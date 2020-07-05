@@ -1,0 +1,13 @@
+# Cargo compilation/executables
+debug/
+target/
+
+# Keep this only for binaries
+Cargo.lock
+
+# Rust backup files
+**/*.rs.bk
+
+# VSCode files
+*.code-workspace
+*/.vscode
