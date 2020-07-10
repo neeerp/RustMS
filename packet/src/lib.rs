@@ -1,7 +1,6 @@
-
-
 pub mod packet {
     use std::io::Write;
+    use byteorder::{LittleEndian, WriteBytesExt};
 
     pub struct MaplePacket {
         bytes: Vec<u8>
@@ -25,19 +24,16 @@ pub mod packet {
             self.bytes.write(bytes).unwrap();
         }
 
-        #[allow(unused_variables)]
         pub fn write_short(&mut self, short: i16) {
-
+            self.bytes.write_u16::<LittleEndian>(short as u16).unwrap();
         }
 
-        #[allow(unused_variables)]
         pub fn write_int(&mut self, int: i32) {
-
+            self.bytes.write_u32::<LittleEndian>(int as u32).unwrap();
         }
 
-        #[allow(unused_variables)]
         pub fn write_long(&mut self, long: i64) {
-
+            self.bytes.write_u64::<LittleEndian>(long as u64).unwrap();
         }
     }
 }
@@ -56,7 +52,7 @@ mod tests {
     
     #[test]
     fn write_byte() {
-        for i in 0..100 {
+        for _ in 0..100 {
             let mut packet = MaplePacket::new();
             let byte: u8 = random();
             packet.write_byte(byte);
@@ -68,12 +64,12 @@ mod tests {
     #[test]
     fn write_bytes() {
         let mut rng = thread_rng();
-        for i in 0..100 {
+        for _ in 0..100 {
             let mut packet = MaplePacket::new();
             let length = rng.gen_range(1, 10);
             let mut bytes: Vec<u8> = Vec::new();
 
-            for i in 0..length {
+            for _ in 0..length {
                 bytes.push(random())
             }
 
