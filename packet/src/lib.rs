@@ -16,24 +16,28 @@ pub mod packet {
             self.bytes.as_slice()
         }
 
-        pub fn write_byte(&mut self, byte: u8) {
-            self.bytes.push(byte); 
+        pub fn write_byte(&mut self, byte: &u8) {
+            self.bytes.push(*byte);
         }
 
         pub fn write_bytes(&mut self, bytes: &[u8]) {
             self.bytes.write(bytes).unwrap();
         }
 
-        pub fn write_short(&mut self, short: i16) {
-            self.bytes.write_u16::<LittleEndian>(short as u16).unwrap();
+        pub fn write_short(&mut self, short: &i16) {
+            self.bytes.write_u16::<LittleEndian>(*short as u16).unwrap();
         }
 
-        pub fn write_int(&mut self, int: i32) {
-            self.bytes.write_u32::<LittleEndian>(int as u32).unwrap();
+        pub fn write_int(&mut self, int: &i32) {
+            self.bytes.write_u32::<LittleEndian>(*int as u32).unwrap();
         }
 
-        pub fn write_long(&mut self, long: i64) {
-            self.bytes.write_u64::<LittleEndian>(long as u64).unwrap();
+        pub fn write_long(&mut self, long: &i64) {
+            self.bytes.write_u64::<LittleEndian>(*long as u64).unwrap();
+        }
+
+        pub fn write_ascii(&mut self, string: &str) {
+            self.bytes.write(string.as_bytes()).unwrap();
         }
     }
 }
@@ -42,6 +46,7 @@ pub mod packet {
 mod tests {
     use crate::packet::MaplePacket;
     use rand::{random, thread_rng, Rng};
+    use rand::distributions::Alphanumeric;
 
     #[test]
     fn empty_packet_is_empty() {
@@ -55,7 +60,7 @@ mod tests {
         for _ in 0..100 {
             let mut packet = MaplePacket::new();
             let byte: u8 = random();
-            packet.write_byte(byte);
+            packet.write_byte(&byte);
 
             assert_eq!(packet.get_bytes(), [byte]);
         }
@@ -86,7 +91,7 @@ mod tests {
             let mut packet = MaplePacket::new();
             let short: i16 = random();
 
-            packet.write_short(short);
+            packet.write_short(&short);
 
             assert_eq!(packet.get_bytes()[0], (short & 0xFF) as u8);
             assert_eq!(packet.get_bytes()[1], ((short >> 8) & 0xFF) as u8);
@@ -99,7 +104,7 @@ mod tests {
             let mut packet = MaplePacket::new();
             let integer: i32 = random();
 
-            packet.write_int(integer);
+            packet.write_int(&integer);
 
             assert_eq!(packet.get_bytes()[0], (integer & 0xFF) as u8);
             assert_eq!(packet.get_bytes()[1], ((integer >> 8) & 0xFF) as u8);
@@ -114,7 +119,7 @@ mod tests {
             let mut packet = MaplePacket::new();
             let long: i64 = random();
 
-            packet.write_long(long);
+            packet.write_long(&long);
 
             assert_eq!(packet.get_bytes()[0], (long & 0xFF) as u8);
             assert_eq!(packet.get_bytes()[1], ((long >> 8) & 0xFF) as u8);
@@ -124,6 +129,27 @@ mod tests {
             assert_eq!(packet.get_bytes()[5], ((long >> 40) & 0xFF) as u8);
             assert_eq!(packet.get_bytes()[6], ((long >> 48) & 0xFF) as u8);
             assert_eq!(packet.get_bytes()[7], ((long >> 56) & 0xFF) as u8);
+        }
+    }
+
+    #[test]
+    fn write_ascii() {
+        for _ in 0..100 {
+            let mut packet = MaplePacket::new();
+
+            let length = rand::thread_rng()
+                .gen_range(0,255);
+            let test_string = rand::thread_rng()
+                .sample_iter(&Alphanumeric)
+                .take(length)
+                .collect::<String>();
+
+            packet.write_ascii(&test_string);
+
+            assert_eq!(
+                String::from_utf8(packet.get_bytes().to_vec()).unwrap(),
+                test_string
+            );
         }
     }
 }
