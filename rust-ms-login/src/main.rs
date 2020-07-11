@@ -3,6 +3,8 @@ use std::net::{TcpListener, TcpStream};
 use std::process::exit;
 use std::thread;
 
+use packet::MaplePacket;
+
 fn main() {
     println!("Starting up...");
 
@@ -26,9 +28,9 @@ fn main() {
 }
 
 fn handle_connection(mut stream: TcpStream) {
-    // Handshake with a v28 game client - Following Hucaru's start here
-    let handshake_packet: [u8; 15] = [13, 0, 28, 0, 0, 0, 28, 62, 13, 176, 236, 76, 141, 116, 8];
-    match stream.write(&handshake_packet) {
+    let handshake_packet = build_handshake_packet();
+
+    match stream.write(handshake_packet.get_bytes()) {
         Ok(_) => println!("Handshake sent"),
         Err(e) => println!("Could not send Handshake: {}", e),
     }
@@ -44,4 +46,34 @@ fn handle_connection(mut stream: TcpStream) {
     }
 
     println!("Connection terminated");
+}
+
+// Handshake with a v28 game client
+fn build_handshake_packet() -> MaplePacket {
+    let mut packet = MaplePacket::new();
+
+    packet.write_short(0x0E); // Packet length header
+    packet.write_short(28); // Version
+
+    // Not sure what this is meant to represent
+    // Interestingly enough, both 00 00 and 01 00 XX
+    // will work as long as length header changes accordingly
+    // - Valhalla does the former, HeavenMS the latter... 
+    //
+    // Changing the first 2 bytes breaks things, making the client
+    // spit out a normal client error with some bad unicode. When the packet
+    // is 14 bytes however, setting the first byte to 0 causes the client
+    // to seg fault.
+    packet.write_short(1);
+    packet.write_byte(49);
+
+    // Initialization vectors that would be used for encryption... They're hardcoded though
+    let recv_iv: [u8; 4] = [28, 62, 13, 176];
+    let send_iv: [u8; 4] = [236, 76, 141, 116];
+
+    packet.write_bytes(&recv_iv);
+    packet.write_bytes(&send_iv);
+    packet.write_byte(8); // Locale byte
+
+    packet
 }
