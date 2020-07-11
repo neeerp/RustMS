@@ -1,3 +1,5 @@
+pub use self::packet::MaplePacket;
+
 pub mod packet {
     use std::io::Write;
     use byteorder::{LittleEndian, WriteBytesExt};
@@ -6,7 +8,6 @@ pub mod packet {
         bytes: Vec<u8>
     }
 
-    #[allow(dead_code)]
     impl MaplePacket {
         pub fn new() -> MaplePacket {
             MaplePacket {bytes: vec![]}
