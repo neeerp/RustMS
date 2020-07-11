@@ -17,7 +17,7 @@ pub mod packet {
         }
 
         pub fn write_byte(&mut self, byte: u8) {
-            self.bytes.push(byte); 
+            self.bytes.push(byte);
         }
 
         pub fn write_bytes(&mut self, bytes: &[u8]) {
@@ -35,6 +35,15 @@ pub mod packet {
         pub fn write_long(&mut self, long: i64) {
             self.bytes.write_u64::<LittleEndian>(long as u64).unwrap();
         }
+
+        pub fn write_ascii(&mut self, string: &str) {
+            self.bytes.write(string.as_bytes()).unwrap();
+        }
+
+        pub fn write_maple_ascii(&mut self, string: &str) {
+            self.write_short(string.len() as i16);
+            self.write_ascii(string);
+        }
     }
 }
 
@@ -42,6 +51,9 @@ pub mod packet {
 mod tests {
     use crate::packet::MaplePacket;
     use rand::{random, thread_rng, Rng};
+    use rand::distributions::Alphanumeric;
+
+    use byteorder::{LittleEndian, ReadBytesExt};
 
     #[test]
     fn empty_packet_is_empty() {
@@ -124,6 +136,54 @@ mod tests {
             assert_eq!(packet.get_bytes()[5], ((long >> 40) & 0xFF) as u8);
             assert_eq!(packet.get_bytes()[6], ((long >> 48) & 0xFF) as u8);
             assert_eq!(packet.get_bytes()[7], ((long >> 56) & 0xFF) as u8);
+        }
+    }
+
+    #[test]
+    fn write_ascii() {
+        for _ in 0..100 {
+            let mut packet = MaplePacket::new();
+
+            let length = rand::thread_rng()
+                .gen_range(0,255);
+            let test_string = rand::thread_rng()
+                .sample_iter(&Alphanumeric)
+                .take(length)
+                .collect::<String>();
+
+            packet.write_ascii(&test_string);
+
+            assert_eq!(
+                String::from_utf8(packet.get_bytes().to_vec()).unwrap(),
+                test_string
+            );
+        }
+    }
+
+    #[test]
+    fn write_length_headered_ascii() {
+        for _ in 0..100 {
+            let mut packet = MaplePacket::new();
+
+            let length = rand::thread_rng()
+                .gen_range(0,255);
+            let test_string = rand::thread_rng()
+                .sample_iter(&Alphanumeric)
+                .take(length)
+                .collect::<String>();
+
+            packet.write_maple_ascii(&test_string);
+
+            assert_eq!(
+                packet.get_bytes().read_u16::<LittleEndian>().unwrap(),
+                length as u16
+            );
+
+            assert_eq!(
+                String::from_utf8(packet.get_bytes()[2..].to_vec()).unwrap(),
+                test_string
+            );
+            
         }
     }
 }
