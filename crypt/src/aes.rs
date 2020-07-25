@@ -1,11 +1,10 @@
+use aes::block_cipher::generic_array::GenericArray;
+use aes::block_cipher::{BlockCipher, NewBlockCipher};
 use aes::Aes256;
-use ofb::Ofb;
-use ofb::stream_cipher::{NewStreamCipher, SyncStreamCipher};
 
-type AesOfb = Ofb<Aes256>;
+use crate::constants;
 
 pub struct MapleAES {
-    cipher: AesOfb,
     iv: Vec<u8>,
     maple_version: i16,
 }
@@ -14,14 +13,9 @@ impl MapleAES {
     /// Instantiate a new Maple AES Cipher
     pub fn new(iv: Vec<u8>, maple_version: i16) -> MapleAES {
 
-        // TODO: Verify that it is actually necessary to swap the bytes here...
         let maple_version: i16 = ((maple_version >> 8) & 0xFF) | ((((maple_version as u32) << 8) & 0xFF00) as i16);
 
-        // Initialize cipher with no nonce... is that right...?
-        let key = super::get_trimmed_user_key();
-        let cipher: Ofb<Aes256> = AesOfb::new_var(&key, &[0u8; 16]).unwrap();
         MapleAES {
-            cipher,
             iv,
             maple_version
         }
@@ -33,14 +27,22 @@ impl MapleAES {
         let mut llength = 0x5B0;
         let mut start = 0;
 
+        let mut key = self.get_trimmed_user_key();
+        let key = 
+            GenericArray::from_mut_slice(&mut key);
+        let cipher = Aes256::new(&key);
+
         while remaining > 0 {
-            let mut iv = super::multiply_bytes(&self.iv, 4, 4);
+            let mut iv = self.repeat_bytes(&self.iv,  4);
+            let mut iv = 
+                GenericArray::from_mut_slice(&mut iv);
+
             if remaining < llength {
                 llength = remaining;
             }
             for i in start..(start+llength) {
                 if (i - start) % iv.len() == 0 {
-                    self.cipher.apply_keystream(&mut iv)
+                    cipher.encrypt_block(&mut iv);
                 }
                 data[i] ^= iv[(i - start) % iv.len()];
             }
@@ -50,6 +52,21 @@ impl MapleAES {
         }
 
         self.update_iv();
+    }
+
+    /// Check if header is for a valid maplestory packet
+    pub fn check_header(&self, packet: &[u8]) -> bool {
+        ((packet[0] ^ self.iv[2]) & 0xFF) == ((self.maple_version >> 8) as u8 & 0xFF) &&
+        ((packet[1] ^ self.iv[3]) & 0xFF) == (self.maple_version & 0xFF) as u8
+    }
+
+    /// Check if header is for a valid maplestory packet, taking the header as a u32
+    pub fn check_header_u32(&self, packet_header: u32) -> bool {
+        let header_buf: Vec<u8> = vec![
+            (packet_header >> 24) as u8 & 0xFF,
+            (packet_header >> 16) as u8 & 0xFF
+        ];
+        self.check_header(&header_buf)
     }
 
     /// Generate a packet header for a packet of a given length using the
@@ -67,21 +84,6 @@ impl MapleAES {
             (xored_iv >> 8) as u8 & 0xFF,
             xored_iv as u8 & 0xFF
         ]
-    }
-
-    /// Check if header is for a valid maplestory packet
-    pub fn check_header(&self, packet: &[u8]) -> bool {
-        ((packet[0] ^ self.iv[2]) & 0xFF) == ((self.maple_version >> 8) as u8 & 0xFF) &&
-        ((packet[1] ^ self.iv[3]) & 0xFF) == (self.maple_version & 0xFF) as u8
-    }
-
-    /// Check if header is for a valid maplestory packet, taking the header as a u32
-    pub fn check_header_u32(&self, packet_header: u32) -> bool {
-        let header_buf: Vec<u8> = vec![
-            (packet_header >> 24) as u8 & 0xFF,
-            (packet_header >> 16) as u8 & 0xFF
-        ];
-        self.check_header(&header_buf)
     }
 
     /// Get packet length from header
@@ -102,9 +104,58 @@ impl MapleAES {
         packet_length as i32
     }
 
-    fn update_iv(&mut self) {
-        self.iv = super::get_new_iv(&self.iv);
+    fn get_trimmed_user_key(&self) -> [u8; 32] {
+        let mut key = [0u8; 32];
+        for i in (0..128).step_by(16) {
+            key[i / 4] = constants::USER_KEY[i];
+        }
+        key
     }
+
+    fn update_iv(&mut self) {
+        self.iv = self.get_new_iv(&self.iv);
+    }
+
+    /// Shuffle algorithm to generate a new Initialization Vector based off
+    /// of the old one. Based directly off of HeavenClient's implementation.
+    fn get_new_iv(&self, iv: &Vec<u8>) -> Vec<u8> {
+        let mut new_iv: Vec<u8> = constants::DEFAULT_AES_KEY_VALUE.to_vec();
+        let shuffle_bytes = constants::SHUFFLE_BYTES;
+
+        for i in 0..4 {
+            let byte = iv[i];
+            new_iv[0] = new_iv[0].wrapping_add(shuffle_bytes[(new_iv[1] & 0xFF) as usize].wrapping_sub(byte));
+            new_iv[1] = new_iv[1].wrapping_sub(new_iv[2] ^ shuffle_bytes[(byte & 0xFF) as usize] & 0xFF);
+            new_iv[2] = new_iv[2] ^ (shuffle_bytes[(new_iv[3] & 0xFF) as usize].wrapping_add(byte));
+            new_iv[3] = new_iv[3].wrapping_add((shuffle_bytes[(byte & 0xFF) as usize] & 0xFF).wrapping_sub(new_iv[0] & 0xFF));
+
+            let mut mask = 0usize;
+            mask |= (new_iv[0] as usize) & 0xFF;
+            mask |= ((new_iv[1] as usize) << 8) & 0xFF00;
+            mask |= ((new_iv[2] as usize) << 16) & 0xFF0000;
+            mask |= ((new_iv[3] as usize) << 24) & 0xFF000000;
+            mask = (mask >> 0x1D) | (mask << 3);
+
+            for j in 0..4 {
+                new_iv[j] = ((mask >> (8 * j)) & 0xFF) as u8;
+            }
+        }
+
+        new_iv
+    }
+
+    /// Repeat the bytes in the given vector `mul` times.
+    fn repeat_bytes(&self, input: &[u8], mul: usize) -> Vec<u8> {
+        let mut result: Vec<u8> = Vec::new();
+        let iv_len = input.len();
+
+        for i in 0..(iv_len*mul) {
+            result.push(input[(i % iv_len) as usize]);
+        }
+
+        result
+    }
+
 }
 
 #[cfg(test)]
@@ -117,7 +168,7 @@ mod tests {
         for _ in 0..25 {
             // Generate an IV
             let mut iv: Vec<u8> = Vec::new();
-            for _ in 0..16 {
+            for _ in 0..4 {
                 iv.push(random());
             }
 
