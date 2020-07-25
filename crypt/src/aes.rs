@@ -168,7 +168,7 @@ mod tests {
         for _ in 0..25 {
             // Generate an IV
             let mut iv: Vec<u8> = Vec::new();
-            for _ in 0..16 {
+            for _ in 0..4 {
                 iv.push(random());
             }
 
