@@ -1,5 +1,6 @@
 
 pub mod session;
+pub mod error;
 
 #[cfg(test)]
 mod tests {

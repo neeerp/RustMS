@@ -1,5 +1,7 @@
 mod model;
 
+pub use self::model::packet::{Packet, MAX_PACKET_LENGTH, INVALID_OPCODE};
+
 pub use self::pkt::MaplePacket;
 
 pub mod pkt {

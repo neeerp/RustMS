@@ -26,10 +26,10 @@ fn main() {
 
 }
 
-fn handle_connection(mut stream: TcpStream) {
+fn handle_connection(stream: TcpStream) {
     let mut session = Session::new(stream);
 
-    session.handle();
+    session.listen();
 
     println!("Connection terminated");
 }
