@@ -1,13 +1,11 @@
 [package]
-name = "rust-ms-login"
+name = "net"
 version = "0.1.0"
-authors = ["David"]
+authors = ["David Goldstein <goldstein.g.david@gmail.com>"]
 edition = "2018"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-ctrlc = "3.1.4"
-crypt = { path = "../crypt"}
 packet = { path = "../packet" }
-net = { path = "../net" }
+crypt = { path = "../crypt" }
