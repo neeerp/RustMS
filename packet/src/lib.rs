@@ -1,6 +1,10 @@
-pub use self::packet::MaplePacket;
+mod model;
 
-pub mod packet {
+pub use self::model::packet::{Packet, MAX_PACKET_LENGTH, INVALID_OPCODE};
+
+pub use self::pkt::MaplePacket;
+
+pub mod pkt {
     use std::io::Write;
     use byteorder::{LittleEndian, WriteBytesExt};
 
@@ -50,7 +54,7 @@ pub mod packet {
 
 #[cfg(test)]
 mod tests {
-    use crate::packet::MaplePacket;
+    use crate::MaplePacket;
     use rand::{random, thread_rng, Rng};
     use rand::distributions::Alphanumeric;
 
