@@ -1,12 +1,12 @@
 use crypt::MapleAES;
-use crypt::maple_crypt;
 
-use packet::{MaplePacket, MAX_PACKET_LENGTH};
+use packet::{Packet, MaplePacket};
 use std::net::TcpStream;
-use std::io::{Write, Read};
+use std::io::Write;
 use std::time::Duration;
 
 use crate::error::NetworkError;
+use crate::accept;
 
 use bufstream::BufStream;
 use rand::{Rng, thread_rng};
@@ -80,74 +80,6 @@ impl Session {
         packet
     }
 
-    /// Read a new packet header from the session stream and determine its
-    /// length.
-    fn read_packet_header(&mut self) -> Result<i16, NetworkError> {
-        let mut header_buf: [u8; 4] = [0u8; 4];
-
-        match self.stream.read_exact(&mut header_buf) {
-            Ok(_) => self.parse_header(&header_buf), 
-            Err(e) => Err(NetworkError::CouldNotReadHeader(e)),
-        }
-    }
-
-    /// Parse the packet header and return the length of the incoming packet.
-    fn parse_header(&mut self, header_buf: &[u8; 4]) -> Result<i16, NetworkError> {
-        if self.recv_crypt.check_header(&header_buf[..]) {
-            let length = self.recv_crypt.get_packet_length(&header_buf[..]);
-
-            Session::validate_packet_length(length)
-        } else {
-            Err(NetworkError::InvalidHeader)
-        }
-    }
-
-    /// Check that the given length value neither exceeds the maximum packet
-    /// length nor is too short to contain an opcode.
-    fn validate_packet_length(length: i16) -> Result<i16, NetworkError> {
-        if length < 2 || length > MAX_PACKET_LENGTH {
-            Err(NetworkError::InvalidPacketLength(length))
-        } else {
-            Ok(length)
-        }
-    }
-
-
-    /// Read a packet from the session stream given a `parsed_len` from a
-    /// packet header that was just read.
-    fn read_packet(&mut self, parsed_len: i16) -> Result<(), NetworkError> {
-        let mut buf = vec![0u8; parsed_len as usize];
-        match self.stream.read_exact(&mut buf) {
-            Ok(_) => {
-                // Decrypt incoming packet
-                self.recv_crypt.crypt(&mut buf[..]);
-                maple_crypt::decrypt(&mut buf[..]);
-
-                self.handle_packet(buf)
-            },
-            Err(_) => Err(NetworkError::InvalidPacket)
-        }
-    }
-
-
-    /// Deal with the packet data by printing it out.
-    fn handle_packet(&mut self, buf: Vec<u8>) -> Result<(), NetworkError> {
-        // TODO: Implement handlers that we delegate to based off opcode
-        println!("Opcode byte values: {} {}", buf[0], buf[1]);
-        println!("Received packet: {}", to_hex_string(buf));
-
-        Ok(())
-    }
-
-
-    /// Read packets from the session stream.
-    fn read_from_stream(&mut self) -> Result<(), NetworkError> {
-        match self.read_packet_header() {
-            Ok(len) => self.read_packet(len),
-            Err(e) => Err(e)
-        }
-    }
-
     /// Listen for packets being sent from the client via the session stream.
     pub fn listen(&mut self) {
         loop {
@@ -160,6 +92,23 @@ impl Session {
                 }
             }
         }
+    }
+
+    /// Read packets from the session stream.
+    fn read_from_stream(&mut self) -> Result<(), NetworkError> {
+        match accept::read_packet(&mut self.stream, &mut self.recv_crypt) {
+            Ok(packet) => self.handle_packet(packet),
+            Err(e) => Err(e)
+        }
+    }
+
+    /// Deal with the packet data by printing it out.
+    fn handle_packet(&mut self, packet: Packet) -> Result<(), NetworkError> {
+        // TODO: Implement handlers that we delegate to based off opcode
+        println!("Opcode: {}", packet.opcode());
+        println!("Received packet: {}", to_hex_string(packet.bytes));
+
+        Ok(())
     }
 }
 
