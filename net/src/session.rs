@@ -1,15 +1,15 @@
 use crypt::MapleAES;
 
-use packet::{Packet, MaplePacket};
-use std::net::TcpStream;
+use packet::{MaplePacket, Packet};
 use std::io::Write;
+use std::net::TcpStream;
 use std::time::Duration;
 
-use crate::error::NetworkError;
 use crate::accept;
+use crate::error::NetworkError;
 
 use bufstream::BufStream;
-use rand::{Rng, thread_rng};
+use rand::{thread_rng, Rng};
 
 pub struct Session {
     pub stream: BufStream<TcpStream>,
@@ -18,13 +18,16 @@ pub struct Session {
 }
 
 impl Session {
-
     /// Instantiate a new maplestory client session, generating encryption
     /// IVs in the process.
     pub fn new(mut stream: TcpStream) -> Session {
         // Set timeouts on stream so that IO does not block for too long
-        stream.set_read_timeout(Some(Duration::from_secs(90))).expect("Could not set read timeout");
-        stream.set_write_timeout(Some(Duration::from_secs(10))).expect("Could not set write timeout");
+        stream
+            .set_read_timeout(Some(Duration::from_secs(90)))
+            .expect("Could not set read timeout");
+        stream
+            .set_write_timeout(Some(Duration::from_secs(10)))
+            .expect("Could not set write timeout");
 
         // Initialization vectors that would be used for encryption... They're hardcoded though
         let (recv_iv, send_iv) = Session::generate_ivs();
@@ -34,7 +37,7 @@ impl Session {
             Ok(_) => println!("Handshake sent"),
             Err(e) => panic!("Could not send Handshake: {}", e),
         }
-        
+
         let recv_crypt = MapleAES::new(recv_iv, 83);
         let send_crypt = MapleAES::new(send_iv, 83);
 
@@ -98,7 +101,7 @@ impl Session {
     fn read_from_stream(&mut self) -> Result<(), NetworkError> {
         match accept::read_packet(&mut self.stream, &mut self.recv_crypt) {
             Ok(packet) => self.handle_packet(packet),
-            Err(e) => Err(e)
+            Err(e) => Err(e),
         }
     }
 
@@ -114,8 +117,6 @@ impl Session {
 
 // Helper method to print out received packets
 fn to_hex_string(bytes: Vec<u8>) -> String {
-  let strs: Vec<String> = bytes.iter()
-                               .map(|b| format!("{:02X}", b))
-                               .collect();
-  strs.join(" ")
+    let strs: Vec<String> = bytes.iter().map(|b| format!("{:02X}", b)).collect();
+    strs.join(" ")
 }

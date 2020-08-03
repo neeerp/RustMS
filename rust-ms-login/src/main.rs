@@ -11,7 +11,8 @@ fn main() {
     ctrlc::set_handler(move || {
         println!("Shutting down...");
         exit(0);
-    }).expect("Error setting ctrl+c handler!");
+    })
+    .expect("Error setting ctrl+c handler!");
 
     let listener = TcpListener::bind("0.0.0.0:8484").unwrap();
 
@@ -23,7 +24,6 @@ fn main() {
             handle_connection(stream);
         });
     }
-
 }
 
 fn handle_connection(stream: TcpStream) {

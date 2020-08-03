@@ -12,35 +12,30 @@ pub struct MapleAES {
 impl MapleAES {
     /// Instantiate a new Maple AES Cipher
     pub fn new(iv: Vec<u8>, maple_version: i16) -> MapleAES {
+        let maple_version: i16 =
+            ((maple_version >> 8) & 0xFF) | ((((maple_version as u32) << 8) & 0xFF00) as i16);
 
-        let maple_version: i16 = ((maple_version >> 8) & 0xFF) | ((((maple_version as u32) << 8) & 0xFF00) as i16);
-
-        MapleAES {
-            iv,
-            maple_version
-        }
+        MapleAES { iv, maple_version }
     }
 
     /// Encrypt data using Maplestory's custom AES encryption
-    pub fn crypt(&mut self, data: &mut[u8]) {
+    pub fn crypt(&mut self, data: &mut [u8]) {
         let mut remaining = data.len();
         let mut llength = 0x5B0;
         let mut start = 0;
 
         let mut key = self.get_trimmed_user_key();
-        let key = 
-            GenericArray::from_mut_slice(&mut key);
+        let key = GenericArray::from_mut_slice(&mut key);
         let cipher = Aes256::new(&key);
 
         while remaining > 0 {
-            let mut iv = self.repeat_bytes(&self.iv,  4);
-            let mut iv = 
-                GenericArray::from_mut_slice(&mut iv);
+            let mut iv = self.repeat_bytes(&self.iv, 4);
+            let mut iv = GenericArray::from_mut_slice(&mut iv);
 
             if remaining < llength {
                 llength = remaining;
             }
-            for i in start..(start+llength) {
+            for i in start..(start + llength) {
                 if (i - start) % iv.len() == 0 {
                     cipher.encrypt_block(&mut iv);
                 }
@@ -56,15 +51,15 @@ impl MapleAES {
 
     /// Check if header is for a valid maplestory packet
     pub fn check_header(&self, packet: &[u8]) -> bool {
-        ((packet[0] ^ self.iv[2]) & 0xFF) == ((self.maple_version >> 8) as u8 & 0xFF) &&
-        ((packet[1] ^ self.iv[3]) & 0xFF) == (self.maple_version & 0xFF) as u8
+        ((packet[0] ^ self.iv[2]) & 0xFF) == ((self.maple_version >> 8) as u8 & 0xFF)
+            && ((packet[1] ^ self.iv[3]) & 0xFF) == (self.maple_version & 0xFF) as u8
     }
 
     /// Check if header is for a valid maplestory packet, taking the header as a u32
     pub fn check_header_u32(&self, packet_header: u32) -> bool {
         let header_buf: Vec<u8> = vec![
             (packet_header >> 24) as u8 & 0xFF,
-            (packet_header >> 16) as u8 & 0xFF
+            (packet_header >> 16) as u8 & 0xFF,
         ];
         self.check_header(&header_buf)
     }
@@ -77,12 +72,12 @@ impl MapleAES {
         iiv ^= self.maple_version as u32;
         let mlength = (((length as u32) << 8) & 0xFF00) | ((length as u32) >> 8);
         let xored_iv = iiv ^ mlength;
-        
+
         vec![
             (iiv >> 8) as u8 & 0xFF,
             iiv as u8 & 0xFF,
             (xored_iv >> 8) as u8 & 0xFF,
-            xored_iv as u8 & 0xFF
+            xored_iv as u8 & 0xFF,
         ]
     }
 
@@ -92,8 +87,8 @@ impl MapleAES {
             return -1;
         }
 
-        (header[0] as i16 + ((header[1] as i16) << 8)) ^
-        (header[2] as i16 + ((header[3] as i16) << 8)) 
+        (header[0] as i16 + ((header[1] as i16) << 8))
+            ^ (header[2] as i16 + ((header[3] as i16) << 8))
     }
 
     // Get packet length from header, treating header as a u32
@@ -124,10 +119,14 @@ impl MapleAES {
 
         for i in 0..4 {
             let byte = iv[i];
-            new_iv[0] = new_iv[0].wrapping_add(shuffle_bytes[(new_iv[1] & 0xFF) as usize].wrapping_sub(byte));
-            new_iv[1] = new_iv[1].wrapping_sub(new_iv[2] ^ shuffle_bytes[(byte & 0xFF) as usize] & 0xFF);
+            new_iv[0] = new_iv[0]
+                .wrapping_add(shuffle_bytes[(new_iv[1] & 0xFF) as usize].wrapping_sub(byte));
+            new_iv[1] =
+                new_iv[1].wrapping_sub(new_iv[2] ^ shuffle_bytes[(byte & 0xFF) as usize] & 0xFF);
             new_iv[2] = new_iv[2] ^ (shuffle_bytes[(new_iv[3] & 0xFF) as usize].wrapping_add(byte));
-            new_iv[3] = new_iv[3].wrapping_add((shuffle_bytes[(byte & 0xFF) as usize] & 0xFF).wrapping_sub(new_iv[0] & 0xFF));
+            new_iv[3] = new_iv[3].wrapping_add(
+                (shuffle_bytes[(byte & 0xFF) as usize] & 0xFF).wrapping_sub(new_iv[0] & 0xFF),
+            );
 
             let mut mask = 0usize;
             mask |= (new_iv[0] as usize) & 0xFF;
@@ -149,19 +148,18 @@ impl MapleAES {
         let mut result: Vec<u8> = Vec::new();
         let iv_len = input.len();
 
-        for i in 0..(iv_len*mul) {
+        for i in 0..(iv_len * mul) {
             result.push(input[(i % iv_len) as usize]);
         }
 
         result
     }
-
 }
 
 #[cfg(test)]
 mod tests {
-    use rand::{random, thread_rng, Rng};
     use byteorder::{BigEndian, ReadBytesExt};
+    use rand::{random, thread_rng, Rng};
 
     #[test]
     fn test_aes_round_trip() {
@@ -173,8 +171,8 @@ mod tests {
             }
 
             // Create an encryption and decryption cipher instance
-            let mut encrypt_cipher = super::MapleAES::new(iv.clone(),  27);
-            let mut decrypt_cipher = super::MapleAES::new(iv.clone(),  27);
+            let mut encrypt_cipher = super::MapleAES::new(iv.clone(), 27);
+            let mut decrypt_cipher = super::MapleAES::new(iv.clone(), 27);
 
             let length: u16 = random();
 
@@ -204,9 +202,9 @@ mod tests {
         for _ in 0..100 {
             let mut iv: Vec<u8> = Vec::new();
             for _ in 0..4 {
-               iv.push(random());
+                iv.push(random());
             }
-            let cipher = super::MapleAES::new(iv,  27);
+            let cipher = super::MapleAES::new(iv, 27);
 
             let initial_length: i16 = rng.gen_range(0, 16000);
 

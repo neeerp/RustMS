@@ -1,20 +1,20 @@
 mod model;
 
-pub use self::model::packet::{Packet, MAX_PACKET_LENGTH, INVALID_OPCODE};
+pub use self::model::packet::{Packet, INVALID_OPCODE, MAX_PACKET_LENGTH};
 
 pub use self::pkt::MaplePacket;
 
 pub mod pkt {
-    use std::io::Write;
     use byteorder::{LittleEndian, WriteBytesExt};
+    use std::io::Write;
 
     pub struct MaplePacket {
-        bytes: Vec<u8>
+        bytes: Vec<u8>,
     }
 
     impl MaplePacket {
         pub fn new() -> MaplePacket {
-            MaplePacket {bytes: vec![]}
+            MaplePacket { bytes: vec![] }
         }
 
         pub fn get_bytes(&self) -> &[u8] {
@@ -55,8 +55,8 @@ pub mod pkt {
 #[cfg(test)]
 mod tests {
     use crate::MaplePacket;
-    use rand::{random, thread_rng, Rng};
     use rand::distributions::Alphanumeric;
+    use rand::{random, thread_rng, Rng};
 
     use byteorder::{LittleEndian, ReadBytesExt};
 
@@ -66,7 +66,7 @@ mod tests {
 
         assert_eq!(packet.get_bytes().len(), 0);
     }
-    
+
     #[test]
     fn write_byte() {
         for _ in 0..100 {
@@ -149,8 +149,7 @@ mod tests {
         for _ in 0..100 {
             let mut packet = MaplePacket::new();
 
-            let length = rand::thread_rng()
-                .gen_range(0,255);
+            let length = rand::thread_rng().gen_range(0, 255);
             let test_string = rand::thread_rng()
                 .sample_iter(&Alphanumeric)
                 .take(length)
@@ -170,8 +169,7 @@ mod tests {
         for _ in 0..100 {
             let mut packet = MaplePacket::new();
 
-            let length = rand::thread_rng()
-                .gen_range(0,255);
+            let length = rand::thread_rng().gen_range(0, 255);
             let test_string = rand::thread_rng()
                 .sample_iter(&Alphanumeric)
                 .take(length)
@@ -188,7 +186,6 @@ mod tests {
                 String::from_utf8(packet.get_bytes()[2..].to_vec()).unwrap(),
                 test_string
             );
-            
         }
     }
 }

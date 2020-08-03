@@ -1,6 +1,6 @@
 /// A data model for a network packet.
 pub struct Packet {
-    pub bytes: Vec<u8>
+    pub bytes: Vec<u8>,
 }
 
 impl Packet {
@@ -16,9 +16,7 @@ impl Packet {
         }
 
         let bytes = buffer.to_vec();
-        Packet {
-            bytes
-        }
+        Packet { bytes }
     }
 
     /// Return the opcode of packet.
@@ -26,16 +24,17 @@ impl Packet {
     /// If the packet has no opcode because it is too short or if the
     /// opcode is negative, returns the `INVALID_OPCODE` sentinel.
     pub fn opcode(&self) -> i16 {
-       if self.bytes.len() > 1 {
-           let opcode: i16 = (
-               (self.bytes[0] as u16) | (
-               (self.bytes[1] as u16) << 8)
-            ) as i16;
+        if self.bytes.len() > 1 {
+            let opcode: i16 = ((self.bytes[0] as u16) | ((self.bytes[1] as u16) << 8)) as i16;
 
-            if opcode >= 0 { opcode } else { INVALID_OPCODE }
-       } else {
-           INVALID_OPCODE
-       }
+            if opcode >= 0 {
+                opcode
+            } else {
+                INVALID_OPCODE
+            }
+        } else {
+            INVALID_OPCODE
+        }
     }
 
     /// Return the length of the packet.
@@ -52,10 +51,10 @@ pub const MAX_PACKET_LENGTH: i16 = i16::MAX;
 
 #[cfg(test)]
 pub mod tests {
+    use super::{Packet, INVALID_OPCODE, MAX_PACKET_LENGTH};
     use byteorder::{LittleEndian, WriteBytesExt};
     use rand::{thread_rng, Rng};
     use std::iter;
-    use super::{Packet, INVALID_OPCODE, MAX_PACKET_LENGTH};
 
     #[test]
     fn read_correct_opcodes() {
@@ -69,7 +68,7 @@ pub mod tests {
             let packet = Packet::new(&buf);
 
             assert_eq!(packet.opcode(), opcode);
-        } 
+        }
     }
 
     #[test]
@@ -84,7 +83,7 @@ pub mod tests {
             let packet = Packet::new(&buf);
 
             assert_eq!(packet.opcode(), INVALID_OPCODE);
-        } 
+        }
     }
 
     #[test]
@@ -101,7 +100,7 @@ pub mod tests {
             let packet = Packet::new(&vec![rng.gen()]);
 
             assert_eq!(packet.opcode(), INVALID_OPCODE);
-        } 
+        }
     }
 
     #[test]
@@ -114,7 +113,7 @@ pub mod tests {
             rng.fill(&mut buf[..]);
 
             let packet = Packet::new(&buf);
-            
+
             assert_eq!(packet.len(), length as i16);
         }
     }
