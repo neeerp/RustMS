@@ -10,3 +10,4 @@ edition = "2018"
 packet = { path = "../packet" }
 crypt = { path = "../crypt" }
 bufstream = "0.1.4"
+rand = "0.7.3"

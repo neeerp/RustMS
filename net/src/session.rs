@@ -9,6 +9,7 @@ use std::time::Duration;
 use crate::error::NetworkError;
 
 use bufstream::BufStream;
+use rand::{Rng, thread_rng};
 
 pub struct Session {
     pub stream: BufStream<TcpStream>,
@@ -17,14 +18,16 @@ pub struct Session {
 }
 
 impl Session {
+
+    /// Instantiate a new maplestory client session, generating encryption
+    /// IVs in the process.
     pub fn new(mut stream: TcpStream) -> Session {
         // Set timeouts on stream so that IO does not block for too long
         stream.set_read_timeout(Some(Duration::from_secs(90))).expect("Could not set read timeout");
         stream.set_write_timeout(Some(Duration::from_secs(10))).expect("Could not set write timeout");
 
         // Initialization vectors that would be used for encryption... They're hardcoded though
-        let recv_iv: Vec<u8> = vec![28, 62, 13, 176];
-        let send_iv: Vec<u8> = vec![236, 76, 141, 116];
+        let (recv_iv, send_iv) = Session::generate_ivs();
 
         let handshake_packet = Session::build_handshake_packet(&recv_iv, &send_iv);
         match stream.write(handshake_packet.get_bytes()) {
@@ -44,6 +47,20 @@ impl Session {
         }
     }
 
+    /// Generate a pair of encryption IVs.
+    fn generate_ivs() -> (Vec<u8>, Vec<u8>) {
+        let mut recv_iv: Vec<u8> = vec![0u8; 4];
+        let mut send_iv: Vec<u8> = vec![0u8; 4];
+
+        let mut rng = thread_rng();
+        rng.fill(&mut recv_iv[..]);
+        rng.fill(&mut send_iv[..]);
+
+        (recv_iv, send_iv)
+    }
+
+    /// Build the handshake_packet which shares the encryption IVs with the
+    /// client.
     fn build_handshake_packet(recv_iv: &Vec<u8>, send_iv: &Vec<u8>) -> MaplePacket {
         let mut packet = MaplePacket::new();
 
@@ -56,7 +73,6 @@ impl Session {
         packet.write_short(0);
         packet.write_byte(0);
 
-
         packet.write_bytes(&recv_iv);
         packet.write_bytes(&send_iv);
         packet.write_byte(8); // Locale byte
@@ -64,7 +80,8 @@ impl Session {
         packet
     }
 
-
+    /// Read a new packet header from the session stream and determine its
+    /// length.
     fn read_packet_header(&mut self) -> Result<i16, NetworkError> {
         let mut header_buf: [u8; 4] = [0u8; 4];
 
@@ -74,6 +91,7 @@ impl Session {
         }
     }
 
+    /// Parse the packet header and return the length of the incoming packet.
     fn parse_header(&mut self, header_buf: &[u8; 4]) -> Result<i16, NetworkError> {
         if self.recv_crypt.check_header(&header_buf[..]) {
             let length = self.recv_crypt.get_packet_length(&header_buf[..]);
@@ -84,6 +102,8 @@ impl Session {
         }
     }
 
+    /// Check that the given length value neither exceeds the maximum packet
+    /// length nor is too short to contain an opcode.
     fn validate_packet_length(length: i16) -> Result<i16, NetworkError> {
         if length < 2 || length > MAX_PACKET_LENGTH {
             Err(NetworkError::InvalidPacketLength(length))
@@ -93,6 +113,8 @@ impl Session {
     }
 
 
+    /// Read a packet from the session stream given a `parsed_len` from a
+    /// packet header that was just read.
     fn read_packet(&mut self, parsed_len: i16) -> Result<(), NetworkError> {
         let mut buf = vec![0u8; parsed_len as usize];
         match self.stream.read_exact(&mut buf) {
@@ -108,6 +130,7 @@ impl Session {
     }
 
 
+    /// Deal with the packet data by printing it out.
     fn handle_packet(&mut self, buf: Vec<u8>) -> Result<(), NetworkError> {
         // TODO: Implement handlers that we delegate to based off opcode
         println!("Opcode byte values: {} {}", buf[0], buf[1]);
@@ -117,6 +140,7 @@ impl Session {
     }
 
 
+    /// Read packets from the session stream.
     fn read_from_stream(&mut self) -> Result<(), NetworkError> {
         match self.read_packet_header() {
             Ok(len) => self.read_packet(len),
@@ -124,6 +148,7 @@ impl Session {
         }
     }
 
+    /// Listen for packets being sent from the client via the session stream.
     pub fn listen(&mut self) {
         loop {
             match self.read_from_stream() {
