@@ -11,3 +11,7 @@ Cargo.lock
 # VSCode files
 *.code-workspace
 */.vscode
+
+# Vim files
+.vim
+*.vim
