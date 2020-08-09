@@ -1,7 +1,13 @@
 use crate::io::{PktRead, PktWrite};
 
-use byteorder::{LittleEndian, WriteBytesExt};
+use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
 use std::io::Write;
+
+/// A sentinel for an invalid packet opcode.
+pub const INVALID_OPCODE: i16 = 1;
+
+/// The maximum length a network packet may take on.
+pub const MAX_PACKET_LENGTH: i16 = i16::MAX;
 
 /// A data model for a network packet.
 pub struct Packet {
@@ -54,7 +60,6 @@ impl Packet {
     }
 }
 
-#[allow(unused_variables)]
 impl PktWrite for Packet {
     fn write_byte(&mut self, byte: u8) {
         self.bytes.push(byte);
@@ -80,28 +85,33 @@ impl PktWrite for Packet {
     }
 }
 
-#[allow(unused_variables)]
 impl PktRead for Packet {
     fn read_byte(&self, pos: usize) -> u8 {
-        todo!()
+        self.bytes[pos]
     }
-    fn read_bytes(&self, pos: usize, length: i16) -> &[u8] {
-        todo!()
+    fn read_bytes(&self, pos: usize, length: usize) -> &[u8] {
+        &self.bytes[pos..(pos + length)]
     }
     fn read_short(&self, pos: usize) -> i16 {
-        todo!()
+        let mut slice: &[u8] = &self.bytes[pos..];
+        slice.read_i16::<LittleEndian>().unwrap()
     }
     fn read_int(&self, pos: usize) -> i32 {
-        todo!()
+        let mut slice: &[u8] = &self.bytes[pos..];
+        slice.read_i32::<LittleEndian>().unwrap()
     }
     fn read_long(&self, pos: usize) -> i64 {
-        todo!()
+        let mut slice: &[u8] = &self.bytes[pos..];
+        slice.read_i64::<LittleEndian>().unwrap()
     }
-    fn read_str(&self, pos: usize, length: i16) -> &str {
-        todo!()
+    fn read_str(&self, pos: usize, length: usize) -> String {
+        let chars = self.bytes[pos..(pos + length)].to_vec();
+        String::from_utf8(chars).unwrap()
     }
-    fn read_str_with_length(&self, pos: usize) -> &str {
-        todo!()
+    fn read_str_with_length(&self, pos: usize) -> String {
+        let length = self.read_short(pos) as usize;
+
+        self.read_str(pos + 2, length)
     }
 }
 
@@ -231,7 +241,7 @@ mod read_tests {
 
             packet.write_str(&test_string);
 
-            assert_eq!(packet.read_str(0, test_string.len() as i16), test_string);
+            assert_eq!(packet.read_str(0, test_string.len()), test_string);
         }
     }
 
@@ -249,7 +259,7 @@ mod read_tests {
             packet.write_str_with_length(&test_string);
 
             assert_eq!(packet.read_short(0), length as i16);
-            assert_eq!(packet.read_str(4, test_string.len() as i16), test_string);
+            assert_eq!(packet.read_str(2, test_string.len()), test_string);
             assert_eq!(packet.read_str_with_length(0), test_string);
         }
     }
@@ -267,21 +277,18 @@ mod read_tests {
 
             let hello = "Hello world!";
             let test = "Test!";
-            packet.write_str_with_length("Hello world!");
+
+            packet.write_str_with_length(hello);
             packet.write_str_with_length(&test_string);
-            packet.write_str("Test!");
+            packet.write_str(test);
 
             assert_eq!(packet.read_short(0), hello.len() as i16);
             assert_eq!(packet.read_str_with_length(0), hello);
-            assert_eq!(packet.read_short(4 + hello.len()), length as i16);
-            assert_eq!(packet.read_str_with_length(4 + hello.len()), test_string);
+            assert_eq!(packet.read_short(2 + hello.len()), length as i16);
+            assert_eq!(packet.read_str_with_length(2 + hello.len()), test_string);
             assert_eq!(
-                packet.read_short(8 + hello.len() + length),
-                test.len() as i16
-            );
-            assert_eq!(
-                packet.read_str_with_length(8 + hello.len() + length),
-                test_string
+                packet.read_str(4 + hello.len() + length, test.len() as usize),
+                test
             );
         }
     }
@@ -295,13 +302,6 @@ mod write_tests {
     use rand::{random, thread_rng, Rng};
 
     use byteorder::{LittleEndian, ReadBytesExt};
-
-    #[test]
-    fn empty_packet_is_empty() {
-        let packet = Packet::new_empty();
-
-        assert_eq!(packet.bytes.len(), 0);
-    }
 
     #[test]
     fn write_byte() {
@@ -425,18 +425,20 @@ mod write_tests {
         }
     }
 }
-/// A sentinel for an invalid packet opcode.
-pub const INVALID_OPCODE: i16 = 1;
-
-/// The maximum length a network packet may take on.
-pub const MAX_PACKET_LENGTH: i16 = i16::MAX;
 
 #[cfg(test)]
-pub mod tests {
+mod test_packet {
     use super::{Packet, INVALID_OPCODE, MAX_PACKET_LENGTH};
     use byteorder::{LittleEndian, WriteBytesExt};
     use rand::{thread_rng, Rng};
     use std::iter;
+
+    #[test]
+    fn empty_packet_is_empty() {
+        let packet = Packet::new_empty();
+
+        assert_eq!(packet.bytes.len(), 0);
+    }
 
     #[test]
     fn read_correct_opcodes() {
