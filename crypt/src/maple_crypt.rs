@@ -1,6 +1,6 @@
 /// Functions to encrypt and decrypt data using Maplestory's custom
 /// encryption algorithm.
-
+///
 /// Encrypt bytes using Maplestory's custom encryption algorithm.
 pub fn encrypt(data: &mut [u8]) {
     let size: usize = data.len();
@@ -47,7 +47,7 @@ pub fn decrypt(data: &mut [u8]) {
             c ^= 0x13;
             a = c;
             c ^= b;
-            c = (c as usize).overflowing_sub(j).0 as u8; // Guess this is supposed to be right?
+            c = (c as usize).overflowing_sub(j).0 as u8;
             c = rotr(c, 4);
             b = a;
             data[j - 1] = c;
@@ -60,7 +60,7 @@ pub fn decrypt(data: &mut [u8]) {
             c = rotl(c, j as u32);
             a = c;
             c ^= b;
-            c = (c as usize).overflowing_sub(j).0 as u8; // Guess this is supposed to be right?
+            c = (c as usize).overflowing_sub(j).0 as u8;
             c = rotr(c, 3);
             b = a;
             data[size - j] = c;
@@ -71,13 +71,21 @@ pub fn decrypt(data: &mut [u8]) {
 /// Roll a byte left count times
 fn rotl(byte: u8, count: u32) -> u8 {
     let count = count % 8;
-    if count > 0 { (byte << count) | (byte >> (8 - count)) } else { byte }
+    if count > 0 {
+        (byte << count) | (byte >> (8 - count))
+    } else {
+        byte
+    }
 }
 
 /// Roll a byte right count times
 fn rotr(byte: u8, count: u32) -> u8 {
     let count = count % 8;
-    if count > 0 { (byte >> count) | (byte << (8 - count)) } else { byte }
+    if count > 0 {
+        (byte >> count) | (byte << (8 - count))
+    } else {
+        byte
+    }
 }
 
 #[cfg(test)]
@@ -132,7 +140,7 @@ mod tests {
             assert_eq!(super::rotl(num, i), 2u8.pow(i % 8))
         }
     }
-    
+
     #[test]
     fn test_rotr_powers_of_two() {
         let num: u8 = 1;
@@ -140,7 +148,6 @@ mod tests {
             assert_eq!(super::rotr(num, i), 2u8.pow((8 - (i % 8)) % 8))
         }
     }
-
 
     #[test]
     fn test_encrypt_decrypt_original() {
@@ -154,7 +161,6 @@ mod tests {
                 let byte: u8 = random();
                 bytes.push(byte);
                 expected.push(byte);
-                
             }
 
             super::encrypt(&mut bytes);
