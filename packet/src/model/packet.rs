@@ -82,26 +82,208 @@ impl PktWrite for Packet {
 
 #[allow(unused_variables)]
 impl PktRead for Packet {
-    fn read_byte(&mut self) -> u8 {
+    fn read_byte(&self, pos: usize) -> u8 {
         todo!()
     }
-    fn read_bytes(&mut self, length: i16) -> &[u8] {
+    fn read_bytes(&self, pos: usize, length: i16) -> &[u8] {
         todo!()
     }
-    fn read_short(&mut self) -> i16 {
+    fn read_short(&self, pos: usize) -> i16 {
         todo!()
     }
-    fn read_int(&mut self) -> i32 {
+    fn read_int(&self, pos: usize) -> i32 {
         todo!()
     }
-    fn read_long(&mut self) -> i64 {
+    fn read_long(&self, pos: usize) -> i64 {
         todo!()
     }
-    fn read_str(&mut self, length: i16) -> &str {
+    fn read_str(&self, pos: usize, length: i16) -> &str {
         todo!()
     }
-    fn read_str_with_length(&mut self) -> &str {
+    fn read_str_with_length(&self, pos: usize) -> &str {
         todo!()
+    }
+}
+
+#[cfg(test)]
+mod read_tests {
+    use super::Packet;
+    use crate::io::*;
+    use rand::distributions::Alphanumeric;
+    use rand::{random, thread_rng, Rng};
+
+    #[test]
+    fn read_byte() {
+        for _ in 0..100 {
+            let byte: u8 = random();
+            let packet = Packet::new(&[byte]);
+
+            assert_eq!(packet.read_byte(0), byte);
+        }
+    }
+
+    #[test]
+    fn read_bytes() {
+        let mut rng = thread_rng();
+        for _ in 0..100 {
+            let length = rng.gen_range(1, 10);
+            let mut bytes: Vec<u8> = Vec::new();
+
+            for _ in 0..length {
+                bytes.push(random())
+            }
+
+            let packet = Packet::new(&bytes);
+
+            assert_eq!(packet.read_bytes(0, length), bytes.as_slice());
+        }
+    }
+
+    #[test]
+    fn read_bytes_one_at_a_time() {
+        let mut rng = thread_rng();
+        for _ in 0..100 {
+            let length = rng.gen_range(1, 10);
+            let mut bytes: Vec<u8> = Vec::new();
+
+            for _ in 0..length {
+                bytes.push(random())
+            }
+
+            let packet = Packet::new(&bytes);
+
+            for i in 0..length {
+                assert_eq!(packet.read_byte(i), bytes[i]);
+            }
+        }
+    }
+
+    #[test]
+    fn read_short() {
+        for _ in 0..100 {
+            let mut packet = Packet::new_empty();
+            let short: i16 = random();
+
+            packet.write_short(short);
+
+            assert_eq!(packet.read_short(0), short);
+        }
+    }
+
+    #[test]
+    fn read_int() {
+        for _ in 0..100 {
+            let mut packet = Packet::new_empty();
+            let integer: i32 = random();
+
+            packet.write_int(integer);
+
+            assert_eq!(packet.read_int(0), integer);
+        }
+    }
+
+    #[test]
+    fn read_long() {
+        for _ in 0..100 {
+            let mut packet = Packet::new_empty();
+            let long: i64 = random();
+
+            packet.write_long(long);
+
+            assert_eq!(packet.read_long(0), long);
+        }
+    }
+
+    #[test]
+    fn read_numbers() {
+        for _ in 0..100 {
+            let short: i16 = random();
+            let integer: i32 = random();
+            let long: i64 = random();
+            let integer2: i32 = random();
+            let short2: i16 = random();
+
+            let mut packet = Packet::new_empty();
+            packet.write_short(short);
+            packet.write_int(integer);
+            packet.write_long(long);
+            packet.write_int(integer2);
+            packet.write_short(short2);
+
+            assert_eq!(packet.read_short(0), short);
+            assert_eq!(packet.read_int(2), integer);
+            assert_eq!(packet.read_long(6), long);
+            assert_eq!(packet.read_int(14), integer2);
+            assert_eq!(packet.read_short(18), short2);
+        }
+    }
+
+    #[test]
+    fn read_string() {
+        for _ in 0..100 {
+            let mut packet = Packet::new_empty();
+
+            let length = rand::thread_rng().gen_range(0, 255);
+            let test_string = rand::thread_rng()
+                .sample_iter(&Alphanumeric)
+                .take(length)
+                .collect::<String>();
+
+            packet.write_str(&test_string);
+
+            assert_eq!(packet.read_str(0, test_string.len() as i16), test_string);
+        }
+    }
+
+    #[test]
+    fn read_str_with_length() {
+        for _ in 0..100 {
+            let mut packet = Packet::new_empty();
+
+            let length = rand::thread_rng().gen_range(0, 255);
+            let test_string = rand::thread_rng()
+                .sample_iter(&Alphanumeric)
+                .take(length)
+                .collect::<String>();
+
+            packet.write_str_with_length(&test_string);
+
+            assert_eq!(packet.read_short(0), length as i16);
+            assert_eq!(packet.read_str(4, test_string.len() as i16), test_string);
+            assert_eq!(packet.read_str_with_length(0), test_string);
+        }
+    }
+
+    #[test]
+    fn read_str_with_length_between_two_fixed_strs() {
+        for _ in 0..100 {
+            let mut packet = Packet::new_empty();
+
+            let length = rand::thread_rng().gen_range(0, 255);
+            let test_string = rand::thread_rng()
+                .sample_iter(&Alphanumeric)
+                .take(length)
+                .collect::<String>();
+
+            let hello = "Hello world!";
+            let test = "Test!";
+            packet.write_str_with_length("Hello world!");
+            packet.write_str_with_length(&test_string);
+            packet.write_str("Test!");
+
+            assert_eq!(packet.read_short(0), hello.len() as i16);
+            assert_eq!(packet.read_str_with_length(0), hello);
+            assert_eq!(packet.read_short(4 + hello.len()), length as i16);
+            assert_eq!(packet.read_str_with_length(4 + hello.len()), test_string);
+            assert_eq!(
+                packet.read_short(8 + hello.len() + length),
+                test.len() as i16
+            );
+            assert_eq!(
+                packet.read_str_with_length(8 + hello.len() + length),
+                test_string
+            );
+        }
     }
 }
 
@@ -199,7 +381,7 @@ mod write_tests {
     }
 
     #[test]
-    fn write_ascii() {
+    fn write_str() {
         for _ in 0..100 {
             let mut packet = Packet::new_empty();
 
@@ -219,7 +401,7 @@ mod write_tests {
     }
 
     #[test]
-    fn write_length_headered_ascii() {
+    fn write_str_with_length() {
         for _ in 0..100 {
             let mut packet = Packet::new_empty();
 
