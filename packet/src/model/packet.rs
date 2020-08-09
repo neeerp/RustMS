@@ -2,6 +2,7 @@ use crate::io::{PktRead, PktWrite};
 
 use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
 use std::io::Write;
+use std::ops::Deref;
 
 /// A sentinel for an invalid packet opcode.
 pub const INVALID_OPCODE: i16 = 1;
@@ -112,6 +113,14 @@ impl PktRead for Packet {
         let length = self.read_short(pos) as usize;
 
         self.read_str(pos + 2, length)
+    }
+}
+
+impl Deref for Packet {
+    type Target = [u8];
+
+    fn deref(&self) -> &Self::Target {
+        &self.bytes
     }
 }
 

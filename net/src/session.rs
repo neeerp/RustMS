@@ -1,6 +1,8 @@
 use crypt::MapleAES;
 
-use packet::{MaplePacket, Packet};
+use packet::io::PktWrite;
+use packet::Packet;
+
 use std::io::Write;
 use std::net::TcpStream;
 use std::time::Duration;
@@ -33,7 +35,7 @@ impl Session {
         let (recv_iv, send_iv) = Session::generate_ivs();
 
         let handshake_packet = Session::build_handshake_packet(&recv_iv, &send_iv);
-        match stream.write(handshake_packet.get_bytes()) {
+        match stream.write(&handshake_packet) {
             Ok(_) => println!("Handshake sent"),
             Err(e) => panic!("Could not send Handshake: {}", e),
         }
@@ -64,8 +66,8 @@ impl Session {
 
     /// Build the handshake_packet which shares the encryption IVs with the
     /// client.
-    fn build_handshake_packet(recv_iv: &Vec<u8>, send_iv: &Vec<u8>) -> MaplePacket {
-        let mut packet = MaplePacket::new();
+    fn build_handshake_packet(recv_iv: &Vec<u8>, send_iv: &Vec<u8>) -> Packet {
+        let mut packet = Packet::new_empty();
 
         packet.write_short(0x0E); // Packet length header
         packet.write_short(83); // Version
