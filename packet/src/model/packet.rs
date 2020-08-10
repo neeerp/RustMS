@@ -2,7 +2,7 @@ use crate::io::{PktRead, PktWrite};
 
 use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
 use std::io::Write;
-use std::ops::Deref;
+use std::ops::{Deref, DerefMut};
 
 /// A sentinel for an invalid packet opcode.
 pub const INVALID_OPCODE: i16 = 1;
@@ -57,7 +57,7 @@ impl Packet {
 
     /// Return the length of the packet.
     pub fn len(&self) -> i16 {
-        self.bytes.len() as i16
+        (self.bytes.len() - 2) as i16
     }
 }
 
@@ -121,6 +121,12 @@ impl Deref for Packet {
 
     fn deref(&self) -> &Self::Target {
         &self.bytes
+    }
+}
+
+impl DerefMut for Packet {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.bytes
     }
 }
 
@@ -500,14 +506,14 @@ mod test_packet {
     fn packet_length_constant() {
         let mut rng = thread_rng();
         for _ in 0..100 {
-            let length = rng.gen_range(0, (MAX_PACKET_LENGTH as usize) + 1);
+            let length = rng.gen_range(2, (MAX_PACKET_LENGTH as usize) + 1);
 
             let mut buf: Vec<u8> = iter::repeat(0).take(length).collect();
             rng.fill(&mut buf[..]);
 
             let packet = Packet::new(&buf);
 
-            assert_eq!(packet.len(), length as i16);
+            assert_eq!(packet.len(), (length - 2) as i16);
         }
     }
 }

@@ -8,7 +8,11 @@ use std::net::TcpStream;
 use std::time::Duration;
 
 use crate::accept;
-use crate::error::NetworkError;
+use crate::{
+    error::NetworkError,
+    handler::{LoginCredentialsHandler, LoginStartHandler},
+    helpers::to_hex_string,
+};
 
 use bufstream::BufStream;
 use rand::{thread_rng, Rng};
@@ -110,15 +114,18 @@ impl Session {
     /// Deal with the packet data by printing it out.
     fn handle_packet(&mut self, packet: Packet) -> Result<(), NetworkError> {
         // TODO: Implement handlers that we delegate to based off opcode
-        println!("Opcode: {}", packet.opcode());
-        println!("Received packet: {}", to_hex_string(packet.bytes));
 
-        Ok(())
+        let start_handler = LoginStartHandler::new();
+        let credential_handler = LoginCredentialsHandler::new();
+
+        match packet.opcode() {
+            1 => credential_handler.handle(&packet, &mut self.stream, &mut self.send_crypt),
+            35 => start_handler.handle(&packet),
+            op => {
+                println!("Opcode: {}", packet.opcode());
+                println!("Received packet: {}", to_hex_string(packet.bytes));
+                Err(NetworkError::UnsupportedOpcodeError(op))
+            }
+        }
     }
-}
-
-// Helper method to print out received packets
-fn to_hex_string(bytes: Vec<u8>) -> String {
-    let strs: Vec<String> = bytes.iter().map(|b| format!("{:02X}", b)).collect();
-    strs.join(" ")
 }
