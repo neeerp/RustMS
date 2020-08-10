@@ -119,7 +119,7 @@ impl Session {
         let credential_handler = LoginCredentialsHandler::new();
 
         match packet.opcode() {
-            1 => credential_handler.handle(&packet),
+            1 => credential_handler.handle(&packet, &mut self.stream, &mut self.send_crypt),
             35 => start_handler.handle(&packet),
             op => {
                 println!("Opcode: {}", packet.opcode());
