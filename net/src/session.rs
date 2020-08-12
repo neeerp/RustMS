@@ -1,6 +1,6 @@
 use crypt::MapleAES;
 
-use packet::io::PktWrite;
+use packet::io::write::PktWrite;
 use packet::Packet;
 
 use std::io::Write;
@@ -73,18 +73,18 @@ impl Session {
     fn build_handshake_packet(recv_iv: &Vec<u8>, send_iv: &Vec<u8>) -> Packet {
         let mut packet = Packet::new_empty();
 
-        packet.write_short(0x0E); // Packet length header
-        packet.write_short(83); // Version
+        packet.write_short(0x0E).unwrap(); // Packet length header
+        packet.write_short(83).unwrap(); // Version
 
         // Not sure what this part is meant to represent...
         // HeavenClient doesn't seem to care for these values but the
         // official clients do...
-        packet.write_short(0);
-        packet.write_byte(0);
+        packet.write_short(0).unwrap();
+        packet.write_byte(0).unwrap();
 
-        packet.write_bytes(&recv_iv);
-        packet.write_bytes(&send_iv);
-        packet.write_byte(8); // Locale byte
+        packet.write_bytes(&recv_iv).unwrap();
+        packet.write_bytes(&send_iv).unwrap();
+        packet.write_byte(8).unwrap(); // Locale byte
 
         packet
     }
@@ -112,14 +112,14 @@ impl Session {
     }
 
     /// Deal with the packet data by printing it out.
-    fn handle_packet(&mut self, packet: Packet) -> Result<(), NetworkError> {
+    fn handle_packet(&mut self, mut packet: Packet) -> Result<(), NetworkError> {
         // TODO: Implement handlers that we delegate to based off opcode
 
         let start_handler = LoginStartHandler::new();
         let credential_handler = LoginCredentialsHandler::new();
 
         match packet.opcode() {
-            1 => credential_handler.handle(&packet, &mut self.stream, &mut self.send_crypt),
+            1 => credential_handler.handle(&mut packet, &mut self.stream, &mut self.send_crypt),
             35 => start_handler.handle(&packet),
             op => {
                 println!("Opcode: {}", packet.opcode());

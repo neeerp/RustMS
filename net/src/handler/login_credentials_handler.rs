@@ -2,11 +2,11 @@ use crate::{error::NetworkError, helpers::to_hex_string};
 use bufstream::BufStream;
 use crypt::maple_crypt;
 use crypt::MapleAES;
-use packet::{
-    io::{PktRead, PktWrite},
-    Packet,
+use packet::{io::read::PktRead, io::write::PktWrite, Packet};
+use std::{
+    io::{BufReader, Write},
+    net::TcpStream,
 };
-use std::{io::Write, net::TcpStream};
 
 pub struct LoginCredentialsHandler {}
 
@@ -15,27 +15,27 @@ impl LoginCredentialsHandler {
         LoginCredentialsHandler {}
     }
 
-    // TODO: We probably want to return a credentials object or something...
+    // TODO: We probably want to return a credentials object or something to
+    // make this testable...
     pub fn handle(
         &self,
-        packet: &Packet,
+        packet: &mut Packet,
         stream: &mut BufStream<TcpStream>,
         send_crypt: &mut MapleAES,
     ) -> Result<(), NetworkError> {
         println!("Login attempted...");
 
-        let mut cursor = 2;
+        let mut reader = BufReader::new(&**packet);
+        // prune opcode; TODO: Initialize cursor at 2
+        reader.read_short().unwrap();
 
-        let user = packet.read_str_with_length(cursor);
-        cursor = cursor + user.len() + 2;
-
-        let pw = packet.read_str_with_length(cursor);
-        cursor = cursor + pw.len() + 2;
+        let user = reader.read_str_with_length().unwrap();
+        let pw = reader.read_str_with_length().unwrap();
 
         // The next 6 bytes should be zero'd out
-        cursor = cursor + 6;
+        reader.read_bytes(6).unwrap();
 
-        let hwid_nibble = packet.read_bytes(cursor, 4);
+        let hwid_nibble = reader.read_bytes(4).unwrap();
 
         println!("Username: {}", user);
         println!("Password: {}", pw);
@@ -45,10 +45,10 @@ impl LoginCredentialsHandler {
 
         // Send a login failed packet with the "Not registered" reason
         println!("Denying logon...");
-        return_packet.write_short(0x00);
-        return_packet.write_byte(5);
-        return_packet.write_byte(0);
-        return_packet.write_int(0);
+        return_packet.write_short(0x00).unwrap();
+        return_packet.write_byte(5).unwrap();
+        return_packet.write_byte(0).unwrap();
+        return_packet.write_int(0).unwrap();
 
         maple_crypt::encrypt(&mut return_packet);
         send_crypt.crypt(&mut return_packet);
