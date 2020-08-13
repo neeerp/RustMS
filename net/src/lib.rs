@@ -1,7 +1,8 @@
 mod accept;
+mod client;
 pub mod error;
-mod handler;
 mod helpers;
+mod packet;
 pub mod session;
 
 #[cfg(test)]

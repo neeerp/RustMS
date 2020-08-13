@@ -27,9 +27,10 @@ fn main() {
 }
 
 fn handle_connection(stream: TcpStream) {
-    let mut session = Session::new(stream);
-
-    session.listen();
+    match Session::new(stream) {
+        Ok(mut session) => session.listen(),
+        Err(_) => println!("Could not establish connection."),
+    }
 
     println!("Connection terminated");
 }

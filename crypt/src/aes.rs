@@ -11,9 +11,11 @@ pub struct MapleAES {
 
 impl MapleAES {
     /// Instantiate a new Maple AES Cipher
-    pub fn new(iv: Vec<u8>, maple_version: i16) -> MapleAES {
+    pub fn new(iv: &Vec<u8>, maple_version: i16) -> MapleAES {
         let maple_version: i16 =
             ((maple_version >> 8) & 0xFF) | ((((maple_version as u32) << 8) & 0xFF00) as i16);
+
+        let iv = iv.clone();
 
         MapleAES { iv, maple_version }
     }
@@ -171,8 +173,8 @@ mod tests {
             }
 
             // Create an encryption and decryption cipher instance
-            let mut encrypt_cipher = super::MapleAES::new(iv.clone(), 27);
-            let mut decrypt_cipher = super::MapleAES::new(iv.clone(), 27);
+            let mut encrypt_cipher = super::MapleAES::new(&iv, 27);
+            let mut decrypt_cipher = super::MapleAES::new(&iv, 27);
 
             let length: u16 = random();
 
@@ -204,7 +206,7 @@ mod tests {
             for _ in 0..4 {
                 iv.push(random());
             }
-            let cipher = super::MapleAES::new(iv, 27);
+            let cipher = super::MapleAES::new(&iv, 27);
 
             let initial_length: i16 = rng.gen_range(0, 16000);
 
