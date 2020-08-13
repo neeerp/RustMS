@@ -28,7 +28,6 @@ impl Packet {
         Packet { bytes }
     }
 
-    /// Instantiate a new, empty packet wrapper.
     pub fn new_empty() -> Packet {
         let bytes = vec![];
 

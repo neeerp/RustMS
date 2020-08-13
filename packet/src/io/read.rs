@@ -226,8 +226,6 @@ mod read_tests {
             let packet = Packet::new(&buf);
             let mut reader = BufReader::new(&*packet);
 
-            // assert_eq!(packet.read_short(0), length as i16);
-            // assert_eq!(packet.read_str(2, test_string.len()), test_string);
             assert_eq!(reader.read_str_with_length().unwrap(), test_string);
         }
     }
@@ -256,9 +254,7 @@ mod read_tests {
             let packet = Packet::new(&buf);
             let mut reader = BufReader::new(&*packet);
 
-            // assert_eq!(packet.read_short().unwrap(), hello.len() as i16);
             assert_eq!(reader.read_str_with_length().unwrap(), hello);
-            // assert_eq!(packet.read_short().unwrap(), length as i16);
             assert_eq!(reader.read_str_with_length().unwrap(), test_string);
             assert_eq!(reader.read_str(test.len() as usize).unwrap(), test);
         }
