@@ -1,32 +1,24 @@
-use crate::{error::NetworkError, helpers::to_hex_string};
-use bufstream::BufStream;
-use crypt::maple_crypt;
-use crypt::MapleAES;
-use packet::{io::read::PktRead, io::write::PktWrite, Packet};
-use std::{
-    io::{BufReader, Write},
-    net::TcpStream,
+use crate::{
+    client::MapleClient,
+    error::NetworkError,
+    helpers::to_hex_string,
+    packet::{build, handle::PacketHandler},
 };
+use packet::{io::read::PktRead, Packet};
+use std::io::BufReader;
 
 pub struct LoginCredentialsHandler {}
 
+/// A handler for login attempt packets.
 impl LoginCredentialsHandler {
     pub fn new() -> Self {
         LoginCredentialsHandler {}
     }
 
-    // TODO: We probably want to return a credentials object or something to
-    // make this testable...
-    pub fn handle(
-        &self,
-        packet: &mut Packet,
-        stream: &mut BufStream<TcpStream>,
-        send_crypt: &mut MapleAES,
-    ) -> Result<(), NetworkError> {
-        println!("Login attempted...");
-
+    fn echo_details(&self, packet: &mut Packet) {
         let mut reader = BufReader::new(&**packet);
-        // prune opcode; TODO: Initialize cursor at 2
+
+        // prune opcode
         reader.read_short().unwrap();
 
         let user = reader.read_str_with_length().unwrap();
@@ -39,30 +31,30 @@ impl LoginCredentialsHandler {
 
         println!("Username: {}", user);
         println!("Password: {}", pw);
-        println!("HWID nibble: {}", to_hex_string(hwid_nibble.to_vec()));
+        println!("HWID nibble: {}", to_hex_string(&hwid_nibble.to_vec()));
+    }
 
-        let mut return_packet = Packet::new_empty();
-
-        // Send a login failed packet with the "Not registered" reason
+    /// Send a login failed packet with the "Not registered" reason
+    fn deny_logon(&self, client: &mut MapleClient) -> Result<(), NetworkError> {
         println!("Denying logon...");
-        return_packet.write_short(0x00).unwrap();
-        return_packet.write_byte(5).unwrap();
-        return_packet.write_byte(0).unwrap();
-        return_packet.write_int(0).unwrap();
 
-        maple_crypt::encrypt(&mut return_packet);
-        send_crypt.crypt(&mut return_packet);
+        let mut return_packet = build::login::status::build_login_status_packet(5);
+        match client.send(&mut return_packet) {
+            Ok(_) => {
+                println!("Logon denied packet sent.");
+                Ok(())
+            }
+            Err(e) => Err(NetworkError::CouldNotSend(e)),
+        }
+    }
+}
 
-        let header = send_crypt.gen_packet_header(return_packet.len() + 2);
+impl PacketHandler for LoginCredentialsHandler {
+    fn handle(&self, packet: &mut Packet, client: &mut MapleClient) -> Result<(), NetworkError> {
+        println!("Login attempted...");
+        self.echo_details(packet);
 
-        // Header
-        stream.write(&header).unwrap();
-        // Packet
-        stream.write(&return_packet).unwrap();
-        stream.flush().unwrap();
-        println!("Logon denied packet sent.");
-
-        Ok(())
+        self.deny_logon(client)
     }
 }
 

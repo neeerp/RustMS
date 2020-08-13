@@ -4,7 +4,7 @@
 //! client session's `TcpStream`.
 //!
 
-use crate::error::NetworkError;
+use crate::{client::MapleClient, error::NetworkError};
 use crypt::{maple_crypt, MapleAES};
 use packet::{Packet, MAX_PACKET_LENGTH};
 
@@ -13,10 +13,9 @@ use std::io::Read;
 use std::net::TcpStream;
 
 /// Read, decrypt, and wrap a new incoming packet from a stream.
-pub fn read_packet(
-    stream: &mut BufStream<TcpStream>,
-    crypt: &mut MapleAES,
-) -> Result<Packet, NetworkError> {
+pub fn read_packet(client: &mut MapleClient) -> Result<Packet, NetworkError> {
+    let crypt = &mut client.recv_crypt;
+    let stream = &mut client.stream;
     match read_header(stream, crypt) {
         Ok(data_length) => read_data(data_length, stream, crypt),
         Err(e) => Err(e),

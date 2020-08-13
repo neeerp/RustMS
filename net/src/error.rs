@@ -12,6 +12,7 @@ pub enum NetworkError {
     CouldNotReadPacket(io::Error),
     PacketHandlerError(&'static str), // TODO: Ideally we make a separate error enum
     UnsupportedOpcodeError(i16),
+    CouldNotSend(io::Error),
 }
 
 impl fmt::Display for NetworkError {
@@ -29,6 +30,7 @@ impl fmt::Display for NetworkError {
             NetworkError::CouldNotReadHeader(e) => write!(f, "Error reading header: {}", e),
             NetworkError::PacketHandlerError(msg) => write!(f, "Error handling packet: {}", msg),
             NetworkError::UnsupportedOpcodeError(op) => write!(f, "Unsupported Opcode: {}", op),
+            NetworkError::CouldNotSend(e) => write!(f, "Error Sending Packet: {}", e),
             e => write!(f, "{}", e),
         }
     }
