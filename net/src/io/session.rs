@@ -1,5 +1,5 @@
-use crate::accept;
-use crate::{client::MapleClient, error::NetworkError, packet::build, packet::handle};
+use crate::io::{accept, client::MapleClient};
+use crate::{error::NetworkError, packet::build, packet::handle};
 
 use packet::Packet;
 

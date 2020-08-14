@@ -1,5 +1,5 @@
 use super::PacketHandler;
-use crate::{client::MapleClient, error::NetworkError, helpers::to_hex_string};
+use crate::{error::NetworkError, helpers::to_hex_string, io::client::MapleClient};
 use packet::Packet;
 
 pub struct DefaultHandler {}

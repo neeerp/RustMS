@@ -4,7 +4,7 @@
 //! client session's `TcpStream`.
 //!
 
-use crate::{client::MapleClient, error::NetworkError};
+use crate::{error::NetworkError, io::client::MapleClient};
 use crypt::{maple_crypt, MapleAES};
 use packet::{Packet, MAX_PACKET_LENGTH};
 

@@ -1,7 +1,7 @@
 use crate::{
-    client::MapleClient,
     error::NetworkError,
     helpers::to_hex_string,
+    io::client::MapleClient,
     packet::{build, handle::PacketHandler},
 };
 use packet::{io::read::PktRead, Packet};

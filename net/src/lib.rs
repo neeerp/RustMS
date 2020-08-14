@@ -1,14 +1,9 @@
-mod accept;
-mod client;
-pub mod error;
-mod helpers;
-mod packet;
-pub mod session;
+#[macro_use]
+extern crate num_derive;
 
-#[cfg(test)]
-mod tests {
-    #[test]
-    fn it_works() {
-        assert_eq!(2 + 2, 4);
-    }
-}
+mod helpers;
+mod io;
+mod packet;
+
+pub use self::io::error;
+pub use self::io::session;

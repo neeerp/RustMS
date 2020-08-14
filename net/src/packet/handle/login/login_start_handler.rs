@@ -1,4 +1,4 @@
-use crate::{client::MapleClient, error::NetworkError, packet::handle::PacketHandler};
+use crate::{error::NetworkError, io::client::MapleClient, packet::handle::PacketHandler};
 use packet::Packet;
 
 pub struct LoginStartHandler {}
