@@ -12,6 +12,8 @@ pub struct MapleClient {
     pub stream: BufStream<TcpStream>,
     pub recv_crypt: MapleAES,
     pub send_crypt: MapleAES,
+    pub user_id: i32,
+    pub logged_in: bool,
 }
 
 impl MapleClient {
@@ -23,6 +25,8 @@ impl MapleClient {
             stream,
             recv_crypt,
             send_crypt,
+            user_id: -1,
+            logged_in: false,
         }
     }
 

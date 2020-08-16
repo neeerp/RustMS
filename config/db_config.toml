@@ -1,0 +1,2 @@
+[database]
+url = "postgres://maplestory:pass@localhost:5432/maplestory"

@@ -1,5 +1,5 @@
 [package]
-name = "crypt"
+name = "db"
 version = "0.1.0"
 authors = ["David Goldstein <goldstein.g.david@gmail.com>"]
 edition = "2018"
@@ -7,8 +7,7 @@ edition = "2018"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-aes = "0.4.0"
-hex-literal = "0.3.0"
-rand = "0.7.3"
-byteorder = "1.3.4"
-bcrypt = "0.8.2"
+diesel = { version = "1.4.4", features = ["postgres"] }
+config = "0.10.1"
+serde_derive = "^1.0.8"
+serde = "^1.0.8"

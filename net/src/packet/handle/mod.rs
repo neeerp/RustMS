@@ -25,8 +25,11 @@ pub fn get_handler(op: i16) -> Box<dyn PacketHandler> {
         Some(RecvOpcode::ServerListReRequest) => Box::new(login::WorldListHandler::new()),
         Some(RecvOpcode::CharListRequest) => Box::new(login::CharListHandler::new()),
         Some(RecvOpcode::ServerStatusRequest) => Box::new(login::ServerStatusHandler::new()),
-        Some(RecvOpcode::AcceptTOS) => Box::new(login::AcceptTOSHandler::new()),
-        Some(RecvOpcode::SetGender) => Box::new(login::SetGenderHandler::new()),
+
+        // TODO
+        Some(RecvOpcode::AcceptTOS) => Box::new(default::DefaultHandler::new()),
+        Some(RecvOpcode::SetGender) => Box::new(default::DefaultHandler::new()),
+
         Some(RecvOpcode::AfterLogin) => Box::new(login::AfterLoginHandler::new()),
         Some(RecvOpcode::RegisterPin) => Box::new(login::RegisterPinHandler::new()),
         Some(RecvOpcode::ServerListRequest) => Box::new(login::WorldListHandler::new()),

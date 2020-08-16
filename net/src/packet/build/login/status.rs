@@ -1,6 +1,7 @@
 use crate::packet::op::SendOpcode::{GuestIdLogin, LoginStatus};
+use db::models::Account;
 use packet::{io::write::PktWrite, Packet};
-use std::time::SystemTime;
+use std::time::{SystemTime, UNIX_EPOCH};
 
 /// Build a login status packet that gets sent upon login failure, relaying the
 /// reason.
@@ -17,19 +18,20 @@ pub fn build_login_status_packet(status: u8) -> Packet {
     packet
 }
 
-pub fn build_successful_login_packet() -> Packet {
+pub fn build_successful_login_packet(acc: &Account) -> Packet {
     let mut packet = Packet::new_empty();
     let opcode = LoginStatus as i16;
 
-    let account_id = 1;
-    let gender = 0;
-    let account_name = "neeerp";
+    let account_id = acc.id;
+    let gender = 0; // acc.gender; TODO: NEED TO IMPLEMENT!
+    let account_name = &acc.user_name;
+    let created_at: i64 = acc.created_at.duration_since(UNIX_EPOCH).unwrap().as_secs() as i64;
 
     packet.write_short(opcode).unwrap();
     packet.write_int(0).unwrap();
-    packet.write_short(opcode).unwrap();
+    packet.write_short(0).unwrap();
     packet.write_int(account_id).unwrap();
-    packet.write_byte(gender).unwrap();
+    packet.write_byte(gender as u8).unwrap();
 
     packet.write_byte(0).unwrap();
     packet.write_byte(0).unwrap();
@@ -40,10 +42,11 @@ pub fn build_successful_login_packet() -> Packet {
 
     packet.write_byte(0).unwrap();
     packet.write_long(0).unwrap();
-    packet.write_long(0).unwrap();
+    packet.write_long(created_at).unwrap();
 
     packet.write_int(1).unwrap();
 
+    // PIN/PIC?
     packet.write_byte(1).unwrap();
     packet.write_byte(1).unwrap();
 

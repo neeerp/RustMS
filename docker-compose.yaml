@@ -1,0 +1,12 @@
+version: '3.1'
+
+services:
+    db:
+        image: postgres
+        restart: always
+        environment:
+            POSTGRES_USER: maplestory
+            POSTGRES_PASSWORD: pass
+            POSTGRES_DATABASE: "RustMS"
+        ports:
+            - 5432:5432
