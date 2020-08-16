@@ -1,5 +1,26 @@
 #[derive(FromPrimitive)]
 pub enum RecvOpcode {
     LoginCredentials = 0x01,
+    GuestLogin = 0x02,
+    ServerListReRequest = 0x04,
+    CharListRequest = 0x05,
+    ServerStatusRequest = 0x06,
+    AcceptTOS = 0x07,
+    SetGender = 0x08,
+    AfterLogin = 0x09,
+    RegisterPin = 0x0A,
+    ServerListRequest = 0x0B,
+    ViewAllChar = 0x0D,
+    PickAllChar = 0x0E,
+    CharSelect = 0x13,
+    CheckCharName = 0x15,
+    CreateChar = 0x16,
+    DeleteChar = 0x17,
+    RegisterPic = 0x1D,
+    CharSelectWithPic = 0x1E,
+    ViewAllPicRegister = 0x1F,
+    ViewAllWithPic = 0x20,
     LoginStarted = 0x23,
+
+    UnusedOpcode = 0xFF,
 }

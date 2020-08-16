@@ -29,8 +29,8 @@ impl LoginCredentialsHandler {
 
         let hwid_nibble = reader.read_bytes(4).unwrap();
 
-        println!("Username: {}", user);
-        println!("Password: {}", pw);
+        println!("Username: {}", &user);
+        println!("Password: {}", &pw);
         println!("HWID nibble: {}", to_hex_string(&hwid_nibble.to_vec()));
     }
 
@@ -47,6 +47,19 @@ impl LoginCredentialsHandler {
             Err(e) => Err(NetworkError::CouldNotSend(e)),
         }
     }
+
+    fn accept_logon(&self, client: &mut MapleClient) -> Result<(), NetworkError> {
+        println!("Logging in!");
+
+        let mut return_packet = build::login::status::build_successful_login_packet();
+        match client.send(&mut return_packet) {
+            Ok(_) => {
+                println!("Logon success packet sent.");
+                Ok(())
+            }
+            Err(e) => Err(NetworkError::CouldNotSend(e)),
+        }
+    }
 }
 
 impl PacketHandler for LoginCredentialsHandler {
@@ -54,7 +67,13 @@ impl PacketHandler for LoginCredentialsHandler {
         println!("Login attempted...");
         self.echo_details(packet);
 
-        self.deny_logon(client)
+        let logged_in = true;
+
+        if logged_in {
+            self.accept_logon(client)
+        } else {
+            self.deny_logon(client)
+        }
     }
 }
 
