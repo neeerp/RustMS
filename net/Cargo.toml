@@ -9,6 +9,7 @@ edition = "2018"
 [dependencies]
 packet = { path = "../packet" }
 crypt = { path = "../crypt" }
+db = { path = "../db" }
 bufstream = "0.1.4"
 rand = "0.7.3"
 num = "0.2"

@@ -4,10 +4,15 @@ use crate::{
     io::client::MapleClient,
     packet::{build, handle::PacketHandler},
 };
+use crypt::login;
+use db::accounts;
+use db::models::Account;
 use packet::{io::read::PktRead, Packet};
-use std::io::BufReader;
+use std::{io::BufReader, time::SystemTime};
 
 pub struct LoginCredentialsHandler {}
+
+// TODO: These methods could use some better error handling.
 
 /// A handler for login attempt packets.
 impl LoginCredentialsHandler {
@@ -15,109 +20,110 @@ impl LoginCredentialsHandler {
         LoginCredentialsHandler {}
     }
 
-    fn echo_details(&self, packet: &mut Packet) {
+    /// Attempt to get an account, either by logging into the one corresponding
+    /// to the credentials, or creating one if the user name given is not taken.
+    fn verify_and_get_account(&self, user: &str, pw: &str) -> Option<Account> {
+        match accounts::get_account(&user) {
+            Some(acc) => self.verify_password(acc, pw),
+            None => self.create_account(user, pw),
+        }
+    }
+
+    /// Return the given account iff the given password matches.
+    fn verify_password(&self, acc: Account, pw: &str) -> Option<Account> {
+        match login::validate_against_hash(pw, &acc.password) {
+            Ok(true) => {
+                println!("Verified account with user '{}'", &acc.user_name);
+                Some(acc)
+            }
+            _ => None,
+        }
+    }
+
+    /// Create and save new account with the given username and password.
+    fn create_account(&self, user: &str, pw: &str) -> Option<Account> {
+        match crypt::login::hash_password(pw) {
+            Ok(hashed_pw) => {
+                println!("Attempting to create account with user '{}'", user);
+                accounts::create_account(user, &hashed_pw)
+            }
+            _ => None,
+        }
+    }
+
+    /// Read the username, password, and HWID from the packet.
+    fn read_credentials(&self, packet: &mut Packet) -> (String, String, String) {
         let mut reader = BufReader::new(&**packet);
 
-        // prune opcode
-        reader.read_short().unwrap();
+        reader.read_short().unwrap(); // prune opcode
 
         let user = reader.read_str_with_length().unwrap();
         let pw = reader.read_str_with_length().unwrap();
 
-        // The next 6 bytes should be zero'd out
-        reader.read_bytes(6).unwrap();
+        reader.read_bytes(6).unwrap(); // prune padding
 
-        let hwid_nibble = reader.read_bytes(4).unwrap();
+        let hwid = to_hex_string(&reader.read_bytes(4).unwrap());
 
-        println!("Username: {}", &user);
-        println!("Password: {}", &pw);
-        println!("HWID nibble: {}", to_hex_string(&hwid_nibble.to_vec()));
+        (user, pw, hwid)
     }
 
-    /// Send a login failed packet with the "Not registered" reason
-    fn deny_logon(&self, client: &mut MapleClient) -> Result<(), NetworkError> {
-        println!("Denying logon...");
-
-        let mut return_packet = build::login::status::build_login_status_packet(5);
-        match client.send(&mut return_packet) {
-            Ok(_) => {
-                println!("Logon denied packet sent.");
-                Ok(())
+    /// Set the session's login state and save the login state in teh database.
+    fn try_login(&self, client: &mut MapleClient, acc: &mut Account) -> u8 {
+        if acc.banned {
+            // TODO: This isn't right...
+            println!("Banned account.");
+            3
+        } else if acc.logged_in {
+            println!("Account already logged in.");
+            7
+        } else {
+            acc.logged_in = true;
+            acc.last_login_at = Some(SystemTime::now());
+            match accounts::login_account(&acc) {
+                Ok(_) => {
+                    client.logged_in = true;
+                    client.user_id = acc.id;
+                    0
+                }
+                _ => 5,
             }
+        }
+    }
+
+    fn accept_logon(&self, client: &mut MapleClient, acc: Account) -> Result<(), NetworkError> {
+        let mut packet = build::login::status::build_successful_login_packet(&acc);
+
+        match client.send(&mut packet) {
+            Ok(_) => Ok(()),
             Err(e) => Err(NetworkError::CouldNotSend(e)),
         }
     }
 
-    fn accept_logon(&self, client: &mut MapleClient) -> Result<(), NetworkError> {
-        println!("Logging in!");
+    fn reject_logon(&self, client: &mut MapleClient, status: u8) -> Result<(), NetworkError> {
+        let mut packet = build::login::status::build_login_status_packet(status);
 
-        let mut return_packet = build::login::status::build_successful_login_packet();
-        match client.send(&mut return_packet) {
-            Ok(_) => {
-                println!("Logon success packet sent.");
-                Ok(())
-            }
+        match client.send(&mut packet) {
+            Ok(_) => Ok(()),
             Err(e) => Err(NetworkError::CouldNotSend(e)),
         }
     }
 }
 
+// TODO: Could be cleaned up...
 impl PacketHandler for LoginCredentialsHandler {
     fn handle(&self, packet: &mut Packet, client: &mut MapleClient) -> Result<(), NetworkError> {
         println!("Login attempted...");
-        self.echo_details(packet);
-
-        let logged_in = true;
-
-        if logged_in {
-            self.accept_logon(client)
-        } else {
-            self.deny_logon(client)
+        let (user, pw, _hwid) = self.read_credentials(packet);
+        match self.verify_and_get_account(&user, &pw) {
+            Some(mut acc) => {
+                let status = self.try_login(client, &mut acc);
+                if status == 0 {
+                    self.accept_logon(client, acc)
+                } else {
+                    self.reject_logon(client, status)
+                }
+            }
+            None => self.reject_logon(client, 4),
         }
     }
 }
-
-// TODO: Need to read about mocking!
-//
-// #[cfg(test)]
-// mod tests {
-//     use super::LoginCredentialsHandler;
-//     use packet::{io::PktWrite, Packet};
-//     use rand::{distributions::Alphanumeric, Rng};
-
-//     #[test]
-//     fn user_pw_login() {
-//         let handler = LoginCredentialsHandler::new();
-//         let mut rng = rand::thread_rng();
-//         for _ in 0..100 {
-//             let mut packet = Packet::new_empty();
-
-//             let user_length = rng.gen_range(0, 255);
-//             let pw_length = rng.gen_range(0, 255);
-
-//             let user = rng
-//                 .sample_iter(&Alphanumeric)
-//                 .take(user_length)
-//                 .collect::<String>();
-
-//             let pw = rng
-//                 .sample_iter(&Alphanumeric)
-//                 .take(pw_length)
-//                 .collect::<String>();
-
-//             let zeros = [0u8; 6];
-//             let hwid: [u8; 4] = [rng.gen(), rng.gen(), rng.gen(), rng.gen()];
-
-//             packet.write_short(1);
-//             packet.write_str_with_length(&user);
-//             packet.write_str_with_length(&pw);
-//             packet.write_bytes(&zeros);
-//             packet.write_bytes(&hwid);
-
-//             match handler.handle(&packet) {
-//                 Ok(_) => (),
-//                 Err(e) => panic!(e),
-//             };
-//         }
-//     }
-// }

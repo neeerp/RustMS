@@ -4,5 +4,6 @@ members = [
     "rust-ms-login",
     "packet",
     "crypt",
-    "net"
+    "net",
+    "db"
 ]
