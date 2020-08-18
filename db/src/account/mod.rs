@@ -1,5 +1,8 @@
-use super::schema::accounts;
+use crate::schema::accounts;
 use std::time::SystemTime;
+
+mod repository;
+pub use repository::*;
 
 #[derive(Identifiable, Queryable, AsChangeset)]
 pub struct Account {

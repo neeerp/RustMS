@@ -1,5 +1,5 @@
 use crate::packet::op::SendOpcode::{GuestIdLogin, LoginStatus};
-use db::models::Account;
+use db::account::Account;
 use packet::{io::write::PktWrite, Packet};
 use std::time::{SystemTime, UNIX_EPOCH};
 

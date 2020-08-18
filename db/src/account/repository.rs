@@ -1,9 +1,11 @@
-use crate::*;
-use models::{Account, NewAccount};
-// use std::time::SystemTime;
+use super::{Account, NewAccount};
+use crate::establish_connection;
+use crate::schema;
+use diesel::expression_methods::*;
+use diesel::{QueryDsl, QueryResult, RunQueryDsl};
+use schema::accounts::dsl::*;
 
 pub fn get_account(user: &str) -> Option<Account> {
-    use schema::accounts::dsl::*;
     let connection = establish_connection();
 
     let results = accounts
