@@ -10,6 +10,7 @@ table! {
         created_at -> Timestamp,
         character_slots -> Int2,
         gender -> Int2,
+        accepted_tos -> Bool,
         banned -> Bool,
         ban_msg -> Nullable<Text>,
     }

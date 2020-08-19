@@ -1,5 +1,8 @@
-use super::schema::accounts;
-use std::time::SystemTime;
+use crate::schema::accounts;
+use std::{fmt::Debug, time::SystemTime};
+
+mod repository;
+pub use repository::*;
 
 #[derive(Identifiable, Queryable, AsChangeset)]
 pub struct Account {
@@ -13,8 +16,19 @@ pub struct Account {
     pub created_at: SystemTime,
     pub character_slots: i16,
     pub gender: i16,
+    pub accepted_tos: bool,
     pub banned: bool,
     pub ban_msg: Option<String>,
+}
+
+impl Debug for Account {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "id: {}, user_name: {}, logged_in: {}",
+            self.id, self.user_name, self.logged_in
+        )
+    }
 }
 
 #[derive(Insertable)]
