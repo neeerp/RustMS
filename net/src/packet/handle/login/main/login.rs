@@ -70,9 +70,44 @@ impl LoginCredentialsHandler {
         }
     }
 
+    /// Attempt to log the user in.
+    fn attempt_logon(&self, client: &mut MapleClient, acc: Account) -> Result<(), NetworkError> {
+        match self.check_account_status(&acc) {
+            0 => self.accept_logon(client, acc),
+            23 => self.send_tos(client, acc),
+            status => self.reject_logon(client, status),
+        }
+    }
+
+    fn check_account_status(&self, acc: &Account) -> u8 {
+        if acc.banned {
+            2
+        } else if acc.logged_in {
+            7
+        } else if !acc.accepted_tos {
+            23
+        } else {
+            0
+        }
+    }
+
     /// Log the user in.
     fn accept_logon(&self, client: &mut MapleClient, acc: Account) -> Result<(), NetworkError> {
         let mut packet = build::login::status::build_successful_login_packet(&acc);
+
+        client.user = Some(acc);
+
+        match client.send(&mut packet) {
+            Ok(_) => Ok(()),
+            Err(e) => Err(NetworkError::CouldNotSend(e)),
+        }
+    }
+
+    /// Have the user accept the TOS.
+    fn send_tos(&self, client: &mut MapleClient, acc: Account) -> Result<(), NetworkError> {
+        let mut packet = build::login::status::build_login_status_packet(23);
+
+        client.user = Some(acc);
 
         match client.send(&mut packet) {
             Ok(_) => Ok(()),
@@ -92,14 +127,11 @@ impl LoginCredentialsHandler {
 }
 
 impl PacketHandler for LoginCredentialsHandler {
-    // For simplicity's sake, we're going to ignore the PIC and PIN and not
-    // worry about whether the account is already logged in or anything like
-    // that. We can deal with that later.
     fn handle(&self, packet: &mut Packet, client: &mut MapleClient) -> Result<(), NetworkError> {
         println!("Login attempted...");
         let (user, pw, _hwid) = self.read_credentials(packet);
         match self.verify_and_get_account(&user, &pw) {
-            Some(acc) => self.accept_logon(client, acc),
+            Some(acc) => self.attempt_logon(client, acc),
             None => self.reject_logon(client, 4),
         }
     }

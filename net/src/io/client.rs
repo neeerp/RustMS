@@ -1,5 +1,6 @@
 use bufstream::BufStream;
 use crypt::{maple_crypt, MapleAES};
+use db::account::Account;
 use packet::Packet;
 use std::{
     io::{Result, Write},
@@ -12,8 +13,7 @@ pub struct MapleClient {
     pub stream: BufStream<TcpStream>,
     pub recv_crypt: MapleAES,
     pub send_crypt: MapleAES,
-    pub user_id: i32,
-    pub logged_in: bool,
+    pub user: Option<Account>,
 }
 
 impl MapleClient {
@@ -25,8 +25,7 @@ impl MapleClient {
             stream,
             recv_crypt,
             send_crypt,
-            user_id: -1,
-            logged_in: false,
+            user: None,
         }
     }
 

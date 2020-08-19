@@ -1,4 +1,7 @@
-use crate::packet::op::SendOpcode::{GuestIdLogin, LoginStatus};
+use crate::{
+    packet::op::SendOpcode::{GuestIdLogin, LoginStatus},
+    settings::Settings,
+};
 use db::account::Account;
 use packet::{io::write::PktWrite, Packet};
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -22,8 +25,10 @@ pub fn build_successful_login_packet(acc: &Account) -> Packet {
     let mut packet = Packet::new_empty();
     let opcode = LoginStatus as i16;
 
+    let settings = Settings::new().unwrap();
+
     let account_id = acc.id;
-    let gender = 0; // acc.gender; TODO: NEED TO IMPLEMENT!
+    let gender = acc.gender;
     let account_name = &acc.user_name;
     let created_at: i64 = acc.created_at.duration_since(UNIX_EPOCH).unwrap().as_secs() as i64;
 
@@ -47,7 +52,9 @@ pub fn build_successful_login_packet(acc: &Account) -> Packet {
     packet.write_int(1).unwrap();
 
     // PIN/PIC?
-    packet.write_byte(1).unwrap();
+    packet
+        .write_byte(settings.login.pin_required as u8)
+        .unwrap();
     packet.write_byte(1).unwrap();
 
     return packet;

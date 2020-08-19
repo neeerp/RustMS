@@ -10,7 +10,9 @@ CREATE TABLE accounts (
     created_at timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     character_slots SMALLINT NOT NULL DEFAULT 3,
+
     gender SMALLINT NOT NULL DEFAULT 10,
+    accepted_tos BOOLEAN NOT NULL DEFAULT FALSE,
 
     banned BOOLEAN NOT NULL DEFAULT FALSE,
     ban_msg text,

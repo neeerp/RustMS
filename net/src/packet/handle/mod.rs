@@ -9,9 +9,6 @@ pub trait PacketHandler {
     fn handle(&self, packet: &mut Packet, client: &mut MapleClient) -> Result<(), NetworkError>;
 }
 
-// TODO: Most of the handlers are hardcoded given that we don't have anything
-// backing our data currently... They also have some missing cases.
-//
 // TODO: A lot of the login related handlers are very similar and can maybe be
 // consolidated, making a check on the opcode to decide how to proceed... These
 // handlers include the LoginCredentials handler, AcceptTOS handler,
@@ -29,8 +26,11 @@ pub fn get_handler(op: i16) -> Box<dyn PacketHandler> {
 
         Some(RecvOpcode::AcceptTOS) => Box::new(login::AcceptTOSHandler::new()),
         Some(RecvOpcode::SetGender) => Box::new(login::SetGenderHandler::new()),
-        Some(RecvOpcode::AfterLogin) => Box::new(login::AfterLoginHandler::new()),
-        Some(RecvOpcode::RegisterPin) => Box::new(login::RegisterPinHandler::new()),
+
+        // TODO: HeavenClient doesn't seem to support PINs...
+        Some(RecvOpcode::AfterLogin) => Box::new(default::DefaultHandler::new()),
+        Some(RecvOpcode::RegisterPin) => Box::new(default::DefaultHandler::new()),
+
         Some(RecvOpcode::ServerListRequest) => Box::new(login::WorldListHandler::new()),
 
         Some(RecvOpcode::ViewAllChar) => Box::new(default::DefaultHandler::new()),

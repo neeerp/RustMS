@@ -2,7 +2,8 @@ use super::{Account, NewAccount};
 use crate::establish_connection;
 use crate::schema;
 use diesel::expression_methods::*;
-use diesel::{QueryDsl, QueryResult, RunQueryDsl};
+use diesel::{QueryDsl, QueryResult, RunQueryDsl, SaveChangesDsl};
+use schema::accounts;
 use schema::accounts::dsl::*;
 
 pub fn get_account(user: &str) -> Option<Account> {
@@ -17,7 +18,6 @@ pub fn get_account(user: &str) -> Option<Account> {
 }
 
 pub fn create_account<'a>(user: &'a str, pw: &'a str) -> Option<Account> {
-    use schema::accounts;
     let connection = establish_connection();
 
     let new_account = NewAccount {
@@ -31,11 +31,7 @@ pub fn create_account<'a>(user: &'a str, pw: &'a str) -> Option<Account> {
         .ok()
 }
 
-pub fn login_account(acc: &Account) -> QueryResult<usize> {
-    use schema::accounts;
+pub fn update_account(acc: &Account) -> QueryResult<Account> {
     let connection = establish_connection();
-
-    diesel::update(accounts::table)
-        .set(acc)
-        .execute(&connection)
+    acc.save_changes(&connection)
 }
