@@ -4,6 +4,7 @@ mod world;
 
 pub use self::char::char_list::CharListHandler;
 pub use self::char::check_name::CheckCharNameHandler;
+pub use self::char::create::CreateCharacterHandler;
 pub use self::main::accept_tos::AcceptTOSHandler;
 pub use self::main::guest_login::GuestLoginHandler;
 pub use self::main::login::LoginCredentialsHandler;

@@ -12,6 +12,7 @@ pub mod schema;
 mod settings;
 
 pub mod account;
+pub mod character;
 
 pub fn establish_connection() -> PgConnection {
     let database_url = Settings::new().unwrap().database.url;
