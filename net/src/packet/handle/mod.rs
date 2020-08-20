@@ -55,7 +55,7 @@ pub fn get_handler(op: i16) -> Box<dyn PacketHandler> {
         Some(RecvOpcode::CheckCharName) => Box::new(login::CheckCharNameHandler::new()),
         Some(RecvOpcode::CreateChar) => Box::new(login::CreateCharacterHandler::new()),
 
-        Some(RecvOpcode::DeleteChar) => Box::new(DefaultHandler::new()),
+        Some(RecvOpcode::DeleteChar) => Box::new(login::DeleteCharHandler::new()),
 
         Some(RecvOpcode::RegisterPic) => Box::new(DefaultHandler::new()),
         Some(RecvOpcode::CharSelectWithPic) => Box::new(DefaultHandler::new()),

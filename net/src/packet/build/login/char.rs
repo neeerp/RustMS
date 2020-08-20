@@ -31,6 +31,18 @@ pub fn build_char_name_response(name: &str, valid: bool) -> Packet {
     packet
 }
 
+pub fn build_char_delete(character_id: i32, status: u8) -> Packet {
+    let mut packet = Packet::new_empty();
+    let op = SendOpcode::DeleteCharacter as i16;
+
+    packet.write_short(op).unwrap();
+
+    packet.write_int(character_id).unwrap();
+    packet.write_byte(status).unwrap();
+
+    packet
+}
+
 pub fn build_char_packet(character: Character) -> Packet {
     let mut packet = Packet::new_empty();
     let op = SendOpcode::NewCharacter as i16;

@@ -7,6 +7,7 @@ pub enum SendOpcode {
     UpdatePin = 0x07,
     ServerList = 0x0A,
     NewCharacter = 0x0E,
+    DeleteCharacter = 0x0F,
     CharList = 0x0B,
     CharNameResponse = 0x0D,
     LastConnectedWorld = 0x1A,

@@ -3,14 +3,14 @@ use crate::establish_connection;
 use crate::schema;
 use crate::schema::characters;
 use diesel::expression_methods::*;
-use diesel::{QueryDsl, RunQueryDsl};
+use diesel::{QueryDsl, QueryResult, RunQueryDsl};
 use schema::characters::dsl::*;
 
-pub fn get_characters_by_accountid(query_id: i32) -> Option<Vec<Character>> {
+pub fn get_characters_by_accountid(account_id: i32) -> Option<Vec<Character>> {
     let connection = establish_connection();
 
     characters
-        .filter(accountid.eq(query_id))
+        .filter(accountid.eq(account_id))
         .load::<Character>(&connection)
         .ok()
 }
@@ -22,4 +22,15 @@ pub fn create_character<'a>(char: NewCharacter) -> Option<Character> {
         .values(&char)
         .get_result::<Character>(&connection)
         .ok()
+}
+
+pub fn delete_character(character_id: i32, account_id: i32) -> QueryResult<usize> {
+    let connection = establish_connection();
+
+    diesel::delete(
+        characters
+            .filter(id.eq(character_id))
+            .filter(accountid.eq(account_id)),
+    )
+    .execute(&connection)
 }
