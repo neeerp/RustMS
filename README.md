@@ -51,7 +51,7 @@ At the time of writing this, you can type in a username and password in the clie
 - [X] Develop a library for encrypting and decrypting packets in the form that the client expects
 - [X] Develop a model for packets and packet IO
 - [X] Develop basic infrastructure for sending and receiving packets to/from the client
-- [ ] Hook up a containerized database
-- [ ] Implement proper login and account creation flow
-- [ ] Implement character creation
+- [X] Hook up a containerized database
+- [X] Implement proper login and account creation flow
+- [X] Implement character creation
 - [ ] Revise and update roadmap
