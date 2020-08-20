@@ -123,6 +123,14 @@ fn write_char_look(packet: &mut Packet, character: &Character) {
 fn write_char_equips(packet: &mut Packet, _character: &Character) {
     // Regular equips
 
+    // Overall (Top slot)
+    packet.write_byte(5).unwrap();
+    packet.write_int(1052122).unwrap();
+
+    // Shoes
+    packet.write_byte(7).unwrap();
+    packet.write_int(1072318).unwrap();
+
     packet.write_byte(0xFF).unwrap();
 
     // Cash shop equips
@@ -130,7 +138,7 @@ fn write_char_equips(packet: &mut Packet, _character: &Character) {
     packet.write_byte(0xFF).unwrap();
 
     // Weapon
-    packet.write_int(0).unwrap();
+    packet.write_int(1302000).unwrap();
 
     // Pet stuff...
     packet.write_int(0).unwrap();

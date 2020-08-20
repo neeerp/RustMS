@@ -38,10 +38,10 @@ impl PacketHandler for CreateCharacterHandler {
         let hair = reader.read_int().unwrap();
         let hair_color = reader.read_int().unwrap();
         let skin = reader.read_int().unwrap();
-        let _top = reader.read_int().unwrap();
-        let _bot = reader.read_int().unwrap();
-        let _shoes = reader.read_int().unwrap();
-        let _weapon = reader.read_int().unwrap();
+        let _top = reader.read_int().unwrap(); // Slot 5
+        let _bot = reader.read_int().unwrap(); // Slot 6
+        let _shoes = reader.read_int().unwrap(); // Slot 7
+        let _weapon = reader.read_int().unwrap(); // Special
         let gender = reader.read_byte().unwrap() as i16;
 
         let world = 0;
