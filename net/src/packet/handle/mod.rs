@@ -1,12 +1,27 @@
 use super::op::RecvOpcode;
-use crate::{error::NetworkError, io::client::MapleClient};
+use crate::{error::NetworkError, helpers::to_hex_string, io::client::MapleClient};
 use packet::Packet;
 
-mod default;
 mod login;
 
 pub trait PacketHandler {
-    fn handle(&self, packet: &mut Packet, client: &mut MapleClient) -> Result<(), NetworkError>;
+    fn handle(&self, packet: &mut Packet, _client: &mut MapleClient) -> Result<(), NetworkError> {
+        let op = packet.opcode();
+        println!("Opcode: {}", op);
+        println!("Received packet: {}", to_hex_string(&packet.bytes));
+        Err(NetworkError::UnsupportedOpcodeError(op))
+    }
+}
+
+pub struct DefaultHandler {}
+
+impl PacketHandler for DefaultHandler {}
+
+/// A default handler that echoes the packet in the console and throws an error.
+impl DefaultHandler {
+    pub fn new() -> Self {
+        DefaultHandler {}
+    }
 }
 
 // TODO: A lot of the login related handlers are very similar and can maybe be
@@ -28,25 +43,27 @@ pub fn get_handler(op: i16) -> Box<dyn PacketHandler> {
         Some(RecvOpcode::SetGender) => Box::new(login::SetGenderHandler::new()),
 
         // TODO: HeavenClient doesn't seem to support PINs...
-        Some(RecvOpcode::AfterLogin) => Box::new(default::DefaultHandler::new()),
-        Some(RecvOpcode::RegisterPin) => Box::new(default::DefaultHandler::new()),
+        Some(RecvOpcode::AfterLogin) => Box::new(DefaultHandler::new()),
+        Some(RecvOpcode::RegisterPin) => Box::new(DefaultHandler::new()),
 
         Some(RecvOpcode::ServerListRequest) => Box::new(login::WorldListHandler::new()),
 
-        Some(RecvOpcode::ViewAllChar) => Box::new(default::DefaultHandler::new()),
-        Some(RecvOpcode::PickAllChar) => Box::new(default::DefaultHandler::new()),
-        Some(RecvOpcode::CharSelect) => Box::new(default::DefaultHandler::new()),
-        Some(RecvOpcode::CheckCharName) => Box::new(login::CheckCharNameHandler::new()),
-        Some(RecvOpcode::CreateChar) => Box::new(default::DefaultHandler::new()),
-        Some(RecvOpcode::DeleteChar) => Box::new(default::DefaultHandler::new()),
+        Some(RecvOpcode::ViewAllChar) => Box::new(DefaultHandler::new()),
+        Some(RecvOpcode::PickAllChar) => Box::new(DefaultHandler::new()),
+        Some(RecvOpcode::CharSelect) => Box::new(DefaultHandler::new()),
 
-        Some(RecvOpcode::RegisterPic) => Box::new(default::DefaultHandler::new()),
-        Some(RecvOpcode::CharSelectWithPic) => Box::new(default::DefaultHandler::new()),
-        Some(RecvOpcode::ViewAllPicRegister) => Box::new(default::DefaultHandler::new()),
-        Some(RecvOpcode::ViewAllWithPic) => Box::new(default::DefaultHandler::new()),
+        Some(RecvOpcode::CheckCharName) => Box::new(login::CheckCharNameHandler::new()),
+        Some(RecvOpcode::CreateChar) => Box::new(login::CreateCharacterHandler::new()),
+
+        Some(RecvOpcode::DeleteChar) => Box::new(login::DeleteCharHandler::new()),
+
+        Some(RecvOpcode::RegisterPic) => Box::new(DefaultHandler::new()),
+        Some(RecvOpcode::CharSelectWithPic) => Box::new(DefaultHandler::new()),
+        Some(RecvOpcode::ViewAllPicRegister) => Box::new(DefaultHandler::new()),
+        Some(RecvOpcode::ViewAllWithPic) => Box::new(DefaultHandler::new()),
 
         Some(RecvOpcode::LoginStarted) => Box::new(login::LoginStartHandler::new()),
 
-        None | Some(_) => Box::new(default::DefaultHandler::new()),
+        None | Some(_) => Box::new(DefaultHandler::new()),
     }
 }

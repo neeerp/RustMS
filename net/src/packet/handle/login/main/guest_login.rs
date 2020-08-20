@@ -11,7 +11,7 @@ use packet::Packet;
 
 pub struct GuestLoginHandler {}
 
-/// A handler for the empty 'login started' packet.
+/// A handler for guest logins...?
 impl GuestLoginHandler {
     pub fn new() -> Self {
         GuestLoginHandler {}
