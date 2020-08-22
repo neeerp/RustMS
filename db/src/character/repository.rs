@@ -14,6 +14,14 @@ pub fn get_characters_by_accountid(account_id: i32) -> QueryResult<Vec<Character
         .load::<Character>(&connection)
 }
 
+pub fn get_character_by_name(cname: &str) -> QueryResult<Character> {
+    let connection = establish_connection();
+
+    characters
+        .filter(name.eq(cname))
+        .first::<Character>(&connection)
+}
+
 pub fn create_character<'a>(char: NewCharacter) -> QueryResult<Character> {
     let connection = establish_connection();
 
