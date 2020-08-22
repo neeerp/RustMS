@@ -19,7 +19,7 @@ impl CreateCharacterHandler {
 impl PacketHandler for CreateCharacterHandler {
     fn handle(&self, packet: &mut Packet, client: &mut MapleClient) -> Result<(), NetworkError> {
         let mut reader = BufReader::new(&**packet);
-        reader.read_short().unwrap();
+        reader.read_short()?;
 
         let user = client.user.take();
         let accountid: i32;
@@ -32,17 +32,17 @@ impl PacketHandler for CreateCharacterHandler {
             _ => panic!("No account found!"),
         }
 
-        let name = &reader.read_str_with_length().unwrap();
-        let job = reader.read_int().unwrap() as i16;
-        let face = reader.read_int().unwrap();
-        let hair = reader.read_int().unwrap();
-        let hair_color = reader.read_int().unwrap();
-        let skin = reader.read_int().unwrap();
-        let _top = reader.read_int().unwrap(); // Slot 5
-        let _bot = reader.read_int().unwrap(); // Slot 6
-        let _shoes = reader.read_int().unwrap(); // Slot 7
-        let _weapon = reader.read_int().unwrap(); // Special
-        let gender = reader.read_byte().unwrap() as i16;
+        let name = &reader.read_str_with_length()?;
+        let job = reader.read_int()? as i16;
+        let face = reader.read_int()?;
+        let hair = reader.read_int()?;
+        let hair_color = reader.read_int()?;
+        let skin = reader.read_int()?;
+        let _top = reader.read_int()?; // Slot 5
+        let _bot = reader.read_int()?; // Slot 6
+        let _shoes = reader.read_int()?; // Slot 7
+        let _weapon = reader.read_int()?; // Special
+        let gender = reader.read_byte()? as i16;
 
         let world = 0;
 
@@ -58,11 +58,9 @@ impl PacketHandler for CreateCharacterHandler {
             gender,
         };
 
-        let character = character::create_character(character).unwrap();
+        // TODO: Need to gracefully return after invalid character!
+        let character = character::create_character(character)?;
 
-        match client.send(&mut login::char::build_char_packet(character)) {
-            Ok(()) => Ok(()),
-            Err(e) => Err(NetworkError::CouldNotSend(e)),
-        }
+        client.send(&mut login::char::build_char_packet(character)?)
     }
 }

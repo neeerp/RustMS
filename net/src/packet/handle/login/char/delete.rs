@@ -19,10 +19,10 @@ impl DeleteCharHandler {
 impl PacketHandler for DeleteCharHandler {
     fn handle(&self, packet: &mut Packet, client: &mut MapleClient) -> Result<(), NetworkError> {
         let mut reader = BufReader::new(&**packet);
-        reader.read_short().unwrap();
+        reader.read_short()?;
 
-        let _pic = reader.read_str_with_length().unwrap();
-        let character_id = reader.read_int().unwrap();
+        let _pic = reader.read_str_with_length()?;
+        let character_id = reader.read_int()?;
 
         let user = client.user.take();
         let accountid: i32;
@@ -36,10 +36,7 @@ impl PacketHandler for DeleteCharHandler {
         }
 
         match character::delete_character(character_id, accountid) {
-            Ok(_) => match client.send(&mut login::char::build_char_delete(character_id, 0x00)) {
-                Ok(()) => Ok(()),
-                Err(e) => Err(NetworkError::CouldNotSend(e)),
-            },
+            Ok(_) => client.send(&mut login::char::build_char_delete(character_id, 0x00)?),
             Err(_) => Err(NetworkError::PacketHandlerError(
                 "Could not delete character",
             )),

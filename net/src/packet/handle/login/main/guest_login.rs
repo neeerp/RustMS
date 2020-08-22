@@ -20,9 +20,7 @@ impl GuestLoginHandler {
 
 impl PacketHandler for GuestLoginHandler {
     fn handle(&self, packet: &mut Packet, client: &mut MapleClient) -> Result<(), NetworkError> {
-        client
-            .send(&mut build::login::status::build_guest_login_packet())
-            .unwrap();
+        client.send(&mut build::login::status::build_guest_login_packet()?)?;
 
         get_handler(RecvOpcode::LoginCredentials as i16).handle(packet, client)
     }
