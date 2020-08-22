@@ -18,13 +18,9 @@ impl CheckCharNameHandler {
 impl PacketHandler for CheckCharNameHandler {
     fn handle(&self, packet: &mut Packet, client: &mut MapleClient) -> Result<(), NetworkError> {
         let mut reader = BufReader::new(&**packet);
-        reader.read_short().unwrap();
+        reader.read_short()?;
 
-        let name = reader.read_str_with_length().unwrap();
-        client
-            .send(&mut login::char::build_char_name_response(&name, true))
-            .unwrap();
-
-        Ok(())
+        let name = reader.read_str_with_length()?;
+        client.send(&mut login::char::build_char_name_response(&name, true)?)
     }
 }

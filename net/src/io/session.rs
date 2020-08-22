@@ -14,23 +14,18 @@ pub struct Session {
 impl Session {
     /// Instantiate a new maplestory client session, generating encryption
     /// IVs in the process.
-    pub fn new(stream: TcpStream) -> Result<Session, std::io::Error> {
+    pub fn new(stream: TcpStream) -> Result<Session, NetworkError> {
         let stream = BufStream::new(stream);
 
         let (recv_iv, send_iv) = Session::generate_ivs();
         let mut client = MapleClient::new(stream, &recv_iv, &send_iv);
 
-        let handshake_packet = build::build_handshake_packet(&recv_iv, &send_iv);
+        let handshake_packet = build::build_handshake_packet(&recv_iv, &send_iv)?;
+
         match client.send_without_encryption(&handshake_packet) {
-            Ok(_) => {
-                println!("Handshake sent");
-                Ok(Session { client })
-            }
-            Err(e) => {
-                // TODO: Should incorporate this into one of our own error types
-                println!("Could not send Handshake: {}", e);
-                Err(e)
-            }
+            Ok(_) => Ok(Session { client }),
+            Err(NetworkError::IoError(e)) => Err(NetworkError::CouldNotEstablishConnection(e)),
+            Err(e) => Err(e),
         }
     }
 
@@ -47,25 +42,15 @@ impl Session {
     }
 
     /// Listen for packets being sent from the client via the session stream.
-    pub fn listen(&mut self) {
+    pub fn listen(&mut self) -> Result<(), NetworkError> {
         loop {
-            match self.read_from_stream() {
-                Ok(_) => continue,
-                Err(NetworkError::NoData) => continue,
-                Err(e) => {
-                    println!("{}", e);
-                    break;
-                }
-            }
+            self.read_from_stream()?
         }
     }
 
     /// Read packets from the session stream.
     fn read_from_stream(&mut self) -> Result<(), NetworkError> {
-        match accept::read_packet(&mut self.client) {
-            Ok(packet) => self.handle_packet(packet),
-            Err(e) => Err(e),
-        }
+        accept::read_packet(&mut self.client).map(|packet| self.handle_packet(packet))?
     }
 
     /// Deal with the packet data by printing it out.

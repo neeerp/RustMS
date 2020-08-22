@@ -22,29 +22,37 @@ impl LoginCredentialsHandler {
     /////// IO ///////
 
     /// Read the username, password, and HWID from the packet.
-    fn read_credentials(&self, packet: &mut Packet) -> (String, String, String) {
+    fn read_credentials(
+        &self,
+        packet: &mut Packet,
+    ) -> Result<(String, String, String), NetworkError> {
         let mut reader = BufReader::new(&**packet);
 
-        reader.read_short().unwrap(); // prune opcode
+        reader.read_short()?; // prune opcode
 
-        let user = reader.read_str_with_length().unwrap();
-        let pw = reader.read_str_with_length().unwrap();
+        let user = reader.read_str_with_length()?;
+        let pw = reader.read_str_with_length()?;
 
-        reader.read_bytes(6).unwrap(); // prune padding
+        reader.read_bytes(6)?; // prune padding
 
-        let hwid = to_hex_string(&reader.read_bytes(4).unwrap());
+        let hwid = to_hex_string(&reader.read_bytes(4)?);
 
-        (user, pw, hwid)
+        Ok((user, pw, hwid))
     }
 
     /////// Get Account ///////
 
     /// Attempt to get an account, either by logging into the one corresponding
     /// to the credentials, or creating one if the user name given is not taken.
-    fn verify_and_get_account(&self, user: &str, pw: &str) -> Option<Account> {
+    fn verify_and_get_account(
+        &self,
+        user: &str,
+        pw: &str,
+    ) -> Result<Option<Account>, NetworkError> {
         match account::get_account(&user) {
-            Some(acc) => self.verify_password(acc, pw),
-            None => self.create_account(user, pw),
+            Ok(acc) => Ok(self.verify_password(acc, pw)),
+            Err(db::Error::NotFound) => self.create_account(user, pw),
+            Err(e) => Err(e.into()),
         }
     }
 
@@ -60,14 +68,13 @@ impl LoginCredentialsHandler {
     }
 
     /// Create and save new account with the given username and password.
-    fn create_account(&self, user: &str, pw: &str) -> Option<Account> {
-        match crypt::login::hash_password(pw) {
-            Ok(hashed_pw) => {
-                println!("Attempting to create account with user '{}'", user);
-                account::create_account(user, &hashed_pw)
-            }
-            _ => None,
-        }
+    fn create_account(&self, user: &str, pw: &str) -> Result<Option<Account>, NetworkError> {
+        let pw = crypt::login::hash_password(pw)?;
+        let acc = account::create_account(user, &pw)?;
+
+        println!("Created user '{}'", user);
+
+        Ok(Some(acc))
     }
 
     /// Attempt to log the user in.
@@ -93,44 +100,32 @@ impl LoginCredentialsHandler {
 
     /// Log the user in.
     fn accept_logon(&self, client: &mut MapleClient, acc: Account) -> Result<(), NetworkError> {
-        let mut packet = build::login::status::build_successful_login_packet(&acc);
-
+        let mut packet = &mut build::login::status::build_successful_login_packet(&acc)?;
         client.user = Some(acc);
 
-        match client.send(&mut packet) {
-            Ok(_) => Ok(()),
-            Err(e) => Err(NetworkError::CouldNotSend(e)),
-        }
+        client.send(&mut packet)
     }
 
     /// Have the user accept the TOS.
     fn send_tos(&self, client: &mut MapleClient, acc: Account) -> Result<(), NetworkError> {
-        let mut packet = build::login::status::build_login_status_packet(23);
-
         client.user = Some(acc);
 
-        match client.send(&mut packet) {
-            Ok(_) => Ok(()),
-            Err(e) => Err(NetworkError::CouldNotSend(e)),
-        }
+        client.send(&mut build::login::status::build_login_status_packet(23)?)
     }
 
     /// Return a reason for why the user could not log in.
     fn reject_logon(&self, client: &mut MapleClient, status: u8) -> Result<(), NetworkError> {
-        let mut packet = build::login::status::build_login_status_packet(status);
-
-        match client.send(&mut packet) {
-            Ok(_) => Ok(()),
-            Err(e) => Err(NetworkError::CouldNotSend(e)),
-        }
+        client.send(&mut build::login::status::build_login_status_packet(
+            status,
+        )?)
     }
 }
 
 impl PacketHandler for LoginCredentialsHandler {
     fn handle(&self, packet: &mut Packet, client: &mut MapleClient) -> Result<(), NetworkError> {
         println!("Login attempted...");
-        let (user, pw, _hwid) = self.read_credentials(packet);
-        match self.verify_and_get_account(&user, &pw) {
+        let (user, pw, _hwid) = self.read_credentials(packet)?;
+        match self.verify_and_get_account(&user, &pw)? {
             Some(acc) => self.attempt_logon(client, acc),
             None => self.reject_logon(client, 4),
         }

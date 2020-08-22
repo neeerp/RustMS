@@ -1,147 +1,153 @@
-use crate::packet::op::SendOpcode;
+use crate::{error::NetworkError, packet::op::SendOpcode};
 use db::character::Character;
 use packet::{io::write::PktWrite, Packet};
 
-pub fn build_char_list(chars: Vec<Character>) -> Packet {
+pub fn build_char_list(chars: Vec<Character>) -> Result<Packet, NetworkError> {
     let mut packet = Packet::new_empty();
     let op = SendOpcode::CharList as i16;
 
-    packet.write_short(op).unwrap();
-    packet.write_byte(0).unwrap(); // account status?
+    packet.write_short(op)?;
+    packet.write_byte(0)?; // account status?
 
-    packet.write_byte(chars.len() as u8).unwrap(); // number of chars
+    packet.write_byte(chars.len() as u8)?; // number of chars
     for character in chars {
-        write_char(&mut packet, &character);
+        write_char(&mut packet, &character)?;
     }
 
-    packet.write_byte(2).unwrap(); // use pic?
-    packet.write_int(3).unwrap(); // Number of character slots
+    packet.write_byte(2)?; // use pic?
+    packet.write_int(3)?; // Number of character slots
 
-    packet
+    Ok(packet)
 }
 
-pub fn build_char_name_response(name: &str, valid: bool) -> Packet {
+pub fn build_char_name_response(name: &str, valid: bool) -> Result<Packet, NetworkError> {
     let mut packet = Packet::new_empty();
     let op = SendOpcode::CharNameResponse as i16;
 
-    packet.write_short(op).unwrap();
-    packet.write_str_with_length(name).unwrap();
-    packet.write_byte(!valid as u8).unwrap();
+    packet.write_short(op)?;
+    packet.write_str_with_length(name)?;
+    packet.write_byte(!valid as u8)?;
 
-    packet
+    Ok(packet)
 }
 
-pub fn build_char_delete(character_id: i32, status: u8) -> Packet {
+pub fn build_char_delete(character_id: i32, status: u8) -> Result<Packet, NetworkError> {
     let mut packet = Packet::new_empty();
     let op = SendOpcode::DeleteCharacter as i16;
 
-    packet.write_short(op).unwrap();
+    packet.write_short(op)?;
 
-    packet.write_int(character_id).unwrap();
-    packet.write_byte(status).unwrap();
+    packet.write_int(character_id)?;
+    packet.write_byte(status)?;
 
-    packet
+    Ok(packet)
 }
 
-pub fn build_char_packet(character: Character) -> Packet {
+pub fn build_char_packet(character: Character) -> Result<Packet, NetworkError> {
     let mut packet = Packet::new_empty();
     let op = SendOpcode::NewCharacter as i16;
 
-    packet.write_short(op).unwrap();
-    packet.write_byte(0).unwrap();
+    packet.write_short(op)?;
+    packet.write_byte(0)?;
 
-    write_char(&mut packet, &character);
+    write_char(&mut packet, &character)?;
 
-    packet
+    Ok(packet)
 }
 
-fn write_char(packet: &mut Packet, character: &Character) {
-    write_char_meta(packet, &character);
-    write_char_look(packet, &character);
+fn write_char(packet: &mut Packet, character: &Character) -> Result<(), NetworkError> {
+    write_char_meta(packet, &character)?;
+    write_char_look(packet, &character)?;
 
-    packet.write_byte(0).unwrap();
+    packet.write_byte(0)?;
 
     // Disable rank.
-    packet.write_byte(0).unwrap();
+    packet.write_byte(0)?;
+
+    Ok(())
 }
 
-fn write_char_meta(packet: &mut Packet, character: &Character) {
-    packet.write_int(character.id).unwrap();
-    packet.write_str(&character.name).unwrap();
-    packet
-        .write_bytes(&vec![0u8; 13 - character.name.len()])
-        .unwrap();
-    packet.write_byte(character.gender as u8).unwrap();
-    packet.write_byte(character.skin as u8).unwrap();
-    packet.write_int(character.face).unwrap();
-    packet.write_int(character.hair).unwrap();
+fn write_char_meta(packet: &mut Packet, character: &Character) -> Result<(), NetworkError> {
+    packet.write_int(character.id)?;
+    packet.write_str(&character.name)?;
+    packet.write_bytes(&vec![0u8; 13 - character.name.len()])?;
+    packet.write_byte(character.gender as u8)?;
+    packet.write_byte(character.skin as u8)?;
+    packet.write_int(character.face)?;
+    packet.write_int(character.hair)?;
 
     // Pets... Not implemented yet
-    packet.write_long(0).unwrap();
-    packet.write_long(0).unwrap();
-    packet.write_long(0).unwrap();
+    packet.write_long(0)?;
+    packet.write_long(0)?;
+    packet.write_long(0)?;
 
-    packet.write_byte(character.level as u8).unwrap();
-    packet.write_short(character.job).unwrap();
+    packet.write_byte(character.level as u8)?;
+    packet.write_short(character.job)?;
 
-    packet.write_short(character.stre).unwrap();
-    packet.write_short(character.dex).unwrap();
-    packet.write_short(character.int).unwrap();
-    packet.write_short(character.luk).unwrap();
-    packet.write_short(character.hp).unwrap();
-    packet.write_short(character.maxhp).unwrap();
-    packet.write_short(character.mp).unwrap();
-    packet.write_short(character.maxmp).unwrap();
-    packet.write_short(character.ap).unwrap();
+    packet.write_short(character.stre)?;
+    packet.write_short(character.dex)?;
+    packet.write_short(character.int)?;
+    packet.write_short(character.luk)?;
+    packet.write_short(character.hp)?;
+    packet.write_short(character.maxhp)?;
+    packet.write_short(character.mp)?;
+    packet.write_short(character.maxmp)?;
+    packet.write_short(character.ap)?;
 
     // SP
-    packet.write_short(0).unwrap();
+    packet.write_short(0)?;
 
-    packet.write_int(character.exp).unwrap();
-    packet.write_short(character.fame).unwrap();
+    packet.write_int(character.exp)?;
+    packet.write_short(character.fame)?;
 
     // Gach xp?
-    packet.write_int(0).unwrap();
+    packet.write_int(0)?;
 
     // Map.. Not implemented yet
-    packet.write_int(0).unwrap();
-    packet.write_byte(1).unwrap();
+    packet.write_int(0)?;
+    packet.write_byte(1)?;
 
-    packet.write_int(0).unwrap();
+    packet.write_int(0)?;
+
+    Ok(())
 }
 
-fn write_char_look(packet: &mut Packet, character: &Character) {
-    packet.write_byte(character.gender as u8).unwrap();
-    packet.write_byte(character.skin as u8).unwrap();
-    packet.write_int(character.face).unwrap();
-    packet.write_byte(0).unwrap();
-    packet.write_int(character.hair).unwrap();
+fn write_char_look(packet: &mut Packet, character: &Character) -> Result<(), NetworkError> {
+    packet.write_byte(character.gender as u8)?;
+    packet.write_byte(character.skin as u8)?;
+    packet.write_int(character.face)?;
+    packet.write_byte(0)?;
+    packet.write_int(character.hair)?;
 
-    write_char_equips(packet, character);
+    write_char_equips(packet, character)?;
+
+    Ok(())
 }
 
-fn write_char_equips(packet: &mut Packet, _character: &Character) {
+fn write_char_equips(packet: &mut Packet, _character: &Character) -> Result<(), NetworkError> {
     // Regular equips
 
     // Overall (Top slot)
-    packet.write_byte(5).unwrap();
-    packet.write_int(1052122).unwrap();
+    packet.write_byte(5)?;
+    packet.write_int(1052122)?;
 
     // Shoes
-    packet.write_byte(7).unwrap();
-    packet.write_int(1072318).unwrap();
+    packet.write_byte(7)?;
+    packet.write_int(1072318)?;
 
-    packet.write_byte(0xFF).unwrap();
+    packet.write_byte(0xFF)?;
 
     // Cash shop equips
 
-    packet.write_byte(0xFF).unwrap();
+    packet.write_byte(0xFF)?;
 
     // Weapon
-    packet.write_int(1302000).unwrap();
+    packet.write_int(1302000)?;
 
     // Pet stuff...
-    packet.write_int(0).unwrap();
-    packet.write_int(0).unwrap();
-    packet.write_int(0).unwrap();
+    packet.write_int(0)?;
+    packet.write_int(0)?;
+    packet.write_int(0)?;
+
+    Ok(())
 }

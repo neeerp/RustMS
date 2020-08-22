@@ -4,3 +4,5 @@ pub use crate::aes::MapleAES;
 
 mod aes;
 mod constants;
+
+pub use bcrypt::BcryptError;

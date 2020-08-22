@@ -16,30 +16,26 @@ impl AcceptTOSHandler {
     }
 
     fn accept_logon(&self, client: &mut MapleClient, acc: Account) -> Result<(), NetworkError> {
-        let mut return_packet = build::login::status::build_successful_login_packet(&acc);
-
+        let mut packet = build::login::status::build_successful_login_packet(&acc)?;
         client.user = Some(acc);
 
-        match client.send(&mut return_packet) {
-            Ok(_) => Ok(()),
-            Err(e) => Err(NetworkError::CouldNotSend(e)),
-        }
+        Ok(client.send(&mut packet)?)
     }
 }
 
 impl PacketHandler for AcceptTOSHandler {
     fn handle(&self, packet: &mut Packet, client: &mut MapleClient) -> Result<(), NetworkError> {
         let mut reader = BufReader::new(&**packet);
-        reader.read_short().unwrap();
+        reader.read_short()?;
 
-        let confirmed = reader.read_byte().unwrap();
+        let confirmed = reader.read_byte()?;
         let user = client.user.take();
 
         match (confirmed, user) {
             (0x01, Some(mut user)) => {
                 user.accepted_tos = true;
 
-                let user = account::update_account(&user).unwrap();
+                let user = account::update_account(&user)?;
 
                 self.accept_logon(client, user)
             }

@@ -1,11 +1,9 @@
+use crate::error::NetworkError;
 use bufstream::BufStream;
 use crypt::{maple_crypt, MapleAES};
 use db::account::Account;
 use packet::Packet;
-use std::{
-    io::{Result, Write},
-    net::TcpStream,
-};
+use std::{io::Write, net::TcpStream};
 
 /// A container for various pieces of information pertaining to a Session's
 /// client.
@@ -31,23 +29,24 @@ impl MapleClient {
 
     /// Encrypt a packet with the custom Maplestory encryption followed by AES,
     /// and then send the packet to the client.
-    pub fn send(&mut self, packet: &mut Packet) -> Result<()> {
+    pub fn send(&mut self, packet: &mut Packet) -> Result<(), NetworkError> {
         let header = self.send_crypt.gen_packet_header(packet.len() + 2);
 
         maple_crypt::encrypt(packet);
         self.send_crypt.crypt(packet);
 
-        match self.send_without_encryption(&header) {
-            Ok(_) => self.send_without_encryption(packet),
-            Err(e) => Err(e),
-        }
+        self.send_without_encryption(&header)?;
+        self.send_without_encryption(packet)
     }
 
     /// Send data to the client.
-    pub fn send_without_encryption(&mut self, data: &[u8]) -> Result<()> {
+    pub fn send_without_encryption(&mut self, data: &[u8]) -> Result<(), NetworkError> {
         match self.stream.write(data) {
-            Ok(_) => self.stream.flush(),
-            Err(e) => Err(e),
+            Ok(_) => match self.stream.flush() {
+                Ok(_) => Ok(()),
+                Err(e) => Err(NetworkError::CouldNotSend(e)),
+            },
+            Err(e) => Err(NetworkError::CouldNotSend(e)),
         }
     }
 }

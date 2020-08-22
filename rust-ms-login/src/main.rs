@@ -27,10 +27,10 @@ fn main() {
 }
 
 fn handle_connection(stream: TcpStream) {
-    match Session::new(stream) {
-        Ok(mut session) => session.listen(),
-        Err(_) => println!("Could not establish connection."),
-    }
-
-    println!("Connection terminated");
+    println!(
+        "Connection Terminated: {}",
+        Session::new(stream)
+            .and_then(|mut session| session.listen())
+            .expect_err("Thread disconnects should result in error...")
+    )
 }

@@ -16,10 +16,9 @@ use std::net::TcpStream;
 pub fn read_packet(client: &mut MapleClient) -> Result<Packet, NetworkError> {
     let crypt = &mut client.recv_crypt;
     let stream = &mut client.stream;
-    match read_header(stream, crypt) {
-        Ok(data_length) => read_data(data_length, stream, crypt),
-        Err(e) => Err(e),
-    }
+
+    let data_length = read_header(stream, crypt)?;
+    read_data(data_length, stream, crypt)
 }
 
 /// Read a new packet header from the session stream and use it to return the
@@ -30,10 +29,8 @@ fn read_header(
 ) -> Result<i16, NetworkError> {
     let mut header_buf: [u8; 4] = [0u8; 4];
 
-    match stream.read_exact(&mut header_buf) {
-        Ok(_) => parse_header(&header_buf, crypt),
-        Err(e) => Err(NetworkError::CouldNotReadHeader(e)),
-    }
+    stream.read_exact(&mut header_buf)?;
+    parse_header(&header_buf, crypt)
 }
 
 /// Read the data of a packet given its length from the session stream and
@@ -45,16 +42,13 @@ fn read_data(
 ) -> Result<Packet, NetworkError> {
     let mut buf = vec![0u8; data_length as usize];
 
-    match stream.read_exact(&mut buf) {
-        Ok(_) => {
-            // Decrypt incoming packet
-            crypt.crypt(&mut buf[..]);
-            maple_crypt::decrypt(&mut buf[..]);
+    stream.read_exact(&mut buf)?;
 
-            Ok(Packet::new(&buf[..]))
-        }
-        Err(_) => Err(NetworkError::InvalidPacket),
-    }
+    // Decrypt incoming packet
+    crypt.crypt(&mut buf[..]);
+    maple_crypt::decrypt(&mut buf[..]);
+
+    Ok(Packet::new(&buf[..]))
 }
 
 /// Parse the packet header and return the length of the incoming packet.
