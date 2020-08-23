@@ -11,21 +11,126 @@ When I started this project, I knew next to no Rust, however I was quite interes
 The second motivation behind this project comes from the fact that Maplestory has a special place in my heart as the game that probably defined my childhood. I knew people had written and ran their own servers before but for the longest time it hadn't hit me that a lot of these servers had their source up on Github. Having looked at a few servers such as [HeavenMS](https://github.com/ronancpl/HeavenMS) and [Valhalla](https://github.com/Hucaru/Valhalla), I realized that I could probably try my hand at writing my own server too and that I could probably have quite a bit of fun with it.
 
 ## Overview
-As of 09/08/2020, RustMS is still in very early stages.
+As of 23/08/2020, RustMS is still in a very early stage.
 
-The library for handling the encryption and decryption of packets is functionally complete, with support for Maplestory's custom approach to AES as well as its custom secondary "encryption" that gets applied before the AES encryption.
+### Crates
+The `crypt` crate provides the means for encrypting and decrypting packets using
+Maplestory's custom AES algorithm as well as its secondary encryption algorithm
+that's applied prior to AES. In particular, this library defines the `MapleAES`
+object that is used to encrypt/decrypt and keep track of the encryption nonce for
+a unidirectional stream of communication between the client and server. There is
+also a module here that provides an interface for encrypting and decrypting
+account passwords with bcrypt.
 
-The library that models packets is functional in that a model exists for the packets with read/write capabilities have been implemented for a number of data types that Maplestory uses including bytes, byte arrays, Little Endian integers of various lengths, and length headered Strings.
+The `packet` crate provides a simple wrapper for our network packets, as well as an 
+extension of the `Read` and `Write` IO traits that allow us to read and write various
+data types to our packets, including little endian integers of different sizes and
+length-headered strings.
 
-The network library currently has a very basic model of the client session (where most of the magic happens, for now), a module for accepting and decrypting incoming packets from a session's TCP stream, and a very rough module for defining packet handlers.
+The `db` crate provides connections to RustMS' PostgreSQL database, a representation 
+of the database's schema, models and projections of the database entities, and 
+the entities' respective data repositories. The models and data repositories live in 
+domain specific modules, so, for instance, everything pertaining to user accounts 
+can be found under the `account` module. The ORM we're using for RustMS is `diesel`.
 
-The entry point of the project is the rust-ms-login module, which listens on `localhost:8484` and delegates incoming connections to new threads that it spawns.
+The `net` crate is currently the largest crate and consists of two primary modules:
+`io` and `packet`. The `io` module has methods and models that define our current
+server infrastructure. Things like the entry point to a connection's main IO loop, 
+as well as the methods and models for reading, decrypting, delegating, and sending 
+packets are defined here. We also model the client connection and its state here. 
+The `packet` module defines our packet handlers and builders for dealing with incoming 
+packets from the client and building responses. There are two major submodules here, 
+`build` and `handle` that perform the aforementioned duties. Currently, most of our 
+server's actual logic resides here, however ideally we'd like to create a separate 
+module (or perhaps add to the `db` crate's domain modules) to keep things organized and
+DRY...
 
-As for overall functionality, you can only really handshake with the server and send it login attempt packets. The current goal at this point in time is to get the network infrastructure and packet model to a slightly more comfortable to work with state (i.e. implement a cleaner framework for handlers, make packet reading/writing seekable, add better error handling). After this, the focus will shift to the login flow, which will include adding a lot of handlers and hooking up a database! That'd also be a good time to Dockerize the project. Ideally I'll write out a more formal Roadmap section for this README sometime in the near future (if you're reading this, that either hasn't happened yet, or I forgot to remove this blurb...).
+The current entry point of the project is the `rust-ms-login` crate. It listens for 
+incoming connections on `localhost:8484` and delegates these connections to threads 
+that instantiate a `Session` (performing an AES handshake in the process) and listen for 
+IO until some kind of `NetworkError` (defined in the `net` crate) is returned and the 
+client connection is closed.
 
-**TLDR**: *Quite a bit of basic infrastructure so far - we can actually understand the data the client sends, parse it, and echo it in the console! More infrastructure work to come and then hopefully login/account creation!*
+### Functionality
+Currently, RustMS consists solely of a reasonably functional Login Server. 
+
+#### Encryption
+Once a new client initiates a connection, the server responds with a handshake to 
+exchange AES initialization vectors as well as some metadata about the server such 
+as the client version that it expects. Any subsequent communication between the 
+client and the server is encrypted with Maplestory's custom encryption (for lack of 
+a better name) followed by Maplestory's custom AES encryption. Send and Receive data 
+is encrypted using separate nonces (i.e. the initialization vectors and their 
+subsequent mutations) that are both kept in sync between the client and server.
+
+#### Account Creation/Login
+Currently, one can create an account by attempting to log into an account that 
+does not yet exist. The provided password is encrypted and the user/encrypted pw
+combination is saved in the database. The first login will prompt the user to 
+accept a TOS as well as select their gender before forwarding them to the world 
+select... these two features are currently hardcoded to trigger however in the 
+future they'll be controlled by a configuration property.
+
+Existing accounts can be logged into as expected, and a successful login will 
+forward you to the world select screen as expected.
+
+Currently, the account PIN prompt is bypassed and PINs are not yet supported. In 
+the future we'll implement this too (likely whenever we establish our architecture 
+for handling multiple servers and moving sessions between them... this will likely 
+require changes in how the client session is modeled, which will have a direct impact 
+on pin logins). We'll be putting this behind a configuration property as well.
+
+#### World Select
+Currently, one may select a world from the world selection screen once they are 
+logged in... There's only one world, and it's hard coded and not actually backed 
+by anything as we've yet to implement separate game/world servers. This'll be 
+updated accordingly when we implement those.
+
+#### Character Selection/Creation/Deletion
+Currently, character creation is supported to an extent. One may create persistent,
+account linked characters that may be viewed on the character selection screen. 
+These characters inherit some of the features that are selected during character 
+creation such as gender, hair, and skin color, however equipment is ignored since 
+this would require us to establish our model for character inventories as well as
+character equiped items. This will most likely happen after we actually get a 
+functioning game server.
+
+Created characters also enforce uniqueness in their names, hence the check done 
+at the end of the character creation flow is actually working. Currently this check 
+is case sensitive, and that'll likely need to be fixed some time in the future.
+
+Character deletion works and is instantaneous, so be careful (not as though your 
+characters really matter at this stage of development anyway though).
+
+PICs are currently disabled and will be implemented alongside PINs as mentioned
+previously. They too will be toggleable via configuration.
+
+Trying to log into a character will end the connection between the server and client 
+since we've not yet implemented anything beyond the login server side.
+
+
+#### Database
+RustMS is currently being backed by a standalone PostgreSQL server that can be seamlessly 
+set up using the `docker-compose` file in the root of the project. The database's schema 
+can be generated by running the `diesel` (our ORM of choice) migrations in the `db` crate.
+
+### What's on the Horizon
+#### Distributed Architecture
+We're currently on the cusp of a major milestone! With a basic login flow working, 
+our next step is to try and turn RustMS into a multi-server application, with the 
+Login Server being what it is currently (functionally), while also being bridged to 
+a separate Game Server that clients will get forwarded to upon selecting a character.
+
+We'll need to look at how other servers achieve this, and we have a number of examples to 
+look to as well as our open source client to help paint a better picture. As of writing this, 
+not too much research has actually been done into this, however I've only just established this 
+as the next major goal I'd like to achieve here! Soon we'll be able to actually get 
+into the game and walk around! Neat!
 
 ## Demonstration
+*This demonstration is out-dated and needs to be updated! For now, see the above 
+overview for an idea of the implemented features!*
+
 ### Running the server
 If you would like to run RustMS, clone the repository and run the project from the root with `cargo run` (make sure you have Rust and Cargo installed). You should see something akin to the following: 
 
@@ -54,4 +159,4 @@ At the time of writing this, you can type in a username and password in the clie
 - [X] Hook up a containerized database
 - [X] Implement proper login and account creation flow
 - [X] Implement character creation
-- [ ] Revise and update roadmap
+- [ ] Revise and update roadmap (in progress)
