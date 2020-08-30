@@ -1,5 +1,5 @@
 [package]
-name = "rust-ms-login"
+name = "rust-ms"
 version = "0.1.0"
 authors = ["David Goldstein <goldstein.g.david@gmail.com>"]
 edition = "2018"

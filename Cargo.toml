@@ -1,7 +1,7 @@
 [workspace]
 
 members = [
-    "rust-ms-login",
+    "rust-ms",
     "packet",
     "crypt",
     "net",

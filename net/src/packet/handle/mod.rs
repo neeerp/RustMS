@@ -1,5 +1,7 @@
 use super::op::RecvOpcode;
-use crate::{error::NetworkError, helpers::to_hex_string, io::client::MapleClient};
+use crate::{
+    error::NetworkError, helpers::to_hex_string, io::client::MapleClient, listener::ServerType,
+};
 use packet::Packet;
 
 mod login;
@@ -28,9 +30,17 @@ impl DefaultHandler {
 // consolidated, making a check on the opcode to decide how to proceed... These
 // handlers include the LoginCredentials handler, AcceptTOS handler,
 // SetGenderHandler
+//
+
+pub fn get_handler(op: i16, server_type: &ServerType) -> Box<dyn PacketHandler> {
+    match server_type {
+        ServerType::Login => get_login_handler(op),
+        ServerType::World => get_world_handler(op),
+    }
+}
 
 /// Get the packet handler corresponding to the given opcode.
-pub fn get_handler(op: i16) -> Box<dyn PacketHandler> {
+fn get_login_handler(op: i16) -> Box<dyn PacketHandler> {
     match num::FromPrimitive::from_i16(op) {
         Some(RecvOpcode::LoginCredentials) => Box::new(login::LoginCredentialsHandler::new()),
         Some(RecvOpcode::GuestLogin) => Box::new(login::GuestLoginHandler::new()),
@@ -50,7 +60,7 @@ pub fn get_handler(op: i16) -> Box<dyn PacketHandler> {
 
         Some(RecvOpcode::ViewAllChar) => Box::new(DefaultHandler::new()),
         Some(RecvOpcode::PickAllChar) => Box::new(DefaultHandler::new()),
-        Some(RecvOpcode::CharSelect) => Box::new(DefaultHandler::new()),
+        Some(RecvOpcode::CharSelect) => Box::new(login::CharacterSelectHandler::new()),
 
         Some(RecvOpcode::CheckCharName) => Box::new(login::CheckCharNameHandler::new()),
         Some(RecvOpcode::CreateChar) => Box::new(login::CreateCharacterHandler::new()),
@@ -63,6 +73,14 @@ pub fn get_handler(op: i16) -> Box<dyn PacketHandler> {
         Some(RecvOpcode::ViewAllWithPic) => Box::new(DefaultHandler::new()),
 
         Some(RecvOpcode::LoginStarted) => Box::new(login::LoginStartHandler::new()),
+
+        None | Some(_) => Box::new(DefaultHandler::new()),
+    }
+}
+
+fn get_world_handler(op: i16) -> Box<dyn PacketHandler> {
+    match num::FromPrimitive::from_i16(op) {
+        Some(RecvOpcode::UnusedOpcode) => Box::new(DefaultHandler::new()),
 
         None | Some(_) => Box::new(DefaultHandler::new()),
     }

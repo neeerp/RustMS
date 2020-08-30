@@ -7,23 +7,40 @@ use bufstream::BufStream;
 use rand::{thread_rng, Rng};
 use std::net::TcpStream;
 
-pub struct Session {
+pub struct ClientConnectionListener {
     pub client: MapleClient,
+    server_type: ServerType,
 }
 
-impl Session {
-    /// Instantiate a new maplestory client session, generating encryption
+impl ClientConnectionListener {
+    /// Instantiate a new Login Server Connection Listener
+    pub fn login_server(stream: TcpStream) -> Result<Self, NetworkError> {
+        Self::new(stream, ServerType::Login)
+    }
+
+    /// Instantiate a new World server Connection Listener
+    pub fn world_server(stream: TcpStream) -> Result<Self, NetworkError> {
+        Self::new(stream, ServerType::World)
+    }
+
+    /// Instantiate a new maplestory client listener, generating encryption
     /// IVs in the process.
-    pub fn new(stream: TcpStream) -> Result<Session, NetworkError> {
+    fn new(
+        stream: TcpStream,
+        server_type: ServerType,
+    ) -> Result<ClientConnectionListener, NetworkError> {
         let stream = BufStream::new(stream);
 
-        let (recv_iv, send_iv) = Session::generate_ivs();
+        let (recv_iv, send_iv) = ClientConnectionListener::generate_ivs();
         let mut client = MapleClient::new(stream, &recv_iv, &send_iv);
 
         let handshake_packet = build::build_handshake_packet(&recv_iv, &send_iv)?;
 
         match client.send_without_encryption(&handshake_packet) {
-            Ok(_) => Ok(Session { client }),
+            Ok(_) => Ok(ClientConnectionListener {
+                client,
+                server_type,
+            }),
             Err(NetworkError::IoError(e)) => Err(NetworkError::CouldNotEstablishConnection(e)),
             Err(e) => Err(e),
         }
@@ -55,8 +72,13 @@ impl Session {
 
     /// Deal with the packet data by printing it out.
     fn handle_packet(&mut self, mut packet: Packet) -> Result<(), NetworkError> {
-        let handler = handle::get_handler(packet.opcode());
+        let handler = handle::get_handler(packet.opcode(), &self.server_type);
 
         handler.handle(&mut packet, &mut self.client)
     }
+}
+
+pub enum ServerType {
+    Login,
+    World,
 }
