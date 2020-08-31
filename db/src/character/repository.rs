@@ -22,6 +22,14 @@ pub fn get_character_by_name(cname: &str) -> QueryResult<Character> {
         .first::<Character>(&connection)
 }
 
+pub fn get_character_by_id(cid: i32) -> QueryResult<Character> {
+    let connection = establish_connection();
+
+    characters
+        .filter(id.eq(cid))
+        .first::<Character>(&connection)
+}
+
 pub fn create_character<'a>(char: NewCharacter) -> QueryResult<Character> {
     let connection = establish_connection();
 

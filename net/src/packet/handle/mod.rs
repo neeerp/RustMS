@@ -5,6 +5,7 @@ use crate::{
 use packet::Packet;
 
 mod login;
+mod world;
 
 pub trait PacketHandler {
     fn handle(&self, packet: &mut Packet, _client: &mut MapleClient) -> Result<(), NetworkError> {
@@ -80,7 +81,12 @@ fn get_login_handler(op: i16) -> Box<dyn PacketHandler> {
 
 fn get_world_handler(op: i16) -> Box<dyn PacketHandler> {
     match num::FromPrimitive::from_i16(op) {
-        Some(RecvOpcode::UnusedOpcode) => Box::new(DefaultHandler::new()),
+        Some(RecvOpcode::PlayerMove) => Box::new(world::PlayerMoveHandler::new()),
+        Some(RecvOpcode::PlayerLoggedIn) => Box::new(world::PlayerLoggedInHandler::new()),
+        Some(RecvOpcode::PlayerMapTransfer) => Box::new(world::PlayerMapTransferHandler::new()),
+        Some(RecvOpcode::PartySearch) => Box::new(world::PartySearchHandler::new()),
+        Some(RecvOpcode::ChangeKeybinds) => Box::new(world::ChangeKeybindsHandler::new()),
+        Some(RecvOpcode::AllChat) => Box::new(world::AllChatHandler::new()),
 
         None | Some(_) => Box::new(DefaultHandler::new()),
     }

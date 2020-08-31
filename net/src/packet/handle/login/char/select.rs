@@ -19,10 +19,11 @@ impl PacketHandler for CharacterSelectHandler {
         let mut reader = BufReader::new(&**packet);
 
         let _op = reader.read_short()?;
+        let cid = reader.read_int()?;
         let _mac = reader.read_str_with_length();
         let _hwid = reader.read_str_with_length();
 
         println!("Redirecting to port 8485!");
-        client.send(&mut build::login::world::build_server_redirect()?)
+        client.send(&mut build::login::world::build_server_redirect(cid)?)
     }
 }

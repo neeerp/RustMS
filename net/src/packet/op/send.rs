@@ -13,4 +13,9 @@ pub enum SendOpcode {
     CharNameResponse = 0x0D,
     LastConnectedWorld = 0x1A,
     RecommendedWorlds = 0x1B,
+
+    BuddyList = 0x3F,
+    FamilyInfo = 0x5F,
+    FamilyList = 0x64,
+    SetField = 0x7D,
 }
