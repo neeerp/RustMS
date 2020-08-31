@@ -2,10 +2,10 @@ use std::net::{TcpListener, TcpStream};
 use std::process::exit;
 use std::thread;
 
-use net::session::Session;
+use net::listener::ClientConnectionListener;
 
 fn main() {
-    println!("Starting up...");
+    println!("Starting World Server...");
 
     // Shut down the server somewhat gracefuly; not a fan of seeing an error on ctrl+c
     ctrlc::set_handler(move || {
@@ -14,7 +14,7 @@ fn main() {
     })
     .expect("Error setting ctrl+c handler!");
 
-    let listener = TcpListener::bind("0.0.0.0:8484").unwrap();
+    let listener = TcpListener::bind("0.0.0.0:8485").unwrap();
 
     for stream in listener.incoming() {
         println!("Incoming connection...");
@@ -29,7 +29,7 @@ fn main() {
 fn handle_connection(stream: TcpStream) {
     println!(
         "Connection Terminated: {}",
-        Session::new(stream)
+        ClientConnectionListener::world_server(stream)
             .and_then(|mut session| session.listen())
             .expect_err("Thread disconnects should result in error...")
     )

@@ -1,5 +1,6 @@
 #[derive(FromPrimitive)]
 pub enum RecvOpcode {
+    // Login Server Opcodes
     LoginCredentials = 0x01,
     GuestLogin = 0x02,
     ServerListReRequest = 0x04,
@@ -21,6 +22,16 @@ pub enum RecvOpcode {
     ViewAllPicRegister = 0x1F,
     ViewAllWithPic = 0x20,
     LoginStarted = 0x23,
+
+    // World Server Opcodes
+    PlayerLoggedIn = 0x14,
+    PlayerMove = 0x29,
+    AllChat = 0x31,
+
+    ChangeKeybinds = 0x87,
+
+    PlayerMapTransfer = 0xCF,
+    PartySearch = 0xDF,
 
     UnusedOpcode = 0xFF,
 }

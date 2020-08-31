@@ -87,3 +87,22 @@ pub fn build_server_status(status: i16) -> Result<Packet, NetworkError> {
 
     Ok(packet)
 }
+
+pub fn build_server_redirect(cid: i32) -> Result<Packet, NetworkError> {
+    let mut packet = Packet::new_empty();
+    let op = SendOpcode::ServerIp as i16;
+
+    let server_ip = vec![127, 0, 0, 1];
+    let server_port = 8485;
+
+    packet.write_short(op)?;
+    packet.write_short(0)?;
+
+    packet.write_bytes(&server_ip)?;
+    packet.write_short(server_port)?;
+    packet.write_int(cid)?;
+
+    packet.write_bytes(&vec![0u8; 5])?;
+
+    Ok(packet)
+}
