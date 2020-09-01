@@ -23,6 +23,8 @@ impl PacketHandler for CharacterSelectHandler {
         let _mac = reader.read_str_with_length();
         let _hwid = reader.read_str_with_length();
 
+        client.transition(cid)?;
+
         println!("Redirecting to port 8485!");
         client.send(&mut build::login::world::build_server_redirect(cid)?)
     }

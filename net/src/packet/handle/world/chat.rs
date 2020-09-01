@@ -1,7 +1,4 @@
-use crate::{
-    error::NetworkError, helpers::to_hex_string, io::client::MapleClient,
-    packet::handle::PacketHandler,
-};
+use crate::{error::NetworkError, io::client::MapleClient, packet::handle::PacketHandler};
 use packet::{io::read::PktRead, Packet};
 use std::io::BufReader;
 

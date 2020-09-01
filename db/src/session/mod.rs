@@ -18,7 +18,7 @@ pub enum SessionState {
     InGame,
 }
 
-#[derive(Identifiable, Queryable)]
+#[derive(Identifiable, Queryable, AsChangeset)]
 #[table_name = "sessions"]
 pub struct Session {
     pub id: i32,
