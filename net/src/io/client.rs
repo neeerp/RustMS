@@ -110,7 +110,7 @@ impl MapleClient {
                 ses.character_id = Some(character_id);
                 ses.updated_at = SystemTime::now();
 
-                self.session = Some(session::update_session(&ses)?);
+                session::update_session(&ses)?;
                 Ok(())
             }
             None => Err(NetworkError::NoData),
@@ -133,12 +133,8 @@ impl MapleClient {
     pub fn logout(&mut self) -> Result<(), NetworkError> {
         match self.session.take() {
             Some(session) => {
-                let deleted = session::delete_session_by_id(session.id)?;
-                if let 1 = deleted {
-                    Ok(())
-                } else {
-                    Err(NetworkError::NoData)
-                }
+                session::delete_session_by_id(session.id)?;
+                Ok(())
             }
             None => Err(NetworkError::NoData),
         }
