@@ -1,0 +1,12 @@
+# For documentation on how to configure this file,
+# see diesel.rs/guides/configuring-diesel-cli
+
+# TODO: Next major release of Diesel will allow this;
+# For now you need to supply --migration-dir to diesel-cli
+# [migrations_directory]
+# file = "db/migrations/"
+
+[print_schema]
+file = "db/src/schema.rs"
+import_types = ["diesel::sql_types::*", "crate::session::*"]
+

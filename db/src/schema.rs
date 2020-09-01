@@ -1,4 +1,6 @@
 table! {
+    use diesel::sql_types::*;
+
     accounts (id) {
         id -> Int4,
         user_name -> Varchar,
@@ -17,6 +19,8 @@ table! {
 }
 
 table! {
+    use diesel::sql_types::*;
+
     characters (id) {
         id -> Int4,
         accountid -> Int4,
@@ -45,7 +49,23 @@ table! {
     }
 }
 
-allow_tables_to_appear_in_same_query!(
-    accounts,
-    characters,
-);
+table! {
+    use diesel::sql_types::*;
+    use crate::session::*;
+
+    sessions (id) {
+        id -> Int4,
+        account_id -> Int4,
+        character_id -> Nullable<Int4>,
+        ip -> Inet,
+        hwid -> Varchar,
+        state -> Session_state,
+        updated_at -> Timestamp,
+        created_at -> Timestamp,
+    }
+}
+
+joinable!(sessions -> accounts (account_id));
+joinable!(sessions -> characters (character_id));
+
+allow_tables_to_appear_in_same_query!(accounts, characters, sessions,);
