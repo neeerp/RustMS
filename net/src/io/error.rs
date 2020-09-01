@@ -49,7 +49,7 @@ impl fmt::Display for NetworkError {
             }
             NetworkError::DbError(e) => write!(f, "Database Error: {}", e),
             NetworkError::CryptError(e) => write!(f, "Error applying encryption: {}", e),
-            e => write!(f, "{}", e),
+            e => write!(f, "{:?}", e),
         }
     }
 }
