@@ -61,7 +61,16 @@ impl ClientConnectionListener {
     /// Listen for packets being sent from the client via the session stream.
     pub fn listen(&mut self) -> Result<(), NetworkError> {
         loop {
-            self.read_from_stream()?
+            if let Err(e) = self.read_from_stream() {
+                return Err(self.close_gracefully(e));
+            }
+        }
+    }
+
+    fn close_gracefully(&mut self, e: NetworkError) -> NetworkError {
+        match self.client.logout() {
+            Ok(_) => e,
+            Err(logout_err) => NetworkError::LogoutError(Box::new(logout_err)), // TODO: Need error type that encapsualtes error
         }
     }
 

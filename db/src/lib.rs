@@ -3,6 +3,8 @@ extern crate serde;
 extern crate diesel;
 #[macro_use]
 extern crate serde_derive;
+#[macro_use]
+extern crate diesel_derive_enum;
 
 use diesel::pg::PgConnection;
 use diesel::prelude::*;
@@ -13,6 +15,7 @@ mod settings;
 
 pub mod account;
 pub mod character;
+pub mod session;
 
 pub use diesel::result::Error;
 

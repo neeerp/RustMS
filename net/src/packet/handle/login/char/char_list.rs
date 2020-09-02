@@ -21,13 +21,9 @@ impl PacketHandler for CharListHandler {
         let _world = reader.read_byte()?;
         let _channel = reader.read_byte()? + 1;
 
-        let user = client.user.take();
+        let user = client.get_account();
         let id = match user {
-            Some(user) => {
-                let id = user.id;
-                client.user = Some(user);
-                id
-            }
+            Some(user) => user.id,
             None => return Err(NetworkError::PacketHandlerError("User not logged in.")),
         };
 

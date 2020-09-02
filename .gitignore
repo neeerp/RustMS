@@ -15,3 +15,5 @@ Cargo.lock
 # Vim files
 .vim
 *.vim
+
+.env

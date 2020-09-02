@@ -21,15 +21,13 @@ impl PacketHandler for CreateCharacterHandler {
         let mut reader = BufReader::new(&**packet);
         reader.read_short()?;
 
-        let user = client.user.take();
+        let user = client.get_account();
         let accountid: i32;
 
-        match user {
-            Some(acc) => {
-                accountid = acc.id;
-                client.user = Some(acc);
-            }
-            _ => panic!("No account found!"),
+        if let Some(acc) = user {
+            accountid = acc.id;
+        } else {
+            return Err(NetworkError::NotLoggedIn);
         }
 
         let name = &reader.read_str_with_length()?;

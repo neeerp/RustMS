@@ -24,15 +24,13 @@ impl PacketHandler for DeleteCharHandler {
         let _pic = reader.read_str_with_length()?;
         let character_id = reader.read_int()?;
 
-        let user = client.user.take();
+        let user = client.get_account();
         let accountid: i32;
 
-        match user {
-            Some(acc) => {
-                accountid = acc.id;
-                client.user = Some(acc);
-            }
-            _ => panic!("No account found!"),
+        if let Some(acc) = user {
+            accountid = acc.id;
+        } else {
+            return Err(NetworkError::NotLoggedIn);
         }
 
         match character::delete_character(character_id, accountid) {

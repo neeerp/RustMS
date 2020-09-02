@@ -5,7 +5,10 @@ use crate::{
     packet::{build, handle::PacketHandler},
 };
 use crypt::login;
-use db::account::{self, Account};
+use db::{
+    account::{self, Account},
+    session::SessionState,
+};
 use packet::{io::read::PktRead, Packet};
 use std::io::BufReader;
 
@@ -78,10 +81,15 @@ impl LoginCredentialsHandler {
     }
 
     /// Attempt to log the user in.
-    fn attempt_logon(&self, client: &mut MapleClient, acc: Account) -> Result<(), NetworkError> {
+    fn attempt_logon(
+        &self,
+        client: &mut MapleClient,
+        acc: Account,
+        hwid: &str,
+    ) -> Result<(), NetworkError> {
         match self.check_account_status(&acc) {
-            0 => self.accept_logon(client, acc),
-            23 => self.send_tos(client, acc),
+            0 => self.accept_logon(client, acc, hwid),
+            23 => self.send_tos(client, acc, hwid),
             status => self.reject_logon(client, status),
         }
     }
@@ -99,16 +107,27 @@ impl LoginCredentialsHandler {
     }
 
     /// Log the user in.
-    fn accept_logon(&self, client: &mut MapleClient, acc: Account) -> Result<(), NetworkError> {
+    fn accept_logon(
+        &self,
+        client: &mut MapleClient,
+        acc: Account,
+        hwid: &str,
+    ) -> Result<(), NetworkError> {
         let mut packet = &mut build::login::status::build_successful_login_packet(&acc)?;
-        client.user = Some(acc);
+
+        client.login(acc.id, hwid, SessionState::AfterLogin)?;
 
         client.send(&mut packet)
     }
 
     /// Have the user accept the TOS.
-    fn send_tos(&self, client: &mut MapleClient, acc: Account) -> Result<(), NetworkError> {
-        client.user = Some(acc);
+    fn send_tos(
+        &self,
+        client: &mut MapleClient,
+        acc: Account,
+        hwid: &str,
+    ) -> Result<(), NetworkError> {
+        client.login(acc.id, hwid, SessionState::BeforeLogin)?;
 
         client.send(&mut build::login::status::build_login_status_packet(23)?)
     }
@@ -124,9 +143,9 @@ impl LoginCredentialsHandler {
 impl PacketHandler for LoginCredentialsHandler {
     fn handle(&self, packet: &mut Packet, client: &mut MapleClient) -> Result<(), NetworkError> {
         println!("Login attempted...");
-        let (user, pw, _hwid) = self.read_credentials(packet)?;
+        let (user, pw, hwid) = self.read_credentials(packet)?;
         match self.verify_and_get_account(&user, &pw)? {
-            Some(acc) => self.attempt_logon(client, acc),
+            Some(acc) => self.attempt_logon(client, acc, &hwid),
             None => self.reject_logon(client, 4),
         }
     }
