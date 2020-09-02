@@ -20,6 +20,8 @@ pub enum NetworkError {
     ConfigLoadError(ConfigError),
     DbError(db::Error),
     CryptError(crypt::BcryptError),
+    LogoutError(Box<NetworkError>),
+    NotLoggedIn,
     ClientDisconnected,
 }
 
@@ -49,6 +51,12 @@ impl fmt::Display for NetworkError {
             }
             NetworkError::DbError(e) => write!(f, "Database Error: {}", e),
             NetworkError::CryptError(e) => write!(f, "Error applying encryption: {}", e),
+            NetworkError::LogoutError(e) => write!(
+                f,
+                "An error occured while performing a session logout: {}",
+                *e
+            ),
+            NetworkError::NotLoggedIn => write!(f, "User not logged in."),
             e => write!(f, "{:?}", e),
         }
     }

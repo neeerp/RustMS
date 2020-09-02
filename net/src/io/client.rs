@@ -99,7 +99,7 @@ impl MapleClient {
                 self.session = Some(session::update_session(&ses)?);
                 Ok(())
             }
-            None => Err(NetworkError::NoData),
+            None => Err(NetworkError::NotLoggedIn),
         }
     }
 
@@ -113,7 +113,7 @@ impl MapleClient {
                 session::update_session(&ses)?;
                 Ok(())
             }
-            None => Err(NetworkError::NoData),
+            None => Err(NetworkError::NotLoggedIn),
         }
     }
 
@@ -129,14 +129,13 @@ impl MapleClient {
         Ok(())
     }
 
-    // TODO: need to handle the errors better.
     pub fn logout(&mut self) -> Result<(), NetworkError> {
         match self.session.take() {
             Some(session) => {
                 session::delete_session_by_id(session.id)?;
                 Ok(())
             }
-            None => Err(NetworkError::NoData),
+            None => Ok(()),
         }
     }
 }

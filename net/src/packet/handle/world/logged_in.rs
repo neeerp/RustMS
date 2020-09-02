@@ -24,7 +24,7 @@ impl PacketHandler for PlayerLoggedInHandler {
 
         match client.get_character() {
             Some(character) => client.send(&mut build::world::char::build_char_info(&character)?),
-            None => Err(NetworkError::NoData),
+            None => Err(NetworkError::NotLoggedIn),
         }
     }
 }

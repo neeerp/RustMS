@@ -27,7 +27,7 @@ impl PacketHandler for CreateCharacterHandler {
         if let Some(acc) = user {
             accountid = acc.id;
         } else {
-            return Err(NetworkError::NoData);
+            return Err(NetworkError::NotLoggedIn);
         }
 
         let name = &reader.read_str_with_length()?;

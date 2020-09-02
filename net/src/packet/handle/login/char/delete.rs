@@ -30,7 +30,7 @@ impl PacketHandler for DeleteCharHandler {
         if let Some(acc) = user {
             accountid = acc.id;
         } else {
-            return Err(NetworkError::NoData);
+            return Err(NetworkError::NotLoggedIn);
         }
 
         match character::delete_character(character_id, accountid) {

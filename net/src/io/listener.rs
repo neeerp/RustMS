@@ -70,7 +70,7 @@ impl ClientConnectionListener {
     fn close_gracefully(&mut self, e: NetworkError) -> NetworkError {
         match self.client.logout() {
             Ok(_) => e,
-            Err(_logout_err) => NetworkError::NoData, // TODO: Need error type that encapsualtes error
+            Err(logout_err) => NetworkError::LogoutError(Box::new(logout_err)), // TODO: Need error type that encapsualtes error
         }
     }
 
