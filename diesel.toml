@@ -8,5 +8,5 @@
 
 [print_schema]
 file = "db/src/schema.rs"
-import_types = ["diesel::sql_types::*", "crate::session::*"]
+import_types = ["crate::sql_types::*"]
 

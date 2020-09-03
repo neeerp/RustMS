@@ -3,14 +3,47 @@ use crate::{
     io::client::MapleClient,
     packet::{build, handle::PacketHandler},
 };
+use db::{character::Character, keybinding};
 use packet::{io::read::PktRead, Packet};
-use std::io::BufReader;
+use std::{collections::HashMap, io::BufReader};
 
 pub struct PlayerLoggedInHandler {}
 
 impl PlayerLoggedInHandler {
     pub fn new() -> PlayerLoggedInHandler {
         PlayerLoggedInHandler {}
+    }
+
+    pub fn send_keybinds(
+        &self,
+        client: &mut MapleClient,
+        chr: &Character,
+    ) -> Result<(), NetworkError> {
+        let bind_vec = keybinding::get_keybindings_by_characterid(chr.id)?;
+        let mut bind_map = HashMap::new();
+
+        for bind in bind_vec {
+            bind_map.insert(bind.key, bind);
+        }
+
+        client.send(&mut build::world::keymap::build_keymap(bind_map)?)
+    }
+
+    pub fn send_character_data(
+        &self,
+        client: &mut MapleClient,
+        chr: &Character,
+    ) -> Result<(), NetworkError> {
+        client.send(&mut build::world::char::build_char_info(&chr)?)
+    }
+
+    pub fn send_loaded_data(
+        &self,
+        client: &mut MapleClient,
+        chr: &Character,
+    ) -> Result<(), NetworkError> {
+        self.send_keybinds(client, chr)?;
+        self.send_character_data(client, chr)
     }
 }
 
@@ -23,7 +56,7 @@ impl PacketHandler for PlayerLoggedInHandler {
         client.reattach(character_id)?;
 
         match client.get_character() {
-            Some(character) => client.send(&mut build::world::char::build_char_info(&character)?),
+            Some(character) => self.send_loaded_data(client, &character),
             None => Err(NetworkError::NotLoggedIn),
         }
     }
