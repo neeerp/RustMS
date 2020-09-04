@@ -26,8 +26,5 @@ CREATE TABLE keybindings (
         FOREIGN KEY(character_id)
             REFERENCES characters(id),
 
-    CONSTRAINT key_is_unique_per_character UNIQUE(character_id, key),
-
-    CONSTRAINT action_is_unique_per_character UNIQUE(character_id, action)
-
+    CONSTRAINT key_is_unique_per_character UNIQUE(character_id, key)
 );

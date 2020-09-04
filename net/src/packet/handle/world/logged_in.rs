@@ -4,6 +4,7 @@ use crate::{
     packet::{build, handle::PacketHandler},
 };
 use db::{character::Character, keybinding};
+use keybinding::Keybinding;
 use packet::{io::read::PktRead, Packet};
 use std::{collections::HashMap, io::BufReader};
 
@@ -20,11 +21,7 @@ impl PlayerLoggedInHandler {
         chr: &Character,
     ) -> Result<(), NetworkError> {
         let bind_vec = keybinding::get_keybindings_by_characterid(chr.id)?;
-        let mut bind_map = HashMap::new();
-
-        for bind in bind_vec {
-            bind_map.insert(bind.key, bind);
-        }
+        let mut bind_map = Keybinding::vec_to_map(bind_vec);
 
         client.send(&mut build::world::keymap::build_keymap(bind_map)?)
     }

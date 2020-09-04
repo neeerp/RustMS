@@ -4,7 +4,11 @@ use crate::{
     packet::{build, handle::PacketHandler},
 };
 use build::login;
-use db::character::{self, NewCharacter};
+use character::Character;
+use db::{
+    character::{self, NewCharacter},
+    keybinding::Keybinding,
+};
 use packet::{io::read::PktRead, Packet};
 use std::io::BufReader;
 
@@ -57,7 +61,7 @@ impl PacketHandler for CreateCharacterHandler {
         };
 
         // TODO: Need to gracefully return after invalid character!
-        let character = character::create_character(character)?;
+        let character = character.create()?;
 
         client.send(&mut login::char::build_char_packet(character)?)
     }

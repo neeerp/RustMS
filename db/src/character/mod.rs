@@ -1,5 +1,9 @@
-use crate::schema::characters;
-use std::time::SystemTime;
+use crate::{
+    keybinding::{self, Keybinding},
+    schema::characters,
+};
+use diesel::QueryResult;
+use std::{collections::HashMap, time::SystemTime};
 
 pub mod repository;
 
@@ -51,4 +55,25 @@ pub struct NewCharacter<'a> {
     pub hair_color: i32,
     pub skin: i32,
     pub gender: i16,
+}
+
+impl Character {
+    pub fn new(new_character: NewCharacter) -> QueryResult<Self> {
+        let new_character = repository::create_character(new_character)?;
+        Keybinding::set_default_bindings(new_character.id)?;
+
+        Ok(new_character)
+    }
+
+    pub fn get_binds(&self) -> QueryResult<HashMap<i16, Keybinding>> {
+        Ok(Keybinding::vec_to_map(
+            keybinding::get_keybindings_by_characterid(self.id)?,
+        ))
+    }
+}
+
+impl NewCharacter<'_> {
+    pub fn create(self) -> QueryResult<Character> {
+        Character::new(self)
+    }
 }
