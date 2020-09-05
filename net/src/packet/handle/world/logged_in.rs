@@ -20,10 +20,7 @@ impl PlayerLoggedInHandler {
         client: &mut MapleClient,
         chr: &Character,
     ) -> Result<(), NetworkError> {
-        let bind_vec = keybinding::get_keybindings_by_characterid(chr.id)?;
-        let mut bind_map = Keybinding::vec_to_map(bind_vec);
-
-        client.send(&mut build::world::keymap::build_keymap(bind_map)?)
+        client.send(&mut build::world::keymap::build_keymap(chr.get_binds()?)?)
     }
 
     pub fn send_character_data(

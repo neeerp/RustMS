@@ -1,5 +1,5 @@
 CREATE TYPE keybind_type AS ENUM (
-    'none',
+    'nil',
     'skill',
     'item',
     'cash',
@@ -19,7 +19,7 @@ CREATE TABLE keybindings (
     id              SERIAL          PRIMARY KEY,
     character_id    INTEGER         NOT NULL,
     key             SMALLINT        NOT NULL DEFAULT 0, 
-    bind_type       KEYBIND_TYPE    NOT NULL DEFAULT 'none',
+    bind_type       KEYBIND_TYPE    NOT NULL DEFAULT 'nil',
     action          SMALLINT        NOT NULL DEFAULT 0,
 
     CONSTRAINT fk_character

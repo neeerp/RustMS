@@ -1,5 +1,5 @@
 use crate::{error::NetworkError, packet::op::SendOpcode};
-use db::{character::Character, keybinding::Keybinding};
+use db::character::Character;
 use packet::{io::write::PktWrite, Packet};
 
 pub fn build_char_list(chars: Vec<Character>) -> Result<Packet, NetworkError> {

@@ -3,6 +3,7 @@ use crate::{
     schema::characters,
 };
 use diesel::QueryResult;
+use keybinding::NewKeybinding;
 use std::{collections::HashMap, time::SystemTime};
 
 pub mod repository;
@@ -69,6 +70,10 @@ impl Character {
         Ok(Keybinding::vec_to_map(
             keybinding::get_keybindings_by_characterid(self.id)?,
         ))
+    }
+
+    pub fn upsert_binds(&self, new_binds: Vec<NewKeybinding>) -> QueryResult<Vec<Keybinding>> {
+        keybinding::upsert_keybindings(new_binds)
     }
 }
 
