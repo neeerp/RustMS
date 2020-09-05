@@ -17,9 +17,9 @@ CREATE TABLE sessions (
 
     CONSTRAINT fk_account
         FOREIGN KEY(account_id)
-            REFERENCES accounts(id),
+            REFERENCES accounts(id) ON DELETE CASCADE,
 
     CONSTRAINT fk_character
         FOREIGN KEY(character_id)
-            REFERENCES characters(id)
+            REFERENCES characters(id) ON DELETE SET NULL
 );

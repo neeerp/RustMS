@@ -24,7 +24,7 @@ CREATE TABLE keybindings (
 
     CONSTRAINT fk_character
         FOREIGN KEY(character_id)
-            REFERENCES characters(id),
+            REFERENCES characters(id) ON DELETE CASCADE,
 
     CONSTRAINT key_is_unique_per_character UNIQUE(character_id, key)
 );

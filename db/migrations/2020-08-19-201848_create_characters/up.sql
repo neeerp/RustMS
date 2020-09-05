@@ -1,6 +1,6 @@
 CREATE TABLE characters (
     id serial PRIMARY KEY,
-    accountid INTEGER NOT NULL,
+    accountid INTEGER NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
     world SMALLINT NOT NULL,
     name varchar(13) NOT NULL,
 
