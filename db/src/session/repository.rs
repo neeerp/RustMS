@@ -31,20 +31,8 @@ pub fn get_session_to_reattach(c_id: i32, ip_addr: IpNetwork) -> QueryResult<Ses
         .first::<Session>(&connection)
 }
 
-pub fn create_session<'a>(
-    a_id: i32,
-    hardware_id: &'a str,
-    ip_addr: IpNetwork,
-    session_state: SessionState,
-) -> QueryResult<Session> {
+pub fn create_session(new_session: NewSession) -> QueryResult<Session> {
     let connection = establish_connection();
-
-    let new_session = NewSession {
-        account_id: a_id,
-        hwid: hardware_id,
-        ip: ip_addr,
-        state: session_state,
-    };
 
     diesel::insert_into(sessions)
         .values(&new_session)

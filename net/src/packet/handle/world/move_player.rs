@@ -1,7 +1,4 @@
-use crate::{
-    error::NetworkError, helpers::to_hex_string, io::client::MapleClient,
-    packet::handle::PacketHandler,
-};
+use crate::{error::NetworkError, io::client::MapleClient, packet::handle::PacketHandler};
 use packet::Packet;
 use std::io::BufReader;
 
@@ -17,7 +14,8 @@ impl PlayerMoveHandler {
 impl PacketHandler for PlayerMoveHandler {
     fn handle(&self, packet: &mut Packet, _client: &mut MapleClient) -> Result<(), NetworkError> {
         let mut _reader = BufReader::new(&**packet);
-        println!("Received packet: {}", to_hex_string(&packet.bytes));
+        // This gets annoying fast...
+        // println!("Received packet: {}", to_hex_string(&packet.bytes));
 
         Ok(())
     }

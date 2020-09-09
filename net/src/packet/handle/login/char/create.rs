@@ -4,11 +4,7 @@ use crate::{
     packet::{build, handle::PacketHandler},
 };
 use build::login;
-use character::Character;
-use db::{
-    character::{self, NewCharacter},
-    keybinding::Keybinding,
-};
+use db::character::NewCharacter;
 use packet::{io::read::PktRead, Packet};
 use std::io::BufReader;
 

@@ -3,8 +3,8 @@ use crate::{
     schema::characters,
 };
 use diesel::QueryResult;
-use keybinding::NewKeybinding;
-use std::{collections::HashMap, time::SystemTime};
+use keybinding::KeybindSet;
+use std::time::SystemTime;
 
 pub mod repository;
 
@@ -66,19 +66,41 @@ impl Character {
         Ok(new_character)
     }
 
-    pub fn get_binds(&self) -> QueryResult<HashMap<i16, Keybinding>> {
-        Ok(Keybinding::vec_to_map(
-            keybinding::get_keybindings_by_characterid(self.id)?,
-        ))
-    }
+    // pub fn get_binds(&self) -> QueryResult<HashMap<i16, Keybinding>> {
+    //     Ok(Keybinding::vec_to_map(
+    //         keybinding::get_keybindings_by_characterid(self.id)?,
+    //     ))
+    // }
 
-    pub fn upsert_binds(&self, new_binds: Vec<NewKeybinding>) -> QueryResult<Vec<Keybinding>> {
-        keybinding::upsert_keybindings(new_binds)
-    }
+    // pub fn upsert_binds(&self, new_binds: Vec<&KeybindDTO>) -> QueryResult<Vec<Keybinding>> {
+    //     keybinding::upsert_keybindings(new_binds)
+    // }
 }
 
 impl NewCharacter<'_> {
     pub fn create(self) -> QueryResult<Character> {
         Character::new(self)
+    }
+}
+
+pub struct CharacterDTO {
+    pub character: Character,
+    pub key_binds: KeybindSet,
+}
+
+impl CharacterDTO {
+    pub fn from_character_id(character_id: i32) -> QueryResult<Self> {
+        let character = repository::get_character_by_id(character_id)?;
+        Self::from_character(character)
+    }
+
+    pub fn from_character(character: Character) -> QueryResult<Self> {
+        let key_binds = KeybindSet::from_character(&character)?;
+
+        let dto = Self {
+            character,
+            key_binds,
+        };
+        Ok(dto)
     }
 }
