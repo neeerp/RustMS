@@ -11,7 +11,7 @@ pub fn build_keymap(binds: &mut KeybindSet) -> Result<Packet, NetworkError> {
 
     for i in 0..90 {
         let bind = binds.get(i);
-        packet.write_byte(bind.bind_type.ord())?;
+        packet.write_byte(bind.bind_type.into())?;
         packet.write_int(bind.action as i32)?;
     }
 

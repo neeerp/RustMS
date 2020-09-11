@@ -95,30 +95,38 @@ impl SessionWrapper {
         }
     }
 
-    // TODO: This is really really ugly... I should be able to condense this but
-    // for some reason I'm struggling to do so... Too frustrated to keep trying
-    // as I'm writing this; will do later.
-    pub fn get_character(&mut self) -> QueryResult<Option<Rc<RefCell<CharacterDTO>>>> {
-        match self.session.take() {
-            Some(session) => {
-                let chr = match session.character_id {
-                    Some(c_id) => {
-                        if let Some(chr) = self.character.take() {
-                            self.character = Some(chr.clone());
+    // // TODO: This is really really ugly... I should be able to condense this but
+    // // for some reason I'm struggling to do so... Too frustrated to keep trying
+    // // as I'm writing this; will do later.
+    // pub fn get_character(&mut self) -> QueryResult<Option<Rc<RefCell<CharacterDTO>>>> {
+    //     match self.session.take() {
+    //         Some(session) => {
+    //             let chr = match session.character_id {
+    //                 Some(c_id) => {
+    //                     if let Some(chr) = self.character.take() {
+    //                         self.character = Some(chr.clone());
 
-                            Ok(Some(chr))
-                        } else {
-                            Ok(Some(self.load_character(c_id)?))
-                        }
-                    }
-                    None => Ok(None),
-                };
+    //                         Ok(Some(chr))
+    //                     } else {
+    //                         Ok(Some(self.load_character(c_id)?))
+    //                     }
+    //                 }
+    //                 None => Ok(None),
+    //             };
 
-                self.session = Some(session);
-                chr
-            }
-            None => Ok(None),
-        }
+    //             self.session = Some(session);
+    //             chr
+    //         }
+    //         None => Ok(None),
+    //     }
+    // }
+
+    pub fn get_character(&mut self) -> QueryResult<Rc<RefCell<CharacterDTO>>> {
+        self.session
+            .as_ref()
+            .and_then(|ses| ses.character_id)
+            .and_then(|c_id| self.load_character(c_id).ok())
+            .ok_or(diesel::result::Error::NotFound)
     }
 
     fn load_character(&mut self, c_id: i32) -> QueryResult<Rc<RefCell<CharacterDTO>>> {

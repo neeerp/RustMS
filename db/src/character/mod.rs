@@ -65,16 +65,6 @@ impl Character {
 
         Ok(new_character)
     }
-
-    // pub fn get_binds(&self) -> QueryResult<HashMap<i16, Keybinding>> {
-    //     Ok(Keybinding::vec_to_map(
-    //         keybinding::get_keybindings_by_characterid(self.id)?,
-    //     ))
-    // }
-
-    // pub fn upsert_binds(&self, new_binds: Vec<&KeybindDTO>) -> QueryResult<Vec<Keybinding>> {
-    //     keybinding::upsert_keybindings(new_binds)
-    // }
 }
 
 impl NewCharacter<'_> {
@@ -83,6 +73,8 @@ impl NewCharacter<'_> {
     }
 }
 
+/// This struct is meant to hold data pertaining to a character
+/// beyond simply the character itself.
 pub struct CharacterDTO {
     pub character: Character,
     pub key_binds: KeybindSet,

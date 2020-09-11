@@ -21,16 +21,7 @@ impl PacketHandler for ChangeKeybindsHandler {
             return Ok(());
         }
 
-        let character;
-        match client.session.get_character()? {
-            Some(chr) => {
-                character = chr;
-            }
-            None => {
-                return Err(NetworkError::NotLoggedIn);
-            }
-        }
-
+        let character = client.session.get_character()?;
         let mut character = character.borrow_mut();
         if reader.read_int()? == 0 {
             for _ in 0..reader.read_int()? {

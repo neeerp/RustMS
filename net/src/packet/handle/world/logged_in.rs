@@ -48,9 +48,9 @@ impl PacketHandler for PlayerLoggedInHandler {
         let character_id = reader.read_int()?;
         client.reattach(character_id)?;
 
-        match client.session.get_character()? {
-            Some(character) => self.send_loaded_data(client, &mut character.borrow_mut()),
-            None => Err(NetworkError::NotLoggedIn),
+        match client.session.get_character() {
+            Ok(character) => self.send_loaded_data(client, &mut character.borrow_mut()),
+            Err(_) => Err(NetworkError::NotLoggedIn),
         }
     }
 }

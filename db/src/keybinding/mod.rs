@@ -31,9 +31,9 @@ pub enum KeybindType {
     Text,
 }
 
-impl KeybindType {
-    pub fn ord(&self) -> u8 {
-        match self {
+impl From<KeybindType> for u8 {
+    fn from(kind: KeybindType) -> Self {
+        match kind {
             KeybindType::Nil => 0,
             KeybindType::Skill => 1,
             KeybindType::Item => 2,
