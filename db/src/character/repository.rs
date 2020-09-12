@@ -3,7 +3,7 @@ use crate::establish_connection;
 use crate::schema;
 use crate::schema::characters;
 use diesel::expression_methods::*;
-use diesel::{QueryDsl, QueryResult, RunQueryDsl};
+use diesel::{QueryDsl, QueryResult, RunQueryDsl, SaveChangesDsl};
 use schema::characters::dsl::*;
 
 pub fn get_characters_by_accountid(account_id: i32) -> QueryResult<Vec<Character>> {
@@ -36,6 +36,12 @@ pub fn create_character<'a>(char: NewCharacter) -> QueryResult<Character> {
     diesel::insert_into(characters::table)
         .values(&char)
         .get_result::<Character>(&connection)
+}
+
+pub fn update_character(character: &Character) -> QueryResult<Character> {
+    let connection = establish_connection();
+
+    character.save_changes(&connection)
 }
 
 pub fn delete_character(character_id: i32, account_id: i32) -> QueryResult<usize> {

@@ -46,6 +46,7 @@ table! {
         skin -> Int4,
         gender -> Int2,
         created_at -> Timestamp,
+        map_id -> Int4,
     }
 }
 

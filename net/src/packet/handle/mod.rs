@@ -84,6 +84,7 @@ fn get_world_handler(op: i16) -> Box<dyn PacketHandler> {
         Some(RecvOpcode::PlayerMove) => Box::new(world::PlayerMoveHandler::new()),
         Some(RecvOpcode::PlayerLoggedIn) => Box::new(world::PlayerLoggedInHandler::new()),
         Some(RecvOpcode::PlayerMapTransfer) => Box::new(world::PlayerMapTransferHandler::new()),
+        Some(RecvOpcode::ChangeMap) => Box::new(world::ChangeMapHandler::new()),
         Some(RecvOpcode::PartySearch) => Box::new(world::PartySearchHandler::new()),
         Some(RecvOpcode::ChangeKeybinds) => Box::new(world::ChangeKeybindsHandler::new()),
         Some(RecvOpcode::AllChat) => Box::new(world::AllChatHandler::new()),
