@@ -25,6 +25,9 @@ pub enum RecvOpcode {
 
     // World Server Opcodes
     PlayerLoggedIn = 0x14,
+
+    ChangeMap = 0x26,
+
     PlayerMove = 0x29,
     AllChat = 0x31,
 

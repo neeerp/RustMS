@@ -104,7 +104,7 @@ fn write_char_meta(packet: &mut Packet, character: &Character) -> Result<(), Net
     packet.write_int(0)?;
 
     // Map.. Not implemented yet
-    let map_id = 1000000;
+    let map_id = 100000000;
     packet.write_int(map_id)?;
     packet.write_byte(0)?;
 
