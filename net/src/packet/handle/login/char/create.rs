@@ -56,9 +56,8 @@ impl PacketHandler for CreateCharacterHandler {
             gender,
         };
 
-        // TODO: Need to gracefully return after invalid character!
-        let character = character.create()?;
-
-        client.send(&mut login::char::build_char_packet(character)?)
+        client.send(&mut login::char::build_char_packet(
+            character.create()?.character,
+        )?)
     }
 }

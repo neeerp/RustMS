@@ -1,7 +1,7 @@
 use crate::{character, schema::sessions};
 
 extern crate ipnetwork;
-use character::CharacterDTO;
+use character::CharacterWrapper;
 use diesel::QueryResult;
 use ipnetwork::IpNetwork;
 
@@ -33,31 +33,7 @@ pub struct Session {
     pub created_at: SystemTime,
 }
 
-impl Session {
-    pub fn new<'a>(
-        a_id: i32,
-        hardware_id: &'a str,
-        ip_addr: IpNetwork,
-        session_state: SessionState,
-    ) -> QueryResult<SessionWrapper> {
-        let new_session = NewSession {
-            account_id: a_id,
-            hwid: hardware_id,
-            ip: ip_addr,
-            state: session_state,
-        };
-
-        let session = repository::create_session(new_session)?;
-        SessionWrapper::new(session)
-    }
-
-    pub fn from_account_id(account_id: i32) -> QueryResult<SessionWrapper> {
-        let session = repository::get_session_by_accountid(account_id)?;
-
-        SessionWrapper::new(session)
-    }
-}
-
+/// Session creation projection.
 #[derive(Insertable)]
 #[table_name = "sessions"]
 pub struct NewSession<'a> {
@@ -67,13 +43,32 @@ pub struct NewSession<'a> {
     pub state: SessionState,
 }
 
+impl<'a> NewSession<'a> {
+    /// Create and save a new session.
+    pub fn create(self) -> QueryResult<SessionWrapper> {
+        SessionWrapper::from(repository::create_session(self)?)
+    }
+}
+
+/// A wrapper that holds a session as well as any additional
+/// information pertaining to the session.
 pub struct SessionWrapper {
     pub session: Option<Session>,
-    character: Option<Rc<RefCell<CharacterDTO>>>,
+    character: Option<Rc<RefCell<CharacterWrapper>>>,
 }
 
 impl SessionWrapper {
-    pub fn new(session: Session) -> QueryResult<Self> {
+    /// Create a new wrapper with no associated session.
+    pub fn new_empty() -> Self {
+        Self {
+            session: None,
+            character: None,
+        }
+    }
+
+    /// Create a wrapper from an existing session, loading in the associated
+    /// character if it exists.
+    pub fn from(session: Session) -> QueryResult<Self> {
         let c_id = session.character_id;
 
         let mut wrapper = Self {
@@ -88,49 +83,24 @@ impl SessionWrapper {
         Ok(wrapper)
     }
 
-    pub fn new_empty() -> Self {
-        Self {
-            session: None,
-            character: None,
-        }
-    }
-
-    // // TODO: This is really really ugly... I should be able to condense this but
-    // // for some reason I'm struggling to do so... Too frustrated to keep trying
-    // // as I'm writing this; will do later.
-    // pub fn get_character(&mut self) -> QueryResult<Option<Rc<RefCell<CharacterDTO>>>> {
-    //     match self.session.take() {
-    //         Some(session) => {
-    //             let chr = match session.character_id {
-    //                 Some(c_id) => {
-    //                     if let Some(chr) = self.character.take() {
-    //                         self.character = Some(chr.clone());
-
-    //                         Ok(Some(chr))
-    //                     } else {
-    //                         Ok(Some(self.load_character(c_id)?))
-    //                     }
-    //                 }
-    //                 None => Ok(None),
-    //             };
-
-    //             self.session = Some(session);
-    //             chr
-    //         }
-    //         None => Ok(None),
-    //     }
-    // }
-
-    pub fn get_character(&mut self) -> QueryResult<Rc<RefCell<CharacterDTO>>> {
+    /// Retrieve the character that the session is associated with, or a NotFound
+    /// error if there is no character associated.
+    pub fn get_character(&mut self) -> QueryResult<Rc<RefCell<CharacterWrapper>>> {
         self.session
             .as_ref()
             .and_then(|ses| ses.character_id)
-            .and_then(|c_id| self.load_character(c_id).ok())
+            .and_then(|c_id| {
+                self.character
+                    .as_ref()
+                    .and_then(|chr| Some(chr.clone()))
+                    .or(self.load_character(c_id).ok())
+            })
             .ok_or(diesel::result::Error::NotFound)
     }
 
-    fn load_character(&mut self, c_id: i32) -> QueryResult<Rc<RefCell<CharacterDTO>>> {
-        let chr = Rc::new(RefCell::new(CharacterDTO::from_character_id(c_id)?));
+    /// Attach a character to the session wrapper and return a counted refcell.
+    fn load_character(&mut self, c_id: i32) -> QueryResult<Rc<RefCell<CharacterWrapper>>> {
+        let chr = Rc::new(RefCell::new(CharacterWrapper::from_character_id(c_id)?));
 
         self.character = Some(chr.clone());
 

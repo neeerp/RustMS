@@ -3,10 +3,10 @@ use bufstream::BufStream;
 use crypt::{maple_crypt, MapleAES};
 use db::{
     account::{self, Account},
-    session::{self, Session, SessionState},
+    session::{self, SessionState},
 };
 use packet::Packet;
-use session::SessionWrapper;
+use session::{NewSession, SessionWrapper};
 use std::{io::Write, net::TcpStream, time::SystemTime};
 
 /// A container for various pieces of information pertaining to a Session's
@@ -70,10 +70,15 @@ impl MapleClient {
         hwid: &str,
         state: SessionState,
     ) -> Result<(), NetworkError> {
-        let ip = self.stream.get_ref().peer_addr()?.ip();
-        let ses = Session::new(account_id, &hwid, ip.into(), state)?;
+        let ip = self.stream.get_ref().peer_addr()?.ip().into();
+        let new_session = NewSession {
+            account_id,
+            hwid,
+            ip,
+            state,
+        };
 
-        self.session = ses;
+        self.session = new_session.create()?;
         Ok(())
     }
 

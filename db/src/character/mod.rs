@@ -1,15 +1,12 @@
-use crate::{
-    keybinding::{self, Keybinding},
-    schema::characters,
-};
+use crate::{keybinding::KeybindSet, schema::characters};
 use diesel::QueryResult;
-use keybinding::KeybindSet;
 use std::time::SystemTime;
 
 pub mod repository;
 
 pub use repository::*;
 
+/// Character database entity.
 #[derive(Identifiable, Queryable)]
 pub struct Character {
     pub id: i32,
@@ -44,6 +41,7 @@ pub struct Character {
     pub created_at: SystemTime,
 }
 
+/// Character creation projection.
 #[derive(Insertable)]
 #[table_name = "characters"]
 pub struct NewCharacter<'a> {
@@ -58,34 +56,35 @@ pub struct NewCharacter<'a> {
     pub gender: i16,
 }
 
-impl Character {
-    pub fn new(new_character: NewCharacter) -> QueryResult<Self> {
-        let new_character = repository::create_character(new_character)?;
-        Keybinding::set_default_bindings(new_character.id)?;
-
-        Ok(new_character)
-    }
-}
-
 impl NewCharacter<'_> {
-    pub fn create(self) -> QueryResult<Character> {
-        Character::new(self)
+    /// Save the new character and return the saved Character's
+    /// wrapper.
+    pub fn create(self) -> QueryResult<CharacterWrapper> {
+        let character = repository::create_character(self)?;
+        let key_binds = KeybindSet::set_defaults(&character)?;
+
+        Ok(CharacterWrapper {
+            character,
+            key_binds,
+        })
     }
 }
 
 /// This struct is meant to hold data pertaining to a character
 /// beyond simply the character itself.
-pub struct CharacterDTO {
+pub struct CharacterWrapper {
     pub character: Character,
     pub key_binds: KeybindSet,
 }
 
-impl CharacterDTO {
+impl CharacterWrapper {
+    /// Load an existing character given their ID.
     pub fn from_character_id(character_id: i32) -> QueryResult<Self> {
         let character = repository::get_character_by_id(character_id)?;
         Self::from_character(character)
     }
 
+    /// Wrap a character entity struct along with any additional information.
     pub fn from_character(character: Character) -> QueryResult<Self> {
         let key_binds = KeybindSet::from_character(&character)?;
 

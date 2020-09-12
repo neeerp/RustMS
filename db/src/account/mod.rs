@@ -37,10 +37,3 @@ pub struct NewAccount<'a> {
     pub user_name: &'a str,
     pub password: &'a str,
 }
-
-#[derive(AsChangeset)]
-#[table_name = "accounts"]
-pub struct AccountLoginUpdate {
-    pub logged_in: bool,
-    pub last_login_at: SystemTime,
-}

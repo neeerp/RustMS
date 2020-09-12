@@ -6,6 +6,9 @@ use std::collections::HashMap;
 mod repository;
 pub use repository::*;
 
+// Values to build default bindings from
+// TODO: These aren't a complete default set.
+// TODO: Perhaps we should externalize these.
 const DEFAULT_KEY: [i16; 23] = [
     59, 60, 61, 62, 63, 64, 65, 56, 87, 18, 23, 31, 37, 19, 17, 46, 50, 16, 43, 40, 21, 4, 84,
 ];
@@ -63,6 +66,7 @@ impl From<u8> for KeybindType {
     }
 }
 
+/// Keybinding database entity.
 #[derive(Identifiable, Queryable, Insertable, AsChangeset)]
 #[table_name = "keybindings"]
 pub struct Keybinding {
@@ -73,44 +77,7 @@ pub struct Keybinding {
     pub action: i16,
 }
 
-#[derive(Insertable, AsChangeset)]
-#[table_name = "keybindings"]
-pub struct NewKeybinding {
-    pub character_id: i32,
-    pub key: i16,
-    pub bind_type: KeybindType,
-    pub action: i16,
-}
-
-impl Keybinding {
-    pub fn set_default_bindings(c_id: i32) -> QueryResult<Vec<Keybinding>> {
-        let new_binds = izip!(
-            DEFAULT_KEY.to_vec(),
-            DEFAULT_TYPE.to_vec(),
-            DEFAULT_ACTION.to_vec()
-        )
-        .map(|(key, btype_ord, action)| KeybindDTO {
-            character_id: c_id,
-            key,
-            bind_type: btype_ord.into(),
-            action,
-        })
-        .collect();
-
-        repository::upsert_keybindings(new_binds)
-    }
-
-    pub fn vec_to_map(bind_vec: Vec<Keybinding>) -> HashMap<i16, Keybinding> {
-        let mut bind_map = HashMap::new();
-
-        for bind in bind_vec {
-            bind_map.insert(bind.key, bind);
-        }
-
-        bind_map
-    }
-}
-
+/// A projection of the Keybinding entity for less cumbersome manipulation.
 #[derive(Clone, Insertable, AsChangeset)]
 #[table_name = "keybindings"]
 pub struct KeybindDTO {
@@ -121,6 +88,17 @@ pub struct KeybindDTO {
 }
 
 impl KeybindDTO {
+    /// Convert a Keybinding entity struct into its DTO projection.
+    pub fn from(character_id: i32, key: i16, bind_type: KeybindType, action: i16) -> Self {
+        KeybindDTO {
+            character_id,
+            key,
+            bind_type,
+            action,
+        }
+    }
+
+    /// Create an empty default keybind for the given key, for the given character.
     pub fn default(key: i16, character_id: i32) -> Self {
         KeybindDTO {
             character_id,
@@ -142,43 +120,79 @@ impl From<&Keybinding> for KeybindDTO {
     }
 }
 
+/// A set of keybinds for a given character.
 pub struct KeybindSet {
     binds: HashMap<i16, KeybindDTO>,
     character_id: i32,
 }
 
 impl KeybindSet {
+    /// Get the keybind set for the given character.
     pub fn from_character(character: &Character) -> QueryResult<Self> {
         let character_id = character.id;
 
+        Ok(Self::from_bind_vec(
+            character_id,
+            repository::get_keybindings_by_characterid(character_id)?,
+        ))
+    }
+
+    /// Create, set, and return a default keybind set for the given character.
+    pub fn set_defaults(character: &Character) -> QueryResult<Self> {
+        let character_id = character.id;
         let mut bind_set = Self {
             character_id,
             binds: HashMap::new(),
         };
 
-        repository::get_keybindings_by_characterid(character_id)?
-            .iter()
-            .for_each(|bind: &Keybinding| bind_set.set(bind.into()));
+        izip!(
+            DEFAULT_KEY.to_vec(),
+            DEFAULT_TYPE.to_vec(),
+            DEFAULT_ACTION.to_vec()
+        )
+        .for_each(|(key, btype_ord, action)| {
+            bind_set.set(KeybindDTO::from(
+                character_id,
+                key,
+                btype_ord.into(),
+                action,
+            ))
+        });
+
+        bind_set.save()?;
 
         Ok(bind_set)
     }
 
-    pub fn get(&mut self, key: i16) -> KeybindDTO {
-        match self.binds.get(&key) {
-            Some(bind_ref) => bind_ref.clone(),
-            None => {
-                self.binds
-                    .insert(key, KeybindDTO::default(key, self.character_id));
+    /// Convert a vector of keybindings to a keybind set for a given character.
+    pub fn from_bind_vec(character_id: i32, bind_vec: Vec<Keybinding>) -> Self {
+        let mut bind_set = Self {
+            character_id,
+            binds: HashMap::new(),
+        };
 
-                self.get(key)
-            }
-        }
+        bind_vec
+            .iter()
+            .for_each(|bind: &Keybinding| bind_set.set(bind.into()));
+
+        bind_set
     }
 
+    /// Get the specified key, or a default if it is not present in the keybind set.
+    pub fn get(&mut self, key: i16) -> KeybindDTO {
+        self.binds
+            .get(&key)
+            .map_or(KeybindDTO::default(key, self.character_id), |bind_ref| {
+                bind_ref.clone()
+            })
+    }
+
+    /// Set/replace the given key in the keybind set.
     pub fn set(&mut self, bind: KeybindDTO) {
         self.binds.insert(bind.key, bind);
     }
 
+    /// Save the current state of the keybind set.
     pub fn save(&self) -> QueryResult<()> {
         repository::upsert_keybindings(self.binds.values().map(|x| x.clone()).collect())?;
         Ok(())

@@ -13,8 +13,6 @@ pub fn get_keybindings_by_characterid(c_id: i32) -> QueryResult<Vec<Keybinding>>
         .load::<Keybinding>(&connection)
 }
 
-// TODO: We're going to have conflicts in two ways; need to address this...
-// TODO: Manual SQL maybe?
 pub fn upsert_keybindings(bindings: Vec<KeybindDTO>) -> QueryResult<Vec<Keybinding>> {
     let connection = establish_connection();
 

@@ -3,7 +3,7 @@ use crate::{
     io::client::MapleClient,
     packet::{build, handle::PacketHandler},
 };
-use db::character::CharacterDTO;
+use db::character::CharacterWrapper;
 use packet::{io::read::PktRead, Packet};
 use std::io::BufReader;
 
@@ -17,7 +17,7 @@ impl PlayerLoggedInHandler {
     pub fn send_keybinds(
         &self,
         client: &mut MapleClient,
-        chr: &mut CharacterDTO,
+        chr: &mut CharacterWrapper,
     ) -> Result<(), NetworkError> {
         client.send(&mut build::world::keymap::build_keymap(&mut chr.key_binds)?)
     }
@@ -25,7 +25,7 @@ impl PlayerLoggedInHandler {
     pub fn send_character_data(
         &self,
         client: &mut MapleClient,
-        chr: &CharacterDTO,
+        chr: &CharacterWrapper,
     ) -> Result<(), NetworkError> {
         client.send(&mut build::world::char::build_char_info(&chr.character)?)
     }
@@ -33,7 +33,7 @@ impl PlayerLoggedInHandler {
     pub fn send_loaded_data(
         &self,
         client: &mut MapleClient,
-        chr: &mut CharacterDTO,
+        chr: &mut CharacterWrapper,
     ) -> Result<(), NetworkError> {
         self.send_keybinds(client, chr)?;
         self.send_character_data(client, chr)
