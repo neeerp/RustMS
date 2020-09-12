@@ -249,9 +249,7 @@ fn write_char_meta(packet: &mut Packet, character: &Character) -> Result<(), Net
     // Gach xp?
     packet.write_int(0)?;
 
-    // TODO: Map and initial spawn: Gotta do these here.
-    let map_id = 100000000;
-    packet.write_int(map_id)?;
+    packet.write_int(character.map_id)?;
     packet.write_byte(0)?;
 
     packet.write_int(0)?;

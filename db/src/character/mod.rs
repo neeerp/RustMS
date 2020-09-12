@@ -7,7 +7,7 @@ pub mod repository;
 pub use repository::*;
 
 /// Character database entity.
-#[derive(Identifiable, Queryable)]
+#[derive(Identifiable, Queryable, AsChangeset)]
 pub struct Character {
     pub id: i32,
     pub accountid: i32,
@@ -39,6 +39,14 @@ pub struct Character {
     pub gender: i16,
 
     pub created_at: SystemTime,
+
+    pub map_id: i32,
+}
+
+impl Character {
+    pub fn save(&self) -> QueryResult<Character> {
+        repository::update_character(self)
+    }
 }
 
 /// Character creation projection.

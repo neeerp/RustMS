@@ -27,9 +27,12 @@ impl PacketHandler for ChangeMapHandler {
 
         let _wheel_of_destiny = reader.read_short()? > 0;
 
+        let character = client.session.get_character()?;
+        let mut character = &mut character.borrow_mut().character;
+
         if target != -1 {
-            let character = client.session.get_character()?;
-            let character = &character.borrow().character;
+            character.map_id = target;
+            character.save()?;
 
             client.send(&mut build::world::map::build_warp_to_map(
                 &character, target,
