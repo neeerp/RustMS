@@ -18,4 +18,6 @@ pub enum SendOpcode {
     FamilyInfo = 0x5F,
     FamilyList = 0x64,
     SetField = 0x7D,
+
+    KeyMap = 0x14F,
 }

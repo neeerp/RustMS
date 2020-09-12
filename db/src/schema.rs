@@ -1,5 +1,5 @@
 table! {
-    use diesel::sql_types::*;
+    use crate::sql_types::*;
 
     accounts (id) {
         id -> Int4,
@@ -19,7 +19,7 @@ table! {
 }
 
 table! {
-    use diesel::sql_types::*;
+    use crate::sql_types::*;
 
     characters (id) {
         id -> Int4,
@@ -50,8 +50,19 @@ table! {
 }
 
 table! {
-    use diesel::sql_types::*;
-    use crate::session::*;
+    use crate::sql_types::*;
+
+    keybindings (id) {
+        id -> Int4,
+        character_id -> Int4,
+        key -> Int2,
+        bind_type -> Keybind_type,
+        action -> Int2,
+    }
+}
+
+table! {
+    use crate::sql_types::*;
 
     sessions (id) {
         id -> Int4,
@@ -66,6 +77,10 @@ table! {
 }
 
 joinable!(sessions -> accounts (account_id));
-joinable!(sessions -> characters (character_id));
 
-allow_tables_to_appear_in_same_query!(accounts, characters, sessions,);
+allow_tables_to_appear_in_same_query!(
+    accounts,
+    characters,
+    keybindings,
+    sessions,
+);
