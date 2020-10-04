@@ -15,6 +15,8 @@ The second motivation behind this project comes from the fact that Maplestory ha
 ## Overview
 As of 23/08/2020, RustMS is still in a very early stage.
 
+** Currently on hold while school's been very unforgiving; have plans for what to do next here that I will hopefully write down soon though! **
+
 ### Crates
 The `crypt` crate provides the means for encrypting and decrypting packets using
 Maplestory's custom AES algorithm as well as its secondary encryption algorithm
