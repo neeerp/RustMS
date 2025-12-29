@@ -6,7 +6,7 @@ extern crate serde;
 
 mod helpers;
 mod io;
-mod packet;
+pub mod packet;
 pub mod settings;
 
 pub use self::io::error;
