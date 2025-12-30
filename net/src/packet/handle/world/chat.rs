@@ -28,3 +28,33 @@ impl PacketHandler for AllChatHandler {
         Ok(())
     }
 }
+
+// === ASYNC HANDLER ===
+use crate::handler::{AsyncPacketHandler, HandlerContext, HandlerResult};
+
+pub struct AsyncAllChatHandler;
+
+impl AsyncAllChatHandler {
+    pub fn new() -> Self {
+        Self
+    }
+}
+
+impl AsyncPacketHandler for AsyncAllChatHandler {
+    fn handle(
+        &self,
+        packet: &mut Packet,
+        _ctx: &mut HandlerContext,
+    ) -> Result<HandlerResult, NetworkError> {
+        let mut reader = BufReader::new(&**packet);
+        let _op = reader.read_short()?;
+
+        let msg = reader.read_str_with_length()?;
+        println!("Somebody said: {}", msg);
+
+        let _hidden = reader.read_byte()?;
+
+        // TODO: Broadcast to map players
+        Ok(HandlerResult::empty())
+    }
+}

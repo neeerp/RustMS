@@ -26,3 +26,30 @@ impl PacketHandler for LoginStartHandler {
         self.check_length(packet)
     }
 }
+
+// === ASYNC HANDLER ===
+use crate::handler::{AsyncPacketHandler, HandlerContext, HandlerResult};
+
+pub struct AsyncLoginStartHandler;
+
+impl AsyncLoginStartHandler {
+    pub fn new() -> Self {
+        Self
+    }
+}
+
+impl AsyncPacketHandler for AsyncLoginStartHandler {
+    fn handle(
+        &self,
+        packet: &mut Packet,
+        _ctx: &mut HandlerContext,
+    ) -> Result<HandlerResult, NetworkError> {
+        if packet.len() != 0 {
+            return Err(NetworkError::PacketHandlerError(
+                "Start login packet has invalid length.",
+            ));
+        }
+        println!("Login started.");
+        Ok(HandlerResult::empty())
+    }
+}

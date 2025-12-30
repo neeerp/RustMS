@@ -23,3 +23,30 @@ impl PacketHandler for WorldListHandler {
         client.send(&mut world::build_send_recommended_worlds()?)
     }
 }
+
+// === ASYNC HANDLER ===
+use crate::handler::{AsyncPacketHandler, HandlerContext, HandlerResult};
+
+pub struct AsyncWorldListHandler;
+
+impl AsyncWorldListHandler {
+    pub fn new() -> Self {
+        Self
+    }
+}
+
+impl AsyncPacketHandler for AsyncWorldListHandler {
+    fn handle(
+        &self,
+        _packet: &mut Packet,
+        _ctx: &mut HandlerContext,
+    ) -> Result<HandlerResult, NetworkError> {
+        let packets = vec![
+            world::build_world_details()?,
+            world::build_end_of_world_list()?,
+            world::build_select_world()?,
+            world::build_send_recommended_worlds()?,
+        ];
+        Ok(HandlerResult::replies(packets))
+    }
+}

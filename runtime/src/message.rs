@@ -1,8 +1,5 @@
+use net::{BroadcastScope, ClientId};
 use packet::Packet;
-
-/// Unique identifier for a connected client.
-/// Uses character_id for world server clients.
-pub type ClientId = i32;
 
 /// Messages sent TO a client from the server or other clients.
 #[derive(Debug)]
@@ -38,18 +35,4 @@ pub enum ClientEvent {
         scope: BroadcastScope,
         packet: Packet,
     },
-}
-
-/// Defines who should receive a broadcast message.
-#[derive(Debug, Clone)]
-pub enum BroadcastScope {
-    /// All players on a specific map
-    Map(i32),
-    /// All players on a map except the sender
-    MapExcludeSelf(i32),
-    /// All players in the world/channel
-    World,
-    /// All players in the world except the sender
-    WorldExcludeSelf,
-    // Future: Party(i32), Guild(i32), Nearby(i32, i16, i16), etc.
 }

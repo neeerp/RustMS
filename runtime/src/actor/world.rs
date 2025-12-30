@@ -1,4 +1,5 @@
-use crate::message::{BroadcastScope, ClientEvent, ClientId, ServerMessage};
+use crate::handler::{BroadcastScope, ClientId};
+use crate::message::{ClientEvent, ServerMessage};
 use std::collections::HashMap;
 use tokio::sync::mpsc;
 use tracing::{info, warn};

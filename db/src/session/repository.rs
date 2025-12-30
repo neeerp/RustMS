@@ -50,3 +50,17 @@ pub fn delete_session_by_id(s_id: i32) -> QueryResult<usize> {
 
     diesel::delete(sessions.filter(id.eq(s_id))).execute(&connection)
 }
+
+/// Alias for get_session_by_characterid
+pub fn get_session_by_character_id(c_id: i32) -> QueryResult<Session> {
+    get_session_by_characterid(c_id)
+}
+
+/// Update the character_id for a session
+pub fn update_session_character(s_id: i32, c_id: i32) -> QueryResult<usize> {
+    let connection = establish_connection();
+
+    diesel::update(sessions.filter(id.eq(s_id)))
+        .set(character_id.eq(Some(c_id)))
+        .execute(&connection)
+}

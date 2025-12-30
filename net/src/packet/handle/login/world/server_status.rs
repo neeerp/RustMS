@@ -20,3 +20,25 @@ impl PacketHandler for ServerStatusHandler {
         client.send(&mut world::build_server_status(1)?)
     }
 }
+
+// === ASYNC HANDLER ===
+use crate::handler::{AsyncPacketHandler, HandlerContext, HandlerResult};
+
+pub struct AsyncServerStatusHandler;
+
+impl AsyncServerStatusHandler {
+    pub fn new() -> Self {
+        Self
+    }
+}
+
+impl AsyncPacketHandler for AsyncServerStatusHandler {
+    fn handle(
+        &self,
+        _packet: &mut Packet,
+        _ctx: &mut HandlerContext,
+    ) -> Result<HandlerResult, NetworkError> {
+        let status_packet = world::build_server_status(1)?;
+        Ok(HandlerResult::reply(status_packet))
+    }
+}

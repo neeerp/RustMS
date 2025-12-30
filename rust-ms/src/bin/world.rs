@@ -1,36 +1,49 @@
-use std::net::{TcpListener, TcpStream};
-use std::process::exit;
-use std::thread;
+use runtime::{ClientActor, ClientEvent, WorldServerActor};
+use tokio::net::TcpListener;
+use tokio::sync::mpsc;
+use tracing::{error, info};
+use tracing_subscriber::EnvFilter;
 
-use net::listener::ClientConnectionListener;
+#[tokio::main]
+async fn main() {
+    // Initialize logging
+    tracing_subscriber::fmt()
+        .with_env_filter(
+            EnvFilter::from_default_env().add_directive("runtime=info".parse().unwrap()),
+        )
+        .init();
 
-fn main() {
-    println!("Starting World Server...");
+    info!("Starting World Server...");
 
-    // Shut down the server somewhat gracefuly; not a fan of seeing an error on ctrl+c
-    ctrlc::set_handler(move || {
-        println!("Shutting down...");
-        exit(0);
-    })
-    .expect("Error setting ctrl+c handler!");
+    // Create channel for client events -> world server
+    let (event_tx, event_rx) = mpsc::channel::<ClientEvent>(256);
 
-    let listener = TcpListener::bind("0.0.0.0:8485").unwrap();
+    // Spawn world server actor
+    let world_server = WorldServerActor::new(event_rx);
+    tokio::spawn(async move {
+        world_server.run().await;
+    });
 
-    for stream in listener.incoming() {
-        println!("Incoming connection...");
-        let stream = stream.unwrap();
+    // Accept connections
+    let listener = TcpListener::bind("0.0.0.0:8485").await.unwrap();
+    info!("World Server listening on 0.0.0.0:8485");
 
-        thread::spawn(move || {
-            handle_connection(stream);
-        });
+    loop {
+        match listener.accept().await {
+            Ok((stream, peer_addr)) => {
+                info!(%peer_addr, "World connection accepted");
+
+                let event_tx = event_tx.clone();
+                tokio::spawn(async move {
+                    match ClientActor::new(stream, event_tx).await {
+                        Ok(actor) => actor.run().await,
+                        Err(e) => error!(error = %e, "Failed to create ClientActor"),
+                    }
+                });
+            }
+            Err(e) => {
+                error!(error = %e, "Error accepting world connection");
+            }
+        }
     }
-}
-
-fn handle_connection(stream: TcpStream) {
-    println!(
-        "Connection Terminated: {}",
-        ClientConnectionListener::world_server(stream)
-            .and_then(|mut session| session.listen())
-            .expect_err("Thread disconnects should result in error...")
-    )
 }

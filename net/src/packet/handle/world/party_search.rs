@@ -22,3 +22,25 @@ impl PacketHandler for PartySearchHandler {
         Ok(())
     }
 }
+
+// === ASYNC HANDLER ===
+use crate::handler::{AsyncPacketHandler, HandlerContext, HandlerResult};
+
+pub struct AsyncPartySearchHandler;
+
+impl AsyncPartySearchHandler {
+    pub fn new() -> Self {
+        Self
+    }
+}
+
+impl AsyncPacketHandler for AsyncPartySearchHandler {
+    fn handle(
+        &self,
+        packet: &mut Packet,
+        _ctx: &mut HandlerContext,
+    ) -> Result<HandlerResult, NetworkError> {
+        println!("Received packet: {}", to_hex_string(&packet.bytes));
+        Ok(HandlerResult::empty())
+    }
+}

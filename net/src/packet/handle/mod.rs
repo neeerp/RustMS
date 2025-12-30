@@ -4,8 +4,8 @@ use crate::{
 };
 use packet::Packet;
 
-mod login;
-mod world;
+pub mod login;
+pub mod world;
 
 pub trait PacketHandler {
     fn handle(&self, packet: &mut Packet, _client: &mut MapleClient) -> Result<(), NetworkError> {

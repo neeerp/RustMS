@@ -1,8 +1,11 @@
 use crate::error::RuntimeError;
-use crate::handler::{HandlerAction, HandlerResult};
+use crate::handler::{ClientId, HandlerAction, HandlerContext, HandlerResult};
 use crate::io::{PacketReader, PacketWriter};
-use crate::message::{ClientEvent, ClientId, ServerMessage};
+use crate::message::{ClientEvent, ServerMessage};
+use db::session::SessionWrapper;
+use net::listener::ServerType;
 use net::packet::build;
+use net::get_async_handler;
 use packet::Packet;
 use rand::{thread_rng, Rng};
 use tokio::net::TcpStream;
@@ -14,6 +17,7 @@ pub struct ClientActor {
     client_id: ClientId,
     reader: PacketReader,
     writer: PacketWriter,
+    session: SessionWrapper,
     /// Channel to send events to world server
     world_tx: mpsc::Sender<ClientEvent>,
     /// Channel to receive messages from world server
@@ -56,6 +60,7 @@ impl ClientActor {
             client_id: 0, // Set after login
             reader,
             writer,
+            session: SessionWrapper::new_empty(),
             world_tx,
             server_rx,
             server_tx,
@@ -110,16 +115,45 @@ impl ClientActor {
         self.cleanup().await;
     }
 
-    async fn handle_packet(&mut self, packet: Packet) -> Result<(), RuntimeError> {
+    async fn handle_packet(&mut self, mut packet: Packet) -> Result<(), RuntimeError> {
         let opcode = packet.opcode();
 
-        // TODO: Phase 5 will implement actual handler migration
-        // For now, just log the packet and return empty result
-        info!(opcode, "Received packet (handler not yet migrated)");
+        // Get the async handler for this opcode
+        let handler = get_async_handler(opcode, &ServerType::World);
 
-        // Process handler actions (empty for now)
-        let result = HandlerResult::empty();
-        self.process_actions(result).await
+        // Execute handler in blocking context for DB calls
+        // Move session out temporarily to satisfy borrow checker
+        let mut session = std::mem::replace(&mut self.session, SessionWrapper::new_empty());
+        let client_id = self.client_id;
+
+        let (result, returned_session) = tokio::task::spawn_blocking(move || {
+            let mut ctx = HandlerContext {
+                client_id,
+                session: &mut session,
+            };
+            let result = handler.handle(&mut packet, &mut ctx);
+            (result, session)
+        })
+        .await
+        .map_err(|e| RuntimeError::Handler(format!("Task join error: {}", e)))?;
+
+        // Restore session
+        self.session = returned_session;
+
+        // Process handler result
+        match result {
+            Ok(result) => self.process_actions(result).await,
+            Err(e) => {
+                // Log handler error but don't disconnect for unsupported opcodes
+                if matches!(e, net::error::NetworkError::UnsupportedOpcodeError(_)) {
+                    info!(opcode, "Unsupported opcode");
+                    Ok(())
+                } else {
+                    error!(opcode, error = %e, "Handler error");
+                    Err(RuntimeError::Handler(e.to_string()))
+                }
+            }
+        }
     }
 
     async fn process_actions(&mut self, result: HandlerResult) -> Result<(), RuntimeError> {
@@ -141,6 +175,61 @@ impl ClientActor {
                 }
                 HandlerAction::Disconnect => {
                     return Err(RuntimeError::ClientDisconnected);
+                }
+                HandlerAction::CreateSession { .. } => {
+                    // World server doesn't create sessions - login server does
+                    warn!("CreateSession action ignored in world server");
+                }
+                HandlerAction::AttachCharacter { character_id } => {
+                    // Load character into session
+                    info!(character_id, "Attaching character to session");
+                    // The character loading is done via session wrapper
+                    if let Some(ref mut session) = self.session.session {
+                        session.character_id = Some(character_id);
+                    }
+                    // Force reload character
+                    let _ = self.session.get_character();
+                }
+                HandlerAction::ReattachSession { character_id } => {
+                    // Reattach session from login server
+                    info!(character_id, "Reattaching session for character");
+                    self.client_id = character_id;
+
+                    // Load session from database by character_id
+                    // Build packets synchronously, then release all locks before await
+                    let reattach_result: Option<(i32, Packet, Packet)> = (|| {
+                        let session = db::session::get_session_by_character_id(character_id).ok()?;
+                        let wrapper = SessionWrapper::from(session).ok()?;
+                        self.session = wrapper;
+                        let chr_ref = self.session.get_character().ok()?;
+                        let mut chr = chr_ref.lock().ok()?;
+                        let map_id = chr.character.map_id;
+
+                        // Build the character data packets
+                        let keymap_packet = build::world::keymap::build_keymap(&mut chr.key_binds).ok()?;
+                        let char_info_packet = build::world::char::build_char_info(&chr.character).ok()?;
+
+                        Some((map_id, keymap_packet, char_info_packet))
+                    })();
+
+                    if let Some((map_id, mut keymap_packet, mut char_info_packet)) = reattach_result {
+                        // Send character data packets to client
+                        self.writer.send_packet(&mut keymap_packet).await?;
+                        self.writer.send_packet(&mut char_info_packet).await?;
+
+                        // Register with world server
+                        let event = ClientEvent::Connected {
+                            client_id: character_id,
+                            sender: self.server_tx.clone(),
+                            map_id,
+                        };
+                        self.world_tx
+                            .send(event)
+                            .await
+                            .map_err(|_| RuntimeError::ChannelSend)?;
+                    } else {
+                        error!(character_id, "Failed to reattach session");
+                    }
                 }
             }
         }
@@ -202,7 +291,6 @@ impl ClientActor {
                 .await;
         }
 
-        // Session cleanup will be handled by the handler layer in Phase 5
         info!(self.client_id, "ClientActor cleanup complete");
     }
 }

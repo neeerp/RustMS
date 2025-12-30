@@ -31,3 +31,37 @@ impl PacketHandler for CharListHandler {
         client.send(&mut char::build_char_list(chars)?)
     }
 }
+
+// === ASYNC HANDLER ===
+use crate::handler::{AsyncPacketHandler, HandlerContext, HandlerResult};
+
+pub struct AsyncCharListHandler;
+
+impl AsyncCharListHandler {
+    pub fn new() -> Self {
+        Self
+    }
+}
+
+impl AsyncPacketHandler for AsyncCharListHandler {
+    fn handle(
+        &self,
+        packet: &mut Packet,
+        ctx: &mut HandlerContext,
+    ) -> Result<HandlerResult, NetworkError> {
+        let mut reader = BufReader::new(&**packet);
+        reader.read_short()?;
+
+        let _world = reader.read_byte()?;
+        let _channel = reader.read_byte()? + 1;
+
+        // Get account_id from session
+        let account_id = ctx.session.session.as_ref()
+            .map(|s| s.account_id)
+            .ok_or(NetworkError::NotLoggedIn)?;
+
+        let chars = character::get_characters_by_accountid(account_id)?;
+        let char_list_packet = char::build_char_list(chars)?;
+        Ok(HandlerResult::reply(char_list_packet))
+    }
+}
