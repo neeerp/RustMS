@@ -807,7 +807,7 @@ namespace ms
 
 		bool character_found = false;
 
-		for (uint8_t i = PAGESIZE - 1; i >= 0; i--)
+		for (uint8_t i = 0; i < PAGESIZE; i++)
 		{
 			uint8_t index = i + selected_page * PAGESIZE;
 
@@ -841,7 +841,7 @@ namespace ms
 
 	void UICharSelect::select_last_slot()
 	{
-		for (uint8_t i = PAGESIZE - 1; i >= 0; i--)
+		for (int8_t i = PAGESIZE - 1; i >= 0; i--)
 		{
 			uint8_t index = i + selected_page * PAGESIZE;
 
