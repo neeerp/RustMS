@@ -17,6 +17,10 @@
 //////////////////////////////////////////////////////////////////////////////////
 #pragma once
 
+#include <string>
+
+#include <cstdint>
+
 #include "Portal.h"
 
 #include <unordered_map>

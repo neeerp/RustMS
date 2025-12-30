@@ -17,6 +17,8 @@
 //////////////////////////////////////////////////////////////////////////////////
 #pragma once
 
+#include <cstdint>
+
 #include "RegularAttack.h"
 
 #include "../MapleMap/MapChars.h"

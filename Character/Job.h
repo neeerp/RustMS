@@ -20,6 +20,8 @@
 #include "EquipStat.h"
 
 #include "Inventory/Weapon.h"
+#include <cstdint>
+#include <string>
 
 namespace ms
 {

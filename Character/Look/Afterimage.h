@@ -17,6 +17,10 @@
 //////////////////////////////////////////////////////////////////////////////////
 #pragma once
 
+#include <string>
+
+#include <cstdint>
+
 #include "../Graphics/Animation.h"
 #include "../Template/Rectangle.h"
 

@@ -17,6 +17,8 @@
 //////////////////////////////////////////////////////////////////////////////////
 #pragma once
 
+#include <cstdint>
+
 #include "../../Graphics/Geometry.h"
 #include "../../Template/Interpolated.h"
 

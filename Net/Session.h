@@ -17,6 +17,10 @@
 //////////////////////////////////////////////////////////////////////////////////
 #pragma once
 
+#include <cstddef>
+
+#include <cstdint>
+
 #include "Cryptography.h"
 #include "PacketSwitch.h"
 

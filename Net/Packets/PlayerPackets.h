@@ -17,6 +17,10 @@
 //////////////////////////////////////////////////////////////////////////////////
 #pragma once
 
+#include <cstddef>
+
+#include <cstdint>
+
 #include "../OutPacket.h"
 
 #include "../../Character/MapleStat.h"

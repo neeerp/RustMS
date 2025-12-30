@@ -18,6 +18,8 @@
 #pragma once
 
 #include "EquipQuality.h"
+#include <cstdint>
+#include <string>
 
 namespace ms
 {

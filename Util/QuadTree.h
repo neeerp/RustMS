@@ -17,6 +17,8 @@
 //////////////////////////////////////////////////////////////////////////////////
 #pragma once
 
+#include <cstddef>
+
 #include <functional>
 #include <vector>
 #include <unordered_map>

@@ -17,6 +17,8 @@
 //////////////////////////////////////////////////////////////////////////////////
 #pragma once
 
+#include <cstdint>
+
 #include "../UIDragElement.h"
 #include "../Components/MapleComboBox.h"
 

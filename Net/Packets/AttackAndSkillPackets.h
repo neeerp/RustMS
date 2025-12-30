@@ -17,6 +17,8 @@
 //////////////////////////////////////////////////////////////////////////////////
 #pragma once
 
+#include <cstdint>
+
 #include "../OutPacket.h"
 
 #include "../Gameplay/Combat/Attack.h"

@@ -17,6 +17,10 @@
 //////////////////////////////////////////////////////////////////////////////////
 #pragma once
 
+#include <string>
+
+#include <cstdint>
+
 #include "Tooltip.h"
 #include "MapleFrame.h"
 

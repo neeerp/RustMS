@@ -17,6 +17,10 @@
 //////////////////////////////////////////////////////////////////////////////////
 #pragma once
 
+#include <string>
+
+#include <cstdint>
+
 #include "Equip.h"
 #include "InventoryType.h"
 #include "Item.h"

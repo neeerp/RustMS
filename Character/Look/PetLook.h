@@ -17,6 +17,10 @@
 //////////////////////////////////////////////////////////////////////////////////
 #pragma once
 
+#include <string>
+
+#include <cstdint>
+
 #include "../../Graphics/Animation.h"
 #include "../../Graphics/Text.h"
 #include "../../Template/EnumMap.h"

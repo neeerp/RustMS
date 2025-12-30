@@ -17,6 +17,10 @@
 //////////////////////////////////////////////////////////////////////////////////
 #pragma once
 
+#include <string>
+
+#include <cstdint>
+
 #include "../../Template/Optional.h"
 #include "../../Template/Point.h"
 #include "../../Template/Range.h"

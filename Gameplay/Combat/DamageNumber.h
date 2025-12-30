@@ -17,6 +17,12 @@
 //////////////////////////////////////////////////////////////////////////////////
 #pragma once
 
+#include <string>
+
+#include <cstddef>
+
+#include <cstdint>
+
 #include "../Physics/PhysicsObject.h"
 #include "../Template/BoolPair.h"
 #include "../Template/Interpolated.h"

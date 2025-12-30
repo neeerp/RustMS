@@ -17,6 +17,12 @@
 //////////////////////////////////////////////////////////////////////////////////
 #pragma once
 
+#include <string>
+
+#include <cstddef>
+
+#include <cstdint>
+
 #include "../Graphics/Text.h"
 
 #include <iostream>

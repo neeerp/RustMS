@@ -17,6 +17,8 @@
 //////////////////////////////////////////////////////////////////////////////////
 #pragma once
 
+#include <cstdint>
+
 #include "../UIElement.h"
 
 #include "../Components/ChatBalloon.h"

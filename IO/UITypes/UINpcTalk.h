@@ -17,6 +17,12 @@
 //////////////////////////////////////////////////////////////////////////////////
 #pragma once
 
+#include <string>
+
+#include <cstddef>
+
+#include <cstdint>
+
 #include "../UIElement.h"
 
 #include "../Graphics/Text.h"

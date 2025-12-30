@@ -17,6 +17,8 @@
 //////////////////////////////////////////////////////////////////////////////////
 #pragma once
 
+#include <cstdint>
+
 #include "../MapleMap/Mob.h"
 #include "../../Template/BoolPair.h"
 

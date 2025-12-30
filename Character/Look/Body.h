@@ -17,6 +17,10 @@
 //////////////////////////////////////////////////////////////////////////////////
 #pragma once
 
+#include <string>
+
+#include <cstdint>
+
 #include "BodyDrawInfo.h"
 
 #include "../../Graphics/Texture.h"

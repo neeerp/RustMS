@@ -17,6 +17,10 @@
 //////////////////////////////////////////////////////////////////////////////////
 #pragma once
 
+#include <string>
+
+#include <cstdint>
+
 #include "Template/Singleton.h"
 #include "Template/TypeMap.h"
 #include "Util/Misc.h"

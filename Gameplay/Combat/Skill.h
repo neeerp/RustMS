@@ -17,6 +17,8 @@
 //////////////////////////////////////////////////////////////////////////////////
 #pragma once
 
+#include <cstdint>
+
 #include "SkillAction.h"
 #include "SkillBullet.h"
 #include "SkillHitEffect.h"

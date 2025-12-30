@@ -17,6 +17,10 @@
 //////////////////////////////////////////////////////////////////////////////////
 #pragma once
 
+#include <cstddef>
+
+#include <cstdint>
+
 #include "../MapleStory.h"
 
 #ifdef USE_ASIO

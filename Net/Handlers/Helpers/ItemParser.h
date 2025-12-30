@@ -17,6 +17,8 @@
 //////////////////////////////////////////////////////////////////////////////////
 #pragma once
 
+#include <cstdint>
+
 #include "../../InPacket.h"
 
 #include "../../../Character/Inventory/Inventory.h"

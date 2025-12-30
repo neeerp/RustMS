@@ -17,6 +17,10 @@
 //////////////////////////////////////////////////////////////////////////////////
 #pragma once
 
+#include <string>
+
+#include <cstdint>
+
 #include "../../Graphics/SpecialText.h"
 #include "../../Graphics/Texture.h"
 #include "../../Template/BoolPair.h"

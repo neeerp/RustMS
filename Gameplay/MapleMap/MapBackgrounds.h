@@ -17,6 +17,8 @@
 //////////////////////////////////////////////////////////////////////////////////
 #pragma once
 
+#include <cstdint>
+
 #include "../Physics/PhysicsObject.h"
 
 #include "../../Graphics/Animation.h"

@@ -17,6 +17,8 @@
 //////////////////////////////////////////////////////////////////////////////////
 #pragma once
 
+#include <string>
+
 #include "../PacketHandler.h"
 
 #include "../../Graphics/Text.h"

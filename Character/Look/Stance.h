@@ -19,6 +19,7 @@
 
 #include "../Template/EnumMap.h"
 
+#include <cstdint>
 #include <string>
 
 namespace ms

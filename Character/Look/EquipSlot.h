@@ -17,6 +17,10 @@
 //////////////////////////////////////////////////////////////////////////////////
 #pragma once
 
+#include <cstddef>
+
+#include <cstdint>
+
 #include "../../Template/Enumeration.h"
 #include "../../Template/EnumMap.h"
 

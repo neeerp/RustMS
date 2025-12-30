@@ -17,6 +17,10 @@
 //////////////////////////////////////////////////////////////////////////////////
 #pragma once
 
+#include <string>
+
+#include <cstddef>
+
 #include "PacketError.h"
 
 #include "../Template/Point.h"

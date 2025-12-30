@@ -17,6 +17,10 @@
 //////////////////////////////////////////////////////////////////////////////////
 #pragma once
 
+#include <string>
+
+#include <cstdint>
+
 #include "MapleMap/MapObject.h"
 
 #include "../Graphics/Animation.h"

@@ -20,6 +20,7 @@
 #include "../EquipStat.h"
 
 #include "../../Template/EnumMap.h"
+#include <cstdint>
 
 namespace ms
 {

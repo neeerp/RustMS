@@ -17,6 +17,8 @@
 //////////////////////////////////////////////////////////////////////////////////
 #pragma once
 
+#include <cstdint>
+
 #include "ActiveBuffs.h"
 #include "MonsterBook.h"
 #include "PassiveBuffs.h"
