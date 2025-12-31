@@ -7,9 +7,9 @@ use packet::Packet;
 /// Uses character_id for world server clients.
 pub type ClientId = i32;
 
-/// Trait for async packet handlers.
+/// Trait for packet handlers.
 /// Handlers take a packet and context, returning actions to perform.
-pub trait AsyncPacketHandler: Send + Sync {
+pub trait PacketHandler: Send + Sync {
     fn handle(
         &self,
         packet: &mut Packet,
@@ -18,9 +18,9 @@ pub trait AsyncPacketHandler: Send + Sync {
 }
 
 /// Default handler that logs unknown packets.
-pub struct DefaultAsyncHandler;
+pub struct DefaultHandler;
 
-impl AsyncPacketHandler for DefaultAsyncHandler {
+impl PacketHandler for DefaultHandler {
     fn handle(
         &self,
         packet: &mut Packet,
@@ -36,55 +36,55 @@ impl AsyncPacketHandler for DefaultAsyncHandler {
 use crate::listener::ServerType;
 use crate::packet::op::RecvOpcode;
 
-/// Get the async packet handler for the given opcode and server type.
-pub fn get_async_handler(op: i16, server_type: &ServerType) -> Box<dyn AsyncPacketHandler> {
+/// Get the packet handler for the given opcode and server type.
+pub fn get_handler(op: i16, server_type: &ServerType) -> Box<dyn PacketHandler> {
     match server_type {
-        ServerType::Login => get_async_login_handler(op),
-        ServerType::World => get_async_world_handler(op),
+        ServerType::Login => get_login_handler(op),
+        ServerType::World => get_world_handler(op),
     }
 }
 
-fn get_async_login_handler(op: i16) -> Box<dyn AsyncPacketHandler> {
+fn get_login_handler(op: i16) -> Box<dyn PacketHandler> {
     use crate::packet::handle::login;
 
     match num::FromPrimitive::from_i16(op) {
-        Some(RecvOpcode::LoginCredentials) => Box::new(login::AsyncLoginCredentialsHandler::new()),
-        Some(RecvOpcode::GuestLogin) => Box::new(login::AsyncGuestLoginHandler::new()),
-        Some(RecvOpcode::ServerListReRequest) => Box::new(login::AsyncWorldListHandler::new()),
-        Some(RecvOpcode::CharListRequest) => Box::new(login::AsyncCharListHandler::new()),
-        Some(RecvOpcode::ServerStatusRequest) => Box::new(login::AsyncServerStatusHandler::new()),
-        Some(RecvOpcode::AcceptTOS) => Box::new(login::AsyncAcceptTOSHandler::new()),
-        Some(RecvOpcode::SetGender) => Box::new(login::AsyncSetGenderHandler::new()),
-        Some(RecvOpcode::AfterLogin) => Box::new(DefaultAsyncHandler),
-        Some(RecvOpcode::RegisterPin) => Box::new(DefaultAsyncHandler),
-        Some(RecvOpcode::ServerListRequest) => Box::new(login::AsyncWorldListHandler::new()),
-        Some(RecvOpcode::ViewAllChar) => Box::new(DefaultAsyncHandler),
-        Some(RecvOpcode::PickAllChar) => Box::new(DefaultAsyncHandler),
-        Some(RecvOpcode::CharSelect) => Box::new(login::AsyncCharacterSelectHandler::new()),
-        Some(RecvOpcode::CheckCharName) => Box::new(login::AsyncCheckCharNameHandler::new()),
-        Some(RecvOpcode::CreateChar) => Box::new(login::AsyncCreateCharacterHandler::new()),
-        Some(RecvOpcode::DeleteChar) => Box::new(login::AsyncDeleteCharHandler::new()),
-        Some(RecvOpcode::RegisterPic) => Box::new(DefaultAsyncHandler),
-        Some(RecvOpcode::CharSelectWithPic) => Box::new(DefaultAsyncHandler),
-        Some(RecvOpcode::ViewAllPicRegister) => Box::new(DefaultAsyncHandler),
-        Some(RecvOpcode::ViewAllWithPic) => Box::new(DefaultAsyncHandler),
-        Some(RecvOpcode::LoginStarted) => Box::new(login::AsyncLoginStartHandler::new()),
-        None | Some(_) => Box::new(DefaultAsyncHandler),
+        Some(RecvOpcode::LoginCredentials) => Box::new(login::LoginCredentialsHandler::new()),
+        Some(RecvOpcode::GuestLogin) => Box::new(login::GuestLoginHandler::new()),
+        Some(RecvOpcode::ServerListReRequest) => Box::new(login::WorldListHandler::new()),
+        Some(RecvOpcode::CharListRequest) => Box::new(login::CharListHandler::new()),
+        Some(RecvOpcode::ServerStatusRequest) => Box::new(login::ServerStatusHandler::new()),
+        Some(RecvOpcode::AcceptTOS) => Box::new(login::AcceptTOSHandler::new()),
+        Some(RecvOpcode::SetGender) => Box::new(login::SetGenderHandler::new()),
+        Some(RecvOpcode::AfterLogin) => Box::new(DefaultHandler),
+        Some(RecvOpcode::RegisterPin) => Box::new(DefaultHandler),
+        Some(RecvOpcode::ServerListRequest) => Box::new(login::WorldListHandler::new()),
+        Some(RecvOpcode::ViewAllChar) => Box::new(DefaultHandler),
+        Some(RecvOpcode::PickAllChar) => Box::new(DefaultHandler),
+        Some(RecvOpcode::CharSelect) => Box::new(login::CharacterSelectHandler::new()),
+        Some(RecvOpcode::CheckCharName) => Box::new(login::CheckCharNameHandler::new()),
+        Some(RecvOpcode::CreateChar) => Box::new(login::CreateCharacterHandler::new()),
+        Some(RecvOpcode::DeleteChar) => Box::new(login::DeleteCharHandler::new()),
+        Some(RecvOpcode::RegisterPic) => Box::new(DefaultHandler),
+        Some(RecvOpcode::CharSelectWithPic) => Box::new(DefaultHandler),
+        Some(RecvOpcode::ViewAllPicRegister) => Box::new(DefaultHandler),
+        Some(RecvOpcode::ViewAllWithPic) => Box::new(DefaultHandler),
+        Some(RecvOpcode::LoginStarted) => Box::new(login::LoginStartHandler::new()),
+        None | Some(_) => Box::new(DefaultHandler),
     }
 }
 
-fn get_async_world_handler(op: i16) -> Box<dyn AsyncPacketHandler> {
+fn get_world_handler(op: i16) -> Box<dyn PacketHandler> {
     use crate::packet::handle::world;
 
     match num::FromPrimitive::from_i16(op) {
-        Some(RecvOpcode::PlayerMove) => Box::new(world::AsyncPlayerMoveHandler::new()),
-        Some(RecvOpcode::PlayerLoggedIn) => Box::new(world::AsyncPlayerLoggedInHandler::new()),
-        Some(RecvOpcode::PlayerMapTransfer) => Box::new(world::AsyncPlayerMapTransferHandler::new()),
-        Some(RecvOpcode::ChangeMap) => Box::new(world::AsyncChangeMapHandler::new()),
-        Some(RecvOpcode::PartySearch) => Box::new(world::AsyncPartySearchHandler::new()),
-        Some(RecvOpcode::ChangeKeybinds) => Box::new(world::AsyncChangeKeybindsHandler::new()),
-        Some(RecvOpcode::AllChat) => Box::new(world::AsyncAllChatHandler::new()),
-        None | Some(_) => Box::new(DefaultAsyncHandler),
+        Some(RecvOpcode::PlayerMove) => Box::new(world::PlayerMoveHandler::new()),
+        Some(RecvOpcode::PlayerLoggedIn) => Box::new(world::PlayerLoggedInHandler::new()),
+        Some(RecvOpcode::PlayerMapTransfer) => Box::new(world::PlayerMapTransferHandler::new()),
+        Some(RecvOpcode::ChangeMap) => Box::new(world::ChangeMapHandler::new()),
+        Some(RecvOpcode::PartySearch) => Box::new(world::PartySearchHandler::new()),
+        Some(RecvOpcode::ChangeKeybinds) => Box::new(world::ChangeKeybindsHandler::new()),
+        Some(RecvOpcode::AllChat) => Box::new(world::AllChatHandler::new()),
+        None | Some(_) => Box::new(DefaultHandler),
     }
 }
 

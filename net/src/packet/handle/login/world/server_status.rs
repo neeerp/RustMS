@@ -1,38 +1,17 @@
 use crate::error::NetworkError;
-use crate::helpers::to_hex_string;
-use crate::io::client::MapleClient;
+use crate::handler::{HandlerContext, HandlerResult, PacketHandler};
 use crate::packet::build::login::world;
-use crate::packet::handle::PacketHandler;
 use packet::Packet;
 
-pub struct ServerStatusHandler {}
+pub struct ServerStatusHandler;
 
 impl ServerStatusHandler {
-    pub fn new() -> ServerStatusHandler {
-        ServerStatusHandler {}
-    }
-}
-
-impl PacketHandler for ServerStatusHandler {
-    fn handle(&self, packet: &mut Packet, client: &mut MapleClient) -> Result<(), NetworkError> {
-        to_hex_string(&packet.bytes);
-
-        client.send(&mut world::build_server_status(1)?)
-    }
-}
-
-// === ASYNC HANDLER ===
-use crate::handler::{AsyncPacketHandler, HandlerContext, HandlerResult};
-
-pub struct AsyncServerStatusHandler;
-
-impl AsyncServerStatusHandler {
     pub fn new() -> Self {
         Self
     }
 }
 
-impl AsyncPacketHandler for AsyncServerStatusHandler {
+impl PacketHandler for ServerStatusHandler {
     fn handle(
         &self,
         _packet: &mut Packet,

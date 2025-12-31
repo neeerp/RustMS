@@ -5,7 +5,7 @@ use crate::message::{ClientEvent, ServerMessage};
 use db::session::SessionWrapper;
 use net::listener::ServerType;
 use net::packet::build;
-use net::get_async_handler;
+use net::get_handler;
 use packet::Packet;
 use rand::{thread_rng, Rng};
 use tokio::net::TcpStream;
@@ -118,8 +118,8 @@ impl ClientActor {
     async fn handle_packet(&mut self, mut packet: Packet) -> Result<(), RuntimeError> {
         let opcode = packet.opcode();
 
-        // Get the async handler for this opcode
-        let handler = get_async_handler(opcode, &ServerType::World);
+        // Get the handler for this opcode
+        let handler = get_handler(opcode, &ServerType::World);
 
         // Execute handler in blocking context for DB calls
         // Move session out temporarily to satisfy borrow checker

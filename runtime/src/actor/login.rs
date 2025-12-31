@@ -4,7 +4,7 @@ use crate::io::{PacketReader, PacketWriter};
 use db::session::{NewSession, SessionWrapper};
 use net::listener::ServerType;
 use net::packet::build;
-use net::get_async_handler;
+use net::get_handler;
 use packet::Packet;
 use rand::{thread_rng, Rng};
 use std::net::SocketAddr;
@@ -89,8 +89,8 @@ impl LoginClientActor {
     async fn handle_packet(&mut self, mut packet: Packet) -> Result<(), RuntimeError> {
         let opcode = packet.opcode();
 
-        // Get the async handler for this opcode
-        let handler = get_async_handler(opcode, &ServerType::Login);
+        // Get the handler for this opcode
+        let handler = get_handler(opcode, &ServerType::Login);
 
         // Execute handler in blocking context for DB calls
         // Move session out temporarily to satisfy borrow checker

@@ -11,8 +11,8 @@ pub mod packet;
 pub mod settings;
 
 pub use self::handler::{
-    get_async_handler, AsyncPacketHandler, BroadcastScope, ClientId, DefaultAsyncHandler,
-    HandlerAction, HandlerContext, HandlerResult,
+    get_handler, BroadcastScope, ClientId, DefaultHandler, HandlerAction, HandlerContext,
+    HandlerResult, PacketHandler,
 };
 pub use self::io::error;
 pub use self::io::listener;
