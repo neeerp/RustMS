@@ -33,10 +33,13 @@ namespace ms
 
 	bool SocketAsio::open(const char* address, const char* port)
 	{
-		tcp::resolver::query query(address, port);
-		tcp::resolver::iterator endpointiter = resolver.resolve(query);
 		error_code error;
-		asio::connect(socket, endpointiter, error);
+		auto endpoints = resolver.resolve(address, port, error);
+		if (error)
+		{
+			return false;
+		}
+		asio::connect(socket, endpoints, error);
 
 		if (!error)
 		{

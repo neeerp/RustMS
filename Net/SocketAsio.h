@@ -38,7 +38,7 @@ namespace ms
 	const size_t HANDSHAKE_LEN = 16;
 #endif
 
-	using asio::io_service;
+	using asio::io_context;
 	using asio::ip::tcp;
 	using asio::error_code;
 
@@ -56,7 +56,7 @@ namespace ms
 		bool dispatch(const int8_t* bytes, size_t length);
 
 	private:
-		io_service ioservice;
+		io_context ioservice;
 		tcp::resolver resolver;
 		tcp::socket socket;
 		int8_t buffer[MAX_PACKET_LENGTH];
