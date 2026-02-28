@@ -19,6 +19,39 @@
 
 #include "../Configuration.h"
 
+#include <filesystem>
+
+namespace
+{
+	std::filesystem::path resolve_font_path(const std::string &configured_path)
+	{
+		if (configured_path.empty())
+			return {};
+
+		std::filesystem::path raw_path(configured_path);
+
+		if (raw_path.is_absolute())
+			return raw_path;
+
+		const std::filesystem::path cwd = std::filesystem::current_path();
+		const std::filesystem::path source_dir = HEAVENCLIENT_SOURCE_DIR;
+		const std::filesystem::path candidates[] = {
+				raw_path,
+				cwd / raw_path,
+				cwd.parent_path() / raw_path,
+				source_dir / raw_path
+		};
+
+		for (const auto &candidate : candidates)
+		{
+			if (std::filesystem::exists(candidate))
+				return candidate;
+		}
+
+		return raw_path;
+	}
+}
+
 namespace ms
 {
 	GraphicsGL::GraphicsGL()
@@ -195,6 +228,7 @@ namespace ms
 		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, ATLASW, ATLASH, 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
 
 		fontborder.set_y(1);
+		font_error_path.clear();
 
 		const std::string FONT_NORMAL = Setting<FontPathNormal>().get().load();
 		const std::string FONT_BOLD = Setting<FontPathBold>().get().load();
@@ -202,17 +236,59 @@ namespace ms
 		if (FONT_NORMAL.empty() || FONT_BOLD.empty())
 			return Error::Code::FONT_PATH;
 
-		const char *FONT_NORMAL_STR = FONT_NORMAL.c_str();
-		const char *FONT_BOLD_STR = FONT_BOLD.c_str();
+		const std::string resolved_normal = resolve_font_path(FONT_NORMAL).string();
+		const std::string resolved_bold = resolve_font_path(FONT_BOLD).string();
 
-		addfont(FONT_NORMAL_STR, Text::Font::A11M, 0, 11);
-		addfont(FONT_BOLD_STR, Text::Font::A11B, 0, 11);
-		addfont(FONT_NORMAL_STR, Text::Font::A12M, 0, 12);
-		addfont(FONT_BOLD_STR, Text::Font::A12B, 0, 12);
-		addfont(FONT_NORMAL_STR, Text::Font::A13M, 0, 13);
-		addfont(FONT_BOLD_STR, Text::Font::A13B, 0, 13);
-		addfont(FONT_BOLD_STR, Text::Font::A15B, 0, 15);
-		addfont(FONT_NORMAL_STR, Text::Font::A18M, 0, 18);
+		const char *FONT_NORMAL_STR = resolved_normal.c_str();
+		const char *FONT_BOLD_STR = resolved_bold.c_str();
+
+		if (!addfont(FONT_NORMAL_STR, Text::Font::A11M, 0, 11))
+		{
+			font_error_path = resolved_normal;
+			return Error(Error::Code::FONT_PATH, font_error_path.c_str());
+		}
+
+		if (!addfont(FONT_BOLD_STR, Text::Font::A11B, 0, 11))
+		{
+			font_error_path = resolved_bold;
+			return Error(Error::Code::FONT_PATH, font_error_path.c_str());
+		}
+
+		if (!addfont(FONT_NORMAL_STR, Text::Font::A12M, 0, 12))
+		{
+			font_error_path = resolved_normal;
+			return Error(Error::Code::FONT_PATH, font_error_path.c_str());
+		}
+
+		if (!addfont(FONT_BOLD_STR, Text::Font::A12B, 0, 12))
+		{
+			font_error_path = resolved_bold;
+			return Error(Error::Code::FONT_PATH, font_error_path.c_str());
+		}
+
+		if (!addfont(FONT_NORMAL_STR, Text::Font::A13M, 0, 13))
+		{
+			font_error_path = resolved_normal;
+			return Error(Error::Code::FONT_PATH, font_error_path.c_str());
+		}
+
+		if (!addfont(FONT_BOLD_STR, Text::Font::A13B, 0, 13))
+		{
+			font_error_path = resolved_bold;
+			return Error(Error::Code::FONT_PATH, font_error_path.c_str());
+		}
+
+		if (!addfont(FONT_BOLD_STR, Text::Font::A15B, 0, 15))
+		{
+			font_error_path = resolved_bold;
+			return Error(Error::Code::FONT_PATH, font_error_path.c_str());
+		}
+
+		if (!addfont(FONT_NORMAL_STR, Text::Font::A18M, 0, 18))
+		{
+			font_error_path = resolved_normal;
+			return Error(Error::Code::FONT_PATH, font_error_path.c_str());
+		}
 
 		fontymax += fontborder.y();
 

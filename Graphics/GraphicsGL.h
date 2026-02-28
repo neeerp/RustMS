@@ -300,6 +300,7 @@ namespace ms
 		Range<GLshort> yrange;
 
 		FT_Library ftlibrary;
+		std::string font_error_path;
 		Font fonts[Text::Font::NUM_FONTS];
 		Point<GLshort> fontborder;
 		GLshort fontymax;
