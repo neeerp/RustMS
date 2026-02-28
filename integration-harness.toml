@@ -1,0 +1,6 @@
+username = "fixtureTest"
+password = "test"
+character_name = "fixture123"
+gender = 0
+login_addr = "127.0.0.1:8484"
+world_addr = "127.0.0.1:8485"

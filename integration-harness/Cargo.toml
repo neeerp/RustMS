@@ -1,0 +1,13 @@
+[package]
+name = "integration-harness"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+tokio = { version = "1", features = ["full"] }
+thiserror = "1"
+serde = { version = "1", features = ["derive"] }
+toml = "0.8"
+crypt = { path = "../crypt" }
+packet = { path = "../packet" }
+net = { path = "../net" }

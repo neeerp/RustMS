@@ -2,6 +2,7 @@
 
 members = [
     "rust-ms",
+    "integration-harness",
     "packet",
     "crypt",
     "net",
