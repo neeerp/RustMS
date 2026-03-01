@@ -68,7 +68,7 @@ impl From<u8> for KeybindType {
 
 /// Keybinding database entity.
 #[derive(Identifiable, Queryable, Insertable, AsChangeset)]
-#[table_name = "keybindings"]
+#[diesel(table_name = keybindings)]
 pub struct Keybinding {
     pub id: i32,
     pub character_id: i32,
@@ -79,7 +79,7 @@ pub struct Keybinding {
 
 /// A projection of the Keybinding entity for less cumbersome manipulation.
 #[derive(Clone, Insertable, AsChangeset)]
-#[table_name = "keybindings"]
+#[diesel(table_name = keybindings)]
 pub struct KeybindDTO {
     pub character_id: i32,
     pub key: i16,

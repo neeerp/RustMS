@@ -7,21 +7,21 @@ use schema::accounts;
 use schema::accounts::dsl::*;
 
 pub fn get_account(user: &str) -> QueryResult<Account> {
-    let connection = establish_connection();
+    let mut connection = establish_connection();
 
     accounts
         .filter(user_name.eq(user))
-        .first::<Account>(&connection)
+        .first::<Account>(&mut connection)
 }
 
 pub fn get_account_by_id(a_id: i32) -> QueryResult<Account> {
-    let connection = establish_connection();
+    let mut connection = establish_connection();
 
-    accounts.filter(id.eq(a_id)).first::<Account>(&connection)
+    accounts.filter(id.eq(a_id)).first::<Account>(&mut connection)
 }
 
 pub fn create_account<'a>(user: &'a str, pw: &'a str) -> QueryResult<Account> {
-    let connection = establish_connection();
+    let mut connection = establish_connection();
 
     let new_account = NewAccount {
         user_name: user,
@@ -30,10 +30,10 @@ pub fn create_account<'a>(user: &'a str, pw: &'a str) -> QueryResult<Account> {
 
     diesel::insert_into(accounts::table)
         .values(&new_account)
-        .get_result::<Account>(&connection)
+        .get_result::<Account>(&mut connection)
 }
 
 pub fn update_account(acc: &Account) -> QueryResult<Account> {
-    let connection = establish_connection();
-    acc.save_changes(&connection)
+    let mut connection = establish_connection();
+    acc.save_changes(&mut connection)
 }

@@ -51,7 +51,7 @@ impl Character {
 
 /// Character creation projection.
 #[derive(Insertable)]
-#[table_name = "characters"]
+#[diesel(table_name = characters)]
 pub struct NewCharacter<'a> {
     pub accountid: i32,
     pub world: i16,

@@ -21,7 +21,7 @@ pub enum SessionState {
 }
 
 #[derive(Identifiable, Queryable, AsChangeset)]
-#[table_name = "sessions"]
+#[diesel(table_name = sessions)]
 pub struct Session {
     pub id: i32,
     pub account_id: i32,
@@ -35,7 +35,7 @@ pub struct Session {
 
 /// Session creation projection.
 #[derive(Insertable)]
-#[table_name = "sessions"]
+#[diesel(table_name = sessions)]
 pub struct NewSession<'a> {
     pub account_id: i32,
     pub ip: IpNetwork,

@@ -32,7 +32,7 @@ impl Debug for Account {
 }
 
 #[derive(Insertable)]
-#[table_name = "accounts"]
+#[diesel(table_name = accounts)]
 pub struct NewAccount<'a> {
     pub user_name: &'a str,
     pub password: &'a str,

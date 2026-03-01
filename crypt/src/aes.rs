@@ -31,7 +31,7 @@ impl MapleAES {
 
         while remaining > 0 {
             let mut iv = self.repeat_bytes(&self.iv, 4);
-            let mut iv = GenericArray::from_mut_slice(&mut iv);
+            let iv = GenericArray::from_mut_slice(&mut iv);
 
             if remaining < llength {
                 llength = remaining;
