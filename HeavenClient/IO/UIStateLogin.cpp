@@ -31,12 +31,10 @@ namespace ms
 	{
 		focused = UIElement::Type::NONE;
 
-		bool start_shown = Configuration::get().get_start_shown();
-
-		if (!start_shown)
-			emplace<UILogo>();
-		else
+		if (Configuration::get().get_skip_startup_logos())
 			emplace<UILogin>();
+		else
+			emplace<UILogo>();
 	}
 
 	void UIStateLogin::draw(float inter, Point<int16_t> cursor) const

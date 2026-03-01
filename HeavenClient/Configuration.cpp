@@ -321,6 +321,11 @@ namespace ms
 		show_weekly = value;
 	}
 
+	bool Configuration::get_skip_startup_logos() const
+	{
+		return SKIP_STARTUP_LOGOS;
+	}
+
 	bool Configuration::get_start_shown()
 	{
 		return start_shown;

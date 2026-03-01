@@ -135,6 +135,9 @@ namespace ms
 		// Set whether to show the weekly maple star in Maple Chat
 		void set_show_weekly(bool value);
 
+		// Whether to skip the startup logo sequence
+		bool get_skip_startup_logos() const;
+
 		// Whether to show the start screen
 		bool get_start_shown();
 
@@ -274,6 +277,7 @@ namespace ms
 		const char* CHARGENX = "https://billing.nexon.net/PurchaseNX";
 		const bool SHOW_FPS = false;
 		const bool SHOW_PACKETS = true;
+		const bool SKIP_STARTUP_LOGOS = true;
 		const bool AUTO_LOGIN = false;
 		const uint8_t auto_world = 0;
 		const uint8_t auto_channel = 0;
