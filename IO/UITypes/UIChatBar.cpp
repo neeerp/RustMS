@@ -25,6 +25,51 @@
 
 namespace ms
 {
+	namespace
+	{
+		enum class WhisperParseResult
+		{
+			NotWhisper,
+			InvalidWhisper,
+			ValidWhisper
+		};
+
+		WhisperParseResult parse_whisper_command(
+			const std::string& input,
+			std::string& target,
+			std::string& message
+		)
+		{
+			static const std::string SHORT_COMMAND = "/w";
+			static const std::string LONG_COMMAND = "/whisper";
+
+			size_t command_length = 0;
+
+			if (input == SHORT_COMMAND || input.rfind(SHORT_COMMAND + " ", 0) == 0)
+				command_length = SHORT_COMMAND.length();
+			else if (input == LONG_COMMAND || input.rfind(LONG_COMMAND + " ", 0) == 0)
+				command_length = LONG_COMMAND.length();
+			else
+				return WhisperParseResult::NotWhisper;
+
+			size_t target_start = input.find_first_not_of(' ', command_length);
+			if (target_start == std::string::npos)
+				return WhisperParseResult::InvalidWhisper;
+
+			size_t target_end = input.find(' ', target_start);
+			target = input.substr(target_start, target_end - target_start);
+			if (target.empty() || target_end == std::string::npos)
+				return WhisperParseResult::InvalidWhisper;
+
+			size_t message_start = input.find_first_not_of(' ', target_end);
+			if (message_start == std::string::npos)
+				return WhisperParseResult::InvalidWhisper;
+
+			message = input.substr(message_start);
+			return message.empty() ? WhisperParseResult::InvalidWhisper : WhisperParseResult::ValidWhisper;
+		}
+	}
+
 	UIChatBar::UIChatBar() : UIDragElement<PosCHAT>(Point<int16_t>(410, -5))
 	{
 		chatopen = Setting<Chatopen>::get().load();
@@ -103,8 +148,23 @@ namespace ms
 						if (last != std::string::npos)
 						{
 							msg.erase(last + 1);
+							std::string target;
+							std::string message;
+							WhisperParseResult whisper_result = parse_whisper_command(msg, target, message);
 
-							GeneralChatPacket(msg, true).dispatch();
+								if (whisper_result == WhisperParseResult::ValidWhisper)
+								{
+									WhisperPacket(target, message).dispatch();
+									send_chatline("#g" + target + "<<" + message, LineType::WHITE);
+								}
+							else if (whisper_result == WhisperParseResult::InvalidWhisper)
+							{
+								send_chatline("Usage: /w <name> <message>", LineType::RED);
+							}
+							else
+							{
+								GeneralChatPacket(msg, true).dispatch();
+							}
 
 							lastentered.push_back(msg);
 							lastpos = lastentered.size();

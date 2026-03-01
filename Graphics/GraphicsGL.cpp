@@ -665,11 +665,17 @@ namespace ms
 							case 'b':
 								color = Color::Name::BLUE;
 								break;
+							case 'g':
+								color = Color::Name::GREEN;
+								break;
 							case 'r':
 								color = Color::Name::RED;
 								break;
 							case 'c':
 								color = Color::Name::ORANGE;
+								break;
+							case 'w':
+								color = Color::Name::WHITE;
 								break;
 						}
 
