@@ -34,4 +34,19 @@ namespace ms
 			write_byte(show);
 		}
 	};
+
+	// Packet which sends a whisper/private message to another player.
+	// Opcode: WHISPER(120)
+	class WhisperPacket : public OutPacket
+	{
+	public:
+		static constexpr int8_t REQUEST_MODE = 0x06;
+
+		WhisperPacket(const std::string& target, const std::string& message) : OutPacket(OutPacket::Opcode::WHISPER)
+		{
+			write_byte(REQUEST_MODE);
+			write_string(target);
+			write_string(message);
+		}
+	};
 }

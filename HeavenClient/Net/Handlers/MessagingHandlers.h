@@ -56,6 +56,13 @@ namespace ms
 		void handle(InPacket& recv) const override;
 	};
 
+	// Handle whisper result and incoming whisper delivery
+	// Opcode: WHISPER(135)
+	class WhisperHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
 	// Shows the effect of a scroll
 	// Opcode: SCROLL_RESULT(167)
 	class ScrollResultHandler : public PacketHandler

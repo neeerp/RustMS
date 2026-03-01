@@ -26,6 +26,18 @@
 
 namespace ms
 {
+	namespace
+	{
+		constexpr int8_t WHISPER_RECEIVE_MODE = 0x0A;
+		constexpr int8_t WHISPER_RESULT_MODE = 0x12;
+
+		std::string build_whisper_chatline(const std::string& sender, bool from_admin, const std::string& message)
+		{
+			std::string display_name = from_admin ? "[GM]" + sender : sender;
+			return "#g" + display_name + ">>" + message;
+		}
+	}
+
 	// Modes:
 	// 0 - Item(0) or Meso(1) 
 	// 3 - Exp gain
@@ -217,6 +229,38 @@ namespace ms
 
 		if (auto chatbar = UI::get().get_element<UIChatBar>())
 			chatbar->send_chatline(message, linetype);
+	}
+
+	void WhisperHandler::handle(InPacket& recv) const
+	{
+		int8_t mode = recv.read_byte();
+
+			if (mode == WHISPER_RECEIVE_MODE)
+			{
+				std::string sender = recv.read_string();
+				recv.read_byte();
+				bool from_admin = recv.read_bool();
+				std::string message = recv.read_string();
+
+				if (auto chatbar = UI::get().get_element<UIChatBar>())
+				{
+					chatbar->send_chatline(
+							build_whisper_chatline(sender, from_admin, message),
+							UIChatBar::LineType::WHITE
+					);
+				}
+		}
+		else if (mode == WHISPER_RESULT_MODE)
+		{
+			std::string target = recv.read_string();
+			bool success = recv.read_bool();
+
+			if (!success)
+			{
+				if (auto chatbar = UI::get().get_element<UIChatBar>())
+					chatbar->send_chatline("Unable to whisper " + target + ".", UIChatBar::LineType::RED);
+			}
+		}
 	}
 
 	void ScrollResultHandler::handle(InPacket& recv) const

@@ -72,6 +72,7 @@ namespace ms
 
 			/// Messaging
 			GENERAL_CHAT = 49,
+			WHISPER = 120,
 
 			/// NPC Interaction
 			TALK_TO_NPC = 58,
