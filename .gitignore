@@ -17,3 +17,19 @@ Cargo.lock
 *.vim
 
 .env
+
+# Nested HeavenClient local artifacts
+HeavenClient/build/
+HeavenClient/cmake-build/
+HeavenClient/libs/
+HeavenClient/.vagrant/
+HeavenClient/.vs/
+HeavenClient/.vscode/
+HeavenClient/x64/
+HeavenClient/Settings
+HeavenClient/nx/
+HeavenClient/*.nx
+HeavenClient/*.aps
+HeavenClient/*.log
+HeavenClient/*.tlog
+HeavenClient/.DS_Store

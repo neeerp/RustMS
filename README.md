@@ -149,7 +149,16 @@ If you would like to run RustMS, clone the repository and run the project from t
 On the first run of the server, you will likely have more output as dependencies will need to be downloaded and the project itself will build.
 
 ### Running the client
-The server on its own is not particularly interesting without a client to communicate with it. At this point in time, this server is being developed with the [Heaven Client](https://github.com/HeavenClient/HeavenClient) in mind, however in theory any V83 Maplestory client that's pointed at `localhost` should work (no promises). Clone HeavenClient and follow the README's instructions on the branch corresponding to your operating system. Note that RustMS supports encryption and hence you shouldn't disable it when building the client.
+The server on its own is not particularly interesting without a client to communicate with it. At this point in time, this server is being developed with the nested `HeavenClient` project in this repository, however in theory any V83 Maplestory client that's pointed at `localhost` should work (no promises). From the `RustMS` repo root, build the client with:
+
+```sh
+cd HeavenClient
+./build-deps.sh
+cmake -S . -B cmake-build
+cmake --build cmake-build -j"$(nproc)"
+```
+
+Note that RustMS supports encryption and hence you shouldn't disable it when building the client.
 
 Once you've built the client, run it:
 ![Run the client](img/run_client.png)
