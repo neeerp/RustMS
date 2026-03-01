@@ -20,6 +20,7 @@ pub enum ClientEvent {
         client_id: ClientId,
         sender: tokio::sync::mpsc::Sender<ServerMessage>,
         map_id: i32,
+        character_name: String,
     },
     /// Client has disconnected
     Disconnected { client_id: ClientId },
@@ -34,5 +35,13 @@ pub enum ClientEvent {
         from: ClientId,
         scope: BroadcastScope,
         packet: Packet,
+    },
+    /// Request to deliver a whisper to a named online player.
+    Whisper {
+        from: ClientId,
+        target_name: String,
+        recipient_packet: Packet,
+        sender_success_packet: Packet,
+        sender_failure_packet: Packet,
     },
 }

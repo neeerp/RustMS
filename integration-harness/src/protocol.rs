@@ -2,15 +2,15 @@ use crate::assertions::{
     assert_handshake, assert_login_success, assert_opcode, assert_redirect_target,
     assert_server_list_kind,
 };
-use crate::config::HarnessConfig;
+use crate::config::{HarnessConfig, MultiHarnessConfig};
 use crate::connection::MapleTestConnection;
 use crate::error::HarnessError;
 use crate::packets::{
     build_accept_tos, build_char_list_request, build_char_select, build_create_char,
-    build_login_credentials, build_login_started, build_player_logged_in,
-    build_server_list_request, build_set_gender, decode_char_list, decode_last_connected_world,
-    decode_login_status, decode_new_character,
-    decode_recommended_worlds, decode_server_redirect, decode_set_field, opcode_name,
+    build_login_credentials, build_login_started, build_player_logged_in, build_server_list_request,
+    build_set_gender, decode_char_list, decode_last_connected_world, decode_login_status,
+    decode_new_character, decode_recommended_worlds, decode_server_redirect, decode_set_field,
+    opcode_name,
     CharacterSummary, CharacterTemplate, LoginStatusPacket, ServerListPacket,
 };
 use net::packet::op::SendOpcode;
@@ -26,7 +26,27 @@ pub struct WorldEntryResult {
     pub world_addr: String,
 }
 
+pub struct WorldSession {
+    pub connection: MapleTestConnection,
+    pub character_id: i32,
+    pub character_name: String,
+    pub map_id: i32,
+    pub login_addr: String,
+    pub world_addr: String,
+}
+
 pub async fn login_to_world(config: &HarnessConfig) -> Result<WorldEntryResult, HarnessError> {
+    let session = login_to_world_session(config).await?;
+    Ok(WorldEntryResult {
+        character_id: session.character_id,
+        character_name: session.character_name,
+        map_id: session.map_id,
+        login_addr: session.login_addr,
+        world_addr: session.world_addr,
+    })
+}
+
+pub async fn login_to_world_session(config: &HarnessConfig) -> Result<WorldSession, HarnessError> {
     let mut login_conn = MapleTestConnection::connect(config.login_addr, "login handshake").await?;
     assert_handshake(
         "login handshake",
@@ -209,13 +229,32 @@ pub async fn login_to_world(config: &HarnessConfig) -> Result<WorldEntryResult, 
         ));
     }
 
-    Ok(WorldEntryResult {
+    Ok(WorldSession {
+        connection: world_conn,
         character_id: world_entry.character_id,
         character_name: world_entry.character_name,
         map_id: world_entry.map_id,
         login_addr: config.login_addr.to_string(),
         world_addr: config.world_addr.to_string(),
     })
+}
+
+pub async fn login_two_players_to_world(
+    config: &MultiHarnessConfig,
+) -> Result<(WorldSession, WorldSession), HarnessError> {
+    let sender = config.player("sender")?;
+    let recipient = config.player("recipient")?;
+
+    let (sender_result, recipient_result) = tokio::join!(
+        login_to_world_session(&sender),
+        login_to_world_session(&recipient)
+    );
+
+    match (sender_result, recipient_result) {
+        (Ok(sender_session), Ok(recipient_session)) => Ok((sender_session, recipient_session)),
+        (Err(error), _) => Err(error),
+        (_, Err(error)) => Err(error),
+    }
 }
 
 async fn read_packet(

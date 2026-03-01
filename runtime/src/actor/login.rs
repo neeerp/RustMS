@@ -177,6 +177,10 @@ impl LoginClientActor {
                     // Login server doesn't reattach sessions
                     warn!("ReattachSession action ignored in login server");
                 }
+                HandlerAction::Whisper { .. } => {
+                    // Login server never handles in-world whispers.
+                    warn!("Whisper action ignored in login server");
+                }
             }
         }
         Ok(())

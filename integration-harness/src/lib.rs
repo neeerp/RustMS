@@ -6,6 +6,9 @@ pub mod handshake;
 pub mod packets;
 pub mod protocol;
 
-pub use config::HarnessConfig;
+pub use config::{HarnessConfig, MultiHarnessConfig};
 pub use error::HarnessError;
-pub use protocol::{login_to_world, WorldEntryResult};
+pub use protocol::{
+    login_to_world, login_to_world_session, login_two_players_to_world, WorldEntryResult,
+    WorldSession,
+};

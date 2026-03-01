@@ -173,6 +173,24 @@ impl ClientActor {
                         .await
                         .map_err(|_| RuntimeError::ChannelSend)?;
                 }
+                HandlerAction::Whisper {
+                    target_name,
+                    recipient_packet,
+                    sender_success_packet,
+                    sender_failure_packet,
+                } => {
+                    let event = ClientEvent::Whisper {
+                        from: self.client_id,
+                        target_name,
+                        recipient_packet,
+                        sender_success_packet,
+                        sender_failure_packet,
+                    };
+                    self.world_tx
+                        .send(event)
+                        .await
+                        .map_err(|_| RuntimeError::ChannelSend)?;
+                }
                 HandlerAction::Disconnect => {
                     return Err(RuntimeError::ClientDisconnected);
                 }
@@ -197,22 +215,23 @@ impl ClientActor {
 
                     // Load session from database by character_id
                     // Build packets synchronously, then release all locks before await
-                    let reattach_result: Option<(i32, Packet, Packet)> = (|| {
+                    let reattach_result: Option<(i32, String, Packet, Packet)> = (|| {
                         let session = db::session::get_session_by_character_id(character_id).ok()?;
                         let wrapper = SessionWrapper::from(session).ok()?;
                         self.session = wrapper;
                         let chr_ref = self.session.get_character().ok()?;
                         let mut chr = chr_ref.lock().ok()?;
                         let map_id = chr.character.map_id;
+                        let character_name = chr.character.name.clone();
 
                         // Build the character data packets
                         let keymap_packet = build::world::keymap::build_keymap(&mut chr.key_binds).ok()?;
                         let char_info_packet = build::world::char::build_char_info(&chr.character).ok()?;
 
-                        Some((map_id, keymap_packet, char_info_packet))
+                        Some((map_id, character_name, keymap_packet, char_info_packet))
                     })();
 
-                    if let Some((map_id, mut keymap_packet, mut char_info_packet)) = reattach_result {
+                    if let Some((map_id, character_name, mut keymap_packet, mut char_info_packet)) = reattach_result {
                         // Send character data packets to client
                         self.writer.send_packet(&mut keymap_packet).await?;
                         self.writer.send_packet(&mut char_info_packet).await?;
@@ -222,6 +241,7 @@ impl ClientActor {
                             client_id: character_id,
                             sender: self.server_tx.clone(),
                             map_id,
+                            character_name,
                         };
                         self.world_tx
                             .send(event)
@@ -263,6 +283,7 @@ impl ClientActor {
         &mut self,
         character_id: i32,
         map_id: i32,
+        character_name: String,
     ) -> Result<(), RuntimeError> {
         self.client_id = character_id;
 
@@ -270,6 +291,7 @@ impl ClientActor {
             client_id: character_id,
             sender: self.server_tx.clone(),
             map_id,
+            character_name,
         };
 
         self.world_tx

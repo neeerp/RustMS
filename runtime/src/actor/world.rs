@@ -8,6 +8,7 @@ use tracing::{info, warn};
 struct ClientEntry {
     sender: mpsc::Sender<ServerMessage>,
     map_id: i32,
+    name: String,
 }
 
 /// Central actor managing all world server clients.
@@ -18,6 +19,8 @@ pub struct WorldServerActor {
     clients: HashMap<ClientId, ClientEntry>,
     /// Map ID to client IDs for efficient map broadcasts
     maps: HashMap<i32, Vec<ClientId>>,
+    /// Character name to client ID for directed routing
+    names: HashMap<String, ClientId>,
 }
 
 impl WorldServerActor {
@@ -26,6 +29,7 @@ impl WorldServerActor {
             event_rx,
             clients: HashMap::new(),
             maps: HashMap::new(),
+            names: HashMap::new(),
         }
     }
 
@@ -46,8 +50,9 @@ impl WorldServerActor {
                 client_id,
                 sender,
                 map_id,
+                character_name,
             } => {
-                self.register_client(client_id, sender, map_id);
+                self.register_client(client_id, sender, map_id, character_name);
             }
             ClientEvent::Disconnected { client_id } => {
                 self.unregister_client(client_id);
@@ -66,6 +71,22 @@ impl WorldServerActor {
             } => {
                 self.handle_broadcast(from, scope, packet).await;
             }
+            ClientEvent::Whisper {
+                from,
+                target_name,
+                recipient_packet,
+                sender_success_packet,
+                sender_failure_packet,
+            } => {
+                self.handle_whisper(
+                    from,
+                    target_name,
+                    recipient_packet,
+                    sender_success_packet,
+                    sender_failure_packet,
+                )
+                .await;
+            }
         }
     }
 
@@ -74,16 +95,26 @@ impl WorldServerActor {
         client_id: ClientId,
         sender: mpsc::Sender<ServerMessage>,
         map_id: i32,
+        character_name: String,
     ) {
-        info!(client_id, map_id, "Client connected");
+        info!(client_id, map_id, character_name, "Client connected");
 
-        self.clients.insert(client_id, ClientEntry { sender, map_id });
+        self.names.insert(character_name.clone(), client_id);
+        self.clients.insert(
+            client_id,
+            ClientEntry {
+                sender,
+                map_id,
+                name: character_name,
+            },
+        );
         self.maps.entry(map_id).or_default().push(client_id);
     }
 
     fn unregister_client(&mut self, client_id: ClientId) {
         if let Some(entry) = self.clients.remove(&client_id) {
             info!(client_id, "Client disconnected");
+            self.names.remove(&entry.name);
 
             // Remove from map index
             if let Some(clients) = self.maps.get_mut(&entry.map_id) {
@@ -132,6 +163,49 @@ impl WorldServerActor {
                         "Failed to send broadcast, client may have disconnected"
                     );
                 }
+            }
+        }
+    }
+
+    async fn handle_whisper(
+        &mut self,
+        from: ClientId,
+        target_name: String,
+        recipient_packet: packet::Packet,
+        sender_success_packet: packet::Packet,
+        sender_failure_packet: packet::Packet,
+    ) {
+        let Some(&target_id) = self.names.get(&target_name) else {
+            self.send_packet_to_client(from, sender_failure_packet).await;
+            return;
+        };
+
+        let delivered = if let Some(entry) = self.clients.get(&target_id) {
+            entry.sender
+                .send(ServerMessage::SendPacket(recipient_packet))
+                .await
+                .is_ok()
+        } else {
+            false
+        };
+
+        if delivered {
+            self.send_packet_to_client(from, sender_success_packet).await;
+        } else {
+            warn!(from, target_name, "Failed to deliver whisper to target");
+            self.send_packet_to_client(from, sender_failure_packet).await;
+        }
+    }
+
+    async fn send_packet_to_client(&self, client_id: ClientId, packet: packet::Packet) {
+        if let Some(entry) = self.clients.get(&client_id) {
+            if entry
+                .sender
+                .send(ServerMessage::SendPacket(packet))
+                .await
+                .is_err()
+            {
+                warn!(client_id, "Failed to send directed packet to client");
             }
         }
     }

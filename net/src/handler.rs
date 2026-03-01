@@ -84,6 +84,7 @@ fn get_world_handler(op: i16) -> Box<dyn PacketHandler> {
         Some(RecvOpcode::PartySearch) => Box::new(world::PartySearchHandler::new()),
         Some(RecvOpcode::ChangeKeybinds) => Box::new(world::ChangeKeybindsHandler::new()),
         Some(RecvOpcode::AllChat) => Box::new(world::AllChatHandler::new()),
+        Some(RecvOpcode::Whisper) => Box::new(world::WhisperHandler::new()),
         None | Some(_) => Box::new(DefaultHandler),
     }
 }
@@ -136,6 +137,13 @@ pub enum HandlerAction {
     AttachCharacter { character_id: i32 },
     /// Reattach session from login server (world server)
     ReattachSession { character_id: i32 },
+    /// Deliver a directed whisper to another player.
+    Whisper {
+        target_name: String,
+        recipient_packet: Packet,
+        sender_success_packet: Packet,
+        sender_failure_packet: Packet,
+    },
 }
 
 /// Result of handling a packet - contains all requested actions.
@@ -206,6 +214,23 @@ impl HandlerResult {
     /// Add a reattach session action (for world server).
     pub fn with_reattach_session(mut self, character_id: i32) -> Self {
         self.actions.push(HandlerAction::ReattachSession { character_id });
+        self
+    }
+
+    /// Add a whisper delivery action.
+    pub fn with_whisper(
+        mut self,
+        target_name: String,
+        recipient_packet: Packet,
+        sender_success_packet: Packet,
+        sender_failure_packet: Packet,
+    ) -> Self {
+        self.actions.push(HandlerAction::Whisper {
+            target_name,
+            recipient_packet,
+            sender_success_packet,
+            sender_failure_packet,
+        });
         self
     }
 }

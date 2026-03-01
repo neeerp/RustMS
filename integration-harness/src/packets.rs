@@ -1,4 +1,7 @@
 use net::packet::op::{RecvOpcode, SendOpcode};
+use net::packet::build::world::messaging::{
+    WHISPER_RECEIVE_MODE, WHISPER_REQUEST_MODE, WHISPER_RESULT_MODE,
+};
 use packet::io::read::PktRead;
 use packet::io::write::PktWrite;
 use packet::Packet;
@@ -56,6 +59,20 @@ pub struct SetFieldPacket {
     pub character_id: i32,
     pub character_name: String,
     pub map_id: i32,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct WhisperReceivePacket {
+    pub sender_name: String,
+    pub channel: u8,
+    pub from_admin: bool,
+    pub message: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct WhisperResultPacket {
+    pub target_name: String,
+    pub success: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -120,6 +137,7 @@ pub fn opcode_name(opcode: i16) -> &'static str {
         x if x == SendOpcode::LastConnectedWorld as i16 => "LastConnectedWorld",
         x if x == SendOpcode::RecommendedWorlds as i16 => "RecommendedWorlds",
         x if x == SendOpcode::SetField as i16 => "SetField",
+        x if x == SendOpcode::Whisper as i16 => "Whisper",
         x if x == SendOpcode::KeyMap as i16 => "KeyMap",
         _ => "Unknown",
     }
@@ -245,6 +263,20 @@ pub fn build_player_logged_in(character_id: i32) -> Result<Packet, String> {
     packet
         .write_int(character_id)
         .map_err(|e| format!("failed to write logged-in character id: {e}"))?;
+    Ok(packet)
+}
+
+pub fn build_whisper(target_name: &str, message: &str) -> Result<Packet, String> {
+    let mut packet = packet_with_opcode(RecvOpcode::Whisper as i16);
+    packet
+        .write_byte(WHISPER_REQUEST_MODE)
+        .map_err(|e| format!("failed to write whisper request mode: {e}"))?;
+    packet
+        .write_str_with_length(target_name)
+        .map_err(|e| format!("failed to write whisper target name: {e}"))?;
+    packet
+        .write_str_with_length(message)
+        .map_err(|e| format!("failed to write whisper message: {e}"))?;
     Ok(packet)
 }
 
@@ -420,6 +452,72 @@ pub fn decode_set_field(packet: &Packet) -> Result<SetFieldPacket, String> {
         character_id: meta.id,
         character_name: meta.name,
         map_id: meta.map_id,
+    })
+}
+
+pub fn decode_whisper_receive(packet: &Packet) -> Result<WhisperReceivePacket, String> {
+    expect_opcode(packet, SendOpcode::Whisper as i16)?;
+    let mut cursor = Cursor::new(&packet.bytes[..]);
+    cursor
+        .read_short()
+        .map_err(|e| format!("failed to read whisper opcode: {e}"))?;
+    let mode = cursor
+        .read_byte()
+        .map_err(|e| format!("failed to read whisper receive mode: {e}"))?;
+    if mode != WHISPER_RECEIVE_MODE {
+        return Err(format!(
+            "expected whisper receive mode {WHISPER_RECEIVE_MODE:#04x} but got {mode:#04x}"
+        ));
+    }
+
+    let sender_name = cursor
+        .read_str_with_length()
+        .map_err(|e| format!("failed to read whisper sender name: {e}"))?;
+    let channel = cursor
+        .read_byte()
+        .map_err(|e| format!("failed to read whisper channel: {e}"))?;
+    let from_admin = cursor
+        .read_byte()
+        .map_err(|e| format!("failed to read whisper admin flag: {e}"))?
+        != 0;
+    let message = cursor
+        .read_str_with_length()
+        .map_err(|e| format!("failed to read whisper message: {e}"))?;
+
+    Ok(WhisperReceivePacket {
+        sender_name,
+        channel,
+        from_admin,
+        message,
+    })
+}
+
+pub fn decode_whisper_result(packet: &Packet) -> Result<WhisperResultPacket, String> {
+    expect_opcode(packet, SendOpcode::Whisper as i16)?;
+    let mut cursor = Cursor::new(&packet.bytes[..]);
+    cursor
+        .read_short()
+        .map_err(|e| format!("failed to read whisper opcode: {e}"))?;
+    let mode = cursor
+        .read_byte()
+        .map_err(|e| format!("failed to read whisper result mode: {e}"))?;
+    if mode != WHISPER_RESULT_MODE {
+        return Err(format!(
+            "expected whisper result mode {WHISPER_RESULT_MODE:#04x} but got {mode:#04x}"
+        ));
+    }
+
+    let target_name = cursor
+        .read_str_with_length()
+        .map_err(|e| format!("failed to read whisper target name: {e}"))?;
+    let success = cursor
+        .read_byte()
+        .map_err(|e| format!("failed to read whisper success flag: {e}"))?
+        != 0;
+
+    Ok(WhisperResultPacket {
+        target_name,
+        success,
     })
 }
 
