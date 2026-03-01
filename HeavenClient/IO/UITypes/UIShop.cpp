@@ -686,7 +686,7 @@ namespace ms
 
 		if (buyable > 1)
 		{
-			constexpr char *question = "How many are you willing to buy?";
+			constexpr const char *question = "How many are you willing to buy?";
 
 			auto onenter = [slot, itemid](int32_t qty)
 			{
@@ -698,7 +698,7 @@ namespace ms
 			UI::get().emplace<UIEnterNumber>(question, onenter, buyable, 1);
 		} else if (buyable > 0)
 		{
-			constexpr char *question = "Are you sure you want to buy it?";
+			constexpr const char *question = "Are you sure you want to buy it?";
 
 			auto ondecide = [slot, itemid](bool yes)
 			{
@@ -800,7 +800,7 @@ namespace ms
 
 		if (sellable > 1)
 		{
-			constexpr char *question = "How many are you willing to sell?";
+			constexpr const char *question = "How many are you willing to sell?";
 
 			auto onenter = [itemid, slot](int32_t qty)
 			{
@@ -818,7 +818,7 @@ namespace ms
 				return;
 			}
 
-			constexpr char *question = "Are you sure you want to sell it?";
+			constexpr const char *question = "Are you sure you want to sell it?";
 
 			auto ondecide = [itemid, slot](bool yes)
 			{

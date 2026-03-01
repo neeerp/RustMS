@@ -239,12 +239,12 @@ namespace ms
 		return CHARGENX;
 	}
 
-	void Configuration::set_macs(char* macs)
+	void Configuration::set_macs(const char* macs)
 	{
 		MACS = macs;
 	}
 
-	void Configuration::set_hwid(char *hwid, char *volumeSerialNumber)
+	void Configuration::set_hwid(const char *hwid, const char *volumeSerialNumber)
 	{
 		VolumeSerialNumber = volumeSerialNumber;
 

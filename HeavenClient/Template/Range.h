@@ -110,25 +110,37 @@ namespace ms
 		// Shift this range by the amounts defined by another range
 		constexpr Range<T> operator + (const Range<T>& v) const
 		{
-			return { a + v.a, b + v.b };
+			return {
+				static_cast<T>(a + v.a),
+				static_cast<T>(b + v.b)
+			};
 		}
 
 		// Shift this range by the negative amounts defined by another range
 		constexpr Range<T> operator - (const Range<T>& v) const
 		{
-			return { a - v.a, b - v.b };
+			return {
+				static_cast<T>(a - v.a),
+				static_cast<T>(b - v.b)
+			};
 		}
 
 		// Return the negative of this range
 		constexpr Range<T> operator - () const
 		{
-			return { -a, -b };
+			return {
+				static_cast<T>(-a),
+				static_cast<T>(-b)
+			};
 		}
 
 		// Construct a symmetric range around mid
 		static Range<T> symmetric(const T& mid, const T& tail)
 		{
-			return { mid - tail, mid + tail };
+			return {
+				static_cast<T>(mid - tail),
+				static_cast<T>(mid + tail)
+			};
 		}
 
 	private:

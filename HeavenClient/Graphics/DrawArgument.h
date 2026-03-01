@@ -211,10 +211,10 @@ namespace ms
 			int16_t cy = center.y();
 
 			return {
-					cx + static_cast<int16_t>(xscale * rl),
-					cx + static_cast<int16_t>(xscale * rr),
-					cy + static_cast<int16_t>(yscale * rt),
-					cy + static_cast<int16_t>(yscale * rb)
+					static_cast<int16_t>(cx + static_cast<int16_t>(xscale * rl)),
+					static_cast<int16_t>(cx + static_cast<int16_t>(xscale * rr)),
+					static_cast<int16_t>(cy + static_cast<int16_t>(yscale * rt)),
+					static_cast<int16_t>(cy + static_cast<int16_t>(yscale * rb))
 			};
 		}
 

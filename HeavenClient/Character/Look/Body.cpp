@@ -86,7 +86,7 @@ namespace ms
 
 		constexpr size_t NUM_SKINTYPES = 12;
 
-		constexpr char *skintypes[NUM_SKINTYPES] =
+		constexpr const char *skintypes[NUM_SKINTYPES] =
 				{
 						"Light",
 						"Tan",

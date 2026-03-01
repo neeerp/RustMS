@@ -88,8 +88,14 @@ namespace ms
 			}
 		}
 
-		walls = {leftw + 25, rightw - 25};
-		borders = {topb - 300, botb + 100};
+			walls = {
+				static_cast<int16_t>(leftw + 25),
+				static_cast<int16_t>(rightw - 25)
+			};
+			borders = {
+				static_cast<int16_t>(topb - 300),
+				static_cast<int16_t>(botb + 100)
+			};
 	}
 
 	FootholdTree::FootholdTree()

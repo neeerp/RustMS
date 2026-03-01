@@ -45,10 +45,8 @@ public:
 	{
 		auto stream = alure::MakeUnique<std::istream>(audiodb->at(name));
 		if (stream->fail())
-		{
-			throw std::runtime_error("Failed to create stream.");
-		}
-		return std::move(stream);
+			return {};
+		return stream;
 	}
 };
 
