@@ -1,0 +1,25 @@
+/.vs
+/.vscode
+/x64
+.DS_store
+
+*.nx
+*.aps
+*.log
+*.tlog
+
+Settings
+
+/includes/**/*.sln
+/includes/**/*.vcxproj*
+/includes/**/*.txt
+/includes/**/*.gitignore
+
+# Builds
+build/
+
+# Libraries
+libs/
+
+# Vagrant
+.vagrant/
