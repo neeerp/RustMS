@@ -19,13 +19,11 @@ The default settings can be configured by editing the **Configuration.h** file. 
 
 ## Building
 
-*After cloning you need to check out the linux branch! To do so run ```git checkout linux``` in your HeavenClient directory.*
+Within this monorepo, `HeavenClient` lives at `RustMS/HeavenClient`. Run the build commands from that directory.
 
 1. Run ```./build-deps.sh```. We try to build each dependency from source -- if any dependencies fail to build, you could try and find the corresponding package for your linux distro if it exists.
-2. ```mkdir build```
-3. ```cd build```
-4. ```cmake ..```
-5. ```make -j$CORES``` where $CORES is your number of CPU cores
+2. ```cmake -S . -B cmake-build```
+3. ```cmake --build cmake-build -j$CORES``` where $CORES is your number of CPU cores
 
 This will always be the option with the most performance, but if you are using Mac / are having issues, try out the [Vagrant](#vagrant-setup) or [Docker](#docker-setup---web-vnc) setups.
 
@@ -77,14 +75,14 @@ One can refer to the shell scripts written within the Vagrantfile to get an insi
 
 ### Building/Running client via Vagrant
 
-All ssh commands must be run on a shell within context of the HeavenClient directory (this project)
+All ssh commands must be run from the `HeavenClient` project directory within the monorepo.
 
 1. ```vagrant up```
 2. Login to the desktop environment via the virtualbox window with default vagrant credentials (vagrant:vagrant) - once the bootstrap script has completed execution
    1. This is required to start up desktop environment (xfce)
 3. ```vagrant ssh -- -R 8484:localhost:8484 -R 7575:localhost:7575 -R 7576:localhost:7576 -R 7577:localhost:7577```
    1. We SSH into the VM with reverse port-forwarding; this allows us to run/dev our [server](https://github.com/ronancpl/HeavenMS) on the host machine while allowing the client to connect to it and run on the VM
-4. ```cd /home/vagrant/Desktop/HeavenClient/build/```
+4. ```cd /home/vagrant/Desktop/HeavenClient/cmake-build/```
 5. ```./HeavenClient```
 
 Note: To run the HeavenClient from the build directory; all the [relevant **.nx** files](./Util/NxFiles.h) must be available within the linux build directory
