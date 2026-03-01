@@ -624,7 +624,7 @@ namespace ms
 			break;
 		case Buttons::DEFAULT:
 		{
-			constexpr char* message = "Would you like to revert to default settings?";
+			constexpr const char* message = "Would you like to revert to default settings?";
 
 			auto onok = [&](bool ok)
 			{
@@ -651,7 +651,7 @@ namespace ms
 		}
 		case Buttons::DELETE:
 		{
-			constexpr char* message = "Would you like to clear all key bindings?";
+			constexpr const char* message = "Would you like to clear all key bindings?";
 
 			auto onok = [&](bool ok)
 			{
@@ -798,7 +798,7 @@ namespace ms
 	{
 		if (dirty)
 		{
-			constexpr char* message = "Do you want to save your changes?";
+			constexpr const char* message = "Do you want to save your changes?";
 
 			auto onok = [&](bool ok)
 			{

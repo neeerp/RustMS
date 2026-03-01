@@ -43,6 +43,34 @@
 
 namespace ms
 {
+	namespace
+	{
+		Tooltip::Parent tooltip_parent_for(UIElement::Type type)
+		{
+			switch (type)
+			{
+				case UIElement::Type::EQUIPINVENTORY:
+					return Tooltip::Parent::EQUIPINVENTORY;
+				case UIElement::Type::ITEMINVENTORY:
+					return Tooltip::Parent::ITEMINVENTORY;
+				case UIElement::Type::SKILLBOOK:
+					return Tooltip::Parent::SKILLBOOK;
+				case UIElement::Type::SHOP:
+					return Tooltip::Parent::SHOP;
+				case UIElement::Type::EVENT:
+					return Tooltip::Parent::EVENT;
+				case UIElement::Type::KEYCONFIG:
+					return Tooltip::Parent::KEYCONFIG;
+				case UIElement::Type::WORLDMAP:
+					return Tooltip::Parent::WORLDMAP;
+				case UIElement::Type::MINIMAP:
+					return Tooltip::Parent::MINIMAP;
+				default:
+					return Tooltip::Parent::NONE;
+			}
+		}
+	}
+
 	UIStateGame::UIStateGame() : stats(Stage::get().get_player().get_stats()), dragged(nullptr)
 	{
 		focused = UIElement::Type::NONE;
@@ -358,8 +386,8 @@ namespace ms
 					{
 						UIElement::Type front_type = front->get_type();
 
-						if (tooltipparent != UIElement::Type::NONE)
-							if (front_type != tooltipparent)
+						if (tooltipparent != Tooltip::Parent::NONE)
+							if (tooltip_parent_for(front_type) != tooltipparent)
 								clear_tooltip(tooltipparent);
 
 						remove_cursor(front_type);
@@ -588,7 +616,7 @@ namespace ms
 		if (type == focused)
 			focused = UIElement::Type::NONE;
 
-		if (type == tooltipparent)
+		if (tooltip_parent_for(type) == tooltipparent)
 			clear_tooltip(tooltipparent);
 
 		elementorder.remove(type);

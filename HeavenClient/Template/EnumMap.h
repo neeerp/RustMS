@@ -21,6 +21,7 @@
 #include <utility>
 #include <array>
 #include <cstddef>
+#include <iterator>
 #include <stdexcept>
 
 namespace ms
@@ -69,10 +70,11 @@ namespace ms
 		}
 
 		template <typename T>
-		class base_iterator : public std::iterator<std::forward_iterator_tag, V> {
-
+		class base_iterator {
 		public:
 			using index_type = typename std::underlying_type<K>::type;
+			using iterator_category = std::forward_iterator_tag;
+			using difference_type = std::ptrdiff_t;
 
 			base_iterator(T* p, index_type i) : value(p), index(i) {}
 
@@ -90,6 +92,10 @@ namespace ms
 					second = t;
 				}
 			};
+
+			using value_type = node;
+			using pointer = void;
+			using reference = node;
 
 			node operator *()
 			{

@@ -97,10 +97,10 @@ namespace ms
 		std::string get_chargenx() const;
 
 		// Set private member MACS
-		void set_macs(char *macs);
+		void set_macs(const char *macs);
 
 		// Set private member HWID
-		void set_hwid(char *hwid, char *volumeSerialNumber);
+		void set_hwid(const char *hwid, const char *volumeSerialNumber);
 
 		// Set private member MAXWIDTH
 		void set_max_width(int16_t max_width);

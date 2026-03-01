@@ -130,20 +130,20 @@ namespace ms
 
 			if (attack.toleft)
 			{
-				range = {
-						origin.x() + hrange,
-						origin.x() + range.right(),
-						origin.y() + range.top(),
-						origin.y() + range.bottom()
-				};
+					range = {
+							static_cast<int16_t>(origin.x() + hrange),
+							static_cast<int16_t>(origin.x() + range.right()),
+							static_cast<int16_t>(origin.y() + range.top()),
+							static_cast<int16_t>(origin.y() + range.bottom())
+					};
 			} else
 			{
-				range = {
-						origin.x() - range.right(),
-						origin.x() - hrange,
-						origin.y() + range.top(),
-						origin.y() + range.bottom()
-				};
+					range = {
+							static_cast<int16_t>(origin.x() - range.right()),
+							static_cast<int16_t>(origin.x() - hrange),
+							static_cast<int16_t>(origin.y() + range.top()),
+							static_cast<int16_t>(origin.y() + range.bottom())
+					};
 			}
 
 			// This approach should also make it easier to implement PvP

@@ -156,57 +156,81 @@ namespace ms
 		// Return a point whose coordinates are the negation of this point's coordinates
 		constexpr Point<T> operator - () const
 		{
-			return { -a, -b };
+			return {
+				static_cast<T>(-a),
+				static_cast<T>(-b)
+			};
 		}
 
 		// Return a point whose coordinates have been added the specified amount
 		constexpr Point<T> operator + (T v) const
 		{
-			return { a + v, b + v };
+			return {
+				static_cast<T>(a + v),
+				static_cast<T>(b + v)
+			};
 		}
 
 		// Return a point whose coordinates have been subtracted the specified amount
 		constexpr Point<T> operator - (T v) const
 		{
-			return { a - v, b - v };
+			return {
+				static_cast<T>(a - v),
+				static_cast<T>(b - v)
+			};
 		}
 
 		// Return a point whose coordinates have been multiplied by the specified amount
 		constexpr Point<T> operator * (T v) const
 		{
-			return { a * v, b * v };
+			return {
+				static_cast<T>(a * v),
+				static_cast<T>(b * v)
+			};
 		}
 
 		// Return a point whose coordinates have been divided by the specified amount
 		constexpr Point<T> operator / (T v) const
 		{
-			return { a / v, b / v };
+			return {
+				static_cast<T>(a / v),
+				static_cast<T>(b / v)
+			};
 		}
 
 		// Return a point whose coordinates are the sum of this and another points coordinates
 		constexpr Point<T> operator + (Point<T> v) const
 		{
-			return { a + v.a, b + v.b };
+			return {
+				static_cast<T>(a + v.a),
+				static_cast<T>(b + v.b)
+			};
 		}
 
 		// Return a point whose coordinates are the difference of this and another points coordinates
 		constexpr Point<T> operator - (Point<T> v) const
 		{
-			return { a - v.a, b - v.b };
+			return {
+				static_cast<T>(a - v.a),
+				static_cast<T>(b - v.b)
+			};
 		}
 
 		// Return a point whose coordinates are the product of this and another points coordinates
 		constexpr Point<T> operator * (Point<T> v) const
 		{
-			return { a / v.a, b / v.b };
+			return {
+				static_cast<T>(a / v.a),
+				static_cast<T>(b / v.b)
+			};
 		}
 
 		// Return a point whose coordinates are the division of this and another points coordinates
 		constexpr Point<T> operator / (Point<T> v) const
 		{
 			return {
-				a / (v.a == 0 ? 1 : v.a),
-				b / (v.b == 0 ? 1 : v.b)
+				static_cast<T>(a / (v.a == 0 ? 1 : v.a)),
+				static_cast<T>(b / (v.b == 0 ? 1 : v.b))
 			};
 		}
 
