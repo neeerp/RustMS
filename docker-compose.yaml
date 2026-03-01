@@ -7,6 +7,6 @@ services:
         environment:
             POSTGRES_USER: maplestory
             POSTGRES_PASSWORD: pass
-            POSTGRES_DATABASE: "RustMS"
+            POSTGRES_DB: maplestory
         ports:
             - 5432:5432

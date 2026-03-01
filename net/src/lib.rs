@@ -4,10 +4,15 @@ extern crate num_derive;
 extern crate serde_derive;
 extern crate serde;
 
+pub mod handler;
 mod helpers;
 mod io;
-mod packet;
+pub mod packet;
 pub mod settings;
 
+pub use self::handler::{
+    get_handler, BroadcastScope, ClientId, DefaultHandler, HandlerAction, HandlerContext,
+    HandlerResult, PacketHandler,
+};
 pub use self::io::error;
 pub use self::io::listener;

@@ -1,34 +1,31 @@
-use crate::{
-    error::NetworkError,
-    io::client::MapleClient,
-    packet::{build, handle::PacketHandler},
-};
-use build::login;
+use crate::error::NetworkError;
+use crate::handler::{HandlerContext, HandlerResult, PacketHandler};
+use crate::packet::build::login;
 use db::character::NewCharacter;
 use packet::{io::read::PktRead, Packet};
 use std::io::BufReader;
 
-pub struct CreateCharacterHandler {}
+pub struct CreateCharacterHandler;
 
 impl CreateCharacterHandler {
     pub fn new() -> Self {
-        CreateCharacterHandler {}
+        Self
     }
 }
 
 impl PacketHandler for CreateCharacterHandler {
-    fn handle(&self, packet: &mut Packet, client: &mut MapleClient) -> Result<(), NetworkError> {
+    fn handle(
+        &self,
+        packet: &mut Packet,
+        ctx: &mut HandlerContext,
+    ) -> Result<HandlerResult, NetworkError> {
         let mut reader = BufReader::new(&**packet);
         reader.read_short()?;
 
-        let user = client.get_account();
-        let accountid: i32;
-
-        if let Some(acc) = user {
-            accountid = acc.id;
-        } else {
-            return Err(NetworkError::NotLoggedIn);
-        }
+        // Get account_id from session
+        let accountid = ctx.session.session.as_ref()
+            .map(|s| s.account_id)
+            .ok_or(NetworkError::NotLoggedIn)?;
 
         let name = &reader.read_str_with_length()?;
         let job = reader.read_int()? as i16;
@@ -56,8 +53,7 @@ impl PacketHandler for CreateCharacterHandler {
             gender,
         };
 
-        client.send(&mut login::char::build_char_packet(
-            character.create()?.character,
-        )?)
+        let char_packet = login::char::build_char_packet(character.create()?.character)?;
+        Ok(HandlerResult::reply(char_packet))
     }
 }

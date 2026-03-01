@@ -5,7 +5,7 @@ use character::CharacterWrapper;
 use diesel::QueryResult;
 use ipnetwork::IpNetwork;
 
-use std::{cell::RefCell, rc::Rc, time::SystemTime};
+use std::{sync::{Arc, Mutex}, time::SystemTime};
 
 pub mod repository;
 pub use repository::*;
@@ -52,9 +52,10 @@ impl<'a> NewSession<'a> {
 
 /// A wrapper that holds a session as well as any additional
 /// information pertaining to the session.
+/// Uses Arc<Mutex<>> for thread-safety with async code.
 pub struct SessionWrapper {
     pub session: Option<Session>,
-    character: Option<Rc<RefCell<CharacterWrapper>>>,
+    character: Option<Arc<Mutex<CharacterWrapper>>>,
 }
 
 impl SessionWrapper {
@@ -85,22 +86,22 @@ impl SessionWrapper {
 
     /// Retrieve the character that the session is associated with, or a NotFound
     /// error if there is no character associated.
-    pub fn get_character(&mut self) -> QueryResult<Rc<RefCell<CharacterWrapper>>> {
+    pub fn get_character(&mut self) -> QueryResult<Arc<Mutex<CharacterWrapper>>> {
         self.session
             .as_ref()
             .and_then(|ses| ses.character_id)
             .and_then(|c_id| {
                 self.character
                     .as_ref()
-                    .and_then(|chr| Some(chr.clone()))
-                    .or(self.load_character(c_id).ok())
+                    .map(|chr| chr.clone())
+                    .or_else(|| self.load_character(c_id).ok())
             })
             .ok_or(diesel::result::Error::NotFound)
     }
 
-    /// Attach a character to the session wrapper and return a counted refcell.
-    fn load_character(&mut self, c_id: i32) -> QueryResult<Rc<RefCell<CharacterWrapper>>> {
-        let chr = Rc::new(RefCell::new(CharacterWrapper::from_character_id(c_id)?));
+    /// Attach a character to the session wrapper and return an Arc.
+    fn load_character(&mut self, c_id: i32) -> QueryResult<Arc<Mutex<CharacterWrapper>>> {
+        let chr = Arc::new(Mutex::new(CharacterWrapper::from_character_id(c_id)?));
 
         self.character = Some(chr.clone());
 

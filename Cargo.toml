@@ -2,8 +2,10 @@
 
 members = [
     "rust-ms",
+    "integration-harness",
     "packet",
     "crypt",
     "net",
-    "db"
+    "db",
+    "runtime"
 ]

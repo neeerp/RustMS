@@ -1,28 +1,32 @@
-use crate::{error::NetworkError, io::client::MapleClient, packet::handle::PacketHandler};
+use crate::error::NetworkError;
+use crate::handler::{HandlerContext, HandlerResult, PacketHandler};
 use db::keybinding::KeybindType;
 use packet::{io::read::PktRead, Packet};
 use std::io::BufReader;
 
-pub struct ChangeKeybindsHandler {}
+pub struct ChangeKeybindsHandler;
 
 impl ChangeKeybindsHandler {
     pub fn new() -> Self {
-        Self {}
+        Self
     }
 }
 
-// TODO: Serious implementation later...
 impl PacketHandler for ChangeKeybindsHandler {
-    fn handle(&self, packet: &mut Packet, client: &mut MapleClient) -> Result<(), NetworkError> {
+    fn handle(
+        &self,
+        packet: &mut Packet,
+        ctx: &mut HandlerContext,
+    ) -> Result<HandlerResult, NetworkError> {
         let mut reader = BufReader::new(&**packet);
         reader.read_short()?; // prune op
 
         if packet.len() < 2 {
-            return Ok(());
+            return Ok(HandlerResult::empty());
         }
 
-        let character = client.session.get_character()?;
-        let mut character = character.borrow_mut();
+        let character = ctx.session.get_character()?;
+        let mut character = character.lock().unwrap();
         if reader.read_int()? == 0 {
             for _ in 0..reader.read_int()? {
                 let key = reader.read_int()? as i16;
@@ -36,6 +40,7 @@ impl PacketHandler for ChangeKeybindsHandler {
             }
         }
 
-        Ok(character.key_binds.save()?)
+        character.key_binds.save()?;
+        Ok(HandlerResult::empty())
     }
 }

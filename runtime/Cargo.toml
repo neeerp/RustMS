@@ -1,0 +1,24 @@
+[package]
+name = "runtime"
+version = "0.1.0"
+authors = ["David Goldstein <goldstein.g.david@gmail.com>"]
+edition = "2021"
+
+[dependencies]
+# Async runtime
+tokio = { version = "1", features = ["full"] }
+
+# Internal crates
+packet = { path = "../packet" }
+crypt = { path = "../crypt" }
+db = { path = "../db" }
+net = { path = "../net" }
+
+# Random number generation
+rand = "0.7"
+
+# Error handling
+thiserror = "1"
+
+# Logging
+tracing = "0.1"

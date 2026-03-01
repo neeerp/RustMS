@@ -30,6 +30,7 @@ pub enum RecvOpcode {
 
     PlayerMove = 0x29,
     AllChat = 0x31,
+    Whisper = 0x78,
 
     ChangeKeybinds = 0x87,
 

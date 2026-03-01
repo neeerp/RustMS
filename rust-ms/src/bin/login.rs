@@ -1,36 +1,19 @@
-use std::net::{TcpListener, TcpStream};
-use std::process::exit;
-use std::thread;
+use runtime::LoginServerActor;
+use tracing::info;
+use tracing_subscriber::EnvFilter;
 
-use net::listener::ClientConnectionListener;
+#[tokio::main]
+async fn main() {
+    // Initialize logging
+    tracing_subscriber::fmt()
+        .with_env_filter(
+            EnvFilter::from_default_env().add_directive("runtime=info".parse().unwrap()),
+        )
+        .init();
 
-fn main() {
-    println!("Starting up...");
+    info!("Starting Login Server...");
 
-    // Shut down the server somewhat gracefuly; not a fan of seeing an error on ctrl+c
-    ctrlc::set_handler(move || {
-        println!("Shutting down...");
-        exit(0);
-    })
-    .expect("Error setting ctrl+c handler!");
-
-    let listener = TcpListener::bind("0.0.0.0:8484").unwrap();
-
-    for stream in listener.incoming() {
-        println!("Incoming connection...");
-        let stream = stream.unwrap();
-
-        thread::spawn(move || {
-            handle_connection(stream);
-        });
+    if let Err(e) = LoginServerActor::run("0.0.0.0:8484").await {
+        tracing::error!(error = %e, "Login server error");
     }
-}
-
-fn handle_connection(stream: TcpStream) {
-    println!(
-        "Connection Terminated: {}",
-        ClientConnectionListener::login_server(stream)
-            .and_then(|mut session| session.listen())
-            .expect_err("Thread disconnects should result in error...")
-    )
 }

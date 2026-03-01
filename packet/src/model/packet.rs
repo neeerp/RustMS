@@ -8,6 +8,7 @@ pub const INVALID_OPCODE: i16 = 1;
 pub const MAX_PACKET_LENGTH: i16 = i16::MAX;
 
 /// A data model for a network packet.
+#[derive(Clone, Debug)]
 pub struct Packet {
     pub bytes: Vec<u8>,
 }
