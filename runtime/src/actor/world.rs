@@ -1,5 +1,6 @@
+use crate::actor::FieldActor;
 use crate::handler::{BroadcastScope, ClientId};
-use crate::message::{ClientEvent, ServerMessage};
+use crate::message::{ClientEvent, FieldKey, FieldMessage, ServerMessage};
 use std::collections::HashMap;
 use tokio::sync::mpsc;
 use tracing::{info, warn};
@@ -7,8 +8,12 @@ use tracing::{info, warn};
 /// Registry entry for a connected client.
 struct ClientEntry {
     sender: mpsc::Sender<ServerMessage>,
-    map_id: i32,
+    field_key: FieldKey,
     name: String,
+}
+
+struct FieldHandle {
+    sender: mpsc::Sender<FieldMessage>,
 }
 
 /// Central actor managing all world server clients.
@@ -17,8 +22,8 @@ pub struct WorldServerActor {
     event_rx: mpsc::Receiver<ClientEvent>,
     /// Registry of connected clients
     clients: HashMap<ClientId, ClientEntry>,
-    /// Map ID to client IDs for efficient map broadcasts
-    maps: HashMap<i32, Vec<ClientId>>,
+    /// Live field actors keyed by field identity
+    fields: HashMap<FieldKey, FieldHandle>,
     /// Character name to client ID for directed routing
     names: HashMap<String, ClientId>,
 }
@@ -28,7 +33,7 @@ impl WorldServerActor {
         Self {
             event_rx,
             clients: HashMap::new(),
-            maps: HashMap::new(),
+            fields: HashMap::new(),
             names: HashMap::new(),
         }
     }
@@ -49,13 +54,12 @@ impl WorldServerActor {
             ClientEvent::Connected {
                 client_id,
                 sender,
-                map_id,
-                character_name,
+                character,
             } => {
-                self.register_client(client_id, sender, map_id, character_name);
+                self.register_client(client_id, sender, character).await;
             }
             ClientEvent::Disconnected { client_id } => {
-                self.unregister_client(client_id);
+                self.unregister_client(client_id).await;
             }
             ClientEvent::MapChanged {
                 client_id,
@@ -70,6 +74,25 @@ impl WorldServerActor {
                 packet,
             } => {
                 self.handle_broadcast(from, scope, packet).await;
+            }
+            ClientEvent::FieldChat { from, packet } => {
+                self.forward_to_field(from, FieldMessage::Chat { from, packet })
+                    .await;
+            }
+            ClientEvent::FieldMove {
+                from,
+                packet,
+                movement_bytes,
+            } => {
+                self.forward_to_field(
+                    from,
+                    FieldMessage::Move {
+                        from,
+                        packet,
+                        movement_bytes,
+                    },
+                )
+                .await;
             }
             ClientEvent::Whisper {
                 from,
@@ -90,60 +113,66 @@ impl WorldServerActor {
         }
     }
 
-    fn register_client(
+    async fn register_client(
         &mut self,
         client_id: ClientId,
         sender: mpsc::Sender<ServerMessage>,
-        map_id: i32,
-        character_name: String,
+        character: crate::message::FieldCharacter,
     ) {
-        info!(client_id, map_id, character_name, "Client connected");
+        let field_key = character.field_key();
+        let character_name = character.name.clone();
+        info!(client_id, field = ?field_key, character_name, "Client connected");
 
         self.names.insert(character_name.clone(), client_id);
         self.clients.insert(
             client_id,
             ClientEntry {
-                sender,
-                map_id,
+                sender: sender.clone(),
+                field_key,
                 name: character_name,
             },
         );
-        self.maps.entry(map_id).or_default().push(client_id);
+
+        let field_sender = self.get_or_create_field(field_key);
+        if field_sender
+            .send(FieldMessage::Join {
+                client_id,
+                sender,
+                character,
+            })
+            .await
+            .is_err()
+        {
+            warn!(client_id, field = ?field_key, "Failed to join client to field");
+        }
     }
 
-    fn unregister_client(&mut self, client_id: ClientId) {
+    async fn unregister_client(&mut self, client_id: ClientId) {
         if let Some(entry) = self.clients.remove(&client_id) {
             info!(client_id, "Client disconnected");
             self.names.remove(&entry.name);
-
-            // Remove from map index
-            if let Some(clients) = self.maps.get_mut(&entry.map_id) {
-                clients.retain(|&id| id != client_id);
-                if clients.is_empty() {
-                    self.maps.remove(&entry.map_id);
+            if let Some(field) = self.fields.get(&entry.field_key) {
+                if field
+                    .sender
+                    .send(FieldMessage::Leave { client_id })
+                    .await
+                    .is_err()
+                {
+                    warn!(client_id, field = ?entry.field_key, "Failed to leave field");
                 }
             }
         }
     }
 
     fn handle_map_change(&mut self, client_id: ClientId, old_map_id: i32, new_map_id: i32) {
-        // Remove from old map
-        if let Some(clients) = self.maps.get_mut(&old_map_id) {
-            clients.retain(|&id| id != client_id);
-            if clients.is_empty() {
-                self.maps.remove(&old_map_id);
-            }
-        }
-
-        // Add to new map
-        self.maps.entry(new_map_id).or_default().push(client_id);
-
-        // Update client entry
         if let Some(entry) = self.clients.get_mut(&client_id) {
-            entry.map_id = new_map_id;
+            entry.field_key.map_id = new_map_id;
         }
 
-        info!(client_id, old_map_id, new_map_id, "Client changed map");
+        warn!(
+            client_id,
+            old_map_id, new_map_id, "Map transitions are not field-aware yet"
+        );
     }
 
     async fn handle_broadcast(
@@ -216,12 +245,20 @@ impl WorldServerActor {
 
     fn get_broadcast_targets(&self, from: ClientId, scope: &BroadcastScope) -> Vec<ClientId> {
         match scope {
-            BroadcastScope::Map(map_id) => self.maps.get(map_id).cloned().unwrap_or_default(),
+            BroadcastScope::Map(map_id) => self
+                .clients
+                .iter()
+                .filter_map(|(&client_id, entry)| {
+                    (entry.field_key.map_id == *map_id).then_some(client_id)
+                })
+                .collect(),
             BroadcastScope::MapExcludeSelf(map_id) => self
-                .maps
-                .get(map_id)
-                .map(|clients| clients.iter().filter(|&&id| id != from).copied().collect())
-                .unwrap_or_default(),
+                .clients
+                .iter()
+                .filter_map(|(&client_id, entry)| {
+                    (entry.field_key.map_id == *map_id && client_id != from).then_some(client_id)
+                })
+                .collect(),
             BroadcastScope::World => self.clients.keys().copied().collect(),
             BroadcastScope::WorldExcludeSelf => self
                 .clients
@@ -229,6 +266,43 @@ impl WorldServerActor {
                 .filter(|&&id| id != from)
                 .copied()
                 .collect(),
+        }
+    }
+
+    fn get_or_create_field(&mut self, field_key: FieldKey) -> mpsc::Sender<FieldMessage> {
+        if let Some(handle) = self.fields.get(&field_key) {
+            return handle.sender.clone();
+        }
+
+        let (field_tx, field_rx) = mpsc::channel(64);
+        let actor = FieldActor::new(field_key, field_rx);
+        tokio::spawn(async move {
+            actor.run().await;
+        });
+
+        self.fields.insert(
+            field_key,
+            FieldHandle {
+                sender: field_tx.clone(),
+            },
+        );
+
+        field_tx
+    }
+
+    async fn forward_to_field(&self, client_id: ClientId, message: FieldMessage) {
+        let Some(entry) = self.clients.get(&client_id) else {
+            warn!(client_id, "Ignoring field event from unregistered client");
+            return;
+        };
+
+        let Some(field) = self.fields.get(&entry.field_key) else {
+            warn!(client_id, field = ?entry.field_key, "No field actor for client");
+            return;
+        };
+
+        if field.sender.send(message).await.is_err() {
+            warn!(client_id, field = ?entry.field_key, "Failed to forward field event");
         }
     }
 }

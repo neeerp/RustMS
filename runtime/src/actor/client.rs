@@ -1,7 +1,7 @@
 use crate::error::RuntimeError;
 use crate::handler::{ClientId, HandlerAction, HandlerContext, HandlerResult};
 use crate::io::{PacketReader, PacketWriter};
-use crate::message::{ClientEvent, ServerMessage};
+use crate::message::{ClientEvent, FieldCharacter, ServerMessage};
 use db::session::SessionWrapper;
 use net::get_handler;
 use net::listener::ServerType;
@@ -191,6 +191,30 @@ impl ClientActor {
                         .await
                         .map_err(|_| RuntimeError::ChannelSend)?;
                 }
+                HandlerAction::FieldChat { packet } => {
+                    let event = ClientEvent::FieldChat {
+                        from: self.client_id,
+                        packet,
+                    };
+                    self.world_tx
+                        .send(event)
+                        .await
+                        .map_err(|_| RuntimeError::ChannelSend)?;
+                }
+                HandlerAction::FieldMove {
+                    packet,
+                    movement_bytes,
+                } => {
+                    let event = ClientEvent::FieldMove {
+                        from: self.client_id,
+                        packet,
+                        movement_bytes,
+                    };
+                    self.world_tx
+                        .send(event)
+                        .await
+                        .map_err(|_| RuntimeError::ChannelSend)?;
+                }
                 HandlerAction::Disconnect => {
                     return Err(RuntimeError::ClientDisconnected);
                 }
@@ -215,15 +239,27 @@ impl ClientActor {
 
                     // Load session from database by character_id
                     // Build packets synchronously, then release all locks before await
-                    let reattach_result: Option<(i32, String, Packet, Packet)> = (|| {
+                    let reattach_result: Option<(FieldCharacter, Packet, Packet)> = (|| {
                         let session =
                             db::session::get_session_by_character_id(character_id).ok()?;
                         let wrapper = SessionWrapper::from(session).ok()?;
                         self.session = wrapper;
                         let chr_ref = self.session.get_character().ok()?;
                         let mut chr = chr_ref.lock().ok()?;
-                        let map_id = chr.character.map_id;
-                        let character_name = chr.character.name.clone();
+                        let character = FieldCharacter {
+                            id: chr.character.id,
+                            name: chr.character.name.clone(),
+                            level: chr.character.level,
+                            job: chr.character.job,
+                            face: chr.character.face,
+                            hair: chr.character.hair,
+                            skin: chr.character.skin,
+                            gender: chr.character.gender,
+                            map_id: chr.character.map_id,
+                            x: 240,
+                            y: 190,
+                            stance: 2,
+                        };
 
                         // Build the character data packets
                         let keymap_packet =
@@ -231,11 +267,11 @@ impl ClientActor {
                         let char_info_packet =
                             build::world::char::build_char_info(&chr.character).ok()?;
 
-                        Some((map_id, character_name, keymap_packet, char_info_packet))
+                        Some((character, keymap_packet, char_info_packet))
                     })(
                     );
 
-                    if let Some((map_id, character_name, mut keymap_packet, mut char_info_packet)) =
+                    if let Some((character, mut keymap_packet, mut char_info_packet)) =
                         reattach_result
                     {
                         // Send character data packets to client
@@ -246,8 +282,7 @@ impl ClientActor {
                         let event = ClientEvent::Connected {
                             client_id: character_id,
                             sender: self.server_tx.clone(),
-                            map_id,
-                            character_name,
+                            character,
                         };
                         self.world_tx
                             .send(event)
@@ -296,8 +331,20 @@ impl ClientActor {
         let event = ClientEvent::Connected {
             client_id: character_id,
             sender: self.server_tx.clone(),
-            map_id,
-            character_name,
+            character: FieldCharacter {
+                id: character_id,
+                name: character_name,
+                level: 1,
+                job: 0,
+                face: 20000,
+                hair: 30000,
+                skin: 0,
+                gender: 0,
+                map_id,
+                x: 240,
+                y: 190,
+                stance: 2,
+            },
         };
 
         self.world_tx

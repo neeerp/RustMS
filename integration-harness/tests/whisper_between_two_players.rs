@@ -1,4 +1,6 @@
-use integration_harness::packets::{build_whisper, decode_whisper_receive, decode_whisper_result};
+use integration_harness::packets::{
+    build_whisper, decode_spawn_player, decode_whisper_receive, decode_whisper_result,
+};
 use integration_harness::{login_two_players_to_world, MultiHarnessConfig};
 use tokio::time::{timeout, Duration};
 
@@ -10,6 +12,28 @@ async fn whisper_between_two_players() {
     let (mut sender, mut recipient) = login_two_players_to_world(&config)
         .await
         .expect("two-player login-to-world flow failed");
+
+    let sender_presence = timeout(
+        Duration::from_secs(5),
+        sender.connection.read_packet("sender same-map presence"),
+    )
+    .await
+    .expect("timed out waiting for sender presence packet")
+    .expect("failed to read sender presence packet");
+    let _ = decode_spawn_player(&sender_presence.packet)
+        .expect("failed to decode sender presence packet");
+
+    let recipient_presence = timeout(
+        Duration::from_secs(5),
+        recipient
+            .connection
+            .read_packet("recipient same-map presence"),
+    )
+    .await
+    .expect("timed out waiting for recipient presence packet")
+    .expect("failed to read recipient presence packet");
+    let _ = decode_spawn_player(&recipient_presence.packet)
+        .expect("failed to decode recipient presence packet");
 
     let message = "integration whisper test";
     sender

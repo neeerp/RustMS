@@ -10,6 +10,7 @@ use std::net::Ipv4Addr;
 
 const LOGIN_PADDING_LEN: usize = 6;
 const LOGIN_HWID: [u8; 4] = [0, 0, 0, 0];
+const MOVEMENT_HEADER_LEN: usize = 9;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CharacterSummary {
@@ -59,6 +60,27 @@ pub struct SetFieldPacket {
     pub character_id: i32,
     pub character_name: String,
     pub map_id: i32,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SpawnPlayerPacket {
+    pub character_id: i32,
+    pub level: u8,
+    pub character_name: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ChatTextPacket {
+    pub character_id: i32,
+    pub from_admin: bool,
+    pub message: String,
+    pub show: u8,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct MovePlayerPacket {
+    pub character_id: i32,
+    pub movement_bytes: Vec<u8>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -138,6 +160,10 @@ pub fn opcode_name(opcode: i16) -> &'static str {
         x if x == SendOpcode::RecommendedWorlds as i16 => "RecommendedWorlds",
         x if x == SendOpcode::SetField as i16 => "SetField",
         x if x == SendOpcode::Whisper as i16 => "Whisper",
+        x if x == SendOpcode::SpawnPlayer as i16 => "SpawnPlayer",
+        x if x == SendOpcode::RemovePlayerFromMap as i16 => "RemovePlayerFromMap",
+        x if x == SendOpcode::ChatText as i16 => "ChatText",
+        x if x == SendOpcode::MovePlayer as i16 => "MovePlayer",
         x if x == SendOpcode::KeyMap as i16 => "KeyMap",
         _ => "Unknown",
     }
@@ -277,6 +303,28 @@ pub fn build_whisper(target_name: &str, message: &str) -> Result<Packet, String>
     packet
         .write_str_with_length(message)
         .map_err(|e| format!("failed to write whisper message: {e}"))?;
+    Ok(packet)
+}
+
+pub fn build_all_chat(message: &str, show: u8) -> Result<Packet, String> {
+    let mut packet = packet_with_opcode(RecvOpcode::AllChat as i16);
+    packet
+        .write_str_with_length(message)
+        .map_err(|e| format!("failed to write all-chat message: {e}"))?;
+    packet
+        .write_byte(show)
+        .map_err(|e| format!("failed to write all-chat show flag: {e}"))?;
+    Ok(packet)
+}
+
+pub fn build_player_move(movement_bytes: &[u8]) -> Result<Packet, String> {
+    let mut packet = packet_with_opcode(RecvOpcode::PlayerMove as i16);
+    packet
+        .write_bytes(&[0; MOVEMENT_HEADER_LEN])
+        .map_err(|e| format!("failed to write movement header: {e}"))?;
+    packet
+        .write_bytes(movement_bytes)
+        .map_err(|e| format!("failed to write movement bytes: {e}"))?;
     Ok(packet)
 }
 
@@ -489,6 +537,80 @@ pub fn decode_whisper_receive(packet: &Packet) -> Result<WhisperReceivePacket, S
         channel,
         from_admin,
         message,
+    })
+}
+
+pub fn decode_spawn_player(packet: &Packet) -> Result<SpawnPlayerPacket, String> {
+    expect_opcode(packet, SendOpcode::SpawnPlayer as i16)?;
+    let mut cursor = Cursor::new(&packet.bytes[..]);
+    cursor
+        .read_short()
+        .map_err(|e| format!("failed to read spawn-player opcode: {e}"))?;
+    let character_id = cursor
+        .read_int()
+        .map_err(|e| format!("failed to read spawn-player character id: {e}"))?;
+    let level = cursor
+        .read_byte()
+        .map_err(|e| format!("failed to read spawn-player level: {e}"))?;
+    let character_name = cursor
+        .read_str_with_length()
+        .map_err(|e| format!("failed to read spawn-player name: {e}"))?;
+
+    Ok(SpawnPlayerPacket {
+        character_id,
+        level,
+        character_name,
+    })
+}
+
+pub fn decode_chat_text(packet: &Packet) -> Result<ChatTextPacket, String> {
+    expect_opcode(packet, SendOpcode::ChatText as i16)?;
+    let mut cursor = Cursor::new(&packet.bytes[..]);
+    cursor
+        .read_short()
+        .map_err(|e| format!("failed to read chat-text opcode: {e}"))?;
+    let character_id = cursor
+        .read_int()
+        .map_err(|e| format!("failed to read chat-text character id: {e}"))?;
+    let from_admin = cursor
+        .read_byte()
+        .map_err(|e| format!("failed to read chat-text admin flag: {e}"))?
+        != 0;
+    let message = cursor
+        .read_str_with_length()
+        .map_err(|e| format!("failed to read chat-text message: {e}"))?;
+    let show = cursor
+        .read_byte()
+        .map_err(|e| format!("failed to read chat-text show flag: {e}"))?;
+
+    Ok(ChatTextPacket {
+        character_id,
+        from_admin,
+        message,
+        show,
+    })
+}
+
+pub fn decode_move_player(packet: &Packet) -> Result<MovePlayerPacket, String> {
+    expect_opcode(packet, SendOpcode::MovePlayer as i16)?;
+    let mut cursor = Cursor::new(&packet.bytes[..]);
+    cursor
+        .read_short()
+        .map_err(|e| format!("failed to read move-player opcode: {e}"))?;
+    let character_id = cursor
+        .read_int()
+        .map_err(|e| format!("failed to read move-player character id: {e}"))?;
+    skip(&mut cursor, 4)?;
+
+    let total_len = cursor.get_ref().len();
+    let current = cursor.position() as usize;
+    let movement_bytes = cursor
+        .read_bytes(total_len.saturating_sub(current))
+        .map_err(|e| format!("failed to read move-player payload: {e}"))?;
+
+    Ok(MovePlayerPacket {
+        character_id,
+        movement_bytes,
     })
 }
 

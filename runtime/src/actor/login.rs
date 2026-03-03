@@ -183,6 +183,9 @@ impl LoginClientActor {
                     // Login server never handles in-world whispers.
                     warn!("Whisper action ignored in login server");
                 }
+                HandlerAction::FieldChat { .. } | HandlerAction::FieldMove { .. } => {
+                    warn!("Field action ignored in login server");
+                }
             }
         }
         Ok(())
