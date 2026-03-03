@@ -80,7 +80,8 @@ impl PacketHandler for LoginCredentialsHandler {
                 match status {
                     0 => {
                         // Successful login
-                        let login_packet = build::login::status::build_successful_login_packet(&acc)?;
+                        let login_packet =
+                            build::login::status::build_successful_login_packet(&acc)?;
                         Ok(HandlerResult::empty()
                             .with_create_session(acc.id, hwid, SessionState::AfterLogin)
                             .with_reply(login_packet))
@@ -94,7 +95,8 @@ impl PacketHandler for LoginCredentialsHandler {
                     }
                     _ => {
                         // Reject login
-                        let reject_packet = build::login::status::build_login_status_packet(status)?;
+                        let reject_packet =
+                            build::login::status::build_login_status_packet(status)?;
                         Ok(HandlerResult::reply(reject_packet))
                     }
                 }

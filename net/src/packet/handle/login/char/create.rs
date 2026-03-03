@@ -23,7 +23,10 @@ impl PacketHandler for CreateCharacterHandler {
         reader.read_short()?;
 
         // Get account_id from session
-        let accountid = ctx.session.session.as_ref()
+        let accountid = ctx
+            .session
+            .session
+            .as_ref()
             .map(|s| s.account_id)
             .ok_or(NetworkError::NotLoggedIn)?;
 

@@ -3,9 +3,9 @@ use crate::handler::{ClientId, HandlerAction, HandlerContext, HandlerResult};
 use crate::io::{PacketReader, PacketWriter};
 use crate::message::{ClientEvent, ServerMessage};
 use db::session::SessionWrapper;
+use net::get_handler;
 use net::listener::ServerType;
 use net::packet::build;
-use net::get_handler;
 use packet::Packet;
 use rand::{thread_rng, Rng};
 use tokio::net::TcpStream;
@@ -216,7 +216,8 @@ impl ClientActor {
                     // Load session from database by character_id
                     // Build packets synchronously, then release all locks before await
                     let reattach_result: Option<(i32, String, Packet, Packet)> = (|| {
-                        let session = db::session::get_session_by_character_id(character_id).ok()?;
+                        let session =
+                            db::session::get_session_by_character_id(character_id).ok()?;
                         let wrapper = SessionWrapper::from(session).ok()?;
                         self.session = wrapper;
                         let chr_ref = self.session.get_character().ok()?;
@@ -225,13 +226,18 @@ impl ClientActor {
                         let character_name = chr.character.name.clone();
 
                         // Build the character data packets
-                        let keymap_packet = build::world::keymap::build_keymap(&mut chr.key_binds).ok()?;
-                        let char_info_packet = build::world::char::build_char_info(&chr.character).ok()?;
+                        let keymap_packet =
+                            build::world::keymap::build_keymap(&mut chr.key_binds).ok()?;
+                        let char_info_packet =
+                            build::world::char::build_char_info(&chr.character).ok()?;
 
                         Some((map_id, character_name, keymap_packet, char_info_packet))
-                    })();
+                    })(
+                    );
 
-                    if let Some((map_id, character_name, mut keymap_packet, mut char_info_packet)) = reattach_result {
+                    if let Some((map_id, character_name, mut keymap_packet, mut char_info_packet)) =
+                        reattach_result
+                    {
                         // Send character data packets to client
                         self.writer.send_packet(&mut keymap_packet).await?;
                         self.writer.send_packet(&mut char_info_packet).await?;

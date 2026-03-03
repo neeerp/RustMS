@@ -17,7 +17,9 @@ pub fn get_account(user: &str) -> QueryResult<Account> {
 pub fn get_account_by_id(a_id: i32) -> QueryResult<Account> {
     let mut connection = establish_connection();
 
-    accounts.filter(id.eq(a_id)).first::<Account>(&mut connection)
+    accounts
+        .filter(id.eq(a_id))
+        .first::<Account>(&mut connection)
 }
 
 pub fn create_account<'a>(user: &'a str, pw: &'a str) -> QueryResult<Account> {

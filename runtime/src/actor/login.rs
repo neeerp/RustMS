@@ -2,9 +2,9 @@ use crate::error::RuntimeError;
 use crate::handler::{HandlerAction, HandlerContext, HandlerResult};
 use crate::io::{PacketReader, PacketWriter};
 use db::session::{NewSession, SessionWrapper};
+use net::get_handler;
 use net::listener::ServerType;
 use net::packet::build;
-use net::get_handler;
 use packet::Packet;
 use rand::{thread_rng, Rng};
 use std::net::SocketAddr;
@@ -168,7 +168,9 @@ impl LoginClientActor {
                     if let Some(ref mut session) = self.session.session {
                         session.character_id = Some(character_id);
                         // Update session in database
-                        if let Err(e) = db::session::update_session_character(session.id, character_id) {
+                        if let Err(e) =
+                            db::session::update_session_character(session.id, character_id)
+                        {
                             error!(error = %e, "Failed to update session with character");
                         }
                     }

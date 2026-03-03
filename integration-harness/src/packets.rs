@@ -1,7 +1,7 @@
-use net::packet::op::{RecvOpcode, SendOpcode};
 use net::packet::build::world::messaging::{
     WHISPER_RECEIVE_MODE, WHISPER_REQUEST_MODE, WHISPER_RESULT_MODE,
 };
+use net::packet::op::{RecvOpcode, SendOpcode};
 use packet::io::read::PktRead;
 use packet::io::write::PktWrite;
 use packet::Packet;
@@ -523,7 +523,9 @@ pub fn decode_whisper_result(packet: &Packet) -> Result<WhisperResultPacket, Str
 
 fn packet_with_opcode(opcode: i16) -> Packet {
     let mut packet = Packet::new_empty();
-    packet.write_short(opcode).expect("packet opcode write cannot fail");
+    packet
+        .write_short(opcode)
+        .expect("packet opcode write cannot fail");
     packet
 }
 

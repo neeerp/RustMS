@@ -26,7 +26,10 @@ impl PacketHandler for DeleteCharHandler {
         let character_id = reader.read_int()?;
 
         // Get account_id from session
-        let accountid = ctx.session.session.as_ref()
+        let accountid = ctx
+            .session
+            .session
+            .as_ref()
             .map(|s| s.account_id)
             .ok_or(NetworkError::NotLoggedIn)?;
 

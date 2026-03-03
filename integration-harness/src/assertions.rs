@@ -41,7 +41,10 @@ pub fn assert_login_success(
         return Err(HarnessError::protocol(
             "login credentials",
             &endpoint,
-            format!("expected successful login status 0 but got {}", status.status),
+            format!(
+                "expected successful login status 0 but got {}",
+                status.status
+            ),
         ));
     }
     Ok(status)
@@ -60,7 +63,10 @@ pub fn assert_server_list_kind(
         return Err(HarnessError::protocol(
             phase,
             &endpoint,
-            format!("expected server list packet {:?} but got {:?}", expected, actual),
+            format!(
+                "expected server list packet {:?} but got {:?}",
+                expected, actual
+            ),
         ));
     }
     Ok(())

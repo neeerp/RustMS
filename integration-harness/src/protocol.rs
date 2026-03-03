@@ -7,11 +7,11 @@ use crate::connection::MapleTestConnection;
 use crate::error::HarnessError;
 use crate::packets::{
     build_accept_tos, build_char_list_request, build_char_select, build_create_char,
-    build_login_credentials, build_login_started, build_player_logged_in, build_server_list_request,
-    build_set_gender, decode_char_list, decode_last_connected_world, decode_login_status,
-    decode_new_character, decode_recommended_worlds, decode_server_redirect, decode_set_field,
-    opcode_name,
-    CharacterSummary, CharacterTemplate, LoginStatusPacket, ServerListPacket,
+    build_login_credentials, build_login_started, build_player_logged_in,
+    build_server_list_request, build_set_gender, decode_char_list, decode_last_connected_world,
+    decode_login_status, decode_new_character, decode_recommended_worlds, decode_server_redirect,
+    decode_set_field, opcode_name, CharacterSummary, CharacterTemplate, LoginStatusPacket,
+    ServerListPacket,
 };
 use net::packet::op::SendOpcode;
 use std::time::Duration;
@@ -60,8 +60,9 @@ pub async fn login_to_world_session(config: &HarnessConfig) -> Result<WorldSessi
         .await?;
     login_conn
         .send_packet(
-            build_login_credentials(&config.username, &config.password)
-                .map_err(|message| HarnessError::protocol("login credentials", config.login_addr, message))?,
+            build_login_credentials(&config.username, &config.password).map_err(|message| {
+                HarnessError::protocol("login credentials", config.login_addr, message)
+            })?,
             "login credentials",
         )
         .await?;
@@ -105,8 +106,9 @@ pub async fn login_to_world_session(config: &HarnessConfig) -> Result<WorldSessi
         login_conn.endpoint(),
         SendOpcode::LastConnectedWorld as i16,
     )?;
-    let _ = decode_last_connected_world(&last_connected.packet)
-        .map_err(|message| HarnessError::protocol("last connected world", login_conn.endpoint(), message))?;
+    let _ = decode_last_connected_world(&last_connected.packet).map_err(|message| {
+        HarnessError::protocol("last connected world", login_conn.endpoint(), message)
+    })?;
 
     let recommended = read_packet(&mut login_conn, "recommended worlds").await?;
     assert_opcode(
@@ -115,22 +117,25 @@ pub async fn login_to_world_session(config: &HarnessConfig) -> Result<WorldSessi
         login_conn.endpoint(),
         SendOpcode::RecommendedWorlds as i16,
     )?;
-    decode_recommended_worlds(&recommended.packet)
-        .map_err(|message| HarnessError::protocol("recommended worlds", login_conn.endpoint(), message))?;
+    decode_recommended_worlds(&recommended.packet).map_err(|message| {
+        HarnessError::protocol("recommended worlds", login_conn.endpoint(), message)
+    })?;
 
     let selected = load_or_create_character(&mut login_conn, config).await?;
 
     login_conn
         .send_packet(
-            build_char_select(selected.id)
-                .map_err(|message| HarnessError::protocol("char select", config.login_addr, message))?,
+            build_char_select(selected.id).map_err(|message| {
+                HarnessError::protocol("char select", config.login_addr, message)
+            })?,
             "char select",
         )
         .await?;
 
     let redirect_packet = read_packet(&mut login_conn, "server redirect").await?;
-    let redirect = decode_server_redirect(&redirect_packet.packet)
-        .map_err(|message| HarnessError::protocol("server redirect", login_conn.endpoint(), message))?;
+    let redirect = decode_server_redirect(&redirect_packet.packet).map_err(|message| {
+        HarnessError::protocol("server redirect", login_conn.endpoint(), message)
+    })?;
     assert_redirect_target(config, login_conn.endpoint(), redirect.ip, redirect.port)?;
     if redirect.character_id != selected.id {
         return Err(HarnessError::protocol(
@@ -277,28 +282,34 @@ async fn resolve_login_prompts(
     config: &HarnessConfig,
 ) -> Result<LoginStatusPacket, HarnessError> {
     let first_packet = read_packet(login_conn, "login credentials").await?;
-    let mut login_status = decode_login_status(&first_packet.packet)
-        .map_err(|message| HarnessError::protocol("login credentials", login_conn.endpoint(), message))?;
+    let mut login_status = decode_login_status(&first_packet.packet).map_err(|message| {
+        HarnessError::protocol("login credentials", login_conn.endpoint(), message)
+    })?;
 
     if login_status.status == 23 {
         login_conn
             .send_packet(
-                build_accept_tos()
-                    .map_err(|message| HarnessError::protocol("accept tos", login_conn.endpoint(), message))?,
+                build_accept_tos().map_err(|message| {
+                    HarnessError::protocol("accept tos", login_conn.endpoint(), message)
+                })?,
                 "accept tos",
             )
             .await?;
 
         let tos_response = read_packet(login_conn, "accept tos").await?;
-        login_status = decode_login_status(&tos_response.packet)
-            .map_err(|message| HarnessError::protocol("accept tos", login_conn.endpoint(), message))?;
+        login_status = decode_login_status(&tos_response.packet).map_err(|message| {
+            HarnessError::protocol("accept tos", login_conn.endpoint(), message)
+        })?;
     }
 
     if login_status.status != 0 {
         return Err(HarnessError::protocol(
             "login credentials",
             login_conn.endpoint(),
-            format!("expected successful login status 0 but got {}", login_status.status),
+            format!(
+                "expected successful login status 0 but got {}",
+                login_status.status
+            ),
         ));
     }
 
@@ -344,7 +355,9 @@ async fn load_or_create_character(
                 &config.character_name,
                 CharacterTemplate::default_for_gender(config.gender),
             )
-            .map_err(|message| HarnessError::protocol("create char", login_conn.endpoint(), message))?,
+            .map_err(|message| {
+                HarnessError::protocol("create char", login_conn.endpoint(), message)
+            })?,
             "create char",
         )
         .await?;
@@ -398,8 +411,9 @@ async fn request_char_list(
 ) -> Result<crate::packets::CharListPacket, HarnessError> {
     login_conn
         .send_packet(
-            build_char_list_request(0, 0)
-                .map_err(|message| HarnessError::protocol(request_phase, login_conn.endpoint(), message))?,
+            build_char_list_request(0, 0).map_err(|message| {
+                HarnessError::protocol(request_phase, login_conn.endpoint(), message)
+            })?,
             request_phase,
         )
         .await?;
@@ -409,7 +423,10 @@ async fn request_char_list(
         .map_err(|message| HarnessError::protocol(response_phase, login_conn.endpoint(), message))
 }
 
-fn find_character(characters: &[CharacterSummary], character_name: &str) -> Option<CharacterSummary> {
+fn find_character(
+    characters: &[CharacterSummary],
+    character_name: &str,
+) -> Option<CharacterSummary> {
     characters
         .iter()
         .find(|character| character.name == character_name)

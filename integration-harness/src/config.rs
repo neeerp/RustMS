@@ -71,11 +71,13 @@ impl HarnessConfig {
 
         let login_addr = parse_addr(
             "login_addr",
-            raw.login_addr.unwrap_or_else(|| DEFAULT_LOGIN_ADDR.to_string()),
+            raw.login_addr
+                .unwrap_or_else(|| DEFAULT_LOGIN_ADDR.to_string()),
         )?;
         let world_addr = parse_addr(
             "world_addr",
-            raw.world_addr.unwrap_or_else(|| DEFAULT_WORLD_ADDR.to_string()),
+            raw.world_addr
+                .unwrap_or_else(|| DEFAULT_WORLD_ADDR.to_string()),
         )?;
 
         Ok(Self {
@@ -99,11 +101,13 @@ impl MultiHarnessConfig {
         let raw = read_raw_config(path)?;
         let login_addr = parse_addr(
             "login_addr",
-            raw.login_addr.unwrap_or_else(|| DEFAULT_LOGIN_ADDR.to_string()),
+            raw.login_addr
+                .unwrap_or_else(|| DEFAULT_LOGIN_ADDR.to_string()),
         )?;
         let world_addr = parse_addr(
             "world_addr",
-            raw.world_addr.unwrap_or_else(|| DEFAULT_WORLD_ADDR.to_string()),
+            raw.world_addr
+                .unwrap_or_else(|| DEFAULT_WORLD_ADDR.to_string()),
         )?;
 
         let players = raw.players.ok_or_else(|| {
@@ -130,7 +134,10 @@ impl MultiHarnessConfig {
             })
             .collect::<Vec<_>>();
 
-        let sender_count = players.iter().filter(|player| player.role == "sender").count();
+        let sender_count = players
+            .iter()
+            .filter(|player| player.role == "sender")
+            .count();
         let recipient_count = players
             .iter()
             .filter(|player| player.role == "recipient")
@@ -211,9 +218,11 @@ fn require_field(name: &'static str, value: Option<String>) -> Result<String, Ha
 }
 
 fn parse_addr(name: &'static str, value: String) -> Result<SocketAddr, HarnessError> {
-    value.parse().map_err(|source| HarnessError::InvalidAddress {
-        name,
-        value,
-        source,
-    })
+    value
+        .parse()
+        .map_err(|source| HarnessError::InvalidAddress {
+            name,
+            value,
+            source,
+        })
 }

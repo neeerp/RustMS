@@ -26,7 +26,10 @@ impl PacketHandler for CharListHandler {
         let _channel = reader.read_byte()? + 1;
 
         // Get account_id from session
-        let account_id = ctx.session.session.as_ref()
+        let account_id = ctx
+            .session
+            .session
+            .as_ref()
             .map(|s| s.account_id)
             .ok_or(NetworkError::NotLoggedIn)?;
 

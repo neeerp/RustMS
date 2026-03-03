@@ -59,7 +59,9 @@ impl MapleTestConnection {
         mut packet: Packet,
         phase: &'static str,
     ) -> Result<(), HarnessError> {
-        let header = self.send_cipher.gen_packet_header(packet.bytes.len() as i16);
+        let header = self
+            .send_cipher
+            .gen_packet_header(packet.bytes.len() as i16);
         maple_crypt::encrypt(&mut packet);
         self.send_cipher.crypt(&mut packet.bytes);
 
@@ -147,6 +149,5 @@ async fn read_handshake(
 
     let mut bytes = len_buf.to_vec();
     bytes.extend_from_slice(&payload);
-    Handshake::parse(&bytes)
-        .map_err(|message| HarnessError::protocol(phase, endpoint, message))
+    Handshake::parse(&bytes).map_err(|message| HarnessError::protocol(phase, endpoint, message))
 }

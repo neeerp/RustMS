@@ -34,10 +34,9 @@ impl PacketHandler for WhisperHandler {
         }
 
         let sender_name = {
-            let character = ctx
-                .session
-                .get_character()
-                .map_err(|_| NetworkError::PacketHandlerError("Whisper requires a loaded character"))?;
+            let character = ctx.session.get_character().map_err(|_| {
+                NetworkError::PacketHandlerError("Whisper requires a loaded character")
+            })?;
             let character = character
                 .lock()
                 .map_err(|_| NetworkError::PacketHandlerError("Failed to lock whisper sender"))?;

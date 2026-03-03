@@ -5,7 +5,10 @@ use character::CharacterWrapper;
 use diesel::QueryResult;
 use ipnetwork::IpNetwork;
 
-use std::{sync::{Arc, Mutex}, time::SystemTime};
+use std::{
+    sync::{Arc, Mutex},
+    time::SystemTime,
+};
 
 pub mod repository;
 pub use repository::*;

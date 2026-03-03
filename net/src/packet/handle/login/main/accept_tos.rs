@@ -24,11 +24,16 @@ impl PacketHandler for AcceptTOSHandler {
 
         let confirmed = reader.read_byte()?;
         if confirmed != 0x01 {
-            return Err(NetworkError::PacketHandlerError("Accept TOS packet is invalid."));
+            return Err(NetworkError::PacketHandlerError(
+                "Accept TOS packet is invalid.",
+            ));
         }
 
         // Get account_id from session
-        let account_id = ctx.session.session.as_ref()
+        let account_id = ctx
+            .session
+            .session
+            .as_ref()
             .map(|s| s.account_id)
             .ok_or(NetworkError::NotLoggedIn)?;
 

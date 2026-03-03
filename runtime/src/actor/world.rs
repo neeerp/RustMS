@@ -176,12 +176,14 @@ impl WorldServerActor {
         sender_failure_packet: packet::Packet,
     ) {
         let Some(&target_id) = self.names.get(&target_name) else {
-            self.send_packet_to_client(from, sender_failure_packet).await;
+            self.send_packet_to_client(from, sender_failure_packet)
+                .await;
             return;
         };
 
         let delivered = if let Some(entry) = self.clients.get(&target_id) {
-            entry.sender
+            entry
+                .sender
                 .send(ServerMessage::SendPacket(recipient_packet))
                 .await
                 .is_ok()
@@ -190,10 +192,12 @@ impl WorldServerActor {
         };
 
         if delivered {
-            self.send_packet_to_client(from, sender_success_packet).await;
+            self.send_packet_to_client(from, sender_success_packet)
+                .await;
         } else {
             warn!(from, target_name, "Failed to deliver whisper to target");
-            self.send_packet_to_client(from, sender_failure_packet).await;
+            self.send_packet_to_client(from, sender_failure_packet)
+                .await;
         }
     }
 
@@ -219,9 +223,12 @@ impl WorldServerActor {
                 .map(|clients| clients.iter().filter(|&&id| id != from).copied().collect())
                 .unwrap_or_default(),
             BroadcastScope::World => self.clients.keys().copied().collect(),
-            BroadcastScope::WorldExcludeSelf => {
-                self.clients.keys().filter(|&&id| id != from).copied().collect()
-            }
+            BroadcastScope::WorldExcludeSelf => self
+                .clients
+                .keys()
+                .filter(|&&id| id != from)
+                .copied()
+                .collect(),
         }
     }
 }

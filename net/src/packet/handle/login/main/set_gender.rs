@@ -24,13 +24,18 @@ impl PacketHandler for SetGenderHandler {
 
         let confirmed = reader.read_byte()?;
         if confirmed != 0x01 {
-            return Err(NetworkError::PacketHandlerError("Set Gender packet is invalid."));
+            return Err(NetworkError::PacketHandlerError(
+                "Set Gender packet is invalid.",
+            ));
         }
 
         let gender = reader.read_byte()?;
 
         // Get account_id from session
-        let account_id = ctx.session.session.as_ref()
+        let account_id = ctx
+            .session
+            .session
+            .as_ref()
             .map(|s| s.account_id)
             .ok_or(NetworkError::NotLoggedIn)?;
 

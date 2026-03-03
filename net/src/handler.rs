@@ -180,7 +180,8 @@ impl HandlerResult {
 
     /// Add a broadcast action to this result.
     pub fn with_broadcast(mut self, scope: BroadcastScope, packet: Packet) -> Self {
-        self.actions.push(HandlerAction::Broadcast { scope, packet });
+        self.actions
+            .push(HandlerAction::Broadcast { scope, packet });
         self
     }
 
@@ -207,13 +208,15 @@ impl HandlerResult {
 
     /// Add an attach character action.
     pub fn with_attach_character(mut self, character_id: i32) -> Self {
-        self.actions.push(HandlerAction::AttachCharacter { character_id });
+        self.actions
+            .push(HandlerAction::AttachCharacter { character_id });
         self
     }
 
     /// Add a reattach session action (for world server).
     pub fn with_reattach_session(mut self, character_id: i32) -> Self {
-        self.actions.push(HandlerAction::ReattachSession { character_id });
+        self.actions
+            .push(HandlerAction::ReattachSession { character_id });
         self
     }
 

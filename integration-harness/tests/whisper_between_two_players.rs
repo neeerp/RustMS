@@ -35,7 +35,9 @@ async fn whisper_between_two_players() {
 
     let recipient_envelope = timeout(
         Duration::from_secs(5),
-        recipient.connection.read_packet("recipient whisper receive"),
+        recipient
+            .connection
+            .read_packet("recipient whisper receive"),
     )
     .await
     .expect("timed out waiting for recipient whisper packet")

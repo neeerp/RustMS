@@ -79,9 +79,4 @@ table! {
 
 joinable!(sessions -> accounts (account_id));
 
-allow_tables_to_appear_in_same_query!(
-    accounts,
-    characters,
-    keybindings,
-    sessions,
-);
+allow_tables_to_appear_in_same_query!(accounts, characters, keybindings, sessions,);
