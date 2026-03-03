@@ -1,12 +1,11 @@
 use integration_harness::packets::{build_all_chat, decode_chat_text, decode_spawn_player};
+use integration_harness::preconditions::load_multi_harness_config_or_fail;
 use integration_harness::{login_two_players_to_world, MultiHarnessConfig};
 use tokio::time::{timeout, Duration};
 
 #[tokio::test]
-#[ignore = "requires externally running login/world servers, two fixture players in integration-harness.toml, and same-map chat support"]
 async fn local_chat_same_map() {
-    let config =
-        MultiHarnessConfig::from_file().expect("failed to load multi-player integration config");
+    let config = load_multi_harness_config_or_fail().await;
     let (mut sender, mut recipient) = login_two_players_to_world(&config)
         .await
         .expect("two-player login-to-world flow failed");

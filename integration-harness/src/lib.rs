@@ -4,6 +4,7 @@ pub mod connection;
 pub mod error;
 pub mod handshake;
 pub mod packets;
+pub mod preconditions;
 pub mod protocol;
 
 pub use config::{HarnessConfig, MultiHarnessConfig};
