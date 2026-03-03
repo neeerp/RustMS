@@ -5,7 +5,7 @@ This repository is a Rust workspace for a MapleStory server plus a nested C++ cl
 ## Documentation index
 
 - `agent_docs/server-architecture.md`: server-side actor model, handler boundaries, and login-to-world flow
-- `agent_docs/integration-harness.md`: harness config and how to run the ignored integration tests
+- `agent_docs/integration-harness.md`: harness config and integration test workflow
 
 ## Workspace layout
 
@@ -70,3 +70,15 @@ Run the client:
 cd HeavenClient/cmake-build
 ./HeavenClient
 ```
+
+## Validate changes
+
+Run the integration harness when validating server behavior changes:
+
+```sh
+cargo test -p integration-harness
+```
+
+After changing Rust server code, rebuild and restart the affected server binaries before trusting live test or manual client results.
+
+For packet mismatch bugs, inspect both the Rust server packet path and the corresponding `HeavenClient` packet handler.
