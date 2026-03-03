@@ -2,31 +2,32 @@
 
 ## Overview
 
-The integration harness lives in the `integration-harness` crate and runs end-to-end flows against already-running login and world servers.
+The integration harness lives in the `integration-harness` crate and runs end-to-end flows against running login and world servers.
 
-## Config file
+The harness reads `integration-harness.toml` at the workspace root.
 
-The harness reads `./integration-harness.toml` at the workspace root.
+## Config
 
-Required top-level fields:
+`HarnessConfig` uses the top-level fields in `integration-harness.toml`:
 
 - `username`
 - `password`
 - `character_name`
 - `gender`
+- optional `login_addr`
+- optional `world_addr`
 
-Optional top-level fields:
+`MultiHarnessConfig` uses:
 
-- `login_addr` default: `127.0.0.1:8484`
-- `world_addr` default: `127.0.0.1:8485`
+- optional `login_addr`
+- optional `world_addr`
+- at least two `[[players]]` entries
 
-For multi-player tests, add exactly two `[[players]]` entries:
+Two-player flows require exactly one player with `role = "sender"` and one player with `role = "recipient"`.
 
-- one with `role = "sender"`
-- one with `role = "recipient"`
+Each `[[players]]` entry needs:
 
-Each player entry needs:
-
+- `role`
 - `username`
 - `password`
 - `character_name`
@@ -34,16 +35,54 @@ Each player entry needs:
 
 Use `integration-harness.toml.example` as the template.
 
+## Preconditions
+
+The tests load config through `integration_harness::preconditions`.
+
+Those helpers:
+
+- load the config file
+- fail immediately when the config file is missing
+- check that the login server is reachable
+- check that the world server is reachable
+
+If a server is down, the tests fail during the precondition step before packet flow begins.
+
 ## Running
 
-Start the login and world servers first, then run:
+Run the harness with:
 
 ```sh
-cargo test -p integration-harness -- --ignored --nocapture
+cargo test -p integration-harness -- --nocapture
 ```
 
-## Notes
+Run a single test with:
 
-- The tests are `#[ignore]`d by default because they require live servers and local fixture config.
-- The harness can drive first-login flows, including TOS acceptance and gender selection.
-- If the configured character does not already exist, the harness will try to create it during login.
+```sh
+cargo test -p integration-harness presence_same_map -- --nocapture
+```
+
+## Coverage
+
+The harness test suite contains:
+
+- `login_to_world_happy_path`
+- `whisper_between_two_players`
+- `presence_same_map`
+- `movement_same_map`
+- `local_chat_same_map`
+
+The same-map tests assume both fixture players land on the same starting map.
+
+## Behavior under test
+
+The harness covers:
+
+- login handshake and world handoff
+- character load and `SetField`
+- same-map foreign-player spawn packets
+- same-map movement replication
+- same-map local chat
+- whisper delivery and failure handling
+
+Two-player flows read same-map presence packets before asserting later actions such as whisper or chat.
