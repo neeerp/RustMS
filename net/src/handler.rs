@@ -144,6 +144,13 @@ pub enum HandlerAction {
         sender_success_packet: Packet,
         sender_failure_packet: Packet,
     },
+    /// Broadcast local chat to the client's current field.
+    FieldChat { packet: Packet },
+    /// Broadcast player movement to the client's current field.
+    FieldMove {
+        packet: Packet,
+        movement_bytes: Vec<u8>,
+    },
 }
 
 /// Result of handling a packet - contains all requested actions.
@@ -233,6 +240,21 @@ impl HandlerResult {
             recipient_packet,
             sender_success_packet,
             sender_failure_packet,
+        });
+        self
+    }
+
+    /// Add a local field-chat action.
+    pub fn with_field_chat(mut self, packet: Packet) -> Self {
+        self.actions.push(HandlerAction::FieldChat { packet });
+        self
+    }
+
+    /// Add a local field-move action.
+    pub fn with_field_move(mut self, packet: Packet, movement_bytes: Vec<u8>) -> Self {
+        self.actions.push(HandlerAction::FieldMove {
+            packet,
+            movement_bytes,
         });
         self
     }
