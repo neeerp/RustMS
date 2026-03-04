@@ -1,7 +1,7 @@
 ---
 title: "NX-authoritative field data + portal map transfer"
 date: 2026-03-04
-status: "draft"
+status: "in_progress"
 owners: ["server", "runtime", "net"]
 related:
   - "other_servers/thoughts/shared/research/2026-03-02-map-representation-in-maplestory-servers.md"
@@ -11,6 +11,12 @@ related:
 # Goal
 
 Introduce server awareness of MapleStory field/map data, using client `.nx` files as authority, to support portal-based map transitions (`CHANGEMAP` with `target == -1`).
+
+# Progress snapshot
+
+- M1 validator scaffold: completed
+- M1 sample validation on `100000000`, `100000001`, `104000000`: completed (no mismatches)
+- M2 `game-data` crate bootstrap and NX field/portal loader: in progress
 
 # Decisions locked
 
