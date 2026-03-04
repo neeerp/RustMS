@@ -63,6 +63,12 @@ pub struct SetFieldPacket {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SetFieldWarpPacket {
+    pub map_id: i32,
+    pub spawn_point: u8,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SpawnPlayerPacket {
     pub character_id: i32,
     pub level: u8,
@@ -328,6 +334,26 @@ pub fn build_player_move(movement_bytes: &[u8]) -> Result<Packet, String> {
     Ok(packet)
 }
 
+pub fn build_change_map(target_map_id: i32, portal_name: &str) -> Result<Packet, String> {
+    let mut packet = packet_with_opcode(RecvOpcode::ChangeMap as i16);
+    packet
+        .write_byte(0)
+        .map_err(|e| format!("failed to write change-map death flag: {e}"))?;
+    packet
+        .write_int(target_map_id)
+        .map_err(|e| format!("failed to write change-map target id: {e}"))?;
+    packet
+        .write_str_with_length(portal_name)
+        .map_err(|e| format!("failed to write change-map portal name: {e}"))?;
+    packet
+        .write_byte(0)
+        .map_err(|e| format!("failed to write change-map padding byte: {e}"))?;
+    packet
+        .write_short(0)
+        .map_err(|e| format!("failed to write change-map wheel flag: {e}"))?;
+    Ok(packet)
+}
+
 pub fn decode_login_status(packet: &Packet) -> Result<LoginStatusPacket, String> {
     expect_opcode(packet, SendOpcode::LoginStatus as i16)?;
     let mut cursor = Cursor::new(&packet.bytes[..]);
@@ -500,6 +526,34 @@ pub fn decode_set_field(packet: &Packet) -> Result<SetFieldPacket, String> {
         character_id: meta.id,
         character_name: meta.name,
         map_id: meta.map_id,
+    })
+}
+
+pub fn decode_set_field_warp(packet: &Packet) -> Result<SetFieldWarpPacket, String> {
+    expect_opcode(packet, SendOpcode::SetField as i16)?;
+    let mut cursor = Cursor::new(&packet.bytes[..]);
+    cursor
+        .read_short()
+        .map_err(|e| format!("failed to read set-field warp opcode: {e}"))?;
+    cursor
+        .read_int()
+        .map_err(|e| format!("failed to read set-field warp channel: {e}"))?;
+    cursor
+        .read_int()
+        .map_err(|e| format!("failed to read set-field warp padding int: {e}"))?;
+    cursor
+        .read_byte()
+        .map_err(|e| format!("failed to read set-field warp padding byte: {e}"))?;
+    let map_id = cursor
+        .read_int()
+        .map_err(|e| format!("failed to read set-field warp map id: {e}"))?;
+    let spawn_point = cursor
+        .read_byte()
+        .map_err(|e| format!("failed to read set-field warp spawn point: {e}"))?;
+
+    Ok(SetFieldWarpPacket {
+        map_id,
+        spawn_point,
     })
 }
 
