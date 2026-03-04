@@ -10,6 +10,7 @@ edition = "2018"
 packet = { path = "../packet" }
 crypt = { path = "../crypt" }
 db = { path = "../db" }
+game-data = { path = "../game-data" }
 bufstream = "0.1.4"
 rand = "0.7.3"
 num = "0.2"

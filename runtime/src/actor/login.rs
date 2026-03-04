@@ -186,6 +186,9 @@ impl LoginClientActor {
                 HandlerAction::FieldChat { .. } | HandlerAction::FieldMove { .. } => {
                     warn!("Field action ignored in login server");
                 }
+                HandlerAction::MapChanged { .. } => {
+                    warn!("MapChanged action ignored in login server");
+                }
             }
         }
         Ok(())

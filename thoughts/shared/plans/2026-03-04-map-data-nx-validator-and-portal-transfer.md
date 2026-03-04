@@ -16,7 +16,9 @@ Introduce server awareness of MapleStory field/map data, using client `.nx` file
 
 - M1 validator scaffold: completed
 - M1 sample validation on `100000000`, `100000001`, `104000000`: completed (no mismatches)
-- M2 `game-data` crate bootstrap and NX field/portal loader: in progress
+- M2 `game-data` crate bootstrap and NX field/portal loader: completed
+- M3 portal resolution in `ChangeMapHandler` using NX data: completed
+- M4 field-aware runtime leave/join orchestration for map changes: completed
 
 # Decisions locked
 
