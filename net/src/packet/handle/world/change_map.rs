@@ -35,6 +35,11 @@ impl PacketHandler for ChangeMapHandler {
         let old_map_id = chr.character.map_id;
 
         if target != -1 {
+            let game_data = crate::game_data::get()?;
+            if !game_data.field_exists(target) {
+                return Err(NetworkError::PacketHandlerError("Target field not found"));
+            }
+
             chr.character.map_id = target;
             chr.character.save()?;
 
