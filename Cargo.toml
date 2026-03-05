@@ -8,5 +8,7 @@ members = [
     "crypt",
     "net",
     "db",
-    "runtime"
+    "runtime",
+    "tools/map-data-validator",
+    "game-data",
 ]

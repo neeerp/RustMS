@@ -215,6 +215,20 @@ impl ClientActor {
                         .await
                         .map_err(|_| RuntimeError::ChannelSend)?;
                 }
+                HandlerAction::MapChanged {
+                    old_map_id,
+                    new_map_id,
+                } => {
+                    let event = ClientEvent::MapChanged {
+                        client_id: self.client_id,
+                        old_map_id,
+                        new_map_id,
+                    };
+                    self.world_tx
+                        .send(event)
+                        .await
+                        .map_err(|_| RuntimeError::ChannelSend)?;
+                }
                 HandlerAction::Disconnect => {
                     return Err(RuntimeError::ClientDisconnected);
                 }

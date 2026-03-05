@@ -4,6 +4,7 @@ extern crate num_derive;
 extern crate serde_derive;
 extern crate serde;
 
+mod game_data;
 pub mod handler;
 mod helpers;
 mod io;

@@ -33,3 +33,7 @@ HeavenClient/*.aps
 HeavenClient/*.log
 HeavenClient/*.tlog
 HeavenClient/.DS_Store
+
+# Local game-data assets (large/unversioned)
+assets/game-data/*
+!assets/game-data/.gitignore

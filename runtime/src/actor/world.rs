@@ -10,6 +10,7 @@ struct ClientEntry {
     sender: mpsc::Sender<ServerMessage>,
     field_key: FieldKey,
     name: String,
+    character: crate::message::FieldCharacter,
 }
 
 struct FieldHandle {
@@ -66,7 +67,8 @@ impl WorldServerActor {
                 old_map_id,
                 new_map_id,
             } => {
-                self.handle_map_change(client_id, old_map_id, new_map_id);
+                self.handle_map_change(client_id, old_map_id, new_map_id)
+                    .await;
             }
             ClientEvent::Broadcast {
                 from,
@@ -130,6 +132,7 @@ impl WorldServerActor {
                 sender: sender.clone(),
                 field_key,
                 name: character_name,
+                character: character.clone(),
             },
         );
 
@@ -164,15 +167,53 @@ impl WorldServerActor {
         }
     }
 
-    fn handle_map_change(&mut self, client_id: ClientId, old_map_id: i32, new_map_id: i32) {
-        if let Some(entry) = self.clients.get_mut(&client_id) {
-            entry.field_key.map_id = new_map_id;
+    async fn handle_map_change(&mut self, client_id: ClientId, old_map_id: i32, new_map_id: i32) {
+        let Some(entry) = self.clients.get_mut(&client_id) else {
+            warn!(
+                client_id,
+                old_map_id, new_map_id, "Map change from unknown client"
+            );
+            return;
+        };
+
+        let old_field_key = entry.field_key;
+        let new_field_key = FieldKey {
+            channel_id: old_field_key.channel_id,
+            map_id: new_map_id,
+            instance_id: old_field_key.instance_id,
+        };
+
+        entry.field_key = new_field_key;
+        entry.character.map_id = new_map_id;
+
+        let sender = entry.sender.clone();
+        let character = entry.character.clone();
+
+        if let Some(old_field) = self.fields.get(&old_field_key) {
+            if old_field
+                .sender
+                .send(FieldMessage::Leave { client_id })
+                .await
+                .is_err()
+            {
+                warn!(client_id, field = ?old_field_key, "Failed to leave previous field");
+            }
         }
 
-        warn!(
-            client_id,
-            old_map_id, new_map_id, "Map transitions are not field-aware yet"
-        );
+        let new_field = self.get_or_create_field(new_field_key);
+        if new_field
+            .send(FieldMessage::Join {
+                client_id,
+                sender,
+                character,
+            })
+            .await
+            .is_err()
+        {
+            warn!(client_id, field = ?new_field_key, "Failed to join destination field");
+        }
+
+        info!(client_id, old_map_id, new_map_id, "Client changed map");
     }
 
     async fn handle_broadcast(

@@ -151,6 +151,8 @@ pub enum HandlerAction {
         packet: Packet,
         movement_bytes: Vec<u8>,
     },
+    /// Notify runtime that this client changed maps.
+    MapChanged { old_map_id: i32, new_map_id: i32 },
 }
 
 /// Result of handling a packet - contains all requested actions.
@@ -255,6 +257,15 @@ impl HandlerResult {
         self.actions.push(HandlerAction::FieldMove {
             packet,
             movement_bytes,
+        });
+        self
+    }
+
+    /// Notify runtime that this client changed maps.
+    pub fn with_map_changed(mut self, old_map_id: i32, new_map_id: i32) -> Self {
+        self.actions.push(HandlerAction::MapChanged {
+            old_map_id,
+            new_map_id,
         });
         self
     }
