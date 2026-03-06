@@ -173,6 +173,15 @@ In the server's console, you should see that the handshake completed successfull
 At the time of writing this, you can type in a username and password in the client's login window and submit. The server will parse the packet and echo it in the console.
 ![Credentials Echoed](img/login.png)
 
+### Running the Integration Harness
+The integration test harness spins up a containerized postgres and pair of login/world servers.
+
+On my machine, I run the harness as follows, using `sg` to assume the `docker` user group:
+
+```
+sg docker -c 'cargo run -p integration-harness --bin harnessctl -- test'
+```
+
 
 ## Roadmap
 - [X] Develop a library for encrypting and decrypting packets in the form that the client expects
