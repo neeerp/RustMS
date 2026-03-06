@@ -1,0 +1,10 @@
+.git/
+.github/
+target/
+**/target/
+HeavenClient/
+spec/
+assets/
+
+**/*.log
+**/.DS_Store

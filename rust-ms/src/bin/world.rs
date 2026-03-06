@@ -1,4 +1,5 @@
 use runtime::{ClientActor, ClientEvent, WorldServerActor};
+use std::env;
 use tokio::net::TcpListener;
 use tokio::sync::mpsc;
 use tracing::{error, info};
@@ -25,8 +26,10 @@ async fn main() {
     });
 
     // Accept connections
-    let listener = TcpListener::bind("0.0.0.0:8485").await.unwrap();
-    info!("World Server listening on 0.0.0.0:8485");
+    let bind_addr =
+        env::var("RUSTMS_WORLD_BIND_ADDR").unwrap_or_else(|_| "0.0.0.0:8485".to_string());
+    let listener = TcpListener::bind(&bind_addr).await.unwrap();
+    info!("World Server listening on {}", bind_addr);
 
     loop {
         match listener.accept().await {

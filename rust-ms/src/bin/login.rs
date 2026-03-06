@@ -1,4 +1,5 @@
 use runtime::LoginServerActor;
+use std::env;
 use tracing::info;
 use tracing_subscriber::EnvFilter;
 
@@ -13,7 +14,9 @@ async fn main() {
 
     info!("Starting Login Server...");
 
-    if let Err(e) = LoginServerActor::run("0.0.0.0:8484").await {
+    let bind_addr =
+        env::var("RUSTMS_LOGIN_BIND_ADDR").unwrap_or_else(|_| "0.0.0.0:8484".to_string());
+    if let Err(e) = LoginServerActor::run(&bind_addr).await {
         tracing::error!(error = %e, "Login server error");
     }
 }

@@ -1,6 +1,6 @@
+use integration_harness::login_two_players_to_world;
 use integration_harness::packets::{build_all_chat, decode_chat_text, decode_spawn_player};
 use integration_harness::preconditions::load_multi_harness_config_or_fail;
-use integration_harness::{login_two_players_to_world, MultiHarnessConfig};
 use tokio::time::{timeout, Duration};
 
 #[tokio::test]
