@@ -182,6 +182,8 @@ fn to_foreign_character(character: &FieldCharacter) -> ForeignCharacter {
 mod tests {
     use super::*;
     use crate::message::ServerMessage;
+    use net::packet::build::world::field::{build_local_chat, build_player_move};
+    use net::packet::op::SendOpcode;
     use tokio::sync::mpsc;
 
     fn test_character(id: i32, name: &str) -> FieldCharacter {
@@ -330,6 +332,7 @@ mod tests {
             .send(FieldMessage::Move {
                 from: 1,
                 packet: movement_packet,
+                movement_bytes: vec![1, 2, 3],
             })
             .await
             .unwrap();

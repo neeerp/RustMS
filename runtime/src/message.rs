@@ -61,6 +61,10 @@ pub enum ClientEvent {
         client_id: ClientId,
         old_map_id: i32,
         new_map_id: i32,
+        spawn_portal_id: Option<u8>,
+        spawn_x: Option<i16>,
+        spawn_y: Option<i16>,
+        spawn_stance: Option<u8>,
     },
     /// Request to broadcast a packet
     Broadcast {

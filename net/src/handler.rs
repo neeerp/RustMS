@@ -152,7 +152,14 @@ pub enum HandlerAction {
         movement_bytes: Vec<u8>,
     },
     /// Notify runtime that this client changed maps.
-    MapChanged { old_map_id: i32, new_map_id: i32 },
+    MapChanged {
+        old_map_id: i32,
+        new_map_id: i32,
+        spawn_portal_id: Option<u8>,
+        spawn_x: Option<i16>,
+        spawn_y: Option<i16>,
+        spawn_stance: Option<u8>,
+    },
 }
 
 /// Result of handling a packet - contains all requested actions.
@@ -262,10 +269,22 @@ impl HandlerResult {
     }
 
     /// Notify runtime that this client changed maps.
-    pub fn with_map_changed(mut self, old_map_id: i32, new_map_id: i32) -> Self {
+    pub fn with_map_changed(
+        mut self,
+        old_map_id: i32,
+        new_map_id: i32,
+        spawn_portal_id: Option<u8>,
+        spawn_x: Option<i16>,
+        spawn_y: Option<i16>,
+        spawn_stance: Option<u8>,
+    ) -> Self {
         self.actions.push(HandlerAction::MapChanged {
             old_map_id,
             new_map_id,
+            spawn_portal_id,
+            spawn_x,
+            spawn_y,
+            spawn_stance,
         });
         self
     }

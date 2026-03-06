@@ -66,8 +66,20 @@ impl WorldServerActor {
                 client_id,
                 old_map_id,
                 new_map_id,
+                spawn_portal_id,
+                spawn_x,
+                spawn_y,
+                spawn_stance,
             } => {
-                self.handle_map_change(client_id, old_map_id, new_map_id)
+                self.handle_map_change(
+                    client_id,
+                    old_map_id,
+                    new_map_id,
+                    spawn_portal_id,
+                    spawn_x,
+                    spawn_y,
+                    spawn_stance,
+                )
                     .await;
             }
             ClientEvent::Broadcast {
@@ -167,7 +179,16 @@ impl WorldServerActor {
         }
     }
 
-    async fn handle_map_change(&mut self, client_id: ClientId, old_map_id: i32, new_map_id: i32) {
+    async fn handle_map_change(
+        &mut self,
+        client_id: ClientId,
+        old_map_id: i32,
+        new_map_id: i32,
+        _spawn_portal_id: Option<u8>,
+        spawn_x: Option<i16>,
+        spawn_y: Option<i16>,
+        spawn_stance: Option<u8>,
+    ) {
         let Some(entry) = self.clients.get_mut(&client_id) else {
             warn!(
                 client_id,
@@ -185,6 +206,15 @@ impl WorldServerActor {
 
         entry.field_key = new_field_key;
         entry.character.map_id = new_map_id;
+        if let Some(x) = spawn_x {
+            entry.character.x = x;
+        }
+        if let Some(y) = spawn_y {
+            entry.character.y = y;
+        }
+        if let Some(stance) = spawn_stance {
+            entry.character.stance = stance;
+        }
 
         let sender = entry.sender.clone();
         let character = entry.character.clone();
@@ -345,5 +375,96 @@ impl WorldServerActor {
         if field.sender.send(message).await.is_err() {
             warn!(client_id, field = ?entry.field_key, "Failed to forward field event");
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::message::FieldCharacter;
+    use net::packet::op::SendOpcode;
+    use packet::io::read::PktRead;
+    use std::io::Cursor;
+
+    fn test_character(id: i32, name: &str, map_id: i32, x: i16, y: i16) -> FieldCharacter {
+        FieldCharacter {
+            id,
+            name: name.to_string(),
+            level: 1,
+            job: 0,
+            face: 20000,
+            hair: 30000,
+            skin: 0,
+            gender: 0,
+            map_id,
+            x,
+            y,
+            stance: 2,
+        }
+    }
+
+    fn decode_spawn_position(packet: &packet::Packet) -> (i16, i16, u8) {
+        let mut cursor = Cursor::new(&packet.bytes[..]);
+        let opcode = cursor.read_short().expect("spawn opcode");
+        assert_eq!(opcode, SendOpcode::SpawnPlayer as i16);
+        cursor.read_int().expect("spawn character id");
+        cursor.read_byte().expect("spawn level");
+        cursor.read_str_with_length().expect("spawn name");
+        cursor
+            .read_bytes(2 + 2 + 1 + 2 + 1 + 8 + 4 + 4 + 4 + 43 + 4 + 61 + 2)
+            .expect("spawn pre-position payload");
+        cursor
+            .read_bytes(1 + 1 + 4 + 1 + 4 + 1 + 4 + 1 + 4 + 1 + 1 + 4 + 4 + 4 + 4 + 4 + 4 + 4)
+            .expect("spawn look payload");
+        let x = cursor.read_short().expect("spawn x");
+        let y = cursor.read_short().expect("spawn y");
+        let stance = cursor.read_byte().expect("spawn stance");
+        (x, y, stance)
+    }
+
+    #[tokio::test]
+    async fn map_change_join_uses_spawn_coordinates_when_present() {
+        let (world_tx, world_rx) = mpsc::channel(16);
+        let world = WorldServerActor::new(world_rx);
+        tokio::spawn(world.run());
+
+        let (mover_tx, _mover_rx) = mpsc::channel(16);
+        let (observer_tx, mut observer_rx) = mpsc::channel(16);
+
+        world_tx
+            .send(ClientEvent::Connected {
+                client_id: 1,
+                sender: mover_tx,
+                character: test_character(1, "mover", 100000000, 240, 190),
+            })
+            .await
+            .unwrap();
+        world_tx
+            .send(ClientEvent::Connected {
+                client_id: 2,
+                sender: observer_tx,
+                character: test_character(2, "observer", 100000001, 10, 20),
+            })
+            .await
+            .unwrap();
+        world_tx
+            .send(ClientEvent::MapChanged {
+                client_id: 1,
+                old_map_id: 100000000,
+                new_map_id: 100000001,
+                spawn_portal_id: Some(2),
+                spawn_x: Some(202),
+                spawn_y: Some(124),
+                spawn_stance: Some(2),
+            })
+            .await
+            .unwrap();
+
+        let packet = match observer_rx.recv().await.expect("observer spawn packet") {
+            ServerMessage::SendPacket(packet) => packet,
+            other => panic!("expected spawn packet, got {other:?}"),
+        };
+        let (x, y, stance) = decode_spawn_position(&packet);
+        assert_eq!((x, y, stance), (202, 124, 2));
     }
 }

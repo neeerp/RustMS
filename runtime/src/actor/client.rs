@@ -218,11 +218,19 @@ impl ClientActor {
                 HandlerAction::MapChanged {
                     old_map_id,
                     new_map_id,
+                    spawn_portal_id,
+                    spawn_x,
+                    spawn_y,
+                    spawn_stance,
                 } => {
                     let event = ClientEvent::MapChanged {
                         client_id: self.client_id,
                         old_map_id,
                         new_map_id,
+                        spawn_portal_id,
+                        spawn_x,
+                        spawn_y,
+                        spawn_stance,
                     };
                     self.world_tx
                         .send(event)

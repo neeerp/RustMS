@@ -73,6 +73,9 @@ pub struct SpawnPlayerPacket {
     pub character_id: i32,
     pub level: u8,
     pub character_name: String,
+    pub x: i16,
+    pub y: i16,
+    pub stance: u8,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -609,11 +612,31 @@ pub fn decode_spawn_player(packet: &Packet) -> Result<SpawnPlayerPacket, String>
     let character_name = cursor
         .read_str_with_length()
         .map_err(|e| format!("failed to read spawn-player name: {e}"))?;
+    skip(
+        &mut cursor,
+        2 + 2 + 1 + 2 + 1 + 8 + 4 + 4 + 4 + 43 + 4 + 61 + 2,
+    )?;
+    skip(
+        &mut cursor,
+        1 + 1 + 4 + 1 + 4 + 1 + 4 + 1 + 4 + 1 + 1 + 4 + 4 + 4 + 4 + 4 + 4 + 4,
+    )?;
+    let x = cursor
+        .read_short()
+        .map_err(|e| format!("failed to read spawn-player x: {e}"))?;
+    let y = cursor
+        .read_short()
+        .map_err(|e| format!("failed to read spawn-player y: {e}"))?;
+    let stance = cursor
+        .read_byte()
+        .map_err(|e| format!("failed to read spawn-player stance: {e}"))?;
 
     Ok(SpawnPlayerPacket {
         character_id,
         level,
         character_name,
+        x,
+        y,
+        stance,
     })
 }
 

@@ -46,7 +46,7 @@ impl PacketHandler for ChangeMapHandler {
             let warp_packet = build::world::map::build_warp_to_map(&chr.character, target, 0)?;
             result = result
                 .with_reply(warp_packet)
-                .with_map_changed(old_map_id, target);
+                .with_map_changed(old_map_id, target, None, None, None, None);
         } else {
             let game_data = crate::game_data::get()?;
             let source_field = game_data
@@ -74,15 +74,26 @@ impl PacketHandler for ChangeMapHandler {
             let spawn_point = u8::try_from(spawn_portal.id).map_err(|_| {
                 NetworkError::PacketHandlerError("Destination spawn portal id out of range")
             })?;
+            let spawn_x = i16::try_from(spawn_portal.x).map_err(|_| {
+                NetworkError::PacketHandlerError("Destination spawn portal x out of range")
+            })?;
+            let spawn_y = i16::try_from(spawn_portal.y).map_err(|_| {
+                NetworkError::PacketHandlerError("Destination spawn portal y out of range")
+            })?;
 
             chr.character.map_id = destination_map;
             chr.character.save()?;
 
             let warp_packet =
                 build::world::map::build_warp_to_map(&chr.character, destination_map, spawn_point)?;
-            result = result
-                .with_reply(warp_packet)
-                .with_map_changed(old_map_id, destination_map);
+            result = result.with_reply(warp_packet).with_map_changed(
+                old_map_id,
+                destination_map,
+                Some(spawn_point),
+                Some(spawn_x),
+                Some(spawn_y),
+                Some(2),
+            );
         }
 
         let stat_packet = build::world::map::build_empty_stat_update()?;

@@ -11,4 +11,5 @@ toml = "0.8"
 crypt = { path = "../crypt" }
 packet = { path = "../packet" }
 net = { path = "../net" }
+game-data = { path = "../game-data" }
 rand = "0.8"
