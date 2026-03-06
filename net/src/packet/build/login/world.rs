@@ -1,5 +1,7 @@
 use crate::{error::NetworkError, packet::op::SendOpcode};
 use packet::{io::write::PktWrite, Packet};
+use std::env;
+use std::net::Ipv4Addr;
 
 pub fn build_end_of_world_list() -> Result<Packet, NetworkError> {
     let mut packet = Packet::new_empty();
@@ -92,13 +94,19 @@ pub fn build_server_redirect(cid: i32) -> Result<Packet, NetworkError> {
     let mut packet = Packet::new_empty();
     let op = SendOpcode::ServerIp as i16;
 
-    let server_ip = vec![127, 0, 0, 1];
-    let server_port = 8485;
+    let server_ip = env::var("RUSTMS_WORLD_REDIRECT_HOST")
+        .ok()
+        .and_then(|host| host.parse::<Ipv4Addr>().ok())
+        .unwrap_or(Ipv4Addr::new(127, 0, 0, 1));
+    let server_port = env::var("RUSTMS_WORLD_REDIRECT_PORT")
+        .ok()
+        .and_then(|port| port.parse::<i16>().ok())
+        .unwrap_or(8485);
 
     packet.write_short(op)?;
     packet.write_short(0)?;
 
-    packet.write_bytes(&server_ip)?;
+    packet.write_bytes(&server_ip.octets())?;
     packet.write_short(server_port)?;
     packet.write_int(cid)?;
 

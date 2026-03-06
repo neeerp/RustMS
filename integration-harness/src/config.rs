@@ -1,32 +1,10 @@
 use crate::error::HarnessError;
-use serde::Deserialize;
-use std::fs;
+use rand::distributions::Alphanumeric;
+use rand::{thread_rng, Rng};
 use std::net::SocketAddr;
-use std::path::{Path, PathBuf};
 
 const DEFAULT_LOGIN_ADDR: &str = "127.0.0.1:8484";
 const DEFAULT_WORLD_ADDR: &str = "127.0.0.1:8485";
-const CONFIG_FILE_NAME: &str = "integration-harness.toml";
-
-#[derive(Debug, Deserialize)]
-struct HarnessConfigFile {
-    username: Option<String>,
-    password: Option<String>,
-    character_name: Option<String>,
-    gender: Option<u8>,
-    login_addr: Option<String>,
-    world_addr: Option<String>,
-    players: Option<Vec<HarnessPlayerConfigFile>>,
-}
-
-#[derive(Debug, Deserialize)]
-struct HarnessPlayerConfigFile {
-    role: String,
-    username: String,
-    password: String,
-    character_name: String,
-    gender: Option<u8>,
-}
 
 #[derive(Debug, Clone)]
 pub struct HarnessConfig {
@@ -55,108 +33,40 @@ pub struct MultiHarnessConfig {
 }
 
 impl HarnessConfig {
-    pub fn from_file() -> Result<Self, HarnessError> {
-        Self::from_path(default_config_path())
-    }
-
-    pub fn from_path(path: impl AsRef<Path>) -> Result<Self, HarnessError> {
-        let path = path.as_ref();
-        if !path.exists() {
-            return Err(HarnessError::MissingConfigFile {
-                path: path.display().to_string(),
-            });
-        }
-
-        let raw = read_raw_config(path)?;
-
-        let login_addr = parse_addr(
-            "login_addr",
-            raw.login_addr
-                .unwrap_or_else(|| DEFAULT_LOGIN_ADDR.to_string()),
-        )?;
-        let world_addr = parse_addr(
-            "world_addr",
-            raw.world_addr
-                .unwrap_or_else(|| DEFAULT_WORLD_ADDR.to_string()),
-        )?;
-
-        Ok(Self {
-            username: require_field("username", raw.username)?,
-            password: require_field("password", raw.password)?,
-            character_name: require_field("character_name", raw.character_name)?,
-            gender: raw.gender.unwrap_or(0),
+    pub fn random(login_addr: SocketAddr, world_addr: SocketAddr) -> Self {
+        Self {
+            username: random_name("iu"),
+            password: "test".to_string(),
+            character_name: random_name("ic"),
+            gender: 0,
             login_addr,
             world_addr,
-        })
+        }
     }
 }
 
 impl MultiHarnessConfig {
-    pub fn from_file() -> Result<Self, HarnessError> {
-        Self::from_path(default_config_path())
-    }
-
-    pub fn from_path(path: impl AsRef<Path>) -> Result<Self, HarnessError> {
-        let path = path.as_ref();
-        let raw = read_raw_config(path)?;
-        let login_addr = parse_addr(
-            "login_addr",
-            raw.login_addr
-                .unwrap_or_else(|| DEFAULT_LOGIN_ADDR.to_string()),
-        )?;
-        let world_addr = parse_addr(
-            "world_addr",
-            raw.world_addr
-                .unwrap_or_else(|| DEFAULT_WORLD_ADDR.to_string()),
-        )?;
-
-        let players = raw.players.ok_or_else(|| {
-            HarnessError::fixture(
-                "integration config",
-                "expected at least two [[players]] entries in integration-harness.toml",
-            )
-        })?;
-        if players.len() < 2 {
-            return Err(HarnessError::fixture(
-                "integration config",
-                "expected at least two [[players]] entries in integration-harness.toml",
-            ));
-        }
-
-        let players = players
-            .into_iter()
-            .map(|player| HarnessPlayerConfig {
-                role: player.role,
-                username: player.username,
-                password: player.password,
-                character_name: player.character_name,
-                gender: player.gender.unwrap_or(0),
-            })
-            .collect::<Vec<_>>();
-
-        let sender_count = players
-            .iter()
-            .filter(|player| player.role == "sender")
-            .count();
-        let recipient_count = players
-            .iter()
-            .filter(|player| player.role == "recipient")
-            .count();
-        if sender_count != 1 || recipient_count != 1 {
-            return Err(HarnessError::fixture(
-                "integration config",
-                format!(
-                    "expected exactly one sender and one recipient player, got sender={} recipient={}",
-                    sender_count, recipient_count
-                ),
-            ));
-        }
-
-        Ok(Self {
+    pub fn random_pair(login_addr: SocketAddr, world_addr: SocketAddr) -> Self {
+        Self {
             login_addr,
             world_addr,
-            players,
-        })
+            players: vec![
+                HarnessPlayerConfig {
+                    role: "sender".to_string(),
+                    username: random_name("is"),
+                    password: "test".to_string(),
+                    character_name: random_name("cs"),
+                    gender: 0,
+                },
+                HarnessPlayerConfig {
+                    role: "recipient".to_string(),
+                    username: random_name("ir"),
+                    password: "test".to_string(),
+                    character_name: random_name("cr"),
+                    gender: 0,
+                },
+            ],
+        }
     }
 
     pub fn player(&self, role: &str) -> Result<HarnessConfig, HarnessError> {
@@ -182,39 +92,15 @@ impl MultiHarnessConfig {
     }
 }
 
-fn default_config_path() -> PathBuf {
-    let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-    manifest_dir
-        .parent()
-        .expect("integration-harness crate must live under the workspace root")
-        .join(CONFIG_FILE_NAME)
-}
-
-fn read_raw_config(path: &Path) -> Result<HarnessConfigFile, HarnessError> {
-    if !path.exists() {
-        return Err(HarnessError::MissingConfigFile {
-            path: path.display().to_string(),
-        });
-    }
-
-    let contents = fs::read_to_string(path).map_err(|source| HarnessError::ConfigRead {
-        path: path.display().to_string(),
-        source,
-    })?;
-
-    toml::from_str(&contents).map_err(|source| HarnessError::ConfigParse {
-        path: path.display().to_string(),
-        message: source.to_string(),
-    })
-}
-
-fn require_field(name: &'static str, value: Option<String>) -> Result<String, HarnessError> {
-    value.ok_or_else(|| {
-        HarnessError::fixture(
-            "integration config",
-            format!("missing required top-level field `{name}` in integration-harness.toml"),
-        )
-    })
+pub fn harness_addrs_from_env() -> Result<(SocketAddr, SocketAddr), HarnessError> {
+    let login =
+        std::env::var("HARNESS_LOGIN_ADDR").unwrap_or_else(|_| DEFAULT_LOGIN_ADDR.to_string());
+    let world =
+        std::env::var("HARNESS_WORLD_ADDR").unwrap_or_else(|_| DEFAULT_WORLD_ADDR.to_string());
+    Ok((
+        parse_addr("HARNESS_LOGIN_ADDR", login)?,
+        parse_addr("HARNESS_WORLD_ADDR", world)?,
+    ))
 }
 
 fn parse_addr(name: &'static str, value: String) -> Result<SocketAddr, HarnessError> {
@@ -225,4 +111,17 @@ fn parse_addr(name: &'static str, value: String) -> Result<SocketAddr, HarnessEr
             value,
             source,
         })
+}
+
+fn random_name(prefix: &str) -> String {
+    let mut rng = thread_rng();
+    let suffix = (&mut rng)
+        .sample_iter(&Alphanumeric)
+        .map(char::from)
+        .map(|ch| ch.to_ascii_lowercase())
+        .take(10)
+        .collect::<String>();
+    let mut candidate = format!("{prefix}{suffix}");
+    candidate.truncate(13);
+    candidate
 }

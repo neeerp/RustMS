@@ -1,0 +1,65 @@
+services:
+  db:
+    image: postgres:16
+    stop_grace_period: 100ms
+    environment:
+      POSTGRES_USER: maplestory
+      POSTGRES_PASSWORD: pass
+      POSTGRES_DB: maplestory_test
+    ports:
+      - "15432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U maplestory -d maplestory_test"]
+      interval: 1s
+      timeout: 5s
+      retries: 30
+
+  migrate:
+    image: postgres:16
+    stop_grace_period: 100ms
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - ../db/migrations:/migrations:ro
+    environment:
+      PGPASSWORD: pass
+    entrypoint: ["sh", "-ec"]
+    command:
+      - |
+        for migration in /migrations/*/up.sql; do
+          psql -h db -U maplestory -d maplestory_test -v ON_ERROR_STOP=1 -f "$$migration"
+        done
+
+  login:
+    image: rustms-server:integration
+    stop_grace_period: 100ms
+    build:
+      context: ..
+      dockerfile: Dockerfile.rustms-server
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    environment:
+      RUSTMS_DATABASE_URL: postgres://maplestory:pass@db:5432/maplestory_test
+      RUSTMS_LOGIN_BIND_ADDR: 0.0.0.0:8484
+      RUSTMS_WORLD_REDIRECT_HOST: 127.0.0.1
+      RUSTMS_WORLD_REDIRECT_PORT: 18485
+    ports:
+      - "18484:8484"
+    command: ["/usr/local/bin/login"]
+
+  world:
+    image: rustms-server:integration
+    stop_grace_period: 100ms
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    environment:
+      RUSTMS_DATABASE_URL: postgres://maplestory:pass@db:5432/maplestory_test
+      RUSTMS_WORLD_BIND_ADDR: 0.0.0.0:8485
+    volumes:
+      - ../assets:/app/assets:ro
+    ports:
+      - "18485:8485"
+    command: ["/usr/local/bin/world"]

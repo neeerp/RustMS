@@ -1,5 +1,4 @@
-use crate::config::{HarnessConfig, MultiHarnessConfig};
-use crate::error::HarnessError;
+use crate::config::{harness_addrs_from_env, HarnessConfig, MultiHarnessConfig};
 use std::net::SocketAddr;
 use tokio::net::TcpStream;
 use tokio::time::{timeout, Duration};
@@ -7,13 +6,15 @@ use tokio::time::{timeout, Duration};
 const SERVER_CHECK_TIMEOUT: Duration = Duration::from_millis(250);
 
 pub async fn load_harness_config_or_fail() -> HarnessConfig {
-    let config = load_or_panic_config(HarnessConfig::from_file(), "single-player");
+    let (login_addr, world_addr) = load_or_panic_addrs();
+    let config = HarnessConfig::random(login_addr, world_addr);
     assert_servers_reachable(config.login_addr, config.world_addr).await;
     config
 }
 
 pub async fn load_multi_harness_config_or_fail() -> MultiHarnessConfig {
-    let config = load_or_panic_config(MultiHarnessConfig::from_file(), "multi-player");
+    let (login_addr, world_addr) = load_or_panic_addrs();
+    let config = MultiHarnessConfig::random_pair(login_addr, world_addr);
     assert_servers_reachable(config.login_addr, config.world_addr).await;
     config
 }
@@ -35,14 +36,7 @@ async fn endpoint_reachable(endpoint: SocketAddr) -> bool {
     )
 }
 
-fn load_or_panic_config<T>(result: Result<T, HarnessError>, config_kind: &'static str) -> T {
-    match result {
-        Ok(config) => config,
-        Err(HarnessError::MissingConfigFile { path }) => {
-            panic!(
-                "integration precondition failed: missing {config_kind} harness config file at `{path}`"
-            )
-        }
-        Err(other) => panic!("failed to load {config_kind} integration harness config: {other}"),
-    }
+fn load_or_panic_addrs() -> (SocketAddr, SocketAddr) {
+    harness_addrs_from_env()
+        .unwrap_or_else(|error| panic!("failed to parse integration harness addresses: {error}"))
 }
