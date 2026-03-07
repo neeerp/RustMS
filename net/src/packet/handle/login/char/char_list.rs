@@ -21,6 +21,7 @@ impl PacketHandler for CharListHandler {
     ) -> Result<HandlerResult, NetworkError> {
         let mut reader = BufReader::new(&**packet);
         reader.read_short()?;
+        reader.read_byte()?;
 
         let world = reader.read_byte()?;
         let channel = reader.read_byte()?;

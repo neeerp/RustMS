@@ -246,6 +246,9 @@ pub fn build_set_gender(gender: u8) -> Result<Packet, String> {
 pub fn build_char_list_request(world_id: u8, channel_id: u8) -> Result<Packet, String> {
     let mut packet = packet_with_opcode(RecvOpcode::CharListRequest as i16);
     packet
+        .write_byte(0)
+        .map_err(|e| format!("failed to write char list padding byte: {e}"))?;
+    packet
         .write_byte(world_id)
         .map_err(|e| format!("failed to write world id: {e}"))?;
     packet
