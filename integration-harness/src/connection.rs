@@ -2,6 +2,7 @@ use crate::error::HarnessError;
 use crate::handshake::Handshake;
 use crypt::{maple_crypt, MapleAES};
 use packet::{Packet, MAX_PACKET_LENGTH};
+use std::collections::VecDeque;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpStream;
 
@@ -18,6 +19,7 @@ impl PacketEnvelope {
 
 pub struct MapleTestConnection {
     endpoint: std::net::SocketAddr,
+    buffered_packets: VecDeque<PacketEnvelope>,
     stream: TcpStream,
     handshake: Handshake,
     send_cipher: MapleAES,
@@ -39,6 +41,7 @@ impl MapleTestConnection {
 
         Ok(Self {
             endpoint,
+            buffered_packets: VecDeque::new(),
             stream,
             handshake,
             send_cipher,
@@ -79,10 +82,18 @@ impl MapleTestConnection {
             .map_err(|source| HarnessError::io(phase, self.endpoint, source))
     }
 
+    pub fn push_back_packet(&mut self, packet: PacketEnvelope) {
+        self.buffered_packets.push_front(packet);
+    }
+
     pub async fn read_packet(
         &mut self,
         phase: &'static str,
     ) -> Result<PacketEnvelope, HarnessError> {
+        if let Some(packet) = self.buffered_packets.pop_front() {
+            return Ok(packet);
+        }
+
         let mut header = [0u8; 4];
         self.stream
             .read_exact(&mut header)

@@ -234,6 +234,8 @@ pub async fn login_to_world_session(config: &HarnessConfig) -> Result<WorldSessi
         ));
     }
 
+    drain_spawn_npcs(&mut world_conn).await;
+
     Ok(WorldSession {
         connection: world_conn,
         character_id: world_entry.character_id,
@@ -242,6 +244,20 @@ pub async fn login_to_world_session(config: &HarnessConfig) -> Result<WorldSessi
         login_addr: config.login_addr.to_string(),
         world_addr: config.world_addr.to_string(),
     })
+}
+
+async fn drain_spawn_npcs(connection: &mut MapleTestConnection) {
+    while let Ok(Ok(envelope)) = timeout(
+        Duration::from_millis(100),
+        connection.read_packet("drain spawn npcs"),
+    )
+    .await
+    {
+        if envelope.opcode() != SendOpcode::SpawnNpc as i16 {
+            connection.push_back_packet(envelope);
+            break;
+        }
+    }
 }
 
 pub async fn login_two_players_to_world(

@@ -2,7 +2,8 @@ use game_data::GameData;
 use integration_harness::connection::MapleTestConnection;
 use integration_harness::login_two_players_to_world;
 use integration_harness::packets::{
-    build_change_map, decode_set_field_warp, decode_spawn_player, opcode_name, SetFieldWarpPacket,
+    build_change_map, decode_set_field_warp, decode_spawn_npc, decode_spawn_player, opcode_name,
+    SetFieldWarpPacket,
 };
 use integration_harness::preconditions::load_multi_harness_config_or_fail;
 use net::packet::op::SendOpcode;
@@ -16,28 +17,18 @@ async fn portal_transfer_spawns_at_destination_portal_for_observers() {
         .await
         .expect("two-player login-to-world flow failed");
 
-    let _ = decode_spawn_player(
-        &timeout(
-            Duration::from_secs(5),
-            mover.connection.read_packet("mover initial presence"),
-        )
-        .await
-        .expect("timed out waiting for mover initial presence")
-        .expect("failed to read mover initial presence")
-        .packet,
+    let _ = timeout(
+        Duration::from_secs(5),
+        read_spawn_player(&mut mover.connection, "mover initial presence"),
     )
-    .expect("failed to decode mover initial presence");
-    let _ = decode_spawn_player(
-        &timeout(
-            Duration::from_secs(5),
-            observer.connection.read_packet("observer initial presence"),
-        )
-        .await
-        .expect("timed out waiting for observer initial presence")
-        .expect("failed to read observer initial presence")
-        .packet,
+    .await
+    .expect("timed out waiting for mover initial presence");
+    let _ = timeout(
+        Duration::from_secs(5),
+        read_spawn_player(&mut observer.connection, "observer initial presence"),
     )
-    .expect("failed to decode observer initial presence");
+    .await
+    .expect("timed out waiting for observer initial presence");
 
     mover
         .connection
@@ -108,17 +99,12 @@ async fn portal_transfer_spawns_at_destination_portal_for_observers() {
         "expected mover warp to use destination portal id"
     );
 
-    let observer_spawn = decode_spawn_player(
-        &timeout(
-            Duration::from_secs(5),
-            observer.connection.read_packet("observer sees mover portal spawn"),
-        )
-        .await
-        .expect("timed out waiting for observer portal spawn")
-        .expect("failed to read observer portal spawn")
-        .packet,
+    let observer_spawn = timeout(
+        Duration::from_secs(5),
+        read_spawn_player(&mut observer.connection, "observer sees mover portal spawn"),
     )
-    .expect("failed to decode observer portal spawn");
+    .await
+    .expect("timed out waiting for observer portal spawn");
     assert_eq!(observer_spawn.character_id, mover.character_id);
     assert_eq!(observer_spawn.character_name, mover.character_name);
     assert_eq!(observer_spawn.x, destination_portal.1);
@@ -164,7 +150,7 @@ async fn read_next_set_field_warp(
     connection: &mut MapleTestConnection,
     phase: &'static str,
 ) -> SetFieldWarpPacket {
-    for _ in 0..4 {
+    for _ in 0..32 {
         let envelope = timeout(Duration::from_secs(5), connection.read_packet(phase))
             .await
             .expect("timed out waiting for map-transfer packet")
@@ -176,6 +162,7 @@ async fn read_next_set_field_warp(
                     .expect("failed to decode set-field warp packet");
             }
             x if x == SendOpcode::StatChange as i16 => continue,
+            x if x == SendOpcode::SpawnNpc as i16 => continue,
             opcode => {
                 panic!(
                     "unexpected opcode {} ({}) during map transfer",
@@ -199,4 +186,22 @@ async fn read_next_stat_change(connection: &mut MapleTestConnection, phase: &'st
         SendOpcode::StatChange as i16,
         "expected stat-change packet after map transfer"
     );
+}
+
+async fn read_spawn_player(
+    connection: &mut MapleTestConnection,
+    phase: &'static str,
+) -> integration_harness::packets::SpawnPlayerPacket {
+    loop {
+        let envelope = timeout(Duration::from_secs(5), connection.read_packet(phase))
+            .await
+            .expect("timed out waiting for spawn-player packet")
+            .expect("failed to read spawn-player packet");
+
+        if let Ok(spawn) = decode_spawn_player(&envelope.packet) {
+            return spawn;
+        }
+
+        let _ = decode_spawn_npc(&envelope.packet);
+    }
 }

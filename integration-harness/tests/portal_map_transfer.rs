@@ -72,7 +72,7 @@ async fn read_next_set_field_warp(
     connection: &mut MapleTestConnection,
     phase: &'static str,
 ) -> SetFieldWarpPacket {
-    for _ in 0..4 {
+    for _ in 0..32 {
         let envelope = timeout(Duration::from_secs(5), connection.read_packet(phase))
             .await
             .expect("timed out waiting for map-transfer packet")
@@ -84,6 +84,7 @@ async fn read_next_set_field_warp(
                     .expect("failed to decode set-field warp packet");
             }
             x if x == SendOpcode::StatChange as i16 => continue,
+            x if x == SendOpcode::SpawnNpc as i16 => continue,
             opcode => {
                 panic!(
                     "unexpected opcode {} ({}) during map transfer",
