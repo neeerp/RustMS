@@ -18,6 +18,12 @@ The stack includes:
 
 If your user was just added to the `docker` group, start a new shell session (or run `newgrp docker`).
 
+If Docker is installed and running but your current shell is not in the `docker` group yet, you can run the harness through `sg` instead of restarting the shell:
+
+```sh
+sg docker -c 'cargo run -p integration-harness --bin harnessctl -- test'
+```
+
 ## Wrapper CLI
 
 Use `harnessctl` as the canonical entrypoint:
@@ -40,12 +46,26 @@ Run the full suite with managed infrastructure:
 cargo run -p integration-harness --bin harnessctl -- test
 ```
 
+If the current shell does not have Docker socket access yet:
+
+```sh
+sg docker -c 'cargo run -p integration-harness --bin harnessctl -- test'
+```
+
 Run a single test while reusing a running stack:
 
 ```sh
 cargo run -p integration-harness --bin harnessctl -- up
 HARNESS_LOGIN_ADDR=127.0.0.1:18484 HARNESS_WORLD_ADDR=127.0.0.1:18485 cargo test -p integration-harness presence_same_map -- --nocapture
 cargo run -p integration-harness --bin harnessctl -- down
+```
+
+Equivalent `sg` workflow when the shell lacks Docker group access:
+
+```sh
+sg docker -c 'cargo run -p integration-harness --bin harnessctl -- up'
+HARNESS_LOGIN_ADDR=127.0.0.1:18484 HARNESS_WORLD_ADDR=127.0.0.1:18485 cargo test -p integration-harness presence_same_map -- --nocapture
+sg docker -c 'cargo run -p integration-harness --bin harnessctl -- down'
 ```
 
 ## Addresses
