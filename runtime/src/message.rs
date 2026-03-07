@@ -18,6 +18,7 @@ pub struct FieldCharacter {
     pub hair: i32,
     pub skin: i32,
     pub gender: i16,
+    pub channel_id: u8,
     pub map_id: i32,
     pub x: i16,
     pub y: i16,
@@ -27,7 +28,7 @@ pub struct FieldCharacter {
 impl FieldCharacter {
     pub fn field_key(&self) -> FieldKey {
         FieldKey {
-            channel_id: 0,
+            channel_id: self.channel_id,
             map_id: self.map_id,
             instance_id: 0,
         }

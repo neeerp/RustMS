@@ -83,7 +83,7 @@ impl WorldServerActor {
                     spawn_y,
                     spawn_stance,
                 )
-                    .await;
+                .await;
             }
             ClientEvent::Broadcast {
                 from,
@@ -318,19 +318,33 @@ impl WorldServerActor {
     }
 
     fn get_broadcast_targets(&self, from: ClientId, scope: &BroadcastScope) -> Vec<ClientId> {
+        let sender_channel_id = self
+            .clients
+            .get(&from)
+            .map(|entry| entry.field_key.channel_id);
+
         match scope {
             BroadcastScope::Map(map_id) => self
                 .clients
                 .iter()
                 .filter_map(|(&client_id, entry)| {
-                    (entry.field_key.map_id == *map_id).then_some(client_id)
+                    (entry.field_key.map_id == *map_id
+                        && sender_channel_id
+                            .map(|channel_id| entry.field_key.channel_id == channel_id)
+                            .unwrap_or(true))
+                    .then_some(client_id)
                 })
                 .collect(),
             BroadcastScope::MapExcludeSelf(map_id) => self
                 .clients
                 .iter()
                 .filter_map(|(&client_id, entry)| {
-                    (entry.field_key.map_id == *map_id && client_id != from).then_some(client_id)
+                    (entry.field_key.map_id == *map_id
+                        && client_id != from
+                        && sender_channel_id
+                            .map(|channel_id| entry.field_key.channel_id == channel_id)
+                            .unwrap_or(true))
+                    .then_some(client_id)
                 })
                 .collect(),
             BroadcastScope::World => self.clients.keys().copied().collect(),
@@ -418,6 +432,7 @@ mod tests {
     use net::packet::op::SendOpcode;
     use packet::io::read::PktRead;
     use std::io::Cursor;
+    use tokio::time::{timeout, Duration};
 
     fn test_character(id: i32, name: &str, map_id: i32, x: i16, y: i16) -> FieldCharacter {
         FieldCharacter {
@@ -429,6 +444,7 @@ mod tests {
             hair: 30000,
             skin: 0,
             gender: 0,
+            channel_id: 0,
             map_id,
             x,
             y,
@@ -499,5 +515,44 @@ mod tests {
         };
         let (x, y, stance) = decode_spawn_position(&packet);
         assert_eq!((x, y, stance), (202, 124, 2));
+    }
+
+    #[tokio::test]
+    async fn same_map_different_channels_do_not_share_presence() {
+        let (world_tx, world_rx) = mpsc::channel(16);
+        let world = WorldServerActor::new(world_rx);
+        tokio::spawn(world.run());
+
+        let (first_tx, mut first_rx) = mpsc::channel(16);
+        let (second_tx, mut second_rx) = mpsc::channel(16);
+
+        let mut first_character = test_character(1, "first", 100000000, 240, 190);
+        first_character.channel_id = 0;
+        let mut second_character = test_character(2, "second", 100000000, 240, 190);
+        second_character.channel_id = 1;
+
+        world_tx
+            .send(ClientEvent::Connected {
+                client_id: 1,
+                sender: first_tx,
+                character: first_character,
+            })
+            .await
+            .unwrap();
+        world_tx
+            .send(ClientEvent::Connected {
+                client_id: 2,
+                sender: second_tx,
+                character: second_character,
+            })
+            .await
+            .unwrap();
+
+        assert!(timeout(Duration::from_millis(100), first_rx.recv())
+            .await
+            .is_err());
+        assert!(timeout(Duration::from_millis(100), second_rx.recv())
+            .await
+            .is_err());
     }
 }

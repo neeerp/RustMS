@@ -27,8 +27,15 @@ impl PacketHandler for PlayerLoggedInHandler {
         match ctx.session.get_character() {
             Ok(character) => {
                 let mut chr = character.lock().unwrap();
+                let channel_id = ctx
+                    .session
+                    .session
+                    .as_ref()
+                    .and_then(|session| session.selected_channel_id)
+                    .unwrap_or(0) as u8;
                 let keymap_packet = build::world::keymap::build_keymap(&mut chr.key_binds)?;
-                let char_info_packet = build::world::char::build_char_info(&chr.character)?;
+                let char_info_packet =
+                    build::world::char::build_char_info(&chr.character, channel_id)?;
 
                 Ok(HandlerResult::empty()
                     .with_reattach_session(character_id)

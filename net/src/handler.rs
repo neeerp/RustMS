@@ -135,6 +135,8 @@ pub enum HandlerAction {
     },
     /// Attach a character to the current session
     AttachCharacter { character_id: i32 },
+    /// Persist the currently selected world and channel for login handoff.
+    UpdateSessionSelection { world_id: u8, channel_id: u8 },
     /// Reattach session from login server (world server)
     ReattachSession { character_id: i32 },
     /// Deliver a directed whisper to another player.
@@ -226,6 +228,15 @@ impl HandlerResult {
     pub fn with_attach_character(mut self, character_id: i32) -> Self {
         self.actions
             .push(HandlerAction::AttachCharacter { character_id });
+        self
+    }
+
+    /// Persist the selected world and channel for the current session.
+    pub fn with_update_session_selection(mut self, world_id: u8, channel_id: u8) -> Self {
+        self.actions.push(HandlerAction::UpdateSessionSelection {
+            world_id,
+            channel_id,
+        });
         self
     }
 

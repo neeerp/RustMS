@@ -2,7 +2,7 @@ use crate::error::RuntimeError;
 use crate::handler::{ClientId, HandlerAction, HandlerContext, HandlerResult};
 use crate::io::{PacketReader, PacketWriter};
 use crate::message::{ClientEvent, FieldCharacter, ServerMessage};
-use db::session::SessionWrapper;
+use db::session::{SessionState, SessionWrapper};
 use net::get_handler;
 use net::listener::ServerType;
 use net::packet::build;
@@ -254,6 +254,9 @@ impl ClientActor {
                     // Force reload character
                     let _ = self.session.get_character();
                 }
+                HandlerAction::UpdateSessionSelection { .. } => {
+                    warn!("UpdateSessionSelection action ignored in world server");
+                }
                 HandlerAction::ReattachSession { character_id } => {
                     // Reattach session from login server
                     info!(character_id, "Reattaching session for character");
@@ -262,8 +265,12 @@ impl ClientActor {
                     // Load session from database by character_id
                     // Build packets synchronously, then release all locks before await
                     let reattach_result: Option<(FieldCharacter, Packet, Packet)> = (|| {
-                        let session =
-                            db::session::get_session_by_character_id(character_id).ok()?;
+                        let mut session =
+                            db::session::get_transition_session_by_character_id(character_id)
+                                .ok()?;
+                        let channel_id = session.selected_channel_id.unwrap_or(0) as u8;
+                        session.state = SessionState::InGame;
+                        let session = db::session::update_session(&session).ok()?;
                         let wrapper = SessionWrapper::from(session).ok()?;
                         self.session = wrapper;
                         let chr_ref = self.session.get_character().ok()?;
@@ -277,6 +284,7 @@ impl ClientActor {
                             hair: chr.character.hair,
                             skin: chr.character.skin,
                             gender: chr.character.gender,
+                            channel_id,
                             map_id: chr.character.map_id,
                             x: 240,
                             y: 190,
@@ -287,7 +295,7 @@ impl ClientActor {
                         let keymap_packet =
                             build::world::keymap::build_keymap(&mut chr.key_binds).ok()?;
                         let char_info_packet =
-                            build::world::char::build_char_info(&chr.character).ok()?;
+                            build::world::char::build_char_info(&chr.character, channel_id).ok()?;
 
                         Some((character, keymap_packet, char_info_packet))
                     })(
@@ -345,6 +353,7 @@ impl ClientActor {
     pub async fn register_with_world(
         &mut self,
         character_id: i32,
+        channel_id: u8,
         map_id: i32,
         character_name: String,
     ) -> Result<(), RuntimeError> {
@@ -362,6 +371,7 @@ impl ClientActor {
                 hair: 30000,
                 skin: 0,
                 gender: 0,
+                channel_id,
                 map_id,
                 x: 240,
                 y: 190,

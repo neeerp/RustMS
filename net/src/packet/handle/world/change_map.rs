@@ -33,6 +33,12 @@ impl PacketHandler for ChangeMapHandler {
 
         let mut result = HandlerResult::empty();
         let old_map_id = chr.character.map_id;
+        let channel_id = ctx
+            .session
+            .session
+            .as_ref()
+            .and_then(|session| session.selected_channel_id)
+            .unwrap_or(0) as u8;
 
         if target != -1 {
             let game_data = crate::game_data::get()?;
@@ -43,7 +49,8 @@ impl PacketHandler for ChangeMapHandler {
             chr.character.map_id = target;
             chr.character.save()?;
 
-            let warp_packet = build::world::map::build_warp_to_map(&chr.character, target, 0)?;
+            let warp_packet =
+                build::world::map::build_warp_to_map(&chr.character, target, 0, channel_id)?;
             result = result
                 .with_reply(warp_packet)
                 .with_map_changed(old_map_id, target, None, None, None, None);
@@ -84,8 +91,12 @@ impl PacketHandler for ChangeMapHandler {
             chr.character.map_id = destination_map;
             chr.character.save()?;
 
-            let warp_packet =
-                build::world::map::build_warp_to_map(&chr.character, destination_map, spawn_point)?;
+            let warp_packet = build::world::map::build_warp_to_map(
+                &chr.character,
+                destination_map,
+                spawn_point,
+                channel_id,
+            )?;
             result = result.with_reply(warp_packet).with_map_changed(
                 old_map_id,
                 destination_map,

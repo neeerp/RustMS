@@ -49,14 +49,13 @@ pub fn _build_family_info() -> Result<Packet, NetworkError> {
     Ok(packet)
 }
 
-pub fn build_char_info(character: &Character) -> Result<Packet, NetworkError> {
+pub fn build_char_info(character: &Character, channel_id: u8) -> Result<Packet, NetworkError> {
     let mut packet = Packet::new_empty();
 
     let op = SendOpcode::SetField as i16;
     packet.write_short(op)?;
 
-    let channel = 0;
-    packet.write_int(channel)?;
+    packet.write_int(i32::from(channel_id))?;
 
     packet.write_byte(1)?;
     packet.write_byte(1)?;

@@ -14,6 +14,7 @@ use crate::packets::{
     ServerListPacket,
 };
 use net::packet::op::SendOpcode;
+use std::net::Ipv4Addr;
 use std::time::Duration;
 use tokio::time::timeout;
 
@@ -35,6 +36,13 @@ pub struct WorldSession {
     pub world_addr: String,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RedirectResult {
+    pub character_id: i32,
+    pub redirect_ip: Ipv4Addr,
+    pub redirect_port: u16,
+}
+
 pub async fn login_to_world(config: &HarnessConfig) -> Result<WorldEntryResult, HarnessError> {
     let session = login_to_world_session(config).await?;
     Ok(WorldEntryResult {
@@ -46,7 +54,115 @@ pub async fn login_to_world(config: &HarnessConfig) -> Result<WorldEntryResult, 
     })
 }
 
+pub async fn login_to_redirect(config: &HarnessConfig) -> Result<RedirectResult, HarnessError> {
+    let (_, redirect) = login_until_redirect(config).await?;
+    Ok(redirect)
+}
+
 pub async fn login_to_world_session(config: &HarnessConfig) -> Result<WorldSession, HarnessError> {
+    let (selected, redirect) = login_until_redirect(config).await?;
+
+    let mut world_conn = MapleTestConnection::connect(config.world_addr, "world handshake").await?;
+    assert_handshake(
+        "world handshake",
+        world_conn.endpoint(),
+        world_conn.handshake().version,
+        world_conn.handshake().locale,
+    )?;
+
+    world_conn
+        .send_packet(
+            build_player_logged_in(selected.id).map_err(|message| {
+                HarnessError::protocol("world entry", config.world_addr, message)
+            })?,
+            "world entry",
+        )
+        .await?;
+
+    let mut saw_keymap = false;
+    let mut world_entry = None;
+
+    for _ in 0..8 {
+        let envelope = read_packet(&mut world_conn, "world entry").await?;
+        match envelope.opcode() {
+            x if x == SendOpcode::KeyMap as i16 => {
+                saw_keymap = true;
+            }
+            x if x == SendOpcode::SetField as i16 => {
+                let set_field = decode_set_field(&envelope.packet).map_err(|message| {
+                    HarnessError::protocol("world entry", world_conn.endpoint(), message)
+                })?;
+                if set_field.character_id != selected.id {
+                    return Err(HarnessError::protocol(
+                        "world entry",
+                        world_conn.endpoint(),
+                        format!(
+                            "expected SetField character id {} but got {}",
+                            selected.id, set_field.character_id
+                        ),
+                    ));
+                }
+                if set_field.character_name != selected.name {
+                    return Err(HarnessError::protocol(
+                        "world entry",
+                        world_conn.endpoint(),
+                        format!(
+                            "expected SetField character name `{}` but got `{}`",
+                            selected.name, set_field.character_name
+                        ),
+                    ));
+                }
+                world_entry = Some(set_field);
+            }
+            opcode => {
+                return Err(HarnessError::protocol(
+                    "world entry",
+                    world_conn.endpoint(),
+                    format!(
+                        "unexpected opcode {} ({}) during world entry",
+                        opcode,
+                        opcode_name(opcode)
+                    ),
+                ));
+            }
+        }
+
+        if saw_keymap && world_entry.is_some() {
+            break;
+        }
+    }
+
+    let world_entry = world_entry.ok_or_else(|| {
+        HarnessError::protocol(
+            "world entry",
+            world_conn.endpoint(),
+            "did not receive SetField during world entry".to_string(),
+        )
+    })?;
+
+    if !saw_keymap {
+        return Err(HarnessError::protocol(
+            "world entry",
+            world_conn.endpoint(),
+            "did not receive KeyMap during world entry".to_string(),
+        ));
+    }
+
+    drain_spawn_npcs(&mut world_conn).await;
+
+    Ok(WorldSession {
+        connection: world_conn,
+        character_id: world_entry.character_id,
+        character_name: world_entry.character_name,
+        map_id: world_entry.map_id,
+        login_addr: config.login_addr.to_string(),
+        world_addr: format!("{}:{}", redirect.redirect_ip, redirect.redirect_port),
+    })
+}
+
+async fn login_until_redirect(
+    config: &HarnessConfig,
+) -> Result<(CharacterSummary, RedirectResult), HarnessError> {
     let mut login_conn = MapleTestConnection::connect(config.login_addr, "login handshake").await?;
     assert_handshake(
         "login handshake",
@@ -147,103 +263,14 @@ pub async fn login_to_world_session(config: &HarnessConfig) -> Result<WorldSessi
             ),
         ));
     }
-
-    let mut world_conn = MapleTestConnection::connect(config.world_addr, "world handshake").await?;
-    assert_handshake(
-        "world handshake",
-        world_conn.endpoint(),
-        world_conn.handshake().version,
-        world_conn.handshake().locale,
-    )?;
-
-    world_conn
-        .send_packet(
-            build_player_logged_in(selected.id).map_err(|message| {
-                HarnessError::protocol("world entry", config.world_addr, message)
-            })?,
-            "world entry",
-        )
-        .await?;
-
-    let mut saw_keymap = false;
-    let mut world_entry = None;
-
-    for _ in 0..8 {
-        let envelope = read_packet(&mut world_conn, "world entry").await?;
-        match envelope.opcode() {
-            x if x == SendOpcode::KeyMap as i16 => {
-                saw_keymap = true;
-            }
-            x if x == SendOpcode::SetField as i16 => {
-                let set_field = decode_set_field(&envelope.packet).map_err(|message| {
-                    HarnessError::protocol("world entry", world_conn.endpoint(), message)
-                })?;
-                if set_field.character_id != selected.id {
-                    return Err(HarnessError::protocol(
-                        "world entry",
-                        world_conn.endpoint(),
-                        format!(
-                            "expected SetField character id {} but got {}",
-                            selected.id, set_field.character_id
-                        ),
-                    ));
-                }
-                if set_field.character_name != selected.name {
-                    return Err(HarnessError::protocol(
-                        "world entry",
-                        world_conn.endpoint(),
-                        format!(
-                            "expected SetField character name `{}` but got `{}`",
-                            selected.name, set_field.character_name
-                        ),
-                    ));
-                }
-                world_entry = Some(set_field);
-            }
-            opcode => {
-                return Err(HarnessError::protocol(
-                    "world entry",
-                    world_conn.endpoint(),
-                    format!(
-                        "unexpected opcode {} ({}) during world entry",
-                        opcode,
-                        opcode_name(opcode)
-                    ),
-                ));
-            }
-        }
-
-        if saw_keymap && world_entry.is_some() {
-            break;
-        }
-    }
-
-    let world_entry = world_entry.ok_or_else(|| {
-        HarnessError::protocol(
-            "world entry",
-            world_conn.endpoint(),
-            "did not receive SetField during world entry".to_string(),
-        )
-    })?;
-
-    if !saw_keymap {
-        return Err(HarnessError::protocol(
-            "world entry",
-            world_conn.endpoint(),
-            "did not receive KeyMap during world entry".to_string(),
-        ));
-    }
-
-    drain_spawn_npcs(&mut world_conn).await;
-
-    Ok(WorldSession {
-        connection: world_conn,
-        character_id: world_entry.character_id,
-        character_name: world_entry.character_name,
-        map_id: world_entry.map_id,
-        login_addr: config.login_addr.to_string(),
-        world_addr: config.world_addr.to_string(),
-    })
+    Ok((
+        selected,
+        RedirectResult {
+            character_id: redirect.character_id,
+            redirect_ip: redirect.ip,
+            redirect_port: redirect.port,
+        },
+    ))
 }
 
 async fn drain_spawn_npcs(connection: &mut MapleTestConnection) {
@@ -360,7 +387,7 @@ async fn load_or_create_character(
     login_conn: &mut MapleTestConnection,
     config: &HarnessConfig,
 ) -> Result<CharacterSummary, HarnessError> {
-    let char_list = request_char_list(login_conn, "char list request", "char list").await?;
+    let char_list = request_char_list(login_conn, config, "char list request", "char list").await?;
     if let Some(character) = find_character(&char_list.characters, &config.character_name) {
         return Ok(character);
     }
@@ -402,7 +429,8 @@ async fn load_or_create_character(
         ));
     }
 
-    let char_list = request_char_list(login_conn, "char list refresh", "char list refresh").await?;
+    let char_list =
+        request_char_list(login_conn, config, "char list refresh", "char list refresh").await?;
     find_character(&char_list.characters, &config.character_name).ok_or_else(|| {
         let names = char_list
             .characters
@@ -422,12 +450,13 @@ async fn load_or_create_character(
 
 async fn request_char_list(
     login_conn: &mut MapleTestConnection,
+    config: &HarnessConfig,
     request_phase: &'static str,
     response_phase: &'static str,
 ) -> Result<crate::packets::CharListPacket, HarnessError> {
     login_conn
         .send_packet(
-            build_char_list_request(0, 0).map_err(|message| {
+            build_char_list_request(config.world_id, config.channel_id).map_err(|message| {
                 HarnessError::protocol(request_phase, login_conn.endpoint(), message)
             })?,
             request_phase,

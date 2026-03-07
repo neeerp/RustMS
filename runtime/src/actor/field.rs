@@ -244,6 +244,7 @@ mod tests {
             hair: 30000,
             skin: 0,
             gender: 0,
+            channel_id: 0,
             map_id: 1_000_000,
             x: 240,
             y: 190,
@@ -452,7 +453,10 @@ mod tests {
         match first_msg {
             ServerMessage::SendPacket(packet) => {
                 let mut cursor = Cursor::new(&packet.bytes[..]);
-                assert_eq!(cursor.read_short().expect("opcode"), SendOpcode::SpawnNpc as i16);
+                assert_eq!(
+                    cursor.read_short().expect("opcode"),
+                    SendOpcode::SpawnNpc as i16
+                );
                 assert_eq!(cursor.read_int().expect("object id"), 1_000_000_000);
                 assert_eq!(cursor.read_int().expect("npc id"), 2101);
             }

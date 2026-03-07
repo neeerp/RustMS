@@ -20,8 +20,7 @@ const DEFAULT_ACTION: [i16; 23] = [
 ];
 
 #[derive(Debug, Clone, Copy, DbEnum)]
-#[DieselType = "Keybind_type"]
-#[PgType = "keybind_type"]
+#[ExistingTypePath = "crate::schema::sql_types::KeybindType"]
 pub enum KeybindType {
     Nil,
     Skill,
