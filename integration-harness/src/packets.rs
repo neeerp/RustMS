@@ -79,6 +79,18 @@ pub struct SpawnPlayerPacket {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SpawnNpcPacket {
+    pub object_id: i32,
+    pub npc_id: i32,
+    pub x: i16,
+    pub y: i16,
+    pub flip: bool,
+    pub foothold: i16,
+    pub rx0: i16,
+    pub rx1: i16,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ChatTextPacket {
     pub character_id: i32,
     pub from_admin: bool,
@@ -170,6 +182,7 @@ pub fn opcode_name(opcode: i16) -> &'static str {
         x if x == SendOpcode::SetField as i16 => "SetField",
         x if x == SendOpcode::Whisper as i16 => "Whisper",
         x if x == SendOpcode::SpawnPlayer as i16 => "SpawnPlayer",
+        x if x == SendOpcode::SpawnNpc as i16 => "SpawnNpc",
         x if x == SendOpcode::RemovePlayerFromMap as i16 => "RemovePlayerFromMap",
         x if x == SendOpcode::ChatText as i16 => "ChatText",
         x if x == SendOpcode::MovePlayer as i16 => "MovePlayer",
@@ -637,6 +650,51 @@ pub fn decode_spawn_player(packet: &Packet) -> Result<SpawnPlayerPacket, String>
         x,
         y,
         stance,
+    })
+}
+
+pub fn decode_spawn_npc(packet: &Packet) -> Result<SpawnNpcPacket, String> {
+    expect_opcode(packet, SendOpcode::SpawnNpc as i16)?;
+
+    let mut cursor = Cursor::new(&packet.bytes[..]);
+    cursor
+        .read_short()
+        .map_err(|e| format!("failed to read spawn-npc opcode: {e}"))?;
+    let object_id = cursor
+        .read_int()
+        .map_err(|e| format!("failed to read spawn-npc object id: {e}"))?;
+    let npc_id = cursor
+        .read_int()
+        .map_err(|e| format!("failed to read spawn-npc npc id: {e}"))?;
+    let x = cursor
+        .read_short()
+        .map_err(|e| format!("failed to read spawn-npc x: {e}"))?;
+    let y = cursor
+        .read_short()
+        .map_err(|e| format!("failed to read spawn-npc y: {e}"))?;
+    let flip = cursor
+        .read_byte()
+        .map_err(|e| format!("failed to read spawn-npc flip: {e}"))?
+        != 0;
+    let foothold = cursor
+        .read_short()
+        .map_err(|e| format!("failed to read spawn-npc foothold: {e}"))?;
+    let rx0 = cursor
+        .read_short()
+        .map_err(|e| format!("failed to read spawn-npc rx0: {e}"))?;
+    let rx1 = cursor
+        .read_short()
+        .map_err(|e| format!("failed to read spawn-npc rx1: {e}"))?;
+
+    Ok(SpawnNpcPacket {
+        object_id,
+        npc_id,
+        x,
+        y,
+        flip,
+        foothold,
+        rx0,
+        rx1,
     })
 }
 

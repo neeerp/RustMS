@@ -1,9 +1,12 @@
+use crate::actor::field::FieldMapEntityNpc;
 use crate::actor::FieldActor;
 use crate::handler::{BroadcastScope, ClientId};
 use crate::message::{ClientEvent, FieldKey, FieldMessage, ServerMessage};
 use std::collections::HashMap;
 use tokio::sync::mpsc;
 use tracing::{info, warn};
+
+const MAP_NPC_OBJECT_ID_BASE: i32 = 1_000_000_000;
 
 /// Registry entry for a connected client.
 struct ClientEntry {
@@ -346,7 +349,8 @@ impl WorldServerActor {
         }
 
         let (field_tx, field_rx) = mpsc::channel(64);
-        let actor = FieldActor::new(field_key, field_rx);
+        let map_npcs = load_field_map_npcs(field_key);
+        let actor = FieldActor::new(field_key, field_rx, map_npcs);
         tokio::spawn(async move {
             actor.run().await;
         });
@@ -376,6 +380,35 @@ impl WorldServerActor {
             warn!(client_id, field = ?entry.field_key, "Failed to forward field event");
         }
     }
+}
+
+fn load_field_map_npcs(field_key: FieldKey) -> Vec<FieldMapEntityNpc> {
+    let Ok(game_data) = net::get_game_data() else {
+        warn!(field = ?field_key, "Failed to load game data for field NPCs");
+        return Vec::new();
+    };
+
+    let Some(field) = game_data.field(field_key.map_id) else {
+        return Vec::new();
+    };
+
+    field
+        .map_npcs
+        .iter()
+        .enumerate()
+        .filter_map(|(index, npc)| {
+            i32::try_from(index).ok().map(|offset| FieldMapEntityNpc {
+                object_id: MAP_NPC_OBJECT_ID_BASE + offset,
+                npc_id: npc.npc_id,
+                x: npc.x,
+                y: npc.y,
+                flip: npc.flip,
+                foothold: npc.foothold,
+                rx0: npc.rx0,
+                rx1: npc.rx1,
+            })
+        })
+        .collect()
 }
 
 #[cfg(test)]

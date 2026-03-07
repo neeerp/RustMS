@@ -25,6 +25,7 @@ pub enum SendOpcode {
     RemovePlayerFromMap = 0xA1,
     ChatText = 0xA2,
     MovePlayer = 0xB9,
+    SpawnNpc = 0x101,
 
     KeyMap = 0x14F,
 }

@@ -36,11 +36,23 @@ pub struct PortalTemplate {
     pub script: Option<String>,
 }
 
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct MapNpcTemplate {
+    pub npc_id: i32,
+    pub x: i16,
+    pub y: i16,
+    pub foothold: i16,
+    pub flip: bool,
+    pub rx0: i16,
+    pub rx1: i16,
+}
+
 #[derive(Clone, Debug)]
 pub struct FieldTemplate {
     pub map_id: i32,
     pub return_map: Option<i32>,
     pub forced_return: Option<i32>,
+    pub map_npcs: Vec<MapNpcTemplate>,
     portals_by_id: BTreeMap<u32, PortalTemplate>,
     portal_ids_by_name: HashMap<String, Vec<u32>>,
 }
@@ -139,6 +151,8 @@ fn build_field_template(
             (None, None)
         };
 
+    let map_npcs = build_map_npcs_from_life(nx, map_node_idx)?;
+
     let mut portals_by_id = BTreeMap::new();
 
     if let Some(portal_root_idx) = nx.child_by_name(map_node_idx, "portal")? {
@@ -190,9 +204,51 @@ fn build_field_template(
         map_id,
         return_map,
         forced_return,
+        map_npcs,
         portals_by_id,
         portal_ids_by_name,
     })
+}
+
+fn build_map_npcs_from_life(
+    nx: &NxMapFile,
+    map_node_idx: u32,
+) -> Result<Vec<MapNpcTemplate>, GameDataError> {
+    let Some(life_root_idx) = nx.child_by_name(map_node_idx, "life")? else {
+        return Ok(Vec::new());
+    };
+
+    let mut map_npcs = Vec::new();
+
+    for life_node_idx in nx.child_indices(life_root_idx)? {
+        let Some(life_type) = nx.string_child(life_node_idx, "type")? else {
+            continue;
+        };
+
+        if life_type != "n" {
+            continue;
+        }
+
+        let npc_id = parse_string_id(nx.string_child(life_node_idx, "id")?, "npc id")?;
+        let x = read_i16_child(nx, life_node_idx, "x", 0)?;
+        let y = read_i16_child(nx, life_node_idx, "y", 0)?;
+        let foothold = read_i16_child(nx, life_node_idx, "fh", 0)?;
+        let face_left = nx.int_child(life_node_idx, "f")?.unwrap_or(0) != 0;
+        let rx0 = read_i16_child(nx, life_node_idx, "rx0", x as i32)?;
+        let rx1 = read_i16_child(nx, life_node_idx, "rx1", x as i32)?;
+
+        map_npcs.push(MapNpcTemplate {
+            npc_id,
+            x,
+            y,
+            foothold,
+            flip: !face_left,
+            rx0,
+            rx1,
+        });
+    }
+
+    Ok(map_npcs)
 }
 
 fn parse_map_id(map_node_name: &str) -> Option<i32> {
@@ -206,6 +262,24 @@ fn normalize_optional_map_id(value: Option<i32>) -> Option<i32> {
         Some(NO_DESTINATION_MAP) | None => None,
         Some(other) => Some(other),
     }
+}
+
+fn parse_string_id(value: Option<String>, field_name: &str) -> Result<i32, GameDataError> {
+    let value = value.ok_or_else(|| GameDataError::InvalidData(format!("missing {field_name}")))?;
+    value
+        .parse::<i32>()
+        .map_err(|_| GameDataError::InvalidData(format!("invalid {field_name}: '{value}'")))
+}
+
+fn read_i16_child(
+    nx: &NxMapFile,
+    parent_index: u32,
+    key: &str,
+    default: i32,
+) -> Result<i16, GameDataError> {
+    let value = nx.int_child(parent_index, key)?.unwrap_or(default);
+    i16::try_from(value)
+        .map_err(|_| GameDataError::InvalidData(format!("{key} out of i16 range: {value}")))
 }
 
 fn normalize_string(value: &str) -> String {
@@ -404,6 +478,7 @@ fn read_u64(bytes: &[u8], offset: u64) -> Result<u64, GameDataError> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::path::Path;
 
     #[test]
     fn resolve_spawn_portal_prefers_name_then_startpoint() {
@@ -411,6 +486,7 @@ mod tests {
             map_id: 1,
             return_map: None,
             forced_return: None,
+            map_npcs: Vec::new(),
             portals_by_id: BTreeMap::from([
                 (
                     0,
@@ -456,5 +532,21 @@ mod tests {
                 .id,
             0
         );
+    }
+
+    #[test]
+    fn loads_map_npcs_from_assets_map_nx() {
+        let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("../assets/game-data/Map.nx");
+        let game_data = GameData::load_from_nx_map(&path).expect("load map nx");
+        let field = game_data.field(10_000).expect("field 10000");
+
+        assert!(field.map_npcs.iter().any(|npc| {
+            npc.npc_id == 2101
+                && npc.x == 130
+                && npc.y == 293
+                && npc.foothold == 51
+                && npc.rx0 <= npc.x
+                && npc.rx1 >= npc.x
+        }));
     }
 }

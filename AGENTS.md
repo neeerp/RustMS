@@ -78,7 +78,17 @@ cd HeavenClient/cmake-build
 Run the integration harness when validating server behavior changes:
 
 ```sh
-cargo test -p integration-harness
+cargo run -p integration-harness --bin harnessctl -- test
+```
+
+Use `harnessctl` as the default integration-harness entrypoint because it brings up the isolated Docker stack, runs the tests against the harness endpoints, and tears the stack down.
+
+If you need to run a specific integration test while reusing an already-running harness stack, use:
+
+```sh
+cargo run -p integration-harness --bin harnessctl -- up
+HARNESS_LOGIN_ADDR=127.0.0.1:18484 HARNESS_WORLD_ADDR=127.0.0.1:18485 cargo test -p integration-harness --test presence_same_map -- --nocapture
+cargo run -p integration-harness --bin harnessctl -- down
 ```
 
 After changing Rust server code, rebuild and restart the affected server binaries before trusting live test or manual client results.

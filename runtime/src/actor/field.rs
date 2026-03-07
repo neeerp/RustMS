@@ -2,6 +2,7 @@ use crate::message::{FieldCharacter, FieldKey, FieldMessage, ServerMessage};
 use net::packet::build::world::field::{
     build_player_enter_field, build_player_leave_field, parse_movement_state, ForeignCharacter,
 };
+use net::packet::build::world::npc::{build_spawn_npc, ForeignNpc};
 use packet::Packet;
 use std::collections::HashMap;
 use tokio::sync::mpsc;
@@ -12,18 +13,36 @@ struct Occupant {
     character: FieldCharacter,
 }
 
+#[derive(Clone, Debug)]
+pub struct FieldMapEntityNpc {
+    pub object_id: i32,
+    pub npc_id: i32,
+    pub x: i16,
+    pub y: i16,
+    pub flip: bool,
+    pub foothold: i16,
+    pub rx0: i16,
+    pub rx1: i16,
+}
+
 pub struct FieldActor {
     key: FieldKey,
     event_rx: mpsc::Receiver<FieldMessage>,
     occupants: HashMap<i32, Occupant>,
+    map_npcs: Vec<FieldMapEntityNpc>,
 }
 
 impl FieldActor {
-    pub fn new(key: FieldKey, event_rx: mpsc::Receiver<FieldMessage>) -> Self {
+    pub fn new(
+        key: FieldKey,
+        event_rx: mpsc::Receiver<FieldMessage>,
+        map_npcs: Vec<FieldMapEntityNpc>,
+    ) -> Self {
         Self {
             key,
             event_rx,
             occupants: HashMap::new(),
+            map_npcs,
         }
     }
 
@@ -82,6 +101,20 @@ impl FieldActor {
         sender: mpsc::Sender<ServerMessage>,
         character: FieldCharacter,
     ) {
+        for map_npc in &self.map_npcs {
+            match build_spawn_npc(&to_foreign_npc(map_npc)) {
+                Ok(packet) => self.send_packet(&sender, packet, client_id).await,
+                Err(error) => {
+                    warn!(
+                        client_id,
+                        npc_id = map_npc.npc_id,
+                        error = %error,
+                        "Failed to build existing map NPC replay packet"
+                    );
+                }
+            }
+        }
+
         for occupant in self.occupants.values() {
             match build_player_enter_field(&to_foreign_character(&occupant.character)) {
                 Ok(packet) => {
@@ -178,12 +211,27 @@ fn to_foreign_character(character: &FieldCharacter) -> ForeignCharacter {
     }
 }
 
+fn to_foreign_npc(npc: &FieldMapEntityNpc) -> ForeignNpc {
+    ForeignNpc {
+        object_id: npc.object_id,
+        npc_id: npc.npc_id,
+        x: npc.x,
+        y: npc.y,
+        flip: npc.flip,
+        foothold: npc.foothold,
+        rx0: npc.rx0,
+        rx1: npc.rx1,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::message::ServerMessage;
     use net::packet::build::world::field::{build_local_chat, build_player_move};
     use net::packet::op::SendOpcode;
+    use packet::io::read::PktRead;
+    use std::io::Cursor;
     use tokio::sync::mpsc;
 
     fn test_character(id: i32, name: &str) -> FieldCharacter {
@@ -220,6 +268,7 @@ mod tests {
                 instance_id: 0,
             },
             field_rx,
+            Vec::new(),
         );
         tokio::spawn(field.run());
 
@@ -257,6 +306,7 @@ mod tests {
                 instance_id: 0,
             },
             field_rx,
+            Vec::new(),
         );
         tokio::spawn(field.run());
 
@@ -302,6 +352,7 @@ mod tests {
                 instance_id: 0,
             },
             field_rx,
+            Vec::new(),
         );
         tokio::spawn(field.run());
 
@@ -350,5 +401,64 @@ mod tests {
 
         assert_opcode(first_rx.recv().await.unwrap(), SendOpcode::ChatText);
         assert_opcode(second_rx.recv().await.unwrap(), SendOpcode::ChatText);
+    }
+
+    #[tokio::test]
+    async fn joining_player_receives_map_npcs_before_existing_occupants() {
+        let (field_tx, field_rx) = mpsc::channel(8);
+        let field = FieldActor::new(
+            FieldKey {
+                channel_id: 0,
+                map_id: 10_000,
+                instance_id: 0,
+            },
+            field_rx,
+            vec![FieldMapEntityNpc {
+                object_id: 1_000_000_000,
+                npc_id: 2101,
+                x: 130,
+                y: 293,
+                flip: true,
+                foothold: 51,
+                rx0: 80,
+                rx1: 180,
+            }],
+        );
+        tokio::spawn(field.run());
+
+        let (first_tx, _first_rx) = mpsc::channel(8);
+        let (second_tx, mut second_rx) = mpsc::channel(8);
+
+        field_tx
+            .send(FieldMessage::Join {
+                client_id: 1,
+                sender: first_tx,
+                character: test_character(1, "first"),
+            })
+            .await
+            .unwrap();
+        field_tx
+            .send(FieldMessage::Join {
+                client_id: 2,
+                sender: second_tx,
+                character: test_character(2, "second"),
+            })
+            .await
+            .unwrap();
+
+        let first_msg = second_rx.recv().await.expect("npc spawn message");
+        let second_msg = second_rx.recv().await.expect("occupant replay message");
+
+        match first_msg {
+            ServerMessage::SendPacket(packet) => {
+                let mut cursor = Cursor::new(&packet.bytes[..]);
+                assert_eq!(cursor.read_short().expect("opcode"), SendOpcode::SpawnNpc as i16);
+                assert_eq!(cursor.read_int().expect("object id"), 1_000_000_000);
+                assert_eq!(cursor.read_int().expect("npc id"), 2101);
+            }
+            other => panic!("expected packet, got {other:?}"),
+        }
+
+        assert_opcode(second_msg, SendOpcode::SpawnPlayer);
     }
 }

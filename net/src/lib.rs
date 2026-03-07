@@ -11,6 +11,7 @@ mod io;
 pub mod packet;
 pub mod settings;
 
+pub use self::game_data::get as get_game_data;
 pub use self::handler::{
     get_handler, BroadcastScope, ClientId, DefaultHandler, HandlerAction, HandlerContext,
     HandlerResult, PacketHandler,
