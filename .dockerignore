@@ -1,5 +1,6 @@
 .git/
 .github/
+other_servers/
 target/
 **/target/
 HeavenClient/
