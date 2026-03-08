@@ -19,6 +19,9 @@
 
 #include "Helpers/LoginParser.h"
 
+#include "../Packets/LoginPackets.h"
+
+#include "../../Configuration.h"
 #include "../../Gameplay/Stage.h"
 #include "../../IO/UI.h"
 
@@ -37,6 +40,8 @@ namespace ms
 
 		if (cashshop)
 			cashshop->exit_cashshop();
+		else
+			PlayerLoginPacket(Stage::get().get_player().get_oid(), Configuration::get().get_channelid()).dispatch();
 	}
 
 	void ChangeStatsHandler::handle(InPacket& recv) const

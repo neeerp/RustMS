@@ -356,6 +356,17 @@ namespace ms
 		channelid = id;
 	}
 
+	uint8_t Configuration::get_world_channel_count(uint8_t world_id)
+	{
+		auto iter = world_channel_counts.find(world_id);
+		return iter != world_channel_counts.end() ? iter->second : 1;
+	}
+
+	void Configuration::set_world_channel_count(uint8_t world_id, uint8_t count)
+	{
+		world_channel_counts[world_id] = count;
+	}
+
 	bool Configuration::get_admin()
 	{
 		return admin;

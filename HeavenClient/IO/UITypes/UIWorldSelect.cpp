@@ -489,6 +489,14 @@ namespace ms
 		return world_map.find(worldid)->second;
 	}
 
+	uint8_t UIWorldSelect::get_channel_count(uint8_t worldid) const
+	{
+		if (worldid < worlds.size())
+			return worlds[worldid].channelcount;
+
+		return 1;
+	}
+
 	Button::State UIWorldSelect::button_pressed(uint16_t id)
 	{
 		if (id == Buttons::BT_ENTERWORLD)

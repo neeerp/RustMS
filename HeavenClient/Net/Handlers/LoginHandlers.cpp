@@ -133,6 +133,7 @@ namespace ms
 
 			if (world.wid != -1)
 			{
+				Configuration::get().set_world_channel_count(static_cast<uint8_t>(world.wid), world.channelcount);
 				worldselect->add_world(world);
 			}
 			else
@@ -156,6 +157,7 @@ namespace ms
 		if (loginwait && loginwait->is_active())
 		{
 			uint8_t channel_id = recv.read_byte();
+			Configuration::get().set_channelid(channel_id);
 
 			// Parse all characters
 			std::vector<CharEntry> characters;
@@ -187,7 +189,7 @@ namespace ms
 		LoginParser::parse_login(recv);
 
 		int32_t cid = recv.read_int();
-		PlayerLoginPacket(cid).dispatch();
+		PlayerLoginPacket(cid, Configuration::get().get_channelid()).dispatch();
 	}
 
 	void CharnameResponseHandler::handle(InPacket& recv) const

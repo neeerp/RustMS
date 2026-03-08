@@ -32,8 +32,15 @@
 
 #include "../../IO/UITypes/UICharSelect.h"
 
+#include <optional>
+
 namespace ms
 {
+	namespace
+	{
+		std::optional<CharEntry> cached_player_entry;
+	}
+
 	void SetFieldHandler::transition(int32_t mapid, uint8_t portalid) const
 	{
 		float fadestep = 0.025f;
@@ -64,6 +71,7 @@ namespace ms
 		Constants::Constants::get().set_viewheight(Setting<Height>::get().load());
 
 		int32_t channel = recv.read_int();
+		Configuration::get().set_channelid(static_cast<uint8_t>(channel));
 		int8_t mode1 = recv.read_byte();
 		int8_t mode2 = recv.read_byte();
 
@@ -89,16 +97,28 @@ namespace ms
 
 		int32_t cid = recv.read_int();
 		auto charselect = UI::get().get_element<UICharSelect>();
+		const CharEntry* playerentry = nullptr;
 
-		if (!charselect)
+		if (charselect)
+		{
+			const CharEntry& selected = charselect->get_character(cid);
+
+			if (selected.id != cid)
+				return;
+
+			cached_player_entry = selected;
+			playerentry = &*cached_player_entry;
+		}
+		else if (cached_player_entry && cached_player_entry->id == cid)
+		{
+			playerentry = &*cached_player_entry;
+		}
+		else
+		{
 			return;
+		}
 
-		const CharEntry& playerentry = charselect->get_character(cid);
-
-		if (playerentry.id != cid)
-			return;
-
-		Stage::get().loadplayer(playerentry);
+		Stage::get().loadplayer(*playerentry);
 
 		LoginParser::parse_stats(recv);
 
