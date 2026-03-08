@@ -24,16 +24,45 @@
 #include "../../Configuration.h"
 #include "../../Gameplay/Stage.h"
 #include "../../IO/UI.h"
+#include "../../IO/Window.h"
 
 #include "../../IO/UITypes/UIBuffList.h"
 #include "../../IO/UITypes/UICashShop.h"
 #include "../../IO/UITypes/UISkillBook.h"
 #include "../../IO/UITypes/UIStatsInfo.h"
 
+#include "Timer.h"
+
 namespace ms
 {
+	namespace
+	{
+		void transition_channel_change()
+		{
+			float fadestep = 0.025f;
+
+			Window::get().fadeout(
+				fadestep,
+				[]()
+				{
+					GraphicsGL::get().clear();
+
+					UI::get().enable();
+					Timer::get().start();
+					GraphicsGL::get().unlock();
+				}
+			);
+
+			GraphicsGL::get().lock();
+			Stage::get().clear();
+			Timer::get().start();
+		}
+	}
+
 	void ChangeChannelHandler::handle(InPacket& recv) const
 	{
+		int32_t character_id = Stage::get().get_player().get_oid();
+		transition_channel_change();
 		LoginParser::parse_login(recv);
 
 		auto cashshop = UI::get().get_element<UICashShop>();
@@ -41,7 +70,7 @@ namespace ms
 		if (cashshop)
 			cashshop->exit_cashshop();
 		else
-			PlayerLoginPacket(Stage::get().get_player().get_oid(), Configuration::get().get_channelid()).dispatch();
+			PlayerLoginPacket(character_id, Configuration::get().get_channelid()).dispatch();
 	}
 
 	void ChangeStatsHandler::handle(InPacket& recv) const
