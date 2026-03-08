@@ -47,7 +47,9 @@ async fn portal_transfer_spawns_at_destination_portal_for_observers() {
     read_next_stat_change(&mut mover.connection, "mover normalize to Henesys").await;
     let mover_leave = timeout(
         Duration::from_secs(5),
-        observer.connection.read_packet("observer sees mover leave initial map"),
+        observer
+            .connection
+            .read_packet("observer sees mover leave initial map"),
     )
     .await
     .expect("timed out waiting for mover leave packet")
@@ -75,7 +77,11 @@ async fn portal_transfer_spawns_at_destination_portal_for_observers() {
         observer_warp.map_id, 100000001,
         "expected observer to warp to map 100000001"
     );
-    read_next_stat_change(&mut observer.connection, "observer direct warp to destination map").await;
+    read_next_stat_change(
+        &mut observer.connection,
+        "observer direct warp to destination map",
+    )
+    .await;
 
     let destination_portal = destination_portal(100000000, "in02");
 
@@ -88,14 +94,14 @@ async fn portal_transfer_spawns_at_destination_portal_for_observers() {
         .await
         .expect("failed to send mover portal transfer");
 
-    let mover_warp = read_next_set_field_warp(&mut mover.connection, "mover portal transfer in02").await;
+    let mover_warp =
+        read_next_set_field_warp(&mut mover.connection, "mover portal transfer in02").await;
     assert_eq!(
         mover_warp.map_id, 100000001,
         "expected mover to warp to map 100000001"
     );
     assert_eq!(
-        mover_warp.spawn_point,
-        destination_portal.0,
+        mover_warp.spawn_point, destination_portal.0,
         "expected mover warp to use destination portal id"
     );
 
@@ -121,8 +127,12 @@ fn destination_portal(source_map_id: i32, source_portal_name: &str) -> (u8, i16,
                 .expect("integration-harness should live under workspace root")
                 .join("assets/game-data/Map.nx")
         });
-    let game_data = GameData::load_from_nx_map(&path)
-        .unwrap_or_else(|error| panic!("failed to load game data from '{}': {error}", path.display()));
+    let game_data = GameData::load_from_nx_map(&path).unwrap_or_else(|error| {
+        panic!(
+            "failed to load game data from '{}': {error}",
+            path.display()
+        )
+    });
     let source_field = game_data
         .field(source_map_id)
         .unwrap_or_else(|| panic!("missing source field {source_map_id}"));

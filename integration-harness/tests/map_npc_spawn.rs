@@ -29,7 +29,10 @@ async fn direct_warp_replays_static_map_npcs() {
         .expect("failed to send npc map warp packet");
 
     let warp = read_next_set_field_warp(&mut session.connection, "warp to npc test map").await;
-    assert_eq!(warp.map_id, NPC_TEST_MAP_ID, "expected warp to npc test map");
+    assert_eq!(
+        warp.map_id, NPC_TEST_MAP_ID,
+        "expected warp to npc test map"
+    );
     read_next_stat_change(&mut session.connection, "warp to npc test map").await;
 
     let expected_npcs = expected_map_npcs(NPC_TEST_MAP_ID);
@@ -76,8 +79,12 @@ fn expected_map_npcs(map_id: i32) -> Vec<game_data::MapNpcTemplate> {
                 .expect("integration-harness should live under workspace root")
                 .join("assets/game-data/Map.nx")
         });
-    let game_data = GameData::load_from_nx_map(&path)
-        .unwrap_or_else(|error| panic!("failed to load game data from '{}': {error}", path.display()));
+    let game_data = GameData::load_from_nx_map(&path).unwrap_or_else(|error| {
+        panic!(
+            "failed to load game data from '{}': {error}",
+            path.display()
+        )
+    });
 
     game_data
         .field(map_id)

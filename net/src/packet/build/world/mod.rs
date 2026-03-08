@@ -1,3 +1,4 @@
+pub mod channel;
 pub mod char;
 pub mod field;
 pub mod keymap;

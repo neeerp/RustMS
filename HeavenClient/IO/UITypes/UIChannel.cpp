@@ -18,21 +18,42 @@
 #include "UIChannel.h"
 
 #include "../KeyAction.h"
+#include "../UI.h"
+#include "UIWorldSelect.h"
 
 #include "../Components/MapleButton.h"
 #include "../Components/AreaButton.h"
 #include "../Audio/Audio.h"
 
+#include "../../Configuration.h"
+#include "../../Net/Packets/GameplayPackets.h"
+
+#include <algorithm>
 #include <nlnx/nx.hpp>
 
 namespace ms
 {
 	UIChannel::UIChannel() : UIDragElement<PosCHANNEL>()
 	{
-		uint8_t selected_world = 1; // TODO: Need to get current world user is on
-		current_channel = 9; // TODO: Need to get current channel user is on
+		uint8_t selected_world = 1;
+		uint8_t selected_world_id = Configuration::get().get_worldid();
+		current_channel = Configuration::get().get_channelid();
 		selected_channel = current_channel;
-		channel_count = 20; // TODO: Need to get total number of channels on world
+		channel_count = 1;
+
+		if (auto worldselect = UI::get().get_element<UIWorldSelect>())
+		{
+			selected_world = static_cast<uint8_t>(worldselect->get_worldbyid(selected_world_id));
+			channel_count = worldselect->get_channel_count(selected_world_id);
+		} else
+		{
+			channel_count = Configuration::get().get_world_channel_count(selected_world_id);
+		}
+
+		channel_count = std::max<uint8_t>(1, std::min<uint8_t>(channel_count, 20));
+		if (current_channel >= channel_count)
+			current_channel = 0;
+		selected_channel = current_channel;
 
 		nl::node Channel = nl::nx::ui["UIWindow2.img"]["Channel"];
 
@@ -289,7 +310,9 @@ namespace ms
 	{
 		deactivate();
 
-		current_channel = 9; // TODO: Need to get current channel user is on
+		current_channel = Configuration::get().get_channelid();
+		if (current_channel >= channel_count)
+			current_channel = 0;
 		selected_channel = current_channel;
 		selected_channel_x = current_channel_x;
 		selected_channel_y = current_channel_y;
@@ -297,7 +320,8 @@ namespace ms
 
 	void UIChannel::change_channel()
 	{
-		// TODO: Send packet to change channel?
+		Configuration::get().set_channelid(selected_channel);
+		ChangeChannelPacket(selected_channel).dispatch();
 		cancel();
 	}
 

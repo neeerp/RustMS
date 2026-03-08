@@ -1,7 +1,7 @@
 use crate::error::RuntimeError;
 use crate::handler::{HandlerAction, HandlerContext, HandlerResult};
 use crate::io::{PacketReader, PacketWriter};
-use db::session::{NewSession, SessionWrapper};
+use db::session::{NewSession, SessionState, SessionWrapper};
 use net::get_handler;
 use net::listener::ServerType;
 use net::packet::build;
@@ -167,17 +167,39 @@ impl LoginClientActor {
                     info!(character_id, "Attaching character to session");
                     if let Some(ref mut session) = self.session.session {
                         session.character_id = Some(character_id);
-                        // Update session in database
-                        if let Err(e) =
-                            db::session::update_session_character(session.id, character_id)
-                        {
+                        session.state = SessionState::Transition;
+                        if let Err(e) = db::session::update_session(session) {
                             error!(error = %e, "Failed to update session with character");
                         }
+                    }
+                }
+                HandlerAction::UpdateSessionSelection {
+                    world_id,
+                    channel_id,
+                } => {
+                    if let Some(ref mut session) = self.session.session {
+                        session.selected_world_id = Some(i16::from(world_id));
+                        session.selected_channel_id = Some(i16::from(channel_id));
+                        if let Err(e) = db::session::update_session_selection(
+                            session.id,
+                            i16::from(world_id),
+                            i16::from(channel_id),
+                        ) {
+                            error!(error = %e, "Failed to persist selected login channel");
+                        }
+                    } else {
+                        warn!(
+                            world_id,
+                            channel_id, "Ignoring channel selection without session"
+                        );
                     }
                 }
                 HandlerAction::ReattachSession { .. } => {
                     // Login server doesn't reattach sessions
                     warn!("ReattachSession action ignored in login server");
+                }
+                HandlerAction::ChangeChannel { .. } => {
+                    warn!("ChangeChannel action ignored in login server");
                 }
                 HandlerAction::Whisper { .. } => {
                     // Login server never handles in-world whispers.

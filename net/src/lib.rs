@@ -8,6 +8,7 @@ mod game_data;
 pub mod handler;
 mod helpers;
 mod io;
+pub mod login_world;
 pub mod packet;
 pub mod settings;
 

@@ -12,8 +12,11 @@ pub struct HarnessConfig {
     pub password: String,
     pub character_name: String,
     pub gender: u8,
+    pub world_id: u8,
+    pub channel_id: u8,
     pub login_addr: SocketAddr,
     pub world_addr: SocketAddr,
+    pub expected_redirect_addr: SocketAddr,
 }
 
 #[derive(Debug, Clone)]
@@ -23,6 +26,8 @@ pub struct HarnessPlayerConfig {
     pub password: String,
     pub character_name: String,
     pub gender: u8,
+    pub world_id: u8,
+    pub channel_id: u8,
 }
 
 #[derive(Debug, Clone)]
@@ -39,9 +44,23 @@ impl HarnessConfig {
             password: "test".to_string(),
             character_name: random_name("ic"),
             gender: 0,
+            world_id: 0,
+            channel_id: 0,
             login_addr,
             world_addr,
+            expected_redirect_addr: world_addr,
         }
+    }
+
+    pub fn with_channel(mut self, world_id: u8, channel_id: u8) -> Self {
+        self.world_id = world_id;
+        self.channel_id = channel_id;
+        self
+    }
+
+    pub fn with_expected_redirect_addr(mut self, addr: SocketAddr) -> Self {
+        self.expected_redirect_addr = addr;
+        self
     }
 }
 
@@ -57,6 +76,8 @@ impl MultiHarnessConfig {
                     password: "test".to_string(),
                     character_name: random_name("cs"),
                     gender: 0,
+                    world_id: 0,
+                    channel_id: 0,
                 },
                 HarnessPlayerConfig {
                     role: "recipient".to_string(),
@@ -64,6 +85,8 @@ impl MultiHarnessConfig {
                     password: "test".to_string(),
                     character_name: random_name("cr"),
                     gender: 0,
+                    world_id: 0,
+                    channel_id: 0,
                 },
             ],
         }
@@ -86,8 +109,11 @@ impl MultiHarnessConfig {
             password: player.password.clone(),
             character_name: player.character_name.clone(),
             gender: player.gender,
+            world_id: player.world_id,
+            channel_id: player.channel_id,
             login_addr: self.login_addr,
             world_addr: self.world_addr,
+            expected_redirect_addr: self.world_addr,
         })
     }
 }

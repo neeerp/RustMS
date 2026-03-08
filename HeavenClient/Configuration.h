@@ -155,6 +155,12 @@ namespace ms
 
 		// Set the character's selected channel
 		void set_channelid(uint8_t id);
+
+		// Get the known channel count for a world.
+		uint8_t get_world_channel_count(uint8_t world_id);
+
+		// Update the known channel count for a world.
+		void set_world_channel_count(uint8_t world_id, uint8_t count);
 		// Check if the current account is an admin account
 		bool get_admin();
 		// Check whether the current account is an admin account
@@ -295,6 +301,7 @@ namespace ms
 		std::string VolumeSerialNumber;
 		uint8_t worldid;
 		uint8_t channelid;
+		std::map<uint8_t, uint8_t> world_channel_counts;
 		bool admin;
 		TypeMap<Entry> settings;
 	};

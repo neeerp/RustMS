@@ -14,8 +14,7 @@ pub mod repository;
 pub use repository::*;
 
 #[derive(Debug, DbEnum)]
-#[DieselType = "Session_state"]
-#[PgType = "session_state"]
+#[ExistingTypePath = "crate::schema::sql_types::SessionState"]
 pub enum SessionState {
     BeforeLogin,
     AfterLogin,
@@ -34,6 +33,8 @@ pub struct Session {
     pub state: SessionState,
     pub updated_at: SystemTime,
     pub created_at: SystemTime,
+    pub selected_world_id: Option<i16>,
+    pub selected_channel_id: Option<i16>,
 }
 
 /// Session creation projection.

@@ -38,7 +38,7 @@ async fn main() {
 
                 let event_tx = event_tx.clone();
                 tokio::spawn(async move {
-                    match ClientActor::new(stream, event_tx).await {
+                    match ClientActor::new(stream, event_tx, peer_addr).await {
                         Ok(actor) => actor.run().await,
                         Err(e) => error!(error = %e, "Failed to create ClientActor"),
                     }

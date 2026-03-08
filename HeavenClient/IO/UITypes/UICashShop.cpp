@@ -378,7 +378,7 @@ namespace ms
 		Stage& stage = Stage::get();
 		Player& player = stage.get_player();
 
-		PlayerLoginPacket(player.get_oid()).dispatch();
+		PlayerLoginPacket(player.get_oid(), Configuration::get().get_channelid()).dispatch();
 
 		int32_t mapid = player.get_stats().get_mapid();
 		uint8_t portalid = player.get_stats().get_portal();

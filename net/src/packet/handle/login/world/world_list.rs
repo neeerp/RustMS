@@ -17,12 +17,10 @@ impl PacketHandler for WorldListHandler {
         _packet: &mut Packet,
         _ctx: &mut HandlerContext,
     ) -> Result<HandlerResult, NetworkError> {
-        let packets = vec![
-            world::build_world_details()?,
-            world::build_end_of_world_list()?,
-            world::build_select_world()?,
-            world::build_send_recommended_worlds()?,
-        ];
+        let mut packets = world::build_world_list_packets()?;
+        packets.push(world::build_end_of_world_list()?);
+        packets.push(world::build_select_world()?);
+        packets.push(world::build_send_recommended_worlds()?);
         Ok(HandlerResult::replies(packets))
     }
 }

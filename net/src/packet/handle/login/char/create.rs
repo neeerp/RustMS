@@ -42,7 +42,12 @@ impl PacketHandler for CreateCharacterHandler {
         let _weapon = reader.read_int()?; // Special
         let gender = reader.read_byte()? as i16;
 
-        let world = 0;
+        let world = ctx
+            .session
+            .session
+            .as_ref()
+            .and_then(|session| session.selected_world_id)
+            .unwrap_or(0);
 
         let character = NewCharacter {
             accountid,

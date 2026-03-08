@@ -25,6 +25,17 @@
 
 namespace ms
 {
+	// Opcode: CHANGE_CHANNEL(39)
+	class ChangeChannelPacket : public OutPacket
+	{
+	public:
+		explicit ChangeChannelPacket(uint8_t channel) : OutPacket(39)
+		{
+			write_byte(channel);
+			write_int(0);
+		}
+	};
+
 	// Opcode: CHANGE_MAP(38)
 	class ChangeMapPacket : public OutPacket
 	{

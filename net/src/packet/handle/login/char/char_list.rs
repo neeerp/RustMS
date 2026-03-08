@@ -21,9 +21,10 @@ impl PacketHandler for CharListHandler {
     ) -> Result<HandlerResult, NetworkError> {
         let mut reader = BufReader::new(&**packet);
         reader.read_short()?;
+        reader.read_byte()?;
 
-        let _world = reader.read_byte()?;
-        let _channel = reader.read_byte()? + 1;
+        let world = reader.read_byte()?;
+        let channel = reader.read_byte()?;
 
         // Get account_id from session
         let account_id = ctx
@@ -35,6 +36,6 @@ impl PacketHandler for CharListHandler {
 
         let chars = character::get_characters_by_accountid(account_id)?;
         let char_list_packet = char::build_char_list(chars)?;
-        Ok(HandlerResult::reply(char_list_packet))
+        Ok(HandlerResult::reply(char_list_packet).with_update_session_selection(world, channel))
     }
 }

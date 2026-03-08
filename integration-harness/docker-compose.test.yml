@@ -43,8 +43,7 @@ services:
     environment:
       RUSTMS_DATABASE_URL: postgres://maplestory:pass@db:5432/maplestory_test
       RUSTMS_LOGIN_BIND_ADDR: 0.0.0.0:8484
-      RUSTMS_WORLD_REDIRECT_HOST: 127.0.0.1
-      RUSTMS_WORLD_REDIRECT_PORT: 18485
+      RUSTMS_LOGIN_CHANNELS: Scania-1@127.0.0.1:18485@700;Scania-2@127.0.0.1:18485@700;Scania-3@127.0.0.1:19485@700
     ports:
       - "18484:8484"
     command: ["/usr/local/bin/login"]
@@ -58,6 +57,7 @@ services:
     environment:
       RUSTMS_DATABASE_URL: postgres://maplestory:pass@db:5432/maplestory_test
       RUSTMS_WORLD_BIND_ADDR: 0.0.0.0:8485
+      RUSTMS_LOGIN_CHANNELS: Scania-1@127.0.0.1:18485@700;Scania-2@127.0.0.1:18485@700;Scania-3@127.0.0.1:19485@700
     volumes:
       - ../assets:/app/assets:ro
     ports:

@@ -115,9 +115,10 @@ namespace ms
 	{
 	public:
 		// Requests being logged-in to a channel server with the specified character
-		PlayerLoginPacket(int32_t cid) : OutPacket(OutPacket::Opcode::PLAYER_LOGIN)
+		PlayerLoginPacket(int32_t cid, uint8_t channel) : OutPacket(OutPacket::Opcode::PLAYER_LOGIN)
 		{
 			write_int(cid);
+			write_byte(channel);
 		}
 	};
 

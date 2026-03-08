@@ -31,6 +31,30 @@ pub fn get_session_to_reattach(c_id: i32, ip_addr: IpNetwork) -> QueryResult<Ses
         .first::<Session>(&mut connection)
 }
 
+pub fn get_transition_session_by_character_id(c_id: i32) -> QueryResult<Session> {
+    let mut connection = establish_connection();
+
+    sessions
+        .filter(character_id.eq(c_id))
+        .filter(state.eq(SessionState::Transition))
+        .first::<Session>(&mut connection)
+}
+
+pub fn get_transition_session_by_character_channel_ip(
+    c_id: i32,
+    ch_id: i16,
+    ip_addr: IpNetwork,
+) -> QueryResult<Session> {
+    let mut connection = establish_connection();
+
+    sessions
+        .filter(character_id.eq(c_id))
+        .filter(selected_channel_id.eq(Some(ch_id)))
+        .filter(ip.eq(ip_addr))
+        .filter(state.eq(SessionState::Transition))
+        .first::<Session>(&mut connection)
+}
+
 pub fn create_session(new_session: NewSession) -> QueryResult<Session> {
     let mut connection = establish_connection();
 
@@ -62,5 +86,16 @@ pub fn update_session_character(s_id: i32, c_id: i32) -> QueryResult<usize> {
 
     diesel::update(sessions.filter(id.eq(s_id)))
         .set(character_id.eq(Some(c_id)))
+        .execute(&mut connection)
+}
+
+pub fn update_session_selection(s_id: i32, w_id: i16, ch_id: i16) -> QueryResult<usize> {
+    let mut connection = establish_connection();
+
+    diesel::update(sessions.filter(id.eq(s_id)))
+        .set((
+            selected_world_id.eq(Some(w_id)),
+            selected_channel_id.eq(Some(ch_id)),
+        ))
         .execute(&mut connection)
 }

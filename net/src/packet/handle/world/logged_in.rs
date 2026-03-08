@@ -22,23 +22,25 @@ impl PacketHandler for PlayerLoggedInHandler {
         reader.read_short()?; // prune opcode
 
         let character_id = reader.read_int()?;
+        let channel_id = reader.read_byte()?;
 
         // Get character from session (should have been loaded during reattach)
         match ctx.session.get_character() {
             Ok(character) => {
                 let mut chr = character.lock().unwrap();
                 let keymap_packet = build::world::keymap::build_keymap(&mut chr.key_binds)?;
-                let char_info_packet = build::world::char::build_char_info(&chr.character)?;
+                let char_info_packet =
+                    build::world::char::build_char_info(&chr.character, channel_id)?;
 
                 Ok(HandlerResult::empty()
-                    .with_reattach_session(character_id)
+                    .with_reattach_session(character_id, channel_id)
                     .with_reply(keymap_packet)
                     .with_reply(char_info_packet))
             }
             Err(_) => {
                 // Session doesn't have character loaded yet - request reattach first
                 // The actor will load the character and call us again
-                Ok(HandlerResult::empty().with_reattach_session(character_id))
+                Ok(HandlerResult::empty().with_reattach_session(character_id, channel_id))
             }
         }
     }

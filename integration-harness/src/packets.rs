@@ -55,6 +55,11 @@ pub struct ServerRedirectPacket {
     pub character_id: i32,
 }
 
+pub struct ChannelChangePacket {
+    pub ip: Ipv4Addr,
+    pub port: u16,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SetFieldPacket {
     pub character_id: i32,
@@ -177,6 +182,7 @@ pub fn opcode_name(opcode: i16) -> &'static str {
         x if x == SendOpcode::ServerList as i16 => "ServerList",
         x if x == SendOpcode::CharList as i16 => "CharList",
         x if x == SendOpcode::ServerIp as i16 => "ServerIp",
+        x if x == SendOpcode::ChangeChannel as i16 => "ChangeChannel",
         x if x == SendOpcode::LastConnectedWorld as i16 => "LastConnectedWorld",
         x if x == SendOpcode::RecommendedWorlds as i16 => "RecommendedWorlds",
         x if x == SendOpcode::SetField as i16 => "SetField",
@@ -246,6 +252,9 @@ pub fn build_set_gender(gender: u8) -> Result<Packet, String> {
 pub fn build_char_list_request(world_id: u8, channel_id: u8) -> Result<Packet, String> {
     let mut packet = packet_with_opcode(RecvOpcode::CharListRequest as i16);
     packet
+        .write_byte(0)
+        .map_err(|e| format!("failed to write char list padding byte: {e}"))?;
+    packet
         .write_byte(world_id)
         .map_err(|e| format!("failed to write world id: {e}"))?;
     packet
@@ -311,6 +320,34 @@ pub fn build_player_logged_in(character_id: i32) -> Result<Packet, String> {
     packet
         .write_int(character_id)
         .map_err(|e| format!("failed to write logged-in character id: {e}"))?;
+    packet
+        .write_byte(0)
+        .map_err(|e| format!("failed to write logged-in channel id: {e}"))?;
+    Ok(packet)
+}
+
+pub fn build_player_logged_in_for_channel(
+    character_id: i32,
+    channel_id: u8,
+) -> Result<Packet, String> {
+    let mut packet = packet_with_opcode(RecvOpcode::PlayerLoggedIn as i16);
+    packet
+        .write_int(character_id)
+        .map_err(|e| format!("failed to write logged-in character id: {e}"))?;
+    packet
+        .write_byte(channel_id)
+        .map_err(|e| format!("failed to write logged-in channel id: {e}"))?;
+    Ok(packet)
+}
+
+pub fn build_change_channel(channel_id: u8) -> Result<Packet, String> {
+    let mut packet = packet_with_opcode(RecvOpcode::ChangeChannel as i16);
+    packet
+        .write_byte(channel_id)
+        .map_err(|e| format!("failed to write change-channel id: {e}"))?;
+    packet
+        .write_int(0)
+        .map_err(|e| format!("failed to write change-channel tick: {e}"))?;
     Ok(packet)
 }
 
@@ -526,6 +563,26 @@ pub fn decode_server_redirect(packet: &Packet) -> Result<ServerRedirectPacket, S
         port: port as u16,
         character_id,
     })
+}
+
+pub fn decode_channel_change(packet: &Packet) -> Result<ChannelChangePacket, String> {
+    expect_opcode(packet, SendOpcode::ChangeChannel as i16)?;
+    let mut cursor = Cursor::new(&packet.bytes[..]);
+    cursor
+        .read_short()
+        .map_err(|e| format!("failed to read change-channel opcode: {e}"))?;
+    cursor
+        .read_byte()
+        .map_err(|e| format!("failed to read change-channel flag: {e}"))?;
+    let octets = cursor
+        .read_bytes(4)
+        .map_err(|e| format!("failed to read change-channel ip: {e}"))?;
+    let ip = Ipv4Addr::new(octets[0], octets[1], octets[2], octets[3]);
+    let port = cursor
+        .read_short()
+        .map_err(|e| format!("failed to read change-channel port: {e}"))? as u16;
+
+    Ok(ChannelChangePacket { ip, port })
 }
 
 pub fn decode_set_field(packet: &Packet) -> Result<SetFieldPacket, String> {

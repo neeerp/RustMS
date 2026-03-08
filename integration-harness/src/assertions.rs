@@ -103,7 +103,7 @@ pub fn assert_redirect_target(
     actual_port: u16,
 ) -> Result<(), HarnessError> {
     let endpoint = endpoint.to_string();
-    let expected_ip = match config.world_addr.ip() {
+    let expected_ip = match config.expected_redirect_addr.ip() {
         std::net::IpAddr::V4(ip) => ip,
         std::net::IpAddr::V6(_) => {
             return Err(HarnessError::protocol(
@@ -122,13 +122,13 @@ pub fn assert_redirect_target(
         ));
     }
 
-    if actual_port != config.world_addr.port() {
+    if actual_port != config.expected_redirect_addr.port() {
         return Err(HarnessError::protocol(
             "server redirect",
             &endpoint,
             format!(
                 "expected redirect port {} but got {}",
-                config.world_addr.port(),
+                config.expected_redirect_addr.port(),
                 actual_port
             ),
         ));

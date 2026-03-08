@@ -17,6 +17,13 @@ Fixes:
 - start daemon: `sudo systemctl enable --now docker`
 - add user to group: `sudo usermod -aG docker $USER`
 - refresh shell session: `newgrp docker` (or log out/in)
+- if the user is already in the `docker` group but the current shell has stale group membership, run harness commands via `sg docker -c '...'` as a temporary workaround
+
+Example:
+
+```sh
+sg docker -c 'cargo run -p integration-harness --bin harnessctl -- test'
+```
 
 ## Slow or huge Docker build context
 

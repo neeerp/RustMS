@@ -19,6 +19,8 @@
 
 #include "../Configuration.h"
 
+#include <vector>
+
 namespace ms
 {
 	Session::Session()
@@ -127,8 +129,13 @@ namespace ms
 		cryptography.create_header(header, packet_length);
 		cryptography.encrypt(packet_bytes, packet_length);
 
-		socket.dispatch(header, HEADER_LENGTH);
-		socket.dispatch(packet_bytes, packet_length);
+		std::vector<int8_t> frame;
+		frame.reserve(HEADER_LENGTH + packet_length);
+		frame.insert(frame.end(), header, header + HEADER_LENGTH);
+		frame.insert(frame.end(), packet_bytes, packet_bytes + packet_length);
+
+		if (!socket.dispatch(frame.data(), frame.size()))
+			connected = false;
 	}
 
 	void Session::read()

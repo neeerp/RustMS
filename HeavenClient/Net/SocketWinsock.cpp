@@ -113,7 +113,24 @@ namespace ms
 
 	bool SocketWinsock::dispatch(const int8_t* bytes, size_t length) const
 	{
-		return send(sock, (char*)bytes, static_cast<int>(length), 0) != SOCKET_ERROR;
+		size_t sent_total = 0;
+
+		while (sent_total < length)
+		{
+			int sent = send(
+				sock,
+				reinterpret_cast<const char*>(bytes + sent_total),
+				static_cast<int>(length - sent_total),
+				0
+			);
+
+			if (sent == SOCKET_ERROR || sent == 0)
+				return false;
+
+			sent_total += static_cast<size_t>(sent);
+		}
+
+		return true;
 	}
 
 	size_t SocketWinsock::receive(bool* success)
