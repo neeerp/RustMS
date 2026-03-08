@@ -1,3 +1,4 @@
+mod change_channel;
 mod change_map;
 mod chat;
 mod keybinds;
@@ -7,6 +8,7 @@ mod move_player;
 mod party_search;
 mod whisper;
 
+pub use self::change_channel::ChangeChannelHandler;
 pub use self::change_map::ChangeMapHandler;
 pub use self::chat::AllChatHandler;
 pub use self::keybinds::ChangeKeybindsHandler;

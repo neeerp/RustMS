@@ -8,6 +8,7 @@ pub enum SendOpcode {
     ServerList = 0x0A,
     NewCharacter = 0x0E,
     DeleteCharacter = 0x0F,
+    ChangeChannel = 0x10,
     CharList = 0x0B,
     ServerIp = 0x0C,
     CharNameResponse = 0x0D,

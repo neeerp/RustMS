@@ -7,7 +7,7 @@ use crate::connection::MapleTestConnection;
 use crate::error::HarnessError;
 use crate::packets::{
     build_accept_tos, build_char_list_request, build_char_select, build_create_char,
-    build_login_credentials, build_login_started, build_player_logged_in,
+    build_login_credentials, build_login_started, build_player_logged_in_for_channel,
     build_server_list_request, build_set_gender, decode_char_list, decode_last_connected_world,
     decode_login_status, decode_new_character, decode_recommended_worlds, decode_server_redirect,
     decode_set_field, opcode_name, CharacterSummary, CharacterTemplate, LoginStatusPacket,
@@ -72,7 +72,7 @@ pub async fn login_to_world_session(config: &HarnessConfig) -> Result<WorldSessi
 
     world_conn
         .send_packet(
-            build_player_logged_in(selected.id).map_err(|message| {
+            build_player_logged_in_for_channel(selected.id, config.channel_id).map_err(|message| {
                 HarnessError::protocol("world entry", config.world_addr, message)
             })?,
             "world entry",

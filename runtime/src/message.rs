@@ -8,6 +8,23 @@ pub struct FieldKey {
     pub instance_id: u32,
 }
 
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+pub struct RuntimeLocation {
+    pub channel_id: u8,
+    pub map_id: i32,
+    pub instance_id: u32,
+}
+
+impl RuntimeLocation {
+    pub fn field_key(&self) -> FieldKey {
+        FieldKey {
+            channel_id: self.channel_id,
+            map_id: self.map_id,
+            instance_id: self.instance_id,
+        }
+    }
+}
+
 #[derive(Clone, Debug)]
 pub struct FieldCharacter {
     pub id: i32,
@@ -26,8 +43,8 @@ pub struct FieldCharacter {
 }
 
 impl FieldCharacter {
-    pub fn field_key(&self) -> FieldKey {
-        FieldKey {
+    pub fn location(&self) -> RuntimeLocation {
+        RuntimeLocation {
             channel_id: self.channel_id,
             map_id: self.map_id,
             instance_id: 0,
@@ -54,14 +71,15 @@ pub enum ClientEvent {
         client_id: ClientId,
         sender: tokio::sync::mpsc::Sender<ServerMessage>,
         character: FieldCharacter,
+        location: RuntimeLocation,
     },
     /// Client has disconnected
     Disconnected { client_id: ClientId },
-    /// Client changed maps
-    MapChanged {
+    /// Client changed runtime location
+    LocationChanged {
         client_id: ClientId,
-        old_map_id: i32,
-        new_map_id: i32,
+        old: RuntimeLocation,
+        new: RuntimeLocation,
         spawn_portal_id: Option<u8>,
         spawn_x: Option<i16>,
         spawn_y: Option<i16>,
@@ -88,6 +106,38 @@ pub enum ClientEvent {
         recipient_packet: Packet,
         sender_success_packet: Packet,
         sender_failure_packet: Packet,
+    },
+}
+
+#[derive(Debug)]
+pub enum ChannelMessage {
+    JoinClient {
+        client_id: ClientId,
+        sender: tokio::sync::mpsc::Sender<ServerMessage>,
+        character: FieldCharacter,
+        location: RuntimeLocation,
+    },
+    LeaveClient {
+        client_id: ClientId,
+        location: RuntimeLocation,
+    },
+    Chat {
+        client_id: ClientId,
+        location: RuntimeLocation,
+        packet: Packet,
+    },
+    Move {
+        client_id: ClientId,
+        location: RuntimeLocation,
+        packet: Packet,
+        movement_bytes: Vec<u8>,
+    },
+    TransferWithinChannel {
+        client_id: ClientId,
+        sender: tokio::sync::mpsc::Sender<ServerMessage>,
+        character: FieldCharacter,
+        old: RuntimeLocation,
+        new: RuntimeLocation,
     },
 }
 

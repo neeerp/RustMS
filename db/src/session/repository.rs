@@ -40,6 +40,21 @@ pub fn get_transition_session_by_character_id(c_id: i32) -> QueryResult<Session>
         .first::<Session>(&mut connection)
 }
 
+pub fn get_transition_session_by_character_channel_ip(
+    c_id: i32,
+    ch_id: i16,
+    ip_addr: IpNetwork,
+) -> QueryResult<Session> {
+    let mut connection = establish_connection();
+
+    sessions
+        .filter(character_id.eq(c_id))
+        .filter(selected_channel_id.eq(Some(ch_id)))
+        .filter(ip.eq(ip_addr))
+        .filter(state.eq(SessionState::Transition))
+        .first::<Session>(&mut connection)
+}
+
 pub fn create_session(new_session: NewSession) -> QueryResult<Session> {
     let mut connection = establish_connection();
 

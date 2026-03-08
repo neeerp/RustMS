@@ -1,13 +1,15 @@
 use crate::error::RuntimeError;
 use crate::handler::{ClientId, HandlerAction, HandlerContext, HandlerResult};
 use crate::io::{PacketReader, PacketWriter};
-use crate::message::{ClientEvent, FieldCharacter, ServerMessage};
+use crate::message::{ClientEvent, FieldCharacter, RuntimeLocation, ServerMessage};
 use db::session::{SessionState, SessionWrapper};
 use net::get_handler;
 use net::listener::ServerType;
+use net::login_world::resolve_login_channel;
 use net::packet::build;
 use packet::Packet;
 use rand::{thread_rng, Rng};
+use std::net::SocketAddr;
 use tokio::net::TcpStream;
 use tokio::sync::mpsc;
 use tracing::{error, info, warn};
@@ -24,6 +26,7 @@ pub struct ClientActor {
     server_rx: mpsc::Receiver<ServerMessage>,
     /// Our sender (given to world server on connect)
     server_tx: mpsc::Sender<ServerMessage>,
+    peer_addr: SocketAddr,
 }
 
 impl ClientActor {
@@ -31,6 +34,7 @@ impl ClientActor {
     pub async fn new(
         stream: TcpStream,
         world_tx: mpsc::Sender<ClientEvent>,
+        peer_addr: SocketAddr,
     ) -> Result<Self, RuntimeError> {
         // Generate encryption IVs (scope rng to drop before await)
         let (recv_iv, send_iv) = {
@@ -64,6 +68,7 @@ impl ClientActor {
             world_tx,
             server_rx,
             server_tx,
+            peer_addr,
         })
     }
 
@@ -223,10 +228,24 @@ impl ClientActor {
                     spawn_y,
                     spawn_stance,
                 } => {
-                    let event = ClientEvent::MapChanged {
+                    let channel_id = self
+                        .session
+                        .session
+                        .as_ref()
+                        .and_then(|session| session.selected_channel_id)
+                        .unwrap_or(0) as u8;
+                    let event = ClientEvent::LocationChanged {
                         client_id: self.client_id,
-                        old_map_id,
-                        new_map_id,
+                        old: RuntimeLocation {
+                            channel_id,
+                            map_id: old_map_id,
+                            instance_id: 0,
+                        },
+                        new: RuntimeLocation {
+                            channel_id,
+                            map_id: new_map_id,
+                            instance_id: 0,
+                        },
                         spawn_portal_id,
                         spawn_x,
                         spawn_y,
@@ -257,18 +276,23 @@ impl ClientActor {
                 HandlerAction::UpdateSessionSelection { .. } => {
                     warn!("UpdateSessionSelection action ignored in world server");
                 }
-                HandlerAction::ReattachSession { character_id } => {
+                HandlerAction::ReattachSession {
+                    character_id,
+                    channel_id,
+                } => {
                     // Reattach session from login server
                     info!(character_id, "Reattaching session for character");
                     self.client_id = character_id;
 
                     // Load session from database by character_id
                     // Build packets synchronously, then release all locks before await
-                    let reattach_result: Option<(FieldCharacter, Packet, Packet)> = (|| {
-                        let mut session =
-                            db::session::get_transition_session_by_character_id(character_id)
-                                .ok()?;
-                        let channel_id = session.selected_channel_id.unwrap_or(0) as u8;
+                    let reattach_result: Option<(FieldCharacter, RuntimeLocation, Packet, Packet)> = (|| {
+                        let mut session = db::session::get_transition_session_by_character_channel_ip(
+                            character_id,
+                            i16::from(channel_id),
+                            self.peer_addr.ip().into(),
+                        )
+                        .ok()?;
                         session.state = SessionState::InGame;
                         let session = db::session::update_session(&session).ok()?;
                         let wrapper = SessionWrapper::from(session).ok()?;
@@ -290,6 +314,11 @@ impl ClientActor {
                             y: 190,
                             stance: 2,
                         };
+                        let location = RuntimeLocation {
+                            channel_id,
+                            map_id: chr.character.map_id,
+                            instance_id: 0,
+                        };
 
                         // Build the character data packets
                         let keymap_packet =
@@ -297,11 +326,11 @@ impl ClientActor {
                         let char_info_packet =
                             build::world::char::build_char_info(&chr.character, channel_id).ok()?;
 
-                        Some((character, keymap_packet, char_info_packet))
+                        Some((character, location, keymap_packet, char_info_packet))
                     })(
                     );
 
-                    if let Some((character, mut keymap_packet, mut char_info_packet)) =
+                    if let Some((character, location, mut keymap_packet, mut char_info_packet)) =
                         reattach_result
                     {
                         // Send character data packets to client
@@ -313,6 +342,7 @@ impl ClientActor {
                             client_id: character_id,
                             sender: self.server_tx.clone(),
                             character,
+                            location,
                         };
                         self.world_tx
                             .send(event)
@@ -321,6 +351,41 @@ impl ClientActor {
                     } else {
                         error!(character_id, "Failed to reattach session");
                     }
+                }
+                HandlerAction::ChangeChannel {
+                    world_id,
+                    channel_id,
+                } => {
+                    let Some(ref mut session) = self.session.session else {
+                        return Err(RuntimeError::Handler(
+                            "ChangeChannel requested without active session".to_string(),
+                        ));
+                    };
+                    let channel = resolve_login_channel(world_id, channel_id).map_err(|e| {
+                        RuntimeError::Handler(format!(
+                            "Failed to resolve channel migration target: {e}"
+                        ))
+                    })?;
+
+                    session.selected_world_id = Some(i16::from(world_id));
+                    session.selected_channel_id = Some(i16::from(channel_id));
+                    session.state = SessionState::Transition;
+                    db::session::update_session(session)
+                        .map_err(|e| RuntimeError::Handler(e.to_string()))?;
+
+                    let mut redirect_packet =
+                        build::world::channel::build_channel_change(channel.host, channel.port)
+                    .map_err(|e| RuntimeError::Handler(e.to_string()))?;
+                    self.writer.send_packet(&mut redirect_packet).await?;
+
+                    self.world_tx
+                        .send(ClientEvent::Disconnected {
+                            client_id: self.client_id,
+                        })
+                        .await
+                        .map_err(|_| RuntimeError::ChannelSend)?;
+                    self.client_id = 0;
+                    return Err(RuntimeError::ClientDisconnected);
                 }
             }
         }
@@ -376,6 +441,11 @@ impl ClientActor {
                 x: 240,
                 y: 190,
                 stance: 2,
+            },
+            location: RuntimeLocation {
+                channel_id,
+                map_id,
+                instance_id: 0,
             },
         };
 

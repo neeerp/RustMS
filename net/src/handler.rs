@@ -79,6 +79,7 @@ fn get_world_handler(op: i16) -> Box<dyn PacketHandler> {
     match num::FromPrimitive::from_i16(op) {
         Some(RecvOpcode::PlayerMove) => Box::new(world::PlayerMoveHandler::new()),
         Some(RecvOpcode::PlayerLoggedIn) => Box::new(world::PlayerLoggedInHandler::new()),
+        Some(RecvOpcode::ChangeChannel) => Box::new(world::ChangeChannelHandler::new()),
         Some(RecvOpcode::PlayerMapTransfer) => Box::new(world::PlayerMapTransferHandler::new()),
         Some(RecvOpcode::ChangeMap) => Box::new(world::ChangeMapHandler::new()),
         Some(RecvOpcode::PartySearch) => Box::new(world::PartySearchHandler::new()),
@@ -138,7 +139,9 @@ pub enum HandlerAction {
     /// Persist the currently selected world and channel for login handoff.
     UpdateSessionSelection { world_id: u8, channel_id: u8 },
     /// Reattach session from login server (world server)
-    ReattachSession { character_id: i32 },
+    ReattachSession { character_id: i32, channel_id: u8 },
+    /// Request a controlled channel migration for this client.
+    ChangeChannel { world_id: u8, channel_id: u8 },
     /// Deliver a directed whisper to another player.
     Whisper {
         target_name: String,
@@ -241,9 +244,20 @@ impl HandlerResult {
     }
 
     /// Add a reattach session action (for world server).
-    pub fn with_reattach_session(mut self, character_id: i32) -> Self {
-        self.actions
-            .push(HandlerAction::ReattachSession { character_id });
+    pub fn with_reattach_session(mut self, character_id: i32, channel_id: u8) -> Self {
+        self.actions.push(HandlerAction::ReattachSession {
+            character_id,
+            channel_id,
+        });
+        self
+    }
+
+    /// Request a controlled channel migration.
+    pub fn with_change_channel(mut self, world_id: u8, channel_id: u8) -> Self {
+        self.actions.push(HandlerAction::ChangeChannel {
+            world_id,
+            channel_id,
+        });
         self
     }
 
