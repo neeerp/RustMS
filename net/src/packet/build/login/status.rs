@@ -7,15 +7,27 @@ use db::account::Account;
 use packet::{io::write::PktWrite, Packet};
 use std::time::{SystemTime, UNIX_EPOCH};
 
+/// Result codes carried by the `LoginStatus` packet that the client knows how
+/// to display.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[repr(u8)]
+pub enum LoginStatusCode {
+    Success = 0,
+    Banned = 2,
+    IncorrectPassword = 4,
+    AlreadyLoggedIn = 7,
+    /// Prompts the client to accept the terms of service.
+    LicenseAgreement = 23,
+}
+
 /// Build a login status packet that gets sent upon login failure, relaying the
 /// reason.
-pub fn build_login_status_packet(status: u8) -> Result<Packet, NetworkError> {
-    // TODO: Need to create an enum for the status...
+pub fn build_login_status_packet(status: LoginStatusCode) -> Result<Packet, NetworkError> {
     let mut packet = Packet::new_empty();
     let opcode = LoginStatus as i16;
 
     packet.write_short(opcode)?;
-    packet.write_byte(status)?;
+    packet.write_byte(status as u8)?;
     packet.write_byte(0)?;
     packet.write_int(0)?;
 
@@ -77,4 +89,17 @@ pub fn build_guest_login_packet() -> Result<Packet, NetworkError> {
     packet.write_str_with_length("https://github.com/neeerp")?;
 
     Ok(packet)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn login_status_packet_encodes_status_code() {
+        let packet = build_login_status_packet(LoginStatusCode::IncorrectPassword).unwrap();
+        let opcode = (LoginStatus as i16).to_le_bytes();
+
+        assert_eq!(packet.bytes, vec![opcode[0], opcode[1], 4, 0, 0, 0, 0, 0]);
+    }
 }
