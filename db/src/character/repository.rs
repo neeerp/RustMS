@@ -3,8 +3,11 @@ use crate::establish_connection;
 use crate::schema;
 use crate::schema::characters;
 use diesel::expression_methods::*;
+use diesel::sql_types::Text;
 use diesel::{QueryDsl, QueryResult, RunQueryDsl, SaveChangesDsl};
 use schema::characters::dsl::*;
+
+diesel::define_sql_function!(fn lower(x: Text) -> Text);
 
 pub fn get_characters_by_accountid(account_id: i32) -> QueryResult<Vec<Character>> {
     let mut connection = establish_connection();
@@ -14,11 +17,12 @@ pub fn get_characters_by_accountid(account_id: i32) -> QueryResult<Vec<Character
         .load::<Character>(&mut connection)
 }
 
+/// Look up a character by name, ignoring case.
 pub fn get_character_by_name(cname: &str) -> QueryResult<Character> {
     let mut connection = establish_connection();
 
     characters
-        .filter(name.eq(cname))
+        .filter(lower(name).eq(lower(cname)))
         .first::<Character>(&mut connection)
 }
 

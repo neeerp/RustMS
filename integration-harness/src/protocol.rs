@@ -6,12 +6,12 @@ use crate::config::{HarnessConfig, MultiHarnessConfig};
 use crate::connection::MapleTestConnection;
 use crate::error::HarnessError;
 use crate::packets::{
-    build_accept_tos, build_char_list_request, build_char_select, build_create_char,
-    build_login_credentials, build_login_started, build_player_logged_in_for_channel,
-    build_server_list_request, build_set_gender, decode_char_list, decode_last_connected_world,
-    decode_login_status, decode_new_character, decode_recommended_worlds, decode_server_redirect,
-    decode_set_field, opcode_name, CharacterSummary, CharacterTemplate, LoginStatusPacket,
-    ServerListPacket,
+    build_accept_tos, build_char_list_request, build_char_select, build_check_char_name,
+    build_create_char, build_login_credentials, build_login_started,
+    build_player_logged_in_for_channel, build_server_list_request, build_set_gender,
+    decode_char_list, decode_char_name_response, decode_last_connected_world, decode_login_status,
+    decode_new_character, decode_recommended_worlds, decode_server_redirect, decode_set_field,
+    opcode_name, CharacterSummary, CharacterTemplate, LoginStatusPacket, ServerListPacket,
 };
 use net::packet::op::SendOpcode;
 use std::net::Ipv4Addr;
@@ -160,9 +160,84 @@ pub async fn login_to_world_session(config: &HarnessConfig) -> Result<WorldSessi
     })
 }
 
+/// Ask the login server whether `name` is available for a new character.
+///
+/// Logs in and ensures the configured character exists first, so callers can
+/// probe variations of an existing name.
+pub async fn check_char_name_available(
+    config: &HarnessConfig,
+    name: &str,
+) -> Result<bool, HarnessError> {
+    let (mut login_conn, _) = login_until_char_select(config).await?;
+
+    login_conn
+        .send_packet(
+            build_check_char_name(name).map_err(|message| {
+                HarnessError::protocol("check char name", login_conn.endpoint(), message)
+            })?,
+            "check char name",
+        )
+        .await?;
+
+    let response = read_packet(&mut login_conn, "check char name").await?;
+    let decoded = decode_char_name_response(&response.packet).map_err(|message| {
+        HarnessError::protocol("check char name", login_conn.endpoint(), message)
+    })?;
+    if decoded.name != name {
+        return Err(HarnessError::protocol(
+            "check char name",
+            login_conn.endpoint(),
+            format!(
+                "expected char-name response for `{}` but got `{}`",
+                name, decoded.name
+            ),
+        ));
+    }
+    Ok(decoded.available)
+}
+
 async fn login_until_redirect(
     config: &HarnessConfig,
 ) -> Result<(CharacterSummary, RedirectResult), HarnessError> {
+    let (mut login_conn, selected) = login_until_char_select(config).await?;
+
+    login_conn
+        .send_packet(
+            build_char_select(selected.id).map_err(|message| {
+                HarnessError::protocol("char select", config.login_addr, message)
+            })?,
+            "char select",
+        )
+        .await?;
+
+    let redirect_packet = read_packet(&mut login_conn, "server redirect").await?;
+    let redirect = decode_server_redirect(&redirect_packet.packet).map_err(|message| {
+        HarnessError::protocol("server redirect", login_conn.endpoint(), message)
+    })?;
+    assert_redirect_target(config, login_conn.endpoint(), redirect.ip, redirect.port)?;
+    if redirect.character_id != selected.id {
+        return Err(HarnessError::protocol(
+            "server redirect",
+            login_conn.endpoint(),
+            format!(
+                "expected redirect character id {} but got {}",
+                selected.id, redirect.character_id
+            ),
+        ));
+    }
+    Ok((
+        selected,
+        RedirectResult {
+            character_id: redirect.character_id,
+            redirect_ip: redirect.ip,
+            redirect_port: redirect.port,
+        },
+    ))
+}
+
+async fn login_until_char_select(
+    config: &HarnessConfig,
+) -> Result<(MapleTestConnection, CharacterSummary), HarnessError> {
     let mut login_conn = MapleTestConnection::connect(config.login_addr, "login handshake").await?;
     assert_handshake(
         "login handshake",
@@ -238,39 +313,7 @@ async fn login_until_redirect(
     })?;
 
     let selected = load_or_create_character(&mut login_conn, config).await?;
-
-    login_conn
-        .send_packet(
-            build_char_select(selected.id).map_err(|message| {
-                HarnessError::protocol("char select", config.login_addr, message)
-            })?,
-            "char select",
-        )
-        .await?;
-
-    let redirect_packet = read_packet(&mut login_conn, "server redirect").await?;
-    let redirect = decode_server_redirect(&redirect_packet.packet).map_err(|message| {
-        HarnessError::protocol("server redirect", login_conn.endpoint(), message)
-    })?;
-    assert_redirect_target(config, login_conn.endpoint(), redirect.ip, redirect.port)?;
-    if redirect.character_id != selected.id {
-        return Err(HarnessError::protocol(
-            "server redirect",
-            login_conn.endpoint(),
-            format!(
-                "expected redirect character id {} but got {}",
-                selected.id, redirect.character_id
-            ),
-        ));
-    }
-    Ok((
-        selected,
-        RedirectResult {
-            character_id: redirect.character_id,
-            redirect_ip: redirect.ip,
-            redirect_port: redirect.port,
-        },
-    ))
+    Ok((login_conn, selected))
 }
 
 async fn drain_spawn_npcs(connection: &mut MapleTestConnection) {
