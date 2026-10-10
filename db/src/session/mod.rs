@@ -12,7 +12,7 @@ use std::{
 pub mod repository;
 pub use repository::*;
 
-#[derive(Debug, DbEnum)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, DbEnum)]
 #[ExistingTypePath = "crate::schema::sql_types::SessionState"]
 pub enum SessionState {
     BeforeLogin,

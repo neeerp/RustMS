@@ -88,6 +88,14 @@ pub fn update_session_character(s_id: i32, c_id: i32) -> crate::Result<usize> {
         .execute(&mut connection)?)
 }
 
+pub fn update_session_state(s_id: i32, new_state: SessionState) -> crate::Result<usize> {
+    let mut connection = crate::connection()?;
+
+    Ok(diesel::update(sessions.filter(id.eq(s_id)))
+        .set(state.eq(new_state))
+        .execute(&mut connection)?)
+}
+
 pub fn update_session_selection(s_id: i32, w_id: i16, ch_id: i16) -> crate::Result<usize> {
     let mut connection = crate::connection()?;
 

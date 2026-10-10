@@ -19,6 +19,7 @@ The actor model lives in `runtime/src/actor`.
   - `Reply`
   - `CreateSession`
   - `AttachCharacter`
+  - `UpdateSessionState`
   - `Disconnect`
 - The login actor interprets those actions, writes packets, and persists session state for the world handoff.
 

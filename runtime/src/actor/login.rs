@@ -176,6 +176,17 @@ impl LoginClientActor {
                         }
                     }
                 }
+                HandlerAction::UpdateSessionState { state } => {
+                    if let Some(ref mut session) = self.session.session {
+                        if let Err(e) = db::session::update_session_state(session.id, state) {
+                            error!(error = %e, "Failed to update session state");
+                        } else {
+                            session.state = state;
+                        }
+                    } else {
+                        warn!("Ignoring session state update without session");
+                    }
+                }
                 HandlerAction::UpdateSessionSelection {
                     world_id,
                     channel_id,

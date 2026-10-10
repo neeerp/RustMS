@@ -306,6 +306,9 @@ impl ClientActor {
                     // Force reload character
                     let _ = self.session.get_character();
                 }
+                HandlerAction::UpdateSessionState { .. } => {
+                    warn!("UpdateSessionState action ignored in world server");
+                }
                 HandlerAction::UpdateSessionSelection { .. } => {
                     warn!("UpdateSessionSelection action ignored in world server");
                 }

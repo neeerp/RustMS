@@ -140,6 +140,8 @@ pub enum HandlerAction {
     },
     /// Attach a character to the current session
     AttachCharacter { character_id: i32 },
+    /// Move the current session to a new state (login server only).
+    UpdateSessionState { state: SessionState },
     /// Persist the currently selected world and channel for login handoff.
     UpdateSessionSelection { world_id: u8, channel_id: u8 },
     /// Reattach session from login server (world server)
@@ -235,6 +237,12 @@ impl HandlerResult {
     pub fn with_attach_character(mut self, character_id: i32) -> Self {
         self.actions
             .push(HandlerAction::AttachCharacter { character_id });
+        self
+    }
+
+    /// Move the current session to a new state.
+    pub fn with_update_session_state(mut self, state: SessionState) -> Self {
+        self.actions.push(HandlerAction::UpdateSessionState { state });
         self
     }
 

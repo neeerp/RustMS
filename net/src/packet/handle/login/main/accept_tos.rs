@@ -1,7 +1,7 @@
 use crate::error::NetworkError;
 use crate::handler::{HandlerContext, HandlerResult, PacketHandler};
 use crate::packet::build;
-use db::account;
+use db::{account, session::SessionState};
 use packet::{io::read::PktRead, Packet};
 use std::io::BufReader;
 
@@ -42,8 +42,9 @@ impl PacketHandler for AcceptTOSHandler {
         user.accepted_tos = true;
         let user = account::update_account(&user)?;
 
-        // TODO: Update session state to AfterLogin
         let login_packet = build::login::status::build_successful_login_packet(&user)?;
-        Ok(HandlerResult::reply(login_packet))
+        Ok(HandlerResult::empty()
+            .with_update_session_state(SessionState::AfterLogin)
+            .with_reply(login_packet))
     }
 }
