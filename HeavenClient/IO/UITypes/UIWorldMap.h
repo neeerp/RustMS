@@ -95,7 +95,7 @@ namespace ms
 		bool search;
 		bool show_path_img;
 
-		int32_t mapid;
+		int32_t mapid = -1;
 
 		std::string parent_map;
 		std::string user_map;

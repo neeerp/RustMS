@@ -28,6 +28,35 @@
 
 namespace ms
 {
+	namespace
+	{
+		std::string world_for_map(int32_t field)
+		{
+			// Map IDs are not world-map filenames. Prefer the most detailed
+			// asset whose MapList actually contains this field.
+			static const auto worlds = [] {
+				std::map<int32_t, std::pair<size_t, std::string>> result;
+				for (auto world : nl::nx::map["WorldMap"])
+				{
+					std::vector<int32_t> fields;
+					for (auto spot : world["MapList"])
+						for (auto id : spot["mapNo"]) fields.push_back(id.get_integer());
+					std::string name = world.name();
+					if (name.size() < 4) continue;
+					name.resize(name.size() - 4);
+					for (auto id : fields)
+					{
+						auto found = result.find(id);
+						if (found == result.end() || fields.size() < found->second.first)
+							result[id] = {fields.size(), name};
+					}
+				}
+				return result;
+			}();
+			auto found = worlds.find(field);
+			return found == worlds.end() ? "WorldMap" : found->second.second;
+		}
+	}
 	UIWorldMap::UIWorldMap() : UIDragElement<PosMAP>()
 	{
 		nl::node close = nl::nx::ui["Basic.img"]["BtClose3"];
@@ -148,8 +177,7 @@ namespace ms
 		if (mid != mapid)
 		{
 			mapid = mid;
-			auto prefix = mapid / 10000000;
-			auto parent_map = "WorldMap0" + std::to_string(prefix);
+			auto parent_map = world_for_map(mapid);
 			user_map = parent_map;
 
 			update_world(parent_map);
