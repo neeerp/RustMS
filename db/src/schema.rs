@@ -131,7 +131,7 @@ diesel::table! {
         character_id -> Int4,
         key -> Int2,
         bind_type -> KeybindType,
-        action -> Int2,
+        action -> Int4,
     }
 }
 

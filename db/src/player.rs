@@ -262,7 +262,7 @@ pub fn quest_record(progress: &QuestProgress) -> QuestRecord {
 }
 
 fn load_keymap(conn: &mut PgConnection, character_id: i32) -> QueryResult<Keymap> {
-    let rows: Vec<(i16, KeybindType, i16)> = keybindings::table
+    let rows: Vec<(i16, KeybindType, i32)> = keybindings::table
         .filter(keybindings::character_id.eq(character_id))
         .select((keybindings::key, keybindings::bind_type, keybindings::action))
         .load(conn)?;
@@ -272,7 +272,7 @@ fn load_keymap(conn: &mut PgConnection, character_id: i32) -> QueryResult<Keymap
             key,
             KeyBinding {
                 kind: kind.into(),
-                action: i32::from(action),
+                action,
             },
         );
     }
@@ -289,7 +289,7 @@ pub(crate) fn save_keymap(conn: &mut PgConnection, character_id: i32, keymap: &K
                 keybindings::character_id.eq(character_id),
                 keybindings::key.eq(key),
                 keybindings::bind_type.eq(KeybindType::from(binding.kind)),
-                keybindings::action.eq(i16::try_from(binding.action).unwrap_or(0)),
+                keybindings::action.eq(binding.action),
             )
         })
         .collect();

@@ -5,6 +5,8 @@ use tokio::time::{sleep, Duration};
 
 /// Default binding the server gives new characters (see game::keymap).
 const DEFAULT_KEY: usize = 18;
+/// A real skill id (Warrior's Power Strike): too large for a 16-bit column.
+const SKILL_ID: i32 = 1001004;
 
 #[tokio::test]
 async fn changed_keys_survive_logout() {
@@ -14,12 +16,12 @@ async fn changed_keys_survive_logout() {
         .expect("login-to-world session flow failed");
     assert_eq!(session.keymap[DEFAULT_KEY], (4, 1), "unexpected default binding");
 
-    // Rebind an existing default key (the case the old upsert dropped) and
-    // bind a previously empty one.
+    // Rebind an existing default key (the case the old upsert dropped), bind
+    // a previously empty one, and bind a skill whose id needs 32 bits.
     session
         .connection
         .send_packet(
-            build_change_keymap(&[(DEFAULT_KEY as i32, 4, 9), (2, 5, 54)])
+            build_change_keymap(&[(DEFAULT_KEY as i32, 4, 9), (2, 5, 54), (3, 1, SKILL_ID)])
                 .expect("failed to build keymap change"),
             "change keymap",
         )
@@ -33,6 +35,7 @@ async fn changed_keys_survive_logout() {
     let session = relogin(&config).await;
     assert_eq!(session.keymap[DEFAULT_KEY], (4, 9));
     assert_eq!(session.keymap[2], (5, 54));
+    assert_eq!(session.keymap[3], (1, SKILL_ID));
 }
 
 /// Log back in once the server has finished closing the previous session.
