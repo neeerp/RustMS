@@ -86,7 +86,10 @@ impl LoginHandler for LoginCredentialsHandler {
         let (state, reply) = match Self::account_status(&acc) {
             LoginStatusCode::Success => (
                 SessionState::AfterLogin,
-                build::login::status::build_successful_login_packet(&acc)?,
+                build::login::status::build_successful_login_packet(
+                    &acc,
+                    crate::settings::login_settings()?.login.pin_required,
+                )?,
             ),
             LoginStatusCode::LicenseAgreement => (
                 SessionState::BeforeLogin,

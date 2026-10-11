@@ -30,18 +30,7 @@ mod tests {
     const SEND_IV: [u8; 4] = [5, 6, 7, 8];
 
     #[test]
-    fn header_ivs_and_locale_match_reference() {
-        let packet = build_handshake_packet(&RECV_IV.to_vec(), &SEND_IV.to_vec()).unwrap();
-
-        let mut expect = Expect::new(&packet.bytes);
-        expect.short(0x0E).short(83);
-        expect.skip(3); // patch version string; see the ignored test below
-        expect.bytes(&RECV_IV).bytes(&SEND_IV).byte(8);
-        expect.end();
-    }
-
-    #[test]
-    fn patch_version_string_matches_reference() {
+    fn handshake_matches_reference() {
         let packet = build_handshake_packet(&RECV_IV.to_vec(), &SEND_IV.to_vec()).unwrap();
 
         let mut expect = Expect::new(&packet.bytes);

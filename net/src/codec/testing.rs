@@ -98,7 +98,10 @@ impl<'a> Expect<'a> {
 
     /// Skip a field whose value is not under test (e.g. a timestamp).
     pub fn skip(&mut self, len: u64) -> &mut Self {
-        self.cursor.set_position(self.at() + len);
+        let at = self.at();
+        let total = self.cursor.get_ref().len() as u64;
+        assert!(at + len <= total, "skip of {len} at offset {at} runs past the end ({total})");
+        self.cursor.set_position(at + len);
         self
     }
 

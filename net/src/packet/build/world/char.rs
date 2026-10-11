@@ -28,7 +28,7 @@ mod tests {
     use super::*;
     use crate::codec::stats::sample_stats;
     use crate::codec::testing::Expect;
-    use crate::codec::time::ZERO_TIME;
+    use crate::codec::time::{DEFAULT_TIME, ZERO_TIME};
     use game::inventory::equip_slot;
     use game::{
         EquipStats, Inventory, InventoryType, Item, Keymap, QuestLog, QuestRecord, QuestStatus,
@@ -130,7 +130,7 @@ mod tests {
             .byte(1)
             .int(1302000)
             .byte(0)
-            .long(ZERO_TIME);
+            .long(DEFAULT_TIME); // no expiration
         expect.byte(7).byte(1);
         expect.short(3).short(0).short(0).short(0); // str dex int luk
         expect.short(0).short(0); // hp mp
@@ -148,7 +148,7 @@ mod tests {
             .int(1002186)
             .byte(1)
             .long(77)
-            .long(ZERO_TIME);
+            .long(DEFAULT_TIME);
         expect.byte(0).byte(0);
         for _ in 0..15 {
             expect.short(0);
@@ -159,9 +159,9 @@ mod tests {
         expect.short(0); // end of cash equipment
         expect.int(0); // equip bag is empty
         // use bag: potion, then throwing stars with the recharge block
-        expect.byte(1).byte(2).int(2000000).byte(0).long(ZERO_TIME);
+        expect.byte(1).byte(2).int(2000000).byte(0).long(DEFAULT_TIME);
         expect.short(12).string("").short(0);
-        expect.byte(2).byte(2).int(2070000).byte(0).long(ZERO_TIME);
+        expect.byte(2).byte(2).int(2070000).byte(0).long(DEFAULT_TIME);
         expect.short(500).string("").short(0);
         expect.int(2).bytes(&[0x54, 0, 0, 0x34]);
         expect.byte(0); // end of use
@@ -171,7 +171,7 @@ mod tests {
 
         // addSkillInfo
         expect.short(2);
-        expect.int(1001004).int(3).long(ZERO_TIME);
+        expect.int(1001004).int(3).long(DEFAULT_TIME);
         expect.int(1121008).int(5).long(FILETIME_1000S).int(30); // 4th job: master level
         expect.short(0); // cooldowns
 

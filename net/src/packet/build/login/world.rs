@@ -136,21 +136,7 @@ mod tests {
 
     #[test]
     fn world_details_match_reference() {
-        let packet = build_world_details(&world(0)).unwrap();
-
-        let mut expect = Expect::new(&packet.bytes);
-        expect.short(SendOpcode::ServerList as i16);
-        expect.byte(0).string("Scania").byte(2).string("Hello");
-        expect.byte(100).byte(0).byte(100).byte(0).byte(0); // rate modifiers
-        expect.byte(2); // channel count
-        expect.string("Scania-1").int(700).byte(1).byte(0).byte(0);
-        expect.string("Scania-2").int(600).byte(1).byte(1).byte(0);
-        expect.short(0);
-        expect.end();
-    }
-
-    #[test]
-    fn channel_entries_are_never_adult_only() {
+        // A non-zero world id: the last channel byte is the adult flag, not the world.
         let packet = build_world_details(&world(2)).unwrap();
 
         let mut expect = Expect::new(&packet.bytes);
@@ -191,7 +177,6 @@ mod tests {
             .byte(0)
             .end();
     }
-
 
     #[test]
     fn server_status_is_a_short() {

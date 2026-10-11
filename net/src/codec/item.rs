@@ -121,6 +121,7 @@ pub fn encode_inventory(packet: &mut Packet, inventory: &Inventory) -> Result<()
 mod tests {
     use super::*;
     use crate::codec::testing::Expect;
+    use crate::codec::time::DEFAULT_TIME;
     use game::inventory::equip_slot;
     use game::EquipStats;
 
@@ -130,7 +131,7 @@ mod tests {
         encode_item(&mut packet, SlotPrefix::Bag(3), &Item::stack(2000000, 12)).unwrap();
 
         let mut expect = Expect::new(&packet.bytes);
-        expect.byte(3).byte(2).int(2000000).byte(0).long(ZERO_TIME);
+        expect.byte(3).byte(2).int(2000000).byte(0).long(DEFAULT_TIME);
         expect.short(12).string("").short(0);
         expect.end();
     }
@@ -151,7 +152,7 @@ mod tests {
         .unwrap();
 
         let mut expect = Expect::new(&packet.bytes);
-        expect.short(11).byte(1).int(1302000).byte(0).long(ZERO_TIME);
+        expect.short(11).byte(1).int(1302000).byte(0).long(DEFAULT_TIME);
         expect.byte(7).byte(0);
         expect.short(0).short(0).short(0).short(0).short(0).short(0);
         expect.short(17);

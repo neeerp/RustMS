@@ -69,7 +69,7 @@ work with a stock v83 client.
 | 14 | Medium ✅ | `Cargo.lock` is gitignored, but the Dockerfile `COPY`s it — fresh clones can't run the harness. | `.gitignore:6`, `Dockerfile.rustms-server:15` |
 | 15 | Medium | Whisper modes likely swapped vs v83 (HeavenMS: 0x12 = receive, 0x0A = reply). Both sides were written together so they agree with each other. Verify. | `net/src/packet/build/world/messaging.rs:4-6`, `HeavenClient/.../MessagingHandlers.cpp:29` |
 | 16 | Medium | Character creation inserts character then keybinds with no transaction. | `db/src/character/mod.rs:466-474` |
-| 17 | Low | 0xDF is `PLAYER_UPDATE` in v83, mislabelled `PartySearch`. | `net/src/packet/op/recv.rs` |
+| 17 | Low | ~~0xDF is `PLAYER_UPDATE` in v83, mislabelled `PartySearch`.~~ Retracted: the reference names 0xDF `PARTY_SEARCH_UPDATE`; only HeavenClient calls it `PLAYER_UPDATE`. Now `PartySearchUpdate`. | `net/src/packet/op/recv.rs` |
 
 ---
 

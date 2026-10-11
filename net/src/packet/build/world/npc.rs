@@ -63,37 +63,6 @@ mod tests {
     use super::*;
     use crate::codec::testing::Expect;
     use crate::dialogue::DialoguePage;
-    use packet::io::read::PktRead;
-    use std::io::Cursor;
-
-    #[test]
-    fn build_spawn_npc_matches_expected_payload() {
-        let packet = build_spawn_npc(&ForeignNpc {
-            object_id: 1_000_000_000,
-            npc_id: 2100,
-            x: 1200,
-            y: 175,
-            flip: true,
-            foothold: 32,
-            rx0: 1150,
-            rx1: 1250,
-        })
-        .expect("build spawn npc");
-
-        let mut cursor = Cursor::new(&packet.bytes[..]);
-        assert_eq!(
-            cursor.read_short().expect("opcode"),
-            SendOpcode::SpawnNpc as i16
-        );
-        assert_eq!(cursor.read_int().expect("object id"), 1_000_000_000);
-        assert_eq!(cursor.read_int().expect("npc id"), 2100);
-        assert_eq!(cursor.read_short().expect("x"), 1200);
-        assert_eq!(cursor.read_short().expect("y"), 175);
-        assert_eq!(cursor.read_byte().expect("flip"), 1);
-        assert_eq!(cursor.read_short().expect("foothold"), 32);
-        assert_eq!(cursor.read_short().expect("rx0"), 1150);
-        assert_eq!(cursor.read_short().expect("rx1"), 1250);
-    }
 
     fn foreign_npc(flip: bool) -> ForeignNpc {
         ForeignNpc {
@@ -116,7 +85,9 @@ mod tests {
         expect.short(SendOpcode::SpawnNpc as i16);
         expect.int(1_000_000_001).int(2100);
         expect.short(1200).short(-175);
-        expect.byte(1); // reference: 0 when the life entry has f = 1, else 1
+        // The reference writes `f == 1 ? 0 : 1`; `flip` is already `!f`
+        // (see game-data), so it goes out as-is.
+        expect.byte(1);
         expect.short(32).short(1150).short(1250);
         expect.byte(1); // shown on the minimap
         expect.end();
