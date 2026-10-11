@@ -1,5 +1,4 @@
 use crate::{character::Character, schema::keybindings};
-use diesel::QueryResult;
 use itertools::izip;
 use std::collections::HashMap;
 
@@ -127,7 +126,7 @@ pub struct KeybindSet {
 
 impl KeybindSet {
     /// Get the keybind set for the given character.
-    pub fn from_character(character: &Character) -> QueryResult<Self> {
+    pub fn from_character(character: &Character) -> crate::Result<Self> {
         let character_id = character.id;
 
         Ok(Self::from_bind_vec(
@@ -136,9 +135,8 @@ impl KeybindSet {
         ))
     }
 
-    /// Create, set, and return a default keybind set for the given character.
-    pub fn set_defaults(character: &Character) -> QueryResult<Self> {
-        let character_id = character.id;
+    /// Build (without saving) the default keybind set for a character.
+    pub fn defaults(character_id: i32) -> Self {
         let mut bind_set = Self {
             character_id,
             binds: HashMap::new(),
@@ -158,9 +156,7 @@ impl KeybindSet {
             ))
         });
 
-        bind_set.save()?;
-
-        Ok(bind_set)
+        bind_set
     }
 
     /// Convert a vector of keybindings to a keybind set for a given character.
@@ -192,8 +188,14 @@ impl KeybindSet {
     }
 
     /// Save the current state of the keybind set.
-    pub fn save(&self) -> QueryResult<()> {
-        repository::upsert_keybindings(self.binds.values().map(|x| x.clone()).collect())?;
+    pub fn save(&self) -> crate::Result<()> {
+        repository::upsert_keybindings(self.binds.values().cloned().collect())?;
+        Ok(())
+    }
+
+    /// Save the keybind set using an existing connection (e.g. inside a transaction).
+    pub(crate) fn save_on(&self, connection: &mut diesel::pg::PgConnection) -> diesel::QueryResult<()> {
+        repository::upsert_keybindings_on(connection, self.binds.values().cloned().collect())?;
         Ok(())
     }
 }

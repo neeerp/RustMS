@@ -6,7 +6,7 @@ pub mod io;
 pub mod message;
 
 pub use actor::{ClientActor, LoginServerActor, WorldServerActor};
-pub use db::spawn_db;
+pub use db::{prepare_database, spawn_db};
 pub use error::RuntimeError;
 pub use handler::{BroadcastScope, ClientId, HandlerAction, HandlerContext, HandlerResult};
 pub use io::{PacketReader, PacketWriter};

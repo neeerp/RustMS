@@ -6,9 +6,45 @@ use std::process::{Command, ExitCode, Stdio};
 use std::thread;
 use std::time::{Duration, Instant};
 
-const PROJECT_NAME: &str = "rustms-integration";
-const LOGIN_ADDR: &str = "127.0.0.1:18484";
-const WORLD_ADDR: &str = "127.0.0.1:18485";
+const DEFAULT_PROJECT_NAME: &str = "rustms-integration";
+const DEFAULT_LOGIN_PORT: u16 = 18484;
+const DEFAULT_WORLD_PORT: u16 = 18485;
+
+/// Host-side identity of one harness stack. Overriding these lets several
+/// checkouts (for example git worktrees) run isolated stacks side by side.
+struct StackConfig {
+    project_name: String,
+    login_port: u16,
+    world_port: u16,
+}
+
+impl StackConfig {
+    fn from_env() -> Result<Self, String> {
+        Ok(Self {
+            project_name: env::var("HARNESS_PROJECT_NAME")
+                .unwrap_or_else(|_| DEFAULT_PROJECT_NAME.to_string()),
+            login_port: port_from_env("HARNESS_LOGIN_PORT", DEFAULT_LOGIN_PORT)?,
+            world_port: port_from_env("HARNESS_WORLD_PORT", DEFAULT_WORLD_PORT)?,
+        })
+    }
+
+    fn login_addr(&self) -> String {
+        format!("127.0.0.1:{}", self.login_port)
+    }
+
+    fn world_addr(&self) -> String {
+        format!("127.0.0.1:{}", self.world_port)
+    }
+}
+
+fn port_from_env(name: &str, default: u16) -> Result<u16, String> {
+    match env::var(name) {
+        Ok(value) => value
+            .parse()
+            .map_err(|_| format!("{name} must be a valid port, got `{value}`")),
+        Err(_) => Ok(default),
+    }
+}
 
 fn main() -> ExitCode {
     match run() {
@@ -29,10 +65,11 @@ fn run() -> Result<(), String> {
         ensure_docker_available()?;
     }
 
+    let stack = StackConfig::from_env()?;
     match command.as_str() {
-        "up" => up_stack(),
-        "down" => down_stack(),
-        "test" => run_tests(),
+        "up" => up_stack(&stack),
+        "down" => down_stack(&stack),
+        "test" => run_tests(&stack),
         other => Err(format!(
             "unsupported command `{other}`; expected one of: up, down, test"
         )),
@@ -97,11 +134,11 @@ fn ensure_docker_available() -> Result<(), String> {
     }
 }
 
-fn run_tests() -> Result<(), String> {
+fn run_tests(stack: &StackConfig) -> Result<(), String> {
     let total_start = Instant::now();
-    if let Err(error) = up_stack() {
-        dump_stack_logs();
-        let _ = down_stack();
+    if let Err(error) = up_stack(stack) {
+        dump_stack_logs(stack);
+        let _ = down_stack(stack);
         return Err(error);
     }
 
@@ -111,8 +148,8 @@ fn run_tests() -> Result<(), String> {
         .arg("test")
         .arg("-p")
         .arg("integration-harness")
-        .env("HARNESS_LOGIN_ADDR", LOGIN_ADDR)
-        .env("HARNESS_WORLD_ADDR", WORLD_ADDR)
+        .env("HARNESS_LOGIN_ADDR", stack.login_addr())
+        .env("HARNESS_WORLD_ADDR", stack.world_addr())
         .current_dir(&workspace_root)
         .stdin(Stdio::null())
         .stdout(Stdio::inherit())
@@ -125,10 +162,10 @@ fn run_tests() -> Result<(), String> {
         tests_start.elapsed().as_secs_f64()
     );
     if !matches!(&status, Ok(status) if status.success()) {
-        dump_stack_logs();
+        dump_stack_logs(stack);
     }
 
-    let down_result = down_stack();
+    let down_result = down_stack(stack);
     eprintln!(
         "harness total lifecycle: {:.3}s",
         total_start.elapsed().as_secs_f64()
@@ -140,18 +177,18 @@ fn run_tests() -> Result<(), String> {
     down_result
 }
 
-fn up_stack() -> Result<(), String> {
-    let _ = down_stack();
+fn up_stack(stack: &StackConfig) -> Result<(), String> {
+    let _ = down_stack(stack);
     let build_start = Instant::now();
-    compose_cmd(["build", "-q"])?;
+    compose_cmd(stack, ["build", "-q"])?;
     eprintln!(
         "harness image build: {:.3}s",
         build_start.elapsed().as_secs_f64()
     );
     let startup_start = Instant::now();
-    compose_cmd(["up", "-d", "--no-build", "--remove-orphans"])?;
-    wait_for_endpoint(LOGIN_ADDR, Duration::from_secs(60))?;
-    wait_for_endpoint(WORLD_ADDR, Duration::from_secs(60))?;
+    compose_cmd(stack, ["up", "-d", "--no-build", "--remove-orphans"])?;
+    wait_for_endpoint(&stack.login_addr(), Duration::from_secs(60))?;
+    wait_for_endpoint(&stack.world_addr(), Duration::from_secs(60))?;
     eprintln!(
         "harness startup/readiness: {:.3}s",
         startup_start.elapsed().as_secs_f64()
@@ -159,25 +196,27 @@ fn up_stack() -> Result<(), String> {
     Ok(())
 }
 
-fn dump_stack_logs() {
+fn dump_stack_logs(stack: &StackConfig) {
     eprintln!("harness failed; collecting container logs before teardown:");
-    if let Err(error) = compose_cmd(["logs", "--no-color", "--tail", "200"]) {
+    if let Err(error) = compose_cmd(stack, ["logs", "--no-color", "--tail", "200"]) {
         eprintln!("failed to collect harness logs: {error}");
     }
 }
 
-fn down_stack() -> Result<(), String> {
-    compose_cmd(["down", "-v", "--remove-orphans"])
+fn down_stack(stack: &StackConfig) -> Result<(), String> {
+    compose_cmd(stack, ["down", "-v", "--remove-orphans"])
 }
 
-fn compose_cmd<const N: usize>(args: [&str; N]) -> Result<(), String> {
+fn compose_cmd<const N: usize>(stack: &StackConfig, args: [&str; N]) -> Result<(), String> {
     let status = Command::new("docker")
         .arg("compose")
         .arg("-f")
         .arg(compose_file_path())
         .arg("-p")
-        .arg(PROJECT_NAME)
+        .arg(&stack.project_name)
         .args(args)
+        .env("HARNESS_LOGIN_PORT", stack.login_port.to_string())
+        .env("HARNESS_WORLD_PORT", stack.world_port.to_string())
         .current_dir(workspace_root())
         .stdin(Stdio::null())
         .stdout(Stdio::inherit())

@@ -16,6 +16,11 @@ async fn main() {
 
     info!("Starting World Server...");
 
+    if let Err(e) = runtime::prepare_database().await {
+        tracing::error!(error = %e, "Failed to prepare database");
+        std::process::exit(1);
+    }
+
     // Create channel for client events -> world server
     let (event_tx, event_rx) = mpsc::channel::<ClientEvent>(256);
 

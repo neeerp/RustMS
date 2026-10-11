@@ -2,9 +2,6 @@
 debug/
 target/
 
-# Keep this only for binaries
-Cargo.lock
-
 # Rust backup files
 **/*.rs.bk
 

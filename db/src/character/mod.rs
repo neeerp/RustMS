@@ -1,5 +1,5 @@
 use crate::{keybinding::KeybindSet, schema::characters};
-use diesel::QueryResult;
+use diesel::Connection;
 use std::time::SystemTime;
 
 pub mod repository;
@@ -44,7 +44,7 @@ pub struct Character {
 }
 
 impl Character {
-    pub fn save(&self) -> QueryResult<Character> {
+    pub fn save(&self) -> crate::Result<Character> {
         repository::update_character(self)
     }
 }
@@ -68,14 +68,22 @@ pub struct NewCharacter<'a> {
 impl NewCharacter<'_> {
     /// Save the new character and return the saved Character's
     /// wrapper.
-    pub fn create(self) -> QueryResult<CharacterWrapper> {
-        let character = repository::create_character(self)?;
-        let key_binds = KeybindSet::set_defaults(&character)?;
-
-        Ok(CharacterWrapper {
-            character,
-            key_binds,
-        })
+    ///
+    /// The character row and its default keybindings are written in one
+    /// transaction so a failure cannot leave a character without a keymap.
+    pub fn create(self) -> crate::Result<CharacterWrapper> {
+        let mut connection = crate::connection()?;
+        connection
+            .transaction(|connection| -> diesel::QueryResult<_> {
+                let character = repository::insert_character(connection, &self)?;
+                let key_binds = KeybindSet::defaults(character.id);
+                key_binds.save_on(connection)?;
+                Ok(CharacterWrapper {
+                    character,
+                    key_binds,
+                })
+            })
+            .map_err(Into::into)
     }
 }
 
@@ -88,13 +96,13 @@ pub struct CharacterWrapper {
 
 impl CharacterWrapper {
     /// Load an existing character given their ID.
-    pub fn from_character_id(character_id: i32) -> QueryResult<Self> {
+    pub fn from_character_id(character_id: i32) -> crate::Result<Self> {
         let character = repository::get_character_by_id(character_id)?;
         Self::from_character(character)
     }
 
     /// Wrap a character entity struct along with any additional information.
-    pub fn from_character(character: Character) -> QueryResult<Self> {
+    pub fn from_character(character: Character) -> crate::Result<Self> {
         let key_binds = KeybindSet::from_character(&character)?;
 
         let dto = Self {
