@@ -20,6 +20,8 @@ services:
     build:
       context: ..
       dockerfile: Dockerfile.rustms-server
+      args:
+        TARGET_CACHE_ID: rustms-target-${HARNESS_PROJECT_NAME:-rustms-integration}
     depends_on:
       db:
         condition: service_healthy

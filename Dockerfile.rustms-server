@@ -1,6 +1,11 @@
 # syntax=docker/dockerfile:1.7
 FROM rust:1.87-alpine AS builder
 
+# The build cache for target/ must not be shared between checkouts: cargo
+# trusts mtimes, so another checkout's newer artifacts would be reused for
+# this one's sources. The harness sets this per compose project.
+ARG TARGET_CACHE_ID=rustms-target
+
 WORKDIR /app
 
 RUN apk add --no-cache \
@@ -24,10 +29,16 @@ COPY runtime runtime
 COPY rust-ms rust-ms
 COPY tools tools
 
+# Cargo decides whether a workspace crate is fresh by comparing source mtimes
+# with the cached artifacts, and the cached target/ may hold artifacts built
+# from other source states (other branches, stashes). Touch the sources so
+# workspace crates always rebuild from what was just copied; dependencies
+# stay cached.
 RUN --mount=type=cache,target=/usr/local/cargo/registry \
     --mount=type=cache,target=/usr/local/cargo/git \
-    --mount=type=cache,target=/app/target \
-    cargo build -p rust-ms --bin login --bin world --release \
+    --mount=type=cache,id=${TARGET_CACHE_ID},target=/app/target \
+    find /app -path /app/target -prune -o -name '*.rs' -exec touch {} + \
+    && cargo build -p rust-ms --bin login --bin world --release \
     && mkdir -p /out \
     && cp /app/target/release/login /out/login \
     && cp /app/target/release/world /out/world

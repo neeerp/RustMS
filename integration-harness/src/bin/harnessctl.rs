@@ -215,6 +215,7 @@ fn compose_cmd<const N: usize>(stack: &StackConfig, args: [&str; N]) -> Result<(
         .arg("-p")
         .arg(&stack.project_name)
         .args(args)
+        .env("HARNESS_PROJECT_NAME", &stack.project_name)
         .env("HARNESS_LOGIN_PORT", stack.login_port.to_string())
         .env("HARNESS_WORLD_PORT", stack.world_port.to_string())
         .current_dir(workspace_root())
