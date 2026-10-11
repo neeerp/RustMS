@@ -151,11 +151,11 @@ namespace ms
 				switch (buttonid)
 				{
 					case Buttons::CLOSE:
-						NpcTalkMorePacket(type, -1).dispatch();
+						NpcTalkMorePacket(message_type, -1).dispatch();
 						break;
 					case Buttons::NEXT:
 					case Buttons::OK:
-						NpcTalkMorePacket(type, 1).dispatch();
+						NpcTalkMorePacket(message_type, 1).dispatch();
 						break;
 				}
 				break;
@@ -164,13 +164,14 @@ namespace ms
 				switch (buttonid)
 				{
 					case Buttons::CLOSE:
-						NpcTalkMorePacket(type, -1).dispatch();
+						NpcTalkMorePacket(message_type, -1).dispatch();
 						break;
 					case Buttons::NEXT:
-						NpcTalkMorePacket(type, 1).dispatch();
+					case Buttons::OK:
+						NpcTalkMorePacket(message_type, 1).dispatch();
 						break;
 					case Buttons::PREV:
-						NpcTalkMorePacket(type, 0).dispatch();
+						NpcTalkMorePacket(message_type, 0).dispatch();
 						break;
 				}
 				break;
@@ -179,13 +180,13 @@ namespace ms
 				switch (buttonid)
 				{
 					case Buttons::CLOSE:
-						NpcTalkMorePacket(type, -1).dispatch();
+						NpcTalkMorePacket(message_type, -1).dispatch();
 						break;
 					case Buttons::NO:
-						NpcTalkMorePacket(type, 0).dispatch();
+						NpcTalkMorePacket(message_type, 0).dispatch();
 						break;
 					case Buttons::YES:
-						NpcTalkMorePacket(type, 1).dispatch();
+						NpcTalkMorePacket(message_type, 1).dispatch();
 						break;
 				}
 				break;
@@ -194,13 +195,13 @@ namespace ms
 				switch (buttonid)
 				{
 					case Buttons::CLOSE:
-						NpcTalkMorePacket(type, -1).dispatch();
+						NpcTalkMorePacket(message_type, -1).dispatch();
 						break;
 					case Buttons::QNO:
-						NpcTalkMorePacket(type, 0).dispatch();
+						NpcTalkMorePacket(message_type, 0).dispatch();
 						break;
 					case Buttons::QYES:
-						NpcTalkMorePacket(type, 1).dispatch();
+						NpcTalkMorePacket(message_type, 1).dispatch();
 						break;
 				}
 				break;
@@ -212,10 +213,10 @@ namespace ms
 				switch (buttonid)
 				{
 					case Buttons::CLOSE:
-						NpcTalkMorePacket(type, 0).dispatch();
+						NpcTalkMorePacket(message_type, 0).dispatch();
 						break;
 					case Buttons::OK:
-						NpcTalkMorePacket(type, 1).dispatch();
+						NpcTalkMorePacket(message_type, 1).dispatch();
 						break;
 				}
 				break;
@@ -224,7 +225,7 @@ namespace ms
 				switch (buttonid)
 				{
 					case Buttons::CLOSE:
-						NpcTalkMorePacket(type, 0).dispatch();
+						NpcTalkMorePacket(message_type, 0).dispatch();
 						break;
 					default:
 						NpcTalkMorePacket(0).dispatch(); // TODO: Selection
@@ -263,7 +264,7 @@ namespace ms
 		{
 			deactivate();
 
-			NpcTalkMorePacket(type, 0).dispatch();
+			NpcTalkMorePacket(message_type, -1).dispatch();
 		}
 	}
 
@@ -329,9 +330,14 @@ namespace ms
 		return formatted_text;
 	}
 
-	void UINpcTalk::change_text(int32_t npcid, int8_t msgtype, int16_t, int8_t speakerbyte, const std::string &tx)
+	void UINpcTalk::change_text(int32_t npcid, int8_t msgtype, int16_t style, int8_t speakerbyte, const std::string &tx)
 	{
+		message_type = msgtype;
 		type = get_by_value(msgtype);
+		const bool has_previous = (style & 0xff) != 0;
+		const bool has_next = (style & 0xff00) != 0;
+		if (msgtype == 0)
+			type = has_previous ? TalkType::SENDNEXTPREV : has_next ? TalkType::SENDNEXT : TalkType::SENDOK;
 
 		timestep = 0;
 		draw_text = true;
@@ -411,6 +417,14 @@ namespace ms
 			}
 			case TalkType::SENDNEXT:
 			case TalkType::SENDNEXTPREV:
+				if (has_previous)
+				{
+					buttons[Buttons::PREV]->set_position(Point<int16_t>(389, y_cord));
+					buttons[Buttons::PREV]->set_active(true);
+				}
+				buttons[has_next ? Buttons::NEXT : Buttons::OK]->set_position(Point<int16_t>(471, y_cord));
+				buttons[has_next ? Buttons::NEXT : Buttons::OK]->set_active(true);
+				break;
 			case TalkType::SENDACCEPTDECLINE:
 			case TalkType::SENDGETTEXT:
 			case TalkType::SENDGETNUMBER:

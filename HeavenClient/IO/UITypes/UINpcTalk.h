@@ -115,6 +115,7 @@ namespace ms
 		bool draw_text;
 		Slider slider;
 		TalkType type;
+		int8_t message_type;
 		std::string formatted_text;
 		size_t formatted_text_pos;
 		uint16_t timestep;

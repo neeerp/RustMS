@@ -5,6 +5,7 @@ This repository is a Rust workspace for a MapleStory server plus a nested C++ cl
 ## Documentation index
 
 - `agent_docs/server-architecture.md`: server-side actor model, handler boundaries, and login-to-world flow
+- `agent_docs/npc-dialogue.md`: asset-backed conversations, runtime ownership, and future quest integration
 - `agent_docs/integration-harness-usage.md`: commands, prerequisites, and day-to-day harness workflow
 - `agent_docs/integration-harness-architecture.md`: harness design, lifecycle, and test isolation model
 - `agent_docs/integration-harness-troubleshooting.md`: common harness failures and targeted fixes

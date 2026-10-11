@@ -66,6 +66,10 @@ pub enum ServerMessage {
 /// Events sent FROM a client TO the world server.
 #[derive(Debug)]
 pub enum ClientEvent {
+    NpcInteraction {
+        from: ClientId,
+        interaction: net::dialogue::NpcInteraction,
+    },
     /// Client has connected and is ready to receive messages
     Connected {
         client_id: ClientId,
@@ -111,6 +115,11 @@ pub enum ClientEvent {
 
 #[derive(Debug)]
 pub enum ChannelMessage {
+    NpcInteraction {
+        client_id: ClientId,
+        location: RuntimeLocation,
+        interaction: net::dialogue::NpcInteraction,
+    },
     JoinClient {
         client_id: ClientId,
         sender: tokio::sync::mpsc::Sender<ServerMessage>,
@@ -143,6 +152,10 @@ pub enum ChannelMessage {
 
 #[derive(Debug)]
 pub enum FieldMessage {
+    NpcInteraction {
+        from: ClientId,
+        interaction: net::dialogue::NpcInteraction,
+    },
     Join {
         client_id: ClientId,
         sender: tokio::sync::mpsc::Sender<ServerMessage>,

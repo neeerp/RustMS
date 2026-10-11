@@ -86,6 +86,8 @@ fn get_world_handler(op: i16) -> Box<dyn PacketHandler> {
         Some(RecvOpcode::ChangeKeybinds) => Box::new(world::ChangeKeybindsHandler::new()),
         Some(RecvOpcode::AllChat) => Box::new(world::AllChatHandler::new()),
         Some(RecvOpcode::Whisper) => Box::new(world::WhisperHandler::new()),
+        Some(RecvOpcode::TalkToNpc) => Box::new(world::NpcTalkHandler),
+        Some(RecvOpcode::NpcTalkMore) => Box::new(world::NpcTalkMoreHandler),
         None | Some(_) => Box::new(DefaultHandler),
     }
 }
@@ -118,6 +120,8 @@ use db::session::SessionState;
 /// Actions a handler can request the actor to perform.
 #[derive(Debug)]
 pub enum HandlerAction {
+    /// Resolve an NPC interaction against the client's current field.
+    NpcInteraction(crate::dialogue::NpcInteraction),
     /// Send a packet to the requesting client
     Reply(Packet),
     /// Broadcast a packet to multiple clients

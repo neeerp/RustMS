@@ -129,6 +129,9 @@ impl LoginClientActor {
     async fn process_actions(&mut self, result: HandlerResult) -> Result<(), RuntimeError> {
         for action in result.actions {
             match action {
+                HandlerAction::NpcInteraction(_) => {
+                    warn!("NpcInteraction action ignored in login server");
+                }
                 HandlerAction::Reply(mut packet) => {
                     self.writer.send_packet(&mut packet).await?;
                 }

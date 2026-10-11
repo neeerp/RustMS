@@ -52,6 +52,14 @@ impl WorldServerActor {
 
     async fn handle_event(&mut self, event: ClientEvent) {
         match event {
+            ClientEvent::NpcInteraction { from, interaction } => {
+                self.forward_to_channel(from, |location| ChannelMessage::NpcInteraction {
+                    client_id: from,
+                    location,
+                    interaction,
+                })
+                .await;
+            }
             ClientEvent::Connected {
                 client_id,
                 sender,

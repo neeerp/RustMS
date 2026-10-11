@@ -38,6 +38,21 @@ impl ChannelActor {
 
     async fn handle_message(&mut self, message: ChannelMessage) {
         match message {
+            ChannelMessage::NpcInteraction {
+                client_id,
+                location,
+                interaction,
+            } => {
+                self.send_to_field(
+                    location,
+                    FieldMessage::NpcInteraction {
+                        from: client_id,
+                        interaction,
+                    },
+                    client_id,
+                )
+                .await;
+            }
             ChannelMessage::JoinClient {
                 client_id,
                 sender,

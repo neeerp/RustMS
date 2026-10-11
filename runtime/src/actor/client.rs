@@ -164,6 +164,15 @@ impl ClientActor {
     async fn process_actions(&mut self, result: HandlerResult) -> Result<(), RuntimeError> {
         for action in result.actions {
             match action {
+                HandlerAction::NpcInteraction(interaction) => {
+                    self.world_tx
+                        .send(ClientEvent::NpcInteraction {
+                            from: self.client_id,
+                            interaction,
+                        })
+                        .await
+                        .map_err(|_| RuntimeError::ChannelSend)?;
+                }
                 HandlerAction::Reply(mut packet) => {
                     self.writer.send_packet(&mut packet).await?;
                 }

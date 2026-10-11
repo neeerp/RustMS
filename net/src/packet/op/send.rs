@@ -27,6 +27,7 @@ pub enum SendOpcode {
     ChatText = 0xA2,
     MovePlayer = 0xB9,
     SpawnNpc = 0x101,
+    NpcDialogue = 0x130,
 
     KeyMap = 0x14F,
 }

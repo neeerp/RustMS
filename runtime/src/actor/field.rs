@@ -1,8 +1,9 @@
 use crate::message::{FieldCharacter, FieldKey, FieldMessage, ServerMessage};
+use net::dialogue::{Conversation, NpcInteraction};
 use net::packet::build::world::field::{
     build_player_enter_field, build_player_leave_field, parse_movement_state, ForeignCharacter,
 };
-use net::packet::build::world::npc::{build_spawn_npc, ForeignNpc};
+use net::packet::build::world::npc::{build_npc_dialogue, build_spawn_npc, ForeignNpc};
 use packet::Packet;
 use std::collections::HashMap;
 use tokio::sync::mpsc;
@@ -11,6 +12,8 @@ use tracing::{info, warn};
 struct Occupant {
     sender: mpsc::Sender<ServerMessage>,
     character: FieldCharacter,
+    /// Transient state, discarded on leaving the field (including channel changes).
+    conversation: Option<Conversation>,
 }
 
 #[derive(Clone, Debug)]
@@ -58,6 +61,9 @@ impl FieldActor {
 
     async fn handle_message(&mut self, message: FieldMessage) {
         match message {
+            FieldMessage::NpcInteraction { from, interaction } => {
+                self.handle_npc_interaction(from, interaction).await;
+            }
             FieldMessage::Join {
                 client_id,
                 sender,
@@ -146,8 +152,66 @@ impl FieldActor {
             }
         }
 
-        self.occupants
-            .insert(client_id, Occupant { sender, character });
+        self.occupants.insert(
+            client_id,
+            Occupant {
+                sender,
+                character,
+                conversation: None,
+            },
+        );
+    }
+
+    async fn handle_npc_interaction(&mut self, client_id: i32, interaction: NpcInteraction) {
+        let Some(occupant) = self.occupants.get_mut(&client_id) else {
+            return;
+        };
+        let page = match interaction {
+            NpcInteraction::Start { object_id } => {
+                // Resolve object IDs only in this field. A new click replaces any
+                // previous conversation; clients cannot choose the NPC template ID.
+                occupant.conversation = None;
+                let Some(npc) = self.map_npcs.iter().find(|npc| npc.object_id == object_id) else {
+                    return;
+                };
+                let data = match net::get_npc_dialogue_data() {
+                    Ok(data) => data,
+                    Err(error) => {
+                        warn!(error, "Failed to load NPC dialogue assets");
+                        return;
+                    }
+                };
+                let Some(definition) = data.dialogue(npc.npc_id) else {
+                    return;
+                };
+                let Some(conversation) = Conversation::start(definition) else {
+                    return;
+                };
+                let page = conversation.current_page();
+                occupant.conversation = Some(conversation);
+                Some(page)
+            }
+            NpcInteraction::Respond {
+                message_type,
+                response,
+            } => {
+                let Some(conversation) = occupant.conversation.as_mut() else {
+                    return;
+                };
+                let page = conversation.respond(message_type, response);
+                if page.is_none() {
+                    occupant.conversation = None;
+                }
+                page
+            }
+        };
+        if let Some(page) = page {
+            let sender = occupant.sender.clone();
+            match build_npc_dialogue(&page) {
+                Ok(packet) => self.send_packet(&sender, packet, client_id).await,
+                Err(error) => warn!(client_id, error = %error, "Failed to build NPC dialogue"),
+            }
+        }
     }
 
     async fn handle_leave(&mut self, client_id: i32) {

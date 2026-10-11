@@ -1,6 +1,20 @@
 use crate::{error::NetworkError, packet::op::SendOpcode};
 use packet::{io::write::PktWrite, Packet};
 
+/// v83 text dialogue: message type 0, followed by separate Back/Next bytes.
+pub fn build_npc_dialogue(page: &crate::dialogue::DialoguePage) -> Result<Packet, NetworkError> {
+    let mut packet = Packet::new_empty();
+    packet.write_short(SendOpcode::NpcDialogue as i16)?;
+    packet.write_byte(4)?; // NPC speaker category
+    packet.write_int(page.npc_id)?;
+    packet.write_byte(0)?; // text dialogue
+    packet.write_byte(0)?; // NPC portrait
+    packet.write_str_with_length(&page.text)?;
+    packet.write_byte(u8::from(page.has_previous))?;
+    packet.write_byte(u8::from(page.has_next))?;
+    Ok(packet)
+}
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ForeignNpc {
     pub object_id: i32,

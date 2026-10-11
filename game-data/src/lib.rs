@@ -47,6 +47,77 @@ pub struct MapNpcTemplate {
     pub rx1: i16,
 }
 
+/// Asset-backed normal speech. Quest scripts can select a different dialogue
+/// definition later; quest completion is never inferred from reading these pages.
+#[derive(Clone, Debug)]
+pub struct NpcDialogueTemplate {
+    pub npc_id: i32,
+    pub pages: Vec<String>,
+}
+
+#[derive(Debug, Default)]
+pub struct NpcDialogueData {
+    dialogues: BTreeMap<i32, NpcDialogueTemplate>,
+}
+
+impl NpcDialogueData {
+    pub fn load_from_nx(
+        npc_path: impl AsRef<Path>,
+        string_path: impl AsRef<Path>,
+    ) -> Result<Self, GameDataError> {
+        let npcs = NxDataFile::open(npc_path.as_ref())?;
+        let strings = NxDataFile::open(string_path.as_ref())?;
+        let names = strings.child_by_name(0, "Npc.img")?.ok_or_else(|| {
+            GameDataError::InvalidData("missing root child 'Npc.img'".to_string())
+        })?;
+        let mut dialogues = BTreeMap::new();
+
+        for npc_index in npcs.child_indices(0)? {
+            let name = npcs.node_name(npc_index)?;
+            let Some(npc_id) = name
+                .strip_suffix(".img")
+                .and_then(|id| id.parse::<i32>().ok())
+            else {
+                continue;
+            };
+            let Some(info) = npcs.child_by_name(npc_index, "info")? else {
+                continue;
+            };
+            let Some(speak) = npcs.child_by_name(info, "speak")? else {
+                continue;
+            };
+            let Some(texts) = strings.child_by_name(names, &npc_id.to_string())? else {
+                continue;
+            };
+            let mut keys = Vec::new();
+            for index in npcs.child_indices(speak)? {
+                if let Ok(order) = npcs.node_name(index)?.parse::<u32>() {
+                    keys.push((order, npcs.node_name(index)?));
+                }
+            }
+            keys.sort_by_key(|(order, _)| *order);
+            let mut pages = Vec::new();
+            for (_, key) in keys {
+                if let Some(text_key) = npcs.string_child(speak, &key)? {
+                    if let Some(text) = strings.string_child(texts, &text_key)? {
+                        if !text.trim().is_empty() {
+                            pages.push(text);
+                        }
+                    }
+                }
+            }
+            if !pages.is_empty() {
+                dialogues.insert(npc_id, NpcDialogueTemplate { npc_id, pages });
+            }
+        }
+        Ok(Self { dialogues })
+    }
+
+    pub fn dialogue(&self, npc_id: i32) -> Option<&NpcDialogueTemplate> {
+        self.dialogues.get(&npc_id)
+    }
+}
+
 #[derive(Clone, Debug)]
 pub struct FieldTemplate {
     pub map_id: i32,
@@ -100,7 +171,7 @@ pub struct GameData {
 
 impl GameData {
     pub fn load_from_nx_map(path: impl AsRef<Path>) -> Result<Self, GameDataError> {
-        let nx = NxMapFile::open(path.as_ref())?;
+        let nx = NxDataFile::open(path.as_ref())?;
         let map_root = nx
             .child_by_name(0, "Map")?
             .ok_or_else(|| GameDataError::InvalidData("missing root child 'Map'".to_string()))?;
@@ -137,7 +208,7 @@ impl GameData {
 }
 
 fn build_field_template(
-    nx: &NxMapFile,
+    nx: &NxDataFile,
     map_node_idx: u32,
     map_id: i32,
 ) -> Result<FieldTemplate, GameDataError> {
@@ -211,7 +282,7 @@ fn build_field_template(
 }
 
 fn build_map_npcs_from_life(
-    nx: &NxMapFile,
+    nx: &NxDataFile,
     map_node_idx: u32,
 ) -> Result<Vec<MapNpcTemplate>, GameDataError> {
     let Some(life_root_idx) = nx.child_by_name(map_node_idx, "life")? else {
@@ -272,7 +343,7 @@ fn parse_string_id(value: Option<String>, field_name: &str) -> Result<i32, GameD
 }
 
 fn read_i16_child(
-    nx: &NxMapFile,
+    nx: &NxDataFile,
     parent_index: u32,
     key: &str,
     default: i32,
@@ -304,7 +375,7 @@ struct NxNodeData {
 }
 
 #[derive(Debug)]
-struct NxMapFile {
+struct NxDataFile {
     mmap: Mmap,
     node_count: u32,
     node_offset: u64,
@@ -312,7 +383,7 @@ struct NxMapFile {
     string_offset: u64,
 }
 
-impl NxMapFile {
+impl NxDataFile {
     fn open(path: &Path) -> Result<Self, GameDataError> {
         NxFile::open(path)?;
 
@@ -479,6 +550,19 @@ fn read_u64(bytes: &[u8], offset: u64) -> Result<u64, GameDataError> {
 mod tests {
     use super::*;
     use std::path::Path;
+
+    #[test]
+    fn normal_npc_speech_resolves_string_asset_keys() {
+        let assets = Path::new(env!("CARGO_MANIFEST_DIR")).join("../assets/game-data");
+        let data = NpcDialogueData::load_from_nx(assets.join("Npc.nx"), assets.join("String.nx"))
+            .expect("load NPC dialogue assets");
+        let rain = data.dialogue(12101).expect("Rain normal speech");
+        assert_eq!(rain.pages.len(), 3);
+        assert!(rain.pages[0].contains("today"));
+        assert!(rain.pages[1].contains("Alt"));
+        assert!(rain.pages[2].contains("arrow keys"));
+        assert!(data.dialogue(-1).is_none());
+    }
 
     #[test]
     fn resolve_spawn_portal_prefers_name_then_startpoint() {
