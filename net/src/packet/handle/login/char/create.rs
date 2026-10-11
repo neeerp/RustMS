@@ -31,7 +31,8 @@ impl PacketHandler for CreateCharacterHandler {
             .ok_or(NetworkError::NotLoggedIn)?;
 
         let name = &reader.read_str_with_length()?;
-        let job = reader.read_int()? as i16;
+        // The creation packet carries a class-family flag, not a job ID.
+        let job = starting_job(reader.read_int()?)?;
         let face = reader.read_int()?;
         let hair = reader.read_int()?;
         let hair_color = reader.read_int()?;
@@ -63,5 +64,29 @@ impl PacketHandler for CreateCharacterHandler {
 
         let char_packet = login::char::build_char_packet(character.create()?.character)?;
         Ok(HandlerResult::reply(char_packet))
+    }
+}
+
+fn starting_job(class_family: i32) -> Result<i16, NetworkError> {
+    match class_family {
+        0 => Ok(1000), // Cygnus Noblesse
+        1 => Ok(0),    // Explorer Beginner
+        2 => Ok(2000), // Aran Legend
+        _ => Err(NetworkError::PacketHandlerError(
+            "Unsupported character class",
+        )),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn creation_flags_are_converted_to_actual_starting_jobs() {
+        assert_eq!(starting_job(1).unwrap(), 0);
+        assert_eq!(starting_job(0).unwrap(), 1000);
+        assert_eq!(starting_job(2).unwrap(), 2000);
+        assert!(starting_job(-1).is_err());
+        assert!(starting_job(100).is_err());
     }
 }
