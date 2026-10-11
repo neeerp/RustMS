@@ -1,5 +1,6 @@
 use byteorder::{LittleEndian, ReadBytesExt};
-use std::io::{Read, Result};
+use std::convert::TryFrom;
+use std::io::{Error, ErrorKind, Read, Result};
 
 pub trait PktRead: ReadBytesExt {
     /// Read a byte.
@@ -8,12 +9,19 @@ pub trait PktRead: ReadBytesExt {
     }
 
     /// Read a byte array of a given `length`.
+    ///
+    /// The buffer grows with the bytes actually available rather than being
+    /// preallocated, so a hostile length cannot force a huge allocation.
     fn read_bytes(&mut self, length: usize) -> Result<Vec<u8>> {
-        let mut buf = vec![0u8; length];
-        match self.read_exact(&mut buf) {
-            Ok(_) => Ok(buf),
-            Err(e) => Err(e),
+        let mut buf = Vec::new();
+        self.take(length as u64).read_to_end(&mut buf)?;
+        if buf.len() != length {
+            return Err(Error::new(
+                ErrorKind::UnexpectedEof,
+                format!("expected {length} bytes but only {} remained", buf.len()),
+            ));
         }
+        Ok(buf)
     }
 
     /// Read a short integer.
@@ -33,25 +41,20 @@ pub trait PktRead: ReadBytesExt {
 
     /// Read a string of a given `length` starting at the `pos`th byte of the packet.
     fn read_str(&mut self, length: usize) -> Result<String> {
-        let mut buf = vec![0u8; length];
-        match self.read_exact(&mut buf) {
-            Ok(_) => match String::from_utf8(buf) {
-                Ok(string) => Ok(string),
-                Err(e) => Err(std::io::Error::new(
-                    std::io::ErrorKind::InvalidData,
-                    e.to_string(),
-                )),
-            },
-            Err(e) => Err(e),
-        }
+        let buf = self.read_bytes(length)?;
+        String::from_utf8(buf).map_err(|e| Error::new(ErrorKind::InvalidData, e.to_string()))
     }
 
     /// Read a length-headered string starting at the `pos`th byte of the packet.
     fn read_str_with_length(&mut self) -> Result<String> {
-        match self.read_short() {
-            Ok(length) => self.read_str(length as usize),
-            Err(e) => Err(e),
-        }
+        let length = self.read_short()?;
+        let length = usize::try_from(length).map_err(|_| {
+            Error::new(
+                ErrorKind::InvalidData,
+                format!("negative string length {length}"),
+            )
+        })?;
+        self.read_str(length)
     }
 }
 
@@ -60,7 +63,28 @@ impl<R: Read> PktRead for R {}
 #[cfg(test)]
 mod read_tests {
     use super::PktRead;
-    use std::io::BufReader;
+    use std::io::{BufReader, Cursor, ErrorKind};
+
+    #[test]
+    fn negative_string_length_is_rejected() {
+        // -1 as a little-endian i16 length prefix.
+        let mut reader = Cursor::new(vec![0xFF, 0xFF, b'a']);
+        let error = reader.read_str_with_length().unwrap_err();
+        assert_eq!(error.kind(), ErrorKind::InvalidData);
+    }
+
+    #[test]
+    fn oversized_string_length_is_eof_not_allocation() {
+        let mut reader = Cursor::new(vec![0xFF, 0x7F, b'a', b'b']);
+        let error = reader.read_str_with_length().unwrap_err();
+        assert_eq!(error.kind(), ErrorKind::UnexpectedEof);
+    }
+
+    #[test]
+    fn read_bytes_reports_short_input() {
+        let mut reader = Cursor::new(vec![1, 2, 3]);
+        assert_eq!(reader.read_bytes(4).unwrap_err().kind(), ErrorKind::UnexpectedEof);
+    }
 
     use std::io::Write;
 

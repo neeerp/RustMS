@@ -1,8 +1,9 @@
 use std::io::{Result, Write};
 use std::ops::{Deref, DerefMut};
 
-/// A sentinel for an invalid packet opcode.
-pub const INVALID_OPCODE: i16 = 1;
+/// A sentinel for an invalid packet opcode. It is negative so that it can never
+/// collide with a real opcode (opcode 1 is `LoginCredentials`).
+pub const INVALID_OPCODE: i16 = -1;
 
 /// The maximum length a network packet may take on.
 pub const MAX_PACKET_LENGTH: i16 = i16::MAX;
@@ -55,7 +56,7 @@ impl Packet {
 
     /// Return the length of the packet.
     pub fn len(&self) -> i16 {
-        (self.bytes.len() - 2) as i16
+        self.bytes.len().saturating_sub(2) as i16
     }
 }
 
@@ -141,6 +142,17 @@ mod test_packet {
 
             assert_eq!(packet.opcode(), INVALID_OPCODE);
         }
+    }
+
+    #[test]
+    fn invalid_opcode_does_not_alias_a_real_opcode() {
+        assert!(INVALID_OPCODE < 0);
+    }
+
+    #[test]
+    fn short_packet_length_does_not_underflow() {
+        assert_eq!(Packet::new(&[1]).len(), 0);
+        assert_eq!(Packet::new_empty().len(), 0);
     }
 
     #[test]

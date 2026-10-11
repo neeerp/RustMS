@@ -26,15 +26,17 @@ impl PacketWriter {
 
     /// Encrypt and send a packet.
     pub async fn send_packet(&mut self, packet: &mut Packet) -> Result<(), RuntimeError> {
-        let header = self.crypt.gen_packet_header(packet.len() + 2);
+        let length = i16::try_from(packet.bytes.len())
+            .map_err(|_| RuntimeError::InvalidPacketLength(i16::MAX))?;
+        let mut frame = self.crypt.gen_packet_header(length);
 
         // Encrypt: first maple_crypt, then AES
         crypt::maple_crypt::encrypt(packet);
         self.crypt.crypt(packet);
 
-        // Send header then body
-        self.writer.write_all(&header).await?;
-        self.writer.write_all(&packet.bytes).await?;
+        // Send header and body as one write so they leave in one segment.
+        frame.extend_from_slice(&packet.bytes);
+        self.writer.write_all(&frame).await?;
         self.writer.flush().await?;
 
         Ok(())
