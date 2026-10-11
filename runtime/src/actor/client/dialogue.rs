@@ -74,7 +74,7 @@ impl ClientActor {
                                 let c = ContactOffer::new(next);
                                 let mut p = npc::build_quest_prompt(&c.prompt())
                                     .map_err(|e| RuntimeError::Handler(e.to_string()))?;
-                                self.writer.send_packet(&mut p).await?;
+                                self.send(&mut p).await?;
                                 self.conversation = Some(ActiveConversation::Contact(c));
                                 return Ok(());
                             }
@@ -84,7 +84,7 @@ impl ClientActor {
                         let c = ContactOffer::new(template);
                         let mut p = npc::build_quest_prompt(&c.prompt())
                             .map_err(|e| RuntimeError::Handler(e.to_string()))?;
-                        self.writer.send_packet(&mut p).await?;
+                        self.send(&mut p).await?;
                         self.conversation = Some(ActiveConversation::Contact(c));
                         return Ok(());
                     }
@@ -100,7 +100,7 @@ impl ClientActor {
                 let c = QuizConversation::new(template, states.get(&template.id) == Some(&1));
                 let mut packet = npc::build_quest_prompt(&c.prompt())
                     .map_err(|e| RuntimeError::Handler(e.to_string()))?;
-                self.writer.send_packet(&mut packet).await?;
+                self.send(&mut packet).await?;
                 self.conversation = Some(ActiveConversation::Quiz(c));
                 return Ok(());
             }
@@ -110,7 +110,7 @@ impl ClientActor {
         if let Some(c) = data.dialogue(npc_id).and_then(Conversation::start) {
             let mut packet = npc::build_npc_dialogue(&c.current_page())
                 .map_err(|e| RuntimeError::Handler(e.to_string()))?;
-            self.writer.send_packet(&mut packet).await?;
+            self.send(&mut packet).await?;
             self.conversation = Some(ActiveConversation::Normal(c));
         }
         Ok(())
@@ -167,7 +167,7 @@ impl ClientActor {
             }
         }
         .map_err(|e| RuntimeError::Handler(e.to_string()))?;
-        self.writer.send_packet(&mut packet).await?;
+        self.send(&mut packet).await?;
         self.conversation = Some(conversation);
         Ok(())
     }
@@ -182,7 +182,7 @@ impl ClientActor {
         };
         let mut p = npc::build_npc_dialogue(&c.current_page())
             .map_err(|e| RuntimeError::Handler(e.to_string()))?;
-        self.writer.send_packet(&mut p).await?;
+        self.send(&mut p).await?;
         self.conversation = Some(ActiveConversation::Normal(c));
         Ok(true)
     }
@@ -221,7 +221,7 @@ impl ClientActor {
             );
         }
         for packet in &mut packets {
-            self.writer.send_packet(packet).await?;
+            self.send(packet).await?;
         }
         if level_changed {
             // Players joining the map later should see the new level.

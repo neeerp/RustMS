@@ -140,6 +140,18 @@ impl ClientActor {
         self.cleanup().await;
     }
 
+    /// Write one packet to the socket. A kick interrupts a write that is
+    /// blocked on a peer that stopped reading, and `PacketWriter` bounds it
+    /// with a timeout either way, so the actor always reaches cleanup.
+    async fn send(&mut self, packet: &mut Packet) -> Result<(), RuntimeError> {
+        let kill = self.kill.clone();
+        tokio::select! {
+            biased;
+            _ = kill.cancelled() => Err(RuntimeError::ClientDisconnected),
+            result = self.writer.send_packet(packet) => result,
+        }
+    }
+
     fn handle(&self) -> ClientHandle {
         ClientHandle::new(
             self.client_id,
@@ -184,7 +196,7 @@ impl ClientActor {
 
     async fn apply(&mut self, action: WorldAction) -> Result<(), RuntimeError> {
         match action {
-            WorldAction::Reply(mut packet) => self.writer.send_packet(&mut packet).await?,
+            WorldAction::Reply(mut packet) => self.send(&mut packet).await?,
             WorldAction::EnterGame { character_id } => self.enter_game(character_id).await?,
             WorldAction::ChangeField { map_id, spawn } => self.change_field(map_id, spawn).await?,
             WorldAction::FieldChat(packet) => {
@@ -269,8 +281,8 @@ impl ClientActor {
             .map_err(|e| RuntimeError::Handler(e.to_string()))?;
         let mut char_info = build::world::char::build_char_info(&player, self.channel_id)
             .map_err(|e| RuntimeError::Handler(e.to_string()))?;
-        self.writer.send_packet(&mut keymap).await?;
-        self.writer.send_packet(&mut char_info).await?;
+        self.send(&mut keymap).await?;
+        self.send(&mut char_info).await?;
 
         self.send_to_directory(DirectoryMessage::Register {
             handle: self.handle(),
@@ -334,7 +346,7 @@ impl ClientActor {
 
         let mut redirect = build::world::channel::build_channel_change(channel.host, channel.port)
             .map_err(|e| RuntimeError::Handler(e.to_string()))?;
-        self.writer.send_packet(&mut redirect).await?;
+        self.send(&mut redirect).await?;
         Err(RuntimeError::ClientDisconnected)
     }
 
@@ -349,7 +361,7 @@ impl ClientActor {
                     self.start_npc_conversation(npc_id, field).await?;
                 }
             }
-            ServerMessage::SendPacket(mut packet) => self.writer.send_packet(&mut packet).await?,
+            ServerMessage::SendPacket(mut packet) => self.send(&mut packet).await?,
         }
         Ok(())
     }
@@ -446,5 +458,47 @@ impl ClientActor {
                 error!(self.client_id, %error, "Failed to close session");
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tokio::net::TcpListener;
+    use tokio::time::{timeout, Instant};
+
+    /// A peer that stops reading fills the socket, the actor blocks writing,
+    /// its queue fills, and the kick must still end the actor (`run` always
+    /// finishes with `cleanup`).
+    #[tokio::test]
+    async fn kicking_a_client_blocked_on_a_full_socket_ends_the_actor() {
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let peer = TcpStream::connect(listener.local_addr().unwrap()).await.unwrap();
+        let (stream, addr) = listener.accept().await.unwrap();
+
+        let (directory, _directory_rx) = mpsc::channel(16);
+        let services = WorldServices {
+            directory,
+            fields: FieldRegistry::new(Duration::from_millis(100)),
+        };
+        let actor = ClientActor::new(stream, addr.ip(), 0, services).await.unwrap();
+        let handle = actor.handle();
+        let running = tokio::spawn(actor.run());
+
+        // Large packets so the kernel buffers fill quickly; the peer never reads.
+        let payload = vec![0u8; 30_000];
+        let deadline = Instant::now() + Duration::from_secs(30);
+        while handle.send_packet(Packet::new(&payload)) {
+            assert!(Instant::now() < deadline, "socket never filled");
+            tokio::task::yield_now().await;
+        }
+
+        // The full queue kicked the client; the actor must stop promptly even
+        // though it is mid-write to a socket nobody is reading.
+        timeout(Duration::from_secs(2), running)
+            .await
+            .expect("actor stayed blocked on the socket write after being kicked")
+            .expect("actor task panicked");
+        drop(peer);
     }
 }
