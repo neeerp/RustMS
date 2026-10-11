@@ -59,25 +59,30 @@ some UI nodes may not exist for v83 features.
 
 ## What works and what is stubbed
 
+This is client-side capability only. The RustMS server currently implements
+login, character management, movement, chat, whispers, portals, channel
+changes, NPC dialogue, and a few quests; everything else below has no server
+side yet.
+
 | Area | Status |
 | --- | --- |
-| Login, world/channel select, character list/create/delete, PIC | Working |
-| In-map play: movement, jumping, portals, map change, channel change | Working |
-| Combat: melee/ranged/magic attacks, mob HP/death, drops, pickup | Working |
-| Inventory, equip, item use, scroll, sort/gather | Working |
-| Skills, stat/AP/SP allocation, buffs, keymap | Working |
-| NPC dialogue and NPC shop | Working (`UINpcTalk`, `UIShop`) |
-| Quest log and markers | Present (`UIQuestLog`); quest flow is server-driven via NPC dialogue, no quest packets |
-| Chat, whisper, server messages | Working; whisper find/buddy modes ignored |
-| Character info, minimap, world map | Working |
+| Login, world/channel select, character list/create/delete, PIC | Implemented |
+| In-map play: movement, jumping, portals, map change, channel change | Implemented |
+| Combat: melee/ranged/magic attacks, mob HP/death, drops, pickup | Implemented |
+| Inventory, equip, item use, scroll, sort/gather | Implemented |
+| Skills, stat/AP/SP allocation, buffs, keymap | Implemented |
+| NPC dialogue and NPC shop | Implemented (`UINpcTalk`, `UIShop`) |
+| Quest log and markers | Implemented (`UIQuestLog`); progress arrives via SHOW_STATUS_INFO, quest start/complete is driven by NPC dialogue |
+| Chat, whisper, server messages | Implemented; whisper find/buddy modes ignored |
+| Character info, minimap, world map | Implemented |
 | Buddy / party / guild / boss list (`UIUserList`) | Buttons and layout only; no handlers, party packet exists but is unused |
 | Cash shop (`UICashShop`) | Browse/enter/exit; purchase is `// TODO: Purchase item` |
 | Storage, trade, player shops, mini-games, messenger, memo/mail | No UI, no handlers |
 | Pets, mounts, summons, reactors beyond hit/spawn | Partial or absent (`Reactor` TODOs) |
 | Party/guild/boss quests, events, MTS | Absent |
 
-Roughly 45 outbound and 75 inbound opcodes are wired (`Net/PacketSwitch.cpp`,
-`Net/OutPacket.h`). Anything not listed there is silently ignored by the client.
+44 outbound opcodes are defined (`Net/OutPacket.h`) and 57 inbound handlers
+are registered (`Net/PacketSwitch.cpp`). Anything not listed there is silently ignored by the client.
 
 ## Estimated client work for a complete game
 
