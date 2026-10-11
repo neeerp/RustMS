@@ -1,10 +1,156 @@
 use crate::dialogue::DialoguePage;
-pub use game_data::quests::{QuizQuestData, QuizQuestTemplate};
+pub use game_data::quests::{
+    ContactQuestData, ContactQuestTemplate, QuizQuestData, QuizQuestTemplate,
+};
 use std::collections::BTreeMap;
 use std::path::PathBuf;
 use std::sync::OnceLock;
 
 static QUESTS: OnceLock<Result<QuizQuestData, String>> = OnceLock::new();
+static CONTACT_QUESTS: OnceLock<Result<ContactQuestData, String>> = OnceLock::new();
+pub fn contact_data() -> Result<&'static ContactQuestData, &'static str> {
+    CONTACT_QUESTS
+        .get_or_init(|| {
+            let path = std::env::var("RUSTMS_QUEST_NX_PATH")
+                .map(PathBuf::from)
+                .unwrap_or_else(|_| PathBuf::from("assets/game-data/Quest.nx"));
+            ContactQuestData::load_from_nx(path).map_err(|e| e.to_string())
+        })
+        .as_ref()
+        .map_err(|e| e.as_str())
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ContactInteraction {
+    Offer,
+    Complete,
+    Reminder,
+}
+
+pub fn contact_role(
+    q: &ContactQuestTemplate,
+    npc_id: i32,
+    job: i16,
+    level: i16,
+    states: &BTreeMap<i16, i16>,
+) -> Option<ContactInteraction> {
+    let state = states.get(&q.id).copied().unwrap_or(0);
+    if state == 1 && q.finish_npc == npc_id {
+        Some(ContactInteraction::Complete)
+    } else if state == 1 && q.start_npc == npc_id {
+        Some(ContactInteraction::Reminder)
+    } else if state == 0
+        && q.start_npc == npc_id
+        && q.required_job == job
+        && level <= q.max_level
+        && q.prerequisite
+            .map(|id| states.get(&id) == Some(&2))
+            .unwrap_or(true)
+    {
+        Some(ContactInteraction::Offer)
+    } else {
+        None
+    }
+}
+
+pub fn contact_eligible<'a>(
+    data: &'a ContactQuestData,
+    npc_id: i32,
+    job: i16,
+    level: i16,
+    states: &BTreeMap<i16, i16>,
+) -> Option<(&'a ContactQuestTemplate, ContactInteraction)> {
+    // Resolve turn-ins before offers/reminders when an NPC has several roles.
+    for interaction in [
+        ContactInteraction::Complete,
+        ContactInteraction::Offer,
+        ContactInteraction::Reminder,
+    ] {
+        for q in data.quests() {
+            if contact_role(q, npc_id, job, level, states) == Some(interaction) {
+                return Some((q, interaction));
+            }
+        }
+    }
+    None
+}
+
+#[derive(Debug)]
+pub struct ContactOffer {
+    pub quest: ContactQuestTemplate,
+    phase: ContactPhase,
+}
+#[derive(Debug)]
+enum ContactPhase {
+    Offer(usize),
+    Accepted(usize),
+    Declined(usize),
+}
+
+impl ContactOffer {
+    pub fn new(quest: &ContactQuestTemplate) -> Self {
+        Self {
+            quest: quest.clone(),
+            phase: ContactPhase::Offer(0),
+        }
+    }
+    pub fn prompt(&self) -> QuestPrompt {
+        let (pages, i) = match self.phase {
+            ContactPhase::Offer(i) if i + 1 == self.quest.offer.len() => {
+                return QuestPrompt::YesNo {
+                    npc_id: self.quest.start_npc,
+                    text: self.quest.offer[i].clone(),
+                }
+            }
+            ContactPhase::Offer(i) => (&self.quest.offer, i),
+            ContactPhase::Accepted(i) => (&self.quest.accepted, i),
+            ContactPhase::Declined(i) => (&self.quest.declined, i),
+        };
+        QuestPrompt::Text(DialoguePage {
+            npc_id: self.quest.start_npc,
+            text: pages[i].clone(),
+            has_previous: i > 0,
+            has_next: i + 1 < pages.len() || matches!(self.phase, ContactPhase::Offer(_)),
+        })
+    }
+    pub fn respond(
+        &mut self,
+        kind: u8,
+        response: i8,
+    ) -> Option<(QuestPrompt, Option<QuestEffect>)> {
+        let expected = if matches!(self.prompt(), QuestPrompt::YesNo { .. }) {
+            1
+        } else {
+            0
+        };
+        if kind != expected || !matches!(response, 0 | 1) {
+            return None;
+        }
+        let mut effect = None;
+        match &mut self.phase {
+            ContactPhase::Offer(_) if expected == 1 => {
+                if response == 1 {
+                    self.phase = ContactPhase::Accepted(0);
+                    effect = Some(QuestEffect::Start);
+                } else {
+                    self.phase = ContactPhase::Declined(0);
+                }
+            }
+            ContactPhase::Offer(i) if response == 0 && *i > 0 => *i -= 1,
+            ContactPhase::Offer(i) if response == 1 => *i += 1,
+            ContactPhase::Accepted(i) if response == 0 && *i > 0 => *i -= 1,
+            ContactPhase::Accepted(i) if response == 1 && *i + 1 < self.quest.accepted.len() => {
+                *i += 1
+            }
+            ContactPhase::Declined(i) if response == 0 && *i > 0 => *i -= 1,
+            ContactPhase::Declined(i) if response == 1 && *i + 1 < self.quest.declined.len() => {
+                *i += 1
+            }
+            _ => return None,
+        }
+        Some((self.prompt(), effect))
+    }
+}
 pub fn data() -> Result<&'static QuizQuestData, &'static str> {
     QUESTS
         .get_or_init(|| {
@@ -209,6 +355,73 @@ impl QuizConversation {
 #[cfg(test)]
 mod tests {
     use super::*;
+    fn contact_fixture() -> ContactQuestTemplate {
+        ContactQuestTemplate {
+            id: 1032,
+            name: "Nina's Brother Sen".into(),
+            start_npc: 2102,
+            finish_npc: 2001,
+            required_job: 0,
+            max_level: 10,
+            prerequisite: None,
+            experience: 7,
+            next_quest: Some(1033),
+            offer: vec!["hello".into(), "please visit Sen".into()],
+            accepted: vec!["enter the house".into()],
+            declined: vec!["later".into()],
+            finished: vec![],
+            reminder: vec!["find Sen".into()],
+        }
+    }
+    #[test]
+    fn contact_quest_requires_acceptance_and_the_correct_destination_npc() {
+        let q = contact_fixture();
+        let mut states = BTreeMap::new();
+        assert_eq!(
+            contact_role(&q, 2102, 0, 1, &states),
+            Some(ContactInteraction::Offer)
+        );
+        assert_eq!(contact_role(&q, 2001, 0, 1, &states), None);
+        assert_eq!(contact_role(&q, 2102, 0, 11, &states), None);
+        assert_eq!(contact_role(&q, 2102, 100, 1, &states), None);
+        states.insert(q.id, 1);
+        assert_eq!(
+            contact_role(&q, 2102, 0, 1, &states),
+            Some(ContactInteraction::Reminder)
+        );
+        assert_eq!(
+            contact_role(&q, 2001, 0, 11, &states),
+            Some(ContactInteraction::Complete)
+        );
+        assert_eq!(contact_role(&q, 12101, 0, 1, &states), None);
+        states.insert(q.id, 2);
+        assert_eq!(contact_role(&q, 2001, 0, 1, &states), None);
+        let mut followup = q.clone();
+        followup.id = 1033;
+        followup.prerequisite = Some(1032);
+        assert_eq!(
+            contact_role(&followup, 2102, 0, 1, &states),
+            Some(ContactInteraction::Offer)
+        );
+        states.clear();
+        assert_eq!(contact_role(&followup, 2102, 0, 1, &states), None);
+    }
+    #[test]
+    fn contact_offer_pages_decline_cancel_and_accept_once() {
+        let q = contact_fixture();
+        let mut c = ContactOffer::new(&q);
+        assert!(c.respond(1, 1).is_none());
+        assert_eq!(c.respond(0, 1).unwrap().1, None);
+        assert!(matches!(c.prompt(), QuestPrompt::YesNo { .. }));
+        assert_eq!(c.respond(1, 0).unwrap().1, None);
+        assert!(c.respond(0, 1).is_none());
+        let mut c = ContactOffer::new(&q);
+        assert!(c.respond(0, -1).is_none());
+        c.respond(0, 1).unwrap();
+        assert_eq!(c.respond(1, 1).unwrap().1, Some(QuestEffect::Start));
+        assert!(c.respond(1, 1).is_none());
+        assert!(c.respond(0, 1).is_none());
+    }
     fn fixture() -> QuizQuestTemplate {
         QuizQuestTemplate {
             id: 1009,

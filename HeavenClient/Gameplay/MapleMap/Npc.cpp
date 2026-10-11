@@ -101,9 +101,10 @@ namespace ms
 		physics.move_object(phobj);
 		auto& quests = Stage::get().get_player().get_quests();
 		int16_t job = Stage::get().get_player().get_stats().get_stat(MapleStat::Id::JOB);
-		if (quest_revision != quests.revision() || quest_job != job)
+		int16_t level = Stage::get().get_player().get_stats().get_stat(MapleStat::Id::LEVEL);
+		if (quest_revision != quests.revision() || quest_job != job || quest_level != level)
 		{
-			QuestMarker next = quests.npc_marker(npcid, job);
+			QuestMarker next = quests.npc_marker(npcid, job, level);
 			if (next != quest_marker)
 			{
 				quest_marker = next;
@@ -112,6 +113,7 @@ namespace ms
 			}
 			quest_revision = quests.revision();
 			quest_job = job;
+			quest_level = level;
 		}
 		if (quest_marker != QuestMarker::NONE) quest_marker_animation.update();
 

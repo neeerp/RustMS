@@ -6,7 +6,7 @@ This repository is a Rust workspace for a MapleStory server plus a nested C++ cl
 
 - `agent_docs/server-architecture.md`: server-side actor model, handler boundaries, and login-to-world flow
 - `agent_docs/npc-dialogue.md`: asset-backed conversations, runtime ownership, and future quest integration
-- `agent_docs/quests.md`: Rain's quiz chain, persistent progress, rewards, and supported quest scope
+- `agent_docs/quests.md`: original beginner NPC visits and Rain's quizzes, persistence, rewards, and supported scope
 - `agent_docs/map-travel.md`: asset portal links, active beginner route, and legacy map variants
 - `agent_docs/client-testing.md`: fast client logic tests and private-display GUI verification
 - `agent_docs/integration-harness-usage.md`: commands, prerequisites, and day-to-day harness workflow

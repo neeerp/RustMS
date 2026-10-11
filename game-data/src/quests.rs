@@ -1,4 +1,4 @@
-//! The asset-defined Rain quiz chain. Other quest objective types are not
+//! Asset-defined beginner dialogue quests. Other quest objective types are not
 //! activated until their requirements and actions have server implementations.
 use crate::{GameDataError, NxDataFile};
 use std::collections::BTreeMap;
@@ -31,6 +31,136 @@ pub struct QuizQuestTemplate {
 #[derive(Debug)]
 pub struct QuizQuestData {
     quests: BTreeMap<i16, QuizQuestTemplate>,
+}
+
+#[derive(Clone, Debug)]
+pub struct ContactQuestTemplate {
+    pub id: i16,
+    pub name: String,
+    pub start_npc: i32,
+    pub finish_npc: i32,
+    pub required_job: i16,
+    pub max_level: i16,
+    pub prerequisite: Option<i16>,
+    pub experience: i32,
+    pub next_quest: Option<i16>,
+    pub offer: Vec<String>,
+    pub accepted: Vec<String>,
+    pub declined: Vec<String>,
+    pub finished: Vec<String>,
+    pub reminder: Vec<String>,
+}
+
+#[derive(Debug)]
+pub struct ContactQuestData {
+    quests: BTreeMap<i16, ContactQuestTemplate>,
+}
+
+impl ContactQuestData {
+    pub fn load_from_nx(path: impl AsRef<Path>) -> Result<Self, GameDataError> {
+        let nx = NxDataFile::open(path.as_ref())?;
+        let mut quests = BTreeMap::new();
+        // These existing quests require only conversations. Do not activate
+        // the following item/hunting quests by ignoring their requirements.
+        for id in [1031, 1032, 1033] {
+            let start = node(&nx, &format!("Check.img/{id}/0"))?;
+            let finish = node(&nx, &format!("Check.img/{id}/1"))?;
+            let action_start = node(&nx, &format!("Act.img/{id}/0"))?;
+            let action_finish = node(&nx, &format!("Act.img/{id}/1"))?;
+            check_keys(&nx, start, &["npc", "job", "lvmax", "quest"])?;
+            check_keys(&nx, finish, &["npc"])?;
+            // Some Act/0 nodes contain duplicate localized speech, not actions.
+            check_keys(&nx, action_start, &["0", "1", "2", "3", "no", "yes"])?;
+            check_keys(&nx, action_finish, &["exp", "nextQuest"])?;
+            let job = node(&nx, &format!("Check.img/{id}/0/job"))?;
+            if nx.child_indices(job)?.len() != 1 || nx.int_child(job, "0")? != Some(0) {
+                return Err(invalid("unsupported contact quest job requirement"));
+            }
+            let prerequisite = if let Some(requirements) = nx.child_by_name(start, "quest")? {
+                if nx.child_indices(requirements)?.len() != 1 {
+                    return Err(invalid("unsupported contact quest prerequisites"));
+                }
+                let requirement = node(&nx, &format!("Check.img/{id}/0/quest/0"))?;
+                if nx.int_child(requirement, "state")? != Some(2) {
+                    return Err(invalid("unsupported contact prerequisite state"));
+                }
+                Some(quest_id(
+                    nx.int_child(requirement, "id")?
+                        .ok_or_else(|| invalid("missing prerequisite"))?,
+                )?)
+            } else {
+                None
+            };
+            let offer = node(&nx, &format!("Say.img/{id}/0"))?;
+            let finished = node(&nx, &format!("Say.img/{id}/1"))?;
+            let offer_pages = pages(&nx, offer)?;
+            let accepted = optional_pages(&nx, offer, "yes")?;
+            let declined = optional_pages(&nx, offer, "no")?;
+            if offer_pages.is_empty() || accepted.is_empty() || declined.is_empty() {
+                return Err(invalid("incomplete contact quest offer"));
+            }
+            let mut finish_pages = pages(&nx, finished)?;
+            finish_pages.extend(optional_pages(&nx, finished, "yes")?);
+            let reminder = node(&nx, &format!("Say.img/{id}/1/stop/npc"))?;
+            quests.insert(
+                id,
+                ContactQuestTemplate {
+                    id,
+                    name: text(&nx, node(&nx, &format!("QuestInfo.img/{id}"))?, "name")?,
+                    start_npc: nx
+                        .int_child(start, "npc")?
+                        .ok_or_else(|| invalid("missing start NPC"))?,
+                    finish_npc: nx
+                        .int_child(finish, "npc")?
+                        .ok_or_else(|| invalid("missing finish NPC"))?,
+                    required_job: 0,
+                    max_level: quest_id(
+                        nx.int_child(start, "lvmax")?
+                            .ok_or_else(|| invalid("missing maximum level"))?,
+                    )?,
+                    prerequisite,
+                    experience: nx.int_child(action_finish, "exp")?.unwrap_or(0),
+                    next_quest: nx
+                        .int_child(action_finish, "nextQuest")?
+                        .map(quest_id)
+                        .transpose()?,
+                    offer: offer_pages,
+                    accepted,
+                    declined,
+                    finished: finish_pages,
+                    reminder: pages(&nx, reminder)?,
+                },
+            );
+        }
+        Ok(Self { quests })
+    }
+    pub fn quests(&self) -> impl Iterator<Item = &ContactQuestTemplate> {
+        self.quests.values()
+    }
+    pub fn quest(&self, id: i16) -> Option<&ContactQuestTemplate> {
+        self.quests.get(&id)
+    }
+}
+
+fn quest_id(id: i32) -> Result<i16, GameDataError> {
+    i16::try_from(id).map_err(|_| invalid("quest integer out of range"))
+}
+fn check_keys(nx: &NxDataFile, parent: u32, allowed: &[&str]) -> Result<(), GameDataError> {
+    for index in nx.child_indices(parent)? {
+        let name = nx.node_name(index)?;
+        if !allowed.contains(&name.as_str()) {
+            return Err(invalid(&format!(
+                "unsupported quest requirement/action {name}"
+            )));
+        }
+    }
+    Ok(())
+}
+fn optional_pages(nx: &NxDataFile, parent: u32, key: &str) -> Result<Vec<String>, GameDataError> {
+    nx.child_by_name(parent, key)?
+        .map(|n| pages(nx, n))
+        .transpose()
+        .map(|p| p.unwrap_or_default())
 }
 
 impl QuizQuestData {
@@ -196,6 +326,33 @@ fn parse_choices(raw: &str) -> Result<(String, Vec<QuizChoice>), GameDataError> 
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn loads_existing_contact_quests_without_enabling_item_objectives() {
+        let data = ContactQuestData::load_from_nx(
+            Path::new(env!("CARGO_MANIFEST_DIR")).join("../assets/game-data/Quest.nx"),
+        )
+        .unwrap();
+        let heena = data.quest(1031).unwrap();
+        assert_eq!(
+            (
+                heena.start_npc,
+                heena.finish_npc,
+                heena.experience,
+                heena.max_level
+            ),
+            (2101, 2100, 5, 10)
+        );
+        assert_eq!(heena.offer.len(), 4);
+        assert_eq!(heena.finished.len(), 3);
+        let nina = data.quest(1032).unwrap();
+        assert_eq!(
+            (nina.start_npc, nina.finish_npc, nina.next_quest),
+            (2102, 2001, Some(1033))
+        );
+        assert!(nina.finished.is_empty());
+        assert_eq!(data.quest(1033).unwrap().prerequisite, Some(1032));
+        assert!(data.quest(1034).is_none());
+    }
     #[test]
     fn loads_all_seven_quizzes_from_assets() {
         let data = QuizQuestData::load_from_nx(

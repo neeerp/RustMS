@@ -1,4 +1,42 @@
-# Rain's Maple Quiz quests
+# Supported beginner quests
+
+## Existing NPC visits
+
+The server also implements these original `Quest.nx` quests:
+
+| Quest | Start | Finish | EXP |
+| --- | --- | --- | --- |
+| 1031, Heena and Sera | Heena (2101) | Sera (2100) | 5 |
+| 1032, Nina's Brother Sen | Nina (2102) | Sen (2001) | 7 |
+| 1033, What Sen Wants | Sen (2001) | Nina (2102) | 7 |
+
+Heena and Sera are in map `10000`. Nina is in `30000`; its `in01`
+portal enters Sen's house (`30001`), and `out00` returns to Nina.
+See [map travel](map-travel.md) for the active asset-defined route.
+
+`ContactQuestData` reads Check/Say/Act/QuestInfo from the assets. Offers require
+Beginner job 0 and level at most 10. Quest 1033 requires completed 1032.
+Acceptance persists on Yes; visiting the destination NPC completes the quest
+and awards EXP atomically. Talking to the source again gives the asset's
+directions. Closing dialogue, changing maps, or relogging does not reset a visit.
+
+Quest 1031 has completion speech. The Nina/Sen legs have no completion speech;
+1032's `Act/1/nextQuest` continues directly into 1033's original offer. Cancelling
+that offer preserves completed 1032 without accepting 1033. Quest 1034 needs
+items and remains unsupported, so completing 1033 returns to normal NPC speech.
+Old quests 1000/1003/1004 require an item and are not substituted for these newer
+asset-defined versions. No quest text or rewards are invented.
+
+Markers show a bulb at an eligible source, an open book at the source while a
+visit is outstanding, and a closed book at the destination. Level changes
+refresh eligibility; the maximum level applies to acceptance, not an already
+started visit. The existing quest log lists the started and completed records.
+
+`beginner_contact_quests` verifies the three quests through real packets,
+including decline, invalid responses, directions, Sen's house portals,
+cancelled follow-up offers, map saves/relogin, and rewards paid once.
+
+## Rain's Maple Quiz quests
 
 Rain (NPC 12101 in Amherst) supports the seven asset-defined quests 1009–1015.
 Click her to accept the first quiz, read the tutorial, and select an answer.

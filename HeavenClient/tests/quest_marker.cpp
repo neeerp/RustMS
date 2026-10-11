@@ -54,6 +54,23 @@ int main()
 		require(marker() == QuestMarker::READY, "ready turn-in takes priority over other markers");
 		states.clear();
 		require(marker() == QuestMarker::AVAILABLE, "another character's progress must not affect availability");
+		std::vector<ms::QuestMarkerRule> contact { {1032, 2102, 2001, {0}, {}, true, 10},
+			{1033, 2001, 2102, {0}, {{1032, 2}}, true, 10} };
+		auto contact_marker = [&](int32_t npc, int16_t level = 1) {
+			return ms::select_quest_marker(npc, 0, contact, [&](int16_t id) { return states[id]; }, level);
+		};
+		require(contact_marker(2102) == QuestMarker::AVAILABLE, "Nina must offer the existing quest");
+		require(contact_marker(2102, 11) == QuestMarker::NONE, "offer must honor maximum start level");
+		require(contact_marker(2001) == QuestMarker::NONE, "Sen must wait for acceptance");
+		states[1032] = 1;
+		require(contact_marker(2102) == QuestMarker::IN_PROGRESS, "source NPC must show an open book while waiting");
+		require(contact_marker(2001, 11) == QuestMarker::READY, "destination NPC must allow an already started turn-in");
+		states[1032] = 2;
+		require(contact_marker(2001) == QuestMarker::AVAILABLE, "completed visit must unlock Sen's reply quest");
+		states[1033] = 1;
+		require(contact_marker(2102) == QuestMarker::READY, "returning to Nina must show a closed book");
+		states[1033] = 2;
+		require(contact_marker(2102) == QuestMarker::NONE, "unsupported item quest must not be advertised");
 		std::cout << "Quest marker transitions and priority passed\n";
 		return 0;
 	}

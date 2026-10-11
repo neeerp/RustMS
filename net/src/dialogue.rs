@@ -33,6 +33,12 @@ pub struct Conversation {
 }
 
 impl Conversation {
+    pub fn from_pages(npc_id: i32, pages: &[String]) -> Option<Self> {
+        Self::start(&NpcDialogueTemplate {
+            npc_id,
+            pages: pages.to_vec(),
+        })
+    }
     pub fn start(definition: &NpcDialogueTemplate) -> Option<Self> {
         if definition.pages.is_empty() {
             return None;

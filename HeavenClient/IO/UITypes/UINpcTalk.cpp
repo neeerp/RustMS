@@ -341,7 +341,7 @@ namespace ms
 			if (end != std::string::npos)
 			{
 				std::string charstr = Stage::get().get_player().get_name();
-				formatted_text.replace(begin, end - begin, charstr);
+				formatted_text.replace(begin, end - begin + 1, charstr);
 			}
 		}
 

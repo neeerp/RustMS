@@ -47,14 +47,14 @@ namespace ms
 	const std::map<int16_t, int64_t>& QuestLog::completed_quests() const { return completed; }
 	uint64_t QuestLog::revision() const { return marker_revision; }
 
-	QuestMarker QuestLog::npc_marker(int32_t npc_id, int16_t job) const
+	QuestMarker QuestLog::npc_marker(int32_t npc_id, int16_t job, int16_t level) const
 	{
 		static const auto rules = []()
 		{
 			std::vector<QuestMarkerRule> result;
 			// Only advertise the quest chain implemented by the server. The NX
 			// files also contain many quests whose objectives are not supported.
-			for (int16_t id = 1009; id <= 1015; ++id)
+			for (int16_t id : {1009, 1010, 1011, 1012, 1013, 1014, 1015, 1031, 1032, 1033})
 			{
 				auto check = nl::nx::quest["Check.img"][std::to_string(id)];
 				auto start = check["0"];
@@ -64,6 +64,8 @@ namespace ms
 				QuestMarkerRule rule { id, static_cast<int32_t>(start["npc"].get_integer()),
 					static_cast<int32_t>(finish["npc"].get_integer()), {}, {}, true };
 				for (auto allowed_job : start["job"]) rule.jobs.push_back(allowed_job.get_integer());
+				if (start["lvmax"].data_type() == nl::node::type::integer)
+					rule.max_start_level = start["lvmax"].get_integer();
 				for (auto prerequisite : start["quest"])
 					rule.prerequisites.emplace_back(prerequisite["id"].get_integer(), prerequisite["state"].get_integer());
 				// These quizzes complete through dialogue. A quest with external
@@ -77,7 +79,7 @@ namespace ms
 		return select_quest_marker(npc_id, job, rules, [&](int16_t id)
 		{
 			return completed.count(id) ? 2 : started.count(id) ? 1 : 0;
-		});
+		}, level);
 	}
 
 	bool QuestLog::is_started(int16_t qid)

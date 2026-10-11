@@ -29,12 +29,16 @@ pub fn transition(
     qid: i16,
     job: i16,
     prerequisite: Option<i16>,
+    max_start_level: Option<i16>,
     reward: Option<i32>,
 ) -> QueryResult<(Character, QuestProgress)> {
     let mut conn = establish_connection();
     conn.transaction(|conn| {
         let mut character: Character = characters::table.find(cid).for_update().first(conn)?;
         if character.job != job {
+            return Err(diesel::result::Error::NotFound);
+        }
+        if reward.is_none() && max_start_level.is_some_and(|max| character.level > max) {
             return Err(diesel::result::Error::NotFound);
         }
         if let Some(required) = prerequisite {

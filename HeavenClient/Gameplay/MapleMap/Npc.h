@@ -66,6 +66,7 @@ namespace ms
 		Animation quest_marker_animation;
 		uint64_t quest_revision = std::numeric_limits<uint64_t>::max();
 		int16_t quest_job = -1;
+		int16_t quest_level = -1;
 		std::map<std::string, Animation> animations;
 		std::map<std::string, std::vector<std::string>> lines;
 		std::vector<std::string> states;
