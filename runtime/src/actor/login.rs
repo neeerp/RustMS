@@ -1,7 +1,7 @@
 use crate::db::spawn_db;
 use crate::error::RuntimeError;
 use crate::io::{PacketReader, PacketWriter};
-use db::session::{NewSession, Session, SessionState};
+use db::session::{Session, SessionState};
 use net::packet::build;
 use net::{LoginAction, LoginContext};
 use packet::Packet;
@@ -75,8 +75,15 @@ impl LoginClientActor {
         // Login handlers hit the database, so they run on the blocking pool.
         let handler = route.handler;
         let session = self.session.clone();
+        let peer_ip = self.peer_ip;
         let result = tokio::task::spawn_blocking(move || {
-            handler.handle(&mut packet, &LoginContext { session: &session })
+            handler.handle(
+                &mut packet,
+                &LoginContext {
+                    session: &session,
+                    peer_ip,
+                },
+            )
         })
         .await
         .map_err(|e| RuntimeError::Handler(format!("Task join error: {e}")))?
@@ -94,26 +101,11 @@ impl LoginClientActor {
     async fn apply(&mut self, action: LoginAction) -> Result<(), RuntimeError> {
         match action {
             LoginAction::Reply(mut packet) => self.writer.send_packet(&mut packet).await?,
-            LoginAction::CreateSession {
-                account_id,
-                hwid,
-                state,
-            } => {
-                if let Some(previous) = self.session.take() {
-                    spawn_db(move || db::session::delete_session(previous.id)).await?;
+            LoginAction::SetSession(session) => {
+                if let Some(session) = &session {
+                    info!(account_id = session.account_id, "Session opened");
                 }
-                let ip = self.peer_ip.into();
-                let session = spawn_db(move || {
-                    db::session::create_session(NewSession {
-                        account_id,
-                        ip,
-                        hwid: &hwid,
-                        state,
-                    })
-                })
-                .await?;
-                info!(account_id, "Session created");
-                self.session = Some(session);
+                self.session = session;
             }
             LoginAction::SetSessionState(state) => {
                 let id = self.session_id()?;

@@ -3,7 +3,7 @@ use crate::schema::characters;
 use crate::schema::sessions::dsl::*;
 use diesel::dsl::{exists, now, IntervalDsl};
 use diesel::expression_methods::*;
-use diesel::{select, QueryDsl, RunQueryDsl};
+use diesel::{Connection, OptionalExtension, QueryDsl, RunQueryDsl};
 use ipnetwork::IpNetwork;
 use std::time::Duration;
 
@@ -14,11 +14,30 @@ fn ttl_seconds() -> i32 {
     TRANSITION_TTL.as_secs() as i32
 }
 
-pub fn create_session(new_session: NewSession) -> crate::Result<Session> {
+/// Open a session for the account, unless it already has one.
+///
+/// This is the atomic "is the account online?" check: sessions are unique per
+/// account, so of several concurrent logins exactly one gets `Some`. An
+/// expired transition ticket no longer holds the account and is replaced.
+pub fn acquire_session(new_session: NewSession) -> crate::Result<Option<Session>> {
     let mut connection = crate::connection()?;
-    Ok(diesel::insert_into(sessions)
-        .values(&new_session)
-        .get_result::<Session>(&mut connection)?)
+    connection
+        .transaction(|connection| -> diesel::QueryResult<_> {
+            diesel::delete(
+                sessions
+                    .filter(account_id.eq(new_session.account_id))
+                    .filter(state.eq(SessionState::Transition))
+                    .filter(updated_at.le(now - ttl_seconds().seconds())),
+            )
+            .execute(connection)?;
+            diesel::insert_into(sessions)
+                .values(&new_session)
+                .on_conflict(account_id)
+                .do_nothing()
+                .get_result::<Session>(connection)
+                .optional()
+        })
+        .map_err(Into::into)
 }
 
 pub fn set_session_state(s_id: i32, new_state: SessionState) -> crate::Result<Session> {
@@ -87,20 +106,6 @@ pub fn claim_world_transition(c_id: i32, ch_id: i16, ip_addr: IpNetwork) -> crat
 pub fn delete_session(s_id: i32) -> crate::Result<usize> {
     let mut connection = crate::connection()?;
     Ok(diesel::delete(sessions.find(s_id)).execute(&mut connection)?)
-}
-
-/// Whether the account currently has a live connection (or a transition
-/// ticket that is still valid).
-pub fn account_is_online(a_id: i32) -> crate::Result<bool> {
-    let mut connection = crate::connection()?;
-    Ok(select(exists(
-        sessions.filter(account_id.eq(a_id)).filter(
-            state
-                .ne(SessionState::Transition)
-                .or(updated_at.gt(now - ttl_seconds().seconds())),
-        ),
-    ))
-    .get_result(&mut connection)?)
 }
 
 /// Remove sessions that a restarted login server can no longer own.

@@ -6,7 +6,7 @@ use crate::packet::build::login::status::LoginStatusCode;
 use crypt::login;
 use db::{
     account::{self, Account},
-    session::{self, SessionState},
+    session::{self, NewSession, Session, SessionState},
 };
 use packet::{io::read::PktRead, Packet};
 use std::io::Cursor;
@@ -41,21 +41,39 @@ impl LoginCredentialsHandler {
         }
     }
 
-    fn account_status(acc: &Account) -> Result<LoginStatusCode, NetworkError> {
-        Ok(if acc.banned {
+    fn account_status(acc: &Account) -> LoginStatusCode {
+        if acc.banned {
             LoginStatusCode::Banned
-        } else if session::account_is_online(acc.id)? {
-            LoginStatusCode::AlreadyLoggedIn
         } else if !acc.accepted_tos {
             LoginStatusCode::LicenseAgreement
         } else {
             LoginStatusCode::Success
-        })
+        }
+    }
+
+    /// Release this connection's previous session (a re-login on the same
+    /// connection) and atomically open a new one. `None` means the account
+    /// is online elsewhere.
+    fn acquire(
+        ctx: &LoginContext,
+        account_id: i32,
+        hwid: &str,
+        state: SessionState,
+    ) -> Result<Option<Session>, NetworkError> {
+        if let Some(previous) = ctx.session {
+            session::delete_session(previous.id)?;
+        }
+        Ok(session::acquire_session(NewSession {
+            account_id,
+            ip: ctx.peer_ip.into(),
+            hwid,
+            state,
+        })?)
     }
 }
 
 impl LoginHandler for LoginCredentialsHandler {
-    fn handle(&self, packet: &mut Packet, _ctx: &LoginContext) -> LoginResult {
+    fn handle(&self, packet: &mut Packet, ctx: &LoginContext) -> LoginResult {
         let (user, pw, hwid) = Self::read_credentials(packet)?;
 
         let Some(acc) = Self::verify_and_get_account(&user, &pw)? else {
@@ -65,32 +83,33 @@ impl LoginHandler for LoginCredentialsHandler {
             return Ok(HandlerResult::reply(reject));
         };
 
-        match Self::account_status(&acc)? {
-            LoginStatusCode::Success => {
-                let login_packet = build::login::status::build_successful_login_packet(&acc)?;
-                Ok(HandlerResult::empty()
-                    .with(LoginAction::CreateSession {
-                        account_id: acc.id,
-                        hwid,
-                        state: SessionState::AfterLogin,
-                    })
-                    .with_reply(login_packet))
-            }
-            LoginStatusCode::LicenseAgreement => {
-                let tos_packet = build::login::status::build_login_status_packet(
+        let (state, reply) = match Self::account_status(&acc) {
+            LoginStatusCode::Success => (
+                SessionState::AfterLogin,
+                build::login::status::build_successful_login_packet(&acc)?,
+            ),
+            LoginStatusCode::LicenseAgreement => (
+                SessionState::BeforeLogin,
+                build::login::status::build_login_status_packet(
                     LoginStatusCode::LicenseAgreement,
-                )?;
-                Ok(HandlerResult::empty()
-                    .with(LoginAction::CreateSession {
-                        account_id: acc.id,
-                        hwid,
-                        state: SessionState::BeforeLogin,
-                    })
-                    .with_reply(tos_packet))
+                )?,
+            ),
+            rejected => {
+                return Ok(HandlerResult::reply(
+                    build::login::status::build_login_status_packet(rejected)?,
+                ))
             }
-            rejected => Ok(HandlerResult::reply(
-                build::login::status::build_login_status_packet(rejected)?,
-            )),
+        };
+
+        match Self::acquire(ctx, acc.id, &hwid, state)? {
+            Some(session) => Ok(HandlerResult::empty()
+                .with(LoginAction::SetSession(Some(session)))
+                .with_reply(reply)),
+            None => Ok(HandlerResult::empty()
+                .with(LoginAction::SetSession(None))
+                .with_reply(build::login::status::build_login_status_packet(
+                    LoginStatusCode::AlreadyLoggedIn,
+                )?)),
         }
     }
 }

@@ -57,6 +57,7 @@ impl<A: ReplyAction> HandlerResult<A> {
 /// runtime runs them on the blocking pool.
 pub struct LoginContext<'a> {
     pub session: &'a Option<Session>,
+    pub peer_ip: std::net::IpAddr,
 }
 
 impl LoginContext<'_> {
@@ -68,12 +69,9 @@ impl LoginContext<'_> {
 #[derive(Debug)]
 pub enum LoginAction {
     Reply(Packet),
-    /// Open a session for an authenticated account.
-    CreateSession {
-        account_id: i32,
-        hwid: String,
-        state: SessionState,
-    },
+    /// Replace the connection's session (handlers open and close sessions
+    /// themselves so that acquiring one is atomic).
+    SetSession(Option<Session>),
     /// Move the current session to a new state (e.g. terms accepted).
     SetSessionState(SessionState),
     /// Persist the world and channel the client picked.
