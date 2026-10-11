@@ -3,6 +3,13 @@ project(HeavenClient)
 
 set(CMAKE_CXX_STANDARD 17)
 
+option(HEAVENCLIENT_BUILD_TESTS "Build lightweight client logic tests" OFF)
+if(HEAVENCLIENT_BUILD_TESTS)
+    enable_testing()
+    add_executable(quest_marker_tests tests/quest_marker.cpp)
+    add_test(NAME quest_markers COMMAND quest_marker_tests)
+endif()
+
 include_directories(.)
 include_directories(Audio)
 include_directories(Character)

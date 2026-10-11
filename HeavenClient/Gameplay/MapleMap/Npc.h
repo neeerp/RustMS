@@ -26,6 +26,8 @@
 #include "../../Graphics/Animation.h"
 #include "../../Graphics/Text.h"
 #include "../../Util/Randomizer.h"
+#include "../../Character/QuestMarker.h"
+#include <limits>
 
 namespace ms
 {
@@ -59,6 +61,11 @@ namespace ms
 		std::string get_func();
 
 	private:
+		Point<int16_t> quest_marker_offset() const;
+		QuestMarker quest_marker = QuestMarker::NONE;
+		Animation quest_marker_animation;
+		uint64_t quest_revision = std::numeric_limits<uint64_t>::max();
+		int16_t quest_job = -1;
 		std::map<std::string, Animation> animations;
 		std::map<std::string, std::vector<std::string>> lines;
 		std::vector<std::string> states;

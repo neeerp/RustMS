@@ -16,6 +16,7 @@
 //	along with this program.  If not, see <https://www.gnu.org/licenses/>.		//
 //////////////////////////////////////////////////////////////////////////////////
 #include "Npc.h"
+#include "../Stage.h"
 
 #include <nlnx/nx.hpp>
 
@@ -88,6 +89,8 @@ namespace ms
 			namelabel.draw(absp + Point<int16_t>(0, -4));
 			funclabel.draw(absp + Point<int16_t>(0, 18));
 		}
+		if (quest_marker != QuestMarker::NONE)
+			quest_marker_animation.draw(DrawArgument(absp + quest_marker_offset()), alpha);
 	}
 
 	int8_t Npc::update(const Physics &physics)
@@ -96,6 +99,21 @@ namespace ms
 			return phobj.fhlayer;
 
 		physics.move_object(phobj);
+		auto& quests = Stage::get().get_player().get_quests();
+		int16_t job = Stage::get().get_player().get_stats().get_stat(MapleStat::Id::JOB);
+		if (quest_revision != quests.revision() || quest_job != job)
+		{
+			QuestMarker next = quests.npc_marker(npcid, job);
+			if (next != quest_marker)
+			{
+				quest_marker = next;
+				if (next != QuestMarker::NONE)
+					quest_marker_animation = nl::nx::ui["UIWindow2.img"]["QuestIcon"][std::to_string(static_cast<int>(next))];
+			}
+			quest_revision = quests.revision();
+			quest_job = job;
+		}
+		if (quest_marker != QuestMarker::NONE) quest_marker_animation.update();
 
 		if (animations.count(stance))
 		{
@@ -149,7 +167,23 @@ namespace ms
 				absp.x() + dim.x() / 2,
 				absp.y() - dim.y(),
 				absp.y()
-		).contains(cursorpos);
+		).contains(cursorpos) || (quest_marker != QuestMarker::NONE &&
+			Rectangle<int16_t>(absp + quest_marker_offset() - quest_marker_animation.get_origin(),
+				absp + quest_marker_offset() - quest_marker_animation.get_origin() + quest_marker_animation.get_dimensions()).contains(cursorpos));
+	}
+
+	Point<int16_t> Npc::quest_marker_offset() const
+	{
+		// Anchor to the standing sprite so changing NPC poses does not move the
+		// marker. The icon's own animation provides its original bobbing motion.
+		auto stand = animations.find("stand");
+		int16_t head_height = 50;
+		if (stand != animations.end())
+		{
+			head_height = stand->second.get_origin().y();
+			if (head_height <= 0) head_height = stand->second.get_dimensions().y();
+		}
+		return Point<int16_t>(0, -head_height - quest_marker_animation.get_dimensions().y() / 2 - 8);
 	}
 
 	std::string Npc::get_name()

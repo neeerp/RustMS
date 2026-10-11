@@ -66,6 +66,26 @@ including the selected integer payload. It normalizes literal newline characters
 to the text renderer's escaped line breaks. Clicking the text reveals a page
 immediately; long text scrolls in 32-pixel increments.
 
+## NPC quest markers
+
+Rain displays the existing animated `UI.nx/UIWindow2.img/QuestIcon` graphics:
+light bulb (0) for an available quiz, open book (1) for unmet objectives, and
+closed book (2) for a quest that can be resolved through NPC dialogue. Accepted
+Rain quizzes use the closed book because they have no external objectives;
+the dialogue still validates the answer before awarding anything. Completion
+unlocks the next quiz's light bulb. Finishing all seven removes the marker.
+
+`QuestLog::npc_marker` reads the supported chain's NPC, job, and prerequisite
+requirements from `Quest.nx`, then combines them with the local quest records.
+It advertises only quests implemented by the server. Marker priority is ready
+turn-in, in progress, then available. Each NPC refreshes its marker when quest
+records or the player's job change, rather than scanning assets every frame.
+The markers are drawn above the standing sprite and are clickable.
+
+Logic tests cover all seven transitions, prerequisites, job/NPC filtering,
+marker priority, and incomplete objectives. Enable the lightweight C++ tests
+with `-DHEAVENCLIENT_BUILD_TESTS=ON`, then run CTest in the client build directory.
+
 ## Validation
 
 Fast logic tests: `cargo test -p net -p runtime -p integration-harness --lib`.

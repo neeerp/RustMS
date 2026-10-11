@@ -22,6 +22,7 @@
 #include <cstdint>
 
 #include <map>
+#include "QuestMarker.h"
 
 namespace ms
 {
@@ -42,10 +43,13 @@ namespace ms
 		bool is_completed(int16_t id) const;
 		const std::map<int16_t, std::string>& started_quests() const;
 		const std::map<int16_t, int64_t>& completed_quests() const;
+		QuestMarker npc_marker(int32_t npc_id, int16_t job) const;
+		uint64_t revision() const;
 
 	private:
 		std::map<int16_t, std::string> started;
 		std::map<int16_t, std::pair<int16_t, std::string>> in_progress;
 		std::map<int16_t, int64_t> completed;
+		uint64_t marker_revision = 0;
 	};
 }
