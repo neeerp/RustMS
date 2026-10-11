@@ -31,8 +31,15 @@ namespace ms
 
 	void QuestLog::add_completed(int16_t qid, int64_t time)
 	{
+		started.erase(qid);
+		in_progress.erase(qid);
 		completed[qid] = time;
 	}
+
+	void QuestLog::clear() { started.clear(); in_progress.clear(); completed.clear(); }
+	bool QuestLog::is_completed(int16_t id) const { return completed.count(id) != 0; }
+	const std::map<int16_t, std::string>& QuestLog::started_quests() const { return started; }
+	const std::map<int16_t, int64_t>& QuestLog::completed_quests() const { return completed; }
 
 	bool QuestLog::is_started(int16_t qid)
 	{

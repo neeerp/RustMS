@@ -13,22 +13,22 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use tokio::time::{timeout, Duration};
 
 const START_MAP: i32 = 1_000_000;
-const RAIN: i32 = 12101;
+const PIO: i32 = 10000;
 const OBJECT_BASE: i32 = 1_000_000_000;
 
 fn assets() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../assets/game-data")
 }
 
-fn rain_object_id() -> i32 {
+fn pio_object_id() -> i32 {
     let maps = GameData::load_from_nx_map(assets().join("Map.nx")).unwrap();
     let index = maps
         .field(START_MAP)
         .unwrap()
         .map_npcs
         .iter()
-        .position(|npc| npc.npc_id == RAIN)
-        .expect("Rain in Amherst");
+        .position(|npc| npc.npc_id == PIO)
+        .expect("Pio in Amherst");
     OBJECT_BASE + index as i32
 }
 
@@ -130,12 +130,12 @@ async fn asset_dialogue_supports_next_back_finish_cancel_and_restart() {
     let conn = &mut session.connection;
     let data =
         NpcDialogueData::load_from_nx(assets().join("Npc.nx"), assets().join("String.nx")).unwrap();
-    let text = &data.dialogue(RAIN).unwrap().pages;
-    conn.send_packet(talk(rain_object_id()), "talk to Rain")
+    let text = &data.dialogue(PIO).unwrap().pages;
+    conn.send_packet(talk(pio_object_id()), "talk to Pio")
         .await
         .unwrap();
     let first = page(conn).await;
-    assert_eq!(first.npc_id, RAIN);
+    assert_eq!(first.npc_id, PIO);
     assert_eq!(first.text, text[0]);
     assert!(!first.has_previous && first.has_next);
     conn.send_packet(response(0, 1), "next").await.unwrap();
@@ -156,7 +156,7 @@ async fn asset_dialogue_supports_next_back_finish_cancel_and_restart() {
         .await
         .unwrap();
     assert_no_dialogue(conn).await;
-    conn.send_packet(talk(rain_object_id()), "restart")
+    conn.send_packet(talk(pio_object_id()), "restart")
         .await
         .unwrap();
     assert_eq!(page(conn).await, first);
@@ -165,7 +165,7 @@ async fn asset_dialogue_supports_next_back_finish_cancel_and_restart() {
         .await
         .unwrap();
     assert_no_dialogue(conn).await;
-    conn.send_packet(talk(rain_object_id()), "restart after cancel")
+    conn.send_packet(talk(pio_object_id()), "restart after cancel")
         .await
         .unwrap();
     assert_eq!(page(conn).await, first);
@@ -184,7 +184,7 @@ async fn players_have_independent_conversations() {
     let second_config = load_harness_config_or_fail().await;
     let mut first = login_to_world_session(&first_config).await.unwrap();
     let mut second = login_to_world_session(&second_config).await.unwrap();
-    let object_id = rain_object_id();
+    let object_id = pio_object_id();
     first
         .connection
         .send_packet(talk(object_id), "first player starts")
@@ -234,11 +234,11 @@ async fn npc_requests_are_field_scoped_and_warp_clears_conversation() {
         .unwrap();
     conn.send_packet(talk(-1), "invalid object").await.unwrap();
     // Template IDs are not map object IDs.
-    conn.send_packet(talk(RAIN), "forged template id")
+    conn.send_packet(talk(PIO), "forged template id")
         .await
         .unwrap();
     assert_no_dialogue(conn).await;
-    conn.send_packet(talk(rain_object_id()), "start before warp")
+    conn.send_packet(talk(pio_object_id()), "start before warp")
         .await
         .unwrap();
     page(conn).await;
@@ -262,7 +262,7 @@ async fn npc_requests_are_field_scoped_and_warp_clears_conversation() {
         .await
         .unwrap();
     assert_no_dialogue(conn).await;
-    conn.send_packet(talk(rain_object_id()), "restart in Amherst")
+    conn.send_packet(talk(pio_object_id()), "restart in Amherst")
         .await
         .unwrap();
     assert!(!page(conn).await.has_previous);

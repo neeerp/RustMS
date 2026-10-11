@@ -146,12 +146,20 @@ fn write_skills(packet: &mut Packet, _character: &Character) -> Result<(), Netwo
     Ok(())
 }
 
-fn write_quests(packet: &mut Packet, _character: &Character) -> Result<(), NetworkError> {
-    let started_quests = 0;
-    packet.write_short(started_quests)?;
-
-    let completed_quests = 0;
-    packet.write_short(completed_quests)?;
+fn write_quests(packet: &mut Packet, character: &Character) -> Result<(), NetworkError> {
+    let quests = db::quest::get_quests(character.id)?;
+    packet.write_short(quests.iter().filter(|q| q.status == 1).count() as i16)?;
+    for q in quests.iter().filter(|q| q.status == 1) {
+        packet.write_short(q.quest_id)?;
+        packet.write_str_with_length("")?;
+    }
+    packet.write_short(quests.iter().filter(|q| q.status == 2).count() as i16)?;
+    for q in quests.iter().filter(|q| q.status == 2) {
+        packet.write_short(q.quest_id)?;
+        packet.write_long(super::quest::quest_time(
+            q.completed_at.expect("completed quest timestamp"),
+        )?)?;
+    }
 
     Ok(())
 }

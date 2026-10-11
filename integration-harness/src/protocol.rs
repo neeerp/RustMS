@@ -34,6 +34,10 @@ pub struct WorldSession {
     pub map_id: i32,
     pub login_addr: String,
     pub world_addr: String,
+    pub level: u8,
+    pub exp: i32,
+    pub ap: i16,
+    pub quests: std::collections::BTreeMap<i16, u8>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -72,9 +76,9 @@ pub async fn login_to_world_session(config: &HarnessConfig) -> Result<WorldSessi
 
     world_conn
         .send_packet(
-            build_player_logged_in_for_channel(selected.id, config.channel_id).map_err(|message| {
-                HarnessError::protocol("world entry", config.world_addr, message)
-            })?,
+            build_player_logged_in_for_channel(selected.id, config.channel_id).map_err(
+                |message| HarnessError::protocol("world entry", config.world_addr, message),
+            )?,
             "world entry",
         )
         .await?;
@@ -153,6 +157,10 @@ pub async fn login_to_world_session(config: &HarnessConfig) -> Result<WorldSessi
     Ok(WorldSession {
         connection: world_conn,
         character_id: world_entry.character_id,
+        level: world_entry.level,
+        exp: world_entry.exp,
+        ap: world_entry.ap,
+        quests: world_entry.quests,
         character_name: world_entry.character_name,
         map_id: world_entry.map_id,
         login_addr: config.login_addr.to_string(),

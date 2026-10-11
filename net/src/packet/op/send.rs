@@ -16,6 +16,7 @@ pub enum SendOpcode {
     RecommendedWorlds = 0x1B,
 
     StatChange = 0x1F,
+    ShowStatusInfo = 0x27,
 
     BuddyList = 0x3F,
     FamilyInfo = 0x5F,

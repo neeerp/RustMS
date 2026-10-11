@@ -1,15 +1,21 @@
 //! Conversation progression independent of transport and asset storage.
 //!
-//! A future quest service can select a definition using persisted character
-//! progress before starting a conversation, and handle explicit quest effects.
-//! Closing or finishing normal speech has no persistence side effects.
+//! Quest-aware conversations live in `crate::quests`. Closing or finishing
+//! these normal speech pages has no persistence side effects.
 
 use game_data::NpcDialogueTemplate;
 
 #[derive(Clone, Copy, Debug)]
 pub enum NpcInteraction {
-    Start { object_id: i32 },
-    Respond { message_type: u8, response: i8 },
+    Start {
+        object_id: i32,
+        request_id: u64,
+    },
+    Respond {
+        message_type: u8,
+        response: i8,
+        selection: Option<i32>,
+    },
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]

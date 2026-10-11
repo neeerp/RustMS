@@ -123,6 +123,16 @@ namespace ms
 				show_status(Color::Name::RED, "Mode: 0, Mode 2: " + std::to_string(mode2) + " is not handled.");
 			}
 		}
+		else if (mode == 1)
+		{
+			int16_t id = recv.read_short();
+			int8_t status = recv.read_byte();
+			auto& quests = Stage::get().get_player().get_quests();
+			if (status == 1)
+				quests.add_started(id, recv.read_string());
+			else if (status == 2)
+				quests.add_completed(id, recv.read_long());
+		}
 		else if (mode == 3)
 		{
 			bool white = recv.read_bool();

@@ -1,6 +1,22 @@
 use crate::{error::NetworkError, packet::op::SendOpcode};
 use packet::{io::write::PktWrite, Packet};
 
+pub fn build_quest_prompt(prompt: &crate::quests::QuestPrompt) -> Result<Packet, NetworkError> {
+    let (npc_id, message_type, text) = match prompt {
+        crate::quests::QuestPrompt::Text(page) => return build_npc_dialogue(page),
+        crate::quests::QuestPrompt::YesNo { npc_id, text } => (*npc_id, 1, text),
+        crate::quests::QuestPrompt::Selection { npc_id, text } => (*npc_id, 4, text),
+    };
+    let mut p = Packet::new_empty();
+    p.write_short(SendOpcode::NpcDialogue as i16)?;
+    p.write_byte(4)?;
+    p.write_int(npc_id)?;
+    p.write_byte(message_type)?;
+    p.write_byte(0)?;
+    p.write_str_with_length(text)?;
+    Ok(p)
+}
+
 /// v83 text dialogue: message type 0, followed by separate Back/Next bytes.
 pub fn build_npc_dialogue(page: &crate::dialogue::DialoguePage) -> Result<Packet, NetworkError> {
     let mut packet = Packet::new_empty();

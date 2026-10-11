@@ -1,8 +1,9 @@
 # NPC dialogue
 
-Clicking an NPC opens normal speech loaded from the local v83 assets. For
-example, Rain (12101) in Amherst has three pages with Next, Back, and OK.
-Close and Escape cancel. Pio and other NPCs with normal speech use the same flow.
+Clicking an NPC opens asset-backed dialogue. Pio and other NPCs with normal
+speech use Next, Back, and OK. Rain (12101) offers her seven-quiz quest chain
+when the character is eligible, then falls back to normal speech after it is
+completed. Close and Escape cancel. See [Quests](./quests.md).
 
 ## Content and quest boundary
 
@@ -11,33 +12,29 @@ Close and Escape cancel. Pio and other NPCs with normal speech use the same flow
 This uses existing asset text without copying it into the repository. NPCs
 without those references currently have no conversation.
 
-`Quest.nx` also contains conversation text (`Say.img`), descriptions
-(`QuestInfo.img`), requirements (`Check.img`), and actions (`Act.img`). Those
-are not used yet. Normal speech is not a quest script and reading it does not
-accept or complete quests or give rewards.
+`Quest.nx` contains conversation text (`Say.img`), descriptions
+(`QuestInfo.img`), requirements (`Check.img`), and actions (`Act.img`). The Rain
+quiz implementation uses those definitions. Normal speech still has no quest
+or reward effects.
 
-`net::dialogue::Conversation` handles progression independently of packets,
-NPC lookup, and asset loading. It consumes a `NpcDialogueTemplate` definition
-and produces a `DialoguePage`. A future quest service should select dialogue
-using the character's persisted quest state and the NPC's quest/script metadata.
-Branching prompts and explicit quest effects belong in that conversation flow;
-quest progress belongs in character persistence, not in a field occupant.
-Reward/quest actions will need server-side eligibility validation and an atomic,
-idempotent persistence operation before confirming success to the client.
+`net::dialogue::Conversation` handles ordinary pages independently of transport.
+`net::quests::QuizConversation` handles offers, tutorial pages, choices, feedback,
+and effect intents. The runtime commits quest effects before confirming them
+with packets. Persisted progress is separate from transient conversation state.
 
 ## Runtime ownership
 
-TalkToNpc (0x3A) and NpcTalkMore (0x3C) are parsed by handlers into typed
-`NpcInteraction` actions. ClientActor forwards them through WorldServerActor
-and ChannelActor to the player's current FieldActor.
+TalkToNpc (0x3A) and NpcTalkMore (0x3C) are parsed into `NpcInteraction` actions.
+Start requests pass through WorldServerActor and ChannelActor to the player's
+FieldActor, which resolves the object ID against its own NPC list. The field
+returns the validated template ID, location, and a server-generated request ID.
+ClientActor rejects late replies after another NPC click or a map transfer.
 
-The field resolves NPC object IDs against its own NPC list. Template IDs and
-unknown object IDs cannot start a conversation. Each occupant owns at most one
-conversation; clicking another NPC replaces it. Replies go only to that player.
-Finishing, cancellation, or invalid response types clear the conversation.
-Leaving a field drops its occupant state, so map transfers, channel changes,
-and disconnects also discard conversation progress. A reply without an active
-conversation is ignored.
+ClientActor owns at most one normal or quiz conversation. It handles responses
+and awaits database work on the blocking pool, serializing reward updates with
+other character operations. A new click replaces the conversation. Finishing,
+cancellation, invalid responses, map changes, channel changes, and disconnects
+clear transient state. Responses without an active conversation are ignored.
 
 ## Wire format and client
 
@@ -50,7 +47,7 @@ wire message type for responses. Escape sends cancellation rather than Back.
 
 ## Assets and validation
 
-Place `Map.nx`, `Npc.nx`, and `String.nx` in `assets/game-data/`. The server's
+Place `Map.nx`, `Npc.nx`, `String.nx`, and `Quest.nx` in `assets/game-data/`. The server's
 NPC paths can be overridden with `RUSTMS_NPC_NX_PATH` and
 `RUSTMS_STRING_NX_PATH`. These assets stay untracked. When running the Docker
 harness, files or symlink targets must live within its mounted `assets/` tree.

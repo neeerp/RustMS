@@ -101,14 +101,15 @@ namespace ms
 		if (show_slider)
 		{
 			int16_t text_min_height = position.y() + top.height() - 1;
-			text.draw(position + Point<int16_t>(162, 19 - offset * 400),
+			text.draw(position + Point<int16_t>(166, 32 - offset * 32),
 					  Range<int16_t>(text_min_height, text_min_height + height - 18));
 			slider.draw(position);
 		} else
 		{
-			int16_t y_adj = height - min_height;
-			text.draw(position + Point<int16_t>(166, 48 - y_adj));
+			text.draw(position + Point<int16_t>(166, 32));
 		}
+		for (size_t i = 0; i < choices.size(); ++i)
+			choices[i].second.draw(position + Point<int16_t>(166, 40 + question_height + i * 28 - offset * 32));
 	}
 
 	void UINpcTalk::update()
@@ -242,10 +243,31 @@ namespace ms
 	Cursor::State UINpcTalk::send_cursor(bool clicked, Point<int16_t> cursorpos)
 	{
 		Point<int16_t> cursor_relative = cursorpos - position;
+		if (message_type == 4)
+			for (size_t i = 0; i < choices.size(); ++i)
+			{
+				int16_t y = 40 + question_height + i * 28 - offset * 32;
+				if (Rectangle<int16_t>(166, 486, y, y + 24).contains(cursor_relative))
+				{
+					if (clicked)
+					{
+						deactivate();
+						NpcTalkMorePacket(choices[i].first).dispatch();
+						return Cursor::State::IDLE;
+					}
+					return Cursor::State::CANCLICK;
+				}
+			}
 
 		if (show_slider && slider.isenabled())
 			if (Cursor::State sstate = slider.send_cursor(cursor_relative, clicked))
 				return sstate;
+		if (clicked && draw_text && Rectangle<int16_t>(166, 486, 24, height + 24).contains(cursor_relative))
+		{
+			draw_text = false;
+			text.change_text(formatted_text);
+			return Cursor::State::IDLE;
+		}
 
 		Cursor::State estate = UIElement::send_cursor(clicked, cursorpos);
 
@@ -285,6 +307,18 @@ namespace ms
 	std::string UINpcTalk::format_text(const std::string &tx, const int32_t &npcid)
 	{
 		std::string formatted_text = tx;
+		// The text renderer understands escaped line breaks, not literal LF/CR.
+		// Quest prompts may contain both asset escapes and real newlines.
+		formatted_text.clear();
+		for (size_t i = 0; i < tx.size(); ++i)
+		{
+			if (tx[i] == '\r' || tx[i] == '\n')
+			{
+				if (tx[i] == '\r' && i + 1 < tx.size() && tx[i + 1] == '\n') ++i;
+				formatted_text += "\\n";
+			}
+			else formatted_text += tx[i];
+		}
 		size_t begin = formatted_text.find("#p");
 
 		if (begin != std::string::npos)
@@ -334,6 +368,8 @@ namespace ms
 	{
 		message_type = msgtype;
 		type = get_by_value(msgtype);
+		if (msgtype == 4)
+			type = TalkType::SENDSIMPLE;
 		const bool has_previous = (style & 0xff) != 0;
 		const bool has_next = (style & 0xff00) != 0;
 		if (msgtype == 0)
@@ -343,10 +379,30 @@ namespace ms
 		draw_text = true;
 		formatted_text_pos = 0;
 		formatted_text = format_text(tx, npcid);
+		choices.clear();
+		if (msgtype == 4)
+		{
+			size_t first_link = formatted_text.find("#L");
+			for (size_t start = first_link; start != std::string::npos;)
+			{
+				size_t id_end = formatted_text.find('#', start + 2);
+				size_t label_end = formatted_text.find("#l", id_end);
+				if (id_end == std::string::npos || label_end == std::string::npos)
+					break;
+				int32_t id = std::stoi(formatted_text.substr(start + 2, id_end - start - 2));
+				std::string label = formatted_text.substr(id_end + 1, label_end - id_end - 1);
+				choices.emplace_back(id, Text(Text::Font::A12M, Text::Alignment::LEFT, Color::Name::BLUE, label, 320));
+				start = formatted_text.find("#L", label_end + 2);
+			}
+			if (first_link != std::string::npos)
+				formatted_text.erase(first_link);
+		}
 
 		text = Text(Text::Font::A12M, Text::Alignment::LEFT, Color::Name::DARKGREY, formatted_text, 320);
 
 		int16_t text_height = text.height();
+		question_height = text_height;
+		text_height += choices.size() * 28 + 32;
 
 		text.change_text("");
 
@@ -375,7 +431,7 @@ namespace ms
 			{
 				height = MAX_HEIGHT;
 				show_slider = true;
-				rowmax = text_height / 400 + 1;
+				rowmax = (text_height - MAX_HEIGHT + 31) / 32 + 1;
 				unitrows = 1;
 
 				int16_t slider_y = top.height() - 7;

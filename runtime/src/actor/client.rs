@@ -1,3 +1,5 @@
+mod dialogue;
+use self::dialogue::ActiveConversation;
 use crate::error::RuntimeError;
 use crate::handler::{ClientId, HandlerAction, HandlerContext, HandlerResult};
 use crate::io::{PacketReader, PacketWriter};
@@ -27,6 +29,8 @@ pub struct ClientActor {
     /// Our sender (given to world server on connect)
     server_tx: mpsc::Sender<ServerMessage>,
     peer_addr: SocketAddr,
+    conversation: Option<ActiveConversation>,
+    npc_request_id: u64,
 }
 
 impl ClientActor {
@@ -69,6 +73,8 @@ impl ClientActor {
             server_rx,
             server_tx,
             peer_addr,
+            conversation: None,
+            npc_request_id: 0,
         })
     }
 
@@ -164,15 +170,31 @@ impl ClientActor {
     async fn process_actions(&mut self, result: HandlerResult) -> Result<(), RuntimeError> {
         for action in result.actions {
             match action {
-                HandlerAction::NpcInteraction(interaction) => {
-                    self.world_tx
-                        .send(ClientEvent::NpcInteraction {
-                            from: self.client_id,
-                            interaction,
-                        })
-                        .await
-                        .map_err(|_| RuntimeError::ChannelSend)?;
-                }
+                HandlerAction::NpcInteraction(interaction) => match interaction {
+                    net::dialogue::NpcInteraction::Start { object_id, .. } => {
+                        self.conversation = None;
+                        self.npc_request_id = self.npc_request_id.wrapping_add(1);
+                        let interaction = net::dialogue::NpcInteraction::Start {
+                            object_id,
+                            request_id: self.npc_request_id,
+                        };
+                        self.world_tx
+                            .send(ClientEvent::NpcInteraction {
+                                from: self.client_id,
+                                interaction,
+                            })
+                            .await
+                            .map_err(|_| RuntimeError::ChannelSend)?;
+                    }
+                    net::dialogue::NpcInteraction::Respond {
+                        message_type,
+                        response,
+                        selection,
+                    } => {
+                        self.respond_to_npc(message_type, response, selection)
+                            .await?;
+                    }
+                },
                 HandlerAction::Reply(mut packet) => {
                     self.writer.send_packet(&mut packet).await?;
                 }
@@ -237,6 +259,8 @@ impl ClientActor {
                     spawn_y,
                     spawn_stance,
                 } => {
+                    self.conversation = None;
+                    self.npc_request_id = self.npc_request_id.wrapping_add(1);
                     let channel_id = self
                         .session
                         .session
@@ -403,6 +427,15 @@ impl ClientActor {
 
     async fn handle_server_message(&mut self, msg: ServerMessage) -> Result<(), RuntimeError> {
         match msg {
+            ServerMessage::NpcConversation {
+                npc_id,
+                field,
+                request_id,
+            } => {
+                if request_id == self.npc_request_id {
+                    self.start_npc_conversation(npc_id, field).await?;
+                }
+            }
             ServerMessage::SendPacket(mut packet) => {
                 self.writer.send_packet(&mut packet).await?;
             }

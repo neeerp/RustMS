@@ -12,6 +12,7 @@ mod io;
 pub mod login_world;
 mod npc_data;
 pub mod packet;
+pub mod quests;
 pub mod settings;
 
 pub use self::game_data::get as get_game_data;

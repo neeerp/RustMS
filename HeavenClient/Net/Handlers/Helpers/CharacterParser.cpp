@@ -94,6 +94,7 @@ namespace ms
 
 	void CharacterParser::parse_questlog(InPacket& recv, QuestLog& quests)
 	{
+		quests.clear();
 		int16_t size = recv.read_short();
 
 		for (int16_t i = 0; i < size; i++)

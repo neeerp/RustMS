@@ -65,6 +65,10 @@ pub struct SetFieldPacket {
     pub character_id: i32,
     pub character_name: String,
     pub map_id: i32,
+    pub level: u8,
+    pub exp: i32,
+    pub ap: i16,
+    pub quests: std::collections::BTreeMap<i16, u8>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -128,6 +132,9 @@ struct CharacterMeta {
     id: i32,
     name: String,
     map_id: i32,
+    level: u8,
+    exp: i32,
+    ap: i16,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -594,11 +601,55 @@ pub fn decode_set_field(packet: &Packet) -> Result<SetFieldPacket, String> {
     skip(&mut cursor, 20)?;
     skip(&mut cursor, 9)?;
     let meta = decode_character_meta(&mut cursor)?;
+    // Buddy capacity/name flag, mesos, then the v83 empty inventory/skills
+    // currently emitted by RustMS. Fail rather than silently misparse items.
+    skip(&mut cursor, 6 + 5 + 8)?;
+    for _ in 0..2 {
+        if cursor.read_short().map_err(|e| e.to_string())? != 0 {
+            return Err("nonempty equipment inventory not supported by harness decoder".into());
+        }
+    }
+    if cursor.read_int().map_err(|e| e.to_string())? != 0 {
+        return Err("nonempty item inventory not supported by harness decoder".into());
+    }
+    for _ in 0..4 {
+        if cursor.read_byte().map_err(|e| e.to_string())? != 0 {
+            return Err("nonempty inventory/skill flag not supported by harness decoder".into());
+        }
+    }
+    for _ in 0..2 {
+        if cursor.read_short().map_err(|e| e.to_string())? != 0 {
+            return Err("nonempty skills/cooldowns not supported by harness decoder".into());
+        }
+    }
+    let mut quests = std::collections::BTreeMap::new();
+    let started = cursor.read_short().map_err(|e| e.to_string())?;
+    if started < 0 {
+        return Err("negative quest count".into());
+    }
+    for _ in 0..started {
+        let id = cursor.read_short().map_err(|e| e.to_string())?;
+        cursor.read_str_with_length().map_err(|e| e.to_string())?;
+        quests.insert(id, 1);
+    }
+    let completed = cursor.read_short().map_err(|e| e.to_string())?;
+    if completed < 0 {
+        return Err("negative quest count".into());
+    }
+    for _ in 0..completed {
+        let id = cursor.read_short().map_err(|e| e.to_string())?;
+        cursor.read_long().map_err(|e| e.to_string())?;
+        quests.insert(id, 2);
+    }
 
     Ok(SetFieldPacket {
         character_id: meta.id,
         character_name: meta.name,
         map_id: meta.map_id,
+        level: meta.level,
+        exp: meta.exp,
+        ap: meta.ap,
+        quests,
     })
 }
 
@@ -871,16 +922,26 @@ fn decode_character_meta(cursor: &mut Cursor<&[u8]>) -> Result<CharacterMeta, St
     let name = String::from_utf8(name_bytes[..end].to_vec())
         .map_err(|e| format!("invalid utf-8 in character name: {e}"))?;
 
-    skip(cursor, 1 + 1 + 4 + 4 + 8 + 8 + 8 + 1 + 2)?;
-    skip(cursor, 2 * 9)?;
+    skip(cursor, 1 + 1 + 4 + 4 + 8 + 8 + 8)?;
+    let level = cursor.read_byte().map_err(|e| e.to_string())?;
+    skip(cursor, 2 + 2 * 8)?;
+    let ap = cursor.read_short().map_err(|e| e.to_string())?;
     skip(cursor, 2)?;
-    skip(cursor, 4 + 2 + 4)?;
+    let exp = cursor.read_int().map_err(|e| e.to_string())?;
+    skip(cursor, 2 + 4)?;
     let map_id = cursor
         .read_int()
         .map_err(|e| format!("failed to read character map id: {e}"))?;
     skip(cursor, 1 + 4)?;
 
-    Ok(CharacterMeta { id, name, map_id })
+    Ok(CharacterMeta {
+        id,
+        name,
+        map_id,
+        level,
+        exp,
+        ap,
+    })
 }
 
 fn skip(cursor: &mut Cursor<&[u8]>, length: usize) -> Result<(), String> {

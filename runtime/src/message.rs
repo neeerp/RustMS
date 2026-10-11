@@ -55,6 +55,12 @@ impl FieldCharacter {
 /// Messages sent TO a client from the server or other clients.
 #[derive(Debug)]
 pub enum ServerMessage {
+    /// NPC identity validated by the player's field. Discard if location changed.
+    NpcConversation {
+        npc_id: i32,
+        field: FieldKey,
+        request_id: u64,
+    },
     /// Send a packet to this client
     SendPacket(Packet),
     /// Forcibly disconnect with reason

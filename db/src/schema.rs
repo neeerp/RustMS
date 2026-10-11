@@ -116,4 +116,20 @@ diesel::joinable!(keybindings -> characters (character_id));
 diesel::joinable!(sessions -> accounts (account_id));
 diesel::joinable!(sessions -> characters (character_id));
 
-diesel::allow_tables_to_appear_in_same_query!(accounts, buddies, characters, keybindings, sessions,);
+diesel::table! {
+    character_quests (character_id, quest_id) {
+        character_id -> Int4,
+        quest_id -> Int2,
+        status -> Int2,
+        completed_at -> Nullable<Timestamp>,
+    }
+}
+diesel::joinable!(character_quests -> characters (character_id));
+diesel::allow_tables_to_appear_in_same_query!(
+    accounts,
+    buddies,
+    characters,
+    keybindings,
+    sessions,
+    character_quests,
+);

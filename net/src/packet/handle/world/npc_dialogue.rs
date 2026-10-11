@@ -19,6 +19,7 @@ impl PacketHandler for NpcTalkHandler {
         Ok(HandlerResult {
             actions: vec![HandlerAction::NpcInteraction(NpcInteraction::Start {
                 object_id,
+                request_id: 0,
             })],
         })
     }
@@ -34,10 +35,16 @@ impl PacketHandler for NpcTalkMoreHandler {
         reader.read_short()?;
         let message_type = reader.read_byte()?;
         let response = reader.read_byte()? as i8;
+        let selection = if message_type == 4 && response == 1 {
+            Some(reader.read_int()?)
+        } else {
+            None
+        };
         Ok(HandlerResult {
             actions: vec![HandlerAction::NpcInteraction(NpcInteraction::Respond {
                 message_type,
                 response,
+                selection,
             })],
         })
     }

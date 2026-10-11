@@ -80,11 +80,13 @@ namespace ms
 
 		Point<int16_t> notice_position = Point<int16_t>(0, 26);
 
-		if (tab == Buttons::TAB0)
+		bool empty = tab == Buttons::TAB0 ||
+			(tab == Buttons::TAB1 ? questlog.started_quests().empty() : questlog.completed_quests().empty());
+		if (empty && tab == Buttons::TAB0)
 			notice_sprites[tab].draw(position + notice_position + Point<int16_t>(9, 0), alpha);
-		else if (tab == Buttons::TAB1)
+		else if (empty && tab == Buttons::TAB1)
 			notice_sprites[tab].draw(position + notice_position + Point<int16_t>(0, 0), alpha);
-		else
+		else if (empty)
 			notice_sprites[tab].draw(position + notice_position + Point<int16_t>(-10, 0), alpha);
 
 		if (tab != Buttons::TAB2)
@@ -97,6 +99,18 @@ namespace ms
 		}
 
 		slider.draw(position + Point<int16_t>(126, 75));
+
+		int16_t row = 0;
+		auto draw_quest = [&](int16_t id)
+		{
+			std::string title = nl::nx::quest["QuestInfo.img"][std::to_string(id)]["name"];
+			Text(Text::Font::A12M, Text::Alignment::LEFT, Color::Name::DARKGREY, title, 250)
+				.draw(position + Point<int16_t>(18, 88 + row++ * 24));
+		};
+		if (tab == Buttons::TAB1)
+			for (const auto& entry : questlog.started_quests()) draw_quest(entry.first);
+		else if (tab == Buttons::TAB2)
+			for (const auto& entry : questlog.completed_quests()) draw_quest(entry.first);
 
 		UIElement::draw_buttons(alpha);
 	}

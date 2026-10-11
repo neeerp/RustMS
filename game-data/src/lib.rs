@@ -5,6 +5,7 @@ use std::collections::{BTreeMap, HashMap};
 use std::fs::File;
 use std::path::Path;
 use thiserror::Error;
+pub mod quests;
 
 const NODE_SIZE_BYTES: u64 = 20;
 pub const NO_DESTINATION_MAP: i32 = 999_999_999;

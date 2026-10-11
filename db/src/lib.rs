@@ -17,6 +17,7 @@ mod sql_types;
 pub mod account;
 pub mod character;
 pub mod keybinding;
+pub mod quest;
 pub mod session;
 
 pub use diesel::result::Error;

@@ -38,6 +38,10 @@ namespace ms
 		bool is_started(int16_t);
 
 		int16_t get_last_started();
+		void clear();
+		bool is_completed(int16_t id) const;
+		const std::map<int16_t, std::string>& started_quests() const;
+		const std::map<int16_t, int64_t>& completed_quests() const;
 
 	private:
 		std::map<int16_t, std::string> started;

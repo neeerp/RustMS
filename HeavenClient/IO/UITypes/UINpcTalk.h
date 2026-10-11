@@ -116,6 +116,8 @@ namespace ms
 		Slider slider;
 		TalkType type;
 		int8_t message_type;
+		std::vector<std::pair<int32_t, Text>> choices;
+		int16_t question_height;
 		std::string formatted_text;
 		size_t formatted_text_pos;
 		uint16_t timestep;
