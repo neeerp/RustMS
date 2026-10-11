@@ -14,6 +14,11 @@ async fn main() {
 
     info!("Starting Login Server...");
 
+    if let Err(e) = runtime::prepare_database().await {
+        tracing::error!(error = %e, "Failed to prepare database");
+        std::process::exit(1);
+    }
+
     let bind_addr =
         env::var("RUSTMS_LOGIN_BIND_ADDR").unwrap_or_else(|_| "0.0.0.0:8484".to_string());
     if let Err(e) = LoginServerActor::run(&bind_addr).await {

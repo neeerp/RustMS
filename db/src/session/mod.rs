@@ -2,7 +2,6 @@ use crate::{character, schema::sessions};
 
 extern crate ipnetwork;
 use character::CharacterWrapper;
-use diesel::QueryResult;
 use ipnetwork::IpNetwork;
 
 use std::{
@@ -49,7 +48,7 @@ pub struct NewSession<'a> {
 
 impl<'a> NewSession<'a> {
     /// Create and save a new session.
-    pub fn create(self) -> QueryResult<SessionWrapper> {
+    pub fn create(self) -> crate::Result<SessionWrapper> {
         SessionWrapper::from(repository::create_session(self)?)
     }
 }
@@ -73,7 +72,7 @@ impl SessionWrapper {
 
     /// Create a wrapper from an existing session, loading in the associated
     /// character if it exists.
-    pub fn from(session: Session) -> QueryResult<Self> {
+    pub fn from(session: Session) -> crate::Result<Self> {
         let c_id = session.character_id;
 
         let mut wrapper = Self {
@@ -90,7 +89,7 @@ impl SessionWrapper {
 
     /// Retrieve the character that the session is associated with, or a NotFound
     /// error if there is no character associated.
-    pub fn get_character(&mut self) -> QueryResult<Arc<Mutex<CharacterWrapper>>> {
+    pub fn get_character(&mut self) -> crate::Result<Arc<Mutex<CharacterWrapper>>> {
         self.session
             .as_ref()
             .and_then(|ses| ses.character_id)
@@ -100,11 +99,11 @@ impl SessionWrapper {
                     .map(|chr| chr.clone())
                     .or_else(|| self.load_character(c_id).ok())
             })
-            .ok_or(diesel::result::Error::NotFound)
+            .ok_or(crate::Error::NotFound)
     }
 
     /// Attach a character to the session wrapper and return an Arc.
-    fn load_character(&mut self, c_id: i32) -> QueryResult<Arc<Mutex<CharacterWrapper>>> {
+    fn load_character(&mut self, c_id: i32) -> crate::Result<Arc<Mutex<CharacterWrapper>>> {
         let chr = Arc::new(Mutex::new(CharacterWrapper::from_character_id(c_id)?));
 
         self.character = Some(chr.clone());

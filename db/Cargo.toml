@@ -7,7 +7,9 @@ edition = "2018"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-diesel = { version = "2.3.6", features = ["postgres", "network-address"] }
+diesel = { version = "2.3.6", features = ["postgres", "network-address", "r2d2"] }
+diesel_migrations = { version = "2.3", features = ["postgres"] }
+thiserror = "2"
 diesel-derive-enum = { version = "2.1.0", features = ["postgres"] }
 config = "0.10.1"
 serde_derive = "^1.0.8"

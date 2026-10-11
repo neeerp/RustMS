@@ -1,6 +1,5 @@
 use crate::{
     character::Character,
-    establish_connection,
     schema::{character_quests, characters},
 };
 use diesel::prelude::*;
@@ -15,11 +14,11 @@ pub struct QuestProgress {
     pub completed_at: Option<SystemTime>,
 }
 
-pub fn get_quests(cid: i32) -> QueryResult<Vec<QuestProgress>> {
-    character_quests::table
+pub fn get_quests(cid: i32) -> crate::Result<Vec<QuestProgress>> {
+    Ok(character_quests::table
         .filter(character_quests::character_id.eq(cid))
         .order(character_quests::quest_id)
-        .load(&mut establish_connection())
+        .load(&mut crate::connection()?)?)
 }
 
 /// Serialize quest transitions and rewards with the character row. Completion
@@ -31,9 +30,9 @@ pub fn transition(
     prerequisite: Option<i16>,
     max_start_level: Option<i16>,
     reward: Option<i32>,
-) -> QueryResult<(Character, QuestProgress)> {
-    let mut conn = establish_connection();
-    conn.transaction(|conn| {
+) -> crate::Result<(Character, QuestProgress)> {
+    let mut conn = crate::connection()?;
+    conn.transaction(|conn| -> diesel::QueryResult<_> {
         let mut character: Character = characters::table.find(cid).for_update().first(conn)?;
         if character.job != job {
             return Err(diesel::result::Error::NotFound);
@@ -107,4 +106,5 @@ pub fn transition(
             Ok((character, progress))
         }
     })
+    .map_err(Into::into)
 }

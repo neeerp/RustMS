@@ -37,18 +37,6 @@ diesel::table! {
 diesel::table! {
     use crate::sql_types::*;
 
-    buddies (id) {
-        id -> Int4,
-        character_id -> Int4,
-        buddy_id -> Int4,
-        buddy_group -> Varchar,
-        pending -> Bool,
-    }
-}
-
-diesel::table! {
-    use crate::sql_types::*;
-
     characters (id) {
         id -> Int4,
         accountid -> Int4,
@@ -127,7 +115,6 @@ diesel::table! {
 diesel::joinable!(character_quests -> characters (character_id));
 diesel::allow_tables_to_appear_in_same_query!(
     accounts,
-    buddies,
     characters,
     keybindings,
     sessions,

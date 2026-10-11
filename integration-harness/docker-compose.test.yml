@@ -14,23 +14,6 @@ services:
       timeout: 5s
       retries: 30
 
-  migrate:
-    image: postgres:16
-    stop_grace_period: 100ms
-    depends_on:
-      db:
-        condition: service_healthy
-    volumes:
-      - ../db/migrations:/migrations:ro
-    environment:
-      PGPASSWORD: pass
-    entrypoint: ["sh", "-ec"]
-    command:
-      - |
-        for migration in /migrations/*/up.sql; do
-          psql -h db -U maplestory -d maplestory_test -v ON_ERROR_STOP=1 -f "$$migration"
-        done
-
   login:
     image: ${HARNESS_IMAGE:-rustms-server:integration}
     stop_grace_period: 100ms
@@ -38,8 +21,8 @@ services:
       context: ..
       dockerfile: Dockerfile.rustms-server
     depends_on:
-      migrate:
-        condition: service_completed_successfully
+      db:
+        condition: service_healthy
     environment:
       RUSTMS_DATABASE_URL: postgres://maplestory:pass@db:5432/maplestory_test
       RUSTMS_LOGIN_BIND_ADDR: 0.0.0.0:8484
@@ -52,8 +35,8 @@ services:
     image: ${HARNESS_IMAGE:-rustms-server:integration}
     stop_grace_period: 100ms
     depends_on:
-      migrate:
-        condition: service_completed_successfully
+      db:
+        condition: service_healthy
     environment:
       RUSTMS_DATABASE_URL: postgres://maplestory:pass@db:5432/maplestory_test
       RUSTMS_WORLD_BIND_ADDR: 0.0.0.0:8485
