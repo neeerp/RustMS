@@ -10,6 +10,13 @@ if(HEAVENCLIENT_BUILD_TESTS)
     add_test(NAME quest_markers COMMAND quest_marker_tests)
     add_executable(input_focus_tests tests/input_focus.cpp)
     add_test(NAME input_focus COMMAND input_focus_tests)
+    add_executable(movement_physics_tests tests/movement_physics.cpp
+        Gameplay/Physics/Physics.cpp Gameplay/Physics/Foothold.cpp Gameplay/Physics/FootholdTree.cpp)
+    target_include_directories(movement_physics_tests PRIVATE ${PROJECT_SOURCE_DIR}/libs/NoLifeNx)
+    target_link_libraries(movement_physics_tests PRIVATE
+        ${PROJECT_SOURCE_DIR}/libs/NoLifeNx/nlnx/build/libNoLifeNx.a
+        ${PROJECT_SOURCE_DIR}/libs/lz4/lib/liblz4.a)
+    add_test(NAME movement_physics COMMAND movement_physics_tests)
 endif()
 
 include_directories(.)

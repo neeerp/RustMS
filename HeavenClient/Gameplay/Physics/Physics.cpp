@@ -99,6 +99,9 @@ namespace ms
 
 		phobj.hspeed += phobj.hacc;
 		phobj.vspeed += phobj.vacc;
+		// Publish takeoff immediately so the controller enters its airborne
+		// state on this tick rather than treating the jump as another walk tick.
+		if (phobj.vspeed < 0.0) phobj.onground = false;
 	}
 
 	void Physics::move_flying(PhysicsObject &phobj) const

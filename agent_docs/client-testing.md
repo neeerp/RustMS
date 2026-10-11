@@ -6,12 +6,18 @@ From the repository root:
 
 ```sh
 cmake -S HeavenClient -B HeavenClient/cmake-build -DHEAVENCLIENT_BUILD_TESTS=ON
-cmake --build HeavenClient/cmake-build --target quest_marker_tests -j4
+cmake --build HeavenClient/cmake-build --target quest_marker_tests input_focus_tests movement_physics_tests -j4
 ctest --test-dir HeavenClient/cmake-build --output-on-failure
 ```
 
 These tests need no display, OpenGL, database, or NX assets. The CMake test option
 defaults to OFF, so ordinary client builds keep their existing behavior.
+
+The checks cover quest marker selection, keyboard routing when a focused panel
+closes, and jump momentum/contact transitions in both directions. The physics
+test creates a tiny temporary NX foothold fixture and uses the production
+collision code. It also checks that releasing an arrow in midair preserves
+speed and that takeoff and landing update the grounded flag immediately.
 
 ## GUI checks without taking desktop focus
 

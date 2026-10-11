@@ -140,6 +140,10 @@ namespace ms
 			if (collision)
 			{
 				phobj.limity(ground.second());
+				// The object has landed. Keeping the old airborne flag until the
+				// next tick drops landing-time jump input and adds a friction-only
+				// tick before the walking controller resumes.
+				phobj.onground = true;
 
 				limit_movement(phobj);
 			} else
