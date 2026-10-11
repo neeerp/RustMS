@@ -6,7 +6,7 @@ From the repository root:
 
 ```sh
 cmake -S HeavenClient -B HeavenClient/cmake-build -DHEAVENCLIENT_BUILD_TESTS=ON
-cmake --build HeavenClient/cmake-build --target quest_marker_tests input_focus_tests movement_physics_tests -j4
+cmake --build HeavenClient/cmake-build --target quest_marker_tests input_focus_tests movement_physics_tests frame_assembler_tests -j4
 ctest --test-dir HeavenClient/cmake-build --output-on-failure
 ```
 
@@ -18,6 +18,12 @@ closes, and jump momentum/contact transitions in both directions. The physics
 test creates a tiny temporary NX foothold fixture and uses the production
 collision code. It also checks that releasing an arrow in midair preserves
 speed and that takeoff and landing update the grounded flag immediately.
+
+`frame_assembler_tests` covers the network receive loop (`Net/FrameAssembler.h`,
+used by `Session`): every split point of a multi-frame stream, a partial
+trailing frame, stopping after a reconnect, and impossible lengths. It encrypts
+frames with a real `Cryptography` pair, so a dropped or repeated frame shows up
+as misdecrypted data.
 
 ## GUI checks without taking desktop focus
 

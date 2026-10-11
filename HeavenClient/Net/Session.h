@@ -22,6 +22,7 @@
 #include <cstdint>
 
 #include "Cryptography.h"
+#include "FrameAssembler.h"
 #include "PacketSwitch.h"
 
 #include "../Error.h"
@@ -59,18 +60,12 @@ namespace ms
 	private:
 		bool init(const char* host, const char* port);
 		void process(const int8_t* bytes, size_t available);
-		void reset_receive_state();
 
 		Cryptography cryptography;
 		PacketSwitch packetswitch;
 
-		// Accumulates the packet header, which may arrive split across several reads
-		int8_t header[HEADER_LENGTH];
-		size_t headerpos;
-		// Accumulates the packet body (without header)
-		int8_t buffer[MAX_PACKET_LENGTH];
-		size_t length;
-		size_t pos;
+		// Reassembles frames that arrive split across reads
+		FrameAssembler assembler;
 		bool connected;
 		// Set when a new connection was opened, so process() can stop using stale input
 		bool reconnected;

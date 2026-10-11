@@ -27,7 +27,6 @@ namespace ms
 	{
 		connected = false;
 		reconnected = false;
-		reset_receive_state();
 	}
 
 	Session::~Session()
@@ -42,7 +41,7 @@ namespace ms
 		connected = socket.open(host, port);
 
 		// Any partially received packet belonged to the previous connection
-		reset_receive_state();
+		assembler.reset();
 		reconnected = true;
 
 		if (connected)
@@ -76,92 +75,36 @@ namespace ms
 			connected = false;
 	}
 
-	void Session::reset_receive_state()
-	{
-		headerpos = 0;
-		length = 0;
-		pos = 0;
-	}
-
 	void Session::process(const int8_t* bytes, size_t available)
 	{
-		// TCP is a byte stream: a read may end in the middle of a header, in the middle of a body,
-		// or contain several packets. Consume everything that was received and keep any partial
-		// state (header bytes or body bytes) until the next read.
-		while (available > 0)
+		auto decode_length = [&](const int8_t* header) { return cryptography.check_length(header); };
+
+		auto on_frame = [&](int8_t* body, size_t length)
 		{
-			if (headerpos < HEADER_LENGTH)
-			{
-				// Still collecting the header. It may be split across reads, so accumulate it.
-				size_t tocopy = HEADER_LENGTH - headerpos;
-
-				if (tocopy > available)
-					tocopy = available;
-
-				memcpy(header + headerpos, bytes, tocopy);
-				headerpos += tocopy;
-				bytes += tocopy;
-				available -= tocopy;
-
-				if (headerpos < HEADER_LENGTH)
-					return;
-
-				// The header is complete, so the body length is known.
-				length = cryptography.check_length(header);
-				pos = 0;
-
-				if (length > MAX_PACKET_LENGTH)
-				{
-					// The stream is corrupt and cannot be resynchronized. Drop the connection.
-					std::cout << "Invalid packet length: " << length << std::endl;
-
-					reset_receive_state();
-					connected = false;
-					return;
-				}
-			}
-
-			if (pos < length)
-			{
-				// Determine how much we can write. Write data into the buffer.
-				size_t towrite = length - pos;
-
-				if (towrite > available)
-					towrite = available;
-
-				memcpy(buffer + pos, bytes, towrite);
-				pos += towrite;
-				bytes += towrite;
-				available -= towrite;
-			}
-
-			// Check if the current packet has been fully received. A packet with an empty body is
-			// already complete once its header is read.
-			if (pos < length)
-				return;
-
-			size_t packetlength = length;
-
-			// Reset before dispatching so that a handler can never observe or corrupt receive state.
-			reset_receive_state();
-
-			cryptography.decrypt(buffer, packetlength);
+			cryptography.decrypt(body, length);
 
 			reconnected = false;
 
 			try
 			{
-				packetswitch.forward(buffer, packetlength);
+				packetswitch.forward(body, length);
 			}
 			catch (const PacketError& err)
 			{
 				std::cout << err.what() << std::endl;
 			}
 
-			// A handler may have switched to a new connection (for example on a server redirect).
-			// The remaining bytes belong to the old connection and the socket buffer was overwritten.
-			if (reconnected)
-				return;
+			// A handler may have switched to a new connection (for example on a server
+			// redirect). The remaining bytes belong to the old connection and the socket
+			// buffer was overwritten, so stop.
+			return !reconnected;
+		};
+
+		if (assembler.feed(bytes, available, decode_length, on_frame) == FrameAssembler::Result::InvalidLength)
+		{
+			// The stream is corrupt and cannot be resynchronized. Drop the connection.
+			std::cout << "Invalid packet length" << std::endl;
+			connected = false;
 		}
 	}
 
