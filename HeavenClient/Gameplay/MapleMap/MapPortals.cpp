@@ -122,7 +122,9 @@ namespace ms
 			{
 				const Portal &portal = iter.second;
 
-				if (portal.bounds().contains(playerpos))
+				// Spawn points and tutorial triggers can overlap a real exit.
+				// They have no travel destination and must not mask that exit.
+				if (portal.getwarpinfo().valid && portal.bounds().contains(playerpos))
 					return portal.getwarpinfo();
 			}
 		}

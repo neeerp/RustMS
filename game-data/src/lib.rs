@@ -146,9 +146,9 @@ impl FieldTemplate {
 
     pub fn resolve_spawn_portal(&self, preferred_name: &str) -> Option<&PortalTemplate> {
         if !preferred_name.trim().is_empty() {
-            if let Some(portal) = self.portal_by_name(preferred_name) {
-                return Some(portal);
-            }
+            // A named link is an exact connection, not a hint. Falling back
+            // hides broken/stale asset links and lands players elsewhere.
+            return self.portal_by_name(preferred_name);
         }
 
         if let Some(start) = self
@@ -566,7 +566,7 @@ mod tests {
     }
 
     #[test]
-    fn resolve_spawn_portal_prefers_name_then_startpoint() {
+    fn resolve_spawn_portal_requires_named_links_and_defaults_only_when_unnamed() {
         let field = FieldTemplate {
             map_id: 1,
             return_map: None,
@@ -610,13 +610,8 @@ mod tests {
             field.resolve_spawn_portal("in01").expect("named portal").id,
             5
         );
-        assert_eq!(
-            field
-                .resolve_spawn_portal("missing")
-                .expect("fallback startpoint")
-                .id,
-            0
-        );
+        assert!(field.resolve_spawn_portal("missing").is_none());
+        assert_eq!(field.resolve_spawn_portal("").unwrap().id, 0);
     }
 
     #[test]

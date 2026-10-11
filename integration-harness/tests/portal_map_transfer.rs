@@ -68,6 +68,65 @@ async fn portal_map_transfer_round_trip() {
     );
 }
 
+#[tokio::test]
+async fn beginner_route_and_ninas_house_follow_asset_links() {
+    let config = load_harness_config_or_fail().await;
+    let mut session = login_to_world_session(&config).await.unwrap();
+    let maps = game_data::GameData::load_from_nx_map(
+        std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../assets/game-data/Map.nx"),
+    )
+    .unwrap();
+    session
+        .connection
+        .send_packet(build_change_map(10_000, "").unwrap(), "beginner route")
+        .await
+        .unwrap();
+    assert_eq!(
+        read_next_set_field_warp(&mut session.connection, "beginner route")
+            .await
+            .map_id,
+        10_000
+    );
+    let mut source = 10_000;
+    // Tutorial exits are intentionally one-way. The legacy side maps in the
+    // archive are not a reason to invent reverse links or insert extra maps.
+    for (name, destination) in [
+        ("out00", 20_000),
+        ("out00", 30_000),
+        ("in01", 30_001),
+        ("out00", 30_000),
+        ("out00", 40_000),
+        ("out00", 50_000),
+        ("east00", 1_000_000),
+        ("east00", 1_010_000),
+        ("east00", 1_020_000),
+        ("east00", 2_000_000),
+        ("west00", 1_020_000),
+        ("west00", 1_010_000),
+        ("west00", 1_000_000),
+        ("west00", 50_000),
+    ] {
+        let link = maps.field(source).unwrap().portal_by_name(name).unwrap();
+        assert_eq!(link.to_map, Some(destination));
+        let arrival = maps
+            .field(destination)
+            .unwrap()
+            .portal_by_name(&link.to_name)
+            .unwrap();
+        session
+            .connection
+            .send_packet(build_change_map(-1, name).unwrap(), "beginner route portal")
+            .await
+            .unwrap();
+        let warp = read_next_set_field_warp(&mut session.connection, "beginner route portal").await;
+        assert_eq!(
+            (warp.map_id, u32::from(warp.spawn_point)),
+            (destination, arrival.id)
+        );
+        source = destination;
+    }
+}
+
 async fn read_next_set_field_warp(
     connection: &mut MapleTestConnection,
     phase: &'static str,
@@ -85,6 +144,11 @@ async fn read_next_set_field_warp(
             }
             x if x == SendOpcode::StatChange as i16 => continue,
             x if x == SendOpcode::SpawnNpc as i16 => continue,
+            x if x == SendOpcode::SpawnPlayer as i16
+                || x == SendOpcode::RemovePlayerFromMap as i16 =>
+            {
+                continue
+            }
             opcode => {
                 panic!(
                     "unexpected opcode {} ({}) during map transfer",
