@@ -83,9 +83,15 @@ the world server deletes `in_game` sessions for the channels it hosts.
 
 Clients `await` their sends to fields and the directory, which bounds work
 per client. Fields and the directory **never await a client**: they use
-`ClientHandle::send`, a `try_send` that disconnects a client whose
-256-message queue is full. No actor can therefore wait on another actor that
-is waiting on it, and one stalled socket cannot stall a map.
+`ClientHandle::send`, a `try_send` that kicks a client whose 256-message queue
+is full. No actor can therefore wait on another actor that is waiting on it,
+and one stalled socket cannot stall a map.
+
+A kicked client actor may itself be blocked writing to a peer that stopped
+reading. Every socket write races the kick (`ClientActor::send`) and is
+bounded by `io::write::WRITE_TIMEOUT` (10 s), so the actor always reaches its
+cleanup: it leaves its field, unregisters, saves the player, and closes the
+session.
 
 ### Persistence
 

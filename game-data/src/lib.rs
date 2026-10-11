@@ -553,18 +553,25 @@ pub(crate) mod test_assets {
     use std::path::{Path, PathBuf};
 
     /// Path to `assets/game-data/<name>`, or `None` (with a note) when the
-    /// file is absent so asset-backed tests skip instead of failing on a
-    /// fresh clone. See assets/game-data/README.md.
+    /// file is absent, so asset-backed tests skip instead of failing on a
+    /// fresh clone. With `RUSTMS_REQUIRE_ASSETS=1` a missing file fails the
+    /// test instead, so an asset run cannot pass vacuously. See
+    /// assets/game-data/README.md.
     pub fn path(name: &str) -> Option<PathBuf> {
         let path = Path::new(env!("CARGO_MANIFEST_DIR"))
             .join("../assets/game-data")
             .join(name);
         if path.exists() {
-            Some(path)
-        } else {
-            eprintln!("skipping: {} is not present", path.display());
-            None
+            return Some(path);
         }
+        if std::env::var("RUSTMS_REQUIRE_ASSETS").is_ok_and(|value| value == "1") {
+            panic!(
+                "RUSTMS_REQUIRE_ASSETS=1 but {} is not present",
+                path.display()
+            );
+        }
+        eprintln!("skipping: {} is not present", path.display());
+        None
     }
 }
 

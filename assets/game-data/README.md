@@ -23,5 +23,13 @@ tools/verify-assets.sh
 ```
 
 The world server loads all of them at startup and refuses to start if any is
-missing or unreadable. Unit tests that need them skip themselves (with a note
-on stderr) when they are absent.
+missing or unreadable.
+
+Unit tests that need these files skip themselves (with a note on stderr) when
+they are absent, so `cargo test` passes on a fresh clone. That also means a
+run without the files does not exercise them. When the files are present, run
+the asset lane strictly so a missing file fails instead of being skipped:
+
+```sh
+RUSTMS_REQUIRE_ASSETS=1 cargo test -p game-data
+```
