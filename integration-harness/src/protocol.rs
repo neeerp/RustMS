@@ -10,7 +10,7 @@ use crate::packets::{
     build_accept_tos, build_char_list_request, build_char_select, build_check_char_name,
     build_create_char, build_login_credentials, build_login_started, build_player_logged_in,
     build_server_list_request, build_set_gender, decode_char_list, decode_char_name_response,
-    decode_last_connected_world, decode_login_status, decode_new_character,
+    decode_keymap, decode_last_connected_world, decode_login_status, decode_new_character,
     decode_recommended_worlds, decode_server_redirect, decode_set_field, opcode_name,
     CharacterSummary, CharacterTemplate, LoginStatusPacket, ServerListPacket,
 };
@@ -41,6 +41,8 @@ pub struct WorldSession {
     pub quests: std::collections::BTreeMap<i16, u8>,
     /// Equipped item ids by equipped slot, from the world-entry SET_FIELD.
     pub equipped: std::collections::BTreeMap<i16, i32>,
+    /// `(kind, action)` for each of the 90 keys, from the world-entry KEYMAP.
+    pub keymap: Vec<(u8, i32)>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -87,14 +89,16 @@ pub async fn login_to_world_session(config: &HarnessConfig) -> Result<WorldSessi
         )
         .await?;
 
-    let mut saw_keymap = false;
+    let mut keymap = None;
     let mut world_entry = None;
 
     for _ in 0..8 {
         let envelope = read_packet(&mut world_conn, "world entry").await?;
         match envelope.opcode() {
             x if x == SendOpcode::KeyMap as i16 => {
-                saw_keymap = true;
+                keymap = Some(decode_keymap(&envelope.packet).map_err(|message| {
+                    HarnessError::protocol("world entry", world_conn.endpoint(), message)
+                })?);
             }
             x if x == SendOpcode::SetField as i16 => {
                 let set_field = decode_set_field(&envelope.packet).map_err(|message| {
@@ -135,7 +139,7 @@ pub async fn login_to_world_session(config: &HarnessConfig) -> Result<WorldSessi
             }
         }
 
-        if saw_keymap && world_entry.is_some() {
+        if keymap.is_some() && world_entry.is_some() {
             break;
         }
     }
@@ -148,13 +152,13 @@ pub async fn login_to_world_session(config: &HarnessConfig) -> Result<WorldSessi
         )
     })?;
 
-    if !saw_keymap {
+    let Some(keymap) = keymap else {
         return Err(HarnessError::protocol(
             "world entry",
             world_conn.endpoint(),
             "did not receive KeyMap during world entry".to_string(),
         ));
-    }
+    };
 
     drain_spawn_npcs(&mut world_conn).await;
 
@@ -166,6 +170,7 @@ pub async fn login_to_world_session(config: &HarnessConfig) -> Result<WorldSessi
         ap: world_entry.ap,
         quests: world_entry.quests,
         equipped: world_entry.equipped,
+        keymap,
         character_name: world_entry.character_name,
         map_id: world_entry.map_id,
         login_addr: config.login_addr.to_string(),

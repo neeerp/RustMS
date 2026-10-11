@@ -327,7 +327,7 @@ impl ClientActor {
             .map_err(|e| RuntimeError::Handler(format!("Unknown channel: {e}")))?;
         let session_id = self.session_id.ok_or(RuntimeError::NotLoggedIn)?;
 
-        self.save().await?;
+        self.flush().await?;
         spawn_db(move || db::session::begin_channel_transition(session_id, i16::from(channel_id)))
             .await?;
         self.changing_channel = true;
@@ -398,11 +398,17 @@ impl ClientActor {
         self.game.as_mut().ok_or(RuntimeError::NotLoggedIn)
     }
 
-    /// Persist the player now.
-    async fn save(&mut self) -> Result<(), RuntimeError> {
+    /// Persist the player if it has unsaved changes. Every mutation marks
+    /// the player dirty, so a clean player already matches the database;
+    /// skipping it also avoids racing the next channel's load after a
+    /// channel change.
+    pub(super) async fn flush(&mut self) -> Result<(), RuntimeError> {
         let Some(game) = self.game.as_mut() else {
             return Ok(());
         };
+        if !game.player.is_dirty() {
+            return Ok(());
+        }
         let snapshot = game.player.clone();
         spawn_db(move || db::player::save_player(&snapshot)).await?;
         game.player.mark_saved();
@@ -410,11 +416,9 @@ impl ClientActor {
     }
 
     async fn save_if_dirty(&mut self) -> Result<(), RuntimeError> {
-        if self.game.as_ref().is_some_and(|game| game.player.is_dirty()) {
-            if let Err(error) = self.save().await {
-                // Keep playing; the next autosave or logout retries.
-                error!(self.client_id, %error, "Autosave failed");
-            }
+        if let Err(error) = self.flush().await {
+            // Keep playing; the next autosave or logout retries.
+            error!(self.client_id, %error, "Autosave failed");
         }
         Ok(())
     }
@@ -432,7 +436,7 @@ impl ClientActor {
                     connection_id: self.connection_id,
                 })
                 .await;
-            if let Err(error) = self.save().await {
+            if let Err(error) = self.flush().await {
                 error!(self.client_id, %error, "Failed to save player on disconnect");
             }
         }

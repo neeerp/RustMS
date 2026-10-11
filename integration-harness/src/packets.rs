@@ -668,6 +668,39 @@ pub fn decode_set_field(packet: &Packet) -> Result<SetFieldPacket, String> {
     })
 }
 
+/// KEYMAP: `(kind, action)` for each of the 90 keys.
+pub fn decode_keymap(packet: &Packet) -> Result<Vec<(u8, i32)>, String> {
+    expect_opcode(packet, SendOpcode::KeyMap as i16)?;
+    let mut cursor = Cursor::new(&packet.bytes[..]);
+    skip(&mut cursor, 2 + 1)?;
+    (0..90)
+        .map(|key| {
+            let kind = cursor
+                .read_byte()
+                .map_err(|e| format!("failed to read key {key} kind: {e}"))?;
+            let action = cursor
+                .read_int()
+                .map_err(|e| format!("failed to read key {key} action: {e}"))?;
+            Ok((kind, action))
+        })
+        .collect()
+}
+
+/// CHANGE_KEYMAP mode 0 with `(key, kind, action)` bindings.
+pub fn build_change_keymap(bindings: &[(i32, u8, i32)]) -> Result<Packet, String> {
+    let mut packet = packet_with_opcode(RecvOpcode::ChangeKeybinds as i16);
+    packet.write_int(0).map_err(|e| e.to_string())?;
+    packet
+        .write_int(bindings.len() as i32)
+        .map_err(|e| e.to_string())?;
+    for &(key, kind, action) in bindings {
+        packet.write_int(key).map_err(|e| e.to_string())?;
+        packet.write_byte(kind).map_err(|e| e.to_string())?;
+        packet.write_int(action).map_err(|e| e.to_string())?;
+    }
+    Ok(packet)
+}
+
 pub fn decode_set_field_warp(packet: &Packet) -> Result<SetFieldWarpPacket, String> {
     expect_opcode(packet, SendOpcode::SetField as i16)?;
     let mut cursor = Cursor::new(&packet.bytes[..]);

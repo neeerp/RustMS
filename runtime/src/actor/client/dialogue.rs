@@ -197,7 +197,7 @@ impl ClientActor {
     ) -> Result<(), RuntimeError> {
         // The transition locks and updates the character row, so flush any
         // unsaved in-memory changes first; then adopt what it committed.
-        self.save().await?;
+        self.flush().await?;
         let cid = self.client_id;
         let (character, progress) =
             spawn_db(move || db::quest::transition(cid, id, job, prerequisite, max_level, reward))
