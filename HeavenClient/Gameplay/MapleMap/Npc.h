@@ -59,6 +59,7 @@ namespace ms
 
 		// Returns the NPC's function description or title.
 		std::string get_func();
+		int32_t get_npcid() const { return npcid; }
 
 	private:
 		Point<int16_t> quest_marker_offset() const;

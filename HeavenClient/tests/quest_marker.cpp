@@ -61,6 +61,12 @@ int main()
 		};
 		require(contact_marker(2102) == QuestMarker::AVAILABLE, "Nina must offer the existing quest");
 		require(contact_marker(2102, 11) == QuestMarker::NONE, "offer must honor maximum start level");
+		auto status = [&](int16_t id) { return states[id]; };
+		require(ms::quest_available(contact[0], 0, 1, status), "quest list must show eligible visits");
+		require(!ms::quest_available(contact[0], 0, 11, status), "level filter must hide unavailable visits");
+		require(ms::quest_available(contact[0], 0, 11, status, true), "all-levels view may show out-of-range visits");
+		require(!ms::quest_available(contact[0], 100, 1, status, true), "all-levels view must still honor job requirements");
+		require(!ms::quest_available(contact[1], 0, 1, status, true), "quest list must not bypass prerequisites");
 		require(contact_marker(2001) == QuestMarker::NONE, "Sen must wait for acceptance");
 		states[1032] = 1;
 		require(contact_marker(2102) == QuestMarker::IN_PROGRESS, "source NPC must show an open book while waiting");

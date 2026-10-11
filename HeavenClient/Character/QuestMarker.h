@@ -21,6 +21,17 @@ namespace ms
 		int16_t max_start_level = 32767;
 	};
 
+	template<class Status>
+	bool quest_available(const QuestMarkerRule& rule, int16_t job, int16_t level,
+		Status status, bool all_levels = false)
+	{
+		return status(rule.quest_id) == 0 &&
+			(rule.jobs.empty() || std::find(rule.jobs.begin(), rule.jobs.end(), job) != rule.jobs.end()) &&
+			(all_levels || level <= rule.max_start_level) &&
+			std::all_of(rule.prerequisites.begin(), rule.prerequisites.end(),
+				[&](const auto& requirement) { return status(requirement.first) == requirement.second; });
+	}
+
 	// Keep selection independent of graphics/assets so chain transitions and
 	// marker priority can be tested without launching the client.
 	template<class Status>

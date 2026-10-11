@@ -47,7 +47,18 @@ namespace ms
 	const std::map<int16_t, int64_t>& QuestLog::completed_quests() const { return completed; }
 	uint64_t QuestLog::revision() const { return marker_revision; }
 
-	QuestMarker QuestLog::npc_marker(int32_t npc_id, int16_t job, int16_t level) const
+	int16_t QuestLog::state(int16_t id) const { return completed.count(id) ? 2 : started.count(id) ? 1 : 0; }
+
+	std::vector<int16_t> QuestLog::available_quests(int16_t job, int16_t level, bool all_levels) const
+	{
+		std::vector<int16_t> result;
+		for (const auto& rule : supported_rules())
+			if (quest_available(rule, job, level, [&](int16_t id) { return state(id); }, all_levels))
+				result.push_back(rule.quest_id);
+		return result;
+	}
+
+	const std::vector<QuestMarkerRule>& QuestLog::supported_rules()
 	{
 		static const auto rules = []()
 		{
@@ -76,10 +87,12 @@ namespace ms
 			}
 			return result;
 		}();
-		return select_quest_marker(npc_id, job, rules, [&](int16_t id)
-		{
-			return completed.count(id) ? 2 : started.count(id) ? 1 : 0;
-		}, level);
+		return rules;
+	}
+
+	QuestMarker QuestLog::npc_marker(int32_t npc_id, int16_t job, int16_t level) const
+	{
+		return select_quest_marker(npc_id, job, supported_rules(), [&](int16_t id) { return state(id); }, level);
 	}
 
 	bool QuestLog::is_started(int16_t qid)

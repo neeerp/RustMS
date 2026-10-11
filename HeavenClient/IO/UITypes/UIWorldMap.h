@@ -36,6 +36,7 @@ namespace ms
 		static constexpr bool TOGGLED = true;
 
 		UIWorldMap();
+		void show_location(int32_t target_map);
 
 		void draw(float inter) const override;
 
@@ -96,6 +97,7 @@ namespace ms
 		bool show_path_img;
 
 		int32_t mapid = -1;
+		int32_t target_map = -1;
 
 		std::string parent_map;
 		std::string user_map;

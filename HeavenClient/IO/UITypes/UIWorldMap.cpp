@@ -25,6 +25,7 @@
 #include "../IO/Components/MapleButton.h"
 
 #include <nlnx/nx.hpp>
+#include <algorithm>
 
 namespace ms
 {
@@ -143,7 +144,11 @@ namespace ms
 			path_img.draw(position + base_position);
 
 		for (auto spot : map_spots)
+		{
 			spot.second.marker.draw(spot.first + position + base_position);
+			if (std::find(spot.second.map_ids.begin(), spot.second.map_ids.end(), target_map) != spot.second.map_ids.end())
+				npc_pos[std::min<uint8_t>(spot.second.type, MAPSPOT_TYPE_MAX - 1)].draw(spot.first + position + base_position, alpha);
+		}
 
 		bool found = false;
 
@@ -168,6 +173,16 @@ namespace ms
 		}
 
 		UIElement::draw_buttons(alpha);
+	}
+
+	void UIWorldMap::show_location(int32_t target)
+	{
+		makeactive();
+		mapid = Stage::get().get_mapid();
+		target_map = target;
+		user_map = world_for_map(mapid);
+		set_search(false);
+		update_world(world_for_map(target));
 	}
 
 	void UIWorldMap::update()
