@@ -70,7 +70,7 @@ namespace ms
 		if (cashshop)
 			cashshop->exit_cashshop();
 		else
-			PlayerLoginPacket(character_id, Configuration::get().get_channelid()).dispatch();
+			PlayerLoginPacket(character_id).dispatch();
 	}
 
 	void ChangeStatsHandler::handle(InPacket& recv) const

@@ -26,8 +26,8 @@ namespace ms
 	Session::Session()
 	{
 		connected = false;
-		length = 0;
-		pos = 0;
+		reconnected = false;
+		reset_receive_state();
 	}
 
 	Session::~Session()
@@ -40,6 +40,10 @@ namespace ms
 	{
 		// Connect to the server
 		connected = socket.open(host, port);
+
+		// Any partially received packet belonged to the previous connection
+		reset_receive_state();
+		reconnected = true;
 
 		if (connected)
 		{
@@ -72,51 +76,92 @@ namespace ms
 			connected = false;
 	}
 
+	void Session::reset_receive_state()
+	{
+		headerpos = 0;
+		length = 0;
+		pos = 0;
+	}
+
 	void Session::process(const int8_t* bytes, size_t available)
 	{
-		if (pos == 0)
+		// TCP is a byte stream: a read may end in the middle of a header, in the middle of a body,
+		// or contain several packets. Consume everything that was received and keep any partial
+		// state (header bytes or body bytes) until the next read.
+		while (available > 0)
 		{
-			// Position is zero, meaning this is the start of a new packet. Start by determining length.
-			length = cryptography.check_length(bytes);
-			// Reading the length means we processed the header. Move forward by the header length.
-			bytes = bytes + HEADER_LENGTH;
-			available -= HEADER_LENGTH;
-		}
+			if (headerpos < HEADER_LENGTH)
+			{
+				// Still collecting the header. It may be split across reads, so accumulate it.
+				size_t tocopy = HEADER_LENGTH - headerpos;
 
-		// Determine how much we can write. Write data into the buffer.
-		size_t towrite = length - pos;
+				if (tocopy > available)
+					tocopy = available;
 
-		if (towrite > available)
-			towrite = available;
+				memcpy(header + headerpos, bytes, tocopy);
+				headerpos += tocopy;
+				bytes += tocopy;
+				available -= tocopy;
 
-		memcpy(buffer + pos, bytes, towrite);
-		pos += towrite;
+				if (headerpos < HEADER_LENGTH)
+					return;
 
-		// Check if the current packet has been fully processed
-		if (pos >= length)
-		{
-			cryptography.decrypt(buffer, length);
+				// The header is complete, so the body length is known.
+				length = cryptography.check_length(header);
+				pos = 0;
+
+				if (length > MAX_PACKET_LENGTH)
+				{
+					// The stream is corrupt and cannot be resynchronized. Drop the connection.
+					std::cout << "Invalid packet length: " << length << std::endl;
+
+					reset_receive_state();
+					connected = false;
+					return;
+				}
+			}
+
+			if (pos < length)
+			{
+				// Determine how much we can write. Write data into the buffer.
+				size_t towrite = length - pos;
+
+				if (towrite > available)
+					towrite = available;
+
+				memcpy(buffer + pos, bytes, towrite);
+				pos += towrite;
+				bytes += towrite;
+				available -= towrite;
+			}
+
+			// Check if the current packet has been fully received. A packet with an empty body is
+			// already complete once its header is read.
+			if (pos < length)
+				return;
+
+			size_t packetlength = length;
+
+			// Reset before dispatching so that a handler can never observe or corrupt receive state.
+			reset_receive_state();
+
+			cryptography.decrypt(buffer, packetlength);
+
+			reconnected = false;
 
 			try
 			{
-				packetswitch.forward(buffer, length);
+				packetswitch.forward(buffer, packetlength);
 			}
 			catch (const PacketError& err)
 			{
 				std::cout << err.what() << std::endl;
 			}
 
-			pos = 0;
-			length = 0;
-
-			// Check if there is more available
-			size_t remaining = available - towrite;
-
-			if (remaining >= MIN_PACKET_LENGTH)
-			{
-				// More packets are available, so we start over.
-				process(bytes + towrite, remaining);
-			}
+			// A handler may have switched to a new connection (for example on a server redirect).
+			// The remaining bytes belong to the old connection and the socket buffer was overwritten.
+			if (reconnected)
+				return;
 		}
 	}
 
@@ -140,10 +185,11 @@ namespace ms
 
 	void Session::read()
 	{
-		// Check if a packet has arrived. Handle if data is sufficient: 4 bytes (header) + 2 bytes (opcode) = 6 bytes.
+		// Check if data has arrived. It does not have to be a whole packet: partial headers and
+		// bodies are buffered by process() until the rest arrives.
 		size_t result = socket.receive(&connected);
 
-		if (result >= MIN_PACKET_LENGTH || length > 0)
+		if (result > 0)
 		{
 			// Retrieve buffer from the socket and process it
 			const int8_t* bytes = socket.get_buffer();

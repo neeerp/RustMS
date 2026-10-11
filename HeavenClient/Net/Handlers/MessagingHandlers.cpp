@@ -28,8 +28,12 @@ namespace ms
 {
 	namespace
 	{
-		constexpr int8_t WHISPER_RECEIVE_MODE = 0x0A;
-		constexpr int8_t WHISPER_RESULT_MODE = 0x12;
+		// Canonical v83 WHISPER (opcode 135) sub-modes sent by the server
+		// 0x0A: reply to our whisper request (string target, byte success)
+		// 0x12: incoming whisper (string sender, byte channel (0-based), byte from_admin, string message)
+		// Other modes (e.g. 0x09 find reply, 0x48 buddy whisper) are not handled and are ignored.
+		constexpr int8_t WHISPER_RESULT_MODE = 0x0A;
+		constexpr int8_t WHISPER_RECEIVE_MODE = 0x12;
 
 		std::string build_whisper_chatline(const std::string& sender, bool from_admin, const std::string& message)
 		{
@@ -245,20 +249,20 @@ namespace ms
 	{
 		int8_t mode = recv.read_byte();
 
-			if (mode == WHISPER_RECEIVE_MODE)
-			{
-				std::string sender = recv.read_string();
-				recv.read_byte();
-				bool from_admin = recv.read_bool();
-				std::string message = recv.read_string();
+		if (mode == WHISPER_RECEIVE_MODE)
+		{
+			std::string sender = recv.read_string();
+			recv.read_byte(); // channel the sender is on (0-based)
+			bool from_admin = recv.read_bool();
+			std::string message = recv.read_string();
 
-				if (auto chatbar = UI::get().get_element<UIChatBar>())
-				{
-					chatbar->send_chatline(
-							build_whisper_chatline(sender, from_admin, message),
-							UIChatBar::LineType::WHITE
-					);
-				}
+			if (auto chatbar = UI::get().get_element<UIChatBar>())
+			{
+				chatbar->send_chatline(
+						build_whisper_chatline(sender, from_admin, message),
+						UIChatBar::LineType::WHITE
+				);
+			}
 		}
 		else if (mode == WHISPER_RESULT_MODE)
 		{
