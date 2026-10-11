@@ -40,11 +40,44 @@ Available subcommands:
 
 ## Common workflows
 
+For the fast development loop, run the in-process logic, actor, and transport
+tests without Docker or local NX assets:
+
+```sh
+cargo test -p net -p runtime -p integration-harness --lib
+```
+
+This is the appropriate lane for dialogue transitions and future quest rules.
+It complements the real-network suite; it does not verify migrations, persistence,
+login redirects, or client rendering. Asset-loader checks remain in `game-data`.
+
 Run the full suite with managed infrastructure:
 
 ```sh
 cargo run -p integration-harness --bin harnessctl -- test
 ```
+
+`harnessctl test` prints separate image-build, startup/readiness, cargo-test,
+and total-lifecycle timings. The cargo-test time includes compilation. First
+runs may download/build images and dependencies; use a warmed run when comparing
+feedback time. A full container lifecycle should not be expected to complete in
+hundreds of milliseconds.
+
+Observed on the local development machine after compilation (October 2026):
+
+| Check | Elapsed time |
+| --- | --- |
+| Fast lane above (14 tests, reduced debug info) | 0.338 s wall time |
+| Network suite test execution (16 tests) | 12.84 s summed executable times |
+| Full lifecycle with cached images and a small host rebuild | 20.829 s |
+
+These are measurements, not timing guarantees. Before coalescing test-client
+frame writes, a warmed network suite took 16.48 s in test execution.
+
+On failure, the wrapper prints the last 200 log lines from each container before
+teardown. Save its output if you want to inspect the failure after cleanup.
+The Docker build uses BuildKit cache mounts and requires Docker Buildx to be
+installed (`docker buildx version`).
 
 If the current shell does not have Docker socket access yet:
 

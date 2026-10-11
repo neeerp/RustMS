@@ -98,12 +98,15 @@ fn ensure_docker_available() -> Result<(), String> {
 }
 
 fn run_tests() -> Result<(), String> {
+    let total_start = Instant::now();
     if let Err(error) = up_stack() {
+        dump_stack_logs();
         let _ = down_stack();
         return Err(error);
     }
 
     let workspace_root = workspace_root();
+    let tests_start = Instant::now();
     let status = Command::new("cargo")
         .arg("test")
         .arg("-p")
@@ -115,9 +118,22 @@ fn run_tests() -> Result<(), String> {
         .stdout(Stdio::inherit())
         .stderr(Stdio::inherit())
         .status()
-        .map_err(|error| format!("failed to execute cargo test: {error}"))?;
+        .map_err(|error| format!("failed to execute cargo test: {error}"));
+
+    eprintln!(
+        "harness cargo test (including compilation): {:.3}s",
+        tests_start.elapsed().as_secs_f64()
+    );
+    if !matches!(&status, Ok(status) if status.success()) {
+        dump_stack_logs();
+    }
 
     let down_result = down_stack();
+    eprintln!(
+        "harness total lifecycle: {:.3}s",
+        total_start.elapsed().as_secs_f64()
+    );
+    let status = status?;
     if !status.success() {
         return Err(format!("cargo test failed with status {status}"));
     }
@@ -126,11 +142,28 @@ fn run_tests() -> Result<(), String> {
 
 fn up_stack() -> Result<(), String> {
     let _ = down_stack();
+    let build_start = Instant::now();
     compose_cmd(["build", "-q"])?;
+    eprintln!(
+        "harness image build: {:.3}s",
+        build_start.elapsed().as_secs_f64()
+    );
+    let startup_start = Instant::now();
     compose_cmd(["up", "-d", "--no-build", "--remove-orphans"])?;
     wait_for_endpoint(LOGIN_ADDR, Duration::from_secs(60))?;
     wait_for_endpoint(WORLD_ADDR, Duration::from_secs(60))?;
+    eprintln!(
+        "harness startup/readiness: {:.3}s",
+        startup_start.elapsed().as_secs_f64()
+    );
     Ok(())
+}
+
+fn dump_stack_logs() {
+    eprintln!("harness failed; collecting container logs before teardown:");
+    if let Err(error) = compose_cmd(["logs", "--no-color", "--tail", "200"]) {
+        eprintln!("failed to collect harness logs: {error}");
+    }
 }
 
 fn down_stack() -> Result<(), String> {

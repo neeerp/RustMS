@@ -79,3 +79,46 @@ Containerized servers use env overrides so they are decoupled from local static 
 - if compose bring-up fails, `harnessctl test` tears stack down before returning error
 - migration job must complete successfully before login/world start
 - endpoint checks fail fast if services do not bind expected ports
+
+## Packet reads and cancellation
+
+`MapleTestConnection` keeps incomplete encrypted frames in a persistent buffer.
+`read_packet` can be interrupted by a timeout without discarding part of a
+header or body. It decrypts and advances cipher state only when a full frame is
+available; extra bytes for the next frame remain buffered. The production
+`runtime::io::PacketReader` follows the same rule because its read future is
+also cancelled by `ClientActor`'s `select!` when a server message arrives.
+
+Regression tests deliberately interrupt a partial header and a partial body,
+then resume and decode two consecutive packets. This tests TCP fragmentation
+and cipher sequencing without requiring PostgreSQL or a Docker stack.
+
+Outbound test-client packets combine the encrypted header and body into one
+frame write, with TCP_NODELAY enabled for request/response traffic. This avoids
+introducing delayed-ACK waits by writing the four-byte header separately.
+
+## Remaining reliability and speed work
+
+The harness remains useful for checking the real protocol and persistence.
+Use in-process tests for frequent gameplay-rule feedback and keep a focused
+end-to-end suite for integration boundaries.
+
+Current limitations worth improving next:
+
+- `drain_spawn_npcs` still relies on a 100 ms quiet interval. Prefer explicit
+  packet expectations/readiness barriers to infer completion from silence.
+- Random identities isolate accounts, but tests within one executable can
+  share maps and channels. Scope fixtures to dedicated locations or route
+  background packets through a matcher instead of assuming the next packet
+  belongs to the test.
+- Fixed Compose project names and ports prevent independent concurrent runs.
+- TCP port readiness proves that listeners are open, not that login-to-world
+  behavior is healthy.
+- The harness shares some protocol definitions with the server. Keep byte-level
+  fixtures or client-derived contract checks so a shared encoding mistake
+  cannot make both sides agree on an invalid protocol.
+- Full lifecycle cleanup still needs explicit handling of external interrupts.
+
+The wrapper records stage timings and captures failure logs before destroying
+the stack. These measurements help separate slow rules/tests from compilation
+and environment startup costs.
