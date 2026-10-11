@@ -31,12 +31,12 @@ int main()
 			if (action == right) walking = down;
 			if (action == jump && down) { jumped = true; running_jump = walking; }
 		};
-		send(&panel, jump, true);
-		require(jumped, "inactive focus discarded the first jump press");
 		auto send = [&](Panel* focused, int32_t action, bool down)
 		{
 			ms::dispatch_focused_key(focused, action, down, false, [&] { gameplay(action, down); });
 		};
+			send(&panel, jump, true);
+			require(jumped, "inactive focus discarded the first jump press");
 		// Reproduce an inactive shop in the focus slot on world entry: the
 		// initial direction press must arrive before jump, without key repeat.
 		send(&panel, right, true);
