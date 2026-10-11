@@ -1,41 +1,32 @@
 use crate::error::NetworkError;
-use crate::handler::{HandlerContext, HandlerResult, PacketHandler};
+use crate::handler::{HandlerResult, LoginAction, LoginContext, LoginHandler, LoginResult};
+use crate::login_world::resolve_login_channel;
 use crate::packet::build::login::char;
-use db::character;
+use db::account;
 use packet::{io::read::PktRead, Packet};
-use std::io::BufReader;
+use std::io::Cursor;
 
 pub struct CharListHandler;
 
-impl CharListHandler {
-    pub fn new() -> Self {
-        Self
-    }
-}
-
-impl PacketHandler for CharListHandler {
-    fn handle(
-        &self,
-        packet: &mut Packet,
-        ctx: &mut HandlerContext,
-    ) -> Result<HandlerResult, NetworkError> {
-        let mut reader = BufReader::new(&**packet);
+impl LoginHandler for CharListHandler {
+    fn handle(&self, packet: &mut Packet, ctx: &LoginContext) -> LoginResult {
+        let mut reader = Cursor::new(&packet.bytes);
         reader.read_short()?;
         reader.read_byte()?;
+        let world_id = reader.read_byte()?;
+        let channel_id = reader.read_byte()?;
 
-        let world = reader.read_byte()?;
-        let channel = reader.read_byte()?;
+        resolve_login_channel(world_id, channel_id)
+            .map_err(|_| NetworkError::PacketHandlerError("Selected channel is not configured"))?;
 
-        // Get account_id from session
-        let account_id = ctx
-            .session
-            .session
-            .as_ref()
-            .map(|s| s.account_id)
-            .ok_or(NetworkError::NotLoggedIn)?;
-
-        let chars = character::get_characters_by_accountid(account_id)?;
-        let char_list_packet = char::build_char_list(chars)?;
-        Ok(HandlerResult::reply(char_list_packet).with_update_session_selection(world, channel))
+        let account_id = ctx.session()?.account_id;
+        let slots = account::get_account_by_id(account_id)?.character_slots;
+        let entries = db::player::load_character_entries(account_id)?;
+        Ok(HandlerResult::empty()
+            .with(LoginAction::SelectChannel {
+                world_id,
+                channel_id,
+            })
+            .with_reply(char::build_char_list(&entries, i32::from(slots))?))
     }
 }

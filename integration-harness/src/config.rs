@@ -52,9 +52,16 @@ impl HarnessConfig {
         }
     }
 
+    /// Channel `n` listens on the first channel's port plus `n` (see
+    /// harnessctl and docker-compose.test.yml).
+    pub fn channel_addr(&self, channel_id: u8) -> SocketAddr {
+        SocketAddr::new(self.world_addr.ip(), self.world_addr.port() + u16::from(channel_id))
+    }
+
     pub fn with_channel(mut self, world_id: u8, channel_id: u8) -> Self {
         self.world_id = world_id;
         self.channel_id = channel_id;
+        self.expected_redirect_addr = self.channel_addr(channel_id);
         self
     }
 
@@ -104,7 +111,7 @@ impl MultiHarnessConfig {
                 )
             })?;
 
-        Ok(HarnessConfig {
+        let config = HarnessConfig {
             username: player.username.clone(),
             password: player.password.clone(),
             character_name: player.character_name.clone(),
@@ -114,7 +121,8 @@ impl MultiHarnessConfig {
             login_addr: self.login_addr,
             world_addr: self.world_addr,
             expected_redirect_addr: self.world_addr,
-        })
+        };
+        Ok(config.with_channel(player.world_id, player.channel_id))
     }
 }
 

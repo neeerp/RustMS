@@ -1,3 +1,4 @@
+use std::net::SocketAddr;
 use crate::assertions::{
     assert_handshake, assert_login_success, assert_opcode, assert_redirect_target,
     assert_server_list_kind,
@@ -7,11 +8,11 @@ use crate::connection::MapleTestConnection;
 use crate::error::HarnessError;
 use crate::packets::{
     build_accept_tos, build_char_list_request, build_char_select, build_check_char_name,
-    build_create_char, build_login_credentials, build_login_started,
-    build_player_logged_in_for_channel, build_server_list_request, build_set_gender,
-    decode_char_list, decode_char_name_response, decode_last_connected_world, decode_login_status,
-    decode_new_character, decode_recommended_worlds, decode_server_redirect, decode_set_field,
-    opcode_name, CharacterSummary, CharacterTemplate, LoginStatusPacket, ServerListPacket,
+    build_create_char, build_login_credentials, build_login_started, build_player_logged_in,
+    build_server_list_request, build_set_gender, decode_char_list, decode_char_name_response,
+    decode_last_connected_world, decode_login_status, decode_new_character,
+    decode_recommended_worlds, decode_server_redirect, decode_set_field, opcode_name,
+    CharacterSummary, CharacterTemplate, LoginStatusPacket, ServerListPacket,
 };
 use net::packet::op::SendOpcode;
 use std::net::Ipv4Addr;
@@ -38,6 +39,8 @@ pub struct WorldSession {
     pub exp: i32,
     pub ap: i16,
     pub quests: std::collections::BTreeMap<i16, u8>,
+    /// Equipped item ids by equipped slot, from the world-entry SET_FIELD.
+    pub equipped: std::collections::BTreeMap<i16, i32>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -66,7 +69,9 @@ pub async fn login_to_redirect(config: &HarnessConfig) -> Result<RedirectResult,
 pub async fn login_to_world_session(config: &HarnessConfig) -> Result<WorldSession, HarnessError> {
     let (selected, redirect) = login_until_redirect(config).await?;
 
-    let mut world_conn = MapleTestConnection::connect(config.world_addr, "world handshake").await?;
+    // Like a real client, connect wherever the login server redirected us.
+    let world_addr = SocketAddr::new(redirect.redirect_ip.into(), redirect.redirect_port);
+    let mut world_conn = MapleTestConnection::connect(world_addr, "world handshake").await?;
     assert_handshake(
         "world handshake",
         world_conn.endpoint(),
@@ -76,9 +81,8 @@ pub async fn login_to_world_session(config: &HarnessConfig) -> Result<WorldSessi
 
     world_conn
         .send_packet(
-            build_player_logged_in_for_channel(selected.id, config.channel_id).map_err(
-                |message| HarnessError::protocol("world entry", config.world_addr, message),
-            )?,
+            build_player_logged_in(selected.id)
+                .map_err(|message| HarnessError::protocol("world entry", world_addr, message))?,
             "world entry",
         )
         .await?;
@@ -161,6 +165,7 @@ pub async fn login_to_world_session(config: &HarnessConfig) -> Result<WorldSessi
         exp: world_entry.exp,
         ap: world_entry.ap,
         quests: world_entry.quests,
+        equipped: world_entry.equipped,
         character_name: world_entry.character_name,
         map_id: world_entry.map_id,
         login_addr: config.login_addr.to_string(),

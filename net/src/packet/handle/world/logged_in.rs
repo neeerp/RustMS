@@ -1,47 +1,16 @@
-use crate::error::NetworkError;
-use crate::handler::{HandlerContext, HandlerResult, PacketHandler};
-use crate::packet::build;
+use crate::handler::{HandlerResult, PreGameHandler, WorldAction, WorldResult};
 use packet::{io::read::PktRead, Packet};
-use std::io::BufReader;
+use std::io::Cursor;
 
+/// PLAYER_LOGGEDIN (0x14): `int character_id`, as in v83. The channel is the
+/// one whose listener accepted the connection, never a client-supplied value.
 pub struct PlayerLoggedInHandler;
 
-impl PlayerLoggedInHandler {
-    pub fn new() -> Self {
-        Self
-    }
-}
-
-impl PacketHandler for PlayerLoggedInHandler {
-    fn handle(
-        &self,
-        packet: &mut Packet,
-        ctx: &mut HandlerContext,
-    ) -> Result<HandlerResult, NetworkError> {
-        let mut reader = BufReader::new(&**packet);
-        reader.read_short()?; // prune opcode
-
+impl PreGameHandler for PlayerLoggedInHandler {
+    fn handle(&self, packet: &mut Packet) -> WorldResult {
+        let mut reader = Cursor::new(&packet.bytes);
+        reader.read_short()?;
         let character_id = reader.read_int()?;
-        let channel_id = reader.read_byte()?;
-
-        // Get character from session (should have been loaded during reattach)
-        match ctx.session.get_character() {
-            Ok(character) => {
-                let mut chr = character.lock().unwrap();
-                let keymap_packet = build::world::keymap::build_keymap(&mut chr.key_binds)?;
-                let char_info_packet =
-                    build::world::char::build_char_info(&chr.character, channel_id)?;
-
-                Ok(HandlerResult::empty()
-                    .with_reattach_session(character_id, channel_id)
-                    .with_reply(keymap_packet)
-                    .with_reply(char_info_packet))
-            }
-            Err(_) => {
-                // Session doesn't have character loaded yet - request reattach first
-                // The actor will load the character and call us again
-                Ok(HandlerResult::empty().with_reattach_session(character_id, channel_id))
-            }
-        }
+        Ok(HandlerResult::empty().with(WorldAction::EnterGame { character_id }))
     }
 }

@@ -38,7 +38,7 @@ pub enum RecvOpcode {
     ChangeKeybinds = 0x87,
 
     PlayerMapTransfer = 0xCF,
-    PartySearch = 0xDF,
+    PlayerUpdate = 0xDF,
 
     UnusedOpcode = 0xFF,
 }

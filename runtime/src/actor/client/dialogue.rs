@@ -1,5 +1,9 @@
 use super::ClientActor;
-use crate::{db::spawn_db, error::RuntimeError, message::FieldKey};
+use crate::{
+    db::spawn_db,
+    error::RuntimeError,
+    message::{FieldKey, FieldMessage},
+};
 use net::dialogue::Conversation;
 use net::packet::build::world::{npc, quest};
 use net::quests::{ContactInteraction, ContactOffer, QuestEffect, QuizConversation};
@@ -17,20 +21,22 @@ impl ClientActor {
         npc_id: i32,
         field: FieldKey,
     ) -> Result<(), RuntimeError> {
-        let chr = self.session.get_character()?;
-        let (map_id, job, level) = {
-            let chr = chr.lock().unwrap();
-            (chr.character.map_id, chr.character.job, chr.character.level)
+        let Some(game) = self.game.as_ref() else {
+            return Ok(());
         };
-        let channel_id = self
-            .session
-            .session
-            .as_ref()
-            .and_then(|s| s.selected_channel_id)
-            .unwrap_or(0) as u8;
-        if field.map_id != map_id || field.channel_id != channel_id || self.client_id == 0 {
+        let stats = &game.player.stats;
+        let (map_id, job, level) = (stats.map_id, stats.job, i16::from(stats.level));
+        if field.map_id != map_id || field.channel_id != self.channel_id {
             return Ok(());
         }
+        // Quest states come from the in-memory log, which every transition updates.
+        let mut states: BTreeMap<_, _> = game
+            .player
+            .quests
+            .started()
+            .map(|q| (q.quest_id, 1))
+            .chain(game.player.quests.completed().map(|(id, _)| (id, 2)))
+            .collect();
         self.conversation = None;
         let contacts =
             net::quests::contact_data().map_err(|e| RuntimeError::Handler(e.to_string()))?;
@@ -39,12 +45,6 @@ impl ClientActor {
                 .quests()
                 .any(|q| q.start_npc == npc_id || q.finish_npc == npc_id)
         {
-            let cid = self.client_id;
-            let progress = spawn_db(move || db::quest::get_quests(cid)).await?;
-            let mut states: BTreeMap<_, _> = progress
-                .into_iter()
-                .map(|q| (q.quest_id, q.status))
-                .collect();
             if let Some((template, interaction)) =
                 net::quests::contact_eligible(contacts, npc_id, job, level, &states)
             {
@@ -195,25 +195,41 @@ impl ClientActor {
         max_level: Option<i16>,
         reward: Option<i32>,
     ) -> Result<(), RuntimeError> {
+        // The transition locks and updates the character row, so flush any
+        // unsaved in-memory changes first; then adopt what it committed.
+        self.save().await?;
         let cid = self.client_id;
         let (character, progress) =
             spawn_db(move || db::quest::transition(cid, id, job, prerequisite, max_level, reward))
                 .await?;
+        let player = &mut self.in_game_mut()?.player;
+        let previous_level = player.stats.level;
+        player.stats.level = u8::try_from(character.level).unwrap_or(previous_level);
+        player.stats.exp = character.exp;
+        player.stats.ap = character.ap;
+        player.quests.upsert(db::player::quest_record(&progress));
+        let level_changed = player.stats.level != previous_level;
         let mut packets = vec![quest::build_quest_progress(&progress)
             .map_err(|e| RuntimeError::Handler(e.to_string()))?];
         if let Some(gain) = reward {
             packets.push(
-                quest::build_reward_stats(&character)
+                quest::build_reward_stats(&self.in_game()?.player.stats)
                     .map_err(|e| RuntimeError::Handler(e.to_string()))?,
             );
             packets.push(
                 quest::build_gain_exp(gain).map_err(|e| RuntimeError::Handler(e.to_string()))?,
             );
         }
-        // Map saves must not overwrite a reward with the old character snapshot.
-        self.session.get_character()?.lock().unwrap().character = character;
         for packet in &mut packets {
             self.writer.send_packet(packet).await?;
+        }
+        if level_changed {
+            // Players joining the map later should see the new level.
+            let game = self.in_game()?;
+            let avatar = game.player.field_avatar(0, 0, 0);
+            let client_id = self.client_id;
+            self.send_to_field(FieldMessage::UpdateAvatar { client_id, avatar })
+                .await?;
         }
         Ok(())
     }

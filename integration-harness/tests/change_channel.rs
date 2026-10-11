@@ -1,6 +1,6 @@
 use integration_harness::connection::MapleTestConnection;
 use integration_harness::packets::{
-    build_change_channel, build_player_logged_in_for_channel, decode_channel_change,
+    build_change_channel, build_player_logged_in, decode_channel_change,
     decode_spawn_player, opcode_name,
 };
 use integration_harness::preconditions::load_harness_config_or_fail;
@@ -11,11 +11,10 @@ use tokio::time::{timeout, Duration};
 async fn read_world_entry(
     connection: &mut MapleTestConnection,
     character_id: i32,
-    channel_id: u8,
 ) -> Result<(), HarnessError> {
     connection
         .send_packet(
-            build_player_logged_in_for_channel(character_id, channel_id)
+            build_player_logged_in(character_id)
                 .map_err(|message| HarnessError::fixture("world entry", message))?,
             "world entry",
         )
@@ -95,13 +94,10 @@ async fn read_until_opcode(
 
 #[tokio::test]
 async fn change_channel_redirects_and_updates_presence() {
-    let mut old_channel_observer = load_harness_config_or_fail().await.with_channel(0, 0);
-    let mut migrant = load_harness_config_or_fail().await.with_channel(0, 0);
-    let mut new_channel_observer = load_harness_config_or_fail().await.with_channel(0, 1);
-
-    old_channel_observer.expected_redirect_addr = old_channel_observer.world_addr;
-    migrant.expected_redirect_addr = migrant.world_addr;
-    new_channel_observer.expected_redirect_addr = new_channel_observer.world_addr;
+    let old_channel_observer = load_harness_config_or_fail().await.with_channel(0, 0);
+    let migrant = load_harness_config_or_fail().await.with_channel(0, 0);
+    let new_channel_observer = load_harness_config_or_fail().await.with_channel(0, 1);
+    let new_channel_addr = new_channel_observer.channel_addr(1);
 
     let mut old_channel_observer = login_to_world_session(&old_channel_observer)
         .await
@@ -148,6 +144,7 @@ async fn change_channel_redirects_and_updates_presence() {
     .expect("failed to read change-channel redirect");
     let redirect = decode_channel_change(&redirect_packet.packet)
         .expect("failed to decode change-channel redirect");
+    assert_eq!(redirect.port, new_channel_addr.port());
 
     let leave_packet = timeout(
         Duration::from_secs(5),
@@ -170,7 +167,7 @@ async fn change_channel_redirects_and_updates_presence() {
     )
     .await
     .expect("failed to reconnect to redirected world address");
-    read_world_entry(&mut reconnected, migrant.character_id, 1)
+    read_world_entry(&mut reconnected, migrant.character_id)
         .await
         .expect("failed to reattach migrated player");
 

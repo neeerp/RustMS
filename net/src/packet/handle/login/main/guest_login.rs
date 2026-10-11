@@ -1,30 +1,17 @@
-use crate::error::NetworkError;
-use crate::handler::{HandlerContext, HandlerResult, PacketHandler};
+use super::login::LoginCredentialsHandler;
+use crate::handler::{HandlerResult, LoginContext, LoginHandler, LoginResult};
 use crate::packet::build;
 use packet::Packet;
 
 pub struct GuestLoginHandler;
 
-impl GuestLoginHandler {
-    pub fn new() -> Self {
-        Self
-    }
-}
-
-impl PacketHandler for GuestLoginHandler {
-    fn handle(
-        &self,
-        packet: &mut Packet,
-        ctx: &mut HandlerContext,
-    ) -> Result<HandlerResult, NetworkError> {
-        // Guest login sends the guest packet, then delegates to login handler
-        let guest_packet = build::login::status::build_guest_login_packet()?;
-        let mut result = HandlerResult::reply(guest_packet);
-
-        // Delegate to login handler
-        use super::login::LoginCredentialsHandler;
-        let login_result = LoginCredentialsHandler::new().handle(packet, ctx)?;
-        result.actions.extend(login_result.actions);
+impl LoginHandler for GuestLoginHandler {
+    fn handle(&self, packet: &mut Packet, ctx: &LoginContext) -> LoginResult {
+        // Send the guest packet, then continue as a normal login.
+        let mut result = HandlerResult::reply(build::login::status::build_guest_login_packet()?);
+        result
+            .actions
+            .extend(LoginCredentialsHandler.handle(packet, ctx)?.actions);
         Ok(result)
     }
 }

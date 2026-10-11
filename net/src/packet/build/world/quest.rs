@@ -1,10 +1,13 @@
 use crate::{error::NetworkError, packet::op::SendOpcode};
-use db::{character::Character, quest::QuestProgress};
+use super::stat::{build_stat_update, StatUpdate};
+use crate::codec::time::filetime;
+use db::quest::QuestProgress;
+use game::CharacterStats;
 use packet::{io::write::PktWrite, Packet};
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::time::SystemTime;
 
 pub fn quest_time(time: SystemTime) -> Result<i64, NetworkError> {
-    Ok(time.duration_since(UNIX_EPOCH)?.as_millis() as i64 * 10_000 + 116_444_736_000_000_000)
+    Ok(filetime(time))
 }
 pub fn build_quest_progress(progress: &QuestProgress) -> Result<Packet, NetworkError> {
     let mut p = Packet::new_empty();
@@ -19,15 +22,15 @@ pub fn build_quest_progress(progress: &QuestProgress) -> Result<Packet, NetworkE
     }
     Ok(p)
 }
-pub fn build_reward_stats(character: &Character) -> Result<Packet, NetworkError> {
-    let mut p = Packet::new_empty();
-    p.write_short(SendOpcode::StatChange as i16)?;
-    p.write_byte(1)?;
-    p.write_int(0x10 | 0x2000 | 0x10000)?;
-    p.write_byte(character.level as u8)?;
-    p.write_short(character.ap)?;
-    p.write_int(character.exp)?;
-    Ok(p)
+pub fn build_reward_stats(stats: &CharacterStats) -> Result<Packet, NetworkError> {
+    build_stat_update(
+        true,
+        &[
+            StatUpdate::Level(stats.level),
+            StatUpdate::Ap(stats.ap),
+            StatUpdate::Exp(stats.exp),
+        ],
+    )
 }
 pub fn build_gain_exp(gain: i32) -> Result<Packet, NetworkError> {
     let mut p = Packet::new_empty();

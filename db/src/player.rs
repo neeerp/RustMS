@@ -1,0 +1,411 @@
+//! Conversion between database rows and the `game` domain model.
+//!
+//! A logged-in character is loaded once into a `game::Player`, owned by its
+//! client actor, and written back with `save_player` (periodically, before
+//! risky operations, and on disconnect).
+
+use crate::character::Character;
+use crate::keybinding::KeybindType;
+use crate::quest::QuestProgress;
+use crate::schema::{
+    accounts, character_quests, characters, equipment_stats, inventory_items, keybindings, skills,
+};
+use diesel::pg::PgConnection;
+use diesel::prelude::*;
+use game::{
+    AvatarLook, CharacterStats, EquipStats, Inventory, InventoryType, Item, KeyBinding, Keymap,
+    Player, QuestLog, QuestRecord, QuestStatus, SkillBook, SkillRecord,
+};
+use std::collections::HashMap;
+use std::convert::TryFrom;
+use std::time::SystemTime;
+
+#[derive(Queryable, Identifiable)]
+#[diesel(table_name = inventory_items)]
+pub struct InventoryItemRow {
+    pub id: i64,
+    pub character_id: i32,
+    pub inventory_type: i16,
+    pub slot: i16,
+    pub item_id: i32,
+    pub quantity: i16,
+    pub owner: String,
+    pub flags: i16,
+    pub expires_at: Option<SystemTime>,
+    pub cash_serial: Option<i64>,
+}
+
+#[derive(Insertable)]
+#[diesel(table_name = inventory_items)]
+struct NewInventoryItem<'a> {
+    character_id: i32,
+    inventory_type: i16,
+    slot: i16,
+    item_id: i32,
+    quantity: i16,
+    owner: &'a str,
+    flags: i16,
+    expires_at: Option<SystemTime>,
+    cash_serial: Option<i64>,
+}
+
+#[derive(Queryable, Insertable)]
+#[diesel(table_name = equipment_stats)]
+pub struct EquipmentStatsRow {
+    pub item_row_id: i64,
+    pub upgrade_slots: i16,
+    pub level: i16,
+    pub stre: i16,
+    pub dex: i16,
+    pub int: i16,
+    pub luk: i16,
+    pub hp: i16,
+    pub mp: i16,
+    pub watk: i16,
+    pub matk: i16,
+    pub wdef: i16,
+    pub mdef: i16,
+    pub acc: i16,
+    pub avoid: i16,
+    pub hands: i16,
+    pub speed: i16,
+    pub jump: i16,
+    pub vicious: i32,
+    pub item_level: i16,
+    pub item_exp: i32,
+}
+
+#[derive(Queryable, Insertable)]
+#[diesel(table_name = skills)]
+pub struct SkillRow {
+    pub character_id: i32,
+    pub skill_id: i32,
+    pub level: i32,
+    pub master_level: i32,
+    pub expires_at: Option<SystemTime>,
+}
+
+/// Load everything needed to play a character.
+pub fn load_player(character_id: i32) -> crate::Result<Player> {
+    let mut conn = crate::connection()?;
+    let character: Character = characters::table.find(character_id).first(&mut conn)?;
+    let gm_level: i16 = accounts::table
+        .find(character.accountid)
+        .select(accounts::gm_level)
+        .first(&mut conn)?;
+
+    let keymap = load_keymap(&mut conn, character_id)?;
+    let inventory = load_inventory(&mut conn, &[character_id])?
+        .remove(&character_id)
+        .unwrap_or_default();
+    let skill_book = SkillBook::from_records(
+        skills::table
+            .filter(skills::character_id.eq(character_id))
+            .load::<SkillRow>(&mut conn)?
+            .into_iter()
+            .map(|row| SkillRecord {
+                skill_id: row.skill_id,
+                level: row.level,
+                master_level: row.master_level,
+                expiration: row.expires_at,
+            }),
+    );
+    let quests = quest_log(
+        character_quests::table
+            .filter(character_quests::character_id.eq(character_id))
+            .load::<QuestProgress>(&mut conn)?,
+    );
+
+    let mut player = Player::new(
+        character.accountid,
+        u8::try_from(character.world).unwrap_or(0),
+        character_stats(&character),
+        character.meso,
+        inventory,
+        skill_book,
+        keymap,
+        quests,
+    );
+    player.gm_level = gm_level;
+    Ok(player)
+}
+
+/// Persist a player snapshot. Character columns, keymap, inventory, and
+/// skills are replaced atomically. Quest progress is written by its own
+/// transactions and is not touched here.
+pub fn save_player(player: &Player) -> crate::Result<()> {
+    let mut conn = crate::connection()?;
+    conn.transaction(|conn| -> QueryResult<()> {
+        let id = player.id();
+        let stats = &player.stats;
+        diesel::update(characters::table.find(id))
+            .set((
+                characters::level.eq(i16::from(stats.level)),
+                characters::exp.eq(stats.exp),
+                characters::job.eq(stats.job),
+                characters::stre.eq(stats.str),
+                characters::dex.eq(stats.dex),
+                characters::int.eq(stats.int),
+                characters::luk.eq(stats.luk),
+                characters::hp.eq(stats.hp),
+                characters::maxhp.eq(stats.max_hp),
+                characters::mp.eq(stats.mp),
+                characters::maxmp.eq(stats.max_mp),
+                characters::ap.eq(stats.ap),
+                characters::sp.eq(stats.sp),
+                characters::fame.eq(stats.fame),
+                characters::meso.eq(player.meso),
+                characters::face.eq(stats.face),
+                characters::hair.eq(stats.hair),
+                characters::skin.eq(i32::from(stats.skin)),
+                characters::map_id.eq(stats.map_id),
+                characters::spawn_point.eq(i16::from(stats.spawn_point)),
+            ))
+            .execute(conn)?;
+
+        save_keymap(conn, id, &player.keymap)?;
+        save_inventory(conn, id, &player.inventory)?;
+
+        diesel::delete(skills::table.filter(skills::character_id.eq(id))).execute(conn)?;
+        let skill_rows: Vec<SkillRow> = player
+            .skills
+            .iter()
+            .map(|skill| SkillRow {
+                character_id: id,
+                skill_id: skill.skill_id,
+                level: skill.level,
+                master_level: skill.master_level,
+                expires_at: skill.expiration,
+            })
+            .collect();
+        diesel::insert_into(skills::table)
+            .values(&skill_rows)
+            .execute(conn)?;
+        Ok(())
+    })
+    .map_err(Into::into)
+}
+
+/// Stats and looks for every character on an account, for the character list.
+pub fn load_character_entries(account_id: i32) -> crate::Result<Vec<(CharacterStats, AvatarLook)>> {
+    let mut conn = crate::connection()?;
+    let rows: Vec<Character> = characters::table
+        .filter(characters::accountid.eq(account_id))
+        .order(characters::id)
+        .load(&mut conn)?;
+    let ids: Vec<i32> = rows.iter().map(|c| c.id).collect();
+    let mut inventories = load_inventory(&mut conn, &ids)?;
+
+    Ok(rows
+        .iter()
+        .map(|character| {
+            let stats = character_stats(character);
+            let inventory = inventories.remove(&character.id).unwrap_or_default();
+            let look = AvatarLook::from_equipped(&stats, inventory.equipped_ids());
+            (stats, look)
+        })
+        .collect())
+}
+
+/// Write a freshly created character's starting items.
+pub(crate) fn insert_items(
+    conn: &mut PgConnection,
+    character_id: i32,
+    items: impl IntoIterator<Item = (InventoryType, i16, Item)>,
+) -> QueryResult<()> {
+    for (kind, slot, item) in items {
+        insert_item(conn, character_id, kind, slot, &item)?;
+    }
+    Ok(())
+}
+
+pub(crate) fn character_stats(character: &Character) -> CharacterStats {
+    CharacterStats {
+        id: character.id,
+        name: character.name.clone(),
+        gender: u8::try_from(character.gender).unwrap_or(0),
+        skin: u8::try_from(character.skin).unwrap_or(0),
+        face: character.face,
+        hair: character.hair,
+        level: u8::try_from(character.level).unwrap_or(u8::MAX),
+        job: character.job,
+        str: character.stre,
+        dex: character.dex,
+        int: character.int,
+        luk: character.luk,
+        hp: character.hp,
+        max_hp: character.maxhp,
+        mp: character.mp,
+        max_mp: character.maxmp,
+        ap: character.ap,
+        sp: character.sp,
+        exp: character.exp,
+        fame: character.fame,
+        map_id: character.map_id,
+        spawn_point: u8::try_from(character.spawn_point).unwrap_or(0),
+    }
+}
+
+pub(crate) fn quest_log(progress: Vec<QuestProgress>) -> QuestLog {
+    QuestLog::from_records(progress.iter().map(quest_record))
+}
+
+/// The domain form of one quest progress row.
+pub fn quest_record(progress: &QuestProgress) -> QuestRecord {
+    QuestRecord {
+        quest_id: progress.quest_id,
+        status: match (progress.status, progress.completed_at) {
+            (2, Some(at)) => QuestStatus::Completed { at },
+            _ => QuestStatus::Started,
+        },
+    }
+}
+
+fn load_keymap(conn: &mut PgConnection, character_id: i32) -> QueryResult<Keymap> {
+    let rows: Vec<(i16, KeybindType, i16)> = keybindings::table
+        .filter(keybindings::character_id.eq(character_id))
+        .select((keybindings::key, keybindings::bind_type, keybindings::action))
+        .load(conn)?;
+    let mut keymap = Keymap::default();
+    for (key, kind, action) in rows {
+        keymap.bind(
+            key,
+            KeyBinding {
+                kind: kind.into(),
+                action: i32::from(action),
+            },
+        );
+    }
+    Ok(keymap)
+}
+
+pub(crate) fn save_keymap(conn: &mut PgConnection, character_id: i32, keymap: &Keymap) -> QueryResult<()> {
+    diesel::delete(keybindings::table.filter(keybindings::character_id.eq(character_id)))
+        .execute(conn)?;
+    let rows: Vec<_> = keymap
+        .iter()
+        .map(|(key, binding)| {
+            (
+                keybindings::character_id.eq(character_id),
+                keybindings::key.eq(key),
+                keybindings::bind_type.eq(KeybindType::from(binding.kind)),
+                keybindings::action.eq(i16::try_from(binding.action).unwrap_or(0)),
+            )
+        })
+        .collect();
+    diesel::insert_into(keybindings::table)
+        .values(&rows)
+        .execute(conn)?;
+    Ok(())
+}
+
+fn load_inventory(conn: &mut PgConnection, character_ids: &[i32]) -> QueryResult<HashMap<i32, Inventory>> {
+    let rows: Vec<(InventoryItemRow, Option<EquipmentStatsRow>)> = inventory_items::table
+        .left_join(equipment_stats::table)
+        .filter(inventory_items::character_id.eq_any(character_ids))
+        .load(conn)?;
+
+    let mut inventories: HashMap<i32, Inventory> = HashMap::new();
+    for (row, equip) in rows {
+        let Some(kind) = InventoryType::from_i16(row.inventory_type) else {
+            continue;
+        };
+        let item = Item {
+            item_id: row.item_id,
+            quantity: row.quantity,
+            owner: row.owner,
+            flags: row.flags,
+            expiration: row.expires_at,
+            cash_serial: row.cash_serial,
+            equip: equip.map(|e| EquipStats {
+                upgrade_slots: u8::try_from(e.upgrade_slots).unwrap_or(0),
+                level: u8::try_from(e.level).unwrap_or(0),
+                str: e.stre,
+                dex: e.dex,
+                int: e.int,
+                luk: e.luk,
+                hp: e.hp,
+                mp: e.mp,
+                watk: e.watk,
+                matk: e.matk,
+                wdef: e.wdef,
+                mdef: e.mdef,
+                acc: e.acc,
+                avoid: e.avoid,
+                hands: e.hands,
+                speed: e.speed,
+                jump: e.jump,
+                vicious: e.vicious,
+                item_level: u8::try_from(e.item_level).unwrap_or(0),
+                item_exp: e.item_exp,
+            }),
+        };
+        inventories
+            .entry(row.character_id)
+            .or_default()
+            .insert(kind, row.slot, item);
+    }
+    Ok(inventories)
+}
+
+fn save_inventory(conn: &mut PgConnection, character_id: i32, inventory: &Inventory) -> QueryResult<()> {
+    // Equipment stats cascade with their item rows.
+    diesel::delete(inventory_items::table.filter(inventory_items::character_id.eq(character_id)))
+        .execute(conn)?;
+    for (kind, slot, item) in inventory.all() {
+        insert_item(conn, character_id, kind, slot, item)?;
+    }
+    Ok(())
+}
+
+fn insert_item(
+    conn: &mut PgConnection,
+    character_id: i32,
+    kind: InventoryType,
+    slot: i16,
+    item: &Item,
+) -> QueryResult<()> {
+    let row_id: i64 = diesel::insert_into(inventory_items::table)
+        .values(&NewInventoryItem {
+            character_id,
+            inventory_type: kind as i16,
+            slot,
+            item_id: item.item_id,
+            quantity: item.quantity,
+            owner: &item.owner,
+            flags: item.flags,
+            expires_at: item.expiration,
+            cash_serial: item.cash_serial,
+        })
+        .returning(inventory_items::id)
+        .get_result(conn)?;
+
+    if let Some(e) = &item.equip {
+        diesel::insert_into(equipment_stats::table)
+            .values(&EquipmentStatsRow {
+                item_row_id: row_id,
+                upgrade_slots: i16::from(e.upgrade_slots),
+                level: i16::from(e.level),
+                stre: e.str,
+                dex: e.dex,
+                int: e.int,
+                luk: e.luk,
+                hp: e.hp,
+                mp: e.mp,
+                watk: e.watk,
+                matk: e.matk,
+                wdef: e.wdef,
+                mdef: e.mdef,
+                acc: e.acc,
+                avoid: e.avoid,
+                hands: e.hands,
+                speed: e.speed,
+                jump: e.jump,
+                vicious: e.vicious,
+                item_level: i16::from(e.item_level),
+                item_exp: e.item_exp,
+            })
+            .execute(conn)?;
+    }
+    Ok(())
+}

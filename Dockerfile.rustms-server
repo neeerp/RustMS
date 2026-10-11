@@ -21,6 +21,7 @@ COPY Cargo.toml Cargo.lock ./
 COPY config config
 COPY crypt crypt
 COPY db db
+COPY game game
 COPY game-data game-data
 COPY integration-harness integration-harness
 COPY net net

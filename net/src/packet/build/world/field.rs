@@ -1,69 +1,90 @@
+use crate::codec::encode_avatar_look;
 use crate::{error::NetworkError, packet::op::SendOpcode};
+use game::FieldAvatar;
 use packet::io::read::PktRead;
 use packet::{io::write::PktWrite, Packet};
 use std::io::Cursor;
 
-const DEFAULT_STANCE: u8 = 2;
-const STARTING_MAP_ID: i32 = 1_000_000;
-const STARTING_MAP_SPAWN_X: i16 = 240;
-const STARTING_MAP_SPAWN_Y: i16 = 190;
-const DEFAULT_OVERALL: i32 = 1052122;
-const DEFAULT_SHOES: i32 = 1072318;
-const DEFAULT_WEAPON: i32 = 1302000;
-
-#[derive(Clone, Debug)]
-pub struct ForeignCharacter {
-    pub id: i32,
-    pub name: String,
-    pub level: i16,
-    pub job: i16,
-    pub face: i32,
-    pub hair: i32,
-    pub skin: i32,
-    pub gender: i16,
-    pub map_id: i32,
-    pub x: i16,
-    pub y: i16,
-    pub stance: u8,
-}
-
-pub fn build_player_enter_field(character: &ForeignCharacter) -> Result<Packet, NetworkError> {
+/// SPAWN_PLAYER: show `avatar` to the other players on the field
+/// (`spawnPlayerMapObject` in HeavenMS, with no guild, buffs, pets, or shops).
+pub fn build_player_enter_field(avatar: &FieldAvatar) -> Result<Packet, NetworkError> {
     let mut packet = Packet::new_empty();
     packet.write_short(SendOpcode::SpawnPlayer as i16)?;
-    packet.write_int(character.id)?;
-    packet.write_byte(character.level as u8)?;
-    packet.write_str_with_length(&character.name)?;
-    packet.write_str_with_length("")?;
-    packet.write_short(0)?;
-    packet.write_byte(0)?;
-    packet.write_short(0)?;
-    packet.write_byte(0)?;
-    packet.write_bytes(&[0; 8])?;
-    packet.write_int(0)?;
-    packet.write_int(0)?;
-    packet.write_int(0)?;
-    packet.write_bytes(&[0; 43])?;
-    packet.write_int(0)?;
-    packet.write_bytes(&[0; 61])?;
-    packet.write_short(character.job)?;
-    write_look(&mut packet, character)?;
-    packet.write_int(0)?;
-    packet.write_int(0)?;
-    packet.write_int(0)?;
+    packet.write_int(avatar.id)?;
+    packet.write_byte(avatar.level)?;
+    packet.write_str_with_length(&avatar.name)?;
 
-    packet.write_short(character.x)?;
-    packet.write_short(character.y)?;
-    packet.write_byte(character.stance)?;
-    packet.write_bytes(&[0; 3])?;
+    // Guild name and emblem.
+    packet.write_str_with_length("")?;
+    packet.write_bytes(&[0; 6])?;
+
+    write_foreign_buffs(&mut packet)?;
+
+    packet.write_short(avatar.job)?;
+    encode_avatar_look(&mut packet, &avatar.look, false)?;
+    packet.write_int(0)?; // count of item 5110000
+    packet.write_int(0)?; // item effect
+    packet.write_int(0)?; // chair
+
+    packet.write_short(avatar.x)?;
+    packet.write_short(avatar.y)?;
+    packet.write_byte(avatar.stance)?;
+    packet.write_short(0)?; // foothold
     packet.write_byte(0)?;
-    packet.write_int(0)?;
-    packet.write_int(0)?;
-    packet.write_int(0)?;
+    packet.write_byte(0)?; // end of pets
+    packet.write_int(1)?; // mount level
+    packet.write_long(0)?; // mount exp and tiredness
+    packet.write_byte(0)?; // no player shop or minigame box
+    packet.write_byte(0)?; // no chalkboard
+    packet.write_byte(0)?; // crush ring
+    packet.write_byte(0)?; // friendship ring
+    packet.write_byte(0)?; // marriage ring
+    packet.write_byte(0)?; // new year cards
     packet.write_byte(0)?;
     packet.write_byte(0)?;
-    packet.write_bytes(&[0; 3])?;
-    packet.write_byte(0)?;
+    packet.write_byte(0)?; // team (only used in event fields)
     Ok(packet)
+}
+
+/// The foreign buff block with no active buffs. Its size is fixed by the
+/// client (8 + 4 + 4 + 4 + 43 + 65 bytes); the 0xFC/0x01 and the repeated
+/// spawn constant mirror what the reference server sends.
+fn write_foreign_buffs(packet: &mut Packet) -> Result<(), NetworkError> {
+    const CHAR_MAGIC_SPAWN: i32 = 0x2D0F_5E1A;
+    packet.write_int(0)?;
+    packet.write_short(0)?;
+    packet.write_byte(0xFC)?;
+    packet.write_byte(1)?;
+    packet.write_int(0)?; // morph
+    packet.write_int(0)?; // buff mask (high)
+    packet.write_int(0)?; // buff mask (low)
+
+    packet.write_int(0)?; // energy charge
+    packet.write_short(0)?;
+    packet.write_bytes(&[0; 4])?;
+    packet.write_int(0)?; // dash speed
+    packet.write_bytes(&[0; 11])?;
+    packet.write_short(0)?;
+    packet.write_bytes(&[0; 9])?; // dash jump
+    packet.write_int(0)?;
+    packet.write_short(0)?;
+    packet.write_byte(0)?;
+
+    packet.write_long(0)?; // monster riding
+    packet.write_int(CHAR_MAGIC_SPAWN)?;
+    packet.write_bytes(&[0; 8])?; // speed infusion
+    packet.write_int(CHAR_MAGIC_SPAWN)?;
+    packet.write_byte(0)?;
+    packet.write_int(CHAR_MAGIC_SPAWN)?;
+    packet.write_short(0)?;
+    packet.write_bytes(&[0; 9])?; // homing beacon
+    packet.write_int(CHAR_MAGIC_SPAWN)?;
+    packet.write_int(0)?;
+    packet.write_bytes(&[0; 9])?; // zombify
+    packet.write_int(CHAR_MAGIC_SPAWN)?;
+    packet.write_short(0)?;
+    packet.write_short(0)?;
+    Ok(())
 }
 
 pub fn build_player_leave_field(character_id: i32) -> Result<Packet, NetworkError> {
@@ -95,32 +116,6 @@ pub fn build_local_chat(
     packet.write_str_with_length(message)?;
     packet.write_byte(show)?;
     Ok(packet)
-}
-
-fn write_look(packet: &mut Packet, character: &ForeignCharacter) -> Result<(), NetworkError> {
-    packet.write_byte((character.gender != 0) as u8)?;
-    packet.write_byte(character.skin as u8)?;
-    packet.write_int(character.face)?;
-    packet.write_byte(0)?;
-    packet.write_int(character.hair)?;
-    packet.write_byte(5)?;
-    packet.write_int(DEFAULT_OVERALL)?;
-    packet.write_byte(7)?;
-    packet.write_int(DEFAULT_SHOES)?;
-    packet.write_byte(0xFF)?;
-    packet.write_byte(0xFF)?;
-    packet.write_int(DEFAULT_WEAPON)?;
-    packet.write_int(0)?;
-    packet.write_int(0)?;
-    packet.write_int(0)?;
-    Ok(())
-}
-
-pub fn default_spawn_position(map_id: i32) -> (i16, i16, u8) {
-    match map_id {
-        STARTING_MAP_ID => (STARTING_MAP_SPAWN_X, STARTING_MAP_SPAWN_Y, DEFAULT_STANCE),
-        _ => (0, 0, DEFAULT_STANCE),
-    }
 }
 
 pub fn parse_movement_state(

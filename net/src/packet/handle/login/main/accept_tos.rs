@@ -1,49 +1,29 @@
 use crate::error::NetworkError;
-use crate::handler::{HandlerContext, HandlerResult, PacketHandler};
+use crate::handler::{HandlerResult, LoginAction, LoginContext, LoginHandler, LoginResult};
 use crate::packet::build;
-use db::account;
+use db::{account, session::SessionState};
 use packet::{io::read::PktRead, Packet};
-use std::io::BufReader;
+use std::io::Cursor;
 
 pub struct AcceptTOSHandler;
 
-impl AcceptTOSHandler {
-    pub fn new() -> Self {
-        Self
-    }
-}
-
-impl PacketHandler for AcceptTOSHandler {
-    fn handle(
-        &self,
-        packet: &mut Packet,
-        ctx: &mut HandlerContext,
-    ) -> Result<HandlerResult, NetworkError> {
-        let mut reader = BufReader::new(&**packet);
+impl LoginHandler for AcceptTOSHandler {
+    fn handle(&self, packet: &mut Packet, ctx: &LoginContext) -> LoginResult {
+        let mut reader = Cursor::new(&packet.bytes);
         reader.read_short()?;
-
-        let confirmed = reader.read_byte()?;
-        if confirmed != 0x01 {
+        if reader.read_byte()? != 0x01 {
             return Err(NetworkError::PacketHandlerError(
                 "Accept TOS packet is invalid.",
             ));
         }
 
-        // Get account_id from session
-        let account_id = ctx
-            .session
-            .session
-            .as_ref()
-            .map(|s| s.account_id)
-            .ok_or(NetworkError::NotLoggedIn)?;
-
-        // Load and update account
-        let mut user = account::get_account_by_id(account_id)?;
+        let mut user = account::get_account_by_id(ctx.session()?.account_id)?;
         user.accepted_tos = true;
         let user = account::update_account(&user)?;
 
-        // TODO: Update session state to AfterLogin
         let login_packet = build::login::status::build_successful_login_packet(&user)?;
-        Ok(HandlerResult::reply(login_packet))
+        Ok(HandlerResult::empty()
+            .with(LoginAction::SetSessionState(SessionState::AfterLogin))
+            .with_reply(login_packet))
     }
 }

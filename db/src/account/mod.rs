@@ -19,6 +19,7 @@ pub struct Account {
     pub accepted_tos: bool,
     pub banned: bool,
     pub ban_msg: Option<String>,
+    pub gm_level: i16,
 }
 
 impl Debug for Account {

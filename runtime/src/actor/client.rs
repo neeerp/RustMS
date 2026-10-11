@@ -1,432 +1,345 @@
 mod dialogue;
+
 use self::dialogue::ActiveConversation;
+use crate::actor::registry::FieldRegistry;
+use crate::db::spawn_db;
 use crate::error::RuntimeError;
-use crate::handler::{ClientId, HandlerAction, HandlerContext, HandlerResult};
 use crate::io::{PacketReader, PacketWriter};
-use crate::message::{ClientEvent, FieldCharacter, RuntimeLocation, ServerMessage};
-use db::session::{SessionState, SessionWrapper};
-use net::get_handler;
-use net::listener::ServerType;
+use crate::message::{
+    ClientHandle, DirectoryMessage, FieldHandle, FieldKey, FieldMessage, ServerMessage,
+    CLIENT_QUEUE_CAPACITY,
+};
+use game::Player;
+use net::dialogue::NpcInteraction;
 use net::login_world::resolve_login_channel;
 use net::packet::build;
+use net::{ClientId, SpawnPosition, WorldAction, WorldContext, WorldRoute};
 use packet::Packet;
 use rand::{thread_rng, Rng};
-use std::net::SocketAddr;
+use std::net::IpAddr;
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::Arc;
+use std::time::Duration;
 use tokio::net::TcpStream;
 use tokio::sync::mpsc;
-use tracing::{error, info, warn};
+use tokio::time::{interval, MissedTickBehavior};
+use tokio_util::sync::CancellationToken;
+use tracing::{debug, error, info, warn};
 
-/// Actor handling a single world server client connection.
+/// How often a dirty player is written back while online.
+const AUTOSAVE_INTERVAL: Duration = Duration::from_secs(60);
+/// Fallback stand position when a map has no usable spawn portal.
+const FALLBACK_SPAWN: SpawnPosition = SpawnPosition {
+    x: 0,
+    y: 0,
+    stance: 2,
+};
+
+static NEXT_CONNECTION_ID: AtomicU64 = AtomicU64::new(1);
+
+/// Shared services a world client actor needs.
+#[derive(Clone)]
+pub struct WorldServices {
+    pub directory: mpsc::Sender<DirectoryMessage>,
+    pub fields: Arc<FieldRegistry>,
+}
+
+/// State that exists only after the client entered the game.
+struct InGame {
+    player: Player,
+    field: FieldHandle,
+}
+
+/// Actor for one world-server connection. It is the single owner of its
+/// character's state: fields and the directory only hold projections.
 pub struct ClientActor {
+    connection_id: u64,
+    channel_id: u8,
+    peer_ip: IpAddr,
     client_id: ClientId,
     reader: PacketReader,
     writer: PacketWriter,
-    session: SessionWrapper,
-    /// Channel to send events to world server
-    world_tx: mpsc::Sender<ClientEvent>,
-    /// Channel to receive messages from world server
-    server_rx: mpsc::Receiver<ServerMessage>,
-    /// Our sender (given to world server on connect)
-    server_tx: mpsc::Sender<ServerMessage>,
-    peer_addr: SocketAddr,
+    rx: mpsc::Receiver<ServerMessage>,
+    tx: mpsc::Sender<ServerMessage>,
+    kill: CancellationToken,
+    services: WorldServices,
+    session_id: Option<i32>,
+    game: Option<InGame>,
     conversation: Option<ActiveConversation>,
     npc_request_id: u64,
+    changing_channel: bool,
 }
 
 impl ClientActor {
-    /// Create a new client actor from an accepted TCP connection.
+    /// Set up encryption and send the handshake for a connection accepted on
+    /// `channel_id`'s listener.
     pub async fn new(
         stream: TcpStream,
-        world_tx: mpsc::Sender<ClientEvent>,
-        peer_addr: SocketAddr,
+        peer_ip: IpAddr,
+        channel_id: u8,
+        services: WorldServices,
     ) -> Result<Self, RuntimeError> {
-        // Generate encryption IVs (scope rng to drop before await)
         let (recv_iv, send_iv) = {
-            let mut recv_iv = vec![0u8; 4];
-            let mut send_iv = vec![0u8; 4];
             let mut rng = thread_rng();
-            rng.fill(&mut recv_iv[..]);
-            rng.fill(&mut send_iv[..]);
-            (recv_iv, send_iv)
+            (rng.gen::<[u8; 4]>().to_vec(), rng.gen::<[u8; 4]>().to_vec())
         };
 
-        // Split stream for independent read/write
         let (read_half, write_half) = stream.into_split();
-
         let reader = PacketReader::new(read_half, &recv_iv);
         let mut writer = PacketWriter::new(write_half, &send_iv);
-
-        // Send handshake
         let handshake = build::build_handshake_packet(&recv_iv, &send_iv)
             .map_err(|e| RuntimeError::Handler(e.to_string()))?;
         writer.send_handshake(&handshake.bytes).await?;
 
-        // Create channel for receiving server messages
-        let (server_tx, server_rx) = mpsc::channel(32);
-
+        let (tx, rx) = mpsc::channel(CLIENT_QUEUE_CAPACITY);
         Ok(Self {
-            client_id: 0, // Set after login
+            connection_id: NEXT_CONNECTION_ID.fetch_add(1, Ordering::Relaxed),
+            channel_id,
+            peer_ip,
+            client_id: 0,
             reader,
             writer,
-            session: SessionWrapper::new_empty(),
-            world_tx,
-            server_rx,
-            server_tx,
-            peer_addr,
+            rx,
+            tx,
+            kill: CancellationToken::new(),
+            services,
+            session_id: None,
+            game: None,
             conversation: None,
             npc_request_id: 0,
+            changing_channel: false,
         })
     }
 
-    /// Run the client actor event loop.
     pub async fn run(mut self) {
-        info!("ClientActor started");
+        let mut autosave = interval(AUTOSAVE_INTERVAL);
+        autosave.set_missed_tick_behavior(MissedTickBehavior::Delay);
+        autosave.reset();
+        let kill = self.kill.clone();
 
-        loop {
-            tokio::select! {
-                // Read packets from TCP
-                result = self.reader.read_packet() => {
-                    match result {
-                        Ok(packet) => {
-                            if let Err(e) = self.handle_packet(packet).await {
-                                match e {
-                                    RuntimeError::ClientDisconnected => {
-                                        info!(self.client_id, "Client disconnected gracefully");
-                                        break;
-                                    }
-                                    other => {
-                                        error!(self.client_id, error = %other, "Error handling packet");
-                                        break;
-                                    }
-                                }
-                            }
-                        }
-                        Err(RuntimeError::ClientDisconnected) => {
-                            info!(self.client_id, "Client disconnected");
-                            break;
-                        }
-                        Err(e) => {
-                            error!(self.client_id, error = %e, "Error reading packet");
-                            break;
-                        }
-                    }
-                }
-
-                // Receive messages from world server
-                Some(msg) = self.server_rx.recv() => {
-                    if let Err(e) = self.handle_server_message(msg).await {
-                        error!(self.client_id, error = %e, "Error handling server message");
-                        break;
-                    }
-                }
+        let outcome = loop {
+            let step = tokio::select! {
+                biased;
+                _ = kill.cancelled() => Err(RuntimeError::ClientDisconnected),
+                result = self.reader.read_packet() => match result {
+                    Ok(packet) => self.handle_packet(packet).await,
+                    Err(error) => Err(error),
+                },
+                Some(message) = self.rx.recv() => self.handle_server_message(message).await,
+                _ = autosave.tick() => self.save_if_dirty().await,
+            };
+            if let Err(error) = step {
+                break error;
             }
-        }
+        };
 
-        // Cleanup
+        match outcome {
+            RuntimeError::ClientDisconnected => info!(self.client_id, "Client disconnected"),
+            error => error!(self.client_id, %error, "Closing client connection"),
+        }
         self.cleanup().await;
+    }
+
+    fn handle(&self) -> ClientHandle {
+        ClientHandle::new(
+            self.client_id,
+            self.connection_id,
+            self.tx.clone(),
+            self.kill.clone(),
+        )
     }
 
     async fn handle_packet(&mut self, mut packet: Packet) -> Result<(), RuntimeError> {
         let opcode = packet.opcode();
+        let Some(route) = net::world_route(opcode) else {
+            debug!(opcode, "Ignoring unhandled world opcode");
+            return Ok(());
+        };
 
-        // Get the handler for this opcode
-        let handler = get_handler(opcode, &ServerType::World);
-
-        // Execute handler in blocking context for DB calls
-        // Move session out temporarily to satisfy borrow checker
-        let mut session = std::mem::replace(&mut self.session, SessionWrapper::new_empty());
-        let client_id = self.client_id;
-
-        let (result, returned_session) = tokio::task::spawn_blocking(move || {
-            let mut ctx = HandlerContext {
-                client_id,
-                session: &mut session,
-            };
-            let result = handler.handle(&mut packet, &mut ctx);
-            (result, session)
-        })
-        .await
-        .map_err(|e| RuntimeError::Handler(format!("Task join error: {}", e)))?;
-
-        // Restore session
-        self.session = returned_session;
-
-        // Process handler result
-        match result {
-            Ok(result) => self.process_actions(result).await,
-            Err(e) => {
-                // Log handler error but don't disconnect for unsupported opcodes
-                if matches!(e, net::error::NetworkError::UnsupportedOpcodeError(_)) {
-                    info!(opcode, "Unsupported opcode");
-                    Ok(())
-                } else {
-                    error!(opcode, error = %e, "Handler error");
-                    Err(RuntimeError::Handler(e.to_string()))
-                }
+        let result = match (route, self.game.as_mut()) {
+            (WorldRoute::PreGame(handler), None) => handler.handle(&mut packet),
+            (WorldRoute::InGame(handler), Some(game)) => {
+                let mut ctx = WorldContext {
+                    client_id: self.client_id,
+                    channel_id: self.channel_id,
+                    player: &mut game.player,
+                };
+                handler.handle(&mut packet, &mut ctx)
             }
-        }
-    }
+            _ => {
+                warn!(opcode, "Opcode not valid in the current session stage");
+                return Ok(());
+            }
+        };
 
-    async fn process_actions(&mut self, result: HandlerResult) -> Result<(), RuntimeError> {
+        let result = result.map_err(|e| {
+            error!(opcode, error = %e, "Handler error");
+            RuntimeError::Handler(e.to_string())
+        })?;
         for action in result.actions {
-            match action {
-                HandlerAction::NpcInteraction(interaction) => match interaction {
-                    net::dialogue::NpcInteraction::Start { object_id, .. } => {
-                        self.conversation = None;
-                        self.npc_request_id = self.npc_request_id.wrapping_add(1);
-                        let interaction = net::dialogue::NpcInteraction::Start {
-                            object_id,
-                            request_id: self.npc_request_id,
-                        };
-                        self.world_tx
-                            .send(ClientEvent::NpcInteraction {
-                                from: self.client_id,
-                                interaction,
-                            })
-                            .await
-                            .map_err(|_| RuntimeError::ChannelSend)?;
-                    }
-                    net::dialogue::NpcInteraction::Respond {
-                        message_type,
-                        response,
-                        selection,
-                    } => {
-                        self.respond_to_npc(message_type, response, selection)
-                            .await?;
-                    }
-                },
-                HandlerAction::Reply(mut packet) => {
-                    self.writer.send_packet(&mut packet).await?;
-                }
-                HandlerAction::Broadcast { scope, packet } => {
-                    let event = ClientEvent::Broadcast {
-                        from: self.client_id,
-                        scope,
-                        packet,
-                    };
-                    self.world_tx
-                        .send(event)
-                        .await
-                        .map_err(|_| RuntimeError::ChannelSend)?;
-                }
-                HandlerAction::Whisper {
-                    target_name,
-                    recipient_packet,
-                    sender_success_packet,
-                    sender_failure_packet,
-                } => {
-                    let event = ClientEvent::Whisper {
-                        from: self.client_id,
-                        target_name,
-                        recipient_packet,
-                        sender_success_packet,
-                        sender_failure_packet,
-                    };
-                    self.world_tx
-                        .send(event)
-                        .await
-                        .map_err(|_| RuntimeError::ChannelSend)?;
-                }
-                HandlerAction::FieldChat { packet } => {
-                    let event = ClientEvent::FieldChat {
-                        from: self.client_id,
-                        packet,
-                    };
-                    self.world_tx
-                        .send(event)
-                        .await
-                        .map_err(|_| RuntimeError::ChannelSend)?;
-                }
-                HandlerAction::FieldMove {
-                    packet,
-                    movement_bytes,
-                } => {
-                    let event = ClientEvent::FieldMove {
-                        from: self.client_id,
-                        packet,
-                        movement_bytes,
-                    };
-                    self.world_tx
-                        .send(event)
-                        .await
-                        .map_err(|_| RuntimeError::ChannelSend)?;
-                }
-                HandlerAction::MapChanged {
-                    old_map_id,
-                    new_map_id,
-                    spawn_portal_id,
-                    spawn_x,
-                    spawn_y,
-                    spawn_stance,
-                } => {
-                    self.conversation = None;
-                    self.npc_request_id = self.npc_request_id.wrapping_add(1);
-                    let channel_id = self
-                        .session
-                        .session
-                        .as_ref()
-                        .and_then(|session| session.selected_channel_id)
-                        .unwrap_or(0) as u8;
-                    let event = ClientEvent::LocationChanged {
-                        client_id: self.client_id,
-                        old: RuntimeLocation {
-                            channel_id,
-                            map_id: old_map_id,
-                            instance_id: 0,
-                        },
-                        new: RuntimeLocation {
-                            channel_id,
-                            map_id: new_map_id,
-                            instance_id: 0,
-                        },
-                        spawn_portal_id,
-                        spawn_x,
-                        spawn_y,
-                        spawn_stance,
-                    };
-                    self.world_tx
-                        .send(event)
-                        .await
-                        .map_err(|_| RuntimeError::ChannelSend)?;
-                }
-                HandlerAction::Disconnect => {
-                    return Err(RuntimeError::ClientDisconnected);
-                }
-                HandlerAction::CreateSession { .. } => {
-                    // World server doesn't create sessions - login server does
-                    warn!("CreateSession action ignored in world server");
-                }
-                HandlerAction::AttachCharacter { character_id } => {
-                    // Load character into session
-                    info!(character_id, "Attaching character to session");
-                    // The character loading is done via session wrapper
-                    if let Some(ref mut session) = self.session.session {
-                        session.character_id = Some(character_id);
-                    }
-                    // Force reload character
-                    let _ = self.session.get_character();
-                }
-                HandlerAction::UpdateSessionSelection { .. } => {
-                    warn!("UpdateSessionSelection action ignored in world server");
-                }
-                HandlerAction::ReattachSession {
-                    character_id,
-                    channel_id,
-                } => {
-                    // Reattach session from login server
-                    info!(character_id, "Reattaching session for character");
-                    self.client_id = character_id;
-
-                    // Load session from database by character_id
-                    // Build packets synchronously, then release all locks before await
-                    let reattach_result: Option<(FieldCharacter, RuntimeLocation, Packet, Packet)> = (|| {
-                        let mut session = db::session::get_transition_session_by_character_channel_ip(
-                            character_id,
-                            i16::from(channel_id),
-                            self.peer_addr.ip().into(),
-                        )
-                        .ok()?;
-                        session.state = SessionState::InGame;
-                        let session = db::session::update_session(&session).ok()?;
-                        let wrapper = SessionWrapper::from(session).ok()?;
-                        self.session = wrapper;
-                        let chr_ref = self.session.get_character().ok()?;
-                        let mut chr = chr_ref.lock().ok()?;
-                        let character = FieldCharacter {
-                            id: chr.character.id,
-                            name: chr.character.name.clone(),
-                            level: chr.character.level,
-                            job: chr.character.job,
-                            face: chr.character.face,
-                            hair: chr.character.hair,
-                            skin: chr.character.skin,
-                            gender: chr.character.gender,
-                            channel_id,
-                            map_id: chr.character.map_id,
-                            x: 240,
-                            y: 190,
-                            stance: 2,
-                        };
-                        let location = RuntimeLocation {
-                            channel_id,
-                            map_id: chr.character.map_id,
-                            instance_id: 0,
-                        };
-
-                        // Build the character data packets
-                        let keymap_packet =
-                            build::world::keymap::build_keymap(&mut chr.key_binds).ok()?;
-                        let char_info_packet =
-                            build::world::char::build_char_info(&chr.character, channel_id).ok()?;
-
-                        Some((character, location, keymap_packet, char_info_packet))
-                    })(
-                    );
-
-                    if let Some((character, location, mut keymap_packet, mut char_info_packet)) =
-                        reattach_result
-                    {
-                        // Send character data packets to client
-                        self.writer.send_packet(&mut keymap_packet).await?;
-                        self.writer.send_packet(&mut char_info_packet).await?;
-
-                        // Register with world server
-                        let event = ClientEvent::Connected {
-                            client_id: character_id,
-                            sender: self.server_tx.clone(),
-                            character,
-                            location,
-                        };
-                        self.world_tx
-                            .send(event)
-                            .await
-                            .map_err(|_| RuntimeError::ChannelSend)?;
-                    } else {
-                        error!(character_id, "Failed to reattach session");
-                    }
-                }
-                HandlerAction::ChangeChannel {
-                    world_id,
-                    channel_id,
-                } => {
-                    let Some(ref mut session) = self.session.session else {
-                        return Err(RuntimeError::Handler(
-                            "ChangeChannel requested without active session".to_string(),
-                        ));
-                    };
-                    let channel = resolve_login_channel(world_id, channel_id).map_err(|e| {
-                        RuntimeError::Handler(format!(
-                            "Failed to resolve channel migration target: {e}"
-                        ))
-                    })?;
-
-                    session.selected_world_id = Some(i16::from(world_id));
-                    session.selected_channel_id = Some(i16::from(channel_id));
-                    session.state = SessionState::Transition;
-                    db::session::update_session(session)
-                        .map_err(|e| RuntimeError::Handler(e.to_string()))?;
-
-                    let mut redirect_packet =
-                        build::world::channel::build_channel_change(channel.host, channel.port)
-                    .map_err(|e| RuntimeError::Handler(e.to_string()))?;
-                    self.writer.send_packet(&mut redirect_packet).await?;
-
-                    self.world_tx
-                        .send(ClientEvent::Disconnected {
-                            client_id: self.client_id,
-                        })
-                        .await
-                        .map_err(|_| RuntimeError::ChannelSend)?;
-                    self.client_id = 0;
-                    return Err(RuntimeError::ClientDisconnected);
-                }
-            }
+            self.apply(action).await?;
         }
         Ok(())
     }
 
-    async fn handle_server_message(&mut self, msg: ServerMessage) -> Result<(), RuntimeError> {
-        match msg {
+    async fn apply(&mut self, action: WorldAction) -> Result<(), RuntimeError> {
+        match action {
+            WorldAction::Reply(mut packet) => self.writer.send_packet(&mut packet).await?,
+            WorldAction::EnterGame { character_id } => self.enter_game(character_id).await?,
+            WorldAction::ChangeField { map_id, spawn } => self.change_field(map_id, spawn).await?,
+            WorldAction::FieldChat(packet) => {
+                self.send_to_field(FieldMessage::Chat {
+                    from: self.client_id,
+                    packet,
+                })
+                .await?
+            }
+            WorldAction::FieldMove {
+                packet,
+                movement_bytes,
+            } => {
+                self.send_to_field(FieldMessage::Move {
+                    from: self.client_id,
+                    packet,
+                    movement_bytes,
+                })
+                .await?
+            }
+            WorldAction::NpcInteraction(NpcInteraction::Start { object_id, .. }) => {
+                self.conversation = None;
+                self.npc_request_id = self.npc_request_id.wrapping_add(1);
+                self.send_to_field(FieldMessage::NpcInteraction {
+                    from: self.client_id,
+                    object_id,
+                    request_id: self.npc_request_id,
+                })
+                .await?
+            }
+            WorldAction::NpcInteraction(NpcInteraction::Respond {
+                message_type,
+                response,
+                selection,
+            }) => {
+                self.respond_to_npc(message_type, response, selection)
+                    .await?
+            }
+            WorldAction::Whisper(delivery) => {
+                self.send_to_directory(DirectoryMessage::Whisper {
+                    from: self.client_id,
+                    delivery,
+                })
+                .await?
+            }
+            WorldAction::ChangeChannel { channel_id } => self.change_channel(channel_id).await?,
+            WorldAction::Disconnect => return Err(RuntimeError::ClientDisconnected),
+        }
+        Ok(())
+    }
+
+    /// Claim the login server's single-use ticket for this channel, load the
+    /// character, and join the world.
+    async fn enter_game(&mut self, character_id: i32) -> Result<(), RuntimeError> {
+        if self.game.is_some() || self.session_id.is_some() {
+            warn!(character_id, "Ignoring repeated world entry");
+            return Ok(());
+        }
+
+        let (channel, ip) = (i16::from(self.channel_id), self.peer_ip.into());
+        let session = match spawn_db(move || {
+            db::session::claim_world_transition(character_id, channel, ip)
+        })
+        .await
+        {
+            Ok(session) => session,
+            Err(RuntimeError::Database(db::Error::NotFound)) => {
+                warn!(character_id, "World entry without a valid transition ticket");
+                return Err(RuntimeError::NotLoggedIn);
+            }
+            Err(error) => return Err(error),
+        };
+        self.session_id = Some(session.id);
+
+        let player = spawn_db(move || db::player::load_player(character_id)).await?;
+        if player.account_id != session.account_id {
+            return Err(RuntimeError::NotLoggedIn);
+        }
+        self.client_id = character_id;
+
+        let mut keymap = build::world::keymap::build_keymap(&player.keymap)
+            .map_err(|e| RuntimeError::Handler(e.to_string()))?;
+        let mut char_info = build::world::char::build_char_info(&player, self.channel_id)
+            .map_err(|e| RuntimeError::Handler(e.to_string()))?;
+        self.writer.send_packet(&mut keymap).await?;
+        self.writer.send_packet(&mut char_info).await?;
+
+        self.send_to_directory(DirectoryMessage::Register {
+            handle: self.handle(),
+            name: player.name().to_string(),
+            channel_id: self.channel_id,
+        })
+        .await?;
+
+        let key = FieldKey::new(self.channel_id, player.stats.map_id);
+        let spawn = net::spawn_position(player.stats.map_id, player.stats.spawn_point)
+            .unwrap_or(FALLBACK_SPAWN);
+        let field = self.services.fields.field(key);
+        self.game = Some(InGame { player, field });
+        self.join_current_field(spawn).await?;
+        info!(character_id, channel_id = self.channel_id, "Entered the game");
+        Ok(())
+    }
+
+    /// Move field membership after the player changed maps.
+    async fn change_field(
+        &mut self,
+        map_id: i32,
+        spawn: Option<SpawnPosition>,
+    ) -> Result<(), RuntimeError> {
+        self.conversation = None;
+        self.npc_request_id = self.npc_request_id.wrapping_add(1);
+
+        self.send_to_field(FieldMessage::Leave {
+            client_id: self.client_id,
+        })
+        .await?;
+        let key = FieldKey::new(self.channel_id, map_id);
+        let field = self.services.fields.field(key);
+        let game = self.in_game_mut()?;
+        game.field = field;
+        let spawn = spawn
+            .or_else(|| net::spawn_position(map_id, game.player.stats.spawn_point))
+            .unwrap_or(FALLBACK_SPAWN);
+        self.join_current_field(spawn).await
+    }
+
+    async fn join_current_field(&mut self, spawn: SpawnPosition) -> Result<(), RuntimeError> {
+        let handle = self.handle();
+        let game = self.in_game()?;
+        let avatar = game.player.field_avatar(spawn.x, spawn.y, spawn.stance);
+        self.send_to_field(FieldMessage::Join { handle, avatar }).await
+    }
+
+    /// Hand the session to another channel: persist, reissue the ticket, and
+    /// tell the client where to reconnect.
+    async fn change_channel(&mut self, channel_id: u8) -> Result<(), RuntimeError> {
+        let world_id = self.in_game()?.player.world_id;
+        let channel = resolve_login_channel(world_id, channel_id)
+            .map_err(|e| RuntimeError::Handler(format!("Unknown channel: {e}")))?;
+        let session_id = self.session_id.ok_or(RuntimeError::NotLoggedIn)?;
+
+        self.save().await?;
+        spawn_db(move || db::session::begin_channel_transition(session_id, i16::from(channel_id)))
+            .await?;
+        self.changing_channel = true;
+
+        let mut redirect = build::world::channel::build_channel_change(channel.host, channel.port)
+            .map_err(|e| RuntimeError::Handler(e.to_string()))?;
+        self.writer.send_packet(&mut redirect).await?;
+        Err(RuntimeError::ClientDisconnected)
+    }
+
+    async fn handle_server_message(&mut self, message: ServerMessage) -> Result<(), RuntimeError> {
+        match message {
             ServerMessage::NpcConversation {
                 npc_id,
                 field,
@@ -436,80 +349,98 @@ impl ClientActor {
                     self.start_npc_conversation(npc_id, field).await?;
                 }
             }
-            ServerMessage::SendPacket(mut packet) => {
-                self.writer.send_packet(&mut packet).await?;
-            }
-            ServerMessage::Kick(reason) => {
-                warn!(self.client_id, reason, "Client kicked");
-                return Err(RuntimeError::ClientDisconnected);
-            }
-            ServerMessage::Shutdown => {
-                info!(self.client_id, "Server shutting down");
-                return Err(RuntimeError::ClientDisconnected);
-            }
+            ServerMessage::SendPacket(mut packet) => self.writer.send_packet(&mut packet).await?,
         }
         Ok(())
     }
 
-    /// Set the client ID (character ID) after login.
-    pub fn set_client_id(&mut self, id: ClientId) {
-        self.client_id = id;
+    /// Send to the current field, restarting it once if its actor died.
+    async fn send_to_field(&mut self, message: FieldMessage) -> Result<(), RuntimeError> {
+        let Some(game) = self.game.as_ref() else {
+            return Ok(());
+        };
+        match game.field.tx.send(message).await {
+            Ok(()) => Ok(()),
+            Err(mpsc::error::SendError(message)) => {
+                warn!(self.client_id, field = ?game.field.key, "Field actor gone; rejoining");
+                let key = game.field.key;
+                let spawn = net::spawn_position(key.map_id, game.player.stats.spawn_point)
+                    .unwrap_or(FALLBACK_SPAWN);
+                let avatar = game.player.field_avatar(spawn.x, spawn.y, spawn.stance);
+                let field = self.services.fields.field(key);
+                self.in_game_mut()?.field = field.clone();
+                let rejoin = FieldMessage::Join {
+                    handle: self.handle(),
+                    avatar,
+                };
+                field.tx.send(rejoin).await.map_err(|_| RuntimeError::ChannelSend)?;
+                if !matches!(message, FieldMessage::Join { .. } | FieldMessage::Leave { .. }) {
+                    field.tx.send(message).await.map_err(|_| RuntimeError::ChannelSend)?;
+                }
+                Ok(())
+            }
+        }
     }
 
-    /// Register with world server after character is loaded.
-    pub async fn register_with_world(
-        &mut self,
-        character_id: i32,
-        channel_id: u8,
-        map_id: i32,
-        character_name: String,
-    ) -> Result<(), RuntimeError> {
-        self.client_id = character_id;
-
-        let event = ClientEvent::Connected {
-            client_id: character_id,
-            sender: self.server_tx.clone(),
-            character: FieldCharacter {
-                id: character_id,
-                name: character_name,
-                level: 1,
-                job: 0,
-                face: 20000,
-                hair: 30000,
-                skin: 0,
-                gender: 0,
-                channel_id,
-                map_id,
-                x: 240,
-                y: 190,
-                stance: 2,
-            },
-            location: RuntimeLocation {
-                channel_id,
-                map_id,
-                instance_id: 0,
-            },
-        };
-
-        self.world_tx
-            .send(event)
+    async fn send_to_directory(&self, message: DirectoryMessage) -> Result<(), RuntimeError> {
+        self.services
+            .directory
+            .send(message)
             .await
-            .map_err(|_| RuntimeError::ChannelSend)?;
+            .map_err(|_| RuntimeError::ChannelSend)
+    }
 
+    fn in_game(&self) -> Result<&InGame, RuntimeError> {
+        self.game.as_ref().ok_or(RuntimeError::NotLoggedIn)
+    }
+
+    fn in_game_mut(&mut self) -> Result<&mut InGame, RuntimeError> {
+        self.game.as_mut().ok_or(RuntimeError::NotLoggedIn)
+    }
+
+    /// Persist the player now.
+    async fn save(&mut self) -> Result<(), RuntimeError> {
+        let Some(game) = self.game.as_mut() else {
+            return Ok(());
+        };
+        let snapshot = game.player.clone();
+        spawn_db(move || db::player::save_player(&snapshot)).await?;
+        game.player.mark_saved();
+        Ok(())
+    }
+
+    async fn save_if_dirty(&mut self) -> Result<(), RuntimeError> {
+        if self.game.as_ref().is_some_and(|game| game.player.is_dirty()) {
+            if let Err(error) = self.save().await {
+                // Keep playing; the next autosave or logout retries.
+                error!(self.client_id, %error, "Autosave failed");
+            }
+        }
         Ok(())
     }
 
     async fn cleanup(&mut self) {
-        // Notify world server of disconnect
-        if self.client_id != 0 {
+        if self.game.is_some() {
             let _ = self
-                .world_tx
-                .send(ClientEvent::Disconnected {
+                .send_to_field(FieldMessage::Leave {
                     client_id: self.client_id,
                 })
                 .await;
+            let _ = self
+                .send_to_directory(DirectoryMessage::Unregister {
+                    client_id: self.client_id,
+                    connection_id: self.connection_id,
+                })
+                .await;
+            if let Err(error) = self.save().await {
+                error!(self.client_id, %error, "Failed to save player on disconnect");
+            }
         }
 
-        info!(self.client_id, "ClientActor cleanup complete");
+        if let (Some(session_id), false) = (self.session_id, self.changing_channel) {
+            if let Err(error) = spawn_db(move || db::session::delete_session(session_id)).await {
+                error!(self.client_id, %error, "Failed to close session");
+            }
+        }
     }
 }

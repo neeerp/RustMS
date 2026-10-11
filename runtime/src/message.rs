@@ -1,5 +1,28 @@
-use net::{BroadcastScope, ClientId};
+//! Messages exchanged between actors, and the handles used to send them.
+//!
+//! Topology (arrows are channel sends):
+//!
+//! ```text
+//!   ClientActor ──► FieldActor        (its current map: chat, movement, NPCs)
+//!   ClientActor ──► WorldDirectory    (name lookup: whisper, world broadcast)
+//!   FieldActor / WorldDirectory ──► ClientHandle (try_send, never awaited)
+//! ```
+//!
+//! Clients await their sends into fields and the directory (bounded
+//! backpressure), but fields and the directory never await a client: a client
+//! whose queue is full is kicked instead. That makes wait cycles impossible.
+
+use game::FieldAvatar;
+use net::{BroadcastScope, ClientId, WhisperDelivery};
 use packet::Packet;
+use tokio::sync::mpsc;
+use tokio::sync::mpsc::error::TrySendError;
+use tokio_util::sync::CancellationToken;
+use tracing::warn;
+
+/// Capacity of each client's inbound queue. A client this far behind is
+/// considered dead weight and disconnected.
+pub const CLIENT_QUEUE_CAPACITY: usize = 256;
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub struct FieldKey {
@@ -8,168 +31,96 @@ pub struct FieldKey {
     pub instance_id: u32,
 }
 
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
-pub struct RuntimeLocation {
-    pub channel_id: u8,
-    pub map_id: i32,
-    pub instance_id: u32,
-}
-
-impl RuntimeLocation {
-    pub fn field_key(&self) -> FieldKey {
-        FieldKey {
-            channel_id: self.channel_id,
-            map_id: self.map_id,
-            instance_id: self.instance_id,
-        }
-    }
-}
-
-#[derive(Clone, Debug)]
-pub struct FieldCharacter {
-    pub id: i32,
-    pub name: String,
-    pub level: i16,
-    pub job: i16,
-    pub face: i32,
-    pub hair: i32,
-    pub skin: i32,
-    pub gender: i16,
-    pub channel_id: u8,
-    pub map_id: i32,
-    pub x: i16,
-    pub y: i16,
-    pub stance: u8,
-}
-
-impl FieldCharacter {
-    pub fn location(&self) -> RuntimeLocation {
-        RuntimeLocation {
-            channel_id: self.channel_id,
-            map_id: self.map_id,
+impl FieldKey {
+    pub fn new(channel_id: u8, map_id: i32) -> Self {
+        Self {
+            channel_id,
+            map_id,
             instance_id: 0,
         }
     }
 }
 
-/// Messages sent TO a client from the server or other clients.
+/// Messages delivered TO a client actor.
 #[derive(Debug)]
 pub enum ServerMessage {
-    /// NPC identity validated by the player's field. Discard if location changed.
+    /// NPC identity validated by the player's field. Discard if stale.
     NpcConversation {
         npc_id: i32,
         field: FieldKey,
         request_id: u64,
     },
-    /// Send a packet to this client
     SendPacket(Packet),
-    /// Forcibly disconnect with reason
-    Kick(String),
-    /// Server is shutting down
-    Shutdown,
 }
 
-/// Events sent FROM a client TO the world server.
-#[derive(Debug)]
-pub enum ClientEvent {
-    NpcInteraction {
-        from: ClientId,
-        interaction: net::dialogue::NpcInteraction,
-    },
-    /// Client has connected and is ready to receive messages
-    Connected {
-        client_id: ClientId,
-        sender: tokio::sync::mpsc::Sender<ServerMessage>,
-        character: FieldCharacter,
-        location: RuntimeLocation,
-    },
-    /// Client has disconnected
-    Disconnected { client_id: ClientId },
-    /// Client changed runtime location
-    LocationChanged {
-        client_id: ClientId,
-        old: RuntimeLocation,
-        new: RuntimeLocation,
-        spawn_portal_id: Option<u8>,
-        spawn_x: Option<i16>,
-        spawn_y: Option<i16>,
-        spawn_stance: Option<u8>,
-    },
-    /// Request to broadcast a packet
-    Broadcast {
-        from: ClientId,
-        scope: BroadcastScope,
-        packet: Packet,
-    },
-    /// Request to broadcast local field chat.
-    FieldChat { from: ClientId, packet: Packet },
-    /// Request to broadcast local field movement.
-    FieldMove {
-        from: ClientId,
-        packet: Packet,
-        movement_bytes: Vec<u8>,
-    },
-    /// Request to deliver a whisper to a named online player.
-    Whisper {
-        from: ClientId,
-        target_name: String,
-        recipient_packet: Packet,
-        sender_success_packet: Packet,
-        sender_failure_packet: Packet,
-    },
+/// A cheap, clonable way to reach one client connection.
+#[derive(Clone, Debug)]
+pub struct ClientHandle {
+    pub client_id: ClientId,
+    /// Distinguishes reconnects of the same character.
+    pub connection_id: u64,
+    tx: mpsc::Sender<ServerMessage>,
+    kill: CancellationToken,
 }
 
-#[derive(Debug)]
-pub enum ChannelMessage {
-    NpcInteraction {
+impl ClientHandle {
+    pub fn new(
         client_id: ClientId,
-        location: RuntimeLocation,
-        interaction: net::dialogue::NpcInteraction,
-    },
-    JoinClient {
-        client_id: ClientId,
-        sender: tokio::sync::mpsc::Sender<ServerMessage>,
-        character: FieldCharacter,
-        location: RuntimeLocation,
-    },
-    LeaveClient {
-        client_id: ClientId,
-        location: RuntimeLocation,
-    },
-    Chat {
-        client_id: ClientId,
-        location: RuntimeLocation,
-        packet: Packet,
-    },
-    Move {
-        client_id: ClientId,
-        location: RuntimeLocation,
-        packet: Packet,
-        movement_bytes: Vec<u8>,
-    },
-    TransferWithinChannel {
-        client_id: ClientId,
-        sender: tokio::sync::mpsc::Sender<ServerMessage>,
-        character: FieldCharacter,
-        old: RuntimeLocation,
-        new: RuntimeLocation,
-    },
+        connection_id: u64,
+        tx: mpsc::Sender<ServerMessage>,
+        kill: CancellationToken,
+    ) -> Self {
+        Self {
+            client_id,
+            connection_id,
+            tx,
+            kill,
+        }
+    }
+
+    /// Queue a message without waiting. A full queue means the client is not
+    /// keeping up, so it is disconnected rather than allowed to stall the
+    /// sender. Returns whether the message was queued.
+    pub fn send(&self, message: ServerMessage) -> bool {
+        match self.tx.try_send(message) {
+            Ok(()) => true,
+            Err(TrySendError::Full(_)) => {
+                warn!(
+                    client_id = self.client_id,
+                    "Client queue full; disconnecting slow client"
+                );
+                self.kill.cancel();
+                false
+            }
+            Err(TrySendError::Closed(_)) => false,
+        }
+    }
+
+    pub fn send_packet(&self, packet: Packet) -> bool {
+        self.send(ServerMessage::SendPacket(packet))
+    }
+
+    /// Ask the client actor to disconnect.
+    pub fn kick(&self) {
+        self.kill.cancel();
+    }
 }
 
+/// Messages to a field actor.
 #[derive(Debug)]
 pub enum FieldMessage {
-    NpcInteraction {
-        from: ClientId,
-        interaction: net::dialogue::NpcInteraction,
-    },
     Join {
-        client_id: ClientId,
-        sender: tokio::sync::mpsc::Sender<ServerMessage>,
-        character: FieldCharacter,
+        handle: ClientHandle,
+        avatar: FieldAvatar,
     },
     Leave {
         client_id: ClientId,
     },
+    /// The occupant's appearance or level changed.
+    UpdateAvatar {
+        client_id: ClientId,
+        avatar: FieldAvatar,
+    },
     Chat {
         from: ClientId,
         packet: Packet,
@@ -178,5 +129,40 @@ pub enum FieldMessage {
         from: ClientId,
         packet: Packet,
         movement_bytes: Vec<u8>,
+    },
+    NpcInteraction {
+        from: ClientId,
+        object_id: i32,
+        request_id: u64,
+    },
+}
+
+/// A way to reach one field actor.
+#[derive(Clone, Debug)]
+pub struct FieldHandle {
+    pub key: FieldKey,
+    pub tx: mpsc::Sender<FieldMessage>,
+}
+
+/// Messages to the world directory.
+#[derive(Debug)]
+pub enum DirectoryMessage {
+    Register {
+        handle: ClientHandle,
+        name: String,
+        channel_id: u8,
+    },
+    Unregister {
+        client_id: ClientId,
+        connection_id: u64,
+    },
+    Whisper {
+        from: ClientId,
+        delivery: WhisperDelivery,
+    },
+    Broadcast {
+        from: ClientId,
+        scope: BroadcastScope,
+        packet: Packet,
     },
 }

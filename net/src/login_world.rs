@@ -1,5 +1,4 @@
 use config::ConfigError;
-use std::convert::TryFrom;
 use std::env;
 use std::net::Ipv4Addr;
 
@@ -9,7 +8,8 @@ const DEFAULT_WORLD_FLAG: u8 = 0;
 const DEFAULT_EVENT_MESSAGE: &str = "Test!";
 const DEFAULT_CHANNEL_COUNT: u8 = 3;
 const DEFAULT_CHANNEL_HOST: Ipv4Addr = Ipv4Addr::new(127, 0, 0, 1);
-const DEFAULT_CHANNEL_PORT: u16 = 8485;
+/// Channel `n` (zero-based) listens on `DEFAULT_FIRST_CHANNEL_PORT + n`.
+const DEFAULT_FIRST_CHANNEL_PORT: u16 = 8485;
 const DEFAULT_CHANNEL_CAPACITY: u16 = 700;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -158,7 +158,7 @@ fn default_world() -> LoginWorld {
             channel_id,
             name: format!("{DEFAULT_WORLD_NAME}-{}", channel_id + 1),
             host: DEFAULT_CHANNEL_HOST,
-            port: DEFAULT_CHANNEL_PORT,
+            port: DEFAULT_FIRST_CHANNEL_PORT + u16::from(channel_id),
             capacity: DEFAULT_CHANNEL_CAPACITY,
         })
         .collect();
@@ -177,10 +177,11 @@ mod tests {
     use super::*;
 
     #[test]
-    fn default_world_points_all_channels_to_same_runtime() {
+    fn default_channels_each_get_their_own_port() {
         let world = default_world();
         assert_eq!(world.channels.len(), 3);
-        assert!(world.channels.iter().all(|channel| channel.port == 8485));
+        let ports: Vec<_> = world.channels.iter().map(|channel| channel.port).collect();
+        assert_eq!(ports, vec![8485, 8486, 8487]);
         assert_eq!(world.channels[1].channel_id, 1);
     }
 

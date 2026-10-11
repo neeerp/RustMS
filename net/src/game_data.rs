@@ -28,3 +28,17 @@ pub fn get() -> Result<&'static GameData, NetworkError> {
         }
     }
 }
+
+/// Where a character stands after spawning at `spawn_point` on `map_id`,
+/// according to the map's portal data.
+pub fn spawn_position(map_id: i32, spawn_point: u8) -> Option<crate::SpawnPosition> {
+    let field = get().ok()?.field(map_id)?;
+    let portal = field
+        .portal_by_id(u32::from(spawn_point))
+        .or_else(|| field.resolve_spawn_portal(""))?;
+    Some(crate::SpawnPosition {
+        x: i16::try_from(portal.x).ok()?,
+        y: i16::try_from(portal.y).ok()?,
+        stance: 2,
+    })
+}

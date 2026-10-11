@@ -1,6 +1,6 @@
 use game_data::GameData;
 use integration_harness::packets::{
-    build_all_chat, build_change_channel, build_change_map, build_player_logged_in_for_channel,
+    build_all_chat, build_change_channel, build_change_map, build_player_logged_in,
     decode_channel_change, decode_set_field,
 };
 use integration_harness::preconditions::load_harness_config_or_fail;
@@ -103,7 +103,8 @@ fn observe(p: &Packet, trace: &mut Trace) {
         r.read_byte().unwrap();
         let mask = r.read_int().unwrap();
         if mask != 0 {
-            assert_eq!(mask, 0x12010);
+            // LEVEL | AVAILABLEAP | EXP
+            assert_eq!(mask, 0x10 | 0x4000 | 0x10000);
             trace.stats = Some((
                 r.read_byte().unwrap(),
                 r.read_short().unwrap(),
@@ -303,13 +304,13 @@ async fn started_quiz_survives_channel_migration() {
             break decode_channel_change(&packet).unwrap();
         }
     };
-    assert_eq!(redirect.port, config.world_addr.port());
-    let mut connection = MapleTestConnection::connect(config.world_addr, "quest channel migration")
+    assert_eq!(redirect.port, config.channel_addr(1).port());
+    let mut connection = MapleTestConnection::connect(config.channel_addr(1), "quest channel migration")
         .await
         .unwrap();
     send(
         &mut connection,
-        build_player_logged_in_for_channel(session.character_id, 1).unwrap(),
+        build_player_logged_in(session.character_id).unwrap(),
     )
     .await;
     let snapshot = loop {

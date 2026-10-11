@@ -1,42 +1,21 @@
-use db::character::Character;
+use crate::codec::time::filetime;
+use crate::{error::NetworkError, packet::op::SendOpcode};
+use game::CharacterStats;
 use packet::{io::write::PktWrite, Packet};
+use std::time::SystemTime;
 
-use crate::{error::NetworkError, helpers, packet::op::SendOpcode};
-
-pub fn build_warp_to_map(
-    character: &Character,
-    map_id: i32,
-    spawn_point: u8,
-    channel_id: u8,
-) -> Result<Packet, NetworkError> {
+/// SET_FIELD for a map change: the client warps to `stats.map_id` at portal
+/// `stats.spawn_point`.
+pub fn build_warp_to_map(stats: &CharacterStats, channel_id: u8) -> Result<Packet, NetworkError> {
     let mut packet = Packet::new_empty();
-    let op = SendOpcode::SetField as i16;
-    packet.write_short(op)?;
-
-    let hp = character.hp;
-    let use_spawn_pos = 0; // If this was non 0, we'd need to provide an x,y
-
+    packet.write_short(SendOpcode::SetField as i16)?;
     packet.write_int(i32::from(channel_id))?;
-
-    // padding?
     packet.write_int(0)?;
     packet.write_byte(0)?;
-
-    packet.write_int(map_id)?;
-    packet.write_byte(spawn_point)?;
-    packet.write_short(hp)?;
-    packet.write_byte(use_spawn_pos)?;
-    packet.write_long(helpers::current_time_i64()?)?;
-
-    Ok(packet)
-}
-
-pub fn build_empty_stat_update() -> Result<Packet, NetworkError> {
-    let mut packet = Packet::new_empty();
-    let op = SendOpcode::StatChange as i16;
-    packet.write_short(op)?;
-    packet.write_byte(1)?;
-    packet.write_int(0)?;
-
+    packet.write_int(stats.map_id)?;
+    packet.write_byte(stats.spawn_point)?;
+    packet.write_short(stats.hp)?;
+    packet.write_byte(0)?; // no explicit spawn position follows
+    packet.write_long(filetime(SystemTime::now()))?;
     Ok(packet)
 }

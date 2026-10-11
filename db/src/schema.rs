@@ -31,6 +31,7 @@ diesel::table! {
         accepted_tos -> Bool,
         banned -> Bool,
         ban_msg -> Nullable<Text>,
+        gm_level -> Int2,
     }
 }
 
@@ -64,6 +65,60 @@ diesel::table! {
         gender -> Int2,
         created_at -> Timestamp,
         map_id -> Int4,
+        sp -> Int2,
+        spawn_point -> Int2,
+    }
+}
+
+diesel::table! {
+    inventory_items (id) {
+        id -> Int8,
+        character_id -> Int4,
+        inventory_type -> Int2,
+        slot -> Int2,
+        item_id -> Int4,
+        quantity -> Int2,
+        #[max_length = 13]
+        owner -> Varchar,
+        flags -> Int2,
+        expires_at -> Nullable<Timestamp>,
+        cash_serial -> Nullable<Int8>,
+    }
+}
+
+diesel::table! {
+    equipment_stats (item_row_id) {
+        item_row_id -> Int8,
+        upgrade_slots -> Int2,
+        level -> Int2,
+        stre -> Int2,
+        dex -> Int2,
+        int -> Int2,
+        luk -> Int2,
+        hp -> Int2,
+        mp -> Int2,
+        watk -> Int2,
+        matk -> Int2,
+        wdef -> Int2,
+        mdef -> Int2,
+        acc -> Int2,
+        avoid -> Int2,
+        hands -> Int2,
+        speed -> Int2,
+        jump -> Int2,
+        vicious -> Int4,
+        item_level -> Int2,
+        item_exp -> Int4,
+    }
+}
+
+diesel::table! {
+    skills (character_id, skill_id) {
+        character_id -> Int4,
+        skill_id -> Int4,
+        level -> Int4,
+        master_level -> Int4,
+        expires_at -> Nullable<Timestamp>,
     }
 }
 
@@ -103,6 +158,9 @@ diesel::joinable!(characters -> accounts (accountid));
 diesel::joinable!(keybindings -> characters (character_id));
 diesel::joinable!(sessions -> accounts (account_id));
 diesel::joinable!(sessions -> characters (character_id));
+diesel::joinable!(inventory_items -> characters (character_id));
+diesel::joinable!(equipment_stats -> inventory_items (item_row_id));
+diesel::joinable!(skills -> characters (character_id));
 
 diesel::table! {
     character_quests (character_id, quest_id) {
@@ -119,4 +177,7 @@ diesel::allow_tables_to_appear_in_same_query!(
     keybindings,
     sessions,
     character_quests,
+    inventory_items,
+    equipment_stats,
+    skills,
 );
