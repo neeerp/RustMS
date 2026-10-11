@@ -2,6 +2,7 @@ use crate::error::NetworkError;
 use crate::handler::{HandlerContext, HandlerResult, PacketHandler};
 use crate::helpers::to_hex_string;
 use crate::packet::build;
+use crate::packet::build::login::status::LoginStatusCode;
 use crypt::login;
 use db::{
     account::{self, Account},
@@ -52,15 +53,15 @@ impl LoginCredentialsHandler {
         Ok(Some(acc))
     }
 
-    fn check_account_status(acc: &Account) -> u8 {
+    fn check_account_status(acc: &Account) -> LoginStatusCode {
         if acc.banned {
-            2
+            LoginStatusCode::Banned
         } else if acc.logged_in {
-            7
+            LoginStatusCode::AlreadyLoggedIn
         } else if !acc.accepted_tos {
-            23
+            LoginStatusCode::LicenseAgreement
         } else {
-            0
+            LoginStatusCode::Success
         }
     }
 }
@@ -78,32 +79,32 @@ impl PacketHandler for LoginCredentialsHandler {
             Some(acc) => {
                 let status = Self::check_account_status(&acc);
                 match status {
-                    0 => {
-                        // Successful login
+                    LoginStatusCode::Success => {
                         let login_packet =
                             build::login::status::build_successful_login_packet(&acc)?;
                         Ok(HandlerResult::empty()
                             .with_create_session(acc.id, hwid, SessionState::AfterLogin)
                             .with_reply(login_packet))
                     }
-                    23 => {
-                        // Need to accept TOS
-                        let tos_packet = build::login::status::build_login_status_packet(23)?;
+                    LoginStatusCode::LicenseAgreement => {
+                        let tos_packet = build::login::status::build_login_status_packet(
+                            LoginStatusCode::LicenseAgreement,
+                        )?;
                         Ok(HandlerResult::empty()
                             .with_create_session(acc.id, hwid, SessionState::BeforeLogin)
                             .with_reply(tos_packet))
                     }
-                    _ => {
-                        // Reject login
+                    rejected => {
                         let reject_packet =
-                            build::login::status::build_login_status_packet(status)?;
+                            build::login::status::build_login_status_packet(rejected)?;
                         Ok(HandlerResult::reply(reject_packet))
                     }
                 }
             }
             None => {
-                // Invalid credentials
-                let reject_packet = build::login::status::build_login_status_packet(4)?;
+                let reject_packet = build::login::status::build_login_status_packet(
+                    LoginStatusCode::IncorrectPassword,
+                )?;
                 Ok(HandlerResult::reply(reject_packet))
             }
         }
