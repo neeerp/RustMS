@@ -18,6 +18,7 @@
 #include "UIStateGame.h"
 
 #include "UI.h"
+#include "InputFocus.h"
 
 #include "UITypes/UIBuffList.h"
 #include "UITypes/UIChannel.h"
@@ -191,19 +192,9 @@ namespace ms
 
 	void UIStateGame::send_key(KeyType::Id type, int32_t action, bool pressed, bool escape)
 	{
-		if (UIElement *focusedelement = get(focused))
+		dispatch_focused_key(get(focused), action, pressed, escape, [&]
 		{
-			if (focusedelement->is_active())
-			{
-				return focusedelement->send_key(action, pressed, escape);
-			} else
-			{
-				focused = UIElement::NONE;
-
-				return;
-			}
-		} else
-		{
+			focused = UIElement::NONE;
 			switch (type)
 			{
 				case KeyType::Id::MENU:
@@ -343,7 +334,7 @@ namespace ms
 					Stage::get().send_key(type, action, pressed);
 					break;
 			}
-		}
+		});
 	}
 
 	Cursor::State UIStateGame::send_cursor(Cursor::State cursorstate, Point<int16_t> cursorpos)

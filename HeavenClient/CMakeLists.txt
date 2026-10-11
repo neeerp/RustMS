@@ -8,6 +8,8 @@ if(HEAVENCLIENT_BUILD_TESTS)
     enable_testing()
     add_executable(quest_marker_tests tests/quest_marker.cpp)
     add_test(NAME quest_markers COMMAND quest_marker_tests)
+    add_executable(input_focus_tests tests/input_focus.cpp)
+    add_test(NAME input_focus COMMAND input_focus_tests)
 endif()
 
 include_directories(.)
