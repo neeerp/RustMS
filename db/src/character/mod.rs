@@ -62,6 +62,7 @@ pub struct NewCharacter<'a> {
     pub hair_color: i32,
     pub skin: i32,
     pub gender: i16,
+    pub map_id: i32,
 }
 
 impl NewCharacter<'_> {

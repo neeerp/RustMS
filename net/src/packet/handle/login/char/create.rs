@@ -60,6 +60,9 @@ impl PacketHandler for CreateCharacterHandler {
             hair_color,
             skin,
             gender,
+            // The Explorer tutorial exits lead one-way toward Amherst. Starting
+            // in Amherst skips the existing Heena/Nina quests entirely.
+            map_id: if job == 0 { 10_000 } else { 1_000_000 },
         };
 
         let char_packet = login::char::build_char_packet(character.create()?.character)?;

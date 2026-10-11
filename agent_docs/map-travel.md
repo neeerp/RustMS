@@ -9,6 +9,10 @@ travel destination when selecting an exit, including overlapping spawn points.
 
 The active beginner route in these assets is:
 
+New Explorer characters start in `10000`, at the entrance to this route. Existing
+characters keep their saved maps. Starting new Explorers in Amherst (`1000000`)
+skipped the tutorial quests, whose one-way entrances cannot be reached from town.
+
 `10000 → 20000 → 30000 → 40000 → 50000 → 1000000 → 1010000 → 1020000 → 2000000`
 
 Nina is in `30000`; its `in01` enters Sen's house (`30001`), whose

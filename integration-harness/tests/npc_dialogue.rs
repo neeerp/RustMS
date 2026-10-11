@@ -1,6 +1,5 @@
 use game_data::{GameData, NpcDialogueData};
 use integration_harness::connection::MapleTestConnection;
-use integration_harness::login_to_world_session;
 use integration_harness::packets::{build_all_chat, build_change_map};
 use integration_harness::preconditions::load_harness_config_or_fail;
 use net::dialogue::DialoguePage;
@@ -15,6 +14,24 @@ use tokio::time::{timeout, Duration};
 const START_MAP: i32 = 1_000_000;
 const PIO: i32 = 10000;
 const OBJECT_BASE: i32 = 1_000_000_000;
+
+async fn login_to_world_session(
+    config: &integration_harness::config::HarnessConfig,
+) -> Result<integration_harness::protocol::WorldSession, integration_harness::error::HarnessError> {
+    let mut session = integration_harness::login_to_world_session(config).await?;
+    if session.map_id != START_MAP {
+        session
+            .connection
+            .send_packet(
+                build_change_map(START_MAP, "").unwrap(),
+                "visit Pio in Amherst",
+            )
+            .await?;
+        assert_no_dialogue(&mut session.connection).await;
+        session.map_id = START_MAP;
+    }
+    Ok(session)
+}
 
 fn assets() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../assets/game-data")

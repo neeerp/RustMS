@@ -4,9 +4,7 @@ use integration_harness::packets::{
     decode_channel_change, decode_set_field,
 };
 use integration_harness::preconditions::load_harness_config_or_fail;
-use integration_harness::{
-    connection::MapleTestConnection, login_to_world_session, protocol::WorldSession,
-};
+use integration_harness::{connection::MapleTestConnection, protocol::WorldSession};
 use net::packet::op::{RecvOpcode, SendOpcode};
 use packet::{
     io::{read::PktRead, write::PktWrite},
@@ -27,6 +25,27 @@ struct Prompt {
     text: String,
     previous: bool,
     next: bool,
+}
+
+async fn login_to_world_session(
+    config: &integration_harness::config::HarnessConfig,
+) -> Result<WorldSession, integration_harness::error::HarnessError> {
+    let mut session = integration_harness::login_to_world_session(config).await?;
+    if session.map_id != 1_000_000 {
+        send(
+            &mut session.connection,
+            build_change_map(1_000_000, "").unwrap(),
+        )
+        .await;
+        barrier(
+            &mut session.connection,
+            &config.character_name,
+            &mut Trace::default(),
+        )
+        .await;
+        session.map_id = 1_000_000;
+    }
+    Ok(session)
 }
 
 fn talk() -> Packet {
