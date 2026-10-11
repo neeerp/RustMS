@@ -102,8 +102,8 @@ character equiped items. This will most likely happen after we actually get a
 functioning game server.
 
 Created characters also enforce uniqueness in their names, hence the check done 
-at the end of the character creation flow is actually working. Currently this check 
-is case sensitive, and that'll likely need to be fixed some time in the future.
+at the end of the character creation flow is actually working. This check is case 
+insensitive, so `Maple` and `maple` can't both exist.
 
 Character deletion works and is instantaneous, so be careful (not as though your 
 characters really matter at this stage of development anyway though).
