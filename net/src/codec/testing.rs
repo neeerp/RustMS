@@ -58,6 +58,44 @@ impl<'a> Expect<'a> {
         self.short(expected.len() as i16).bytes(expected.as_bytes())
     }
 
+    /// Read an int whose value is not fixed in advance (e.g. a random seed),
+    /// returning it so the caller can assert relationships between fields.
+    pub fn read_int(&mut self) -> i32 {
+        self.cursor.read_i32::<LittleEndian>().expect("int")
+    }
+
+    /// The v83 stat block (`addCharStats` in HeavenMS), written out from the
+    /// reference layout rather than through the encoder.
+    pub fn stats(&mut self, s: &game::CharacterStats) -> &mut Self {
+        let mut name = s.name.clone().into_bytes();
+        name.resize(13, 0);
+        self.int(s.id).bytes(&name).byte(s.gender).byte(s.skin);
+        self.int(s.face).int(s.hair);
+        self.long(0).long(0).long(0); // pet unique ids
+        self.byte(s.level).short(s.job);
+        self.short(s.str).short(s.dex).short(s.int).short(s.luk);
+        self.short(s.hp).short(s.max_hp).short(s.mp).short(s.max_mp);
+        self.short(s.ap).short(s.sp).int(s.exp).short(s.fame);
+        self.int(0); // gacha exp
+        self.int(s.map_id).byte(s.spawn_point).int(0)
+    }
+
+    /// The v83 avatar look (`addCharLook` in HeavenMS).
+    pub fn look(&mut self, l: &game::AvatarLook, megaphone: bool) -> &mut Self {
+        self.byte(l.gender).byte(l.skin).int(l.face);
+        self.byte(if megaphone { 0 } else { 1 }).int(l.hair);
+        for (&slot, &id) in &l.visible {
+            self.byte(slot).int(id);
+        }
+        self.byte(0xFF);
+        for (&slot, &id) in &l.masked {
+            self.byte(slot).int(id);
+        }
+        self.byte(0xFF);
+        self.int(l.cash_weapon.unwrap_or(0));
+        self.int(0).int(0).int(0) // pet item ids
+    }
+
     /// Skip a field whose value is not under test (e.g. a timestamp).
     pub fn skip(&mut self, len: u64) -> &mut Self {
         self.cursor.set_position(self.at() + len);
