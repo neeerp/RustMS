@@ -6,6 +6,17 @@ CORES=$(nproc)
 
 mkdir -p libs
 
+# Pinned dependency revisions. These are the exact commits the client is known to build against.
+# (openal-soft and glfw were already pinned to short hashes that match these.)
+ALURE_REV=2b54c0d8b074ff1b84821c791556b3634c11764f
+OPENAL_SOFT_REV=f5e0eef34db3a3ab94b61a2f99f84f078ba947e7
+GLAD_REV=b5d260b65b3edbbd9e75f5a6c9924fe0ff4f04dd
+LZ4_REV=384eb158358a21f4c501cebc2cadd127cbd4fde2
+NOLIFENX_REV=8af296265f6ce4bffecd96f35323952e820fb45b
+GLFW_REV=0a49ef0a00baa3ab520ddc452f0e3b1e099c5589
+ASIO_REV=180bc40ea03ae95bf45dd6890e979ea9ffef54e8
+STB_REV=b42009b3b9d4ca35bc703f5310eedc74f584be58
+
 # fetch & build alure
 if [[
     ! -d "libs/alure/include" ||
@@ -16,6 +27,7 @@ if [[
     cd libs && \
     git clone https://github.com/kcat/alure && \
     cd alure && \
+    git checkout $ALURE_REV && \
     cd build && \
     cmake .. && \
     make -j$CORES
@@ -34,7 +46,7 @@ if [[
     cd libs && \
     git clone https://github.com/kcat/openal-soft && \
     cd openal-soft && \
-    git checkout f5e0eef && \
+    git checkout $OPENAL_SOFT_REV && \
     cd build && \
     cmake .. && \
     make -j$CORES
@@ -53,6 +65,7 @@ if [[
     cd libs && \
     git clone https://github.com/Dav1dde/glad.git && \
     cd glad && \
+    git checkout $GLAD_REV && \
     mkdir build && \
     cd build && \
     cmake .. && \
@@ -70,6 +83,7 @@ if [[
     cd libs && \
     git clone https://github.com/lz4/lz4.git && \
     cd lz4 && \
+    git checkout $LZ4_REV && \
     make -j$CORES && \
     echo "successfully compiled lz4"
     cd $SOURCE_DIR
@@ -86,6 +100,7 @@ if [[
     cd NoLifeNx && \
     git clone https://github.com/lain3d/NoLifeNx nlnx && \
     cd nlnx && \
+    git checkout $NOLIFENX_REV && \
     mkdir build && \
     cd build && \
     cmake .. && \
@@ -105,7 +120,7 @@ if [[
     cd libs && \
     git clone https://github.com/glfw/glfw && \
     cd glfw && \
-    git checkout 0a49ef0 && \
+    git checkout $GLFW_REV && \
     mkdir build && \
     cd build && \
     cmake .. && \
@@ -123,6 +138,7 @@ if [[
     echo "fetching asio..."
     cd libs && \
     git clone https://github.com/chriskohlhoff/asio.git && \
+    git -C asio checkout $ASIO_REV && \
     echo "successfully fetched asio"
     cd $SOURCE_DIR
 fi
@@ -135,6 +151,7 @@ if [[
     echo "fetching stb..."
     cd libs && \
     git clone https://github.com/nothings/stb.git && \
+    git -C stb checkout $STB_REV && \
     echo "successfully fetched stb"
     cd $SOURCE_DIR
 fi
