@@ -11,4 +11,5 @@ members = [
     "runtime",
     "tools/map-data-validator",
     "game-data",
+    "game",
 ]
