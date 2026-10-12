@@ -18,14 +18,17 @@
 #include "NxFiles.h"
 
 #include <fstream>
+#include <memory>
 
-#include <nlnx/node.hpp>
+#include <nlnx/file.hpp>
 #include <nlnx/nx.hpp>
 
 namespace ms
 {
 	namespace NxFiles
 	{
+		nl::node ui_classic;
+
 		Error init()
 		{
 			for (auto filename : filenames)
@@ -35,6 +38,11 @@ namespace ms
 			try
 			{
 				nl::nx::load_all();
+
+				// nl::nx::load_all only knows the standard files, so this one is
+				// opened here and stays open for the life of the client.
+				static std::unique_ptr<nl::file> ui_classic_file = std::make_unique<nl::file>("UIClassic.nx");
+				ui_classic = *ui_classic_file;
 			}
 			catch (const std::exception& ex)
 			{
@@ -47,6 +55,15 @@ namespace ms
 
 			if (nl::nx::ui.resolve(POSTCHAOS_BITMAP).data_type() != nl::node::type::bitmap)
 				return Error::Code::WRONG_UI_FILE;
+
+			// The pre-Big-Bang minimap rules out the newer UI.wz, and the Aran
+			// skill guide rules out UI.wz files from before v83.
+			constexpr const char* PREBB_BITMAP = "UIWindow.img/MiniMap/title";
+			constexpr const char* ARAN_BITMAP = "UIWindow.img/AranSkillGuide/0";
+
+			if (ui_classic.resolve(PREBB_BITMAP).data_type() != nl::node::type::bitmap
+				|| ui_classic.resolve(ARAN_BITMAP).data_type() != nl::node::type::bitmap)
+				return Error::Code::WRONG_UI_CLASSIC_FILE;
 
 			return Error::Code::NONE;
 		}

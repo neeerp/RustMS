@@ -23,12 +23,14 @@
 
 #include <array>
 
+#include <nlnx/node.hpp>
+
 namespace ms
 {
 	namespace NxFiles
 	{
 		// Number of needed files
-		constexpr uint8_t NUM_FILES = 18;
+		constexpr uint8_t NUM_FILES = 19;
 
 		// Names of the needed game files.
 		constexpr std::array<const char *, NUM_FILES> filenames =
@@ -50,8 +52,13 @@ namespace ms
 						"Sound.nx",
 						"String.nx",
 						"TamingMob.nx",
-						"UI.nx"            // From v209.2
+						"UI.nx",           // From v209.2
+						"UIClassic.nx"     // From v83
 				};
+
+		// The v83 UI, from UIClassic.nx. Windows move here from the newer UI.nx
+		// one at a time; see agent_docs/client.md.
+		extern nl::node ui_classic;
 
 		// Initialize NX
 		// When successful test if the UI file is the correct version
