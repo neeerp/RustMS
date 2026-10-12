@@ -172,3 +172,123 @@ pub fn parse_movement_state(
 
     Some((x, y, stance))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::codec::testing::Expect;
+    use game::AvatarLook;
+    use std::collections::BTreeMap;
+
+    fn avatar() -> FieldAvatar {
+        FieldAvatar {
+            id: 0x0102_0304,
+            name: "Tester".to_string(),
+            level: 10,
+            job: 100,
+            look: AvatarLook {
+                gender: 1,
+                skin: 2,
+                face: 20000,
+                hair: 30030,
+                visible: BTreeMap::from([(5, 1042003), (11, 1302000)]),
+                masked: BTreeMap::from([(5, 1040002)]),
+                cash_weapon: Some(1702000),
+            },
+            x: -120,
+            y: 275,
+            stance: 4,
+        }
+    }
+
+    /// `writeForeignBuffs` in HeavenMS with no active buffs; the reference
+    /// draws a random "magic spawn" int and repeats it six times.
+    fn foreign_buffs(expect: &mut Expect<'_>) {
+        expect.int(0).short(0).byte(0xFC).byte(1);
+        expect.int(0); // morph
+        expect.int(0); // buff mask (high)
+        expect.int(0); // buff mask (low)
+        expect.int(0).short(0).bytes(&[0; 4]); // energy charge
+        expect.int(0).bytes(&[0; 11]).short(0); // dash speed
+        expect.bytes(&[0; 9]).int(0).short(0).byte(0); // dash jump
+        expect.long(0); // monster riding
+        let magic = expect.read_int();
+        expect.bytes(&[0; 8]); // speed infusion
+        assert_eq!(expect.read_int(), magic);
+        expect.byte(0);
+        assert_eq!(expect.read_int(), magic);
+        expect.short(0);
+        expect.bytes(&[0; 9]); // homing beacon
+        assert_eq!(expect.read_int(), magic);
+        expect.int(0);
+        expect.bytes(&[0; 9]); // zombify
+        assert_eq!(expect.read_int(), magic);
+        expect.short(0).short(0);
+    }
+
+    #[test]
+    fn spawn_player_matches_reference() {
+        let avatar = avatar();
+        let packet = build_player_enter_field(&avatar).unwrap();
+
+        let mut expect = Expect::new(&packet.bytes);
+        expect.short(SendOpcode::SpawnPlayer as i16);
+        expect.int(0x0102_0304).byte(10).string("Tester");
+        expect.string("").bytes(&[0; 6]); // no guild
+        foreign_buffs(&mut expect);
+        expect.short(100);
+        expect.look(&avatar.look, false);
+        expect.int(0).int(0).int(0); // 5110000 count, item effect, chair
+        expect.short(-120).short(275).byte(4).short(0).byte(0);
+        expect.byte(0); // end of pets
+        expect.int(1).long(0); // mount level, exp and tiredness
+        expect.byte(0); // no shop or minigame box
+        expect.byte(0); // no chalkboard
+        expect.byte(0).byte(0).byte(0); // crush, friendship, marriage rings
+        expect.byte(0).byte(0).byte(0); // new year cards, two zero bytes
+        expect.byte(0); // team
+        expect.end();
+    }
+
+    #[test]
+    fn leave_field_is_just_the_character_id() {
+        let packet = build_player_leave_field(0x0102_0304).unwrap();
+        Expect::new(&packet.bytes)
+            .short(SendOpcode::RemovePlayerFromMap as i16)
+            .int(0x0102_0304)
+            .end();
+    }
+
+    #[test]
+    fn player_move_rebroadcasts_the_movement_bytes() {
+        let movement = [1u8, 0, 0x10, 0, 0x20, 0, 0, 0, 0, 0, 0, 0, 4, 0, 0x64, 0];
+        let packet = build_player_move(0x0102_0304, &movement).unwrap();
+
+        let mut expect = Expect::new(&packet.bytes);
+        expect.short(SendOpcode::MovePlayer as i16);
+        expect.int(0x0102_0304).int(0);
+        expect.bytes(&movement);
+        expect.end();
+    }
+
+    #[test]
+    fn local_chat_matches_reference() {
+        let packet = build_local_chat(0x0102_0304, "hi all", false, 1).unwrap();
+        Expect::new(&packet.bytes)
+            .short(SendOpcode::ChatText as i16)
+            .int(0x0102_0304)
+            .byte(0)
+            .string("hi all")
+            .byte(1)
+            .end();
+
+        let admin = build_local_chat(7, "notice", true, 0).unwrap();
+        Expect::new(&admin.bytes)
+            .short(SendOpcode::ChatText as i16)
+            .int(7)
+            .byte(1)
+            .string("notice")
+            .byte(0)
+            .end();
+    }
+}

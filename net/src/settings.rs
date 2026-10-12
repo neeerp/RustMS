@@ -1,4 +1,5 @@
 use config::{Config, ConfigError, File};
+use std::sync::OnceLock;
 
 #[derive(Debug, Deserialize)]
 pub struct Login {
@@ -19,4 +20,13 @@ impl Settings {
 
         s.try_into()
     }
+}
+
+/// The login server settings, read from `config/login_server_config` once.
+pub fn login_settings() -> Result<&'static Settings, ConfigError> {
+    static SETTINGS: OnceLock<Result<Settings, String>> = OnceLock::new();
+    SETTINGS
+        .get_or_init(|| Settings::new().map_err(|e| e.to_string()))
+        .as_ref()
+        .map_err(|message| ConfigError::Message(message.clone()))
 }
