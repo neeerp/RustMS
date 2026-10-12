@@ -83,6 +83,9 @@ namespace ms
 	private:
 		TalkType get_by_value(int8_t value);
 
+		// The text area's rows, relative to the window.
+		Range<int16_t> visible_rows() const;
+
 		// Send a response to the server, or to the local responder if set.
 		void respond(int8_t response, int32_t selection = -1);
 

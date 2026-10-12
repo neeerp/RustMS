@@ -23,6 +23,9 @@
 #include "../Gameplay/Stage.h"
 
 #include "../Net/Packets/NpcInteractionPackets.h"
+#include "../../Data/ItemData.h"
+#include "../../Util/Misc.h"
+#include "../../Util/NpcTextMarkup.h"
 
 #include <nlnx/nx.hpp>
 
@@ -108,15 +111,33 @@ namespace ms
 		{
 			text.draw(position + Point<int16_t>(166, 32));
 		}
+		// Choices scroll with the text and are clipped to the same area.
+		Range<int16_t> visible = visible_rows();
+		Range<int16_t> clip(position.y() + visible.first(), position.y() + visible.second());
+
 		for (const auto &choice : choices)
 		{
-			Point<int16_t> at = position + Point<int16_t>(166, choice.y - offset * 32);
+			int16_t y = choice.y - offset * 32;
+			Point<int16_t> at = position + Point<int16_t>(166, y);
 
 			if (choice.header.is_valid())
-				choice.header.draw(at - Point<int16_t>(0, choice.header.height() + 2));
+			{
+				int16_t header_top = y - choice.header.height() - 2;
 
-			choice.label.draw(at);
+				if (header_top >= visible.first() && y <= visible.second())
+					choice.header.draw(at - Point<int16_t>(0, choice.header.height() + 2));
+			}
+
+			choice.label.draw(at, clip);
 		}
+	}
+
+	Range<int16_t> UINpcTalk::visible_rows() const
+	{
+		// Relative to the window: the text area between the top and the buttons.
+		int16_t first = top.height() - 1;
+
+		return Range<int16_t>(first, show_slider ? first + height - 18 : first + height + 24);
 	}
 
 	void UINpcTalk::update()
@@ -256,6 +277,9 @@ namespace ms
 			for (const auto &choice : choices)
 			{
 				int16_t y = choice.y - offset * 32;
+				Range<int16_t> visible = visible_rows();
+				if (y + 12 < visible.first() || y + 12 > visible.second())
+					continue;
 				if (Rectangle<int16_t>(166, 486, y, y + 24).contains(cursor_relative))
 				{
 					if (clicked)
@@ -328,47 +352,15 @@ namespace ms
 			}
 			else formatted_text += tx[i];
 		}
-		size_t begin = formatted_text.find("#p");
+		NpcTextMarkup::Lookups lookups {
+			[]() { return Stage::get().get_player().get_name(); },
+			[](int32_t id) { return std::string(nl::nx::string["Npc.img"][std::to_string(id)]["name"]); },
+			[](int32_t id) { return ItemData::get(id).get_name(); },
+			[](int32_t id) { return std::string(nl::nx::string["Mob.img"][std::to_string(id)]["name"]); },
+			[](int32_t id) { return NxHelper::Map::get_map_info_by_id(id).name; }
+		};
 
-		if (begin != std::string::npos)
-		{
-			size_t end = formatted_text.find("#", begin + 1);
-
-			if (end != std::string::npos)
-			{
-				std::string namestr = nl::nx::string["Npc.img"][std::to_string(npcid)]["name"];
-				formatted_text.replace(begin, end - begin, namestr);
-			}
-		}
-
-		begin = formatted_text.find("#h");
-
-		if (begin != std::string::npos)
-		{
-			size_t end = formatted_text.find("#", begin + 1);
-
-			if (end != std::string::npos)
-			{
-				std::string charstr = Stage::get().get_player().get_name();
-				formatted_text.replace(begin, end - begin + 1, charstr);
-			}
-		}
-
-		begin = formatted_text.find("#t");
-
-		if (begin != std::string::npos)
-		{
-			size_t end = formatted_text.find("#", begin + 1);
-
-			if (end != std::string::npos)
-			{
-				size_t b = begin + 2;
-				int32_t itemid = std::stoi(formatted_text.substr(b, end - b));
-				std::string itemname = nl::nx::string["Consume.img"][itemid]["name"];
-
-				formatted_text.replace(begin, end - begin, itemname);
-			}
-		}
+		formatted_text = NpcTextMarkup::expand(formatted_text, lookups);
 
 		return formatted_text;
 	}

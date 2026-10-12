@@ -21,6 +21,8 @@ if(HEAVENCLIENT_BUILD_TESTS)
     add_test(NAME frame_assembler COMMAND frame_assembler_tests)
     add_executable(quest_dialogue_tests tests/quest_dialogue.cpp)
     add_test(NAME quest_dialogue COMMAND quest_dialogue_tests)
+    add_executable(npc_text_tests tests/npc_text.cpp)
+    add_test(NAME npc_text COMMAND npc_text_tests)
     # Loads every quest in game-data/supported_quests.txt from Quest.nx.
     # Skipped when Quest.nx is absent.
     add_executable(quest_catalog_tests tests/quest_catalog.cpp Character/QuestCatalog.cpp)
@@ -470,6 +472,7 @@ add_executable(HeavenClient
     Util/Lerp.h
     Util/Misc.cpp
     Util/Misc.h
+    Util/NpcTextMarkup.h
     Util/NxFiles.cpp
     Util/NxFiles.h
     Util/QuadTree.h
