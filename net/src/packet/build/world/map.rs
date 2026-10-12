@@ -19,3 +19,24 @@ pub fn build_warp_to_map(stats: &CharacterStats, channel_id: u8) -> Result<Packe
     packet.write_long(filetime(SystemTime::now()))?;
     Ok(packet)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::codec::stats::sample_stats;
+    use crate::codec::testing::Expect;
+
+    #[test]
+    fn warp_to_map_matches_reference() {
+        let packet = build_warp_to_map(&sample_stats(), 1).unwrap();
+
+        let mut expect = Expect::new(&packet.bytes);
+        expect.short(SendOpcode::SetField as i16);
+        expect.int(1); // zero-based channel
+        expect.int(0).byte(0); // "change map" rather than "enter world"
+        expect.int(100000000).byte(2).short(300);
+        expect.byte(0); // no explicit spawn position
+        expect.skip(8); // FILETIME now
+        expect.end();
+    }
+}

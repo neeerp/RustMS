@@ -22,6 +22,7 @@
 #include <cstdint>
 
 #include "Cryptography.h"
+#include "FrameAssembler.h"
 #include "PacketSwitch.h"
 
 #include "../Error.h"
@@ -63,10 +64,11 @@ namespace ms
 		Cryptography cryptography;
 		PacketSwitch packetswitch;
 
-		int8_t buffer[MAX_PACKET_LENGTH];
-		size_t length;
-		size_t pos;
+		// Reassembles frames that arrive split across reads
+		FrameAssembler assembler;
 		bool connected;
+		// Set when a new connection was opened, so process() can stop using stale input
+		bool reconnected;
 
 #ifdef USE_ASIO
 		SocketAsio socket;

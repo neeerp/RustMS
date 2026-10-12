@@ -2,189 +2,65 @@
 
 ## Overview
 
-Field-local runtime state lives in `runtime/src/actor/field.rs`.
+`FieldActor` (`runtime/src/actor/field.rs`) owns one live copy of a map,
+identified by `FieldKey { channel_id, map_id, instance_id }`
+(`runtime/src/message.rs`). Every connected character is in exactly one field:
+`channel_id` is the channel whose listener accepted the connection,
+`map_id` is the character's map, and `instance_id` is `0` until instanced
+content exists.
 
-`FieldActor` owns one live field copy identified by `FieldKey`. A field copy is the unit that holds same-map occupants and broadcasts local gameplay packets.
+Fields are created on demand by `FieldRegistry` and kept alive afterwards.
 
-## Field identity
+## What a field owns
 
-`FieldKey` lives in `runtime/src/message.rs`:
+- **Occupants**: a `ClientHandle` plus a `game::FieldAvatar` per character
+  (id, name, level, job, avatar look, live `x`/`y`/`stance`). The avatar is a
+  projection built by the owning `ClientActor`; the field only updates the
+  position from movement packets.
+- **Static NPCs** from the map data, with object ids starting at
+  `1_000_000_000`.
+- **Time**: a 100 ms tick (`on_tick`). Nothing is time-driven yet; mobs,
+  respawns, and drop expiry go here.
 
-```rust
-pub struct FieldKey {
-    pub channel_id: u8,
-    pub map_id: i32,
-    pub instance_id: u32,
-}
-```
+A field does not own character state (stats, inventory, quests). Those live
+in the client's `Player`.
 
-The current runtime maps connected characters to:
+## Messages
 
-- `channel_id = 0`
-- `instance_id = 0`
-- `map_id = character.map_id`
+`FieldMessage`:
 
-## Field character state
+| Message | Effect |
+| --- | --- |
+| `Join { handle, avatar }` | Send map NPCs and existing occupants to the newcomer, announce the newcomer to everyone, then add it |
+| `Leave { client_id }` | Remove the occupant and broadcast `RemovePlayerFromMap` |
+| `UpdateAvatar { client_id, avatar }` | Replace the projection (keeping the live position), e.g. after a level-up |
+| `Chat { from, packet }` | Broadcast to everyone, sender included |
+| `Move { from, packet, movement_bytes }` | Update the mover's position from the movement fragment, broadcast to everyone else |
+| `NpcInteraction { from, object_id, request_id }` | Validate the NPC is on this map, then tell the client which NPC id to talk to |
 
-Each occupant is stored as a `FieldCharacter`.
+All sends to clients use `ClientHandle::send` (`try_send`); a client whose
+queue is full is disconnected rather than allowed to block the field.
 
-`FieldCharacter` includes:
+## Map changes
 
-- `id`
-- `name`
-- `level`
-- `job`
-- `face`
-- `hair`
-- `skin`
-- `gender`
-- `map_id`
-- `x`
-- `y`
-- `stance`
+`ChangeMapHandler` resolves the destination (portal link or permitted map-id
+warp), updates the player's map and spawn point, sends the warp, and returns
+`WorldAction::ChangeField`. The client actor then leaves the old field and
+joins the new one at the spawn portal's position.
 
-`ClientActor` creates the initial `FieldCharacter` during world reattach.
+World entry uses the same spawn-portal lookup (`net::spawn_position`) instead
+of a hard-coded position.
 
-The seeded position is:
+## Packets
 
-- `x = 240`
-- `y = 190`
-- `stance = 2`
-
-That seed matches the start-map spawn snapshot used by the field packet builder.
-
-## Ownership model
-
-`WorldServerActor` owns field lookup.
-
-`FieldActor` owns:
-
-- occupant membership
-- local join replay
-- local leave broadcast
-- local movement fanout
-- local chat fanout
-- live `x/y/stance` updates derived from movement fragments
-
-`FieldActor` does not own:
-
-- map transition orchestration
-- NPCs
-- mobs
-- drops
-- reactors
-- AOI partitioning
-- instance allocation policy
-
-## Field messages
-
-`FieldMessage` lives in `runtime/src/message.rs`:
-
-- `Join`
-- `Leave`
-- `Chat`
-- `Move`
-
-`Move` carries:
-
-- the prebuilt `MovePlayer` packet
-- the raw movement fragment used to update local field state
-
-## Join flow
-
-Join handling in `FieldActor` does three things:
-
-1. send all existing occupants to the joining client as `SpawnPlayer`
-2. send the joining player to all existing occupants as `SpawnPlayer`
-3. insert the new occupant into the field table
-
-The spawn packet is built from the occupant’s `FieldCharacter` snapshot.
-
-## Leave flow
-
-Leave handling:
-
-1. removes the occupant from the field table
-2. broadcasts `RemovePlayerFromMap` to the remaining occupants
-
-## Movement flow
-
-Movement handling starts in `PlayerMoveHandler`:
-
-- strip the v83 movement header
-- keep the movement fragment
-- build a `MovePlayer` packet
-- emit `HandlerAction::FieldMove`
-
-The message path is:
-
-1. `PlayerMoveHandler`
-2. `ClientActor`
-3. `WorldServerActor`
-4. `FieldActor`
-
-Inside `FieldActor`, `parse_movement_state` reads the movement fragment and updates the mover’s:
-
-- `x`
-- `y`
-- `stance`
-
-The movement packet is then broadcast to every other occupant in that field.
-
-## Chat flow
-
-Local chat handling starts in `AllChatHandler`:
-
-- read the message
-- read the show mode
-- build a `ChatText` packet
-- emit `HandlerAction::FieldChat`
-
-The message path is:
-
-1. `AllChatHandler`
-2. `ClientActor`
-3. `WorldServerActor`
-4. `FieldActor`
-
-`FieldActor` broadcasts the chat packet to all occupants of the field, including the sender.
-
-## Field packet builders
-
-Field-local packet builders live in `net/src/packet/build/world/field.rs`.
-
-They build:
-
-- `SpawnPlayer`
-- `RemovePlayerFromMap`
-- `MovePlayer`
-- `ChatText`
-
-The same module also defines:
-
-- `default_spawn_position`
-- `parse_movement_state`
-
-Foreign-player look data is synthesized from:
-
-- character appearance fields
-- default equipment ids for overall, shoes, and weapon
-
-## Relationship to map changes
-
-`ChangeMapHandler` updates persistent `map_id` and emits map packets directly.
-
-Field membership does not move across field actors during a map change. A field-aware leave/join handoff is a separate piece of work.
+Field packets are built in `net/src/packet/build/world/field.rs`
+(`SpawnPlayer`, `RemovePlayerFromMap`, `MovePlayer`, `ChatText`) and
+`npc.rs` (`SpawnNpc`). `SpawnPlayer` encodes the avatar's real equipment
+through `net::codec::encode_avatar_look`.
 
 ## Tests
 
-Field-local behavior is covered in two places:
-
-- unit tests in `runtime/src/actor/field.rs`
-- end-to-end integration tests in `integration-harness/tests/`
-
-The integration harness covers:
-
-- same-map presence
-- same-map movement
-- same-map local chat
+- Unit tests in `runtime/src/actor/field.rs`: join/leave visibility, and a
+  stalled client being kicked without blocking others.
+- Integration tests: same-map presence, movement, chat, portal transfers,
+  NPC spawns, cross-channel isolation, and starting equipment on spawn.

@@ -240,7 +240,7 @@ fn world_routes() -> &'static HashMap<i16, WorldRoute> {
             (Op::ChangeChannel, InGame(&world::ChangeChannelHandler)),
             (Op::ChangeMap, InGame(&world::ChangeMapHandler)),
             (Op::PlayerMapTransfer, InGame(&world::PlayerMapTransferHandler)),
-            (Op::PlayerUpdate, InGame(&world::PlayerUpdateHandler)),
+            (Op::PartySearchUpdate, InGame(&world::PartySearchUpdateHandler)),
             (Op::ChangeKeybinds, InGame(&world::ChangeKeybindsHandler)),
             (Op::AllChat, InGame(&world::AllChatHandler)),
             (Op::Whisper, InGame(&world::WhisperHandler)),

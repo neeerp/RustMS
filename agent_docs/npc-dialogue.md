@@ -25,8 +25,8 @@ with packets. Persisted progress is separate from transient conversation state.
 ## Runtime ownership
 
 TalkToNpc (0x3A) and NpcTalkMore (0x3C) are parsed into `NpcInteraction` actions.
-Start requests pass through WorldServerActor and ChannelActor to the player's
-FieldActor, which resolves the object ID against its own NPC list. The field
+Start requests go straight from the ClientActor to the player's FieldActor,
+which resolves the object ID against its own NPC list. The field
 returns the validated template ID, location, and a server-generated request ID.
 ClientActor rejects late replies after another NPC click or a map transfer.
 

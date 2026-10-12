@@ -211,7 +211,8 @@ namespace ms
 		}
 
 		// Read the port address in a string
-		std::string portstr = std::to_string(recv.read_short());
+		// The port is unsigned on the wire; read_short would turn ports above 32767 negative.
+		std::string portstr = std::to_string(static_cast<uint16_t>(recv.read_short()));
 
 		// Attempt to reconnect to the server
 		Session::get().reconnect(addrstr.c_str(), portstr.c_str());

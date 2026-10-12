@@ -156,8 +156,9 @@ namespace ms
 
 		if (loginwait && loginwait->is_active())
 		{
-			uint8_t channel_id = recv.read_byte();
-			Configuration::get().set_channelid(channel_id);
+			// First byte is a status byte, not the channel. The selected channel is tracked
+			// client-side by UIWorldSelect / UIChannel and must not be overwritten here.
+			recv.skip_byte();
 
 			// Parse all characters
 			std::vector<CharEntry> characters;
@@ -189,7 +190,7 @@ namespace ms
 		LoginParser::parse_login(recv);
 
 		int32_t cid = recv.read_int();
-		PlayerLoginPacket(cid, Configuration::get().get_channelid()).dispatch();
+		PlayerLoginPacket(cid).dispatch();
 	}
 
 	void CharnameResponseHandler::handle(InPacket& recv) const

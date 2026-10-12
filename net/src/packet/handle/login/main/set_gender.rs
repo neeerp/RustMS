@@ -25,7 +25,10 @@ impl LoginHandler for SetGenderHandler {
         user.gender = i16::from(gender);
         let user = account::update_account(&user)?;
 
-        let login_packet = build::login::status::build_successful_login_packet(&user)?;
+        let login_packet = build::login::status::build_successful_login_packet(
+            &user,
+            crate::settings::login_settings()?.login.pin_required,
+        )?;
         Ok(HandlerResult::reply(login_packet))
     }
 }

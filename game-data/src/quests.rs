@@ -328,10 +328,10 @@ mod tests {
     use super::*;
     #[test]
     fn loads_existing_contact_quests_without_enabling_item_objectives() {
-        let data = ContactQuestData::load_from_nx(
-            Path::new(env!("CARGO_MANIFEST_DIR")).join("../assets/game-data/Quest.nx"),
-        )
-        .unwrap();
+        let Some(path) = crate::test_assets::path("Quest.nx") else {
+            return;
+        };
+        let data = ContactQuestData::load_from_nx(path).unwrap();
         let heena = data.quest(1031).unwrap();
         assert_eq!(
             (
@@ -355,10 +355,10 @@ mod tests {
     }
     #[test]
     fn loads_all_seven_quizzes_from_assets() {
-        let data = QuizQuestData::load_from_nx(
-            Path::new(env!("CARGO_MANIFEST_DIR")).join("../assets/game-data/Quest.nx"),
-        )
-        .unwrap();
+        let Some(path) = crate::test_assets::path("Quest.nx") else {
+            return;
+        };
+        let data = QuizQuestData::load_from_nx(path).unwrap();
         let answers: Vec<_> = data.quests().map(|q| q.correct_choice).collect();
         assert_eq!(answers, [0, 0, 0, 3, 1, 2, 0]);
         assert_eq!(data.quests().map(|q| q.experience).sum::<i32>(), 62);

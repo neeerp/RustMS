@@ -4,12 +4,15 @@ This repository is a Rust workspace for a MapleStory server plus a nested C++ cl
 
 ## Documentation index
 
-- `agent_docs/server-architecture.md`: server-side actor model, handler boundaries, and login-to-world flow
+- `agent_docs/server-architecture.md`: crates, actor topology, state ownership, persistence, sessions, handler registry, and how to add a feature
+- `agent_docs/fields.md`: field actors, occupants, map changes, and field packets
 - `agent_docs/npc-dialogue.md`: asset-backed conversations, runtime ownership, and future quest integration
 - `agent_docs/quests.md`: original beginner NPC visits and Rain's quizzes, persistence, rewards, and supported scope
 - `agent_docs/map-travel.md`: asset portal links, active beginner route, and legacy map variants
 - `agent_docs/client-testing.md`: fast client logic tests and private-display GUI verification
 - `agent_docs/quest-window.md`: original quest UI assets, layout, controls, and visual validation
+- `agent_docs/client.md`: HeavenClient origin, license, NX file versions, feature status, and fixed protocol deviations
+- `agent_docs/scripting.md`: proposed decision for data-driven quests plus Lua scripts
 - `agent_docs/integration-harness-usage.md`: commands, prerequisites, and day-to-day harness workflow
 - `agent_docs/integration-harness-architecture.md`: harness design, lifecycle, and test isolation model
 - `agent_docs/integration-harness-troubleshooting.md`: common harness failures and targeted fixes
@@ -18,7 +21,9 @@ This repository is a Rust workspace for a MapleStory server plus a nested C++ cl
 
 - `rust-ms`: binaries (`login`, `world`)
 - `runtime`: actor runtime and message types
-- `net`: packet handlers/builders and handler/action abstractions
+- `net`: packet handlers/builders, the opcode registry, and shared encoders (`net::codec`)
+- `game`: domain model (`Player`, stats, look, inventory, skills, keymap, quests)
+- `game-data`: static data read from NX files (see `assets/game-data/README.md`)
 - `db`: Diesel-backed persistence and repositories
 - `packet`: packet type plus read/write helpers
 - `crypt`: MapleStory crypto helpers
@@ -69,7 +74,8 @@ Notes:
 - `HeavenClient/MapleStory.h` has `USE_CRYPTO` enabled; keep that on for RustMS.
 - The generated executable is `HeavenClient/cmake-build/HeavenClient`.
 - The client reads host/port from a `Settings` file. Defaults are `ServerIP = 127.0.0.1` and `ServerPort = 8484`.
-- The login server currently redirects to world on `127.0.0.1:8485`, so the standard setup is fully local unless that packet builder is changed.
+- By default the world server hosts three channels on `127.0.0.1:8485`, `8486`, and `8487` (one port per channel; configure with `RUSTMS_LOGIN_CHANNELS`), so the standard setup is fully local.
+- Set `RUSTMS_ALLOW_DEBUG_WARPS=1` on the world server to allow map-id warps for every player during local testing.
 
 Run the client:
 
@@ -91,6 +97,8 @@ cargo run -p integration-harness --bin harnessctl -- test
 ```
 
 Use `harnessctl` as the default integration-harness entrypoint because it brings up the isolated Docker stack, runs the tests against the harness endpoints, and tears the stack down.
+
+If another checkout (for example a worktree used by a parallel session) may be running the harness, give yours its own stack first; see "Running several stacks at once" in `agent_docs/integration-harness-usage.md`.
 
 If you need to run a specific integration test while reusing an already-running harness stack, use:
 

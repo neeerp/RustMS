@@ -1,3 +1,5 @@
-# Keep this directory in git, ignore everything else in it.
+# Keep this directory in git, ignore the (large, unredistributable) NX files.
 *
 !.gitignore
+!README.md
+!SHA256SUMS
