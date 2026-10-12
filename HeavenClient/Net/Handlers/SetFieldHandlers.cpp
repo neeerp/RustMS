@@ -118,9 +118,17 @@ namespace ms
 			return;
 		}
 
-		Stage::get().loadplayer(*playerentry);
+		// The cached entry is the character-select snapshot; after a channel
+		// change its map and stats are stale, so take them from this packet.
+		// Only the character list carries rankings, so keep those.
+		CharEntry entry = *playerentry;
+		StatsEntry stats = LoginParser::parse_stats(recv);
+		stats.rank = entry.stats.rank;
+		stats.jobrank = entry.stats.jobrank;
+		entry.stats = stats;
+		cached_player_entry = entry;
 
-		LoginParser::parse_stats(recv);
+		Stage::get().loadplayer(entry);
 
 		Player& player = Stage::get().get_player();
 
