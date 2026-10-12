@@ -15,6 +15,7 @@ pub enum SendOpcode {
     LastConnectedWorld = 0x1A,
     RecommendedWorlds = 0x1B,
 
+    InventoryOperation = 0x1D,
     StatChange = 0x1F,
     ShowStatusInfo = 0x27,
 
@@ -31,6 +32,7 @@ pub enum SendOpcode {
     UpdateQuestInfo = 0xD3,
     PlayerHint = 0xD6,
     MovePlayer = 0xB9,
+    UpdateCharLook = 0xC5,
     SpawnNpc = 0x101,
     NpcDialogue = 0x130,
 

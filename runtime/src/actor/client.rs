@@ -243,6 +243,15 @@ impl ClientActor {
             }) => self.respond_to_npc(message_type, response).await?,
             WorldAction::Quest(request) => self.request_quest_action(request).await?,
             WorldAction::ScriptPortal { portal } => self.touch_script_portal(&portal).await?,
+            WorldAction::LookChanged(announce) => {
+                let avatar = self.in_game()?.player.field_avatar(0, 0, 0);
+                self.send_to_field(FieldMessage::UpdateAvatar {
+                    client_id: self.client_id,
+                    avatar,
+                    announce: Some(announce),
+                })
+                .await?
+            }
             WorldAction::Whisper(delivery) => {
                 self.send_to_directory(DirectoryMessage::Whisper {
                     from: self.client_id,

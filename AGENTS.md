@@ -9,6 +9,7 @@ This repository is a Rust workspace for a MapleStory server plus a nested C++ cl
 - `agent_docs/npc-dialogue.md`: asset-backed conversations, runtime ownership, and future quest integration
 - `agent_docs/quests.md`: the v83 client-driven quest flow, supported requirements/actions, persistence, and rewards
 - `agent_docs/map-travel.md`: asset portal links, active beginner route, legacy map variants, and map/portal scripts
+- `agent_docs/inventory.md`: inventory operations, item data, item moves, and their packets
 - `agent_docs/server-content.md`: the ignored content pack (script text, drops), placeholders, and the importer
 - `agent_docs/client-testing.md`: fast client logic tests and private-display GUI verification
 - `agent_docs/quest-window.md`: original quest UI assets, layout, controls, and visual validation

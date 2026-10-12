@@ -2,6 +2,7 @@ pub mod channel;
 pub mod char;
 pub mod effect;
 pub mod field;
+pub mod inventory;
 pub mod keymap;
 pub mod map;
 pub mod messaging;

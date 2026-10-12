@@ -11,6 +11,8 @@ mod game_data;
 pub mod handler;
 mod helpers;
 mod io;
+pub mod items;
+mod load;
 pub mod login_world;
 mod npc_data;
 pub mod packet;

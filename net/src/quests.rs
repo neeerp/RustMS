@@ -2,23 +2,19 @@
 //! and sends `QUEST_ACTION`; the server checks the request against the
 //! catalog and the player's state before anything is persisted.
 
+use crate::load;
 use game::{Player, QuestState};
 pub use game_data::quests::{QuestCatalog, QuestPrerequisite, QuestTemplate, StartRequirements};
-use std::path::PathBuf;
 use std::sync::OnceLock;
 
-static CATALOG: OnceLock<Result<QuestCatalog, String>> = OnceLock::new();
-
 pub fn catalog() -> Result<&'static QuestCatalog, &'static str> {
-    CATALOG
-        .get_or_init(|| {
-            let path = std::env::var("RUSTMS_QUEST_NX_PATH")
-                .map(PathBuf::from)
-                .unwrap_or_else(|_| PathBuf::from("assets/game-data/Quest.nx"));
-            QuestCatalog::load_from_nx(path).map_err(|e| e.to_string())
-        })
-        .as_ref()
-        .map_err(|e| e.as_str())
+    static CATALOG: OnceLock<Result<QuestCatalog, String>> = OnceLock::new();
+    load::once(&CATALOG, || {
+        QuestCatalog::load_from_nx(load::asset_path(
+            "RUSTMS_QUEST_NX_PATH",
+            "assets/game-data/Quest.nx",
+        ))
+    })
 }
 
 /// A parsed `QUEST_ACTION`.

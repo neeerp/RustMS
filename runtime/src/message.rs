@@ -125,6 +125,8 @@ pub enum FieldMessage {
     UpdateAvatar {
         client_id: ClientId,
         avatar: FieldAvatar,
+        /// Sent to everyone else on the map (e.g. UPDATE_CHAR_LOOK).
+        announce: Option<Packet>,
     },
     Chat {
         from: ClientId,

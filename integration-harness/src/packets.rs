@@ -212,6 +212,8 @@ pub fn opcode_name(opcode: i16) -> &'static str {
         x if x == SendOpcode::UpdateQuestInfo as i16 => "UpdateQuestInfo",
         x if x == SendOpcode::PlayerHint as i16 => "PlayerHint",
         x if x == SendOpcode::ShowItemGainInChat as i16 => "ShowItemGainInChat",
+        x if x == SendOpcode::InventoryOperation as i16 => "InventoryOperation",
+        x if x == SendOpcode::UpdateCharLook as i16 => "UpdateCharLook",
         _ => "Unknown",
     }
 }

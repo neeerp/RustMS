@@ -5,6 +5,7 @@ use std::collections::{BTreeMap, HashMap};
 use std::fs::File;
 use std::path::Path;
 use thiserror::Error;
+pub mod items;
 pub mod lua_strings;
 pub mod quests;
 pub mod server_content;

@@ -75,6 +75,7 @@ async fn preload_game_data() -> Result<(), RuntimeError> {
             supported = quests.supported().count(),
             "Quest catalog loaded"
         );
+        net::items::data().map_err(|e| format!("item data: {e}"))?;
         info!("Server content: {}", net::content::load()?);
         Ok(())
     })

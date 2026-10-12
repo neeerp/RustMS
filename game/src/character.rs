@@ -185,6 +185,12 @@ impl Player {
         &mut self.keymap
     }
 
+    /// Mutable access to the inventory; marks the player as needing a save.
+    pub fn inventory_mut(&mut self) -> &mut Inventory {
+        self.dirty = true;
+        &mut self.inventory
+    }
+
     /// Flag in-memory changes that have not been persisted yet. Mutators on
     /// this type call this themselves; use it after editing public fields.
     pub fn mark_dirty(&mut self) {

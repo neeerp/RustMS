@@ -161,8 +161,12 @@ impl ClientActor {
             // Players joining the map later should see the new level.
             let avatar = self.in_game()?.player.field_avatar(0, 0, 0);
             let client_id = self.client_id;
-            self.send_to_field(FieldMessage::UpdateAvatar { client_id, avatar })
-                .await?;
+            self.send_to_field(FieldMessage::UpdateAvatar {
+                client_id,
+                avatar,
+                announce: None,
+            })
+            .await?;
         }
         Ok(())
     }

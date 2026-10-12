@@ -85,7 +85,14 @@ impl FieldActor {
         match message {
             FieldMessage::Join { handle, avatar } => self.handle_join(handle, avatar),
             FieldMessage::Leave { client_id } => self.handle_leave(client_id),
-            FieldMessage::UpdateAvatar { client_id, avatar } => {
+            FieldMessage::UpdateAvatar {
+                client_id,
+                avatar,
+                announce,
+            } => {
+                if let Some(packet) = announce {
+                    self.broadcast(Some(client_id), packet);
+                }
                 if let Some(occupant) = self.occupants.get_mut(&client_id) {
                     // Keep the live position; take everything else.
                     let (x, y, stance) =
