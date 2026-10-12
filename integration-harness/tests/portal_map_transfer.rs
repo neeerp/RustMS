@@ -148,6 +148,7 @@ async fn read_next_set_field_warp(
             }
             x if x == SendOpcode::StatChange as i16 => continue,
             x if x == SendOpcode::SpawnNpc as i16 => continue,
+            x if x == SendOpcode::FieldEffect as i16 => continue,
             x if x == SendOpcode::SpawnPlayer as i16
                 || x == SendOpcode::RemovePlayerFromMap as i16 =>
             {

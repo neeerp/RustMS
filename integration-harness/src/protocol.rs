@@ -341,11 +341,29 @@ async fn drain_spawn_npcs(connection: &mut MapleTestConnection) {
     )
     .await
     {
-        if envelope.opcode() != SendOpcode::SpawnNpc as i16 {
+        // Map setup: NPC spawns and the map entry banner.
+        if envelope.opcode() != SendOpcode::SpawnNpc as i16
+            && envelope.opcode() != SendOpcode::FieldEffect as i16
+        {
             connection.push_back_packet(envelope);
             break;
         }
     }
+}
+
+/// Log in again right after dropping a session. The server closes the old
+/// session asynchronously, so an immediate login may still be refused as a
+/// duplicate (status 7); retry for a few seconds.
+pub async fn relogin(config: &HarnessConfig) -> WorldSession {
+    let mut last_error = None;
+    for _ in 0..20 {
+        match login_to_world_session(config).await {
+            Ok(session) => return session,
+            Err(error) => last_error = Some(error),
+        }
+        tokio::time::sleep(Duration::from_millis(250)).await;
+    }
+    panic!("relogin failed: {last_error:?}");
 }
 
 pub async fn login_two_players_to_world(

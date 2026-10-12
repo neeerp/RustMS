@@ -20,9 +20,9 @@ async fn in_amherst(
     config: &integration_harness::config::HarnessConfig,
     trace: &mut QuestTrace,
 ) -> WorldSession {
-    let mut session = integration_harness::login_to_world_session(config)
-        .await
-        .unwrap();
+    // Tests reconnect right after dropping a session; relogin waits out the
+    // server closing the old one.
+    let mut session = integration_harness::relogin(config).await;
     if session.map_id != AMHERST {
         assert_eq!(
             warp(&mut session.connection, AMHERST, "", trace).await,
@@ -59,9 +59,7 @@ async fn seven_quizzes_award_once_and_survive_map_changes_and_relogin() {
     assert_eq!(warp(c, 10_000, "", &mut trace).await, 10_000);
     assert_eq!(warp(c, AMHERST, "", &mut trace).await, AMHERST);
     drop(session);
-    let restored = integration_harness::login_to_world_session(&config)
-        .await
-        .unwrap();
+    let restored = integration_harness::relogin(&config).await;
     assert_eq!((restored.level, restored.ap, restored.exp), (3, 10, 13));
     assert_eq!(restored.quests.len(), 7);
     assert!(restored.quests.values().all(|state| *state == 2));
@@ -107,9 +105,7 @@ async fn invalid_actions_are_refused_and_progress_is_per_character() {
     act(c, &mut trace, &m, START, 1009, RAIN).await;
     drop(session);
 
-    let restored = integration_harness::login_to_world_session(&config)
-        .await
-        .unwrap();
+    let restored = integration_harness::relogin(&config).await;
     assert_eq!(restored.quests.get(&1009), Some(&1));
     assert!(trace.gains.is_empty());
     let isolated = integration_harness::login_to_world_session(&other)

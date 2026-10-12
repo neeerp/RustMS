@@ -28,6 +28,7 @@ async fn read_world_entry(
             x if x == SendOpcode::KeyMap as i16 => saw_keymap = true,
             x if x == SendOpcode::SetField as i16 => saw_set_field = true,
             x if x == SendOpcode::SpawnNpc as i16 => {}
+            x if x == SendOpcode::FieldEffect as i16 => {}
             opcode => {
                 return Err(HarnessError::protocol(
                     "world entry",
@@ -63,6 +64,7 @@ async fn read_until_opcode(
         match envelope.opcode() {
             opcode if opcode == expected_opcode => return Ok(envelope),
             x if x == SendOpcode::SpawnNpc as i16 => {}
+            x if x == SendOpcode::FieldEffect as i16 => {}
             x if x == SendOpcode::SpawnPlayer as i16 => {}
             x if x == SendOpcode::RemovePlayerFromMap as i16 => {}
             opcode => {

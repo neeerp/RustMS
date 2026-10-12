@@ -110,6 +110,7 @@ async fn read_next_set_field_warp(
             }
             x if x == SendOpcode::StatChange as i16 => continue,
             x if x == SendOpcode::SpawnNpc as i16 => continue,
+            x if x == SendOpcode::FieldEffect as i16 => continue,
             opcode => {
                 panic!(
                     "unexpected opcode {} ({}) during map transfer",
@@ -124,10 +125,17 @@ async fn read_next_set_field_warp(
 }
 
 async fn read_next_stat_change(connection: &mut MapleTestConnection, phase: &'static str) {
-    let envelope = timeout(Duration::from_secs(5), connection.read_packet(phase))
+    let mut envelope = timeout(Duration::from_secs(5), connection.read_packet(phase))
         .await
         .expect("timed out waiting for stat-change packet")
         .expect("failed to read stat-change packet");
+    // The map's entry banner may come first.
+    while envelope.opcode() == SendOpcode::FieldEffect as i16 {
+        envelope = timeout(Duration::from_secs(5), connection.read_packet(phase))
+            .await
+            .expect("timed out waiting for stat-change packet")
+            .expect("failed to read stat-change packet");
+    }
     assert_eq!(
         envelope.opcode(),
         SendOpcode::StatChange as i16,

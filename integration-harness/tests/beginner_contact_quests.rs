@@ -1,9 +1,9 @@
 //! The original beginner visits (1031 Heena → Sera, 1032/1033 Nina ⇄ Sen)
 //! through the v83 quest flow, along the asset-defined route.
 
-use integration_harness::login_to_world_session;
 use integration_harness::preconditions::load_harness_config_or_fail;
 use integration_harness::quests::{act, warp, QuestTrace, COMPLETE, START};
+use integration_harness::{login_to_world_session, relogin};
 
 const HEENA: i32 = 2101;
 const SERA: i32 = 2100;
@@ -40,7 +40,7 @@ async fn beginner_visits_follow_portals_and_persist_rewards_once() {
     assert_eq!(trace.gains, [5]);
     drop(session);
 
-    let mut session = login_to_world_session(&config).await.unwrap();
+    let mut session = relogin(&config).await;
     assert_eq!((session.map_id, session.exp), (30_000, 5));
     assert_eq!(session.quests.get(&1032), Some(&1));
     let c = &mut session.connection;
@@ -61,7 +61,7 @@ async fn beginner_visits_follow_portals_and_persist_rewards_once() {
     assert!(!trace.states.contains_key(&1034));
     drop(session);
 
-    let restored = login_to_world_session(&config).await.unwrap();
+    let restored = relogin(&config).await;
     assert_eq!((restored.level, restored.exp, restored.ap), (2, 4, 5));
     for id in [1031, 1032, 1033] {
         assert_eq!(restored.quests.get(&id), Some(&2));
