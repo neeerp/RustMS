@@ -1,5 +1,6 @@
 pub mod channel;
 pub mod char;
+pub mod effect;
 pub mod field;
 pub mod keymap;
 pub mod map;

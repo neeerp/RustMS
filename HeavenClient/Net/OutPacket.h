@@ -98,6 +98,7 @@ namespace ms
 			USE_SKILL = 91,
 
 			/// Gameplay 2
+			CHANGE_MAP_SPECIAL = 100,
 			QUEST_ACTION = 107,
 			PARTY_OPERATION = 124,
 			ADMIN_COMMAND = 128,

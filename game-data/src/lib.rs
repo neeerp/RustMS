@@ -126,6 +126,8 @@ pub struct FieldTemplate {
     pub map_id: i32,
     pub return_map: Option<i32>,
     pub forced_return: Option<i32>,
+    /// `info/onUserEnter`: the script run whenever a player enters the map.
+    pub on_user_enter: Option<String>,
     pub map_npcs: Vec<MapNpcTemplate>,
     portals_by_id: BTreeMap<u32, PortalTemplate>,
     portal_ids_by_name: HashMap<String, Vec<u32>>,
@@ -215,14 +217,15 @@ fn build_field_template(
     map_node_idx: u32,
     map_id: i32,
 ) -> Result<FieldTemplate, GameDataError> {
-    let (return_map, forced_return) =
+    let (return_map, forced_return, on_user_enter) =
         if let Some(info_idx) = nx.child_by_name(map_node_idx, "info")? {
             (
                 normalize_optional_map_id(nx.int_child(info_idx, "returnMap")?),
                 normalize_optional_map_id(nx.int_child(info_idx, "forcedReturn")?),
+                normalize_optional_string(nx.string_child(info_idx, "onUserEnter")?),
             )
         } else {
-            (None, None)
+            (None, None, None)
         };
 
     let map_npcs = build_map_npcs_from_life(nx, map_node_idx)?;
@@ -278,6 +281,7 @@ fn build_field_template(
         map_id,
         return_map,
         forced_return,
+        on_user_enter,
         map_npcs,
         portals_by_id,
         portal_ids_by_name,
@@ -603,6 +607,7 @@ mod tests {
             map_id: 1,
             return_map: None,
             forced_return: None,
+            on_user_enter: None,
             map_npcs: Vec::new(),
             portals_by_id: BTreeMap::from([
                 (

@@ -22,8 +22,28 @@ also retain older disconnected map variants (`40001`, `40002`, `50001`,
 `60000`, etc.). Do not insert them into the active route or invent reverse
 connections based on their presence in the archive.
 
-Scripted portals and map-entry scripts need separate implementations; the
-presence of a script name alone does not provide its behavior. Explicit direct
+## Map and portal scripts
+
+Map entry (`info/onUserEnter`) and touch portals (`pt` 9) run native scripts
+from `net::scripts`, keyed by the script names in `Map.nx`; unknown names do
+nothing. A script returns effects that the client actor sends:
+
+| Script | Effect |
+| --- | --- |
+| `go<map id>` (entry) | Map name banner, FIELD_EFFECT `maplemap/enter/<map id>` |
+| `infoMinimap` | `UI/tutorial.img/25` once 1031 is started |
+| `infoAttack`, `infoPickup` | `/20`, `/21` once 1035 is started |
+| `infoSkill` | `/23` once 1035 is completed |
+| `infoWorldmap` | `/26` |
+| `infoReactor` | `/22` after 1008, else `/27` after 1020 |
+| `glTutoMsg0` | PLAYER_HINT balloon, text key `glTutoMsg0.message` |
+
+HeavenClient sends CHANGE_MAP_SPECIAL (`0x64`, portal name) when the player
+first touches a script portal, and the server answers with the effects and an
+enable-actions stat update. An `info*` hint runs once per session after it
+was shown; the exit warning repeats. Hint text comes from the
+[server content pack](./server-content.md). `tutoChatNPC` (the skip offer)
+belongs with scripted NPCs. Explicit direct
 warps remain available for existing development/harness workflows.
 
 `beginner_route_and_ninas_house_follow_asset_links` checks the active route,

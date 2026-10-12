@@ -24,6 +24,8 @@
 #include "../../IO/UITypes/UIChatBar.h"
 #include "../../IO/UITypes/UIStatusMessenger.h"
 
+#include <nlnx/nx.hpp>
+
 namespace ms
 {
 	namespace
@@ -314,6 +316,16 @@ namespace ms
 		}
 	}
 
+	void PlayerHintHandler::handle(InPacket& recv) const
+	{
+		std::string text = recv.read_string();
+		int16_t width = recv.read_short();
+		recv.read_short(); // height
+		recv.read_byte();
+
+		Stage::get().get_player().show_hint(text, width);
+	}
+
 	void ShowItemGainInChatHandler::handle(InPacket& recv) const
 	{
 		int8_t mode1 = recv.read_byte();
@@ -348,10 +360,20 @@ namespace ms
 		{
 			recv.read_string(); // path
 		}
-		else if (mode1 == 23) // info
+		else if (mode1 == 23) // info: a UI image anchored to the player (tutorial hints)
 		{
-			recv.read_string();	// path
-			recv.read_int();	// some int
+			std::string path = recv.read_string();
+			recv.read_int();
+
+			// The path names an NX file ("UI/tutorial.img/25"), then a node in it.
+			size_t slash = path.find('/');
+			nl::node file = slash == std::string::npos ? nl::node() :
+				path.compare(0, slash, "UI") == 0 ? nl::nx::ui :
+				path.compare(0, slash, "Effect") == 0 ? nl::nx::effect :
+				path.compare(0, slash, "Map") == 0 ? nl::nx::map : nl::node();
+
+			if (file)
+				Stage::get().get_player().show_effect(Animation(file.resolve(path.substr(slash + 1))));
 		}
 		else // Buff effect
 		{

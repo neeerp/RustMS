@@ -16,6 +16,7 @@ mod npc_data;
 pub mod packet;
 pub mod policy;
 pub mod quests;
+pub mod scripts;
 pub mod settings;
 
 pub use self::game_data::{get as get_game_data, spawn_position};

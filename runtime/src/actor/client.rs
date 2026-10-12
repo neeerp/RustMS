@@ -1,5 +1,6 @@
 mod dialogue;
 mod quest;
+mod script;
 
 use crate::actor::registry::FieldRegistry;
 use crate::db::spawn_db;
@@ -17,6 +18,7 @@ use net::quests::QuestRequest;
 use net::{ClientId, SpawnPosition, WorldAction, WorldContext, WorldRoute};
 use packet::Packet;
 use rand::{thread_rng, Rng};
+use std::collections::HashSet;
 use std::net::IpAddr;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
@@ -69,6 +71,8 @@ pub struct ClientActor {
     conversation: Option<Conversation>,
     /// A quest action waiting for its field to confirm the NPC is near.
     pending_quest: Option<(u64, QuestRequest)>,
+    /// Portal scripts that already ran and won't run again this session.
+    blocked_scripts: HashSet<String>,
     npc_request_id: u64,
     changing_channel: bool,
 }
@@ -110,6 +114,7 @@ impl ClientActor {
             game: None,
             conversation: None,
             pending_quest: None,
+            blocked_scripts: HashSet::new(),
             npc_request_id: 0,
             changing_channel: false,
         })
@@ -237,6 +242,7 @@ impl ClientActor {
                 ..
             }) => self.respond_to_npc(message_type, response).await?,
             WorldAction::Quest(request) => self.request_quest_action(request).await?,
+            WorldAction::ScriptPortal { portal } => self.touch_script_portal(&portal).await?,
             WorldAction::Whisper(delivery) => {
                 self.send_to_directory(DirectoryMessage::Whisper {
                     from: self.client_id,
@@ -338,7 +344,8 @@ impl ClientActor {
         let game = self.in_game()?;
         let avatar = game.player.field_avatar(spawn.x, spawn.y, spawn.stance);
         self.send_to_field(FieldMessage::Join { handle, avatar })
-            .await
+            .await?;
+        self.run_map_enter_script().await
     }
 
     /// Hand the session to another channel: persist, reissue the ticket, and

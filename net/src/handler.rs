@@ -214,6 +214,10 @@ pub enum WorldAction {
     NpcInteraction(NpcInteraction),
     /// Start, complete, or forfeit a quest (v83 `QUEST_ACTION`).
     Quest(crate::quests::QuestRequest),
+    /// The player touched the named script portal on their map.
+    ScriptPortal {
+        portal: String,
+    },
     Whisper(WhisperDelivery),
     ChangeChannel {
         channel_id: u8,
@@ -249,7 +253,7 @@ fn world_routes() -> &'static HashMap<i16, WorldRoute> {
     ROUTES.get_or_init(|| {
         use RecvOpcode as Op;
         use WorldRoute::*;
-        let table: [(Op, WorldRoute); 12] = [
+        let table: [(Op, WorldRoute); 13] = [
             (Op::PlayerLoggedIn, PreGame(&world::PlayerLoggedInHandler)),
             (Op::PlayerMove, InGame(&world::PlayerMoveHandler)),
             (Op::ChangeChannel, InGame(&world::ChangeChannelHandler)),
@@ -268,6 +272,10 @@ fn world_routes() -> &'static HashMap<i16, WorldRoute> {
             (Op::TalkToNpc, InGame(&world::NpcTalkHandler)),
             (Op::NpcTalkMore, InGame(&world::NpcTalkMoreHandler)),
             (Op::QuestAction, InGame(&world::QuestActionHandler)),
+            (
+                Op::ChangeMapSpecial,
+                InGame(&world::ChangeMapSpecialHandler),
+            ),
         ];
         table
             .into_iter()
@@ -298,7 +306,7 @@ mod tests {
     fn every_registered_opcode_is_unique_per_server() {
         // The maps would silently drop duplicates; check the table sizes match.
         assert_eq!(login_routes().len(), 13);
-        assert_eq!(world_routes().len(), 12);
+        assert_eq!(world_routes().len(), 13);
     }
 
     #[test]

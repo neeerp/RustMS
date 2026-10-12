@@ -20,6 +20,7 @@
 #include "../../Constants.h"
 
 #include "../../Util/Misc.h"
+#include "../../Net/Packets/GameplayPackets.h"
 
 #include <nlnx/nx.hpp>
 
@@ -73,6 +74,13 @@ namespace ms
 				case Portal::HIDDEN:
 				case Portal::TOUCH:
 					portal.update(playerpos);
+					break;
+				case Portal::SCRIPTED_TOUCH:
+					// Tutorial hints and other touch scripts run on the server.
+					if (portal.touch(playerpos))
+						ChangeMapSpecialPacket(portal.get_name()).dispatch();
+					break;
+				default:
 					break;
 			}
 		}

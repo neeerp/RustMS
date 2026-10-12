@@ -206,6 +206,12 @@ pub fn opcode_name(opcode: i16) -> &'static str {
         x if x == SendOpcode::ChatText as i16 => "ChatText",
         x if x == SendOpcode::MovePlayer as i16 => "MovePlayer",
         x if x == SendOpcode::KeyMap as i16 => "KeyMap",
+        x if x == SendOpcode::FieldEffect as i16 => "FieldEffect",
+        x if x == SendOpcode::StatChange as i16 => "StatChange",
+        x if x == SendOpcode::ShowStatusInfo as i16 => "ShowStatusInfo",
+        x if x == SendOpcode::UpdateQuestInfo as i16 => "UpdateQuestInfo",
+        x if x == SendOpcode::PlayerHint as i16 => "PlayerHint",
+        x if x == SendOpcode::ShowItemGainInChat as i16 => "ShowItemGainInChat",
         _ => "Unknown",
     }
 }

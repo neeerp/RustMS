@@ -1,0 +1,186 @@
+//! Native map and portal scripts, keyed by the script names in `Map.nx`
+//! (`info/onUserEnter`, portal `script`). Lua is deferred; these handlers
+//! only return effects, which the runtime turns into packets, so they can
+//! move to a scripting runtime later. Unknown names do nothing.
+
+use crate::content;
+use game::{Player, QuestState};
+use game_data::server_content::keys;
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum ScriptEffect {
+    /// A screen effect from `Map.nx/Effect.img` (map name banners).
+    FieldEffect(String),
+    /// A UI image anchored to the player (`UI/tutorial.img/<n>` hints).
+    AvatarEffect(String),
+    /// An instruction balloon above the player.
+    Hint {
+        text: String,
+        width: i16,
+        height: i16,
+    },
+}
+
+#[derive(Debug, Default, PartialEq, Eq)]
+pub struct ScriptOutcome {
+    pub effects: Vec<ScriptEffect>,
+    /// Don't run this portal's script again this session.
+    pub block: bool,
+}
+
+/// A map's `onUserEnter` script. `None` if the script is unknown.
+pub fn map_enter(script: &str) -> Option<Vec<ScriptEffect>> {
+    // go<map id>: the map's name banner. HeavenMS also unlocks the UI here,
+    // which HeavenClient never locks.
+    let map = script.strip_prefix("go")?;
+    if map.is_empty() || !map.bytes().all(|b| b.is_ascii_digit()) {
+        return None;
+    }
+    Some(vec![ScriptEffect::FieldEffect(format!(
+        "maplemap/enter/{map}"
+    ))])
+}
+
+/// A touch portal's script. `None` if the script is unknown.
+pub fn portal(script: &str, player: &Player) -> Option<ScriptOutcome> {
+    let quest = |id: i16| player.quests.state(id);
+    // The tutorial hints show once a condition holds, then not again this
+    // session (HeavenMS blocks the portal even when nothing was shown, so a
+    // hint touched too early would never appear).
+    let hint = |condition: bool, image: u8| {
+        if condition {
+            ScriptOutcome {
+                effects: vec![ScriptEffect::AvatarEffect(format!(
+                    "UI/tutorial.img/{image}"
+                ))],
+                block: true,
+            }
+        } else {
+            ScriptOutcome::default()
+        }
+    };
+    let outcome = match script {
+        "infoMinimap" => hint(quest(1031) == QuestState::Started, 25),
+        "infoAttack" => hint(quest(1035) == QuestState::Started, 20),
+        "infoPickup" => hint(quest(1035) == QuestState::Started, 21),
+        "infoSkill" => hint(quest(1035) == QuestState::Completed, 23),
+        "infoWorldmap" => hint(true, 26),
+        "infoReactor" if quest(1008) == QuestState::Completed => hint(true, 22),
+        "infoReactor" => hint(quest(1020) == QuestState::Completed, 27),
+        "glTutoMsg0" => ScriptOutcome {
+            effects: vec![ScriptEffect::Hint {
+                text: content::text().get(keys::LEAVE_AREA_WARNING, &[]),
+                width: 150,
+                height: 5,
+            }],
+            block: false,
+        },
+        _ => return None,
+    };
+    Some(outcome)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use game::{QuestRecord, QuestStatus};
+    use std::time::SystemTime;
+
+    fn player_with(quests: &[(i16, QuestState)]) -> Player {
+        let mut player = crate::codec::stats::sample_player();
+        for &(quest_id, state) in quests {
+            let status = match state {
+                QuestState::Started => QuestStatus::Started,
+                _ => QuestStatus::Completed {
+                    at: SystemTime::UNIX_EPOCH,
+                },
+            };
+            player.quests.upsert(QuestRecord { quest_id, status });
+        }
+        player
+    }
+
+    fn avatar(path: &str) -> ScriptOutcome {
+        ScriptOutcome {
+            effects: vec![ScriptEffect::AvatarEffect(path.into())],
+            block: true,
+        }
+    }
+
+    #[test]
+    fn map_entry_shows_the_maps_banner() {
+        assert_eq!(
+            map_enter("go10000"),
+            Some(vec![ScriptEffect::FieldEffect(
+                "maplemap/enter/10000".into()
+            )])
+        );
+        assert_eq!(map_enter("goAdventure"), None);
+        assert_eq!(map_enter("go"), None);
+    }
+
+    #[test]
+    fn hints_wait_for_their_quest_condition() {
+        let fresh = player_with(&[]);
+        assert_eq!(
+            portal("infoMinimap", &fresh),
+            Some(ScriptOutcome::default())
+        );
+        assert_eq!(
+            portal("infoMinimap", &player_with(&[(1031, QuestState::Started)])),
+            Some(avatar("UI/tutorial.img/25"))
+        );
+        let hunting = player_with(&[(1035, QuestState::Started)]);
+        assert_eq!(
+            portal("infoAttack", &hunting),
+            Some(avatar("UI/tutorial.img/20"))
+        );
+        assert_eq!(
+            portal("infoPickup", &hunting),
+            Some(avatar("UI/tutorial.img/21"))
+        );
+        assert_eq!(
+            portal("infoSkill", &hunting),
+            Some(ScriptOutcome::default())
+        );
+        assert_eq!(
+            portal("infoSkill", &player_with(&[(1035, QuestState::Completed)])),
+            Some(avatar("UI/tutorial.img/23"))
+        );
+        assert_eq!(
+            portal("infoWorldmap", &fresh),
+            Some(avatar("UI/tutorial.img/26"))
+        );
+        assert_eq!(
+            portal(
+                "infoReactor",
+                &player_with(&[(1008, QuestState::Completed)])
+            ),
+            Some(avatar("UI/tutorial.img/22"))
+        );
+        assert_eq!(
+            portal(
+                "infoReactor",
+                &player_with(&[(1020, QuestState::Completed)])
+            ),
+            Some(avatar("UI/tutorial.img/27"))
+        );
+        assert_eq!(portal("somethingElse", &fresh), None);
+    }
+
+    #[test]
+    fn the_leave_area_warning_repeats_with_its_text() {
+        let outcome = portal("glTutoMsg0", &player_with(&[])).unwrap();
+        assert!(!outcome.block);
+        let [ScriptEffect::Hint {
+            text,
+            width,
+            height,
+        }] = outcome.effects.as_slice()
+        else {
+            panic!("expected a hint");
+        };
+        assert!(!text.is_empty());
+        assert_eq!((*width, *height), (150, 5));
+    }
+}

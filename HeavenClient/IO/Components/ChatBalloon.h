@@ -36,8 +36,9 @@ namespace ms
 		// Player balloon in a numbered UI.nx/ChatBalloon.img style (0 is the default).
 		ChatBalloon(int8_t type);
 
-		// Balloon in a named style such as "npc"; NPC lines keep their #b/#k markup.
-		ChatBalloon(const std::string &style, bool formatted);
+		// Balloon in a named style such as "npc"; NPC lines keep their #b/#k
+		// markup. Lines wrap at `wrap_width` pixels.
+		ChatBalloon(const std::string &style, bool formatted, uint16_t wrap_width = WRAP_WIDTH);
 
 		ChatBalloon();
 
@@ -53,7 +54,7 @@ namespace ms
 		bool is_active() const;
 
 	private:
-		void load(nl::node src, bool formatted);
+		void load(nl::node src, bool formatted, uint16_t wrap_width);
 
 		// v83 CUser::OnChat shows a balloon for 5 s, then fades it out over 1 s.
 		static constexpr int16_t DURATION = 5000;

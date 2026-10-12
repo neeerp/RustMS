@@ -8,6 +8,7 @@ mod move_player;
 mod npc_dialogue;
 mod party_search_update;
 mod quest_action;
+mod script_portal;
 mod whisper;
 
 pub use self::change_channel::ChangeChannelHandler;
@@ -20,4 +21,5 @@ pub use self::move_player::PlayerMoveHandler;
 pub use self::npc_dialogue::{NpcTalkHandler, NpcTalkMoreHandler};
 pub use self::party_search_update::PartySearchUpdateHandler;
 pub use self::quest_action::QuestActionHandler;
+pub use self::script_portal::ChangeMapSpecialHandler;
 pub use self::whisper::WhisperHandler;
