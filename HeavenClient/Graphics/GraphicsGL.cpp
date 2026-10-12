@@ -832,7 +832,6 @@ namespace ms
 
 			for (const Text::Layout::Word &word : line.words)
 			{
-				GLshort ax = position.x() + layout.advance(word.first);
 				GLshort ay = position.y();
 
 				const GLfloat *wordcolor;
@@ -849,6 +848,10 @@ namespace ms
 					const char c = text[pos];
 					const Font::Char &ch = font.chars[c];
 
+					// The layout already places every character, including giving a
+					// wrapped line's leading space no width, so use its advances
+					// rather than re-accumulating widths here.
+					GLshort ax = position.x() + layout.advance(pos);
 					GLshort char_x = x + ax + ch.bl;
 					GLshort char_y = y + ay - ch.bt;
 					GLshort char_width = ch.bw;
@@ -873,11 +876,6 @@ namespace ms
 
 					if (char_y < minheight)
 						continue;
-
-					if (ax == 0 && c == ' ')
-						continue;
-
-					ax += ch.ax;
 
 					if (char_width <= 0 || char_height <= 0)
 						continue;

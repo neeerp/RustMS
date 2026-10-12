@@ -17,23 +17,31 @@
 //////////////////////////////////////////////////////////////////////////////////
 #pragma once
 
+#include <array>
 #include <string>
 
 #include <cstdint>
 
-#include "MapleFrame.h"
+#include "../Graphics/Texture.h"
 
 #include "../Graphics/Text.h"
+
+#include <nlnx/node.hpp>
 
 namespace ms
 {
 	class ChatBalloon
 	{
 	public:
+		// Player balloon in a numbered UI.nx/ChatBalloon.img style (0 is the default).
 		ChatBalloon(int8_t type);
+
+		// Balloon in a named style such as "npc"; NPC lines keep their #b/#k markup.
+		ChatBalloon(const std::string &style, bool formatted);
 
 		ChatBalloon();
 
+		// Draws the balloon so that its arrow hangs down to the given point.
 		void draw(Point<int16_t> position) const;
 
 		void update();
@@ -42,13 +50,30 @@ namespace ms
 
 		void expire();
 
-	private:
-		// How long a line stays on screen
-		static constexpr int16_t DURATION = 4000; // 4 seconds
+		bool is_active() const;
 
-		MapleFrame frame;
+	private:
+		void load(nl::node src, bool formatted);
+
+		// v83 CUser::OnChat shows a balloon for 5 s, then fades it out over 1 s.
+		static constexpr int16_t DURATION = 5000;
+		static constexpr int16_t FADE = 1000;
+		// Lines wrap at about 80 px, which matches the narrow balloons of the original.
+		static constexpr uint16_t WRAP_WIDTH = 80;
+		static constexpr int16_t PADDING = 2;
+		static constexpr int16_t LINE_GAP = 3;
+
+		// The frame pieces, named in ChatBalloon.img as c, n, s, w, e, nw, ne, sw, se, and arrow.
+		enum Piece : uint8_t
+		{
+			CENTER, NORTH, SOUTH, WEST, EAST, NORTHWEST, NORTHEAST, SOUTHWEST, SOUTHEAST, ARROW, NUM_PIECES
+		};
+
+		std::array<Texture, NUM_PIECES> pieces;
+		int16_t xtile = 1;
+		int16_t ytile = 1;
+		Color textcolor;
 		Text textlabel;
-		Texture arrow;
 		int16_t duration;
 	};
 

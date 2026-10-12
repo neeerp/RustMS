@@ -235,7 +235,7 @@ namespace ms
 
 		if (auto character = Stage::get().get_character(charid))
 		{
-			message = character->get_name() + ": " + message;
+			message = character->get_name() + " : " + message;
 			character->speak(message);
 		}
 

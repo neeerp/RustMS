@@ -25,6 +25,7 @@
 
 #include "../../Graphics/Animation.h"
 #include "../../Graphics/Text.h"
+#include "../../IO/Components/ChatBalloon.h"
 #include "../../Util/Randomizer.h"
 #include "../../Character/QuestMarker.h"
 #include <limits>
@@ -63,6 +64,20 @@ namespace ms
 
 	private:
 		Point<int16_t> quest_marker_offset() const;
+		int16_t head_height() const;
+		void update_speech();
+
+		// Pauses between idle lines, in milliseconds. The v83 client's exact
+		// timing is unknown; these keep NPCs chatty without crowding the screen.
+		static constexpr int32_t SPEECH_FIRST_MIN = 2000;
+		static constexpr int32_t SPEECH_FIRST_MAX = 10000;
+		static constexpr int32_t SPEECH_PAUSE_MIN = 8000;
+		static constexpr int32_t SPEECH_PAUSE_MAX = 16000;
+
+		// Idle lines from info/speak, said now and then in the "npc" balloon style.
+		std::vector<std::string> idle_lines;
+		ChatBalloon speech;
+		int32_t speech_cooldown = 0;
 		QuestMarker quest_marker = QuestMarker::NONE;
 		Animation quest_marker_animation;
 		uint64_t quest_revision = std::numeric_limits<uint64_t>::max();

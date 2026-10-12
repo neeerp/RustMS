@@ -17,6 +17,7 @@
 //////////////////////////////////////////////////////////////////////////////////
 #include "Npc.h"
 #include "../Stage.h"
+#include "../../Constants.h"
 
 #include <nlnx/nx.hpp>
 
@@ -59,6 +60,13 @@ namespace ms
 				lines[state].push_back(strsrc[speaknode.get_string()]);
 		}
 
+		if (lines.count("info"))
+			idle_lines = lines["info"];
+
+		speech = ChatBalloon("npc", true);
+		// Stagger the first line so the NPCs on a map don't all speak at once.
+		speech_cooldown = random.next_int<int32_t>(SPEECH_FIRST_MIN, SPEECH_FIRST_MAX);
+
 		name = std::string(strsrc["name"]);
 		func = std::string(strsrc["func"]);
 
@@ -91,6 +99,12 @@ namespace ms
 		}
 		if (quest_marker != QuestMarker::NONE)
 			quest_marker_animation.draw(DrawArgument(absp + quest_marker_offset()), alpha);
+
+		// The balloon sits above the head, and above the quest marker if there is one.
+		int16_t lift = quest_marker != QuestMarker::NONE
+			? -quest_marker_offset().y() + quest_marker_animation.get_dimensions().y() / 2
+			: head_height() + 4;
+		speech.draw(absp - Point<int16_t>(0, lift));
 	}
 
 	int8_t Npc::update(const Physics &physics)
@@ -116,6 +130,8 @@ namespace ms
 			quest_level = level;
 		}
 		if (quest_marker != QuestMarker::NONE) quest_marker_animation.update();
+
+		update_speech();
 
 		if (animations.count(stance))
 		{
@@ -174,18 +190,40 @@ namespace ms
 				absp + quest_marker_offset() - quest_marker_animation.get_origin() + quest_marker_animation.get_dimensions()).contains(cursorpos));
 	}
 
-	Point<int16_t> Npc::quest_marker_offset() const
+	int16_t Npc::head_height() const
 	{
-		// Anchor to the standing sprite so changing NPC poses does not move the
-		// marker. The icon's own animation provides its original bobbing motion.
+		// Anchor to the standing sprite so changing NPC poses does not move what
+		// is drawn above the head.
 		auto stand = animations.find("stand");
-		int16_t head_height = 50;
+		int16_t height = 50;
 		if (stand != animations.end())
 		{
-			head_height = stand->second.get_origin().y();
-			if (head_height <= 0) head_height = stand->second.get_dimensions().y();
+			height = stand->second.get_origin().y();
+			if (height <= 0) height = stand->second.get_dimensions().y();
 		}
-		return Point<int16_t>(0, -head_height - quest_marker_animation.get_dimensions().y() / 2 - 8);
+		return height;
+	}
+
+	Point<int16_t> Npc::quest_marker_offset() const
+	{
+		// The icon's own animation provides its original bobbing motion.
+		return Point<int16_t>(0, -head_height() - quest_marker_animation.get_dimensions().y() / 2 - 8);
+	}
+
+	void Npc::update_speech()
+	{
+		speech.update();
+
+		if (idle_lines.empty() || speech.is_active())
+			return;
+
+		speech_cooldown -= Constants::TIMESTEP;
+
+		if (speech_cooldown > 0)
+			return;
+
+		speech.change_text(idle_lines[random.next_int(idle_lines.size())]);
+		speech_cooldown = random.next_int<int32_t>(SPEECH_PAUSE_MIN, SPEECH_PAUSE_MAX);
 	}
 
 	std::string Npc::get_name()
