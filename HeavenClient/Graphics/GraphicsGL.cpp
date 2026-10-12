@@ -241,61 +241,34 @@ namespace ms
 		const std::string resolved_bold = resolve_font_path(FONT_BOLD).string();
 		const std::string resolved_balloon = resolve_font_path(FONT_BALLOON).string();
 
-		const char *FONT_NORMAL_STR = resolved_normal.c_str();
-		const char *FONT_BOLD_STR = resolved_bold.c_str();
-
-		if (!addfont(FONT_NORMAL_STR, Text::Font::A11M, 0, 11))
+		// The UI was laid out for these line heights, 1.35 times the tallest
+		// glyph of Roboto, which drew the UI text before Arimo. They stay
+		// fixed so that the layouts don't move with the font.
+		const struct
 		{
-			font_error_path = resolved_normal;
-			return Error(Error::Code::FONT_PATH, font_error_path.c_str());
-		}
+			const std::string &path;
+			Text::Font id;
+			FT_UInt size;
+			GLshort lineheight;
+		} faces[] = {
+			{ resolved_normal, Text::Font::A11M, 11, 17 },
+			{ resolved_bold, Text::Font::A11B, 11, 17 },
+			{ resolved_normal, Text::Font::A12M, 12, 18 },
+			{ resolved_bold, Text::Font::A12B, 12, 18 },
+			{ resolved_normal, Text::Font::A13M, 13, 18 },
+			{ resolved_bold, Text::Font::A13B, 13, 18 },
+			{ resolved_bold, Text::Font::A15B, 15, 21 },
+			{ resolved_normal, Text::Font::A18M, 18, 25 },
+			{ resolved_balloon, Text::Font::BALLOON, 12, FACE_LINES }
+		};
 
-		if (!addfont(FONT_BOLD_STR, Text::Font::A11B, 0, 11))
+		for (const auto &face : faces)
 		{
-			font_error_path = resolved_bold;
-			return Error(Error::Code::FONT_PATH, font_error_path.c_str());
-		}
-
-		if (!addfont(FONT_NORMAL_STR, Text::Font::A12M, 0, 12))
-		{
-			font_error_path = resolved_normal;
-			return Error(Error::Code::FONT_PATH, font_error_path.c_str());
-		}
-
-		if (!addfont(FONT_BOLD_STR, Text::Font::A12B, 0, 12))
-		{
-			font_error_path = resolved_bold;
-			return Error(Error::Code::FONT_PATH, font_error_path.c_str());
-		}
-
-		if (!addfont(FONT_NORMAL_STR, Text::Font::A13M, 0, 13))
-		{
-			font_error_path = resolved_normal;
-			return Error(Error::Code::FONT_PATH, font_error_path.c_str());
-		}
-
-		if (!addfont(FONT_BOLD_STR, Text::Font::A13B, 0, 13))
-		{
-			font_error_path = resolved_bold;
-			return Error(Error::Code::FONT_PATH, font_error_path.c_str());
-		}
-
-		if (!addfont(FONT_BOLD_STR, Text::Font::A15B, 0, 15))
-		{
-			font_error_path = resolved_bold;
-			return Error(Error::Code::FONT_PATH, font_error_path.c_str());
-		}
-
-		if (!addfont(FONT_NORMAL_STR, Text::Font::A18M, 0, 18))
-		{
-			font_error_path = resolved_normal;
-			return Error(Error::Code::FONT_PATH, font_error_path.c_str());
-		}
-
-		if (!addfont(resolved_balloon.c_str(), Text::Font::BALLOON, 0, 12, LineSpacing::FACE))
-		{
-			font_error_path = resolved_balloon;
-			return Error(Error::Code::FONT_PATH, font_error_path.c_str());
+			if (!addfont(face.path.c_str(), face.id, 0, face.size, face.lineheight))
+			{
+				font_error_path = face.path;
+				return Error(Error::Code::FONT_PATH, font_error_path.c_str());
+			}
 		}
 
 		fontymax += fontborder.y();
@@ -320,7 +293,7 @@ namespace ms
 		return Error::Code::NONE;
 	}
 
-	bool GraphicsGL::addfont(const char *name, Text::Font id, FT_UInt pixelw, FT_UInt pixelh, LineSpacing spacing)
+	bool GraphicsGL::addfont(const char *name, Text::Font id, FT_UInt pixelw, FT_UInt pixelh, GLshort lineheight)
 	{
 		FT_Face face;
 
@@ -364,9 +337,7 @@ namespace ms
 		if (height > fontymax)
 			fontymax = height;
 
-		GLshort lineheight = 0;
-
-		if (spacing == LineSpacing::FACE)
+		if (lineheight == FACE_LINES)
 			lineheight = static_cast<GLshort>((face->size->metrics.ascender - face->size->metrics.descender) >> 6);
 
 		fonts[id] = Font(width, height, lineheight);
