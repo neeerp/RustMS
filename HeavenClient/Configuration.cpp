@@ -96,12 +96,24 @@ namespace ms
 			}
 		}
 
+		// Settings saved before the UI text moved to Arimo name the old Roboto
+		// defaults, which are no longer shipped: keep the new defaults instead.
+		const std::unordered_map<std::string, std::string> retired_defaults = {
+			{ "FontPathNormal", "fonts/Roboto/Roboto-Regular.ttf" },
+			{ "FontPathBold", "fonts/Roboto/Roboto-Bold.ttf" }
+		};
+
 		// Replace default values with loaded values.
 		for (auto &setting : settings)
 		{
 			auto rsiter = rawsettings.find(setting.second->name);
 
-			if (rsiter != rawsettings.end())
+			if (rsiter == rawsettings.end())
+				continue;
+
+			auto retired = retired_defaults.find(rsiter->first);
+
+			if (retired == retired_defaults.end() || retired->second != rsiter->second)
 				setting.second->value = rsiter->second;
 		}
 	}

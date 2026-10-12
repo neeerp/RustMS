@@ -61,10 +61,16 @@ some UI nodes may not exist for v83 features.
 
 `fonts/` is copied next to the executable at build time, and `Settings` names
 the files (`FontPathNormal`, `FontPathBold`, `FontPathBalloon`). The original
-client draws text in Arial, which can't be shipped. Most text uses Roboto
-(Apache 2.0), a deviation from the original look. Chat balloons use Arimo
-(OFL 1.1), which has Arial's metrics, at 12 px with 14 px lines as in the
-original; see `IO/Components/ChatBalloon.h`.
+client draws text in Arial, which can't be shipped, so all text uses Arimo
+(OFL 1.1), which has Arial's metrics and widths.
+
+- **Line heights:** the UI fonts keep the line heights the window layouts were
+  tuned to under Roboto, which the client used before; they are listed in
+  `GraphicsGL::init`.
+- **Chat balloons:** these use 12 px Arimo with 14 px lines, as in the
+  original; see `IO/Components/ChatBalloon.h`.
+- **Old `Settings` files:** a file that still names the old Roboto defaults
+  gets the Arimo defaults instead (`Configuration::load`).
 
 ## What works and what is stubbed
 

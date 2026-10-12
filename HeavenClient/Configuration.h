@@ -348,22 +348,22 @@ namespace ms
 		{}
 	};
 
-	// The normal font which will be used
+	// The UI text font. The original client draws its text in Arial; Arimo has
+	// the same metrics.
 	struct FontPathNormal : public Configuration::StringEntry
 	{
-		FontPathNormal() : StringEntry("FontPathNormal", "fonts/Roboto/Roboto-Regular.ttf")
+		FontPathNormal() : StringEntry("FontPathNormal", "fonts/Arimo/Arimo-Regular.ttf")
 		{}
 	};
 
-	// The bold font which will be used
+	// The bold UI text font.
 	struct FontPathBold : public Configuration::StringEntry
 	{
-		FontPathBold() : StringEntry("FontPathBold", "fonts/Roboto/Roboto-Bold.ttf")
+		FontPathBold() : StringEntry("FontPathBold", "fonts/Arimo/Arimo-Bold.ttf")
 		{}
 	};
 
-	// The chat balloon font. The original client draws balloons in 12 px Arial;
-	// Arimo has the same metrics.
+	// The chat balloon font. The original client draws balloons in 12 px Arial.
 	struct FontPathBalloon : public Configuration::StringEntry
 	{
 		FontPathBalloon() : StringEntry("FontPathBalloon", "fonts/Arimo/Arimo-Regular.ttf")
