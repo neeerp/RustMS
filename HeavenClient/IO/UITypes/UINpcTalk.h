@@ -92,7 +92,17 @@ namespace ms
 		void respond(int8_t response, int32_t selection = -1);
 
 
-		std::string format_text(const std::string &tx, const int32_t &npcid);
+		// An image in the text (#f, #i, #s, #v): its box in the layout, and
+		// where the texture's origin goes from the box's top-left corner.
+		struct InlineImage
+		{
+			Texture texture;
+			Point<int16_t> size;
+			Point<int16_t> anchor;
+		};
+
+		// Expands the markup, leaving a Text::BOX for each image in `images`.
+		std::string format_text(const std::string &tx, const int32_t &npcid, std::vector<InlineImage> &images);
 
 		static constexpr int16_t MAX_HEIGHT = 248;
 
@@ -144,6 +154,7 @@ namespace ms
 		};
 
 		std::vector<Choice> choices;
+		std::vector<InlineImage> images;
 		std::function<void(int8_t, int32_t)> local_responder;
 		int16_t question_height;
 		std::string formatted_text;

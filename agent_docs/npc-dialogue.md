@@ -45,8 +45,15 @@ page shows instead. Answers are matched to the prompt they answer
 
 Text comes from the [server content pack](./server-content.md) with
 placeholders. HeavenClient expands NPC text markup (`Util/NpcTextMarkup.h`:
-`#h`, `#p`, `#t`/`#z`, `#o`, `#m`; image tags `#v`/`#i`/`#f`/`#s` are dropped
-until inline icons exist) and clips long menus to the dialog.
+`#h`, `#p`, `#t`/`#z`, `#o`, `#m`) and clips long menus to the dialog.
+
+Image tags draw inline: `#v`/`#i` item icons and `#s` skill icons in a 32x32
+slot, `#f`/`#F` any image by NX path (`UI/UIWindow.img/QuestIcon/4/0`; our
+UI.nx keeps those quest icons in `UIWindow2.img`, so the dialog looks there
+too). Each image becomes a `Text::BOX` character that the text layout sizes
+like the image, bottom on the baseline; a taller image pushes its line
+down. As in 2008 GMS footage, the images show as soon as a page opens and
+only the text types out. Images inside `#L` menu choices are still dropped.
 
 ## Runtime ownership
 

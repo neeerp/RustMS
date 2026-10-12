@@ -12,6 +12,23 @@ namespace ms
 	// ...) and #L choices are left for the text renderer and menu parser.
 	namespace NpcTextMarkup
 	{
+		// Stands in for an inline image in expanded text; the text layout
+		// gives it the image's size.
+		constexpr char IMAGE = '\x01';
+
+		// An image tag: #v/#i (item icon), #s (skill icon) or #f/#F (a
+		// path such as UI/UIWindow.img/QuestIcon/4/0).
+		struct InlineImage
+		{
+			char tag;
+			std::string arg;
+
+			bool operator==(const InlineImage& other) const
+			{
+				return tag == other.tag && arg == other.arg;
+			}
+		};
+
 		struct Lookups
 		{
 			std::function<std::string()> player_name;
@@ -33,8 +50,22 @@ namespace ms
 			return true;
 		}
 
-		inline std::string expand(const std::string& text, const Lookups& lookups)
+		// Without `images`, image tags are dropped; with it, each becomes an
+		// IMAGE placeholder and is appended to `images` in order.
+		inline std::string expand(const std::string& text, const Lookups& lookups,
+								  std::vector<InlineImage>* images = nullptr)
 		{
+			auto image = [&](char tag, const std::string& arg)
+			{
+				if (images)
+				{
+					images->push_back({ tag, arg });
+					return std::string(1, IMAGE);
+				}
+
+				return std::string();
+			};
+
 			std::string out;
 			size_t i = 0;
 
@@ -80,14 +111,15 @@ namespace ms
 					case 'v':
 					case 'i':
 					case 's':
-						// Item and skill icons: not drawn inline yet.
-						if (numeric) { i = close + 1; continue; }
+						// Item and skill icons.
+						if (numeric) { out += image(tag, arg); i = close + 1; continue; }
 						break;
 					case 'f':
 					case 'F':
-						// UI images by path: not drawn inline yet.
+						// Images by path.
 						if (close != std::string::npos && arg.find('/') != std::string::npos)
 						{
+							out += image(tag, arg);
 							i = close + 1;
 							continue;
 						}

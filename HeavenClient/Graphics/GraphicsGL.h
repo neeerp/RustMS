@@ -59,13 +59,15 @@ namespace ms
 		// Draw the bitmap with the given parameters.
 		void draw(const nl::bitmap &bmp, const Rectangle<int16_t> &rect, const Color &color, float angle);
 
-		// Create a layout for the text with the parameters specified.
+		// Create a layout for the text with the parameters specified. The n-th
+		// Text::BOX character takes the n-th of `boxes` (width, height).
 		Text::Layout createlayout(const std::string &text, Text::Font font, Text::Alignment alignment, int16_t maxwidth,
-								  bool formatted, int16_t line_adj);
+								  bool formatted, int16_t line_adj, const std::vector<Point<int16_t>> &boxes);
 
-		// Draw a text with the given parameters.
+		// Draw a text with the given parameters, up to character `reveal`.
 		void drawtext(const DrawArgument &args, const Range<int16_t> &vertical, const std::string &text,
-					  const Text::Layout &layout, Text::Font font, Color::Name color, Text::Background back);
+					  const Text::Layout &layout, Text::Font font, Color::Name color, Text::Background back,
+					  size_t reveal);
 
 		// Draw a rectangle filled with the specified color.
 		void drawrectangle(int16_t x, int16_t y, int16_t width, int16_t height, float red, float green, float blue,
@@ -254,7 +256,7 @@ namespace ms
 		{
 		public:
 			LayoutBuilder(const Font &font, Text::Alignment alignment, int16_t maxwidth, bool formatted,
-						  int16_t line_adj);
+						  int16_t line_adj, const std::string &text, const std::vector<Point<int16_t>> &boxes);
 
 			size_t add(const char *text, size_t prev, size_t first, size_t last);
 
@@ -264,6 +266,9 @@ namespace ms
 			void add_word(size_t first, size_t last, Text::Font font, Color::Name color);
 
 			void add_line();
+
+			// The advance of the character at `pos`: an inline box's width.
+			int16_t advance_of(const char *text, size_t pos) const;
 
 			const Font &font;
 
@@ -282,6 +287,13 @@ namespace ms
 			int16_t width;
 			int16_t endy;
 			int16_t line_adj;
+
+			// Inline boxes: their sizes by text position, the ones on the
+			// current line, and where each was placed.
+			std::map<size_t, Point<int16_t>> boxes;
+			std::vector<std::pair<size_t, int16_t>> line_boxes;
+			std::map<size_t, Point<int16_t>> box_positions;
+			int16_t line_top;
 		};
 
 		int16_t VWIDTH;
