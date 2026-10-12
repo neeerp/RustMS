@@ -90,6 +90,9 @@ namespace ms
 		// Check whether the player is invincible
 		bool is_invincible() const override;
 
+		// Return whether the player is lying dead under a tombstone.
+		bool is_dead() const;
+
 		// Handle an attack to the player.
 		MobAttackResult damage(const MobAttack &attack);
 
@@ -186,6 +189,9 @@ namespace ms
 		uint16_t recovery_timer = 0;
 
 		void update_recovery();
+
+		// Die when HP runs out, and get back up when it returns.
+		void update_death();
 
 		CharStats stats;
 		Inventory inventory;

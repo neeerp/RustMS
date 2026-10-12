@@ -230,7 +230,7 @@ namespace ms
 
 	void Stage::send_key(KeyType::Id type, int32_t action, bool down)
 	{
-		if (state != State::ACTIVE || !playable)
+		if (state != State::ACTIVE || !playable || player.is_dead())
 			return;
 
 		switch (type)

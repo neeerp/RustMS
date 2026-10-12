@@ -22,6 +22,7 @@
 #include "../Data/WeaponData.h"
 #include "../IO/UI.h"
 
+#include "../IO/UITypes/UINotice.h"
 #include "../IO/UITypes/UIStatsInfo.h"
 #include "../Net/Packets/GameplayPackets.h"
 #include "../Net/Packets/PlayerPackets.h"
@@ -155,6 +156,8 @@ namespace ms
 
 	int8_t Player::update(const Physics &physics)
 	{
+		update_death();
+
 		const PlayerState *pst = get_state(state);
 
 		if (pst)
@@ -172,6 +175,10 @@ namespace ms
 			{
 				pst->update_state(*this);
 			}
+		} else if (state == Char::State::DIED)
+		{
+			physics.move_object(phobj);
+			Char::update(physics, 1.0f);
 		}
 
 		update_recovery();
@@ -187,6 +194,34 @@ namespace ms
 		}
 
 		return get_layer();
+	}
+
+	void Player::update_death()
+	{
+		bool dead = stats.get_stat(MapleStat::Id::HP) <= 0;
+
+		if (dead == is_dead())
+			return;
+
+		attacking = false;
+		keysdown.clear();
+
+		if (dead)
+		{
+			ladder = nullptr;
+			phobj.hspeed = 0.0;
+			phobj.type = PhysicsObject::Type::NORMAL;
+			set_state(Char::State::DIED);
+
+			// Any answer sends the player to the map's return map with a little HP.
+			UI::get().emplace<UIOk>("You have died.\\nYou will be revived in the nearest town.", [](bool)
+			{
+				ChangeMapPacket(true, 0, "", false).dispatch();
+			});
+		} else
+		{
+			nullstate.update_state(*this);
+		}
 	}
 
 	void Player::update_recovery()
@@ -252,7 +287,7 @@ namespace ms
 
 	bool Player::can_attack() const
 	{
-		return !attacking && !is_climbing() && !is_sitting() && look.get_equips().has_weapon();
+		return !attacking && !is_dead() && !is_climbing() && !is_sitting() && look.get_equips().has_weapon();
 	}
 
 	SpecialMove::ForbidReason Player::can_use(const SpecialMove &move) const
@@ -343,6 +378,11 @@ namespace ms
 			phobj.movexuntil(targetx, delay);
 			phobj.set_flag(PhysicsObject::Flag::TURNATEDGES);
 		}
+	}
+
+	bool Player::is_dead() const
+	{
+		return state == Char::State::DIED;
 	}
 
 	bool Player::is_invincible() const

@@ -99,6 +99,26 @@ namespace ms
 			equips.draw(EquipSlot::Id::SHIELD, interstance, Clothing::Layer::BACKSHIELD, interframe, args);
 			equips.draw(EquipSlot::Id::WEAPON, interstance, Clothing::Layer::BACKWEAPON, interframe, args);
 		}
+		else if (interstance == Stance::Id::DEAD)
+		{
+			// The ghost is only a body. It wears the standing hair and head gear, moved onto its neck.
+			Stance::Id standing = Stance::Id::STAND1;
+			Point<int16_t> neckshift = drawinfo.get_head_position(interstance, interframe) -
+									   drawinfo.get_head_position(standing, 0);
+			DrawArgument headargs = args + DrawArgument{neckshift, false, Point<int16_t>{}};
+
+			hair->draw(standing, Hair::Layer::BELOWBODY, 0, headargs);
+			equips.draw(EquipSlot::Id::HAT, standing, Clothing::Layer::CAP_BELOW_BODY, 0, headargs);
+			body->draw(interstance, Body::Layer::BODY, interframe, args);
+			hair->draw(standing, Hair::Layer::DEFAULT, 0, headargs);
+			equips.draw(EquipSlot::Id::EARACC, standing, Clothing::Layer::EARRINGS, 0, headargs);
+			body->draw(interstance, Body::Layer::HEAD, interframe, args);
+			hair->draw(standing, Hair::Layer::SHADE, 0, headargs);
+			face->draw(interexpression, interexpframe, faceargs);
+			equips.draw(EquipSlot::Id::FACE, standing, Clothing::Layer::FACEACC, 0, faceargs);
+			equips.draw(EquipSlot::Id::EYEACC, standing, Clothing::Layer::EYEACC, 0, headargs);
+			draw_cap(headargs, standing, 0);
+		}
 		else
 		{
 			hair->draw(interstance, Hair::Layer::BELOWBODY, interframe, args);
@@ -132,27 +152,7 @@ namespace ms
 			equips.draw(EquipSlot::Id::FACE, interstance, Clothing::Layer::FACEACC, 0, faceargs);
 			equips.draw(EquipSlot::Id::EYEACC, interstance, Clothing::Layer::EYEACC, interframe, args);
 			equips.draw(EquipSlot::Id::SHIELD, interstance, Clothing::Layer::SHIELD, interframe, args);
-
-			switch (equips.getcaptype())
-			{
-			case CharEquips::CapType::NONE:
-				hair->draw(interstance, Hair::Layer::OVERHEAD, interframe, args);
-				break;
-			case CharEquips::CapType::HEADBAND:
-				equips.draw(EquipSlot::Id::HAT, interstance, Clothing::Layer::CAP, interframe, args);
-				hair->draw(interstance, Hair::Layer::DEFAULT, interframe, args);
-				hair->draw(interstance, Hair::Layer::OVERHEAD, interframe, args);
-				equips.draw(EquipSlot::Id::HAT, interstance, Clothing::Layer::CAP_OVER_HAIR, interframe, args);
-				break;
-			case CharEquips::CapType::HALFCOVER:
-				hair->draw(interstance, Hair::Layer::DEFAULT, interframe, args);
-				equips.draw(EquipSlot::Id::HAT, interstance, Clothing::Layer::CAP, interframe, args);
-				break;
-			case CharEquips::CapType::FULLCOVER:
-				equips.draw(EquipSlot::Id::HAT, interstance, Clothing::Layer::CAP, interframe, args);
-				break;
-			}
-
+			draw_cap(args, interstance, interframe);
 			equips.draw(EquipSlot::Id::WEAPON, interstance, Clothing::Layer::WEAPON_BELOW_ARM, interframe, args);
 			bool twohanded = is_twohanded(interstance);
 
@@ -184,6 +184,29 @@ namespace ms
 
 			equips.draw(EquipSlot::Id::GLOVES, interstance, Clothing::Layer::WRIST_OVER_HAIR, interframe, args);
 			equips.draw(EquipSlot::Id::GLOVES, interstance, Clothing::Layer::GLOVE_OVER_HAIR, interframe, args);
+		}
+	}
+
+	void CharLook::draw_cap(const DrawArgument &args, Stance::Id stance, uint8_t frame) const
+	{
+		switch (equips.getcaptype())
+		{
+		case CharEquips::CapType::NONE:
+			hair->draw(stance, Hair::Layer::OVERHEAD, frame, args);
+			break;
+		case CharEquips::CapType::HEADBAND:
+			equips.draw(EquipSlot::Id::HAT, stance, Clothing::Layer::CAP, frame, args);
+			hair->draw(stance, Hair::Layer::DEFAULT, frame, args);
+			hair->draw(stance, Hair::Layer::OVERHEAD, frame, args);
+			equips.draw(EquipSlot::Id::HAT, stance, Clothing::Layer::CAP_OVER_HAIR, frame, args);
+			break;
+		case CharEquips::CapType::HALFCOVER:
+			hair->draw(stance, Hair::Layer::DEFAULT, frame, args);
+			equips.draw(EquipSlot::Id::HAT, stance, Clothing::Layer::CAP, frame, args);
+			break;
+		case CharEquips::CapType::FULLCOVER:
+			equips.draw(EquipSlot::Id::HAT, stance, Clothing::Layer::CAP, frame, args);
+			break;
 		}
 	}
 

@@ -73,7 +73,13 @@ namespace ms
 						}
 					}
 
-					nl::node headmap = headnode[ststr][frame]["head"]["map"];
+					nl::node headframe = headnode[ststr][frame];
+
+					// The dead ghost has no head of its own and wears the front-facing one.
+					if (!headframe)
+						headframe = headnode["front"];
+
+					nl::node headmap = headframe["head"]["map"];
 
 					for (auto mapnode : headmap)
 						bodyshiftmap[Body::Layer::HEAD].emplace(mapnode.name(), mapnode);

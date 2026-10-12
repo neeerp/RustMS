@@ -66,7 +66,19 @@ TAKE_DAMAGE from a touch (-1) is accepted up to the touching mob's
 `PADamage`, only for mobs with `bodyAttack` and without `notAttack`. HP
 drops, others see DAMAGE_PLAYER, and at 0 HP the player is dead:
 non-beginners lose 10% of their level's EXP; the client's respawn
-(CHANGE_MAP with a target while dead) returns them to the map's return map.
+(CHANGE_MAP with a target while dead) returns them to the map's return map
+with 50 HP.
+
+HeavenClient's `Player::update_death` notices HP reaching 0: the player
+becomes a ghost (`Char::State::DIED`), the tombstone from `Effect.nx/Tomb.img`
+drops behind them (drawn by `Char`), keys are ignored, and a "You have died."
+notice opens. The ghost is the body's `dead` frame, which fades in. Head, hair
+and equips have no `dead` frames, so `CharLook` puts the standing ones on the
+ghost's neck, as the original client does. The ghost and its name tag circle
+the tombstone clockwise, 9 pixels out, once every two seconds; the data has no
+motion for this, so `Char::draw` offsets them. The radius and period were
+measured from 2008 GMS footage. The notice's OK sends that respawn CHANGE_MAP. The SET_FIELD that follows
+carries the new HP, which brings the player back up.
 
 ## Keys
 

@@ -20,12 +20,13 @@
 namespace ms
 {
 	Portal::Portal(const Animation *a, Type t, std::string nm, bool intramap, Point<int16_t> p, int32_t tid,
-				   std::string tnm) : animation(a), type(t), name(nm), position(p), warpinfo(tid, intramap, tnm, nm)
+				   std::string tnm, int16_t hr, int16_t vr) : animation(a), type(t), name(nm), position(p),
+				   warpinfo(tid, intramap, tnm, nm), hrange(hr), vrange(vr)
 	{
 		touched = false;
 	}
 
-	Portal::Portal() : Portal(nullptr, SPAWN, "", false, Point<int16_t>(), 0, "")
+	Portal::Portal() : Portal(nullptr, SPAWN, "", false, Point<int16_t>(), 0, "", DEFAULT_RANGE, DEFAULT_RANGE)
 	{}
 
 	void Portal::update(Point<int16_t> playerpos)
@@ -36,7 +37,7 @@ namespace ms
 	bool Portal::touch(Point<int16_t> playerpos)
 	{
 		bool was_touched = touched;
-		touched = bounds().contains(playerpos);
+		touched = touch_bounds().contains(playerpos);
 
 		return touched && !was_touched;
 	}
@@ -68,6 +69,14 @@ namespace ms
 	{
 		auto lt = position + Point<int16_t>(-25, -100);
 		auto rb = position + Point<int16_t>(25, 25);
+
+		return Rectangle<int16_t>(lt, rb);
+	}
+
+	Rectangle<int16_t> Portal::touch_bounds() const
+	{
+		auto lt = position - Point<int16_t>(hrange / 2, vrange / 2);
+		auto rb = position + Point<int16_t>(hrange / 2 - 1, vrange / 2 - 1);
 
 		return Rectangle<int16_t>(lt, rb);
 	}

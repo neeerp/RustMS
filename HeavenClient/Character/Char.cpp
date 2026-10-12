@@ -48,6 +48,18 @@ namespace ms
 			color = Color::Code::CWHITE;
 		}
 
+		if (state == State::DIED)
+		{
+			// The ghost floats in front of its tombstone, circling it from the top.
+			tomb.draw(absp - Point<int16_t>(0, tomb_drop), alpha);
+			color = color * Color(1.0f, 1.0f, 1.0f, ghost_opacity.get(alpha));
+
+			float angle = 6.2831853f * (ghost_tick + alpha) / GHOST_LAP;
+			absp = absp + Point<int16_t>(
+				static_cast<int16_t>(std::lround(GHOST_RADIUS * std::sin(angle))),
+				static_cast<int16_t>(std::lround(-GHOST_RADIUS * std::cos(angle))));
+		}
+
 		look.draw(DrawArgument(absp, color), alpha);
 
 		afterimage.draw(look.get_frame(), DrawArgument(absp, facing_right), alpha);
@@ -95,6 +107,22 @@ namespace ms
 		hintballoon.update();
 		invincible.update();
 		ironbody.update();
+
+		if (state == State::DIED)
+		{
+			tomb_drop = std::max<int16_t>(tomb_drop - TOMB_SPEED, 0);
+			ghost_opacity += GHOST_FADE;
+			ghost_tick = (ghost_tick + 1) % GHOST_LAP;
+
+			if (ghost_opacity.last() > 1.0f - GHOST_FADE)
+				ghost_opacity.set(1.0f);
+
+			if (!tomb_landed && tomb.update())
+			{
+				tomb = tomb_land;
+				tomb_landed = true;
+			}
+		}
 
 		for (auto &pet : pets)
 		{
@@ -310,6 +338,15 @@ namespace ms
 
 	void Char::set_state(State st)
 	{
+		if (st == State::DIED && state != State::DIED)
+		{
+			tomb = tomb_fall;
+			tomb_drop = TOMB_DROP;
+			tomb_landed = false;
+			ghost_opacity.set(0.0f);
+			ghost_tick = 0;
+		}
+
 		state = st;
 
 		Stance::Id stance = Stance::by_state(state);
@@ -401,7 +438,13 @@ namespace ms
 
 		for (auto iter : CharEffect::PATHS)
 			chareffects.emplace(iter.first, src.resolve(iter.second));
+
+		nl::node tomb = nl::nx::effect["Tomb.img"];
+		tomb_fall = tomb["fall"];
+		tomb_land = tomb["land"];
 	}
 
 	EnumMap<CharEffect::Id, Animation> Char::chareffects;
+	Animation Char::tomb_fall;
+	Animation Char::tomb_land;
 }
