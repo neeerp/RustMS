@@ -9,6 +9,7 @@
 #include "../IO/UITypes/UINpcTalk.h"
 #include "../Net/Packets/NpcInteractionPackets.h"
 #include "../Net/Packets/QuestPackets.h"
+#include "../Util/Misc.h"
 
 #include <nlnx/nx.hpp>
 
@@ -71,24 +72,10 @@ namespace ms
 				return end_mobs_met(quest, iter == started.end() ? std::string() : iter->second);
 			}
 
-			std::string npc_image(int32_t npc_id)
-			{
-				std::string id = std::to_string(npc_id);
-				id.insert(0, 7 - id.size(), '0');
-
-				return id + ".img";
-			}
-
 			// Whether the server has normal speech for this NPC (info/speak).
 			bool has_speech(int32_t npc_id)
 			{
-				nl::node npc = nl::nx::npc[npc_image(npc_id)];
-				std::string link = npc["info"]["link"];
-
-				if (!link.empty())
-					npc = nl::nx::npc[link + ".img"];
-
-				return npc["info"]["speak"].size() > 0;
+				return NxHelper::Npc::get_npc_node(npc_id)["info"]["speak"].size() > 0;
 			}
 
 			Texture list_header(int index)

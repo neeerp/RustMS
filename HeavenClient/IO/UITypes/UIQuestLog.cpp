@@ -279,7 +279,7 @@ namespace ms
 		if (check["0"]["lvmax"]) requirement += " - " + std::to_string(check["0"]["lvmax"].get_integer());
 		else requirement += "+";
 		level_text = Text(Text::A11M, Text::LEFT, Color::Name::WHITE, requirement);
-		portrait = nl::nx::npc[string_format::extend_id(target_npc, 7) + ".img"]["stand"];
+		portrait = NxHelper::Npc::get_npc_node(target_npc)["stand"];
 		std::string npc_name = nl::nx::string["Npc.img"][std::to_string(target_npc)]["name"];
 		objective = Text(Text::A12B, Text::LEFT, Color::Name::BLUE, "Talk to " + npc_name, 250);
 		auto map_name = target_map >= 0 ? NxHelper::Map::get_map_info_by_id(target_map).name : "";

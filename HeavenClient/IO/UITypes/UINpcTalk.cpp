@@ -425,11 +425,7 @@ namespace ms
 
 		if (speakerbyte == 0)
 		{
-			std::string strid = std::to_string(npcid);
-			strid.insert(0, 7 - strid.size(), '0');
-			strid.append(".img");
-
-			speaker = nl::nx::npc[strid]["stand"]["0"];
+			speaker = NxHelper::Npc::get_npc_node(npcid)["stand"]["0"];
 
 			std::string namestr = nl::nx::string["Npc.img"][std::to_string(npcid)]["name"];
 			name.change_text(namestr);
