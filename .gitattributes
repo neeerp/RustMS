@@ -1,0 +1,4 @@
+# Normalize line endings for all text files in the repository.
+# Keeps the canonical stored form as LF and prevents Windows CRLF
+# churn when the working copy moves between OSes.
+* text=auto
