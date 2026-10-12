@@ -58,10 +58,12 @@ namespace ms
 		// v83 CUser::OnChat shows a balloon for 5 s, then fades it out over 1 s.
 		static constexpr int16_t DURATION = 5000;
 		static constexpr int16_t FADE = 1000;
-		// Lines wrap at about 80 px, which matches the narrow balloons of the original.
-		static constexpr uint16_t WRAP_WIDTH = 80;
-		static constexpr int16_t PADDING = 2;
-		static constexpr int16_t LINE_GAP = 3;
+		// The original wraps balloon text at seven 12 px tiles of the frame.
+		static constexpr uint16_t WRAP_WIDTH = 84;
+		// The balloon font's descent. Each layout line puts its baseline a full
+		// line height below the line's top, so the text is raised by this much
+		// to fill its 14 px rows.
+		static constexpr int16_t TEXT_DESCENT = 3;
 
 		// The frame pieces, named in ChatBalloon.img as c, n, s, w, e, nw, ne, sw, se, and arrow.
 		enum Piece : uint8_t

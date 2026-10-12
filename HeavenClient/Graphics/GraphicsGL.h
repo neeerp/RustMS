@@ -89,7 +89,17 @@ namespace ms
 	private:
 		void clearinternal();
 
-		bool addfont(const char *name, Text::Font id, FT_UInt width, FT_UInt height);
+		// How far text moves down per line.
+		enum class LineSpacing
+		{
+			// HeavenClient's default, about 1.35 times the tallest glyph.
+			GLYPHS,
+			// The face's ascent plus descent, the way Windows lays out text in the original client.
+			FACE
+		};
+
+		bool addfont(const char *name, Text::Font id, FT_UInt width, FT_UInt height,
+					 LineSpacing spacing = LineSpacing::GLYPHS);
 
 		struct Offset
 		{
@@ -213,22 +223,29 @@ namespace ms
 
 			GLshort width;
 			GLshort height;
+			// The face's own line height, or 0 to derive one from the glyph height.
+			GLshort lineheight;
 			Char chars[128];
 
-			Font(GLshort w, GLshort h)
+			Font(GLshort w, GLshort h, GLshort lh)
 			{
 				width = w;
 				height = h;
+				lineheight = lh;
 			}
 
 			Font()
 			{
 				width = 0;
 				height = 0;
+				lineheight = 0;
 			}
 
 			int16_t linespace() const
 			{
+				if (lineheight > 0)
+					return lineheight;
+
 				return static_cast<int16_t>(height * 1.35 + 1);
 			}
 		};

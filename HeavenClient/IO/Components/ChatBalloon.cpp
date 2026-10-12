@@ -66,7 +66,7 @@ namespace ms
 		textcolor = clr.data_type() == nl::node::type::integer ? argb_color(static_cast<int32_t>(clr.get_integer())) : Color(Color::Code::CBLACK);
 
 		// The text itself is white so the style color applied at draw time is exact.
-		textlabel = Text(Text::Font::A11M, Text::Alignment::CENTER, Color::Name::WHITE, "", WRAP_WIDTH, formatted);
+		textlabel = Text(Text::Font::BALLOON, Text::Alignment::CENTER, Color::Name::WHITE, "", WRAP_WIDTH, formatted);
 
 		duration = 0;
 	}
@@ -85,11 +85,11 @@ namespace ms
 
 		float opacity = duration < FADE ? static_cast<float>(duration) / FADE : 1.0f;
 
-		// The content area fits the text exactly. The border pieces are drawn
-		// outside it through their asset origins, with the edges stretched to
-		// the content size, so the text always sits inside the frame.
-		int16_t width = std::max<int16_t>(textlabel.width() + 2 * PADDING, xtile);
-		int16_t height = std::max<int16_t>(textlabel.height() - LINE_GAP, ytile);
+		// The content area is exactly the text block, one 14 px row per line, as
+		// in the original. The border pieces are drawn outside it through their
+		// asset origins, with the edges stretched to the content size.
+		int16_t width = std::max<int16_t>(textlabel.width(), xtile);
+		int16_t height = std::max<int16_t>(textlabel.height(), ytile);
 		int16_t left = position.x() - width / 2;
 		int16_t right = left + width;
 		int16_t bottom = position.y();
@@ -117,9 +117,7 @@ namespace ms
 
 		Color color(textcolor.r(), textcolor.g(), textcolor.b(), opacity);
 
-		// Each layout line includes leading below the glyphs; shift the text up so
-		// the padding above and below it is even.
-		int16_t text_top = top - LINE_GAP;
+		int16_t text_top = top - TEXT_DESCENT;
 		textlabel.draw(DrawArgument(Point<int16_t>(position.x(), text_top), color));
 	}
 
