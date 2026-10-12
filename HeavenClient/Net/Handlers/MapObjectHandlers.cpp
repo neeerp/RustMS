@@ -203,7 +203,7 @@ namespace ms
 		recv.read_byte(); // 5 if controller == null
 		int32_t id = recv.read_int();
 
-		recv.skip(22);
+		recv.skip(16); // temporary status mask
 
 		Point<int16_t> position = recv.read_point();
 		int8_t stance = recv.read_byte();
@@ -256,7 +256,7 @@ namespace ms
 
 				int32_t id = recv.read_int();
 
-				recv.skip(22);
+				recv.skip(16); // temporary status mask
 
 				Point<int16_t> position = recv.read_point();
 				int8_t stance = recv.read_byte();
