@@ -26,8 +26,7 @@ namespace ms
 	Session::Session()
 	{
 		connected = false;
-		length = 0;
-		pos = 0;
+		reconnected = false;
 	}
 
 	Session::~Session()
@@ -40,6 +39,10 @@ namespace ms
 	{
 		// Connect to the server
 		connected = socket.open(host, port);
+
+		// Any partially received packet belonged to the previous connection
+		assembler.reset();
+		reconnected = true;
 
 		if (connected)
 		{
@@ -74,49 +77,34 @@ namespace ms
 
 	void Session::process(const int8_t* bytes, size_t available)
 	{
-		if (pos == 0)
+		auto decode_length = [&](const int8_t* header) { return cryptography.check_length(header); };
+
+		auto on_frame = [&](int8_t* body, size_t length)
 		{
-			// Position is zero, meaning this is the start of a new packet. Start by determining length.
-			length = cryptography.check_length(bytes);
-			// Reading the length means we processed the header. Move forward by the header length.
-			bytes = bytes + HEADER_LENGTH;
-			available -= HEADER_LENGTH;
-		}
+			cryptography.decrypt(body, length);
 
-		// Determine how much we can write. Write data into the buffer.
-		size_t towrite = length - pos;
-
-		if (towrite > available)
-			towrite = available;
-
-		memcpy(buffer + pos, bytes, towrite);
-		pos += towrite;
-
-		// Check if the current packet has been fully processed
-		if (pos >= length)
-		{
-			cryptography.decrypt(buffer, length);
+			reconnected = false;
 
 			try
 			{
-				packetswitch.forward(buffer, length);
+				packetswitch.forward(body, length);
 			}
 			catch (const PacketError& err)
 			{
 				std::cout << err.what() << std::endl;
 			}
 
-			pos = 0;
-			length = 0;
+			// A handler may have switched to a new connection (for example on a server
+			// redirect). The remaining bytes belong to the old connection and the socket
+			// buffer was overwritten, so stop.
+			return !reconnected;
+		};
 
-			// Check if there is more available
-			size_t remaining = available - towrite;
-
-			if (remaining >= MIN_PACKET_LENGTH)
-			{
-				// More packets are available, so we start over.
-				process(bytes + towrite, remaining);
-			}
+		if (assembler.feed(bytes, available, decode_length, on_frame) == FrameAssembler::Result::InvalidLength)
+		{
+			// The stream is corrupt and cannot be resynchronized. Drop the connection.
+			std::cout << "Invalid packet length" << std::endl;
+			connected = false;
 		}
 	}
 
@@ -140,10 +128,11 @@ namespace ms
 
 	void Session::read()
 	{
-		// Check if a packet has arrived. Handle if data is sufficient: 4 bytes (header) + 2 bytes (opcode) = 6 bytes.
+		// Check if data has arrived. It does not have to be a whole packet: partial headers and
+		// bodies are buffered by process() until the rest arrives.
 		size_t result = socket.receive(&connected);
 
-		if (result >= MIN_PACKET_LENGTH || length > 0)
+		if (result > 0)
 		{
 			// Retrieve buffer from the socket and process it
 			const int8_t* bytes = socket.get_buffer();
