@@ -94,6 +94,7 @@ namespace ms
 			SILVERCHALICE,
 			GRAY,
 			TORCHRED,
+			SILVER,
 			NUM_COLORS
 		};
 
@@ -134,7 +135,11 @@ namespace ms
 						{0.80f, 1.00f, 0.00f}, // Electric Lime
 						{1.00f, 0.80f, 0.00f}, // Supernova
 						{0.47f, 1.00f, 0.00f}, // Chartreuse
-						{0.47f, 0.80f, 1.00f}  // Malibu
+						{0.47f, 0.80f, 1.00f}, // Malibu
+						{0.67f, 0.67f, 0.67f}, // Silver Chalice
+						{0.50f, 0.50f, 0.50f}, // Gray
+						{0.99f, 0.05f, 0.21f}, // Torch Red
+						{0.73f, 0.73f, 0.73f}  // Silver (#BBBBBB, quest item gains in the chat log)
 				};
 
 		// Create a color by an array of real numbers [0.0f, 1.0f]

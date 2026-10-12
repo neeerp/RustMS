@@ -499,6 +499,9 @@ namespace ms
 			case LineType::YELLOW:
 				color = Color::Name::YELLOW;
 				break;
+			case LineType::GREY:
+				color = Color::Name::SILVER;
+				break;
 			default:
 				color = Color::Name::WHITE;
 				break;

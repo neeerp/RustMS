@@ -44,7 +44,8 @@ namespace ms
 			WHITE,
 			RED,
 			BLUE,
-			YELLOW
+			YELLOW,
+			GREY
 		};
 
 		UIChatBar();
