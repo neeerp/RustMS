@@ -13,7 +13,7 @@
 //! whose queue is full is kicked instead. That makes wait cycles impossible.
 
 use game::FieldAvatar;
-use net::{BroadcastScope, ClientId, WhisperDelivery};
+use net::{BroadcastScope, ClientId, FieldRequest, WhisperDelivery};
 use packet::Packet;
 use tokio::sync::mpsc;
 use tokio::sync::mpsc::error::TrySendError;
@@ -49,6 +49,13 @@ pub enum ServerMessage {
         npc_id: i32,
         field: FieldKey,
         request_id: u64,
+    },
+    /// A mob this player helped kill; `exp` is their share.
+    MobKilled {
+        mob_id: i32,
+        exp: i32,
+        x: i16,
+        y: i16,
     },
     /// Whether a quest NPC is on the player's map and within reach.
     QuestNpcChecked {
@@ -141,6 +148,11 @@ pub enum FieldMessage {
         from: ClientId,
         object_id: i32,
         request_id: u64,
+    },
+    /// A player's request of the field (`net::handler::FieldRequest`).
+    FromClient {
+        from: ClientId,
+        request: FieldRequest,
     },
     /// Check that an NPC with this template id is near the player before a
     /// quest action; answered with `ServerMessage::QuestNpcChecked`.

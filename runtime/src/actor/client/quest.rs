@@ -2,7 +2,7 @@ use super::ClientActor;
 use crate::{db::spawn_db, error::RuntimeError, message::FieldMessage};
 use game::{Player, QuestState};
 use net::npc_scripts::NpcScript;
-use net::packet::build::world::{quest, stat};
+use net::packet::build::world::{effect, quest, stat};
 use net::quests::{self, QuestActionKind, QuestRequest, QuestTemplate};
 use packet::Packet;
 use tracing::{debug, warn};
@@ -208,16 +208,16 @@ impl ClientActor {
         } else {
             next.mark_dirty();
         }
-        let level_changed = next.stats.level != previous_level;
+        let levelled = next.stats.level > previous_level;
         self.in_game_mut()?.player = next;
-        if level_changed {
-            // Players joining the map later should see the new level.
+        if levelled {
+            // Others see the level-up effect; the field avatar shows the level.
             let avatar = self.in_game()?.player.field_avatar(0, 0, 0);
             let client_id = self.client_id;
             self.send_to_field(FieldMessage::UpdateAvatar {
                 client_id,
                 avatar,
-                announce: None,
+                announce: Some(effect::build_level_up_effect(client_id)?),
             })
             .await?;
         }

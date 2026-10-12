@@ -76,6 +76,7 @@ async fn preload_game_data() -> Result<(), RuntimeError> {
             "Quest catalog loaded"
         );
         net::items::data().map_err(|e| format!("item data: {e}"))?;
+        net::mobs::data().map_err(|e| format!("mob data: {e}"))?;
         info!("Server content: {}", net::content::load()?);
         Ok(())
     })

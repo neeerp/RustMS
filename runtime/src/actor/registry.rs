@@ -1,4 +1,5 @@
 use crate::actor::field::{FieldActor, FieldMapEntityNpc};
+use crate::actor::field_mobs::MobSet;
 use crate::message::{FieldHandle, FieldKey};
 use crate::supervisor::spawn_supervised;
 use std::collections::HashMap;
@@ -36,7 +37,13 @@ impl FieldRegistry {
 
         let (tx, rx) = mpsc::channel(FIELD_QUEUE_CAPACITY);
         let handle = FieldHandle { key, tx };
-        let actor = FieldActor::new(key, rx, load_field_map_npcs(key), self.tick);
+        let actor = FieldActor::new(
+            key,
+            rx,
+            load_field_map_npcs(key),
+            load_field_mobs(key),
+            self.tick,
+        );
         let registry: Weak<Self> = Arc::downgrade(self);
         let exited = handle.clone();
         spawn_supervised(format!("field {key:?}"), actor.run(), move || {
@@ -58,6 +65,27 @@ impl FieldRegistry {
             fields.remove(&exited.key);
         }
     }
+}
+
+fn load_field_mobs(field_key: FieldKey) -> MobSet {
+    let Some(field) = net::get_game_data()
+        .ok()
+        .and_then(|data| data.field(field_key.map_id))
+    else {
+        return MobSet::default();
+    };
+    MobSet::new(
+        field
+            .mob_spawns
+            .iter()
+            .filter_map(|spawn| match net::mobs::info(spawn.mob_id) {
+                Some(info) => Some((spawn.clone(), info)),
+                None => {
+                    warn!(field = ?field_key, mob_id = spawn.mob_id, "Unknown mob in spawn list");
+                    None
+                }
+            }),
+    )
 }
 
 fn load_field_map_npcs(field_key: FieldKey) -> Vec<FieldMapEntityNpc> {

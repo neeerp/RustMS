@@ -1145,6 +1145,7 @@ dependencies = [
  "crypt",
  "db",
  "game",
+ "game-data",
  "net",
  "packet",
  "rand 0.7.3",

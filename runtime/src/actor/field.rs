@@ -1,10 +1,15 @@
+use crate::actor::field_mobs::MobSet;
 use crate::message::{ClientHandle, FieldKey, FieldMessage, ServerMessage};
 use game::FieldAvatar;
 use net::packet::build::world::field::{
     build_player_enter_field, build_player_leave_field, parse_movement_state,
 };
+use net::packet::build::world::mob::{
+    build_control_mob, build_kill_mob, build_mob_hp, build_move_mob, build_move_mob_response,
+    build_spawn_mob,
+};
 use net::packet::build::world::npc::{build_spawn_npc, ForeignNpc};
-use net::ClientId;
+use net::{ClientId, FieldRequest};
 use packet::Packet;
 use std::collections::HashMap;
 use std::time::Duration;
@@ -42,6 +47,7 @@ pub struct FieldActor {
     rx: mpsc::Receiver<FieldMessage>,
     occupants: HashMap<ClientId, Occupant>,
     map_npcs: Vec<FieldMapEntityNpc>,
+    mobs: MobSet,
     tick: Duration,
 }
 
@@ -50,13 +56,16 @@ impl FieldActor {
         key: FieldKey,
         rx: mpsc::Receiver<FieldMessage>,
         map_npcs: Vec<FieldMapEntityNpc>,
+        mut mobs: MobSet,
         tick: Duration,
     ) -> Self {
+        mobs.respawn(Instant::now());
         Self {
             key,
             rx,
             occupants: HashMap::new(),
             map_npcs,
+            mobs,
             tick,
         }
     }
@@ -77,9 +86,40 @@ impl FieldActor {
         }
     }
 
-    /// Advance time-driven field state. Mob AI, respawns, and drop expiry
-    /// belong here; nothing on a field is time-driven yet.
-    fn on_tick(&mut self, _now: Instant) {}
+    /// Advance time-driven field state: mob respawns (drop expiry later).
+    fn on_tick(&mut self, now: Instant) {
+        let spawned = self.mobs.respawn(now);
+        if spawned.is_empty() {
+            return;
+        }
+        let controller = self.occupants.keys().next().copied();
+        for object_id in spawned {
+            let Some(mob) = self.mobs.get(object_id) else {
+                continue;
+            };
+            if let Ok(packet) = build_spawn_mob(&mob.view(true)) {
+                self.broadcast(None, packet);
+            }
+        }
+        if let Some(controller) = controller {
+            let controlled = self.mobs.assign_uncontrolled(controller);
+            self.send_control(controller, &controlled);
+        }
+    }
+
+    /// Tell `client` it now moves these mobs.
+    fn send_control(&self, client: ClientId, object_ids: &[i32]) {
+        let Some(occupant) = self.occupants.get(&client) else {
+            return;
+        };
+        for &object_id in object_ids {
+            if let Some(mob) = self.mobs.get(object_id) {
+                if let Ok(packet) = build_control_mob(&mob.view(false)) {
+                    occupant.handle.send_packet(packet);
+                }
+            }
+        }
+    }
 
     fn handle_message(&mut self, message: FieldMessage) {
         match message {
@@ -133,6 +173,73 @@ impl FieldActor {
                 npc_id,
                 request_id,
             } => self.handle_quest_npc(from, npc_id, request_id),
+            FieldMessage::FromClient { from, request } => match request {
+                FieldRequest::MobMove {
+                    object_id,
+                    move_id,
+                    start,
+                    movement,
+                } => self.handle_mob_move(from, object_id, move_id, start, &movement),
+                FieldRequest::Attack { broadcast, hits } => {
+                    self.handle_attack(from, broadcast, hits)
+                }
+                FieldRequest::Broadcast(packet) => self.broadcast(Some(from), packet),
+            },
+        }
+    }
+
+    fn handle_mob_move(
+        &mut self,
+        from: ClientId,
+        object_id: i32,
+        move_id: i16,
+        start: (i16, i16),
+        movement: &[u8],
+    ) {
+        if !self.mobs.move_mob(from, object_id, movement) {
+            return;
+        }
+        if let Some(occupant) = self.occupants.get(&from) {
+            if let Ok(packet) = build_move_mob_response(object_id, move_id, 0) {
+                occupant.handle.send_packet(packet);
+            }
+        }
+        if let Ok(packet) = build_move_mob(object_id, start, movement) {
+            self.broadcast(Some(from), packet);
+        }
+    }
+
+    fn handle_attack(&mut self, from: ClientId, broadcast: Packet, hits: Vec<(i32, i64)>) {
+        let Some(attacker) = self.occupants.get(&from) else {
+            return;
+        };
+        let attacker = attacker.handle.clone();
+        self.broadcast(Some(from), broadcast);
+        let now = Instant::now();
+        for (object_id, damage) in hits {
+            match self.mobs.damage(from, object_id, damage, now) {
+                Some(Ok(percent)) => {
+                    if let Ok(packet) = build_mob_hp(object_id, percent) {
+                        attacker.send_packet(packet);
+                    }
+                }
+                Some(Err(kill)) => {
+                    if let Ok(packet) = build_kill_mob(kill.object_id, 1) {
+                        self.broadcast(None, packet);
+                    }
+                    for (client, exp) in &kill.exp {
+                        if let Some(occupant) = self.occupants.get(client) {
+                            occupant.handle.send(ServerMessage::MobKilled {
+                                mob_id: kill.mob_id,
+                                exp: *exp,
+                                x: kill.x,
+                                y: kill.y,
+                            });
+                        }
+                    }
+                }
+                None => {}
+            }
         }
     }
 
@@ -166,13 +273,26 @@ impl FieldActor {
             Err(error) => warn!(client_id, %error, "Failed to build join spawn"),
         }
 
+        for mob in self.mobs.live() {
+            if let Ok(packet) = build_spawn_mob(&mob.view(false)) {
+                handle.send_packet(packet);
+            }
+        }
+
         self.occupants
             .insert(client_id, Occupant { handle, avatar });
+        let controlled = self.mobs.assign_uncontrolled(client_id);
+        self.send_control(client_id, &controlled);
     }
 
     fn handle_leave(&mut self, client_id: ClientId) {
         if self.occupants.remove(&client_id).is_none() {
             return;
+        }
+        let next = self.occupants.keys().next().copied();
+        let handed = self.mobs.release(client_id, next);
+        if let Some(next) = next {
+            self.send_control(next, &handed);
         }
         match build_player_leave_field(client_id) {
             Ok(packet) => self.broadcast(None, packet),
@@ -278,6 +398,7 @@ mod tests {
             FieldKey::new(0, 100000000),
             rx,
             Vec::new(),
+            MobSet::default(),
             Duration::from_millis(50),
         );
         tokio::spawn(actor.run());
@@ -396,6 +517,7 @@ mod tests {
             FieldKey::new(0, 10000),
             rx,
             vec![heena],
+            MobSet::default(),
             Duration::from_millis(50),
         );
         tokio::spawn(actor.run());

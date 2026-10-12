@@ -192,8 +192,9 @@ impl Player {
     }
 
     /// Add EXP, levelling up as many times as it covers. Each level grants
-    /// 5 AP. Returns the number of levels gained. (HP/MP and SP growth come
-    /// with combat.)
+    /// 5 AP and the job family's HP/MP growth, then restores HP and MP.
+    /// Returns the number of levels gained. (SP comes with skills; v83
+    /// beginners get none.)
     pub fn gain_exp(&mut self, amount: i32) -> u8 {
         if amount <= 0 {
             return 0;
@@ -207,10 +208,17 @@ impl Player {
             exp -= needed;
             self.stats.level += 1;
             self.stats.ap = self.stats.ap.saturating_add(5);
+            let (hp, mp) = level_up_growth(self.stats.job);
+            self.stats.max_hp = self.stats.max_hp.saturating_add(hp);
+            self.stats.max_mp = self.stats.max_mp.saturating_add(mp);
             gained += 1;
         }
         if crate::exp::to_next_level(self.stats.level).is_none() {
             exp = 0;
+        }
+        if gained > 0 {
+            self.stats.hp = self.stats.max_hp;
+            self.stats.mp = self.stats.max_mp;
         }
         self.stats.exp = i32::try_from(exp).unwrap_or(i32::MAX);
         self.dirty = true;
@@ -246,6 +254,19 @@ impl Player {
     /// Called after a successful save of a snapshot taken from this player.
     pub fn mark_saved(&mut self) {
         self.dirty = false;
+    }
+}
+
+/// Max HP/MP gained per level: the middle of v83's random ranges
+/// (`MapleCharacter.levelUp`), so levels are reproducible.
+fn level_up_growth(job: i16) -> (i16, i16) {
+    match job / 100 {
+        0 | 10 | 20 => (14, 11),
+        1 | 11 | 21 => (26, 5),
+        2 | 12 => (12, 23),
+        3 | 4 | 13 | 14 => (22, 15),
+        5 | 15 => (25, 20),
+        _ => (14, 11),
     }
 }
 
@@ -342,6 +363,8 @@ mod tests {
             (player.stats.level, player.stats.exp, player.stats.ap),
             (3, 13, 10)
         );
+        // Two beginner levels: +28 max HP, +22 max MP, fully restored.
+        assert_eq!((player.stats.max_hp, player.stats.hp), (78, 78));
         assert_eq!(player.gain_exp(0), 0);
         assert!(player.is_dirty());
     }

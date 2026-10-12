@@ -22,6 +22,15 @@ pub fn build_avatar_effect(path: &str) -> Result<Packet, NetworkError> {
     Ok(p)
 }
 
+/// SHOW_FOREIGN_EFFECT 0: the level-up effect on another player.
+pub fn build_level_up_effect(character_id: i32) -> Result<Packet, NetworkError> {
+    let mut p = Packet::new_empty();
+    p.write_short(SendOpcode::ShowForeignEffect as i16)?;
+    p.write_int(character_id)?;
+    p.write_byte(0)?;
+    Ok(p)
+}
+
 /// PLAYER_HINT: an instruction balloon above the player.
 pub fn build_hint(text: &str, width: i16, height: i16) -> Result<Packet, NetworkError> {
     let mut p = Packet::new_empty();
@@ -55,6 +64,17 @@ mod tests {
             .short(SendOpcode::ShowItemGainInChat as i16)
             .byte(0x17);
         expect.string("UI/tutorial.img/25").int(1);
+        expect.end();
+    }
+
+    #[test]
+    fn level_up_effect_names_the_player() {
+        let packet = build_level_up_effect(7).unwrap();
+        let mut expect = Expect::new(&packet.bytes);
+        expect
+            .short(SendOpcode::ShowForeignEffect as i16)
+            .int(7)
+            .byte(0);
         expect.end();
     }
 

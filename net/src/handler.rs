@@ -226,11 +226,34 @@ pub enum WorldAction {
         hp: i16,
         mp: i16,
     },
+    /// Something for the player's field to do on their behalf.
+    Field(FieldRequest),
+    /// The player's HP reached 0.
+    Died,
     Whisper(WhisperDelivery),
     ChangeChannel {
         channel_id: u8,
     },
     Disconnect,
+}
+
+/// A request a player makes of their field, which owns its mobs.
+#[derive(Debug)]
+pub enum FieldRequest {
+    /// The controller moved a mob.
+    MobMove {
+        object_id: i32,
+        move_id: i16,
+        start: (i16, i16),
+        movement: Vec<u8>,
+    },
+    /// A validated attack: `broadcast` for the others, total damage per mob.
+    Attack {
+        broadcast: Packet,
+        hits: Vec<(i32, i64)>,
+    },
+    /// Show everyone else on the map this packet.
+    Broadcast(Packet),
 }
 
 impl ReplyAction for WorldAction {
@@ -261,7 +284,7 @@ fn world_routes() -> &'static HashMap<i16, WorldRoute> {
     ROUTES.get_or_init(|| {
         use RecvOpcode as Op;
         use WorldRoute::*;
-        let table: [(Op, WorldRoute); 16] = [
+        let table: [(Op, WorldRoute); 19] = [
             (Op::PlayerLoggedIn, PreGame(&world::PlayerLoggedInHandler)),
             (Op::PlayerMove, InGame(&world::PlayerMoveHandler)),
             (Op::ChangeChannel, InGame(&world::ChangeChannelHandler)),
@@ -286,6 +309,12 @@ fn world_routes() -> &'static HashMap<i16, WorldRoute> {
             ),
             (Op::ItemMove, InGame(&world::ItemMoveHandler)),
             (Op::UseItem, InGame(&world::UseItemHandler)),
+            (Op::MoveLife, InGame(&world::MoveLifeHandler)),
+            (
+                Op::CloseRangeAttack,
+                InGame(&world::CloseRangeAttackHandler),
+            ),
+            (Op::TakeDamage, InGame(&world::TakeDamageHandler)),
             (Op::HealOverTime, InGame(&world::HealOverTimeHandler)),
         ];
         table
@@ -317,7 +346,7 @@ mod tests {
     fn every_registered_opcode_is_unique_per_server() {
         // The maps would silently drop duplicates; check the table sizes match.
         assert_eq!(login_routes().len(), 13);
-        assert_eq!(world_routes().len(), 16);
+        assert_eq!(world_routes().len(), 19);
     }
 
     #[test]

@@ -1,6 +1,7 @@
 pub mod client;
 pub mod directory;
 pub mod field;
+pub mod field_mobs;
 pub mod login;
 pub mod registry;
 

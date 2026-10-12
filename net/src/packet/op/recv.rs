@@ -30,6 +30,8 @@ pub enum RecvOpcode {
     ChangeMap = 0x26,
 
     PlayerMove = 0x29,
+    CloseRangeAttack = 0x2C,
+    TakeDamage = 0x30,
     AllChat = 0x31,
     Whisper = 0x78,
     TalkToNpc = 0x3A,
@@ -41,6 +43,7 @@ pub enum RecvOpcode {
     QuestAction = 0x6B,
 
     ChangeKeybinds = 0x87,
+    MoveLife = 0xBC,
 
     PlayerMapTransfer = 0xCF,
     PartySearchUpdate = 0xDF,

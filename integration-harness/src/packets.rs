@@ -214,6 +214,10 @@ pub fn opcode_name(opcode: i16) -> &'static str {
         x if x == SendOpcode::ShowItemGainInChat as i16 => "ShowItemGainInChat",
         x if x == SendOpcode::InventoryOperation as i16 => "InventoryOperation",
         x if x == SendOpcode::UpdateCharLook as i16 => "UpdateCharLook",
+        x if x == SendOpcode::SpawnMonster as i16 => "SpawnMonster",
+        x if x == SendOpcode::SpawnMonsterControl as i16 => "SpawnMonsterControl",
+        x if x == SendOpcode::MoveMonster as i16 => "MoveMonster",
+        x if x == SendOpcode::KillMonster as i16 => "KillMonster",
         _ => "Unknown",
     }
 }

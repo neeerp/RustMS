@@ -1,6 +1,7 @@
 mod change_channel;
 mod change_map;
 mod chat;
+mod combat;
 mod item_move;
 mod keybinds;
 mod logged_in;
@@ -16,6 +17,7 @@ mod whisper;
 pub use self::change_channel::ChangeChannelHandler;
 pub use self::change_map::{warp, ChangeMapHandler};
 pub use self::chat::AllChatHandler;
+pub use self::combat::{CloseRangeAttackHandler, MoveLifeHandler, TakeDamageHandler};
 pub use self::item_move::ItemMoveHandler;
 pub use self::keybinds::ChangeKeybindsHandler;
 pub use self::logged_in::PlayerLoggedInHandler;

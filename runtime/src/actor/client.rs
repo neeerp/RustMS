@@ -1,3 +1,4 @@
+mod combat;
 mod dialogue;
 mod npc_script;
 mod quest;
@@ -257,6 +258,14 @@ impl ClientActor {
                 }
             }
             WorldAction::NaturalHeal { hp, mp } => self.natural_heal(hp, mp).await?,
+            WorldAction::Field(request) => {
+                self.send_to_field(FieldMessage::FromClient {
+                    from: self.client_id,
+                    request,
+                })
+                .await?
+            }
+            WorldAction::Died => self.died().await?,
             WorldAction::Quest(request) => self.request_quest_action(request).await?,
             WorldAction::ScriptPortal { portal } => self.touch_script_portal(&portal).await?,
             WorldAction::LookChanged(announce) => {
@@ -407,6 +416,7 @@ impl ClientActor {
             ServerMessage::QuestNpcChecked { request_id, nearby } => {
                 self.quest_npc_checked(request_id, nearby).await?
             }
+            ServerMessage::MobKilled { mob_id, exp, .. } => self.mob_killed(mob_id, exp).await?,
             ServerMessage::SendPacket(mut packet) => self.send(&mut packet).await?,
         }
         Ok(())
