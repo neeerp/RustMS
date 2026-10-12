@@ -4,7 +4,7 @@
 use crate::actor::object_ids::{self, ObjectIds};
 use game_data::mobs::MobInfo;
 use game_data::MapMobTemplate;
-use net::packet::build::world::field::parse_movement_state;
+use net::packet::build::world::field::parse_movement;
 use net::packet::build::world::mob::MobView;
 use net::ClientId;
 use std::collections::{BTreeMap, HashMap};
@@ -170,10 +170,16 @@ impl MobSet {
         if mob.controller != Some(from) {
             return false;
         }
-        if let Some((x, y, stance)) = parse_movement_state(movement, (mob.x, mob.y, mob.stance)) {
+        if let Some((x, y, stance, foothold)) = parse_movement(movement, (mob.x, mob.y, mob.stance))
+        {
             mob.x = x;
             mob.y = y;
             mob.stance = stance;
+            // Spawns for players who join later must name the platform the
+            // mob stands on now, not its spawn point's.
+            if let Some(foothold) = foothold {
+                mob.foothold = foothold;
+            }
         }
         true
     }
@@ -277,6 +283,14 @@ mod tests {
             (mobs.get(snail).unwrap().x, mobs.get(snail).unwrap().y),
             (150, -25)
         );
+        // Walking onto another platform: an absolute fragment with
+        // foothold 52; airborne fragments (foothold 0) keep the last one.
+        let walk = [
+            2, 0, 0x96, 0, 0x2D, 0, 0, 0, 0, 0, 52, 0, 2, 100, 0, //
+            0, 0x96, 0, 0x30, 0, 0, 0, 0, 0, 0, 0, 2, 100, 0,
+        ];
+        assert!(mobs.move_mob(1, snail, &walk));
+        assert_eq!(mobs.get(snail).unwrap().view(false).foothold, 52);
 
         assert_eq!(mobs.damage(1, snail, 3, now), Some(Ok(63)));
         let Some(Err(kill)) = mobs.damage(2, snail, 10, now) else {
