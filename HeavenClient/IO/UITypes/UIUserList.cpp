@@ -19,6 +19,10 @@
 
 #include "../IO/Components/MapleButton.h"
 #include "../IO/Components/TwoSpriteButton.h"
+#include "../../Gameplay/Stage.h"
+#include "../../Util/Misc.h"
+
+#include <iterator>
 
 #include <nlnx/nx.hpp>
 
@@ -49,7 +53,7 @@ namespace ms
 		party_tab = Tab::PARTY_MINE;
 		party_title = Party["title"];
 
-		for (size_t i = 0; i <= 4; i++)
+		for (size_t i = 0; i < std::size(party_mine_grid); i++)
 			party_mine_grid[i] = UserList["Sheet2"][i];
 
 		party_mine_name = Text(Text::Font::A12M, Text::Alignment::LEFT, Color::Name::BLACK, "none", 0);
@@ -99,7 +103,7 @@ namespace ms
 																			Point<int16_t>(13, 118));
 		buttons[Buttons::BT_FRIEND_GROUP_0]->set_active(false);
 
-		for (size_t i = 0; i <= 3; i++)
+		for (size_t i = 0; i < std::size(friend_grid); i++)
 			friend_grid[i] = UserList["Sheet1"][i];
 
 		std::string text =
@@ -171,7 +175,7 @@ namespace ms
 
 		blacklist_title = Blacklist["base"];
 
-		for (size_t i = 0; i <= 3; i++)
+		for (size_t i = 0; i < std::size(blacklist_grid); i++)
 			blacklist_grid[i] = UserList["Sheet6"][i];
 
 		blacklist_name = Text(Text::Font::A12M, Text::Alignment::LEFT, Color::Name::BLACK, "none", 0);
@@ -453,6 +457,6 @@ namespace ms
 
 	std::string UIUserList::get_cur_location()
 	{
-		return "Henesys Market";
+		return NxHelper::Map::get_map_info_by_id(Stage::get().get_mapid()).name;
 	}
 }
