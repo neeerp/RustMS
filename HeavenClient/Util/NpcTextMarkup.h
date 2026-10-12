@@ -3,6 +3,8 @@
 #include <cstdint>
 #include <functional>
 #include <string>
+#include <utility>
+#include <vector>
 
 namespace ms
 {
@@ -98,6 +100,48 @@ namespace ms
 			}
 
 			return out;
+		}
+	
+		// The length of a line break (escaped or not), colour code, or space
+		// at the end of `text`, or zero.
+		inline size_t trailing_filler(const std::string& text)
+		{
+			for (const std::string tail : { "\\r", "\\n", "\r", "\n", "#b", "#k", "#r", "#g", "#d", "#e", "#n", " " })
+				if (text.size() >= tail.size() && text.compare(text.size() - tail.size(), tail.size(), tail) == 0)
+					return tail.size();
+
+			return 0;
+		}
+
+		// The #L<id># choices of a menu, as (id, label). A label ends at its
+		// #l, at the next #L, or at the end of the text: the data sometimes
+		// leaves out the #l (Robin's last quiz question). Trailing line
+		// breaks, escaped or not, and colour codes are trimmed.
+		inline std::vector<std::pair<int32_t, std::string>> choices(const std::string& text)
+		{
+			std::vector<std::pair<int32_t, std::string>> result;
+			size_t start = text.find("#L");
+
+			while (start != std::string::npos)
+			{
+				size_t id_end = text.find('#', start + 2);
+
+				if (id_end == std::string::npos || !is_digits(text.substr(start + 2, id_end - start - 2)))
+					break;
+
+				size_t next = text.find("#L", id_end + 1);
+				size_t close = text.find("#l", id_end + 1);
+				size_t end = std::min(close, next);
+				std::string label = text.substr(id_end + 1, end == std::string::npos ? std::string::npos : end - id_end - 1);
+
+				while (size_t n = trailing_filler(label))
+					label.erase(label.size() - n);
+
+				result.emplace_back(static_cast<int32_t>(std::stol(text.substr(start + 2, id_end - start - 2))), label);
+				start = next;
+			}
+
+			return result;
 		}
 	}
 }

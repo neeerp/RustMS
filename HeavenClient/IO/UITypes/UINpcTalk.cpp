@@ -132,6 +132,12 @@ namespace ms
 		}
 	}
 
+	void UINpcTalk::send_scroll(double yoffset)
+	{
+		if (show_slider && slider.isenabled())
+			slider.send_scroll(yoffset);
+	}
+
 	Range<int16_t> UINpcTalk::visible_rows() const
 	{
 		// Relative to the window: the text area between the top and the buttons.
@@ -386,18 +392,11 @@ namespace ms
 		if (msgtype == 4)
 		{
 			size_t first_link = formatted_text.find("#L");
-			for (size_t start = first_link; start != std::string::npos;)
+			for (const auto& [id, label] : NpcTextMarkup::choices(formatted_text))
 			{
-				size_t id_end = formatted_text.find('#', start + 2);
-				size_t label_end = formatted_text.find("#l", id_end);
-				if (id_end == std::string::npos || label_end == std::string::npos)
-					break;
-				int32_t id = std::stoi(formatted_text.substr(start + 2, id_end - start - 2));
-				std::string label = formatted_text.substr(id_end + 1, label_end - id_end - 1);
 				auto header = headers.find(id);
 				choices.push_back({ id, Text(Text::Font::A12M, Text::Alignment::LEFT, Color::Name::BLUE, label, 320),
 					header == headers.end() ? Texture() : header->second });
-				start = formatted_text.find("#L", label_end + 2);
 			}
 			if (first_link != std::string::npos)
 				formatted_text.erase(first_link);
