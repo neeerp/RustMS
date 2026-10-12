@@ -1,4 +1,3 @@
-use std::collections::BTreeMap;
 use net::packet::build::world::messaging::{
     WHISPER_RECEIVE_MODE, WHISPER_REQUEST_MODE, WHISPER_RESULT_MODE,
 };
@@ -6,6 +5,7 @@ use net::packet::op::{RecvOpcode, SendOpcode};
 use packet::io::read::PktRead;
 use packet::io::write::PktWrite;
 use packet::Packet;
+use std::collections::BTreeMap;
 use std::io::Cursor;
 use std::net::Ipv4Addr;
 

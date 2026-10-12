@@ -83,7 +83,10 @@ mod read_tests {
     #[test]
     fn read_bytes_reports_short_input() {
         let mut reader = Cursor::new(vec![1, 2, 3]);
-        assert_eq!(reader.read_bytes(4).unwrap_err().kind(), ErrorKind::UnexpectedEof);
+        assert_eq!(
+            reader.read_bytes(4).unwrap_err().kind(),
+            ErrorKind::UnexpectedEof
+        );
     }
 
     use std::io::Write;

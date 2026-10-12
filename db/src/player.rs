@@ -264,7 +264,11 @@ pub fn quest_record(progress: &QuestProgress) -> QuestRecord {
 fn load_keymap(conn: &mut PgConnection, character_id: i32) -> QueryResult<Keymap> {
     let rows: Vec<(i16, KeybindType, i32)> = keybindings::table
         .filter(keybindings::character_id.eq(character_id))
-        .select((keybindings::key, keybindings::bind_type, keybindings::action))
+        .select((
+            keybindings::key,
+            keybindings::bind_type,
+            keybindings::action,
+        ))
         .load(conn)?;
     let mut keymap = Keymap::default();
     for (key, kind, action) in rows {
@@ -279,7 +283,11 @@ fn load_keymap(conn: &mut PgConnection, character_id: i32) -> QueryResult<Keymap
     Ok(keymap)
 }
 
-pub(crate) fn save_keymap(conn: &mut PgConnection, character_id: i32, keymap: &Keymap) -> QueryResult<()> {
+pub(crate) fn save_keymap(
+    conn: &mut PgConnection,
+    character_id: i32,
+    keymap: &Keymap,
+) -> QueryResult<()> {
     diesel::delete(keybindings::table.filter(keybindings::character_id.eq(character_id)))
         .execute(conn)?;
     let rows: Vec<_> = keymap
@@ -299,7 +307,10 @@ pub(crate) fn save_keymap(conn: &mut PgConnection, character_id: i32, keymap: &K
     Ok(())
 }
 
-fn load_inventory(conn: &mut PgConnection, character_ids: &[i32]) -> QueryResult<HashMap<i32, Inventory>> {
+fn load_inventory(
+    conn: &mut PgConnection,
+    character_ids: &[i32],
+) -> QueryResult<HashMap<i32, Inventory>> {
     let rows: Vec<(InventoryItemRow, Option<EquipmentStatsRow>)> = inventory_items::table
         .left_join(equipment_stats::table)
         .filter(inventory_items::character_id.eq_any(character_ids))
@@ -348,7 +359,11 @@ fn load_inventory(conn: &mut PgConnection, character_ids: &[i32]) -> QueryResult
     Ok(inventories)
 }
 
-fn save_inventory(conn: &mut PgConnection, character_id: i32, inventory: &Inventory) -> QueryResult<()> {
+fn save_inventory(
+    conn: &mut PgConnection,
+    character_id: i32,
+    inventory: &Inventory,
+) -> QueryResult<()> {
     // Equipment stats cascade with their item rows.
     diesel::delete(inventory_items::table.filter(inventory_items::character_id.eq(character_id)))
         .execute(conn)?;

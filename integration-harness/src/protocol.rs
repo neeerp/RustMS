@@ -1,4 +1,3 @@
-use std::net::SocketAddr;
 use crate::assertions::{
     assert_handshake, assert_login_success, assert_opcode, assert_redirect_target,
     assert_server_list_kind,
@@ -16,6 +15,7 @@ use crate::packets::{
 };
 use net::packet::op::SendOpcode;
 use std::net::Ipv4Addr;
+use std::net::SocketAddr;
 use std::time::Duration;
 use tokio::time::timeout;
 

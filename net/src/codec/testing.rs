@@ -21,7 +21,11 @@ impl<'a> Expect<'a> {
 
     pub fn byte(&mut self, expected: u8) -> &mut Self {
         let at = self.at();
-        assert_eq!(self.cursor.read_u8().expect("byte"), expected, "byte at offset {at}");
+        assert_eq!(
+            self.cursor.read_u8().expect("byte"),
+            expected,
+            "byte at offset {at}"
+        );
         self
     }
 
@@ -100,7 +104,10 @@ impl<'a> Expect<'a> {
     pub fn skip(&mut self, len: u64) -> &mut Self {
         let at = self.at();
         let total = self.cursor.get_ref().len() as u64;
-        assert!(at + len <= total, "skip of {len} at offset {at} runs past the end ({total})");
+        assert!(
+            at + len <= total,
+            "skip of {len} at offset {at} runs past the end ({total})"
+        );
         self.cursor.set_position(at + len);
         self
     }

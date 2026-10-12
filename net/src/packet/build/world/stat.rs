@@ -54,9 +54,10 @@ impl StatUpdate {
             StatUpdate::Skin(v) | StatUpdate::Level(v) => {
                 packet.write_byte(v)?;
             }
-            StatUpdate::Face(v) | StatUpdate::Hair(v) | StatUpdate::Exp(v) | StatUpdate::Meso(v) => {
-                packet.write_int(v)?
-            }
+            StatUpdate::Face(v)
+            | StatUpdate::Hair(v)
+            | StatUpdate::Exp(v)
+            | StatUpdate::Meso(v) => packet.write_int(v)?,
             StatUpdate::Job(v)
             | StatUpdate::Str(v)
             | StatUpdate::Dex(v)
@@ -117,6 +118,10 @@ mod tests {
     fn empty_update_only_enables_actions() {
         let packet = build_stat_update(true, &[]).unwrap();
         let mut expect = Expect::new(&packet.bytes);
-        expect.short(SendOpcode::StatChange as i16).byte(1).int(0).end();
+        expect
+            .short(SendOpcode::StatChange as i16)
+            .byte(1)
+            .int(0)
+            .end();
     }
 }

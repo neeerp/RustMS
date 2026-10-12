@@ -257,18 +257,20 @@ impl ClientActor {
         }
 
         let (channel, ip) = (i16::from(self.channel_id), self.peer_ip.into());
-        let session = match spawn_db(move || {
-            db::session::claim_world_transition(character_id, channel, ip)
-        })
-        .await
-        {
-            Ok(session) => session,
-            Err(RuntimeError::Database(db::Error::NotFound)) => {
-                warn!(character_id, "World entry without a valid transition ticket");
-                return Err(RuntimeError::NotLoggedIn);
-            }
-            Err(error) => return Err(error),
-        };
+        let session =
+            match spawn_db(move || db::session::claim_world_transition(character_id, channel, ip))
+                .await
+            {
+                Ok(session) => session,
+                Err(RuntimeError::Database(db::Error::NotFound)) => {
+                    warn!(
+                        character_id,
+                        "World entry without a valid transition ticket"
+                    );
+                    return Err(RuntimeError::NotLoggedIn);
+                }
+                Err(error) => return Err(error),
+            };
         self.session_id = Some(session.id);
 
         let player = spawn_db(move || db::player::load_player(character_id)).await?;
@@ -297,7 +299,11 @@ impl ClientActor {
         let field = self.services.fields.field(key);
         self.game = Some(InGame { player, field });
         self.join_current_field(spawn).await?;
-        info!(character_id, channel_id = self.channel_id, "Entered the game");
+        info!(
+            character_id,
+            channel_id = self.channel_id,
+            "Entered the game"
+        );
         Ok(())
     }
 
@@ -328,7 +334,8 @@ impl ClientActor {
         let handle = self.handle();
         let game = self.in_game()?;
         let avatar = game.player.field_avatar(spawn.x, spawn.y, spawn.stance);
-        self.send_to_field(FieldMessage::Join { handle, avatar }).await
+        self.send_to_field(FieldMessage::Join { handle, avatar })
+            .await
     }
 
     /// Hand the session to another channel: persist, reissue the ticket, and
@@ -385,9 +392,20 @@ impl ClientActor {
                     handle: self.handle(),
                     avatar,
                 };
-                field.tx.send(rejoin).await.map_err(|_| RuntimeError::ChannelSend)?;
-                if !matches!(message, FieldMessage::Join { .. } | FieldMessage::Leave { .. }) {
-                    field.tx.send(message).await.map_err(|_| RuntimeError::ChannelSend)?;
+                field
+                    .tx
+                    .send(rejoin)
+                    .await
+                    .map_err(|_| RuntimeError::ChannelSend)?;
+                if !matches!(
+                    message,
+                    FieldMessage::Join { .. } | FieldMessage::Leave { .. }
+                ) {
+                    field
+                        .tx
+                        .send(message)
+                        .await
+                        .map_err(|_| RuntimeError::ChannelSend)?;
                 }
                 Ok(())
             }
@@ -473,7 +491,9 @@ mod tests {
     #[tokio::test]
     async fn kicking_a_client_blocked_on_a_full_socket_ends_the_actor() {
         let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
-        let peer = TcpStream::connect(listener.local_addr().unwrap()).await.unwrap();
+        let peer = TcpStream::connect(listener.local_addr().unwrap())
+            .await
+            .unwrap();
         let (stream, addr) = listener.accept().await.unwrap();
 
         let (directory, _directory_rx) = mpsc::channel(16);
@@ -481,7 +501,9 @@ mod tests {
             directory,
             fields: FieldRegistry::new(Duration::from_millis(100)),
         };
-        let actor = ClientActor::new(stream, addr.ip(), 0, services).await.unwrap();
+        let actor = ClientActor::new(stream, addr.ip(), 0, services)
+            .await
+            .unwrap();
         let handle = actor.handle();
         let running = tokio::spawn(actor.run());
 

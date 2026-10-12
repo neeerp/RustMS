@@ -58,7 +58,10 @@ impl WorldDirectory {
         let client_id = handle.client_id;
         if let Some(previous) = self.clients.remove(&client_id) {
             // The same character connected again: only one session may live.
-            warn!(client_id, "Duplicate login; disconnecting previous connection");
+            warn!(
+                client_id,
+                "Duplicate login; disconnecting previous connection"
+            );
             previous.handle.kick();
             self.names.remove(&previous.name);
         }
@@ -113,10 +116,21 @@ mod tests {
     use crate::message::ServerMessage;
     use tokio_util::sync::CancellationToken;
 
-    fn handle(client_id: ClientId, connection_id: u64) -> (ClientHandle, mpsc::Receiver<ServerMessage>, CancellationToken) {
+    fn handle(
+        client_id: ClientId,
+        connection_id: u64,
+    ) -> (
+        ClientHandle,
+        mpsc::Receiver<ServerMessage>,
+        CancellationToken,
+    ) {
         let (tx, rx) = mpsc::channel(4);
         let kill = CancellationToken::new();
-        (ClientHandle::new(client_id, connection_id, tx, kill.clone()), rx, kill)
+        (
+            ClientHandle::new(client_id, connection_id, tx, kill.clone()),
+            rx,
+            kill,
+        )
     }
 
     #[test]

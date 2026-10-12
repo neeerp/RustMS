@@ -305,9 +305,10 @@ async fn started_quiz_survives_channel_migration() {
         }
     };
     assert_eq!(redirect.port, config.channel_addr(1).port());
-    let mut connection = MapleTestConnection::connect(config.channel_addr(1), "quest channel migration")
-        .await
-        .unwrap();
+    let mut connection =
+        MapleTestConnection::connect(config.channel_addr(1), "quest channel migration")
+            .await
+            .unwrap();
     send(
         &mut connection,
         build_player_logged_in(session.character_id).unwrap(),

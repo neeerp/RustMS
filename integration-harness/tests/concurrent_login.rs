@@ -30,7 +30,9 @@ async fn attempt_login(config: &HarnessConfig) -> (i32, MapleTestConnection) {
         .await
         .expect("timed out waiting for login status")
         .expect("read login status");
-    let status = decode_login_status(&reply.packet).expect("decode login status").status;
+    let status = decode_login_status(&reply.packet)
+        .expect("decode login status")
+        .status;
     (status, conn)
 }
 
@@ -61,7 +63,10 @@ async fn simultaneous_logins_to_one_account_admit_exactly_one() {
         // opened by winners are still held while the others are checked.
         let results = attempts.join_all().await;
 
-        let admitted = results.iter().filter(|(status, _)| *status == SUCCESS).count();
+        let admitted = results
+            .iter()
+            .filter(|(status, _)| *status == SUCCESS)
+            .count();
         assert!(
             admitted <= 1,
             "{admitted} concurrent logins were admitted to the same account"

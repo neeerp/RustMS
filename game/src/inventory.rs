@@ -222,7 +222,9 @@ impl Inventory {
     }
 
     pub fn equipped_ids(&self) -> impl Iterator<Item = (i16, i32)> + '_ {
-        self.equipped.iter().map(|(&slot, item)| (slot, item.item_id))
+        self.equipped
+            .iter()
+            .map(|(&slot, item)| (slot, item.item_id))
     }
 
     /// Every item with its inventory and slot, for persistence.
@@ -231,9 +233,9 @@ impl Inventory {
             .equipped
             .iter()
             .map(|(&slot, item)| (InventoryType::Equipped, slot, item));
-        let bags = InventoryType::BAGS.into_iter().flat_map(move |kind| {
-            self.items(kind).map(move |(slot, item)| (kind, slot, item))
-        });
+        let bags = InventoryType::BAGS
+            .into_iter()
+            .flat_map(move |kind| self.items(kind).map(move |(slot, item)| (kind, slot, item)));
         equipped.chain(bags)
     }
 }
@@ -253,11 +255,17 @@ mod tests {
             Item::equipment(1302000, EquipStats::default()),
         );
 
-        let slots: Vec<_> = inventory.items(InventoryType::Use).map(|(s, _)| s).collect();
+        let slots: Vec<_> = inventory
+            .items(InventoryType::Use)
+            .map(|(s, _)| s)
+            .collect();
         assert_eq!(slots, vec![1, 3]);
         assert_eq!(inventory.all().count(), 3);
         assert_eq!(inventory.equipped_regular().count(), 1);
-        assert_eq!(inventory.slot_limit(InventoryType::Cash), DEFAULT_CASH_SLOT_LIMIT);
+        assert_eq!(
+            inventory.slot_limit(InventoryType::Cash),
+            DEFAULT_CASH_SLOT_LIMIT
+        );
     }
 
     #[test]

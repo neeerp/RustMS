@@ -1,10 +1,10 @@
+use crate::codec::time::{filetime, ZERO_TIME};
 use crate::{
     error::NetworkError,
     packet::op::SendOpcode::{GuestIdLogin, LoginStatus},
 };
 use db::account::Account;
 use packet::{io::write::PktWrite, Packet};
-use crate::codec::time::{filetime, ZERO_TIME};
 use std::time::SystemTime;
 
 /// Result codes carried by the `LoginStatus` packet that the client knows how
@@ -75,7 +75,6 @@ pub fn build_guest_login_packet() -> Result<Packet, NetworkError> {
     let mut packet = Packet::new_empty();
     let opcode = GuestIdLogin as i16;
 
-
     packet.write_short(opcode)?;
     packet.write_short(0x100)?;
     packet.write_int(0)?; // TODO: Should be random
@@ -118,7 +117,11 @@ mod tests {
     fn login_failure_carries_reason_then_padding() {
         let packet = build_login_status_packet(LoginStatusCode::IncorrectPassword).unwrap();
         let mut expect = Expect::new(&packet.bytes);
-        expect.short(SendOpcode::LoginStatus as i16).byte(4).byte(0).int(0);
+        expect
+            .short(SendOpcode::LoginStatus as i16)
+            .byte(4)
+            .byte(0)
+            .int(0);
         expect.end();
     }
 

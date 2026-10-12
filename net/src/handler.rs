@@ -75,9 +75,14 @@ pub enum LoginAction {
     /// Move the current session to a new state (e.g. terms accepted).
     SetSessionState(SessionState),
     /// Persist the world and channel the client picked.
-    SelectChannel { world_id: u8, channel_id: u8 },
+    SelectChannel {
+        world_id: u8,
+        channel_id: u8,
+    },
     /// Issue a world-entry ticket for an owned character.
-    EnterWorld { character_id: i32 },
+    EnterWorld {
+        character_id: i32,
+    },
     Disconnect,
 }
 
@@ -134,7 +139,11 @@ fn login_routes() -> &'static HashMap<i16, LoginRoute> {
             (Op::SetGender, Session, &login::SetGenderHandler),
             (Op::ServerListRequest, LoggedIn, &login::WorldListHandler),
             (Op::ServerListReRequest, LoggedIn, &login::WorldListHandler),
-            (Op::ServerStatusRequest, LoggedIn, &login::ServerStatusHandler),
+            (
+                Op::ServerStatusRequest,
+                LoggedIn,
+                &login::ServerStatusHandler,
+            ),
             (Op::CharListRequest, LoggedIn, &login::CharListHandler),
             (Op::CheckCharName, LoggedIn, &login::CheckCharNameHandler),
             (Op::CreateChar, LoggedIn, &login::CreateCharacterHandler),
@@ -188,7 +197,9 @@ pub struct SpawnPosition {
 pub enum WorldAction {
     Reply(Packet),
     /// Enter the game with the character named in PLAYER_LOGGEDIN.
-    EnterGame { character_id: i32 },
+    EnterGame {
+        character_id: i32,
+    },
     /// The player already moved to `map_id` (the handler updated it and sent
     /// the warp); move the client's field membership to match.
     ChangeField {
@@ -202,7 +213,9 @@ pub enum WorldAction {
     },
     NpcInteraction(NpcInteraction),
     Whisper(WhisperDelivery),
-    ChangeChannel { channel_id: u8 },
+    ChangeChannel {
+        channel_id: u8,
+    },
     Disconnect,
 }
 
@@ -239,8 +252,14 @@ fn world_routes() -> &'static HashMap<i16, WorldRoute> {
             (Op::PlayerMove, InGame(&world::PlayerMoveHandler)),
             (Op::ChangeChannel, InGame(&world::ChangeChannelHandler)),
             (Op::ChangeMap, InGame(&world::ChangeMapHandler)),
-            (Op::PlayerMapTransfer, InGame(&world::PlayerMapTransferHandler)),
-            (Op::PartySearchUpdate, InGame(&world::PartySearchUpdateHandler)),
+            (
+                Op::PlayerMapTransfer,
+                InGame(&world::PlayerMapTransferHandler),
+            ),
+            (
+                Op::PartySearchUpdate,
+                InGame(&world::PartySearchUpdateHandler),
+            ),
             (Op::ChangeKeybinds, InGame(&world::ChangeKeybindsHandler)),
             (Op::AllChat, InGame(&world::AllChatHandler)),
             (Op::Whisper, InGame(&world::WhisperHandler)),

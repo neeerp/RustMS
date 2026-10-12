@@ -42,10 +42,15 @@ impl WorldHandler for ChangeMapHandler {
                 .ok_or(NetworkError::PacketHandlerError("Source portal not found"))?;
             let destination_map = source_portal
                 .to_map
-                .ok_or(NetworkError::PacketHandlerError("Portal has no destination"))?;
-            let destination_field = game_data
-                .field(destination_map)
-                .ok_or(NetworkError::PacketHandlerError("Destination field not found"))?;
+                .ok_or(NetworkError::PacketHandlerError(
+                    "Portal has no destination",
+                ))?;
+            let destination_field =
+                game_data
+                    .field(destination_map)
+                    .ok_or(NetworkError::PacketHandlerError(
+                        "Destination field not found",
+                    ))?;
             let spawn_portal = destination_field
                 .resolve_spawn_portal(source_portal.to_name.as_str())
                 .ok_or(NetworkError::PacketHandlerError(
@@ -153,7 +158,10 @@ mod tests {
     #[test]
     fn gms_can_warp_by_map_id() {
         let mut p = player(50, 1);
-        assert_eq!(direct_destination(&mut p, 180000000, |_| None).unwrap(), 180000000);
+        assert_eq!(
+            direct_destination(&mut p, 180000000, |_| None).unwrap(),
+            180000000
+        );
     }
 
     #[test]

@@ -141,7 +141,7 @@ mod tests {
         expect.byte(0).byte(1).int(0).int(2).long(0);
         expect.long(ZERO_TIME).int(-1);
         expect.short(0); // end of regular equipment
-        // equipped cash: the cash cap at position 101 -> 1
+                         // equipped cash: the cash cap at position 101 -> 1
         expect
             .short(1)
             .byte(1)
@@ -158,10 +158,20 @@ mod tests {
         expect.long(ZERO_TIME).int(-1);
         expect.short(0); // end of cash equipment
         expect.int(0); // equip bag is empty
-        // use bag: potion, then throwing stars with the recharge block
-        expect.byte(1).byte(2).int(2000000).byte(0).long(DEFAULT_TIME);
+                       // use bag: potion, then throwing stars with the recharge block
+        expect
+            .byte(1)
+            .byte(2)
+            .int(2000000)
+            .byte(0)
+            .long(DEFAULT_TIME);
         expect.short(12).string("").short(0);
-        expect.byte(2).byte(2).int(2070000).byte(0).long(DEFAULT_TIME);
+        expect
+            .byte(2)
+            .byte(2)
+            .int(2070000)
+            .byte(0)
+            .long(DEFAULT_TIME);
         expect.short(500).string("").short(0);
         expect.int(2).bytes(&[0x54, 0, 0, 0x34]);
         expect.byte(0); // end of use

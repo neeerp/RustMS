@@ -9,9 +9,9 @@ pub mod character;
 pub mod item;
 pub mod look;
 pub mod stats;
-pub mod time;
 #[cfg(test)]
 pub(crate) mod testing;
+pub mod time;
 
 pub use character::encode_character_data;
 pub use item::{encode_inventory, encode_item};

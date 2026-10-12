@@ -14,7 +14,11 @@ async fn changed_keys_survive_logout() {
     let mut session = login_to_world_session(&config)
         .await
         .expect("login-to-world session flow failed");
-    assert_eq!(session.keymap[DEFAULT_KEY], (4, 1), "unexpected default binding");
+    assert_eq!(
+        session.keymap[DEFAULT_KEY],
+        (4, 1),
+        "unexpected default binding"
+    );
 
     // Rebind an existing default key (the case the old upsert dropped), bind
     // a previously empty one, and bind a skill whose id needs 32 bits.

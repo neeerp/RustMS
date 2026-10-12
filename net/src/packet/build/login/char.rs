@@ -39,7 +39,10 @@ pub fn build_char_delete(character_id: i32, status: u8) -> Result<Packet, Networ
 }
 
 /// ADD_NEW_CHAR_ENTRY after a successful creation.
-pub fn build_char_packet(stats: &CharacterStats, look: &AvatarLook) -> Result<Packet, NetworkError> {
+pub fn build_char_packet(
+    stats: &CharacterStats,
+    look: &AvatarLook,
+) -> Result<Packet, NetworkError> {
     let mut packet = Packet::new_empty();
     packet.write_short(SendOpcode::NewCharacter as i16)?;
     packet.write_byte(0)?;

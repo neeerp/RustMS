@@ -1,6 +1,6 @@
-use crate::{error::NetworkError, packet::op::SendOpcode};
 use super::stat::{build_stat_update, StatUpdate};
 use crate::codec::time::filetime;
+use crate::{error::NetworkError, packet::op::SendOpcode};
 use db::quest::QuestProgress;
 use game::CharacterStats;
 use packet::{io::write::PktWrite, Packet};
@@ -119,7 +119,6 @@ mod tests {
         expect.byte(10).short(3).int(1234);
         expect.end();
     }
-
 
     #[test]
     fn gain_exp_matches_reference() {

@@ -51,7 +51,13 @@ mod tests {
         let mut keymap = Keymap::default();
         keymap.bind(0, KeyBinding { kind: 1, action: 7 });
         keymap.bind(18, KeyBinding { kind: 4, action: 1 });
-        keymap.bind(89, KeyBinding { kind: 5, action: 54 });
+        keymap.bind(
+            89,
+            KeyBinding {
+                kind: 5,
+                action: 54,
+            },
+        );
         assert_keymap_packet(
             &keymap,
             &expected_table(&[(0, 1, 7), (18, 4, 1), (89, 5, 54)]),

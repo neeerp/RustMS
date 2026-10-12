@@ -54,7 +54,9 @@ impl LoginHandler for CreateCharacterHandler {
         };
 
         let (stats, look) = character.create(starting_items)?;
-        Ok(HandlerResult::reply(login::char::build_char_packet(&stats, &look)?))
+        Ok(HandlerResult::reply(login::char::build_char_packet(
+            &stats, &look,
+        )?))
     }
 }
 
@@ -160,7 +162,12 @@ mod tests {
         assert_eq!(items.len(), 4);
         assert!(starting_equipment(1060002, 1040002, 1072001, 1302000).is_err());
         // Overall with no bottom.
-        assert_eq!(starting_equipment(1052122, 0, 1072001, 1302000).unwrap().len(), 3);
+        assert_eq!(
+            starting_equipment(1052122, 0, 1072001, 1302000)
+                .unwrap()
+                .len(),
+            3
+        );
     }
 
     #[test]

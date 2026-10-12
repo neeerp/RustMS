@@ -7,9 +7,8 @@ use std::sync::OnceLock;
 /// for local development and the integration harness.
 pub fn debug_warps_enabled() -> bool {
     static ENABLED: OnceLock<bool> = OnceLock::new();
-    *ENABLED.get_or_init(|| {
-        std::env::var("RUSTMS_ALLOW_DEBUG_WARPS").is_ok_and(|value| value == "1")
-    })
+    *ENABLED
+        .get_or_init(|| std::env::var("RUSTMS_ALLOW_DEBUG_WARPS").is_ok_and(|value| value == "1"))
 }
 
 /// Whether `player` may warp straight to an arbitrary map.

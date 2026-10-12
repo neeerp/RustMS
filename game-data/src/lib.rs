@@ -581,7 +581,8 @@ mod tests {
 
     #[test]
     fn normal_npc_speech_resolves_string_asset_keys() {
-        let (Some(npc), Some(string)) = (test_assets::path("Npc.nx"), test_assets::path("String.nx"))
+        let (Some(npc), Some(string)) =
+            (test_assets::path("Npc.nx"), test_assets::path("String.nx"))
         else {
             return;
         };

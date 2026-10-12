@@ -1,7 +1,7 @@
 use integration_harness::connection::MapleTestConnection;
 use integration_harness::packets::{
-    build_change_channel, build_player_logged_in, decode_channel_change,
-    decode_spawn_player, opcode_name,
+    build_change_channel, build_player_logged_in, decode_channel_change, decode_spawn_player,
+    opcode_name,
 };
 use integration_harness::preconditions::load_harness_config_or_fail;
 use integration_harness::{login_to_world_session, HarnessError};
@@ -157,7 +157,10 @@ async fn change_channel_redirects_and_updates_presence() {
     .await
     .expect("timed out waiting for old-channel leave")
     .expect("failed to read old-channel leave");
-    assert_eq!(leave_packet.opcode(), SendOpcode::RemovePlayerFromMap as i16);
+    assert_eq!(
+        leave_packet.opcode(),
+        SendOpcode::RemovePlayerFromMap as i16
+    );
 
     let mut reconnected = MapleTestConnection::connect(
         format!("{}:{}", redirect.ip, redirect.port)
@@ -182,7 +185,7 @@ async fn change_channel_redirects_and_updates_presence() {
     .await
     .expect("timed out waiting for new-channel join")
     .expect("failed to read new-channel join");
-    let new_spawn = decode_spawn_player(&new_presence.packet)
-        .expect("failed to decode new-channel join");
+    let new_spawn =
+        decode_spawn_player(&new_presence.packet).expect("failed to decode new-channel join");
     assert_eq!(new_spawn.character_id, migrant.character_id);
 }

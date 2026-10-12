@@ -83,8 +83,14 @@ impl FieldActor {
             FieldMessage::UpdateAvatar { client_id, avatar } => {
                 if let Some(occupant) = self.occupants.get_mut(&client_id) {
                     // Keep the live position; take everything else.
-                    let (x, y, stance) = (occupant.avatar.x, occupant.avatar.y, occupant.avatar.stance);
-                    occupant.avatar = FieldAvatar { x, y, stance, ..avatar };
+                    let (x, y, stance) =
+                        (occupant.avatar.x, occupant.avatar.y, occupant.avatar.stance);
+                    occupant.avatar = FieldAvatar {
+                        x,
+                        y,
+                        stance,
+                        ..avatar
+                    };
                 }
             }
             FieldMessage::Chat { packet, .. } => self.broadcast(None, packet),
@@ -123,7 +129,9 @@ impl FieldActor {
                 Ok(packet) => {
                     handle.send_packet(packet);
                 }
-                Err(error) => warn!(client_id, npc_id = map_npc.npc_id, %error, "Failed to build NPC spawn"),
+                Err(error) => {
+                    warn!(client_id, npc_id = map_npc.npc_id, %error, "Failed to build NPC spawn")
+                }
             }
         }
 
@@ -141,7 +149,8 @@ impl FieldActor {
             Err(error) => warn!(client_id, %error, "Failed to build join spawn"),
         }
 
-        self.occupants.insert(client_id, Occupant { handle, avatar });
+        self.occupants
+            .insert(client_id, Occupant { handle, avatar });
     }
 
     fn handle_leave(&mut self, client_id: ClientId) {
@@ -225,18 +234,30 @@ mod tests {
 
     fn client(id: i32) -> (ClientHandle, mpsc::Receiver<ServerMessage>) {
         let (tx, rx) = mpsc::channel(16);
-        (ClientHandle::new(id, id as u64, tx, CancellationToken::new()), rx)
+        (
+            ClientHandle::new(id, id as u64, tx, CancellationToken::new()),
+            rx,
+        )
     }
 
     fn spawn_field() -> mpsc::Sender<FieldMessage> {
         let (tx, rx) = mpsc::channel(16);
-        let actor = FieldActor::new(FieldKey::new(0, 100000000), rx, Vec::new(), Duration::from_millis(50));
+        let actor = FieldActor::new(
+            FieldKey::new(0, 100000000),
+            rx,
+            Vec::new(),
+            Duration::from_millis(50),
+        );
         tokio::spawn(actor.run());
         tx
     }
 
     async fn next_opcode(rx: &mut mpsc::Receiver<ServerMessage>) -> i16 {
-        match timeout(Duration::from_secs(1), rx.recv()).await.unwrap().unwrap() {
+        match timeout(Duration::from_secs(1), rx.recv())
+            .await
+            .unwrap()
+            .unwrap()
+        {
             ServerMessage::SendPacket(packet) => packet.opcode(),
             other => panic!("expected a packet, got {other:?}"),
         }
@@ -248,15 +269,39 @@ mod tests {
         let (first, mut first_rx) = client(1);
         let (second, mut second_rx) = client(2);
 
-        field.send(FieldMessage::Join { handle: first, avatar: avatar(1, 10, 20) }).await.unwrap();
-        field.send(FieldMessage::Join { handle: second, avatar: avatar(2, 30, 40) }).await.unwrap();
+        field
+            .send(FieldMessage::Join {
+                handle: first,
+                avatar: avatar(1, 10, 20),
+            })
+            .await
+            .unwrap();
+        field
+            .send(FieldMessage::Join {
+                handle: second,
+                avatar: avatar(2, 30, 40),
+            })
+            .await
+            .unwrap();
 
         // The newcomer sees the existing occupant; the occupant sees the newcomer.
-        assert_eq!(next_opcode(&mut second_rx).await, SendOpcode::SpawnPlayer as i16);
-        assert_eq!(next_opcode(&mut first_rx).await, SendOpcode::SpawnPlayer as i16);
+        assert_eq!(
+            next_opcode(&mut second_rx).await,
+            SendOpcode::SpawnPlayer as i16
+        );
+        assert_eq!(
+            next_opcode(&mut first_rx).await,
+            SendOpcode::SpawnPlayer as i16
+        );
 
-        field.send(FieldMessage::Leave { client_id: 2 }).await.unwrap();
-        assert_eq!(next_opcode(&mut first_rx).await, SendOpcode::RemovePlayerFromMap as i16);
+        field
+            .send(FieldMessage::Leave { client_id: 2 })
+            .await
+            .unwrap();
+        assert_eq!(
+            next_opcode(&mut first_rx).await,
+            SendOpcode::RemovePlayerFromMap as i16
+        );
     }
 
     #[tokio::test]
@@ -267,14 +312,35 @@ mod tests {
         let stalled = ClientHandle::new(1, 1, tx, kill.clone());
         let (healthy, mut healthy_rx) = client(2);
 
-        field.send(FieldMessage::Join { handle: stalled, avatar: avatar(1, 0, 0) }).await.unwrap();
-        field.send(FieldMessage::Join { handle: healthy, avatar: avatar(2, 0, 0) }).await.unwrap();
+        field
+            .send(FieldMessage::Join {
+                handle: stalled,
+                avatar: avatar(1, 0, 0),
+            })
+            .await
+            .unwrap();
+        field
+            .send(FieldMessage::Join {
+                handle: healthy,
+                avatar: avatar(2, 0, 0),
+            })
+            .await
+            .unwrap();
         for _ in 0..4 {
-            field.send(FieldMessage::Chat { from: 2, packet: Packet::new(&[0x00, 0x00]) }).await.unwrap();
+            field
+                .send(FieldMessage::Chat {
+                    from: 2,
+                    packet: Packet::new(&[0x00, 0x00]),
+                })
+                .await
+                .unwrap();
         }
 
         // The healthy client still receives everything; the stalled one is kicked.
-        assert_eq!(next_opcode(&mut healthy_rx).await, SendOpcode::SpawnPlayer as i16);
+        assert_eq!(
+            next_opcode(&mut healthy_rx).await,
+            SendOpcode::SpawnPlayer as i16
+        );
         for _ in 0..4 {
             next_opcode(&mut healthy_rx).await;
         }

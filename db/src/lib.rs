@@ -83,7 +83,9 @@ pub fn pool() -> Result<&'static DbPool> {
     let pool = Pool::builder()
         .max_size(size)
         .connection_timeout(Duration::from_secs(10))
-        .build(ConnectionManager::<PgConnection>::new(settings.database.url))?;
+        .build(ConnectionManager::<PgConnection>::new(
+            settings.database.url,
+        ))?;
 
     // Another thread may have raced us; either pool is equivalent.
     Ok(POOL.get_or_init(|| pool))
