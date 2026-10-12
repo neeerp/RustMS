@@ -47,7 +47,6 @@ namespace ms
 		uint64_t revision() const;
 		int16_t state(int16_t id) const;
 		std::vector<int16_t> available_quests(int16_t job, int16_t level, bool all_levels = false) const;
-		static const std::vector<QuestMarkerRule>& supported_rules();
 
 	private:
 		std::map<int16_t, std::string> started;

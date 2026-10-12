@@ -23,7 +23,7 @@
 #include "../../Graphics/GraphicsGL.h"
 #include "../../Gameplay/Stage.h"
 #include "../../Gameplay/MapleMap/Npc.h"
-#include "../../Net/Packets/NpcInteractionPackets.h"
+#include "../../Gameplay/QuestConversation.h"
 #include "../../Util/Misc.h"
 #include <nlnx/nx.hpp>
 #include <algorithm>
@@ -440,7 +440,7 @@ namespace ms
 			case FIND_NPC: find_npc(); break;
 			case ACCEPT:
 			case FINISH:
-				if (auto oid = local_npc_oid(); oid >= 0) { TalkToNPCPacket(oid).dispatch(); close(); } break;
+				if (local_npc_oid() >= 0) { QuestConversation::open(selected, target_npc); close(); } break;
 			default: break;
 		}
 		return Button::NORMAL;

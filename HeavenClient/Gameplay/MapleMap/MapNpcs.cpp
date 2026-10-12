@@ -16,6 +16,8 @@
 //	along with this program.  If not, see <https://www.gnu.org/licenses/>.		//
 //////////////////////////////////////////////////////////////////////////////////
 #include "MapNpcs.h"
+
+#include "../QuestConversation.h"
 #include "Npc.h"
 
 #include "../Net/Packets/NpcInteractionPackets.h"
@@ -76,8 +78,9 @@ namespace ms
 			{
 				if (pressed)
 				{
-					// TODO: Try finding dialog first
-					TalkToNPCPacket(npc->get_oid()).dispatch();
+					// The client offers the NPC's quests itself; only plain speech
+					// goes to the server.
+					QuestConversation::talk_to_npc(npc->get_npcid(), npc->get_oid());
 
 					return Cursor::State::IDLE;
 				} else

@@ -40,7 +40,7 @@ variables only for the test client's process:
 - `ALSOFT_DRIVERS=null` for silent GUI testing
 
 Use a separate ignored working directory for each test client. Symlink the NX
-files, fonts, and Icon.png there, and copy Settings. This avoids asset copies
+files, fonts, Icon.png, and supported_quests.txt there, and copy Settings. This avoids asset copies
 and keeps GUI test preferences separate from the desktop client's settings.
 Launch the compiled client by its absolute path from that directory.
 

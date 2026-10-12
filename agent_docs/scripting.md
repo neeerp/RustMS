@@ -1,15 +1,27 @@
 # Decision: how NPC, quest, portal, and event behaviour is expressed
 
-Status: **proposed** (needs an owner decision before more content is added)
+Status: **step 1 accepted and implemented; Lua deferred** (2026-10-11)
+
+- Quests use the v83 client-driven flow: the client renders `Say.img` and
+  sends `QUEST_ACTION`; the server validates against `Check.img`/`Act.img`
+  through one generic engine (#48, #58). See [Quests](./quests.md).
+- The engine supports a fixed subset of requirements and actions; other
+  quests are refused, and the client offers only the supported ones
+  (`game-data/supported_quests.txt`).
+- Lua is deferred until content needs it. Scripted NPCs and portals are
+  native handlers behind an effect-returning interface for now (#60, #61).
+- Text that never shipped in the client data lives in an ignored content
+  pack with committed placeholders (#63).
+
+The original proposal follows.
 
 ## Problem
 
 v83 behaviour beyond movement and chat is mostly content: thousands of NPC
-conversations, quests, portal scripts, reactors, and events. Today each piece
-is hand-written Rust: Rain's quiz and the Heena/Nina contact quests are
-special-cased by quest and NPC id (`game-data/src/quests.rs`,
-`net/src/quests.rs`, `runtime/src/actor/client/dialogue.rs`), and portal
-`script` fields are parsed and ignored. That does not scale past a handful of
+conversations, quests, portal scripts, reactors, and events. At the time each
+piece was hand-written Rust: Rain's quiz and the Heena/Nina contact quests
+were special-cased by quest and NPC id, and portal `script` fields were
+parsed and ignored. That does not scale past a handful of
 quests.
 
 ## What the data already covers

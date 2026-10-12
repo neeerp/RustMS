@@ -19,6 +19,19 @@ if(HEAVENCLIENT_BUILD_TESTS)
     add_test(NAME movement_physics COMMAND movement_physics_tests)
     add_executable(frame_assembler_tests tests/frame_assembler.cpp Net/Cryptography.cpp)
     add_test(NAME frame_assembler COMMAND frame_assembler_tests)
+    add_executable(quest_dialogue_tests tests/quest_dialogue.cpp)
+    add_test(NAME quest_dialogue COMMAND quest_dialogue_tests)
+    # Loads every quest in game-data/supported_quests.txt from Quest.nx.
+    # Skipped when Quest.nx is absent.
+    add_executable(quest_catalog_tests tests/quest_catalog.cpp Character/QuestCatalog.cpp)
+    target_include_directories(quest_catalog_tests PRIVATE ${PROJECT_SOURCE_DIR}/libs/NoLifeNx ${PROJECT_SOURCE_DIR}/includes)
+    target_link_libraries(quest_catalog_tests PRIVATE
+        ${PROJECT_SOURCE_DIR}/libs/NoLifeNx/nlnx/build/libNoLifeNx.a
+        ${PROJECT_SOURCE_DIR}/libs/lz4/lib/liblz4.a)
+    target_compile_definitions(quest_catalog_tests PRIVATE
+        SUPPORTED_QUESTS="${PROJECT_SOURCE_DIR}/../game-data/supported_quests.txt"
+        DEFAULT_QUEST_NX="${PROJECT_SOURCE_DIR}/../assets/game-data/Quest.nx")
+    add_test(NAME quest_catalog COMMAND quest_catalog_tests)
 endif()
 
 include_directories(.)
@@ -109,6 +122,10 @@ add_executable(HeavenClient
     Character/Player.h
     Character/PlayerStates.cpp
     Character/PlayerStates.h
+    Character/QuestCatalog.cpp
+    Character/QuestCatalog.h
+    Character/QuestDialogue.h
+    Character/QuestInfo.h
     Character/QuestLog.cpp
     Character/QuestLog.h
     Character/SkillBook.cpp
@@ -207,6 +224,8 @@ add_executable(HeavenClient
     Gameplay/Playable.h
     Gameplay/Spawn.cpp
     Gameplay/Spawn.h
+    Gameplay/QuestConversation.cpp
+    Gameplay/QuestConversation.h
     Gameplay/Stage.cpp
     Gameplay/Stage.h
     Graphics/Animation.cpp
@@ -413,6 +432,7 @@ add_executable(HeavenClient
     Net/Packets/MessagingPackets.h
     Net/Packets/MovementPacket.h
     Net/Packets/NpcInteractionPackets.h
+    Net/Packets/QuestPackets.h
     Net/Packets/PlayerPackets.h
     Net/Packets/SelectCharPackets.h
     Net/Cryptography.cpp
@@ -520,4 +540,8 @@ ADD_CUSTOM_COMMAND(TARGET HeavenClient POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_directory
         ${PROJECT_SOURCE_DIR}/fonts
         $<TARGET_FILE_DIR:HeavenClient>/fonts
+    # The quests the server supports; the client offers only these.
+    COMMAND ${CMAKE_COMMAND} -E copy
+        ${PROJECT_SOURCE_DIR}/../game-data/supported_quests.txt
+        $<TARGET_FILE_DIR:HeavenClient>/supported_quests.txt
 )

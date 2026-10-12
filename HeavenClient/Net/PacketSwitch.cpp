@@ -66,6 +66,7 @@ namespace ms
 
 		/// Messaging 1
 		SHOW_STATUS_INFO = 39,
+		UPDATE_QUEST_INFO = 211,
 
 		/// Inventory 2
 		GATHER_RESULT = 52,
@@ -190,6 +191,7 @@ namespace ms
 
 		// Messaging handlers
 		emplace<SHOW_STATUS_INFO, ShowStatusInfoHandler>();
+		emplace<UPDATE_QUEST_INFO, UpdateQuestInfoHandler>();
 		emplace<CHAT_RECEIVED, ChatReceivedHandler>();
 		emplace<WHISPER, WhisperHandler>();
 		emplace<SCROLL_RESULT, ScrollResultHandler>();

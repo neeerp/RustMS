@@ -1,5 +1,6 @@
 # Quests the server supports (game-data/src/quests.rs) and HeavenClient offers.
-# Generated from Quest.nx; both sides check this list. One id per line.
+# Generated from Quest.nx and checked by the server's asset test; HeavenClient
+# reads it at startup. One id per line.
 1009
 1010
 1011

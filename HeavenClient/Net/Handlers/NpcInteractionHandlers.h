@@ -27,6 +27,14 @@ namespace ms
 		void handle(InPacket& recv) const override;
 	};
 
+	// The result of a QUEST_ACTION. On success (mode 8) a nonzero next quest
+	// continues straight into that quest's conversation (Act/nextQuest).
+	// Opcode: UPDATE_QUEST_INFO(211)
+	class UpdateQuestInfoHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
 	// Opens an NPC shop defined by the packet's contents
 	class OpenNpcShopHandler : public PacketHandler
 	{

@@ -6,8 +6,8 @@
 //! requirements (`Check.img`) and actions (`Act.img`). A quest is supported
 //! only if every requirement and action it declares is one the server
 //! implements; anything else would be silently skipped, so such quests are
-//! refused instead. HeavenClient applies the same rules (see
-//! `supported_quests.txt`).
+//! refused instead. HeavenClient offers only the supported quests, which it
+//! reads from `supported_quests.txt`.
 
 use crate::{GameDataError, NxDataFile};
 use game::QuestState;
@@ -309,7 +309,7 @@ mod tests {
     }
 
     /// The supported set must match `supported_quests.txt`, which HeavenClient
-    /// also checks, so the two can't disagree about what is offered.
+    /// reads, so the two can't disagree about what is offered.
     #[test]
     fn supported_quests_match_the_golden_list() {
         let Some(path) = crate::test_assets::path("Quest.nx") else {

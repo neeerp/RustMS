@@ -20,6 +20,7 @@
 #include "../IO/UI.h"
 #include "../IO/UITypes/UINpcTalk.h"
 #include "../IO/UITypes/UIShop.h"
+#include "../Gameplay/QuestConversation.h"
 
 namespace ms
 {
@@ -42,6 +43,21 @@ namespace ms
 
 		if (auto npctalk = UI::get().get_element<UINpcTalk>())
 			npctalk->change_text(npcid, msgtype, style, speaker, text);
+	}
+
+	void UpdateQuestInfoHandler::handle(InPacket& recv) const
+	{
+		int8_t mode = recv.read_byte();
+
+		if (mode != 8)
+			return;
+
+		int16_t quest_id = recv.read_short();
+		int32_t npc_id = recv.read_int();
+		int16_t next_quest = recv.length() >= 2 ? recv.read_short() : 0;
+
+		if (next_quest != 0)
+			QuestConversation::continue_with(next_quest, npc_id);
 	}
 
 	void OpenNpcShopHandler::handle(InPacket& recv) const

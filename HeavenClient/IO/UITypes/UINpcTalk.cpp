@@ -108,8 +108,15 @@ namespace ms
 		{
 			text.draw(position + Point<int16_t>(166, 32));
 		}
-		for (size_t i = 0; i < choices.size(); ++i)
-			choices[i].second.draw(position + Point<int16_t>(166, 40 + question_height + i * 28 - offset * 32));
+		for (const auto &choice : choices)
+		{
+			Point<int16_t> at = position + Point<int16_t>(166, choice.y - offset * 32);
+
+			if (choice.header.is_valid())
+				choice.header.draw(at - Point<int16_t>(0, choice.header.height() + 2));
+
+			choice.label.draw(at);
+		}
 	}
 
 	void UINpcTalk::update()
@@ -148,31 +155,19 @@ namespace ms
 		{
 			case TalkType::SENDNEXT:
 			case TalkType::SENDOK:
-				// Type = 0
-				switch (buttonid)
-				{
-					case Buttons::CLOSE:
-						NpcTalkMorePacket(message_type, -1).dispatch();
-						break;
-					case Buttons::NEXT:
-					case Buttons::OK:
-						NpcTalkMorePacket(message_type, 1).dispatch();
-						break;
-				}
-				break;
 			case TalkType::SENDNEXTPREV:
 				// Type = 0
 				switch (buttonid)
 				{
 					case Buttons::CLOSE:
-						NpcTalkMorePacket(message_type, -1).dispatch();
+						respond(-1);
 						break;
 					case Buttons::NEXT:
 					case Buttons::OK:
-						NpcTalkMorePacket(message_type, 1).dispatch();
+						respond(1);
 						break;
 					case Buttons::PREV:
-						NpcTalkMorePacket(message_type, 0).dispatch();
+						respond(0);
 						break;
 				}
 				break;
@@ -181,13 +176,13 @@ namespace ms
 				switch (buttonid)
 				{
 					case Buttons::CLOSE:
-						NpcTalkMorePacket(message_type, -1).dispatch();
+						respond(-1);
 						break;
 					case Buttons::NO:
-						NpcTalkMorePacket(message_type, 0).dispatch();
+						respond(0);
 						break;
 					case Buttons::YES:
-						NpcTalkMorePacket(message_type, 1).dispatch();
+						respond(1);
 						break;
 				}
 				break;
@@ -196,13 +191,13 @@ namespace ms
 				switch (buttonid)
 				{
 					case Buttons::CLOSE:
-						NpcTalkMorePacket(message_type, -1).dispatch();
+						respond(-1);
 						break;
 					case Buttons::QNO:
-						NpcTalkMorePacket(message_type, 0).dispatch();
+						respond(0);
 						break;
 					case Buttons::QYES:
-						NpcTalkMorePacket(message_type, 1).dispatch();
+						respond(1);
 						break;
 				}
 				break;
@@ -214,24 +209,17 @@ namespace ms
 				switch (buttonid)
 				{
 					case Buttons::CLOSE:
-						NpcTalkMorePacket(message_type, 0).dispatch();
+						respond(0);
 						break;
 					case Buttons::OK:
-						NpcTalkMorePacket(message_type, 1).dispatch();
+						respond(1);
 						break;
 				}
 				break;
 			case TalkType::SENDSIMPLE:
 				// Type = 4
-				switch (buttonid)
-				{
-					case Buttons::CLOSE:
-						NpcTalkMorePacket(message_type, 0).dispatch();
-						break;
-					default:
-						NpcTalkMorePacket(0).dispatch(); // TODO: Selection
-						break;
-				}
+				if (buttonid == Buttons::CLOSE)
+					local_responder ? respond(-1) : respond(0);
 				break;
 			default:
 				break;
@@ -240,19 +228,40 @@ namespace ms
 		return Button::State::NORMAL;
 	}
 
+	void UINpcTalk::respond(int8_t response, int32_t selection)
+	{
+		if (local_responder)
+		{
+			// The responder may replace this dialogue, so call a copy.
+			auto responder = local_responder;
+			responder(response, selection);
+			return;
+		}
+
+		if (selection >= 0)
+			NpcTalkMorePacket(selection).dispatch();
+		else
+			NpcTalkMorePacket(message_type, response).dispatch();
+	}
+
+	void UINpcTalk::set_local_responder(std::function<void(int8_t, int32_t)> responder)
+	{
+		local_responder = std::move(responder);
+	}
+
 	Cursor::State UINpcTalk::send_cursor(bool clicked, Point<int16_t> cursorpos)
 	{
 		Point<int16_t> cursor_relative = cursorpos - position;
 		if (message_type == 4)
-			for (size_t i = 0; i < choices.size(); ++i)
+			for (const auto &choice : choices)
 			{
-				int16_t y = 40 + question_height + i * 28 - offset * 32;
+				int16_t y = choice.y - offset * 32;
 				if (Rectangle<int16_t>(166, 486, y, y + 24).contains(cursor_relative))
 				{
 					if (clicked)
 					{
 						deactivate();
-						NpcTalkMorePacket(choices[i].first).dispatch();
+						respond(1, choice.id);
 						return Cursor::State::IDLE;
 					}
 					return Cursor::State::CANCLICK;
@@ -286,7 +295,7 @@ namespace ms
 		{
 			deactivate();
 
-			NpcTalkMorePacket(message_type, -1).dispatch();
+			respond(-1);
 		}
 	}
 
@@ -364,8 +373,10 @@ namespace ms
 		return formatted_text;
 	}
 
-	void UINpcTalk::change_text(int32_t npcid, int8_t msgtype, int16_t style, int8_t speakerbyte, const std::string &tx)
+	void UINpcTalk::change_text(int32_t npcid, int8_t msgtype, int16_t style, int8_t speakerbyte, const std::string &tx,
+								const std::map<int32_t, Texture> &headers)
 	{
+		local_responder = nullptr;
 		message_type = msgtype;
 		type = get_by_value(msgtype);
 		if (msgtype == 4)
@@ -391,7 +402,9 @@ namespace ms
 					break;
 				int32_t id = std::stoi(formatted_text.substr(start + 2, id_end - start - 2));
 				std::string label = formatted_text.substr(id_end + 1, label_end - id_end - 1);
-				choices.emplace_back(id, Text(Text::Font::A12M, Text::Alignment::LEFT, Color::Name::BLUE, label, 320));
+				auto header = headers.find(id);
+				choices.push_back({ id, Text(Text::Font::A12M, Text::Alignment::LEFT, Color::Name::BLUE, label, 320),
+					header == headers.end() ? Texture() : header->second });
 				start = formatted_text.find("#L", label_end + 2);
 			}
 			if (first_link != std::string::npos)
@@ -402,7 +415,19 @@ namespace ms
 
 		int16_t text_height = text.height();
 		question_height = text_height;
-		text_height += choices.size() * 28 + 32;
+
+		int16_t choice_y = 40 + question_height;
+
+		for (auto &choice : choices)
+		{
+			if (choice.header.is_valid())
+				choice_y += choice.header.height() + 6;
+
+			choice.y = choice_y;
+			choice_y += 28;
+		}
+
+		text_height = choice_y - 8;
 
 		text.change_text("");
 

@@ -16,8 +16,7 @@
 //	along with this program.  If not, see <https://www.gnu.org/licenses/>.		//
 //////////////////////////////////////////////////////////////////////////////////
 #include "QuestLog.h"
-#include <nlnx/nx.hpp>
-#include <nlnx/node.hpp>
+#include "QuestCatalog.h"
 
 namespace ms
 {
@@ -52,47 +51,15 @@ namespace ms
 	std::vector<int16_t> QuestLog::available_quests(int16_t job, int16_t level, bool all_levels) const
 	{
 		std::vector<int16_t> result;
-		for (const auto& rule : supported_rules())
-			if (quest_available(rule, job, level, [&](int16_t id) { return state(id); }, all_levels))
-				result.push_back(rule.quest_id);
+		for (const auto& quest : QuestCatalog::get().quests())
+			if (quest_available(quest, job, level, [&](int16_t id) { return state(id); }, all_levels))
+				result.push_back(quest.id);
 		return result;
-	}
-
-	const std::vector<QuestMarkerRule>& QuestLog::supported_rules()
-	{
-		static const auto rules = []()
-		{
-			std::vector<QuestMarkerRule> result;
-			// Only advertise the quest chain implemented by the server. The NX
-			// files also contain many quests whose objectives are not supported.
-			for (int16_t id : {1009, 1010, 1011, 1012, 1013, 1014, 1015, 1031, 1032, 1033})
-			{
-				auto check = nl::nx::quest["Check.img"][std::to_string(id)];
-				auto start = check["0"];
-				auto finish = check["1"];
-				if (start["npc"].data_type() != nl::node::type::integer ||
-					finish["npc"].data_type() != nl::node::type::integer) continue;
-				QuestMarkerRule rule { id, static_cast<int32_t>(start["npc"].get_integer()),
-					static_cast<int32_t>(finish["npc"].get_integer()), {}, {}, true };
-				for (auto allowed_job : start["job"]) rule.jobs.push_back(allowed_job.get_integer());
-				if (start["lvmax"].data_type() == nl::node::type::integer)
-					rule.max_start_level = start["lvmax"].get_integer();
-				for (auto prerequisite : start["quest"])
-					rule.prerequisites.emplace_back(prerequisite["id"].get_integer(), prerequisite["state"].get_integer());
-				// These quizzes complete through dialogue. A quest with external
-				// objectives remains open-book until objective tracking exists.
-				for (auto requirement : finish)
-					if (requirement.name() != "npc") rule.completion_ready = false;
-				result.push_back(std::move(rule));
-			}
-			return result;
-		}();
-		return rules;
 	}
 
 	QuestMarker QuestLog::npc_marker(int32_t npc_id, int16_t job, int16_t level) const
 	{
-		return select_quest_marker(npc_id, job, supported_rules(), [&](int16_t id) { return state(id); }, level);
+		return select_quest_marker(npc_id, job, QuestCatalog::get().quests(), [&](int16_t id) { return state(id); }, level);
 	}
 
 	bool QuestLog::is_started(int16_t qid)
