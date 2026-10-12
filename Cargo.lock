@@ -473,6 +473,7 @@ version = "0.1.0"
 name = "game-data"
 version = "0.1.0"
 dependencies = [
+ "game",
  "memmap2",
  "nx-pkg4",
  "thiserror 1.0.69",

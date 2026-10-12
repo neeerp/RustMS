@@ -1,6 +1,6 @@
 mod dialogue;
+mod quest;
 
-use self::dialogue::ActiveConversation;
 use crate::actor::registry::FieldRegistry;
 use crate::db::spawn_db;
 use crate::error::RuntimeError;
@@ -10,9 +10,10 @@ use crate::message::{
     CLIENT_QUEUE_CAPACITY,
 };
 use game::Player;
-use net::dialogue::NpcInteraction;
+use net::dialogue::{Conversation, NpcInteraction};
 use net::login_world::resolve_login_channel;
 use net::packet::build;
+use net::quests::QuestRequest;
 use net::{ClientId, SpawnPosition, WorldAction, WorldContext, WorldRoute};
 use packet::Packet;
 use rand::{thread_rng, Rng};
@@ -65,7 +66,9 @@ pub struct ClientActor {
     services: WorldServices,
     session_id: Option<i32>,
     game: Option<InGame>,
-    conversation: Option<ActiveConversation>,
+    conversation: Option<Conversation>,
+    /// A quest action waiting for its field to confirm the NPC is near.
+    pending_quest: Option<(u64, QuestRequest)>,
     npc_request_id: u64,
     changing_channel: bool,
 }
@@ -106,6 +109,7 @@ impl ClientActor {
             session_id: None,
             game: None,
             conversation: None,
+            pending_quest: None,
             npc_request_id: 0,
             changing_channel: false,
         })
@@ -230,11 +234,9 @@ impl ClientActor {
             WorldAction::NpcInteraction(NpcInteraction::Respond {
                 message_type,
                 response,
-                selection,
-            }) => {
-                self.respond_to_npc(message_type, response, selection)
-                    .await?
-            }
+                ..
+            }) => self.respond_to_npc(message_type, response).await?,
+            WorldAction::Quest(request) => self.request_quest_action(request).await?,
             WorldAction::Whisper(delivery) => {
                 self.send_to_directory(DirectoryMessage::Whisper {
                     from: self.client_id,
@@ -314,6 +316,7 @@ impl ClientActor {
         spawn: Option<SpawnPosition>,
     ) -> Result<(), RuntimeError> {
         self.conversation = None;
+        self.pending_quest = None;
         self.npc_request_id = self.npc_request_id.wrapping_add(1);
 
         self.send_to_field(FieldMessage::Leave {
@@ -367,6 +370,9 @@ impl ClientActor {
                 if request_id == self.npc_request_id {
                     self.start_npc_conversation(npc_id, field).await?;
                 }
+            }
+            ServerMessage::QuestNpcChecked { request_id, nearby } => {
+                self.quest_npc_checked(request_id, nearby).await?
             }
             ServerMessage::SendPacket(mut packet) => self.send(&mut packet).await?,
         }

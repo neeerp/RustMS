@@ -1,290 +1,120 @@
-use game_data::GameData;
+//! Rain's Maple Quiz (1009–1015) through the v83 quest flow. The client asks
+//! the quiz from `Say.img` and sends `QUEST_ACTION`; the server validates the
+//! start and completion and pays each reward once.
+
 use integration_harness::packets::{
-    build_all_chat, build_change_channel, build_change_map, build_player_logged_in,
-    decode_channel_change, decode_set_field,
+    build_change_channel, build_player_logged_in, decode_channel_change, decode_set_field,
 };
 use integration_harness::preconditions::load_harness_config_or_fail;
-use integration_harness::{connection::MapleTestConnection, protocol::WorldSession};
-use net::packet::op::{RecvOpcode, SendOpcode};
-use packet::{
-    io::{read::PktRead, write::PktWrite},
-    Packet,
+use integration_harness::quests::{
+    act, barrier, read, send, warp, QuestTrace, COMPLETE, FORFEIT, START,
 };
-use std::io::Cursor;
-use std::path::Path;
-use tokio::time::{timeout, Duration};
+use integration_harness::{connection::MapleTestConnection, protocol::WorldSession};
+use net::packet::op::SendOpcode;
 
-#[derive(Default)]
-struct Trace {
-    progress: Vec<(i16, u8)>,
-    gains: Vec<i32>,
-    stats: Option<(u8, i16, i32)>,
-}
-struct Prompt {
-    kind: u8,
-    text: String,
-    previous: bool,
-    next: bool,
-}
+const AMHERST: i32 = 1_000_000;
+const RAIN: i32 = 12101;
+const PIO: i32 = 10000;
 
-async fn login_to_world_session(
+async fn in_amherst(
     config: &integration_harness::config::HarnessConfig,
-) -> Result<WorldSession, integration_harness::error::HarnessError> {
-    let mut session = integration_harness::login_to_world_session(config).await?;
-    if session.map_id != 1_000_000 {
-        send(
-            &mut session.connection,
-            build_change_map(1_000_000, "").unwrap(),
-        )
-        .await;
-        barrier(
-            &mut session.connection,
-            &config.character_name,
-            &mut Trace::default(),
-        )
-        .await;
-        session.map_id = 1_000_000;
-    }
-    Ok(session)
-}
-
-fn talk() -> Packet {
-    let maps = GameData::load_from_nx_map(
-        Path::new(env!("CARGO_MANIFEST_DIR")).join("../assets/game-data/Map.nx"),
-    )
-    .unwrap();
-    let index = maps
-        .field(1_000_000)
-        .unwrap()
-        .map_npcs
-        .iter()
-        .position(|n| n.npc_id == 12101)
-        .unwrap();
-    let mut p = Packet::new_empty();
-    p.write_short(RecvOpcode::TalkToNpc as i16).unwrap();
-    p.write_int(1_000_000_000 + index as i32).unwrap();
-    p
-}
-fn response(kind: u8, value: i8, selection: Option<i32>) -> Packet {
-    let mut p = Packet::new_empty();
-    p.write_short(RecvOpcode::NpcTalkMore as i16).unwrap();
-    p.write_byte(kind).unwrap();
-    p.write_byte(value as u8).unwrap();
-    if let Some(selected) = selection {
-        p.write_int(selected).unwrap();
-    }
-    p
-}
-async fn send(conn: &mut MapleTestConnection, p: Packet) {
-    conn.send_packet(p, "Rain quiz").await.unwrap();
-}
-async fn read(conn: &mut MapleTestConnection) -> Packet {
-    timeout(Duration::from_secs(5), conn.read_packet("Rain quiz"))
+    trace: &mut QuestTrace,
+) -> WorldSession {
+    let mut session = integration_harness::login_to_world_session(config)
         .await
-        .expect("packet timeout")
-        .expect("read packet")
-        .packet
-}
-fn observe(p: &Packet, trace: &mut Trace) {
-    let mut r = Cursor::new(&p.bytes);
-    r.read_short().unwrap();
-    if p.opcode() == SendOpcode::ShowStatusInfo as i16 {
-        match r.read_byte().unwrap() {
-            1 => trace
-                .progress
-                .push((r.read_short().unwrap(), r.read_byte().unwrap())),
-            3 => {
-                r.read_byte().unwrap();
-                trace.gains.push(r.read_int().unwrap());
-            }
-            mode => panic!("unexpected status mode {mode}"),
-        }
-    } else if p.opcode() == SendOpcode::StatChange as i16 {
-        r.read_byte().unwrap();
-        let mask = r.read_int().unwrap();
-        if mask != 0 {
-            // LEVEL | AVAILABLEAP | EXP
-            assert_eq!(mask, 0x10 | 0x4000 | 0x10000);
-            trace.stats = Some((
-                r.read_byte().unwrap(),
-                r.read_short().unwrap(),
-                r.read_int().unwrap(),
-            ));
-        }
-    }
-}
-async fn prompt(conn: &mut MapleTestConnection, trace: &mut Trace) -> Prompt {
-    loop {
-        let p = read(conn).await;
-        observe(&p, trace);
-        if p.opcode() != SendOpcode::NpcDialogue as i16 {
-            continue;
-        }
-        let mut r = Cursor::new(&p.bytes);
-        r.read_short().unwrap();
-        assert_eq!(r.read_byte().unwrap(), 4);
-        assert_eq!(r.read_int().unwrap(), 12101);
-        let kind = r.read_byte().unwrap();
-        r.read_byte().unwrap();
-        let text = r.read_str_with_length().unwrap();
-        let (previous, next) = if kind == 0 {
-            (r.read_byte().unwrap() != 0, r.read_byte().unwrap() != 0)
-        } else {
-            (false, false)
-        };
-        return Prompt {
-            kind,
-            text,
-            previous,
-            next,
-        };
-    }
-}
-async fn question(conn: &mut MapleTestConnection, trace: &mut Trace) -> Prompt {
-    let mut p = prompt(conn, trace).await;
-    for _ in 0..12 {
-        if p.kind == 4 {
-            return p;
-        }
-        assert!(matches!(p.kind, 0 | 1));
-        send(conn, response(p.kind, 1, None)).await;
-        p = prompt(conn, trace).await;
-    }
-    panic!("did not reach quiz question");
-}
-async fn finish_feedback(conn: &mut MapleTestConnection, trace: &mut Trace) {
-    let mut p = prompt(conn, trace).await;
-    loop {
-        assert_eq!(p.kind, 0);
-        let next = p.next;
-        send(conn, response(0, 1, None)).await;
-        if !next {
-            break;
-        }
-        p = prompt(conn, trace).await;
-    }
-}
-async fn barrier(conn: &mut MapleTestConnection, marker: &str, trace: &mut Trace) {
-    send(conn, build_all_chat(marker, 0).unwrap()).await;
-    loop {
-        let p = read(conn).await;
-        assert_ne!(
-            p.opcode(),
-            SendOpcode::NpcDialogue as i16,
-            "unexpected dialogue after cancellation/stale response"
+        .unwrap();
+    if session.map_id != AMHERST {
+        assert_eq!(
+            warp(&mut session.connection, AMHERST, "", trace).await,
+            AMHERST
         );
-        observe(&p, trace);
-        if p.opcode() == SendOpcode::ChatText as i16 {
-            let mut r = Cursor::new(&p.bytes);
-            r.read_short().unwrap();
-            r.read_int().unwrap();
-            r.read_byte().unwrap();
-            if r.read_str_with_length().unwrap() == marker {
-                break;
-            }
-        }
+        session.map_id = AMHERST;
     }
+    session
 }
 
 #[tokio::test]
 async fn seven_quizzes_award_once_and_survive_map_changes_and_relogin() {
     let config = load_harness_config_or_fail().await;
-    let mut session = login_to_world_session(&config).await.unwrap();
-    let mut trace = Trace::default();
+    let mut trace = QuestTrace::default();
+    let mut session = in_amherst(&config, &mut trace).await;
     assert_eq!((session.level, session.exp, session.ap), (1, 0, 0));
-    for (index, answer) in [0, 0, 0, 3, 1, 2, 0].into_iter().enumerate() {
-        send(&mut session.connection, talk()).await;
-        let q = question(&mut session.connection, &mut trace).await;
-        assert!(q.text.contains(&format!("#L{answer}#")));
-        let id = 1009 + index as i16;
-        assert!(trace.progress.contains(&(id, 1)));
-        if index == 0 {
-            // Wrong answer explains why, returns to the same question, and pays nothing.
-            send(&mut session.connection, response(4, 1, Some(1))).await;
-            let wrong = prompt(&mut session.connection, &mut trace).await;
-            assert!(wrong.text.contains("Skill Window"));
-            assert!(trace.gains.is_empty());
-            send(&mut session.connection, response(0, 1, None)).await;
-            assert_eq!(
-                prompt(&mut session.connection, &mut trace).await.text,
-                q.text
-            );
-        }
-        send(&mut session.connection, response(4, 1, Some(answer))).await;
-        finish_feedback(&mut session.connection, &mut trace).await;
-        assert!(trace.progress.contains(&(id, 2)));
-        // Replayed choice after completion must not grant EXP a second time.
-        send(&mut session.connection, response(4, 1, Some(answer))).await;
-        barrier(
-            &mut session.connection,
-            &format!("{}-quiz-{index}", config.character_name),
-            &mut trace,
-        )
-        .await;
-        assert_eq!(trace.gains.len(), index + 1);
+    let c = &mut session.connection;
+    let marker = config.character_name.clone();
+    for id in 1009..=1015 {
+        act(c, &mut trace, &marker, START, id, RAIN).await;
+        assert_eq!(trace.states.get(&id), Some(&1));
+        assert_eq!(trace.results.last(), Some(&(id, RAIN, 0)));
+        act(c, &mut trace, &marker, COMPLETE, id, RAIN).await;
+        assert_eq!(trace.states.get(&id), Some(&2));
+        // Act/1/nextQuest continues into the next quiz.
+        let next = if id < 1015 { id + 1 } else { 0 };
+        assert_eq!(trace.results.last(), Some(&(id, RAIN, next)));
+        // A replayed completion must not pay again.
+        act(c, &mut trace, &marker, COMPLETE, id, RAIN).await;
+        assert_eq!(trace.gains.len(), (id - 1008) as usize);
     }
     assert_eq!(trace.gains, [2, 4, 6, 10, 10, 10, 20]);
     assert_eq!(trace.stats, Some((3, 10, 13)));
-    send(
-        &mut session.connection,
-        build_change_map(10_000, "").unwrap(),
-    )
-    .await;
-    barrier(
-        &mut session.connection,
-        &format!("{}-warp", config.character_name),
-        &mut trace,
-    )
-    .await;
-    send(
-        &mut session.connection,
-        build_change_map(1_000_000, "").unwrap(),
-    )
-    .await;
-    barrier(
-        &mut session.connection,
-        &format!("{}-return", config.character_name),
-        &mut trace,
-    )
-    .await;
+    assert_eq!(warp(c, 10_000, "", &mut trace).await, 10_000);
+    assert_eq!(warp(c, AMHERST, "", &mut trace).await, AMHERST);
     drop(session);
-    let restored = login_to_world_session(&config).await.unwrap();
+    let restored = integration_harness::login_to_world_session(&config)
+        .await
+        .unwrap();
     assert_eq!((restored.level, restored.ap, restored.exp), (3, 10, 13));
     assert_eq!(restored.quests.len(), 7);
     assert!(restored.quests.values().all(|state| *state == 2));
 }
 
 #[tokio::test]
-async fn decline_cancel_invalid_answers_and_player_isolation() {
+async fn invalid_actions_are_refused_and_progress_is_per_character() {
     let config = load_harness_config_or_fail().await;
     let other = load_harness_config_or_fail().await;
-    let mut session = login_to_world_session(&config).await.unwrap();
-    let mut trace = Trace::default();
-    send(&mut session.connection, talk()).await;
-    assert_eq!(prompt(&mut session.connection, &mut trace).await.kind, 1);
-    send(&mut session.connection, response(1, 0, None)).await;
-    finish_feedback(&mut session.connection, &mut trace).await;
-    assert!(trace.progress.is_empty());
-    send(&mut session.connection, talk()).await;
-    prompt(&mut session.connection, &mut trace).await;
-    // A forged answer while still at the offer cannot start or complete anything.
-    send(&mut session.connection, response(4, 1, Some(0))).await;
-    barrier(&mut session.connection, &config.character_name, &mut trace).await;
-    assert!(trace.progress.is_empty());
-    send(&mut session.connection, talk()).await;
-    question(&mut session.connection, &mut trace).await;
-    send(&mut session.connection, response(4, 1, Some(99))).await;
-    barrier(&mut session.connection, &config.character_name, &mut trace).await;
+    let mut trace = QuestTrace::default();
+    let mut session = in_amherst(&config, &mut trace).await;
+    let c = &mut session.connection;
+    let m = config.character_name.clone();
+
+    // Prerequisite: quiz 2 needs quiz 1 completed.
+    act(c, &mut trace, &m, START, 1010, RAIN).await;
+    // Completing a quest that was never started.
+    act(c, &mut trace, &m, COMPLETE, 1009, RAIN).await;
+    // Pio is in Amherst but does not offer Rain's quiz.
+    act(c, &mut trace, &m, START, 1009, PIO).await;
+    // Item quests are not supported yet, even at their own NPC.
+    act(c, &mut trace, &m, START, 1034, 2102).await;
+    assert!(trace.progress.is_empty() && trace.results.is_empty());
+
+    act(c, &mut trace, &m, START, 1009, RAIN).await;
+    assert_eq!(trace.progress, [(1009, 1)]);
+    // Starting twice does nothing.
+    act(c, &mut trace, &m, START, 1009, RAIN).await;
+    assert_eq!(trace.progress, [(1009, 1)]);
+
+    // Rain is not on Mushroom Town, so the field refuses the NPC.
+    assert_eq!(warp(c, 10_000, "", &mut trace).await, 10_000);
+    act(c, &mut trace, &m, COMPLETE, 1009, RAIN).await;
     assert!(trace.gains.is_empty());
+
+    // A started quest can be forfeited and taken again.
+    act(c, &mut trace, &m, FORFEIT, 1009, 0).await;
+    assert_eq!(trace.states.get(&1009), Some(&0));
     drop(session);
-    let mut restored = login_to_world_session(&config).await.unwrap();
+    let mut session = in_amherst(&config, &mut trace).await;
+    assert!(session.quests.is_empty());
+    let c = &mut session.connection;
+    act(c, &mut trace, &m, START, 1009, RAIN).await;
+    drop(session);
+
+    let restored = integration_harness::login_to_world_session(&config)
+        .await
+        .unwrap();
     assert_eq!(restored.quests.get(&1009), Some(&1));
-    send(&mut restored.connection, talk()).await;
-    assert_eq!(prompt(&mut restored.connection, &mut trace).await.kind, 4);
-    send(&mut restored.connection, response(4, -1, None)).await;
-    barrier(&mut restored.connection, &config.character_name, &mut trace).await;
     assert!(trace.gains.is_empty());
-    let isolated: WorldSession = login_to_world_session(&other).await.unwrap();
+    let isolated = integration_harness::login_to_world_session(&other)
+        .await
+        .unwrap();
     assert!(isolated.quests.is_empty());
     assert_eq!(isolated.exp, 0);
 }
@@ -292,14 +122,13 @@ async fn decline_cancel_invalid_answers_and_player_isolation() {
 #[tokio::test]
 async fn started_quiz_survives_channel_migration() {
     let config = load_harness_config_or_fail().await;
-    let mut session = login_to_world_session(&config).await.unwrap();
-    let mut trace = Trace::default();
-    send(&mut session.connection, talk()).await;
-    question(&mut session.connection, &mut trace).await;
-    assert!(trace.progress.contains(&(1009, 1)));
+    let mut trace = QuestTrace::default();
+    let mut session = in_amherst(&config, &mut trace).await;
+    let m = config.character_name.clone();
+    act(&mut session.connection, &mut trace, &m, START, 1009, RAIN).await;
     send(&mut session.connection, build_change_channel(1).unwrap()).await;
     let redirect = loop {
-        let packet = read(&mut session.connection).await;
+        let packet = read(&mut session.connection, &mut trace).await;
         if packet.opcode() == SendOpcode::ChangeChannel as i16 {
             break decode_channel_change(&packet).unwrap();
         }
@@ -315,14 +144,14 @@ async fn started_quiz_survives_channel_migration() {
     )
     .await;
     let snapshot = loop {
-        let packet = read(&mut connection).await;
+        let packet = read(&mut connection, &mut trace).await;
         if packet.opcode() == SendOpcode::SetField as i16 {
             break decode_set_field(&packet).unwrap();
         }
     };
     assert_eq!(snapshot.quests.get(&1009), Some(&1));
     assert_eq!(snapshot.exp, 0);
-    send(&mut connection, talk()).await;
-    assert_eq!(prompt(&mut connection, &mut trace).await.kind, 4);
-    assert!(trace.gains.is_empty());
+    barrier(&mut connection, &m, &mut trace).await;
+    act(&mut connection, &mut trace, &m, COMPLETE, 1009, RAIN).await;
+    assert_eq!(trace.gains, [2]);
 }

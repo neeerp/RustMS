@@ -34,6 +34,7 @@ pub enum RecvOpcode {
     Whisper = 0x78,
     TalkToNpc = 0x3A,
     NpcTalkMore = 0x3C,
+    QuestAction = 0x6B,
 
     ChangeKeybinds = 0x87,
 

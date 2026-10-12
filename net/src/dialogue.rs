@@ -1,6 +1,7 @@
 //! Conversation progression independent of transport and asset storage.
 //!
-//! Quest-aware conversations live in `crate::quests`. Closing or finishing
+//! Quests are not conversations on the server: the client renders their
+//! pages and sends `QUEST_ACTION` (see `crate::quests`). Closing or finishing
 //! these normal speech pages has no persistence side effects.
 
 use game_data::NpcDialogueTemplate;
@@ -15,6 +16,21 @@ pub enum NpcInteraction {
         message_type: u8,
         response: i8,
         selection: Option<i32>,
+    },
+}
+
+/// One server-driven NPC prompt.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum Prompt {
+    Text(DialoguePage),
+    YesNo {
+        npc_id: i32,
+        text: String,
+    },
+    /// A menu; choices are embedded in `text` as `#L<id>#label#l`.
+    Selection {
+        npc_id: i32,
+        text: String,
     },
 }
 

@@ -85,6 +85,21 @@ pub(crate) fn sample_stats() -> CharacterStats {
     }
 }
 
+/// A player with `sample_stats` and nothing else, for handler tests.
+#[cfg(test)]
+pub(crate) fn sample_player() -> game::Player {
+    game::Player::new(
+        1,
+        0,
+        sample_stats(),
+        0,
+        game::Inventory::default(),
+        game::SkillBook::default(),
+        game::Keymap::default(),
+        game::QuestLog::default(),
+    )
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -50,6 +50,11 @@ pub enum ServerMessage {
         field: FieldKey,
         request_id: u64,
     },
+    /// Whether a quest NPC is on the player's map and within reach.
+    QuestNpcChecked {
+        request_id: u64,
+        nearby: bool,
+    },
     SendPacket(Packet),
 }
 
@@ -133,6 +138,13 @@ pub enum FieldMessage {
     NpcInteraction {
         from: ClientId,
         object_id: i32,
+        request_id: u64,
+    },
+    /// Check that an NPC with this template id is near the player before a
+    /// quest action; answered with `ServerMessage::QuestNpcChecked`.
+    QuestNpc {
+        from: ClientId,
+        npc_id: i32,
         request_id: u64,
     },
 }

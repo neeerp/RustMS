@@ -1,11 +1,13 @@
 use crate::{error::NetworkError, packet::op::SendOpcode};
 use packet::{io::write::PktWrite, Packet};
 
-pub fn build_quest_prompt(prompt: &crate::quests::QuestPrompt) -> Result<Packet, NetworkError> {
+/// Any server-driven NPC prompt: a text page, a yes/no question, or a menu.
+pub fn build_prompt(prompt: &crate::dialogue::Prompt) -> Result<Packet, NetworkError> {
+    use crate::dialogue::Prompt;
     let (npc_id, message_type, text) = match prompt {
-        crate::quests::QuestPrompt::Text(page) => return build_npc_dialogue(page),
-        crate::quests::QuestPrompt::YesNo { npc_id, text } => (*npc_id, 1, text),
-        crate::quests::QuestPrompt::Selection { npc_id, text } => (*npc_id, 4, text),
+        Prompt::Text(page) => return build_npc_dialogue(page),
+        Prompt::YesNo { npc_id, text } => (*npc_id, 1, text),
+        Prompt::Selection { npc_id, text } => (*npc_id, 4, text),
     };
     let mut p = Packet::new_empty();
     p.write_short(SendOpcode::NpcDialogue as i16)?;
@@ -155,9 +157,9 @@ mod tests {
     }
 
     #[test]
-    fn quest_prompt_text_is_a_dialogue_page() {
-        let prompt = crate::quests::QuestPrompt::Text(page(true, true));
-        let packet = build_quest_prompt(&prompt).unwrap();
+    fn prompt_text_is_a_dialogue_page() {
+        let prompt = crate::dialogue::Prompt::Text(page(true, true));
+        let packet = build_prompt(&prompt).unwrap();
 
         let mut expect = Expect::new(&packet.bytes);
         expect.short(SendOpcode::NpcDialogue as i16);
@@ -167,12 +169,12 @@ mod tests {
     }
 
     #[test]
-    fn quest_prompt_yes_no_uses_message_type_one_without_trailer() {
-        let prompt = crate::quests::QuestPrompt::YesNo {
+    fn prompt_yes_no_uses_message_type_one_without_trailer() {
+        let prompt = crate::dialogue::Prompt::YesNo {
             npc_id: 1012100,
             text: "Will you help?".to_string(),
         };
-        let packet = build_quest_prompt(&prompt).unwrap();
+        let packet = build_prompt(&prompt).unwrap();
 
         let mut expect = Expect::new(&packet.bytes);
         expect.short(SendOpcode::NpcDialogue as i16);
@@ -182,12 +184,12 @@ mod tests {
     }
 
     #[test]
-    fn quest_prompt_selection_uses_message_type_four_without_trailer() {
-        let prompt = crate::quests::QuestPrompt::Selection {
+    fn prompt_selection_uses_message_type_four_without_trailer() {
+        let prompt = crate::dialogue::Prompt::Selection {
             npc_id: 1012100,
             text: "#L0#Yes#l".to_string(),
         };
-        let packet = build_quest_prompt(&prompt).unwrap();
+        let packet = build_prompt(&prompt).unwrap();
 
         let mut expect = Expect::new(&packet.bytes);
         expect.short(SendOpcode::NpcDialogue as i16);

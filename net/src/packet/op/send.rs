@@ -26,6 +26,7 @@ pub enum SendOpcode {
     SpawnPlayer = 0xA0,
     RemovePlayerFromMap = 0xA1,
     ChatText = 0xA2,
+    UpdateQuestInfo = 0xD3,
     MovePlayer = 0xB9,
     SpawnNpc = 0x101,
     NpcDialogue = 0x130,

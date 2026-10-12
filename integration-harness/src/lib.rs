@@ -6,6 +6,7 @@ pub mod handshake;
 pub mod packets;
 pub mod preconditions;
 pub mod protocol;
+pub mod quests;
 
 pub use config::{HarnessConfig, MultiHarnessConfig};
 pub use error::HarnessError;

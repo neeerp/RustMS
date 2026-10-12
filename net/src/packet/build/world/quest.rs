@@ -1,27 +1,54 @@
 use super::stat::{build_stat_update, StatUpdate};
 use crate::codec::time::filetime;
 use crate::{error::NetworkError, packet::op::SendOpcode};
-use db::quest::QuestProgress;
-use game::CharacterStats;
+use game::{CharacterStats, QuestState, QuestStatus};
 use packet::{io::write::PktWrite, Packet};
 use std::time::SystemTime;
 
 pub fn quest_time(time: SystemTime) -> Result<i64, NetworkError> {
     Ok(filetime(time))
 }
-pub fn build_quest_progress(progress: &QuestProgress) -> Result<Packet, NetworkError> {
+/// A quest's new status; `None` once it is forfeited.
+pub fn build_quest_progress(
+    quest_id: i16,
+    status: Option<&QuestStatus>,
+) -> Result<Packet, NetworkError> {
     let mut p = Packet::new_empty();
     p.write_short(SendOpcode::ShowStatusInfo as i16)?;
     p.write_byte(1)?;
-    p.write_short(progress.quest_id)?;
-    p.write_byte(progress.status as u8)?;
-    if progress.status == 1 {
-        p.write_str_with_length("")?;
-    } else if let Some(time) = progress.completed_at {
-        p.write_long(quest_time(time)?)?;
+    p.write_short(quest_id)?;
+    match status {
+        None => {
+            p.write_byte(QuestState::NotStarted as u8)?;
+        }
+        Some(QuestStatus::Started) => {
+            p.write_byte(QuestState::Started as u8)?;
+            p.write_str_with_length("")?;
+        }
+        Some(QuestStatus::Completed { at }) => {
+            p.write_byte(QuestState::Completed as u8)?;
+            p.write_long(quest_time(*at)?)?;
+        }
     }
     Ok(p)
 }
+/// `UPDATE_QUEST_INFO` success (mode 8): the quest action at `npc_id`
+/// succeeded. A nonzero `next_quest` makes the client continue straight into
+/// that quest's conversation with the same NPC (`Act/nextQuest`).
+pub fn build_quest_action_result(
+    quest_id: i16,
+    npc_id: i32,
+    next_quest: i16,
+) -> Result<Packet, NetworkError> {
+    let mut p = Packet::new_empty();
+    p.write_short(SendOpcode::UpdateQuestInfo as i16)?;
+    p.write_byte(8)?;
+    p.write_short(quest_id)?;
+    p.write_int(npc_id)?;
+    p.write_short(next_quest)?;
+    Ok(p)
+}
+
 pub fn build_reward_stats(stats: &CharacterStats) -> Result<Packet, NetworkError> {
     build_stat_update(
         true,
@@ -60,15 +87,6 @@ mod tests {
     /// FILETIME of the unix epoch plus 1000 seconds.
     const FILETIME_1000S: i64 = 116_444_746_000_000_000;
 
-    fn progress(status: i16, completed_at: Option<SystemTime>) -> QuestProgress {
-        QuestProgress {
-            character_id: 1,
-            quest_id: 1021,
-            status,
-            completed_at,
-        }
-    }
-
     #[test]
     fn quest_time_is_a_filetime() {
         let at = UNIX_EPOCH + Duration::from_secs(1_000);
@@ -77,7 +95,7 @@ mod tests {
 
     #[test]
     fn started_quest_carries_empty_progress_string() {
-        let packet = build_quest_progress(&progress(1, None)).unwrap();
+        let packet = build_quest_progress(1021, Some(&QuestStatus::Started)).unwrap();
 
         let mut expect = Expect::new(&packet.bytes);
         expect.short(SendOpcode::ShowStatusInfo as i16).byte(1);
@@ -89,7 +107,7 @@ mod tests {
     fn completed_quest_carries_completion_filetime() {
         // HeavenClient (and the v83 client) read a FILETIME for status 2.
         let at = UNIX_EPOCH + Duration::from_secs(1_000);
-        let packet = build_quest_progress(&progress(2, Some(at))).unwrap();
+        let packet = build_quest_progress(1021, Some(&QuestStatus::Completed { at })).unwrap();
 
         let mut expect = Expect::new(&packet.bytes);
         expect.short(SendOpcode::ShowStatusInfo as i16).byte(1);
@@ -99,11 +117,21 @@ mod tests {
 
     #[test]
     fn forfeited_quest_has_no_payload() {
-        let packet = build_quest_progress(&progress(0, None)).unwrap();
+        let packet = build_quest_progress(1021, None).unwrap();
 
         let mut expect = Expect::new(&packet.bytes);
         expect.short(SendOpcode::ShowStatusInfo as i16).byte(1);
         expect.short(1021).byte(0);
+        expect.end();
+    }
+
+    #[test]
+    fn quest_action_result_names_the_npc_and_next_quest() {
+        let packet = build_quest_action_result(1032, 2001, 1033).unwrap();
+
+        let mut expect = Expect::new(&packet.bytes);
+        expect.short(SendOpcode::UpdateQuestInfo as i16).byte(8);
+        expect.short(1032).int(2001).short(1033);
         expect.end();
     }
 

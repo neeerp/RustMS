@@ -8,6 +8,9 @@ pub enum RuntimeError {
     #[error("Database error: {0}")]
     Database(#[from] db::Error),
 
+    #[error("Network error: {0}")]
+    Network(#[from] net::error::NetworkError),
+
     #[error("Encryption error: {0}")]
     Crypt(#[from] crypt::BcryptError),
 

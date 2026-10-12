@@ -29,6 +29,11 @@ pub struct FieldMapEntityNpc {
     pub rx1: i16,
 }
 
+/// How far a player may be from an NPC and still start or complete its quest:
+/// roughly the screen around the player, so the NPC must be on screen.
+const QUEST_NPC_REACH_X: i32 = 1200;
+const QUEST_NPC_REACH_Y: i32 = 800;
+
 /// One live copy of a map. It owns everything local to that map: who is on
 /// it and where, its NPCs, and (later) mobs, drops, and reactors, which will
 /// advance on `tick`.
@@ -116,6 +121,11 @@ impl FieldActor {
                 object_id,
                 request_id,
             } => self.handle_npc_interaction(from, object_id, request_id),
+            FieldMessage::QuestNpc {
+                from,
+                npc_id,
+                request_id,
+            } => self.handle_quest_npc(from, npc_id, request_id),
         }
     }
 
@@ -177,6 +187,21 @@ impl FieldActor {
             field: self.key,
             request_id,
         });
+    }
+
+    fn handle_quest_npc(&self, from: ClientId, npc_id: i32, request_id: u64) {
+        let Some(occupant) = self.occupants.get(&from) else {
+            return;
+        };
+        let (x, y) = (i32::from(occupant.avatar.x), i32::from(occupant.avatar.y));
+        let nearby = self.map_npcs.iter().any(|npc| {
+            npc.npc_id == npc_id
+                && (i32::from(npc.x) - x).abs() <= QUEST_NPC_REACH_X
+                && (i32::from(npc.y) - y).abs() <= QUEST_NPC_REACH_Y
+        });
+        occupant
+            .handle
+            .send(ServerMessage::QuestNpcChecked { request_id, nearby });
     }
 
     /// Send to every occupant, optionally skipping one. Never waits.
@@ -345,5 +370,83 @@ mod tests {
             next_opcode(&mut healthy_rx).await;
         }
         assert!(kill.is_cancelled());
+    }
+
+    #[tokio::test]
+    async fn quest_npcs_must_be_on_the_map_and_within_reach() {
+        let (tx, rx) = mpsc::channel(16);
+        let heena = FieldMapEntityNpc {
+            object_id: 1_000_000_000,
+            npc_id: 2101,
+            x: 130,
+            y: 185,
+            flip: false,
+            foothold: 0,
+            rx0: 80,
+            rx1: 180,
+        };
+        let actor = FieldActor::new(
+            FieldKey::new(0, 10000),
+            rx,
+            vec![heena],
+            Duration::from_millis(50),
+        );
+        tokio::spawn(actor.run());
+        let (near, mut near_rx) = client(1);
+        let (far, mut far_rx) = client(2);
+        tx.send(FieldMessage::Join {
+            handle: near,
+            avatar: avatar(1, 600, 185),
+        })
+        .await
+        .unwrap();
+        tx.send(FieldMessage::Join {
+            handle: far,
+            avatar: avatar(2, 1500, 185),
+        })
+        .await
+        .unwrap();
+
+        async fn checked(rx: &mut mpsc::Receiver<ServerMessage>) -> (u64, bool) {
+            loop {
+                match timeout(Duration::from_secs(1), rx.recv())
+                    .await
+                    .unwrap()
+                    .unwrap()
+                {
+                    ServerMessage::QuestNpcChecked { request_id, nearby } => {
+                        return (request_id, nearby)
+                    }
+                    ServerMessage::SendPacket(_) => continue,
+                    other => panic!("unexpected {other:?}"),
+                }
+            }
+        }
+
+        tx.send(FieldMessage::QuestNpc {
+            from: 1,
+            npc_id: 2101,
+            request_id: 7,
+        })
+        .await
+        .unwrap();
+        assert_eq!(checked(&mut near_rx).await, (7, true));
+        // Sera is not on this copy of the map.
+        tx.send(FieldMessage::QuestNpc {
+            from: 1,
+            npc_id: 2100,
+            request_id: 8,
+        })
+        .await
+        .unwrap();
+        assert_eq!(checked(&mut near_rx).await, (8, false));
+        tx.send(FieldMessage::QuestNpc {
+            from: 2,
+            npc_id: 2101,
+            request_id: 9,
+        })
+        .await
+        .unwrap();
+        assert_eq!(checked(&mut far_rx).await, (9, false));
     }
 }
