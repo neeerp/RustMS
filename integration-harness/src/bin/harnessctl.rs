@@ -1,5 +1,5 @@
 use std::env;
-use std::io;
+use std::io::{self, Read};
 use std::net::TcpStream;
 use std::path::{Path, PathBuf};
 use std::process::{Command, ExitCode, Stdio};
@@ -237,18 +237,20 @@ fn compose_cmd<const N: usize>(stack: &StackConfig, args: [&str; N]) -> Result<(
     }
 }
 
+/// Wait until the server at `addr` sends the start of its handshake. A bare
+/// TCP connect is not enough: Docker's port proxy accepts connections before
+/// the server inside the container listens, then closes them.
 fn wait_for_endpoint(addr: &str, timeout: Duration) -> Result<(), String> {
     let start = Instant::now();
     while start.elapsed() < timeout {
-        match TcpStream::connect(addr) {
-            Ok(_) => return Ok(()),
-            Err(error) if error.kind() == io::ErrorKind::ConnectionRefused => {
-                thread::sleep(Duration::from_millis(250));
-            }
-            Err(_) => {
-                thread::sleep(Duration::from_millis(250));
+        if let Ok(mut stream) = TcpStream::connect(addr) {
+            let _ = stream.set_read_timeout(Some(Duration::from_secs(1)));
+            let mut header = [0u8; 2];
+            if stream.read_exact(&mut header).is_ok() {
+                return Ok(());
             }
         }
+        thread::sleep(Duration::from_millis(250));
     }
 
     Err(format!(
