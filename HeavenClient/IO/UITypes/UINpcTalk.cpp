@@ -24,13 +24,57 @@
 
 #include "../Net/Packets/NpcInteractionPackets.h"
 #include "../../Data/ItemData.h"
+#include "../../Data/SkillData.h"
 #include "../../Util/Misc.h"
 #include "../../Util/NpcTextMarkup.h"
 
 #include <nlnx/nx.hpp>
 
+#include <algorithm>
+
 namespace ms
 {
+	static_assert(NpcTextMarkup::IMAGE == Text::BOX, "dialogue images must be laid out as boxes");
+
+	namespace
+	{
+		// An image by path, such as UI/UIWindow.img/QuestIcon/4/0. Our UI.nx
+		// keeps the quest icons that v83 text names under UIWindow.img in
+		// UIWindow2.img.
+		Texture path_image(const std::string &path)
+		{
+			size_t slash = path.find('/');
+
+			if (slash == std::string::npos)
+				return Texture();
+
+			const std::pair<std::string, nl::node> files[] = {
+				{ "UI", nl::nx::ui }, { "Map", nl::nx::map }, { "Effect", nl::nx::effect }, { "Item", nl::nx::item },
+				{ "Skill", nl::nx::skill }, { "Mob", nl::nx::mob }, { "Npc", nl::nx::npc },
+				{ "Character", nl::nx::character }, { "Etc", nl::nx::etc }, { "Quest", nl::nx::quest },
+				{ "Reactor", nl::nx::reactor }
+			};
+
+			std::string file = path.substr(0, slash);
+			std::string rest = path.substr(slash + 1);
+
+			for (const auto &[name, root] : files)
+			{
+				if (name != file)
+					continue;
+
+				nl::node found = root.resolve(rest);
+
+				if (found.data_type() != nl::node::type::bitmap && rest.rfind("UIWindow.img/", 0) == 0)
+					found = root.resolve("UIWindow2.img/" + rest.substr(13));
+
+				return Texture(found);
+			}
+
+			return Texture();
+		}
+	}
+
 	UINpcTalk::UINpcTalk() : offset(0), unitrows(0), rowmax(0), show_slider(false), draw_text(false),
 							 formatted_text(""), formatted_text_pos(0), timestep(0)
 	{
@@ -101,16 +145,33 @@ namespace ms
 		nametag.draw(speaker_pos);
 		name.draw(center_pos + Point<int16_t>(0, -4));
 
+		// The text types out, but its images show at once, as in the original.
+		size_t reveal = draw_text ? formatted_text_pos : formatted_text.size();
+		Point<int16_t> text_pos = position + Point<int16_t>(166, 32);
+		Range<int16_t> text_clip(0, 0);
+
 		if (show_slider)
 		{
 			int16_t text_min_height = position.y() + top.height() - 1;
-			text.draw(position + Point<int16_t>(166, 32 - offset * 32),
-					  Range<int16_t>(text_min_height, text_min_height + height - 18));
-			slider.draw(position);
-		} else
-		{
-			text.draw(position + Point<int16_t>(166, 32));
+			text_pos.shift_y(-offset * 32);
+			text_clip = Range<int16_t>(text_min_height, text_min_height + height - 18);
 		}
+
+		for (size_t i = 0; i < images.size(); i++)
+		{
+			Point<int16_t> box = text_pos + text.box_position(i);
+
+			if (show_slider && (box.y() < text_clip.first() || box.y() + images[i].size.y() > text_clip.second()))
+				continue;
+
+			images[i].texture.draw(box + images[i].anchor);
+		}
+
+		text.draw(text_pos, text_clip, reveal);
+
+		if (show_slider)
+			slider.draw(position);
+
 		// Choices scroll with the text and are clipped to the same area.
 		Range<int16_t> visible = visible_rows();
 		Range<int16_t> clip(position.y() + visible.first(), position.y() + visible.second());
@@ -156,11 +217,6 @@ namespace ms
 			{
 				if (formatted_text_pos < formatted_text.size())
 				{
-					std::string t = text.get_text();
-					char c = formatted_text[formatted_text_pos];
-
-					text.change_text(t + c);
-
 					formatted_text_pos++;
 					timestep = 0;
 				} else
@@ -304,17 +360,13 @@ namespace ms
 		if (clicked && draw_text && Rectangle<int16_t>(166, 486, 24, height + 24).contains(cursor_relative))
 		{
 			draw_text = false;
-			text.change_text(formatted_text);
 			return Cursor::State::IDLE;
 		}
 
 		Cursor::State estate = UIElement::send_cursor(clicked, cursorpos);
 
 		if (estate == Cursor::State::CLICKING && clicked && draw_text)
-		{
 			draw_text = false;
-			text.change_text(formatted_text);
-		}
 
 		return estate;
 	}
@@ -343,7 +395,7 @@ namespace ms
 	}
 
 	// TODO: Move this to GraphicsGL?
-	std::string UINpcTalk::format_text(const std::string &tx, const int32_t &npcid)
+	std::string UINpcTalk::format_text(const std::string &tx, const int32_t &npcid, std::vector<InlineImage> &images)
 	{
 		std::string formatted_text = tx;
 		// The text renderer understands escaped line breaks, not literal LF/CR.
@@ -366,7 +418,37 @@ namespace ms
 			[](int32_t id) { return NxHelper::Map::get_map_info_by_id(id).name; }
 		};
 
-		formatted_text = NpcTextMarkup::expand(formatted_text, lookups);
+		std::vector<NpcTextMarkup::InlineImage> tags;
+		formatted_text = NpcTextMarkup::expand(formatted_text, lookups, &tags);
+
+		for (const auto &tag : tags)
+		{
+			InlineImage image;
+
+			if (tag.tag == 'f' || tag.tag == 'F')
+			{
+				image.texture = path_image(tag.arg);
+				image.size = image.texture.get_dimensions();
+				image.anchor = image.texture.get_origin();
+			} else
+			{
+				// Icons fill a 32x32 slot, their origin at its bottom left.
+				int32_t id = tag.arg.size() <= 9 ? std::stoi(tag.arg) : 0;
+
+				if (tag.tag == 's')
+					image.texture = SkillData::get(id).get_icon(SkillData::Icon::NORMAL);
+				else if (ItemData::get(id).is_valid())
+					image.texture = ItemData::get(id).get_icon(false);
+
+				if (image.texture.is_valid())
+				{
+					image.size = Point<int16_t>(32, 32);
+					image.anchor = Point<int16_t>(0, 32);
+				}
+			}
+
+			images.push_back(image);
+		}
 
 		return formatted_text;
 	}
@@ -387,22 +469,35 @@ namespace ms
 		timestep = 0;
 		draw_text = true;
 		formatted_text_pos = 0;
-		formatted_text = format_text(tx, npcid);
+		images.clear();
+		formatted_text = format_text(tx, npcid, images);
 		choices.clear();
 		if (msgtype == 4)
 		{
 			size_t first_link = formatted_text.find("#L");
-			for (const auto& [id, label] : NpcTextMarkup::choices(formatted_text))
+			for (auto [id, label] : NpcTextMarkup::choices(formatted_text))
 			{
+				// Choices are drawn without their images for now.
+				label.erase(std::remove(label.begin(), label.end(), Text::BOX), label.end());
 				auto header = headers.find(id);
 				choices.push_back({ id, Text(Text::Font::A12M, Text::Alignment::LEFT, Color::Name::BLUE, label, 320),
 					header == headers.end() ? Texture() : header->second });
 			}
 			if (first_link != std::string::npos)
+			{
 				formatted_text.erase(first_link);
+				images.resize(std::count(formatted_text.begin(), formatted_text.end(), Text::BOX));
+			}
 		}
 
 		text = Text(Text::Font::A12M, Text::Alignment::LEFT, Color::Name::DARKGREY, formatted_text, 320);
+
+		std::vector<Point<int16_t>> boxes;
+
+		for (const auto &image : images)
+			boxes.push_back(image.size);
+
+		text.set_boxes(boxes);
 
 		int16_t text_height = text.height();
 		question_height = text_height;
@@ -419,8 +514,6 @@ namespace ms
 		}
 
 		text_height = choice_y - 8;
-
-		text.change_text("");
 
 		if (speakerbyte == 0)
 		{

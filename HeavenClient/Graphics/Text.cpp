@@ -42,7 +42,7 @@ namespace ms
 		if (text.empty())
 			return;
 
-		layout = GraphicsGL::get().createlayout(text, font, alignment, maxwidth, formatted, line_adj);
+		layout = GraphicsGL::get().createlayout(text, font, alignment, maxwidth, formatted, line_adj, boxes);
 	}
 
 	void Text::change_text(const std::string &t)
@@ -70,6 +70,18 @@ namespace ms
 		background = b;
 	}
 
+	void Text::set_boxes(const std::vector<Point<int16_t>> &b)
+	{
+		boxes = b;
+
+		reset_layout();
+	}
+
+	Point<int16_t> Text::box_position(size_t index) const
+	{
+		return layout.box(index);
+	}
+
 	void Text::draw(const DrawArgument &args) const
 	{
 		draw(args, Range<int16_t>(0, 0));
@@ -77,7 +89,12 @@ namespace ms
 
 	void Text::draw(const DrawArgument &args, const Range<int16_t> &vertical) const
 	{
-		GraphicsGL::get().drawtext(args, vertical, text, layout, font, color, background);
+		draw(args, vertical, text.size());
+	}
+
+	void Text::draw(const DrawArgument &args, const Range<int16_t> &vertical, size_t reveal) const
+	{
+		GraphicsGL::get().drawtext(args, vertical, text, layout, font, color, background, reveal);
 	}
 
 	uint16_t Text::advance(size_t pos) const
@@ -121,7 +138,9 @@ namespace ms
 	}
 
 	Text::Layout::Layout(const std::vector<Layout::Line> &l, const std::vector<int16_t> &a, int16_t w, int16_t h,
-						 int16_t ex, int16_t ey) : lines(l), advances(a), dimensions(w, h), endoffset(ex, ey)
+						 int16_t ex, int16_t ey, const std::vector<Point<int16_t>> &b) : lines(l), advances(a),
+																						 dimensions(w, h),
+																						 endoffset(ex, ey), boxes(b)
 	{}
 
 	Text::Layout::Layout() : Layout(std::vector<Layout::Line>(), std::vector<int16_t>(), 0, 0, 0, 0)
@@ -150,6 +169,11 @@ namespace ms
 	Point<int16_t> Text::Layout::get_endoffset() const
 	{
 		return endoffset;
+	}
+
+	Point<int16_t> Text::Layout::box(size_t index) const
+	{
+		return index < boxes.size() ? boxes[index] : Point<int16_t>();
 	}
 
 	Text::Layout::iterator Text::Layout::begin() const

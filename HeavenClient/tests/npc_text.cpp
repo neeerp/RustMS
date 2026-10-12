@@ -28,6 +28,12 @@ int main()
 		require(expand("Hunt #o100100# in #m10000#, #z2010000#.") == "Hunt Snail in Mushroom Town, Apple.", "mob, map, item names");
 		require(expand("#bBlue#k and #L0#a choice#l") == "#bBlue#k and #L0#a choice#l", "colours and choices are left alone");
 		require(expand("a # sign") == "a # sign", "a lone # survives");
+		using Images = std::vector<ms::NpcTextMarkup::InlineImage>;
+		Images images;
+		require(ms::NpcTextMarkup::expand("#fUI/UIWindow.img/QuestIcon/4/0#\\n#v2010000# 3 #t2010000#\\n#s1001# and #i2010009##fnot an image#",
+			lookups, &images) == "\x01\\n\x01 3 Apple\\n\x01 and \x01#fnot an image#", "captured images leave placeholders");
+		require(images == Images{{'f', "UI/UIWindow.img/QuestIcon/4/0"}, {'v', "2010000"}, {'s', "1001"}, {'i', "2010009"}},
+			"captured images in order");
 		using Choices = std::vector<std::pair<int32_t, std::string>>;
 		auto choices = ms::NpcTextMarkup::choices;
 		require(choices("Pick:\\r\\n#L0#One#l\\r\\n#L1#Two#l") == Choices{{0, "One"}, {1, "Two"}}, "closed choices");

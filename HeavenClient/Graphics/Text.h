@@ -61,6 +61,10 @@ namespace ms
 			NAMETAG
 		};
 
+		// Stands in for an inline box, such as an image in NPC dialogue: the
+		// layout reserves the box's size and reports where it went.
+		static constexpr char BOX = '\x01';
+
 		class Layout
 		{
 		public:
@@ -79,7 +83,7 @@ namespace ms
 			};
 
 			Layout(const std::vector<Line> &lines, const std::vector<int16_t> &advances, int16_t width, int16_t height,
-				   int16_t endx, int16_t endy);
+				   int16_t endx, int16_t endy, const std::vector<Point<int16_t>> &boxes = {});
 
 			Layout();
 
@@ -93,6 +97,9 @@ namespace ms
 
 			Point<int16_t> get_endoffset() const;
 
+			// The top-left corner of the n-th inline box.
+			Point<int16_t> box(size_t index) const;
+
 			using iterator = std::vector<Line>::const_iterator;
 
 			iterator begin() const;
@@ -104,6 +111,7 @@ namespace ms
 			std::vector<int16_t> advances;
 			Point<int16_t> dimensions;
 			Point<int16_t> endoffset;
+			std::vector<Point<int16_t>> boxes;
 		};
 
 		Text(Font font, Alignment alignment, Color::Name color, Background background, const std::string &text = "",
@@ -118,11 +126,20 @@ namespace ms
 
 		void draw(const DrawArgument &args, const Range<int16_t> &vertical) const;
 
+		// Draw only the first `reveal` characters, as when text types out.
+		void draw(const DrawArgument &args, const Range<int16_t> &vertical, size_t reveal) const;
+
 		void change_text(const std::string &text);
 
 		void change_color(Color::Name color);
 
 		void set_background(Background background);
+
+		// The sizes of the text's BOX characters, in order.
+		void set_boxes(const std::vector<Point<int16_t>> &boxes);
+
+		// The top-left corner of the n-th BOX character.
+		Point<int16_t> box_position(size_t index) const;
 
 		bool empty() const;
 
@@ -152,5 +169,6 @@ namespace ms
 		bool formatted;
 		std::string text;
 		int16_t line_adj;
+		std::vector<Point<int16_t>> boxes;
 	};
 }

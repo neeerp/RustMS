@@ -19,6 +19,7 @@
 
 #include "../Configuration.h"
 
+#include <algorithm>
 #include <filesystem>
 
 namespace
@@ -593,23 +594,24 @@ namespace ms
 
 	Text::Layout
 	GraphicsGL::createlayout(const std::string &text, Text::Font id, Text::Alignment alignment, int16_t maxwidth,
-							 bool formatted, int16_t line_adj)
+							 bool formatted, int16_t line_adj, const std::vector<Point<int16_t>> &boxes)
 	{
 		size_t length = text.length();
 
 		if (length == 0)
 			return Text::Layout();
 
-		LayoutBuilder builder(fonts[id], alignment, maxwidth, formatted, line_adj);
+		LayoutBuilder builder(fonts[id], alignment, maxwidth, formatted, line_adj, text, boxes);
 
 		const char *p_text = text.c_str();
+		const std::string separators = { ' ', '\\', '#', Text::BOX };
 
 		size_t first = 0;
 		size_t offset = 0;
 
 		while (offset < length)
 		{
-			size_t last = text.find_first_of(" \\#", offset + 1);
+			size_t last = text.find_first_of(separators, offset + 1);
 
 			if (last == std::string::npos)
 				last = length;
@@ -621,7 +623,8 @@ namespace ms
 		return builder.finish(first, offset);
 	}
 
-	GraphicsGL::LayoutBuilder::LayoutBuilder(const Font &f, Text::Alignment a, int16_t mw, bool fm, int16_t la) : font(
+	GraphicsGL::LayoutBuilder::LayoutBuilder(const Font &f, Text::Alignment a, int16_t mw, bool fm, int16_t la,
+											 const std::string &text, const std::vector<Point<int16_t>> &b) : font(
 			f), alignment(a), maxwidth(mw), formatted(fm), line_adj(la)
 	{
 		fontid = Text::Font::NUM_FONTS;
@@ -630,6 +633,13 @@ namespace ms
 		ay = font.linespace();
 		width = 0;
 		endy = 0;
+		line_top = 0;
+
+		size_t next_box = 0;
+
+		for (size_t pos = 0; pos < text.size() && next_box < b.size(); pos++)
+			if (text[pos] == Text::BOX)
+				boxes[pos] = b[next_box++];
 
 		if (maxwidth == 0)
 			maxwidth = 800;
@@ -706,8 +716,7 @@ namespace ms
 		{
 			for (size_t i = first; i < last; i++)
 			{
-				char c = text[i];
-				wordwidth += font.chars[c].ax;
+				wordwidth += advance_of(text, i);
 
 				if (wordwidth > maxwidth)
 				{
@@ -739,19 +748,29 @@ namespace ms
 
 			if (lines.size() > 0)
 				ay -= line_adj;
+
+			line_top = ay - font.linespace();
 		}
 
 		for (size_t pos = first; pos < last; pos++)
 		{
 			char c = text[pos];
-			const Font::Char &ch = font.chars[c];
 
 			advances.push_back(ax);
 
 			if (pos < first + skip || newline && c == ' ')
 				continue;
 
-			ax += ch.ax;
+			auto box = boxes.find(pos);
+
+			if (box != boxes.end())
+			{
+				// A box sits on the baseline, pushing the line down if it is taller.
+				line_boxes.emplace_back(pos, ax);
+				ay = std::max<int16_t>(ay, line_top + box->second.y());
+			}
+
+			ax += advance_of(text, pos);
 
 			if (width < ax)
 				width = ax;
@@ -770,7 +789,25 @@ namespace ms
 
 		advances.push_back(ax);
 
-		return Text::Layout(lines, advances, width, ay, ax, endy);
+		std::vector<Point<int16_t>> positions;
+
+		for (const auto &box : boxes)
+		{
+			auto placed = box_positions.find(box.first);
+			positions.push_back(placed == box_positions.end() ? Point<int16_t>() : placed->second);
+		}
+
+		return Text::Layout(lines, advances, width, ay, ax, endy, positions);
+	}
+
+	int16_t GraphicsGL::LayoutBuilder::advance_of(const char *text, size_t pos) const
+	{
+		auto box = boxes.find(pos);
+
+		if (box != boxes.end())
+			return box->second.x();
+
+		return font.chars[text[pos]].ax;
 	}
 
 	void GraphicsGL::LayoutBuilder::add_word(size_t word_first, size_t word_last, Text::Font word_font,
@@ -794,13 +831,17 @@ namespace ms
 				break;
 		}
 
+		for (const auto &box : line_boxes)
+			box_positions[box.first] = Point<int16_t>(line_x + box.second, line_y - boxes[box.first].y());
+
 		lines.push_back({words, {line_x, line_y}});
 		words.clear();
+		line_boxes.clear();
 	}
 
 	void GraphicsGL::drawtext(const DrawArgument &args, const Range<int16_t> &vertical, const std::string &text,
 							  const Text::Layout &layout, Text::Font id, Color::Name colorid,
-							  Text::Background background)
+							  Text::Background background, size_t reveal)
 	{
 		if (locked)
 			return;
@@ -858,6 +899,9 @@ namespace ms
 
 				for (size_t pos = word.first; pos < word.last; ++pos)
 				{
+					if (pos >= reveal)
+						return;
+
 					const char c = text[pos];
 					const Font::Char &ch = font.chars[c];
 
