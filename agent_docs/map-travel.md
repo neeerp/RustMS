@@ -38,9 +38,11 @@ nothing. A script returns effects that the client actor sends:
 | `infoReactor` | `/22` after 1008, else `/27` after 1020 |
 | `glTutoMsg0` | PLAYER_HINT balloon, text key `glTutoMsg0.message` |
 
-HeavenClient sends CHANGE_MAP_SPECIAL (`0x64`, portal name) when the player
-first touches a script portal, and the server answers with the effects and an
-enable-actions stat update. An `info*` hint runs once per session after it
+HeavenClient sends CHANGE_MAP_SPECIAL (`0x64`, portal name) when the player's
+feet first enter a script portal's box, and the server answers with the effects
+and an enable-actions stat update. As in the original, the box is the portal's
+`hRange` by `vRange` (100 by default) centred on it, so the triggers that sit
+30-40 px above the floor fire as the player walks past. An `info*` hint runs once per session after it
 was shown; the exit warning repeats. Hint text comes from the
 [server content pack](./server-content.md). `tutoChatNPC` (the skip offer)
 belongs with scripted NPCs. Explicit direct

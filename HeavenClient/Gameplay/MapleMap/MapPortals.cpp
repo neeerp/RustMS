@@ -40,6 +40,8 @@ namespace ms
 			std::string target_name = sub["tn"];
 			int32_t target_id = sub["tm"];
 			Point<int16_t> position = {sub["x"], sub["y"]};
+			auto hrange = static_cast<int16_t>(sub["hRange"].get_integer(Portal::DEFAULT_RANGE));
+			auto vrange = static_cast<int16_t>(sub["vRange"].get_integer(Portal::DEFAULT_RANGE));
 
 			const Animation *animation = &animations[type];
 			bool intramap = target_id == mapid;
@@ -47,7 +49,8 @@ namespace ms
 			portals_by_id.emplace(
 					std::piecewise_construct,
 					std::forward_as_tuple(portal_id),
-					std::forward_as_tuple(animation, type, name, intramap, position, target_id, target_name)
+					std::forward_as_tuple(animation, type, name, intramap, position, target_id, target_name, hrange,
+										  vrange)
 			);
 
 			portal_ids_by_name.emplace(name, portal_id);

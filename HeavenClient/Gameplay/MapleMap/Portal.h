@@ -49,6 +49,10 @@ namespace ms
 			TYPE14
 		};
 
+		// A portal's hRange and vRange when the map doesn't set them, as in the
+		// original's CPortalList::Init.
+		static constexpr int16_t DEFAULT_RANGE = 100;
+
 		static Type typebyid(int32_t id)
 		{
 			return static_cast<Type>(id);
@@ -72,7 +76,7 @@ namespace ms
 		};
 
 		Portal(const Animation *animation, Type type, std::string name, bool intramap, Point<int16_t> position,
-			   int32_t tomap, std::string toname);
+			   int32_t tomap, std::string toname, int16_t hrange, int16_t vrange);
 
 		Portal();
 
@@ -94,11 +98,17 @@ namespace ms
 		WarpInfo getwarpinfo() const;
 
 	private:
+		// The original's CPortalList::FindPortal_Collision box: hRange by vRange
+		// centred on the portal, with the right and bottom edges excluded.
+		Rectangle<int16_t> touch_bounds() const;
+
 		const Animation *animation;
 		Type type;
 		std::string name;
 		Point<int16_t> position;
 		WarpInfo warpinfo;
+		int16_t hrange;
+		int16_t vrange;
 		bool touched;
 	};
 }

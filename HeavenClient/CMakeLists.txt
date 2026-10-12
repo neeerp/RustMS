@@ -23,6 +23,10 @@ if(HEAVENCLIENT_BUILD_TESTS)
     add_test(NAME quest_dialogue COMMAND quest_dialogue_tests)
     add_executable(npc_text_tests tests/npc_text.cpp)
     add_test(NAME npc_text COMMAND npc_text_tests)
+    add_executable(portal_touch_tests tests/portal_touch.cpp Gameplay/MapleMap/Portal.cpp)
+    target_include_directories(portal_touch_tests PRIVATE
+        ${PROJECT_SOURCE_DIR}/libs/NoLifeNx ${PROJECT_SOURCE_DIR}/libs/glad/build/include)
+    add_test(NAME portal_touch COMMAND portal_touch_tests)
     # Loads every quest in game-data/supported_quests.txt from Quest.nx.
     # Skipped when Quest.nx is absent.
     add_executable(quest_catalog_tests tests/quest_catalog.cpp Character/QuestCatalog.cpp)
