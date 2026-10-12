@@ -129,4 +129,6 @@ These were corrected:
    are buffered, several packets per read are all processed, empty bodies are
    handled, an oversized length drops the connection, and receive state is
    cleared (and stale input abandoned) when a handler reconnects.
-5. Dependency pins in `build-deps.sh` (see Build).
+5. The map-change SET_FIELD's HP short (after the portal byte) was not read.
+   It now sets the player's HP, which is how a dead player gets back up.
+6. Dependency pins in `build-deps.sh` (see Build).

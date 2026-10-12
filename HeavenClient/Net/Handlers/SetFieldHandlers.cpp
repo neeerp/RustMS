@@ -87,6 +87,10 @@ namespace ms
 
 		int32_t mapid = recv.read_int();
 		int8_t portalid = recv.read_byte();
+		int16_t hp = recv.read_short();
+
+		// Respawning after death restores some HP.
+		Stage::get().get_player().get_stats().set_stat(MapleStat::Id::HP, hp);
 
 		transition(mapid, portalid);
 	}

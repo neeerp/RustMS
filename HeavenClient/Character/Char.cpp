@@ -50,6 +50,9 @@ namespace ms
 
 		look.draw(DrawArgument(absp, color), alpha);
 
+		if (state == State::DIED)
+			tomb.draw(absp - Point<int16_t>(0, tomb_drop), alpha);
+
 		afterimage.draw(look.get_frame(), DrawArgument(absp, facing_right), alpha);
 
 		if (ironbody)
@@ -95,6 +98,17 @@ namespace ms
 		hintballoon.update();
 		invincible.update();
 		ironbody.update();
+
+		if (state == State::DIED)
+		{
+			tomb_drop = std::max<int16_t>(tomb_drop - TOMB_SPEED, 0);
+
+			if (!tomb_landed && tomb.update())
+			{
+				tomb = tomb_land;
+				tomb_landed = true;
+			}
+		}
 
 		for (auto &pet : pets)
 		{
@@ -310,6 +324,13 @@ namespace ms
 
 	void Char::set_state(State st)
 	{
+		if (st == State::DIED && state != State::DIED)
+		{
+			tomb = tomb_fall;
+			tomb_drop = TOMB_DROP;
+			tomb_landed = false;
+		}
+
 		state = st;
 
 		Stance::Id stance = Stance::by_state(state);
@@ -401,7 +422,13 @@ namespace ms
 
 		for (auto iter : CharEffect::PATHS)
 			chareffects.emplace(iter.first, src.resolve(iter.second));
+
+		nl::node tomb = nl::nx::effect["Tomb.img"];
+		tomb_fall = tomb["fall"];
+		tomb_land = tomb["land"];
 	}
 
 	EnumMap<CharEffect::Id, Animation> Char::chareffects;
+	Animation Char::tomb_fall;
+	Animation Char::tomb_land;
 }

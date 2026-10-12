@@ -192,7 +192,7 @@ namespace ms
 		CharLook look_preview;
 		PetLook pets[3];
 
-		State state;
+		State state = State::STAND;
 		bool attacking;
 		bool facing_right;
 
@@ -206,6 +206,15 @@ namespace ms
 		TimedBool ironbody;
 		std::list<DamageNumber> damagenumbers;
 
+		// A dead character's tombstone drops from above, then stays on them.
+		static constexpr int16_t TOMB_DROP = 240;
+		static constexpr int16_t TOMB_SPEED = 2;
+		Animation tomb;
+		int16_t tomb_drop = 0;
+		bool tomb_landed = false;
+
 		static EnumMap<CharEffect::Id, Animation> chareffects;
+		static Animation tomb_fall;
+		static Animation tomb_land;
 	};
 }
