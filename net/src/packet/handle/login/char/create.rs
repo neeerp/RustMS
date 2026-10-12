@@ -4,7 +4,7 @@ use crate::handler::{HandlerResult, LoginContext, LoginHandler, LoginResult};
 use crate::packet::build::login;
 use db::character::NewCharacter;
 use game::inventory::equip_slot;
-use game::{EquipStats, InventoryType, Item};
+use game::{InventoryType, Item};
 use packet::{io::read::PktRead, Packet};
 use std::io::Cursor;
 
@@ -54,7 +54,9 @@ impl LoginHandler for CreateCharacterHandler {
         };
 
         let (stats, look) = character.create(starting_items)?;
-        Ok(HandlerResult::reply(login::char::build_char_packet(&stats, &look)?))
+        Ok(HandlerResult::reply(login::char::build_char_packet(
+            &stats, &look,
+        )?))
     }
 }
 
@@ -99,8 +101,8 @@ fn validate_appearance(
 }
 
 /// The chosen starting clothes and weapon, equipped. Each id must belong to
-/// the slot it was offered for. Equipment stats start empty until the server
-/// loads item data (Character.wz).
+/// the slot it was offered for. Equipment gets its base stats from
+/// Character.nx when the item data is available.
 fn starting_equipment(
     top: i32,
     bottom: i32,
@@ -123,10 +125,14 @@ fn starting_equipment(
                 "Invalid starting equipment",
             ));
         }
+        let stats = crate::items::info(item_id)
+            .and_then(|info| info.equip)
+            .map(|equip| crate::items::base_stats(&equip))
+            .unwrap_or_default();
         items.push((
             InventoryType::Equipped,
             slot,
-            Item::equipment(item_id, EquipStats::default()),
+            Item::equipment(item_id, stats),
         ));
     }
     Ok(items)
@@ -160,7 +166,12 @@ mod tests {
         assert_eq!(items.len(), 4);
         assert!(starting_equipment(1060002, 1040002, 1072001, 1302000).is_err());
         // Overall with no bottom.
-        assert_eq!(starting_equipment(1052122, 0, 1072001, 1302000).unwrap().len(), 3);
+        assert_eq!(
+            starting_equipment(1052122, 0, 1072001, 1302000)
+                .unwrap()
+                .len(),
+            3
+        );
     }
 
     #[test]

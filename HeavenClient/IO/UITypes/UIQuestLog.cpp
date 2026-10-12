@@ -23,7 +23,10 @@
 #include "../../Graphics/GraphicsGL.h"
 #include "../../Gameplay/Stage.h"
 #include "../../Gameplay/MapleMap/Npc.h"
-#include "../../Net/Packets/NpcInteractionPackets.h"
+#include "../../Gameplay/QuestConversation.h"
+#include "../../Character/QuestCatalog.h"
+#include "../../Character/QuestObjectives.h"
+#include "../../Data/ItemData.h"
 #include "../../Util/Misc.h"
 #include <nlnx/nx.hpp>
 #include <algorithm>
@@ -73,7 +76,11 @@ namespace ms
 			return found == locations.end() ? -1 : found->second;
 		}
 
-		std::string quest_text(std::string text)
+		// Quest text with its placeholders filled in: #p NPC, #m map, #h the
+		// player, #t item, #o mob, #c how many of an item the player holds,
+		// #a a kill count (#a<index># for this quest's mobs, or
+		// #a<quest><index>#), and #i item icons, which are left out.
+		std::string quest_text(std::string text, int16_t quest_id)
 		{
 			for (size_t i = 0; i < text.size(); ++i)
 				if (text[i] == '\n') { text.replace(i, 1, "\\n"); ++i; }
@@ -83,15 +90,33 @@ namespace ms
 				size_t end = text.find('#', start + 2);
 				if (end == std::string::npos) break;
 				char kind = start + 1 < text.size() ? text[start + 1] : 0;
-				if (kind != 'p' && kind != 'm' && kind != 'h') { ++start; continue; }
+				if (std::string("pmhtocia").find(kind) == std::string::npos || kind == 0) { ++start; continue; }
 				std::string replacement;
-				if (kind == 'h') replacement = Stage::get().get_player().get_name();
+				auto& player = Stage::get().get_player();
+				if (kind == 'h') replacement = player.get_name();
 				else
 				{
 					auto id = string_conversion::or_default<int32_t>(text.substr(start + 2, end - start - 2), -1);
 					if (id < 0) { ++start; continue; }
-					replacement = kind == 'p' ? nl::nx::string["Npc.img"][std::to_string(id)]["name"].get_string()
-						: NxHelper::Map::get_map_info_by_id(id).name;
+					switch (kind)
+					{
+						case 'p': replacement = nl::nx::string["Npc.img"][std::to_string(id)]["name"].get_string(); break;
+						case 'm': replacement = NxHelper::Map::get_map_info_by_id(id).name; break;
+						case 't': replacement = ItemData::get(id).get_name(); break;
+						case 'o': replacement = nl::nx::string["Mob.img"][std::to_string(id)]["name"].get_string(); break;
+						case 'c': replacement = std::to_string(player.get_inventory().get_total_item_count(id)); break;
+						case 'i': break;
+						case 'a':
+						{
+							int16_t quest = id < 10 ? quest_id : static_cast<int16_t>(id / 10);
+							const auto& started = player.get_quests().started_quests();
+							auto progress = started.find(quest);
+							auto kills = decode_kills(progress == started.end() ? std::string() : progress->second);
+							size_t index = static_cast<size_t>(id % 10);
+							replacement = std::to_string(index >= 1 && index <= kills.size() ? kills[index - 1] : 0);
+							break;
+						}
+					}
 				}
 				text.replace(start, end - start + 1, replacement);
 				start += replacement.size();
@@ -182,8 +207,10 @@ namespace ms
 			if (!allowed) buttons[id]->set_state(Button::DISABLED);
 			else if (buttons[id]->get_state() == Button::DISABLED) buttons[id]->set_state(Button::NORMAL);
 		};
-		enable(ACCEPT, local && questlog.npc_marker(target_npc, job, level) == QuestMarker::AVAILABLE);
-		enable(FINISH, local && questlog.npc_marker(target_npc, job, level) == QuestMarker::READY);
+		const Inventory& inventory = Stage::get().get_player().get_inventory();
+		auto count = [&](int32_t item_id) { return static_cast<int32_t>(inventory.get_total_item_count(item_id)); };
+		enable(ACCEPT, local && questlog.npc_marker(target_npc, job, level, count) == QuestMarker::AVAILABLE);
+		enable(FINISH, local && questlog.npc_marker(target_npc, job, level, count) == QuestMarker::READY);
 	}
 
 	void UIQuestLog::refresh_list()
@@ -240,7 +267,7 @@ namespace ms
 		buttons[HELPER]->set_active(detail_open && selected >= 0 && tab == TAB1);
 		buttons[FORFEIT]->set_active(detail_open && selected >= 0 && tab == TAB1);
 		buttons[FIND_NPC]->set_active(detail_open && selected >= 0 && tab != TAB1);
-		buttons[HELPER]->set_state(Button::DISABLED); buttons[FORFEIT]->set_state(Button::DISABLED);
+		buttons[FORFEIT]->set_state(Button::DISABLED);
 		if (id < 0) { target_npc = 0; target_map = -1; return; }
 		auto info = nl::nx::quest["QuestInfo.img"][std::to_string(id)];
 		auto check = nl::nx::quest["Check.img"][std::to_string(id)];
@@ -252,17 +279,49 @@ namespace ms
 		if (check["0"]["lvmax"]) requirement += " - " + std::to_string(check["0"]["lvmax"].get_integer());
 		else requirement += "+";
 		level_text = Text(Text::A11M, Text::LEFT, Color::Name::WHITE, requirement);
-		portrait = nl::nx::npc[string_format::extend_id(target_npc, 7) + ".img"]["stand"];
+		portrait = NxHelper::Npc::get_npc_node(target_npc)["stand"];
 		std::string npc_name = nl::nx::string["Npc.img"][std::to_string(target_npc)]["name"];
 		objective = Text(Text::A12B, Text::LEFT, Color::Name::BLUE, "Talk to " + npc_name, 250);
 		auto map_name = target_map >= 0 ? NxHelper::Map::get_map_info_by_id(target_map).name : "";
 		location = Text(Text::A11B, Text::LEFT, Color::Name::RED, map_name, 250);
 		std::string text = info[std::to_string(tab)].get_string();
 		if (text.empty()) text = info["1"].get_string();
-		description = Text(Text::A12M, Text::LEFT, Color::Name::DARKGREY, quest_text(text), 250);
-		reward_y = std::max<int16_t>(245, 180 + description.height() + 24);
+		description = Text(Text::A12M, Text::LEFT, Color::Name::DARKGREY, quest_text(text, id), 250);
+		// What an open quest still needs: "Snail 3/10", "Shellpiece 0/1".
+		std::string needs;
+		const QuestInfo* quest = QuestCatalog::get().find(id);
+		if (tab == TAB1 && quest)
+		{
+			const auto& started = questlog.started_quests();
+			auto progress = started.find(id);
+			const Inventory& inventory = Stage::get().get_player().get_inventory();
+			auto objectives = quest_objectives(quest->end_mobs, quest->end_items,
+				progress == started.end() ? std::string() : progress->second,
+				[&](int32_t item_id) { return static_cast<int32_t>(inventory.get_total_item_count(item_id)); });
+			for (const auto& goal : objectives)
+			{
+				std::string name = goal.mob
+					? nl::nx::string["Mob.img"][std::to_string(goal.id)]["name"].get_string()
+					: ItemData::get(goal.id).get_name();
+				if (!needs.empty()) needs += "\\n";
+				needs += (goal.met() ? "#g" : "#k") + name + " " + std::to_string(goal.have) + "/" + std::to_string(goal.need) + "#k";
+			}
+			buttons[HELPER]->set_state(questlog.is_tracked(id) || questlog.tracked().size() < QuestLog::MAX_TRACKED
+				? Button::NORMAL : Button::DISABLED);
+		}
+		goals = Text(Text::A12M, Text::LEFT, Color::Name::DARKGREY, needs, 250);
+		reward_y = std::max<int16_t>(245, 180 + goals_height() + description.height() + 24);
 		auto experience = nl::nx::quest["Act.img"][std::to_string(id)]["1"]["exp"].get_integer();
-		reward = Text(Text::A12M, Text::LEFT, Color::Name::DARKGREY, std::to_string(experience) + " EXP");
+		std::string rewards = std::to_string(experience) + " EXP";
+		// Item rewards; those with a weight are one random pick.
+		for (auto item : nl::nx::quest["Act.img"][std::to_string(id)]["1"]["item"])
+		{
+			int32_t count = item["count"].get_integer(1);
+			if (count <= 0) continue;
+			rewards += "\\n" + ItemData::get(item["id"].get_integer()).get_name() + " x" + std::to_string(count);
+			if (item["prop"].get_integer(0) > 0) rewards += " (random)";
+		}
+		reward = Text(Text::A12M, Text::LEFT, Color::Name::DARKGREY, rewards, 230);
 		completed_on = Text();
 		if (tab == TAB2)
 		{
@@ -276,7 +335,7 @@ namespace ms
 				completed_on = Text(Text::A11B, Text::LEFT, Color::Name::BLUE, stamp.str());
 			}
 		}
-		detail_height = reward_y + 112 - 130;
+		detail_height = reward_y + std::max<int16_t>(112, 64 + reward.height() + 12) - 130;
 		detail_slider.setrows(1, 1 + (std::max<int16_t>(0, detail_height - 235) + 15) / 16);
 		buttons[FIND_NPC]->set_state(target_map >= 0 ? Button::NORMAL : Button::DISABLED);
 	}
@@ -329,11 +388,12 @@ namespace ms
 				Range<int16_t> clip(position.y() + 130, position.y() + 364);
 				auto content = origin - Point<int16_t>(0, detail_offset);
 				(tab == TAB2 ? completed_on : objective).draw(content + Point<int16_t>(16, 140), clip);
-				location.draw(content + Point<int16_t>(16, 160), clip);
-				description.draw(content + Point<int16_t>(16, 180), clip);
+				goals.draw(content + Point<int16_t>(16, 160), clip);
+				location.draw(content + Point<int16_t>(16, 160 + goals_height()), clip);
+				description.draw(content + Point<int16_t>(16, 180 + goals_height()), clip);
 				// Keep the reward panel inside the detail viewport while scrolling.
 				int16_t top = std::max<int16_t>(130, reward_y - detail_offset);
-				int16_t bottom = std::min<int16_t>(364, reward_y + 112 - detail_offset);
+				int16_t bottom = std::min<int16_t>(364, reward_y + std::max<int16_t>(112, 64 + reward.height() + 12) - detail_offset);
 				if (bottom > top) reward_background.draw(DrawArgument(origin + Point<int16_t>(10, top), Point<int16_t>(263, bottom - top)));
 				auto icon = [&](const Texture& texture, int16_t y) {
 					if (y - detail_offset >= 130 && y - detail_offset + texture.height() <= 364)
@@ -438,9 +498,16 @@ namespace ms
 				buttons[MY_LOCATION]->set_active(!current_location); buttons[ALL_LOCATION]->set_active(current_location);
 				refresh_list(); break;
 			case FIND_NPC: find_npc(); break;
+			case HELPER:
+			{
+				auto& quests = Stage::get().get_player().get_quests();
+				if (quests.is_tracked(selected)) quests.untrack(selected);
+				else quests.track(selected);
+				break;
+			}
 			case ACCEPT:
 			case FINISH:
-				if (auto oid = local_npc_oid(); oid >= 0) { TalkToNPCPacket(oid).dispatch(); close(); } break;
+				if (local_npc_oid() >= 0) { QuestConversation::open(selected, target_npc); close(); } break;
 			default: break;
 		}
 		return Button::NORMAL;

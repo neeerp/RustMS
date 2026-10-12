@@ -19,45 +19,73 @@
 
 #include "../Constants.h"
 
+#include <algorithm>
+
 #include <nlnx/nx.hpp>
 
 namespace ms
 {
-	ChatBalloon::ChatBalloon(int8_t type)
+	namespace
 	{
-		std::string typestr;
+		// ChatBalloon.img styles store their text color as a signed ARGB integer.
+		Color argb_color(int32_t argb)
+		{
+			auto value = static_cast<uint32_t>(argb);
+			auto channel = [value](int shift) { return ((value >> shift) & 0xFF) / 255.0f; };
 
-		if (type < 0)
-		{
-			switch (type)
-			{
-				case -1:
-					typestr = "dead";
-					break;
-			}
-		} else
-		{
-			typestr = std::to_string(type);
+			return Color(channel(16), channel(8), channel(0), 1.0f);
 		}
 
-		nl::node src = nl::nx::ui["ChatBalloon.img"][typestr];
+		// Some styles reuse another style's pieces through "_inlink" (a path
+		// within ChatBalloon.img) instead of storing the bitmap again.
+		nl::node piece(nl::node style, const char *name)
+		{
+			nl::node node = style[name];
+			std::string link = node["_inlink"];
 
-		arrow = src["arrow"];
-		frame = src;
+			return link.empty() ? node : nl::nx::ui["ChatBalloon.img"].resolve(link);
+		}
+	}
 
-		textlabel = Text(Text::Font::A11M, Text::Alignment::CENTER, Color::Name::BLACK, "", 80);
+	ChatBalloon::ChatBalloon(int8_t type)
+	{
+		std::string typestr = type == -1 ? "dead" : std::to_string(std::max<int8_t>(type, 0));
 
-		duration = 0;
+		load(nl::nx::ui["ChatBalloon.img"][typestr], false, WRAP_WIDTH);
+	}
+
+	ChatBalloon::ChatBalloon(const std::string &style, bool formatted, uint16_t wrap_width)
+	{
+		load(nl::nx::ui["ChatBalloon.img"][style], formatted, wrap_width);
 	}
 
 	ChatBalloon::ChatBalloon() : ChatBalloon(0)
 	{}
 
+	void ChatBalloon::load(nl::node src, bool formatted, uint16_t wrap_width)
+	{
+		constexpr const char *names[NUM_PIECES] = { "c", "n", "s", "w", "e", "nw", "ne", "sw", "se", "arrow" };
+
+		for (size_t i = 0; i < NUM_PIECES; i++)
+			pieces[i] = piece(src, names[i]);
+
+		xtile = std::max<int16_t>(pieces[NORTH].width(), 1);
+		ytile = std::max<int16_t>(pieces[WEST].height(), 1);
+
+		nl::node clr = src["clr"];
+		textcolor = clr.data_type() == nl::node::type::integer ? argb_color(static_cast<int32_t>(clr.get_integer())) : Color(Color::Code::CBLACK);
+
+		// The text itself is white so the style color applied at draw time is exact.
+		textlabel = Text(Text::Font::BALLOON, Text::Alignment::CENTER, Color::Name::WHITE, "", wrap_width, formatted);
+
+		duration = 0;
+	}
+
 	void ChatBalloon::change_text(const std::string &text)
 	{
 		textlabel.change_text(text);
 
-		duration = DURATION;
+		duration = DURATION + FADE;
 	}
 
 	void ChatBalloon::draw(Point<int16_t> position) const
@@ -65,12 +93,42 @@ namespace ms
 		if (duration == 0)
 			return;
 
-		int16_t width = textlabel.width();
-		int16_t height = textlabel.height();
+		float opacity = duration < FADE ? static_cast<float>(duration) / FADE : 1.0f;
 
-		frame.draw(position, width, height);
-		arrow.draw(position);
-		textlabel.draw(position - Point<int16_t>(0, height + 4));
+		// The content area is exactly the text block, one 14 px row per line, as
+		// in the original. The border pieces are drawn outside it through their
+		// asset origins, with the edges stretched to the content size.
+		int16_t width = std::max<int16_t>(textlabel.width(), xtile);
+		int16_t height = std::max<int16_t>(textlabel.height(), ytile);
+		int16_t left = position.x() - width / 2;
+		int16_t right = left + width;
+		int16_t bottom = position.y();
+		int16_t top = bottom - height;
+
+		auto at = [opacity](int16_t x, int16_t y) { return DrawArgument(Point<int16_t>(x, y), opacity); };
+		auto stretched = [opacity](int16_t x, int16_t y, int16_t w, int16_t h)
+		{
+			Point<int16_t> p(x, y);
+
+			return DrawArgument(p, p, Point<int16_t>(w, h), 1.0f, 1.0f, opacity, 0.0f);
+		};
+
+		pieces[CENTER].draw(stretched(left, top, width, height));
+		pieces[NORTH].draw(stretched(left, top, width, 0));
+		pieces[SOUTH].draw(stretched(left, bottom, width, 0));
+		pieces[WEST].draw(stretched(left, top, 0, height));
+		pieces[EAST].draw(stretched(right, top, 0, height));
+
+		pieces[NORTHWEST].draw(at(left, top));
+		pieces[NORTHEAST].draw(at(right, top));
+		pieces[SOUTHWEST].draw(at(left, bottom));
+		pieces[SOUTHEAST].draw(at(right, bottom));
+		pieces[ARROW].draw(at(position.x(), bottom));
+
+		Color color(textcolor.r(), textcolor.g(), textcolor.b(), opacity);
+
+		int16_t text_top = top - TEXT_DESCENT;
+		textlabel.draw(DrawArgument(Point<int16_t>(position.x(), text_top), color));
 	}
 
 	void ChatBalloon::update()
@@ -84,6 +142,11 @@ namespace ms
 	void ChatBalloon::expire()
 	{
 		duration = 0;
+	}
+
+	bool ChatBalloon::is_active() const
+	{
+		return duration > 0;
 	}
 
 	ChatBalloonHorizontal::ChatBalloonHorizontal()

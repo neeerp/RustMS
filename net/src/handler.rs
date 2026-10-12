@@ -75,9 +75,14 @@ pub enum LoginAction {
     /// Move the current session to a new state (e.g. terms accepted).
     SetSessionState(SessionState),
     /// Persist the world and channel the client picked.
-    SelectChannel { world_id: u8, channel_id: u8 },
+    SelectChannel {
+        world_id: u8,
+        channel_id: u8,
+    },
     /// Issue a world-entry ticket for an owned character.
-    EnterWorld { character_id: i32 },
+    EnterWorld {
+        character_id: i32,
+    },
     Disconnect,
 }
 
@@ -134,7 +139,11 @@ fn login_routes() -> &'static HashMap<i16, LoginRoute> {
             (Op::SetGender, Session, &login::SetGenderHandler),
             (Op::ServerListRequest, LoggedIn, &login::WorldListHandler),
             (Op::ServerListReRequest, LoggedIn, &login::WorldListHandler),
-            (Op::ServerStatusRequest, LoggedIn, &login::ServerStatusHandler),
+            (
+                Op::ServerStatusRequest,
+                LoggedIn,
+                &login::ServerStatusHandler,
+            ),
             (Op::CharListRequest, LoggedIn, &login::CharListHandler),
             (Op::CheckCharName, LoggedIn, &login::CheckCharNameHandler),
             (Op::CreateChar, LoggedIn, &login::CreateCharacterHandler),
@@ -188,7 +197,9 @@ pub struct SpawnPosition {
 pub enum WorldAction {
     Reply(Packet),
     /// Enter the game with the character named in PLAYER_LOGGEDIN.
-    EnterGame { character_id: i32 },
+    EnterGame {
+        character_id: i32,
+    },
     /// The player already moved to `map_id` (the handler updated it and sent
     /// the warp); move the client's field membership to match.
     ChangeField {
@@ -201,9 +212,51 @@ pub enum WorldAction {
         movement_bytes: Vec<u8>,
     },
     NpcInteraction(NpcInteraction),
+    /// Start, complete, or forfeit a quest (v83 `QUEST_ACTION`).
+    Quest(crate::quests::QuestRequest),
+    /// The player touched the named script portal on their map.
+    ScriptPortal {
+        portal: String,
+    },
+    /// The player's worn equipment changed; refresh their field avatar and
+    /// show the others this UPDATE_CHAR_LOOK.
+    LookChanged(Packet),
+    /// Natural HP/MP recovery the client reports; the runtime checks timing.
+    NaturalHeal {
+        hp: i16,
+        mp: i16,
+    },
+    /// Something for the player's field to do on their behalf.
+    Field(FieldRequest),
+    /// The player's HP reached 0.
+    Died,
     Whisper(WhisperDelivery),
-    ChangeChannel { channel_id: u8 },
+    ChangeChannel {
+        channel_id: u8,
+    },
     Disconnect,
+}
+
+/// A request a player makes of their field, which owns its mobs.
+#[derive(Debug)]
+pub enum FieldRequest {
+    /// The controller moved a mob.
+    MobMove {
+        object_id: i32,
+        move_id: i16,
+        start: (i16, i16),
+        movement: Vec<u8>,
+    },
+    /// A validated attack: `broadcast` for the others, total damage per mob.
+    Attack {
+        broadcast: Packet,
+        hits: Vec<(i32, i64)>,
+    },
+    /// Show everyone else on the map this packet.
+    Broadcast(Packet),
+    /// Pick up the drop `object_id`, answered with `ServerMessage::PickedUp`;
+    /// the player stands at (x, y).
+    Pickup { object_id: i32, x: i16, y: i16 },
 }
 
 impl ReplyAction for WorldAction {
@@ -234,18 +287,39 @@ fn world_routes() -> &'static HashMap<i16, WorldRoute> {
     ROUTES.get_or_init(|| {
         use RecvOpcode as Op;
         use WorldRoute::*;
-        let table: [(Op, WorldRoute); 11] = [
+        let table: [(Op, WorldRoute); 20] = [
             (Op::PlayerLoggedIn, PreGame(&world::PlayerLoggedInHandler)),
             (Op::PlayerMove, InGame(&world::PlayerMoveHandler)),
             (Op::ChangeChannel, InGame(&world::ChangeChannelHandler)),
             (Op::ChangeMap, InGame(&world::ChangeMapHandler)),
-            (Op::PlayerMapTransfer, InGame(&world::PlayerMapTransferHandler)),
-            (Op::PartySearchUpdate, InGame(&world::PartySearchUpdateHandler)),
+            (
+                Op::PlayerMapTransfer,
+                InGame(&world::PlayerMapTransferHandler),
+            ),
+            (
+                Op::PartySearchUpdate,
+                InGame(&world::PartySearchUpdateHandler),
+            ),
             (Op::ChangeKeybinds, InGame(&world::ChangeKeybindsHandler)),
             (Op::AllChat, InGame(&world::AllChatHandler)),
             (Op::Whisper, InGame(&world::WhisperHandler)),
             (Op::TalkToNpc, InGame(&world::NpcTalkHandler)),
             (Op::NpcTalkMore, InGame(&world::NpcTalkMoreHandler)),
+            (Op::QuestAction, InGame(&world::QuestActionHandler)),
+            (
+                Op::ChangeMapSpecial,
+                InGame(&world::ChangeMapSpecialHandler),
+            ),
+            (Op::ItemMove, InGame(&world::ItemMoveHandler)),
+            (Op::UseItem, InGame(&world::UseItemHandler)),
+            (Op::MoveLife, InGame(&world::MoveLifeHandler)),
+            (
+                Op::CloseRangeAttack,
+                InGame(&world::CloseRangeAttackHandler),
+            ),
+            (Op::TakeDamage, InGame(&world::TakeDamageHandler)),
+            (Op::ItemPickup, InGame(&world::ItemPickupHandler)),
+            (Op::HealOverTime, InGame(&world::HealOverTimeHandler)),
         ];
         table
             .into_iter()
@@ -276,7 +350,7 @@ mod tests {
     fn every_registered_opcode_is_unique_per_server() {
         // The maps would silently drop duplicates; check the table sizes match.
         assert_eq!(login_routes().len(), 13);
-        assert_eq!(world_routes().len(), 11);
+        assert_eq!(world_routes().len(), 20);
     }
 
     #[test]

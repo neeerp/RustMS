@@ -10,7 +10,8 @@ The local assets provide the frames, tabs, search field, empty notices, quest
 icons, completed-count header, portrait panel, reward panel/headings, scrollbars,
 and action buttons. Solid category/selection bars use the reference's colors.
 
-Available quests share `QuestLog::supported_rules()` and eligibility rules with
+Available quests share `QuestLog::supported_rules()` (built from the
+client's `QuestCatalog`, see [Quests](./quests.md)) and eligibility rules with
 NPC markers, so unsupported asset quests are not advertised. The level filter
 can display out-of-range quests without enabling their acceptance. Job and
 prerequisite checks still apply. Started and completed records are read from
@@ -26,13 +27,16 @@ the field. The complete window is kept within the viewport when opened/resized.
 Find NPC, or double-clicking the portrait, opens the world map with the destination
 marked. NPC locations are resolved by traversing the active beginner portal graph
 from `10000`, avoiding the disconnected legacy map variants. Accept/Finish opens
-the existing server-validated NPC conversation when that NPC is present and its
-quest marker permits the action; it does not bypass dialogue requirements.
+the quest's own conversation with that NPC when the NPC is present and its
+quest marker permits the action; the server still validates the resulting
+`QUEST_ACTION`.
 
-The Recommended tab, Quest Helper, and Forfeit use disabled states: recommendations,
-tracking overlays, and abandonment do not yet have implementations. Displayed reward details currently
-cover the EXP rewards of the supported quests. Adding item/meso rewards requires
-matching server support and reward UI rows.
+Open quests list what they still need under the objective ("Snail 3/10",
+green once met), and the reward panel lists EXP and item rewards, marking
+random picks. The helper button (`BtArlim`) adds an open quest to the Quest
+Helper or removes it (see [Quests](./quests.md)). The Recommended tab and
+Forfeit use disabled states: recommendations and abandonment do not yet have
+implementations.
 
 Validation: build the native client and run CTest; marker tests include available
 quest filtering across jobs, prerequisites, and level modes. Use a private Xvfb

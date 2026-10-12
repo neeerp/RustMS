@@ -60,6 +60,8 @@ namespace ms
 		void close();
 		void find_npc();
 		int32_t local_npc_oid() const;
+		// Height of the objective lines, 0 without any.
+		int16_t goals_height() const { return goals.empty() ? 0 : goals.height() + 4; }
 
 		enum Buttons : uint16_t
 		{
@@ -94,7 +96,7 @@ namespace ms
 		Texture quest_icons[3];
 		Texture reward_background, reward_heading, basic_reward;
 		Animation portrait;
-		Text heading, level_text, description, objective, location, reward, completed_on;
+		Text heading, level_text, description, objective, goals, location, reward, completed_on;
 		Text completion_count, empty_detail;
 		struct QuestRow { int16_t id; Text title; bool eligible; };
 		std::vector<QuestRow> rows;

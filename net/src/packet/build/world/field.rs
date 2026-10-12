@@ -122,6 +122,16 @@ pub fn parse_movement_state(
     movement_bytes: &[u8],
     current: (i16, i16, u8),
 ) -> Option<(i16, i16, u8)> {
+    parse_movement(movement_bytes, current).map(|(x, y, stance, _)| (x, y, stance))
+}
+
+/// Like `parse_movement_state`, plus the foothold the mover ended up on:
+/// the last nonzero foothold of an absolute or jump-down fragment (0 means
+/// airborne), if any fragment had one.
+pub fn parse_movement(
+    movement_bytes: &[u8],
+    current: (i16, i16, u8),
+) -> Option<(i16, i16, u8, Option<i16>)> {
     let mut cursor = Cursor::new(movement_bytes);
     let count = cursor.read_byte().ok()?;
     if count == 0 {
@@ -129,6 +139,7 @@ pub fn parse_movement_state(
     }
 
     let (mut x, mut y, mut stance) = current;
+    let mut foothold = None;
 
     for _ in 0..count {
         let command = cursor.read_byte().ok()?;
@@ -138,7 +149,10 @@ pub fn parse_movement_state(
                 y = cursor.read_short().ok()?;
                 let _ = cursor.read_short().ok()?;
                 let _ = cursor.read_short().ok()?;
-                let _ = cursor.read_short().ok()?;
+                let fh = cursor.read_short().ok()?;
+                if fh != 0 {
+                    foothold = Some(fh);
+                }
                 stance = cursor.read_byte().ok()?;
                 let _ = cursor.read_short().ok()?;
             }
@@ -161,7 +175,10 @@ pub fn parse_movement_state(
                 let _ = cursor.read_short().ok()?;
                 let _ = cursor.read_short().ok()?;
                 let _ = cursor.read_short().ok()?;
-                let _ = cursor.read_short().ok()?;
+                let fh = cursor.read_short().ok()?;
+                if fh != 0 {
+                    foothold = Some(fh);
+                }
                 stance = cursor.read_byte().ok()?;
                 let _ = cursor.read_short().ok()?;
             }
@@ -170,7 +187,7 @@ pub fn parse_movement_state(
         }
     }
 
-    Some((x, y, stance))
+    Some((x, y, stance, foothold))
 }
 
 #[cfg(test)]

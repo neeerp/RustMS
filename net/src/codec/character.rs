@@ -2,6 +2,7 @@ use super::item::encode_inventory;
 use super::stats::encode_character_stats;
 use super::time::{expiration, filetime};
 use crate::error::NetworkError;
+use game::quest::encode_kills;
 use game::Player;
 use packet::{io::write::PktWrite, Packet};
 
@@ -37,7 +38,7 @@ pub fn encode_character_data(packet: &mut Packet, player: &Player) -> Result<(),
     packet.write_short(started.len() as i16)?;
     for quest in started {
         packet.write_short(quest.quest_id)?;
-        packet.write_str_with_length("")?;
+        packet.write_str_with_length(&encode_kills(player.quests.kills(quest.quest_id)))?;
     }
     let completed: Vec<_> = player.quests.completed().collect();
     packet.write_short(completed.len() as i16)?;

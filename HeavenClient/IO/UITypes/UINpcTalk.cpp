@@ -23,6 +23,9 @@
 #include "../Gameplay/Stage.h"
 
 #include "../Net/Packets/NpcInteractionPackets.h"
+#include "../../Data/ItemData.h"
+#include "../../Util/Misc.h"
+#include "../../Util/NpcTextMarkup.h"
 
 #include <nlnx/nx.hpp>
 
@@ -108,8 +111,39 @@ namespace ms
 		{
 			text.draw(position + Point<int16_t>(166, 32));
 		}
-		for (size_t i = 0; i < choices.size(); ++i)
-			choices[i].second.draw(position + Point<int16_t>(166, 40 + question_height + i * 28 - offset * 32));
+		// Choices scroll with the text and are clipped to the same area.
+		Range<int16_t> visible = visible_rows();
+		Range<int16_t> clip(position.y() + visible.first(), position.y() + visible.second());
+
+		for (const auto &choice : choices)
+		{
+			int16_t y = choice.y - offset * 32;
+			Point<int16_t> at = position + Point<int16_t>(166, y);
+
+			if (choice.header.is_valid())
+			{
+				int16_t header_top = y - choice.header.height() - 2;
+
+				if (header_top >= visible.first() && y <= visible.second())
+					choice.header.draw(at - Point<int16_t>(0, choice.header.height() + 2));
+			}
+
+			choice.label.draw(at, clip);
+		}
+	}
+
+	void UINpcTalk::send_scroll(double yoffset)
+	{
+		if (show_slider && slider.isenabled())
+			slider.send_scroll(yoffset);
+	}
+
+	Range<int16_t> UINpcTalk::visible_rows() const
+	{
+		// Relative to the window: the text area between the top and the buttons.
+		int16_t first = top.height() - 1;
+
+		return Range<int16_t>(first, show_slider ? first + height - 18 : first + height + 24);
 	}
 
 	void UINpcTalk::update()
@@ -148,31 +182,19 @@ namespace ms
 		{
 			case TalkType::SENDNEXT:
 			case TalkType::SENDOK:
-				// Type = 0
-				switch (buttonid)
-				{
-					case Buttons::CLOSE:
-						NpcTalkMorePacket(message_type, -1).dispatch();
-						break;
-					case Buttons::NEXT:
-					case Buttons::OK:
-						NpcTalkMorePacket(message_type, 1).dispatch();
-						break;
-				}
-				break;
 			case TalkType::SENDNEXTPREV:
 				// Type = 0
 				switch (buttonid)
 				{
 					case Buttons::CLOSE:
-						NpcTalkMorePacket(message_type, -1).dispatch();
+						respond(-1);
 						break;
 					case Buttons::NEXT:
 					case Buttons::OK:
-						NpcTalkMorePacket(message_type, 1).dispatch();
+						respond(1);
 						break;
 					case Buttons::PREV:
-						NpcTalkMorePacket(message_type, 0).dispatch();
+						respond(0);
 						break;
 				}
 				break;
@@ -181,13 +203,13 @@ namespace ms
 				switch (buttonid)
 				{
 					case Buttons::CLOSE:
-						NpcTalkMorePacket(message_type, -1).dispatch();
+						respond(-1);
 						break;
 					case Buttons::NO:
-						NpcTalkMorePacket(message_type, 0).dispatch();
+						respond(0);
 						break;
 					case Buttons::YES:
-						NpcTalkMorePacket(message_type, 1).dispatch();
+						respond(1);
 						break;
 				}
 				break;
@@ -196,13 +218,13 @@ namespace ms
 				switch (buttonid)
 				{
 					case Buttons::CLOSE:
-						NpcTalkMorePacket(message_type, -1).dispatch();
+						respond(-1);
 						break;
 					case Buttons::QNO:
-						NpcTalkMorePacket(message_type, 0).dispatch();
+						respond(0);
 						break;
 					case Buttons::QYES:
-						NpcTalkMorePacket(message_type, 1).dispatch();
+						respond(1);
 						break;
 				}
 				break;
@@ -214,24 +236,17 @@ namespace ms
 				switch (buttonid)
 				{
 					case Buttons::CLOSE:
-						NpcTalkMorePacket(message_type, 0).dispatch();
+						respond(0);
 						break;
 					case Buttons::OK:
-						NpcTalkMorePacket(message_type, 1).dispatch();
+						respond(1);
 						break;
 				}
 				break;
 			case TalkType::SENDSIMPLE:
 				// Type = 4
-				switch (buttonid)
-				{
-					case Buttons::CLOSE:
-						NpcTalkMorePacket(message_type, 0).dispatch();
-						break;
-					default:
-						NpcTalkMorePacket(0).dispatch(); // TODO: Selection
-						break;
-				}
+				if (buttonid == Buttons::CLOSE)
+					local_responder ? respond(-1) : respond(0);
 				break;
 			default:
 				break;
@@ -240,19 +255,43 @@ namespace ms
 		return Button::State::NORMAL;
 	}
 
+	void UINpcTalk::respond(int8_t response, int32_t selection)
+	{
+		if (local_responder)
+		{
+			// The responder may replace this dialogue, so call a copy.
+			auto responder = local_responder;
+			responder(response, selection);
+			return;
+		}
+
+		if (selection >= 0)
+			NpcTalkMorePacket(selection).dispatch();
+		else
+			NpcTalkMorePacket(message_type, response).dispatch();
+	}
+
+	void UINpcTalk::set_local_responder(std::function<void(int8_t, int32_t)> responder)
+	{
+		local_responder = std::move(responder);
+	}
+
 	Cursor::State UINpcTalk::send_cursor(bool clicked, Point<int16_t> cursorpos)
 	{
 		Point<int16_t> cursor_relative = cursorpos - position;
 		if (message_type == 4)
-			for (size_t i = 0; i < choices.size(); ++i)
+			for (const auto &choice : choices)
 			{
-				int16_t y = 40 + question_height + i * 28 - offset * 32;
+				int16_t y = choice.y - offset * 32;
+				Range<int16_t> visible = visible_rows();
+				if (y + 12 < visible.first() || y + 12 > visible.second())
+					continue;
 				if (Rectangle<int16_t>(166, 486, y, y + 24).contains(cursor_relative))
 				{
 					if (clicked)
 					{
 						deactivate();
-						NpcTalkMorePacket(choices[i].first).dispatch();
+						respond(1, choice.id);
 						return Cursor::State::IDLE;
 					}
 					return Cursor::State::CANCLICK;
@@ -286,7 +325,7 @@ namespace ms
 		{
 			deactivate();
 
-			NpcTalkMorePacket(message_type, -1).dispatch();
+			respond(-1);
 		}
 	}
 
@@ -319,53 +358,23 @@ namespace ms
 			}
 			else formatted_text += tx[i];
 		}
-		size_t begin = formatted_text.find("#p");
+		NpcTextMarkup::Lookups lookups {
+			[]() { return Stage::get().get_player().get_name(); },
+			[](int32_t id) { return std::string(nl::nx::string["Npc.img"][std::to_string(id)]["name"]); },
+			[](int32_t id) { return ItemData::get(id).get_name(); },
+			[](int32_t id) { return std::string(nl::nx::string["Mob.img"][std::to_string(id)]["name"]); },
+			[](int32_t id) { return NxHelper::Map::get_map_info_by_id(id).name; }
+		};
 
-		if (begin != std::string::npos)
-		{
-			size_t end = formatted_text.find("#", begin + 1);
-
-			if (end != std::string::npos)
-			{
-				std::string namestr = nl::nx::string["Npc.img"][std::to_string(npcid)]["name"];
-				formatted_text.replace(begin, end - begin, namestr);
-			}
-		}
-
-		begin = formatted_text.find("#h");
-
-		if (begin != std::string::npos)
-		{
-			size_t end = formatted_text.find("#", begin + 1);
-
-			if (end != std::string::npos)
-			{
-				std::string charstr = Stage::get().get_player().get_name();
-				formatted_text.replace(begin, end - begin + 1, charstr);
-			}
-		}
-
-		begin = formatted_text.find("#t");
-
-		if (begin != std::string::npos)
-		{
-			size_t end = formatted_text.find("#", begin + 1);
-
-			if (end != std::string::npos)
-			{
-				size_t b = begin + 2;
-				int32_t itemid = std::stoi(formatted_text.substr(b, end - b));
-				std::string itemname = nl::nx::string["Consume.img"][itemid]["name"];
-
-				formatted_text.replace(begin, end - begin, itemname);
-			}
-		}
+		formatted_text = NpcTextMarkup::expand(formatted_text, lookups);
 
 		return formatted_text;
 	}
 
-	void UINpcTalk::change_text(int32_t npcid, int8_t msgtype, int16_t style, int8_t speakerbyte, const std::string &tx)
+	void UINpcTalk::change_text(int32_t npcid, int8_t msgtype, int16_t style, int8_t speakerbyte, const std::string &tx,
+								const std::map<int32_t, Texture> &headers)
 	{
+		local_responder = nullptr;
 		message_type = msgtype;
 		type = get_by_value(msgtype);
 		if (msgtype == 4)
@@ -383,16 +392,11 @@ namespace ms
 		if (msgtype == 4)
 		{
 			size_t first_link = formatted_text.find("#L");
-			for (size_t start = first_link; start != std::string::npos;)
+			for (const auto& [id, label] : NpcTextMarkup::choices(formatted_text))
 			{
-				size_t id_end = formatted_text.find('#', start + 2);
-				size_t label_end = formatted_text.find("#l", id_end);
-				if (id_end == std::string::npos || label_end == std::string::npos)
-					break;
-				int32_t id = std::stoi(formatted_text.substr(start + 2, id_end - start - 2));
-				std::string label = formatted_text.substr(id_end + 1, label_end - id_end - 1);
-				choices.emplace_back(id, Text(Text::Font::A12M, Text::Alignment::LEFT, Color::Name::BLUE, label, 320));
-				start = formatted_text.find("#L", label_end + 2);
+				auto header = headers.find(id);
+				choices.push_back({ id, Text(Text::Font::A12M, Text::Alignment::LEFT, Color::Name::BLUE, label, 320),
+					header == headers.end() ? Texture() : header->second });
 			}
 			if (first_link != std::string::npos)
 				formatted_text.erase(first_link);
@@ -402,17 +406,25 @@ namespace ms
 
 		int16_t text_height = text.height();
 		question_height = text_height;
-		text_height += choices.size() * 28 + 32;
+
+		int16_t choice_y = 40 + question_height;
+
+		for (auto &choice : choices)
+		{
+			if (choice.header.is_valid())
+				choice_y += choice.header.height() + 6;
+
+			choice.y = choice_y;
+			choice_y += 28;
+		}
+
+		text_height = choice_y - 8;
 
 		text.change_text("");
 
 		if (speakerbyte == 0)
 		{
-			std::string strid = std::to_string(npcid);
-			strid.insert(0, 7 - strid.size(), '0');
-			strid.append(".img");
-
-			speaker = nl::nx::npc[strid]["stand"]["0"];
+			speaker = NxHelper::Npc::get_npc_node(npcid)["stand"]["0"];
 
 			std::string namestr = nl::nx::string["Npc.img"][std::to_string(npcid)]["name"];
 			name.change_text(namestr);

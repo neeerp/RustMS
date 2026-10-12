@@ -1,6 +1,6 @@
 use integration_harness::packets::build_change_keymap;
 use integration_harness::preconditions::load_harness_config_or_fail;
-use integration_harness::{login_to_world_session, WorldSession};
+use integration_harness::{login_to_world_session, relogin};
 use tokio::time::{sleep, Duration};
 
 /// Default binding the server gives new characters (see game::keymap).
@@ -14,7 +14,11 @@ async fn changed_keys_survive_logout() {
     let mut session = login_to_world_session(&config)
         .await
         .expect("login-to-world session flow failed");
-    assert_eq!(session.keymap[DEFAULT_KEY], (4, 1), "unexpected default binding");
+    assert_eq!(
+        session.keymap[DEFAULT_KEY],
+        (4, 1),
+        "unexpected default binding"
+    );
 
     // Rebind an existing default key (the case the old upsert dropped), bind
     // a previously empty one, and bind a skill whose id needs 32 bits.
@@ -36,17 +40,4 @@ async fn changed_keys_survive_logout() {
     assert_eq!(session.keymap[DEFAULT_KEY], (4, 9));
     assert_eq!(session.keymap[2], (5, 54));
     assert_eq!(session.keymap[3], (1, SKILL_ID));
-}
-
-/// Log back in once the server has finished closing the previous session.
-async fn relogin(config: &integration_harness::HarnessConfig) -> WorldSession {
-    let mut last_error = None;
-    for _ in 0..20 {
-        match login_to_world_session(config).await {
-            Ok(session) => return session,
-            Err(error) => last_error = Some(error),
-        }
-        sleep(Duration::from_millis(250)).await;
-    }
-    panic!("relogin failed: {last_error:?}");
 }

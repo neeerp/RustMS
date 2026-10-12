@@ -31,6 +31,7 @@ namespace ms
 			SCROLL_SUCCESS,
 			SCROLL_FAILURE,
 			MONSTER_CARD,
+			QUEST_CLEAR,
 			LENGTH
 		};
 

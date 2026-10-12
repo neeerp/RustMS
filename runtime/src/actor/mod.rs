@@ -1,7 +1,10 @@
 pub mod client;
 pub mod directory;
 pub mod field;
+pub mod field_drops;
+pub mod field_mobs;
 pub mod login;
+pub mod object_ids;
 pub mod registry;
 
 pub use client::ClientActor;

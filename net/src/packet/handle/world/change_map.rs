@@ -42,10 +42,15 @@ impl WorldHandler for ChangeMapHandler {
                 .ok_or(NetworkError::PacketHandlerError("Source portal not found"))?;
             let destination_map = source_portal
                 .to_map
-                .ok_or(NetworkError::PacketHandlerError("Portal has no destination"))?;
-            let destination_field = game_data
-                .field(destination_map)
-                .ok_or(NetworkError::PacketHandlerError("Destination field not found"))?;
+                .ok_or(NetworkError::PacketHandlerError(
+                    "Portal has no destination",
+                ))?;
+            let destination_field =
+                game_data
+                    .field(destination_map)
+                    .ok_or(NetworkError::PacketHandlerError(
+                        "Destination field not found",
+                    ))?;
             let spawn_portal = destination_field
                 .resolve_spawn_portal(source_portal.to_name.as_str())
                 .ok_or(NetworkError::PacketHandlerError(
@@ -73,6 +78,28 @@ impl WorldHandler for ChangeMapHandler {
             .with(WorldAction::ChangeField { map_id, spawn })
             .with_reply(enable_actions))
     }
+}
+
+/// Send the player to `map_id`'s default spawn point (script warps).
+pub fn warp(
+    player: &mut Player,
+    map_id: i32,
+    channel_id: u8,
+) -> Result<Vec<WorldAction>, NetworkError> {
+    if !crate::game_data::get()?.field_exists(map_id) {
+        return Err(NetworkError::PacketHandlerError("Target field not found"));
+    }
+    player.move_to(map_id, 0);
+    Ok(vec![
+        WorldAction::Reply(build::world::map::build_warp_to_map(
+            &player.stats,
+            channel_id,
+        )?),
+        WorldAction::ChangeField {
+            map_id,
+            spawn: crate::spawn_position(map_id, 0),
+        },
+    ])
 }
 
 /// Where a direct (map id) warp may take the player.
@@ -153,7 +180,10 @@ mod tests {
     #[test]
     fn gms_can_warp_by_map_id() {
         let mut p = player(50, 1);
-        assert_eq!(direct_destination(&mut p, 180000000, |_| None).unwrap(), 180000000);
+        assert_eq!(
+            direct_destination(&mut p, 180000000, |_| None).unwrap(),
+            180000000
+        );
     }
 
     #[test]

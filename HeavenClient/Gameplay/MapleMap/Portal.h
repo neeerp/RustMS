@@ -78,6 +78,9 @@ namespace ms
 
 		void update(Point<int16_t> playerpos);
 
+		// Track contact; true only on the update the player first touches it.
+		bool touch(Point<int16_t> playerpos);
+
 		void draw(Point<int16_t> viewpos, float alpha) const;
 
 		std::string get_name() const;

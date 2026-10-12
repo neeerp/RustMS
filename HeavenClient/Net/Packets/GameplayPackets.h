@@ -37,6 +37,19 @@ namespace ms
 	};
 
 	// Opcode: CHANGE_MAP(38)
+	// Tells the server the player touched a script portal (e.g. a tutorial hint)
+	// Opcode: CHANGE_MAP_SPECIAL(100)
+	class ChangeMapSpecialPacket : public OutPacket
+	{
+	public:
+		ChangeMapSpecialPacket(const std::string &portal) : OutPacket(OutPacket::Opcode::CHANGE_MAP_SPECIAL)
+		{
+			write_byte(0);
+			write_string(portal);
+			write_short(0);
+		}
+	};
+
 	class ChangeMapPacket : public OutPacket
 	{
 	public:

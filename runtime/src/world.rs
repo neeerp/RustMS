@@ -70,8 +70,14 @@ async fn preload_game_data() -> Result<(), RuntimeError> {
     tokio::task::spawn_blocking(|| -> Result<(), String> {
         net::get_game_data().map_err(|e| e.to_string())?;
         net::get_npc_dialogue_data().map_err(|e| e.to_string())?;
-        net::quests::data().map_err(|e| e.to_string())?;
-        net::quests::contact_data().map_err(|e| e.to_string())?;
+        let quests = net::quests::catalog().map_err(|e| e.to_string())?;
+        info!(
+            supported = quests.supported().count(),
+            "Quest catalog loaded"
+        );
+        net::items::data().map_err(|e| format!("item data: {e}"))?;
+        net::mobs::data().map_err(|e| format!("mob data: {e}"))?;
+        info!("Server content: {}", net::content::load()?);
         Ok(())
     })
     .await

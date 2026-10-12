@@ -33,6 +33,14 @@ namespace ms
 		touched = bounds().contains(playerpos);
 	}
 
+	bool Portal::touch(Point<int16_t> playerpos)
+	{
+		bool was_touched = touched;
+		touched = bounds().contains(playerpos);
+
+		return touched && !was_touched;
+	}
+
 	void Portal::draw(Point<int16_t> viewpos, float inter) const
 	{
 		if (!animation || (type == HIDDEN && !touched))

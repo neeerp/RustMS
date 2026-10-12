@@ -1,4 +1,3 @@
-use std::collections::BTreeMap;
 use net::packet::build::world::messaging::{
     WHISPER_RECEIVE_MODE, WHISPER_REQUEST_MODE, WHISPER_RESULT_MODE,
 };
@@ -6,6 +5,7 @@ use net::packet::op::{RecvOpcode, SendOpcode};
 use packet::io::read::PktRead;
 use packet::io::write::PktWrite;
 use packet::Packet;
+use std::collections::BTreeMap;
 use std::io::Cursor;
 use std::net::Ipv4Addr;
 
@@ -72,8 +72,13 @@ pub struct SetFieldPacket {
     pub exp: i32,
     pub ap: i16,
     pub quests: std::collections::BTreeMap<i16, u8>,
+    /// Progress strings (kill counts) of started quests.
+    pub quest_progress: BTreeMap<i16, String>,
     /// Equipped item ids by (positive) equipped slot.
     pub equipped: BTreeMap<i16, i32>,
+    /// How many of each item the bags hold (not counting equipped items).
+    pub items: BTreeMap<i32, i32>,
+    pub meso: i32,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -206,6 +211,20 @@ pub fn opcode_name(opcode: i16) -> &'static str {
         x if x == SendOpcode::ChatText as i16 => "ChatText",
         x if x == SendOpcode::MovePlayer as i16 => "MovePlayer",
         x if x == SendOpcode::KeyMap as i16 => "KeyMap",
+        x if x == SendOpcode::FieldEffect as i16 => "FieldEffect",
+        x if x == SendOpcode::StatChange as i16 => "StatChange",
+        x if x == SendOpcode::ShowStatusInfo as i16 => "ShowStatusInfo",
+        x if x == SendOpcode::UpdateQuestInfo as i16 => "UpdateQuestInfo",
+        x if x == SendOpcode::PlayerHint as i16 => "PlayerHint",
+        x if x == SendOpcode::ShowItemGainInChat as i16 => "ShowItemGainInChat",
+        x if x == SendOpcode::InventoryOperation as i16 => "InventoryOperation",
+        x if x == SendOpcode::UpdateCharLook as i16 => "UpdateCharLook",
+        x if x == SendOpcode::SpawnMonster as i16 => "SpawnMonster",
+        x if x == SendOpcode::SpawnMonsterControl as i16 => "SpawnMonsterControl",
+        x if x == SendOpcode::MoveMonster as i16 => "MoveMonster",
+        x if x == SendOpcode::KillMonster as i16 => "KillMonster",
+        x if x == SendOpcode::DropItemFromMapObject as i16 => "DropItemFromMapObject",
+        x if x == SendOpcode::RemoveItemFromMap as i16 => "RemoveItemFromMap",
         _ => "Unknown",
     }
 }
@@ -601,11 +620,12 @@ pub fn decode_set_field(packet: &Packet) -> Result<SetFieldPacket, String> {
     if cursor.read_byte().map_err(|e| e.to_string())? != 0 {
         cursor.read_str_with_length().map_err(|e| e.to_string())?; // linked name
     }
-    cursor.read_int().map_err(|e| e.to_string())?; // meso
+    let meso = cursor.read_int().map_err(|e| e.to_string())?;
     skip(&mut cursor, 5 + 8)?; // slot limits, timestamp
 
     // Equipped, equipped cash, and equip bag: short slot lists ending in 0.
     let mut equipped = BTreeMap::new();
+    let mut items = BTreeMap::new();
     for list in 0..3 {
         loop {
             let slot = cursor.read_short().map_err(|e| e.to_string())?;
@@ -615,6 +635,8 @@ pub fn decode_set_field(packet: &Packet) -> Result<SetFieldPacket, String> {
             let item_id = decode_item(&mut cursor)?;
             if list == 0 {
                 equipped.insert(slot, item_id);
+            } else if list == 2 {
+                *items.entry(item_id).or_insert(0) += 1;
             }
         }
     }
@@ -622,7 +644,8 @@ pub fn decode_set_field(packet: &Packet) -> Result<SetFieldPacket, String> {
     // Use, setup, etc, and cash bags: byte slot lists ending in 0.
     for _ in 0..4 {
         while cursor.read_byte().map_err(|e| e.to_string())? != 0 {
-            decode_item(&mut cursor)?;
+            let (item_id, quantity) = decode_item_stack(&mut cursor)?;
+            *items.entry(item_id).or_insert(0) += i32::from(quantity);
         }
     }
     let skills = cursor.read_short().map_err(|e| e.to_string())?;
@@ -637,13 +660,17 @@ pub fn decode_set_field(packet: &Packet) -> Result<SetFieldPacket, String> {
     skip(&mut cursor, cooldowns.max(0) as usize * 6)?;
 
     let mut quests = std::collections::BTreeMap::new();
+    let mut quest_progress = BTreeMap::new();
     let started = cursor.read_short().map_err(|e| e.to_string())?;
     if started < 0 {
         return Err("negative quest count".into());
     }
     for _ in 0..started {
         let id = cursor.read_short().map_err(|e| e.to_string())?;
-        cursor.read_str_with_length().map_err(|e| e.to_string())?;
+        quest_progress.insert(
+            id,
+            cursor.read_str_with_length().map_err(|e| e.to_string())?,
+        );
         quests.insert(id, 1);
     }
     let completed = cursor.read_short().map_err(|e| e.to_string())?;
@@ -664,7 +691,10 @@ pub fn decode_set_field(packet: &Packet) -> Result<SetFieldPacket, String> {
         exp: meta.exp,
         ap: meta.ap,
         quests,
+        quest_progress,
         equipped,
+        items,
+        meso,
     })
 }
 
@@ -1012,6 +1042,11 @@ fn decode_look(cursor: &mut Cursor<&[u8]>) -> Result<BTreeMap<u8, i32>, String> 
 
 /// Decode one inventory item (without its slot prefix), returning its id.
 fn decode_item(cursor: &mut Cursor<&[u8]>) -> Result<i32, String> {
+    decode_item_stack(cursor).map(|(item_id, _)| item_id)
+}
+
+/// An item's id and quantity (1 for equipment).
+fn decode_item_stack(cursor: &mut Cursor<&[u8]>) -> Result<(i32, i16), String> {
     let item_type = cursor.read_byte().map_err(|e| e.to_string())?;
     let item_id = cursor.read_int().map_err(|e| e.to_string())?;
     let is_cash = cursor.read_byte().map_err(|e| e.to_string())? != 0;
@@ -1028,16 +1063,17 @@ fn decode_item(cursor: &mut Cursor<&[u8]>) -> Result<i32, String> {
             skip(cursor, 8 + 4)?;
         }
         2 => {
-            skip(cursor, 2)?;
+            let quantity = cursor.read_short().map_err(|e| e.to_string())?;
             cursor.read_str_with_length().map_err(|e| e.to_string())?;
             skip(cursor, 2)?;
             if matches!(item_id / 10_000, 207 | 233) {
                 skip(cursor, 8)?;
             }
+            return Ok((item_id, quantity));
         }
         other => return Err(format!("unsupported item type {other} for item {item_id}")),
     }
-    Ok(item_id)
+    Ok((item_id, 1))
 }
 
 fn skip(cursor: &mut Cursor<&[u8]>, length: usize) -> Result<(), String> {

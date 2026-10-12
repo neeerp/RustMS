@@ -20,12 +20,16 @@ impl LoginHandler for CharacterSelectHandler {
             ));
         }
 
-        let world_id = session.selected_world_id.ok_or(NetworkError::PacketHandlerError(
-            "No world selected for character select",
-        ))? as u8;
-        let channel_id = session.selected_channel_id.ok_or(
-            NetworkError::PacketHandlerError("No channel selected for character select"),
-        )? as u8;
+        let world_id = session
+            .selected_world_id
+            .ok_or(NetworkError::PacketHandlerError(
+                "No world selected for character select",
+            ))? as u8;
+        let channel_id = session
+            .selected_channel_id
+            .ok_or(NetworkError::PacketHandlerError(
+                "No channel selected for character select",
+            ))? as u8;
         let channel = resolve_login_channel(world_id, channel_id)
             .map_err(|_| NetworkError::PacketHandlerError("Selected channel is not configured"))?;
 

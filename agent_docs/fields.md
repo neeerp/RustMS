@@ -19,8 +19,11 @@ Fields are created on demand by `FieldRegistry` and kept alive afterwards.
   position from movement packets.
 - **Static NPCs** from the map data, with object ids starting at
   `1_000_000_000`.
-- **Time**: a 100 ms tick (`on_tick`). Nothing is time-driven yet; mobs,
-  respawns, and drop expiry go here.
+- **Mobs** (`field_mobs::MobSet`): spawn points, live mobs, controllers,
+  and damage; see [Mobs and combat](./combat.md).
+- **Drops** (`field_drops::DropSet`): items and mesos on the ground, with
+  ownership and expiry; see [Mobs and combat](./combat.md).
+- **Time**: a 100 ms tick (`on_tick`) respawns mobs and expires drops.
 
 A field does not own character state (stats, inventory, quests). Those live
 in the client's `Player`.
@@ -33,10 +36,11 @@ in the client's `Player`.
 | --- | --- |
 | `Join { handle, avatar }` | Send map NPCs and existing occupants to the newcomer, announce the newcomer to everyone, then add it |
 | `Leave { client_id }` | Remove the occupant and broadcast `RemovePlayerFromMap` |
-| `UpdateAvatar { client_id, avatar }` | Replace the projection (keeping the live position), e.g. after a level-up |
+| `UpdateAvatar { client_id, avatar, announce }` | Replace the projection (keeping the live position), e.g. after a level-up, and show the others `announce` |
 | `Chat { from, packet }` | Broadcast to everyone, sender included |
 | `Move { from, packet, movement_bytes }` | Update the mover's position from the movement fragment, broadcast to everyone else |
 | `NpcInteraction { from, object_id, request_id }` | Validate the NPC is on this map, then tell the client which NPC id to talk to |
+| `FromClient { from, request }` | A `net::FieldRequest` from a handler: move a mob it controls, apply an attack, or show the others a packet |
 
 All sends to clients use `ClientHandle::send` (`try_send`); a client whose
 queue is full is disconnected rather than allowed to block the field.

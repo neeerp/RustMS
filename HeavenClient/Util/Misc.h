@@ -98,5 +98,12 @@ namespace ms
 			// Returns the name of the node, under which the argument map id is in
 			nl::node get_map_node_name(int32_t mapid);
 		}
+
+		namespace Npc
+		{
+			// The NPC's Npc.nx node, following info/link to the NPC whose
+			// sprites it shares (Todd, 2004, links to 2003).
+			nl::node get_npc_node(int32_t npcid);
+		}
 	}
 }

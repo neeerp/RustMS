@@ -5,13 +5,14 @@
 //! `db` converts rows to and from them and `net` encodes them for the wire.
 
 pub mod character;
+pub mod exp;
 pub mod inventory;
 pub mod keymap;
 pub mod quest;
 pub mod skill;
 
 pub use character::{AvatarLook, CharacterStats, FieldAvatar, Player};
-pub use inventory::{EquipStats, Inventory, InventoryType, Item};
+pub use inventory::{EquipStats, Inventory, InventoryChange, InventoryError, InventoryType, Item};
 pub use keymap::{KeyBinding, Keymap};
-pub use quest::{QuestLog, QuestRecord, QuestStatus};
+pub use quest::{QuestLog, QuestRecord, QuestState, QuestStatus};
 pub use skill::{SkillBook, SkillRecord};

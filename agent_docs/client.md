@@ -57,6 +57,15 @@ files, so mixing in a mismatched v83 file fails later at runtime.
 The mixed UI/Map versions mean the client uses post-v83 art with v83 data, and
 some UI nodes may not exist for v83 features.
 
+## Fonts
+
+`fonts/` is copied next to the executable at build time, and `Settings` names
+the files (`FontPathNormal`, `FontPathBold`, `FontPathBalloon`). The original
+client draws text in Arial, which can't be shipped. Most text uses Roboto
+(Apache 2.0), a deviation from the original look. Chat balloons use Arimo
+(OFL 1.1), which has Arial's metrics, at 12 px with 14 px lines as in the
+original; see `IO/Components/ChatBalloon.h`.
+
 ## What works and what is stubbed
 
 This is client-side capability only. The RustMS server currently implements

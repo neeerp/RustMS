@@ -21,6 +21,8 @@
 
 #include <nlnx/nx.hpp>
 
+#include <algorithm>
+
 namespace ms
 {
 	Char::Char(int32_t o, const CharLook &lk, const std::string &name) : MapObject(o), look(lk), look_preview(lk), namelabel(
@@ -66,6 +68,7 @@ namespace ms
 		// If ever changing code for namelabel confirm placements with map 10000
 		namelabel.draw(absp + Point<int16_t>(0, -4));
 		chatballoon.draw(absp - Point<int16_t>(0, 85));
+		hintballoon.draw(absp - Point<int16_t>(0, 85));
 
 		effects.drawabove(absp, alpha);
 
@@ -89,6 +92,7 @@ namespace ms
 
 		effects.update();
 		chatballoon.update();
+		hintballoon.update();
 		invincible.update();
 		ironbody.update();
 
@@ -183,6 +187,11 @@ namespace ms
 		effects.add(chareffects[toshow]);
 	}
 
+	void Char::show_effect(const Animation &effect)
+	{
+		effects.add(effect);
+	}
+
 	void Char::show_iron_body()
 	{
 		ironbody.set_for(500);
@@ -202,6 +211,12 @@ namespace ms
 	void Char::speak(const std::string &line)
 	{
 		chatballoon.change_text(line);
+	}
+
+	void Char::show_hint(const std::string &text, int16_t width)
+	{
+		hintballoon = ChatBalloon("tutorial", true, static_cast<uint16_t>(std::max<int16_t>(width, 40)));
+		hintballoon.change_text(text);
 	}
 
 	void Char::change_look(MapleStat::Id stat, int32_t id)

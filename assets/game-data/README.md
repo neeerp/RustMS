@@ -11,8 +11,11 @@ redistributed.
 | `Npc.nx` | NPC speech keys | `RUSTMS_NPC_NX_PATH` |
 | `String.nx` | NPC speech text | `RUSTMS_STRING_NX_PATH` |
 | `Quest.nx` | Quest templates | `RUSTMS_QUEST_NX_PATH` |
+| `Item.nx` | Item templates (stack sizes, quest flags, consumable effects) | `RUSTMS_ITEM_NX_PATH` |
+| `Character.nx` | Equipment stats and requirements | `RUSTMS_CHARACTER_NX_PATH` |
+| `Mob.nx` | Mob stats (HP, EXP, attack, touch damage) | `RUSTMS_MOB_NX_PATH` |
 
-All four are the v83 GMS files that HeavenClient also loads (see
+All of these are the v83 GMS files that HeavenClient also loads (see
 `agent_docs/client.md`); the client's `nx/` directory can symlink to these.
 
 `SHA256SUMS` pins the exact files the server and its tests were written

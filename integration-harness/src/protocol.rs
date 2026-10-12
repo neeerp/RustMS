@@ -1,4 +1,3 @@
-use std::net::SocketAddr;
 use crate::assertions::{
     assert_handshake, assert_login_success, assert_opcode, assert_redirect_target,
     assert_server_list_kind,
@@ -16,6 +15,7 @@ use crate::packets::{
 };
 use net::packet::op::SendOpcode;
 use std::net::Ipv4Addr;
+use std::net::SocketAddr;
 use std::time::Duration;
 use tokio::time::timeout;
 
@@ -39,8 +39,13 @@ pub struct WorldSession {
     pub exp: i32,
     pub ap: i16,
     pub quests: std::collections::BTreeMap<i16, u8>,
+    /// Progress strings (kill counts) of started quests.
+    pub quest_progress: std::collections::BTreeMap<i16, String>,
     /// Equipped item ids by equipped slot, from the world-entry SET_FIELD.
     pub equipped: std::collections::BTreeMap<i16, i32>,
+    /// How many of each item the bags hold.
+    pub items: std::collections::BTreeMap<i32, i32>,
+    pub meso: i32,
     /// `(kind, action)` for each of the 90 keys, from the world-entry KEYMAP.
     pub keymap: Vec<(u8, i32)>,
 }
@@ -169,7 +174,10 @@ pub async fn login_to_world_session(config: &HarnessConfig) -> Result<WorldSessi
         exp: world_entry.exp,
         ap: world_entry.ap,
         quests: world_entry.quests,
+        quest_progress: world_entry.quest_progress,
         equipped: world_entry.equipped,
+        items: world_entry.items,
+        meso: world_entry.meso,
         keymap,
         character_name: world_entry.character_name,
         map_id: world_entry.map_id,
@@ -341,11 +349,36 @@ async fn drain_spawn_npcs(connection: &mut MapleTestConnection) {
     )
     .await
     {
-        if envelope.opcode() != SendOpcode::SpawnNpc as i16 {
+        // Map setup: NPC spawns and the map entry banner.
+        // ...and the map's mobs.
+        if ![
+            SendOpcode::SpawnNpc as i16,
+            SendOpcode::FieldEffect as i16,
+            SendOpcode::SpawnMonster as i16,
+            SendOpcode::SpawnMonsterControl as i16,
+            SendOpcode::DropItemFromMapObject as i16,
+        ]
+        .contains(&envelope.opcode())
+        {
             connection.push_back_packet(envelope);
             break;
         }
     }
+}
+
+/// Log in again right after dropping a session. The server closes the old
+/// session asynchronously, so an immediate login may still be refused as a
+/// duplicate (status 7); retry for a few seconds.
+pub async fn relogin(config: &HarnessConfig) -> WorldSession {
+    let mut last_error = None;
+    for _ in 0..20 {
+        match login_to_world_session(config).await {
+            Ok(session) => return session,
+            Err(error) => last_error = Some(error),
+        }
+        tokio::time::sleep(Duration::from_millis(250)).await;
+    }
+    panic!("relogin failed: {last_error:?}");
 }
 
 pub async fn login_two_players_to_world(

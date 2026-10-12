@@ -13,7 +13,7 @@
 //! whose queue is full is kicked instead. That makes wait cycles impossible.
 
 use game::FieldAvatar;
-use net::{BroadcastScope, ClientId, WhisperDelivery};
+use net::{BroadcastScope, ClientId, FieldRequest, WhisperDelivery};
 use packet::Packet;
 use tokio::sync::mpsc;
 use tokio::sync::mpsc::error::TrySendError;
@@ -49,6 +49,23 @@ pub enum ServerMessage {
         npc_id: i32,
         field: FieldKey,
         request_id: u64,
+    },
+    /// A mob this player helped kill; `exp` is their share.
+    MobKilled {
+        mob_id: i32,
+        object_id: i32,
+        exp: i32,
+        x: i16,
+        y: i16,
+    },
+    /// The field gave this player a drop to put in their inventory.
+    PickedUp {
+        drop: crate::actor::field_drops::Drop,
+    },
+    /// Whether a quest NPC is on the player's map and within reach.
+    QuestNpcChecked {
+        request_id: u64,
+        nearby: bool,
     },
     SendPacket(Packet),
 }
@@ -120,6 +137,8 @@ pub enum FieldMessage {
     UpdateAvatar {
         client_id: ClientId,
         avatar: FieldAvatar,
+        /// Sent to everyone else on the map (e.g. UPDATE_CHAR_LOOK).
+        announce: Option<Packet>,
     },
     Chat {
         from: ClientId,
@@ -133,6 +152,30 @@ pub enum FieldMessage {
     NpcInteraction {
         from: ClientId,
         object_id: i32,
+        request_id: u64,
+    },
+    /// A player's request of the field (`net::handler::FieldRequest`).
+    FromClient {
+        from: ClientId,
+        request: FieldRequest,
+    },
+    /// Put a player's loot from a kill on the ground.
+    SpawnLoot {
+        owner: ClientId,
+        loot: Vec<net::loot::Loot>,
+        x: i16,
+        y: i16,
+        dropper: i32,
+    },
+    /// The client couldn't take the drop (full inventory); put it back.
+    ReturnDrop {
+        drop: crate::actor::field_drops::Drop,
+    },
+    /// Check that an NPC with this template id is near the player before a
+    /// quest action; answered with `ServerMessage::QuestNpcChecked`.
+    QuestNpc {
+        from: ClientId,
+        npc_id: i32,
         request_id: u64,
     },
 }

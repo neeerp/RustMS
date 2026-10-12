@@ -11,10 +11,12 @@ impl WorldHandler for NpcTalkHandler {
         let mut reader = Cursor::new(&packet.bytes);
         reader.read_short()?;
         let object_id = reader.read_int()?;
-        Ok(HandlerResult::empty().with(WorldAction::NpcInteraction(NpcInteraction::Start {
-            object_id,
-            request_id: 0,
-        })))
+        Ok(
+            HandlerResult::empty().with(WorldAction::NpcInteraction(NpcInteraction::Start {
+                object_id,
+                request_id: 0,
+            })),
+        )
     }
 }
 
@@ -29,10 +31,12 @@ impl WorldHandler for NpcTalkMoreHandler {
         } else {
             None
         };
-        Ok(HandlerResult::empty().with(WorldAction::NpcInteraction(NpcInteraction::Respond {
-            message_type,
-            response,
-            selection,
-        })))
+        Ok(
+            HandlerResult::empty().with(WorldAction::NpcInteraction(NpcInteraction::Respond {
+                message_type,
+                response,
+                selection,
+            })),
+        )
     }
 }

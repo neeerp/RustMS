@@ -62,6 +62,8 @@ impl fmt::Display for NetworkError {
     }
 }
 
+impl std::error::Error for NetworkError {}
+
 impl From<io::Error> for NetworkError {
     fn from(error: io::Error) -> Self {
         match error {

@@ -21,6 +21,7 @@
 #include "InputFocus.h"
 
 #include "UITypes/UIBuffList.h"
+#include "UITypes/UIQuestHelper.h"
 #include "UITypes/UIChannel.h"
 #include "UITypes/UICharInfo.h"
 #include "UITypes/UIChat.h"
@@ -85,6 +86,7 @@ namespace ms
 		emplace<UIChatBar>();
 		emplace<UIMiniMap>(stats);
 		emplace<UIBuffList>();
+		emplace<UIQuestHelper>(Stage::get().get_player().get_quests(), inventory);
 		emplace<UIShop>(look, inventory);
 
 		VWIDTH = Constants::Constants::get().get_viewwidth();
@@ -446,6 +448,12 @@ namespace ms
 		draggedicon = drgic;
 	}
 
+	void UIStateGame::cancel_drag()
+	{
+		if (draggedicon)
+			remove_icon();
+	}
+
 	void UIStateGame::clear_tooltip(Tooltip::Parent parent)
 	{
 		if (parent == tooltipparent)
@@ -533,6 +541,7 @@ namespace ms
 					UIElement::Type::CHATBAR,
 					UIElement::Type::MINIMAP,
 					UIElement::Type::BUFFLIST,
+					UIElement::Type::QUESTHELPER,
 					UIElement::Type::NPCTALK,
 					UIElement::Type::SHOP
 			};

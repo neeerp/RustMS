@@ -55,7 +55,10 @@ impl HarnessConfig {
     /// Channel `n` listens on the first channel's port plus `n` (see
     /// harnessctl and docker-compose.test.yml).
     pub fn channel_addr(&self, channel_id: u8) -> SocketAddr {
-        SocketAddr::new(self.world_addr.ip(), self.world_addr.port() + u16::from(channel_id))
+        SocketAddr::new(
+            self.world_addr.ip(),
+            self.world_addr.port() + u16::from(channel_id),
+        )
     }
 
     pub fn with_channel(mut self, world_id: u8, channel_id: u8) -> Self {

@@ -1,10 +1,34 @@
 use std::collections::BTreeMap;
 use std::time::SystemTime;
 
+/// A quest's state as the client and the quest data number it.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum QuestState {
+    NotStarted = 0,
+    Started = 1,
+    Completed = 2,
+}
+
+impl QuestState {
+    pub fn from_number(number: i32) -> Option<Self> {
+        match number {
+            0 => Some(Self::NotStarted),
+            1 => Some(Self::Started),
+            2 => Some(Self::Completed),
+            _ => None,
+        }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum QuestStatus {
-    Started,
-    Completed { at: SystemTime },
+    /// Kill counts of the quest's required mobs, in `Check/1/mob` order.
+    Started {
+        kills: Vec<u16>,
+    },
+    Completed {
+        at: SystemTime,
+    },
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -30,16 +54,118 @@ impl QuestLog {
         self.records.insert(record.quest_id, record);
     }
 
+    /// Forget a quest, e.g. after it was forfeited.
+    pub fn remove(&mut self, quest_id: i16) {
+        self.records.remove(&quest_id);
+    }
+
+    /// Kill counts for a started quest's required mobs.
+    pub fn kills(&self, quest_id: i16) -> &[u16] {
+        match self.status(quest_id) {
+            Some(QuestStatus::Started { kills }) => kills,
+            _ => &[],
+        }
+    }
+
+    /// The kill counts of a started quest, to count kills into.
+    pub fn kills_mut(&mut self, quest_id: i16) -> Option<&mut Vec<u16>> {
+        match &mut self.records.get_mut(&quest_id)?.status {
+            QuestStatus::Started { kills } => Some(kills),
+            QuestStatus::Completed { .. } => None,
+        }
+    }
+
+    /// A started or completed quest's status; `None` if not started.
+    pub fn status(&self, quest_id: i16) -> Option<&QuestStatus> {
+        self.records.get(&quest_id).map(|r| &r.status)
+    }
+
+    pub fn state(&self, quest_id: i16) -> QuestState {
+        match self.status(quest_id) {
+            None => QuestState::NotStarted,
+            Some(QuestStatus::Started { .. }) => QuestState::Started,
+            Some(QuestStatus::Completed { .. }) => QuestState::Completed,
+        }
+    }
+
     pub fn started(&self) -> impl Iterator<Item = &QuestRecord> {
         self.records
             .values()
-            .filter(|r| r.status == QuestStatus::Started)
+            .filter(|r| matches!(r.status, QuestStatus::Started { .. }))
     }
 
     pub fn completed(&self) -> impl Iterator<Item = (i16, SystemTime)> + '_ {
         self.records.values().filter_map(|r| match r.status {
             QuestStatus::Completed { at } => Some((r.quest_id, at)),
-            QuestStatus::Started => None,
+            QuestStatus::Started { .. } => None,
         })
+    }
+}
+
+/// Kill counts as the v83 progress string ("003012" for 3 and 12).
+pub fn encode_kills(kills: &[u16]) -> String {
+    kills
+        .iter()
+        .map(|count| format!("{:03}", count.min(&999)))
+        .collect()
+}
+
+/// The kill counts in a progress string (malformed parts count as 0).
+pub fn decode_kills(progress: &str) -> Vec<u16> {
+    progress
+        .as_bytes()
+        .chunks(3)
+        .map(|chunk| {
+            std::str::from_utf8(chunk)
+                .ok()
+                .and_then(|s| s.parse().ok())
+                .unwrap_or(0)
+        })
+        .collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn state_tracks_start_completion_and_removal() {
+        let mut log = QuestLog::default();
+        assert_eq!(log.state(1031), QuestState::NotStarted);
+        log.upsert(QuestRecord {
+            quest_id: 1031,
+            status: QuestStatus::Started { kills: Vec::new() },
+        });
+        assert_eq!(log.state(1031), QuestState::Started);
+        let at = SystemTime::UNIX_EPOCH;
+        log.upsert(QuestRecord {
+            quest_id: 1031,
+            status: QuestStatus::Completed { at },
+        });
+        assert_eq!(log.state(1031), QuestState::Completed);
+        log.remove(1031);
+        assert_eq!(log.state(1031), QuestState::NotStarted);
+    }
+
+    #[test]
+    fn kill_counts_round_trip_and_end_with_the_quest() {
+        assert_eq!(encode_kills(&[3, 12]), "003012");
+        assert_eq!(decode_kills("003012"), [3, 12]);
+        assert_eq!(decode_kills(""), Vec::<u16>::new());
+        let mut log = QuestLog::default();
+        log.upsert(QuestRecord {
+            quest_id: 1037,
+            status: QuestStatus::Started { kills: vec![0] },
+        });
+        log.kills_mut(1037).unwrap()[0] = 4;
+        assert_eq!(encode_kills(log.kills(1037)), "004");
+        log.upsert(QuestRecord {
+            quest_id: 1037,
+            status: QuestStatus::Completed {
+                at: SystemTime::UNIX_EPOCH,
+            },
+        });
+        assert_eq!(log.kills(1037), []);
+        assert_eq!(log.kills_mut(1037), None);
     }
 }

@@ -18,7 +18,11 @@ pub enum SlotPrefix {
 }
 
 /// Write one item (`addItemInfo` in HeavenMS).
-pub fn encode_item(packet: &mut Packet, prefix: SlotPrefix, item: &Item) -> Result<(), NetworkError> {
+pub fn encode_item(
+    packet: &mut Packet,
+    prefix: SlotPrefix,
+    item: &Item,
+) -> Result<(), NetworkError> {
     match prefix {
         SlotPrefix::None => {}
         SlotPrefix::Bag(slot) => {
@@ -26,7 +30,11 @@ pub fn encode_item(packet: &mut Packet, prefix: SlotPrefix, item: &Item) -> Resu
         }
         SlotPrefix::Equip(slot) => {
             let position = slot.abs();
-            packet.write_short(if position > 100 { position - 100 } else { position })?;
+            packet.write_short(if position > 100 {
+                position - 100
+            } else {
+                position
+            })?;
         }
     }
 
@@ -57,8 +65,21 @@ pub fn encode_item(packet: &mut Packet, prefix: SlotPrefix, item: &Item) -> Resu
     packet.write_byte(equip.upgrade_slots)?;
     packet.write_byte(equip.level)?;
     for stat in [
-        equip.str, equip.dex, equip.int, equip.luk, equip.hp, equip.mp, equip.watk, equip.matk,
-        equip.wdef, equip.mdef, equip.acc, equip.avoid, equip.hands, equip.speed, equip.jump,
+        equip.str,
+        equip.dex,
+        equip.int,
+        equip.luk,
+        equip.hp,
+        equip.mp,
+        equip.watk,
+        equip.matk,
+        equip.wdef,
+        equip.mdef,
+        equip.acc,
+        equip.avoid,
+        equip.hands,
+        equip.speed,
+        equip.jump,
     ] {
         packet.write_short(stat)?;
     }
@@ -131,7 +152,12 @@ mod tests {
         encode_item(&mut packet, SlotPrefix::Bag(3), &Item::stack(2000000, 12)).unwrap();
 
         let mut expect = Expect::new(&packet.bytes);
-        expect.byte(3).byte(2).int(2000000).byte(0).long(DEFAULT_TIME);
+        expect
+            .byte(3)
+            .byte(2)
+            .int(2000000)
+            .byte(0)
+            .long(DEFAULT_TIME);
         expect.short(12).string("").short(0);
         expect.end();
     }
@@ -152,11 +178,24 @@ mod tests {
         .unwrap();
 
         let mut expect = Expect::new(&packet.bytes);
-        expect.short(11).byte(1).int(1302000).byte(0).long(DEFAULT_TIME);
+        expect
+            .short(11)
+            .byte(1)
+            .int(1302000)
+            .byte(0)
+            .long(DEFAULT_TIME);
         expect.byte(7).byte(0);
         expect.short(0).short(0).short(0).short(0).short(0).short(0);
         expect.short(17);
-        expect.short(0).short(0).short(0).short(0).short(0).short(0).short(0).short(0);
+        expect
+            .short(0)
+            .short(0)
+            .short(0)
+            .short(0)
+            .short(0)
+            .short(0)
+            .short(0)
+            .short(0);
         expect.string("").short(0);
         expect.byte(0).byte(0).int(0).int(0).long(0);
         expect.long(ZERO_TIME).int(-1);
@@ -169,7 +208,13 @@ mod tests {
         encode_inventory(&mut packet, &Inventory::default()).unwrap();
 
         let mut expect = Expect::new(&packet.bytes);
-        expect.byte(24).byte(24).byte(24).byte(24).byte(96).long(ZERO_TIME);
+        expect
+            .byte(24)
+            .byte(24)
+            .byte(24)
+            .byte(24)
+            .byte(96)
+            .long(ZERO_TIME);
         expect.short(0).short(0).int(0);
         expect.byte(0).byte(0).byte(0).byte(0);
         expect.end();

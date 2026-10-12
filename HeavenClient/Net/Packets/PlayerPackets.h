@@ -31,6 +31,20 @@ namespace ms
 {
 	// Requests a stat increase by spending AP
 	// Opcode: SPEND_AP(87)
+	// Reports natural HP/MP recovery; the server checks the amount and timing
+	// Opcode: HEAL_OVER_TIME(89)
+	class HealOverTimePacket : public OutPacket
+	{
+	public:
+		HealOverTimePacket(int16_t hp, int16_t mp) : OutPacket(OutPacket::Opcode::HEAL_OVER_TIME)
+		{
+			write_time();
+			write_int(0);
+			write_short(hp);
+			write_short(mp);
+		}
+	};
+
 	class SpendApPacket : public OutPacket
 	{
 	public:

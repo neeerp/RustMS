@@ -28,6 +28,9 @@
 #include "../Graphics/Text.h"
 #include "../Components/Slider.h"
 
+#include <functional>
+#include <map>
+
 namespace ms
 {
 	class UINpcTalk : public UIElement
@@ -61,17 +64,33 @@ namespace ms
 
 		Cursor::State send_cursor(bool clicked, Point<int16_t> cursorpos) override;
 
+		void send_scroll(double yoffset) override;
+
 		void send_key(int32_t keycode, bool pressed, bool escape) override;
 
 		UIElement::Type get_type() const override;
 
-		void change_text(int32_t npcid, int8_t msgtype, int16_t style, int8_t speaker, const std::string &text);
+		// `headers` puts an image (e.g. a quest list category) above menu choices.
+		void change_text(int32_t npcid, int8_t msgtype, int16_t style, int8_t speaker, const std::string &text,
+						 const std::map<int32_t, Texture> &headers = {});
+
+		// Answer this dialogue in the client instead of sending NPC_TALK_MORE.
+		// The responder gets 1/0/-1 (next or yes / previous or no / close) and,
+		// for menus, the chosen #L id. change_text clears it.
+		void set_local_responder(std::function<void(int8_t, int32_t)> responder);
 
 	protected:
 		Button::State button_pressed(uint16_t buttonid) override;
 
 	private:
 		TalkType get_by_value(int8_t value);
+
+		// The text area's rows, relative to the window.
+		Range<int16_t> visible_rows() const;
+
+		// Send a response to the server, or to the local responder if set.
+		void respond(int8_t response, int32_t selection = -1);
+
 
 		std::string format_text(const std::string &tx, const int32_t &npcid);
 
@@ -116,7 +135,16 @@ namespace ms
 		Slider slider;
 		TalkType type;
 		int8_t message_type;
-		std::vector<std::pair<int32_t, Text>> choices;
+		struct Choice
+		{
+			int32_t id;
+			Text label;
+			Texture header;
+			int16_t y = 0;
+		};
+
+		std::vector<Choice> choices;
+		std::function<void(int8_t, int32_t)> local_responder;
 		int16_t question_height;
 		std::string formatted_text;
 		size_t formatted_text_pos;

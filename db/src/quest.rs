@@ -1,8 +1,11 @@
 use crate::{
     character::Character,
+    player::write_player,
     schema::{character_quests, characters},
 };
 use diesel::prelude::*;
+use game::quest::encode_kills;
+use game::{Player, QuestState};
 use std::time::SystemTime;
 
 #[derive(Clone, Debug, Queryable, Identifiable)]
@@ -12,6 +15,8 @@ pub struct QuestProgress {
     pub quest_id: i16,
     pub status: i16,
     pub completed_at: Option<SystemTime>,
+    /// Mob kill counts, three digits per required mob (v83 format).
+    pub progress: String,
 }
 
 pub fn get_quests(cid: i32) -> crate::Result<Vec<QuestProgress>> {
@@ -21,90 +26,101 @@ pub fn get_quests(cid: i32) -> crate::Result<Vec<QuestProgress>> {
         .load(&mut crate::connection()?)?)
 }
 
-/// Serialize quest transitions and rewards with the character row. Completion
-/// and EXP are committed together, so retries cannot award the reward twice.
-pub fn transition(
-    cid: i32,
+fn rejected() -> diesel::result::Error {
+    diesel::result::Error::NotFound
+}
+
+/// Start a quest and save `player` (already updated with whatever starting
+/// it changed, e.g. a given item, and holding the started quest) in one
+/// transaction. `prerequisites` are
+/// `(quest id, required state)` pairs, rechecked under the character lock; a
+/// quest can only be started once.
+pub fn start(
+    player: &Player,
     qid: i16,
-    job: i16,
-    prerequisite: Option<i16>,
-    max_start_level: Option<i16>,
-    reward: Option<i32>,
-) -> crate::Result<(Character, QuestProgress)> {
+    prerequisites: &[(i16, QuestState)],
+) -> crate::Result<QuestProgress> {
+    let cid = player.id();
     let mut conn = crate::connection()?;
     conn.transaction(|conn| -> diesel::QueryResult<_> {
-        let mut character: Character = characters::table.find(cid).for_update().first(conn)?;
-        if character.job != job {
-            return Err(diesel::result::Error::NotFound);
-        }
-        if reward.is_none() && max_start_level.is_some_and(|max| character.level > max) {
-            return Err(diesel::result::Error::NotFound);
-        }
-        if let Some(required) = prerequisite {
-            let completed = character_quests::table
+        // Serialize every quest change for a character on its row.
+        characters::table
+            .find(cid)
+            .for_update()
+            .first::<Character>(conn)?;
+        for &(required, state) in prerequisites {
+            let current = character_quests::table
                 .find((cid, required))
-                .filter(character_quests::status.eq(2))
-                .first::<QuestProgress>(conn)
-                .optional()?;
-            if completed.is_none() {
-                return Err(diesel::result::Error::NotFound);
+                .select(character_quests::status)
+                .first::<i16>(conn)
+                .optional()?
+                .unwrap_or(0);
+            if current != state as i16 {
+                return Err(rejected());
             }
         }
+        if character_quests::table
+            .find((cid, qid))
+            .first::<QuestProgress>(conn)
+            .optional()?
+            .is_some()
+        {
+            return Err(rejected());
+        }
+        let progress = diesel::insert_into(character_quests::table)
+            .values((
+                character_quests::character_id.eq(cid),
+                character_quests::quest_id.eq(qid),
+                character_quests::status.eq(1),
+                character_quests::progress.eq(encode_kills(player.quests.kills(qid))),
+            ))
+            .get_result(conn)?;
+        write_player(conn, player)?;
+        Ok(progress)
+    })
+    .map_err(Into::into)
+}
+
+/// Complete a started quest and save `player` (already holding its rewards)
+/// in one transaction, so a replayed completion can never pay twice.
+pub fn complete(player: &Player, qid: i16) -> crate::Result<QuestProgress> {
+    let cid = player.id();
+    let mut conn = crate::connection()?;
+    conn.transaction(|conn| -> diesel::QueryResult<_> {
+        characters::table
+            .find(cid)
+            .for_update()
+            .first::<Character>(conn)?;
         let current = character_quests::table
             .find((cid, qid))
             .first::<QuestProgress>(conn)
             .optional()?;
-        if let Some(gain) = reward {
-            if current.as_ref().map(|p| p.status) != Some(1) || gain < 0 {
-                return Err(diesel::result::Error::NotFound);
-            }
-            character.exp = character
-                .exp
-                .checked_add(gain)
-                .ok_or(diesel::result::Error::RollbackTransaction)?;
-            // The beginner levels reached by Rain's 62 EXP, using the client table.
-            const EXP: [i32; 10] = [0, 15, 34, 57, 92, 135, 372, 560, 840, 1242];
-            while character.level > 0
-                && character.level < 10
-                && character.exp >= EXP[character.level as usize]
-            {
-                character.exp -= EXP[character.level as usize];
-                character.level += 1;
-                character.ap = character
-                    .ap
-                    .checked_add(5)
-                    .ok_or(diesel::result::Error::RollbackTransaction)?;
-            }
-            diesel::update(characters::table.find(cid))
-                .set((
-                    characters::exp.eq(character.exp),
-                    characters::level.eq(character.level),
-                    characters::ap.eq(character.ap),
-                ))
-                .execute(conn)?;
-            let progress = diesel::update(character_quests::table.find((cid, qid)))
-                .set((
-                    character_quests::status.eq(2),
-                    character_quests::completed_at.eq(Some(SystemTime::now())),
-                ))
-                .get_result(conn)?;
-            Ok((character, progress))
-        } else {
-            if let Some(progress) = current {
-                if progress.status != 1 {
-                    return Err(diesel::result::Error::NotFound);
-                }
-                return Ok((character, progress));
-            }
-            let progress = diesel::insert_into(character_quests::table)
-                .values((
-                    character_quests::character_id.eq(cid),
-                    character_quests::quest_id.eq(qid),
-                    character_quests::status.eq(1),
-                ))
-                .get_result(conn)?;
-            Ok((character, progress))
+        if current.map(|p| p.status) != Some(1) {
+            return Err(rejected());
         }
+        let progress = diesel::update(character_quests::table.find((cid, qid)))
+            .set((
+                character_quests::status.eq(2),
+                character_quests::completed_at.eq(Some(SystemTime::now())),
+            ))
+            .get_result(conn)?;
+        write_player(conn, player)?;
+        Ok(progress)
     })
     .map_err(Into::into)
+}
+
+/// Give up a started quest. Completed quests cannot be forfeited.
+pub fn forfeit(cid: i32, qid: i16) -> crate::Result<()> {
+    let mut conn = crate::connection()?;
+    let deleted = diesel::delete(
+        character_quests::table
+            .find((cid, qid))
+            .filter(character_quests::status.eq(1)),
+    )
+    .execute(&mut conn)?;
+    if deleted == 0 {
+        return Err(rejected().into());
+    }
+    Ok(())
 }

@@ -17,7 +17,9 @@ impl LoginHandler for DeleteCharHandler {
 
         // Deletion is scoped to the session's account.
         match character::delete_character(character_id, ctx.session()?.account_id)? {
-            0 => Err(NetworkError::PacketHandlerError("Could not delete character")),
+            0 => Err(NetworkError::PacketHandlerError(
+                "Could not delete character",
+            )),
             _ => Ok(HandlerResult::reply(login::char::build_char_delete(
                 character_id,
                 0x00,

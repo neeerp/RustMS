@@ -1,6 +1,10 @@
+mod combat;
 mod dialogue;
+mod loot;
+mod npc_script;
+mod quest;
+mod script;
 
-use self::dialogue::ActiveConversation;
 use crate::actor::registry::FieldRegistry;
 use crate::db::spawn_db;
 use crate::error::RuntimeError;
@@ -10,12 +14,14 @@ use crate::message::{
     CLIENT_QUEUE_CAPACITY,
 };
 use game::Player;
-use net::dialogue::NpcInteraction;
+use net::dialogue::{Conversation, NpcInteraction};
 use net::login_world::resolve_login_channel;
 use net::packet::build;
+use net::quests::QuestRequest;
 use net::{ClientId, SpawnPosition, WorldAction, WorldContext, WorldRoute};
 use packet::Packet;
 use rand::{thread_rng, Rng};
+use std::collections::HashSet;
 use std::net::IpAddr;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
@@ -65,7 +71,15 @@ pub struct ClientActor {
     services: WorldServices,
     session_id: Option<i32>,
     game: Option<InGame>,
-    conversation: Option<ActiveConversation>,
+    conversation: Option<Conversation>,
+    /// A native NPC or quest script conversation.
+    script: Option<npc_script::ActiveScript>,
+    /// When natural recovery was last accepted.
+    last_heal: Option<tokio::time::Instant>,
+    /// A quest action waiting for its field to confirm the NPC is near.
+    pending_quest: Option<(u64, QuestRequest)>,
+    /// Portal scripts that already ran and won't run again this session.
+    blocked_scripts: HashSet<String>,
     npc_request_id: u64,
     changing_channel: bool,
 }
@@ -106,6 +120,10 @@ impl ClientActor {
             session_id: None,
             game: None,
             conversation: None,
+            script: None,
+            last_heal: None,
+            pending_quest: None,
+            blocked_scripts: HashSet::new(),
             npc_request_id: 0,
             changing_channel: false,
         })
@@ -219,6 +237,7 @@ impl ClientActor {
             }
             WorldAction::NpcInteraction(NpcInteraction::Start { object_id, .. }) => {
                 self.conversation = None;
+                self.script = None;
                 self.npc_request_id = self.npc_request_id.wrapping_add(1);
                 self.send_to_field(FieldMessage::NpcInteraction {
                     from: self.client_id,
@@ -232,8 +251,32 @@ impl ClientActor {
                 response,
                 selection,
             }) => {
-                self.respond_to_npc(message_type, response, selection)
+                if !self
+                    .respond_to_script(message_type, response, selection)
                     .await?
+                {
+                    self.respond_to_npc(message_type, response).await?
+                }
+            }
+            WorldAction::NaturalHeal { hp, mp } => self.natural_heal(hp, mp).await?,
+            WorldAction::Field(request) => {
+                self.send_to_field(FieldMessage::FromClient {
+                    from: self.client_id,
+                    request,
+                })
+                .await?
+            }
+            WorldAction::Died => self.died().await?,
+            WorldAction::Quest(request) => self.request_quest_action(request).await?,
+            WorldAction::ScriptPortal { portal } => self.touch_script_portal(&portal).await?,
+            WorldAction::LookChanged(announce) => {
+                let avatar = self.in_game()?.player.field_avatar(0, 0, 0);
+                self.send_to_field(FieldMessage::UpdateAvatar {
+                    client_id: self.client_id,
+                    avatar,
+                    announce: Some(announce),
+                })
+                .await?
             }
             WorldAction::Whisper(delivery) => {
                 self.send_to_directory(DirectoryMessage::Whisper {
@@ -257,18 +300,20 @@ impl ClientActor {
         }
 
         let (channel, ip) = (i16::from(self.channel_id), self.peer_ip.into());
-        let session = match spawn_db(move || {
-            db::session::claim_world_transition(character_id, channel, ip)
-        })
-        .await
-        {
-            Ok(session) => session,
-            Err(RuntimeError::Database(db::Error::NotFound)) => {
-                warn!(character_id, "World entry without a valid transition ticket");
-                return Err(RuntimeError::NotLoggedIn);
-            }
-            Err(error) => return Err(error),
-        };
+        let session =
+            match spawn_db(move || db::session::claim_world_transition(character_id, channel, ip))
+                .await
+            {
+                Ok(session) => session,
+                Err(RuntimeError::Database(db::Error::NotFound)) => {
+                    warn!(
+                        character_id,
+                        "World entry without a valid transition ticket"
+                    );
+                    return Err(RuntimeError::NotLoggedIn);
+                }
+                Err(error) => return Err(error),
+            };
         self.session_id = Some(session.id);
 
         let player = spawn_db(move || db::player::load_player(character_id)).await?;
@@ -297,7 +342,11 @@ impl ClientActor {
         let field = self.services.fields.field(key);
         self.game = Some(InGame { player, field });
         self.join_current_field(spawn).await?;
-        info!(character_id, channel_id = self.channel_id, "Entered the game");
+        info!(
+            character_id,
+            channel_id = self.channel_id,
+            "Entered the game"
+        );
         Ok(())
     }
 
@@ -308,6 +357,8 @@ impl ClientActor {
         spawn: Option<SpawnPosition>,
     ) -> Result<(), RuntimeError> {
         self.conversation = None;
+        self.script = None;
+        self.pending_quest = None;
         self.npc_request_id = self.npc_request_id.wrapping_add(1);
 
         self.send_to_field(FieldMessage::Leave {
@@ -328,7 +379,9 @@ impl ClientActor {
         let handle = self.handle();
         let game = self.in_game()?;
         let avatar = game.player.field_avatar(spawn.x, spawn.y, spawn.stance);
-        self.send_to_field(FieldMessage::Join { handle, avatar }).await
+        self.send_to_field(FieldMessage::Join { handle, avatar })
+            .await?;
+        self.run_map_enter_script().await
     }
 
     /// Hand the session to another channel: persist, reissue the ticket, and
@@ -361,6 +414,21 @@ impl ClientActor {
                     self.start_npc_conversation(npc_id, field).await?;
                 }
             }
+            ServerMessage::QuestNpcChecked { request_id, nearby } => {
+                self.quest_npc_checked(request_id, nearby).await?
+            }
+            ServerMessage::MobKilled {
+                mob_id,
+                object_id,
+                exp,
+                x,
+                y,
+            } => {
+                self.mob_killed(mob_id, exp).await?;
+                self.count_quest_kill(mob_id).await?;
+                self.drop_loot(mob_id, object_id, x, y).await?
+            }
+            ServerMessage::PickedUp { drop } => self.picked_up(drop).await?,
             ServerMessage::SendPacket(mut packet) => self.send(&mut packet).await?,
         }
         Ok(())
@@ -385,9 +453,20 @@ impl ClientActor {
                     handle: self.handle(),
                     avatar,
                 };
-                field.tx.send(rejoin).await.map_err(|_| RuntimeError::ChannelSend)?;
-                if !matches!(message, FieldMessage::Join { .. } | FieldMessage::Leave { .. }) {
-                    field.tx.send(message).await.map_err(|_| RuntimeError::ChannelSend)?;
+                field
+                    .tx
+                    .send(rejoin)
+                    .await
+                    .map_err(|_| RuntimeError::ChannelSend)?;
+                if !matches!(
+                    message,
+                    FieldMessage::Join { .. } | FieldMessage::Leave { .. }
+                ) {
+                    field
+                        .tx
+                        .send(message)
+                        .await
+                        .map_err(|_| RuntimeError::ChannelSend)?;
                 }
                 Ok(())
             }
@@ -473,7 +552,9 @@ mod tests {
     #[tokio::test]
     async fn kicking_a_client_blocked_on_a_full_socket_ends_the_actor() {
         let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
-        let peer = TcpStream::connect(listener.local_addr().unwrap()).await.unwrap();
+        let peer = TcpStream::connect(listener.local_addr().unwrap())
+            .await
+            .unwrap();
         let (stream, addr) = listener.accept().await.unwrap();
 
         let (directory, _directory_rx) = mpsc::channel(16);
@@ -481,7 +562,9 @@ mod tests {
             directory,
             fields: FieldRegistry::new(Duration::from_millis(100)),
         };
-        let actor = ClientActor::new(stream, addr.ip(), 0, services).await.unwrap();
+        let actor = ClientActor::new(stream, addr.ip(), 0, services)
+            .await
+            .unwrap();
         let handle = actor.handle();
         let running = tokio::spawn(actor.run());
 

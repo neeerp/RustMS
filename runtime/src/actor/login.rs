@@ -109,7 +109,8 @@ impl LoginClientActor {
             }
             LoginAction::SetSessionState(state) => {
                 let id = self.session_id()?;
-                self.session = Some(spawn_db(move || db::session::set_session_state(id, state)).await?);
+                self.session =
+                    Some(spawn_db(move || db::session::set_session_state(id, state)).await?);
             }
             LoginAction::SelectChannel {
                 world_id,
@@ -132,8 +133,7 @@ impl LoginClientActor {
                 // Fails unless the character belongs to the session's account,
                 // so the redirect queued after this action is never sent.
                 self.session = Some(
-                    spawn_db(move || db::session::begin_world_transition(id, character_id))
-                        .await?,
+                    spawn_db(move || db::session::begin_world_transition(id, character_id)).await?,
                 );
                 info!(character_id, "World transition ticket issued");
             }
@@ -154,7 +154,8 @@ impl LoginClientActor {
     async fn cleanup(&mut self) {
         if let Some(session) = self.session.take() {
             if session.state != SessionState::Transition {
-                if let Err(error) = spawn_db(move || db::session::delete_session(session.id)).await {
+                if let Err(error) = spawn_db(move || db::session::delete_session(session.id)).await
+                {
                     error!(%error, "Failed to close login session");
                 }
             }

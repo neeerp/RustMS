@@ -16,15 +16,24 @@
 //	along with this program.  If not, see <https://www.gnu.org/licenses/>.		//
 //////////////////////////////////////////////////////////////////////////////////
 #include "QuestLog.h"
-#include <nlnx/nx.hpp>
-#include <nlnx/node.hpp>
+#include "QuestCatalog.h"
+#include <algorithm>
 
 namespace ms
 {
 	void QuestLog::add_started(int16_t qid, const std::string &qdata)
 	{
+		bool fresh = started.count(qid) == 0;
 		started[qid] = qdata;
 		++marker_revision;
+
+		if (fresh && std::find(dismissed.begin(), dismissed.end(), qid) == dismissed.end())
+		{
+			const QuestInfo* quest = QuestCatalog::get().find(qid);
+
+			if (quest && (!quest->end_mobs.empty() || !quest->end_items.empty()))
+				track(qid);
+		}
 	}
 
 	void QuestLog::add_in_progress(int16_t qid, int16_t qidl, const std::string &qdata)
@@ -38,10 +47,56 @@ namespace ms
 		started.erase(qid);
 		in_progress.erase(qid);
 		completed[qid] = time;
+		tracking.erase(std::remove(tracking.begin(), tracking.end(), qid), tracking.end());
 		++marker_revision;
 	}
 
-	void QuestLog::clear() { started.clear(); in_progress.clear(); completed.clear(); ++marker_revision; }
+	void QuestLog::remove(int16_t qid)
+	{
+		started.erase(qid);
+		in_progress.erase(qid);
+		completed.erase(qid);
+		tracking.erase(std::remove(tracking.begin(), tracking.end(), qid), tracking.end());
+		++marker_revision;
+	}
+
+	const std::vector<int16_t>& QuestLog::tracked() const { return tracking; }
+
+	bool QuestLog::is_tracked(int16_t id) const
+	{
+		return std::find(tracking.begin(), tracking.end(), id) != tracking.end();
+	}
+
+	bool QuestLog::track(int16_t id)
+	{
+		if (is_tracked(id))
+			return true;
+
+		if (tracking.size() >= MAX_TRACKED || started.count(id) == 0)
+			return false;
+
+		tracking.push_back(id);
+		dismissed.erase(std::remove(dismissed.begin(), dismissed.end(), id), dismissed.end());
+		++marker_revision;
+		return true;
+	}
+
+	void QuestLog::untrack(int16_t id)
+	{
+		if (!is_tracked(id))
+			return;
+
+		tracking.erase(std::remove(tracking.begin(), tracking.end(), id), tracking.end());
+		dismissed.push_back(id);
+		++marker_revision;
+	}
+
+	void QuestLog::clear()
+	{
+		started.clear(); in_progress.clear(); completed.clear();
+		tracking.clear(); dismissed.clear();
+		++marker_revision;
+	}
 	bool QuestLog::is_completed(int16_t id) const { return completed.count(id) != 0; }
 	const std::map<int16_t, std::string>& QuestLog::started_quests() const { return started; }
 	const std::map<int16_t, int64_t>& QuestLog::completed_quests() const { return completed; }
@@ -52,47 +107,21 @@ namespace ms
 	std::vector<int16_t> QuestLog::available_quests(int16_t job, int16_t level, bool all_levels) const
 	{
 		std::vector<int16_t> result;
-		for (const auto& rule : supported_rules())
-			if (quest_available(rule, job, level, [&](int16_t id) { return state(id); }, all_levels))
-				result.push_back(rule.quest_id);
+		for (const auto& quest : QuestCatalog::get().quests())
+			if (quest_available(quest, job, level, [&](int16_t id) { return state(id); }, all_levels))
+				result.push_back(quest.id);
 		return result;
 	}
 
-	const std::vector<QuestMarkerRule>& QuestLog::supported_rules()
+	QuestMarker QuestLog::npc_marker(int32_t npc_id, int16_t job, int16_t level,
+		const std::function<int32_t(int32_t)>& count) const
 	{
-		static const auto rules = []()
-		{
-			std::vector<QuestMarkerRule> result;
-			// Only advertise the quest chain implemented by the server. The NX
-			// files also contain many quests whose objectives are not supported.
-			for (int16_t id : {1009, 1010, 1011, 1012, 1013, 1014, 1015, 1031, 1032, 1033})
+		return select_quest_marker(npc_id, job, QuestCatalog::get().quests(), [&](int16_t id) { return state(id); }, level, count,
+			[&](int16_t id)
 			{
-				auto check = nl::nx::quest["Check.img"][std::to_string(id)];
-				auto start = check["0"];
-				auto finish = check["1"];
-				if (start["npc"].data_type() != nl::node::type::integer ||
-					finish["npc"].data_type() != nl::node::type::integer) continue;
-				QuestMarkerRule rule { id, static_cast<int32_t>(start["npc"].get_integer()),
-					static_cast<int32_t>(finish["npc"].get_integer()), {}, {}, true };
-				for (auto allowed_job : start["job"]) rule.jobs.push_back(allowed_job.get_integer());
-				if (start["lvmax"].data_type() == nl::node::type::integer)
-					rule.max_start_level = start["lvmax"].get_integer();
-				for (auto prerequisite : start["quest"])
-					rule.prerequisites.emplace_back(prerequisite["id"].get_integer(), prerequisite["state"].get_integer());
-				// These quizzes complete through dialogue. A quest with external
-				// objectives remains open-book until objective tracking exists.
-				for (auto requirement : finish)
-					if (requirement.name() != "npc") rule.completion_ready = false;
-				result.push_back(std::move(rule));
-			}
-			return result;
-		}();
-		return rules;
-	}
-
-	QuestMarker QuestLog::npc_marker(int32_t npc_id, int16_t job, int16_t level) const
-	{
-		return select_quest_marker(npc_id, job, supported_rules(), [&](int16_t id) { return state(id); }, level);
+				auto iter = started.find(id);
+				return iter == started.end() ? std::string() : iter->second;
+			});
 	}
 
 	bool QuestLog::is_started(int16_t qid)

@@ -1,0 +1,4 @@
+# Keep this directory in git, ignore the imported (unredistributable) content.
+*
+!.gitignore
+!README.md

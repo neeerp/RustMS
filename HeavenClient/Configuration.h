@@ -362,6 +362,14 @@ namespace ms
 		{}
 	};
 
+	// The chat balloon font. The original client draws balloons in 12 px Arial;
+	// Arimo has the same metrics.
+	struct FontPathBalloon : public Configuration::StringEntry
+	{
+		FontPathBalloon() : StringEntry("FontPathBalloon", "fonts/Arimo/Arimo-Regular.ttf")
+		{}
+	};
+
 	// Music Volume
 	// Number from 0 to 100
 	struct BGMVolume : public Configuration::ByteEntry

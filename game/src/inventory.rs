@@ -74,16 +74,57 @@ pub mod equip_slot {
             .then(|| (-position - 100) as u8)
     }
 
-    /// The regular slot an equip id is worn in, from its id range.
+    pub const FACE_ACCESSORY: i16 = -2;
+    pub const EYE_ACCESSORY: i16 = -3;
+    pub const EARRINGS: i16 = -4;
+    pub const GLOVES: i16 = -8;
+    pub const CAPE: i16 = -9;
+    pub const SHIELD: i16 = -10;
+    pub const RINGS: [i16; 4] = [-12, -13, -15, -16];
+    pub const PENDANT: i16 = -17;
+    pub const MEDAL: i16 = -49;
+    pub const BELT: i16 = -50;
+
+    /// The regular slot an equip id is worn in, from its id range. Rings
+    /// may go in any of `RINGS`; this returns the first.
     pub fn for_item(item_id: i32) -> Option<i16> {
         match item_id / 10_000 {
             100 => Some(CAP),
+            101 => Some(FACE_ACCESSORY),
+            102 => Some(EYE_ACCESSORY),
+            103 => Some(EARRINGS),
             104 | 105 => Some(TOP),
             106 => Some(BOTTOM),
             107 => Some(SHOES),
+            108 => Some(GLOVES),
+            109 => Some(SHIELD),
+            110 => Some(CAPE),
+            111 => Some(RINGS[0]),
+            112 => Some(PENDANT),
+            113 => Some(BELT),
+            114 => Some(MEDAL),
             130..=170 => Some(WEAPON),
             _ => None,
         }
+    }
+
+    /// Whether `item_id` may be worn at `position`.
+    pub fn fits(item_id: i32, position: i16) -> bool {
+        match for_item(item_id) {
+            Some(slot) if RINGS.contains(&slot) => RINGS.contains(&position),
+            Some(slot) => slot == position,
+            None => false,
+        }
+    }
+
+    /// An overall occupies the top slot and leaves no room for pants.
+    pub fn is_overall(item_id: i32) -> bool {
+        item_id / 10_000 == 105
+    }
+
+    /// Two-handed weapons leave no room for a shield.
+    pub fn is_two_handed(item_id: i32) -> bool {
+        (140..=146).contains(&(item_id / 10_000))
     }
 }
 
@@ -149,6 +190,60 @@ impl Item {
         self.item_id / 1_000_000 == 5 || self.cash_serial.is_some()
     }
 }
+
+/// One change to an inventory, in the order the client must apply them
+/// (INVENTORY_OPERATION). Equipped positions are negative.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum InventoryChange {
+    Add {
+        kind: InventoryType,
+        slot: i16,
+        item: Item,
+    },
+    Quantity {
+        kind: InventoryType,
+        slot: i16,
+        quantity: i16,
+    },
+    /// Move, or swap with whatever is at `to`.
+    Move {
+        kind: InventoryType,
+        from: i16,
+        to: i16,
+    },
+    Remove {
+        kind: InventoryType,
+        slot: i16,
+    },
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum InventoryError {
+    /// Not enough free slots.
+    Full,
+    /// Fewer items than requested.
+    NotEnough,
+    /// The slot is empty, out of range, or otherwise unusable.
+    InvalidSlot,
+    /// The item can't be worn there.
+    CannotEquip,
+    /// The item data has no such item.
+    UnknownItem,
+}
+
+impl std::fmt::Display for InventoryError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(match self {
+            Self::Full => "inventory full",
+            Self::NotEnough => "not enough items",
+            Self::InvalidSlot => "invalid inventory slot",
+            Self::CannotEquip => "item cannot be equipped there",
+            Self::UnknownItem => "unknown item",
+        })
+    }
+}
+
+impl std::error::Error for InventoryError {}
 
 pub const DEFAULT_SLOT_LIMIT: u8 = 24;
 pub const DEFAULT_CASH_SLOT_LIMIT: u8 = 96;
@@ -222,7 +317,289 @@ impl Inventory {
     }
 
     pub fn equipped_ids(&self) -> impl Iterator<Item = (i16, i32)> + '_ {
-        self.equipped.iter().map(|(&slot, item)| (slot, item.item_id))
+        self.equipped
+            .iter()
+            .map(|(&slot, item)| (slot, item.item_id))
+    }
+
+    pub fn get(&self, kind: InventoryType, slot: i16) -> Option<&Item> {
+        self.map(kind).get(&slot)
+    }
+
+    /// How many of `item_id` are in its bag.
+    pub fn count(&self, item_id: i32) -> i32 {
+        InventoryType::for_item(item_id).map_or(0, |kind| {
+            self.items(kind)
+                .filter(|(_, item)| item.item_id == item_id)
+                .map(|(_, item)| i32::from(item.quantity))
+                .sum()
+        })
+    }
+
+    /// Add an item, filling partial stacks of the same id before taking
+    /// empty slots. `slot_max` is the item's stack size (1 for equipment).
+    /// Nothing changes unless all of it fits.
+    pub fn add(
+        &mut self,
+        item: Item,
+        slot_max: i16,
+    ) -> Result<Vec<InventoryChange>, InventoryError> {
+        let kind = InventoryType::for_item(item.item_id).ok_or(InventoryError::InvalidSlot)?;
+        let slot_max = slot_max.max(1);
+        let stackable =
+            item.equip.is_none() && item.expiration.is_none() && item.cash_serial.is_none();
+        let mut remaining = item.quantity.max(1);
+
+        // Fill a copy so a full inventory changes nothing.
+        let mut next = self.clone();
+        let mut changes = Vec::new();
+        if stackable {
+            let partial: Vec<i16> = self
+                .items(kind)
+                .filter(|(_, other)| Self::stacks_with(other, &item) && other.quantity < slot_max)
+                .map(|(slot, _)| slot)
+                .collect();
+            for slot in partial {
+                if remaining == 0 {
+                    break;
+                }
+                let existing = next
+                    .map_mut(kind)
+                    .get_mut(&slot)
+                    .expect("slot listed above");
+                let moved = remaining.min(slot_max - existing.quantity);
+                existing.quantity += moved;
+                remaining -= moved;
+                changes.push(InventoryChange::Quantity {
+                    kind,
+                    slot,
+                    quantity: existing.quantity,
+                });
+            }
+        }
+        for slot in self.free_slots(kind) {
+            if remaining == 0 {
+                break;
+            }
+            let quantity = if stackable {
+                remaining.min(slot_max)
+            } else {
+                1
+            };
+            let placed = Item {
+                quantity,
+                ..item.clone()
+            };
+            next.map_mut(kind).insert(slot, placed.clone());
+            remaining -= quantity;
+            changes.push(InventoryChange::Add {
+                kind,
+                slot,
+                item: placed,
+            });
+        }
+        if remaining > 0 {
+            return Err(InventoryError::Full);
+        }
+        *self = next;
+        Ok(changes)
+    }
+
+    /// Remove `quantity` of `item_id`, from the lowest slots first. Nothing
+    /// changes unless there are enough.
+    pub fn remove(
+        &mut self,
+        item_id: i32,
+        quantity: i16,
+    ) -> Result<Vec<InventoryChange>, InventoryError> {
+        let kind = InventoryType::for_item(item_id).ok_or(InventoryError::InvalidSlot)?;
+        if self.count(item_id) < i32::from(quantity) {
+            return Err(InventoryError::NotEnough);
+        }
+        let slots: Vec<i16> = self
+            .items(kind)
+            .filter(|(_, item)| item.item_id == item_id)
+            .map(|(slot, _)| slot)
+            .collect();
+        let mut remaining = quantity;
+        let mut changes = Vec::new();
+        for slot in slots {
+            if remaining == 0 {
+                break;
+            }
+            let taken = remaining.min(self.map(kind)[&slot].quantity);
+            changes.extend(self.take(kind, slot, taken)?);
+            remaining -= taken;
+        }
+        Ok(changes)
+    }
+
+    /// Take `quantity` from one slot (e.g. using an item).
+    pub fn take(
+        &mut self,
+        kind: InventoryType,
+        slot: i16,
+        quantity: i16,
+    ) -> Result<Vec<InventoryChange>, InventoryError> {
+        let item = self
+            .map_mut(kind)
+            .get_mut(&slot)
+            .ok_or(InventoryError::InvalidSlot)?;
+        if quantity < 1 || item.quantity < quantity {
+            return Err(InventoryError::NotEnough);
+        }
+        item.quantity -= quantity;
+        if item.quantity == 0 {
+            self.map_mut(kind).remove(&slot);
+            Ok(vec![InventoryChange::Remove { kind, slot }])
+        } else {
+            Ok(vec![InventoryChange::Quantity {
+                kind,
+                slot,
+                quantity: item.quantity,
+            }])
+        }
+    }
+
+    /// Move an item within a bag: into an empty slot, onto a stack of the
+    /// same item (up to `slot_max`), or swapping with another item.
+    pub fn move_in_bag(
+        &mut self,
+        kind: InventoryType,
+        from: i16,
+        to: i16,
+        slot_max: i16,
+    ) -> Result<Vec<InventoryChange>, InventoryError> {
+        if kind == InventoryType::Equipped || from == to || !self.in_bag(kind, to) {
+            return Err(InventoryError::InvalidSlot);
+        }
+        let moving = self
+            .map(kind)
+            .get(&from)
+            .ok_or(InventoryError::InvalidSlot)?
+            .clone();
+        if let Some(target) = self.map(kind).get(&to) {
+            let room = slot_max - target.quantity;
+            if Self::stacks_with(target, &moving) && room > 0 {
+                let moved = room.min(moving.quantity);
+                let target_quantity = target.quantity + moved;
+                self.map_mut(kind).get_mut(&to).expect("checked").quantity = target_quantity;
+                let mut changes = vec![InventoryChange::Quantity {
+                    kind,
+                    slot: to,
+                    quantity: target_quantity,
+                }];
+                changes.extend(self.take(kind, from, moved)?);
+                return Ok(changes);
+            }
+        }
+        let map = self.map_mut(kind);
+        let moving = map.remove(&from).expect("checked");
+        if let Some(target) = map.remove(&to) {
+            map.insert(from, target);
+        }
+        map.insert(to, moving);
+        Ok(vec![InventoryChange::Move { kind, from, to }])
+    }
+
+    /// Wear the equipment at `from` (equip bag) at `to` (a negative
+    /// position), swapping out what was worn there. Wearing an overall or a
+    /// two-handed weapon also takes off the pants or shield, and vice versa;
+    /// those need free slots.
+    pub fn equip(&mut self, from: i16, to: i16) -> Result<Vec<InventoryChange>, InventoryError> {
+        let item = self
+            .get(InventoryType::Equip, from)
+            .ok_or(InventoryError::InvalidSlot)?
+            .clone();
+        if item.equip.is_none() || !equip_slot::fits(item.item_id, to) {
+            return Err(InventoryError::CannotEquip);
+        }
+        let worn = |position: i16| self.equipped.get(&position).map(|i| i.item_id);
+        let conflict = match to {
+            equip_slot::TOP if equip_slot::is_overall(item.item_id) => {
+                worn(equip_slot::BOTTOM).map(|_| equip_slot::BOTTOM)
+            }
+            equip_slot::BOTTOM => worn(equip_slot::TOP)
+                .filter(|&id| equip_slot::is_overall(id))
+                .map(|_| equip_slot::TOP),
+            equip_slot::WEAPON if equip_slot::is_two_handed(item.item_id) => {
+                worn(equip_slot::SHIELD).map(|_| equip_slot::SHIELD)
+            }
+            equip_slot::SHIELD => worn(equip_slot::WEAPON)
+                .filter(|&id| equip_slot::is_two_handed(id))
+                .map(|_| equip_slot::WEAPON),
+            _ => None,
+        };
+        let mut changes = Vec::new();
+        if let Some(position) = conflict {
+            let free = self
+                .free_slots(InventoryType::Equip)
+                .find(|&slot| slot != from)
+                .ok_or(InventoryError::Full)?;
+            changes.extend(self.unequip(position, free)?);
+        }
+        let worn_item = self.equipped.remove(&to);
+        let wearing = self.bags[0].remove(&from).expect("checked");
+        if let Some(previous) = worn_item {
+            self.bags[0].insert(from, previous);
+        }
+        self.equipped.insert(to, wearing);
+        changes.push(InventoryChange::Move {
+            kind: InventoryType::Equip,
+            from,
+            to,
+        });
+        Ok(changes)
+    }
+
+    /// Take off the equipment at `from` (negative) into the empty equip-bag
+    /// slot `to`.
+    pub fn unequip(&mut self, from: i16, to: i16) -> Result<Vec<InventoryChange>, InventoryError> {
+        if !self.in_bag(InventoryType::Equip, to) || self.bags[0].contains_key(&to) {
+            return Err(InventoryError::InvalidSlot);
+        }
+        let item = self
+            .equipped
+            .remove(&from)
+            .ok_or(InventoryError::InvalidSlot)?;
+        self.bags[0].insert(to, item);
+        Ok(vec![InventoryChange::Move {
+            kind: InventoryType::Equip,
+            from,
+            to,
+        }])
+    }
+
+    fn in_bag(&self, kind: InventoryType, slot: i16) -> bool {
+        slot >= 1 && slot <= i16::from(self.slot_limit(kind))
+    }
+
+    fn free_slots(&self, kind: InventoryType) -> impl Iterator<Item = i16> + '_ {
+        let limit = i16::from(self.slot_limit(kind));
+        (1..=limit).filter(move |slot| !self.map(kind).contains_key(slot))
+    }
+
+    fn stacks_with(existing: &Item, item: &Item) -> bool {
+        existing.item_id == item.item_id
+            && existing.equip.is_none()
+            && existing.expiration.is_none()
+            && existing.cash_serial.is_none()
+            && existing.owner == item.owner
+            && existing.flags == item.flags
+    }
+
+    fn map(&self, kind: InventoryType) -> &BTreeMap<i16, Item> {
+        match kind.bag_index() {
+            Some(index) => &self.bags[index],
+            None => &self.equipped,
+        }
+    }
+
+    fn map_mut(&mut self, kind: InventoryType) -> &mut BTreeMap<i16, Item> {
+        match kind.bag_index() {
+            Some(index) => &mut self.bags[index],
+            None => &mut self.equipped,
+        }
     }
 
     /// Every item with its inventory and slot, for persistence.
@@ -231,9 +608,9 @@ impl Inventory {
             .equipped
             .iter()
             .map(|(&slot, item)| (InventoryType::Equipped, slot, item));
-        let bags = InventoryType::BAGS.into_iter().flat_map(move |kind| {
-            self.items(kind).map(move |(slot, item)| (kind, slot, item))
-        });
+        let bags = InventoryType::BAGS
+            .into_iter()
+            .flat_map(move |kind| self.items(kind).map(move |(slot, item)| (kind, slot, item)));
         equipped.chain(bags)
     }
 }
@@ -253,11 +630,17 @@ mod tests {
             Item::equipment(1302000, EquipStats::default()),
         );
 
-        let slots: Vec<_> = inventory.items(InventoryType::Use).map(|(s, _)| s).collect();
+        let slots: Vec<_> = inventory
+            .items(InventoryType::Use)
+            .map(|(s, _)| s)
+            .collect();
         assert_eq!(slots, vec![1, 3]);
         assert_eq!(inventory.all().count(), 3);
         assert_eq!(inventory.equipped_regular().count(), 1);
-        assert_eq!(inventory.slot_limit(InventoryType::Cash), DEFAULT_CASH_SLOT_LIMIT);
+        assert_eq!(
+            inventory.slot_limit(InventoryType::Cash),
+            DEFAULT_CASH_SLOT_LIMIT
+        );
     }
 
     #[test]
@@ -269,5 +652,169 @@ mod tests {
         assert_eq!(equip_slot::for_item(1302000), Some(equip_slot::WEAPON));
         assert_eq!(equip_slot::for_item(2000000), None);
         assert_eq!(InventoryType::for_item(4000000), Some(InventoryType::Etc));
+    }
+
+    fn equip(id: i32) -> Item {
+        Item::equipment(id, EquipStats::default())
+    }
+
+    #[test]
+    fn adding_fills_partial_stacks_then_empty_slots() {
+        let mut inventory = Inventory::default();
+        inventory.insert(InventoryType::Use, 2, Item::stack(2010000, 98));
+        let changes = inventory.add(Item::stack(2010000, 5), 100).unwrap();
+        assert_eq!(
+            changes,
+            [
+                InventoryChange::Quantity {
+                    kind: InventoryType::Use,
+                    slot: 2,
+                    quantity: 100
+                },
+                InventoryChange::Add {
+                    kind: InventoryType::Use,
+                    slot: 1,
+                    item: Item::stack(2010000, 3)
+                },
+            ]
+        );
+        assert_eq!(inventory.count(2010000), 103);
+    }
+
+    #[test]
+    fn a_full_bag_changes_nothing() {
+        let mut inventory = Inventory::default();
+        inventory.set_slot_limit(InventoryType::Etc, 1);
+        inventory.insert(InventoryType::Etc, 1, Item::stack(4000019, 199));
+        assert!(inventory.add(Item::stack(4000019, 1), 200).is_ok());
+        let before = inventory.clone();
+        assert_eq!(
+            inventory.add(Item::stack(4000019, 1), 200),
+            Err(InventoryError::Full)
+        );
+        assert_eq!(
+            inventory.add(Item::stack(4031802, 1), 100),
+            Err(InventoryError::Full)
+        );
+        assert_eq!(inventory, before);
+    }
+
+    #[test]
+    fn removing_takes_from_the_lowest_slots() {
+        let mut inventory = Inventory::default();
+        inventory.insert(InventoryType::Etc, 1, Item::stack(4031792, 4));
+        inventory.insert(InventoryType::Etc, 3, Item::stack(4031792, 10));
+        assert_eq!(
+            inventory.remove(4031792, 20),
+            Err(InventoryError::NotEnough)
+        );
+        let changes = inventory.remove(4031792, 10).unwrap();
+        assert_eq!(
+            changes,
+            [
+                InventoryChange::Remove {
+                    kind: InventoryType::Etc,
+                    slot: 1
+                },
+                InventoryChange::Quantity {
+                    kind: InventoryType::Etc,
+                    slot: 3,
+                    quantity: 4
+                },
+            ]
+        );
+    }
+
+    #[test]
+    fn moving_merges_stacks_or_swaps() {
+        let mut inventory = Inventory::default();
+        inventory.insert(InventoryType::Use, 1, Item::stack(2000000, 60));
+        inventory.insert(InventoryType::Use, 2, Item::stack(2000000, 60));
+        inventory.insert(InventoryType::Use, 3, Item::stack(2000003, 1));
+        let merged = inventory
+            .move_in_bag(InventoryType::Use, 1, 2, 100)
+            .unwrap();
+        assert_eq!(
+            merged[0],
+            InventoryChange::Quantity {
+                kind: InventoryType::Use,
+                slot: 2,
+                quantity: 100
+            }
+        );
+        assert_eq!(inventory.get(InventoryType::Use, 1).unwrap().quantity, 20);
+        inventory
+            .move_in_bag(InventoryType::Use, 1, 3, 100)
+            .unwrap();
+        assert_eq!(
+            inventory.get(InventoryType::Use, 1).unwrap().item_id,
+            2000003
+        );
+        assert_eq!(
+            inventory.get(InventoryType::Use, 3).unwrap().item_id,
+            2000000
+        );
+        assert_eq!(
+            inventory.move_in_bag(InventoryType::Use, 1, 99, 100),
+            Err(InventoryError::InvalidSlot)
+        );
+    }
+
+    #[test]
+    fn equipping_swaps_with_what_is_worn() {
+        let mut inventory = Inventory::default();
+        inventory.insert(InventoryType::Equipped, equip_slot::CAP, equip(1002067));
+        inventory.insert(InventoryType::Equip, 4, equip(1002008));
+        inventory.equip(4, equip_slot::CAP).unwrap();
+        assert_eq!(
+            inventory
+                .get(InventoryType::Equipped, equip_slot::CAP)
+                .unwrap()
+                .item_id,
+            1002008
+        );
+        assert_eq!(
+            inventory.get(InventoryType::Equip, 4).unwrap().item_id,
+            1002067
+        );
+        assert_eq!(
+            inventory.equip(4, equip_slot::WEAPON),
+            Err(InventoryError::CannotEquip)
+        );
+        inventory.unequip(equip_slot::CAP, 1).unwrap();
+        assert!(inventory
+            .get(InventoryType::Equipped, equip_slot::CAP)
+            .is_none());
+        assert_eq!(
+            inventory.unequip(equip_slot::CAP, 2),
+            Err(InventoryError::InvalidSlot)
+        );
+    }
+
+    #[test]
+    fn overalls_and_pants_take_each_other_off() {
+        let mut inventory = Inventory::default();
+        inventory.insert(InventoryType::Equipped, equip_slot::TOP, equip(1040002));
+        inventory.insert(InventoryType::Equipped, equip_slot::BOTTOM, equip(1060002));
+        inventory.insert(InventoryType::Equip, 1, equip(1050000));
+        let changes = inventory.equip(1, equip_slot::TOP).unwrap();
+        assert_eq!(changes.len(), 2, "pants come off first");
+        assert!(inventory
+            .get(InventoryType::Equipped, equip_slot::BOTTOM)
+            .is_none());
+        assert_eq!(
+            inventory.count(1060002),
+            1,
+            "the pants went to the equip bag"
+        );
+        let pants_slot = inventory
+            .items(InventoryType::Equip)
+            .find(|(_, item)| item.item_id == 1060002)
+            .map(|(slot, _)| slot)
+            .unwrap();
+        inventory.equip(pants_slot, equip_slot::BOTTOM).unwrap();
+        assert!(inventory
+            .get(InventoryType::Equipped, equip_slot::TOP)
+            .is_none());
     }
 }

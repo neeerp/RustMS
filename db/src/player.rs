@@ -12,6 +12,7 @@ use crate::schema::{
 };
 use diesel::pg::PgConnection;
 use diesel::prelude::*;
+use game::quest::{decode_kills, encode_kills};
 use game::{
     AvatarLook, CharacterStats, EquipStats, Inventory, InventoryType, Item, KeyBinding, Keymap,
     Player, QuestLog, QuestRecord, QuestStatus, SkillBook, SkillRecord,
@@ -135,7 +136,13 @@ pub fn load_player(character_id: i32) -> crate::Result<Player> {
 /// transactions and is not touched here.
 pub fn save_player(player: &Player) -> crate::Result<()> {
     let mut conn = crate::connection()?;
-    conn.transaction(|conn| -> QueryResult<()> {
+    conn.transaction(|conn| write_player(conn, player))
+        .map_err(Into::into)
+}
+
+/// Write the whole player within the caller's transaction.
+pub(crate) fn write_player(conn: &mut PgConnection, player: &Player) -> QueryResult<()> {
+    {
         let id = player.id();
         let stats = &player.stats;
         diesel::update(characters::table.find(id))
@@ -165,6 +172,17 @@ pub fn save_player(player: &Player) -> crate::Result<()> {
 
         save_keymap(conn, id, &player.keymap)?;
         save_inventory(conn, id, &player.inventory)?;
+        // Kill progress of started quests.
+        for record in player.quests.started() {
+            let kills = player.quests.kills(record.quest_id);
+            diesel::update(
+                character_quests::table
+                    .find((id, record.quest_id))
+                    .filter(character_quests::status.eq(1)),
+            )
+            .set(character_quests::progress.eq(encode_kills(kills)))
+            .execute(conn)?;
+        }
 
         diesel::delete(skills::table.filter(skills::character_id.eq(id))).execute(conn)?;
         let skill_rows: Vec<SkillRow> = player
@@ -182,8 +200,7 @@ pub fn save_player(player: &Player) -> crate::Result<()> {
             .values(&skill_rows)
             .execute(conn)?;
         Ok(())
-    })
-    .map_err(Into::into)
+    }
 }
 
 /// Stats and looks for every character on an account, for the character list.
@@ -256,7 +273,9 @@ pub fn quest_record(progress: &QuestProgress) -> QuestRecord {
         quest_id: progress.quest_id,
         status: match (progress.status, progress.completed_at) {
             (2, Some(at)) => QuestStatus::Completed { at },
-            _ => QuestStatus::Started,
+            _ => QuestStatus::Started {
+                kills: decode_kills(&progress.progress),
+            },
         },
     }
 }
@@ -264,7 +283,11 @@ pub fn quest_record(progress: &QuestProgress) -> QuestRecord {
 fn load_keymap(conn: &mut PgConnection, character_id: i32) -> QueryResult<Keymap> {
     let rows: Vec<(i16, KeybindType, i32)> = keybindings::table
         .filter(keybindings::character_id.eq(character_id))
-        .select((keybindings::key, keybindings::bind_type, keybindings::action))
+        .select((
+            keybindings::key,
+            keybindings::bind_type,
+            keybindings::action,
+        ))
         .load(conn)?;
     let mut keymap = Keymap::default();
     for (key, kind, action) in rows {
@@ -279,7 +302,11 @@ fn load_keymap(conn: &mut PgConnection, character_id: i32) -> QueryResult<Keymap
     Ok(keymap)
 }
 
-pub(crate) fn save_keymap(conn: &mut PgConnection, character_id: i32, keymap: &Keymap) -> QueryResult<()> {
+pub(crate) fn save_keymap(
+    conn: &mut PgConnection,
+    character_id: i32,
+    keymap: &Keymap,
+) -> QueryResult<()> {
     diesel::delete(keybindings::table.filter(keybindings::character_id.eq(character_id)))
         .execute(conn)?;
     let rows: Vec<_> = keymap
@@ -299,7 +326,10 @@ pub(crate) fn save_keymap(conn: &mut PgConnection, character_id: i32, keymap: &K
     Ok(())
 }
 
-fn load_inventory(conn: &mut PgConnection, character_ids: &[i32]) -> QueryResult<HashMap<i32, Inventory>> {
+fn load_inventory(
+    conn: &mut PgConnection,
+    character_ids: &[i32],
+) -> QueryResult<HashMap<i32, Inventory>> {
     let rows: Vec<(InventoryItemRow, Option<EquipmentStatsRow>)> = inventory_items::table
         .left_join(equipment_stats::table)
         .filter(inventory_items::character_id.eq_any(character_ids))
@@ -348,7 +378,11 @@ fn load_inventory(conn: &mut PgConnection, character_ids: &[i32]) -> QueryResult
     Ok(inventories)
 }
 
-fn save_inventory(conn: &mut PgConnection, character_id: i32, inventory: &Inventory) -> QueryResult<()> {
+fn save_inventory(
+    conn: &mut PgConnection,
+    character_id: i32,
+    inventory: &Inventory,
+) -> QueryResult<()> {
     // Equipment stats cascade with their item rows.
     diesel::delete(inventory_items::table.filter(inventory_items::character_id.eq(character_id)))
         .execute(conn)?;

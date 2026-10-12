@@ -24,6 +24,7 @@
 
 #include "../IO/UITypes/UIStatsInfo.h"
 #include "../Net/Packets/GameplayPackets.h"
+#include "../Net/Packets/PlayerPackets.h"
 #include "../Net/Packets/InventoryPackets.h"
 
 namespace ms
@@ -173,6 +174,8 @@ namespace ms
 			}
 		}
 
+		update_recovery();
+
 		uint8_t stancebyte = facing_right ? state : state + 1;
 		Movement newmove(phobj, stancebyte);
 		bool needupdate = lastmove.hasmoved(newmove);
@@ -184,6 +187,28 @@ namespace ms
 		}
 
 		return get_layer();
+	}
+
+	void Player::update_recovery()
+	{
+		recovery_timer += Constants::TIMESTEP;
+
+		if (recovery_timer < RECOVERY_INTERVAL)
+			return;
+
+		recovery_timer = 0;
+
+		int32_t hp = stats.get_stat(MapleStat::Id::HP);
+		int32_t mp = stats.get_stat(MapleStat::Id::MP);
+
+		if (hp <= 0)
+			return;
+
+		int16_t heal_hp = hp < stats.get_total(EquipStat::Id::HP) ? RECOVERY_HP : 0;
+		int16_t heal_mp = mp < stats.get_total(EquipStat::Id::MP) ? RECOVERY_MP : 0;
+
+		if (heal_hp > 0 || heal_mp > 0)
+			HealOverTimePacket(heal_hp, heal_mp).dispatch();
 	}
 
 	int8_t Player::get_integer_attackspeed() const

@@ -1,9 +1,13 @@
 pub mod channel;
 pub mod char;
+pub mod drop;
+pub mod effect;
 pub mod field;
+pub mod inventory;
 pub mod keymap;
 pub mod map;
 pub mod messaging;
+pub mod mob;
 pub mod npc;
 pub mod quest;
 pub mod stat;

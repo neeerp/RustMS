@@ -5,7 +5,11 @@ use std::collections::{BTreeMap, HashMap};
 use std::fs::File;
 use std::path::Path;
 use thiserror::Error;
+pub mod items;
+pub mod lua_strings;
+pub mod mobs;
 pub mod quests;
+pub mod server_content;
 
 const NODE_SIZE_BYTES: u64 = 20;
 pub const NO_DESTINATION_MAP: i32 = 999_999_999;
@@ -35,6 +39,20 @@ pub struct PortalTemplate {
     pub to_map: Option<i32>,
     pub to_name: String,
     pub script: Option<String>,
+}
+
+/// A mob spawn point from a map's `life` (type `m`).
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct MapMobTemplate {
+    pub mob_id: i32,
+    /// Spawn position: `x` and the foothold height `cy`.
+    pub x: i16,
+    pub y: i16,
+    pub foothold: i16,
+    pub flip: bool,
+    /// Seconds before the mob respawns; negative means never.
+    pub mob_time: i32,
+    pub hide: bool,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -124,7 +142,11 @@ pub struct FieldTemplate {
     pub map_id: i32,
     pub return_map: Option<i32>,
     pub forced_return: Option<i32>,
+    /// `info/onUserEnter`: the script run whenever a player enters the map.
+    pub on_user_enter: Option<String>,
     pub map_npcs: Vec<MapNpcTemplate>,
+    pub mob_spawns: Vec<MapMobTemplate>,
+    pub mob_rate: f64,
     portals_by_id: BTreeMap<u32, PortalTemplate>,
     portal_ids_by_name: HashMap<String, Vec<u32>>,
 }
@@ -213,17 +235,25 @@ fn build_field_template(
     map_node_idx: u32,
     map_id: i32,
 ) -> Result<FieldTemplate, GameDataError> {
-    let (return_map, forced_return) =
+    let (return_map, forced_return, on_user_enter) =
         if let Some(info_idx) = nx.child_by_name(map_node_idx, "info")? {
             (
                 normalize_optional_map_id(nx.int_child(info_idx, "returnMap")?),
                 normalize_optional_map_id(nx.int_child(info_idx, "forcedReturn")?),
+                normalize_optional_string(nx.string_child(info_idx, "onUserEnter")?),
             )
         } else {
-            (None, None)
+            (None, None, None)
         };
 
     let map_npcs = build_map_npcs_from_life(nx, map_node_idx)?;
+    let mob_spawns = build_mob_spawns_from_life(nx, map_node_idx)?;
+    let mob_rate = nx
+        .child_by_name(map_node_idx, "info")?
+        .map(|info| nx.real_child(info, "mobRate"))
+        .transpose()?
+        .flatten()
+        .unwrap_or(1.0);
 
     let mut portals_by_id = BTreeMap::new();
 
@@ -276,10 +306,40 @@ fn build_field_template(
         map_id,
         return_map,
         forced_return,
+        on_user_enter,
         map_npcs,
+        mob_spawns,
+        mob_rate,
         portals_by_id,
         portal_ids_by_name,
     })
+}
+
+fn build_mob_spawns_from_life(
+    nx: &NxDataFile,
+    map_node_idx: u32,
+) -> Result<Vec<MapMobTemplate>, GameDataError> {
+    let Some(life_root_idx) = nx.child_by_name(map_node_idx, "life")? else {
+        return Ok(Vec::new());
+    };
+    let mut spawns = Vec::new();
+    for life in nx.child_indices(life_root_idx)? {
+        if nx.string_child(life, "type")?.as_deref() != Some("m") {
+            continue;
+        }
+        let x = read_i16_child(nx, life, "x", 0)?;
+        let y = read_i16_child(nx, life, "y", 0)?;
+        spawns.push(MapMobTemplate {
+            mob_id: parse_string_id(nx.string_child(life, "id")?, "mob id")?,
+            x,
+            y: read_i16_child(nx, life, "cy", i32::from(y))?,
+            foothold: read_i16_child(nx, life, "fh", 0)?,
+            flip: nx.int_child(life, "f")?.unwrap_or(0) != 0,
+            mob_time: nx.int_child(life, "mobTime")?.unwrap_or(0),
+            hide: nx.int_child(life, "hide")?.unwrap_or(0) != 0,
+        });
+    }
+    Ok(spawns)
 }
 
 fn build_map_npcs_from_life(
@@ -507,6 +567,19 @@ impl NxDataFile {
         })
     }
 
+    /// A real (or integer) child as `f64`.
+    fn real_child(&self, parent_index: u32, key: &str) -> Result<Option<f64>, GameDataError> {
+        let Some(child_index) = self.child_by_name(parent_index, key)? else {
+            return Ok(None);
+        };
+        let node = self.node_at(child_index)?;
+        Ok(match node.data_type {
+            1 => Some(i64::from_le_bytes(node.data.to_le_bytes()) as f64),
+            2 => Some(f64::from_bits(node.data)),
+            _ => None,
+        })
+    }
+
     fn string_child(&self, parent_index: u32, key: &str) -> Result<Option<String>, GameDataError> {
         let Some(child_index) = self.child_by_name(parent_index, key)? else {
             return Ok(None);
@@ -581,7 +654,8 @@ mod tests {
 
     #[test]
     fn normal_npc_speech_resolves_string_asset_keys() {
-        let (Some(npc), Some(string)) = (test_assets::path("Npc.nx"), test_assets::path("String.nx"))
+        let (Some(npc), Some(string)) =
+            (test_assets::path("Npc.nx"), test_assets::path("String.nx"))
         else {
             return;
         };
@@ -600,7 +674,10 @@ mod tests {
             map_id: 1,
             return_map: None,
             forced_return: None,
+            on_user_enter: None,
             map_npcs: Vec::new(),
+            mob_spawns: Vec::new(),
+            mob_rate: 1.0,
             portals_by_id: BTreeMap::from([
                 (
                     0,

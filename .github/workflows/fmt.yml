@@ -1,0 +1,17 @@
+name: rustfmt
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+
+jobs:
+  fmt:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.93.0
+          components: rustfmt
+      - run: cargo fmt --all --check

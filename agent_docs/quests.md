@@ -1,139 +1,162 @@
-# Supported beginner quests
+# Quests
 
-## Existing NPC visits
+## The v83 flow
 
-The server also implements these original `Quest.nx` quests:
+Quests run the way the original client ran them:
 
-| Quest | Start | Finish | EXP |
-| --- | --- | --- | --- |
-| 1031, Heena and Sera | Heena (2101) | Sera (2100) | 5 |
-| 1032, Nina's Brother Sen | Nina (2102) | Sen (2001) | 7 |
-| 1033, What Sen Wants | Sen (2001) | Nina (2102) | 7 |
+1. **HeavenClient** reads `Quest.nx` itself. Clicking an NPC lists its quests
+   in the NPC chat window under the original `UtilDlgEx/list*` headers
+   ("Quests to turn in", "Quests in progress", "Available quests"), with
+   "Misc." for the NPC's normal speech. Picking a quest plays its `Say.img`
+   pages locally (`Gameplay/QuestConversation.cpp`).
+2. When the player accepts or finishes, the client sends `QUEST_ACTION`
+   (`0x6B`): action byte (1 start, 2 complete, 3 forfeit, 4/5 scripted),
+   quest id, and the NPC, then its position.
+3. **The server** checks the request against the quest's `Check.img`
+   requirements and the player (`net::quests::check_start`/`check_complete`),
+   asks the field whether that NPC is on the map within reach (1200×800
+   around the player), and commits the change and its `Act.img` rewards
+   atomically (`db::quest::start`/`complete`/`forfeit`).
+4. It answers with the quest record (`SHOW_STATUS_INFO` mode 1), EXP gain and
+   stats if any, and `UPDATE_QUEST_INFO` mode 8 (quest, NPC, next quest). A
+   nonzero next quest (`Act/1/nextQuest`) makes the client continue straight
+   into that quest's offer once the current conversation ends.
 
-Heena and Sera are in map `10000`. Nina is in `30000`; its `in01`
-portal enters Sen's house (`30001`), and `out00` returns to Nina.
-See [map travel](map-travel.md) for the active asset-defined route.
+The server sends no quest dialogue and keeps no quest conversation state.
+Rejected actions (unsupported quest, wrong NPC or state, unmet job, level, or
+prerequisite, NPC not nearby, replays) are logged at debug level and ignored.
 
-`ContactQuestData` reads Check/Say/Act/QuestInfo from the assets. Offers require
-Beginner job 0 and level at most 10. Quest 1033 requires completed 1032.
-Acceptance persists on Yes; visiting the destination NPC completes the quest
-and awards EXP atomically. Talking to the source again gives the asset's
-directions. Closing dialogue, changing maps, or relogging does not reset a visit.
+## Supported quests
 
-Quest 1031 has completion speech. The Nina/Sen legs have no completion speech;
-1032's `Act/1/nextQuest` continues directly into 1033's original offer. Cancelling
-that offer preserves completed 1032 without accepting 1033. Quest 1034 needs
-items and remains unsupported, so completing 1033 returns to normal NPC speech.
-Old quests 1000/1003/1004 require an item and are not substituted for these newer
-asset-defined versions. No quest text or rewards are invented.
+Only requirements and actions the server implements are allowed
+(`game-data/src/quests.rs`):
 
-Markers show a bulb at an eligible source, an open book at the source while a
-visit is outstanding, and a closed book at the destination. Level changes
-refresh eligibility; the maximum level applies to acceptance, not an already
-started visit. The existing quest log lists the started and completed records.
+| Node | Allowed keys |
+| --- | --- |
+| `Check/<id>/0` (start) | `npc`, `job`, `lvmin`, `lvmax`, `quest`, `startscript` |
+| `Check/<id>/1` (complete) | `npc`, `item`, `mob`, `endscript` |
+| `Act/<id>/0` | `item` |
+| `Act/<id>/1` | `exp`, `nextQuest`, `item` |
+| `Act/<id>/<n>/item/<k>` | `id`, `count`, `job`, `gender`, `prop` (not -1) |
 
-`beginner_contact_quests` verifies the three quests through real packets,
-including decline, invalid responses, directions, Sen's house portals,
-cancelled follow-up offers, map saves/relogin, and rewards paid once.
+`Act` nodes may repeat speech under numbered keys and `yes`/`no`; that is not
+an action. `item` requirements are counts the player must hold; a count of 0
+means none may be left (Roger's apples must all be eaten). `mob` requirements
+are kill counts (below).
 
-## Rain's Maple Quiz quests
+Item actions (`net::quests::pick_items`/`apply_items`) give positive counts
+and take negative ones (capped at what the player holds). An entry applies
+only to its `job` families (v83 bits: 0x1 beginner, 0x2 warrior, 0x4
+magician, 0x8 bowman, 0x10 thief, 0x20 pirate, 0x400+ Cygnus) and `gender`
+(2 or absent: either). Entries without `prop` always apply; among those with
+a positive `prop`, one is picked at random by weight (Todd's beginner hats).
+`prop` -1 is a reward the player chooses, which needs UI and stays
+unsupported, as do `period`, `dateExpire`, `var`, and `name`. If the gifts
+don't fit, nothing changes and the client gets "You can't get anymore
+items." `startscript`/
+`endscript` are allowed only for scripts the server implements
+(`game_data::quests::SCRIPTS`: `q1021s`, `q1021e`); those steps go through
+QUEST_ACTION 4/5 and the server drives the dialogue (see
+[NPC dialogue](./npc-dialogue.md)). A quest with any other key (`money`, `pop`, `skill`, `infoex`,
+`pet`, ...) is **unsupported**: it is
+never offered, and actions for it are refused. A prerequisite without a
+`state` means "not started" (mutually exclusive quests).
 
-Rain (NPC 12101 in Amherst) supports the seven asset-defined quests 1009–1015.
-Click her to accept the first quiz, read the tutorial, and select an answer.
-Wrong answers display the asset's explanation and allow a retry. Correct
-answers complete the current quest and award its EXP. Click Rain again for the
-next quiz. Progress is retained if the dialogue is cancelled or the player
-changes maps, changes channels, disconnects, or logs in again.
+The `game-data` asset test compares the server's result with the committed
+list `game-data/supported_quests.txt`. HeavenClient doesn't classify quests:
+the build copies that list next to the executable, and the client offers
+only those quests (`Character/QuestCatalog.cpp`). Supporting a new key means
+changing the server's allowlist and regenerating the list. 909 quests qualify
+with the current rules, including the beginner ones:
 
-## Assets and eligibility
+| Quest | Start → Finish | EXP |
+| --- | --- | --- |
+| 1009–1015 Rain's Maple Quiz | Rain (12101) | 2, 4, 6, 10, 10, 10, 20 |
+| 1031 Heena and Sera | Heena (2101) → Sera (2100) | 5 |
+| 1032 Nina's Brother Sen | Nina (2102) → Sen (2001) | 7, next 1033 |
+| 1033 What Sen Wants | Sen (2001) → Nina (2102) | 7, next 1034 |
+| 1034 Tasty Mushroom Candy | Nina (2102) → Sen (2001) | 20; gives 10 candies for Sen, then 2 edible ones (2022253) for beginners |
+| 1035 Todd's Hunting Method | Todd (2004) → Peter (2002) | 30; one Jr. Sentinel and its shellpiece for a random beginner hat |
+| 1036 Robin the Walking Encyclopedia | Robin (2003) | 40 |
+| 1037 Help Hunt the Snails | Sam (2005) → Maria (2103) | 60 for 10 snails, next 1038 |
+| 1038 Maria's Letter | Maria (2103) → Lucas (12000) | 40; the letter for 5 Red and 5 Blue Potions |
+| 1021 Roger's Apple (scripted) | Roger (2000) | 10, 3 Apples, 3 Green Apples |
 
-`game-data::quests::QuizQuestData` reads the Rain definitions from `Quest.nx`:
+## Kill counts
 
-- `Check.img`: NPC, beginner job requirement, completed-quest prerequisites
-- `Say.img`: offer, acceptance/decline, question, choices, explanations
-- `Say.img/<id>/1/stop/0/answer`: one-based answer, converted to a choice ID
-- `Act.img`: EXP reward
-- `QuestInfo.img`: quest name
+`character_quests.progress` holds a started quest's v83 progress string:
+three digits per `Check/1/mob` entry, in order ("003012" for 3 and 12).
+Starting a hunting quest sets every count to 0; each kill a player takes part
+in (`ServerMessage::MobKilled`) adds one for every started quest that needs
+that mob, up to the required count (`net::quests::count_kill`), and sends the
+quest record again with the new string. Counts live in the quest's
+`QuestStatus::Started { kills }` and are saved with the player. Completion
+requires every count.
 
-No questions or answers are copied into the server source. The executable
-quiz set is deliberately limited to this chain. Other quests must not be
-activated without implementations of their objectives and actions.
+Completing a quest also plays the v83 "Quest Clear" effect
+(`effect::build_own_effect` and `effect::build_foreign_effect` with
+`CharEffect::QuestClear`).
 
-Place `Quest.nx` alongside `Map.nx`, `Npc.nx`, and `String.nx` in the ignored
-`assets/game-data/` directory. `RUSTMS_QUEST_NX_PATH` overrides its server path.
-Files must be visible through the harness's assets mount.
+## Conversations in the client
+
+`Character/QuestDialogue.h` is a pure state machine over one side of
+`Say.img/<id>`:
+
+- **Offer** (`/0`): numbered pages, the last one asking yes/no; `yes` pages
+  follow acceptance and `no` pages a decline. Accepting sends start. An offer
+  ending in a question starts when answered correctly.
+- **Completion** (`/1`): numbered pages, then `yes` pages. Quiz pages contain
+  `#L` choices and `stop/<page>/answer` (one-based); a wrong choice shows
+  `stop/<page>/<choice>` and asks again. Passing the last question, or leaving
+  the last page of a talk-only completion, sends complete. There is no going
+  back to an answered question.
+- **Reminder**: `stop/npc` pages when the start NPC is clicked while the
+  quest is open; at the finishing NPC, `stop/mob` while kills are missing and
+  `stop/item` while items are.
+- No pages at all: the action is sent immediately (Sen's completion of 1032).
+
+Markers use the same catalog (`QuestLog::supported_rules`): bulb for an
+available quest, open book while in progress at the start NPC, closed book at
+the finishing NPC once its kills and items are in (open book until then).
+
+The **Quest Helper** (`IO/UITypes/UIQuestHelper.cpp`, from
+`UIWindow2.img/QuestAlarm`) sits in the top-right corner and lists up to
+five tracked quests with what each still needs ("Snail 3/10"), green once
+met. Starting a quest with kills or items to bring tracks it; the quest
+window's helper button tracks and untracks open quests.
 
 ## Persistence and rewards
 
-`character_quests` is keyed by `(character_id, quest_id)`:
+`character_quests` is keyed by `(character_id, quest_id)`: no row (not
+started), status 1 (started), status 2 (completed, with a timestamp).
+Forfeiting deletes a started row. A start or completion writes the quest row
+and the whole player snapshot (EXP, items, HP) in one transaction that locks
+the character row first: rewards are applied to a copy of the player, and the
+actor adopts it only after the commit, so a replay cannot pay twice.
+Prerequisites are rechecked inside the transaction.
 
-- no row: not started
-- status 1: started
-- status 2: completed, with a completion timestamp
+EXP uses `game::exp` (HeavenClient's table) through `Player::gain_exp`
+(+5 AP per level). HP/MP growth and SP belong with combat. If the level
+changed, the client actor refreshes its field avatar.
 
-`db::quest::transition` locks the character row, validates job and prerequisite
-progress, and commits quest completion and EXP together. Only a started quest
-can complete. Duplicate completion attempts cannot award the EXP again.
+## Assets
 
-Rain awards 2, 4, 6, 10, 10, 10, and 20 EXP (62 total). Starting at level 1
-with zero EXP yields level 3, 13 remaining EXP, and 10 AP. Beginner EXP thresholds
-through level 9 are implemented using the client's table. Full leveling stat
-growth (HP/MP, class-specific rules) remains separate future work.
-
-After a reward, ClientActor refreshes its character snapshot before processing
-other actions. This prevents a later map save from overwriting rewarded EXP.
-Quest records are serialized at world entry and sent live through status-info
-packets. The client updates its started/completed quest log and displays EXP
-notifications. The quest window lists started and completed quests; available
-quest discovery and objective/detail panes are not implemented yet.
-
-## Conversations
-
-`QuizConversation` is a pure state machine. Offers, tutorial pages, questions,
-wrong-answer feedback, and correct-answer feedback have distinct states. It
-emits start/complete intents; the runtime persists them before sending the next
-prompt. A correct answer pays once even if the player closes its feedback.
-
-NPC identity is validated by the field, while the client actor owns transient
-conversation state. Wrong prompt types, invalid choice IDs, and stale replies
-are discarded. A new NPC request or map transition invalidates pending field
-validation replies with a request generation ID.
-
-The client supports yes/no prompts (type 1) and clickable choices (type 4),
-including the selected integer payload. It normalizes literal newline characters
-to the text renderer's escaped line breaks. Clicking the text reveals a page
-immediately; long text scrolls in 32-pixel increments.
-
-## NPC quest markers
-
-Rain displays the existing animated `UI.nx/UIWindow2.img/QuestIcon` graphics:
-light bulb (0) for an available quiz, open book (1) for unmet objectives, and
-closed book (2) for a quest that can be resolved through NPC dialogue. Accepted
-Rain quizzes use the closed book because they have no external objectives;
-the dialogue still validates the answer before awarding anything. Completion
-unlocks the next quiz's light bulb. Finishing all seven removes the marker.
-
-`QuestLog::npc_marker` reads the supported chain's NPC, job, and prerequisite
-requirements from `Quest.nx`, then combines them with the local quest records.
-It advertises only quests implemented by the server. Marker priority is ready
-turn-in, in progress, then available. Each NPC refreshes its marker when quest
-records or the player's job change, rather than scanning assets every frame.
-The markers are drawn above the standing sprite and are clickable.
-
-Logic tests cover all seven transitions, prerequisites, job/NPC filtering,
-marker priority, and incomplete objectives. Enable the lightweight C++ tests
-with `-DHEAVENCLIENT_BUILD_TESTS=ON`, then run CTest in the client build directory.
+`Quest.nx` lives in the ignored `assets/game-data/` with `Map.nx`, `Npc.nx`,
+and `String.nx`; `RUSTMS_QUEST_NX_PATH` overrides the server's path. The
+client reads its own `Quest.nx` (a symlink to the same file). No quest text is
+copied into the source.
 
 ## Validation
 
-Fast logic tests: `cargo test -p net -p runtime -p integration-harness --lib`.
-Asset checks: `cargo test -p game-data --lib`.
-Full suite: `cargo run -p integration-harness --bin harnessctl -- test`.
-
-`rain_quizzes` plays all seven quests, tests wrong answers and replayed rewards,
-checks persisted EXP/AP/level after map saves and relogin, and checks decline,
-cancellation, invalid selections, channel migration, and isolation between characters. Ordinary
-dialogue tests use Pio so they continue to exercise non-quest speech.
-
-Character creation now translates client class-family flags to real job IDs.
-The separate correction migration repairs invalid legacy Explorer job 1 rows.
+- Unit: `cargo test -p game-data -p net -p runtime -p game --lib`
+  (classification, golden list, eligibility, packet parsing and building,
+  NPC reach). Set `RUSTMS_REQUIRE_ASSETS=1` so asset tests cannot skip.
+- Client: build with `-DHEAVENCLIENT_BUILD_TESTS=ON` and run CTest
+  (`quest_dialogue`, `quest_catalog`, `quest_markers`).
+- Integration: `scripted_npcs` (Roger's Apple end to end, Robin, the
+  tutorial skip, natural recovery limits), `rain_quizzes` (all seven quizzes, rewards once, prerequisites,
+  wrong NPC, NPC not on the map, forfeit, relogin, channel change, isolation)
+  `beginner_contact_quests` (the route through Sen's house and `nextQuest`
+  results), and `quest_objectives` (1034's candy errand, Todd's hunt and
+  random hat, Sam's snails persisting across relog and capped at ten, Maria's
+  letter to Lucas, refusals before requirements are met).

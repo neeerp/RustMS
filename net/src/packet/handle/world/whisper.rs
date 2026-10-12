@@ -32,11 +32,13 @@ impl WorldHandler for WhisperHandler {
             build_whisper_receive(ctx.player.name(), ctx.channel_id, false, &message)?;
         let sender_success_packet = build_whisper_result(&target_name, true)?;
 
-        Ok(HandlerResult::empty().with(WorldAction::Whisper(WhisperDelivery {
-            target_name,
-            recipient_packet,
-            sender_success_packet,
-            sender_failure_packet,
-        })))
+        Ok(
+            HandlerResult::empty().with(WorldAction::Whisper(WhisperDelivery {
+                target_name,
+                recipient_packet,
+                sender_success_packet,
+                sender_failure_packet,
+            })),
+        )
     }
 }

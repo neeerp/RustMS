@@ -1,0 +1,328 @@
+# Where the importer (cargo run -p game-data --bin import-server-content)
+# finds each text key in the MIT-licensed community scripts, and the SHA-256
+# of the expected text so upstream changes are caught. The text itself is not
+# committed. `template` joins string literals of `source` ({sN} is the Nth
+# literal, counting from 0); other {name} placeholders are filled at runtime.
+#
+# Sources (clone them into one directory):
+#   https://github.com/Kaioru/Edelstein.lua   (MIT, Copyright (c) 2023 Kaioru)
+#   https://github.com/Kaioru/Server.Scripts  (MIT, Copyright (c) 2018 Kaioru)
+#   https://github.com/Kaioru/Server.NX       (MIT, Copyright (c) 2018 Kaioru)
+
+[text."glTutoMsg0.message"]
+source = "Edelstein.lua/src/mapleisland/glTutoMsg0.lua"
+template = "{s0}"
+sha256 = "a1da6df337c3f9a387020a6eda69d8880c46c10f12e360933093241eb3ce3486"
+
+[text."roger.title.male"]
+source = "Edelstein.lua/src/mapleisland/q1021s.lua"
+template = "{s1}"
+sha256 = "20fe1bd201cd900bdbffeaec0b42e40b51cbf6b37ae5fbeaddd83aab9a221837"
+
+[text."roger.title.female"]
+source = "Edelstein.lua/src/mapleisland/q1021s.lua"
+template = "{s2}"
+sha256 = "0317c92ad78c13c7887310bac1e747e6c5b6da7f619ab9e7b66481c7cbab86cb"
+
+[text."roger.start.0"]
+source = "Edelstein.lua/src/mapleisland/q1021s.lua"
+template = "{s0}{title}{s3}"
+sha256 = "a9ce908391edad644c1fcd1b65de020718d08ce343cc74b5c7dce84b3be33828"
+
+[text."roger.start.1"]
+source = "Edelstein.lua/src/mapleisland/q1021s.lua"
+template = "{s4}"
+sha256 = "db0c76ed1e6d8e507db010cbf787c31d0c8316a1a848337dc088623a5fbda9c4"
+
+[text."roger.start.2"]
+source = "Edelstein.lua/src/mapleisland/q1021s.lua"
+template = "{s5}"
+sha256 = "6e97afa3ff6a575c37f87a8de3f6c2a79d0ec0ab806a68dab5a571a2eb53b512"
+
+[text."roger.start.3"]
+source = "Edelstein.lua/src/mapleisland/q1021s.lua"
+template = "{s6}"
+sha256 = "3db7a4255c44bf8aca6800144ac28b35581c1ef9a6c9331e24d9d6eb30a09ee9"
+
+[text."roger.start.4"]
+source = "Edelstein.lua/src/mapleisland/q1021s.lua"
+template = "{s7}"
+sha256 = "3c5f0ca4d84e068086c63d43e43e64dbc4ab6c41e9d491e8e4198e514f0d5a0b"
+
+[text."roger.inventory_full"]
+source = "Edelstein.lua/src/mapleisland/q1021s.lua"
+template = "{s9}"
+sha256 = "d6918011eb4ba0ae2ed2804c82bb0911eaed9e4141f1cdb63377e53f48be86f4"
+
+[text."roger.end.not_recovered"]
+source = "Edelstein.lua/src/mapleisland/q1021e.lua"
+template = "{s0}"
+sha256 = "18605bb08b5ca3d3cb1f0ffbf768d66d731b68b96a8f476da4b2198feb6bdee3"
+
+[text."roger.end.0"]
+source = "Edelstein.lua/src/mapleisland/q1021e.lua"
+template = "{s1}"
+sha256 = "c276aab768e41747156b54e216634cd75f6fea8a6e07d1fc86714946b3d7200b"
+
+[text."roger.end.1"]
+source = "Edelstein.lua/src/mapleisland/q1021e.lua"
+template = "{s2}"
+sha256 = "72e58ad29d4cf1f1abf8b1cb022428af0c3f6b5ebe63ef5b3fdf19c7cebc5a24"
+
+[text."roger.end.2"]
+source = "Edelstein.lua/src/mapleisland/q1021e.lua"
+template = "{s3}"
+sha256 = "52f315fe9b946fed1d8c33f4a7aa451c2adb8e481c3419a1b93e886e82e7edf5"
+
+[text."roger.end.inventory_full"]
+source = "Edelstein.lua/src/mapleisland/q1021e.lua"
+template = "{s4}"
+sha256 = "d6918011eb4ba0ae2ed2804c82bb0911eaed9e4141f1cdb63377e53f48be86f4"
+
+[text."skip.ask"]
+source = "Edelstein.lua/src/mapleisland/tutoChatNPC.lua"
+template = "{s0}"
+sha256 = "48aa85a2217b443566e8f8af87d9dde15d46a59dc8ab3b20d566494be629bf0c"
+
+[text."skip.decline"]
+source = "Edelstein.lua/src/mapleisland/tutoChatNPC.lua"
+template = "{s1}"
+sha256 = "6425ca5895f678e542d284f333aa335f81dab3bd860222f166f74367f624bea1"
+
+[text."robin.menu"]
+source = "Server.Scripts/src/begin5.lua"
+template = "{s0}"
+sha256 = "6fd2624840e7d7b1e711b3de6976d7905b0632ace0d3b5d41c2ba15f0cc5fb54"
+
+[text."robin.choice.0"]
+source = "Server.Scripts/src/begin5.lua"
+template = "{s1}"
+sha256 = "a2aff2cb3f50a57b7cb5270f1db46082ee859f1b60e558c1495a0ea1ea383443"
+
+[text."robin.choice.1"]
+source = "Server.Scripts/src/begin5.lua"
+template = "{s2}"
+sha256 = "e081eced3eadacc079fc3f2fb45047b57d299ecd983956abd28c8ab625cae95e"
+
+[text."robin.choice.2"]
+source = "Server.Scripts/src/begin5.lua"
+template = "{s3}"
+sha256 = "8aeba076e33c496f92ffbc4f4ed81f7bfd100904fe23990cf2173e91f11fb166"
+
+[text."robin.choice.3"]
+source = "Server.Scripts/src/begin5.lua"
+template = "{s4}"
+sha256 = "d3be3c6fbc2f3608dbc31a6b87743c3160b935040d42785d884ec723e77fdf63"
+
+[text."robin.choice.4"]
+source = "Server.Scripts/src/begin5.lua"
+template = "{s5}"
+sha256 = "113bfc56a5b88134188248d439845e9a7707942a2f3f5ef58e6e4627d5c3d3e3"
+
+[text."robin.choice.5"]
+source = "Server.Scripts/src/begin5.lua"
+template = "{s6}"
+sha256 = "b057c6ee02a0486dd2aff1f94688713ec73e0ff8da656647ea82381e74befc65"
+
+[text."robin.choice.6"]
+source = "Server.Scripts/src/begin5.lua"
+template = "{s7}"
+sha256 = "c8df00b67866fe42096ff03672861c2967418b4a2cfbd2ed49fa961cfdc2c5d4"
+
+[text."robin.choice.7"]
+source = "Server.Scripts/src/begin5.lua"
+template = "{s8}"
+sha256 = "b59c41942436b35cdfb76b502c9bc0d6ac4fdd7e9f561b045e7f396b276e726c"
+
+[text."robin.choice.8"]
+source = "Server.Scripts/src/begin5.lua"
+template = "{s9}"
+sha256 = "325be96621b358748ab691b7db71986fcfc48fecfe8f7ddd6cee7e846f67f92e"
+
+[text."robin.choice.9"]
+source = "Server.Scripts/src/begin5.lua"
+template = "{s10}"
+sha256 = "e1cd7c04604c3a22d6de3845969223c8f92fc94cff56f99bd80516e1bc5a4466"
+
+[text."robin.choice.10"]
+source = "Server.Scripts/src/begin5.lua"
+template = "{s11}"
+sha256 = "441f7f9991cc821bc67aca514ba1451bf1ce99d2ad18253c4dac50c5a9b365a5"
+
+[text."robin.choice.11"]
+source = "Server.Scripts/src/begin5.lua"
+template = "{s12}"
+sha256 = "0c04c8fa3819349021db3db5d7d4fe7add17b9cd8220545f6560b145cf549738"
+
+[text."robin.choice.12"]
+source = "Server.Scripts/src/begin5.lua"
+template = "{s13}"
+sha256 = "bbcd0b7075c3b0c1ae62aeb0621b4f76e5fb1efb8caf80e93eac3f37593a033e"
+
+[text."robin.choice.13"]
+source = "Server.Scripts/src/begin5.lua"
+template = "{s14}"
+sha256 = "ff679fb94b4e763bbabc4d5942055aed0ea09bc2c8880caa2971d140b5f03422"
+
+[text."robin.choice.14"]
+source = "Server.Scripts/src/begin5.lua"
+template = "{s15}"
+sha256 = "072829122c55617a3ece10d3e91c9c170134f4e2dcc2d611c68f694e5e2171a4"
+
+[text."robin.choice.15"]
+source = "Server.Scripts/src/begin5.lua"
+template = "{s16}"
+sha256 = "1bae9c2e165b48e7534052f2b2d278cb027f10133b1e52d2d2a34066d7ead256"
+
+[text."robin.choice.16"]
+source = "Server.Scripts/src/begin5.lua"
+template = "{s17}"
+sha256 = "60c6df00ab11be9de538a76ad6227ad3f1206f5202396683483ba47ee05f7456"
+
+[text."robin.choice.17"]
+source = "Server.Scripts/src/begin5.lua"
+template = "{s18}"
+sha256 = "9f233bcb66d64b166f45f897c6b8677876dc35a659ef4ae8906dd77db7a3af03"
+
+[text."robin.answer.0.0"]
+source = "Server.Scripts/src/begin5.lua"
+template = "{s19}"
+sha256 = "5d92deae3f6096a5a3d6f492ad47295588a1527f05503f648237bedafa527f2c"
+
+[text."robin.answer.1.0"]
+source = "Server.Scripts/src/begin5.lua"
+template = "{s20}"
+sha256 = "b5b03d4b8c226c6718cbddc6818032cb8bad7ed659ffd80ec454dca3e2e0d5b4"
+
+[text."robin.answer.1.1"]
+source = "Server.Scripts/src/begin5.lua"
+template = "{s21}"
+sha256 = "2baec9f848ebe4ca918e244f20a23e1a015ebb3d577803e5446bd408db764857"
+
+[text."robin.answer.2.0"]
+source = "Server.Scripts/src/begin5.lua"
+template = "{s22}"
+sha256 = "65a4ebf774c91bc0bb442195884d3b3de086c33de5cf30863f4fda68ccad27e6"
+
+[text."robin.answer.2.1"]
+source = "Server.Scripts/src/begin5.lua"
+template = "{s23}"
+sha256 = "a0ac80b12fc5e03fdbc4c7f3d2b24e07b5a85b075a8dd6de7430c389d70ca197"
+
+[text."robin.answer.3.0"]
+source = "Server.Scripts/src/begin5.lua"
+template = "{s24}"
+sha256 = "3401ce31aca5b28cfb966ed0918854dd420431e1e33c944f7de536ce9de516b3"
+
+[text."robin.answer.3.1"]
+source = "Server.Scripts/src/begin5.lua"
+template = "{s25}"
+sha256 = "11643fb58fd027476e8d374afb25e3fadc7fe1c27b6a81dfb0f1517aa5ef9882"
+
+[text."robin.answer.4.0"]
+source = "Server.Scripts/src/begin5.lua"
+template = "{s26}"
+sha256 = "ad6ad32abf82cf07b01120ca31eb6d4902e5931ca020843d0cea7e0bb091161a"
+
+[text."robin.answer.4.1"]
+source = "Server.Scripts/src/begin5.lua"
+template = "{s27}"
+sha256 = "81b263b42d378b285a72fa492050bb4b5bf2159b534b199de25d531333ae0e33"
+
+[text."robin.answer.5.0"]
+source = "Server.Scripts/src/begin5.lua"
+template = "{s28}"
+sha256 = "2efeafd20e3bfabaf9888fcf3af08df3eaee5711ab73fac2fc283d62333c3396"
+
+[text."robin.answer.5.1"]
+source = "Server.Scripts/src/begin5.lua"
+template = "{s29}"
+sha256 = "4d335062a475dd49a8cc88b517c042a70acf4359cadf5e2c0ea9a8ac8fce414a"
+
+[text."robin.answer.5.2"]
+source = "Server.Scripts/src/begin5.lua"
+template = "{s30}"
+sha256 = "7050a4a3be12ad8b50508808cecb77f8783988bdb4bd5b64ef42c098f452eb82"
+
+[text."robin.answer.5.3"]
+source = "Server.Scripts/src/begin5.lua"
+template = "{s31}"
+sha256 = "d23c0a3566ed712fef0d5cc2b2946ca4f5f476a7fe776e932566b7e8bfaff9d4"
+
+[text."robin.answer.6.0"]
+source = "Server.Scripts/src/begin5.lua"
+template = "{s32}"
+sha256 = "9d8b3368e0cb8a6fd886060c306c022e645636573a9975f2c96dc0bdb9323658"
+
+[text."robin.answer.7.0"]
+source = "Server.Scripts/src/begin5.lua"
+template = "{s33}"
+sha256 = "ccc222089edc91f465ea7a64148d4b8f2a271f916a7a1b2dc04f378dbbd4c55f"
+
+[text."robin.answer.8.0"]
+source = "Server.Scripts/src/begin5.lua"
+template = "{s34}"
+sha256 = "e465d7307b7c2b7dd14beda1cd9de6db94a1276916d6c612a808d56ef02cabc3"
+
+[text."robin.answer.9.0"]
+source = "Server.Scripts/src/begin5.lua"
+template = "{s35}"
+sha256 = "98f3940644313d24f825828547569706e31239a6c81fde8dc71887919f347131"
+
+[text."robin.answer.9.1"]
+source = "Server.Scripts/src/begin5.lua"
+template = "{s36}"
+sha256 = "e5a8a7f12499f0f6f68c58a50df15f332fe1a47cc1644ac43c5a18433137940c"
+
+[text."robin.answer.10.0"]
+source = "Server.Scripts/src/begin5.lua"
+template = "{s37}"
+sha256 = "ed4ca6cf70817542d198ea1762bc01ad1e7e32993413bfe46844ab63a51bf704"
+
+[text."robin.answer.10.1"]
+source = "Server.Scripts/src/begin5.lua"
+template = "{s38}"
+sha256 = "433efb4576721a7707b67bc8572a9a940f0c037ac0b0142d1c5f4a9ed539ea33"
+
+[text."robin.answer.11.0"]
+source = "Server.Scripts/src/begin5.lua"
+template = "{s39}"
+sha256 = "a0ad44372e725f23b1a3c5429e114dda3fbb1a61de14096eed23e3dee7ceeb73"
+
+[text."robin.answer.11.1"]
+source = "Server.Scripts/src/begin5.lua"
+template = "{s40}"
+sha256 = "fade512f0b64111c30af60d97a0893043b433b06efb70497fc97524eae9c1458"
+
+[text."robin.answer.12.0"]
+source = "Server.Scripts/src/begin5.lua"
+template = "{s41}"
+sha256 = "bb7e2555dc2908bae282c2de78d99e21151ada1f1bb1ef4ac2ed0d5d4ba61667"
+
+[text."robin.answer.13.0"]
+source = "Server.Scripts/src/begin5.lua"
+template = "{s42}"
+sha256 = "ad4e5af99dc0b0ff59e0be6b8a6be6203560896774134e939b740f061cd6f582"
+
+[text."robin.answer.14.0"]
+source = "Server.Scripts/src/begin5.lua"
+template = "{s43}"
+sha256 = "47e221aa2ca1f003b21e2ea716b1075c0b2b05aefd74f25260e28e04e8291b80"
+
+[text."robin.answer.15.0"]
+source = "Server.Scripts/src/begin5.lua"
+template = "{s44}"
+sha256 = "448596f3b8e9c9f4c727acc646ee5118aac4103a8812273ba710e0f17bcd4390"
+
+[text."robin.answer.16.0"]
+source = "Server.Scripts/src/begin5.lua"
+template = "{s45}"
+sha256 = "88fb683304248bf13f8e143b38d74f35e85d0e5a473468545942679e3beaf021"
+
+[text."robin.answer.17.0"]
+source = "Server.Scripts/src/begin5.lua"
+template = "{s46}"
+sha256 = "fc1ce77d58f6bb05021d7da1ebe4cb509c620b32c368f5780dc8df7abc6cc422"
+
+[rewards]
+source = "Server.NX/src/Reward.img"

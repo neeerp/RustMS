@@ -1,0 +1,233 @@
+//! Items and mesos lying on one field. Pure state; `FieldActor` sends the
+//! packets.
+
+use crate::actor::object_ids::{self, ObjectIds};
+use net::loot::Loot;
+use net::packet::build::world::drop::DropView;
+use net::ClientId;
+use std::collections::BTreeMap;
+use tokio::time::{Duration, Instant};
+
+/// How long only the killer may pick a drop up.
+pub const OWNERSHIP: Duration = Duration::from_secs(15);
+/// How long a drop lies on the ground.
+pub const LIFETIME: Duration = Duration::from_secs(180);
+/// How far away a player may pick something up.
+const REACH: (i32, i32) = (800, 600);
+/// Spacing between drops from one kill.
+const SPREAD: i16 = 25;
+
+#[derive(Clone, Debug)]
+pub struct Drop {
+    pub object_id: i32,
+    pub loot: Loot,
+    pub owner: ClientId,
+    pub x: i16,
+    pub y: i16,
+    pub dropper: i32,
+    pub dropped_at: Instant,
+}
+
+impl Drop {
+    pub fn view(&self, now: Instant) -> DropView {
+        let (item_or_meso, meso) = match self.loot {
+            Loot::Item { item_id, .. } => (item_id, false),
+            Loot::Mesos(amount) => (amount, true),
+        };
+        DropView {
+            object_id: self.object_id,
+            item_or_meso,
+            meso,
+            owner: self.owner,
+            ownership: if now < self.dropped_at + OWNERSHIP {
+                0
+            } else {
+                2
+            },
+            x: self.x,
+            y: self.y,
+            dropper: self.dropper,
+        }
+    }
+
+    /// Who may see it: quest items only show to their owner.
+    pub fn visible_to(&self, client: ClientId) -> bool {
+        self.loot.quest().is_none() || self.owner == client
+    }
+}
+
+#[derive(Debug, PartialEq, Eq)]
+pub enum PickupError {
+    Gone,
+    TooFar,
+    NotYours,
+}
+
+pub struct DropSet {
+    drops: BTreeMap<i32, Drop>,
+    object_ids: ObjectIds,
+}
+
+impl Default for DropSet {
+    fn default() -> Self {
+        Self {
+            drops: BTreeMap::new(),
+            object_ids: ObjectIds::new(object_ids::DROPS),
+        }
+    }
+}
+
+impl DropSet {
+    pub fn all(&self) -> impl Iterator<Item = &Drop> {
+        self.drops.values()
+    }
+
+    /// Spread `loot` around (x, y) and return the new drops.
+    pub fn spawn(
+        &mut self,
+        loot: Vec<Loot>,
+        owner: ClientId,
+        x: i16,
+        y: i16,
+        dropper: i32,
+        now: Instant,
+    ) -> Vec<&Drop> {
+        let count = loot.len() as i16;
+        let mut ids = Vec::new();
+        for (index, loot) in loot.into_iter().enumerate() {
+            let object_id = self.object_ids.next();
+            let offset = (index as i16 * 2 - (count - 1)) * SPREAD / 2;
+            self.drops.insert(
+                object_id,
+                Drop {
+                    object_id,
+                    loot,
+                    owner,
+                    x: x.saturating_add(offset),
+                    y,
+                    dropper,
+                    dropped_at: now,
+                },
+            );
+            ids.push(object_id);
+        }
+        ids.iter().filter_map(|id| self.drops.get(id)).collect()
+    }
+
+    /// Take a drop for `client` standing at (x, y).
+    pub fn take(
+        &mut self,
+        client: ClientId,
+        object_id: i32,
+        x: i16,
+        y: i16,
+        now: Instant,
+    ) -> Result<Drop, PickupError> {
+        let drop = self.drops.get(&object_id).ok_or(PickupError::Gone)?;
+        if (i32::from(drop.x) - i32::from(x)).abs() > REACH.0
+            || (i32::from(drop.y) - i32::from(y)).abs() > REACH.1
+        {
+            return Err(PickupError::TooFar);
+        }
+        let owned = drop.loot.quest().is_some() || now < drop.dropped_at + OWNERSHIP;
+        if owned && drop.owner != client {
+            return Err(PickupError::NotYours);
+        }
+        self.drops.remove(&object_id).ok_or(PickupError::Gone)
+    }
+
+    /// Put back a drop that couldn't be picked up (a full inventory).
+    pub fn restore(&mut self, drop: Drop) {
+        self.drops.insert(drop.object_id, drop);
+    }
+
+    /// Remove expired drops and return their object ids.
+    pub fn expire(&mut self, now: Instant) -> Vec<i32> {
+        let expired: Vec<i32> = self
+            .drops
+            .values()
+            .filter(|drop| now >= drop.dropped_at + LIFETIME)
+            .map(|drop| drop.object_id)
+            .collect();
+        for id in &expired {
+            self.drops.remove(id);
+        }
+        expired
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn owners_pick_up_first_then_anyone() {
+        let now = Instant::now();
+        let mut drops = DropSet::default();
+        let ids: Vec<i32> = drops
+            .spawn(
+                vec![
+                    Loot::Mesos(5),
+                    Loot::Item {
+                        item_id: 4000019,
+                        quantity: 1,
+                        quest: None,
+                    },
+                ],
+                1,
+                100,
+                0,
+                9,
+                now,
+            )
+            .iter()
+            .map(|d| d.object_id)
+            .collect();
+        assert_eq!(ids.len(), 2);
+        assert_eq!(drops.all().map(|d| d.x).collect::<Vec<_>>(), [88, 112]);
+        assert_eq!(
+            drops.take(2, ids[0], 100, 0, now).unwrap_err(),
+            PickupError::NotYours
+        );
+        assert_eq!(
+            drops.take(1, ids[0], 2000, 0, now).unwrap_err(),
+            PickupError::TooFar
+        );
+        assert_eq!(
+            drops.take(1, ids[0], 100, 0, now).unwrap().loot,
+            Loot::Mesos(5)
+        );
+        assert_eq!(
+            drops.take(1, ids[0], 100, 0, now).unwrap_err(),
+            PickupError::Gone
+        );
+        assert!(drops.take(2, ids[1], 100, 0, now + OWNERSHIP).is_ok());
+    }
+
+    #[test]
+    fn quest_items_stay_with_their_owner_and_drops_expire() {
+        let now = Instant::now();
+        let mut drops = DropSet::default();
+        let id = drops.spawn(
+            vec![Loot::Item {
+                item_id: 4031802,
+                quantity: 1,
+                quest: Some(1035),
+            }],
+            1,
+            0,
+            0,
+            9,
+            now,
+        )[0]
+        .object_id;
+        let drop = drops.all().next().unwrap();
+        assert!(drop.visible_to(1) && !drop.visible_to(2));
+        assert_eq!(
+            drops.take(2, id, 0, 0, now + OWNERSHIP * 2).unwrap_err(),
+            PickupError::NotYours
+        );
+        assert_eq!(drops.expire(now + LIFETIME), [id]);
+        assert_eq!(drops.all().count(), 0);
+    }
+}

@@ -82,6 +82,8 @@ namespace ms
 
 		void drag_icon(Icon *icon);
 
+		void cancel_drag();
+
 		void add_keymapping(uint8_t no, uint8_t type, int32_t action);
 
 		void clear_tooltip(Tooltip::Parent parent);

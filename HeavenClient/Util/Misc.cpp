@@ -162,5 +162,16 @@ namespace ms
 				return nl::nx::map["Map"]["Map" + prefix][mapid_str + ".img"];
 			}
 		}
+
+		namespace Npc
+		{
+			nl::node get_npc_node(int32_t npcid)
+			{
+				nl::node npc = nl::nx::npc[string_format::extend_id(npcid, 7) + ".img"];
+				std::string link = npc["info"]["link"];
+
+				return link.empty() ? npc : nl::nx::npc[link + ".img"];
+			}
+		}
 	}
 }

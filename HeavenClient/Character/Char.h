@@ -119,6 +119,9 @@ namespace ms
 		// Display an animation as an effect on top of the character.
 		void show_effect_id(CharEffect::Id toshow);
 
+		// Play an animation anchored to the character (e.g. a tutorial image).
+		void show_effect(const Animation &effect);
+
 		// Display the iron body skill animation.
 		void show_iron_body();
 
@@ -127,6 +130,9 @@ namespace ms
 
 		// Display a chat bubble with the specified line in it.
 		void speak(const std::string &line);
+
+		// Show an instruction balloon above the character (PLAYER_HINT).
+		void show_hint(const std::string &text, int16_t width);
 
 		// Change a part of the character's look.
 		void change_look(MapleStat::Id stat, int32_t id);
@@ -193,6 +199,7 @@ namespace ms
 	private:
 		Text namelabel;
 		ChatBalloon chatballoon;
+		ChatBalloon hintballoon;
 		EffectLayer effects;
 		Afterimage afterimage;
 		TimedBool invincible;

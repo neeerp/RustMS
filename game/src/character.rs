@@ -185,6 +185,62 @@ impl Player {
         &mut self.keymap
     }
 
+    /// Mutable access to the inventory; marks the player as needing a save.
+    pub fn inventory_mut(&mut self) -> &mut Inventory {
+        self.dirty = true;
+        &mut self.inventory
+    }
+
+    /// Add EXP, levelling up as many times as it covers. Each level grants
+    /// 5 AP and the job family's HP/MP growth, then restores HP and MP.
+    /// Returns the number of levels gained. (SP comes with skills; v83
+    /// beginners get none.)
+    pub fn gain_exp(&mut self, amount: i32) -> u8 {
+        if amount <= 0 {
+            return 0;
+        }
+        let mut exp = i64::from(self.stats.exp) + i64::from(amount);
+        let mut gained = 0;
+        while let Some(needed) = crate::exp::to_next_level(self.stats.level) {
+            if exp < needed {
+                break;
+            }
+            exp -= needed;
+            self.stats.level += 1;
+            self.stats.ap = self.stats.ap.saturating_add(5);
+            let (hp, mp) = level_up_growth(self.stats.job);
+            self.stats.max_hp = self.stats.max_hp.saturating_add(hp);
+            self.stats.max_mp = self.stats.max_mp.saturating_add(mp);
+            gained += 1;
+        }
+        if crate::exp::to_next_level(self.stats.level).is_none() {
+            exp = 0;
+        }
+        if gained > 0 {
+            self.stats.hp = self.stats.max_hp;
+            self.stats.mp = self.stats.max_mp;
+        }
+        self.stats.exp = i32::try_from(exp).unwrap_or(i32::MAX);
+        self.dirty = true;
+        gained
+    }
+
+    /// Change HP by `delta`, clamped to `0..=max_hp`. Returns the new HP.
+    pub fn add_hp(&mut self, delta: i32) -> i16 {
+        let hp = (i32::from(self.stats.hp) + delta).clamp(0, i32::from(self.stats.max_hp));
+        self.stats.hp = hp as i16;
+        self.dirty = true;
+        self.stats.hp
+    }
+
+    /// Change MP by `delta`, clamped to `0..=max_mp`. Returns the new MP.
+    pub fn add_mp(&mut self, delta: i32) -> i16 {
+        let mp = (i32::from(self.stats.mp) + delta).clamp(0, i32::from(self.stats.max_mp));
+        self.stats.mp = mp as i16;
+        self.dirty = true;
+        self.stats.mp
+    }
+
     /// Flag in-memory changes that have not been persisted yet. Mutators on
     /// this type call this themselves; use it after editing public fields.
     pub fn mark_dirty(&mut self) {
@@ -198,6 +254,19 @@ impl Player {
     /// Called after a successful save of a snapshot taken from this player.
     pub fn mark_saved(&mut self) {
         self.dirty = false;
+    }
+}
+
+/// Max HP/MP gained per level: the middle of v83's random ranges
+/// (`MapleCharacter.levelUp`), so levels are reproducible.
+fn level_up_growth(job: i16) -> (i16, i16) {
+    match job / 100 {
+        0 | 10 | 20 => (14, 11),
+        1 | 11 | 21 => (26, 5),
+        2 | 12 => (12, 23),
+        3 | 4 | 13 | 14 => (22, 15),
+        5 | 15 => (25, 20),
+        _ => (14, 11),
     }
 }
 
@@ -269,5 +338,45 @@ mod tests {
         assert_eq!(player.stats.spawn_point, 2);
         player.mark_saved();
         assert!(!player.is_dirty());
+    }
+
+    fn player() -> Player {
+        Player::new(
+            1,
+            0,
+            test_stats(),
+            0,
+            Inventory::default(),
+            SkillBook::default(),
+            Keymap::default(),
+            QuestLog::default(),
+        )
+    }
+
+    #[test]
+    fn exp_levels_up_through_several_levels() {
+        let mut player = player();
+        player.stats.max_hp = 50;
+        // Rain's seven quizzes pay 62 EXP: level 1 -> 3 with 13 left over.
+        assert_eq!(player.gain_exp(62), 2);
+        assert_eq!(
+            (player.stats.level, player.stats.exp, player.stats.ap),
+            (3, 13, 10)
+        );
+        // Two beginner levels: +28 max HP, +22 max MP, fully restored.
+        assert_eq!((player.stats.max_hp, player.stats.hp), (78, 78));
+        assert_eq!(player.gain_exp(0), 0);
+        assert!(player.is_dirty());
+    }
+
+    #[test]
+    fn hp_and_mp_stay_within_bounds() {
+        let mut player = player();
+        player.stats.max_hp = 50;
+        player.stats.hp = 25;
+        assert_eq!(player.add_hp(30), 50);
+        assert_eq!(player.add_hp(-80), 0);
+        player.stats.max_mp = 5;
+        assert_eq!(player.add_mp(10), 5);
     }
 }

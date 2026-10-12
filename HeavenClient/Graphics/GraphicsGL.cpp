@@ -232,12 +232,14 @@ namespace ms
 
 		const std::string FONT_NORMAL = Setting<FontPathNormal>().get().load();
 		const std::string FONT_BOLD = Setting<FontPathBold>().get().load();
+		const std::string FONT_BALLOON = Setting<FontPathBalloon>().get().load();
 
-		if (FONT_NORMAL.empty() || FONT_BOLD.empty())
+		if (FONT_NORMAL.empty() || FONT_BOLD.empty() || FONT_BALLOON.empty())
 			return Error::Code::FONT_PATH;
 
 		const std::string resolved_normal = resolve_font_path(FONT_NORMAL).string();
 		const std::string resolved_bold = resolve_font_path(FONT_BOLD).string();
+		const std::string resolved_balloon = resolve_font_path(FONT_BALLOON).string();
 
 		const char *FONT_NORMAL_STR = resolved_normal.c_str();
 		const char *FONT_BOLD_STR = resolved_bold.c_str();
@@ -290,6 +292,12 @@ namespace ms
 			return Error(Error::Code::FONT_PATH, font_error_path.c_str());
 		}
 
+		if (!addfont(resolved_balloon.c_str(), Text::Font::BALLOON, 0, 12, LineSpacing::FACE))
+		{
+			font_error_path = resolved_balloon;
+			return Error(Error::Code::FONT_PATH, font_error_path.c_str());
+		}
+
 		fontymax += fontborder.y();
 
 		leftovers = QuadTree<size_t, Leftover>(
@@ -312,7 +320,7 @@ namespace ms
 		return Error::Code::NONE;
 	}
 
-	bool GraphicsGL::addfont(const char *name, Text::Font id, FT_UInt pixelw, FT_UInt pixelh)
+	bool GraphicsGL::addfont(const char *name, Text::Font id, FT_UInt pixelw, FT_UInt pixelh, LineSpacing spacing)
 	{
 		FT_Face face;
 
@@ -356,7 +364,12 @@ namespace ms
 		if (height > fontymax)
 			fontymax = height;
 
-		fonts[id] = Font(width, height);
+		GLshort lineheight = 0;
+
+		if (spacing == LineSpacing::FACE)
+			lineheight = static_cast<GLshort>((face->size->metrics.ascender - face->size->metrics.descender) >> 6);
+
+		fonts[id] = Font(width, height, lineheight);
 
 		GLshort ox = x;
 		GLshort oy = y;
@@ -832,7 +845,6 @@ namespace ms
 
 			for (const Text::Layout::Word &word : line.words)
 			{
-				GLshort ax = position.x() + layout.advance(word.first);
 				GLshort ay = position.y();
 
 				const GLfloat *wordcolor;
@@ -849,6 +861,10 @@ namespace ms
 					const char c = text[pos];
 					const Font::Char &ch = font.chars[c];
 
+					// The layout already places every character, including giving a
+					// wrapped line's leading space no width, so use its advances
+					// rather than re-accumulating widths here.
+					GLshort ax = position.x() + layout.advance(pos);
 					GLshort char_x = x + ax + ch.bl;
 					GLshort char_y = y + ay - ch.bt;
 					GLshort char_width = ch.bw;
@@ -873,11 +889,6 @@ namespace ms
 
 					if (char_y < minheight)
 						continue;
-
-					if (ax == 0 && c == ' ')
-						continue;
-
-					ax += ch.ax;
 
 					if (char_width <= 0 || char_height <= 0)
 						continue;

@@ -78,13 +78,15 @@ pub fn begin_world_transition(s_id: i32, c_id: i32) -> crate::Result<Session> {
 /// another channel.
 pub fn begin_channel_transition(s_id: i32, ch_id: i16) -> crate::Result<Session> {
     let mut connection = crate::connection()?;
-    Ok(diesel::update(sessions.find(s_id).filter(state.eq(SessionState::InGame)))
-        .set((
-            selected_channel_id.eq(Some(ch_id)),
-            state.eq(SessionState::Transition),
-            updated_at.eq(now),
-        ))
-        .get_result(&mut connection)?)
+    Ok(
+        diesel::update(sessions.find(s_id).filter(state.eq(SessionState::InGame)))
+            .set((
+                selected_channel_id.eq(Some(ch_id)),
+                state.eq(SessionState::Transition),
+                updated_at.eq(now),
+            ))
+            .get_result(&mut connection)?,
+    )
 }
 
 /// Atomically consume a fresh transition ticket for entering `ch_id` from
@@ -111,14 +113,16 @@ pub fn delete_session(s_id: i32) -> crate::Result<usize> {
 /// Remove sessions that a restarted login server can no longer own.
 pub fn clear_login_sessions() -> crate::Result<usize> {
     let mut connection = crate::connection()?;
-    Ok(diesel::delete(sessions.filter(
-        state
-            .eq(SessionState::BeforeLogin)
-            .or(state.eq(SessionState::AfterLogin))
-            .or(state
-                .eq(SessionState::Transition)
-                .and(updated_at.le(now - ttl_seconds().seconds()))),
-    ))
+    Ok(diesel::delete(
+        sessions.filter(
+            state
+                .eq(SessionState::BeforeLogin)
+                .or(state.eq(SessionState::AfterLogin))
+                .or(state
+                    .eq(SessionState::Transition)
+                    .and(updated_at.le(now - ttl_seconds().seconds()))),
+        ),
+    )
     .execute(&mut connection)?)
 }
 

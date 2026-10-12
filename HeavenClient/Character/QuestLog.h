@@ -21,7 +21,9 @@
 
 #include <cstdint>
 
+#include <functional>
 #include <map>
+#include <vector>
 #include "QuestMarker.h"
 
 namespace ms
@@ -36,6 +38,18 @@ namespace ms
 
 		void add_completed(int16_t, int64_t);
 
+		// Forget a quest, e.g. after it was forfeited.
+		void remove(int16_t);
+
+		// Quests shown in the Quest Helper, oldest first. Newly started quests
+		// with something to hunt or collect are tracked automatically.
+		static constexpr size_t MAX_TRACKED = 5;
+		const std::vector<int16_t>& tracked() const;
+		bool is_tracked(int16_t id) const;
+		// `false` if the helper is full or the quest is not started.
+		bool track(int16_t id);
+		void untrack(int16_t id);
+
 		bool is_started(int16_t);
 
 		int16_t get_last_started();
@@ -43,16 +57,20 @@ namespace ms
 		bool is_completed(int16_t id) const;
 		const std::map<int16_t, std::string>& started_quests() const;
 		const std::map<int16_t, int64_t>& completed_quests() const;
-		QuestMarker npc_marker(int32_t npc_id, int16_t job, int16_t level) const;
+		// `count` gives how many of an item the player holds.
+		QuestMarker npc_marker(int32_t npc_id, int16_t job, int16_t level,
+			const std::function<int32_t(int32_t)>& count) const;
 		uint64_t revision() const;
 		int16_t state(int16_t id) const;
 		std::vector<int16_t> available_quests(int16_t job, int16_t level, bool all_levels = false) const;
-		static const std::vector<QuestMarkerRule>& supported_rules();
 
 	private:
 		std::map<int16_t, std::string> started;
 		std::map<int16_t, std::pair<int16_t, std::string>> in_progress;
 		std::map<int16_t, int64_t> completed;
+		std::vector<int16_t> tracking;
+		// Quests the player took out of the helper; not re-added automatically.
+		std::vector<int16_t> dismissed;
 		uint64_t marker_revision = 0;
 	};
 }

@@ -50,6 +50,10 @@ namespace ms
 	{
 		recv.read_bool(); // 'updatetick'
 
+		// A dragged icon points into the inventory windows' icons, which the
+		// changes below rebuild; drop the drag while it is still valid.
+		UI::get().cancel_drag();
+
 		Inventory& inventory = Stage::get()
 			.get_player()
 			.get_inventory();

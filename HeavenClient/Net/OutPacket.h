@@ -87,6 +87,7 @@ namespace ms
 			SORT_ITEMS = 70,
 			MOVE_ITEM = 71,
 			USE_ITEM = 72,
+			HEAL_OVER_TIME = 89,
 			SCROLL_EQUIP = 86,
 
 			/// Player
@@ -98,6 +99,8 @@ namespace ms
 			USE_SKILL = 91,
 
 			/// Gameplay 2
+			CHANGE_MAP_SPECIAL = 100,
+			QUEST_ACTION = 107,
 			PARTY_OPERATION = 124,
 			ADMIN_COMMAND = 128,
 			MOVE_MONSTER = 188,

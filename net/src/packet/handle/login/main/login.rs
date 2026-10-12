@@ -93,9 +93,7 @@ impl LoginHandler for LoginCredentialsHandler {
             ),
             LoginStatusCode::LicenseAgreement => (
                 SessionState::BeforeLogin,
-                build::login::status::build_login_status_packet(
-                    LoginStatusCode::LicenseAgreement,
-                )?,
+                build::login::status::build_login_status_packet(LoginStatusCode::LicenseAgreement)?,
             ),
             rejected => {
                 return Ok(HandlerResult::reply(
