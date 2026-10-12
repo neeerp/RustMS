@@ -53,9 +53,14 @@ pub enum ServerMessage {
     /// A mob this player helped kill; `exp` is their share.
     MobKilled {
         mob_id: i32,
+        object_id: i32,
         exp: i32,
         x: i16,
         y: i16,
+    },
+    /// The field gave this player a drop to put in their inventory.
+    PickedUp {
+        drop: crate::actor::field_drops::Drop,
     },
     /// Whether a quest NPC is on the player's map and within reach.
     QuestNpcChecked {
@@ -153,6 +158,18 @@ pub enum FieldMessage {
     FromClient {
         from: ClientId,
         request: FieldRequest,
+    },
+    /// Put a player's loot from a kill on the ground.
+    SpawnLoot {
+        owner: ClientId,
+        loot: Vec<net::loot::Loot>,
+        x: i16,
+        y: i16,
+        dropper: i32,
+    },
+    /// The client couldn't take the drop (full inventory); put it back.
+    ReturnDrop {
+        drop: crate::actor::field_drops::Drop,
     },
     /// Check that an NPC with this template id is near the player before a
     /// quest action; answered with `ServerMessage::QuestNpcChecked`.

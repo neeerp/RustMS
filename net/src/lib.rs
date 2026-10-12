@@ -15,6 +15,7 @@ mod io;
 pub mod items;
 mod load;
 pub mod login_world;
+pub mod loot;
 pub mod mobs;
 mod npc_data;
 pub mod npc_scripts;

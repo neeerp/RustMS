@@ -1,5 +1,6 @@
 mod combat;
 mod dialogue;
+mod loot;
 mod npc_script;
 mod quest;
 mod script;
@@ -416,7 +417,17 @@ impl ClientActor {
             ServerMessage::QuestNpcChecked { request_id, nearby } => {
                 self.quest_npc_checked(request_id, nearby).await?
             }
-            ServerMessage::MobKilled { mob_id, exp, .. } => self.mob_killed(mob_id, exp).await?,
+            ServerMessage::MobKilled {
+                mob_id,
+                object_id,
+                exp,
+                x,
+                y,
+            } => {
+                self.mob_killed(mob_id, exp).await?;
+                self.drop_loot(mob_id, object_id, x, y).await?
+            }
+            ServerMessage::PickedUp { drop } => self.picked_up(drop).await?,
             ServerMessage::SendPacket(mut packet) => self.send(&mut packet).await?,
         }
         Ok(())

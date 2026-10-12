@@ -1,6 +1,8 @@
+use crate::actor::field_drops::{Drop, DropSet};
 use crate::actor::field_mobs::MobSet;
 use crate::message::{ClientHandle, FieldKey, FieldMessage, ServerMessage};
 use game::FieldAvatar;
+use net::packet::build::world::drop::{build_drop, build_remove_drop, DropAppearance};
 use net::packet::build::world::field::{
     build_player_enter_field, build_player_leave_field, parse_movement_state,
 };
@@ -48,6 +50,7 @@ pub struct FieldActor {
     occupants: HashMap<ClientId, Occupant>,
     map_npcs: Vec<FieldMapEntityNpc>,
     mobs: MobSet,
+    drops: DropSet,
     tick: Duration,
 }
 
@@ -66,6 +69,7 @@ impl FieldActor {
             occupants: HashMap::new(),
             map_npcs,
             mobs,
+            drops: DropSet::default(),
             tick,
         }
     }
@@ -88,6 +92,11 @@ impl FieldActor {
 
     /// Advance time-driven field state: mob respawns (drop expiry later).
     fn on_tick(&mut self, now: Instant) {
+        for object_id in self.drops.expire(now) {
+            if let Ok(packet) = build_remove_drop(object_id, None) {
+                self.broadcast(None, packet);
+            }
+        }
         let spawned = self.mobs.respawn(now);
         if spawned.is_empty() {
             return;
@@ -184,7 +193,78 @@ impl FieldActor {
                     self.handle_attack(from, broadcast, hits)
                 }
                 FieldRequest::Broadcast(packet) => self.broadcast(Some(from), packet),
+                FieldRequest::Pickup { object_id, x, y } => {
+                    self.handle_pickup(from, object_id, x, y)
+                }
             },
+            FieldMessage::SpawnLoot {
+                owner,
+                loot,
+                x,
+                y,
+                dropper,
+            } => self.spawn_loot(owner, loot, x, y, dropper),
+            FieldMessage::ReturnDrop { drop } => {
+                let now = Instant::now();
+                if let Ok(packet) = build_drop(&drop.view(now), DropAppearance::Lying) {
+                    self.send_drop_packet(&drop, packet);
+                }
+                self.drops.restore(drop);
+            }
+        }
+    }
+
+    fn spawn_loot(
+        &mut self,
+        owner: ClientId,
+        loot: Vec<net::loot::Loot>,
+        x: i16,
+        y: i16,
+        dropper: i32,
+    ) {
+        let now = Instant::now();
+        let packets: Vec<(Drop, Packet)> = self
+            .drops
+            .spawn(loot, owner, x, y, dropper, now)
+            .into_iter()
+            .filter_map(|drop| {
+                build_drop(&drop.view(now), DropAppearance::Falling { from: (x, y) })
+                    .ok()
+                    .map(|packet| (drop.clone(), packet))
+            })
+            .collect();
+        for (drop, packet) in packets {
+            self.send_drop_packet(&drop, packet);
+        }
+    }
+
+    /// Send a drop packet to everyone who may see the drop.
+    fn send_drop_packet(&self, drop: &Drop, packet: Packet) {
+        for (&client, occupant) in &self.occupants {
+            if drop.visible_to(client) {
+                occupant.handle.send_packet(packet.clone());
+            }
+        }
+    }
+
+    fn handle_pickup(&mut self, from: ClientId, object_id: i32, x: i16, y: i16) {
+        let Some(occupant) = self.occupants.get(&from) else {
+            return;
+        };
+        let handle = occupant.handle.clone();
+        match self.drops.take(from, object_id, x, y, Instant::now()) {
+            Ok(drop) => {
+                if let Ok(packet) = build_remove_drop(object_id, Some(from)) {
+                    self.send_drop_packet(&drop, packet);
+                }
+                handle.send(ServerMessage::PickedUp { drop });
+            }
+            Err(_) => {
+                // Unlock the client's pickup.
+                if let Ok(packet) = net::packet::build::world::stat::build_stat_update(true, &[]) {
+                    handle.send_packet(packet);
+                }
+            }
         }
     }
 
@@ -231,6 +311,7 @@ impl FieldActor {
                         if let Some(occupant) = self.occupants.get(client) {
                             occupant.handle.send(ServerMessage::MobKilled {
                                 mob_id: kill.mob_id,
+                                object_id: kill.object_id,
                                 exp: *exp,
                                 x: kill.x,
                                 y: kill.y,
@@ -275,6 +356,13 @@ impl FieldActor {
 
         for mob in self.mobs.live() {
             if let Ok(packet) = build_spawn_mob(&mob.view(false)) {
+                handle.send_packet(packet);
+            }
+        }
+
+        let now = Instant::now();
+        for drop in self.drops.all().filter(|drop| drop.visible_to(client_id)) {
+            if let Ok(packet) = build_drop(&drop.view(now), DropAppearance::Lying) {
                 handle.send_packet(packet);
             }
         }

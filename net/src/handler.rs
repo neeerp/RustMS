@@ -254,6 +254,9 @@ pub enum FieldRequest {
     },
     /// Show everyone else on the map this packet.
     Broadcast(Packet),
+    /// Pick up the drop `object_id`, answered with `ServerMessage::PickedUp`;
+    /// the player stands at (x, y).
+    Pickup { object_id: i32, x: i16, y: i16 },
 }
 
 impl ReplyAction for WorldAction {
@@ -284,7 +287,7 @@ fn world_routes() -> &'static HashMap<i16, WorldRoute> {
     ROUTES.get_or_init(|| {
         use RecvOpcode as Op;
         use WorldRoute::*;
-        let table: [(Op, WorldRoute); 19] = [
+        let table: [(Op, WorldRoute); 20] = [
             (Op::PlayerLoggedIn, PreGame(&world::PlayerLoggedInHandler)),
             (Op::PlayerMove, InGame(&world::PlayerMoveHandler)),
             (Op::ChangeChannel, InGame(&world::ChangeChannelHandler)),
@@ -315,6 +318,7 @@ fn world_routes() -> &'static HashMap<i16, WorldRoute> {
                 InGame(&world::CloseRangeAttackHandler),
             ),
             (Op::TakeDamage, InGame(&world::TakeDamageHandler)),
+            (Op::ItemPickup, InGame(&world::ItemPickupHandler)),
             (Op::HealOverTime, InGame(&world::HealOverTimeHandler)),
         ];
         table
@@ -346,7 +350,7 @@ mod tests {
     fn every_registered_opcode_is_unique_per_server() {
         // The maps would silently drop duplicates; check the table sizes match.
         assert_eq!(login_routes().len(), 13);
-        assert_eq!(world_routes().len(), 19);
+        assert_eq!(world_routes().len(), 20);
     }
 
     #[test]

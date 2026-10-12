@@ -1,6 +1,7 @@
 //! The mobs of one field: spawn points, live mobs, who controls each, and
 //! the damage dealt to them. Pure state; `FieldActor` sends the packets.
 
+use crate::actor::object_ids::{self, ObjectIds};
 use game_data::mobs::MobInfo;
 use game_data::MapMobTemplate;
 use net::packet::build::world::field::parse_movement_state;
@@ -9,8 +10,6 @@ use net::ClientId;
 use std::collections::{BTreeMap, HashMap};
 use tokio::time::{Duration, Instant};
 
-/// Mob object ids start here (NPCs use 1_000_000_000 and up).
-const MOB_OBJECT_ID_BASE: i32 = 2_000_000_000;
 /// The soonest a killed mob comes back, when its spawn point has no
 /// `mobTime` of its own.
 pub const RESPAWN_DELAY: Duration = Duration::from_secs(7);
@@ -67,11 +66,16 @@ pub struct Kill {
     pub exp: Vec<(ClientId, i32)>,
 }
 
-#[derive(Default)]
 pub struct MobSet {
     spawns: Vec<SpawnPoint>,
     live: BTreeMap<i32, LiveMob>,
-    next_object_id: i32,
+    object_ids: ObjectIds,
+}
+
+impl Default for MobSet {
+    fn default() -> Self {
+        Self::new([])
+    }
 }
 
 impl MobSet {
@@ -88,7 +92,7 @@ impl MobSet {
                 })
                 .collect(),
             live: BTreeMap::new(),
-            next_object_id: MOB_OBJECT_ID_BASE,
+            object_ids: ObjectIds::new(object_ids::MOBS),
         }
     }
 
@@ -108,8 +112,7 @@ impl MobSet {
             if spawn.alive.is_some() || spawn.next_spawn.is_some_and(|at| at > now) {
                 continue;
             }
-            let object_id = self.next_object_id;
-            self.next_object_id = self.next_object_id.wrapping_add(1).max(MOB_OBJECT_ID_BASE);
+            let object_id = self.object_ids.next();
             spawn.alive = Some(object_id);
             spawn.next_spawn = None;
             self.live.insert(

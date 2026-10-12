@@ -41,6 +41,7 @@ pub struct WorldSession {
     pub quests: std::collections::BTreeMap<i16, u8>,
     /// Equipped item ids by equipped slot, from the world-entry SET_FIELD.
     pub equipped: std::collections::BTreeMap<i16, i32>,
+    pub meso: i32,
     /// `(kind, action)` for each of the 90 keys, from the world-entry KEYMAP.
     pub keymap: Vec<(u8, i32)>,
 }
@@ -170,6 +171,7 @@ pub async fn login_to_world_session(config: &HarnessConfig) -> Result<WorldSessi
         ap: world_entry.ap,
         quests: world_entry.quests,
         equipped: world_entry.equipped,
+        meso: world_entry.meso,
         keymap,
         character_name: world_entry.character_name,
         map_id: world_entry.map_id,
@@ -348,6 +350,7 @@ async fn drain_spawn_npcs(connection: &mut MapleTestConnection) {
             SendOpcode::FieldEffect as i16,
             SendOpcode::SpawnMonster as i16,
             SendOpcode::SpawnMonsterControl as i16,
+            SendOpcode::DropItemFromMapObject as i16,
         ]
         .contains(&envelope.opcode())
         {

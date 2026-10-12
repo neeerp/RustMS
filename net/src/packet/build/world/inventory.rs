@@ -83,6 +83,15 @@ pub fn build_item_gain(item_id: i32, quantity: i32) -> Result<Packet, NetworkErr
     Ok(p)
 }
 
+/// SHOW_STATUS_INFO 0/-1: "You can't get anymore items."
+pub fn build_inventory_full() -> Result<Packet, NetworkError> {
+    let mut p = Packet::new_empty();
+    p.write_short(SendOpcode::ShowStatusInfo as i16)?;
+    p.write_byte(0)?;
+    p.write_byte(0xFF)?;
+    Ok(p)
+}
+
 /// SHOW_ITEM_GAIN_INCHAT mode 3: an item gain line in the chat log (quest
 /// rewards and turn-ins).
 pub fn build_item_gain_in_chat(item_id: i32, quantity: i32) -> Result<Packet, NetworkError> {

@@ -9,8 +9,8 @@ templates from `Mob.nx` (`maxHP`, `exp`, `PADamage`, `bodyAttack`,
 
 - **Spawning:** every visible spawn point (not `hide`, `mobTime` ≥ 0) spawns
   when the field starts. A killed mob comes back after `mobTime` seconds, at
-  least 7 s, on the field's 100 ms tick, with a new object id (from
-  2,000,000,000). Joining players get SPAWN_MONSTER for every live mob.
+  least 7 s, on the field's 100 ms tick, with a new object id (mobs and drops
+  each have a range in `actor::object_ids`). Joining players get SPAWN_MONSTER for every live mob.
 - **Control:** one player moves each mob (SPAWN_MONSTER_CONTROL 1). New
   mobs and joiners pick up uncontrolled mobs; leaving hands them to another
   occupant. MOVE_LIFE from the controller updates the position, answers
@@ -37,6 +37,29 @@ gained sends the new level, AP, max HP/MP (+14/+11 per beginner level, the
 middle of v83's ranges), restores HP/MP, and shows SHOW_FOREIGN_EFFECT 0 to
 the others.
 
+## Drops and pickup
+
+When a mob dies, each player who earned EXP from it rolls their own drops
+(`net::loot::roll`) from the content pack's table plus the committed v83
+overrides (`game-data/reward_overrides.toml`): each entry rolls its `prob`,
+mesos vary by ±25%, items take `min`..`max`. Quest-only entries roll only
+while that quest is started and the player doesn't hold the item yet. Without
+a content pack, mobs drop only the overrides. The client actor rolls (it has
+the player's quests) and asks the field to place the loot.
+
+The field's `field_drops::DropSet` spreads a kill's drops around where the
+mob died and shows them falling (DROP_ITEM_FROM_MAPOBJECT 1); players
+entering see lying drops (mode 2). Quest drops are shown only to their owner.
+For 15 s only the killer may pick a drop up (quest drops: always only the
+owner); drops vanish after 180 s (REMOVE_ITEM_FROM_MAP 0).
+
+ITEM_PICKUP (`0xCA`) needs the player within 800×600 of the drop. The field
+removes it (REMOVE_ITEM_FROM_MAP 2 with the looter) and hands it to the
+client actor, which adds mesos (MESO stat update, "You have gained mesos")
+or the item (INVENTORY_OPERATION, "You have gained an item"). If the item
+doesn't fit, the player sees "You can't get anymore items." and the drop goes
+back on the ground.
+
 ## Getting hurt
 
 TAKE_DAMAGE from a touch (-1) is accepted up to the touching mob's
@@ -56,4 +79,6 @@ keymap, as HeavenClient numbers its actions.
 EXP sharing, and respawn; `net::combat` covers parsing, the damage cap, and
 the broadcast; `mob_combat` (integration) runs two players in Dangerous
 Forest through control, relayed movement, hits, kills, EXP, refused damage,
-touch damage, a level-up seen by the other player, and a respawn.
+touch damage, a level-up seen by the other player, and a respawn;
+`drops_and_pickup` checks ownership, reach, pickup, replays, meso
+persistence, and that the tutorial sentinel's quest drop needs its quest.

@@ -74,6 +74,7 @@ pub struct SetFieldPacket {
     pub quests: std::collections::BTreeMap<i16, u8>,
     /// Equipped item ids by (positive) equipped slot.
     pub equipped: BTreeMap<i16, i32>,
+    pub meso: i32,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -218,6 +219,8 @@ pub fn opcode_name(opcode: i16) -> &'static str {
         x if x == SendOpcode::SpawnMonsterControl as i16 => "SpawnMonsterControl",
         x if x == SendOpcode::MoveMonster as i16 => "MoveMonster",
         x if x == SendOpcode::KillMonster as i16 => "KillMonster",
+        x if x == SendOpcode::DropItemFromMapObject as i16 => "DropItemFromMapObject",
+        x if x == SendOpcode::RemoveItemFromMap as i16 => "RemoveItemFromMap",
         _ => "Unknown",
     }
 }
@@ -613,7 +616,7 @@ pub fn decode_set_field(packet: &Packet) -> Result<SetFieldPacket, String> {
     if cursor.read_byte().map_err(|e| e.to_string())? != 0 {
         cursor.read_str_with_length().map_err(|e| e.to_string())?; // linked name
     }
-    cursor.read_int().map_err(|e| e.to_string())?; // meso
+    let meso = cursor.read_int().map_err(|e| e.to_string())?;
     skip(&mut cursor, 5 + 8)?; // slot limits, timestamp
 
     // Equipped, equipped cash, and equip bag: short slot lists ending in 0.
@@ -677,6 +680,7 @@ pub fn decode_set_field(packet: &Packet) -> Result<SetFieldPacket, String> {
         ap: meta.ap,
         quests,
         equipped,
+        meso,
     })
 }
 
