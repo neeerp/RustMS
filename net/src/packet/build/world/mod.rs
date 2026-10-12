@@ -6,3 +6,4 @@ pub mod map;
 pub mod messaging;
 pub mod npc;
 pub mod quest;
+pub mod stat;

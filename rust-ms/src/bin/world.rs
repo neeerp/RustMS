@@ -1,13 +1,9 @@
-use runtime::{ClientActor, ClientEvent, WorldServerActor};
 use std::env;
-use tokio::net::TcpListener;
-use tokio::sync::mpsc;
 use tracing::{error, info};
 use tracing_subscriber::EnvFilter;
 
 #[tokio::main]
 async fn main() {
-    // Initialize logging
     tracing_subscriber::fmt()
         .with_env_filter(
             EnvFilter::from_default_env().add_directive("runtime=info".parse().unwrap()),
@@ -17,41 +13,15 @@ async fn main() {
     info!("Starting World Server...");
 
     if let Err(e) = runtime::prepare_database().await {
-        tracing::error!(error = %e, "Failed to prepare database");
+        error!(error = %e, "Failed to prepare database");
         std::process::exit(1);
     }
 
-    // Create channel for client events -> world server
-    let (event_tx, event_rx) = mpsc::channel::<ClientEvent>(256);
-
-    // Spawn world server actor
-    let world_server = WorldServerActor::new(event_rx);
-    tokio::spawn(async move {
-        world_server.run().await;
-    });
-
-    // Accept connections
-    let bind_addr =
-        env::var("RUSTMS_WORLD_BIND_ADDR").unwrap_or_else(|_| "0.0.0.0:8485".to_string());
-    let listener = TcpListener::bind(&bind_addr).await.unwrap();
-    info!("World Server listening on {}", bind_addr);
-
-    loop {
-        match listener.accept().await {
-            Ok((stream, peer_addr)) => {
-                info!(%peer_addr, "World connection accepted");
-
-                let event_tx = event_tx.clone();
-                tokio::spawn(async move {
-                    match ClientActor::new(stream, event_tx, peer_addr).await {
-                        Ok(actor) => actor.run().await,
-                        Err(e) => error!(error = %e, "Failed to create ClientActor"),
-                    }
-                });
-            }
-            Err(e) => {
-                error!(error = %e, "Error accepting world connection");
-            }
-        }
+    // Channels listen on the ports from the channel configuration
+    // (RUSTMS_LOGIN_CHANNELS); this only picks the interface.
+    let bind_host = env::var("RUSTMS_WORLD_BIND_HOST").unwrap_or_else(|_| "0.0.0.0".to_string());
+    if let Err(e) = runtime::run_world_server(&bind_host).await {
+        error!(error = %e, "World server error");
+        std::process::exit(1);
     }
 }

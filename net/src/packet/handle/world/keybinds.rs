@@ -1,46 +1,32 @@
-use crate::error::NetworkError;
-use crate::handler::{HandlerContext, HandlerResult, PacketHandler};
-use db::keybinding::KeybindType;
+use crate::handler::{HandlerResult, WorldContext, WorldHandler, WorldResult};
+use game::keymap::KEY_COUNT;
+use game::KeyBinding;
 use packet::{io::read::PktRead, Packet};
-use std::io::BufReader;
+use std::io::Cursor;
 
 pub struct ChangeKeybindsHandler;
 
-impl ChangeKeybindsHandler {
-    pub fn new() -> Self {
-        Self
-    }
-}
+impl WorldHandler for ChangeKeybindsHandler {
+    fn handle(&self, packet: &mut Packet, ctx: &mut WorldContext) -> WorldResult {
+        let mut reader = Cursor::new(&packet.bytes);
+        reader.read_short()?;
 
-impl PacketHandler for ChangeKeybindsHandler {
-    fn handle(
-        &self,
-        packet: &mut Packet,
-        ctx: &mut HandlerContext,
-    ) -> Result<HandlerResult, NetworkError> {
-        let mut reader = BufReader::new(&**packet);
-        reader.read_short()?; // prune op
-
-        if packet.len() < 2 {
+        // Mode 0 changes key bindings; other modes (auto HP/MP pots) are not
+        // supported yet.
+        if reader.read_int()? != 0 {
             return Ok(HandlerResult::empty());
         }
 
-        let character = ctx.session.get_character()?;
-        let mut character = character.lock().unwrap();
-        if reader.read_int()? == 0 {
-            for _ in 0..reader.read_int()? {
-                let key = reader.read_int()? as i16;
-                let bind_type: KeybindType = reader.read_byte()?.into();
-                let action = reader.read_int()? as i16;
-
-                let mut bind = character.key_binds.get(key);
-                bind.bind_type = bind_type;
-                bind.action = action;
-                character.key_binds.set(bind);
+        let count = reader.read_int()?;
+        let keymap = ctx.player.keymap_mut();
+        for _ in 0..count {
+            let key = reader.read_int()?;
+            let kind = reader.read_byte()?;
+            let action = reader.read_int()?;
+            if (0..i32::from(KEY_COUNT)).contains(&key) {
+                keymap.bind(key as i16, KeyBinding { kind, action });
             }
         }
-
-        character.key_binds.save()?;
         Ok(HandlerResult::empty())
     }
 }

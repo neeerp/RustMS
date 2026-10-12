@@ -21,6 +21,7 @@ mod sql_types;
 pub mod account;
 pub mod character;
 pub mod keybinding;
+pub mod player;
 pub mod quest;
 pub mod session;
 

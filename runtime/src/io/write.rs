@@ -1,8 +1,13 @@
 use crate::error::RuntimeError;
 use crypt::MapleAES;
 use packet::Packet;
+use std::time::Duration;
 use tokio::io::{AsyncWriteExt, BufWriter};
 use tokio::net::tcp::OwnedWriteHalf;
+
+/// How long one packet may take to reach the socket. A peer that stops
+/// reading would otherwise block its connection's actor forever.
+pub const WRITE_TIMEOUT: Duration = Duration::from_secs(10);
 
 pub struct PacketWriter {
     writer: BufWriter<OwnedWriteHalf>,
@@ -36,9 +41,16 @@ impl PacketWriter {
 
         // Send header and body as one write so they leave in one segment.
         frame.extend_from_slice(&packet.bytes);
-        self.writer.write_all(&frame).await?;
-        self.writer.flush().await?;
-
-        Ok(())
+        let write = async {
+            self.writer.write_all(&frame).await?;
+            self.writer.flush().await
+        };
+        match tokio::time::timeout(WRITE_TIMEOUT, write).await {
+            Ok(result) => Ok(result?),
+            Err(_) => Err(RuntimeError::Io(std::io::Error::new(
+                std::io::ErrorKind::TimedOut,
+                "peer is not reading",
+            ))),
+        }
     }
 }

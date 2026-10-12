@@ -1,320 +1,302 @@
-use crate::error::NetworkError;
-use crate::helpers::to_hex_string;
-use db::session::SessionWrapper;
-use packet::Packet;
+//! Packet handler contracts and the opcode registry.
+//!
+//! Login and world handlers are separate traits with separate action types,
+//! so neither server has to ignore the other's verbs. Each server has one
+//! routing table that maps an opcode to its handler and to the session stage
+//! the client must be in; the runtime dispatches through `login_route` /
+//! `world_route` and never matches on opcodes itself.
 
-/// Unique identifier for a connected client.
-/// Uses character_id for world server clients.
+use crate::dialogue::NpcInteraction;
+use crate::error::NetworkError;
+use crate::packet::handle::{login, world};
+use crate::packet::op::RecvOpcode;
+use db::session::{Session, SessionState};
+use game::Player;
+use packet::Packet;
+use std::collections::HashMap;
+use std::sync::OnceLock;
+
+/// Unique identifier for a connected world client (its character id).
 pub type ClientId = i32;
 
-/// Trait for packet handlers.
-/// Handlers take a packet and context, returning actions to perform.
-pub trait PacketHandler: Send + Sync {
-    fn handle(
-        &self,
-        packet: &mut Packet,
-        ctx: &mut HandlerContext,
-    ) -> Result<HandlerResult, NetworkError>;
-}
-
-/// Default handler that logs unknown packets.
-pub struct DefaultHandler;
-
-impl PacketHandler for DefaultHandler {
-    fn handle(
-        &self,
-        packet: &mut Packet,
-        _ctx: &mut HandlerContext,
-    ) -> Result<HandlerResult, NetworkError> {
-        let op = packet.opcode();
-        println!("Opcode: {}", op);
-        println!("Received packet: {}", to_hex_string(&packet.bytes));
-        Err(NetworkError::UnsupportedOpcodeError(op))
-    }
-}
-
-use crate::listener::ServerType;
-use crate::packet::op::RecvOpcode;
-
-/// Get the packet handler for the given opcode and server type.
-pub fn get_handler(op: i16, server_type: &ServerType) -> Box<dyn PacketHandler> {
-    match server_type {
-        ServerType::Login => get_login_handler(op),
-        ServerType::World => get_world_handler(op),
-    }
-}
-
-fn get_login_handler(op: i16) -> Box<dyn PacketHandler> {
-    use crate::packet::handle::login;
-
-    match num::FromPrimitive::from_i16(op) {
-        Some(RecvOpcode::LoginCredentials) => Box::new(login::LoginCredentialsHandler::new()),
-        Some(RecvOpcode::GuestLogin) => Box::new(login::GuestLoginHandler::new()),
-        Some(RecvOpcode::ServerListReRequest) => Box::new(login::WorldListHandler::new()),
-        Some(RecvOpcode::CharListRequest) => Box::new(login::CharListHandler::new()),
-        Some(RecvOpcode::ServerStatusRequest) => Box::new(login::ServerStatusHandler::new()),
-        Some(RecvOpcode::AcceptTOS) => Box::new(login::AcceptTOSHandler::new()),
-        Some(RecvOpcode::SetGender) => Box::new(login::SetGenderHandler::new()),
-        Some(RecvOpcode::AfterLogin) => Box::new(DefaultHandler),
-        Some(RecvOpcode::RegisterPin) => Box::new(DefaultHandler),
-        Some(RecvOpcode::ServerListRequest) => Box::new(login::WorldListHandler::new()),
-        Some(RecvOpcode::ViewAllChar) => Box::new(DefaultHandler),
-        Some(RecvOpcode::PickAllChar) => Box::new(DefaultHandler),
-        Some(RecvOpcode::CharSelect) => Box::new(login::CharacterSelectHandler::new()),
-        Some(RecvOpcode::CheckCharName) => Box::new(login::CheckCharNameHandler::new()),
-        Some(RecvOpcode::CreateChar) => Box::new(login::CreateCharacterHandler::new()),
-        Some(RecvOpcode::DeleteChar) => Box::new(login::DeleteCharHandler::new()),
-        Some(RecvOpcode::RegisterPic) => Box::new(DefaultHandler),
-        Some(RecvOpcode::CharSelectWithPic) => Box::new(DefaultHandler),
-        Some(RecvOpcode::ViewAllPicRegister) => Box::new(DefaultHandler),
-        Some(RecvOpcode::ViewAllWithPic) => Box::new(DefaultHandler),
-        Some(RecvOpcode::LoginStarted) => Box::new(login::LoginStartHandler::new()),
-        None | Some(_) => Box::new(DefaultHandler),
-    }
-}
-
-fn get_world_handler(op: i16) -> Box<dyn PacketHandler> {
-    use crate::packet::handle::world;
-
-    match num::FromPrimitive::from_i16(op) {
-        Some(RecvOpcode::PlayerMove) => Box::new(world::PlayerMoveHandler::new()),
-        Some(RecvOpcode::PlayerLoggedIn) => Box::new(world::PlayerLoggedInHandler::new()),
-        Some(RecvOpcode::ChangeChannel) => Box::new(world::ChangeChannelHandler::new()),
-        Some(RecvOpcode::PlayerMapTransfer) => Box::new(world::PlayerMapTransferHandler::new()),
-        Some(RecvOpcode::ChangeMap) => Box::new(world::ChangeMapHandler::new()),
-        Some(RecvOpcode::PartySearch) => Box::new(world::PartySearchHandler::new()),
-        Some(RecvOpcode::ChangeKeybinds) => Box::new(world::ChangeKeybindsHandler::new()),
-        Some(RecvOpcode::AllChat) => Box::new(world::AllChatHandler::new()),
-        Some(RecvOpcode::Whisper) => Box::new(world::WhisperHandler::new()),
-        Some(RecvOpcode::TalkToNpc) => Box::new(world::NpcTalkHandler),
-        Some(RecvOpcode::NpcTalkMore) => Box::new(world::NpcTalkMoreHandler),
-        None | Some(_) => Box::new(DefaultHandler),
-    }
-}
-
-/// Defines who should receive a broadcast message.
-#[derive(Debug, Clone)]
-pub enum BroadcastScope {
-    /// All players on a specific map
-    Map(i32),
-    /// All players on a map except the sender
-    MapExcludeSelf(i32),
-    /// All players in the world/channel
-    World,
-    /// All players in the world except the sender
-    WorldExcludeSelf,
-    // Future: Party(i32), Guild(i32), Nearby(i32, i16, i16), etc.
-}
-
-/// Context available to packet handlers.
-/// Provides access to session data without exposing the network stream.
-pub struct HandlerContext<'a> {
-    /// The client's identifier (character_id for world server)
-    pub client_id: ClientId,
-    /// Session and character data
-    pub session: &'a mut SessionWrapper,
-}
-
-use db::session::SessionState;
-
-/// Actions a handler can request the actor to perform.
+/// Actions requested by a handler, in order.
 #[derive(Debug)]
-pub enum HandlerAction {
-    /// Resolve an NPC interaction against the client's current field.
-    NpcInteraction(crate::dialogue::NpcInteraction),
-    /// Send a packet to the requesting client
-    Reply(Packet),
-    /// Broadcast a packet to multiple clients
-    Broadcast {
-        scope: BroadcastScope,
-        packet: Packet,
-    },
-    /// Disconnect this client
-    Disconnect,
-    /// Create a new session (login server only)
-    /// The actor will fill in network-specific details (IP address)
-    CreateSession {
-        account_id: i32,
-        hwid: String,
-        state: SessionState,
-    },
-    /// Attach a character to the current session
-    AttachCharacter { character_id: i32 },
-    /// Persist the currently selected world and channel for login handoff.
-    UpdateSessionSelection { world_id: u8, channel_id: u8 },
-    /// Reattach session from login server (world server)
-    ReattachSession { character_id: i32, channel_id: u8 },
-    /// Request a controlled channel migration for this client.
-    ChangeChannel { world_id: u8, channel_id: u8 },
-    /// Deliver a directed whisper to another player.
-    Whisper {
-        target_name: String,
-        recipient_packet: Packet,
-        sender_success_packet: Packet,
-        sender_failure_packet: Packet,
-    },
-    /// Broadcast local chat to the client's current field.
-    FieldChat { packet: Packet },
-    /// Broadcast player movement to the client's current field.
-    FieldMove {
-        packet: Packet,
-        movement_bytes: Vec<u8>,
-    },
-    /// Notify runtime that this client changed maps.
-    MapChanged {
-        old_map_id: i32,
-        new_map_id: i32,
-        spawn_portal_id: Option<u8>,
-        spawn_x: Option<i16>,
-        spawn_y: Option<i16>,
-        spawn_stance: Option<u8>,
-    },
+pub struct HandlerResult<A> {
+    pub actions: Vec<A>,
 }
 
-/// Result of handling a packet - contains all requested actions.
-#[derive(Debug, Default)]
-pub struct HandlerResult {
-    pub actions: Vec<HandlerAction>,
+/// Every action type can carry a plain reply to the requesting client.
+pub trait ReplyAction {
+    fn reply(packet: Packet) -> Self;
 }
 
-impl HandlerResult {
-    /// Create an empty result (no actions).
+impl<A: ReplyAction> HandlerResult<A> {
     pub fn empty() -> Self {
         Self { actions: vec![] }
     }
 
-    /// Create a result with a single reply packet.
     pub fn reply(packet: Packet) -> Self {
-        Self {
-            actions: vec![HandlerAction::Reply(packet)],
+        Self::empty().with_reply(packet)
+    }
+
+    pub fn with_reply(self, packet: Packet) -> Self {
+        self.with(A::reply(packet))
+    }
+
+    pub fn with(mut self, action: A) -> Self {
+        self.actions.push(action);
+        self
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Login server
+// ---------------------------------------------------------------------------
+
+/// What a login handler can see. Login handlers may touch the database; the
+/// runtime runs them on the blocking pool.
+pub struct LoginContext<'a> {
+    pub session: &'a Option<Session>,
+    pub peer_ip: std::net::IpAddr,
+}
+
+impl LoginContext<'_> {
+    pub fn session(&self) -> Result<&Session, NetworkError> {
+        self.session.as_ref().ok_or(NetworkError::NotLoggedIn)
+    }
+}
+
+#[derive(Debug)]
+pub enum LoginAction {
+    Reply(Packet),
+    /// Replace the connection's session (handlers open and close sessions
+    /// themselves so that acquiring one is atomic).
+    SetSession(Option<Session>),
+    /// Move the current session to a new state (e.g. terms accepted).
+    SetSessionState(SessionState),
+    /// Persist the world and channel the client picked.
+    SelectChannel { world_id: u8, channel_id: u8 },
+    /// Issue a world-entry ticket for an owned character.
+    EnterWorld { character_id: i32 },
+    Disconnect,
+}
+
+impl ReplyAction for LoginAction {
+    fn reply(packet: Packet) -> Self {
+        LoginAction::Reply(packet)
+    }
+}
+
+pub type LoginResult = Result<HandlerResult<LoginAction>, NetworkError>;
+
+pub trait LoginHandler: Send + Sync {
+    fn handle(&self, packet: &mut Packet, ctx: &LoginContext) -> LoginResult;
+}
+
+/// Session requirement for a login opcode.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum LoginStage {
+    /// Allowed before authentication.
+    Any,
+    /// Requires a session, including one still accepting terms.
+    Session,
+    /// Requires a fully logged-in session.
+    LoggedIn,
+}
+
+impl LoginStage {
+    pub fn admits(self, session: &Option<Session>) -> bool {
+        match self {
+            LoginStage::Any => true,
+            LoginStage::Session => session.is_some(),
+            LoginStage::LoggedIn => session
+                .as_ref()
+                .is_some_and(|s| s.state == SessionState::AfterLogin),
         }
     }
+}
 
-    /// Create a result with multiple reply packets.
-    pub fn replies(packets: Vec<Packet>) -> Self {
-        Self {
-            actions: packets.into_iter().map(HandlerAction::Reply).collect(),
-        }
+pub struct LoginRoute {
+    pub stage: LoginStage,
+    pub handler: &'static dyn LoginHandler,
+}
+
+fn login_routes() -> &'static HashMap<i16, LoginRoute> {
+    static ROUTES: OnceLock<HashMap<i16, LoginRoute>> = OnceLock::new();
+    ROUTES.get_or_init(|| {
+        use LoginStage::*;
+        use RecvOpcode as Op;
+        let table: [(Op, LoginStage, &'static dyn LoginHandler); 13] = [
+            (Op::LoginStarted, Any, &login::LoginStartHandler),
+            (Op::LoginCredentials, Any, &login::LoginCredentialsHandler),
+            (Op::GuestLogin, Any, &login::GuestLoginHandler),
+            (Op::AcceptTOS, Session, &login::AcceptTOSHandler),
+            (Op::SetGender, Session, &login::SetGenderHandler),
+            (Op::ServerListRequest, LoggedIn, &login::WorldListHandler),
+            (Op::ServerListReRequest, LoggedIn, &login::WorldListHandler),
+            (Op::ServerStatusRequest, LoggedIn, &login::ServerStatusHandler),
+            (Op::CharListRequest, LoggedIn, &login::CharListHandler),
+            (Op::CheckCharName, LoggedIn, &login::CheckCharNameHandler),
+            (Op::CreateChar, LoggedIn, &login::CreateCharacterHandler),
+            (Op::DeleteChar, LoggedIn, &login::DeleteCharHandler),
+            (Op::CharSelect, LoggedIn, &login::CharacterSelectHandler),
+        ];
+        table
+            .into_iter()
+            .map(|(op, stage, handler)| (op as i16, LoginRoute { stage, handler }))
+            .collect()
+    })
+}
+
+/// The route for a login opcode, if one is registered.
+pub fn login_route(opcode: i16) -> Option<&'static LoginRoute> {
+    login_routes().get(&opcode)
+}
+
+// ---------------------------------------------------------------------------
+// World server
+// ---------------------------------------------------------------------------
+
+/// What an in-game world handler can see: the player it acts on. World
+/// handlers are pure (no database or network IO) and run inline on the
+/// client actor; anything with side effects is returned as an action.
+pub struct WorldContext<'a> {
+    pub client_id: ClientId,
+    pub channel_id: u8,
+    pub player: &'a mut Player,
+}
+
+/// A whisper ready for delivery; the world directory picks which packet the
+/// sender gets back.
+#[derive(Debug)]
+pub struct WhisperDelivery {
+    pub target_name: String,
+    pub recipient_packet: Packet,
+    pub sender_success_packet: Packet,
+    pub sender_failure_packet: Packet,
+}
+
+/// Where a character appears after changing maps.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct SpawnPosition {
+    pub x: i16,
+    pub y: i16,
+    pub stance: u8,
+}
+
+#[derive(Debug)]
+pub enum WorldAction {
+    Reply(Packet),
+    /// Enter the game with the character named in PLAYER_LOGGEDIN.
+    EnterGame { character_id: i32 },
+    /// The player already moved to `map_id` (the handler updated it and sent
+    /// the warp); move the client's field membership to match.
+    ChangeField {
+        map_id: i32,
+        spawn: Option<SpawnPosition>,
+    },
+    FieldChat(Packet),
+    FieldMove {
+        packet: Packet,
+        movement_bytes: Vec<u8>,
+    },
+    NpcInteraction(NpcInteraction),
+    Whisper(WhisperDelivery),
+    ChangeChannel { channel_id: u8 },
+    Disconnect,
+}
+
+impl ReplyAction for WorldAction {
+    fn reply(packet: Packet) -> Self {
+        WorldAction::Reply(packet)
+    }
+}
+
+pub type WorldResult = Result<HandlerResult<WorldAction>, NetworkError>;
+
+/// Handles packets from a client that has entered the game.
+pub trait WorldHandler: Send + Sync {
+    fn handle(&self, packet: &mut Packet, ctx: &mut WorldContext) -> WorldResult;
+}
+
+/// Handles packets from a client that has connected but not entered yet.
+pub trait PreGameHandler: Send + Sync {
+    fn handle(&self, packet: &mut Packet) -> WorldResult;
+}
+
+pub enum WorldRoute {
+    PreGame(&'static dyn PreGameHandler),
+    InGame(&'static dyn WorldHandler),
+}
+
+fn world_routes() -> &'static HashMap<i16, WorldRoute> {
+    static ROUTES: OnceLock<HashMap<i16, WorldRoute>> = OnceLock::new();
+    ROUTES.get_or_init(|| {
+        use RecvOpcode as Op;
+        use WorldRoute::*;
+        let table: [(Op, WorldRoute); 11] = [
+            (Op::PlayerLoggedIn, PreGame(&world::PlayerLoggedInHandler)),
+            (Op::PlayerMove, InGame(&world::PlayerMoveHandler)),
+            (Op::ChangeChannel, InGame(&world::ChangeChannelHandler)),
+            (Op::ChangeMap, InGame(&world::ChangeMapHandler)),
+            (Op::PlayerMapTransfer, InGame(&world::PlayerMapTransferHandler)),
+            (Op::PlayerUpdate, InGame(&world::PlayerUpdateHandler)),
+            (Op::ChangeKeybinds, InGame(&world::ChangeKeybindsHandler)),
+            (Op::AllChat, InGame(&world::AllChatHandler)),
+            (Op::Whisper, InGame(&world::WhisperHandler)),
+            (Op::TalkToNpc, InGame(&world::NpcTalkHandler)),
+            (Op::NpcTalkMore, InGame(&world::NpcTalkMoreHandler)),
+        ];
+        table
+            .into_iter()
+            .map(|(op, route)| (op as i16, route))
+            .collect()
+    })
+}
+
+/// The route for a world opcode, if one is registered.
+pub fn world_route(opcode: i16) -> Option<&'static WorldRoute> {
+    world_routes().get(&opcode)
+}
+
+/// Defines who should receive a world-wide broadcast.
+#[derive(Debug, Clone)]
+pub enum BroadcastScope {
+    /// All players in the world.
+    World,
+    /// All players in the world except the sender.
+    WorldExcludeSelf,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn every_registered_opcode_is_unique_per_server() {
+        // The maps would silently drop duplicates; check the table sizes match.
+        assert_eq!(login_routes().len(), 13);
+        assert_eq!(world_routes().len(), 11);
     }
 
-    /// Add a reply packet to this result.
-    pub fn with_reply(mut self, packet: Packet) -> Self {
-        self.actions.push(HandlerAction::Reply(packet));
-        self
+    #[test]
+    fn character_flow_requires_a_logged_in_session() {
+        let route = login_route(RecvOpcode::CharSelect as i16).unwrap();
+        assert_eq!(route.stage, LoginStage::LoggedIn);
+        assert!(!route.stage.admits(&None));
+        assert!(login_route(RecvOpcode::LoginCredentials as i16)
+            .unwrap()
+            .stage
+            .admits(&None));
     }
 
-    /// Add a broadcast action to this result.
-    pub fn with_broadcast(mut self, scope: BroadcastScope, packet: Packet) -> Self {
-        self.actions
-            .push(HandlerAction::Broadcast { scope, packet });
-        self
-    }
-
-    /// Add a disconnect action to this result.
-    pub fn with_disconnect(mut self) -> Self {
-        self.actions.push(HandlerAction::Disconnect);
-        self
-    }
-
-    /// Add a create session action (for login).
-    pub fn with_create_session(
-        mut self,
-        account_id: i32,
-        hwid: String,
-        state: SessionState,
-    ) -> Self {
-        self.actions.push(HandlerAction::CreateSession {
-            account_id,
-            hwid,
-            state,
-        });
-        self
-    }
-
-    /// Add an attach character action.
-    pub fn with_attach_character(mut self, character_id: i32) -> Self {
-        self.actions
-            .push(HandlerAction::AttachCharacter { character_id });
-        self
-    }
-
-    /// Persist the selected world and channel for the current session.
-    pub fn with_update_session_selection(mut self, world_id: u8, channel_id: u8) -> Self {
-        self.actions.push(HandlerAction::UpdateSessionSelection {
-            world_id,
-            channel_id,
-        });
-        self
-    }
-
-    /// Add a reattach session action (for world server).
-    pub fn with_reattach_session(mut self, character_id: i32, channel_id: u8) -> Self {
-        self.actions.push(HandlerAction::ReattachSession {
-            character_id,
-            channel_id,
-        });
-        self
-    }
-
-    /// Request a controlled channel migration.
-    pub fn with_change_channel(mut self, world_id: u8, channel_id: u8) -> Self {
-        self.actions.push(HandlerAction::ChangeChannel {
-            world_id,
-            channel_id,
-        });
-        self
-    }
-
-    /// Add a whisper delivery action.
-    pub fn with_whisper(
-        mut self,
-        target_name: String,
-        recipient_packet: Packet,
-        sender_success_packet: Packet,
-        sender_failure_packet: Packet,
-    ) -> Self {
-        self.actions.push(HandlerAction::Whisper {
-            target_name,
-            recipient_packet,
-            sender_success_packet,
-            sender_failure_packet,
-        });
-        self
-    }
-
-    /// Add a local field-chat action.
-    pub fn with_field_chat(mut self, packet: Packet) -> Self {
-        self.actions.push(HandlerAction::FieldChat { packet });
-        self
-    }
-
-    /// Add a local field-move action.
-    pub fn with_field_move(mut self, packet: Packet, movement_bytes: Vec<u8>) -> Self {
-        self.actions.push(HandlerAction::FieldMove {
-            packet,
-            movement_bytes,
-        });
-        self
-    }
-
-    /// Notify runtime that this client changed maps.
-    pub fn with_map_changed(
-        mut self,
-        old_map_id: i32,
-        new_map_id: i32,
-        spawn_portal_id: Option<u8>,
-        spawn_x: Option<i16>,
-        spawn_y: Option<i16>,
-        spawn_stance: Option<u8>,
-    ) -> Self {
-        self.actions.push(HandlerAction::MapChanged {
-            old_map_id,
-            new_map_id,
-            spawn_portal_id,
-            spawn_x,
-            spawn_y,
-            spawn_stance,
-        });
-        self
+    #[test]
+    fn only_player_login_is_allowed_before_entering_the_game() {
+        let pre_game: Vec<_> = world_routes()
+            .iter()
+            .filter(|(_, route)| matches!(route, WorldRoute::PreGame(_)))
+            .map(|(&op, _)| op)
+            .collect();
+        assert_eq!(pre_game, vec![RecvOpcode::PlayerLoggedIn as i16]);
     }
 }

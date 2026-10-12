@@ -2,7 +2,7 @@
 name = "net"
 version = "0.1.0"
 authors = ["David Goldstein <goldstein.g.david@gmail.com>"]
-edition = "2018"
+edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -10,6 +10,7 @@ edition = "2018"
 packet = { path = "../packet" }
 crypt = { path = "../crypt" }
 db = { path = "../db" }
+game = { path = "../game" }
 game-data = { path = "../game-data" }
 bufstream = "0.1.4"
 rand = "0.7.3"
@@ -19,3 +20,7 @@ num-traits = "0.2"
 serde_derive = "^1.0.8"
 serde = "^1.0.8"
 config = "0.10.1"
+tracing = "0.1"
+
+[dev-dependencies]
+byteorder = "1"

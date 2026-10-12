@@ -1,3 +1,4 @@
+use std::collections::BTreeMap;
 use net::packet::build::world::messaging::{
     WHISPER_RECEIVE_MODE, WHISPER_REQUEST_MODE, WHISPER_RESULT_MODE,
 };
@@ -16,6 +17,8 @@ const MOVEMENT_HEADER_LEN: usize = 9;
 pub struct CharacterSummary {
     pub id: i32,
     pub name: String,
+    /// Visible equipment by body slot, as shown in the character list.
+    pub visible_equips: BTreeMap<u8, i32>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -69,6 +72,8 @@ pub struct SetFieldPacket {
     pub exp: i32,
     pub ap: i16,
     pub quests: std::collections::BTreeMap<i16, u8>,
+    /// Equipped item ids by (positive) equipped slot.
+    pub equipped: BTreeMap<i16, i32>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -82,6 +87,7 @@ pub struct SpawnPlayerPacket {
     pub character_id: i32,
     pub level: u8,
     pub character_name: String,
+    pub visible_equips: BTreeMap<u8, i32>,
     pub x: i16,
     pub y: i16,
     pub stance: u8,
@@ -160,10 +166,10 @@ impl CharacterTemplate {
                 hair: 31000,
                 hair_color: 0,
                 skin: 0,
-                top: 0,
-                bottom: 0,
-                shoes: 0,
-                weapon: 0,
+                top: 1041002,
+                bottom: 1061002,
+                shoes: 1072001,
+                weapon: 1302000,
                 gender,
             },
             _ => Self {
@@ -172,10 +178,10 @@ impl CharacterTemplate {
                 hair: 30000,
                 hair_color: 0,
                 skin: 0,
-                top: 0,
-                bottom: 0,
-                shoes: 0,
-                weapon: 0,
+                top: 1040002,
+                bottom: 1060002,
+                shoes: 1072001,
+                weapon: 1302000,
                 gender: 0,
             },
         }
@@ -322,28 +328,13 @@ pub fn build_create_char(name: &str, template: CharacterTemplate) -> Result<Pack
     Ok(packet)
 }
 
+/// PLAYER_LOGGEDIN as a v83 client sends it: just the character id. The
+/// server knows the channel from the port the connection arrived on.
 pub fn build_player_logged_in(character_id: i32) -> Result<Packet, String> {
     let mut packet = packet_with_opcode(RecvOpcode::PlayerLoggedIn as i16);
     packet
         .write_int(character_id)
         .map_err(|e| format!("failed to write logged-in character id: {e}"))?;
-    packet
-        .write_byte(0)
-        .map_err(|e| format!("failed to write logged-in channel id: {e}"))?;
-    Ok(packet)
-}
-
-pub fn build_player_logged_in_for_channel(
-    character_id: i32,
-    channel_id: u8,
-) -> Result<Packet, String> {
-    let mut packet = packet_with_opcode(RecvOpcode::PlayerLoggedIn as i16);
-    packet
-        .write_int(character_id)
-        .map_err(|e| format!("failed to write logged-in character id: {e}"))?;
-    packet
-        .write_byte(channel_id)
-        .map_err(|e| format!("failed to write logged-in channel id: {e}"))?;
     Ok(packet)
 }
 
@@ -497,10 +488,13 @@ pub fn decode_char_list(packet: &Packet) -> Result<CharListPacket, String> {
     let mut characters = Vec::with_capacity(count as usize);
     for _ in 0..count {
         let meta = decode_character_meta(&mut cursor)?;
-        skip(&mut cursor, 41)?;
+        let look = decode_look(&mut cursor)?;
+        // View-all flag and ranking flag (ranking disabled).
+        skip(&mut cursor, 2)?;
         characters.push(CharacterSummary {
             id: meta.id,
             name: meta.name,
+            visible_equips: look,
         });
     }
 
@@ -535,13 +529,15 @@ pub fn decode_new_character(packet: &Packet) -> Result<NewCharacterPacket, Strin
         .read_byte()
         .map_err(|e| format!("failed to read new-character status: {e}"))?;
     let meta = decode_character_meta(&mut cursor)?;
-    skip(&mut cursor, 41)?;
+    let look = decode_look(&mut cursor)?;
+    skip(&mut cursor, 2)?;
 
     Ok(NewCharacterPacket {
         status,
         character: CharacterSummary {
             id: meta.id,
             name: meta.name,
+            visible_equips: look,
         },
     })
 }
@@ -601,27 +597,45 @@ pub fn decode_set_field(packet: &Packet) -> Result<SetFieldPacket, String> {
     skip(&mut cursor, 20)?;
     skip(&mut cursor, 9)?;
     let meta = decode_character_meta(&mut cursor)?;
-    // Buddy capacity/name flag, mesos, then the v83 empty inventory/skills
-    // currently emitted by RustMS. Fail rather than silently misparse items.
-    skip(&mut cursor, 6 + 5 + 8)?;
-    for _ in 0..2 {
-        if cursor.read_short().map_err(|e| e.to_string())? != 0 {
-            return Err("nonempty equipment inventory not supported by harness decoder".into());
+    cursor.read_byte().map_err(|e| e.to_string())?; // buddy capacity
+    if cursor.read_byte().map_err(|e| e.to_string())? != 0 {
+        cursor.read_str_with_length().map_err(|e| e.to_string())?; // linked name
+    }
+    cursor.read_int().map_err(|e| e.to_string())?; // meso
+    skip(&mut cursor, 5 + 8)?; // slot limits, timestamp
+
+    // Equipped, equipped cash, and equip bag: short slot lists ending in 0.
+    let mut equipped = BTreeMap::new();
+    for list in 0..3 {
+        loop {
+            let slot = cursor.read_short().map_err(|e| e.to_string())?;
+            if slot == 0 {
+                break;
+            }
+            let item_id = decode_item(&mut cursor)?;
+            if list == 0 {
+                equipped.insert(slot, item_id);
+            }
         }
     }
-    if cursor.read_int().map_err(|e| e.to_string())? != 0 {
-        return Err("nonempty item inventory not supported by harness decoder".into());
-    }
+    skip(&mut cursor, 2)?;
+    // Use, setup, etc, and cash bags: byte slot lists ending in 0.
     for _ in 0..4 {
-        if cursor.read_byte().map_err(|e| e.to_string())? != 0 {
-            return Err("nonempty inventory/skill flag not supported by harness decoder".into());
+        while cursor.read_byte().map_err(|e| e.to_string())? != 0 {
+            decode_item(&mut cursor)?;
         }
     }
-    for _ in 0..2 {
-        if cursor.read_short().map_err(|e| e.to_string())? != 0 {
-            return Err("nonempty skills/cooldowns not supported by harness decoder".into());
+    let skills = cursor.read_short().map_err(|e| e.to_string())?;
+    for _ in 0..skills {
+        let skill_id = cursor.read_int().map_err(|e| e.to_string())?;
+        skip(&mut cursor, 4 + 8)?;
+        if (skill_id / 10_000) % 10 == 2 {
+            skip(&mut cursor, 4)?;
         }
     }
+    let cooldowns = cursor.read_short().map_err(|e| e.to_string())?;
+    skip(&mut cursor, cooldowns.max(0) as usize * 6)?;
+
     let mut quests = std::collections::BTreeMap::new();
     let started = cursor.read_short().map_err(|e| e.to_string())?;
     if started < 0 {
@@ -650,7 +664,41 @@ pub fn decode_set_field(packet: &Packet) -> Result<SetFieldPacket, String> {
         exp: meta.exp,
         ap: meta.ap,
         quests,
+        equipped,
     })
+}
+
+/// KEYMAP: `(kind, action)` for each of the 90 keys.
+pub fn decode_keymap(packet: &Packet) -> Result<Vec<(u8, i32)>, String> {
+    expect_opcode(packet, SendOpcode::KeyMap as i16)?;
+    let mut cursor = Cursor::new(&packet.bytes[..]);
+    skip(&mut cursor, 2 + 1)?;
+    (0..90)
+        .map(|key| {
+            let kind = cursor
+                .read_byte()
+                .map_err(|e| format!("failed to read key {key} kind: {e}"))?;
+            let action = cursor
+                .read_int()
+                .map_err(|e| format!("failed to read key {key} action: {e}"))?;
+            Ok((kind, action))
+        })
+        .collect()
+}
+
+/// CHANGE_KEYMAP mode 0 with `(key, kind, action)` bindings.
+pub fn build_change_keymap(bindings: &[(i32, u8, i32)]) -> Result<Packet, String> {
+    let mut packet = packet_with_opcode(RecvOpcode::ChangeKeybinds as i16);
+    packet.write_int(0).map_err(|e| e.to_string())?;
+    packet
+        .write_int(bindings.len() as i32)
+        .map_err(|e| e.to_string())?;
+    for &(key, kind, action) in bindings {
+        packet.write_int(key).map_err(|e| e.to_string())?;
+        packet.write_byte(kind).map_err(|e| e.to_string())?;
+        packet.write_int(action).map_err(|e| e.to_string())?;
+    }
+    Ok(packet)
 }
 
 pub fn decode_set_field_warp(packet: &Packet) -> Result<SetFieldWarpPacket, String> {
@@ -733,14 +781,11 @@ pub fn decode_spawn_player(packet: &Packet) -> Result<SpawnPlayerPacket, String>
     let character_name = cursor
         .read_str_with_length()
         .map_err(|e| format!("failed to read spawn-player name: {e}"))?;
-    skip(
-        &mut cursor,
-        2 + 2 + 1 + 2 + 1 + 8 + 4 + 4 + 4 + 43 + 4 + 61 + 2,
-    )?;
-    skip(
-        &mut cursor,
-        1 + 1 + 4 + 1 + 4 + 1 + 4 + 1 + 4 + 1 + 1 + 4 + 4 + 4 + 4 + 4 + 4 + 4,
-    )?;
+    // Guild (empty name + emblem), the fixed foreign-buff block, then job.
+    skip(&mut cursor, 2 + 6 + 8 + 4 + 4 + 4 + 43 + 65 + 2)?;
+    let visible_equips = decode_look(&mut cursor)?;
+    // Item 5110000 count, item effect, chair.
+    skip(&mut cursor, 4 + 4 + 4)?;
     let x = cursor
         .read_short()
         .map_err(|e| format!("failed to read spawn-player x: {e}"))?;
@@ -755,6 +800,7 @@ pub fn decode_spawn_player(packet: &Packet) -> Result<SpawnPlayerPacket, String>
         character_id,
         level,
         character_name,
+        visible_equips,
         x,
         y,
         stance,
@@ -942,6 +988,56 @@ fn decode_character_meta(cursor: &mut Cursor<&[u8]>) -> Result<CharacterMeta, St
         exp,
         ap,
     })
+}
+
+/// Decode an avatar look, returning visible equipment by body slot.
+fn decode_look(cursor: &mut Cursor<&[u8]>) -> Result<BTreeMap<u8, i32>, String> {
+    skip(cursor, 1 + 1 + 4 + 1 + 4)?; // gender, skin, face, megaphone flag, hair
+    let mut visible = BTreeMap::new();
+    for list in 0..2 {
+        loop {
+            let slot = cursor.read_byte().map_err(|e| e.to_string())?;
+            if slot == 0xFF {
+                break;
+            }
+            let item_id = cursor.read_int().map_err(|e| e.to_string())?;
+            if list == 0 {
+                visible.insert(slot, item_id);
+            }
+        }
+    }
+    skip(cursor, 4 + 3 * 4)?; // cash weapon, pet ids
+    Ok(visible)
+}
+
+/// Decode one inventory item (without its slot prefix), returning its id.
+fn decode_item(cursor: &mut Cursor<&[u8]>) -> Result<i32, String> {
+    let item_type = cursor.read_byte().map_err(|e| e.to_string())?;
+    let item_id = cursor.read_int().map_err(|e| e.to_string())?;
+    let is_cash = cursor.read_byte().map_err(|e| e.to_string())? != 0;
+    if is_cash {
+        skip(cursor, 8)?;
+    }
+    skip(cursor, 8)?; // expiration
+    match item_type {
+        1 => {
+            skip(cursor, 1 + 1 + 15 * 2)?;
+            cursor.read_str_with_length().map_err(|e| e.to_string())?;
+            skip(cursor, 2)?;
+            skip(cursor, if is_cash { 10 } else { 1 + 1 + 4 + 4 + 8 })?;
+            skip(cursor, 8 + 4)?;
+        }
+        2 => {
+            skip(cursor, 2)?;
+            cursor.read_str_with_length().map_err(|e| e.to_string())?;
+            skip(cursor, 2)?;
+            if matches!(item_id / 10_000, 207 | 233) {
+                skip(cursor, 8)?;
+            }
+        }
+        other => return Err(format!("unsupported item type {other} for item {item_id}")),
+    }
+    Ok(item_id)
 }
 
 fn skip(cursor: &mut Cursor<&[u8]>, length: usize) -> Result<(), String> {

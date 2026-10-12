@@ -1,18 +1,18 @@
-use crate::{character, schema::sessions};
-
-extern crate ipnetwork;
-use character::CharacterWrapper;
+use crate::schema::sessions;
 use ipnetwork::IpNetwork;
-
-use std::{
-    sync::{Arc, Mutex},
-    time::SystemTime,
-};
+use std::time::SystemTime;
 
 pub mod repository;
 pub use repository::*;
 
-#[derive(Debug, DbEnum)]
+/// Where a session is in the login → world flow.
+///
+/// `BeforeLogin`/`AfterLogin` belong to a live login-server connection,
+/// `Transition` is a short-lived, single-use ticket to enter one channel, and
+/// `InGame` belongs to a live world connection. A row exists only while its
+/// owning connection does (plus the brief transition window), so the
+/// sessions table is the source of truth for whether an account is online.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, DbEnum)]
 #[ExistingTypePath = "crate::schema::sql_types::SessionState"]
 pub enum SessionState {
     BeforeLogin,
@@ -21,7 +21,7 @@ pub enum SessionState {
     InGame,
 }
 
-#[derive(Identifiable, Queryable, AsChangeset)]
+#[derive(Clone, Debug, Identifiable, Queryable, AsChangeset)]
 #[diesel(table_name = sessions)]
 pub struct Session {
     pub id: i32,
@@ -44,70 +44,4 @@ pub struct NewSession<'a> {
     pub ip: IpNetwork,
     pub hwid: &'a str,
     pub state: SessionState,
-}
-
-impl<'a> NewSession<'a> {
-    /// Create and save a new session.
-    pub fn create(self) -> crate::Result<SessionWrapper> {
-        SessionWrapper::from(repository::create_session(self)?)
-    }
-}
-
-/// A wrapper that holds a session as well as any additional
-/// information pertaining to the session.
-/// Uses Arc<Mutex<>> for thread-safety with async code.
-pub struct SessionWrapper {
-    pub session: Option<Session>,
-    character: Option<Arc<Mutex<CharacterWrapper>>>,
-}
-
-impl SessionWrapper {
-    /// Create a new wrapper with no associated session.
-    pub fn new_empty() -> Self {
-        Self {
-            session: None,
-            character: None,
-        }
-    }
-
-    /// Create a wrapper from an existing session, loading in the associated
-    /// character if it exists.
-    pub fn from(session: Session) -> crate::Result<Self> {
-        let c_id = session.character_id;
-
-        let mut wrapper = Self {
-            session: Some(session),
-            character: None,
-        };
-
-        if let Some(c_id) = c_id {
-            wrapper.load_character(c_id)?;
-        };
-
-        Ok(wrapper)
-    }
-
-    /// Retrieve the character that the session is associated with, or a NotFound
-    /// error if there is no character associated.
-    pub fn get_character(&mut self) -> crate::Result<Arc<Mutex<CharacterWrapper>>> {
-        self.session
-            .as_ref()
-            .and_then(|ses| ses.character_id)
-            .and_then(|c_id| {
-                self.character
-                    .as_ref()
-                    .map(|chr| chr.clone())
-                    .or_else(|| self.load_character(c_id).ok())
-            })
-            .ok_or(crate::Error::NotFound)
-    }
-
-    /// Attach a character to the session wrapper and return an Arc.
-    fn load_character(&mut self, c_id: i32) -> crate::Result<Arc<Mutex<CharacterWrapper>>> {
-        let chr = Arc::new(Mutex::new(CharacterWrapper::from_character_id(c_id)?));
-
-        self.character = Some(chr.clone());
-
-        Ok(chr.clone())
-    }
 }

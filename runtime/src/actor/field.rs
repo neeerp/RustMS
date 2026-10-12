@@ -1,17 +1,20 @@
-use crate::message::{FieldCharacter, FieldKey, FieldMessage, ServerMessage};
-use net::dialogue::NpcInteraction;
+use crate::message::{ClientHandle, FieldKey, FieldMessage, ServerMessage};
+use game::FieldAvatar;
 use net::packet::build::world::field::{
-    build_player_enter_field, build_player_leave_field, parse_movement_state, ForeignCharacter,
+    build_player_enter_field, build_player_leave_field, parse_movement_state,
 };
 use net::packet::build::world::npc::{build_spawn_npc, ForeignNpc};
+use net::ClientId;
 use packet::Packet;
 use std::collections::HashMap;
+use std::time::Duration;
 use tokio::sync::mpsc;
+use tokio::time::{interval, Instant, MissedTickBehavior};
 use tracing::{info, warn};
 
 struct Occupant {
-    sender: mpsc::Sender<ServerMessage>,
-    character: FieldCharacter,
+    handle: ClientHandle,
+    avatar: FieldAvatar,
 }
 
 #[derive(Clone, Debug)]
@@ -26,222 +29,154 @@ pub struct FieldMapEntityNpc {
     pub rx1: i16,
 }
 
+/// One live copy of a map. It owns everything local to that map: who is on
+/// it and where, its NPCs, and (later) mobs, drops, and reactors, which will
+/// advance on `tick`.
 pub struct FieldActor {
     key: FieldKey,
-    event_rx: mpsc::Receiver<FieldMessage>,
-    occupants: HashMap<i32, Occupant>,
+    rx: mpsc::Receiver<FieldMessage>,
+    occupants: HashMap<ClientId, Occupant>,
     map_npcs: Vec<FieldMapEntityNpc>,
+    tick: Duration,
 }
 
 impl FieldActor {
     pub fn new(
         key: FieldKey,
-        event_rx: mpsc::Receiver<FieldMessage>,
+        rx: mpsc::Receiver<FieldMessage>,
         map_npcs: Vec<FieldMapEntityNpc>,
+        tick: Duration,
     ) -> Self {
         Self {
             key,
-            event_rx,
+            rx,
             occupants: HashMap::new(),
             map_npcs,
+            tick,
         }
     }
 
     pub async fn run(mut self) {
         info!(field = ?self.key, "FieldActor started");
+        let mut ticker = interval(self.tick);
+        ticker.set_missed_tick_behavior(MissedTickBehavior::Delay);
 
-        while let Some(message) = self.event_rx.recv().await {
-            self.handle_message(message).await;
+        loop {
+            tokio::select! {
+                message = self.rx.recv() => match message {
+                    Some(message) => self.handle_message(message),
+                    None => break,
+                },
+                now = ticker.tick() => self.on_tick(now),
+            }
         }
-
-        info!(field = ?self.key, "FieldActor shutting down");
     }
 
-    async fn handle_message(&mut self, message: FieldMessage) {
+    /// Advance time-driven field state. Mob AI, respawns, and drop expiry
+    /// belong here; nothing on a field is time-driven yet.
+    fn on_tick(&mut self, _now: Instant) {}
+
+    fn handle_message(&mut self, message: FieldMessage) {
         match message {
-            FieldMessage::NpcInteraction { from, interaction } => {
-                self.handle_npc_interaction(from, interaction).await;
+            FieldMessage::Join { handle, avatar } => self.handle_join(handle, avatar),
+            FieldMessage::Leave { client_id } => self.handle_leave(client_id),
+            FieldMessage::UpdateAvatar { client_id, avatar } => {
+                if let Some(occupant) = self.occupants.get_mut(&client_id) {
+                    // Keep the live position; take everything else.
+                    let (x, y, stance) = (occupant.avatar.x, occupant.avatar.y, occupant.avatar.stance);
+                    occupant.avatar = FieldAvatar { x, y, stance, ..avatar };
+                }
             }
-            FieldMessage::Join {
-                client_id,
-                sender,
-                character,
-            } => {
-                self.handle_join(client_id, sender, character).await;
-            }
-            FieldMessage::Leave { client_id } => {
-                self.handle_leave(client_id).await;
-            }
-            FieldMessage::Chat { packet, .. } => {
-                self.broadcast_to_all(packet).await;
-            }
+            FieldMessage::Chat { packet, .. } => self.broadcast(None, packet),
             FieldMessage::Move {
                 from,
                 packet,
                 movement_bytes,
             } => {
                 if let Some(occupant) = self.occupants.get_mut(&from) {
-                    if let Some((x, y, stance)) = parse_movement_state(
-                        &movement_bytes,
-                        (
-                            occupant.character.x,
-                            occupant.character.y,
-                            occupant.character.stance,
-                        ),
-                    ) {
-                        occupant.character.x = x;
-                        occupant.character.y = y;
-                        occupant.character.stance = stance;
+                    let avatar = &mut occupant.avatar;
+                    if let Some((x, y, stance)) =
+                        parse_movement_state(&movement_bytes, (avatar.x, avatar.y, avatar.stance))
+                    {
+                        avatar.x = x;
+                        avatar.y = y;
+                        avatar.stance = stance;
                     }
                 }
-                self.broadcast_to_others(from, packet).await;
+                self.broadcast(Some(from), packet);
             }
+            FieldMessage::NpcInteraction {
+                from,
+                object_id,
+                request_id,
+            } => self.handle_npc_interaction(from, object_id, request_id),
         }
     }
 
-    async fn handle_join(
-        &mut self,
-        client_id: i32,
-        sender: mpsc::Sender<ServerMessage>,
-        character: FieldCharacter,
-    ) {
+    fn handle_join(&mut self, handle: ClientHandle, avatar: FieldAvatar) {
+        let client_id = handle.client_id;
+        // A rejoin replaces the previous entry without announcing a leave.
+        self.occupants.remove(&client_id);
+
         for map_npc in &self.map_npcs {
             match build_spawn_npc(&to_foreign_npc(map_npc)) {
-                Ok(packet) => self.send_packet(&sender, packet, client_id).await,
-                Err(error) => {
-                    warn!(
-                        client_id,
-                        npc_id = map_npc.npc_id,
-                        error = %error,
-                        "Failed to build existing map NPC replay packet"
-                    );
+                Ok(packet) => {
+                    handle.send_packet(packet);
                 }
+                Err(error) => warn!(client_id, npc_id = map_npc.npc_id, %error, "Failed to build NPC spawn"),
             }
         }
 
         for occupant in self.occupants.values() {
-            match build_player_enter_field(&to_foreign_character(&occupant.character)) {
+            match build_player_enter_field(&occupant.avatar) {
                 Ok(packet) => {
-                    self.send_packet(&sender, packet, client_id).await;
+                    handle.send_packet(packet);
                 }
-                Err(error) => {
-                    warn!(
-                        client_id,
-                        error = %error,
-                        "Failed to build existing occupant replay packet"
-                    );
-                }
+                Err(error) => warn!(client_id, %error, "Failed to build occupant spawn"),
             }
         }
 
-        match build_player_enter_field(&to_foreign_character(&character)) {
-            Ok(join_packet) => {
-                for (&occupant_id, occupant) in &self.occupants {
-                    self.send_packet(&occupant.sender, join_packet.clone(), occupant_id)
-                        .await;
-                }
-            }
-            Err(error) => {
-                warn!(
-                    client_id,
-                    error = %error,
-                    "Failed to build join packet for occupant broadcast"
-                );
-            }
+        match build_player_enter_field(&avatar) {
+            Ok(packet) => self.broadcast(None, packet),
+            Err(error) => warn!(client_id, %error, "Failed to build join spawn"),
         }
 
-        self.occupants
-            .insert(client_id, Occupant { sender, character });
+        self.occupants.insert(client_id, Occupant { handle, avatar });
     }
 
-    async fn handle_npc_interaction(&mut self, client_id: i32, interaction: NpcInteraction) {
-        let Some(occupant) = self.occupants.get(&client_id) else {
+    fn handle_leave(&mut self, client_id: ClientId) {
+        if self.occupants.remove(&client_id).is_none() {
             return;
-        };
-        let NpcInteraction::Start {
-            object_id,
-            request_id,
-        } = interaction
-        else {
+        }
+        match build_player_leave_field(client_id) {
+            Ok(packet) => self.broadcast(None, packet),
+            Err(error) => warn!(client_id, %error, "Failed to build leave packet"),
+        }
+    }
+
+    fn handle_npc_interaction(&self, from: ClientId, object_id: i32, request_id: u64) {
+        let Some(occupant) = self.occupants.get(&from) else {
             return;
         };
         let Some(npc) = self.map_npcs.iter().find(|npc| npc.object_id == object_id) else {
             return;
         };
         // The field validates map object identity; the client actor owns the
-        // conversation and serializes quest persistence with character updates.
-        if occupant
-            .sender
-            .send(ServerMessage::NpcConversation {
-                npc_id: npc.npc_id,
-                field: self.key,
-                request_id,
-            })
-            .await
-            .is_err()
-        {
-            warn!(client_id, "Failed to send validated NPC interaction");
-        }
+        // conversation and serializes quest persistence with character state.
+        occupant.handle.send(ServerMessage::NpcConversation {
+            npc_id: npc.npc_id,
+            field: self.key,
+            request_id,
+        });
     }
 
-    async fn handle_leave(&mut self, client_id: i32) {
-        let Some(occupant) = self.occupants.remove(&client_id) else {
-            return;
-        };
-
-        match build_player_leave_field(occupant.character.id) {
-            Ok(packet) => self.broadcast_to_all(packet).await,
-            Err(error) => warn!(client_id, error = %error, "Failed to build leave packet"),
-        }
-    }
-
-    async fn broadcast_to_all(&self, packet: Packet) {
+    /// Send to every occupant, optionally skipping one. Never waits.
+    fn broadcast(&self, except: Option<ClientId>, packet: Packet) {
         for (&client_id, occupant) in &self.occupants {
-            self.send_packet(&occupant.sender, packet.clone(), client_id)
-                .await;
-        }
-    }
-
-    async fn broadcast_to_others(&self, from: i32, packet: Packet) {
-        for (&client_id, occupant) in &self.occupants {
-            if client_id == from {
-                continue;
+            if Some(client_id) != except {
+                occupant.handle.send_packet(packet.clone());
             }
-            self.send_packet(&occupant.sender, packet.clone(), client_id)
-                .await;
         }
-    }
-
-    async fn send_packet(
-        &self,
-        sender: &mpsc::Sender<ServerMessage>,
-        packet: Packet,
-        client_id: i32,
-    ) {
-        if sender
-            .send(ServerMessage::SendPacket(packet))
-            .await
-            .is_err()
-        {
-            warn!(client_id, "Failed to send field packet to client");
-        }
-    }
-}
-
-fn to_foreign_character(character: &FieldCharacter) -> ForeignCharacter {
-    ForeignCharacter {
-        id: character.id,
-        name: character.name.clone(),
-        level: character.level,
-        job: character.job,
-        face: character.face,
-        hair: character.hair,
-        skin: character.skin,
-        gender: character.gender,
-        map_id: character.map_id,
-        x: character.x,
-        y: character.y,
-        stance: character.stance,
     }
 }
 
@@ -261,242 +196,88 @@ fn to_foreign_npc(npc: &FieldMapEntityNpc) -> ForeignNpc {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::message::ServerMessage;
-    use net::packet::build::world::field::{build_local_chat, build_player_move};
+    use game::AvatarLook;
     use net::packet::op::SendOpcode;
-    use packet::io::read::PktRead;
-    use std::io::Cursor;
-    use tokio::sync::mpsc;
+    use std::collections::BTreeMap;
+    use tokio::time::timeout;
+    use tokio_util::sync::CancellationToken;
 
-    fn test_character(id: i32, name: &str) -> FieldCharacter {
-        FieldCharacter {
+    fn avatar(id: i32, x: i16, y: i16) -> FieldAvatar {
+        FieldAvatar {
             id,
-            name: name.to_string(),
+            name: format!("p{id}"),
             level: 1,
             job: 0,
-            face: 20000,
-            hair: 30000,
-            skin: 0,
-            gender: 0,
-            channel_id: 0,
-            map_id: 1_000_000,
-            x: 240,
-            y: 190,
+            look: AvatarLook {
+                gender: 0,
+                skin: 0,
+                face: 20000,
+                hair: 30000,
+                visible: BTreeMap::from([(5, 1040002)]),
+                masked: BTreeMap::new(),
+                cash_weapon: None,
+            },
+            x,
+            y,
             stance: 2,
         }
     }
 
-    fn assert_opcode(msg: ServerMessage, opcode: SendOpcode) {
-        match msg {
-            ServerMessage::SendPacket(packet) => assert_eq!(packet.opcode(), opcode as i16),
-            other => panic!("expected packet, got {:?}", other),
+    fn client(id: i32) -> (ClientHandle, mpsc::Receiver<ServerMessage>) {
+        let (tx, rx) = mpsc::channel(16);
+        (ClientHandle::new(id, id as u64, tx, CancellationToken::new()), rx)
+    }
+
+    fn spawn_field() -> mpsc::Sender<FieldMessage> {
+        let (tx, rx) = mpsc::channel(16);
+        let actor = FieldActor::new(FieldKey::new(0, 100000000), rx, Vec::new(), Duration::from_millis(50));
+        tokio::spawn(actor.run());
+        tx
+    }
+
+    async fn next_opcode(rx: &mut mpsc::Receiver<ServerMessage>) -> i16 {
+        match timeout(Duration::from_secs(1), rx.recv()).await.unwrap().unwrap() {
+            ServerMessage::SendPacket(packet) => packet.opcode(),
+            other => panic!("expected a packet, got {other:?}"),
         }
     }
 
     #[tokio::test]
-    async fn joining_second_player_replays_existing_occupant() {
-        let (field_tx, field_rx) = mpsc::channel(8);
-        let field = FieldActor::new(
-            FieldKey {
-                channel_id: 0,
-                map_id: 1_000_000,
-                instance_id: 0,
-            },
-            field_rx,
-            Vec::new(),
-        );
-        tokio::spawn(field.run());
+    async fn occupants_see_each_other_join_and_leave() {
+        let field = spawn_field();
+        let (first, mut first_rx) = client(1);
+        let (second, mut second_rx) = client(2);
 
-        let (first_tx, mut first_rx) = mpsc::channel(8);
-        let (second_tx, mut second_rx) = mpsc::channel(8);
+        field.send(FieldMessage::Join { handle: first, avatar: avatar(1, 10, 20) }).await.unwrap();
+        field.send(FieldMessage::Join { handle: second, avatar: avatar(2, 30, 40) }).await.unwrap();
 
-        field_tx
-            .send(FieldMessage::Join {
-                client_id: 1,
-                sender: first_tx,
-                character: test_character(1, "first"),
-            })
-            .await
-            .unwrap();
-        field_tx
-            .send(FieldMessage::Join {
-                client_id: 2,
-                sender: second_tx,
-                character: test_character(2, "second"),
-            })
-            .await
-            .unwrap();
+        // The newcomer sees the existing occupant; the occupant sees the newcomer.
+        assert_eq!(next_opcode(&mut second_rx).await, SendOpcode::SpawnPlayer as i16);
+        assert_eq!(next_opcode(&mut first_rx).await, SendOpcode::SpawnPlayer as i16);
 
-        assert_opcode(first_rx.recv().await.unwrap(), SendOpcode::SpawnPlayer);
-        assert_opcode(second_rx.recv().await.unwrap(), SendOpcode::SpawnPlayer);
+        field.send(FieldMessage::Leave { client_id: 2 }).await.unwrap();
+        assert_eq!(next_opcode(&mut first_rx).await, SendOpcode::RemovePlayerFromMap as i16);
     }
 
     #[tokio::test]
-    async fn leave_broadcasts_remove_packet() {
-        let (field_tx, field_rx) = mpsc::channel(8);
-        let field = FieldActor::new(
-            FieldKey {
-                channel_id: 0,
-                map_id: 1_000_000,
-                instance_id: 0,
-            },
-            field_rx,
-            Vec::new(),
-        );
-        tokio::spawn(field.run());
+    async fn a_stalled_client_cannot_block_the_field() {
+        let field = spawn_field();
+        let (tx, _never_read) = mpsc::channel(1);
+        let kill = CancellationToken::new();
+        let stalled = ClientHandle::new(1, 1, tx, kill.clone());
+        let (healthy, mut healthy_rx) = client(2);
 
-        let (first_tx, mut first_rx) = mpsc::channel(8);
-        let (second_tx, _second_rx) = mpsc::channel(8);
-
-        field_tx
-            .send(FieldMessage::Join {
-                client_id: 1,
-                sender: first_tx,
-                character: test_character(1, "first"),
-            })
-            .await
-            .unwrap();
-        field_tx
-            .send(FieldMessage::Join {
-                client_id: 2,
-                sender: second_tx,
-                character: test_character(2, "second"),
-            })
-            .await
-            .unwrap();
-        let _ = first_rx.recv().await;
-
-        field_tx
-            .send(FieldMessage::Leave { client_id: 2 })
-            .await
-            .unwrap();
-
-        assert_opcode(
-            first_rx.recv().await.unwrap(),
-            SendOpcode::RemovePlayerFromMap,
-        );
-    }
-
-    #[tokio::test]
-    async fn movement_excludes_sender_but_chat_includes_sender() {
-        let (field_tx, field_rx) = mpsc::channel(8);
-        let field = FieldActor::new(
-            FieldKey {
-                channel_id: 0,
-                map_id: 1_000_000,
-                instance_id: 0,
-            },
-            field_rx,
-            Vec::new(),
-        );
-        tokio::spawn(field.run());
-
-        let (first_tx, mut first_rx) = mpsc::channel(8);
-        let (second_tx, mut second_rx) = mpsc::channel(8);
-
-        field_tx
-            .send(FieldMessage::Join {
-                client_id: 1,
-                sender: first_tx,
-                character: test_character(1, "first"),
-            })
-            .await
-            .unwrap();
-        field_tx
-            .send(FieldMessage::Join {
-                client_id: 2,
-                sender: second_tx,
-                character: test_character(2, "second"),
-            })
-            .await
-            .unwrap();
-        let _ = first_rx.recv().await;
-        let _ = second_rx.recv().await;
-
-        let movement_packet = build_player_move(1, &[1, 2, 3]).unwrap();
-        field_tx
-            .send(FieldMessage::Move {
-                from: 1,
-                packet: movement_packet,
-                movement_bytes: vec![1, 2, 3],
-            })
-            .await
-            .unwrap();
-
-        assert_opcode(second_rx.recv().await.unwrap(), SendOpcode::MovePlayer);
-
-        let chat_packet = build_local_chat(1, "hello", false, 0).unwrap();
-        field_tx
-            .send(FieldMessage::Chat {
-                from: 1,
-                packet: chat_packet,
-            })
-            .await
-            .unwrap();
-
-        assert_opcode(first_rx.recv().await.unwrap(), SendOpcode::ChatText);
-        assert_opcode(second_rx.recv().await.unwrap(), SendOpcode::ChatText);
-    }
-
-    #[tokio::test]
-    async fn joining_player_receives_map_npcs_before_existing_occupants() {
-        let (field_tx, field_rx) = mpsc::channel(8);
-        let field = FieldActor::new(
-            FieldKey {
-                channel_id: 0,
-                map_id: 10_000,
-                instance_id: 0,
-            },
-            field_rx,
-            vec![FieldMapEntityNpc {
-                object_id: 1_000_000_000,
-                npc_id: 2101,
-                x: 130,
-                y: 293,
-                flip: true,
-                foothold: 51,
-                rx0: 80,
-                rx1: 180,
-            }],
-        );
-        tokio::spawn(field.run());
-
-        let (first_tx, _first_rx) = mpsc::channel(8);
-        let (second_tx, mut second_rx) = mpsc::channel(8);
-
-        field_tx
-            .send(FieldMessage::Join {
-                client_id: 1,
-                sender: first_tx,
-                character: test_character(1, "first"),
-            })
-            .await
-            .unwrap();
-        field_tx
-            .send(FieldMessage::Join {
-                client_id: 2,
-                sender: second_tx,
-                character: test_character(2, "second"),
-            })
-            .await
-            .unwrap();
-
-        let first_msg = second_rx.recv().await.expect("npc spawn message");
-        let second_msg = second_rx.recv().await.expect("occupant replay message");
-
-        match first_msg {
-            ServerMessage::SendPacket(packet) => {
-                let mut cursor = Cursor::new(&packet.bytes[..]);
-                assert_eq!(
-                    cursor.read_short().expect("opcode"),
-                    SendOpcode::SpawnNpc as i16
-                );
-                assert_eq!(cursor.read_int().expect("object id"), 1_000_000_000);
-                assert_eq!(cursor.read_int().expect("npc id"), 2101);
-            }
-            other => panic!("expected packet, got {other:?}"),
+        field.send(FieldMessage::Join { handle: stalled, avatar: avatar(1, 0, 0) }).await.unwrap();
+        field.send(FieldMessage::Join { handle: healthy, avatar: avatar(2, 0, 0) }).await.unwrap();
+        for _ in 0..4 {
+            field.send(FieldMessage::Chat { from: 2, packet: Packet::new(&[0x00, 0x00]) }).await.unwrap();
         }
 
-        assert_opcode(second_msg, SendOpcode::SpawnPlayer);
+        // The healthy client still receives everything; the stalled one is kicked.
+        assert_eq!(next_opcode(&mut healthy_rx).await, SendOpcode::SpawnPlayer as i16);
+        for _ in 0..4 {
+            next_opcode(&mut healthy_rx).await;
+        }
+        assert!(kill.is_cancelled());
     }
 }

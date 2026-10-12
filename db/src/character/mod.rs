@@ -1,5 +1,6 @@
-use crate::{keybinding::KeybindSet, schema::characters};
+use crate::schema::characters;
 use diesel::Connection;
+use game::{AvatarLook, CharacterStats, InventoryType, Item, Keymap};
 use std::time::SystemTime;
 
 pub mod repository;
@@ -41,12 +42,8 @@ pub struct Character {
     pub created_at: SystemTime,
 
     pub map_id: i32,
-}
-
-impl Character {
-    pub fn save(&self) -> crate::Result<Character> {
-        repository::update_character(self)
-    }
+    pub sp: i16,
+    pub spawn_point: i16,
 }
 
 /// Character creation projection.
@@ -66,49 +63,30 @@ pub struct NewCharacter<'a> {
 }
 
 impl NewCharacter<'_> {
-    /// Save the new character and return the saved Character's
-    /// wrapper.
+    /// Save the new character with its default keymap and starting items.
     ///
-    /// The character row and its default keybindings are written in one
-    /// transaction so a failure cannot leave a character without a keymap.
-    pub fn create(self) -> crate::Result<CharacterWrapper> {
+    /// Everything is written in one transaction so a failure cannot leave a
+    /// half-created character behind. Returns what the character list needs.
+    pub fn create(
+        self,
+        starting_items: Vec<(InventoryType, i16, Item)>,
+    ) -> crate::Result<(CharacterStats, AvatarLook)> {
         let mut connection = crate::connection()?;
         connection
             .transaction(|connection| -> diesel::QueryResult<_> {
                 let character = repository::insert_character(connection, &self)?;
-                let key_binds = KeybindSet::defaults(character.id);
-                key_binds.save_on(connection)?;
-                Ok(CharacterWrapper {
-                    character,
-                    key_binds,
-                })
+                crate::player::save_keymap(connection, character.id, &Keymap::defaults())?;
+                let stats = crate::player::character_stats(&character);
+                let look = AvatarLook::from_equipped(
+                    &stats,
+                    starting_items
+                        .iter()
+                        .filter(|(kind, _, _)| *kind == InventoryType::Equipped)
+                        .map(|(_, slot, item)| (*slot, item.item_id)),
+                );
+                crate::player::insert_items(connection, character.id, starting_items)?;
+                Ok((stats, look))
             })
             .map_err(Into::into)
-    }
-}
-
-/// This struct is meant to hold data pertaining to a character
-/// beyond simply the character itself.
-pub struct CharacterWrapper {
-    pub character: Character,
-    pub key_binds: KeybindSet,
-}
-
-impl CharacterWrapper {
-    /// Load an existing character given their ID.
-    pub fn from_character_id(character_id: i32) -> crate::Result<Self> {
-        let character = repository::get_character_by_id(character_id)?;
-        Self::from_character(character)
-    }
-
-    /// Wrap a character entity struct along with any additional information.
-    pub fn from_character(character: Character) -> crate::Result<Self> {
-        let key_binds = KeybindSet::from_character(&character)?;
-
-        let dto = Self {
-            character,
-            key_binds,
-        };
-        Ok(dto)
     }
 }

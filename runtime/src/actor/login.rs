@@ -1,45 +1,33 @@
+use crate::db::spawn_db;
 use crate::error::RuntimeError;
-use crate::handler::{HandlerAction, HandlerContext, HandlerResult};
 use crate::io::{PacketReader, PacketWriter};
-use db::session::{NewSession, SessionState, SessionWrapper};
-use net::get_handler;
-use net::listener::ServerType;
+use db::session::{Session, SessionState};
 use net::packet::build;
+use net::{LoginAction, LoginContext};
 use packet::Packet;
 use rand::{thread_rng, Rng};
-use std::net::SocketAddr;
+use std::net::IpAddr;
 use tokio::net::TcpStream;
-use tracing::{error, info, warn};
+use tracing::{debug, error, info, warn};
 
-/// Actor handling a single login server client connection.
-/// Simpler than ClientActor - no inter-client communication needed.
+/// Actor for one login-server connection.
 pub struct LoginClientActor {
     reader: PacketReader,
     writer: PacketWriter,
-    session: SessionWrapper,
-    peer_addr: SocketAddr,
+    session: Option<Session>,
+    peer_ip: IpAddr,
 }
 
 impl LoginClientActor {
-    /// Create a new login client actor from an accepted TCP connection.
-    pub async fn new(stream: TcpStream, peer_addr: SocketAddr) -> Result<Self, RuntimeError> {
-        // Generate encryption IVs (scope rng to drop before await)
+    pub async fn new(stream: TcpStream, peer_ip: IpAddr) -> Result<Self, RuntimeError> {
         let (recv_iv, send_iv) = {
-            let mut recv_iv = vec![0u8; 4];
-            let mut send_iv = vec![0u8; 4];
             let mut rng = thread_rng();
-            rng.fill(&mut recv_iv[..]);
-            rng.fill(&mut send_iv[..]);
-            (recv_iv, send_iv)
+            (rng.gen::<[u8; 4]>().to_vec(), rng.gen::<[u8; 4]>().to_vec())
         };
 
-        // Split stream
         let (read_half, write_half) = stream.into_split();
-
         let reader = PacketReader::new(read_half, &recv_iv);
         let mut writer = PacketWriter::new(write_half, &send_iv);
-
-        // Send handshake
         let handshake = build::build_handshake_packet(&recv_iv, &send_iv)
             .map_err(|e| RuntimeError::Handler(e.to_string()))?;
         writer.send_handshake(&handshake.bytes).await?;
@@ -47,209 +35,157 @@ impl LoginClientActor {
         Ok(Self {
             reader,
             writer,
-            session: SessionWrapper::new_empty(),
-            peer_addr,
+            session: None,
+            peer_ip,
         })
     }
 
-    /// Run the login client actor event loop.
     pub async fn run(mut self) {
-        info!("LoginClientActor started");
-
         loop {
-            match self.reader.read_packet().await {
-                Ok(packet) => {
-                    if let Err(e) = self.handle_packet(packet).await {
-                        match e {
-                            RuntimeError::ClientDisconnected => {
-                                info!("Login client disconnected gracefully");
-                                break;
-                            }
-                            other => {
-                                error!(error = %other, "Error handling login packet");
-                                break;
-                            }
-                        }
-                    }
-                }
+            let step = match self.reader.read_packet().await {
+                Ok(packet) => self.handle_packet(packet).await,
+                Err(error) => Err(error),
+            };
+            match step {
+                Ok(()) => {}
                 Err(RuntimeError::ClientDisconnected) => {
                     info!("Login client disconnected");
                     break;
                 }
-                Err(e) => {
-                    error!(error = %e, "Error reading login packet");
+                Err(error) => {
+                    error!(%error, "Closing login connection");
                     break;
                 }
             }
         }
-
-        info!("LoginClientActor finished");
+        self.cleanup().await;
     }
 
     async fn handle_packet(&mut self, mut packet: Packet) -> Result<(), RuntimeError> {
         let opcode = packet.opcode();
+        let Some(route) = net::login_route(opcode) else {
+            debug!(opcode, "Ignoring unhandled login opcode");
+            return Ok(());
+        };
+        if !route.stage.admits(&self.session) {
+            warn!(opcode, stage = ?route.stage, "Opcode not valid in the current session stage");
+            return Ok(());
+        }
 
-        // Get the handler for this opcode
-        let handler = get_handler(opcode, &ServerType::Login);
-
-        // Execute handler in blocking context for DB calls
-        // Move session out temporarily to satisfy borrow checker
-        let mut session = std::mem::replace(&mut self.session, SessionWrapper::new_empty());
-
-        let (result, returned_session) = tokio::task::spawn_blocking(move || {
-            let mut ctx = HandlerContext {
-                client_id: 0, // Login server doesn't use client_id
-                session: &mut session,
-            };
-            let result = handler.handle(&mut packet, &mut ctx);
-            (result, session)
+        // Login handlers hit the database, so they run on the blocking pool.
+        let handler = route.handler;
+        let session = self.session.clone();
+        let peer_ip = self.peer_ip;
+        let result = tokio::task::spawn_blocking(move || {
+            handler.handle(
+                &mut packet,
+                &LoginContext {
+                    session: &session,
+                    peer_ip,
+                },
+            )
         })
         .await
-        .map_err(|e| RuntimeError::Handler(format!("Task join error: {}", e)))?;
+        .map_err(|e| RuntimeError::Handler(format!("Task join error: {e}")))?
+        .map_err(|e| {
+            error!(opcode, error = %e, "Handler error");
+            RuntimeError::Handler(e.to_string())
+        })?;
 
-        // Restore session
-        self.session = returned_session;
-
-        // Process handler result
-        match result {
-            Ok(result) => self.process_actions(result).await,
-            Err(e) => {
-                // Log handler error but don't disconnect for unsupported opcodes
-                if matches!(e, net::error::NetworkError::UnsupportedOpcodeError(_)) {
-                    info!(opcode, "Unsupported opcode");
-                    Ok(())
-                } else {
-                    error!(opcode, error = %e, "Handler error");
-                    Err(RuntimeError::Handler(e.to_string()))
-                }
-            }
-        }
-    }
-
-    async fn process_actions(&mut self, result: HandlerResult) -> Result<(), RuntimeError> {
         for action in result.actions {
-            match action {
-                HandlerAction::NpcInteraction(_) => {
-                    warn!("NpcInteraction action ignored in login server");
-                }
-                HandlerAction::Reply(mut packet) => {
-                    self.writer.send_packet(&mut packet).await?;
-                }
-                HandlerAction::Broadcast { .. } => {
-                    // Login server doesn't support broadcast
-                    warn!("Broadcast action ignored in login server");
-                }
-                HandlerAction::Disconnect => {
-                    return Err(RuntimeError::ClientDisconnected);
-                }
-                HandlerAction::CreateSession {
-                    account_id,
-                    hwid,
-                    state,
-                } => {
-                    // Create a new session in the database
-                    info!(account_id, "Creating session");
-                    let new_session = NewSession {
-                        account_id,
-                        ip: self.peer_addr.ip().into(),
-                        hwid: &hwid,
-                        state,
-                    };
-                    match new_session.create() {
-                        Ok(wrapper) => {
-                            self.session = wrapper;
-                            info!(account_id, "Session created successfully");
-                        }
-                        Err(e) => {
-                            error!(error = %e, "Failed to create session");
-                        }
-                    }
-                }
-                HandlerAction::AttachCharacter { character_id } => {
-                    // Attach character to session for world server transition
-                    info!(character_id, "Attaching character to session");
-                    if let Some(ref mut session) = self.session.session {
-                        session.character_id = Some(character_id);
-                        session.state = SessionState::Transition;
-                        if let Err(e) = db::session::update_session(session) {
-                            error!(error = %e, "Failed to update session with character");
-                        }
-                    }
-                }
-                HandlerAction::UpdateSessionSelection {
-                    world_id,
-                    channel_id,
-                } => {
-                    if let Some(ref mut session) = self.session.session {
-                        session.selected_world_id = Some(i16::from(world_id));
-                        session.selected_channel_id = Some(i16::from(channel_id));
-                        if let Err(e) = db::session::update_session_selection(
-                            session.id,
-                            i16::from(world_id),
-                            i16::from(channel_id),
-                        ) {
-                            error!(error = %e, "Failed to persist selected login channel");
-                        }
-                    } else {
-                        warn!(
-                            world_id,
-                            channel_id, "Ignoring channel selection without session"
-                        );
-                    }
-                }
-                HandlerAction::ReattachSession { .. } => {
-                    // Login server doesn't reattach sessions
-                    warn!("ReattachSession action ignored in login server");
-                }
-                HandlerAction::ChangeChannel { .. } => {
-                    warn!("ChangeChannel action ignored in login server");
-                }
-                HandlerAction::Whisper { .. } => {
-                    // Login server never handles in-world whispers.
-                    warn!("Whisper action ignored in login server");
-                }
-                HandlerAction::FieldChat { .. } | HandlerAction::FieldMove { .. } => {
-                    warn!("Field action ignored in login server");
-                }
-                HandlerAction::MapChanged { .. } => {
-                    warn!("MapChanged action ignored in login server");
-                }
-            }
+            self.apply(action).await?;
         }
         Ok(())
     }
 
-    /// Send a packet to the client.
-    #[allow(dead_code)]
-    pub async fn send(&mut self, packet: &mut Packet) -> Result<(), RuntimeError> {
-        self.writer.send_packet(packet).await
+    async fn apply(&mut self, action: LoginAction) -> Result<(), RuntimeError> {
+        match action {
+            LoginAction::Reply(mut packet) => self.writer.send_packet(&mut packet).await?,
+            LoginAction::SetSession(session) => {
+                if let Some(session) = &session {
+                    info!(account_id = session.account_id, "Session opened");
+                }
+                self.session = session;
+            }
+            LoginAction::SetSessionState(state) => {
+                let id = self.session_id()?;
+                self.session = Some(spawn_db(move || db::session::set_session_state(id, state)).await?);
+            }
+            LoginAction::SelectChannel {
+                world_id,
+                channel_id,
+            } => {
+                let id = self.session_id()?;
+                self.session = Some(
+                    spawn_db(move || {
+                        db::session::update_session_selection(
+                            id,
+                            i16::from(world_id),
+                            i16::from(channel_id),
+                        )
+                    })
+                    .await?,
+                );
+            }
+            LoginAction::EnterWorld { character_id } => {
+                let id = self.session_id()?;
+                // Fails unless the character belongs to the session's account,
+                // so the redirect queued after this action is never sent.
+                self.session = Some(
+                    spawn_db(move || db::session::begin_world_transition(id, character_id))
+                        .await?,
+                );
+                info!(character_id, "World transition ticket issued");
+            }
+            LoginAction::Disconnect => return Err(RuntimeError::ClientDisconnected),
+        }
+        Ok(())
+    }
+
+    fn session_id(&self) -> Result<i32, RuntimeError> {
+        self.session
+            .as_ref()
+            .map(|session| session.id)
+            .ok_or(RuntimeError::NotLoggedIn)
+    }
+
+    /// A session that is not handing off to the world dies with its
+    /// connection.
+    async fn cleanup(&mut self) {
+        if let Some(session) = self.session.take() {
+            if session.state != SessionState::Transition {
+                if let Err(error) = spawn_db(move || db::session::delete_session(session.id)).await {
+                    error!(%error, "Failed to close login session");
+                }
+            }
+        }
     }
 }
 
-/// Simple login server that just accepts connections.
-/// No world server needed since login clients don't communicate with each other.
+/// Accepts login connections and spawns one actor per client.
 pub struct LoginServerActor;
 
 impl LoginServerActor {
     pub async fn run(addr: &str) -> Result<(), RuntimeError> {
+        // Sessions owned by a previous run of this server cannot be resumed.
+        let cleared = spawn_db(db::session::clear_login_sessions).await?;
+        info!(cleared, "Cleared stale login sessions");
+
         let listener = tokio::net::TcpListener::bind(addr).await?;
         info!(addr, "LoginServerActor listening");
 
         loop {
             match listener.accept().await {
                 Ok((stream, peer_addr)) => {
-                    info!(%peer_addr, "Login connection accepted");
-
+                    debug!(%peer_addr, "Login connection accepted");
                     tokio::spawn(async move {
-                        match LoginClientActor::new(stream, peer_addr).await {
+                        match LoginClientActor::new(stream, peer_addr.ip()).await {
                             Ok(actor) => actor.run().await,
                             Err(e) => error!(error = %e, "Failed to create LoginClientActor"),
                         }
                     });
                 }
-                Err(e) => {
-                    error!(error = %e, "Error accepting login connection");
-                }
+                Err(e) => error!(error = %e, "Error accepting login connection"),
             }
         }
     }

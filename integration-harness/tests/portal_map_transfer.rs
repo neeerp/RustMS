@@ -5,7 +5,7 @@ use integration_harness::packets::{
 };
 use integration_harness::preconditions::load_harness_config_or_fail;
 use net::packet::op::SendOpcode;
-use tokio::time::{timeout, Duration};
+use tokio::time::{timeout_at, Duration, Instant};
 
 #[tokio::test]
 async fn portal_map_transfer_round_trip() {
@@ -131,8 +131,12 @@ async fn read_next_set_field_warp(
     connection: &mut MapleTestConnection,
     phase: &'static str,
 ) -> SetFieldWarpPacket {
-    for _ in 0..32 {
-        let envelope = timeout(Duration::from_secs(5), connection.read_packet(phase))
+    // Bound the wait by time, not packet count: entering a busy map (Henesys
+    // has 30 NPCs) leaves enough spawn packets queued to fill any small count
+    // before the next warp arrives.
+    let deadline = Instant::now() + Duration::from_secs(5);
+    while Instant::now() < deadline {
+        let envelope = timeout_at(deadline, connection.read_packet(phase))
             .await
             .expect("timed out waiting for map-transfer packet")
             .expect("failed to read map-transfer packet");

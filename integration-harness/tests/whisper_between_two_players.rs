@@ -69,7 +69,8 @@ async fn whisper_between_two_players() {
         .expect("failed to decode recipient whisper packet");
     assert_eq!(recipient_whisper.sender_name, sender.character_name);
     assert_eq!(recipient_whisper.message, message);
-    assert_eq!(recipient_whisper.channel, 1);
+    // The sender is on the first channel; v83 sends it zero-based.
+    assert_eq!(recipient_whisper.channel, 0);
     assert!(!recipient_whisper.from_admin);
 
     sender

@@ -1,18 +1,17 @@
 use crate::{error::NetworkError, packet::op::SendOpcode};
-use db::keybinding::KeybindSet;
+use game::keymap::KEY_COUNT;
+use game::Keymap;
 use packet::{io::write::PktWrite, Packet};
 
-pub fn build_keymap(binds: &mut KeybindSet) -> Result<Packet, NetworkError> {
+pub fn build_keymap(keymap: &Keymap) -> Result<Packet, NetworkError> {
     let mut packet = Packet::new_empty();
-
-    let op = SendOpcode::KeyMap as i16;
-    packet.write_short(op)?;
+    packet.write_short(SendOpcode::KeyMap as i16)?;
     packet.write_byte(0)?;
 
-    for i in 0..90 {
-        let bind = binds.get(i);
-        packet.write_byte(bind.bind_type.into())?;
-        packet.write_int(bind.action as i32)?;
+    for key in 0..KEY_COUNT {
+        let binding = keymap.get(key);
+        packet.write_byte(binding.map_or(0, |b| b.kind))?;
+        packet.write_int(binding.map_or(0, |b| b.action))?;
     }
 
     Ok(packet)
