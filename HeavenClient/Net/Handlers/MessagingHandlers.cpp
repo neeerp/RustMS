@@ -26,6 +26,8 @@
 
 #include <nlnx/nx.hpp>
 
+#include <cstdlib>
+
 namespace ms
 {
 	namespace
@@ -41,6 +43,19 @@ namespace ms
 		{
 			std::string display_name = from_admin ? "[GM]" + sender : sender;
 			return "#g" + display_name + ">>" + message;
+		}
+
+		// A quest item gain or loss, worded as in the original client (period GMS footage):
+		// "You have gained an item (Roger's Apple)", "You have gained items (3 Green Apple)".
+		std::string build_item_gain_chatline(const std::string& name, int32_t quantity)
+		{
+			std::string verb = quantity < 0 ? "You have lost " : "You have gained ";
+			int32_t count = std::abs(quantity);
+
+			if (count == 1)
+				return verb + "an item (" + name + ")";
+
+			return verb + "items (" + std::to_string(count) + " " + name + ")";
 		}
 	}
 
@@ -334,9 +349,11 @@ namespace ms
 
 		if (mode1 == 3)
 		{
-			int8_t mode2 = recv.read_byte();
+			// Quest item gains and losses: a count, then an item id and quantity for each,
+			// shown as one grey chat line per item.
+			uint8_t count = recv.read_byte();
 
-			if (mode2 == 1) // This is actually 'item gain in chat'
+			for (uint8_t i = 0; i < count; i++)
 			{
 				int32_t itemid = recv.read_int();
 				int32_t qty = recv.read_int();
@@ -344,14 +361,10 @@ namespace ms
 				const ItemData& idata = ItemData::get(itemid);
 
 				if (!idata.is_valid())
-					return;
-
-				std::string name = idata.get_name();
-				std::string sign = (qty < 0) ? "-" : "+";
-				std::string message = "Gained an item: " + name + " (" + sign + std::to_string(qty) + ")";
+					continue;
 
 				if (auto chatbar = UI::get().get_element<UIChatBar>())
-					chatbar->send_chatline(message, UIChatBar::LineType::BLUE);
+					chatbar->send_chatline(build_item_gain_chatline(idata.get_name(), qty), UIChatBar::LineType::GREY);
 			}
 		}
 		else if (mode1 == 9) // quest complete

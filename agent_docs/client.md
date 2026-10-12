@@ -132,3 +132,9 @@ These were corrected:
 5. The map-change SET_FIELD's HP short (after the portal byte) was not read.
    It now sets the player's HP, which is how a dead player gets back up.
 6. Dependency pins in `build-deps.sh` (see Build).
+7. SHOW_ITEM_GAIN_INCHAT mode 3 (quest item gains and losses) is a count byte
+   followed by an item id and quantity for each. The client read the count as a
+   sub-mode and showed nothing unless it was 1. It now shows each item as its
+   own grey (`#BBBBBB`) chat line, worded as in period footage: "You have
+   gained an item (Roger's Apple)", "You have gained items (3 Green Apple)",
+   and "You have lost ..." for losses.
