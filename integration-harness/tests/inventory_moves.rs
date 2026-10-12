@@ -2,7 +2,7 @@
 
 use integration_harness::connection::MapleTestConnection;
 use integration_harness::preconditions::load_harness_config_or_fail;
-use integration_harness::quests::{read, send, QuestTrace};
+use integration_harness::trace::{read, send, Trace};
 use integration_harness::{login_to_world_session, relogin};
 use net::packet::op::{RecvOpcode, SendOpcode};
 use packet::io::{read::PktRead, write::PktWrite};
@@ -33,7 +33,7 @@ enum Reply {
 /// Send a move and read the server's answer to it.
 async fn request(c: &mut MapleTestConnection, kind: i8, from: i16, to: i16) -> Reply {
     send(c, item_move(kind, from, to)).await;
-    let mut trace = QuestTrace::default();
+    let mut trace = Trace::default();
     loop {
         let p = read(c, &mut trace).await;
         let mut r = Cursor::new(&p.bytes);

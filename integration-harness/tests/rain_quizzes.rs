@@ -6,9 +6,8 @@ use integration_harness::packets::{
     build_change_channel, build_player_logged_in, decode_channel_change, decode_set_field,
 };
 use integration_harness::preconditions::load_harness_config_or_fail;
-use integration_harness::quests::{
-    act, barrier, read, send, warp, QuestTrace, COMPLETE, FORFEIT, START,
-};
+use integration_harness::quests::{act, COMPLETE, FORFEIT, START};
+use integration_harness::trace::{barrier, read, send, stat, warp, Trace};
 use integration_harness::{connection::MapleTestConnection, protocol::WorldSession};
 use net::packet::op::SendOpcode;
 
@@ -18,7 +17,7 @@ const PIO: i32 = 10000;
 
 async fn in_amherst(
     config: &integration_harness::config::HarnessConfig,
-    trace: &mut QuestTrace,
+    trace: &mut Trace,
 ) -> WorldSession {
     // Tests reconnect right after dropping a session; relogin waits out the
     // server closing the old one.
@@ -36,7 +35,7 @@ async fn in_amherst(
 #[tokio::test]
 async fn seven_quizzes_award_once_and_survive_map_changes_and_relogin() {
     let config = load_harness_config_or_fail().await;
-    let mut trace = QuestTrace::default();
+    let mut trace = Trace::default();
     let mut session = in_amherst(&config, &mut trace).await;
     assert_eq!((session.level, session.exp, session.ap), (1, 0, 0));
     let c = &mut session.connection;
@@ -55,7 +54,9 @@ async fn seven_quizzes_award_once_and_survive_map_changes_and_relogin() {
         assert_eq!(trace.gains.len(), (id - 1008) as usize);
     }
     assert_eq!(trace.gains, [2, 4, 6, 10, 10, 10, 20]);
-    assert_eq!(trace.stats, Some((3, 10, 13)));
+    assert_eq!(trace.stat(stat::LEVEL), Some(3));
+    assert_eq!(trace.stat(stat::AP), Some(10));
+    assert_eq!(trace.stat(stat::EXP), Some(13));
     assert_eq!(warp(c, 10_000, "", &mut trace).await, 10_000);
     assert_eq!(warp(c, AMHERST, "", &mut trace).await, AMHERST);
     drop(session);
@@ -69,7 +70,7 @@ async fn seven_quizzes_award_once_and_survive_map_changes_and_relogin() {
 async fn invalid_actions_are_refused_and_progress_is_per_character() {
     let config = load_harness_config_or_fail().await;
     let other = load_harness_config_or_fail().await;
-    let mut trace = QuestTrace::default();
+    let mut trace = Trace::default();
     let mut session = in_amherst(&config, &mut trace).await;
     let c = &mut session.connection;
     let m = config.character_name.clone();
@@ -118,7 +119,7 @@ async fn invalid_actions_are_refused_and_progress_is_per_character() {
 #[tokio::test]
 async fn started_quiz_survives_channel_migration() {
     let config = load_harness_config_or_fail().await;
-    let mut trace = QuestTrace::default();
+    let mut trace = Trace::default();
     let mut session = in_amherst(&config, &mut trace).await;
     let m = config.character_name.clone();
     act(&mut session.connection, &mut trace, &m, START, 1009, RAIN).await;

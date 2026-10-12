@@ -3,10 +3,12 @@ pub mod config;
 pub mod connection;
 pub mod error;
 pub mod handshake;
+pub mod hunting;
 pub mod packets;
 pub mod preconditions;
 pub mod protocol;
 pub mod quests;
+pub mod trace;
 
 pub use config::{HarnessConfig, MultiHarnessConfig};
 pub use error::HarnessError;

@@ -2,7 +2,8 @@
 //! through the v83 quest flow, along the asset-defined route.
 
 use integration_harness::preconditions::load_harness_config_or_fail;
-use integration_harness::quests::{act, warp, QuestTrace, COMPLETE, START};
+use integration_harness::quests::{act, COMPLETE, START};
+use integration_harness::trace::{warp, Trace};
 use integration_harness::{login_to_world_session, relogin};
 
 const HEENA: i32 = 2101;
@@ -14,7 +15,7 @@ const SEN: i32 = 2001;
 async fn beginner_visits_follow_portals_and_persist_rewards_once() {
     let config = load_harness_config_or_fail().await;
     let m = config.character_name.clone();
-    let mut trace = QuestTrace::default();
+    let mut trace = Trace::default();
     let mut session = login_to_world_session(&config).await.unwrap();
     let c = &mut session.connection;
     assert_eq!(session.map_id, 10_000);

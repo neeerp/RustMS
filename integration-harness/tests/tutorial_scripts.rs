@@ -3,7 +3,8 @@
 use integration_harness::connection::MapleTestConnection;
 use integration_harness::login_to_world_session;
 use integration_harness::preconditions::load_harness_config_or_fail;
-use integration_harness::quests::{act, read, send, warp, QuestTrace, START};
+use integration_harness::quests::{act, START};
+use integration_harness::trace::{read, send, warp, Trace};
 use net::packet::op::{RecvOpcode, SendOpcode};
 use packet::io::{read::PktRead, write::PktWrite};
 use packet::Packet;
@@ -50,7 +51,7 @@ fn decode(p: &Packet) -> Option<Seen> {
 /// stat update that ends every script.
 async fn touch_portal(c: &mut MapleTestConnection, portal: &str) -> Vec<Seen> {
     send(c, touch(portal)).await;
-    let mut trace = QuestTrace::default();
+    let mut trace = Trace::default();
     let mut seen = Vec::new();
     loop {
         let p = read(c, &mut trace).await;
@@ -64,7 +65,7 @@ async fn touch_portal(c: &mut MapleTestConnection, portal: &str) -> Vec<Seen> {
 }
 
 async fn banner(c: &mut MapleTestConnection) -> String {
-    let mut trace = QuestTrace::default();
+    let mut trace = Trace::default();
     loop {
         if let Some(Seen::Banner(path)) = decode(&read(c, &mut trace).await) {
             return path;
@@ -76,7 +77,7 @@ async fn banner(c: &mut MapleTestConnection) -> String {
 async fn banners_and_tutorial_hints_follow_quest_progress() {
     let config = load_harness_config_or_fail().await;
     let m = config.character_name.clone();
-    let mut trace = QuestTrace::default();
+    let mut trace = Trace::default();
     let mut session = login_to_world_session(&config).await.unwrap();
     let c = &mut session.connection;
     assert_eq!(session.map_id, 10_000);
