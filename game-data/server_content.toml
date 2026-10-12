@@ -1,0 +1,18 @@
+# Where the importer (cargo run -p game-data --bin import-server-content)
+# finds each text key in the MIT-licensed community scripts, and the SHA-256
+# of the expected text so upstream changes are caught. The text itself is not
+# committed. `template` joins string literals of `source` ({sN} is the Nth
+# literal, counting from 0); other {name} placeholders are filled at runtime.
+#
+# Sources (clone them into one directory):
+#   https://github.com/Kaioru/Edelstein.lua   (MIT, Copyright (c) 2023 Kaioru)
+#   https://github.com/Kaioru/Server.Scripts  (MIT, Copyright (c) 2018 Kaioru)
+#   https://github.com/Kaioru/Server.NX       (MIT, Copyright (c) 2018 Kaioru)
+
+[text."glTutoMsg0.message"]
+source = "Edelstein.lua/src/mapleisland/glTutoMsg0.lua"
+template = "{s0}"
+sha256 = "a1da6df337c3f9a387020a6eda69d8880c46c10f12e360933093241eb3ce3486"
+
+[rewards]
+source = "Server.NX/src/Reward.img"

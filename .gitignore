@@ -34,3 +34,6 @@ HeavenClient/.DS_Store
 # Local game-data assets (large/unversioned)
 assets/game-data/*
 !assets/game-data/.gitignore
+assets/server-content/*
+!assets/server-content/.gitignore
+!assets/server-content/README.md

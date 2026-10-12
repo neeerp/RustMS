@@ -1,0 +1,7 @@
+# Placeholder text for server scripts whose real text never shipped in the
+# client data. The real text lives in the ignored content pack
+# (assets/server-content/text.toml, see agent_docs/server-content.md); these
+# lines are ours and only describe what happens. Every key a script uses must
+# be listed here.
+
+"glTutoMsg0.message" = "[placeholder] One-way exit: you can't come back here."

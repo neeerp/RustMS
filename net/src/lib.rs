@@ -5,6 +5,7 @@ extern crate serde_derive;
 extern crate serde;
 
 pub mod codec;
+pub mod content;
 pub mod dialogue;
 mod game_data;
 pub mod handler;
