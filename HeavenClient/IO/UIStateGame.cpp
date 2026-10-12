@@ -446,6 +446,12 @@ namespace ms
 		draggedicon = drgic;
 	}
 
+	void UIStateGame::cancel_drag()
+	{
+		if (draggedicon)
+			remove_icon();
+	}
+
 	void UIStateGame::clear_tooltip(Tooltip::Parent parent)
 	{
 		if (parent == tooltipparent)

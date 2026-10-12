@@ -399,6 +399,11 @@ namespace ms
 		state->drag_icon(icon);
 	}
 
+	void UI::cancel_drag()
+	{
+		state->cancel_drag();
+	}
+
 	void UI::add_keymapping(uint8_t no, uint8_t type, int32_t action)
 	{
 		keyboard.assign(no, type, action);

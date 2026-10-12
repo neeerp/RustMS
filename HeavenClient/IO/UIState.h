@@ -59,6 +59,10 @@ namespace ms
 
 		virtual void drag_icon(Icon *icon) = 0;
 
+		// Drop any dragged icon without placing it, e.g. before the icons it
+		// points into are rebuilt.
+		virtual void cancel_drag() {}
+
 		virtual void clear_tooltip(Tooltip::Parent parent) = 0;
 
 		virtual void show_equip(Tooltip::Parent parent, int16_t slot) = 0;
