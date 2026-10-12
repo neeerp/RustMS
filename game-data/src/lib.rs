@@ -547,16 +547,45 @@ fn read_u64(bytes: &[u8], offset: u64) -> Result<u64, GameDataError> {
     Ok(u64::from_le_bytes(data.try_into()?))
 }
 
+/// Locating the (untracked) NX assets from tests.
+#[cfg(test)]
+pub(crate) mod test_assets {
+    use std::path::{Path, PathBuf};
+
+    /// Path to `assets/game-data/<name>`, or `None` (with a note) when the
+    /// file is absent, so asset-backed tests skip instead of failing on a
+    /// fresh clone. With `RUSTMS_REQUIRE_ASSETS=1` a missing file fails the
+    /// test instead, so an asset run cannot pass vacuously. See
+    /// assets/game-data/README.md.
+    pub fn path(name: &str) -> Option<PathBuf> {
+        let path = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../assets/game-data")
+            .join(name);
+        if path.exists() {
+            return Some(path);
+        }
+        if std::env::var("RUSTMS_REQUIRE_ASSETS").is_ok_and(|value| value == "1") {
+            panic!(
+                "RUSTMS_REQUIRE_ASSETS=1 but {} is not present",
+                path.display()
+            );
+        }
+        eprintln!("skipping: {} is not present", path.display());
+        None
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::path::Path;
 
     #[test]
     fn normal_npc_speech_resolves_string_asset_keys() {
-        let assets = Path::new(env!("CARGO_MANIFEST_DIR")).join("../assets/game-data");
-        let data = NpcDialogueData::load_from_nx(assets.join("Npc.nx"), assets.join("String.nx"))
-            .expect("load NPC dialogue assets");
+        let (Some(npc), Some(string)) = (test_assets::path("Npc.nx"), test_assets::path("String.nx"))
+        else {
+            return;
+        };
+        let data = NpcDialogueData::load_from_nx(npc, string).expect("load NPC dialogue assets");
         let rain = data.dialogue(12101).expect("Rain normal speech");
         assert_eq!(rain.pages.len(), 3);
         assert!(rain.pages[0].contains("today"));
@@ -616,7 +645,9 @@ mod tests {
 
     #[test]
     fn loads_map_npcs_from_assets_map_nx() {
-        let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("../assets/game-data/Map.nx");
+        let Some(path) = test_assets::path("Map.nx") else {
+            return;
+        };
         let game_data = GameData::load_from_nx_map(&path).expect("load map nx");
         let field = game_data.field(10_000).expect("field 10000");
 

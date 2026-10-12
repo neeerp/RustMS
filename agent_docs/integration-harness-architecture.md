@@ -48,19 +48,26 @@ Containerized servers use env overrides so they are decoupled from local static 
 
 - DB URL: `RUSTMS_DATABASE_URL` (`db/src/settings.rs`)
 - login bind addr: `RUSTMS_LOGIN_BIND_ADDR` (`rust-ms/src/bin/login.rs`)
-- world bind addr: `RUSTMS_WORLD_BIND_ADDR` (`rust-ms/src/bin/world.rs`)
-- world redirect target: `RUSTMS_WORLD_REDIRECT_HOST`, `RUSTMS_WORLD_REDIRECT_PORT` (`net/src/packet/build/login/world.rs`)
+- world bind host: `RUSTMS_WORLD_BIND_HOST` (`rust-ms/src/bin/world.rs`)
+- channels (names, advertised host/port, capacity): `RUSTMS_LOGIN_CHANNELS`
+  (`net/src/login_world.rs`), read by both servers. The world binds each
+  channel on its advertised port, so the compose file maps those ports 1:1.
+- debug map-id warps: `RUSTMS_ALLOW_DEBUG_WARPS=1` (`net/src/policy.rs`)
 
 ## Harness invariants
 
-- fixed host ports are expected for default runs:
+- default host ports (override with `HARNESS_LOGIN_PORT`, `HARNESS_WORLD_PORT`,
+  `HARNESS_DB_PORT`):
   - login: `127.0.0.1:18484`
-  - world: `127.0.0.1:18485`
+  - channels 1-3: `127.0.0.1:18485`, `18486`, `18487` (world port + n)
+- tests connect to the address in the login redirect, as a real client does,
+  and send the canonical v83 `PLAYER_LOGGEDIN` (character id only)
 - test address contract:
   - harness reads `HARNESS_LOGIN_ADDR` and `HARNESS_WORLD_ADDR`
   - `harnessctl test` sets these for child test processes
-- migration ordering:
-  - `migrate` must complete successfully before `login`/`world` start
+- migrations:
+  - both servers apply embedded migrations at startup (advisory-locked); there is
+    no separate migration container
 - random identity constraints:
   - username and character name are generated per test
   - generated names are truncated to Maple-compatible limits (<=13 chars)

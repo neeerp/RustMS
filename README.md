@@ -34,32 +34,29 @@ extension of the `Read` and `Write` IO traits that allow us to read and write va
 data types to our packets, including little endian integers of different sizes and
 length-headered strings.
 
-The `db` crate provides connections to RustMS' PostgreSQL database, a representation 
-of the database's schema, models and projections of the database entities, and 
-the entities' respective data repositories. The models and data repositories live in 
-domain specific modules, so, for instance, everything pertaining to user accounts 
-can be found under the `account` module. The ORM we're using for RustMS is `diesel`.
+The `game` crate holds the domain model: a logged-in `Player` with its stats,
+avatar look, inventory and equipment, skills, keymap, and quest log. It knows
+nothing about databases or packets.
 
-The `net` crate is currently the largest crate and consists of two primary modules:
-`io` and `packet`. The `io` module has methods and models that define our current
-server infrastructure. Things like the entry point to a connection's main IO loop, 
-as well as the methods and models for reading, decrypting, delegating, and sending 
-packets are defined here. We also model the client connection and its state here. 
-The `packet` module defines our packet handlers and builders for dealing with incoming 
-packets from the client and building responses. There are two major submodules here, 
-`build` and `handle` that perform the aforementioned duties. Currently, most of our 
-server's actual logic resides here, however ideally we'd like to create a separate 
-module (or perhaps add to the `db` crate's domain modules) to keep things organized and
-DRY...
+The `db` crate persists that model in PostgreSQL through Diesel and a
+connection pool. `db::player` loads and saves whole players; migrations are
+embedded and applied by both servers at startup.
 
-The current entry point of the project is the `rust-ms-login` crate. It listens for 
-incoming connections on `localhost:8484` and delegates these connections to threads 
-that instantiate a `Session` (performing an AES handshake in the process) and listen for 
-IO until some kind of `NetworkError` (defined in the `net` crate) is returned and the 
-client connection is closed.
+The `game-data` crate reads static data (maps, portals, NPCs, quests) from the
+v83 NX files in `assets/game-data` (see the README there).
+
+The `net` crate holds the protocol: opcodes, an opcode registry that routes
+each packet to a login or world handler, the handlers themselves, packet
+builders, and shared encoders (`net::codec`) for the structures that recur
+across packets (character stats, avatar looks, items, inventories).
+
+The `runtime` crate runs the servers as Tokio actors. The `rust-ms` crate has
+two binaries: `login` (port 8484) and `world`, which hosts every channel in
+one process with one port per channel (8485, 8486, 8487 by default). See
+`agent_docs/server-architecture.md` for how they fit together.
 
 ### Functionality
-Currently, RustMS consists solely of a reasonably functional Login Server. 
+RustMS has a login server and a multi-channel world server.
 
 #### Encryption
 Once a new client initiates a connection, the server responds with a handshake to 
@@ -88,18 +85,16 @@ require changes in how the client session is modeled, which will have a direct i
 on pin logins). We'll be putting this behind a configuration property as well.
 
 #### World Select
-Currently, one may select a world from the world selection screen once they are 
-logged in... Currently, there is only one world with one channel (though 3 appear
-in the world select, the port of the one world with its one channel is hardcoded).
+Currently, one may select a world and one of its channels once logged in. There
+is one world with three channels, each served on its own port, and players can
+change channels in game.
 
 #### Character Selection/Creation/Deletion
 Currently, character creation is supported to an extent. One may create persistent,
 account linked characters that may be viewed on the character selection screen. 
-These characters inherit some of the features that are selected during character 
-creation such as gender, hair, and skin color, however equipment is ignored since 
-this would require us to establish our model for character inventories as well as
-character equiped items. This will most likely happen after we actually get a 
-functioning game server.
+These characters keep what was selected during character creation, including
+the starting clothes and weapon, which are stored as equipped items and shown
+to other players. Equipment stats are not loaded from item data yet.
 
 Created characters also enforce uniqueness in their names, hence the check done 
 at the end of the character creation flow is actually working. This check is case 
@@ -124,10 +119,8 @@ New characters initially spawn in the town of Amherst. From here, one may walk
 around and enter portals to adjacent maps. If the player logs out, they will reappear
 in the map they logged out from.
 
-Note that currently, the default spawn point is selected for a given map, hence
-the portal the player came out from probably won't line up with where the character
-actually appears once they've loaded the map. This'll likely get addressed when
-we develop a more concrete model for dealing with maps on the server side.
+Portals are resolved from the map data, so players appear at the portal they
+came through, and other players see them there.
 
 ##### Keybinds
 One may re-assign their keybinds as they normally would with the client. The selected
@@ -136,16 +129,16 @@ in later.
 
 
 #### Database
-RustMS is currently being backed by a standalone PostgreSQL server that can be seamlessly 
-set up using the `docker-compose` file in the root of the project. The database's schema 
-can be generated by running the `diesel` (our ORM of choice) migrations in the `db` crate.
+RustMS is backed by a PostgreSQL server that can be set up using the
+`docker-compose` file in the root of the project. The servers apply the schema
+migrations in the `db` crate themselves on startup.
 
 ## Demonstration
 *This demonstration is out-dated and needs to be updated! For now, see the above 
 overview for an idea of the implemented features!*
 
 ### Running the server
-If you would like to run RustMS, clone the repository and run the project from the root with `cargo run` (make sure you have Rust and Cargo installed). You should see something akin to the following: 
+If you would like to run RustMS, start the database, put the v83 NX files in `assets/game-data` (check them with `tools/verify-assets.sh`), and run the two servers from the root with `cargo run -p rust-ms --bin login` and `cargo run -p rust-ms --bin world` (make sure you have Rust and Cargo installed). You should see something akin to the following: 
 
 ![Run the server](img/run.png)
 

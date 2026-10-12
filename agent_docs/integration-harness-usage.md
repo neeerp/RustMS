@@ -106,18 +106,32 @@ sg docker -c 'cargo run -p integration-harness --bin harnessctl -- down'
 The harness reads endpoints from environment variables:
 
 - `HARNESS_LOGIN_ADDR`
-- `HARNESS_WORLD_ADDR`
+- `HARNESS_WORLD_ADDR` (channel 1; channel `n` is this port + `n`)
 
-`harnessctl test` sets these automatically to fixed host ports.
+`harnessctl test` sets these automatically.
+
+## Running several stacks at once
+
+Each checkout (for example a git worktree) can run its own stack by giving it
+a distinct project, ports, and image tag. `harnessctl` and the compose file
+read:
+
+| Variable | Default |
+| --- | --- |
+| `HARNESS_PROJECT_NAME` | `rustms-integration` |
+| `HARNESS_LOGIN_PORT` | `18484` |
+| `HARNESS_WORLD_PORT` | `18485` (channels use this, +1, +2) |
+| `HARNESS_DB_PORT` | `15432` |
+| `HARNESS_IMAGE` | `rustms-server:integration` |
+| `HARNESS_ASSETS_DIR` | `../assets` (must be a real directory, not symlinks, because it is bind-mounted) |
+
+Without overrides, two checkouts share one project and `harnessctl down` in
+one tears down the other's stack.
 
 ## Coverage
 
-The suite currently includes:
-
-- `login_to_world_happy_path`
-- `whisper_between_two_players`
-- `presence_same_map`
-- `movement_same_map`
-- `local_chat_same_map`
-- `portal_map_transfer_round_trip`
-- `invalid_direct_map_target_disconnects_client`
+Each file in `integration-harness/tests/` is one test binary; list them with
+`ls integration-harness/tests`. They cover login to world, character
+creation with starting equipment, channel redirects and changes, presence,
+movement, chat, whisper, portal and direct warps, NPC spawns and dialogue,
+and the beginner quests.
