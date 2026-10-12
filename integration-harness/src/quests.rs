@@ -42,6 +42,14 @@ pub struct QuestTrace {
     pub stats: Option<(u8, i16, i32)>,
     /// UPDATE_QUEST_INFO successes: quest, NPC, next quest.
     pub results: Vec<(i16, i32, i16)>,
+    /// Latest progress string (kill counts) per started quest.
+    pub kills: BTreeMap<i16, String>,
+    /// Item gains and losses shown in chat (SHOW_ITEM_GAIN_INCHAT 3).
+    pub items: Vec<(i32, i32)>,
+    /// "Quest Clear" effects (SHOW_ITEM_GAIN_INCHAT 9).
+    pub cleared: usize,
+    /// "You can't get anymore items." (SHOW_STATUS_INFO 0/-1).
+    pub inventory_full: usize,
 }
 
 impl QuestTrace {
@@ -50,16 +58,39 @@ impl QuestTrace {
         r.read_short().unwrap();
         if p.opcode() == SendOpcode::ShowStatusInfo as i16 {
             match r.read_byte().unwrap() {
+                0 => {
+                    // Only the "inventory full" notice; item gains from
+                    // pickups are not quest packets.
+                    if r.read_byte().unwrap() == 0xFF {
+                        self.inventory_full += 1;
+                    }
+                }
                 1 => {
                     let (quest, state) = (r.read_short().unwrap(), r.read_byte().unwrap());
+                    if state == 1 {
+                        self.kills.insert(quest, r.read_str_with_length().unwrap());
+                    }
+                    if self.states.get(&quest) != Some(&state) {
+                        self.progress.push((quest, state));
+                    }
                     self.states.insert(quest, state);
-                    self.progress.push((quest, state));
                 }
                 3 => {
                     r.read_byte().unwrap();
                     self.gains.push(r.read_int().unwrap());
                 }
                 mode => panic!("unexpected status mode {mode}"),
+            }
+        } else if p.opcode() == SendOpcode::ShowItemGainInChat as i16 {
+            match r.read_byte().unwrap() {
+                3 => {
+                    for _ in 0..r.read_byte().unwrap() {
+                        self.items
+                            .push((r.read_int().unwrap(), r.read_int().unwrap()));
+                    }
+                }
+                9 => self.cleared += 1,
+                _ => {}
             }
         } else if p.opcode() == SendOpcode::StatChange as i16 {
             r.read_byte().unwrap();

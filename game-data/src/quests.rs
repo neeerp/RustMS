@@ -17,14 +17,16 @@ use std::path::Path;
 /// Requirements to start a quest (`Check.img/<id>/0`) that the server checks.
 pub const START_REQUIREMENTS: &[&str] = &["npc", "job", "lvmin", "lvmax", "quest", "startscript"];
 /// Requirements to complete a quest (`Check.img/<id>/1`) that the server checks.
-pub const END_REQUIREMENTS: &[&str] = &["npc", "item", "endscript"];
+pub const END_REQUIREMENTS: &[&str] = &["npc", "item", "mob", "endscript"];
 /// Quest scripts (`startscript`/`endscript`) the server implements. A quest
 /// naming any other script is unsupported.
 pub const SCRIPTS: &[&str] = &["q1021s", "q1021e"];
 /// Actions on starting a quest (`Act.img/<id>/0`) that the server applies.
-pub const START_ACTIONS: &[&str] = &[];
+pub const START_ACTIONS: &[&str] = &["item"];
 /// Actions on completing a quest (`Act.img/<id>/1`) that the server applies.
-pub const END_ACTIONS: &[&str] = &["exp", "nextQuest"];
+pub const END_ACTIONS: &[&str] = &["exp", "nextQuest", "item"];
+/// Keys of an `Act/<n>/item/<k>` entry the server applies.
+pub const ITEM_ACTION_KEYS: &[&str] = &["id", "count", "job", "gender", "prop"];
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct QuestPrerequisite {
@@ -51,11 +53,62 @@ pub struct QuestTemplate {
     /// Items needed to complete, as `(item id, count)`. A count of 0 means
     /// the player must have none left (e.g. Roger's apples, all eaten).
     pub end_items: Vec<(i32, i32)>,
+    /// Mobs to kill before completing, as `(mob id, count)`.
+    pub end_mobs: Vec<(i32, u16)>,
+    /// Items given or taken on start and on completion.
+    pub start_items: Vec<QuestItem>,
+    pub end_rewards: Vec<QuestItem>,
     /// Scripts that run the start or completion instead of the quest data.
     pub start_script: Option<String>,
     pub end_script: Option<String>,
     pub exp: i32,
     pub next_quest: Option<i16>,
+}
+
+/// One `Act/<n>/item` entry.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct QuestItem {
+    pub item_id: i32,
+    /// Positive gives, negative takes.
+    pub count: i32,
+    /// Job families allowed (v83's bit encoding: 1 beginner, 2 warrior, 4
+    /// magician, 8 bowman, 16 thief, 32 pirate, ...); 0 means any.
+    pub job: i32,
+    /// 0 male, 1 female, 2 (or absent) either.
+    pub gender: u8,
+    /// Weight among the entries that have one; one of them is picked at
+    /// random. `None` always applies. -1 (a reward the player picks) is
+    /// not supported.
+    pub prop: Option<i32>,
+}
+
+impl QuestItem {
+    /// Whether this entry applies to a player of `job` and `gender`.
+    pub fn applies_to(&self, job: i16, gender: u8) -> bool {
+        if self.gender != 2 && self.gender != gender {
+            return false;
+        }
+        if self.job == 0 {
+            return true;
+        }
+        const FAMILIES: [(i32, i16); 12] = [
+            (0x1, 0),
+            (0x2, 100),
+            (0x4, 200),
+            (0x8, 300),
+            (0x10, 400),
+            (0x20, 500),
+            (0x400, 1000),
+            (0x800, 1100),
+            (0x1000, 1200),
+            (0x2000, 1300),
+            (0x4000, 1400),
+            (0x8000, 1500),
+        ];
+        FAMILIES
+            .iter()
+            .any(|&(bit, family)| self.job & bit != 0 && family / 100 == job / 100)
+    }
 }
 
 /// The keys a quest declares in each `Check`/`Act` node, used to decide
@@ -66,6 +119,10 @@ pub struct QuestKeys {
     pub end_check: Option<Vec<String>>,
     pub start_act: Vec<String>,
     pub end_act: Vec<String>,
+    /// Keys used by any `Act/<n>/item` entry.
+    pub item_keys: Vec<String>,
+    /// Whether an item action has `prop` -1: a reward the player picks.
+    pub item_choice: bool,
 }
 
 /// `Ok` if every declared requirement and action is supported, otherwise the
@@ -86,6 +143,10 @@ pub fn classify(keys: &QuestKeys) -> Result<(), String> {
     unsupported(end, END_REQUIREMENTS, "Check/1")?;
     unsupported(&keys.start_act, START_ACTIONS, "Act/0")?;
     unsupported(&keys.end_act, END_ACTIONS, "Act/1")?;
+    unsupported(&keys.item_keys, ITEM_ACTION_KEYS, "Act/item")?;
+    if keys.item_choice {
+        return Err("Act/item/prop=-1".into());
+    }
     Ok(())
 }
 
@@ -120,12 +181,22 @@ impl QuestCatalog {
             let Ok(id) = nx.node_name(quest)?.parse::<i16>() else {
                 continue;
             };
-            let keys = QuestKeys {
+            let mut keys = QuestKeys {
                 start_check: keys_at(&nx, &format!("Check.img/{id}/0"))?,
                 end_check: keys_at(&nx, &format!("Check.img/{id}/1"))?,
                 start_act: keys_at(&nx, &format!("Act.img/{id}/0"))?.unwrap_or_default(),
                 end_act: keys_at(&nx, &format!("Act.img/{id}/1"))?.unwrap_or_default(),
+                ..QuestKeys::default()
             };
+            for stage in ["0", "1"] {
+                let Some(items) = path_index(&nx, &format!("Act.img/{id}/{stage}/item"))? else {
+                    continue;
+                };
+                for item in nx.child_indices(items)? {
+                    keys.item_keys.extend(child_names(&nx, item)?);
+                    keys.item_choice |= nx.int_child(item, "prop")? == Some(-1);
+                }
+            }
             match classify(&keys).and_then(|()| template(&nx, id).map_err(|e| e.to_string())) {
                 Ok(template) => {
                     catalog.supported.insert(id, template);
@@ -204,6 +275,19 @@ fn template(nx: &NxDataFile, id: i16) -> Result<QuestTemplate, GameDataError> {
             end_items.push((item_id, nx.int_child(item, "count")?.unwrap_or(0)));
         }
     }
+    let mut end_mobs = Vec::new();
+    if let Some(mobs) = nx.child_by_name(end, "mob")? {
+        for mob in nx.child_indices(mobs)? {
+            let mob_id = nx
+                .int_child(mob, "id")?
+                .ok_or_else(|| invalid("mob requirement without id"))?;
+            let count = nx.int_child(mob, "count")?.unwrap_or(1);
+            end_mobs.push((
+                mob_id,
+                u16::try_from(count).map_err(|_| invalid("mob count out of range"))?,
+            ));
+        }
+    }
     let actions = path_index(nx, &format!("Act.img/{id}/1"))?;
     let action_int = |key: &str| match actions {
         Some(index) => nx.int_child(index, key),
@@ -225,6 +309,9 @@ fn template(nx: &NxDataFile, id: i16) -> Result<QuestTemplate, GameDataError> {
             .int_child(end, "npc")?
             .ok_or_else(|| invalid("missing completion NPC"))?,
         end_items,
+        end_mobs,
+        start_items: quest_items(nx, &format!("Act.img/{id}/0"))?,
+        end_rewards: quest_items(nx, &format!("Act.img/{id}/1"))?,
         start_script: script(nx, start, "startscript")?,
         end_script: script(nx, end, "endscript")?,
         exp,
@@ -232,6 +319,25 @@ fn template(nx: &NxDataFile, id: i16) -> Result<QuestTemplate, GameDataError> {
             .map(|id| small(id, "quest id"))
             .transpose()?,
     })
+}
+
+fn quest_items(nx: &NxDataFile, act: &str) -> Result<Vec<QuestItem>, GameDataError> {
+    let Some(items) = path_index(nx, &format!("{act}/item"))? else {
+        return Ok(Vec::new());
+    };
+    let mut result = Vec::new();
+    for item in nx.child_indices(items)? {
+        result.push(QuestItem {
+            item_id: nx
+                .int_child(item, "id")?
+                .ok_or_else(|| invalid("item action without id"))?,
+            count: nx.int_child(item, "count")?.unwrap_or(1),
+            job: nx.int_child(item, "job")?.unwrap_or(0),
+            gender: u8::try_from(nx.int_child(item, "gender")?.unwrap_or(2)).unwrap_or(2),
+            prop: nx.int_child(item, "prop")?,
+        });
+    }
+    Ok(result)
 }
 
 /// A supported script name, if the node names one.
@@ -245,12 +351,12 @@ fn script(nx: &NxDataFile, parent: u32, key: &str) -> Result<Option<String>, Gam
 
 fn keys_at(nx: &NxDataFile, path: &str) -> Result<Option<Vec<String>>, GameDataError> {
     match path_index(nx, path)? {
-        Some(index) => keys(nx, index).map(Some),
+        Some(index) => child_names(nx, index).map(Some),
         None => Ok(None),
     }
 }
 
-fn keys(nx: &NxDataFile, index: u32) -> Result<Vec<String>, GameDataError> {
+fn child_names(nx: &NxDataFile, index: u32) -> Result<Vec<String>, GameDataError> {
     nx.child_indices(index)?
         .into_iter()
         .map(|child| nx.node_name(child))
@@ -291,6 +397,7 @@ mod tests {
             end_check: Some(owned(end)),
             start_act: owned(start_act),
             end_act: owned(end_act),
+            ..QuestKeys::default()
         }
     }
 
@@ -315,12 +422,16 @@ mod tests {
 
     #[test]
     fn any_unsupported_key_marks_the_quest_unsupported() {
-        let hunting = keys(&["npc"], &["npc", "mob"], &[], &["exp"]);
-        assert_eq!(classify(&hunting), Err("Check/1/mob".into()));
-        let item_reward = keys(&["npc"], &["npc"], &[], &["exp", "item"]);
-        assert_eq!(classify(&item_reward), Err("Act/1/item".into()));
-        let given_item = keys(&["npc"], &["npc"], &["item"], &[]);
-        assert_eq!(classify(&given_item), Err("Act/0/item".into()));
+        let hunting = keys(&["npc"], &["npc", "mob"], &[], &["exp", "item"]);
+        assert_eq!(classify(&hunting), Ok(()));
+        let mut expiring = hunting.clone();
+        expiring.item_keys = vec!["id".into(), "count".into(), "period".into()];
+        assert_eq!(classify(&expiring), Err("Act/item/period".into()));
+        let mut chosen = hunting.clone();
+        chosen.item_choice = true;
+        assert_eq!(classify(&chosen), Err("Act/item/prop=-1".into()));
+        let pet = keys(&["npc", "pet"], &["npc"], &[], &[]);
+        assert_eq!(classify(&pet), Err("Check/0/pet".into()));
         let money = keys(&["npc"], &["npc"], &[], &["money"]);
         assert_eq!(classify(&money), Err("Act/1/money".into()));
     }
@@ -385,8 +496,23 @@ mod tests {
         assert_eq!(roger.start_script.as_deref(), Some("q1021s"));
         assert_eq!(roger.end_script.as_deref(), Some("q1021e"));
         assert_eq!(roger.end_items, [(2010007, 0)]);
-        // Item rewards and hunting stay unsupported until those systems exist.
-        assert_eq!(catalog.unsupported_reason(1034), Some("Act/0/item"));
-        assert!(catalog.unsupported_reason(1035).is_some());
+        // Todd's hunt: Jr. Sentinels and their shellpieces.
+        let todd = catalog.quest(1035).unwrap();
+        assert_eq!(todd.end_mobs, [(9300018, 1)]);
+        assert_eq!(todd.end_items, [(4031802, 1)]);
+        // One of five beginner hats, and the shellpiece is taken.
+        let hats = &todd.end_rewards[..5];
+        assert!(hats.iter().all(|h| h.prop == Some(1) && h.applies_to(0, 0)));
+        assert!(!hats[0].applies_to(100, 0));
+        assert_eq!(
+            todd.end_rewards[5],
+            QuestItem {
+                item_id: 4031802,
+                count: -1,
+                job: 0,
+                gender: 2,
+                prop: None
+            }
+        );
     }
 }

@@ -1,6 +1,7 @@
 #include "../Character/QuestMarker.h"
 #include <iostream>
 #include <map>
+#include <string>
 #include <stdexcept>
 
 using ms::QuestMarker;
@@ -33,7 +34,7 @@ int main()
 			{
 				auto found = states.find(id);
 				return found == states.end() ? 0 : found->second;
-			}, 1, [](int32_t) { return 0; });
+			}, 1, [](int32_t) { return 0; }, [](int16_t) { return std::string(); });
 		};
 		require(marker(10000) == QuestMarker::NONE, "Pio must not advertise Rain's quests");
 		require(marker(12101, 100) == QuestMarker::NONE, "non-beginners must not see the bulb");
@@ -62,7 +63,7 @@ int main()
 		std::vector<ms::QuestInfo> contact { quest(1032, 2102, 2001, {}, 10), quest(1033, 2001, 2102, {{1032, 2}}, 10) };
 		auto contact_marker = [&](int32_t npc, int16_t level = 1) {
 			return ms::select_quest_marker(npc, 0, contact, [&](int16_t id) { return states[id]; }, level,
-				[](int32_t) { return 0; });
+				[](int32_t) { return 0; }, [](int16_t) { return std::string(); });
 		};
 		require(contact_marker(2102) == QuestMarker::AVAILABLE, "Nina must offer the existing quest");
 		require(contact_marker(2102, 11) == QuestMarker::NONE, "offer must honor maximum start level");
@@ -82,6 +83,22 @@ int main()
 		require(contact_marker(2102) == QuestMarker::READY, "returning to Nina must show a closed book");
 		states[1033] = 2;
 		require(contact_marker(2102) == QuestMarker::NONE, "unsupported item quest must not be advertised");
+		// Todd's hunt is ready once the kill count and the item are in.
+		ms::QuestInfo hunt = quest(1035, 2004, 2002);
+		hunt.end_mobs = {{9300018, 1}};
+		hunt.end_items = {{4031802, 1}};
+		std::string progress = "000";
+		int32_t shells = 0;
+		auto hunt_marker = [&]() {
+			return ms::select_quest_marker(2002, 0, {hunt}, [](int16_t) { return 1; }, 1,
+				[&](int32_t) { return shells; }, [&](int16_t) { return progress; });
+		};
+		require(hunt_marker() == QuestMarker::IN_PROGRESS, "no kills yet");
+		shells = 1;
+		require(hunt_marker() == QuestMarker::IN_PROGRESS, "the item alone is not enough");
+		progress = "001";
+		require(hunt_marker() == QuestMarker::READY, "kills and item complete the hunt");
+		require(ms::decode_kills("003012") == std::vector<int16_t>({3, 12}), "progress decodes three digits per mob");
 		std::cout << "Quest marker transitions and priority passed\n";
 		return 0;
 	}

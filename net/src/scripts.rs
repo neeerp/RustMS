@@ -104,7 +104,7 @@ mod tests {
         let mut player = crate::codec::stats::sample_player();
         for &(quest_id, state) in quests {
             let status = match state {
-                QuestState::Started => QuestStatus::Started,
+                QuestState::Started => QuestStatus::Started { kills: Vec::new() },
                 _ => QuestStatus::Completed {
                     at: SystemTime::UNIX_EPOCH,
                 },

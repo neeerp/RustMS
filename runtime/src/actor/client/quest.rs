@@ -1,13 +1,16 @@
 use super::ClientActor;
 use crate::{db::spawn_db, error::RuntimeError, message::FieldMessage};
-use game::{Player, QuestState};
+use game::{Player, QuestRecord, QuestState, QuestStatus};
 use net::npc_scripts::NpcScript;
-use net::packet::build::world::{effect, quest, stat};
-use net::quests::{self, QuestActionKind, QuestRequest, QuestTemplate};
+use net::packet::build::world::effect::{self, CharEffect};
+use net::packet::build::world::{inventory, quest, stat};
+use net::quests::{self, QuestActionKind, QuestItem, QuestRejection, QuestRequest, QuestTemplate};
+use net::FieldRequest;
 use packet::Packet;
 use tracing::{debug, warn};
 
 /// A quest change to commit together with the player.
+#[derive(Clone, Copy)]
 pub(super) enum QuestChange {
     Start(&'static QuestTemplate),
     Complete(&'static QuestTemplate),
@@ -120,8 +123,11 @@ impl ClientActor {
         if quests::check_start(template, npc_id, &self.in_game()?.player).is_err() {
             return Ok(());
         }
-        let next = self.in_game()?.player.clone();
+        let mut next = self.in_game()?.player.clone();
         let mut packets = Vec::new();
+        if !self.quest_items(&template.start_items, &mut next, &mut packets)? {
+            return self.send_all(&mut packets).await;
+        }
         if self
             .commit_player(next, Some(QuestChange::Start(template)), &mut packets)
             .await?
@@ -141,6 +147,9 @@ impl ClientActor {
         }
         let mut next = self.in_game()?.player.clone();
         let mut packets = Vec::new();
+        if !self.quest_items(&template.end_rewards, &mut next, &mut packets)? {
+            return self.send_all(&mut packets).await;
+        }
         if template.exp > 0 {
             gain_exp(&mut next, template.exp, &mut packets)?;
         }
@@ -160,6 +169,61 @@ impl ClientActor {
             npc_id,
             follow_up,
         )?);
+        packets.push(effect::build_own_effect(CharEffect::QuestClear)?);
+        self.send_all(&mut packets).await?;
+        let character_id = self.in_game()?.player.id();
+        let shown = effect::build_foreign_effect(character_id, CharEffect::QuestClear)?;
+        self.send_to_field(FieldMessage::FromClient {
+            from: self.client_id,
+            request: FieldRequest::Broadcast(shown),
+        })
+        .await
+    }
+
+    /// Apply a quest step's item actions to `next`. `false`, with the
+    /// "inventory full" notice queued, if the gifts don't fit.
+    fn quest_items(
+        &self,
+        items: &[QuestItem],
+        next: &mut Player,
+        packets: &mut Vec<Packet>,
+    ) -> Result<bool, RuntimeError> {
+        let picked = quests::pick_items(items, next, &mut rand::thread_rng());
+        let changes = match quests::apply_items(next, &picked) {
+            Ok(changes) => changes,
+            Err(rejection) => {
+                debug!(?rejection, "Quest items refused");
+                if rejection == QuestRejection::InventoryFull {
+                    packets.push(inventory::build_inventory_full()?);
+                }
+                return Ok(false);
+            }
+        };
+        if !changes.is_empty() {
+            packets.push(inventory::build_inventory_operation(true, &changes)?);
+        }
+        for (item_id, count) in picked {
+            packets.push(inventory::build_item_gain_in_chat(item_id, count)?);
+        }
+        Ok(true)
+    }
+
+    /// Count a kill toward started quests and show the new progress.
+    pub(super) async fn count_quest_kill(&mut self, mob_id: i32) -> Result<(), RuntimeError> {
+        let Ok(catalog) = quests::catalog() else {
+            return Ok(());
+        };
+        let player = &mut self.in_game_mut()?.player;
+        let changed = quests::count_kill(|id| catalog.quest(id), player, mob_id);
+        if changed.is_empty() {
+            return Ok(());
+        }
+        player.mark_dirty();
+        let mut packets = Vec::new();
+        for quest_id in changed {
+            let status = player.quests.status(quest_id);
+            packets.push(quest::build_quest_progress(quest_id, status)?);
+        }
         self.send_all(&mut packets).await
     }
 
@@ -174,6 +238,15 @@ impl ClientActor {
         packets: &mut Vec<Packet>,
     ) -> Result<bool, RuntimeError> {
         let previous_level = self.in_game()?.player.stats.level;
+        if let Some(QuestChange::Start(template)) = change {
+            // Hunting quests start with every kill count at 0 ("000").
+            next.quests.upsert(QuestRecord {
+                quest_id: template.id,
+                status: QuestStatus::Started {
+                    kills: vec![0; template.end_mobs.len()],
+                },
+            });
+        }
         if let Some(change) = change {
             let snapshot = next.clone();
             let progress = match change {
@@ -217,7 +290,10 @@ impl ClientActor {
             self.send_to_field(FieldMessage::UpdateAvatar {
                 client_id,
                 avatar,
-                announce: Some(effect::build_level_up_effect(client_id)?),
+                announce: Some(effect::build_foreign_effect(
+                    client_id,
+                    CharEffect::LevelUp,
+                )?),
             })
             .await?;
         }

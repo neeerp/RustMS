@@ -55,10 +55,9 @@ async fn beginner_visits_follow_portals_and_persist_rewards_once() {
     assert_eq!(warp(c, -1, "out00", &mut trace).await, 30_000);
     act(c, &mut trace, &m, COMPLETE, 1033, NINA).await;
     assert_eq!(trace.gains, [5, 7, 7]);
-    // 1033's nextQuest (1034) needs items, so the chain stops here.
-    assert_eq!(trace.results.last(), Some(&(1033, NINA, 0)));
-    act(c, &mut trace, &m, START, 1034, NINA).await;
-    assert!(!trace.states.contains_key(&1034));
+    // 1033's nextQuest continues into Nina's candy errand (1034), which
+    // quest_objectives.rs covers.
+    assert_eq!(trace.results.last(), Some(&(1033, NINA, 1034)));
     drop(session);
 
     let restored = relogin(&config).await;

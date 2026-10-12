@@ -4,6 +4,7 @@ use crate::{
     schema::{character_quests, characters},
 };
 use diesel::prelude::*;
+use game::quest::encode_kills;
 use game::{Player, QuestState};
 use std::time::SystemTime;
 
@@ -14,6 +15,8 @@ pub struct QuestProgress {
     pub quest_id: i16,
     pub status: i16,
     pub completed_at: Option<SystemTime>,
+    /// Mob kill counts, three digits per required mob (v83 format).
+    pub progress: String,
 }
 
 pub fn get_quests(cid: i32) -> crate::Result<Vec<QuestProgress>> {
@@ -28,7 +31,8 @@ fn rejected() -> diesel::result::Error {
 }
 
 /// Start a quest and save `player` (already updated with whatever starting
-/// it changed, e.g. a given item) in one transaction. `prerequisites` are
+/// it changed, e.g. a given item, and holding the started quest) in one
+/// transaction. `prerequisites` are
 /// `(quest id, required state)` pairs, rechecked under the character lock; a
 /// quest can only be started once.
 pub fn start(
@@ -68,6 +72,7 @@ pub fn start(
                 character_quests::character_id.eq(cid),
                 character_quests::quest_id.eq(qid),
                 character_quests::status.eq(1),
+                character_quests::progress.eq(encode_kills(player.quests.kills(qid))),
             ))
             .get_result(conn)?;
         write_player(conn, player)?;

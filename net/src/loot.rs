@@ -98,7 +98,7 @@ mod tests {
         assert!(roll_entries(&shellpiece, &player, &mut rng).is_empty());
         player.quests.upsert(QuestRecord {
             quest_id: 1035,
-            status: QuestStatus::Started,
+            status: QuestStatus::Started { kills: Vec::new() },
         });
         assert_eq!(
             roll_entries(&shellpiece, &player, &mut rng),

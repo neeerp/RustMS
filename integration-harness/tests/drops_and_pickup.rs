@@ -162,6 +162,9 @@ async fn snail_drops_go_to_the_killer_first_and_persist() {
         FOREST
     );
     read_for(&mut rival.connection, &mut r, 300).await;
+    read_for(&mut hunter.connection, &mut h, 300).await;
+    // Earlier tests may have left drops (and pending removals) on this map.
+    let old_drops = h.drops.len();
 
     // Snails drop mesos 65% of the time; kill until something drops.
     let snails: Vec<_> = h.mobs.iter().filter(|m| m.1 == SNAIL).copied().collect();
@@ -169,11 +172,21 @@ async fn snail_drops_go_to_the_killer_first_and_persist() {
         send(&mut hunter.connection, attack(oid, 8)).await;
         until(&mut hunter.connection, &mut h, |s| s.killed.contains(&oid)).await;
         read_for(&mut hunter.connection, &mut h, 200).await;
-        if !h.drops.is_empty() {
+        if h.drops.len() > old_drops {
             break;
         }
     }
-    let loot = *h.drops.first().expect("seventeen snails dropped nothing");
+    let loot = *h
+        .drops
+        .get(old_drops)
+        .expect("seventeen snails dropped nothing");
+    let ours = |s: &Seen| -> Vec<(i32, Option<i32>)> {
+        s.removed
+            .iter()
+            .filter(|(oid, _)| *oid == loot.object_id)
+            .copied()
+            .collect()
+    };
     until(&mut rival.connection, &mut r, |s| {
         s.drops.iter().any(|d| d.object_id == loot.object_id)
     })
@@ -191,7 +204,7 @@ async fn snail_drops_go_to_the_killer_first_and_persist() {
     )
     .await;
     read_for(&mut hunter.connection, &mut h, 400).await;
-    assert!(h.removed.is_empty());
+    assert!(ours(&h).is_empty());
 
     // The killer takes it; everyone sees it go.
     send(
@@ -199,9 +212,9 @@ async fn snail_drops_go_to_the_killer_first_and_persist() {
         pickup(loot.object_id, loot.x, loot.y),
     )
     .await;
-    until(&mut hunter.connection, &mut h, |s| !s.removed.is_empty()).await;
-    assert_eq!(h.removed, [(loot.object_id, Some(hunter.character_id))]);
-    until(&mut rival.connection, &mut r, |s| !s.removed.is_empty()).await;
+    until(&mut hunter.connection, &mut h, |s| !ours(s).is_empty()).await;
+    assert_eq!(ours(&h), [(loot.object_id, Some(hunter.character_id))]);
+    until(&mut rival.connection, &mut r, |s| !ours(s).is_empty()).await;
     if loot.meso {
         until(&mut hunter.connection, &mut h, |s| s.meso.is_some()).await;
         assert_eq!(h.meso, Some(loot.value));
@@ -220,7 +233,7 @@ async fn snail_drops_go_to_the_killer_first_and_persist() {
     )
     .await;
     read_for(&mut hunter.connection, &mut h, 400).await;
-    assert_eq!(h.removed.len(), 1);
+    assert_eq!(ours(&h).len(), 1);
     drop(rival);
     drop(hunter);
 

@@ -34,18 +34,31 @@ Only requirements and actions the server implements are allowed
 | Node | Allowed keys |
 | --- | --- |
 | `Check/<id>/0` (start) | `npc`, `job`, `lvmin`, `lvmax`, `quest`, `startscript` |
-| `Check/<id>/1` (complete) | `npc`, `item`, `endscript` |
-| `Act/<id>/0` | none |
-| `Act/<id>/1` | `exp`, `nextQuest` |
+| `Check/<id>/1` (complete) | `npc`, `item`, `mob`, `endscript` |
+| `Act/<id>/0` | `item` |
+| `Act/<id>/1` | `exp`, `nextQuest`, `item` |
+| `Act/<id>/<n>/item/<k>` | `id`, `count`, `job`, `gender`, `prop` (not -1) |
 
 `Act` nodes may repeat speech under numbered keys and `yes`/`no`; that is not
 an action. `item` requirements are counts the player must hold; a count of 0
-means none may be left (Roger's apples must all be eaten). `startscript`/
+means none may be left (Roger's apples must all be eaten). `mob` requirements
+are kill counts (below).
+
+Item actions (`net::quests::pick_items`/`apply_items`) give positive counts
+and take negative ones (capped at what the player holds). An entry applies
+only to its `job` families (v83 bits: 0x1 beginner, 0x2 warrior, 0x4
+magician, 0x8 bowman, 0x10 thief, 0x20 pirate, 0x400+ Cygnus) and `gender`
+(2 or absent: either). Entries without `prop` always apply; among those with
+a positive `prop`, one is picked at random by weight (Todd's beginner hats).
+`prop` -1 is a reward the player chooses, which needs UI and stays
+unsupported, as do `period`, `dateExpire`, `var`, and `name`. If the gifts
+don't fit, nothing changes and the client gets "You can't get anymore
+items." `startscript`/
 `endscript` are allowed only for scripts the server implements
 (`game_data::quests::SCRIPTS`: `q1021s`, `q1021e`); those steps go through
 QUEST_ACTION 4/5 and the server drives the dialogue (see
-[NPC dialogue](./npc-dialogue.md)). A quest with any other key (`item`, `mob`, `money`, `pop`,
-`skill`, `startscript`, `endscript`, `infoex`, ...) is **unsupported**: it is
+[NPC dialogue](./npc-dialogue.md)). A quest with any other key (`money`, `pop`, `skill`, `infoex`,
+`pet`, ...) is **unsupported**: it is
 never offered, and actions for it are refused. A prerequisite without a
 `state` means "not started" (mutually exclusive quests).
 
@@ -53,7 +66,7 @@ The `game-data` asset test compares the server's result with the committed
 list `game-data/supported_quests.txt`. HeavenClient doesn't classify quests:
 the build copies that list next to the executable, and the client offers
 only those quests (`Character/QuestCatalog.cpp`). Supporting a new key means
-changing the server's allowlist and regenerating the list. 219 quests qualify
+changing the server's allowlist and regenerating the list. 909 quests qualify
 with the current rules, including the beginner ones:
 
 | Quest | Start → Finish | EXP |
@@ -61,12 +74,28 @@ with the current rules, including the beginner ones:
 | 1009–1015 Rain's Maple Quiz | Rain (12101) | 2, 4, 6, 10, 10, 10, 20 |
 | 1031 Heena and Sera | Heena (2101) → Sera (2100) | 5 |
 | 1032 Nina's Brother Sen | Nina (2102) → Sen (2001) | 7, next 1033 |
-| 1033 What Sen Wants | Sen (2001) → Nina (2102) | 7 |
+| 1033 What Sen Wants | Sen (2001) → Nina (2102) | 7, next 1034 |
+| 1034 Tasty Mushroom Candy | Nina (2102) → Sen (2001) | 20; gives 10 candies for Sen, then 2 edible ones (2022253) for beginners |
+| 1035 Todd's Hunting Method | Todd (2004) → Peter (2002) | 30; one Jr. Sentinel and its shellpiece for a random beginner hat |
 | 1036 Robin the Walking Encyclopedia | Robin (2003) | 40 |
+| 1037 Help Hunt the Snails | Sam (2005) → Maria (2103) | 60 for 10 snails, next 1038 |
+| 1038 Maria's Letter | Maria (2103) → Lucas (12000) | 40; the letter for 5 Red and 5 Blue Potions |
 | 1021 Roger's Apple (scripted) | Roger (2000) | 10, 3 Apples, 3 Green Apples |
 
-1034 (Mushroom Candy) and 1035 (Todd's hunting) need item rewards or kills
-and stay unsupported for now.
+## Kill counts
+
+`character_quests.progress` holds a started quest's v83 progress string:
+three digits per `Check/1/mob` entry, in order ("003012" for 3 and 12).
+Starting a hunting quest sets every count to 0; each kill a player takes part
+in (`ServerMessage::MobKilled`) adds one for every started quest that needs
+that mob, up to the required count (`net::quests::count_kill`), and sends the
+quest record again with the new string. Counts live in the quest's
+`QuestStatus::Started { kills }` and are saved with the player. Completion
+requires every count.
+
+Completing a quest also plays the v83 "Quest Clear" effect
+(`effect::build_own_effect` and `effect::build_foreign_effect` with
+`CharEffect::QuestClear`).
 
 ## Conversations in the client
 
@@ -82,12 +111,19 @@ and stay unsupported for now.
   the last page of a talk-only completion, sends complete. There is no going
   back to an answered question.
 - **Reminder**: `stop/npc` pages when the start NPC is clicked while the
-  quest is open.
+  quest is open; at the finishing NPC, `stop/mob` while kills are missing and
+  `stop/item` while items are.
 - No pages at all: the action is sent immediately (Sen's completion of 1032).
 
 Markers use the same catalog (`QuestLog::supported_rules`): bulb for an
 available quest, open book while in progress at the start NPC, closed book at
-the finishing NPC.
+the finishing NPC once its kills and items are in (open book until then).
+
+The **Quest Helper** (`IO/UITypes/UIQuestHelper.cpp`, from
+`UIWindow2.img/QuestAlarm`) sits in the top-right corner and lists up to
+five tracked quests with what each still needs ("Snail 3/10"), green once
+met. Starting a quest with kills or items to bring tracks it; the quest
+window's helper button tracks and untracks open quests.
 
 ## Persistence and rewards
 
@@ -120,5 +156,7 @@ copied into the source.
 - Integration: `scripted_npcs` (Roger's Apple end to end, Robin, the
   tutorial skip, natural recovery limits), `rain_quizzes` (all seven quizzes, rewards once, prerequisites,
   wrong NPC, NPC not on the map, forfeit, relogin, channel change, isolation)
-  and `beginner_contact_quests` (the route through Sen's house, `nextQuest`
-  results, and unsupported 1034).
+  `beginner_contact_quests` (the route through Sen's house and `nextQuest`
+  results), and `quest_objectives` (1034's candy errand, Todd's hunt and
+  random hat, Sam's snails persisting across relog and capped at ten, Maria's
+  letter to Lucas, refusals before requirements are met).

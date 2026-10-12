@@ -168,6 +168,7 @@ diesel::table! {
         quest_id -> Int2,
         status -> Int2,
         completed_at -> Nullable<Timestamp>,
+        progress -> Text,
     }
 }
 diesel::joinable!(character_quests -> characters (character_id));

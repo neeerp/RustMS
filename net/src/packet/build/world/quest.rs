@@ -1,5 +1,6 @@
 use crate::codec::time::filetime;
 use crate::{error::NetworkError, packet::op::SendOpcode};
+use game::quest::encode_kills;
 use game::{QuestState, QuestStatus};
 use packet::{io::write::PktWrite, Packet};
 use std::time::SystemTime;
@@ -20,9 +21,9 @@ pub fn build_quest_progress(
         None => {
             p.write_byte(QuestState::NotStarted as u8)?;
         }
-        Some(QuestStatus::Started) => {
+        Some(QuestStatus::Started { kills }) => {
             p.write_byte(QuestState::Started as u8)?;
-            p.write_str_with_length("")?;
+            p.write_str_with_length(&encode_kills(kills))?;
         }
         Some(QuestStatus::Completed { at }) => {
             p.write_byte(QuestState::Completed as u8)?;
@@ -82,12 +83,13 @@ mod tests {
     }
 
     #[test]
-    fn started_quest_carries_empty_progress_string() {
-        let packet = build_quest_progress(1021, Some(&QuestStatus::Started)).unwrap();
+    fn started_quest_carries_its_kill_counts() {
+        let status = QuestStatus::Started { kills: vec![3, 12] };
+        let packet = build_quest_progress(1021, Some(&status)).unwrap();
 
         let mut expect = Expect::new(&packet.bytes);
         expect.short(SendOpcode::ShowStatusInfo as i16).byte(1);
-        expect.short(1021).byte(1).string("");
+        expect.short(1021).byte(1).string("003012");
         expect.end();
     }
 

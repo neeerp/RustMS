@@ -63,6 +63,14 @@ namespace ms
 				return end_items_met(quest, [&](int32_t id) { return inventory.get_total_item_count(id); });
 			}
 
+			bool mobs_met(const QuestInfo& quest)
+			{
+				const auto& started = player().get_quests().started_quests();
+				auto iter = started.find(quest.id);
+
+				return end_mobs_met(quest, iter == started.end() ? std::string() : iter->second);
+			}
+
 			std::string npc_image(int32_t npc_id)
 			{
 				std::string id = std::to_string(npc_id);
@@ -173,7 +181,13 @@ namespace ms
 			bool completion_side = *mode != QuestDialogue::Mode::OFFER;
 			QuestScript script = QuestCatalog::get().script(quest_id, completion_side);
 
-			if (*mode == QuestDialogue::Mode::COMPLETION && !items_met(*quest))
+			if (*mode == QuestDialogue::Mode::COMPLETION && !mobs_met(*quest))
+			{
+				// Say why it can't be finished yet (stop/mob, else stop/item).
+				script.reminder = script.mob_reminder.empty() ? script.item_reminder : script.mob_reminder;
+				mode = QuestDialogue::Mode::REMINDER;
+			}
+			else if (*mode == QuestDialogue::Mode::COMPLETION && !items_met(*quest))
 			{
 				// Say why it can't be finished yet (stop/item).
 				script.reminder = script.item_reminder;

@@ -31,10 +31,12 @@ the quest's own conversation with that NPC when the NPC is present and its
 quest marker permits the action; the server still validates the resulting
 `QUEST_ACTION`.
 
-The Recommended tab, Quest Helper, and Forfeit use disabled states: recommendations,
-tracking overlays, and abandonment do not yet have implementations. Displayed reward details currently
-cover the EXP rewards of the supported quests. Adding item/meso rewards requires
-matching server support and reward UI rows.
+Open quests list what they still need under the objective ("Snail 3/10",
+green once met), and the reward panel lists EXP and item rewards, marking
+random picks. The helper button (`BtArlim`) adds an open quest to the Quest
+Helper or removes it (see [Quests](./quests.md)). The Recommended tab and
+Forfeit use disabled states: recommendations and abandonment do not yet have
+implementations.
 
 Validation: build the native client and run CTest; marker tests include available
 quest filtering across jobs, prerequisites, and level modes. Use a private Xvfb

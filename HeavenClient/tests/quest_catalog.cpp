@@ -51,6 +51,14 @@ int main()
 		return 1;
 	}
 
+	const ms::QuestInfo* todd = catalog.find(1035);
+
+	if (!todd || todd->end_mobs.size() != 1 || todd->end_mobs[0] != std::make_pair(9300018, int16_t(1)))
+	{
+		std::cerr << "Quest 1035's hunt did not parse as expected\n";
+		return 1;
+	}
+
 	ms::QuestScript rain = catalog.script(1009, true);
 
 	if (rain.answers.at(0) != 0 || rain.wrong.at(0).count(1) != 1)

@@ -3,8 +3,11 @@
 //! catalog and the player's state before anything is persisted.
 
 use crate::load;
-use game::{Player, QuestState};
-pub use game_data::quests::{QuestCatalog, QuestPrerequisite, QuestTemplate, StartRequirements};
+use game::{InventoryChange, InventoryError, Player, QuestState};
+pub use game_data::quests::{
+    QuestCatalog, QuestItem, QuestPrerequisite, QuestTemplate, StartRequirements,
+};
+use rand::Rng;
 use std::sync::OnceLock;
 
 pub fn catalog() -> Result<&'static QuestCatalog, &'static str> {
@@ -42,6 +45,10 @@ pub enum QuestRejection {
     Prerequisite(i16),
     /// Missing (or, for a count of 0, still holding) a required item.
     Items(i32),
+    /// Fewer kills of this mob than required.
+    Mobs(i32),
+    /// The item rewards don't fit.
+    InventoryFull,
 }
 
 /// Whether `player` may start `quest` with `npc_id`.
@@ -96,7 +103,115 @@ pub fn check_complete(
             return Err(QuestRejection::Items(item_id));
         }
     }
+    let kills = player.quests.kills(quest.id);
+    for (index, &(mob_id, count)) in quest.end_mobs.iter().enumerate() {
+        if kills.get(index).copied().unwrap_or(0) < count {
+            return Err(QuestRejection::Mobs(mob_id));
+        }
+    }
     Ok(())
+}
+
+/// Count a kill of `mob_id` toward every started quest that needs it.
+/// Returns the quests whose progress changed.
+pub fn count_kill<'a>(
+    quest: impl Fn(i16) -> Option<&'a QuestTemplate>,
+    player: &mut Player,
+    mob_id: i32,
+) -> Vec<i16> {
+    let started: Vec<i16> = player.quests.started().map(|r| r.quest_id).collect();
+    let mut changed = Vec::new();
+    for quest_id in started {
+        let Some(quest) = quest(quest_id) else {
+            continue;
+        };
+        if !quest
+            .end_mobs
+            .iter()
+            .any(|&(required, _)| required == mob_id)
+        {
+            continue;
+        }
+        let Some(kills) = player.quests.kills_mut(quest_id) else {
+            continue;
+        };
+        kills.resize(quest.end_mobs.len(), 0);
+        let mut counted = false;
+        for (index, &(required, count)) in quest.end_mobs.iter().enumerate() {
+            // Kills past the required count are not recorded.
+            if required == mob_id && kills[index] < count {
+                kills[index] += 1;
+                counted = true;
+            }
+        }
+        if counted {
+            changed.push(quest_id);
+        }
+    }
+    changed
+}
+
+/// The item changes a quest step makes for `player`, as `(item id, count)`:
+/// every entry for their job and gender without a `prop`, plus one pick
+/// among those with one, weighted by it.
+pub fn pick_items(items: &[QuestItem], player: &Player, rng: &mut impl Rng) -> Vec<(i32, i32)> {
+    let eligible: Vec<&QuestItem> = items
+        .iter()
+        .filter(|item| item.applies_to(player.stats.job, player.stats.gender))
+        .collect();
+    let mut picked: Vec<(i32, i32)> = eligible
+        .iter()
+        .filter(|item| item.prop.is_none())
+        .map(|item| (item.item_id, item.count))
+        .collect();
+    let weighted: Vec<&&QuestItem> = eligible
+        .iter()
+        .filter(|item| item.prop.is_some_and(|w| w > 0))
+        .collect();
+    let total: i32 = weighted.iter().filter_map(|item| item.prop).sum();
+    if total > 0 {
+        let mut roll = rng.gen_range(0, total);
+        for item in weighted {
+            let weight = item.prop.unwrap_or(0);
+            if roll < weight {
+                picked.push((item.item_id, item.count));
+                break;
+            }
+            roll -= weight;
+        }
+    }
+    picked
+}
+
+/// Take, then give, `items` (negative counts take). Takes are capped at
+/// what the player holds. Fails without a partial result if a gift doesn't
+/// fit; the caller applies this to a copy of the player.
+pub fn apply_items(
+    player: &mut Player,
+    items: &[(i32, i32)],
+) -> Result<Vec<InventoryChange>, QuestRejection> {
+    let mut changes = Vec::new();
+    for &(item_id, count) in items.iter().filter(|(_, count)| *count < 0) {
+        let held = player.inventory.count(item_id);
+        let taken = i16::try_from(held.min(-count)).unwrap_or(i16::MAX);
+        if taken > 0 {
+            changes.extend(
+                player
+                    .inventory
+                    .remove(item_id, taken)
+                    .map_err(|_| QuestRejection::Items(item_id))?,
+            );
+        }
+    }
+    for &(item_id, count) in items.iter().filter(|(_, count)| *count > 0) {
+        let quantity = i16::try_from(count).unwrap_or(i16::MAX);
+        let given = crate::items::give(&mut player.inventory, item_id, quantity);
+        changes.extend(given.map_err(|error| match error {
+            InventoryError::UnknownItem => QuestRejection::Items(item_id),
+            _ => QuestRejection::InventoryFull,
+        })?);
+    }
+    Ok(changes)
 }
 
 #[cfg(test)]
@@ -121,6 +236,9 @@ mod tests {
             },
             end_npc: 2102,
             end_items: vec![],
+            end_mobs: vec![],
+            start_items: vec![],
+            end_rewards: vec![],
             start_script: None,
             end_script: None,
             exp: 7,
@@ -138,7 +256,7 @@ mod tests {
     fn set(player: &mut Player, quest_id: i16, state: QuestState) {
         let status = match state {
             QuestState::NotStarted => return player.quests.remove(quest_id),
-            QuestState::Started => QuestStatus::Started,
+            QuestState::Started => QuestStatus::Started { kills: Vec::new() },
             QuestState::Completed => QuestStatus::Completed {
                 at: SystemTime::UNIX_EPOCH,
             },
@@ -219,5 +337,64 @@ mod tests {
             check_start(&q, 2001, &p),
             Err(QuestRejection::Prerequisite(2078))
         );
+    }
+
+    #[test]
+    fn kills_count_toward_started_quests_up_to_the_required_number() {
+        let mut q = quest();
+        q.end_mobs = vec![(100100, 2), (100101, 1)];
+        let mut p = player(1, 0);
+        set(&mut p, 1033, QuestState::Started);
+        assert_eq!(
+            check_complete(&q, 2102, &p),
+            Err(QuestRejection::Mobs(100100))
+        );
+        let catalog = |id| (id == 1033).then_some(&q);
+        assert_eq!(count_kill(catalog, &mut p, 100100), [1033]);
+        assert_eq!(count_kill(catalog, &mut p, 100100), [1033]);
+        assert!(count_kill(catalog, &mut p, 100100).is_empty());
+        assert!(count_kill(catalog, &mut p, 9300018).is_empty());
+        assert_eq!(p.quests.kills(1033), [2, 0]);
+        assert_eq!(
+            check_complete(&q, 2102, &p),
+            Err(QuestRejection::Mobs(100101))
+        );
+        assert_eq!(count_kill(catalog, &mut p, 100101), [1033]);
+        assert_eq!(check_complete(&q, 2102, &p), Ok(()));
+    }
+
+    #[test]
+    fn rewards_filter_by_job_and_gender_and_pick_one_weighted_entry() {
+        use rand::SeedableRng;
+        let item = |item_id, job, gender, prop| QuestItem {
+            item_id,
+            count: 1,
+            job,
+            gender,
+            prop,
+        };
+        let items = [
+            item(1002053, 1, 2, Some(1)),
+            item(1002008, 1, 2, Some(1)),
+            item(1302000, 2, 2, None),
+            item(1041002, 0, 1, None),
+            QuestItem {
+                count: -1,
+                ..item(4031802, 0, 2, None)
+            },
+        ];
+        let mut beginner = player(1, 0);
+        beginner.stats.gender = 0;
+        let mut rng = rand::rngs::StdRng::seed_from_u64(7);
+        let mut hats = std::collections::BTreeSet::new();
+        for _ in 0..50 {
+            let picked = pick_items(&items, &beginner, &mut rng);
+            // The shellpiece is always taken; exactly one hat; no sword
+            // (warriors only) and no skirt (female only).
+            assert_eq!(picked.len(), 2);
+            assert!(picked.contains(&(4031802, -1)));
+            hats.insert(picked.iter().find(|(_, c)| *c > 0).unwrap().0);
+        }
+        assert_eq!(hats.len(), 2);
     }
 }

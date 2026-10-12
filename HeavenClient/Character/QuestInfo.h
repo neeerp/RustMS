@@ -22,6 +22,8 @@ namespace ms
 		// Items needed to complete: (item id, count); a count of 0 means none
 		// may be left.
 		std::vector<std::pair<int32_t, int32_t>> end_items;
+		// Mobs to kill before completing: (mob id, count).
+		std::vector<std::pair<int32_t, int16_t>> end_mobs;
 		// The server runs these steps as scripts (QUEST_ACTION 4/5).
 		bool start_script = false;
 		bool end_script = false;

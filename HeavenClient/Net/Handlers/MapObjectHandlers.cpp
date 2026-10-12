@@ -175,7 +175,20 @@ namespace ms
 		int32_t cid = recv.read_int();
 		int8_t effect = recv.read_byte();
 
-		if (effect == 10) // recovery
+		// v83 special effects: 0 level up, 8 job change, 9 quest complete.
+		if (effect == 0 && !recv.available())
+		{
+			Stage::get().show_character_effect(cid, CharEffect::LEVELUP);
+		}
+		else if (effect == 8 && !recv.available())
+		{
+			Stage::get().show_character_effect(cid, CharEffect::JOBCHANGE);
+		}
+		else if (effect == 9 && !recv.available())
+		{
+			Stage::get().show_character_effect(cid, CharEffect::QUEST_CLEAR);
+		}
+		else if (effect == 10) // recovery
 		{
 			recv.read_byte(); // 'amount'
 		}

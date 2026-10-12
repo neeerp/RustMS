@@ -73,6 +73,7 @@ namespace ms
 			QUIT,
 			CHARINFO,
 			CASHSHOP,
+			QUESTHELPER,
 			NUM_TYPES
 		};
 

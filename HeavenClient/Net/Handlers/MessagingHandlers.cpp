@@ -134,7 +134,9 @@ namespace ms
 			int16_t id = recv.read_short();
 			int8_t status = recv.read_byte();
 			auto& quests = Stage::get().get_player().get_quests();
-			if (status == 1)
+			if (status == 0)
+				quests.remove(id);
+			else if (status == 1)
 				quests.add_started(id, recv.read_string());
 			else if (status == 2)
 				quests.add_completed(id, recv.read_long());
@@ -351,6 +353,10 @@ namespace ms
 				if (auto chatbar = UI::get().get_element<UIChatBar>())
 					chatbar->send_chatline(message, UIChatBar::LineType::BLUE);
 			}
+		}
+		else if (mode1 == 9) // quest complete
+		{
+			Stage::get().get_player().show_effect_id(CharEffect::Id::QUEST_CLEAR);
 		}
 		else if (mode1 == 13) // card effect
 		{

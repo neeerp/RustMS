@@ -39,8 +39,12 @@ pub struct WorldSession {
     pub exp: i32,
     pub ap: i16,
     pub quests: std::collections::BTreeMap<i16, u8>,
+    /// Progress strings (kill counts) of started quests.
+    pub quest_progress: std::collections::BTreeMap<i16, String>,
     /// Equipped item ids by equipped slot, from the world-entry SET_FIELD.
     pub equipped: std::collections::BTreeMap<i16, i32>,
+    /// How many of each item the bags hold.
+    pub items: std::collections::BTreeMap<i32, i32>,
     pub meso: i32,
     /// `(kind, action)` for each of the 90 keys, from the world-entry KEYMAP.
     pub keymap: Vec<(u8, i32)>,
@@ -170,7 +174,9 @@ pub async fn login_to_world_session(config: &HarnessConfig) -> Result<WorldSessi
         exp: world_entry.exp,
         ap: world_entry.ap,
         quests: world_entry.quests,
+        quest_progress: world_entry.quest_progress,
         equipped: world_entry.equipped,
+        items: world_entry.items,
         meso: world_entry.meso,
         keymap,
         character_name: world_entry.character_name,

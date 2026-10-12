@@ -425,6 +425,7 @@ impl ClientActor {
                 y,
             } => {
                 self.mob_killed(mob_id, exp).await?;
+                self.count_quest_kill(mob_id).await?;
                 self.drop_loot(mob_id, object_id, x, y).await?
             }
             ServerMessage::PickedUp { drop } => self.picked_up(drop).await?,

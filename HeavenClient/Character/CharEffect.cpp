@@ -25,6 +25,7 @@ namespace ms
 					"JobChanged",
 					"Enchant/Success",
 					"Enchant/Failure",
-					"MonsterBook/cardGet"
+					"MonsterBook/cardGet",
+					"QuestClear"
 			};
 }

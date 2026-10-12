@@ -35,15 +35,24 @@ pub fn create(item_id: i32, quantity: i16) -> Option<Item> {
     })
 }
 
-/// Put `quantity` of `item_id` into `inventory`. Nothing changes unless all
-/// of it fits.
+/// Put `quantity` of `item_id` into `inventory`, one slot per piece of
+/// equipment. Nothing changes unless all of it fits.
 pub fn give(
     inventory: &mut Inventory,
     item_id: i32,
     quantity: i16,
 ) -> Result<Vec<InventoryChange>, InventoryError> {
     let item = create(item_id, quantity).ok_or(InventoryError::UnknownItem)?;
-    inventory.add(item, slot_max(item_id))
+    if item.equip.is_none() {
+        return inventory.add(item, slot_max(item_id));
+    }
+    let mut next = inventory.clone();
+    let mut changes = Vec::new();
+    for _ in 0..quantity.max(1) {
+        changes.extend(next.add(item.clone(), 1)?);
+    }
+    *inventory = next;
+    Ok(changes)
 }
 
 pub fn base_stats(equip: &EquipInfo) -> EquipStats {

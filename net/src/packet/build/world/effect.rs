@@ -22,12 +22,27 @@ pub fn build_avatar_effect(path: &str) -> Result<Packet, NetworkError> {
     Ok(p)
 }
 
-/// SHOW_FOREIGN_EFFECT 0: the level-up effect on another player.
-pub fn build_level_up_effect(character_id: i32) -> Result<Packet, NetworkError> {
+/// An effect played on a character.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum CharEffect {
+    LevelUp = 0,
+    QuestClear = 9,
+}
+
+/// SHOW_ITEM_GAIN_INCHAT: `effect` on this player.
+pub fn build_own_effect(effect: CharEffect) -> Result<Packet, NetworkError> {
+    let mut p = Packet::new_empty();
+    p.write_short(SendOpcode::ShowItemGainInChat as i16)?;
+    p.write_byte(effect as u8)?;
+    Ok(p)
+}
+
+/// SHOW_FOREIGN_EFFECT: `effect` on another player.
+pub fn build_foreign_effect(character_id: i32, effect: CharEffect) -> Result<Packet, NetworkError> {
     let mut p = Packet::new_empty();
     p.write_short(SendOpcode::ShowForeignEffect as i16)?;
     p.write_int(character_id)?;
-    p.write_byte(0)?;
+    p.write_byte(effect as u8)?;
     Ok(p)
 }
 
@@ -68,8 +83,16 @@ mod tests {
     }
 
     #[test]
-    fn level_up_effect_names_the_player() {
-        let packet = build_level_up_effect(7).unwrap();
+    fn own_effect_is_just_the_effect() {
+        let packet = build_own_effect(CharEffect::QuestClear).unwrap();
+        let mut expect = Expect::new(&packet.bytes);
+        expect.short(SendOpcode::ShowItemGainInChat as i16).byte(9);
+        expect.end();
+    }
+
+    #[test]
+    fn foreign_effect_names_the_player() {
+        let packet = build_foreign_effect(7, CharEffect::LevelUp).unwrap();
         let mut expect = Expect::new(&packet.bytes);
         expect
             .short(SendOpcode::ShowForeignEffect as i16)

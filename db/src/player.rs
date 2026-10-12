@@ -12,6 +12,7 @@ use crate::schema::{
 };
 use diesel::pg::PgConnection;
 use diesel::prelude::*;
+use game::quest::{decode_kills, encode_kills};
 use game::{
     AvatarLook, CharacterStats, EquipStats, Inventory, InventoryType, Item, KeyBinding, Keymap,
     Player, QuestLog, QuestRecord, QuestStatus, SkillBook, SkillRecord,
@@ -171,6 +172,17 @@ pub(crate) fn write_player(conn: &mut PgConnection, player: &Player) -> QueryRes
 
         save_keymap(conn, id, &player.keymap)?;
         save_inventory(conn, id, &player.inventory)?;
+        // Kill progress of started quests.
+        for record in player.quests.started() {
+            let kills = player.quests.kills(record.quest_id);
+            diesel::update(
+                character_quests::table
+                    .find((id, record.quest_id))
+                    .filter(character_quests::status.eq(1)),
+            )
+            .set(character_quests::progress.eq(encode_kills(kills)))
+            .execute(conn)?;
+        }
 
         diesel::delete(skills::table.filter(skills::character_id.eq(id))).execute(conn)?;
         let skill_rows: Vec<SkillRow> = player
@@ -261,7 +273,9 @@ pub fn quest_record(progress: &QuestProgress) -> QuestRecord {
         quest_id: progress.quest_id,
         status: match (progress.status, progress.completed_at) {
             (2, Some(at)) => QuestStatus::Completed { at },
-            _ => QuestStatus::Started,
+            _ => QuestStatus::Started {
+                kills: decode_kills(&progress.progress),
+            },
         },
     }
 }

@@ -26,6 +26,9 @@ namespace ms
 		// stop/item on the completion side: what to say while the required
 		// items are missing (or, for Roger's apples, not yet used up).
 		std::vector<std::string> item_reminder;
+		// stop/mob on the completion side: what to say while the required
+		// mobs have not all been hunted.
+		std::vector<std::string> mob_reminder;
 	};
 
 	struct QuestPage

@@ -64,6 +64,10 @@ namespace ms
 				info.end_items.emplace_back(static_cast<int32_t>(item["id"].get_integer()),
 					static_cast<int32_t>(item["count"].get_integer()));
 
+			for (auto mob : end["mob"])
+				info.end_mobs.emplace_back(static_cast<int32_t>(mob["id"].get_integer()),
+					static_cast<int16_t>(mob["count"].get_integer(1)));
+
 			return info;
 		}
 	}
@@ -127,6 +131,12 @@ namespace ms
 			if (stop.name() == "item")
 			{
 				script.item_reminder = pages(stop);
+				continue;
+			}
+
+			if (stop.name() == "mob")
+			{
+				script.mob_reminder = pages(stop);
 				continue;
 			}
 
