@@ -73,7 +73,13 @@ namespace ms
 					}
 				}
 
-				if (nl::node headsfnode = headnode[stancename][frame]["head"])
+				nl::node headframe = headnode[stancename][frame];
+
+				// The dead ghost has no head of its own and wears the front-facing one.
+				if (!headframe)
+					headframe = headnode["front"];
+
+				if (nl::node headsfnode = headframe["head"])
 				{
 					Point<int16_t> shift = drawinfo.get_head_position(stance, frame);
 

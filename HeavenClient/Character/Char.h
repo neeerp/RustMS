@@ -206,12 +206,19 @@ namespace ms
 		TimedBool ironbody;
 		std::list<DamageNumber> damagenumbers;
 
-		// A dead character's tombstone drops from above, then stays on them.
+		// A dead character's ghost fades in over two seconds while its tombstone drops from above behind it.
+		// The ghost then circles the tombstone, as in the original client: clockwise, 9 pixels out, once
+		// every two seconds.
 		static constexpr int16_t TOMB_DROP = 240;
 		static constexpr int16_t TOMB_SPEED = 2;
+		static constexpr float GHOST_FADE = 0.004f;
+		static constexpr float GHOST_RADIUS = 9.0f;
+		static constexpr uint16_t GHOST_LAP = 2000 / Constants::TIMESTEP;
 		Animation tomb;
 		int16_t tomb_drop = 0;
 		bool tomb_landed = false;
+		Linear<float> ghost_opacity;
+		uint16_t ghost_tick = 0;
 
 		static EnumMap<CharEffect::Id, Animation> chareffects;
 		static Animation tomb_fall;

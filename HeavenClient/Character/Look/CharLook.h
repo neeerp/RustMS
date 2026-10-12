@@ -100,6 +100,9 @@ namespace ms
 		void draw(const DrawArgument &args, Stance::Id interstance, Expression::Id interexp, uint8_t interframe,
 				  uint8_t interfcframe) const;
 
+		// Draw the hair over the head and the cap, which covers some of it.
+		void draw_cap(const DrawArgument &args, Stance::Id stance, uint8_t frame) const;
+
 		uint16_t get_delay(Stance::Id stance, uint8_t frame) const;
 
 		uint8_t getnextframe(Stance::Id stance, uint8_t frame) const;
