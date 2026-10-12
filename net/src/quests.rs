@@ -40,6 +40,8 @@ pub enum QuestRejection {
     Job,
     Level,
     Prerequisite(i16),
+    /// Missing (or, for a count of 0, still holding) a required item.
+    Items(i32),
 }
 
 /// Whether `player` may start `quest` with `npc_id`.
@@ -87,6 +89,13 @@ pub fn check_complete(
     if player.quests.state(quest.id) != QuestState::Started {
         return Err(QuestRejection::WrongState);
     }
+    for &(item_id, count) in &quest.end_items {
+        let held = player.inventory.count(item_id);
+        let met = if count > 0 { held >= count } else { held == 0 };
+        if !met {
+            return Err(QuestRejection::Items(item_id));
+        }
+    }
     Ok(())
 }
 
@@ -111,6 +120,9 @@ mod tests {
                 }],
             },
             end_npc: 2102,
+            end_items: vec![],
+            start_script: None,
+            end_script: None,
             exp: 7,
             next_quest: None,
         }
@@ -171,6 +183,25 @@ mod tests {
         assert_eq!(
             check_complete(&q, 2102, &p),
             Err(QuestRejection::WrongState)
+        );
+    }
+
+    #[test]
+    fn completion_checks_item_counts_and_zero_means_none_left() {
+        let mut q = quest();
+        q.end_items = vec![(4031792, 2), (2010007, 0)];
+        let mut p = player(1, 0);
+        set(&mut p, 1033, QuestState::Started);
+        assert_eq!(
+            check_complete(&q, 2102, &p),
+            Err(QuestRejection::Items(4031792))
+        );
+        p.inventory.add(game::Item::stack(4031792, 2), 100).unwrap();
+        assert_eq!(check_complete(&q, 2102, &p), Ok(()));
+        p.inventory.add(game::Item::stack(2010007, 1), 100).unwrap();
+        assert_eq!(
+            check_complete(&q, 2102, &p),
+            Err(QuestRejection::Items(2010007))
         );
     }
 

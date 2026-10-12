@@ -10,10 +10,11 @@ mod npc_dialogue;
 mod party_search_update;
 mod quest_action;
 mod script_portal;
+mod use_item;
 mod whisper;
 
 pub use self::change_channel::ChangeChannelHandler;
-pub use self::change_map::ChangeMapHandler;
+pub use self::change_map::{warp, ChangeMapHandler};
 pub use self::chat::AllChatHandler;
 pub use self::item_move::ItemMoveHandler;
 pub use self::keybinds::ChangeKeybindsHandler;
@@ -24,4 +25,5 @@ pub use self::npc_dialogue::{NpcTalkHandler, NpcTalkMoreHandler};
 pub use self::party_search_update::PartySearchUpdateHandler;
 pub use self::quest_action::QuestActionHandler;
 pub use self::script_portal::ChangeMapSpecialHandler;
+pub use self::use_item::{HealOverTimeHandler, UseItemHandler, MAX_NATURAL_HEAL};
 pub use self::whisper::WhisperHandler;

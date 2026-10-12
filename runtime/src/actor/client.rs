@@ -1,4 +1,5 @@
 mod dialogue;
+mod npc_script;
 mod quest;
 mod script;
 
@@ -69,6 +70,10 @@ pub struct ClientActor {
     session_id: Option<i32>,
     game: Option<InGame>,
     conversation: Option<Conversation>,
+    /// A native NPC or quest script conversation.
+    script: Option<npc_script::ActiveScript>,
+    /// When natural recovery was last accepted.
+    last_heal: Option<tokio::time::Instant>,
     /// A quest action waiting for its field to confirm the NPC is near.
     pending_quest: Option<(u64, QuestRequest)>,
     /// Portal scripts that already ran and won't run again this session.
@@ -113,6 +118,8 @@ impl ClientActor {
             session_id: None,
             game: None,
             conversation: None,
+            script: None,
+            last_heal: None,
             pending_quest: None,
             blocked_scripts: HashSet::new(),
             npc_request_id: 0,
@@ -228,6 +235,7 @@ impl ClientActor {
             }
             WorldAction::NpcInteraction(NpcInteraction::Start { object_id, .. }) => {
                 self.conversation = None;
+                self.script = None;
                 self.npc_request_id = self.npc_request_id.wrapping_add(1);
                 self.send_to_field(FieldMessage::NpcInteraction {
                     from: self.client_id,
@@ -239,8 +247,16 @@ impl ClientActor {
             WorldAction::NpcInteraction(NpcInteraction::Respond {
                 message_type,
                 response,
-                ..
-            }) => self.respond_to_npc(message_type, response).await?,
+                selection,
+            }) => {
+                if !self
+                    .respond_to_script(message_type, response, selection)
+                    .await?
+                {
+                    self.respond_to_npc(message_type, response).await?
+                }
+            }
+            WorldAction::NaturalHeal { hp, mp } => self.natural_heal(hp, mp).await?,
             WorldAction::Quest(request) => self.request_quest_action(request).await?,
             WorldAction::ScriptPortal { portal } => self.touch_script_portal(&portal).await?,
             WorldAction::LookChanged(announce) => {
@@ -331,6 +347,7 @@ impl ClientActor {
         spawn: Option<SpawnPosition>,
     ) -> Result<(), RuntimeError> {
         self.conversation = None;
+        self.script = None;
         self.pending_quest = None;
         self.npc_request_id = self.npc_request_id.wrapping_add(1);
 

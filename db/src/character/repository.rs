@@ -28,6 +28,17 @@ pub fn character_belongs_to(character_id: i32, account_id: i32) -> crate::Result
     .get_result(&mut connection)?)
 }
 
+/// Whether the account has a character of at least `min_level`.
+pub fn account_has_level(account_id: i32, min_level: i16) -> crate::Result<bool> {
+    let mut connection = crate::connection()?;
+    Ok(select(exists(
+        characters
+            .filter(accountid.eq(account_id))
+            .filter(level.ge(min_level)),
+    ))
+    .get_result(&mut connection)?)
+}
+
 pub(crate) fn insert_character(
     connection: &mut PgConnection,
     new_character: &NewCharacter,

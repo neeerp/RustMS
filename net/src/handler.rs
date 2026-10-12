@@ -221,6 +221,11 @@ pub enum WorldAction {
     /// The player's worn equipment changed; refresh their field avatar and
     /// show the others this UPDATE_CHAR_LOOK.
     LookChanged(Packet),
+    /// Natural HP/MP recovery the client reports; the runtime checks timing.
+    NaturalHeal {
+        hp: i16,
+        mp: i16,
+    },
     Whisper(WhisperDelivery),
     ChangeChannel {
         channel_id: u8,
@@ -256,7 +261,7 @@ fn world_routes() -> &'static HashMap<i16, WorldRoute> {
     ROUTES.get_or_init(|| {
         use RecvOpcode as Op;
         use WorldRoute::*;
-        let table: [(Op, WorldRoute); 14] = [
+        let table: [(Op, WorldRoute); 16] = [
             (Op::PlayerLoggedIn, PreGame(&world::PlayerLoggedInHandler)),
             (Op::PlayerMove, InGame(&world::PlayerMoveHandler)),
             (Op::ChangeChannel, InGame(&world::ChangeChannelHandler)),
@@ -280,6 +285,8 @@ fn world_routes() -> &'static HashMap<i16, WorldRoute> {
                 InGame(&world::ChangeMapSpecialHandler),
             ),
             (Op::ItemMove, InGame(&world::ItemMoveHandler)),
+            (Op::UseItem, InGame(&world::UseItemHandler)),
+            (Op::HealOverTime, InGame(&world::HealOverTimeHandler)),
         ];
         table
             .into_iter()
@@ -310,7 +317,7 @@ mod tests {
     fn every_registered_opcode_is_unique_per_server() {
         // The maps would silently drop duplicates; check the table sizes match.
         assert_eq!(login_routes().len(), 13);
-        assert_eq!(world_routes().len(), 14);
+        assert_eq!(world_routes().len(), 16);
     }
 
     #[test]

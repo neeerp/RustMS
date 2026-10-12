@@ -47,6 +47,17 @@ because the dragged icon points into the icons being rebuilt.
 
 The player is marked dirty and saved with the usual autosave/logout path.
 
+## Using items and recovery
+
+USE_ITEM (`0x48`: tick, slot, item id) checks the slot holds that item,
+applies its `spec` (`hp`, `mp`, and percent `hpR`/`mpR`, capped at the
+maximums), consumes one, and answers with the inventory change and an HP/MP
+stat update. Dead players can't use items.
+
+HEAL_OVER_TIME (`0x59`) is HeavenClient's natural recovery: every 10 s while
+below full it reports +10 HP / +3 MP. The server accepts at most +20 HP and
++10 MP per report and one report per 9 s; others are ignored.
+
 ## Tests
 
 `game` unit tests cover stacking, full bags, removal order, merging,

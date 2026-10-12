@@ -113,12 +113,17 @@ namespace ms
 			return phobj.fhlayer;
 
 		physics.move_object(phobj);
-		auto& quests = Stage::get().get_player().get_quests();
-		int16_t job = Stage::get().get_player().get_stats().get_stat(MapleStat::Id::JOB);
-		int16_t level = Stage::get().get_player().get_stats().get_stat(MapleStat::Id::LEVEL);
-		if (quest_revision != quests.revision() || quest_job != job || quest_level != level)
+		auto& player = Stage::get().get_player();
+		auto& quests = player.get_quests();
+		int16_t job = player.get_stats().get_stat(MapleStat::Id::JOB);
+		int16_t level = player.get_stats().get_stat(MapleStat::Id::LEVEL);
+		// Item requirements can change without a quest update, so also
+		// refresh now and then.
+		if (quest_revision != quests.revision() || quest_job != job || quest_level != level || ++quest_refresh >= 30)
 		{
-			QuestMarker next = quests.npc_marker(npcid, job, level);
+			const Inventory& inventory = player.get_inventory();
+			QuestMarker next = quests.npc_marker(npcid, job, level,
+				[&](int32_t item_id) { return static_cast<int32_t>(inventory.get_total_item_count(item_id)); });
 			if (next != quest_marker)
 			{
 				quest_marker = next;
@@ -128,6 +133,7 @@ namespace ms
 			quest_revision = quests.revision();
 			quest_job = job;
 			quest_level = level;
+			quest_refresh = 0;
 		}
 		if (quest_marker != QuestMarker::NONE) quest_marker_animation.update();
 

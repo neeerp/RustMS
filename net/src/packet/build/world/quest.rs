@@ -1,7 +1,6 @@
-use super::stat::{build_stat_update, StatUpdate};
 use crate::codec::time::filetime;
 use crate::{error::NetworkError, packet::op::SendOpcode};
-use game::{CharacterStats, QuestState, QuestStatus};
+use game::{QuestState, QuestStatus};
 use packet::{io::write::PktWrite, Packet};
 use std::time::SystemTime;
 
@@ -49,16 +48,6 @@ pub fn build_quest_action_result(
     Ok(p)
 }
 
-pub fn build_reward_stats(stats: &CharacterStats) -> Result<Packet, NetworkError> {
-    build_stat_update(
-        true,
-        &[
-            StatUpdate::Level(stats.level),
-            StatUpdate::Ap(stats.ap),
-            StatUpdate::Exp(stats.exp),
-        ],
-    )
-}
 pub fn build_gain_exp(gain: i32) -> Result<Packet, NetworkError> {
     let mut p = Packet::new_empty();
     p.write_short(SendOpcode::ShowStatusInfo as i16)?;
@@ -80,7 +69,6 @@ pub fn build_gain_exp(gain: i32) -> Result<Packet, NetworkError> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::codec::stats::sample_stats;
     use crate::codec::testing::Expect;
     use std::time::{Duration, UNIX_EPOCH};
 
@@ -132,19 +120,6 @@ mod tests {
         let mut expect = Expect::new(&packet.bytes);
         expect.short(SendOpcode::UpdateQuestInfo as i16).byte(8);
         expect.short(1032).int(2001).short(1033);
-        expect.end();
-    }
-
-    #[test]
-    fn reward_stats_update_level_ap_and_exp() {
-        let packet = build_reward_stats(&sample_stats()).unwrap();
-
-        // Reference updatePlayerStats: mask, then values in mask order with
-        // level a byte, AP a short and EXP an int.
-        let mut expect = Expect::new(&packet.bytes);
-        expect.short(SendOpcode::StatChange as i16).byte(1);
-        expect.int(0x10 | 0x4000 | 0x10000);
-        expect.byte(10).short(3).int(1234);
         expect.end();
     }
 

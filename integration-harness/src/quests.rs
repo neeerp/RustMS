@@ -64,9 +64,9 @@ impl QuestTrace {
         } else if p.opcode() == SendOpcode::StatChange as i16 {
             r.read_byte().unwrap();
             let mask = r.read_int().unwrap();
-            if mask != 0 {
-                // LEVEL | AVAILABLEAP | EXP
-                assert_eq!(mask, 0x10 | 0x4000 | 0x10000);
+            // LEVEL | AVAILABLEAP | EXP: a reward. Other updates (HP after
+            // an item, enable-actions) are not quest progress.
+            if mask == 0x10 | 0x4000 | 0x10000 {
                 self.stats = Some((
                     r.read_byte().unwrap(),
                     r.read_short().unwrap(),

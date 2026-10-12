@@ -23,6 +23,9 @@ namespace ms
 		std::map<size_t, std::map<int32_t, std::string>> wrong;
 		// stop/npc on the completion side: directions while the quest is open.
 		std::vector<std::string> reminder;
+		// stop/item on the completion side: what to say while the required
+		// items are missing (or, for Roger's apples, not yet used up).
+		std::vector<std::string> item_reminder;
 	};
 
 	struct QuestPage

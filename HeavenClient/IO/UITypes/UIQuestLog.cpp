@@ -182,8 +182,10 @@ namespace ms
 			if (!allowed) buttons[id]->set_state(Button::DISABLED);
 			else if (buttons[id]->get_state() == Button::DISABLED) buttons[id]->set_state(Button::NORMAL);
 		};
-		enable(ACCEPT, local && questlog.npc_marker(target_npc, job, level) == QuestMarker::AVAILABLE);
-		enable(FINISH, local && questlog.npc_marker(target_npc, job, level) == QuestMarker::READY);
+		const Inventory& inventory = Stage::get().get_player().get_inventory();
+		auto count = [&](int32_t item_id) { return static_cast<int32_t>(inventory.get_total_item_count(item_id)); };
+		enable(ACCEPT, local && questlog.npc_marker(target_npc, job, level, count) == QuestMarker::AVAILABLE);
+		enable(FINISH, local && questlog.npc_marker(target_npc, job, level, count) == QuestMarker::READY);
 	}
 
 	void UIQuestLog::refresh_list()

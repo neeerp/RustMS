@@ -15,9 +15,12 @@ use std::collections::BTreeMap;
 use std::path::Path;
 
 /// Requirements to start a quest (`Check.img/<id>/0`) that the server checks.
-pub const START_REQUIREMENTS: &[&str] = &["npc", "job", "lvmin", "lvmax", "quest"];
+pub const START_REQUIREMENTS: &[&str] = &["npc", "job", "lvmin", "lvmax", "quest", "startscript"];
 /// Requirements to complete a quest (`Check.img/<id>/1`) that the server checks.
-pub const END_REQUIREMENTS: &[&str] = &["npc"];
+pub const END_REQUIREMENTS: &[&str] = &["npc", "item", "endscript"];
+/// Quest scripts (`startscript`/`endscript`) the server implements. A quest
+/// naming any other script is unsupported.
+pub const SCRIPTS: &[&str] = &["q1021s", "q1021e"];
 /// Actions on starting a quest (`Act.img/<id>/0`) that the server applies.
 pub const START_ACTIONS: &[&str] = &[];
 /// Actions on completing a quest (`Act.img/<id>/1`) that the server applies.
@@ -45,6 +48,12 @@ pub struct QuestTemplate {
     pub name: String,
     pub start: StartRequirements,
     pub end_npc: i32,
+    /// Items needed to complete, as `(item id, count)`. A count of 0 means
+    /// the player must have none left (e.g. Roger's apples, all eaten).
+    pub end_items: Vec<(i32, i32)>,
+    /// Scripts that run the start or completion instead of the quest data.
+    pub start_script: Option<String>,
+    pub end_script: Option<String>,
     pub exp: i32,
     pub next_quest: Option<i16>,
 }
@@ -186,6 +195,15 @@ fn template(nx: &NxDataFile, id: i16) -> Result<QuestTemplate, GameDataError> {
             });
         }
     }
+    let mut end_items = Vec::new();
+    if let Some(items) = nx.child_by_name(end, "item")? {
+        for item in nx.child_indices(items)? {
+            let item_id = nx
+                .int_child(item, "id")?
+                .ok_or_else(|| invalid("item requirement without id"))?;
+            end_items.push((item_id, nx.int_child(item, "count")?.unwrap_or(0)));
+        }
+    }
     let actions = path_index(nx, &format!("Act.img/{id}/1"))?;
     let action_int = |key: &str| match actions {
         Some(index) => nx.int_child(index, key),
@@ -206,11 +224,23 @@ fn template(nx: &NxDataFile, id: i16) -> Result<QuestTemplate, GameDataError> {
         end_npc: nx
             .int_child(end, "npc")?
             .ok_or_else(|| invalid("missing completion NPC"))?,
+        end_items,
+        start_script: script(nx, start, "startscript")?,
+        end_script: script(nx, end, "endscript")?,
         exp,
         next_quest: action_int("nextQuest")?
             .map(|id| small(id, "quest id"))
             .transpose()?,
     })
+}
+
+/// A supported script name, if the node names one.
+fn script(nx: &NxDataFile, parent: u32, key: &str) -> Result<Option<String>, GameDataError> {
+    match nx.string_child(parent, key)? {
+        None => Ok(None),
+        Some(name) if SCRIPTS.contains(&name.as_str()) => Ok(Some(name)),
+        Some(name) => Err(invalid(&format!("unsupported script {name}"))),
+    }
 }
 
 fn keys_at(nx: &NxDataFile, path: &str) -> Result<Option<Vec<String>>, GameDataError> {
@@ -285,16 +315,14 @@ mod tests {
 
     #[test]
     fn any_unsupported_key_marks_the_quest_unsupported() {
-        let item_turn_in = keys(&["npc"], &["npc", "item"], &[], &["exp"]);
-        assert_eq!(classify(&item_turn_in), Err("Check/1/item".into()));
+        let hunting = keys(&["npc"], &["npc", "mob"], &[], &["exp"]);
+        assert_eq!(classify(&hunting), Err("Check/1/mob".into()));
         let item_reward = keys(&["npc"], &["npc"], &[], &["exp", "item"]);
         assert_eq!(classify(&item_reward), Err("Act/1/item".into()));
         let given_item = keys(&["npc"], &["npc"], &["item"], &[]);
         assert_eq!(classify(&given_item), Err("Act/0/item".into()));
-        let scripted = keys(&["npc", "startscript"], &["npc"], &[], &[]);
-        assert_eq!(classify(&scripted), Err("Check/0/startscript".into()));
-        let hunting = keys(&["npc"], &["npc", "mob"], &[], &[]);
-        assert_eq!(classify(&hunting), Err("Check/1/mob".into()));
+        let money = keys(&["npc"], &["npc"], &[], &["money"]);
+        assert_eq!(classify(&money), Err("Act/1/money".into()));
     }
 
     #[test]
@@ -352,9 +380,13 @@ mod tests {
             .collect();
         assert_eq!(rain, [2, 4, 6, 10, 10, 10, 20]);
         assert_eq!(catalog.quest(1036).unwrap().exp, 40);
-        // Item and hunting quests stay unsupported until those systems exist.
-        assert_eq!(catalog.unsupported_reason(1034), Some("Check/1/item"));
+        // Roger's Apple runs through its scripts and needs every apple eaten.
+        let roger = catalog.quest(1021).unwrap();
+        assert_eq!(roger.start_script.as_deref(), Some("q1021s"));
+        assert_eq!(roger.end_script.as_deref(), Some("q1021e"));
+        assert_eq!(roger.end_items, [(2010007, 0)]);
+        // Item rewards and hunting stay unsupported until those systems exist.
+        assert_eq!(catalog.unsupported_reason(1034), Some("Act/0/item"));
         assert!(catalog.unsupported_reason(1035).is_some());
-        assert!(catalog.unsupported_reason(1021).is_some());
     }
 }

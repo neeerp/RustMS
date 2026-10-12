@@ -2,7 +2,7 @@
 //! turn them into inventory items.
 
 use crate::load::{self, asset_path};
-use game::{EquipStats, Item};
+use game::{EquipStats, Inventory, InventoryChange, InventoryError, Item};
 use game_data::items::{EquipInfo, ItemData, ItemInfo};
 use std::sync::OnceLock;
 
@@ -33,6 +33,17 @@ pub fn create(item_id: i32, quantity: i16) -> Option<Item> {
         Some(equip) => Item::equipment(item_id, base_stats(&equip)),
         None => Item::stack(item_id, quantity),
     })
+}
+
+/// Put `quantity` of `item_id` into `inventory`. Nothing changes unless all
+/// of it fits.
+pub fn give(
+    inventory: &mut Inventory,
+    item_id: i32,
+    quantity: i16,
+) -> Result<Vec<InventoryChange>, InventoryError> {
+    let item = create(item_id, quantity).ok_or(InventoryError::UnknownItem)?;
+    inventory.add(item, slot_max(item_id))
 }
 
 pub fn base_stats(equip: &EquipInfo) -> EquipStats {

@@ -21,6 +21,7 @@
 
 #include <cstdint>
 
+#include <functional>
 #include <map>
 #include "QuestMarker.h"
 
@@ -43,7 +44,9 @@ namespace ms
 		bool is_completed(int16_t id) const;
 		const std::map<int16_t, std::string>& started_quests() const;
 		const std::map<int16_t, int64_t>& completed_quests() const;
-		QuestMarker npc_marker(int32_t npc_id, int16_t job, int16_t level) const;
+		// `count` gives how many of an item the player holds.
+		QuestMarker npc_marker(int32_t npc_id, int16_t job, int16_t level,
+			const std::function<int32_t(int32_t)>& count) const;
 		uint64_t revision() const;
 		int16_t state(int16_t id) const;
 		std::vector<int16_t> available_quests(int16_t job, int16_t level, bool all_levels = false) const;

@@ -178,6 +178,15 @@ namespace ms
 		MonsterBook &get_monsterbook();
 
 	private:
+		// Natural recovery: report a small heal every 10 seconds while not
+		// at full HP/MP (the server checks it).
+		static constexpr uint16_t RECOVERY_INTERVAL = 10000;
+		static constexpr int16_t RECOVERY_HP = 10;
+		static constexpr int16_t RECOVERY_MP = 3;
+		uint16_t recovery_timer = 0;
+
+		void update_recovery();
+
 		CharStats stats;
 		Inventory inventory;
 		SkillBook skillbook;

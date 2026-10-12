@@ -33,7 +33,7 @@ int main()
 			{
 				auto found = states.find(id);
 				return found == states.end() ? 0 : found->second;
-			}, 1);
+			}, 1, [](int32_t) { return 0; });
 		};
 		require(marker(10000) == QuestMarker::NONE, "Pio must not advertise Rain's quests");
 		require(marker(12101, 100) == QuestMarker::NONE, "non-beginners must not see the bulb");
@@ -42,6 +42,9 @@ int main()
 			require(marker() == QuestMarker::AVAILABLE, "each newly unlocked quiz needs a bulb");
 			states[id] = 1;
 			require(marker() == QuestMarker::READY, "accepted dialogue-only quiz needs a closed book");
+			chain[id - 1009].end_items = {{4000000, 1}};
+			require(marker() == QuestMarker::IN_PROGRESS, "unmet objectives need an open book");
+			chain[id - 1009].end_items.clear();
 			states[id] = 2;
 		}
 		require(marker() == QuestMarker::NONE, "completed chain must clear its marker");
@@ -58,7 +61,8 @@ int main()
 		require(marker() == QuestMarker::AVAILABLE, "another character's progress must not affect availability");
 		std::vector<ms::QuestInfo> contact { quest(1032, 2102, 2001, {}, 10), quest(1033, 2001, 2102, {{1032, 2}}, 10) };
 		auto contact_marker = [&](int32_t npc, int16_t level = 1) {
-			return ms::select_quest_marker(npc, 0, contact, [&](int16_t id) { return states[id]; }, level);
+			return ms::select_quest_marker(npc, 0, contact, [&](int16_t id) { return states[id]; }, level,
+				[](int32_t) { return 0; });
 		};
 		require(contact_marker(2102) == QuestMarker::AVAILABLE, "Nina must offer the existing quest");
 		require(contact_marker(2102, 11) == QuestMarker::NONE, "offer must honor maximum start level");

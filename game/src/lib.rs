@@ -5,6 +5,7 @@
 //! `db` converts rows to and from them and `net` encodes them for the wire.
 
 pub mod character;
+pub mod exp;
 pub mod inventory;
 pub mod keymap;
 pub mod quest;

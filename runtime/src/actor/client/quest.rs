@@ -1,10 +1,17 @@
 use super::ClientActor;
 use crate::{db::spawn_db, error::RuntimeError, message::FieldMessage};
-use game::QuestState;
-use net::packet::build::world::quest;
+use game::{Player, QuestState};
+use net::npc_scripts::NpcScript;
+use net::packet::build::world::{quest, stat};
 use net::quests::{self, QuestActionKind, QuestRequest, QuestTemplate};
 use packet::Packet;
 use tracing::{debug, warn};
+
+/// A quest change to commit together with the player.
+pub(super) enum QuestChange {
+    Start(&'static QuestTemplate),
+    Complete(&'static QuestTemplate),
+}
 
 impl ClientActor {
     /// Check a `QUEST_ACTION` against the catalog and the player, then ask the
@@ -22,17 +29,25 @@ impl ClientActor {
             );
             return Ok(());
         };
+        // Scripted steps must go through their script (actions 4/5), and
+        // only scripted steps may.
         let (npc_id, check) = match request.kind {
-            QuestActionKind::Start { npc_id } => {
+            QuestActionKind::Start { npc_id } if template.start_script.is_none() => {
                 (npc_id, quests::check_start(template, npc_id, player))
             }
-            QuestActionKind::Complete { npc_id, .. } => {
+            QuestActionKind::ScriptStart { npc_id } if template.start_script.is_some() => {
+                (npc_id, quests::check_start(template, npc_id, player))
+            }
+            QuestActionKind::Complete { npc_id, .. } if template.end_script.is_none() => {
+                (npc_id, quests::check_complete(template, npc_id, player))
+            }
+            QuestActionKind::ScriptEnd { npc_id } if template.end_script.is_some() => {
                 (npc_id, quests::check_complete(template, npc_id, player))
             }
             QuestActionKind::Forfeit => return self.forfeit_quest(request.quest_id).await,
-            // No supported quest is scripted; scripted quests are refused by the catalog.
-            QuestActionKind::ScriptStart { .. } | QuestActionKind::ScriptEnd { .. } => {
-                return Ok(())
+            _ => {
+                debug!(quest_id = request.quest_id, ?request.kind, "Wrong quest action kind");
+                return Ok(());
             }
         };
         if let Err(rejection) = check {
@@ -77,86 +92,124 @@ impl ClientActor {
         match request.kind {
             QuestActionKind::Start { npc_id } => self.start_quest(template, npc_id).await,
             QuestActionKind::Complete { npc_id, .. } => self.complete_quest(template, npc_id).await,
-            _ => Ok(()),
+            QuestActionKind::ScriptStart { .. } => {
+                self.run_quest_script(template.start_script.as_deref())
+                    .await
+            }
+            QuestActionKind::ScriptEnd { .. } => {
+                self.run_quest_script(template.end_script.as_deref()).await
+            }
+            QuestActionKind::Forfeit => Ok(()),
+        }
+    }
+
+    async fn run_quest_script(&mut self, script: Option<&str>) -> Result<(), RuntimeError> {
+        let player = &self.in_game()?.player;
+        match script.and_then(|script| NpcScript::for_quest(script, player)) {
+            Some(script) => self.start_script(script).await,
+            None => Ok(()),
         }
     }
 
     async fn start_quest(
         &mut self,
-        template: &QuestTemplate,
+        template: &'static QuestTemplate,
         npc_id: i32,
     ) -> Result<(), RuntimeError> {
         // Recheck: the player may have changed while the field answered.
         if quests::check_start(template, npc_id, &self.in_game()?.player).is_err() {
             return Ok(());
         }
-        let (cid, qid) = (self.client_id, template.id);
-        let prerequisites: Vec<_> = template
-            .start
-            .quests
-            .iter()
-            .map(|p| (p.quest_id, p.state))
-            .collect();
-        let progress = match spawn_db(move || db::quest::start(cid, qid, &prerequisites)).await {
-            Ok(progress) => progress,
-            Err(RuntimeError::Database(db::Error::NotFound)) => {
-                warn!(cid, qid, "Quest start refused by the database");
-                return Ok(());
-            }
-            Err(error) => return Err(error),
-        };
-        let record = db::player::quest_record(&progress);
-        let mut packets = vec![
-            quest::build_quest_progress(qid, Some(&record.status))?,
-            quest::build_quest_action_result(qid, npc_id, 0)?,
-        ];
-        self.in_game_mut()?.player.quests.upsert(record);
+        let next = self.in_game()?.player.clone();
+        let mut packets = Vec::new();
+        if self
+            .commit_player(next, Some(QuestChange::Start(template)), &mut packets)
+            .await?
+        {
+            packets.push(quest::build_quest_action_result(template.id, npc_id, 0)?);
+        }
         self.send_all(&mut packets).await
     }
 
     async fn complete_quest(
         &mut self,
-        template: &QuestTemplate,
+        template: &'static QuestTemplate,
         npc_id: i32,
     ) -> Result<(), RuntimeError> {
         if quests::check_complete(template, npc_id, &self.in_game()?.player).is_err() {
             return Ok(());
         }
-        // The transaction locks and updates the character row, so flush any
-        // unsaved in-memory changes first; then adopt what it committed.
-        self.flush().await?;
-        let (cid, qid, exp) = (self.client_id, template.id, template.exp);
-        let (character, progress) = match spawn_db(move || db::quest::complete(cid, qid, exp)).await
+        let mut next = self.in_game()?.player.clone();
+        let mut packets = Vec::new();
+        if template.exp > 0 {
+            gain_exp(&mut next, template.exp, &mut packets)?;
+        }
+        if !self
+            .commit_player(next, Some(QuestChange::Complete(template)), &mut packets)
+            .await?
         {
-            Ok(result) => result,
-            Err(RuntimeError::Database(db::Error::NotFound)) => {
-                warn!(cid, qid, "Quest completion refused by the database");
-                return Ok(());
-            }
-            Err(error) => return Err(error),
-        };
-        let player = &mut self.in_game_mut()?.player;
-        let previous_level = player.stats.level;
-        player.stats.level = u8::try_from(character.level).unwrap_or(previous_level);
-        player.stats.exp = character.exp;
-        player.stats.ap = character.ap;
-        let record = db::player::quest_record(&progress);
-        let mut packets = vec![quest::build_quest_progress(qid, Some(&record.status))?];
-        player.quests.upsert(record);
-        let level_changed = player.stats.level != previous_level;
-
+            return Ok(());
+        }
         // Only continue into a quest the client can actually be offered.
-        let next = template
+        let follow_up = template
             .next_quest
             .filter(|id| quests::catalog().is_ok_and(|c| c.quest(*id).is_some()))
             .unwrap_or(0);
-        if exp > 0 {
-            packets.push(quest::build_reward_stats(&self.in_game()?.player.stats)?);
-            packets.push(quest::build_gain_exp(exp)?);
-        }
-        packets.push(quest::build_quest_action_result(qid, npc_id, next)?);
-        self.send_all(&mut packets).await?;
+        packets.push(quest::build_quest_action_result(
+            template.id,
+            npc_id,
+            follow_up,
+        )?);
+        self.send_all(&mut packets).await
+    }
 
+    /// Adopt `next` as the player. With a quest change, the change and the
+    /// whole player commit together first; if the database refuses (e.g. a
+    /// replayed completion), nothing is adopted and `false` is returned. The
+    /// quest record update goes first in `packets`.
+    pub(super) async fn commit_player(
+        &mut self,
+        mut next: Player,
+        change: Option<QuestChange>,
+        packets: &mut Vec<Packet>,
+    ) -> Result<bool, RuntimeError> {
+        let previous_level = self.in_game()?.player.stats.level;
+        if let Some(change) = change {
+            let snapshot = next.clone();
+            let progress = match change {
+                QuestChange::Start(template) => {
+                    let prerequisites: Vec<_> = template
+                        .start
+                        .quests
+                        .iter()
+                        .map(|p| (p.quest_id, p.state))
+                        .collect();
+                    spawn_db(move || db::quest::start(&snapshot, template.id, &prerequisites)).await
+                }
+                QuestChange::Complete(template) => {
+                    spawn_db(move || db::quest::complete(&snapshot, template.id)).await
+                }
+            };
+            let progress = match progress {
+                Ok(progress) => progress,
+                Err(RuntimeError::Database(db::Error::NotFound)) => {
+                    warn!(self.client_id, "Quest change refused by the database");
+                    return Ok(false);
+                }
+                Err(error) => return Err(error),
+            };
+            let record = db::player::quest_record(&progress);
+            packets.insert(
+                0,
+                quest::build_quest_progress(record.quest_id, Some(&record.status))?,
+            );
+            next.quests.upsert(record);
+            next.mark_saved();
+        } else {
+            next.mark_dirty();
+        }
+        let level_changed = next.stats.level != previous_level;
+        self.in_game_mut()?.player = next;
         if level_changed {
             // Players joining the map later should see the new level.
             let avatar = self.in_game()?.player.field_avatar(0, 0, 0);
@@ -168,7 +221,7 @@ impl ClientActor {
             })
             .await?;
         }
-        Ok(())
+        Ok(true)
     }
 
     async fn forfeit_quest(&mut self, quest_id: i16) -> Result<(), RuntimeError> {
@@ -186,10 +239,22 @@ impl ClientActor {
         self.send_all(&mut packets).await
     }
 
-    async fn send_all(&mut self, packets: &mut [Packet]) -> Result<(), RuntimeError> {
+    pub(super) async fn send_all(&mut self, packets: &mut [Packet]) -> Result<(), RuntimeError> {
         for packet in packets {
             self.send(packet).await?;
         }
         Ok(())
     }
+}
+
+/// Add EXP to `next`, with the stat update and the EXP message.
+pub(super) fn gain_exp(
+    next: &mut Player,
+    amount: i32,
+    packets: &mut Vec<Packet>,
+) -> Result<(), RuntimeError> {
+    let levelled = next.gain_exp(amount) > 0;
+    packets.push(stat::build_exp_stats(&next.stats, levelled)?);
+    packets.push(quest::build_gain_exp(amount)?);
+    Ok(())
 }

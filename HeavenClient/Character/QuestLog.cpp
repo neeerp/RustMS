@@ -57,9 +57,10 @@ namespace ms
 		return result;
 	}
 
-	QuestMarker QuestLog::npc_marker(int32_t npc_id, int16_t job, int16_t level) const
+	QuestMarker QuestLog::npc_marker(int32_t npc_id, int16_t job, int16_t level,
+		const std::function<int32_t(int32_t)>& count) const
 	{
-		return select_quest_marker(npc_id, job, QuestCatalog::get().quests(), [&](int16_t id) { return state(id); }, level);
+		return select_quest_marker(npc_id, job, QuestCatalog::get().quests(), [&](int16_t id) { return state(id); }, level, count);
 	}
 
 	bool QuestLog::is_started(int16_t qid)

@@ -87,6 +87,7 @@ namespace ms
 			SORT_ITEMS = 70,
 			MOVE_ITEM = 71,
 			USE_ITEM = 72,
+			HEAL_OVER_TIME = 89,
 			SCROLL_EQUIP = 86,
 
 			/// Player

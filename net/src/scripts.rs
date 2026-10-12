@@ -1,14 +1,16 @@
 //! Native map and portal scripts, keyed by the script names in `Map.nx`
-//! (`info/onUserEnter`, portal `script`). Lua is deferred; these handlers
-//! only return effects, which the runtime turns into packets, so they can
-//! move to a scripting runtime later. Unknown names do nothing.
+//! (`info/onUserEnter`, portal `script`), and the effects all scripts
+//! return. Lua is deferred; returning effects keeps the shape a scripting
+//! runtime would have. Unknown names do nothing.
 
 use crate::content;
 use game::{Player, QuestState};
 use game_data::server_content::keys;
 
+/// What a map, portal, or NPC script does. Scripts only return effects; the
+/// runtime applies them, committing player changes together.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub enum ScriptEffect {
+pub enum Effect {
     /// A screen effect from `Map.nx/Effect.img` (map name banners).
     FieldEffect(String),
     /// A UI image anchored to the player (`UI/tutorial.img/<n>` hints).
@@ -19,26 +21,36 @@ pub enum ScriptEffect {
         width: i16,
         height: i16,
     },
+    /// Offer to skip the tutorial (Maple Administrator), only to accounts
+    /// that already have a level-30 character.
+    OfferTutorialSkip,
+    SetHp(i16),
+    GiveItem {
+        item_id: i32,
+        quantity: i16,
+    },
+    GainExp(i32),
+    StartQuest(i16),
+    CompleteQuest(i16),
+    Warp(i32),
 }
 
 #[derive(Debug, Default, PartialEq, Eq)]
 pub struct ScriptOutcome {
-    pub effects: Vec<ScriptEffect>,
+    pub effects: Vec<Effect>,
     /// Don't run this portal's script again this session.
     pub block: bool,
 }
 
 /// A map's `onUserEnter` script. `None` if the script is unknown.
-pub fn map_enter(script: &str) -> Option<Vec<ScriptEffect>> {
+pub fn map_enter(script: &str) -> Option<Vec<Effect>> {
     // go<map id>: the map's name banner. HeavenMS also unlocks the UI here,
     // which HeavenClient never locks.
     let map = script.strip_prefix("go")?;
     if map.is_empty() || !map.bytes().all(|b| b.is_ascii_digit()) {
         return None;
     }
-    Some(vec![ScriptEffect::FieldEffect(format!(
-        "maplemap/enter/{map}"
-    ))])
+    Some(vec![Effect::FieldEffect(format!("maplemap/enter/{map}"))])
 }
 
 /// A touch portal's script. `None` if the script is unknown.
@@ -50,9 +62,7 @@ pub fn portal(script: &str, player: &Player) -> Option<ScriptOutcome> {
     let hint = |condition: bool, image: u8| {
         if condition {
             ScriptOutcome {
-                effects: vec![ScriptEffect::AvatarEffect(format!(
-                    "UI/tutorial.img/{image}"
-                ))],
+                effects: vec![Effect::AvatarEffect(format!("UI/tutorial.img/{image}"))],
                 block: true,
             }
         } else {
@@ -67,8 +77,12 @@ pub fn portal(script: &str, player: &Player) -> Option<ScriptOutcome> {
         "infoWorldmap" => hint(true, 26),
         "infoReactor" if quest(1008) == QuestState::Completed => hint(true, 22),
         "infoReactor" => hint(quest(1020) == QuestState::Completed, 27),
+        "tutoChatNPC" => ScriptOutcome {
+            effects: vec![Effect::OfferTutorialSkip],
+            block: true,
+        },
         "glTutoMsg0" => ScriptOutcome {
-            effects: vec![ScriptEffect::Hint {
+            effects: vec![Effect::Hint {
                 text: content::text().get(keys::LEAVE_AREA_WARNING, &[]),
                 width: 150,
                 height: 5,
@@ -102,7 +116,7 @@ mod tests {
 
     fn avatar(path: &str) -> ScriptOutcome {
         ScriptOutcome {
-            effects: vec![ScriptEffect::AvatarEffect(path.into())],
+            effects: vec![Effect::AvatarEffect(path.into())],
             block: true,
         }
     }
@@ -111,9 +125,7 @@ mod tests {
     fn map_entry_shows_the_maps_banner() {
         assert_eq!(
             map_enter("go10000"),
-            Some(vec![ScriptEffect::FieldEffect(
-                "maplemap/enter/10000".into()
-            )])
+            Some(vec![Effect::FieldEffect("maplemap/enter/10000".into())])
         );
         assert_eq!(map_enter("goAdventure"), None);
         assert_eq!(map_enter("go"), None);
@@ -165,6 +177,13 @@ mod tests {
             ),
             Some(avatar("UI/tutorial.img/27"))
         );
+        assert_eq!(
+            portal("tutoChatNPC", &fresh),
+            Some(ScriptOutcome {
+                effects: vec![Effect::OfferTutorialSkip],
+                block: true
+            })
+        );
         assert_eq!(portal("somethingElse", &fresh), None);
     }
 
@@ -172,7 +191,7 @@ mod tests {
     fn the_leave_area_warning_repeats_with_its_text() {
         let outcome = portal("glTutoMsg0", &player_with(&[])).unwrap();
         assert!(!outcome.block);
-        let [ScriptEffect::Hint {
+        let [Effect::Hint {
             text,
             width,
             height,

@@ -1,7 +1,7 @@
 use super::ClientActor;
 use crate::error::RuntimeError;
-use net::packet::build::world::{effect, stat};
-use net::scripts::{self, ScriptEffect};
+use net::packet::build::world::stat;
+use net::scripts;
 use tracing::debug;
 
 impl ClientActor {
@@ -16,7 +16,7 @@ impl ClientActor {
             return Ok(());
         };
         match scripts::map_enter(&script) {
-            Some(effects) => self.send_script_effects(&effects).await,
+            Some(effects) => self.apply_effects(&effects).await.map(drop),
             None => {
                 debug!(map_id, script, "No native map entry script");
                 Ok(())
@@ -38,7 +38,7 @@ impl ClientActor {
                     if outcome.block {
                         self.blocked_scripts.insert(script);
                     }
-                    self.send_script_effects(&outcome.effects).await?;
+                    self.apply_effects(&outcome.effects).await?;
                 }
                 None => debug!(map_id, portal, script, "No native portal script"),
             }
@@ -46,21 +46,5 @@ impl ClientActor {
         // The client waits for this before it accepts the next portal.
         let mut enable = stat::build_stat_update(true, &[])?;
         self.send(&mut enable).await
-    }
-
-    async fn send_script_effects(&mut self, effects: &[ScriptEffect]) -> Result<(), RuntimeError> {
-        for effect in effects {
-            let mut packet = match effect {
-                ScriptEffect::FieldEffect(path) => effect::build_field_effect(path),
-                ScriptEffect::AvatarEffect(path) => effect::build_avatar_effect(path),
-                ScriptEffect::Hint {
-                    text,
-                    width,
-                    height,
-                } => effect::build_hint(text, *width, *height),
-            }?;
-            self.send(&mut packet).await?;
-        }
-        Ok(())
     }
 }

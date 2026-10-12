@@ -37,17 +37,20 @@ namespace ms
 		{
 			std::string name = std::to_string(id);
 			nl::node start = root["Check.img"][name]["0"];
+			nl::node end = root["Check.img"][name]["1"];
 			nl::node act = root["Act.img"][name]["1"];
 
 			QuestInfo info;
 			info.id = id;
 			info.name = root["QuestInfo.img"][name]["name"].get_string();
 			info.start_npc = static_cast<int32_t>(start["npc"].get_integer());
-			info.end_npc = static_cast<int32_t>(root["Check.img"][name]["1"]["npc"].get_integer());
+			info.end_npc = static_cast<int32_t>(end["npc"].get_integer());
 			info.min_level = static_cast<int16_t>(start["lvmin"].get_integer(0));
 			info.max_level = static_cast<int16_t>(start["lvmax"].get_integer(32767));
 			info.exp = static_cast<int32_t>(act["exp"].get_integer());
 			info.next_quest = static_cast<int16_t>(act["nextQuest"].get_integer());
+			info.start_script = start["startscript"].data_type() == nl::node::type::string;
+			info.end_script = end["endscript"].data_type() == nl::node::type::string;
 
 			for (auto job : start["job"])
 				info.jobs.push_back(static_cast<int16_t>(job.get_integer()));
@@ -56,6 +59,10 @@ namespace ms
 			for (auto prerequisite : start["quest"])
 				info.prerequisites.emplace_back(static_cast<int16_t>(prerequisite["id"].get_integer()),
 					static_cast<int16_t>(prerequisite["state"].get_integer()));
+
+			for (auto item : end["item"])
+				info.end_items.emplace_back(static_cast<int32_t>(item["id"].get_integer()),
+					static_cast<int32_t>(item["count"].get_integer()));
 
 			return info;
 		}
@@ -114,6 +121,12 @@ namespace ms
 			if (stop.name() == "npc")
 			{
 				script.reminder = pages(stop);
+				continue;
+			}
+
+			if (stop.name() == "item")
+			{
+				script.item_reminder = pages(stop);
 				continue;
 			}
 

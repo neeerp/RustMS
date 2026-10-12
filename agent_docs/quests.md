@@ -33,13 +33,18 @@ Only requirements and actions the server implements are allowed
 
 | Node | Allowed keys |
 | --- | --- |
-| `Check/<id>/0` (start) | `npc`, `job`, `lvmin`, `lvmax`, `quest` |
-| `Check/<id>/1` (complete) | `npc` |
+| `Check/<id>/0` (start) | `npc`, `job`, `lvmin`, `lvmax`, `quest`, `startscript` |
+| `Check/<id>/1` (complete) | `npc`, `item`, `endscript` |
 | `Act/<id>/0` | none |
 | `Act/<id>/1` | `exp`, `nextQuest` |
 
 `Act` nodes may repeat speech under numbered keys and `yes`/`no`; that is not
-an action. A quest with any other key (`item`, `mob`, `money`, `pop`,
+an action. `item` requirements are counts the player must hold; a count of 0
+means none may be left (Roger's apples must all be eaten). `startscript`/
+`endscript` are allowed only for scripts the server implements
+(`game_data::quests::SCRIPTS`: `q1021s`, `q1021e`); those steps go through
+QUEST_ACTION 4/5 and the server drives the dialogue (see
+[NPC dialogue](./npc-dialogue.md)). A quest with any other key (`item`, `mob`, `money`, `pop`,
 `skill`, `startscript`, `endscript`, `infoex`, ...) is **unsupported**: it is
 never offered, and actions for it are refused. A prerequisite without a
 `state` means "not started" (mutually exclusive quests).
@@ -48,8 +53,8 @@ The `game-data` asset test compares the server's result with the committed
 list `game-data/supported_quests.txt`. HeavenClient doesn't classify quests:
 the build copies that list next to the executable, and the client offers
 only those quests (`Character/QuestCatalog.cpp`). Supporting a new key means
-changing the server's allowlist and regenerating the list. 209 quests qualify with the current
-rules, including the beginner ones:
+changing the server's allowlist and regenerating the list. 219 quests qualify
+with the current rules, including the beginner ones:
 
 | Quest | Start → Finish | EXP |
 | --- | --- | --- |
@@ -58,9 +63,10 @@ rules, including the beginner ones:
 | 1032 Nina's Brother Sen | Nina (2102) → Sen (2001) | 7, next 1033 |
 | 1033 What Sen Wants | Sen (2001) → Nina (2102) | 7 |
 | 1036 Robin the Walking Encyclopedia | Robin (2003) | 40 |
+| 1021 Roger's Apple (scripted) | Roger (2000) | 10, 3 Apples, 3 Green Apples |
 
-1034 (Mushroom Candy), 1035 (Todd's hunting), and 1021 (Roger's Apple) need
-items, kills, or scripts and stay unsupported for now.
+1034 (Mushroom Candy) and 1035 (Todd's hunting) need item rewards or kills
+and stay unsupported for now.
 
 ## Conversations in the client
 
@@ -87,14 +93,15 @@ the finishing NPC.
 
 `character_quests` is keyed by `(character_id, quest_id)`: no row (not
 started), status 1 (started), status 2 (completed, with a timestamp).
-Forfeiting deletes a started row. Every change locks the character row first;
-prerequisites are rechecked inside the transaction, and a completion moves
-1 → 2 and adds EXP in one transaction, so a replay cannot pay twice.
+Forfeiting deletes a started row. A start or completion writes the quest row
+and the whole player snapshot (EXP, items, HP) in one transaction that locks
+the character row first: rewards are applied to a copy of the player, and the
+actor adopts it only after the commit, so a replay cannot pay twice.
+Prerequisites are rechecked inside the transaction.
 
-EXP uses the beginner table through level 9 (+5 AP per level). Full leveling
-(HP/MP growth, SP, other jobs) belongs with combat. After a completion the
-client actor adopts the committed level, EXP, and AP and refreshes its field
-avatar if the level changed.
+EXP uses `game::exp` (HeavenClient's table) through `Player::gain_exp`
+(+5 AP per level). HP/MP growth and SP belong with combat. If the level
+changed, the client actor refreshes its field avatar.
 
 ## Assets
 
@@ -110,7 +117,8 @@ copied into the source.
   NPC reach). Set `RUSTMS_REQUIRE_ASSETS=1` so asset tests cannot skip.
 - Client: build with `-DHEAVENCLIENT_BUILD_TESTS=ON` and run CTest
   (`quest_dialogue`, `quest_catalog`, `quest_markers`).
-- Integration: `rain_quizzes` (all seven quizzes, rewards once, prerequisites,
+- Integration: `scripted_npcs` (Roger's Apple end to end, Robin, the
+  tutorial skip, natural recovery limits), `rain_quizzes` (all seven quizzes, rewards once, prerequisites,
   wrong NPC, NPC not on the map, forfeit, relogin, channel change, isolation)
   and `beginner_contact_quests` (the route through Sen's house, `nextQuest`
   results, and unsupported 1034).

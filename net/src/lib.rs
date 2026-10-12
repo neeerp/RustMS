@@ -15,6 +15,7 @@ pub mod items;
 mod load;
 pub mod login_world;
 mod npc_data;
+pub mod npc_scripts;
 pub mod packet;
 pub mod policy;
 pub mod quests;

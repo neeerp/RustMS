@@ -12,6 +12,7 @@
 
 #include <nlnx/nx.hpp>
 
+#include <algorithm>
 #include <map>
 #include <optional>
 #include <string>
@@ -53,6 +54,13 @@ namespace ms
 
 				return quest_available(quest, stats.get_stat(MapleStat::Id::JOB), stats.get_stat(MapleStat::Id::LEVEL),
 					[](int16_t id) { return state(id); });
+			}
+
+			bool items_met(const QuestInfo& quest)
+			{
+				const Inventory& inventory = player().get_inventory();
+
+				return end_items_met(quest, [&](int32_t id) { return inventory.get_total_item_count(id); });
 			}
 
 			std::string npc_image(int32_t npc_id)
@@ -163,7 +171,25 @@ namespace ms
 				return;
 
 			bool completion_side = *mode != QuestDialogue::Mode::OFFER;
-			active = Active { QuestDialogue(*mode, QuestCatalog::get().script(quest_id, completion_side)), quest_id, npc_id };
+			QuestScript script = QuestCatalog::get().script(quest_id, completion_side);
+
+			if (*mode == QuestDialogue::Mode::COMPLETION && !items_met(*quest))
+			{
+				// Say why it can't be finished yet (stop/item).
+				script.reminder = script.item_reminder;
+				mode = QuestDialogue::Mode::REMINDER;
+			}
+			else if ((*mode == QuestDialogue::Mode::OFFER && quest->start_script) ||
+				(*mode == QuestDialogue::Mode::COMPLETION && quest->end_script))
+			{
+				// The server runs this step as a script and sends its dialogue.
+				auto action = *mode == QuestDialogue::Mode::OFFER
+					? QuestActionPacket::SCRIPT_START : QuestActionPacket::SCRIPT_END;
+				QuestActionPacket(action, quest_id, npc_id, player().get_position()).dispatch();
+				return;
+			}
+
+			active = Active { QuestDialogue(*mode, std::move(script)), quest_id, npc_id };
 			send(active->dialogue.take_initial_effect(), quest_id, npc_id);
 			show();
 		}

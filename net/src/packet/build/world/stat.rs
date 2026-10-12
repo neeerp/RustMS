@@ -1,4 +1,5 @@
 use crate::{error::NetworkError, packet::op::SendOpcode};
+use game::CharacterStats;
 use packet::{io::write::PktWrite, Packet};
 
 /// One changed stat in a STAT_CHANGED packet. Each variant knows its mask bit
@@ -94,9 +95,27 @@ pub fn build_stat_update(
     Ok(packet)
 }
 
+/// The stats an EXP gain changes: EXP, and after a level-up the level, AP,
+/// and the (restored) HP and MP.
+pub fn build_exp_stats(stats: &CharacterStats, levelled: bool) -> Result<Packet, NetworkError> {
+    let mut updates = vec![StatUpdate::Exp(stats.exp)];
+    if levelled {
+        updates.extend([
+            StatUpdate::Level(stats.level),
+            StatUpdate::Ap(stats.ap),
+            StatUpdate::Hp(stats.hp),
+            StatUpdate::MaxHp(stats.max_hp),
+            StatUpdate::Mp(stats.mp),
+            StatUpdate::MaxMp(stats.max_mp),
+        ]);
+    }
+    build_stat_update(false, &updates)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::codec::stats::sample_stats;
     use crate::codec::testing::Expect;
 
     #[test]
@@ -123,5 +142,23 @@ mod tests {
             .byte(1)
             .int(0)
             .end();
+    }
+
+    #[test]
+    fn exp_stats_add_level_ap_hp_and_mp_after_a_level_up() {
+        let stats = sample_stats();
+        let packet = build_exp_stats(&stats, false).unwrap();
+        let mut expect = Expect::new(&packet.bytes);
+        expect.short(SendOpcode::StatChange as i16).byte(0);
+        expect.int(0x10000).int(1234);
+        expect.end();
+
+        let packet = build_exp_stats(&stats, true).unwrap();
+        let mut expect = Expect::new(&packet.bytes);
+        expect.short(SendOpcode::StatChange as i16).byte(0);
+        expect.int(0x10 | 0x400 | 0x800 | 0x1000 | 0x2000 | 0x4000 | 0x10000);
+        expect.byte(10).short(300).short(310).short(50).short(55);
+        expect.short(3).int(1234);
+        expect.end();
     }
 }

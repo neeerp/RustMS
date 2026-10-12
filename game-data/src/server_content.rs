@@ -16,12 +16,49 @@ use std::path::Path;
 const PLACEHOLDER_TEXT: &str = include_str!("../placeholder_text.toml");
 const REWARD_OVERRIDES: &str = include_str!("../reward_overrides.toml");
 
-/// Text keys used by server scripts. Each must have a placeholder.
+/// Text keys used by server scripts. `placeholder_text.toml` lists them all.
 pub mod keys {
     /// `glTutoMsg0`: the instruction balloon at Maple Island's one-way exits.
     pub const LEAVE_AREA_WARNING: &str = "glTutoMsg0.message";
 
-    pub const ALL: &[&str] = &[LEAVE_AREA_WARNING];
+    /// Roger's Apple (quest 1021): `q1021s` pages, then `q1021e` pages.
+    pub const ROGER_TITLE_MALE: &str = "roger.title.male";
+    pub const ROGER_TITLE_FEMALE: &str = "roger.title.female";
+    pub const ROGER_START: [&str; 5] = [
+        "roger.start.0",
+        "roger.start.1",
+        "roger.start.2",
+        "roger.start.3",
+        "roger.start.4",
+    ];
+    pub const ROGER_INVENTORY_FULL: &str = "roger.inventory_full";
+    pub const ROGER_NOT_RECOVERED: &str = "roger.end.not_recovered";
+    pub const ROGER_END: [&str; 3] = ["roger.end.0", "roger.end.1", "roger.end.2"];
+    pub const ROGER_END_INVENTORY_FULL: &str = "roger.end.inventory_full";
+
+    /// Maple Administrator's offer to skip the tutorial (`tutorialSkip`).
+    pub const SKIP_ASK: &str = "skip.ask";
+    pub const SKIP_DECLINE: &str = "skip.decline";
+
+    /// Robin's beginner Q&A (`begin5`): a menu, then each topic's pages.
+    /// The placeholders decide how many topics and pages there are.
+    pub const ROBIN_MENU: &str = "robin.menu";
+
+    pub fn robin_choice(topic: usize) -> String {
+        format!("robin.choice.{topic}")
+    }
+
+    pub fn robin_answer(topic: usize, page: usize) -> String {
+        format!("robin.answer.{topic}.{page}")
+    }
+
+    /// Every key: one per placeholder.
+    pub fn all() -> Vec<String> {
+        super::parse_text(super::PLACEHOLDER_TEXT, "placeholder_text.toml")
+            .expect("placeholder_text.toml parses")
+            .into_keys()
+            .collect()
+    }
 }
 
 /// Script text, resolved from the content pack with placeholder fallbacks.
@@ -180,12 +217,31 @@ mod tests {
     use super::*;
 
     #[test]
-    fn every_script_key_has_a_placeholder() {
+    fn every_named_key_has_a_placeholder() {
         let text = ServerText::load(None).unwrap();
-        for key in keys::ALL {
+        let named = [
+            keys::LEAVE_AREA_WARNING,
+            keys::ROGER_TITLE_MALE,
+            keys::ROGER_TITLE_FEMALE,
+            keys::ROGER_INVENTORY_FULL,
+            keys::ROGER_NOT_RECOVERED,
+            keys::ROGER_END_INVENTORY_FULL,
+            keys::SKIP_ASK,
+            keys::SKIP_DECLINE,
+            keys::ROBIN_MENU,
+        ];
+        for key in named
+            .iter()
+            .chain(&keys::ROGER_START)
+            .chain(&keys::ROGER_END)
+        {
             assert!(text.contains(key), "{key} has no placeholder");
-            assert!(text.get(key, &[]).starts_with("[placeholder]"));
         }
+        assert!(text.contains(&keys::robin_answer(0, 0)));
+        assert!(text
+            .get(keys::LEAVE_AREA_WARNING, &[])
+            .starts_with("[placeholder]"));
+        assert_eq!(text.placeholders(), keys::all().len());
         assert_eq!(text.from_pack(), 0);
     }
 
@@ -205,7 +261,7 @@ mod tests {
         );
         assert_eq!(
             (text.from_pack(), text.placeholders()),
-            (1, keys::ALL.len() - 1)
+            (1, keys::all().len() - 1)
         );
         assert_eq!(text.unknown_in_pack(), ["stale.key"]);
         std::fs::remove_dir_all(dir).unwrap();

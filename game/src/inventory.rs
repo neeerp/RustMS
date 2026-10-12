@@ -227,6 +227,8 @@ pub enum InventoryError {
     InvalidSlot,
     /// The item can't be worn there.
     CannotEquip,
+    /// The item data has no such item.
+    UnknownItem,
 }
 
 impl std::fmt::Display for InventoryError {
@@ -236,6 +238,7 @@ impl std::fmt::Display for InventoryError {
             Self::NotEnough => "not enough items",
             Self::InvalidSlot => "invalid inventory slot",
             Self::CannotEquip => "item cannot be equipped there",
+            Self::UnknownItem => "unknown item",
         })
     }
 }

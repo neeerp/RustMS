@@ -80,6 +80,28 @@ impl WorldHandler for ChangeMapHandler {
     }
 }
 
+/// Send the player to `map_id`'s default spawn point (script warps).
+pub fn warp(
+    player: &mut Player,
+    map_id: i32,
+    channel_id: u8,
+) -> Result<Vec<WorldAction>, NetworkError> {
+    if !crate::game_data::get()?.field_exists(map_id) {
+        return Err(NetworkError::PacketHandlerError("Target field not found"));
+    }
+    player.move_to(map_id, 0);
+    Ok(vec![
+        WorldAction::Reply(build::world::map::build_warp_to_map(
+            &player.stats,
+            channel_id,
+        )?),
+        WorldAction::ChangeField {
+            map_id,
+            spawn: crate::spawn_position(map_id, 0),
+        },
+    ])
+}
+
 /// Where a direct (map id) warp may take the player.
 ///
 /// In v83 the client only sends a map id when a dead player respawns, which

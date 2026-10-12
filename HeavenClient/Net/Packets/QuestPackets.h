@@ -17,7 +17,10 @@ namespace ms
 		{
 			START = 1,
 			COMPLETE = 2,
-			FORFEIT = 3
+			FORFEIT = 3,
+			// The server runs the step as a script and drives the dialogue.
+			SCRIPT_START = 4,
+			SCRIPT_END = 5
 		};
 
 		QuestActionPacket(Action action, int16_t quest_id, int32_t npc_id, Point<int16_t> position) :

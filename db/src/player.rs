@@ -135,7 +135,13 @@ pub fn load_player(character_id: i32) -> crate::Result<Player> {
 /// transactions and is not touched here.
 pub fn save_player(player: &Player) -> crate::Result<()> {
     let mut conn = crate::connection()?;
-    conn.transaction(|conn| -> QueryResult<()> {
+    conn.transaction(|conn| write_player(conn, player))
+        .map_err(Into::into)
+}
+
+/// Write the whole player within the caller's transaction.
+pub(crate) fn write_player(conn: &mut PgConnection, player: &Player) -> QueryResult<()> {
+    {
         let id = player.id();
         let stats = &player.stats;
         diesel::update(characters::table.find(id))
@@ -182,8 +188,7 @@ pub fn save_player(player: &Player) -> crate::Result<()> {
             .values(&skill_rows)
             .execute(conn)?;
         Ok(())
-    })
-    .map_err(Into::into)
+    }
 }
 
 /// Stats and looks for every character on an account, for the character list.

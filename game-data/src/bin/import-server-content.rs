@@ -55,8 +55,8 @@ fn main() -> ExitCode {
 
 fn run(sources: &Path, pack: &Path) -> Result<(), String> {
     let mapping: Mapping = toml::from_str(MAPPING).map_err(|e| e.to_string())?;
-    for key in keys::ALL {
-        if !mapping.text.contains_key(*key) {
+    for key in keys::all() {
+        if !mapping.text.contains_key(&key) {
             return Err(format!("server_content.toml has no source for {key}"));
         }
     }
