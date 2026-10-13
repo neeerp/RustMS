@@ -119,6 +119,12 @@ namespace ms
 		}
 	}
 
+	void MapMobs::expect_hits(int32_t oid, int32_t count)
+	{
+		if (Optional<Mob> mob = mobs.get(oid))
+			mob->expect_hits(count);
+	}
+
 	bool MapMobs::contains(int32_t oid) const
 	{
 		return mobs.contains(oid);

@@ -23,6 +23,9 @@
 
 #include <nlnx/nx.hpp>
 
+#include <algorithm>
+#include <cstdint>
+
 namespace ms
 {
 	Mob::Mob(int32_t oi, int32_t mid, int8_t mode, int8_t st, uint16_t fh, bool newspawn, int8_t tm,
@@ -95,6 +98,8 @@ namespace ms
 		set_stance(st);
 		flydirection = STRAIGHT;
 		counter = 0;
+		pending_hits = 0;
+		death_timeout = 0;
 
 		namelabel = Text(Text::Font::A13M, Text::Alignment::CENTER, Color::Name::WHITE, Text::Background::NAMETAG,
 						 name);
@@ -258,6 +263,9 @@ namespace ms
 		{
 			phobj.normalize();
 			physics.get_fht().update_fh(phobj);
+
+			if (death_timeout > 0 && --death_timeout == 0 && stance != Stance::DIE)
+				apply_death();
 		}
 
 		return phobj.fhlayer;
@@ -387,13 +395,24 @@ namespace ms
 			case 1:
 				dying = true;
 
-				apply_death();
+				// The server kills the mob before the swing connects; let the
+				// killing hit land first.
+				if (pending_hits == 0)
+					apply_death();
+				else
+					death_timeout = 250; // 2 s
+
 				break;
 			case 2:
 				fading = true;
 				dying = true;
 				break;
 		}
+	}
+
+	void Mob::expect_hits(int32_t count)
+	{
+		pending_hits = static_cast<uint16_t>(std::clamp<int32_t>(pending_hits + count, 0, UINT16_MAX));
 	}
 
 	void Mob::show_hp(int8_t percent, uint16_t playerlevel)
@@ -549,9 +568,13 @@ namespace ms
 	{
 		hitsound.play();
 
+		if (pending_hits > 0)
+			pending_hits--;
+
 		if (dying && stance != Stance::DIE)
 		{
-			apply_death();
+			if (pending_hits == 0)
+				apply_death();
 		} else if (control && is_alive() && damage >= knockback)
 		{
 			flip = toleft;

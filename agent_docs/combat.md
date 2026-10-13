@@ -30,6 +30,12 @@ one hit, and each hit at most twice the character's basic maximum
 damage, sends the attacker SHOW_MONSTER_HP, and on death KILL_MONSTER to
 everyone.
 
+KILL_MONSTER usually arrives before the swing connects on screen. In
+HeavenClient each mob counts the hits queued against it (`Mob::expect_hits`,
+from the player's own attacks and from other players' attacks as they
+arrive), and a killed mob starts its death animation when the last of them
+lands, or after 2 s if one never does.
+
 A dead mob's EXP is shared by damage dealt (the top damager gets any
 rounding remainder) and each share goes to that player's client actor
 (`ServerMessage::MobKilled`), which adds it with `Player::gain_exp`. A level
