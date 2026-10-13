@@ -18,11 +18,18 @@
 #include "Npc.h"
 #include "../Stage.h"
 #include "../../Constants.h"
+#include "../../Util/NxFiles.h"
 
 #include <nlnx/nx.hpp>
 
 namespace ms
 {
+	namespace
+	{
+		// The quest icons are 44 px tall, with their origin halfway down.
+		constexpr int16_t QUEST_MARKER_HALF = 22;
+	}
+
 	Npc::Npc(int32_t id, int32_t o, bool fl, uint16_t f, bool cnt, Point<int16_t> position) : MapObject(o)
 	{
 		std::string strid = std::to_string(id);
@@ -102,7 +109,7 @@ namespace ms
 
 		// The balloon sits above the head, and above the quest marker if there is one.
 		int16_t lift = quest_marker != QuestMarker::NONE
-			? -quest_marker_offset().y() + quest_marker_animation.get_dimensions().y() / 2
+			? -quest_marker_offset().y() + QUEST_MARKER_HALF
 			: head_height() + 4;
 		speech.draw(absp - Point<int16_t>(0, lift));
 	}
@@ -128,7 +135,7 @@ namespace ms
 			{
 				quest_marker = next;
 				if (next != QuestMarker::NONE)
-					quest_marker_animation = nl::nx::ui["UIWindow2.img"]["QuestIcon"][std::to_string(static_cast<int>(next))];
+					quest_marker_animation = NxFiles::ui_classic["UIWindow.img"]["QuestIcon"][std::to_string(static_cast<int>(next))];
 			}
 			quest_revision = quests.revision();
 			quest_job = job;
@@ -212,8 +219,10 @@ namespace ms
 
 	Point<int16_t> Npc::quest_marker_offset() const
 	{
-		// The icon's own animation provides its original bobbing motion.
-		return Point<int16_t>(0, -head_height() - quest_marker_animation.get_dimensions().y() / 2 - 8);
+		// As in footage (Robin, Maria), the bubble sits right of centre, its
+		// tail resting on the head. The icon's frames differ in height, but
+		// each has its origin at the same point of the art, so this is fixed.
+		return Point<int16_t>(20, -head_height() - 15);
 	}
 
 	void Npc::update_speech()
