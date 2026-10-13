@@ -175,5 +175,50 @@ namespace ms
 
 			return result;
 		}
+
+		// Where a choice starts and where its label ends, in text marked by
+		// mark_choices.
+		constexpr char CHOICE = '\x02';
+		constexpr char CHOICE_END = '\x03';
+
+		// Marks the choices of a menu for laying them out in the text: each
+		// #L<id># becomes CHOICE, and CHOICE_END follows its label as
+		// choices() trims it. A closing #l is dropped. Appends the ids to
+		// `ids` in order.
+		inline std::string mark_choices(const std::string& text, std::vector<int32_t>& ids)
+		{
+			std::string out;
+			size_t done = 0;
+			size_t start = text.find("#L");
+
+			while (start != std::string::npos)
+			{
+				size_t id_end = text.find('#', start + 2);
+
+				if (id_end == std::string::npos || !is_digits(text.substr(start + 2, id_end - start - 2)))
+					break;
+
+				size_t next = text.find("#L", id_end + 1);
+				size_t close = text.find("#l", id_end + 1);
+				size_t end = std::min(close, next);
+				std::string label = text.substr(id_end + 1, end == std::string::npos ? std::string::npos : end - id_end - 1);
+				size_t length = label.size();
+
+				while (size_t n = trailing_filler(label.substr(0, length)))
+					length -= n;
+
+				ids.push_back(static_cast<int32_t>(std::stol(text.substr(start + 2, id_end - start - 2))));
+				out += text.substr(done, start - done);
+				out += CHOICE;
+				out += label.substr(0, length);
+				out += CHOICE_END;
+				out += label.substr(length);
+
+				done = end == std::string::npos ? text.size() : end == close ? close + 2 : next;
+				start = next;
+			}
+
+			return out + text.substr(std::min(done, text.size()));
+		}
 	}
 }

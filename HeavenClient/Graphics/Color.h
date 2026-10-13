@@ -95,6 +95,7 @@ namespace ms
 			GRAY,
 			TORCHRED,
 			SILVER,
+			DUSKBLUE,
 			NUM_COLORS
 		};
 
@@ -139,7 +140,8 @@ namespace ms
 						{0.67f, 0.67f, 0.67f}, // Silver Chalice
 						{0.50f, 0.50f, 0.50f}, // Gray
 						{0.99f, 0.05f, 0.21f}, // Torch Red
-						{0.73f, 0.73f, 0.73f}  // Silver (#BBBBBB, quest item gains in the chat log)
+						{0.73f, 0.73f, 0.73f}, // Silver (#BBBBBB, quest item gains in the chat log)
+						{0.34f, 0.34f, 0.42f}  // Dusk blue (#56566B, quest list choices in the v83 NPC dialog, from footage)
 				};
 
 		// Create a color by an array of real numbers [0.0f, 1.0f]

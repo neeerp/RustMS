@@ -43,6 +43,20 @@ int main()
 			"unclosed choices end at the next #L or the end");
 		require(choices("no menu here").empty(), "text without choices");
 		require(choices("#Lx# broken").empty(), "a non-numeric id is not a choice");
+		auto mark = [](const std::string& s, std::vector<int32_t> expected)
+		{
+			std::vector<int32_t> ids;
+			std::string marked = ms::NpcTextMarkup::mark_choices(s, ids);
+			require(ids == expected, "marked choice ids");
+			return marked;
+		};
+		require(mark("Pick:\\r\\n#L0#One#l\\r\\n#L1#Two#l", { 0, 1 }) == "Pick:\\r\\n\x02One\x03\\r\\n\x02Two\x03",
+			"closed choices are marked and lose their #l");
+		require(mark("#L0##bLevel 10#l#l\\n#L1#Level 8#k#l", { 0, 1 }) == "\x02#bLevel 10\x03#l\\n\x02Level 8\x03#k",
+			"a trailing colour code stays after the end marker");
+		require(mark("#b#L2# Bowman  -  Henesys \\r\\n#b#L3# Thief", { 2, 3 }) == "#b\x02 Bowman  -  Henesys\x03 \\r\\n#b\x02 Thief\x03",
+			"unclosed choices end at the next #L or the end");
+		require(mark("no menu here", {}) == "no menu here", "text without choices is unchanged");
 		std::cout << "NPC text markup passed\n";
 		return 0;
 	}

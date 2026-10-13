@@ -45,12 +45,22 @@ page shows instead. Answers are matched to the prompt they answer
 
 Text comes from the [server content pack](./server-content.md) with
 placeholders. HeavenClient expands NPC text markup (`Util/NpcTextMarkup.h`:
-`#h`, `#p`, `#t`/`#z`, `#o`, `#m`) and clips long menus to the dialog.
+`#h`, `#p`, `#t`/`#z`, `#o`, `#m`).
+
+The dialog (`UINpcTalk`) is the v83 `UtilDlgEx` window from `UIClassic.nx`,
+laid out from period footage. It is centred on the screen, and its middle
+grows with the text, from 120 px to 240 px; longer text scrolls by line.
+NEXT and BACK sit in the text area; END CHAT, OK, YES/NO, and ACCEPT/DECLINE
+sit on the bottom bar. A server menu's `#L` choices stay in the text where
+the script puts them, each with a dot. The client's own quest menus list
+their choices in 32 px rows under the question instead (`UINpcTalk::Menu`).
+Clicking a choice selects it (red arrow, dotted underline); NEXT or a double
+click answers with it.
 
 Image tags draw inline: `#v`/`#i` item icons and `#s` skill icons in a 32x32
-slot, `#f`/`#F` any image by NX path (`UI/UIWindow.img/QuestIcon/4/0`; our
-UI.nx keeps those quest icons in `UIWindow2.img`, so the dialog looks there
-too). Each image becomes a `Text::BOX` character that the text layout sizes
+slot, `#f`/`#F` any image by NX path (`UI/UIWindow.img/QuestIcon/4/0`). `UI/`
+paths are read from `UIClassic.nx`, then from `UI.nx`, whose
+`UIWindow2.img` holds the quest icons. Each image becomes a `Text::BOX` character that the text layout sizes
 like the image, bottom on the baseline; a taller image pushes its line
 down. As in 2008 GMS footage, the images show as soon as a page opens and
 only the text types out. Images inside `#L` menu choices are still dropped.
@@ -77,6 +87,9 @@ message type 0. Response 1 advances or finishes, 0 goes back, and -1 cancels.
 
 HeavenClient uses the Back/Next bytes to choose buttons while retaining the
 wire message type for responses. Escape sends cancellation rather than Back.
+Message type 1 shows YES and NO; type 12 shows ACCEPT and DECLINE, which the
+client's quest dialogs use for an offer. A menu (type 4) answers with
+response 1 and the chosen `#L` id.
 
 ## Assets and validation
 

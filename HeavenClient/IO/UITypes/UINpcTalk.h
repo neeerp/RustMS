@@ -52,6 +52,15 @@ namespace ms
 			LENGTH
 		};
 
+		// Where a menu shows its choices: in the text, as the server's
+		// menus do, or listed under it 32 px apart, as the client's quest
+		// list and quest questions do.
+		enum class Menu
+		{
+			INLINE,
+			LIST
+		};
+
 		static constexpr Type TYPE = UIElement::Type::NPCTALK;
 		static constexpr bool FOCUSED = true;
 		static constexpr bool TOGGLED = false;
@@ -64,15 +73,18 @@ namespace ms
 
 		Cursor::State send_cursor(bool clicked, Point<int16_t> cursorpos) override;
 
+		void doubleclick(Point<int16_t> cursorpos) override;
+
 		void send_scroll(double yoffset) override;
 
 		void send_key(int32_t keycode, bool pressed, bool escape) override;
 
 		UIElement::Type get_type() const override;
 
-		// `headers` puts an image (e.g. a quest list category) above menu choices.
+		// `headers` puts an image (e.g. a quest list category) above listed
+		// menu choices.
 		void change_text(int32_t npcid, int8_t msgtype, int16_t style, int8_t speaker, const std::string &text,
-						 const std::map<int32_t, Texture> &headers = {});
+						 const std::map<int32_t, Texture> &headers = {}, Menu menu = Menu::INLINE);
 
 		// Answer this dialogue in the client instead of sending NPC_TALK_MORE.
 		// The responder gets 1/0/-1 (next or yes / previous or no / close) and,
@@ -85,12 +97,20 @@ namespace ms
 	private:
 		TalkType get_by_value(int8_t value);
 
+		// Where the text starts, relative to the window, after scrolling.
+		Point<int16_t> text_origin() const;
+
 		// The text area's rows, relative to the window.
 		Range<int16_t> visible_rows() const;
 
+		// How much of the text has typed out.
+		size_t revealed() const;
+
+		// The choice under a point relative to the window, or -1.
+		int16_t choice_at(Point<int16_t> cursor) const;
+
 		// Send a response to the server, or to the local responder if set.
 		void respond(int8_t response, int32_t selection = -1);
-
 
 		// An image in the text (#f, #i, #s, #v): its box in the layout, and
 		// where the texture's origin goes from the box's top-left corner.
@@ -99,28 +119,23 @@ namespace ms
 			Texture texture;
 			Point<int16_t> size;
 			Point<int16_t> anchor;
+			size_t box = 0;
 		};
 
 		// Expands the markup, leaving a Text::BOX for each image in `images`.
 		std::string format_text(const std::string &tx, const int32_t &npcid, std::vector<InlineImage> &images);
 
-		static constexpr int16_t MAX_HEIGHT = 248;
+		static constexpr int16_t MIN_HEIGHT = 120;
+		static constexpr int16_t MAX_HEIGHT = 240;
 
 		enum Buttons
 		{
-			ALLLEVEL,
 			CLOSE,
-			MYLEVEL,
 			NEXT,
 			NO,
 			OK,
 			PREV,
-			QAFTER,
-			QCNO,
-			QCYES,
-			QGIVEUP,
 			QNO,
-			QSTART,
 			QYES,
 			YES
 		};
@@ -130,33 +145,47 @@ namespace ms
 		Texture bottom;
 		Texture nametag;
 		Texture speaker;
+		Texture dot_selected;
+		Texture dot;
 
 		Text text;
 		Text name;
 
+		// The height of the middle, between top and bottom.
 		int16_t height;
+		// The text's top before scrolling, relative to the window.
+		int16_t text_y;
+		// Lines scrolled, and the most there are.
 		int16_t offset;
-		int16_t unitrows;
 		int16_t rowmax;
-		int16_t min_height;
 
 		bool show_slider;
 		bool draw_text;
 		Slider slider;
 		TalkType type;
 		int8_t message_type;
+
 		struct Choice
 		{
 			int32_t id;
+			// Where the choice starts, on its baseline: the dot goes there and
+			// the label follows it. And where the label ends. Both relative
+			// to the text.
+			Point<int16_t> start;
+			Point<int16_t> end;
+			// How much text has to type out before the choice shows. Listed
+			// choices show at once, as in footage.
+			size_t reveal;
+			// Listed choices draw their own label, under an optional header.
 			Text label;
 			Texture header;
-			int16_t y = 0;
+			int16_t header_y = 0;
 		};
 
 		std::vector<Choice> choices;
+		size_t selected;
 		std::vector<InlineImage> images;
 		std::function<void(int8_t, int32_t)> local_responder;
-		int16_t question_height;
 		std::string formatted_text;
 		size_t formatted_text_pos;
 		uint16_t timestep;

@@ -23,10 +23,13 @@
 #include "../Gameplay/Stage.h"
 
 #include "../Net/Packets/NpcInteractionPackets.h"
+#include "../../Constants.h"
 #include "../../Data/ItemData.h"
 #include "../../Data/SkillData.h"
+#include "../../Graphics/Geometry.h"
 #include "../../Util/Misc.h"
 #include "../../Util/NpcTextMarkup.h"
+#include "../../Util/NxFiles.h"
 
 #include <nlnx/nx.hpp>
 
@@ -38,9 +41,30 @@ namespace ms
 
 	namespace
 	{
-		// An image by path, such as UI/UIWindow.img/QuestIcon/4/0. Our UI.nx
-		// keeps the quest icons that v83 text names under UIWindow.img in
-		// UIWindow2.img.
+		// The window, measured from period footage. The middle stretches to
+		// fit the text plus 34 px, and the window is centred on the screen.
+		constexpr int16_t TOP = 28;
+		constexpr int16_t TEXT_X = 165;
+		constexpr int16_t TEXT_WIDTH = 312;
+		constexpr int16_t LINE = 18;
+		constexpr int16_t PADDING = 34;
+		// Lines shown at once when the text scrolls, and where they start.
+		constexpr int16_t SCROLL_LINES = 11;
+		constexpr int16_t SCROLL_TEXT_Y = 28;
+		// A choice's dot and label, from where the choice starts.
+		constexpr int16_t DOT_X = 10;
+		constexpr int16_t LABEL_X = 18;
+		// Listed choices: where they start under the question, the gap
+		// before each later header, a header's top, and from a header to
+		// its first row.
+		constexpr int16_t LIST_TOP = 25;
+		constexpr int16_t HEADER_GAP = 9;
+		constexpr int16_t HEADER_Y = 4;
+		constexpr int16_t HEADER_ROW = 11;
+		constexpr int16_t ROW = 32;
+
+		// An image by path, such as UI/UIWindow.img/QuestIcon/4/0. UI paths
+		// name the v83 UI; our UI.nx has the quest icons under UIWindow2.img.
 		Texture path_image(const std::string &path)
 		{
 			size_t slash = path.find('/');
@@ -49,8 +73,8 @@ namespace ms
 				return Texture();
 
 			const std::pair<std::string, nl::node> files[] = {
-				{ "UI", nl::nx::ui }, { "Map", nl::nx::map }, { "Effect", nl::nx::effect }, { "Item", nl::nx::item },
-				{ "Skill", nl::nx::skill }, { "Mob", nl::nx::mob }, { "Npc", nl::nx::npc },
+				{ "UI", NxFiles::ui_classic }, { "Map", nl::nx::map }, { "Effect", nl::nx::effect },
+				{ "Item", nl::nx::item }, { "Skill", nl::nx::skill }, { "Mob", nl::nx::mob }, { "Npc", nl::nx::npc },
 				{ "Character", nl::nx::character }, { "Etc", nl::nx::etc }, { "Quest", nl::nx::quest },
 				{ "Reactor", nl::nx::reactor }
 			};
@@ -65,60 +89,59 @@ namespace ms
 
 				nl::node found = root.resolve(rest);
 
-				if (found.data_type() != nl::node::type::bitmap && rest.rfind("UIWindow.img/", 0) == 0)
-					found = root.resolve("UIWindow2.img/" + rest.substr(13));
+				if (found.data_type() != nl::node::type::bitmap && name == "UI")
+				{
+					found = nl::nx::ui.resolve(rest);
+
+					if (found.data_type() != nl::node::type::bitmap && rest.rfind("UIWindow.img/", 0) == 0)
+						found = nl::nx::ui.resolve("UIWindow2.img/" + rest.substr(13));
+				}
 
 				return Texture(found);
 			}
 
 			return Texture();
 		}
+
+		// The dotted line under the selected choice.
+		void dotted_line(Point<int16_t> from, int16_t to, Color::Name color)
+		{
+			ColorBox dot(1, 1, color, 1.0f);
+
+			for (int16_t x = from.x(); x < to; x += 2)
+				dot.draw(Point<int16_t>(x, from.y()));
+		}
 	}
 
-	UINpcTalk::UINpcTalk() : offset(0), unitrows(0), rowmax(0), show_slider(false), draw_text(false),
-							 formatted_text(""), formatted_text_pos(0), timestep(0)
+	UINpcTalk::UINpcTalk() : height(MIN_HEIGHT), text_y(0), offset(0), rowmax(0), show_slider(false), draw_text(false),
+							 type(TalkType::NONE), message_type(0), selected(0), formatted_text(""),
+							 formatted_text_pos(0), timestep(0)
 	{
-		nl::node UIWindow2 = nl::nx::ui["UIWindow2.img"];
-		nl::node UtilDlgEx = UIWindow2["UtilDlgEx"];
+		nl::node UtilDlgEx = NxFiles::ui_classic["UIWindow.img"]["UtilDlgEx"];
 
 		top = UtilDlgEx["t"];
 		fill = UtilDlgEx["c"];
 		bottom = UtilDlgEx["s"];
 		nametag = UtilDlgEx["bar"];
+		dot_selected = UtilDlgEx["dot1"];
+		dot = UtilDlgEx["dot0"];
 
-		min_height = 8 * fill.height() + 14;
-
-		buttons[Buttons::ALLLEVEL] = std::make_unique<MapleButton>(UtilDlgEx["BtAllLevel"]);
 		buttons[Buttons::CLOSE] = std::make_unique<MapleButton>(UtilDlgEx["BtClose"]);
-		buttons[Buttons::MYLEVEL] = std::make_unique<MapleButton>(UtilDlgEx["BtMyLevel"]);
 		buttons[Buttons::NEXT] = std::make_unique<MapleButton>(UtilDlgEx["BtNext"]);
-
-		// TODO: Replace when _inlink is fixed
-		//buttons[Buttons::NO] = std::make_unique<MapleButton>(UtilDlgEx["BtNo"]);
-
-		nl::node Quest = UIWindow2["Quest"];
-
-		buttons[Buttons::NO] = std::make_unique<MapleButton>(Quest["BtNo"]);
+		buttons[Buttons::NO] = std::make_unique<MapleButton>(UtilDlgEx["BtNo"]);
 		buttons[Buttons::OK] = std::make_unique<MapleButton>(UtilDlgEx["BtOK"]);
 		buttons[Buttons::PREV] = std::make_unique<MapleButton>(UtilDlgEx["BtPrev"]);
-		buttons[Buttons::QAFTER] = std::make_unique<MapleButton>(UtilDlgEx["BtQAfter"]);
-		buttons[Buttons::QCNO] = std::make_unique<MapleButton>(UtilDlgEx["BtQCNo"]);
-		buttons[Buttons::QCYES] = std::make_unique<MapleButton>(UtilDlgEx["BtQCYes"]);
-		buttons[Buttons::QGIVEUP] = std::make_unique<MapleButton>(UtilDlgEx["BtQGiveup"]);
 		buttons[Buttons::QNO] = std::make_unique<MapleButton>(UtilDlgEx["BtQNo"]);
-		buttons[Buttons::QSTART] = std::make_unique<MapleButton>(UtilDlgEx["BtQStart"]);
 		buttons[Buttons::QYES] = std::make_unique<MapleButton>(UtilDlgEx["BtQYes"]);
 		buttons[Buttons::YES] = std::make_unique<MapleButton>(UtilDlgEx["BtYes"]);
 
-		name = Text(Text::Font::A11M, Text::Alignment::CENTER, Color::Name::WHITE);
+		name = Text(Text::Font::A13M, Text::Alignment::CENTER, Color::Name::WHITE);
 
 		onmoved = [&](bool upwards)
 		{
-			int16_t shift = upwards ? -unitrows : unitrows;
-			bool above = offset + shift >= 0;
-			bool below = offset + shift <= rowmax - unitrows;
+			int16_t shift = upwards ? -1 : 1;
 
-			if (above && below)
+			if (offset + shift >= 0 && offset + shift <= rowmax - SCROLL_LINES)
 				offset += shift;
 		};
 
@@ -127,70 +150,85 @@ namespace ms
 
 	void UINpcTalk::draw(float inter) const
 	{
-		Point<int16_t> drawpos = position;
-		top.draw(drawpos);
-		drawpos.shift_y(top.height());
-		fill.draw(DrawArgument(drawpos, Point<int16_t>(0, height)));
-		drawpos.shift_y(height);
-		bottom.draw(drawpos);
-		drawpos.shift_y(bottom.height());
+		// The middle repeats; stretching it would smear its dithering.
+		top.draw(position);
+
+		for (int16_t y = 0; y < height; y += fill.height())
+			fill.draw(position + Point<int16_t>(0, TOP + y),
+					  Rectangle<int16_t>(0, fill.width(), 0, std::min<int16_t>(fill.height(), height - y)));
+
+		bottom.draw(position + Point<int16_t>(0, TOP + height));
 
 		UIElement::draw(inter);
 
-		int16_t speaker_y = (top.height() + height + bottom.height()) / 2;
-		Point<int16_t> speaker_pos = position + Point<int16_t>(22, 11 + speaker_y);
+		int16_t total = TOP + height + bottom.height();
+		Point<int16_t> speaker_pos = position + Point<int16_t>(20, total / 2 + 11);
 		Point<int16_t> center_pos = speaker_pos + Point<int16_t>(nametag.width() / 2, 0);
 
 		speaker.draw(DrawArgument(center_pos, true));
 		nametag.draw(speaker_pos);
 		name.draw(center_pos + Point<int16_t>(0, -4));
 
-		// The text types out, but its images show at once, as in the original.
-		size_t reveal = draw_text ? formatted_text_pos : formatted_text.size();
-		Point<int16_t> text_pos = position + Point<int16_t>(166, 32);
-		Range<int16_t> text_clip(0, 0);
-
-		if (show_slider)
+		Point<int16_t> origin = position + text_origin();
+		Range<int16_t> rows = visible_rows();
+		Range<int16_t> clip = show_slider ? Range<int16_t>(position.y() + rows.first(), position.y() + rows.second())
+										  : Range<int16_t>(0, 0);
+		auto visible = [&](int16_t top_y, int16_t bottom_y)
 		{
-			int16_t text_min_height = position.y() + top.height() - 1;
-			text_pos.shift_y(-offset * 32);
-			text_clip = Range<int16_t>(text_min_height, text_min_height + height - 18);
+			return !show_slider || (top_y >= clip.first() && bottom_y <= clip.second());
+		};
+
+		// The text types out, but its images show at once, as in the original.
+		for (const auto &image : images)
+		{
+			Point<int16_t> box = origin + text.box_position(image.box);
+
+			if (visible(box.y(), box.y() + image.size.y()))
+				image.texture.draw(box + image.anchor);
 		}
 
-		for (size_t i = 0; i < images.size(); i++)
-		{
-			Point<int16_t> box = text_pos + text.box_position(i);
+		text.draw(origin, clip, revealed());
 
-			if (show_slider && (box.y() < text_clip.first() || box.y() + images[i].size.y() > text_clip.second()))
+		for (size_t i = 0; i < choices.size(); i++)
+		{
+			const Choice &choice = choices[i];
+
+			if (draw_text && formatted_text_pos < choice.reveal)
 				continue;
 
-			images[i].texture.draw(box + images[i].anchor);
-		}
+			if (choice.header.is_valid() && visible(origin.y() + choice.header_y,
+													 origin.y() + choice.header_y + choice.header.height()))
+				choice.header.draw(origin + Point<int16_t>(0, choice.header_y));
 
-		text.draw(text_pos, text_clip, reveal);
+			Point<int16_t> start = origin + choice.start;
+
+			if (!visible(start.y() - LINE + 4, start.y() + 4))
+				continue;
+
+			(i == selected ? dot_selected : dot).draw(start + Point<int16_t>(DOT_X, -8));
+			choice.label.draw(start + Point<int16_t>(LABEL_X, -LINE));
+
+			if (i != selected)
+				continue;
+
+			// A label that wraps is underlined on its first and last lines.
+			Point<int16_t> end = origin + choice.end;
+			Color::Name color = choice.label.empty() ? Color::Name::BLUE : Color::Name::DUSKBLUE;
+
+			if (end.y() == start.y())
+			{
+				dotted_line(start + Point<int16_t>(LABEL_X, 2), end.x(), color);
+			} else
+			{
+				dotted_line(start + Point<int16_t>(LABEL_X, 2), origin.x() + text.width(), color);
+
+				if (visible(end.y() - LINE + 4, end.y() + 4))
+					dotted_line(Point<int16_t>(origin.x(), end.y() + 2), end.x(), color);
+			}
+		}
 
 		if (show_slider)
 			slider.draw(position);
-
-		// Choices scroll with the text and are clipped to the same area.
-		Range<int16_t> visible = visible_rows();
-		Range<int16_t> clip(position.y() + visible.first(), position.y() + visible.second());
-
-		for (const auto &choice : choices)
-		{
-			int16_t y = choice.y - offset * 32;
-			Point<int16_t> at = position + Point<int16_t>(166, y);
-
-			if (choice.header.is_valid())
-			{
-				int16_t header_top = y - choice.header.height() - 2;
-
-				if (header_top >= visible.first() && y <= visible.second())
-					choice.header.draw(at - Point<int16_t>(0, choice.header.height() + 2));
-			}
-
-			choice.label.draw(at, clip);
-		}
 	}
 
 	void UINpcTalk::send_scroll(double yoffset)
@@ -199,12 +237,50 @@ namespace ms
 			slider.send_scroll(yoffset);
 	}
 
+	Point<int16_t> UINpcTalk::text_origin() const
+	{
+		return Point<int16_t>(TEXT_X, text_y - offset * LINE);
+	}
+
 	Range<int16_t> UINpcTalk::visible_rows() const
 	{
-		// Relative to the window: the text area between the top and the buttons.
-		int16_t first = top.height() - 1;
+		// Room below the last line for its descenders.
+		return Range<int16_t>(text_y, text_y + SCROLL_LINES * LINE + 5);
+	}
 
-		return Range<int16_t>(first, show_slider ? first + height - 18 : first + height + 24);
+	size_t UINpcTalk::revealed() const
+	{
+		return draw_text ? formatted_text_pos : formatted_text.size();
+	}
+
+	int16_t UINpcTalk::choice_at(Point<int16_t> cursor) const
+	{
+		Point<int16_t> origin = text_origin();
+		Range<int16_t> rows = visible_rows();
+
+		if (show_slider && (cursor.y() < rows.first() || cursor.y() > rows.second()))
+			return -1;
+
+		for (size_t i = 0; i < choices.size(); i++)
+		{
+			const Choice &choice = choices[i];
+
+			if (draw_text && formatted_text_pos < choice.reveal)
+				continue;
+
+			Point<int16_t> start = origin + choice.start;
+			Point<int16_t> end = origin + choice.end;
+			int16_t right = end.y() == start.y() ? end.x() : origin.x() + text.width();
+
+			if (Rectangle<int16_t>(start.x(), right, start.y() - LINE + 4, start.y() + 4).contains(cursor))
+				return static_cast<int16_t>(i);
+
+			if (end.y() != start.y()
+				&& Rectangle<int16_t>(origin.x(), end.x(), start.y() + 4, end.y() + 4).contains(cursor))
+				return static_cast<int16_t>(i);
+		}
+
+		return -1;
 	}
 
 	void UINpcTalk::update()
@@ -270,7 +346,7 @@ namespace ms
 				}
 				break;
 			case TalkType::SENDACCEPTDECLINE:
-				// Type = 1
+				// Type = 12
 				switch (buttonid)
 				{
 					case Buttons::CLOSE:
@@ -300,8 +376,10 @@ namespace ms
 				}
 				break;
 			case TalkType::SENDSIMPLE:
-				// Type = 4
-				if (buttonid == Buttons::CLOSE)
+				// Type = 4: NEXT answers with the selected choice.
+				if (buttonid == Buttons::NEXT && selected < choices.size())
+					respond(1, choices[selected].id);
+				else if (buttonid == Buttons::CLOSE)
 					local_responder ? respond(-1) : respond(0);
 				break;
 			default:
@@ -335,29 +413,23 @@ namespace ms
 	Cursor::State UINpcTalk::send_cursor(bool clicked, Point<int16_t> cursorpos)
 	{
 		Point<int16_t> cursor_relative = cursorpos - position;
-		if (message_type == 4)
-			for (const auto &choice : choices)
-			{
-				int16_t y = choice.y - offset * 32;
-				Range<int16_t> visible = visible_rows();
-				if (y + 12 < visible.first() || y + 12 > visible.second())
-					continue;
-				if (Rectangle<int16_t>(166, 486, y, y + 24).contains(cursor_relative))
-				{
-					if (clicked)
-					{
-						deactivate();
-						respond(1, choice.id);
-						return Cursor::State::IDLE;
-					}
-					return Cursor::State::CANCLICK;
-				}
-			}
 
 		if (show_slider && slider.isenabled())
 			if (Cursor::State sstate = slider.send_cursor(cursor_relative, clicked))
 				return sstate;
-		if (clicked && draw_text && Rectangle<int16_t>(166, 486, 24, height + 24).contains(cursor_relative))
+
+		// Clicking a choice selects it; NEXT or a double click answers.
+		int16_t choice = choice_at(cursor_relative);
+
+		if (choice >= 0)
+		{
+			if (clicked)
+				selected = choice;
+
+			return Cursor::State::CANCLICK;
+		}
+
+		if (clicked && draw_text && Rectangle<int16_t>(TEXT_X, TEXT_X + TEXT_WIDTH, TOP, TOP + height).contains(cursor_relative))
 		{
 			draw_text = false;
 			return Cursor::State::IDLE;
@@ -369,6 +441,18 @@ namespace ms
 			draw_text = false;
 
 		return estate;
+	}
+
+	void UINpcTalk::doubleclick(Point<int16_t> cursorpos)
+	{
+		int16_t choice = choice_at(cursorpos - position);
+
+		if (type != TalkType::SENDSIMPLE || choice < 0)
+			return;
+
+		selected = choice;
+		deactivate();
+		respond(1, choices[selected].id);
 	}
 
 	void UINpcTalk::send_key(int32_t keycode, bool pressed, bool escape)
@@ -388,19 +472,32 @@ namespace ms
 
 	UINpcTalk::TalkType UINpcTalk::get_by_value(int8_t value)
 	{
-		if (value > TalkType::NONE && value < TalkType::LENGTH)
-			return static_cast<TalkType>(value);
-
-		return TalkType::NONE;
+		switch (value)
+		{
+			case 0:
+				return TalkType::SENDOK;
+			case 1:
+				return TalkType::SENDYESNO;
+			case 2:
+				return TalkType::SENDGETTEXT;
+			case 3:
+				return TalkType::SENDGETNUMBER;
+			case 4:
+				return TalkType::SENDSIMPLE;
+			case 12:
+				return TalkType::SENDACCEPTDECLINE;
+			default:
+				return TalkType::NONE;
+		}
 	}
 
 	// TODO: Move this to GraphicsGL?
 	std::string UINpcTalk::format_text(const std::string &tx, const int32_t &npcid, std::vector<InlineImage> &images)
 	{
-		std::string formatted_text = tx;
 		// The text renderer understands escaped line breaks, not literal LF/CR.
 		// Quest prompts may contain both asset escapes and real newlines.
-		formatted_text.clear();
+		std::string formatted_text;
+
 		for (size_t i = 0; i < tx.size(); ++i)
 		{
 			if (tx[i] == '\r' || tx[i] == '\n')
@@ -410,6 +507,7 @@ namespace ms
 			}
 			else formatted_text += tx[i];
 		}
+
 		NpcTextMarkup::Lookups lookups {
 			[]() { return Stage::get().get_player().get_name(); },
 			[](int32_t id) { return std::string(nl::nx::string["Npc.img"][std::to_string(id)]["name"]); },
@@ -454,13 +552,11 @@ namespace ms
 	}
 
 	void UINpcTalk::change_text(int32_t npcid, int8_t msgtype, int16_t style, int8_t speakerbyte, const std::string &tx,
-								const std::map<int32_t, Texture> &headers)
+								const std::map<int32_t, Texture> &headers, Menu menu)
 	{
 		local_responder = nullptr;
 		message_type = msgtype;
 		type = get_by_value(msgtype);
-		if (msgtype == 4)
-			type = TalkType::SENDSIMPLE;
 		const bool has_previous = (style & 0xff) != 0;
 		const bool has_next = (style & 0xff00) != 0;
 		if (msgtype == 0)
@@ -469,51 +565,119 @@ namespace ms
 		timestep = 0;
 		draw_text = true;
 		formatted_text_pos = 0;
+		offset = 0;
+		selected = 0;
 		images.clear();
-		formatted_text = format_text(tx, npcid, images);
 		choices.clear();
-		if (msgtype == 4)
+		formatted_text = format_text(tx, npcid, images);
+
+		std::vector<int32_t> inline_ids;
+
+		if (type == TalkType::SENDSIMPLE && menu == Menu::LIST)
 		{
 			size_t first_link = formatted_text.find("#L");
+			size_t link = first_link;
+			int16_t space = Text(Text::Font::A12M, Text::Alignment::LEFT, Color::Name::BLACK, " ").width();
+
 			for (auto [id, label] : NpcTextMarkup::choices(formatted_text))
 			{
-				// Choices are drawn without their images for now.
+				// Spaces before a choice indent it.
+				size_t indent = 0;
+
+				while (link != std::string::npos && indent < link && formatted_text[link - indent - 1] == ' ')
+					indent++;
+
+				link = formatted_text.find("#L", link + 2);
+
+				// Listed choices are drawn without their images for now.
 				label.erase(std::remove(label.begin(), label.end(), Text::BOX), label.end());
 				auto header = headers.find(id);
-				choices.push_back({ id, Text(Text::Font::A12M, Text::Alignment::LEFT, Color::Name::BLUE, label, 320),
-					header == headers.end() ? Texture() : header->second });
+				Choice choice { id, Point<int16_t>(static_cast<int16_t>(indent * space), 0), {}, 0,
+					Text(Text::Font::A12M, Text::Alignment::LEFT, Color::Name::DUSKBLUE, label, TEXT_WIDTH - LABEL_X) };
+
+				if (header != headers.end())
+					choice.header = header->second;
+
+				choices.push_back(std::move(choice));
 			}
+
+			// The question is the text before the choices, less trailing
+			// line breaks, colour codes and spaces.
 			if (first_link != std::string::npos)
 			{
 				formatted_text.erase(first_link);
+
+				while (size_t n = NpcTextMarkup::trailing_filler(formatted_text))
+					formatted_text.erase(formatted_text.size() - n);
+
 				images.resize(std::count(formatted_text.begin(), formatted_text.end(), Text::BOX));
+			}
+		} else if (type == TalkType::SENDSIMPLE)
+		{
+			formatted_text = NpcTextMarkup::mark_choices(formatted_text, inline_ids);
+		}
+
+		// Images and the marks around inline choices are all boxes to the
+		// layout: a choice's start leaves room for its dot, its end takes none.
+		std::vector<Point<int16_t>> boxes;
+		std::vector<std::pair<size_t, size_t>> marks;
+		size_t next_image = 0;
+
+		for (size_t i = 0; i < formatted_text.size(); i++)
+		{
+			char &c = formatted_text[i];
+
+			if (c == Text::BOX && next_image < images.size())
+			{
+				images[next_image].box = boxes.size();
+				boxes.push_back(images[next_image++].size);
+			} else if (c == NpcTextMarkup::CHOICE)
+			{
+				marks.emplace_back(boxes.size(), i);
+				boxes.emplace_back(LABEL_X, 0);
+				c = Text::BOX;
+			} else if (c == NpcTextMarkup::CHOICE_END)
+			{
+				boxes.emplace_back(0, 0);
+				c = Text::BOX;
 			}
 		}
 
-		text = Text(Text::Font::A12M, Text::Alignment::LEFT, Color::Name::DARKGREY, formatted_text, 320);
-
-		std::vector<Point<int16_t>> boxes;
-
-		for (const auto &image : images)
-			boxes.push_back(image.size);
-
+		text = Text(Text::Font::A12M, Text::Alignment::LEFT, Color::Name::DARKGREY, formatted_text, TEXT_WIDTH);
 		text.set_boxes(boxes);
 
-		int16_t text_height = text.height();
-		question_height = text_height;
+		int16_t block = text.height();
 
-		int16_t choice_y = 40 + question_height;
+		for (size_t i = 0; i < marks.size() && i < inline_ids.size(); i++)
+			choices.push_back({ inline_ids[i], text.box_position(marks[i].first), text.box_position(marks[i].first + 1),
+								marks[i].second + 1 });
 
-		for (auto &choice : choices)
+		// Listed choices: 32 px rows under the question, a header above the
+		// first of each group.
+		if (menu == Menu::LIST && !choices.empty())
 		{
-			if (choice.header.is_valid())
-				choice_y += choice.header.height() + 6;
+			int16_t y = block + LIST_TOP;
+			bool first_header = true;
 
-			choice.y = choice_y;
-			choice_y += 28;
+			for (auto &choice : choices)
+			{
+				if (choice.header.is_valid())
+				{
+					if (!first_header)
+						y += HEADER_GAP;
+
+					first_header = false;
+					choice.header_y = y + HEADER_Y;
+					y = choice.header_y + choice.header.height() + HEADER_ROW;
+				}
+
+				choice.start.set_y(y + LINE);
+				choice.end = choice.start + Point<int16_t>(LABEL_X + choice.label.width(), 0);
+				y += ROW;
+			}
+
+			block = y;
 		}
-
-		text_height = choice_y - 8;
 
 		if (speakerbyte == 0)
 		{
@@ -527,25 +691,19 @@ namespace ms
 			name.change_text("");
 		}
 
-		height = min_height;
-		show_slider = false;
+		show_slider = block + PADDING > MAX_HEIGHT;
 
-		if (text_height > height)
+		if (show_slider)
 		{
-			if (text_height > MAX_HEIGHT)
-			{
-				height = MAX_HEIGHT;
-				show_slider = true;
-				rowmax = (text_height - MAX_HEIGHT + 31) / 32 + 1;
-				unitrows = 1;
-
-				int16_t slider_y = top.height() - 7;
-				slider = Slider(Slider::Type::DEFAULT_SILVER, Range<int16_t>(slider_y, slider_y + height - 20),
-								top.width() - 26, unitrows, rowmax, onmoved);
-			} else
-			{
-				height = text_height;
-			}
+			height = MAX_HEIGHT;
+			text_y = SCROLL_TEXT_Y;
+			rowmax = (block + LINE - 1) / LINE;
+			slider = Slider(Slider::Type::CLASSIC, Range<int16_t>(24, height + 14), 493, SCROLL_LINES, rowmax, onmoved);
+		} else
+		{
+			height = std::max<int16_t>(block + PADDING, MIN_HEIGHT);
+			text_y = 15 + (height - block) / 2;
+			rowmax = 0;
 		}
 
 		for (auto &button : buttons)
@@ -554,47 +712,58 @@ namespace ms
 			button.second->set_state(Button::State::NORMAL);
 		}
 
-		int16_t y_cord = height + 48;
+		// END CHAT, OK, YES/NO and ACCEPT/DECLINE sit on the bottom bar; NEXT
+		// and BACK sit in the text area, clear of the scroll bar.
+		int16_t bar_y = TOP + height + 32;
+		int16_t text_button_y = TOP + height - 19;
+		int16_t text_button_x = show_slider ? -8 : 0;
 
-		buttons[Buttons::CLOSE]->set_position(Point<int16_t>(9, y_cord));
-		buttons[Buttons::CLOSE]->set_active(true);
+		auto place = [&](Buttons button, int16_t x, int16_t y)
+		{
+			buttons[button]->set_position(Point<int16_t>(x, y));
+			buttons[button]->set_active(true);
+		};
+
+		place(Buttons::CLOSE, 9, bar_y);
 
 		switch (type)
 		{
 			case TalkType::SENDOK:
-				buttons[Buttons::OK]->set_position(Point<int16_t>(471, y_cord));
-				buttons[Buttons::OK]->set_active(true);
+				place(Buttons::OK, 475, bar_y);
 				break;
 			case TalkType::SENDYESNO:
-			{
-				Point<int16_t> yes_position = Point<int16_t>(389, y_cord);
-
-				buttons[Buttons::YES]->set_position(yes_position);
-				buttons[Buttons::YES]->set_active(true);
-
-				buttons[Buttons::NO]->set_position(yes_position + Point<int16_t>(65, 0));
-				buttons[Buttons::NO]->set_active(true);
+				place(Buttons::YES, 421, bar_y);
+				place(Buttons::NO, 475, bar_y);
 				break;
-			}
+			case TalkType::SENDACCEPTDECLINE:
+				place(Buttons::QYES, 399, bar_y);
+				place(Buttons::QNO, 464, bar_y);
+				break;
 			case TalkType::SENDNEXT:
 			case TalkType::SENDNEXTPREV:
 				if (has_previous)
-				{
-					buttons[Buttons::PREV]->set_position(Point<int16_t>(389, y_cord));
-					buttons[Buttons::PREV]->set_active(true);
-				}
-				buttons[has_next ? Buttons::NEXT : Buttons::OK]->set_position(Point<int16_t>(471, y_cord));
-				buttons[has_next ? Buttons::NEXT : Buttons::OK]->set_active(true);
+					place(Buttons::PREV, 397 + text_button_x, text_button_y);
+
+				if (has_next)
+					place(Buttons::NEXT, 451 + text_button_x, text_button_y);
+				else
+					place(Buttons::OK, 475, bar_y);
 				break;
-			case TalkType::SENDACCEPTDECLINE:
+			case TalkType::SENDSIMPLE:
+				place(Buttons::NEXT, 451 + text_button_x, text_button_y);
+				break;
 			case TalkType::SENDGETTEXT:
 			case TalkType::SENDGETNUMBER:
-			case TalkType::SENDSIMPLE:
 			default:
 				break;
 		}
 
-		position = Point<int16_t>(400 - top.width() / 2, 240 - height / 2);
-		dimension = Point<int16_t>(top.width(), height + 120);
+		int16_t total = TOP + height + bottom.height();
+
+		position = Point<int16_t>(
+			Constants::Constants::get().get_viewwidth() / 2 - top.width() / 2,
+			Constants::Constants::get().get_viewheight() / 2 - total / 2
+		);
+		dimension = Point<int16_t>(top.width(), total);
 	}
 }

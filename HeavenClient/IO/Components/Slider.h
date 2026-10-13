@@ -82,7 +82,9 @@ namespace ms
 			ARROWS_TORYBLUE,
 			THIN_SLATEGRAY,
 			/// Custom
-			CHATBAR
+			CHATBAR,
+			/// v83 Basic.img/VScr4 from UIClassic.nx
+			CLASSIC
 		};
 
 	private:
