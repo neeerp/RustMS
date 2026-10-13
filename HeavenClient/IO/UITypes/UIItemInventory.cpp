@@ -296,6 +296,25 @@ namespace ms
 				return Button::State::NORMAL;
 			case Buttons::BT_COIN:
 			case Buttons::BT_COIN_SM:
+			{
+				// One drop holds 10 to 50,000 mesos.
+				constexpr int32_t MESO_DROP_MIN = 10;
+				constexpr int32_t MESO_DROP_MAX = 50000;
+
+				auto most = static_cast<int32_t>(std::min<int64_t>(inventory.get_meso(), MESO_DROP_MAX));
+
+				if (most >= MESO_DROP_MIN)
+				{
+					auto onenter = [](int32_t amount)
+					{
+						MesoDropPacket(amount).dispatch();
+					};
+
+					UI::get().emplace<UIEnterNumber>("How many mesos will you drop?", onenter, most, MESO_DROP_MIN);
+				}
+
+				return Button::State::NORMAL;
+			}
 			case Buttons::BT_POINT:
 			case Buttons::BT_POINT_SM:
 			case Buttons::BT_POT:

@@ -26,6 +26,8 @@ pub struct Drop {
     pub y: i16,
     pub dropper: i32,
     pub dropped_at: Instant,
+    /// A player threw it away, so anyone may pick it up at once.
+    pub player_drop: bool,
 }
 
 impl Drop {
@@ -33,13 +35,14 @@ impl Drop {
         let (item_or_meso, meso) = match self.loot {
             Loot::Item { item_id, .. } => (item_id, false),
             Loot::Mesos(amount) => (amount, true),
+            Loot::Dropped(ref item) => (item.item_id, false),
         };
         DropView {
             object_id: self.object_id,
             item_or_meso,
             meso,
             owner: self.owner,
-            ownership: if now < self.dropped_at + OWNERSHIP {
+            ownership: if !self.player_drop && now < self.dropped_at + OWNERSHIP {
                 0
             } else {
                 2
@@ -47,6 +50,7 @@ impl Drop {
             x: self.x,
             y: self.y,
             dropper: self.dropper,
+            player_drop: self.player_drop,
         }
     }
 
@@ -107,11 +111,32 @@ impl DropSet {
                     y,
                     dropper,
                     dropped_at: now,
+                    player_drop: false,
                 },
             );
             ids.push(object_id);
         }
         ids.iter().filter_map(|id| self.drops.get(id)).collect()
+    }
+
+    /// Put down what `owner` threw away at (x, y).
+    pub fn throw(&mut self, loot: Loot, owner: ClientId, x: i16, y: i16, now: Instant) -> &Drop {
+        let object_id = self.object_ids.next();
+        self.drops.entry(object_id).or_insert(Drop {
+            object_id,
+            loot,
+            owner,
+            x,
+            y,
+            dropper: 0,
+            dropped_at: now,
+            player_drop: true,
+        })
+    }
+
+    /// An object id for a drop that is shown but never lies on the field.
+    pub fn next_object_id(&mut self) -> i32 {
+        self.object_ids.next()
     }
 
     /// Take a drop for `client` standing at (x, y).
@@ -129,7 +154,8 @@ impl DropSet {
         {
             return Err(PickupError::TooFar);
         }
-        let owned = drop.loot.quest().is_some() || now < drop.dropped_at + OWNERSHIP;
+        let owned =
+            drop.loot.quest().is_some() || (!drop.player_drop && now < drop.dropped_at + OWNERSHIP);
         if owned && drop.owner != client {
             return Err(PickupError::NotYours);
         }
@@ -202,6 +228,24 @@ mod tests {
             PickupError::Gone
         );
         assert!(drops.take(2, ids[1], 100, 0, now + OWNERSHIP).is_ok());
+    }
+
+    #[test]
+    fn thrown_drops_are_anyones_at_once() {
+        let now = Instant::now();
+        let mut drops = DropSet::default();
+        let item = game::Item::stack(2010000, 3);
+        let drop = drops.throw(Loot::Dropped(item.clone()), 1, 40, 7, now);
+        let (id, view) = (drop.object_id, drop.view(now));
+        assert_eq!((view.item_or_meso, view.meso), (2010000, false));
+        assert_eq!(
+            (view.ownership, view.dropper, view.player_drop),
+            (2, 0, true)
+        );
+        assert_eq!(
+            drops.take(2, id, 40, 7, now).unwrap().loot,
+            Loot::Dropped(item)
+        );
     }
 
     #[test]

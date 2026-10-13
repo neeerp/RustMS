@@ -1,7 +1,7 @@
 //! What a killed mob drops for one player, from the content pack's drop
 //! table (`crate::content::rewards`) and the committed v83 overrides.
 
-use game::{Player, QuestState};
+use game::{Item, Player, QuestState};
 use game_data::server_content::RewardEntry;
 use rand::Rng;
 
@@ -14,13 +14,16 @@ pub enum Loot {
         quest: Option<i16>,
     },
     Mesos(i32),
+    /// An item a player dropped, exactly as it was (equipment keeps its
+    /// stats).
+    Dropped(Item),
 }
 
 impl Loot {
     pub fn quest(&self) -> Option<i16> {
         match self {
             Loot::Item { quest, .. } => *quest,
-            Loot::Mesos(_) => None,
+            Loot::Mesos(_) | Loot::Dropped(_) => None,
         }
     }
 }

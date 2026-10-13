@@ -39,6 +39,7 @@ pub enum RecvOpcode {
     ItemMove = 0x47,
     UseItem = 0x48,
     HealOverTime = 0x59,
+    MesoDrop = 0x5E,
     ChangeMapSpecial = 0x64,
     QuestAction = 0x6B,
 

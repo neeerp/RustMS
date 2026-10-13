@@ -257,6 +257,12 @@ pub enum FieldRequest {
     /// Pick up the drop `object_id`, answered with `ServerMessage::PickedUp`;
     /// the player stands at (x, y).
     Pickup { object_id: i32, x: i16, y: i16 },
+    /// Throw `loot` down where the player stands; anyone may pick it up at
+    /// once. With `vanish` it falls and fades instead (quest items).
+    Throw {
+        loot: crate::loot::Loot,
+        vanish: bool,
+    },
 }
 
 impl ReplyAction for WorldAction {
@@ -287,7 +293,7 @@ fn world_routes() -> &'static HashMap<i16, WorldRoute> {
     ROUTES.get_or_init(|| {
         use RecvOpcode as Op;
         use WorldRoute::*;
-        let table: [(Op, WorldRoute); 20] = [
+        let table: [(Op, WorldRoute); 21] = [
             (Op::PlayerLoggedIn, PreGame(&world::PlayerLoggedInHandler)),
             (Op::PlayerMove, InGame(&world::PlayerMoveHandler)),
             (Op::ChangeChannel, InGame(&world::ChangeChannelHandler)),
@@ -320,6 +326,7 @@ fn world_routes() -> &'static HashMap<i16, WorldRoute> {
             (Op::TakeDamage, InGame(&world::TakeDamageHandler)),
             (Op::ItemPickup, InGame(&world::ItemPickupHandler)),
             (Op::HealOverTime, InGame(&world::HealOverTimeHandler)),
+            (Op::MesoDrop, InGame(&world::MesoDropHandler)),
         ];
         table
             .into_iter()
@@ -350,7 +357,7 @@ mod tests {
     fn every_registered_opcode_is_unique_per_server() {
         // The maps would silently drop duplicates; check the table sizes match.
         assert_eq!(login_routes().len(), 13);
-        assert_eq!(world_routes().len(), 20);
+        assert_eq!(world_routes().len(), 21);
     }
 
     #[test]

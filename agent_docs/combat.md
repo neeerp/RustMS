@@ -51,7 +51,8 @@ The field's `field_drops::DropSet` spreads a kill's drops around where the
 mob died and shows them falling (DROP_ITEM_FROM_MAPOBJECT 1); players
 entering see lying drops (mode 2). Quest drops are shown only to their owner.
 For 15 s only the killer may pick a drop up (quest drops: always only the
-owner); drops vanish after 180 s (REMOVE_ITEM_FROM_MAP 0).
+owner); drops vanish after 180 s (REMOVE_ITEM_FROM_MAP 0). Drops players
+throw down are anyone's at once; see "Client moves" in `inventory.md`.
 
 ITEM_PICKUP (`0xCA`) needs the player within 800×600 of the drop. The field
 removes it (REMOVE_ITEM_FROM_MAP 2 with the looter) and hands it to the
