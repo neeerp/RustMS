@@ -68,10 +68,11 @@ namespace ms
 		Text::Layout createlayout(const std::string &text, Text::Font font, Text::Alignment alignment, int16_t maxwidth,
 								  bool formatted, int16_t line_adj, const std::vector<Point<int16_t>> &boxes);
 
-		// Draw a text with the given parameters, up to character `reveal`.
+		// Draw a text with the given parameters, up to character `reveal`,
+		// and the [first, last) ranges in `shown` whatever `reveal` is.
 		void drawtext(const DrawArgument &args, const Range<int16_t> &vertical, const std::string &text,
 					  const Text::Layout &layout, Text::Font font, Color::Name color, Text::Background back,
-					  size_t reveal);
+					  size_t reveal, const std::vector<std::pair<size_t, size_t>> &shown = {});
 
 		// Draw a rectangle filled with the specified color.
 		void drawrectangle(int16_t x, int16_t y, int16_t width, int16_t height, float red, float green, float blue,

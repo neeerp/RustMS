@@ -109,6 +109,12 @@ namespace ms
 		// The choice under a point relative to the window, or -1.
 		int16_t choice_at(Point<int16_t> cursor) const;
 
+		// Selects a choice and scrolls it into view.
+		void select(size_t choice);
+
+		// Answers a menu with the selected choice.
+		void answer_choice();
+
 		// Send a response to the server, or to the local responder if set.
 		void respond(int8_t response, int32_t selection = -1);
 
@@ -163,6 +169,7 @@ namespace ms
 		bool draw_text;
 		Slider slider;
 		TalkType type;
+		Menu menu_kind;
 		int8_t message_type;
 
 		struct Choice
@@ -173,9 +180,6 @@ namespace ms
 			// to the text.
 			Point<int16_t> start;
 			Point<int16_t> end;
-			// How much text has to type out before the choice shows. Listed
-			// choices show at once, as in footage.
-			size_t reveal;
 			// Listed choices draw their own label, under an optional header.
 			Text label;
 			Texture header;
@@ -183,6 +187,9 @@ namespace ms
 		};
 
 		std::vector<Choice> choices;
+		// Inline choices' text, which shows at once while the rest types
+		// out, as in footage.
+		std::vector<std::pair<size_t, size_t>> choice_text;
 		size_t selected;
 		std::vector<InlineImage> images;
 		std::function<void(int8_t, int32_t)> local_responder;

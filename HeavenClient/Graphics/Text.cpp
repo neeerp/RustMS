@@ -92,9 +92,10 @@ namespace ms
 		draw(args, vertical, text.size());
 	}
 
-	void Text::draw(const DrawArgument &args, const Range<int16_t> &vertical, size_t reveal) const
+	void Text::draw(const DrawArgument &args, const Range<int16_t> &vertical, size_t reveal,
+					const std::vector<std::pair<size_t, size_t>> &shown) const
 	{
-		GraphicsGL::get().drawtext(args, vertical, text, layout, font, color, background, reveal);
+		GraphicsGL::get().drawtext(args, vertical, text, layout, font, color, background, reveal, shown);
 	}
 
 	uint16_t Text::advance(size_t pos) const
