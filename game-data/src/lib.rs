@@ -5,6 +5,7 @@ use std::collections::{BTreeMap, HashMap};
 use std::fs::File;
 use std::path::Path;
 use thiserror::Error;
+pub mod footholds;
 pub mod items;
 pub mod lua_strings;
 pub mod mobs;
@@ -147,6 +148,7 @@ pub struct FieldTemplate {
     pub map_npcs: Vec<MapNpcTemplate>,
     pub mob_spawns: Vec<MapMobTemplate>,
     pub mob_rate: f64,
+    pub footholds: footholds::Footholds,
     portals_by_id: BTreeMap<u32, PortalTemplate>,
     portal_ids_by_name: HashMap<String, Vec<u32>>,
 }
@@ -248,6 +250,7 @@ fn build_field_template(
 
     let map_npcs = build_map_npcs_from_life(nx, map_node_idx)?;
     let mob_spawns = build_mob_spawns_from_life(nx, map_node_idx)?;
+    let footholds = build_footholds(nx, map_node_idx)?;
     let mob_rate = nx
         .child_by_name(map_node_idx, "info")?
         .map(|info| nx.real_child(info, "mobRate"))
@@ -310,9 +313,33 @@ fn build_field_template(
         map_npcs,
         mob_spawns,
         mob_rate,
+        footholds,
         portals_by_id,
         portal_ids_by_name,
     })
+}
+
+fn build_footholds(
+    nx: &NxDataFile,
+    map_node_idx: u32,
+) -> Result<footholds::Footholds, GameDataError> {
+    let Some(root) = nx.child_by_name(map_node_idx, "foothold")? else {
+        return Ok(footholds::Footholds::default());
+    };
+    let mut lines = Vec::new();
+    for layer in nx.child_indices(root)? {
+        for group in nx.child_indices(layer)? {
+            for node in nx.child_indices(group)? {
+                lines.push(footholds::Foothold {
+                    x1: read_i16_child(nx, node, "x1", 0)?,
+                    y1: read_i16_child(nx, node, "y1", 0)?,
+                    x2: read_i16_child(nx, node, "x2", 0)?,
+                    y2: read_i16_child(nx, node, "y2", 0)?,
+                });
+            }
+        }
+    }
+    Ok(footholds::Footholds::new(lines))
 }
 
 fn build_mob_spawns_from_life(
@@ -678,6 +705,7 @@ mod tests {
             map_npcs: Vec::new(),
             mob_spawns: Vec::new(),
             mob_rate: 1.0,
+            footholds: footholds::Footholds::default(),
             portals_by_id: BTreeMap::from([
                 (
                     0,
@@ -736,5 +764,24 @@ mod tests {
                 && npc.rx0 <= npc.x
                 && npc.rx1 >= npc.x
         }));
+    }
+
+    #[test]
+    fn loads_footholds_from_assets_map_nx() {
+        let Some(path) = test_assets::path("Map.nx") else {
+            return;
+        };
+        let game_data = GameData::load_from_nx_map(&path).expect("load map nx");
+        let field = game_data.field(50_000).expect("field 50000");
+
+        assert!(!field.footholds.is_empty());
+        // Every snail spawn stands on a foothold.
+        for spawn in &field.mob_spawns {
+            assert_eq!(
+                field.footholds.ground_below(spawn.x, spawn.y - 5),
+                Some(spawn.y),
+                "{spawn:?}"
+            );
+        }
     }
 }

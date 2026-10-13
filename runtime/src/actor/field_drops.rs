@@ -2,6 +2,7 @@
 //! packets.
 
 use crate::actor::object_ids::{self, ObjectIds};
+use game_data::footholds::Footholds;
 use net::loot::Loot;
 use net::packet::build::world::drop::DropView;
 use net::ClientId;
@@ -66,23 +67,31 @@ pub enum PickupError {
 pub struct DropSet {
     drops: BTreeMap<i32, Drop>,
     object_ids: ObjectIds,
+    footholds: Footholds,
 }
 
 impl Default for DropSet {
     fn default() -> Self {
-        Self {
-            drops: BTreeMap::new(),
-            object_ids: ObjectIds::new(object_ids::DROPS),
-        }
+        Self::new(Footholds::default())
     }
 }
 
 impl DropSet {
+    /// Drops for a field with these footholds to land on.
+    pub fn new(footholds: Footholds) -> Self {
+        Self {
+            drops: BTreeMap::new(),
+            object_ids: ObjectIds::new(object_ids::DROPS),
+            footholds,
+        }
+    }
+
     pub fn all(&self) -> impl Iterator<Item = &Drop> {
         self.drops.values()
     }
 
-    /// Spread `loot` around (x, y) and return the new drops.
+    /// Spread `loot` around (x, y), each on the ground below its place (see
+    /// `Footholds::drop_position`), and return the new drops.
     pub fn spawn(
         &mut self,
         loot: Vec<Loot>,
@@ -97,14 +106,17 @@ impl DropSet {
         for (index, loot) in loot.into_iter().enumerate() {
             let object_id = self.object_ids.next();
             let offset = (index as i16 * 2 - (count - 1)) * SPREAD / 2;
+            let (drop_x, drop_y) = self
+                .footholds
+                .drop_position((x, y), x.saturating_add(offset));
             self.drops.insert(
                 object_id,
                 Drop {
                     object_id,
                     loot,
                     owner,
-                    x: x.saturating_add(offset),
-                    y,
+                    x: drop_x,
+                    y: drop_y,
                     dropper,
                     dropped_at: now,
                 },
@@ -229,5 +241,44 @@ mod tests {
         );
         assert_eq!(drops.expire(now + LIFETIME), [id]);
         assert_eq!(drops.all().count(), 0);
+    }
+
+    #[test]
+    fn drops_land_on_footholds_and_not_in_walls() {
+        use game_data::footholds::Foothold;
+
+        // A cliff on the left of x 0: upper ground at y 100, lower at y 200.
+        let footholds = Footholds::new(vec![
+            Foothold {
+                x1: -300,
+                y1: 100,
+                x2: 0,
+                y2: 100,
+            },
+            Foothold {
+                x1: 0,
+                y1: 100,
+                x2: 0,
+                y2: 200,
+            },
+            Foothold {
+                x1: 0,
+                y1: 200,
+                x2: 300,
+                y2: 200,
+            },
+        ]);
+        let mut drops = DropSet::new(footholds);
+        // A snail stopped against the cliff, killed a little above its floor.
+        drops.spawn(
+            vec![Loot::Mesos(5), Loot::Mesos(6), Loot::Mesos(7)],
+            1,
+            0,
+            195,
+            9,
+            Instant::now(),
+        );
+        let placed: Vec<(i16, i16)> = drops.all().map(|d| (d.x, d.y)).collect();
+        assert_eq!(placed, [(0, 200), (0, 200), (25, 200)]);
     }
 }
