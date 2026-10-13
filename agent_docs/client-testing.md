@@ -34,6 +34,10 @@ name, and descriptions wrap at the name's width when that is wider.
 and ACCEPT/DECLINE pages (`IO/Components/AnswerFocus.h`): Enter presses YES or
 ACCEPT when no answer is focused, and otherwise the one Left or Right focused.
 
+`npc_reach_tests` covers which NPC the Interact key talks to
+(`Gameplay/MapleMap/NpcReach.h`): NPCs within 150 px either side and 50 px up or
+down are in reach, and the horizontally nearest wins.
+
 ## GUI checks without taking desktop focus
 
 Prefer a private Xvfb display for automated native-client checks. It gives the
