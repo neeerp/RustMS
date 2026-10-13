@@ -363,19 +363,16 @@ namespace ms
 		{
 			bool clicked = cursorstate == Cursor::State::CLICKING || cursorstate == Cursor::State::VSCROLLIDLE;
 
+			// A focused window that has closed lets go of the cursor, which
+			// then reaches whatever is under it.
+			if (auto focusedelement = get(focused); focusedelement && !focusedelement->is_active())
+				focused = UIElement::Type::NONE;
+
 			if (auto focusedelement = get(focused))
 			{
-				if (focusedelement->is_active())
-				{
-					remove_cursor(focusedelement->get_type());
+				remove_cursor(focusedelement->get_type());
 
-					return focusedelement->send_cursor(clicked, cursorpos);
-				} else
-				{
-					focused = UIElement::Type::NONE;
-
-					return cursorstate;
-				}
+				return focusedelement->send_cursor(clicked, cursorpos);
 			} else
 			{
 				if (!clicked)
