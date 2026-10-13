@@ -264,6 +264,8 @@ add_executable(HeavenClient
     IO/Components/Charset.h
     IO/Components/ChatBalloon.cpp
     IO/Components/ChatBalloon.h
+    IO/Components/ClassicTabs.cpp
+    IO/Components/ClassicTabs.h
     IO/Components/EquipTooltip.cpp
     IO/Components/EquipTooltip.h
     IO/Components/Gauge.cpp

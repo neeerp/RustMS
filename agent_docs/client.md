@@ -100,6 +100,13 @@ from `UI.nx`. Moved so far:
   bitmaps for explorers and Cygnus Knights. Beginners get the greyed INT and
   LUK labels and no HP or MP buttons. The AP buttons and AUTO-ASSIGN are
   disabled without AP. EXP shows as "exp (pct%)" and updates as it is gained.
+- **Skill window** (`UISkillBook`, `UIWindow.img/Skill`): one tab per job
+  advancement (`Basic.img/Tab5`, drawn by `ClassicTabs`), the book and name of
+  the selected one, four skill rows with a `VScr4` scroll bar, and the points
+  left, laid out from period footage. The job name is 10 px Arimo
+  (`Text::Font::A10M`). Rows are grey when a required skill is missing. SP-up
+  spends a point at once; v83 had no allocation popup. The MACRO button and the
+  `SkillMacro` window are not drawn yet.
 
 `UIClassic.nx` is not one of NoLifeNx's standard files, so `NxFiles` opens it
 with `nl::file` instead of `nl::nx::load_all`.

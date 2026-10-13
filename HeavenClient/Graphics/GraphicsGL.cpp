@@ -260,6 +260,7 @@ namespace ms
 			{ resolved_bold, Text::Font::A13B, 13, 18 },
 			{ resolved_bold, Text::Font::A15B, 15, 21 },
 			{ resolved_normal, Text::Font::A18M, 18, 25 },
+			{ resolved_normal, Text::Font::A10M, 10, 15 },
 			{ resolved_balloon, Text::Font::BALLOON, 12, FACE_LINES }
 		};
 
