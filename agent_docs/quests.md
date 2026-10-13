@@ -120,6 +120,9 @@ Completing a quest also plays the v83 "Quest Clear" effect
 Markers use the same catalog (`QuestLog::supported_rules`): bulb for an
 available quest, open book while in progress at the start NPC, closed book at
 the finishing NPC once its kills and items are in (open book until then).
+The marker is the v83 `UIWindow.img/QuestIcon` bubble. As in footage, it
+sits right of the NPC's centre with its tail resting on the head, and it
+holds still while the bulb inside glows.
 
 The **Quest Helper** (`IO/UITypes/UIQuestHelper.cpp`, from
 `UIWindow2.img/QuestAlarm`) sits in the top-right corner and lists up to
