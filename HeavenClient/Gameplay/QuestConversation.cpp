@@ -10,6 +10,7 @@
 #include "../Net/Packets/NpcInteractionPackets.h"
 #include "../Net/Packets/QuestPackets.h"
 #include "../Util/Misc.h"
+#include "../Util/NxFiles.h"
 
 #include <nlnx/nx.hpp>
 
@@ -80,7 +81,7 @@ namespace ms
 
 			Texture list_header(int index)
 			{
-				return nl::nx::ui["UIWindow2.img"]["UtilDlgEx"]["list" + std::to_string(index)];
+				return NxFiles::ui_classic["UIWindow.img"]["UtilDlgEx"]["list" + std::to_string(index)];
 			}
 
 			void send(QuestDialogue::Effect effect, int16_t quest_id, int32_t npc_id)
@@ -125,7 +126,8 @@ namespace ms
 				switch (page->kind)
 				{
 					case QuestPage::YESNO:
-						type = 1;
+						// A quest's offer ends with ACCEPT and DECLINE.
+						type = 12;
 						break;
 					case QuestPage::SELECTION:
 						type = 4;
@@ -140,7 +142,7 @@ namespace ms
 
 				if (auto talk = UI::get().get_element<UINpcTalk>())
 				{
-					talk->change_text(active->npc_id, type, style, 0, page->text);
+					talk->change_text(active->npc_id, type, style, 0, page->text, {}, UINpcTalk::Menu::LIST);
 					talk->set_local_responder(respond);
 				}
 			}
@@ -226,8 +228,9 @@ namespace ms
 				return;
 			}
 
-			// UtilDlgEx/list3 "Quests to turn in", list0 "Quests in progress",
-			// list1 "Available quests", list2 "Misc." (normal speech).
+			// UtilDlgEx/list3 "QUEST THAT CAN BE COMPLETED", list0 "QUEST IN
+			// PROGRESS", list1 "QUEST AVAILABLE", list2 "ETC" (normal speech,
+			// worded as in period footage).
 			std::string text;
 			std::map<int32_t, Texture> headers;
 
@@ -240,15 +243,14 @@ namespace ms
 					if (i == 0)
 						headers[id] = list_header(header);
 
-					text += "#L" + std::to_string(id) + "#" + QuestCatalog::get().find(id)->name + "#l";
+					text += " #L" + std::to_string(id) + "# " + QuestCatalog::get().find(id)->name + "#l";
 				}
 			}
 
 			if (has_speech(npc_id))
 			{
 				headers[TALK_CHOICE] = list_header(2);
-				std::string name = nl::nx::string["Npc.img"][std::to_string(npc_id)]["name"];
-				text += "#L" + std::to_string(TALK_CHOICE) + "#Talk to " + name + "#l";
+				text += " #L" + std::to_string(TALK_CHOICE) + "# I have something to tell you.#l";
 			}
 
 			active.reset();
@@ -259,7 +261,7 @@ namespace ms
 
 			if (auto talk = UI::get().get_element<UINpcTalk>())
 			{
-				talk->change_text(npc_id, 4, 0, 0, text, headers);
+				talk->change_text(npc_id, 4, 0, 0, text, headers, UINpcTalk::Menu::LIST);
 				talk->set_local_responder([npc_id, object_id](int8_t response, int32_t selection)
 				{
 					if (response != 1)

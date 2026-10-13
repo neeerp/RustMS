@@ -70,6 +70,9 @@ from `UI.nx`. Moved so far:
 - **Chat** (`UIChatBar`): the input strip in the bar's top-left and the log
   above it. The status bar cuts that strip out of its background, so the two
   can overlap in either draw order.
+- **NPC dialog** (`UINpcTalk`, `UIWindow.img/UtilDlgEx`): the frame,
+  buttons, menu dots, quest list headers, and the `Basic.img/VScr4` scroll
+  bar (`Slider::Type::CLASSIC`). See [npc-dialogue.md](npc-dialogue.md).
 
 `UIClassic.nx` is not one of NoLifeNx's standard files, so `NxFiles` opens it
 with `nl::file` instead of `nl::nx::load_all`.

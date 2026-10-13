@@ -17,6 +17,8 @@
 //////////////////////////////////////////////////////////////////////////////////
 #include "Slider.h"
 
+#include "../../Util/NxFiles.h"
+
 #include <nlnx/nx.hpp>
 
 namespace ms
@@ -34,6 +36,9 @@ namespace ms
 		{
 			src = nl::nx::ui["StatusBar3.img"]["chat"]["common"]["scroll"];
 			base_str += "_c";
+		} else if (type == Type::CLASSIC)
+		{
+			src = NxFiles::ui_classic["Basic.img"]["VScr4"];
 		} else
 		{
 			std::string VScr = "VScr";

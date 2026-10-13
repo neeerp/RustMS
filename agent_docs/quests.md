@@ -5,10 +5,12 @@
 Quests run the way the original client ran them:
 
 1. **HeavenClient** reads `Quest.nx` itself. Clicking an NPC lists its quests
-   in the NPC chat window under the original `UtilDlgEx/list*` headers
-   ("Quests to turn in", "Quests in progress", "Available quests"), with
-   "Misc." for the NPC's normal speech. Picking a quest plays its `Say.img`
-   pages locally (`Gameplay/QuestConversation.cpp`).
+   in the NPC chat window under the v83 `UtilDlgEx/list*` headers ("QUEST
+   THAT CAN BE COMPLETED", "QUEST IN PROGRESS", "QUEST AVAILABLE"), with
+   "ETC: I have something to tell you." for the NPC's normal speech, as in
+   period footage. Picking a quest plays its `Say.img` pages locally
+   (`Gameplay/QuestConversation.cpp`); an offer's yes/no page shows ACCEPT
+   and DECLINE.
 2. When the player accepts or finishes, the client sends `QUEST_ACTION`
    (`0x6B`): action byte (1 start, 2 complete, 3 forfeit, 4/5 scripted),
    quest id, and the NPC, then its position.
