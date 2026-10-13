@@ -67,6 +67,9 @@ from `UI.nx`. Moved so far:
 - **Status bar** (`UIStatusBar`, `StatusBar.img`): gauges, menu buttons, the
   quick slot panel, and the Game Menu and ShortCut popups (`UIWindow.img`).
   Esc opens the Game Menu; the MENU key action opens ShortCut.
+  Status messages (`UIStatusMessenger`) stack upward from just above the
+  quick slot panel, right-aligned with it; `UIStatusBar::QUICKSLOT_TOP` is
+  the shared anchor.
 - **Chat** (`UIChatBar`): the input strip in the bar's top-left and the log
   above it. The status bar cuts that strip out of its background, so the two
   can overlap in either draw order.

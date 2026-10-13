@@ -165,7 +165,7 @@ namespace ms
 		buttons[Buttons::BT_QUICKSLOT_SHOW]->set_active(!quickslot_active);
 		buttons[Buttons::BT_QUICKSLOT_HIDE]->set_active(quickslot_active);
 
-		quickslot_pos = Point<int16_t>(647 + right, -76);
+		quickslot_pos = Point<int16_t>(647 + right, QUICKSLOT_TOP);
 
 		// Each menu's pointer sits over the button that opens it, as far as
 		// the screen allows.
