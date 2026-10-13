@@ -66,4 +66,9 @@ namespace ms
 	{
 		return pressed;
 	}
+
+	void Button::set_focused(bool f)
+	{
+		focused = f;
+	}
 }

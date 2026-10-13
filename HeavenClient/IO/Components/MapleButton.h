@@ -51,5 +51,7 @@ namespace ms
 	private:
 		Texture textures[Button::State::NUM_STATES];
 		Animation animations[Button::State::NUM_STATES];
+		// Drawn over the state's texture while the button has key focus.
+		Texture focus;
 	};
 }
