@@ -22,16 +22,22 @@
 #include <cstddef>
 
 #include <cstdint>
+#include <unordered_map>
+#include <vector>
 
 #include "../Messages.h"
-#include "../UIDragElement.h"
+#include "../UIElement.h"
 
-#include "../Components/Slider.h"
 #include "../Components/Textfield.h"
+
+#include "../../Template/EnumMap.h"
 
 namespace ms
 {
-	class UIChatBar : public UIDragElement<PosCHAT>
+	// The v83 chat: a strip in the status bar that shows the latest line or,
+	// after Enter, the input field, and a log above the bar that the button
+	// at the strip's right end expands.
+	class UIChatBar : public UIElement
 	{
 	public:
 		static constexpr Type TYPE = UIElement::Type::CHATBAR;
@@ -54,24 +60,30 @@ namespace ms
 
 		void update() override;
 
+		void update_screen(int16_t new_width, int16_t new_height) override;
+
 		void send_key(int32_t keycode, bool pressed, bool escape) override;
 
 		bool is_in_range(Point<int16_t> cursorpos) const override;
 
 		Cursor::State send_cursor(bool clicking, Point<int16_t> cursorpos) override;
 
-		UIElement::Type get_type() const override;
+		void send_scroll(double yoffset) override;
 
-		Cursor::State check_dragtop(bool clicking, Point<int16_t> cursorpos);
+		void remove_cursor() override;
+
+		UIElement::Type get_type() const override;
 
 		void send_chatline(const std::string &line, LineType type);
 
 		void display_message(Messages::Type line, UIChatBar::LineType type);
 
+		// Expand or collapse the log above the status bar.
 		void toggle_chat();
 
 		void toggle_chat(bool chat_open);
 
+		// Open or close the input field.
 		void toggle_chatfield();
 
 		void toggle_chatfield(bool chatfield_open);
@@ -84,83 +96,51 @@ namespace ms
 		Button::State button_pressed(uint16_t buttonid) override;
 
 	private:
-		bool indragrange(Point<int16_t> cursorpos) const override;
+		enum Arrow
+		{
+			PREV,
+			NEXT
+		};
 
-		int16_t getchattop(bool chat_open) const;
+		void scroll(int16_t rows);
 
-		int16_t getchatbarheight() const;
+		int16_t get_logtop() const;
 
-		Rectangle<int16_t> getbounds(Point<int16_t> additional_area) const;
+		Point<int16_t> get_arrow_pos(Arrow arrow) const;
+
+		Rectangle<int16_t> get_arrow_bounds(Arrow arrow) const;
 
 		static constexpr int16_t CHATROWHEIGHT = 13;
-		static constexpr int16_t MINCHATROWS = 1;
-		static constexpr int16_t MAXCHATROWS = 16;
-		static constexpr int16_t DIMENSION_Y = 17;
+		static constexpr int16_t CHATROWS = 5;
+		static constexpr int16_t STRIP_WIDTH = 551;
 		static constexpr time_t MESSAGE_COOLDOWN = 1'000;
 
 		enum Buttons : uint16_t
 		{
 			BT_OPENCHAT,
-			BT_CLOSECHAT,
-			BT_CHAT,
-			BT_HELP,
-			BT_LINK,
-			BT_TAB_0,
-			BT_TAB_1,
-			BT_TAB_2,
-			BT_TAB_3,
-			BT_TAB_4,
-			BT_TAB_5,
-			BT_TAB_ADD,
-			BT_CHAT_TARGET
+			BT_CLOSECHAT
 		};
-
-		enum ChatTab
-		{
-			CHT_ALL,
-			CHT_BATTLE,
-			CHT_PARTY,
-			CHT_FRIEND,
-			CHT_GUILD,
-			CHT_ALLIANCE,
-			NUM_CHATTAB
-		};
-
-		std::vector<std::string> ChatTabText =
-				{
-						"All",
-						"Battle",
-						"Party",
-						"Friend",
-						"Guild",
-						"Alliance"
-				};
 
 		bool chatopen;
-		bool chatopen_persist;
 		bool chatfieldopen;
-		Texture chatspace[4];
-		Texture chatenter;
-		Texture chatcover;
+		Texture backgrnd;
+		Texture backgrnd2;
+		Texture chattarget;
+		Text chattarget_label;
+		Texture arrows[2][3];
+		Texture arrows_disabled[2];
+		Texture scrollbase;
 		Textfield chatfield;
-		Point<int16_t> closechat;
 
-		Text chattab_text[UIChatBar::ChatTab::NUM_CHATTAB];
-		int16_t chattab_x;
-		int16_t chattab_y;
-		int16_t chattab_span;
-
-		Slider slider;
+		// The arrow under the cursor, and whether it is held down.
+		int16_t arrow_state[2];
 
 		EnumMap<Messages::Type, time_t> message_cooldowns;
 		std::vector<std::string> lastentered;
 		size_t lastpos;
 
-		int16_t chatrows;
 		int16_t rowpos;
 		int16_t rowmax;
 		std::unordered_map<int16_t, Text> rowtexts;
-
-		bool dragchattop;
 	};
 }

@@ -62,8 +62,17 @@ mixing in a mismatched v83 file fails later at runtime.
 
 Issue #120 moves the client back to the v83 UI one window at a time. Windows
 that have moved read `NxFiles::ui_classic`; the rest still read `nl::nx::ui`
-from `UI.nx`. `UIClassic.nx` is not one of NoLifeNx's standard files, so
-`NxFiles` opens it with `nl::file` instead of `nl::nx::load_all`.
+from `UI.nx`. Moved so far:
+
+- **Status bar** (`UIStatusBar`, `StatusBar.img`): gauges, menu buttons, the
+  quick slot panel, and the Game Menu and ShortCut popups (`UIWindow.img`).
+  Esc opens the Game Menu; the MENU key action opens ShortCut.
+- **Chat** (`UIChatBar`): the input strip in the bar's top-left and the log
+  above it. The status bar cuts that strip out of its background, so the two
+  can overlap in either draw order.
+
+`UIClassic.nx` is not one of NoLifeNx's standard files, so `NxFiles` opens it
+with `nl::file` instead of `nl::nx::load_all`.
 
 Convert it from a v83 GMS `UI.wz` with:
 

@@ -59,6 +59,10 @@ namespace ms
 		// Draw the bitmap with the given parameters.
 		void draw(const nl::bitmap &bmp, const Rectangle<int16_t> &rect, const Color &color, float angle);
 
+		// Draw the part of the bitmap inside `crop` (bitmap pixels) into `rect`.
+		void draw(const nl::bitmap &bmp, const Rectangle<int16_t> &rect, const Rectangle<int16_t> &crop,
+				  const Color &color, float angle);
+
 		// Create a layout for the text with the parameters specified. The n-th
 		// Text::BOX character takes the n-th of `boxes` (width, height).
 		Text::Layout createlayout(const std::string &text, Text::Font font, Text::Alignment alignment, int16_t maxwidth,

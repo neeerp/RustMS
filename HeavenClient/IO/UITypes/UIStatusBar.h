@@ -18,17 +18,20 @@
 #pragma once
 
 #include <cstdint>
+#include <map>
 
 #include "../UIElement.h"
 
 #include "../Components/Charset.h"
-#include "../Components/Gauge.h"
 
 #include "../../Character/CharStats.h"
-#include "../../Graphics/SpecialText.h"
+#include "../../Graphics/Text.h"
 
 namespace ms
 {
+	// The v83 status bar along the bottom of the screen: level, job and name,
+	// the HP, MP and EXP gauges, the menu buttons, the quick slot panel and the
+	// two popup menus. The chat strip in its top-left is UIChatBar's.
 	class UIStatusBar : public UIElement
 	{
 	public:
@@ -36,14 +39,11 @@ namespace ms
 		static constexpr bool FOCUSED = false;
 		static constexpr bool TOGGLED = true;
 
-		enum MenuType
-		{
-			MENU,
-			SETTING,
-			COMMUNITY,
-			CHARACTER,
-			EVENT
-		};
+		// The bar is 71 px tall; layouts are in pixels from its top-left.
+		static constexpr int16_t HEIGHT = 71;
+
+		// The chat strip, which UIChatBar draws and handles.
+		static constexpr Rectangle<int16_t> CHAT_STRIP = Rectangle<int16_t>(0, 570, 7, 29);
 
 		UIStatusBar(const CharStats &stats);
 
@@ -56,8 +56,10 @@ namespace ms
 
 		UIElement::Type get_type() const override;
 
+		// Show or hide the quick slot panel.
 		void toggle_qs();
 
+		// Open or close the shortcut menu.
 		void toggle_menu();
 
 		void remove_menus();
@@ -68,7 +70,12 @@ namespace ms
 		Button::State button_pressed(uint16_t buttonid) override;
 
 	private:
-		static constexpr int16_t QUICKSLOT_MAX = 211;
+		enum Menu
+		{
+			NONE,
+			GAME,
+			SHORTCUT
+		};
 
 		float getexppercent() const;
 
@@ -76,100 +83,74 @@ namespace ms
 
 		float getmppercent() const;
 
-		void toggle_qs(bool quick_slot_active);
+		void toggle_menu(Menu menu);
 
-		void toggle_setting();
+		void set_menu(Menu menu);
 
-		void toggle_community();
+		void draw_gauge(int16_t left, int16_t width, float percent) const;
 
-		void toggle_character();
+		void draw_number(const std::string &text, Point<int16_t> pos) const;
 
-		void toggle_event();
+		void draw_quickslots() const;
 
-		void remove_active_menu(MenuType type);
-
-		Point<int16_t> get_quickslot_pos() const;
+		Rectangle<int16_t> get_menu_bounds() const;
 
 		enum Buttons : uint16_t
 		{
+			BT_CLAIM,
+			BT_EQUIP,
+			BT_INVEN,
+			BT_STAT,
+			BT_SKILL,
+			BT_KEYSET,
+			BT_QUICKSLOT_SHOW,
+			BT_QUICKSLOT_HIDE,
 			BT_CASHSHOP,
+			BT_TRADE,
 			BT_MENU,
-			BT_OPTIONS,
-			BT_CHARACTER,
-			BT_COMMUNITY,
-			BT_EVENT,
-			BT_FOLD_QS,
-			BT_EXTEND_QS,
-			BT_MENU_QUEST,
-			BT_MENU_MEDAL,
-			BT_MENU_UNION,
-			BT_MENU_MONSTER_COLLECTION,
-			BT_MENU_AUCTION,
-			BT_MENU_MONSTER_LIFE,
-			BT_MENU_BATTLE,
-			BT_MENU_ACHIEVEMENT,
-			BT_MENU_FISHING,
-			BT_MENU_HELP,
-			BT_MENU_CLAIM,
-			BT_SETTING_CHANNEL,
-			BT_SETTING_OPTION,
-			BT_SETTING_KEYS,
-			BT_SETTING_JOYPAD,
-			BT_SETTING_QUIT,
-			BT_COMMUNITY_FRIENDS,
-			BT_COMMUNITY_PARTY,
-			BT_COMMUNITY_GUILD,
-			BT_COMMUNITY_MAPLECHAT,
-			BT_CHARACTER_INFO,
-			BT_CHARACTER_STAT,
-			BT_CHARACTER_SKILL,
-			BT_CHARACTER_EQUIP,
-			BT_CHARACTER_ITEM,
-			BT_EVENT_SCHEDULE,
-			BT_EVENT_DAILY
+			BT_SHORTCUT,
+			BT_GAME_CHANNEL,
+			BT_GAME_OPTION,
+			BT_GAME_SYSTEM,
+			BT_GAME_QUIT,
+			BT_SHORTCUT_EQUIP,
+			BT_SHORTCUT_ITEM,
+			BT_SHORTCUT_STAT,
+			BT_SHORTCUT_SKILL,
+			BT_SHORTCUT_QUEST,
+			BT_SHORTCUT_COMMUNITY,
+			BT_SHORTCUT_MESSENGER,
+			BT_SHORTCUT_MONSTERBOOK
 		};
 
 		const CharStats &stats;
 
-		Gauge expbar;
-		Gauge hpbar;
-		Gauge mpbar;
-		Charset statset;
-		Charset hpmpset;
-		Charset levelset;
-		Texture quickslot[2];
-		Texture menutitle[5];
-		Texture menubackground[3];
-		OutlinedText namelabel;
-		std::vector<Sprite> hpmp_sprites;
+		Texture backgrnd;
+		Texture backgrnd2;
+		Texture gaugebar;
+		Texture gaugegray;
+		Texture graduation;
+		Texture quickslot;
+		Texture keylabels[8];
+		Texture gamemenu;
+		Texture shortcutmenu;
+		std::map<int32_t, Texture> action_icons;
+		Charset number;
+		Charset levelnumber;
+		Charset itemnumber;
+		Text joblabel;
+		Text namelabel;
 
-		Point<int16_t> exp_pos;
-		Point<int16_t> hpmp_pos;
-		Point<int16_t> hpset_pos;
-		Point<int16_t> mpset_pos;
-		Point<int16_t> statset_pos;
-		Point<int16_t> levelset_pos;
-		Point<int16_t> namelabel_pos;
-		Point<int16_t> quickslot_pos;
-		Point<int16_t> quickslot_adj;
-		Point<int16_t> quickslot_qs_adj;
-		Point<int16_t> menu_pos;
-		Point<int16_t> setting_pos;
-		Point<int16_t> community_pos;
-		Point<int16_t> character_pos;
-		Point<int16_t> event_pos;
-		int16_t quickslot_min;
-		int16_t position_x;
-		int16_t position_y;
-
-		bool quickslot_active;
 		int16_t VWIDTH;
 		int16_t VHEIGHT;
 
-		bool menu_active;
-		bool setting_active;
-		bool community_active;
-		bool character_active;
-		bool event_active;
+		// The menu buttons and quick slot panel keep to the right edge.
+		int16_t right;
+		Point<int16_t> quickslot_pos;
+		Point<int16_t> gamemenu_pos;
+		Point<int16_t> shortcutmenu_pos;
+
+		bool quickslot_active;
+		Menu menu;
 	};
 }
