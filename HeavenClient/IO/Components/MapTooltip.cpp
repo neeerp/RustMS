@@ -25,7 +25,7 @@
 
 namespace ms
 {
-	MapTooltip::MapTooltip() : name(""), description(""), fillwidth(MIN_WIDTH), fillheight(0)
+	MapTooltip::MapTooltip() : fillwidth(map_tooltip::MIN_WIDTH), fillheight(0)
 	{
 		nl::node Frame = nl::nx::ui["UIToolTip.img"]["Item"]["Frame2"];
 		nl::node WorldMap = nl::nx::ui["UIWindow2.img"]["ToolTip"]["WorldMap"];
@@ -45,7 +45,7 @@ namespace ms
 		int16_t max_width = Constants::Constants::get().get_viewwidth();
 		int16_t max_height = Constants::Constants::get().get_viewheight();
 
-		if (parent == Tooltip::Parent::MINIMAP && mob_labels->empty() && npc_labels->empty())
+		if (parent == Tooltip::Parent::MINIMAP && mob_labels.empty() && npc_labels.empty())
 		{
 			if (desc_label.empty())
 			{
@@ -139,148 +139,97 @@ namespace ms
 				pos.shift_y(name_height + BOTTOM_PADDING);
 			}
 
-			if (mob_labels->length() > 0)
+			if (!mob_labels.empty())
 			{
 				separator.draw(pos + SEPARATOR_ADJ);
+				Mob.draw(pos + LIFE_ICON_ADJ);
 
-				for (size_t i = 0; i < MAX_LIFE; i++)
+				for (const Text& label : mob_labels)
 				{
-					if (!mob_labels[i].empty())
-					{
-						mob_labels[i].draw(pos + LIFE_LABEL_ADJ);
-
-						if (i == 0)
-							Mob.draw(pos + LIFE_ICON_ADJ);
-
-						pos.shift_y(mob_labels[i].height());
-					}
+					label.draw(pos + LIFE_LABEL_ADJ);
+					pos.shift_y(label.height());
 				}
 
 				pos.shift_y(8);
 			}
 
-			if (npc_labels->length() > 0)
+			if (!npc_labels.empty())
 			{
 				separator.draw(pos + SEPARATOR_ADJ);
+				Npc.draw(pos + LIFE_ICON_ADJ);
 
-				for (size_t i = 0; i < MAX_LIFE; i++)
+				for (const Text& label : npc_labels)
 				{
-					if (!npc_labels[i].empty())
-					{
-						npc_labels[i].draw(pos + LIFE_LABEL_ADJ);
-
-						if (i == 0)
-							Npc.draw(pos + LIFE_ICON_ADJ);
-
-						pos.shift_y(npc_labels[i].height());
-					}
+					label.draw(pos + LIFE_LABEL_ADJ);
+					pos.shift_y(label.height());
 				}
 			}
 		}
 	}
 
-	void MapTooltip::set_name(Tooltip::Parent p, std::string n, bool bolded)
+	void MapTooltip::set_map(Tooltip::Parent p, std::string n, std::string d, int32_t m, bool b)
 	{
-		if (name == n || parent == p)
+		if (p == parent && n == name && d == description && m == mapid && b == bolded)
 			return;
 
-		name = n;
 		parent = p;
+		name = n;
+		description = d;
+		mapid = m;
+		bolded = b;
+
+		name_label = Text();
+		name_simple = Text();
+		desc_label = Text();
+		desc_simple = Text();
+		mob_labels.clear();
+		npc_labels.clear();
+		fillwidth = map_tooltip::MIN_WIDTH;
+		fillheight = 0;
 
 		if (name.empty() || (parent != Tooltip::Parent::WORLDMAP && parent != Tooltip::Parent::MINIMAP))
 			return;
 
-		name_label = Text(bolded ? Text::Font::A12B : Text::Font::A12M, Text::Alignment::CENTER, Color::Name::WHITE,
-						  name);
-		name_simple = Text(bolded ? Text::Font::A12B : Text::Font::A12M, Text::Alignment::LEFT, Color::Name::WHITE,
-						   name);
+		Text::Font font = bolded ? Text::Font::A12B : Text::Font::A12M;
+		name_label = Text(font, Text::Alignment::CENTER, Color::Name::WHITE, name);
+		name_simple = Text(font, Text::Alignment::LEFT, Color::Name::WHITE, name);
 
-		int16_t width = name_label.width();
-		int16_t height = name_label.height();
+		int16_t wrap = map_tooltip::wrap_width(name_label.width());
+		int16_t desc_height = 0;
 
-		if (width > fillwidth)
-			fillwidth = width;
-
-		separator = ColorLine(fillwidth - 6, Color::Name::WHITE, 0.40f);
-
-		if (height > fillheight)
-			fillheight = height;
-	}
-
-	void MapTooltip::set_desc(std::string d)
-	{
-		if (description == d)
-			return;
-
-		description = d;
-
-		if (description.empty())
-			return;
-
-		desc_label = Text(Text::Font::A12M, Text::Alignment::LEFT, Color::Name::WHITE, description, fillwidth);
-		desc_simple = Text(Text::Font::A12M, Text::Alignment::CENTER, Color::Name::WHITE, description, fillwidth);
-
-		fillwidth += 17;
-
-		if (parent == Tooltip::Parent::MINIMAP)
+		if (!description.empty())
 		{
-			int16_t name_width = name_label.width();
-			int16_t desc_width = desc_simple.width();
-			int16_t new_width = (name_width > desc_width) ? name_width : desc_width;
-
-			separator = ColorLine(new_width - 6, Color::Name::WHITE, 0.40f);
-		} else
-		{
-			separator = ColorLine(fillwidth - 6, Color::Name::WHITE, 0.40f);
+			desc_label = Text(Text::Font::A12M, Text::Alignment::LEFT, Color::Name::WHITE, description, wrap);
+			desc_simple = Text(Text::Font::A12M, Text::Alignment::CENTER, Color::Name::WHITE, description, wrap);
+			desc_height = desc_label.height();
 		}
 
-		fillheight += desc_label.height() + 4;
-	}
+		map_tooltip::Life life = map_tooltip::pick_life(NxHelper::Map::get_life_on_map(mapid));
 
-	void MapTooltip::set_mapid(int32_t mapid)
-	{
-		size_t m = 0;
-		size_t n = 0;
-		auto life = NxHelper::Map::get_life_on_map(mapid);
+		for (const std::string& mob : life.mobs)
+			mob_labels.emplace_back(Text::Font::A12M, Text::Alignment::LEFT, Color::Name::CHARTREUSE, mob);
 
-		for (auto l : life)
-		{
-			auto life_object = l.second;
+		for (const std::string& npc : life.npcs)
+			npc_labels.emplace_back(Text::Font::A12M, Text::Alignment::LEFT, Color::Name::MALIBU, npc);
 
-			if (life_object.first == "m" && m < MAX_LIFE)
-			{
-				mob_labels[m] = Text(Text::Font::A12M, Text::Alignment::LEFT, Color::Name::CHARTREUSE,
-									 life_object.second);
-				fillheight += mob_labels->height() + 2;
-				m++;
-			} else if (life_object.first == "n" && n < MAX_LIFE)
-			{
-				npc_labels[n] = Text(Text::Font::A12M, Text::Alignment::LEFT, Color::Name::MALIBU, life_object.second);
-				fillheight += npc_labels->height() + 2;
-				n++;
-			}
-		}
+		int16_t line_height = !mob_labels.empty() ? mob_labels[0].height()
+							: !npc_labels.empty() ? npc_labels[0].height() : 0;
+		map_tooltip::Size size = map_tooltip::size(name_label.width(), name_label.height(), desc_height, life,
+												   line_height);
+		fillwidth = size.width;
+		fillheight = size.height;
 
-		if (desc_label.empty())
-			if (mob_labels->length() > 0 || npc_labels->length() > 0)
-				fillheight += BOTTOM_PADDING;
+		// The minimap's frame hugs its text.
+		int16_t separator_width = fillwidth;
+
+		if (parent == Tooltip::Parent::MINIMAP && !description.empty())
+			separator_width = std::max(name_label.width(), desc_simple.width());
+
+		separator = ColorLine(separator_width - 6, Color::Name::WHITE, 0.40f);
 	}
 
 	void MapTooltip::reset()
 	{
-		set_name(Tooltip::Parent::NONE, "", false);
-		set_desc("");
-
-		desc_label.change_text("");
-		name_label.change_text("");
-
-		for (size_t i = 0; i < MAX_LIFE; i++)
-		{
-			mob_labels[i].change_text("");
-			npc_labels[i].change_text("");
-		}
-
-		fillwidth = MIN_WIDTH;
-		fillheight = 0;
+		set_map(Tooltip::Parent::NONE, "", "", 0, false);
 	}
 }

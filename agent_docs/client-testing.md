@@ -25,6 +25,11 @@ trailing frame, stopping after a reconnect, and impossible lengths. It encrypts
 frames with a real `Cryptography` pair, so a dropped or repeated frame shows up
 as misdecrypted data.
 
+`map_tooltip_tests` covers the World Map and minimap tooltip's layout
+(`IO/Components/MapTooltipLayout.h`): a map's size and NPC list don't depend
+on the map shown before it, the description margin is added once, and life
+lists stop at ten.
+
 ## GUI checks without taking desktop focus
 
 Prefer a private Xvfb display for automated native-client checks. It gives the

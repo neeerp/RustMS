@@ -291,6 +291,7 @@ namespace ms
 			return new_state;
 
 		show_path_img = false;
+		bool on_spot = false;
 
 		for (auto path : map_spots)
 		{
@@ -302,12 +303,16 @@ namespace ms
 			{
 				path_img = path.second.path;
 				show_path_img = path_img.is_valid();
+				on_spot = true;
 
 				UI::get().show_map(Tooltip::Parent::WORLDMAP, path.second.title, path.second.description,
 								   path.second.map_ids[0], path.second.bolded);
 				break;
 			}
 		}
+
+		if (!on_spot)
+			UI::get().clear_tooltip(Tooltip::Parent::WORLDMAP);
 
 		return UIDragElement::send_cursor(clicked, cursorpos);
 	}

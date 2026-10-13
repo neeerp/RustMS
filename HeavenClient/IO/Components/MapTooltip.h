@@ -23,11 +23,12 @@
 
 #include "Tooltip.h"
 #include "MapleFrame.h"
+#include "MapTooltipLayout.h"
 
 #include "../Graphics/Text.h"
 #include "../Graphics/Geometry.h"
 
-#include <unordered_map>
+#include <vector>
 
 namespace ms
 {
@@ -38,18 +39,13 @@ namespace ms
 
 		void draw(Point<int16_t> position) const override;
 
-		void set_name(Tooltip::Parent parent, std::string name, bool bolded);
-
-		void set_desc(std::string description);
-
-		void set_mapid(int32_t mapid);
+		// Shows a map, or a spot on one, rebuilt only when any of it changes.
+		void set_map(Tooltip::Parent parent, std::string name, std::string description, int32_t mapid, bool bolded);
 
 		void reset();
 
 	private:
-		static constexpr uint8_t MAX_LIFE = 10u;
-		static constexpr uint8_t MIN_WIDTH = 166u;
-		static constexpr uint8_t BOTTOM_PADDING = 8u;
+		static constexpr uint8_t BOTTOM_PADDING = map_tooltip::BOTTOM_PADDING;
 		static constexpr Point<int16_t> SEPARATOR_ADJ = Point<int16_t>(5, 0);
 		static constexpr Point<int16_t> LIFE_LABEL_ADJ = Point<int16_t>(20, 3);
 		static constexpr Point<int16_t> LIFE_ICON_ADJ = Point<int16_t>(5, 9);
@@ -61,17 +57,18 @@ namespace ms
 		Texture Npc;
 		Texture Party;
 
-		Tooltip::Parent parent;
-
+		Tooltip::Parent parent = Tooltip::Parent::NONE;
 		std::string name;
 		std::string description;
+		int32_t mapid = 0;
+		bool bolded = false;
 
 		Text name_label;
 		Text name_simple;
 		Text desc_label;
 		Text desc_simple;
-		Text mob_labels[MAX_LIFE];
-		Text npc_labels[MAX_LIFE];
+		std::vector<Text> mob_labels;
+		std::vector<Text> npc_labels;
 
 		int16_t fillwidth;
 		int16_t fillheight;
