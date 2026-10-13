@@ -24,6 +24,8 @@
 
 #include "../IO/Components/MapleButton.h"
 
+#include "../../Util/NxFiles.h"
+
 #include <nlnx/nx.hpp>
 #include <algorithm>
 
@@ -31,6 +33,15 @@ namespace ms
 {
 	namespace
 	{
+		// Laid out from footage, against the window's top-left corner. The
+		// frame fits a 640x470 world map with a margin of 14 at the sides.
+		constexpr int16_t WIDTH = 668, HEIGHT = 524;
+		constexpr int16_t EDGE = 7, TOP = 33, BOTTOM = 18;
+		const Point<int16_t> TITLE = { 9, 10 };
+		const Point<int16_t> CLOSE = { WIDTH - 21, 6 };
+		const Point<int16_t> MAP = { 14, 35 };
+		constexpr int16_t MAP_WIDTH = 640, MAP_HEIGHT = 470;
+
 		std::string world_for_map(int32_t field)
 		{
 			// Map IDs are not world-map filenames. Prefer the most detailed
@@ -58,68 +69,51 @@ namespace ms
 			return found == worlds.end() ? "WorldMap" : found->second.second;
 		}
 	}
-	UIWorldMap::UIWorldMap() : UIDragElement<PosMAP>()
+
+	UIWorldMap::UIWorldMap() : UIDragElement<PosMAP>(Point<int16_t>(WIDTH, 20))
 	{
-		nl::node close = nl::nx::ui["Basic.img"]["BtClose3"];
-		nl::node WorldMap = nl::nx::ui["UIWindow2.img"]["WorldMap"];
-		nl::node WorldMapSearch = WorldMap["WorldMapSearch"];
-		nl::node Border = WorldMap["Border"]["0"];
-		nl::node backgrnd = WorldMapSearch["backgrnd"];
+		nl::node src = NxFiles::ui_classic["UIWindow.img"]["WorldMap"];
 		nl::node MapHelper = nl::nx::map["MapHelper.img"]["worldMap"];
+
+		for (size_t i = 0; i < 8; i++)
+			border[i] = src["Border"][std::to_string(i)];
+
+		title = src["title"];
+		fill = ColorBox(WIDTH - 2 * EDGE, HEIGHT - TOP - BOTTOM, Color::Name::WHITE, 1.0f);
+
+		// A grey line along the map's top and left edges.
+		map_edge[0] = ColorBox(MAP_WIDTH + 1, 1, Color::Name::DUSTYGRAY, 1.0f);
+		map_edge[1] = ColorBox(1, MAP_HEIGHT, Color::Name::DUSTYGRAY, 1.0f);
 
 		cur_pos = MapHelper["curPos"];
 
 		for (size_t i = 0; i < MAPSPOT_TYPE_MAX; i++)
 			npc_pos[i] = MapHelper["npcPos" + std::to_string(i)];
 
-		sprites.emplace_back(Border);
+		buttons[Buttons::BT_CLOSE] = std::make_unique<MapleButton>(NxFiles::ui_classic["Basic.img"]["BtClose"], CLOSE);
 
-		search_background = backgrnd;
-		search_notice = WorldMapSearch["notice"];
-
-		bg_dimensions = Texture(Border).get_dimensions();
-		bg_search_dimensions = search_background.get_dimensions();
-
-		int16_t bg_dimension_x = bg_dimensions.x();
-		background_dimensions = Point<int16_t>(bg_dimension_x, 0);
-
-		int16_t base_x = bg_dimension_x / 2;
-		int16_t base_y = bg_dimensions.y() / 2;
-		base_position = Point<int16_t>(base_x, base_y + 15);
-
-		Point<int16_t> close_dimensions = Point<int16_t>(bg_dimension_x - 22, 4);
-
-		buttons[Buttons::BT_CLOSE] = std::make_unique<MapleButton>(close, close_dimensions);
-		buttons[Buttons::BT_SEARCH] = std::make_unique<MapleButton>(WorldMap["BtSearch"]);
-		buttons[Buttons::BT_AUTOFLY] = std::make_unique<MapleButton>(WorldMap["BtAutoFly_1"]);
-		buttons[Buttons::BT_NAVIREG] = std::make_unique<MapleButton>(WorldMap["BtNaviRegister"]);
-		buttons[Buttons::BT_SEARCH_CLOSE] = std::make_unique<MapleButton>(close, close_dimensions + Point<int16_t>(
-				bg_search_dimensions.x(), 0));
-		buttons[Buttons::BT_ALLSEARCH] = std::make_unique<MapleButton>(WorldMapSearch["BtAllsearch"],
-																	   background_dimensions);
-
-		Point<int16_t> search_text_pos = Point<int16_t>(bg_dimension_x + 14, 25);
-		Point<int16_t> search_box_dim = Point<int16_t>(83, 15);
-		Rectangle<int16_t> search_text_dim = Rectangle<int16_t>(search_text_pos, search_text_pos + search_box_dim);
-
-		search_text = Textfield(Text::Font::A11M, Text::Alignment::LEFT, Color::Name::BLACK, search_text_dim, 8);
-
-		set_search(true);
-
-		dragarea = Point<int16_t>(bg_dimension_x, 20);
+		dimension = Point<int16_t>(WIDTH, HEIGHT);
 	}
 
 	void UIWorldMap::draw(float alpha) const
 	{
-		UIElement::draw_sprites(alpha);
+		int16_t right = WIDTH - EDGE;
+		int16_t bottom = HEIGHT - BOTTOM;
+		int16_t top_right = border[2].get_dimensions().y();
 
-		if (search)
-		{
-			search_background.draw(position + background_dimensions);
-			search_notice.draw(position + background_dimensions);
-			search_text.draw(position + Point<int16_t>(1, -5));
-		}
+		border[0].draw(position);
+		border[1].draw(DrawArgument(position + Point<int16_t>(EDGE, 0), Point<int16_t>(right - EDGE, 0)));
+		border[2].draw(position + Point<int16_t>(right, 0));
+		border[3].draw(DrawArgument(position + Point<int16_t>(0, TOP), Point<int16_t>(0, bottom - TOP)));
+		border[4].draw(DrawArgument(position + Point<int16_t>(right, top_right), Point<int16_t>(0, bottom - top_right)));
+		border[5].draw(position + Point<int16_t>(0, bottom));
+		border[6].draw(DrawArgument(position + Point<int16_t>(EDGE, bottom), Point<int16_t>(right - EDGE, 0)));
+		border[7].draw(position + Point<int16_t>(right, bottom));
+		fill.draw(DrawArgument(position + Point<int16_t>(EDGE, TOP)));
+		title.draw(position + TITLE);
 
+		map_edge[0].draw(DrawArgument(position + MAP - Point<int16_t>(1, 1)));
+		map_edge[1].draw(DrawArgument(position + MAP - Point<int16_t>(1, 0)));
 		base_img.draw(position + base_position);
 
 		if (link_images.size() > 0)
@@ -150,25 +144,13 @@ namespace ms
 				npc_pos[std::min<uint8_t>(spot.second.type, MAPSPOT_TYPE_MAX - 1)].draw(spot.first + position + base_position, alpha);
 		}
 
-		bool found = false;
-
-		if (!found)
+		for (auto spot : map_spots)
 		{
-			for (auto spot : map_spots)
+			if (std::find(spot.second.map_ids.begin(), spot.second.map_ids.end(), mapid) != spot.second.map_ids.end())
 			{
-				for (auto map_id : spot.second.map_ids)
-				{
-					if (map_id == mapid)
-					{
-						found = true;
-						npc_pos[spot.second.type].draw(spot.first + position + base_position, alpha);
-						cur_pos.draw(spot.first + position + base_position, alpha);
-						break;
-					}
-				}
-
-				if (found)
-					break;
+				npc_pos[std::min<uint8_t>(spot.second.type, MAPSPOT_TYPE_MAX - 1)].draw(spot.first + position + base_position, alpha);
+				cur_pos.draw(spot.first + position + base_position, alpha);
+				break;
 			}
 		}
 
@@ -181,7 +163,6 @@ namespace ms
 		mapid = Stage::get().get_mapid();
 		target_map = target;
 		user_map = world_for_map(mapid);
-		set_search(false);
 		update_world(world_for_map(target));
 	}
 
@@ -198,9 +179,6 @@ namespace ms
 			update_world(parent_map);
 		}
 
-		if (search)
-			search_text.update(position);
-
 		for (size_t i = 0; i < MAPSPOT_TYPE_MAX; i++)
 			npc_pos[i].update(1);
 
@@ -214,32 +192,23 @@ namespace ms
 		UIElement::toggle_active();
 
 		if (!active)
-		{
-			set_search(true);
 			update_world(user_map);
-		}
 	}
 
 	void UIWorldMap::send_key(int32_t keycode, bool pressed, bool escape)
 	{
 		if (pressed && escape)
 		{
-			if (search)
+			if (parent_map == "")
 			{
-				set_search(false);
+				toggle_active();
+
+				update_world(user_map);
 			} else
 			{
-				if (parent_map == "")
-				{
-					toggle_active();
+				Sound(Sound::Name::SELECTMAP).play();
 
-					update_world(user_map);
-				} else
-				{
-					Sound(Sound::Name::SELECTMAP).play();
-
-					update_world(parent_map);
-				}
+				update_world(parent_map);
 			}
 		}
 	}
@@ -255,12 +224,6 @@ namespace ms
 		{
 			case Buttons::BT_CLOSE:
 				deactivate();
-				break;
-			case Buttons::BT_SEARCH:
-				set_search(!search);
-				break;
-			case Buttons::BT_SEARCH_CLOSE:
-				set_search(false);
 				break;
 			default:
 				break;
@@ -287,9 +250,6 @@ namespace ms
 
 	Cursor::State UIWorldMap::send_cursor(bool clicked, Point<int16_t> cursorpos)
 	{
-		if (Cursor::State new_state = search_text.send_cursor(cursorpos, clicked))
-			return new_state;
-
 		show_path_img = false;
 		bool on_spot = false;
 
@@ -305,8 +265,7 @@ namespace ms
 				show_path_img = path_img.is_valid();
 				on_spot = true;
 
-				UI::get().show_map(Tooltip::Parent::WORLDMAP, path.second.title, path.second.description,
-								   path.second.map_ids[0], path.second.bolded);
+				UI::get().show_map(Tooltip::Parent::WORLDMAP, path.second.title, path.second.description);
 				break;
 			}
 		}
@@ -317,24 +276,6 @@ namespace ms
 		return UIDragElement::send_cursor(clicked, cursorpos);
 	}
 
-	void UIWorldMap::set_search(bool enable)
-	{
-		search = enable;
-
-		buttons[Buttons::BT_SEARCH_CLOSE]->set_active(enable);
-		buttons[Buttons::BT_ALLSEARCH]->set_active(enable);
-
-		if (enable)
-		{
-			search_text.set_state(Textfield::State::NORMAL);
-			dimension = bg_dimensions + Point<int16_t>(bg_search_dimensions.x(), 0);
-		} else
-		{
-			search_text.set_state(Textfield::State::DISABLED);
-			dimension = bg_dimensions;
-		}
-	}
-
 	void UIWorldMap::update_world(std::string map)
 	{
 		nl::node WorldMap = nl::nx::map["WorldMap"][map + ".img"];
@@ -343,6 +284,7 @@ namespace ms
 			WorldMap = nl::nx::map["WorldMap"]["WorldMap.img"];
 
 		base_img = WorldMap["BaseImg"][0];
+		base_position = MAP + base_img.get_origin();
 		parent_map = std::string(WorldMap["info"]["parentMap"]);
 
 		link_images.clear();
@@ -395,12 +337,11 @@ namespace ms
 
 				map_spots.emplace_back(std::make_pair<Point<int16_t>, MapSpot>(spot, {map_info.description, path,
 																					  map_info.full_name, type, marker,
-																					  true, map_ids}));
+																					  map_ids}));
 			} else
 			{
 				map_spots.emplace_back(std::make_pair<Point<int16_t>, MapSpot>(spot,
-																			   {desc, path, title, type, marker, false,
-																				map_ids}));
+																			   {desc, path, title, type, marker, map_ids}));
 			}
 		}
 	}

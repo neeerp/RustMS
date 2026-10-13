@@ -295,6 +295,8 @@ add_executable(HeavenClient
     IO/Components/Textfield.h
     IO/Components/TextTooltip.cpp
     IO/Components/TextTooltip.h
+    IO/Components/TooltipBox.cpp
+    IO/Components/TooltipBox.h
     IO/Components/Tooltip.h
     IO/Components/TwoSpriteButton.cpp
     IO/Components/TwoSpriteButton.h

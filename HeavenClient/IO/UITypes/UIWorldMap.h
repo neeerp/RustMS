@@ -24,7 +24,8 @@
 #include "../UIDragElement.h"
 
 #include "../Components/AreaButton.h"
-#include "../Components/Textfield.h"
+
+#include "../../Graphics/Geometry.h"
 
 namespace ms
 {
@@ -58,18 +59,11 @@ namespace ms
 	private:
 		static constexpr uint8_t MAPSPOT_TYPE_MAX = 4u;
 
-		void set_search(bool enable);
-
 		void update_world(std::string parent_map);
 
 		enum Buttons
 		{
 			BT_CLOSE,
-			BT_SEARCH,
-			BT_AUTOFLY,
-			BT_NAVIREG,
-			BT_ALLSEARCH,
-			BT_SEARCH_CLOSE,
 			BT_LINK0,
 			BT_LINK1,
 			BT_LINK2,
@@ -89,11 +83,9 @@ namespace ms
 			std::string title;
 			uint8_t type;
 			Texture marker;
-			bool bolded;
 			std::vector<int32_t> map_ids;
 		};
 
-		bool search;
 		bool show_path_img;
 
 		int32_t mapid = -1;
@@ -102,24 +94,22 @@ namespace ms
 		std::string parent_map;
 		std::string user_map;
 
-		Texture search_background;
-		Texture search_notice;
+		Texture border[8];
+		Texture title;
+		ColorBox fill;
+		ColorBox map_edge[2];
+
 		Texture base_img;
 		Texture path_img;
 
 		Animation cur_pos;
 		Animation npc_pos[MAPSPOT_TYPE_MAX];
 
-		Textfield search_text;
-
 		std::map<uint16_t, Texture> link_images;
 		std::map<uint16_t, std::string> link_maps;
 
 		std::vector<std::pair<Point<int16_t>, MapSpot>> map_spots;
 
-		Point<int16_t> bg_dimensions;
-		Point<int16_t> bg_search_dimensions;
-		Point<int16_t> background_dimensions;
 		Point<int16_t> base_position;
 	};
 }

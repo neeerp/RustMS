@@ -269,7 +269,7 @@ namespace ms
 			if (covers(npc.second->get_position(), npc_size))
 			{
 				auto n = static_cast<Npc *>(npc.second.get());
-				UI::get().show_map(Tooltip::Parent::MINIMAP, n->get_name(), n->get_func(), {}, false);
+				UI::get().show_map(Tooltip::Parent::MINIMAP, n->get_name(), n->get_func());
 
 				return dstate;
 			}
@@ -288,7 +288,7 @@ namespace ms
 
 			if (target_name)
 			{
-				UI::get().show_map(Tooltip::Parent::MINIMAP, target_name, "", target, false);
+				UI::get().show_map(Tooltip::Parent::MINIMAP, target_name, "");
 
 				return dstate;
 			}

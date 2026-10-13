@@ -531,9 +531,9 @@ namespace ms
 	}
 
 	void
-	UIStateGame::show_map(Tooltip::Parent parent, std::string name, std::string description, int32_t mapid, bool bolded)
+	UIStateGame::show_map(Tooltip::Parent parent, std::string name, std::string description)
 	{
-		matooltip.set_map(parent, name, description, mapid, bolded);
+		matooltip.set_map(parent, name, description);
 
 		if (!name.empty())
 		{

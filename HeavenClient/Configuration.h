@@ -473,7 +473,7 @@ namespace ms
 	// The default position of UIWorldMap
 	struct PosMAP : public Configuration::PointEntry
 	{
-		PosMAP() : PointEntry("PosMAP", "(100,35)")
+		PosMAP() : PointEntry("PosMAP", "(66,0)")
 		{}
 	};
 

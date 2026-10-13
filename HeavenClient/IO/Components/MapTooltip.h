@@ -22,16 +22,14 @@
 #include <cstdint>
 
 #include "Tooltip.h"
-#include "MapleFrame.h"
-#include "MapTooltipLayout.h"
+#include "TooltipBox.h"
 
 #include "../Graphics/Text.h"
-#include "../Graphics/Geometry.h"
-
-#include <vector>
 
 namespace ms
 {
+	// The name of a map, a spot on the world map, or something on the
+	// minimap, with its description if it has one, in the v83 tooltip box.
 	class MapTooltip : public Tooltip
 	{
 	public:
@@ -39,40 +37,21 @@ namespace ms
 
 		void draw(Point<int16_t> position) const override;
 
-		// Shows a map, or a spot on one, rebuilt only when any of it changes.
-		void set_map(Tooltip::Parent parent, std::string name, std::string description, int32_t mapid, bool bolded);
+		// Shows a name, rebuilt only when it or the description changes.
+		void set_map(Tooltip::Parent parent, std::string name, std::string description);
 
 		void reset();
 
 	private:
-		static constexpr uint8_t BOTTOM_PADDING = map_tooltip::BOTTOM_PADDING;
-		static constexpr Point<int16_t> SEPARATOR_ADJ = Point<int16_t>(5, 0);
-		static constexpr Point<int16_t> LIFE_LABEL_ADJ = Point<int16_t>(20, 3);
-		static constexpr Point<int16_t> LIFE_ICON_ADJ = Point<int16_t>(5, 9);
-
-		MapleFrame frame;
-
-		Texture cover;
-		Texture Mob;
-		Texture Npc;
-		Texture Party;
+		TooltipBox box;
 
 		Tooltip::Parent parent = Tooltip::Parent::NONE;
 		std::string name;
 		std::string description;
-		int32_t mapid = 0;
-		bool bolded = false;
 
 		Text name_label;
-		Text name_simple;
 		Text desc_label;
-		Text desc_simple;
-		std::vector<Text> mob_labels;
-		std::vector<Text> npc_labels;
 
-		int16_t fillwidth;
-		int16_t fillheight;
-
-		ColorLine separator;
+		Point<int16_t> size;
 	};
 }

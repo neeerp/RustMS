@@ -74,8 +74,7 @@ namespace ms
 
 		void show_text(Tooltip::Parent parent, std::string text) override;
 
-		void show_map(Tooltip::Parent parent, std::string name, std::string description, int32_t mapid,
-					  bool bolded) override;
+		void show_map(Tooltip::Parent parent, std::string name, std::string description) override;
 
 		Iterator pre_add(UIElement::Type type, bool toggled, bool focused);
 

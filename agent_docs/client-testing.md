@@ -26,9 +26,9 @@ frames with a real `Cryptography` pair, so a dropped or repeated frame shows up
 as misdecrypted data.
 
 `map_tooltip_tests` covers the World Map and minimap tooltip's layout
-(`IO/Components/MapTooltipLayout.h`): a map's size and NPC list don't depend
-on the map shown before it, the description margin is added once, and life
-lists stop at ten.
+(`IO/Components/MapTooltipLayout.h`): a map's size doesn't depend on the map
+shown before it, the padding is added once, the description sits under the
+name, and descriptions wrap at the name's width when that is wider.
 
 ## GUI checks without taking desktop focus
 
