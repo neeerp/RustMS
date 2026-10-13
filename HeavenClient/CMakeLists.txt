@@ -25,6 +25,8 @@ if(HEAVENCLIENT_BUILD_TESTS)
     add_test(NAME npc_text COMMAND npc_text_tests)
     add_executable(map_tooltip_tests tests/map_tooltip.cpp)
     add_test(NAME map_tooltip COMMAND map_tooltip_tests)
+    add_executable(answer_focus_tests tests/answer_focus.cpp)
+    add_test(NAME answer_focus COMMAND answer_focus_tests)
     add_executable(portal_touch_tests tests/portal_touch.cpp Gameplay/MapleMap/Portal.cpp)
     target_include_directories(portal_touch_tests PRIVATE
         ${PROJECT_SOURCE_DIR}/libs/NoLifeNx ${PROJECT_SOURCE_DIR}/libs/glad/build/include)
