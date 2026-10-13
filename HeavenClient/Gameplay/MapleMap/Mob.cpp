@@ -564,7 +564,7 @@ namespace ms
 
 	MobAttack Mob::create_touch_attack() const
 	{
-		if (!touchdamage)
+		if (!deals_touch_damage())
 			return MobAttack();
 
 		int32_t minattack = static_cast<int32_t>(watk * 0.8f);
@@ -584,6 +584,11 @@ namespace ms
 	bool Mob::is_alive() const
 	{
 		return active && !dying;
+	}
+
+	bool Mob::deals_touch_damage() const
+	{
+		return touchdamage && !notattack;
 	}
 
 	bool Mob::is_in_range(const Rectangle<int16_t> &range) const
