@@ -23,157 +23,124 @@
 
 #include "../Components/MapleButton.h"
 
+#include "../../Character/ExpTable.h"
 #include "../../Gameplay/Stage.h"
-
 #include "../../Net/Packets/PlayerPackets.h"
+#include "../../Util/NxFiles.h"
 
 #include <nlnx/nx.hpp>
 
 namespace ms
 {
-	UIStatsInfo::UIStatsInfo(const CharStats &st) : UIDragElement<PosSTATS>(Point<int16_t>(212, 20)), stats(st)
+	namespace
 	{
-		nl::node close = nl::nx::ui["Basic.img"]["BtClose3"];
-		nl::node Stat = nl::nx::ui["UIWindow4.img"]["Stat"];
-		nl::node main = Stat["main"];
-		nl::node detail = Stat["detail"];
-		nl::node abilityTitle = detail["abilityTitle"];
-		nl::node metierLine = detail["metierLine"];
+		// Laid out from footage, against the window's top-left corner.
+		constexpr int16_t WIDTH = 175, HEIGHT = 347;
+		// The detail panel opens beside the window, level with its stats.
+		const Point<int16_t> DETAIL = { 170, 144 };
+		constexpr int16_t DETAIL_WIDTH = 177, DETAIL_HEIGHT = 203;
 
-		sprites.emplace_back(main["backgrnd"]);
-		sprites.emplace_back(main["backgrnd2"]);
-		sprites.emplace_back(main["backgrnd3"]);
+		const Point<int16_t> CLOSE = { 156, 6 };
+		const Point<int16_t> AUTO = { 97, 197 };
+		const Point<int16_t> DETAIL_BUTTON = { 124, 324 };
+		const Point<int16_t> HIDE = { 155, 182 };
 
-		textures_detail.emplace_back(detail["backgrnd"]);
-		textures_detail.emplace_back(detail["backgrnd2"]);
-		textures_detail.emplace_back(detail["backgrnd3"]);
-		textures_detail.emplace_back(detail["backgrnd4"]);
+		// Values start right of the labels; a row's text has its cap top 4
+		// below the row's top, and its AP button sits 3 below it.
+		constexpr int16_t VALUE_X = 61;
+		constexpr int16_t DETAIL_VALUE_X = 77;
+		constexpr int16_t JOB_X = 62;
+		constexpr int16_t APUP_X = 153;
+		constexpr int16_t LABEL_X = 8;
+		// From where a line of text is drawn to its cap top.
+		constexpr int16_t TEXT_Y = -9;
 
-		abilities[Ability::RARE] = abilityTitle["rare"]["0"];
-		abilities[Ability::EPIC] = abilityTitle["epic"]["0"];
-		abilities[Ability::UNIQUE] = abilityTitle["unique"]["0"];
-		abilities[Ability::LEGENDARY] = abilityTitle["legendary"]["0"];
-		abilities[Ability::NONE] = abilityTitle["normal"]["0"];
+		constexpr int16_t ROW_NAME = 32, ROW_JOB = 50, ROW_LEVEL = 78, ROW_GUILD = 96, ROW_HP = 114, ROW_MP = 132,
+				ROW_EXP = 150, ROW_FAME = 168, ROW_STR = 244, ROW_DEX = 262, ROW_INT = 280, ROW_LUK = 298;
+		// The detail panel's first row, and the step between its rows.
+		constexpr int16_t DETAIL_ROW = 7, DETAIL_STEP = 18;
+		// The right edge of the AP box's number, and its cap top.
+		const Point<int16_t> AP_VALUE = { 84, 218 };
+	}
 
-		inner_ability[true] = metierLine["activated"]["0"];
-		inner_ability[false] = metierLine["disabled"]["0"];
+	UIStatsInfo::UIStatsInfo(const CharStats &st) : UIDragElement<PosSTATS>(Point<int16_t>(WIDTH, 20)), stats(st)
+	{
+		nl::node Stat = NxFiles::ui_classic["UIWindow.img"]["Stat"];
 
-		buttons[Buttons::BT_CLOSE] = std::make_unique<MapleButton>(close, Point<int16_t>(190, 6));
-		buttons[Buttons::BT_HP] = std::make_unique<MapleButton>(main["BtHpUp"]);
-		buttons[Buttons::BT_MP] = std::make_unique<MapleButton>(main["BtHpUp"], Point<int16_t>(0,
-																							   18));        // TODO: "BtMpUp" not Working
-		buttons[Buttons::BT_STR] = std::make_unique<MapleButton>(main["BtHpUp"], Point<int16_t>(0,
-																								87));    // TODO: "BtStrUp" not working
-		buttons[Buttons::BT_DEX] = std::make_unique<MapleButton>(main["BtHpUp"], Point<int16_t>(0,
-																								105));    // TODO: "BtDexUp" not working
-		buttons[Buttons::BT_INT] = std::make_unique<MapleButton>(main["BtHpUp"], Point<int16_t>(0,
-																								123));    // TODO: "BtIntUp" not working
-		buttons[Buttons::BT_LUK] = std::make_unique<MapleButton>(main["BtHpUp"], Point<int16_t>(0,
-																								141));    // TODO: "BtLukUp" not working
-		buttons[Buttons::BT_AUTO] = std::make_unique<MapleButton>(main["BtAuto"]);
-		buttons[Buttons::BT_HYPERSTATOPEN] = std::make_unique<MapleButton>(main["BtHyperStatOpen"]);
-		buttons[Buttons::BT_HYPERSTATCLOSE] = std::make_unique<MapleButton>(main["BtHyperStatClose"]);
-		buttons[Buttons::BT_DETAILOPEN] = std::make_unique<MapleButton>(main["BtDetailOpen"]);
-		buttons[Buttons::BT_DETAILCLOSE] = std::make_unique<MapleButton>(main["BtDetailClose"]);
-		buttons[Buttons::BT_ABILITY] = std::make_unique<MapleButton>(detail["BtAbility"], Point<int16_t>(212, 0));
-		buttons[Buttons::BT_DETAIL_DETAILCLOSE] = std::make_unique<MapleButton>(detail["BtHpUp"],
-																				Point<int16_t>(212, 0));
+		sprites.emplace_back(Stat["backgrnd"]);
+		detail = Stat["backgrnd2"];
 
-		buttons[Buttons::BT_HYPERSTATOPEN]->set_active(false);
-		buttons[Buttons::BT_DETAILCLOSE]->set_active(false);
-		buttons[Buttons::BT_ABILITY]->set_active(false);
-		buttons[Buttons::BT_ABILITY]->set_state(Button::State::DISABLED);
-		buttons[Buttons::BT_DETAIL_DETAILCLOSE]->set_active(false);
+		disabled[0] = Stat["Disabled"]["STR"];
+		disabled[1] = Stat["Disabled"]["DEX"];
+		disabled[2] = Stat["Disabled"]["INT"];
+		disabled[3] = Stat["Disabled"]["LUK"];
 
-		update_ap();
+		nl::node apup = Stat["BtApUp"];
 
-		// Normal
-		for (size_t i = StatLabel::NAME; i <= LUK; i++)
-			statlabels[i] = Text(Text::Font::A11M, Text::Alignment::LEFT, Color::Name::EMPEROR);
+		buttons[Buttons::BT_CLOSE] = std::make_unique<MapleButton>(NxFiles::ui_classic["Basic.img"]["BtClose"], CLOSE);
+		buttons[Buttons::BT_HP] = std::make_unique<MapleButton>(apup, Point<int16_t>(APUP_X, ROW_HP + 3));
+		buttons[Buttons::BT_MP] = std::make_unique<MapleButton>(apup, Point<int16_t>(APUP_X, ROW_MP + 3));
+		buttons[Buttons::BT_STR] = std::make_unique<MapleButton>(apup, Point<int16_t>(APUP_X, ROW_STR + 3));
+		buttons[Buttons::BT_DEX] = std::make_unique<MapleButton>(apup, Point<int16_t>(APUP_X, ROW_DEX + 3));
+		buttons[Buttons::BT_INT] = std::make_unique<MapleButton>(apup, Point<int16_t>(APUP_X, ROW_INT + 3));
+		buttons[Buttons::BT_LUK] = std::make_unique<MapleButton>(apup, Point<int16_t>(APUP_X, ROW_LUK + 3));
+		buttons[Buttons::BT_AUTO] = std::make_unique<MapleButton>(Stat["BtAuto"], AUTO);
+		buttons[Buttons::BT_DETAIL] = std::make_unique<MapleButton>(Stat["BtDetail"], DETAIL_BUTTON);
+		buttons[Buttons::BT_HIDE] = std::make_unique<MapleButton>(NxFiles::ui_classic["Basic.img"]["BtHide"],
+																  DETAIL + HIDE);
 
-		statlabels[StatLabel::AP] = Text(Text::Font::A11M, Text::Alignment::RIGHT, Color::Name::EMPEROR);
+		for (auto &label : statlabels)
+			label = Text(Text::Font::A12M, Text::Alignment::LEFT, Color::Name::BLACK);
 
-		statoffsets[StatLabel::NAME] = Point<int16_t>(73, 26);
-		statoffsets[StatLabel::JOB] = Point<int16_t>(74, 44);
-		statoffsets[StatLabel::GUILD] = Point<int16_t>(74, 63);
-		statoffsets[StatLabel::FAME] = Point<int16_t>(74, 80);
-		statoffsets[StatLabel::DAMAGE] = Point<int16_t>(74, 98);
-		statoffsets[StatLabel::HP] = Point<int16_t>(74, 116);
-		statoffsets[StatLabel::MP] = Point<int16_t>(74, 134);
-		statoffsets[StatLabel::AP] = Point<int16_t>(91, 175);
-		statoffsets[StatLabel::STR] = Point<int16_t>(73, 204);
-		statoffsets[StatLabel::DEX] = Point<int16_t>(73, 222);
-		statoffsets[StatLabel::INT] = Point<int16_t>(73, 240);
-		statoffsets[StatLabel::LUK] = Point<int16_t>(73, 258);
+		statlabels[StatLabel::AP] = Text(Text::Font::A12M, Text::Alignment::RIGHT, Color::Name::BLACK);
+		job_name = Text(Text::Font::A12M, Text::Alignment::LEFT, Color::Name::BLACK);
 
-		// Detailed
-		statlabels[StatLabel::DAMAGE_DETAILED] = Text(Text::Font::A11M, Text::Alignment::LEFT, Color::Name::EMPEROR);
-		statlabels[StatLabel::DAMAGE_BONUS] = Text(Text::Font::A11M, Text::Alignment::RIGHT, Color::Name::EMPEROR);
-		statlabels[StatLabel::BOSS_DAMAGE] = Text(Text::Font::A11M, Text::Alignment::RIGHT, Color::Name::EMPEROR);
-		statlabels[StatLabel::FINAL_DAMAGE] = Text(Text::Font::A11M, Text::Alignment::RIGHT, Color::Name::EMPEROR);
-		statlabels[StatLabel::IGNORE_DEFENSE] = Text(Text::Font::A11M, Text::Alignment::RIGHT, Color::Name::EMPEROR);
-		statlabels[StatLabel::CRITICAL_RATE] = Text(Text::Font::A11M, Text::Alignment::RIGHT, Color::Name::EMPEROR);
-		statlabels[StatLabel::CRITICAL_DAMAGE] = Text(Text::Font::A11M, Text::Alignment::LEFT, Color::Name::EMPEROR);
-		statlabels[StatLabel::STATUS_RESISTANCE] = Text(Text::Font::A11M, Text::Alignment::RIGHT, Color::Name::EMPEROR);
-		statlabels[StatLabel::KNOCKBACK_RESISTANCE] = Text(Text::Font::A11M, Text::Alignment::RIGHT,
-														   Color::Name::EMPEROR);
-		statlabels[StatLabel::DEFENSE] = Text(Text::Font::A11M, Text::Alignment::LEFT, Color::Name::EMPEROR);
-		statlabels[StatLabel::SPEED] = Text(Text::Font::A11M, Text::Alignment::RIGHT, Color::Name::EMPEROR);
-		statlabels[StatLabel::JUMP] = Text(Text::Font::A11M, Text::Alignment::RIGHT, Color::Name::EMPEROR);
-		statlabels[StatLabel::HONOR] = Text(Text::Font::A11M, Text::Alignment::LEFT, Color::Name::EMPEROR);
-
-		statoffsets[StatLabel::DAMAGE_DETAILED] = Point<int16_t>(73, 38);
-		statoffsets[StatLabel::DAMAGE_BONUS] = Point<int16_t>(100, 56);
-		statoffsets[StatLabel::BOSS_DAMAGE] = Point<int16_t>(196, 56);
-		statoffsets[StatLabel::FINAL_DAMAGE] = Point<int16_t>(100, 74);
-		statoffsets[StatLabel::IGNORE_DEFENSE] = Point<int16_t>(196, 74);
-		statoffsets[StatLabel::CRITICAL_RATE] = Point<int16_t>(100, 92);
-		statoffsets[StatLabel::CRITICAL_DAMAGE] = Point<int16_t>(73, 110);
-		statoffsets[StatLabel::STATUS_RESISTANCE] = Point<int16_t>(100, 128);
-		statoffsets[StatLabel::KNOCKBACK_RESISTANCE] = Point<int16_t>(196, 128);
-		statoffsets[StatLabel::DEFENSE] = Point<int16_t>(73, 146);
-		statoffsets[StatLabel::SPEED] = Point<int16_t>(100, 164);
-		statoffsets[StatLabel::JUMP] = Point<int16_t>(196, 164);
-		statoffsets[StatLabel::HONOR] = Point<int16_t>(73, 283);
-
+		dimension = Point<int16_t>(WIDTH, HEIGHT);
+		set_detail(false);
 		update_all_stats();
-		update_stat(MapleStat::Id::JOB);
-		update_stat(MapleStat::Id::FAME);
-
-		dimension = Point<int16_t>(212, 318);
-		showdetail = false;
 	}
 
 	void UIStatsInfo::draw(float alpha) const
 	{
+		if (showdetail)
+			detail.draw(position + DETAIL);
+
 		UIElement::draw_sprites(alpha);
+
+		if (is_beginner())
+		{
+			disabled[2].draw(position + Point<int16_t>(LABEL_X, ROW_INT));
+			disabled[3].draw(position + Point<int16_t>(LABEL_X, ROW_LUK));
+		}
+
+		if (job_main.is_valid())
+		{
+			job_main.draw(position + Point<int16_t>(JOB_X, ROW_JOB + 3));
+			job_sub.draw(position + Point<int16_t>(JOB_X + 3, ROW_JOB + 15));
+		}
+		else
+		{
+			job_name.draw(position + Point<int16_t>(VALUE_X, ROW_JOB + 4 + TEXT_Y));
+		}
+
+		const int16_t rows[StatLabel::NUM_MAIN] = {
+				ROW_NAME, ROW_LEVEL, ROW_GUILD, ROW_HP, ROW_MP, ROW_EXP, ROW_FAME, 0, ROW_STR, ROW_DEX, ROW_INT, ROW_LUK
+		};
+
+		for (size_t i = 0; i < StatLabel::NUM_MAIN; i++)
+			if (i != StatLabel::AP)
+				statlabels[i].draw(position + Point<int16_t>(VALUE_X, rows[i] + 4 + TEXT_Y));
+
+		statlabels[StatLabel::AP].draw(position + AP_VALUE + Point<int16_t>(0, TEXT_Y));
 
 		if (showdetail)
 		{
-			Point<int16_t> detail_pos(position + Point<int16_t>(212, 0));
+			for (size_t i = StatLabel::NUM_MAIN; i < StatLabel::NUM_LABELS; i++)
+			{
+				int16_t row = DETAIL_ROW + DETAIL_STEP * static_cast<int16_t>(i - StatLabel::NUM_MAIN);
 
-			textures_detail[0].draw(detail_pos + Point<int16_t>(0, -1));
-			textures_detail[1].draw(detail_pos);
-			textures_detail[2].draw(detail_pos);
-			textures_detail[3].draw(detail_pos);
-
-			abilities[Ability::NONE].draw(DrawArgument(detail_pos));
-
-			inner_ability[false].draw(detail_pos);
-			inner_ability[false].draw(detail_pos + Point<int16_t>(0, 19));
-			inner_ability[false].draw(detail_pos + Point<int16_t>(0, 38));
-		}
-
-		size_t last = showdetail ? StatLabel::NUM_LABELS : StatLabel::NUM_NORMAL;
-
-		for (size_t i = 0; i < last; i++)
-		{
-			Point<int16_t> labelpos = position + statoffsets[i];
-
-			if (i >= StatLabel::NUM_NORMAL)
-				labelpos.shift_x(213);
-
-			statlabels[i].draw(labelpos);
+				statlabels[i].draw(position + DETAIL + Point<int16_t>(DETAIL_VALUE_X, row + 4 + TEXT_Y));
+			}
 		}
 
 		UIElement::draw_buttons(alpha);
@@ -187,15 +154,16 @@ namespace ms
 
 	bool UIStatsInfo::is_in_range(Point<int16_t> cursorpos) const
 	{
-		Point<int16_t> pos_adj;
+		if (Rectangle<int16_t>(position, position + dimension).contains(cursorpos))
+			return true;
 
-		if (showdetail)
-			pos_adj = Point<int16_t>(211, 25);
-		else
-			pos_adj = Point<int16_t>(0, 0);
+		if (!showdetail)
+			return false;
 
-		auto bounds = Rectangle<int16_t>(position, position + dimension + pos_adj);
-		return bounds.contains(cursorpos);
+		Point<int16_t> detail_pos = position + DETAIL;
+
+		return Rectangle<int16_t>(detail_pos, detail_pos + Point<int16_t>(DETAIL_WIDTH, DETAIL_HEIGHT)).contains(
+				cursorpos);
 	}
 
 	UIElement::Type UIStatsInfo::get_type() const
@@ -205,62 +173,51 @@ namespace ms
 
 	void UIStatsInfo::update_all_stats()
 	{
-		update_simple(AP, MapleStat::Id::AP);
+		update_ap();
+		update_job();
 
-		if (hasap ^ (stats.get_stat(MapleStat::Id::AP) > 0))
-			update_ap();
+		int16_t level = stats.get_stat(MapleStat::Id::LEVEL);
+		int64_t exp = stats.get_exp();
+		int64_t percent = level < ExpTable::LEVELCAP ? 100 * exp / ExpTable::values[level] : 0;
 
 		statlabels[StatLabel::NAME].change_text(stats.get_name());
+		statlabels[StatLabel::LEVEL].change_text(std::to_string(level));
 		statlabels[StatLabel::GUILD].change_text("-");
 		statlabels[StatLabel::HP].change_text(std::to_string(stats.get_stat(MapleStat::Id::HP)) + " / " + std::to_string(stats.get_total(EquipStat::Id::HP)));
 		statlabels[StatLabel::MP].change_text(std::to_string(stats.get_stat(MapleStat::Id::MP)) + " / " + std::to_string(stats.get_total(EquipStat::Id::MP)));
+		statlabels[StatLabel::EXP].change_text(std::to_string(exp) + " (" + std::to_string(percent) + "%)");
+		statlabels[StatLabel::FAME].change_text(std::to_string(stats.get_stat(MapleStat::Id::FAME)));
+		statlabels[StatLabel::AP].change_text(std::to_string(stats.get_stat(MapleStat::Id::AP)));
 
 		update_basevstotal(StatLabel::STR, MapleStat::Id::STR, EquipStat::Id::STR);
 		update_basevstotal(StatLabel::DEX, MapleStat::Id::DEX, EquipStat::Id::DEX);
 		update_basevstotal(StatLabel::INT, MapleStat::Id::INT, EquipStat::Id::INT);
 		update_basevstotal(StatLabel::LUK, MapleStat::Id::LUK, EquipStat::Id::LUK);
 
-		statlabels[StatLabel::DAMAGE].change_text(
+		statlabels[StatLabel::ATTACK].change_text(
 				std::to_string(stats.get_mindamage()) + " ~ " + std::to_string(stats.get_maxdamage()));
+		statlabels[StatLabel::ATTACK].change_color(stats.is_damage_buffed() ? Color::Name::RED : Color::Name::BLACK);
 
-		if (stats.is_damage_buffed())
-			statlabels[StatLabel::DAMAGE].change_color(Color::Name::RED);
-		else
-			statlabels[StatLabel::DAMAGE].change_color(Color::Name::EMPEROR);
+		// The window adds what INT, DEX and LUK give to the totals; the
+		// footage's beginners show these values with no equipment bonuses.
+		int32_t dex = stats.get_total(EquipStat::Id::DEX);
+		int32_t intl = stats.get_total(EquipStat::Id::INT);
+		int32_t luk = stats.get_total(EquipStat::Id::LUK);
 
-		statlabels[StatLabel::DAMAGE_DETAILED].change_text(
-				std::to_string(stats.get_mindamage()) + " ~ " + std::to_string(stats.get_maxdamage()));
-		statlabels[StatLabel::DAMAGE_BONUS].change_text("0%");
-		statlabels[StatLabel::BOSS_DAMAGE].change_text(
-				std::to_string(static_cast<int32_t>(stats.get_bossdmg() * 100)) + "%");
-		statlabels[StatLabel::FINAL_DAMAGE].change_text("0%");
-		statlabels[StatLabel::IGNORE_DEFENSE].change_text(
-				std::to_string(static_cast<int32_t>(stats.get_ignoredef())) + "%");
-		statlabels[StatLabel::CRITICAL_RATE].change_text(
-				std::to_string(static_cast<int32_t>(stats.get_critical() * 100)) + "%");
-		statlabels[StatLabel::CRITICAL_DAMAGE].change_text("0.00%");
-		statlabels[StatLabel::STATUS_RESISTANCE].change_text(
-				std::to_string(static_cast<int32_t>(stats.get_resistance())));
-		statlabels[StatLabel::KNOCKBACK_RESISTANCE].change_text("0%");
-
-		update_buffed(StatLabel::DEFENSE, EquipStat::Id::WDEF);
+		update_buffed(StatLabel::WDEF, EquipStat::Id::WDEF, 0);
+		update_buffed(StatLabel::MAGIC, EquipStat::Id::MAGIC, intl);
+		update_buffed(StatLabel::MDEF, EquipStat::Id::MDEF, intl);
+		update_buffed(StatLabel::ACCURACY, EquipStat::Id::ACC, 0);
+		update_buffed(StatLabel::AVOID, EquipStat::Id::AVOID, dex / 4 + luk / 2);
+		update_buffed(StatLabel::HANDS, EquipStat::Id::HANDS, dex + intl + luk);
 
 		statlabels[StatLabel::SPEED].change_text(std::to_string(stats.get_total(EquipStat::Id::SPEED)) + "%");
 		statlabels[StatLabel::JUMP].change_text(std::to_string(stats.get_total(EquipStat::Id::JUMP)) + "%");
-		statlabels[StatLabel::HONOR].change_text(std::to_string(stats.get_honor()));
 	}
 
-	void UIStatsInfo::update_stat(MapleStat::Id stat)
+	void UIStatsInfo::update_stat(MapleStat::Id)
 	{
-		switch (stat)
-		{
-		case MapleStat::Id::JOB:
-			statlabels[StatLabel::JOB].change_text(stats.get_jobname());
-			break;
-		case MapleStat::Id::FAME:
-			update_simple(StatLabel::FAME, MapleStat::Id::FAME);
-			break;
-		}
+		update_all_stats();
 	}
 
 	Button::State UIStatsInfo::button_pressed(uint16_t id)
@@ -348,23 +305,11 @@ namespace ms
 				UI::get().emplace<UIYesNo>(message, yesnohandler, Text::Alignment::LEFT);
 			}
 				break;
-			case Buttons::BT_HYPERSTATOPEN:
-				break;
-			case Buttons::BT_HYPERSTATCLOSE:
-			{
-				if (player.get_level() < 140)
-					UI::get().emplace<UIOk>("You can use the Hyper Stat at Lv. 140 and above.", [](bool)
-					{});
-			}
-				break;
-			case Buttons::BT_DETAILOPEN:
+			case Buttons::BT_DETAIL:
 				set_detail(true);
 				break;
-			case Buttons::BT_DETAILCLOSE:
-			case Buttons::BT_DETAIL_DETAILCLOSE:
+			case Buttons::BT_HIDE:
 				set_detail(false);
-				break;
-			case Buttons::BT_ABILITY:
 				break;
 			default:
 				break;
@@ -383,26 +328,56 @@ namespace ms
 	{
 		showdetail = enabled;
 
-		buttons[Buttons::BT_DETAILOPEN]->set_active(!enabled);
-		buttons[Buttons::BT_DETAILCLOSE]->set_active(enabled);
-		buttons[Buttons::BT_ABILITY]->set_active(enabled);
-		buttons[Buttons::BT_DETAIL_DETAILCLOSE]->set_active(enabled);
+		buttons[Buttons::BT_DETAIL]->set_active(!enabled);
+		buttons[Buttons::BT_HIDE]->set_active(enabled);
+	}
+
+	bool UIStatsInfo::is_beginner() const
+	{
+		return stats.get_job().get_level() == Job::Level::BEGINNER;
 	}
 
 	void UIStatsInfo::update_ap()
 	{
-		bool nowap = stats.get_stat(MapleStat::Id::AP) > 0;
-		Button::State newstate = nowap ? Button::State::NORMAL : Button::State::DISABLED;
+		bool hasap = stats.get_stat(MapleStat::Id::AP) > 0;
+		Button::State state = hasap ? Button::State::NORMAL : Button::State::DISABLED;
 
 		for (int i = Buttons::BT_HP; i <= Buttons::BT_AUTO; i++)
-			buttons[i]->set_state(newstate);
+			buttons[i]->set_state(state);
 
-		hasap = nowap;
+		// Beginners can't put AP into HP or MP.
+		if (is_beginner())
+		{
+			buttons[Buttons::BT_HP]->set_state(Button::State::DISABLED);
+			buttons[Buttons::BT_MP]->set_state(Button::State::DISABLED);
+		}
 	}
 
-	void UIStatsInfo::update_simple(StatLabel label, MapleStat::Id stat)
+	void UIStatsInfo::update_job()
 	{
-		statlabels[label].change_text(std::to_string(stats.get_stat(stat)));
+		// The job's branch and title are small bitmaps; Cygnus Knights use
+		// the premium set, and jobs with neither are written out.
+		uint16_t id = stats.get_job().get_id();
+		nl::node job = NxFiles::ui_classic["UIWindow.img"]["Stat"]["Job"];
+		std::string branch = std::to_string(id / 100 % 10);
+
+		if (id < 1000)
+		{
+			job_main = job["main"][branch];
+			job_sub = job["sub"][branch][std::to_string(id)];
+		}
+		else if (id < 2000)
+		{
+			job_main = job["main"]["premium"][branch];
+			job_sub = job["sub"]["premium"][branch][std::to_string(id)];
+		}
+		else
+		{
+			job_main = {};
+			job_sub = {};
+		}
+
+		job_name.change_text(stats.get_jobname());
 	}
 
 	void UIStatsInfo::update_basevstotal(StatLabel label, MapleStat::Id bstat, EquipStat::Id tstat)
@@ -428,12 +403,13 @@ namespace ms
 		statlabels[label].change_text(stattext);
 	}
 
-	void UIStatsInfo::update_buffed(StatLabel label, EquipStat::Id stat)
+	void UIStatsInfo::update_buffed(StatLabel label, EquipStat::Id stat, int32_t extra)
 	{
-		int32_t total = stats.get_total(stat);
+		int32_t total = stats.get_total(stat) + extra;
 		int32_t delta = stats.get_buffdelta(stat);
 
 		std::string stattext = std::to_string(total);
+		Color::Name color = Color::Name::BLACK;
 
 		if (delta)
 		{
@@ -442,18 +418,17 @@ namespace ms
 			if (delta > 0)
 			{
 				stattext += "+" + std::to_string(delta);
-
-				statlabels[label].change_color(Color::Name::RED);
-			} else if (delta < 0)
+				color = Color::Name::RED;
+			} else
 			{
 				stattext += "-" + std::to_string(-delta);
-
-				statlabels[label].change_color(Color::Name::BLUE);
+				color = Color::Name::BLUE;
 			}
 
 			stattext += ")";
 		}
 
 		statlabels[label].change_text(stattext);
+		statlabels[label].change_color(color);
 	}
 }

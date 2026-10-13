@@ -94,6 +94,12 @@ from `UI.nx`. Moved so far:
   World Map spots, in the v83 box. `UIClassic.nx` has no bitmaps for it (the
   original drew it), so `TooltipBox` draws the dark edge, light edge, and
   translucent navy fill measured from footage.
+- **Stat window** (`UIStatsInfo`, `UIWindow.img/Stat`): the main panel and,
+  behind DETAIL, the attack and defence panel (closed with `Basic.img/BtHide`),
+  laid out from period footage. The job shows as the `Job/main` and `Job/sub`
+  bitmaps for explorers and Cygnus Knights. Beginners get the greyed INT and
+  LUK labels and no HP or MP buttons. The AP buttons and AUTO-ASSIGN are
+  disabled without AP. EXP shows as "exp (pct%)" and updates as it is gained.
 
 `UIClassic.nx` is not one of NoLifeNx's standard files, so `NxFiles` opens it
 with `nl::file` instead of `nl::nx::load_all`.
