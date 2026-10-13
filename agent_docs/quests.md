@@ -121,11 +121,16 @@ Markers use the same catalog (`QuestLog::supported_rules`): bulb for an
 available quest, open book while in progress at the start NPC, closed book at
 the finishing NPC once its kills and items are in (open book until then).
 
-The **Quest Helper** (`IO/UITypes/UIQuestHelper.cpp`, from
-`UIWindow2.img/QuestAlarm`) sits in the top-right corner and lists up to
-five tracked quests with what each still needs ("Snail 3/10"), green once
-met. Starting a quest with kills or items to bring tracks it; the quest
-window's helper button tracks and untracks open quests.
+The **Quest Helper** (`IO/UITypes/UIQuestHelper.cpp`) is the v83
+`UIWindow.img/QuestAlarm` from `UIClassic.nx`, laid out from period footage.
+It sits flush with the top-right corner, even with nothing tracked, and
+lists up to five tracked quests with what each still needs ("Snail 3/10"),
+the count green once met. Starting a quest with kills or items to bring
+tracks it unless AUTO was switched off; the quest window's helper button
+tracks and untracks open quests. Each quest's ⓧ untracks it, the minimize
+button folds the helper to its title bar, and close hides it until the
+quest window tracks a quest again. Footage doesn't show what AUTO and close
+did, so those two are best guesses.
 
 ## Persistence and rewards
 

@@ -49,6 +49,9 @@ namespace ms
 		// `false` if the helper is full or the quest is not started.
 		bool track(int16_t id);
 		void untrack(int16_t id);
+		// Whether newly started quests are tracked (the helper's AUTO).
+		bool auto_tracks() const;
+		void set_auto_track(bool on);
 
 		bool is_started(int16_t);
 
@@ -69,6 +72,7 @@ namespace ms
 		std::map<int16_t, std::pair<int16_t, std::string>> in_progress;
 		std::map<int16_t, int64_t> completed;
 		std::vector<int16_t> tracking;
+		bool auto_track = true;
 		// Quests the player took out of the helper; not re-added automatically.
 		std::vector<int16_t> dismissed;
 		uint64_t marker_revision = 0;

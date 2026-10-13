@@ -27,7 +27,7 @@ namespace ms
 		started[qid] = qdata;
 		++marker_revision;
 
-		if (fresh && std::find(dismissed.begin(), dismissed.end(), qid) == dismissed.end())
+		if (fresh && auto_track && std::find(dismissed.begin(), dismissed.end(), qid) == dismissed.end())
 		{
 			const QuestInfo* quest = QuestCatalog::get().find(qid);
 
@@ -90,6 +90,10 @@ namespace ms
 		dismissed.push_back(id);
 		++marker_revision;
 	}
+
+	bool QuestLog::auto_tracks() const { return auto_track; }
+
+	void QuestLog::set_auto_track(bool on) { auto_track = on; }
 
 	void QuestLog::clear()
 	{

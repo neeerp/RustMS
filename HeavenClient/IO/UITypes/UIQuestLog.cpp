@@ -16,6 +16,7 @@
 //	along with this program.  If not, see <https://www.gnu.org/licenses/>.		//
 //////////////////////////////////////////////////////////////////////////////////
 #include "UIQuestLog.h"
+#include "UIQuestHelper.h"
 #include "UIWorldMap.h"
 #include "../UI.h"
 #include "../Components/MapleButton.h"
@@ -501,8 +502,14 @@ namespace ms
 			case HELPER:
 			{
 				auto& quests = Stage::get().get_player().get_quests();
-				if (quests.is_tracked(selected)) quests.untrack(selected);
-				else quests.track(selected);
+				if (quests.is_tracked(selected))
+					quests.untrack(selected);
+				else if (quests.track(selected))
+				{
+					// Tracking a quest brings back a closed helper.
+					if (auto helper = UI::get().get_element<UIQuestHelper>())
+						helper->makeactive();
+				}
 				break;
 			}
 			case ACCEPT:
