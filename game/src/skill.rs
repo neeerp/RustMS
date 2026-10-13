@@ -12,8 +12,30 @@ pub struct SkillRecord {
 impl SkillRecord {
     /// Fourth-job skills also carry a master level on the wire.
     pub fn is_fourth_job(&self) -> bool {
-        (self.skill_id / 10_000) % 10 == 2
+        is_fourth_job(self.skill_id)
     }
+}
+
+/// Fourth-job skills can only be raised up to the master level the
+/// character has been granted.
+pub fn is_fourth_job(skill_id: i32) -> bool {
+    (skill_id / 10_000) % 10 == 2
+}
+
+/// Three Snails, Recovery, and Nimble Feet (and their Cygnus and Aran
+/// copies) are raised from the beginner pool rather than SP.
+pub fn uses_beginner_sp(skill_id: i32) -> bool {
+    (1000..=1002).contains(&(skill_id % 10_000_000))
+}
+
+/// Whether a character of `job` can learn `skill_id`: the skill belongs to
+/// its job or to one it advanced through (beginner, first, second, third).
+pub fn in_job_tree(skill_id: i32, job: i16) -> bool {
+    let skill_job = skill_id / 10_000;
+    let job = i32::from(job);
+    skill_job == job / 1000 * 1000
+        || skill_job == job / 100 * 100
+        || (skill_job / 10 == job / 10 && skill_job <= job)
 }
 
 /// A character's learned skills keyed by skill id.
@@ -31,6 +53,11 @@ impl SkillBook {
 
     pub fn get(&self, skill_id: i32) -> Option<&SkillRecord> {
         self.skills.get(&skill_id)
+    }
+
+    /// The skill's level, 0 if it was never learned.
+    pub fn level(&self, skill_id: i32) -> i32 {
+        self.get(skill_id).map_or(0, |s| s.level)
     }
 
     pub fn set(&mut self, record: SkillRecord) {
@@ -66,5 +93,31 @@ mod tests {
         assert!(record(21120002).is_fourth_job());
         assert!(!record(1001004).is_fourth_job());
         assert!(!record(1000).is_fourth_job());
+    }
+
+    #[test]
+    fn jobs_learn_the_skills_of_every_job_they_advanced_through() {
+        // Hero: beginner, warrior, fighter, crusader, hero.
+        for skill_id in [1000, 1001004, 1101006, 1111002, 1121008] {
+            assert!(in_job_tree(skill_id, 112), "{skill_id}");
+        }
+        // Not a page's, a magician's, or a fourth job's yet.
+        for skill_id in [1201004, 2001002, 1121008, 10001000] {
+            assert!(!in_job_tree(skill_id, 111), "{skill_id}");
+        }
+        assert!(in_job_tree(1000, 0));
+        assert!(!in_job_tree(1001004, 0));
+        assert!(in_job_tree(20001000, 2100) && in_job_tree(21000002, 2112));
+        assert!(!in_job_tree(1000, 2000));
+    }
+
+    #[test]
+    fn only_the_three_beginner_skills_use_the_beginner_pool() {
+        for skill_id in [1000, 1001, 1002, 10001001, 20001002] {
+            assert!(uses_beginner_sp(skill_id), "{skill_id}");
+        }
+        for skill_id in [1003, 12, 1001004, 10001003] {
+            assert!(!uses_beginner_sp(skill_id), "{skill_id}");
+        }
     }
 }

@@ -208,3 +208,6 @@ These were corrected:
    own grey (`#BBBBBB`) chat line, worded as in period footage: "You have
    gained an item (Roger's Apple)", "You have gained items (3 Green Apple)",
    and "You have lost ..." for losses.
+8. The stat window's HP and MP buttons sent SPEND_AP with the current HP and
+   MP codes (0x400, 0x1000). They now send MaxHP and MaxMP (0x800, 0x2000),
+   which is what AP raises.

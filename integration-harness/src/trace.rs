@@ -14,9 +14,11 @@ use tokio::time::{timeout, Duration, Instant};
 /// STAT_CHANGED mask bits the tests read.
 pub mod stat {
     pub const LEVEL: i32 = 0x10;
+    pub const STR: i32 = 0x40;
     pub const HP: i32 = 0x400;
     pub const MAX_HP: i32 = 0x800;
     pub const AP: i32 = 0x4000;
+    pub const SP: i32 = 0x8000;
     pub const EXP: i32 = 0x10000;
     pub const MESO: i32 = 0x40000;
 }
@@ -59,6 +61,8 @@ pub struct Trace {
     pub gains: Vec<i32>,
     /// Every STAT_CHANGED, as values by mask bit.
     pub stat_updates: Vec<BTreeMap<i32, i64>>,
+    /// UPDATE_SKILLS: (skill id, level).
+    pub skills: Vec<(i32, i32)>,
     /// Item gains and losses shown in chat (SHOW_ITEM_GAIN_INCHAT 3).
     pub items: Vec<(i32, i32)>,
     /// Items added to the bags: (inventory type, slot, item id).
@@ -130,6 +134,14 @@ impl Trace {
                 values.insert(bit, value);
             }
             self.stat_updates.push(values);
+        } else if op == SendOpcode::UpdateSkills as i16 {
+            r.read_byte().unwrap();
+            for _ in 0..r.read_short().unwrap() {
+                let skill_id = r.read_int().unwrap();
+                self.skills.push((skill_id, r.read_int().unwrap()));
+                r.read_int().unwrap();
+                r.read_long().unwrap();
+            }
         } else if op == SendOpcode::InventoryOperation as i16 {
             r.read_byte().unwrap();
             for _ in 0..r.read_byte().unwrap() {
