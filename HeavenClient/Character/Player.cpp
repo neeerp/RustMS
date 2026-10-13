@@ -96,6 +96,24 @@ namespace ms
 		keysdown[action] = down;
 	}
 
+	void Player::release_key(KeyAction::Id action)
+	{
+		if (is_key_down(action))
+			send_action(action, false);
+	}
+
+	void Player::release_keys()
+	{
+		std::vector<KeyAction::Id> held;
+
+		for (const auto &key : keysdown)
+			if (key.second)
+				held.push_back(key.first);
+
+		for (KeyAction::Id action : held)
+			send_action(action, false);
+	}
+
 	void Player::recalc_stats(bool equipchanged)
 	{
 		Weapon::Type weapontype = get_weapontype();

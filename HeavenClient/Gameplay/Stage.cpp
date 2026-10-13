@@ -273,6 +273,18 @@ namespace ms
 		}
 	}
 
+	void Stage::release_key(KeyType::Id type, int32_t action)
+	{
+		if (state == State::ACTIVE && type == KeyType::Id::ACTION)
+			player.release_key(KeyAction::actionbyid(action));
+	}
+
+	void Stage::release_keys()
+	{
+		if (state == State::ACTIVE)
+			player.release_keys();
+	}
+
 	Cursor::State Stage::send_cursor(bool pressed, Point<int16_t> position)
 	{
 		auto statusbar = UI::get().get_element<UIStatusBar>();

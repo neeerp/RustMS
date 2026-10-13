@@ -22,6 +22,8 @@
 #include "UIStateLogin.h"
 #include "Window.h"
 
+#include "../Gameplay/Stage.h"
+
 #include "UITypes/UIChannel.h"
 #include "UITypes/UIChat.h"
 #include "UITypes/UIChatBar.h"
@@ -120,9 +122,13 @@ namespace ms
 			Music::set_bgmvolume(bgmvolume);
 		} else
 		{
-			// The window lost input focus
+			// The window lost input focus, and won't see the releases of the
+			// keys held now.
 			Sound::set_sfxvolume(0);
 			Music::set_bgmvolume(0);
+
+			is_key_down.clear();
+			Stage::get().release_keys();
 		}
 	}
 
@@ -368,6 +374,14 @@ namespace ms
 					state->send_key(mapping.type, mapping.action, pressed, escape);
 				}
 			}
+		}
+
+		// A dialog or text field may have taken this release. The player
+		// still has to let go of the key, or it keeps walking.
+		if (!pressed)
+		{
+			Keyboard::Mapping mapping = keyboard.get_mapping(keycode);
+			Stage::get().release_key(mapping.type, mapping.action);
 		}
 
 		is_key_down[keycode] = pressed;

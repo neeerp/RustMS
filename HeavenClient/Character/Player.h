@@ -63,6 +63,12 @@ namespace ms
 		// Sends a Keyaction to the player's state, to apply forces, change the state and other behaviour.
 		void send_action(KeyAction::Id action, bool pressed);
 
+		// Lets go of a held key, as when a dialog took its release.
+		void release_key(KeyAction::Id action);
+
+		// Lets go of every held key, as when the window loses focus.
+		void release_keys();
+
 		// Recalculates the total stats from base stats, inventories and skills.
 		void recalc_stats(bool equipchanged);
 

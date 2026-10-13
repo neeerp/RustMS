@@ -67,6 +67,13 @@ namespace ms
 		// Send key input to the stage
 		void send_key(KeyType::Id keytype, int32_t keycode, bool pressed);
 
+		// Lets go of a held key whose release went elsewhere, such as to a
+		// dialog or a text field, so the player doesn't keep walking.
+		void release_key(KeyType::Id keytype, int32_t keycode);
+
+		// Lets go of every held key.
+		void release_keys();
+
 		// Send mouse input to the stage.
 		Cursor::State send_cursor(bool pressed, Point<int16_t> position);
 
