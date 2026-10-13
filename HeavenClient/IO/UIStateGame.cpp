@@ -140,6 +140,20 @@ namespace ms
 					element->update_screen(new_width, new_height);
 			}
 		}
+
+		// A window hidden by a key leaves the cursor where it was, so nothing
+		// else takes its tooltip down.
+		for (auto &type : elementorder)
+		{
+			auto &element = elements[type];
+
+			if (tooltipparent != Tooltip::Parent::NONE && tooltip_parent_for(type) == tooltipparent &&
+				!(element && element->is_active()))
+			{
+				clear_tooltip(tooltipparent);
+				break;
+			}
+		}
 	}
 
 	bool UIStateGame::drop_icon(const Icon &icon, Point<int16_t> pos)
