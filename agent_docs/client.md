@@ -73,6 +73,27 @@ from `UI.nx`. Moved so far:
 - **NPC dialog** (`UINpcTalk`, `UIWindow.img/UtilDlgEx`): the frame,
   buttons, menu dots, quest list headers, and the `Basic.img/VScr4` scroll
   bar (`Slider::Type::CLASSIC`). See [npc-dialogue.md](npc-dialogue.md).
+- **Quest Helper** (`UIQuestHelper`, `UIWindow.img/QuestAlarm`). See
+  [quests.md](quests.md).
+- **Minimap** (`UIMiniMap`, `UIWindow.img/MiniMap`): folded to its title bar,
+  the map alone (`MinMap`), or the map under the map's mark, street, and name
+  (`MaxMap`), laid out from period footage. M or the `Basic.img` minus and
+  plus buttons step between them; towns open in the largest, maps without a
+  `miniMap` stay folded. The window fits the map's `miniMap/canvas` (scaled
+  by `2^mag`) and the names. Markers (`Map.nx` `MapHelper.img/minimap`) stand
+  bottom-centred on portals to other maps, NPCs, other players, and you.
+  Hovering an NPC or portal shows its name. Period canvases had the map's
+  background baked in; v83 `Map.nx` canvases are transparent there, so the
+  frame shows through.
+- **World Map** (`UIWorldMap`, `UIWindow.img/WorldMap`): the frame, title,
+  and `Basic.img/BtClose` around the map's 640x470 `BaseImg`, laid out from
+  period footage. The Big Bang search panel is gone. Esc steps up to the
+  parent map and closes the window from the top.
+- **Map tooltips** (`MapTooltip`, `TooltipBox`): the World Map's spots and the
+  minimap's NPCs and portals show the name, plus the map's description for
+  World Map spots, in the v83 box. `UIClassic.nx` has no bitmaps for it (the
+  original drew it), so `TooltipBox` draws the dark edge, light edge, and
+  translucent navy fill measured from footage.
 
 `UIClassic.nx` is not one of NoLifeNx's standard files, so `NxFiles` opens it
 with `nl::file` instead of `nl::nx::load_all`.

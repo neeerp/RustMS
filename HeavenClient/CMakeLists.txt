@@ -23,6 +23,8 @@ if(HEAVENCLIENT_BUILD_TESTS)
     add_test(NAME quest_dialogue COMMAND quest_dialogue_tests)
     add_executable(npc_text_tests tests/npc_text.cpp)
     add_test(NAME npc_text COMMAND npc_text_tests)
+    add_executable(map_tooltip_tests tests/map_tooltip.cpp)
+    add_test(NAME map_tooltip COMMAND map_tooltip_tests)
     add_executable(portal_touch_tests tests/portal_touch.cpp Gameplay/MapleMap/Portal.cpp)
     target_include_directories(portal_touch_tests PRIVATE
         ${PROJECT_SOURCE_DIR}/libs/NoLifeNx ${PROJECT_SOURCE_DIR}/libs/glad/build/include)
@@ -293,6 +295,8 @@ add_executable(HeavenClient
     IO/Components/Textfield.h
     IO/Components/TextTooltip.cpp
     IO/Components/TextTooltip.h
+    IO/Components/TooltipBox.cpp
+    IO/Components/TooltipBox.h
     IO/Components/Tooltip.h
     IO/Components/TwoSpriteButton.cpp
     IO/Components/TwoSpriteButton.h

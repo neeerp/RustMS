@@ -75,7 +75,7 @@ namespace ms
 		virtual void show_text(Tooltip::Parent parent, std::string text) = 0;
 
 		virtual void
-		show_map(Tooltip::Parent parent, std::string name, std::string description, int32_t mapid, bool bolded) = 0;
+		show_map(Tooltip::Parent parent, std::string name, std::string description) = 0;
 
 		virtual Iterator pre_add(UIElement::Type type, bool toggled, bool focused) = 0;
 
@@ -104,7 +104,7 @@ namespace ms
 		void show_item(Tooltip::Parent, int32_t) override {}
 		void show_skill(Tooltip::Parent, int32_t, int32_t, int32_t, int64_t) override {}
 		void show_text(Tooltip::Parent, std::string) override {}
-		void show_map(Tooltip::Parent, std::string, std::string, int32_t, bool) override {}
+		void show_map(Tooltip::Parent, std::string, std::string) override {}
 		Iterator pre_add(UIElement::Type, bool, bool) override { return { nullptr, UIElement::Type::NUM_TYPES }; }
 		void remove(UIElement::Type) override {}
 		UIElement* get(UIElement::Type) override { return nullptr; }

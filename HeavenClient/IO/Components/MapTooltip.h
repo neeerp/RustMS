@@ -22,15 +22,14 @@
 #include <cstdint>
 
 #include "Tooltip.h"
-#include "MapleFrame.h"
+#include "TooltipBox.h"
 
 #include "../Graphics/Text.h"
-#include "../Graphics/Geometry.h"
-
-#include <unordered_map>
 
 namespace ms
 {
+	// The name of a map, a spot on the world map, or something on the
+	// minimap, with its description if it has one, in the v83 tooltip box.
 	class MapTooltip : public Tooltip
 	{
 	public:
@@ -38,44 +37,21 @@ namespace ms
 
 		void draw(Point<int16_t> position) const override;
 
-		void set_name(Tooltip::Parent parent, std::string name, bool bolded);
-
-		void set_desc(std::string description);
-
-		void set_mapid(int32_t mapid);
+		// Shows a name, rebuilt only when it or the description changes.
+		void set_map(Tooltip::Parent parent, std::string name, std::string description);
 
 		void reset();
 
 	private:
-		static constexpr uint8_t MAX_LIFE = 10u;
-		static constexpr uint8_t MIN_WIDTH = 166u;
-		static constexpr uint8_t BOTTOM_PADDING = 8u;
-		static constexpr Point<int16_t> SEPARATOR_ADJ = Point<int16_t>(5, 0);
-		static constexpr Point<int16_t> LIFE_LABEL_ADJ = Point<int16_t>(20, 3);
-		static constexpr Point<int16_t> LIFE_ICON_ADJ = Point<int16_t>(5, 9);
+		TooltipBox box;
 
-		MapleFrame frame;
-
-		Texture cover;
-		Texture Mob;
-		Texture Npc;
-		Texture Party;
-
-		Tooltip::Parent parent;
-
+		Tooltip::Parent parent = Tooltip::Parent::NONE;
 		std::string name;
 		std::string description;
 
 		Text name_label;
-		Text name_simple;
 		Text desc_label;
-		Text desc_simple;
-		Text mob_labels[MAX_LIFE];
-		Text npc_labels[MAX_LIFE];
 
-		int16_t fillwidth;
-		int16_t fillheight;
-
-		ColorLine separator;
+		Point<int16_t> size;
 	};
 }

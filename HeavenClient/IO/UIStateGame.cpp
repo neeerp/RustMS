@@ -140,6 +140,20 @@ namespace ms
 					element->update_screen(new_width, new_height);
 			}
 		}
+
+		// A window hidden by a key leaves the cursor where it was, so nothing
+		// else takes its tooltip down.
+		for (auto &type : elementorder)
+		{
+			auto &element = elements[type];
+
+			if (tooltipparent != Tooltip::Parent::NONE && tooltip_parent_for(type) == tooltipparent &&
+				!(element && element->is_active()))
+			{
+				clear_tooltip(tooltipparent);
+				break;
+			}
+		}
 	}
 
 	bool UIStateGame::drop_icon(const Icon &icon, Point<int16_t> pos)
@@ -363,19 +377,16 @@ namespace ms
 		{
 			bool clicked = cursorstate == Cursor::State::CLICKING || cursorstate == Cursor::State::VSCROLLIDLE;
 
+			// A focused window that has closed lets go of the cursor, which
+			// then reaches whatever is under it.
+			if (auto focusedelement = get(focused); focusedelement && !focusedelement->is_active())
+				focused = UIElement::Type::NONE;
+
 			if (auto focusedelement = get(focused))
 			{
-				if (focusedelement->is_active())
-				{
-					remove_cursor(focusedelement->get_type());
+				remove_cursor(focusedelement->get_type());
 
-					return focusedelement->send_cursor(clicked, cursorpos);
-				} else
-				{
-					focused = UIElement::Type::NONE;
-
-					return cursorstate;
-				}
+				return focusedelement->send_cursor(clicked, cursorpos);
 			} else
 			{
 				if (!clicked)
@@ -520,11 +531,9 @@ namespace ms
 	}
 
 	void
-	UIStateGame::show_map(Tooltip::Parent parent, std::string name, std::string description, int32_t mapid, bool bolded)
+	UIStateGame::show_map(Tooltip::Parent parent, std::string name, std::string description)
 	{
-		matooltip.set_name(parent, name, bolded);
-		matooltip.set_desc(description);
-		matooltip.set_mapid(mapid);
+		matooltip.set_map(parent, name, description);
 
 		if (!name.empty())
 		{

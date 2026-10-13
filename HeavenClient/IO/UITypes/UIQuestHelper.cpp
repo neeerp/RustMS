@@ -6,15 +6,27 @@
 #include "../../Character/QuestCatalog.h"
 #include "../../Constants.h"
 #include "../../Data/ItemData.h"
+#include "../../Util/NxFiles.h"
 
 #include <nlnx/nx.hpp>
 
 namespace ms
 {
-	UIQuestHelper::UIQuestHelper(const QuestLog& quests, const Inventory& inventory) :
+	namespace
+	{
+		// Where the quest lines start, from footage.
+		constexpr int16_t TEXT_X = 9;
+		// Room left after a quest's name for its untrack button.
+		constexpr int16_t UNTRACK_ROOM = 24;
+		// Between a requirement's name and its count.
+		constexpr int16_t COUNT_GAP = 12;
+	}
+
+	UIQuestHelper::UIQuestHelper(QuestLog& quests, const Inventory& inventory) :
 		UIElement(Point<int16_t>(), Point<int16_t>(WIDTH, 0)), quests(quests), inventory(inventory)
 	{
-		nl::node alarm = nl::nx::ui["UIWindow2.img"]["QuestAlarm"];
+		nl::node alarm = NxFiles::ui_classic["UIWindow.img"]["QuestAlarm"];
+		nl::node basic = NxFiles::ui_classic["Basic.img"];
 
 		top = alarm["backgrndmax"];
 		top_minimized = alarm["backgrndmin"];
@@ -22,8 +34,12 @@ namespace ms
 		bottom = alarm["backgrndbottom"];
 		icon = alarm["BtQ"]["normal"]["0"];
 
-		buttons[MINIMIZE] = std::make_unique<MapleButton>(alarm["BtMin"]);
-		buttons[MAXIMIZE] = std::make_unique<MapleButton>(alarm["BtMax"]);
+		// Laid out from footage, where the minimize and close buttons are the
+		// blue ones from Basic.img.
+		buttons[AUTO] = std::make_unique<MapleButton>(alarm["BtAuto"], Point<int16_t>(141, 4));
+		buttons[MINIMIZE] = std::make_unique<MapleButton>(basic["BtMin"], Point<int16_t>(190, 4));
+		buttons[MAXIMIZE] = std::make_unique<MapleButton>(basic["BtMax"], Point<int16_t>(190, 4));
+		buttons[CLOSE] = std::make_unique<MapleButton>(basic["BtClose"], Point<int16_t>(203, 4));
 		buttons[MAXIMIZE]->set_active(false);
 
 		update_screen(Constants::Constants::get().get_viewwidth(), Constants::Constants::get().get_viewheight());
@@ -32,9 +48,6 @@ namespace ms
 
 	void UIQuestHelper::draw(float alpha) const
 	{
-		if (quests.tracked().empty())
-			return;
-
 		if (minimized)
 		{
 			top_minimized.draw(position);
@@ -49,15 +62,26 @@ namespace ms
 
 			int16_t y = TOP;
 
-			for (const auto& line : lines)
+			for (const auto& entry : entries)
 			{
-				line.text.draw(position + Point<int16_t>(10, y + 1));
-				y += line.rows * ROW;
+				entry.name.draw(position + Point<int16_t>(TEXT_X, y - 6));
+				y += entry.name.height() > ROW ? (entry.name.height() + ROW - 1) / ROW * ROW : ROW;
+
+				for (const auto& requirement : entry.requirements)
+				{
+					Point<int16_t> at = position + Point<int16_t>(TEXT_X, y - 6);
+					requirement.name.draw(at);
+					at.shift_x(requirement.name.width() + COUNT_GAP);
+					requirement.have.draw(at);
+					at.shift_x(requirement.have.width());
+					requirement.need.draw(at);
+					y += ROW;
+				}
 			}
 		}
 
-		icon.draw(position);
-		title.draw(position + Point<int16_t>(22, 4));
+		icon.draw(position + Point<int16_t>(5, 4));
+		title.draw(position + Point<int16_t>(25, -5));
 		UIElement::draw_buttons(alpha);
 	}
 
@@ -89,30 +113,47 @@ namespace ms
 
 	void UIQuestHelper::rebuild()
 	{
-		title = Text(Text::A11B, Text::LEFT, Color::Name::WHITE,
+		title = Text(Text::A12M, Text::LEFT, Color::Name::BLACK,
 			"Quest Helper (" + std::to_string(shown.size()) + "/" + std::to_string(QuestLog::MAX_TRACKED) + ")");
-		lines.clear();
+		entries.clear();
 
-		auto add = [&](Text::Font font, Color::Name color, const std::string& text)
-		{
-			Text line(font, Text::LEFT, color, text, WIDTH - 20);
-			int16_t rows = std::max<int16_t>(1, (line.height() + ROW - 1) / ROW);
-			lines.push_back({ std::move(line), rows });
-		};
+		for (auto it = buttons.lower_bound(UNTRACK); it != buttons.end();)
+			it = buttons.erase(it);
+
+		int16_t y = TOP;
 
 		for (const auto& [id, objectives] : shown)
 		{
 			const QuestInfo* quest = QuestCatalog::get().find(id);
-			add(Text::A11B, Color::Name::SUPERNOVA, quest ? quest->name : std::to_string(id));
+			Entry entry { id, Text(Text::A12B, Text::LEFT, Color::Name::BLACK, quest ? quest->name : std::to_string(id),
+				WIDTH - TEXT_X - UNTRACK_ROOM) };
+
+			// The untrack button follows the name.
+			Point<int16_t> end = entry.name.endoffset();
+			uint16_t untrack = UNTRACK + static_cast<uint16_t>(entries.size());
+			buttons[untrack] = std::make_unique<MapleButton>(NxFiles::ui_classic["Basic.img"]["BtClose2"],
+				Point<int16_t>(TEXT_X + end.x() + 4, y + end.y() - 2));
+			buttons[untrack]->set_active(!minimized);
+
+			y += entry.name.height() > ROW ? (entry.name.height() + ROW - 1) / ROW * ROW : ROW;
 
 			for (const auto& objective : objectives)
 			{
 				std::string name = objective.mob
 					? nl::nx::string["Mob.img"][std::to_string(objective.id)]["name"].get_string()
 					: ItemData::get(objective.id).get_name();
-				std::string count = std::to_string(objective.have) + "/" + std::to_string(objective.need);
-				add(Text::A11M, objective.met() ? Color::Name::LIGHTGREEN : Color::Name::WHITE, "  " + name + " " + count);
+
+				// Only the count you have is coloured, once it is enough.
+				entry.requirements.push_back({
+					Text(Text::A12M, Text::LEFT, Color::Name::DARKGREY, name),
+					Text(Text::A12M, Text::LEFT, objective.met() ? Color::Name::HIPPIEGREEN : Color::Name::DARKGREY,
+						std::to_string(objective.have)),
+					Text(Text::A12M, Text::LEFT, Color::Name::DARKGREY, "/" + std::to_string(objective.need))
+				});
+				y += ROW;
 			}
+
+			entries.push_back(std::move(entry));
 		}
 
 		dimension = Point<int16_t>(WIDTH, height());
@@ -120,31 +161,27 @@ namespace ms
 
 	int16_t UIQuestHelper::height() const
 	{
-		if (quests.tracked().empty())
-			return 0;
-
 		if (minimized)
 			return TOP_MINIMIZED;
 
 		int16_t rows = 0;
 
-		for (const auto& line : lines)
-			rows += line.rows;
+		for (const auto& entry : entries)
+		{
+			rows += entry.name.height() > ROW ? (entry.name.height() + ROW - 1) / ROW * ROW : ROW;
+			rows += static_cast<int16_t>(entry.requirements.size()) * ROW;
+		}
 
-		return TOP + rows * ROW + BOTTOM;
+		return TOP + rows + BOTTOM;
 	}
 
 	void UIQuestHelper::update_screen(int16_t new_width, int16_t)
 	{
-		// Below the buff icons in the top-right corner.
-		position = Point<int16_t>(new_width - WIDTH - 6, 92);
+		position = Point<int16_t>(new_width - WIDTH, 0);
 	}
 
 	bool UIQuestHelper::is_in_range(Point<int16_t> cursorpos) const
 	{
-		if (quests.tracked().empty())
-			return false;
-
 		return Rectangle<int16_t>(position, position + Point<int16_t>(WIDTH, height())).contains(cursorpos);
 	}
 
@@ -155,10 +192,33 @@ namespace ms
 
 	Button::State UIQuestHelper::button_pressed(uint16_t buttonid)
 	{
-		minimized = buttonid == MINIMIZE;
-		buttons[MINIMIZE]->set_active(!minimized);
-		buttons[MAXIMIZE]->set_active(minimized);
-		dimension = Point<int16_t>(WIDTH, height());
+		switch (buttonid)
+		{
+			case AUTO:
+				quests.set_auto_track(!quests.auto_tracks());
+				break;
+			case MINIMIZE:
+			case MAXIMIZE:
+				minimized = buttonid == MINIMIZE;
+				buttons[MINIMIZE]->set_active(!minimized);
+				buttons[MAXIMIZE]->set_active(minimized);
+
+				for (auto it = buttons.lower_bound(UNTRACK); it != buttons.end(); ++it)
+					it->second->set_active(!minimized);
+
+				dimension = Point<int16_t>(WIDTH, height());
+				break;
+			case CLOSE:
+				deactivate();
+				break;
+			default:
+				// The buttons are rebuilt on the next update, not while the
+				// caller walks them.
+				if (buttonid >= UNTRACK && buttonid - UNTRACK < static_cast<int>(entries.size()))
+					quests.untrack(entries[buttonid - UNTRACK].id);
+
+				break;
+		}
 
 		return Button::State::NORMAL;
 	}

@@ -46,7 +46,7 @@ namespace ms
 		void show_item(Tooltip::Parent parent, int32_t itemid) override {}
 		void show_skill(Tooltip::Parent parent, int32_t skill_id, int32_t level, int32_t masterlevel, int64_t expiration) override {}
 		void show_text(Tooltip::Parent parent, std::string text) override {}
-		void show_map(Tooltip::Parent parent, std::string name, std::string description, int32_t mapid, bool bolded) override {}
+		void show_map(Tooltip::Parent parent, std::string name, std::string description) override {}
 
 		Iterator pre_add(UIElement::Type type, bool toggled, bool focused) override;
 		void remove(UIElement::Type type) override;
