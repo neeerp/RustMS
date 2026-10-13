@@ -17,18 +17,19 @@
 //////////////////////////////////////////////////////////////////////////////////
 #pragma once
 
-#include <string>
-
-#include <cstdint>
-
 #include "../UIDragElement.h"
 
-#include "../Components/Slider.h"
-
 #include "../../Gameplay/Stage.h"
+#include "../../Graphics/SpecialText.h"
+
+#include <cstdint>
+#include <string>
+#include <vector>
 
 namespace ms
 {
+	// The v83 minimap (UIWindow.img/MiniMap): folded to its title bar, the
+	// map alone, or the map under its mark, street and name.
 	class UIMiniMap : public UIDragElement<PosMINIMAP>
 	{
 	public:
@@ -39,13 +40,9 @@ namespace ms
 		UIMiniMap(const CharStats &stats);
 
 		void draw(float alpha) const override;
-
 		void update() override;
-
 		void remove_cursor() override;
-
 		Cursor::State send_cursor(bool clicked, Point<int16_t> pos) override;
-		void send_scroll(double yoffset) override;
 		void send_key(int32_t keycode, bool pressed, bool escape) override;
 
 		UIElement::Type get_type() const override;
@@ -54,100 +51,49 @@ namespace ms
 		Button::State button_pressed(uint16_t buttonid) override;
 
 	private:
-		static constexpr int16_t CENTER_START_X = 64;
-		static constexpr int16_t BTN_MIN_Y = 4;
-		static constexpr int16_t ML_MR_Y = 17;
-		static constexpr int16_t MAX_ADJ = 40;
-		static constexpr int16_t M_START = 36;
-		static constexpr int16_t LISTNPC_ITEM_HEIGHT = 17;
-		static constexpr int16_t LISTNPC_ITEM_WIDTH = 140;
-		static constexpr int16_t LISTNPC_TEXT_WIDTH = 114;
-		static constexpr Point<int16_t> WINDOW_UL_POS = Point<int16_t>(0, 0);
+		enum Buttons : uint16_t { BT_MIN, BT_MAX, BT_MAP };
+		enum Type : int8_t { MIN, NORMAL, MAX };
 
-		void update_buttons();
-
-		void toggle_buttons();
-
-		void update_text();
-
-		void update_canvas();
-
-		void draw_movable_markers(Point<int16_t> init_pos, float alpha) const;
-
-		void update_static_markers();
-
-		void set_npclist_active(bool active);
-
-		void update_dimensions();
-
-		void update_npclist();
-
-		void draw_npclist(Point<int16_t> minimap_dims, float alpha) const;
-
-		void select_npclist(int16_t choice);
-
-		enum Buttons
+		// The nine pieces of a stretchable frame.
+		struct Frame
 		{
-			BT_MIN,
-			BT_MAX,
-			BT_SMALL,
-			BT_BIG,
-			BT_MAP,
-			BT_NPC
+			Texture nw, n, ne, w, c, e, sw, s, se;
+
+			Frame() = default;
+			Frame(nl::node src);
+
+			void draw(Point<int16_t> position, int16_t width, int16_t middle) const;
+			int16_t top() const;
+			int16_t bottom() const;
 		};
 
-		enum Type
-		{
-			MIN,
-			NORMAL,
-			MAX
-		};
+		void change_map();
+		void set_type(int8_t type);
+		// The player's choice, kept for the next map and session.
+		void choose_type(int8_t type);
+		// Where a point of the map shows in the window.
+		Point<int16_t> to_window(Point<int16_t> map_position) const;
+		int16_t top() const;
 
-		/// Constants
-		int32_t mapid;
-		int8_t type;
-		int8_t user_type;
-		bool simpleMode;
-		bool big_map;
-		bool has_map;
-		int16_t scale;
-		nl::node Map;
-		nl::node MiniMap;
-		nl::node marker;
-		Texture map_sprite;
-		Animation player_marker;
-		int16_t combined_text_width;
-		int16_t middle_right_x;
-		int16_t bt_min_width;
-		int16_t bt_max_width;
-		int16_t bt_map_width;
-		std::vector<Sprite> min_sprites;
-		std::vector<Sprite> normal_sprites;
-		std::vector<Sprite> max_sprites;
-		std::vector<std::pair<std::string, Point<int16_t>>> static_marker_info;
-		int16_t map_draw_origin_x, map_draw_origin_y;
-		Point<int16_t> center_offset;
-		Point<int16_t> min_dimensions;
-		Point<int16_t> normal_dimensions;
-		Point<int16_t> max_dimensions;
-		Text combined_text;
-		Text region_text;
-		Text town_text;
-
-		bool listNpc_enabled;
-		nl::node listNpc;
-		std::vector<Sprite> listNpc_sprites;
-		std::vector<MapObject *> listNpc_list;
-		std::vector<Text> listNpc_names;
-		std::vector<std::string> listNpc_full_names;
-
-		Point<int16_t> listNpc_dimensions;
-
-		Slider listNpc_slider;
-		int16_t listNpc_offset;
-		int16_t selected;
-		Animation selected_marker;
+		static constexpr int16_t MIN_WIDTH = 128;
+		static constexpr int16_t BORDER = 6;
 
 		const CharStats &stats;
+		Frame normal_frame, max_frame;
+		Texture min_left, min_center, min_right, title;
+		nl::node markers;
+		int32_t mapid = -1;
+		nl::node map;
+		bool has_map = false;
+		int8_t type;
+		// The type the player chose, kept while towns force MAX.
+		int8_t user_type;
+		Texture canvas, mark;
+		OutlinedText street, name;
+		int16_t scale = 1;
+		Point<int16_t> center_offset;
+		int16_t width = MIN_WIDTH;
+		// Portals to other maps, by name, where they show.
+		std::vector<std::pair<std::string, Point<int16_t>>> portals;
 	};
 }
