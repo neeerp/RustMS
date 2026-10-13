@@ -94,6 +94,13 @@ from `UI.nx`. Moved so far:
   World Map spots, in the v83 box. `UIClassic.nx` has no bitmaps for it (the
   original drew it), so `TooltipBox` draws the dark edge, light edge, and
   translucent navy fill measured from footage.
+- **Skill window** (`UISkillBook`, `UIWindow.img/Skill`): one tab per job
+  advancement (`Basic.img/Tab5`, drawn by `ClassicTabs`), the book and name of
+  the selected one, four skill rows with a `VScr4` scroll bar, and the points
+  left, laid out from period footage. The job name is 10 px Arimo
+  (`Text::Font::A10M`). Rows are grey when a required skill is missing. SP-up
+  spends a point at once; v83 had no allocation popup. The MACRO button and the
+  `SkillMacro` window are not drawn yet.
 
 `UIClassic.nx` is not one of NoLifeNx's standard files, so `NxFiles` opens it
 with `nl::file` instead of `nl::nx::load_all`.

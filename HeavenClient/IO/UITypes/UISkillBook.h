@@ -17,13 +17,11 @@
 //////////////////////////////////////////////////////////////////////////////////
 #pragma once
 
-#include <string>
-
 #include <cstdint>
 
 #include "../UIDragElement.h"
 
-#include "../Components/Charset.h"
+#include "../Components/ClassicTabs.h"
 #include "../Components/Slider.h"
 #include "../Components/StatefulIcon.h"
 
@@ -32,6 +30,9 @@
 
 namespace ms
 {
+	// The v83 skill window (UIClassic.nx UIWindow.img/Skill), laid out from
+	// period footage: one tab per job advancement, the book of the selected
+	// one, four skill rows, and the skill points left.
 	class UISkillBook : public UIDragElement<PosSKILL>
 	{
 	public:
@@ -51,6 +52,8 @@ namespace ms
 
 		Cursor::State send_cursor(bool clicked, Point<int16_t> cursorpos) override;
 
+		void send_scroll(double yoffset) override;
+
 		void send_key(int32_t keycode, bool pressed, bool escape) override;
 
 		UIElement::Type get_type() const override;
@@ -58,8 +61,6 @@ namespace ms
 		void update_stat(MapleStat::Id stat, int16_t value);
 
 		void update_skills(int32_t skill_id);
-
-		bool is_skillpoint_enabled();
 
 	protected:
 		Button::State button_pressed(uint16_t id) override;
@@ -92,7 +93,7 @@ namespace ms
 		public:
 			SkillDisplayMeta(int32_t id, int32_t level);
 
-			void draw(const DrawArgument &args) const;
+			void draw(Point<int16_t> position) const;
 
 			int32_t get_id() const;
 
@@ -114,6 +115,8 @@ namespace ms
 
 		void change_tab(uint16_t new_tab);
 
+		void load_skills();
+
 		void change_offset(uint16_t new_offset);
 
 		void show_skill(int32_t skill_id);
@@ -122,35 +125,22 @@ namespace ms
 
 		bool can_raise(int32_t skill_id) const;
 
-		void send_spup(uint16_t row);
-
 		void spend_sp(int32_t skill_id);
 
 		Job::Level joblevel_by_tab(uint16_t tab) const;
 
-		const UISkillBook::SkillDisplayMeta *skill_by_position(Point<int16_t> cursorpos) const;
+		uint16_t tab_count() const;
+
+		// The visible row under a position relative to the window, or -1.
+		int16_t row_by_position(Point<int16_t> cursorpos) const;
 
 		void close();
 
 		bool check_required(int32_t id) const;
 
-		void set_macro(bool enabled);
-
-		void set_skillpoint(bool enabled);
-
 		enum Buttons : uint16_t
 		{
 			BT_CLOSE,
-			BT_HYPER,
-			BT_GUILDSKILL,
-			BT_RIDE,
-			BT_MACRO,
-			BT_MACRO_OK,
-			BT_CANCLE,
-			BT_OKAY,
-			BT_SPDOWN,
-			BT_SPMAX,
-			BT_SPUP,
 			BT_TAB0,
 			BT_TAB1,
 			BT_TAB2,
@@ -159,31 +149,20 @@ namespace ms
 			BT_SPUP0,
 			BT_SPUP1,
 			BT_SPUP2,
-			BT_SPUP3,
-			BT_SPUP4,
-			BT_SPUP5,
-			BT_SPUP6,
-			BT_SPUP7,
-			BT_SPUP8,
-			BT_SPUP9,
-			BT_SPUP10,
-			BT_SPUP11
+			BT_SPUP3
 		};
 
-		static constexpr int16_t ROWS = 12;
+		static constexpr uint16_t TABS = 5;
+		static constexpr int16_t ROWS = 4;
 		static constexpr int16_t ROW_HEIGHT = 40;
-		static constexpr int16_t ROW_WIDTH = 143;
-		static constexpr Point<int16_t> SKILL_OFFSET = Point<int16_t>(11, 93);
-		static constexpr Point<int16_t> SKILL_META_OFFSET = Point<int16_t>(2, 2);
-		static constexpr Point<int16_t> LINE_OFFSET = Point<int16_t>(0, 37);
 
 		const CharStats &stats;
 		const SkillBook &skillbook;
 
+		ClassicTabs tabs;
 		Slider slider;
 		Texture skille;
 		Texture skilld;
-		Texture skillb;
 		Texture line;
 		Texture bookicon;
 		Text booktext;
@@ -194,32 +173,9 @@ namespace ms
 		int16_t beginner_sp;
 
 		uint16_t tab;
-		uint16_t skillcount;
 		uint16_t offset;
 
 		std::vector<SkillDisplayMeta> skills;
 		bool grabbing;
-
-		Point<int16_t> bg_dimensions;
-
-		bool macro_enabled;
-		Texture macro_backgrnd;
-		Texture macro_backgrnd2;
-		Texture macro_backgrnd3;
-
-		bool sp_enabled;
-		Texture sp_backgrnd;
-		Texture sp_backgrnd2;
-		Texture sp_backgrnd3;
-		Charset sp_before;
-		Charset sp_after;
-		std::string sp_before_text;
-		std::string sp_after_text;
-		Text sp_used;
-		Text sp_remaining;
-		Text sp_name;
-		Texture sp_skill;
-		int32_t sp_id;
-		int32_t sp_masterlevel;
 	};
 }

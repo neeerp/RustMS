@@ -43,6 +43,8 @@ namespace ms
 			A13B,
 			A15B,
 			A18M,
+			// The skill window's job name, measured from period footage.
+			A10M,
 			// Chat balloon text: 12 px Arimo with 14 px lines, like the original's Arial.
 			BALLOON,
 			NUM_FONTS
