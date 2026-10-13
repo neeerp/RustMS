@@ -52,49 +52,32 @@ namespace ms
 	private:
 		enum StatLabel
 		{
-			// Normal
+			// Main
 			NAME,
-			JOB,
+			LEVEL,
 			GUILD,
-			FAME,
-			DAMAGE,
 			HP,
 			MP,
+			EXP,
+			FAME,
 			AP,
 			STR,
 			DEX,
 			INT,
 			LUK,
-			NUM_NORMAL,
-			// Detailed
-			DAMAGE_DETAILED,
-			DAMAGE_BONUS,
-			BOSS_DAMAGE,
-			FINAL_DAMAGE,
-			IGNORE_DEFENSE,
-			CRITICAL_RATE,
-			CRITICAL_DAMAGE,
-			STATUS_RESISTANCE,
-			KNOCKBACK_RESISTANCE,
-			DEFENSE,
+			NUM_MAIN,
+			// Detail
+			ATTACK = NUM_MAIN,
+			WDEF,
+			MAGIC,
+			MDEF,
+			ACCURACY,
+			AVOID,
+			HANDS,
 			SPEED,
 			JUMP,
-			HONOR,
-			// Total
-					NUM_LABELS
+			NUM_LABELS
 		};
-
-		void update_ap();
-
-		void update_simple(StatLabel label, MapleStat::Id stat);
-
-		void update_basevstotal(StatLabel label, MapleStat::Id bstat, EquipStat::Id tstat);
-
-		void update_buffed(StatLabel label, EquipStat::Id stat);
-
-		void send_apup(MapleStat::Id stat) const;
-
-		void set_detail(bool enabled);
 
 		enum Buttons
 		{
@@ -106,35 +89,36 @@ namespace ms
 			BT_INT,
 			BT_LUK,
 			BT_AUTO,
-			BT_HYPERSTATOPEN,
-			BT_HYPERSTATCLOSE,
-			BT_DETAILOPEN,
-			BT_DETAILCLOSE,
-			BT_ABILITY,
-			BT_DETAIL_DETAILCLOSE
+			BT_DETAIL,
+			BT_HIDE
 		};
+
+		void update_ap();
+
+		void update_job();
+
+		void update_basevstotal(StatLabel label, MapleStat::Id bstat, EquipStat::Id tstat);
+
+		void update_buffed(StatLabel label, EquipStat::Id stat, int32_t extra);
+
+		void send_apup(MapleStat::Id stat) const;
+
+		void set_detail(bool enabled);
+
+		bool is_beginner() const;
 
 		const CharStats &stats;
 
-		enum Ability
-		{
-			RARE,
-			EPIC,
-			UNIQUE,
-			LEGENDARY,
-			NONE,
-			NUM_ABILITIES
-		};
+		Texture detail;
+		// Grey STR, DEX, INT and LUK labels, drawn over the ones a beginner's
+		// stats don't grow by.
+		Texture disabled[4];
+		Texture job_main;
+		Texture job_sub;
+		Text job_name;
 
-		std::array<Texture, Ability::NUM_ABILITIES> abilities;
-		BoolPair<Texture> inner_ability;
-
-		std::vector<Texture> textures_detail;
 		bool showdetail;
 
-		bool hasap;
-
 		Text statlabels[StatLabel::NUM_LABELS];
-		Point<int16_t> statoffsets[StatLabel::NUM_LABELS];
 	};
 }
