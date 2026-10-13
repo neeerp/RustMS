@@ -26,6 +26,7 @@
 #include "../UIElement.h"
 
 #include "../Graphics/Text.h"
+#include "../Components/AnswerFocus.h"
 #include "../Components/Slider.h"
 
 #include <functional>
@@ -72,8 +73,6 @@ namespace ms
 		void update() override;
 
 		Cursor::State send_cursor(bool clicked, Point<int16_t> cursorpos) override;
-
-		void doubleclick(Point<int16_t> cursorpos) override;
 
 		void send_scroll(double yoffset) override;
 
@@ -146,6 +145,13 @@ namespace ms
 			YES
 		};
 
+		// The page's two answers (YES/NO or ACCEPT/DECLINE), left first, if
+		// it has them.
+		bool answers(Buttons &left, Buttons &right) const;
+
+		// Outlines the answer the keyboard has focused.
+		void focus_answer(answer_focus::Focus focus);
+
 		Texture top;
 		Texture fill;
 		Texture bottom;
@@ -191,6 +197,7 @@ namespace ms
 		// out, as in footage.
 		std::vector<std::pair<size_t, size_t>> choice_text;
 		size_t selected;
+		answer_focus::Focus focus;
 		std::vector<InlineImage> images;
 		std::function<void(int8_t, int32_t)> local_responder;
 		std::string formatted_text;

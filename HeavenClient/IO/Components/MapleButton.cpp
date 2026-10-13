@@ -31,6 +31,7 @@ namespace ms
 		textures[Button::State::PRESSED] = src["pressed"]["0"];
 		textures[Button::State::MOUSEOVER] = src["mouseOver"]["0"];
 		textures[Button::State::DISABLED] = src["disabled"]["0"];
+		focus = src["keyFocused"]["0"];
 
 		active = true;
 		position = pos;
@@ -49,6 +50,9 @@ namespace ms
 		{
 			textures[state].draw(position + parentpos);
 			animations[state].draw(position + parentpos, 1.0f);
+
+			if (focused)
+				focus.draw(position + parentpos);
 		}
 	}
 

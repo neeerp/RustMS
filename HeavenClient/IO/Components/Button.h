@@ -70,10 +70,14 @@ namespace ms
 
 		bool is_pressed() const;
 
+		// Key focus outlines the button in whatever state it is in.
+		void set_focused(bool focused);
+
 	protected:
 		State state;
 		Point<int16_t> position;
 		bool active;
 		bool pressed;
+		bool focused = false;
 	};
 }

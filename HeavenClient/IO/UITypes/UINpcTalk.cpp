@@ -118,7 +118,7 @@ namespace ms
 	}
 
 	UINpcTalk::UINpcTalk() : height(MIN_HEIGHT), text_y(0), offset(0), rowmax(0), show_slider(false), draw_text(false),
-							 type(TalkType::NONE), menu_kind(Menu::INLINE), message_type(0), selected(0), formatted_text(""),
+							 type(TalkType::NONE), menu_kind(Menu::INLINE), message_type(0), selected(0), focus(answer_focus::Focus::NONE), formatted_text(""),
 							 formatted_text_pos(0), timestep(0)
 	{
 		nl::node UtilDlgEx = NxFiles::ui_classic["UIWindow.img"]["UtilDlgEx"];
@@ -439,9 +439,7 @@ namespace ms
 			if (Cursor::State sstate = slider.send_cursor(cursor_relative, clicked))
 				return sstate;
 
-		// Clicking a choice in a server's menu answers with it, as there is
-		// no NEXT. In the client's quest lists it selects the choice, and
-		// NEXT or a double click answers.
+		// Clicking a choice answers with it.
 		int16_t choice = choice_at(cursor_relative);
 
 		if (choice >= 0)
@@ -449,9 +447,7 @@ namespace ms
 			if (clicked)
 			{
 				selected = choice;
-
-				if (menu_kind == Menu::INLINE)
-					answer_choice();
+				answer_choice();
 			}
 
 			return Cursor::State::CANCLICK;
@@ -469,18 +465,6 @@ namespace ms
 			draw_text = false;
 
 		return estate;
-	}
-
-	void UINpcTalk::doubleclick(Point<int16_t> cursorpos)
-	{
-		int16_t choice = choice_at(cursorpos - position);
-
-		// A click already answers a server's menu.
-		if (type != TalkType::SENDSIMPLE || menu_kind != Menu::LIST || choice < 0)
-			return;
-
-		selected = choice;
-		answer_choice();
 	}
 
 	void UINpcTalk::send_key(int32_t keycode, bool pressed, bool escape)
@@ -509,6 +493,20 @@ namespace ms
 			return;
 		}
 
+		// Left and Right focus YES/NO or ACCEPT/DECLINE, and Enter presses
+		// the focused one, or the left one.
+		Buttons left, right;
+
+		if (answers(left, right))
+		{
+			if (keycode == KeyAction::Id::LEFT || keycode == KeyAction::Id::RIGHT)
+				focus_answer(answer_focus::move(focus, keycode == KeyAction::Id::LEFT, keycode == KeyAction::Id::RIGHT));
+			else if (keycode == KeyAction::Id::RETURN)
+				button_pressed(answer_focus::pressed(focus) == answer_focus::Focus::LEFT ? left : right);
+
+			return;
+		}
+
 		// Enter presses the page's default button, even while the text
 		// types out.
 		if (keycode != KeyAction::Id::RETURN)
@@ -522,6 +520,36 @@ namespace ms
 				return;
 			}
 		}
+	}
+
+	bool UINpcTalk::answers(Buttons &left, Buttons &right) const
+	{
+		switch (type)
+		{
+			case TalkType::SENDYESNO:
+				left = Buttons::YES;
+				right = Buttons::NO;
+				return true;
+			case TalkType::SENDACCEPTDECLINE:
+				left = Buttons::QYES;
+				right = Buttons::QNO;
+				return true;
+			default:
+				return false;
+		}
+	}
+
+	void UINpcTalk::focus_answer(answer_focus::Focus f)
+	{
+		focus = f;
+
+		Buttons left, right;
+
+		if (!answers(left, right))
+			return;
+
+		buttons[left]->set_focused(focus == answer_focus::Focus::LEFT);
+		buttons[right]->set_focused(focus == answer_focus::Focus::RIGHT);
 	}
 
 	UIElement::Type UINpcTalk::get_type() const
@@ -773,7 +801,10 @@ namespace ms
 		{
 			button.second->set_active(false);
 			button.second->set_state(Button::State::NORMAL);
+			button.second->set_focused(false);
 		}
+
+		focus = answer_focus::Focus::NONE;
 
 		// END CHAT, OK, YES/NO and ACCEPT/DECLINE sit on the bottom bar; NEXT
 		// and BACK sit in the text area, clear of the scroll bar.

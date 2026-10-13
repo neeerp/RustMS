@@ -30,6 +30,10 @@ as misdecrypted data.
 shown before it, the padding is added once, the description sits under the
 name, and descriptions wrap at the name's width when that is wider.
 
+`answer_focus_tests` covers Left, Right, and Enter on an NPC dialog's YES/NO
+and ACCEPT/DECLINE pages (`IO/Components/AnswerFocus.h`): Enter presses YES or
+ACCEPT when no answer is focused, and otherwise the one Left or Right focused.
+
 ## GUI checks without taking desktop focus
 
 Prefer a private Xvfb display for automated native-client checks. It gives the

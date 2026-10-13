@@ -58,10 +58,13 @@ The text types out at about 35 characters a second, but a menu's choices
 show at once, as in footage.
 
 The first choice starts selected (red arrow, dotted underline), and Up and
-Down move the selection. A server menu has no NEXT, as in v83 footage, so
-clicking a choice or pressing Enter answers with it. In a quest list, a
-click selects, and NEXT, Enter, or a double click answers. On other pages
-Enter presses NEXT, OK, YES, or ACCEPT, even while the text types out.
+Down move the selection. Clicking a choice or pressing Enter answers with
+it. A server menu has no NEXT, as in v83 footage; a quest list keeps NEXT,
+which also answers. On YES/NO and ACCEPT/DECLINE pages, Left and Right
+outline one answer with its `keyFocused` frame, and Enter presses it. With
+nothing outlined, as when the page opens, Enter presses YES or ACCEPT. On
+other pages Enter presses NEXT or OK. Enter works even while the text types
+out.
 
 Image tags draw inline: `#v`/`#i` item icons and `#s` skill icons in a 32x32
 slot, `#f`/`#F` any image by NX path (`UI/UIWindow.img/QuestIcon/4/0`). `UI/`
