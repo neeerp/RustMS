@@ -185,6 +185,8 @@ namespace ms
 
 		std::vector<Movement> movements;
 		uint16_t counter;
+		// Ticks left to push back a mob that was knocked back.
+		uint8_t knockback_ticks;
 
 		int32_t id;
 		int8_t effect;
