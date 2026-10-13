@@ -17,6 +17,7 @@
 //////////////////////////////////////////////////////////////////////////////////
 #include "UINpcTalk.h"
 
+#include "../KeyAction.h"
 #include "../UI.h"
 
 #include "../Components/MapleButton.h"
@@ -62,6 +63,9 @@ namespace ms
 		constexpr int16_t HEADER_Y = 4;
 		constexpr int16_t HEADER_ROW = 11;
 		constexpr int16_t ROW = 32;
+		// How long each character takes to type out: footage types about 35
+		// a second.
+		constexpr uint16_t TYPE_MS = 28;
 
 		// An image by path, such as UI/UIWindow.img/QuestIcon/4/0. UI paths
 		// name the v83 UI; our UI.nx has the quest icons under UIWindow2.img.
@@ -114,7 +118,7 @@ namespace ms
 	}
 
 	UINpcTalk::UINpcTalk() : height(MIN_HEIGHT), text_y(0), offset(0), rowmax(0), show_slider(false), draw_text(false),
-							 type(TalkType::NONE), message_type(0), selected(0), formatted_text(""),
+							 type(TalkType::NONE), menu_kind(Menu::INLINE), message_type(0), selected(0), formatted_text(""),
 							 formatted_text_pos(0), timestep(0)
 	{
 		nl::node UtilDlgEx = NxFiles::ui_classic["UIWindow.img"]["UtilDlgEx"];
@@ -187,14 +191,11 @@ namespace ms
 				image.texture.draw(box + image.anchor);
 		}
 
-		text.draw(origin, clip, revealed());
+		text.draw(origin, clip, revealed(), choice_text);
 
 		for (size_t i = 0; i < choices.size(); i++)
 		{
 			const Choice &choice = choices[i];
-
-			if (draw_text && formatted_text_pos < choice.reveal)
-				continue;
 
 			if (choice.header.is_valid() && visible(origin.y() + choice.header_y,
 													 origin.y() + choice.header_y + choice.header.height()))
@@ -264,10 +265,6 @@ namespace ms
 		for (size_t i = 0; i < choices.size(); i++)
 		{
 			const Choice &choice = choices[i];
-
-			if (draw_text && formatted_text_pos < choice.reveal)
-				continue;
-
 			Point<int16_t> start = origin + choice.start;
 			Point<int16_t> end = origin + choice.end;
 			int16_t right = end.y() == start.y() ? end.x() : origin.x() + text.width();
@@ -289,20 +286,13 @@ namespace ms
 
 		if (draw_text)
 		{
-			if (timestep > 4)
-			{
-				if (formatted_text_pos < formatted_text.size())
-				{
-					formatted_text_pos++;
-					timestep = 0;
-				} else
-				{
-					draw_text = false;
-				}
-			} else
-			{
-				timestep++;
-			}
+			timestep += Constants::TIMESTEP;
+
+			for (; timestep >= TYPE_MS && formatted_text_pos < formatted_text.size(); timestep -= TYPE_MS)
+				formatted_text_pos++;
+
+			if (formatted_text_pos >= formatted_text.size())
+				draw_text = false;
 		}
 	}
 
@@ -377,8 +367,8 @@ namespace ms
 				break;
 			case TalkType::SENDSIMPLE:
 				// Type = 4: NEXT answers with the selected choice.
-				if (buttonid == Buttons::NEXT && selected < choices.size())
-					respond(1, choices[selected].id);
+				if (buttonid == Buttons::NEXT)
+					answer_choice();
 				else if (buttonid == Buttons::CLOSE)
 					local_responder ? respond(-1) : respond(0);
 				break;
@@ -405,6 +395,37 @@ namespace ms
 			NpcTalkMorePacket(message_type, response).dispatch();
 	}
 
+	void UINpcTalk::select(size_t choice)
+	{
+		if (choice >= choices.size())
+			return;
+
+		selected = choice;
+
+		if (!show_slider)
+			return;
+
+		// The lines the choice's label takes up.
+		int16_t first = (choices[choice].start.y() - LINE) / LINE;
+		int16_t last = (choices[choice].end.y() - LINE) / LINE;
+
+		if (first < offset)
+			offset = first;
+		else if (last >= offset + SCROLL_LINES)
+			offset = std::min<int16_t>(last - SCROLL_LINES + 1, rowmax - SCROLL_LINES);
+
+		slider.setrows(offset, SCROLL_LINES, rowmax);
+	}
+
+	void UINpcTalk::answer_choice()
+	{
+		if (selected >= choices.size())
+			return;
+
+		deactivate();
+		respond(1, choices[selected].id);
+	}
+
 	void UINpcTalk::set_local_responder(std::function<void(int8_t, int32_t)> responder)
 	{
 		local_responder = std::move(responder);
@@ -418,13 +439,20 @@ namespace ms
 			if (Cursor::State sstate = slider.send_cursor(cursor_relative, clicked))
 				return sstate;
 
-		// Clicking a choice selects it; NEXT or a double click answers.
+		// Clicking a choice in a server's menu answers with it, as there is
+		// no NEXT. In the client's quest lists it selects the choice, and
+		// NEXT or a double click answers.
 		int16_t choice = choice_at(cursor_relative);
 
 		if (choice >= 0)
 		{
 			if (clicked)
+			{
 				selected = choice;
+
+				if (menu_kind == Menu::INLINE)
+					answer_choice();
+			}
 
 			return Cursor::State::CANCLICK;
 		}
@@ -447,21 +475,52 @@ namespace ms
 	{
 		int16_t choice = choice_at(cursorpos - position);
 
-		if (type != TalkType::SENDSIMPLE || choice < 0)
+		// A click already answers a server's menu.
+		if (type != TalkType::SENDSIMPLE || menu_kind != Menu::LIST || choice < 0)
 			return;
 
 		selected = choice;
-		deactivate();
-		respond(1, choices[selected].id);
+		answer_choice();
 	}
 
 	void UINpcTalk::send_key(int32_t keycode, bool pressed, bool escape)
 	{
-		if (pressed && escape)
+		if (!pressed)
+			return;
+
+		if (escape)
 		{
 			deactivate();
 
 			respond(-1);
+			return;
+		}
+
+		if (type == TalkType::SENDSIMPLE)
+		{
+			// Up and Down move the selection; Enter answers with it.
+			if (keycode == KeyAction::Id::UP && selected > 0)
+				select(selected - 1);
+			else if (keycode == KeyAction::Id::DOWN)
+				select(selected + 1);
+			else if (keycode == KeyAction::Id::RETURN)
+				answer_choice();
+
+			return;
+		}
+
+		// Enter presses the page's default button, even while the text
+		// types out.
+		if (keycode != KeyAction::Id::RETURN)
+			return;
+
+		for (Buttons button : { Buttons::NEXT, Buttons::OK, Buttons::YES, Buttons::QYES })
+		{
+			if (buttons[button]->is_active())
+			{
+				button_pressed(button);
+				return;
+			}
 		}
 	}
 
@@ -567,8 +626,10 @@ namespace ms
 		formatted_text_pos = 0;
 		offset = 0;
 		selected = 0;
+		menu_kind = menu;
 		images.clear();
 		choices.clear();
+		choice_text.clear();
 		formatted_text = format_text(tx, npcid, images);
 
 		std::vector<int32_t> inline_ids;
@@ -592,7 +653,7 @@ namespace ms
 				// Listed choices are drawn without their images for now.
 				label.erase(std::remove(label.begin(), label.end(), Text::BOX), label.end());
 				auto header = headers.find(id);
-				Choice choice { id, Point<int16_t>(static_cast<int16_t>(indent * space), 0), {}, 0,
+				Choice choice { id, Point<int16_t>(static_cast<int16_t>(indent * space), 0), {},
 					Text(Text::Font::A12M, Text::Alignment::LEFT, Color::Name::DUSKBLUE, label, TEXT_WIDTH - LABEL_X) };
 
 				if (header != headers.end())
@@ -638,6 +699,9 @@ namespace ms
 				c = Text::BOX;
 			} else if (c == NpcTextMarkup::CHOICE_END)
 			{
+				if (choice_text.size() < marks.size())
+					choice_text.emplace_back(marks.back().second, i + 1);
+
 				boxes.emplace_back(0, 0);
 				c = Text::BOX;
 			}
@@ -649,8 +713,7 @@ namespace ms
 		int16_t block = text.height();
 
 		for (size_t i = 0; i < marks.size() && i < inline_ids.size(); i++)
-			choices.push_back({ inline_ids[i], text.box_position(marks[i].first), text.box_position(marks[i].first + 1),
-								marks[i].second + 1 });
+			choices.push_back({ inline_ids[i], text.box_position(marks[i].first), text.box_position(marks[i].first + 1) });
 
 		// Listed choices: 32 px rows under the question, a header above the
 		// first of each group.
@@ -750,7 +813,9 @@ namespace ms
 					place(Buttons::OK, 475, bar_y);
 				break;
 			case TalkType::SENDSIMPLE:
-				place(Buttons::NEXT, 451 + text_button_x, text_button_y);
+				// A server's menu has no NEXT: clicking a choice answers.
+				if (menu == Menu::LIST)
+					place(Buttons::NEXT, 451 + text_button_x, text_button_y);
 				break;
 			case TalkType::SENDGETTEXT:
 			case TalkType::SENDGETNUMBER:

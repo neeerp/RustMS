@@ -837,7 +837,8 @@ namespace ms
 
 	void GraphicsGL::drawtext(const DrawArgument &args, const Range<int16_t> &vertical, const std::string &text,
 							  const Text::Layout &layout, Text::Font id, Color::Name colorid,
-							  Text::Background background, size_t reveal)
+							  Text::Background background, size_t reveal,
+							  const std::vector<std::pair<size_t, size_t>> &shown)
 	{
 		if (locked)
 			return;
@@ -896,7 +897,18 @@ namespace ms
 				for (size_t pos = word.first; pos < word.last; ++pos)
 				{
 					if (pos >= reveal)
-						return;
+					{
+						if (shown.empty() || pos >= shown.back().second)
+							return;
+
+						bool in_shown = std::any_of(shown.begin(), shown.end(), [pos](const auto &range)
+						{
+							return pos >= range.first && pos < range.second;
+						});
+
+						if (!in_shown)
+							continue;
+					}
 
 					const char c = text[pos];
 					const Font::Char &ch = font.chars[c];

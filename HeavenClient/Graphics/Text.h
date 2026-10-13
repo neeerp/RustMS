@@ -126,8 +126,10 @@ namespace ms
 
 		void draw(const DrawArgument &args, const Range<int16_t> &vertical) const;
 
-		// Draw only the first `reveal` characters, as when text types out.
-		void draw(const DrawArgument &args, const Range<int16_t> &vertical, size_t reveal) const;
+		// Draw only the first `reveal` characters, as when text types out,
+		// and the [first, last) ranges in `shown`.
+		void draw(const DrawArgument &args, const Range<int16_t> &vertical, size_t reveal,
+				  const std::vector<std::pair<size_t, size_t>> &shown = {}) const;
 
 		void change_text(const std::string &text);
 
