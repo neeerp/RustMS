@@ -17,8 +17,25 @@
 //////////////////////////////////////////////////////////////////////////////////
 #include "Drop.h"
 
+#include <algorithm>
+#include <cmath>
+
 namespace ms
 {
+	namespace
+	{
+		const double DROPSPEED = -2.9;
+		const double DROPGRAVITY = 0.042;
+
+		// Ticks a falling drop needs to come down by dy pixels.
+		double air_ticks(double dy)
+		{
+			double ticks = (-DROPSPEED + std::sqrt(DROPSPEED * DROPSPEED + 2.0 * DROPGRAVITY * std::max(dy, 0.0))) / DROPGRAVITY;
+
+			return std::max(ticks, 1.0);
+		}
+	}
+
 	Drop::Drop(int32_t id, int32_t own, Point<int16_t> start, Point<int16_t> dst, int8_t type, int8_t mode, bool pldrp)
 			: MapObject(id)
 	{
@@ -39,8 +56,11 @@ namespace ms
 			case 1:
 				state = Drop::State::DROPPED;
 				basey = static_cast<double>(dest.y() - 4);
-				phobj.vspeed = -5.0f;
-				phobj.hspeed = static_cast<double>(dest.x() - start.x()) / 48;
+				// Drops fall under their own, lighter gravity: about 100 px up
+				// and about 1.1 s in the air, as in the original.
+				phobj.set_flag(PhysicsObject::Flag::NOGRAVITY);
+				phobj.vspeed = DROPSPEED;
+				phobj.hspeed = static_cast<double>(dest.x() - start.x()) / air_ticks(dest.y() - start.y() + 4);
 				break;
 			case 2:
 				state = Drop::State::FLOATING;
@@ -56,6 +76,9 @@ namespace ms
 
 	int8_t Drop::update(const Physics &physics)
 	{
+		if (state == Drop::State::DROPPED)
+			phobj.vspeed += DROPGRAVITY;
+
 		physics.move_object(phobj);
 
 		if (state == Drop::State::DROPPED)
@@ -64,12 +87,15 @@ namespace ms
 			{
 				phobj.hspeed = 0.0;
 				phobj.type = PhysicsObject::Type::FIXATED;
+				phobj.clear_flag(PhysicsObject::Flag::NOGRAVITY);
 				state = Drop::State::FLOATING;
 				angle.set(0.0f);
 				set_position(dest.x(), dest.y() - 4);
 			} else
 			{
-				static const float SPINSTEP = 0.2f;
+				// About two turns over the 1.1 s flight, as before the
+				// flight was slowed down.
+				static const float SPINSTEP = 0.1f;
 				angle += SPINSTEP;
 			}
 		}
@@ -110,6 +136,7 @@ namespace ms
 		switch (type)
 		{
 			case 0:
+				phobj.clear_flag(PhysicsObject::Flag::NOGRAVITY);
 				state = Drop::State::PICKEDUP;
 				break;
 			case 1:
@@ -121,6 +148,7 @@ namespace ms
 				looter = lt;
 				phobj.vspeed = -4.5f;
 				phobj.type = PhysicsObject::Type::NORMAL;
+				phobj.clear_flag(PhysicsObject::Flag::NOGRAVITY);
 				break;
 		}
 	}
