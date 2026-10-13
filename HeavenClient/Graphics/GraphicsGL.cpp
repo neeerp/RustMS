@@ -563,6 +563,31 @@ namespace ms
 		quads.emplace_back(rect.left(), rect.right(), rect.top(), rect.bottom(), getoffset(bmp), color, angle);
 	}
 
+	void GraphicsGL::draw(const nl::bitmap &bmp, const Rectangle<int16_t> &rect, const Rectangle<int16_t> &crop,
+						  const Color &color, float angle)
+	{
+		if (locked)
+			return;
+
+		if (color.invisible())
+			return;
+
+		if (!rect.overlaps(SCREEN))
+			return;
+
+		Offset offset = getoffset(bmp);
+
+		if (offset.right == offset.left)
+			return;
+
+		offset.right = offset.left + crop.right();
+		offset.left += crop.left();
+		offset.bottom = offset.top + crop.bottom();
+		offset.top += crop.top();
+
+		quads.emplace_back(rect.left(), rect.right(), rect.top(), rect.bottom(), offset, color, angle);
+	}
+
 	Text::Layout
 	GraphicsGL::createlayout(const std::string &text, Text::Font id, Text::Alignment alignment, int16_t maxwidth,
 							 bool formatted, int16_t line_adj, const std::vector<Point<int16_t>> &boxes)

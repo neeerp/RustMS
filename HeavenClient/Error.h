@@ -30,6 +30,7 @@ namespace ms
 			NLNX,
 			MISSING_FILE,
 			WRONG_UI_FILE,
+			WRONG_UI_CLASSIC_FILE,
 			GLFW,
 			GLEW,
 			FREETYPE,
@@ -55,7 +56,7 @@ namespace ms
 
 		constexpr bool can_retry() const
 		{
-			return code == Code::CONNECTION || code == Code::MISSING_FILE || code == Code::WRONG_UI_FILE || code == Code::MISSING_ICON || code == Code::FONT_PATH;
+			return code == Code::CONNECTION || code == Code::MISSING_FILE || code == Code::WRONG_UI_FILE || code == Code::WRONG_UI_CLASSIC_FILE || code == Code::MISSING_ICON || code == Code::FONT_PATH;
 		}
 
 		constexpr const char* get_message() const
@@ -79,6 +80,7 @@ namespace ms
 			"Could not initialize NLNX.",
 			"Missing a game file: ",
 			"UI.nx has wrong version.",
+			"UIClassic.nx is not the v83 UI.wz.",
 			"Could not initialize GLFW.",
 			"Could not initialize GLEW.",
 			"Could not initialize FreeType.",

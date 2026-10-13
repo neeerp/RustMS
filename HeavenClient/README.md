@@ -35,6 +35,7 @@ This will always be the option with the most performance, but if you are using M
 - MapLatest.nx (Lastest GMS Map.wz)
 - Map001.nx (Latest GMS Map001.wz)
 - UI.nx (Latest GMS UI.wz)
+- UIClassic.nx (v83 GMS UI.wz, converted with `tools/convert-ui-classic.sh`)
 - Everything else is from v83 GMS wz files
 
 ## Dependencies

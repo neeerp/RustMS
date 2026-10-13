@@ -83,6 +83,22 @@ namespace ms
 		);
 	}
 
+	void Texture::draw(const DrawArgument &args, const Rectangle<int16_t> &crop) const
+	{
+		size_t id = bitmap.id();
+
+		if (id == 0)
+			return;
+
+		GraphicsGL::get().draw(
+				bitmap,
+				args.get_rectangle(origin - crop.get_left_top(), Point<int16_t>(crop.width(), crop.height())),
+				crop,
+				args.get_color(),
+				args.get_angle()
+		);
+	}
+
 	void Texture::shift(Point<int16_t> amount)
 	{
 		origin -= amount;

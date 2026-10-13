@@ -39,6 +39,10 @@ namespace ms
 
 		void draw(const DrawArgument &args) const;
 
+		// Draw only the part inside `crop`, in pixels of the texture. The part
+		// lands where it would in the whole texture; a stretch sets its size.
+		void draw(const DrawArgument &args, const Rectangle<int16_t> &crop) const;
+
 		void shift(Point<int16_t> amount);
 
 		bool is_valid() const;

@@ -280,8 +280,15 @@ namespace ms
 								);
 								break;
 							case KeyAction::Id::MENU:
+								// Esc is bound to MENU by default, but it opens the
+								// Game Menu rather than the ShortCut menu.
 								if (auto statusbar = UI::get().get_element<UIStatusBar>())
-									statusbar->toggle_menu();
+								{
+									if (escape)
+										statusbar->send_key(action, pressed, escape);
+									else
+										statusbar->toggle_menu();
+								}
 
 								break;
 							case KeyAction::Id::QUICKSLOTS:

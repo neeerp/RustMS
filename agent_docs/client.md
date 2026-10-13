@@ -33,7 +33,7 @@ are described in [client-testing.md](client-testing.md).
 
 ## Required NX files
 
-NX files are loaded from the working directory (`Util/NxFiles.cpp`); 18 are
+NX files are loaded from the working directory (`Util/NxFiles.cpp`); 19 are
 required, and startup fails with `MISSING_FILE` for the first absent one.
 
 | File | Source version | Notes |
@@ -44,18 +44,58 @@ required, and startup fails with `MISSING_FILE` for the first absent one.
 | MapLatest | v209.2 / latest GMS Map.wz | Newer map art (~3.7 GB) |
 | Map001 | v209.2 / latest GMS Map001.wz | Login backgrounds and similar (~2.4 GB) |
 | UI | v209.2 / latest GMS UI.wz | Post-Big-Bang UI layout (~1.2 GB) |
+| UIClassic | v83 GMS UI.wz | The original UI (~72 MB); see below |
 
 Total is about 14 GB. In this repo `Map`, `Npc`, `Quest`, and `String` are
 symlinks to `assets/game-data/` so client and server read the same v83 data.
 `Base.nx` is present locally but not in the required list.
 
-Startup version check: `NxFiles::init` probes `UI.nx` for
+Startup version checks: `NxFiles::init` probes `UI.nx` for
 `Login.img/WorldSelect/BtChannel/layer:bg`. If it is not a bitmap the UI file is
-too old and the client reports `WRONG_UI_FILE`. There is no check on the other
-files, so mixing in a mismatched v83 file fails later at runtime.
+too old and the client reports `WRONG_UI_FILE`. It probes `UIClassic.nx` for
+`UIWindow.img/MiniMap/title`, which the Big Bang UI dropped, and
+`UIWindow.img/AranSkillGuide/0`, which v83 added; without both the client
+reports `WRONG_UI_CLASSIC_FILE`. There is no check on the other files, so
+mixing in a mismatched v83 file fails later at runtime.
+
+### UIClassic.nx
+
+Issue #120 moves the client back to the v83 UI one window at a time. Windows
+that have moved read `NxFiles::ui_classic`; the rest still read `nl::nx::ui`
+from `UI.nx`. Moved so far:
+
+- **Status bar** (`UIStatusBar`, `StatusBar.img`): gauges, menu buttons, the
+  quick slot panel, and the Game Menu and ShortCut popups (`UIWindow.img`).
+  Esc opens the Game Menu; the MENU key action opens ShortCut.
+- **Chat** (`UIChatBar`): the input strip in the bar's top-left and the log
+  above it. The status bar cuts that strip out of its background, so the two
+  can overlap in either draw order.
+
+`UIClassic.nx` is not one of NoLifeNx's standard files, so `NxFiles` opens it
+with `nl::file` instead of `nl::nx::load_all`.
+
+Convert it from a v83 GMS `UI.wz` with:
+
+```sh
+tools/convert-ui-classic.sh PATH/TO/UI.wz
+```
+
+The script builds NoLifeWzToNx at a pinned commit, with fixes for its
+`wchar_t` string conversion (4 bytes on Linux, so every string throws) and its
+`std::experimental::filesystem` include, then writes `HeavenClient/nx/UIClassic.nx`.
+It checks both files against the ones the client was written against:
+
+| File | SHA-256 |
+| --- | --- |
+| `UI.wz` (input, 28 MB) | `d253934d986cd428ba914c37f1bfae18513e2830ec3ec5d0e055fd2cef05e47c` |
+| `UIClassic.nx` | `d2e0e1ce6f1864e99ad6fdd1017e3495e72802744f68e9ffad54e61794b4d98a` |
+
+The converter cannot inflate one bitmap in this `UI.wz`,
+`UIWindow.img/FadeYesNo/icon7/icon5` (18x18), and writes it blank.
 
 The mixed UI/Map versions mean the client uses post-v83 art with v83 data, and
-some UI nodes may not exist for v83 features.
+some UI nodes may not exist for v83 features. That goes away for the UI as
+windows move to `UIClassic.nx`.
 
 ## Fonts
 

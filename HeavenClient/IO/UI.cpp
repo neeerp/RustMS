@@ -353,7 +353,7 @@ namespace ms
 
 				if (escape)
 				{
-					if (chatbar && chatbar->is_chatopen())
+					if (chatbar && chatbar->is_chatfieldopen())
 						chatbar->send_key(mapping.action, pressed, escape);
 					else
 						state->send_key(mapping.type, mapping.action, pressed, escape);
