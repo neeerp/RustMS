@@ -255,6 +255,11 @@ namespace ms
 		} catch (std::out_of_range e)
 		{
 			nl::audio ad = nl::nx::sound.resolve(path);
+
+			// Later-version paths (e.g. Bgm43) aren't in this Sound.nx.
+			if (!ad || ad.length() <= 82)
+				return;
+
 			auto data = reinterpret_cast<const char *>(ad.data());
 			audiodb[path] = new membuf(data + 82, ad.length() - 82);
 		}
@@ -280,6 +285,11 @@ namespace ms
 		} catch (std::out_of_range e)
 		{
 			nl::audio ad = nl::nx::sound.resolve(path);
+
+			// Later-version paths (e.g. Bgm43) aren't in this Sound.nx.
+			if (!ad || ad.length() <= 82)
+				return;
+
 			auto data = reinterpret_cast<const char *>(ad.data());
 			audiodb[path] = new membuf(data + 82, ad.length() - 82);
 		}
