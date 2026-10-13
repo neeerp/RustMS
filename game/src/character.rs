@@ -192,8 +192,8 @@ impl Player {
     }
 
     /// Add EXP, levelling up as many times as it covers. Each level grants
-    /// 5 AP and the job family's HP/MP growth, then restores HP and MP.
-    /// Returns the number of levels gained. (SP comes with skills; v83
+    /// 5 AP and the job family's max HP/MP growth; current HP and MP stay
+    /// as they were, as in v83. Returns the number of levels gained. (SP comes with skills; v83
     /// beginners get none.)
     pub fn gain_exp(&mut self, amount: i32) -> u8 {
         if amount <= 0 {
@@ -215,10 +215,6 @@ impl Player {
         }
         if crate::exp::to_next_level(self.stats.level).is_none() {
             exp = 0;
-        }
-        if gained > 0 {
-            self.stats.hp = self.stats.max_hp;
-            self.stats.mp = self.stats.max_mp;
         }
         self.stats.exp = i32::try_from(exp).unwrap_or(i32::MAX);
         self.dirty = true;
@@ -357,14 +353,16 @@ mod tests {
     fn exp_levels_up_through_several_levels() {
         let mut player = player();
         player.stats.max_hp = 50;
+        player.stats.hp = 40;
         // Rain's seven quizzes pay 62 EXP: level 1 -> 3 with 13 left over.
         assert_eq!(player.gain_exp(62), 2);
         assert_eq!(
             (player.stats.level, player.stats.exp, player.stats.ap),
             (3, 13, 10)
         );
-        // Two beginner levels: +28 max HP, +22 max MP, fully restored.
-        assert_eq!((player.stats.max_hp, player.stats.hp), (78, 78));
+        // Two beginner levels: +28 max HP, +22 max MP, no refill.
+        assert_eq!((player.stats.max_hp, player.stats.hp), (78, 40));
+        assert_eq!((player.stats.max_mp, player.stats.mp), (27, 5));
         assert_eq!(player.gain_exp(0), 0);
         assert!(player.is_dirty());
     }
