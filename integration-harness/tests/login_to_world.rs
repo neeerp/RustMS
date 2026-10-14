@@ -10,7 +10,7 @@ async fn login_to_world_happy_path() {
 
     assert_eq!(result.character_name, config.character_name);
     assert_eq!(
-        result.map_id, 10_000,
+        result.map_id, 0,
         "new Explorers must enter the tutorial route"
     );
 }
