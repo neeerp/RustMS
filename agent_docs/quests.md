@@ -76,7 +76,7 @@ The `game-data` asset test compares the server's result with the committed
 list `game-data/supported_quests.txt`. HeavenClient doesn't classify quests:
 the build copies that list next to the executable, and the client offers
 only those quests (`Character/QuestCatalog.cpp`). Supporting a new key means
-changing the server's allowlist and regenerating the list. 945 quests qualify
+changing the server's allowlist and regenerating the list. 960 quests qualify
 with the current rules, including the beginner ones:
 
 | Quest | Start → Finish | EXP |
