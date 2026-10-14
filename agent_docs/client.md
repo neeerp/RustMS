@@ -141,6 +141,13 @@ from `UI.nx`. Moved so far:
   restores the server's defaults; DEFAULT, CLEAR ALL, and Esc with unsaved
   changes ask through the in-window `notice` bitmaps. CHANGE QUICK SLOTS is
   disabled until the quick slot is configurable.
+- **Maple Messenger** (`UIMessenger`, `UIWindow.img/Messenger`): three seats
+  with the members standing in them, the chat log, and the input line, laid
+  out from period footage. The MAPLECHAT key or ShortCut's MESSENGER button
+  opens a room, or minimises the open one to its title bar (which blinks on
+  unread lines). Clicking an empty seat or typing `/invite name` invites; `/q`
+  or the close button leaves. A speaker shows the `chatBalloon` dots for a
+  few seconds. Invitations arrive as a yes/no notice.
 - **Game Option** (`UIGameOption`, `UIWindow.img/GameOpt`), from MENU: a
   `Basic.img/CheckBox` right of each row's ALLOW, laid out from the
   background. OK saves the boxes as the `Allow*` settings; the client doesn't
@@ -251,7 +258,8 @@ side yet.
 | Monster Book (`UIMonsterBook`) | Implemented: cards, summary, monster pages, search, cover; see `combat.md` |
 | Buddy / party / guild / boss list (`UIUserList`) | Buttons and layout only; no handlers, party packet exists but is unused |
 | Cash shop (`UICashShop`) | Browse/enter/exit; purchase is `// TODO: Purchase item` |
-| Storage, trade, player shops, mini-games, messenger, memo/mail | No UI, no handlers |
+| Maple Messenger (`UIMessenger`) | Implemented |
+| Storage, trade, player shops, mini-games, memo/mail | No UI, no handlers |
 | Pets, mounts, summons, reactors beyond hit/spawn | Partial or absent (`Reactor` TODOs) |
 | Party/guild/boss quests, events, MTS | Absent |
 
@@ -269,7 +277,7 @@ are registered (`Net/PacketSwitch.cpp`). Anything not listed there is silently i
 | Cash shop purchase and inventory | Display only | M |
 | Quest accept/complete UI flow | Partial | S |
 | Pets and mounts | Partial rendering, no interaction | M |
-| Messenger, memo, mail, MTS | Nothing | M each |
+| Memo, mail, MTS | Nothing | M each |
 | Whisper find/buddy modes | Ignored | S |
 | Mini-dungeons, boss/event UI | Nothing | M |
 

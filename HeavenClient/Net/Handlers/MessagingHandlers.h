@@ -70,6 +70,13 @@ namespace ms
 		void handle(InPacket& recv) const override;
 	};
 
+	// Maple Messenger: members joining, leaving and talking, and invitations
+	// Opcode: MESSENGER(313)
+	class MessengerHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
 	// Shows the effect of a scroll
 	// Opcode: SCROLL_RESULT(167)
 	class ScrollResultHandler : public PacketHandler

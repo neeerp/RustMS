@@ -25,7 +25,6 @@
 #include "../Gameplay/Stage.h"
 
 #include "UITypes/UIChannel.h"
-#include "UITypes/UIChat.h"
 #include "UITypes/UIChatBar.h"
 #include "UITypes/UIGameOption.h"
 #include "UITypes/UIJoypad.h"
@@ -247,7 +246,6 @@ namespace ms
 			auto systemoption = UI::get().get_element<UISystemOption>();
 			auto shop = UI::get().get_element<UIShop>();
 			auto joypad = UI::get().get_element<UIJoypad>();
-			auto rank = UI::get().get_element<UIRank>();
 			auto npctalk = UI::get().get_element<UINpcTalk>();
 			//auto report = UI::get().get_element<UIReport>();
 			//auto whisper = UI::get().get_element<UIWhisper>();
@@ -284,10 +282,6 @@ namespace ms
 			{
 				joypad->send_key(mapping.action, pressed, escape);
 				sent = true;
-			} else if (rank && rank->is_active())
-			{
-				rank->send_key(mapping.action, pressed, escape);
-				sent = true;
 			} else
 			{
 				// All
@@ -316,7 +310,6 @@ namespace ms
 					types.emplace_back(UIElement::Type::NOTICE);
 					types.emplace_back(UIElement::Type::ENTERNUMBER);
 					types.emplace_back(UIElement::Type::KEYCONFIG);
-					types.emplace_back(UIElement::Type::CHAT);
 					types.emplace_back(UIElement::Type::EVENT);
 					types.emplace_back(UIElement::Type::STATSINFO);
 					types.emplace_back(UIElement::Type::ITEMINVENTORY);

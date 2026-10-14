@@ -17,12 +17,17 @@
 //////////////////////////////////////////////////////////////////////////////////
 #include "MessagingHandlers.h"
 
+#include "Helpers/LoginParser.h"
+
 #include "../../Audio/Audio.h"
 #include "../../Data/ItemData.h"
 #include "../../Gameplay/Stage.h"
 #include "../../IO/UI.h"
+#include "../Packets/MessagingPackets.h"
 
 #include "../../IO/UITypes/UIChatBar.h"
+#include "../../IO/UITypes/UIMessenger.h"
+#include "../../IO/UITypes/UINotice.h"
 #include "../../IO/UITypes/UIStatusMessenger.h"
 
 #include <nlnx/nx.hpp>
@@ -295,6 +300,99 @@ namespace ms
 			{
 				if (auto chatbar = UI::get().get_element<UIChatBar>())
 					chatbar->send_chatline("Unable to whisper " + target + ".", UIChatBar::LineType::RED);
+			}
+		}
+	}
+
+	void MessengerHandler::handle(InPacket& recv) const
+	{
+		// Canonical v83 MESSENGER modes
+		enum Mode : int8_t
+		{
+			ADD = 0x00,
+			JOIN = 0x01,
+			REMOVE = 0x02,
+			INVITE = 0x03,
+			INVITE_RESULT = 0x04,
+			DECLINED = 0x05,
+			CHAT = 0x06,
+			UPDATE = 0x07
+		};
+
+		int8_t mode = recv.read_byte();
+		auto messenger = UI::get().get_element<UIMessenger>();
+
+		switch (mode)
+		{
+			case Mode::ADD:
+			case Mode::UPDATE:
+			{
+				uint8_t slot = recv.read_byte();
+				LookEntry look = LoginParser::parse_look(recv);
+				std::string name = recv.read_string();
+
+				if (messenger)
+					messenger->set_member(slot, CharLook(look), name);
+
+				break;
+			}
+			case Mode::JOIN:
+				UIMessenger::seat(recv.read_byte());
+				break;
+			case Mode::REMOVE:
+				if (messenger)
+					messenger->remove_member(recv.read_byte());
+
+				break;
+			case Mode::INVITE:
+			{
+				std::string from = recv.read_string();
+				recv.skip_byte();
+				int32_t messenger_id = recv.read_int();
+
+				UI::get().emplace<UIYesNo>(
+						from + " has invited you to Maple Messenger. Would you like to join?",
+						[from, messenger_id](bool yes)
+						{
+							if (yes)
+								MessengerOpenPacket(messenger_id).dispatch();
+							else
+								MessengerDeclinePacket(from).dispatch();
+						}
+				);
+
+				break;
+			}
+			case Mode::INVITE_RESULT:
+			{
+				std::string target = recv.read_string();
+				bool sent = recv.read_bool();
+
+				if (messenger)
+					messenger->add_note(sent ? "You have sent an invite to " + target + "."
+											 : "Unable to find '" + target + "'.");
+
+				break;
+			}
+			case Mode::DECLINED:
+			{
+				std::string note = recv.read_string() + " has declined your invitation.";
+
+				if (messenger && messenger->is_active())
+					messenger->add_note(note);
+				else if (auto chatbar = UI::get().get_element<UIChatBar>())
+					chatbar->send_chatline(note, UIChatBar::LineType::RED);
+
+				break;
+			}
+			case Mode::CHAT:
+			{
+				std::string line = recv.read_string();
+
+				if (messenger && messenger->is_active())
+					messenger->add_chat(line);
+
+				break;
 			}
 		}
 	}

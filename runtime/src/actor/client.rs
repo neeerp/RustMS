@@ -285,11 +285,18 @@ impl ClientActor {
             WorldAction::Shop(request) => self.shop_action(request).await?,
             WorldAction::ScriptPortal { portal } => self.touch_script_portal(&portal).await?,
             WorldAction::LookChanged(announce) => {
-                let avatar = self.in_game()?.player.field_avatar(0, 0, 0);
+                let player = &self.in_game()?.player;
+                let avatar = player.field_avatar(0, 0, 0);
+                let look = player.look();
                 self.send_to_field(FieldMessage::UpdateAvatar {
                     client_id: self.client_id,
                     avatar,
                     announce: Some(announce),
+                })
+                .await?;
+                self.send_to_directory(DirectoryMessage::LookChanged {
+                    client_id: self.client_id,
+                    look,
                 })
                 .await?
             }
@@ -297,6 +304,13 @@ impl ClientActor {
                 self.send_to_directory(DirectoryMessage::Whisper {
                     from: self.client_id,
                     delivery,
+                })
+                .await?
+            }
+            WorldAction::Messenger(request) => {
+                self.send_to_directory(DirectoryMessage::Messenger {
+                    from: self.client_id,
+                    request,
                 })
                 .await?
             }
@@ -553,6 +567,7 @@ impl ClientActor {
                 .send_to_directory(DirectoryMessage::Unregister {
                     client_id: self.client_id,
                     connection_id: self.connection_id,
+                    changing_channel: self.changing_channel,
                 })
                 .await;
             if let Err(error) = self.flush().await {

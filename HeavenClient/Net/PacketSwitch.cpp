@@ -86,6 +86,7 @@ namespace ms
 		SKILL_MACROS = 124,
 		SET_FIELD = 125,
 		WHISPER = 135,
+		MESSENGER = 313,
 		FIELD_EFFECT = 138,
 
 		/// MapObject
@@ -204,6 +205,7 @@ namespace ms
 		emplace<PLAYER_HINT, PlayerHintHandler>();
 		emplace<CHAT_RECEIVED, ChatReceivedHandler>();
 		emplace<WHISPER, WhisperHandler>();
+		emplace<MESSENGER, MessengerHandler>();
 		emplace<SCROLL_RESULT, ScrollResultHandler>();
 		emplace<SERVER_MESSAGE, ServerMessageHandler>();
 		emplace<WEEK_EVENT_MESSAGE, WeekEventMessageHandler>();

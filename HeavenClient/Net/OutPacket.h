@@ -74,6 +74,7 @@ namespace ms
 			GENERAL_CHAT = 49,
 			FACE_EXPRESSION = 51,
 			WHISPER = 120,
+			MESSENGER = 122,
 
 			/// Monster Book
 			MONSTER_BOOK_COVER = 57,

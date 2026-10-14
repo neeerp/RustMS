@@ -129,12 +129,6 @@ namespace ms
 		// Set the shop's "Right-click to sell item" boolean
 		void set_rightclicksell(bool value);
 
-		// Whether to show the weekly maple star in Maple Chat
-		bool get_show_weekly();
-
-		// Set whether to show the weekly maple star in Maple Chat
-		void set_show_weekly(bool value);
-
 		// Whether to skip the startup logo sequence
 		bool get_skip_startup_logos() const;
 
@@ -292,7 +286,6 @@ namespace ms
 		const std::string auto_pic = "";
 		const int32_t auto_cid = 0;
 		bool rightclicksell = false;
-		bool show_weekly = true;
 		bool start_shown = false;
 		std::string MACS;
 		std::string HWID;
@@ -643,10 +636,10 @@ namespace ms
 		{}
 	};
 
-	// The default position of UIChat and UIRank
-	struct PosMAPLECHAT : public Configuration::PointEntry
+	// The default position of UIMessenger
+	struct PosMESSENGER : public Configuration::PointEntry
 	{
-		PosMAPLECHAT() : PointEntry("PosMAPLECHAT", "(50, 46)")
+		PosMESSENGER() : PointEntry("PosMESSENGER", "(250, 80)")
 		{}
 	};
 

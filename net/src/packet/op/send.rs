@@ -59,6 +59,7 @@ pub enum SendOpcode {
     SpawnReactor = 0x117,
     RemoveReactor = 0x118,
     NpcDialogue = 0x130,
+    Messenger = 0x139,
     OpenNpcShop = 0x131,
     ConfirmShopTransaction = 0x132,
 
