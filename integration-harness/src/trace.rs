@@ -17,6 +17,7 @@ pub mod stat {
     pub const STR: i32 = 0x40;
     pub const HP: i32 = 0x400;
     pub const MAX_HP: i32 = 0x800;
+    pub const MP: i32 = 0x1000;
     pub const AP: i32 = 0x4000;
     pub const SP: i32 = 0x8000;
     pub const EXP: i32 = 0x10000;
@@ -69,6 +70,12 @@ pub struct Trace {
     pub added: Vec<(u8, i16, i32)>,
     /// "Quest Clear" effects (SHOW_ITEM_GAIN_INCHAT 9).
     pub cleared: usize,
+    /// "Card get" effects (SHOW_ITEM_GAIN_INCHAT 0x0D).
+    pub card_effects: usize,
+    /// MONSTER_BOOK_SET_CARD: (went into the book, card, copies).
+    pub cards: Vec<(bool, i32, i32)>,
+    /// MONSTER_BOOK_SET_COVER answers.
+    pub covers: Vec<i32>,
     /// UI images shown on the player (SHOW_ITEM_GAIN_INCHAT 0x17).
     pub images: Vec<String>,
     /// "You can't get anymore items." (SHOW_STATUS_INFO 0/-1).
@@ -77,6 +84,16 @@ pub struct Trace {
     pub prompts: Vec<(i32, u8)>,
     /// Maps warped to.
     pub warps: Vec<i32>,
+    /// NPC shops opened: the NPC and (item id, price) per row.
+    pub shops: Vec<(i32, Vec<(i32, i32)>)>,
+    /// CONFIRM_SHOP_TRANSACTION codes.
+    pub shop_results: Vec<u8>,
+    /// GIVE_BUFF: (skill id, value, duration in ms).
+    pub buffs: Vec<(i32, i16, i32)>,
+    /// CANCEL_BUFF: the second mask of each.
+    pub cancelled_buffs: Vec<i64>,
+    /// COOLDOWN: (skill id, seconds).
+    pub cooldowns: Vec<(i32, i16)>,
     /// Mobs and drops on the current field.
     pub field: Field,
 }
@@ -117,9 +134,16 @@ impl Trace {
                     }
                 }
                 9 => self.cleared += 1,
+                0x0D => self.card_effects += 1,
                 0x17 => self.images.push(r.read_str_with_length().unwrap()),
                 _ => {}
             }
+        } else if op == SendOpcode::MonsterBookSetCard as i16 {
+            let added = r.read_byte().unwrap() == 1;
+            self.cards
+                .push((added, r.read_int().unwrap(), r.read_int().unwrap()));
+        } else if op == SendOpcode::MonsterBookSetCover as i16 {
+            self.covers.push(r.read_int().unwrap());
         } else if op == SendOpcode::StatChange as i16 {
             r.read_byte().unwrap();
             let mask = r.read_int().unwrap();
@@ -172,6 +196,38 @@ impl Trace {
             r.read_byte().unwrap();
             let npc = r.read_int().unwrap();
             self.prompts.push((npc, r.read_byte().unwrap()));
+        } else if op == SendOpcode::OpenNpcShop as i16 {
+            let npc = r.read_int().unwrap();
+            let rows = (0..r.read_short().unwrap())
+                .map(|_| {
+                    let (item, price) = (r.read_int().unwrap(), r.read_int().unwrap());
+                    for _ in 0..3 {
+                        r.read_int().unwrap();
+                    }
+                    if matches!(item / 10_000, 207 | 233) {
+                        r.read_long().unwrap(); // recharge rate
+                    } else {
+                        r.read_short().unwrap(); // bundle size
+                    }
+                    r.read_short().unwrap();
+                    (item, price)
+                })
+                .collect();
+            self.shops.push((npc, rows));
+        } else if op == SendOpcode::ConfirmShopTransaction as i16 {
+            self.shop_results.push(r.read_byte().unwrap());
+        } else if op == SendOpcode::GiveBuff as i16 {
+            r.read_long().unwrap();
+            r.read_long().unwrap();
+            let value = r.read_short().unwrap();
+            self.buffs
+                .push((r.read_int().unwrap(), value, r.read_int().unwrap()));
+        } else if op == SendOpcode::CancelBuff as i16 {
+            r.read_long().unwrap();
+            self.cancelled_buffs.push(r.read_long().unwrap());
+        } else if op == SendOpcode::Cooldown as i16 {
+            self.cooldowns
+                .push((r.read_int().unwrap(), r.read_short().unwrap()));
         } else if op == SendOpcode::SetField as i16 && p.bytes.get(6) == Some(&0) {
             // A map change rather than entering the world.
             self.warps.push(decode_set_field_warp(p).unwrap().map_id);

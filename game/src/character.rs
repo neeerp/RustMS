@@ -1,5 +1,7 @@
+use crate::buff::Buffs;
 use crate::inventory::{equip_slot, Inventory};
 use crate::keymap::Keymap;
+use crate::monster_book::MonsterBook;
 use crate::quest::QuestLog;
 use crate::skill::{self, SkillBook, SkillRecord};
 use std::collections::BTreeMap;
@@ -133,8 +135,11 @@ pub struct Player {
     pub skills: SkillBook,
     pub keymap: Keymap,
     pub quests: QuestLog,
+    pub monster_book: MonsterBook,
     /// Account GM level; 0 for regular players.
     pub gm_level: i16,
+    /// Active buffs and cooldowns; not saved.
+    pub buffs: Buffs,
     dirty: bool,
 }
 
@@ -159,7 +164,9 @@ impl Player {
             skills,
             keymap,
             quests,
+            monster_book: MonsterBook::default(),
             gm_level: 0,
+            buffs: Buffs::default(),
             dirty: false,
         }
     }
@@ -201,6 +208,13 @@ impl Player {
     pub fn keymap_mut(&mut self) -> &mut Keymap {
         self.dirty = true;
         &mut self.keymap
+    }
+
+    /// Mutable access to the Monster Book; marks the player as needing a
+    /// save.
+    pub fn monster_book_mut(&mut self) -> &mut MonsterBook {
+        self.dirty = true;
+        &mut self.monster_book
     }
 
     /// Mutable access to the inventory; marks the player as needing a save.

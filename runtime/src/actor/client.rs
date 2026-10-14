@@ -1,9 +1,11 @@
+mod buff;
 mod combat;
 mod dialogue;
 mod loot;
 mod npc_script;
 mod quest;
 mod script;
+mod shop;
 
 use crate::actor::registry::FieldRegistry;
 use crate::db::spawn_db;
@@ -29,7 +31,7 @@ use std::sync::Arc;
 use std::time::Duration;
 use tokio::net::TcpStream;
 use tokio::sync::mpsc;
-use tokio::time::{interval, MissedTickBehavior};
+use tokio::time::{interval, sleep_until, Instant, MissedTickBehavior};
 use tokio_util::sync::CancellationToken;
 use tracing::{debug, error, info, warn};
 
@@ -75,6 +77,8 @@ pub struct ClientActor {
     conversation: Option<Conversation>,
     /// A native NPC or quest script conversation.
     script: Option<npc_script::ActiveScript>,
+    /// The NPC shop the player has open.
+    shop: Option<net::shop::Shop>,
     /// When natural recovery was last accepted.
     last_heal: Option<tokio::time::Instant>,
     /// When the player last sent movement; recovery needs them to rest.
@@ -124,6 +128,7 @@ impl ClientActor {
             game: None,
             conversation: None,
             script: None,
+            shop: None,
             last_heal: None,
             last_moved: None,
             pending_quest: None,
@@ -140,6 +145,7 @@ impl ClientActor {
         let kill = self.kill.clone();
 
         let outcome = loop {
+            let buffs_due = self.buffs_due();
             let step = tokio::select! {
                 biased;
                 _ = kill.cancelled() => Err(RuntimeError::ClientDisconnected),
@@ -149,6 +155,9 @@ impl ClientActor {
                 },
                 Some(message) = self.rx.recv() => self.handle_server_message(message).await,
                 _ = autosave.tick() => self.save_if_dirty().await,
+                _ = sleep_until(buffs_due.unwrap_or_else(Instant::now)), if buffs_due.is_some() => {
+                    self.update_buffs().await
+                }
             };
             if let Err(error) = step {
                 break error;
@@ -243,6 +252,7 @@ impl ClientActor {
             WorldAction::NpcInteraction(NpcInteraction::Start { object_id, .. }) => {
                 self.conversation = None;
                 self.script = None;
+                self.shop = None;
                 self.npc_request_id = self.npc_request_id.wrapping_add(1);
                 self.send_to_field(FieldMessage::NpcInteraction {
                     from: self.client_id,
@@ -273,13 +283,21 @@ impl ClientActor {
             }
             WorldAction::Died => self.died().await?,
             WorldAction::Quest(request) => self.request_quest_action(request).await?,
+            WorldAction::Shop(request) => self.shop_action(request).await?,
             WorldAction::ScriptPortal { portal } => self.touch_script_portal(&portal).await?,
             WorldAction::LookChanged(announce) => {
-                let avatar = self.in_game()?.player.field_avatar(0, 0, 0);
+                let player = &self.in_game()?.player;
+                let avatar = player.field_avatar(0, 0, 0);
+                let look = player.look();
                 self.send_to_field(FieldMessage::UpdateAvatar {
                     client_id: self.client_id,
                     avatar,
                     announce: Some(announce),
+                })
+                .await?;
+                self.send_to_directory(DirectoryMessage::LookChanged {
+                    client_id: self.client_id,
+                    look,
                 })
                 .await?
             }
@@ -294,6 +312,13 @@ impl ClientActor {
                 self.send_to_directory(DirectoryMessage::Find {
                     from: self.client_id,
                     target_name,
+                })
+                .await?
+            }
+            WorldAction::Messenger(request) => {
+                self.send_to_directory(DirectoryMessage::Messenger {
+                    from: self.client_id,
+                    request,
                 })
                 .await?
             }
@@ -370,6 +395,7 @@ impl ClientActor {
     ) -> Result<(), RuntimeError> {
         self.conversation = None;
         self.script = None;
+        self.shop = None;
         self.pending_quest = None;
         self.npc_request_id = self.npc_request_id.wrapping_add(1);
 
@@ -404,6 +430,7 @@ impl ClientActor {
             .map_err(|e| RuntimeError::Handler(format!("Unknown channel: {e}")))?;
         let session_id = self.session_id.ok_or(RuntimeError::NotLoggedIn)?;
 
+        self.cancel_buffs().await?;
         self.flush().await?;
         spawn_db(move || db::session::begin_channel_transition(session_id, i16::from(channel_id)))
             .await?;
@@ -440,8 +467,19 @@ impl ClientActor {
                 self.count_quest_kill(mob_id).await?;
                 self.drop_loot(mob_id, object_id, x, y).await?
             }
+            ServerMessage::ReactorBroken {
+                reactor_id,
+                object_id,
+                x,
+                y,
+            } => self.drop_reactor_loot(reactor_id, object_id, x, y).await?,
             ServerMessage::PickedUp { drop } => self.picked_up(drop).await?,
             ServerMessage::Locate { reply_to } => self.locate(&reply_to),
+            ServerMessage::CharInfoRequested { requester } => {
+                let packet = build::world::info::build_character_info(&self.in_game()?.player)
+                    .map_err(|e| RuntimeError::Handler(e.to_string()))?;
+                requester.send_packet(packet);
+            }
             ServerMessage::SendPacket(mut packet) => self.send(&mut packet).await?,
         }
         Ok(())
@@ -552,6 +590,7 @@ impl ClientActor {
                 .send_to_directory(DirectoryMessage::Unregister {
                     client_id: self.client_id,
                     connection_id: self.connection_id,
+                    changing_channel: self.changing_channel,
                 })
                 .await;
             if let Err(error) = self.flush().await {

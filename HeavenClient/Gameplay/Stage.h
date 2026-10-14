@@ -70,6 +70,9 @@ namespace ms
 		// Talk to the nearest NPC in reach, as if it had been clicked.
 		void talk_to_nearest_npc();
 
+		// The character under a cursor position, or 0 if there is none.
+		int32_t character_at(Point<int16_t> cursorpos);
+
 		// Lets go of a held key whose release went elsewhere, such as to a
 		// dialog or a text field, so the player doesn't keep walking.
 		void release_key(KeyType::Id keytype, int32_t keycode);
@@ -134,6 +137,8 @@ namespace ms
 
 		void check_ladders(bool up);
 
+		void check_held_ladders();
+
 		void check_drops();
 
 		enum State
@@ -152,6 +157,8 @@ namespace ms
 		int32_t mapid;
 
 		MapInfo mapinfo;
+		// The ladder or rope the player last climbed, until they land.
+		Optional<const Ladder> left_ladder;
 		MapTilesObjs tilesobjs;
 		MapBackgrounds backgrounds;
 		MapPortals portals;

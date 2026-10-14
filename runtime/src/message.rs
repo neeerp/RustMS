@@ -4,7 +4,7 @@
 //!
 //! ```text
 //!   ClientActor ──► FieldActor        (its current map: chat, movement, NPCs)
-//!   ClientActor ──► WorldDirectory    (name lookup: whisper, world broadcast)
+//!   ClientActor ──► WorldDirectory    (name lookup: whisper, broadcast, messenger)
 //!   FieldActor / WorldDirectory ──► ClientHandle (try_send, never awaited)
 //! ```
 //!
@@ -12,8 +12,8 @@
 //! backpressure), but fields and the directory never await a client: a client
 //! whose queue is full is kicked instead. That makes wait cycles impossible.
 
-use game::FieldAvatar;
-use net::{BroadcastScope, ClientId, FieldRequest, WhisperDelivery};
+use game::{AvatarLook, FieldAvatar};
+use net::{BroadcastScope, ClientId, FieldRequest, MessengerRequest, WhisperDelivery};
 use packet::Packet;
 use tokio::sync::mpsc;
 use tokio::sync::mpsc::error::TrySendError;
@@ -58,6 +58,13 @@ pub enum ServerMessage {
         x: i16,
         y: i16,
     },
+    /// This player broke a reactor; its loot drops for them.
+    ReactorBroken {
+        reactor_id: i32,
+        object_id: i32,
+        x: i16,
+        y: i16,
+    },
     /// The field gave this player a drop to put in their inventory.
     PickedUp {
         drop: crate::actor::field_drops::Drop,
@@ -70,6 +77,11 @@ pub enum ServerMessage {
     /// Someone on this channel looked for this player; answer with the map.
     Locate {
         reply_to: ClientHandle,
+    },
+    /// `requester` (maybe this player) double-clicked this player; send them
+    /// CHAR_INFO.
+    CharInfoRequested {
+        requester: ClientHandle,
     },
     SendPacket(Packet),
 }
@@ -202,6 +214,8 @@ pub enum DirectoryMessage {
     Unregister {
         client_id: ClientId,
         connection_id: u64,
+        /// The client is moving to another channel and will register again.
+        changing_channel: bool,
     },
     Whisper {
         from: ClientId,
@@ -215,5 +229,14 @@ pub enum DirectoryMessage {
         from: ClientId,
         scope: BroadcastScope,
         packet: Packet,
+    },
+    Messenger {
+        from: ClientId,
+        request: MessengerRequest,
+    },
+    /// The client's worn equipment changed.
+    LookChanged {
+        client_id: ClientId,
+        look: AvatarLook,
     },
 }

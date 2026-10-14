@@ -3,6 +3,7 @@
 
 use std::ops::Range;
 
+pub const REACTORS: Range<i32> = 1_200_000_000..1_500_000_000;
 pub const DROPS: Range<i32> = 1_500_000_000..2_000_000_000;
 pub const MOBS: Range<i32> = 2_000_000_000..i32::MAX;
 

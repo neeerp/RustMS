@@ -1,14 +1,14 @@
 //! Mob drops: rolling, ownership, pickup into the inventory or meso total,
 //! persistence, and quest-only drops.
 
-use integration_harness::hunting::{attack, pickup};
+use integration_harness::hunting::{attack, pickup, MapDrop};
 use integration_harness::preconditions::load_harness_config_or_fail;
 use integration_harness::trace::{read_for, send, stat, until, warp, Trace};
 use integration_harness::{login_to_world_session, relogin};
 
 const FOREST: i32 = 50_000;
 const SNAIL: i32 = 100100;
-const SMALL_FOREST: i32 = 40_000;
+const EAST_ENTRANCE: i32 = 30_000;
 const SENTINEL: i32 = 9300018;
 
 #[tokio::test]
@@ -32,7 +32,10 @@ async fn snail_drops_go_to_the_killer_first_and_persist() {
     // Earlier tests may have left drops (and pending removals) on this map.
     let old_drops = h.field.drops.len();
 
-    // Snails drop mesos 65% of the time; kill until something drops.
+    // Snails drop mesos 65% of the time; kill until something drops. The
+    // harness makes every kill drop a Monster Book card too
+    // (tests/monster_book.rs), so look past those.
+    let not_card = |d: &&MapDrop| d.meso || d.value / 10_000 != 238;
     for oid in h.field.alive(SNAIL) {
         send(&mut hunter.connection, attack(oid, 8)).await;
         until(&mut hunter.connection, &mut h, |t| {
@@ -40,14 +43,13 @@ async fn snail_drops_go_to_the_killer_first_and_persist() {
         })
         .await;
         read_for(&mut hunter.connection, &mut h, 200).await;
-        if h.field.drops.len() > old_drops {
+        if h.field.drops[old_drops..].iter().any(|d| not_card(&d)) {
             break;
         }
     }
-    let loot = *h
-        .field
-        .drops
-        .get(old_drops)
+    let loot = *h.field.drops[old_drops..]
+        .iter()
+        .find(not_card)
         .expect("seventeen snails dropped nothing");
     let ours = |t: &Trace| t.field.removals(loot.object_id);
     until(&mut rival.connection, &mut r, |t| {
@@ -113,8 +115,8 @@ async fn the_shellpiece_only_drops_during_todds_quest() {
     let mut session = login_to_world_session(&config).await.unwrap();
     let mut seen = Trace::default();
     assert_eq!(
-        warp(&mut session.connection, SMALL_FOREST, "", &mut seen).await,
-        SMALL_FOREST
+        warp(&mut session.connection, EAST_ENTRANCE, "", &mut seen).await,
+        EAST_ENTRANCE
     );
     until(&mut session.connection, &mut seen, |t| {
         t.field.alive(SENTINEL).len() >= 3

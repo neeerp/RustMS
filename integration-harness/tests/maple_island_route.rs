@@ -1,4 +1,4 @@
-//! A new Explorer plays Maple Island from Mushroom Town to Amherst the way
+//! A new Explorer plays Maple Island from the Training Camp to Amherst the way
 //! a player would: through portals only (no debug warps), doing every quest
 //! on the way, hunting with melee attacks, and picking up quest drops.
 
@@ -74,7 +74,7 @@ impl Run {
 async fn a_new_explorer_plays_maple_island_to_amherst() {
     let config = load_harness_config_or_fail().await;
     let session = login_to_world_session(&config).await.unwrap();
-    assert_eq!(session.map_id, 10_000);
+    assert_eq!(session.map_id, 0);
     let mut run = Run {
         session,
         marker: config.character_name.clone(),
@@ -82,14 +82,14 @@ async fn a_new_explorer_plays_maple_island_to_amherst() {
     };
     run.settle().await;
 
-    // Mushroom Town: Heena sends us to Sera.
+    // Outside the Training Camp: Heena sends us to Sera.
     run.quest(START, 1031, 2101).await;
     run.quest(COMPLETE, 1031, 2100).await;
     assert_eq!(run.state(1031), Some(2));
 
-    // Snail Garden: Roger's Apple. The script takes HP down to 25 and
+    // Mushroom Town: Roger's Apple. The script takes HP down to 25 and
     // hands over an apple; eating it lets Roger finish the quest.
-    run.portal("out00", 20_000).await;
+    run.portal("out00", 10_000).await;
     run.step(build_quest_action(SCRIPT_START, 1021, 2000)).await;
     run.step(answer(0, 1, None)).await;
     run.step(answer(0, 1, None)).await;
@@ -110,25 +110,25 @@ async fn a_new_explorer_plays_maple_island_to_amherst() {
     }
     assert_eq!(run.state(1021), Some(2));
 
-    // Snail Field of Flowers and Sen's house: Nina and Sen's errands, and
-    // the Mushroom Candy.
-    run.portal("out00", 30_000).await;
+    // Further into town, and Sen's house: Nina and Sen's errands, and the
+    // Mushroom Candy.
+    run.portal("out00", 20_000).await;
     run.quest(START, 1032, 2102).await;
-    run.portal("in01", 30_001).await;
+    run.portal("in01", 20_001).await;
     run.quest(COMPLETE, 1032, 2001).await;
     run.quest(START, 1033, 2001).await;
-    run.portal("out00", 30_000).await;
+    run.portal("out00", 20_000).await;
     run.quest(COMPLETE, 1033, 2102).await;
     run.quest(START, 1034, 2102).await;
-    run.portal("in01", 30_001).await;
+    run.portal("in01", 20_001).await;
     run.quest(COMPLETE, 1034, 2001).await;
-    run.portal("out00", 30_000).await;
+    run.portal("out00", 20_000).await;
     for id in [1032, 1033, 1034] {
         assert_eq!(run.state(id), Some(2), "quest {id}");
     }
 
-    // In a Small Forest: Todd's hunt, the shellpiece, and Peter.
-    run.portal("out00", 40_000).await;
+    // East Entrance: Todd's hunt, the shellpiece, and Peter up by the exit.
+    run.portal("out00", 30_000).await;
     run.quest(START, 1035, 2004).await;
     run.hunt(SENTINEL, 1).await;
     run.wait(|t| t.field.item_drop(SHELLPIECE).is_some()).await;
@@ -138,11 +138,12 @@ async fn a_new_explorer_plays_maple_island_to_amherst() {
         .await;
     run.wait(|t| !t.field.removals(shellpiece.object_id).is_empty())
         .await;
+    run.send(walk_to(972, -694)).await;
     run.quest(COMPLETE, 1035, 2002).await;
     assert_eq!(run.state(1035), Some(2));
 
-    // Dangerous Forest: Robin, then Sam's snails.
-    run.portal("out00", 50_000).await;
+    // Snail Hunting Ground I: Robin, then Sam's snails.
+    run.portal("out00", 40_000).await;
     run.quest(START, 1036, 2003).await;
     run.quest(COMPLETE, 1036, 2003).await;
     assert_eq!(run.state(1036), Some(2));
@@ -150,10 +151,14 @@ async fn a_new_explorer_plays_maple_island_to_amherst() {
     run.hunt(SNAIL, 10).await;
     assert_eq!(run.trace.kills.get(&1037).map(String::as_str), Some("010"));
 
-    // Amherst: Maria, her letter, and Lucas across town.
-    run.portal("east00", 1_000_000).await;
+    // A Split Road: Maria, and her letter for Lucas across Amherst.
+    run.portal("east00", 40_001).await;
+    run.portal("east00", 40_002).await;
+    run.portal("east00", 50_000).await;
     run.quest(COMPLETE, 1037, 2103).await;
     run.quest(START, 1038, 2103).await;
+    run.portal("east00", 1_000_000).await;
+    run.portal("east00", 1_010_000).await;
     run.send(walk_to(1500, 154)).await;
     run.quest(COMPLETE, 1038, 12000).await;
     assert_eq!(run.state(1038), Some(2));
@@ -162,7 +167,7 @@ async fn a_new_explorer_plays_maple_island_to_amherst() {
 
     // Everything was saved: the quests, the map, and the EXP.
     let restored = relogin(&config).await;
-    assert_eq!(restored.map_id, 1_000_000);
+    assert_eq!(restored.map_id, 1_010_000);
     for id in [1021, 1031, 1032, 1033, 1034, 1035, 1036, 1037, 1038] {
         assert_eq!(restored.quests.get(&id), Some(&2), "quest {id}");
     }

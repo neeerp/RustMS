@@ -72,7 +72,12 @@ namespace ms
 
 			/// Messaging
 			GENERAL_CHAT = 49,
+			FACE_EXPRESSION = 51,
 			WHISPER = 120,
+			MESSENGER = 122,
+
+			/// Monster Book
+			MONSTER_BOOK_COVER = 57,
 
 			/// NPC Interaction
 			TALK_TO_NPC = 58,
