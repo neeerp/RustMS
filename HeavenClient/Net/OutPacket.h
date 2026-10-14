@@ -72,7 +72,13 @@ namespace ms
 
 			/// Messaging
 			GENERAL_CHAT = 49,
+			MULTICHAT = 119,
+			FACE_EXPRESSION = 51,
 			WHISPER = 120,
+			MESSENGER = 122,
+
+			/// Monster Book
+			MONSTER_BOOK_COVER = 57,
 
 			/// NPC Interaction
 			TALK_TO_NPC = 58,
@@ -103,6 +109,7 @@ namespace ms
 			CHANGE_MAP_SPECIAL = 100,
 			QUEST_ACTION = 107,
 			PARTY_OPERATION = 124,
+			DENY_PARTY_REQUEST = 125,
 			ADMIN_COMMAND = 128,
 			MOVE_MONSTER = 188,
 			PICKUP_ITEM = 202,

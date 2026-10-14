@@ -48,9 +48,10 @@ impl LoginHandler for CreateCharacterHandler {
             hair_color,
             skin,
             gender: i16::from(gender),
-            // The Explorer tutorial exits lead one-way toward Amherst. Starting
-            // in Amherst skips the existing Heena/Nina quests entirely.
-            map_id: if job == 0 { 10_000 } else { 1_000_000 },
+            // Explorers start outside the Training Camp, with Heena and Sera.
+            // The island's exits lead one-way from there, so starting further
+            // along skips its first quests.
+            map_id: if job == 0 { 0 } else { 1_010_000 },
         };
 
         let (stats, look) = character.create(starting_items)?;

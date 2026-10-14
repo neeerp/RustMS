@@ -7,6 +7,7 @@ use game_data::MapMobTemplate;
 use net::packet::build::world::field::parse_movement;
 use net::packet::build::world::mob::MobView;
 use net::ClientId;
+use std::cmp::Reverse;
 use std::collections::{BTreeMap, HashMap};
 use tokio::time::{Duration, Instant};
 
@@ -55,15 +56,18 @@ impl LiveMob {
     }
 }
 
-/// A mob killed by an attack and who gets EXP for it.
+/// A mob killed by an attack. The field splits its EXP (`split_exp`),
+/// since only the field knows who is in which party.
 #[derive(Debug, PartialEq, Eq)]
 pub struct Kill {
     pub object_id: i32,
     pub mob_id: i32,
     pub x: i16,
     pub y: i16,
-    /// EXP per player, shared by damage dealt.
-    pub exp: Vec<(ClientId, i32)>,
+    pub exp: i32,
+    pub level: i16,
+    /// Damage per player still on the field, most first.
+    pub damage_by: Vec<(ClientId, i64)>,
 }
 
 pub struct MobSet {
@@ -213,27 +217,120 @@ impl MobSet {
             mob_id: mob.info.mob_id,
             x: mob.x,
             y: mob.y,
-            exp: share_exp(mob.info.exp, &mob.damage_by),
+            exp: mob.info.exp,
+            level: mob.info.level,
+            damage_by: ranked_damage(&mob.damage_by),
         }))
     }
 }
 
-/// Split a mob's EXP by damage dealt; the top damage dealer gets any
-/// rounding remainder.
-fn share_exp(exp: i32, damage_by: &HashMap<ClientId, i64>) -> Vec<(ClientId, i32)> {
-    let total: i64 = damage_by.values().sum();
+fn ranked_damage(damage_by: &HashMap<ClientId, i64>) -> Vec<(ClientId, i64)> {
+    let mut ranked: Vec<_> = damage_by
+        .iter()
+        .filter(|(_, damage)| **damage > 0)
+        .map(|(&client, &damage)| (client, damage))
+        .collect();
+    ranked.sort_by_key(|&(client, damage)| (Reverse(damage), client));
+    ranked
+}
+
+/// Someone on the field when a mob dies, who may share its EXP.
+#[derive(Clone, Copy, Debug)]
+pub struct Sharer {
+    pub client: ClientId,
+    pub level: u8,
+    pub party: Option<i32>,
+}
+
+/// One player's part of a kill.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct ExpShare {
+    pub client: ClientId,
+    pub exp: i32,
+    /// Extra EXP for hunting with a party, shown separately.
+    pub party_bonus: i32,
+    /// Whether they hit the mob, and so roll its loot.
+    pub attacked: bool,
+}
+
+/// Party members share a party's EXP when within this many levels of the
+/// mob or of a member who hit it.
+const LEECH_LEVELS: i32 = 5;
+/// Party EXP is split 80% by level, plus 20% to the member who hit hardest.
+const LEVEL_SHARE: f64 = 0.8;
+const TOP_DAMAGE_SHARE: f64 = 0.2;
+/// Each member sharing a kill adds 5% party bonus.
+const PARTY_BONUS_PER_MEMBER: f64 = 0.05;
+
+/// Split a mob's EXP the v83 way (as reconstructed by Cosmic): each solo
+/// attacker, and each party taken together, earns EXP for its part of the
+/// damage. A party's EXP goes to its members on the field by level, with an
+/// extra 20% to whoever dealt it the most, plus 5% per sharing member.
+pub fn split_exp(
+    exp: i32,
+    mob_level: i16,
+    damage_by: &[(ClientId, i64)],
+    sharers: &[Sharer],
+) -> Vec<ExpShare> {
+    let total: i64 = damage_by.iter().map(|(_, damage)| damage).sum();
     if total <= 0 || exp <= 0 {
         return Vec::new();
     }
-    let mut shares: Vec<(ClientId, i32)> = damage_by
-        .iter()
-        .filter(|(_, damage)| **damage > 0)
-        .map(|(&client, &damage)| (client, (i64::from(exp) * damage / total) as i32))
-        .collect();
-    shares.sort_by_key(|(client, _)| std::cmp::Reverse(damage_by[client]));
-    let given: i32 = shares.iter().map(|(_, e)| e).sum();
-    if let Some(top) = shares.first_mut() {
-        top.1 += exp - given;
+    let per_damage = f64::from(exp) / total as f64;
+    let round = |exp: f64| exp.round() as i32;
+
+    let mut shares = Vec::new();
+    let mut parties: BTreeMap<i32, Vec<(Sharer, i64)>> = BTreeMap::new();
+    for &(client, damage) in damage_by {
+        let Some(&sharer) = sharers.iter().find(|s| s.client == client) else {
+            continue;
+        };
+        match sharer.party {
+            Some(party) => parties.entry(party).or_default().push((sharer, damage)),
+            None => shares.push(ExpShare {
+                client,
+                exp: round(damage as f64 * per_damage),
+                party_bonus: 0,
+                attacked: true,
+            }),
+        }
+    }
+
+    for (party, attackers) in parties {
+        // `damage_by` is ranked, so the first attacker hit hardest.
+        let top = attackers[0].0.client;
+        let party_exp = attackers.iter().map(|(_, d)| *d).sum::<i64>() as f64 * per_damage;
+        let in_range = |level: u8| {
+            let near = |other: i32| (i32::from(level) - other).abs() <= LEECH_LEVELS;
+            near(i32::from(mob_level)) || attackers.iter().any(|(a, _)| near(i32::from(a.level)))
+        };
+        let members: Vec<&Sharer> = sharers
+            .iter()
+            .filter(|s| s.party == Some(party) && in_range(s.level))
+            .collect();
+        let total_level = members
+            .iter()
+            .map(|s| f64::from(s.level))
+            .sum::<f64>()
+            .max(1.0);
+        let bonus_rate = if members.len() > 1 {
+            PARTY_BONUS_PER_MEMBER * members.len() as f64
+        } else {
+            0.0
+        };
+        for member in members {
+            let mut ratio = LEVEL_SHARE * f64::from(member.level) / total_level;
+            if member.client == top {
+                ratio += TOP_DAMAGE_SHARE;
+            }
+            let exp = ratio * party_exp;
+            shares.push(ExpShare {
+                client: member.client,
+                exp: round(exp),
+                party_bonus: round(exp * bonus_rate),
+                attacked: attackers.iter().any(|(a, _)| a.client == member.client),
+            });
+        }
     }
     shares
 }
@@ -296,10 +393,16 @@ mod tests {
         let Some(Err(kill)) = mobs.damage(2, snail, 10, now) else {
             panic!("the snail should die");
         };
+        assert_eq!(kill.damage_by, [(2, 5), (1, 3)]);
         // 3 of 8 damage vs 5 of 8: 1 and 2 EXP of 3.
-        let mut exp = kill.exp.clone();
-        exp.sort();
-        assert_eq!(exp, [(1, 1), (2, 2)]);
+        let solo = |client| Sharer {
+            client,
+            level: 1,
+            party: None,
+        };
+        let shares = split_exp(kill.exp, kill.level, &kill.damage_by, &[solo(1), solo(2)]);
+        let exp: Vec<_> = shares.iter().map(|s| (s.client, s.exp)).collect();
+        assert_eq!(exp, [(2, 2), (1, 1)]);
         assert!(mobs.get(snail).is_none());
         assert!(
             mobs.damage(1, snail, 1, now).is_none(),
@@ -332,5 +435,48 @@ mod tests {
         never.mob_time = -1;
         let mut mobs = MobSet::new([(hidden, info), (never, info2)]);
         assert!(mobs.respawn(Instant::now()).is_empty());
+    }
+
+    #[test]
+    fn a_party_splits_its_exp_by_level_with_a_bonus() {
+        let sharer = |client, level, party| Sharer {
+            client,
+            level,
+            party,
+        };
+        let on_field = [
+            sharer(1, 10, Some(7)),
+            sharer(2, 10, Some(7)),
+            // Too far above the mob and the attacker to share.
+            sharer(3, 30, Some(7)),
+            sharer(4, 10, None),
+            sharer(5, 10, Some(8)),
+        ];
+        let shares = split_exp(100, 10, &[(1, 80), (5, 20)], &on_field);
+        // Party 7 earned 80 EXP: 40% each by level, 20% more to the attacker,
+        // and 10% bonus for two sharers. Party 8 is one member: no bonus.
+        assert_eq!(
+            shares,
+            [
+                ExpShare {
+                    client: 1,
+                    exp: 48,
+                    party_bonus: 5,
+                    attacked: true,
+                },
+                ExpShare {
+                    client: 2,
+                    exp: 32,
+                    party_bonus: 3,
+                    attacked: false,
+                },
+                ExpShare {
+                    client: 5,
+                    exp: 20,
+                    party_bonus: 0,
+                    attacked: true,
+                },
+            ]
+        );
     }
 }

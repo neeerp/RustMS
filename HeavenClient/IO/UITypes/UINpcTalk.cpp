@@ -480,6 +480,10 @@ namespace ms
 			return;
 		}
 
+		// The NPC chat key advances the conversation it started, as Enter
+		// does.
+		bool confirm = keycode == KeyAction::Id::RETURN || keycode == KeyAction::Id::INTERACT_HARVEST;
+
 		if (type == TalkType::SENDSIMPLE)
 		{
 			// Up and Down move the selection; Enter answers with it.
@@ -487,7 +491,7 @@ namespace ms
 				select(selected - 1);
 			else if (keycode == KeyAction::Id::DOWN)
 				select(selected + 1);
-			else if (keycode == KeyAction::Id::RETURN)
+			else if (confirm)
 				answer_choice();
 
 			return;
@@ -501,7 +505,7 @@ namespace ms
 		{
 			if (keycode == KeyAction::Id::LEFT || keycode == KeyAction::Id::RIGHT)
 				focus_answer(answer_focus::move(focus, keycode == KeyAction::Id::LEFT, keycode == KeyAction::Id::RIGHT));
-			else if (keycode == KeyAction::Id::RETURN)
+			else if (confirm)
 				button_pressed(answer_focus::pressed(focus) == answer_focus::Focus::LEFT ? left : right);
 
 			return;
@@ -509,7 +513,7 @@ namespace ms
 
 		// Enter presses the page's default button, even while the text
 		// types out.
-		if (keycode != KeyAction::Id::RETURN)
+		if (!confirm)
 			return;
 
 		for (Buttons button : { Buttons::NEXT, Buttons::OK, Buttons::YES, Buttons::QYES })

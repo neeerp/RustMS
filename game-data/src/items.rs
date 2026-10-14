@@ -8,7 +8,7 @@ use std::path::Path;
 /// Stack size when `info/slotMax` is absent (v83: 1 for equipment, else 100).
 pub const DEFAULT_SLOT_MAX: i16 = 100;
 
-#[derive(Clone, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Debug, Default, PartialEq)]
 pub struct ItemInfo {
     pub item_id: i32,
     pub slot_max: i16,
@@ -19,6 +19,8 @@ pub struct ItemInfo {
     /// Items that can't change hands (`info/tradeBlock`).
     pub trade_block: bool,
     pub price: i32,
+    /// What one throwing star or bullet costs to recharge (`unitPrice`).
+    pub unit_price: f64,
     /// `spec` of consumable items.
     pub spec: Option<ConsumeSpec>,
     pub equip: Option<EquipInfo>,
@@ -108,6 +110,28 @@ impl ItemData {
         })
     }
 
+    /// Every Monster Book card (`Consume/0238.img`) as `(card, mob)`, in
+    /// card order.
+    pub fn monster_cards(&self) -> Result<Vec<(i32, i32)>, GameDataError> {
+        let nx = &self.items;
+        let Some(cards) = path_index(nx, "Consume/0238.img")? else {
+            return Ok(Vec::new());
+        };
+        let mut found = Vec::new();
+        for node in nx.child_indices(cards)? {
+            let Ok(card) = nx.node_name(node)?.parse::<i32>() else {
+                continue;
+            };
+            let Some(info) = nx.child_by_name(node, "info")? else {
+                continue;
+            };
+            if let Some(mob) = number(nx, info, "mob")? {
+                found.push((card, mob));
+            }
+        }
+        Ok(found)
+    }
+
     /// The template for `item_id`, or `None` if the data has no such item.
     pub fn info(&self, item_id: i32) -> Result<Option<ItemInfo>, GameDataError> {
         if item_id / 1_000_000 == 1 {
@@ -134,6 +158,7 @@ impl ItemData {
             info.only = number(nx, meta, "only")? == Some(1);
             info.trade_block = number(nx, meta, "tradeBlock")? == Some(1);
             info.price = number(nx, meta, "price")?.unwrap_or(0);
+            info.unit_price = nx.real_child(meta, "unitPrice")?.unwrap_or(0.0);
         }
         if let Some(spec) = nx.child_by_name(node, "spec")? {
             info.spec = Some(ConsumeSpec {
@@ -197,6 +222,7 @@ impl ItemData {
             only: number(nx, meta, "only")? == Some(1),
             trade_block: number(nx, meta, "tradeBlock")? == Some(1),
             price: number(nx, meta, "price")?.unwrap_or(0),
+            unit_price: 0.0,
             spec: None,
             equip: Some(equip),
         }))
@@ -250,6 +276,22 @@ mod tests {
         assert!(data.info(2000012).unwrap().unwrap().trade_block);
         assert!(data.info(4031044).unwrap().unwrap().trade_block);
         assert!(data.info(4999999).unwrap().is_none());
+        let subi = data.info(2070000).unwrap().unwrap();
+        assert_eq!(
+            (subi.price, subi.unit_price, subi.slot_max),
+            (250, 0.3, 500)
+        );
+    }
+
+    #[test]
+    fn reads_monster_cards_and_their_mobs() {
+        let Some(data) = data() else {
+            return;
+        };
+        let cards = data.monster_cards().unwrap();
+        assert!(cards.len() > 300);
+        assert_eq!(cards[0], (2380000, 100100)); // Snail
+        assert!(cards.contains(&(2380001, 100101))); // Blue Snail
     }
 
     #[test]

@@ -185,6 +185,56 @@ pub struct WhisperDelivery {
     pub sender_failure_packet: Packet,
 }
 
+/// A party operation; the world directory owns parties and carries it out.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum PartyRequest {
+    Create,
+    /// Leave the party; the leader leaving disbands it.
+    Leave,
+    /// Accept an invitation to `party_id`.
+    Accept {
+        party_id: i32,
+    },
+    /// Invite the named character, creating a party first if needed.
+    Invite {
+        name: String,
+    },
+    Decline {
+        inviter: String,
+    },
+    Expel {
+        member_id: i32,
+    },
+    ChangeLeader {
+        member_id: i32,
+    },
+    Chat {
+        text: String,
+    },
+}
+
+/// Something a player asks of their Maple Messenger, which the world
+/// directory owns.
+#[derive(Debug)]
+pub enum MessengerRequest {
+    /// Open a new messenger (`messenger_id` 0) or accept an invitation.
+    Open {
+        messenger_id: i32,
+        look: game::AvatarLook,
+    },
+    Leave,
+    Invite {
+        target: String,
+    },
+    Decline {
+        inviter: String,
+    },
+    /// A line already formatted as `name : text`.
+    Chat {
+        line: String,
+    },
+}
+
 /// Where a character appears after changing maps.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct SpawnPosition {
@@ -214,6 +264,8 @@ pub enum WorldAction {
     NpcInteraction(NpcInteraction),
     /// Start, complete, or forfeit a quest (v83 `QUEST_ACTION`).
     Quest(crate::quests::QuestRequest),
+    /// Buy, sell, recharge at, or leave the shop the player has open.
+    Shop(crate::shop::ShopRequest),
     /// The player touched the named script portal on their map.
     ScriptPortal {
         portal: String,
@@ -231,6 +283,12 @@ pub enum WorldAction {
     /// The player's HP reached 0.
     Died,
     Whisper(WhisperDelivery),
+    Party(PartyRequest),
+    /// Tell the player where a character is (`/find`).
+    Find {
+        target_name: String,
+    },
+    Messenger(MessengerRequest),
     ChangeChannel {
         channel_id: u8,
     },
@@ -267,6 +325,15 @@ pub enum FieldRequest {
         loot: crate::loot::Loot,
         vanish: bool,
     },
+    /// Hit the reactor `object_id` with `skill_id` (0 for a plain attack).
+    HitReactor {
+        object_id: i32,
+        skill_id: i32,
+        stance: i16,
+    },
+    /// Show the player the info window for `character_id`, who must be on
+    /// their map (and may be themselves).
+    CharInfo { character_id: i32 },
 }
 
 impl ReplyAction for WorldAction {
@@ -297,7 +364,7 @@ fn world_routes() -> &'static HashMap<i16, WorldRoute> {
     ROUTES.get_or_init(|| {
         use RecvOpcode as Op;
         use WorldRoute::*;
-        let table: [(Op, WorldRoute); 26] = [
+        let table = [
             (Op::PlayerLoggedIn, PreGame(&world::PlayerLoggedInHandler)),
             (Op::PlayerMove, InGame(&world::PlayerMoveHandler)),
             (Op::ChangeChannel, InGame(&world::ChangeChannelHandler)),
@@ -312,11 +379,24 @@ fn world_routes() -> &'static HashMap<i16, WorldRoute> {
                 InGame(&world::PartySearchUpdateHandler),
             ),
             (Op::ChangeKeybinds, InGame(&world::ChangeKeybindsHandler)),
+            (
+                Op::MonsterBookCover,
+                InGame(&world::MonsterBookCoverHandler),
+            ),
             (Op::AllChat, InGame(&world::AllChatHandler)),
+            (Op::FaceExpression, InGame(&world::FaceExpressionHandler)),
             (Op::Whisper, InGame(&world::WhisperHandler)),
+            (Op::PartyOperation, InGame(&world::PartyOperationHandler)),
+            (
+                Op::DenyPartyRequest,
+                InGame(&world::DenyPartyRequestHandler),
+            ),
+            (Op::PartyChat, InGame(&world::PartyChatHandler)),
+            (Op::Messenger, InGame(&world::MessengerHandler)),
             (Op::TalkToNpc, InGame(&world::NpcTalkHandler)),
             (Op::NpcTalkMore, InGame(&world::NpcTalkMoreHandler)),
             (Op::QuestAction, InGame(&world::QuestActionHandler)),
+            (Op::NpcShopAction, InGame(&world::NpcShopActionHandler)),
             (
                 Op::ChangeMapSpecial,
                 InGame(&world::ChangeMapSpecialHandler),
@@ -332,10 +412,13 @@ fn world_routes() -> &'static HashMap<i16, WorldRoute> {
             ),
             (Op::TakeDamage, InGame(&world::TakeDamageHandler)),
             (Op::ItemPickup, InGame(&world::ItemPickupHandler)),
+            (Op::DamageReactor, InGame(&world::DamageReactorHandler)),
             (Op::HealOverTime, InGame(&world::HealOverTimeHandler)),
             (Op::SpendAp, InGame(&world::SpendApHandler)),
             (Op::SpendSp, InGame(&world::SpendSpHandler)),
+            (Op::UseSkill, InGame(&world::UseSkillHandler)),
             (Op::MesoDrop, InGame(&world::MesoDropHandler)),
+            (Op::CharInfoRequest, InGame(&world::CharInfoRequestHandler)),
         ];
         table
             .into_iter()
@@ -366,7 +449,7 @@ mod tests {
     fn every_registered_opcode_is_unique_per_server() {
         // The maps would silently drop duplicates; check the table sizes match.
         assert_eq!(login_routes().len(), 13);
-        assert_eq!(world_routes().len(), 26);
+        assert_eq!(world_routes().len(), 29);
     }
 
     #[test]

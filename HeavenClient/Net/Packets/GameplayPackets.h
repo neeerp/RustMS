@@ -88,6 +88,17 @@ namespace ms
 		}
 	};
 
+	// Shows the player's emote to the rest of the map
+	// Opcode: FACE_EXPRESSION(51)
+	class FaceExpressionPacket : public OutPacket
+	{
+	public:
+		FaceExpressionPacket(int32_t emote) : OutPacket(OutPacket::Opcode::FACE_EXPRESSION)
+		{
+			write_int(emote);
+		}
+	};
+
 	// Opcode: PARTY_OPERATION(124)
 	class PartyOperationPacket : public OutPacket
 	{
@@ -160,6 +171,20 @@ namespace ms
 		ChangePartyLeaderPacket(int32_t cid) : PartyOperationPacket(PartyOperationPacket::Operation::PASS_LEADER)
 		{
 			write_int(cid);
+		}
+	};
+
+	// Turns down a party invitation
+	// Opcode: DENY_PARTY_REQUEST(125)
+	class DenyPartyRequestPacket : public OutPacket
+	{
+	public:
+		static constexpr int8_t DENIED = 0x17;
+
+		DenyPartyRequestPacket(const std::string& inviter) : OutPacket(OutPacket::Opcode::DENY_PARTY_REQUEST)
+		{
+			write_byte(DENIED);
+			write_string(inviter);
 		}
 	};
 

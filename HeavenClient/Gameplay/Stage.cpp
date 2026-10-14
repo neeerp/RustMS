@@ -20,6 +20,7 @@
 #include "../Configuration.h"
 #include "QuestConversation.h"
 #include "Timer.h"
+#include "MapleMap/CharClick.h"
 #include "MapleMap/Npc.h"
 
 #include "../IO/UI.h"
@@ -106,6 +107,7 @@ namespace ms
 		Point<int16_t> spawnpoint = portals.get_portal_by_id(portalid);
 		Point<int16_t> startpos = physics.get_y_below(spawnpoint);
 		player.respawn(startpos, mapinfo.is_underwater());
+		left_ladder = nullptr;
 		camera.set_position(startpos);
 		camera.set_view(mapinfo.get_walls(), mapinfo.get_borders());
 	}
@@ -133,6 +135,11 @@ namespace ms
 			drops.draw(id, viewx, viewy, alpha);
 		}
 
+		const Party &party = player.get_party();
+
+		if (party.shows_hp_marks())
+			chars.draw_party_hp(party, player.get_oid(), mapid, viewx, viewy, alpha);
+
 		combat.draw(viewx, viewy, alpha);
 		portals.draw(viewpos, alpha);
 		backgrounds.drawforegrounds(viewx, viewy, alpha);
@@ -155,6 +162,7 @@ namespace ms
 		chars.update(physics);
 		drops.update(physics);
 		player.update(physics);
+		check_held_ladders();
 
 		portals.update(player.get_position());
 		camera.update(player.get_position());
@@ -192,6 +200,7 @@ namespace ms
 			Point<int16_t> startpos = physics.get_y_below(spawnpoint);
 
 			player.respawn(startpos, mapinfo.is_underwater());
+			left_ladder = nullptr;
 		} else if (warpinfo.valid)
 		{
 			ChangeMapPacket(false, -1, warpinfo.name, false).dispatch();
@@ -220,6 +229,29 @@ namespace ms
 
 		Optional<const Ladder> ladder = mapinfo.findladder(player.get_position(), up);
 		player.set_ladder(ladder);
+	}
+
+	// Holding Up catches any ladder or rope the player reaches, as pressing
+	// it there does. The one they just climbed off waits until they land, so
+	// jumping off it sideways with Up still held does not catch it again.
+	void Stage::check_held_ladders()
+	{
+		if (player.is_climbing())
+		{
+			left_ladder = player.get_ladder();
+			return;
+		}
+
+		if (player.get_phobj().onground)
+			left_ladder = nullptr;
+
+		if (!player.is_key_down(KeyAction::Id::UP))
+			return;
+
+		Optional<const Ladder> ladder = mapinfo.findladder(player.get_position(), true);
+
+		if (ladder && ladder.get() != left_ladder.get())
+			check_ladders(true);
 	}
 
 	void Stage::check_drops()
@@ -259,6 +291,9 @@ namespace ms
 						case KeyAction::Id::PICKUP:
 							check_drops();
 							break;
+						case KeyAction::Id::INTERACT_HARVEST:
+							talk_to_nearest_npc();
+							break;
 					}
 				}
 
@@ -271,7 +306,13 @@ namespace ms
 				player.use_item(action);
 				break;
 			case KeyType::Id::FACE:
-				player.set_expression(action);
+				if (down)
+				{
+					player.set_expression(action);
+					// v83 numbers emotes from F1's action (100) as 1.
+					FaceExpressionPacket(action - 99).dispatch();
+				}
+
 				break;
 		}
 	}
@@ -286,6 +327,28 @@ namespace ms
 
 		if (Npc *npc = npcs.find_nearest(player.get_position()))
 			QuestConversation::talk_to_npc(npc->get_npcid(), npc->get_oid());
+	}
+
+	int32_t Stage::character_at(Point<int16_t> cursorpos)
+	{
+		if (state != State::ACTIVE)
+			return 0;
+
+		Point<int16_t> viewpos = camera.position();
+
+		// Others first: the player is often standing in front of someone.
+		for (auto &mmo : *chars.get_chars())
+		{
+			MapObject *character = mmo.second.get();
+
+			if (character->is_active() && char_click::hits(character->get_position() + viewpos, cursorpos))
+				return character->get_oid();
+		}
+
+		if (char_click::hits(player.get_position() + viewpos, cursorpos))
+			return player.get_oid();
+
+		return 0;
 	}
 
 	void Stage::release_key(KeyType::Id type, int32_t action)
