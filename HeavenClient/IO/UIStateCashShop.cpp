@@ -60,11 +60,15 @@ namespace ms
 
 	void UIStateCashShop::doubleclick(Point<int16_t> pos)
 	{
-		// Not while a dialog is over the shop.
-		UIElement* front = get_front();
+		UIElement* shop = get(UIElement::Type::CASHSHOP);
+		UIElement* dialog = get(focused);
 
-		if (front && front->get_type() == UIElement::Type::CASHSHOP)
-			front->doubleclick(pos);
+		// Not while a dialog is over the shop.
+		if (dialog && dialog != shop && dialog->is_active())
+			return;
+
+		if (shop && shop->is_active())
+			shop->doubleclick(pos);
 	}
 
 	void UIStateCashShop::send_key(KeyType::Id type, int32_t action, bool pressed, bool escape)
