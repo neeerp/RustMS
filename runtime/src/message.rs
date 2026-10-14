@@ -58,6 +58,13 @@ pub enum ServerMessage {
         x: i16,
         y: i16,
     },
+    /// This player broke a reactor; its loot drops for them.
+    ReactorBroken {
+        reactor_id: i32,
+        object_id: i32,
+        x: i16,
+        y: i16,
+    },
     /// The field gave this player a drop to put in their inventory.
     PickedUp {
         drop: crate::actor::field_drops::Drop,
@@ -66,6 +73,11 @@ pub enum ServerMessage {
     QuestNpcChecked {
         request_id: u64,
         nearby: bool,
+    },
+    /// `requester` (maybe this player) double-clicked this player; send them
+    /// CHAR_INFO.
+    CharInfoRequested {
+        requester: ClientHandle,
     },
     SendPacket(Packet),
 }

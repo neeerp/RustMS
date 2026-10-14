@@ -68,6 +68,18 @@ namespace ms
 		}
 	};
 
+	// Requests the server to show a collected card on the Monster Book's
+	// cover, or none for 0
+	// Opcode: MONSTER_BOOK_COVER(57)
+	class MonsterBookCoverPacket : public OutPacket
+	{
+	public:
+		MonsterBookCoverPacket(int32_t card) : OutPacket(OutPacket::Opcode::MONSTER_BOOK_COVER)
+		{
+			write_int(card);
+		}
+	};
+
 	// Requests the server to change key mappings
 	// Opcode: CHANGE_KEYMAP(135)
 	class ChangeKeyMapPacket : public OutPacket

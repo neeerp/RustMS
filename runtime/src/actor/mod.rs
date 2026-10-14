@@ -3,6 +3,7 @@ pub mod directory;
 pub mod field;
 pub mod field_drops;
 pub mod field_mobs;
+pub mod field_reactors;
 pub mod login;
 pub mod messenger;
 pub mod object_ids;

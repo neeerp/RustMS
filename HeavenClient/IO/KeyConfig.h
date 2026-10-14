@@ -105,5 +105,28 @@ namespace ms
 		{
 			return static_cast<Key>(id);
 		}
+
+		// The game reads either Ctrl, Alt or Shift as the same key, so the
+		// pairs are bound together. Other keys have no twin (-1).
+		inline int32_t twin_of(int32_t key)
+		{
+			switch (key)
+			{
+			case Key::LEFT_CONTROL:
+				return Key::RIGHT_CONTROL;
+			case Key::RIGHT_CONTROL:
+				return Key::LEFT_CONTROL;
+			case Key::LEFT_ALT:
+				return Key::RIGHT_ALT;
+			case Key::RIGHT_ALT:
+				return Key::LEFT_ALT;
+			case Key::LEFT_SHIFT:
+				return Key::RIGHT_SHIFT;
+			case Key::RIGHT_SHIFT:
+				return Key::LEFT_SHIFT;
+			default:
+				return -1;
+			}
+		}
 	}
 }

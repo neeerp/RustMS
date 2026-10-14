@@ -26,12 +26,12 @@
 
 #include "UITypes/UIChannel.h"
 #include "UITypes/UIChatBar.h"
+#include "UITypes/UIGameOption.h"
 #include "UITypes/UIJoypad.h"
 #include "UITypes/UINpcTalk.h"
-#include "UITypes/UIOptionMenu.h"
-#include "UITypes/UIQuit.h"
 #include "UITypes/UIShop.h"
 #include "UITypes/UIStatusBar.h"
+#include "UITypes/UISystemOption.h"
 #include "UITypes/UIWorldMap.h"
 
 namespace ms
@@ -114,11 +114,8 @@ namespace ms
 		if (focused)
 		{
 			// The window gained input focus
-			uint8_t sfxvolume = Setting<SFXVolume>::get().load();
-			Sound::set_sfxvolume(sfxvolume);
-
-			uint8_t bgmvolume = Setting<BGMVolume>::get().load();
-			Music::set_bgmvolume(bgmvolume);
+			Sound::set_sfxvolume(Sound::configured_volume());
+			Music::set_bgmvolume(Music::configured_volume());
 		} else
 		{
 			// The window lost input focus, and won't see the releases of the
@@ -148,11 +145,12 @@ namespace ms
 		Point<int16_t> cursorpos = cursor.get_position();
 		cursor.set_pressed(pressed && enabled);
 
-		// A click that opens a window focusing its own field must not blur it.
+		// A click that opens a window can focus that window's field, such as the number entry. Only a field that
+		// was focused before the click loses focus to it.
 		Textfield *focused_before = focusedtextfield.get();
 		send_cursor(cursorpos, cursorstate);
 
-		if (focusedtextfield && focusedtextfield.get() == focused_before && pressed)
+		if (focusedtextfield && pressed && focusedtextfield.get() == focused_before)
 		{
 			Cursor::State tstate = focusedtextfield->send_cursor(cursorpos, pressed);
 
@@ -244,10 +242,11 @@ namespace ms
 			auto statusbar = UI::get().get_element<UIStatusBar>();
 			auto channel = UI::get().get_element<UIChannel>();
 			auto worldmap = UI::get().get_element<UIWorldMap>();
-			auto optionmenu = UI::get().get_element<UIOptionMenu>();
+			auto gameoption = UI::get().get_element<UIGameOption>();
+			auto systemoption = UI::get().get_element<UISystemOption>();
 			auto shop = UI::get().get_element<UIShop>();
 			auto joypad = UI::get().get_element<UIJoypad>();
-			auto quit = UI::get().get_element<UIQuit>();
+			auto rank = UI::get().get_element<UIRank>();
 			auto npctalk = UI::get().get_element<UINpcTalk>();
 			//auto report = UI::get().get_element<UIReport>();
 			//auto whisper = UI::get().get_element<UIWhisper>();
@@ -268,9 +267,13 @@ namespace ms
 			{
 				worldmap->send_key(mapping.action, pressed, escape);
 				sent = true;
-			} else if (optionmenu && optionmenu->is_active())
+			} else if (gameoption && gameoption->is_active())
 			{
-				optionmenu->send_key(mapping.action, pressed, escape);
+				gameoption->send_key(mapping.action, pressed, escape);
+				sent = true;
+			} else if (systemoption && systemoption->is_active())
+			{
+				systemoption->send_key(mapping.action, pressed, escape);
 				sent = true;
 			} else if (shop && shop->is_active())
 			{
@@ -280,9 +283,9 @@ namespace ms
 			{
 				joypad->send_key(mapping.action, pressed, escape);
 				sent = true;
-			} else if (quit && quit->is_active())
+			} else if (rank && rank->is_active())
 			{
-				quit->send_key(mapping.action, pressed, escape);
+				rank->send_key(mapping.action, pressed, escape);
 				sent = true;
 			} else
 			{
@@ -310,12 +313,14 @@ namespace ms
 
 					// Game
 					types.emplace_back(UIElement::Type::NOTICE);
+					types.emplace_back(UIElement::Type::ENTERNUMBER);
 					types.emplace_back(UIElement::Type::KEYCONFIG);
 					types.emplace_back(UIElement::Type::EVENT);
 					types.emplace_back(UIElement::Type::STATSINFO);
 					types.emplace_back(UIElement::Type::ITEMINVENTORY);
 					types.emplace_back(UIElement::Type::EQUIPINVENTORY);
 					types.emplace_back(UIElement::Type::SKILLBOOK);
+					types.emplace_back(UIElement::Type::MONSTERBOOK);
 					types.emplace_back(UIElement::Type::QUESTLOG);
 					types.emplace_back(UIElement::Type::USERLIST);
 					types.emplace_back(UIElement::Type::NPCTALK);
@@ -328,6 +333,7 @@ namespace ms
 
 					// Game
 					types.emplace_back(UIElement::Type::NOTICE);
+					types.emplace_back(UIElement::Type::ENTERNUMBER);
 				} else if (tab)
 				{
 					// Game

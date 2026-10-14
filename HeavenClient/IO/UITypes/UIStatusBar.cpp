@@ -19,14 +19,16 @@
 
 #include "UIChannel.h"
 #include "UIEquipInventory.h"
+#include "UIGameOption.h"
 #include "UIItemInventory.h"
 #include "UIKeyConfig.h"
 #include "UIMessenger.h"
-#include "UIOptionMenu.h"
 #include "UIQuestLog.h"
 #include "UIQuit.h"
+#include "UIMonsterBook.h"
 #include "UISkillBook.h"
 #include "UIStatsInfo.h"
+#include "UISystemOption.h"
 #include "UIUserList.h"
 
 #include "../KeyConfig.h"
@@ -41,6 +43,7 @@
 #include "../../Gameplay/Stage.h"
 #include "../../Graphics/GraphicsGL.h"
 #include "../../Net/Packets/GameplayPackets.h"
+#include "../../Net/Packets/PlayerPackets.h"
 #include "../../Util/NxFiles.h"
 
 namespace ms
@@ -108,6 +111,43 @@ namespace ms
 		const Point<int16_t> GAUGE_POS = Point<int16_t>(218, 38);
 		const Point<int16_t> CELL_SPACING = Point<int16_t>(35, 34);
 		const Point<int16_t> LABEL_SPACING = Point<int16_t>(35, 33);
+
+		// Bind a key, and its twin, to a mapping and tell the server. As in
+		// Key Config, the mapping leaves any other key it was on.
+		void bind_key(int32_t key, Keyboard::Mapping mapping)
+		{
+			Keyboard &keyboard = UI::get().get_keyboard();
+			int32_t twin = KeyConfig::twin_of(key);
+			std::vector<std::tuple<KeyConfig::Key, KeyType::Id, int32_t>> changes;
+
+			for (auto const &[other, bound] : keyboard.get_maplekeys())
+				if (bound == mapping && other != key && other != twin)
+					changes.emplace_back(KeyConfig::actionbyid(other), KeyType::Id::NONE, KeyAction::Id::LENGTH);
+
+			if (keyboard.get_maple_mapping(key) != mapping)
+				changes.emplace_back(KeyConfig::actionbyid(key), mapping.type, mapping.action);
+
+			if (twin >= 0 && keyboard.get_maple_mapping(twin) != mapping)
+				changes.emplace_back(KeyConfig::actionbyid(twin), mapping.type, mapping.action);
+
+			if (changes.empty())
+				return;
+
+			ChangeKeyMapPacket(changes).dispatch();
+
+			for (auto const &[changed, type, action] : changes)
+			{
+				if (type == KeyType::Id::NONE)
+					keyboard.remove(changed);
+				else
+					keyboard.assign(changed, type, action);
+			}
+
+			// An open Key Config shows the same binding.
+			if (auto keyconfig = UI::get().get_element<UIKeyConfig>())
+				if (keyconfig->is_active())
+					keyconfig->stage_key(key, mapping);
+		}
 	}
 
 	UIStatusBar::UIStatusBar(const CharStats &st) : stats(st)
@@ -451,11 +491,13 @@ namespace ms
 				UI::get().emplace<UIChannel>();
 				break;
 			case Buttons::BT_GAME_OPTION:
+				UI::get().emplace<UIGameOption>();
+				break;
 			case Buttons::BT_GAME_SYSTEM:
-				UI::get().emplace<UIOptionMenu>();
+				UI::get().emplace<UISystemOption>();
 				break;
 			case Buttons::BT_GAME_QUIT:
-				UI::get().emplace<UIQuit>(stats);
+				ask_to_quit();
 				break;
 			case Buttons::BT_SHORTCUT_QUEST:
 				UI::get().emplace<UIQuestLog>(player.get_quests());
@@ -484,6 +526,7 @@ namespace ms
 				UIMessenger::toggle();
 				break;
 			case Buttons::BT_SHORTCUT_MONSTERBOOK:
+				UI::get().emplace<UIMonsterBook>(player.get_monsterbook());
 				break;
 		}
 
@@ -540,6 +583,41 @@ namespace ms
 
 			buttons[id]->set_state(Button::State::MOUSEOVER);
 		}
+	}
+
+	// Dropping a skill or item on a quick slot binds the slot's key to it.
+	bool UIStatusBar::send_icon(const Icon &icon, Point<int16_t> cursorpos)
+	{
+		int16_t slot = quickslot_at(cursorpos);
+		Keyboard::Mapping mapping = icon.get_mapping();
+
+		if (slot >= 0 && mapping.type != KeyType::Id::NONE)
+		{
+			bind_key(QUICKSLOT_KEYS[slot], mapping);
+			Sound(Sound::Name::DRAGEND).play();
+		}
+
+		return true;
+	}
+
+	int16_t UIStatusBar::quickslot_at(Point<int16_t> cursorpos) const
+	{
+		if (!quickslot_active)
+			return -1;
+
+		Point<int16_t> panel = position + quickslot_pos;
+
+		for (int16_t i = 0; i < 8; i++)
+		{
+			int16_t col = i % 4;
+			int16_t row = i / 4;
+			Point<int16_t> cellpos = panel + Point<int16_t>(7 + col * CELL_SPACING.x(), 8 + row * CELL_SPACING.y());
+
+			if (Rectangle<int16_t>(cellpos, cellpos + CELL_SPACING).contains(cursorpos))
+				return i;
+		}
+
+		return -1;
 	}
 
 	bool UIStatusBar::is_in_range(Point<int16_t> cursorpos) const
