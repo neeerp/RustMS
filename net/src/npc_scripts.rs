@@ -515,7 +515,11 @@ mod tests {
         player.stats.level = level;
         player.meso = meso;
         if letter {
-            crate::items::give(&mut player.inventory, RECOMMENDATION_LETTER, 1).unwrap();
+            player.inventory.insert(
+                game::InventoryType::Etc,
+                1,
+                game::Item::stack(RECOMMENDATION_LETTER, 1),
+            );
         }
         player
     }
