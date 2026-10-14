@@ -4,7 +4,7 @@
 //!
 //! ```text
 //!   ClientActor ──► FieldActor        (its current map: chat, movement, NPCs)
-//!   ClientActor ──► WorldDirectory    (name lookup: whisper, world broadcast)
+//!   ClientActor ──► WorldDirectory    (name lookup: whisper, broadcast, messenger)
 //!   FieldActor / WorldDirectory ──► ClientHandle (try_send, never awaited)
 //! ```
 //!
@@ -12,8 +12,8 @@
 //! backpressure), but fields and the directory never await a client: a client
 //! whose queue is full is kicked instead. That makes wait cycles impossible.
 
-use game::FieldAvatar;
-use net::{BroadcastScope, ClientId, FieldRequest, WhisperDelivery};
+use game::{AvatarLook, FieldAvatar};
+use net::{BroadcastScope, ClientId, FieldRequest, MessengerRequest, WhisperDelivery};
 use packet::Packet;
 use tokio::sync::mpsc;
 use tokio::sync::mpsc::error::TrySendError;
@@ -198,6 +198,8 @@ pub enum DirectoryMessage {
     Unregister {
         client_id: ClientId,
         connection_id: u64,
+        /// The client is moving to another channel and will register again.
+        changing_channel: bool,
     },
     Whisper {
         from: ClientId,
@@ -207,5 +209,14 @@ pub enum DirectoryMessage {
         from: ClientId,
         scope: BroadcastScope,
         packet: Packet,
+    },
+    Messenger {
+        from: ClientId,
+        request: MessengerRequest,
+    },
+    /// The client's worn equipment changed.
+    LookChanged {
+        client_id: ClientId,
+        look: AvatarLook,
     },
 }

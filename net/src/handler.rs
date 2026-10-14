@@ -185,6 +185,28 @@ pub struct WhisperDelivery {
     pub sender_failure_packet: Packet,
 }
 
+/// Something a player asks of their Maple Messenger, which the world
+/// directory owns.
+#[derive(Debug)]
+pub enum MessengerRequest {
+    /// Open a new messenger (`messenger_id` 0) or accept an invitation.
+    Open {
+        messenger_id: i32,
+        look: game::AvatarLook,
+    },
+    Leave,
+    Invite {
+        target: String,
+    },
+    Decline {
+        inviter: String,
+    },
+    /// A line already formatted as `name : text`.
+    Chat {
+        line: String,
+    },
+}
+
 /// Where a character appears after changing maps.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct SpawnPosition {
@@ -231,6 +253,7 @@ pub enum WorldAction {
     /// The player's HP reached 0.
     Died,
     Whisper(WhisperDelivery),
+    Messenger(MessengerRequest),
     ChangeChannel {
         channel_id: u8,
     },
@@ -293,7 +316,7 @@ fn world_routes() -> &'static HashMap<i16, WorldRoute> {
     ROUTES.get_or_init(|| {
         use RecvOpcode as Op;
         use WorldRoute::*;
-        let table: [(Op, WorldRoute); 25] = [
+        let table: [(Op, WorldRoute); 26] = [
             (Op::PlayerLoggedIn, PreGame(&world::PlayerLoggedInHandler)),
             (Op::PlayerMove, InGame(&world::PlayerMoveHandler)),
             (Op::ChangeChannel, InGame(&world::ChangeChannelHandler)),
@@ -309,6 +332,7 @@ fn world_routes() -> &'static HashMap<i16, WorldRoute> {
             (Op::ChangeKeybinds, InGame(&world::ChangeKeybindsHandler)),
             (Op::AllChat, InGame(&world::AllChatHandler)),
             (Op::Whisper, InGame(&world::WhisperHandler)),
+            (Op::Messenger, InGame(&world::MessengerHandler)),
             (Op::TalkToNpc, InGame(&world::NpcTalkHandler)),
             (Op::NpcTalkMore, InGame(&world::NpcTalkMoreHandler)),
             (Op::QuestAction, InGame(&world::QuestActionHandler)),
@@ -361,7 +385,7 @@ mod tests {
     fn every_registered_opcode_is_unique_per_server() {
         // The maps would silently drop duplicates; check the table sizes match.
         assert_eq!(login_routes().len(), 13);
-        assert_eq!(world_routes().len(), 25);
+        assert_eq!(world_routes().len(), 26);
     }
 
     #[test]
