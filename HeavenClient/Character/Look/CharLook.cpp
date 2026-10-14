@@ -110,7 +110,6 @@ namespace ms
 			hair->draw(standing, Hair::Layer::BELOWBODY, 0, headargs);
 			equips.draw(EquipSlot::Id::HAT, standing, Clothing::Layer::CAP_BELOW_BODY, 0, headargs);
 			body->draw(interstance, Body::Layer::BODY, interframe, args);
-			hair->draw(standing, Hair::Layer::DEFAULT, 0, headargs);
 			equips.draw(EquipSlot::Id::EARACC, standing, Clothing::Layer::EARRINGS, 0, headargs);
 			body->draw(interstance, Body::Layer::HEAD, interframe, args);
 			hair->draw(standing, Hair::Layer::SHADE, 0, headargs);
@@ -143,7 +142,6 @@ namespace ms
 			}
 
 			body->draw(interstance, Body::Layer::ARM_BELOW_HEAD_OVER_MAIL, interframe, args);
-			hair->draw(interstance, Hair::Layer::DEFAULT, interframe, args);
 			equips.draw(EquipSlot::Id::SHIELD, interstance, Clothing::Layer::SHIELD_OVER_HAIR, interframe, args);
 			equips.draw(EquipSlot::Id::EARACC, interstance, Clothing::Layer::EARRINGS, interframe, args);
 			body->draw(interstance, Body::Layer::HEAD, interframe, args);
@@ -192,6 +190,8 @@ namespace ms
 		switch (equips.getcaptype())
 		{
 		case CharEquips::CapType::NONE:
+			// The hair covers the scalp, so it goes over the head and the face.
+			hair->draw(stance, Hair::Layer::DEFAULT, frame, args);
 			hair->draw(stance, Hair::Layer::OVERHEAD, frame, args);
 			break;
 		case CharEquips::CapType::HEADBAND:
