@@ -560,10 +560,11 @@ namespace ms
 		PosCHARINFO() : PointEntry("PosCHARINFO", "(264, 264)") {}
 	};
 
-	// The default type of UIMiniMap
+	// The type of UIMiniMap on maps that aren't towns: 0 folded, 1 the map
+	// alone, 2 the map under its names
 	struct MiniMapType : public Configuration::ByteEntry
 	{
-		MiniMapType() : ByteEntry("MiniMapType", "0")
+		MiniMapType() : ByteEntry("MiniMapType", "2")
 		{}
 	};
 

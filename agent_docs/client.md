@@ -81,8 +81,9 @@ from `UI.nx`. Moved so far:
 - **Minimap** (`UIMiniMap`, `UIWindow.img/MiniMap`): folded to its title bar,
   the map alone (`MinMap`), or the map under the map's mark, street, and name
   (`MaxMap`), laid out from period footage. M or the `Basic.img` minus and
-  plus buttons step between them; towns open in the largest, maps without a
-  `miniMap` stay folded. The window fits the map's `miniMap/canvas` (scaled
+  plus buttons step between them, and other maps keep the last choice
+  (`MiniMapType`, the largest until one is made). Towns open in the largest,
+  and maps without a `miniMap` stay folded. The window fits the map's `miniMap/canvas` (scaled
   by `2^mag`) and the names. Markers (`Map.nx` `MapHelper.img/minimap`) stand
   bottom-centred on portals to other maps, NPCs, other players, and you.
   Hovering an NPC or portal shows its name. Period canvases had the map's
