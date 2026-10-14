@@ -198,6 +198,9 @@ impl FieldActor {
                     self.handle_pickup(from, object_id, x, y)
                 }
                 FieldRequest::Throw { loot, vanish } => self.handle_throw(from, loot, vanish),
+                FieldRequest::CharInfo { character_id } => {
+                    self.handle_char_info(from, character_id)
+                }
             },
             FieldMessage::SpawnLoot {
                 owner,
@@ -237,6 +240,23 @@ impl FieldActor {
             .collect();
         for (drop, packet) in packets {
             self.send_drop_packet(&drop, packet);
+        }
+    }
+
+    /// Have `character_id`, if they are here, answer `from`'s request for
+    /// their info: their own actor holds the current level and fame.
+    fn handle_char_info(&self, from: ClientId, character_id: i32) {
+        let Some(requester) = self.occupants.get(&from) else {
+            return;
+        };
+        if let Some(target) = self
+            .occupants
+            .values()
+            .find(|occupant| occupant.avatar.id == character_id)
+        {
+            target.handle.send(ServerMessage::CharInfoRequested {
+                requester: requester.handle.clone(),
+            });
         }
     }
 
@@ -698,5 +718,43 @@ mod tests {
         .await
         .unwrap();
         assert_eq!(checked(&mut far_rx).await, (9, false));
+    }
+
+    #[tokio::test]
+    async fn the_target_answers_a_char_info_request() {
+        let field = spawn_field();
+        let (first, mut first_rx) = client(1);
+        let (second, mut second_rx) = client(2);
+        for (handle, id) in [(first, 1), (second, 2)] {
+            field
+                .send(FieldMessage::Join {
+                    handle,
+                    avatar: avatar(id, 0, 0),
+                })
+                .await
+                .unwrap();
+        }
+        next_opcode(&mut first_rx).await;
+        next_opcode(&mut second_rx).await;
+
+        // Character 3 is not here, so only the request for 2 reaches anyone.
+        for character_id in [3, 2] {
+            field
+                .send(FieldMessage::FromClient {
+                    from: 1,
+                    request: FieldRequest::CharInfo { character_id },
+                })
+                .await
+                .unwrap();
+        }
+        match timeout(Duration::from_secs(1), second_rx.recv())
+            .await
+            .unwrap()
+            .unwrap()
+        {
+            ServerMessage::CharInfoRequested { requester } => assert_eq!(requester.client_id, 1),
+            other => panic!("expected a char info request, got {other:?}"),
+        }
+        assert!(first_rx.try_recv().is_err());
     }
 }

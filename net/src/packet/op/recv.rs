@@ -44,6 +44,7 @@ pub enum RecvOpcode {
     HealOverTime = 0x59,
     SpendSp = 0x5A,
     MesoDrop = 0x5E,
+    CharInfoRequest = 0x61,
     ChangeMapSpecial = 0x64,
     QuestAction = 0x6B,
 

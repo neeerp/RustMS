@@ -22,6 +22,7 @@ pub enum SendOpcode {
     GatherItemResult = 0x34,
     SortItemResult = 0x35,
 
+    CharInfo = 0x3D,
     BuddyList = 0x3F,
     FamilyInfo = 0x5F,
     FamilyList = 0x64,

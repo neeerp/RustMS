@@ -3,6 +3,7 @@ pub mod char;
 pub mod drop;
 pub mod effect;
 pub mod field;
+pub mod info;
 pub mod inventory;
 pub mod keymap;
 pub mod map;

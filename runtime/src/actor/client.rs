@@ -433,6 +433,11 @@ impl ClientActor {
                 self.drop_loot(mob_id, object_id, x, y).await?
             }
             ServerMessage::PickedUp { drop } => self.picked_up(drop).await?,
+            ServerMessage::CharInfoRequested { requester } => {
+                let packet = build::world::info::build_character_info(&self.in_game()?.player)
+                    .map_err(|e| RuntimeError::Handler(e.to_string()))?;
+                requester.send_packet(packet);
+            }
             ServerMessage::SendPacket(mut packet) => self.send(&mut packet).await?,
         }
         Ok(())
