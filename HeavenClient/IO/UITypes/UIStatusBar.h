@@ -68,6 +68,7 @@ namespace ms
 
 	protected:
 		Button::State button_pressed(uint16_t buttonid) override;
+		bool button_covered(uint16_t buttonid, Point<int16_t> cursorpos) const override;
 
 	private:
 		enum Menu
