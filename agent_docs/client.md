@@ -229,6 +229,21 @@ from `UI.nx`. Moved so far:
   Characters stay disabled, since the server recommends no worlds and can't
   list every character. The balloon is `WorldNotice/Balloon`. Positions are
   checked against footage from 2009 (v80) and v55.
+- **Character select** (`UICharSelect`, `Login.img/CharSelect`): up to three
+  characters stand on the scene's rope bridge, 125 pixels apart. Each one
+  stands under a signpost for its job family (`adventure`, `knight`, or
+  `aran`) and has a `nameTag`, which turns black when the character is
+  picked. Picking a character plays the light from above (`effect/1`) and
+  the sparkle (`effect/0`), and the character walks in place. It also
+  unrolls `scroll/0` over the character, showing the `charInfo` table with
+  job, level, fame, stats, and world ranking. `charInfo1` and `scroll/2` add
+  the job ranking, but RustMS sends no rankings, so the short scroll is
+  always used. The `pageL` and `pageR` arrows appear when the account has
+  more than three slots. Tab toggles a focus hand (`keyFocused`) on the
+  Start, Create, and Delete signs. Up and Down move the hand, Left and Right
+  move between characters, Enter starts, and Escape goes back. The selected
+  world and channel show in `Common/selectWorld`. Positions are checked
+  against footage from v55 and v1.0.
 
 `UIClassic.nx` is not one of NoLifeNx's standard files, so `NxFiles` opens it
 with `nl::file` instead of `nl::nx::load_all`.

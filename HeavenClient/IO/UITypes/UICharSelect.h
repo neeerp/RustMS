@@ -17,24 +17,18 @@
 //////////////////////////////////////////////////////////////////////////////////
 #pragma once
 
-#include <string>
-
-#include <cstddef>
-
-#include <cstdint>
-
 #include "../UIElement.h"
 
-#include "../Components/Charset.h"
-#include "../Components/NameTag.h"
+#include "../Components/ChatBalloon.h"
 
 #include "../../Character/Look/CharLook.h"
-
-#include <list>
+#include "../../Net/Login.h"
 
 namespace ms
 {
-	// The character selection screen
+	// The v83 character select, step 2 of the login scene. Up to three
+	// characters stand on the rope bridge; picking one lights it from above
+	// and unrolls a scroll of its stats over it.
 	class UICharSelect : public UIElement
 	{
 	public:
@@ -44,8 +38,7 @@ namespace ms
 
 		UICharSelect(std::vector<CharEntry> characters, int8_t characters_count, int32_t slots, int8_t require_pic);
 
-		void draw(float inter) const override;
-
+		void draw(float alpha) const override;
 		void update() override;
 
 		void doubleclick(Point<int16_t> cursorpos) override;
@@ -69,93 +62,82 @@ namespace ms
 
 	private:
 		void update_buttons();
+		void select_character(int16_t index);
+		void change_page(int16_t page);
+		void move_focus(int8_t step);
+		void enter_game();
+		void delete_character();
 
-		void update_selected_character();
-
-		void select_last_slot();
-
-		std::string get_slot_text();
-
-		std::string pad_number_with_leading_zero(uint8_t value) const;
-
-		Point<int16_t> get_character_slot_pos(size_t index, uint16_t x_adj, uint16_t y_adj) const;
-
-		Point<int16_t> get_infolabel_pos(size_t index) const;
-
-		std::string get_infolabel(size_t index, StatsEntry character_stats) const;
+		// The slot on this page under the cursor, or -1.
+		int16_t slot_at(Point<int16_t> cursorpos) const;
 
 		void request_pic();
-
 		void check_pic(const std::string entered_pic) const;
-
-		static constexpr uint8_t PAGESIZE = 8;
 
 		enum Buttons : uint16_t
 		{
-			CHARACTER_SELECT,
-			CHARACTER_NEW,
-			CHARACTER_DELETE,
-			PAGELEFT,
-			PAGERIGHT,
-			CHANGEPIC,
-			RESETPIC,
-			EDITCHARLIST,
-			BACK,
-			CHARACTER_SLOT0
+			BT_SELECT,
+			BT_NEW,
+			BT_DELETE,
+			BT_VIEWALLCHAR,
+			BT_BACK
+		};
+
+		enum class Scroll : uint8_t
+		{
+			CLOSED,
+			OPENING,
+			OPEN
+		};
+
+		// A page arrow on the bridge; it lights up under the cursor.
+		struct PageArrow
+		{
+			Texture normal;
+			Texture hovered;
+			Point<int16_t> position;
+			bool hover = false;
 		};
 
 		std::vector<CharEntry> characters;
+		std::vector<CharLook> charlooks;
+		std::vector<Text> names;
 		int8_t characters_count;
 		int32_t slots;
 		int8_t require_pic;
-		Text version;
-		Point<int16_t> pagepos;
-		Point<int16_t> worldpos;
-		Point<int16_t> charinfopos;
-		uint8_t selected_character;
-		uint8_t selected_page;
-		uint8_t page_count;
-		Texture tab;
-		uint8_t tab_index;
-		bool tab_active;
-		bool tab_move;
-		Point<int16_t> tab_pos[3];
-		int16_t tab_move_pos;
-		std::map<uint8_t, uint16_t> tab_map;
-		Point<int16_t> world_dimensions;
-		Animation burning_notice;
-		Text burning_count;
-		std::vector<Sprite> world_sprites;
-		Texture charinfo;
-		Texture charslot;
-		Texture pagebase;
-		Charset pagenumber;
-		nl::node pagenumberpos;
-		Texture signpost[3];
-		nl::node nametag;
-		Charset levelset;
-		OutlinedText namelabel;
-		std::vector<CharLook> charlooks;
-		std::vector<NameTag> nametags;
-		Animation emptyslot_effect;
-		Texture emptyslot;
-		Animation selectedslot_effect[2];
-		OutlinedText chatslotlabel;
-		int16_t timestamp;
-		uint16_t charslot_y;
-		bool show_timestamp;
-		bool burning_character;
 
-		enum InfoLabel : uint8_t
-		{
-			JOB,
-			STR,
-			DEX,
-			INT,
-			LUK,
-			NUM_LABELS
-		};
+		// Indexes into `characters`; -1 when none.
+		int16_t selected = -1;
+		int16_t page = 0;
+		int16_t page_count = 1;
 
-		OutlinedText infolabels[UICharSelect::InfoLabel::NUM_LABELS];
+		// The menu sign the Tab key points at, or -1 while the keys move
+		// between characters.
+		int16_t menu_focus = -1;
+		Animation focus_hand[3];
+
+		Texture signposts[3];
+		Texture nametags[2][3];
+
+		Animation beam;
+		Animation sparkle;
+		bool beam_done = true;
+		bool sparkle_done = true;
+
+		Scroll scroll = Scroll::CLOSED;
+		Animation scroll_open[2];
+		Texture scroll_opened[2];
+		Texture charinfo[2];
+		Texture rank_icons[3];
+		Texture job_icons[5];
+
+		PageArrow page_left;
+		PageArrow page_right;
+
+		Texture world_box;
+		Text world_name;
+		Text channel_name;
+
+		ChatBalloonHorizontal chatballoon;
 	};
 }

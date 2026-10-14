@@ -427,9 +427,13 @@ namespace ms
 		Sound(Sound::Name::SCROLLUP).play();
 	}
 
-	uint16_t UIWorldSelect::get_worldbyid(uint16_t worldid)
+	std::string UIWorldSelect::get_world_name(uint8_t worldid) const
 	{
-		return worldid;
+		for (auto &world : worlds)
+			if (world.wid == worldid)
+				return world.name;
+
+		return "";
 	}
 
 	uint8_t UIWorldSelect::get_channel_count(uint8_t worldid) const
