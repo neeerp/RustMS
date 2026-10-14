@@ -95,14 +95,14 @@ namespace ms
 		buttons[Buttons::SELL_ITEM] = std::make_unique<MapleButton>(src["BtSell"], BUY_BUTTON + Point<int16_t>(HALF, 0));
 
 		// Only the whole list: the Must tab beside it is left out.
-		buytabs = ClassicTabs(src["TabBuy"]["enabled"], src["TabBuy"]["disabled"], BUY_TAB_FILL);
-		selltabs = ClassicTabs(src["TabSell"]["enabled"], src["TabSell"]["disabled"], SELL_TAB_FILL);
+		buytabs = ClassicTabs(ClassicTabs::TAB5, src["TabBuy"]["enabled"], src["TabBuy"]["disabled"], BUY_TAB_FILL);
+		selltabs = ClassicTabs(ClassicTabs::TAB5, src["TabSell"]["enabled"], src["TabSell"]["disabled"], SELL_TAB_FILL);
 
 		for (int16_t i = 0; i < SELL_TABS; i++)
 		{
 			Point<int16_t> tab_pos = TABS + Point<int16_t>(HALF + selltabs.pitch() * i, 0);
 			buttons[Buttons::EQUIP + i] = std::make_unique<AreaButton>(tab_pos,
-																	   Point<int16_t>(selltabs.pitch(), ClassicTabs::HEIGHT));
+																	   Point<int16_t>(selltabs.pitch(), selltabs.height()));
 		}
 
 		for (int16_t i = 0; i < ROWS; i++)
