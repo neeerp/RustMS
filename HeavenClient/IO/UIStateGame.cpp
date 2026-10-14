@@ -27,7 +27,6 @@
 #include "UITypes/UICharInfo.h"
 #include "UITypes/UIChatBar.h"
 #include "UITypes/UIEquipInventory.h"
-#include "UITypes/UIEvent.h"
 #include "UITypes/UIItemInventory.h"
 #include "UITypes/UIKeyConfig.h"
 #include "UITypes/UIMessenger.h"
@@ -352,9 +351,6 @@ namespace ms
 								if (auto statusbar = UI::get().get_element<UIStatusBar>())
 									statusbar->send_key(action, pressed, escape);
 
-								break;
-							case KeyAction::Id::EVENT:
-								emplace<UIEvent>();
 								break;
 							case KeyAction::Id::CHANGECHANNEL:
 								emplace<UIChannel>();
