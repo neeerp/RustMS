@@ -218,6 +218,9 @@ pub fn opcode_name(opcode: i16) -> &'static str {
         x if x == SendOpcode::LastConnectedWorld as i16 => "LastConnectedWorld",
         x if x == SendOpcode::RecommendedWorlds as i16 => "RecommendedWorlds",
         x if x == SendOpcode::SetField as i16 => "SetField",
+        x if x == SendOpcode::SetCashShop as i16 => "SetCashShop",
+        x if x == SendOpcode::QueryCashResult as i16 => "QueryCashResult",
+        x if x == SendOpcode::CashShopOperation as i16 => "CashShopOperation",
         x if x == SendOpcode::Whisper as i16 => "Whisper",
         x if x == SendOpcode::SpawnPlayer as i16 => "SpawnPlayer",
         x if x == SendOpcode::SpawnNpc as i16 => "SpawnNpc",
@@ -430,6 +433,16 @@ pub fn build_player_move(movement_bytes: &[u8]) -> Result<Packet, String> {
         .write_bytes(movement_bytes)
         .map_err(|e| format!("failed to write movement bytes: {e}"))?;
     Ok(packet)
+}
+
+/// SHOP on the status bar.
+pub fn build_enter_cash_shop() -> Packet {
+    packet_with_opcode(RecvOpcode::EnterCashShop as i16)
+}
+
+/// The Cash Shop's exit button: CHANGE_MAP with no body.
+pub fn build_leave_cash_shop() -> Packet {
+    packet_with_opcode(RecvOpcode::ChangeMap as i16)
 }
 
 pub fn build_change_map(target_map_id: i32, portal_name: &str) -> Result<Packet, String> {

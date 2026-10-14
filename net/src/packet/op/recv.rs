@@ -28,6 +28,7 @@ pub enum RecvOpcode {
     ChangeChannel = 0x27,
 
     ChangeMap = 0x26,
+    EnterCashShop = 0x28,
 
     PlayerMove = 0x29,
     CloseRangeAttack = 0x2C,

@@ -76,6 +76,17 @@ joins the new one at the spawn portal's position.
 World entry uses the same spawn-portal lookup (`net::spawn_position`) instead
 of a hard-coded position.
 
+### The Cash Shop
+
+`ENTER_CASHSHOP` (0x28) takes the player off their field, saves them, and
+sends `SET_CASH_SHOP` (character data plus the shop's lists) followed by the
+cash inventory, gifts, wish list and NX balance
+(`net/src/packet/build/world/cash_shop.rs`). The session stays on the channel
+and in the world directory, so whispers still arrive, but the client actor
+ignores every other opcode until the player leaves. Leaving sends a
+`CHANGE_MAP` with no body; the actor answers it like a channel change to its
+own channel, and the client reconnects and enters the map it left. Buying is
+not implemented, and every balance is 0.
 The client actor also follows its own movement to know roughly where the
 player stands. Before saving on a channel change or disconnect, it sets the
 spawn point to the nearest start or invisible portal that leads nowhere
