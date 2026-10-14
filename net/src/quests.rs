@@ -111,6 +111,13 @@ pub fn check_complete(
             return Err(QuestRejection::Mobs(mob_id));
         }
     }
+    if let Some(unmet) = quest
+        .end_quests
+        .iter()
+        .find(|p| player.quests.state(p.quest_id) != p.state)
+    {
+        return Err(QuestRejection::Prerequisite(unmet.quest_id));
+    }
     if quest.money < 0 && player.meso < quest.money.saturating_neg() {
         return Err(QuestRejection::Mesos);
     }
@@ -242,6 +249,7 @@ mod tests {
             end_npc: 2102,
             end_items: vec![],
             end_mobs: vec![],
+            end_quests: vec![],
             start_items: vec![],
             end_rewards: vec![],
             start_script: None,
@@ -342,6 +350,31 @@ mod tests {
             check_complete(&q, 2102, &p),
             Err(QuestRejection::Items(2010007))
         );
+    }
+
+    #[test]
+    fn completion_needs_the_listed_quests_in_their_states() {
+        let mut q = quest();
+        q.end_quests = vec![
+            QuestPrerequisite {
+                quest_id: 1041,
+                state: QuestState::Completed,
+            },
+            QuestPrerequisite {
+                quest_id: 1042,
+                state: QuestState::Completed,
+            },
+        ];
+        let mut p = player(1, 0);
+        set(&mut p, 1033, QuestState::Started);
+        set(&mut p, 1041, QuestState::Completed);
+        set(&mut p, 1042, QuestState::Started);
+        assert_eq!(
+            check_complete(&q, 2102, &p),
+            Err(QuestRejection::Prerequisite(1042))
+        );
+        set(&mut p, 1042, QuestState::Completed);
+        assert_eq!(check_complete(&q, 2102, &p), Ok(()));
     }
 
     #[test]
