@@ -139,6 +139,17 @@ from `UI.nx`. Moved so far:
   restores the server's defaults; DEFAULT, CLEAR ALL, and Esc with unsaved
   changes ask through the in-window `notice` bitmaps. CHANGE QUICK SLOTS is
   disabled until the quick slot is configurable.
+- **Character info** (`UICharInfo`, `UIWindow.img/UserInfo`): opened by
+  double-clicking a character on the map, the player included
+  (`Stage::character_at`, a body-sized box above the feet in
+  `MapleMap/CharClick.h`; NPCs under the cursor take the click first). It shows
+  a copy of the character's look and name, and the level, job, fame, guild, and
+  alliance from CHAR_INFO, laid out from the background and the v83 client.
+  Double-clicking someone else replaces the window. TAMING MOB, PET INFO, and
+  COLLECTION lengthen it to `backgrnd5`, `backgrnd2`, and `backgrnd7`, and ITEM
+  and WISHLIST open `backgrnd4` and `backgrnd3` beside it; all are empty, as
+  RustMS has no mounts, pets, monster book, or cash shop wish list. Family,
+  party, trade, fame, and excluded items are disabled.
 
 `UIClassic.nx` is not one of NoLifeNx's standard files, so `NxFiles` opens it
 with `nl::file` instead of `nl::nx::load_all`.

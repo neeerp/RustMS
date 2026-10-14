@@ -43,6 +43,10 @@ presses nothing.
 (`Gameplay/MapleMap/NpcReach.h`): NPCs within 150 px either side and 50 px up or
 down are in reach, and the horizontally nearest wins.
 
+`char_click_tests` covers which clicks land on a character for the character
+info window (`Gameplay/MapleMap/CharClick.h`): a box 18 px either side of the
+feet and 70 px tall above them.
+
 ## GUI checks without taking desktop focus
 
 Prefer a private Xvfb display for automated native-client checks. It gives the
