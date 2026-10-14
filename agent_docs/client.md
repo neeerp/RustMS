@@ -67,6 +67,9 @@ from `UI.nx`. Moved so far:
 - **Status bar** (`UIStatusBar`, `StatusBar.img`): gauges, menu buttons, the
   quick slot panel, and the Game Menu and ShortCut popups (`UIWindow.img`).
   Esc opens the Game Menu; the MENU key action opens ShortCut.
+  Status messages (`UIStatusMessenger`) stack upward from just above the
+  quick slot panel, right-aligned with it; `UIStatusBar::QUICKSLOT_TOP` is
+  the shared anchor.
 - **Chat** (`UIChatBar`): the input strip in the bar's top-left and the log
   above it. The status bar cuts that strip out of its background, so the two
   can overlap in either draw order.
@@ -221,3 +224,6 @@ These were corrected:
    own grey (`#BBBBBB`) chat line, worded as in period footage: "You have
    gained an item (Roger's Apple)", "You have gained items (3 Green Apple)",
    and "You have lost ..." for losses.
+8. The stat window's HP and MP buttons sent SPEND_AP with the current HP and
+   MP codes (0x400, 0x1000). They now send MaxHP and MaxMP (0x800, 0x2000),
+   which is what AP raises.

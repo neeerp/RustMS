@@ -13,6 +13,7 @@ mod party_search_update;
 mod pickup;
 mod quest_action;
 mod script_portal;
+mod spend_points;
 mod use_item;
 mod whisper;
 
@@ -31,5 +32,6 @@ pub use self::party_search_update::PartySearchUpdateHandler;
 pub use self::pickup::ItemPickupHandler;
 pub use self::quest_action::QuestActionHandler;
 pub use self::script_portal::ChangeMapSpecialHandler;
+pub use self::spend_points::{SpendApHandler, SpendSpHandler};
 pub use self::use_item::{HealOverTimeHandler, UseItemHandler, MAX_NATURAL_HEAL};
 pub use self::whisper::WhisperHandler;

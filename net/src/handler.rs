@@ -293,7 +293,7 @@ fn world_routes() -> &'static HashMap<i16, WorldRoute> {
     ROUTES.get_or_init(|| {
         use RecvOpcode as Op;
         use WorldRoute::*;
-        let table: [(Op, WorldRoute); 21] = [
+        let table: [(Op, WorldRoute); 23] = [
             (Op::PlayerLoggedIn, PreGame(&world::PlayerLoggedInHandler)),
             (Op::PlayerMove, InGame(&world::PlayerMoveHandler)),
             (Op::ChangeChannel, InGame(&world::ChangeChannelHandler)),
@@ -326,6 +326,8 @@ fn world_routes() -> &'static HashMap<i16, WorldRoute> {
             (Op::TakeDamage, InGame(&world::TakeDamageHandler)),
             (Op::ItemPickup, InGame(&world::ItemPickupHandler)),
             (Op::HealOverTime, InGame(&world::HealOverTimeHandler)),
+            (Op::SpendAp, InGame(&world::SpendApHandler)),
+            (Op::SpendSp, InGame(&world::SpendSpHandler)),
             (Op::MesoDrop, InGame(&world::MesoDropHandler)),
         ];
         table
@@ -357,7 +359,7 @@ mod tests {
     fn every_registered_opcode_is_unique_per_server() {
         // The maps would silently drop duplicates; check the table sizes match.
         assert_eq!(login_routes().len(), 13);
-        assert_eq!(world_routes().len(), 21);
+        assert_eq!(world_routes().len(), 23);
     }
 
     #[test]

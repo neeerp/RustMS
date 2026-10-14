@@ -19,6 +19,7 @@
 
 #include "PlayerStates.h"
 
+#include "../Audio/Audio.h"
 #include "../Data/WeaponData.h"
 #include "../IO/UI.h"
 
@@ -230,6 +231,7 @@ namespace ms
 			phobj.hspeed = 0.0;
 			phobj.type = PhysicsObject::Type::NORMAL;
 			set_state(Char::State::DIED);
+			Sound(Sound::Name::TOMBSTONE).play();
 
 			// Any answer sends the player to the map's return map with a little HP.
 			UI::get().emplace<UIOk>("You have died.\\nYou will be revived in the nearest town.", [](bool)
@@ -480,7 +482,10 @@ namespace ms
 		uint16_t oldlevel = get_level();
 
 		if (level > oldlevel)
+		{
 			show_effect_id(CharEffect::Id::LEVELUP);
+			Sound(Sound::Name::LEVELUP).play();
+		}
 
 		stats.set_stat(MapleStat::Id::LEVEL, level);
 	}
