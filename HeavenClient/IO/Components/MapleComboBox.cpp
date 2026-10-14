@@ -25,8 +25,7 @@
 namespace ms
 {
 	MapleComboBox::MapleComboBox(Type type, std::vector<std::string> o, uint16_t default_option, Point<int16_t> ppos,
-								 Point<int16_t> pos, int64_t w) : options(o), selected_index(default_option),
-																  parentpos(ppos), rwidth(w)
+								 Point<int16_t> pos, int64_t w) : options(o), rwidth(w), selected_index(default_option)
 	{
 		std::string combobox = "ComboBox";
 
@@ -51,9 +50,6 @@ namespace ms
 		textures[Button::State::DISABLED][1] = src["disabled"][1];
 		textures[Button::State::DISABLED][2] = src["disabled"][2];
 
-		for (auto &option : options)
-			option_text.push_back(Text(Text::Font::A12M, Text::Alignment::LEFT, Color::Name::BLACK, option));
-
 		Text::Font selected_font = Text::Font::A12M;
 		Color::Name selected_color = Color::Name::BLACK;
 		selected_adj = Point<int16_t>(2, -3);
@@ -65,6 +61,30 @@ namespace ms
 			selected_adj = Point<int16_t>(11, 2);
 		}
 
+		init(selected_font, selected_color, ppos, pos);
+	}
+
+	MapleComboBox::MapleComboBox(nl::node src, Point<int16_t> b, std::vector<std::string> o, uint16_t default_option,
+								 Point<int16_t> ppos, Point<int16_t> pos) : options(o), rwidth(0),
+																			selected_index(default_option), box(b)
+	{
+		textures[Button::State::PRESSED][0] = src["pressed"][0];
+		textures[Button::State::MOUSEOVER][0] = src["mouseOver"][0];
+		textures[Button::State::DISABLED][0] = src["disabled"][0];
+
+		selected_adj = Point<int16_t>(4, -2);
+
+		init(Text::Font::A12M, Color::Name::BLACK, ppos, pos);
+	}
+
+	void MapleComboBox::init(Text::Font selected_font, Color::Name selected_color, Point<int16_t> ppos,
+							 Point<int16_t> pos)
+	{
+		parentpos = ppos;
+
+		for (auto &option : options)
+			option_text.push_back(Text(Text::Font::A12M, Text::Alignment::LEFT, Color::Name::BLACK, option));
+
 		selected = Text(selected_font, Text::Alignment::LEFT, selected_color, options[selected_index]);
 
 		state = Button::State::NORMAL;
@@ -72,8 +92,7 @@ namespace ms
 		rect = ColorBox(width() - 2, options.size() * HEIGHT - 2, Color::Name::GALLERY, 1.0f);
 		current_rect = ColorBox(width() - 2, HEIGHT - 2, Color::Name::GRAYOLIVE, 1.0f);
 
-		Point<int16_t> option_pos =
-				Point<int16_t>(position.x(), position.y() + textures[state][0].get_dimensions().y()) + parentpos;
+		Point<int16_t> option_pos = Point<int16_t>(position.x(), position.y() + box_height()) + parentpos;
 
 		for (size_t i = 0; i < option_text.size(); i++)
 			buttons[i] = std::make_unique<AreaButton>(
@@ -101,7 +120,7 @@ namespace ms
 			int16_t middle_width = textures[state][1].width();
 			int16_t current_width = middle_width;
 
-			while (current_width < rwidth)
+			while (middle_width > 0 && current_width < rwidth)
 			{
 				textures[state][1].draw(lpos);
 				lpos.shift_x(middle_width);
@@ -114,9 +133,7 @@ namespace ms
 
 			if (pressed)
 			{
-				Point<int16_t> pos =
-						Point<int16_t>(position.x(), position.y() + textures[state][0].get_dimensions().y()) +
-						parentpos;
+				Point<int16_t> pos = Point<int16_t>(position.x(), position.y() + box_height()) + parentpos;
 
 				background.draw(pos + Point<int16_t>(0, 2));
 				rect.draw(pos + Point<int16_t>(1, 3));
@@ -133,6 +150,10 @@ namespace ms
 	Rectangle<int16_t> MapleComboBox::bounds(Point<int16_t>) const
 	{
 		auto lt = parentpos + position - origin();
+
+		if (box.x() > 0)
+			return Rectangle<int16_t>(lt, lt + box);
+
 		auto rb = lt + textures[state][0].get_dimensions();
 
 		auto end = textures[state][2].get_dimensions();
@@ -144,7 +165,18 @@ namespace ms
 
 	int16_t MapleComboBox::width() const
 	{
+		if (box.x() > 0)
+			return box.x();
+
 		return textures[state][0].width() + textures[state][2].width() + rwidth;
+	}
+
+	int16_t MapleComboBox::box_height() const
+	{
+		if (box.y() > 0)
+			return box.y();
+
+		return textures[state][0].height();
 	}
 
 	Point<int16_t> MapleComboBox::origin() const
@@ -199,8 +231,7 @@ namespace ms
 	bool MapleComboBox::in_combobox(Point<int16_t> cursorpos)
 	{
 		Point<int16_t> lt =
-				Point<int16_t>(position.x() + 1, position.y() + textures[state][0].get_dimensions().y() + 1) +
-				parentpos;
+				Point<int16_t>(position.x() + 1, position.y() + box_height() + 1) + parentpos;
 		Point<int16_t> rb = lt + Point<int16_t>(width() - 2, options.size() * HEIGHT - 2);
 
 		return Rectangle<int16_t>(lt, rb).contains(cursorpos);

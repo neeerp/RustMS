@@ -24,6 +24,7 @@
 #include "../UITypes/UILoginWait.h"
 
 #include "../../Net/Packets/LoginPackets.h"
+#include "../../Util/NxFiles.h"
 
 #include <nlnx/nx.hpp>
 
@@ -33,7 +34,7 @@ namespace ms
 	{
 		CUR_TIMESTEP = 0;
 
-		nl::node Login = nl::nx::ui["Login.img"];
+		nl::node Login = NxFiles::ui_classic["Login.img"];
 		nl::node Gender = Login["Gender"];
 		nl::node scroll = Gender["scroll"][0];
 
@@ -48,12 +49,11 @@ namespace ms
 
 		uint16_t default_option = 0;
 
-		buttons[Buttons::NO] = std::make_unique<MapleButton>(Login["BtCancel"], Point<int16_t>(650,
-																							   349)); // TODO: _inlink issue: Original: Gender["BtNo"]
+		buttons[Buttons::NO] = std::make_unique<MapleButton>(Gender["BtNo"], Point<int16_t>(650, 349));
 		buttons[Buttons::YES] = std::make_unique<MapleButton>(Gender["BtYes"], Point<int16_t>(578, 349));
-		buttons[Buttons::SELECT] = std::make_unique<MapleComboBox>(MapleComboBox::Type::DEFAULT, options,
-																   default_option, position, Point<int16_t>(510, 283),
-																   65);
+		// The drop box's box is drawn in the text.
+		buttons[Buttons::SELECT] = std::make_unique<MapleComboBox>(Gender["DropBox"], Point<int16_t>(50, 21), options,
+																   default_option, position, Point<int16_t>(509, 282));
 
 		dimension = Texture(gender_sprites[2]).get_dimensions();
 	}

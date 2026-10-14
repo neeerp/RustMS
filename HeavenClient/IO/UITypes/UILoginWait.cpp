@@ -20,6 +20,7 @@
 #include "../Components/MapleButton.h"
 
 #include "../../Net/Session.h"
+#include "../../Util/NxFiles.h"
 
 #include <nlnx/nx.hpp>
 
@@ -29,15 +30,18 @@ namespace ms
 
 	UILoginWait::UILoginWait(std::function<void()> okhandler) : okhandler(okhandler)
 	{
-		nl::node Loading = nl::nx::ui["Login.img"]["Notice"]["Loading"];
+		// The v83 "Connecting to server" scroll: its LOADING bar fills up in
+		// ten steps, and Cancel sits right of the caption. The positions
+		// match v0.59 footage at 800x600.
+		nl::node Loading = NxFiles::ui_classic["Login.img"]["Notice"]["Loading"];
 		nl::node backgrnd = Loading["backgrnd"];
 
 		sprites.emplace_back(backgrnd);
-		sprites.emplace_back(Loading["circle"], Point<int16_t>(127, 70));
+		sprites.emplace_back(Loading["bar"], Point<int16_t>(131, 98));
 
-		buttons[Buttons::CANCEL] = std::make_unique<MapleButton>(Loading["BtCancel"], Point<int16_t>(101, 106));
+		buttons[Buttons::CANCEL] = std::make_unique<MapleButton>(Loading["BtCancel"], Point<int16_t>(189, 44));
 
-		position = Point<int16_t>(276, 229);
+		position = Point<int16_t>(259, 226);
 		dimension = Texture(backgrnd).get_dimensions();
 	}
 
