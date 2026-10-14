@@ -41,11 +41,21 @@ pub struct CloseRangeAttackHandler;
 impl WorldHandler for CloseRangeAttackHandler {
     fn handle(&self, packet: &mut Packet, ctx: &mut WorldContext) -> WorldResult {
         let attack = combat::parse_close_attack(packet)?;
-        if let Err(rejection) = combat::validate(&attack, ctx.player) {
-            debug!(?rejection, "Attack refused");
-            return Ok(HandlerResult::empty());
+        let skill = match combat::validate(&attack, ctx.player) {
+            Ok(skill) => skill,
+            Err(rejection) => {
+                debug!(?rejection, skill = attack.skill, "Attack refused");
+                return Ok(HandlerResult::empty());
+            }
+        };
+        let mut result = HandlerResult::empty();
+        let mut skill_level = 0;
+        if let Some(skill) = skill {
+            let mp = ctx.player.add_mp(-skill.effect.mp_cost);
+            result = HandlerResult::reply(stat::build_stat_update(false, &[StatUpdate::Mp(mp)])?);
+            skill_level = skill.level as u8;
         }
-        let broadcast = combat::build_close_attack(ctx.player.id(), &attack)?;
+        let broadcast = combat::build_close_attack(ctx.player.id(), &attack, skill_level)?;
         let hits = attack
             .hits
             .into_iter()
@@ -56,8 +66,7 @@ impl WorldHandler for CloseRangeAttackHandler {
                 )
             })
             .collect();
-        Ok(HandlerResult::empty()
-            .with(WorldAction::Field(FieldRequest::Attack { broadcast, hits })))
+        Ok(result.with(WorldAction::Field(FieldRequest::Attack { broadcast, hits })))
     }
 }
 

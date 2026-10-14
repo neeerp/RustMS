@@ -16,6 +16,8 @@ pub enum SendOpcode {
     RecommendedWorlds = 0x1B,
 
     InventoryOperation = 0x1D,
+    GiveBuff = 0x20,
+    CancelBuff = 0x21,
     StatChange = 0x1F,
     UpdateSkills = 0x24,
     ShowStatusInfo = 0x27,
@@ -33,6 +35,7 @@ pub enum SendOpcode {
     ChatText = 0xA2,
     ShowItemGainInChat = 0xCE,
     UpdateQuestInfo = 0xD3,
+    Cooldown = 0xEA,
     SpawnMonster = 0xEC,
     KillMonster = 0xED,
     SpawnMonsterControl = 0xEE,
