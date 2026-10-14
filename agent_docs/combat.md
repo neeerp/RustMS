@@ -77,7 +77,12 @@ the player's quests) and asks the field to place the loot.
 
 The field's `field_drops::DropSet` spreads a kill's drops around where the
 mob died and shows them falling (DROP_ITEM_FROM_MAPOBJECT 1); players
-entering see lying drops (mode 2). Quest drops are shown only to their owner.
+entering see lying drops (mode 2). Each drop lands on the map's footholds
+(`game_data::footholds`, loaded with the field template): on the highest
+ground below its column, searched from 50 px above the mob as v83 servers do.
+A wall between the mob and the drop's column, or no ground under it, keeps
+the drop on the ground below the mob, so drops don't end up inside a cliff or
+in the air. Quest drops are shown only to their owner.
 For 15 s only the killer may pick a drop up (quest drops: always only the
 owner); drops vanish after 180 s (REMOVE_ITEM_FROM_MAP 0). Drops players
 throw down are anyone's at once; see "Client moves" in `inventory.md`.

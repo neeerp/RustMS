@@ -60,6 +60,7 @@ impl FieldActor {
         rx: mpsc::Receiver<FieldMessage>,
         map_npcs: Vec<FieldMapEntityNpc>,
         mut mobs: MobSet,
+        drops: DropSet,
         tick: Duration,
     ) -> Self {
         mobs.respawn(Instant::now());
@@ -69,7 +70,7 @@ impl FieldActor {
             occupants: HashMap::new(),
             map_npcs,
             mobs,
-            drops: DropSet::default(),
+            drops,
             tick,
         }
     }
@@ -517,6 +518,7 @@ mod tests {
             rx,
             Vec::new(),
             MobSet::default(),
+            DropSet::default(),
             Duration::from_millis(50),
         );
         tokio::spawn(actor.run());
@@ -636,6 +638,7 @@ mod tests {
             rx,
             vec![heena],
             MobSet::default(),
+            DropSet::default(),
             Duration::from_millis(50),
         );
         tokio::spawn(actor.run());
