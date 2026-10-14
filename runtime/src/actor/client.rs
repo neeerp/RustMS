@@ -10,7 +10,7 @@ use crate::db::spawn_db;
 use crate::error::RuntimeError;
 use crate::io::{PacketReader, PacketWriter};
 use crate::message::{
-    ClientHandle, DirectoryMessage, FieldHandle, FieldKey, FieldMessage, ServerMessage,
+    ClientHandle, DirectoryMessage, FieldHandle, FieldKey, FieldMessage, Presence, ServerMessage,
     CLIENT_QUEUE_CAPACITY,
 };
 use game::Player;
@@ -84,6 +84,11 @@ pub struct ClientActor {
     blocked_scripts: HashSet<String>,
     npc_request_id: u64,
     changing_channel: bool,
+    /// The party the directory says the player is in; fields need it to
+    /// share EXP.
+    party_id: Option<i32>,
+    /// What the directory last heard of the player.
+    presence: Option<Presence>,
 }
 
 impl ClientActor {
@@ -129,6 +134,8 @@ impl ClientActor {
             blocked_scripts: HashSet::new(),
             npc_request_id: 0,
             changing_channel: false,
+            party_id: None,
+            presence: None,
         })
     }
 
@@ -150,6 +157,9 @@ impl ClientActor {
                 _ = autosave.tick() => self.save_if_dirty().await,
             };
             if let Err(error) = step {
+                break error;
+            }
+            if let Err(error) = self.sync_presence().await {
                 break error;
             }
         };
@@ -289,6 +299,13 @@ impl ClientActor {
                 })
                 .await?
             }
+            WorldAction::Party(request) => {
+                self.send_to_directory(DirectoryMessage::Party {
+                    from: self.client_id,
+                    request,
+                })
+                .await?
+            }
             WorldAction::ChangeChannel { channel_id } => self.change_channel(channel_id).await?,
             WorldAction::Disconnect => return Err(RuntimeError::ClientDisconnected),
         }
@@ -333,9 +350,11 @@ impl ClientActor {
         self.send(&mut keymap).await?;
         self.send(&mut char_info).await?;
 
+        let presence = Presence::of(&player);
+        self.presence = Some(presence.clone());
         self.send_to_directory(DirectoryMessage::Register {
             handle: self.handle(),
-            name: player.name().to_string(),
+            presence,
             channel_id: self.channel_id,
         })
         .await?;
@@ -383,8 +402,13 @@ impl ClientActor {
         let handle = self.handle();
         let game = self.in_game()?;
         let avatar = game.player.field_avatar(spawn.x, spawn.y, spawn.stance);
-        self.send_to_field(FieldMessage::Join { handle, avatar })
-            .await?;
+        let party = self.party_id;
+        self.send_to_field(FieldMessage::Join {
+            handle,
+            avatar,
+            party,
+        })
+        .await?;
         self.run_map_enter_script().await
     }
 
@@ -425,12 +449,24 @@ impl ClientActor {
                 mob_id,
                 object_id,
                 exp,
+                party_bonus,
+                attacked,
                 x,
                 y,
             } => {
-                self.mob_killed(mob_id, exp).await?;
+                self.mob_killed(mob_id, exp, party_bonus).await?;
                 self.count_quest_kill(mob_id).await?;
-                self.drop_loot(mob_id, object_id, x, y).await?
+                if attacked {
+                    self.drop_loot(mob_id, object_id, x, y).await?
+                }
+            }
+            ServerMessage::PartyChanged { party_id } => {
+                self.party_id = party_id;
+                self.send_to_field(FieldMessage::SetParty {
+                    client_id: self.client_id,
+                    party: party_id,
+                })
+                .await?
             }
             ServerMessage::PickedUp { drop } => self.picked_up(drop).await?,
             ServerMessage::SendPacket(mut packet) => self.send(&mut packet).await?,
@@ -456,6 +492,7 @@ impl ClientActor {
                 let rejoin = FieldMessage::Join {
                     handle: self.handle(),
                     avatar,
+                    party: self.party_id,
                 };
                 field
                     .tx
@@ -475,6 +512,24 @@ impl ClientActor {
                 Ok(())
             }
         }
+    }
+
+    /// Keep the directory's view of the player (map, level, job, HP)
+    /// current, for party windows and HP bars.
+    async fn sync_presence(&mut self) -> Result<(), RuntimeError> {
+        let Some(game) = self.game.as_ref() else {
+            return Ok(());
+        };
+        let presence = Presence::of(&game.player);
+        if self.presence.as_ref() == Some(&presence) {
+            return Ok(());
+        }
+        self.presence = Some(presence.clone());
+        self.send_to_directory(DirectoryMessage::Presence {
+            client_id: self.client_id,
+            presence,
+        })
+        .await
     }
 
     async fn send_to_directory(&self, message: DirectoryMessage) -> Result<(), RuntimeError> {

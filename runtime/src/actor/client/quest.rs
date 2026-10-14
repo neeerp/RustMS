@@ -329,8 +329,18 @@ pub(super) fn gain_exp(
     amount: i32,
     packets: &mut Vec<Packet>,
 ) -> Result<(), RuntimeError> {
-    let levelled = next.gain_exp(amount) > 0;
+    gain_exp_with_bonus(next, amount, 0, packets)
+}
+
+/// `gain_exp` plus a party bonus the message shows separately.
+pub(super) fn gain_exp_with_bonus(
+    next: &mut Player,
+    amount: i32,
+    party_bonus: i32,
+    packets: &mut Vec<Packet>,
+) -> Result<(), RuntimeError> {
+    let levelled = next.gain_exp(amount.saturating_add(party_bonus)) > 0;
     packets.push(stat::build_exp_stats(&next.stats, levelled)?);
-    packets.push(quest::build_gain_exp(amount)?);
+    packets.push(quest::build_gain_exp(amount, party_bonus)?);
     Ok(())
 }

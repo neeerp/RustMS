@@ -4,7 +4,8 @@
 //!
 //! ```text
 //!   ClientActor ──► FieldActor        (its current map: chat, movement, NPCs)
-//!   ClientActor ──► WorldDirectory    (name lookup: whisper, world broadcast)
+//!   ClientActor ──► WorldDirectory    (name lookup: whisper, world broadcast;
+//!                                      parties)
 //!   FieldActor / WorldDirectory ──► ClientHandle (try_send, never awaited)
 //! ```
 //!
@@ -12,8 +13,8 @@
 //! backpressure), but fields and the directory never await a client: a client
 //! whose queue is full is kicked instead. That makes wait cycles impossible.
 
-use game::FieldAvatar;
-use net::{BroadcastScope, ClientId, FieldRequest, WhisperDelivery};
+use game::{FieldAvatar, Player};
+use net::{BroadcastScope, ClientId, FieldRequest, PartyRequest, WhisperDelivery};
 use packet::Packet;
 use tokio::sync::mpsc;
 use tokio::sync::mpsc::error::TrySendError;
@@ -50,13 +51,20 @@ pub enum ServerMessage {
         field: FieldKey,
         request_id: u64,
     },
-    /// A mob this player helped kill; `exp` is their share.
+    /// A mob this player or their party killed; `exp` is their share.
     MobKilled {
         mob_id: i32,
         object_id: i32,
         exp: i32,
+        party_bonus: i32,
+        /// They hit it themselves, so they roll its loot.
+        attacked: bool,
         x: i16,
         y: i16,
+    },
+    /// The player joined or left a party.
+    PartyChanged {
+        party_id: Option<i32>,
     },
     /// The field gave this player a drop to put in their inventory.
     PickedUp {
@@ -129,6 +137,12 @@ pub enum FieldMessage {
     Join {
         handle: ClientHandle,
         avatar: FieldAvatar,
+        party: Option<i32>,
+    },
+    /// The occupant joined or left a party, which decides who shares EXP.
+    SetParty {
+        client_id: ClientId,
+        party: Option<i32>,
     },
     Leave {
         client_id: ClientId,
@@ -187,13 +201,48 @@ pub struct FieldHandle {
     pub tx: mpsc::Sender<FieldMessage>,
 }
 
+/// What the world directory knows of an online character: enough for party
+/// windows and HP bars.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Presence {
+    pub name: String,
+    pub job: i16,
+    pub level: u8,
+    pub map_id: i32,
+    pub hp: i16,
+    pub max_hp: i16,
+}
+
+impl Presence {
+    pub fn of(player: &Player) -> Self {
+        let stats = &player.stats;
+        Self {
+            name: stats.name.clone(),
+            job: stats.job,
+            level: stats.level,
+            map_id: stats.map_id,
+            hp: stats.hp,
+            max_hp: stats.max_hp,
+        }
+    }
+}
+
 /// Messages to the world directory.
 #[derive(Debug)]
 pub enum DirectoryMessage {
     Register {
         handle: ClientHandle,
-        name: String,
+        presence: Presence,
         channel_id: u8,
+    },
+    /// The character's map, level, job, or HP changed.
+    Presence {
+        client_id: ClientId,
+        presence: Presence,
+    },
+    Party {
+        from: ClientId,
+        request: PartyRequest,
     },
     Unregister {
         client_id: ClientId,

@@ -77,6 +77,14 @@ pub struct Trace {
     pub prompts: Vec<(i32, u8)>,
     /// Maps warped to.
     pub warps: Vec<i32>,
+    /// PARTY_OPERATION sub-operations, in order.
+    pub party_ops: Vec<u8>,
+    /// Party invitations: (party id, inviter).
+    pub party_invites: Vec<(i32, String)>,
+    /// UPDATE_PARTYMEMBER_HP: (character, HP, max HP).
+    pub party_hp: Vec<(i32, i32, i32)>,
+    /// Party chat lines: (sender, text).
+    pub party_chat: Vec<(String, String)>,
     /// Mobs and drops on the current field.
     pub field: Field,
 }
@@ -172,6 +180,24 @@ impl Trace {
             r.read_byte().unwrap();
             let npc = r.read_int().unwrap();
             self.prompts.push((npc, r.read_byte().unwrap()));
+        } else if op == SendOpcode::PartyOperation as i16 {
+            let party_op = r.read_byte().unwrap();
+            self.party_ops.push(party_op);
+            if party_op == 4 {
+                let party_id = r.read_int().unwrap();
+                self.party_invites
+                    .push((party_id, r.read_str_with_length().unwrap()));
+            }
+        } else if op == SendOpcode::UpdatePartyMemberHp as i16 {
+            self.party_hp.push((
+                r.read_int().unwrap(),
+                r.read_int().unwrap(),
+                r.read_int().unwrap(),
+            ));
+        } else if op == SendOpcode::MultiChat as i16 && r.read_byte().unwrap() == 1 {
+            let name = r.read_str_with_length().unwrap();
+            self.party_chat
+                .push((name, r.read_str_with_length().unwrap()));
         } else if op == SendOpcode::SetField as i16 && p.bytes.get(6) == Some(&0) {
             // A map change rather than entering the world.
             self.warps.push(decode_set_field_warp(p).unwrap().map_id);
