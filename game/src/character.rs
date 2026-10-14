@@ -1,3 +1,4 @@
+use crate::buff::Buffs;
 use crate::inventory::{equip_slot, Inventory};
 use crate::keymap::Keymap;
 use crate::monster_book::MonsterBook;
@@ -137,6 +138,8 @@ pub struct Player {
     pub monster_book: MonsterBook,
     /// Account GM level; 0 for regular players.
     pub gm_level: i16,
+    /// Active buffs and cooldowns; not saved.
+    pub buffs: Buffs,
     dirty: bool,
 }
 
@@ -163,6 +166,7 @@ impl Player {
             quests,
             monster_book: MonsterBook::default(),
             gm_level: 0,
+            buffs: Buffs::default(),
             dirty: false,
         }
     }

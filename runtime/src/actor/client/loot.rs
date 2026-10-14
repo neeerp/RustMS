@@ -20,6 +20,28 @@ impl ClientActor {
         y: i16,
     ) -> Result<(), RuntimeError> {
         let loot = loot::roll(mob_id, &self.in_game()?.player, &mut rand::thread_rng());
+        self.spawn_loot(loot, object_id, x, y).await
+    }
+
+    /// A reactor this player broke drops its loot for them.
+    pub(super) async fn drop_reactor_loot(
+        &mut self,
+        reactor_id: i32,
+        object_id: i32,
+        x: i16,
+        y: i16,
+    ) -> Result<(), RuntimeError> {
+        let loot = loot::roll_reactor(reactor_id, &self.in_game()?.player, &mut rand::thread_rng());
+        self.spawn_loot(loot, object_id, x, y).await
+    }
+
+    async fn spawn_loot(
+        &mut self,
+        loot: Vec<Loot>,
+        dropper: i32,
+        x: i16,
+        y: i16,
+    ) -> Result<(), RuntimeError> {
         if loot.is_empty() {
             return Ok(());
         }
@@ -28,7 +50,7 @@ impl ClientActor {
             loot,
             x,
             y,
-            dropper: object_id,
+            dropper,
         })
         .await
     }

@@ -18,7 +18,7 @@ async fn beginner_visits_follow_portals_and_persist_rewards_once() {
     let mut trace = Trace::default();
     let mut session = login_to_world_session(&config).await.unwrap();
     let c = &mut session.connection;
-    assert_eq!(session.map_id, 10_000);
+    assert_eq!(session.map_id, 0);
 
     act(c, &mut trace, &m, START, 1031, HEENA).await;
     assert_eq!(trace.states.get(&1031), Some(&1));
@@ -32,8 +32,8 @@ async fn beginner_visits_follow_portals_and_persist_rewards_once() {
     act(c, &mut trace, &m, COMPLETE, 1031, SERA).await;
     assert_eq!(trace.gains, [5]);
 
+    assert_eq!(warp(c, -1, "out00", &mut trace).await, 10_000);
     assert_eq!(warp(c, -1, "out00", &mut trace).await, 20_000);
-    assert_eq!(warp(c, -1, "out00", &mut trace).await, 30_000);
     act(c, &mut trace, &m, START, 1032, NINA).await;
     assert_eq!(trace.states.get(&1032), Some(&1));
     // Sen is inside his house, not on Nina's map.
@@ -42,10 +42,10 @@ async fn beginner_visits_follow_portals_and_persist_rewards_once() {
     drop(session);
 
     let mut session = relogin(&config).await;
-    assert_eq!((session.map_id, session.exp), (30_000, 5));
+    assert_eq!((session.map_id, session.exp), (20_000, 5));
     assert_eq!(session.quests.get(&1032), Some(&1));
     let c = &mut session.connection;
-    assert_eq!(warp(c, -1, "in01", &mut trace).await, 30_001);
+    assert_eq!(warp(c, -1, "in01", &mut trace).await, 20_001);
     act(c, &mut trace, &m, COMPLETE, 1032, SEN).await;
     // Act/1032/1/nextQuest makes the client continue into Sen's own offer.
     assert_eq!(trace.results.last(), Some(&(1032, SEN, 1033)));
@@ -53,7 +53,7 @@ async fn beginner_visits_follow_portals_and_persist_rewards_once() {
     // Sen's follow-up needs 1032 completed, which it now is.
     act(c, &mut trace, &m, START, 1033, SEN).await;
     assert_eq!(trace.states.get(&1033), Some(&1));
-    assert_eq!(warp(c, -1, "out00", &mut trace).await, 30_000);
+    assert_eq!(warp(c, -1, "out00", &mut trace).await, 20_000);
     act(c, &mut trace, &m, COMPLETE, 1033, NINA).await;
     assert_eq!(trace.gains, [5, 7, 7]);
     // 1033's nextQuest continues into Nina's candy errand (1034), which

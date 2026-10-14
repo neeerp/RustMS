@@ -4,6 +4,7 @@
 //! state. They deliberately know nothing about Diesel rows or packet layouts:
 //! `db` converts rows to and from them and `net` encodes them for the wire.
 
+pub mod buff;
 pub mod character;
 pub mod exp;
 pub mod inventory;
@@ -12,6 +13,7 @@ pub mod monster_book;
 pub mod quest;
 pub mod skill;
 
+pub use buff::{Buff, BuffStat, Buffs};
 pub use character::{ApStat, AvatarLook, CharacterStats, FieldAvatar, Player};
 pub use inventory::{EquipStats, Inventory, InventoryChange, InventoryError, InventoryType, Item};
 pub use keymap::{KeyBinding, Keymap};

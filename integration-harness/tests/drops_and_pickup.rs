@@ -8,7 +8,7 @@ use integration_harness::{login_to_world_session, relogin};
 
 const FOREST: i32 = 50_000;
 const SNAIL: i32 = 100100;
-const SMALL_FOREST: i32 = 40_000;
+const EAST_ENTRANCE: i32 = 30_000;
 const SENTINEL: i32 = 9300018;
 
 #[tokio::test]
@@ -115,8 +115,8 @@ async fn the_shellpiece_only_drops_during_todds_quest() {
     let mut session = login_to_world_session(&config).await.unwrap();
     let mut seen = Trace::default();
     assert_eq!(
-        warp(&mut session.connection, SMALL_FOREST, "", &mut seen).await,
-        SMALL_FOREST
+        warp(&mut session.connection, EAST_ENTRANCE, "", &mut seen).await,
+        EAST_ENTRANCE
     );
     until(&mut session.connection, &mut seen, |t| {
         t.field.alive(SENTINEL).len() >= 3

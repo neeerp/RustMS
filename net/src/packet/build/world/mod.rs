@@ -1,8 +1,10 @@
+pub mod buff;
 pub mod channel;
 pub mod char;
 pub mod drop;
 pub mod effect;
 pub mod field;
+pub mod info;
 pub mod inventory;
 pub mod keymap;
 pub mod map;
@@ -11,5 +13,7 @@ pub mod mob;
 pub mod monster_book;
 pub mod npc;
 pub mod quest;
+pub mod reactor;
+pub mod shop;
 pub mod skill;
 pub mod stat;

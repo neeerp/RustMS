@@ -239,6 +239,9 @@ pub fn opcode_name(opcode: i16) -> &'static str {
         x if x == SendOpcode::RemoveItemFromMap as i16 => "RemoveItemFromMap",
         x if x == SendOpcode::MonsterBookSetCard as i16 => "MonsterBookSetCard",
         x if x == SendOpcode::MonsterBookSetCover as i16 => "MonsterBookSetCover",
+        x if x == SendOpcode::SpawnReactor as i16 => "SpawnReactor",
+        x if x == SendOpcode::HitReactor as i16 => "HitReactor",
+        x if x == SendOpcode::RemoveReactor as i16 => "RemoveReactor",
         _ => "Unknown",
     }
 }
@@ -404,6 +407,14 @@ pub fn build_all_chat(message: &str, show: u8) -> Result<Packet, String> {
     packet
         .write_byte(show)
         .map_err(|e| format!("failed to write all-chat show flag: {e}"))?;
+    Ok(packet)
+}
+
+pub fn build_face_expression(emote: i32) -> Result<Packet, String> {
+    let mut packet = packet_with_opcode(RecvOpcode::FaceExpression as i16);
+    packet
+        .write_int(emote)
+        .map_err(|e| format!("failed to write face-expression emote: {e}"))?;
     Ok(packet)
 }
 
