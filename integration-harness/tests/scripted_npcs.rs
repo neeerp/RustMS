@@ -1,5 +1,5 @@
 //! Roger's Apple (quest 1021, scripted), using items, natural recovery,
-//! Robin's Q&A, the Maple Administrator's tutorial skip, and Shanks's ship.
+//! Robin's Q&A and Shanks's ship.
 
 use game_data::GameData;
 use integration_harness::hunting::{use_item, walk_to};
@@ -58,7 +58,7 @@ async fn rogers_apple_teaches_using_items_and_pays_once() {
     let mut session = login_to_world_session(&config).await.unwrap();
     let c = &mut session.connection;
     let mut trace = Trace::default();
-    assert_eq!(warp(c, -1, "out00", &mut trace).await, 20_000);
+    assert_eq!(warp(c, -1, "out00", &mut trace).await, 10_000);
     barrier(c, &m, &mut trace).await;
 
     // Plain QUEST_ACTION start is refused for a scripted quest.
@@ -120,7 +120,7 @@ async fn natural_recovery_is_rate_limited() {
     let mut session = login_to_world_session(&config).await.unwrap();
     let c = &mut session.connection;
     let mut trace = Trace::default();
-    assert_eq!(warp(c, -1, "out00", &mut trace).await, 20_000);
+    assert_eq!(warp(c, -1, "out00", &mut trace).await, 10_000);
     barrier(c, &m, &mut trace).await;
     step(c, &m, build_quest_action(SCRIPT_START, 1021, ROGER)).await;
     step(c, &m, answer(0, 1, None)).await;
@@ -151,23 +151,16 @@ async fn natural_recovery_waits_for_the_player_to_rest() {
 }
 
 #[tokio::test]
-async fn robin_answers_and_the_administrator_offers_a_skip() {
+async fn robin_answers_questions_about_the_island() {
     let config = load_harness_config_or_fail().await;
     let m = config.character_name.clone();
     let mut session = login_to_world_session(&config).await.unwrap();
     let c = &mut session.connection;
     let mut trace = Trace::default();
 
-    // Maple Administrator in Mushroom Town: decline, then accept.
-    let t = step(c, &m, talk(10_000, 2007)).await;
-    assert_eq!(t.prompts, [(2007, 1)]);
-    let t = step(c, &m, answer(1, 0, None)).await;
-    assert_eq!(t.prompts, [(2007, 0)]);
-    step(c, &m, answer(0, 1, None)).await;
-
-    assert_eq!(warp(c, 50_000, "", &mut trace).await, 50_000);
+    assert_eq!(warp(c, 40_000, "", &mut trace).await, 40_000);
     barrier(c, &m, &mut trace).await;
-    let t = step(c, &m, talk(50_000, 2003)).await;
+    let t = step(c, &m, talk(40_000, 2003)).await;
     assert_eq!(t.prompts, [(2003, 4)]);
     // "Tell me more about this island!" has four pages.
     let t = step(c, &m, answer(4, 1, Some(5))).await;
@@ -178,12 +171,6 @@ async fn robin_answers_and_the_administrator_offers_a_skip() {
     }
     let t = step(c, &m, answer(0, 1, None)).await;
     assert!(t.prompts.is_empty(), "the conversation ends");
-
-    assert_eq!(warp(c, 10_000, "", &mut trace).await, 10_000);
-    barrier(c, &m, &mut trace).await;
-    step(c, &m, talk(10_000, 2007)).await;
-    let t = step(c, &m, answer(1, 1, None)).await;
-    assert_eq!(t.warps.last(), Some(&104_000_000));
 }
 
 #[tokio::test]

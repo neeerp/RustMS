@@ -366,3 +366,6 @@ sha256 = "fc1ce77d58f6bb05021d7da1ebe4cb509c620b32c368f5780dc8df7abc6cc422"
 
 [rewards]
 source = "Server.NX/src/Reward.img"
+
+[shops]
+source = "Server.NX/src/NpcShop.img"

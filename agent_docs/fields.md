@@ -44,10 +44,23 @@ in the client's `Player`.
 | `Chat { from, packet }` | Broadcast to everyone, sender included |
 | `Move { from, packet, movement_bytes }` | Update the mover's position from the movement fragment, broadcast to everyone else |
 | `NpcInteraction { from, object_id, request_id }` | Validate the NPC is on this map, then tell the client which NPC id to talk to |
-| `FromClient { from, request }` | A `net::FieldRequest` from a handler: move a mob it controls, apply an attack, or show the others a packet |
+| `FromClient { from, request }` | A `net::FieldRequest` from a handler: move a mob it controls, apply an attack, show the others a packet, pick up or throw down a drop, or pass a character info request on |
 
 All sends to clients use `ClientHandle::send` (`try_send`); a client whose
 queue is full is disconnected rather than allowed to block the field.
+
+## Character info
+
+Double-clicking a character sends CHAR_INFO_REQUEST (0x61: tick, character
+id). `CharInfoRequestHandler` passes it to the requester's field as
+`FieldRequest::CharInfo`. If that character is on the map, the requester
+included, the field sends their client actor
+`ServerMessage::CharInfoRequested` with the requester's handle. The target
+answers with CHAR_INFO (0x3D, `build::world::info::build_character_info`)
+built from its own `Player`, so the level and fame are current rather than
+the field's projection. Guild, alliance, pets, mount, wish list, and monster
+book are empty; the medal is the item worn in the medal slot. A request for
+someone not on the map gets no answer.
 
 ## Map changes
 
@@ -62,13 +75,20 @@ of a hard-coded position.
 ## Packets
 
 Field packets are built in `net/src/packet/build/world/field.rs`
-(`SpawnPlayer`, `RemovePlayerFromMap`, `MovePlayer`, `ChatText`) and
-`npc.rs` (`SpawnNpc`). `SpawnPlayer` encodes the avatar's real equipment
-through `net::codec::encode_avatar_look`.
+(`SpawnPlayer`, `RemovePlayerFromMap`, `MovePlayer`, `ChatText`,
+`FacialExpression`) and `npc.rs` (`SpawnNpc`). `SpawnPlayer` encodes the
+avatar's real equipment through `net::codec::encode_avatar_look`.
+
+Emotes (F1-F7) arrive as `FACE_EXPRESSION`; `FaceExpressionHandler` shows
+the others a `FacialExpression` through `FieldRequest::Broadcast`. The sender
+has already changed its own face. Emotes above 7 need an emotion cash item
+and are dropped.
 
 ## Tests
 
-- Unit tests in `runtime/src/actor/field.rs`: join/leave visibility, and a
-  stalled client being kicked without blocking others.
-- Integration tests: same-map presence, movement, chat, portal transfers,
-  NPC spawns, cross-channel isolation, and starting equipment on spawn.
+- Unit tests in `runtime/src/actor/field.rs`: join/leave visibility, a
+  stalled client being kicked without blocking others, and a character info
+  request reaching only its target.
+- Integration tests: same-map presence, movement, chat, emotes, portal transfers,
+  NPC spawns, cross-channel isolation, starting equipment on spawn, and
+  character info (`char_info`).
