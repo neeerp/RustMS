@@ -18,6 +18,7 @@
 #include "ChatBalloon.h"
 
 #include "../Constants.h"
+#include "../../Util/NxFiles.h"
 
 #include <algorithm>
 
@@ -151,9 +152,9 @@ namespace ms
 
 	ChatBalloonHorizontal::ChatBalloonHorizontal()
 	{
-		nl::node Balloon = nl::nx::ui["Login.img"]["WorldNotice"]["Balloon"];
+		nl::node Balloon = NxFiles::ui_classic["Login.img"]["WorldNotice"]["Balloon"];
 
-		arrow = Balloon["arrow"];
+		arrow = Balloon["slArrow"];
 		center = Balloon["c"];
 		east = Balloon["e"];
 		northeast = Balloon["ne"];
@@ -172,16 +173,16 @@ namespace ms
 
 	void ChatBalloonHorizontal::draw(Point<int16_t> position) const
 	{
-		int16_t width = textlabel.width() + 9;
-		int16_t height = textlabel.height() - 2;
+		// The edge pieces sit outside the box, which hugs the text.
+		int16_t width = textlabel.width() + 12;
+		int16_t height = textlabel.height() - 5;
 
 		int16_t left = position.x() - width / 2;
 		int16_t top = position.y() - height;
 		int16_t right = left + width;
 		int16_t bottom = top + height;
 
-		northwest.draw(DrawArgument(left, top));
-		southwest.draw(DrawArgument(left, bottom));
+		center.draw(DrawArgument(Point<int16_t>(left, top), Point<int16_t>(width, height)));
 
 		for (int16_t y = top; y < bottom; y += ytile)
 		{
@@ -189,19 +190,22 @@ namespace ms
 			east.draw(DrawArgument(right, y));
 		}
 
-		center.draw(DrawArgument(Point<int16_t>(left - 8, top), Point<int16_t>(width + 8, height)));
-
+		// The tail replaces the bottom edge at the left end.
 		for (int16_t x = left; x < right; x += xtile)
 		{
 			north.draw(DrawArgument(x, top));
-			south.draw(DrawArgument(x, bottom));
+
+			if (x >= left + arrow.width())
+				south.draw(DrawArgument(x, bottom));
 		}
 
+		northwest.draw(DrawArgument(left, top));
 		northeast.draw(DrawArgument(right, top));
+		southwest.draw(DrawArgument(left, bottom));
 		southeast.draw(DrawArgument(right, bottom));
 
-		arrow.draw(DrawArgument(right + 1, top));
-		textlabel.draw(DrawArgument(left + 6, top - 5));
+		arrow.draw(DrawArgument(left, bottom));
+		textlabel.draw(DrawArgument(left + 6, top - 6));
 	}
 
 	void ChatBalloonHorizontal::change_text(const std::string &text)

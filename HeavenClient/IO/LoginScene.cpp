@@ -34,6 +34,26 @@ namespace ms
 
 		// The share of the remaining distance the camera covers each update.
 		constexpr double SCROLL_RATE = 0.06;
+
+		// Where the step sign rests, and the left edge it slides in from.
+		constexpr int16_t SIGN_Y = 31;
+		constexpr double SIGN_START_X = -150;
+
+		// Login.img/Common/step art: 1 world, 2 character, 3 creation.
+		uint8_t sign_for(LoginScene::Step step)
+		{
+			switch (step)
+			{
+			case LoginScene::Step::TITLE:
+				return 0;
+			case LoginScene::Step::WORLD_SELECT:
+				return 1;
+			case LoginScene::Step::CHAR_SELECT:
+				return 2;
+			default:
+				return 3;
+			}
+		}
 	}
 
 	void LoginScene::load()
@@ -54,6 +74,8 @@ namespace ms
 	{
 		backgrounds = {};
 		tilesobjs = {};
+		sign = {};
+		sign_id = 0;
 		loaded = false;
 		visible = false;
 	}
@@ -70,6 +92,16 @@ namespace ms
 			y = target_y;
 			last_y = target_y;
 			visible = true;
+		}
+
+		uint8_t id = sign_for(step);
+
+		if (id != sign_id)
+		{
+			sign_id = id;
+			sign = id ? Texture(NxFiles::ui_classic["Login.img"]["Common"]["step"][std::to_string(id)]) : Texture();
+			sign_x = SIGN_START_X;
+			last_sign_x = SIGN_START_X;
 		}
 	}
 
@@ -96,6 +128,9 @@ namespace ms
 
 		frame.draw(Point<int16_t>(400, 300));
 		version.draw(Point<int16_t>(595, 5));
+
+		double x = last_sign_x + (sign_x - last_sign_x) * alpha;
+		sign.draw(Point<int16_t>(static_cast<int16_t>(std::round(x)), SIGN_Y));
 	}
 
 	void LoginScene::update()
@@ -114,5 +149,13 @@ namespace ms
 			y = target_y;
 		else
 			y += delta * SCROLL_RATE;
+
+		// The sign eases in the same way the camera does.
+		last_sign_x = sign_x;
+
+		if (std::abs(sign_x) < 1.0)
+			sign_x = 0.0;
+		else
+			sign_x -= sign_x * SCROLL_RATE;
 	}
 }
