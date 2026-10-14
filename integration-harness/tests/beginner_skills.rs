@@ -1,4 +1,4 @@
-//! The beginner skills on Dangerous Forest (50000): Three Snails attacks
+//! The beginner skills on Snail Hunting Ground I (40000): Three Snails attacks
 //! through CLOSE_RANGE_ATTACK, and Recovery and Nimble Feet are buffs from
 //! USE_SKILL. Each spends its MP, and the map sees it used.
 
@@ -10,7 +10,7 @@ use net::packet::op::RecvOpcode;
 use packet::io::write::PktWrite;
 use packet::Packet;
 
-const FOREST: i32 = 50_000;
+const FOREST: i32 = 40_000;
 const SNAIL: i32 = 100100;
 const THREE_SNAILS: i32 = 1000;
 const RECOVERY: i32 = 1001;
@@ -64,14 +64,17 @@ async fn beginner_skills_spend_mp_and_take_effect() {
         unreachable!()
     };
     // Earlier tests may have hunted here; wait for enough to respawn.
-    until(&mut a.connection, ta, |t| t.field.alive(SNAIL).len() >= 16).await;
+    until(&mut a.connection, ta, |t| t.field.alive(SNAIL).len() >= 15).await;
     let snails = ta.field.alive(SNAIL);
     learn(a, ta, &snails[0..5], THREE_SNAILS).await;
     learn(b, tb, &snails[5..10], NIMBLE_FEET).await;
     learn(c, tc, &snails[10..15], RECOVERY).await;
 
+    barrier(&mut a.connection, "all snails hunted", ta).await;
+
     // Three Snails at level 1 does exactly 10, for 3 of a new beginner's 5 MP.
-    let target = snails[15];
+    until(&mut a.connection, ta, |t| !t.field.alive(SNAIL).is_empty()).await;
+    let target = ta.field.alive(SNAIL)[0];
     send(&mut a.connection, skill_attack(THREE_SNAILS, target, 11)).await;
     send(&mut a.connection, skill_attack(RECOVERY, target, 1)).await;
     barrier(&mut a.connection, "refused", ta).await;
