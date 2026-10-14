@@ -26,7 +26,7 @@ pub mod scripts;
 pub mod settings;
 pub mod skills;
 
-pub use self::game_data::{get as get_game_data, spawn_position};
+pub use self::game_data::{closest_spawn_point, get as get_game_data, spawn_position};
 pub use self::handler::{
     login_route, world_route, BroadcastScope, ClientId, FieldRequest, HandlerResult, LoginAction,
     LoginContext, LoginHandler, LoginStage, PreGameHandler, SpawnPosition, WhisperDelivery,

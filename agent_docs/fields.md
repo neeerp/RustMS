@@ -59,6 +59,13 @@ joins the new one at the spawn portal's position.
 World entry uses the same spawn-portal lookup (`net::spawn_position`) instead
 of a hard-coded position.
 
+The client actor also follows its own movement to know roughly where the
+player stands. Before saving on a channel change or disconnect, it sets the
+spawn point to the nearest start or invisible portal that leads nowhere
+(`net::closest_spawn_point`), as Cosmic's `findClosestPlayerSpawnpoint` does,
+so the player comes back near where they left instead of at the portal they
+entered the map by.
+
 ## Packets
 
 Field packets are built in `net/src/packet/build/world/field.rs`

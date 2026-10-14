@@ -197,6 +197,15 @@ impl Player {
         self.dirty = true;
     }
 
+    /// Record where the character should appear when they next enter
+    /// their current map (after logout or a channel change).
+    pub fn set_spawn_point(&mut self, spawn_point: u8) {
+        if self.stats.spawn_point != spawn_point {
+            self.stats.spawn_point = spawn_point;
+            self.dirty = true;
+        }
+    }
+
     /// Mutable access to the keymap; marks the player as needing a save.
     pub fn keymap_mut(&mut self) -> &mut Keymap {
         self.dirty = true;
@@ -435,6 +444,10 @@ mod tests {
         assert_eq!(player.stats.spawn_point, 2);
         player.mark_saved();
         assert!(!player.is_dirty());
+        player.set_spawn_point(2);
+        assert!(!player.is_dirty());
+        player.set_spawn_point(4);
+        assert!(player.is_dirty());
     }
 
     fn player() -> Player {

@@ -169,6 +169,20 @@ impl FieldTemplate {
         self.portals_by_id.get(id)
     }
 
+    /// The player spawn point nearest `(x, y)`: a start or invisible portal
+    /// that leads nowhere. Saved on logout so the player returns near where
+    /// they stood.
+    pub fn closest_spawn_portal(&self, x: i32, y: i32) -> Option<&PortalTemplate> {
+        self.portals_by_id
+            .values()
+            .filter(|portal| (PORTAL_TYPE_START_POINT..=1).contains(&portal.portal_type))
+            .filter(|portal| portal.to_map.is_none())
+            .min_by_key(|portal| {
+                let (dx, dy) = (i64::from(portal.x - x), i64::from(portal.y - y));
+                dx * dx + dy * dy
+            })
+    }
+
     pub fn resolve_spawn_portal(&self, preferred_name: &str) -> Option<&PortalTemplate> {
         if !preferred_name.trim().is_empty() {
             // A named link is an exact connection, not a hint. Falling back
@@ -747,6 +761,42 @@ mod tests {
         );
         assert!(field.resolve_spawn_portal("missing").is_none());
         assert_eq!(field.resolve_spawn_portal("").unwrap().id, 0);
+    }
+
+    #[test]
+    fn closest_spawn_portal_skips_portals_that_lead_elsewhere() {
+        let portal = |id, portal_type, x, to_map| PortalTemplate {
+            id,
+            name: format!("p{id}"),
+            portal_type,
+            x,
+            y: 100,
+            to_map,
+            to_name: String::new(),
+            script: None,
+        };
+        let field = FieldTemplate {
+            map_id: 1,
+            return_map: None,
+            forced_return: None,
+            on_user_enter: None,
+            map_npcs: Vec::new(),
+            mob_spawns: Vec::new(),
+            mob_rate: 1.0,
+            footholds: footholds::Footholds::default(),
+            portals_by_id: BTreeMap::from([
+                (0, portal(0, PORTAL_TYPE_START_POINT, -500, None)),
+                (1, portal(1, 0, 300, None)),
+                (2, portal(2, 2, 900, Some(2))),
+                (3, portal(3, 1, 700, None)),
+            ]),
+            portal_ids_by_name: HashMap::new(),
+        };
+
+        let closest = |x| field.closest_spawn_portal(x, 100).map(|p| p.id);
+        assert_eq!(closest(-400), Some(0));
+        assert_eq!(closest(250), Some(1));
+        assert_eq!(closest(950), Some(3));
     }
 
     #[test]

@@ -33,6 +33,8 @@ pub struct WorldSession {
     pub character_id: i32,
     pub character_name: String,
     pub map_id: i32,
+    /// The portal the character appeared at on entering the world.
+    pub spawn_point: u8,
     pub login_addr: String,
     pub world_addr: String,
     pub level: u8,
@@ -190,6 +192,7 @@ pub async fn login_to_world_session(config: &HarnessConfig) -> Result<WorldSessi
         keymap,
         character_name: world_entry.character_name,
         map_id: world_entry.map_id,
+        spawn_point: world_entry.spawn_point,
         login_addr: config.login_addr.to_string(),
         world_addr: format!("{}:{}", redirect.redirect_ip, redirect.redirect_port),
     })
