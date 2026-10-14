@@ -66,7 +66,9 @@ from `UI.nx`. Moved so far:
 
 - **Status bar** (`UIStatusBar`, `StatusBar.img`): gauges, menu buttons, the
   quick slot panel, and the Game Menu and ShortCut popups (`UIWindow.img`).
-  Esc opens the Game Menu; the MENU key action opens ShortCut.
+  Esc opens the Game Menu; the MENU key action opens ShortCut. Dropping a
+  skill, or a USE or SETUP item, on a quick slot binds that slot's key and
+  saves the keymap right away; an open Key Config shows the new binding.
   Status messages (`UIStatusMessenger`) stack upward from just above the
   quick slot panel, right-aligned with it; `UIStatusBar::QUICKSLOT_TOP` is
   the shared anchor.

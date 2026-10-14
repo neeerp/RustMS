@@ -62,12 +62,17 @@ namespace ms
 	void UISkillBook::SkillIcon::drop_on_bindings(Point<int16_t> cursorposition, bool remove) const
 	{
 		auto keyconfig = UI::get().get_element<UIKeyConfig>();
-		Keyboard::Mapping mapping = Keyboard::Mapping(KeyType::SKILL, skill_id);
+		Keyboard::Mapping mapping = get_mapping();
 
 		if (remove)
 			keyconfig->unstage_mapping(mapping);
 		else
 			keyconfig->stage_mapping(cursorposition, mapping);
+	}
+
+	Keyboard::Mapping UISkillBook::SkillIcon::get_mapping() const
+	{
+		return Keyboard::Mapping(KeyType::SKILL, skill_id);
 	}
 
 	Icon::IconType UISkillBook::SkillIcon::get_type()

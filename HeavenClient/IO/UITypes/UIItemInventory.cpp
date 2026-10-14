@@ -815,15 +815,25 @@ namespace ms
 
 	void UIItemInventory::ItemIcon::drop_on_bindings(Point<int16_t> cursorposition, bool remove) const
 	{
-		if (sourcetab == InventoryType::Id::USE || sourcetab == InventoryType::Id::SETUP)
-		{
-			auto keyconfig = UI::get().get_element<UIKeyConfig>();
-			Keyboard::Mapping mapping = Keyboard::Mapping(KeyType::ITEM, item_id);
+		Keyboard::Mapping mapping = get_mapping();
 
-			if (remove)
-				keyconfig->unstage_mapping(mapping);
-			else
-				keyconfig->stage_mapping(cursorposition, mapping);
-		}
+		if (mapping.type == KeyType::Id::NONE)
+			return;
+
+		auto keyconfig = UI::get().get_element<UIKeyConfig>();
+
+		if (remove)
+			keyconfig->unstage_mapping(mapping);
+		else
+			keyconfig->stage_mapping(cursorposition, mapping);
+	}
+
+	// Only use and set-up items go on keys.
+	Keyboard::Mapping UIItemInventory::ItemIcon::get_mapping() const
+	{
+		if (sourcetab == InventoryType::Id::USE || sourcetab == InventoryType::Id::SETUP)
+			return Keyboard::Mapping(KeyType::ITEM, item_id);
+
+		return {};
 	}
 }
