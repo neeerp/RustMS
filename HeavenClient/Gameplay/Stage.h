@@ -137,6 +137,8 @@ namespace ms
 
 		void check_ladders(bool up);
 
+		void check_held_ladders();
+
 		void check_drops();
 
 		enum State
@@ -155,6 +157,8 @@ namespace ms
 		int32_t mapid;
 
 		MapInfo mapinfo;
+		// The ladder or rope the player last climbed, until they land.
+		Optional<const Ladder> left_ladder;
 		MapTilesObjs tilesobjs;
 		MapBackgrounds backgrounds;
 		MapPortals portals;

@@ -107,6 +107,7 @@ namespace ms
 		Point<int16_t> spawnpoint = portals.get_portal_by_id(portalid);
 		Point<int16_t> startpos = physics.get_y_below(spawnpoint);
 		player.respawn(startpos, mapinfo.is_underwater());
+		left_ladder = nullptr;
 		camera.set_position(startpos);
 		camera.set_view(mapinfo.get_walls(), mapinfo.get_borders());
 	}
@@ -156,6 +157,7 @@ namespace ms
 		chars.update(physics);
 		drops.update(physics);
 		player.update(physics);
+		check_held_ladders();
 
 		portals.update(player.get_position());
 		camera.update(player.get_position());
@@ -193,6 +195,7 @@ namespace ms
 			Point<int16_t> startpos = physics.get_y_below(spawnpoint);
 
 			player.respawn(startpos, mapinfo.is_underwater());
+			left_ladder = nullptr;
 		} else if (warpinfo.valid)
 		{
 			ChangeMapPacket(false, -1, warpinfo.name, false).dispatch();
@@ -221,6 +224,29 @@ namespace ms
 
 		Optional<const Ladder> ladder = mapinfo.findladder(player.get_position(), up);
 		player.set_ladder(ladder);
+	}
+
+	// Holding Up catches any ladder or rope the player reaches, as pressing
+	// it there does. The one they just climbed off waits until they land, so
+	// jumping off it sideways with Up still held does not catch it again.
+	void Stage::check_held_ladders()
+	{
+		if (player.is_climbing())
+		{
+			left_ladder = player.get_ladder();
+			return;
+		}
+
+		if (player.get_phobj().onground)
+			left_ladder = nullptr;
+
+		if (!player.is_key_down(KeyAction::Id::UP))
+			return;
+
+		Optional<const Ladder> ladder = mapinfo.findladder(player.get_position(), true);
+
+		if (ladder && ladder.get() != left_ladder.get())
+			check_ladders(true);
 	}
 
 	void Stage::check_drops()
@@ -272,7 +298,13 @@ namespace ms
 				player.use_item(action);
 				break;
 			case KeyType::Id::FACE:
-				player.set_expression(action);
+				if (down)
+				{
+					player.set_expression(action);
+					// v83 numbers emotes from F1's action (100) as 1.
+					FaceExpressionPacket(action - 99).dispatch();
+				}
+
 				break;
 		}
 	}
