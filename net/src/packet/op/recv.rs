@@ -46,6 +46,7 @@ pub enum RecvOpcode {
     SpendSp = 0x5A,
     UseSkill = 0x5B,
     MesoDrop = 0x5E,
+    CharInfoRequest = 0x61,
     ChangeMapSpecial = 0x64,
     QuestAction = 0x6B,
 

@@ -20,6 +20,7 @@
 #include "../Configuration.h"
 #include "QuestConversation.h"
 #include "Timer.h"
+#include "MapleMap/CharClick.h"
 #include "MapleMap/Npc.h"
 
 #include "../IO/UI.h"
@@ -318,6 +319,28 @@ namespace ms
 
 		if (Npc *npc = npcs.find_nearest(player.get_position()))
 			QuestConversation::talk_to_npc(npc->get_npcid(), npc->get_oid());
+	}
+
+	int32_t Stage::character_at(Point<int16_t> cursorpos)
+	{
+		if (state != State::ACTIVE)
+			return 0;
+
+		Point<int16_t> viewpos = camera.position();
+
+		// Others first: the player is often standing in front of someone.
+		for (auto &mmo : *chars.get_chars())
+		{
+			MapObject *character = mmo.second.get();
+
+			if (character->is_active() && char_click::hits(character->get_position() + viewpos, cursorpos))
+				return character->get_oid();
+		}
+
+		if (char_click::hits(player.get_position() + viewpos, cursorpos))
+			return player.get_oid();
+
+		return 0;
 	}
 
 	void Stage::release_key(KeyType::Id type, int32_t action)

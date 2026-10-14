@@ -1,5 +1,6 @@
 mod change_channel;
 mod change_map;
+mod char_info;
 mod chat;
 mod combat;
 mod emote;
@@ -22,6 +23,7 @@ mod whisper;
 
 pub use self::change_channel::ChangeChannelHandler;
 pub use self::change_map::{warp, ChangeMapHandler};
+pub use self::char_info::CharInfoRequestHandler;
 pub use self::chat::AllChatHandler;
 pub use self::combat::{CloseRangeAttackHandler, MoveLifeHandler, TakeDamageHandler};
 pub use self::emote::FaceExpressionHandler;

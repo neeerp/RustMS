@@ -70,6 +70,9 @@ namespace ms
 		// Talk to the nearest NPC in reach, as if it had been clicked.
 		void talk_to_nearest_npc();
 
+		// The character under a cursor position, or 0 if there is none.
+		int32_t character_at(Point<int16_t> cursorpos);
+
 		// Lets go of a held key whose release went elsewhere, such as to a
 		// dialog or a text field, so the player doesn't keep walking.
 		void release_key(KeyType::Id keytype, int32_t keycode);
