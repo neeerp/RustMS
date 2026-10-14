@@ -62,13 +62,18 @@ of a hard-coded position.
 ## Packets
 
 Field packets are built in `net/src/packet/build/world/field.rs`
-(`SpawnPlayer`, `RemovePlayerFromMap`, `MovePlayer`, `ChatText`) and
-`npc.rs` (`SpawnNpc`). `SpawnPlayer` encodes the avatar's real equipment
-through `net::codec::encode_avatar_look`.
+(`SpawnPlayer`, `RemovePlayerFromMap`, `MovePlayer`, `ChatText`,
+`FacialExpression`) and `npc.rs` (`SpawnNpc`). `SpawnPlayer` encodes the
+avatar's real equipment through `net::codec::encode_avatar_look`.
+
+Emotes (F1-F7) arrive as `FACE_EXPRESSION`; `FaceExpressionHandler` shows
+the others a `FacialExpression` through `FieldRequest::Broadcast`. The sender
+has already changed its own face. Emotes above 7 need an emotion cash item
+and are dropped.
 
 ## Tests
 
 - Unit tests in `runtime/src/actor/field.rs`: join/leave visibility, and a
   stalled client being kicked without blocking others.
-- Integration tests: same-map presence, movement, chat, portal transfers,
-  NPC spawns, cross-channel isolation, and starting equipment on spawn.
+- Integration tests: same-map presence, movement, chat, emotes, portal
+  transfers, NPC spawns, cross-channel isolation, and starting equipment on spawn.

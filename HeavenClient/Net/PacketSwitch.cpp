@@ -101,6 +101,7 @@ namespace ms
 		ATTACKED_RANGED = 187,
 		ATTACKED_MAGIC = 188,
 
+		FACIAL_EXPRESSION = 193,
 		UPDATE_CHARLOOK = 197,
 		SHOW_FOREIGN_EFFECT = 198,
 		SHOW_ITEM_GAIN_INCHAT = 206, // TODO: Rename this (Terribly named)
@@ -157,6 +158,7 @@ namespace ms
 		// MapObject handlers
 		emplace<SPAWN_CHAR, SpawnCharHandler>();
 		emplace<CHAR_MOVED, CharMovedHandler>();
+		emplace<FACIAL_EXPRESSION, FacialExpressionHandler>();
 		emplace<UPDATE_CHARLOOK, UpdateCharLookHandler>();
 		emplace<SHOW_FOREIGN_EFFECT, ShowForeignEffectHandler>();
 		emplace<REMOVE_CHAR, RemoveCharHandler>();

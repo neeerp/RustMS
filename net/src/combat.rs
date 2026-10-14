@@ -1,5 +1,6 @@
 //! Player attacks: parsing, damage limits, and the attack broadcast.
 
+use crate::skills::{self, Learned};
 use crate::{error::NetworkError, packet::op::SendOpcode};
 use game::inventory::equip_slot;
 use game::{InventoryType, Player};
@@ -107,25 +108,45 @@ pub fn max_base_damage(player: &Player) -> i32 {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum AttackRejection {
     Dead,
-    /// Skills need a skill system first.
+    /// A skill the player hasn't learned, or one that doesn't attack.
     Skill,
+    NotEnoughMp,
     TooManyTargets,
     Damage,
 }
 
 /// Basic attacks hit one mob once; each hit must stay under twice the base
-/// maximum (room for the client's own rolls, never a multiple of it).
-pub fn validate(attack: &Attack, player: &Player) -> Result<(), AttackRejection> {
+/// maximum (room for the client's own rolls, never a multiple of it). A
+/// skill attack takes its limits from the skill's level: its mob and hit
+/// counts, and its fixed damage or its damage percent. Returns the skill
+/// used, whose MP the caller spends.
+pub fn validate(attack: &Attack, player: &Player) -> Result<Option<Learned>, AttackRejection> {
     if player.stats.hp <= 0 {
         return Err(AttackRejection::Dead);
     }
-    if attack.skill != 0 {
-        return Err(AttackRejection::Skill);
-    }
-    if attack.mob_count > 1 || attack.hit_count > 1 || attack.hits.len() > 1 {
+    let base_cap = (max_base_damage(player) * 2).max(10);
+    let (skill, mob_count, hit_count, cap) = if attack.skill == 0 {
+        (None, 1, 1, base_cap)
+    } else {
+        let skill = skills::learned(player, attack.skill).ok_or(AttackRejection::Skill)?;
+        let effect = &skill.effect;
+        let cap = match (effect.fixed_damage, effect.damage) {
+            (0, 0) => return Err(AttackRejection::Skill),
+            (0, percent) => (base_cap * percent / 100).max(10),
+            (fixed, _) => fixed,
+        };
+        if i32::from(player.stats.mp) < effect.mp_cost {
+            return Err(AttackRejection::NotEnoughMp);
+        }
+        let counts = (effect.mob_count, effect.attack_count);
+        (Some(skill), counts.0, counts.1, cap)
+    };
+    if i32::from(attack.mob_count) > mob_count
+        || i32::from(attack.hit_count) > hit_count
+        || attack.hits.len() > mob_count as usize
+    {
         return Err(AttackRejection::TooManyTargets);
     }
-    let cap = (max_base_damage(player) * 2).max(10);
     if attack
         .hits
         .iter()
@@ -134,17 +155,24 @@ pub fn validate(attack: &Attack, player: &Player) -> Result<(), AttackRejection>
     {
         return Err(AttackRejection::Damage);
     }
-    Ok(())
+    Ok(skill)
 }
 
 /// CLOSE_RANGE_ATTACK as other players see it (`addAttackBody`).
-pub fn build_close_attack(character_id: i32, attack: &Attack) -> Result<Packet, NetworkError> {
+pub fn build_close_attack(
+    character_id: i32,
+    attack: &Attack,
+    skill_level: u8,
+) -> Result<Packet, NetworkError> {
     let mut p = Packet::new_empty();
     p.write_short(SendOpcode::CloseRangeAttack as i16)?;
     p.write_int(character_id)?;
     p.write_byte((attack.mob_count << 4) | attack.hit_count)?;
     p.write_byte(0x5B)?;
-    p.write_byte(0)?; // skill level
+    p.write_byte(skill_level)?;
+    if skill_level > 0 {
+        p.write_int(attack.skill)?;
+    }
     p.write_byte(attack.display)?;
     p.write_byte(attack.direction)?;
     p.write_byte(attack.stance)?;
@@ -168,11 +196,15 @@ mod tests {
     use game::{EquipStats, Item};
 
     fn attack_packet(object_id: i32, damage: i32) -> Packet {
+        skill_attack_packet(0, object_id, damage)
+    }
+
+    fn skill_attack_packet(skill: i32, object_id: i32, damage: i32) -> Packet {
         let mut p = Packet::new_empty();
         p.write_short(0x2C).unwrap();
         p.write_byte(0).unwrap();
         p.write_byte(0x11).unwrap();
-        p.write_int(0).unwrap();
+        p.write_int(skill).unwrap();
         p.write_bytes(&[0; 8]).unwrap();
         p.write_byte(3).unwrap(); // display
         p.write_byte(0x80).unwrap(); // direction
@@ -238,7 +270,7 @@ mod tests {
         assert_eq!(max_base_damage(&player), 10);
         assert_eq!(
             validate(&parse_close_attack(&attack_packet(1, 20)).unwrap(), &player),
-            Ok(())
+            Ok(None)
         );
         assert_eq!(
             validate(&parse_close_attack(&attack_packet(1, 21)).unwrap(), &player),
@@ -253,9 +285,73 @@ mod tests {
     }
 
     #[test]
+    fn three_snails_needs_the_skill_its_mp_and_its_fixed_damage() {
+        if skills::data().is_err() {
+            return;
+        }
+        let snails = |damage| parse_close_attack(&skill_attack_packet(1000, 1, damage)).unwrap();
+        let mut player = beginner_with_sword();
+        assert_eq!(
+            validate(&snails(10), &player).unwrap_err(),
+            AttackRejection::Skill
+        );
+        player.skills.set(game::SkillRecord {
+            skill_id: 1000,
+            level: 2,
+            master_level: 0,
+            expiration: None,
+        });
+        player.stats.mp = 4;
+        assert_eq!(
+            validate(&snails(10), &player).unwrap_err(),
+            AttackRejection::NotEnoughMp
+        );
+        player.stats.mp = 5;
+        // Level 2 does 25, more than twice a basic hit.
+        let used = validate(&snails(25), &player).unwrap().unwrap();
+        assert_eq!(
+            (used.skill_id, used.level, used.effect.mp_cost),
+            (1000, 2, 5)
+        );
+        assert_eq!(
+            validate(&snails(26), &player).unwrap_err(),
+            AttackRejection::Damage
+        );
+        // Recovery doesn't attack.
+        player.skills.set(game::SkillRecord {
+            skill_id: 1001,
+            level: 1,
+            master_level: 0,
+            expiration: None,
+        });
+        let recovery = parse_close_attack(&skill_attack_packet(1001, 1, 1)).unwrap();
+        assert_eq!(
+            validate(&recovery, &player).unwrap_err(),
+            AttackRejection::Skill
+        );
+    }
+
+    #[test]
+    fn a_skill_broadcast_names_the_skill() {
+        let attack = parse_close_attack(&skill_attack_packet(1000, 77, 25)).unwrap();
+        let packet = build_close_attack(5, &attack, 2).unwrap();
+        let mut expect = Expect::new(&packet.bytes);
+        expect
+            .short(SendOpcode::CloseRangeAttack as i16)
+            .int(5)
+            .byte(0x11)
+            .byte(0x5B)
+            .byte(2)
+            .int(1000);
+        expect.byte(3).byte(0x80).byte(5).byte(4).byte(0x0A).int(0);
+        expect.int(77).byte(0).int(25);
+        expect.end();
+    }
+
+    #[test]
     fn the_broadcast_matches_add_attack_body() {
         let attack = parse_close_attack(&attack_packet(77, 9)).unwrap();
-        let packet = build_close_attack(5, &attack).unwrap();
+        let packet = build_close_attack(5, &attack, 0).unwrap();
         let mut expect = Expect::new(&packet.bytes);
         expect
             .short(SendOpcode::CloseRangeAttack as i16)
