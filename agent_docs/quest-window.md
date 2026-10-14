@@ -45,7 +45,7 @@ along the bottom depend on the tab:
 
 - Available has FIND NPC (`BtMarkNpc`), which opens the world map with the
   giver's map marked. NPC maps come from walking the portal graph out from
-  Maple Island and each continent's towns, which skips the disconnected
+  the Explorer start (`0`) and each continent's towns, which skips the disconnected
   legacy map variants.
 - In Progress has QUEST HELPER (`BtAlert`), which tracks or untracks the
   quest in the Quest Helper, and FORFEIT (`BtGiveup`). FORFEIT stays disabled
