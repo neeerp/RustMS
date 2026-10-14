@@ -43,6 +43,7 @@ pub enum SendOpcode {
     MovePlayer = 0xB9,
     CloseRangeAttack = 0xBA,
     DamagePlayer = 0xC0,
+    FacialExpression = 0xC1,
     ShowForeignEffect = 0xC6,
     UpdateCharLook = 0xC5,
     SpawnNpc = 0x101,
