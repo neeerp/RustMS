@@ -246,7 +246,6 @@ namespace ms
 			auto systemoption = UI::get().get_element<UISystemOption>();
 			auto shop = UI::get().get_element<UIShop>();
 			auto joypad = UI::get().get_element<UIJoypad>();
-			auto rank = UI::get().get_element<UIRank>();
 			auto npctalk = UI::get().get_element<UINpcTalk>();
 			//auto report = UI::get().get_element<UIReport>();
 			//auto whisper = UI::get().get_element<UIWhisper>();
@@ -282,10 +281,6 @@ namespace ms
 			} else if (joypad && joypad->is_active())
 			{
 				joypad->send_key(mapping.action, pressed, escape);
-				sent = true;
-			} else if (rank && rank->is_active())
-			{
-				rank->send_key(mapping.action, pressed, escape);
 				sent = true;
 			} else
 			{
