@@ -244,6 +244,14 @@ from `UI.nx`. Moved so far:
   move between characters, Enter starts, and Escape goes back. The selected
   world and channel show in `Common/selectWorld`. Positions are checked
   against footage from v55 and v1.0.
+- **Race select** (`UIRaceSelect`, `Login.img/RaceSelect`): Cygnus Knights
+  (`knight`), Explorers (`normal`), and Aran stand under the `textGL` banner.
+  Explorers start picked. The picked race's `OnAnimation` is drawn in colour
+  over its faded button, which keeps the name plate under it. Its `text`
+  board sits below, with Select on it. Left and Right change the race, and
+  Enter goes on to that race's creation, with no confirmation, as in v80
+  footage. Escape and Back return to the character select. `aran1` is the
+  same art as `aran`.
 
 `UIClassic.nx` is not one of NoLifeNx's standard files, so `NxFiles` opens it
 with `nl::file` instead of `nl::nx::load_all`.

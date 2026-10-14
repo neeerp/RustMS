@@ -19,20 +19,15 @@
 
 #include <string>
 
-#include <cstddef>
-
-#include <cstdint>
-
-#include <vector>
-
 #include "../UIElement.h"
 
-#include "../Components/Textfield.h"
-#include "../Template/BoolPair.h"
+#include "../../Graphics/Text.h"
 
 namespace ms
 {
-	// Race selection screen.
+	// The v83 race select, step 3 of the login scene: Cygnus Knights,
+	// Explorers, and Aran stand under the "Choose Character Type" banner,
+	// and the picked one's description sits on a board below them.
 	class UIRaceSelect : public UIElement
 	{
 	public:
@@ -43,10 +38,6 @@ namespace ms
 		UIRaceSelect();
 
 		void draw(float inter) const override;
-
-		void update() override;
-
-		Cursor::State send_cursor(bool clicked, Point<int16_t> cursorpos) override;
 
 		void send_key(int32_t keycode, bool pressed, bool escape) override;
 
@@ -60,90 +51,39 @@ namespace ms
 		Button::State button_pressed(uint16_t buttonid) override;
 
 	private:
-		void select_class(uint8_t index);
-
-		void show_charselect();
-
-		Point<int16_t> get_class_pos(size_t index) const;
-
-		std::string to_lower(std::string value) const;
-
-		static constexpr uint8_t INDEX_COUNT = 5;
-		static constexpr uint8_t CLASS_COUNT = 26;
+		// In the order they stand, left to right.
+		enum Race : uint8_t
+		{
+			CYGNUS,
+			EXPLORER,
+			ARAN,
+			RACE_COUNT
+		};
 
 		enum Buttons : uint16_t
 		{
-			BACK,
-			MAKE,
-			LEFT,
-			RIGHT,
-			CLASS0,
-			CLASS1,
-			CLASS2,
-			CLASS3,
-			CLASS4
+			BT_CYGNUS,
+			BT_EXPLORER,
+			BT_ARAN,
+			BT_SELECT,
+			BT_VIEWALLCHAR,
+			BT_BACK
 		};
 
-		// TODO: Merge with UILoginNotice.h
-		enum Classes : uint8_t
-		{
-			RESISTANCE,
-			EXPLORER,
-			CYGNUSKNIGHTS,
-			ARAN,
-			EVAN,
-			MERCEDES,
-			DEMON,
-			PHANTOM,
-			DUALBLADE,
-			MIHILE,
-			LUMINOUS,
-			KAISER,
-			ANGELICBUSTER,
-			CANNONEER,
-			XENON,
-			ZERO,
-			SHADE,
-			JETT,
-			HAYATO,
-			KANNA,
-			CHASE,
-			PINKBEAN,
-			KINESIS,
-			CADENA,
-			ILLIUM,
-			ARK,
-		};
+		void select_race(uint8_t race);
 
-		Text version;
-		Point<int16_t> pos;
-		Point<int16_t> posZero;
-		// The classes in UI.nx's order that this client has art for; the list
-		// also names ids from 1000 up, which are past CLASS_COUNT.
-		std::vector<uint8_t> classes;
-		nl::node hotlist;
-		nl::node newlist;
-		nl::node bgm;
-		Sprite hotlabel;
-		Sprite hotlabelZero;
-		Sprite newlabel;
-		Sprite hotbtn;
-		Sprite newbtn;
-		uint8_t class_index[INDEX_COUNT];
-		bool mouseover[INDEX_COUNT];
-		uint8_t selected_class;
-		uint8_t index_shift;
-		uint16_t selected_index;
-		bool class_isdisabled[CLASS_COUNT];
-		BoolPair<Texture> class_disabled[CLASS_COUNT];
-		BoolPair<Texture> class_normal[CLASS_COUNT];
-		Texture class_background[CLASS_COUNT];
-		Texture class_details[CLASS_COUNT];
-		Texture class_title[CLASS_COUNT];
-		Texture back;
-		Texture backZero;
-		Sprite back_ani;
-		Texture class_details_background;
-		Texture class_details_backgroundZero;
+		void make_character();
+
+		void show_charselect();
+
+		std::string to_lower(std::string value) const;
+
+		uint8_t selected;
+		Texture title;
+		Texture race_on[RACE_COUNT];
+		Texture race_text[RACE_COUNT];
+		Texture world_box;
+		Text world_name;
+		Text channel_name;
 	};
 }
