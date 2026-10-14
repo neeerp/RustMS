@@ -27,6 +27,13 @@ namespace ms
 		const double DROPSPEED = -2.9;
 		const double DROPGRAVITY = 0.042;
 
+		// A picked up drop rises about 50 px, slowing down, and disappears
+		// after about 0.37 s, fading only over the last few ticks.
+		const double PICKUPSPEED = -2.3;
+		const double PICKUPGRAVITY = 0.05;
+		const uint16_t PICKUPTIME = 46;
+		const uint16_t PICKUPFADETIME = 6;
+
 		// Ticks a falling drop needs to come down by dy pixels.
 		double air_ticks(double dy)
 		{
@@ -48,6 +55,7 @@ namespace ms
 		angle.set(0.0f);
 		opacity.set(1.0f);
 		moved = 0.0f;
+		pickupticks = 0;
 		looter = nullptr;
 
 		switch (mode)
@@ -68,8 +76,7 @@ namespace ms
 				phobj.type = PhysicsObject::Type::FIXATED;
 				break;
 			case 3:
-				state = Drop::State::PICKEDUP;
-				phobj.vspeed = -5.0f;
+				pick_up();
 				break;
 		}
 	}
@@ -78,6 +85,8 @@ namespace ms
 	{
 		if (state == Drop::State::DROPPED)
 			phobj.vspeed += DROPGRAVITY;
+		else if (state == Drop::State::PICKEDUP)
+			phobj.vspeed += PICKUPGRAVITY;
 
 		physics.move_object(phobj);
 
@@ -108,14 +117,29 @@ namespace ms
 
 		if (state == Drop::State::PICKEDUP)
 		{
-			static const uint16_t PICKUPTIME = 48;
-			static const float OPCSTEP = 1.0f / PICKUPTIME;
-
 			if (looter)
 			{
 				double hdelta = looter->x - phobj.x;
 				phobj.hspeed = looter->hspeed / 2.0 + (hdelta - 16.0) / PICKUPTIME;
 			}
+
+			pickupticks++;
+
+			if (pickupticks > PICKUPTIME - PICKUPFADETIME)
+				opacity -= 1.0f / PICKUPFADETIME;
+
+			if (pickupticks >= PICKUPTIME)
+			{
+				opacity.set(1.0f);
+
+				MapObject::deactivate();
+				return -1;
+			}
+		}
+
+		if (state == Drop::State::EXPIRING)
+		{
+			static const float OPCSTEP = 1.0f / 48;
 
 			opacity -= OPCSTEP;
 
@@ -137,20 +161,27 @@ namespace ms
 		{
 			case 0:
 				phobj.clear_flag(PhysicsObject::Flag::NOGRAVITY);
-				state = Drop::State::PICKEDUP;
+				state = Drop::State::EXPIRING;
 				break;
 			case 1:
 				deactivate();
 				break;
 			case 2:
-				angle.set(0.0f);
-				state = Drop::State::PICKEDUP;
 				looter = lt;
-				phobj.vspeed = -4.5f;
-				phobj.type = PhysicsObject::Type::NORMAL;
-				phobj.clear_flag(PhysicsObject::Flag::NOGRAVITY);
+				pick_up();
 				break;
 		}
+	}
+
+	void Drop::pick_up()
+	{
+		angle.set(0.0f);
+		state = Drop::State::PICKEDUP;
+		pickupticks = 0;
+		phobj.hspeed = 0.0;
+		phobj.vspeed = PICKUPSPEED;
+		phobj.type = PhysicsObject::Type::NORMAL;
+		phobj.set_flag(PhysicsObject::Flag::NOGRAVITY);
 	}
 
 	Rectangle<int16_t> Drop::bounds() const

@@ -86,7 +86,10 @@ HeavenClient's `Drop` gives a falling drop its own, lighter gravity instead
 of the player's: it launches at -2.9 px per tick and gains 0.042 px per tick,
 so it rises about 100 px and is in the air about 1.1 s, as measured from 2008
 GMS footage. Its horizontal speed is set from that air time so it lands on
-its destination, and it turns about twice on the way down.
+its destination, and it turns about twice on the way down. A picked up drop
+(REMOVE_ITEM_FROM_MAP 2) follows the looter and rises about 50 px, slowing
+down, then disappears after about 0.37 s; it stays opaque except for the last
+six ticks. An expiring drop (mode 0) fades out where it is.
 
 ITEM_PICKUP (`0xCA`) needs the player within 800×600 of the drop. The field
 removes it (REMOVE_ITEM_FROM_MAP 2 with the looter) and hands it to the
