@@ -19,6 +19,7 @@ use game::Player;
 use net::dialogue::{Conversation, NpcInteraction};
 use net::login_world::resolve_login_channel;
 use net::packet::build;
+use net::packet::build::world::messaging::{build_find_result, FindLocation};
 use net::quests::QuestRequest;
 use net::{ClientId, SpawnPosition, WorldAction, WorldContext, WorldRoute};
 use packet::Packet;
@@ -307,6 +308,13 @@ impl ClientActor {
                 })
                 .await?
             }
+            WorldAction::Find { target_name } => {
+                self.send_to_directory(DirectoryMessage::Find {
+                    from: self.client_id,
+                    target_name,
+                })
+                .await?
+            }
             WorldAction::Messenger(request) => {
                 self.send_to_directory(DirectoryMessage::Messenger {
                     from: self.client_id,
@@ -466,6 +474,7 @@ impl ClientActor {
                 y,
             } => self.drop_reactor_loot(reactor_id, object_id, x, y).await?,
             ServerMessage::PickedUp { drop } => self.picked_up(drop).await?,
+            ServerMessage::Locate { reply_to } => self.locate(&reply_to),
             ServerMessage::CharInfoRequested { requester } => {
                 let packet = build::world::info::build_character_info(&self.in_game()?.player)
                     .map_err(|e| RuntimeError::Handler(e.to_string()))?;
@@ -474,6 +483,20 @@ impl ClientActor {
             ServerMessage::SendPacket(mut packet) => self.send(&mut packet).await?,
         }
         Ok(())
+    }
+
+    /// Tell someone who looked for this player which map they are on.
+    fn locate(&self, reply_to: &ClientHandle) {
+        let Some(game) = self.game.as_ref() else {
+            return;
+        };
+        let location = FindLocation::Map(game.player.stats.map_id);
+        match build_find_result(game.player.name(), location) {
+            Ok(packet) => {
+                reply_to.send_packet(packet);
+            }
+            Err(e) => error!(client_id = self.client_id, "find result: {e}"),
+        }
     }
 
     /// Send to the current field, restarting it once if its actor died.

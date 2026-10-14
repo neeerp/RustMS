@@ -74,6 +74,10 @@ pub enum ServerMessage {
         request_id: u64,
         nearby: bool,
     },
+    /// Someone on this channel looked for this player; answer with the map.
+    Locate {
+        reply_to: ClientHandle,
+    },
     /// `requester` (maybe this player) double-clicked this player; send them
     /// CHAR_INFO.
     CharInfoRequested {
@@ -216,6 +220,10 @@ pub enum DirectoryMessage {
     Whisper {
         from: ClientId,
         delivery: WhisperDelivery,
+    },
+    Find {
+        from: ClientId,
+        target_name: String,
     },
     Broadcast {
         from: ClientId,

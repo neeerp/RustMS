@@ -50,6 +50,19 @@ namespace ms
 		}
 	};
 
+	// Asks where a character is (/find)
+	// Opcode: WHISPER(120)
+	class FindPacket : public OutPacket
+	{
+	public:
+		static constexpr int8_t REQUEST_MODE = 0x05;
+
+		FindPacket(const std::string& target) : OutPacket(OutPacket::Opcode::WHISPER)
+		{
+			write_byte(REQUEST_MODE);
+			write_string(target);
+		}
+	};
 	// Maple Messenger requests. Every one starts with a mode byte.
 	// Opcode: MESSENGER(122)
 	class MessengerPacket : public OutPacket

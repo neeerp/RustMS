@@ -254,7 +254,7 @@ side yet.
 | Skills, stat/AP/SP allocation, buffs, keymap | Implemented |
 | NPC dialogue and NPC shop | Implemented (`UINpcTalk`, `UIShop`) |
 | Quest log and markers | Implemented (`UIQuestLog`); progress arrives via SHOW_STATUS_INFO, quest start/complete is driven by NPC dialogue |
-| Chat, whisper, server messages | Implemented; whisper find/buddy modes ignored |
+| Chat, whisper, `/find`, server messages | Implemented; buddy whisper/find modes ignored |
 | Character info, minimap, world map | Implemented |
 | Monster Book (`UIMonsterBook`) | Implemented: cards, summary, monster pages, search, cover; see `combat.md` |
 | Buddy / party / guild / boss list (`UIUserList`) | Buttons and layout only; no handlers, party packet exists but is unused |
@@ -279,7 +279,7 @@ are registered (`Net/PacketSwitch.cpp`). Anything not listed there is silently i
 | Quest accept/complete UI flow | Partial | S |
 | Pets and mounts | Partial rendering, no interaction | M |
 | Memo, mail, MTS | Nothing | M each |
-| Whisper find/buddy modes | Ignored | S |
+| Buddy whisper/find modes | Ignored | S |
 | Mini-dungeons, boss/event UI | Nothing | M |
 
 ## Protocol deviations fixed
