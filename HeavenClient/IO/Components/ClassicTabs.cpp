@@ -4,19 +4,23 @@
 
 namespace ms
 {
-	ClassicTabs::ClassicTabs(nl::node enabled_src, nl::node disabled_src, int16_t fill) : fill_width(fill)
+	// Measured from period footage of the skill window and the quest log.
+	const ClassicTabs::Style ClassicTabs::TAB5 = { "Tab5", 6, 21, 17, false };
+	const ClassicTabs::Style ClassicTabs::TAB2 = { "Tab2", 4, 19, 6, true };
+
+	ClassicTabs::ClassicTabs(const Style& st, nl::node enabled_src, nl::node disabled_src, int16_t fill) : style(st), fill_width(fill)
 	{
-		nl::node Tab5 = NxFiles::ui_classic["Basic.img"]["Tab5"];
+		nl::node strip = NxFiles::ui_classic["Basic.img"][style.node];
 
 		for (size_t i = 0; i < 2; i++)
 		{
-			left[i] = Tab5["left" + std::to_string(i)];
-			this->fill[i] = Tab5["fill" + std::to_string(i)];
-			right[i] = Tab5["right" + std::to_string(i)];
+			left[i] = strip["left" + std::to_string(i)];
+			this->fill[i] = strip["fill" + std::to_string(i)];
+			right[i] = strip["right" + std::to_string(i)];
 		}
 
 		for (size_t i = 0; i < 3; i++)
-			middle[i] = Tab5["middle" + std::to_string(i)];
+			middle[i] = strip["middle" + std::to_string(i)];
 
 		for (nl::node label : enabled_src)
 			enabled.emplace_back(label);
@@ -35,7 +39,7 @@ namespace ms
 		Point<int16_t> pos = position;
 
 		left[selected == 0].draw(pos);
-		pos.shift_x(EDGE);
+		pos.shift_x(style.edge);
 
 		for (uint16_t i = 0; i < count; i++)
 		{
@@ -49,7 +53,7 @@ namespace ms
 			{
 				Point<int16_t> dimensions = labels[i].get_dimensions();
 				int16_t x = fill_width / 2 - dimensions.x() / 2;
-				int16_t y = LABEL_BOTTOM - dimensions.y();
+				int16_t y = style.label_top ? style.label_y : style.label_y - dimensions.y();
 
 				labels[i].draw(pos + Point<int16_t>(x, y));
 			}
@@ -61,7 +65,7 @@ namespace ms
 				size_t piece = is_selected ? 1 : (i + 1 == selected ? 2 : 0);
 
 				middle[piece].draw(pos);
-				pos.shift_x(2 * EDGE);
+				pos.shift_x(2 * style.edge);
 			}
 		}
 
@@ -70,6 +74,11 @@ namespace ms
 
 	int16_t ClassicTabs::pitch() const
 	{
-		return fill_width + 2 * EDGE;
+		return fill_width + 2 * style.edge;
+	}
+
+	int16_t ClassicTabs::height() const
+	{
+		return style.height;
 	}
 }
