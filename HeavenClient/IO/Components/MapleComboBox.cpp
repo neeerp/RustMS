@@ -19,6 +19,7 @@
 #include "AreaButton.h"
 
 #include "../Audio/Audio.h"
+#include "../../Util/NxFiles.h"
 
 #include <nlnx/nx.hpp>
 
@@ -32,7 +33,11 @@ namespace ms
 		if (type != Type::DEFAULT)
 			combobox += std::to_string(type);
 
-		nl::node src = nl::nx::ui["Basic.img"][combobox];
+		nl::node src = NxFiles::ui_classic["Basic.img"][combobox];
+
+		// UIClassic.nx stops at ComboBox5; later types keep the modern art.
+		if (!src)
+			src = nl::nx::ui["Basic.img"][combobox];
 
 		textures[Button::State::PRESSED][0] = src["pressed"][0];
 		textures[Button::State::PRESSED][1] = src["pressed"][1];

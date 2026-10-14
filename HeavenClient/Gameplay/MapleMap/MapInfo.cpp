@@ -37,7 +37,9 @@ namespace ms
 
 		std::string bgmpath = info["bgm"];
 		size_t split = bgmpath.find('/');
-		bgm = bgmpath.substr(0, split) + ".img/" + bgmpath.substr(split + 1);
+
+		if (split != std::string::npos)
+			bgm = bgmpath.substr(0, split) + ".img/" + bgmpath.substr(split + 1);
 
 		cloud = info["cloud"].get_bool();
 		fieldlimit = info["fieldLimit"];

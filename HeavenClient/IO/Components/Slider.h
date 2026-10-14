@@ -81,8 +81,6 @@ namespace ms
 			THIN_MIKADO,
 			ARROWS_TORYBLUE,
 			THIN_SLATEGRAY,
-			/// Custom
-			CHATBAR,
 			/// v83 Basic.img/VScr4 from UIClassic.nx
 			CLASSIC
 		};

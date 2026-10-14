@@ -304,9 +304,16 @@ from `UI.nx`. Moved so far:
   `UIClassic.nx`, which has up to `VScr8`. Later types, such as
   `DEFAULT_SILVER`, read `UI.nx`.
 
-Still on `UI.nx`: the chat bar's slider type, the unreachable `UIEvent`,
-`UIJoypad`, and `UIRegion` windows, `MapleComboBox`'s normal mode, and the
-Cash Shop preview stage.
+- **Combo boxes** (`MapleComboBox`): the typed boxes read `Basic.img/ComboBox`
+  to `ComboBox5` from `UIClassic.nx`; later types keep the modern art. No
+  window uses one yet.
+- **Cash Shop stage** (`Stage::load_map(-1)`): v83's `CashShopPreview.img`.
+  The full-screen Cash Shop hides the stage, whose preview window draws its
+  own art. The v83 stage names no music, so the Cash Shop plays
+  `BgmUI.img/ShopBgm` instead of the modern stage's `Bgm00/FloralLife`.
+
+Still on `UI.nx`: the unreachable `UIEvent`, `UIJoypad`, and `UIRegion`
+windows.
 
 `UIClassic.nx` is not one of NoLifeNx's standard files, so `NxFiles` opens it
 with `nl::file` instead of `nl::nx::load_all`.

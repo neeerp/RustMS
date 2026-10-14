@@ -25,6 +25,7 @@
 
 #include "../IO/UI.h"
 #include "../Util/Misc.h"
+#include "../Util/NxFiles.h"
 
 #include "../IO/UITypes/UINpcTalk.h"
 #include "../IO/UITypes/UIStatusBar.h"
@@ -91,7 +92,7 @@ namespace ms
 		std::string strid = string_format::extend_id(mapid, 9);
 		std::string prefix = std::to_string(mapid / 100000000);
 
-		nl::node src = mapid == -1 ? nl::nx::ui["CashShopPreview.img"] : nl::nx::map["Map"]["Map" + prefix][strid + ".img"];
+		nl::node src = mapid == -1 ? NxFiles::ui_classic["CashShopPreview.img"] : nl::nx::map["Map"]["Map" + prefix][strid + ".img"];
 
 		tilesobjs = MapTilesObjs(src);
 		backgrounds = MapBackgrounds(src["back"]);
@@ -102,7 +103,9 @@ namespace ms
 
 	void Stage::respawn(int8_t portalid)
 	{
-		Music(mapinfo.get_bgm()).play();
+		// v83's Cash Shop stage has no music of its own; the Cash Shop plays
+		// its theme.
+		Music(mapid == -1 ? "BgmUI.img/ShopBgm" : mapinfo.get_bgm()).play();
 
 		Point<int16_t> spawnpoint = portals.get_portal_by_id(portalid);
 		Point<int16_t> startpos = physics.get_y_below(spawnpoint);
