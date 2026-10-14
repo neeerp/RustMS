@@ -21,7 +21,6 @@
 
 #include "../UIDragElement.h"
 
-#include "../Template/BoolPair.h"
 
 namespace ms
 {
@@ -35,8 +34,6 @@ namespace ms
 		UIChannel();
 
 		void draw(float inter) const override;
-
-		void update() override;
 
 		void send_key(int32_t keycode, bool pressed, bool escape) override;
 
@@ -52,7 +49,9 @@ namespace ms
 
 		void change_channel();
 
-		void update_selected_channel_position();
+		void select(uint8_t channel);
+
+		Point<int16_t> cell_position(uint8_t index) const;
 
 		enum Buttons : uint16_t
 		{
@@ -61,14 +60,19 @@ namespace ms
 			CH
 		};
 
+		enum Cell : uint8_t
+		{
+			EMPTY,
+			CURRENT,
+			SELECTED,
+			LENGTH
+		};
+
 		uint8_t current_channel;
 		uint8_t selected_channel;
 		uint8_t channel_count;
-		BoolPair<Texture> channel;
-		std::vector<Sprite> ch;
-		int16_t current_channel_x;
-		int16_t current_channel_y;
-		int16_t selected_channel_x;
-		int16_t selected_channel_y;
+		uint8_t cells;
+		Texture cell[Cell::LENGTH];
+		std::vector<Texture> ch;
 	};
 }
