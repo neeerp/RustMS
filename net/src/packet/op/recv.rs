@@ -50,6 +50,7 @@ pub enum RecvOpcode {
     ChangeKeybinds = 0x87,
     MoveLife = 0xBC,
     ItemPickup = 0xCA,
+    DamageReactor = 0xCD,
 
     PlayerMapTransfer = 0xCF,
     PartySearchUpdate = 0xDF,

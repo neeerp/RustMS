@@ -27,7 +27,11 @@ Fields are created on demand by `FieldRegistry` and kept alive afterwards.
   and damage; see [Mobs and combat](./combat.md).
 - **Drops** (`field_drops::DropSet`): items and mesos on the ground, with
   ownership and expiry; see [Mobs and combat](./combat.md).
-- **Time**: a 100 ms tick (`on_tick`) respawns mobs and expires drops.
+- **Reactors** (`field_reactors::ReactorSet`): boxes and the like placed
+  by the map's `reactor` nodes; see "Reactors" in [Mobs and
+  combat](./combat.md).
+- **Time**: a 100 ms tick (`on_tick`) respawns mobs and reactors and expires
+  drops.
 
 A field does not own character state (stats, inventory, quests). Those live
 in the client's `Player`.

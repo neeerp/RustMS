@@ -48,6 +48,9 @@ pub enum SendOpcode {
     SpawnNpc = 0x101,
     DropItemFromMapObject = 0x10C,
     RemoveItemFromMap = 0x10D,
+    HitReactor = 0x115,
+    SpawnReactor = 0x117,
+    RemoveReactor = 0x118,
     NpcDialogue = 0x130,
 
     KeyMap = 0x14F,

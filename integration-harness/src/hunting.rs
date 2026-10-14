@@ -28,6 +28,19 @@ pub fn attack(object_id: i32, damage: i32) -> Packet {
     p
 }
 
+/// DAMAGE_REACTOR: a plain attack on a reactor, standing at (x, y).
+pub fn hit_reactor(object_id: i32, x: i16, y: i16) -> Packet {
+    let mut p = Packet::new_empty();
+    p.write_short(RecvOpcode::DamageReactor as i16).unwrap();
+    p.write_int(object_id).unwrap();
+    p.write_short(x).unwrap();
+    p.write_short(y).unwrap();
+    p.write_short(0).unwrap();
+    p.write_int(0).unwrap();
+    p.write_int(0).unwrap();
+    p
+}
+
 /// ITEM_PICKUP of a drop, standing at (x, y).
 pub fn pickup(object_id: i32, x: i16, y: i16) -> Packet {
     let mut p = Packet::new_empty();
@@ -90,7 +103,17 @@ pub struct MapDrop {
     pub y: i16,
 }
 
-/// Mobs, attacks, drops, and effects seen on the current field.
+/// A reactor spawned on the field.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct MapReactor {
+    pub object_id: i32,
+    pub reactor_id: i32,
+    pub state: u8,
+    pub x: i16,
+    pub y: i16,
+}
+
+/// Mobs, attacks, drops, reactors, and effects seen on the current field.
 #[derive(Debug, Default)]
 pub struct Field {
     /// (object id, mob id)
@@ -111,6 +134,11 @@ pub struct Field {
     pub removed: Vec<(i32, Option<i32>)>,
     /// Effects on other characters: (character id, effect).
     pub effects: Vec<(i32, u8)>,
+    pub reactors: Vec<MapReactor>,
+    /// (object id, state it moved to)
+    pub reactor_hits: Vec<(i32, u8)>,
+    /// (object id, state it broke from)
+    pub reactors_removed: Vec<(i32, u8)>,
 }
 
 impl Field {
@@ -159,6 +187,20 @@ impl Field {
                 .push((oid, (mode >= 2).then(|| r.read_int().unwrap())));
         } else if op == SendOpcode::ShowForeignEffect as i16 {
             self.effects
+                .push((r.read_int().unwrap(), r.read_byte().unwrap()));
+        } else if op == SendOpcode::SpawnReactor as i16 {
+            self.reactors.push(MapReactor {
+                object_id: r.read_int().unwrap(),
+                reactor_id: r.read_int().unwrap(),
+                state: r.read_byte().unwrap(),
+                x: r.read_short().unwrap(),
+                y: r.read_short().unwrap(),
+            });
+        } else if op == SendOpcode::HitReactor as i16 {
+            self.reactor_hits
+                .push((r.read_int().unwrap(), r.read_byte().unwrap()));
+        } else if op == SendOpcode::RemoveReactor as i16 {
+            self.reactors_removed
                 .push((r.read_int().unwrap(), r.read_byte().unwrap()));
         }
     }

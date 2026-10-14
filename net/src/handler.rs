@@ -263,6 +263,12 @@ pub enum FieldRequest {
         loot: crate::loot::Loot,
         vanish: bool,
     },
+    /// Hit the reactor `object_id` with `skill_id` (0 for a plain attack).
+    HitReactor {
+        object_id: i32,
+        skill_id: i32,
+        stance: i16,
+    },
 }
 
 impl ReplyAction for WorldAction {
@@ -293,7 +299,7 @@ fn world_routes() -> &'static HashMap<i16, WorldRoute> {
     ROUTES.get_or_init(|| {
         use RecvOpcode as Op;
         use WorldRoute::*;
-        let table: [(Op, WorldRoute); 25] = [
+        let table: [(Op, WorldRoute); 26] = [
             (Op::PlayerLoggedIn, PreGame(&world::PlayerLoggedInHandler)),
             (Op::PlayerMove, InGame(&world::PlayerMoveHandler)),
             (Op::ChangeChannel, InGame(&world::ChangeChannelHandler)),
@@ -327,6 +333,7 @@ fn world_routes() -> &'static HashMap<i16, WorldRoute> {
             ),
             (Op::TakeDamage, InGame(&world::TakeDamageHandler)),
             (Op::ItemPickup, InGame(&world::ItemPickupHandler)),
+            (Op::DamageReactor, InGame(&world::DamageReactorHandler)),
             (Op::HealOverTime, InGame(&world::HealOverTimeHandler)),
             (Op::SpendAp, InGame(&world::SpendApHandler)),
             (Op::SpendSp, InGame(&world::SpendSpHandler)),
@@ -361,7 +368,7 @@ mod tests {
     fn every_registered_opcode_is_unique_per_server() {
         // The maps would silently drop duplicates; check the table sizes match.
         assert_eq!(login_routes().len(), 13);
-        assert_eq!(world_routes().len(), 25);
+        assert_eq!(world_routes().len(), 26);
     }
 
     #[test]

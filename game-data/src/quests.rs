@@ -24,7 +24,7 @@ pub const SCRIPTS: &[&str] = &["q1021s", "q1021e"];
 /// Actions on starting a quest (`Act.img/<id>/0`) that the server applies.
 pub const START_ACTIONS: &[&str] = &["item"];
 /// Actions on completing a quest (`Act.img/<id>/1`) that the server applies.
-pub const END_ACTIONS: &[&str] = &["exp", "nextQuest", "item"];
+pub const END_ACTIONS: &[&str] = &["exp", "money", "nextQuest", "item"];
 /// Keys of an `Act/<n>/item/<k>` entry the server applies.
 pub const ITEM_ACTION_KEYS: &[&str] = &["id", "count", "job", "gender", "prop"];
 
@@ -62,6 +62,8 @@ pub struct QuestTemplate {
     pub start_script: Option<String>,
     pub end_script: Option<String>,
     pub exp: i32,
+    /// Mesos given on completion; negative takes them (and needs them held).
+    pub money: i32,
     pub next_quest: Option<i16>,
 }
 
@@ -136,7 +138,10 @@ pub fn classify(keys: &QuestKeys) -> Result<(), String> {
     if !start.iter().any(|k| k == "npc") {
         return Err("no start NPC".into());
     }
-    if !end.iter().any(|k| k == "npc") {
+    // Without a completion NPC, a quest that asks for items or kills is
+    // handed in to the NPC that gave it (Pio's 1008). Without either, it is
+    // a record kept by some event, not something an NPC completes.
+    if !end.iter().any(|k| k == "npc" || k == "item" || k == "mob") {
         return Err("no completion NPC".into());
     }
     unsupported(start, START_REQUIREMENTS, "Check/0")?;
@@ -301,13 +306,13 @@ fn template(nx: &NxDataFile, id: i16) -> Result<QuestTemplate, GameDataError> {
         Some(info) => nx.string_child(info, "name")?.unwrap_or_default(),
         None => String::new(),
     };
+    // See `classify`: quests without a completion NPC go back to the start NPC.
+    let start_npc = requirements.npc;
     Ok(QuestTemplate {
         id,
         name,
         start: requirements,
-        end_npc: nx
-            .int_child(end, "npc")?
-            .ok_or_else(|| invalid("missing completion NPC"))?,
+        end_npc: nx.int_child(end, "npc")?.unwrap_or(start_npc),
         end_items,
         end_mobs,
         start_items: quest_items(nx, &format!("Act.img/{id}/0"))?,
@@ -315,6 +320,7 @@ fn template(nx: &NxDataFile, id: i16) -> Result<QuestTemplate, GameDataError> {
         start_script: script(nx, start, "startscript")?,
         end_script: script(nx, end, "endscript")?,
         exp,
+        money: action_int("money")?.unwrap_or(0),
         next_quest: action_int("nextQuest")?
             .map(|id| small(id, "quest id"))
             .transpose()?,
@@ -433,7 +439,9 @@ mod tests {
         let pet = keys(&["npc", "pet"], &["npc"], &[], &[]);
         assert_eq!(classify(&pet), Err("Check/0/pet".into()));
         let money = keys(&["npc"], &["npc"], &[], &["money"]);
-        assert_eq!(classify(&money), Err("Act/1/money".into()));
+        assert_eq!(classify(&money), Ok(()));
+        let start_money = keys(&["npc"], &["npc"], &["money"], &[]);
+        assert_eq!(classify(&start_money), Err("Act/0/money".into()));
     }
 
     #[test]
@@ -442,6 +450,8 @@ mod tests {
         assert!(classify(&auto_start).is_err());
         let auto_complete = keys(&["npc"], &[], &[], &[]);
         assert!(classify(&auto_complete).is_err());
+        let hand_in = keys(&["npc"], &["item"], &[], &[]);
+        assert_eq!(classify(&hand_in), Ok(()));
         let mut no_end = keys(&["npc"], &[], &[], &[]);
         no_end.end_check = None;
         assert!(classify(&no_end).is_err());
