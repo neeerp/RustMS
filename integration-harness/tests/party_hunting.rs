@@ -1,5 +1,5 @@
 //! Parties: inviting, joining, party HP bars, sharing a kill's EXP on
-//! Dangerous Forest (50000), party chat, and disbanding.
+//! Snail Hunting Ground I (40000), party chat, and disbanding.
 
 use integration_harness::hunting::attack;
 use integration_harness::login_to_world_session;
@@ -9,7 +9,7 @@ use net::packet::op::RecvOpcode;
 use packet::io::write::PktWrite;
 use packet::Packet;
 
-const FOREST: i32 = 50_000;
+const FOREST: i32 = 40_000;
 const SNAIL: i32 = 100100;
 
 const OP_INVITE: u8 = 0x04;

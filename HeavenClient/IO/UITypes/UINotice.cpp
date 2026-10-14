@@ -316,16 +316,12 @@ namespace ms
 	UIEnterText::UIEnterText(std::string message, std::function<void(const std::string &)> th, size_t limit)
 			: UINotice(message, NoticeType::ENTERNUMBER), texthandler(th)
 	{
-		int16_t belowtext = box2offset(true) - 21;
-		int16_t pos_y = belowtext + 35;
-
-		nl::node src = nl::nx::ui["Basic.img"];
-
-		buttons[Buttons::OK] = std::make_unique<MapleButton>(src["BtOK4"], 156, pos_y);
-		buttons[Buttons::CANCEL] = std::make_unique<MapleButton>(src["BtCancel4"], 198, pos_y);
-
-		textfield = Textfield(Text::Font::A11M, Text::Alignment::LEFT, Color::Name::LIGHTGREY,
-							  Rectangle<int16_t>(24, 232, belowtext, belowtext + 20), limit);
+		nl::node src = NxFiles::ui_classic["Basic.img"];
+		buttons[Buttons::OK] = std::make_unique<MapleButton>(src["BtOK"], LEFT_BUTTON_X, buttons_y());
+		buttons[Buttons::CANCEL] = std::make_unique<MapleButton>(src["BtCancel"], RIGHT_BUTTON_X, buttons_y());
+		int16_t top = field_y();
+		textfield = Textfield(Text::Font::A12M, Text::Alignment::LEFT, Color::Name::BLACK,
+			Rectangle<int16_t>(FIELD_LEFT + 4, FIELD_RIGHT - 4, top - 5, top + FIELD_HEIGHT - 5), limit);
 
 		textfield.set_enter_callback(
 				[&](std::string)
@@ -347,7 +343,7 @@ namespace ms
 
 	void UIEnterText::draw(float alpha) const
 	{
-		UINotice::draw(true);
+		UINotice::draw();
 		UIElement::draw(alpha);
 
 		textfield.draw(position);
