@@ -22,12 +22,13 @@
 #include <cstdint>
 
 #include "Tooltip.h"
-#include "MapleFrame.h"
+#include "TooltipBox.h"
 
 #include "../Graphics/Text.h"
 
 namespace ms
 {
+	// A line or two of text in the v83 tooltip box, as for the map names.
 	class TextTooltip : public Tooltip
 	{
 	public:
@@ -38,9 +39,9 @@ namespace ms
 		bool set_text(std::string text);
 
 	private:
-		MapleFrame frame;
-		Texture cover;
+		TooltipBox box;
 		std::string text;
 		Text text_label;
+		Point<int16_t> size;
 	};
 }

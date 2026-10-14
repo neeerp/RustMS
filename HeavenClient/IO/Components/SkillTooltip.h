@@ -20,12 +20,15 @@
 #include <cstdint>
 
 #include "Tooltip.h"
-#include "MapleFrame.h"
+#include "TooltipBox.h"
 
 #include "../Graphics/Geometry.h"
+#include "../Graphics/Text.h"
 
 namespace ms
 {
+	// The v83 skill tooltip: the name, the icon with the description beside
+	// it, and under a line the current and next levels' effects.
 	class SkillTooltip : public Tooltip
 	{
 	public:
@@ -37,19 +40,18 @@ namespace ms
 
 	private:
 		int32_t skill_id;
-		int16_t height;
-		int16_t width;
-		int16_t icon_offset;
-		int16_t level_offset;
-		Texture icon;
-		Texture required_icon;
+		int32_t skill_level;
+		int32_t skill_masterlevel;
+		Point<int16_t> size;
+		int16_t line_y;
 
+		TooltipBox box;
+		TooltipIcon icon;
+		ColorLine line;
+
+		Texture skillicon;
 		Text name;
 		Text desc;
 		Text leveldesc;
-		MapleFrame frame;
-		ColorLine line;
-		ColorBox box;
-		Texture cover;
 	};
 }

@@ -19,15 +19,10 @@
 
 #include "MapTooltipLayout.h"
 
-#include "../Constants.h"
-
 namespace ms
 {
 	namespace
 	{
-		// The box's top-left against where the tooltip is drawn, which is
-		// 22 below the cursor. From footage.
-		const Point<int16_t> OFFSET = { 20, -1 };
 		// Where the text starts in the box; glyphs sit low in their lines.
 		const Point<int16_t> TEXT_POS = { map_tooltip::PADDING_X, 2 };
 	}
@@ -39,14 +34,7 @@ namespace ms
 		if (name_label.empty())
 			return;
 
-		pos += OFFSET;
-
-		int16_t max_width = Constants::Constants::get().get_viewwidth();
-		int16_t max_height = Constants::Constants::get().get_viewheight();
-
-		pos = Point<int16_t>(std::min<int16_t>(pos.x(), max_width - size.x()),
-							 std::min<int16_t>(pos.y(), max_height - size.y()));
-
+		pos = tooltip::place(pos, size);
 		box.draw(pos, size);
 
 		pos += TEXT_POS;

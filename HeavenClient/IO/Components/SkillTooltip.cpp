@@ -19,26 +19,41 @@
 
 #include "../Data/SkillData.h"
 
-#include <nlnx/nx.hpp>
+#include <algorithm>
 
 namespace ms
 {
-	SkillTooltip::SkillTooltip()
+	namespace
 	{
-		nl::node Frame = nl::nx::ui["UIToolTip.img"]["Item"]["Frame2"];
+		// Measured from period footage.
+		constexpr int16_t WIDTH = 312;
+		const Point<int16_t> DESC_POS = { 87, 29 };
+		constexpr int16_t DESC_WIDTH = 215;
+		// The line over the levels' effects sits well below the icon.
+		const int16_t LINE_MIN_Y = tooltip::ICON_POS.y() + tooltip::ICON_BOX + 49;
+		constexpr int16_t LINE_DESC_GAP = 8;
+		constexpr int16_t LINE_X = 6;
+		const Point<int16_t> LEVEL_POS = { 9, 4 };
+		constexpr int16_t LEVEL_WIDTH = 294;
+	}
 
-		frame = Frame;
-		cover = Frame["cover"];
-
+	SkillTooltip::SkillTooltip() :
+		line(WIDTH - 2 * LINE_X, Color::Name::WHITE, 1.0f)
+	{
 		skill_id = 0;
+		skill_level = 0;
+		skill_masterlevel = 0;
+		line_y = 0;
 	}
 
 	void SkillTooltip::set_skill(int32_t id, int32_t level, int32_t mlevel, int64_t expiration)
 	{
-		if (skill_id == id)
+		if (skill_id == id && skill_level == level && skill_masterlevel == mlevel)
 			return;
 
 		skill_id = id;
+		skill_level = level;
+		skill_masterlevel = mlevel;
 
 		if (skill_id == 0)
 			return;
@@ -107,30 +122,21 @@ namespace ms
 		bool next = level < masterlevel;
 
 		if (current)
-			levelstr += "[Current Level: " + std::to_string(level) + "]\\n" + data.get_level_desc(level);
+			levelstr += "[Current Level " + std::to_string(level) + "]\\n" + data.get_level_desc(level);
 
 		if (current && next)
 			levelstr += "\\n";
 
 		if (next)
-			levelstr += "[Next Level: " + std::to_string(level + 1) + "]\\n" + data.get_level_desc(level + 1);
+			levelstr += "[Next Level " + std::to_string(level + 1) + "]\\n" + data.get_level_desc(level + 1);
 
-		icon = data.get_icon(SkillData::Icon::NORMAL);
-		name = Text(Text::Font::A12B, Text::Alignment::LEFT, Color::Name::WHITE, data.get_name(), 320);
-		desc = Text(Text::Font::A12M, Text::Alignment::LEFT, Color::Name::WHITE, descstr, 210);
-		leveldesc = Text(Text::Font::A12M, Text::Alignment::LEFT, Color::Name::WHITE, levelstr, 290);
+		skillicon = data.get_icon(SkillData::Icon::NORMAL);
+		name = Text(Text::Font::A12B, Text::Alignment::LEFT, Color::Name::WHITE, data.get_name(), WIDTH - 2 * tooltip::NAME_POS.x());
+		desc = Text(Text::Font::A12M, Text::Alignment::LEFT, Color::Name::WHITE, descstr, DESC_WIDTH, true, tooltip::LINE_ADJ);
+		leveldesc = Text(Text::Font::A12M, Text::Alignment::LEFT, Color::Name::WHITE, levelstr, LEVEL_WIDTH, true, tooltip::LINE_ADJ);
 
-		int16_t desc_height = desc.height() + 11;
-
-		icon_offset = name.height();
-		level_offset = std::max<int16_t>(desc_height, 85);
-		height = icon_offset + level_offset + leveldesc.height();
-
-		int16_t icon_width = (icon.get_dimensions().x() * 2) + 4;
-		width = 292;
-
-		line = ColorLine(width + 16, Color::Name::WHITE, 1.0f);
-		box = ColorBox(icon_width, icon_width, Color::Name::WHITE, 0.65f);
+		line_y = std::max<int16_t>(LINE_MIN_Y, DESC_POS.y() + desc.height() + LINE_DESC_GAP);
+		size = Point<int16_t>(WIDTH, line_y + LEVEL_POS.y() + leveldesc.height() + tooltip::BOTTOM);
 	}
 
 	void SkillTooltip::draw(Point<int16_t> pos) const
@@ -138,33 +144,16 @@ namespace ms
 		if (skill_id == 0)
 			return;
 
-		int16_t max_width = Constants::Constants::get().get_viewwidth();
-		int16_t max_height = Constants::Constants::get().get_viewheight();
-		int16_t cur_width = pos.x() + width + 45;
-		int16_t cur_height = pos.y() + height + 35;
+		pos = tooltip::place(pos, size);
+		box.draw(pos, size);
 
-		int16_t adj_x = cur_width - max_width;
-		int16_t adj_y = cur_height - max_height;
+		icon.draw_dot(pos + tooltip::DOT_POS);
+		name.draw(pos + tooltip::NAME_POS);
+		icon.draw(skillicon, pos + tooltip::ICON_POS);
+		desc.draw(pos + DESC_POS);
 
-		if (adj_x > 0)
-			pos.shift_x(adj_x * -1);
-
-		if (adj_y > 0)
-			pos.shift_y(adj_y * -1);
-
-		frame.draw(pos + Point<int16_t>(176, height + 11), width, height - 1);
-		name.draw(pos + Point<int16_t>(33, 3));
-		cover.draw(pos + Point<int16_t>(16, -1));
-
-		pos.shift_y(icon_offset);
-
-		box.draw(DrawArgument(pos + Point<int16_t>(26, 21)));
-		icon.draw(DrawArgument(pos + Point<int16_t>(28, 87), 2.0f, 2.0f));
-		desc.draw(pos + Point<int16_t>(102, 15));
-
-		pos.shift_y(level_offset);
-
-		line.draw(pos + Point<int16_t>(22, 10));
-		leveldesc.draw(pos + Point<int16_t>(25, 11));
+		pos.shift_y(line_y);
+		line.draw(pos + Point<int16_t>(LINE_X, 0));
+		leveldesc.draw(pos + LEVEL_POS);
 	}
 }

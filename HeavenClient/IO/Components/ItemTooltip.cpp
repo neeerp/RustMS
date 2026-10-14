@@ -17,28 +17,23 @@
 //////////////////////////////////////////////////////////////////////////////////
 #include "ItemTooltip.h"
 
-#include "../Constants.h"
-
 #include "../Data/ItemData.h"
 
-#include <nlnx/nx.hpp>
+#include <algorithm>
 
 namespace ms
 {
-	// TODO: Add blue dot next to name
+	namespace
+	{
+		// Measured from period footage.
+		constexpr int16_t WIDTH = 290;
+		constexpr int16_t QUAL_Y = 25;
+		const Point<int16_t> DESC_POS = { 91, 29 };
+		constexpr int16_t DESC_WIDTH = 186;
+	}
+
 	ItemTooltip::ItemTooltip()
 	{
-		nl::node Item = nl::nx::ui["UIToolTip.img"]["Item"];
-		nl::node Frame = Item["Frame2"];
-		nl::node ItemIcon = Item["ItemIcon"];
-
-		frame = Frame;
-		cover = Frame["cover"];
-		base = ItemIcon["base"];
-		itemcover = ItemIcon["cover"];
-		type[true] = ItemIcon["new"];
-		type[false] = ItemIcon["old"];
-
 		itemid = 0;
 	}
 
@@ -54,31 +49,26 @@ namespace ms
 
 		const ItemData &idata = ItemData::get(itemid);
 
-		itemicon = idata.get_icon(false);
-		untradable = idata.is_untradable();
-		unique = idata.is_unique();
+		bool untradable = idata.is_untradable();
+		bool unique = idata.is_unique();
 
-		std::string quality = "";
+		std::string quality;
 
 		if (unique && untradable)
 			quality = "One-of-a-kind Item, Untradable";
-		else if (unique && !untradable)
+		else if (unique)
 			quality = "One-of-a-kind Item";
-		else if (!unique && untradable)
+		else if (untradable)
 			quality = "Untradable";
-		else
-			quality = "";
 
-		name = Text(Text::Font::A12B, Text::Alignment::LEFT, Color::Name::WHITE, idata.get_name(), 240);
-		desc = Text(Text::Font::A12M, Text::Alignment::LEFT, Color::Name::WHITE, idata.get_desc(), 185);
-		qual = Text(Text::Font::A12M, Text::Alignment::CENTER, Color::Name::ORANGE, quality, 185);
+		itemicon = idata.get_icon(false);
+		name = Text(Text::Font::A12B, Text::Alignment::LEFT, Color::Name::WHITE, idata.get_name(), WIDTH - 2 * tooltip::NAME_POS.x());
+		qual = quality.empty() ? Text() : Text(Text::Font::A12M, Text::Alignment::CENTER, Color::Name::ORANGE, quality);
+		desc = Text(Text::Font::A12M, Text::Alignment::LEFT, Color::Name::WHITE, idata.get_desc(), DESC_WIDTH, true, tooltip::LINE_ADJ);
 
-		fillwidth = 264;
-		fillheight = 83 + name.height();
-		descdelta = desc.height() - 80;
-
-		if (descdelta > 0)
-			fillheight += descdelta;
+		int16_t top = qual.empty() ? 0 : qual.height();
+		int16_t bottom = std::max<int16_t>(tooltip::ICON_POS.y() + tooltip::ICON_BOX, DESC_POS.y() + desc.height());
+		size = Point<int16_t>(WIDTH, top + bottom + tooltip::BOTTOM);
 
 		return true;
 	}
@@ -88,36 +78,19 @@ namespace ms
 		if (itemid == 0)
 			return;
 
-		int16_t max_width = Constants::Constants::get().get_viewwidth();
-		int16_t max_height = Constants::Constants::get().get_viewheight();
-		int16_t cur_width = pos.x() + fillwidth + 32;
-		int16_t cur_height = pos.y() + fillheight + 40;
+		pos = tooltip::place(pos, size);
+		box.draw(pos, size);
 
-		int16_t adj_x = cur_width - max_width;
-		int16_t adj_y = cur_height - max_height;
+		icon.draw_dot(pos + tooltip::DOT_POS);
+		name.draw(pos + tooltip::NAME_POS);
 
-		int16_t adj_d = descdelta > 0 ? descdelta : 0;
-		int16_t adj_t = (untradable || unique) ? 19 : 0;
+		if (!qual.empty())
+		{
+			qual.draw(pos + Point<int16_t>(WIDTH / 2, QUAL_Y));
+			pos.shift_y(qual.height());
+		}
 
-		if (adj_x > 0)
-			pos.shift_x(adj_x * -1);
-
-		if (adj_y > 0)
-			pos.shift_y(adj_y * -1);
-
-		frame.draw(pos + Point<int16_t>(150, 118 + adj_d + adj_t), fillwidth, fillheight + adj_t);
-		cover.draw(pos + Point<int16_t>(4, 4));
-		name.draw(pos + Point<int16_t>(22, 8));
-
-		if (untradable || unique)
-			qual.draw(pos + Point<int16_t>(148, 27));
-
-		pos.shift(14, 18 + name.height() + adj_t);
-
-		base.draw(pos);
-		type[true].draw(pos);
-		itemicon.draw(DrawArgument(pos + Point<int16_t>(8, 72), 2.0f, 2.0f));
-		itemcover.draw(pos);
-		desc.draw(pos + Point<int16_t>(90, -6));
+		icon.draw(itemicon, pos + tooltip::ICON_POS);
+		desc.draw(pos + DESC_POS);
 	}
 }

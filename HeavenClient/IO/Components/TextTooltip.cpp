@@ -17,19 +17,19 @@
 //////////////////////////////////////////////////////////////////////////////////
 #include "TextTooltip.h"
 
-#include "../Constants.h"
-
-#include <nlnx/nx.hpp>
+#include "MapTooltipLayout.h"
 
 namespace ms
 {
+	namespace
+	{
+		// Where the text starts in the box, as in the map tooltips.
+		const Point<int16_t> TEXT_POS = { map_tooltip::PADDING_X, 2 };
+		constexpr int16_t MAX_WIDTH = 340;
+	}
+
 	TextTooltip::TextTooltip()
 	{
-		nl::node Frame = nl::nx::ui["UIToolTip.img"]["Item"]["Frame2"];
-
-		frame = Frame;
-		cover = Frame["cover"];
-
 		text = "";
 	}
 
@@ -38,34 +38,9 @@ namespace ms
 		if (text_label.empty())
 			return;
 
-		int16_t fillwidth = text_label.width();
-		int16_t fillheight = text_label.height();
-
-		int16_t max_width = Constants::Constants::get().get_viewwidth();
-		int16_t max_height = Constants::Constants::get().get_viewheight();
-		int16_t cur_width = pos.x() + fillwidth + 21;
-		int16_t cur_height = pos.y() + fillheight + 40;
-
-		int16_t adj_x = cur_width - max_width;
-		int16_t adj_y = cur_height - max_height;
-
-		if (adj_x > 0)
-			pos.shift_x(adj_x * -1);
-
-		if (adj_y > 0)
-			pos.shift_y(adj_y * -1);
-
-		frame.draw(pos + Point<int16_t>(fillwidth / 2 + 2, fillheight - 7), fillwidth - 14, fillheight - 18);
-
-		if (fillheight > 18)
-		{
-			cover.draw(pos + Point<int16_t>(-5, -2));
-			text_label.draw(pos);
-		} else
-		{
-			cover.draw(DrawArgument(pos + Point<int16_t>(-5, -2), 0.5f, 0.5f));
-			text_label.draw(pos + Point<int16_t>(1, -3));
-		}
+		pos = tooltip::place(pos, size);
+		box.draw(pos, size);
+		text_label.draw(pos + TEXT_POS);
 	}
 
 	bool TextTooltip::set_text(std::string t)
@@ -76,9 +51,15 @@ namespace ms
 		text = t;
 
 		if (text.empty())
+		{
+			text_label = Text();
 			return false;
+		}
 
-		text_label = Text(Text::Font::A12M, Text::Alignment::LEFT, Color::Name::WHITE, text, 340, true, 2);
+		text_label = Text(Text::Font::A12M, Text::Alignment::LEFT, Color::Name::WHITE, text, MAX_WIDTH, true, tooltip::LINE_ADJ);
+
+		map_tooltip::Size s = map_tooltip::size(text_label.width(), text_label.height(), 0, 0);
+		size = Point<int16_t>(s.width, s.height);
 
 		return true;
 	}
