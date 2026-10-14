@@ -27,93 +27,104 @@
 #include "../Data/ItemData.h"
 
 #include "../Net/Packets/NpcInteractionPackets.h"
+#include "../Util/NxFiles.h"
 
 #include <nlnx/nx.hpp>
 
+#include <algorithm>
+
 namespace ms
 {
+	namespace
+	{
+		// The window, measured from its background and period footage. The
+		// sell half repeats the buy half this far to the right.
+		constexpr int16_t HALF = 230;
+		constexpr Point<int16_t> NPC_FEET = Point<int16_t>(53, 75);
+		constexpr Point<int16_t> EXIT_BUTTON = Point<int16_t>(142, 15);
+		constexpr Point<int16_t> BUY_BUTTON = Point<int16_t>(142, 36);
+		// The right end of the meso amount, in the field at 361-450.
+		constexpr Point<int16_t> MESO = Point<int16_t>(447, 63);
+		constexpr Point<int16_t> TABS = Point<int16_t>(4, 95);
+		constexpr int16_t BUY_TAB_FILL = 43;
+		constexpr int16_t SELL_TAB_FILL = 32;
+		constexpr int16_t SELL_TABS = 5;
+		// Each row is an icon box and, 36 to its right, the 162 wide entry.
+		constexpr Point<int16_t> ROW = Point<int16_t>(7, 127);
+		constexpr Point<int16_t> ROW_SIZE = Point<int16_t>(198, 35);
+		constexpr int16_t ROW_PITCH = 40;
+		constexpr int16_t ENTRY_X = 36;
+		// Rech. at the right end of a row's price line.
+		constexpr Point<int16_t> RECHARGE = Point<int16_t>(165, 18);
+		constexpr int16_t SLIDER_X = 209;
+		constexpr Range<int16_t> SLIDER_RANGE = Range<int16_t>(128, 309);
+
+		// Within a row: the icon's top-left, the name, and the price line.
+		constexpr Point<int16_t> ICON = Point<int16_t>(1, -1);
+		constexpr Point<int16_t> NAME = Point<int16_t>(41, 1);
+		constexpr Point<int16_t> COIN = Point<int16_t>(41, 20);
+		constexpr Point<int16_t> PRICE = Point<int16_t>(55, 18);
+
+		Point<int16_t> row_position(bool sell, int16_t row)
+		{
+			return ROW + Point<int16_t>(sell ? HALF : 0, ROW_PITCH * row);
+		}
+
+		void draw_entry(Point<int16_t> pos, const Texture &icon, const Text &name, const Texture &coin,
+						const Text &price)
+		{
+			icon.draw(pos + ICON + Point<int16_t>(0, 32));
+			name.draw(pos + NAME);
+			coin.draw(pos + COIN);
+			price.draw(pos + PRICE);
+		}
+	}
+
 	UIShop::UIShop(const CharLook &in_charlook, const Inventory &in_inventory)
 			: UIDragElement<PosSHOP>(), charlook(in_charlook), inventory(in_inventory)
 	{
-		nl::node src = nl::nx::ui["UIWindow2.img"]["Shop2"];
+		nl::node src = NxFiles::ui_classic["UIWindow.img"]["Shop"];
 
-		nl::node background = src["backgrnd"];
-		Texture bg = background;
-
+		Texture bg = src["backgrnd"];
 		auto bg_dimensions = bg.get_dimensions();
 
-		sprites.emplace_back(background);
-		sprites.emplace_back(src["backgrnd2"]);
-		sprites.emplace_back(src["backgrnd3"]);
-		sprites.emplace_back(src["backgrnd4"]);
+		sprites.emplace_back(src["backgrnd"]);
 
-		buttons[Buttons::BUY_ITEM] = std::make_unique<MapleButton>(src["BtBuy"]);
-		buttons[Buttons::SELL_ITEM] = std::make_unique<MapleButton>(src["BtSell"]);
-		buttons[Buttons::EXIT] = std::make_unique<MapleButton>(src["BtExit"]);
+		buttons[Buttons::EXIT] = std::make_unique<MapleButton>(src["BtExit"], EXIT_BUTTON);
+		buttons[Buttons::BUY_ITEM] = std::make_unique<MapleButton>(src["BtBuy"], BUY_BUTTON);
+		buttons[Buttons::SELL_ITEM] = std::make_unique<MapleButton>(src["BtSell"], BUY_BUTTON + Point<int16_t>(HALF, 0));
 
-		Texture cben = src["checkBox"][0];
-		Texture cbdis = src["checkBox"][1];
+		// Only the whole list: the Must tab beside it is left out.
+		buytabs = ClassicTabs(ClassicTabs::TAB5, src["TabBuy"]["enabled"], src["TabBuy"]["disabled"], BUY_TAB_FILL);
+		selltabs = ClassicTabs(ClassicTabs::TAB5, src["TabSell"]["enabled"], src["TabSell"]["disabled"], SELL_TAB_FILL);
 
-		Point<int16_t> cb_origin = cben.get_origin();
-		int16_t cb_x = cb_origin.x();
-		int16_t cb_y = cb_origin.y();
-
-		checkBox[0] = cbdis;
-		checkBox[1] = cben;
-
-		buttons[Buttons::CHECKBOX] = std::make_unique<AreaButton>(Point<int16_t>(std::abs(cb_x), std::abs(cb_y)),
-																  cben.get_dimensions());
-
-		nl::node buyen = src["TabBuy"]["enabled"];
-		nl::node buydis = src["TabBuy"]["disabled"];
-
-		buttons[Buttons::OVERALL] = std::make_unique<TwoSpriteButton>(buydis[0], buyen[0]);
-
-		nl::node sellen = src["TabSell"]["enabled"];
-		nl::node selldis = src["TabSell"]["disabled"];
-
-		for (uint16_t i = Buttons::EQUIP; i <= Buttons::CASH; i++)
+		for (int16_t i = 0; i < SELL_TABS; i++)
 		{
-			std::string tabnum = std::to_string(i - Buttons::EQUIP);
-			buttons[i] = std::make_unique<TwoSpriteButton>(selldis[tabnum], sellen[tabnum]);
+			Point<int16_t> tab_pos = TABS + Point<int16_t>(HALF + selltabs.pitch() * i, 0);
+			buttons[Buttons::EQUIP + i] = std::make_unique<AreaButton>(tab_pos,
+																	   Point<int16_t>(selltabs.pitch(), selltabs.height()));
 		}
 
-		int16_t item_y = 124;
-		int16_t item_height = 36;
-
-		buy_x = 8;
-		buy_width = 257;
-
-		for (uint16_t i = Buttons::BUY0; i <= Buttons::BUY8; i++)
+		for (int16_t i = 0; i < ROWS; i++)
 		{
-			Point<int16_t> pos(buy_x, item_y + 42 * (i - Buttons::BUY0));
-			Point<int16_t> dim(buy_width, item_height);
-			buttons[i] = std::make_unique<AreaButton>(pos, dim);
+			buttons[Buttons::BUY0 + i] = std::make_unique<AreaButton>(row_position(false, i), ROW_SIZE);
+			buttons[Buttons::SELL0 + i] = std::make_unique<AreaButton>(row_position(true, i), ROW_SIZE);
+			buttons[Buttons::RECHARGE0 + i] = std::make_unique<MapleButton>(src["BtRecharge"],
+																			row_position(true, i) + RECHARGE);
 		}
 
-		sell_x = 284;
-		sell_width = 200;
-
-		for (uint16_t i = Buttons::SELL0; i <= Buttons::SELL8; i++)
-		{
-			Point<int16_t> pos(sell_x, item_y + 42 * (i - Buttons::SELL0));
-			Point<int16_t> dim(sell_width, item_height);
-			buttons[i] = std::make_unique<AreaButton>(pos, dim);
-		}
-
-		buy_selection = src["select"];
-		sell_selection = src["select2"];
+		selection = src["select"];
 		meso = src["meso"];
 
-		mesolabel = Text(Text::Font::A11M, Text::Alignment::RIGHT, Color::Name::MINESHAFT);
+		mesolabel = Text(Text::Font::A12M, Text::Alignment::RIGHT, Color::Name::BLACK);
 
 		buyslider = Slider(
-				Slider::Type::DEFAULT_SILVER, Range<int16_t>(123, 484), 257, 5, 1,
+				Slider::Type::CLASSIC, SLIDER_RANGE, SLIDER_X, ROWS, 1,
 				[&](bool upwards)
 				{
 					int16_t shift = upwards ? -1 : 1;
 					bool above = buystate.offset + shift >= 0;
-					bool below = buystate.offset + shift <= buystate.lastslot - 5;
+					bool below = buystate.offset + shift <= buystate.lastslot - ROWS;
 
 					if (above && below)
 						buystate.offset += shift;
@@ -121,15 +132,18 @@ namespace ms
 		);
 
 		sellslider = Slider(
-				Slider::Type::DEFAULT_SILVER, Range<int16_t>(123, 484), 488, 5, 1,
+				Slider::Type::CLASSIC, SLIDER_RANGE, SLIDER_X + HALF, ROWS, 1,
 				[&](bool upwards)
 				{
 					int16_t shift = upwards ? -1 : 1;
 					bool above = sellstate.offset + shift >= 0;
-					bool below = sellstate.offset + shift <= sellstate.lastslot - 5;
+					bool below = sellstate.offset + shift <= sellstate.lastslot - ROWS;
 
 					if (above && below)
+					{
 						sellstate.offset += shift;
+						update_recharge();
+					}
 				}
 		);
 
@@ -140,20 +154,24 @@ namespace ms
 
 	void UIShop::draw(float alpha) const
 	{
-		UIElement::draw(alpha);
+		UIElement::draw_sprites(alpha);
 
-		npc.draw(DrawArgument(position + Point<int16_t>(58, 85), true));
-		charlook.draw(position + Point<int16_t>(338, 85), false, Stance::Id::STAND1, Expression::Id::DEFAULT);
+		npc.draw(DrawArgument(position + NPC_FEET, true));
+		charlook.draw(position + NPC_FEET + Point<int16_t>(HALF, 0), false, Stance::Id::STAND1,
+					  Expression::Id::DEFAULT);
 
-		mesolabel.draw(position + Point<int16_t>(493, 51));
+		mesolabel.draw(position + MESO);
 
-		buystate.draw(position, buy_selection);
-		sellstate.draw(position, sell_selection);
+		buytabs.draw(position + TABS, 1, 0);
+		selltabs.draw(position + TABS + Point<int16_t>(HALF, 0), SELL_TABS, tabbyinventory(sellstate.tab) - Buttons::EQUIP);
+
+		buystate.draw(position, selection);
+		sellstate.draw(position, selection);
 
 		buyslider.draw(position);
 		sellslider.draw(position);
 
-		checkBox[rightclicksell].draw(position);
+		UIElement::draw_buttons(alpha);
 	}
 
 	void UIShop::update()
@@ -168,8 +186,9 @@ namespace ms
 	{
 		clear_tooltip();
 
-		constexpr Range<uint16_t> buy(Buttons::BUY0, Buttons::BUY8);
-		constexpr Range<uint16_t> sell(Buttons::SELL0, Buttons::SELL8);
+		constexpr Range<uint16_t> buy(Buttons::BUY0, Buttons::BUY4);
+		constexpr Range<uint16_t> sell(Buttons::SELL0, Buttons::SELL4);
+		constexpr Range<uint16_t> recharge(Buttons::RECHARGE0, Buttons::RECHARGE4);
 
 		if (buy.contains(buttonid))
 		{
@@ -183,6 +202,14 @@ namespace ms
 			int16_t selected = buttonid - Buttons::SELL0;
 			sellstate.select(selected);
 			buystate.selection = -1;
+
+			return Button::State::NORMAL;
+		} else if (recharge.contains(buttonid))
+		{
+			int16_t row = sellstate.offset + buttonid - Buttons::RECHARGE0;
+
+			if (row < sellstate.lastslot)
+				NpcShopActionPacket(sellstate.items[row].get_slot()).dispatch();
 
 			return Button::State::NORMAL;
 		} else
@@ -201,31 +228,26 @@ namespace ms
 					exit_shop();
 
 					return Button::State::PRESSED;
-				case Buttons::CHECKBOX:
-					rightclicksell = !rightclicksell;
-					Configuration::get().set_rightclicksell(rightclicksell);
-
-					return Button::State::NORMAL;
 				case Buttons::EQUIP:
 					changeselltab(InventoryType::Id::EQUIP);
 
-					return Button::State::IDENTITY;
+					return Button::State::NORMAL;
 				case Buttons::USE:
 					changeselltab(InventoryType::Id::USE);
 
-					return Button::State::IDENTITY;
-				case Buttons::ETC:
-					changeselltab(InventoryType::Id::ETC);
-
-					return Button::State::IDENTITY;
+					return Button::State::NORMAL;
 				case Buttons::SETUP:
 					changeselltab(InventoryType::Id::SETUP);
 
-					return Button::State::IDENTITY;
+					return Button::State::NORMAL;
+				case Buttons::ETC:
+					changeselltab(InventoryType::Id::ETC);
+
+					return Button::State::NORMAL;
 				case Buttons::CASH:
 					changeselltab(InventoryType::Id::CASH);
 
-					return Button::State::IDENTITY;
+					return Button::State::NORMAL;
 			}
 		}
 
@@ -270,14 +292,13 @@ namespace ms
 		}
 
 		int16_t xoff = cursoroffset.x();
-		int16_t yoff = cursoroffset.y();
-		int16_t slot = slot_by_position(yoff);
+		int16_t slot = slot_by_position(cursoroffset.y());
 
-		if (slot >= 0 && slot <= 8)
+		if (slot >= 0)
 		{
-			if (xoff >= buy_x && xoff <= buy_width)
+			if (xoff >= ROW.x() && xoff < ROW.x() + ROW_SIZE.x())
 				show_item(slot, true);
-			else if (xoff >= sell_x && xoff <= sell_x + sell_width)
+			else if (xoff >= ROW.x() + HALF && xoff < ROW.x() + HALF + ROW_SIZE.x())
 				show_item(slot, false);
 			else
 				clear_tooltip();
@@ -287,70 +308,46 @@ namespace ms
 		}
 
 		Cursor::State ret = clicked ? Cursor::State::CLICKING : Cursor::State::IDLE;
+		bool handled = false;
 
 		for (size_t i = 0; i < Buttons::NUM_BUTTONS; i++)
 		{
-			if (buttons[i]->is_active() && buttons[i]->bounds(position).contains(cursorpos))
+			Button &button = *buttons[i];
+			bool real = i <= Buttons::RECHARGE4;
+
+			if (button.is_active() && button.bounds(position).contains(cursorpos) && !handled)
 			{
-				if (buttons[i]->get_state() == Button::State::NORMAL)
+				if (button.get_state() == Button::State::NORMAL)
 				{
-					if (i >= Buttons::BUY_ITEM && i <= Buttons::EXIT)
+					if (real)
 					{
 						Sound(Sound::Name::BUTTONOVER).play();
-
-						buttons[i]->set_state(Button::State::MOUSEOVER);
 						ret = Cursor::State::CANCLICK;
-					} else
-					{
-						buttons[i]->set_state(Button::State::MOUSEOVER);
-						ret = Cursor::State::IDLE;
 					}
-				} else if (buttons[i]->get_state() == Button::State::MOUSEOVER)
+
+					button.set_state(Button::State::MOUSEOVER);
+				} else if (button.get_state() == Button::State::MOUSEOVER)
 				{
 					if (clicked)
 					{
-						if (i >= Buttons::BUY_ITEM && i <= Buttons::CASH)
-						{
-							if (i >= Buttons::OVERALL && i <= Buttons::CASH)
-							{
-								Sound(Sound::Name::TAB).play();
-							} else
-							{
-								if (i != Buttons::CHECKBOX)
-									Sound(Sound::Name::BUTTONCLICK).play();
-							}
-
-							buttons[i]->set_state(button_pressed(i));
-
-							ret = Cursor::State::IDLE;
-						} else
-						{
-							buttons[i]->set_state(button_pressed(i));
-
-							ret = Cursor::State::IDLE;
-						}
-					} else
-					{
-						if (i >= Buttons::BUY_ITEM && i <= Buttons::EXIT)
-							ret = Cursor::State::CANCLICK;
-						else
-							ret = Cursor::State::IDLE;
-					}
-				} else if (buttons[i]->get_state() == Button::State::PRESSED)
-				{
-					if (clicked)
-					{
-						if (i >= Buttons::OVERALL && i <= Buttons::CASH)
-						{
+						if (i >= Buttons::EQUIP && i <= Buttons::CASH)
 							Sound(Sound::Name::TAB).play();
+						else if (real)
+							Sound(Sound::Name::BUTTONCLICK).play();
 
-							ret = Cursor::State::IDLE;
-						}
+						button.set_state(button_pressed(i));
+
+						ret = Cursor::State::IDLE;
+						// A click on Rech. isn't also one on its row.
+						handled = true;
+					} else if (real)
+					{
+						ret = Cursor::State::CANCLICK;
 					}
 				}
-			} else if (buttons[i]->get_state() == Button::State::MOUSEOVER)
+			} else if (button.get_state() == Button::State::MOUSEOVER)
 			{
-				buttons[i]->set_state(Button::State::NORMAL);
+				button.set_state(Button::State::NORMAL);
 			}
 		}
 
@@ -360,15 +357,11 @@ namespace ms
 	void UIShop::send_scroll(double yoffset)
 	{
 		int16_t xoff = lastcursorpos.x();
-		int16_t slider_width = 10;
 
-		if (buyslider.isenabled())
-			if (xoff >= buy_x && xoff <= buy_width + slider_width)
-				buyslider.send_scroll(yoffset);
-
-		if (sellslider.isenabled())
-			if (xoff >= sell_x && xoff <= sell_x + sell_width + slider_width)
-				sellslider.send_scroll(yoffset);
+		if (xoff < HALF)
+			buyslider.send_scroll(yoffset);
+		else
+			sellslider.send_scroll(yoffset);
 	}
 
 	void UIShop::rightclick(Point<int16_t> cursorpos)
@@ -378,19 +371,15 @@ namespace ms
 			Point<int16_t> cursoroffset = cursorpos - position;
 
 			int16_t xoff = cursoroffset.x();
-			int16_t yoff = cursoroffset.y();
-			int16_t slot = slot_by_position(yoff);
+			int16_t slot = slot_by_position(cursoroffset.y());
 
-			if (slot >= 0 && slot <= 8)
+			if (slot >= 0 && xoff >= ROW.x() + HALF && xoff < ROW.x() + HALF + ROW_SIZE.x())
 			{
-				if (xoff >= sell_x && xoff <= sell_x + sell_width)
-				{
-					clear_tooltip();
+				clear_tooltip();
 
-					sellstate.selection = slot;
-					sellstate.sell(true);
-					buystate.selection = -1;
-				}
+				sellstate.selection = slot + sellstate.offset;
+				sellstate.sell(true);
+				buystate.selection = -1;
 			}
 		}
 	}
@@ -421,27 +410,47 @@ namespace ms
 
 	void UIShop::changeselltab(InventoryType::Id type)
 	{
-		uint16_t oldtab = tabbyinventory(sellstate.tab);
-
-		if (oldtab > 0)
-			buttons[oldtab]->set_state(Button::State::NORMAL);
-
-		uint16_t newtab = tabbyinventory(type);
-
-		if (newtab > 0)
-			buttons[newtab]->set_state(Button::State::PRESSED);
-
 		sellstate.change_tab(inventory, type, meso);
 
-		sellslider.setrows(5, sellstate.lastslot);
+		sellslider.setrows(ROWS, std::max<int16_t>(sellstate.lastslot, ROWS));
 
-		for (size_t i = Buttons::SELL0; i < Buttons::SELL8; i++)
+		for (int16_t i = 0; i < ROWS; i++)
 		{
-			if (i - Buttons::SELL0 < sellstate.lastslot)
-				buttons[i]->set_state(Button::State::NORMAL);
+			if (i < sellstate.lastslot)
+				buttons[Buttons::SELL0 + i]->set_state(Button::State::NORMAL);
 			else
-				buttons[i]->set_state(Button::State::DISABLED);
+				buttons[Buttons::SELL0 + i]->set_state(Button::State::DISABLED);
 		}
+
+		update_recharge();
+	}
+
+	void UIShop::update_recharge()
+	{
+		for (int16_t i = 0; i < ROWS; i++)
+		{
+			int16_t row = sellstate.offset + i;
+			bool shown = false;
+
+			if (row < sellstate.lastslot)
+			{
+				const SellItem &item = sellstate.items[row];
+
+				if (const shop_list::Row *shop_row = recharge_row(item.get_id()))
+					shown = item.get_sellable() < shop_row->buyable;
+			}
+
+			buttons[Buttons::RECHARGE0 + i]->set_active(shown);
+		}
+	}
+
+	const shop_list::Row *UIShop::recharge_row(int32_t itemid) const
+	{
+		for (const shop_list::Row &row : recharges)
+			if (row.itemid == itemid)
+				return &row;
+
+		return nullptr;
 	}
 
 	void UIShop::reset(int32_t npcid)
@@ -452,11 +461,11 @@ namespace ms
 		for (auto &button : buttons)
 			button.second->set_state(Button::State::NORMAL);
 
-		buttons[Buttons::OVERALL]->set_state(Button::State::PRESSED);
-		buttons[Buttons::EQUIP]->set_state(Button::State::PRESSED);
-
 		buystate.reset();
 		sellstate.reset();
+		recharges.clear();
+
+		buyslider.setrows(ROWS, ROWS);
 
 		changeselltab(InventoryType::Id::EQUIP);
 
@@ -467,58 +476,63 @@ namespace ms
 	void UIShop::modify(InventoryType::Id type)
 	{
 		if (type == sellstate.tab)
-			changeselltab(type);
+		{
+			int16_t offset = sellstate.offset;
+
+			sellstate.change_tab(inventory, type, meso);
+			sellstate.offset = std::max<int16_t>(0, std::min<int16_t>(offset, sellstate.lastslot - ROWS));
+			sellslider.setrows(sellstate.offset, ROWS, std::max<int16_t>(sellstate.lastslot, ROWS));
+
+			for (int16_t i = 0; i < ROWS; i++)
+				buttons[Buttons::SELL0 + i]->set_state(i < sellstate.lastslot ? Button::State::NORMAL
+																				: Button::State::DISABLED);
+
+			update_recharge();
+		}
 	}
 
 	void UIShop::add_item(const shop_list::Row &row)
 	{
+		if (shop_list::is_rechargeable(row.itemid))
+		{
+			recharges.push_back(row);
+			update_recharge();
+		}
+
+		if (!row.for_sale())
+			return;
+
 		buystate.add(BuyItem(meso, row));
 
-		buyslider.setrows(5, buystate.lastslot);
+		buyslider.setrows(ROWS, std::max<int16_t>(buystate.lastslot, ROWS));
 	}
 
-	int16_t UIShop::slot_by_position(int16_t y)
+	int16_t UIShop::slot_by_position(int16_t y) const
 	{
-		int16_t yoff = y - 123;
+		int16_t yoff = y - ROW.y();
 
-		if (yoff > 0 && yoff < 38)
-			return 0;
-		else if (yoff > 42 && yoff < 80)
-			return 1;
-		else if (yoff > 84 && yoff < 122)
-			return 2;
-		else if (yoff > 126 && yoff < 164)
-			return 3;
-		else if (yoff > 168 && yoff < 206)
-			return 4;
-		else if (yoff > 210 && yoff < 248)
-			return 5;
-		else if (yoff > 252 && yoff < 290)
-			return 6;
-		else if (yoff > 294 && yoff < 332)
-			return 7;
-		else if (yoff > 336 && yoff < 374)
-			return 8;
-		else
+		if (yoff < 0 || yoff % ROW_PITCH >= ROW_SIZE.y())
 			return -1;
+
+		int16_t slot = yoff / ROW_PITCH;
+
+		return slot < ROWS ? slot : -1;
 	}
 
 	uint16_t UIShop::tabbyinventory(InventoryType::Id type)
 	{
 		switch (type)
 		{
-			case InventoryType::Id::EQUIP:
-				return Buttons::EQUIP;
 			case InventoryType::Id::USE:
 				return Buttons::USE;
-			case InventoryType::Id::ETC:
-				return Buttons::ETC;
 			case InventoryType::Id::SETUP:
 				return Buttons::SETUP;
+			case InventoryType::Id::ETC:
+				return Buttons::ETC;
 			case InventoryType::Id::CASH:
 				return Buttons::CASH;
 			default:
-				return 0;
+				return Buttons::EQUIP;
 		}
 	}
 
@@ -532,8 +546,8 @@ namespace ms
 
 	UIShop::BuyItem::BuyItem(Texture cur, const shop_list::Row &r) : currency(cur), row(r)
 	{
-		namelabel = Text(Text::Font::A11M, Text::Alignment::LEFT, Color::Name::MINESHAFT);
-		pricelabel = Text(Text::Font::A11M, Text::Alignment::LEFT, Color::Name::MINESHAFT);
+		namelabel = Text(Text::Font::A12M, Text::Alignment::LEFT, Color::Name::BLACK);
+		pricelabel = Text(Text::Font::A12M, Text::Alignment::LEFT, Color::Name::BLACK);
 
 		const ItemData &item = ItemData::get(row.itemid);
 
@@ -550,10 +564,7 @@ namespace ms
 
 	void UIShop::BuyItem::draw(Point<int16_t> pos) const
 	{
-		icon.draw(pos + Point<int16_t>(0, 42));
-		namelabel.draw(pos + Point<int16_t>(40, 6));
-		currency.draw(pos + Point<int16_t>(38, 29));
-		pricelabel.draw(pos + Point<int16_t>(55, 24));
+		draw_entry(pos, icon, namelabel, currency, pricelabel);
 	}
 
 	int16_t UIShop::BuyItem::get_index() const
@@ -571,7 +582,7 @@ namespace ms
 		return row.buyable;
 	}
 
-	UIShop::SellItem::SellItem(int32_t item_id, int16_t count, int16_t s, bool sc, Texture cur)
+	UIShop::SellItem::SellItem(int32_t item_id, int16_t count, int16_t s, bool sc, Texture cur) : currency(cur)
 	{
 		const ItemData &idata = ItemData::get(item_id);
 
@@ -581,13 +592,13 @@ namespace ms
 		slot = s;
 		showcount = sc;
 
-		namelabel = Text(Text::Font::A11M, Text::Alignment::LEFT, Color::Name::MINESHAFT);
-		pricelabel = Text(Text::Font::A11M, Text::Alignment::LEFT, Color::Name::MINESHAFT);
+		namelabel = Text(Text::Font::A12M, Text::Alignment::LEFT, Color::Name::BLACK);
+		pricelabel = Text(Text::Font::A12M, Text::Alignment::LEFT, Color::Name::BLACK);
 
 		std::string name = idata.get_name();
 
-		if (name.length() >= 28)
-			name = name.substr(0, 28) + "..";
+		if (name.length() >= 24)
+			name = name.substr(0, 22) + "..";
 
 		namelabel.change_text(name);
 
@@ -599,16 +610,14 @@ namespace ms
 
 	void UIShop::SellItem::draw(Point<int16_t> pos) const
 	{
-		icon.draw(pos + Point<int16_t>(43, 42));
+		draw_entry(pos, icon, namelabel, currency, pricelabel);
 
 		if (showcount)
 		{
-			static const Charset countset = Charset(nl::nx::ui["Basic.img"]["ItemNo"], Charset::Alignment::LEFT);
-			countset.draw(std::to_string(sellable), pos + Point<int16_t>(41, 28));
+			static const Charset countset = Charset(NxFiles::ui_classic["Basic.img"]["ItemNo"],
+													Charset::Alignment::LEFT);
+			countset.draw(std::to_string(sellable), pos + ICON + Point<int16_t>(0, 20));
 		}
-
-		namelabel.draw(pos + Point<int16_t>(84, 6));
-		pricelabel.draw(pos + Point<int16_t>(84, 24));
 	}
 
 	int32_t UIShop::SellItem::get_id() const
@@ -637,19 +646,19 @@ namespace ms
 
 	void UIShop::BuyState::draw(Point<int16_t> parentpos, const Texture &selected) const
 	{
-		for (int16_t i = 0; i < 9; i++)
+		for (int16_t i = 0; i < ROWS; i++)
 		{
 			int16_t slot = i + offset;
 
 			if (slot >= lastslot)
 				break;
 
-			auto itempos = Point<int16_t>(12, 116 + 42 * i);
+			Point<int16_t> itempos = parentpos + row_position(false, i);
 
 			if (slot == selection)
-				selected.draw(parentpos + itempos + Point<int16_t>(35, 8));
+				selected.draw(itempos + Point<int16_t>(ENTRY_X, 0));
 
-			items[slot].draw(parentpos + itempos);
+			items[slot].draw(itempos);
 		}
 	}
 
@@ -752,19 +761,19 @@ namespace ms
 
 	void UIShop::SellState::draw(Point<int16_t> parentpos, const Texture &selected) const
 	{
-		for (int16_t i = 0; i <= 8; i++)
+		for (int16_t i = 0; i < ROWS; i++)
 		{
 			int16_t slot = i + offset;
 
 			if (slot >= lastslot)
 				break;
 
-			Point<int16_t> itempos(243, 116 + 42 * i);
+			Point<int16_t> itempos = parentpos + row_position(true, i);
 
 			if (slot == selection)
-				selected.draw(parentpos + itempos + Point<int16_t>(78, 8));
+				selected.draw(itempos + Point<int16_t>(ENTRY_X, 0));
 
-			items[slot].draw(parentpos + itempos);
+			items[slot].draw(itempos);
 		}
 	}
 

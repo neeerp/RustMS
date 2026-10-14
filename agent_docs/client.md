@@ -141,6 +141,13 @@ from `UI.nx`. Moved so far:
   restores the server's defaults; DEFAULT, CLEAR ALL, and Esc with unsaved
   changes ask through the in-window `notice` bitmaps. CHANGE QUICK SLOTS is
   disabled until the quick slot is configurable.
+- **NPC shop** (`UIShop`, `UIWindow.img/Shop`): the shop's list on the left
+  under the NPC, your bag on the right under you and your mesos, five 40 px
+  rows a side with a `VScr4` scroll bar each, laid out from the background
+  and period footage. The sell side has the five `Basic.img/Tab5` bag tabs;
+  the buy side shows only the "All" tab. A star or bullet set below its full
+  size shows `BtRecharge` on its row, which recharges it at once. The
+  right-click-to-sell checkbox is gone; right-click still sells.
 - **Character info** (`UICharInfo`, `UIWindow.img/UserInfo`): opened by
   double-clicking a character on the map, the player included
   (`Stage::character_at`, a body-sized box above the feet in
@@ -281,8 +288,9 @@ These were corrected:
    after the row's zero ints was 1, then read their 8-byte recharge rate as a
    skip and a short. It now decides by item id (`207xxxx`, `233xxxx`) and
    reads the double (`Net/Handlers/ShopList.h`). Rows without a price, which
-   are there only to recharge, are hidden, so buying sends the row's index in
-   the server's list rather than its place on screen. Stars are bought one
+   are there only to recharge, are not shown for sale but give the full set
+   for the Rech. button, and buying sends the row's index in the server's
+   list rather than its place on screen. Stars are bought one
    set at a time and sold as a whole set, both after a yes/no. The new
    CONFIRM_SHOP_TRANSACTION handler shows "You do not have enough mesos." and
    "Please check if your inventory is full or not."; codes 0 and 8 need no

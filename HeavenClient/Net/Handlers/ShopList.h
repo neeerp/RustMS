@@ -47,12 +47,17 @@ namespace ms
 			double unitprice;
 			// How many can be bought at once: a stack, or one set
 			int16_t buyable;
+
+			// Rows without a price are only there to recharge
+			bool for_sale() const
+			{
+				return price > 0;
+			}
 		};
 
 		// The rows of OPEN_NPC_SHOP after the NPC id. Each item carries a
 		// bundle size, or for stars and bullets a recharge rate (a double);
-		// the item id says which. Rows without a price are only there to
-		// recharge, so they aren't for sale.
+		// the item id says which.
 		inline std::vector<Row> read(InPacket& recv)
 		{
 			std::vector<Row> rows;
@@ -80,9 +85,7 @@ namespace ms
 				}
 
 				row.buyable = recv.read_short();
-
-				if (row.price > 0)
-					rows.push_back(row);
+				rows.push_back(row);
 			}
 
 			return rows;
