@@ -54,7 +54,7 @@ namespace ms
 		bool is_active() const;
 
 	private:
-		void load(nl::node src, bool formatted, uint16_t wrap_width);
+		void load(const std::string &style, bool formatted, uint16_t wrap_width);
 
 		// v83 CUser::OnChat shows a balloon for 5 s, then fades it out over 1 s.
 		static constexpr int16_t DURATION = 5000;

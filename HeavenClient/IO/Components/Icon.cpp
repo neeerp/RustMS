@@ -20,6 +20,7 @@
 #include "Charset.h"
 
 #include "../../Audio/Audio.h"
+#include "../../Util/NxFiles.h"
 
 #include <nlnx/nx.hpp>
 
@@ -42,7 +43,7 @@ namespace ms
 
 		if (showcount)
 		{
-			static const Charset countset = Charset(nl::nx::ui["Basic.img"]["ItemNo"], Charset::Alignment::LEFT);
+			static const Charset countset = Charset(NxFiles::ui_classic["Basic.img"]["ItemNo"], Charset::Alignment::LEFT);
 			countset.draw(std::to_string(count), position + Point<int16_t>(0, 20));
 		}
 	}
