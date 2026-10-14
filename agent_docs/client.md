@@ -125,6 +125,12 @@ from `UI.nx`. Moved so far:
   overall, SHIELD beside a two-handed weapon, and the riding cells without
   Monster Riding. RustMS has no pets, so the pet tabs are disabled and the pet
   and MOB EQUIP cells hold nothing.
+- **Channel window** (`UIChannel`, `UIWindow.img/Channel`): the `t`, tiled
+  `c` and `s` pieces around a six-column grid of 68×20 cells (70×21 apart from
+  (9,67)), with a row per six channels, laid out from period footage. Every
+  cell in those rows is drawn, `channel0` where there is no channel. The
+  selected channel is `channel2` and the current one `channel1`. The world
+  name is `world/<world id>`.
 
 `UIClassic.nx` is not one of NoLifeNx's standard files, so `NxFiles` opens it
 with `nl::file` instead of `nl::nx::load_all`.
