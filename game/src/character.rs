@@ -1,8 +1,26 @@
 use crate::inventory::{equip_slot, Inventory};
 use crate::keymap::Keymap;
 use crate::quest::QuestLog;
-use crate::skill::SkillBook;
+use crate::skill::{self, SkillBook, SkillRecord};
 use std::collections::BTreeMap;
+
+/// The most STR, DEX, INT, or LUK AP can raise a stat to.
+pub const MAX_BASE_STAT: i16 = 999;
+/// The most max HP or max MP AP can raise.
+pub const MAX_HP_MP: i16 = 30_000;
+/// The most SP the three beginner skills can share (one per level from 2).
+pub const MAX_BEGINNER_SP: i32 = 6;
+
+/// A stat `SPEND_AP` can raise.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ApStat {
+    Str,
+    Dex,
+    Int,
+    Luk,
+    MaxHp,
+    MaxMp,
+}
 
 /// The core stat block that v83 sends in character lists, SET_FIELD, and
 /// stat updates.
@@ -192,9 +210,9 @@ impl Player {
     }
 
     /// Add EXP, levelling up as many times as it covers. Each level grants
-    /// 5 AP and the job family's max HP/MP growth; current HP and MP stay
-    /// as they were, as in v83. Returns the number of levels gained. (SP comes with skills; v83
-    /// beginners get none.)
+    /// 5 AP, 3 SP past beginner, and the job family's max HP/MP growth;
+    /// current HP and MP stay as they were, as in v83. Returns the number of
+    /// levels gained.
     pub fn gain_exp(&mut self, amount: i32) -> u8 {
         if amount <= 0 {
             return 0;
@@ -208,6 +226,9 @@ impl Player {
             exp -= needed;
             self.stats.level += 1;
             self.stats.ap = self.stats.ap.saturating_add(5);
+            if self.stats.job % 1000 != 0 {
+                self.stats.sp = self.stats.sp.saturating_add(3);
+            }
             let (hp, mp) = level_up_growth(self.stats.job);
             self.stats.max_hp = self.stats.max_hp.saturating_add(hp);
             self.stats.max_mp = self.stats.max_mp.saturating_add(mp);
@@ -219,6 +240,74 @@ impl Player {
         self.stats.exp = i32::try_from(exp).unwrap_or(i32::MAX);
         self.dirty = true;
         gained
+    }
+
+    /// Spend one AP on `stat`. Returns false, changing nothing, without AP
+    /// or once the stat is at its cap.
+    pub fn spend_ap(&mut self, stat: ApStat) -> bool {
+        if self.stats.ap <= 0 {
+            return false;
+        }
+        let (hp, mp) = ap_growth(self.stats.job);
+        let stats = &mut self.stats;
+        let (value, gain, cap) = match stat {
+            ApStat::Str => (&mut stats.str, 1, MAX_BASE_STAT),
+            ApStat::Dex => (&mut stats.dex, 1, MAX_BASE_STAT),
+            ApStat::Int => (&mut stats.int, 1, MAX_BASE_STAT),
+            ApStat::Luk => (&mut stats.luk, 1, MAX_BASE_STAT),
+            ApStat::MaxHp => (&mut stats.max_hp, hp, MAX_HP_MP),
+            ApStat::MaxMp => (&mut stats.max_mp, mp, MAX_HP_MP),
+        };
+        if *value >= cap {
+            return false;
+        }
+        *value = value.saturating_add(gain).min(cap);
+        stats.ap -= 1;
+        self.dirty = true;
+        true
+    }
+
+    /// SP left for the three beginner skills: one per level from 2 up to
+    /// six, less what they already have.
+    pub fn beginner_sp(&self) -> i32 {
+        let base = i32::from(self.stats.job) / 1000 * 10_000_000;
+        let used: i32 = (1000..=1002).map(|id| self.skills.level(base + id)).sum();
+        (i32::from(self.stats.level) - 1).min(MAX_BEGINNER_SP) - used
+    }
+
+    /// Raise `skill_id` a level, up to `max_level`, paying one SP (or one
+    /// beginner SP for the beginner skills). Fourth-job skills stop at the
+    /// master level the character was granted instead. Returns the new
+    /// record, or `None` if the skill can't go higher or there is no SP.
+    /// Which skills the character may learn is the caller's to check.
+    pub fn raise_skill(&mut self, skill_id: i32, max_level: i32) -> Option<SkillRecord> {
+        let mut record = self.skills.get(skill_id).cloned().unwrap_or(SkillRecord {
+            skill_id,
+            level: 0,
+            master_level: 0,
+            expiration: None,
+        });
+        let cap = if skill::is_fourth_job(skill_id) {
+            record.master_level.min(max_level)
+        } else {
+            max_level
+        };
+        if record.level >= cap {
+            return None;
+        }
+        if skill::uses_beginner_sp(skill_id) {
+            if self.beginner_sp() <= 0 {
+                return None;
+            }
+        } else if self.stats.sp <= 0 {
+            return None;
+        } else {
+            self.stats.sp -= 1;
+        }
+        record.level += 1;
+        self.skills.set(record.clone());
+        self.dirty = true;
+        Some(record)
     }
 
     /// Change HP by `delta`, clamped to `0..=max_hp`. Returns the new HP.
@@ -263,6 +352,18 @@ fn level_up_growth(job: i16) -> (i16, i16) {
         3 | 4 | 13 | 14 => (22, 15),
         5 | 15 => (25, 20),
         _ => (14, 11),
+    }
+}
+
+/// Max HP/MP one AP adds: the middle of v83's random ranges, as with
+/// `level_up_growth`.
+fn ap_growth(job: i16) -> (i16, i16) {
+    match job / 100 {
+        1 | 11 | 21 => (22, 3),
+        2 | 12 => (8, 19),
+        3 | 4 | 13 | 14 => (18, 11),
+        5 | 15 => (20, 15),
+        _ => (10, 7),
     }
 }
 
@@ -365,6 +466,86 @@ mod tests {
         assert_eq!((player.stats.max_mp, player.stats.mp), (27, 5));
         assert_eq!(player.gain_exp(0), 0);
         assert!(player.is_dirty());
+    }
+
+    #[test]
+    fn levels_past_beginner_grant_sp() {
+        let mut player = player();
+        player.gain_exp(62);
+        assert_eq!(player.stats.sp, 0);
+        player.stats.job = 200;
+        player.gain_exp(57 + 92 - 13);
+        assert_eq!((player.stats.level, player.stats.sp), (5, 6));
+    }
+
+    #[test]
+    fn ap_raises_one_stat_until_it_runs_out_or_caps() {
+        let mut player = player();
+        player.stats.ap = 3;
+        assert!(player.spend_ap(ApStat::Str));
+        assert_eq!((player.stats.str, player.stats.ap), (13, 2));
+        assert!(player.is_dirty());
+        player.stats.job = 200;
+        assert!(player.spend_ap(ApStat::MaxMp));
+        assert_eq!((player.stats.max_mp, player.stats.ap), (24, 1));
+        player.stats.luk = MAX_BASE_STAT;
+        assert!(!player.spend_ap(ApStat::Luk));
+        player.stats.max_hp = MAX_HP_MP - 1;
+        assert!(player.spend_ap(ApStat::MaxHp));
+        assert_eq!((player.stats.max_hp, player.stats.ap), (MAX_HP_MP, 0));
+        assert!(!player.spend_ap(ApStat::Dex));
+        assert_eq!(player.stats.dex, 5);
+    }
+
+    #[test]
+    fn beginner_skills_share_one_sp_per_level_up_to_six() {
+        let mut player = player();
+        assert_eq!(player.raise_skill(1000, 3), None);
+        player.stats.level = 3;
+        assert_eq!(player.raise_skill(1000, 3).unwrap().level, 1);
+        assert_eq!(player.raise_skill(1001, 3).unwrap().level, 1);
+        assert_eq!(player.raise_skill(1002, 3), None);
+        assert_eq!(player.stats.sp, 0);
+        player.stats.level = 30;
+        assert_eq!(player.beginner_sp(), 4);
+        player.raise_skill(1000, 3);
+        player.raise_skill(1000, 3);
+        assert_eq!(player.raise_skill(1000, 3), None);
+        // A magician keeps the pool for the skills it never raised.
+        player.stats.job = 200;
+        player.stats.sp = 1;
+        assert_eq!(player.raise_skill(1002, 3).unwrap().level, 1);
+        assert_eq!((player.beginner_sp(), player.stats.sp), (1, 1));
+    }
+
+    #[test]
+    fn skills_cost_sp_and_stop_at_their_cap() {
+        let mut player = player();
+        player.stats.job = 200;
+        player.stats.sp = 2;
+        assert_eq!(player.raise_skill(2001002, 1).unwrap().level, 1);
+        assert_eq!(player.raise_skill(2001002, 1), None);
+        assert_eq!(player.stats.sp, 1);
+        assert_eq!(player.raise_skill(2000000, 10).unwrap().level, 1);
+        assert_eq!(player.raise_skill(2000000, 10), None);
+        assert_eq!(player.skills.level(2000000), 1);
+    }
+
+    #[test]
+    fn fourth_job_skills_stop_at_their_master_level() {
+        let mut player = player();
+        player.stats.job = 212;
+        player.stats.sp = 5;
+        assert_eq!(player.raise_skill(2121000, 30), None);
+        player.skills.set(SkillRecord {
+            skill_id: 2121000,
+            level: 0,
+            master_level: 1,
+            expiration: None,
+        });
+        assert_eq!(player.raise_skill(2121000, 30).unwrap().master_level, 1);
+        assert_eq!(player.raise_skill(2121000, 30), None);
+        assert_eq!(player.stats.sp, 4);
     }
 
     #[test]

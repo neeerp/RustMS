@@ -11,7 +11,7 @@ pub mod keymap;
 pub mod quest;
 pub mod skill;
 
-pub use character::{AvatarLook, CharacterStats, FieldAvatar, Player};
+pub use character::{ApStat, AvatarLook, CharacterStats, FieldAvatar, Player};
 pub use inventory::{EquipStats, Inventory, InventoryChange, InventoryError, InventoryType, Item};
 pub use keymap::{KeyBinding, Keymap};
 pub use quest::{QuestLog, QuestRecord, QuestState, QuestStatus};

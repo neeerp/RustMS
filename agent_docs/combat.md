@@ -33,9 +33,27 @@ everyone.
 A dead mob's EXP is shared by damage dealt (the top damager gets any
 rounding remainder) and each share goes to that player's client actor
 (`ServerMessage::MobKilled`), which adds it with `Player::gain_exp`. A level
-gained sends the new level, AP, max HP/MP (+14/+11 per beginner level, the
-middle of v83's ranges) and shows SHOW_FOREIGN_EFFECT 0 to the others. As in
-v83, current HP and MP are not refilled.
+gained sends the new level, AP, SP, max HP/MP (+14/+11 per beginner level,
+the middle of v83's ranges) and shows SHOW_FOREIGN_EFFECT 0 to the others. As
+in v83, current HP and MP are not refilled. Each level grants 5 AP, and 3 SP
+once past beginner.
+
+## Spending AP and SP
+
+The client locks its UI after SPEND_AP or SPEND_SP until the server answers,
+so every request is answered, refusals with an empty STAT_CHANGED.
+
+- **AP** (`Player::spend_ap`): SPEND_AP names the stat by its STAT_CHANGED
+  bit: STR, DEX, INT, LUK, MaxHP (0x800), or MaxMP (0x2000). Base stats stop
+  at 999 and max HP/MP at 30,000. One AP adds the middle of v83's per-job
+  HP/MP range (`ap_growth`; a beginner gets +10/+7).
+- **SP** (`Player::raise_skill`): the skill must belong to the character's
+  job or one it advanced through (`game::skill::in_job_tree`). Its `Skill.nx`
+  template (`game_data::skills`) gives the max level and the `req` skills it
+  needs; skills marked `invisible` must be granted first. Fourth-job skills
+  also stop at the character's master level. Three Snails, Recovery, and
+  Nimble Feet share a beginner pool of one per level from 2, up to 6, rather
+  than SP. The reply is STAT_CHANGED with the SP left, then UPDATE_SKILLS.
 
 ## Drops and pickup
 
@@ -93,4 +111,6 @@ the broadcast; `mob_combat` (integration) runs two players in Dangerous
 Forest through control, relayed movement, hits, kills, EXP, refused damage,
 touch damage, a level-up seen by the other player, and a respawn;
 `drops_and_pickup` checks ownership, reach, pickup, replays, meso
-persistence, and that the tutorial sentinel's quest drop needs its quest.
+persistence, and that the tutorial sentinel's quest drop needs its quest;
+`spend_points` levels a beginner and checks AP, the beginner pool, refusals,
+and that both survive logging out.
