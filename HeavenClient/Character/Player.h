@@ -21,6 +21,7 @@
 
 #include "ActiveBuffs.h"
 #include "MonsterBook.h"
+#include "Party.h"
 #include "PassiveBuffs.h"
 #include "QuestLog.h"
 #include "SkillBook.h"
@@ -186,6 +187,10 @@ namespace ms
 		// Obtain a reference to the player's monsterbook.
 		MonsterBook &get_monsterbook();
 
+		// Obtain a reference to the player's party.
+		Party &get_party();
+		const Party &get_party() const;
+
 	private:
 		// Natural recovery: report a small heal after every 10 seconds spent
 		// standing, lying prone or sitting without moving, while not at full
@@ -206,6 +211,7 @@ namespace ms
 		QuestLog questlog;
 		TeleportRock teleportrock;
 		MonsterBook monsterbook;
+		Party party;
 
 		EnumMap<Buffstat::Id, Buff> buffs;
 		ActiveBuffs active_buffs;

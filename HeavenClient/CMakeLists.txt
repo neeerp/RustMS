@@ -30,6 +30,8 @@ if(HEAVENCLIENT_BUILD_TESTS)
     add_executable(menu_cover_tests tests/menu_cover.cpp)
     target_include_directories(menu_cover_tests PRIVATE ${PROJECT_SOURCE_DIR}/libs/NoLifeNx)
     add_test(NAME menu_cover COMMAND menu_cover_tests)
+    add_executable(party_tests tests/party.cpp Character/Party.cpp)
+    add_test(NAME party COMMAND party_tests)
     add_executable(npc_reach_tests tests/npc_reach.cpp)
     target_include_directories(npc_reach_tests PRIVATE ${PROJECT_SOURCE_DIR}/libs/NoLifeNx)
     add_test(NAME npc_reach COMMAND npc_reach_tests)
@@ -130,6 +132,8 @@ add_executable(HeavenClient
     Character/MapleStat.h
     Character/MonsterBook.cpp
     Character/MonsterBook.h
+    Character/Party.cpp
+    Character/Party.h
     Character/OtherChar.cpp
     Character/OtherChar.h
     Character/PassiveBuffs.cpp
@@ -315,6 +319,8 @@ add_executable(HeavenClient
     IO/UITypes/UIBuffList.cpp
     IO/UITypes/UIBuffList.h
     IO/UITypes/UIQuestHelper.cpp
+    IO/UITypes/UIPartyHP.cpp
+    IO/UITypes/UIPartyHP.h
     IO/UITypes/UIQuestHelper.h
     IO/UITypes/UICashShop.cpp
     IO/UITypes/UICashShop.h
@@ -330,6 +336,8 @@ add_executable(HeavenClient
     IO/UITypes/UIChatBar.h
     IO/UITypes/UICygnusCreation.cpp
     IO/UITypes/UICygnusCreation.h
+    IO/UITypes/UIEnterText.cpp
+    IO/UITypes/UIEnterText.h
     IO/UITypes/UIEquipInventory.cpp
     IO/UITypes/UIEquipInventory.h
     IO/UITypes/UIEvent.cpp
@@ -437,6 +445,8 @@ add_executable(HeavenClient
     Net/Handlers/MessagingHandlers.h
     Net/Handlers/NpcInteractionHandlers.cpp
     Net/Handlers/NpcInteractionHandlers.h
+    Net/Handlers/PartyHandlers.cpp
+    Net/Handlers/PartyHandlers.h
     Net/Handlers/PlayerHandlers.cpp
     Net/Handlers/PlayerHandlers.h
     Net/Handlers/PlayerInteractionHandlers.cpp

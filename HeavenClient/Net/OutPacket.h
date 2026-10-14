@@ -72,6 +72,7 @@ namespace ms
 
 			/// Messaging
 			GENERAL_CHAT = 49,
+			MULTICHAT = 119,
 			WHISPER = 120,
 
 			/// NPC Interaction
@@ -103,6 +104,7 @@ namespace ms
 			CHANGE_MAP_SPECIAL = 100,
 			QUEST_ACTION = 107,
 			PARTY_OPERATION = 124,
+			DENY_PARTY_REQUEST = 125,
 			ADMIN_COMMAND = 128,
 			MOVE_MONSTER = 188,
 			PICKUP_ITEM = 202,

@@ -163,6 +163,20 @@ namespace ms
 		}
 	};
 
+	// Turns down a party invitation
+	// Opcode: DENY_PARTY_REQUEST(125)
+	class DenyPartyRequestPacket : public OutPacket
+	{
+	public:
+		static constexpr int8_t DENIED = 0x17;
+
+		DenyPartyRequestPacket(const std::string& inviter) : OutPacket(OutPacket::Opcode::DENY_PARTY_REQUEST)
+		{
+			write_byte(DENIED);
+			write_string(inviter);
+		}
+	};
+
 	// Opcode: ADMIN_COMMAND(128)
 	class AdminCommandPacket : public OutPacket
 	{

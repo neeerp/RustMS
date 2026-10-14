@@ -148,9 +148,14 @@ namespace ms
 		Cursor::State cursorstate = (pressed && enabled) ? Cursor::State::CLICKING : Cursor::State::IDLE;
 		Point<int16_t> cursorpos = cursor.get_position();
 		cursor.set_pressed(pressed && enabled);
+
+		// A click that opens a window with a focused field lands outside
+		// that field; only fields focused before the click lose focus.
+		Textfield* focused_before = focusedtextfield.get();
+
 		send_cursor(cursorpos, cursorstate);
 
-		if (focusedtextfield && pressed)
+		if (focusedtextfield && focusedtextfield.get() == focused_before && pressed)
 		{
 			Cursor::State tstate = focusedtextfield->send_cursor(cursorpos, pressed);
 

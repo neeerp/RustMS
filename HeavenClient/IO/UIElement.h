@@ -74,6 +74,7 @@ namespace ms
 			CHARINFO,
 			CASHSHOP,
 			QUESTHELPER,
+			PARTYHP,
 			NUM_TYPES
 		};
 

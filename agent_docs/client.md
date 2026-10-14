@@ -199,7 +199,8 @@ side yet.
 | Quest log and markers | Implemented (`UIQuestLog`); progress arrives via SHOW_STATUS_INFO, quest start/complete is driven by NPC dialogue |
 | Chat, whisper, server messages | Implemented; whisper find/buddy modes ignored |
 | Character info, minimap, world map | Implemented |
-| Buddy / party / guild / boss list (`UIUserList`) | Buttons and layout only; no handlers, party packet exists but is unused |
+| Party (`UIUserList` Party tab, `UIPartyHP`, party chat) | Implemented; see `parties.md` |
+| Buddy / guild / alliance / blacklist tabs (`UIUserList`) | Tab strip only |
 | Cash shop (`UICashShop`) | Browse/enter/exit; purchase is `// TODO: Purchase item` |
 | Storage, trade, player shops, mini-games, messenger, memo/mail | No UI, no handlers |
 | Pets, mounts, summons, reactors beyond hit/spawn | Partial or absent (`Reactor` TODOs) |
@@ -213,7 +214,6 @@ are registered (`Net/PacketSwitch.cpp`). Anything not listed there is silently i
 | System | Client status | Effort |
 | --- | --- | --- |
 | Buddy list | UI skeleton, no packets | M |
-| Party (create/invite/HP bars) | UI skeleton, `PARTY_OPERATION` packet only | M |
 | Guild | Skeleton only, plus guild emblem/BBS UIs missing | L |
 | Trade / storage / player shops | Nothing | L |
 | Cash shop purchase and inventory | Display only | M |

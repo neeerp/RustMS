@@ -27,6 +27,7 @@
 #include "Handlers/MessagingHandlers.h"
 #include "Handlers/NpcInteractionHandlers.h"
 #include "Handlers/PlayerHandlers.h"
+#include "Handlers/PartyHandlers.h"
 #include "Handlers/PlayerInteractionHandlers.h"
 #include "Handlers/SetFieldHandlers.h"
 #include "Handlers/TestingHandlers.h"
@@ -131,6 +132,11 @@ namespace ms
 		/// Player Interaction
 		CHAR_INFO = 61,
 
+		/// Party
+		PARTY_OPERATION = 62,
+		MULTICHAT = 134,
+		UPDATE_PARTYMEMBER_HP = 201,
+
 		/// Cash Shop
 		SET_CASH_SHOP = 127
 	};
@@ -212,6 +218,11 @@ namespace ms
 
 		// Player Interaction
 		emplace<CHAR_INFO, CharInfoHandler>();
+
+		// Party handlers
+		emplace<PARTY_OPERATION, PartyOperationHandler>();
+		emplace<MULTICHAT, MultiChatHandler>();
+		emplace<UPDATE_PARTYMEMBER_HP, UpdatePartyMemberHpHandler>();
 
 		// Cash Shop
 		emplace<SET_CASH_SHOP, SetCashShopHandler>();

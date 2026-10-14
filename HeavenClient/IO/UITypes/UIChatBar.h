@@ -51,7 +51,16 @@ namespace ms
 			RED,
 			BLUE,
 			YELLOW,
-			GREY
+			GREY,
+			// Party chat and party notices
+			PARTY
+		};
+
+		// Who a typed line goes to
+		enum class Target
+		{
+			ALL,
+			PARTY
 		};
 
 		UIChatBar();
@@ -92,6 +101,12 @@ namespace ms
 
 		bool is_chatfieldopen();
 
+		// Send typed lines to everyone nearby or to the party, and open the
+		// input field.
+		void set_target(Target new_target);
+		// Open the chat field with "/w name " typed, ready for the message.
+		void start_whisper(const std::string& name);
+
 	protected:
 		Button::State button_pressed(uint16_t buttonid) override;
 
@@ -110,6 +125,8 @@ namespace ms
 
 		Rectangle<int16_t> get_arrow_bounds(Arrow arrow) const;
 
+		void send_party_chat(const std::string& message);
+
 		static constexpr int16_t CHATROWHEIGHT = 13;
 		static constexpr int16_t CHATROWS = 5;
 		static constexpr int16_t STRIP_WIDTH = 551;
@@ -127,6 +144,7 @@ namespace ms
 		Texture backgrnd2;
 		Texture chattarget;
 		Text chattarget_label;
+		Target chat_target;
 		Texture arrows[2][3];
 		Texture arrows_disabled[2];
 		Texture scrollbase;

@@ -84,6 +84,9 @@ namespace ms
 	public:
 		void draw(Point<int16_t> position, int16_t hppercent) const;
 
+		// The same bar in other colors, as over party members' heads.
+		void draw(Point<int16_t> position, int16_t hppercent, Color::Name fill, Color::Name shade) const;
+
 	private:
 		static const int16_t WIDTH = 50;
 		static const int16_t HEIGHT = 10;

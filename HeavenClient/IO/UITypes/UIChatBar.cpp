@@ -22,6 +22,7 @@
 #include "../Components/MapleButton.h"
 
 #include "../../Configuration.h"
+#include "../../Gameplay/Stage.h"
 #include "../../Graphics/GraphicsGL.h"
 #include "../../Net/Packets/MessagingPackets.h"
 #include "../../Util/NxFiles.h"
@@ -95,6 +96,7 @@ namespace ms
 		backgrnd2 = base["backgrnd2"];
 		chattarget = base["chatTarget"];
 		chattarget_label = Text(Text::Font::A11M, Text::Alignment::LEFT, Color::Name::WHITE, "To All");
+		chat_target = Target::ALL;
 
 		for (size_t i = 0; i < 3; i++)
 		{
@@ -137,6 +139,10 @@ namespace ms
 							else if (whisper_result == WhisperParseResult::InvalidWhisper)
 							{
 								send_chatline("Usage: /w <name> <message>", LineType::RED);
+							}
+							else if (chat_target == Target::PARTY)
+							{
+								send_party_chat(msg);
 							}
 							else
 							{
@@ -365,6 +371,9 @@ namespace ms
 			case LineType::GREY:
 				color = Color::Name::SILVER;
 				break;
+			case LineType::PARTY:
+				color = Color::Name::PARTYPINK;
+				break;
 			default:
 				color = Color::Name::WHITE;
 				break;
@@ -430,6 +439,42 @@ namespace ms
 	bool UIChatBar::is_chatfieldopen()
 	{
 		return chatfieldopen;
+	}
+
+	void UIChatBar::set_target(Target new_target)
+	{
+		chat_target = new_target;
+		chattarget_label.change_text(chat_target == Target::PARTY ? "To Party" : "To All");
+		toggle_chatfield(true);
+	}
+
+	void UIChatBar::start_whisper(const std::string& name)
+	{
+		toggle_chatfield(true);
+		chatfield.change_text("/w " + name + " ");
+	}
+
+	void UIChatBar::send_party_chat(const std::string& message)
+	{
+		Player& player = Stage::get().get_player();
+		const Party& party = player.get_party();
+
+		if (!party.exists())
+		{
+			send_chatline("You are not in a party.", LineType::RED);
+			return;
+		}
+
+		std::vector<int32_t> recipients;
+
+		for (auto& member : party.get_members())
+			if (member.id != player.get_oid())
+				recipients.push_back(member.id);
+
+		PartyChatPacket(recipients, message).dispatch();
+
+		// The server sends the line to the other members only.
+		send_chatline(player.get_stats().get_name() + " : " + message, LineType::PARTY);
 	}
 
 	Button::State UIChatBar::button_pressed(uint16_t buttonid)

@@ -21,6 +21,7 @@
 #include "InputFocus.h"
 
 #include "UITypes/UIBuffList.h"
+#include "UITypes/UIPartyHP.h"
 #include "UITypes/UIQuestHelper.h"
 #include "UITypes/UIChannel.h"
 #include "UITypes/UICharInfo.h"
@@ -87,6 +88,7 @@ namespace ms
 		emplace<UIMiniMap>(stats);
 		emplace<UIBuffList>();
 		emplace<UIQuestHelper>(Stage::get().get_player().get_quests(), inventory);
+		emplace<UIPartyHP>(Stage::get().get_player().get_party(), stats);
 		emplace<UIShop>(look, inventory);
 
 		VWIDTH = Constants::Constants::get().get_viewwidth();
@@ -251,10 +253,8 @@ namespace ms
 										tab = UIUserList::Tab::FRIEND;
 										break;
 									case KeyAction::Id::PARTY:
-										tab = UIUserList::Tab::PARTY;
-										break;
 									case KeyAction::Id::BOSSPARTY:
-										tab = UIUserList::Tab::BOSS;
+										tab = UIUserList::Tab::PARTY;
 										break;
 								}
 
@@ -312,6 +312,14 @@ namespace ms
 								break;
 							case KeyAction::Id::CASHSHOP:
 								EnterCashShopPacket().dispatch();
+								break;
+							case KeyAction::Id::SAY:
+							case KeyAction::Id::PARTYCHAT:
+								if (auto chatbar = UI::get().get_element<UIChatBar>())
+									chatbar->set_target(action == KeyAction::Id::PARTYCHAT
+										? UIChatBar::Target::PARTY
+										: UIChatBar::Target::ALL);
+
 								break;
 							case KeyAction::Id::TOGGLECHAT:
 								if (auto chatbar = UI::get().get_element<UIChatBar>())
@@ -561,6 +569,7 @@ namespace ms
 					UIElement::Type::MINIMAP,
 					UIElement::Type::BUFFLIST,
 					UIElement::Type::QUESTHELPER,
+					UIElement::Type::PARTYHP,
 					UIElement::Type::NPCTALK,
 					UIElement::Type::SHOP
 			};
