@@ -445,6 +445,12 @@ impl ClientActor {
                 self.count_quest_kill(mob_id).await?;
                 self.drop_loot(mob_id, object_id, x, y).await?
             }
+            ServerMessage::ReactorBroken {
+                reactor_id,
+                object_id,
+                x,
+                y,
+            } => self.drop_reactor_loot(reactor_id, object_id, x, y).await?,
             ServerMessage::PickedUp { drop } => self.picked_up(drop).await?,
             ServerMessage::CharInfoRequested { requester } => {
                 let packet = build::world::info::build_character_info(&self.in_game()?.player)

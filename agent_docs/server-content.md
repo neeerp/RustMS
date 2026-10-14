@@ -12,7 +12,7 @@ tests.
 | Path | Committed | Contents |
 | --- | --- | --- |
 | `assets/server-content/text.toml` | no | Script text, `"key" = "text"` |
-| `assets/server-content/rewards.json` | no | Drops per mob id (`item`/`money`, `prob`, `min`/`max`) |
+| `assets/server-content/rewards.json` | no | Drops per mob or reactor id (`item`/`money`, `prob`, `min`/`max`) |
 | `assets/server-content/shops.json` | no | Shop rows per NPC id (`item`, `price`) |
 | `game-data/placeholder_text.toml` | yes | A placeholder for **every** text key, written by us |
 | `game-data/reward_overrides.toml` | yes | v83 corrections, e.g. quest drops |
@@ -34,6 +34,13 @@ tests.
   (`Check.img/1035/1/item`), since the imported v95 data names another item.
   `quest = <id>` limits a drop to players with that quest started. Premium
   (cash) drops are filtered out.
+- **Reactor drops** (`RewardTable::reactor_drops`): `rewards.json` mixes
+  reactor ids in with the mobs. `[reactors.<id>]` overrides add to the
+  pack's drops rather than replace them: `like = <id>` borrows another
+  reactor's drops (Amherst's box 2001 has none of its own, so it borrows
+  2000's), and `quest_items` makes items quest drops that always drop during
+  that quest, adding them if the pack lacks them. So Pio's materials for
+  quest 1008 drop from the boxes even without a pack.
 - **Shops** (`ShopTable`): without `shops.json` no NPC keeps a shop, and
   shopkeepers fall back to their normal speech.
 

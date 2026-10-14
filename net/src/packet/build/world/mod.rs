@@ -12,6 +12,7 @@ pub mod messaging;
 pub mod mob;
 pub mod npc;
 pub mod quest;
+pub mod reactor;
 pub mod shop;
 pub mod skill;
 pub mod stat;

@@ -128,6 +128,31 @@ or the item (INVENTORY_OPERATION, "You have gained an item"). If the item
 doesn't fit, the player sees "You can't get anymore items." and the drop goes
 back on the ground.
 
+## Reactors
+
+A map's `reactor` nodes (`game_data::MapReactorTemplate`) place reactors such
+as Amherst's scrap boxes; their states come from `Reactor.nx`
+(`game_data::reactors`, following `info/link`). In each state, the first
+event of type 0–2 is what an attack does: it moves the reactor to that
+event's `state`, optionally only for the skills in `activeSkillID`. A state
+without events is the end.
+
+The field's `field_reactors::ReactorSet` spawns every reactor on load
+(SPAWN_REACTOR `0x117`, also sent to players entering). DAMAGE_REACTOR
+(`0xCD`) hits one if the player is within 250×200 of it, by the field's idea
+of where they are. A hit that leaves it short of its last state is shown to
+everyone (HIT_REACTOR `0x115`); the hit into the last state removes it
+(REMOVE_REACTOR `0x118` with the state it broke from, which HeavenClient uses
+to play the breaking animation) and the hitter rolls its drops
+(`net::loot::roll_reactor`) where it stood. A broken reactor comes back after
+the map's `reactorTime` seconds, under a new object id since HeavenClient
+keeps a broken reactor under its old one; one without a `reactorTime` stays
+broken.
+
+Reactor drops come from the content pack's table, keyed by reactor id, plus
+`[reactors]` in `reward_overrides.toml`; see `server-content.md`. Reactor
+`action` scripts (`mBoxItem0` and others) are not run.
+
 ## Getting hurt
 
 TAKE_DAMAGE from a touch (-1) is accepted up to the touching mob's
@@ -163,6 +188,8 @@ EXP sharing, and respawn; `net::combat` covers parsing, the damage cap, and
 the broadcast; `mob_combat` (integration) runs two players in Dangerous
 Forest through control, relayed movement, hits, kills, EXP, refused damage,
 touch damage, a level-up seen by the other player, and a respawn;
+`reactors` (integration) breaks two of Amherst's boxes, before and during
+Pio's quest;
 `drops_and_pickup` checks ownership, reach, pickup, replays, meso
 persistence, and that the tutorial sentinel's quest drop needs its quest;
 `spend_points` levels a beginner and checks AP, the beginner pool, refusals,

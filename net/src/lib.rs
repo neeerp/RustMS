@@ -22,6 +22,7 @@ pub mod npc_scripts;
 pub mod packet;
 pub mod policy;
 pub mod quests;
+pub mod reactors;
 pub mod scripts;
 pub mod settings;
 pub mod shop;

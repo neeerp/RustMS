@@ -359,13 +359,14 @@ async fn drain_spawn_npcs(connection: &mut MapleTestConnection) {
     .await
     {
         // Map setup: NPC spawns and the map entry banner.
-        // ...and the map's mobs.
+        // ...and the map's mobs, drops, and reactors.
         if ![
             SendOpcode::SpawnNpc as i16,
             SendOpcode::FieldEffect as i16,
             SendOpcode::SpawnMonster as i16,
             SendOpcode::SpawnMonsterControl as i16,
             SendOpcode::DropItemFromMapObject as i16,
+            SendOpcode::SpawnReactor as i16,
         ]
         .contains(&envelope.opcode())
         {

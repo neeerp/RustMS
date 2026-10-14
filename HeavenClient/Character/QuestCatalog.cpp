@@ -44,7 +44,9 @@ namespace ms
 			info.id = id;
 			info.name = root["QuestInfo.img"][name]["name"].get_string();
 			info.start_npc = static_cast<int32_t>(start["npc"].get_integer());
-			info.end_npc = static_cast<int32_t>(end["npc"].get_integer());
+			// A hand-in quest without a completion NPC goes back to the NPC
+			// that gave it (Pio's 1008), as on the server.
+			info.end_npc = static_cast<int32_t>(end["npc"].get_integer(info.start_npc));
 			info.min_level = static_cast<int16_t>(start["lvmin"].get_integer(0));
 			info.max_level = static_cast<int16_t>(start["lvmax"].get_integer(32767));
 			info.exp = static_cast<int32_t>(act["exp"].get_integer());
