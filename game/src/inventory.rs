@@ -461,6 +461,37 @@ impl Inventory {
         }
     }
 
+    /// Put an item in the first empty slot of its bag, as it is: a set of
+    /// throwing stars or bullets never merges with another.
+    pub fn add_alone(&mut self, item: Item) -> Result<Vec<InventoryChange>, InventoryError> {
+        let kind = InventoryType::for_item(item.item_id).ok_or(InventoryError::InvalidSlot)?;
+        let slot = self.free_slots(kind).next().ok_or(InventoryError::Full)?;
+        self.map_mut(kind).insert(slot, item.clone());
+        Ok(vec![InventoryChange::Add { kind, slot, item }])
+    }
+
+    /// Set how many one slot holds (recharging throwing stars).
+    pub fn refill(
+        &mut self,
+        kind: InventoryType,
+        slot: i16,
+        quantity: i16,
+    ) -> Result<Vec<InventoryChange>, InventoryError> {
+        let item = self
+            .map_mut(kind)
+            .get_mut(&slot)
+            .ok_or(InventoryError::InvalidSlot)?;
+        if quantity < 1 {
+            return Err(InventoryError::NotEnough);
+        }
+        item.quantity = quantity;
+        Ok(vec![InventoryChange::Quantity {
+            kind,
+            slot,
+            quantity,
+        }])
+    }
+
     /// Move an item within a bag: into an empty slot, onto a stack of the
     /// same item (up to `slot_max`), or swapping with another item.
     pub fn move_in_bag(
@@ -751,6 +782,42 @@ mod tests {
         );
         assert_eq!(
             inventory.add(Item::stack(4031802, 1), 100),
+            Err(InventoryError::Full)
+        );
+        assert_eq!(inventory, before);
+    }
+
+    #[test]
+    fn star_sets_take_their_own_slot_and_refill_in_place() {
+        let mut inventory = Inventory::default();
+        inventory.insert(InventoryType::Use, 1, Item::stack(2070000, 120));
+        let changes = inventory.add_alone(Item::stack(2070000, 500)).unwrap();
+        assert_eq!(
+            changes,
+            [InventoryChange::Add {
+                kind: InventoryType::Use,
+                slot: 2,
+                item: Item::stack(2070000, 500)
+            }]
+        );
+        assert_eq!(
+            inventory.refill(InventoryType::Use, 1, 500).unwrap(),
+            [InventoryChange::Quantity {
+                kind: InventoryType::Use,
+                slot: 1,
+                quantity: 500
+            }]
+        );
+        assert_eq!(inventory.count(2070000), 1000);
+        assert_eq!(
+            inventory.refill(InventoryType::Use, 3, 500),
+            Err(InventoryError::InvalidSlot)
+        );
+
+        inventory.set_slot_limit(InventoryType::Use, 2);
+        let before = inventory.clone();
+        assert_eq!(
+            inventory.add_alone(Item::stack(2070000, 500)),
             Err(InventoryError::Full)
         );
         assert_eq!(inventory, before);

@@ -25,7 +25,8 @@ pub(super) enum Applied {
     Yes,
     /// The items it gives don't fit; nothing was applied.
     NoRoom,
-    /// The database refused the quest change; nothing was applied.
+    /// The database refused the quest change, or the player no longer has
+    /// what it takes; nothing was applied.
     Refused,
 }
 
@@ -123,6 +124,30 @@ impl ClientActor {
                         i32::from(*quantity),
                     )?);
                 }
+                Effect::TakeItem { item_id, quantity } => {
+                    let Ok(changes) = next.inventory.remove(*item_id, *quantity) else {
+                        warn!(item_id, "Script item no longer held; nothing applied");
+                        return Ok(Applied::Refused);
+                    };
+                    changed = true;
+                    packets.push(inventory::build_inventory_operation(false, &changes)?);
+                    packets.push(inventory::build_item_gain_in_chat(
+                        *item_id,
+                        -i32::from(*quantity),
+                    )?);
+                }
+                Effect::SpendMeso(amount) => {
+                    if next.meso < *amount {
+                        warn!(amount, "Script mesos no longer held; nothing applied");
+                        return Ok(Applied::Refused);
+                    }
+                    next.meso -= amount;
+                    changed = true;
+                    packets.push(stat::build_stat_update(
+                        false,
+                        &[StatUpdate::Meso(next.meso)],
+                    )?);
+                }
                 Effect::GainExp(amount) => {
                     gain_exp(&mut next, *amount, &mut packets)?;
                     changed = true;
@@ -142,8 +167,9 @@ impl ClientActor {
             let account_id = self.in_game()?.player.account_id;
             let veteran =
                 spawn_db(move || db::character::account_has_level(account_id, 30)).await?;
+            let player = &self.in_game()?.player;
             if let Some(script) = veteran
-                .then(|| NpcScript::for_npc(MAPLE_ADMINISTRATOR))
+                .then(|| NpcScript::for_npc(MAPLE_ADMINISTRATOR, player))
                 .flatten()
             {
                 Box::pin(self.start_script(script)).await?;

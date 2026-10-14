@@ -609,6 +609,16 @@ namespace ms
 		return monsterbook;
 	}
 
+	Party &Player::get_party()
+	{
+		return party;
+	}
+
+	const Party &Player::get_party() const
+	{
+		return party;
+	}
+
 	Optional<const Ladder> Player::get_ladder() const
 	{
 		return ladder;

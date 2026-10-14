@@ -31,6 +31,57 @@ namespace ms
 
 	void MonsterBook::add_card(int16_t card, int8_t level)
 	{
+		set_card(FIRST_CARD + card, level);
+	}
+
+	void MonsterBook::set_card(int32_t card, int8_t level)
+	{
 		cards[card] = level;
+	}
+
+	int32_t MonsterBook::get_cover() const
+	{
+		return cover;
+	}
+
+	int8_t MonsterBook::get_level(int32_t card) const
+	{
+		auto iter = cards.find(card);
+
+		return iter == cards.end() ? 0 : iter->second;
+	}
+
+	int16_t MonsterBook::count_cards(bool special) const
+	{
+		int16_t count = 0;
+
+		for (auto &card : cards)
+			if (card.second > 0 && is_special(card.first) == special)
+				count++;
+
+		return count;
+	}
+
+	int16_t MonsterBook::get_book_level() const
+	{
+		// Each level needs ten more cards than the last: 11 cards for
+		// level 2, 31 for level 3, and so on. A 2009 book showed level 3 at
+		// 35 cards.
+		int16_t collected = count_cards(false) + count_cards(true);
+		int16_t level = 0;
+		int16_t next = 1;
+
+		do
+		{
+			level++;
+			next += level * 10;
+		} while (collected >= next);
+
+		return level;
+	}
+
+	bool MonsterBook::is_special(int32_t card)
+	{
+		return card / 1000 % 10 == 8;
 	}
 }

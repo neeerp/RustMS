@@ -1,6 +1,7 @@
 use crate::actor::field::{FieldActor, FieldMapEntityNpc};
 use crate::actor::field_drops::DropSet;
 use crate::actor::field_mobs::MobSet;
+use crate::actor::field_reactors::ReactorSet;
 use crate::message::{FieldHandle, FieldKey};
 use crate::supervisor::spawn_supervised;
 use std::collections::HashMap;
@@ -44,6 +45,7 @@ impl FieldRegistry {
             load_field_map_npcs(key),
             load_field_mobs(key),
             load_field_drops(key),
+            load_field_reactors(key),
             self.tick,
         );
         let registry: Weak<Self> = Arc::downgrade(self);
@@ -88,6 +90,24 @@ fn load_field_mobs(field_key: FieldKey) -> MobSet {
                 }
             }),
     )
+}
+
+fn load_field_reactors(field_key: FieldKey) -> ReactorSet {
+    let Some(field) = net::get_game_data()
+        .ok()
+        .and_then(|data| data.field(field_key.map_id))
+    else {
+        return ReactorSet::default();
+    };
+    ReactorSet::new(field.reactors.iter().filter_map(|reactor| {
+        match net::reactors::template(reactor.reactor_id) {
+            Some(template) => Some((reactor.clone(), template)),
+            None => {
+                warn!(field = ?field_key, reactor_id = reactor.reactor_id, "Unknown reactor on map");
+                None
+            }
+        }
+    }))
 }
 
 fn load_field_drops(field_key: FieldKey) -> DropSet {

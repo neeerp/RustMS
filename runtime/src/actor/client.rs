@@ -1,16 +1,18 @@
+mod buff;
 mod combat;
 mod dialogue;
 mod loot;
 mod npc_script;
 mod quest;
 mod script;
+mod shop;
 
 use crate::actor::registry::FieldRegistry;
 use crate::db::spawn_db;
 use crate::error::RuntimeError;
 use crate::io::{PacketReader, PacketWriter};
 use crate::message::{
-    ClientHandle, DirectoryMessage, FieldHandle, FieldKey, FieldMessage, ServerMessage,
+    ClientHandle, DirectoryMessage, FieldHandle, FieldKey, FieldMessage, Presence, ServerMessage,
     CLIENT_QUEUE_CAPACITY,
 };
 use game::Player;
@@ -18,6 +20,7 @@ use net::dialogue::{Conversation, NpcInteraction};
 use net::login_world::resolve_login_channel;
 use net::packet::build;
 use net::packet::build::world::field::parse_movement_state;
+use net::packet::build::world::messaging::{build_find_result, FindLocation};
 use net::quests::QuestRequest;
 use net::{ClientId, SpawnPosition, WorldAction, WorldContext, WorldRoute};
 use packet::Packet;
@@ -29,7 +32,7 @@ use std::sync::Arc;
 use std::time::Duration;
 use tokio::net::TcpStream;
 use tokio::sync::mpsc;
-use tokio::time::{interval, MissedTickBehavior};
+use tokio::time::{interval, sleep_until, Instant, MissedTickBehavior};
 use tokio_util::sync::CancellationToken;
 use tracing::{debug, error, info, warn};
 
@@ -78,6 +81,8 @@ pub struct ClientActor {
     conversation: Option<Conversation>,
     /// A native NPC or quest script conversation.
     script: Option<npc_script::ActiveScript>,
+    /// The NPC shop the player has open.
+    shop: Option<net::shop::Shop>,
     /// When natural recovery was last accepted.
     last_heal: Option<tokio::time::Instant>,
     /// When the player last sent movement; recovery needs them to rest.
@@ -88,6 +93,11 @@ pub struct ClientActor {
     blocked_scripts: HashSet<String>,
     npc_request_id: u64,
     changing_channel: bool,
+    /// The party the directory says the player is in; fields need it to
+    /// share EXP.
+    party_id: Option<i32>,
+    /// What the directory last heard of the player.
+    presence: Option<Presence>,
 }
 
 impl ClientActor {
@@ -127,12 +137,15 @@ impl ClientActor {
             game: None,
             conversation: None,
             script: None,
+            shop: None,
             last_heal: None,
             last_moved: None,
             pending_quest: None,
             blocked_scripts: HashSet::new(),
             npc_request_id: 0,
             changing_channel: false,
+            party_id: None,
+            presence: None,
         })
     }
 
@@ -143,6 +156,7 @@ impl ClientActor {
         let kill = self.kill.clone();
 
         let outcome = loop {
+            let buffs_due = self.buffs_due();
             let step = tokio::select! {
                 biased;
                 _ = kill.cancelled() => Err(RuntimeError::ClientDisconnected),
@@ -152,8 +166,14 @@ impl ClientActor {
                 },
                 Some(message) = self.rx.recv() => self.handle_server_message(message).await,
                 _ = autosave.tick() => self.save_if_dirty().await,
+                _ = sleep_until(buffs_due.unwrap_or_else(Instant::now)), if buffs_due.is_some() => {
+                    self.update_buffs().await
+                }
             };
             if let Err(error) = step {
+                break error;
+            }
+            if let Err(error) = self.sync_presence().await {
                 break error;
             }
         };
@@ -252,6 +272,7 @@ impl ClientActor {
             WorldAction::NpcInteraction(NpcInteraction::Start { object_id, .. }) => {
                 self.conversation = None;
                 self.script = None;
+                self.shop = None;
                 self.npc_request_id = self.npc_request_id.wrapping_add(1);
                 self.send_to_field(FieldMessage::NpcInteraction {
                     from: self.client_id,
@@ -282,13 +303,21 @@ impl ClientActor {
             }
             WorldAction::Died => self.died().await?,
             WorldAction::Quest(request) => self.request_quest_action(request).await?,
+            WorldAction::Shop(request) => self.shop_action(request).await?,
             WorldAction::ScriptPortal { portal } => self.touch_script_portal(&portal).await?,
             WorldAction::LookChanged(announce) => {
-                let avatar = self.in_game()?.player.field_avatar(0, 0, 0);
+                let player = &self.in_game()?.player;
+                let avatar = player.field_avatar(0, 0, 0);
+                let look = player.look();
                 self.send_to_field(FieldMessage::UpdateAvatar {
                     client_id: self.client_id,
                     avatar,
                     announce: Some(announce),
+                })
+                .await?;
+                self.send_to_directory(DirectoryMessage::LookChanged {
+                    client_id: self.client_id,
+                    look,
                 })
                 .await?
             }
@@ -296,6 +325,27 @@ impl ClientActor {
                 self.send_to_directory(DirectoryMessage::Whisper {
                     from: self.client_id,
                     delivery,
+                })
+                .await?
+            }
+            WorldAction::Party(request) => {
+                self.send_to_directory(DirectoryMessage::Party {
+                    from: self.client_id,
+                    request,
+                })
+                .await?
+            }
+            WorldAction::Find { target_name } => {
+                self.send_to_directory(DirectoryMessage::Find {
+                    from: self.client_id,
+                    target_name,
+                })
+                .await?
+            }
+            WorldAction::Messenger(request) => {
+                self.send_to_directory(DirectoryMessage::Messenger {
+                    from: self.client_id,
+                    request,
                 })
                 .await?
             }
@@ -343,9 +393,11 @@ impl ClientActor {
         self.send(&mut keymap).await?;
         self.send(&mut char_info).await?;
 
+        let presence = Presence::of(&player);
+        self.presence = Some(presence.clone());
         self.send_to_directory(DirectoryMessage::Register {
             handle: self.handle(),
-            name: player.name().to_string(),
+            presence,
             channel_id: self.channel_id,
         })
         .await?;
@@ -376,6 +428,7 @@ impl ClientActor {
     ) -> Result<(), RuntimeError> {
         self.conversation = None;
         self.script = None;
+        self.shop = None;
         self.pending_quest = None;
         self.npc_request_id = self.npc_request_id.wrapping_add(1);
 
@@ -398,8 +451,13 @@ impl ClientActor {
         let game = self.in_game_mut()?;
         game.position = (spawn.x, spawn.y);
         let avatar = game.player.field_avatar(spawn.x, spawn.y, spawn.stance);
-        self.send_to_field(FieldMessage::Join { handle, avatar })
-            .await?;
+        let party = self.party_id;
+        self.send_to_field(FieldMessage::Join {
+            handle,
+            avatar,
+            party,
+        })
+        .await?;
         self.run_map_enter_script().await
     }
 
@@ -412,6 +470,7 @@ impl ClientActor {
         let session_id = self.session_id.ok_or(RuntimeError::NotLoggedIn)?;
 
         self.remember_spawn_point();
+        self.cancel_buffs().await?;
         self.flush().await?;
         spawn_db(move || db::session::begin_channel_transition(session_id, i16::from(channel_id)))
             .await?;
@@ -441,17 +500,55 @@ impl ClientActor {
                 mob_id,
                 object_id,
                 exp,
+                party_bonus,
+                attacked,
                 x,
                 y,
             } => {
-                self.mob_killed(mob_id, exp).await?;
+                self.mob_killed(mob_id, exp, party_bonus).await?;
                 self.count_quest_kill(mob_id).await?;
-                self.drop_loot(mob_id, object_id, x, y).await?
+                if attacked {
+                    self.drop_loot(mob_id, object_id, x, y).await?
+                }
             }
+            ServerMessage::PartyChanged { party_id } => {
+                self.party_id = party_id;
+                self.send_to_field(FieldMessage::SetParty {
+                    client_id: self.client_id,
+                    party: party_id,
+                })
+                .await?
+            }
+            ServerMessage::ReactorBroken {
+                reactor_id,
+                object_id,
+                x,
+                y,
+            } => self.drop_reactor_loot(reactor_id, object_id, x, y).await?,
             ServerMessage::PickedUp { drop } => self.picked_up(drop).await?,
+            ServerMessage::Locate { reply_to } => self.locate(&reply_to),
+            ServerMessage::CharInfoRequested { requester } => {
+                let packet = build::world::info::build_character_info(&self.in_game()?.player)
+                    .map_err(|e| RuntimeError::Handler(e.to_string()))?;
+                requester.send_packet(packet);
+            }
             ServerMessage::SendPacket(mut packet) => self.send(&mut packet).await?,
         }
         Ok(())
+    }
+
+    /// Tell someone who looked for this player which map they are on.
+    fn locate(&self, reply_to: &ClientHandle) {
+        let Some(game) = self.game.as_ref() else {
+            return;
+        };
+        let location = FindLocation::Map(game.player.stats.map_id);
+        match build_find_result(game.player.name(), location) {
+            Ok(packet) => {
+                reply_to.send_packet(packet);
+            }
+            Err(e) => error!(client_id = self.client_id, "find result: {e}"),
+        }
     }
 
     /// Send to the current field, restarting it once if its actor died.
@@ -472,6 +569,7 @@ impl ClientActor {
                 let rejoin = FieldMessage::Join {
                     handle: self.handle(),
                     avatar,
+                    party: self.party_id,
                 };
                 field
                     .tx
@@ -491,6 +589,24 @@ impl ClientActor {
                 Ok(())
             }
         }
+    }
+
+    /// Keep the directory's view of the player (map, level, job, HP)
+    /// current, for party windows and HP bars.
+    async fn sync_presence(&mut self) -> Result<(), RuntimeError> {
+        let Some(game) = self.game.as_ref() else {
+            return Ok(());
+        };
+        let presence = Presence::of(&game.player);
+        if self.presence.as_ref() == Some(&presence) {
+            return Ok(());
+        }
+        self.presence = Some(presence.clone());
+        self.send_to_directory(DirectoryMessage::Presence {
+            client_id: self.client_id,
+            presence,
+        })
+        .await
     }
 
     async fn send_to_directory(&self, message: DirectoryMessage) -> Result<(), RuntimeError> {
@@ -558,6 +674,7 @@ impl ClientActor {
                 .send_to_directory(DirectoryMessage::Unregister {
                     client_id: self.client_id,
                     connection_id: self.connection_id,
+                    changing_channel: self.changing_channel,
                 })
                 .await;
             self.remember_spawn_point();

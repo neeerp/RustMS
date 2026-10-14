@@ -16,8 +16,10 @@
 //	along with this program.  If not, see <https://www.gnu.org/licenses/>.		//
 //////////////////////////////////////////////////////////////////////////////////
 #include "NpcInteractionHandlers.h"
+#include "ShopList.h"
 
 #include "../IO/UI.h"
+#include "../IO/UITypes/UINotice.h"
 #include "../IO/UITypes/UINpcTalk.h"
 #include "../IO/UITypes/UIShop.h"
 #include "../Gameplay/QuestConversation.h"
@@ -72,34 +74,26 @@ namespace ms
 
 		shop.reset(npcid);
 
-		int16_t size = recv.read_short();
+		for (const shop_list::Row& row : shop_list::read(recv))
+			shop.add_item(row);
+	}
 
-		for (int16_t i = 0; i < size; i++)
+	void ConfirmShopTransactionHandler::handle(InPacket& recv) const
+	{
+		const char* message = nullptr;
+
+		switch (recv.read_byte())
 		{
-			int32_t itemid = recv.read_int();
-			int32_t price = recv.read_int();
-			int32_t pitch = recv.read_int();
-			int32_t time = recv.read_int();
-
-			recv.skip(4);
-
-			bool norecharge = recv.read_short() == 1;
-
-			if (norecharge)
-			{
-				int16_t buyable = recv.read_short();
-
-				shop.add_item(itemid, price, pitch, time, buyable);
-			}
-			else
-			{
-				recv.skip(4);
-
-				int16_t rechargeprice = recv.read_short();
-				int16_t slotmax = recv.read_short();
-
-				shop.add_rechargable(itemid, price, pitch, time, rechargeprice, slotmax);
-			}
+		case 2:
+			message = "You do not have enough mesos.";
+			break;
+		case 3:
+			message = "Please check if your inventory is full or not.";
+			break;
+		default:
+			return;
 		}
+
+		UI::get().emplace<UIOk>(message, [](bool) {});
 	}
 }

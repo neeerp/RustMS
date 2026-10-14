@@ -44,6 +44,7 @@ pub struct Character {
     pub map_id: i32,
     pub sp: i16,
     pub spawn_point: i16,
+    pub monster_book_cover: i32,
 }
 
 /// Character creation projection.

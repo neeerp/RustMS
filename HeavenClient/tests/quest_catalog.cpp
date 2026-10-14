@@ -59,6 +59,15 @@ int main()
 		return 1;
 	}
 
+	// Pio's quest has no completion NPC; it goes back to Pio.
+	const ms::QuestInfo* pio = catalog.find(1008);
+
+	if (!pio || pio->start_npc != 10000 || pio->end_npc != 10000)
+	{
+		std::cerr << "Quest 1008 is not handed in to Pio\n";
+		return 1;
+	}
+
 	ms::QuestScript rain = catalog.script(1009, true);
 
 	if (rain.answers.at(0) != 0 || rain.wrong.at(0).count(1) != 1)
