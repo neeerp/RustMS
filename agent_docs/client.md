@@ -260,3 +260,13 @@ These were corrected:
    key 2. `Keyboard::Keytable` had 0 to 9 from key 2, so every number-row
    binding sat one key off. The `v83_number_row_keys` migration moves saved
    bindings, and the server's default party chat is on key 3 (the 2 key).
+9. OPEN_NPC_SHOP told stars and bullets from other items by whether the short
+   after the row's zero ints was 1, then read their 8-byte recharge rate as a
+   skip and a short. It now decides by item id (`207xxxx`, `233xxxx`) and
+   reads the double (`Net/Handlers/ShopList.h`). Rows without a price, which
+   are there only to recharge, are hidden, so buying sends the row's index in
+   the server's list rather than its place on screen. Stars are bought one
+   set at a time and sold as a whole set, both after a yes/no. The new
+   CONFIRM_SHOP_TRANSACTION handler shows "You do not have enough mesos." and
+   "Please check if your inventory is full or not."; codes 0 and 8 need no
+   notice.

@@ -111,6 +111,8 @@ pub struct Field {
     pub removed: Vec<(i32, Option<i32>)>,
     /// Effects on other characters: (character id, effect).
     pub effects: Vec<(i32, u8)>,
+    /// (object id, NPC id)
+    pub npcs: Vec<(i32, i32)>,
 }
 
 impl Field {
@@ -157,10 +159,21 @@ impl Field {
             let oid = r.read_int().unwrap();
             self.removed
                 .push((oid, (mode >= 2).then(|| r.read_int().unwrap())));
+        } else if op == SendOpcode::SpawnNpc as i16 {
+            self.npcs
+                .push((r.read_int().unwrap(), r.read_int().unwrap()));
         } else if op == SendOpcode::ShowForeignEffect as i16 {
             self.effects
                 .push((r.read_int().unwrap(), r.read_byte().unwrap()));
         }
+    }
+
+    /// The object id of NPC `npc_id`, once it has spawned.
+    pub fn npc(&self, npc_id: i32) -> Option<i32> {
+        self.npcs
+            .iter()
+            .find(|&&(_, npc)| npc == npc_id)
+            .map(|&(object_id, _)| object_id)
     }
 
     /// The first item drop of `item_id`.

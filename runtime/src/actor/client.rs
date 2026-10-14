@@ -4,6 +4,7 @@ mod loot;
 mod npc_script;
 mod quest;
 mod script;
+mod shop;
 
 use crate::actor::registry::FieldRegistry;
 use crate::db::spawn_db;
@@ -74,6 +75,8 @@ pub struct ClientActor {
     conversation: Option<Conversation>,
     /// A native NPC or quest script conversation.
     script: Option<npc_script::ActiveScript>,
+    /// The NPC shop the player has open.
+    shop: Option<net::shop::Shop>,
     /// When natural recovery was last accepted.
     last_heal: Option<tokio::time::Instant>,
     /// When the player last sent movement; recovery needs them to rest.
@@ -123,6 +126,7 @@ impl ClientActor {
             game: None,
             conversation: None,
             script: None,
+            shop: None,
             last_heal: None,
             last_moved: None,
             pending_quest: None,
@@ -242,6 +246,7 @@ impl ClientActor {
             WorldAction::NpcInteraction(NpcInteraction::Start { object_id, .. }) => {
                 self.conversation = None;
                 self.script = None;
+                self.shop = None;
                 self.npc_request_id = self.npc_request_id.wrapping_add(1);
                 self.send_to_field(FieldMessage::NpcInteraction {
                     from: self.client_id,
@@ -272,6 +277,7 @@ impl ClientActor {
             }
             WorldAction::Died => self.died().await?,
             WorldAction::Quest(request) => self.request_quest_action(request).await?,
+            WorldAction::Shop(request) => self.shop_action(request).await?,
             WorldAction::ScriptPortal { portal } => self.touch_script_portal(&portal).await?,
             WorldAction::LookChanged(announce) => {
                 let avatar = self.in_game()?.player.field_avatar(0, 0, 0);
@@ -362,6 +368,7 @@ impl ClientActor {
     ) -> Result<(), RuntimeError> {
         self.conversation = None;
         self.script = None;
+        self.shop = None;
         self.pending_quest = None;
         self.npc_request_id = self.npc_request_id.wrapping_add(1);
 

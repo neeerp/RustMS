@@ -1,7 +1,7 @@
 # Server content pack
 
 Some v83 content never shipped in the client data: the dialogue of scripted
-NPCs and portals, and mob drop tables. In v83 these lived on Nexon's servers.
+NPCs and portals, mob drop tables, and what NPC shops sell. In v83 these lived on Nexon's servers.
 Like the NX files they are Nexon's content, so they stay **out of the
 repository**. Only behavior is code; text and data come from an ignored
 content pack, with committed fallbacks so a fresh clone runs and passes its
@@ -13,6 +13,7 @@ tests.
 | --- | --- | --- |
 | `assets/server-content/text.toml` | no | Script text, `"key" = "text"` |
 | `assets/server-content/rewards.json` | no | Drops per mob id (`item`/`money`, `prob`, `min`/`max`) |
+| `assets/server-content/shops.json` | no | Shop rows per NPC id (`item`, `price`) |
 | `game-data/placeholder_text.toml` | yes | A placeholder for **every** text key, written by us |
 | `game-data/reward_overrides.toml` | yes | v83 corrections, e.g. quest drops |
 | `game-data/server_content.toml` | yes | Where the importer finds each key, plus its SHA-256 |
@@ -33,18 +34,20 @@ tests.
   (`Check.img/1035/1/item`), since the imported v95 data names another item.
   `quest = <id>` limits a drop to players with that quest started. Premium
   (cash) drops are filtered out.
+- **Shops** (`ShopTable`): without `shops.json` no NPC keeps a shop, and
+  shopkeepers fall back to their normal speech.
 
 The world server logs what it found at startup:
 
 ```
-Server content: assets/server-content: 1 text keys from the pack, 0 placeholders; drops for 646 mobs from the pack
+Server content: assets/server-content: 63 text keys from the pack, 0 placeholders; drops for 646 mobs and 97 shops from the pack
 ```
 
 ## Importing
 
 Sources (MIT, Copyright Kaioru): [Edelstein.lua](https://github.com/Kaioru/Edelstein.lua),
 [Server.Scripts](https://github.com/Kaioru/Server.Scripts) (scripts), and
-[Server.NX](https://github.com/Kaioru/Server.NX) (`Reward.img`). They target
+[Server.NX](https://github.com/Kaioru/Server.NX) (`Reward.img`, `NpcShop.img`). They target
 v95; behavior differences are handled in code and overrides, never by
 editing the text. Clone them into one directory and run:
 
@@ -56,7 +59,9 @@ For each key in `server_content.toml` the importer reads the Lua file, takes
 its string literals in order (`game_data::lua_strings`), fills the key's
 `template` (`{sN}` is the Nth literal), and checks the SHA-256. A mismatch
 means the upstream text changed: review it, then update the hash. Drops are
-copied from `Server.NX/src/Reward.img/*.json` into one `rewards.json`.
+copied from `Server.NX/src/Reward.img/*.json` into one `rewards.json`, and
+shops from `Server.NX/src/NpcShop.img/*.json` into one `shops.json`. The
+harness only has shops if its assets directory has the pack.
 
 ## Adding text
 
