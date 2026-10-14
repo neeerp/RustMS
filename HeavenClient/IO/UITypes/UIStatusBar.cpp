@@ -33,6 +33,7 @@
 #include "../UI.h"
 
 #include "../Components/MapleButton.h"
+#include "../Components/MenuCover.h"
 
 #include "../../Character/ExpTable.h"
 #include "../../Data/ItemData.h"
@@ -165,7 +166,7 @@ namespace ms
 		buttons[Buttons::BT_QUICKSLOT_SHOW]->set_active(!quickslot_active);
 		buttons[Buttons::BT_QUICKSLOT_HIDE]->set_active(quickslot_active);
 
-		quickslot_pos = Point<int16_t>(647 + right, -76);
+		quickslot_pos = Point<int16_t>(647 + right, QUICKSLOT_TOP);
 
 		// Each menu's pointer sits over the button that opens it, as far as
 		// the screen allows.
@@ -263,12 +264,20 @@ namespace ms
 		if (quickslot_active)
 			draw_quickslots();
 
+		// An open menu covers the icon row and quick slots, so its frame goes
+		// between the status bar's buttons and its own.
+		for (auto &iter : buttons)
+			if (iter.first < Buttons::BT_GAME_CHANNEL && iter.second)
+				iter.second->draw(position);
+
 		if (menu == Menu::GAME)
 			gamemenu.draw(position + gamemenu_pos);
 		else if (menu == Menu::SHORTCUT)
 			shortcutmenu.draw(position + shortcutmenu_pos);
 
-		UIElement::draw_buttons(alpha);
+		for (auto &iter : buttons)
+			if (iter.first >= Buttons::BT_GAME_CHANNEL && iter.second)
+				iter.second->draw(position);
 	}
 
 	void UIStatusBar::draw_gauge(int16_t left, int16_t width, float percent) const
@@ -548,6 +557,16 @@ namespace ms
 			return false;
 
 		return Rectangle<int16_t>(Point<int16_t>(), dimension).contains(pos);
+	}
+
+	bool UIStatusBar::button_covered(uint16_t buttonid, Point<int16_t> cursorpos) const
+	{
+		return menu_cover::covered(
+				menu != Menu::NONE,
+				get_menu_bounds(),
+				buttonid >= Buttons::BT_GAME_CHANNEL,
+				cursorpos - position
+		);
 	}
 
 	UIElement::Type UIStatusBar::get_type() const

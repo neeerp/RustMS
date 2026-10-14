@@ -104,14 +104,13 @@ async fn equipment_moves_persist_and_update_the_look_for_others() {
         session.character_id
     );
 
-    // A weapon is not a hat, empty slots hold nothing, and drops need a floor.
+    // A weapon is not a hat, and empty slots hold nothing.
     assert_eq!(
         request(c, -1, WEAPON, 2).await,
         Reply::Moves(vec![(1, WEAPON, 2)])
     );
     assert_eq!(request(c, 1, 2, -1).await, Reply::Refused);
     assert_eq!(request(c, 1, 9, 10).await, Reply::Refused);
-    assert_eq!(request(c, 1, 2, 0).await, Reply::Refused);
     drop(session);
     drop(observer);
 

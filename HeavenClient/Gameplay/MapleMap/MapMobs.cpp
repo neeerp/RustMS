@@ -119,6 +119,12 @@ namespace ms
 		}
 	}
 
+	void MapMobs::expect_hits(int32_t oid, int32_t count)
+	{
+		if (Optional<Mob> mob = mobs.get(oid))
+			mob->expect_hits(count);
+	}
+
 	bool MapMobs::contains(int32_t oid) const
 	{
 		return mobs.contains(oid);
@@ -142,7 +148,8 @@ namespace ms
 				[&player_rect](auto &mmo)
 				{
 					Optional<Mob> mob = mmo.second.get();
-					return mob && mob->is_alive() && mob->is_in_range(player_rect);
+					return mob && mob->is_alive() && mob->deals_touch_damage() &&
+						   mob->is_in_range(player_rect);
 				}
 		);
 

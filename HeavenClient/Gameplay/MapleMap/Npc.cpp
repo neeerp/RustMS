@@ -22,6 +22,9 @@
 
 #include <nlnx/nx.hpp>
 
+#include <algorithm>
+#include <cstdlib>
+
 namespace ms
 {
 	namespace
@@ -30,7 +33,8 @@ namespace ms
 		constexpr int16_t QUEST_MARKER_HALF = 22;
 	}
 
-	Npc::Npc(int32_t id, int32_t o, bool fl, uint16_t f, bool cnt, Point<int16_t> position) : MapObject(o)
+	Npc::Npc(int32_t id, int32_t o, bool fl, uint16_t f, bool cnt, Point<int16_t> position, int16_t r0, int16_t r1)
+		: MapObject(o)
 	{
 		std::string strid = std::to_string(id);
 		strid.insert(0, 7 - strid.size(), '0');
@@ -86,8 +90,11 @@ namespace ms
 		flip = !fl;
 		control = cnt;
 		stance = "stand";
+		rx0 = std::min(r0, r1);
+		rx1 = std::max(r0, r1);
 
 		phobj.fhid = f;
+		phobj.set_flag(PhysicsObject::Flag::TURNATEDGES);
 		set_position(position);
 	}
 
@@ -119,6 +126,7 @@ namespace ms
 		if (!active)
 			return phobj.fhlayer;
 
+		update_walk();
 		physics.move_object(phobj);
 		auto& player = Stage::get().get_player();
 		auto& quests = player.get_quests();
@@ -150,15 +158,59 @@ namespace ms
 		{
 			bool aniend = animations.at(stance).update();
 
-			if (aniend && states.size() > 0)
-			{
-				size_t next_stance = random.next_int(states.size());
-				std::string new_stance = states[next_stance];
-				set_stance(new_stance);
-			}
+			// A walk keeps its stance until it ends.
+			if (aniend && !walking)
+				next_stance();
 		}
 
 		return phobj.fhlayer;
+	}
+
+	void Npc::next_stance()
+	{
+		if (states.empty())
+			return;
+
+		std::string next = states[random.next_int(states.size())];
+
+		if (next == "move")
+		{
+			int16_t x = get_position().x();
+			int16_t target = random.next_int<int16_t>(rx0, rx1 + 1);
+
+			if (rx1 - rx0 < WALK_MIN || std::abs(target - x) < WALK_MIN)
+			{
+				next = "stand";
+			}
+			else
+			{
+				walking = true;
+				walk_target = target;
+				flip = target > x;
+			}
+		}
+
+		set_stance(next);
+	}
+
+	void Npc::update_walk()
+	{
+		if (!walking)
+			return;
+
+		int16_t x = get_position().x();
+		bool arrived = flip ? x >= walk_target : x <= walk_target;
+
+		// A wall or the edge of the floor ends the walk early.
+		if (arrived || phobj.is_flag_not_set(PhysicsObject::Flag::TURNATEDGES))
+		{
+			walking = false;
+			phobj.set_flag(PhysicsObject::Flag::TURNATEDGES);
+			set_stance("stand");
+			return;
+		}
+
+		phobj.hforce = flip ? WALKFORCE : -WALKFORCE;
 	}
 
 	void Npc::set_stance(const std::string &st)

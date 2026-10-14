@@ -35,30 +35,43 @@ impl ClientActor {
     pub(super) async fn picked_up(&mut self, drop: Drop) -> Result<(), RuntimeError> {
         let mut packets = Vec::new();
         let player = &mut self.in_game_mut()?.player;
-        match drop.loot {
+        let (given, item_id, quantity) = match &drop.loot {
             Loot::Mesos(amount) => {
-                player.meso = player.meso.saturating_add(amount);
+                player.meso = player.meso.saturating_add(*amount);
                 player.mark_dirty();
                 let meso = player.meso;
                 packets.push(stat::build_stat_update(true, &[StatUpdate::Meso(meso)])?);
-                packets.push(drop::build_meso_gain(amount)?);
+                packets.push(drop::build_meso_gain(*amount)?);
+                return self.send_all(&mut packets).await;
             }
             Loot::Item {
                 item_id, quantity, ..
-            } => match net::items::give(&mut player.inventory, item_id, quantity) {
-                Ok(changes) => {
-                    player.mark_dirty();
-                    packets.push(inventory::build_inventory_operation(true, &changes)?);
-                    packets.push(inventory::build_item_gain(item_id, i32::from(quantity))?);
-                }
-                Err(_) => {
-                    // "You can't get anymore items." and back on the ground.
-                    packets.push(inventory::build_inventory_full()?);
-                    packets.push(stat::build_stat_update(true, &[])?);
-                    self.send_all(&mut packets).await?;
-                    return self.send_to_field(FieldMessage::ReturnDrop { drop }).await;
-                }
-            },
+            } => (
+                net::items::give(&mut player.inventory, *item_id, *quantity),
+                *item_id,
+                *quantity,
+            ),
+            Loot::Dropped(item) => (
+                player
+                    .inventory
+                    .add(item.clone(), net::items::slot_max(item.item_id)),
+                item.item_id,
+                item.quantity,
+            ),
+        };
+        match given {
+            Ok(changes) => {
+                player.mark_dirty();
+                packets.push(inventory::build_inventory_operation(true, &changes)?);
+                packets.push(inventory::build_item_gain(item_id, i32::from(quantity))?);
+            }
+            Err(_) => {
+                // "You can't get anymore items." and back on the ground.
+                packets.push(inventory::build_inventory_full()?);
+                packets.push(stat::build_stat_update(true, &[])?);
+                self.send_all(&mut packets).await?;
+                return self.send_to_field(FieldMessage::ReturnDrop { drop }).await;
+            }
         }
         self.send_all(&mut packets).await
     }

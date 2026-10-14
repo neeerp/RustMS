@@ -16,6 +16,8 @@ pub struct ItemInfo {
     pub quest: bool,
     /// One-of-a-kind items (`info/only`).
     pub only: bool,
+    /// Items that can't change hands (`info/tradeBlock`).
+    pub trade_block: bool,
     pub price: i32,
     /// `spec` of consumable items.
     pub spec: Option<ConsumeSpec>,
@@ -130,6 +132,7 @@ impl ItemData {
             }
             info.quest = number(nx, meta, "quest")? == Some(1);
             info.only = number(nx, meta, "only")? == Some(1);
+            info.trade_block = number(nx, meta, "tradeBlock")? == Some(1);
             info.price = number(nx, meta, "price")?.unwrap_or(0);
         }
         if let Some(spec) = nx.child_by_name(node, "spec")? {
@@ -192,6 +195,7 @@ impl ItemData {
             slot_max: 1,
             quest: number(nx, meta, "quest")? == Some(1),
             only: number(nx, meta, "only")? == Some(1),
+            trade_block: number(nx, meta, "tradeBlock")? == Some(1),
             price: number(nx, meta, "price")?.unwrap_or(0),
             spec: None,
             equip: Some(equip),
@@ -241,6 +245,10 @@ mod tests {
         assert_eq!(apple.slot_max, DEFAULT_SLOT_MAX);
         let shell = data.info(4000019).unwrap().unwrap();
         assert_eq!(shell.slot_max, 200);
+        assert!(!shell.trade_block);
+        // Stored as an integer in one and as a string in the other.
+        assert!(data.info(2000012).unwrap().unwrap().trade_block);
+        assert!(data.info(4031044).unwrap().unwrap().trade_block);
         assert!(data.info(4999999).unwrap().is_none());
     }
 

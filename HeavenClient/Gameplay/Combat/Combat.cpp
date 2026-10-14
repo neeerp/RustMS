@@ -158,6 +158,7 @@ namespace ms
 
 			mobs.send_attack(result, attack, mob_targets, mobcount);
 			result.attacker = player.get_oid();
+			expect_hits(result, 1);
 			extract_effects(player, move, result);
 
 			apply_use_movement(move);
@@ -284,7 +285,14 @@ namespace ms
 
 	void Combat::push_attack(const AttackResult &attack)
 	{
+		expect_hits(attack, 1);
 		attackresults.push(400, attack);
+	}
+
+	void Combat::expect_hits(const AttackResult &result, int32_t sign)
+	{
+		for (auto &line : result.damagelines)
+			mobs.expect_hits(line.first, sign * static_cast<int32_t>(line.second.size()));
 	}
 
 	void Combat::apply_attack(const AttackResult &attack)
@@ -306,6 +314,9 @@ namespace ms
 			user.set_afterimage(attack.skill);
 
 			extract_effects(user, move, attack);
+		} else
+		{
+			expect_hits(attack, -1);
 		}
 	}
 

@@ -72,6 +72,9 @@ namespace ms
 	private:
 		static constexpr size_t MAX_MESSAGES = 6;
 
+		// From the newest line's anchor down to the quick-slot panel's top.
+		static constexpr int16_t LINE_GAP = 23;
+
 		std::deque<StatusInfo> statusinfos;
 	};
 }
