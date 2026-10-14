@@ -18,109 +18,115 @@
 #pragma once
 
 #include <string>
-
-#include <cstddef>
-
-#include <cstdint>
+#include <vector>
 
 #include "../UIElement.h"
 
 #include "../Components/Textfield.h"
 
-#include "../../Template/BoolPair.h"
-
 #include "../../Character/Look/CharLook.h"
+#include "../../Graphics/Text.h"
 
 namespace ms
 {
-	class UIAranCreation : public UIElement
+	// The v83 character creation, steps 4 to 6 of the login scene. The new
+	// character stands in its race's scene while a board on the right asks
+	// for a name and then for the look. Each race has its own boards in
+	// Login.img: NewCharKnight, NewChar, and NewCharAran.
+	class UICharCreation : public UIElement
 	{
 	public:
 		static constexpr Type TYPE = UIElement::Type::CLASSCREATION;
 		static constexpr bool FOCUSED = false;
 		static constexpr bool TOGGLED = false;
 
-		UIAranCreation();
+		// In the race select's order: Cygnus Knights, Explorers, and Aran.
+		enum Race : uint8_t
+		{
+			CYGNUS,
+			EXPLORER,
+			ARAN,
+			RACE_COUNT
+		};
+
+		UICharCreation(uint8_t race);
 
 		void draw(float inter) const override;
-
 		void update() override;
 
 		Cursor::State send_cursor(bool clicked, Point<int16_t> cursorpos) override;
-
 		void send_key(int32_t keycode, bool pressed, bool escape) override;
 
 		UIElement::Type get_type() const override;
 
+		// The server's answer to the name check.
 		void send_naming_result(bool nameused);
+
+		// The server added the new character: back to the character select.
+		void send_created();
 
 	protected:
 		Button::State button_pressed(uint16_t buttonid) override;
 
 	private:
-		void randomize_look();
+		// The rows of the Character Setting board, top to bottom, in the
+		// order of the lists in Etc.img/MakeCharInfo.
+		enum Row : uint8_t
+		{
+			FACE,
+			HAIR,
+			HAIR_COLOR,
+			SKIN,
+			TOP,
+			BOTTOM,
+			SHOES,
+			WEAPON,
+			GENDER,
+			ROW_COUNT
+		};
 
-		const std::string &get_equipname(EquipSlot::Id slot) const;
-
+		// Each row has a left and a right arrow, from BT_ARROWS on.
 		enum Buttons : uint16_t
 		{
+			BT_OK,
+			BT_CANCEL,
+			BT_VIEWALLCHAR,
 			BT_BACK,
-			BT_CHARC_OK,
-			BT_CHARC_CANCEL,
-			BT_CHARC_SKINL,
-			BT_CHARC_SKINR,
-			BT_CHARC_GENDER_M,
-			BT_CHARC_GEMDER_F
+			BT_ARROWS
 		};
 
-		enum GenderButtons : uint8_t
-		{
-			GENDER_BACKGROUND,
-			GENDER_HEAD,
-			GENDER_TOP,
-			GENDER_MID,
-			GENDER_BOTTOM
-		};
+		void show_settings(bool settings);
+		void check_name();
+		void create_character();
+		void show_raceselect();
 
-		std::vector<Sprite> sprites_lookboard;
-		std::vector<Sprite> sprites_gender_select;
-		std::vector<Sprite> sprites_keytype;
-		Texture sky;
-		Texture cloud;
-		float cloudfx;
-		Texture nameboard;
-		Textfield namechar;
-		CharLook newchar;
-		Randomizer randomizer;
+		void step(uint8_t row, bool right);
+		void reset_look();
+		void update_look();
+		void enable_buttons(bool enabled);
 
-		BoolPair<std::vector<uint8_t>> skins;
-		BoolPair<std::vector<uint8_t>> haircolors;
-		BoolPair<std::vector<int32_t>> faces;
-		BoolPair<std::vector<int32_t>> hairs;
-		BoolPair<std::vector<int32_t>> tops;
-		BoolPair<std::vector<int32_t>> bots;
-		BoolPair<std::vector<int32_t>> shoes;
-		BoolPair<std::vector<int32_t>> weapons;
+		std::string row_text(uint8_t row) const;
+		std::string choice_name(uint8_t row, int32_t value) const;
+		bool name_allowed(const std::string &name) const;
 
-		bool gender;
-		bool charSet;
-		bool named;
+		uint8_t race;
+		bool settings;
 		bool female;
-		size_t skin;
-		size_t haircolor;
-		size_t face;
-		size_t hair;
-		size_t top;
-		size_t bot;
-		size_t shoe;
-		size_t weapon;
-		Text facename;
-		Text hairname;
-		Text bodyname;
-		Text topname;
-		Text botname;
-		Text shoename;
-		Text wepname;
-		Text version;
+
+		Texture name_board;
+		Texture setting_board;
+		Texture rows[ROW_COUNT];
+		Textfield name;
+		Text values[ROW_COUNT];
+
+		Texture world_box;
+		Text world_name;
+		Text channel_name;
+
+		CharLook newchar;
+
+		// MakeCharInfo's choices for each row but gender, by gender.
+		std::vector<int32_t> choices[2][GENDER];
+		uint8_t chosen[GENDER];
 	};
 }

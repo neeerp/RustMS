@@ -23,11 +23,11 @@
 
 #include "../../IO/UI.h"
 
+#include "../../IO/UITypes/UICharCreation.h"
 #include "../../IO/UITypes/UICharSelect.h"
 #include "../../IO/UITypes/UIGender.h"
 #include "../../IO/UITypes/UILoginNotice.h"
 #include "../../IO/UITypes/UILoginWait.h"
-#include "../../IO/UITypes/UIRaceSelect.h"
 #include "../../IO/UITypes/UITermsOfService.h"
 #include "../../IO/UITypes/UIWorldSelect.h"
 
@@ -200,8 +200,8 @@ namespace ms
 		bool used = recv.read_bool();
 
 		// Notify the character creation screen
-		if (auto raceselect = UI::get().get_element<UIRaceSelect>())
-			raceselect->send_naming_result(used);
+		if (auto charcreation = UI::get().get_element<UICharCreation>())
+			charcreation->send_naming_result(used);
 	}
 
 	void AddNewCharEntryHandler::handle(InPacket& recv) const
@@ -214,6 +214,10 @@ namespace ms
 		// Read the updated character selection
 		if (auto charselect = UI::get().get_element<UICharSelect>())
 			charselect->add_character(std::move(character));
+
+		// Leave the creation screen for the character select
+		if (auto charcreation = UI::get().get_element<UICharCreation>())
+			charcreation->send_created();
 	}
 
 	void DeleteCharResponseHandler::handle(InPacket& recv) const
