@@ -27,6 +27,8 @@ if(HEAVENCLIENT_BUILD_TESTS)
     add_test(NAME map_tooltip COMMAND map_tooltip_tests)
     add_executable(answer_focus_tests tests/answer_focus.cpp)
     add_test(NAME answer_focus COMMAND answer_focus_tests)
+    add_executable(slider_steps_tests tests/slider_steps.cpp)
+    add_test(NAME slider_steps COMMAND slider_steps_tests)
     add_executable(menu_cover_tests tests/menu_cover.cpp)
     target_include_directories(menu_cover_tests PRIVATE ${PROJECT_SOURCE_DIR}/libs/NoLifeNx)
     add_test(NAME menu_cover COMMAND menu_cover_tests)
@@ -37,6 +39,16 @@ if(HEAVENCLIENT_BUILD_TESTS)
     add_executable(npc_reach_tests tests/npc_reach.cpp)
     target_include_directories(npc_reach_tests PRIVATE ${PROJECT_SOURCE_DIR}/libs/NoLifeNx)
     add_test(NAME npc_reach COMMAND npc_reach_tests)
+    add_executable(monster_book_tests tests/monster_book.cpp Character/MonsterBook.cpp)
+    add_test(NAME monster_book COMMAND monster_book_tests)
+    add_executable(enter_number_tests tests/enter_number.cpp)
+    add_test(NAME enter_number COMMAND enter_number_tests)
+    add_executable(shop_list_tests tests/shop_list.cpp Net/InPacket.cpp)
+    target_include_directories(shop_list_tests PRIVATE ${PROJECT_SOURCE_DIR}/libs/NoLifeNx)
+    add_test(NAME shop_list COMMAND shop_list_tests)
+    add_executable(char_click_tests tests/char_click.cpp)
+    target_include_directories(char_click_tests PRIVATE ${PROJECT_SOURCE_DIR}/libs/NoLifeNx)
+    add_test(NAME char_click COMMAND char_click_tests)
     add_executable(portal_touch_tests tests/portal_touch.cpp Gameplay/MapleMap/Portal.cpp)
     target_include_directories(portal_touch_tests PRIVATE
         ${PROJECT_SOURCE_DIR}/libs/NoLifeNx ${PROJECT_SOURCE_DIR}/libs/glad/build/include)
@@ -278,8 +290,11 @@ add_executable(HeavenClient
     IO/Components/Charset.h
     IO/Components/ChatBalloon.cpp
     IO/Components/ChatBalloon.h
+    IO/Components/ClassicSlider.cpp
+    IO/Components/ClassicSlider.h
     IO/Components/ClassicTabs.cpp
     IO/Components/ClassicTabs.h
+    IO/Components/SliderSteps.h
     IO/Components/EquipTooltip.cpp
     IO/Components/EquipTooltip.h
     IO/Components/Gauge.cpp
@@ -330,12 +345,12 @@ add_executable(HeavenClient
     IO/UITypes/UICashShop.h
     IO/UITypes/UIChannel.cpp
     IO/UITypes/UIChannel.h
+    IO/UITypes/UIGameOption.cpp
+    IO/UITypes/UIGameOption.h
     IO/UITypes/UICharInfo.cpp
     IO/UITypes/UICharInfo.h
     IO/UITypes/UICharSelect.cpp
     IO/UITypes/UICharSelect.h
-    IO/UITypes/UIChat.cpp
-    IO/UITypes/UIChat.h
     IO/UITypes/UIChatBar.cpp
     IO/UITypes/UIChatBar.h
     IO/UITypes/UICygnusCreation.cpp
@@ -364,14 +379,15 @@ add_executable(HeavenClient
     IO/UITypes/UILoginWait.h
     IO/UITypes/UILogo.cpp
     IO/UITypes/UILogo.h
+    IO/UITypes/UIMessenger.cpp
+    IO/UITypes/UIMessenger.h
     IO/UITypes/UIMiniMap.cpp
     IO/UITypes/UIMiniMap.h
+    IO/UITypes/EnterNumber.h
     IO/UITypes/UINotice.cpp
     IO/UITypes/UINotice.h
     IO/UITypes/UINpcTalk.cpp
     IO/UITypes/UINpcTalk.h
-    IO/UITypes/UIOptionMenu.cpp
-    IO/UITypes/UIOptionMenu.h
     IO/UITypes/UIQuestLog.cpp
     IO/UITypes/UIQuestLog.h
     IO/UITypes/UIQuit.cpp
@@ -382,8 +398,12 @@ add_executable(HeavenClient
     IO/UITypes/UIRegion.h
     IO/UITypes/UIShop.cpp
     IO/UITypes/UIShop.h
+    IO/UITypes/UIMonsterBook.cpp
+    IO/UITypes/UIMonsterBook.h
     IO/UITypes/UISkillBook.cpp
     IO/UITypes/UISkillBook.h
+    IO/UITypes/UISystemOption.cpp
+    IO/UITypes/UISystemOption.h
     IO/UITypes/UISoftKey.cpp
     IO/UITypes/UISoftKey.h
     IO/UITypes/UIStatsInfo.cpp

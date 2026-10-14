@@ -55,7 +55,8 @@ namespace ms
 			// Party chat and party notices
 			PARTY,
 			// Buddy chat
-			BUDDY
+			BUDDY,
+			PINK
 		};
 
 		// Who a typed line goes to

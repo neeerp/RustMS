@@ -3,7 +3,7 @@ use crate::{db::spawn_db, error::RuntimeError, message::FieldMessage};
 use game::{Player, QuestRecord, QuestState, QuestStatus};
 use net::npc_scripts::NpcScript;
 use net::packet::build::world::effect::{self, CharEffect};
-use net::packet::build::world::{inventory, quest, stat};
+use net::packet::build::world::{drop, inventory, quest, stat};
 use net::quests::{self, QuestActionKind, QuestItem, QuestRejection, QuestRequest, QuestTemplate};
 use net::FieldRequest;
 use packet::Packet;
@@ -149,6 +149,14 @@ impl ClientActor {
         let mut packets = Vec::new();
         if !self.quest_items(&template.end_rewards, &mut next, &mut packets)? {
             return self.send_all(&mut packets).await;
+        }
+        if template.money != 0 {
+            next.meso = next.meso.saturating_add(template.money).max(0);
+            packets.push(stat::build_stat_update(
+                false,
+                &[stat::StatUpdate::Meso(next.meso)],
+            )?);
+            packets.push(drop::build_meso_gain(template.money)?);
         }
         if template.exp > 0 {
             gain_exp(&mut next, template.exp, &mut packets)?;

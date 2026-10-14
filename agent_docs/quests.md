@@ -36,15 +36,21 @@ Only requirements and actions the server implements are allowed
 | Node | Allowed keys |
 | --- | --- |
 | `Check/<id>/0` (start) | `npc`, `job`, `lvmin`, `lvmax`, `quest`, `startscript` |
-| `Check/<id>/1` (complete) | `npc`, `item`, `mob`, `endscript` |
+| `Check/<id>/1` (complete) | `npc`, `item`, `mob`, `quest`, `endscript` |
 | `Act/<id>/0` | `item` |
-| `Act/<id>/1` | `exp`, `nextQuest`, `item` |
+| `Act/<id>/1` | `exp`, `nextQuest`, `item`, `money` |
 | `Act/<id>/<n>/item/<k>` | `id`, `count`, `job`, `gender`, `prop` (not -1) |
 
 `Act` nodes may repeat speech under numbered keys and `yes`/`no`; that is not
 an action. `item` requirements are counts the player must hold; a count of 0
 means none may be left (Roger's apples must all be eaten). `mob` requirements
-are kill counts (below).
+are kill counts (below). `quest` requirements, on either side, name other
+quests that must be in a given state: Chief's Introduction (1040) completes
+only once Mai's, Sam's, Rain's and Yoona's quests (1041–1044) are done.
+A quest without a `Check/1` `npc` is completed at
+its start NPC if `Check/1` asks for items or kills (Pio's 1008); one with
+neither is unsupported, which keeps out the event records that only a
+server script completes.
 
 Item actions (`net::quests::pick_items`/`apply_items`) give positive counts
 and take negative ones (capped at what the player holds). An entry applies
@@ -59,7 +65,9 @@ items." `startscript`/
 `endscript` are allowed only for scripts the server implements
 (`game_data::quests::SCRIPTS`: `q1021s`, `q1021e`); those steps go through
 QUEST_ACTION 4/5 and the server drives the dialogue (see
-[NPC dialogue](./npc-dialogue.md)). A quest with any other key (`money`, `pop`, `skill`, `infoex`,
+[NPC dialogue](./npc-dialogue.md)). `money` pays (or, if negative, takes)
+mesos on completion; a quest that takes mesos needs them held. A quest with
+any other key (`pop`, `skill`, `infoex`,
 `pet`, ...) is **unsupported**: it is
 never offered, and actions for it are refused. A prerequisite without a
 `state` means "not started" (mutually exclusive quests).
@@ -68,7 +76,7 @@ The `game-data` asset test compares the server's result with the committed
 list `game-data/supported_quests.txt`. HeavenClient doesn't classify quests:
 the build copies that list next to the executable, and the client offers
 only those quests (`Character/QuestCatalog.cpp`). Supporting a new key means
-changing the server's allowlist and regenerating the list. 909 quests qualify
+changing the server's allowlist and regenerating the list. 945 quests qualify
 with the current rules, including the beginner ones:
 
 | Quest | Start → Finish | EXP |
@@ -82,7 +90,9 @@ with the current rules, including the beginner ones:
 | 1036 Robin the Walking Encyclopedia | Robin (2003) | 40 |
 | 1037 Help Hunt the Snails | Sam (2005) → Maria (2103) | 60 for 10 snails, next 1038 |
 | 1038 Maria's Letter | Maria (2103) → Lucas (12000) | 40; the letter for 5 Red and 5 Blue Potions |
+| 1040 Chief's Introduction | Lucas (12000) | 500 and Lucas's letter, after 1041–1044; opens those four |
 | 1021 Roger's Apple (scripted) | Roger (2000) | 10, 3 Apples, 3 Green Apples |
+| 1008 Pio's Collecting Recycled Goods | Pio (10000) | 100 and 200 mesos for the two materials from Amherst's boxes |
 
 ## Kill counts
 
@@ -164,7 +174,7 @@ copied into the source.
 - Client: build with `-DHEAVENCLIENT_BUILD_TESTS=ON` and run CTest
   (`quest_dialogue`, `quest_catalog`, `quest_markers`).
 - Integration: `scripted_npcs` (Roger's Apple end to end, Robin, the
-  tutorial skip, natural recovery limits), `rain_quizzes` (all seven quizzes, rewards once, prerequisites,
+  Shanks refusing a new beginner, natural recovery limits), `rain_quizzes` (all seven quizzes, rewards once, prerequisites,
   wrong NPC, NPC not on the map, forfeit, relogin, channel change, isolation)
   `beginner_contact_quests` (the route through Sen's house and `nextQuest`
   results), and `quest_objectives` (1034's candy errand, Todd's hunt and

@@ -31,6 +31,7 @@
 #include "../../IO/Window.h"
 
 #include "../../IO/UITypes/UICharSelect.h"
+#include "../../IO/UITypes/UIStatsInfo.h"
 
 #include <optional>
 
@@ -91,6 +92,11 @@ namespace ms
 
 		// Respawning after death restores some HP.
 		Stage::get().get_player().get_stats().set_stat(MapleStat::Id::HP, hp);
+
+		// The stat window keeps its text until told; the status bar reads HP
+		// every frame.
+		if (auto statsinfo = UI::get().get_element<UIStatsInfo>())
+			statsinfo->update_stat(MapleStat::Id::HP);
 
 		transition(mapid, portalid);
 	}
