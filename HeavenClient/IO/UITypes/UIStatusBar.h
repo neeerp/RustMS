@@ -55,6 +55,7 @@ namespace ms
 		void update() override;
 
 		bool is_in_range(Point<int16_t> cursorpos) const override;
+		bool send_icon(const Icon &icon, Point<int16_t> cursorpos) override;
 		void send_key(int32_t keycode, bool pressed, bool escape) override;
 
 		UIElement::Type get_type() const override;
@@ -96,6 +97,7 @@ namespace ms
 		void draw_number(const std::string &text, Point<int16_t> pos) const;
 
 		void draw_quickslots() const;
+		int16_t quickslot_at(Point<int16_t> cursorpos) const;
 
 		Rectangle<int16_t> get_menu_bounds() const;
 

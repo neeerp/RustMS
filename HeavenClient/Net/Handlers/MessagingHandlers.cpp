@@ -136,9 +136,11 @@ namespace ms
 				recv.skip(1);
 
 				int32_t gain = recv.read_int();
-				std::string sign = (gain < 0) ? "-" : "+";
 
-				show_status(Color::Name::WHITE, "You have gained mesos (" + sign + std::to_string(gain) + ")");
+				if (gain < 0)
+					show_status(Color::Name::WHITE, "You have lost mesos (" + std::to_string(gain) + ")");
+				else
+					show_status(Color::Name::WHITE, "You have gained mesos (+" + std::to_string(gain) + ")");
 			}
 			else
 			{

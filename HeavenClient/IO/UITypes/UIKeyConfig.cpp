@@ -574,29 +574,6 @@ namespace ms
 	/// Keymap Staging
 	namespace
 	{
-		// The game reads either Ctrl, Alt or Shift as the same key, so the
-		// pairs are bound together.
-		int32_t twin_of(int32_t key)
-		{
-			switch (key)
-			{
-			case KeyConfig::Key::LEFT_CONTROL:
-				return KeyConfig::Key::RIGHT_CONTROL;
-			case KeyConfig::Key::RIGHT_CONTROL:
-				return KeyConfig::Key::LEFT_CONTROL;
-			case KeyConfig::Key::LEFT_ALT:
-				return KeyConfig::Key::RIGHT_ALT;
-			case KeyConfig::Key::RIGHT_ALT:
-				return KeyConfig::Key::LEFT_ALT;
-			case KeyConfig::Key::LEFT_SHIFT:
-				return KeyConfig::Key::RIGHT_SHIFT;
-			case KeyConfig::Key::RIGHT_SHIFT:
-				return KeyConfig::Key::LEFT_SHIFT;
-			default:
-				return -1;
-			}
-		}
-
 		// Unbind the bindable key holding the mapping, if any.
 		bool unbind(std::map<int32_t, Keyboard::Mapping>& mappings, Keyboard::Mapping mapping)
 		{
@@ -608,7 +585,7 @@ namespace ms
 					continue;
 
 				mappings.erase(key);
-				mappings.erase(twin_of(key));
+				mappings.erase(KeyConfig::twin_of(key));
 
 				return true;
 			}
@@ -619,8 +596,11 @@ namespace ms
 
 	void UIKeyConfig::stage_mapping(Point<int16_t> cursorposition, Keyboard::Mapping mapping)
 	{
-		int32_t key = key_by_position(cursorposition);
+		stage_key(key_by_position(cursorposition), mapping);
+	}
 
+	void UIKeyConfig::stage_key(int32_t key, Keyboard::Mapping mapping)
+	{
 		if (key == KeyConfig::Key::LENGTH)
 			return;
 
@@ -636,7 +616,7 @@ namespace ms
 
 		staged_mappings[key] = mapping;
 
-		if (int32_t twin = twin_of(key); twin >= 0)
+		if (int32_t twin = KeyConfig::twin_of(key); twin >= 0)
 			staged_mappings[twin] = mapping;
 
 		if (mapping.type == KeyType::Id::ITEM)
