@@ -137,7 +137,7 @@ namespace ms
 		skille = Skill["skill1"];
 		line = Skill["line"];
 
-		tabs = ClassicTabs(Skill["Tab"]["enabled"], Skill["Tab"]["disabled"], TAB_FILL);
+		tabs = ClassicTabs(ClassicTabs::TAB5, Skill["Tab"]["enabled"], Skill["Tab"]["disabled"], TAB_FILL);
 
 		buttons[Buttons::BT_CLOSE] = std::make_unique<MapleButton>(NxFiles::ui_classic["Basic.img"]["BtClose"], CLOSE);
 
@@ -146,7 +146,7 @@ namespace ms
 			Point<int16_t> tab_pos = TAB_STRIP + Point<int16_t>(tabs.pitch() * i, 0);
 
 			buttons[Buttons::BT_TAB0 + i] = std::make_unique<AreaButton>(tab_pos,
-																		 Point<int16_t>(tabs.pitch(), ClassicTabs::HEIGHT));
+																		 Point<int16_t>(tabs.pitch(), tabs.height()));
 		}
 
 		for (uint16_t i = 0; i < ROWS; i++)
