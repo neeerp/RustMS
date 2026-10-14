@@ -66,8 +66,9 @@ show at once, as in footage.
 The first choice starts selected (red arrow, dotted underline), and Up and
 Down move the selection. Clicking a choice or pressing Enter answers with
 it. A server menu has no NEXT, as in v83 footage; a quest list keeps NEXT,
-which also answers. On YES/NO and ACCEPT/DECLINE pages, Left and Right
-outline one answer with its `keyFocused` frame, and Enter presses it. With
+which also answers. On YES/NO and ACCEPT/DECLINE pages, the first Left or
+Right outlines YES or ACCEPT with its `keyFocused` frame, as in the original;
+then Left and Right move the outline, and Enter presses it. With
 nothing outlined, as when the page opens, Enter presses YES or ACCEPT. On
 other pages Enter presses NEXT or OK. Enter works even while the text types
 out.
