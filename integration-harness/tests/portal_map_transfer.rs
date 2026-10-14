@@ -78,33 +78,36 @@ async fn beginner_route_and_ninas_house_follow_asset_links() {
     .unwrap();
     session
         .connection
-        .send_packet(build_change_map(10_000, "").unwrap(), "beginner route")
+        .send_packet(build_change_map(0, "").unwrap(), "beginner route")
         .await
         .unwrap();
     assert_eq!(
         read_next_set_field_warp(&mut session.connection, "beginner route")
             .await
             .map_id,
-        10_000
+        0
     );
-    let mut source = 10_000;
+    let mut source = 0;
     // Tutorial exits are intentionally one-way. The legacy side maps in the
     // archive are not a reason to invent reverse links or insert extra maps.
     for (name, destination) in [
+        ("out00", 10_000),
+        ("out00", 20_000),
+        ("in01", 20_001),
         ("out00", 20_000),
         ("out00", 30_000),
-        ("in01", 30_001),
-        ("out00", 30_000),
         ("out00", 40_000),
-        ("out00", 50_000),
+        ("east00", 40_001),
+        ("east00", 40_002),
+        ("east00", 50_000),
         ("east00", 1_000_000),
         ("east00", 1_010_000),
         ("east00", 1_020_000),
-        ("east00", 2_000_000),
-        ("west00", 1_020_000),
         ("west00", 1_010_000),
         ("west00", 1_000_000),
         ("west00", 50_000),
+        ("east01", 50_001),
+        ("east00", 60_000),
     ] {
         let link = maps.field(source).unwrap().portal_by_name(name).unwrap();
         assert_eq!(link.to_map, Some(destination));

@@ -17,48 +17,64 @@
 //////////////////////////////////////////////////////////////////////////////////
 #include "UINotice.h"
 
+#include "EnterNumber.h"
+
 #include "../UI.h"
 
 #include "../Components/MapleButton.h"
 #include "../Audio/Audio.h"
 
-#include <nlnx/nx.hpp>
+#include "../../Util/NxFiles.h"
+
+#include <algorithm>
 
 namespace ms
 {
+	namespace
+	{
+		// The pieces of the stretchable boxes: t holds the title strip, the top of the bolted plate and the top
+		// edge of the text frame, c repeats as the inside of the text frame, and s holds its bottom edge, the
+		// button frames and the bottom of the plate.
+		constexpr int16_t TEXT_TOP = 38;
+		constexpr int16_t TEXT_PADDING = 6;
+		constexpr int16_t TEXT_WIDTH = 220;
+		constexpr int16_t TEXT_LEFT = 20;
+		constexpr int16_t MIN_ROWS = 2;
+		constexpr int16_t FIELD_LEFT = 20;
+		constexpr int16_t FIELD_RIGHT = 238;
+		constexpr int16_t FIELD_HEIGHT = 18;
+		constexpr int16_t FIELD_GAP = 4;
+
+		// In s: the inside of the button frames, which fit the 65x24 buttons.
+		constexpr int16_t BUTTON_TOP = 10;
+		constexpr int16_t ONE_BUTTON_X = 97;
+		constexpr int16_t LEFT_BUTTON_X = 53;
+		constexpr int16_t RIGHT_BUTTON_X = 141;
+	}
+
 	UINotice::UINotice(std::string message, NoticeType t, Text::Alignment a)
 			: UIDragElement<PosNOTICE>(), type(t), alignment(a)
 	{
-		nl::node src = nl::nx::ui["Basic.img"]["Notice6"];
+		nl::node src = NxFiles::ui_classic["Basic.img"][type == NoticeType::OK ? "Notice2" : "YesNo2"];
 
 		top = src["t"];
 		center = src["c"];
-		centerbox = src["c_box"];
-		box = src["box"];
-		box2 = src["box2"];
 		bottom = src["s"];
-		bottombox = src["s_box"];
 
-		if (type == NoticeType::YESNO)
-		{
-			position.shift_y(-8);
-			question = Text(Text::Font::A11M, alignment, Color::Name::WHITE, message, 200);
-		} else if (type == NoticeType::ENTERNUMBER)
-		{
-			position.shift_y(-16);
-			question = Text(Text::Font::A12M, Text::Alignment::LEFT, Color::Name::WHITE, message, 200);
-		} else if (type == NoticeType::OK)
-		{
-			uint16_t maxwidth = top.width() - 6;
+		question = Text(Text::Font::A12M, alignment, Color::Name::BLACK, message, TEXT_WIDTH);
 
-			position.shift_y(-8);
-			question = Text(Text::Font::A11M, Text::Alignment::CENTER, Color::Name::WHITE, message, maxwidth);
-		}
+		int16_t needed = question.height() + 2 * TEXT_PADDING;
 
-		height = question.height();
-		dimension = Point<int16_t>(top.width(), top.height() + height + bottom.height());
+		if (type == NoticeType::ENTERNUMBER)
+			needed += FIELD_GAP + FIELD_HEIGHT;
+
+		// The text frame is 4 pixels taller than its rows: two in t and two in s.
+		int16_t row_height = center.height();
+		rows = std::max<int16_t>(MIN_ROWS, (needed - 4 + row_height - 1) / row_height);
+
+		dimension = Point<int16_t>(top.width(), top.height() + rows * row_height + bottom.height());
 		position = Point<int16_t>(position.x() - dimension.x() / 2, position.y() - dimension.y() / 2);
-		dragarea = Point<int16_t>(dimension.x(), 20);
+		dragarea = Point<int16_t>(dimension.x(), 19);
 
 		if (type != NoticeType::ENTERNUMBER)
 			Sound(Sound::Name::DLGNOTICE).play();
@@ -67,54 +83,43 @@ namespace ms
 	UINotice::UINotice(std::string message, NoticeType t) : UINotice(message, t, Text::Alignment::CENTER)
 	{}
 
-	void UINotice::draw(bool textfield) const
+	void UINotice::draw() const
 	{
 		Point<int16_t> start = position;
 
 		top.draw(start);
 		start.shift_y(top.height());
 
-		if (textfield)
+		for (int16_t i = 0; i < rows; i++)
 		{
 			center.draw(start);
 			start.shift_y(center.height());
-			centerbox.draw(start);
-			start.shift_y(centerbox.height() - 1);
-			box2.draw(start);
-			start.shift_y(box2.height());
-			box.draw(DrawArgument(start, Point<int16_t>(0, 29)));
-			start.shift_y(29);
-
-			question.draw(position + Point<int16_t>(13, 13));
-		} else
-		{
-			int16_t pos_y = height >= 32 ? height : 32;
-
-			center.draw(DrawArgument(start, Point<int16_t>(0, pos_y)));
-			start.shift_y(pos_y);
-			centerbox.draw(start);
-			start.shift_y(centerbox.height());
-			box.draw(start);
-			start.shift_y(box.height());
-
-			if (type == NoticeType::YESNO && alignment == Text::Alignment::LEFT)
-				question.draw(position + Point<int16_t>(31, 14));
-			else
-				question.draw(position + Point<int16_t>(131, 14));
 		}
 
-		bottombox.draw(start);
+		bottom.draw(start);
+
+		int16_t text_y = TEXT_TOP + TEXT_PADDING;
+
+		if (type != NoticeType::ENTERNUMBER)
+		{
+			// The glyphs sit a few pixels below the top of their line, so the line is centred a little high.
+			int16_t area = rows * center.height() + 4;
+			text_y = TEXT_TOP + (area - question.height()) / 2 - 3;
+		}
+
+		int16_t text_x = alignment == Text::Alignment::LEFT ? TEXT_LEFT : dimension.x() / 2;
+
+		question.draw(position + Point<int16_t>(text_x, text_y));
 	}
 
-	int16_t UINotice::box2offset(bool textfield) const
+	int16_t UINotice::buttons_y() const
 	{
-		int16_t offset = top.height() + centerbox.height() + box.height() + height - (textfield ? 0 : 16);
+		return top.height() + rows * center.height() + BUTTON_TOP;
+	}
 
-		if (type == NoticeType::OK)
-			if (height < 34)
-				offset += 15;
-
-		return offset;
+	int16_t UINotice::field_y() const
+	{
+		return TEXT_TOP + TEXT_PADDING + question.height() + FIELD_GAP;
 	}
 
 	UIYesNo::UIYesNo(std::string message, std::function<void(bool yes)> yh, Text::Alignment alignment) : UINotice(
@@ -122,12 +127,10 @@ namespace ms
 	{
 		yesnohandler = yh;
 
-		int16_t belowtext = box2offset(false);
+		nl::node src = NxFiles::ui_classic["Basic.img"];
 
-		nl::node src = nl::nx::ui["Basic.img"];
-
-		buttons[Buttons::YES] = std::make_unique<MapleButton>(src["BtOK4"], Point<int16_t>(156, belowtext));
-		buttons[Buttons::NO] = std::make_unique<MapleButton>(src["BtCancel4"], Point<int16_t>(198, belowtext));
+		buttons[Buttons::YES] = std::make_unique<MapleButton>(src["BtYes"], Point<int16_t>(LEFT_BUTTON_X, buttons_y()));
+		buttons[Buttons::NO] = std::make_unique<MapleButton>(src["BtNo"], Point<int16_t>(RIGHT_BUTTON_X, buttons_y()));
 	}
 
 	UIYesNo::UIYesNo(std::string message, std::function<void(bool yes)> yesnohandler) : UIYesNo(message, yesnohandler,
@@ -136,7 +139,7 @@ namespace ms
 
 	void UIYesNo::draw(float alpha) const
 	{
-		UINotice::draw(false);
+		UINotice::draw();
 		UIElement::draw(alpha);
 	}
 
@@ -181,16 +184,19 @@ namespace ms
 		numhandler = nh;
 		max = m;
 
-		int16_t belowtext = box2offset(true) - 21;
-		int16_t pos_y = belowtext + 35;
+		nl::node src = NxFiles::ui_classic["Basic.img"];
 
-		nl::node src = nl::nx::ui["Basic.img"];
+		buttons[Buttons::OK] = std::make_unique<MapleButton>(src["BtOK"], LEFT_BUTTON_X, buttons_y());
+		buttons[Buttons::CANCEL] = std::make_unique<MapleButton>(src["BtCancel"], RIGHT_BUTTON_X, buttons_y());
 
-		buttons[Buttons::OK] = std::make_unique<MapleButton>(src["BtOK4"], 156, pos_y);
-		buttons[Buttons::CANCEL] = std::make_unique<MapleButton>(src["BtCancel4"], 198, pos_y);
+		int16_t field_width = FIELD_RIGHT - FIELD_LEFT;
+		fieldborder = ColorBox(field_width, FIELD_HEIGHT, Color::Name::DUSTYGRAY, 1.0f);
+		fieldfill = ColorBox(field_width - 2, FIELD_HEIGHT - 2, Color::Name::WHITE, 1.0f);
 
-		numfield = Textfield(Text::Font::A11M, Text::Alignment::LEFT, Color::Name::LIGHTGREY,
-							 Rectangle<int16_t>(24, 232, belowtext, belowtext + 20), 10);
+		// Text draws below its anchor, so the bounds sit a little above the box.
+		int16_t top = field_y();
+		numfield = Textfield(Text::Font::A12M, Text::Alignment::LEFT, Color::Name::BLACK,
+							 Rectangle<int16_t>(FIELD_LEFT + 4, FIELD_RIGHT - 4, top - 5, top + FIELD_HEIGHT - 5), 10);
 		numfield.change_text(std::to_string(quantity));
 
 		numfield.set_enter_callback(
@@ -213,8 +219,12 @@ namespace ms
 
 	void UIEnterNumber::draw(float alpha) const
 	{
-		UINotice::draw(true);
+		UINotice::draw();
 		UIElement::draw(alpha);
+
+		Point<int16_t> field = position + Point<int16_t>(FIELD_LEFT, field_y());
+		fieldborder.draw(field);
+		fieldfill.draw(field + Point<int16_t>(1, 1));
 
 		numfield.draw(position);
 	}
@@ -244,7 +254,6 @@ namespace ms
 		if (keycode == KeyAction::Id::RETURN)
 		{
 			handlestring(numfield.get_text());
-			deactivate();
 		} else if (escape)
 		{
 			deactivate();
@@ -273,57 +282,49 @@ namespace ms
 
 	void UIEnterNumber::handlestring(std::string numstr)
 	{
-		int num = -1;
-		bool has_only_digits = (numstr.find_first_not_of("0123456789") == std::string::npos);
-
 		auto okhandler = [&](bool)
 		{
 			numfield.set_state(Textfield::State::FOCUSED);
 			buttons[Buttons::OK]->set_state(Button::State::NORMAL);
 		};
 
-		if (!has_only_digits)
+		enter_number::Checked checked = enter_number::check(numstr, max);
+		std::string problem;
+
+		switch (checked.problem)
 		{
-			numfield.set_state(Textfield::State::DISABLED);
-			UI::get().emplace<UIOk>("Only numbers are allowed.", okhandler);
-			return;
-		} else
-		{
-			num = std::stoi(numstr);
+			case enter_number::Problem::NONE:
+				numhandler(checked.number);
+				deactivate();
+				buttons[Buttons::OK]->set_state(Button::State::NORMAL);
+				return;
+			case enter_number::Problem::NOT_A_NUMBER:
+				problem = "Only numbers are allowed.";
+				break;
+			case enter_number::Problem::TOO_LOW:
+				problem = "You may only enter a number equal to or higher than 1.";
+				break;
+			case enter_number::Problem::TOO_HIGH:
+				problem = "You may only enter a number equal to or lower than " + std::to_string(max) + ".";
+				break;
 		}
 
-		if (num < 1)
-		{
-			numfield.set_state(Textfield::State::DISABLED);
-			UI::get().emplace<UIOk>("You may only enter a number equal to or higher than 1.", okhandler);
-			return;
-		} else if (num > max)
-		{
-			numfield.set_state(Textfield::State::DISABLED);
-			UI::get().emplace<UIOk>("You may only enter a number equal to or lower than " + std::to_string(max) + ".",
-									okhandler);
-			return;
-		} else
-		{
-			numhandler(num);
-			deactivate();
-		}
-
-		buttons[Buttons::OK]->set_state(Button::State::NORMAL);
+		numfield.set_state(Textfield::State::DISABLED);
+		UI::get().emplace<UIOk>(problem, okhandler);
 	}
 
 	UIOk::UIOk(std::string message, std::function<void(bool ok)> oh) : UINotice(message, NoticeType::OK)
 	{
 		okhandler = oh;
 
-		nl::node src = nl::nx::ui["Basic.img"];
+		nl::node src = NxFiles::ui_classic["Basic.img"];
 
-		buttons[Buttons::OK] = std::make_unique<MapleButton>(src["BtOK4"], 197, box2offset(false));
+		buttons[Buttons::OK] = std::make_unique<MapleButton>(src["BtOK"], ONE_BUTTON_X, buttons_y());
 	}
 
 	void UIOk::draw(float alpha) const
 	{
-		UINotice::draw(false);
+		UINotice::draw();
 		UIElement::draw(alpha);
 	}
 

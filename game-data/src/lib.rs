@@ -793,13 +793,13 @@ mod tests {
             return;
         };
         let game_data = GameData::load_from_nx_map(&path).expect("load map nx");
-        let field = game_data.field(10_000).expect("field 10000");
+        let field = game_data.field(0).expect("field 0");
 
         assert!(field.map_npcs.iter().any(|npc| {
             npc.npc_id == 2101
-                && npc.x == 130
-                && npc.y == 293
-                && npc.foothold == 51
+                && npc.x == -46
+                && npc.y == 280
+                && npc.foothold == 45
                 && npc.rx0 <= npc.x
                 && npc.rx1 >= npc.x
         }));

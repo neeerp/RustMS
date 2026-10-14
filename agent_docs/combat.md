@@ -23,12 +23,19 @@ id); HeavenClient used to skip 22 bytes there and now skips 16.
 ## Attacks
 
 CLOSE_RANGE_ATTACK (`net::combat::parse_close_attack`) is checked before it
-reaches the field (`validate`): alive, no skill (skills come later), one mob,
-one hit, and each hit at most twice the character's basic maximum
-(`max_base_damage`, v83's weapon multiplier × main stat + secondary stat,
-× weapon attack / 100). The field shows the swing to the others, applies the
-damage, sends the attacker SHOW_MONSTER_HP, and on death KILL_MONSTER to
-everyone.
+reaches the field (`validate`): the attacker must be alive, and a basic
+attack (skill 0) hits one mob once, each hit at most twice the character's
+basic maximum (`max_base_damage`, v83's weapon multiplier × main stat +
+secondary stat, × weapon attack / 100). An attack naming a skill needs that
+skill learned at some level; its `Skill.nx` level (`game_data::skills::
+SkillLevel`) gives the mobs and hits allowed, the MP spent, and the cap: a
+`fixdamage` skill (Three Snails: 10/25/40) hits for at most that, a `damage`
+skill for that percentage of the basic cap, and a skill with neither is not an
+attack. Too little MP refuses the attack. HeavenClient sends Three Snails here
+for melee weapons. The field shows the swing (with the skill id and level, so
+others see the skill's effect) to the others, applies the damage, sends the
+attacker SHOW_MONSTER_HP, and on death KILL_MONSTER to everyone; the attacker
+gets the MP left as STAT_CHANGED.
 
 In HeavenClient a hit of at least the mob's `pushed` value puts it in its
 `hit1` stance for about a quarter second, with a three-tick push that moves it
@@ -47,6 +54,24 @@ gained sends the new level, AP, SP, max HP/MP (+14/+11 per beginner level,
 the middle of v83's ranges) and shows SHOW_FOREIGN_EFFECT 0 to the others. As
 in v83, current HP and MP are not refilled. Each level grants 5 AP, and 3 SP
 once past beginner.
+
+## Buff skills
+
+USE_SKILL (`0x5B`, `handle::world::use_skill`) casts a skill that doesn't
+attack. Only the beginner buffs do anything yet (Recovery and Nimble Feet, by
+`skill_id % 10_000_000`, so Noblesse and Legend copies work too); others are
+ignored. The level the client names must be the learned one, the skill must
+be off cooldown, and the player alive with enough MP. The caster gets the MP
+left, GIVE_BUFF (the temporary-stat masks match HeavenMS: Speed and Recovery
+are both second-mask bits), and COOLDOWN when the level has a `cooltime`;
+the map sees SHOW_FOREIGN_EFFECT 1 with the skill.
+
+`game::Buffs` on the `Player` holds the active buffs and cooldowns; neither is
+saved. A new buff replaces one on the same stat. The client actor sleeps until
+the next deadline (`actor::client::buff`): Recovery heals its `x` every 5 s
+while the player is hurt (HP stat update), and an expired buff sends
+CANCEL_BUFF, since the client never ends buffs itself. Dying and changing
+channel end every buff; cooldowns keep running.
 
 ## Spending AP and SP
 
@@ -168,4 +193,7 @@ Pio's quest;
 `drops_and_pickup` checks ownership, reach, pickup, replays, meso
 persistence, and that the tutorial sentinel's quest drop needs its quest;
 `spend_points` levels a beginner and checks AP, the beginner pool, refusals,
-and that both survive logging out.
+and that both survive logging out; `beginner_skills` has three players learn
+Three Snails, Nimble Feet, and Recovery and checks their damage caps, MP,
+buffs, cooldowns, Recovery's heal, what the others see, and that the buffs
+end on time and on death.

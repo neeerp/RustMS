@@ -16,12 +16,15 @@ pub enum SendOpcode {
     RecommendedWorlds = 0x1B,
 
     InventoryOperation = 0x1D,
+    GiveBuff = 0x20,
+    CancelBuff = 0x21,
     StatChange = 0x1F,
     UpdateSkills = 0x24,
     ShowStatusInfo = 0x27,
     GatherItemResult = 0x34,
     SortItemResult = 0x35,
 
+    CharInfo = 0x3D,
     BuddyList = 0x3F,
     FamilyInfo = 0x5F,
     FamilyList = 0x64,
@@ -33,6 +36,7 @@ pub enum SendOpcode {
     ChatText = 0xA2,
     ShowItemGainInChat = 0xCE,
     UpdateQuestInfo = 0xD3,
+    Cooldown = 0xEA,
     SpawnMonster = 0xEC,
     KillMonster = 0xED,
     SpawnMonsterControl = 0xEE,
@@ -43,6 +47,7 @@ pub enum SendOpcode {
     MovePlayer = 0xB9,
     CloseRangeAttack = 0xBA,
     DamagePlayer = 0xC0,
+    FacialExpression = 0xC1,
     ShowForeignEffect = 0xC6,
     UpdateCharLook = 0xC5,
     SpawnNpc = 0x101,
@@ -52,6 +57,8 @@ pub enum SendOpcode {
     SpawnReactor = 0x117,
     RemoveReactor = 0x118,
     NpcDialogue = 0x130,
+    OpenNpcShop = 0x131,
+    ConfirmShopTransaction = 0x132,
 
     KeyMap = 0x14F,
 }

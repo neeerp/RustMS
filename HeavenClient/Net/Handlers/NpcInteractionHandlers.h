@@ -40,4 +40,12 @@ namespace ms
 	{
 		void handle(InPacket& recv) const override;
 	};
+
+	// How a buy, sell, or recharge went; tells the player about a shortage
+	// of mesos or bag space
+	// Opcode: CONFIRM_SHOP_TRANSACTION(306)
+	class ConfirmShopTransactionHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
 }

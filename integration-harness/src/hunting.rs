@@ -11,11 +11,16 @@ use std::io::Cursor;
 
 /// CLOSE_RANGE_ATTACK hitting one mob once for `damage`.
 pub fn attack(object_id: i32, damage: i32) -> Packet {
+    skill_attack(0, object_id, damage)
+}
+
+/// CLOSE_RANGE_ATTACK with a skill (0 for none), hitting one mob once.
+pub fn skill_attack(skill_id: i32, object_id: i32, damage: i32) -> Packet {
     let mut p = Packet::new_empty();
     p.write_short(RecvOpcode::CloseRangeAttack as i16).unwrap();
     p.write_byte(0).unwrap();
     p.write_byte(0x11).unwrap();
-    p.write_int(0).unwrap();
+    p.write_int(skill_id).unwrap();
     p.write_bytes(&[0; 8]).unwrap();
     for b in [0u8, 0x80, 5, 0, 4] {
         p.write_byte(b).unwrap();
@@ -81,6 +86,16 @@ pub fn spend_sp(skill_id: i32) -> Packet {
     p
 }
 
+/// USE_SKILL of a skill at the level the client thinks it has.
+pub fn use_skill(skill_id: i32, level: u8) -> Packet {
+    let mut p = Packet::new_empty();
+    p.write_short(RecvOpcode::UseSkill as i16).unwrap();
+    p.write_int(0).unwrap();
+    p.write_int(skill_id).unwrap();
+    p.write_byte(level).unwrap();
+    p
+}
+
 /// MOVE_PLAYER: one absolute movement to (x, y), standing.
 pub fn walk_to(x: i16, y: i16) -> Packet {
     let mut movement = vec![1u8, 0];
@@ -129,6 +144,8 @@ pub struct Field {
     pub killed: Vec<i32>,
     /// Characters seen attacking.
     pub attacks_by: Vec<i32>,
+    /// The skill of each attack seen: (character id, skill id, level).
+    pub attack_skills: Vec<(i32, i32, u8)>,
     pub drops: Vec<MapDrop>,
     /// (object id, character who picked it up)
     pub removed: Vec<(i32, Option<i32>)>,
@@ -139,6 +156,8 @@ pub struct Field {
     pub reactor_hits: Vec<(i32, u8)>,
     /// (object id, state it broke from)
     pub reactors_removed: Vec<(i32, u8)>,
+    /// (object id, NPC id)
+    pub npcs: Vec<(i32, i32)>,
 }
 
 impl Field {
@@ -164,7 +183,12 @@ impl Field {
         } else if op == SendOpcode::KillMonster as i16 {
             self.killed.push(r.read_int().unwrap());
         } else if op == SendOpcode::CloseRangeAttack as i16 {
-            self.attacks_by.push(r.read_int().unwrap());
+            let character_id = r.read_int().unwrap();
+            self.attacks_by.push(character_id);
+            r.read_bytes(2).unwrap();
+            let level = r.read_byte().unwrap();
+            let skill_id = if level > 0 { r.read_int().unwrap() } else { 0 };
+            self.attack_skills.push((character_id, skill_id, level));
         } else if op == SendOpcode::DropItemFromMapObject as i16 {
             r.read_byte().unwrap();
             let object_id = r.read_int().unwrap();
@@ -185,6 +209,9 @@ impl Field {
             let oid = r.read_int().unwrap();
             self.removed
                 .push((oid, (mode >= 2).then(|| r.read_int().unwrap())));
+        } else if op == SendOpcode::SpawnNpc as i16 {
+            self.npcs
+                .push((r.read_int().unwrap(), r.read_int().unwrap()));
         } else if op == SendOpcode::ShowForeignEffect as i16 {
             self.effects
                 .push((r.read_int().unwrap(), r.read_byte().unwrap()));
@@ -203,6 +230,14 @@ impl Field {
             self.reactors_removed
                 .push((r.read_int().unwrap(), r.read_byte().unwrap()));
         }
+    }
+
+    /// The object id of NPC `npc_id`, once it has spawned.
+    pub fn npc(&self, npc_id: i32) -> Option<i32> {
+        self.npcs
+            .iter()
+            .find(|&&(_, npc)| npc == npc_id)
+            .map(|&(object_id, _)| object_id)
     }
 
     /// The first item drop of `item_id`.

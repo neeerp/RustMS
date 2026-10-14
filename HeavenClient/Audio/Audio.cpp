@@ -29,6 +29,8 @@
 #include <nlnx/nx.hpp>
 #include <nlnx/audio.hpp>
 
+#include <algorithm>
+
 namespace ms
 {
 
@@ -40,6 +42,7 @@ namespace ms
 	std::unordered_map<std::string, membuf *> Music::audiodb;
 	size_t Sound::source_inc;
 	alure::Source Sound::sound_srcs[100];
+	float Sound::gain = 1.0f;
 
 	void Sound::create_alure_source()
 	{
@@ -125,7 +128,10 @@ namespace ms
 			std::string id_s = std::to_string((uint32_t) id);
 			alure::Buffer buff = Music::ctx.getBuffer(id_s);
 			if (sound_src)
+			{
+				sound_src.setGain(gain);
 				sound_src.play(buff);
+			}
 		}
 	}
 
@@ -169,11 +175,8 @@ namespace ms
 		for (auto node : itemsrc)
 			add_sound(node.name(), node["Use"]);
 
-		uint8_t volume = Setting<SFXVolume>::get().load();
-
 		source_inc = 1;
-		//if (!set_sfxvolume(volume))
-		//	return Error::Code::AUDIO;
+		set_sfxvolume(configured_volume());
 
 		return Error::Code::NONE;
 	}
@@ -187,8 +190,14 @@ namespace ms
 
 	bool Sound::set_sfxvolume(uint8_t vol)
 	{
-		// TODO: implement in-game volume
-		return false;
+		gain = std::min<uint8_t>(vol, 100) / 100.0f;
+
+		return true;
+	}
+
+	uint8_t Sound::configured_volume()
+	{
+		return Setting<SFXMute>::get().load() ? 0 : Setting<SFXVolume>::get().load();
 	}
 
 	size_t Sound::add_sound(nl::node src)
@@ -306,9 +315,6 @@ namespace ms
 
 	Error Music::init()
 	{
-
-		uint8_t volume = Setting<BGMVolume>::get().load();
-
 		devMgr = alure::DeviceManager::getInstance();
 		dev = devMgr.openPlayback();
 		ctx = dev.createContext();
@@ -318,16 +324,24 @@ namespace ms
 		alure::FileIOFactory::set(alure::MakeUnique<FileFactory>(&audiodb));
 		/*TODO: add checks*/
 
-		//if (!set_bgmvolume(volume))
-		//	return Error::Code::AUDIO;
+		set_bgmvolume(configured_volume());
 
 		return Error::Code::NONE;
 	}
 
 	bool Music::set_bgmvolume(uint8_t vol)
 	{
+		if (!music_src)
+			return false;
 
-		return true; //BASS_SetConfig(BASS_CONFIG_GVOL_STREAM, vol * 100) == TRUE;
+		music_src.setGain(std::min<uint8_t>(vol, 100) / 100.0f);
+
+		return true;
+	}
+
+	uint8_t Music::configured_volume()
+	{
+		return Setting<BGMMute>::get().load() ? 0 : Setting<BGMVolume>::get().load();
 	}
 
 	void Music::update_context()

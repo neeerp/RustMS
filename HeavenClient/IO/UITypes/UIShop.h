@@ -21,10 +21,13 @@
 
 #include "../UIDragElement.h"
 
+#include "../Components/ClassicTabs.h"
 #include "../Components/Slider.h"
 #include "../Graphics/Text.h"
 
 #include "../Character/Look/CharLook.h"
+
+#include "../Net/Handlers/ShopList.h"
 
 namespace ms
 {
@@ -55,10 +58,7 @@ namespace ms
 
 		void reset(int32_t npcid);
 
-		void add_item(int32_t id, int32_t price, int32_t pitch, int32_t time, int16_t buyable);
-
-		void
-		add_rechargable(int32_t id, int32_t price, int32_t pitch, int32_t time, int16_t chargeprice, int16_t buyable);
+		void add_item(const shop_list::Row &row);
 
 		void modify(InventoryType::Id type);
 
@@ -72,42 +72,37 @@ namespace ms
 
 		void changeselltab(InventoryType::Id tab);
 
-		int16_t slot_by_position(int16_t y);
+		// The visible row under y, or -1.
+		int16_t slot_by_position(int16_t y) const;
 
-		uint16_t tabbyinventory(InventoryType::Id type);
+		static uint16_t tabbyinventory(InventoryType::Id type);
+
+		void update_recharge();
+
+		// The shop's row for a star or bullet, which it recharges, if any.
+		const shop_list::Row *recharge_row(int32_t itemid) const;
 
 		void exit_shop();
+
+		static constexpr int16_t ROWS = 5;
 
 		enum Buttons : int16_t
 		{
 			BUY_ITEM,
 			SELL_ITEM,
 			EXIT,
-			CHECKBOX,
-			OVERALL,
+			// Before the rows they sit on, so a click recharges and stops there.
+			RECHARGE0,
+			RECHARGE4 = RECHARGE0 + ROWS - 1,
 			EQUIP,
 			USE,
-			ETC,
 			SETUP,
+			ETC,
 			CASH,
 			BUY0,
-			BUY1,
-			BUY2,
-			BUY3,
-			BUY4,
-			BUY5,
-			BUY6,
-			BUY7,
-			BUY8,
+			BUY4 = BUY0 + ROWS - 1,
 			SELL0,
-			SELL1,
-			SELL2,
-			SELL3,
-			SELL4,
-			SELL5,
-			SELL6,
-			SELL7,
-			SELL8,
+			SELL4 = SELL0 + ROWS - 1,
 			NUM_BUTTONS
 		};
 
@@ -115,20 +110,18 @@ namespace ms
 		const Inventory &inventory;
 
 		Texture npc;
-		Texture buy_selection;
-		Texture sell_selection;
+		Texture selection;
 		Texture meso;
 		Text mesolabel;
+
+		ClassicTabs buytabs;
+		ClassicTabs selltabs;
 
 		Slider buyslider;
 		Slider sellslider;
 
-		int16_t buy_x;
-		int16_t buy_width;
-		int16_t sell_x;
-		int16_t sell_width;
-
-		BoolPair<Texture> checkBox;
+		// Stars and bullets the shop recharges, with their full set.
+		std::vector<shop_list::Row> recharges;
 
 		bool rightclicksell;
 
@@ -137,9 +130,11 @@ namespace ms
 		class BuyItem
 		{
 		public:
-			BuyItem(Texture cur, int32_t i, int32_t p, int32_t pt, int32_t t, int16_t cp, int16_t b);
+			BuyItem(Texture cur, const shop_list::Row &row);
 
 			void draw(Point<int16_t> position) const;
+
+			int16_t get_index() const;
 
 			int32_t get_id() const;
 
@@ -148,12 +143,7 @@ namespace ms
 		private:
 			Texture icon;
 			Texture currency;
-			int32_t id;
-			int32_t price;
-			int32_t pitch;
-			int32_t time;
-			int16_t chargeprice;
-			int16_t buyable;
+			shop_list::Row row;
 			Text namelabel;
 			Text pricelabel;
 		};
@@ -173,6 +163,7 @@ namespace ms
 
 		private:
 			Texture icon;
+			Texture currency;
 			int32_t id;
 			int16_t slot;
 			int16_t sellable;
