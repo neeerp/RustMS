@@ -42,6 +42,9 @@ namespace ms
 		// The bar is 71 px tall; layouts are in pixels from its top-left.
 		static constexpr int16_t HEIGHT = 71;
 
+		// The quick-slot panel's top, from the bar's top.
+		static constexpr int16_t QUICKSLOT_TOP = -76;
+
 		// The chat strip, which UIChatBar draws and handles.
 		static constexpr Rectangle<int16_t> CHAT_STRIP = Rectangle<int16_t>(0, 570, 7, 29);
 
