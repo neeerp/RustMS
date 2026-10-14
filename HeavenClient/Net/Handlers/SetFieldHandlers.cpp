@@ -136,7 +136,7 @@ namespace ms
 
 		Player& player = Stage::get().get_player();
 
-		recv.read_byte(); // 'buddycap'
+		player.get_buddies().set_capacity(static_cast<uint8_t>(recv.read_byte()));
 
 		if (recv.read_bool())
 			recv.read_string(); // 'linkedname'

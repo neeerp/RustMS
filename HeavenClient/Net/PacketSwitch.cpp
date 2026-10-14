@@ -18,6 +18,7 @@
 #include "PacketSwitch.h"
 
 #include "Handlers/AttackHandlers.h"
+#include "Handlers/BuddyHandlers.h"
 #include "Handlers/MapObjectHandlers.h"
 #include "Handlers/CashShopHandlers.h"
 #include "Handlers/CommonHandlers.h"
@@ -134,6 +135,7 @@ namespace ms
 
 		/// Party
 		PARTY_OPERATION = 62,
+		BUDDYLIST = 63,
 		MULTICHAT = 134,
 		UPDATE_PARTYMEMBER_HP = 201,
 
@@ -223,6 +225,9 @@ namespace ms
 		emplace<PARTY_OPERATION, PartyOperationHandler>();
 		emplace<MULTICHAT, MultiChatHandler>();
 		emplace<UPDATE_PARTYMEMBER_HP, UpdatePartyMemberHpHandler>();
+
+		// Buddy list
+		emplace<BUDDYLIST, BuddyListHandler>();
 
 		// Cash Shop
 		emplace<SET_CASH_SHOP, SetCashShopHandler>();

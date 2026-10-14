@@ -32,6 +32,8 @@ if(HEAVENCLIENT_BUILD_TESTS)
     add_test(NAME menu_cover COMMAND menu_cover_tests)
     add_executable(party_tests tests/party.cpp Character/Party.cpp)
     add_test(NAME party COMMAND party_tests)
+    add_executable(buddy_list_tests tests/buddy_list.cpp Character/BuddyList.cpp)
+    add_test(NAME buddy_list COMMAND buddy_list_tests)
     add_executable(npc_reach_tests tests/npc_reach.cpp)
     target_include_directories(npc_reach_tests PRIVATE ${PROJECT_SOURCE_DIR}/libs/NoLifeNx)
     add_test(NAME npc_reach COMMAND npc_reach_tests)
@@ -114,6 +116,8 @@ add_executable(HeavenClient
     Character/Look/Stance.h
     Character/ActiveBuffs.cpp
     Character/ActiveBuffs.h
+    Character/BuddyList.cpp
+    Character/BuddyList.h
     Character/Buff.cpp
     Character/Buff.h
     Character/Char.cpp
@@ -431,6 +435,8 @@ add_executable(HeavenClient
     Net/Handlers/Helpers/MovementParser.h
     Net/Handlers/AttackHandlers.cpp
     Net/Handlers/AttackHandlers.h
+    Net/Handlers/BuddyHandlers.cpp
+    Net/Handlers/BuddyHandlers.h
     Net/Handlers/CashShopHandlers.cpp
     Net/Handlers/CashShopHandlers.h
     Net/Handlers/CommonHandlers.cpp

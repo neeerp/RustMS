@@ -200,20 +200,21 @@ side yet.
 | Chat, whisper, server messages | Implemented; whisper find/buddy modes ignored |
 | Character info, minimap, world map | Implemented |
 | Party (`UIUserList` Party tab, `UIPartyHP`, party chat) | Implemented; see `parties.md` |
-| Buddy / guild / alliance / blacklist tabs (`UIUserList`) | Tab strip only |
+| Buddy list (`UIUserList` Friend tab, buddy chat) | Implemented without groups; see `buddies.md` |
+| Guild / alliance / blacklist tabs (`UIUserList`) | Tab strip only |
 | Cash shop (`UICashShop`) | Browse/enter/exit; purchase is `// TODO: Purchase item` |
 | Storage, trade, player shops, mini-games, messenger, memo/mail | No UI, no handlers |
 | Pets, mounts, summons, reactors beyond hit/spawn | Partial or absent (`Reactor` TODOs) |
 | Party/guild/boss quests, events, MTS | Absent |
 
-44 outbound opcodes are defined (`Net/OutPacket.h`) and 57 inbound handlers
+51 outbound opcodes are defined (`Net/OutPacket.h`) and 63 inbound handlers
 are registered (`Net/PacketSwitch.cpp`). Anything not listed there is silently ignored by the client.
 
 ## Estimated client work for a complete game
 
 | System | Client status | Effort |
 | --- | --- | --- |
-| Buddy list | UI skeleton, no packets | M |
+| Buddy groups | Default group only | S |
 | Guild | Skeleton only, plus guild emblem/BBS UIs missing | L |
 | Trade / storage / player shops | Nothing | L |
 | Cash shop purchase and inventory | Display only | M |

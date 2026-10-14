@@ -1,6 +1,7 @@
 #include "PartyHandlers.h"
 
 #include "../Packets/GameplayPackets.h"
+#include "../Packets/MessagingPackets.h"
 
 #include "../../Configuration.h"
 
@@ -218,13 +219,13 @@ namespace ms
 
 	void MultiChatHandler::handle(InPacket& recv) const
 	{
-		static constexpr int8_t PARTY_MODE = 1;
-
 		int8_t mode = recv.read_byte();
 		std::string name = recv.read_string();
 		std::string text = recv.read_string();
 
-		if (mode == PARTY_MODE)
+		if (mode == MultiChatPacket::Mode::PARTY)
 			party_line(name + " : " + text);
+		else if (mode == MultiChatPacket::Mode::BUDDY)
+			party_line(name + " : " + text, UIChatBar::LineType::BUDDY);
 	}
 }
