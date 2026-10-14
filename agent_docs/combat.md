@@ -34,8 +34,9 @@ A dead mob's EXP is shared by damage dealt (the top damager gets any
 rounding remainder) and each share goes to that player's client actor
 (`ServerMessage::MobKilled`), which adds it with `Player::gain_exp`. A level
 gained sends the new level, AP, SP, max HP/MP (+14/+11 per beginner level,
-the middle of v83's ranges), restores HP/MP, and shows SHOW_FOREIGN_EFFECT 0
-to the others. Each level grants 5 AP, and 3 SP once past beginner.
+the middle of v83's ranges) and shows SHOW_FOREIGN_EFFECT 0 to the others. As
+in v83, current HP and MP are not refilled. Each level grants 5 AP, and 3 SP
+once past beginner.
 
 ## Spending AP and SP
 
