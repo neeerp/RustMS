@@ -18,6 +18,7 @@
 #include "CharStats.h"
 
 #include "StatCaps.h"
+#include "TouchDamage.h"
 
 namespace ms
 {
@@ -216,15 +217,15 @@ namespace ms
 
 	int32_t CharStats::calculate_damage(int32_t mobatk) const
 	{
-		// TODO: Random stuff, need to find the actual formula somewhere.
-		auto weapon_def = get_total(EquipStat::Id::WDEF);
+		int32_t defense = touch_damage::defense(
+				get_total(EquipStat::Id::STR),
+				get_total(EquipStat::Id::DEX),
+				get_total(EquipStat::Id::INT),
+				get_total(EquipStat::Id::LUK),
+				get_total(EquipStat::Id::WDEF)
+		);
 
-		if (weapon_def == 0)
-			return mobatk;
-
-		int32_t reduceatk = mobatk / 2 + mobatk / weapon_def;
-
-		return reduceatk - static_cast<int32_t>(reduceatk * reducedamage);
+		return touch_damage::damage(mobatk, defense, reducedamage);
 	}
 
 	bool CharStats::is_damage_buffed() const
