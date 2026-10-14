@@ -17,245 +17,324 @@
 //////////////////////////////////////////////////////////////////////////////////
 #include "UIUserList.h"
 
-#include "../IO/Components/MapleButton.h"
-#include "../IO/Components/TwoSpriteButton.h"
-#include "../../Gameplay/Stage.h"
-#include "../../Util/Misc.h"
+#include "UIChatBar.h"
+#include "UIEnterText.h"
 
-#include <iterator>
+#include "../UI.h"
+
+#include "../Components/AreaButton.h"
+#include "../Components/MapleButton.h"
+
+#include "../../Configuration.h"
+
+#include "../../Character/Job.h"
+#include "../../Gameplay/Stage.h"
+#include "../../Util/NxFiles.h"
+
+#include "../../Net/Packets/GameplayPackets.h"
 
 #include <nlnx/nx.hpp>
 
+#include <algorithm>
+
 namespace ms
 {
-	UIUserList::UIUserList(uint16_t t) : UIDragElement<PosUSERLIST>(Point<int16_t>(260, 20)), tab(t)
+	namespace
 	{
-		nl::node close = nl::nx::ui["Basic.img"]["BtClose3"];
-		UserList = nl::nx::ui["UIWindow2.img"]["UserList"];
-		nl::node Main = UserList["Main"];
+		// The window, measured from period footage.
+		constexpr Point<int16_t> CLOSE = Point<int16_t>(291, 7);
+		constexpr Point<int16_t> TAB_STRIP = Point<int16_t>(11, 23);
+		constexpr int16_t TAB_FILL = 46;
+		// The party list's top-left. Each section is a title bar, column
+		// headings, one row per member (or "none"), and a bottom edge.
+		constexpr Point<int16_t> LIST = Point<int16_t>(15, 51);
+		constexpr int16_t HEADER = 27;
+		constexpr int16_t COLUMNS = 18;
+		constexpr int16_t ROW = 18;
+		constexpr int16_t FOOTER = 4;
+		constexpr int16_t SECTION_GAP = 10;
+		constexpr Point<int16_t> HIGHLIGHT_SIZE = Point<int16_t>(278, ROW);
+		// Offsets in a row, from the list's left edge and the row's top.
+		constexpr int16_t STAR_X = 4;
+		constexpr int16_t NAME_X = 26;
+		constexpr int16_t JOB_X = 130;
+		constexpr int16_t LEVEL_X = 224;
+		constexpr int16_t TEXT_Y = -3;
+		constexpr Point<int16_t> COUNT = Point<int16_t>(270, 2);
+		// The two rows of party buttons.
+		constexpr Point<int16_t> BUTTONS = Point<int16_t>(12, 341);
+		constexpr Point<int16_t> BUTTON_PITCH = Point<int16_t>(60, 22);
+		constexpr size_t PARTY_CAPACITY = 6;
+		constexpr size_t NAME_LIMIT = 12;
+		// The buddy list shares the party list's corner, header, and rows,
+		// but splits each row in two: same-channel buddies on the left and
+		// the rest on the right, under a legend saying so.
+		constexpr int16_t LEGEND = 19;
+		constexpr int16_t BUDDY_FOOTER = 6;
+		constexpr int16_t CELL_WIDTH = 140;
+		constexpr int16_t CELL_NAME_X = 18;
+		constexpr int16_t CELL_CHANNEL_X = 134;
+		constexpr Point<int16_t> CELL_HIGHLIGHT = Point<int16_t>(CELL_WIDTH - 1, ROW);
+		// The buddy buttons: one row, then INVITE TO PARTY and the filter.
+		constexpr int16_t BUDDY_BUTTON_GAP = 7;
+		constexpr int16_t BUTTONS_RIGHT = 299;
+		const char* DEFAULT_GROUP = "Default Group";
+	}
 
-		sprites.emplace_back(Main["backgrnd"]);
+	bool UIUserList::Shown::operator==(const Shown& other) const
+	{
+		return id == other.id && name == other.name && job == other.job && level == other.level &&
+			   channel == other.channel && map_id == other.map_id;
+	}
 
-		buttons[Buttons::BT_CLOSE] = std::make_unique<MapleButton>(close, Point<int16_t>(244, 7));
+	UIUserList::UIUserList(uint16_t t)
+			: UIDragElement<PosUSERLIST>(), tab(t), party(Stage::get().get_player().get_party()),
+			  buddies(Stage::get().get_player().get_buddies())
+	{
+		nl::node UserList = NxFiles::ui_classic["UIWindow.img"]["UserList"];
+		nl::node Party = UserList["Party"];
+		nl::node Friend = UserList["Friend"];
+		nl::node backgrnd = UserList["backgrnd"];
 
-		nl::node taben = Main["Tab"]["enabled"];
-		nl::node tabdis = Main["Tab"]["disabled"];
+		sprites.emplace_back(backgrnd);
 
-		buttons[Buttons::BT_TAB_FRIEND] = std::make_unique<TwoSpriteButton>(tabdis["0"], taben["0"]);
-		buttons[Buttons::BT_TAB_PARTY] = std::make_unique<TwoSpriteButton>(tabdis["1"], taben["1"]);
-		buttons[Buttons::BT_TAB_BOSS] = std::make_unique<TwoSpriteButton>(tabdis["2"], taben["2"]);
-		buttons[Buttons::BT_TAB_BLACKLIST] = std::make_unique<TwoSpriteButton>(tabdis["3"], taben["3"]);
+		tabs = ClassicTabs(UserList["Tab"]["enabled"], UserList["Tab"]["disabled"], TAB_FILL);
 
-		// Party Tab
-		nl::node Party = Main["Party"];
-		nl::node PartySearch = Party["PartySearch"];
+		buttons[Buttons::BT_CLOSE] = std::make_unique<MapleButton>(NxFiles::ui_classic["Basic.img"]["BtClose"], CLOSE);
 
-		party_tab = Tab::PARTY_MINE;
-		party_title = Party["title"];
+		for (uint16_t i = 0; i < Tab::NUM_TABS; i++)
+		{
+			Point<int16_t> tab_pos = TAB_STRIP + Point<int16_t>(tabs.pitch() * i, 0);
 
-		for (size_t i = 0; i < std::size(party_mine_grid); i++)
-			party_mine_grid[i] = UserList["Sheet2"][i];
+			buttons[Buttons::BT_TAB0 + i] = std::make_unique<AreaButton>(tab_pos,
+																		 Point<int16_t>(tabs.pitch(), ClassicTabs::HEIGHT));
+		}
 
-		party_mine_name = Text(Text::Font::A12M, Text::Alignment::LEFT, Color::Name::BLACK, "none", 0);
+		const char* party_buttons[] = {
+				"BtHP", "BtChangeBoss", "BtWhisper", "BtChat", "BtSearch",
+				"BtCreate", "BtWithdraw", "BtKick", "BtInvite"
+		};
 
-		nl::node party_taben = Party["Tab"]["enabled"];
-		nl::node party_tabdis = Party["Tab"]["disabled"];
+		for (uint16_t i = 0; i < std::size(party_buttons); i++)
+		{
+			Point<int16_t> slot = Point<int16_t>(i % 5, i / 5);
+			Point<int16_t> button_pos = BUTTONS + Point<int16_t>(BUTTON_PITCH.x() * slot.x(), BUTTON_PITCH.y() * slot.y());
 
-		buttons[Buttons::BT_PARTY_CREATE] = std::make_unique<MapleButton>(Party["BtPartyMake"]);
-		buttons[Buttons::BT_PARTY_INVITE] = std::make_unique<MapleButton>(Party["BtPartyInvite"]);
-		buttons[Buttons::BT_PARTY_LEAVE] = std::make_unique<MapleButton>(Party["BtPartyOut"]);
-		buttons[Buttons::BT_PARTY_SETTINGS] = std::make_unique<MapleButton>(Party["BtPartySettings"]);
-		buttons[Buttons::BT_PARTY_CREATE]->set_active(false);
-		buttons[Buttons::BT_PARTY_INVITE]->set_active(false);
-		buttons[Buttons::BT_PARTY_LEAVE]->set_active(false);
-		buttons[Buttons::BT_PARTY_SETTINGS]->set_active(false);
+			buttons[Buttons::BT_HP + i] = std::make_unique<MapleButton>(Party[party_buttons[i]], button_pos);
+		}
 
-		buttons[Buttons::BT_TAB_PARTY_MINE] = std::make_unique<TwoSpriteButton>(party_tabdis["0"], party_taben["0"]);
-		buttons[Buttons::BT_TAB_PARTY_SEARCH] = std::make_unique<TwoSpriteButton>(party_tabdis["1"], party_taben["1"]);
-		buttons[Buttons::BT_TAB_PARTY_MINE]->set_active(false);
-		buttons[Buttons::BT_TAB_PARTY_SEARCH]->set_active(false);
+		const char* buddy_buttons[] = { "BtAddFriend", "BtDelete", "BtWhisper", "BtChat", "BtWhere" };
+		int16_t buddy_x = BUTTONS.x();
 
-		party_search_grid[0] = PartySearch["partyName"];
-		party_search_grid[1] = PartySearch["request"];
-		party_search_grid[2] = PartySearch["table"];
+		for (uint16_t i = 0; i < std::size(buddy_buttons); i++)
+		{
+			nl::node button = Friend[buddy_buttons[i]];
+			buttons[Buttons::BT_ADD_BUDDY + i] = std::make_unique<MapleButton>(button, Point<int16_t>(buddy_x, BUTTONS.y()));
+			buddy_x += Texture(button["normal"]["0"]).get_dimensions().x() + BUDDY_BUTTON_GAP;
+		}
 
-		buttons[Buttons::BT_PARTY_SEARCH_LEVEL] = std::make_unique<MapleButton>(PartySearch["BtPartyLevel"]);
-		buttons[Buttons::BT_PARTY_SEARCH_LEVEL]->set_active(false);
+		Point<int16_t> second_row = BUTTONS + Point<int16_t>(0, BUTTON_PITCH.y());
+		buttons[Buttons::BT_INVITE_BUDDY] = std::make_unique<MapleButton>(Friend["BtParty"], second_row);
 
-		int16_t party_x = 243;
-		int16_t party_y = 114;
-		int16_t party_height = party_y + 168;
-		int16_t party_unitrows = 6;
-		int16_t party_rowmax = 6;
-		party_slider = Slider(Slider::Type::DEFAULT_SILVER, Range<int16_t>(party_y, party_height), party_x, party_unitrows,
-							  party_rowmax, [](bool)
-							  {});
+		for (auto [id, name] : { std::pair(Buttons::BT_SHOW_ONLINE, "BtShowOnline"), std::pair(Buttons::BT_SHOW_ALL, "BtShowAll") })
+		{
+			int16_t width = Texture(Friend[name]["normal"]["0"]).get_dimensions().x();
+			buttons[id] = std::make_unique<MapleButton>(Friend[name], Point<int16_t>(BUTTONS_RIGHT - width, second_row.y()));
+		}
 
-		// Buddy Tab
-		nl::node Friend = Main["Friend"];
+		buddies_online.header = Friend["friend0"];
+		buddies_offline.header = Friend["friend4"];
+		legend = Friend["friend1"];
+		buddy_row = Friend["friend2"];
+		offline_row = Friend["friend5"];
+		buddy_bottom = Friend["friend3"];
+		buddies_online.count = Text(Text::Font::A11M, Text::Alignment::RIGHT, Color::Name::WHITE);
+		buddies_offline.count = Text(Text::Font::A11M, Text::Alignment::RIGHT, Color::Name::WHITE);
 
-		friend_tab = Tab::FRIEND_ALL;
-		friend_sprites.emplace_back(Friend["title"]);
-		friend_sprites.emplace_back(Friend["CbCondition"]["text"]);
-		friend_sprites.emplace_back(UserList["line"], DrawArgument(Point<int16_t>(132, 115), Point<int16_t>(230, 0)));
+		online.header = Party["party0"];
+		offline.header = Party["party4"];
+		columns = Party["party5"];
+		row = Party["party1"];
+		bottom = Party["party2"];
+		highlight = Party["party3"];
+		star = Party["icon0"];
 
-		buttons[Buttons::BT_FRIEND_GROUP_0] = std::make_unique<MapleButton>(UserList["BtSheetIClose"],
-																			Point<int16_t>(13, 118));
-		buttons[Buttons::BT_FRIEND_GROUP_0]->set_active(false);
+		online.count = Text(Text::Font::A11M, Text::Alignment::RIGHT, Color::Name::WHITE);
+		offline.count = Text(Text::Font::A11M, Text::Alignment::RIGHT, Color::Name::WHITE);
+		none = Text(Text::Font::A12M, Text::Alignment::LEFT, Color::Name::BLACK, "none");
 
-		for (size_t i = 0; i < std::size(friend_grid); i++)
-			friend_grid[i] = UserList["Sheet1"][i];
+		dimension = Texture(backgrnd).get_dimensions();
+		dragarea = Point<int16_t>(dimension.x(), 20);
 
-		std::string text =
-				"(" + std::to_string(friend_count) + std::string("/") + std::to_string(friend_total) + std::string(")");
-		friends_online_text = Text(Text::Font::A11M, Text::Alignment::LEFT, Color::Name::WHITE, text, 0);
-
-		friends_cur_location = Text(Text::Font::A11M, Text::Alignment::LEFT, Color::Name::LIGHTGREY,
-									"My Location - " + get_cur_location(), 0);
-		friends_name = Text(Text::Font::A11M, Text::Alignment::LEFT, Color::Name::BLACK, "none", 0);
-		friends_group_name = Text(Text::Font::A11M, Text::Alignment::LEFT, Color::Name::WHITE, "Default Group (0/0)",
-								  0);
-
-		buttons[Buttons::BT_FRIEND_ADD] = std::make_unique<MapleButton>(Friend["BtAddFriend"]);
-		buttons[Buttons::BT_FRIEND_ADD_GROUP] = std::make_unique<MapleButton>(Friend["BtAddGroup"]);
-		buttons[Buttons::BT_FRIEND_EXPAND] = std::make_unique<MapleButton>(Friend["BtPlusFriend"]);
-		buttons[Buttons::BT_FRIEND_ADD]->set_active(false);
-		buttons[Buttons::BT_FRIEND_ADD_GROUP]->set_active(false);
-		buttons[Buttons::BT_FRIEND_EXPAND]->set_active(false);
-
-		buttons[Buttons::BT_TAB_FRIEND_ALL] = std::make_unique<MapleButton>(Friend["TapShowAll"]);
-		buttons[Buttons::BT_TAB_FRIEND_ONLINE] = std::make_unique<MapleButton>(Friend["TapShowOnline"]);
-		buttons[Buttons::BT_TAB_FRIEND_ALL]->set_active(false);
-		buttons[Buttons::BT_TAB_FRIEND_ONLINE]->set_active(false);
-
-		int16_t friends_x = 243;
-		int16_t friends_y = 115;
-		int16_t friends_height = friends_y + 148;
-		int16_t friends_unitrows = 6;
-		int16_t friends_rowmax = 6;
-		friends_slider = Slider(Slider::Type::DEFAULT_SILVER, Range<int16_t>(friends_y, friends_height), friends_x,
-								friends_unitrows, friends_rowmax, [](bool)
-								{});
-
-		// Boss tab
-		nl::node Boss = Main["Boss"];
-
-		boss_sprites.emplace_back(Boss["base"]);
-		boss_sprites.emplace_back(Boss["base3"]);
-		boss_sprites.emplace_back(Boss["base2"]);
-
-		buttons[Buttons::BT_BOSS_0] = std::make_unique<TwoSpriteButton>(Boss["BossList"]["0"]["icon"]["disabled"]["0"],
-																		Boss["BossList"]["0"]["icon"]["normal"]["0"]);
-		buttons[Buttons::BT_BOSS_1] = std::make_unique<TwoSpriteButton>(Boss["BossList"]["1"]["icon"]["disabled"]["0"],
-																		Boss["BossList"]["1"]["icon"]["normal"]["0"]);
-		buttons[Buttons::BT_BOSS_2] = std::make_unique<TwoSpriteButton>(Boss["BossList"]["2"]["icon"]["disabled"]["0"],
-																		Boss["BossList"]["2"]["icon"]["normal"]["0"]);
-		buttons[Buttons::BT_BOSS_3] = std::make_unique<TwoSpriteButton>(Boss["BossList"]["3"]["icon"]["disabled"]["0"],
-																		Boss["BossList"]["3"]["icon"]["normal"]["0"]);
-		buttons[Buttons::BT_BOSS_4] = std::make_unique<TwoSpriteButton>(Boss["BossList"]["4"]["icon"]["disabled"]["0"],
-																		Boss["BossList"]["4"]["icon"]["normal"]["0"]);
-		buttons[Buttons::BT_BOSS_L] = std::make_unique<MapleButton>(Boss["BtArrow"]["Left"]);
-		buttons[Buttons::BT_BOSS_R] = std::make_unique<MapleButton>(Boss["BtArrow"]["Right"]);
-		buttons[Buttons::BT_BOSS_DIFF_L] = std::make_unique<MapleButton>(Boss["BtArrow2"]["Left"]);
-		buttons[Buttons::BT_BOSS_DIFF_R] = std::make_unique<MapleButton>(Boss["BtArrow2"]["Right"]);
-		buttons[Buttons::BT_BOSS_GO] = std::make_unique<MapleButton>(Boss["BtEntry"]);
-		buttons[Buttons::BT_BOSS_0]->set_active(false);
-		buttons[Buttons::BT_BOSS_1]->set_active(false);
-		buttons[Buttons::BT_BOSS_2]->set_active(false);
-		buttons[Buttons::BT_BOSS_3]->set_active(false);
-		buttons[Buttons::BT_BOSS_4]->set_active(false);
-		buttons[Buttons::BT_BOSS_L]->set_active(false);
-		buttons[Buttons::BT_BOSS_R]->set_active(false);
-		buttons[Buttons::BT_BOSS_DIFF_L]->set_active(false);
-		buttons[Buttons::BT_BOSS_DIFF_R]->set_active(false);
-		buttons[Buttons::BT_BOSS_GO]->set_active(false);
-
-		// Blacklist tab
-		nl::node Blacklist = Main["Blacklist"];
-
-		blacklist_title = Blacklist["base"];
-
-		for (size_t i = 0; i < std::size(blacklist_grid); i++)
-			blacklist_grid[i] = UserList["Sheet6"][i];
-
-		blacklist_name = Text(Text::Font::A12M, Text::Alignment::LEFT, Color::Name::BLACK, "none", 0);
-
-		nl::node blacklist_taben = Blacklist["Tab"]["enabled"];
-		nl::node blacklist_tabdis = Blacklist["Tab"]["disabled"];
-
-		buttons[Buttons::BT_BLACKLIST_ADD] = std::make_unique<MapleButton>(Blacklist["BtAdd"]);
-		buttons[Buttons::BT_BLACKLIST_DELETE] = std::make_unique<MapleButton>(Blacklist["BtDelete"]);
-		buttons[Buttons::BT_TAB_BLACKLIST_INDIVIDUAL] = std::make_unique<MapleButton>(Blacklist["TapShowIndividual"]);
-		buttons[Buttons::BT_TAB_BLACKLIST_GUILD] = std::make_unique<MapleButton>(Blacklist["TapShowGuild"]);
-		buttons[Buttons::BT_BLACKLIST_ADD]->set_active(false);
-		buttons[Buttons::BT_BLACKLIST_DELETE]->set_active(false);
-		buttons[Buttons::BT_TAB_BLACKLIST_INDIVIDUAL]->set_active(false);
-		buttons[Buttons::BT_TAB_BLACKLIST_GUILD]->set_active(false);
-
+		rebuild();
+		rebuild_buddies();
 		change_tab(tab);
-
-		dimension = Point<int16_t>(276, 390);
 	}
 
 	void UIUserList::draw(float alpha) const
 	{
 		UIElement::draw_sprites(alpha);
 
-		background.draw(position);
+		tabs.draw(position + TAB_STRIP, Tab::NUM_TABS, tab);
 
-		if (tab == Buttons::BT_TAB_PARTY)
+		if (tab == Tab::PARTY)
 		{
-			party_title.draw(position);
+			draw_section(online);
+			draw_section(offline);
+		}
+		else if (tab == Tab::FRIEND)
+		{
+			draw_buddies(buddies_online, buddy_row, true);
 
-			if (party_tab == Buttons::BT_TAB_PARTY_MINE)
-			{
-				party_mine_grid[0].draw(position + Point<int16_t>(10, 115));
-				party_mine_grid[4].draw(position + Point<int16_t>(10, 133));
-				party_mine_name.draw(position + Point<int16_t>(27, 130));
-			} else if (party_tab == Buttons::BT_TAB_PARTY_SEARCH)
-			{
-				party_search_grid[0].draw(position);
-				party_search_grid[1].draw(position);
-				party_search_grid[2].draw(position);
-				party_slider.draw(position);
-			}
-		} else if (tab == Buttons::BT_TAB_FRIEND)
-		{
-			for (auto sprite : friend_sprites)
-				sprite.draw(position, alpha);
-
-			friends_online_text.draw(position + Point<int16_t>(211, 62));
-			friends_cur_location.draw(position + Point<int16_t>(9, 279));
-			friend_grid[0].draw(position + Point<int16_t>(10, 116));
-			friend_grid[2].draw(position + Point<int16_t>(10, 135));
-			friends_name.draw(position + Point<int16_t>(24, 134));
-			friends_group_name.draw(position + Point<int16_t>(29, 114));
-			friends_slider.draw(position);
-		} else if (tab == Buttons::BT_TAB_BOSS)
-		{
-			for (auto sprite : boss_sprites)
-				sprite.draw(position, alpha);
-		} else if (tab == Buttons::BT_TAB_BLACKLIST)
-		{
-			blacklist_title.draw(position + Point<int16_t>(24, 104));
-			blacklist_grid[0].draw(position + Point<int16_t>(24, 134));
-			blacklist_name.draw(position + Point<int16_t>(24, 134));
+			if (show_all)
+				draw_buddies(buddies_offline, offline_row, false);
 		}
 
 		UIElement::draw_buttons(alpha);
+	}
+
+	void UIUserList::draw_section(const Section& section) const
+	{
+		Point<int16_t> top = position + Point<int16_t>(LIST.x(), section.top);
+
+		section.header.draw(top);
+		section.count.draw(top + COUNT);
+		columns.draw(top + Point<int16_t>(1, HEADER));
+
+		int16_t first = section.top + HEADER + COLUMNS;
+
+		if (section.lines.empty())
+		{
+			Point<int16_t> row_pos = position + Point<int16_t>(LIST.x(), first);
+
+			row.draw(row_pos + Point<int16_t>(1, 0));
+			none.draw(row_pos + Point<int16_t>(NAME_X, TEXT_Y));
+		}
+
+		for (const Line& line : section.lines)
+		{
+			Point<int16_t> row_pos = position + Point<int16_t>(LIST.x(), line.y);
+
+			// The row art is clear inside its border, so the highlight shows
+			// through it.
+			if (line.id == selected)
+				highlight.draw(DrawArgument(row_pos + Point<int16_t>(1, 0), HIGHLIGHT_SIZE));
+
+			row.draw(row_pos + Point<int16_t>(1, 0));
+
+			if (line.leader)
+				star.draw(row_pos + Point<int16_t>(STAR_X, 2));
+
+			line.name.draw(row_pos + Point<int16_t>(NAME_X, TEXT_Y));
+			line.job.draw(row_pos + Point<int16_t>(JOB_X, TEXT_Y));
+			line.level.draw(row_pos + Point<int16_t>(LEVEL_X, TEXT_Y));
+		}
+
+		bottom.draw(position + Point<int16_t>(LIST.x() + 1, section.bottom - FOOTER));
+	}
+
+	void UIUserList::draw_buddies(const BuddySection& section, const Texture& section_row, bool with_legend) const
+	{
+		Point<int16_t> top = position + Point<int16_t>(LIST.x(), section.top);
+
+		section.header.draw(top);
+		section.count.draw(top + COUNT);
+
+		int16_t first = HEADER;
+
+		if (with_legend)
+		{
+			legend.draw(top + Point<int16_t>(0, HEADER));
+			first += LEGEND;
+		}
+
+		for (const Cell& cell : section.cells)
+			if (cell.id == picked_buddy)
+				highlight.draw(DrawArgument(position + cell.pos + Point<int16_t>(1, 0), CELL_HIGHLIGHT));
+
+		for (int16_t i = 0; i < section.rows; i++)
+			section_row.draw(top + Point<int16_t>(0, first + ROW * i));
+
+		for (const Cell& cell : section.cells)
+		{
+			cell.name.draw(position + cell.pos + Point<int16_t>(CELL_NAME_X, TEXT_Y));
+			cell.channel.draw(position + cell.pos + Point<int16_t>(CELL_CHANNEL_X, TEXT_Y));
+		}
+
+		buddy_bottom.draw(position + Point<int16_t>(LIST.x(), section.bottom - BUDDY_FOOTER));
 	}
 
 	void UIUserList::update()
 	{
 		UIElement::update();
 
-		if (tab == Buttons::BT_TAB_FRIEND)
-			for (auto sprite : friend_sprites)
-				sprite.update();
+		int32_t mapid = Stage::get().get_mapid();
+		std::vector<Shown> now = currently_shown();
 
-		if (tab == Buttons::BT_TAB_BOSS)
-			for (auto sprite : boss_sprites)
-				sprite.update();
+		if (now != shown || party.get_leader() != shown_leader || mapid != shown_mapid)
+			rebuild();
+
+		if (buddies.get_buddies() != shown_buddies)
+			rebuild_buddies();
+
+		update_buttons();
+	}
+
+	Cursor::State UIUserList::send_cursor(bool clicked, Point<int16_t> cursorpos)
+	{
+		Cursor::State dstate = UIDragElement::send_cursor(clicked, cursorpos);
+
+		if (dragged)
+			return dstate;
+
+		if (!clicked)
+			filter_clicked = false;
+
+		Point<int16_t> cursor_relative = cursorpos - position;
+
+		if (clicked && tab == Tab::PARTY)
+		{
+			for (const Section* section : {&online, &offline})
+			{
+				for (const Line& line : section->lines)
+				{
+					Point<int16_t> row_pos = Point<int16_t>(LIST.x() + 1, line.y);
+					Rectangle<int16_t> bounds = Rectangle<int16_t>(row_pos, row_pos + HIGHLIGHT_SIZE);
+
+					if (bounds.contains(cursor_relative))
+					{
+						selected = line.id;
+						update_buttons();
+
+						return Cursor::State::IDLE;
+					}
+				}
+			}
+		}
+
+		if (clicked && tab == Tab::FRIEND)
+		{
+			for (const BuddySection* section : {&buddies_online, &buddies_offline})
+			{
+				if (section == &buddies_offline && !show_all)
+					continue;
+
+				for (const Cell& cell : section->cells)
+				{
+					Point<int16_t> corner = cell.pos + Point<int16_t>(1, 0);
+
+					if (Rectangle<int16_t>(corner, corner + CELL_HIGHLIGHT).contains(cursor_relative))
+					{
+						picked_buddy = cell.id;
+						update_buttons();
+
+						return Cursor::State::IDLE;
+					}
+				}
+			}
+		}
+
+		return UIElement::send_cursor(clicked, cursorpos);
 	}
 
 	void UIUserList::send_key(int32_t keycode, bool pressed, bool escape)
@@ -263,19 +342,9 @@ namespace ms
 		if (pressed)
 		{
 			if (escape)
-			{
 				deactivate();
-			} else if (keycode == KeyAction::Id::TAB)
-			{
-				uint16_t new_tab = tab;
-
-				if (new_tab < Buttons::BT_TAB_BLACKLIST)
-					new_tab++;
-				else
-					new_tab = Buttons::BT_TAB_FRIEND;
-
-				change_tab(new_tab);
-			}
+			else if (keycode == KeyAction::Id::TAB)
+				change_tab((tab + 1) % Tab::NUM_TABS);
 		}
 	}
 
@@ -284,132 +353,23 @@ namespace ms
 		return TYPE;
 	}
 
-	Button::State UIUserList::button_pressed(uint16_t buttonid)
+	void UIUserList::change_tab(uint16_t tabid)
 	{
-		switch (buttonid)
-		{
-			case Buttons::BT_CLOSE:
-				deactivate();
-				break;
-			case Buttons::BT_TAB_FRIEND:
-			case Buttons::BT_TAB_PARTY:
-			case Buttons::BT_TAB_BOSS:
-			case Buttons::BT_TAB_BLACKLIST:
-				change_tab(buttonid);
-				return Button::State::PRESSED;
-			case Buttons::BT_TAB_PARTY_MINE:
-			case Buttons::BT_TAB_PARTY_SEARCH:
-				change_party_tab(buttonid);
-				return Button::State::PRESSED;
-			case Buttons::BT_TAB_FRIEND_ALL:
-			case Buttons::BT_TAB_FRIEND_ONLINE:
-				change_friend_tab(buttonid);
-				return Button::State::PRESSED;
-			case Buttons::BT_TAB_BLACKLIST_INDIVIDUAL:
-			case Buttons::BT_TAB_BLACKLIST_GUILD:
-				change_blacklist_tab(buttonid);
-				return Button::State::PRESSED;
-			default:
-				return Button::State::NORMAL;
-		}
-
-		return Button::State::NORMAL;
-	}
-
-	void UIUserList::change_tab(uint8_t tabid)
-	{
-		uint8_t oldtab = tab;
+		buttons[Buttons::BT_TAB0 + tab]->set_state(Button::State::NORMAL);
+		buttons[Buttons::BT_TAB0 + tabid]->set_state(Button::State::PRESSED);
 		tab = tabid;
 
-		background =
-				tabid == Buttons::BT_TAB_BOSS ? UserList["Main"]["Boss"]["backgrnd3"] : UserList["Main"]["backgrnd2"];
+		for (uint16_t i = Buttons::BT_HP; i <= Buttons::BT_INVITE; i++)
+			buttons[i]->set_active(tab == Tab::PARTY);
 
-		if (oldtab != tab)
-			buttons[Buttons::BT_TAB_FRIEND + oldtab]->set_state(Button::State::NORMAL);
+		for (uint16_t i = Buttons::BT_ADD_BUDDY; i <= Buttons::BT_INVITE_BUDDY; i++)
+			buttons[i]->set_active(tab == Tab::FRIEND);
 
-		buttons[Buttons::BT_TAB_FRIEND + tab]->set_state(Button::State::PRESSED);
+		// The filter button offers whichever view isn't showing.
+		buttons[Buttons::BT_SHOW_ONLINE]->set_active(tab == Tab::FRIEND && show_all);
+		buttons[Buttons::BT_SHOW_ALL]->set_active(tab == Tab::FRIEND && !show_all);
 
-		if (tab == Buttons::BT_TAB_PARTY)
-		{
-			buttons[Buttons::BT_PARTY_CREATE]->set_active(true);
-			buttons[Buttons::BT_PARTY_INVITE]->set_active(true);
-			buttons[Buttons::BT_TAB_PARTY_MINE]->set_active(true);
-			buttons[Buttons::BT_TAB_PARTY_SEARCH]->set_active(true);
-
-			change_party_tab(Tab::PARTY_MINE);
-		} else
-		{
-			buttons[Buttons::BT_PARTY_CREATE]->set_active(false);
-			buttons[Buttons::BT_PARTY_INVITE]->set_active(false);
-			buttons[Buttons::BT_TAB_PARTY_MINE]->set_active(false);
-			buttons[Buttons::BT_TAB_PARTY_SEARCH]->set_active(false);
-			buttons[Buttons::BT_PARTY_SEARCH_LEVEL]->set_active(false);
-		}
-
-		if (tab == Buttons::BT_TAB_FRIEND)
-		{
-			buttons[Buttons::BT_FRIEND_ADD]->set_active(true);
-			buttons[Buttons::BT_FRIEND_ADD_GROUP]->set_active(true);
-			buttons[Buttons::BT_FRIEND_EXPAND]->set_active(true);
-			buttons[Buttons::BT_TAB_FRIEND_ALL]->set_active(true);
-			buttons[Buttons::BT_TAB_FRIEND_ONLINE]->set_active(true);
-			buttons[Buttons::BT_FRIEND_GROUP_0]->set_active(true);
-
-			change_friend_tab(Tab::FRIEND_ALL);
-		} else
-		{
-			buttons[Buttons::BT_FRIEND_ADD]->set_active(false);
-			buttons[Buttons::BT_FRIEND_ADD_GROUP]->set_active(false);
-			buttons[Buttons::BT_FRIEND_EXPAND]->set_active(false);
-			buttons[Buttons::BT_TAB_FRIEND_ALL]->set_active(false);
-			buttons[Buttons::BT_TAB_FRIEND_ONLINE]->set_active(false);
-			buttons[Buttons::BT_FRIEND_GROUP_0]->set_active(false);
-		}
-
-		if (tab == Buttons::BT_TAB_BOSS)
-		{
-			buttons[Buttons::BT_BOSS_0]->set_active(true);
-			buttons[Buttons::BT_BOSS_1]->set_active(true);
-			buttons[Buttons::BT_BOSS_2]->set_active(true);
-			buttons[Buttons::BT_BOSS_3]->set_active(true);
-			buttons[Buttons::BT_BOSS_4]->set_active(true);
-			buttons[Buttons::BT_BOSS_L]->set_active(true);
-			buttons[Buttons::BT_BOSS_R]->set_active(true);
-			buttons[Buttons::BT_BOSS_DIFF_L]->set_active(true);
-			buttons[Buttons::BT_BOSS_DIFF_R]->set_active(true);
-			buttons[Buttons::BT_BOSS_GO]->set_active(true);
-			buttons[Buttons::BT_BOSS_L]->set_state(Button::State::DISABLED);
-			buttons[Buttons::BT_BOSS_R]->set_state(Button::State::DISABLED);
-			buttons[Buttons::BT_BOSS_GO]->set_state(Button::State::DISABLED);
-			buttons[Buttons::BT_BOSS_DIFF_L]->set_state(Button::State::DISABLED);
-			buttons[Buttons::BT_BOSS_DIFF_R]->set_state(Button::State::DISABLED);
-		} else
-		{
-			buttons[Buttons::BT_BOSS_0]->set_active(false);
-			buttons[Buttons::BT_BOSS_1]->set_active(false);
-			buttons[Buttons::BT_BOSS_2]->set_active(false);
-			buttons[Buttons::BT_BOSS_3]->set_active(false);
-			buttons[Buttons::BT_BOSS_4]->set_active(false);
-			buttons[Buttons::BT_BOSS_L]->set_active(false);
-			buttons[Buttons::BT_BOSS_R]->set_active(false);
-			buttons[Buttons::BT_BOSS_DIFF_L]->set_active(false);
-			buttons[Buttons::BT_BOSS_DIFF_R]->set_active(false);
-			buttons[Buttons::BT_BOSS_GO]->set_active(false);
-		}
-
-		if (tab == Buttons::BT_TAB_BLACKLIST)
-		{
-			buttons[Buttons::BT_BLACKLIST_ADD]->set_active(true);
-			buttons[Buttons::BT_BLACKLIST_DELETE]->set_active(true);
-			buttons[Buttons::BT_TAB_BLACKLIST_INDIVIDUAL]->set_active(true);
-			buttons[Buttons::BT_TAB_BLACKLIST_GUILD]->set_active(true);
-		} else
-		{
-			buttons[Buttons::BT_BLACKLIST_ADD]->set_active(false);
-			buttons[Buttons::BT_BLACKLIST_DELETE]->set_active(false);
-			buttons[Buttons::BT_TAB_BLACKLIST_INDIVIDUAL]->set_active(false);
-			buttons[Buttons::BT_TAB_BLACKLIST_GUILD]->set_active(false);
-		}
+		update_buttons();
 	}
 
 	uint16_t UIUserList::get_tab()
@@ -417,46 +377,313 @@ namespace ms
 		return tab;
 	}
 
-	void UIUserList::change_party_tab(uint8_t tabid)
+	Button::State UIUserList::button_pressed(uint16_t buttonid)
 	{
-		uint8_t oldtab = party_tab;
-		party_tab = tabid;
+		const PartyMember* member = selected_member();
+		const Buddy* buddy = selected_buddy();
 
-		if (oldtab != party_tab)
-			buttons[Buttons::BT_TAB_FRIEND + oldtab]->set_state(Button::State::NORMAL);
+		switch (buttonid)
+		{
+			case Buttons::BT_CLOSE:
+				deactivate();
+				break;
+			case Buttons::BT_HP:
+				party.toggle_hp_marks();
+				break;
+			case Buttons::BT_CHANGE_LEADER:
+				if (member)
+					ChangePartyLeaderPacket(member->id).dispatch();
 
-		buttons[Buttons::BT_TAB_FRIEND + party_tab]->set_state(Button::State::PRESSED);
+				break;
+			case Buttons::BT_WHISPER:
+				if (member)
+					if (auto chatbar = UI::get().get_element<UIChatBar>())
+						chatbar->start_whisper(member->name);
 
-		if (party_tab == Buttons::BT_TAB_PARTY_SEARCH)
-			buttons[Buttons::BT_PARTY_SEARCH_LEVEL]->set_active(true);
-		else
-			buttons[Buttons::BT_PARTY_SEARCH_LEVEL]->set_active(false);
+				break;
+			case Buttons::BT_CHAT:
+				if (auto chatbar = UI::get().get_element<UIChatBar>())
+					chatbar->set_target(UIChatBar::Target::PARTY);
+
+				break;
+			case Buttons::BT_CREATE:
+				CreatePartyPacket().dispatch();
+				break;
+			case Buttons::BT_LEAVE:
+				LeavePartyPacket().dispatch();
+				break;
+			case Buttons::BT_EXPEL:
+				if (member)
+					ExpelFromPartyPacket(member->id).dispatch();
+
+				break;
+			case Buttons::BT_INVITE:
+				UI::get().emplace<UIEnterText>(
+						"Who do you want to invite?",
+						[](const std::string& name)
+						{
+							InviteToPartyPacket(name).dispatch();
+						},
+						NAME_LIMIT
+				);
+				break;
+			case Buttons::BT_ADD_BUDDY:
+				UI::get().emplace<UIEnterText>(
+						"Enter the character name you'd like to add as a buddy.",
+						[](const std::string& name)
+						{
+							AddBuddyPacket(name, DEFAULT_GROUP).dispatch();
+						},
+						NAME_LIMIT
+				);
+				break;
+			case Buttons::BT_DELETE_BUDDY:
+				if (buddy)
+				{
+					int32_t id = buddy->id;
+
+					UI::get().emplace<UIYesNo>(
+							"Are you sure you want to delete '" + buddy->name + "'\\nfrom your buddy list?",
+							[id](bool yes)
+							{
+								if (yes)
+									DeleteBuddyPacket(id).dispatch();
+							}
+					);
+				}
+
+				break;
+			case Buttons::BT_WHISPER_BUDDY:
+				if (buddy)
+					if (auto chatbar = UI::get().get_element<UIChatBar>())
+						chatbar->start_whisper(buddy->name);
+
+				break;
+			case Buttons::BT_BUDDY_CHAT:
+				if (auto chatbar = UI::get().get_element<UIChatBar>())
+					chatbar->set_target(UIChatBar::Target::BUDDY);
+
+				break;
+			case Buttons::BT_INVITE_BUDDY:
+				if (buddy)
+					InviteToPartyPacket(buddy->name).dispatch();
+
+				break;
+			case Buttons::BT_SHOW_ONLINE:
+			case Buttons::BT_SHOW_ALL:
+				// The two share a spot, and one click can reach both: the
+				// cursor keeps clicking until the button is released.
+				if (!filter_clicked)
+				{
+					filter_clicked = true;
+					show_all = buttonid == Buttons::BT_SHOW_ALL;
+					change_tab(tab);
+				}
+
+				break;
+			default:
+				if (buttonid >= Buttons::BT_TAB0 && buttonid < Buttons::BT_TAB0 + Tab::NUM_TABS)
+				{
+					change_tab(buttonid - Buttons::BT_TAB0);
+
+					return Button::State::PRESSED;
+				}
+
+				break;
+		}
+
+		return Button::State::NORMAL;
 	}
 
-	void UIUserList::change_friend_tab(uint8_t tabid)
+	std::vector<UIUserList::Shown> UIUserList::currently_shown() const
 	{
-		uint8_t oldtab = friend_tab;
-		friend_tab = tabid;
+		std::vector<Shown> result;
 
-		if (oldtab != friend_tab)
-			buttons[Buttons::BT_TAB_FRIEND + oldtab]->set_state(Button::State::NORMAL);
+		for (const PartyMember& member : party.get_members())
+			result.push_back({ member.id, member.name, member.job, member.level, member.channel, member.map_id });
 
-		buttons[Buttons::BT_TAB_FRIEND + friend_tab]->set_state(Button::State::PRESSED);
+		return result;
 	}
 
-	void UIUserList::change_blacklist_tab(uint8_t tabid)
+	void UIUserList::rebuild()
 	{
-		uint8_t oldtab = blacklist_tab;
-		blacklist_tab = tabid;
+		shown = currently_shown();
+		shown_leader = party.get_leader();
+		shown_mapid = Stage::get().get_mapid();
 
-		if (oldtab != blacklist_tab)
-			buttons[Buttons::BT_TAB_FRIEND + oldtab]->set_state(Button::State::NORMAL);
+		if (!party.find(selected))
+			selected = 0;
 
-		buttons[Buttons::BT_TAB_FRIEND + blacklist_tab]->set_state(Button::State::PRESSED);
+		std::vector<const PartyMember*> online_members, offline_members;
+
+		for (const PartyMember& member : party.get_members())
+			(member.online() ? online_members : offline_members).push_back(&member);
+
+		// Footage counts only the members on the player's map as online,
+		// though the others are listed, greyed.
+		size_t nearby = 0;
+
+		for (const PartyMember* member : online_members)
+			if (member->map_id == shown_mapid)
+				nearby++;
+
+		size_t total = party.get_members().size();
+
+		online.count.change_text(std::to_string(nearby) + "/" + std::to_string(total));
+		offline.count.change_text(std::to_string(offline_members.size()) + "/" + std::to_string(total));
+
+		int16_t next = lay_out(online, online_members, LIST.y());
+		lay_out(offline, offline_members, next + SECTION_GAP);
 	}
 
-	std::string UIUserList::get_cur_location()
+	int16_t UIUserList::lay_out(Section& section, const std::vector<const PartyMember*>& members, int16_t y)
 	{
-		return NxHelper::Map::get_map_info_by_id(Stage::get().get_mapid()).name;
+		section.top = y;
+		section.lines.clear();
+
+		y += HEADER + COLUMNS;
+
+		for (const PartyMember* member : members)
+		{
+			Color::Name color = member->online() && member->map_id == shown_mapid
+								? Color::Name::BLACK
+								: Color::Name::SILVERCHALICE;
+
+			section.lines.push_back({
+					member->id,
+					member->id == shown_leader,
+					y,
+					Text(Text::Font::A12M, Text::Alignment::LEFT, color, member->name),
+					Text(Text::Font::A12M, Text::Alignment::LEFT, color, Job(member->job).get_name()),
+					Text(Text::Font::A12M, Text::Alignment::LEFT, color, std::to_string(member->level))
+			});
+
+			y += ROW;
+		}
+
+		if (members.empty())
+			y += ROW;
+
+		y += FOOTER;
+		section.bottom = y;
+
+		return y;
+	}
+
+	void UIUserList::rebuild_buddies()
+	{
+		shown_buddies = buddies.get_buddies();
+
+		if (!buddies.find(picked_buddy))
+			picked_buddy = 0;
+
+		int32_t channel = Configuration::get().get_channelid();
+		std::vector<const Buddy*> same, other, away;
+
+		for (const Buddy& buddy : shown_buddies)
+		{
+			if (!buddy.online())
+				away.push_back(&buddy);
+			else if (buddy.channel == channel)
+				same.push_back(&buddy);
+			else
+				other.push_back(&buddy);
+		}
+
+		std::string total = "/" + std::to_string(shown_buddies.size());
+		buddies_online.count.change_text(std::to_string(same.size() + other.size()) + total);
+		buddies_offline.count.change_text(std::to_string(away.size()) + total);
+
+		auto cell = [](const Buddy& buddy, Point<int16_t> pos, bool online)
+		{
+			Color::Name color = online ? Color::Name::BLACK : Color::Name::SILVERCHALICE;
+
+			return Cell{ buddy.id, pos, Text(Text::Font::A12M, Text::Alignment::LEFT, color, buddy.name), Text() };
+		};
+
+		// Online: a column per kind, as long as the longer one.
+		buddies_online.top = LIST.y();
+		buddies_online.cells.clear();
+		int16_t first = buddies_online.top + HEADER + LEGEND;
+
+		for (size_t i = 0; i < same.size(); i++)
+			buddies_online.cells.push_back(cell(*same[i], Point<int16_t>(LIST.x(), first + ROW * i), true));
+
+		for (size_t i = 0; i < other.size(); i++)
+		{
+			Cell c = cell(*other[i], Point<int16_t>(LIST.x() + CELL_WIDTH, first + ROW * i), true);
+			c.channel = Text(Text::Font::A11M, Text::Alignment::RIGHT, Color::Name::SILVERCHALICE,
+							 "Ch. " + std::to_string(other[i]->channel + 1));
+			buddies_online.cells.push_back(std::move(c));
+		}
+
+		buddies_online.rows = static_cast<int16_t>(std::max<size_t>({ 1, same.size(), other.size() }));
+		buddies_online.bottom = first + ROW * buddies_online.rows + BUDDY_FOOTER;
+
+		// Offline: left to right, then down.
+		buddies_offline.top = buddies_online.bottom + SECTION_GAP;
+		buddies_offline.cells.clear();
+		first = buddies_offline.top + HEADER;
+
+		for (size_t i = 0; i < away.size(); i++)
+		{
+			Point<int16_t> pos = Point<int16_t>(LIST.x() + CELL_WIDTH * (i % 2), first + ROW * (i / 2));
+			buddies_offline.cells.push_back(cell(*away[i], pos, false));
+		}
+
+		buddies_offline.rows = static_cast<int16_t>(std::max<size_t>(1, (away.size() + 1) / 2));
+		buddies_offline.bottom = first + ROW * buddies_offline.rows + BUDDY_FOOTER;
+	}
+
+	const Buddy* UIUserList::selected_buddy() const
+	{
+		return picked_buddy == 0 ? nullptr : buddies.find(picked_buddy);
+	}
+
+	void UIUserList::enable(uint16_t buttonid, bool enabled)
+	{
+		Button& button = *buttons[buttonid];
+		bool is_enabled = button.get_state() != Button::State::DISABLED;
+
+		// Leave the state alone otherwise, so mouseover survives.
+		if (is_enabled != enabled)
+			button.set_state(enabled ? Button::State::NORMAL : Button::State::DISABLED);
+	}
+
+	void UIUserList::update_buttons()
+	{
+		int32_t self = Stage::get().get_player().get_oid();
+		bool in_party = party.exists();
+		bool leader = in_party && party.is_leader(self);
+		const PartyMember* member = selected_member();
+
+		enable(Buttons::BT_HP, in_party);
+		enable(Buttons::BT_CHANGE_LEADER, leader && member && member->online());
+		enable(Buttons::BT_WHISPER, member && member->online());
+		enable(Buttons::BT_CHAT, in_party);
+		enable(Buttons::BT_SEARCH, false);
+		enable(Buttons::BT_CREATE, !in_party);
+		enable(Buttons::BT_LEAVE, in_party);
+		enable(Buttons::BT_EXPEL, leader && member);
+		enable(Buttons::BT_INVITE, leader && party.get_members().size() < PARTY_CAPACITY);
+
+		const Buddy* buddy = selected_buddy();
+		bool party_has_room = !in_party || (leader && party.get_members().size() < PARTY_CAPACITY);
+
+		enable(Buttons::BT_ADD_BUDDY, !buddies.is_full());
+		enable(Buttons::BT_DELETE_BUDDY, buddy);
+		enable(Buttons::BT_WHISPER_BUDDY, buddy && buddy->online());
+		enable(Buttons::BT_BUDDY_CHAT, !buddies.get_buddies().empty());
+		enable(Buttons::BT_BUDDY_MAP, false);
+		// Inviting someone makes a party first if the player has none.
+		enable(Buttons::BT_INVITE_BUDDY, buddy && buddy->online() && party_has_room);
+	}
+
+	const PartyMember* UIUserList::selected_member() const
+	{
+		if (selected == 0 || selected == Stage::get().get_player().get_oid())
+			return nullptr;
+
+		return party.find(selected);
 	}
 }

@@ -18,6 +18,9 @@ const MARIA: i32 = 2103;
 const LUCAS: i32 = 12000;
 const SENTINEL: i32 = 9300018;
 const SNAIL: i32 = 100100;
+// Where Peter stands on East Entrance to Mushroom Town (30000).
+const PETER_X: i16 = 972;
+const PETER_Y: i16 = -694;
 const CANDY: i32 = 4031792;
 const SHELLPIECE: i32 = 4031802;
 const LETTER: i32 = 4031800;
@@ -51,12 +54,12 @@ async fn nina_gives_candy_that_sen_shares_with_beginners() {
     let c = &mut session.connection;
 
     // 1034 needs Sen's own errand (1033) done first.
-    assert_eq!(warp(c, 30_000, "", &mut trace).await, 30_000);
+    assert_eq!(warp(c, 20_000, "", &mut trace).await, 20_000);
     act(c, &mut trace, &m, START, 1032, NINA).await;
-    assert_eq!(warp(c, 30_001, "", &mut trace).await, 30_001);
+    assert_eq!(warp(c, 20_001, "", &mut trace).await, 20_001);
     act(c, &mut trace, &m, COMPLETE, 1032, SEN).await;
     act(c, &mut trace, &m, START, 1033, SEN).await;
-    assert_eq!(warp(c, 30_000, "", &mut trace).await, 30_000);
+    assert_eq!(warp(c, 20_000, "", &mut trace).await, 20_000);
     act(c, &mut trace, &m, COMPLETE, 1033, NINA).await;
     // Act/1033/1/nextQuest continues straight into Nina's candy errand.
     assert_eq!(trace.results.last(), Some(&(1033, NINA, 1034)));
@@ -66,7 +69,7 @@ async fn nina_gives_candy_that_sen_shares_with_beginners() {
     assert_eq!(trace.states.get(&1034), Some(&1));
     assert_eq!(trace.items, [(CANDY, 10)]);
 
-    assert_eq!(warp(c, 30_001, "", &mut trace).await, 30_001);
+    assert_eq!(warp(c, 20_001, "", &mut trace).await, 20_001);
     act(c, &mut trace, &m, COMPLETE, 1034, SEN).await;
     assert_eq!(trace.states.get(&1034), Some(&2));
     // Sen's candies go; two edible ones (job-filtered: beginners) come.
@@ -89,14 +92,16 @@ async fn todds_hunt_needs_the_kill_and_the_shellpiece() {
     let mut trace = Trace::default();
     let mut session = login_to_world_session(&config).await.unwrap();
     let c = &mut session.connection;
-    enter_hunting_ground(c, &mut trace, 40_000, SENTINEL, 1).await;
+    enter_hunting_ground(c, &mut trace, 30_000, SENTINEL, 1).await;
 
     act(c, &mut trace, &m, START, 1035, TODD).await;
     assert_eq!(trace.states.get(&1035), Some(&1));
     // One Jr. Sentinel to hunt, none yet.
     assert_eq!(trace.kills.get(&1035).map(String::as_str), Some("000"));
 
-    // Peter won't finish it before the hunt.
+    // Peter waits up the hill by the exit, and won't finish it before the
+    // hunt.
+    send(c, walk_to(PETER_X, PETER_Y)).await;
     act(c, &mut trace, &m, COMPLETE, 1035, PETER).await;
     assert_eq!(trace.states.get(&1035), Some(&1));
     assert!(trace.results.iter().all(|r| r.0 != 1035 || r.1 != PETER));
@@ -112,11 +117,13 @@ async fn todds_hunt_needs_the_kill_and_the_shellpiece() {
     assert_eq!(trace.states.get(&1035), Some(&1));
 
     let shellpiece = trace.field.item_drop(SHELLPIECE).unwrap();
+    send(c, walk_to(shellpiece.x, shellpiece.y)).await;
     send(c, pickup(shellpiece.object_id, shellpiece.x, shellpiece.y)).await;
     until(c, &mut trace, |t| {
         !t.field.removals(shellpiece.object_id).is_empty()
     })
     .await;
+    send(c, walk_to(PETER_X, PETER_Y)).await;
     act(c, &mut trace, &m, COMPLETE, 1035, PETER).await;
     assert_eq!(trace.states.get(&1035), Some(&2));
     assert_eq!(trace.gains.last(), Some(&30));
@@ -145,7 +152,7 @@ async fn snail_kills_persist_and_lead_on_to_lucas() {
     let mut trace = Trace::default();
     let mut session = login_to_world_session(&config).await.unwrap();
     let c = &mut session.connection;
-    enter_hunting_ground(c, &mut trace, 50_000, SNAIL, 17).await;
+    enter_hunting_ground(c, &mut trace, 40_000, SNAIL, 15).await;
     act(c, &mut trace, &m, START, 1037, SAM).await;
     assert_eq!(trace.kills.get(&1037).map(String::as_str), Some("000"));
     for count in 1..=4 {
@@ -163,8 +170,8 @@ async fn snail_kills_persist_and_lead_on_to_lucas() {
         Some("004")
     );
     let c = &mut session.connection;
-    assert_eq!(warp(c, 40_000, "", &mut trace).await, 40_000);
-    enter_hunting_ground(c, &mut trace, 50_000, SNAIL, 6).await;
+    assert_eq!(warp(c, 30_000, "", &mut trace).await, 30_000);
+    enter_hunting_ground(c, &mut trace, 40_000, SNAIL, 6).await;
     for _ in 5..=11 {
         if trace.field.alive(SNAIL).is_empty() {
             until(c, &mut trace, |t| !t.field.alive(SNAIL).is_empty()).await;
@@ -175,7 +182,7 @@ async fn snail_kills_persist_and_lead_on_to_lucas() {
     // The eleventh kill isn't counted past the ten needed.
     assert_eq!(trace.kills.get(&1037).map(String::as_str), Some("010"));
 
-    assert_eq!(warp(c, 1_000_000, "", &mut trace).await, 1_000_000);
+    assert_eq!(warp(c, 50_000, "", &mut trace).await, 50_000);
     act(c, &mut trace, &m, COMPLETE, 1037, MARIA).await;
     assert_eq!(trace.states.get(&1037), Some(&2));
     assert_eq!(trace.gains.last(), Some(&60));
@@ -184,7 +191,8 @@ async fn snail_kills_persist_and_lead_on_to_lucas() {
     // Maria's letter for Lucas, then potions for delivering it.
     act(c, &mut trace, &m, START, 1038, MARIA).await;
     assert_eq!(trace.items.last(), Some(&(LETTER, 1)));
-    // Lucas stands across town, out of reach from the spawn point.
+    // Lucas stands across Amherst, out of reach from the spawn point.
+    assert_eq!(warp(c, 1_010_000, "", &mut trace).await, 1_010_000);
     act(c, &mut trace, &m, COMPLETE, 1038, LUCAS).await;
     assert_eq!(trace.states.get(&1038), Some(&1));
     send(c, walk_to(1500, 154)).await;

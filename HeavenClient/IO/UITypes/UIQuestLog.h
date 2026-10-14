@@ -18,16 +18,21 @@
 #pragma once
 
 #include <cstdint>
+#include <set>
 
 #include "../UIDragElement.h"
 
+#include "../Components/ClassicTabs.h"
 #include "../Components/Slider.h"
-#include "../Components/Textfield.h"
 
 #include "../../Character/QuestLog.h"
+#include "../../Character/QuestObjectives.h"
+#include "../../Graphics/Animation.h"
 
 namespace ms
 {
+	// The v83 quest log (UIClassic.nx, UIWindow.img/Quest): the list of
+	// quests by area, and beside it the selected quest's details.
 	class UIQuestLog : public UIDragElement<PosQUEST>
 	{
 	public:
@@ -42,7 +47,6 @@ namespace ms
 		void toggle_active() override;
 		void update_screen(int16_t width, int16_t height) override;
 		void send_scroll(double yoffset) override;
-		void doubleclick(Point<int16_t> cursorpos) override;
 
 		void send_key(int32_t keycode, bool pressed, bool escape) override;
 
@@ -57,62 +61,76 @@ namespace ms
 		Button::State button_pressed(uint16_t buttonid) override;
 
 	private:
-		void change_tab(uint16_t tabid);
-		void refresh_list();
-		void select_quest(int16_t id);
-		void close();
-		void find_npc();
-		int32_t local_npc_oid() const;
-		// Height of the objective lines, 0 without any.
-		int16_t goals_height() const { return goals.empty() ? 0 : goals.height() + 4; }
-
 		enum Buttons : uint16_t
 		{
 			TAB0,
 			TAB1,
 			TAB2,
 			CLOSE,
-			SEARCH,
-			ALL_LEVEL,
-			MY_LOCATION,
-			DETAIL_CLOSE,
-			ACCEPT,
-			FINISH,
+			HIDE,
 			FIND_NPC,
 			HELPER,
-			FORFEIT,
-			MY_LEVEL,
-			ALL_LOCATION,
-			RECOMMENDED
+			FORFEIT
 		};
 
+		enum Icon : uint8_t
+		{
+			AVAILABLE,
+			IN_PROGRESS,
+			READY,
+			COMPLETE
+		};
+
+		// An area's bar (`quest` < 0) or a quest under it.
+		struct Row
+		{
+			int16_t area;
+			int16_t quest;
+			Text label;
+			// The selected quest's label, white and cut short with "..".
+			Text chosen;
+			Icon icon;
+		};
+
+		// An item icon in the description, in the text's n-th box.
+		struct InlineIcon
+		{
+			Texture texture;
+			size_t box;
+		};
+
+		void change_tab(uint16_t tabid);
+		void refresh_list();
+		void select_quest(int16_t id);
+		void write_details();
+		void show_details(bool open);
+		void close();
+		void find_npc();
+		std::vector<QuestObjective> objectives(int16_t id) const;
+		Icon progress_icon(int16_t id) const;
+		void scroll_list(int16_t offset);
+		void scroll_details(int16_t offset);
+
 		const QuestLog &questlog;
-		uint16_t tab;
-		std::vector<Sprite> notice_sprites;
-		Textfield search;
-		Text placeholder;
-		Slider slider;
-		Slider detail_slider;
-		Texture search_area;
-		Texture complete_count;
-		Texture info_background, info_paper, info_header, info_tip;
-		Texture quest_icons[3];
-		Texture reward_background, reward_heading, basic_reward;
+		uint16_t tab = TAB0;
+		ClassicTabs tabs;
+		Texture list_background, detail_background;
+		Texture notices[3];
+		Texture fold_boxes[2];
+		Texture available_icon, complete_icon;
+		Animation progress_animation, ready_animation;
+		Slider list_slider, detail_slider;
+		std::vector<Row> rows;
+		std::set<int16_t> folded[3];
 		Animation portrait;
-		Text heading, level_text, description, objective, goals, location, reward, completed_on;
-		Text completion_count, empty_detail;
-		struct QuestRow { int16_t id; Text title; bool eligible; };
-		std::vector<QuestRow> rows;
-		Text group_title;
-		bool collapsed = false, all_levels = false, current_location = false;
-		bool click_down = false, detail_open = true;
-		int16_t selected = -1, list_offset = 0, detail_offset = 0, reward_y = 245, detail_height = 235;
+		Text title, jobs, levels, description;
+		std::vector<InlineIcon> icons;
+		std::vector<QuestObjective> shown_goals;
+		bool details_open = false;
+		int16_t selected = -1, list_offset = 0, detail_offset = 0;
 		int32_t target_npc = 0, target_map = -1;
 		Point<int16_t> cursor_relative;
 		uint64_t seen_revision = 0;
 		int16_t seen_job = -1, seen_level = -1;
-		int32_t seen_map = -1;
-		std::string seen_search;
-		static constexpr int16_t DETAIL_X = 295, ROW_Y = 82, ROW_HEIGHT = 18, VISIBLE_ROWS = 15;
 	};
 }

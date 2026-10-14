@@ -68,6 +68,8 @@ pub struct SetFieldPacket {
     pub character_id: i32,
     pub character_name: String,
     pub map_id: i32,
+    /// The portal the character appears at.
+    pub spawn_point: u8,
     pub level: u8,
     pub exp: i32,
     pub str: i16,
@@ -84,6 +86,9 @@ pub struct SetFieldPacket {
     /// How many of each item the bags hold (not counting equipped items).
     pub items: BTreeMap<i32, i32>,
     pub meso: i32,
+    /// The Monster Book's cover card and each card's copies, by card id.
+    pub monster_book_cover: i32,
+    pub monster_book: BTreeMap<i32, u8>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -148,6 +153,7 @@ struct CharacterMeta {
     id: i32,
     name: String,
     map_id: i32,
+    spawn_point: u8,
     level: u8,
     exp: i32,
     str: i16,
@@ -212,6 +218,9 @@ pub fn opcode_name(opcode: i16) -> &'static str {
         x if x == SendOpcode::LastConnectedWorld as i16 => "LastConnectedWorld",
         x if x == SendOpcode::RecommendedWorlds as i16 => "RecommendedWorlds",
         x if x == SendOpcode::SetField as i16 => "SetField",
+        x if x == SendOpcode::SetCashShop as i16 => "SetCashShop",
+        x if x == SendOpcode::QueryCashResult as i16 => "QueryCashResult",
+        x if x == SendOpcode::CashShopOperation as i16 => "CashShopOperation",
         x if x == SendOpcode::Whisper as i16 => "Whisper",
         x if x == SendOpcode::SpawnPlayer as i16 => "SpawnPlayer",
         x if x == SendOpcode::SpawnNpc as i16 => "SpawnNpc",
@@ -234,6 +243,11 @@ pub fn opcode_name(opcode: i16) -> &'static str {
         x if x == SendOpcode::KillMonster as i16 => "KillMonster",
         x if x == SendOpcode::DropItemFromMapObject as i16 => "DropItemFromMapObject",
         x if x == SendOpcode::RemoveItemFromMap as i16 => "RemoveItemFromMap",
+        x if x == SendOpcode::MonsterBookSetCard as i16 => "MonsterBookSetCard",
+        x if x == SendOpcode::MonsterBookSetCover as i16 => "MonsterBookSetCover",
+        x if x == SendOpcode::SpawnReactor as i16 => "SpawnReactor",
+        x if x == SendOpcode::HitReactor as i16 => "HitReactor",
+        x if x == SendOpcode::RemoveReactor as i16 => "RemoveReactor",
         _ => "Unknown",
     }
 }
@@ -402,6 +416,14 @@ pub fn build_all_chat(message: &str, show: u8) -> Result<Packet, String> {
     Ok(packet)
 }
 
+pub fn build_face_expression(emote: i32) -> Result<Packet, String> {
+    let mut packet = packet_with_opcode(RecvOpcode::FaceExpression as i16);
+    packet
+        .write_int(emote)
+        .map_err(|e| format!("failed to write face-expression emote: {e}"))?;
+    Ok(packet)
+}
+
 pub fn build_player_move(movement_bytes: &[u8]) -> Result<Packet, String> {
     let mut packet = packet_with_opcode(RecvOpcode::PlayerMove as i16);
     packet
@@ -411,6 +433,16 @@ pub fn build_player_move(movement_bytes: &[u8]) -> Result<Packet, String> {
         .write_bytes(movement_bytes)
         .map_err(|e| format!("failed to write movement bytes: {e}"))?;
     Ok(packet)
+}
+
+/// SHOP on the status bar.
+pub fn build_enter_cash_shop() -> Packet {
+    packet_with_opcode(RecvOpcode::EnterCashShop as i16)
+}
+
+/// The Cash Shop's exit button: CHANGE_MAP with no body.
+pub fn build_leave_cash_shop() -> Packet {
+    packet_with_opcode(RecvOpcode::ChangeMap as i16)
 }
 
 pub fn build_change_map(target_map_id: i32, portal_name: &str) -> Result<Packet, String> {
@@ -693,10 +725,27 @@ pub fn decode_set_field(packet: &Packet) -> Result<SetFieldPacket, String> {
         quests.insert(id, 2);
     }
 
+    // Minigame records and rings (the server sends none), then the teleport
+    // rocks.
+    for _ in 0..4 {
+        if cursor.read_short().map_err(|e| e.to_string())? != 0 {
+            return Err("unexpected minigame or ring records".into());
+        }
+    }
+    skip(&mut cursor, 15 * 4)?;
+    let monster_book_cover = cursor.read_int().map_err(|e| e.to_string())?;
+    cursor.read_byte().map_err(|e| e.to_string())?;
+    let mut monster_book = BTreeMap::new();
+    for _ in 0..cursor.read_short().map_err(|e| e.to_string())? {
+        let card = 2_380_000 + i32::from(cursor.read_short().map_err(|e| e.to_string())?);
+        monster_book.insert(card, cursor.read_byte().map_err(|e| e.to_string())?);
+    }
+
     Ok(SetFieldPacket {
         character_id: meta.id,
         character_name: meta.name,
         map_id: meta.map_id,
+        spawn_point: meta.spawn_point,
         level: meta.level,
         exp: meta.exp,
         str: meta.str,
@@ -709,6 +758,8 @@ pub fn decode_set_field(packet: &Packet) -> Result<SetFieldPacket, String> {
         equipped,
         items,
         meso,
+        monster_book_cover,
+        monster_book,
     })
 }
 
@@ -1026,12 +1077,14 @@ fn decode_character_meta(cursor: &mut Cursor<&[u8]>) -> Result<CharacterMeta, St
     let map_id = cursor
         .read_int()
         .map_err(|e| format!("failed to read character map id: {e}"))?;
-    skip(cursor, 1 + 4)?;
+    let spawn_point = cursor.read_byte().map_err(|e| e.to_string())?;
+    skip(cursor, 4)?;
 
     Ok(CharacterMeta {
         id,
         name,
         map_id,
+        spawn_point,
         level,
         exp,
         str,

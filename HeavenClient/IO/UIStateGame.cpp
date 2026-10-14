@@ -21,20 +21,22 @@
 #include "InputFocus.h"
 
 #include "UITypes/UIBuffList.h"
+#include "UITypes/UIPartyHP.h"
 #include "UITypes/UIQuestHelper.h"
 #include "UITypes/UIChannel.h"
 #include "UITypes/UICharInfo.h"
-#include "UITypes/UIChat.h"
 #include "UITypes/UIChatBar.h"
 #include "UITypes/UIEquipInventory.h"
 #include "UITypes/UIEvent.h"
 #include "UITypes/UIItemInventory.h"
 #include "UITypes/UIKeyConfig.h"
+#include "UITypes/UIMessenger.h"
 #include "UITypes/UIMiniMap.h"
 #include "UITypes/UIQuestComplete.h"
 #include "UITypes/UIQuestLog.h"
 #include "UITypes/UIQuit.h"
 #include "UITypes/UIShop.h"
+#include "UITypes/UIMonsterBook.h"
 #include "UITypes/UISkillBook.h"
 #include "UITypes/UIStatsInfo.h"
 #include "UITypes/UIStatusBar.h"
@@ -68,6 +70,8 @@ namespace ms
 					return Tooltip::Parent::WORLDMAP;
 				case UIElement::Type::MINIMAP:
 					return Tooltip::Parent::MINIMAP;
+				case UIElement::Type::MONSTERBOOK:
+					return Tooltip::Parent::MONSTERBOOK;
 				default:
 					return Tooltip::Parent::NONE;
 			}
@@ -89,6 +93,7 @@ namespace ms
 		emplace<UIBuffList>();
 		emplace<UIQuestHelper>(Stage::get().get_player().get_quests(), inventory);
 		emplace<UIQuestComplete>(Stage::get().get_player().get_quests(), inventory);
+		emplace<UIPartyHP>(Stage::get().get_player().get_party(), stats);
 		emplace<UIShop>(look, inventory);
 
 		VWIDTH = Constants::Constants::get().get_viewwidth();
@@ -200,6 +205,8 @@ namespace ms
 	{
 		if (UIElement *front = get_front(pos))
 			front->doubleclick(pos);
+		else if (int32_t cid = Stage::get().character_at(pos))
+			emplace<UICharInfo>(cid);
 	}
 
 	void UIStateGame::rightclick(Point<int16_t> pos)
@@ -241,6 +248,11 @@ namespace ms
 										Stage::get().get_player().get_skills()
 								);
 								break;
+							case KeyAction::Id::MONSTERBOOK:
+								emplace<UIMonsterBook>(
+										Stage::get().get_player().get_monsterbook()
+								);
+								break;
 							case KeyAction::Id::FRIENDS:
 							case KeyAction::Id::PARTY:
 							case KeyAction::Id::BOSSPARTY:
@@ -253,10 +265,8 @@ namespace ms
 										tab = UIUserList::Tab::FRIEND;
 										break;
 									case KeyAction::Id::PARTY:
-										tab = UIUserList::Tab::PARTY;
-										break;
 									case KeyAction::Id::BOSSPARTY:
-										tab = UIUserList::Tab::BOSS;
+										tab = UIUserList::Tab::PARTY;
 										break;
 								}
 
@@ -278,12 +288,7 @@ namespace ms
 								emplace<UIWorldMap>();
 								break;
 							case KeyAction::Id::MAPLECHAT:
-							{
-								auto chat = UI::get().get_element<UIChat>();
-
-								if (!chat || !chat->is_active())
-									emplace<UIChat>();
-							}
+								UIMessenger::toggle();
 								break;
 							case KeyAction::Id::MINIMAP:
 								if (auto minimap = UI::get().get_element<UIMiniMap>())
@@ -314,6 +319,14 @@ namespace ms
 								break;
 							case KeyAction::Id::CASHSHOP:
 								EnterCashShopPacket().dispatch();
+								break;
+							case KeyAction::Id::SAY:
+							case KeyAction::Id::PARTYCHAT:
+								if (auto chatbar = UI::get().get_element<UIChatBar>())
+									chatbar->set_target(action == KeyAction::Id::PARTYCHAT
+										? UIChatBar::Target::PARTY
+										: UIChatBar::Target::ALL);
+
 								break;
 							case KeyAction::Id::TOGGLECHAT:
 								if (auto chatbar = UI::get().get_element<UIChatBar>())
@@ -380,7 +393,8 @@ namespace ms
 			return Cursor::State::GRABBING;
 		} else
 		{
-			bool clicked = cursorstate == Cursor::State::CLICKING || cursorstate == Cursor::State::VSCROLLIDLE;
+			bool clicked = cursorstate == Cursor::State::CLICKING || cursorstate == Cursor::State::VSCROLLIDLE
+				|| cursorstate == Cursor::State::HSCROLLIDLE;
 
 			// A focused window that has closed lets go of the cursor, which
 			// then reaches whatever is under it.
@@ -463,7 +477,7 @@ namespace ms
 
 	void UIStateGame::send_close()
 	{
-		UI::get().emplace<UIQuit>(stats);
+		ask_to_quit();
 	}
 
 	void UIStateGame::drag_icon(Icon *drgic)
@@ -564,6 +578,7 @@ namespace ms
 					UIElement::Type::BUFFLIST,
 					UIElement::Type::QUESTHELPER,
 					UIElement::Type::QUESTCOMPLETE,
+					UIElement::Type::PARTYHP,
 					UIElement::Type::NPCTALK,
 					UIElement::Type::SHOP
 			};
