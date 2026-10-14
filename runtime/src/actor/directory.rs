@@ -666,7 +666,7 @@ mod tests {
         assert!(received(&mut alice).is_empty());
 
         // Offline members stay in the party; the leader leaving ends it.
-        directory.unregister(2, 2);
+        directory.unregister(2, 2, false);
         assert_eq!(received(&mut alice), ["op 0x7"]);
         request(&mut directory, 1, PartyRequest::Leave);
         assert_eq!(received(&mut alice), ["op 0xc", "party None"]);
