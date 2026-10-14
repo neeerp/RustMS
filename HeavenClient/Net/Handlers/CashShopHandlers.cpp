@@ -21,6 +21,7 @@
 
 #include "../../Gameplay/Stage.h"
 #include "../../IO/UI.h"
+#include "../../IO/UITypes/UICashShop.h"
 #include "../../IO/Window.h"
 
 #include "Timer.h"
@@ -32,7 +33,7 @@ namespace ms
 		CashShopParser::parseCharacterInfo(recv);
 
 		recv.skip_byte();	// Not MTS
-		recv.skip_string();	// account_name
+		std::string account = recv.read_string();
 		recv.skip_int();
 
 		int16_t specialcashitem_size = recv.read_short();
@@ -46,6 +47,11 @@ namespace ms
 
 		recv.skip(121);
 
+		// The Best Items of each category, for each gender. The column is the
+		// same on every tab, so keep the first category's for the player.
+		bool female = Stage::get().get_player().get_stats().get_female();
+		std::vector<int32_t> best;
+
 		for (size_t cat = 1; cat <= 8; cat++)
 		{
 			for (size_t gender = 0; gender < 2; gender++)
@@ -54,7 +60,10 @@ namespace ms
 				{
 					recv.skip_int(); // category
 					recv.skip_int(); // gender
-					recv.skip_int(); // commoditysn
+					int32_t sn = recv.read_int();
+
+					if (cat == 1 && gender == female)
+						best.push_back(sn);
 				}
 			}
 		}
@@ -67,13 +76,13 @@ namespace ms
 		transition();
 
 		UI::get().change_state(UI::State::CASHSHOP);
+
+		if (auto cashshop = UI::get().get_element<UICashShop>())
+			cashshop->set_account(account, best);
 	}
 
 	void SetCashShopHandler::transition() const
 	{
-		Constants::Constants::get().set_viewwidth(1024);
-		Constants::Constants::get().set_viewheight(768);
-
 		float fadestep = 0.025f;
 
 		Window::get().fadeout(
@@ -93,5 +102,87 @@ namespace ms
 		GraphicsGL::get().lock();
 		Stage::get().clear();
 		Timer::get().start();
+	}
+
+	void QueryCashResultHandler::handle(InPacket& recv) const
+	{
+		int32_t credit = recv.read_int();
+		int32_t points = recv.read_int();
+		int32_t prepaid = recv.read_int();
+
+		if (auto cashshop = UI::get().get_element<UICashShop>())
+			cashshop->set_balance(credit, points, prepaid);
+	}
+
+	void CashShopOperationHandler::handle(InPacket& recv) const
+	{
+		auto cashshop = UI::get().get_element<UICashShop>();
+
+		if (!cashshop)
+			return;
+
+		int8_t mode = recv.read_byte();
+
+		switch (mode)
+		{
+		case 0x4B:
+		{
+			// The Cash Inventory
+			int16_t count = recv.read_short();
+			std::vector<UICashShop::CashItem> items;
+
+			for (int16_t i = 0; i < count; i++)
+			{
+				int64_t cash_id = recv.read_long();
+				recv.skip_int();	// account id
+				recv.skip_int();	// character id
+				int32_t item_id = recv.read_int();
+				recv.skip_int();	// sn
+				int16_t quantity = recv.read_short();
+				recv.skip(13);		// gift from
+				recv.skip_long();	// expiration
+				recv.skip_long();
+
+				items.push_back({ cash_id, item_id, quantity });
+			}
+
+			recv.skip_short();	// storage slots
+			recv.skip_short();	// character slots
+
+			cashshop->set_cash_items(items);
+			break;
+		}
+		case 0x4D:
+		{
+			// Gifts waiting for the account join the Cash Inventory.
+			int16_t count = recv.read_short();
+			std::vector<UICashShop::CashItem> items;
+
+			for (int16_t i = 0; i < count; i++)
+			{
+				int64_t cash_id = recv.read_long();
+				int32_t item_id = recv.read_int();
+				recv.skip(13);	// from
+				recv.skip(73);	// message
+
+				items.push_back({ cash_id, item_id, 1 });
+			}
+
+			cashshop->add_cash_items(items);
+			break;
+		}
+		case 0x4F:
+		{
+			std::vector<int32_t> sns;
+
+			for (size_t i = 0; i < 10; i++)
+				sns.push_back(recv.read_int());
+
+			cashshop->set_wish_list(sns);
+			break;
+		}
+		default:
+			break;
+		}
 	}
 }

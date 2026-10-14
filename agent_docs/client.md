@@ -271,6 +271,29 @@ side yet.
 51 outbound opcodes are defined (`Net/OutPacket.h`) and 63 inbound handlers
 are registered (`Net/PacketSwitch.cpp`). Anything not listed there is silently ignored by the client.
 
+## Cash Shop
+
+`UICashShop` draws the 800x600 v83 Cash Shop from `UIClassic.nx`
+`CashShop.img`, matched against 2008–2010 footage. The window doesn't change
+the screen size.
+
+- **Catalog:** `Etc.nx` `Commodity.img` is the catalog and `Category.img`
+  names the sub-tabs. A commodity's SN holds its tab and sub-tab (50200003 is
+  tab 5, ETC, sub-tab 2, Game). `Data/CashCatalog.h` sorts a sub-tab by
+  `Priority` (highest first), then SN. HOT items have the highest priorities,
+  so a sub-tab's first page is all HOT, as in the footage. `Class` picks the
+  NEW/SALE/HOT/EVENT label, and unlabelled Event > New items show NEW.
+- **Gender:** items for the other gender are hidden. Commodities whose item has
+  no data are skipped.
+- **Background:** the preview background follows the job: Cygnus and Aran have
+  their own.
+- **Packets:** SET_CASH_SHOP gives the account name and the Best Item SNs for
+  the player's gender. QUERY_CASH_RESULT (324) gives the NX Credit, Maple Point
+  and NX Prepaid balances. CASHSHOP_OPERATION (325) modes 0x4B (Cash
+  Inventory), 0x4D (gifts waiting for the account) and 0x4F (wish list) are read.
+- **Not served yet:** BUY, GIFT, RESERVE, the slot expansions, CHARGE, CHECK
+  CASH and COUPON do nothing.
+
 ## Estimated client work for a complete game
 
 | System | Client status | Effort |
@@ -278,7 +301,7 @@ are registered (`Net/PacketSwitch.cpp`). Anything not listed there is silently i
 | Buddy groups | Default group only | S |
 | Guild | Skeleton only, plus guild emblem/BBS UIs missing | L |
 | Trade / storage / player shops | Nothing | L |
-| Cash shop purchase and inventory | Display only | M |
+| Cash shop purchase, gifts, wish list | Display only | M |
 | Quest accept/complete UI flow | Partial | S |
 | Pets and mounts | Partial rendering, no interaction | M |
 | Memo, mail, MTS | Nothing | M each |

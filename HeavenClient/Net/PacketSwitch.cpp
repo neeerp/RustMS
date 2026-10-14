@@ -146,7 +146,9 @@ namespace ms
 		UPDATE_PARTYMEMBER_HP = 201,
 
 		/// Cash Shop
-		SET_CASH_SHOP = 127
+		SET_CASH_SHOP = 127,
+		QUERY_CASH_RESULT = 324,
+		CASHSHOP_OPERATION = 325
 	};
 
 	PacketSwitch::PacketSwitch()
@@ -242,6 +244,8 @@ namespace ms
 
 		// Cash Shop
 		emplace<SET_CASH_SHOP, SetCashShopHandler>();
+		emplace<QUERY_CASH_RESULT, QueryCashResultHandler>();
+		emplace<CASHSHOP_OPERATION, CashShopOperationHandler>();
 
 		// TODO: New handlers, they need coded and moved to a proper file.
 		emplace<CHECK_SPW_RESULT, CheckSpwResultHandler>();

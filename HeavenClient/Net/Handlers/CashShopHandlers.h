@@ -30,4 +30,18 @@ namespace ms
 	private:
 		void transition() const;
 	};
+
+	// Handler for the account's NX balances
+	class QueryCashResultHandler : public PacketHandler
+	{
+	public:
+		void handle(InPacket& recv) const override;
+	};
+
+	// Handler for the Cash Inventory, gifts and wish list
+	class CashShopOperationHandler : public PacketHandler
+	{
+	public:
+		void handle(InPacket& recv) const override;
+	};
 }

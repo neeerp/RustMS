@@ -27,6 +27,8 @@ if(HEAVENCLIENT_BUILD_TESTS)
     add_test(NAME npc_text COMMAND npc_text_tests)
     add_executable(map_tooltip_tests tests/map_tooltip.cpp)
     add_test(NAME map_tooltip COMMAND map_tooltip_tests)
+    add_executable(cash_catalog_tests tests/cash_catalog.cpp)
+    add_test(NAME cash_catalog COMMAND cash_catalog_tests)
     add_executable(answer_focus_tests tests/answer_focus.cpp)
     add_test(NAME answer_focus COMMAND answer_focus_tests)
     add_executable(slider_steps_tests tests/slider_steps.cpp)
@@ -179,6 +181,7 @@ add_executable(HeavenClient
     Data/EquipData.h
     Data/ItemData.cpp
     Data/ItemData.h
+    Data/CashCatalog.h
     Data/JobData.cpp
     Data/JobData.h
     Data/SkillData.cpp
