@@ -293,7 +293,7 @@ fn world_routes() -> &'static HashMap<i16, WorldRoute> {
     ROUTES.get_or_init(|| {
         use RecvOpcode as Op;
         use WorldRoute::*;
-        let table: [(Op, WorldRoute); 25] = [
+        let table: [(Op, WorldRoute); 26] = [
             (Op::PlayerLoggedIn, PreGame(&world::PlayerLoggedInHandler)),
             (Op::PlayerMove, InGame(&world::PlayerMoveHandler)),
             (Op::ChangeChannel, InGame(&world::ChangeChannelHandler)),
@@ -308,6 +308,7 @@ fn world_routes() -> &'static HashMap<i16, WorldRoute> {
             ),
             (Op::ChangeKeybinds, InGame(&world::ChangeKeybindsHandler)),
             (Op::AllChat, InGame(&world::AllChatHandler)),
+            (Op::FaceExpression, InGame(&world::FaceExpressionHandler)),
             (Op::Whisper, InGame(&world::WhisperHandler)),
             (Op::TalkToNpc, InGame(&world::NpcTalkHandler)),
             (Op::NpcTalkMore, InGame(&world::NpcTalkMoreHandler)),

@@ -271,7 +271,13 @@ namespace ms
 				player.use_item(action);
 				break;
 			case KeyType::Id::FACE:
-				player.set_expression(action);
+				if (down)
+				{
+					player.set_expression(action);
+					// v83 numbers emotes from F1's action (100) as 1.
+					FaceExpressionPacket(action - 99).dispatch();
+				}
+
 				break;
 		}
 	}
