@@ -36,6 +36,8 @@ pub enum RecvOpcode {
     Whisper = 0x78,
     TalkToNpc = 0x3A,
     NpcTalkMore = 0x3C,
+    GatherItems = 0x45,
+    SortItems = 0x46,
     ItemMove = 0x47,
     UseItem = 0x48,
     SpendAp = 0x57,

@@ -13,6 +13,7 @@ order the client must apply them:
 | `take(kind, slot, quantity)` | Take from one slot (using an item) |
 | `move_in_bag(kind, from, to, slot_max)` | Move, merge onto a stack, or swap |
 | `equip(from, to)` / `unequip(from, to)` | Wear or take off; overall ⇄ pants and two-handed weapon ⇄ shield take each other off (needs a free slot) |
+| `gather(kind)` / `sort(kind)` | Lay the bag out from slot 1, in slot order or by item id (ties keep slot order); stacks are not merged |
 
 `net::packet::build::world::inventory::build_inventory_operation` turns the
 changes into INVENTORY_OPERATION (`0x1D`); worn positions travel as the EQUIP
@@ -49,8 +50,15 @@ stats (`Loot::Dropped`). Quest and `tradeBlock` items leave the bag but don't
 reach the floor: everyone sees them vanish (DROP_ITEM_FROM_MAPOBJECT 3).
 MESO_DROP (`0x5E`: tick, amount) drops 10 to 50,000 mesos the player holds;
 HeavenClient's meso button asks how many with `UIEnterNumber`. The field
-places either kind where it last saw the player (it has no footholds), and
-anyone may pick it up at once (ownership 2). Dead players can't drop.
+places either kind where it last saw the player, and anyone may pick it up
+at once (ownership 2). Dead players can't drop.
+
+GATHER_ITEMS (`0x45`) and SORT_ITEMS (`0x46`) (tick, type) are the item
+window's Gather and Sort buttons. The rearrangement goes out as one
+INVENTORY_OPERATION of swaps (mode 2), then GATHER_ITEM_RESULT (`0x34`) or
+SORT_ITEM_RESULT (`0x35`) (`0`, type), which flips the button between Gather
+and Sort. A bag that is already in order gets only the result and an
+enable-actions stat update.
 
 HeavenClient cancels any icon drag before applying an INVENTORY_OPERATION,
 because the dragged icon points into the icons being rebuilt.
@@ -73,8 +81,8 @@ and none within 9 s of the player's last PLAYER_MOVE; others are ignored.
 ## Tests
 
 `game` unit tests cover stacking, full bags, removal order, merging,
-swapping, and overall/pants; `net` covers the packet layouts and the handler;
+swapping, overall/pants, and gather/sort (replaying the swaps); `net` covers the packet layouts and the handler;
 `inventory_moves` (integration) equips, unequips, moves, checks refusals,
-observes UPDATE_CHAR_LOOK from a second player, and checks persistence;
-`player_drops` drops a weapon for a second player to pick up and drops
-mesos earned from snails, checking both losses are saved.
+observes UPDATE_CHAR_LOOK from a second player, gathers and sorts the equip
+bag, and checks persistence; `player_drops` drops a weapon for a second player
+to pick up and drops mesos earned from snails, checking both losses are saved.
