@@ -344,6 +344,9 @@ namespace ms
 							case KeyAction::Id::CHANGECHANNEL:
 								emplace<UIChannel>();
 								break;
+							case KeyAction::Id::INTERACT_HARVEST:
+								Stage::get().talk_to_nearest_npc();
+								break;
 							default:
 								std::cout << "Action (" << action << ") not handled!" << std::endl;
 								break;

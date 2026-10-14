@@ -132,6 +132,10 @@ namespace ms
 
 		void draw_buttons(float alpha) const;
 
+		// Whether something drawn over this button keeps the cursor from it.
+		virtual bool button_covered(uint16_t buttonid, Point<int16_t> cursorpos) const
+		{ return false; }
+
 		std::map<uint16_t, std::unique_ptr<Button>> buttons;
 		std::vector<Sprite> sprites;
 		Point<int16_t> position;

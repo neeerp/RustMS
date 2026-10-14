@@ -129,6 +129,7 @@ namespace ms
 
 			is_key_down.clear();
 			Stage::get().release_keys();
+			cursor.set_pressed(false);
 		}
 	}
 
@@ -146,6 +147,7 @@ namespace ms
 	{
 		Cursor::State cursorstate = (pressed && enabled) ? Cursor::State::CLICKING : Cursor::State::IDLE;
 		Point<int16_t> cursorpos = cursor.get_position();
+		cursor.set_pressed(pressed && enabled);
 		send_cursor(cursorpos, cursorstate);
 
 		if (focusedtextfield && pressed)

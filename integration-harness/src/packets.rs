@@ -70,7 +70,12 @@ pub struct SetFieldPacket {
     pub map_id: i32,
     pub level: u8,
     pub exp: i32,
+    pub str: i16,
+    pub max_hp: i16,
     pub ap: i16,
+    pub sp: i16,
+    /// Skill levels by skill id.
+    pub skills: BTreeMap<i32, i32>,
     pub quests: std::collections::BTreeMap<i16, u8>,
     /// Progress strings (kill counts) of started quests.
     pub quest_progress: BTreeMap<i16, String>,
@@ -145,7 +150,10 @@ struct CharacterMeta {
     map_id: i32,
     level: u8,
     exp: i32,
+    str: i16,
+    max_hp: i16,
     ap: i16,
+    sp: i16,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -214,6 +222,7 @@ pub fn opcode_name(opcode: i16) -> &'static str {
         x if x == SendOpcode::FieldEffect as i16 => "FieldEffect",
         x if x == SendOpcode::StatChange as i16 => "StatChange",
         x if x == SendOpcode::ShowStatusInfo as i16 => "ShowStatusInfo",
+        x if x == SendOpcode::UpdateSkills as i16 => "UpdateSkills",
         x if x == SendOpcode::UpdateQuestInfo as i16 => "UpdateQuestInfo",
         x if x == SendOpcode::PlayerHint as i16 => "PlayerHint",
         x if x == SendOpcode::ShowItemGainInChat as i16 => "ShowItemGainInChat",
@@ -648,10 +657,11 @@ pub fn decode_set_field(packet: &Packet) -> Result<SetFieldPacket, String> {
             *items.entry(item_id).or_insert(0) += i32::from(quantity);
         }
     }
-    let skills = cursor.read_short().map_err(|e| e.to_string())?;
-    for _ in 0..skills {
+    let mut skills = BTreeMap::new();
+    for _ in 0..cursor.read_short().map_err(|e| e.to_string())? {
         let skill_id = cursor.read_int().map_err(|e| e.to_string())?;
-        skip(&mut cursor, 4 + 8)?;
+        skills.insert(skill_id, cursor.read_int().map_err(|e| e.to_string())?);
+        skip(&mut cursor, 8)?;
         if (skill_id / 10_000) % 10 == 2 {
             skip(&mut cursor, 4)?;
         }
@@ -689,7 +699,11 @@ pub fn decode_set_field(packet: &Packet) -> Result<SetFieldPacket, String> {
         map_id: meta.map_id,
         level: meta.level,
         exp: meta.exp,
+        str: meta.str,
+        max_hp: meta.max_hp,
         ap: meta.ap,
+        sp: meta.sp,
+        skills,
         quests,
         quest_progress,
         equipped,
@@ -1000,9 +1014,13 @@ fn decode_character_meta(cursor: &mut Cursor<&[u8]>) -> Result<CharacterMeta, St
 
     skip(cursor, 1 + 1 + 4 + 4 + 8 + 8 + 8)?;
     let level = cursor.read_byte().map_err(|e| e.to_string())?;
-    skip(cursor, 2 + 2 * 8)?;
+    skip(cursor, 2)?; // job
+    let str = cursor.read_short().map_err(|e| e.to_string())?;
+    skip(cursor, 2 * 4)?; // dex, int, luk, hp
+    let max_hp = cursor.read_short().map_err(|e| e.to_string())?;
+    skip(cursor, 2 * 2)?; // mp, max mp
     let ap = cursor.read_short().map_err(|e| e.to_string())?;
-    skip(cursor, 2)?;
+    let sp = cursor.read_short().map_err(|e| e.to_string())?;
     let exp = cursor.read_int().map_err(|e| e.to_string())?;
     skip(cursor, 2 + 4)?;
     let map_id = cursor
@@ -1016,7 +1034,10 @@ fn decode_character_meta(cursor: &mut Cursor<&[u8]>) -> Result<CharacterMeta, St
         map_id,
         level,
         exp,
+        str,
+        max_hp,
         ap,
+        sp,
     })
 }
 

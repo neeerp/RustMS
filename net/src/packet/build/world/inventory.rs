@@ -70,6 +70,24 @@ pub fn build_inventory_operation(
     Ok(p)
 }
 
+/// GATHER_ITEM_RESULT: the bag is gathered; the item window offers Sort.
+pub fn build_gather_result(kind: InventoryType) -> Result<Packet, NetworkError> {
+    build_rearrange_result(SendOpcode::GatherItemResult, kind)
+}
+
+/// SORT_ITEM_RESULT: the bag is sorted; the item window offers Gather again.
+pub fn build_sort_result(kind: InventoryType) -> Result<Packet, NetworkError> {
+    build_rearrange_result(SendOpcode::SortItemResult, kind)
+}
+
+fn build_rearrange_result(opcode: SendOpcode, kind: InventoryType) -> Result<Packet, NetworkError> {
+    let mut p = Packet::new_empty();
+    p.write_short(opcode as i16)?;
+    p.write_byte(0)?;
+    p.write_byte(wire_type(kind))?;
+    Ok(p)
+}
+
 /// SHOW_STATUS_INFO mode 0: "You have gained an item" on the right.
 pub fn build_item_gain(item_id: i32, quantity: i32) -> Result<Packet, NetworkError> {
     let mut p = Packet::new_empty();

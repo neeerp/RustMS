@@ -29,8 +29,6 @@
 
 namespace ms
 {
-	// Requests a stat increase by spending AP
-	// Opcode: SPEND_AP(87)
 	// Reports natural HP/MP recovery; the server checks the amount and timing
 	// Opcode: HEAL_OVER_TIME(89)
 	class HealOverTimePacket : public OutPacket
@@ -45,6 +43,9 @@ namespace ms
 		}
 	};
 
+	// Requests a stat increase by spending AP. HP and MP buttons send the
+	// MAXHP and MAXMP codes.
+	// Opcode: SPEND_AP(87)
 	class SpendApPacket : public OutPacket
 	{
 	public:

@@ -49,6 +49,20 @@ namespace ms
 			return text;
 		}
 
+		// One line of text, cut to fit `width` with "..", as the original
+		// quest window cuts long quest names.
+		Text one_line(Text::Font font, Color::Name color, std::string text, int16_t width)
+		{
+			Text result(font, Text::LEFT, color, text, 0, false);
+			while (result.width() > width && text.size() > 1)
+			{
+				text.pop_back();
+				while (text.size() > 1 && text.back() == ' ') text.pop_back();
+				result.change_text(text + "..");
+			}
+			return result;
+		}
+
 		// Follow the active beginner graph, avoiding old disconnected map
 		// variants that contain duplicates of these NPCs.
 		int32_t npc_map(int32_t npc)
@@ -240,12 +254,7 @@ namespace ms
 			auto check = nl::nx::quest["Check.img"][std::to_string(id)]["0"];
 			int16_t minimum = check["lvmin"] ? check["lvmin"].get_integer() : 1;
 			std::string label = "(Lv. " + std::to_string(minimum) + ") " + name;
-			Text title(Text::A11M, Text::LEFT, Color::Name::DARKGREY, label, 0, false);
-			while (title.width() > 235 && label.size() > 4)
-			{
-				label.pop_back(); title.change_text(label + "...");
-			}
-			rows.push_back({id, std::move(title), tab != TAB0 || std::find(eligible.begin(), eligible.end(), id) != eligible.end()});
+			rows.push_back({id, one_line(Text::A11M, Color::Name::DARKGREY, label, 235), tab != TAB0 || std::find(eligible.begin(), eligible.end(), id) != eligible.end()});
 		}
 		group_title = Text(Text::A11B, Text::LEFT, Color::Name::WHITE, "Maple Island (" + std::to_string(rows.size()) + ")", 0, false);
 		completion_count = Text(Text::A11B, Text::RIGHT, Color::Name::WHITE, std::to_string(questlog.completed_quests().size()));
@@ -274,7 +283,7 @@ namespace ms
 		auto check = nl::nx::quest["Check.img"][std::to_string(id)];
 		target_npc = check[tab == TAB0 ? "0" : "1"]["npc"];
 		target_map = npc_map(target_npc);
-		heading = Text(Text::A12B, Text::LEFT, Color::Name::WHITE, info["name"], 172);
+		heading = one_line(Text::A12B, Color::Name::WHITE, info["name"], 172);
 		int16_t minimum = check["0"]["lvmin"] ? check["0"]["lvmin"].get_integer() : 1;
 		std::string requirement = "Level " + std::to_string(minimum);
 		if (check["0"]["lvmax"]) requirement += " - " + std::to_string(check["0"]["lvmax"].get_integer());
@@ -385,7 +394,7 @@ namespace ms
 				info_header.draw(origin); info_tip.draw(origin);
 				portrait.draw(origin + Point<int16_t>(234, 119), alpha);
 				heading.draw(origin + Point<int16_t>(20, 43));
-				level_text.draw(origin + Point<int16_t>(20, 43 + std::max<int16_t>(20, heading.height()) + 8));
+				level_text.draw(origin + Point<int16_t>(20, 71));
 				Range<int16_t> clip(position.y() + 130, position.y() + 364);
 				auto content = origin - Point<int16_t>(0, detail_offset);
 				(tab == TAB2 ? completed_on : objective).draw(content + Point<int16_t>(16, 140), clip);
