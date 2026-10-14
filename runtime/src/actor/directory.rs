@@ -1,18 +1,21 @@
-use crate::message::{ClientHandle, DirectoryMessage};
+use crate::message::{ClientHandle, DirectoryMessage, ServerMessage};
+use net::packet::build::world::messaging::{build_find_result, build_whisper_result, FindLocation};
 use net::{BroadcastScope, ClientId, WhisperDelivery};
 use packet::Packet;
 use std::collections::HashMap;
 use tokio::sync::mpsc;
-use tracing::{info, warn};
+use tracing::{error, info, warn};
 
 struct Entry {
     handle: ClientHandle,
     name: String,
+    channel_id: u8,
 }
 
 /// World-wide directory of online characters: who is online, under which
 /// name, on which channel. It owns no game state; it exists for features
-/// that cross fields (whispers, world broadcasts, and later buddies/parties).
+/// that cross fields (whispers, finds, world broadcasts, and later
+/// buddies/parties).
 pub struct WorldDirectory {
     rx: mpsc::Receiver<DirectoryMessage>,
     clients: HashMap<ClientId, Entry>,
@@ -46,6 +49,7 @@ impl WorldDirectory {
                 connection_id,
             } => self.unregister(client_id, connection_id),
             DirectoryMessage::Whisper { from, delivery } => self.whisper(from, delivery),
+            DirectoryMessage::Find { from, target_name } => self.find(from, &target_name),
             DirectoryMessage::Broadcast {
                 from,
                 scope,
@@ -67,7 +71,14 @@ impl WorldDirectory {
         }
         info!(client_id, name, channel_id, "Character online");
         self.names.insert(name.clone(), client_id);
-        self.clients.insert(client_id, Entry { handle, name });
+        self.clients.insert(
+            client_id,
+            Entry {
+                handle,
+                name,
+                channel_id,
+            },
+        );
     }
 
     fn unregister(&mut self, client_id: ClientId, connection_id: u64) {
@@ -98,6 +109,36 @@ impl WorldDirectory {
         } else {
             delivery.sender_failure_packet
         });
+    }
+
+    /// Tell the asker where a character is: their channel if it isn't the
+    /// asker's, otherwise their map, which only their own client knows.
+    fn find(&self, from: ClientId, target_name: &str) {
+        let Some(asker) = self.clients.get(&from) else {
+            return;
+        };
+        let target = self
+            .names
+            .get(target_name)
+            .and_then(|id| self.clients.get(id));
+        let packet = match target {
+            Some(target) if target.channel_id == asker.channel_id => {
+                target.handle.send(ServerMessage::Locate {
+                    reply_to: asker.handle.clone(),
+                });
+                return;
+            }
+            Some(target) => {
+                build_find_result(&target.name, FindLocation::Channel(target.channel_id))
+            }
+            None => build_whisper_result(target_name, false),
+        };
+        match packet {
+            Ok(packet) => {
+                asker.handle.send_packet(packet);
+            }
+            Err(e) => error!(client_id = from, "find result: {e}"),
+        }
     }
 
     fn broadcast(&self, from: ClientId, scope: BroadcastScope, packet: Packet) {

@@ -24,6 +24,7 @@
 
 #include "../../IO/UITypes/UIChatBar.h"
 #include "../../IO/UITypes/UIStatusMessenger.h"
+#include "../../Util/Misc.h"
 
 #include <nlnx/nx.hpp>
 
@@ -34,11 +35,30 @@ namespace ms
 	namespace
 	{
 		// Canonical v83 WHISPER (opcode 135) sub-modes sent by the server
-		// 0x0A: reply to our whisper request (string target, byte success)
+		// 0x09: reply to our find (string target, byte where, then for where
+		//       1 int map id, int x, int y; 2 int -1 (Cash Shop); 3 int channel (0-based))
+		// 0x0A: reply to our whisper or find request (string target, byte success)
 		// 0x12: incoming whisper (string sender, byte channel (0-based), byte from_admin, string message)
-		// Other modes (e.g. 0x09 find reply, 0x48 buddy whisper) are not handled and are ignored.
+		// Other modes (e.g. 0x48 buddy whisper) are not handled and are ignored.
+		constexpr int8_t FIND_RESULT_MODE = 0x09;
 		constexpr int8_t WHISPER_RESULT_MODE = 0x0A;
 		constexpr int8_t WHISPER_RECEIVE_MODE = 0x12;
+
+		// Where a /find found its character, or nothing for an unknown answer.
+		std::string build_find_chatline(const std::string& target, int8_t where, int32_t value)
+		{
+			switch (where)
+			{
+				case 1:
+					return "'" + target + "' is in " + NxHelper::Map::get_map_info_by_id(value).name + ".";
+				case 2:
+					return "'" + target + "' is in the Cash Shop.";
+				case 3:
+					return "'" + target + "' is in Channel " + std::to_string(value + 1) + ".";
+				default:
+					return {};
+			}
+		}
 
 		std::string build_whisper_chatline(const std::string& sender, bool from_admin, const std::string& message)
 		{
@@ -292,8 +312,21 @@ namespace ms
 			if (!success)
 			{
 				if (auto chatbar = UI::get().get_element<UIChatBar>())
-					chatbar->send_chatline("Unable to whisper " + target + ".", UIChatBar::LineType::RED);
+					chatbar->send_chatline("Unable to find '" + target + "'.", UIChatBar::LineType::RED);
 			}
+		}
+		else if (mode == FIND_RESULT_MODE)
+		{
+			std::string target = recv.read_string();
+			int8_t where = recv.read_byte();
+			int32_t value = recv.read_int();
+			std::string line = build_find_chatline(target, where, value);
+
+			if (line.empty())
+				return;
+
+			if (auto chatbar = UI::get().get_element<UIChatBar>())
+				chatbar->send_chatline(line, UIChatBar::LineType::YELLOW);
 		}
 	}
 

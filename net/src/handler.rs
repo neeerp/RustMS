@@ -231,6 +231,10 @@ pub enum WorldAction {
     /// The player's HP reached 0.
     Died,
     Whisper(WhisperDelivery),
+    /// Tell the player where a character is (`/find`).
+    Find {
+        target_name: String,
+    },
     ChangeChannel {
         channel_id: u8,
     },

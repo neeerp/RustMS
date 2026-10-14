@@ -76,8 +76,10 @@ the world server deletes `in_game` sessions for the channels it hosts.
   its handle is dropped and the next lookup starts a fresh actor (clients
   rejoin automatically).
 - **`WorldDirectory`** (`runtime/src/actor/directory.rs`) knows who is online
-  under which name. It handles whispers and world broadcasts, and kicks the
-  older connection when a character connects twice. It owns no game state.
+  under which name and on which channel. It handles whispers, `/find` (asking
+  the target's client for its map when it shares the asker's channel), and
+  world broadcasts, and kicks the older connection when a character connects
+  twice. It owns no game state.
 
 ### Backpressure rule
 
