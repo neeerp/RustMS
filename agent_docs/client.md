@@ -118,6 +118,13 @@ from `UI.nx`. Moved so far:
   (`New/Tab0`, or `Tab1` when selected) and its slot (`New/inventory`) until
   the window closes. BtGather and BtSort rearrange the bag, and BtCoin asks
   how many mesos to drop.
+- **Equipment window** (`UIEquipInventory`, `UIWindow.img/Equip`): the labelled
+  `backgrnd` grid (33 px cells from (5,35)) with an icon per worn slot, and the
+  `pet` panel that PET EQUIP opens beside it, laid out from period footage.
+  Cells that cannot be used are tinted red as in the footage: PANTS under an
+  overall, SHIELD beside a two-handed weapon, and the riding cells without
+  Monster Riding. RustMS has no pets, so the pet tabs are disabled and the pet
+  and MOB EQUIP cells hold nothing.
 
 `UIClassic.nx` is not one of NoLifeNx's standard files, so `NxFiles` opens it
 with `nl::file` instead of `nl::nx::load_all`.
