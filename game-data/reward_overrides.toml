@@ -1,5 +1,5 @@
 # Corrections to the imported (v95) drop data so it matches our v83 data.
-# Each entry replaces the pack's drops for that mob. Values here are facts
+# Each mob entry replaces the pack's drops for that mob. Values here are facts
 # from our own assets, not copied drop tables, so they are committed and also
 # apply when there is no content pack.
 
@@ -7,3 +7,14 @@
 # Tutorial Jr. Sentinel: Todd's Hunting Method (1035) checks for
 # Jr. Sentinel Shellpiece 4031802 (Quest.nx Check.img/1035/1/item).
 replace = [{ item = 4031802, prob = 1.0, quest = 1035 }]
+
+[reactors.2000]
+# Maple Island's scrap box. Pio's Collecting Recycled Goods (1008) checks for
+# 4031161 and 4031162 (Quest.nx Check.img/1008/1/item).
+quest_items = { 4031161 = 1008, 4031162 = 1008 }
+
+[reactors.2001]
+# Amherst's scrap boxes: the same box (Reactor.nx 0002001 and 0002000 share
+# the mBoxItem0 action), which the pack only lists under 2000.
+like = 2000
+quest_items = { 4031161 = 1008, 4031162 = 1008 }

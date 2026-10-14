@@ -10,6 +10,7 @@ pub mod items;
 pub mod lua_strings;
 pub mod mobs;
 pub mod quests;
+pub mod reactors;
 pub mod server_content;
 pub mod skills;
 
@@ -55,6 +56,18 @@ pub struct MapMobTemplate {
     /// Seconds before the mob respawns; negative means never.
     pub mob_time: i32,
     pub hide: bool,
+}
+
+/// A reactor (a breakable box and the like) from a map's `reactor` nodes.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct MapReactorTemplate {
+    pub reactor_id: i32,
+    pub x: i16,
+    pub y: i16,
+    pub flip: bool,
+    /// Seconds before a broken reactor comes back; negative means never.
+    pub reactor_time: i32,
+    pub name: String,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -148,6 +161,7 @@ pub struct FieldTemplate {
     pub on_user_enter: Option<String>,
     pub map_npcs: Vec<MapNpcTemplate>,
     pub mob_spawns: Vec<MapMobTemplate>,
+    pub reactors: Vec<MapReactorTemplate>,
     pub mob_rate: f64,
     pub footholds: footholds::Footholds,
     portals_by_id: BTreeMap<u32, PortalTemplate>,
@@ -167,6 +181,20 @@ impl FieldTemplate {
         let ids = self.portal_ids_by_name.get(name)?;
         let id = ids.first()?;
         self.portals_by_id.get(id)
+    }
+
+    /// The player spawn point nearest `(x, y)`: a start or invisible portal
+    /// that leads nowhere. Saved on logout so the player returns near where
+    /// they stood.
+    pub fn closest_spawn_portal(&self, x: i32, y: i32) -> Option<&PortalTemplate> {
+        self.portals_by_id
+            .values()
+            .filter(|portal| (PORTAL_TYPE_START_POINT..=1).contains(&portal.portal_type))
+            .filter(|portal| portal.to_map.is_none())
+            .min_by_key(|portal| {
+                let (dx, dy) = (i64::from(portal.x - x), i64::from(portal.y - y));
+                dx * dx + dy * dy
+            })
     }
 
     pub fn resolve_spawn_portal(&self, preferred_name: &str) -> Option<&PortalTemplate> {
@@ -251,6 +279,7 @@ fn build_field_template(
 
     let map_npcs = build_map_npcs_from_life(nx, map_node_idx)?;
     let mob_spawns = build_mob_spawns_from_life(nx, map_node_idx)?;
+    let reactors = build_reactors(nx, map_node_idx)?;
     let footholds = build_footholds(nx, map_node_idx)?;
     let mob_rate = nx
         .child_by_name(map_node_idx, "info")?
@@ -313,6 +342,7 @@ fn build_field_template(
         on_user_enter,
         map_npcs,
         mob_spawns,
+        reactors,
         mob_rate,
         footholds,
         portals_by_id,
@@ -341,6 +371,27 @@ fn build_footholds(
         }
     }
     Ok(footholds::Footholds::new(lines))
+}
+
+fn build_reactors(
+    nx: &NxDataFile,
+    map_node_idx: u32,
+) -> Result<Vec<MapReactorTemplate>, GameDataError> {
+    let Some(root) = nx.child_by_name(map_node_idx, "reactor")? else {
+        return Ok(Vec::new());
+    };
+    let mut reactors = Vec::new();
+    for node in nx.child_indices(root)? {
+        reactors.push(MapReactorTemplate {
+            reactor_id: parse_string_id(nx.string_child(node, "id")?, "reactor id")?,
+            x: read_i16_child(nx, node, "x", 0)?,
+            y: read_i16_child(nx, node, "y", 0)?,
+            flip: nx.int_child(node, "f")?.unwrap_or(0) != 0,
+            reactor_time: nx.int_child(node, "reactorTime")?.unwrap_or(0),
+            name: nx.string_child(node, "name")?.unwrap_or_default(),
+        });
+    }
+    Ok(reactors)
 }
 
 fn build_mob_spawns_from_life(
@@ -705,6 +756,7 @@ mod tests {
             on_user_enter: None,
             map_npcs: Vec::new(),
             mob_spawns: Vec::new(),
+            reactors: Vec::new(),
             mob_rate: 1.0,
             footholds: footholds::Footholds::default(),
             portals_by_id: BTreeMap::from([
@@ -750,18 +802,54 @@ mod tests {
     }
 
     #[test]
+    fn closest_spawn_portal_skips_portals_that_lead_elsewhere() {
+        let portal = |id, portal_type, x, to_map| PortalTemplate {
+            id,
+            name: format!("p{id}"),
+            portal_type,
+            x,
+            y: 100,
+            to_map,
+            to_name: String::new(),
+            script: None,
+        };
+        let field = FieldTemplate {
+            map_id: 1,
+            return_map: None,
+            forced_return: None,
+            on_user_enter: None,
+            map_npcs: Vec::new(),
+            mob_spawns: Vec::new(),
+            mob_rate: 1.0,
+            footholds: footholds::Footholds::default(),
+            portals_by_id: BTreeMap::from([
+                (0, portal(0, PORTAL_TYPE_START_POINT, -500, None)),
+                (1, portal(1, 0, 300, None)),
+                (2, portal(2, 2, 900, Some(2))),
+                (3, portal(3, 1, 700, None)),
+            ]),
+            portal_ids_by_name: HashMap::new(),
+        };
+
+        let closest = |x| field.closest_spawn_portal(x, 100).map(|p| p.id);
+        assert_eq!(closest(-400), Some(0));
+        assert_eq!(closest(250), Some(1));
+        assert_eq!(closest(950), Some(3));
+    }
+
+    #[test]
     fn loads_map_npcs_from_assets_map_nx() {
         let Some(path) = test_assets::path("Map.nx") else {
             return;
         };
         let game_data = GameData::load_from_nx_map(&path).expect("load map nx");
-        let field = game_data.field(10_000).expect("field 10000");
+        let field = game_data.field(0).expect("field 0");
 
         assert!(field.map_npcs.iter().any(|npc| {
             npc.npc_id == 2101
-                && npc.x == 130
-                && npc.y == 293
-                && npc.foothold == 51
+                && npc.x == -46
+                && npc.y == 280
+                && npc.foothold == 45
                 && npc.rx0 <= npc.x
                 && npc.rx1 >= npc.x
         }));

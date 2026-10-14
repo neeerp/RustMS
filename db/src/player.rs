@@ -8,14 +8,16 @@ use crate::character::Character;
 use crate::keybinding::KeybindType;
 use crate::quest::QuestProgress;
 use crate::schema::{
-    accounts, character_quests, characters, equipment_stats, inventory_items, keybindings, skills,
+    accounts, character_quests, characters, equipment_stats, inventory_items, keybindings,
+    monster_book_cards, skills,
 };
 use diesel::pg::PgConnection;
 use diesel::prelude::*;
+use diesel::upsert::excluded;
 use game::quest::{decode_kills, encode_kills};
 use game::{
     AvatarLook, CharacterStats, EquipStats, Inventory, InventoryType, Item, KeyBinding, Keymap,
-    Player, QuestLog, QuestRecord, QuestStatus, SkillBook, SkillRecord,
+    MonsterBook, Player, QuestLog, QuestRecord, QuestStatus, SkillBook, SkillRecord,
 };
 use std::collections::HashMap;
 use std::convert::TryFrom;
@@ -128,11 +130,20 @@ pub fn load_player(character_id: i32) -> crate::Result<Player> {
         quests,
     );
     player.gm_level = gm_level;
+    player.monster_book = MonsterBook::new(
+        character.monster_book_cover,
+        monster_book_cards::table
+            .filter(monster_book_cards::character_id.eq(character_id))
+            .select((monster_book_cards::card_id, monster_book_cards::level))
+            .load::<(i32, i16)>(&mut conn)?
+            .into_iter()
+            .map(|(card, level)| (card, u8::try_from(level).unwrap_or(0))),
+    );
     Ok(player)
 }
 
-/// Persist a player snapshot. Character columns, keymap, inventory, and
-/// skills are replaced atomically. Quest progress is written by its own
+/// Persist a player snapshot. Character columns, keymap, inventory, skills,
+/// and Monster Book cards are replaced atomically. Quest progress is written by its own
 /// transactions and is not touched here.
 pub fn save_player(player: &Player) -> crate::Result<()> {
     let mut conn = crate::connection()?;
@@ -167,8 +178,33 @@ pub(crate) fn write_player(conn: &mut PgConnection, player: &Player) -> QueryRes
                 characters::skin.eq(i32::from(stats.skin)),
                 characters::map_id.eq(stats.map_id),
                 characters::spawn_point.eq(i16::from(stats.spawn_point)),
+                characters::monster_book_cover.eq(player.monster_book.cover()),
             ))
             .execute(conn)?;
+
+        // Cards are only ever added or levelled up.
+        let cards: Vec<_> = player
+            .monster_book
+            .cards()
+            .map(|(card, level)| {
+                (
+                    monster_book_cards::character_id.eq(id),
+                    monster_book_cards::card_id.eq(card),
+                    monster_book_cards::level.eq(i16::from(level)),
+                )
+            })
+            .collect();
+        if !cards.is_empty() {
+            diesel::insert_into(monster_book_cards::table)
+                .values(&cards)
+                .on_conflict((
+                    monster_book_cards::character_id,
+                    monster_book_cards::card_id,
+                ))
+                .do_update()
+                .set(monster_book_cards::level.eq(excluded(monster_book_cards::level)))
+                .execute(conn)?;
+        }
 
         save_keymap(conn, id, &player.keymap)?;
         save_inventory(conn, id, &player.inventory)?;

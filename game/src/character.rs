@@ -1,5 +1,7 @@
+use crate::buff::Buffs;
 use crate::inventory::{equip_slot, Inventory};
 use crate::keymap::Keymap;
+use crate::monster_book::MonsterBook;
 use crate::quest::QuestLog;
 use crate::skill::{self, SkillBook, SkillRecord};
 use std::collections::BTreeMap;
@@ -133,8 +135,11 @@ pub struct Player {
     pub skills: SkillBook,
     pub keymap: Keymap,
     pub quests: QuestLog,
+    pub monster_book: MonsterBook,
     /// Account GM level; 0 for regular players.
     pub gm_level: i16,
+    /// Active buffs and cooldowns; not saved.
+    pub buffs: Buffs,
     dirty: bool,
 }
 
@@ -159,7 +164,9 @@ impl Player {
             skills,
             keymap,
             quests,
+            monster_book: MonsterBook::default(),
             gm_level: 0,
+            buffs: Buffs::default(),
             dirty: false,
         }
     }
@@ -197,10 +204,26 @@ impl Player {
         self.dirty = true;
     }
 
+    /// Record where the character should appear when they next enter
+    /// their current map (after logout or a channel change).
+    pub fn set_spawn_point(&mut self, spawn_point: u8) {
+        if self.stats.spawn_point != spawn_point {
+            self.stats.spawn_point = spawn_point;
+            self.dirty = true;
+        }
+    }
+
     /// Mutable access to the keymap; marks the player as needing a save.
     pub fn keymap_mut(&mut self) -> &mut Keymap {
         self.dirty = true;
         &mut self.keymap
+    }
+
+    /// Mutable access to the Monster Book; marks the player as needing a
+    /// save.
+    pub fn monster_book_mut(&mut self) -> &mut MonsterBook {
+        self.dirty = true;
+        &mut self.monster_book
     }
 
     /// Mutable access to the inventory; marks the player as needing a save.
@@ -435,6 +458,10 @@ mod tests {
         assert_eq!(player.stats.spawn_point, 2);
         player.mark_saved();
         assert!(!player.is_dirty());
+        player.set_spawn_point(2);
+        assert!(!player.is_dirty());
+        player.set_spawn_point(4);
+        assert!(player.is_dirty());
     }
 
     fn player() -> Player {

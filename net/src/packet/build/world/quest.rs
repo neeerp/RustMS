@@ -49,7 +49,9 @@ pub fn build_quest_action_result(
     Ok(p)
 }
 
-pub fn build_gain_exp(gain: i32) -> Result<Packet, NetworkError> {
+/// The white "You have gained experience" line; `party_bonus` is the extra
+/// EXP from sharing the kill with a party, shown as "(+N)".
+pub fn build_gain_exp(gain: i32, party_bonus: i32) -> Result<Packet, NetworkError> {
     let mut p = Packet::new_empty();
     p.write_short(SendOpcode::ShowStatusInfo as i16)?;
     p.write_byte(3)?;
@@ -60,8 +62,9 @@ pub fn build_gain_exp(gain: i32) -> Result<Packet, NetworkError> {
     p.write_short(0)?;
     p.write_int(0)?;
     p.write_byte(0)?;
-    // Party, equipment, internet cafe, and rainbow week bonus EXP.
-    for _ in 0..4 {
+    p.write_int(party_bonus)?;
+    // Equipment, internet cafe, and rainbow week bonus EXP.
+    for _ in 0..3 {
         p.write_int(0)?;
     }
     Ok(p)
@@ -127,7 +130,7 @@ mod tests {
 
     #[test]
     fn gain_exp_matches_reference() {
-        let packet = build_gain_exp(25).unwrap();
+        let packet = build_gain_exp(25, 3).unwrap();
 
         let mut expect = Expect::new(&packet.bytes);
         expect.short(SendOpcode::ShowStatusInfo as i16).byte(3);
@@ -136,7 +139,7 @@ mod tests {
         expect.byte(0).byte(0);
         expect.int(0);
         expect.byte(0);
-        expect.int(0).int(0).int(0).int(0);
+        expect.int(3).int(0).int(0).int(0);
         expect.end();
     }
 }

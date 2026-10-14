@@ -1,9 +1,8 @@
-//! Map entry banners and Maple Island's touch-portal hints.
+//! Map entry banners and touch portals.
 
 use integration_harness::connection::MapleTestConnection;
 use integration_harness::login_to_world_session;
 use integration_harness::preconditions::load_harness_config_or_fail;
-use integration_harness::quests::{act, START};
 use integration_harness::trace::{read, send, warp, Trace};
 use net::packet::op::{RecvOpcode, SendOpcode};
 use packet::io::{read::PktRead, write::PktWrite};
@@ -74,40 +73,20 @@ async fn banner(c: &mut MapleTestConnection) -> String {
 }
 
 #[tokio::test]
-async fn banners_and_tutorial_hints_follow_quest_progress() {
+async fn banners_show_and_unscripted_portals_do_nothing() {
     let config = load_harness_config_or_fail().await;
-    let m = config.character_name.clone();
     let mut trace = Trace::default();
     let mut session = login_to_world_session(&config).await.unwrap();
     let c = &mut session.connection;
-    assert_eq!(session.map_id, 10_000);
-    // Logging in drains the entry banner with the other map setup packets,
-    // so check it on a warp back into the map.
-    assert_eq!(warp(c, 10_000, "", &mut trace).await, 10_000);
-    assert_eq!(banner(c).await, "maplemap/enter/10000");
+    assert_eq!(session.map_id, 0);
 
-    // The minimap hint waits for Heena's quest, then shows once.
-    assert_eq!(touch_portal(c, "tuto01").await, []);
-    act(c, &mut trace, &m, START, 1031, 2101).await;
-    assert_eq!(
-        touch_portal(c, "tuto01").await,
-        [Seen::Image("UI/tutorial.img/25".into())]
-    );
-    assert_eq!(touch_portal(c, "tuto01").await, []);
-
-    // The exit warning repeats and carries text (pack or placeholder).
-    for _ in 0..2 {
-        let seen = touch_portal(c, "glBmsg0").await;
-        let [Seen::Hint(text, 150, 5)] = seen.as_slice() else {
-            panic!("expected the exit warning, got {seen:?}");
-        };
-        assert!(!text.is_empty());
-    }
-
-    // Portals without scripts, or not on this map, do nothing.
+    // The original island's advice portals name scripts the server doesn't
+    // have; touching them, or portals without scripts, does nothing.
+    assert_eq!(touch_portal(c, "tutorial0").await, []);
     assert_eq!(touch_portal(c, "out00").await, []);
     assert_eq!(touch_portal(c, "no-such-portal").await, []);
 
-    assert_eq!(warp(c, -1, "out00", &mut trace).await, 20_000);
-    assert_eq!(banner(c).await, "maplemap/enter/20000");
+    // Maps with a go<map id> entry script show their name banner.
+    assert_eq!(warp(c, 1_010_100, "", &mut trace).await, 1_010_100);
+    assert_eq!(banner(c).await, "maplemap/enter/1010100");
 }
