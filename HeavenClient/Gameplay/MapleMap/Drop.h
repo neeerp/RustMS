@@ -47,8 +47,12 @@ namespace ms
 		{
 			DROPPED,
 			FLOATING,
-			PICKEDUP
+			PICKEDUP,
+			EXPIRING
 		};
+
+		// Start rising toward the looter.
+		void pick_up();
 
 		int32_t owner;
 		int8_t pickuptype;
@@ -60,5 +64,6 @@ namespace ms
 		Point<int16_t> dest;
 		double basey;
 		double moved;
+		uint16_t pickupticks;
 	};
 }

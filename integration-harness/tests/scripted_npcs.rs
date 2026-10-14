@@ -2,11 +2,11 @@
 //! Robin's Q&A, and the Maple Administrator's tutorial skip.
 
 use game_data::GameData;
-use integration_harness::hunting::use_item;
+use integration_harness::hunting::{use_item, walk_to};
 use integration_harness::login_to_world_session;
 use integration_harness::preconditions::load_harness_config_or_fail;
 use integration_harness::quests::{answer, build_quest_action, SCRIPT_END, SCRIPT_START};
-use integration_harness::trace::{barrier, stat, step, warp, Trace};
+use integration_harness::trace::{barrier, send, stat, step, warp, Trace};
 use net::packet::op::RecvOpcode;
 use packet::io::write::PktWrite;
 use packet::Packet;
@@ -130,6 +130,22 @@ async fn natural_recovery_is_rate_limited() {
     assert!(t.stat_values(stat::HP).is_empty(), "too soon");
     let t = step(c, &m, heal(500)).await;
     assert!(t.stat_values(stat::HP).is_empty(), "too much");
+}
+
+#[tokio::test]
+async fn natural_recovery_waits_for_the_player_to_rest() {
+    let config = load_harness_config_or_fail().await;
+    let m = config.character_name.clone();
+    let mut session = login_to_world_session(&config).await.unwrap();
+    let c = &mut session.connection;
+    let mut trace = Trace::default();
+    assert_eq!(warp(c, 50_000, "", &mut trace).await, 50_000);
+    barrier(c, &m, &mut trace).await;
+
+    // The first heal of a session would count, but not right after moving.
+    send(c, walk_to(100, 0)).await;
+    let t = step(c, &m, heal(10)).await;
+    assert!(t.stat_values(stat::HP).is_empty(), "still moving");
 }
 
 #[tokio::test]

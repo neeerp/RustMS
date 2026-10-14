@@ -66,14 +66,23 @@ namespace ms
 
 		void set_position(Point<int16_t> position);
 
+		// Whether the left button is held. While it is, the cursor shows the
+		// pressed hand unless its state is a more specific one (grabbing,
+		// scrolling, ...).
+		void set_pressed(bool pressed);
+
 		State get_state() const;
 
 		Point<int16_t> get_position() const;
 
 	private:
+		// The state whose animation is drawn.
+		State shown() const;
+
 		EnumMap<State, Animation> animations;
 
 		State state;
+		bool pressed;
 		Point<int16_t> position;
 		int32_t hide_counter;
 

@@ -19,6 +19,7 @@
 
 #include "../QuestConversation.h"
 #include "Npc.h"
+#include "NpcReach.h"
 
 #include "../Net/Packets/NpcInteractionPackets.h"
 
@@ -91,5 +92,23 @@ namespace ms
 		}
 
 		return Cursor::State::IDLE;
+	}
+
+	Npc *MapNpcs::find_nearest(Point<int16_t> position)
+	{
+		Npc *nearest = nullptr;
+
+		for (auto &map_object : npcs)
+		{
+			Npc *npc = static_cast<Npc *>(map_object.second.get());
+
+			if (!npc || !npc->is_active() || !npc_reach::in_reach(position, npc->get_position()))
+				continue;
+
+			if (!nearest || npc_reach::nearer(position, npc->get_position(), nearest->get_position()))
+				nearest = npc;
+		}
+
+		return nearest;
 	}
 }

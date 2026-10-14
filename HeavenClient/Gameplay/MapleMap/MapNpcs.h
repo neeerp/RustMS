@@ -29,6 +29,8 @@
 
 namespace ms
 {
+	class Npc;
+
 	class MapNpcs
 	{
 	public:
@@ -52,6 +54,9 @@ namespace ms
 
 		// Send mouse input to clickable NPCs.
 		Cursor::State send_cursor(bool pressed, Point<int16_t> position, Point<int16_t> viewpos);
+
+		// The nearest active NPC the Interact key reaches from `position`, if any.
+		Npc *find_nearest(Point<int16_t> position);
 
 	private:
 		MapObjects npcs;

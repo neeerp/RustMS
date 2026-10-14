@@ -187,8 +187,9 @@ namespace ms
 		MonsterBook &get_monsterbook();
 
 	private:
-		// Natural recovery: report a small heal every 10 seconds while not
-		// at full HP/MP (the server checks it).
+		// Natural recovery: report a small heal after every 10 seconds spent
+		// standing, lying prone or sitting without moving, while not at full
+		// HP/MP (the server checks it).
 		static constexpr uint16_t RECOVERY_INTERVAL = 10000;
 		static constexpr int16_t RECOVERY_HP = 10;
 		static constexpr int16_t RECOVERY_MP = 3;

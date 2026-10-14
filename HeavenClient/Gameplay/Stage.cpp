@@ -18,11 +18,14 @@
 #include "Stage.h"
 
 #include "../Configuration.h"
+#include "QuestConversation.h"
 #include "Timer.h"
+#include "MapleMap/Npc.h"
 
 #include "../IO/UI.h"
 #include "../Util/Misc.h"
 
+#include "../IO/UITypes/UINpcTalk.h"
 #include "../IO/UITypes/UIStatusBar.h"
 #include "../Net/Packets/AttackAndSkillPackets.h"
 #include "../Net/Packets/GameplayPackets.h"
@@ -271,6 +274,18 @@ namespace ms
 				player.set_expression(action);
 				break;
 		}
+	}
+
+	void Stage::talk_to_nearest_npc()
+	{
+		if (state != State::ACTIVE || !playable || player.is_dead())
+			return;
+
+		if (auto npctalk = UI::get().get_element<UINpcTalk>(); npctalk && npctalk->is_active())
+			return;
+
+		if (Npc *npc = npcs.find_nearest(player.get_position()))
+			QuestConversation::talk_to_npc(npc->get_npcid(), npc->get_oid());
 	}
 
 	void Stage::release_key(KeyType::Id type, int32_t action)

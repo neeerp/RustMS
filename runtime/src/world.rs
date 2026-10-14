@@ -77,6 +77,7 @@ async fn preload_game_data() -> Result<(), RuntimeError> {
         );
         net::items::data().map_err(|e| format!("item data: {e}"))?;
         net::mobs::data().map_err(|e| format!("mob data: {e}"))?;
+        net::skills::data().map_err(|e| format!("skill data: {e}"))?;
         info!("Server content: {}", net::content::load()?);
         Ok(())
     })
