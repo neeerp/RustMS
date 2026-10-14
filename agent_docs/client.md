@@ -200,13 +200,36 @@ side yet.
 | Chat, whisper, server messages | Implemented; whisper find/buddy modes ignored |
 | Character info, minimap, world map | Implemented |
 | Buddy / party / guild / boss list (`UIUserList`) | Buttons and layout only; no handlers, party packet exists but is unused |
-| Cash shop (`UICashShop`) | Browse/enter/exit; purchase is `// TODO: Purchase item` |
+| Cash shop (`UICashShop`) | The v83 screen: enter/exit, tabs, pages, balance, Cash Inventory; buying, gifting and the wish list aren't served (see below) |
 | Storage, trade, player shops, mini-games, messenger, memo/mail | No UI, no handlers |
 | Pets, mounts, summons, reactors beyond hit/spawn | Partial or absent (`Reactor` TODOs) |
 | Party/guild/boss quests, events, MTS | Absent |
 
-44 outbound opcodes are defined (`Net/OutPacket.h`) and 57 inbound handlers
+44 outbound opcodes are defined (`Net/OutPacket.h`) and 61 inbound handlers
 are registered (`Net/PacketSwitch.cpp`). Anything not listed there is silently ignored by the client.
+
+## Cash Shop
+
+`UICashShop` draws the 800x600 v83 Cash Shop from `UIClassic.nx`
+`CashShop.img`, matched against 2008–2010 footage. The window doesn't change
+the screen size.
+
+- **Catalog:** `Etc.nx` `Commodity.img` is the catalog and `Category.img`
+  names the sub-tabs. A commodity's SN holds its tab and sub-tab (50200003 is
+  tab 5, ETC, sub-tab 2, Game). `Data/CashCatalog.h` sorts a sub-tab by
+  `Priority` (highest first), then SN. HOT items have the highest priorities,
+  so a sub-tab's first page is all HOT, as in the footage. `Class` picks the
+  NEW/SALE/HOT/EVENT label, and unlabelled Event > New items show NEW.
+- **Gender:** items for the other gender are hidden. Commodities whose item has
+  no data are skipped.
+- **Background:** the preview background follows the job: Cygnus and Aran have
+  their own.
+- **Packets:** SET_CASH_SHOP gives the account name and the Best Item SNs for
+  the player's gender. QUERY_CASH_RESULT (324) gives the NX Credit, Maple Point
+  and NX Prepaid balances. CASHSHOP_OPERATION (325) modes 0x4B (Cash
+  Inventory), 0x4D (purchase result) and 0x4F (wish list) are read.
+- **Not served yet:** BUY, GIFT, RESERVE, the slot expansions, CHARGE, CHECK
+  CASH and COUPON do nothing.
 
 ## Estimated client work for a complete game
 
@@ -216,7 +239,7 @@ are registered (`Net/PacketSwitch.cpp`). Anything not listed there is silently i
 | Party (create/invite/HP bars) | UI skeleton, `PARTY_OPERATION` packet only | M |
 | Guild | Skeleton only, plus guild emblem/BBS UIs missing | L |
 | Trade / storage / player shops | Nothing | L |
-| Cash shop purchase and inventory | Display only | M |
+| Cash shop purchase, gifts, wish list | Display only | M |
 | Quest accept/complete UI flow | Partial | S |
 | Pets and mounts | Partial rendering, no interaction | M |
 | Messenger, memo, mail, MTS | Nothing | M each |
