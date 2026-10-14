@@ -27,12 +27,13 @@
 #include "UITypes/UIChannel.h"
 #include "UITypes/UIChat.h"
 #include "UITypes/UIChatBar.h"
+#include "UITypes/UIGameOption.h"
 #include "UITypes/UIJoypad.h"
 #include "UITypes/UINpcTalk.h"
-#include "UITypes/UIOptionMenu.h"
 #include "UITypes/UIQuit.h"
 #include "UITypes/UIShop.h"
 #include "UITypes/UIStatusBar.h"
+#include "UITypes/UISystemOption.h"
 #include "UITypes/UIWorldMap.h"
 
 namespace ms
@@ -115,11 +116,8 @@ namespace ms
 		if (focused)
 		{
 			// The window gained input focus
-			uint8_t sfxvolume = Setting<SFXVolume>::get().load();
-			Sound::set_sfxvolume(sfxvolume);
-
-			uint8_t bgmvolume = Setting<BGMVolume>::get().load();
-			Music::set_bgmvolume(bgmvolume);
+			Sound::set_sfxvolume(Sound::configured_volume());
+			Music::set_bgmvolume(Music::configured_volume());
 		} else
 		{
 			// The window lost input focus, and won't see the releases of the
@@ -242,7 +240,8 @@ namespace ms
 			auto statusbar = UI::get().get_element<UIStatusBar>();
 			auto channel = UI::get().get_element<UIChannel>();
 			auto worldmap = UI::get().get_element<UIWorldMap>();
-			auto optionmenu = UI::get().get_element<UIOptionMenu>();
+			auto gameoption = UI::get().get_element<UIGameOption>();
+			auto systemoption = UI::get().get_element<UISystemOption>();
 			auto shop = UI::get().get_element<UIShop>();
 			auto joypad = UI::get().get_element<UIJoypad>();
 			auto rank = UI::get().get_element<UIRank>();
@@ -267,9 +266,13 @@ namespace ms
 			{
 				worldmap->send_key(mapping.action, pressed, escape);
 				sent = true;
-			} else if (optionmenu && optionmenu->is_active())
+			} else if (gameoption && gameoption->is_active())
 			{
-				optionmenu->send_key(mapping.action, pressed, escape);
+				gameoption->send_key(mapping.action, pressed, escape);
+				sent = true;
+			} else if (systemoption && systemoption->is_active())
+			{
+				systemoption->send_key(mapping.action, pressed, escape);
 				sent = true;
 			} else if (shop && shop->is_active())
 			{

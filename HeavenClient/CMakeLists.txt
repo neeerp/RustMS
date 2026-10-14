@@ -27,6 +27,8 @@ if(HEAVENCLIENT_BUILD_TESTS)
     add_test(NAME map_tooltip COMMAND map_tooltip_tests)
     add_executable(answer_focus_tests tests/answer_focus.cpp)
     add_test(NAME answer_focus COMMAND answer_focus_tests)
+    add_executable(slider_steps_tests tests/slider_steps.cpp)
+    add_test(NAME slider_steps COMMAND slider_steps_tests)
     add_executable(menu_cover_tests tests/menu_cover.cpp)
     target_include_directories(menu_cover_tests PRIVATE ${PROJECT_SOURCE_DIR}/libs/NoLifeNx)
     add_test(NAME menu_cover COMMAND menu_cover_tests)
@@ -270,8 +272,11 @@ add_executable(HeavenClient
     IO/Components/Charset.h
     IO/Components/ChatBalloon.cpp
     IO/Components/ChatBalloon.h
+    IO/Components/ClassicSlider.cpp
+    IO/Components/ClassicSlider.h
     IO/Components/ClassicTabs.cpp
     IO/Components/ClassicTabs.h
+    IO/Components/SliderSteps.h
     IO/Components/EquipTooltip.cpp
     IO/Components/EquipTooltip.h
     IO/Components/Gauge.cpp
@@ -320,6 +325,8 @@ add_executable(HeavenClient
     IO/UITypes/UICashShop.h
     IO/UITypes/UIChannel.cpp
     IO/UITypes/UIChannel.h
+    IO/UITypes/UIGameOption.cpp
+    IO/UITypes/UIGameOption.h
     IO/UITypes/UICharInfo.cpp
     IO/UITypes/UICharInfo.h
     IO/UITypes/UICharSelect.cpp
@@ -358,8 +365,6 @@ add_executable(HeavenClient
     IO/UITypes/UINotice.h
     IO/UITypes/UINpcTalk.cpp
     IO/UITypes/UINpcTalk.h
-    IO/UITypes/UIOptionMenu.cpp
-    IO/UITypes/UIOptionMenu.h
     IO/UITypes/UIQuestLog.cpp
     IO/UITypes/UIQuestLog.h
     IO/UITypes/UIQuit.cpp
@@ -372,6 +377,8 @@ add_executable(HeavenClient
     IO/UITypes/UIShop.h
     IO/UITypes/UISkillBook.cpp
     IO/UITypes/UISkillBook.h
+    IO/UITypes/UISystemOption.cpp
+    IO/UITypes/UISystemOption.h
     IO/UITypes/UISoftKey.cpp
     IO/UITypes/UISoftKey.h
     IO/UITypes/UIStatsInfo.cpp

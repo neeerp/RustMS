@@ -34,6 +34,11 @@ name, and descriptions wrap at the name's width when that is wider.
 and ACCEPT/DECLINE pages (`IO/Components/AnswerFocus.h`): Enter presses YES or
 ACCEPT when no answer is focused, and otherwise the one Left or Right focused.
 
+`slider_steps_tests` covers where a System Option slider's thumb stops
+(`IO/Components/SliderSteps.h`): the steps spread evenly from end to end, a
+thumb dragged between steps snaps to the closer one, and one dragged past
+either end stays at that end.
+
 `menu_cover_tests` covers the status bar's open game or shortcut menu
 (`IO/Components/MenuCover.h`): inside the menu only its own buttons take the
 cursor, so QUIT GAME wins over the Stat icon drawn under it and the menu's frame

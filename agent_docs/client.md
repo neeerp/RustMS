@@ -139,6 +139,20 @@ from `UI.nx`. Moved so far:
   restores the server's defaults; DEFAULT, CLEAR ALL, and Esc with unsaved
   changes ask through the in-window `notice` bitmaps. CHANGE QUICK SLOTS is
   disabled until the quick slot is configurable.
+- **Game Option** (`UIGameOption`, `UIWindow.img/GameOpt`), from MENU: a
+  `Basic.img/CheckBox` right of each row's ALLOW, laid out from the
+  background. OK saves the boxes as the `Allow*` settings; the client doesn't
+  act on them yet.
+- **System Option** (`UISystemOption`, `UIWindow.img/SysOpt`), from MENU:
+  `Basic.img/Slider` sliders (`ClassicSlider`) between each row's end labels,
+  mute, screen shake, and WINDOW / FULL SCREEN boxes, laid out from the
+  background. The BGM and SOUND sliders change the volume as they move, in
+  steps of 10, and MUTE greys the slider out; Cancel and Esc put the volume
+  back. OK saves `BGMVolume`, `SFXVolume`, `BGMMute`, `SFXMute`, and the
+  stored-only `PictureQuality`, `MouseSpeed`, `HPAlert`, `MPAlert` and
+  `ShakeScreen`, and switches to the chosen viewing mode. MONSTER INFO has
+  no control, and the post-Big Bang Options window's resolution picker is
+  gone; set `Width` and `Height` in `Settings` instead.
 
 `UIClassic.nx` is not one of NoLifeNx's standard files, so `NxFiles` opens it
 with `nl::file` instead of `nl::nx::load_all`.

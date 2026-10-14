@@ -378,7 +378,8 @@ namespace ms
 			return Cursor::State::GRABBING;
 		} else
 		{
-			bool clicked = cursorstate == Cursor::State::CLICKING || cursorstate == Cursor::State::VSCROLLIDLE;
+			bool clicked = cursorstate == Cursor::State::CLICKING || cursorstate == Cursor::State::VSCROLLIDLE
+				|| cursorstate == Cursor::State::HSCROLLIDLE;
 
 			// A focused window that has closed lets go of the cursor, which
 			// then reaches whatever is under it.
