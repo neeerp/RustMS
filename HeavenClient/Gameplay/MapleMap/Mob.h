@@ -106,6 +106,9 @@ namespace ms
 		// Create a touch damage attack to the player
 		MobAttack create_touch_attack() const;
 
+		// Check if touching this mob hurts: `bodyAttack` without `notAttack`.
+		bool deals_touch_damage() const;
+
 		// Check if this mob collides with the specified rectangle.
 		bool is_in_range(const Rectangle<int16_t> &range) const;
 
