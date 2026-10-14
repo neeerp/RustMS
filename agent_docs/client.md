@@ -107,6 +107,14 @@ from `UI.nx`. Moved so far:
   (`Text::Font::A10M`). Rows are grey when a required skill is missing. SP-up
   spends a point at once; v83 had no allocation popup. The MACRO button and the
   `SkillMacro` window are not drawn yet.
+- **Item window** (`UIItemInventory`, `UIWindow.img/Item`): five tabs
+  (`Item/Tab`, drawn by `ClassicTabs`), six rows of four slots with a `VScr4`
+  scroll bar, and the mesos, laid out from period footage. BtFull widens it to
+  `FullBackgrnd`, four pages of 24 with no scroll bar; BtSmall goes back.
+  Slots past the tab's limit show `disabled`. A gained item pulses its tab
+  (`New/Tab0`, or `Tab1` when selected) and its slot (`New/inventory`) until
+  the window closes. Gather and sort send their packets, which the server
+  does not handle yet, and BtCoin (dropping mesos) does nothing.
 
 `UIClassic.nx` is not one of NoLifeNx's standard files, so `NxFiles` opens it
 with `nl::file` instead of `nl::nx::load_all`.
