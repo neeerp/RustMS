@@ -19,7 +19,8 @@ const MAPPING: &str = include_str!("../../server_content.toml");
 #[derive(Deserialize)]
 struct Mapping {
     text: BTreeMap<String, TextSource>,
-    rewards: RewardSource,
+    rewards: DirectorySource,
+    shops: DirectorySource,
 }
 
 #[derive(Deserialize)]
@@ -29,8 +30,9 @@ struct TextSource {
     sha256: String,
 }
 
+/// A directory of `<id>.json` files, merged into one JSON object by id.
 #[derive(Deserialize)]
-struct RewardSource {
+struct DirectorySource {
     source: String,
 }
 
@@ -83,32 +85,39 @@ fn run(sources: &Path, pack: &Path) -> Result<(), String> {
     std::fs::write(pack.join("text.toml"), format!("{header}{text_toml}"))
         .map_err(|e| e.to_string())?;
 
-    let rewards_dir = sources.join(&mapping.rewards.source);
-    let mut rewards: BTreeMap<String, serde_json::Value> = BTreeMap::new();
-    for entry in
-        std::fs::read_dir(&rewards_dir).map_err(|e| format!("{}: {e}", rewards_dir.display()))?
-    {
+    let rewards = merge_by_id(&sources.join(&mapping.rewards.source))?;
+    std::fs::write(pack.join("rewards.json"), rewards.1).map_err(|e| e.to_string())?;
+    let shops = merge_by_id(&sources.join(&mapping.shops.source))?;
+    std::fs::write(pack.join("shops.json"), shops.1).map_err(|e| e.to_string())?;
+
+    println!(
+        "Wrote {} text keys, drops for {} mobs, and {} shops to {}",
+        text.len(),
+        rewards.0,
+        shops.0,
+        pack.display()
+    );
+    Ok(())
+}
+
+/// Read every `<id>.json` in `dir` (ids may have leading zeros) into one
+/// JSON object keyed by the plain id. Returns how many and the JSON.
+fn merge_by_id(dir: &Path) -> Result<(usize, String), String> {
+    let mut merged: BTreeMap<String, serde_json::Value> = BTreeMap::new();
+    for entry in std::fs::read_dir(dir).map_err(|e| format!("{}: {e}", dir.display()))? {
         let path = entry.map_err(|e| e.to_string())?.path();
-        let Some(mob) = path.file_stem().and_then(|s| s.to_str()) else {
+        let Some(stem) = path.file_stem().and_then(|s| s.to_str()) else {
             continue;
         };
-        let Ok(id) = mob.parse::<i32>() else {
+        let Ok(id) = stem.parse::<i32>() else {
             continue;
         };
         let json = std::fs::read_to_string(&path).map_err(|e| e.to_string())?;
         let value = serde_json::from_str(&json).map_err(|e| format!("{}: {e}", path.display()))?;
-        rewards.insert(id.to_string(), value);
+        merged.insert(id.to_string(), value);
     }
-    let rewards_json = serde_json::to_string(&rewards).map_err(|e| e.to_string())?;
-    std::fs::write(pack.join("rewards.json"), rewards_json).map_err(|e| e.to_string())?;
-
-    println!(
-        "Wrote {} text keys and drops for {} mobs to {}",
-        text.len(),
-        rewards.len(),
-        pack.display()
-    );
-    Ok(())
+    let json = serde_json::to_string(&merged).map_err(|e| e.to_string())?;
+    Ok((merged.len(), json))
 }
 
 /// Replace `{sN}` with literal N; leave other `{name}` placeholders.

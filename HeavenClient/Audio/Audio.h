@@ -105,8 +105,11 @@ namespace ms
 
 		static void close();
 
+		// Volume from 0 to 100.
 		static bool set_sfxvolume(uint8_t volume);
 
+		// The volume from the settings, 0 when muted.
+		static uint8_t configured_volume();
 
 	private:
 		size_t id;
@@ -127,6 +130,7 @@ namespace ms
 		alure::Source sound_src;
 		static size_t source_inc;
 		static alure::Source sound_srcs[100];
+		static float gain;
 	};
 
 	class Music
@@ -140,7 +144,11 @@ namespace ms
 
 		static Error init();
 
+		// Volume from 0 to 100.
 		static bool set_bgmvolume(uint8_t volume);
+
+		// The volume from the settings, 0 when muted.
+		static uint8_t configured_volume();
 
 		static void update_context();
 

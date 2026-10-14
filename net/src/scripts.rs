@@ -29,6 +29,13 @@ pub enum Effect {
         item_id: i32,
         quantity: i16,
     },
+    /// Nothing is applied if the player no longer has them.
+    TakeItem {
+        item_id: i32,
+        quantity: i16,
+    },
+    /// Nothing is applied if the player no longer has that much.
+    SpendMeso(i32),
     GainExp(i32),
     StartQuest(i16),
     CompleteQuest(i16),

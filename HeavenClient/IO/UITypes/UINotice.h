@@ -25,6 +25,8 @@
 
 #include "../Components/Textfield.h"
 
+#include "../../Graphics/Geometry.h"
+
 namespace ms
 {
 	class UINotice : public UIDragElement<PosNOTICE>
@@ -46,20 +48,21 @@ namespace ms
 
 		UINotice(std::string message, NoticeType type);
 
-		void draw(bool textfield) const;
+		// Draws the box and the message. The message sits in the text frame, above the field for number entry.
+		void draw() const;
 
-		int16_t box2offset(bool textfield) const;
+		// The top edge of the button frames at the bottom of the box.
+		int16_t buttons_y() const;
+
+		// The top edge of the number field, below the message.
+		int16_t field_y() const;
 
 	private:
 		Texture top;
 		Texture center;
-		Texture centerbox;
-		Texture box;
-		Texture box2;
 		Texture bottom;
-		Texture bottombox;
 		Text question;
-		int16_t height;
+		int16_t rows;
 		NoticeType type;
 		Text::Alignment alignment;
 	};
@@ -92,6 +95,9 @@ namespace ms
 	class UIEnterNumber : public UINotice
 	{
 	public:
+		// Its own type, so that a notice about the number opens over it instead of replacing it.
+		static constexpr Type TYPE = UIElement::Type::ENTERNUMBER;
+
 		UIEnterNumber(std::string message, std::function<void(int32_t number)> numhandler, int32_t max,
 					  int32_t quantity);
 
@@ -117,6 +123,8 @@ namespace ms
 		};
 
 		std::function<void(int32_t number)> numhandler;
+		ColorBox fieldborder;
+		ColorBox fieldfill;
 		Textfield numfield;
 		int32_t max;
 	};

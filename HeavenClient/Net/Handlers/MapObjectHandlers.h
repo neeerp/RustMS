@@ -49,6 +49,13 @@ namespace ms
 		void handle(InPacket& recv) const override;
 	};
 
+	// Show another character's emote
+	// Opcode: FACIAL_EXPRESSION(193)
+	class FacialExpressionHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
 	// Update the look of a character
 	// Opcode: UPDATE_CHARLOOK(197)
 	class UpdateCharLookHandler : public PacketHandler

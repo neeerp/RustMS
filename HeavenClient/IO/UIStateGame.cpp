@@ -198,6 +198,8 @@ namespace ms
 	{
 		if (UIElement *front = get_front(pos))
 			front->doubleclick(pos);
+		else if (int32_t cid = Stage::get().character_at(pos))
+			emplace<UICharInfo>(cid);
 	}
 
 	void UIStateGame::rightclick(Point<int16_t> pos)
@@ -378,7 +380,8 @@ namespace ms
 			return Cursor::State::GRABBING;
 		} else
 		{
-			bool clicked = cursorstate == Cursor::State::CLICKING || cursorstate == Cursor::State::VSCROLLIDLE;
+			bool clicked = cursorstate == Cursor::State::CLICKING || cursorstate == Cursor::State::VSCROLLIDLE
+				|| cursorstate == Cursor::State::HSCROLLIDLE;
 
 			// A focused window that has closed lets go of the cursor, which
 			// then reaches whatever is under it.
@@ -461,7 +464,7 @@ namespace ms
 
 	void UIStateGame::send_close()
 	{
-		UI::get().emplace<UIQuit>(stats);
+		ask_to_quit();
 	}
 
 	void UIStateGame::drag_icon(Icon *drgic)
