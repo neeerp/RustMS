@@ -101,6 +101,7 @@ namespace ms
 			STRATOS,
 			BLUEBELL,
 			PARTYPINK,
+			MONALISA,
 			NUM_COLORS
 		};
 
@@ -151,7 +152,8 @@ namespace ms
 						{0.20f, 0.33f, 0.40f}, // San Juan (#335566, outlines the v83 minimap's names, from footage)
 						{0.00f, 0.00f, 0.27f}, // Stratos (#000044, fills v83 tooltips, from footage)
 						{0.60f, 0.60f, 0.80f}, // Blue Bell (#9999CC, edges v83 tooltips, from footage)
-						{1.00f, 0.60f, 0.80f}  // Party pink (#FF99CC, party chat; not yet checked against footage)
+						{1.00f, 0.60f, 0.80f}, // Party pink (#FF99CC, party chat; not yet checked against footage)
+						{1.00f, 0.63f, 0.58f}  // Mona Lisa (#FFA194, Monster Book lines in the chat log, from footage)
 				};
 
 		// Create a color by an array of real numbers [0.0f, 1.0f]
@@ -190,6 +192,13 @@ namespace ms
 
 		constexpr Color() : Color(Code::CNONE)
 		{}
+
+		// Draw textures in shades of grey, as the Monster Book draws the
+		// cards still missing. The shader reads a negative red as this.
+		static constexpr Color grayscale(float opacity)
+		{
+			return Color(-1.0f, 1.0f, 1.0f, opacity);
+		}
 
 		// Check whether the color is completely invisible
 		constexpr bool invisible() const

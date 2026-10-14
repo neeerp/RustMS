@@ -88,6 +88,17 @@ namespace ms
 		}
 	};
 
+	// Shows the player's emote to the rest of the map
+	// Opcode: FACE_EXPRESSION(51)
+	class FaceExpressionPacket : public OutPacket
+	{
+	public:
+		FaceExpressionPacket(int32_t emote) : OutPacket(OutPacket::Opcode::FACE_EXPRESSION)
+		{
+			write_int(emote);
+		}
+	};
+
 	// Opcode: PARTY_OPERATION(124)
 	class PartyOperationPacket : public OutPacket
 	{

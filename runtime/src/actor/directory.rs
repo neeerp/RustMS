@@ -1,16 +1,21 @@
+use crate::actor::messenger::{Messengers, Outbox};
 use crate::actor::parties::{self, Member, Parties, Party};
 use crate::message::{ClientHandle, DirectoryMessage, Presence, ServerMessage};
+use net::packet::build::world::messaging::{build_find_result, build_whisper_result, FindLocation};
 use net::packet::build::world::party::{
     build_party_chat, build_party_created, build_party_disbanded, build_party_invite,
     build_party_joined, build_party_leader_changed, build_party_left, build_party_member_hp,
     build_party_status, build_party_update, Departure, PartyMemberView, PartyStatus, PartyView,
 };
-use net::{BroadcastScope, ClientId, PartyRequest, WhisperDelivery};
+use net::{BroadcastScope, ClientId, MessengerRequest, PartyRequest, WhisperDelivery};
 use packet::Packet;
 use std::collections::HashMap;
-use std::time::Instant;
+use std::time::{Duration, Instant};
 use tokio::sync::mpsc;
-use tracing::{info, warn};
+use tracing::{error, info, warn};
+
+/// How often seats held through a channel change are checked.
+const PURGE_INTERVAL: Duration = Duration::from_secs(10);
 
 struct Entry {
     handle: ClientHandle,
@@ -42,6 +47,7 @@ pub struct WorldDirectory {
     clients: HashMap<ClientId, Entry>,
     names: HashMap<String, ClientId>,
     parties: Parties,
+    messengers: Messengers,
 }
 
 impl WorldDirectory {
@@ -51,12 +57,23 @@ impl WorldDirectory {
             clients: HashMap::new(),
             names: HashMap::new(),
             parties: Parties::default(),
+            messengers: Messengers::default(),
         }
     }
 
     pub async fn run(mut self) {
-        while let Some(message) = self.rx.recv().await {
-            self.handle(message);
+        let mut purge = tokio::time::interval(PURGE_INTERVAL);
+        loop {
+            tokio::select! {
+                message = self.rx.recv() => match message {
+                    Some(message) => self.handle(message),
+                    None => break,
+                },
+                _ = purge.tick() => {
+                    let out = self.messengers.purge(Instant::now());
+                    self.deliver(out);
+                }
+            }
         }
     }
 
@@ -70,12 +87,14 @@ impl WorldDirectory {
             DirectoryMessage::Unregister {
                 client_id,
                 connection_id,
-            } => self.unregister(client_id, connection_id),
+                changing_channel,
+            } => self.unregister(client_id, connection_id, changing_channel),
             DirectoryMessage::Presence {
                 client_id,
                 presence,
             } => self.update_presence(client_id, presence),
             DirectoryMessage::Whisper { from, delivery } => self.whisper(from, delivery),
+            DirectoryMessage::Find { from, target_name } => self.find(from, &target_name),
             DirectoryMessage::Broadcast {
                 from,
                 scope,
@@ -83,6 +102,11 @@ impl WorldDirectory {
             } => self.broadcast(from, scope, packet),
             DirectoryMessage::Party { from, request } => {
                 self.party_request(from, request, Instant::now())
+            }
+            DirectoryMessage::Messenger { from, request } => self.messenger(from, request),
+            DirectoryMessage::LookChanged { client_id, look } => {
+                let out = self.messengers.look_changed(client_id, look);
+                self.deliver(out);
             }
         }
     }
@@ -120,9 +144,11 @@ impl WorldDirectory {
             self.send_party_update(party);
             self.exchange_hp(client_id);
         }
+        let out = self.messengers.connected(client_id, channel_id);
+        self.deliver(out);
     }
 
-    fn unregister(&mut self, client_id: ClientId, connection_id: u64) {
+    fn unregister(&mut self, client_id: ClientId, connection_id: u64, changing_channel: bool) {
         // Ignore a stale unregister from a connection that was replaced.
         let is_current = self
             .clients
@@ -132,6 +158,10 @@ impl WorldDirectory {
             if let Some(entry) = self.clients.remove(&client_id) {
                 self.names.remove(&entry.presence.name);
                 info!(client_id, "Character offline");
+                let out = self
+                    .messengers
+                    .disconnected(client_id, changing_channel, Instant::now());
+                self.deliver(out);
             }
             self.parties.forget_invites(client_id);
             if let Some(party) = self.parties.of(client_id) {
@@ -179,6 +209,73 @@ impl WorldDirectory {
         } else {
             delivery.sender_failure_packet
         });
+    }
+
+    /// Tell the asker where a character is: their channel if it isn't the
+    /// asker's, otherwise their map, which only their own client knows.
+    fn find(&self, from: ClientId, target_name: &str) {
+        let Some(asker) = self.clients.get(&from) else {
+            return;
+        };
+        let target = self
+            .names
+            .get(target_name)
+            .and_then(|id| self.clients.get(id));
+        let packet = match target {
+            Some(target) if target.channel_id == asker.channel_id => {
+                target.handle.send(ServerMessage::Locate {
+                    reply_to: asker.handle.clone(),
+                });
+                return;
+            }
+            Some(target) => build_find_result(
+                &target.presence.name,
+                FindLocation::Channel(target.channel_id),
+            ),
+            None => build_whisper_result(target_name, false),
+        };
+        match packet {
+            Ok(packet) => {
+                asker.handle.send_packet(packet);
+            }
+            Err(e) => error!(client_id = from, "find result: {e}"),
+        }
+    }
+
+    fn messenger(&mut self, from: ClientId, request: MessengerRequest) {
+        let Some(sender) = self.clients.get(&from) else {
+            return;
+        };
+        let out = match request {
+            MessengerRequest::Open { messenger_id, look } => self.messengers.open(
+                from,
+                &sender.presence.name,
+                sender.channel_id,
+                look,
+                messenger_id,
+            ),
+            MessengerRequest::Leave => self.messengers.leave(from),
+            MessengerRequest::Invite { target } => {
+                let target_id = self.names.get(&target).copied();
+                self.messengers.invite(from, target_id, &target)
+            }
+            MessengerRequest::Decline { inviter } => match self.names.get(&inviter) {
+                Some(&inviter) => self
+                    .messengers
+                    .decline(from, &sender.presence.name, inviter),
+                None => Outbox::new(),
+            },
+            MessengerRequest::Chat { line } => self.messengers.chat(from, &line),
+        };
+        self.deliver(out);
+    }
+
+    fn deliver(&self, out: Outbox) {
+        for (to, packet) in out {
+            if let Some(entry) = self.clients.get(&to) {
+                entry.handle.send_packet(packet);
+            }
+        }
     }
 
     fn broadcast(&self, from: ClientId, scope: BroadcastScope, packet: Packet) {
@@ -562,9 +659,9 @@ mod tests {
         assert!(!second_kill.is_cancelled());
 
         // The old connection's late unregister must not remove the new one.
-        directory.unregister(1, 10);
+        directory.unregister(1, 10, false);
         assert!(directory.names.contains_key("dup"));
-        directory.unregister(1, 11);
+        directory.unregister(1, 11, false);
         assert!(!directory.names.contains_key("dup"));
     }
 

@@ -53,7 +53,8 @@ namespace ms
 			YELLOW,
 			GREY,
 			// Party chat and party notices
-			PARTY
+			PARTY,
+			PINK
 		};
 
 		// Who a typed line goes to

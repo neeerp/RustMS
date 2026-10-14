@@ -73,6 +73,22 @@ namespace ms
 			return message.empty() ? WhisperParseResult::InvalidWhisper : WhisperParseResult::ValidWhisper;
 		}
 
+		// Whether input is /find, with the name it looks for, if any.
+		bool parse_find_command(const std::string& input, std::string& target)
+		{
+			static const std::string COMMAND = "/find";
+
+			if (input != COMMAND && input.rfind(COMMAND + " ", 0) != 0)
+				return false;
+
+			size_t target_start = input.find_first_not_of(' ', COMMAND.length());
+
+			if (target_start != std::string::npos)
+				target = input.substr(target_start, input.find(' ', target_start) - target_start);
+
+			return true;
+		}
+
 		// Lines sit on a dark band, and so does the latest line in the strip
 		// while the input field is closed.
 		constexpr float BAND_ALPHA = 0.55f;
@@ -140,11 +156,19 @@ namespace ms
 							{
 								send_chatline("Usage: /w <name> <message>", LineType::RED);
 							}
+							else if (parse_find_command(msg, target))
+							{
+								if (target.empty())
+									send_chatline("Usage: /find <name>", LineType::RED);
+								else
+									FindPacket(target).dispatch();
+							}
 							else if (chat_target == Target::PARTY)
 							{
 								send_party_chat(msg);
 							}
-							else
+							// Commands the client doesn't know aren't chat.
+							else if (msg[0] != '/')
 							{
 								GeneralChatPacket(msg, true).dispatch();
 							}
@@ -373,6 +397,9 @@ namespace ms
 				break;
 			case LineType::PARTY:
 				color = Color::Name::PARTYPINK;
+				break;
+			case LineType::PINK:
+				color = Color::Name::MONALISA;
 				break;
 			default:
 				color = Color::Name::WHITE;

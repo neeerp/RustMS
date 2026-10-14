@@ -67,6 +67,7 @@ diesel::table! {
         map_id -> Int4,
         sp -> Int2,
         spawn_point -> Int2,
+        monster_book_cover -> Int4,
     }
 }
 
@@ -172,6 +173,15 @@ diesel::table! {
     }
 }
 diesel::joinable!(character_quests -> characters (character_id));
+
+diesel::table! {
+    monster_book_cards (character_id, card_id) {
+        character_id -> Int4,
+        card_id -> Int4,
+        level -> Int2,
+    }
+}
+diesel::joinable!(monster_book_cards -> characters (character_id));
 diesel::allow_tables_to_appear_in_same_query!(
     accounts,
     characters,
@@ -181,4 +191,5 @@ diesel::allow_tables_to_appear_in_same_query!(
     inventory_items,
     equipment_stats,
     skills,
+    monster_book_cards,
 );

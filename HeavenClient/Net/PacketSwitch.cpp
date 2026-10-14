@@ -80,9 +80,14 @@ namespace ms
 		SERVER_MESSAGE = 68,
 		WEEK_EVENT_MESSAGE = 77,
 
+		/// Monster Book
+		MONSTER_BOOK_SET_CARD = 83,
+		MONSTER_BOOK_SET_COVER = 84,
+
 		SKILL_MACROS = 124,
 		SET_FIELD = 125,
 		WHISPER = 135,
+		MESSENGER = 313,
 		FIELD_EFFECT = 138,
 
 		/// MapObject
@@ -102,6 +107,7 @@ namespace ms
 		ATTACKED_RANGED = 187,
 		ATTACKED_MAGIC = 188,
 
+		FACIAL_EXPRESSION = 193,
 		UPDATE_CHARLOOK = 197,
 		SHOW_FOREIGN_EFFECT = 198,
 		SHOW_ITEM_GAIN_INCHAT = 206, // TODO: Rename this (Terribly named)
@@ -163,6 +169,7 @@ namespace ms
 		// MapObject handlers
 		emplace<SPAWN_CHAR, SpawnCharHandler>();
 		emplace<CHAR_MOVED, CharMovedHandler>();
+		emplace<FACIAL_EXPRESSION, FacialExpressionHandler>();
 		emplace<UPDATE_CHARLOOK, UpdateCharLookHandler>();
 		emplace<SHOW_FOREIGN_EFFECT, ShowForeignEffectHandler>();
 		emplace<REMOVE_CHAR, RemoveCharHandler>();
@@ -195,6 +202,8 @@ namespace ms
 		emplace<RECALCULATE_STATS, RecalculateStatsHandler>();
 		emplace<UPDATE_SKILL, UpdateSkillHandler>();
 		emplace<ADD_COOLDOWN, AddCooldownHandler>();
+		emplace<MONSTER_BOOK_SET_CARD, MonsterBookSetCardHandler>();
+		emplace<MONSTER_BOOK_SET_COVER, MonsterBookSetCoverHandler>();
 
 		// Messaging handlers
 		emplace<SHOW_STATUS_INFO, ShowStatusInfoHandler>();
@@ -202,6 +211,7 @@ namespace ms
 		emplace<PLAYER_HINT, PlayerHintHandler>();
 		emplace<CHAT_RECEIVED, ChatReceivedHandler>();
 		emplace<WHISPER, WhisperHandler>();
+		emplace<MESSENGER, MessengerHandler>();
 		emplace<SCROLL_RESULT, ScrollResultHandler>();
 		emplace<SERVER_MESSAGE, ServerMessageHandler>();
 		emplace<WEEK_EVENT_MESSAGE, WeekEventMessageHandler>();
@@ -215,6 +225,7 @@ namespace ms
 		// NPC Interaction Handlers
 		emplace<NPC_DIALOGUE, NpcDialogueHandler>();
 		emplace<OPEN_NPC_SHOP, OpenNpcShopHandler>();
+		emplace<CONFIRM_SHOP_TRANSACTION, ConfirmShopTransactionHandler>();
 
 		// Player Interaction
 		emplace<CHAR_INFO, CharInfoHandler>();

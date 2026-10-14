@@ -1,5 +1,6 @@
 use crate::actor::field_drops::{Drop, DropSet};
 use crate::actor::field_mobs::{split_exp, MobSet, Sharer};
+use crate::actor::field_reactors::{Hit, ReactorSet};
 use crate::message::{ClientHandle, FieldKey, FieldMessage, ServerMessage};
 use game::FieldAvatar;
 use net::packet::build::world::drop::{build_drop, build_remove_drop, DropAppearance};
@@ -11,6 +12,9 @@ use net::packet::build::world::mob::{
     build_spawn_mob,
 };
 use net::packet::build::world::npc::{build_spawn_npc, ForeignNpc};
+use net::packet::build::world::reactor::{
+    build_hit_reactor, build_remove_reactor, build_spawn_reactor,
+};
 use net::{ClientId, FieldRequest};
 use packet::Packet;
 use std::collections::HashMap;
@@ -43,8 +47,8 @@ const QUEST_NPC_REACH_X: i32 = 1200;
 const QUEST_NPC_REACH_Y: i32 = 800;
 
 /// One live copy of a map. It owns everything local to that map: who is on
-/// it and where, its NPCs, and (later) mobs, drops, and reactors, which will
-/// advance on `tick`.
+/// it and where, its NPCs, mobs, drops, and reactors, which advance on
+/// `tick`.
 pub struct FieldActor {
     key: FieldKey,
     rx: mpsc::Receiver<FieldMessage>,
@@ -52,6 +56,7 @@ pub struct FieldActor {
     map_npcs: Vec<FieldMapEntityNpc>,
     mobs: MobSet,
     drops: DropSet,
+    reactors: ReactorSet,
     tick: Duration,
 }
 
@@ -62,9 +67,11 @@ impl FieldActor {
         map_npcs: Vec<FieldMapEntityNpc>,
         mut mobs: MobSet,
         drops: DropSet,
+        mut reactors: ReactorSet,
         tick: Duration,
     ) -> Self {
         mobs.respawn(Instant::now());
+        reactors.respawn(Instant::now());
         Self {
             key,
             rx,
@@ -72,6 +79,7 @@ impl FieldActor {
             map_npcs,
             mobs,
             drops,
+            reactors,
             tick,
         }
     }
@@ -92,11 +100,19 @@ impl FieldActor {
         }
     }
 
-    /// Advance time-driven field state: mob respawns (drop expiry later).
+    /// Advance time-driven field state: drop expiry and mob and reactor
+    /// respawns.
     fn on_tick(&mut self, now: Instant) {
         for object_id in self.drops.expire(now) {
             if let Ok(packet) = build_remove_drop(object_id, None) {
                 self.broadcast(None, packet);
+            }
+        }
+        for object_id in self.reactors.respawn(now) {
+            if let Some(reactor) = self.reactors.get(object_id) {
+                if let Ok(packet) = build_spawn_reactor(&reactor.view()) {
+                    self.broadcast(None, packet);
+                }
             }
         }
         let spawned = self.mobs.respawn(now);
@@ -208,6 +224,14 @@ impl FieldActor {
                     self.handle_pickup(from, object_id, x, y)
                 }
                 FieldRequest::Throw { loot, vanish } => self.handle_throw(from, loot, vanish),
+                FieldRequest::HitReactor {
+                    object_id,
+                    skill_id,
+                    stance,
+                } => self.handle_hit_reactor(from, object_id, skill_id, stance),
+                FieldRequest::CharInfo { character_id } => {
+                    self.handle_char_info(from, character_id)
+                }
             },
             FieldMessage::SpawnLoot {
                 owner,
@@ -247,6 +271,23 @@ impl FieldActor {
             .collect();
         for (drop, packet) in packets {
             self.send_drop_packet(&drop, packet);
+        }
+    }
+
+    /// Have `character_id`, if they are here, answer `from`'s request for
+    /// their info: their own actor holds the current level and fame.
+    fn handle_char_info(&self, from: ClientId, character_id: i32) {
+        let Some(requester) = self.occupants.get(&from) else {
+            return;
+        };
+        if let Some(target) = self
+            .occupants
+            .values()
+            .find(|occupant| occupant.avatar.id == character_id)
+        {
+            target.handle.send(ServerMessage::CharInfoRequested {
+                requester: requester.handle.clone(),
+            });
         }
     }
 
@@ -376,6 +417,40 @@ impl FieldActor {
         }
     }
 
+    /// A player hit a reactor: show its new state, or break it and have the
+    /// player's client actor roll its drops.
+    fn handle_hit_reactor(&mut self, from: ClientId, object_id: i32, skill_id: i32, stance: i16) {
+        let Some(occupant) = self.occupants.get(&from) else {
+            return;
+        };
+        let handle = occupant.handle.clone();
+        let position = (occupant.avatar.x, occupant.avatar.y);
+        match self
+            .reactors
+            .hit(object_id, skill_id, position, Instant::now())
+        {
+            Some(Hit::Moved(view)) => {
+                if let Ok(packet) = build_hit_reactor(&view, stance) {
+                    self.broadcast(None, packet);
+                }
+            }
+            Some(Hit::Broke(view)) => {
+                // The client plays the state's last hit animation as it
+                // removes the reactor.
+                if let Ok(packet) = build_remove_reactor(&view) {
+                    self.broadcast(None, packet);
+                }
+                handle.send(ServerMessage::ReactorBroken {
+                    reactor_id: view.reactor_id,
+                    object_id: view.object_id,
+                    x: view.x,
+                    y: view.y,
+                });
+            }
+            None => {}
+        }
+    }
+
     fn handle_join(&mut self, handle: ClientHandle, avatar: FieldAvatar, party: Option<i32>) {
         let client_id = handle.client_id;
         // A rejoin replaces the previous entry without announcing a leave.
@@ -408,6 +483,12 @@ impl FieldActor {
 
         for mob in self.mobs.live() {
             if let Ok(packet) = build_spawn_mob(&mob.view(false)) {
+                handle.send_packet(packet);
+            }
+        }
+
+        for reactor in self.reactors.live() {
+            if let Ok(packet) = build_spawn_reactor(&reactor.view()) {
                 handle.send_packet(packet);
             }
         }
@@ -546,6 +627,7 @@ mod tests {
             Vec::new(),
             MobSet::default(),
             DropSet::default(),
+            ReactorSet::default(),
             Duration::from_millis(50),
         );
         tokio::spawn(actor.run());
@@ -670,6 +752,7 @@ mod tests {
             vec![heena],
             MobSet::default(),
             DropSet::default(),
+            ReactorSet::default(),
             Duration::from_millis(50),
         );
         tokio::spawn(actor.run());
@@ -731,5 +814,43 @@ mod tests {
         .await
         .unwrap();
         assert_eq!(checked(&mut far_rx).await, (9, false));
+    }
+
+    #[tokio::test]
+    async fn the_target_answers_a_char_info_request() {
+        let field = spawn_field();
+        let (first, mut first_rx) = client(1);
+        let (second, mut second_rx) = client(2);
+        for (handle, id) in [(first, 1), (second, 2)] {
+            field
+                .send(FieldMessage::Join {
+                    handle,
+                    avatar: avatar(id, 0, 0),
+                })
+                .await
+                .unwrap();
+        }
+        next_opcode(&mut first_rx).await;
+        next_opcode(&mut second_rx).await;
+
+        // Character 3 is not here, so only the request for 2 reaches anyone.
+        for character_id in [3, 2] {
+            field
+                .send(FieldMessage::FromClient {
+                    from: 1,
+                    request: FieldRequest::CharInfo { character_id },
+                })
+                .await
+                .unwrap();
+        }
+        match timeout(Duration::from_secs(1), second_rx.recv())
+            .await
+            .unwrap()
+            .unwrap()
+        {
+            ServerMessage::CharInfoRequested { requester } => assert_eq!(requester.client_id, 1),
+            other => panic!("expected a char info request, got {other:?}"),
+        }
+        assert!(first_rx.try_recv().is_err());
     }
 }
