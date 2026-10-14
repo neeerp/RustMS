@@ -107,6 +107,14 @@ from `UI.nx`. Moved so far:
   (`Text::Font::A10M`). Rows are grey when a required skill is missing. SP-up
   spends a point at once; v83 had no allocation popup. The MACRO button and the
   `SkillMacro` window are not drawn yet.
+- **Key config** (`UIKeyConfig`, `UIWindow.img/KeyConfig`): the keyboard with a
+  `key` label over each bindable key's icon, and a three-row palette of unbound
+  functions (`icon/N`, by v83 function id), laid out from the background and
+  period footage. Drag an icon between keys or onto the palette to unbind it.
+  Esc, Tab, and the other keys printed on the background are fixed. DEFAULT
+  restores the server's defaults; DEFAULT, CLEAR ALL, and Esc with unsaved
+  changes ask through the in-window `notice` bitmaps. CHANGE QUICK SLOTS is
+  disabled until the quick slot is configurable.
 
 `UIClassic.nx` is not one of NoLifeNx's standard files, so `NxFiles` opens it
 with `nl::file` instead of `nl::nx::load_all`.
@@ -221,3 +229,7 @@ These were corrected:
    own grey (`#BBBBBB`) chat line, worded as in period footage: "You have
    gained an item (Roger's Apple)", "You have gained items (3 Green Apple)",
    and "You have lost ..." for losses.
+8. Keymap keys are v83 scan codes, where the number row runs 1 to 9 then 0 from
+   key 2. `Keyboard::Keytable` had 0 to 9 from key 2, so every number-row
+   binding sat one key off. The `v83_number_row_keys` migration moves saved
+   bindings, and the server's default party chat is on key 3 (the 2 key).

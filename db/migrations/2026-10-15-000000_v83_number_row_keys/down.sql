@@ -1,0 +1,2 @@
+UPDATE keybindings SET key = key + 1000 WHERE key BETWEEN 2 AND 11;
+UPDATE keybindings SET key = CASE WHEN key = 1011 THEN 2 ELSE key - 999 END WHERE key BETWEEN 1002 AND 1011;

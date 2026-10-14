@@ -33,7 +33,8 @@ const DEFAULT_BINDINGS: [(i16, u8, i32); 25] = [
     (43, 4, 10),
     (40, 4, 11),
     (21, 4, 12),
-    (4, 4, 14),
+    // Party chat on 2 (v83 numbers keys by scan code, so 1 is key 2).
+    (3, 4, 14),
     (84, 4, 15),
     // Ctrl attacks and Z picks up (HeavenClient's ATTACK 53 and PICKUP 51).
     (29, 5, 53),
