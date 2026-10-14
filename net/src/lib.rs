@@ -4,6 +4,7 @@ extern crate num_derive;
 extern crate serde_derive;
 extern crate serde;
 
+pub mod cash_shop;
 pub mod codec;
 pub mod combat;
 pub mod content;

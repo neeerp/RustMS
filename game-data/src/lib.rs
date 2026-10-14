@@ -6,6 +6,7 @@ use std::fs::File;
 use std::path::Path;
 use thiserror::Error;
 pub mod footholds;
+pub mod commodities;
 pub mod items;
 pub mod lua_strings;
 pub mod mobs;

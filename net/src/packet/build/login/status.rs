@@ -110,6 +110,9 @@ mod tests {
             banned: false,
             ban_msg: None,
             gm_level: 0,
+            nx_credit: 0,
+            maple_points: 0,
+            nx_prepaid: 0,
         }
     }
 

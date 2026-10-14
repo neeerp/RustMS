@@ -14,6 +14,7 @@ use crate::message::{
     CLIENT_QUEUE_CAPACITY,
 };
 use game::Player;
+use net::cash_shop::CashShopRequest;
 use net::dialogue::{Conversation, NpcInteraction};
 use net::login_world::resolve_login_channel;
 use net::packet::build;
@@ -26,7 +27,7 @@ use std::collections::HashSet;
 use std::net::IpAddr;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
-use std::time::Duration;
+use std::time::{Duration, SystemTime};
 use tokio::net::TcpStream;
 use tokio::sync::mpsc;
 use tokio::time::{interval, MissedTickBehavior};
@@ -192,8 +193,12 @@ impl ClientActor {
             debug!(opcode, "Ignoring unhandled world opcode");
             return Ok(());
         };
-        // In the Cash Shop the player is off the map; only leaving counts.
-        if self.in_cash_shop && opcode != RecvOpcode::ChangeMap as i16 {
+        // In the Cash Shop the player is off the map; only leaving and the
+        // shop itself count.
+        if self.in_cash_shop
+            && opcode != RecvOpcode::ChangeMap as i16
+            && opcode != RecvOpcode::CashShopOperation as i16
+        {
             debug!(opcode, "Ignoring opcode in the Cash Shop");
             return Ok(());
         }
@@ -305,6 +310,11 @@ impl ClientActor {
                     // Like a channel change to this channel: the client
                     // reconnects and enters the map it left.
                     self.change_channel(self.channel_id).await?
+                }
+            }
+            WorldAction::CashShop(request) => {
+                if self.in_cash_shop {
+                    self.cash_shop(request).await?
                 }
             }
             WorldAction::Disconnect => return Err(RuntimeError::ClientDisconnected),
@@ -441,23 +451,86 @@ impl ClientActor {
         self.in_cash_shop = true;
         self.flush().await?;
 
-        let account_id = self.in_game()?.player.account_id;
-        let account = spawn_db(move || db::account::get_account_by_id(account_id)).await?;
         let player = &self.in_game()?.player;
-        let packets = [
-            build::world::cash_shop::build_open_cash_shop(player, &account.user_name),
-            build::world::cash_shop::build_cash_inventory(account.character_slots),
-            build::world::cash_shop::build_cash_gifts(),
-            build::world::cash_shop::build_wish_list(),
-            // No NX yet.
-            build::world::cash_shop::build_cash_balance(0, 0, 0),
+        let (account_id, character_id) = (player.account_id, player.stats.id);
+        let (account, balance, items, wish_list) = spawn_db(move || {
+            Ok((
+                db::account::get_account_by_id(account_id)?,
+                db::cash_shop::balance(account_id)?,
+                db::cash_shop::cash_items(account_id)?,
+                db::cash_shop::wish_list(character_id)?,
+            ))
+        })
+        .await?;
+        let player = &self.in_game()?.player;
+        let mut packets = [
+            build::world::cash_shop::build_open_cash_shop(player, &account.user_name)?,
+            build::world::cash_shop::build_cash_inventory(&items, account.character_slots)?,
+            build::world::cash_shop::build_cash_gifts()?,
+            build::world::cash_shop::build_wish_list(&wish_list, false)?,
+            build::world::cash_shop::build_cash_balance(
+                balance.credit,
+                balance.points,
+                balance.prepaid,
+            )?,
         ];
-        for packet in packets {
-            let mut packet = packet.map_err(|e| RuntimeError::Handler(e.to_string()))?;
-            self.send(&mut packet).await?;
-        }
+        self.send_all(&mut packets).await?;
         info!(self.client_id, "Entered the Cash Shop");
         Ok(())
+    }
+
+    /// Buy a commodity into the account's Cash Inventory, or save the wish
+    /// list. The handler already checked the commodity is for sale.
+    async fn cash_shop(&mut self, request: CashShopRequest) -> Result<(), RuntimeError> {
+        use build::world::cash_shop as cs;
+        let player = &self.in_game()?.player;
+        let (account_id, character_id) = (player.account_id, player.stats.id);
+        let mut packets = match request {
+            CashShopRequest::Buy {
+                cash_type,
+                commodity,
+            } => {
+                let item = db::cash_shop::NewCashItem {
+                    account_id,
+                    item_id: commodity.item_id,
+                    sn: commodity.sn,
+                    quantity: commodity.count,
+                    expires_at: (commodity.period > 0).then(|| {
+                        SystemTime::now()
+                            + Duration::from_secs(commodity.period.unsigned_abs() as u64 * 86_400)
+                    }),
+                };
+                let price = commodity.price;
+                match spawn_db(move || db::cash_shop::buy(cash_type, price, &item)).await? {
+                    Some((bought, balance)) => {
+                        info!(
+                            self.client_id,
+                            sn = bought.sn,
+                            item_id = bought.item_id,
+                            price,
+                            "Bought from the Cash Shop"
+                        );
+                        vec![
+                            cs::build_bought_cash_item(&bought)?,
+                            cs::build_cash_balance(
+                                balance.credit,
+                                balance.points,
+                                balance.prepaid,
+                            )?,
+                        ]
+                    }
+                    None => vec![cs::build_cash_shop_failure(
+                        cs::CashShopFailure::NotEnoughCash,
+                    )?],
+                }
+            }
+            CashShopRequest::SetWishList(sns) => {
+                let saved = sns.clone();
+                spawn_db(move || db::cash_shop::set_wish_list(character_id, &saved)).await?;
+                vec![cs::build_wish_list(&sns, true)?]
+            }
+        };
+        self.send_all(&mut packets).await
     }
 
     async fn handle_server_message(&mut self, message: ServerMessage) -> Result<(), RuntimeError> {

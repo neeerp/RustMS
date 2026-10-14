@@ -15,6 +15,7 @@ redistributed.
 | `Character.nx` | Equipment stats and requirements | `RUSTMS_CHARACTER_NX_PATH` |
 | `Mob.nx` | Mob stats (HP, EXP, attack, touch damage) | `RUSTMS_MOB_NX_PATH` |
 | `Skill.nx` | Skill max levels, master levels, and requirements | `RUSTMS_SKILL_NX_PATH` |
+| `Etc.nx` | Cash Shop commodities (prices, counts, periods) | `RUSTMS_ETC_NX_PATH` |
 
 All of these are the v83 GMS files that HeavenClient also loads (see
 `agent_docs/client.md`); the client's `nx/` directory can symlink to these.

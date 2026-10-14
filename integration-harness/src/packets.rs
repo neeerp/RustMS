@@ -426,6 +426,36 @@ pub fn build_leave_cash_shop() -> Packet {
     packet_with_opcode(RecvOpcode::ChangeMap as i16)
 }
 
+/// CASHSHOP_OPERATION buy: pay with `cash_type` (1 NX Credit, 2 Maple
+/// Points, 4 NX Prepaid) for the commodity `sn`.
+pub fn build_cash_shop_buy(cash_type: i32, sn: i32) -> Result<Packet, String> {
+    let mut packet = packet_with_opcode(RecvOpcode::CashShopOperation as i16);
+    packet
+        .write_bytes(&[0x03, 0])
+        .map_err(|e| format!("failed to write purchase action: {e}"))?;
+    packet
+        .write_int(cash_type)
+        .map_err(|e| format!("failed to write purchase cash type: {e}"))?;
+    packet
+        .write_int(sn)
+        .map_err(|e| format!("failed to write purchase serial number: {e}"))?;
+    Ok(packet)
+}
+
+/// CASHSHOP_OPERATION wish list: ten serial numbers, 0 for an empty slot.
+pub fn build_cash_shop_wish_list(sns: &[i32; 10]) -> Result<Packet, String> {
+    let mut packet = packet_with_opcode(RecvOpcode::CashShopOperation as i16);
+    packet
+        .write_byte(0x05)
+        .map_err(|e| format!("failed to write wish list action: {e}"))?;
+    for &sn in sns {
+        packet
+            .write_int(sn)
+            .map_err(|e| format!("failed to write wish list slot: {e}"))?;
+    }
+    Ok(packet)
+}
+
 pub fn build_change_map(target_map_id: i32, portal_name: &str) -> Result<Packet, String> {
     let mut packet = packet_with_opcode(RecvOpcode::ChangeMap as i16);
     packet

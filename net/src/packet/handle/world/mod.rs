@@ -19,7 +19,7 @@ mod spend_points;
 mod use_item;
 mod whisper;
 
-pub use self::cash_shop::EnterCashShopHandler;
+pub use self::cash_shop::{CashShopOperationHandler, EnterCashShopHandler};
 pub use self::change_channel::ChangeChannelHandler;
 pub use self::change_map::{warp, ChangeMapHandler};
 pub use self::chat::AllChatHandler;

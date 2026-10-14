@@ -32,6 +32,30 @@ diesel::table! {
         banned -> Bool,
         ban_msg -> Nullable<Text>,
         gm_level -> Int2,
+        nx_credit -> Int4,
+        maple_points -> Int4,
+        nx_prepaid -> Int4,
+    }
+}
+
+diesel::table! {
+    cash_items (id) {
+        id -> Int8,
+        account_id -> Int4,
+        item_id -> Int4,
+        sn -> Int4,
+        quantity -> Int2,
+        #[max_length = 13]
+        gift_from -> Varchar,
+        expires_at -> Nullable<Timestamp>,
+    }
+}
+
+diesel::table! {
+    wish_lists (character_id, slot) {
+        character_id -> Int4,
+        slot -> Int2,
+        sn -> Int4,
     }
 }
 
@@ -161,6 +185,8 @@ diesel::joinable!(sessions -> characters (character_id));
 diesel::joinable!(inventory_items -> characters (character_id));
 diesel::joinable!(equipment_stats -> inventory_items (item_row_id));
 diesel::joinable!(skills -> characters (character_id));
+diesel::joinable!(cash_items -> accounts (account_id));
+diesel::joinable!(wish_lists -> characters (character_id));
 
 diesel::table! {
     character_quests (character_id, quest_id) {
@@ -181,4 +207,6 @@ diesel::allow_tables_to_appear_in_same_query!(
     inventory_items,
     equipment_stats,
     skills,
+    cash_items,
+    wish_lists,
 );

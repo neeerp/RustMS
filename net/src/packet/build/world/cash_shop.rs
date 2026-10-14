@@ -1,5 +1,8 @@
 use crate::codec::encode_character_data;
+use crate::codec::stats::write_padded_name;
+use crate::codec::time::expiration;
 use crate::{error::NetworkError, packet::op::SendOpcode};
+use db::cash_shop::CashItem;
 use game::Player;
 use packet::{io::write::PktWrite, Packet};
 
@@ -7,7 +10,7 @@ use packet::{io::write::PktWrite, Packet};
 const BEST_SELLER_TABS: i32 = 8;
 const BEST_SELLERS_PER_TAB: usize = 5;
 /// Slots in the Cash Shop wish list.
-const WISH_LIST_SLOTS: usize = 10;
+pub const WISH_LIST_SLOTS: usize = 10;
 /// Storage slots of an account that never expanded its storage.
 const STORAGE_SLOTS: i16 = 4;
 
@@ -48,34 +51,99 @@ pub fn build_cash_balance(credit: i32, points: i32, prepaid: i32) -> Result<Pack
     Ok(packet)
 }
 
-/// CASHSHOP_OPERATION: the empty cash inventory, with the account's storage
-/// and character slots.
-pub fn build_cash_inventory(character_slots: i16) -> Result<Packet, NetworkError> {
+/// CASHSHOP_OPERATION modes.
+const CASH_INVENTORY: u8 = 0x4B;
+const GIFTS: u8 = 0x4D;
+const WISH_LIST: u8 = 0x4F;
+const WISH_LIST_UPDATED: u8 = 0x55;
+const BOUGHT: u8 = 0x57;
+const FAILED: u8 = 0x5C;
+
+/// Why a Cash Shop request failed; the client shows the matching notice.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[repr(u8)]
+pub enum CashShopFailure {
+    /// "Due to an unknown error, failed."
+    Unknown = 0x00,
+    /// "You don't have enough cash."
+    NotEnoughCash = 0xA5,
+    /// The item is for the other gender.
+    Gender = 0xAA,
+    /// The item isn't on sale.
+    SoldOut = 0xC0,
+}
+
+/// CASHSHOP_OPERATION: the account's Cash Inventory, with its storage and
+/// character slots.
+pub fn build_cash_inventory(
+    items: &[CashItem],
+    character_slots: i16,
+) -> Result<Packet, NetworkError> {
     let mut packet = Packet::new_empty();
     packet.write_short(SendOpcode::CashShopOperation as i16)?;
-    packet.write_byte(0x4B)?;
-    packet.write_short(0)?; // items
+    packet.write_byte(CASH_INVENTORY)?;
+    packet.write_short(items.len() as i16)?;
+    for item in items {
+        encode_cash_item(&mut packet, item)?;
+    }
     packet.write_short(STORAGE_SLOTS)?;
     packet.write_short(character_slots)?;
     Ok(packet)
+}
+
+/// CASHSHOP_OPERATION: a purchase is in the Cash Inventory.
+pub fn build_bought_cash_item(item: &CashItem) -> Result<Packet, NetworkError> {
+    let mut packet = Packet::new_empty();
+    packet.write_short(SendOpcode::CashShopOperation as i16)?;
+    packet.write_byte(BOUGHT)?;
+    encode_cash_item(&mut packet, item)?;
+    Ok(packet)
+}
+
+/// CASHSHOP_OPERATION: a request failed.
+pub fn build_cash_shop_failure(failure: CashShopFailure) -> Result<Packet, NetworkError> {
+    let mut packet = Packet::new_empty();
+    packet.write_short(SendOpcode::CashShopOperation as i16)?;
+    packet.write_byte(FAILED)?;
+    packet.write_byte(failure as u8)?;
+    Ok(packet)
+}
+
+/// One Cash Inventory item: 55 bytes.
+fn encode_cash_item(packet: &mut Packet, item: &CashItem) -> Result<(), NetworkError> {
+    packet.write_long(item.id)?;
+    packet.write_int(item.account_id)?;
+    packet.write_int(0)?; // the character it was bought for
+    packet.write_int(item.item_id)?;
+    packet.write_int(item.sn)?;
+    packet.write_short(item.quantity)?;
+    write_padded_name(packet, &item.gift_from)?;
+    packet.write_long(expiration(item.expires_at))?;
+    packet.write_long(0)?;
+    Ok(())
 }
 
 /// CASHSHOP_OPERATION: no gifts waiting.
 pub fn build_cash_gifts() -> Result<Packet, NetworkError> {
     let mut packet = Packet::new_empty();
     packet.write_short(SendOpcode::CashShopOperation as i16)?;
-    packet.write_byte(0x4D)?;
+    packet.write_byte(GIFTS)?;
     packet.write_short(0)?;
     Ok(packet)
 }
 
-/// CASHSHOP_OPERATION: an empty wish list.
-pub fn build_wish_list() -> Result<Packet, NetworkError> {
+/// CASHSHOP_OPERATION: the character's wish list, on entering the shop or
+/// (`updated`) after changing it.
+pub fn build_wish_list(sns: &[i32], updated: bool) -> Result<Packet, NetworkError> {
     let mut packet = Packet::new_empty();
     packet.write_short(SendOpcode::CashShopOperation as i16)?;
-    packet.write_byte(0x4F)?;
-    for _ in 0..WISH_LIST_SLOTS {
-        packet.write_int(0)?;
+    packet.write_byte(if updated {
+        WISH_LIST_UPDATED
+    } else {
+        WISH_LIST
+    })?;
+    for slot in 0..WISH_LIST_SLOTS {
+        packet.write_int(sns.get(slot).copied().unwrap_or(0))?;
     }
     Ok(packet)
 }
@@ -131,7 +199,7 @@ mod tests {
         expect.int(1).int(2).int(3);
         expect.end();
 
-        let packet = build_cash_inventory(6).unwrap();
+        let packet = build_cash_inventory(&[], 6).unwrap();
         let mut expect = Expect::new(&packet.bytes);
         expect
             .short(SendOpcode::CashShopOperation as i16)
@@ -147,7 +215,7 @@ mod tests {
         expect.short(0);
         expect.end();
 
-        let packet = build_wish_list().unwrap();
+        let packet = build_wish_list(&[], false).unwrap();
         let mut expect = Expect::new(&packet.bytes);
         expect
             .short(SendOpcode::CashShopOperation as i16)
@@ -155,6 +223,76 @@ mod tests {
         for _ in 0..10 {
             expect.int(0);
         }
+        expect.end();
+
+        let packet = build_wish_list(&[50200005, 20000053], true).unwrap();
+        let mut expect = Expect::new(&packet.bytes);
+        expect
+            .short(SendOpcode::CashShopOperation as i16)
+            .byte(0x55);
+        expect.int(50200005).int(20000053);
+        for _ in 2..10 {
+            expect.int(0);
+        }
+        expect.end();
+
+        let packet = build_cash_shop_failure(CashShopFailure::NotEnoughCash).unwrap();
+        let mut expect = Expect::new(&packet.bytes);
+        expect
+            .short(SendOpcode::CashShopOperation as i16)
+            .byte(0x5C)
+            .byte(0xA5);
+        expect.end();
+    }
+
+    #[test]
+    fn cash_items_are_55_bytes() {
+        let items = [
+            CashItem {
+                id: 7,
+                account_id: 3,
+                item_id: 5220000,
+                sn: 50200005,
+                quantity: 1,
+                gift_from: String::new(),
+                expires_at: None,
+            },
+            CashItem {
+                id: 8,
+                account_id: 3,
+                item_id: 5220000,
+                sn: 50200003,
+                quantity: 35,
+                gift_from: "bob".to_string(),
+                expires_at: Some(std::time::UNIX_EPOCH),
+            },
+        ];
+        let expect_item = |expect: &mut Expect, item: &CashItem, time: i64| {
+            expect.long(item.id).int(3).int(0).int(5220000);
+            expect.int(item.sn).short(item.quantity);
+            let mut from = item.gift_from.clone().into_bytes();
+            from.resize(13, 0);
+            expect.bytes(&from).long(time).long(0);
+        };
+
+        let packet = build_bought_cash_item(&items[0]).unwrap();
+        assert_eq!(packet.bytes.len(), 2 + 1 + 55);
+        let mut expect = Expect::new(&packet.bytes);
+        expect
+            .short(SendOpcode::CashShopOperation as i16)
+            .byte(0x57);
+        expect_item(&mut expect, &items[0], crate::codec::time::DEFAULT_TIME);
+        expect.end();
+
+        let packet = build_cash_inventory(&items, 6).unwrap();
+        let mut expect = Expect::new(&packet.bytes);
+        expect
+            .short(SendOpcode::CashShopOperation as i16)
+            .byte(0x4B)
+            .short(2);
+        expect_item(&mut expect, &items[0], crate::codec::time::DEFAULT_TIME);
+        expect_item(&mut expect, &items[1], 116_444_736_000_000_000);
+        expect.short(4).short(6);
         expect.end();
     }
 }
