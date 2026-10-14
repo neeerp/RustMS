@@ -25,12 +25,13 @@
 
 #include "../Components/ClassicTabs.h"
 
+#include "../../Character/BuddyList.h"
 #include "../../Character/Party.h"
 
 namespace ms
 {
 	// The v83 Maple User List & Guild window (UIWindow.img/UserList). Only
-	// the Party tab works so far; the others show an empty window.
+	// the Friend and Party tabs work so far; the others show an empty window.
 	class UIUserList : public UIDragElement<PosUSERLIST>
 	{
 	public:
@@ -80,6 +81,14 @@ namespace ms
 			BT_LEAVE,
 			BT_EXPEL,
 			BT_INVITE,
+			BT_ADD_BUDDY,
+			BT_DELETE_BUDDY,
+			BT_WHISPER_BUDDY,
+			BT_BUDDY_CHAT,
+			BT_BUDDY_MAP,
+			BT_INVITE_BUDDY,
+			BT_SHOW_ONLINE,
+			BT_SHOW_ALL,
 			BT_TAB0
 		};
 
@@ -113,6 +122,25 @@ namespace ms
 			bool operator==(const Shown& other) const;
 		};
 
+		// One buddy's half of a row; pos is relative to the window.
+		struct Cell
+		{
+			int32_t id;
+			Point<int16_t> pos;
+			Text name, channel;
+		};
+
+		// The online or offline part of the buddy list, two buddies a row.
+		struct BuddySection
+		{
+			Texture header;
+			Text count;
+			int16_t top = 0;
+			int16_t bottom = 0;
+			int16_t rows = 0;
+			std::vector<Cell> cells;
+		};
+
 		std::vector<Shown> currently_shown() const;
 		void rebuild();
 		// Lays out one section from y and returns where the next may start.
@@ -122,8 +150,13 @@ namespace ms
 		void update_buttons();
 		const PartyMember* selected_member() const;
 
+		void rebuild_buddies();
+		void draw_buddies(const BuddySection& section, const Texture& section_row, bool legend) const;
+		const Buddy* selected_buddy() const;
+
 		uint16_t tab;
 		Party& party;
+		BuddyList& buddies;
 		ClassicTabs tabs;
 
 		Texture columns, row, bottom, highlight, star;
@@ -133,5 +166,12 @@ namespace ms
 		int32_t shown_leader = 0;
 		int32_t shown_mapid = 0;
 		int32_t selected = 0;
+
+		Texture legend, buddy_row, offline_row, buddy_bottom;
+		BuddySection buddies_online, buddies_offline;
+		std::vector<Buddy> shown_buddies;
+		int32_t picked_buddy = 0;
+		bool show_all = true;
+		bool filter_clicked = false;
 	};
 }

@@ -1,3 +1,4 @@
+mod buddies;
 mod buff;
 mod combat;
 mod dialogue;
@@ -344,6 +345,7 @@ impl ClientActor {
                 })
                 .await?
             }
+            WorldAction::Buddy(request) => self.buddy_request(request).await?,
             WorldAction::Find { target_name } => {
                 self.send_to_directory(DirectoryMessage::Find {
                     from: self.client_id,
@@ -429,6 +431,7 @@ impl ClientActor {
             position: (spawn.x, spawn.y),
         });
         self.join_current_field(spawn).await?;
+        self.load_buddies().await?;
         info!(
             character_id,
             channel_id = self.channel_id,
@@ -724,6 +727,11 @@ impl ClientActor {
                         client_id: self.client_id,
                     })
                     .await;
+            }
+            if !self.changing_channel {
+                if let Err(error) = self.announce_offline().await {
+                    warn!(self.client_id, %error, "Failed to tell buddies of logout");
+                }
             }
             let _ = self
                 .send_to_directory(DirectoryMessage::Unregister {

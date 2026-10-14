@@ -213,6 +213,19 @@ pub enum PartyRequest {
     },
 }
 
+/// A buddy list operation, carried out by the client's actor.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum BuddyRequest {
+    /// Add the named character, asking them to add the player back.
+    Add { name: String, group: String },
+    /// Accept a request from `id`.
+    Accept { id: i32 },
+    /// Remove `id` from the list, or decline their request.
+    Remove { id: i32 },
+    /// Say something to the listed buddies.
+    Chat { recipients: Vec<i32>, text: String },
+}
+
 /// Something a player asks of their Maple Messenger, which the world
 /// directory owns.
 #[derive(Debug)]
@@ -284,6 +297,7 @@ pub enum WorldAction {
     Died,
     Whisper(WhisperDelivery),
     Party(PartyRequest),
+    Buddy(BuddyRequest),
     /// Tell the player where a character is (`/find`).
     Find {
         target_name: String,
@@ -391,7 +405,8 @@ fn world_routes() -> &'static HashMap<i16, WorldRoute> {
                 Op::DenyPartyRequest,
                 InGame(&world::DenyPartyRequestHandler),
             ),
-            (Op::PartyChat, InGame(&world::PartyChatHandler)),
+            (Op::MultiChat, InGame(&world::MultiChatHandler)),
+            (Op::BuddyListModify, InGame(&world::BuddyListModifyHandler)),
             (Op::Messenger, InGame(&world::MessengerHandler)),
             (Op::TalkToNpc, InGame(&world::NpcTalkHandler)),
             (Op::NpcTalkMore, InGame(&world::NpcTalkMoreHandler)),
@@ -449,7 +464,7 @@ mod tests {
     fn every_registered_opcode_is_unique_per_server() {
         // The maps would silently drop duplicates; check the table sizes match.
         assert_eq!(login_routes().len(), 13);
-        assert_eq!(world_routes().len(), 36);
+        assert_eq!(world_routes().len(), 37);
     }
 
     #[test]

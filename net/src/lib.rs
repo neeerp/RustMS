@@ -31,9 +31,10 @@ pub mod skills;
 
 pub use self::game_data::{closest_spawn_point, get as get_game_data, spawn_position};
 pub use self::handler::{
-    login_route, world_route, BroadcastScope, ClientId, FieldRequest, HandlerResult, LoginAction,
-    LoginContext, LoginHandler, LoginStage, MessengerRequest, PartyRequest, PreGameHandler,
-    SpawnPosition, WhisperDelivery, WorldAction, WorldContext, WorldHandler, WorldRoute,
+    login_route, world_route, BroadcastScope, BuddyRequest, ClientId, FieldRequest, HandlerResult,
+    LoginAction, LoginContext, LoginHandler, LoginStage, MessengerRequest, PartyRequest,
+    PreGameHandler, SpawnPosition, WhisperDelivery, WorldAction, WorldContext, WorldHandler,
+    WorldRoute,
 };
 pub use self::io::error;
 pub use self::npc_data::get as get_npc_dialogue_data;

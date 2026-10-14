@@ -36,17 +36,21 @@ namespace ms
 		}
 	};
 
-	// Sends a line to the player's party. The server decides who hears it,
-	// but the client lists the recipients.
+	// Sends a line to the player's party or buddies. The server decides who
+	// hears it, but the client lists the recipients.
 	// Opcode: MULTICHAT(119)
-	class PartyChatPacket : public OutPacket
+	class MultiChatPacket : public OutPacket
 	{
 	public:
-		static constexpr int8_t PARTY_MODE = 1;
-
-		PartyChatPacket(const std::vector<int32_t>& recipients, const std::string& message) : OutPacket(OutPacket::Opcode::MULTICHAT)
+		enum Mode : int8_t
 		{
-			write_byte(PARTY_MODE);
+			BUDDY = 0,
+			PARTY = 1
+		};
+
+		MultiChatPacket(Mode mode, const std::vector<int32_t>& recipients, const std::string& message) : OutPacket(OutPacket::Opcode::MULTICHAT)
+		{
+			write_byte(mode);
 			write_byte(static_cast<int8_t>(recipients.size()));
 
 			for (int32_t cid : recipients)

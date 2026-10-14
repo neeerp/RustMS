@@ -167,6 +167,10 @@ namespace ms
 							{
 								send_party_chat(msg);
 							}
+							else if (chat_target == Target::BUDDY)
+							{
+								send_buddy_chat(msg);
+							}
 							// Commands the client doesn't know aren't chat.
 							else if (msg[0] != '/')
 							{
@@ -398,6 +402,9 @@ namespace ms
 			case LineType::PARTY:
 				color = Color::Name::PARTYPINK;
 				break;
+			case LineType::BUDDY:
+				color = Color::Name::ORANGE;
+				break;
 			case LineType::PINK:
 				color = Color::Name::MONALISA;
 				break;
@@ -471,7 +478,19 @@ namespace ms
 	void UIChatBar::set_target(Target new_target)
 	{
 		chat_target = new_target;
-		chattarget_label.change_text(chat_target == Target::PARTY ? "To Party" : "To All");
+
+		switch (chat_target)
+		{
+			case Target::PARTY:
+				chattarget_label.change_text("To Party");
+				break;
+			case Target::BUDDY:
+				chattarget_label.change_text("To Buddy");
+				break;
+			default:
+				chattarget_label.change_text("To All");
+				break;
+		}
 		toggle_chatfield(true);
 	}
 
@@ -498,10 +517,27 @@ namespace ms
 			if (member.id != player.get_oid())
 				recipients.push_back(member.id);
 
-		PartyChatPacket(recipients, message).dispatch();
+		MultiChatPacket(MultiChatPacket::Mode::PARTY, recipients, message).dispatch();
 
 		// The server sends the line to the other members only.
 		send_chatline(player.get_stats().get_name() + " : " + message, LineType::PARTY);
+	}
+
+	void UIChatBar::send_buddy_chat(const std::string& message)
+	{
+		Player& player = Stage::get().get_player();
+		std::vector<int32_t> recipients = player.get_buddies().online_ids();
+
+		if (recipients.empty())
+		{
+			send_chatline("None of your buddies are online.", LineType::RED);
+			return;
+		}
+
+		MultiChatPacket(MultiChatPacket::Mode::BUDDY, recipients, message).dispatch();
+
+		// As with party chat, the server sends the line to the others only.
+		send_chatline(player.get_stats().get_name() + " : " + message, LineType::BUDDY);
 	}
 
 	Button::State UIChatBar::button_pressed(uint16_t buttonid)

@@ -54,6 +54,8 @@ namespace ms
 			GREY,
 			// Party chat and party notices
 			PARTY,
+			// Buddy chat
+			BUDDY,
 			PINK
 		};
 
@@ -61,7 +63,8 @@ namespace ms
 		enum class Target
 		{
 			ALL,
-			PARTY
+			PARTY,
+			BUDDY
 		};
 
 		UIChatBar();
@@ -102,8 +105,8 @@ namespace ms
 
 		bool is_chatfieldopen();
 
-		// Send typed lines to everyone nearby or to the party, and open the
-		// input field.
+		// Send typed lines to everyone nearby, the party, or online buddies,
+		// and open the input field.
 		void set_target(Target new_target);
 		// Open the chat field with "/w name " typed, ready for the message.
 		void start_whisper(const std::string& name);
@@ -127,6 +130,7 @@ namespace ms
 		Rectangle<int16_t> get_arrow_bounds(Arrow arrow) const;
 
 		void send_party_chat(const std::string& message);
+		void send_buddy_chat(const std::string& message);
 
 		static constexpr int16_t CHATROWHEIGHT = 13;
 		static constexpr int16_t CHATROWS = 5;

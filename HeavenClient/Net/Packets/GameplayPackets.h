@@ -188,6 +188,55 @@ namespace ms
 		}
 	};
 
+	// Opcode: BUDDYLIST_MODIFY(130)
+	class BuddyListModifyPacket : public OutPacket
+	{
+	public:
+		enum Mode : int8_t
+		{
+			ADD = 1,
+			ACCEPT = 2,
+			REMOVE = 3
+		};
+
+	protected:
+		BuddyListModifyPacket(Mode mode) : OutPacket(OutPacket::Opcode::BUDDYLIST_MODIFY)
+		{
+			write_byte(mode);
+		}
+	};
+
+	// Adds a character to the buddy list, asking them to add the player back
+	class AddBuddyPacket : public BuddyListModifyPacket
+	{
+	public:
+		AddBuddyPacket(const std::string& name, const std::string& group) : BuddyListModifyPacket(BuddyListModifyPacket::Mode::ADD)
+		{
+			write_string(name);
+			write_string(group);
+		}
+	};
+
+	// Accepts a buddy request
+	class AcceptBuddyPacket : public BuddyListModifyPacket
+	{
+	public:
+		AcceptBuddyPacket(int32_t cid) : BuddyListModifyPacket(BuddyListModifyPacket::Mode::ACCEPT)
+		{
+			write_int(cid);
+		}
+	};
+
+	// Removes a buddy, or declines their request
+	class DeleteBuddyPacket : public BuddyListModifyPacket
+	{
+	public:
+		DeleteBuddyPacket(int32_t cid) : BuddyListModifyPacket(BuddyListModifyPacket::Mode::REMOVE)
+		{
+			write_int(cid);
+		}
+	};
+
 	// Opcode: ADMIN_COMMAND(128)
 	class AdminCommandPacket : public OutPacket
 	{

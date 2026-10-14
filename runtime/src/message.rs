@@ -244,6 +244,16 @@ impl Presence {
     }
 }
 
+/// A buddy on someone's list, for the directory to fill in their channel.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ListedBuddy {
+    pub id: ClientId,
+    pub name: String,
+    pub group: String,
+    /// They list the owner too, so the owner may see their channel.
+    pub mutual: bool,
+}
+
 /// Messages to the world directory.
 #[derive(Debug)]
 pub enum DirectoryMessage {
@@ -278,6 +288,16 @@ pub enum DirectoryMessage {
     Broadcast {
         from: ClientId,
         scope: BroadcastScope,
+        packet: Packet,
+    },
+    /// Send `owner` their buddy list with the channels of those online.
+    BuddyList {
+        owner: ClientId,
+        buddies: Vec<ListedBuddy>,
+    },
+    /// Send a packet to whichever of these characters are online.
+    Deliver {
+        to: Vec<ClientId>,
         packet: Packet,
     },
     Messenger {

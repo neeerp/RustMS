@@ -1,3 +1,4 @@
+mod buddy;
 mod cash_shop;
 mod change_channel;
 mod change_map;
@@ -27,6 +28,7 @@ mod use_item;
 mod use_skill;
 mod whisper;
 
+pub use self::buddy::BuddyListModifyHandler;
 pub use self::cash_shop::EnterCashShopHandler;
 pub use self::change_channel::ChangeChannelHandler;
 pub use self::change_map::{warp, ChangeMapHandler};
@@ -44,7 +46,7 @@ pub use self::monster_book_cover::MonsterBookCoverHandler;
 pub use self::move_player::PlayerMoveHandler;
 pub use self::npc_dialogue::{NpcTalkHandler, NpcTalkMoreHandler};
 pub use self::npc_shop::NpcShopActionHandler;
-pub use self::party::{DenyPartyRequestHandler, PartyChatHandler, PartyOperationHandler};
+pub use self::party::{DenyPartyRequestHandler, MultiChatHandler, PartyOperationHandler};
 pub use self::party_search_update::PartySearchUpdateHandler;
 pub use self::pickup::ItemPickupHandler;
 pub use self::quest_action::QuestActionHandler;
