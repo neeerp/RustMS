@@ -17,6 +17,9 @@ can display out-of-range quests without enabling their acceptance. Job and
 prerequisite checks still apply. Started and completed records are read from
 the server's quest ledger.
 
+Quest names stay on one line, in the list and in the detail header, and long
+ones are cut with "..", as in the reference.
+
 Select a list entry to show its NPC portrait, level range, destination, original
 `QuestInfo.img/<id>/<state>` description, completion date, and EXP reward. Search
 is case insensitive. The list and detail pane scroll independently, and the
