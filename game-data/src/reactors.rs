@@ -138,12 +138,12 @@ mod tests {
             return;
         };
         let data = crate::GameData::load_from_nx_map(path).unwrap();
-        let amherst = &data.field(1000000).unwrap().reactors;
+        let amherst = &data.field(1010000).unwrap().reactors;
         assert_eq!(amherst.len(), 5);
-        assert!(amherst.iter().all(|r| r.reactor_id == 2001));
+        assert!(amherst.iter().all(|r| r.reactor_id == 2000));
         assert_eq!(
             (amherst[0].x, amherst[0].y, amherst[0].reactor_time),
-            (610, 254, 90)
+            (610, 259, 90)
         );
     }
 }

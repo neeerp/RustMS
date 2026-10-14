@@ -9,7 +9,7 @@ use integration_harness::preconditions::load_harness_config_or_fail;
 use integration_harness::trace::{read_for, send, until, warp, Trace};
 use integration_harness::{login_to_world_session, relogin};
 
-const FOREST: i32 = 50_000;
+const FOREST: i32 = 40_000;
 const SNAIL: i32 = 100100;
 const SNAIL_CARD: i32 = 2380000;
 const BLUE_SNAIL_CARD: i32 = 2380001;
