@@ -475,6 +475,29 @@ pub fn build_cash_shop_wish_list(sns: &[i32; 10]) -> Result<Packet, String> {
     Ok(packet)
 }
 
+/// CASHSHOP_OPERATION take out (0x0D): move Cash Inventory item `cash_id`
+/// to `slot` of bag `kind`.
+pub fn build_cash_shop_take_out(cash_id: i64, kind: u8, slot: i16) -> Result<Packet, String> {
+    let mut packet = packet_with_opcode(RecvOpcode::CashShopOperation as i16);
+    let write = |e: std::io::Error| format!("failed to write take out: {e}");
+    packet.write_byte(0x0D).map_err(write)?;
+    packet.write_long(cash_id).map_err(write)?;
+    packet.write_byte(kind).map_err(write)?;
+    packet.write_short(slot).map_err(write)?;
+    Ok(packet)
+}
+
+/// CASHSHOP_OPERATION put back (0x0E): return item `cash_id` from bag
+/// `kind` to the Cash Inventory.
+pub fn build_cash_shop_put_back(cash_id: i64, kind: u8) -> Result<Packet, String> {
+    let mut packet = packet_with_opcode(RecvOpcode::CashShopOperation as i16);
+    let write = |e: std::io::Error| format!("failed to write put back: {e}");
+    packet.write_byte(0x0E).map_err(write)?;
+    packet.write_long(cash_id).map_err(write)?;
+    packet.write_byte(kind).map_err(write)?;
+    Ok(packet)
+}
+
 pub fn build_change_map(target_map_id: i32, portal_name: &str) -> Result<Packet, String> {
     let mut packet = packet_with_opcode(RecvOpcode::ChangeMap as i16);
     packet

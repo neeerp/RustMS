@@ -24,6 +24,8 @@
 
 #include "MovementPacket.h"
 
+#include "../../Character/Inventory/InventoryType.h"
+
 namespace ms
 {
 	// Opcode: CHANGE_CHANNEL(39)
@@ -102,6 +104,33 @@ namespace ms
 
 			for (size_t i = 0; i < 10; i++)
 				write_int(i < sns.size() ? sns[i] : 0);
+		}
+	};
+
+	// Opcode: CASHSHOP_OPERATION(229)
+	class TakeOutCashItemPacket : public OutPacket
+	{
+	public:
+		// Move a Cash Inventory item to its bag, at slot if that is free
+		TakeOutCashItemPacket(int64_t cash_id, InventoryType::Id type, int16_t slot) : OutPacket(OutPacket::Opcode::CASHSHOP_OPERATION)
+		{
+			write_byte(0x0D);
+			write_long(cash_id);
+			write_byte(type);
+			write_short(slot);
+		}
+	};
+
+	// Opcode: CASHSHOP_OPERATION(229)
+	class PutBackCashItemPacket : public OutPacket
+	{
+	public:
+		// Move a cash item from a bag back to the Cash Inventory
+		PutBackCashItemPacket(int64_t cash_id, InventoryType::Id type) : OutPacket(OutPacket::Opcode::CASHSHOP_OPERATION)
+		{
+			write_byte(0x0E);
+			write_long(cash_id);
+			write_byte(type);
 		}
 	};
 

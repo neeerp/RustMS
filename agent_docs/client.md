@@ -262,7 +262,7 @@ side yet.
 | Buddy list (`UIUserList` Friend tab, buddy chat) | Implemented without groups; see `buddies.md` |
 | Guild / alliance / blacklist tabs (`UIUserList`) | Tab strip only |
 | Monster Book (`UIMonsterBook`) | Implemented: cards, summary, monster pages, search, cover; see `combat.md` |
-| Cash shop (`UICashShop`) | Enter/exit, catalog, buying, Cash Inventory and wish list; gifts and withdrawing items remain unimplemented |
+| Cash shop (`UICashShop`) | Enter/exit, catalog, buying, Cash Inventory, wish list, and moving items to and from the bags; gifts remain unimplemented |
 | Maple Messenger (`UIMessenger`) | Implemented |
 | Storage, trade, player shops, mini-games, memo/mail | No UI, no handlers |
 | Pets, mounts, summons, reactors beyond hit/spawn | Partial or absent (`Reactor` TODOs) |
@@ -291,7 +291,9 @@ the screen size.
   the player's gender. QUERY_CASH_RESULT (324) gives the NX Credit, Maple Point
   and NX Prepaid balances. CASHSHOP_OPERATION (325) modes 0x4B (Cash
   Inventory), 0x4D (gifts waiting for the account), 0x4F and 0x55 (wish list),
-  0x57 (a bought item) and 0x5C (a failed purchase) are read.
+  0x57 (a bought item), 0x5C (a failure), 0x68 (an item taken out) and 0x6A
+  (an item put back) are read. Inventory slots keep the item's cash serial,
+  which the item encoding carries, so a cash item can find its way back.
 - **Buying:** BUY opens `UICashBuy` (`CashShop.img/CSNotice/0`): the item, its
   price and period, and a checkbox per balance. It checks the first balance
   that covers the price, trying NX Prepaid, NX Credit, then Maple Points. OK
@@ -300,8 +302,14 @@ the screen size.
   failure notice.
 - **Wish list:** RESERVE and REMOVE send the whole list (0x05, ten SNs), and the
   server answers with the list it kept.
-- **Not served yet:** GIFT, taking items out of the Cash Inventory, the slot
-  expansions, CHARGE, CHECK CASH and COUPON do nothing.
+- **Taking out and putting back:** double-clicking a Cash Inventory item
+  sends 0x0D with its serial, bag and the bag's first free slot; the server
+  answers with the slot and the item (0x68), or 0xBB if the bag is full.
+  Double-clicking a cash item in the Item Inventory sends 0x0E, and the server
+  answers with the Cash Inventory item (0x6A). The footage doesn't show
+  whether v83 used double-clicks or dragging; dragging isn't supported.
+- **Not served yet:** GIFT, the slot expansions, CHARGE, CHECK CASH and COUPON
+  do nothing.
 
 ## Estimated client work for a complete game
 
@@ -310,7 +318,7 @@ the screen size.
 | Buddy groups | Default group only | S |
 | Guild | Skeleton only, plus guild emblem/BBS UIs missing | L |
 | Trade / storage / player shops | Nothing | L |
-| Cash shop gifts, taking items out, packages | Buying and the wish list only | M |
+| Cash shop gifts and packages | Buying, the wish list and moving items only | M |
 | Quest accept/complete UI flow | Partial | S |
 | Pets and mounts | Partial rendering, no interaction | M |
 | Memo, mail, MTS | Nothing | M each |

@@ -26,9 +26,7 @@ namespace ms
 		{
 			// Read all item stats
 			bool cash = recv.read_bool();
-
-			if (cash)
-				recv.skip(8); // unique id
+			int64_t cash_id = cash ? recv.read_long() : 0;
 
 			int64_t expire = recv.read_long();
 			int16_t count = recv.read_short();
@@ -39,7 +37,7 @@ namespace ms
 			if ((id / 10000 == 233) || (id / 10000 == 207))
 				recv.skip(8);
 
-			inventory.add_item(invtype, slot, id, cash, expire, count, owner, flag);
+			inventory.add_item(invtype, slot, id, cash_id, expire, count, owner, flag);
 		}
 
 		// Parse a pet from a packet
@@ -47,9 +45,7 @@ namespace ms
 		{
 			// Read all pet stats
 			bool cash = recv.read_bool();
-
-			if (cash)
-				recv.skip(8); // unique id
+			int64_t cash_id = cash ? recv.read_long() : 0;
 
 			int64_t expire = recv.read_long();
 			std::string petname = recv.read_padded_string(13);
@@ -60,7 +56,7 @@ namespace ms
 			// Some unused bytes
 			recv.skip(18);
 
-			inventory.add_pet(invtype, slot, id, cash, expire, petname, petlevel, closeness, fullness);
+			inventory.add_pet(invtype, slot, id, cash_id, expire, petname, petlevel, closeness, fullness);
 		}
 
 		// Parse an equip from a packet
@@ -68,9 +64,7 @@ namespace ms
 		{
 			// Read equip information
 			bool cash = recv.read_bool();
-
-			if (cash)
-				recv.skip(8); // unique id
+			int64_t cash_id = cash ? recv.read_long() : 0;
 
 			int64_t expire = recv.read_long();
 			uint8_t slots = recv.read_byte();
@@ -112,7 +106,7 @@ namespace ms
 				slot = -slot;
 			}
 
-			inventory.add_equip(invtype, slot, id, cash, expire, slots, level, stats, owner, flag, itemlevel, itemexp, vicious);
+			inventory.add_equip(invtype, slot, id, cash_id, expire, slots, level, stats, owner, flag, itemlevel, itemexp, vicious);
 		}
 
 		void parse_item(InPacket& recv, InventoryType::Id invtype, int16_t slot, Inventory& inventory)

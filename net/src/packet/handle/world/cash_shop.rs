@@ -2,6 +2,7 @@ use crate::cash_shop::{self, CashShopRequest};
 use crate::handler::{HandlerResult, WorldAction, WorldContext, WorldHandler, WorldResult};
 use crate::packet::build;
 use crate::packet::build::world::cash_shop::{CashShopFailure, WISH_LIST_SLOTS};
+use game::InventoryType;
 use packet::{io::read::PktRead, Packet};
 use std::io::Cursor;
 use tracing::debug;
@@ -23,10 +24,15 @@ impl WorldHandler for EnterCashShopHandler {
 /// 0xE5, `CASHSHOP_OPERATION`: an action byte, then its fields. Buying (0x03)
 /// sends a byte, the balance to pay with, and the commodity's serial number;
 /// the wish list (0x05) sends its ten serial numbers, 0 for an empty slot.
+/// Taking an item out of the Cash Inventory (0x0D) sends its cash serial, its
+/// bag and the slot the client chose; putting one back (0x0E) sends its cash
+/// serial and bag.
 pub struct CashShopOperationHandler;
 
 const BUY: u8 = 0x03;
 const SET_WISH_LIST: u8 = 0x05;
+const TAKE_OUT: u8 = 0x0D;
+const PUT_BACK: u8 = 0x0E;
 
 impl WorldHandler for CashShopOperationHandler {
     fn handle(&self, packet: &mut Packet, ctx: &mut WorldContext) -> WorldResult {
@@ -59,9 +65,23 @@ impl WorldHandler for CashShopOperationHandler {
                     cash_shop::commodity(sn).is_some_and(|c| c.on_sale)
                 }))
             }
+            TAKE_OUT => {
+                let cash_id = reader.read_long()?;
+                reader.read_byte()?; // the item's bag
+                let slot = reader.read_short()?;
+                CashShopRequest::TakeOut { cash_id, slot }
+            }
+            PUT_BACK => {
+                let cash_id = reader.read_long()?;
+                let kind = InventoryType::from_i16(reader.read_byte()?.into())
+                    .filter(|kind| InventoryType::BAGS.contains(kind));
+                match kind {
+                    Some(kind) => CashShopRequest::PutBack { cash_id, kind },
+                    None => return fail(CashShopFailure::Unknown),
+                }
+            }
             other => {
-                // Gifts, packages, coupons, and moving items out of the Cash
-                // Inventory aren't supported yet.
+                // Gifts, packages and coupons aren't supported yet.
                 debug!(action = other, "Ignoring Cash Shop operation");
                 return Ok(HandlerResult::empty());
             }
@@ -111,6 +131,44 @@ mod tests {
             panic!("expected a failure reply: {:?}", result.actions);
         };
         assert_eq!(reply.bytes[2..], [0x5C, CashShopFailure::Unknown as u8]);
+    }
+
+    #[test]
+    fn items_move_between_the_cash_inventory_and_the_bags() {
+        let result = handle(|p| {
+            p.write_byte(TAKE_OUT).unwrap();
+            p.write_long(42).unwrap();
+            p.write_byte(5).unwrap();
+            p.write_short(3).unwrap();
+        });
+        assert!(matches!(
+            result.actions.as_slice(),
+            [WorldAction::CashShop(CashShopRequest::TakeOut {
+                cash_id: 42,
+                slot: 3
+            })]
+        ));
+
+        let result = handle(|p| {
+            p.write_byte(PUT_BACK).unwrap();
+            p.write_long(42).unwrap();
+            p.write_byte(1).unwrap();
+        });
+        assert!(matches!(
+            result.actions.as_slice(),
+            [WorldAction::CashShop(CashShopRequest::PutBack {
+                cash_id: 42,
+                kind: InventoryType::Equip
+            })]
+        ));
+
+        // Equipped items (-1) can't go back.
+        let result = handle(|p| {
+            p.write_byte(PUT_BACK).unwrap();
+            p.write_long(42).unwrap();
+            p.write_byte(0xFF).unwrap();
+        });
+        assert!(matches!(result.actions.as_slice(), [WorldAction::Reply(_)]));
     }
 
     #[test]

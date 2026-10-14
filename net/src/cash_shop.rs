@@ -3,7 +3,8 @@
 
 use crate::load::{self, asset_path};
 use crate::packet::build::world::cash_shop::{CashShopFailure, WISH_LIST_SLOTS};
-use db::cash_shop::CashType;
+use db::cash_shop::{CashItem, CashType};
+use game::{InventoryType, Item};
 use game_data::commodities::{Commodity, CommodityData};
 use std::sync::OnceLock;
 
@@ -29,6 +30,12 @@ pub enum CashShopRequest {
     },
     /// Replace the wish list with these serial numbers.
     SetWishList(Vec<i32>),
+    /// Move the Cash Inventory item with this cash serial to the character,
+    /// at `slot` of its bag if that slot is free.
+    TakeOut { cash_id: i64, slot: i16 },
+    /// Move the character's item with this cash serial, from `kind`, back to
+    /// the Cash Inventory.
+    PutBack { cash_id: i64, kind: InventoryType },
 }
 
 /// The balance a purchase names: 1 NX Credit, 2 Maple Points, 4 NX Prepaid.
@@ -60,6 +67,46 @@ pub fn check_purchase(
     Ok(commodity)
 }
 
+/// The inventory item a Cash Inventory item becomes: equipment gets its base
+/// stats, and the item keeps its cash serial and expiry. `None` if the item
+/// data has no such item, or for pets, whose item encoding isn't written yet.
+pub fn inventory_item(cash_item: &CashItem) -> Option<Item> {
+    if cash_item.item_id / 10_000 == 500 {
+        return None;
+    }
+    let item = crate::items::create(cash_item.item_id, cash_item.quantity)?;
+    Some(Item {
+        cash_serial: Some(cash_item.id),
+        expiration: cash_item.expires_at,
+        ..item
+    })
+}
+
+/// The Cash Inventory item a character's cash item becomes again. The
+/// inventory doesn't keep the commodity, so it is looked up by item.
+pub fn cash_item(account_id: i32, cash_id: i64, item: &Item) -> CashItem {
+    CashItem {
+        id: cash_id,
+        account_id,
+        item_id: item.item_id,
+        sn: commodity_sn(item.item_id, item.quantity),
+        quantity: item.quantity,
+        gift_from: String::new(),
+        expires_at: item.expiration,
+    }
+}
+
+/// The serial number of a commodity selling `count` of `item_id`, preferring
+/// one on sale; 0 if none does.
+fn commodity_sn(item_id: i32, count: i16) -> i32 {
+    commodities().ok().map_or(0, |data| {
+        data.iter()
+            .filter(|c| c.item_id == item_id)
+            .max_by_key(|c| (c.count == count, c.on_sale, -c.sn))
+            .map_or(0, |c| c.sn)
+    })
+}
+
 /// The wish list the client sent, keeping the commodities on sale, each once.
 pub fn wish_list(sns: &[i32], on_sale: impl Fn(i32) -> bool) -> Vec<i32> {
     let mut list = Vec::new();
@@ -85,6 +132,20 @@ mod tests {
             gender: 2,
             on_sale: true,
         }
+    }
+
+    #[test]
+    fn pets_stay_in_the_cash_inventory() {
+        let pet = CashItem {
+            id: 7,
+            account_id: 3,
+            item_id: 5000000,
+            sn: 60000000,
+            quantity: 1,
+            gift_from: String::new(),
+            expires_at: None,
+        };
+        assert_eq!(inventory_item(&pet), None);
     }
 
     #[test]

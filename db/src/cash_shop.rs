@@ -1,8 +1,10 @@
 //! The Cash Shop: an account's NX balances and Cash Inventory, and each
 //! character's wish list.
 
+use crate::player::write_player;
 use crate::schema::{accounts, cash_items, wish_lists};
 use diesel::prelude::*;
+use game::Player;
 use std::time::SystemTime;
 
 /// What a purchase is paid with.
@@ -21,7 +23,7 @@ pub struct Balance {
 }
 
 /// An item in an account's Cash Inventory. `id` is its cash serial number.
-#[derive(Clone, Debug, PartialEq, Eq, Queryable, Identifiable)]
+#[derive(Clone, Debug, PartialEq, Eq, Queryable, Identifiable, Insertable)]
 #[diesel(table_name = cash_items)]
 pub struct CashItem {
     pub id: i64,
@@ -59,6 +61,47 @@ pub fn cash_items(account_id: i32) -> crate::Result<Vec<CashItem>> {
         .filter(cash_items::account_id.eq(account_id))
         .order(cash_items::id)
         .load(&mut crate::connection()?)?)
+}
+
+/// The account's Cash Inventory item with cash serial `id`.
+pub fn cash_item(account_id: i32, id: i64) -> crate::Result<Option<CashItem>> {
+    Ok(cash_items::table
+        .find(id)
+        .filter(cash_items::account_id.eq(account_id))
+        .first(&mut crate::connection()?)
+        .optional()?)
+}
+
+/// Move a Cash Inventory item to a character: delete it and save `player`,
+/// who now carries it, in one transaction. False if it was already gone.
+pub fn take_out(account_id: i32, id: i64, player: &Player) -> crate::Result<bool> {
+    let mut conn = crate::connection()?;
+    Ok(conn.transaction(|conn| -> diesel::QueryResult<bool> {
+        let taken = diesel::delete(
+            cash_items::table
+                .find(id)
+                .filter(cash_items::account_id.eq(account_id)),
+        )
+        .execute(conn)?;
+        if taken == 0 {
+            return Ok(false);
+        }
+        write_player(conn, player)?;
+        Ok(true)
+    })?)
+}
+
+/// Move a character's cash item back to the Cash Inventory: insert it and
+/// save `player`, who no longer carries it, in one transaction.
+pub fn put_back(item: &CashItem, player: &Player) -> crate::Result<()> {
+    let mut conn = crate::connection()?;
+    conn.transaction(|conn| -> diesel::QueryResult<()> {
+        diesel::insert_into(cash_items::table)
+            .values(item)
+            .execute(conn)?;
+        write_player(conn, player)
+    })?;
+    Ok(())
 }
 
 /// Pay `price` from the account's `cash_type` balance and put `item` in its

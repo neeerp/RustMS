@@ -65,6 +65,10 @@ impl CommodityData {
         self.by_sn.get(&sn)
     }
 
+    pub fn iter(&self) -> impl Iterator<Item = &Commodity> {
+        self.by_sn.values()
+    }
+
     pub fn len(&self) -> usize {
         self.by_sn.len()
     }

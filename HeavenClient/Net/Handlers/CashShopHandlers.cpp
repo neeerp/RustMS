@@ -18,6 +18,7 @@
 #include "CashShopHandlers.h"
 
 #include "Helpers/CashShopParser.h"
+#include "Helpers/ItemParser.h"
 
 #include "../../Gameplay/Stage.h"
 #include "../../IO/UI.h"
@@ -151,6 +152,8 @@ namespace ms
 				return "You don't have enough cash.";
 			case 0xAA:
 				return "Due to gender restrictions, you can't buy this item.";
+			case 0xBB:
+				return "Please check if your inventory is full or not.";
 			case 0xC0:
 				return "This item is out of stock, and therefore not available for sale.";
 			default:
@@ -214,6 +217,34 @@ namespace ms
 			cashshop->add_cash_items({ read_cash_item(recv) });
 			UI::get().emplace<UIOk>("You have successfully made the purchase.", [](bool) {});
 			break;
+		case 0x68:
+		{
+			// A Cash Inventory item is now in its bag at slot. Peek at the
+			// item's id and serial, which come after its type byte.
+			int16_t slot = recv.read_short();
+			InPacket peek = recv;
+			peek.skip_byte();
+			int32_t item_id = peek.read_int();
+			int64_t cash_id = peek.read_bool() ? peek.read_long() : 0;
+
+			Inventory& inventory = Stage::get().get_player().get_inventory();
+			ItemParser::parse_item(recv, InventoryType::by_item_id(item_id), slot, inventory);
+			cashshop->remove_cash_item(cash_id);
+			break;
+		}
+		case 0x6A:
+		{
+			// A character's item is back in the Cash Inventory.
+			UICashShop::CashItem item = read_cash_item(recv);
+			InventoryType::Id type = InventoryType::by_item_id(item.item_id);
+			Inventory& inventory = Stage::get().get_player().get_inventory();
+
+			if (int16_t slot = inventory.find_cash_item(type, item.cash_id))
+				inventory.modify(type, slot, Inventory::Modification::REMOVE, 0, Inventory::Movement::MOVE_NONE);
+
+			cashshop->add_cash_items({ item });
+			break;
+		}
 		case 0x5C:
 			UI::get().emplace<UIOk>(failure_message(recv.read_byte()), [](bool) {});
 			break;

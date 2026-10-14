@@ -1,6 +1,7 @@
 use integration_harness::connection::{MapleTestConnection, PacketEnvelope};
 use integration_harness::packets::{
-    build_cash_shop_buy, build_cash_shop_wish_list, build_enter_cash_shop, opcode_name,
+    build_cash_shop_buy, build_cash_shop_put_back, build_cash_shop_take_out,
+    build_cash_shop_wish_list, build_enter_cash_shop, opcode_name,
 };
 use integration_harness::preconditions::load_harness_config_or_fail;
 use integration_harness::{login_to_world_session, relogin};
@@ -94,6 +95,26 @@ async fn purchases_need_cash_and_the_wish_list_is_kept() {
     assert_eq!(
         failure(&mut session.connection, "buy a retired item").await,
         0xC0
+    );
+
+    // Items the account doesn't hold can't move either way.
+    session
+        .connection
+        .send_packet(build_cash_shop_take_out(999_999, 5, 1).unwrap(), "take out")
+        .await
+        .expect("send take out");
+    assert_eq!(
+        failure(&mut session.connection, "take out a missing item").await,
+        0x00
+    );
+    session
+        .connection
+        .send_packet(build_cash_shop_put_back(999_999, 5).unwrap(), "put back")
+        .await
+        .expect("send put back");
+    assert_eq!(
+        failure(&mut session.connection, "put back a missing item").await,
+        0x00
     );
 
     // Empty slots, repeats, and items off sale are dropped.

@@ -37,6 +37,8 @@
 
 #include <nlnx/nx.hpp>
 
+#include <algorithm>
+
 namespace ms
 {
 	namespace
@@ -553,6 +555,45 @@ namespace ms
 		return UIElement::send_cursor(clicked, cursorpos);
 	}
 
+	void UICashShop::doubleclick(Point<int16_t> cursorpos)
+	{
+		Point<int16_t> cursor = cursorpos - position;
+		const Inventory& inventory = Stage::get().get_player().get_inventory();
+
+		int16_t cash_cell = grid_cell(cursor, CASH_GRID_POS, CASH_COLUMNS, CASH_ROWS);
+		size_t index = cash_row * CASH_COLUMNS + cash_cell;
+
+		if (cash_cell >= 0 && index < cash_items.size())
+		{
+			const CashItem& item = cash_items[index];
+			InventoryType::Id type = InventoryType::by_item_id(item.item_id);
+
+			// The server picks another slot, or refuses, if this one is taken.
+			TakeOutCashItemPacket(item.cash_id, type, inventory.find_free_slot(type)).dispatch();
+			return;
+		}
+
+		int16_t item_cell = grid_cell(cursor, ITEM_GRID_POS, ITEM_COLUMNS, ITEM_ROWS);
+
+		if (item_cell >= 0)
+		{
+			int16_t slot = static_cast<int16_t>(item_row * ITEM_COLUMNS + item_cell + 1);
+
+			if (int64_t cash_id = inventory.get_cash_id(item_tab, slot))
+				PutBackCashItemPacket(cash_id, item_tab).dispatch();
+		}
+	}
+
+	int16_t UICashShop::grid_cell(Point<int16_t> cursor, Point<int16_t> grid, size_t columns, size_t rows) const
+	{
+		Point<int16_t> in_grid = cursor - grid;
+
+		if (in_grid.x() < 0 || in_grid.y() < 0 || in_grid.x() >= GRID_STEP * columns || in_grid.y() >= GRID_STEP * rows)
+			return -1;
+
+		return static_cast<int16_t>(in_grid.y() / GRID_STEP * columns + in_grid.x() / GRID_STEP);
+	}
+
 	UIElement::Type UICashShop::get_type() const
 	{
 		return TYPE;
@@ -631,6 +672,21 @@ namespace ms
 	void UICashShop::add_cash_items(const std::vector<CashItem>& items)
 	{
 		cash_items.insert(cash_items.end(), items.begin(), items.end());
+		update_cash_slider();
+	}
+
+	void UICashShop::remove_cash_item(int64_t cash_id)
+	{
+		cash_items.erase(
+			std::remove_if(cash_items.begin(), cash_items.end(), [cash_id](const CashItem& item) { return item.cash_id == cash_id; }),
+			cash_items.end()
+		);
+
+		size_t rows = (cash_items.size() + CASH_COLUMNS - 1) / CASH_COLUMNS;
+
+		if (cash_row + CASH_ROWS > rows)
+			cash_row = rows > CASH_ROWS ? rows - CASH_ROWS : 0;
+
 		update_cash_slider();
 	}
 

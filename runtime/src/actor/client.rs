@@ -16,7 +16,7 @@ use crate::message::{
     ClientHandle, DirectoryMessage, FieldHandle, FieldKey, FieldMessage, Presence, ServerMessage,
     CLIENT_QUEUE_CAPACITY,
 };
-use game::Player;
+use game::{InventoryType, Player};
 use net::cash_shop::CashShopRequest;
 use net::dialogue::{Conversation, NpcInteraction};
 use net::login_world::resolve_login_channel;
@@ -607,8 +607,104 @@ impl ClientActor {
                 spawn_db(move || db::cash_shop::set_wish_list(character_id, &saved)).await?;
                 vec![cs::build_wish_list(&sns, true)?]
             }
+            CashShopRequest::TakeOut { cash_id, slot } => {
+                self.take_out_cash_item(account_id, cash_id, slot).await?
+            }
+            CashShopRequest::PutBack { cash_id, kind } => {
+                self.put_back_cash_item(account_id, cash_id, kind).await?
+            }
         };
         self.send_all(&mut packets).await
+    }
+
+    /// Move a Cash Inventory item into its bag, at `slot` if that is free.
+    async fn take_out_cash_item(
+        &mut self,
+        account_id: i32,
+        cash_id: i64,
+        slot: i16,
+    ) -> Result<Vec<Packet>, RuntimeError> {
+        use build::world::cash_shop as cs;
+        let cash_item = spawn_db(move || db::cash_shop::cash_item(account_id, cash_id)).await?;
+        let Some(item) = cash_item.as_ref().and_then(net::cash_shop::inventory_item) else {
+            return Ok(vec![cs::build_cash_shop_failure(
+                cs::CashShopFailure::Unknown,
+            )?]);
+        };
+        let player = &mut self.in_game_mut()?.player;
+        let before = player.inventory.clone();
+        let slot = match player.inventory_mut().place(item.clone(), slot) {
+            Ok((_, slot)) => slot,
+            Err(_) => {
+                return Ok(vec![cs::build_cash_shop_failure(
+                    cs::CashShopFailure::InventoryFull,
+                )?])
+            }
+        };
+        let snapshot = player.clone();
+        let taken = spawn_db(move || db::cash_shop::take_out(account_id, cash_id, &snapshot)).await;
+        let player = &mut self.in_game_mut()?.player;
+        match taken {
+            Ok(true) => {
+                player.mark_saved();
+                info!(
+                    self.client_id,
+                    cash_id,
+                    item_id = item.item_id,
+                    slot,
+                    "Took out a cash item"
+                );
+                Ok(vec![cs::build_taken_out(slot, &item)?])
+            }
+            Ok(false) => {
+                *player.inventory_mut() = before;
+                Ok(vec![cs::build_cash_shop_failure(
+                    cs::CashShopFailure::Unknown,
+                )?])
+            }
+            Err(error) => {
+                *player.inventory_mut() = before;
+                Err(error)
+            }
+        }
+    }
+
+    /// Move a character's cash item back to the account's Cash Inventory.
+    async fn put_back_cash_item(
+        &mut self,
+        account_id: i32,
+        cash_id: i64,
+        kind: InventoryType,
+    ) -> Result<Vec<Packet>, RuntimeError> {
+        use build::world::cash_shop as cs;
+        let player = &mut self.in_game_mut()?.player;
+        let before = player.inventory.clone();
+        let Some((_, item)) = player.inventory_mut().pull_cash_item(kind, cash_id) else {
+            return Ok(vec![cs::build_cash_shop_failure(
+                cs::CashShopFailure::Unknown,
+            )?]);
+        };
+        let cash_item = net::cash_shop::cash_item(account_id, cash_id, &item);
+        let snapshot = player.clone();
+        let saved = cash_item.clone();
+        let put = spawn_db(move || db::cash_shop::put_back(&saved, &snapshot)).await;
+        let player = &mut self.in_game_mut()?.player;
+        match put {
+            Ok(()) => {
+                player.mark_saved();
+                info!(
+                    self.client_id,
+                    cash_id,
+                    item_id = item.item_id,
+                    "Put back a cash item"
+                );
+                Ok(vec![cs::build_put_back(&cash_item)?])
+            }
+            Err(error) => {
+                *player.inventory_mut() = before;
+                Err(error)
+            }
+        }
     }
 
     async fn handle_server_message(&mut self, message: ServerMessage) -> Result<(), RuntimeError> {

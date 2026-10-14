@@ -58,6 +58,15 @@ namespace ms
 		}
 	}
 
+	void UIStateCashShop::doubleclick(Point<int16_t> pos)
+	{
+		// Not while a dialog is over the shop.
+		UIElement* front = get_front();
+
+		if (front && front->get_type() == UIElement::Type::CASHSHOP)
+			front->doubleclick(pos);
+	}
+
 	void UIStateCashShop::send_key(KeyType::Id type, int32_t action, bool pressed, bool escape)
 	{
 		// Only a dialog over the shop takes keys.

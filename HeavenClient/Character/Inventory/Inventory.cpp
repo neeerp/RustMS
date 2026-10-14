@@ -100,33 +100,33 @@ namespace ms
 		slotmaxima[type] = slotmax;
 	}
 
-	void Inventory::add_item(InventoryType::Id invtype, int16_t slot, int32_t item_id, bool cash, int64_t expire,
+	void Inventory::add_item(InventoryType::Id invtype, int16_t slot, int32_t item_id, int64_t cash_id, int64_t expire,
 							 uint16_t count, const std::string &owner, int16_t flags)
 	{
 		items.emplace(
 				std::piecewise_construct,
-				std::forward_as_tuple(add_slot(invtype, slot, item_id, count, cash)),
+				std::forward_as_tuple(add_slot(invtype, slot, item_id, count, cash_id)),
 				std::forward_as_tuple(item_id, expire, owner, flags)
 		);
 	}
 
-	void Inventory::add_pet(InventoryType::Id invtype, int16_t slot, int32_t item_id, bool cash, int64_t expire,
+	void Inventory::add_pet(InventoryType::Id invtype, int16_t slot, int32_t item_id, int64_t cash_id, int64_t expire,
 							const std::string &name, int8_t level, int16_t closeness, int8_t fullness)
 	{
 		pets.emplace(
 				std::piecewise_construct,
-				std::forward_as_tuple(add_slot(invtype, slot, item_id, 1, cash)),
+				std::forward_as_tuple(add_slot(invtype, slot, item_id, 1, cash_id)),
 				std::forward_as_tuple(item_id, expire, name, level, closeness, fullness)
 		);
 	}
 
-	void Inventory::add_equip(InventoryType::Id invtype, int16_t slot, int32_t item_id, bool cash, int64_t expire,
+	void Inventory::add_equip(InventoryType::Id invtype, int16_t slot, int32_t item_id, int64_t cash_id, int64_t expire,
 							  uint8_t slots, uint8_t level, const EnumMap<EquipStat::Id, uint16_t> &stats,
 							  const std::string &owner, int16_t flag, uint8_t ilevel, uint16_t iexp, int32_t vicious)
 	{
 		equips.emplace(
 				std::piecewise_construct,
-				std::forward_as_tuple(add_slot(invtype, slot, item_id, 1, cash)),
+				std::forward_as_tuple(add_slot(invtype, slot, item_id, 1, cash_id)),
 				std::forward_as_tuple(item_id, expire, owner, flag, slots, level, stats, ilevel, iexp, vicious)
 		);
 	}
@@ -171,10 +171,10 @@ namespace ms
 			remove(secondtype, secondslot);
 	}
 
-	int32_t Inventory::add_slot(InventoryType::Id type, int16_t slot, int32_t item_id, int16_t count, bool cash)
+	int32_t Inventory::add_slot(InventoryType::Id type, int16_t slot, int32_t item_id, int16_t count, int64_t cash_id)
 	{
 		running_uid++;
-		inventories[type][slot] = {running_uid, item_id, count, cash};
+		inventories[type][slot] = {running_uid, item_id, count, cash_id};
 
 		return running_uid;
 	}
@@ -345,6 +345,25 @@ namespace ms
 			return iter->second.item_id;
 		else
 			return 0;
+	}
+
+	int64_t Inventory::get_cash_id(InventoryType::Id type, int16_t slot) const
+	{
+		auto iter = inventories[type].find(slot);
+
+		if (iter != inventories[type].end())
+			return iter->second.cash_id;
+		else
+			return 0;
+	}
+
+	int16_t Inventory::find_cash_item(InventoryType::Id type, int64_t cash_id) const
+	{
+		for (auto& iter : inventories[type])
+			if (cash_id && iter.second.cash_id == cash_id)
+				return iter.first;
+
+		return 0;
 	}
 
 	Optional<const Equip> Inventory::get_equip(InventoryType::Id type, int16_t slot) const

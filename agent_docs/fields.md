@@ -104,6 +104,17 @@ spawn point to the nearest start or invisible portal that leads nowhere
 so the player comes back near where they left instead of at the portal they
 entered the map by.
 
+Taking an item out (0x0D) turns the Cash Inventory row into an inventory item
+that keeps its cash serial and expiry (`net::cash_shop::inventory_item`), puts
+it in the requested slot or the bag's first free one, and then
+`db::cash_shop::take_out` deletes the row and saves the character in one
+transaction. Putting it back (0x0E) does the reverse with
+`db::cash_shop::put_back`, which re-inserts the row under the same serial. The
+inventory doesn't keep the commodity, so the row gets an SN that sells the
+item in that quantity, preferring one on sale. Either way, a failed write
+restores the in-memory inventory. A full bag fails with 0xBB. Pets stay in the
+Cash Inventory (0x00) until the server can encode them.
+
 ## Packets
 
 Field packets are built in `net/src/packet/build/world/field.rs`
