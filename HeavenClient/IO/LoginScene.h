@@ -46,6 +46,7 @@ namespace ms
 		void unload();
 
 		// The first step shown cuts straight to its stop; later ones scroll.
+		// A step with a new sign slides it in from the left edge.
 		void move_to(Step step);
 
 		void draw(float alpha) const;
@@ -63,5 +64,10 @@ namespace ms
 		double y = 0.0;
 		double last_y = 0.0;
 		double target_y = 0.0;
+
+		Texture sign;
+		uint8_t sign_id = 0;
+		double sign_x = 0.0;
+		double last_sign_x = 0.0;
 	};
 }

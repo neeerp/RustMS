@@ -208,11 +208,27 @@ from `UI.nx`. Moved so far:
   `Obj/login.img`. `UIStateLogin` loads the scene and draws it, then the book
   frame (`Login.img/Common/frame`) and the version, under the login windows.
   Each classic window calls `LoginScene::move_to` with its step. The first
-  call cuts straight to that step; later calls scroll the camera there.
+  call cuts straight to that step; later calls scroll the camera there. A
+  step with a new sign (`Login.img/Common/step`: 1 world, 2 character, 3
+  creation) slides it in from the left edge to rest at (0, 31), as the
+  original does.
 - **Title** (`UILogin`, `Login.img/Title`): the ID and password fields and
   the buttons sit on the planks of the scene's signboard. The labels are part
   of the signboard art, and v83 places everything else in code, so the
   positions are measured from the art and checked against 2009 footage. The version reads "Ver. 0.83".
+- **World select** (`UIWorldSelect`, `Login.img/WorldSelect`): the worlds
+  hang in packet order as planks (`BtWorld/<world id>`) from the scene's rope
+  bar. Fifteen slots start at x 232, 27 apart, and blank planks fill the
+  unused ones. Picking a world plays `scroll/0` over the scene's closed
+  scroll. When it opens, it shows the world's name and its channels in four
+  columns, each with a load gauge. The gauge treats a load of 1000 as full,
+  and RustMS sends each channel's configured capacity (700 by default) as its
+  load. The red `chSelect` circle marks the chosen channel. Clicking it again,
+  Enter Channel, or Enter goes in. Escape rolls the scroll up with `scroll/1`.
+  Back reconnects and returns to the title. View Recommended and View All
+  Characters stay disabled, since the server recommends no worlds and can't
+  list every character. The balloon is `WorldNotice/Balloon`. Positions are
+  checked against footage from 2009 (v80) and v55.
 
 `UIClassic.nx` is not one of NoLifeNx's standard files, so `NxFiles` opens it
 with `nl::file` instead of `nl::nx::load_all`.

@@ -21,6 +21,7 @@
 #include "UISoftKey.h"
 #include "UIWorldSelect.h"
 
+#include "../LoginScene.h"
 #include "../UI.h"
 
 #include "../Components/AreaButton.h"
@@ -771,7 +772,10 @@ namespace ms
 				Sound(Sound::Name::SCROLLUP).play();
 
 				if (auto worldselect = UI::get().get_element<UIWorldSelect>())
+				{
 					worldselect->makeactive();
+					LoginScene::get().move_to(LoginScene::Step::WORLD_SELECT);
+				}
 
 				break;
 			default:
