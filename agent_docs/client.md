@@ -141,6 +141,10 @@ from `UI.nx`. Moved so far:
   restores the server's defaults; DEFAULT, CLEAR ALL, and Esc with unsaved
   changes ask through the in-window `notice` bitmaps. CHANGE QUICK SLOTS is
   disabled until the quick slot is configurable.
+- **Quest log** (`UIQuestLog`, `UIWindow.img/Quest`): Available, In Progress,
+  and Complete tabs (`Basic.img/Tab2`), quests folded by area, and a detail
+  panel with the quest's text and FIND NPC or QUEST HELPER, laid out from
+  period footage. See [quest-window.md](quest-window.md).
 
 `UIClassic.nx` is not one of NoLifeNx's standard files, so `NxFiles` opens it
 with `nl::file` instead of `nl::nx::load_all`.

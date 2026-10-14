@@ -69,7 +69,7 @@ namespace ms
 		backgrnd = Item["backgrnd"];
 		full_backgrnd = Item["FullBackgrnd"];
 
-		tabs = ClassicTabs(Item["Tab"]["enabled"], Item["Tab"]["disabled"], TAB_FILL);
+		tabs = ClassicTabs(ClassicTabs::TAB5, Item["Tab"]["enabled"], Item["Tab"]["disabled"], TAB_FILL);
 
 		nl::node New = Item["New"];
 		newitemslot = New["inventory"];
@@ -86,7 +86,7 @@ namespace ms
 			Point<int16_t> tab_pos = TAB_STRIP + Point<int16_t>(tabs.pitch() * i, 0);
 
 			buttons[Buttons::BT_TAB0 + i] = std::make_unique<AreaButton>(tab_pos,
-																		 Point<int16_t>(tabs.pitch(), ClassicTabs::HEIGHT));
+																		 Point<int16_t>(tabs.pitch(), tabs.height()));
 		}
 
 		buttons[Buttons::BT_COIN] = std::make_unique<MapleButton>(Item["BtCoin"]);

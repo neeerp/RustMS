@@ -8,9 +8,11 @@ See [Quests](./quests.md).
 
 The Interact key (Space by default, action 55) does the same as clicking the
 nearest NPC within 150 px horizontally and 50 px vertically of the player's
-feet (`HeavenClient/Gameplay/MapleMap/NpcReach.h`). v83 had no such key; it is
-a convenience from the later client. Characters created before the binding was
-added need to bind it in the key config.
+feet (`HeavenClient/Gameplay/MapleMap/NpcReach.h`). While a conversation is
+open, it also does what Enter does: Next, OK, Yes, the focused answer, or the
+selected choice. v83 had no such key; it is a convenience from the later
+client. A migration gives it to characters created before the binding was
+added, unless Space is already taken.
 
 ## Content and quest boundary
 
@@ -47,7 +49,7 @@ page shows instead. Answers are matched to the prompt they answer
 | --- | --- | --- |
 | `q1021s`/`q1021e` | QUEST_ACTION 4/5 for quest 1021 | Roger sets HP to 25 and gives Roger's Apple; finishing needs full HP and no apples left, then pays 3 Apples, 3 Green Apples, 10 EXP |
 | `begin5` | Clicking Robin (2003) | 18-topic Q&A menu |
-| `tutorialSkip` | Clicking the Maple Administrator (2007), or the `tutoChatNPC` portal for accounts with a level-30 character | Yes warps to Lith Harbor (104000000) |
+| `tutorialSkip` | Clicking the Maple Administrator (2007), or the `tutoChatNPC` portal for accounts with a level-30 character | Yes warps to Lith Harbor (104000000). Neither is on the original island, so this is unused |
 
 Text comes from the [server content pack](./server-content.md) with
 placeholders. HeavenClient expands NPC text markup (`Util/NpcTextMarkup.h`:
@@ -66,8 +68,9 @@ show at once, as in footage.
 The first choice starts selected (red arrow, dotted underline), and Up and
 Down move the selection. Clicking a choice or pressing Enter answers with
 it. A server menu has no NEXT, as in v83 footage; a quest list keeps NEXT,
-which also answers. On YES/NO and ACCEPT/DECLINE pages, Left and Right
-outline one answer with its `keyFocused` frame, and Enter presses it. With
+which also answers. On YES/NO and ACCEPT/DECLINE pages, the first Left or
+Right outlines YES or ACCEPT with its `keyFocused` frame, as in the original;
+then Left and Right move the outline, and Enter presses it. With
 nothing outlined, as when the page opens, Enter presses YES or ACCEPT. On
 other pages Enter presses NEXT or OK. Enter works even while the text types
 out.

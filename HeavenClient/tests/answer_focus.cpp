@@ -16,8 +16,13 @@ int main()
 		require(pressed(Focus::NONE) == Focus::LEFT, "Enter with nothing focused presses YES or ACCEPT");
 		require(move(Focus::NONE, false, false) == Focus::NONE, "other keys focus nothing");
 
+		require(move(Focus::NONE, true, false) == Focus::LEFT, "the first Left focuses YES or ACCEPT");
+
 		Focus focus = move(Focus::NONE, false, true);
-		require(focus == Focus::RIGHT && pressed(focus) == Focus::RIGHT, "Right then Enter presses NO or DECLINE");
+		require(focus == Focus::LEFT && pressed(focus) == Focus::LEFT, "the first Right focuses YES or ACCEPT too");
+
+		focus = move(focus, false, true);
+		require(focus == Focus::RIGHT && pressed(focus) == Focus::RIGHT, "a second Right then Enter presses NO or DECLINE");
 
 		focus = move(focus, true, false);
 		require(focus == Focus::LEFT && pressed(focus) == Focus::LEFT, "Left then Enter presses YES or ACCEPT");
