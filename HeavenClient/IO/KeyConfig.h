@@ -25,8 +25,7 @@ namespace ms
 	{
 		enum Key : uint8_t
 		{
-			NUM0 = 2,
-			NUM1,
+			NUM1 = 2,
 			NUM2,
 			NUM3,
 			NUM4,
@@ -35,6 +34,7 @@ namespace ms
 			NUM7,
 			NUM8,
 			NUM9,
+			NUM0,
 			MINUS,
 			EQUAL,
 			Q = 16,

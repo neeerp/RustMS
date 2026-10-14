@@ -131,6 +131,14 @@ from `UI.nx`. Moved so far:
   cell in those rows is drawn, `channel0` where there is no channel. The
   selected channel is `channel2` and the current one `channel1`. The world
   name is `world/<world id>`.
+- **Key config** (`UIKeyConfig`, `UIWindow.img/KeyConfig`): the keyboard with a
+  `key` label over each bindable key's icon, and a three-row palette of unbound
+  functions (`icon/N`, by v83 function id), laid out from the background and
+  period footage. Drag an icon between keys or onto the palette to unbind it.
+  Esc, Tab, and the other keys printed on the background are fixed. DEFAULT
+  restores the server's defaults; DEFAULT, CLEAR ALL, and Esc with unsaved
+  changes ask through the in-window `notice` bitmaps. CHANGE QUICK SLOTS is
+  disabled until the quick slot is configurable.
 
 `UIClassic.nx` is not one of NoLifeNx's standard files, so `NxFiles` opens it
 with `nl::file` instead of `nl::nx::load_all`.
@@ -248,3 +256,7 @@ These were corrected:
 8. The stat window's HP and MP buttons sent SPEND_AP with the current HP and
    MP codes (0x400, 0x1000). They now send MaxHP and MaxMP (0x800, 0x2000),
    which is what AP raises.
+8. Keymap keys are v83 scan codes, where the number row runs 1 to 9 then 0 from
+   key 2. `Keyboard::Keytable` had 0 to 9 from key 2, so every number-row
+   binding sat one key off. The `v83_number_row_keys` migration moves saved
+   bindings, and the server's default party chat is on key 3 (the 2 key).
