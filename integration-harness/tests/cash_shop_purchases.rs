@@ -1,6 +1,6 @@
 use integration_harness::connection::{MapleTestConnection, PacketEnvelope};
 use integration_harness::packets::{
-    build_cash_shop_buy, build_cash_shop_put_back, build_cash_shop_take_out,
+    build_cash_shop_buy, build_cash_shop_gift, build_cash_shop_put_back, build_cash_shop_take_out,
     build_cash_shop_wish_list, build_enter_cash_shop, opcode_name,
 };
 use integration_harness::preconditions::load_harness_config_or_fail;
@@ -141,4 +141,75 @@ async fn purchases_need_cash_and_the_wish_list_is_kept() {
         [TICKET, TICKETS],
         "the wish list wasn't saved"
     );
+}
+
+#[tokio::test]
+async fn gifts_need_a_birthday_code_another_account_and_cash() {
+    let config = load_harness_config_or_fail().await;
+    let receiver_config = load_harness_config_or_fail().await;
+    let mut session = login_to_world_session(&config)
+        .await
+        .expect("login-to-world session flow failed");
+    let mut receiver = login_to_world_session(&receiver_config)
+        .await
+        .expect("receiver login failed");
+    enter_cash_shop(&mut session.connection).await;
+
+    let cases = [
+        (
+            0,
+            receiver_config.character_name.as_str(),
+            0xC4,
+            "no birthday code",
+        ),
+        (19830113, "NoSuchName", 0xA9, "an unknown receiver"),
+        (
+            19830113,
+            config.character_name.as_str(),
+            0xA8,
+            "the sender's account",
+        ),
+        // A new account has no NX.
+        (
+            19830113,
+            receiver_config.character_name.as_str(),
+            0xA5,
+            "no NX",
+        ),
+    ];
+    for (birthday, to, code, phase) in cases {
+        session
+            .connection
+            .send_packet(
+                build_cash_shop_gift(birthday, TICKET, to, "for you").unwrap(),
+                "gift",
+            )
+            .await
+            .expect("send gift");
+        assert_eq!(
+            failure(&mut session.connection, phase).await,
+            code,
+            "{phase}"
+        );
+    }
+
+    // Nothing reached the receiver.
+    receiver
+        .connection
+        .send_packet(build_enter_cash_shop(), "enter cash shop")
+        .await
+        .expect("send ENTER_CASHSHOP");
+    for _ in 0..2 {
+        let list = read_until(
+            &mut receiver.connection,
+            "receiver lists",
+            SendOpcode::CashShopOperation,
+        )
+        .await;
+        if list.packet.bytes[2] == 0x4D {
+            assert_eq!(list.packet.bytes[3..5], [0, 0], "unexpected gifts");
+            return;
+        }
+    }
+    panic!("no gift list");
 }

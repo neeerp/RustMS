@@ -20,6 +20,7 @@
 #include "Helpers/CashShopParser.h"
 #include "Helpers/ItemParser.h"
 
+#include "../../Data/ItemData.h"
 #include "../../Gameplay/Stage.h"
 #include "../../IO/UI.h"
 #include "../../IO/UITypes/UICashShop.h"
@@ -27,6 +28,8 @@
 #include "../../IO/Window.h"
 
 #include "Timer.h"
+
+#include <algorithm>
 
 namespace ms
 {
@@ -134,6 +137,16 @@ namespace ms
 			return { cash_id, item_id, quantity };
 		}
 
+		// A player's text in a notice, without the characters that would
+		// format it.
+		std::string plain(std::string text)
+		{
+			std::replace(text.begin(), text.end(), '#', ' ');
+			std::replace(text.begin(), text.end(), '\\', '/');
+
+			return text;
+		}
+
 		std::vector<int32_t> read_wish_list(InPacket& recv)
 		{
 			std::vector<int32_t> sns;
@@ -150,12 +163,18 @@ namespace ms
 			{
 			case 0xA5:
 				return "You don't have enough cash.";
+			case 0xA8:
+				return "You cannot send a gift to your own account.";
+			case 0xA9:
+				return "Please confirm whether the character's name is correct.";
 			case 0xAA:
 				return "Due to gender restrictions, you can't buy this item.";
 			case 0xBB:
 				return "Please check if your inventory is full or not.";
 			case 0xC0:
 				return "This item is out of stock, and therefore not available for sale.";
+			case 0xC4:
+				return "Please check your birthday code.";
 			default:
 				return "Due to an unknown error, failed.";
 			}
@@ -190,21 +209,31 @@ namespace ms
 		}
 		case 0x4D:
 		{
-			// Gifts waiting for the account join the Cash Inventory.
+			// Gifts received since the last visit join the Cash Inventory.
 			int16_t count = recv.read_short();
 			std::vector<UICashShop::CashItem> items;
+			std::string notice;
 
 			for (int16_t i = 0; i < count; i++)
 			{
 				int64_t cash_id = recv.read_long();
 				int32_t item_id = recv.read_int();
-				recv.skip(13);	// from
-				recv.skip(73);	// message
+				std::string from = recv.read_padded_string(13);
+				std::string message = recv.read_padded_string(73);
 
 				items.push_back({ cash_id, item_id, 1 });
+
+				if (!notice.empty())
+					notice += "\\n\\n";
+
+				notice += from + " has sent you " + ItemData::get(item_id).get_name() + ".\\n\"" + plain(message) + "\"";
 			}
 
 			cashshop->add_cash_items(items);
+
+			if (!notice.empty())
+				UI::get().emplace<UIOk>(notice, [](bool) {});
+
 			break;
 		}
 		case 0x4F:
@@ -217,6 +246,17 @@ namespace ms
 			cashshop->add_cash_items({ read_cash_item(recv) });
 			UI::get().emplace<UIOk>("You have successfully made the purchase.", [](bool) {});
 			break;
+		case 0x5E:
+		{
+			// A gift is on its way; the balance follows.
+			std::string to = recv.read_string();
+			int32_t item_id = recv.read_int();
+			recv.skip_short();	// count
+			recv.skip_int();	// price
+
+			UI::get().emplace<UIOk>("You have sent " + ItemData::get(item_id).get_name() + " to " + to + ".", [](bool) {});
+			break;
+		}
 		case 0x68:
 		{
 			// A Cash Inventory item is now in its bag at slot. Peek at the

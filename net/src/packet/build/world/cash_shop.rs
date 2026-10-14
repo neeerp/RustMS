@@ -12,6 +12,8 @@ const BEST_SELLER_TABS: i32 = 8;
 const BEST_SELLERS_PER_TAB: usize = 5;
 /// Slots in the Cash Shop wish list.
 pub const WISH_LIST_SLOTS: usize = 10;
+/// The longest gift message, in bytes.
+pub const GIFT_MESSAGE_LEN: usize = 73;
 /// Storage slots of an account that never expanded its storage.
 const STORAGE_SLOTS: i16 = 4;
 
@@ -59,6 +61,7 @@ const WISH_LIST: u8 = 0x4F;
 const WISH_LIST_UPDATED: u8 = 0x55;
 const BOUGHT: u8 = 0x57;
 const FAILED: u8 = 0x5C;
+const GIFT_SENT: u8 = 0x5E;
 const TAKEN_OUT: u8 = 0x68;
 const PUT_BACK: u8 = 0x6A;
 
@@ -70,12 +73,18 @@ pub enum CashShopFailure {
     Unknown = 0x00,
     /// "You don't have enough cash."
     NotEnoughCash = 0xA5,
+    /// "You cannot send a gift to your own account."
+    OwnAccount = 0xA8,
+    /// "Please confirm whether the character's name is correct."
+    NoSuchCharacter = 0xA9,
     /// The item is for the other gender.
     Gender = 0xAA,
     /// "Please check if your inventory is full or not."
     InventoryFull = 0xBB,
     /// The item isn't on sale.
     SoldOut = 0xC0,
+    /// The birthday code isn't a date.
+    BirthdayCode = 0xC4,
 }
 
 /// CASHSHOP_OPERATION: the account's Cash Inventory, with its storage and
@@ -147,12 +156,41 @@ fn encode_cash_item(packet: &mut Packet, item: &CashItem) -> Result<(), NetworkE
     Ok(())
 }
 
-/// CASHSHOP_OPERATION: no gifts waiting.
-pub fn build_cash_gifts() -> Result<Packet, NetworkError> {
+/// CASHSHOP_OPERATION: the gifts received since the account last entered
+/// the shop, with who sent them and their messages. The client adds them to
+/// the Cash Inventory, so they are left out of its list.
+pub fn build_cash_gifts(gifts: &[CashItem]) -> Result<Packet, NetworkError> {
     let mut packet = Packet::new_empty();
     packet.write_short(SendOpcode::CashShopOperation as i16)?;
     packet.write_byte(GIFTS)?;
-    packet.write_short(0)?;
+    packet.write_short(gifts.len() as i16)?;
+    for gift in gifts {
+        packet.write_long(gift.id)?;
+        packet.write_int(gift.item_id)?;
+        write_padded_name(&mut packet, &gift.gift_from)?;
+        let message = gift.gift_message.as_deref().unwrap_or_default().as_bytes();
+        let message = &message[..message.len().min(GIFT_MESSAGE_LEN)];
+        packet.write_bytes(message)?;
+        packet.write_bytes(&[0; GIFT_MESSAGE_LEN][message.len()..])?;
+    }
+    Ok(packet)
+}
+
+/// CASHSHOP_OPERATION: `count` of `item_id` went to the character named `to`
+/// for `price`.
+pub fn build_gift_sent(
+    to: &str,
+    item_id: i32,
+    count: i16,
+    price: i32,
+) -> Result<Packet, NetworkError> {
+    let mut packet = Packet::new_empty();
+    packet.write_short(SendOpcode::CashShopOperation as i16)?;
+    packet.write_byte(GIFT_SENT)?;
+    packet.write_str_with_length(to)?;
+    packet.write_int(item_id)?;
+    packet.write_short(count)?;
+    packet.write_int(price)?;
     Ok(packet)
 }
 
@@ -231,7 +269,7 @@ mod tests {
         expect.short(0).short(4).short(6);
         expect.end();
 
-        let packet = build_cash_gifts().unwrap();
+        let packet = build_cash_gifts(&[]).unwrap();
         let mut expect = Expect::new(&packet.bytes);
         expect
             .short(SendOpcode::CashShopOperation as i16)
@@ -280,6 +318,7 @@ mod tests {
                 quantity: 1,
                 gift_from: String::new(),
                 expires_at: None,
+                gift_message: None,
             },
             CashItem {
                 id: 8,
@@ -289,6 +328,7 @@ mod tests {
                 quantity: 35,
                 gift_from: "bob".to_string(),
                 expires_at: Some(std::time::UNIX_EPOCH),
+                gift_message: None,
             },
         ];
         let expect_item = |expect: &mut Expect, item: &CashItem, time: i64| {
@@ -325,6 +365,47 @@ mod tests {
         expect_item(&mut expect, &items[0], crate::codec::time::DEFAULT_TIME);
         expect_item(&mut expect, &items[1], 116_444_736_000_000_000);
         expect.short(4).short(6);
+        expect.end();
+    }
+
+    #[test]
+    fn gifts_carry_who_sent_them_and_why() {
+        let gift = CashItem {
+            id: 9,
+            account_id: 3,
+            item_id: 1002357,
+            sn: 20000000,
+            quantity: 1,
+            gift_from: "bob".to_string(),
+            expires_at: None,
+            gift_message: Some("happy birthday".to_string()),
+        };
+        let packet = build_cash_gifts(&[gift]).unwrap();
+        assert_eq!(packet.bytes.len(), 2 + 1 + 2 + 8 + 4 + 13 + 73);
+        let mut expect = Expect::new(&packet.bytes);
+        expect
+            .short(SendOpcode::CashShopOperation as i16)
+            .byte(0x4D)
+            .short(1)
+            .long(9)
+            .int(1002357);
+        let mut from = b"bob".to_vec();
+        from.resize(13, 0);
+        let mut message = b"happy birthday".to_vec();
+        message.resize(73, 0);
+        expect.bytes(&from).bytes(&message);
+        expect.end();
+
+        let packet = build_gift_sent("Bob", 1002357, 1, 3400).unwrap();
+        let mut expect = Expect::new(&packet.bytes);
+        expect
+            .short(SendOpcode::CashShopOperation as i16)
+            .byte(0x5E)
+            .short(3)
+            .bytes(b"Bob")
+            .int(1002357)
+            .short(1)
+            .int(3400);
         expect.end();
     }
 }

@@ -28,6 +28,13 @@ pub enum CashShopRequest {
         cash_type: CashType,
         commodity: Commodity,
     },
+    /// Pay for `commodity` and send it to the character named `to`, whose
+    /// gender the runtime still has to check.
+    Gift {
+        commodity: Commodity,
+        to: String,
+        message: String,
+    },
     /// Replace the wish list with these serial numbers.
     SetWishList(Vec<i32>),
     /// Move the Cash Inventory item with this cash serial to the character,
@@ -53,18 +60,39 @@ pub fn check_purchase(
     commodity: Option<&Commodity>,
     gender: i16,
 ) -> Result<&Commodity, CashShopFailure> {
+    let commodity = check_gift(commodity)?;
+    if !commodity.for_gender(gender) {
+        return Err(CashShopFailure::Gender);
+    }
+    Ok(commodity)
+}
+
+/// Whether `commodity` is for sale, to anyone; a gift's receiver is checked
+/// once it is found.
+pub fn check_gift(commodity: Option<&Commodity>) -> Result<&Commodity, CashShopFailure> {
     let commodity = commodity.ok_or(CashShopFailure::Unknown)?;
     if !commodity.on_sale || commodity.price <= 0 {
         return Err(CashShopFailure::SoldOut);
-    }
-    if !commodity.for_gender(gender) {
-        return Err(CashShopFailure::Gender);
     }
     // Packages (CashPackage.img) hold several items; they aren't sold yet.
     if commodity.item_id / 1_000_000 == 9 {
         return Err(CashShopFailure::Unknown);
     }
     Ok(commodity)
+}
+
+/// Whether a birthday code, YYYYMMDD, is a date. Accounts don't record a
+/// birthday, so any date confirms a gift.
+pub fn birthday_code(code: i32) -> bool {
+    let (year, month, day) = (code / 10_000, code / 100 % 100, code % 100);
+    let days = match month {
+        1 | 3 | 5 | 7 | 8 | 10 | 12 => 31,
+        4 | 6 | 9 | 11 => 30,
+        2 if year % 4 == 0 && (year % 100 != 0 || year % 400 == 0) => 29,
+        2 => 28,
+        _ => return false,
+    };
+    (1900..=9999).contains(&year) && (1..=days).contains(&day)
 }
 
 /// The inventory item a Cash Inventory item becomes: equipment gets its base
@@ -93,6 +121,7 @@ pub fn cash_item(account_id: i32, cash_id: i64, item: &Item) -> CashItem {
         quantity: item.quantity,
         gift_from: String::new(),
         expires_at: item.expiration,
+        gift_message: None,
     }
 }
 
@@ -144,6 +173,7 @@ mod tests {
             quantity: 1,
             gift_from: String::new(),
             expires_at: None,
+            gift_message: None,
         };
         assert_eq!(inventory_item(&pet), None);
     }
@@ -178,6 +208,31 @@ mod tests {
             check_purchase(Some(&package), 0),
             Err(CashShopFailure::Unknown)
         );
+    }
+
+    #[test]
+    fn gifts_ignore_the_senders_gender() {
+        let male = Commodity {
+            gender: 0,
+            ..ticket()
+        };
+        assert_eq!(check_gift(Some(&male)), Ok(&male));
+        let retired = Commodity {
+            on_sale: false,
+            ..ticket()
+        };
+        assert_eq!(check_gift(Some(&retired)), Err(CashShopFailure::SoldOut));
+    }
+
+    #[test]
+    fn birthday_codes_are_dates() {
+        assert!(birthday_code(19830113));
+        assert!(birthday_code(20000229));
+        assert!(!birthday_code(19000229));
+        assert!(!birthday_code(19831301));
+        assert!(!birthday_code(19830100));
+        assert!(!birthday_code(0));
+        assert!(!birthday_code(-19830113));
     }
 
     #[test]

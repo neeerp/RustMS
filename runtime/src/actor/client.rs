@@ -17,6 +17,7 @@ use crate::message::{
     CLIENT_QUEUE_CAPACITY,
 };
 use game::{InventoryType, Player};
+use game_data::commodities::Commodity;
 use net::cash_shop::CashShopRequest;
 use net::dialogue::{Conversation, NpcInteraction};
 use net::login_world::resolve_login_channel;
@@ -531,11 +532,11 @@ impl ClientActor {
 
         let player = &self.in_game()?.player;
         let (account_id, character_id) = (player.account_id, player.stats.id);
-        let (account, balance, items, wish_list) = spawn_db(move || {
+        let (account, balance, (items, gifts), wish_list) = spawn_db(move || {
             Ok((
                 db::account::get_account_by_id(account_id)?,
                 db::cash_shop::balance(account_id)?,
-                db::cash_shop::cash_items(account_id)?,
+                db::cash_shop::open_cash_inventory(account_id)?,
                 db::cash_shop::wish_list(character_id)?,
             ))
         })
@@ -544,7 +545,7 @@ impl ClientActor {
         let mut packets = [
             build::world::cash_shop::build_open_cash_shop(player, &account.user_name)?,
             build::world::cash_shop::build_cash_inventory(&items, account.character_slots)?,
-            build::world::cash_shop::build_cash_gifts()?,
+            build::world::cash_shop::build_cash_gifts(&gifts)?,
             build::world::cash_shop::build_wish_list(&wish_list, false)?,
             build::world::cash_shop::build_cash_balance(
                 balance.credit,
@@ -573,10 +574,7 @@ impl ClientActor {
                     item_id: commodity.item_id,
                     sn: commodity.sn,
                     quantity: commodity.count,
-                    expires_at: (commodity.period > 0).then(|| {
-                        SystemTime::now()
-                            + Duration::from_secs(commodity.period.unsigned_abs() as u64 * 86_400)
-                    }),
+                    expires_at: expiry(commodity.period),
                 };
                 let price = commodity.price;
                 match spawn_db(move || db::cash_shop::buy(cash_type, price, &item)).await? {
@@ -602,6 +600,11 @@ impl ClientActor {
                     )?],
                 }
             }
+            CashShopRequest::Gift {
+                commodity,
+                to,
+                message,
+            } => self.send_gift(account_id, commodity, to, message).await?,
             CashShopRequest::SetWishList(sns) => {
                 let saved = sns.clone();
                 spawn_db(move || db::cash_shop::set_wish_list(character_id, &saved)).await?;
@@ -615,6 +618,62 @@ impl ClientActor {
             }
         };
         self.send_all(&mut packets).await
+    }
+
+    /// Pay for `commodity` and put it in the Cash Inventory of the account
+    /// of the character named `to`, who sees it on next entering the shop.
+    async fn send_gift(
+        &mut self,
+        account_id: i32,
+        commodity: Commodity,
+        to: String,
+        message: String,
+    ) -> Result<Vec<Packet>, RuntimeError> {
+        use build::world::cash_shop as cs;
+        let sender = self.in_game()?.player.stats.name.clone();
+        let receiver = spawn_db(move || db::cash_shop::gift_receiver(&to)).await?;
+        let failure = match &receiver {
+            None => Some(cs::CashShopFailure::NoSuchCharacter),
+            Some(receiver) if receiver.account_id == account_id => {
+                Some(cs::CashShopFailure::OwnAccount)
+            }
+            Some(receiver) if !commodity.for_gender(receiver.gender) => {
+                Some(cs::CashShopFailure::Gender)
+            }
+            Some(_) => None,
+        };
+        let Some(receiver) = receiver.filter(|_| failure.is_none()) else {
+            return Ok(vec![cs::build_cash_shop_failure(
+                failure.unwrap_or(cs::CashShopFailure::Unknown),
+            )?]);
+        };
+        let gift = db::cash_shop::NewGift {
+            account_id: receiver.account_id,
+            item_id: commodity.item_id,
+            sn: commodity.sn,
+            quantity: commodity.count,
+            expires_at: expiry(commodity.period),
+            gift_from: sender,
+            gift_message: Some(message),
+        };
+        let price = commodity.price;
+        let Some(balance) = spawn_db(move || db::cash_shop::gift(account_id, price, &gift)).await?
+        else {
+            return Ok(vec![cs::build_cash_shop_failure(
+                cs::CashShopFailure::NotEnoughCash,
+            )?]);
+        };
+        info!(
+            self.client_id,
+            sn = commodity.sn,
+            to = receiver.name,
+            price,
+            "Sent a gift from the Cash Shop"
+        );
+        Ok(vec![
+            cs::build_gift_sent(&receiver.name, commodity.item_id, commodity.count, price)?,
+            cs::build_cash_balance(balance.credit, balance.points, balance.prepaid)?,
+        ])
     }
 
     /// Move a Cash Inventory item into its bag, at `slot` if that is free.
@@ -921,6 +980,12 @@ impl ClientActor {
             }
         }
     }
+}
+
+/// When an item bought now for `period` days expires; `None` for 0, which
+/// never does.
+fn expiry(period: i32) -> Option<SystemTime> {
+    (period > 0).then(|| SystemTime::now() + Duration::from_secs(period as u64 * 86_400))
 }
 
 #[cfg(test)]

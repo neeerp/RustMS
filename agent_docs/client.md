@@ -262,7 +262,7 @@ side yet.
 | Buddy list (`UIUserList` Friend tab, buddy chat) | Implemented without groups; see `buddies.md` |
 | Guild / alliance / blacklist tabs (`UIUserList`) | Tab strip only |
 | Monster Book (`UIMonsterBook`) | Implemented: cards, summary, monster pages, search, cover; see `combat.md` |
-| Cash shop (`UICashShop`) | Enter/exit, catalog, buying, Cash Inventory, wish list, and moving items to and from the bags; gifts remain unimplemented |
+| Cash shop (`UICashShop`) | Enter/exit, catalog, buying, gifts, Cash Inventory, wish list, and moving items to and from the bags |
 | Maple Messenger (`UIMessenger`) | Implemented |
 | Storage, trade, player shops, mini-games, memo/mail | No UI, no handlers |
 | Pets, mounts, summons, reactors beyond hit/spawn | Partial or absent (`Reactor` TODOs) |
@@ -290,9 +290,9 @@ the screen size.
 - **Packets:** SET_CASH_SHOP gives the account name and the Best Item SNs for
   the player's gender. QUERY_CASH_RESULT (324) gives the NX Credit, Maple Point
   and NX Prepaid balances. CASHSHOP_OPERATION (325) modes 0x4B (Cash
-  Inventory), 0x4D (gifts waiting for the account), 0x4F and 0x55 (wish list),
-  0x57 (a bought item), 0x5C (a failure), 0x68 (an item taken out) and 0x6A
-  (an item put back) are read. Inventory slots keep the item's cash serial,
+  Inventory), 0x4D (gifts received since the last visit), 0x4F and 0x55 (wish list),
+  0x57 (a bought item), 0x5C (a failure), 0x5E (a gift sent), 0x68 (an item
+  taken out) and 0x6A (an item put back) are read. Inventory slots keep the item's cash serial,
   which the item encoding carries, so a cash item can find its way back.
 - **Buying:** BUY opens `UICashBuy` (`CashShop.img/CSNotice/0`): the item, its
   price and period, and a checkbox per balance. It checks the first balance
@@ -308,8 +308,17 @@ the screen size.
   Double-clicking a cash item in the Item Inventory sends 0x0E, and the server
   answers with the Cash Inventory item (0x6A). The footage doesn't show
   whether v83 used double-clicks or dragging; dragging isn't supported.
-- **Not served yet:** GIFT, the slot expansions, CHARGE, CHECK CASH and COUPON
-  do nothing.
+- **Gifts:** GIFT opens `UICashGift` on `CashShop.img/CSGift/backgrnd`, with
+  a To field and a message box that wraps over its two ruled rows (73
+  characters). OK, once both are filled, swaps the art for `CSNotice/1` and asks
+  for the birthday code (YYYYMMDD). Its OK sends 0x04 with the code, SN, name
+  and message. The sender sees "You have sent ITEM to NAME." on 0x5E, or a
+  failure notice (0xA8 own account, 0xA9 unknown name, 0xC4 birthday code).
+  The receiver gets one notice listing each gift's sender, item and message
+  when 0x4D arrives. The buddy and guild buttons that open the wider
+  `backgrnd1` aren't drawn, and only one name is sent.
+- **Not served yet:** the slot expansions, CHARGE, CHECK CASH and COUPON do
+  nothing.
 
 ## Estimated client work for a complete game
 
@@ -318,7 +327,7 @@ the screen size.
 | Buddy groups | Default group only | S |
 | Guild | Skeleton only, plus guild emblem/BBS UIs missing | L |
 | Trade / storage / player shops | Nothing | L |
-| Cash shop gifts and packages | Buying, the wish list and moving items only | M |
+| Cash shop packages | Buying, gifts, the wish list and moving items only | M |
 | Quest accept/complete UI flow | Partial | S |
 | Pets and mounts | Partial rendering, no interaction | M |
 | Memo, mail, MTS | Nothing | M each |

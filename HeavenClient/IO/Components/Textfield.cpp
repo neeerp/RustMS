@@ -28,7 +28,7 @@ namespace ms
 		text = "";
 	}
 
-	Textfield::Textfield(Text::Font font, Text::Alignment alignment, Color::Name color, Rectangle<int16_t> bounds, size_t limit) : bounds(bounds), limit(limit)
+	Textfield::Textfield(Text::Font font, Text::Alignment alignment, Color::Name color, Rectangle<int16_t> bounds, size_t limit) : font(font), alignment(alignment), color(color), bounds(bounds), limit(limit)
 	{
 		textlabel = Text(font, alignment, color, "", 0, false);
 		marker = Text(font, alignment, color, "|");
@@ -51,7 +51,7 @@ namespace ms
 
 		if (state == State::FOCUSED && showmarker)
 		{
-			Point<int16_t> mpos = absp + Point<int16_t>(textlabel.advance(markerpos), -1);
+			Point<int16_t> mpos = absp + marker_offset() + Point<int16_t>(0, -1);
 
 			marker.draw(mpos);
 		}
@@ -244,6 +244,23 @@ namespace ms
 	void Textfield::set_cryptchar(int8_t character)
 	{
 		crypt = character;
+	}
+
+	void Textfield::set_wrap(uint16_t width)
+	{
+		wrapwidth = width;
+		textlabel = Text(font, alignment, color, textlabel.get_text(), wrapwidth, false);
+	}
+
+	Point<int16_t> Textfield::marker_offset() const
+	{
+		if (wrapwidth == 0)
+			return Point<int16_t>(textlabel.advance(markerpos), 0);
+
+		// Where the text before the marker ends once wrapped.
+		Text before(font, alignment, color, textlabel.get_text().substr(0, markerpos), wrapwidth, false);
+
+		return before.endoffset();
 	}
 
 	bool Textfield::belowlimit() const

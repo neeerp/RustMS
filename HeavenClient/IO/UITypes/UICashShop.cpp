@@ -18,6 +18,7 @@
 #include "UICashShop.h"
 
 #include "UICashBuy.h"
+#include "UICashGift.h"
 
 #include "../UI.h"
 #include "../Window.h"
@@ -450,13 +451,14 @@ namespace ms
 					SetWishListPacket(unwish(wish_list, commodity.sn)).dispatch();
 				else if (list_button % 3 == 0)
 					UI::get().emplace<UICashBuy>(commodity, credit, points, prepaid);
+				else if (list_button % 3 == 1)
+					UI::get().emplace<UICashGift>(commodity);
 				else if (list_button % 3 == 2)
 					SetWishListPacket(wish(wish_list, commodity.sn)).dispatch();
 			}
 		}
 
-		// Gifting and slot expansions aren't served yet, so their buttons do
-		// nothing.
+		// Slot expansions aren't served yet, so their buttons do nothing.
 		return Button::State::NORMAL;
 	}
 
