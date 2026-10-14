@@ -570,6 +570,63 @@ impl Inventory {
         }])
     }
 
+    /// Move a bag's items up into its empty slots, keeping their order (the
+    /// item window's Gather).
+    pub fn gather(&mut self, kind: InventoryType) -> Result<Vec<InventoryChange>, InventoryError> {
+        self.rearrange(kind, |_| ())
+    }
+
+    /// Order a bag's items by item id from the first slot (the item window's
+    /// Sort). Stacks are not merged.
+    pub fn sort(&mut self, kind: InventoryType) -> Result<Vec<InventoryChange>, InventoryError> {
+        self.rearrange(kind, |item| item.item_id)
+    }
+
+    /// Lay a bag's items out from slot 1, ordered by `key` and then by slot,
+    /// as the swaps (`Move`s) that get there.
+    fn rearrange<K: Ord>(
+        &mut self,
+        kind: InventoryType,
+        key: impl Fn(&Item) -> K,
+    ) -> Result<Vec<InventoryChange>, InventoryError> {
+        if kind.bag_index().is_none() {
+            return Err(InventoryError::InvalidSlot);
+        }
+        let mut order: Vec<i16> = self.map(kind).keys().copied().collect();
+        order.sort_by_key(|slot| key(&self.map(kind)[slot]));
+
+        // Where each of the original slots' items is now, and the reverse.
+        let mut now: BTreeMap<i16, i16> = order.iter().map(|&slot| (slot, slot)).collect();
+        let mut origin: BTreeMap<i16, i16> = now.clone();
+        let mut changes = Vec::new();
+        for (target, original) in (1..).zip(order) {
+            let from = now[&original];
+            if from == target {
+                continue;
+            }
+            if let Some(displaced) = origin.remove(&target) {
+                now.insert(displaced, from);
+                origin.insert(from, displaced);
+            } else {
+                origin.remove(&from);
+            }
+            now.insert(original, target);
+            origin.insert(target, original);
+            changes.push(InventoryChange::Move {
+                kind,
+                from,
+                to: target,
+            });
+        }
+
+        let mut items = std::mem::take(self.map_mut(kind));
+        *self.map_mut(kind) = origin
+            .into_iter()
+            .map(|(slot, original)| (slot, items.remove(&original).expect("tracked")))
+            .collect();
+        Ok(changes)
+    }
+
     fn in_bag(&self, kind: InventoryType, slot: i16) -> bool {
         slot >= 1 && slot <= i16::from(self.slot_limit(kind))
     }
@@ -816,5 +873,101 @@ mod tests {
         assert!(inventory
             .get(InventoryType::Equipped, equip_slot::TOP)
             .is_none());
+    }
+
+    /// Item ids by slot in `kind`.
+    fn layout(inventory: &Inventory, kind: InventoryType) -> Vec<(i16, i32)> {
+        inventory
+            .items(kind)
+            .map(|(slot, item)| (slot, item.item_id))
+            .collect()
+    }
+
+    /// Apply `Move`s as the client does: swap the two slots.
+    fn replay(mut slots: BTreeMap<i16, i32>, changes: &[InventoryChange]) -> Vec<(i16, i32)> {
+        for change in changes {
+            let InventoryChange::Move { from, to, .. } = *change else {
+                panic!("only moves: {change:?}");
+            };
+            let moving = slots.remove(&from);
+            if let Some(target) = slots.remove(&to) {
+                slots.insert(from, target);
+            }
+            if let Some(moving) = moving {
+                slots.insert(to, moving);
+            }
+        }
+        slots.into_iter().collect()
+    }
+
+    fn scattered() -> Inventory {
+        let mut inventory = Inventory::default();
+        for (slot, item_id, quantity) in [
+            (2, 4000019, 30),
+            (5, 4000000, 12),
+            (6, 4000019, 5),
+            (9, 4000001, 7),
+            (24, 4000000, 1),
+        ] {
+            inventory.insert(InventoryType::Etc, slot, Item::stack(item_id, quantity));
+        }
+        inventory
+    }
+
+    #[test]
+    fn gather_fills_the_gaps_in_order() {
+        let mut inventory = scattered();
+        let before: BTreeMap<_, _> = layout(&inventory, InventoryType::Etc).into_iter().collect();
+        let changes = inventory.gather(InventoryType::Etc).unwrap();
+        let expected = vec![
+            (1, 4000019),
+            (2, 4000000),
+            (3, 4000019),
+            (4, 4000001),
+            (5, 4000000),
+        ];
+        assert_eq!(layout(&inventory, InventoryType::Etc), expected);
+        assert_eq!(replay(before, &changes), expected);
+        assert_eq!(
+            inventory.get(InventoryType::Etc, 3).unwrap().quantity,
+            5,
+            "stacks keep their quantities"
+        );
+        assert!(inventory.gather(InventoryType::Etc).unwrap().is_empty());
+    }
+
+    #[test]
+    fn sort_orders_by_item_id_without_merging() {
+        let mut inventory = scattered();
+        let before: BTreeMap<_, _> = layout(&inventory, InventoryType::Etc).into_iter().collect();
+        let changes = inventory.sort(InventoryType::Etc).unwrap();
+        let expected = vec![
+            (1, 4000000),
+            (2, 4000000),
+            (3, 4000001),
+            (4, 4000019),
+            (5, 4000019),
+        ];
+        assert_eq!(layout(&inventory, InventoryType::Etc), expected);
+        assert_eq!(replay(before, &changes), expected);
+        let quantities: Vec<_> = inventory
+            .items(InventoryType::Etc)
+            .map(|(_, item)| item.quantity)
+            .collect();
+        assert_eq!(
+            quantities,
+            vec![12, 1, 7, 30, 5],
+            "equal ids keep their slot order"
+        );
+        assert!(inventory.sort(InventoryType::Etc).unwrap().is_empty());
+    }
+
+    #[test]
+    fn worn_equipment_cannot_be_rearranged() {
+        let mut inventory = Inventory::default();
+        assert_eq!(
+            inventory.sort(InventoryType::Equipped),
+            Err(InventoryError::InvalidSlot)
+        );
     }
 }

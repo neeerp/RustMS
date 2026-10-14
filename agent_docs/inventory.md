@@ -13,6 +13,7 @@ order the client must apply them:
 | `take(kind, slot, quantity)` | Take from one slot (using an item) |
 | `move_in_bag(kind, from, to, slot_max)` | Move, merge onto a stack, or swap |
 | `equip(from, to)` / `unequip(from, to)` | Wear or take off; overall ⇄ pants and two-handed weapon ⇄ shield take each other off (needs a free slot) |
+| `gather(kind)` / `sort(kind)` | Lay the bag out from slot 1, in slot order or by item id (ties keep slot order); stacks are not merged |
 
 `net::packet::build::world::inventory::build_inventory_operation` turns the
 changes into INVENTORY_OPERATION (`0x1D`); worn positions travel as the EQUIP
@@ -42,6 +43,13 @@ and sends UPDATE_CHAR_LOOK (`0xC5`) to the other players on the map. Refused
 moves only get an enable-actions stat update. Dropping (destination 0) waits
 for floor items.
 
+GATHER_ITEMS (`0x45`) and SORT_ITEMS (`0x46`) (tick, type) are the item
+window's Gather and Sort buttons. The rearrangement goes out as one
+INVENTORY_OPERATION of swaps (mode 2), then GATHER_ITEM_RESULT (`0x34`) or
+SORT_ITEM_RESULT (`0x35`) (`0`, type), which flips the button between Gather
+and Sort. A bag that is already in order gets only the result and an
+enable-actions stat update.
+
 HeavenClient cancels any icon drag before applying an INVENTORY_OPERATION,
 because the dragged icon points into the icons being rebuilt.
 
@@ -61,6 +69,7 @@ below full it reports +10 HP / +3 MP. The server accepts at most +20 HP and
 ## Tests
 
 `game` unit tests cover stacking, full bags, removal order, merging,
-swapping, and overall/pants; `net` covers the packet layouts and the handler;
+swapping, overall/pants, and gather/sort (replaying the swaps); `net` covers the packet layouts and the handler;
 `inventory_moves` (integration) equips, unequips, moves, checks refusals,
-observes UPDATE_CHAR_LOOK from a second player, and checks persistence.
+observes UPDATE_CHAR_LOOK from a second player, gathers and sorts the equip
+bag, and checks persistence.

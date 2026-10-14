@@ -129,3 +129,75 @@ async fn equipment_moves_persist_and_update_the_look_for_others() {
     let worn = relogin(&config).await;
     assert_eq!(worn.equipped[&WEAPON.abs()], weapon);
 }
+
+const SHOES: i16 = -7;
+
+/// Send GATHER_ITEMS or SORT_ITEMS for the equip bag; returns the moves and
+/// the result packet's opcode.
+async fn rearrange(c: &mut MapleTestConnection, opcode: RecvOpcode) -> (Vec<(i16, i16)>, i16) {
+    let mut p = Packet::new_empty();
+    p.write_short(opcode as i16).unwrap();
+    p.write_int(0).unwrap();
+    p.write_byte(1).unwrap();
+    send(c, p).await;
+    let mut trace = Trace::default();
+    let mut moves = Vec::new();
+    loop {
+        let p = read(c, &mut trace).await;
+        let mut r = Cursor::new(&p.bytes);
+        r.read_short().unwrap();
+        if p.opcode() == SendOpcode::InventoryOperation as i16 {
+            r.read_byte().unwrap();
+            for _ in 0..r.read_byte().unwrap() {
+                assert_eq!(r.read_byte().unwrap(), 2, "only moves expected");
+                assert_eq!(r.read_byte().unwrap(), 1, "equip bag");
+                moves.push((r.read_short().unwrap(), r.read_short().unwrap()));
+            }
+        }
+        if p.opcode() == SendOpcode::GatherItemResult as i16
+            || p.opcode() == SendOpcode::SortItemResult as i16
+        {
+            assert_eq!(&p.bytes[2..], &[0, 1]);
+            return (moves, p.opcode());
+        }
+    }
+}
+
+#[tokio::test]
+async fn gather_and_sort_rearrange_the_bag_and_persist() {
+    let config = load_harness_config_or_fail().await;
+    let mut session = login_to_world_session(&config).await.unwrap();
+    let c = &mut session.connection;
+
+    // The weapon (130xxxx) ahead of the shoes (107xxxx), with gaps.
+    assert_eq!(
+        request(c, -1, WEAPON, 3).await,
+        Reply::Moves(vec![(1, WEAPON, 3)])
+    );
+    assert_eq!(
+        request(c, -1, SHOES, 6).await,
+        Reply::Moves(vec![(1, SHOES, 6)])
+    );
+
+    assert_eq!(
+        rearrange(c, RecvOpcode::GatherItems).await,
+        (vec![(3, 1), (6, 2)], SendOpcode::GatherItemResult as i16)
+    );
+    assert_eq!(
+        rearrange(c, RecvOpcode::SortItems).await,
+        (vec![(2, 1)], SendOpcode::SortItemResult as i16)
+    );
+    drop(session);
+
+    // The shoes are now first and the weapon second.
+    let mut restored = relogin(&config).await;
+    let c = &mut restored.connection;
+    assert_eq!(
+        request(c, 1, 2, WEAPON).await,
+        Reply::Moves(vec![(1, 2, WEAPON)])
+    );
+    assert_eq!(
+        request(c, 1, 1, SHOES).await,
+        Reply::Moves(vec![(1, 1, SHOES)])
+    );
+}
