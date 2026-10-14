@@ -17,6 +17,7 @@
 //////////////////////////////////////////////////////////////////////////////////
 #include "UIStateLogin.h"
 
+#include "LoginScene.h"
 #include "UITypes/UICharSelect.h"
 #include "UITypes/UILogin.h"
 #include "UITypes/UILoginNotice.h"
@@ -31,14 +32,23 @@ namespace ms
 	{
 		focused = UIElement::Type::NONE;
 
+		LoginScene::get().load();
+
 		if (Configuration::get().get_skip_startup_logos())
 			emplace<UILogin>();
 		else
 			emplace<UILogo>();
 	}
 
+	UIStateLogin::~UIStateLogin()
+	{
+		LoginScene::get().unload();
+	}
+
 	void UIStateLogin::draw(float inter, Point<int16_t> cursor) const
 	{
+		LoginScene::get().draw(inter);
+
 		for (auto iter : elements)
 		{
 			UIElement *element = iter.second.get();
@@ -53,6 +63,8 @@ namespace ms
 
 	void UIStateLogin::update()
 	{
+		LoginScene::get().update();
+
 		for (auto iter : elements)
 		{
 			UIElement *element = iter.second.get();

@@ -452,6 +452,8 @@ add_executable(HeavenClient
     IO/UIStateCashShop.h
     IO/UIStateGame.cpp
     IO/UIStateGame.h
+    IO/LoginScene.cpp
+    IO/LoginScene.h
     IO/UIStateLogin.cpp
     IO/UIStateLogin.h
     IO/Window.cpp

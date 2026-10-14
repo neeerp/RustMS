@@ -198,6 +198,21 @@ from `UI.nx`. Moved so far:
   and Complete tabs (`Basic.img/Tab2`), quests folded by area, and a detail
   panel with the quest's text and FIND NPC or QUEST HELPER, laid out from
   period footage. See [quest-window.md](quest-window.md).
+- **Login scene** (`LoginScene`, `MapLogin.img`): v83 draws the login steps
+  as one map, with a stop for each step stacked 600 pixels apart going up:
+  title at y 0, world select at -600, character select at -1200, race select
+  at -1800, then Cygnus, Explorer, and Aran creation at -2400, -3000, and
+  -3600. The camera centre sits at x 28 and 8 pixels above each stop; fitting
+  renders of the map to 2009 title and v83 character select footage agrees on
+  that offset to the pixel. Its backgrounds and objects come from `Map.nx` `Back/login.img` and
+  `Obj/login.img`. `UIStateLogin` loads the scene and draws it, then the book
+  frame (`Login.img/Common/frame`) and the version, under the login windows.
+  Each classic window calls `LoginScene::move_to` with its step. The first
+  call cuts straight to that step; later calls scroll the camera there.
+- **Title** (`UILogin`, `Login.img/Title`): the ID and password fields and
+  the buttons sit on the planks of the scene's signboard. The labels are part
+  of the signboard art, and v83 places everything else in code, so the
+  positions are measured from the art and checked against 2009 footage. The version reads "Ver. 0.83".
 
 `UIClassic.nx` is not one of NoLifeNx's standard files, so `NxFiles` opens it
 with `nl::file` instead of `nl::nx::load_all`.
