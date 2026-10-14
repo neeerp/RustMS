@@ -351,7 +351,6 @@ add_executable(HeavenClient
     IO/UITypes/UIChatBar.h
     IO/UITypes/UICygnusCreation.cpp
     IO/UITypes/UICygnusCreation.h
-    IO/UITypes/UIEnterText.cpp
     IO/UITypes/UIEnterText.h
     IO/UITypes/UIEquipInventory.cpp
     IO/UITypes/UIEquipInventory.h
