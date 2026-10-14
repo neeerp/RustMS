@@ -17,6 +17,7 @@ pub enum SendOpcode {
 
     InventoryOperation = 0x1D,
     StatChange = 0x1F,
+    UpdateSkills = 0x24,
     ShowStatusInfo = 0x27,
 
     BuddyList = 0x3F,

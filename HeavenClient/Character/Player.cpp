@@ -19,6 +19,7 @@
 
 #include "PlayerStates.h"
 
+#include "../Audio/Audio.h"
 #include "../Data/WeaponData.h"
 #include "../IO/UI.h"
 
@@ -480,7 +481,10 @@ namespace ms
 		uint16_t oldlevel = get_level();
 
 		if (level > oldlevel)
+		{
 			show_effect_id(CharEffect::Id::LEVELUP);
+			Sound(Sound::Name::LEVELUP).play();
+		}
 
 		stats.set_stat(MapleStat::Id::LEVEL, level);
 	}

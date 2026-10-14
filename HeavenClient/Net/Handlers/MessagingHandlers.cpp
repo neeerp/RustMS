@@ -17,6 +17,7 @@
 //////////////////////////////////////////////////////////////////////////////////
 #include "MessagingHandlers.h"
 
+#include "../../Audio/Audio.h"
 #include "../../Data/ItemData.h"
 #include "../../Gameplay/Stage.h"
 #include "../../IO/UI.h"
@@ -367,9 +368,15 @@ namespace ms
 					chatbar->send_chatline(build_item_gain_chatline(idata.get_name(), qty), UIChatBar::LineType::GREY);
 			}
 		}
+		else if (mode1 == 8) // job change
+		{
+			Stage::get().get_player().show_effect_id(CharEffect::Id::JOBCHANGE);
+			Sound(Sound::Name::JOBCHANGED).play();
+		}
 		else if (mode1 == 9) // quest complete
 		{
 			Stage::get().get_player().show_effect_id(CharEffect::Id::QUEST_CLEAR);
+			Sound(Sound::Name::QUESTCLEAR).play();
 		}
 		else if (mode1 == 13) // card effect
 		{
