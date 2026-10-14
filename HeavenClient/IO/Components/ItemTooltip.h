@@ -20,13 +20,14 @@
 #include <cstdint>
 
 #include "Tooltip.h"
+#include "TooltipBox.h"
 
-#include "../Template/BoolPair.h"
-#include "../Components/MapleFrame.h"
 #include "../Graphics/Text.h"
 
 namespace ms
 {
+	// The v83 item tooltip: the name, and the icon with the description beside
+	// it.
 	class ItemTooltip : public Tooltip
 	{
 	public:
@@ -38,20 +39,14 @@ namespace ms
 
 	private:
 		int32_t itemid;
-		int16_t fillwidth;
-		int16_t fillheight;
-		int16_t descdelta;
-		Texture itemicon;
+		Point<int16_t> size;
 
+		TooltipBox box;
+		TooltipIcon icon;
+
+		Texture itemicon;
 		Text name;
-		Text desc;
 		Text qual;
-		MapleFrame frame;
-		Texture cover;
-		Texture base;
-		Texture itemcover;
-		BoolPair<Texture> type;
-		bool untradable;
-		bool unique;
+		Text desc;
 	};
 }

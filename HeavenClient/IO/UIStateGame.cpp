@@ -497,6 +497,7 @@ namespace ms
 		{
 			eqtooltip.set_equip(Tooltip::Parent::NONE, 0);
 			ittooltip.set_item(0);
+			sktooltip.set_skill(0, 0, 0, 0);
 			tetooltip.set_text("");
 			matooltip.reset();
 			tooltip = {};

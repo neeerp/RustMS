@@ -102,6 +102,16 @@ from `UI.nx`. Moved so far:
   World Map spots, in the v83 box. `UIClassic.nx` has no bitmaps for it (the
   original drew it), so `TooltipBox` draws the dark edge, light edge, and
   translucent navy fill measured from footage.
+- **Item, equip, skill, and text tooltips** (`ItemTooltip`, `EquipTooltip`,
+  `SkillTooltip`, `TextTooltip`): the same box, with the layouts measured from
+  period footage in place of the Big Bang `UIToolTip.img` frames. Items, equips,
+  and skills show a blue dot before the name and the icon at twice its size in
+  a light box. Equips have the required stats and the job row from
+  `UIWindow.img/ToolTip/Equip` (white and orange when met, red and grey when
+  not), then a line and one row per stat ("CATEGORY :OVERALL", "LUK : +11").
+  Upgraded equips' names are light blue with the upgrades and gender run
+  together, "(+4Male)", as in footage. Skills show the current and next levels
+  under a line, "[Next Level 1]".
 - **Stat window** (`UIStatsInfo`, `UIWindow.img/Stat`): the main panel and,
   behind DETAIL, the attack and defence panel (closed with `Basic.img/BtHide`),
   laid out from period footage. The job shows as the `Job/main` and `Job/sub`
