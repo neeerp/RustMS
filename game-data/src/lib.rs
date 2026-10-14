@@ -822,6 +822,7 @@ mod tests {
             map_npcs: Vec::new(),
             mob_spawns: Vec::new(),
             mob_rate: 1.0,
+            reactors: Vec::new(),
             footholds: footholds::Footholds::default(),
             portals_by_id: BTreeMap::from([
                 (0, portal(0, PORTAL_TYPE_START_POINT, -500, None)),
