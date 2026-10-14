@@ -107,6 +107,13 @@ from `UI.nx`. Moved so far:
   (`Text::Font::A10M`). Rows are grey when a required skill is missing. SP-up
   spends a point at once; v83 had no allocation popup. The MACRO button and the
   `SkillMacro` window are not drawn yet.
+- **Equipment window** (`UIEquipInventory`, `UIWindow.img/Equip`): the labelled
+  `backgrnd` grid (33 px cells from (5,35)) with an icon per worn slot, and the
+  `pet` panel that PET EQUIP opens beside it, laid out from period footage.
+  Cells that cannot be used are tinted red as in the footage: PANTS under an
+  overall, SHIELD beside a two-handed weapon, and the riding cells without
+  Monster Riding. RustMS has no pets, so the pet tabs are disabled and the pet
+  and MOB EQUIP cells hold nothing.
 
 `UIClassic.nx` is not one of NoLifeNx's standard files, so `NxFiles` opens it
 with `nl::file` instead of `nl::nx::load_all`.
