@@ -214,6 +214,8 @@ pub enum WorldAction {
     NpcInteraction(NpcInteraction),
     /// Start, complete, or forfeit a quest (v83 `QUEST_ACTION`).
     Quest(crate::quests::QuestRequest),
+    /// Buy, sell, recharge at, or leave the shop the player has open.
+    Shop(crate::shop::ShopRequest),
     /// The player touched the named script portal on their map.
     ScriptPortal {
         portal: String,
@@ -263,6 +265,9 @@ pub enum FieldRequest {
         loot: crate::loot::Loot,
         vanish: bool,
     },
+    /// Show the player the info window for `character_id`, who must be on
+    /// their map (and may be themselves).
+    CharInfo { character_id: i32 },
 }
 
 impl ReplyAction for WorldAction {
@@ -293,7 +298,7 @@ fn world_routes() -> &'static HashMap<i16, WorldRoute> {
     ROUTES.get_or_init(|| {
         use RecvOpcode as Op;
         use WorldRoute::*;
-        let table: [(Op, WorldRoute); 25] = [
+        let table: [(Op, WorldRoute); 26] = [
             (Op::PlayerLoggedIn, PreGame(&world::PlayerLoggedInHandler)),
             (Op::PlayerMove, InGame(&world::PlayerMoveHandler)),
             (Op::ChangeChannel, InGame(&world::ChangeChannelHandler)),
@@ -308,10 +313,12 @@ fn world_routes() -> &'static HashMap<i16, WorldRoute> {
             ),
             (Op::ChangeKeybinds, InGame(&world::ChangeKeybindsHandler)),
             (Op::AllChat, InGame(&world::AllChatHandler)),
+            (Op::FaceExpression, InGame(&world::FaceExpressionHandler)),
             (Op::Whisper, InGame(&world::WhisperHandler)),
             (Op::TalkToNpc, InGame(&world::NpcTalkHandler)),
             (Op::NpcTalkMore, InGame(&world::NpcTalkMoreHandler)),
             (Op::QuestAction, InGame(&world::QuestActionHandler)),
+            (Op::NpcShopAction, InGame(&world::NpcShopActionHandler)),
             (
                 Op::ChangeMapSpecial,
                 InGame(&world::ChangeMapSpecialHandler),
@@ -330,7 +337,9 @@ fn world_routes() -> &'static HashMap<i16, WorldRoute> {
             (Op::HealOverTime, InGame(&world::HealOverTimeHandler)),
             (Op::SpendAp, InGame(&world::SpendApHandler)),
             (Op::SpendSp, InGame(&world::SpendSpHandler)),
+            (Op::UseSkill, InGame(&world::UseSkillHandler)),
             (Op::MesoDrop, InGame(&world::MesoDropHandler)),
+            (Op::CharInfoRequest, InGame(&world::CharInfoRequestHandler)),
         ];
         table
             .into_iter()
@@ -361,7 +370,7 @@ mod tests {
     fn every_registered_opcode_is_unique_per_server() {
         // The maps would silently drop duplicates; check the table sizes match.
         assert_eq!(login_routes().len(), 13);
-        assert_eq!(world_routes().len(), 25);
+        assert_eq!(world_routes().len(), 26);
     }
 
     #[test]

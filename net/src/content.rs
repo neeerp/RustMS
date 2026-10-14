@@ -1,12 +1,13 @@
-//! The server content pack (script text, drop tables), loaded once.
+//! The server content pack (script text, drop tables, shops), loaded once.
 //! See `game_data::server_content` and `agent_docs/server-content.md`.
 
-use game_data::server_content::{RewardTable, ServerText};
+use game_data::server_content::{RewardTable, ServerText, ShopTable};
 use std::path::PathBuf;
 use std::sync::OnceLock;
 
 static TEXT: OnceLock<ServerText> = OnceLock::new();
 static REWARDS: OnceLock<RewardTable> = OnceLock::new();
+static SHOPS: OnceLock<ShopTable> = OnceLock::new();
 
 /// `RUSTMS_SERVER_CONTENT_PATH`, default `assets/server-content`.
 pub fn pack_path() -> PathBuf {
@@ -33,23 +34,30 @@ pub fn rewards() -> &'static RewardTable {
     })
 }
 
-/// Load both and describe what was found, for the startup log. A pack that
+pub fn shops() -> &'static ShopTable {
+    SHOPS.get_or_init(|| ShopTable::load(Some(&pack_path())).unwrap_or_default())
+}
+
+/// Load the pack and describe what was found, for the startup log. A pack that
 /// exists but cannot be parsed is an error.
 pub fn load() -> Result<String, String> {
     let path = pack_path();
     let text = ServerText::load(Some(&path)).map_err(|e| e.to_string())?;
     let rewards = RewardTable::load(Some(&path)).map_err(|e| e.to_string())?;
+    let shops = ShopTable::load(Some(&path)).map_err(|e| e.to_string())?;
     let mut summary = format!(
-        "{}: {} text keys from the pack, {} placeholders; drops for {} mobs from the pack",
+        "{}: {} text keys from the pack, {} placeholders; drops for {} mobs and {} shops from the pack",
         path.display(),
         text.from_pack(),
         text.placeholders(),
-        rewards.from_pack()
+        rewards.from_pack(),
+        shops.len()
     );
     if !text.unknown_in_pack().is_empty() {
         summary.push_str(&format!("; unused pack keys: {:?}", text.unknown_in_pack()));
     }
     let _ = TEXT.set(text);
     let _ = REWARDS.set(rewards);
+    let _ = SHOPS.set(shops);
     Ok(summary)
 }

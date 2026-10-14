@@ -17,31 +17,28 @@
 //////////////////////////////////////////////////////////////////////////////////
 #pragma once
 
-#include <string>
-
-#include <cstdint>
-
 #include "../UIDragElement.h"
 
-#include "../Components/Charset.h"
-
+#include "../../Character/Look/CharLook.h"
 #include "../../Graphics/Text.h"
-#include "../../Character/Char.h"
-#include "../../Template/BoolPair.h"
+
+#include <cstdint>
+#include <string>
 
 namespace ms
 {
+	// The v83 character info window, opened by double-clicking a character.
 	class UICharInfo : public UIDragElement<PosCHARINFO>
 	{
 	public:
 		static constexpr Type TYPE = UIElement::Type::CHARINFO;
 		static constexpr bool FOCUSED = false;
-		static constexpr bool TOGGLED = true;
+		// Opening it for another character replaces the window.
+		static constexpr bool TOGGLED = false;
 
 		UICharInfo(int32_t cid);
 
 		void draw(float inter) const override;
-		void update() override;
 
 		Button::State button_pressed(uint16_t buttonid) override;
 
@@ -53,78 +50,63 @@ namespace ms
 		void update_stats(int32_t character_id, int16_t job_id, int8_t level, int16_t fame, std::string guild, std::string alliance);
 
 	private:
-		void show_bottom_window(uint16_t buttonid);
-		void show_right_window(uint16_t buttonid);
+		// The main window alone, or lengthened to show pets, the mount, or
+		// the monster book collection.
+		enum Mode : uint8_t
+		{
+			MAIN,
+			PET,
+			TAMING,
+			COLLECTION,
+			NUM_MODES
+		};
+
+		// The list that can open on the right.
+		enum Panel : uint8_t
+		{
+			NO_PANEL,
+			ITEMS,
+			WISHES
+		};
 
 		enum Buttons : uint16_t
 		{
-			BtClose,
-			BtCollect,
-			BtDamage,
-			BtFamily,
-			BtItem,
-			BtParty,
-			BtPersonality,
-			BtPet,
-			BtPopDown,
-			BtPopUp,
-			BtRide,
-			BtTrad,
-			BtFriend,
-			BtVisit,
-			BtArrayGet,
-			BtArrayName,
-			BtFAQ,
-			BtRegist
+			BT_CLOSE,
+			BT_FAMILY,
+			BT_PARTY,
+			BT_TRADE,
+			BT_ITEM,
+			BT_WISH,
+			BT_FAME_UP,
+			BT_FAME_DOWN,
+			BT_PET_SHOW,
+			BT_PET_HIDE,
+			BT_TAMING_SHOW,
+			BT_TAMING_HIDE,
+			BT_COLLECTION_SHOW,
+			BT_COLLECTION_HIDE,
+			BT_EXCEPTION,
+			BT_PANEL_HIDE
 		};
 
-		/// Main Window
+		void set_mode(Mode mode);
+		void set_panel(Panel panel);
+
+		int32_t cid;
+		bool known;
+		CharLook look;
+
+		Mode mode;
+		Panel panel;
+		Texture backgrounds[NUM_MODES];
+		Texture item_list;
+		Texture wish_list;
+
 		Text name;
-		Text job;
 		Text level;
+		Text job;
 		Text fame;
 		Text guild;
 		Text alliance;
-
-		Char* target_character;
-
-		/// Sub Windows
-		Point<int16_t> bottom_window_adj;
-		Point<int16_t> right_window_adj;
-
-		/// Farm
-		Text farm_name;
-		Sprite loading;
-		bool is_loading;
-		uint16_t timestep;
-		Charset farm_level;
-		Point<int16_t> farm_dim;
-		Point<int16_t> farm_adj;
-		std::string farm_level_text;
-
-		/// Personality
-		bool personality_enabled;
-		std::vector<Sprite> personality_sprites;
-		BoolPair<std::vector<Sprite>> personality_sprites_enabled;
-		Point<int16_t> personality_dimensions;
-
-		/// Collect
-		bool collect_enabled;
-		std::vector<Sprite> collect_sprites;
-		Point<int16_t> collect_dimensions;
-		Point<int16_t> collect_adj;
-		Sprite default_medal;
-		Text medal_text;
-		Text medal_total;
-
-		/// Damage
-		bool damage_enabled;
-		std::vector<Sprite> damage_sprites;
-		Point<int16_t> damage_dimensions;
-
-		/// Item
-		bool item_enabled;
-		std::vector<Sprite> item_sprites;
-		Point<int16_t> item_dimensions;
 	};
 }

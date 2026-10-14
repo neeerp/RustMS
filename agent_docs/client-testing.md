@@ -48,6 +48,13 @@ presses nothing.
 (`Gameplay/MapleMap/NpcReach.h`): NPCs within 150 px either side and 50 px up or
 down are in reach, and the horizontally nearest wins.
 
+`enter_number_tests` covers what a number entry box accepts
+(`IO/UITypes/EnterNumber.h`): digits from 1 to the box's maximum, with empty,
+zero, too-large (however many digits), and non-digit input refused.
+`char_click_tests` covers which clicks land on a character for the character
+info window (`Gameplay/MapleMap/CharClick.h`): a box 18 px either side of the
+feet and 70 px tall above them.
+
 ## GUI checks without taking desktop focus
 
 Prefer a private Xvfb display for automated native-client checks. It gives the
