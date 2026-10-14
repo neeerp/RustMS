@@ -22,6 +22,7 @@
 #include "../../Graphics/Texture.h"
 
 #include "../../Character/Inventory/Inventory.h"
+#include "../Keyboard.h"
 
 #include <memory>
 
@@ -54,6 +55,13 @@ namespace ms
 
 			virtual void drop_on_bindings(Point<int16_t> cursorposition, bool remove) const = 0;
 
+			// What a key bound to this icon would do; NONE if it cannot be
+			// bound.
+			virtual Keyboard::Mapping get_mapping() const
+			{
+				return {};
+			}
+
 			virtual void set_count(int16_t) = 0;
 
 			virtual IconType get_type() = 0;
@@ -77,6 +85,7 @@ namespace ms
 		void drop_on_equips(EquipSlot::Id eqslot) const;
 		bool drop_on_items(InventoryType::Id tab, EquipSlot::Id eqslot, int16_t slot, bool equip) const;
 		void drop_on_bindings(Point<int16_t> cursorposition, bool remove) const;
+		Keyboard::Mapping get_mapping() const;
 
 		void set_count(int16_t count);
 

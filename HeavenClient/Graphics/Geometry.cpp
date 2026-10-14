@@ -120,6 +120,11 @@ namespace ms
 
 	void MobHpBar::draw(Point<int16_t> position, int16_t hppercent) const
 	{
+		draw(position, hppercent, Color::Name::LIGHTGREEN, Color::Name::JAPANESELAUREL);
+	}
+
+	void MobHpBar::draw(Point<int16_t> position, int16_t hppercent, Color::Name fill, Color::Name shade) const
+	{
 		int16_t fillw = static_cast<int16_t>((WIDTH - 6) * static_cast<float>(hppercent) / 100);
 		int16_t x = position.x() - WIDTH / 2;
 		int16_t y = position.y() - HEIGHT * 3;
@@ -129,7 +134,7 @@ namespace ms
 		Geometry::draw(x + 1, y + HEIGHT - 2, WIDTH - 2, 1, Color::Name::WHITE, 1.0f);
 		Geometry::draw(x + 1, y + 2, 1, HEIGHT - 4, Color::Name::WHITE, 1.0f);
 		Geometry::draw(x + WIDTH - 2, y + 2, 1, HEIGHT - 4, Color::Name::WHITE, 1.0f);
-		Geometry::draw(x + 3, y + 3, fillw, 3, Color::Name::LIGHTGREEN, 1.0f);
-		Geometry::draw(x + 3, y + 6, fillw, 1, Color::Name::JAPANESELAUREL, 1.0f);
+		Geometry::draw(x + 3, y + 3, fillw, 3, fill, 1.0f);
+		Geometry::draw(x + 3, y + 6, fillw, 1, shade, 1.0f);
 	}
 }

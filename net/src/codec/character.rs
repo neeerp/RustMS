@@ -54,9 +54,15 @@ pub fn encode_character_data(packet: &mut Packet, player: &Player) -> Result<(),
     for _ in 0..REGULAR_TELEPORT_ROCKS + VIP_TELEPORT_ROCKS {
         packet.write_int(EMPTY_TELEPORT_ROCK)?;
     }
-    packet.write_int(0)?; // monster book cover
+    packet.write_int(player.monster_book.cover())?;
     packet.write_byte(0)?;
-    packet.write_short(0)?; // monster book cards
+    let cards: Vec<_> = player.monster_book.cards().collect();
+    packet.write_short(cards.len() as i16)?;
+    for (card, level) in cards {
+        // Cards go by their number within 0238.img.
+        packet.write_short((card % 10_000) as i16)?;
+        packet.write_byte(level)?;
+    }
     packet.write_short(0)?; // new year cards
     packet.write_short(0)?; // area info
     packet.write_short(0)?;

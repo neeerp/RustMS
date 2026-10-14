@@ -17,17 +17,21 @@
 //////////////////////////////////////////////////////////////////////////////////
 #pragma once
 
-#include <string>
-
 #include <cstdint>
+#include <string>
+#include <vector>
 
 #include "../UIDragElement.h"
 
-#include "../Components/Textfield.h"
-#include "../Components/Slider.h"
+#include "../Components/ClassicTabs.h"
+
+#include "../../Character/BuddyList.h"
+#include "../../Character/Party.h"
 
 namespace ms
 {
+	// The v83 Maple User List & Guild window (UIWindow.img/UserList). Only
+	// the Friend and Party tabs work so far; the others show an empty window.
 	class UIUserList : public UIDragElement<PosUSERLIST>
 	{
 	public:
@@ -35,29 +39,29 @@ namespace ms
 		static constexpr bool FOCUSED = false;
 		static constexpr bool TOGGLED = true;
 
+		enum Tab : uint16_t
+		{
+			FRIEND,
+			PARTY,
+			GUILD,
+			ALLIANCE,
+			BLACKLIST,
+			NUM_TABS
+		};
+
 		UIUserList(uint16_t tab);
 
 		void draw(float inter) const override;
 
 		void update() override;
 
+		Cursor::State send_cursor(bool clicked, Point<int16_t> cursorpos) override;
+
 		void send_key(int32_t keycode, bool pressed, bool escape) override;
 
 		UIElement::Type get_type() const override;
 
-		enum Tab
-		{
-			FRIEND,
-			PARTY,
-			BOSS,
-			BLACKLIST,
-			PARTY_MINE,
-			PARTY_SEARCH,
-			FRIEND_ALL,
-			FRIEND_ONLINE
-		};
-
-		void change_tab(uint8_t tabid);
+		void change_tab(uint16_t tabid);
 
 		uint16_t get_tab();
 
@@ -65,82 +69,109 @@ namespace ms
 		Button::State button_pressed(uint16_t buttonid) override;
 
 	private:
-		void change_party_tab(uint8_t tabid);
-
-		void change_friend_tab(uint8_t tabid);
-
-		void change_blacklist_tab(uint8_t tabid);
-
-		std::string get_cur_location();
-
-		enum Buttons
+		enum Buttons : uint16_t
 		{
-			BT_TAB_FRIEND,
-			BT_TAB_PARTY,
-			BT_TAB_BOSS,
-			BT_TAB_BLACKLIST,
-			BT_TAB_PARTY_MINE,
-			BT_TAB_PARTY_SEARCH,
-			BT_TAB_FRIEND_ALL,
-			BT_TAB_FRIEND_ONLINE,
-			BT_TAB_BLACKLIST_INDIVIDUAL,
-			BT_TAB_BLACKLIST_GUILD,
 			BT_CLOSE,
-			BT_PARTY_CREATE,
-			BT_PARTY_INVITE,
-			BT_PARTY_LEAVE,
-			BT_PARTY_SETTINGS,
-			BT_PARTY_SEARCH_LEVEL,
-			BT_PARTY_SEARCH_INVITE,
-			BT_FRIEND_ADD,
-			BT_FRIEND_ADD_GROUP,
-			BT_FRIEND_EXPAND,
-			BT_FRIEND_GROUP_0,
-			BT_BOSS_0,
-			BT_BOSS_1,
-			BT_BOSS_2,
-			BT_BOSS_3,
-			BT_BOSS_4,
-			BT_BOSS_L,
-			BT_BOSS_R,
-			BT_BOSS_DIFF_L,
-			BT_BOSS_DIFF_R,
-			BT_BOSS_GO,
-			BT_BLACKLIST_ADD,
-			BT_BLACKLIST_DELETE
+			BT_HP,
+			BT_CHANGE_LEADER,
+			BT_WHISPER,
+			BT_CHAT,
+			BT_SEARCH,
+			BT_CREATE,
+			BT_LEAVE,
+			BT_EXPEL,
+			BT_INVITE,
+			BT_ADD_BUDDY,
+			BT_DELETE_BUDDY,
+			BT_WHISPER_BUDDY,
+			BT_BUDDY_CHAT,
+			BT_BUDDY_MAP,
+			BT_INVITE_BUDDY,
+			BT_SHOW_ONLINE,
+			BT_SHOW_ALL,
+			BT_TAB0
 		};
 
+		// One member's row; y is relative to the window.
+		struct Line
+		{
+			int32_t id;
+			bool leader;
+			int16_t y;
+			Text name, job, level;
+		};
+
+		// The online or offline part of the party list.
+		struct Section
+		{
+			Texture header;
+			Text count;
+			int16_t top = 0;
+			int16_t bottom = 0;
+			std::vector<Line> lines;
+		};
+
+		// The members shown, minus their HP, to rebuild only on changes.
+		struct Shown
+		{
+			int32_t id;
+			std::string name;
+			int16_t job, level;
+			int32_t channel, map_id;
+
+			bool operator==(const Shown& other) const;
+		};
+
+		// One buddy's half of a row; pos is relative to the window.
+		struct Cell
+		{
+			int32_t id;
+			Point<int16_t> pos;
+			Text name, channel;
+		};
+
+		// The online or offline part of the buddy list, two buddies a row.
+		struct BuddySection
+		{
+			Texture header;
+			Text count;
+			int16_t top = 0;
+			int16_t bottom = 0;
+			int16_t rows = 0;
+			std::vector<Cell> cells;
+		};
+
+		std::vector<Shown> currently_shown() const;
+		void rebuild();
+		// Lays out one section from y and returns where the next may start.
+		int16_t lay_out(Section& section, const std::vector<const PartyMember*>& members, int16_t y);
+		void draw_section(const Section& section) const;
+		void enable(uint16_t buttonid, bool enabled);
+		void update_buttons();
+		const PartyMember* selected_member() const;
+
+		void rebuild_buddies();
+		void draw_buddies(const BuddySection& section, const Texture& section_row, bool legend) const;
+		const Buddy* selected_buddy() const;
+
 		uint16_t tab;
-		nl::node UserList;
-		Texture background;
+		Party& party;
+		BuddyList& buddies;
+		ClassicTabs tabs;
 
-		// Party tab
-		uint16_t party_tab;
-		Texture party_title;
-		Texture party_mine_grid[5];
-		Texture party_search_grid[3];
-		Text party_mine_name;
-		Slider party_slider;
+		Texture columns, row, bottom, highlight, star;
+		Text none;
+		Section online, offline;
+		std::vector<Shown> shown;
+		int32_t shown_leader = 0;
+		int32_t shown_mapid = 0;
+		int32_t selected = 0;
 
-		// Buddy tab
-		uint16_t friend_tab;
-		int friend_count = 0;
-		int friend_total = 50;
-		std::vector<Sprite> friend_sprites;
-		Texture friend_grid[4];
-		Text friends_online_text;
-		Text friends_cur_location;
-		Text friends_name;
-		Text friends_group_name;
-		Slider friends_slider;
-
-		// Boss tab
-		std::vector<Sprite> boss_sprites;
-
-		// Blacklist tab
-		uint16_t blacklist_tab;
-		Texture blacklist_title;
-		Texture blacklist_grid[3];
-		Text blacklist_name;
+		Texture legend, buddy_row, offline_row, buddy_bottom;
+		BuddySection buddies_online, buddies_offline;
+		std::vector<Buddy> shown_buddies;
+		int32_t picked_buddy = 0;
+		bool show_all = true;
+		bool filter_clicked = false;
 	};
 }

@@ -17,13 +17,19 @@
 //////////////////////////////////////////////////////////////////////////////////
 #include "MessagingHandlers.h"
 
+#include "Helpers/LoginParser.h"
+
 #include "../../Audio/Audio.h"
 #include "../../Data/ItemData.h"
 #include "../../Gameplay/Stage.h"
 #include "../../IO/UI.h"
+#include "../Packets/MessagingPackets.h"
 
 #include "../../IO/UITypes/UIChatBar.h"
+#include "../../IO/UITypes/UIMessenger.h"
+#include "../../IO/UITypes/UINotice.h"
 #include "../../IO/UITypes/UIStatusMessenger.h"
+#include "../../Util/Misc.h"
 
 #include <nlnx/nx.hpp>
 
@@ -34,11 +40,30 @@ namespace ms
 	namespace
 	{
 		// Canonical v83 WHISPER (opcode 135) sub-modes sent by the server
-		// 0x0A: reply to our whisper request (string target, byte success)
+		// 0x09: reply to our find (string target, byte where, then for where
+		//       1 int map id, int x, int y; 2 int -1 (Cash Shop); 3 int channel (0-based))
+		// 0x0A: reply to our whisper or find request (string target, byte success)
 		// 0x12: incoming whisper (string sender, byte channel (0-based), byte from_admin, string message)
-		// Other modes (e.g. 0x09 find reply, 0x48 buddy whisper) are not handled and are ignored.
+		// Other modes (e.g. 0x48 buddy whisper) are not handled and are ignored.
+		constexpr int8_t FIND_RESULT_MODE = 0x09;
 		constexpr int8_t WHISPER_RESULT_MODE = 0x0A;
 		constexpr int8_t WHISPER_RECEIVE_MODE = 0x12;
+
+		// Where a /find found its character, or nothing for an unknown answer.
+		std::string build_find_chatline(const std::string& target, int8_t where, int32_t value)
+		{
+			switch (where)
+			{
+				case 1:
+					return "'" + target + "' is in " + NxHelper::Map::get_map_info_by_id(value).name + ".";
+				case 2:
+					return "'" + target + "' is in the Cash Shop.";
+				case 3:
+					return "'" + target + "' is in Channel " + std::to_string(value + 1) + ".";
+				default:
+					return {};
+			}
+		}
 
 		std::string build_whisper_chatline(const std::string& sender, bool from_admin, const std::string& message)
 		{
@@ -136,9 +161,11 @@ namespace ms
 				recv.skip(1);
 
 				int32_t gain = recv.read_int();
-				std::string sign = (gain < 0) ? "-" : "+";
 
-				show_status(Color::Name::WHITE, "You have gained mesos (" + sign + std::to_string(gain) + ")");
+				if (gain < 0)
+					show_status(Color::Name::WHITE, "You have lost mesos (" + std::to_string(gain) + ")");
+				else
+					show_status(Color::Name::WHITE, "You have gained mesos (+" + std::to_string(gain) + ")");
 			}
 			else
 			{
@@ -292,7 +319,113 @@ namespace ms
 			if (!success)
 			{
 				if (auto chatbar = UI::get().get_element<UIChatBar>())
-					chatbar->send_chatline("Unable to whisper " + target + ".", UIChatBar::LineType::RED);
+					chatbar->send_chatline("Unable to find '" + target + "'.", UIChatBar::LineType::RED);
+			}
+		}
+		else if (mode == FIND_RESULT_MODE)
+		{
+			std::string target = recv.read_string();
+			int8_t where = recv.read_byte();
+			int32_t value = recv.read_int();
+			std::string line = build_find_chatline(target, where, value);
+
+			if (line.empty())
+				return;
+
+			if (auto chatbar = UI::get().get_element<UIChatBar>())
+				chatbar->send_chatline(line, UIChatBar::LineType::YELLOW);
+		}
+	}
+
+	void MessengerHandler::handle(InPacket& recv) const
+	{
+		// Canonical v83 MESSENGER modes
+		enum Mode : int8_t
+		{
+			ADD = 0x00,
+			JOIN = 0x01,
+			REMOVE = 0x02,
+			INVITE = 0x03,
+			INVITE_RESULT = 0x04,
+			DECLINED = 0x05,
+			CHAT = 0x06,
+			UPDATE = 0x07
+		};
+
+		int8_t mode = recv.read_byte();
+		auto messenger = UI::get().get_element<UIMessenger>();
+
+		switch (mode)
+		{
+			case Mode::ADD:
+			case Mode::UPDATE:
+			{
+				uint8_t slot = recv.read_byte();
+				LookEntry look = LoginParser::parse_look(recv);
+				std::string name = recv.read_string();
+
+				if (messenger)
+					messenger->set_member(slot, CharLook(look), name);
+
+				break;
+			}
+			case Mode::JOIN:
+				UIMessenger::seat(recv.read_byte());
+				break;
+			case Mode::REMOVE:
+				if (messenger)
+					messenger->remove_member(recv.read_byte());
+
+				break;
+			case Mode::INVITE:
+			{
+				std::string from = recv.read_string();
+				recv.skip_byte();
+				int32_t messenger_id = recv.read_int();
+
+				UI::get().emplace<UIYesNo>(
+						from + " has invited you to Maple Messenger. Would you like to join?",
+						[from, messenger_id](bool yes)
+						{
+							if (yes)
+								MessengerOpenPacket(messenger_id).dispatch();
+							else
+								MessengerDeclinePacket(from).dispatch();
+						}
+				);
+
+				break;
+			}
+			case Mode::INVITE_RESULT:
+			{
+				std::string target = recv.read_string();
+				bool sent = recv.read_bool();
+
+				if (messenger)
+					messenger->add_note(sent ? "You have sent an invite to " + target + "."
+											 : "Unable to find '" + target + "'.");
+
+				break;
+			}
+			case Mode::DECLINED:
+			{
+				std::string note = recv.read_string() + " has declined your invitation.";
+
+				if (messenger && messenger->is_active())
+					messenger->add_note(note);
+				else if (auto chatbar = UI::get().get_element<UIChatBar>())
+					chatbar->send_chatline(note, UIChatBar::LineType::RED);
+
+				break;
+			}
+			case Mode::CHAT:
+			{
+				std::string line = recv.read_string();
+
+				if (messenger && messenger->is_active())
+					messenger->add_chat(line);
+
+				break;
 			}
 		}
 	}

@@ -1,5 +1,6 @@
-//! What a killed mob drops for one player, from the content pack's drop
-//! table (`crate::content::rewards`) and the committed v83 overrides.
+//! What a killed mob or broken reactor drops for one player, from the
+//! content pack's drop table (`crate::content::rewards`) and the committed
+//! v83 overrides.
 
 use game::{Item, Player, QuestState};
 use game_data::server_content::RewardEntry;
@@ -28,9 +29,28 @@ impl Loot {
     }
 }
 
-/// Roll one mob's drops for `player`.
+/// Roll one mob's drops for `player`, then its Monster Book card.
 pub fn roll(mob_id: i32, player: &Player, rng: &mut impl Rng) -> Vec<Loot> {
-    roll_entries(crate::content::rewards().drops(mob_id), player, rng)
+    let mut loot = roll_entries(crate::content::rewards().drops(mob_id), player, rng);
+    if let Some(card) = crate::monster_book::card_for(mob_id) {
+        if rng.gen_bool(crate::monster_book::drop_rate()) {
+            loot.push(Loot::Item {
+                item_id: card,
+                quantity: 1,
+                quest: None,
+            });
+        }
+    }
+    loot
+}
+
+/// Roll one broken reactor's drops for `player`.
+pub fn roll_reactor(reactor_id: i32, player: &Player, rng: &mut impl Rng) -> Vec<Loot> {
+    roll_entries(
+        crate::content::rewards().reactor_drops(reactor_id),
+        player,
+        rng,
+    )
 }
 
 pub fn roll_entries(entries: &[RewardEntry], player: &Player, rng: &mut impl Rng) -> Vec<Loot> {

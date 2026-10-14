@@ -17,14 +17,14 @@ use std::path::Path;
 /// Requirements to start a quest (`Check.img/<id>/0`) that the server checks.
 pub const START_REQUIREMENTS: &[&str] = &["npc", "job", "lvmin", "lvmax", "quest", "startscript"];
 /// Requirements to complete a quest (`Check.img/<id>/1`) that the server checks.
-pub const END_REQUIREMENTS: &[&str] = &["npc", "item", "mob", "endscript"];
+pub const END_REQUIREMENTS: &[&str] = &["npc", "item", "mob", "quest", "endscript"];
 /// Quest scripts (`startscript`/`endscript`) the server implements. A quest
 /// naming any other script is unsupported.
 pub const SCRIPTS: &[&str] = &["q1021s", "q1021e"];
 /// Actions on starting a quest (`Act.img/<id>/0`) that the server applies.
 pub const START_ACTIONS: &[&str] = &["item"];
 /// Actions on completing a quest (`Act.img/<id>/1`) that the server applies.
-pub const END_ACTIONS: &[&str] = &["exp", "nextQuest", "item"];
+pub const END_ACTIONS: &[&str] = &["exp", "money", "nextQuest", "item"];
 /// Keys of an `Act/<n>/item/<k>` entry the server applies.
 pub const ITEM_ACTION_KEYS: &[&str] = &["id", "count", "job", "gender", "prop"];
 
@@ -55,6 +55,8 @@ pub struct QuestTemplate {
     pub end_items: Vec<(i32, i32)>,
     /// Mobs to kill before completing, as `(mob id, count)`.
     pub end_mobs: Vec<(i32, u16)>,
+    /// Quests that must be in a given state before completing.
+    pub end_quests: Vec<QuestPrerequisite>,
     /// Items given or taken on start and on completion.
     pub start_items: Vec<QuestItem>,
     pub end_rewards: Vec<QuestItem>,
@@ -62,6 +64,8 @@ pub struct QuestTemplate {
     pub start_script: Option<String>,
     pub end_script: Option<String>,
     pub exp: i32,
+    /// Mesos given on completion; negative takes them (and needs them held).
+    pub money: i32,
     pub next_quest: Option<i16>,
 }
 
@@ -136,7 +140,10 @@ pub fn classify(keys: &QuestKeys) -> Result<(), String> {
     if !start.iter().any(|k| k == "npc") {
         return Err("no start NPC".into());
     }
-    if !end.iter().any(|k| k == "npc") {
+    // Without a completion NPC, a quest that asks for items or kills is
+    // handed in to the NPC that gave it (Pio's 1008). Without either, it is
+    // a record kept by some event, not something an NPC completes.
+    if !end.iter().any(|k| k == "npc" || k == "item" || k == "mob") {
         return Err("no completion NPC".into());
     }
     unsupported(start, START_REQUIREMENTS, "Check/0")?;
@@ -249,23 +256,7 @@ fn template(nx: &NxDataFile, id: i16) -> Result<QuestTemplate, GameDataError> {
             requirements.jobs.push(small(value, "job")?);
         }
     }
-    if let Some(quests) = nx.child_by_name(start, "quest")? {
-        for prerequisite in nx.child_indices(quests)? {
-            let quest_id = nx
-                .int_child(prerequisite, "id")?
-                .ok_or_else(|| invalid("prerequisite without id"))?;
-            // A prerequisite without a state must not have been started; the
-            // data uses this for mutually exclusive quests.
-            let state = nx
-                .int_child(prerequisite, "state")?
-                .unwrap_or(QuestState::NotStarted as i32);
-            requirements.quests.push(QuestPrerequisite {
-                quest_id: small(quest_id, "quest id")?,
-                state: QuestState::from_number(state)
-                    .ok_or_else(|| invalid("invalid prerequisite state"))?,
-            });
-        }
-    }
+    requirements.quests = prerequisites(nx, start)?;
     let mut end_items = Vec::new();
     if let Some(items) = nx.child_by_name(end, "item")? {
         for item in nx.child_indices(items)? {
@@ -301,24 +292,50 @@ fn template(nx: &NxDataFile, id: i16) -> Result<QuestTemplate, GameDataError> {
         Some(info) => nx.string_child(info, "name")?.unwrap_or_default(),
         None => String::new(),
     };
+    // See `classify`: quests without a completion NPC go back to the start NPC.
+    let start_npc = requirements.npc;
     Ok(QuestTemplate {
         id,
         name,
         start: requirements,
-        end_npc: nx
-            .int_child(end, "npc")?
-            .ok_or_else(|| invalid("missing completion NPC"))?,
+        end_npc: nx.int_child(end, "npc")?.unwrap_or(start_npc),
         end_items,
         end_mobs,
+        end_quests: prerequisites(nx, end)?,
         start_items: quest_items(nx, &format!("Act.img/{id}/0"))?,
         end_rewards: quest_items(nx, &format!("Act.img/{id}/1"))?,
         start_script: script(nx, start, "startscript")?,
         end_script: script(nx, end, "endscript")?,
         exp,
+        money: action_int("money")?.unwrap_or(0),
         next_quest: action_int("nextQuest")?
             .map(|id| small(id, "quest id"))
             .transpose()?,
     })
+}
+
+/// The `quest` requirements of a `Check` node: other quests' states.
+fn prerequisites(nx: &NxDataFile, check: u32) -> Result<Vec<QuestPrerequisite>, GameDataError> {
+    let Some(quests) = nx.child_by_name(check, "quest")? else {
+        return Ok(Vec::new());
+    };
+    let mut result = Vec::new();
+    for prerequisite in nx.child_indices(quests)? {
+        let quest_id = nx
+            .int_child(prerequisite, "id")?
+            .ok_or_else(|| invalid("prerequisite without id"))?;
+        // A prerequisite without a state must not have been started; the
+        // data uses this for mutually exclusive quests.
+        let state = nx
+            .int_child(prerequisite, "state")?
+            .unwrap_or(QuestState::NotStarted as i32);
+        result.push(QuestPrerequisite {
+            quest_id: small(quest_id, "quest id")?,
+            state: QuestState::from_number(state)
+                .ok_or_else(|| invalid("invalid prerequisite state"))?,
+        });
+    }
+    Ok(result)
 }
 
 fn quest_items(nx: &NxDataFile, act: &str) -> Result<Vec<QuestItem>, GameDataError> {
@@ -433,7 +450,9 @@ mod tests {
         let pet = keys(&["npc", "pet"], &["npc"], &[], &[]);
         assert_eq!(classify(&pet), Err("Check/0/pet".into()));
         let money = keys(&["npc"], &["npc"], &[], &["money"]);
-        assert_eq!(classify(&money), Err("Act/1/money".into()));
+        assert_eq!(classify(&money), Ok(()));
+        let start_money = keys(&["npc"], &["npc"], &["money"], &[]);
+        assert_eq!(classify(&start_money), Err("Act/0/money".into()));
     }
 
     #[test]
@@ -442,6 +461,8 @@ mod tests {
         assert!(classify(&auto_start).is_err());
         let auto_complete = keys(&["npc"], &[], &[], &[]);
         assert!(classify(&auto_complete).is_err());
+        let hand_in = keys(&["npc"], &["item"], &[], &[]);
+        assert_eq!(classify(&hand_in), Ok(()));
         let mut no_end = keys(&["npc"], &[], &[], &[]);
         no_end.end_check = None;
         assert!(classify(&no_end).is_err());

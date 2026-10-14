@@ -81,6 +81,11 @@ namespace ms
 		type->drop_on_bindings(cursorposition, remove);
 	}
 
+	Keyboard::Mapping Icon::get_mapping() const
+	{
+		return type->get_mapping();
+	}
+
 	void Icon::start_drag(Point<int16_t> offset)
 	{
 		cursoroffset = offset;

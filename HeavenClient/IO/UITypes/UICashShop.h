@@ -17,21 +17,25 @@
 //////////////////////////////////////////////////////////////////////////////////
 #pragma once
 
-#include <string>
-
-#include <cstdint>
-
 #include "../UIElement.h"
 
-#include "../Components/Charset.h"
-#include "../Components/Gauge.h"
 #include "../Components/Slider.h"
 
-#include "../../Data/ItemData.h"
+#include "../../Character/Inventory/InventoryType.h"
+#include "../../Data/CashCatalog.h"
+#include "../../Graphics/Animation.h"
+#include "../../Graphics/Geometry.h"
 #include "../../Graphics/Text.h"
+
+#include <array>
+#include <string>
+#include <vector>
 
 namespace ms
 {
+	// The v83 Cash Shop (UIClassic.nx CashShop.img), an 800x600 screen: the
+	// avatar preview, Cash and Item Inventories on the left, the catalog of
+	// Etc.nx Commodity.img in tabs and pages, and the Best Item column.
 	class UICashShop : public UIElement
 	{
 	public:
@@ -39,12 +43,20 @@ namespace ms
 		static constexpr bool FOCUSED = true;
 		static constexpr bool TOGGLED = false;
 
+		// An item in the account's Cash Inventory.
+		struct CashItem
+		{
+			int64_t cash_id;
+			int32_t item_id;
+			int16_t count;
+		};
+
 		UICashShop();
 
-		void draw(float inter) const;
+		void draw(float inter) const override;
 		void update() override;
 
-		Button::State button_pressed(uint16_t buttonid);
+		Button::State button_pressed(uint16_t buttonid) override;
 
 		Cursor::State send_cursor(bool clicked, Point<int16_t> cursorpos) override;
 
@@ -52,123 +64,106 @@ namespace ms
 
 		void exit_cashshop();
 
+		// The account's name and the Best Item commodities, from SET_CASH_SHOP.
+		void set_account(const std::string& account, const std::vector<int32_t>& best);
+		void set_balance(int32_t credit, int32_t points, int32_t prepaid);
+		void set_cash_items(const std::vector<CashItem>& items);
+		void add_cash_items(const std::vector<CashItem>& items);
+		void set_wish_list(const std::vector<int32_t>& sns);
+
 	private:
-		void update_items();
+		void change_tab(cash_catalog::Tab tab);
+		void change_subtab(size_t subtab);
+		void change_page(size_t page);
+		void update_list();
+		void update_page();
+		void update_cash_slider();
+		void update_item_slider();
 
-		static constexpr uint8_t MAX_ITEMS = 7u * 2u + 1u;
+		void draw_item_inventory() const;
 
-		class Item
-		{
-		public:
-			enum Label : uint8_t
-			{
-				ACTION,
-				BOMB_SALE,
-				BONUS,
-				EVENT = 4,
-				HOT,
-				LIMITED,
-				LIMITED_BRONZE,
-				LIMITED_GOLD,
-				LIMITED_SILVER,
-				LUNA_CRYSTAL,
-				MASTER = 12,
-				MUST,
-				NEW,
-				SALE = 17,
-				SPEICAL,
-				SPECIAL_PRICE,
-				TIME,
-				TODAY,
-				WEEKLY,
-				WONDER_BERRY,
-				WORLD_SALE,
-				NONE
-			};
-
-			Item(int32_t itemid, Label label, int32_t discount, uint16_t count) : label(label), discount_price(discount), count(count), data(ItemData::get(itemid)) {}
-
-			Label label;
-			int32_t discount_price;
-			uint16_t count;
-
-			void draw(const DrawArgument& args) const
-			{
-				data.get_icon(false).draw(args);
-			}
-
-			const std::string get_name() const
-			{
-				return data.get_name();
-			}
-
-			const int32_t get_price() const
-			{
-				return data.get_price();
-			}
-
-		private:
-			const ItemData& data;
-		};
+		static constexpr size_t LIST_COLUMNS = 2;
+		static constexpr size_t BEST_ITEMS = 5;
+		static constexpr size_t CASH_COLUMNS = 6;
+		static constexpr size_t CASH_ROWS = 2;
+		static constexpr size_t ITEM_COLUMNS = 4;
+		static constexpr size_t ITEM_ROWS = 3;
+		static constexpr size_t ITEM_TABS = 5;
 
 		enum Buttons : uint16_t
 		{
-			BtPreview1,
-			BtPreview2,
-			BtPreview3,
-			BtExit,
-			BtChargeNX,
-			BtChargeRefresh,
-			BtWish,
-			BtMileage,
-			BtHelp,
-			BtCoupon,
-			BtNext,
-			BtPrev,
-			BtDetailPackage,
-			BtNonGrade,
-			BtBuyAvatar,
-			BtDefaultAvatar,
-			BtInventory,
-			BtSaveAvatar,
-			BtTakeoffAvatar,
-			BtBuy
+			BT_PREVIEW1,
+			BT_PREVIEW2,
+			BT_PREVIEW3,
+			BT_BUY_AVATAR,
+			BT_DEFAULT_AVATAR,
+			BT_TAKEOFF_AVATAR,
+			BT_EX_EQUIP,
+			BT_EX_USE,
+			BT_EX_SETUP,
+			BT_EX_ETC,
+			BT_EX_TRUNK,
+			BT_SEARCH,
+			BT_CHARGE,
+			BT_CHECK,
+			BT_COUPON,
+			BT_EXIT,
+			// BUY, GIFT, then RESERVE (or REMOVE on the wish list) per cell
+			BT_LIST
 		};
 
-		Point<int16_t> BestNew_dim;
+		struct Cell
+		{
+			Text name;
+			Text price;
+		};
 
-		Sprite preview_sprites[3];
+		struct Best
+		{
+			int32_t item_id;
+			Text name;
+			Text price;
+		};
+
+		std::vector<cash_catalog::Commodity> commodities;
+		std::array<std::vector<std::string>, cash_catalog::NUM_TABS> subtab_names;
+
+		Texture background;
+		Texture preview_backgrounds[3];
+		Texture preview_frame;
+		Texture tab_bars[cash_catalog::NUM_TABS];
+		Texture item_base;
+		Texture how_to[2];
+		Texture sold_out;
+		Texture item_tab_labels[2][ITEM_TABS];
+		std::vector<Animation> labels;
+
+		cash_catalog::Tab tab;
+		size_t subtab;
+		size_t page;
 		uint8_t preview_index;
+		bool female;
 
-		Sprite menu_tabs[9];
-		uint8_t menu_index;
+		std::vector<cash_catalog::Commodity> listed;
+		std::vector<Text> subtab_texts;
+		std::vector<Text> page_texts;
+		std::array<Cell, cash_catalog::PAGE_SIZE> cells;
+		std::vector<Best> best_items;
+		std::vector<int32_t> wish_list;
 
-		Text job_label;
 		Text name_label;
+		Text account_label;
+		Text balance_labels[3];
 
-		std::vector<Sprite> promotion_sprites;
-		Point<int16_t> promotion_pos;
-		int8_t promotion_index;
+		std::vector<CashItem> cash_items;
+		Slider cash_slider;
+		size_t cash_row;
 
-		Sprite mvp_sprites[7];
-		Point<int16_t> mvp_pos;
-		uint8_t mvp_grade;
-		Gauge mvp_gauge;
-		float_t mvp_exp;
-
-		Charset charge_charset;
-
-		Sprite item_base;
-		Sprite item_line;
-		Sprite item_none;
-		std::vector<Sprite> item_labels;
-		std::vector<Item> items;
-		Text item_name[MAX_ITEMS];
-		Text item_price[MAX_ITEMS];
-		Text item_discount[MAX_ITEMS];
-		Text item_percent[MAX_ITEMS];
-
-		Slider list_slider;
-		int16_t list_offset;
+		InventoryType::Id item_tab;
+		Slider item_slider;
+		size_t item_row;
+		ColorBox item_tab_outline;
+		ColorBox item_tab_selected;
+		ColorBox item_tab_unselected;
 	};
 }
