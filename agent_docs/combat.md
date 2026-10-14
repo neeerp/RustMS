@@ -192,8 +192,16 @@ Reactor drops come from the content pack's table, keyed by reactor id, plus
 TAKE_DAMAGE from a touch (-1) is accepted up to the touching mob's
 `PADamage`, only for mobs with `bodyAttack` and without `notAttack`
 (HeavenClient's `Mob::deals_touch_damage` applies the same rule, so other
-mobs neither hurt nor knock back on touch). HP
-drops, others see DAMAGE_PLAYER, and at 0 HP the player is dead:
+mobs neither hurt nor knock back on touch). The client works out the
+damage (`Character/TouchDamage.h`) by a pre-Big Bang procedure
+([ayumilove](https://ayumilove.net/maplestory-formula/)). The mob's base
+damage is a roll from 85% of `PADamage` up to it. The player's defense is
+`1.2 STR + 0.5 DEX + 0.4 INT + 0.5 LUK` plus W.DEF from equipment, and 75%
+of it, rounded down, comes off the base. The minimum is 1. The stat part is
+hidden: the stat window shows only the equipment W.DEF. Period footage agrees.
+Snails hit level 2–4 beginners for 1, and Shrooms and Blue Snails hit a
+level 5 beginner for 1–2 (#125). The procedure has no level-difference
+term and no avoid check. HP drops, others see DAMAGE_PLAYER, and at 0 HP the player is dead:
 non-beginners lose 10% of their level's EXP; the client's respawn
 (CHANGE_MAP with a target while dead) returns them to the map's return map
 with 50 HP.

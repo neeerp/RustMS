@@ -17,6 +17,7 @@
 //////////////////////////////////////////////////////////////////////////////////
 #include "Mob.h"
 
+#include "../../Character/TouchDamage.h"
 #include "../../Util/Misc.h"
 #include "../../Util/NxFiles.h"
 
@@ -632,9 +633,9 @@ namespace ms
 		if (!deals_touch_damage())
 			return MobAttack();
 
-		int32_t minattack = static_cast<int32_t>(watk * 0.8f);
-		int32_t maxattack = watk;
-		int32_t attack = randomizer.next_int(minattack, maxattack);
+		// The base damage of the hit, a roll between 85% of the attack and all
+		// of it, rounded down.
+		int32_t attack = randomizer.next_int<int32_t>(touch_damage::min_base(watk), watk);
 
 		return MobAttack(attack, get_position(), id, oid);
 	}
