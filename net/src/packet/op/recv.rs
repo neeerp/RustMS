@@ -34,6 +34,7 @@ pub enum RecvOpcode {
     TakeDamage = 0x30,
     AllChat = 0x31,
     Whisper = 0x78,
+    MonsterBookCover = 0x39,
     TalkToNpc = 0x3A,
     NpcTalkMore = 0x3C,
     GatherItems = 0x45,

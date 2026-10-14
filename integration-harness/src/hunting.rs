@@ -40,6 +40,14 @@ pub fn pickup(object_id: i32, x: i16, y: i16) -> Packet {
     p
 }
 
+/// MONSTER_BOOK_COVER: show a card (0 for none) on the book's cover.
+pub fn choose_cover(card: i32) -> Packet {
+    let mut p = Packet::new_empty();
+    p.write_short(RecvOpcode::MonsterBookCover as i16).unwrap();
+    p.write_int(card).unwrap();
+    p
+}
+
 /// USE_ITEM of the item in a USE slot.
 pub fn use_item(slot: i16, item_id: i32) -> Packet {
     let mut p = Packet::new_empty();

@@ -2,9 +2,12 @@ use super::ClientActor;
 use crate::actor::field_drops::Drop;
 use crate::error::RuntimeError;
 use crate::message::FieldMessage;
+use game::monster_book::{self, MAX_CARD_LEVEL};
 use net::loot::{self, Loot};
+use net::packet::build::world::effect::{self, CharEffect};
 use net::packet::build::world::stat::{self, StatUpdate};
-use net::packet::build::world::{drop, inventory};
+use net::packet::build::world::{drop, inventory, monster_book as book};
+use net::FieldRequest;
 
 impl ClientActor {
     /// Roll this player's drops from a mob they helped kill and put them on
@@ -33,6 +36,11 @@ impl ClientActor {
     /// The field handed over a drop: put it in the inventory, or give it back
     /// if it doesn't fit.
     pub(super) async fn picked_up(&mut self, drop: Drop) -> Result<(), RuntimeError> {
+        if let Loot::Item { item_id, .. } = drop.loot {
+            if monster_book::is_card(item_id) {
+                return self.collect_card(item_id).await;
+            }
+        }
         let mut packets = Vec::new();
         let player = &mut self.in_game_mut()?.player;
         let (given, item_id, quantity) = match &drop.loot {
@@ -74,5 +82,29 @@ impl ClientActor {
             }
         }
         self.send_all(&mut packets).await
+    }
+
+    /// A picked-up card goes straight into the Monster Book; once its page
+    /// holds five, more copies are wasted.
+    async fn collect_card(&mut self, card: i32) -> Result<(), RuntimeError> {
+        let player = &mut self.in_game_mut()?.player;
+        let character_id = player.id();
+        let level = player.monster_book_mut().add(card);
+        let mut packets = vec![
+            book::build_set_card(level.is_none(), card, level.unwrap_or(MAX_CARD_LEVEL))?,
+            // Unlock the client's pickup.
+            stat::build_stat_update(true, &[])?,
+        ];
+        if level.is_none() {
+            return self.send_all(&mut packets).await;
+        }
+        packets.push(effect::build_own_effect(CharEffect::MonsterCard)?);
+        self.send_all(&mut packets).await?;
+        let shown = effect::build_foreign_effect(character_id, CharEffect::MonsterCard)?;
+        self.send_to_field(FieldMessage::FromClient {
+            from: self.client_id,
+            request: FieldRequest::Broadcast(shown),
+        })
+        .await
     }
 }

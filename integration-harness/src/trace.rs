@@ -69,6 +69,12 @@ pub struct Trace {
     pub added: Vec<(u8, i16, i32)>,
     /// "Quest Clear" effects (SHOW_ITEM_GAIN_INCHAT 9).
     pub cleared: usize,
+    /// "Card get" effects (SHOW_ITEM_GAIN_INCHAT 0x0D).
+    pub card_effects: usize,
+    /// MONSTER_BOOK_SET_CARD: (went into the book, card, copies).
+    pub cards: Vec<(bool, i32, i32)>,
+    /// MONSTER_BOOK_SET_COVER answers.
+    pub covers: Vec<i32>,
     /// UI images shown on the player (SHOW_ITEM_GAIN_INCHAT 0x17).
     pub images: Vec<String>,
     /// "You can't get anymore items." (SHOW_STATUS_INFO 0/-1).
@@ -117,9 +123,16 @@ impl Trace {
                     }
                 }
                 9 => self.cleared += 1,
+                0x0D => self.card_effects += 1,
                 0x17 => self.images.push(r.read_str_with_length().unwrap()),
                 _ => {}
             }
+        } else if op == SendOpcode::MonsterBookSetCard as i16 {
+            let added = r.read_byte().unwrap() == 1;
+            self.cards
+                .push((added, r.read_int().unwrap(), r.read_int().unwrap()));
+        } else if op == SendOpcode::MonsterBookSetCover as i16 {
+            self.covers.push(r.read_int().unwrap());
         } else if op == SendOpcode::StatChange as i16 {
             r.read_byte().unwrap();
             let mask = r.read_int().unwrap();

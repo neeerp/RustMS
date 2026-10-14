@@ -11,7 +11,7 @@ pub struct KeyBinding {
 pub const KEY_COUNT: i16 = 90;
 
 /// Default bindings for new characters: (key, kind, action).
-const DEFAULT_BINDINGS: [(i16, u8, i32); 26] = [
+const DEFAULT_BINDINGS: [(i16, u8, i32); 27] = [
     (59, 6, 100),
     (60, 6, 101),
     (61, 6, 102),
@@ -36,6 +36,8 @@ const DEFAULT_BINDINGS: [(i16, u8, i32); 26] = [
     // Party chat on 2 (v83 numbers keys by scan code, so 1 is key 2).
     (3, 4, 14),
     (84, 4, 15),
+    // B opens the Monster Book (HeavenClient's MONSTERBOOK 59).
+    (48, 4, 59),
     // Ctrl attacks and Z picks up (HeavenClient's ATTACK 53 and PICKUP 51).
     (29, 5, 53),
     (44, 5, 51),
@@ -87,6 +89,6 @@ mod tests {
         assert!(keymap.get(59).is_some());
         keymap.bind(59, KeyBinding { kind: 0, action: 0 });
         assert!(keymap.get(59).is_none());
-        assert_eq!(keymap.iter().count(), 25);
+        assert_eq!(keymap.iter().count(), 26);
     }
 }

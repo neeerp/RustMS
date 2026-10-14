@@ -17,6 +17,7 @@ mod load;
 pub mod login_world;
 pub mod loot;
 pub mod mobs;
+pub mod monster_book;
 mod npc_data;
 pub mod npc_scripts;
 pub mod packet;
