@@ -43,10 +43,6 @@ namespace ms
 
 		UIElement::Type get_type() const override;
 
-		bool check_name(std::string name) const;
-
-		void send_naming_result(bool nameused);
-
 	protected:
 		Button::State button_pressed(uint16_t buttonid) override;
 
@@ -75,8 +71,6 @@ namespace ms
 		void make_character();
 
 		void show_charselect();
-
-		std::string to_lower(std::string value) const;
 
 		uint8_t selected;
 		Texture title;

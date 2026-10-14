@@ -341,8 +341,6 @@ add_executable(HeavenClient
     IO/Components/Tooltip.h
     IO/Components/TwoSpriteButton.cpp
     IO/Components/TwoSpriteButton.h
-    IO/UITypes/UIAranCreation.cpp
-    IO/UITypes/UIAranCreation.h
     IO/UITypes/UIBuffList.cpp
     IO/UITypes/UIBuffList.h
     IO/UITypes/UIQuestHelper.cpp
@@ -363,19 +361,17 @@ add_executable(HeavenClient
     IO/UITypes/UIGameOption.h
     IO/UITypes/UICharInfo.cpp
     IO/UITypes/UICharInfo.h
+    IO/UITypes/UICharCreation.cpp
+    IO/UITypes/UICharCreation.h
     IO/UITypes/UICharSelect.cpp
     IO/UITypes/UICharSelect.h
     IO/UITypes/UIChatBar.cpp
     IO/UITypes/UIChatBar.h
-    IO/UITypes/UICygnusCreation.cpp
-    IO/UITypes/UICygnusCreation.h
     IO/UITypes/UIEnterText.h
     IO/UITypes/UIEquipInventory.cpp
     IO/UITypes/UIEquipInventory.h
     IO/UITypes/UIEvent.cpp
     IO/UITypes/UIEvent.h
-    IO/UITypes/UIExplorerCreation.cpp
-    IO/UITypes/UIExplorerCreation.h
     IO/UITypes/UIGender.cpp
     IO/UITypes/UIGender.h
     IO/UITypes/UIItemInventory.cpp

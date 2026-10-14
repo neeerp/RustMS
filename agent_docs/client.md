@@ -252,6 +252,21 @@ from `UI.nx`. Moved so far:
   Enter goes on to that race's creation, with no confirmation, as in v80
   footage. Escape and Back return to the character select. `aran1` is the
   same art as `aran`.
+- **Character creation** (`UICharCreation`, `Login.img/NewCharKnight`,
+  `NewChar`, and `NewCharAran`): one class for all three races, with a
+  `Layout` per race for its board and button positions. The new character
+  stands in the race's scene. A `charName` board asks for the name first. OK
+  checks it against `Etc.img/ForbiddenName` and the server. The `charSet`
+  board then has nine rows of `avatarSel` with `BtLeft` and `BtRight`
+  arrows. Their choices come from `Etc.img/MakeCharInfo`: `Info/CharMale`
+  and `CharFemale` for Explorers, `PremiumCharMale` and `PremiumCharFemale`
+  for Cygnus, and `OrientCharMale` and `OrientCharFemale` for Aran. Gender is
+  the last row. Values too wide for their row, like the Aran's Average
+  Musashi Shoes, drop to the 10 px font. Cancel on `charSet` returns to the
+  name, and Cancel on `charName` or Back returns to the race select. Once
+  the server adds the character, the scene scrolls back to the character
+  select with the new character picked. Positions are checked against v0.73
+  footage.
 
 `UIClassic.nx` is not one of NoLifeNx's standard files, so `NxFiles` opens it
 with `nl::file` instead of `nl::nx::load_all`.

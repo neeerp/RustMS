@@ -16,10 +16,8 @@
 //	along with this program.  If not, see <https://www.gnu.org/licenses/>.		//
 //////////////////////////////////////////////////////////////////////////////////
 #include "UIRaceSelect.h"
-#include "UIAranCreation.h"
+#include "UICharCreation.h"
 #include "UICharSelect.h"
-#include "UICygnusCreation.h"
-#include "UIExplorerCreation.h"
 #include "UIWorldSelect.h"
 
 #include "../LoginScene.h"
@@ -31,9 +29,6 @@
 
 #include "../../Audio/Audio.h"
 #include "../../Util/NxFiles.h"
-
-#include <algorithm>
-#include <cctype>
 
 #include <nlnx/nx.hpp>
 
@@ -137,44 +132,6 @@ namespace ms
 		return TYPE;
 	}
 
-	bool UIRaceSelect::check_name(std::string name) const
-	{
-		nl::node ForbiddenName = nl::nx::etc["ForbiddenName.img"];
-
-		for (auto forbiddenName : ForbiddenName)
-		{
-			std::string lName = to_lower(name);
-			std::string fName = to_lower(forbiddenName);
-
-			if (lName.find(fName) != std::string::npos)
-				return false;
-		}
-
-		return true;
-	}
-
-	void UIRaceSelect::send_naming_result(bool nameused)
-	{
-		switch (selected)
-		{
-		case Race::CYGNUS:
-			if (auto cygnuscreation = UI::get().get_element<UICygnusCreation>())
-				cygnuscreation->send_naming_result(nameused);
-
-			break;
-		case Race::EXPLORER:
-			if (auto explorercreation = UI::get().get_element<UIExplorerCreation>())
-				explorercreation->send_naming_result(nameused);
-
-			break;
-		case Race::ARAN:
-			if (auto arancreation = UI::get().get_element<UIAranCreation>())
-				arancreation->send_naming_result(nameused);
-
-			break;
-		}
-	}
-
 	Button::State UIRaceSelect::button_pressed(uint16_t buttonid)
 	{
 		switch (buttonid)
@@ -213,18 +170,7 @@ namespace ms
 
 		deactivate();
 
-		switch (selected)
-		{
-		case Race::CYGNUS:
-			UI::get().emplace<UICygnusCreation>();
-			break;
-		case Race::EXPLORER:
-			UI::get().emplace<UIExplorerCreation>();
-			break;
-		case Race::ARAN:
-			UI::get().emplace<UIAranCreation>();
-			break;
-		}
+		UI::get().emplace<UICharCreation>(selected);
 	}
 
 	void UIRaceSelect::show_charselect()
@@ -238,12 +184,5 @@ namespace ms
 			charselect->makeactive();
 			LoginScene::get().move_to(LoginScene::Step::CHAR_SELECT);
 		}
-	}
-
-	std::string UIRaceSelect::to_lower(std::string value) const
-	{
-		std::transform(value.begin(), value.end(), value.begin(), ::tolower);
-
-		return value;
 	}
 }
