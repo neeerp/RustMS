@@ -1,5 +1,5 @@
 //! Roger's Apple (quest 1021, scripted), using items, natural recovery,
-//! Robin's Q&A, and the Maple Administrator's tutorial skip.
+//! Robin's Q&A, the Maple Administrator's tutorial skip, and Shanks's ship.
 
 use game_data::GameData;
 use integration_harness::hunting::{use_item, walk_to};
@@ -14,6 +14,8 @@ use std::path::Path;
 use std::sync::OnceLock;
 const ROGER: i32 = 2000;
 const ROGERS_APPLE: i32 = 2010007;
+const SOUTHPERRY: i32 = 60_000;
+const SHANKS: i32 = 22000;
 
 fn maps() -> &'static GameData {
     static MAPS: OnceLock<GameData> = OnceLock::new();
@@ -182,4 +184,33 @@ async fn robin_answers_and_the_administrator_offers_a_skip() {
     step(c, &m, talk(10_000, 2007)).await;
     let t = step(c, &m, answer(1, 1, None)).await;
     assert_eq!(t.warps.last(), Some(&104_000_000));
+}
+
+#[tokio::test]
+async fn shanks_wont_sail_for_a_new_beginner() {
+    let config = load_harness_config_or_fail().await;
+    let m = config.character_name.clone();
+    let mut session = login_to_world_session(&config).await.unwrap();
+    let c = &mut session.connection;
+    let mut trace = Trace::default();
+    assert_eq!(warp(c, SOUTHPERRY, "", &mut trace).await, SOUTHPERRY);
+    barrier(c, &m, &mut trace).await;
+
+    // No: a single parting line.
+    let t = step(c, &m, talk(SOUTHPERRY, SHANKS)).await;
+    assert_eq!(t.prompts, [(SHANKS, 1)]);
+    let t = step(c, &m, answer(1, 0, None)).await;
+    assert_eq!(t.prompts, [(SHANKS, 0)]);
+    let t = step(c, &m, answer(0, 1, None)).await;
+    assert!(t.prompts.is_empty());
+
+    // Yes: the fare, then level 1 is too weak, and he stays in port.
+    step(c, &m, talk(SOUTHPERRY, SHANKS)).await;
+    let t = step(c, &m, answer(1, 1, None)).await;
+    assert_eq!(t.prompts, [(SHANKS, 0)]);
+    let t = step(c, &m, answer(0, 1, None)).await;
+    assert_eq!(t.prompts, [(SHANKS, 0)]);
+    let t = step(c, &m, answer(0, 1, None)).await;
+    assert!(t.prompts.is_empty() && t.warps.is_empty());
+    assert!(t.stat_values(stat::MESO).is_empty());
 }

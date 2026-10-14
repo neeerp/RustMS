@@ -164,7 +164,7 @@ copied into the source.
 - Client: build with `-DHEAVENCLIENT_BUILD_TESTS=ON` and run CTest
   (`quest_dialogue`, `quest_catalog`, `quest_markers`).
 - Integration: `scripted_npcs` (Roger's Apple end to end, Robin, the
-  tutorial skip, natural recovery limits), `rain_quizzes` (all seven quizzes, rewards once, prerequisites,
+  tutorial skip, Shanks refusing a new beginner, natural recovery limits), `rain_quizzes` (all seven quizzes, rewards once, prerequisites,
   wrong NPC, NPC not on the map, forfeit, relogin, channel change, isolation)
   `beginner_contact_quests` (the route through Sen's house and `nextQuest`
   results), and `quest_objectives` (1034's candy errand, Todd's hunt and

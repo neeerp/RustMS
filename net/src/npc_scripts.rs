@@ -18,7 +18,12 @@ const GREEN_APPLE: i32 = 2010009;
 const ROGER: i32 = 2000;
 const ROBIN: i32 = 2003;
 const MAPLE_ADMINISTRATOR: i32 = 2007;
+const SHANKS: i32 = 22000;
 const LITH_HARBOR: i32 = 104_000_000;
+/// Lucas's recommendation letter, which pays for Shanks's ship.
+const RECOMMENDATION_LETTER: i32 = 4031801;
+const SHIP_FARE: i32 = 150;
+const SHIP_LEVEL: u8 = 7;
 
 /// The player's answer to the current prompt.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -77,10 +82,12 @@ impl NpcScript {
         }
     }
 
-    /// The script an NPC runs when clicked (`Npc.nx info/script`).
-    pub fn for_npc(npc_id: i32) -> Option<Self> {
+    /// The script an NPC runs when clicked (`Npc.nx info/script`), as it
+    /// plays for `player`.
+    pub fn for_npc(npc_id: i32, player: &Player) -> Option<Self> {
         match npc_id {
             ROBIN => Some(robin()),
+            SHANKS => Some(shanks(player)),
             MAPLE_ADMINISTRATOR => Some(Self::new(
                 MAPLE_ADMINISTRATOR,
                 vec![Page::Ask {
@@ -262,6 +269,39 @@ fn roger_end(player: &Player) -> NpcScript {
     script
 }
 
+/// `begin7`: Shanks sails to Victoria Island for Lucas's letter or the fare.
+fn shanks(player: &Player) -> NpcScript {
+    let mut pages = vec![Page::Ask {
+        text: text(keys::SHANKS_ASK),
+        on_yes: Vec::new(),
+        on_no: Some(text(keys::SHANKS_DECLINE)),
+    }];
+    let mut on_end = Vec::new();
+    if player.inventory.count(RECOMMENDATION_LETTER) > 0 {
+        pages.extend(keys::SHANKS_LETTER.map(|key| Page::Say(text(key))));
+        on_end.push(Effect::TakeItem {
+            item_id: RECOMMENDATION_LETTER,
+            quantity: 1,
+        });
+    } else {
+        pages.push(Page::Say(text(keys::SHANKS_FARE)));
+        pages.push(Page::Say(text(if player.stats.level < SHIP_LEVEL {
+            keys::SHANKS_TOO_WEAK
+        } else if player.meso < SHIP_FARE {
+            keys::SHANKS_NO_MESOS
+        } else {
+            on_end.push(Effect::SpendMeso(SHIP_FARE));
+            keys::SHANKS_PAID
+        })));
+    }
+    if !on_end.is_empty() {
+        on_end.push(Effect::Warp(LITH_HARBOR));
+    }
+    let mut script = NpcScript::new(SHANKS, pages);
+    script.on_end = on_end;
+    script
+}
+
 /// `begin5`: Robin's questions and answers, as many topics and pages as the
 /// text has.
 fn robin() -> NpcScript {
@@ -417,7 +457,7 @@ mod tests {
 
     #[test]
     fn robin_answers_any_topic_page_by_page() {
-        let mut robin = NpcScript::for_npc(ROBIN).unwrap();
+        let mut robin = NpcScript::for_npc(ROBIN, &player(50)).unwrap();
         let Some(Prompt::Selection { text, .. }) = &robin.begin().prompt else {
             panic!("menu expected");
         };
@@ -433,13 +473,13 @@ mod tests {
             (true, false)
         );
         assert_eq!(robin.respond(ScriptInput::Next), Some(Step::default()));
-        let mut robin = NpcScript::for_npc(ROBIN).unwrap();
+        let mut robin = NpcScript::for_npc(ROBIN, &player(50)).unwrap();
         assert_eq!(robin.respond(ScriptInput::Select(18)), None);
     }
 
     #[test]
     fn the_administrator_warps_to_lith_harbor_on_yes() {
-        let mut admin = NpcScript::for_npc(MAPLE_ADMINISTRATOR).unwrap();
+        let mut admin = NpcScript::for_npc(MAPLE_ADMINISTRATOR, &player(50)).unwrap();
         assert_eq!(kind(&admin.begin()), Some(1));
         assert_eq!(
             admin.respond(ScriptInput::Yes).unwrap(),
@@ -448,12 +488,77 @@ mod tests {
                 effects: vec![Effect::Warp(LITH_HARBOR)]
             }
         );
-        let mut admin = NpcScript::for_npc(MAPLE_ADMINISTRATOR).unwrap();
+        let mut admin = NpcScript::for_npc(MAPLE_ADMINISTRATOR, &player(50)).unwrap();
         assert_eq!(
             buttons(&admin.respond(ScriptInput::No).unwrap()),
             (false, false)
         );
         assert_eq!(admin.respond(ScriptInput::Next), Some(Step::default()));
+    }
+
+    /// Shanks's pages after yes, and what reading past the last one does.
+    fn sail(player: &Player) -> (Vec<(bool, bool)>, Vec<Effect>) {
+        let mut shanks = NpcScript::for_npc(SHANKS, player).unwrap();
+        assert_eq!(kind(&shanks.begin()), Some(1));
+        let mut step = shanks.respond(ScriptInput::Yes).unwrap();
+        assert!(step.effects.is_empty());
+        let mut pages = Vec::new();
+        while step.prompt.is_some() {
+            pages.push(buttons(&step));
+            step = shanks.respond(ScriptInput::Next).unwrap();
+        }
+        (pages, step.effects)
+    }
+
+    fn traveller(level: u8, meso: i32, letter: bool) -> Player {
+        let mut player = player(50);
+        player.stats.level = level;
+        player.meso = meso;
+        if letter {
+            crate::items::give(&mut player.inventory, RECOMMENDATION_LETTER, 1).unwrap();
+        }
+        player
+    }
+
+    #[test]
+    fn shanks_sails_for_the_fare_from_level_7() {
+        let warp = Effect::Warp(LITH_HARBOR);
+        assert_eq!(
+            sail(&traveller(7, 150, false)),
+            (
+                vec![(false, true), (true, true)],
+                vec![Effect::SpendMeso(SHIP_FARE), warp.clone()]
+            )
+        );
+        // Too weak or too poor: he says so and stays.
+        assert_eq!(
+            sail(&traveller(6, 1000, false)),
+            (vec![(false, true), (true, false)], vec![])
+        );
+        assert_eq!(
+            sail(&traveller(7, 149, false)),
+            (vec![(false, true), (true, false)], vec![])
+        );
+        // Lucas's letter pays, at any level.
+        assert_eq!(
+            sail(&traveller(1, 0, true)),
+            (
+                vec![(false, true), (true, true)],
+                vec![
+                    Effect::TakeItem {
+                        item_id: RECOMMENDATION_LETTER,
+                        quantity: 1
+                    },
+                    warp
+                ]
+            )
+        );
+        let mut shanks = NpcScript::for_npc(SHANKS, &traveller(7, 150, false)).unwrap();
+        assert_eq!(
+            buttons(&shanks.respond(ScriptInput::No).unwrap()),
+            (false, false)
+        );
+        assert_eq!(shanks.respond(ScriptInput::Next), Some(Step::default()));
     }
 
     #[test]

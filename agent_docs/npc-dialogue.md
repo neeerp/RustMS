@@ -40,7 +40,9 @@ own pages), plus effects applied after the last page. The effects are
 (`ClientActor::apply_effects` in `client/npc_script.rs`) applies them to a
 copy of the player and commits any quest change together with it, or
 nothing at all; if a given item doesn't fit, the script's "inventory full"
-page shows instead. Answers are matched to the prompt they answer
+page shows instead. Scripts are built for the player as they are when the
+conversation starts; effects that take items or mesos are checked again when
+applied, and apply nothing if the player no longer has them. Answers are matched to the prompt they answer
 (`npc_scripts::input`); anything else ends the script.
 
 | Script | Trigger | Behavior |
@@ -48,6 +50,7 @@ page shows instead. Answers are matched to the prompt they answer
 | `q1021s`/`q1021e` | QUEST_ACTION 4/5 for quest 1021 | Roger sets HP to 25 and gives Roger's Apple; finishing needs full HP and no apples left, then pays 3 Apples, 3 Green Apples, 10 EXP |
 | `begin5` | Clicking Robin (2003) | 18-topic Q&A menu |
 | `tutorialSkip` | Clicking the Maple Administrator (2007), or the `tutoChatNPC` portal for accounts with a level-30 character | Yes warps to Lith Harbor (104000000) |
+| `begin7` | Clicking Shanks (22000) in Southperry | Yes sails to Lith Harbor (104000000) for Lucas's recommendation letter (4031801), at any level, or for 150 mesos from level 7; otherwise he says why not |
 
 Text comes from the [server content pack](./server-content.md) with
 placeholders. HeavenClient expands NPC text markup (`Util/NpcTextMarkup.h`:

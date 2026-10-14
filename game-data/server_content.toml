@@ -89,6 +89,46 @@ source = "Edelstein.lua/src/mapleisland/tutoChatNPC.lua"
 template = "{s1}"
 sha256 = "6425ca5895f678e542d284f333aa335f81dab3bd860222f166f74367f624bea1"
 
+[text."shanks.ask"]
+source = "Edelstein.lua/src/mapleisland/begin7.lua"
+template = "{s0}"
+sha256 = "9a393b36d1d7cfac2ce31c26a561d179f775946da48a77f62c8003759f17c44e"
+
+[text."shanks.decline"]
+source = "Edelstein.lua/src/mapleisland/begin7.lua"
+template = "{s1}"
+sha256 = "c6921906d3df844c73848b61485be804e2a0bcc1edc822a0599b54b8755682dc"
+
+[text."shanks.letter.0"]
+source = "Edelstein.lua/src/mapleisland/begin7.lua"
+template = "{s2}"
+sha256 = "9d5275fb3a159533317c0103a3151ca84a9d593cf08cae1cb6c5f218eb8e2cc2"
+
+[text."shanks.letter.1"]
+source = "Edelstein.lua/src/mapleisland/begin7.lua"
+template = "{s3}"
+sha256 = "7265b269edaba1f9f3c3da593c20198a6bd75672d89575f6905d2d86cb7df068"
+
+[text."shanks.fare"]
+source = "Edelstein.lua/src/mapleisland/begin7.lua"
+template = "{s4}"
+sha256 = "7890603caea3fc9ebfe2dcc282bc2a53587cd8745fec9d2e6657866974205bb5"
+
+[text."shanks.too_weak"]
+source = "Edelstein.lua/src/mapleisland/begin7.lua"
+template = "{s5}"
+sha256 = "5cea974e579674a788a9c9292c794e00d0932678e8aeca1e789928a4c99ddaa5"
+
+[text."shanks.no_mesos"]
+source = "Edelstein.lua/src/mapleisland/begin7.lua"
+template = "{s6}"
+sha256 = "e9db5e7c9dea653323dcf1f30388f84ab942033bde7c0a281800cf4964a6e49a"
+
+[text."shanks.paid"]
+source = "Edelstein.lua/src/mapleisland/begin7.lua"
+template = "{s7}"
+sha256 = "7a16a54688936cf927bfbea6a341e763a602c35db2ec98ab716ef6f63cb391fb"
+
 [text."robin.menu"]
 source = "Server.Scripts/src/begin5.lua"
 template = "{s0}"
