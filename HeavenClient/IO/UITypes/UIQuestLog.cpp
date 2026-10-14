@@ -63,13 +63,14 @@ namespace ms
 			return result;
 		}
 
-		// Follow the active beginner graph, avoiding old disconnected map
-		// variants that contain duplicates of these NPCs.
+		// Follow the portals from where Explorers start, avoiding the
+		// disconnected Training Camp and revamp maps that contain duplicates
+		// of these NPCs.
 		int32_t npc_map(int32_t npc)
 		{
 			static const auto locations = [] {
 				std::map<int32_t, int32_t> result;
-				std::queue<int32_t> pending; pending.push(10000);
+				std::queue<int32_t> pending; pending.push(0);
 				std::set<int32_t> visited;
 				while (!pending.empty())
 				{

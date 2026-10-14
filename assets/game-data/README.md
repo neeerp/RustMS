@@ -19,6 +19,18 @@ redistributed.
 All of these are the v83 GMS files that HeavenClient also loads (see
 `agent_docs/client.md`); the client's `nx/` directory can symlink to these.
 
+`Map.nx` and `String.nx` have one change. v83 already has the revamped Maple
+Island, so its 12 maps from the Training Camp entrance to Amherst, their
+names, and the island's world map are replaced by the original ones from GMS
+v68 (see `agent_docs/map-travel.md`). With the v83 files in place and the v68
+`Map.wz` and `String.wz` in a directory, build them with:
+
+```sh
+tools/graft-original-island.sh PATH/TO/V68
+```
+
+The script checks its inputs and outputs against pinned checksums.
+
 `SHA256SUMS` pins the exact files the server and its tests were written
 against. After copying files in, check them with:
 

@@ -99,18 +99,18 @@ mod tests {
             return;
         };
         let data = crate::GameData::load_from_nx_map(path).unwrap();
-        let forest = data.field(50000).unwrap();
+        let hunting_ground = data.field(40000).unwrap();
         assert_eq!(
-            forest
+            hunting_ground
                 .mob_spawns
                 .iter()
                 .filter(|m| m.mob_id == 100100)
                 .count(),
-            17
+            15
         );
-        let small_forest = data.field(40000).unwrap();
+        let east_entrance = data.field(30000).unwrap();
         assert_eq!(
-            small_forest
+            east_entrance
                 .mob_spawns
                 .iter()
                 .filter(|m| m.mob_id == 9300018)

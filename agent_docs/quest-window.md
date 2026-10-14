@@ -28,8 +28,8 @@ all/current levels. Current-location filtering uses NPCs actually present in
 the field. The complete window is kept within the viewport when opened/resized.
 
 Find NPC, or double-clicking the portrait, opens the world map with the destination
-marked. NPC locations are resolved by traversing the active beginner portal graph
-from `10000`, avoiding the disconnected legacy map variants. Accept/Finish opens
+marked. NPC locations are resolved by traversing the portal graph from where
+Explorers start (`0`), avoiding the disconnected maps that repeat its NPCs. Accept/Finish opens
 the quest's own conversation with that NPC when the NPC is present and its
 quest marker permits the action; the server still validates the resulting
 `QUEST_ACTION`.
