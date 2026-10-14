@@ -54,6 +54,8 @@ pub enum SendOpcode {
     DropItemFromMapObject = 0x10C,
     RemoveItemFromMap = 0x10D,
     NpcDialogue = 0x130,
+    OpenNpcShop = 0x131,
+    ConfirmShopTransaction = 0x132,
 
     KeyMap = 0x14F,
 }

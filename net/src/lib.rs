@@ -24,6 +24,7 @@ pub mod policy;
 pub mod quests;
 pub mod scripts;
 pub mod settings;
+pub mod shop;
 pub mod skills;
 
 pub use self::game_data::{get as get_game_data, spawn_position};

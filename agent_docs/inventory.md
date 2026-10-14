@@ -78,6 +78,38 @@ without sending movement, the client reports +10 HP / +3 MP if below full.
 The server accepts at most +20 HP and +10 MP per report, one report per 9 s,
 and none within 9 s of the player's last PLAYER_MOVE; others are ignored.
 
+## NPC shops
+
+Clicking an NPC that keeps a shop (`content::shops()`, from the pack's
+`shops.json`) opens it instead of its speech: `net::shop::Shop::open` builds
+the list and the client actor holds it until the player leaves (mode 3),
+talks to another NPC, or changes maps. Rows whose item our v83 data lacks are
+dropped, as are price-0 rows other than throwing stars and bullets, which a
+shop lists only to recharge.
+
+OPEN_NPC_SHOP (`0x131`): NPC id, row count, then per row the item id, price,
+three zero ints (token price, period, unused), and either a bundle size of 1
+or, for stars and bullets (`207xxxx`, `233xxxx`), the item's `unitPrice` as an
+8-byte double; then the most bought at once.
+
+NPC_SHOP_ACTION (`0x3D`) answers with the inventory change, a meso stat
+update, and CONFIRM_SHOP_TRANSACTION (`0x132`) code 0 (bought) or 8 (sold,
+recharged). Not enough mesos is 2 and a full bag 3, with nothing changed.
+A request the client can't make (wrong row or item, too many, nothing open)
+gets only an enable-actions stat update.
+
+- **Buy** (row, item, quantity): the row must hold that item at a price.
+  Stars and bullets come as one full set for the price, in a slot of their
+  own (`Inventory::add_alone`); a set is `slotMax` plus 10 per level of Claw
+  Mastery (4100000) or Gun Mastery (5200000). Anything else is 1 to
+  `slotMax` at price × quantity.
+- **Sell** (bag slot, item, quantity): the item's `price` each. A set of
+  stars or bullets goes whole, for its share of the price of a full set.
+  Cash items can't be sold, and a sale that would pass 2,147,483,647 mesos
+  is refused.
+- **Recharge** (USE slot): stars or bullets the shop lists, below a full
+  set, refilled for `unitPrice` per missing one, rounded up.
+
 ## Tests
 
 `game` unit tests cover stacking, full bags, removal order, merging,
@@ -85,4 +117,8 @@ swapping, overall/pants, and gather/sort (replaying the swaps); `net` covers the
 `inventory_moves` (integration) equips, unequips, moves, checks refusals,
 observes UPDATE_CHAR_LOOK from a second player, gathers and sorts the equip
 bag, and checks persistence; `player_drops` drops a weapon for a second player
-to pick up and drops mesos earned from snails, checking both losses are saved.
+to pick up and drops mesos earned from snails, checking both losses are saved;
+`net::shop` covers buying, selling, recharging, and their refusals, and
+`npc_shops` (integration, needs the pack's `shops.json`) opens the Henesys
+grocer, is refused for want of mesos, sells a sword, buys an arrow with it,
+and checks both are saved.

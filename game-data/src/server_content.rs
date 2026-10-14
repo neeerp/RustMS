@@ -1,5 +1,5 @@
-//! Server content that never shipped in the client data: script dialogue and
-//! mob drop tables.
+//! Server content that never shipped in the client data: script dialogue,
+//! mob drop tables, and NPC shops.
 //!
 //! Like the NX files, this content is Nexon's and stays out of the
 //! repository. It is imported into an ignored content pack
@@ -212,6 +212,54 @@ impl RewardTable {
     }
 }
 
+/// One thing an NPC shop lists, in the server data's `NpcShop.img` shape.
+/// A throwing star or bullet without a price is only recharged there.
+#[derive(Clone, Debug, Deserialize, PartialEq)]
+pub struct ShopEntry {
+    pub item: i32,
+    #[serde(default)]
+    pub price: i32,
+}
+
+/// NPC shops: the pack's `shops.json`, by NPC id. Without the pack there are
+/// no shops.
+#[derive(Debug, Default)]
+pub struct ShopTable {
+    npcs: BTreeMap<i32, Vec<ShopEntry>>,
+}
+
+impl ShopTable {
+    pub fn load(pack: Option<&Path>) -> Result<Self, GameDataError> {
+        let mut npcs = BTreeMap::new();
+        if let Some(path) = pack.map(|p| p.join("shops.json")).filter(|p| p.exists()) {
+            let file = std::fs::File::open(&path)?;
+            let raw: BTreeMap<String, Vec<ShopEntry>> =
+                serde_json::from_reader(std::io::BufReader::new(file))
+                    .map_err(|e| GameDataError::InvalidData(format!("{}: {e}", path.display())))?;
+            for (npc, entries) in raw {
+                let id = npc
+                    .parse()
+                    .map_err(|_| GameDataError::InvalidData(format!("bad shop npc id {npc}")))?;
+                npcs.insert(id, entries);
+            }
+        }
+        Ok(Self { npcs })
+    }
+
+    /// What `npc_id` sells, in the order it lists it, if it keeps a shop.
+    pub fn shop(&self, npc_id: i32) -> Option<&[ShopEntry]> {
+        self.npcs.get(&npc_id).map(Vec::as_slice)
+    }
+
+    pub fn len(&self) -> usize {
+        self.npcs.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.npcs.is_empty()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -286,5 +334,35 @@ mod tests {
             }]
         );
         assert!(table.drops(100100).is_empty());
+    }
+
+    #[test]
+    fn shops_come_from_the_pack() {
+        assert!(ShopTable::load(None).unwrap().is_empty());
+
+        let dir = std::env::temp_dir().join(format!("rustms-shops-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::write(
+            dir.join("shops.json"),
+            r#"{"1011100": [{"item": 2000000, "price": 50, "stock": 100000},
+                            {"item": 2070001, "stock": 100000, "unitPrice": 0.4}]}"#,
+        )
+        .unwrap();
+        let shops = ShopTable::load(Some(&dir)).unwrap();
+        assert_eq!(
+            shops.shop(1011100).unwrap(),
+            [
+                ShopEntry {
+                    item: 2000000,
+                    price: 50
+                },
+                ShopEntry {
+                    item: 2070001,
+                    price: 0
+                }
+            ]
+        );
+        assert!(shops.shop(11000).is_none());
+        std::fs::remove_dir_all(dir).unwrap();
     }
 }

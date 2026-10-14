@@ -22,6 +22,9 @@ impl ClientActor {
         if let Some(script) = net::npc_scripts::NpcScript::for_npc(npc_id) {
             return self.start_script(script).await;
         }
+        if self.open_shop(npc_id).await? {
+            return Ok(());
+        }
         let data =
             net::get_npc_dialogue_data().map_err(|e| RuntimeError::Handler(e.to_string()))?;
         if let Some(c) = data.dialogue(npc_id).and_then(Conversation::start) {

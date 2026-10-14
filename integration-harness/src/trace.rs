@@ -78,6 +78,10 @@ pub struct Trace {
     pub prompts: Vec<(i32, u8)>,
     /// Maps warped to.
     pub warps: Vec<i32>,
+    /// NPC shops opened: the NPC and (item id, price) per row.
+    pub shops: Vec<(i32, Vec<(i32, i32)>)>,
+    /// CONFIRM_SHOP_TRANSACTION codes.
+    pub shop_results: Vec<u8>,
     /// GIVE_BUFF: (skill id, value, duration in ms).
     pub buffs: Vec<(i32, i16, i32)>,
     /// CANCEL_BUFF: the second mask of each.
@@ -179,6 +183,26 @@ impl Trace {
             r.read_byte().unwrap();
             let npc = r.read_int().unwrap();
             self.prompts.push((npc, r.read_byte().unwrap()));
+        } else if op == SendOpcode::OpenNpcShop as i16 {
+            let npc = r.read_int().unwrap();
+            let rows = (0..r.read_short().unwrap())
+                .map(|_| {
+                    let (item, price) = (r.read_int().unwrap(), r.read_int().unwrap());
+                    for _ in 0..3 {
+                        r.read_int().unwrap();
+                    }
+                    if matches!(item / 10_000, 207 | 233) {
+                        r.read_long().unwrap(); // recharge rate
+                    } else {
+                        r.read_short().unwrap(); // bundle size
+                    }
+                    r.read_short().unwrap();
+                    (item, price)
+                })
+                .collect();
+            self.shops.push((npc, rows));
+        } else if op == SendOpcode::ConfirmShopTransaction as i16 {
+            self.shop_results.push(r.read_byte().unwrap());
         } else if op == SendOpcode::GiveBuff as i16 {
             r.read_long().unwrap();
             r.read_long().unwrap();

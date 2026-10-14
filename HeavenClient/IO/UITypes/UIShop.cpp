@@ -470,16 +470,9 @@ namespace ms
 			changeselltab(type);
 	}
 
-	void UIShop::add_item(int32_t id, int32_t price, int32_t pitch, int32_t time, int16_t buyable)
+	void UIShop::add_item(const shop_list::Row &row)
 	{
-		add_rechargable(id, price, pitch, time, 0, buyable);
-	}
-
-	void UIShop::add_rechargable(int32_t id, int32_t price, int32_t pitch, int32_t time, int16_t chargeprice,
-								 int16_t buyable)
-	{
-		auto buyitem = BuyItem(meso, id, price, pitch, time, chargeprice, buyable);
-		buystate.add(buyitem);
+		buystate.add(BuyItem(meso, row));
 
 		buyslider.setrows(5, buystate.lastslot);
 	}
@@ -537,13 +530,12 @@ namespace ms
 		NpcShopActionPacket().dispatch();
 	}
 
-	UIShop::BuyItem::BuyItem(Texture cur, int32_t i, int32_t p, int32_t pt, int32_t t, int16_t cp, int16_t b)
-			: currency(cur), id(i), price(p), pitch(pt), time(t), chargeprice(cp), buyable(b)
+	UIShop::BuyItem::BuyItem(Texture cur, const shop_list::Row &r) : currency(cur), row(r)
 	{
 		namelabel = Text(Text::Font::A11M, Text::Alignment::LEFT, Color::Name::MINESHAFT);
 		pricelabel = Text(Text::Font::A11M, Text::Alignment::LEFT, Color::Name::MINESHAFT);
 
-		const ItemData &item = ItemData::get(id);
+		const ItemData &item = ItemData::get(row.itemid);
 
 		if (item.is_valid())
 		{
@@ -551,7 +543,7 @@ namespace ms
 			namelabel.change_text(item.get_name());
 		}
 
-		std::string mesostr = std::to_string(price);
+		std::string mesostr = std::to_string(row.price);
 		string_format::split_number(mesostr);
 		pricelabel.change_text(mesostr + "meso");
 	}
@@ -564,14 +556,19 @@ namespace ms
 		pricelabel.draw(pos + Point<int16_t>(55, 24));
 	}
 
+	int16_t UIShop::BuyItem::get_index() const
+	{
+		return row.index;
+	}
+
 	int32_t UIShop::BuyItem::get_id() const
 	{
-		return id;
+		return row.itemid;
 	}
 
 	int16_t UIShop::BuyItem::get_buyable() const
 	{
-		return buyable;
+		return row.buyable;
 	}
 
 	UIShop::SellItem::SellItem(int32_t item_id, int16_t count, int16_t s, bool sc, Texture cur)
@@ -681,10 +678,11 @@ namespace ms
 
 		const BuyItem &item = items[selection];
 		int16_t buyable = item.get_buyable();
-		int16_t slot = selection;
+		int16_t slot = item.get_index();
 		int32_t itemid = item.get_id();
 
-		if (buyable > 1)
+		// Stars and bullets come one full set at a time
+		if (buyable > 1 && !shop_list::is_rechargeable(itemid))
 		{
 			constexpr const char *question = "How many are you willing to buy?";
 
@@ -798,7 +796,20 @@ namespace ms
 		int16_t sellable = item.get_sellable();
 		int16_t slot = item.get_slot();
 
-		if (sellable > 1)
+		// A set of stars or bullets is sold whole
+		if (shop_list::is_rechargeable(itemid))
+		{
+			auto ondecide = [itemid, slot, sellable](bool yes)
+			{
+				if (yes)
+					NpcShopActionPacket(slot, itemid, sellable, false).dispatch();
+			};
+
+			if (skip_confirmation)
+				ondecide(true);
+			else
+				UI::get().emplace<UIYesNo>("Are you sure you want to sell it?", ondecide);
+		} else if (sellable > 1)
 		{
 			constexpr const char *question = "How many are you willing to sell?";
 

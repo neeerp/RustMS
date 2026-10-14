@@ -26,6 +26,8 @@
 
 #include "../Character/Look/CharLook.h"
 
+#include "../Net/Handlers/ShopList.h"
+
 namespace ms
 {
 	class UIShop : public UIDragElement<PosSHOP>
@@ -55,10 +57,7 @@ namespace ms
 
 		void reset(int32_t npcid);
 
-		void add_item(int32_t id, int32_t price, int32_t pitch, int32_t time, int16_t buyable);
-
-		void
-		add_rechargable(int32_t id, int32_t price, int32_t pitch, int32_t time, int16_t chargeprice, int16_t buyable);
+		void add_item(const shop_list::Row &row);
 
 		void modify(InventoryType::Id type);
 
@@ -137,9 +136,11 @@ namespace ms
 		class BuyItem
 		{
 		public:
-			BuyItem(Texture cur, int32_t i, int32_t p, int32_t pt, int32_t t, int16_t cp, int16_t b);
+			BuyItem(Texture cur, const shop_list::Row &row);
 
 			void draw(Point<int16_t> position) const;
+
+			int16_t get_index() const;
 
 			int32_t get_id() const;
 
@@ -148,12 +149,7 @@ namespace ms
 		private:
 			Texture icon;
 			Texture currency;
-			int32_t id;
-			int32_t price;
-			int32_t pitch;
-			int32_t time;
-			int16_t chargeprice;
-			int16_t buyable;
+			shop_list::Row row;
 			Text namelabel;
 			Text pricelabel;
 		};
