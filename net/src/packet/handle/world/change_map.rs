@@ -16,9 +16,13 @@ pub struct ChangeMapHandler;
 
 impl WorldHandler for ChangeMapHandler {
     fn handle(&self, packet: &mut Packet, ctx: &mut WorldContext) -> WorldResult {
+        // Leaving the Cash Shop sends the opcode alone.
+        if packet.bytes.len() == 2 {
+            return Ok(HandlerResult::empty().with(WorldAction::LeaveCashShop));
+        }
         let mut reader = Cursor::new(&packet.bytes);
         reader.read_short()?;
-        reader.read_byte()?; // 1 when returning from the cash shop
+        reader.read_byte()?; // 1 when the player died
         let target = reader.read_int()?;
         let portal_name = reader.read_str_with_length()?;
 
@@ -130,6 +134,7 @@ fn direct_destination(
 mod tests {
     use super::*;
     use game::{CharacterStats, Inventory, Keymap, QuestLog, SkillBook};
+    use packet::io::write::PktWrite;
 
     fn player(hp: i16, gm_level: i16) -> Player {
         let mut player = Player::new(
@@ -193,5 +198,25 @@ mod tests {
         assert_eq!(destination, 100000000);
         assert_eq!(p.stats.hp, RESPAWN_HP);
         assert!(p.is_dirty());
+    }
+
+    #[test]
+    fn an_empty_change_map_leaves_the_cash_shop() {
+        let mut p = player(50, 0);
+        let mut packet = Packet::new_empty();
+        packet
+            .write_short(crate::packet::op::RecvOpcode::ChangeMap as i16)
+            .unwrap();
+        let mut ctx = WorldContext {
+            client_id: 1,
+            channel_id: 0,
+            player: &mut p,
+        };
+        let result = ChangeMapHandler.handle(&mut packet, &mut ctx).unwrap();
+        assert!(matches!(
+            result.actions.as_slice(),
+            [WorldAction::LeaveCashShop]
+        ));
+        assert_eq!(p.stats.map_id, 100000000);
     }
 }

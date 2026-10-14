@@ -18,6 +18,7 @@
 #pragma once
 
 #include <string>
+#include <vector>
 
 #include "../OutPacket.h"
 
@@ -35,6 +36,30 @@ namespace ms
 		}
 	};
 
+	// Sends a line to the player's party or buddies. The server decides who
+	// hears it, but the client lists the recipients.
+	// Opcode: MULTICHAT(119)
+	class MultiChatPacket : public OutPacket
+	{
+	public:
+		enum Mode : int8_t
+		{
+			BUDDY = 0,
+			PARTY = 1
+		};
+
+		MultiChatPacket(Mode mode, const std::vector<int32_t>& recipients, const std::string& message) : OutPacket(OutPacket::Opcode::MULTICHAT)
+		{
+			write_byte(mode);
+			write_byte(static_cast<int8_t>(recipients.size()));
+
+			for (int32_t cid : recipients)
+				write_int(cid);
+
+			write_string(message);
+		}
+	};
+
 	// Packet which sends a whisper/private message to another player.
 	// Opcode: WHISPER(120)
 	class WhisperPacket : public OutPacket
@@ -47,6 +72,83 @@ namespace ms
 			write_byte(REQUEST_MODE);
 			write_string(target);
 			write_string(message);
+		}
+	};
+
+	// Asks where a character is (/find)
+	// Opcode: WHISPER(120)
+	class FindPacket : public OutPacket
+	{
+	public:
+		static constexpr int8_t REQUEST_MODE = 0x05;
+
+		FindPacket(const std::string& target) : OutPacket(OutPacket::Opcode::WHISPER)
+		{
+			write_byte(REQUEST_MODE);
+			write_string(target);
+		}
+	};
+	// Maple Messenger requests. Every one starts with a mode byte.
+	// Opcode: MESSENGER(122)
+	class MessengerPacket : public OutPacket
+	{
+	protected:
+		enum Mode : int8_t
+		{
+			OPEN = 0x00,
+			LEAVE = 0x02,
+			INVITE = 0x03,
+			DECLINE = 0x05,
+			CHAT = 0x06
+		};
+
+		MessengerPacket(Mode mode) : OutPacket(OutPacket::Opcode::MESSENGER)
+		{
+			write_byte(mode);
+		}
+	};
+
+	// Opens a new messenger (id 0) or joins the one we were invited to.
+	class MessengerOpenPacket : public MessengerPacket
+	{
+	public:
+		MessengerOpenPacket(int32_t messenger_id) : MessengerPacket(Mode::OPEN)
+		{
+			write_int(messenger_id);
+		}
+	};
+
+	class MessengerLeavePacket : public MessengerPacket
+	{
+	public:
+		MessengerLeavePacket() : MessengerPacket(Mode::LEAVE) {}
+	};
+
+	class MessengerInvitePacket : public MessengerPacket
+	{
+	public:
+		MessengerInvitePacket(const std::string& target) : MessengerPacket(Mode::INVITE)
+		{
+			write_string(target);
+		}
+	};
+
+	class MessengerDeclinePacket : public MessengerPacket
+	{
+	public:
+		MessengerDeclinePacket(const std::string& inviter) : MessengerPacket(Mode::DECLINE)
+		{
+			write_string(inviter);
+		}
+	};
+
+	// A chat line, formatted as "name : text".
+	class MessengerChatPacket : public MessengerPacket
+	{
+	public:
+		MessengerChatPacket(const std::string& line) : MessengerPacket(Mode::CHAT)
+		{
+			write_string(line);
 		}
 	};
 }

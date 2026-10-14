@@ -62,6 +62,9 @@ namespace ms
 		// Returns the current position.
 		Point<int16_t> get_position() const;
 
+		// Returns the position on screen, between the last and current update.
+		Point<int16_t> get_absolute(double viewx, double viewy, float alpha) const;
+
 	protected:
 		MapObject(int32_t oid, Point<int16_t> position = {});
 

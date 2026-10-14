@@ -4,7 +4,7 @@
 //!
 //! ```text
 //!   ClientActor ──► FieldActor        (its current map: chat, movement, NPCs)
-//!   ClientActor ──► WorldDirectory    (name lookup: whisper, world broadcast)
+//!   ClientActor ──► WorldDirectory    (whispers, finds, broadcast, parties, messenger)
 //!   FieldActor / WorldDirectory ──► ClientHandle (try_send, never awaited)
 //! ```
 //!
@@ -12,8 +12,10 @@
 //! backpressure), but fields and the directory never await a client: a client
 //! whose queue is full is kicked instead. That makes wait cycles impossible.
 
-use game::FieldAvatar;
-use net::{BroadcastScope, ClientId, FieldRequest, WhisperDelivery};
+use game::{AvatarLook, FieldAvatar, Player};
+use net::{
+    BroadcastScope, ClientId, FieldRequest, MessengerRequest, PartyRequest, WhisperDelivery,
+};
 use packet::Packet;
 use tokio::sync::mpsc;
 use tokio::sync::mpsc::error::TrySendError;
@@ -50,11 +52,25 @@ pub enum ServerMessage {
         field: FieldKey,
         request_id: u64,
     },
-    /// A mob this player helped kill; `exp` is their share.
+    /// A mob this player or their party killed; `exp` is their share.
     MobKilled {
         mob_id: i32,
         object_id: i32,
         exp: i32,
+        party_bonus: i32,
+        /// They hit it themselves, so they roll its loot.
+        attacked: bool,
+        x: i16,
+        y: i16,
+    },
+    /// The player joined or left a party.
+    PartyChanged {
+        party_id: Option<i32>,
+    },
+    /// This player broke a reactor; its loot drops for them.
+    ReactorBroken {
+        reactor_id: i32,
+        object_id: i32,
         x: i16,
         y: i16,
     },
@@ -66,6 +82,15 @@ pub enum ServerMessage {
     QuestNpcChecked {
         request_id: u64,
         nearby: bool,
+    },
+    /// Someone on this channel looked for this player; answer with the map.
+    Locate {
+        reply_to: ClientHandle,
+    },
+    /// `requester` (maybe this player) double-clicked this player; send them
+    /// CHAR_INFO.
+    CharInfoRequested {
+        requester: ClientHandle,
     },
     SendPacket(Packet),
 }
@@ -129,6 +154,12 @@ pub enum FieldMessage {
     Join {
         handle: ClientHandle,
         avatar: FieldAvatar,
+        party: Option<i32>,
+    },
+    /// The occupant joined or left a party, which decides who shares EXP.
+    SetParty {
+        client_id: ClientId,
+        party: Option<i32>,
     },
     Leave {
         client_id: ClientId,
@@ -187,25 +218,95 @@ pub struct FieldHandle {
     pub tx: mpsc::Sender<FieldMessage>,
 }
 
+/// What the world directory knows of an online character: enough for party
+/// windows and HP bars.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Presence {
+    pub name: String,
+    pub job: i16,
+    pub level: u8,
+    pub map_id: i32,
+    pub hp: i16,
+    pub max_hp: i16,
+}
+
+impl Presence {
+    pub fn of(player: &Player) -> Self {
+        let stats = &player.stats;
+        Self {
+            name: stats.name.clone(),
+            job: stats.job,
+            level: stats.level,
+            map_id: stats.map_id,
+            hp: stats.hp,
+            max_hp: stats.max_hp,
+        }
+    }
+}
+
+/// A buddy on someone's list, for the directory to fill in their channel.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ListedBuddy {
+    pub id: ClientId,
+    pub name: String,
+    pub group: String,
+    /// They list the owner too, so the owner may see their channel.
+    pub mutual: bool,
+}
+
 /// Messages to the world directory.
 #[derive(Debug)]
 pub enum DirectoryMessage {
     Register {
         handle: ClientHandle,
-        name: String,
+        presence: Presence,
         channel_id: u8,
+    },
+    /// The character's map, level, job, or HP changed.
+    Presence {
+        client_id: ClientId,
+        presence: Presence,
+    },
+    Party {
+        from: ClientId,
+        request: PartyRequest,
     },
     Unregister {
         client_id: ClientId,
         connection_id: u64,
+        /// The client is moving to another channel and will register again.
+        changing_channel: bool,
     },
     Whisper {
         from: ClientId,
         delivery: WhisperDelivery,
     },
+    Find {
+        from: ClientId,
+        target_name: String,
+    },
     Broadcast {
         from: ClientId,
         scope: BroadcastScope,
         packet: Packet,
+    },
+    /// Send `owner` their buddy list with the channels of those online.
+    BuddyList {
+        owner: ClientId,
+        buddies: Vec<ListedBuddy>,
+    },
+    /// Send a packet to whichever of these characters are online.
+    Deliver {
+        to: Vec<ClientId>,
+        packet: Packet,
+    },
+    Messenger {
+        from: ClientId,
+        request: MessengerRequest,
+    },
+    /// The client's worn equipment changed.
+    LookChanged {
+        client_id: ClientId,
+        look: AvatarLook,
     },
 }

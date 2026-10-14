@@ -18,6 +18,7 @@
 #include "Mob.h"
 
 #include "../../Util/Misc.h"
+#include "../../Util/NxFiles.h"
 
 #include "../../Net/Packets/GameplayPackets.h"
 
@@ -104,6 +105,7 @@ namespace ms
 
 		namelabel = Text(Text::Font::A13M, Text::Alignment::CENTER, Color::Name::WHITE, Text::Background::NAMETAG,
 						 name);
+		set_level_tag(0);
 
 		if (newspawn)
 		{
@@ -348,6 +350,19 @@ namespace ms
 			{
 				namelabel.draw(absp);
 
+				int16_t width = 0;
+
+				for (const Texture& part : leveltag)
+					width += part.width();
+
+				Point<int16_t> tagpos = absp + Point<int16_t>(-namelabel.width() / 2 - width - 3, 5);
+
+				for (const Texture& part : leveltag)
+				{
+					part.draw(tagpos);
+					tagpos.shift_x(part.width());
+				}
+
 				if (!dying && hppercent > 0)
 					hpbar.draw(headpos, hppercent);
 			}
@@ -417,6 +432,20 @@ namespace ms
 		}
 	}
 
+	void Mob::set_level_tag(uint8_t set)
+	{
+		nl::node src = NxFiles::ui_classic["Basic.img"]["ShowLevel"];
+		nl::node digits = src[std::to_string(set)];
+
+		leveltag.clear();
+		leveltag.emplace_back(digits["left"]);
+
+		for (char digit : std::to_string(level))
+			leveltag.emplace_back(digits[std::string(1, digit)]);
+
+		leveltag.emplace_back(src["Bracket"]["right"]);
+	}
+
 	void Mob::expect_hits(int32_t count)
 	{
 		pending_hits = static_cast<uint16_t>(std::clamp<int32_t>(pending_hits + count, 0, UINT16_MAX));
@@ -429,9 +458,15 @@ namespace ms
 			int16_t delta = playerlevel - level;
 
 			if (delta > 9)
+			{
 				namelabel.change_color(Color::Name::YELLOW);
+				set_level_tag(1);
+			}
 			else if (delta < -9)
+			{
 				namelabel.change_color(Color::Name::RED);
+				set_level_tag(2);
+			}
 		}
 
 		if (percent > 100)

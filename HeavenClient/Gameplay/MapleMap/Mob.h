@@ -33,6 +33,7 @@
 #include "../../Audio/Audio.h"
 #include "../../Graphics/EffectLayer.h"
 #include "../../Graphics/Geometry.h"
+#include "../../Graphics/Texture.h"
 #include "../../Util/Randomizer.h"
 #include "../../Util/TimedBool.h"
 
@@ -162,6 +163,10 @@ namespace ms
 		// Return the current 'head' position
 		Point<int16_t> get_head_position(Point<int16_t> position) const;
 
+		// Load the level tag in one of ShowLevel's sets: 0 white, 1 yellow,
+		// 2 red.
+		void set_level_tag(uint8_t set);
+
 		std::map<Stance, Animation> animations;
 		std::string name;
 		Sound hitsound;
@@ -186,6 +191,8 @@ namespace ms
 
 		EffectLayer effects;
 		Text namelabel;
+		// "Lv. N", drawn left of the name tag (Basic.img/ShowLevel).
+		std::vector<Texture> leveltag;
 		MobHpBar hpbar;
 		Randomizer randomizer;
 

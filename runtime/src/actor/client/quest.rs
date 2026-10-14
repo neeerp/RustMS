@@ -3,7 +3,7 @@ use crate::{db::spawn_db, error::RuntimeError, message::FieldMessage};
 use game::{Player, QuestRecord, QuestState, QuestStatus};
 use net::npc_scripts::NpcScript;
 use net::packet::build::world::effect::{self, CharEffect};
-use net::packet::build::world::{inventory, quest, stat};
+use net::packet::build::world::{drop, inventory, quest, stat};
 use net::quests::{self, QuestActionKind, QuestItem, QuestRejection, QuestRequest, QuestTemplate};
 use net::FieldRequest;
 use packet::Packet;
@@ -149,6 +149,14 @@ impl ClientActor {
         let mut packets = Vec::new();
         if !self.quest_items(&template.end_rewards, &mut next, &mut packets)? {
             return self.send_all(&mut packets).await;
+        }
+        if template.money != 0 {
+            next.meso = next.meso.saturating_add(template.money).max(0);
+            packets.push(stat::build_stat_update(
+                false,
+                &[stat::StatUpdate::Meso(next.meso)],
+            )?);
+            packets.push(drop::build_meso_gain(template.money)?);
         }
         if template.exp > 0 {
             gain_exp(&mut next, template.exp, &mut packets)?;
@@ -329,8 +337,18 @@ pub(super) fn gain_exp(
     amount: i32,
     packets: &mut Vec<Packet>,
 ) -> Result<(), RuntimeError> {
-    let levelled = next.gain_exp(amount) > 0;
+    gain_exp_with_bonus(next, amount, 0, packets)
+}
+
+/// `gain_exp` plus a party bonus the message shows separately.
+pub(super) fn gain_exp_with_bonus(
+    next: &mut Player,
+    amount: i32,
+    party_bonus: i32,
+    packets: &mut Vec<Packet>,
+) -> Result<(), RuntimeError> {
+    let levelled = next.gain_exp(amount.saturating_add(party_bonus)) > 0;
     packets.push(stat::build_exp_stats(&next.stats, levelled)?);
-    packets.push(quest::build_gain_exp(amount)?);
+    packets.push(quest::build_gain_exp(amount, party_bonus)?);
     Ok(())
 }

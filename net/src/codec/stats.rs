@@ -45,7 +45,7 @@ pub fn encode_character_stats(
 
 /// Names are a fixed 13-byte, NUL-padded field. Longer names are rejected
 /// rather than silently truncated or underflowing the padding.
-fn write_padded_name(packet: &mut Packet, name: &str) -> Result<(), NetworkError> {
+pub(crate) fn write_padded_name(packet: &mut Packet, name: &str) -> Result<(), NetworkError> {
     let bytes = name.as_bytes();
     if bytes.len() > NAME_FIELD_LEN {
         return Err(NetworkError::PacketHandlerError(

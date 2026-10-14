@@ -104,6 +104,12 @@ namespace ms
 				"	{"
 				"		gl_FragColor = vec4(1, 1, 1, texture2D(texture, texpos / atlassize).r) * colormod;"
 				"	}"
+				"	else if (colormod.r < 0.0)"
+				"	{"
+				"		vec4 texel = texture2D(texture, texpos / atlassize);"
+				"		float grey = dot(texel.rgb, vec3(0.299, 0.587, 0.114));"
+				"		gl_FragColor = vec4(grey, grey, grey, texel.a) * vec4(-colormod.r, colormod.gba);"
+				"	}"
 				"	else"
 				"	{"
 				"		gl_FragColor = texture2D(texture, texpos / atlassize) * colormod;"
@@ -680,7 +686,9 @@ namespace ms
 						switch (text[first + 1])
 						{
 							case 'k':
-								color = Color::Name::DARKGREY;
+								// Back to the text's own colour: dark grey in NPC
+								// dialogue, black in quest descriptions.
+								color = Color::Name::NUM_COLORS;
 								break;
 							case 'b':
 								color = Color::Name::BLUE;
@@ -711,7 +719,9 @@ namespace ms
 
 		if (!linebreak)
 		{
-			for (size_t i = first; i < last; i++)
+			// Markup such as #k takes no room, so it can't push a word onto
+			// the next line (leaving the space after it at the line's start).
+			for (size_t i = first + skip; i < last; i++)
 			{
 				wordwidth += advance_of(text, i);
 
