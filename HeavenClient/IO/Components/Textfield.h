@@ -61,6 +61,9 @@ namespace ms
 
 		void set_cryptchar(int8_t character);
 
+		// Wrap the text at width pixels instead of keeping it on one line.
+		void set_wrap(uint16_t width);
+
 		void set_enter_callback(std::function<void(std::string)> onreturn);
 
 		void set_key_callback(KeyAction::Id key, std::function<void(void)> action);
@@ -80,7 +83,13 @@ namespace ms
 
 		bool belowlimit() const;
 
+		Point<int16_t> marker_offset() const;
+
 		Text textlabel;
+		Text::Font font;
+		Text::Alignment alignment;
+		Color::Name color;
+		uint16_t wrapwidth = 0;
 		std::string text;
 		Text marker;
 		bool showmarker;

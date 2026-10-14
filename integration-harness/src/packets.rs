@@ -461,6 +461,33 @@ pub fn build_cash_shop_buy(cash_type: i32, sn: i32) -> Result<Packet, String> {
     Ok(packet)
 }
 
+/// CASHSHOP_OPERATION gift: the birthday code, the serial number, and the
+/// receiver's name and message.
+pub fn build_cash_shop_gift(
+    birthday: i32,
+    sn: i32,
+    to: &str,
+    message: &str,
+) -> Result<Packet, String> {
+    let mut packet = packet_with_opcode(RecvOpcode::CashShopOperation as i16);
+    packet
+        .write_byte(0x04)
+        .map_err(|e| format!("failed to write gift action: {e}"))?;
+    packet
+        .write_int(birthday)
+        .map_err(|e| format!("failed to write gift birthday code: {e}"))?;
+    packet
+        .write_int(sn)
+        .map_err(|e| format!("failed to write gift serial number: {e}"))?;
+    packet
+        .write_str_with_length(to)
+        .map_err(|e| format!("failed to write gift receiver: {e}"))?;
+    packet
+        .write_str_with_length(message)
+        .map_err(|e| format!("failed to write gift message: {e}"))?;
+    Ok(packet)
+}
+
 /// CASHSHOP_OPERATION wish list: ten serial numbers, 0 for an empty slot.
 pub fn build_cash_shop_wish_list(sns: &[i32; 10]) -> Result<Packet, String> {
     let mut packet = packet_with_opcode(RecvOpcode::CashShopOperation as i16);

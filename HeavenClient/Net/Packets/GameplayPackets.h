@@ -94,6 +94,22 @@ namespace ms
 	};
 
 	// Opcode: CASHSHOP_OPERATION(229)
+	class GiftCashItemPacket : public OutPacket
+	{
+	public:
+		// Send the commodity sn to the character named to. The birthday code
+		// is the date as YYYYMMDD.
+		GiftCashItemPacket(int32_t birthday, int32_t sn, const std::string& to, const std::string& message) : OutPacket(OutPacket::Opcode::CASHSHOP_OPERATION)
+		{
+			write_byte(4);
+			write_int(birthday);
+			write_int(sn);
+			write_string(to);
+			write_string(message);
+		}
+	};
+
+	// Opcode: CASHSHOP_OPERATION(229)
 	class SetWishListPacket : public OutPacket
 	{
 	public:

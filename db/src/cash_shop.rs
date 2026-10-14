@@ -2,7 +2,8 @@
 //! character's wish list.
 
 use crate::player::write_player;
-use crate::schema::{accounts, cash_items, wish_lists};
+use crate::schema::{accounts, cash_items, characters, wish_lists};
+use diesel::pg::PgConnection;
 use diesel::prelude::*;
 use game::Player;
 use std::time::SystemTime;
@@ -33,6 +34,8 @@ pub struct CashItem {
     pub quantity: i16,
     pub gift_from: String,
     pub expires_at: Option<SystemTime>,
+    /// A gift's message, until the account has been shown the gift.
+    pub gift_message: Option<String>,
 }
 
 #[derive(Clone, Debug, Insertable)]
@@ -45,22 +48,60 @@ pub struct NewCashItem {
     pub expires_at: Option<SystemTime>,
 }
 
-pub fn balance(account_id: i32) -> crate::Result<Balance> {
-    Ok(accounts::table
-        .find(account_id)
-        .select((
-            accounts::nx_credit,
-            accounts::maple_points,
-            accounts::nx_prepaid,
-        ))
-        .first(&mut crate::connection()?)?)
+/// A gift for another account's Cash Inventory.
+#[derive(Clone, Debug, Insertable)]
+#[diesel(table_name = cash_items)]
+pub struct NewGift {
+    pub account_id: i32,
+    pub item_id: i32,
+    pub sn: i32,
+    pub quantity: i16,
+    pub expires_at: Option<SystemTime>,
+    pub gift_from: String,
+    pub gift_message: Option<String>,
 }
 
-pub fn cash_items(account_id: i32) -> crate::Result<Vec<CashItem>> {
-    Ok(cash_items::table
-        .filter(cash_items::account_id.eq(account_id))
-        .order(cash_items::id)
-        .load(&mut crate::connection()?)?)
+/// The character a gift is for.
+#[derive(Clone, Debug, PartialEq, Eq, Queryable)]
+pub struct GiftReceiver {
+    pub account_id: i32,
+    pub name: String,
+    pub gender: i16,
+}
+
+pub fn balance(account_id: i32) -> crate::Result<Balance> {
+    Ok(balance_of(&mut *crate::connection()?, account_id)?)
+}
+
+/// The account's Cash Inventory, and apart from it the gifts it hasn't been
+/// shown yet, which from now on count as shown.
+pub fn open_cash_inventory(account_id: i32) -> crate::Result<(Vec<CashItem>, Vec<CashItem>)> {
+    let mut conn = crate::connection()?;
+    Ok(conn.transaction(|conn| -> diesel::QueryResult<_> {
+        let items: Vec<CashItem> = cash_items::table
+            .filter(cash_items::account_id.eq(account_id))
+            .order(cash_items::id)
+            .load(conn)?;
+        let (gifts, items): (Vec<_>, Vec<_>) = items
+            .into_iter()
+            .partition(|item| item.gift_message.is_some());
+        let ids: Vec<i64> = gifts.iter().map(|gift| gift.id).collect();
+        diesel::update(cash_items::table.filter(cash_items::id.eq_any(&ids)))
+            .set(cash_items::gift_message.eq(None::<String>))
+            .execute(conn)?;
+        Ok((items, gifts))
+    })?)
+}
+
+diesel::define_sql_function!(fn lower(x: diesel::sql_types::Text) -> diesel::sql_types::Text);
+
+/// The character named `name`, ignoring case, that a gift would go to.
+pub fn gift_receiver(name: &str) -> crate::Result<Option<GiftReceiver>> {
+    Ok(characters::table
+        .filter(lower(characters::name).eq(lower(name)))
+        .select((characters::accountid, characters::name, characters::gender))
+        .first(&mut crate::connection()?)
+        .optional()?)
 }
 
 /// The account's Cash Inventory item with cash serial `id`.
@@ -114,35 +155,65 @@ pub fn buy(
     let account_id = item.account_id;
     let mut conn = crate::connection()?;
     Ok(conn.transaction(|conn| -> diesel::QueryResult<_> {
-        let account = accounts::table.find(account_id);
-        let paid = match cash_type {
-            CashType::Credit => diesel::update(account.filter(accounts::nx_credit.ge(price)))
-                .set(accounts::nx_credit.eq(accounts::nx_credit - price))
-                .execute(conn)?,
-            CashType::MaplePoints => {
-                diesel::update(account.filter(accounts::maple_points.ge(price)))
-                    .set(accounts::maple_points.eq(accounts::maple_points - price))
-                    .execute(conn)?
-            }
-            CashType::Prepaid => diesel::update(account.filter(accounts::nx_prepaid.ge(price)))
-                .set(accounts::nx_prepaid.eq(accounts::nx_prepaid - price))
-                .execute(conn)?,
-        };
-        if paid == 0 {
+        if !pay(conn, account_id, cash_type, price)? {
             return Ok(None);
         }
         let bought = diesel::insert_into(cash_items::table)
             .values(item)
             .get_result::<CashItem>(conn)?;
-        let balance = account
-            .select((
-                accounts::nx_credit,
-                accounts::maple_points,
-                accounts::nx_prepaid,
-            ))
-            .first::<Balance>(conn)?;
-        Ok(Some((bought, balance)))
+        Ok(Some((bought, balance_of(conn, account_id)?)))
     })?)
+}
+
+/// Pay `price` from the sender's NX Credit, or its NX Prepaid if the credit
+/// is short, and put `gift` in the receiver's Cash Inventory, in one
+/// transaction. `None` if neither balance covers the price.
+pub fn gift(sender: i32, price: i32, gift: &NewGift) -> crate::Result<Option<Balance>> {
+    let mut conn = crate::connection()?;
+    Ok(conn.transaction(|conn| -> diesel::QueryResult<_> {
+        if !pay(conn, sender, CashType::Credit, price)?
+            && !pay(conn, sender, CashType::Prepaid, price)?
+        {
+            return Ok(None);
+        }
+        diesel::insert_into(cash_items::table)
+            .values(gift)
+            .execute(conn)?;
+        Ok(Some(balance_of(conn, sender)?))
+    })?)
+}
+
+/// Take `price` from the account's `cash_type` balance; false if it is short.
+fn pay(
+    conn: &mut PgConnection,
+    account_id: i32,
+    cash_type: CashType,
+    price: i32,
+) -> diesel::QueryResult<bool> {
+    let account = accounts::table.find(account_id);
+    let paid = match cash_type {
+        CashType::Credit => diesel::update(account.filter(accounts::nx_credit.ge(price)))
+            .set(accounts::nx_credit.eq(accounts::nx_credit - price))
+            .execute(conn)?,
+        CashType::MaplePoints => diesel::update(account.filter(accounts::maple_points.ge(price)))
+            .set(accounts::maple_points.eq(accounts::maple_points - price))
+            .execute(conn)?,
+        CashType::Prepaid => diesel::update(account.filter(accounts::nx_prepaid.ge(price)))
+            .set(accounts::nx_prepaid.eq(accounts::nx_prepaid - price))
+            .execute(conn)?,
+    };
+    Ok(paid > 0)
+}
+
+fn balance_of(conn: &mut PgConnection, account_id: i32) -> diesel::QueryResult<Balance> {
+    accounts::table
+        .find(account_id)
+        .select((
+            accounts::nx_credit,
+            accounts::maple_points,
+            accounts::nx_prepaid,
+        ))
+        .first::<Balance>(conn)
 }
 
 /// The character's wish list, in slot order.

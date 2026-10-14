@@ -48,6 +48,8 @@ diesel::table! {
         #[max_length = 13]
         gift_from -> Varchar,
         expires_at -> Nullable<Timestamp>,
+        #[max_length = 73]
+        gift_message -> Nullable<Varchar>,
     }
 }
 

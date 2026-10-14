@@ -115,6 +115,20 @@ item in that quantity, preferring one on sale. Either way, a failed write
 restores the in-memory inventory. A full bag fails with 0xBB. Pets stay in the
 Cash Inventory (0x00) until the server can encode them.
 
+A gift (0x04) names the commodity, a receiving character and a message of 1 to
+73 bytes, and carries the birthday code the client asked for. Accounts don't
+record a birthday, so any real date passes, and anything else fails with 0xC4.
+The receiver must exist (0xA9), belong to another account (0xA8), and be of a
+gender the item is for (0xAA). `db::cash_shop::gift` takes the price from the
+sender's NX Credit, or from their NX Prepaid if the credit is short (never Maple
+Points), and inserts the item into the receiver's account with `gift_from` and
+`gift_message` set, in one transaction. The sender gets 0x5E (receiver, item,
+count, price) and their new balance. When the receiving account next enters the
+shop, `db::cash_shop::open_cash_inventory` splits the unseen gifts (rows with a
+message) from the rest and clears their messages. The gifts go out in 0x4D
+with sender and message, and the client adds them to the Cash Inventory list
+it got in 0x4B, as HeavenMS does.
+
 ## Packets
 
 Field packets are built in `net/src/packet/build/world/field.rs`
