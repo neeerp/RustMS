@@ -139,6 +139,17 @@ from `UI.nx`. Moved so far:
   restores the server's defaults; DEFAULT, CLEAR ALL, and Esc with unsaved
   changes ask through the in-window `notice` bitmaps. CHANGE QUICK SLOTS is
   disabled until the quick slot is configurable.
+- **Notices** (`UIOk`, `UIYesNo`, `UIEnterNumber`, `Basic.img/Notice2` and
+  `YesNo2`): the silver bolted boxes. `t`, then `c` repeated to fit the black
+  message, then `s` with one button frame (`BtOK`) or two (`BtYes`/`BtNo`, or
+  `BtOK`/`BtCancel` for number entry). Number entry draws a white field under
+  the message. The click that opens it no longer takes the focus from its
+  field, so typed amounts count. `UIEnterNumber` has its own element type, so the notice about a
+  bad number opens over it, and OK goes back to the field.
+- **Quit** (`ask_to_quit`): MENU's QUIT GAME and closing the window ask
+  "Are you sure you want to quit?" in a `UIYesNo`; yes goes back to the login
+  screen. The later playtime and EXP summary (`UIWindow6.img/askReward`) is
+  gone.
 
 `UIClassic.nx` is not one of NoLifeNx's standard files, so `NxFiles` opens it
 with `nl::file` instead of `nl::nx::load_all`.

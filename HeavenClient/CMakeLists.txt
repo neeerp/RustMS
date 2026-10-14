@@ -33,6 +33,8 @@ if(HEAVENCLIENT_BUILD_TESTS)
     add_executable(npc_reach_tests tests/npc_reach.cpp)
     target_include_directories(npc_reach_tests PRIVATE ${PROJECT_SOURCE_DIR}/libs/NoLifeNx)
     add_test(NAME npc_reach COMMAND npc_reach_tests)
+    add_executable(enter_number_tests tests/enter_number.cpp)
+    add_test(NAME enter_number COMMAND enter_number_tests)
     add_executable(portal_touch_tests tests/portal_touch.cpp Gameplay/MapleMap/Portal.cpp)
     target_include_directories(portal_touch_tests PRIVATE
         ${PROJECT_SOURCE_DIR}/libs/NoLifeNx ${PROJECT_SOURCE_DIR}/libs/glad/build/include)
@@ -354,6 +356,7 @@ add_executable(HeavenClient
     IO/UITypes/UILogo.h
     IO/UITypes/UIMiniMap.cpp
     IO/UITypes/UIMiniMap.h
+    IO/UITypes/EnterNumber.h
     IO/UITypes/UINotice.cpp
     IO/UITypes/UINotice.h
     IO/UITypes/UINpcTalk.cpp
