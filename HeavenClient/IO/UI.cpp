@@ -27,7 +27,6 @@
 #include "UITypes/UIChannel.h"
 #include "UITypes/UIChatBar.h"
 #include "UITypes/UIGameOption.h"
-#include "UITypes/UIJoypad.h"
 #include "UITypes/UINpcTalk.h"
 #include "UITypes/UIShop.h"
 #include "UITypes/UIStatusBar.h"
@@ -245,7 +244,6 @@ namespace ms
 			auto gameoption = UI::get().get_element<UIGameOption>();
 			auto systemoption = UI::get().get_element<UISystemOption>();
 			auto shop = UI::get().get_element<UIShop>();
-			auto joypad = UI::get().get_element<UIJoypad>();
 			auto npctalk = UI::get().get_element<UINpcTalk>();
 			//auto report = UI::get().get_element<UIReport>();
 			//auto whisper = UI::get().get_element<UIWhisper>();
@@ -277,10 +275,6 @@ namespace ms
 			} else if (shop && shop->is_active())
 			{
 				shop->send_key(mapping.action, pressed, escape);
-				sent = true;
-			} else if (joypad && joypad->is_active())
-			{
-				joypad->send_key(mapping.action, pressed, escape);
 				sent = true;
 			} else
 			{

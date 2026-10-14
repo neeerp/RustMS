@@ -650,20 +650,6 @@ namespace ms
 		{}
 	};
 
-	// The default position of UIJoypad
-	struct PosJOYPAD : public Configuration::PointEntry
-	{
-		PosJOYPAD() : PointEntry("PosJOYPAD", "(312, 134)")
-		{}
-	};
-
-	// The default position of UIEvent
-	struct PosEVENT : public Configuration::PointEntry
-	{
-		PosEVENT() : PointEntry("PosEVENT", "(99, 100)")
-		{}
-	};
-
 	// The default position of UIKeyConfig
 	struct PosKEYCONFIG : public Configuration::PointEntry
 	{

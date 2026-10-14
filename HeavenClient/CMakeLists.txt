@@ -370,14 +370,10 @@ add_executable(HeavenClient
     IO/UITypes/UIEnterText.h
     IO/UITypes/UIEquipInventory.cpp
     IO/UITypes/UIEquipInventory.h
-    IO/UITypes/UIEvent.cpp
-    IO/UITypes/UIEvent.h
     IO/UITypes/UIGender.cpp
     IO/UITypes/UIGender.h
     IO/UITypes/UIItemInventory.cpp
     IO/UITypes/UIItemInventory.h
-    IO/UITypes/UIJoypad.cpp
-    IO/UITypes/UIJoypad.h
     IO/UITypes/UIKeyConfig.cpp
     IO/UITypes/UIKeyConfig.h
     IO/UITypes/UILogin.cpp
@@ -403,8 +399,6 @@ add_executable(HeavenClient
     IO/UITypes/UIQuit.h
     IO/UITypes/UIRaceSelect.cpp
     IO/UITypes/UIRaceSelect.h
-    IO/UITypes/UIRegion.cpp
-    IO/UITypes/UIRegion.h
     IO/UITypes/UIShop.cpp
     IO/UITypes/UIShop.h
     IO/UITypes/UIMonsterBook.cpp

@@ -30,13 +30,8 @@ namespace ms
 		end = Point<int16_t>(x, vertical.second());
 
 		nl::node src;
-		std::string base_str = "base";
 
-		if (type == Type::CHATBAR)
-		{
-			src = nl::nx::ui["StatusBar3.img"]["chat"]["common"]["scroll"];
-			base_str += "_c";
-		} else if (type == Type::CLASSIC)
+		if (type == Type::CLASSIC)
 		{
 			src = NxFiles::ui_classic["Basic.img"]["VScr4"];
 		} else
@@ -55,14 +50,14 @@ namespace ms
 
 		nl::node dsrc = src["disabled"];
 
-		dbase = dsrc[base_str];
+		dbase = dsrc["base"];
 
 		dprev = dsrc["prev"];
 		dnext = dsrc["next"];
 
 		nl::node esrc = src["enabled"];
 
-		base = esrc[base_str];
+		base = esrc["base"];
 
 		prev = TwoSpriteButton(esrc["prev0"], esrc["prev1"], start);
 		next = TwoSpriteButton(esrc["next0"], esrc["next1"], end);

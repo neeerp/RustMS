@@ -74,8 +74,6 @@ namespace ms
 		settings.emplace<PosNOTICE>();
 		settings.emplace<PosMESSENGER>();
 		settings.emplace<PosCHANNEL>();
-		settings.emplace<PosJOYPAD>();
-		settings.emplace<PosEVENT>();
 		settings.emplace<PosKEYCONFIG>();
 		settings.emplace<PosGAMEOPTION>();
 		settings.emplace<PosSYSTEMOPTION>();
