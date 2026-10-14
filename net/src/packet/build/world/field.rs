@@ -118,6 +118,15 @@ pub fn build_local_chat(
     Ok(packet)
 }
 
+/// FACIAL_EXPRESSION: another player's emote, by FACE_EXPRESSION number.
+pub fn build_facial_expression(character_id: i32, emote: i32) -> Result<Packet, NetworkError> {
+    let mut packet = Packet::new_empty();
+    packet.write_short(SendOpcode::FacialExpression as i16)?;
+    packet.write_int(character_id)?;
+    packet.write_int(emote)?;
+    Ok(packet)
+}
+
 pub fn parse_movement_state(
     movement_bytes: &[u8],
     current: (i16, i16, u8),

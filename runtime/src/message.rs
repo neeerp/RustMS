@@ -67,6 +67,11 @@ pub enum ServerMessage {
         request_id: u64,
         nearby: bool,
     },
+    /// `requester` (maybe this player) double-clicked this player; send them
+    /// CHAR_INFO.
+    CharInfoRequested {
+        requester: ClientHandle,
+    },
     SendPacket(Packet),
 }
 

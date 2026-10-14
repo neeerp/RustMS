@@ -46,6 +46,7 @@ namespace ms
 		void close();
 
 		void stage_mapping(Point<int16_t> cursorposition, Keyboard::Mapping mapping);
+		void stage_key(int32_t key, Keyboard::Mapping mapping);
 		void unstage_mapping(Keyboard::Mapping mapping);
 
 		void update_item_count(InventoryType::Id type, int16_t slot, int16_t change);
