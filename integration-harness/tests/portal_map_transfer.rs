@@ -154,7 +154,8 @@ async fn read_next_set_field_warp(
                 || x == SendOpcode::MoveMonster as i16
                 || x == SendOpcode::KillMonster as i16
                 || x == SendOpcode::DropItemFromMapObject as i16
-                || x == SendOpcode::RemoveItemFromMap as i16 =>
+                || x == SendOpcode::RemoveItemFromMap as i16
+                || x == SendOpcode::SpawnReactor as i16 =>
             {
                 continue
             }

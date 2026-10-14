@@ -234,6 +234,9 @@ pub fn opcode_name(opcode: i16) -> &'static str {
         x if x == SendOpcode::KillMonster as i16 => "KillMonster",
         x if x == SendOpcode::DropItemFromMapObject as i16 => "DropItemFromMapObject",
         x if x == SendOpcode::RemoveItemFromMap as i16 => "RemoveItemFromMap",
+        x if x == SendOpcode::SpawnReactor as i16 => "SpawnReactor",
+        x if x == SendOpcode::HitReactor as i16 => "HitReactor",
+        x if x == SendOpcode::RemoveReactor as i16 => "RemoveReactor",
         _ => "Unknown",
     }
 }
