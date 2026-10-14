@@ -324,8 +324,6 @@ add_executable(HeavenClient
     IO/UITypes/UICharInfo.h
     IO/UITypes/UICharSelect.cpp
     IO/UITypes/UICharSelect.h
-    IO/UITypes/UIChat.cpp
-    IO/UITypes/UIChat.h
     IO/UITypes/UIChatBar.cpp
     IO/UITypes/UIChatBar.h
     IO/UITypes/UICygnusCreation.cpp
@@ -352,6 +350,8 @@ add_executable(HeavenClient
     IO/UITypes/UILoginWait.h
     IO/UITypes/UILogo.cpp
     IO/UITypes/UILogo.h
+    IO/UITypes/UIMessenger.cpp
+    IO/UITypes/UIMessenger.h
     IO/UITypes/UIMiniMap.cpp
     IO/UITypes/UIMiniMap.h
     IO/UITypes/UINotice.cpp

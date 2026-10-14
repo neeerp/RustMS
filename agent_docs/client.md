@@ -139,6 +139,13 @@ from `UI.nx`. Moved so far:
   restores the server's defaults; DEFAULT, CLEAR ALL, and Esc with unsaved
   changes ask through the in-window `notice` bitmaps. CHANGE QUICK SLOTS is
   disabled until the quick slot is configurable.
+- **Maple Messenger** (`UIMessenger`, `UIWindow.img/Messenger`): three seats
+  with the members standing in them, the chat log, and the input line, laid
+  out from period footage. The MAPLECHAT key or ShortCut's MESSENGER button
+  opens a room, or minimises the open one to its title bar (which blinks on
+  unread lines). Clicking an empty seat or typing `/invite name` invites; `/q`
+  or the close button leaves. A speaker shows the `chatBalloon` dots for a
+  few seconds. Invitations arrive as a yes/no notice.
 
 `UIClassic.nx` is not one of NoLifeNx's standard files, so `NxFiles` opens it
 with `nl::file` instead of `nl::nx::load_all`.
@@ -201,11 +208,12 @@ side yet.
 | Character info, minimap, world map | Implemented |
 | Buddy / party / guild / boss list (`UIUserList`) | Buttons and layout only; no handlers, party packet exists but is unused |
 | Cash shop (`UICashShop`) | Browse/enter/exit; purchase is `// TODO: Purchase item` |
-| Storage, trade, player shops, mini-games, messenger, memo/mail | No UI, no handlers |
+| Maple Messenger (`UIMessenger`) | Implemented |
+| Storage, trade, player shops, mini-games, memo/mail | No UI, no handlers |
 | Pets, mounts, summons, reactors beyond hit/spawn | Partial or absent (`Reactor` TODOs) |
 | Party/guild/boss quests, events, MTS | Absent |
 
-44 outbound opcodes are defined (`Net/OutPacket.h`) and 57 inbound handlers
+49 outbound opcodes are defined (`Net/OutPacket.h`) and 60 inbound handlers
 are registered (`Net/PacketSwitch.cpp`). Anything not listed there is silently ignored by the client.
 
 ## Estimated client work for a complete game
@@ -219,7 +227,7 @@ are registered (`Net/PacketSwitch.cpp`). Anything not listed there is silently i
 | Cash shop purchase and inventory | Display only | M |
 | Quest accept/complete UI flow | Partial | S |
 | Pets and mounts | Partial rendering, no interaction | M |
-| Messenger, memo, mail, MTS | Nothing | M each |
+| Memo, mail, MTS | Nothing | M each |
 | Whisper find/buddy modes | Ignored | S |
 | Mini-dungeons, boss/event UI | Nothing | M |
 

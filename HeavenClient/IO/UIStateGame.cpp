@@ -24,12 +24,12 @@
 #include "UITypes/UIQuestHelper.h"
 #include "UITypes/UIChannel.h"
 #include "UITypes/UICharInfo.h"
-#include "UITypes/UIChat.h"
 #include "UITypes/UIChatBar.h"
 #include "UITypes/UIEquipInventory.h"
 #include "UITypes/UIEvent.h"
 #include "UITypes/UIItemInventory.h"
 #include "UITypes/UIKeyConfig.h"
+#include "UITypes/UIMessenger.h"
 #include "UITypes/UIMiniMap.h"
 #include "UITypes/UIQuestLog.h"
 #include "UITypes/UIQuit.h"
@@ -276,12 +276,7 @@ namespace ms
 								emplace<UIWorldMap>();
 								break;
 							case KeyAction::Id::MAPLECHAT:
-							{
-								auto chat = UI::get().get_element<UIChat>();
-
-								if (!chat || !chat->is_active())
-									emplace<UIChat>();
-							}
+								UIMessenger::toggle();
 								break;
 							case KeyAction::Id::MINIMAP:
 								if (auto minimap = UI::get().get_element<UIMiniMap>())

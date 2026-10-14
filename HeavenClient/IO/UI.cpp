@@ -25,7 +25,6 @@
 #include "../Gameplay/Stage.h"
 
 #include "UITypes/UIChannel.h"
-#include "UITypes/UIChat.h"
 #include "UITypes/UIChatBar.h"
 #include "UITypes/UIJoypad.h"
 #include "UITypes/UINpcTalk.h"
@@ -148,9 +147,12 @@ namespace ms
 		Cursor::State cursorstate = (pressed && enabled) ? Cursor::State::CLICKING : Cursor::State::IDLE;
 		Point<int16_t> cursorpos = cursor.get_position();
 		cursor.set_pressed(pressed && enabled);
+
+		// A click that opens a window focusing its own field must not blur it.
+		Textfield *focused_before = focusedtextfield.get();
 		send_cursor(cursorpos, cursorstate);
 
-		if (focusedtextfield && pressed)
+		if (focusedtextfield && focusedtextfield.get() == focused_before && pressed)
 		{
 			Cursor::State tstate = focusedtextfield->send_cursor(cursorpos, pressed);
 
@@ -245,7 +247,6 @@ namespace ms
 			auto optionmenu = UI::get().get_element<UIOptionMenu>();
 			auto shop = UI::get().get_element<UIShop>();
 			auto joypad = UI::get().get_element<UIJoypad>();
-			auto rank = UI::get().get_element<UIRank>();
 			auto quit = UI::get().get_element<UIQuit>();
 			auto npctalk = UI::get().get_element<UINpcTalk>();
 			//auto report = UI::get().get_element<UIReport>();
@@ -279,10 +280,6 @@ namespace ms
 			{
 				joypad->send_key(mapping.action, pressed, escape);
 				sent = true;
-			} else if (rank && rank->is_active())
-			{
-				rank->send_key(mapping.action, pressed, escape);
-				sent = true;
 			} else if (quit && quit->is_active())
 			{
 				quit->send_key(mapping.action, pressed, escape);
@@ -314,7 +311,6 @@ namespace ms
 					// Game
 					types.emplace_back(UIElement::Type::NOTICE);
 					types.emplace_back(UIElement::Type::KEYCONFIG);
-					types.emplace_back(UIElement::Type::CHAT);
 					types.emplace_back(UIElement::Type::EVENT);
 					types.emplace_back(UIElement::Type::STATSINFO);
 					types.emplace_back(UIElement::Type::ITEMINVENTORY);

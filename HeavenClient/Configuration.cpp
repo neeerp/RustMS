@@ -52,7 +52,7 @@ namespace ms
 		settings.emplace<PosMINIMAP>();
 		settings.emplace<PosSHOP>();
 		settings.emplace<PosNOTICE>();
-		settings.emplace<PosMAPLECHAT>();
+		settings.emplace<PosMESSENGER>();
 		settings.emplace<PosCHANNEL>();
 		settings.emplace<PosJOYPAD>();
 		settings.emplace<PosEVENT>();
@@ -322,16 +322,6 @@ namespace ms
 	void Configuration::set_rightclicksell(bool value)
 	{
 		rightclicksell = value;
-	}
-
-	bool Configuration::get_show_weekly()
-	{
-		return show_weekly;
-	}
-
-	void Configuration::set_show_weekly(bool value)
-	{
-		show_weekly = value;
 	}
 
 	bool Configuration::get_skip_startup_logos() const

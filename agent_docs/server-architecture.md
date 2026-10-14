@@ -77,7 +77,10 @@ the world server deletes `in_game` sessions for the channels it hosts.
   rejoin automatically).
 - **`WorldDirectory`** (`runtime/src/actor/directory.rs`) knows who is online
   under which name. It handles whispers and world broadcasts, and kicks the
-  older connection when a character connects twice. It owns no game state.
+  older connection when a character connects twice. It also owns the Maple
+  Messenger rooms (`runtime/src/actor/messenger.rs`), because their members
+  may sit on different channels; a member changing channel keeps their seat
+  for `CHANNEL_CHANGE_GRACE`. Otherwise it owns no game state.
 
 ### Backpressure rule
 

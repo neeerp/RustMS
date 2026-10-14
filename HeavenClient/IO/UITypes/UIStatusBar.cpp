@@ -18,10 +18,10 @@
 #include "UIStatusBar.h"
 
 #include "UIChannel.h"
-#include "UIChat.h"
 #include "UIEquipInventory.h"
 #include "UIItemInventory.h"
 #include "UIKeyConfig.h"
+#include "UIMessenger.h"
 #include "UIOptionMenu.h"
 #include "UIQuestLog.h"
 #include "UIQuit.h"
@@ -481,7 +481,7 @@ namespace ms
 				break;
 			}
 			case Buttons::BT_SHORTCUT_MESSENGER:
-				UI::get().emplace<UIChat>();
+				UIMessenger::toggle();
 				break;
 			case Buttons::BT_SHORTCUT_MONSTERBOOK:
 				break;

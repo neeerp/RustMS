@@ -49,4 +49,68 @@ namespace ms
 			write_string(message);
 		}
 	};
+
+	// Maple Messenger requests. Every one starts with a mode byte.
+	// Opcode: MESSENGER(122)
+	class MessengerPacket : public OutPacket
+	{
+	protected:
+		enum Mode : int8_t
+		{
+			OPEN = 0x00,
+			LEAVE = 0x02,
+			INVITE = 0x03,
+			DECLINE = 0x05,
+			CHAT = 0x06
+		};
+
+		MessengerPacket(Mode mode) : OutPacket(OutPacket::Opcode::MESSENGER)
+		{
+			write_byte(mode);
+		}
+	};
+
+	// Opens a new messenger (id 0) or joins the one we were invited to.
+	class MessengerOpenPacket : public MessengerPacket
+	{
+	public:
+		MessengerOpenPacket(int32_t messenger_id) : MessengerPacket(Mode::OPEN)
+		{
+			write_int(messenger_id);
+		}
+	};
+
+	class MessengerLeavePacket : public MessengerPacket
+	{
+	public:
+		MessengerLeavePacket() : MessengerPacket(Mode::LEAVE) {}
+	};
+
+	class MessengerInvitePacket : public MessengerPacket
+	{
+	public:
+		MessengerInvitePacket(const std::string& target) : MessengerPacket(Mode::INVITE)
+		{
+			write_string(target);
+		}
+	};
+
+	class MessengerDeclinePacket : public MessengerPacket
+	{
+	public:
+		MessengerDeclinePacket(const std::string& inviter) : MessengerPacket(Mode::DECLINE)
+		{
+			write_string(inviter);
+		}
+	};
+
+	// A chat line, formatted as "name : text".
+	class MessengerChatPacket : public MessengerPacket
+	{
+	public:
+		MessengerChatPacket(const std::string& line) : MessengerPacket(Mode::CHAT)
+		{
+			write_string(line);
+		}
+	};
 }
