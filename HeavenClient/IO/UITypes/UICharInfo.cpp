@@ -19,310 +19,177 @@
 
 #include "../Components/MapleButton.h"
 
+#include "../../Character/Job.h"
 #include "../../Gameplay/Stage.h"
-
 #include "../../Net/Packets/PlayerInteractionPackets.h"
+#include "../../Util/NxFiles.h"
 
 #include <nlnx/nx.hpp>
 
 namespace ms
 {
-	UICharInfo::UICharInfo(int32_t cid) : UIDragElement<PosCHARINFO>(), is_loading(true), timestep(Constants::TIMESTEP), personality_enabled(false), collect_enabled(false), damage_enabled(false), item_enabled(false)
+	namespace
 	{
-		nl::node close = nl::nx::ui["Basic.img"]["BtClose3"];
-		nl::node UserInfo = nl::nx::ui["UIWindow2.img"]["UserInfo"];
-		nl::node character = UserInfo["character"];
-		nl::node backgrnd = character["backgrnd"];
+		// Laid out from footage and the v83 client, against the window's
+		// top-left corner.
+		constexpr int16_t WIDTH = 275;
+		// Each mode's window height, and the row its mode buttons sit on.
+		constexpr int16_t HEIGHTS[] = { 199, 400, 362, 404 };
+		constexpr int16_t BOTTOMS[] = { 177, 378, 340, 382 };
+		constexpr int16_t TAMING_X = 5, PET_X = 93, COLLECTION_X = 145, EXCEPTION_X = 199;
 
-		/// Main Window
-		sprites.emplace_back(backgrnd);
-		sprites.emplace_back(character["backgrnd2"]);
-		sprites.emplace_back(character["name"]);
+		const Point<int16_t> CLOSE = { 256, 6 };
+		const Point<int16_t> FAMILY = { 105, 23 };
+		const Point<int16_t> PARTY = { 149, 23 };
+		const Point<int16_t> TRADE = { 149, 42 };
+		const Point<int16_t> ITEM = { 208, 22 };
+		const Point<int16_t> WISH = { 208, 41 };
+		const Point<int16_t> FAME_UP = { 237, 114 };
+		const Point<int16_t> FAME_DOWN = { 252, 114 };
 
-		Point<int16_t> backgrnd_dim = Texture(backgrnd).get_dimensions();
-		Point<int16_t> close_dimensions = Point<int16_t>(backgrnd_dim.x() - 21, 6);
+		// The character stands on the shadow in the portrait box, with
+		// their name in the box below.
+		const Point<int16_t> PORTRAIT = { 52, 133 };
+		const Point<int16_t> NAME = { 53, 139 };
 
-		buttons[Buttons::BtClose] = std::make_unique<MapleButton>(close, close_dimensions);
-		buttons[Buttons::BtCollect] = std::make_unique<MapleButton>(character["BtCollect"]);
-		buttons[Buttons::BtDamage] = std::make_unique<MapleButton>(character["BtDamage"]);
-		buttons[Buttons::BtFamily] = std::make_unique<MapleButton>(character["BtFamily"]);
-		buttons[Buttons::BtItem] = std::make_unique<MapleButton>(character["BtItem"]);
-		buttons[Buttons::BtParty] = std::make_unique<MapleButton>(character["BtParty"]);
-		buttons[Buttons::BtPersonality] = std::make_unique<MapleButton>(character["BtPersonality"]);
-		buttons[Buttons::BtPet] = std::make_unique<MapleButton>(character["BtPet"]);
-		buttons[Buttons::BtPopDown] = std::make_unique<MapleButton>(character["BtPopDown"]);
-		buttons[Buttons::BtPopUp] = std::make_unique<MapleButton>(character["BtPopUp"]);
-		buttons[Buttons::BtRide] = std::make_unique<MapleButton>(character["BtRide"]);
-		buttons[Buttons::BtTrad] = std::make_unique<MapleButton>(character["BtTrad"]);
+		// Values sit right of the labels; a row's text has its cap top 4
+		// below the row's top.
+		constexpr int16_t VALUE_X = 160;
+		constexpr int16_t ROW_LEVEL = 76, ROW_STEP = 18;
+		// From where a line of text is drawn to its cap top.
+		constexpr int16_t TEXT_Y = -9;
+
+		// The item and wish lists open beside the window, over its edge.
+		const Point<int16_t> PANEL = { 270, 0 };
+		const Point<int16_t> PANEL_HIDE = { 220, 6 };
+		const Point<int16_t> PANEL_SIZE = { 240, 162 };
+	}
+
+	UICharInfo::UICharInfo(int32_t id) : UIDragElement<PosCHARINFO>(Point<int16_t>(WIDTH, 20)), cid(id), known(false), mode(Mode::MAIN), panel(Panel::NO_PANEL)
+	{
+		nl::node UserInfo = NxFiles::ui_classic["UIWindow.img"]["UserInfo"];
+		nl::node Basic = NxFiles::ui_classic["Basic.img"];
+
+		backgrounds[Mode::MAIN] = UserInfo["backgrnd"];
+		backgrounds[Mode::PET] = UserInfo["backgrnd2"];
+		backgrounds[Mode::TAMING] = UserInfo["backgrnd5"];
+		backgrounds[Mode::COLLECTION] = UserInfo["backgrnd7"];
+		item_list = UserInfo["backgrnd4"];
+		wish_list = UserInfo["backgrnd3"];
+
+		buttons[Buttons::BT_CLOSE] = std::make_unique<MapleButton>(Basic["BtClose"], CLOSE);
+		buttons[Buttons::BT_FAMILY] = std::make_unique<MapleButton>(UserInfo["BtFamily"], FAMILY);
+		buttons[Buttons::BT_PARTY] = std::make_unique<MapleButton>(UserInfo["BtParty"], PARTY);
+		buttons[Buttons::BT_TRADE] = std::make_unique<MapleButton>(UserInfo["BtTrade"], TRADE);
+		buttons[Buttons::BT_ITEM] = std::make_unique<MapleButton>(UserInfo["BtItem"], ITEM);
+		buttons[Buttons::BT_WISH] = std::make_unique<MapleButton>(UserInfo["BtWish"], WISH);
+		buttons[Buttons::BT_FAME_UP] = std::make_unique<MapleButton>(Basic["BtUP"], FAME_UP);
+		buttons[Buttons::BT_FAME_DOWN] = std::make_unique<MapleButton>(Basic["BtDown"], FAME_DOWN);
+		buttons[Buttons::BT_PET_SHOW] = std::make_unique<MapleButton>(UserInfo["BtPetShow"]);
+		buttons[Buttons::BT_PET_HIDE] = std::make_unique<MapleButton>(UserInfo["BtPetHide"]);
+		buttons[Buttons::BT_TAMING_SHOW] = std::make_unique<MapleButton>(UserInfo["BtTamingShow"]);
+		buttons[Buttons::BT_TAMING_HIDE] = std::make_unique<MapleButton>(UserInfo["BtTamingHide"]);
+		buttons[Buttons::BT_COLLECTION_SHOW] = std::make_unique<MapleButton>(UserInfo["BtCollectionShow"]);
+		buttons[Buttons::BT_COLLECTION_HIDE] = std::make_unique<MapleButton>(UserInfo["BtCollectionHide"]);
+		buttons[Buttons::BT_EXCEPTION] = std::make_unique<MapleButton>(UserInfo["BtExceptionShow"]);
+		buttons[Buttons::BT_PANEL_HIDE] = std::make_unique<MapleButton>(Basic["BtHide"], PANEL + PANEL_HIDE);
+
+		// There are no families, parties, trades, fame, or pets yet.
+		for (auto button : { Buttons::BT_FAMILY, Buttons::BT_PARTY, Buttons::BT_TRADE, Buttons::BT_FAME_UP, Buttons::BT_FAME_DOWN, Buttons::BT_EXCEPTION })
+			buttons[button]->set_state(Button::State::DISABLED);
 
 		name = Text(Text::Font::A12M, Text::Alignment::CENTER, Color::Name::WHITE);
-		job = Text(Text::Font::A11M, Text::Alignment::LEFT, Color::Name::EMPEROR);
-		level = Text(Text::Font::A11M, Text::Alignment::LEFT, Color::Name::EMPEROR);
-		fame = Text(Text::Font::A11M, Text::Alignment::LEFT, Color::Name::EMPEROR);
-		guild = Text(Text::Font::A11M, Text::Alignment::LEFT, Color::Name::EMPEROR);
-		alliance = Text(Text::Font::A11M, Text::Alignment::LEFT, Color::Name::EMPEROR);
+		level = Text(Text::Font::A12M, Text::Alignment::LEFT, Color::Name::BLACK);
+		job = Text(Text::Font::A12M, Text::Alignment::LEFT, Color::Name::BLACK);
+		fame = Text(Text::Font::A12M, Text::Alignment::LEFT, Color::Name::BLACK);
+		guild = Text(Text::Font::A12M, Text::Alignment::LEFT, Color::Name::BLACK);
+		alliance = Text(Text::Font::A12M, Text::Alignment::LEFT, Color::Name::BLACK);
 
-		// TODO: Check if player has a mount or pet, disable if they don't
-		buttons[Buttons::BtPet]->set_state(Button::State::DISABLED);
-		buttons[Buttons::BtRide]->set_state(Button::State::DISABLED);
+		// Copy what is shown: the character may leave the map while the
+		// window is open.
+		if (auto character = Stage::get().get_character(cid))
+		{
+			look = character->get_look();
+			name.change_text(character->get_name());
+			known = true;
+		}
 
-		/// Farm
-		nl::node farm = UserInfo["farm"];
-		nl::node farm_backgrnd = farm["backgrnd"];
-
-		loading = farm["loading"];
-
-		farm_dim = Texture(farm_backgrnd).get_dimensions();
-		farm_adj = Point<int16_t>(-farm_dim.x(), 0);
-
-		sprites.emplace_back(farm_backgrnd, farm_adj);
-		sprites.emplace_back(farm["backgrnd2"], farm_adj);
-		sprites.emplace_back(farm["default"], farm_adj);
-		sprites.emplace_back(farm["cover"], farm_adj);
-
-		buttons[Buttons::BtFriend] = std::make_unique<MapleButton>(farm["btFriend"], farm_adj);
-		buttons[Buttons::BtVisit] = std::make_unique<MapleButton>(farm["btVisit"], farm_adj);
-
-		farm_name = Text(Text::Font::A11M, Text::Alignment::CENTER, Color::Name::SUPERNOVA);
-		farm_level = Charset(farm["number"], Charset::Alignment::LEFT);
-
-#pragma region BottomWindow
-		bottom_window_adj = Point<int16_t>(0, backgrnd_dim.y() + 1);
-
-		/// Personality
-		nl::node personality = UserInfo["personality"];
-		nl::node personality_backgrnd = personality["backgrnd"];
-
-		personality_sprites.emplace_back(personality_backgrnd, bottom_window_adj);
-		personality_sprites.emplace_back(personality["backgrnd2"], bottom_window_adj);
-
-		personality_sprites_enabled[true].emplace_back(personality["backgrnd3"], bottom_window_adj);
-		personality_sprites_enabled[true].emplace_back(personality["backgrnd4"], bottom_window_adj);
-		personality_sprites_enabled[true].emplace_back(personality["center"], bottom_window_adj);
-		personality_sprites_enabled[false].emplace_back(personality["before30level"], bottom_window_adj);
-
-		personality_dimensions = Texture(personality_backgrnd).get_dimensions();
-
-		/// Collect
-		nl::node collect = UserInfo["collect"];
-		nl::node collect_backgrnd = collect["backgrnd"];
-
-		collect_sprites.emplace_back(collect_backgrnd, bottom_window_adj);
-		collect_sprites.emplace_back(collect["backgrnd2"], bottom_window_adj);
-
-		default_medal = collect["icon1"];
-
-		buttons[Buttons::BtArrayGet] = std::make_unique<MapleButton>(collect["BtArrayGet"], bottom_window_adj);
-		buttons[Buttons::BtArrayName] = std::make_unique<MapleButton>(collect["BtArrayName"], bottom_window_adj);
-
-		medal_text = Text(Text::Font::A11M, Text::Alignment::LEFT, Color::Name::EMPEROR, "Junior Adventurer");
-		medal_total = Text(Text::Font::A11M, Text::Alignment::LEFT, Color::Name::EMPEROR, "2");
-
-		collect_dimensions = Texture(collect_backgrnd).get_dimensions();
-
-		/// Damage
-		nl::node damage = UserInfo["damage"];
-		nl::node damage_backgrnd = damage["backgrnd"];
-
-		damage_sprites.emplace_back(damage_backgrnd, bottom_window_adj);
-		damage_sprites.emplace_back(damage["backgrnd2"], bottom_window_adj);
-		damage_sprites.emplace_back(damage["backgrnd3"], bottom_window_adj);
-
-		buttons[Buttons::BtFAQ] = std::make_unique<MapleButton>(damage["BtFAQ"], bottom_window_adj);
-		buttons[Buttons::BtRegist] = std::make_unique<MapleButton>(damage["BtRegist"], bottom_window_adj);
-
-		damage_dimensions = Texture(damage_backgrnd).get_dimensions();
-#pragma endregion
-
-#pragma region RightWindow
-		right_window_adj = Point<int16_t>(backgrnd_dim.x(), 0);
-
-		/// Item
-		nl::node item = UserInfo["item"];
-		nl::node item_backgrnd = item["backgrnd"];
-
-		item_sprites.emplace_back(item_backgrnd, right_window_adj);
-		item_sprites.emplace_back(item["backgrnd2"], right_window_adj);
-
-		item_dimensions = Texture(item_backgrnd).get_dimensions();
-#pragma endregion
-
-
-		dimension = backgrnd_dim;
-		dragarea = Point<int16_t>(dimension.x(), 20);
-
-		target_character = Stage::get().get_character(cid).get();
+		set_mode(Mode::MAIN);
+		set_panel(Panel::NO_PANEL);
 
 		CharInfoRequestPacket(cid).dispatch();
 	}
 
-	void UICharInfo::draw(float inter) const
+	void UICharInfo::draw(float alpha) const
 	{
-		UIElement::draw_sprites(inter);
+		backgrounds[mode].draw(position);
 
-		for (size_t i = 0; i < Buttons::BtArrayGet; i++)
-			if (const auto button = buttons.at(i).get())
-				button->draw(position);
+		if (panel == Panel::ITEMS)
+			item_list.draw(position + PANEL);
+		else if (panel == Panel::WISHES)
+			wish_list.draw(position + PANEL);
 
-		/// Main Window
-		int16_t row_height = 18;
-		Point<int16_t> text_pos = position + Point<int16_t>(153, 65);
+		if (known)
+			look.draw(position + PORTRAIT, false, Stance::Id::STAND1, Expression::Id::DEFAULT);
 
-		target_character->draw_preview(position + Point<int16_t>(63, 129), inter);
+		name.draw(position + NAME);
 
-		name.draw(position + Point<int16_t>(59, 131));
-		level.draw(text_pos + Point<int16_t>(0, row_height * 0));
-		job.draw(text_pos + Point<int16_t>(0, row_height * 1));
-		fame.draw(text_pos + Point<int16_t>(0, row_height * 2));
-		guild.draw(text_pos + Point<int16_t>(0, row_height * 3) + Point<int16_t>(0, 1));
-		alliance.draw(text_pos + Point<int16_t>(0, row_height * 4));
+		const Text *rows[] = { &level, &job, &fame, &guild, &alliance };
 
-		/// Farm
-		Point<int16_t> farm_pos = position + farm_adj;
+		for (size_t i = 0; i < 5; i++)
+			rows[i]->draw(position + Point<int16_t>(VALUE_X, ROW_LEVEL + ROW_STEP * i + 4 + TEXT_Y));
 
-		if (is_loading)
-			loading.draw(farm_pos, inter);
-
-		farm_name.draw(farm_pos + Point<int16_t>(136, 51));
-		farm_level.draw(farm_level_text, farm_pos + Point<int16_t>(126, 34));
-
-		/// Personality
-		if (personality_enabled)
-		{
-			for (Sprite sprite : personality_sprites)
-				sprite.draw(position, inter);
-
-			bool show_personality = (target_character->get_level() >= 30);
-
-			for (Sprite sprite : personality_sprites_enabled[show_personality])
-				sprite.draw(position, inter);
-		}
-
-		/// Collect
-		if (collect_enabled)
-		{
-			for (Sprite sprite : collect_sprites)
-				sprite.draw(position, inter);
-
-			for (size_t i = 0; i < 15; i++)
-			{
-				div_t div = std::div(i, 5);
-				default_medal.draw(position + bottom_window_adj + Point<int16_t>(61, 66) + Point<int16_t>(38 * div.rem, 38 * div.quot), inter);
-			}
-
-			for (size_t i = Buttons::BtArrayGet; i < Buttons::BtFAQ; i++)
-				if (const auto button = buttons.at(i).get())
-					button->draw(position);
-
-			Point<int16_t> text_pos = Point<int16_t>(121, 8);
-
-			medal_text.draw(position + bottom_window_adj + text_pos);
-			medal_total.draw(position + bottom_window_adj + text_pos + Point<int16_t>(0, 19));
-		}
-
-		/// Damage
-		if (damage_enabled)
-		{
-			for (Sprite sprite : damage_sprites)
-				sprite.draw(position, inter);
-
-			for (size_t i = Buttons::BtFAQ; i < buttons.size(); i++)
-				if (const auto button = buttons.at(i).get())
-					button->draw(position);
-		}
-
-		/// Item
-		if (item_enabled)
-			for (Sprite sprite : item_sprites)
-				sprite.draw(position, inter);
-	}
-
-	void UICharInfo::update()
-	{
-		if (timestep >= Constants::TIMESTEP * UCHAR_MAX)
-		{
-			is_loading = false;
-		}
-		else
-		{
-			loading.update();
-			timestep += Constants::TIMESTEP;
-		}
+		UIElement::draw_buttons(alpha);
 	}
 
 	Button::State UICharInfo::button_pressed(uint16_t buttonid)
 	{
 		switch (buttonid)
 		{
-		case Buttons::BtClose:
+		case Buttons::BT_CLOSE:
 			deactivate();
-			return Button::State::NORMAL;
-		case Buttons::BtFamily:
-		case Buttons::BtParty:
 			break;
-		case Buttons::BtItem:
-			show_right_window(buttonid);
-			return Button::State::NORMAL;
-		case Buttons::BtCollect:
-		case Buttons::BtPersonality:
-		case Buttons::BtRide:
-		case Buttons::BtPet:
-		case Buttons::BtDamage:
-			show_bottom_window(buttonid);
-			return Button::State::NORMAL;
-		case Buttons::BtPopDown:
-		case Buttons::BtPopUp:
-		case Buttons::BtTrad:
-		case Buttons::BtFriend:
-		case Buttons::BtVisit:
+		case Buttons::BT_ITEM:
+			set_panel(panel == Panel::ITEMS ? Panel::NO_PANEL : Panel::ITEMS);
+			break;
+		case Buttons::BT_WISH:
+			set_panel(panel == Panel::WISHES ? Panel::NO_PANEL : Panel::WISHES);
+			break;
+		case Buttons::BT_PANEL_HIDE:
+			set_panel(Panel::NO_PANEL);
+			break;
+		case Buttons::BT_PET_SHOW:
+			set_mode(Mode::PET);
+			break;
+		case Buttons::BT_TAMING_SHOW:
+			set_mode(Mode::TAMING);
+			break;
+		case Buttons::BT_COLLECTION_SHOW:
+			set_mode(Mode::COLLECTION);
+			break;
+		case Buttons::BT_PET_HIDE:
+		case Buttons::BT_TAMING_HIDE:
+		case Buttons::BT_COLLECTION_HIDE:
+			set_mode(Mode::MAIN);
+			break;
 		default:
 			break;
 		}
 
-		return Button::State::DISABLED;
+		return Button::State::NORMAL;
 	}
 
 	bool UICharInfo::is_in_range(Point<int16_t> cursorpos) const
 	{
-		Rectangle<int16_t> bounds = Rectangle<int16_t>(position, position + dimension);
+		if (Rectangle<int16_t>(position, position + dimension).contains(cursorpos))
+			return true;
 
-		Rectangle<int16_t> farm_bounds = Rectangle<int16_t>(position, position + farm_dim);
-		farm_bounds.shift(farm_adj);
+		Point<int16_t> panelpos = position + PANEL;
 
-		Rectangle<int16_t> bottom_bounds = Rectangle<int16_t>(Point<int16_t>(0, 0), Point<int16_t>(0, 0));
-		Rectangle<int16_t> right_bounds = Rectangle<int16_t>(Point<int16_t>(0, 0), Point<int16_t>(0, 0));
-
-		int16_t cur_x = cursorpos.x();
-		int16_t cur_y = cursorpos.y();
-
-		if (personality_enabled)
-		{
-			bottom_bounds = Rectangle<int16_t>(position, position + personality_dimensions);
-			bottom_bounds.shift(bottom_window_adj);
-		}
-
-		if (collect_enabled)
-		{
-			bottom_bounds = Rectangle<int16_t>(position, position + collect_dimensions);
-			bottom_bounds.shift(bottom_window_adj);
-		}
-
-		if (damage_enabled)
-		{
-			bottom_bounds = Rectangle<int16_t>(position, position + damage_dimensions);
-			bottom_bounds.shift(bottom_window_adj);
-		}
-
-		if (item_enabled)
-		{
-			right_bounds = Rectangle<int16_t>(position, position + item_dimensions);
-			right_bounds.shift(right_window_adj);
-		}
-
-		return bounds.contains(cursorpos) || farm_bounds.contains(cursorpos) || bottom_bounds.contains(cursorpos) || right_bounds.contains(cursorpos);
+		return panel != Panel::NO_PANEL && Rectangle<int16_t>(panelpos, panelpos + PANEL_SIZE).contains(cursorpos);
 	}
 
-	void UICharInfo::send_key(int32_t keycode, bool pressed, bool escape)
+	void UICharInfo::send_key(int32_t, bool pressed, bool escape)
 	{
 		if (pressed && escape)
 			deactivate();
@@ -335,58 +202,50 @@ namespace ms
 
 	void UICharInfo::update_stats(int32_t character_id, int16_t job_id, int8_t lv, int16_t f, std::string g, std::string a)
 	{
-		int32_t player_id = Stage::get().get_player().get_oid();
+		if (character_id != cid)
+			return;
 
-		if (character_id == player_id)
-		{
-			buttons[Buttons::BtParty]->set_state(Button::State::DISABLED);
-			buttons[Buttons::BtPopDown]->set_state(Button::State::DISABLED);
-			buttons[Buttons::BtPopUp]->set_state(Button::State::DISABLED);
-			buttons[Buttons::BtFriend]->set_state(Button::State::DISABLED);
-		}
-
-		Job character_job = Job(job_id);
-
-		name.change_text(target_character->get_name());
-		job.change_text(character_job.get_name());
-		level.change_text(std::to_string(lv));
+		level.change_text(std::to_string(static_cast<uint8_t>(lv)));
+		job.change_text(Job(job_id).get_name());
 		fame.change_text(std::to_string(f));
-		guild.change_text((g == "" ? "-" : g));
-		alliance.change_text(a);
-
-		farm_name.change_text("");
-		farm_level_text = "1";
+		guild.change_text(g.empty() ? "-" : g);
+		alliance.change_text(a.empty() ? "-" : a);
 	}
 
-	void UICharInfo::show_bottom_window(uint16_t buttonid)
+	void UICharInfo::set_mode(Mode m)
 	{
-		personality_enabled = false;
-		collect_enabled = false;
-		damage_enabled = false;
+		mode = m;
+		dimension = Point<int16_t>(WIDTH, HEIGHTS[mode]);
 
-		switch (buttonid)
+		int16_t bottom = BOTTOMS[mode];
+
+		struct Toggle
 		{
-		case Buttons::BtPersonality:
-			personality_enabled = true;
-			break;
-		case Buttons::BtCollect:
-			collect_enabled = true;
-			break;
-		case Buttons::BtDamage:
-			damage_enabled = true;
-			break;
+			Mode target;
+			int16_t x;
+			uint16_t show, hide;
+		};
+
+		const Toggle toggles[] = {
+			{ Mode::PET, PET_X, Buttons::BT_PET_SHOW, Buttons::BT_PET_HIDE },
+			{ Mode::TAMING, TAMING_X, Buttons::BT_TAMING_SHOW, Buttons::BT_TAMING_HIDE },
+			{ Mode::COLLECTION, COLLECTION_X, Buttons::BT_COLLECTION_SHOW, Buttons::BT_COLLECTION_HIDE }
+		};
+
+		for (auto [target, x, show, hide] : toggles)
+		{
+			buttons[show]->set_position(Point<int16_t>(x, bottom));
+			buttons[hide]->set_position(Point<int16_t>(x, bottom));
+			buttons[show]->set_active(mode != target);
+			buttons[hide]->set_active(mode == target);
 		}
+
+		buttons[Buttons::BT_EXCEPTION]->set_position(Point<int16_t>(EXCEPTION_X, bottom));
 	}
 
-	void UICharInfo::show_right_window(uint16_t buttonid)
+	void UICharInfo::set_panel(Panel p)
 	{
-		item_enabled = false;
-
-		switch (buttonid)
-		{
-		case Buttons::BtItem:
-			item_enabled = true;
-			break;
-		}
+		panel = p;
+		buttons[Buttons::BT_PANEL_HIDE]->set_active(panel != Panel::NO_PANEL);
 	}
 }

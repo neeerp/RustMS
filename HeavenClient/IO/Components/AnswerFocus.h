@@ -5,8 +5,9 @@
 namespace ms
 {
 	// Which of a dialog page's two answers (YES/NO, ACCEPT/DECLINE) the
-	// keyboard has focused. Left focuses the left one and Right the right
-	// one; Enter presses the focused one, or the left one when neither is.
+	// keyboard has focused. As in the original, the first arrow of either
+	// kind focuses the left one; then Left and Right move between them.
+	// Enter presses the focused one, or the left one when neither is.
 	namespace answer_focus
 	{
 		enum Focus : int8_t
@@ -18,6 +19,9 @@ namespace ms
 
 		inline Focus move(Focus focus, bool left, bool right)
 		{
+			if (focus == Focus::NONE && (left || right))
+				return Focus::LEFT;
+
 			if (left)
 				return Focus::LEFT;
 

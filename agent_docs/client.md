@@ -66,7 +66,9 @@ from `UI.nx`. Moved so far:
 
 - **Status bar** (`UIStatusBar`, `StatusBar.img`): gauges, menu buttons, the
   quick slot panel, and the Game Menu and ShortCut popups (`UIWindow.img`).
-  Esc opens the Game Menu; the MENU key action opens ShortCut.
+  Esc opens the Game Menu; the MENU key action opens ShortCut. Dropping a
+  skill, or a USE or SETUP item, on a quick slot binds that slot's key and
+  saves the keymap right away; an open Key Config shows the new binding.
   Status messages (`UIStatusMessenger`) stack upward from just above the
   quick slot panel, right-aligned with it; `UIStatusBar::QUICKSLOT_TOP` is
   the shared anchor.
@@ -139,6 +141,21 @@ from `UI.nx`. Moved so far:
   restores the server's defaults; DEFAULT, CLEAR ALL, and Esc with unsaved
   changes ask through the in-window `notice` bitmaps. CHANGE QUICK SLOTS is
   disabled until the quick slot is configurable.
+- **Character info** (`UICharInfo`, `UIWindow.img/UserInfo`): opened by
+  double-clicking a character on the map, the player included
+  (`Stage::character_at`, a body-sized box above the feet in
+  `MapleMap/CharClick.h`; NPCs under the cursor take the click first). It shows
+  a copy of the character's look and name, and the level, job, fame, guild, and
+  alliance from CHAR_INFO, laid out from the background and the v83 client.
+  Double-clicking someone else replaces the window. TAMING MOB, PET INFO, and
+  COLLECTION lengthen it to `backgrnd5`, `backgrnd2`, and `backgrnd7`, and ITEM
+  and WISHLIST open `backgrnd4` and `backgrnd3` beside it; all are empty, as
+  RustMS has no mounts, pets, monster book, or cash shop wish list. Family,
+  party, trade, fame, and excluded items are disabled.
+- **Quest log** (`UIQuestLog`, `UIWindow.img/Quest`): Available, In Progress,
+  and Complete tabs (`Basic.img/Tab2`), quests folded by area, and a detail
+  panel with the quest's text and FIND NPC or QUEST HELPER, laid out from
+  period footage. See [quest-window.md](quest-window.md).
 
 `UIClassic.nx` is not one of NoLifeNx's standard files, so `NxFiles` opens it
 with `nl::file` instead of `nl::nx::load_all`.

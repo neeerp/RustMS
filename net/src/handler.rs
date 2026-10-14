@@ -265,6 +265,9 @@ pub enum FieldRequest {
         loot: crate::loot::Loot,
         vanish: bool,
     },
+    /// Show the player the info window for `character_id`, who must be on
+    /// their map (and may be themselves).
+    CharInfo { character_id: i32 },
 }
 
 impl ReplyAction for WorldAction {
@@ -310,6 +313,7 @@ fn world_routes() -> &'static HashMap<i16, WorldRoute> {
             ),
             (Op::ChangeKeybinds, InGame(&world::ChangeKeybindsHandler)),
             (Op::AllChat, InGame(&world::AllChatHandler)),
+            (Op::FaceExpression, InGame(&world::FaceExpressionHandler)),
             (Op::Whisper, InGame(&world::WhisperHandler)),
             (Op::TalkToNpc, InGame(&world::NpcTalkHandler)),
             (Op::NpcTalkMore, InGame(&world::NpcTalkMoreHandler)),
@@ -333,7 +337,9 @@ fn world_routes() -> &'static HashMap<i16, WorldRoute> {
             (Op::HealOverTime, InGame(&world::HealOverTimeHandler)),
             (Op::SpendAp, InGame(&world::SpendApHandler)),
             (Op::SpendSp, InGame(&world::SpendSpHandler)),
+            (Op::UseSkill, InGame(&world::UseSkillHandler)),
             (Op::MesoDrop, InGame(&world::MesoDropHandler)),
+            (Op::CharInfoRequest, InGame(&world::CharInfoRequestHandler)),
         ];
         table
             .into_iter()
