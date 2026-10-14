@@ -23,6 +23,8 @@
 
 #include <cstdint>
 
+#include <vector>
+
 #include "../UIElement.h"
 
 #include "../Components/Textfield.h"
@@ -116,7 +118,9 @@ namespace ms
 		Text version;
 		Point<int16_t> pos;
 		Point<int16_t> posZero;
-		nl::node order;
+		// The classes in UI.nx's order that this client has art for; the list
+		// also names ids from 1000 up, which are past CLASS_COUNT.
+		std::vector<uint8_t> classes;
 		nl::node hotlist;
 		nl::node newlist;
 		nl::node bgm;

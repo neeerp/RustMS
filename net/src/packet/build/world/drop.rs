@@ -9,6 +9,9 @@ pub enum DropAppearance {
     Falling { from: (i16, i16) },
     /// Already on the ground (shown to someone entering the map).
     Lying,
+    /// Thrown from `from`, then fades away instead of landing (an item that
+    /// can't be dropped).
+    Vanishing { from: (i16, i16) },
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -24,6 +27,8 @@ pub struct DropView {
     pub x: i16,
     pub y: i16,
     pub dropper: i32,
+    /// A player threw it away; pets leave it alone.
+    pub player_drop: bool,
 }
 
 /// DROP_ITEM_FROM_MAPOBJECT (`dropItemFromMapObject`).
@@ -33,6 +38,7 @@ pub fn build_drop(drop: &DropView, appearance: DropAppearance) -> Result<Packet,
     p.write_byte(match appearance {
         DropAppearance::Falling { .. } => 1,
         DropAppearance::Lying => 2,
+        DropAppearance::Vanishing { .. } => 3,
     })?;
     p.write_int(drop.object_id)?;
     p.write_byte(drop.meso as u8)?;
@@ -42,7 +48,7 @@ pub fn build_drop(drop: &DropView, appearance: DropAppearance) -> Result<Packet,
     p.write_short(drop.x)?;
     p.write_short(drop.y)?;
     p.write_int(drop.dropper)?;
-    if let DropAppearance::Falling { from } = appearance {
+    if let DropAppearance::Falling { from } | DropAppearance::Vanishing { from } = appearance {
         p.write_short(from.0)?;
         p.write_short(from.1)?;
         p.write_short(0)?;
@@ -50,7 +56,7 @@ pub fn build_drop(drop: &DropView, appearance: DropAppearance) -> Result<Packet,
     if !drop.meso {
         p.write_long(expiration(None))?;
     }
-    p.write_byte(1)?; // not a player drop
+    p.write_byte(u8::from(!drop.player_drop))?;
     Ok(p)
 }
 
@@ -98,6 +104,7 @@ mod tests {
             x: 150,
             y: -25,
             dropper: 2_000_000_001,
+            player_drop: false,
         }
     }
 
@@ -135,6 +142,31 @@ mod tests {
             .byte(2);
         expect.int(mesos.object_id).byte(1).int(5).int(7).byte(2);
         expect.short(150).short(-25).int(2_000_000_001).byte(1);
+        expect.end();
+    }
+
+    #[test]
+    fn vanishing_player_drop_layout() {
+        let thrown = DropView {
+            ownership: 2,
+            dropper: 0,
+            player_drop: true,
+            ..shell()
+        };
+        let packet = build_drop(&thrown, DropAppearance::Vanishing { from: (150, -25) }).unwrap();
+        let mut expect = Expect::new(&packet.bytes);
+        expect
+            .short(SendOpcode::DropItemFromMapObject as i16)
+            .byte(3);
+        expect
+            .int(thrown.object_id)
+            .byte(0)
+            .int(4000019)
+            .int(7)
+            .byte(2);
+        expect.short(150).short(-25).int(0);
+        expect.short(150).short(-25).short(0);
+        expect.long(expiration(None)).byte(0);
         expect.end();
     }
 

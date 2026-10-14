@@ -51,13 +51,14 @@ impl ClientActor {
         Ok(())
     }
 
-    /// Natural recovery reported by the client, at most every 9 seconds.
+    /// Natural recovery reported by the client, at most every 9 seconds and
+    /// only once the player has stood still that long.
     pub(super) async fn natural_heal(&mut self, hp: i16, mp: i16) -> Result<(), RuntimeError> {
         let now = tokio::time::Instant::now();
-        if self
-            .last_heal
-            .is_some_and(|last| now.duration_since(last) < NATURAL_HEAL_INTERVAL)
-        {
+        let recent = |at: Option<tokio::time::Instant>| {
+            at.is_some_and(|at| now.duration_since(at) < NATURAL_HEAL_INTERVAL)
+        };
+        if recent(self.last_heal) || recent(self.last_moved) {
             return Ok(());
         }
         let player = &mut self.in_game_mut()?.player;
@@ -77,5 +78,5 @@ impl ClientActor {
     }
 }
 
-/// The v83 client reports natural recovery every 10 seconds.
+/// The v83 client reports natural recovery after 10 seconds at rest.
 const NATURAL_HEAL_INTERVAL: std::time::Duration = std::time::Duration::from_secs(9);

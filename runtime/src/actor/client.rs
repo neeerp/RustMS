@@ -76,6 +76,8 @@ pub struct ClientActor {
     script: Option<npc_script::ActiveScript>,
     /// When natural recovery was last accepted.
     last_heal: Option<tokio::time::Instant>,
+    /// When the player last sent movement; recovery needs them to rest.
+    last_moved: Option<tokio::time::Instant>,
     /// A quest action waiting for its field to confirm the NPC is near.
     pending_quest: Option<(u64, QuestRequest)>,
     /// Portal scripts that already ran and won't run again this session.
@@ -122,6 +124,7 @@ impl ClientActor {
             conversation: None,
             script: None,
             last_heal: None,
+            last_moved: None,
             pending_quest: None,
             blocked_scripts: HashSet::new(),
             npc_request_id: 0,
@@ -228,6 +231,7 @@ impl ClientActor {
                 packet,
                 movement_bytes,
             } => {
+                self.last_moved = Some(tokio::time::Instant::now());
                 self.send_to_field(FieldMessage::Move {
                     from: self.client_id,
                     packet,

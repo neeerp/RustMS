@@ -30,12 +30,40 @@ one hit, and each hit at most twice the character's basic maximum
 damage, sends the attacker SHOW_MONSTER_HP, and on death KILL_MONSTER to
 everyone.
 
+In HeavenClient a hit of at least the mob's `pushed` value puts it in its
+`hit1` stance for about a quarter second, with a three-tick push that moves it
+a few pixels (`Mob::knockback_ticks`), as in period footage.
+
+KILL_MONSTER usually arrives before the swing connects on screen. In
+HeavenClient each mob counts the hits queued against it (`Mob::expect_hits`,
+from the player's own attacks and from other players' attacks as they
+arrive), and a killed mob starts its death animation when the last of them
+lands, or after 2 s if one never does.
+
 A dead mob's EXP is shared by damage dealt (the top damager gets any
 rounding remainder) and each share goes to that player's client actor
 (`ServerMessage::MobKilled`), which adds it with `Player::gain_exp`. A level
-gained sends the new level, AP, max HP/MP (+14/+11 per beginner level, the
-middle of v83's ranges), restores HP/MP, and shows SHOW_FOREIGN_EFFECT 0 to
-the others.
+gained sends the new level, AP, SP, max HP/MP (+14/+11 per beginner level,
+the middle of v83's ranges) and shows SHOW_FOREIGN_EFFECT 0 to the others. As
+in v83, current HP and MP are not refilled. Each level grants 5 AP, and 3 SP
+once past beginner.
+
+## Spending AP and SP
+
+The client locks its UI after SPEND_AP or SPEND_SP until the server answers,
+so every request is answered, refusals with an empty STAT_CHANGED.
+
+- **AP** (`Player::spend_ap`): SPEND_AP names the stat by its STAT_CHANGED
+  bit: STR, DEX, INT, LUK, MaxHP (0x800), or MaxMP (0x2000). Base stats stop
+  at 999 and max HP/MP at 30,000. One AP adds the middle of v83's per-job
+  HP/MP range (`ap_growth`; a beginner gets +10/+7).
+- **SP** (`Player::raise_skill`): the skill must belong to the character's
+  job or one it advanced through (`game::skill::in_job_tree`). Its `Skill.nx`
+  template (`game_data::skills`) gives the max level and the `req` skills it
+  needs; skills marked `invisible` must be granted first. Fourth-job skills
+  also stop at the character's master level. Three Snails, Recovery, and
+  Nimble Feet share a beginner pool of one per level from 2, up to 6, rather
+  than SP. The reply is STAT_CHANGED with the SP left, then UPDATE_SKILLS.
 
 ## Drops and pickup
 
@@ -49,9 +77,24 @@ the player's quests) and asks the field to place the loot.
 
 The field's `field_drops::DropSet` spreads a kill's drops around where the
 mob died and shows them falling (DROP_ITEM_FROM_MAPOBJECT 1); players
-entering see lying drops (mode 2). Quest drops are shown only to their owner.
+entering see lying drops (mode 2). Each drop lands on the map's footholds
+(`game_data::footholds`, loaded with the field template): on the highest
+ground below its column, searched from 50 px above the mob as v83 servers do.
+A wall between the mob and the drop's column, or no ground under it, keeps
+the drop on the ground below the mob, so drops don't end up inside a cliff or
+in the air. Quest drops are shown only to their owner.
 For 15 s only the killer may pick a drop up (quest drops: always only the
-owner); drops vanish after 180 s (REMOVE_ITEM_FROM_MAP 0).
+owner); drops vanish after 180 s (REMOVE_ITEM_FROM_MAP 0). Drops players
+throw down are anyone's at once; see "Client moves" in `inventory.md`.
+
+HeavenClient's `Drop` gives a falling drop its own, lighter gravity instead
+of the player's: it launches at -2.9 px per tick and gains 0.042 px per tick,
+so it rises about 100 px and is in the air about 1.1 s, as measured from 2008
+GMS footage. Its horizontal speed is set from that air time so it lands on
+its destination, and it turns about twice on the way down. A picked up drop
+(REMOVE_ITEM_FROM_MAP 2) follows the looter and rises about 50 px, slowing
+down, then disappears after about 0.37 s; it stays opaque except for the last
+six ticks. An expiring drop (mode 0) fades out where it is.
 
 ITEM_PICKUP (`0xCA`) needs the player within 800×600 of the drop. The field
 removes it (REMOVE_ITEM_FROM_MAP 2 with the looter) and hands it to the
@@ -63,7 +106,9 @@ back on the ground.
 ## Getting hurt
 
 TAKE_DAMAGE from a touch (-1) is accepted up to the touching mob's
-`PADamage`, only for mobs with `bodyAttack` and without `notAttack`. HP
+`PADamage`, only for mobs with `bodyAttack` and without `notAttack`
+(HeavenClient's `Mob::deals_touch_damage` applies the same rule, so other
+mobs neither hurt nor knock back on touch). HP
 drops, others see DAMAGE_PLAYER, and at 0 HP the player is dead:
 non-beginners lose 10% of their level's EXP; the client's respawn
 (CHANGE_MAP with a target while dead) returns them to the map's return map
@@ -71,7 +116,8 @@ with 50 HP.
 
 HeavenClient's `Player::update_death` notices HP reaching 0: the player
 becomes a ghost (`Char::State::DIED`), the tombstone from `Effect.nx/Tomb.img`
-drops behind them (drawn by `Char`), keys are ignored, and a "You have died."
+drops behind them (drawn by `Char`) as `Sound.nx/Game.img/Tombstone` plays,
+keys are ignored, and a "You have died."
 notice opens. The ghost is the body's `dead` frame, which fades in. Head, hair
 and equips have no `dead` frames, so `CharLook` puts the standing ones on the
 ghost's neck, as the original client does. The ghost and its name tag circle
@@ -93,4 +139,6 @@ the broadcast; `mob_combat` (integration) runs two players in Dangerous
 Forest through control, relayed movement, hits, kills, EXP, refused damage,
 touch damage, a level-up seen by the other player, and a respawn;
 `drops_and_pickup` checks ownership, reach, pickup, replays, meso
-persistence, and that the tutorial sentinel's quest drop needs its quest.
+persistence, and that the tutorial sentinel's quest drop needs its quest;
+`spend_points` levels a beginner and checks AP, the beginner pool, refusals,
+and that both survive logging out.

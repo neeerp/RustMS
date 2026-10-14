@@ -67,6 +67,9 @@ namespace ms
 		// Send key input to the stage
 		void send_key(KeyType::Id keytype, int32_t keycode, bool pressed);
 
+		// Talk to the nearest NPC in reach, as if it had been clicked.
+		void talk_to_nearest_npc();
+
 		// Lets go of a held key whose release went elsewhere, such as to a
 		// dialog or a text field, so the player doesn't keep walking.
 		void release_key(KeyType::Id keytype, int32_t keycode);

@@ -67,6 +67,9 @@ from `UI.nx`. Moved so far:
 - **Status bar** (`UIStatusBar`, `StatusBar.img`): gauges, menu buttons, the
   quick slot panel, and the Game Menu and ShortCut popups (`UIWindow.img`).
   Esc opens the Game Menu; the MENU key action opens ShortCut.
+  Status messages (`UIStatusMessenger`) stack upward from just above the
+  quick slot panel, right-aligned with it; `UIStatusBar::QUICKSLOT_TOP` is
+  the shared anchor.
 - **Chat** (`UIChatBar`): the input strip in the bar's top-left and the log
   above it. The status bar cuts that strip out of its background, so the two
   can overlap in either draw order.
@@ -107,6 +110,21 @@ from `UI.nx`. Moved so far:
   (`Text::Font::A10M`). Rows are grey when a required skill is missing. SP-up
   spends a point at once; v83 had no allocation popup. The MACRO button and the
   `SkillMacro` window are not drawn yet.
+- **Item window** (`UIItemInventory`, `UIWindow.img/Item`): five tabs
+  (`Item/Tab`, drawn by `ClassicTabs`), six rows of four slots with a `VScr4`
+  scroll bar, and the mesos, laid out from period footage. BtFull widens it to
+  `FullBackgrnd`, four pages of 24 with no scroll bar; BtSmall goes back.
+  Slots past the tab's limit show `disabled`. A gained item pulses its tab
+  (`New/Tab0`, or `Tab1` when selected) and its slot (`New/inventory`) until
+  the window closes. BtGather and BtSort rearrange the bag, and BtCoin asks
+  how many mesos to drop.
+- **Equipment window** (`UIEquipInventory`, `UIWindow.img/Equip`): the labelled
+  `backgrnd` grid (33 px cells from (5,35)) with an icon per worn slot, and the
+  `pet` panel that PET EQUIP opens beside it, laid out from period footage.
+  Cells that cannot be used are tinted red as in the footage: PANTS under an
+  overall, SHIELD beside a two-handed weapon, and the riding cells without
+  Monster Riding. RustMS has no pets, so the pet tabs are disabled and the pet
+  and MOB EQUIP cells hold nothing.
 - **Channel window** (`UIChannel`, `UIWindow.img/Channel`): the `t`, tiled
   `c` and `s` pieces around a six-column grid of 68×20 cells (70×21 apart from
   (9,67)), with a row per six channels, laid out from period footage. Every
@@ -227,3 +245,6 @@ These were corrected:
    own grey (`#BBBBBB`) chat line, worded as in period footage: "You have
    gained an item (Roger's Apple)", "You have gained items (3 Green Apple)",
    and "You have lost ..." for losses.
+8. The stat window's HP and MP buttons sent SPEND_AP with the current HP and
+   MP codes (0x400, 0x1000). They now send MaxHP and MaxMP (0x800, 0x2000),
+   which is what AP raises.

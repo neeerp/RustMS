@@ -230,10 +230,10 @@ namespace ms
 				deactivate();
 				break;
 			case Buttons::BT_HP:
-				send_apup(MapleStat::Id::HP);
+				send_apup(MapleStat::Id::MAXHP);
 				break;
 			case Buttons::BT_MP:
-				send_apup(MapleStat::Id::MP);
+				send_apup(MapleStat::Id::MAXMP);
 				break;
 			case Buttons::BT_STR:
 				send_apup(MapleStat::Id::STR);

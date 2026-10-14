@@ -1,4 +1,5 @@
 use crate::actor::field::{FieldActor, FieldMapEntityNpc};
+use crate::actor::field_drops::DropSet;
 use crate::actor::field_mobs::MobSet;
 use crate::message::{FieldHandle, FieldKey};
 use crate::supervisor::spawn_supervised;
@@ -42,6 +43,7 @@ impl FieldRegistry {
             rx,
             load_field_map_npcs(key),
             load_field_mobs(key),
+            load_field_drops(key),
             self.tick,
         );
         let registry: Weak<Self> = Arc::downgrade(self);
@@ -86,6 +88,15 @@ fn load_field_mobs(field_key: FieldKey) -> MobSet {
                 }
             }),
     )
+}
+
+fn load_field_drops(field_key: FieldKey) -> DropSet {
+    let footholds = net::get_game_data()
+        .ok()
+        .and_then(|data| data.field(field_key.map_id))
+        .map(|field| field.footholds.clone())
+        .unwrap_or_default();
+    DropSet::new(footholds)
 }
 
 fn load_field_map_npcs(field_key: FieldKey) -> Vec<FieldMapEntityNpc> {
