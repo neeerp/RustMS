@@ -11,13 +11,12 @@ use integration_harness::trace::{barrier, read, send, warp, Trace};
 use integration_harness::{login_to_world_session, relogin};
 use net::packet::op::SendOpcode;
 
-/// Entrance to Adventurer Training Center: several start points, entered
-/// through portal 0 at (-288, 27).
-const TRAINING_ENTRANCE: i32 = 1_010_000;
-/// The start point under Bari, at (257, 132).
-const UNDER_BARI: u8 = 3;
-/// The start point at the top left, at (-349, -45).
-const TOP_LEFT: u8 = 2;
+/// An unchanged training map with several distinct start points.
+const TRAINING_ENTRANCE: i32 = 1_010_100;
+/// The leftmost start point, at (213, -763).
+const LEFT_SPAWN: u8 = 3;
+/// The rightmost start point, at (353, -774).
+const RIGHT_SPAWN: u8 = 2;
 
 #[tokio::test]
 async fn leaving_the_game_saves_the_nearest_spawn_point() {
@@ -31,8 +30,8 @@ async fn leaving_the_game_saves_the_nearest_spawn_point() {
         TRAINING_ENTRANCE
     );
 
-    send(&mut c, walk_to(250, 132)).await;
-    barrier(&mut c, "under bari", &mut trace).await;
+    send(&mut c, walk_to(213, -763)).await;
+    barrier(&mut c, "left spawn", &mut trace).await;
     send(&mut c, build_change_channel(1).unwrap()).await;
     let redirect = loop {
         let packet = read(&mut c, &mut trace).await;
@@ -57,13 +56,13 @@ async fn leaving_the_game_saves_the_nearest_spawn_point() {
         }
     };
     assert_eq!(set_field.map_id, TRAINING_ENTRANCE);
-    assert_eq!(set_field.spawn_point, UNDER_BARI);
+    assert_eq!(set_field.spawn_point, LEFT_SPAWN);
 
-    send(&mut c, walk_to(-340, -45)).await;
-    barrier(&mut c, "top left", &mut trace).await;
+    send(&mut c, walk_to(353, -774)).await;
+    barrier(&mut c, "right spawn", &mut trace).await;
     drop(c);
 
     let session = relogin(&config).await;
     assert_eq!(session.map_id, TRAINING_ENTRANCE);
-    assert_eq!(session.spawn_point, TOP_LEFT);
+    assert_eq!(session.spawn_point, RIGHT_SPAWN);
 }
