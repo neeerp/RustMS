@@ -58,7 +58,7 @@ namespace ms
 		void remove_selected();
 
 		// The v83 art for a world is keyed by the world id itself.
-		uint16_t get_worldbyid(uint16_t worldid);
+		std::string get_world_name(uint8_t worldid) const;
 		uint8_t get_channel_count(uint8_t worldid) const;
 
 	protected:
