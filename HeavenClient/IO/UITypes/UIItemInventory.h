@@ -21,6 +21,7 @@
 
 #include "../UIDragElement.h"
 
+#include "../Components/ClassicTabs.h"
 #include "../Components/Slider.h"
 
 namespace ms
@@ -73,21 +74,19 @@ namespace ms
 
 		void update_slot(int16_t slot);
 
-		bool is_visible(int16_t slot) const;
+		void update_slider();
 
-		bool is_not_visible(int16_t slot) const;
+		bool is_visible(int16_t slot) const;
 
 		bool can_wear_equip(int16_t slot) const;
 
+		int16_t first_slot() const;
+
+		int16_t last_slot() const;
+
 		int16_t slot_by_position(Point<int16_t> position) const;
 
-		uint16_t button_by_tab(InventoryType::Id tab) const;
-
 		Point<int16_t> get_slotpos(int16_t slot) const;
-
-		Point<int16_t> get_full_slotpos(int16_t slot) const;
-
-		Point<int16_t> get_tabpos(InventoryType::Id tab) const;
 
 		Icon *get_icon(int16_t slot);
 
@@ -122,60 +121,44 @@ namespace ms
 			const UIItemInventory &parent;
 		};
 
-		static constexpr uint16_t ROWS = 8;
-		static constexpr uint16_t COLUMNS = 4;
-		static constexpr uint16_t MAXSLOTS = ROWS * COLUMNS;
-		static constexpr uint16_t MAXFULLSLOTS = COLUMNS * MAXSLOTS;
-		static constexpr uint16_t ICON_WIDTH = 36;
-		static constexpr uint16_t ICON_HEIGHT = 35;
+		static constexpr uint16_t TABS = 5;
+		static constexpr int16_t ROWS = 6;
+		static constexpr int16_t COLUMNS = 4;
+		// The full window shows four pages of ROWS * COLUMNS side by side.
+		static constexpr int16_t PAGES = 4;
+		static constexpr int16_t MAXSLOTS = ROWS * COLUMNS;
+		static constexpr int16_t MAXFULLSLOTS = PAGES * MAXSLOTS;
 
-		enum Buttons
+		enum Buttons : uint16_t
 		{
 			BT_CLOSE,
-			BT_TAB_EQUIP,
-			BT_TAB_USE,
-			BT_TAB_ETC,
-			BT_TAB_SETUP,
-			BT_TAB_CASH,
+			BT_TAB0,
+			BT_TAB1,
+			BT_TAB2,
+			BT_TAB3,
+			BT_TAB4,
 			BT_COIN,
-			BT_POINT,
 			BT_GATHER,
 			BT_SORT,
 			BT_FULL,
-			BT_SMALL,
-			BT_POT,
-			BT_UPGRADE,
-			BT_APPRAISE,
-			BT_EXTRACT,
-			BT_DISASSEMBLE,
-			BT_TOAD,
-			BT_COIN_SM,
-			BT_POINT_SM,
-			BT_GATHER_SM,
-			BT_SORT_SM,
-			BT_FULL_SM,
-			BT_SMALL_SM,
-			BT_POT_SM,
-			BT_UPGRADE_SM,
-			BT_APPRAISE_SM,
-			BT_EXTRACT_SM,
-			BT_DISASSEMBLE_SM,
-			BT_TOAD_SM,
-			BT_CASHSHOP
+			BT_SMALL
 		};
 
 		const Inventory &inventory;
 
+		Texture backgrnd;
+		Texture full_backgrnd;
+		ClassicTabs tabs;
 		Animation newitemslot;
-		Animation newitemtab;
+		Animation newitemtab[2];
 		Texture projectile;
 		Texture disabled;
 		Text mesolabel;
-		Text maplepointslabel;
 		Slider slider;
 
 		std::map<int16_t, std::unique_ptr<Icon>> icons;
-		std::map<InventoryType::Id, std::pair<int16_t, int16_t>> slotrange;
+		// The first row shown in each tab.
+		std::map<InventoryType::Id, int16_t> rows;
 
 		InventoryType::Id tab;
 		InventoryType::Id newtab;
@@ -184,13 +167,5 @@ namespace ms
 
 		bool sort_enabled;
 		bool full_enabled;
-		Texture backgrnd;
-		Texture backgrnd2;
-		Texture backgrnd3;
-		Texture full_backgrnd;
-		Texture full_backgrnd2;
-		Texture full_backgrnd3;
-		Point<int16_t> bg_dimensions;
-		Point<int16_t> bg_full_dimensions;
 	};
 }
