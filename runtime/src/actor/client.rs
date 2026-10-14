@@ -17,6 +17,7 @@ use game::Player;
 use net::dialogue::{Conversation, NpcInteraction};
 use net::login_world::resolve_login_channel;
 use net::packet::build;
+use net::packet::op::RecvOpcode;
 use net::quests::QuestRequest;
 use net::{ClientId, SpawnPosition, WorldAction, WorldContext, WorldRoute};
 use packet::Packet;
@@ -84,6 +85,8 @@ pub struct ClientActor {
     blocked_scripts: HashSet<String>,
     npc_request_id: u64,
     changing_channel: bool,
+    /// The player left their field for the Cash Shop.
+    in_cash_shop: bool,
 }
 
 impl ClientActor {
@@ -129,6 +132,7 @@ impl ClientActor {
             blocked_scripts: HashSet::new(),
             npc_request_id: 0,
             changing_channel: false,
+            in_cash_shop: false,
         })
     }
 
@@ -188,6 +192,11 @@ impl ClientActor {
             debug!(opcode, "Ignoring unhandled world opcode");
             return Ok(());
         };
+        // In the Cash Shop the player is off the map; only leaving counts.
+        if self.in_cash_shop && opcode != RecvOpcode::ChangeMap as i16 {
+            debug!(opcode, "Ignoring opcode in the Cash Shop");
+            return Ok(());
+        }
 
         let result = match (route, self.game.as_mut()) {
             (WorldRoute::PreGame(handler), None) => handler.handle(&mut packet),
@@ -290,6 +299,14 @@ impl ClientActor {
                 .await?
             }
             WorldAction::ChangeChannel { channel_id } => self.change_channel(channel_id).await?,
+            WorldAction::EnterCashShop => self.enter_cash_shop().await?,
+            WorldAction::LeaveCashShop => {
+                if self.in_cash_shop {
+                    // Like a channel change to this channel: the client
+                    // reconnects and enters the map it left.
+                    self.change_channel(self.channel_id).await?
+                }
+            }
             WorldAction::Disconnect => return Err(RuntimeError::ClientDisconnected),
         }
         Ok(())
@@ -407,6 +424,42 @@ impl ClientActor {
         Err(RuntimeError::ClientDisconnected)
     }
 
+    /// Take the player off their field and into the Cash Shop. The session
+    /// stays on this channel, so whispers still reach them.
+    async fn enter_cash_shop(&mut self) -> Result<(), RuntimeError> {
+        if self.in_cash_shop {
+            return Ok(());
+        }
+        self.conversation = None;
+        self.script = None;
+        self.pending_quest = None;
+        self.npc_request_id = self.npc_request_id.wrapping_add(1);
+        self.send_to_field(FieldMessage::Leave {
+            client_id: self.client_id,
+        })
+        .await?;
+        self.in_cash_shop = true;
+        self.flush().await?;
+
+        let account_id = self.in_game()?.player.account_id;
+        let account = spawn_db(move || db::account::get_account_by_id(account_id)).await?;
+        let player = &self.in_game()?.player;
+        let packets = [
+            build::world::cash_shop::build_open_cash_shop(player, &account.user_name),
+            build::world::cash_shop::build_cash_inventory(account.character_slots),
+            build::world::cash_shop::build_cash_gifts(),
+            build::world::cash_shop::build_wish_list(),
+            // No NX yet.
+            build::world::cash_shop::build_cash_balance(0, 0, 0),
+        ];
+        for packet in packets {
+            let mut packet = packet.map_err(|e| RuntimeError::Handler(e.to_string()))?;
+            self.send(&mut packet).await?;
+        }
+        info!(self.client_id, "Entered the Cash Shop");
+        Ok(())
+    }
+
     async fn handle_server_message(&mut self, message: ServerMessage) -> Result<(), RuntimeError> {
         match message {
             ServerMessage::NpcConversation {
@@ -520,11 +573,13 @@ impl ClientActor {
 
     async fn cleanup(&mut self) {
         if self.game.is_some() {
-            let _ = self
-                .send_to_field(FieldMessage::Leave {
-                    client_id: self.client_id,
-                })
-                .await;
+            if !self.in_cash_shop {
+                let _ = self
+                    .send_to_field(FieldMessage::Leave {
+                        client_id: self.client_id,
+                    })
+                    .await;
+            }
             let _ = self
                 .send_to_directory(DirectoryMessage::Unregister {
                     client_id: self.client_id,

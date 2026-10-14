@@ -1,3 +1,4 @@
+pub mod cash_shop;
 pub mod channel;
 pub mod char;
 pub mod drop;

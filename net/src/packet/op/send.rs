@@ -26,6 +26,7 @@ pub enum SendOpcode {
     FamilyInfo = 0x5F,
     FamilyList = 0x64,
     SetField = 0x7D,
+    SetCashShop = 0x7F,
     FieldEffect = 0x8A,
     Whisper = 0x87,
     SpawnPlayer = 0xA0,
@@ -49,6 +50,8 @@ pub enum SendOpcode {
     DropItemFromMapObject = 0x10C,
     RemoveItemFromMap = 0x10D,
     NpcDialogue = 0x130,
+    QueryCashResult = 0x144,
+    CashShopOperation = 0x145,
 
     KeyMap = 0x14F,
 }

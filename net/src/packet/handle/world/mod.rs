@@ -1,3 +1,4 @@
+mod cash_shop;
 mod change_channel;
 mod change_map;
 mod chat;
@@ -18,6 +19,7 @@ mod spend_points;
 mod use_item;
 mod whisper;
 
+pub use self::cash_shop::EnterCashShopHandler;
 pub use self::change_channel::ChangeChannelHandler;
 pub use self::change_map::{warp, ChangeMapHandler};
 pub use self::chat::AllChatHandler;
