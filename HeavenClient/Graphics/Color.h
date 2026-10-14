@@ -100,6 +100,7 @@ namespace ms
 			SANJUAN,
 			STRATOS,
 			BLUEBELL,
+			PARTYPINK,
 			MONALISA,
 			NUM_COLORS
 		};
@@ -151,6 +152,7 @@ namespace ms
 						{0.20f, 0.33f, 0.40f}, // San Juan (#335566, outlines the v83 minimap's names, from footage)
 						{0.00f, 0.00f, 0.27f}, // Stratos (#000044, fills v83 tooltips, from footage)
 						{0.60f, 0.60f, 0.80f}, // Blue Bell (#9999CC, edges v83 tooltips, from footage)
+						{1.00f, 0.60f, 0.80f}, // Party pink (#FF99CC, party chat; not yet checked against footage)
 						{1.00f, 0.63f, 0.58f}  // Mona Lisa (#FFA194, Monster Book lines in the chat log, from footage)
 				};
 

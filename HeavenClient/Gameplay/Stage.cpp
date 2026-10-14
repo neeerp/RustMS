@@ -135,6 +135,11 @@ namespace ms
 			drops.draw(id, viewx, viewy, alpha);
 		}
 
+		const Party &party = player.get_party();
+
+		if (party.shows_hp_marks())
+			chars.draw_party_hp(party, player.get_oid(), mapid, viewx, viewy, alpha);
+
 		combat.draw(viewx, viewy, alpha);
 		portals.draw(viewpos, alpha);
 		backgrounds.drawforegrounds(viewx, viewy, alpha);

@@ -25,6 +25,8 @@
 #include "../Spawn.h"
 
 #include "../Character/OtherChar.h"
+#include "../Character/Party.h"
+#include "../Graphics/Geometry.h"
 
 #include <queue>
 
@@ -60,8 +62,15 @@ namespace ms
 
 		Optional<OtherChar> get_char(int32_t cid);
 
+		// Draw HP bars over the heads of the player's party members.
+		void draw_party_hp(const Party &party, int32_t self, int32_t mapid, double viewx, double viewy, float alpha) const;
+
 	private:
+		// The bar's top is this far above a member's feet, as in period footage.
+		static constexpr int16_t PARTY_HP_RISE = 84;
+
 		MapObjects chars;
+		MobHpBar party_hpbar;
 
 		std::queue<CharSpawn> spawns;
 	};

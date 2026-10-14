@@ -7,6 +7,7 @@ pub mod field_reactors;
 pub mod login;
 pub mod messenger;
 pub mod object_ids;
+pub mod parties;
 pub mod registry;
 
 pub use client::ClientActor;

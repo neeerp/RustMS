@@ -256,8 +256,9 @@ side yet.
 | Quest log and markers | Implemented (`UIQuestLog`); progress arrives via SHOW_STATUS_INFO, quest start/complete is driven by NPC dialogue |
 | Chat, whisper, `/find`, server messages | Implemented; buddy whisper/find modes ignored |
 | Character info, minimap, world map | Implemented |
+| Party (`UIUserList` Party tab, `UIPartyHP`, party chat) | Implemented; see `parties.md` |
+| Buddy / guild / alliance / blacklist tabs (`UIUserList`) | Tab strip only |
 | Monster Book (`UIMonsterBook`) | Implemented: cards, summary, monster pages, search, cover; see `combat.md` |
-| Buddy / party / guild / boss list (`UIUserList`) | Buttons and layout only; no handlers, party packet exists but is unused |
 | Cash shop (`UICashShop`) | Browse/enter/exit; purchase is `// TODO: Purchase item` |
 | Maple Messenger (`UIMessenger`) | Implemented |
 | Storage, trade, player shops, mini-games, memo/mail | No UI, no handlers |
@@ -272,7 +273,6 @@ are registered (`Net/PacketSwitch.cpp`). Anything not listed there is silently i
 | System | Client status | Effort |
 | --- | --- | --- |
 | Buddy list | UI skeleton, no packets | M |
-| Party (create/invite/HP bars) | UI skeleton, `PARTY_OPERATION` packet only | M |
 | Guild | Skeleton only, plus guild emblem/BBS UIs missing | L |
 | Trade / storage / player shops | Nothing | L |
 | Cash shop purchase and inventory | Display only | M |

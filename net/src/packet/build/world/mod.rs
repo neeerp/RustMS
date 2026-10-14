@@ -13,6 +13,7 @@ pub mod messenger;
 pub mod mob;
 pub mod monster_book;
 pub mod npc;
+pub mod party;
 pub mod quest;
 pub mod reactor;
 pub mod shop;

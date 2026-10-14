@@ -1,5 +1,5 @@
 use crate::actor::field_drops::{Drop, DropSet};
-use crate::actor::field_mobs::MobSet;
+use crate::actor::field_mobs::{split_exp, MobSet, Sharer};
 use crate::actor::field_reactors::{Hit, ReactorSet};
 use crate::message::{ClientHandle, FieldKey, FieldMessage, ServerMessage};
 use game::FieldAvatar;
@@ -26,6 +26,7 @@ use tracing::{info, warn};
 struct Occupant {
     handle: ClientHandle,
     avatar: FieldAvatar,
+    party: Option<i32>,
 }
 
 #[derive(Clone, Debug)]
@@ -149,8 +150,17 @@ impl FieldActor {
 
     fn handle_message(&mut self, message: FieldMessage) {
         match message {
-            FieldMessage::Join { handle, avatar } => self.handle_join(handle, avatar),
+            FieldMessage::Join {
+                handle,
+                avatar,
+                party,
+            } => self.handle_join(handle, avatar, party),
             FieldMessage::Leave { client_id } => self.handle_leave(client_id),
+            FieldMessage::SetParty { client_id, party } => {
+                if let Some(occupant) = self.occupants.get_mut(&client_id) {
+                    occupant.party = party;
+                }
+            }
             FieldMessage::UpdateAvatar {
                 client_id,
                 avatar,
@@ -379,12 +389,23 @@ impl FieldActor {
                     if let Ok(packet) = build_kill_mob(kill.object_id, 1) {
                         self.broadcast(None, packet);
                     }
-                    for (client, exp) in &kill.exp {
-                        if let Some(occupant) = self.occupants.get(client) {
+                    let sharers: Vec<Sharer> = self
+                        .occupants
+                        .iter()
+                        .map(|(&client, occupant)| Sharer {
+                            client,
+                            level: occupant.avatar.level,
+                            party: occupant.party,
+                        })
+                        .collect();
+                    for share in split_exp(kill.exp, kill.level, &kill.damage_by, &sharers) {
+                        if let Some(occupant) = self.occupants.get(&share.client) {
                             occupant.handle.send(ServerMessage::MobKilled {
                                 mob_id: kill.mob_id,
                                 object_id: kill.object_id,
-                                exp: *exp,
+                                exp: share.exp,
+                                party_bonus: share.party_bonus,
+                                attacked: share.attacked,
                                 x: kill.x,
                                 y: kill.y,
                             });
@@ -430,7 +451,7 @@ impl FieldActor {
         }
     }
 
-    fn handle_join(&mut self, handle: ClientHandle, avatar: FieldAvatar) {
+    fn handle_join(&mut self, handle: ClientHandle, avatar: FieldAvatar, party: Option<i32>) {
         let client_id = handle.client_id;
         // A rejoin replaces the previous entry without announcing a leave.
         self.occupants.remove(&client_id);
@@ -479,8 +500,14 @@ impl FieldActor {
             }
         }
 
-        self.occupants
-            .insert(client_id, Occupant { handle, avatar });
+        self.occupants.insert(
+            client_id,
+            Occupant {
+                handle,
+                avatar,
+                party,
+            },
+        );
         let controlled = self.mobs.assign_uncontrolled(client_id);
         self.send_control(client_id, &controlled);
     }
@@ -628,6 +655,7 @@ mod tests {
             .send(FieldMessage::Join {
                 handle: first,
                 avatar: avatar(1, 10, 20),
+                party: None,
             })
             .await
             .unwrap();
@@ -635,6 +663,7 @@ mod tests {
             .send(FieldMessage::Join {
                 handle: second,
                 avatar: avatar(2, 30, 40),
+                party: None,
             })
             .await
             .unwrap();
@@ -671,6 +700,7 @@ mod tests {
             .send(FieldMessage::Join {
                 handle: stalled,
                 avatar: avatar(1, 0, 0),
+                party: None,
             })
             .await
             .unwrap();
@@ -678,6 +708,7 @@ mod tests {
             .send(FieldMessage::Join {
                 handle: healthy,
                 avatar: avatar(2, 0, 0),
+                party: None,
             })
             .await
             .unwrap();
@@ -730,12 +761,14 @@ mod tests {
         tx.send(FieldMessage::Join {
             handle: near,
             avatar: avatar(1, 600, 185),
+            party: None,
         })
         .await
         .unwrap();
         tx.send(FieldMessage::Join {
             handle: far,
             avatar: avatar(2, 1500, 185),
+            party: None,
         })
         .await
         .unwrap();
@@ -793,6 +826,7 @@ mod tests {
                 .send(FieldMessage::Join {
                     handle,
                     avatar: avatar(id, 0, 0),
+                    party: None,
                 })
                 .await
                 .unwrap();

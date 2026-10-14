@@ -24,6 +24,7 @@ pub enum SendOpcode {
     GatherItemResult = 0x34,
     SortItemResult = 0x35,
 
+    PartyOperation = 0x3E,
     CharInfo = 0x3D,
     BuddyList = 0x3F,
     MonsterBookSetCard = 0x53,
@@ -32,6 +33,7 @@ pub enum SendOpcode {
     FamilyList = 0x64,
     SetField = 0x7D,
     FieldEffect = 0x8A,
+    MultiChat = 0x86,
     Whisper = 0x87,
     SpawnPlayer = 0xA0,
     RemovePlayerFromMap = 0xA1,
@@ -52,6 +54,7 @@ pub enum SendOpcode {
     FacialExpression = 0xC1,
     ShowForeignEffect = 0xC6,
     UpdateCharLook = 0xC5,
+    UpdatePartyMemberHp = 0xC9,
     SpawnNpc = 0x101,
     DropItemFromMapObject = 0x10C,
     RemoveItemFromMap = 0x10D,

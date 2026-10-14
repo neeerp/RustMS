@@ -185,6 +185,34 @@ pub struct WhisperDelivery {
     pub sender_failure_packet: Packet,
 }
 
+/// A party operation; the world directory owns parties and carries it out.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum PartyRequest {
+    Create,
+    /// Leave the party; the leader leaving disbands it.
+    Leave,
+    /// Accept an invitation to `party_id`.
+    Accept {
+        party_id: i32,
+    },
+    /// Invite the named character, creating a party first if needed.
+    Invite {
+        name: String,
+    },
+    Decline {
+        inviter: String,
+    },
+    Expel {
+        member_id: i32,
+    },
+    ChangeLeader {
+        member_id: i32,
+    },
+    Chat {
+        text: String,
+    },
+}
+
 /// Something a player asks of their Maple Messenger, which the world
 /// directory owns.
 #[derive(Debug)]
@@ -255,6 +283,7 @@ pub enum WorldAction {
     /// The player's HP reached 0.
     Died,
     Whisper(WhisperDelivery),
+    Party(PartyRequest),
     /// Tell the player where a character is (`/find`).
     Find {
         target_name: String,
@@ -331,7 +360,7 @@ fn world_routes() -> &'static HashMap<i16, WorldRoute> {
     ROUTES.get_or_init(|| {
         use RecvOpcode as Op;
         use WorldRoute::*;
-        let table: [(Op, WorldRoute); 32] = [
+        let table = [
             (Op::PlayerLoggedIn, PreGame(&world::PlayerLoggedInHandler)),
             (Op::PlayerMove, InGame(&world::PlayerMoveHandler)),
             (Op::ChangeChannel, InGame(&world::ChangeChannelHandler)),
@@ -352,6 +381,12 @@ fn world_routes() -> &'static HashMap<i16, WorldRoute> {
             (Op::AllChat, InGame(&world::AllChatHandler)),
             (Op::FaceExpression, InGame(&world::FaceExpressionHandler)),
             (Op::Whisper, InGame(&world::WhisperHandler)),
+            (Op::PartyOperation, InGame(&world::PartyOperationHandler)),
+            (
+                Op::DenyPartyRequest,
+                InGame(&world::DenyPartyRequestHandler),
+            ),
+            (Op::PartyChat, InGame(&world::PartyChatHandler)),
             (Op::Messenger, InGame(&world::MessengerHandler)),
             (Op::TalkToNpc, InGame(&world::NpcTalkHandler)),
             (Op::NpcTalkMore, InGame(&world::NpcTalkMoreHandler)),
@@ -409,7 +444,7 @@ mod tests {
     fn every_registered_opcode_is_unique_per_server() {
         // The maps would silently drop duplicates; check the table sizes match.
         assert_eq!(login_routes().len(), 13);
-        assert_eq!(world_routes().len(), 32);
+        assert_eq!(world_routes().len(), 35);
     }
 
     #[test]
