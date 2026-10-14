@@ -35,6 +35,7 @@ pub enum RecvOpcode {
     AllChat = 0x31,
     FaceExpression = 0x33,
     Whisper = 0x78,
+    MonsterBookCover = 0x39,
     TalkToNpc = 0x3A,
     NpcTalkMore = 0x3C,
     NpcShopAction = 0x3D,

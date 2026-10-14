@@ -75,6 +75,9 @@ namespace ms
 			FACE_EXPRESSION = 51,
 			WHISPER = 120,
 
+			/// Monster Book
+			MONSTER_BOOK_COVER = 57,
+
 			/// NPC Interaction
 			TALK_TO_NPC = 58,
 			NPC_TALK_MORE = 60,

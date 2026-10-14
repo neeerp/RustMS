@@ -25,6 +25,7 @@
 #include "UIKeyConfig.h"
 #include "UIQuestLog.h"
 #include "UIQuit.h"
+#include "UIMonsterBook.h"
 #include "UISkillBook.h"
 #include "UIStatsInfo.h"
 #include "UISystemOption.h"
@@ -525,6 +526,7 @@ namespace ms
 				UI::get().emplace<UIChat>();
 				break;
 			case Buttons::BT_SHORTCUT_MONSTERBOOK:
+				UI::get().emplace<UIMonsterBook>(player.get_monsterbook());
 				break;
 		}
 

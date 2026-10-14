@@ -26,6 +26,8 @@ pub enum SendOpcode {
 
     CharInfo = 0x3D,
     BuddyList = 0x3F,
+    MonsterBookSetCard = 0x53,
+    MonsterBookSetCover = 0x54,
     FamilyInfo = 0x5F,
     FamilyList = 0x64,
     SetField = 0x7D,

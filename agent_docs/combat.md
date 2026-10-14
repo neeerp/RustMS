@@ -128,6 +128,40 @@ or the item (INVENTORY_OPERATION, "You have gained an item"). If the item
 doesn't fit, the player sees "You can't get anymore items." and the drop goes
 back on the ground.
 
+## Monster Book cards
+
+Every mob with a card (`Item.nx/Consume/0238.img`, matched by each card's
+`info/mob`) also rolls it on each kill: 1% as in v83, or
+`RUSTMS_CARD_DROP_RATE` (0 to 1; the harness sets 1). The card drops like any
+item, but picking it up puts it in the Monster Book (`game::MonsterBook`)
+instead of the bags: MONSTER_BOOK_SET_CARD (`0x53`: added byte, card, level)
+and the card effect (user effect 13), which the map sees too. A page holds
+five copies; a sixth is reported as not added and has no effect. The cover
+(MONSTER_BOOK_COVER `0x39` in, MONSTER_BOOK_SET_COVER `0x54` out) only takes a
+collected card, or 0 to clear it. Cards and cover persist
+(`monster_book_cards`, `characters.monster_book_cover`) and travel in
+SET_FIELD's character data (`net::codec::character`): the cover int, a 0 byte, a
+short count of cards, each its number within `0238.img` (a short) and level
+(a byte).
+
+HeavenClient's `UIMonsterBook` (B, or the status bar's shortcut menu) is
+the v83 book from `UIClassic.nx`, laid out from 2008 footage:
+
+- The "!" tab is the summary: book level (Cosmic's formula: level 1, then
+  each level needs 10 × level more distinct cards), total, special
+  (`card / 1000 % 10 == 8`) and basic counts, and the cover card.
+- The nine coloured tabs list each category's cards, 25 to a page: collected
+  ones in colour with their count (or the full mark at five), the rest in
+  grey (`Color::grayscale`, which the fragment shader turns to luminance).
+  The search box finds a monster by name and jumps to its card.
+- The right page shows the selected card's monster. More copies show more:
+  its picture from one, HP and MP from two, then Episode, Dropping (item
+  tooltips on hover) and Found In (maps grouped under bold street names) at
+  three, four and five. These come from `String.nx/MonsterBook.img`.
+- Right-clicking a collected card offers SET AS COVER / REMOVE COVER.
+
+A new card also prints "[Card name] has been successfully registered in the
+Monster Book." in the chat log in pink (`#FFA194`, from footage).
 ## Reactors
 
 A map's `reactor` nodes (`game_data::MapReactorTemplate`) place reactors such
@@ -178,8 +212,8 @@ carries the new HP, which brings the player back up.
 
 ## Keys
 
-New characters get Ctrl → attack (53) and Z → pick up (51) in their default
-keymap, as HeavenClient numbers its actions.
+New characters get Ctrl → attack (53), Z → pick up (51) and B → Monster Book
+(59) in their default keymap, as HeavenClient numbers its actions.
 
 ## Tests
 
@@ -193,6 +227,9 @@ Pio's quest;
 `drops_and_pickup` checks ownership, reach, pickup, replays, meso
 persistence, and that the tutorial sentinel's quest drop needs its quest;
 `spend_points` levels a beginner and checks AP, the beginner pool, refusals,
+and that both survive logging out; `monster_book` fills a card's page from
+six snails, checks the effect another player sees and the cover, and that
+both survive logging out.
 and that both survive logging out; `beginner_skills` has three players learn
 Three Snails, Nimble Feet, and Recovery and checks their damage caps, MP,
 buffs, cooldowns, Recovery's heal, what the others see, and that the buffs

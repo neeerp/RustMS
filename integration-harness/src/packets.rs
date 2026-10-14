@@ -84,6 +84,9 @@ pub struct SetFieldPacket {
     /// How many of each item the bags hold (not counting equipped items).
     pub items: BTreeMap<i32, i32>,
     pub meso: i32,
+    /// The Monster Book's cover card and each card's copies, by card id.
+    pub monster_book_cover: i32,
+    pub monster_book: BTreeMap<i32, u8>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -234,6 +237,8 @@ pub fn opcode_name(opcode: i16) -> &'static str {
         x if x == SendOpcode::KillMonster as i16 => "KillMonster",
         x if x == SendOpcode::DropItemFromMapObject as i16 => "DropItemFromMapObject",
         x if x == SendOpcode::RemoveItemFromMap as i16 => "RemoveItemFromMap",
+        x if x == SendOpcode::MonsterBookSetCard as i16 => "MonsterBookSetCard",
+        x if x == SendOpcode::MonsterBookSetCover as i16 => "MonsterBookSetCover",
         x if x == SendOpcode::SpawnReactor as i16 => "SpawnReactor",
         x if x == SendOpcode::HitReactor as i16 => "HitReactor",
         x if x == SendOpcode::RemoveReactor as i16 => "RemoveReactor",
@@ -704,6 +709,22 @@ pub fn decode_set_field(packet: &Packet) -> Result<SetFieldPacket, String> {
         quests.insert(id, 2);
     }
 
+    // Minigame records and rings (the server sends none), then the teleport
+    // rocks.
+    for _ in 0..4 {
+        if cursor.read_short().map_err(|e| e.to_string())? != 0 {
+            return Err("unexpected minigame or ring records".into());
+        }
+    }
+    skip(&mut cursor, 15 * 4)?;
+    let monster_book_cover = cursor.read_int().map_err(|e| e.to_string())?;
+    cursor.read_byte().map_err(|e| e.to_string())?;
+    let mut monster_book = BTreeMap::new();
+    for _ in 0..cursor.read_short().map_err(|e| e.to_string())? {
+        let card = 2_380_000 + i32::from(cursor.read_short().map_err(|e| e.to_string())?);
+        monster_book.insert(card, cursor.read_byte().map_err(|e| e.to_string())?);
+    }
+
     Ok(SetFieldPacket {
         character_id: meta.id,
         character_name: meta.name,
@@ -720,6 +741,8 @@ pub fn decode_set_field(packet: &Packet) -> Result<SetFieldPacket, String> {
         equipped,
         items,
         meso,
+        monster_book_cover,
+        monster_book,
     })
 }
 

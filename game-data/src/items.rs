@@ -110,6 +110,28 @@ impl ItemData {
         })
     }
 
+    /// Every Monster Book card (`Consume/0238.img`) as `(card, mob)`, in
+    /// card order.
+    pub fn monster_cards(&self) -> Result<Vec<(i32, i32)>, GameDataError> {
+        let nx = &self.items;
+        let Some(cards) = path_index(nx, "Consume/0238.img")? else {
+            return Ok(Vec::new());
+        };
+        let mut found = Vec::new();
+        for node in nx.child_indices(cards)? {
+            let Ok(card) = nx.node_name(node)?.parse::<i32>() else {
+                continue;
+            };
+            let Some(info) = nx.child_by_name(node, "info")? else {
+                continue;
+            };
+            if let Some(mob) = number(nx, info, "mob")? {
+                found.push((card, mob));
+            }
+        }
+        Ok(found)
+    }
+
     /// The template for `item_id`, or `None` if the data has no such item.
     pub fn info(&self, item_id: i32) -> Result<Option<ItemInfo>, GameDataError> {
         if item_id / 1_000_000 == 1 {
@@ -259,6 +281,17 @@ mod tests {
             (subi.price, subi.unit_price, subi.slot_max),
             (250, 0.3, 500)
         );
+    }
+
+    #[test]
+    fn reads_monster_cards_and_their_mobs() {
+        let Some(data) = data() else {
+            return;
+        };
+        let cards = data.monster_cards().unwrap();
+        assert!(cards.len() > 300);
+        assert_eq!(cards[0], (2380000, 100100)); // Snail
+        assert!(cards.contains(&(2380001, 100101))); // Blue Snail
     }
 
     #[test]

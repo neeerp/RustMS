@@ -31,8 +31,8 @@ mod tests {
     use crate::codec::time::{DEFAULT_TIME, ZERO_TIME};
     use game::inventory::equip_slot;
     use game::{
-        EquipStats, Inventory, InventoryType, Item, Keymap, QuestLog, QuestRecord, QuestStatus,
-        SkillBook, SkillRecord,
+        EquipStats, Inventory, InventoryType, Item, Keymap, MonsterBook, QuestLog, QuestRecord,
+        QuestStatus, SkillBook, SkillRecord,
     };
     use std::time::{Duration, UNIX_EPOCH};
 
@@ -101,6 +101,7 @@ mod tests {
             quests,
         );
         player.buddy_capacity = 30;
+        player.monster_book = MonsterBook::new(2380001, [(2380000, 5), (2380001, 2)]);
         player
     }
 
@@ -194,7 +195,9 @@ mod tests {
         for _ in 0..15 {
             expect.int(999_999_999); // teleport rocks (5 regular + 10 VIP)
         }
-        expect.int(0).byte(0).short(0); // monster book
+        // monster book: the cover card, then each card's number and count
+        expect.int(2380001).byte(0).short(2);
+        expect.short(0).byte(5).short(1).byte(2);
         expect.short(0); // new year cards
         expect.short(0); // area info
         expect.short(0);

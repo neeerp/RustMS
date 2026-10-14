@@ -34,6 +34,7 @@
 #include "UITypes/UIQuestLog.h"
 #include "UITypes/UIQuit.h"
 #include "UITypes/UIShop.h"
+#include "UITypes/UIMonsterBook.h"
 #include "UITypes/UISkillBook.h"
 #include "UITypes/UIStatsInfo.h"
 #include "UITypes/UIStatusBar.h"
@@ -67,6 +68,8 @@ namespace ms
 					return Tooltip::Parent::WORLDMAP;
 				case UIElement::Type::MINIMAP:
 					return Tooltip::Parent::MINIMAP;
+				case UIElement::Type::MONSTERBOOK:
+					return Tooltip::Parent::MONSTERBOOK;
 				default:
 					return Tooltip::Parent::NONE;
 			}
@@ -239,6 +242,11 @@ namespace ms
 								emplace<UISkillBook>(
 										Stage::get().get_player().get_stats(),
 										Stage::get().get_player().get_skills()
+								);
+								break;
+							case KeyAction::Id::MONSTERBOOK:
+								emplace<UIMonsterBook>(
+										Stage::get().get_player().get_monsterbook()
 								);
 								break;
 							case KeyAction::Id::FRIENDS:

@@ -79,6 +79,10 @@ namespace ms
 		SERVER_MESSAGE = 68,
 		WEEK_EVENT_MESSAGE = 77,
 
+		/// Monster Book
+		MONSTER_BOOK_SET_CARD = 83,
+		MONSTER_BOOK_SET_COVER = 84,
+
 		SKILL_MACROS = 124,
 		SET_FIELD = 125,
 		WHISPER = 135,
@@ -191,6 +195,8 @@ namespace ms
 		emplace<RECALCULATE_STATS, RecalculateStatsHandler>();
 		emplace<UPDATE_SKILL, UpdateSkillHandler>();
 		emplace<ADD_COOLDOWN, AddCooldownHandler>();
+		emplace<MONSTER_BOOK_SET_CARD, MonsterBookSetCardHandler>();
+		emplace<MONSTER_BOOK_SET_COVER, MonsterBookSetCoverHandler>();
 
 		// Messaging handlers
 		emplace<SHOW_STATUS_INFO, ShowStatusInfoHandler>();

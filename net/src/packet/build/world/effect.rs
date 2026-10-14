@@ -27,6 +27,7 @@ pub fn build_avatar_effect(path: &str) -> Result<Packet, NetworkError> {
 pub enum CharEffect {
     LevelUp = 0,
     QuestClear = 9,
+    MonsterCard = 13,
 }
 
 /// SHOW_ITEM_GAIN_INCHAT: `effect` on this player.
