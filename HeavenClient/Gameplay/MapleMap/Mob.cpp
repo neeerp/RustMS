@@ -95,6 +95,7 @@ namespace ms
 		set_stance(st);
 		flydirection = STRAIGHT;
 		counter = 0;
+		knockback_ticks = 0;
 
 		namelabel = Text(Text::Font::A13M, Text::Alignment::CENTER, Color::Name::WHITE, Text::Background::NAMETAG,
 						 name);
@@ -128,6 +129,10 @@ namespace ms
 
 	void Mob::set_stance(Stance newstance)
 	{
+		// A hit nudges the mob back a few pixels; it doesn't slide away.
+		if (newstance == Stance::HIT)
+			knockback_ticks = 3;
+
 		if (stance != newstance)
 		{
 			stance = newstance;
@@ -214,8 +219,10 @@ namespace ms
 
 					break;
 				case Stance::HIT:
-					if (canmove)
+					if (canmove && knockback_ticks > 0)
 					{
+						knockback_ticks--;
+
 						double KBFORCE = phobj.onground ? 0.2 : 0.1;
 						phobj.hforce = flip ? -KBFORCE : KBFORCE;
 					}

@@ -30,6 +30,10 @@ one hit, and each hit at most twice the character's basic maximum
 damage, sends the attacker SHOW_MONSTER_HP, and on death KILL_MONSTER to
 everyone.
 
+In HeavenClient a hit of at least the mob's `pushed` value puts it in its
+`hit1` stance for about a quarter second, with a three-tick push that moves it
+a few pixels (`Mob::knockback_ticks`), as in period footage.
+
 A dead mob's EXP is shared by damage dealt (the top damager gets any
 rounding remainder) and each share goes to that player's client actor
 (`ServerMessage::MobKilled`), which adds it with `Player::gain_exp`. A level
