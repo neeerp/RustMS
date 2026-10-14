@@ -64,6 +64,18 @@ namespace ms
 		}
 	};
 
+	// Packet which requests that mesos are dropped on the map
+	// Opcode: MESO_DROP(94)
+	class MesoDropPacket : public OutPacket
+	{
+	public:
+		MesoDropPacket(int32_t amount) : OutPacket(OutPacket::Opcode::MESO_DROP)
+		{
+			write_time();
+			write_int(amount);
+		}
+	};
+
 	// Packet which requests that an item is equipped
 	// Opcode: MOVE_ITEM(71)
 	class EquipItemPacket : public MoveItemPacket

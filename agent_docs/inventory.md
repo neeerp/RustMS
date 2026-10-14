@@ -23,8 +23,9 @@ and `build_item_gain_in_chat` (SHOW_ITEM_GAIN_INCHAT mode 3) show gains.
 ## Item data
 
 `game_data::items::ItemData` reads `Item.nx` (use/setup/etc/cash: `slotMax`,
-`quest`, `only`, `price`, consumable `spec`) and `Character.nx` (equipment
-stats `inc*`, `tuc`, and `req*` requirements) on demand. Stacks default to
+`quest`, `only`, `price`, `tradeBlock`, consumable `spec`) and `Character.nx`
+(equipment stats `inc*`, `tuc`, `req*` requirements, and `tradeBlock`) on
+demand. Stacks default to
 100 when `slotMax` is absent. `net::items` loads it once
 (`RUSTMS_ITEM_NX_PATH`, `RUSTMS_CHARACTER_NX_PATH`), creates items with their
 base stats (`create`), and checks wear requirements (`can_wear`: level,
@@ -39,8 +40,17 @@ ITEM_MOVE (`0x47`: tick, type, from, to, quantity) is handled by
 (after `can_wear`), anything else moves within the bag. The reply is the
 INVENTORY_OPERATION; a worn-equipment change also refreshes the field avatar
 and sends UPDATE_CHAR_LOOK (`0xC5`) to the other players on the map. Refused
-moves only get an enable-actions stat update. Dropping (destination 0) waits
-for floor items.
+moves only get an enable-actions stat update.
+
+Dropping is a move to destination 0 from a bag slot (`drop_item`; worn items
+can't be dropped, and the client never asks). Stars and bullets go as the
+whole stack; anything else drops the asked quantity, keeping equipment's
+stats (`Loot::Dropped`). Quest and `tradeBlock` items leave the bag but don't
+reach the floor: everyone sees them vanish (DROP_ITEM_FROM_MAPOBJECT 3).
+MESO_DROP (`0x5E`: tick, amount) drops 10 to 50,000 mesos the player holds;
+HeavenClient's meso button asks how many with `UIEnterNumber`. The field
+places either kind where it last saw the player (it has no footholds), and
+anyone may pick it up at once (ownership 2). Dead players can't drop.
 
 HeavenClient cancels any icon drag before applying an INVENTORY_OPERATION,
 because the dragged icon points into the icons being rebuilt.
@@ -63,4 +73,6 @@ below full it reports +10 HP / +3 MP. The server accepts at most +20 HP and
 `game` unit tests cover stacking, full bags, removal order, merging,
 swapping, and overall/pants; `net` covers the packet layouts and the handler;
 `inventory_moves` (integration) equips, unequips, moves, checks refusals,
-observes UPDATE_CHAR_LOOK from a second player, and checks persistence.
+observes UPDATE_CHAR_LOOK from a second player, and checks persistence;
+`player_drops` drops a weapon for a second player to pick up and drops
+mesos earned from snails, checking both losses are saved.
