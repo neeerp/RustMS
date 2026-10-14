@@ -19,13 +19,20 @@ async fn changed_keys_survive_logout() {
         (4, 1),
         "unexpected default binding"
     );
+    // v83's layout: Whisper on H rather than Y, X sits, Space talks to NPCs
+    // as an action, and 1 is all chat.
+    assert_eq!(session.keymap[35], (4, 12));
+    assert_eq!(session.keymap[21], (0, 0));
+    assert_eq!(session.keymap[45], (5, 52));
+    assert_eq!(session.keymap[57], (5, 55));
+    assert_eq!(session.keymap[2], (4, 13));
 
     // Rebind an existing default key (the case the old upsert dropped), bind
     // a previously empty one, and bind a skill whose id needs 32 bits.
     session
         .connection
         .send_packet(
-            build_change_keymap(&[(DEFAULT_KEY as i32, 4, 9), (2, 5, 54), (3, 1, SKILL_ID)])
+            build_change_keymap(&[(DEFAULT_KEY as i32, 4, 9), (8, 5, 54), (3, 1, SKILL_ID)])
                 .expect("failed to build keymap change"),
             "change keymap",
         )
@@ -38,6 +45,6 @@ async fn changed_keys_survive_logout() {
 
     let session = relogin(&config).await;
     assert_eq!(session.keymap[DEFAULT_KEY], (4, 9));
-    assert_eq!(session.keymap[2], (5, 54));
+    assert_eq!(session.keymap[8], (5, 54));
     assert_eq!(session.keymap[3], (1, SKILL_ID));
 }

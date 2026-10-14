@@ -191,7 +191,7 @@ namespace ms
 			return PALETTE + Point<int16_t>(slot % PALETTE_COLUMNS * SLOT, slot / PALETTE_COLUMNS * SLOT);
 		}
 
-		// The server's default bindings (game/src/keymap.rs).
+		// The server's default bindings (game/src/keymap.rs), v83's layout.
 		const std::map<int32_t, Keyboard::Mapping> DEFAULT_BINDINGS = {
 			{ KeyConfig::Key::F1, { KeyType::Id::FACE, KeyAction::Id::FACE1 } },
 			{ KeyConfig::Key::F2, { KeyType::Id::FACE, KeyAction::Id::FACE2 } },
@@ -213,11 +213,26 @@ namespace ms
 			{ KeyConfig::Key::Q, { KeyType::Id::MENU, KeyAction::Id::QUESTLOG } },
 			{ KeyConfig::Key::BACKSLASH, { KeyType::Id::MENU, KeyAction::Id::KEYBINDINGS } },
 			{ KeyConfig::Key::APOSTROPHE, { KeyType::Id::MENU, KeyAction::Id::TOGGLECHAT } },
-			{ KeyConfig::Key::Y, { KeyType::Id::MENU, KeyAction::Id::WHISPER } },
+			{ KeyConfig::Key::H, { KeyType::Id::MENU, KeyAction::Id::WHISPER } },
+			{ KeyConfig::Key::NUM1, { KeyType::Id::MENU, KeyAction::Id::SAY } },
 			{ KeyConfig::Key::NUM2, { KeyType::Id::MENU, KeyAction::Id::PARTYCHAT } },
+			{ KeyConfig::Key::NUM3, { KeyType::Id::MENU, KeyAction::Id::FRIENDSCHAT } },
+			{ KeyConfig::Key::NUM4, { KeyType::Id::MENU, KeyAction::Id::GUILDCHAT } },
+			{ KeyConfig::Key::NUM5, { KeyType::Id::MENU, KeyAction::Id::ALLIANCECHAT } },
+			{ KeyConfig::Key::NUM6, { KeyType::Id::MENU, KeyAction::Id::TOSPOUSE } },
 			{ KeyConfig::Key::ESCAPE, { KeyType::Id::MENU, KeyAction::Id::MENU } },
+			{ KeyConfig::Key::LEFT_BRACKET, { KeyType::Id::MENU, KeyAction::Id::MENU } },
+			{ KeyConfig::Key::RIGHT_BRACKET, { KeyType::Id::MENU, KeyAction::Id::QUICKSLOTS } },
+			{ KeyConfig::Key::G, { KeyType::Id::MENU, KeyAction::Id::GUILD } },
+			{ KeyConfig::Key::P, { KeyType::Id::MENU, KeyAction::Id::PARTY } },
+			{ KeyConfig::Key::L, { KeyType::Id::MENU, KeyAction::Id::NOTIFIER } },
+			{ KeyConfig::Key::GRAVE_ACCENT, { KeyType::Id::MENU, KeyAction::Id::CASHSHOP } },
+			{ KeyConfig::Key::SEMICOLON, { KeyType::Id::MENU, KeyAction::Id::MEDALS } },
+			{ KeyConfig::Key::B, { KeyType::Id::MENU, KeyAction::Id::MONSTERBOOK } },
 			{ KeyConfig::Key::LEFT_CONTROL, { KeyType::Id::ACTION, KeyAction::Id::ATTACK } },
-			{ KeyConfig::Key::Z, { KeyType::Id::ACTION, KeyAction::Id::PICKUP } }
+			{ KeyConfig::Key::Z, { KeyType::Id::ACTION, KeyAction::Id::PICKUP } },
+			{ KeyConfig::Key::X, { KeyType::Id::ACTION, KeyAction::Id::SIT } },
+			{ KeyConfig::Key::SPACE, { KeyType::Id::ACTION, KeyAction::Id::INTERACT_HARVEST } }
 		};
 	}
 
@@ -873,8 +888,8 @@ namespace ms
 		case KeyAction::Id::SIT:
 		case KeyAction::Id::ATTACK:
 		case KeyAction::Id::JUMP:
-			return KeyType::Id::ACTION;
 		case KeyAction::Id::INTERACT_HARVEST:
+			return KeyType::Id::ACTION;
 		case KeyAction::Id::MAPLESTORAGE:
 		case KeyAction::Id::SAFEMODE:
 		case KeyAction::Id::MUTE:

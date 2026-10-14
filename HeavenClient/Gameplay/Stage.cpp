@@ -259,6 +259,9 @@ namespace ms
 						case KeyAction::Id::PICKUP:
 							check_drops();
 							break;
+						case KeyAction::Id::INTERACT_HARVEST:
+							talk_to_nearest_npc();
+							break;
 					}
 				}
 
