@@ -262,7 +262,9 @@ namespace ms
 					set_sort(false);
 				}
 
-				return Button::State::PRESSED;
+				// The strip is drawn from tab, not the button states. A tab
+				// left PRESSED would ignore every later click (#188).
+				break;
 			}
 			case Buttons::BT_GATHER:
 				GatherItemsPacket(tab).dispatch();
