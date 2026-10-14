@@ -746,6 +746,22 @@ namespace ms
 		return Button::State::NORMAL;
 	}
 
+	void UIQuestLog::show_quest(int16_t id)
+	{
+		int16_t area = nl::nx::quest["QuestInfo.img"][std::to_string(id)]["area"].get_integer();
+		change_tab(TAB1);
+		folded[TAB1].erase(area);
+		selected = id;
+		refresh_list();
+		auto found = std::find_if(rows.begin(), rows.end(), [&](const Row& row) { return row.quest == id; });
+		if (found != rows.end())
+		{
+			int16_t row = static_cast<int16_t>(found - rows.begin());
+			if (row < list_offset || row >= list_offset + ROWS)
+				scroll_list(std::max<int16_t>(0, row - ROWS + 1));
+		}
+	}
+
 	void UIQuestLog::change_tab(uint16_t tabid)
 	{
 		buttons[TAB0 + tab]->set_state(Button::State::NORMAL);

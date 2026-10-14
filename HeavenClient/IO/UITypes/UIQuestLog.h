@@ -52,6 +52,9 @@ namespace ms
 
 		Cursor::State send_cursor(bool clicking, Point<int16_t> cursorpos) override;
 
+		// Show a quest in progress, opening it on the In Progress tab.
+		void show_quest(int16_t id);
+
 		UIElement::Type get_type() const override;
 
 	protected:

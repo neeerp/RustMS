@@ -32,6 +32,7 @@
 #include "UITypes/UIKeyConfig.h"
 #include "UITypes/UIMessenger.h"
 #include "UITypes/UIMiniMap.h"
+#include "UITypes/UIQuestComplete.h"
 #include "UITypes/UIQuestLog.h"
 #include "UITypes/UIQuit.h"
 #include "UITypes/UIShop.h"
@@ -91,6 +92,7 @@ namespace ms
 		emplace<UIMiniMap>(stats);
 		emplace<UIBuffList>();
 		emplace<UIQuestHelper>(Stage::get().get_player().get_quests(), inventory);
+		emplace<UIQuestComplete>(Stage::get().get_player().get_quests(), inventory);
 		emplace<UIPartyHP>(Stage::get().get_player().get_party(), stats);
 		emplace<UIShop>(look, inventory);
 
@@ -575,6 +577,7 @@ namespace ms
 					UIElement::Type::MINIMAP,
 					UIElement::Type::BUFFLIST,
 					UIElement::Type::QUESTHELPER,
+					UIElement::Type::QUESTCOMPLETE,
 					UIElement::Type::PARTYHP,
 					UIElement::Type::NPCTALK,
 					UIElement::Type::SHOP

@@ -80,6 +80,8 @@ from `UI.nx`. Moved so far:
   bar (`Slider::Type::CLASSIC`). See [npc-dialogue.md](npc-dialogue.md).
 - **Quest Helper** (`UIQuestHelper`, `UIWindow.img/QuestAlarm`). See
   [quests.md](quests.md).
+- **Quest Complete! notice** (`UIQuestComplete`, `UIWindow.img/FadeYesNo`).
+  See [quests.md](quests.md).
 - **Minimap** (`UIMiniMap`, `UIWindow.img/MiniMap`): folded to its title bar,
   the map alone (`MinMap`), or the map under the map's mark, street, and name
   (`MaxMap`), laid out from period footage. M or the `Basic.img` minus and
