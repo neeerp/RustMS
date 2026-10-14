@@ -19,7 +19,7 @@ impl ClientActor {
             return Ok(());
         }
         self.conversation = None;
-        if let Some(script) = net::npc_scripts::NpcScript::for_npc(npc_id) {
+        if let Some(script) = net::npc_scripts::NpcScript::for_npc(npc_id, &game.player) {
             return self.start_script(script).await;
         }
         if self.open_shop(npc_id).await? {

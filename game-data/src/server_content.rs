@@ -40,6 +40,16 @@ pub mod keys {
     pub const SKIP_ASK: &str = "skip.ask";
     pub const SKIP_DECLINE: &str = "skip.decline";
 
+    /// Shanks's ship from Southperry to Victoria Island (`begin7`): the
+    /// offer, then the letter's pages or the fare's.
+    pub const SHANKS_ASK: &str = "shanks.ask";
+    pub const SHANKS_DECLINE: &str = "shanks.decline";
+    pub const SHANKS_LETTER: [&str; 2] = ["shanks.letter.0", "shanks.letter.1"];
+    pub const SHANKS_FARE: &str = "shanks.fare";
+    pub const SHANKS_TOO_WEAK: &str = "shanks.too_weak";
+    pub const SHANKS_NO_MESOS: &str = "shanks.no_mesos";
+    pub const SHANKS_PAID: &str = "shanks.paid";
+
     /// Robin's beginner Q&A (`begin5`): a menu, then each topic's pages.
     /// The placeholders decide how many topics and pages there are.
     pub const ROBIN_MENU: &str = "robin.menu";
@@ -276,12 +286,19 @@ mod tests {
             keys::ROGER_END_INVENTORY_FULL,
             keys::SKIP_ASK,
             keys::SKIP_DECLINE,
+            keys::SHANKS_ASK,
+            keys::SHANKS_DECLINE,
+            keys::SHANKS_FARE,
+            keys::SHANKS_TOO_WEAK,
+            keys::SHANKS_NO_MESOS,
+            keys::SHANKS_PAID,
             keys::ROBIN_MENU,
         ];
         for key in named
             .iter()
             .chain(&keys::ROGER_START)
             .chain(&keys::ROGER_END)
+            .chain(&keys::SHANKS_LETTER)
         {
             assert!(text.contains(key), "{key} has no placeholder");
         }
