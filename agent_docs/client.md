@@ -67,6 +67,9 @@ from `UI.nx`. Moved so far:
 - **Status bar** (`UIStatusBar`, `StatusBar.img`): gauges, menu buttons, the
   quick slot panel, and the Game Menu and ShortCut popups (`UIWindow.img`).
   Esc opens the Game Menu; the MENU key action opens ShortCut.
+  Status messages (`UIStatusMessenger`) stack upward from just above the
+  quick slot panel, right-aligned with it; `UIStatusBar::QUICKSLOT_TOP` is
+  the shared anchor.
 - **Chat** (`UIChatBar`): the input strip in the bar's top-left and the log
   above it. The status bar cuts that strip out of its background, so the two
   can overlap in either draw order.
@@ -107,6 +110,35 @@ from `UI.nx`. Moved so far:
   (`Text::Font::A10M`). Rows are grey when a required skill is missing. SP-up
   spends a point at once; v83 had no allocation popup. The MACRO button and the
   `SkillMacro` window are not drawn yet.
+- **Item window** (`UIItemInventory`, `UIWindow.img/Item`): five tabs
+  (`Item/Tab`, drawn by `ClassicTabs`), six rows of four slots with a `VScr4`
+  scroll bar, and the mesos, laid out from period footage. BtFull widens it to
+  `FullBackgrnd`, four pages of 24 with no scroll bar; BtSmall goes back.
+  Slots past the tab's limit show `disabled`. A gained item pulses its tab
+  (`New/Tab0`, or `Tab1` when selected) and its slot (`New/inventory`) until
+  the window closes. BtGather and BtSort rearrange the bag, and BtCoin asks
+  how many mesos to drop.
+- **Equipment window** (`UIEquipInventory`, `UIWindow.img/Equip`): the labelled
+  `backgrnd` grid (33 px cells from (5,35)) with an icon per worn slot, and the
+  `pet` panel that PET EQUIP opens beside it, laid out from period footage.
+  Cells that cannot be used are tinted red as in the footage: PANTS under an
+  overall, SHIELD beside a two-handed weapon, and the riding cells without
+  Monster Riding. RustMS has no pets, so the pet tabs are disabled and the pet
+  and MOB EQUIP cells hold nothing.
+- **Channel window** (`UIChannel`, `UIWindow.img/Channel`): the `t`, tiled
+  `c` and `s` pieces around a six-column grid of 68×20 cells (70×21 apart from
+  (9,67)), with a row per six channels, laid out from period footage. Every
+  cell in those rows is drawn, `channel0` where there is no channel. The
+  selected channel is `channel2` and the current one `channel1`. The world
+  name is `world/<world id>`.
+- **Key config** (`UIKeyConfig`, `UIWindow.img/KeyConfig`): the keyboard with a
+  `key` label over each bindable key's icon, and a three-row palette of unbound
+  functions (`icon/N`, by v83 function id), laid out from the background and
+  period footage. Drag an icon between keys or onto the palette to unbind it.
+  Esc, Tab, and the other keys printed on the background are fixed. DEFAULT
+  restores the server's defaults; DEFAULT, CLEAR ALL, and Esc with unsaved
+  changes ask through the in-window `notice` bitmaps. CHANGE QUICK SLOTS is
+  disabled until the quick slot is configurable.
 - **Quest log** (`UIQuestLog`, `UIWindow.img/Quest`): Available, In Progress,
   and Complete tabs (`Basic.img/Tab2`), quests folded by area, and a detail
   panel with the quest's text and FIND NPC or QUEST HELPER, laid out from
@@ -225,3 +257,10 @@ These were corrected:
    own grey (`#BBBBBB`) chat line, worded as in period footage: "You have
    gained an item (Roger's Apple)", "You have gained items (3 Green Apple)",
    and "You have lost ..." for losses.
+8. The stat window's HP and MP buttons sent SPEND_AP with the current HP and
+   MP codes (0x400, 0x1000). They now send MaxHP and MaxMP (0x800, 0x2000),
+   which is what AP raises.
+8. Keymap keys are v83 scan codes, where the number row runs 1 to 9 then 0 from
+   key 2. `Keyboard::Keytable` had 0 to 9 from key 2, so every number-row
+   binding sat one key off. The `v83_number_row_keys` migration moves saved
+   bindings, and the server's default party chat is on key 3 (the 2 key).

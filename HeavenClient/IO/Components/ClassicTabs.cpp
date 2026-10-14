@@ -46,18 +46,6 @@ namespace ms
 			bool is_selected = i == selected;
 
 			fill[is_selected].draw(DrawArgument(pos, Point<int16_t>(fill_width, 0)));
-
-			const std::vector<Texture> &labels = is_selected ? enabled : disabled;
-
-			if (i < labels.size())
-			{
-				Point<int16_t> dimensions = labels[i].get_dimensions();
-				int16_t x = fill_width / 2 - dimensions.x() / 2;
-				int16_t y = style.label_top ? style.label_y : style.label_y - dimensions.y();
-
-				labels[i].draw(pos + Point<int16_t>(x, y));
-			}
-
 			pos.shift_x(fill_width);
 
 			if (i + 1 < count)
@@ -70,6 +58,23 @@ namespace ms
 		}
 
 		right[selected + 1 == count].draw(pos);
+
+		for (uint16_t i = 0; i < count; i++)
+			draw_label(position, i, i == selected);
+	}
+
+	void ClassicTabs::draw_label(Point<int16_t> position, uint16_t index, bool selected) const
+	{
+		const std::vector<Texture> &labels = selected ? enabled : disabled;
+
+		if (index >= labels.size())
+			return;
+
+		Point<int16_t> dimensions = labels[index].get_dimensions();
+		int16_t x = pitch() * index + style.edge + fill_width / 2 - dimensions.x() / 2;
+		int16_t y = style.label_top ? style.label_y : style.label_y - dimensions.y();
+
+		labels[index].draw(position + Point<int16_t>(x, y));
 	}
 
 	int16_t ClassicTabs::pitch() const

@@ -37,8 +37,10 @@ namespace ms
 	class Npc : public MapObject
 	{
 	public:
-		// Constructs an NPC by combining data from game files with data sent by the server
-		Npc(int32_t npcid, int32_t oid, bool mirrored, uint16_t fhid, bool control, Point<int16_t> position);
+		// Constructs an NPC by combining data from game files with data sent by the server.
+		// NPCs with a 'move' animation walk between rx0 and rx1.
+		Npc(int32_t npcid, int32_t oid, bool mirrored, uint16_t fhid, bool control, Point<int16_t> position,
+			int16_t rx0, int16_t rx1);
 
 		// Draws the current animation and name/function tags
 		void draw(double viewx, double viewy, float alpha) const override;
@@ -66,6 +68,15 @@ namespace ms
 		Point<int16_t> quest_marker_offset() const;
 		int16_t head_height() const;
 		void update_speech();
+		// Pick the stance after one ends; 'move' starts a walk.
+		void next_stance();
+		void update_walk();
+
+		// The walking force, as for a mob with speed 0. The v83 client's
+		// value is unknown.
+		static constexpr double WALKFORCE = 0.1;
+		// The shortest walk worth taking, in pixels.
+		static constexpr int16_t WALK_MIN = 20;
 
 		// Pauses between idle lines, in milliseconds. The v83 client's exact
 		// timing is unknown; these keep NPCs chatty without crowding the screen.
@@ -97,6 +108,10 @@ namespace ms
 		bool flip;
 		std::string stance;
 		bool control;
+		int16_t rx0;
+		int16_t rx1;
+		bool walking = false;
+		int16_t walk_target = 0;
 
 		Randomizer random;
 		Text namelabel;

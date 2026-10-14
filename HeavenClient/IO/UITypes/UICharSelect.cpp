@@ -64,6 +64,11 @@ namespace ms
 		Point<int16_t> character_del_pos = Point<int16_t>(316, 495);
 
 		selected_character = Setting<DefaultCharacter>::get().load();
+
+		// The saved slot may be from an account with more characters than this one.
+		if (selected_character >= characters_count)
+			selected_character = characters_count > 0 ? characters_count - 1 : 0;
+
 		selected_page = selected_character / PAGESIZE;
 		page_count = std::ceil((double) slots / (double) PAGESIZE);
 
@@ -616,6 +621,9 @@ namespace ms
 		{
 			case Buttons::CHARACTER_SELECT:
 			{
+				if (selected_character >= characters_count)
+					break;
+
 				Setting<DefaultCharacter>::get().save(selected_character);
 				int32_t id = characters[selected_character].id;
 
@@ -661,6 +669,9 @@ namespace ms
 				break;
 			case Buttons::CHARACTER_DELETE:
 			{
+				if (selected_character >= characters_count)
+					break;
+
 				int32_t id = characters[selected_character].id;
 
 				switch (require_pic)

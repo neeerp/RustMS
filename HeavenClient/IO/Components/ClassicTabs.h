@@ -37,6 +37,8 @@ namespace ms
 		ClassicTabs();
 
 		void draw(Point<int16_t> position, uint16_t count, uint16_t selected) const;
+		// Only tab index's label, e.g. over a highlight drawn on that tab.
+		void draw_label(Point<int16_t> position, uint16_t index, bool selected) const;
 
 		int16_t pitch() const;
 		int16_t height() const;

@@ -50,6 +50,24 @@ pub fn use_item(slot: i16, item_id: i32) -> Packet {
     p
 }
 
+/// SPEND_AP on the stat with this STAT_CHANGED mask bit.
+pub fn spend_ap(stat: i32) -> Packet {
+    let mut p = Packet::new_empty();
+    p.write_short(RecvOpcode::SpendAp as i16).unwrap();
+    p.write_int(0).unwrap();
+    p.write_int(stat).unwrap();
+    p
+}
+
+/// SPEND_SP on a skill.
+pub fn spend_sp(skill_id: i32) -> Packet {
+    let mut p = Packet::new_empty();
+    p.write_short(RecvOpcode::SpendSp as i16).unwrap();
+    p.write_int(0).unwrap();
+    p.write_int(skill_id).unwrap();
+    p
+}
+
 /// MOVE_PLAYER: one absolute movement to (x, y), standing.
 pub fn walk_to(x: i16, y: i16) -> Packet {
     let mut movement = vec![1u8, 0];

@@ -17,6 +17,8 @@
 //////////////////////////////////////////////////////////////////////////////////
 #include "UIStatusMessenger.h"
 
+#include "UIStatusBar.h"
+
 #include "../Constants.h"
 
 namespace ms
@@ -72,9 +74,11 @@ namespace ms
 
 	void UIStatusMessenger::update_screen(int16_t new_width, int16_t new_height)
 	{
-		int16_t y_adj = (new_width > 800) ? 37 : 0;
+		// The newest line sits just above the quick-slot panel, right-aligned
+		// with it, as in the original.
+		int16_t panel_top = new_height - UIStatusBar::HEIGHT + UIStatusBar::QUICKSLOT_TOP;
 
-		position = Point<int16_t>(new_width - 6, new_height - 145 + y_adj);
+		position = Point<int16_t>(new_width - 6, panel_top - LINE_GAP);
 	}
 
 	UIElement::Type UIStatusMessenger::get_type() const

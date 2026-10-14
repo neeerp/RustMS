@@ -91,6 +91,10 @@ namespace ms
 
 		void extract_effects(const Char &user, const SpecialMove &move, const AttackResult &result);
 
+		// Tell the targets how many hits are coming (sign 1) or cancel them (sign -1),
+		// so a mob the server kills waits for the hits before dying.
+		void expect_hits(const AttackResult &result, int32_t sign);
+
 		std::vector<DamageNumber> place_numbers(int32_t oid, const std::vector<std::pair<int32_t, bool>> &damagelines);
 
 		const SpecialMove &get_move(int32_t move_id);

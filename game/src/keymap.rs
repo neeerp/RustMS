@@ -11,7 +11,7 @@ pub struct KeyBinding {
 pub const KEY_COUNT: i16 = 90;
 
 /// Default bindings for new characters: (key, kind, action).
-const DEFAULT_BINDINGS: [(i16, u8, i32); 25] = [
+const DEFAULT_BINDINGS: [(i16, u8, i32); 26] = [
     (59, 6, 100),
     (60, 6, 101),
     (61, 6, 102),
@@ -33,11 +33,15 @@ const DEFAULT_BINDINGS: [(i16, u8, i32); 25] = [
     (43, 4, 10),
     (40, 4, 11),
     (21, 4, 12),
-    (4, 4, 14),
+    // Party chat on 2 (v83 numbers keys by scan code, so 1 is key 2).
+    (3, 4, 14),
     (84, 4, 15),
     // Ctrl attacks and Z picks up (HeavenClient's ATTACK 53 and PICKUP 51).
     (29, 5, 53),
     (44, 5, 51),
+    // Space talks to the nearest NPC (HeavenClient's INTERACT_HARVEST 55).
+    // v83 had no such key; it is a convenience from the later client.
+    (57, 4, 55),
 ];
 
 /// A character's key bindings. Unbound keys are simply absent.
@@ -83,6 +87,6 @@ mod tests {
         assert!(keymap.get(59).is_some());
         keymap.bind(59, KeyBinding { kind: 0, action: 0 });
         assert!(keymap.get(59).is_none());
-        assert_eq!(keymap.iter().count(), 24);
+        assert_eq!(keymap.iter().count(), 25);
     }
 }

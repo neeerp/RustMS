@@ -6,6 +6,12 @@ quests for the player, HeavenClient shows its quest menu first and renders
 quest conversations itself; picking "Misc." asks the server for normal speech.
 See [Quests](./quests.md).
 
+The Interact key (Space by default, action 55) does the same as clicking the
+nearest NPC within 150 px horizontally and 50 px vertically of the player's
+feet (`HeavenClient/Gameplay/MapleMap/NpcReach.h`). v83 had no such key; it is
+a convenience from the later client. Characters created before the binding was
+added need to bind it in the key config.
+
 ## Content and quest boundary
 
 `NpcDialogueData` in `game-data` resolves the numbered references under

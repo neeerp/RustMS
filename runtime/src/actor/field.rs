@@ -60,6 +60,7 @@ impl FieldActor {
         rx: mpsc::Receiver<FieldMessage>,
         map_npcs: Vec<FieldMapEntityNpc>,
         mut mobs: MobSet,
+        drops: DropSet,
         tick: Duration,
     ) -> Self {
         mobs.respawn(Instant::now());
@@ -69,7 +70,7 @@ impl FieldActor {
             occupants: HashMap::new(),
             map_npcs,
             mobs,
-            drops: DropSet::default(),
+            drops,
             tick,
         }
     }
@@ -196,6 +197,7 @@ impl FieldActor {
                 FieldRequest::Pickup { object_id, x, y } => {
                     self.handle_pickup(from, object_id, x, y)
                 }
+                FieldRequest::Throw { loot, vanish } => self.handle_throw(from, loot, vanish),
             },
             FieldMessage::SpawnLoot {
                 owner,
@@ -234,6 +236,35 @@ impl FieldActor {
             })
             .collect();
         for (drop, packet) in packets {
+            self.send_drop_packet(&drop, packet);
+        }
+    }
+
+    /// Put down what a player threw away where they stand, or show it
+    /// falling and fading if it can't lie on the ground.
+    fn handle_throw(&mut self, from: ClientId, loot: net::loot::Loot, vanish: bool) {
+        let Some(occupant) = self.occupants.get(&from) else {
+            return;
+        };
+        let (x, y) = (occupant.avatar.x, occupant.avatar.y);
+        let now = Instant::now();
+        let (drop, appearance) = if vanish {
+            let drop = Drop {
+                object_id: self.drops.next_object_id(),
+                loot,
+                owner: from,
+                x,
+                y,
+                dropper: 0,
+                dropped_at: now,
+                player_drop: true,
+            };
+            (drop, DropAppearance::Vanishing { from: (x, y) })
+        } else {
+            let drop = self.drops.throw(loot, from, x, y, now).clone();
+            (drop, DropAppearance::Falling { from: (x, y) })
+        };
+        if let Ok(packet) = build_drop(&drop.view(now), appearance) {
             self.send_drop_packet(&drop, packet);
         }
     }
@@ -487,6 +518,7 @@ mod tests {
             rx,
             Vec::new(),
             MobSet::default(),
+            DropSet::default(),
             Duration::from_millis(50),
         );
         tokio::spawn(actor.run());
@@ -606,6 +638,7 @@ mod tests {
             rx,
             vec![heena],
             MobSet::default(),
+            DropSet::default(),
             Duration::from_millis(50),
         );
         tokio::spawn(actor.run());
