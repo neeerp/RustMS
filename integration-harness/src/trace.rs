@@ -85,6 +85,16 @@ pub struct Trace {
     pub party_hp: Vec<(i32, i32, i32)>,
     /// Party chat lines: (sender, text).
     pub party_chat: Vec<(String, String)>,
+    /// Every full BUDDYLIST: (id, name, channel) per buddy.
+    pub buddy_lists: Vec<Vec<(i32, String, i32)>>,
+    /// Buddy requests: (requester id, name).
+    pub buddy_requests: Vec<(i32, String)>,
+    /// Buddy channel changes: (buddy, channel or -1).
+    pub buddy_channels: Vec<(i32, i32)>,
+    /// Failed buddy adds, by BUDDYLIST mode.
+    pub buddy_errors: Vec<u8>,
+    /// Buddy chat lines: (sender, text).
+    pub buddy_chat: Vec<(String, String)>,
     /// Mobs and drops on the current field.
     pub field: Field,
 }
@@ -194,10 +204,46 @@ impl Trace {
                 r.read_int().unwrap(),
                 r.read_int().unwrap(),
             ));
-        } else if op == SendOpcode::MultiChat as i16 && r.read_byte().unwrap() == 1 {
-            let name = r.read_str_with_length().unwrap();
-            self.party_chat
-                .push((name, r.read_str_with_length().unwrap()));
+        } else if op == SendOpcode::MultiChat as i16 {
+            let mode = r.read_byte().unwrap();
+            let line = (
+                r.read_str_with_length().unwrap(),
+                r.read_str_with_length().unwrap(),
+            );
+            match mode {
+                0 => self.buddy_chat.push(line),
+                1 => self.party_chat.push(line),
+                _ => {}
+            }
+        } else if op == SendOpcode::BuddyList as i16 {
+            match r.read_byte().unwrap() {
+                7 => {
+                    let count = r.read_byte().unwrap();
+                    let list = (0..count)
+                        .map(|_| {
+                            let id = r.read_int().unwrap();
+                            let name = read_padded(&mut r, 13);
+                            r.read_byte().unwrap();
+                            let channel = r.read_int().unwrap();
+                            read_padded(&mut r, 17);
+                            (id, name, channel)
+                        })
+                        .collect();
+                    self.buddy_lists.push(list);
+                }
+                9 => {
+                    let id = r.read_int().unwrap();
+                    self.buddy_requests
+                        .push((id, r.read_str_with_length().unwrap()));
+                }
+                0x14 => {
+                    let id = r.read_int().unwrap();
+                    r.read_byte().unwrap();
+                    self.buddy_channels.push((id, r.read_int().unwrap()));
+                }
+                mode @ 0x0B..=0x0F => self.buddy_errors.push(mode),
+                _ => {}
+            }
         } else if op == SendOpcode::SetField as i16 && p.bytes.get(6) == Some(&0) {
             // A map change rather than entering the world.
             self.warps.push(decode_set_field_warp(p).unwrap().map_id);
@@ -300,4 +346,11 @@ pub async fn warp(c: &mut MapleTestConnection, map: i32, portal: &str, trace: &m
     }
     trace.field = Field::default();
     *trace.warps.last().unwrap()
+}
+
+/// A NUL-padded fixed-length string.
+fn read_padded(r: &mut Cursor<&Vec<u8>>, len: usize) -> String {
+    let bytes: Vec<u8> = (0..len).map(|_| r.read_byte().unwrap()).collect();
+    let end = bytes.iter().position(|&b| b == 0).unwrap_or(len);
+    String::from_utf8_lossy(&bytes[..end]).into_owned()
 }

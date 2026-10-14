@@ -1,5 +1,6 @@
 use crate::actor::parties::{self, Member, Parties, Party};
-use crate::message::{ClientHandle, DirectoryMessage, Presence, ServerMessage};
+use crate::message::{ClientHandle, DirectoryMessage, ListedBuddy, Presence, ServerMessage};
+use net::packet::build::world::buddy::{build_buddy_list, BuddyView};
 use net::packet::build::world::party::{
     build_party_chat, build_party_created, build_party_disbanded, build_party_invite,
     build_party_joined, build_party_leader_changed, build_party_left, build_party_member_hp,
@@ -36,7 +37,7 @@ impl Entry {
 /// World-wide directory of online characters: who is online, under which
 /// name, on which channel and map. It owns no character state; it exists
 /// for features that cross fields (whispers, world broadcasts, parties, and
-/// later buddies).
+/// buddies).
 pub struct WorldDirectory {
     rx: mpsc::Receiver<DirectoryMessage>,
     clients: HashMap<ClientId, Entry>,
@@ -83,6 +84,14 @@ impl WorldDirectory {
             } => self.broadcast(from, scope, packet),
             DirectoryMessage::Party { from, request } => {
                 self.party_request(from, request, Instant::now())
+            }
+            DirectoryMessage::BuddyList { owner, buddies } => self.send_buddy_list(owner, buddies),
+            DirectoryMessage::Deliver { to, packet } => {
+                for client in to {
+                    if let Some(entry) = self.clients.get(&client) {
+                        entry.handle.send_packet(packet.clone());
+                    }
+                }
             }
         }
     }
@@ -188,6 +197,24 @@ impl WorldDirectory {
             }
             entry.handle.send_packet(packet.clone());
         }
+    }
+
+    /// Only mutual buddies show their channel.
+    fn send_buddy_list(&self, owner: ClientId, buddies: Vec<ListedBuddy>) {
+        let views: Vec<_> = buddies
+            .into_iter()
+            .map(|buddy| BuddyView {
+                channel: self
+                    .clients
+                    .get(&buddy.id)
+                    .filter(|_| buddy.mutual)
+                    .map(|entry| entry.channel_id),
+                id: buddy.id,
+                name: buddy.name,
+                group: buddy.group,
+            })
+            .collect();
+        self.send_packet(owner, build_buddy_list(&views));
     }
 
     fn party_request(&mut self, from: ClientId, request: PartyRequest, now: Instant) {
@@ -399,7 +426,7 @@ impl WorldDirectory {
             Ok(packet) => {
                 entry.handle.send_packet(packet);
             }
-            Err(error) => warn!(client, %error, "Failed to build party packet"),
+            Err(error) => warn!(client, %error, "Failed to build packet"),
         }
     }
 }
@@ -407,6 +434,7 @@ impl WorldDirectory {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use net::packet::build::world::buddy::build_buddy_channel;
     use net::packet::op::SendOpcode;
     use tokio_util::sync::CancellationToken;
 
@@ -547,6 +575,46 @@ mod tests {
         assert_eq!(received(&mut alice), ["op 0xc", "party None"]);
         let mut bobby = online(&mut directory, 2, "Bobby", 10000);
         assert!(received(&mut bobby).is_empty());
+    }
+
+    #[test]
+    fn buddy_lists_show_channels_of_online_mutual_buddies_only() {
+        let (_tx, rx) = mpsc::channel(1);
+        let mut directory = WorldDirectory::new(rx);
+        let mut alice = online(&mut directory, 1, "Alice", 10000);
+        let _bobby = online(&mut directory, 2, "Bobby", 10000);
+        let _carol = online(&mut directory, 3, "Carol", 10000);
+        let buddy = |id, name: &str, mutual| ListedBuddy {
+            id,
+            name: name.into(),
+            group: "Default Group".into(),
+            mutual,
+        };
+        directory.handle(DirectoryMessage::BuddyList {
+            owner: 1,
+            buddies: vec![
+                buddy(2, "Bobby", true),
+                buddy(3, "Carol", false),
+                buddy(4, "Dave", true),
+            ],
+        });
+        let Ok(ServerMessage::SendPacket(packet)) = alice.try_recv() else {
+            panic!("no buddy list");
+        };
+        let channels: Vec<i32> = (0..3)
+            .map(|i| {
+                let at = 4 + i * 39 + 18;
+                i32::from_le_bytes(packet.bytes[at..at + 4].try_into().unwrap())
+            })
+            .collect();
+        assert_eq!(channels, [0, -1, -1]);
+
+        directory.handle(DirectoryMessage::Deliver {
+            to: vec![1, 4],
+            packet: build_buddy_channel(2, Some(0)).unwrap(),
+        });
+        let buddy_list = format!("opcode {:#x}", SendOpcode::BuddyList as i16);
+        assert_eq!(received(&mut alice), [buddy_list]);
     }
 
     #[test]

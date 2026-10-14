@@ -213,6 +213,19 @@ pub enum PartyRequest {
     },
 }
 
+/// A buddy list operation, carried out by the client's actor.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum BuddyRequest {
+    /// Add the named character, asking them to add the player back.
+    Add { name: String, group: String },
+    /// Accept a request from `id`.
+    Accept { id: i32 },
+    /// Remove `id` from the list, or decline their request.
+    Remove { id: i32 },
+    /// Say something to the listed buddies.
+    Chat { recipients: Vec<i32>, text: String },
+}
+
 /// Where a character appears after changing maps.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct SpawnPosition {
@@ -260,6 +273,7 @@ pub enum WorldAction {
     Died,
     Whisper(WhisperDelivery),
     Party(PartyRequest),
+    Buddy(BuddyRequest),
     ChangeChannel {
         channel_id: u8,
     },
@@ -322,7 +336,7 @@ fn world_routes() -> &'static HashMap<i16, WorldRoute> {
     ROUTES.get_or_init(|| {
         use RecvOpcode as Op;
         use WorldRoute::*;
-        let table: [(Op, WorldRoute); 28] = [
+        let table: [(Op, WorldRoute); 29] = [
             (Op::PlayerLoggedIn, PreGame(&world::PlayerLoggedInHandler)),
             (Op::PlayerMove, InGame(&world::PlayerMoveHandler)),
             (Op::ChangeChannel, InGame(&world::ChangeChannelHandler)),
@@ -343,7 +357,8 @@ fn world_routes() -> &'static HashMap<i16, WorldRoute> {
                 Op::DenyPartyRequest,
                 InGame(&world::DenyPartyRequestHandler),
             ),
-            (Op::PartyChat, InGame(&world::PartyChatHandler)),
+            (Op::MultiChat, InGame(&world::MultiChatHandler)),
+            (Op::BuddyListModify, InGame(&world::BuddyListModifyHandler)),
             (Op::TalkToNpc, InGame(&world::NpcTalkHandler)),
             (Op::NpcTalkMore, InGame(&world::NpcTalkMoreHandler)),
             (Op::QuestAction, InGame(&world::QuestActionHandler)),
@@ -396,7 +411,7 @@ mod tests {
     fn every_registered_opcode_is_unique_per_server() {
         // The maps would silently drop duplicates; check the table sizes match.
         assert_eq!(login_routes().len(), 13);
-        assert_eq!(world_routes().len(), 28);
+        assert_eq!(world_routes().len(), 29);
     }
 
     #[test]

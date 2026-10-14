@@ -1,3 +1,4 @@
+pub mod buddy;
 pub mod channel;
 pub mod char;
 pub mod drop;

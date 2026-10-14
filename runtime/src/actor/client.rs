@@ -1,3 +1,4 @@
+mod buddies;
 mod combat;
 mod dialogue;
 mod loot;
@@ -306,6 +307,7 @@ impl ClientActor {
                 })
                 .await?
             }
+            WorldAction::Buddy(request) => self.buddy_request(request).await?,
             WorldAction::ChangeChannel { channel_id } => self.change_channel(channel_id).await?,
             WorldAction::Disconnect => return Err(RuntimeError::ClientDisconnected),
         }
@@ -365,6 +367,7 @@ impl ClientActor {
         let field = self.services.fields.field(key);
         self.game = Some(InGame { player, field });
         self.join_current_field(spawn).await?;
+        self.load_buddies().await?;
         info!(
             character_id,
             channel_id = self.channel_id,
@@ -580,6 +583,11 @@ impl ClientActor {
                     client_id: self.client_id,
                 })
                 .await;
+            if !self.changing_channel {
+                if let Err(error) = self.announce_offline().await {
+                    warn!(self.client_id, %error, "Failed to tell buddies of logout");
+                }
+            }
             let _ = self
                 .send_to_directory(DirectoryMessage::Unregister {
                     client_id: self.client_id,

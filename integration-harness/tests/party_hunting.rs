@@ -38,7 +38,7 @@ fn accept(party_id: i32) -> Packet {
 
 fn party_chat(recipient: i32, text: &str) -> Packet {
     let mut p = Packet::new_empty();
-    p.write_short(RecvOpcode::PartyChat as i16).unwrap();
+    p.write_short(RecvOpcode::MultiChat as i16).unwrap();
     p.write_byte(1).unwrap();
     p.write_byte(1).unwrap();
     p.write_int(recipient).unwrap();

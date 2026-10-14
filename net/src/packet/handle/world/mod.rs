@@ -1,3 +1,4 @@
+mod buddy;
 mod change_channel;
 mod change_map;
 mod chat;
@@ -19,6 +20,7 @@ mod spend_points;
 mod use_item;
 mod whisper;
 
+pub use self::buddy::BuddyListModifyHandler;
 pub use self::change_channel::ChangeChannelHandler;
 pub use self::change_map::{warp, ChangeMapHandler};
 pub use self::chat::AllChatHandler;
@@ -30,7 +32,7 @@ pub use self::map_transfer::PlayerMapTransferHandler;
 pub use self::meso_drop::MesoDropHandler;
 pub use self::move_player::PlayerMoveHandler;
 pub use self::npc_dialogue::{NpcTalkHandler, NpcTalkMoreHandler};
-pub use self::party::{DenyPartyRequestHandler, PartyChatHandler, PartyOperationHandler};
+pub use self::party::{DenyPartyRequestHandler, MultiChatHandler, PartyOperationHandler};
 pub use self::party_search_update::PartySearchUpdateHandler;
 pub use self::pickup::ItemPickupHandler;
 pub use self::quest_action::QuestActionHandler;
