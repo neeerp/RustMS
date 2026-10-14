@@ -40,14 +40,17 @@ impl CommodityData {
             .ok_or_else(|| GameDataError::InvalidData("missing Commodity.img".to_string()))?;
         let mut by_sn = HashMap::new();
         for entry in nx.child_indices(root)? {
-            let int = |key: &str| -> Result<Option<i32>, GameDataError> { nx.int_child(entry, key) };
+            let int =
+                |key: &str| -> Result<Option<i32>, GameDataError> { nx.int_child(entry, key) };
             let Some(sn) = int("SN")? else {
                 continue;
             };
             let commodity = Commodity {
                 sn,
                 item_id: int("ItemId")?.unwrap_or(0),
-                count: i16::try_from(int("Count")?.unwrap_or(1)).unwrap_or(1).max(1),
+                count: i16::try_from(int("Count")?.unwrap_or(1))
+                    .unwrap_or(1)
+                    .max(1),
                 price: int("Price")?.unwrap_or(0),
                 period: int("Period")?.unwrap_or(0),
                 gender: i8::try_from(int("Gender")?.unwrap_or(2)).unwrap_or(2),
@@ -86,7 +89,10 @@ mod tests {
         // Etc > Game: 35 Gachapon Tickets, labelled HOT.
         let tickets = data.get(50200003).unwrap();
         assert_eq!(tickets.item_id, 5220000);
-        assert_eq!((tickets.count, tickets.price, tickets.period), (35, 30000, 90));
+        assert_eq!(
+            (tickets.count, tickets.price, tickets.period),
+            (35, 30000, 90)
+        );
         assert!(tickets.on_sale && tickets.for_gender(0) && tickets.for_gender(1));
 
         // A hat that is no longer sold.

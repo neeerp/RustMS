@@ -66,7 +66,9 @@ from `UI.nx`. Moved so far:
 
 - **Status bar** (`UIStatusBar`, `StatusBar.img`): gauges, menu buttons, the
   quick slot panel, and the Game Menu and ShortCut popups (`UIWindow.img`).
-  Esc opens the Game Menu; the MENU key action opens ShortCut.
+  Esc opens the Game Menu; the MENU key action opens ShortCut. Dropping a
+  skill, or a USE or SETUP item, on a quick slot binds that slot's key and
+  saves the keymap right away; an open Key Config shows the new binding.
   Status messages (`UIStatusMessenger`) stack upward from just above the
   quick slot panel, right-aligned with it; `UIStatusBar::QUICKSLOT_TOP` is
   the shared anchor.
@@ -78,11 +80,14 @@ from `UI.nx`. Moved so far:
   bar (`Slider::Type::CLASSIC`). See [npc-dialogue.md](npc-dialogue.md).
 - **Quest Helper** (`UIQuestHelper`, `UIWindow.img/QuestAlarm`). See
   [quests.md](quests.md).
+- **Quest Complete! notice** (`UIQuestComplete`, `UIWindow.img/FadeYesNo`).
+  See [quests.md](quests.md).
 - **Minimap** (`UIMiniMap`, `UIWindow.img/MiniMap`): folded to its title bar,
   the map alone (`MinMap`), or the map under the map's mark, street, and name
   (`MaxMap`), laid out from period footage. M or the `Basic.img` minus and
-  plus buttons step between them; towns open in the largest, maps without a
-  `miniMap` stay folded. The window fits the map's `miniMap/canvas` (scaled
+  plus buttons step between them, and other maps keep the last choice
+  (`MiniMapType`, the largest until one is made). Towns open in the largest,
+  and maps without a `miniMap` stay folded. The window fits the map's `miniMap/canvas` (scaled
   by `2^mag`) and the names. Markers (`Map.nx` `MapHelper.img/minimap`) stand
   bottom-centred on portals to other maps, NPCs, other players, and you.
   Hovering an NPC or portal shows its name. Period canvases had the map's
@@ -139,6 +144,60 @@ from `UI.nx`. Moved so far:
   restores the server's defaults; DEFAULT, CLEAR ALL, and Esc with unsaved
   changes ask through the in-window `notice` bitmaps. CHANGE QUICK SLOTS is
   disabled until the quick slot is configurable.
+- **Maple Messenger** (`UIMessenger`, `UIWindow.img/Messenger`): three seats
+  with the members standing in them, the chat log, and the input line, laid
+  out from period footage. The MAPLECHAT key or ShortCut's MESSENGER button
+  opens a room, or minimises the open one to its title bar (which blinks on
+  unread lines). Clicking an empty seat or typing `/invite name` invites; `/q`
+  or the close button leaves. A speaker shows the `chatBalloon` dots for a
+  few seconds. Invitations arrive as a yes/no notice.
+- **Game Option** (`UIGameOption`, `UIWindow.img/GameOpt`), from MENU: a
+  `Basic.img/CheckBox` right of each row's ALLOW, laid out from the
+  background. OK saves the boxes as the `Allow*` settings; the client doesn't
+  act on them yet.
+- **System Option** (`UISystemOption`, `UIWindow.img/SysOpt`), from MENU:
+  `Basic.img/Slider` sliders (`ClassicSlider`) between each row's end labels,
+  mute, screen shake, and WINDOW / FULL SCREEN boxes, laid out from the
+  background. The BGM and SOUND sliders change the volume as they move, in
+  steps of 10, and MUTE greys the slider out; Cancel and Esc put the volume
+  back. OK saves `BGMVolume`, `SFXVolume`, `BGMMute`, `SFXMute`, and the
+  stored-only `PictureQuality`, `MouseSpeed`, `HPAlert`, `MPAlert` and
+  `ShakeScreen`, and switches to the chosen viewing mode. MONSTER INFO has
+  no control, and the post-Big Bang Options window's resolution picker is
+  gone; set `Width` and `Height` in `Settings` instead.
+- **Notices** (`UIOk`, `UIYesNo`, `UIEnterNumber`, `Basic.img/Notice2` and
+  `YesNo2`): the silver bolted boxes. `t`, then `c` repeated to fit the black
+  message, then `s` with one button frame (`BtOK`) or two (`BtYes`/`BtNo`, or
+  `BtOK`/`BtCancel` for number entry). Number entry draws a white field under
+  the message. The click that opens it no longer takes the focus from its
+  field, so typed amounts count. `UIEnterNumber` has its own element type, so the notice about a
+  bad number opens over it, and OK goes back to the field.
+- **Quit** (`ask_to_quit`): MENU's QUIT GAME and closing the window ask
+  "Are you sure you want to quit?" in a `UIYesNo`; yes goes back to the login
+  screen. The later playtime and EXP summary (`UIWindow6.img/askReward`) is
+  gone.
+- **NPC shop** (`UIShop`, `UIWindow.img/Shop`): the shop's list on the left
+  under the NPC, your bag on the right under you and your mesos, five 40 px
+  rows a side with a `VScr4` scroll bar each, laid out from the background
+  and period footage. The sell side has the five `Basic.img/Tab5` bag tabs;
+  the buy side shows only the "All" tab. A star or bullet set below its full
+  size shows `BtRecharge` on its row, which recharges it at once. The
+  right-click-to-sell checkbox is gone; right-click still sells.
+- **Character info** (`UICharInfo`, `UIWindow.img/UserInfo`): opened by
+  double-clicking a character on the map, the player included
+  (`Stage::character_at`, a body-sized box above the feet in
+  `MapleMap/CharClick.h`; NPCs under the cursor take the click first). It shows
+  a copy of the character's look and name, and the level, job, fame, guild, and
+  alliance from CHAR_INFO, laid out from the background and the v83 client.
+  Double-clicking someone else replaces the window. TAMING MOB, PET INFO, and
+  COLLECTION lengthen it to `backgrnd5`, `backgrnd2`, and `backgrnd7`, and ITEM
+  and WISHLIST open `backgrnd4` and `backgrnd3` beside it; all are empty, as
+  RustMS has no mounts, pets, monster book, or cash shop wish list. Family,
+  party, trade, fame, and excluded items are disabled.
+- **Quest log** (`UIQuestLog`, `UIWindow.img/Quest`): Available, In Progress,
+  and Complete tabs (`Basic.img/Tab2`), quests folded by area, and a detail
+  panel with the quest's text and FIND NPC or QUEST HELPER, laid out from
+  period footage. See [quest-window.md](quest-window.md).
 
 `UIClassic.nx` is not one of NoLifeNx's standard files, so `NxFiles` opens it
 with `nl::file` instead of `nl::nx::load_all`.
@@ -197,15 +256,19 @@ side yet.
 | Skills, stat/AP/SP allocation, buffs, keymap | Implemented |
 | NPC dialogue and NPC shop | Implemented (`UINpcTalk`, `UIShop`) |
 | Quest log and markers | Implemented (`UIQuestLog`); progress arrives via SHOW_STATUS_INFO, quest start/complete is driven by NPC dialogue |
-| Chat, whisper, server messages | Implemented; whisper find/buddy modes ignored |
+| Chat, whisper, `/find`, server messages | Implemented; buddy whisper/find modes ignored |
 | Character info, minimap, world map | Implemented |
-| Buddy / party / guild / boss list (`UIUserList`) | Buttons and layout only; no handlers, party packet exists but is unused |
-| Cash shop (`UICashShop`) | The v83 screen: enter/exit, tabs, pages, balance, Cash Inventory, buying and the wish list; gifting and taking items out aren't served (see below) |
-| Storage, trade, player shops, mini-games, messenger, memo/mail | No UI, no handlers |
+| Party (`UIUserList` Party tab, `UIPartyHP`, party chat) | Implemented; see `parties.md` |
+| Buddy list (`UIUserList` Friend tab, buddy chat) | Implemented without groups; see `buddies.md` |
+| Guild / alliance / blacklist tabs (`UIUserList`) | Tab strip only |
+| Monster Book (`UIMonsterBook`) | Implemented: cards, summary, monster pages, search, cover; see `combat.md` |
+| Cash shop (`UICashShop`) | Enter/exit, catalog, buying, Cash Inventory and wish list; gifts and withdrawing items remain unimplemented |
+| Maple Messenger (`UIMessenger`) | Implemented |
+| Storage, trade, player shops, mini-games, memo/mail | No UI, no handlers |
 | Pets, mounts, summons, reactors beyond hit/spawn | Partial or absent (`Reactor` TODOs) |
 | Party/guild/boss quests, events, MTS | Absent |
 
-45 outbound opcodes are defined (`Net/OutPacket.h`) and 61 inbound handlers
+51 outbound opcodes are defined (`Net/OutPacket.h`) and 63 inbound handlers
 are registered (`Net/PacketSwitch.cpp`). Anything not listed there is silently ignored by the client.
 
 ## Cash Shop
@@ -244,15 +307,14 @@ the screen size.
 
 | System | Client status | Effort |
 | --- | --- | --- |
-| Buddy list | UI skeleton, no packets | M |
-| Party (create/invite/HP bars) | UI skeleton, `PARTY_OPERATION` packet only | M |
+| Buddy groups | Default group only | S |
 | Guild | Skeleton only, plus guild emblem/BBS UIs missing | L |
 | Trade / storage / player shops | Nothing | L |
 | Cash shop gifts, taking items out, packages | Buying and the wish list only | M |
 | Quest accept/complete UI flow | Partial | S |
 | Pets and mounts | Partial rendering, no interaction | M |
-| Messenger, memo, mail, MTS | Nothing | M each |
-| Whisper find/buddy modes | Ignored | S |
+| Memo, mail, MTS | Nothing | M each |
+| Buddy whisper/find modes | Ignored | S |
 | Mini-dungeons, boss/event UI | Nothing | M |
 
 ## Protocol deviations fixed
@@ -292,3 +354,14 @@ These were corrected:
    key 2. `Keyboard::Keytable` had 0 to 9 from key 2, so every number-row
    binding sat one key off. The `v83_number_row_keys` migration moves saved
    bindings, and the server's default party chat is on key 3 (the 2 key).
+9. OPEN_NPC_SHOP told stars and bullets from other items by whether the short
+   after the row's zero ints was 1, then read their 8-byte recharge rate as a
+   skip and a short. It now decides by item id (`207xxxx`, `233xxxx`) and
+   reads the double (`Net/Handlers/ShopList.h`). Rows without a price, which
+   are there only to recharge, are not shown for sale but give the full set
+   for the Rech. button, and buying sends the row's index in the server's
+   list rather than its place on screen. Stars are bought one
+   set at a time and sold as a whole set, both after a yes/no. The new
+   CONFIRM_SHOP_TRANSACTION handler shows "You do not have enough mesos." and
+   "Please check if your inventory is full or not."; codes 0 and 8 need no
+   notice.

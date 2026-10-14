@@ -54,7 +54,8 @@ namespace ms
 		attackspeed = 0;
 		projectilerange = 400;
 		mastery = 0.0f;
-		critical = 0.05f;
+		// v83 has no base critical rate; only skills such as Critical Shot add one.
+		critical = 0.0f;
 		mincrit = 0.5f;
 		maxcrit = 0.75f;
 		damagepercent = 0.0f;

@@ -81,4 +81,21 @@ namespace ms
 	{
 		return chars.get(cid);
 	}
+
+	void MapChars::draw_party_hp(const Party &party, int32_t self, int32_t mapid, double viewx, double viewy, float alpha) const
+	{
+		for (auto member : party.on_map(self, mapid))
+		{
+			if (member->maxhp <= 0)
+				continue;
+
+			if (Optional<const MapObject> chr = chars.get(member->id))
+			{
+				// MobHpBar::draw puts the top three bar heights above its point.
+				Point<int16_t> feet = chr->get_absolute(viewx, viewy, alpha);
+				auto percent = static_cast<int16_t>(100 * static_cast<int64_t>(member->hp) / member->maxhp);
+				party_hpbar.draw(feet - Point<int16_t>(0, PARTY_HP_RISE - 30), percent, Color::Name::RED, Color::Name::DARKRED);
+			}
+		}
+	}
 }

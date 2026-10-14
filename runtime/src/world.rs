@@ -79,6 +79,7 @@ async fn preload_game_data() -> Result<(), RuntimeError> {
         net::mobs::data().map_err(|e| format!("mob data: {e}"))?;
         net::skills::data().map_err(|e| format!("skill data: {e}"))?;
         net::cash_shop::commodities().map_err(|e| format!("commodity data: {e}"))?;
+        net::reactors::data().map_err(|e| format!("reactor data: {e}"))?;
         info!("Server content: {}", net::content::load()?);
         Ok(())
     })

@@ -118,6 +118,17 @@ namespace ms
 		}
 	};
 
+	// Shows the player's emote to the rest of the map
+	// Opcode: FACE_EXPRESSION(51)
+	class FaceExpressionPacket : public OutPacket
+	{
+	public:
+		FaceExpressionPacket(int32_t emote) : OutPacket(OutPacket::Opcode::FACE_EXPRESSION)
+		{
+			write_int(emote);
+		}
+	};
+
 	// Opcode: PARTY_OPERATION(124)
 	class PartyOperationPacket : public OutPacket
 	{
@@ -188,6 +199,69 @@ namespace ms
 	{
 	public:
 		ChangePartyLeaderPacket(int32_t cid) : PartyOperationPacket(PartyOperationPacket::Operation::PASS_LEADER)
+		{
+			write_int(cid);
+		}
+	};
+
+	// Turns down a party invitation
+	// Opcode: DENY_PARTY_REQUEST(125)
+	class DenyPartyRequestPacket : public OutPacket
+	{
+	public:
+		static constexpr int8_t DENIED = 0x17;
+
+		DenyPartyRequestPacket(const std::string& inviter) : OutPacket(OutPacket::Opcode::DENY_PARTY_REQUEST)
+		{
+			write_byte(DENIED);
+			write_string(inviter);
+		}
+	};
+
+	// Opcode: BUDDYLIST_MODIFY(130)
+	class BuddyListModifyPacket : public OutPacket
+	{
+	public:
+		enum Mode : int8_t
+		{
+			ADD = 1,
+			ACCEPT = 2,
+			REMOVE = 3
+		};
+
+	protected:
+		BuddyListModifyPacket(Mode mode) : OutPacket(OutPacket::Opcode::BUDDYLIST_MODIFY)
+		{
+			write_byte(mode);
+		}
+	};
+
+	// Adds a character to the buddy list, asking them to add the player back
+	class AddBuddyPacket : public BuddyListModifyPacket
+	{
+	public:
+		AddBuddyPacket(const std::string& name, const std::string& group) : BuddyListModifyPacket(BuddyListModifyPacket::Mode::ADD)
+		{
+			write_string(name);
+			write_string(group);
+		}
+	};
+
+	// Accepts a buddy request
+	class AcceptBuddyPacket : public BuddyListModifyPacket
+	{
+	public:
+		AcceptBuddyPacket(int32_t cid) : BuddyListModifyPacket(BuddyListModifyPacket::Mode::ACCEPT)
+		{
+			write_int(cid);
+		}
+	};
+
+	// Removes a buddy, or declines their request
+	class DeleteBuddyPacket : public BuddyListModifyPacket
+	{
+	public:
+		DeleteBuddyPacket(int32_t cid) : BuddyListModifyPacket(BuddyListModifyPacket::Mode::REMOVE)
 		{
 			write_int(cid);
 		}

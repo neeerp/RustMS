@@ -40,7 +40,8 @@ namespace ms
 			TEXT,
 			KEYCONFIG,
 			WORLDMAP,
-			MINIMAP
+			MINIMAP,
+			MONSTERBOOK
 		};
 
 		virtual ~Tooltip()

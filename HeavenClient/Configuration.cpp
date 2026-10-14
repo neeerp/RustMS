@@ -34,6 +34,25 @@ namespace ms
 		settings.emplace<FontPathBalloon>();
 		settings.emplace<BGMVolume>();
 		settings.emplace<SFXVolume>();
+		settings.emplace<BGMMute>();
+		settings.emplace<SFXMute>();
+		settings.emplace<PictureQuality>();
+		settings.emplace<MouseSpeed>();
+		settings.emplace<HPAlert>();
+		settings.emplace<MPAlert>();
+		settings.emplace<ShakeScreen>();
+		settings.emplace<AllowWhisper>();
+		settings.emplace<AllowFriends>();
+		settings.emplace<AllowChatInvite>();
+		settings.emplace<AllowTradeRequest>();
+		settings.emplace<AllowPartyInvite>();
+		settings.emplace<AllowPartySearch>();
+		settings.emplace<AllowGameInvite>();
+		settings.emplace<AllowGuildChat>();
+		settings.emplace<AllowGuildInvite>();
+		settings.emplace<AllowAllianceTournament>();
+		settings.emplace<AllowAllianceInvite>();
+		settings.emplace<AllowFamilyInvite>();
 		settings.emplace<SaveLogin>();
 		settings.emplace<DefaultAccount>();
 		settings.emplace<DefaultWorld>();
@@ -45,6 +64,7 @@ namespace ms
 		settings.emplace<PosEQINV>();
 		settings.emplace<PosINV>();
 		settings.emplace<PosSKILL>();
+		settings.emplace<PosMONSTERBOOK>();
 		settings.emplace<PosQUEST>();
 		settings.emplace<PosMAP>();
 		settings.emplace<PosUSERLIST>();
@@ -52,12 +72,13 @@ namespace ms
 		settings.emplace<PosMINIMAP>();
 		settings.emplace<PosSHOP>();
 		settings.emplace<PosNOTICE>();
-		settings.emplace<PosMAPLECHAT>();
+		settings.emplace<PosMESSENGER>();
 		settings.emplace<PosCHANNEL>();
 		settings.emplace<PosJOYPAD>();
 		settings.emplace<PosEVENT>();
 		settings.emplace<PosKEYCONFIG>();
-		settings.emplace<PosOPTIONMENU>();
+		settings.emplace<PosGAMEOPTION>();
+		settings.emplace<PosSYSTEMOPTION>();
 		settings.emplace<PosCHARINFO>();
 		settings.emplace<MiniMapType>();
 		settings.emplace<MiniMapSimpleMode>();
@@ -322,16 +343,6 @@ namespace ms
 	void Configuration::set_rightclicksell(bool value)
 	{
 		rightclicksell = value;
-	}
-
-	bool Configuration::get_show_weekly()
-	{
-		return show_weekly;
-	}
-
-	void Configuration::set_show_weekly(bool value)
-	{
-		show_weekly = value;
 	}
 
 	bool Configuration::get_skip_startup_logos() const

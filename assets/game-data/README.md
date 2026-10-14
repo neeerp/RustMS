@@ -14,11 +14,24 @@ redistributed.
 | `Item.nx` | Item templates (stack sizes, quest flags, consumable effects) | `RUSTMS_ITEM_NX_PATH` |
 | `Character.nx` | Equipment stats and requirements | `RUSTMS_CHARACTER_NX_PATH` |
 | `Mob.nx` | Mob stats (HP, EXP, attack, touch damage) | `RUSTMS_MOB_NX_PATH` |
-| `Skill.nx` | Skill max levels, master levels, and requirements | `RUSTMS_SKILL_NX_PATH` |
 | `Etc.nx` | Cash Shop commodities (prices, counts, periods) | `RUSTMS_ETC_NX_PATH` |
+| `Reactor.nx` | Reactor states and what hits them (boxes) | `RUSTMS_REACTOR_NX_PATH` |
+| `Skill.nx` | Skill levels (MP cost, damage, duration, cooldown), master levels, and requirements | `RUSTMS_SKILL_NX_PATH` |
 
 All of these are the v83 GMS files that HeavenClient also loads (see
 `agent_docs/client.md`); the client's `nx/` directory can symlink to these.
+
+`Map.nx` and `String.nx` have one change. v83 already has the revamped Maple
+Island, so its 12 maps from the Training Camp entrance to Amherst, their
+names, and the island's world map are replaced by the original ones from GMS
+v68 (see `agent_docs/map-travel.md`). With the v83 files in place and the v68
+`Map.wz` and `String.wz` in a directory, build them with:
+
+```sh
+tools/graft-original-island.sh PATH/TO/V68
+```
+
+The script checks its inputs and outputs against pinned checksums.
 
 `SHA256SUMS` pins the exact files the server and its tests were written
 against. After copying files in, check them with:

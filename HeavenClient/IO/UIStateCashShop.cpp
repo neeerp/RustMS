@@ -66,7 +66,8 @@ namespace ms
 
 	Cursor::State UIStateCashShop::send_cursor(Cursor::State cursorstate, Point<int16_t> cursorpos)
 	{
-		bool clicked = cursorstate == Cursor::State::CLICKING || cursorstate == Cursor::State::VSCROLLIDLE;
+		bool clicked = cursorstate == Cursor::State::CLICKING || cursorstate == Cursor::State::VSCROLLIDLE
+			|| cursorstate == Cursor::State::HSCROLLIDLE;
 
 		if (auto focusedelement = get(focused))
 		{

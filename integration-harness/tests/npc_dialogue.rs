@@ -11,7 +11,7 @@ use std::path::PathBuf;
 use std::sync::atomic::{AtomicU64, Ordering};
 use tokio::time::{timeout, Duration};
 
-const START_MAP: i32 = 1_000_000;
+const START_MAP: i32 = 1_010_000;
 const PIO: i32 = 10000;
 const OBJECT_BASE: i32 = 1_000_000_000;
 

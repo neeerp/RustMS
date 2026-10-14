@@ -75,6 +75,7 @@ namespace ms
 			void drop_on_equips(EquipSlot::Id) const override {}
 			bool drop_on_items(InventoryType::Id, EquipSlot::Id, int16_t, bool) const override { return true; }
 			void drop_on_bindings(Point<int16_t> cursorposition, bool remove) const override;
+			Keyboard::Mapping get_mapping() const override;
 
 			void set_count(int16_t) override
 			{}
