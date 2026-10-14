@@ -227,7 +227,7 @@ the screen size.
 - **Packets:** SET_CASH_SHOP gives the account name and the Best Item SNs for
   the player's gender. QUERY_CASH_RESULT (324) gives the NX Credit, Maple Point
   and NX Prepaid balances. CASHSHOP_OPERATION (325) modes 0x4B (Cash
-  Inventory), 0x4D (purchase result) and 0x4F (wish list) are read.
+  Inventory), 0x4D (gifts waiting for the account) and 0x4F (wish list) are read.
 - **Not served yet:** BUY, GIFT, RESERVE, the slot expansions, CHARGE, CHECK
   CASH and COUPON do nothing.
 
