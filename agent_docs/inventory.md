@@ -108,7 +108,8 @@ gets only an enable-actions stat update.
   Cash items can't be sold, and a sale that would pass 2,147,483,647 mesos
   is refused.
 - **Recharge** (USE slot): stars or bullets the shop lists, below a full
-  set, refilled for `unitPrice` per missing one, rounded up.
+  set, refilled for `unitPrice` per missing one, rounded up. The client
+  sends it from the Rech. button on the stack's row in the shop window.
 
 ## Tests
 

@@ -47,10 +47,11 @@ int main()
 		auto rows = shop_list::read(recv);
 
 		require(!recv.available(), "the whole list is read");
-		require(rows.size() == 3, "the recharge-only row is not for sale");
+		require(rows.size() == 4, "every row is read");
 		require(rows[0].itemid == 2000000 && rows[0].price == 50 && rows[0].buyable == 100, "a potion is a stack");
 		require(rows[1].itemid == 2070000 && rows[1].unitprice == 0.3 && rows[1].buyable == 530, "stars carry a recharge rate and a set size");
-		require(rows[2].itemid == 2330000 && rows[2].index == 3, "buying refers to the server's row, past hidden ones");
+		require(rows[1].for_sale() && !rows[2].for_sale() && rows[2].unitprice == 0.4, "a recharge-only row is not for sale");
+		require(rows[3].itemid == 2330000 && rows[3].index == 3, "buying refers to the server's row, past hidden ones");
 		require(shop_list::is_rechargeable(2330000) && !shop_list::is_rechargeable(2060000), "bullets recharge, arrows don't");
 
 		std::cout << "Shop list passed\n";
