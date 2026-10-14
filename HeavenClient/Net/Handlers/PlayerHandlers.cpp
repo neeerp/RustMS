@@ -22,12 +22,15 @@
 #include "../Packets/LoginPackets.h"
 
 #include "../../Configuration.h"
+#include "../../Data/ItemData.h"
 #include "../../Gameplay/Stage.h"
 #include "../../IO/UI.h"
 #include "../../IO/Window.h"
 
 #include "../../IO/UITypes/UIBuffList.h"
 #include "../../IO/UITypes/UICashShop.h"
+#include "../../IO/UITypes/UIChatBar.h"
+#include "../../IO/UITypes/UIMonsterBook.h"
 #include "../../IO/UITypes/UISkillBook.h"
 #include "../../IO/UITypes/UIStatsInfo.h"
 
@@ -270,5 +273,37 @@ namespace ms
 
 			UI::get().add_keymapping(i, type, action);
 		}
+	}
+
+	void MonsterBookSetCardHandler::handle(InPacket& recv) const
+	{
+		bool added = recv.read_bool();
+		int32_t card = recv.read_int();
+		int32_t level = recv.read_int();
+
+		if (!added)
+			return;
+
+		Stage::get().get_player().get_monsterbook().set_card(card, level);
+
+		if (auto chatbar = UI::get().get_element<UIChatBar>())
+		{
+			const std::string &name = ItemData::get(card).get_name();
+
+			chatbar->send_chatline("[" + name + "] has been successfully registered in the Monster Book.", UIChatBar::LineType::PINK);
+		}
+
+		if (auto monsterbook = UI::get().get_element<UIMonsterBook>())
+			monsterbook->update_cards();
+	}
+
+	void MonsterBookSetCoverHandler::handle(InPacket& recv) const
+	{
+		int32_t card = recv.read_int();
+
+		Stage::get().get_player().get_monsterbook().set_cover(card);
+
+		if (auto monsterbook = UI::get().get_element<UIMonsterBook>())
+			monsterbook->update_cards();
 	}
 }

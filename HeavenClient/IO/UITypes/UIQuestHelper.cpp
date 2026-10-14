@@ -1,4 +1,5 @@
 #include "UIQuestHelper.h"
+#include "UIPartyHP.h"
 
 #include "../Components/MapleButton.h"
 
@@ -6,6 +7,7 @@
 #include "../../Character/QuestCatalog.h"
 #include "../../Constants.h"
 #include "../../Data/ItemData.h"
+#include "../../Gameplay/Stage.h"
 #include "../../Util/NxFiles.h"
 
 #include <nlnx/nx.hpp>
@@ -87,6 +89,9 @@ namespace ms
 
 	void UIQuestHelper::update()
 	{
+		// Below the party HP list, when there is one.
+		position = Point<int16_t>(position.x(), UIPartyHP::height_for(Stage::get().get_player().get_party()));
+
 		std::vector<std::pair<int16_t, std::vector<QuestObjective>>> current;
 		const auto& started = quests.started_quests();
 

@@ -47,6 +47,8 @@ pub enum QuestRejection {
     Items(i32),
     /// Fewer kills of this mob than required.
     Mobs(i32),
+    /// Fewer mesos than the quest takes.
+    Mesos,
     /// The item rewards don't fit.
     InventoryFull,
 }
@@ -115,6 +117,9 @@ pub fn check_complete(
         .find(|p| player.quests.state(p.quest_id) != p.state)
     {
         return Err(QuestRejection::Prerequisite(unmet.quest_id));
+    }
+    if quest.money < 0 && player.meso < quest.money.saturating_neg() {
+        return Err(QuestRejection::Mesos);
     }
     Ok(())
 }
@@ -250,6 +255,7 @@ mod tests {
             start_script: None,
             end_script: None,
             exp: 7,
+            money: 0,
             next_quest: None,
         }
     }
@@ -310,6 +316,21 @@ mod tests {
             check_complete(&q, 2102, &p),
             Err(QuestRejection::WrongState)
         );
+    }
+
+    #[test]
+    fn a_quest_that_takes_mesos_needs_them_held() {
+        let mut q = quest();
+        q.money = -200;
+        let mut p = player(1, 0);
+        set(&mut p, 1033, QuestState::Started);
+        p.meso = 199;
+        assert_eq!(check_complete(&q, 2102, &p), Err(QuestRejection::Mesos));
+        p.meso = 200;
+        assert_eq!(check_complete(&q, 2102, &p), Ok(()));
+        q.money = 200;
+        p.meso = 0;
+        assert_eq!(check_complete(&q, 2102, &p), Ok(()));
     }
 
     #[test]

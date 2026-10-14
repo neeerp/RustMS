@@ -74,4 +74,9 @@ namespace ms
 	{
 		return phobj.get_position();
 	}
+
+	Point<int16_t> MapObject::get_absolute(double viewx, double viewy, float alpha) const
+	{
+		return phobj.get_absolute(viewx, viewy, alpha);
+	}
 }

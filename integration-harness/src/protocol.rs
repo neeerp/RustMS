@@ -33,6 +33,8 @@ pub struct WorldSession {
     pub character_id: i32,
     pub character_name: String,
     pub map_id: i32,
+    /// The portal the character appeared at on entering the world.
+    pub spawn_point: u8,
     pub login_addr: String,
     pub world_addr: String,
     pub level: u8,
@@ -51,6 +53,9 @@ pub struct WorldSession {
     /// How many of each item the bags hold.
     pub items: std::collections::BTreeMap<i32, i32>,
     pub meso: i32,
+    pub monster_book_cover: i32,
+    /// Copies of each Monster Book card, by card id.
+    pub monster_book: std::collections::BTreeMap<i32, u8>,
     /// `(kind, action)` for each of the 90 keys, from the world-entry KEYMAP.
     pub keymap: Vec<(u8, i32)>,
 }
@@ -187,9 +192,12 @@ pub async fn login_to_world_session(config: &HarnessConfig) -> Result<WorldSessi
         equipped: world_entry.equipped,
         items: world_entry.items,
         meso: world_entry.meso,
+        monster_book_cover: world_entry.monster_book_cover,
+        monster_book: world_entry.monster_book,
         keymap,
         character_name: world_entry.character_name,
         map_id: world_entry.map_id,
+        spawn_point: world_entry.spawn_point,
         login_addr: config.login_addr.to_string(),
         world_addr: format!("{}:{}", redirect.redirect_ip, redirect.redirect_port),
     })
@@ -359,13 +367,14 @@ async fn drain_spawn_npcs(connection: &mut MapleTestConnection) {
     .await
     {
         // Map setup: NPC spawns and the map entry banner.
-        // ...and the map's mobs.
+        // ...and the map's mobs, drops, and reactors.
         if ![
             SendOpcode::SpawnNpc as i16,
             SendOpcode::FieldEffect as i16,
             SendOpcode::SpawnMonster as i16,
             SendOpcode::SpawnMonsterControl as i16,
             SendOpcode::DropItemFromMapObject as i16,
+            SendOpcode::SpawnReactor as i16,
         ]
         .contains(&envelope.opcode())
         {
