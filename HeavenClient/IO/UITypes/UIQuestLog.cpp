@@ -18,72 +18,161 @@
 #include "UIQuestLog.h"
 #include "UIQuestHelper.h"
 #include "UIWorldMap.h"
+
 #include "../UI.h"
+
+#include "../Components/AreaButton.h"
 #include "../Components/MapleButton.h"
+
 #include "../../Constants.h"
-#include "../../Graphics/GraphicsGL.h"
-#include "../../Gameplay/Stage.h"
-#include "../../Gameplay/MapleMap/Npc.h"
-#include "../../Gameplay/QuestConversation.h"
+#include "../../Character/Job.h"
 #include "../../Character/QuestCatalog.h"
-#include "../../Character/QuestObjectives.h"
 #include "../../Data/ItemData.h"
+#include "../../Gameplay/Stage.h"
+#include "../../Graphics/GraphicsGL.h"
 #include "../../Util/Misc.h"
+#include "../../Util/NpcTextMarkup.h"
+#include "../../Util/NxFiles.h"
+
 #include <nlnx/nx.hpp>
+
 #include <algorithm>
-#include <cctype>
-#include <ctime>
-#include <iomanip>
 #include <limits>
+#include <map>
 #include <queue>
-#include <set>
-#include <sstream>
 
 namespace ms
 {
 	namespace
 	{
-		std::string lower(std::string text)
+		// The window, measured from period footage. The list is on the
+		// left; the details' coordinates are from their own origin.
+		constexpr Point<int16_t> CLOSE_POS = Point<int16_t>(227, 6);
+		constexpr Point<int16_t> TAB_STRIP = Point<int16_t>(5, 23);
+		constexpr int16_t TAB_FILL = 56;
+		constexpr int16_t LIST_WIDTH = 245;
+		constexpr int16_t DETAIL_X = 244;
+		constexpr int16_t DETAIL_WIDTH = 305;
+		constexpr int16_t HEIGHT = 396;
+		// Rows: an area's bar, or a quest with its icon.
+		constexpr int16_t ROW_TOP = 50;
+		constexpr int16_t ROW_PITCH = 22;
+		constexpr int16_t ROWS = 14;
+		constexpr int16_t ROW_X = 10;
+		constexpr int16_t ROW_RIGHT = 219;
+		constexpr int16_t BAR_HEIGHT = 18;
+		constexpr Point<int16_t> FOLD_BOX = Point<int16_t>(13, 2);
+		constexpr Point<int16_t> ROW_ICON = Point<int16_t>(11, 2);
+		// The in-progress arrow is narrower and stands a little lower.
+		constexpr Point<int16_t> ARROW_ICON = Point<int16_t>(14, 3);
+		constexpr int16_t LABEL_X = 30;
+		constexpr int16_t LABEL_Y = -4;
+		// Unselected labels run to the scroll bar; the selected one stops
+		// short of its bar's end with "..".
+		constexpr int16_t LABEL_WIDTH = 195;
+		constexpr int16_t CHOSEN_WIDTH = 186;
+		constexpr int16_t LIST_SLIDER_X = 225;
+		constexpr Range<int16_t> LIST_SLIDER = Range<int16_t>(50, 346);
+		// The details.
+		constexpr Point<int16_t> HIDE_POS = Point<int16_t>(285, 6);
+		constexpr Point<int16_t> TITLE_POS = Point<int16_t>(34, 34);
+		constexpr int16_t TITLE_WIDTH = 152;
+		constexpr Point<int16_t> JOBS_POS = Point<int16_t>(22, 57);
+		constexpr Point<int16_t> LEVELS_POS = Point<int16_t>(22, 73);
+		constexpr int16_t HEADER_WIDTH = 164;
+		// The portrait's feet.
+		constexpr Point<int16_t> PORTRAIT_POS = Point<int16_t>(236, 108);
+		constexpr Point<int16_t> TEXT_POS = Point<int16_t>(18, 121);
+		constexpr int16_t TEXT_WIDTH = 260;
+		constexpr Range<int16_t> TEXT_VIEW = Range<int16_t>(123, 364);
+		constexpr int16_t TEXT_STEP = 18;
+		constexpr int16_t DETAIL_SLIDER_X = 283;
+		constexpr Range<int16_t> DETAIL_SLIDER = Range<int16_t>(123, 352);
+		constexpr Point<int16_t> HELPER_POS = Point<int16_t>(150, 372);
+		constexpr Point<int16_t> FORFEIT_POS = Point<int16_t>(242, 372);
+		constexpr Point<int16_t> FIND_NPC_POS = Point<int16_t>(217, 372);
+		// Item icons take a 32x32 box in the description.
+		constexpr int16_t ICON_SIZE = 32;
+
+		// The list's area headings by QuestInfo.img/<id>/area. Most are read
+		// from period footage; the rest name the region their quests are in.
+		std::string area_name(int16_t area)
 		{
-			for (char& c : text) c = std::tolower(static_cast<unsigned char>(c));
-			return text;
+			static const std::map<int16_t, std::string> names = {
+				{ 6, "Hero With The Lost Memory" },
+				{ 10, "Job" },
+				{ 15, "Knights of Cygnus" },
+				{ 20, "Maple Island" },
+				{ 30, "Victoria Island" },
+				{ 33, "Elnath Mt. + Aquaroad" },
+				{ 37, "Ludus Lake" },
+				{ 41, "Minar Forest" },
+				{ 44, "Mu Lung + Nihal Desert" },
+				{ 45, "Masteria" },
+				{ 46, "Temple of Time" },
+				{ 47, "Party Quest" },
+				{ 48, "World Tour" },
+				{ 49, "Malaysia" },
+				{ 50, "Event" }
+			};
+
+			auto name = names.find(area);
+
+			return name == names.end() ? "Etc." : name->second;
 		}
 
-		// One line of text, cut to fit `width` with "..", as the original
-		// quest window cuts long quest names.
-		Text one_line(Text::Font font, Color::Name color, std::string text, int16_t width)
+		// `text` cut to `width`, with `tail` after it if cut.
+		std::string fit(Text::Font font, const std::string& text, int16_t width, const std::string& tail)
 		{
-			Text result(font, Text::LEFT, color, text, 0, false);
-			while (result.width() > width && text.size() > 1)
+			Text measure(font, Text::Alignment::LEFT, Color::Name::BLACK, text, 0, false);
+
+			if (measure.width() <= width)
+				return text;
+
+			std::string cut = text;
+
+			while (!cut.empty())
 			{
-				text.pop_back();
-				while (text.size() > 1 && text.back() == ' ') text.pop_back();
-				result.change_text(text + "..");
+				cut.pop_back();
+				measure.change_text(cut + tail);
+
+				if (measure.width() <= width)
+					break;
 			}
-			return result;
+
+			return cut + tail;
 		}
 
-		// Follow the portals from where Explorers start, avoiding the
-		// disconnected Training Camp and revamp maps that contain duplicates
-		// of these NPCs.
+		// Walk the portal graph out from Maple Island and each continent's
+		// towns (ships between them are scripted, not portals), avoiding old
+		// disconnected map variants that contain duplicates of these NPCs.
 		int32_t npc_map(int32_t npc)
 		{
 			static const auto locations = [] {
+				constexpr int32_t TOWNS[] = {
+					0, 100000000, 130000000, 140000000, 200000000, 211000000, 220000000, 221000000,
+					222000000, 230000000, 240000000, 250000000, 251000000, 260000000, 261000000, 800000000
+				};
+
 				std::map<int32_t, int32_t> result;
-				std::queue<int32_t> pending; pending.push(0);
+				std::queue<int32_t> pending;
 				std::set<int32_t> visited;
+
+				for (int32_t town : TOWNS)
+					pending.push(town);
+
 				while (!pending.empty())
 				{
 					int32_t id = pending.front(); pending.pop();
 					if (!visited.insert(id).second) continue;
-					auto map = nl::nx::map["Map"]["Map0"][string_format::extend_id(id, 9) + ".img"];
+					auto map = nl::nx::map["Map"]["Map" + std::to_string(id / 100000000)][string_format::extend_id(id, 9) + ".img"];
 					for (auto life : map["life"])
 						if (life["type"].get_string() == "n")
 							result.emplace(string_conversion::or_default<int32_t>(life["id"].get_string(), 0), id);
 					for (auto portal : map["portal"])
 					{
 						int32_t to = portal["tm"];
-						if (to > 0 && to < 100000000 && to != id) pending.push(to);
+						if (to > 0 && to < 999999999 && to != id) pending.push(to);
 					}
 				}
 				return result;
@@ -92,114 +181,112 @@ namespace ms
 			return found == locations.end() ? -1 : found->second;
 		}
 
-		// Quest text with its placeholders filled in: #p NPC, #m map, #h the
-		// player, #t item, #o mob, #c how many of an item the player holds,
-		// #a a kill count (#a<index># for this quest's mobs, or
-		// #a<quest><index>#), and #i item icons, which are left out.
-		std::string quest_text(std::string text, int16_t quest_id)
+		// Fill in the quest-only placeholders, which NpcTextMarkup leaves:
+		// #c how many of an item the player holds, and #a a kill count
+		// (#a<index># for this quest's mobs, or #a<quest><index>#). Line
+		// breaks become the renderer's escapes.
+		std::string quest_counts(const std::string& text, int16_t quest_id)
 		{
-			for (size_t i = 0; i < text.size(); ++i)
-				if (text[i] == '\n') { text.replace(i, 1, "\\n"); ++i; }
-			// Resolve the name/map placeholders used in quest descriptions.
-			for (size_t start = 0; (start = text.find('#', start)) != std::string::npos;)
+			auto& player = Stage::get().get_player();
+			std::string out;
+
+			for (size_t i = 0; i < text.size(); i++)
 			{
-				size_t end = text.find('#', start + 2);
-				if (end == std::string::npos) break;
-				char kind = start + 1 < text.size() ? text[start + 1] : 0;
-				if (std::string("pmhtocia").find(kind) == std::string::npos || kind == 0) { ++start; continue; }
-				std::string replacement;
-				auto& player = Stage::get().get_player();
-				if (kind == 'h') replacement = player.get_name();
+				char c = text[i];
+
+				if (c == '\r' || c == '\n')
+				{
+					if (c == '\r' && i + 1 < text.size() && text[i + 1] == '\n')
+						i++;
+
+					out += "\\n";
+					continue;
+				}
+
+				size_t close = c == '#' && i + 2 < text.size() ? text.find('#', i + 2) : std::string::npos;
+				char tag = i + 1 < text.size() ? text[i + 1] : 0;
+
+				if (close == std::string::npos || (tag != 'c' && tag != 'a')
+					|| !NpcTextMarkup::is_digits(text.substr(i + 2, close - i - 2)) || close - i - 2 > 9)
+				{
+					out += c;
+					continue;
+				}
+
+				int32_t id = std::stoi(text.substr(i + 2, close - i - 2));
+
+				if (tag == 'c')
+				{
+					out += std::to_string(player.get_inventory().get_total_item_count(id));
+				}
 				else
 				{
-					auto id = string_conversion::or_default<int32_t>(text.substr(start + 2, end - start - 2), -1);
-					if (id < 0) { ++start; continue; }
-					switch (kind)
-					{
-						case 'p': replacement = nl::nx::string["Npc.img"][std::to_string(id)]["name"].get_string(); break;
-						case 'm': replacement = NxHelper::Map::get_map_info_by_id(id).name; break;
-						case 't': replacement = ItemData::get(id).get_name(); break;
-						case 'o': replacement = nl::nx::string["Mob.img"][std::to_string(id)]["name"].get_string(); break;
-						case 'c': replacement = std::to_string(player.get_inventory().get_total_item_count(id)); break;
-						case 'i': break;
-						case 'a':
-						{
-							int16_t quest = id < 10 ? quest_id : static_cast<int16_t>(id / 10);
-							const auto& started = player.get_quests().started_quests();
-							auto progress = started.find(quest);
-							auto kills = decode_kills(progress == started.end() ? std::string() : progress->second);
-							size_t index = static_cast<size_t>(id % 10);
-							replacement = std::to_string(index >= 1 && index <= kills.size() ? kills[index - 1] : 0);
-							break;
-						}
-					}
+					int16_t quest = id < 10 ? quest_id : static_cast<int16_t>(id / 10);
+					const auto& started = player.get_quests().started_quests();
+					auto progress = started.find(quest);
+					auto kills = decode_kills(progress == started.end() ? std::string() : progress->second);
+					size_t index = static_cast<size_t>(id % 10);
+					out += std::to_string(index >= 1 && index <= kills.size() ? kills[index - 1] : 0);
 				}
-				text.replace(start, end - start + 1, replacement);
-				start += replacement.size();
+
+				i = close;
 			}
-			return text;
+
+			return out;
 		}
 	}
 
 	UIQuestLog::UIQuestLog(const QuestLog& ql) : UIDragElement<PosQUEST>(), questlog(ql)
 	{
-		tab = Buttons::TAB0;
-		auto quest = nl::nx::ui["UIWindow2.img"]["Quest"];
-		auto list = quest["list"];
-		auto info = quest["quest_info"];
-		sprites.emplace_back(list["backgrnd"]);
-		sprites.emplace_back(list["backgrnd2"]);
-		for (int i = 0; i < 3; ++i)
-		{
-			notice_sprites.emplace_back(list["notice" + std::to_string(i)]);
-			buttons[TAB0 + i] = std::make_unique<TwoSpriteButton>(list["Tab"]["disabled"][std::to_string(i)],
-				list["Tab"]["enabled"][std::to_string(i)]);
-			if (i > 0) quest_icons[i] = quest["icon"][i == 1 ? "icon2" : "icon3"]["0"];
-		}
-		// The available icon is a bitmap; the others are animations' first frames.
-		quest_icons[0] = quest["icon"]["icon0"];
-		buttons[RECOMMENDED] = std::make_unique<TwoSpriteButton>(list["Tab"]["disabled"]["3"], list["Tab"]["enabled"]["3"]);
-		buttons[RECOMMENDED]->set_state(Button::DISABLED);
-		buttons[CLOSE] = std::make_unique<MapleButton>(nl::nx::ui["Basic.img"]["BtClose3"], Point<int16_t>(275, 6));
-		buttons[SEARCH] = std::make_unique<MapleButton>(list["BtSearch"]);
-		buttons[ALL_LEVEL] = std::make_unique<MapleButton>(list["BtAllLevel"]);
-		buttons[MY_LEVEL] = std::make_unique<MapleButton>(list["BtMyLevel"]);
-		buttons[MY_LOCATION] = std::make_unique<MapleButton>(list["BtMyLocation"]);
-		buttons[ALL_LOCATION] = std::make_unique<MapleButton>(list["BtAllLocation"]);
-		buttons[DETAIL_CLOSE] = std::make_unique<MapleButton>(info["BtClose"], Point<int16_t>(DETAIL_X, 0));
-		buttons[ACCEPT] = std::make_unique<MapleButton>(info["BtAccept"], Point<int16_t>(DETAIL_X, 0));
-		buttons[FINISH] = std::make_unique<MapleButton>(info["BtFinish"], Point<int16_t>(DETAIL_X, 0));
-		buttons[FIND_NPC] = std::make_unique<MapleButton>(info["BtNPC"], Point<int16_t>(DETAIL_X, 0));
-		buttons[HELPER] = std::make_unique<MapleButton>(info["BtArlim"], Point<int16_t>(DETAIL_X, 0));
-		buttons[FORFEIT] = std::make_unique<MapleButton>(info["BtGiveup"], Point<int16_t>(DETAIL_X, 0));
-		info_background = info["backgrnd"]; info_paper = info["backgrnd2"];
-		info_header = info["backgrnd3"]; info_tip = info["tip"];
-		reward_background = info["summary"]; reward_background.shift(reward_background.get_origin());
-		reward_heading = info["summary_icon"]["reward"];
-		basic_reward = info["summary_icon"]["basic"];
-		search_area = list["searchArea"]; complete_count = list["completeCount"];
-		// Textfield bounds are relative to the movable window, never screen coordinates.
-		search = Textfield(Text::A11M, Text::LEFT, Color::Name::DARKGREY,
-			Rectangle<int16_t>({36, 49}, {235, 71}), 40);
-		search.set_enter_callback([&](std::string) { search.set_state(Textfield::DISABLED); search.set_state(Textfield::NORMAL); refresh_list(); });
-		search.set_key_callback(KeyAction::ESCAPE, [&] { close(); });
-		placeholder = Text(Text::A11M, Text::LEFT, Color::Name::BOULDER, "Enter the quest name.");
-		empty_detail = Text(Text::A12M, Text::CENTER, Color::Name::BOULDER, "Select a quest to view its information.", 250);
-		slider = Slider(Slider::DEFAULT_SILVER, {78, 353}, 278, VISIBLE_ROWS, 0, [&](bool up) { list_offset += up ? -1 : 1; });
-		detail_slider = Slider(Slider::DEFAULT_SILVER, {130, 353}, DETAIL_X + 278, 235, 235,
-			[&](bool up) { detail_offset = std::clamp<int16_t>(detail_offset + (up ? -16 : 16), 0, std::max<int16_t>(0, detail_height - 235)); });
+		nl::node Quest = NxFiles::ui_classic["UIWindow.img"]["Quest"];
+		nl::node Basic = NxFiles::ui_classic["Basic.img"];
+
+		list_background = Quest["backgrnd"];
+		detail_background = Quest["backgrnd2"];
+
+		for (size_t i = 0; i < 3; i++)
+			notices[i] = Quest["notice" + std::to_string(i)];
+
+		fold_boxes[0] = Basic["BtMin"]["normal"]["0"];
+		fold_boxes[1] = Basic["BtMax"]["normal"]["0"];
+		available_icon = Quest["icon0"];
+		progress_animation = Quest["icon2"];
+		ready_animation = Quest["icon3"];
+		complete_icon = Quest["icon4"];
+
+		tabs = ClassicTabs(ClassicTabs::TAB2, Quest["Tab"]["enabled"], Quest["Tab"]["disabled"], TAB_FILL);
+
+		for (uint16_t i = 0; i < 3; i++)
+			buttons[TAB0 + i] = std::make_unique<AreaButton>(TAB_STRIP + Point<int16_t>(tabs.pitch() * i, 0),
+				Point<int16_t>(tabs.pitch(), tabs.height()));
+
+		Point<int16_t> detail = Point<int16_t>(DETAIL_X, 0);
+
+		buttons[CLOSE] = std::make_unique<MapleButton>(Basic["BtClose"], CLOSE_POS);
+		buttons[HIDE] = std::make_unique<MapleButton>(Basic["BtHide"], detail + HIDE_POS);
+		buttons[FIND_NPC] = std::make_unique<MapleButton>(Quest["BtMarkNpc"], detail + FIND_NPC_POS);
+		buttons[HELPER] = std::make_unique<MapleButton>(Quest["BtAlert"], detail + HELPER_POS);
+		buttons[FORFEIT] = std::make_unique<MapleButton>(Quest["BtGiveup"], detail + FORFEIT_POS);
+
+		list_slider = Slider(Slider::Type::CLASSIC, LIST_SLIDER, LIST_SLIDER_X, ROWS, 0,
+			[&](bool up) { scroll_list(list_offset + (up ? -1 : 1)); });
+		detail_slider = Slider(Slider::Type::CLASSIC, DETAIL_SLIDER, DETAIL_X + DETAIL_SLIDER_X, 1, 1,
+			[&](bool up) { scroll_details(detail_offset + (up ? -1 : 1)); });
+
 		seen_revision = std::numeric_limits<uint64_t>::max();
 		change_tab(TAB0);
-		update_screen(Constants::Constants::get().get_viewwidth(), Constants::Constants::get().get_viewheight());
+		show_details(false);
 		update();
 	}
 
 	void UIQuestLog::update_screen(int16_t width, int16_t height)
 	{
-		dimension = {static_cast<int16_t>(detail_open ? DETAIL_X + 296 : 295), 396};
-		dragarea = {dimension.x(), 20};
+		dimension = Point<int16_t>(details_open ? DETAIL_X + DETAIL_WIDTH : LIST_WIDTH, HEIGHT);
+		dragarea = Point<int16_t>(dimension.x(), 20);
+
 		if (position.x() < 0 || position.x() + dimension.x() > width)
 			position.set_x(std::max<int16_t>(0, (width - dimension.x()) / 2));
+
 		if (position.y() < 0 || position.y() + dimension.y() > height)
 			position.set_y(std::max<int16_t>(0, (height - dimension.y()) / 2));
 	}
@@ -207,343 +294,471 @@ namespace ms
 	void UIQuestLog::update()
 	{
 		UIElement::update();
-		search.update(position);
-		if (selected >= 0) portrait.update();
-		auto& player = Stage::get().get_player();
-		auto job = player.get_stats().get_stat(MapleStat::JOB);
-		auto level = player.get_stats().get_stat(MapleStat::LEVEL);
-		auto map = Stage::get().get_mapid();
-		if (seen_revision != questlog.revision() || seen_job != job || seen_level != level || seen_map != map || seen_search != search.get_text())
+
+		progress_animation.update();
+		ready_animation.update();
+
+		if (selected >= 0)
+			portrait.update();
+
+		auto& stats = Stage::get().get_player().get_stats();
+		int16_t job = stats.get_stat(MapleStat::JOB);
+		int16_t level = stats.get_stat(MapleStat::LEVEL);
+
+		if (seen_revision != questlog.revision() || seen_job != job || seen_level != level)
 		{
-			seen_revision = questlog.revision(); seen_job = job; seen_level = level; seen_map = map; seen_search = search.get_text();
+			seen_revision = questlog.revision();
+			seen_job = job;
+			seen_level = level;
 			refresh_list();
+			return;
 		}
-		bool local = selected >= 0 && local_npc_oid() >= 0;
-		auto enable = [&](Buttons id, bool allowed) {
-			if (!allowed) buttons[id]->set_state(Button::DISABLED);
-			else if (buttons[id]->get_state() == Button::DISABLED) buttons[id]->set_state(Button::NORMAL);
-		};
+
+		// Items picked up or used change what a quest still needs without
+		// touching the quest log.
+		if (tab == TAB1)
+		{
+			for (auto& row : rows)
+				if (row.quest >= 0)
+					row.icon = progress_icon(row.quest);
+
+			if (selected >= 0 && objectives(selected) != shown_goals)
+				write_details();
+		}
+	}
+
+	std::vector<QuestObjective> UIQuestLog::objectives(int16_t id) const
+	{
+		const QuestInfo* quest = QuestCatalog::get().find(id);
+		const auto& started = questlog.started_quests();
+		auto progress = started.find(id);
+
+		if (!quest || progress == started.end())
+			return {};
+
 		const Inventory& inventory = Stage::get().get_player().get_inventory();
-		auto count = [&](int32_t item_id) { return static_cast<int32_t>(inventory.get_total_item_count(item_id)); };
-		enable(ACCEPT, local && questlog.npc_marker(target_npc, job, level, count) == QuestMarker::AVAILABLE);
-		enable(FINISH, local && questlog.npc_marker(target_npc, job, level, count) == QuestMarker::READY);
+
+		return quest_objectives(quest->end_mobs, quest->end_items, progress->second,
+			[&](int32_t item_id) { return static_cast<int32_t>(inventory.get_total_item_count(item_id)); });
+	}
+
+	UIQuestLog::Icon UIQuestLog::progress_icon(int16_t id) const
+	{
+		if (!QuestCatalog::get().find(id))
+			return Icon::IN_PROGRESS;
+
+		auto goals = objectives(id);
+
+		return std::all_of(goals.begin(), goals.end(), [](const QuestObjective& goal) { return goal.met(); })
+			? Icon::READY : Icon::IN_PROGRESS;
 	}
 
 	void UIQuestLog::refresh_list()
 	{
 		std::vector<int16_t> ids;
 		auto& stats = Stage::get().get_player().get_stats();
-		auto eligible = questlog.available_quests(stats.get_stat(MapleStat::JOB), stats.get_stat(MapleStat::LEVEL));
-		if (tab == TAB0) ids = questlog.available_quests(stats.get_stat(MapleStat::JOB), stats.get_stat(MapleStat::LEVEL), all_levels);
-		else if (tab == TAB1) for (const auto& q : questlog.started_quests()) ids.push_back(q.first);
-		else for (const auto& q : questlog.completed_quests()) ids.push_back(q.first);
-		rows.clear();
-		std::string filter = lower(search.get_text());
+
+		if (tab == TAB0)
+			ids = questlog.available_quests(stats.get_stat(MapleStat::JOB), stats.get_stat(MapleStat::LEVEL));
+		else if (tab == TAB1)
+			for (const auto& quest : questlog.started_quests())
+				ids.push_back(quest.first);
+		else
+			for (const auto& quest : questlog.completed_quests())
+				ids.push_back(quest.first);
+
+		// Quests by area, the areas in order.
+		std::map<int16_t, std::vector<std::pair<int16_t, std::string>>> areas;
+
 		for (int16_t id : ids)
 		{
-			auto info = nl::nx::quest["QuestInfo.img"][std::to_string(id)];
+			nl::node info = nl::nx::quest["QuestInfo.img"][std::to_string(id)];
 			std::string name = info["name"];
-			if (name.empty() || (tab != TAB2 && lower(name).find(filter) == std::string::npos)) continue;
-			int32_t npc = nl::nx::quest["Check.img"][std::to_string(id)][tab == TAB0 ? "0" : "1"]["npc"];
-			if (current_location && tab == TAB0)
-			{
-				bool here = false;
-				for (const auto& object : *Stage::get().get_npcs().get_npcs())
-					if (auto n = dynamic_cast<Npc*>(object.second.get())) if (n->get_npcid() == npc) here = true;
-				if (!here) continue;
-			}
-			auto check = nl::nx::quest["Check.img"][std::to_string(id)]["0"];
-			int16_t minimum = check["lvmin"] ? check["lvmin"].get_integer() : 1;
-			std::string label = "(Lv. " + std::to_string(minimum) + ") " + name;
-			rows.push_back({id, one_line(Text::A11M, Color::Name::DARKGREY, label, 235), tab != TAB0 || std::find(eligible.begin(), eligible.end(), id) != eligible.end()});
+
+			if (!name.empty())
+				areas[static_cast<int16_t>(info["area"].get_integer())].emplace_back(id, name);
 		}
-		group_title = Text(Text::A11B, Text::LEFT, Color::Name::WHITE, "Maple Island (" + std::to_string(rows.size()) + ")", 0, false);
-		completion_count = Text(Text::A11B, Text::RIGHT, Color::Name::WHITE, std::to_string(questlog.completed_quests().size()));
-		int16_t total = rows.empty() ? 0 : collapsed ? 1 : rows.size() + 1;
-		list_offset = std::clamp<int16_t>(list_offset, 0, std::max<int16_t>(0, total - VISIBLE_ROWS));
-		slider.setrows(list_offset, VISIBLE_ROWS, total);
-		auto found = std::find_if(rows.begin(), rows.end(), [&](const auto& q) { return q.id == selected; });
-		if (found == rows.end()) selected = rows.empty() ? -1 : rows.front().id;
-		select_quest(selected);
+
+		rows.clear();
+
+		for (const auto& [area, quests] : areas)
+		{
+			std::string heading = area_name(area) + " (" + std::to_string(quests.size()) + ")";
+			rows.push_back({ area, -1, Text(Text::Font::A12M, Text::Alignment::LEFT, Color::Name::WHITE, heading, 0, false),
+				Text(), Icon::AVAILABLE });
+
+			if (folded[tab].count(area))
+				continue;
+
+			for (const auto& [id, name] : quests)
+			{
+				Icon icon = tab == TAB0 ? Icon::AVAILABLE : tab == TAB1 ? progress_icon(id) : Icon::COMPLETE;
+				Text label(Text::Font::A12M, Text::Alignment::LEFT, Color::Name::BLACK,
+					fit(Text::Font::A12M, name, LABEL_WIDTH, ""), 0, false);
+				Text chosen(Text::Font::A12M, Text::Alignment::LEFT, Color::Name::WHITE,
+					fit(Text::Font::A12M, name, CHOSEN_WIDTH, ".."), 0, false);
+
+				rows.push_back({ area, id, std::move(label), std::move(chosen), icon });
+			}
+		}
+
+		int16_t count = static_cast<int16_t>(rows.size());
+		list_offset = std::clamp<int16_t>(list_offset, 0, std::max<int16_t>(0, count - ROWS));
+		list_slider.setrows(list_offset, ROWS, count);
+
+		bool listed = std::any_of(rows.begin(), rows.end(), [&](const Row& row) { return row.quest == selected; });
+		select_quest(listed ? selected : -1);
 	}
 
 	void UIQuestLog::select_quest(int16_t id)
 	{
-		selected = id; detail_offset = 0;
-		for (auto& row : rows) row.title.change_color(row.id == id ? Color::Name::WHITE : row.eligible ? Color::Name::DARKGREY : Color::Name::BOULDER);
-		buttons[DETAIL_CLOSE]->set_active(detail_open);
-		for (auto b : {ACCEPT, FINISH, FIND_NPC, HELPER, FORFEIT}) buttons[b]->set_active(detail_open && selected >= 0);
-		buttons[ACCEPT]->set_active(detail_open && selected >= 0 && tab == TAB0);
-		buttons[FINISH]->set_active(detail_open && selected >= 0 && tab == TAB1);
-		buttons[HELPER]->set_active(detail_open && selected >= 0 && tab == TAB1);
-		buttons[FORFEIT]->set_active(detail_open && selected >= 0 && tab == TAB1);
-		buttons[FIND_NPC]->set_active(detail_open && selected >= 0 && tab != TAB1);
-		buttons[FORFEIT]->set_state(Button::DISABLED);
-		if (id < 0) { target_npc = 0; target_map = -1; return; }
-		auto info = nl::nx::quest["QuestInfo.img"][std::to_string(id)];
-		auto check = nl::nx::quest["Check.img"][std::to_string(id)];
-		target_npc = check[tab == TAB0 ? "0" : "1"]["npc"];
+		selected = id;
+		detail_offset = 0;
+
+		if (selected < 0)
+		{
+			target_npc = 0;
+			target_map = -1;
+			show_details(false);
+			return;
+		}
+
+		std::string name = std::to_string(id);
+		nl::node info = nl::nx::quest["QuestInfo.img"][name];
+		nl::node start = nl::nx::quest["Check.img"][name]["0"];
+
+		// Available quests point at the NPC who gives them, the rest at the
+		// one who takes them back.
+		target_npc = nl::nx::quest["Check.img"][name][tab == TAB0 ? "0" : "1"]["npc"];
 		target_map = npc_map(target_npc);
-		heading = one_line(Text::A12B, Color::Name::WHITE, info["name"], 172);
-		int16_t minimum = check["0"]["lvmin"] ? check["0"]["lvmin"].get_integer() : 1;
-		std::string requirement = "Level " + std::to_string(minimum);
-		if (check["0"]["lvmax"]) requirement += " - " + std::to_string(check["0"]["lvmax"].get_integer());
-		else requirement += "+";
-		level_text = Text(Text::A11M, Text::LEFT, Color::Name::WHITE, requirement);
 		portrait = NxHelper::Npc::get_npc_node(target_npc)["stand"];
-		std::string npc_name = nl::nx::string["Npc.img"][std::to_string(target_npc)]["name"];
-		objective = Text(Text::A12B, Text::LEFT, Color::Name::BLUE, "Talk to " + npc_name, 250);
-		auto map_name = target_map >= 0 ? NxHelper::Map::get_map_info_by_id(target_map).name : "";
-		location = Text(Text::A11B, Text::LEFT, Color::Name::RED, map_name, 250);
-		std::string text = info[std::to_string(tab)].get_string();
-		if (text.empty()) text = info["1"].get_string();
-		description = Text(Text::A12M, Text::LEFT, Color::Name::DARKGREY, quest_text(text, id), 250);
-		// What an open quest still needs: "Snail 3/10", "Shellpiece 0/1".
-		std::string needs;
-		const QuestInfo* quest = QuestCatalog::get().find(id);
-		if (tab == TAB1 && quest)
+
+		title = Text(Text::Font::A12B, Text::Alignment::LEFT, Color::Name::WHITE,
+			fit(Text::Font::A12B, info["name"], TITLE_WIDTH, ".."), 0, false);
+
+		std::string allowed;
+
+		for (auto job : start["job"])
+			allowed += (allowed.empty() ? "" : ", ") + Job(static_cast<uint16_t>(job.get_integer())).get_name();
+
+		jobs = Text(Text::Font::A12M, Text::Alignment::LEFT, Color::Name::WHITE,
+			fit(Text::Font::A12M, "Available to " + (allowed.empty() ? "all" : allowed), HEADER_WIDTH, ".."), 0, false);
+
+		std::string level;
+
+		if (start["lvmin"].get_integer() > 0)
+			level = "Over Level " + std::to_string(start["lvmin"].get_integer());
+		else if (start["lvmax"].get_integer() > 0)
+			level = "Under Level " + std::to_string(start["lvmax"].get_integer());
+
+		levels = Text(Text::Font::A12M, Text::Alignment::LEFT, Color::Name::WHITE, level, 0, false);
+
+		write_details();
+		show_details(true);
+	}
+
+	void UIQuestLog::write_details()
+	{
+		shown_goals = tab == TAB1 ? objectives(selected) : std::vector<QuestObjective>();
+
+		// What the quest says in its current state: offered, started or done.
+		std::string text = nl::nx::quest["QuestInfo.img"][std::to_string(selected)][std::to_string(tab)];
+
+		NpcTextMarkup::Lookups lookups {
+			[]() { return Stage::get().get_player().get_name(); },
+			[](int32_t id) { return std::string(nl::nx::string["Npc.img"][std::to_string(id)]["name"]); },
+			[](int32_t id) { return ItemData::get(id).get_name(); },
+			[](int32_t id) { return std::string(nl::nx::string["Mob.img"][std::to_string(id)]["name"]); },
+			[](int32_t id) { return NxHelper::Map::get_map_info_by_id(id).name; }
+		};
+
+		std::vector<NpcTextMarkup::InlineImage> tags;
+		text = NpcTextMarkup::expand(quest_counts(text, selected), lookups, &tags);
+
+		// Item icons take a box in the text; anything else is left out.
+		icons.clear();
+		std::vector<Point<int16_t>> boxes;
+
+		for (const auto& tag : tags)
 		{
-			const auto& started = questlog.started_quests();
-			auto progress = started.find(id);
-			const Inventory& inventory = Stage::get().get_player().get_inventory();
-			auto objectives = quest_objectives(quest->end_mobs, quest->end_items,
-				progress == started.end() ? std::string() : progress->second,
-				[&](int32_t item_id) { return static_cast<int32_t>(inventory.get_total_item_count(item_id)); });
-			for (const auto& goal : objectives)
-			{
-				std::string name = goal.mob
-					? nl::nx::string["Mob.img"][std::to_string(goal.id)]["name"].get_string()
-					: ItemData::get(goal.id).get_name();
-				if (!needs.empty()) needs += "\\n";
-				needs += (goal.met() ? "#g" : "#k") + name + " " + std::to_string(goal.have) + "/" + std::to_string(goal.need) + "#k";
-			}
-			buttons[HELPER]->set_state(questlog.is_tracked(id) || questlog.tracked().size() < QuestLog::MAX_TRACKED
-				? Button::NORMAL : Button::DISABLED);
+			Texture icon;
+
+			if ((tag.tag == 'i' || tag.tag == 'v') && tag.arg.size() <= 9 && ItemData::get(std::stoi(tag.arg)).is_valid())
+				icon = ItemData::get(std::stoi(tag.arg)).get_icon(false);
+
+			boxes.push_back(icon.is_valid() ? Point<int16_t>(ICON_SIZE, ICON_SIZE) : Point<int16_t>());
+			icons.push_back({ icon, icons.size() });
 		}
-		goals = Text(Text::A12M, Text::LEFT, Color::Name::DARKGREY, needs, 250);
-		reward_y = std::max<int16_t>(245, 180 + goals_height() + description.height() + 24);
-		auto experience = nl::nx::quest["Act.img"][std::to_string(id)]["1"]["exp"].get_integer();
-		std::string rewards = std::to_string(experience) + " EXP";
-		// Item rewards; those with a weight are one random pick.
-		for (auto item : nl::nx::quest["Act.img"][std::to_string(id)]["1"]["item"])
-		{
-			int32_t count = item["count"].get_integer(1);
-			if (count <= 0) continue;
-			rewards += "\\n" + ItemData::get(item["id"].get_integer()).get_name() + " x" + std::to_string(count);
-			if (item["prop"].get_integer(0) > 0) rewards += " (random)";
-		}
-		reward = Text(Text::A12M, Text::LEFT, Color::Name::DARKGREY, rewards, 230);
-		completed_on = Text();
-		if (tab == TAB2)
-		{
-			// Quest packets store Windows FILETIME ticks.
-			int64_t ticks = questlog.completed_quests().at(id);
-			std::time_t seconds = ticks / 10000000 - 11644473600LL;
-			std::tm* date = std::localtime(&seconds);
-			if (date)
-			{
-				std::ostringstream stamp; stamp << "Completed on " << std::put_time(date, "%Y-%m-%d");
-				completed_on = Text(Text::A11B, Text::LEFT, Color::Name::BLUE, stamp.str());
-			}
-		}
-		detail_height = reward_y + std::max<int16_t>(112, 64 + reward.height() + 12) - 130;
-		detail_slider.setrows(1, 1 + (std::max<int16_t>(0, detail_height - 235) + 15) / 16);
+
+		description = Text(Text::Font::A12M, Text::Alignment::LEFT, Color::Name::BLACK, text, TEXT_WIDTH);
+		description.set_boxes(boxes);
+
+		int16_t view = TEXT_VIEW.length() - (TEXT_POS.y() - TEXT_VIEW.first());
+		int16_t steps = std::max<int16_t>(0, (description.height() - view + TEXT_STEP - 1) / TEXT_STEP);
+		detail_offset = std::min(detail_offset, steps);
+		detail_slider.setrows(detail_offset, 1, steps + 1);
+	}
+
+	void UIQuestLog::show_details(bool open)
+	{
+		details_open = open && selected >= 0;
+
+		buttons[HIDE]->set_active(details_open);
+		buttons[FIND_NPC]->set_active(details_open && tab == TAB0);
+		buttons[HELPER]->set_active(details_open && tab == TAB1);
+		buttons[FORFEIT]->set_active(details_open && tab == TAB1);
+
+		// Forfeiting is not supported yet.
+		buttons[FORFEIT]->set_state(Button::DISABLED);
 		buttons[FIND_NPC]->set_state(target_map >= 0 ? Button::NORMAL : Button::DISABLED);
+
+		if (tab == TAB1 && selected >= 0)
+			buttons[HELPER]->set_state(questlog.is_tracked(selected) || questlog.tracked().size() < QuestLog::MAX_TRACKED
+				? Button::NORMAL : Button::DISABLED);
+
+		update_screen(Constants::Constants::get().get_viewwidth(), Constants::Constants::get().get_viewheight());
+	}
+
+	void UIQuestLog::scroll_list(int16_t offset)
+	{
+		int16_t count = static_cast<int16_t>(rows.size());
+		list_offset = std::clamp<int16_t>(offset, 0, std::max<int16_t>(0, count - ROWS));
+	}
+
+	void UIQuestLog::scroll_details(int16_t offset)
+	{
+		int16_t view = TEXT_VIEW.length() - (TEXT_POS.y() - TEXT_VIEW.first());
+		int16_t steps = std::max<int16_t>(0, (description.height() - view + TEXT_STEP - 1) / TEXT_STEP);
+		detail_offset = std::clamp<int16_t>(offset, 0, steps);
 	}
 
 	void UIQuestLog::draw(float alpha) const
 	{
-		draw_sprites(alpha);
-		if (tab == TAB2)
-		{
-			complete_count.draw(position);
-			completion_count.draw(position + Point<int16_t>(272, 44));
-		}
-		else
-		{
-			search_area.draw(position); search.draw(position);
-			if (search.empty() && search.get_state() != Textfield::FOCUSED) placeholder.draw(position + Point<int16_t>(39, 50));
-		}
-		if (rows.empty()) notice_sprites[tab].draw(position, alpha);
-		for (int16_t row = 0; row < VISIBLE_ROWS && !rows.empty(); ++row)
-		{
-			int16_t index = row + list_offset;
-			auto pos = position + Point<int16_t>(12, ROW_Y + row * ROW_HEIGHT + 9);
-			if (index == 0)
-			{
-				GraphicsGL::get().drawrectangle(pos.x(), pos.y() - 9, 263, 18, .21f, .43f, .61f, 1.0f);
-				Text(Text::A11B, Text::LEFT, Color::Name::WHITE, collapsed ? "+" : "-").draw(pos + Point<int16_t>(3, -15));
-				group_title.draw(pos + Point<int16_t>(17, -15));
-			}
-			else if (!collapsed && index <= static_cast<int16_t>(rows.size()))
-			{
-				const auto& q = rows[index - 1];
-				bool chosen = q.id == selected;
-				if (chosen) GraphicsGL::get().drawrectangle(pos.x(), pos.y() - 9, 263, 18, .60f, .60f, .60f, 1.0f);
-				quest_icons[tab].draw(pos + Point<int16_t>(0, -7));
-				q.title.draw(pos + Point<int16_t>(17, -15));
-			}
-			else break;
-		}
-		slider.draw(position);
-		if (detail_open)
-		{
-			auto origin = position + Point<int16_t>(DETAIL_X, 0);
-			info_background.draw(origin); info_paper.draw(origin);
-			if (selected >= 0)
-			{
-				info_header.draw(origin); info_tip.draw(origin);
-				portrait.draw(origin + Point<int16_t>(234, 119), alpha);
-				heading.draw(origin + Point<int16_t>(20, 43));
-				level_text.draw(origin + Point<int16_t>(20, 71));
-				Range<int16_t> clip(position.y() + 130, position.y() + 364);
-				auto content = origin - Point<int16_t>(0, detail_offset);
-				(tab == TAB2 ? completed_on : objective).draw(content + Point<int16_t>(16, 140), clip);
-				goals.draw(content + Point<int16_t>(16, 160), clip);
-				location.draw(content + Point<int16_t>(16, 160 + goals_height()), clip);
-				description.draw(content + Point<int16_t>(16, 180 + goals_height()), clip);
-				// Keep the reward panel inside the detail viewport while scrolling.
-				int16_t top = std::max<int16_t>(130, reward_y - detail_offset);
-				int16_t bottom = std::min<int16_t>(364, reward_y + std::max<int16_t>(112, 64 + reward.height() + 12) - detail_offset);
-				if (bottom > top) reward_background.draw(DrawArgument(origin + Point<int16_t>(10, top), Point<int16_t>(263, bottom - top)));
-				auto icon = [&](const Texture& texture, int16_t y) {
-					if (y - detail_offset >= 130 && y - detail_offset + texture.height() <= 364)
-						texture.draw(content + Point<int16_t>(20, y));
-				};
-				icon(reward_heading, reward_y + 9); icon(basic_reward, reward_y + 36);
-				reward.draw(content + Point<int16_t>(26, reward_y + 64), clip);
-				detail_slider.draw(position);
-			}
-			else empty_detail.draw(origin + Point<int16_t>(148, 195));
-		}
-		draw_buttons(alpha);
-	}
+		list_background.draw(position);
+		tabs.draw(position + TAB_STRIP, 3, tab);
 
-	int32_t UIQuestLog::local_npc_oid() const
-	{
-		for (const auto& object : *Stage::get().get_npcs().get_npcs())
-			if (auto n = dynamic_cast<Npc*>(object.second.get()))
-				if (n->get_npcid() == target_npc) return object.first;
-		return -1;
+		if (rows.empty())
+		{
+			const Texture& notice = notices[tab];
+			notice.draw(position + Point<int16_t>((LIST_WIDTH - notice.width()) / 2, 180));
+		}
+
+		for (int16_t i = 0; i < ROWS && list_offset + i < static_cast<int16_t>(rows.size()); i++)
+		{
+			const Row& row = rows[list_offset + i];
+			Point<int16_t> top = position + Point<int16_t>(0, ROW_TOP + ROW_PITCH * i);
+			Point<int16_t> label = top + Point<int16_t>(LABEL_X, LABEL_Y);
+
+			if (row.quest < 0)
+			{
+				GraphicsGL::get().drawrectangle(top.x() + ROW_X, top.y(), ROW_RIGHT - ROW_X, BAR_HEIGHT,
+					0.59f, 0.71f, 0.79f, 1.0f);
+				fold_boxes[folded[tab].count(row.area)].draw(top + FOLD_BOX);
+				row.label.draw(label);
+				continue;
+			}
+
+			switch (row.icon)
+			{
+				case Icon::AVAILABLE:
+					available_icon.draw(top + ROW_ICON);
+					break;
+				case Icon::IN_PROGRESS:
+					progress_animation.draw(top + ARROW_ICON, alpha);
+					break;
+				case Icon::READY:
+					ready_animation.draw(top + ROW_ICON, alpha);
+					break;
+				case Icon::COMPLETE:
+					complete_icon.draw(top + ROW_ICON);
+					break;
+			}
+
+			if (row.quest == selected && details_open)
+			{
+				GraphicsGL::get().drawrectangle(top.x() + LABEL_X - 2, top.y(), ROW_RIGHT - LABEL_X + 2, BAR_HEIGHT,
+					0.16f, 0.37f, 0.59f, 1.0f);
+				row.chosen.draw(label);
+			}
+			else
+			{
+				row.label.draw(label);
+			}
+		}
+
+		list_slider.draw(position);
+
+		if (details_open)
+		{
+			Point<int16_t> detail = position + Point<int16_t>(DETAIL_X, 0);
+
+			detail_background.draw(detail);
+			portrait.draw(detail + PORTRAIT_POS, alpha);
+			title.draw(detail + TITLE_POS);
+			jobs.draw(detail + JOBS_POS);
+			levels.draw(detail + LEVELS_POS);
+
+			Range<int16_t> clip = Range<int16_t>(detail.y() + TEXT_VIEW.first(), detail.y() + TEXT_VIEW.second());
+			Point<int16_t> text = detail + TEXT_POS - Point<int16_t>(0, detail_offset * TEXT_STEP);
+
+			for (const auto& icon : icons)
+			{
+				Point<int16_t> box = text + description.box_position(icon.box);
+
+				if (icon.texture.is_valid() && box.y() >= clip.first() && box.y() + ICON_SIZE <= clip.second())
+					icon.texture.draw(box + Point<int16_t>(0, ICON_SIZE));
+			}
+
+			description.draw(text, clip);
+			detail_slider.draw(position);
+		}
+
+		UIElement::draw_buttons(alpha);
 	}
 
 	void UIQuestLog::find_npc()
 	{
-		if (target_map < 0) return;
-		search.set_state(Textfield::DISABLED);
-		auto map = UI::get().emplace<UIWorldMap>();
-		if (map) map->show_location(target_map);
-		search.set_state(tab == TAB2 ? Textfield::DISABLED : Textfield::NORMAL);
+		if (target_map < 0)
+			return;
+
+		if (auto map = UI::get().emplace<UIWorldMap>())
+			map->show_location(target_map);
 	}
 
-	void UIQuestLog::doubleclick(Point<int16_t> pos)
+	void UIQuestLog::close()
 	{
-		if (detail_open && selected >= 0 && Rectangle<int16_t>(position + Point<int16_t>(DETAIL_X + 185, 27), position + Point<int16_t>(DETAIL_X + 280, 122)).contains(pos)) find_npc();
+		deactivate();
 	}
 
-	void UIQuestLog::close() { search.set_state(Textfield::DISABLED); deactivate(); }
 	void UIQuestLog::toggle_active()
 	{
-		if (active) close();
-		else { makeactive(); search.set_state(tab == TAB2 ? Textfield::DISABLED : Textfield::NORMAL); seen_revision = std::numeric_limits<uint64_t>::max(); }
-	}
-
-	void UIQuestLog::send_key(int32_t key, bool pressed, bool escape)
-	{
-		if (!pressed) return;
-		if (escape) close();
-		else if (key == KeyAction::TAB) change_tab((tab + 1) % 3);
-	}
-
-	void UIQuestLog::send_scroll(double offset)
-	{
-		if (detail_open && cursor_relative.x() >= DETAIL_X) detail_slider.send_scroll(offset);
-		else slider.send_scroll(offset);
-	}
-
-	Cursor::State UIQuestLog::send_cursor(bool clicking, Point<int16_t> pos)
-	{
-		cursor_relative = pos - position;
-		if (!clicking) click_down = false;
-		if (clicking && search.get_state() == Textfield::FOCUSED && !search.get_bounds().contains(pos))
-		{ search.set_state(Textfield::DISABLED); search.set_state(tab == TAB2 ? Textfield::DISABLED : Textfield::NORMAL); }
-		if (auto state = search.send_cursor(pos, clicking)) return state;
-		if (!collapsed && rows.size() + 1 > VISIBLE_ROWS) if (auto state = slider.send_cursor(cursor_relative, clicking)) return state;
-		if (detail_open && selected >= 0 && detail_height > 235) if (auto state = detail_slider.send_cursor(cursor_relative, clicking)) return state;
-		if (cursor_relative.x() >= 12 && cursor_relative.x() <= 275 && cursor_relative.y() >= ROW_Y && cursor_relative.y() < ROW_Y + VISIBLE_ROWS * ROW_HEIGHT && !rows.empty())
+		if (active)
 		{
-			if (clicking && !click_down)
-			{
-				click_down = true;
-				int16_t row = (cursor_relative.y() - ROW_Y) / ROW_HEIGHT + list_offset;
-				if (row == 0) { collapsed = !collapsed; refresh_list(); }
-				else if (!collapsed && row <= static_cast<int16_t>(rows.size()))
-				{
-					detail_open = true; select_quest(rows[row - 1].id);
-					update_screen(Constants::Constants::get().get_viewwidth(), Constants::Constants::get().get_viewheight());
-				}
-			}
-			return Cursor::CANCLICK;
+			close();
 		}
-		return UIDragElement::send_cursor(clicking, pos);
+		else
+		{
+			makeactive();
+			seen_revision = std::numeric_limits<uint64_t>::max();
+		}
 	}
 
-	Button::State UIQuestLog::button_pressed(uint16_t id)
+	void UIQuestLog::send_key(int32_t keycode, bool pressed, bool escape)
 	{
-		if (id <= TAB2) { change_tab(id); return Button::IDENTITY; }
-		switch (id)
+		if (!pressed)
+			return;
+
+		if (escape)
+			close();
+		else if (keycode == KeyAction::Id::TAB)
+			change_tab((tab + 1) % 3);
+	}
+
+	void UIQuestLog::send_scroll(double yoffset)
+	{
+		if (details_open && cursor_relative.x() >= DETAIL_X)
+			detail_slider.send_scroll(yoffset);
+		else
+			list_slider.send_scroll(yoffset);
+	}
+
+	Cursor::State UIQuestLog::send_cursor(bool clicking, Point<int16_t> cursorpos)
+	{
+		cursor_relative = cursorpos - position;
+
+		if (Cursor::State state = list_slider.send_cursor(cursor_relative, clicking))
+			return state;
+
+		if (details_open)
+			if (Cursor::State state = detail_slider.send_cursor(cursor_relative, clicking))
+				return state;
+
+		int16_t x = cursor_relative.x();
+		int16_t y = cursor_relative.y() - ROW_TOP;
+		int16_t index = y >= 0 && y % ROW_PITCH < BAR_HEIGHT ? list_offset + y / ROW_PITCH : -1;
+
+		if (x >= ROW_X && x < ROW_RIGHT && y >= 0 && y < ROWS * ROW_PITCH && index < static_cast<int16_t>(rows.size()) && index >= 0)
 		{
-			case CLOSE: close(); break;
-			case DETAIL_CLOSE:
-				detail_open = false; select_quest(selected);
-				update_screen(Constants::Constants::get().get_viewwidth(), Constants::Constants::get().get_viewheight()); break;
-			case SEARCH: refresh_list(); break;
-			case ALL_LEVEL:
-			case MY_LEVEL:
-				all_levels = !all_levels;
-				buttons[ALL_LEVEL]->set_active(!all_levels); buttons[MY_LEVEL]->set_active(all_levels);
-				refresh_list(); break;
-			case MY_LOCATION:
-			case ALL_LOCATION:
-				current_location = !current_location;
-				buttons[MY_LOCATION]->set_active(!current_location); buttons[ALL_LOCATION]->set_active(current_location);
-				refresh_list(); break;
-			case FIND_NPC: find_npc(); break;
+			if (clicking)
+			{
+				const Row& row = rows[index];
+
+				if (row.quest < 0)
+				{
+					if (!folded[tab].erase(row.area))
+						folded[tab].insert(row.area);
+
+					refresh_list();
+				}
+				else
+				{
+					select_quest(row.quest);
+				}
+
+				return Cursor::State::CLICKING;
+			}
+
+			return Cursor::State::CANCLICK;
+		}
+
+		return UIDragElement::send_cursor(clicking, cursorpos);
+	}
+
+	Button::State UIQuestLog::button_pressed(uint16_t buttonid)
+	{
+		switch (buttonid)
+		{
+			case TAB0:
+			case TAB1:
+			case TAB2:
+				change_tab(buttonid - TAB0);
+				return Button::State::IDENTITY;
+			case CLOSE:
+				close();
+				break;
+			case HIDE:
+				show_details(false);
+				break;
+			case FIND_NPC:
+				find_npc();
+				break;
 			case HELPER:
 			{
 				auto& quests = Stage::get().get_player().get_quests();
+
 				if (quests.is_tracked(selected))
+				{
 					quests.untrack(selected);
+				}
 				else if (quests.track(selected))
 				{
 					// Tracking a quest brings back a closed helper.
 					if (auto helper = UI::get().get_element<UIQuestHelper>())
 						helper->makeactive();
 				}
+
 				break;
 			}
-			case ACCEPT:
-			case FINISH:
-				if (local_npc_oid() >= 0) { QuestConversation::open(selected, target_npc); close(); } break;
-			default: break;
+			default:
+				break;
 		}
-		return Button::NORMAL;
+
+		return Button::State::NORMAL;
 	}
 
-	void UIQuestLog::change_tab(uint16_t id)
+	void UIQuestLog::change_tab(uint16_t tabid)
 	{
-		buttons[TAB0 + tab]->set_state(Button::NORMAL);
-		tab = id; selected = -1; list_offset = 0; collapsed = false;
-		search.set_state(Textfield::DISABLED); search.change_text("");
-		search.set_state(tab == TAB2 ? Textfield::DISABLED : Textfield::NORMAL);
-		buttons[MY_LOCATION]->set_active(tab == TAB0 && !current_location);
-		buttons[ALL_LOCATION]->set_active(tab == TAB0 && current_location);
-		buttons[ALL_LEVEL]->set_active(tab == TAB0 && !all_levels);
-		buttons[MY_LEVEL]->set_active(tab == TAB0 && all_levels);
-		buttons[SEARCH]->set_active(tab != TAB2);
-		buttons[TAB0 + tab]->set_state(Button::PRESSED);
+		buttons[TAB0 + tab]->set_state(Button::State::NORMAL);
+		tab = tabid;
+		buttons[TAB0 + tab]->set_state(Button::State::PRESSED);
+
+		selected = -1;
+		list_offset = 0;
 		refresh_list();
 	}
 
-	UIElement::Type UIQuestLog::get_type() const { return TYPE; }
+	UIElement::Type UIQuestLog::get_type() const
+	{
+		return TYPE;
+	}
 }
