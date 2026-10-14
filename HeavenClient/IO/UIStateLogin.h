@@ -37,6 +37,8 @@ namespace ms
 	public:
 		UIStateLogin();
 
+		~UIStateLogin() override;
+
 		void draw(float inter, Point<int16_t> cursor) const override;
 
 		void update() override;

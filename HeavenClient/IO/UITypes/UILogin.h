@@ -64,11 +64,8 @@ namespace ms
 			NUM_BUTTONS
 		};
 
-		Text version;
 		Textfield account;
 		Textfield password;
-		Texture accountbg;
-		Texture passwordbg;
 		BoolPair<Texture> checkbox;
 
 		bool saveid;
