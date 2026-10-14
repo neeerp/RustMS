@@ -50,6 +50,11 @@ namespace ms
 		MapleComboBox(Type type, std::vector<std::string> options, uint16_t default_option, Point<int16_t> parentpos,
 					  Point<int16_t> position, int64_t width);
 
+		// A v83 drop box, whose box is part of its parent's background: src
+		// has one image for each state but normal, drawn over a box of size box.
+		MapleComboBox(nl::node src, Point<int16_t> box, std::vector<std::string> options, uint16_t default_option,
+					  Point<int16_t> parentpos, Point<int16_t> position);
+
 		void draw(Point<int16_t> parentpos) const override;
 
 		void update()
@@ -71,6 +76,10 @@ namespace ms
 		Button::State button_pressed(uint16_t buttonid);
 
 	private:
+		void init(Text::Font selected_font, Color::Name selected_color, Point<int16_t> parentpos, Point<int16_t> position);
+
+		int16_t box_height() const;
+
 		enum Buttons : uint16_t
 		{
 			OPTION1,
@@ -101,5 +110,7 @@ namespace ms
 		uint16_t selected_index;
 		Point<int16_t> selected_adj;
 		Point<int16_t> parentpos;
+		// The size of a v83 drop box's box, or zero for the three-piece box.
+		Point<int16_t> box;
 	};
 }

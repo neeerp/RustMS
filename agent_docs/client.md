@@ -267,6 +267,21 @@ from `UI.nx`. Moved so far:
   the server adds the character, the scene scrolls back to the character
   select with the new character picked. Positions are checked against v0.73
   footage.
+- **Login dialogs** (`UILoginNotice`, `UIQuitConfirm`, `UILoginWait`,
+  `UITermsOfService`, `UIGender`): notices are a 362x219 `Notice/backgrnd`
+  scroll at (219, 170). Errors use `backgrnd/1`, with the "no" stamp.
+  Confirmations and "name OK" use `backgrnd/0`. The message's `text` image has the parchment baked
+  in and sits at (119, 21). A lone OK is at (162, 150); OK and Cancel pairs,
+  as in the quit confirmation, are at (106, 150) and (195, 150). These are
+  checked against v0.50 and v0.55 footage. "Connecting to server"
+  (`Notice/Loading`) is at (259, 226). Its `bar` animation fills the LOADING
+  slot at (131, 98), and `BtCancel` sits right of the caption at (189, 44),
+  as in v0.59 footage. `TOS` and `Gender` keep their layouts, which already
+  fit the v83 art. The gender `DropBox` has no normal image, since its box
+  is drawn in `text/0`, so `MapleComboBox` has a mode that draws one image
+  per state over a box in the parent's background. No footage shows these
+  two, since they appear once per account. `UISoftKey` still uses the
+  modern `Common/SoftKey`. It only opens for a PIC, and RustMS disables PICs.
 
 `UIClassic.nx` is not one of NoLifeNx's standard files, so `NxFiles` opens it
 with `nl::file` instead of `nl::nx::load_all`.
