@@ -529,6 +529,20 @@ namespace ms
 		return Button::NORMAL;
 	}
 
+	void UIQuestLog::show_quest(int16_t id)
+	{
+		change_tab(TAB1);
+		detail_open = true; selected = id;
+		refresh_list();
+		// Scroll its row (after the group's) into view.
+		auto found = std::find_if(rows.begin(), rows.end(), [&](const auto& q) { return q.id == id; });
+		int16_t row = static_cast<int16_t>(found - rows.begin()) + 1;
+		if (found != rows.end() && row >= list_offset + VISIBLE_ROWS)
+		{
+			list_offset = row - VISIBLE_ROWS + 1;
+			refresh_list();
+		}
+	}
 	void UIQuestLog::change_tab(uint16_t id)
 	{
 		buttons[TAB0 + tab]->set_state(Button::NORMAL);

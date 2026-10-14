@@ -135,6 +135,17 @@ button folds the helper to its title bar, and close hides it until the
 quest window tracks a quest again. Footage doesn't show what AUTO and close
 did, so those two are best guesses.
 
+The **Quest Complete! notice** (`IO/UITypes/UIQuestComplete.cpp`) is the red
+`UIWindow.img/FadeYesNo/backgrnd4` box with the envelope `icon7`, above the
+status bar (FRS4wNJWWIE, 2:00). Each update it reads every started quest's
+objectives (kills and items), and `QuestCompletion` reports those whose last
+objective was just met. A quest is judged from when it is first seen, so one
+already met when started or on login doesn't get a notice. O opens the quest
+on the quest log's In Progress tab (`UIQuestLog::show_quest`) and X dismisses
+it. Otherwise the notice stays, across map changes, until the quest is handed
+in or forfeited, as in footage. Newer notices stack above older ones, up to
+four. Footage shows only one notice, so the stacking is a guess.
+
 ## Persistence and rewards
 
 `character_quests` is keyed by `(character_id, quest_id)`: no row (not

@@ -8,6 +8,8 @@ if(HEAVENCLIENT_BUILD_TESTS)
     enable_testing()
     add_executable(quest_marker_tests tests/quest_marker.cpp)
     add_test(NAME quest_markers COMMAND quest_marker_tests)
+    add_executable(quest_completion_tests tests/quest_completion.cpp)
+    add_test(NAME quest_completion COMMAND quest_completion_tests)
     add_executable(input_focus_tests tests/input_focus.cpp)
     add_test(NAME input_focus COMMAND input_focus_tests)
     add_executable(movement_physics_tests tests/movement_physics.cpp
@@ -140,6 +142,7 @@ add_executable(HeavenClient
     Character/PlayerStates.h
     Character/QuestCatalog.cpp
     Character/QuestCatalog.h
+    Character/QuestCompletion.h
     Character/QuestDialogue.h
     Character/QuestInfo.h
     Character/QuestLog.cpp
@@ -315,6 +318,8 @@ add_executable(HeavenClient
     IO/UITypes/UIBuffList.cpp
     IO/UITypes/UIBuffList.h
     IO/UITypes/UIQuestHelper.cpp
+    IO/UITypes/UIQuestComplete.cpp
+    IO/UITypes/UIQuestComplete.h
     IO/UITypes/UIQuestHelper.h
     IO/UITypes/UICashShop.cpp
     IO/UITypes/UICashShop.h

@@ -74,6 +74,7 @@ namespace ms
 			CHARINFO,
 			CASHSHOP,
 			QUESTHELPER,
+			QUESTCOMPLETE,
 			NUM_TYPES
 		};
 

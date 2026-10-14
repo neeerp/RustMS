@@ -31,6 +31,7 @@
 #include "UITypes/UIItemInventory.h"
 #include "UITypes/UIKeyConfig.h"
 #include "UITypes/UIMiniMap.h"
+#include "UITypes/UIQuestComplete.h"
 #include "UITypes/UIQuestLog.h"
 #include "UITypes/UIQuit.h"
 #include "UITypes/UIShop.h"
@@ -87,6 +88,7 @@ namespace ms
 		emplace<UIMiniMap>(stats);
 		emplace<UIBuffList>();
 		emplace<UIQuestHelper>(Stage::get().get_player().get_quests(), inventory);
+		emplace<UIQuestComplete>(Stage::get().get_player().get_quests(), inventory);
 		emplace<UIShop>(look, inventory);
 
 		VWIDTH = Constants::Constants::get().get_viewwidth();
@@ -561,6 +563,7 @@ namespace ms
 					UIElement::Type::MINIMAP,
 					UIElement::Type::BUFFLIST,
 					UIElement::Type::QUESTHELPER,
+					UIElement::Type::QUESTCOMPLETE,
 					UIElement::Type::NPCTALK,
 					UIElement::Type::SHOP
 			};
