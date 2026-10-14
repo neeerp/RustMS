@@ -68,6 +68,8 @@ pub struct SetFieldPacket {
     pub character_id: i32,
     pub character_name: String,
     pub map_id: i32,
+    /// The portal the character appears at.
+    pub spawn_point: u8,
     pub level: u8,
     pub exp: i32,
     pub str: i16,
@@ -151,6 +153,7 @@ struct CharacterMeta {
     id: i32,
     name: String,
     map_id: i32,
+    spawn_point: u8,
     level: u8,
     exp: i32,
     str: i16,
@@ -729,6 +732,7 @@ pub fn decode_set_field(packet: &Packet) -> Result<SetFieldPacket, String> {
         character_id: meta.id,
         character_name: meta.name,
         map_id: meta.map_id,
+        spawn_point: meta.spawn_point,
         level: meta.level,
         exp: meta.exp,
         str: meta.str,
@@ -1060,12 +1064,14 @@ fn decode_character_meta(cursor: &mut Cursor<&[u8]>) -> Result<CharacterMeta, St
     let map_id = cursor
         .read_int()
         .map_err(|e| format!("failed to read character map id: {e}"))?;
-    skip(cursor, 1 + 4)?;
+    let spawn_point = cursor.read_byte().map_err(|e| e.to_string())?;
+    skip(cursor, 4)?;
 
     Ok(CharacterMeta {
         id,
         name,
         map_id,
+        spawn_point,
         level,
         exp,
         str,

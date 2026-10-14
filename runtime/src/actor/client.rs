@@ -19,6 +19,7 @@ use game::Player;
 use net::dialogue::{Conversation, NpcInteraction};
 use net::login_world::resolve_login_channel;
 use net::packet::build;
+use net::packet::build::world::field::parse_movement_state;
 use net::packet::build::world::messaging::{build_find_result, FindLocation};
 use net::quests::QuestRequest;
 use net::{ClientId, SpawnPosition, WorldAction, WorldContext, WorldRoute};
@@ -57,6 +58,9 @@ pub struct WorldServices {
 struct InGame {
     player: Player,
     field: FieldHandle,
+    /// Where the player last stood on the current map, from their own
+    /// movement; the field keeps the authoritative copy.
+    position: (i16, i16),
 }
 
 /// Actor for one world-server connection. It is the single owner of its
@@ -252,6 +256,12 @@ impl ClientActor {
                 movement_bytes,
             } => {
                 self.last_moved = Some(tokio::time::Instant::now());
+                if let Some(game) = self.game.as_mut() {
+                    let (x, y) = game.position;
+                    if let Some((x, y, _)) = parse_movement_state(&movement_bytes, (x, y, 0)) {
+                        game.position = (x, y);
+                    }
+                }
                 self.send_to_field(FieldMessage::Move {
                     from: self.client_id,
                     packet,
@@ -396,7 +406,11 @@ impl ClientActor {
         let spawn = net::spawn_position(player.stats.map_id, player.stats.spawn_point)
             .unwrap_or(FALLBACK_SPAWN);
         let field = self.services.fields.field(key);
-        self.game = Some(InGame { player, field });
+        self.game = Some(InGame {
+            player,
+            field,
+            position: (spawn.x, spawn.y),
+        });
         self.join_current_field(spawn).await?;
         info!(
             character_id,
@@ -434,7 +448,8 @@ impl ClientActor {
 
     async fn join_current_field(&mut self, spawn: SpawnPosition) -> Result<(), RuntimeError> {
         let handle = self.handle();
-        let game = self.in_game()?;
+        let game = self.in_game_mut()?;
+        game.position = (spawn.x, spawn.y);
         let avatar = game.player.field_avatar(spawn.x, spawn.y, spawn.stance);
         let party = self.party_id;
         self.send_to_field(FieldMessage::Join {
@@ -454,6 +469,7 @@ impl ClientActor {
             .map_err(|e| RuntimeError::Handler(format!("Unknown channel: {e}")))?;
         let session_id = self.session_id.ok_or(RuntimeError::NotLoggedIn)?;
 
+        self.remember_spawn_point();
         self.cancel_buffs().await?;
         self.flush().await?;
         spawn_db(move || db::session::begin_channel_transition(session_id, i16::from(channel_id)))
@@ -626,6 +642,19 @@ impl ClientActor {
         Ok(())
     }
 
+    /// Save the spawn point nearest where the player stands, so they come
+    /// back there after a channel change or logout rather than at the
+    /// portal they entered the map by.
+    fn remember_spawn_point(&mut self) {
+        let Some(game) = self.game.as_mut() else {
+            return;
+        };
+        let (x, y) = game.position;
+        if let Some(spawn_point) = net::closest_spawn_point(game.player.stats.map_id, x, y) {
+            game.player.set_spawn_point(spawn_point);
+        }
+    }
+
     async fn save_if_dirty(&mut self) -> Result<(), RuntimeError> {
         if let Err(error) = self.flush().await {
             // Keep playing; the next autosave or logout retries.
@@ -648,6 +677,7 @@ impl ClientActor {
                     changing_channel: self.changing_channel,
                 })
                 .await;
+            self.remember_spawn_point();
             if let Err(error) = self.flush().await {
                 error!(self.client_id, %error, "Failed to save player on disconnect");
             }

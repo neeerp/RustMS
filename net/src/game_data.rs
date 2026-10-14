@@ -42,3 +42,11 @@ pub fn spawn_position(map_id: i32, spawn_point: u8) -> Option<crate::SpawnPositi
         stance: 2,
     })
 }
+
+/// The id of the spawn point on `map_id` nearest `(x, y)`, to save as the
+/// character's spawn point when they leave the game.
+pub fn closest_spawn_point(map_id: i32, x: i16, y: i16) -> Option<u8> {
+    let field = get().ok()?.field(map_id)?;
+    let portal = field.closest_spawn_portal(i32::from(x), i32::from(y))?;
+    u8::try_from(portal.id).ok()
+}
