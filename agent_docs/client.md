@@ -199,13 +199,14 @@ side yet.
 | Quest log and markers | Implemented (`UIQuestLog`); progress arrives via SHOW_STATUS_INFO, quest start/complete is driven by NPC dialogue |
 | Chat, whisper, server messages | Implemented; whisper find/buddy modes ignored |
 | Character info, minimap, world map | Implemented |
+| Monster Book (`UIMonsterBook`) | Implemented: cards, summary, monster pages, search, cover; see `combat.md` |
 | Buddy / party / guild / boss list (`UIUserList`) | Buttons and layout only; no handlers, party packet exists but is unused |
 | Cash shop (`UICashShop`) | Browse/enter/exit; purchase is `// TODO: Purchase item` |
 | Storage, trade, player shops, mini-games, messenger, memo/mail | No UI, no handlers |
 | Pets, mounts, summons, reactors beyond hit/spawn | Partial or absent (`Reactor` TODOs) |
 | Party/guild/boss quests, events, MTS | Absent |
 
-44 outbound opcodes are defined (`Net/OutPacket.h`) and 57 inbound handlers
+49 outbound opcodes are defined (`Net/OutPacket.h`) and 61 inbound handlers
 are registered (`Net/PacketSwitch.cpp`). Anything not listed there is silently ignored by the client.
 
 ## Estimated client work for a complete game

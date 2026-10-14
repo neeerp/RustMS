@@ -33,6 +33,8 @@ if(HEAVENCLIENT_BUILD_TESTS)
     add_executable(npc_reach_tests tests/npc_reach.cpp)
     target_include_directories(npc_reach_tests PRIVATE ${PROJECT_SOURCE_DIR}/libs/NoLifeNx)
     add_test(NAME npc_reach COMMAND npc_reach_tests)
+    add_executable(monster_book_tests tests/monster_book.cpp Character/MonsterBook.cpp)
+    add_test(NAME monster_book COMMAND monster_book_tests)
     add_executable(portal_touch_tests tests/portal_touch.cpp Gameplay/MapleMap/Portal.cpp)
     target_include_directories(portal_touch_tests PRIVATE
         ${PROJECT_SOURCE_DIR}/libs/NoLifeNx ${PROJECT_SOURCE_DIR}/libs/glad/build/include)
@@ -370,6 +372,8 @@ add_executable(HeavenClient
     IO/UITypes/UIRegion.h
     IO/UITypes/UIShop.cpp
     IO/UITypes/UIShop.h
+    IO/UITypes/UIMonsterBook.cpp
+    IO/UITypes/UIMonsterBook.h
     IO/UITypes/UISkillBook.cpp
     IO/UITypes/UISkillBook.h
     IO/UITypes/UISoftKey.cpp

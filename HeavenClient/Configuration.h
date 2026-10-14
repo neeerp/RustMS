@@ -463,6 +463,13 @@ namespace ms
 		{}
 	};
 
+	// The default position of UIMonsterBook
+	struct PosMONSTERBOOK : public Configuration::PointEntry
+	{
+		PosMONSTERBOOK() : PointEntry("PosMONSTERBOOK", "(162,90)")
+		{}
+	};
+
 	// The default position of UIQuestLog
 	struct PosQUEST : public Configuration::PointEntry
 	{

@@ -45,6 +45,7 @@ namespace ms
 		settings.emplace<PosEQINV>();
 		settings.emplace<PosINV>();
 		settings.emplace<PosSKILL>();
+		settings.emplace<PosMONSTERBOOK>();
 		settings.emplace<PosQUEST>();
 		settings.emplace<PosMAP>();
 		settings.emplace<PosUSERLIST>();

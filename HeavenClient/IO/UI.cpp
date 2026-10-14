@@ -320,6 +320,7 @@ namespace ms
 					types.emplace_back(UIElement::Type::ITEMINVENTORY);
 					types.emplace_back(UIElement::Type::EQUIPINVENTORY);
 					types.emplace_back(UIElement::Type::SKILLBOOK);
+					types.emplace_back(UIElement::Type::MONSTERBOOK);
 					types.emplace_back(UIElement::Type::QUESTLOG);
 					types.emplace_back(UIElement::Type::USERLIST);
 					types.emplace_back(UIElement::Type::NPCTALK);
