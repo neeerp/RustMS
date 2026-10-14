@@ -8,9 +8,11 @@ See [Quests](./quests.md).
 
 The Interact key (Space by default, action 55) does the same as clicking the
 nearest NPC within 150 px horizontally and 50 px vertically of the player's
-feet (`HeavenClient/Gameplay/MapleMap/NpcReach.h`). v83 had no such key; it is
-a convenience from the later client. Characters created before the binding was
-added need to bind it in the key config.
+feet (`HeavenClient/Gameplay/MapleMap/NpcReach.h`). While a conversation is
+open, it also does what Enter does: Next, OK, Yes, the focused answer, or the
+selected choice. v83 had no such key; it is a convenience from the later
+client. A migration gives it to characters created before the binding was
+added, unless Space is already taken.
 
 ## Content and quest boundary
 
