@@ -11,7 +11,7 @@ use integration_harness::trace::{barrier, read, send, stat, warp, Trace};
 use integration_harness::{connection::MapleTestConnection, protocol::WorldSession};
 use net::packet::op::SendOpcode;
 
-const AMHERST: i32 = 1_000_000;
+const AMHERST: i32 = 1_010_000;
 const RAIN: i32 = 12101;
 const PIO: i32 = 10000;
 

@@ -1,3 +1,4 @@
+mod buff;
 mod combat;
 mod dialogue;
 mod loot;
@@ -29,7 +30,7 @@ use std::sync::Arc;
 use std::time::Duration;
 use tokio::net::TcpStream;
 use tokio::sync::mpsc;
-use tokio::time::{interval, MissedTickBehavior};
+use tokio::time::{interval, sleep_until, Instant, MissedTickBehavior};
 use tokio_util::sync::CancellationToken;
 use tracing::{debug, error, info, warn};
 
@@ -143,6 +144,7 @@ impl ClientActor {
         let kill = self.kill.clone();
 
         let outcome = loop {
+            let buffs_due = self.buffs_due();
             let step = tokio::select! {
                 biased;
                 _ = kill.cancelled() => Err(RuntimeError::ClientDisconnected),
@@ -152,6 +154,9 @@ impl ClientActor {
                 },
                 Some(message) = self.rx.recv() => self.handle_server_message(message).await,
                 _ = autosave.tick() => self.save_if_dirty().await,
+                _ = sleep_until(buffs_due.unwrap_or_else(Instant::now)), if buffs_due.is_some() => {
+                    self.update_buffs().await
+                }
             };
             if let Err(error) = step {
                 break error;
@@ -403,6 +408,7 @@ impl ClientActor {
             .map_err(|e| RuntimeError::Handler(format!("Unknown channel: {e}")))?;
         let session_id = self.session_id.ok_or(RuntimeError::NotLoggedIn)?;
 
+        self.cancel_buffs().await?;
         self.flush().await?;
         spawn_db(move || db::session::begin_channel_transition(session_id, i16::from(channel_id)))
             .await?;
@@ -440,6 +446,11 @@ impl ClientActor {
                 self.drop_loot(mob_id, object_id, x, y).await?
             }
             ServerMessage::PickedUp { drop } => self.picked_up(drop).await?,
+            ServerMessage::CharInfoRequested { requester } => {
+                let packet = build::world::info::build_character_info(&self.in_game()?.player)
+                    .map_err(|e| RuntimeError::Handler(e.to_string()))?;
+                requester.send_packet(packet);
+            }
             ServerMessage::SendPacket(mut packet) => self.send(&mut packet).await?,
         }
         Ok(())

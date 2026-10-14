@@ -402,6 +402,14 @@ pub fn build_all_chat(message: &str, show: u8) -> Result<Packet, String> {
     Ok(packet)
 }
 
+pub fn build_face_expression(emote: i32) -> Result<Packet, String> {
+    let mut packet = packet_with_opcode(RecvOpcode::FaceExpression as i16);
+    packet
+        .write_int(emote)
+        .map_err(|e| format!("failed to write face-expression emote: {e}"))?;
+    Ok(packet)
+}
+
 pub fn build_player_move(movement_bytes: &[u8]) -> Result<Packet, String> {
     let mut packet = packet_with_opcode(RecvOpcode::PlayerMove as i16);
     packet
