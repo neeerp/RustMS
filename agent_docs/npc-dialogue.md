@@ -6,13 +6,12 @@ quests for the player, HeavenClient shows its quest menu first and renders
 quest conversations itself; picking "Misc." asks the server for normal speech.
 See [Quests](./quests.md).
 
-The Interact key (Space by default, action 55) does the same as clicking the
-nearest NPC within 150 px horizontally and 50 px vertically of the player's
-feet (`HeavenClient/Gameplay/MapleMap/NpcReach.h`). While a conversation is
-open, it also does what Enter does: Next, OK, Yes, the focused answer, or the
-selected choice. v83 had no such key; it is a convenience from the later
-client. A migration gives it to characters created before the binding was
-added, unless Space is already taken.
+The NPC chat key (Space by default, action 55) talks to the nearest NPC
+within 150 px horizontally and 50 px vertically of the player's feet
+(`HeavenClient/Gameplay/MapleMap/NpcReach.h`). While a conversation is open,
+it also does what Enter does: Next, OK, Yes, the focused answer, or the
+selected choice. Migrations give earlier characters this binding unless
+Space is already taken, and normalize it to an action binding.
 
 ## Content and quest boundary
 

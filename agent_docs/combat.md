@@ -212,8 +212,10 @@ carries the new HP, which brings the player back up.
 
 ## Keys
 
-New characters get Ctrl → attack (53), Z → pick up (51) and B → Monster Book
-(59) in their default keymap, as HeavenClient numbers its actions.
+New characters get v83's default keymap (`game/src/keymap.rs`), with actions as
+HeavenClient numbers them: Ctrl → attack (53), Z → pick up (51), X → sit (52)
+and B → Monster Book (59), among others. The client's DEFAULT button in Keyboard
+Setting restores the same table.
 
 ## Tests
 
