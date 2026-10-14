@@ -17,7 +17,7 @@ use std::path::Path;
 /// Requirements to start a quest (`Check.img/<id>/0`) that the server checks.
 pub const START_REQUIREMENTS: &[&str] = &["npc", "job", "lvmin", "lvmax", "quest", "startscript"];
 /// Requirements to complete a quest (`Check.img/<id>/1`) that the server checks.
-pub const END_REQUIREMENTS: &[&str] = &["npc", "item", "mob", "endscript"];
+pub const END_REQUIREMENTS: &[&str] = &["npc", "item", "mob", "quest", "endscript"];
 /// Quest scripts (`startscript`/`endscript`) the server implements. A quest
 /// naming any other script is unsupported.
 pub const SCRIPTS: &[&str] = &["q1021s", "q1021e"];
@@ -55,6 +55,8 @@ pub struct QuestTemplate {
     pub end_items: Vec<(i32, i32)>,
     /// Mobs to kill before completing, as `(mob id, count)`.
     pub end_mobs: Vec<(i32, u16)>,
+    /// Quests that must be in a given state before completing.
+    pub end_quests: Vec<QuestPrerequisite>,
     /// Items given or taken on start and on completion.
     pub start_items: Vec<QuestItem>,
     pub end_rewards: Vec<QuestItem>,
@@ -249,23 +251,7 @@ fn template(nx: &NxDataFile, id: i16) -> Result<QuestTemplate, GameDataError> {
             requirements.jobs.push(small(value, "job")?);
         }
     }
-    if let Some(quests) = nx.child_by_name(start, "quest")? {
-        for prerequisite in nx.child_indices(quests)? {
-            let quest_id = nx
-                .int_child(prerequisite, "id")?
-                .ok_or_else(|| invalid("prerequisite without id"))?;
-            // A prerequisite without a state must not have been started; the
-            // data uses this for mutually exclusive quests.
-            let state = nx
-                .int_child(prerequisite, "state")?
-                .unwrap_or(QuestState::NotStarted as i32);
-            requirements.quests.push(QuestPrerequisite {
-                quest_id: small(quest_id, "quest id")?,
-                state: QuestState::from_number(state)
-                    .ok_or_else(|| invalid("invalid prerequisite state"))?,
-            });
-        }
-    }
+    requirements.quests = prerequisites(nx, start)?;
     let mut end_items = Vec::new();
     if let Some(items) = nx.child_by_name(end, "item")? {
         for item in nx.child_indices(items)? {
@@ -310,6 +296,7 @@ fn template(nx: &NxDataFile, id: i16) -> Result<QuestTemplate, GameDataError> {
             .ok_or_else(|| invalid("missing completion NPC"))?,
         end_items,
         end_mobs,
+        end_quests: prerequisites(nx, end)?,
         start_items: quest_items(nx, &format!("Act.img/{id}/0"))?,
         end_rewards: quest_items(nx, &format!("Act.img/{id}/1"))?,
         start_script: script(nx, start, "startscript")?,
@@ -319,6 +306,30 @@ fn template(nx: &NxDataFile, id: i16) -> Result<QuestTemplate, GameDataError> {
             .map(|id| small(id, "quest id"))
             .transpose()?,
     })
+}
+
+/// The `quest` requirements of a `Check` node: other quests' states.
+fn prerequisites(nx: &NxDataFile, check: u32) -> Result<Vec<QuestPrerequisite>, GameDataError> {
+    let Some(quests) = nx.child_by_name(check, "quest")? else {
+        return Ok(Vec::new());
+    };
+    let mut result = Vec::new();
+    for prerequisite in nx.child_indices(quests)? {
+        let quest_id = nx
+            .int_child(prerequisite, "id")?
+            .ok_or_else(|| invalid("prerequisite without id"))?;
+        // A prerequisite without a state must not have been started; the
+        // data uses this for mutually exclusive quests.
+        let state = nx
+            .int_child(prerequisite, "state")?
+            .unwrap_or(QuestState::NotStarted as i32);
+        result.push(QuestPrerequisite {
+            quest_id: small(quest_id, "quest id")?,
+            state: QuestState::from_number(state)
+                .ok_or_else(|| invalid("invalid prerequisite state"))?,
+        });
+    }
+    Ok(result)
 }
 
 fn quest_items(nx: &NxDataFile, act: &str) -> Result<Vec<QuestItem>, GameDataError> {

@@ -1,4 +1,4 @@
-//! A new Explorer plays Maple Island from Mushroom Town to Amherst the way
+//! A new Explorer plays Maple Island from Mushroom Town to Amherst and Mai the way
 //! a player would: through portals only (no debug warps), doing every quest
 //! on the way, hunting with melee attacks, and picking up quest drops.
 
@@ -157,14 +157,28 @@ async fn a_new_explorer_plays_maple_island_to_amherst() {
     run.send(walk_to(1500, 154)).await;
     run.quest(COMPLETE, 1038, 12000).await;
     assert_eq!(run.state(1038), Some(2));
+
+    // Lucas's introduction sends us to Mai; it can't be finished until her
+    // training (1041-1044) is done.
+    run.quest(START, 1040, 12000).await;
+    assert_eq!(run.state(1040), Some(1));
+    run.quest(COMPLETE, 1040, 12000).await;
+    assert_eq!(run.state(1040), Some(1));
+    run.portal("east00", 1_010_000).await;
+    run.send(walk_to(-18, 155)).await;
+    run.quest(START, 1041, 12100).await;
+    assert_eq!(run.state(1041), Some(1));
     let gained: i32 = run.trace.gains.iter().sum();
     drop(run);
 
     // Everything was saved: the quests, the map, and the EXP.
     let restored = relogin(&config).await;
-    assert_eq!(restored.map_id, 1_000_000);
+    assert_eq!(restored.map_id, 1_010_000);
     for id in [1021, 1031, 1032, 1033, 1034, 1035, 1036, 1037, 1038] {
         assert_eq!(restored.quests.get(&id), Some(&2), "quest {id}");
+    }
+    for id in [1040, 1041] {
+        assert_eq!(restored.quests.get(&id), Some(&1), "quest {id}");
     }
     assert!(
         restored.level >= 3,

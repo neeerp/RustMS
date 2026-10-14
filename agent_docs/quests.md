@@ -36,7 +36,7 @@ Only requirements and actions the server implements are allowed
 | Node | Allowed keys |
 | --- | --- |
 | `Check/<id>/0` (start) | `npc`, `job`, `lvmin`, `lvmax`, `quest`, `startscript` |
-| `Check/<id>/1` (complete) | `npc`, `item`, `mob`, `endscript` |
+| `Check/<id>/1` (complete) | `npc`, `item`, `mob`, `quest`, `endscript` |
 | `Act/<id>/0` | `item` |
 | `Act/<id>/1` | `exp`, `nextQuest`, `item` |
 | `Act/<id>/<n>/item/<k>` | `id`, `count`, `job`, `gender`, `prop` (not -1) |
@@ -44,7 +44,9 @@ Only requirements and actions the server implements are allowed
 `Act` nodes may repeat speech under numbered keys and `yes`/`no`; that is not
 an action. `item` requirements are counts the player must hold; a count of 0
 means none may be left (Roger's apples must all be eaten). `mob` requirements
-are kill counts (below).
+are kill counts (below). `quest` requirements, on either side, name other
+quests that must be in a given state: Chief's Introduction (1040) completes
+only once Mai's, Sam's, Rain's and Yoona's quests (1041–1044) are done.
 
 Item actions (`net::quests::pick_items`/`apply_items`) give positive counts
 and take negative ones (capped at what the player holds). An entry applies
@@ -68,7 +70,7 @@ The `game-data` asset test compares the server's result with the committed
 list `game-data/supported_quests.txt`. HeavenClient doesn't classify quests:
 the build copies that list next to the executable, and the client offers
 only those quests (`Character/QuestCatalog.cpp`). Supporting a new key means
-changing the server's allowlist and regenerating the list. 909 quests qualify
+changing the server's allowlist and regenerating the list. 923 quests qualify
 with the current rules, including the beginner ones:
 
 | Quest | Start → Finish | EXP |
@@ -82,6 +84,7 @@ with the current rules, including the beginner ones:
 | 1036 Robin the Walking Encyclopedia | Robin (2003) | 40 |
 | 1037 Help Hunt the Snails | Sam (2005) → Maria (2103) | 60 for 10 snails, next 1038 |
 | 1038 Maria's Letter | Maria (2103) → Lucas (12000) | 40; the letter for 5 Red and 5 Blue Potions |
+| 1040 Chief's Introduction | Lucas (12000) | 500 and Lucas's letter, after 1041–1044; opens those four |
 | 1021 Roger's Apple (scripted) | Roger (2000) | 10, 3 Apples, 3 Green Apples |
 
 ## Kill counts
