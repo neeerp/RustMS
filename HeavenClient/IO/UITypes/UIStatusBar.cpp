@@ -20,13 +20,14 @@
 #include "UIChannel.h"
 #include "UIChat.h"
 #include "UIEquipInventory.h"
+#include "UIGameOption.h"
 #include "UIItemInventory.h"
 #include "UIKeyConfig.h"
-#include "UIOptionMenu.h"
 #include "UIQuestLog.h"
 #include "UIQuit.h"
 #include "UISkillBook.h"
 #include "UIStatsInfo.h"
+#include "UISystemOption.h"
 #include "UIUserList.h"
 
 #include "../KeyConfig.h"
@@ -489,8 +490,10 @@ namespace ms
 				UI::get().emplace<UIChannel>();
 				break;
 			case Buttons::BT_GAME_OPTION:
+				UI::get().emplace<UIGameOption>();
+				break;
 			case Buttons::BT_GAME_SYSTEM:
-				UI::get().emplace<UIOptionMenu>();
+				UI::get().emplace<UISystemOption>();
 				break;
 			case Buttons::BT_GAME_QUIT:
 				ask_to_quit();
