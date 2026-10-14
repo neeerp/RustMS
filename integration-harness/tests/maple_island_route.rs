@@ -169,8 +169,8 @@ async fn a_new_explorer_plays_maple_island_to_amherst() {
     assert_eq!(run.state(1040), Some(1));
     run.quest(COMPLETE, 1040, 12000).await;
     assert_eq!(run.state(1040), Some(1));
-    run.portal("east00", 1_010_000).await;
-    run.send(walk_to(-18, 155)).await;
+    run.portal("east00", 1_020_000).await;
+    run.send(walk_to(-21, 95)).await;
     run.quest(START, 1041, 12100).await;
     assert_eq!(run.state(1041), Some(1));
     let gained: i32 = run.trace.gains.iter().sum();
@@ -178,7 +178,7 @@ async fn a_new_explorer_plays_maple_island_to_amherst() {
 
     // Everything was saved: the quests, the map, and the EXP.
     let restored = relogin(&config).await;
-    assert_eq!(restored.map_id, 1_010_000);
+    assert_eq!(restored.map_id, 1_020_000);
     for id in [1021, 1031, 1032, 1033, 1034, 1035, 1036, 1037, 1038] {
         assert_eq!(restored.quests.get(&id), Some(&2), "quest {id}");
     }
