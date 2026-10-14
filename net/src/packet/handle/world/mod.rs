@@ -17,6 +17,7 @@ mod rearrange;
 mod script_portal;
 mod spend_points;
 mod use_item;
+mod use_skill;
 mod whisper;
 
 pub use self::change_channel::ChangeChannelHandler;
@@ -38,4 +39,5 @@ pub use self::rearrange::{GatherItemsHandler, SortItemsHandler};
 pub use self::script_portal::ChangeMapSpecialHandler;
 pub use self::spend_points::{SpendApHandler, SpendSpHandler};
 pub use self::use_item::{HealOverTimeHandler, UseItemHandler, MAX_NATURAL_HEAL};
+pub use self::use_skill::UseSkillHandler;
 pub use self::whisper::WhisperHandler;
