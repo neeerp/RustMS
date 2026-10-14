@@ -1,4 +1,4 @@
-//! Mobs on Dangerous Forest (50000): spawning, control, movement, melee
+//! Mobs on Snail Hunting Ground I (40000): spawning, control, movement, melee
 //! attacks, kills and EXP, touch damage, respawning, and levelling up.
 
 use integration_harness::hunting::attack;
@@ -9,7 +9,7 @@ use net::packet::op::RecvOpcode;
 use packet::io::write::PktWrite;
 use packet::Packet;
 
-const FOREST: i32 = 50_000;
+const HUNTING_GROUND: i32 = 40_000;
 const SNAIL: i32 = 100100;
 
 fn move_mob(object_id: i32, x: i16, y: i16) -> Packet {
@@ -55,24 +55,24 @@ async fn snails_spawn_move_fight_back_die_and_respawn() {
     // have hunted here, so allow for a respawn.
     let mut h = Trace::default();
     assert_eq!(
-        warp(&mut hunter.connection, FOREST, "", &mut h).await,
-        FOREST
+        warp(&mut hunter.connection, HUNTING_GROUND, "", &mut h).await,
+        HUNTING_GROUND
     );
     until(&mut hunter.connection, &mut h, |t| {
-        t.field.controlled.len() >= 17
+        t.field.controlled.len() >= 15
     })
     .await;
     let snails = h.field.alive(SNAIL);
-    assert_eq!(snails.len(), 17);
+    assert_eq!(snails.len(), 15);
 
     // The second sees them all but controls none.
     let mut w = Trace::default();
     assert_eq!(
-        warp(&mut watcher.connection, FOREST, "", &mut w).await,
-        FOREST
+        warp(&mut watcher.connection, HUNTING_GROUND, "", &mut w).await,
+        HUNTING_GROUND
     );
     until(&mut watcher.connection, &mut w, |t| {
-        t.field.mobs.len() >= 17
+        t.field.mobs.len() >= 15
     })
     .await;
     read_for(&mut watcher.connection, &mut w, 300).await;
