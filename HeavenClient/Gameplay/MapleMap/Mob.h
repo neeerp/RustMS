@@ -88,7 +88,12 @@ namespace ms
 
 		// Kill the mob with the appropriate type:
 		// 0 - make inactive 1 - death animation 2 - fade out
+		// The death animation waits for any hits still on their way.
 		void kill(int8_t killtype);
+
+		// Note hits that will land on this mob once their attack connects;
+		// a negative count cancels hits that won't land after all.
+		void expect_hits(int32_t count);
 
 		// Display the hp percentage above the mob.
 		// Use the playerlevel to determine color of nametag.
@@ -190,6 +195,10 @@ namespace ms
 		uint16_t counter;
 		// Ticks left to push back a mob that was knocked back.
 		uint8_t knockback_ticks;
+		// Hits queued against this mob that haven't landed yet.
+		uint16_t pending_hits;
+		// Ticks before a killed mob dies even if its pending hits never land.
+		uint16_t death_timeout;
 
 		int32_t id;
 		int8_t effect;
