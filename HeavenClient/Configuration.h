@@ -129,12 +129,6 @@ namespace ms
 		// Set the shop's "Right-click to sell item" boolean
 		void set_rightclicksell(bool value);
 
-		// Whether to show the weekly maple star in Maple Chat
-		bool get_show_weekly();
-
-		// Set whether to show the weekly maple star in Maple Chat
-		void set_show_weekly(bool value);
-
 		// Whether to skip the startup logo sequence
 		bool get_skip_startup_logos() const;
 
@@ -292,7 +286,6 @@ namespace ms
 		const std::string auto_pic = "";
 		const int32_t auto_cid = 0;
 		bool rightclicksell = false;
-		bool show_weekly = true;
 		bool start_shown = false;
 		std::string MACS;
 		std::string HWID;
@@ -386,6 +379,130 @@ namespace ms
 		{}
 	};
 
+	// Whether the music is muted, whatever BGMVolume says
+	struct BGMMute : public Configuration::BoolEntry
+	{
+		BGMMute() : BoolEntry("BGMMute", "false")
+		{}
+	};
+
+	// Whether the sound effects are muted, whatever SFXVolume says
+	struct SFXMute : public Configuration::BoolEntry
+	{
+		SFXMute() : BoolEntry("SFXMute", "false")
+		{}
+	};
+
+	// The System Option settings the client stores but doesn't apply yet.
+	// Picture quality from 0 (normal) to 2 (best)
+	struct PictureQuality : public Configuration::ByteEntry
+	{
+		PictureQuality() : ByteEntry("PictureQuality", "2")
+		{}
+	};
+
+	// Mouse cursor speed from 0 (slow) to 10 (fast)
+	struct MouseSpeed : public Configuration::ByteEntry
+	{
+		MouseSpeed() : ByteEntry("MouseSpeed", "5")
+		{}
+	};
+
+	// Warn when HP falls to this percentage; 0 never warns
+	struct HPAlert : public Configuration::ByteEntry
+	{
+		HPAlert() : ByteEntry("HPAlert", "20")
+		{}
+	};
+
+	// Warn when MP falls to this percentage; 0 never warns
+	struct MPAlert : public Configuration::ByteEntry
+	{
+		MPAlert() : ByteEntry("MPAlert", "20")
+		{}
+	};
+
+	// Whether skills shake the screen
+	struct ShakeScreen : public Configuration::BoolEntry
+	{
+		ShakeScreen() : BoolEntry("ShakeScreen", "true")
+		{}
+	};
+
+	// The Game Option settings: whether to allow each kind of request. The
+	// client stores them; declining needs the features they belong to.
+	struct AllowWhisper : public Configuration::BoolEntry
+	{
+		AllowWhisper() : BoolEntry("AllowWhisper", "true")
+		{}
+	};
+
+	struct AllowFriends : public Configuration::BoolEntry
+	{
+		AllowFriends() : BoolEntry("AllowFriends", "true")
+		{}
+	};
+
+	struct AllowChatInvite : public Configuration::BoolEntry
+	{
+		AllowChatInvite() : BoolEntry("AllowChatInvite", "true")
+		{}
+	};
+
+	struct AllowTradeRequest : public Configuration::BoolEntry
+	{
+		AllowTradeRequest() : BoolEntry("AllowTradeRequest", "true")
+		{}
+	};
+
+	struct AllowPartyInvite : public Configuration::BoolEntry
+	{
+		AllowPartyInvite() : BoolEntry("AllowPartyInvite", "true")
+		{}
+	};
+
+	struct AllowPartySearch : public Configuration::BoolEntry
+	{
+		AllowPartySearch() : BoolEntry("AllowPartySearch", "true")
+		{}
+	};
+
+	struct AllowGameInvite : public Configuration::BoolEntry
+	{
+		AllowGameInvite() : BoolEntry("AllowGameInvite", "true")
+		{}
+	};
+
+	struct AllowGuildChat : public Configuration::BoolEntry
+	{
+		AllowGuildChat() : BoolEntry("AllowGuildChat", "true")
+		{}
+	};
+
+	struct AllowGuildInvite : public Configuration::BoolEntry
+	{
+		AllowGuildInvite() : BoolEntry("AllowGuildInvite", "true")
+		{}
+	};
+
+	struct AllowAllianceTournament : public Configuration::BoolEntry
+	{
+		AllowAllianceTournament() : BoolEntry("AllowAllianceTournament", "true")
+		{}
+	};
+
+	struct AllowAllianceInvite : public Configuration::BoolEntry
+	{
+		AllowAllianceInvite() : BoolEntry("AllowAllianceInvite", "true")
+		{}
+	};
+
+	struct AllowFamilyInvite : public Configuration::BoolEntry
+	{
+		AllowFamilyInvite() : BoolEntry("AllowFamilyInvite", "true")
+		{}
+	};
+
 	// Whether to save the last used account name
 	struct SaveLogin : public Configuration::BoolEntry
 	{
@@ -463,6 +580,13 @@ namespace ms
 		{}
 	};
 
+	// The default position of UIMonsterBook
+	struct PosMONSTERBOOK : public Configuration::PointEntry
+	{
+		PosMONSTERBOOK() : PointEntry("PosMONSTERBOOK", "(162,90)")
+		{}
+	};
+
 	// The default position of UIQuestLog
 	struct PosQUEST : public Configuration::PointEntry
 	{
@@ -512,10 +636,10 @@ namespace ms
 		{}
 	};
 
-	// The default position of UIChat and UIRank
-	struct PosMAPLECHAT : public Configuration::PointEntry
+	// The default position of UIMessenger
+	struct PosMESSENGER : public Configuration::PointEntry
 	{
-		PosMAPLECHAT() : PointEntry("PosMAPLECHAT", "(50, 46)")
+		PosMESSENGER() : PointEntry("PosMESSENGER", "(250, 80)")
 		{}
 	};
 
@@ -547,10 +671,17 @@ namespace ms
 		{}
 	};
 
-	// The default position of UIOptionMenu
-	struct PosOPTIONMENU : public Configuration::PointEntry
+	// The default position of UIGameOption
+	struct PosGAMEOPTION : public Configuration::PointEntry
 	{
-		PosOPTIONMENU() : PointEntry("PosUSERLIST", "(170, -1)")
+		PosGAMEOPTION() : PointEntry("PosGAMEOPTION", "(321, 158)")
+		{}
+	};
+
+	// The default position of UISystemOption
+	struct PosSYSTEMOPTION : public Configuration::PointEntry
+	{
+		PosSYSTEMOPTION() : PointEntry("PosSYSTEMOPTION", "(250, 117)")
 		{}
 	};
 

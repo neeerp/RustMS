@@ -104,4 +104,18 @@ namespace ms
 	{
 		void handle(InPacket& recv) const override;
 	};
+
+	// Puts a picked-up card in the Monster Book, or says its page is full
+	// Opcode: MONSTER_BOOK_SET_CARD(83)
+	class MonsterBookSetCardHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
+	// Shows a card on the Monster Book's cover
+	// Opcode: MONSTER_BOOK_SET_COVER(84)
+	class MonsterBookSetCoverHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
 }
