@@ -463,7 +463,7 @@ namespace ms
 
 	void UIStateGame::send_close()
 	{
-		UI::get().emplace<UIQuit>(stats);
+		ask_to_quit();
 	}
 
 	void UIStateGame::drag_icon(Icon *drgic)

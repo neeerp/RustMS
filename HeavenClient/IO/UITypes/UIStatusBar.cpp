@@ -493,7 +493,7 @@ namespace ms
 				UI::get().emplace<UIOptionMenu>();
 				break;
 			case Buttons::BT_GAME_QUIT:
-				UI::get().emplace<UIQuit>(stats);
+				ask_to_quit();
 				break;
 			case Buttons::BT_SHORTCUT_QUEST:
 				UI::get().emplace<UIQuestLog>(player.get_quests());

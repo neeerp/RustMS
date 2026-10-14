@@ -70,7 +70,7 @@ namespace ms
 			EVENT,
 			KEYCONFIG,
 			OPTIONMENU,
-			QUIT,
+			ENTERNUMBER,
 			CHARINFO,
 			CASHSHOP,
 			QUESTHELPER,
