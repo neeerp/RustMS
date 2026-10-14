@@ -37,14 +37,23 @@ namespace ms
 			return Color(channel(16), channel(8), channel(0), 1.0f);
 		}
 
+		// The v83 ChatBalloon.img, or the modern one for the later styles
+		// that UIClassic.nx doesn't have.
+		nl::node balloons(const std::string &style)
+		{
+			nl::node classic = NxFiles::ui_classic["ChatBalloon.img"];
+
+			return classic[style] ? classic : nl::nx::ui["ChatBalloon.img"];
+		}
+
 		// Some styles reuse another style's pieces through "_inlink" (a path
 		// within ChatBalloon.img) instead of storing the bitmap again.
-		nl::node piece(nl::node style, const char *name)
+		nl::node piece(nl::node file, nl::node style, const char *name)
 		{
 			nl::node node = style[name];
 			std::string link = node["_inlink"];
 
-			return link.empty() ? node : nl::nx::ui["ChatBalloon.img"].resolve(link);
+			return link.empty() ? node : file.resolve(link);
 		}
 	}
 
@@ -52,23 +61,26 @@ namespace ms
 	{
 		std::string typestr = type == -1 ? "dead" : std::to_string(std::max<int8_t>(type, 0));
 
-		load(nl::nx::ui["ChatBalloon.img"][typestr], false, WRAP_WIDTH);
+		load(typestr, false, WRAP_WIDTH);
 	}
 
 	ChatBalloon::ChatBalloon(const std::string &style, bool formatted, uint16_t wrap_width)
 	{
-		load(nl::nx::ui["ChatBalloon.img"][style], formatted, wrap_width);
+		load(style, formatted, wrap_width);
 	}
 
 	ChatBalloon::ChatBalloon() : ChatBalloon(0)
 	{}
 
-	void ChatBalloon::load(nl::node src, bool formatted, uint16_t wrap_width)
+	void ChatBalloon::load(const std::string &style, bool formatted, uint16_t wrap_width)
 	{
+		nl::node file = balloons(style);
+		nl::node src = file[style];
+
 		constexpr const char *names[NUM_PIECES] = { "c", "n", "s", "w", "e", "nw", "ne", "sw", "se", "arrow" };
 
 		for (size_t i = 0; i < NUM_PIECES; i++)
-			pieces[i] = piece(src, names[i]);
+			pieces[i] = piece(file, src, names[i]);
 
 		xtile = std::max<int16_t>(pieces[NORTH].width(), 1);
 		ytile = std::max<int16_t>(pieces[WEST].height(), 1);

@@ -265,7 +265,7 @@ namespace ms
 		buttons[Buttons::BT_REGISTER]->set_active(false);
 		buttons[Buttons::BT_RELEASE]->set_active(false);
 
-		countset = Charset(nl::nx::ui["Basic.img"]["ItemNo"], Charset::Alignment::LEFT);
+		countset = Charset(NxFiles::ui_classic["Basic.img"]["ItemNo"], Charset::Alignment::LEFT);
 
 		searchfield = Textfield(Text::Font::A12M, Text::Alignment::LEFT, Color::Name::BLACK,
 								Rectangle<int16_t>(SEARCH_FIELD_LT, SEARCH_FIELD_RB), 12);

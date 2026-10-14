@@ -21,6 +21,7 @@
 #include "../Components/TwoSpriteButton.h"
 
 #include "../../Constants.h"
+#include "../../Util/NxFiles.h"
 
 #include <nlnx/nx.hpp>
 
@@ -31,7 +32,7 @@ namespace ms
 	{
 		Point<int16_t> screen_adj = Point<int16_t>(-1, 0);
 
-		nl::node SoftKey = nl::nx::ui["Login.img"]["Common"]["SoftKey"];
+		nl::node SoftKey = NxFiles::ui_classic["Login.img"]["Common"]["SoftKey"];
 		nl::node backgrnd = SoftKey["backgrnd"];
 
 		nl::node Tab = SoftKey["Tab"];

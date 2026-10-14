@@ -46,7 +46,11 @@ namespace ms
 			if (type != Type::LINE_CYAN)
 				VScr += std::to_string(type);
 
-			src = nl::nx::ui["Basic.img"][VScr];
+			// UIClassic.nx stops at VScr8; later types keep the modern art.
+			src = NxFiles::ui_classic["Basic.img"][VScr];
+
+			if (!src)
+				src = nl::nx::ui["Basic.img"][VScr];
 		}
 
 		nl::node dsrc = src["disabled"];

@@ -290,8 +290,23 @@ from `UI.nx`. Moved so far:
   fit the v83 art. The gender `DropBox` has no normal image, since its box
   is drawn in `text/0`, so `MapleComboBox` has a mode that draws one image
   per state over a box in the parent's background. No footage shows these
-  two, since they appear once per account. `UISoftKey` still uses the
-  modern `Common/SoftKey`. It only opens for a PIC, and RustMS disables PICs.
+  two, since they appear once per account. `UISoftKey` reads the v83
+  `Common/SoftKey`, whose `Tab` and `BtNext` the modern file lacks. It only
+  opens for a PIC, and RustMS disables PICs, so it is untested.
+- **Shared art**: the cursor (`Basic.img/Cursor`), item counts
+  (`Basic.img/ItemNo`), and chat balloons (`ChatBalloon.img`) read
+  `UIClassic.nx`. States and styles added after v83 fall back to `UI.nx`:
+  the `LEAF` and chat bar cursors, and balloon styles above 39.
+- **Startup logos** (`UILogo`, `Logo.img`): v83's 137-frame Nexon intro, then
+  Wizet. Both are centred through their origins. `SKIP_STARTUP_LOGOS` in
+  `Configuration.h` skips them by default.
+- **Sliders** (`Slider`): the numbered `Basic.img/VScr` types read
+  `UIClassic.nx`, which has up to `VScr8`. Later types, such as
+  `DEFAULT_SILVER`, read `UI.nx`.
+
+Still on `UI.nx`: the chat bar's slider type, the unreachable `UIEvent`,
+`UIJoypad`, and `UIRegion` windows, `MapleComboBox`'s normal mode, and the
+Cash Shop preview stage.
 
 `UIClassic.nx` is not one of NoLifeNx's standard files, so `NxFiles` opens it
 with `nl::file` instead of `nl::nx::load_all`.

@@ -18,6 +18,7 @@
 #include "Cursor.h"
 
 #include "../Constants.h"
+#include "../Util/NxFiles.h"
 
 #include <nlnx/nx.hpp>
 
@@ -32,10 +33,16 @@ namespace ms
 
 	void Cursor::init()
 	{
-		nl::node src = nl::nx::ui["Basic.img"]["Cursor"];
+		// The v83 cursors, with the modern file's for the later states (LEAF
+		// and the chat bar drags) that UIClassic.nx doesn't have.
+		nl::node classic = NxFiles::ui_classic["Basic.img"]["Cursor"];
+		nl::node modern = nl::nx::ui["Basic.img"]["Cursor"];
 
 		for (auto iter : animations)
-			iter.second = src[iter.first];
+		{
+			nl::node src = classic[iter.first];
+			iter.second = src ? src : modern[iter.first];
+		}
 	}
 
 	void Cursor::draw(float alpha) const

@@ -21,11 +21,17 @@
 #include "../Configuration.h"
 
 #include "../Audio/Audio.h"
+#include "../../Util/NxFiles.h"
 
 #include <nlnx/nx.hpp>
 
 namespace ms
 {
+	namespace
+	{
+		const Point<int16_t> CENTER = Point<int16_t>(400, 300);
+	}
+
 	UILogo::UILogo() : UIElement(Point<int16_t>(0, 0), Point<int16_t>(800, 600))
 	{
 		Music("BgmUI.img/NxLogo").play_once();
@@ -34,7 +40,8 @@ namespace ms
 		wizet_ended = false;
 		user_clicked = false;
 
-		nl::node Logo = nl::nx::ui["Logo.img"];
+		// Both logos are centred on the 800x600 screen through their origins.
+		nl::node Logo = NxFiles::ui_classic["Logo.img"];
 
 		Nexon = Logo["Nexon"];
 		Wizet = Logo["Wizet"];
@@ -49,17 +56,17 @@ namespace ms
 		{
 			if (!nexon_ended)
 			{
-				Nexon.draw(position + Point<int16_t>(440, 360), inter);
+				Nexon.draw(position + CENTER, inter);
 			} else
 			{
 				if (!wizet_ended)
-					Wizet.draw(position + Point<int16_t>(263, 195), inter);
+					Wizet.draw(position + CENTER, inter);
 				else
-					WizetEnd.draw(position + Point<int16_t>(263, 195));
+					WizetEnd.draw(position + CENTER);
 			}
 		} else
 		{
-			WizetEnd.draw(position + Point<int16_t>(263, 195));
+			WizetEnd.draw(position + CENTER);
 		}
 	}
 
