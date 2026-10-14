@@ -458,7 +458,20 @@ namespace ms
 			}
 		}
 
-		// Slot expansions aren't served yet, so their buttons do nothing.
+		if (buttonid >= Buttons::BT_EX_EQUIP && buttonid <= Buttons::BT_EX_TRUNK)
+		{
+			// Four slots for 4,000 NX, shown as the expansion item: 9111000
+			// to 9114000 for the bags, 9110000 for the storage.
+			int32_t bag = buttonid == Buttons::BT_EX_TRUNK ? 0 : buttonid - Buttons::BT_EX_EQUIP + 1;
+			Commodity slots = {};
+			slots.item_id = 9110000 + 1000 * bag;
+			slots.price = 4000;
+			slots.count = 1;
+			slots.label = Label::NONE;
+
+			UI::get().emplace<UICashBuy>(slots, credit, points, prepaid);
+		}
+
 		return Button::State::NORMAL;
 	}
 
@@ -669,6 +682,11 @@ namespace ms
 		cash_items = items;
 		cash_row = 0;
 		update_cash_slider();
+	}
+
+	void UICashShop::refresh_slots()
+	{
+		update_item_slider();
 	}
 
 	void UICashShop::add_cash_items(const std::vector<CashItem>& items)

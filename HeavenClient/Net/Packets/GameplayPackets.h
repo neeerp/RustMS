@@ -94,6 +94,51 @@ namespace ms
 	};
 
 	// Opcode: CASHSHOP_OPERATION(229)
+	class BuyCashPackagePacket : public OutPacket
+	{
+	public:
+		// Pay for the package sn, whose items each join the Cash Inventory
+		BuyCashPackagePacket(int32_t cash_type, int32_t sn) : OutPacket(OutPacket::Opcode::CASHSHOP_OPERATION)
+		{
+			write_byte(0x1E);
+			write_byte(0);
+			write_int(cash_type);
+			write_int(sn);
+		}
+	};
+
+	// Opcode: CASHSHOP_OPERATION(229)
+	class ExpandSlotsPacket : public OutPacket
+	{
+	public:
+		// Four more slots in a bag, or in the storage with type NONE, for
+		// 4,000 NX: the Cash Inventory's slot buttons
+		ExpandSlotsPacket(int32_t cash_type, InventoryType::Id type) : OutPacket(OutPacket::Opcode::CASHSHOP_OPERATION)
+		{
+			write_header(cash_type, type, 0);
+
+			if (type != InventoryType::Id::NONE)
+				write_byte(type);
+		}
+
+		// Eight more slots: the expansion commodity sn
+		ExpandSlotsPacket(int32_t cash_type, InventoryType::Id type, int32_t sn) : OutPacket(OutPacket::Opcode::CASHSHOP_OPERATION)
+		{
+			write_header(cash_type, type, 1);
+			write_int(sn);
+		}
+
+	private:
+		void write_header(int32_t cash_type, InventoryType::Id type, int8_t mode)
+		{
+			write_byte(type == InventoryType::Id::NONE ? 7 : 6);
+			write_byte(0);
+			write_int(cash_type);
+			write_byte(mode);
+		}
+	};
+
+	// Opcode: CASHSHOP_OPERATION(229)
 	class GiftCashItemPacket : public OutPacket
 	{
 	public:

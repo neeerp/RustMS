@@ -9,6 +9,7 @@ use std::time::{Duration, Instant};
 const DEFAULT_PROJECT_NAME: &str = "rustms-integration";
 const DEFAULT_LOGIN_PORT: u16 = 18484;
 const DEFAULT_WORLD_PORT: u16 = 18485;
+const DEFAULT_DB_PORT: u16 = 15432;
 
 /// Host-side identity of one harness stack. Overriding these lets several
 /// checkouts (for example git worktrees) run isolated stacks side by side.
@@ -16,6 +17,7 @@ struct StackConfig {
     project_name: String,
     login_port: u16,
     world_port: u16,
+    db_port: u16,
 }
 
 impl StackConfig {
@@ -25,6 +27,7 @@ impl StackConfig {
                 .unwrap_or_else(|_| DEFAULT_PROJECT_NAME.to_string()),
             login_port: port_from_env("HARNESS_LOGIN_PORT", DEFAULT_LOGIN_PORT)?,
             world_port: port_from_env("HARNESS_WORLD_PORT", DEFAULT_WORLD_PORT)?,
+            db_port: port_from_env("HARNESS_DB_PORT", DEFAULT_DB_PORT)?,
         })
     }
 
@@ -34,6 +37,13 @@ impl StackConfig {
 
     fn world_addr(&self) -> String {
         format!("127.0.0.1:{}", self.world_port)
+    }
+
+    fn database_url(&self) -> String {
+        format!(
+            "postgres://maplestory:pass@127.0.0.1:{}/maplestory_test",
+            self.db_port
+        )
     }
 }
 
@@ -150,6 +160,7 @@ fn run_tests(stack: &StackConfig) -> Result<(), String> {
         .arg("integration-harness")
         .env("HARNESS_LOGIN_ADDR", stack.login_addr())
         .env("HARNESS_WORLD_ADDR", stack.world_addr())
+        .env("HARNESS_DATABASE_URL", stack.database_url())
         .current_dir(&workspace_root)
         .stdin(Stdio::null())
         .stdout(Stdio::inherit())
@@ -221,6 +232,7 @@ fn compose_cmd<const N: usize>(stack: &StackConfig, args: [&str; N]) -> Result<(
         .env("HARNESS_WORLD_PORT", stack.world_port.to_string())
         .env("HARNESS_WORLD_PORT_2", (stack.world_port + 1).to_string())
         .env("HARNESS_WORLD_PORT_3", (stack.world_port + 2).to_string())
+        .env("HARNESS_DB_PORT", stack.db_port.to_string())
         .current_dir(workspace_root())
         .stdin(Stdio::null())
         .stdout(Stdio::inherit())

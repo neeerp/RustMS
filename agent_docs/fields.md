@@ -90,12 +90,30 @@ own channel, and the client reconnects and enters the map it left.
 In the shop, `CASHSHOP_OPERATION` (0xE5) buys a commodity and sets the wish
 list (`net/src/packet/handle/world/cash_shop.rs`). A purchase is checked against
 `Etc.nx` `Commodity.img` (`net::cash_shop`): the item must be on sale and allowed
-for the character's gender, and packages aren't sold yet. `db::cash_shop::buy`
-then takes the price from the chosen balance and adds the item to the Cash
-Inventory in one transaction. The client gets the item (0x57) and its new
-balance, or a failure code (0x5C): 0xA5 not enough cash, 0xAA gender, 0xC0 sold
-out, 0x00 anything else. The wish list keeps up to ten commodities that are on
-sale and answers with 0x55. Balances are only granted through SQL for now.
+for the character's gender. `db::cash_shop::buy` then takes the price from the
+chosen balance and adds the item to the Cash Inventory in one transaction. The
+client gets the item (0x57) and its new balance, or a failure code (0x5C): 0xA5
+not enough cash, 0xAA gender, 0xC0 sold out, 0x00 anything else. The wish list
+keeps up to ten commodities that are on sale and answers with 0x55. Balances
+are only granted through SQL for now.
+
+A package (0x1E, items 910xxxx) is bought the same way, but
+`Etc.nx` `CashPackage.img` lists the commodities it holds, and each joins the
+Cash Inventory; the client gets them all in 0xA4. Packages can't be gifted,
+and every other 9xxxxxx item is refused. Slot expansions come two ways. The Cash Inventory's slot buttons
+(0x06 mode 0 with a bag, 0x07 mode 0 for the storage) add four slots for
+4,000 NX. The expansion commodities (0x06 or 0x07 mode 1 with the SN; items
+9110000 for the storage and 9111000-9114000 for the bags) add eight for their
+price. Bags stop at 96 slots and the storage at 48; past that, or with the
+wrong bag, the reply is 0x00. A bag's slots are saved with the character
+(`characters.equip_slots` and the rest) in the same transaction as the payment
+(`db::cash_shop::expand_inventory`), and answer 0x60 (bag, slots). The storage's
+are saved on the account (`accounts.storage_slots`, sent in 0x4B) and answer
+0x62. There is no storage window yet.
+
+Each sale and gift adds one to its SN in `cash_sales`. The shop's Best Items
+are the five best-selling SNs a character of each gender may buy
+(`net::cash_shop::best_items`), the same five on every tab.
 
 The client actor also follows its own movement to know roughly where the
 player stands. Before saving on a channel change or disconnect, it sets the

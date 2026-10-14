@@ -16,9 +16,10 @@ use crate::message::{
     ClientHandle, DirectoryMessage, FieldHandle, FieldKey, FieldMessage, Presence, ServerMessage,
     CLIENT_QUEUE_CAPACITY,
 };
+use db::cash_shop::CashType;
 use game::{InventoryType, Player};
 use game_data::commodities::Commodity;
-use net::cash_shop::CashShopRequest;
+use net::cash_shop::{CashShopRequest, Expansion};
 use net::dialogue::{Conversation, NpcInteraction};
 use net::login_world::resolve_login_channel;
 use net::packet::build;
@@ -532,19 +533,25 @@ impl ClientActor {
 
         let player = &self.in_game()?.player;
         let (account_id, character_id) = (player.account_id, player.stats.id);
-        let (account, balance, (items, gifts), wish_list) = spawn_db(move || {
+        let (account, balance, (items, gifts), wish_list, best_sellers) = spawn_db(move || {
             Ok((
                 db::account::get_account_by_id(account_id)?,
                 db::cash_shop::balance(account_id)?,
                 db::cash_shop::open_cash_inventory(account_id)?,
                 db::cash_shop::wish_list(character_id)?,
+                db::cash_shop::best_sellers(BEST_SELLERS_CONSIDERED)?,
             ))
         })
         .await?;
         let player = &self.in_game()?.player;
+        let best = net::cash_shop::best_items(&best_sellers);
         let mut packets = [
-            build::world::cash_shop::build_open_cash_shop(player, &account.user_name)?,
-            build::world::cash_shop::build_cash_inventory(&items, account.character_slots)?,
+            build::world::cash_shop::build_open_cash_shop(player, &account.user_name, &best)?,
+            build::world::cash_shop::build_cash_inventory(
+                &items,
+                account.storage_slots,
+                account.character_slots,
+            )?,
             build::world::cash_shop::build_cash_gifts(&gifts)?,
             build::world::cash_shop::build_wish_list(&wish_list, false)?,
             build::world::cash_shop::build_cash_balance(
@@ -569,25 +576,37 @@ impl ClientActor {
                 cash_type,
                 commodity,
             } => {
-                let item = db::cash_shop::NewCashItem {
-                    account_id,
-                    item_id: commodity.item_id,
-                    sn: commodity.sn,
-                    quantity: commodity.count,
-                    expires_at: expiry(commodity.period),
-                };
-                let price = commodity.price;
-                match spawn_db(move || db::cash_shop::buy(cash_type, price, &item)).await? {
+                let package = net::cash_shop::package(&commodity);
+                let contents = package.clone().unwrap_or_else(|| vec![&commodity]);
+                let items: Vec<_> = contents
+                    .iter()
+                    .map(|item| db::cash_shop::NewCashItem {
+                        account_id,
+                        item_id: item.item_id,
+                        sn: item.sn,
+                        quantity: item.count,
+                        expires_at: expiry(item.period),
+                    })
+                    .collect();
+                let (sn, price) = (commodity.sn, commodity.price);
+                let bought =
+                    spawn_db(move || db::cash_shop::buy(account_id, cash_type, sn, price, &items))
+                        .await?;
+                match bought {
                     Some((bought, balance)) => {
                         info!(
                             self.client_id,
-                            sn = bought.sn,
-                            item_id = bought.item_id,
+                            sn,
+                            item_id = commodity.item_id,
                             price,
                             "Bought from the Cash Shop"
                         );
+                        let bought = match (&package, bought.as_slice()) {
+                            (None, [item]) => cs::build_bought_cash_item(item)?,
+                            _ => cs::build_bought_package(&bought)?,
+                        };
                         vec![
-                            cs::build_bought_cash_item(&bought)?,
+                            bought,
                             cs::build_cash_balance(
                                 balance.credit,
                                 balance.points,
@@ -615,6 +634,21 @@ impl ClientActor {
             }
             CashShopRequest::PutBack { cash_id, kind } => {
                 self.put_back_cash_item(account_id, cash_id, kind).await?
+            }
+            CashShopRequest::Expand {
+                cash_type,
+                expansion: Expansion::Bag(kind),
+                slots,
+                price,
+            } => self.expand_bag(cash_type, kind, slots, price).await?,
+            CashShopRequest::Expand {
+                cash_type,
+                expansion: Expansion::Storage,
+                slots,
+                price,
+            } => {
+                self.expand_storage(account_id, cash_type, slots, price)
+                    .await?
             }
         };
         self.send_all(&mut packets).await
@@ -672,6 +706,72 @@ impl ClientActor {
         );
         Ok(vec![
             cs::build_gift_sent(&receiver.name, commodity.item_id, commodity.count, price)?,
+            cs::build_cash_balance(balance.credit, balance.points, balance.prepaid)?,
+        ])
+    }
+
+    /// Pay for `slots` more slots in the bag of `kind`, up to 96.
+    async fn expand_bag(
+        &mut self,
+        cash_type: CashType,
+        kind: InventoryType,
+        slots: u8,
+        price: i32,
+    ) -> Result<Vec<Packet>, RuntimeError> {
+        use build::world::cash_shop as cs;
+        let player = &self.in_game()?.player;
+        let limit = player.inventory.slot_limit(kind) + slots;
+        if limit > net::cash_shop::MAX_BAG_SLOTS {
+            return Ok(vec![cs::build_cash_shop_failure(
+                cs::CashShopFailure::Unknown,
+            )?]);
+        }
+        let mut snapshot = player.clone();
+        snapshot.inventory_mut().set_slot_limit(kind, limit);
+        let paid =
+            spawn_db(move || db::cash_shop::expand_inventory(cash_type, price, &snapshot)).await?;
+        let Some(balance) = paid else {
+            return Ok(vec![cs::build_cash_shop_failure(
+                cs::CashShopFailure::NotEnoughCash,
+            )?]);
+        };
+        let player = &mut self.in_game_mut()?.player;
+        player.inventory_mut().set_slot_limit(kind, limit);
+        player.mark_saved();
+        info!(self.client_id, ?kind, limit, price, "Expanded a bag");
+        Ok(vec![
+            cs::build_inventory_slots(kind, limit)?,
+            cs::build_cash_balance(balance.credit, balance.points, balance.prepaid)?,
+        ])
+    }
+
+    /// Pay for `slots` more slots in the account's storage, up to 48.
+    async fn expand_storage(
+        &mut self,
+        account_id: i32,
+        cash_type: CashType,
+        slots: u8,
+        price: i32,
+    ) -> Result<Vec<Packet>, RuntimeError> {
+        use build::world::cash_shop as cs;
+        let account = spawn_db(move || db::account::get_account_by_id(account_id)).await?;
+        let limit = account.storage_slots + i16::from(slots);
+        if limit > net::cash_shop::MAX_STORAGE_SLOTS {
+            return Ok(vec![cs::build_cash_shop_failure(
+                cs::CashShopFailure::Unknown,
+            )?]);
+        }
+        let paid =
+            spawn_db(move || db::cash_shop::expand_storage(account_id, cash_type, price, limit))
+                .await?;
+        let Some(balance) = paid else {
+            return Ok(vec![cs::build_cash_shop_failure(
+                cs::CashShopFailure::NotEnoughCash,
+            )?]);
+        };
+        info!(self.client_id, limit, price, "Expanded the storage");
+        Ok(vec![
+            cs::build_storage_slots(limit)?,
             cs::build_cash_balance(balance.credit, balance.points, balance.prepaid)?,
         ])
     }
@@ -981,6 +1081,10 @@ impl ClientActor {
         }
     }
 }
+
+/// How many of the best sellers to look through for five on sale for each
+/// gender.
+const BEST_SELLERS_CONSIDERED: i64 = 50;
 
 /// When an item bought now for `period` days expires; `None` for 0, which
 /// never does.

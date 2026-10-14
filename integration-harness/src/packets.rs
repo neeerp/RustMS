@@ -86,6 +86,8 @@ pub struct SetFieldPacket {
     /// How many of each item the bags hold (not counting equipped items).
     pub items: BTreeMap<i32, i32>,
     pub meso: i32,
+    /// Slots in the Equip, Use, Set-up, Etc and Cash bags.
+    pub slot_limits: [u8; 5],
     /// The Monster Book's cover card and each card's copies, by card id.
     pub monster_book_cover: i32,
     pub monster_book: BTreeMap<i32, u8>,
@@ -448,9 +450,18 @@ pub fn build_leave_cash_shop() -> Packet {
 /// CASHSHOP_OPERATION buy: pay with `cash_type` (1 NX Credit, 2 Maple
 /// Points, 4 NX Prepaid) for the commodity `sn`.
 pub fn build_cash_shop_buy(cash_type: i32, sn: i32) -> Result<Packet, String> {
+    cash_shop_purchase(0x03, cash_type, sn)
+}
+
+/// CASHSHOP_OPERATION 0x1E: buy package `sn`, paying with `cash_type`.
+pub fn build_cash_shop_buy_package(cash_type: i32, sn: i32) -> Result<Packet, String> {
+    cash_shop_purchase(0x1E, cash_type, sn)
+}
+
+fn cash_shop_purchase(action: u8, cash_type: i32, sn: i32) -> Result<Packet, String> {
     let mut packet = packet_with_opcode(RecvOpcode::CashShopOperation as i16);
     packet
-        .write_bytes(&[0x03, 0])
+        .write_bytes(&[action, 0])
         .map_err(|e| format!("failed to write purchase action: {e}"))?;
     packet
         .write_int(cash_type)
@@ -458,6 +469,28 @@ pub fn build_cash_shop_buy(cash_type: i32, sn: i32) -> Result<Packet, String> {
     packet
         .write_int(sn)
         .map_err(|e| format!("failed to write purchase serial number: {e}"))?;
+    Ok(packet)
+}
+
+/// CASHSHOP_OPERATION 0x06, or 0x07 for the storage (`bag` `None`): buy four
+/// slots with a slot button, paying with `cash_type`.
+pub fn build_cash_shop_expand(cash_type: i32, bag: Option<u8>) -> Result<Packet, String> {
+    let mut packet = packet_with_opcode(RecvOpcode::CashShopOperation as i16);
+    let action = if bag.is_some() { 0x06 } else { 0x07 };
+    packet
+        .write_bytes(&[action, 0])
+        .map_err(|e| format!("failed to write expansion action: {e}"))?;
+    packet
+        .write_int(cash_type)
+        .map_err(|e| format!("failed to write expansion cash type: {e}"))?;
+    packet
+        .write_byte(0)
+        .map_err(|e| format!("failed to write expansion mode: {e}"))?;
+    if let Some(bag) = bag {
+        packet
+            .write_byte(bag)
+            .map_err(|e| format!("failed to write expansion bag: {e}"))?;
+    }
     Ok(packet)
 }
 
@@ -742,7 +775,11 @@ pub fn decode_set_field(packet: &Packet) -> Result<SetFieldPacket, String> {
         cursor.read_str_with_length().map_err(|e| e.to_string())?; // linked name
     }
     let meso = cursor.read_int().map_err(|e| e.to_string())?;
-    skip(&mut cursor, 5 + 8)?; // slot limits, timestamp
+    let mut slot_limits = [0; 5];
+    for limit in &mut slot_limits {
+        *limit = cursor.read_byte().map_err(|e| e.to_string())?;
+    }
+    skip(&mut cursor, 8)?; // timestamp
 
     // Equipped, equipped cash, and equip bag: short slot lists ending in 0.
     let mut equipped = BTreeMap::new();
@@ -838,6 +875,7 @@ pub fn decode_set_field(packet: &Packet) -> Result<SetFieldPacket, String> {
         equipped,
         items,
         meso,
+        slot_limits,
         monster_book_cover,
         monster_book,
     })

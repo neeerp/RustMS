@@ -188,7 +188,7 @@ namespace ms
 		if (!cashshop)
 			return;
 
-		int8_t mode = recv.read_byte();
+		uint8_t mode = static_cast<uint8_t>(recv.read_byte());
 
 		switch (mode)
 		{
@@ -201,7 +201,7 @@ namespace ms
 			for (int16_t i = 0; i < count; i++)
 				items.push_back(read_cash_item(recv));
 
-			recv.skip_short();	// storage slots
+			recv.skip_short();	// storage slots; there is no storage window yet
 			recv.skip_short();	// character slots
 
 			cashshop->set_cash_items(items);
@@ -244,6 +244,38 @@ namespace ms
 		case 0x57:
 			// A purchase is in the Cash Inventory; the balance follows.
 			cashshop->add_cash_items({ read_cash_item(recv) });
+			UI::get().emplace<UIOk>("You have successfully made the purchase.", [](bool) {});
+			break;
+		case 0xA4:
+		{
+			// A package's items are in the Cash Inventory; the balance
+			// follows.
+			uint8_t count = static_cast<uint8_t>(recv.read_byte());
+			std::vector<UICashShop::CashItem> items;
+
+			for (uint8_t i = 0; i < count; i++)
+				items.push_back(read_cash_item(recv));
+
+			recv.skip_short();
+
+			cashshop->add_cash_items(items);
+			UI::get().emplace<UIOk>("You have successfully made the purchase.", [](bool) {});
+			break;
+		}
+		case 0x60:
+		{
+			// A bag has more slots; the balance follows.
+			InventoryType::Id type = InventoryType::by_value(recv.read_byte());
+			int16_t slots = recv.read_short();
+
+			Stage::get().get_player().get_inventory().set_slotmax(type, static_cast<uint8_t>(slots));
+			cashshop->refresh_slots();
+			UI::get().emplace<UIOk>("You have successfully made the purchase.", [](bool) {});
+			break;
+		}
+		case 0x62:
+			// The storage has more slots; the balance follows.
+			recv.skip_short();
 			UI::get().emplace<UIOk>("You have successfully made the purchase.", [](bool) {});
 			break;
 		case 0x5E:

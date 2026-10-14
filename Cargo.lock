@@ -588,6 +588,7 @@ name = "integration-harness"
 version = "0.1.0"
 dependencies = [
  "crypt",
+ "diesel",
  "game-data",
  "net",
  "packet",

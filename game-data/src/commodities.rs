@@ -1,6 +1,7 @@
 //! Cash Shop commodities from `Etc.nx` (`Commodity.img`), keyed by their
 //! serial number (SN). The client lists the same entries, so a purchase
-//! names a commodity by SN.
+//! names a commodity by SN. `CashPackage.img` lists the commodities each
+//! package item holds.
 
 use crate::{GameDataError, NxDataFile};
 use std::collections::HashMap;
@@ -30,6 +31,8 @@ impl Commodity {
 #[derive(Debug, Default)]
 pub struct CommodityData {
     by_sn: HashMap<i32, Commodity>,
+    /// A package's item id to the SNs of the commodities in it.
+    packages: HashMap<i32, Vec<i32>>,
 }
 
 impl CommodityData {
@@ -58,11 +61,36 @@ impl CommodityData {
             };
             by_sn.insert(sn, commodity);
         }
-        Ok(Self { by_sn })
+        let mut packages = HashMap::new();
+        if let Some(root) = nx.child_by_name(0, "CashPackage.img")? {
+            for package in nx.child_indices(root)? {
+                let Ok(item_id) = nx.node_name(package)?.parse::<i32>() else {
+                    continue;
+                };
+                let Some(list) = nx.child_by_name(package, "SN")? else {
+                    continue;
+                };
+                let mut sns = Vec::new();
+                for index in nx.child_indices(list)? {
+                    if let Some(sn) = nx.int_child(list, &nx.node_name(index)?)? {
+                        sns.push(sn);
+                    }
+                }
+                packages.insert(item_id, sns);
+            }
+        }
+        Ok(Self { by_sn, packages })
     }
 
     pub fn get(&self, sn: i32) -> Option<&Commodity> {
         self.by_sn.get(&sn)
+    }
+
+    /// The commodities in the package `item_id`, or `None` if it isn't one
+    /// or names a commodity that doesn't exist.
+    pub fn package(&self, item_id: i32) -> Option<Vec<&Commodity>> {
+        let sns = self.packages.get(&item_id)?;
+        sns.iter().map(|sn| self.get(*sn)).collect()
     }
 
     pub fn iter(&self) -> impl Iterator<Item = &Commodity> {
@@ -109,5 +137,17 @@ mod tests {
         assert!(male.for_gender(0) && !male.for_gender(1));
 
         assert!(data.get(-1).is_none());
+
+        // The Baby Tiger Package: the pet, its equipment and 11 Pet Food.
+        let package = data.get(10002307).unwrap();
+        assert_eq!((package.item_id, package.price), (9102232, 16900));
+        let contents: Vec<(i32, i16)> = data
+            .package(package.item_id)
+            .unwrap()
+            .iter()
+            .map(|commodity| (commodity.item_id, commodity.count))
+            .collect();
+        assert_eq!(contents, [(5000066, 1), (1802063, 1), (5240027, 11)]);
+        assert!(data.package(5220000).is_none());
     }
 }

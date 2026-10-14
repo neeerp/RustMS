@@ -110,6 +110,12 @@ The harness reads endpoints from environment variables:
 
 `harnessctl test` sets these automatically.
 
+Tests that need state the protocol can't create, such as an NX balance, use
+`integration_harness::database` (`set_nx_credit`). It connects to
+`HARNESS_DATABASE_URL`, which `harnessctl test` also sets; when reusing a
+stack, pass it yourself, for example
+`HARNESS_DATABASE_URL=postgres://maplestory:pass@127.0.0.1:15432/maplestory_test`.
+
 ## Running several stacks at once
 
 Each checkout (for example a git worktree) can run its own stack by giving it

@@ -1,7 +1,9 @@
 use integration_harness::connection::{MapleTestConnection, PacketEnvelope};
+use integration_harness::database::set_nx_credit;
 use integration_harness::packets::{
-    build_cash_shop_buy, build_cash_shop_gift, build_cash_shop_put_back, build_cash_shop_take_out,
-    build_cash_shop_wish_list, build_enter_cash_shop, opcode_name,
+    build_cash_shop_buy, build_cash_shop_buy_package, build_cash_shop_expand, build_cash_shop_gift,
+    build_cash_shop_put_back, build_cash_shop_take_out, build_cash_shop_wish_list,
+    build_enter_cash_shop, opcode_name,
 };
 use integration_harness::preconditions::load_harness_config_or_fail;
 use integration_harness::{login_to_world_session, relogin};
@@ -34,6 +36,8 @@ async fn read_until(
 const TICKET: i32 = 50200005;
 const TICKETS: i32 = 50200003;
 const RETIRED_HAT: i32 = 20000000;
+/// The Baby Tiger Package (16,900 NX): a pet, its equipment and Pet Food.
+const PACKAGE: i32 = 10002307;
 
 /// Enter the Cash Shop and return the wish list it opens with.
 async fn enter_cash_shop(connection: &mut MapleTestConnection) -> Vec<i32> {
@@ -208,6 +212,130 @@ async fn gifts_need_a_birthday_code_another_account_and_cash() {
         .await;
         if list.packet.bytes[2] == 0x4D {
             assert_eq!(list.packet.bytes[3..5], [0, 0], "unexpected gifts");
+            return;
+        }
+    }
+    panic!("no gift list");
+}
+
+/// The NX Credit in the balance (QUERY_CASH_RESULT) that follows a purchase.
+async fn credit(connection: &mut MapleTestConnection, phase: &'static str) -> i32 {
+    let balance = read_until(connection, phase, SendOpcode::QueryCashResult).await;
+    Cursor::new(&balance.packet.bytes[2..])
+        .read_int()
+        .expect("NX Credit")
+}
+
+/// Send a Cash Shop request and return the CASHSHOP_OPERATION reply.
+async fn request(
+    connection: &mut MapleTestConnection,
+    packet: packet::Packet,
+    phase: &'static str,
+) -> Vec<u8> {
+    connection.send_packet(packet, phase).await.expect(phase);
+    let reply = read_until(connection, phase, SendOpcode::CashShopOperation).await;
+    reply.packet.bytes[2..].to_vec()
+}
+
+#[tokio::test]
+async fn nx_buys_items_packages_gifts_and_slots() {
+    let config = load_harness_config_or_fail().await;
+    let receiver_config = load_harness_config_or_fail().await;
+    drop(
+        login_to_world_session(&receiver_config)
+            .await
+            .expect("receiver login failed"),
+    );
+    let mut session = login_to_world_session(&config)
+        .await
+        .expect("login-to-world session flow failed");
+    set_nx_credit(&config.username, 30_000)
+        .await
+        .expect("grant NX");
+    enter_cash_shop(&mut session.connection).await;
+    let connection = &mut session.connection;
+
+    let bought = request(connection, build_cash_shop_buy(1, TICKET).unwrap(), "buy").await;
+    assert_eq!(bought[0], 0x57, "buy an item");
+    assert_eq!(credit(connection, "buy an item").await, 29_000);
+
+    let package = build_cash_shop_buy_package(1, PACKAGE).unwrap();
+    let bought = request(connection, package, "buy a package").await;
+    assert_eq!(bought[..2], [0xA4, 3], "a package's three items");
+    assert_eq!(credit(connection, "buy a package").await, 12_100);
+
+    let gift = build_cash_shop_gift(19830113, TICKET, &receiver_config.character_name, "enjoy");
+    let sent = request(connection, gift.unwrap(), "gift").await;
+    assert_eq!(sent[0], 0x5E, "send a gift");
+    assert_eq!(credit(connection, "gift").await, 11_100);
+
+    // The slot buttons add four slots for 4,000 NX.
+    let expand = build_cash_shop_expand(1, Some(3)).unwrap();
+    let expanded = request(connection, expand, "expand the Set-up bag").await;
+    assert_eq!(expanded, [0x60, 3, 28, 0]);
+    assert_eq!(credit(connection, "expand the Set-up bag").await, 7_100);
+
+    let expand = build_cash_shop_expand(1, None).unwrap();
+    let expanded = request(connection, expand, "expand the storage").await;
+    assert_eq!(expanded, [0x62, 8, 0]);
+    assert_eq!(credit(connection, "expand the storage").await, 3_100);
+
+    let expand = build_cash_shop_expand(1, Some(3)).unwrap();
+    let failed = request(connection, expand, "expand without NX").await;
+    assert_eq!(failed, [0x5C, 0xA5]);
+    drop(session);
+
+    // The bag keeps its slots, and the Cash Inventory its four items and the
+    // storage's.
+    let mut session = relogin(&config).await;
+    assert_eq!(session.slot_limits, [24, 24, 28, 24, 96]);
+    let connection = &mut session.connection;
+    connection
+        .send_packet(build_enter_cash_shop(), "enter cash shop")
+        .await
+        .expect("send ENTER_CASHSHOP");
+    let inventory = read_until(connection, "cash inventory", SendOpcode::CashShopOperation).await;
+    let inventory = &inventory.packet.bytes[2..];
+    assert_eq!(inventory[..3], [0x4B, 4, 0], "Cash Inventory");
+    assert_eq!(
+        inventory[inventory.len() - 4..][..2],
+        [8, 0],
+        "storage slots"
+    );
+
+    // The gift waits for the receiver, and both commodities are now among the
+    // Best Items: the last of SET_CASH_SHOP is 8 tabs of five for each
+    // gender, then 11 more bytes.
+    let mut receiver = relogin(&receiver_config).await;
+    let connection = &mut receiver.connection;
+    connection
+        .send_packet(build_enter_cash_shop(), "enter cash shop")
+        .await
+        .expect("send ENTER_CASHSHOP");
+    let shop = read_until(connection, "receiver shop", SendOpcode::SetCashShop).await;
+    let bytes = &shop.packet.bytes;
+    let mut best = Cursor::new(&bytes[bytes.len() - 11 - 8 * 2 * 5 * 12..]);
+    let men: Vec<i32> = (0..5)
+        .map(|_| {
+            let tab = best.read_int().unwrap();
+            let gender = best.read_int().unwrap();
+            assert_eq!((tab, gender), (1, 0));
+            best.read_int().unwrap()
+        })
+        .collect();
+    assert!(
+        men.contains(&TICKET) && men.contains(&PACKAGE),
+        "Best Items {men:?}"
+    );
+    for _ in 0..2 {
+        let list = read_until(connection, "receiver lists", SendOpcode::CashShopOperation).await;
+        let list = &list.packet.bytes[2..];
+        if list[0] == 0x4D {
+            assert_eq!(list[1..3], [1, 0], "one gift");
+            let item_id = Cursor::new(&list[11..]).read_int().unwrap();
+            assert_eq!(item_id, 5220000);
+            let from = &list[15..15 + config.character_name.len()];
+            assert_eq!(from, config.character_name.as_bytes());
             return;
         }
     }

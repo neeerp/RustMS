@@ -25,7 +25,8 @@
 namespace ms
 {
 	// The Cash Shop's BUY dialog (UIClassic.nx CashShop.img/CSNotice/0): the
-	// item, its price, and which balance pays for it.
+	// item, its price, and which balance pays for it. A commodity with sn 0
+	// is a slot button's four slots.
 	class UICashBuy : public UIElement
 	{
 	public:

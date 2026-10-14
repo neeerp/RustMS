@@ -59,9 +59,25 @@ namespace ms
 				strsrc = nl::nx::string["Etc.img"]["Etc"][std::to_string(itemid)];
 				break;
 			case 5:
+				// Pets (500xxxx) have an image of their own.
+				if (get_item_prefix(itemid) == 500)
+				{
+					category = "Pet";
+					src = nl::nx::item["Pet"][std::to_string(itemid) + ".img"]["info"];
+					strsrc = nl::nx::string["Pet.img"][std::to_string(itemid)];
+					break;
+				}
+
 				category = "Cash";
 				src = nl::nx::item["Cash"][strprefix + ".img"][strid]["info"];
 				strsrc = nl::nx::string["Cash.img"][std::to_string(itemid)];
+				break;
+			case 9:
+				// Cash Shop packages (0910) and slot expansions (0911) keep
+				// their name and icon together.
+				category = "Special";
+				src = nl::nx::item["Special"][strprefix + ".img"][std::to_string(itemid)];
+				strsrc = src;
 				break;
 		}
 
@@ -113,6 +129,8 @@ namespace ms
 			return categorynames[index];
 		else if (index >= 30 && index <= 70)
 			return "Weapon";
+		else if (index == 80)
+			return "PetEquip";
 		else
 			return "";
 	}

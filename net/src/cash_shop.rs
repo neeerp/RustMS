@@ -20,10 +20,30 @@ pub fn commodity(sn: i32) -> Option<&'static Commodity> {
     commodities().ok()?.get(sn)
 }
 
+/// The most slots a bag can have.
+pub const MAX_BAG_SLOTS: u8 = 96;
+/// The most slots an account's storage can have.
+pub const MAX_STORAGE_SLOTS: i16 = 48;
+/// What the slot buttons charge, and how many slots they add.
+pub const EXPANSION_PRICE: i32 = 4_000;
+pub const EXPANSION_SLOTS: u8 = 4;
+/// How many slots an expansion commodity (`Special/0911.img`) adds.
+pub const COMMODITY_EXPANSION_SLOTS: u8 = 8;
+
+/// What a slot expansion grows.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Expansion {
+    /// One of the character's bags, not the cash bag.
+    Bag(InventoryType),
+    /// The account's storage.
+    Storage,
+}
+
 /// A Cash Shop request the runtime carries out against the account.
 #[derive(Debug, PartialEq, Eq)]
 pub enum CashShopRequest {
-    /// Pay for `commodity` and put it in the Cash Inventory.
+    /// Pay for `commodity` and put it, or each item of a package, in the
+    /// Cash Inventory.
     Buy {
         cash_type: CashType,
         commodity: Commodity,
@@ -43,6 +63,13 @@ pub enum CashShopRequest {
     /// Move the character's item with this cash serial, from `kind`, back to
     /// the Cash Inventory.
     PutBack { cash_id: i64, kind: InventoryType },
+    /// Pay `price` and add `slots` slots to a bag or the storage.
+    Expand {
+        cash_type: CashType,
+        expansion: Expansion,
+        slots: u8,
+        price: i32,
+    },
 }
 
 /// The balance a purchase names: 1 NX Credit, 2 Maple Points, 4 NX Prepaid.
@@ -60,25 +87,65 @@ pub fn check_purchase(
     commodity: Option<&Commodity>,
     gender: i16,
 ) -> Result<&Commodity, CashShopFailure> {
-    let commodity = check_gift(commodity)?;
+    let commodity = check_sale(commodity)?;
     if !commodity.for_gender(gender) {
         return Err(CashShopFailure::Gender);
     }
     Ok(commodity)
 }
 
-/// Whether `commodity` is for sale, to anyone; a gift's receiver is checked
-/// once it is found.
+/// Whether `commodity` can be sent as a gift, to anyone; a gift's receiver
+/// is checked once it is found. Packages can't be.
 pub fn check_gift(commodity: Option<&Commodity>) -> Result<&Commodity, CashShopFailure> {
+    let commodity = check_sale(commodity)?;
+    if package(commodity).is_some() {
+        return Err(CashShopFailure::Unknown);
+    }
+    Ok(commodity)
+}
+
+/// Whether `commodity` is for sale as an item or a package. The other
+/// `9xxxxxx` items, the slot expansions, are bought with their own request.
+fn check_sale(commodity: Option<&Commodity>) -> Result<&Commodity, CashShopFailure> {
     let commodity = commodity.ok_or(CashShopFailure::Unknown)?;
     if !commodity.on_sale || commodity.price <= 0 {
         return Err(CashShopFailure::SoldOut);
     }
-    // Packages (CashPackage.img) hold several items; they aren't sold yet.
-    if commodity.item_id / 1_000_000 == 9 {
+    if commodity.item_id / 1_000_000 == 9 && package(commodity).is_none() {
         return Err(CashShopFailure::Unknown);
     }
     Ok(commodity)
+}
+
+/// The commodities in `commodity`, if it is a package (`CashPackage.img`).
+pub fn package(commodity: &Commodity) -> Option<Vec<&'static Commodity>> {
+    commodities().ok()?.package(commodity.item_id)
+}
+
+/// What an expansion commodity grows: `9110000` the storage, and
+/// `9111000` to `9114000` the Equip, Use, Set-up and Etc bags.
+pub fn expansion(commodity: &Commodity) -> Option<Expansion> {
+    match commodity.item_id {
+        9_110_000 => Some(Expansion::Storage),
+        9_111_000 => Some(Expansion::Bag(InventoryType::Equip)),
+        9_112_000 => Some(Expansion::Bag(InventoryType::Use)),
+        9_113_000 => Some(Expansion::Bag(InventoryType::Setup)),
+        9_114_000 => Some(Expansion::Bag(InventoryType::Etc)),
+        _ => None,
+    }
+}
+
+/// The Best Items for each gender: the best sellers still on sale, five at
+/// most.
+pub fn best_items(best_sellers: &[i32]) -> [Vec<i32>; 2] {
+    [0, 1].map(|gender| {
+        best_sellers
+            .iter()
+            .filter(|&&sn| check_purchase(commodity(sn), gender).is_ok())
+            .copied()
+            .take(5)
+            .collect()
+    })
 }
 
 /// Whether a birthday code, YYYYMMDD, is a date. Accounts don't record a
@@ -200,14 +267,51 @@ mod tests {
         assert_eq!(check_purchase(Some(&male), 0), Ok(&male));
         assert_eq!(check_purchase(Some(&male), 1), Err(CashShopFailure::Gender));
 
-        let package = Commodity {
-            item_id: 9101000,
+        // Slot expansions are bought with their own request.
+        let slots = Commodity {
+            item_id: 9111000,
             ..ticket
         };
         assert_eq!(
-            check_purchase(Some(&package), 0),
+            check_purchase(Some(&slots), 0),
             Err(CashShopFailure::Unknown)
         );
+        assert_eq!(
+            expansion(&slots),
+            Some(Expansion::Bag(InventoryType::Equip))
+        );
+    }
+
+    #[test]
+    fn packages_are_sold_but_not_gifted() {
+        if commodities().is_err() {
+            return;
+        }
+        // Package > Pet: the Baby Tiger Package.
+        let package = commodity(10002307).unwrap();
+        assert_eq!(check_purchase(Some(package), 1), Ok(package));
+        assert_eq!(check_gift(Some(package)), Err(CashShopFailure::Unknown));
+        let items: Vec<_> = super::package(package)
+            .unwrap()
+            .iter()
+            .map(|c| c.item_id)
+            .collect();
+        assert_eq!(items, [5000066, 1802063, 5240027]);
+        assert!(super::package(&ticket()).is_none());
+    }
+
+    #[test]
+    fn best_items_are_on_sale_for_each_gender() {
+        if commodities().is_err() {
+            return;
+        }
+        // A package, men's equipment, a retired hat, Gachapon Tickets.
+        let sellers = [10002307, 20000053, 20000000, 50200003];
+        assert_eq!(
+            best_items(&sellers),
+            [vec![10002307, 20000053, 50200003], vec![10002307, 50200003]]
+        );
+        assert_eq!(best_items(&[50200003; 7])[0].len(), 5);
     }
 
     #[test]
