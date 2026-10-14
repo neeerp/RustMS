@@ -18,6 +18,7 @@
 #pragma once
 
 #include <string>
+#include <vector>
 
 #include <cstdint>
 
@@ -73,6 +74,35 @@ namespace ms
 	public:
 		// Requests the server to warp the player into the cash shop
 		EnterCashShopPacket() : OutPacket(OutPacket::Opcode::ENTER_CASHSHOP) {}
+	};
+
+	// Opcode: CASHSHOP_OPERATION(229)
+	class BuyCashItemPacket : public OutPacket
+	{
+	public:
+		// Pay for the commodity sn: cash type 1 is NX Credit, 2 Maple Points,
+		// 4 NX Prepaid
+		BuyCashItemPacket(int32_t cash_type, int32_t sn) : OutPacket(OutPacket::Opcode::CASHSHOP_OPERATION)
+		{
+			write_byte(3);
+			write_byte(0);
+			write_int(cash_type);
+			write_int(sn);
+		}
+	};
+
+	// Opcode: CASHSHOP_OPERATION(229)
+	class SetWishListPacket : public OutPacket
+	{
+	public:
+		// Save the wish list's ten slots; 0 marks an empty one
+		SetWishListPacket(const std::vector<int32_t>& sns) : OutPacket(OutPacket::Opcode::CASHSHOP_OPERATION)
+		{
+			write_byte(5);
+
+			for (size_t i = 0; i < 10; i++)
+				write_int(i < sns.size() ? sns[i] : 0);
+		}
 	};
 
 	// Opcode: MOVE_PLAYER(41)

@@ -20,6 +20,14 @@ pub struct Account {
     pub banned: bool,
     pub ban_msg: Option<String>,
     pub gm_level: i16,
+    // Only purchases change the balances (`crate::cash_shop`), so saving a
+    // stale account can't undo one.
+    #[diesel(skip_update)]
+    pub nx_credit: i32,
+    #[diesel(skip_update)]
+    pub maple_points: i32,
+    #[diesel(skip_update)]
+    pub nx_prepaid: i32,
 }
 
 impl Debug for Account {

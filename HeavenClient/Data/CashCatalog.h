@@ -46,6 +46,8 @@ namespace ms
 			int8_t gender;
 			Label label;
 			int32_t priority;
+			// Days the item lasts; 0 is forever.
+			int32_t period = 0;
 		};
 
 		// Tabs in the order they're drawn. MAIN shows the how-to pages
@@ -154,6 +156,52 @@ namespace ms
 		inline size_t page_count(size_t items)
 		{
 			return std::max<size_t>(1, (items + PAGE_SIZE - 1) / PAGE_SIZE);
+		}
+
+		// The wish list with sn added at the end, unless it's there already
+		// or the list is full.
+		inline std::vector<int32_t> wish(std::vector<int32_t> sns, int32_t sn)
+		{
+			sns.erase(std::remove(sns.begin(), sns.end(), 0), sns.end());
+
+			if (sns.size() < WISH_LIST_SIZE && std::find(sns.begin(), sns.end(), sn) == sns.end())
+				sns.push_back(sn);
+
+			return sns;
+		}
+
+		// The wish list without sn.
+		inline std::vector<int32_t> unwish(std::vector<int32_t> sns, int32_t sn)
+		{
+			sns.erase(std::remove(sns.begin(), sns.end(), sn), sns.end());
+			sns.erase(std::remove(sns.begin(), sns.end(), 0), sns.end());
+
+			return sns;
+		}
+
+		// What a purchase is paid with, as the server numbers it.
+		enum CashType : int32_t
+		{
+			CREDIT = 1,
+			MAPLE_POINTS = 2,
+			PREPAID = 4
+		};
+
+		// The BUY dialog's options, top to bottom.
+		constexpr size_t NUM_PAYMENTS = 3;
+		constexpr CashType PAYMENTS[NUM_PAYMENTS] = { MAPLE_POINTS, PREPAID, CREDIT };
+
+		// The option checked when the BUY dialog opens: NX Prepaid, as in
+		// period footage, unless only another balance covers the price.
+		inline size_t default_payment(int32_t price, int32_t credit, int32_t points, int32_t prepaid)
+		{
+			const int32_t balances[NUM_PAYMENTS] = { points, prepaid, credit };
+
+			for (size_t option : { 1, 2, 0 })
+				if (balances[option] >= price)
+					return option;
+
+			return 1;
 		}
 	}
 }

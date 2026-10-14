@@ -349,6 +349,8 @@ add_executable(HeavenClient
     IO/UITypes/UIPartyHP.cpp
     IO/UITypes/UIPartyHP.h
     IO/UITypes/UIQuestHelper.h
+    IO/UITypes/UICashBuy.cpp
+    IO/UITypes/UICashBuy.h
     IO/UITypes/UICashShop.cpp
     IO/UITypes/UICashShop.h
     IO/UITypes/UIChannel.cpp

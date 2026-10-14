@@ -262,7 +262,7 @@ side yet.
 | Buddy list (`UIUserList` Friend tab, buddy chat) | Implemented without groups; see `buddies.md` |
 | Guild / alliance / blacklist tabs (`UIUserList`) | Tab strip only |
 | Monster Book (`UIMonsterBook`) | Implemented: cards, summary, monster pages, search, cover; see `combat.md` |
-| Cash shop (`UICashShop`) | Browse/enter/exit; purchase is `// TODO: Purchase item` |
+| Cash shop (`UICashShop`) | Enter/exit, catalog, buying, Cash Inventory and wish list; gifts and withdrawing items remain unimplemented |
 | Maple Messenger (`UIMessenger`) | Implemented |
 | Storage, trade, player shops, mini-games, memo/mail | No UI, no handlers |
 | Pets, mounts, summons, reactors beyond hit/spawn | Partial or absent (`Reactor` TODOs) |
@@ -290,9 +290,18 @@ the screen size.
 - **Packets:** SET_CASH_SHOP gives the account name and the Best Item SNs for
   the player's gender. QUERY_CASH_RESULT (324) gives the NX Credit, Maple Point
   and NX Prepaid balances. CASHSHOP_OPERATION (325) modes 0x4B (Cash
-  Inventory), 0x4D (gifts waiting for the account) and 0x4F (wish list) are read.
-- **Not served yet:** BUY, GIFT, RESERVE, the slot expansions, CHARGE, CHECK
-  CASH and COUPON do nothing.
+  Inventory), 0x4D (gifts waiting for the account), 0x4F and 0x55 (wish list),
+  0x57 (a bought item) and 0x5C (a failed purchase) are read.
+- **Buying:** BUY opens `UICashBuy` (`CashShop.img/CSNotice/0`): the item, its
+  price and period, and a checkbox per balance. It checks the first balance
+  that covers the price, trying NX Prepaid, NX Credit, then Maple Points. OK
+  sends CASHSHOP_OPERATION (229) 0x03 with the cash type (1 Credit, 2 Maple
+  Points, 4 Prepaid) and SN. The result is a "successful purchase" or a
+  failure notice.
+- **Wish list:** RESERVE and REMOVE send the whole list (0x05, ten SNs), and the
+  server answers with the list it kept.
+- **Not served yet:** GIFT, taking items out of the Cash Inventory, the slot
+  expansions, CHARGE, CHECK CASH and COUPON do nothing.
 
 ## Estimated client work for a complete game
 
@@ -301,7 +310,7 @@ the screen size.
 | Buddy groups | Default group only | S |
 | Guild | Skeleton only, plus guild emblem/BBS UIs missing | L |
 | Trade / storage / player shops | Nothing | L |
-| Cash shop purchase, gifts, wish list | Display only | M |
+| Cash shop gifts, taking items out, packages | Buying and the wish list only | M |
 | Quest accept/complete UI flow | Partial | S |
 | Pets and mounts | Partial rendering, no interaction | M |
 | Memo, mail, MTS | Nothing | M each |

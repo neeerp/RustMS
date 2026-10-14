@@ -42,6 +42,17 @@ int main()
 		std::vector<Commodity> wished = find(all, { 50100001, 0, 99999999, 50200003 });
 		require(wished.size() == 2 && wished[0].sn == 50100001 && wished[1].sn == 50200003, "the wish list keeps its order and skips empty slots");
 
+		std::vector<int32_t> wishes = wish({ 7, 0, 0 }, 9);
+		require(wishes == std::vector<int32_t>({ 7, 9 }), "a wish joins the end, dropping empty slots");
+		require(wish(wishes, 7) == wishes, "a wish is listed once");
+		require(wish({ 1, 2, 3, 4, 5, 6, 7, 8, 9, 10 }, 11).size() == WISH_LIST_SIZE, "the wish list holds ten");
+		require(unwish({ 7, 9, 0 }, 7) == std::vector<int32_t>({ 9 }), "removing a wish keeps the rest");
+
+		require(PAYMENTS[default_payment(1000, 5000, 5000, 5000)] == PREPAID, "NX Prepaid is checked first");
+		require(PAYMENTS[default_payment(1000, 5000, 0, 0)] == CREDIT, "then whatever covers the price");
+		require(PAYMENTS[default_payment(1000, 0, 1000, 0)] == MAPLE_POINTS, "Maple Points cover it exactly");
+		require(PAYMENTS[default_payment(1000, 0, 0, 0)] == PREPAID, "nothing covers it");
+
 		require(page_count(0) == 1 && page_count(10) == 1 && page_count(11) == 2, "ten items to a page");
 
 		std::cout << "Cash catalog passed\n";

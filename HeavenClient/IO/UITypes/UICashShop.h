@@ -154,6 +154,9 @@ namespace ms
 		Text name_label;
 		Text account_label;
 		Text balance_labels[3];
+		int32_t credit;
+		int32_t points;
+		int32_t prepaid;
 
 		std::vector<CashItem> cash_items;
 		Slider cash_slider;

@@ -22,6 +22,7 @@
 #include "../../Gameplay/Stage.h"
 #include "../../IO/UI.h"
 #include "../../IO/UITypes/UICashShop.h"
+#include "../../IO/UITypes/UINotice.h"
 #include "../../IO/Window.h"
 
 #include "Timer.h"
@@ -114,6 +115,50 @@ namespace ms
 			cashshop->set_balance(credit, points, prepaid);
 	}
 
+	namespace
+	{
+		// An item in the Cash Inventory, as CASHSHOP_OPERATION sends it.
+		UICashShop::CashItem read_cash_item(InPacket& recv)
+		{
+			int64_t cash_id = recv.read_long();
+			recv.skip_int();	// account id
+			recv.skip_int();	// character id
+			int32_t item_id = recv.read_int();
+			recv.skip_int();	// sn
+			int16_t quantity = recv.read_short();
+			recv.skip(13);		// gift from
+			recv.skip_long();	// expiration
+			recv.skip_long();
+
+			return { cash_id, item_id, quantity };
+		}
+
+		std::vector<int32_t> read_wish_list(InPacket& recv)
+		{
+			std::vector<int32_t> sns;
+
+			for (size_t i = 0; i < 10; i++)
+				sns.push_back(recv.read_int());
+
+			return sns;
+		}
+
+		std::string failure_message(uint8_t code)
+		{
+			switch (code)
+			{
+			case 0xA5:
+				return "You don't have enough cash.";
+			case 0xAA:
+				return "Due to gender restrictions, you can't buy this item.";
+			case 0xC0:
+				return "This item is out of stock, and therefore not available for sale.";
+			default:
+				return "Due to an unknown error, failed.";
+			}
+		}
+	}
+
 	void CashShopOperationHandler::handle(InPacket& recv) const
 	{
 		auto cashshop = UI::get().get_element<UICashShop>();
@@ -132,19 +177,7 @@ namespace ms
 			std::vector<UICashShop::CashItem> items;
 
 			for (int16_t i = 0; i < count; i++)
-			{
-				int64_t cash_id = recv.read_long();
-				recv.skip_int();	// account id
-				recv.skip_int();	// character id
-				int32_t item_id = recv.read_int();
-				recv.skip_int();	// sn
-				int16_t quantity = recv.read_short();
-				recv.skip(13);		// gift from
-				recv.skip_long();	// expiration
-				recv.skip_long();
-
-				items.push_back({ cash_id, item_id, quantity });
-			}
+				items.push_back(read_cash_item(recv));
 
 			recv.skip_short();	// storage slots
 			recv.skip_short();	// character slots
@@ -172,15 +205,18 @@ namespace ms
 			break;
 		}
 		case 0x4F:
-		{
-			std::vector<int32_t> sns;
-
-			for (size_t i = 0; i < 10; i++)
-				sns.push_back(recv.read_int());
-
-			cashshop->set_wish_list(sns);
+		case 0x55:
+			// The wish list, on entering and after a change.
+			cashshop->set_wish_list(read_wish_list(recv));
 			break;
-		}
+		case 0x57:
+			// A purchase is in the Cash Inventory; the balance follows.
+			cashshop->add_cash_items({ read_cash_item(recv) });
+			UI::get().emplace<UIOk>("You have successfully made the purchase.", [](bool) {});
+			break;
+		case 0x5C:
+			UI::get().emplace<UIOk>(failure_message(recv.read_byte()), [](bool) {});
+			break;
 		default:
 			break;
 		}

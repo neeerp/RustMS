@@ -29,7 +29,7 @@ mod use_skill;
 mod whisper;
 
 pub use self::buddy::BuddyListModifyHandler;
-pub use self::cash_shop::EnterCashShopHandler;
+pub use self::cash_shop::{CashShopOperationHandler, EnterCashShopHandler};
 pub use self::change_channel::ChangeChannelHandler;
 pub use self::change_map::{warp, ChangeMapHandler};
 pub use self::char_info::CharInfoRequestHandler;

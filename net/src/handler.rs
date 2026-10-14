@@ -310,6 +310,8 @@ pub enum WorldAction {
     EnterCashShop,
     /// Return from the Cash Shop to the map the player left.
     LeaveCashShop,
+    /// Buy something or save the wish list, in the Cash Shop.
+    CashShop(crate::cash_shop::CashShopRequest),
     Disconnect,
 }
 
@@ -384,6 +386,10 @@ fn world_routes() -> &'static HashMap<i16, WorldRoute> {
             (Op::ChangeChannel, InGame(&world::ChangeChannelHandler)),
             (Op::ChangeMap, InGame(&world::ChangeMapHandler)),
             (Op::EnterCashShop, InGame(&world::EnterCashShopHandler)),
+            (
+                Op::CashShopOperation,
+                InGame(&world::CashShopOperationHandler),
+            ),
             (
                 Op::PlayerMapTransfer,
                 InGame(&world::PlayerMapTransferHandler),
@@ -464,7 +470,7 @@ mod tests {
     fn every_registered_opcode_is_unique_per_server() {
         // The maps would silently drop duplicates; check the table sizes match.
         assert_eq!(login_routes().len(), 13);
-        assert_eq!(world_routes().len(), 37);
+        assert_eq!(world_routes().len(), 38);
     }
 
     #[test]

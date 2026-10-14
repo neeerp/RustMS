@@ -85,8 +85,18 @@ cash inventory, gifts, wish list and NX balance
 and in the world directory, so whispers still arrive, but the client actor
 ignores every other opcode until the player leaves. Leaving sends a
 `CHANGE_MAP` with no body; the actor answers it like a channel change to its
-own channel, and the client reconnects and enters the map it left. Buying is
-not implemented, and every balance is 0.
+own channel, and the client reconnects and enters the map it left.
+
+In the shop, `CASHSHOP_OPERATION` (0xE5) buys a commodity and sets the wish
+list (`net/src/packet/handle/world/cash_shop.rs`). A purchase is checked against
+`Etc.nx` `Commodity.img` (`net::cash_shop`): the item must be on sale and allowed
+for the character's gender, and packages aren't sold yet. `db::cash_shop::buy`
+then takes the price from the chosen balance and adds the item to the Cash
+Inventory in one transaction. The client gets the item (0x57) and its new
+balance, or a failure code (0x5C): 0xA5 not enough cash, 0xAA gender, 0xC0 sold
+out, 0x00 anything else. The wish list keeps up to ten commodities that are on
+sale and answers with 0x55. Balances are only granted through SQL for now.
+
 The client actor also follows its own movement to know roughly where the
 player stands. Before saving on a channel change or disconnect, it sets the
 spawn point to the nearest start or invisible portal that leads nowhere

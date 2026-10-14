@@ -14,6 +14,7 @@ redistributed.
 | `Item.nx` | Item templates (stack sizes, quest flags, consumable effects) | `RUSTMS_ITEM_NX_PATH` |
 | `Character.nx` | Equipment stats and requirements | `RUSTMS_CHARACTER_NX_PATH` |
 | `Mob.nx` | Mob stats (HP, EXP, attack, touch damage) | `RUSTMS_MOB_NX_PATH` |
+| `Etc.nx` | Cash Shop commodities (prices, counts, periods) | `RUSTMS_ETC_NX_PATH` |
 | `Reactor.nx` | Reactor states and what hits them (boxes) | `RUSTMS_REACTOR_NX_PATH` |
 | `Skill.nx` | Skill levels (MP cost, damage, duration, cooldown), master levels, and requirements | `RUSTMS_SKILL_NX_PATH` |
 
