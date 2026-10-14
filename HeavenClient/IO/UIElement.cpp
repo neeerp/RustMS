@@ -106,7 +106,8 @@ namespace ms
 
 		for (auto &btit : buttons)
 		{
-			if (btit.second->is_active() && btit.second->bounds(position).contains(pos))
+			if (btit.second->is_active() && btit.second->bounds(position).contains(pos)
+				&& !button_covered(btit.first, pos))
 			{
 				if (btit.second->get_state() == Button::State::NORMAL)
 				{

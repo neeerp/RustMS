@@ -26,6 +26,7 @@ namespace ms
 	Cursor::Cursor()
 	{
 		state = Cursor::State::IDLE;
+		pressed = false;
 		hide_counter = 0;
 	}
 
@@ -42,14 +43,14 @@ namespace ms
 		constexpr int64_t HIDE_AFTER = HIDE_TIME / Constants::TIMESTEP;
 
 		if (hide_counter < HIDE_AFTER)
-			animations[state].draw(position, alpha);
+			animations[shown()].draw(position, alpha);
 	}
 
 	void Cursor::update()
 	{
-		animations[state].update();
+		animations[shown()].update();
 
-		switch (state)
+		switch (shown())
 		{
 			case Cursor::State::CANCLICK:
 			case Cursor::State::CANCLICK2:
@@ -70,8 +71,32 @@ namespace ms
 		{
 			state = s;
 
-			animations[state].reset();
+			animations[shown()].reset();
 			hide_counter = 0;
+		}
+	}
+
+	void Cursor::set_pressed(bool p)
+	{
+		if (pressed != p)
+		{
+			pressed = p;
+
+			animations[shown()].reset();
+			hide_counter = 0;
+		}
+	}
+
+	Cursor::State Cursor::shown() const
+	{
+		switch (state)
+		{
+			case Cursor::State::IDLE:
+			case Cursor::State::CANCLICK:
+			case Cursor::State::CANCLICK2:
+				return pressed ? Cursor::State::CLICKING : state;
+			default:
+				return state;
 		}
 	}
 

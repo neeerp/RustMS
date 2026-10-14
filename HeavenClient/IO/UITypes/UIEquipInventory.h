@@ -17,15 +17,15 @@
 //////////////////////////////////////////////////////////////////////////////////
 #pragma once
 
-#include <string>
-
 #include <cstdint>
 
 #include "../UIDragElement.h"
 
+#include "../../Graphics/Geometry.h"
+
 namespace ms
 {
-	// The Equip inventory
+	// The Equip inventory, with the pet equipment panel that opens beside it
 	class UIEquipInventory : public UIDragElement<PosEQINV>
 	{
 	public:
@@ -59,8 +59,9 @@ namespace ms
 
 		void load_icons();
 		void update_slot(EquipSlot::Id slot);
+		bool is_unavailable(EquipSlot::Id slot) const;
 		EquipSlot::Id slot_by_position(Point<int16_t> position) const;
-		void change_tab(uint16_t tabid);
+		void show_pet(bool show);
 
 		class EquipIcon : public Icon::Type
 		{
@@ -80,18 +81,12 @@ namespace ms
 
 		enum Buttons : uint16_t
 		{
-			BT_TAB0,
-			BT_TAB1,
-			BT_TAB2,
-			BT_TAB3,
-			BT_TABE,
 			BT_CLOSE,
-			BT_SLOT,
-			BT_EFFECT,
-			BT_SALON,
-			BT_CONSUMESETTING,
-			BT_EXCEPTION,
-			BT_SHOP
+			BT_PET_SHOW,
+			BT_PET_HIDE,
+			BT_PET1,
+			BT_PET2,
+			BT_PET3
 		};
 
 		const Inventory &inventory;
@@ -99,18 +94,10 @@ namespace ms
 		EnumMap<EquipSlot::Id, Point<int16_t>> iconpositions;
 		EnumMap<EquipSlot::Id, std::unique_ptr<Icon>> icons;
 
-		uint16_t tab;
-		std::string tab_source[Buttons::BT_TABE];
-		Texture tabbar;
-		Texture background[Buttons::BT_TABE];
-		Texture disabled;
-		Texture disabled2;
-		std::vector<Texture> Slots[Buttons::BT_TABE];
+		Texture backgrnd;
+		Texture pet;
+		ColorBox unavailable;
 
-		Point<int16_t> totem_dimensions;
-		Point<int16_t> totem_adj;
-
-		bool hasPendantSlot;
-		bool hasPocketSlot;
+		bool pet_enabled;
 	};
 }

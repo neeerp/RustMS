@@ -27,197 +27,128 @@
 
 #include "../../Configuration.h"
 #include "../../Net/Packets/GameplayPackets.h"
+#include "../../Util/NxFiles.h"
 
 #include <algorithm>
 #include <nlnx/nx.hpp>
 
 namespace ms
 {
+	namespace
+	{
+		// The window, measured from period footage. The top piece ends where
+		// the channel grid starts; the middle piece is tiled down to the bottom
+		// piece, which follows the last row.
+		constexpr Point<int16_t> WORLD = Point<int16_t>(16, 30);
+		constexpr int16_t GRID_TOP = 67;
+		constexpr Point<int16_t> CELL = Point<int16_t>(9, GRID_TOP);
+		constexpr Point<int16_t> CELL_PITCH = Point<int16_t>(70, 21);
+		constexpr Point<int16_t> LABEL = Point<int16_t>(8, 5);
+		constexpr int16_t COLUMNS = 6;
+		constexpr Point<int16_t> BT_CHANGE = Point<int16_t>(286, 11);
+		constexpr Point<int16_t> BT_CANCEL = Point<int16_t>(380, 11);
+	}
+
 	UIChannel::UIChannel() : UIDragElement<PosCHANNEL>()
 	{
-		uint8_t selected_world = 1;
 		uint8_t selected_world_id = Configuration::get().get_worldid();
 		current_channel = Configuration::get().get_channelid();
-		selected_channel = current_channel;
 		channel_count = 1;
 
 		if (auto worldselect = UI::get().get_element<UIWorldSelect>())
-		{
-			selected_world = static_cast<uint8_t>(worldselect->get_worldbyid(selected_world_id));
 			channel_count = worldselect->get_channel_count(selected_world_id);
-		} else
-		{
+		else
 			channel_count = Configuration::get().get_world_channel_count(selected_world_id);
-		}
 
-		channel_count = std::max<uint8_t>(1, std::min<uint8_t>(channel_count, 20));
+		nl::node Channel = NxFiles::ui_classic["UIWindow.img"]["Channel"];
+		nl::node labels = Channel["ch"];
+
+		channel_count = std::max<uint8_t>(1, std::min<uint8_t>(channel_count, labels.size()));
+
 		if (current_channel >= channel_count)
 			current_channel = 0;
+
 		selected_channel = current_channel;
 
-		nl::node Channel = nl::nx::ui["UIWindow2.img"]["Channel"];
+		Texture top = Channel["t"];
+		Texture middle = Channel["c"];
+		Texture bottom = Channel["s"];
 
-		nl::node backgrnd = Channel["backgrnd"];
-		Texture bg = backgrnd;
+		int16_t rows = (channel_count + COLUMNS - 1) / COLUMNS;
+		int16_t bottom_y = GRID_TOP + CELL_PITCH.y() * rows;
 
-		sprites.emplace_back(backgrnd, Point<int16_t>(1, 0));
-		sprites.emplace_back(Channel["backgrnd2"]);
-		sprites.emplace_back(Channel["backgrnd3"]);
-		sprites.emplace_back(Channel["world"][selected_world], Point<int16_t>(16, 30));
+		sprites.emplace_back(Channel["t"]);
 
-		buttons[Buttons::CANCEL] = std::make_unique<MapleButton>(Channel["BtCancel"]);
-		buttons[Buttons::CHANGE] = std::make_unique<MapleButton>(Channel["BtChange"], Point<int16_t>(-20, 0));
+		// The last tile overlaps the one before it rather than run past the bottom.
+		for (int16_t y = top.height(); y < bottom_y; y += middle.height())
+			sprites.emplace_back(Channel["c"], Point<int16_t>(0, std::min<int16_t>(y, bottom_y - middle.height())));
 
-		channel[true] = Channel["channel1"];
-		channel[false] = Channel["channel0"];
+		sprites.emplace_back(Channel["s"], Point<int16_t>(0, bottom_y));
+		sprites.emplace_back(Channel["world"][std::to_string(selected_world_id)], WORLD);
 
-		size_t x = 0;
-		size_t y = 0;
+		buttons[Buttons::CANCEL] = std::make_unique<MapleButton>(Channel["BtCancel"], BT_CANCEL + Point<int16_t>(0, bottom_y));
+		buttons[Buttons::CHANGE] = std::make_unique<MapleButton>(Channel["BtChange"], BT_CHANGE + Point<int16_t>(0, bottom_y));
 
-		for (size_t i = 0; i < channel_count; i++)
+		cell[Cell::EMPTY] = Channel["channel0"];
+		cell[Cell::CURRENT] = Channel["channel1"];
+		cell[Cell::SELECTED] = Channel["channel2"];
+		cells = rows * COLUMNS;
+
+		for (uint8_t i = 0; i < channel_count; i++)
 		{
-			if (x >= 5)
-			{
-				x = 0;
-				y++;
-			}
-
-			ch.emplace_back(Channel["ch"][i], Point<int16_t>(19 + 70 * x, 60 + 20 * y));
-			buttons[Buttons::CH + i] = std::make_unique<AreaButton>(Point<int16_t>(11 + 70 * x, 55 + 20 * y),
-																	channel[true].get_dimensions());
-
-			if (i == selected_channel)
-			{
-				current_channel_x = 11 + 70 * x;
-				current_channel_y = 55 + 20 * y;
-				selected_channel_x = current_channel_x;
-				selected_channel_y = current_channel_y;
-			}
-
-			x++;
+			ch.emplace_back(labels[i]);
+			buttons[Buttons::CH + i] = std::make_unique<AreaButton>(cell_position(i), cell[Cell::EMPTY].get_dimensions());
 		}
 
-		dimension = bg.get_dimensions();
+		dimension = Point<int16_t>(top.width(), bottom_y + bottom.height());
 		dragarea = Point<int16_t>(dimension.x(), 20);
 	}
 
 	void UIChannel::draw(float inter) const
 	{
-		UIElement::draw(inter);
+		UIElement::draw_sprites(inter);
 
-		if (current_channel == selected_channel)
+		for (uint8_t i = 0; i < cells; i++)
 		{
-			channel[true].draw(DrawArgument(position.x() + selected_channel_x, position.y() + selected_channel_y));
-		} else
-		{
-			channel[true].draw(DrawArgument(position.x() + selected_channel_x, position.y() + selected_channel_y));
-			channel[false].draw(DrawArgument(position.x() + current_channel_x, position.y() + current_channel_y));
+			Cell kind = Cell::EMPTY;
+
+			if (i == selected_channel)
+				kind = Cell::SELECTED;
+			else if (i == current_channel)
+				kind = Cell::CURRENT;
+
+			cell[kind].draw(position + cell_position(i));
 		}
 
+		for (uint8_t i = 0; i < ch.size(); i++)
+			ch[i].draw(position + cell_position(i) + LABEL);
 
-		for (auto &sprite : ch)
-			sprite.draw(position, inter);
-	}
-
-	void UIChannel::update()
-	{
-		UIElement::update();
-
-		for (auto &sprite : ch)
-			sprite.update();
+		UIElement::draw_buttons(inter);
 	}
 
 	void UIChannel::send_key(int32_t keycode, bool pressed, bool escape)
 	{
-		if (pressed)
+		if (!pressed)
+			return;
+
+		if (escape)
 		{
-			if (escape)
-			{
-				cancel();
-			} else if (keycode == KeyAction::Id::RETURN)
-			{
-				change_channel();
-			} else if (keycode == KeyAction::Id::UP)
-			{
-				if (selected_channel > 4)
-				{
-					selected_channel -= 5;
-				} else
-				{
-					for (size_t i = 0; i < 3; i++)
-						selected_channel += 5;
-				}
-
-				if (selected_channel == current_channel)
-				{
-					if (selected_channel > 4)
-					{
-						selected_channel -= 5;
-					} else
-					{
-						for (size_t i = 0; i < 3; i++)
-							selected_channel += 5;
-					}
-				}
-
-				update_selected_channel_position();
-			} else if (keycode == KeyAction::Id::DOWN)
-			{
-				if (selected_channel < 15)
-				{
-					selected_channel += 5;
-				} else
-				{
-					for (size_t i = 0; i < 3; i++)
-						selected_channel -= 5;
-				}
-
-				if (selected_channel == current_channel)
-				{
-					if (selected_channel < 15)
-					{
-						selected_channel += 5;
-					} else
-					{
-						for (size_t i = 0; i < 3; i++)
-							selected_channel -= 5;
-					}
-				}
-
-				update_selected_channel_position();
-			} else if (keycode == KeyAction::Id::LEFT)
-			{
-				if (selected_channel != 0)
-					selected_channel--;
-				else
-					selected_channel = channel_count - 1;
-
-				if (selected_channel == current_channel)
-				{
-					if (selected_channel != 0)
-						selected_channel--;
-					else
-						selected_channel = channel_count - 1;
-				}
-
-				update_selected_channel_position();
-			} else if (keycode == KeyAction::Id::RIGHT)
-			{
-				if (selected_channel != channel_count - 1)
-					selected_channel++;
-				else
-					selected_channel = 0;
-
-				if (selected_channel == current_channel)
-				{
-					if (selected_channel != channel_count - 1)
-						selected_channel++;
-					else
-						selected_channel = 0;
-				}
-
-				update_selected_channel_position();
-			}
+			cancel();
+		} else if (keycode == KeyAction::Id::RETURN)
+		{
+			change_channel();
+		} else if (keycode == KeyAction::Id::UP)
+		{
+			select(selected_channel >= COLUMNS ? selected_channel - COLUMNS : selected_channel);
+		} else if (keycode == KeyAction::Id::DOWN)
+		{
+			select(selected_channel + COLUMNS < channel_count ? selected_channel + COLUMNS : selected_channel);
+		} else if (keycode == KeyAction::Id::LEFT)
+		{
+			select(selected_channel > 0 ? selected_channel - 1 : channel_count - 1);
+		} else if (keycode == KeyAction::Id::RIGHT)
+		{
+			select(selected_channel + 1 < channel_count ? selected_channel + 1 : 0);
 		}
 	}
 
@@ -281,26 +212,17 @@ namespace ms
 
 	Button::State UIChannel::button_pressed(uint16_t buttonid)
 	{
-		if (buttonid < Buttons::CH)
+		switch (buttonid)
 		{
-			switch (buttonid)
-			{
-				case Buttons::CANCEL:
-					cancel();
-					break;
-				case Buttons::CHANGE:
-					change_channel();
-					break;
-				default:
-					break;
-			}
-		} else
-		{
-			if (buttonid - Buttons::CH == current_channel)
-				return Button::State::NORMAL;
-
-			selected_channel = buttonid - Buttons::CH;
-			update_selected_channel_position();
+			case Buttons::CANCEL:
+				cancel();
+				break;
+			case Buttons::CHANGE:
+				change_channel();
+				break;
+			default:
+				select(buttonid - Buttons::CH);
+				break;
 		}
 
 		return Button::State::NORMAL;
@@ -311,41 +233,31 @@ namespace ms
 		deactivate();
 
 		current_channel = Configuration::get().get_channelid();
+
 		if (current_channel >= channel_count)
 			current_channel = 0;
+
 		selected_channel = current_channel;
-		selected_channel_x = current_channel_x;
-		selected_channel_y = current_channel_y;
 	}
 
 	void UIChannel::change_channel()
 	{
-		Configuration::get().set_channelid(selected_channel);
-		ChangeChannelPacket(selected_channel).dispatch();
+		if (selected_channel != current_channel)
+		{
+			Configuration::get().set_channelid(selected_channel);
+			ChangeChannelPacket(selected_channel).dispatch();
+		}
+
 		cancel();
 	}
 
-	void UIChannel::update_selected_channel_position()
+	void UIChannel::select(uint8_t channel)
 	{
-		size_t x = 0;
-		size_t y = 0;
+		selected_channel = channel;
+	}
 
-		for (size_t i = 0; i < channel_count; i++)
-		{
-			if (x >= 5)
-			{
-				x = 0;
-				y++;
-			}
-
-			if (i == selected_channel)
-			{
-				selected_channel_x = 11 + 70 * x;
-				selected_channel_y = 55 + 20 * y;
-				break;
-			}
-
-			x++;
-		}
+	Point<int16_t> UIChannel::cell_position(uint8_t index) const
+	{
+		return CELL + Point<int16_t>(CELL_PITCH.x() * (index % COLUMNS), CELL_PITCH.y() * (index / COLUMNS));
 	}
 }

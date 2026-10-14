@@ -160,6 +160,8 @@ namespace ms
 		add_sound(Sound::Name::PICKUP, gamesrc["PickUpItem"]);
 		add_sound(Sound::Name::PORTAL, gamesrc["Portal"]);
 		add_sound(Sound::Name::LEVELUP, gamesrc["LevelUp"]);
+		add_sound(Sound::Name::JOBCHANGED, gamesrc["JobChanged"]);
+		add_sound(Sound::Name::QUESTCLEAR, gamesrc["QuestClear"]);
 		add_sound(Sound::Name::TOMBSTONE, gamesrc["Tombstone"]);
 
 		nl::node itemsrc = nl::nx::sound["Item.img"];
@@ -255,6 +257,11 @@ namespace ms
 		} catch (std::out_of_range e)
 		{
 			nl::audio ad = nl::nx::sound.resolve(path);
+
+			// Later-version paths (e.g. Bgm43) aren't in this Sound.nx.
+			if (!ad || ad.length() <= 82)
+				return;
+
 			auto data = reinterpret_cast<const char *>(ad.data());
 			audiodb[path] = new membuf(data + 82, ad.length() - 82);
 		}
@@ -280,6 +287,11 @@ namespace ms
 		} catch (std::out_of_range e)
 		{
 			nl::audio ad = nl::nx::sound.resolve(path);
+
+			// Later-version paths (e.g. Bgm43) aren't in this Sound.nx.
+			if (!ad || ad.length() <= 82)
+				return;
+
 			auto data = reinterpret_cast<const char *>(ad.data());
 			audiodb[path] = new membuf(data + 82, ad.length() - 82);
 		}

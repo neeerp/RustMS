@@ -18,7 +18,11 @@ Fields are created on demand by `FieldRegistry` and kept alive afterwards.
   projection built by the owning `ClientActor`; the field only updates the
   position from movement packets.
 - **Static NPCs** from the map data, with object ids starting at
-  `1_000_000_000`.
+  `1_000_000_000`. SPAWN_NPC carries each NPC's `rx0`/`rx1` range. In
+  HeavenClient, NPCs with a `move` animation walk to a random x in that range
+  now and then, and stand at the end or at a wall or ledge. The walk is
+  client-local: as in v83, where each client controls its own NPCs and the
+  server only echoes their moves, players don't see the same positions.
 - **Mobs** (`field_mobs::MobSet`): spawn points, live mobs, controllers,
   and damage; see [Mobs and combat](./combat.md).
 - **Drops** (`field_drops::DropSet`): items and mesos on the ground, with

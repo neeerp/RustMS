@@ -84,6 +84,8 @@ namespace ms
 			PICKUP,
 			PORTAL,
 			LEVELUP,
+			JOBCHANGED,
+			QUESTCLEAR,
 			TOMBSTONE,
 			LENGTH
 		};

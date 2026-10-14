@@ -2,6 +2,7 @@
 //! packets.
 
 use crate::actor::object_ids::{self, ObjectIds};
+use game_data::footholds::Footholds;
 use net::loot::Loot;
 use net::packet::build::world::drop::DropView;
 use net::ClientId;
@@ -26,6 +27,8 @@ pub struct Drop {
     pub y: i16,
     pub dropper: i32,
     pub dropped_at: Instant,
+    /// A player threw it away, so anyone may pick it up at once.
+    pub player_drop: bool,
 }
 
 impl Drop {
@@ -33,13 +36,14 @@ impl Drop {
         let (item_or_meso, meso) = match self.loot {
             Loot::Item { item_id, .. } => (item_id, false),
             Loot::Mesos(amount) => (amount, true),
+            Loot::Dropped(ref item) => (item.item_id, false),
         };
         DropView {
             object_id: self.object_id,
             item_or_meso,
             meso,
             owner: self.owner,
-            ownership: if now < self.dropped_at + OWNERSHIP {
+            ownership: if !self.player_drop && now < self.dropped_at + OWNERSHIP {
                 0
             } else {
                 2
@@ -47,6 +51,7 @@ impl Drop {
             x: self.x,
             y: self.y,
             dropper: self.dropper,
+            player_drop: self.player_drop,
         }
     }
 
@@ -66,23 +71,31 @@ pub enum PickupError {
 pub struct DropSet {
     drops: BTreeMap<i32, Drop>,
     object_ids: ObjectIds,
+    footholds: Footholds,
 }
 
 impl Default for DropSet {
     fn default() -> Self {
-        Self {
-            drops: BTreeMap::new(),
-            object_ids: ObjectIds::new(object_ids::DROPS),
-        }
+        Self::new(Footholds::default())
     }
 }
 
 impl DropSet {
+    /// Drops for a field with these footholds to land on.
+    pub fn new(footholds: Footholds) -> Self {
+        Self {
+            drops: BTreeMap::new(),
+            object_ids: ObjectIds::new(object_ids::DROPS),
+            footholds,
+        }
+    }
+
     pub fn all(&self) -> impl Iterator<Item = &Drop> {
         self.drops.values()
     }
 
-    /// Spread `loot` around (x, y) and return the new drops.
+    /// Spread `loot` around (x, y), each on the ground below its place (see
+    /// `Footholds::drop_position`), and return the new drops.
     pub fn spawn(
         &mut self,
         loot: Vec<Loot>,
@@ -97,21 +110,45 @@ impl DropSet {
         for (index, loot) in loot.into_iter().enumerate() {
             let object_id = self.object_ids.next();
             let offset = (index as i16 * 2 - (count - 1)) * SPREAD / 2;
+            let (drop_x, drop_y) = self
+                .footholds
+                .drop_position((x, y), x.saturating_add(offset));
             self.drops.insert(
                 object_id,
                 Drop {
                     object_id,
                     loot,
                     owner,
-                    x: x.saturating_add(offset),
-                    y,
+                    x: drop_x,
+                    y: drop_y,
                     dropper,
                     dropped_at: now,
+                    player_drop: false,
                 },
             );
             ids.push(object_id);
         }
         ids.iter().filter_map(|id| self.drops.get(id)).collect()
+    }
+
+    /// Put down what `owner` threw away at (x, y).
+    pub fn throw(&mut self, loot: Loot, owner: ClientId, x: i16, y: i16, now: Instant) -> &Drop {
+        let object_id = self.object_ids.next();
+        self.drops.entry(object_id).or_insert(Drop {
+            object_id,
+            loot,
+            owner,
+            x,
+            y,
+            dropper: 0,
+            dropped_at: now,
+            player_drop: true,
+        })
+    }
+
+    /// An object id for a drop that is shown but never lies on the field.
+    pub fn next_object_id(&mut self) -> i32 {
+        self.object_ids.next()
     }
 
     /// Take a drop for `client` standing at (x, y).
@@ -129,7 +166,8 @@ impl DropSet {
         {
             return Err(PickupError::TooFar);
         }
-        let owned = drop.loot.quest().is_some() || now < drop.dropped_at + OWNERSHIP;
+        let owned =
+            drop.loot.quest().is_some() || (!drop.player_drop && now < drop.dropped_at + OWNERSHIP);
         if owned && drop.owner != client {
             return Err(PickupError::NotYours);
         }
@@ -205,6 +243,24 @@ mod tests {
     }
 
     #[test]
+    fn thrown_drops_are_anyones_at_once() {
+        let now = Instant::now();
+        let mut drops = DropSet::default();
+        let item = game::Item::stack(2010000, 3);
+        let drop = drops.throw(Loot::Dropped(item.clone()), 1, 40, 7, now);
+        let (id, view) = (drop.object_id, drop.view(now));
+        assert_eq!((view.item_or_meso, view.meso), (2010000, false));
+        assert_eq!(
+            (view.ownership, view.dropper, view.player_drop),
+            (2, 0, true)
+        );
+        assert_eq!(
+            drops.take(2, id, 40, 7, now).unwrap().loot,
+            Loot::Dropped(item)
+        );
+    }
+
+    #[test]
     fn quest_items_stay_with_their_owner_and_drops_expire() {
         let now = Instant::now();
         let mut drops = DropSet::default();
@@ -229,5 +285,44 @@ mod tests {
         );
         assert_eq!(drops.expire(now + LIFETIME), [id]);
         assert_eq!(drops.all().count(), 0);
+    }
+
+    #[test]
+    fn drops_land_on_footholds_and_not_in_walls() {
+        use game_data::footholds::Foothold;
+
+        // A cliff on the left of x 0: upper ground at y 100, lower at y 200.
+        let footholds = Footholds::new(vec![
+            Foothold {
+                x1: -300,
+                y1: 100,
+                x2: 0,
+                y2: 100,
+            },
+            Foothold {
+                x1: 0,
+                y1: 100,
+                x2: 0,
+                y2: 200,
+            },
+            Foothold {
+                x1: 0,
+                y1: 200,
+                x2: 300,
+                y2: 200,
+            },
+        ]);
+        let mut drops = DropSet::new(footholds);
+        // A snail stopped against the cliff, killed a little above its floor.
+        drops.spawn(
+            vec![Loot::Mesos(5), Loot::Mesos(6), Loot::Mesos(7)],
+            1,
+            0,
+            195,
+            9,
+            Instant::now(),
+        );
+        let placed: Vec<(i16, i16)> = drops.all().map(|d| (d.x, d.y)).collect();
+        assert_eq!(placed, [(0, 200), (0, 200), (25, 200)]);
     }
 }

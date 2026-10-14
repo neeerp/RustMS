@@ -62,6 +62,10 @@ namespace ms
 		void
 		send_attack(AttackResult &result, const Attack &attack, const std::vector<int32_t> &targets, uint8_t mobcount);
 
+		// Note hits that will land on a mob once their attack connects;
+		// a negative count cancels hits that won't land after all.
+		void expect_hits(int32_t oid, int32_t count);
+
 		// Applies damage to a mob.
 		void apply_damage(int32_t oid, int32_t damage, bool toleft, const AttackUser &user, const SpecialMove &move);
 
