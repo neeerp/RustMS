@@ -11,8 +11,9 @@ use integration_harness::trace::{barrier, read, send, warp, Trace};
 use integration_harness::{login_to_world_session, relogin};
 use net::packet::op::SendOpcode;
 
-/// Amherst: several start points, entered through portal 0 at (-288, 27).
-const AMHERST: i32 = 1_010_000;
+/// Entrance to Adventurer Training Center: several start points, entered
+/// through portal 0 at (-288, 27).
+const TRAINING_ENTRANCE: i32 = 1_010_000;
 /// The start point under Bari, at (257, 132).
 const UNDER_BARI: u8 = 3;
 /// The start point at the top left, at (-349, -45).
@@ -25,7 +26,10 @@ async fn leaving_the_game_saves_the_nearest_spawn_point() {
     let character_id = session.character_id;
     let mut c = session.connection;
     let mut trace = Trace::default();
-    assert_eq!(warp(&mut c, AMHERST, "", &mut trace).await, AMHERST);
+    assert_eq!(
+        warp(&mut c, TRAINING_ENTRANCE, "", &mut trace).await,
+        TRAINING_ENTRANCE
+    );
 
     send(&mut c, walk_to(250, 132)).await;
     barrier(&mut c, "under bari", &mut trace).await;
@@ -52,7 +56,7 @@ async fn leaving_the_game_saves_the_nearest_spawn_point() {
             break decode_set_field(&packet).unwrap();
         }
     };
-    assert_eq!(set_field.map_id, AMHERST);
+    assert_eq!(set_field.map_id, TRAINING_ENTRANCE);
     assert_eq!(set_field.spawn_point, UNDER_BARI);
 
     send(&mut c, walk_to(-340, -45)).await;
@@ -60,6 +64,6 @@ async fn leaving_the_game_saves_the_nearest_spawn_point() {
     drop(c);
 
     let session = relogin(&config).await;
-    assert_eq!(session.map_id, AMHERST);
+    assert_eq!(session.map_id, TRAINING_ENTRANCE);
     assert_eq!(session.spawn_point, TOP_LEFT);
 }
