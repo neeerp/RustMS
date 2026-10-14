@@ -8,8 +8,8 @@ use integration_harness::preconditions::load_harness_config_or_fail;
 use integration_harness::quests::{act, COMPLETE, START};
 use integration_harness::trace::{read_for, send, stat, until, warp, Trace};
 
-const AMHERST: i32 = 1_000_000;
-const SCRAP_BOX: i32 = 2001;
+const AMHERST: i32 = 1_010_000;
+const SCRAP_BOX: i32 = 2000;
 const PIO: i32 = 10000;
 const PIOS_QUEST: i16 = 1008;
 const MATERIALS: [i32; 2] = [4031161, 4031162];
@@ -79,6 +79,7 @@ async fn amherst_boxes_break_and_drop_pios_materials_during_his_quest() {
     read_for(c, &mut trace, 400).await;
     assert_eq!(trace.field.reactor_hits.len(), hits);
 
+    send(c, walk_to(547, 274)).await;
     act(c, &mut trace, &m, START, PIOS_QUEST, PIO).await;
     break_box(c, &mut trace, second).await;
     for item in MATERIALS {
@@ -91,6 +92,7 @@ async fn amherst_boxes_break_and_drop_pios_materials_during_his_quest() {
     }
 
     // Pio takes the materials and pays 200 mesos.
+    send(c, walk_to(547, 274)).await;
     act(c, &mut trace, &m, COMPLETE, PIOS_QUEST, PIO).await;
     assert_eq!(trace.states.get(&PIOS_QUEST), Some(&2));
     assert_eq!(trace.stat(stat::MESO), Some(200));

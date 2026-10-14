@@ -826,6 +826,7 @@ mod tests {
                 .send(FieldMessage::Join {
                     handle,
                     avatar: avatar(id, 0, 0),
+                    party: None,
                 })
                 .await
                 .unwrap();
