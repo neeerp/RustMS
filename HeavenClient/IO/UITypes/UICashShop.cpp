@@ -17,6 +17,8 @@
 //////////////////////////////////////////////////////////////////////////////////
 #include "UICashShop.h"
 
+#include "UICashBuy.h"
+
 #include "../UI.h"
 #include "../Window.h"
 
@@ -91,7 +93,7 @@ namespace ms
 		}
 	}
 
-	UICashShop::UICashShop() : tab(EVENT_TAB), subtab(0), page(0), preview_index(0), female(false), cash_row(0), item_tab(InventoryType::Id::EQUIP), item_row(0)
+	UICashShop::UICashShop() : tab(EVENT_TAB), subtab(0), page(0), preview_index(0), female(false), credit(0), points(0), prepaid(0), cash_row(0), item_tab(InventoryType::Id::EQUIP), item_row(0)
 	{
 		nl::node CashShop = NxFiles::ui_classic["CashShop.img"];
 		nl::node Base = CashShop["Base"];
@@ -206,7 +208,8 @@ namespace ms
 				static_cast<int16_t>(item["Count"].get_integer(1)),
 				static_cast<int8_t>(item["Gender"].get_integer(2)),
 				label(static_cast<int32_t>(item["Class"].get_integer(-1)), sn),
-				static_cast<int32_t>(item["Priority"].get_integer())
+				static_cast<int32_t>(item["Priority"].get_integer()),
+				static_cast<int32_t>(item["Period"].get_integer())
 			});
 		}
 
@@ -430,8 +433,28 @@ namespace ms
 			break;
 		}
 
-		// Buying, gifting, the wish list and slot expansions aren't served
-		// yet, so the other buttons do nothing.
+		if (buttonid >= Buttons::BT_LIST)
+		{
+			// Three buttons to a cell, then each cell's REMOVE.
+			size_t list_button = buttonid - Buttons::BT_LIST;
+			bool remove = list_button >= 3 * PAGE_SIZE;
+			size_t index = page * PAGE_SIZE + (remove ? list_button - 3 * PAGE_SIZE : list_button / 3);
+
+			if (index < listed.size())
+			{
+				const Commodity& commodity = listed[index];
+
+				if (remove)
+					SetWishListPacket(unwish(wish_list, commodity.sn)).dispatch();
+				else if (list_button % 3 == 0)
+					UI::get().emplace<UICashBuy>(commodity, credit, points, prepaid);
+				else if (list_button % 3 == 2)
+					SetWishListPacket(wish(wish_list, commodity.sn)).dispatch();
+			}
+		}
+
+		// Gifting and slot expansions aren't served yet, so their buttons do
+		// nothing.
 		return Button::State::NORMAL;
 	}
 
@@ -581,8 +604,12 @@ namespace ms
 		}
 	}
 
-	void UICashShop::set_balance(int32_t credit, int32_t points, int32_t prepaid)
+	void UICashShop::set_balance(int32_t nx_credit, int32_t maple_points, int32_t nx_prepaid)
 	{
+		credit = nx_credit;
+		points = maple_points;
+		prepaid = nx_prepaid;
+
 		// The art labels the rows NX Credit, NX Prepaid, Maple Point.
 		int32_t balances[3] = { credit, prepaid, points };
 

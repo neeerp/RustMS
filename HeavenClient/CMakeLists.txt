@@ -319,6 +319,8 @@ add_executable(HeavenClient
     IO/UITypes/UIBuffList.h
     IO/UITypes/UIQuestHelper.cpp
     IO/UITypes/UIQuestHelper.h
+    IO/UITypes/UICashBuy.cpp
+    IO/UITypes/UICashBuy.h
     IO/UITypes/UICashShop.cpp
     IO/UITypes/UICashShop.h
     IO/UITypes/UIChannel.cpp

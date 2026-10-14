@@ -17,6 +17,8 @@
 //////////////////////////////////////////////////////////////////////////////////
 #include "UIStateCashShop.h"
 
+#include "InputFocus.h"
+
 #include "UITypes/UICashShop.h"
 
 namespace ms
@@ -30,11 +32,17 @@ namespace ms
 
 	void UIStateCashShop::draw(float inter, Point<int16_t> cursor) const
 	{
+		// The shop fills the screen, so its dialogs go on top.
+		UIElement* shop = elements[UIElement::Type::CASHSHOP].get();
+
+		if (shop && shop->is_active())
+			shop->draw(inter);
+
 		for (auto iter : elements)
 		{
 			UIElement* element = iter.second.get();
 
-			if (element && element->is_active())
+			if (element && element != shop && element->is_active())
 				element->draw(inter);
 		}
 	}
@@ -48,6 +56,12 @@ namespace ms
 			if (element && element->is_active())
 				element->update();
 		}
+	}
+
+	void UIStateCashShop::send_key(KeyType::Id type, int32_t action, bool pressed, bool escape)
+	{
+		// Only a dialog over the shop takes keys.
+		dispatch_focused_key(get(focused), action, pressed, escape, [] {});
 	}
 
 	Cursor::State UIStateCashShop::send_cursor(Cursor::State cursorstate, Point<int16_t> cursorpos)
