@@ -308,6 +308,7 @@ fn world_routes() -> &'static HashMap<i16, WorldRoute> {
             ),
             (Op::ChangeKeybinds, InGame(&world::ChangeKeybindsHandler)),
             (Op::AllChat, InGame(&world::AllChatHandler)),
+            (Op::FaceExpression, InGame(&world::FaceExpressionHandler)),
             (Op::Whisper, InGame(&world::WhisperHandler)),
             (Op::TalkToNpc, InGame(&world::NpcTalkHandler)),
             (Op::NpcTalkMore, InGame(&world::NpcTalkMoreHandler)),

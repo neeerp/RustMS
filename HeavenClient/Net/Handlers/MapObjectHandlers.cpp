@@ -161,6 +161,16 @@ namespace ms
 		Stage::get().get_chars().send_movement(cid, movements);
 	}
 
+	void FacialExpressionHandler::handle(InPacket& recv) const
+	{
+		int32_t cid = recv.read_int();
+		int32_t emote = recv.read_int();
+
+		// The inverse of the FACE key action to emote mapping in Stage::send_key.
+		if (Optional<OtherChar> otherchar = Stage::get().get_chars().get_char(cid))
+			otherchar->set_expression(emote + 99);
+	}
+
 	void UpdateCharLookHandler::handle(InPacket& recv) const
 	{
 		int32_t cid = recv.read_int();

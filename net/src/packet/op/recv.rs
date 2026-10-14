@@ -33,6 +33,7 @@ pub enum RecvOpcode {
     CloseRangeAttack = 0x2C,
     TakeDamage = 0x30,
     AllChat = 0x31,
+    FaceExpression = 0x33,
     Whisper = 0x78,
     TalkToNpc = 0x3A,
     NpcTalkMore = 0x3C,

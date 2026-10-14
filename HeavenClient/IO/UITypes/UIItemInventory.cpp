@@ -69,7 +69,7 @@ namespace ms
 		backgrnd = Item["backgrnd"];
 		full_backgrnd = Item["FullBackgrnd"];
 
-		tabs = ClassicTabs(Item["Tab"]["enabled"], Item["Tab"]["disabled"], TAB_FILL);
+		tabs = ClassicTabs(ClassicTabs::TAB5, Item["Tab"]["enabled"], Item["Tab"]["disabled"], TAB_FILL);
 
 		nl::node New = Item["New"];
 		newitemslot = New["inventory"];
@@ -86,7 +86,7 @@ namespace ms
 			Point<int16_t> tab_pos = TAB_STRIP + Point<int16_t>(tabs.pitch() * i, 0);
 
 			buttons[Buttons::BT_TAB0 + i] = std::make_unique<AreaButton>(tab_pos,
-																		 Point<int16_t>(tabs.pitch(), ClassicTabs::HEIGHT));
+																		 Point<int16_t>(tabs.pitch(), tabs.height()));
 		}
 
 		buttons[Buttons::BT_COIN] = std::make_unique<MapleButton>(Item["BtCoin"]);
@@ -815,15 +815,25 @@ namespace ms
 
 	void UIItemInventory::ItemIcon::drop_on_bindings(Point<int16_t> cursorposition, bool remove) const
 	{
-		if (sourcetab == InventoryType::Id::USE || sourcetab == InventoryType::Id::SETUP)
-		{
-			auto keyconfig = UI::get().get_element<UIKeyConfig>();
-			Keyboard::Mapping mapping = Keyboard::Mapping(KeyType::ITEM, item_id);
+		Keyboard::Mapping mapping = get_mapping();
 
-			if (remove)
-				keyconfig->unstage_mapping(mapping);
-			else
-				keyconfig->stage_mapping(cursorposition, mapping);
-		}
+		if (mapping.type == KeyType::Id::NONE)
+			return;
+
+		auto keyconfig = UI::get().get_element<UIKeyConfig>();
+
+		if (remove)
+			keyconfig->unstage_mapping(mapping);
+		else
+			keyconfig->stage_mapping(cursorposition, mapping);
+	}
+
+	// Only use and set-up items go on keys.
+	Keyboard::Mapping UIItemInventory::ItemIcon::get_mapping() const
+	{
+		if (sourcetab == InventoryType::Id::USE || sourcetab == InventoryType::Id::SETUP)
+			return Keyboard::Mapping(KeyType::ITEM, item_id);
+
+		return {};
 	}
 }
