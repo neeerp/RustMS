@@ -52,7 +52,15 @@ namespace ms
 
 		uint8_t selected_list = 1;
 
-		order = RaceSelect["order"][selected_list];
+		nl::node order = RaceSelect["order"][selected_list];
+
+		for (size_t i = 0; i < order.size(); i++)
+		{
+			int32_t id = order[i];
+
+			if (id >= 0 && id < CLASS_COUNT)
+				classes.push_back(id);
+		}
 		hotlist = RaceSelect["hotList"][selected_list];
 		newlist = RaceSelect["newList"][selected_list];
 		bgm = RaceSelect["bgm"];
@@ -63,11 +71,11 @@ namespace ms
 		hotbtn = RaceSelect["hot"];
 		newbtn = RaceSelect["new"];
 
-		class_index[0] = order[0];
-		class_index[1] = order[1];
-		class_index[2] = order[2];
-		class_index[3] = order[3];
-		class_index[4] = order[4];
+		class_index[0] = classes[0];
+		class_index[1] = classes[1];
+		class_index[2] = classes[2];
+		class_index[3] = classes[3];
+		class_index[4] = classes[4];
 		mouseover[0] = true;
 		mouseover[1] = false;
 		mouseover[2] = false;
@@ -244,7 +252,7 @@ namespace ms
 
 		for (const auto node : bgm)
 		{
-			uint8_t name = std::stoi(node.name());
+			int32_t name = std::stoi(node.name());
 
 			if (name == selected_class)
 			{
@@ -420,11 +428,11 @@ namespace ms
 				{
 					index_shift--;
 
-					class_index[0] = order[new_index + 4 - Buttons::CLASS0];
-					class_index[1] = order[new_index + 5 - Buttons::CLASS0];
-					class_index[2] = order[new_index + 6 - Buttons::CLASS0];
-					class_index[3] = order[new_index + 7 - Buttons::CLASS0];
-					class_index[4] = order[new_index + 8 - Buttons::CLASS0];
+					class_index[0] = classes[new_index + 4 - Buttons::CLASS0];
+					class_index[1] = classes[new_index + 5 - Buttons::CLASS0];
+					class_index[2] = classes[new_index + 6 - Buttons::CLASS0];
+					class_index[3] = classes[new_index + 7 - Buttons::CLASS0];
+					class_index[4] = classes[new_index + 8 - Buttons::CLASS0];
 				}
 			}
 
@@ -448,11 +456,11 @@ namespace ms
 				{
 					index_shift++;
 
-					class_index[0] = order[new_index + 0 - Buttons::CLASS0];
-					class_index[1] = order[new_index + 1 - Buttons::CLASS0];
-					class_index[2] = order[new_index + 2 - Buttons::CLASS0];
-					class_index[3] = order[new_index + 3 - Buttons::CLASS0];
-					class_index[4] = order[new_index + 4 - Buttons::CLASS0];
+					class_index[0] = classes[new_index + 0 - Buttons::CLASS0];
+					class_index[1] = classes[new_index + 1 - Buttons::CLASS0];
+					class_index[2] = classes[new_index + 2 - Buttons::CLASS0];
+					class_index[3] = classes[new_index + 3 - Buttons::CLASS0];
+					class_index[4] = classes[new_index + 4 - Buttons::CLASS0];
 				}
 			}
 
@@ -514,7 +522,7 @@ namespace ms
 		else
 			buttons[Buttons::LEFT]->set_state(Button::State::DISABLED);
 
-		if (selected_index < CLASS_COUNT - 2)
+		if (selected_index + 1u < classes.size())
 			buttons[Buttons::RIGHT]->set_state(Button::State::NORMAL);
 		else
 			buttons[Buttons::RIGHT]->set_state(Button::State::DISABLED);

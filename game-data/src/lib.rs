@@ -10,6 +10,7 @@ pub mod lua_strings;
 pub mod mobs;
 pub mod quests;
 pub mod server_content;
+pub mod skills;
 
 const NODE_SIZE_BYTES: u64 = 20;
 pub const NO_DESTINATION_MAP: i32 = 999_999_999;

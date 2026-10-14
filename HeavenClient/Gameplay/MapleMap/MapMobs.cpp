@@ -148,7 +148,8 @@ namespace ms
 				[&player_rect](auto &mmo)
 				{
 					Optional<Mob> mob = mmo.second.get();
-					return mob && mob->is_alive() && mob->is_in_range(player_rect);
+					return mob && mob->is_alive() && mob->deals_touch_damage() &&
+						   mob->is_in_range(player_rect);
 				}
 		);
 

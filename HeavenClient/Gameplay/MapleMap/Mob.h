@@ -111,6 +111,9 @@ namespace ms
 		// Create a touch damage attack to the player
 		MobAttack create_touch_attack() const;
 
+		// Check if touching this mob hurts: `bodyAttack` without `notAttack`.
+		bool deals_touch_damage() const;
+
 		// Check if this mob collides with the specified rectangle.
 		bool is_in_range(const Rectangle<int16_t> &range) const;
 
@@ -190,6 +193,8 @@ namespace ms
 
 		std::vector<Movement> movements;
 		uint16_t counter;
+		// Ticks left to push back a mob that was knocked back.
+		uint8_t knockback_ticks;
 		// Hits queued against this mob that haven't landed yet.
 		uint16_t pending_hits;
 		// Ticks before a killed mob dies even if its pending hits never land.
