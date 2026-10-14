@@ -89,7 +89,8 @@ with 50 HP.
 
 HeavenClient's `Player::update_death` notices HP reaching 0: the player
 becomes a ghost (`Char::State::DIED`), the tombstone from `Effect.nx/Tomb.img`
-drops behind them (drawn by `Char`), keys are ignored, and a "You have died."
+drops behind them (drawn by `Char`) as `Sound.nx/Game.img/Tombstone` plays,
+keys are ignored, and a "You have died."
 notice opens. The ghost is the body's `dead` frame, which fades in. Head, hair
 and equips have no `dead` frames, so `CharLook` puts the standing ones on the
 ghost's neck, as the original client does. The ghost and its name tag circle

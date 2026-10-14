@@ -231,6 +231,7 @@ namespace ms
 			phobj.hspeed = 0.0;
 			phobj.type = PhysicsObject::Type::NORMAL;
 			set_state(Char::State::DIED);
+			Sound(Sound::Name::TOMBSTONE).play();
 
 			// Any answer sends the player to the map's return map with a little HP.
 			UI::get().emplace<UIOk>("You have died.\\nYou will be revived in the nearest town.", [](bool)
