@@ -2,7 +2,7 @@
 //! character's wish list.
 
 use crate::player::write_player;
-use crate::schema::{accounts, cash_items, characters, wish_lists};
+use crate::schema::{accounts, cash_items, cash_sales, characters, wish_lists};
 use diesel::pg::PgConnection;
 use diesel::prelude::*;
 use game::Player;
@@ -145,22 +145,25 @@ pub fn put_back(item: &CashItem, player: &Player) -> crate::Result<()> {
     Ok(())
 }
 
-/// Pay `price` from the account's `cash_type` balance and put `item` in its
-/// Cash Inventory, in one transaction. `None` if the balance is short.
+/// Pay `price` from the account's `cash_type` balance and put `items`, all
+/// that commodity `sn` sells, in its Cash Inventory, in one transaction.
+/// `None` if the balance is short.
 pub fn buy(
+    account_id: i32,
     cash_type: CashType,
+    sn: i32,
     price: i32,
-    item: &NewCashItem,
-) -> crate::Result<Option<(CashItem, Balance)>> {
-    let account_id = item.account_id;
+    items: &[NewCashItem],
+) -> crate::Result<Option<(Vec<CashItem>, Balance)>> {
     let mut conn = crate::connection()?;
     Ok(conn.transaction(|conn| -> diesel::QueryResult<_> {
         if !pay(conn, account_id, cash_type, price)? {
             return Ok(None);
         }
         let bought = diesel::insert_into(cash_items::table)
-            .values(item)
-            .get_result::<CashItem>(conn)?;
+            .values(items)
+            .get_results::<CashItem>(conn)?;
+        record_sale(conn, sn)?;
         Ok(Some((bought, balance_of(conn, account_id)?)))
     })?)
 }
@@ -179,8 +182,67 @@ pub fn gift(sender: i32, price: i32, gift: &NewGift) -> crate::Result<Option<Bal
         diesel::insert_into(cash_items::table)
             .values(gift)
             .execute(conn)?;
+        record_sale(conn, gift.sn)?;
         Ok(Some(balance_of(conn, sender)?))
     })?)
+}
+
+/// Pay `price` from the account's `cash_type` balance and save `player`,
+/// whose bags have grown, in one transaction. `None` if the balance is short.
+pub fn expand_inventory(
+    cash_type: CashType,
+    price: i32,
+    player: &Player,
+) -> crate::Result<Option<Balance>> {
+    let account_id = player.account_id;
+    let mut conn = crate::connection()?;
+    Ok(conn.transaction(|conn| -> diesel::QueryResult<_> {
+        if !pay(conn, account_id, cash_type, price)? {
+            return Ok(None);
+        }
+        write_player(conn, player)?;
+        Ok(Some(balance_of(conn, account_id)?))
+    })?)
+}
+
+/// Pay `price` from the account's `cash_type` balance and give its storage
+/// `slots` slots, in one transaction. `None` if the balance is short.
+pub fn expand_storage(
+    account_id: i32,
+    cash_type: CashType,
+    price: i32,
+    slots: i16,
+) -> crate::Result<Option<Balance>> {
+    let mut conn = crate::connection()?;
+    Ok(conn.transaction(|conn| -> diesel::QueryResult<_> {
+        if !pay(conn, account_id, cash_type, price)? {
+            return Ok(None);
+        }
+        diesel::update(accounts::table.find(account_id))
+            .set(accounts::storage_slots.eq(slots))
+            .execute(conn)?;
+        Ok(Some(balance_of(conn, account_id)?))
+    })?)
+}
+
+/// The serial numbers of the commodities sold most, best first.
+pub fn best_sellers(limit: i64) -> crate::Result<Vec<i32>> {
+    Ok(cash_sales::table
+        .order((cash_sales::sold.desc(), cash_sales::sn))
+        .select(cash_sales::sn)
+        .limit(limit)
+        .load(&mut crate::connection()?)?)
+}
+
+/// Count one more sale of commodity `sn`.
+fn record_sale(conn: &mut PgConnection, sn: i32) -> diesel::QueryResult<()> {
+    diesel::insert_into(cash_sales::table)
+        .values((cash_sales::sn.eq(sn), cash_sales::sold.eq(1)))
+        .on_conflict(cash_sales::sn)
+        .do_update()
+        .set(cash_sales::sold.eq(cash_sales::sold + 1))
+        .execute(conn)?;
+    Ok(())
 }
 
 /// Take `price` from the account's `cash_type` balance; false if it is short.

@@ -71,6 +71,8 @@ namespace ms
 		void set_balance(int32_t credit, int32_t points, int32_t prepaid);
 		void set_cash_items(const std::vector<CashItem>& items);
 		void add_cash_items(const std::vector<CashItem>& items);
+		// A bag gained slots.
+		void refresh_slots();
 		void remove_cash_item(int64_t cash_id);
 		void set_wish_list(const std::vector<int32_t>& sns);
 

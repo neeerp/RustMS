@@ -14,6 +14,7 @@ use crate::schema::{
 use diesel::pg::PgConnection;
 use diesel::prelude::*;
 use diesel::upsert::excluded;
+use game::inventory::DEFAULT_SLOT_LIMIT;
 use game::quest::{decode_kills, encode_kills};
 use game::{
     AvatarLook, CharacterStats, EquipStats, Inventory, InventoryType, Item, KeyBinding, Keymap,
@@ -98,9 +99,17 @@ pub fn load_player(character_id: i32) -> crate::Result<Player> {
         .first(&mut conn)?;
 
     let keymap = load_keymap(&mut conn, character_id)?;
-    let inventory = load_inventory(&mut conn, &[character_id])?
+    let mut inventory = load_inventory(&mut conn, &[character_id])?
         .remove(&character_id)
         .unwrap_or_default();
+    for (kind, slots) in [
+        (InventoryType::Equip, character.equip_slots),
+        (InventoryType::Use, character.use_slots),
+        (InventoryType::Setup, character.setup_slots),
+        (InventoryType::Etc, character.etc_slots),
+    ] {
+        inventory.set_slot_limit(kind, u8::try_from(slots).unwrap_or(DEFAULT_SLOT_LIMIT));
+    }
     let skill_book = SkillBook::from_records(
         skills::table
             .filter(skills::character_id.eq(character_id))
@@ -156,6 +165,7 @@ pub(crate) fn write_player(conn: &mut PgConnection, player: &Player) -> QueryRes
     {
         let id = player.id();
         let stats = &player.stats;
+        let slots = |kind| i16::from(player.inventory.slot_limit(kind));
         diesel::update(characters::table.find(id))
             .set((
                 characters::level.eq(i16::from(stats.level)),
@@ -179,6 +189,10 @@ pub(crate) fn write_player(conn: &mut PgConnection, player: &Player) -> QueryRes
                 characters::map_id.eq(stats.map_id),
                 characters::spawn_point.eq(i16::from(stats.spawn_point)),
                 characters::monster_book_cover.eq(player.monster_book.cover()),
+                characters::equip_slots.eq(slots(InventoryType::Equip)),
+                characters::use_slots.eq(slots(InventoryType::Use)),
+                characters::setup_slots.eq(slots(InventoryType::Setup)),
+                characters::etc_slots.eq(slots(InventoryType::Etc)),
             ))
             .execute(conn)?;
 

@@ -45,6 +45,12 @@ pub struct Character {
     pub sp: i16,
     pub spawn_point: i16,
     pub monster_book_cover: i32,
+
+    /// Slots in the Equip, Use, Set-up and Etc bags.
+    pub equip_slots: i16,
+    pub use_slots: i16,
+    pub setup_slots: i16,
+    pub etc_slots: i16,
 }
 
 /// Character creation projection.

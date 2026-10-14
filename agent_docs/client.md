@@ -291,15 +291,23 @@ the screen size.
   the player's gender. QUERY_CASH_RESULT (324) gives the NX Credit, Maple Point
   and NX Prepaid balances. CASHSHOP_OPERATION (325) modes 0x4B (Cash
   Inventory), 0x4D (gifts received since the last visit), 0x4F and 0x55 (wish list),
-  0x57 (a bought item), 0x5C (a failure), 0x5E (a gift sent), 0x68 (an item
-  taken out) and 0x6A (an item put back) are read. Inventory slots keep the item's cash serial,
+  0x57 (a bought item), 0x5C (a failure), 0x5E (a gift sent), 0x60 (a bag's
+  new slot count), 0x62 (the storage's), 0x68 (an item taken out), 0x6A (an
+  item put back) and 0xA4 (a bought package) are read. Inventory slots keep the item's cash serial,
   which the item encoding carries, so a cash item can find its way back.
 - **Buying:** BUY opens `UICashBuy` (`CashShop.img/CSNotice/0`): the item, its
   price and period, and a checkbox per balance. It checks the first balance
   that covers the price, trying NX Prepaid, NX Credit, then Maple Points. OK
   sends CASHSHOP_OPERATION (229) 0x03 with the cash type (1 Credit, 2 Maple
-  Points, 4 Prepaid) and SN. The result is a "successful purchase" or a
-  failure notice.
+  Points, 4 Prepaid) and SN, or 0x1E for a package (items 910xxxx) and
+  0x06/0x07 mode 1 for an expansion commodity (911x000). The result is a
+  "successful purchase" or a failure notice.
+- **Slot buttons:** Equip Slot through Stor. Slot open `UICashBuy` for the
+  matching expansion item at 4,000 NX, and OK sends 0x06 mode 0 with the bag,
+  or 0x07 mode 0. On 0x60 the bag's slot count changes at once.
+- **Item data:** packages and expansions take their name and icon from
+  `Item.nx` `Special`, pets from `Item.nx` `Pet`, and pet equipment from
+  `Character.nx` `PetEquip`.
 - **Wish list:** RESERVE and REMOVE send the whole list (0x05, ten SNs), and the
   server answers with the list it kept.
 - **Taking out and putting back:** double-clicking a Cash Inventory item
@@ -317,8 +325,7 @@ the screen size.
   The receiver gets one notice listing each gift's sender, item and message
   when 0x4D arrives. The buddy and guild buttons that open the wider
   `backgrnd1` aren't drawn, and only one name is sent.
-- **Not served yet:** the slot expansions, CHARGE, CHECK CASH and COUPON do
-  nothing.
+- **Not served yet:** CHARGE, CHECK CASH and COUPON do nothing.
 
 ## Estimated client work for a complete game
 
@@ -327,7 +334,7 @@ the screen size.
 | Buddy groups | Default group only | S |
 | Guild | Skeleton only, plus guild emblem/BBS UIs missing | L |
 | Trade / storage / player shops | Nothing | L |
-| Cash shop packages | Buying, gifts, the wish list and moving items only | M |
+| Cash shop | No coupons, charging, or storage window | S |
 | Quest accept/complete UI flow | Partial | S |
 | Pets and mounts | Partial rendering, no interaction | M |
 | Memo, mail, MTS | Nothing | M each |

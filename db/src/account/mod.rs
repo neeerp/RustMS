@@ -28,6 +28,9 @@ pub struct Account {
     pub maple_points: i32,
     #[diesel(skip_update)]
     pub nx_prepaid: i32,
+    /// Slots in the account's storage; only the Cash Shop changes them.
+    #[diesel(skip_update)]
+    pub storage_slots: i16,
 }
 
 impl Debug for Account {

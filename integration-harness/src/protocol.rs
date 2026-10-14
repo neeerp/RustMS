@@ -53,6 +53,8 @@ pub struct WorldSession {
     /// How many of each item the bags hold.
     pub items: std::collections::BTreeMap<i32, i32>,
     pub meso: i32,
+    /// Slots in the Equip, Use, Set-up, Etc and Cash bags.
+    pub slot_limits: [u8; 5],
     pub monster_book_cover: i32,
     /// Copies of each Monster Book card, by card id.
     pub monster_book: std::collections::BTreeMap<i32, u8>,
@@ -192,6 +194,7 @@ pub async fn login_to_world_session(config: &HarnessConfig) -> Result<WorldSessi
         equipped: world_entry.equipped,
         items: world_entry.items,
         meso: world_entry.meso,
+        slot_limits: world_entry.slot_limits,
         monster_book_cover: world_entry.monster_book_cover,
         monster_book: world_entry.monster_book,
         keymap,

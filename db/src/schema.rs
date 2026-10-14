@@ -35,6 +35,14 @@ diesel::table! {
         nx_credit -> Int4,
         maple_points -> Int4,
         nx_prepaid -> Int4,
+        storage_slots -> Int2,
+    }
+}
+
+diesel::table! {
+    cash_sales (sn) {
+        sn -> Int4,
+        sold -> Int8,
     }
 }
 
@@ -94,6 +102,10 @@ diesel::table! {
         sp -> Int2,
         spawn_point -> Int2,
         monster_book_cover -> Int4,
+        equip_slots -> Int2,
+        use_slots -> Int2,
+        setup_slots -> Int2,
+        etc_slots -> Int2,
     }
 }
 
@@ -230,6 +242,7 @@ diesel::allow_tables_to_appear_in_same_query!(
     equipment_stats,
     skills,
     cash_items,
+    cash_sales,
     wish_lists,
     monster_book_cards,
 );

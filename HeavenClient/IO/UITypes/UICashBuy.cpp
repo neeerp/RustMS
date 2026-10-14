@@ -46,6 +46,23 @@ namespace ms
 		constexpr int16_t CHECKBOX_SIZE = 12;
 		// The labels end near x 193; a click on one checks it too.
 		constexpr int16_t OPTION_WIDTH = 166;
+
+		// Packages are items 910xxxx, and slot expansions 911x000: 9110000
+		// for the storage, then one for each bag from Equip to Etc.
+		bool is_package(int32_t item_id)
+		{
+			return item_id / 10000 == 910;
+		}
+
+		bool is_expansion(int32_t item_id)
+		{
+			return item_id / 10000 == 911;
+		}
+
+		InventoryType::Id expanded(int32_t item_id)
+		{
+			return static_cast<InventoryType::Id>(item_id / 1000 % 10);
+		}
 	}
 
 	UICashBuy::UICashBuy(const Commodity& commodity, int32_t credit, int32_t points, int32_t prepaid) : UIElement(Point<int16_t>(0, 0), Point<int16_t>(0, 0)), sn(commodity.sn), item_id(commodity.item_id), payment(default_payment(commodity.price, credit, points, prepaid))
@@ -146,7 +163,17 @@ namespace ms
 
 	void UICashBuy::buy()
 	{
-		BuyCashItemPacket(PAYMENTS[payment], sn).dispatch();
+		CashType cash_type = PAYMENTS[payment];
+
+		if (is_package(item_id))
+			BuyCashPackagePacket(cash_type, sn).dispatch();
+		else if (is_expansion(item_id) && sn == 0)
+			ExpandSlotsPacket(cash_type, expanded(item_id)).dispatch();
+		else if (is_expansion(item_id))
+			ExpandSlotsPacket(cash_type, expanded(item_id), sn).dispatch();
+		else
+			BuyCashItemPacket(cash_type, sn).dispatch();
+
 		deactivate();
 	}
 }

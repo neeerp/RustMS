@@ -4,7 +4,7 @@ use crate::codec::stats::write_padded_name;
 use crate::codec::time::expiration;
 use crate::{error::NetworkError, packet::op::SendOpcode};
 use db::cash_shop::CashItem;
-use game::{Item, Player};
+use game::{InventoryType, Item, Player};
 use packet::{io::write::PktWrite, Packet};
 
 /// Cash Shop tabs with a best-sellers row, and how many items each shows.
@@ -14,12 +14,15 @@ const BEST_SELLERS_PER_TAB: usize = 5;
 pub const WISH_LIST_SLOTS: usize = 10;
 /// The longest gift message, in bytes.
 pub const GIFT_MESSAGE_LEN: usize = 73;
-/// Storage slots of an account that never expanded its storage.
-const STORAGE_SLOTS: i16 = 4;
 
 /// SET_CASH_SHOP: take the player out of the map and into the Cash Shop.
-/// The shop has no special-priced items and no best sellers yet.
-pub fn build_open_cash_shop(player: &Player, account_name: &str) -> Result<Packet, NetworkError> {
+/// `best` holds the Best Items for men and for women, up to five each; every
+/// tab gets the same. The shop has no special-priced items.
+pub fn build_open_cash_shop(
+    player: &Player,
+    account_name: &str,
+    best: &[Vec<i32>; 2],
+) -> Result<Packet, NetworkError> {
     let mut packet = Packet::new_empty();
     packet.write_short(SendOpcode::SetCashShop as i16)?;
     encode_character_data(&mut packet, player)?;
@@ -29,11 +32,11 @@ pub fn build_open_cash_shop(player: &Player, account_name: &str) -> Result<Packe
     packet.write_short(0)?; // special-priced items
     packet.write_bytes(&[0; 121])?;
     for tab in 1..=BEST_SELLER_TABS {
-        for gender in 0..2 {
-            for _ in 0..BEST_SELLERS_PER_TAB {
+        for (gender, best) in (0..).zip(best) {
+            for index in 0..BEST_SELLERS_PER_TAB {
                 packet.write_int(tab)?;
                 packet.write_int(gender)?;
-                packet.write_int(0)?; // no item
+                packet.write_int(best.get(index).copied().unwrap_or(0))?;
             }
         }
     }
@@ -62,8 +65,11 @@ const WISH_LIST_UPDATED: u8 = 0x55;
 const BOUGHT: u8 = 0x57;
 const FAILED: u8 = 0x5C;
 const GIFT_SENT: u8 = 0x5E;
+const INVENTORY_SLOTS: u8 = 0x60;
+const STORAGE_SLOTS: u8 = 0x62;
 const TAKEN_OUT: u8 = 0x68;
 const PUT_BACK: u8 = 0x6A;
+const BOUGHT_PACKAGE: u8 = 0xA4;
 
 /// Why a Cash Shop request failed; the client shows the matching notice.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -91,6 +97,7 @@ pub enum CashShopFailure {
 /// character slots.
 pub fn build_cash_inventory(
     items: &[CashItem],
+    storage_slots: i16,
     character_slots: i16,
 ) -> Result<Packet, NetworkError> {
     let mut packet = Packet::new_empty();
@@ -100,7 +107,7 @@ pub fn build_cash_inventory(
     for item in items {
         encode_cash_item(&mut packet, item)?;
     }
-    packet.write_short(STORAGE_SLOTS)?;
+    packet.write_short(storage_slots)?;
     packet.write_short(character_slots)?;
     Ok(packet)
 }
@@ -111,6 +118,38 @@ pub fn build_bought_cash_item(item: &CashItem) -> Result<Packet, NetworkError> {
     packet.write_short(SendOpcode::CashShopOperation as i16)?;
     packet.write_byte(BOUGHT)?;
     encode_cash_item(&mut packet, item)?;
+    Ok(packet)
+}
+
+/// CASHSHOP_OPERATION: a package's items are in the Cash Inventory.
+pub fn build_bought_package(items: &[CashItem]) -> Result<Packet, NetworkError> {
+    let mut packet = Packet::new_empty();
+    packet.write_short(SendOpcode::CashShopOperation as i16)?;
+    packet.write_byte(BOUGHT_PACKAGE)?;
+    packet.write_byte(items.len() as u8)?;
+    for item in items {
+        encode_cash_item(&mut packet, item)?;
+    }
+    packet.write_short(0)?;
+    Ok(packet)
+}
+
+/// CASHSHOP_OPERATION: the bag of `kind` now has `slots` slots.
+pub fn build_inventory_slots(kind: InventoryType, slots: u8) -> Result<Packet, NetworkError> {
+    let mut packet = Packet::new_empty();
+    packet.write_short(SendOpcode::CashShopOperation as i16)?;
+    packet.write_byte(INVENTORY_SLOTS)?;
+    packet.write_byte(kind as u8)?;
+    packet.write_short(i16::from(slots))?;
+    Ok(packet)
+}
+
+/// CASHSHOP_OPERATION: the account's storage now has `slots` slots.
+pub fn build_storage_slots(slots: i16) -> Result<Packet, NetworkError> {
+    let mut packet = Packet::new_empty();
+    packet.write_short(SendOpcode::CashShopOperation as i16)?;
+    packet.write_byte(STORAGE_SLOTS)?;
+    packet.write_short(slots)?;
     Ok(packet)
 }
 
@@ -233,7 +272,8 @@ mod tests {
     #[test]
     fn open_cash_shop_follows_the_character_data() {
         let player = player();
-        let packet = build_open_cash_shop(&player, "alice").unwrap();
+        let best = [vec![50200003, 20000053], vec![50200003]];
+        let packet = build_open_cash_shop(&player, "alice", &best).unwrap();
 
         let mut character = Packet::new_empty();
         encode_character_data(&mut character, &player).unwrap();
@@ -243,9 +283,12 @@ mod tests {
         expect.byte(1).string("alice").int(0).short(0);
         expect.bytes(&[0; 121]);
         for tab in 1..=8 {
-            for gender in 0..2 {
-                for _ in 0..5 {
-                    expect.int(tab).int(gender).int(0);
+            for (gender, sns) in [
+                (0, [50200003, 20000053, 0, 0, 0]),
+                (1, [50200003, 0, 0, 0, 0]),
+            ] {
+                for sn in sns {
+                    expect.int(tab).int(gender).int(sn);
                 }
             }
         }
@@ -261,7 +304,7 @@ mod tests {
         expect.int(1).int(2).int(3);
         expect.end();
 
-        let packet = build_cash_inventory(&[], 6).unwrap();
+        let packet = build_cash_inventory(&[], 4, 6).unwrap();
         let mut expect = Expect::new(&packet.bytes);
         expect
             .short(SendOpcode::CashShopOperation as i16)
@@ -356,7 +399,7 @@ mod tests {
         expect_item(&mut expect, &items[1], 116_444_736_000_000_000);
         expect.end();
 
-        let packet = build_cash_inventory(&items, 6).unwrap();
+        let packet = build_cash_inventory(&items, 12, 6).unwrap();
         let mut expect = Expect::new(&packet.bytes);
         expect
             .short(SendOpcode::CashShopOperation as i16)
@@ -364,7 +407,38 @@ mod tests {
             .short(2);
         expect_item(&mut expect, &items[0], crate::codec::time::DEFAULT_TIME);
         expect_item(&mut expect, &items[1], 116_444_736_000_000_000);
-        expect.short(4).short(6);
+        expect.short(12).short(6);
+        expect.end();
+
+        let packet = build_bought_package(&items).unwrap();
+        let mut expect = Expect::new(&packet.bytes);
+        expect
+            .short(SendOpcode::CashShopOperation as i16)
+            .byte(0xA4)
+            .byte(2);
+        expect_item(&mut expect, &items[0], crate::codec::time::DEFAULT_TIME);
+        expect_item(&mut expect, &items[1], 116_444_736_000_000_000);
+        expect.short(0);
+        expect.end();
+    }
+
+    #[test]
+    fn expansions_report_the_new_slot_count() {
+        let packet = build_inventory_slots(InventoryType::Setup, 28).unwrap();
+        let mut expect = Expect::new(&packet.bytes);
+        expect
+            .short(SendOpcode::CashShopOperation as i16)
+            .byte(0x60)
+            .byte(3)
+            .short(28);
+        expect.end();
+
+        let packet = build_storage_slots(12).unwrap();
+        let mut expect = Expect::new(&packet.bytes);
+        expect
+            .short(SendOpcode::CashShopOperation as i16)
+            .byte(0x62)
+            .short(12);
         expect.end();
     }
 
