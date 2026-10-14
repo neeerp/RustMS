@@ -58,6 +58,19 @@ namespace ms
 		}
 	}
 
+	void UIStateCashShop::doubleclick(Point<int16_t> pos)
+	{
+		UIElement* shop = get(UIElement::Type::CASHSHOP);
+		UIElement* dialog = get(focused);
+
+		// Not while a dialog is over the shop.
+		if (dialog && dialog != shop && dialog->is_active())
+			return;
+
+		if (shop && shop->is_active())
+			shop->doubleclick(pos);
+	}
+
 	void UIStateCashShop::send_key(KeyType::Id type, int32_t action, bool pressed, bool escape)
 	{
 		// Only a dialog over the shop takes keys.

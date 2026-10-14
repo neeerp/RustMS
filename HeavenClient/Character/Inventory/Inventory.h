@@ -75,15 +75,15 @@ namespace ms
 		void modify(InventoryType::Id type, int16_t pos, int8_t mode, int16_t arg, Movement movement);
 
 		// Add a general item.
-		void add_item(InventoryType::Id type, int16_t slot, int32_t itemid, bool cash, int64_t expire, uint16_t count,
+		void add_item(InventoryType::Id type, int16_t slot, int32_t itemid, int64_t cash_id, int64_t expire, uint16_t count,
 					  const std::string &owner, int16_t flag);
 
 		// Add a pet item.
-		void add_pet(InventoryType::Id type, int16_t slot, int32_t itemid, bool cash, int64_t expire,
+		void add_pet(InventoryType::Id type, int16_t slot, int32_t itemid, int64_t cash_id, int64_t expire,
 					 const std::string &name, int8_t level, int16_t closeness, int8_t fullness);
 
 		// Add an equip item.
-		void add_equip(InventoryType::Id type, int16_t slot, int32_t itemid, bool cash, int64_t expire, uint8_t slots,
+		void add_equip(InventoryType::Id type, int16_t slot, int32_t itemid, int64_t cash_id, int64_t expire, uint8_t slots,
 					   uint8_t level, const EnumMap<EquipStat::Id, uint16_t> &stats, const std::string &owner,
 					   int16_t flag, uint8_t itemlevel, uint16_t itemexp, int32_t vicious);
 
@@ -129,12 +129,18 @@ namespace ms
 		// Return the id of an item. Returns 0 if the slot is empty.
 		int32_t get_item_id(InventoryType::Id type, int16_t slot) const;
 
+		// Return the Cash Shop serial of an item. Returns 0 if it has none.
+		int64_t get_cash_id(InventoryType::Id type, int16_t slot) const;
+
+		// Return the slot holding the item with a Cash Shop serial, or 0.
+		int16_t find_cash_item(InventoryType::Id type, int64_t cash_id) const;
+
 		// Return a pointer to an equip
 		Optional<const Equip> get_equip(InventoryType::Id type, int16_t slot) const;
 
 	private:
 		// Add an inventory slot and return the unique_id
-		int32_t add_slot(InventoryType::Id type, int16_t slot, int32_t item_id, int16_t count, bool cash);
+		int32_t add_slot(InventoryType::Id type, int16_t slot, int32_t item_id, int16_t count, int64_t cash_id);
 
 		// Change the quantity of an item.
 		void change_count(InventoryType::Id type, int16_t slot, int16_t count);
@@ -150,7 +156,7 @@ namespace ms
 			int32_t unique_id;
 			int32_t item_id;
 			int16_t count;
-			bool cash;
+			int64_t cash_id;
 		};
 
 		EnumMap<InventoryType::Id, std::map<int16_t, Slot>> inventories;

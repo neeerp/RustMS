@@ -59,6 +59,8 @@ namespace ms
 		Button::State button_pressed(uint16_t buttonid) override;
 
 		Cursor::State send_cursor(bool clicked, Point<int16_t> cursorpos) override;
+		// Double-clicking moves an item between the Cash and Item Inventories.
+		void doubleclick(Point<int16_t> cursorpos) override;
 
 		UIElement::Type get_type() const override;
 
@@ -69,6 +71,7 @@ namespace ms
 		void set_balance(int32_t credit, int32_t points, int32_t prepaid);
 		void set_cash_items(const std::vector<CashItem>& items);
 		void add_cash_items(const std::vector<CashItem>& items);
+		void remove_cash_item(int64_t cash_id);
 		void set_wish_list(const std::vector<int32_t>& sns);
 
 	private:
@@ -81,6 +84,9 @@ namespace ms
 		void update_item_slider();
 
 		void draw_item_inventory() const;
+
+		// The cell of a grid under the cursor, or -1.
+		int16_t grid_cell(Point<int16_t> cursor, Point<int16_t> grid, size_t columns, size_t rows) const;
 
 		static constexpr size_t LIST_COLUMNS = 2;
 		static constexpr size_t BEST_ITEMS = 5;

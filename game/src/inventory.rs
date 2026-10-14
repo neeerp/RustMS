@@ -492,6 +492,30 @@ impl Inventory {
         }])
     }
 
+    /// Put a whole item in its bag at `slot` if that slot is free, else in
+    /// the first free slot, without stacking it (an item taken out of the
+    /// Cash Inventory).
+    pub fn place(&mut self, item: Item, slot: i16) -> Result<(InventoryType, i16), InventoryError> {
+        let kind = InventoryType::for_item(item.item_id).ok_or(InventoryError::InvalidSlot)?;
+        let slot = if self.in_bag(kind, slot) && !self.map(kind).contains_key(&slot) {
+            slot
+        } else {
+            self.free_slots(kind).next().ok_or(InventoryError::Full)?
+        };
+        self.map_mut(kind).insert(slot, item);
+        Ok((kind, slot))
+    }
+
+    /// Take the item with cash serial `serial` out of `kind`, with its slot.
+    pub fn pull_cash_item(&mut self, kind: InventoryType, serial: i64) -> Option<(i16, Item)> {
+        kind.bag_index()?;
+        let slot = self
+            .items(kind)
+            .find(|(_, item)| item.cash_serial == Some(serial))
+            .map(|(slot, _)| slot)?;
+        self.map_mut(kind).remove(&slot).map(|item| (slot, item))
+    }
+
     /// Move an item within a bag: into an empty slot, onto a stack of the
     /// same item (up to `slot_max`), or swapping with another item.
     pub fn move_in_bag(
@@ -706,6 +730,44 @@ impl Inventory {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn cash_items_are_placed_whole_and_pulled_by_serial() {
+        let mut inventory = Inventory::default();
+        let tickets = Item {
+            cash_serial: Some(9),
+            ..Item::stack(5220000, 11)
+        };
+        assert_eq!(
+            inventory.place(tickets.clone(), 3),
+            Ok((InventoryType::Cash, 3))
+        );
+        // Slot 3 is taken and 0 is out of the bag, so the first free slot.
+        assert_eq!(
+            inventory.place(Item::stack(5220000, 1), 3),
+            Ok((InventoryType::Cash, 1))
+        );
+        assert_eq!(
+            inventory.place(Item::stack(5220000, 1), 0),
+            Ok((InventoryType::Cash, 2))
+        );
+        assert_eq!(inventory.get(InventoryType::Cash, 3), Some(&tickets));
+
+        assert_eq!(inventory.pull_cash_item(InventoryType::Use, 9), None);
+        assert_eq!(
+            inventory.pull_cash_item(InventoryType::Cash, 9),
+            Some((3, tickets))
+        );
+        assert_eq!(inventory.pull_cash_item(InventoryType::Cash, 9), None);
+
+        let mut full = Inventory::default();
+        full.set_slot_limit(InventoryType::Cash, 1);
+        full.place(Item::stack(5220000, 1), 1).unwrap();
+        assert_eq!(
+            full.place(Item::stack(5220000, 1), 1),
+            Err(InventoryError::Full)
+        );
+    }
 
     #[test]
     fn items_are_grouped_by_inventory_and_ordered_by_slot() {

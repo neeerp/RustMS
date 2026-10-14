@@ -1,9 +1,10 @@
 use crate::codec::encode_character_data;
+use crate::codec::item::{encode_item, SlotPrefix};
 use crate::codec::stats::write_padded_name;
 use crate::codec::time::expiration;
 use crate::{error::NetworkError, packet::op::SendOpcode};
 use db::cash_shop::CashItem;
-use game::Player;
+use game::{Item, Player};
 use packet::{io::write::PktWrite, Packet};
 
 /// Cash Shop tabs with a best-sellers row, and how many items each shows.
@@ -58,6 +59,8 @@ const WISH_LIST: u8 = 0x4F;
 const WISH_LIST_UPDATED: u8 = 0x55;
 const BOUGHT: u8 = 0x57;
 const FAILED: u8 = 0x5C;
+const TAKEN_OUT: u8 = 0x68;
+const PUT_BACK: u8 = 0x6A;
 
 /// Why a Cash Shop request failed; the client shows the matching notice.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -69,6 +72,8 @@ pub enum CashShopFailure {
     NotEnoughCash = 0xA5,
     /// The item is for the other gender.
     Gender = 0xAA,
+    /// "Please check if your inventory is full or not."
+    InventoryFull = 0xBB,
     /// The item isn't on sale.
     SoldOut = 0xC0,
 }
@@ -96,6 +101,25 @@ pub fn build_bought_cash_item(item: &CashItem) -> Result<Packet, NetworkError> {
     let mut packet = Packet::new_empty();
     packet.write_short(SendOpcode::CashShopOperation as i16)?;
     packet.write_byte(BOUGHT)?;
+    encode_cash_item(&mut packet, item)?;
+    Ok(packet)
+}
+
+/// CASHSHOP_OPERATION: an item left the Cash Inventory for `slot` of its bag.
+pub fn build_taken_out(slot: i16, item: &Item) -> Result<Packet, NetworkError> {
+    let mut packet = Packet::new_empty();
+    packet.write_short(SendOpcode::CashShopOperation as i16)?;
+    packet.write_byte(TAKEN_OUT)?;
+    packet.write_short(slot)?;
+    encode_item(&mut packet, SlotPrefix::None, item)?;
+    Ok(packet)
+}
+
+/// CASHSHOP_OPERATION: a character's item is back in the Cash Inventory.
+pub fn build_put_back(item: &CashItem) -> Result<Packet, NetworkError> {
+    let mut packet = Packet::new_empty();
+    packet.write_short(SendOpcode::CashShopOperation as i16)?;
+    packet.write_byte(PUT_BACK)?;
     encode_cash_item(&mut packet, item)?;
     Ok(packet)
 }
@@ -282,6 +306,14 @@ mod tests {
             .short(SendOpcode::CashShopOperation as i16)
             .byte(0x57);
         expect_item(&mut expect, &items[0], crate::codec::time::DEFAULT_TIME);
+        expect.end();
+
+        let packet = build_put_back(&items[1]).unwrap();
+        let mut expect = Expect::new(&packet.bytes);
+        expect
+            .short(SendOpcode::CashShopOperation as i16)
+            .byte(0x6A);
+        expect_item(&mut expect, &items[1], 116_444_736_000_000_000);
         expect.end();
 
         let packet = build_cash_inventory(&items, 6).unwrap();
