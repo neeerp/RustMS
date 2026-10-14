@@ -64,9 +64,11 @@ applies its `spec` (`hp`, `mp`, and percent `hpR`/`mpR`, capped at the
 maximums), consumes one, and answers with the inventory change and an HP/MP
 stat update. Dead players can't use items.
 
-HEAL_OVER_TIME (`0x59`) is HeavenClient's natural recovery: every 10 s while
-below full it reports +10 HP / +3 MP. The server accepts at most +20 HP and
-+10 MP per report and one report per 9 s; others are ignored.
+HEAL_OVER_TIME (`0x59`) is HeavenClient's natural recovery. As in v83, it
+comes only at rest: after every 10 s spent standing, lying prone or sitting
+without sending movement, the client reports +10 HP / +3 MP if below full.
+The server accepts at most +20 HP and +10 MP per report, one report per 9 s,
+and none within 9 s of the player's last PLAYER_MOVE; others are ignored.
 
 ## Tests
 

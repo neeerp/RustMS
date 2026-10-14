@@ -210,6 +210,7 @@ namespace ms
 		{
 			MovePlayerPacket(newmove).dispatch();
 			lastmove = newmove;
+			recovery_timer = 0;
 		}
 
 		return get_layer();
@@ -246,6 +247,14 @@ namespace ms
 
 	void Player::update_recovery()
 	{
+		bool resting = state == Char::State::STAND || state == Char::State::PRONE || state == Char::State::SIT;
+
+		if (!resting)
+		{
+			recovery_timer = 0;
+			return;
+		}
+
 		recovery_timer += Constants::TIMESTEP;
 
 		if (recovery_timer < RECOVERY_INTERVAL)
