@@ -270,7 +270,9 @@ from `UI.nx`. Moved so far:
   the job ranking, but RustMS sends no rankings, so the short scroll is
   always used. The `pageL` and `pageR` arrows appear when the account has
   more than three slots. Tab toggles a focus hand (`keyFocused`) on the
-  Start, Create, and Delete signs. Up and Down move the hand, Left and Right
+  Start, Create, and Delete signs. Those three buttons are boards that hang
+  on the map's `CharSelect/signboard` post, at the v83 offsets (see
+  `MENU_POS`). Up and Down move the hand, Left and Right
   move between characters, Enter starts, and Escape goes back. It gives the
   login scene the world and channel names for the world box. Positions are checked
   against footage from v55 and v1.0.

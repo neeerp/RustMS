@@ -51,8 +51,12 @@ namespace ms
 		constexpr int16_t SLOT_HEIGHT = 80;
 
 		// Start, Create a character and Delete a character, in that order.
+		// Each button is a board of the sign whose post is the map's
+		// CharSelect/signboard object. v83 puts them at (4, -2), (4, 36) and
+		// (4, 85) in a window at (200, -1359) in map space (0x56d411,
+		// 0x56d543); the scene's camera puts that window at (572, 149).
 		const Point<int16_t> MENU_POS[3] = {
-			Point<int16_t>(575, 140), Point<int16_t>(573, 180), Point<int16_t>(567, 222)
+			Point<int16_t>(576, 147), Point<int16_t>(576, 185), Point<int16_t>(576, 234)
 		};
 
 		const Point<int16_t> PAGE_LEFT_POS = Point<int16_t>(150, 318);
