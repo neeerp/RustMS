@@ -120,6 +120,9 @@ namespace ms
 		// Return the first slot which contains the specified item.
 		int16_t find_item(InventoryType::Id type, int32_t itemid) const;
 
+		// Return how many slots of the specified inventory hold an item.
+		int16_t count_slots(InventoryType::Id type, int32_t itemid) const;
+
 		// Return the count of an item. Returns 0 if the slot is empty.
 		int16_t get_item_count(InventoryType::Id type, int16_t slot) const;
 

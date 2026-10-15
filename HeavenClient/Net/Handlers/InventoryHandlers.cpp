@@ -111,6 +111,15 @@ namespace ms
 				mod.arg = recv.read_short();
 				break;
 			case Inventory::Modification::REMOVE:
+			{
+				// Like v83, losing the last stack of the chair the player sits
+				// on asks the server to let them up.
+				Player& player = Stage::get().get_player();
+				int32_t itemid = inventory.get_item_id(mod.type, mod.pos);
+
+				if (itemid != 0 && itemid == player.get_chair() && inventory.count_slots(mod.type, itemid) == 1)
+					player.leave_chair();
+
 				if (auto keyconfig = UI::get().get_element<UIKeyConfig>())
 				{
 					int16_t count_before = inventory.get_item_count(mod.type, mod.pos);
@@ -118,7 +127,8 @@ namespace ms
 				}
 
 				inventory.modify(mod.type, mod.pos, mod.mode, mod.arg, Inventory::Movement::MOVE_INTERNAL);
-				break;
+			}
+			break;
 			}
 
 			mods.push_back(mod);
