@@ -38,12 +38,11 @@ namespace ms
 
 		Color color;
 
-		if (invincible)
+		// While blinking, the avatar is drawn at half brightness for two of
+		// every four 30 ms updates (FUN_0078ded5).
+		if (invincible && blinking && invincible.elapsed() / 30 % 4 < 2)
 		{
-			float phi = invincible.alpha() * 30;
-			float rgb = 0.9f - 0.5f * std::abs(std::sin(phi));
-
-			color = Color(rgb, rgb, rgb, 1.0f);
+			color = Color(0.5f, 0.5f, 0.5f, 1.0f);
 		} else
 		{
 			color = Color::Code::CWHITE;
@@ -250,7 +249,10 @@ namespace ms
 		damagenumbers.back().set_anchor(Point<int16_t>(phobj.get_x(), phobj.get_y() - 64));
 
 		look.set_alerted(5000);
-		invincible.set_for(2000);
+		// CUserLocal is invincible for 1500 ms after a hit, and blinks
+		// only if the hit did damage (FUN_007ad352).
+		invincible.set_for(1500);
+		blinking = damage > 0;
 	}
 
 	void Char::show_heal(int32_t amount)
