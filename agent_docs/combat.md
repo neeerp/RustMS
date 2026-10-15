@@ -20,6 +20,17 @@ templates from `Mob.nx` (`maxHP`, `exp`, `PADamage`, `bodyAttack`,
   mob that can walk but neither jump nor fly turns 20 px before any foothold
   end that does not lead on to another floor, as v83 does
   (`FootholdTree::get_walk_edge`).
+- **Aggro:** a hit hands the mob to the attacker with aggro
+  (SPAWN_MONSTER_CONTROL 2) for `AGGRO_DURATION` (180 s, v83's minimum chase
+  time). The previous controller gets SPAWN_MONSTER_CONTROL 0, and later hits
+  from the same player within that time send nothing.
+- **Client AI:** HeavenClient decides each mob's movement in v83's 90 ms
+  steps. Each decision holds for a random time: 1 to 3 s when idle (walk
+  left, right, or stand), and 0.8 to 1.2 s when chasing. A mob given aggro
+  heads for the local player, keeping its direction until it is 100 px past
+  them, and gives up after 180 to 240 s. A mob that cannot move turns to
+  face the player and forgets them once they leave a 2000 x 1200 box.
+  Flying mobs still use the older HeavenClient random flight.
 
 Packets follow the v83 layout (16-byte temporary status mask after the mob
 id); HeavenClient used to skip 22 bytes there and now skips 16. After the

@@ -84,6 +84,9 @@ namespace ms
 		// 0 - no control, 1 - control, 2 - aggro
 		void set_control(int8_t mode);
 
+		// Tell the mob where the local player is, whom it chases with aggro.
+		void set_target(Point<int16_t> position);
+
 		// Send movement to the mob.
 		void send_movement(Point<int16_t> start, std::vector<Movement> &&movements);
 
@@ -145,8 +148,15 @@ namespace ms
 		// Start the death animation.
 		void apply_death();
 
-		// Decide on the next state.
+		// Decide on the next state of a flying mob.
 		void next_move();
+
+		// Take one 90 ms step of a ground mob's AI.
+		void think();
+
+		// Stand (0) or walk left (-1) or right (1), telling the server if
+		// that changes anything.
+		void walk(int8_t direction);
 
 		// Send the current position and state to the server.
 		void update_movement();
@@ -214,7 +224,15 @@ namespace ms
 		bool dying;
 		bool dead;
 		bool control;
-		bool aggro;
+		// Whether the mob chases the local player, and for how many more ms.
+		bool hastarget;
+		int32_t targettime;
+		Point<int16_t> targetpos;
+		// Ms towards the next AI step, and AI steps until the next decision.
+		uint16_t aitime;
+		int16_t thinktimer;
+		// Where the AI means to go: -1 left, 0 nowhere, 1 right.
+		int8_t movedir;
 		Stance stance;
 		bool flip;
 		FlyDirection flydirection;

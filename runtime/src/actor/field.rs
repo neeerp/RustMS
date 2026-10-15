@@ -9,7 +9,7 @@ use net::packet::build::world::field::{
 };
 use net::packet::build::world::mob::{
     build_control_mob, build_kill_mob, build_mob_hp, build_move_mob, build_move_mob_response,
-    build_spawn_mob,
+    build_spawn_mob, build_stop_controlling_mob,
 };
 use net::packet::build::world::npc::{build_spawn_npc, ForeignNpc};
 use net::packet::build::world::reactor::{
@@ -141,7 +141,7 @@ impl FieldActor {
         };
         for &object_id in object_ids {
             if let Some(mob) = self.mobs.get(object_id) {
-                if let Ok(packet) = build_control_mob(&mob.view(false)) {
+                if let Ok(packet) = build_control_mob(&mob.view(false), false) {
                     occupant.handle.send_packet(packet);
                 }
             }
@@ -384,6 +384,7 @@ impl FieldActor {
                     if let Ok(packet) = build_mob_hp(object_id, percent) {
                         attacker.send_packet(packet);
                     }
+                    self.provoke(from, &attacker, object_id, now);
                 }
                 Some(Err(kill)) => {
                     if let Ok(packet) = build_kill_mob(kill.object_id, 1) {
@@ -413,6 +414,27 @@ impl FieldActor {
                     }
                 }
                 None => {}
+            }
+        }
+    }
+
+    /// Give the mob `from` hit to its client with aggro, taking it from
+    /// whoever moved it before.
+    fn provoke(&mut self, from: ClientId, attacker: &ClientHandle, object_id: i32, now: Instant) {
+        let Some(previous) = self.mobs.provoke(from, object_id, now) else {
+            return;
+        };
+        if let Some(previous) = previous.filter(|&previous| previous != from) {
+            if let (Some(occupant), Ok(packet)) = (
+                self.occupants.get(&previous),
+                build_stop_controlling_mob(object_id),
+            ) {
+                occupant.handle.send_packet(packet);
+            }
+        }
+        if let Some(mob) = self.mobs.get(object_id) {
+            if let Ok(packet) = build_control_mob(&mob.view(false), true) {
+                attacker.send_packet(packet);
             }
         }
     }
