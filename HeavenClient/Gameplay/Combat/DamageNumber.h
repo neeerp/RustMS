@@ -17,21 +17,17 @@
 //////////////////////////////////////////////////////////////////////////////////
 #pragma once
 
-#include <string>
-
 #include <cstddef>
-
 #include <cstdint>
+#include <vector>
 
-#include "../Physics/PhysicsObject.h"
-#include "../Template/BoolPair.h"
-#include "../Template/Interpolated.h"
-#include "../Template/Point.h"
-
-#include "../IO/Components/Charset.h"
+#include "../../Graphics/Texture.h"
+#include "../../Template/Interpolated.h"
+#include "../../Template/Point.h"
 
 namespace ms
 {
+	// A damage number or miss, laid out as in v83; see damage_layout.
 	class DamageNumber
 	{
 	public:
@@ -45,34 +41,40 @@ namespace ms
 			HEAL
 		};
 
-		DamageNumber(Type type, int32_t damage, int16_t starty, int16_t x = 0);
+		// A damage of 0 shows "Miss". The number is placed `lift` px above
+		// its anchor.
+		DamageNumber(Type type, int32_t damage, int16_t lift = 0);
 
 		DamageNumber();
 
 		void draw(double viewx, double viewy, float alpha) const;
 
-		void set_x(int16_t headx);
+		// Places the number: centred on the anchor's x, its digits' bottoms
+		// 6 to 9 px below the anchor (less the lift), a miss's bottom on it.
+		void set_anchor(Point<int16_t> anchor);
 
 		bool update();
-
-		static int16_t rowheight(bool critical);
 
 		static void init();
 
 	private:
-		int16_t getadvance(char c, bool first) const;
+		struct Glyph
+		{
+			const Texture* texture;
+			// Where the texture's origin is drawn, relative to the anchor.
+			Point<int16_t> offset;
+		};
 
-		static constexpr uint16_t FADE_TIME = 500;
-
-		Type type;
-		bool miss;
-		bool multiple;
-		int8_t firstnum;
-		std::string restnum;
-		int16_t shift;
-		MovingObject moveobj;
+		std::vector<Glyph> glyphs;
+		Point<int16_t> anchor;
+		int16_t lift = 0;
+		int32_t elapsed = 0;
+		Linear<float> rise;
 		Linear<float> opacity;
 
-		static BoolPair<Charset> charsets[NUM_TYPES];
+		// Per type, the first digit's set ("1") and the others' ("0").
+		static Texture digits[NUM_TYPES][2][10];
+		static Texture misses[NUM_TYPES];
+		static Texture critical_effect;
 	};
 }

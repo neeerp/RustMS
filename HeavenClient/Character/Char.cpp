@@ -244,10 +244,10 @@ namespace ms
 
 	void Char::show_damage(int32_t damage)
 	{
-		int16_t start_y = phobj.get_y() - 60;
-		int16_t x = phobj.get_x() - 10;
-
-		damagenumbers.emplace_back(DamageNumber::Type::TOPLAYER, damage, start_y, x);
+		// v83 anchors it on the top of the avatar's image; a bare head's top
+		// is 64 px above the feet when standing.
+		damagenumbers.emplace_back(DamageNumber::Type::TOPLAYER, damage);
+		damagenumbers.back().set_anchor(Point<int16_t>(phobj.get_x(), phobj.get_y() - 64));
 
 		look.set_alerted(5000);
 		invincible.set_for(2000);
@@ -256,9 +256,10 @@ namespace ms
 	void Char::show_heal(int32_t amount)
 	{
 		int16_t start_y = phobj.get_y() - 60;
-		int16_t x = phobj.get_x() - 10;
+		int16_t x = phobj.get_x();
 
-		damagenumbers.emplace_back(DamageNumber::Type::HEAL, amount, start_y, x);
+		damagenumbers.emplace_back(DamageNumber::Type::HEAL, amount);
+		damagenumbers.back().set_anchor(Point<int16_t>(x, start_y));
 	}
 
 	void Char::speak(const std::string &line)

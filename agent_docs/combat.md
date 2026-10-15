@@ -100,6 +100,15 @@ In HeavenClient a hit of at least the mob's `pushed` value puts it in its
 `hit1` stance for about a quarter second, with a three-tick push that moves it
 a few pixels (`Mob::knockback_ticks`), as in period footage.
 
+Damage numbers follow v83 (`Gameplay/Combat/DamageLayout.h`). The first digit
+comes from the larger `NoRed1` set and the rest from `NoRed0`. Each digit
+overlaps the previous one by 3/5 of its part right of the origin, and digits
+alternate 3 px up and down, with 1 px of random drop. Criticals use `NoCri`,
+start 30 px in, and sit on the `NoCri1/effect` banner. Hits on the player use
+`NoViolet`, and a 0 shows `Miss`. A number is centred on the mob's head, 15 px
+above it plus 30 px per hit (15 px for Demolition). It stays opaque for
+400 ms, then fades over 600 ms, rising 30 px over the whole second.
+
 KILL_MONSTER usually arrives before the swing connects on screen. In
 HeavenClient each mob counts the hits queued against it (`Mob::expect_hits`,
 from the player's own attacks and from other players' attacks as they
