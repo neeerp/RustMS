@@ -208,6 +208,14 @@ namespace ms
 		double hacc = 0.0;
 		double vacc = 0.0;
 
+		// Objects wearing a shoe walk and fall by the v83 client's CVecCtrl
+		// rules, steered by walkdir (-1, 0, 1) instead of hforce. walkspeed
+		// is the shoe's speed multiplier. Everything else keeps
+		// HeavenClient's force-and-friction model.
+		bool shoe = false;
+		double walkspeed = 1.0;
+		int8_t walkdir = 0;
+
 		bool is_flag_set(Flag f)
 		{
 			return (flags & f) != 0;

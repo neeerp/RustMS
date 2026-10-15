@@ -17,8 +17,58 @@
 //////////////////////////////////////////////////////////////////////////////////
 #include "Physics.h"
 
+#include <algorithm>
+#include <cmath>
+
 namespace ms
 {
+	// v83 Map/Physics.img values, as the MapleLegends client loads them
+	// (FUN_0085f495), in pixels and seconds. Forces are divided by the 100
+	// mass of a CAttrShoe.
+	const double WALKACC = 140000.0 / 100.0;
+	const double WALKSPEED = 125.0;
+	const double WALKDRAG = 80000.0 / 100.0;
+	const double SLIPACC = 60000.0 / 100.0;
+	const double SLIPSPEED = 120.0;
+	const double FLOATDRAG = 10000.0 / 100.0;
+	const double FLOATCOEFFICIENT = 0.01;
+	const double GRAVITYACC = 2000.0;
+	const double FALLSPEED = 670.0;
+	const double JUMPSPEED = 555.0;
+	// CAttrShoe::walkSlant: slopes steeper than this slide.
+	const double WALKSLANT = 0.9;
+	// Steering in the air pushes at twice floatDrag2 towards a speed of
+	// walkSpeed / walkForce * floatDrag2.
+	const double AIRACC = 2.0 * FLOATDRAG;
+	const double AIRSPEED = 125.0 / 140000.0 * 10000.0;
+	const double TICK = Constants::TIMESTEP / 1000.0;
+
+	// CVecCtrl's accelerate (FUN_007f29ab): speeds up towards +-limit and
+	// stops there, but never slows a faster object.
+	void accelerate(double &speed, double acc, double limit)
+	{
+		if (limit < 0.0)
+			return;
+
+		if (acc > 0.0)
+		{
+			if (speed < limit)
+				speed = std::min(speed + acc * TICK, limit);
+		} else if (speed > -limit)
+		{
+			speed = std::max(speed + acc * TICK, -limit);
+		}
+	}
+
+	// Slows an object faster than +-limit back towards it.
+	void decelerate(double &speed, double limit, double drag)
+	{
+		if (speed > limit)
+			speed = std::max(speed - drag * TICK, limit);
+		else if (speed < -limit)
+			speed = std::min(speed + drag * TICK, -limit);
+	}
+
 	const double GRAVFORCE = 0.14;
 	const double SWIMGRAVFORCE = 0.03;
 	const double FRICTION = 0.3;
@@ -39,6 +89,12 @@ namespace ms
 	{
 		// Determine which platform the object is currently on
 		fht.update_fh(phobj);
+
+		if (phobj.shoe && phobj.type == PhysicsObject::Type::NORMAL)
+		{
+			move_shoe(phobj);
+			return;
+		}
 
 		// Use the appropriate physics for the terrain the object is on
 		switch (phobj.type)
@@ -62,6 +118,149 @@ namespace ms
 
 		// Move the object forward
 		phobj.move();
+	}
+
+	void Physics::move_shoe(PhysicsObject &phobj) const
+	{
+		double hspeed = phobj.hspeed / TICK;
+		double vspeed = phobj.vspeed / TICK;
+		int8_t dir = phobj.walkdir;
+
+		// An upward force on the ground is a takeoff speed.
+		if (phobj.onground && phobj.vforce < 0.0)
+		{
+			vspeed = phobj.vforce / TICK;
+			phobj.onground = false;
+		}
+
+		phobj.hforce = 0.0;
+		phobj.vforce = 0.0;
+		phobj.walkdir = 0;
+
+		double hstart = hspeed;
+		double vstart = vspeed;
+
+		if (phobj.onground)
+		{
+			// CVecCtrl's walking (FUN_007f21d2) works on the speed along the
+			// foothold, with uy the foothold's downward slant.
+			double ux = 1.0 / std::sqrt(1.0 + phobj.fhslope * phobj.fhslope);
+			double uy = phobj.fhslope * ux;
+			double slant = std::abs(uy);
+			double speed = hspeed / ux;
+			double limit = WALKSPEED * phobj.walkspeed;
+
+			if (slant == 0.0)
+			{
+				decelerate(speed, limit, WALKDRAG);
+
+				if (dir == 0)
+					decelerate(speed, 0.0, WALKDRAG);
+				else
+					accelerate(speed, dir * WALKACC, limit);
+			} else
+			{
+				int8_t uphill = uy >= 0.0 ? -1 : 1;
+				double steep = slant * slant;
+				double force = dir * WALKACC * (uphill < 0 ? 1.0 + steep : 1.0 - steep);
+				double downhill = (1.0 + steep) * limit;
+
+				decelerate(speed, uphill * speed > 0.0 ? limit : downhill, WALKDRAG);
+
+				if (slant <= WALKSLANT)
+				{
+					if (dir == 0)
+						decelerate(speed, 0.0, WALKDRAG);
+					else
+						accelerate(speed, force, uphill * force > 0.0 ? limit : downhill);
+				} else
+				{
+					double slip = -uphill * slant * SLIPACC;
+					double sliplimit = slant * SLIPSPEED;
+
+					if (dir * uphill > 0)
+					{
+						slip *= 0.5;
+						sliplimit *= 0.5;
+					} else if (dir != 0)
+					{
+						slip += force;
+						sliplimit += downhill;
+					}
+
+					if (uphill * speed > 0.0)
+						decelerate(speed, 0.0, WALKDRAG);
+
+					accelerate(speed, slip, sliplimit);
+				}
+			}
+
+			hspeed = speed * ux;
+			vspeed = 0.0;
+		} else
+		{
+			// CVecCtrl's falling (FUN_007f2a1c).
+			if (vspeed > FALLSPEED)
+				vspeed = std::max(vspeed - FLOATDRAG * TICK, FALLSPEED);
+
+			if (phobj.is_flag_not_set(PhysicsObject::Flag::NOGRAVITY))
+				accelerate(vspeed, GRAVITYACC, FALLSPEED);
+
+			if (dir != 0)
+				accelerate(hspeed, dir * AIRACC, AIRSPEED);
+			else
+				decelerate(hspeed, 0.0, vspeed < FALLSPEED ? FLOATDRAG * FLOATCOEFFICIENT : FLOATDRAG);
+		}
+
+		// Positions advance by the average of the old and new speeds. A
+		// collision zeroes the step, and then the speed stays zero.
+		phobj.hspeed = (hstart + hspeed) / 2.0 * TICK;
+		phobj.vspeed = (vstart + vspeed) / 2.0 * TICK;
+
+		bool hstep = phobj.hspeed != 0.0;
+		bool vstep = phobj.vspeed != 0.0;
+
+		fht.limit_movement(phobj);
+		phobj.move();
+
+		if (!hstep || phobj.hspeed != 0.0)
+			phobj.hspeed = hspeed * TICK;
+
+		if (!vstep || phobj.vspeed != 0.0)
+			phobj.vspeed = vspeed * TICK;
+	}
+
+	double Physics::walk_speed(double walkspeed)
+	{
+		return WALKSPEED * walkspeed * TICK;
+	}
+
+	double Physics::jump_speed(double walkjump)
+	{
+		return JUMPSPEED * walkjump * TICK;
+	}
+
+	void Physics::jump(PhysicsObject &phobj, double jumpspeed, int8_t dir)
+	{
+		phobj.vforce = -jumpspeed;
+
+		if (dir == 0)
+			return;
+
+		// CVecCtrl::Jump (FUN_007f1bb0) measures the walking speed along the
+		// foothold and raises it by the slant when jumping downhill.
+		double ux = 1.0 / std::sqrt(1.0 + phobj.fhslope * phobj.fhslope);
+		double uy = phobj.fhslope * ux;
+		double limit = walk_speed(phobj.walkspeed) * (1.0 + uy * uy * (dir * uy >= 0.0 ? 1.0 : -1.0));
+		double speed = phobj.hspeed / ux;
+
+		if (dir * speed < limit * 0.8)
+			speed += dir * limit * 0.8;
+
+		if (dir * speed > limit)
+			speed = dir * limit;
+
+		phobj.hspeed = speed * ux;
 	}
 
 	void Physics::move_normal(PhysicsObject &phobj) const

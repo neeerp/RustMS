@@ -137,11 +137,11 @@ namespace ms
 		// Return the character's attacking speed.
 		int8_t get_integer_attackspeed() const override;
 
-		// Returns the current walking force, calculated from the total ES_SPEED stat.
-		float get_walkforce() const;
+		// Returns the shoe's walking speed multiplier, from the total ES_SPEED stat.
+		double get_walkspeed() const;
 
-		// Returns the current jumping force, calculated from the total ES_JUMP stat.
-		float get_jumpforce() const;
+		// Returns the takeoff speed in pixels per tick, from the total ES_JUMP stat.
+		double get_jumpforce() const;
 
 		// Returns the climbing force, calculated from the total ES_SPEED stat.
 		float get_climbforce() const;

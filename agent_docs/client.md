@@ -388,6 +388,36 @@ side yet.
 51 outbound opcodes are defined (`Net/OutPacket.h`) and 63 inbound handlers
 are registered (`Net/PacketSwitch.cpp`). Anything not listed there is silently ignored by the client.
 
+## Movement physics
+
+The player follows v83's CVecCtrl rules (MapleLegends client, decompiled).
+`Player` sets `phobj.shoe`, and `Physics::move_shoe` handles it. Everything
+else, including mobs, NPCs, pets and drops, keeps HeavenClient's older
+force-and-friction model (`move_normal`).
+
+- **Units.** The constants in `Physics.cpp` come from v83 `Map.wz/Physics.img`
+  and are in pixels and seconds. One 8 ms tick is 1/125 s. `hspeed` and
+  `vspeed` are still stored per tick.
+- **Steering.** Player states set `phobj.walkdir` (-1, 0 or 1) each tick
+  instead of pushing with `hforce`. `phobj.walkspeed` is the shoe's speed
+  multiplier.
+- **Walking.** On flat ground the player accelerates at 1400 px/s² toward
+  125 px/s × walkspeed and brakes at 800 px/s². On a slope the push scales by
+  1 ± slant², and a slant over 0.9 slides. Positions advance by the average of
+  the old and new speeds.
+- **Air.** Gravity is 2000 px/s², capped at a fall speed of 670 px/s. A held
+  direction accelerates at 200 px/s² toward about 8.9 px/s, so it barely
+  steers.
+- **Stats.** `get_walkspeed` is clamp(SPEED, 80, 140)/100. `get_jumpforce`
+  uses clamp(JUMP, 80, 123)/100 of the 555 px/s takeoff speed.
+- **Jumping.** `Physics::jump` sets the takeoff speed. A held direction adds
+  80% of the top walking speed, capped at the top speed. A rope jump uses half
+  the jump speed and 1.3 times the walking speed.
+- **Not ported yet:**
+  - The down-jump's small hop (196 px/s, with the old foothold ignored).
+  - v83 knockback speeds.
+  - Swimming and flying.
+
 ## Cash Shop
 
 `UICashShop` draws the 800x600 v83 Cash Shop from `UIClassic.nx`

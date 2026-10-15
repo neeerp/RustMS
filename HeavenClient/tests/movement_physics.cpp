@@ -1,4 +1,5 @@
 #include "../Gameplay/Physics/Physics.h"
+#include <algorithm>
 #include <nlnx/file.hpp>
 #include <chrono>
 #include <cmath>
@@ -50,6 +51,180 @@ std::filesystem::path flat_map()
 	return path;
 }
 
+// One v83 tick is 8 ms, so 1 pixel per tick is 125 pixels per second.
+const double TICKS_PER_SECOND = 125.0;
+
+ms::PhysicsObject grounded_shoe(const ms::Physics& physics)
+{
+	ms::PhysicsObject player;
+	player.shoe = true;
+	player.set_x(0); player.set_y(100);
+	physics.move_object(player);
+	require(player.onground && player.fhid != 0, "fixture did not find its floor");
+	return player;
+}
+
+// HeavenClient's own model, which mobs, NPCs and pets still use.
+void legacy_jumps_keep_momentum(const ms::Physics& physics)
+{
+	for (double direction : {-1.0, 1.0})
+	{
+		ms::PhysicsObject player;
+		player.set_x(0); player.set_y(100);
+		physics.move_object(player);
+		require(player.onground && player.fhid != 0, "fixture did not find its floor");
+		player.hspeed = direction * 1.2;
+		player.hforce = direction * .16;
+		player.vforce = -4.5;
+		physics.move_object(player);
+		require(!player.onground && player.vspeed < 0.0, "takeoff must become airborne on the same tick");
+		double momentum = player.hspeed;
+		for (int tick = 0; tick < 100; ++tick)
+		{
+			// Releasing the direction key while airborne adds no force.
+			player.hforce = 0.0;
+			physics.move_object(player);
+			require(std::abs(player.hspeed - momentum) < 1e-9, "jump lost horizontal momentum");
+			if (player.vspeed == 0.0)
+			{
+				require(player.onground && player.crnt_y() == 100, "landing must become grounded on the collision tick");
+				break;
+			}
+			require(!player.onground, "airborne motion was classified as grounded");
+			require(tick < 99, "jump never landed");
+		}
+		// A jump requested immediately on landing must work without an
+		// extra settling tick, and maintain the running horizontal speed.
+		player.hforce = direction * .16;
+		player.vforce = -4.5;
+		physics.move_object(player);
+		require(player.vspeed < 0.0 && !player.onground, "landing-time jump was lost");
+		require(std::abs(player.hspeed - momentum) < 1e-9, "running restart lost momentum");
+	}
+}
+
+// v83 walks at 1400 px/s^2 up to 125 px/s and stops at 800 px/s^2.
+void walking(const ms::Physics& physics)
+{
+	for (int8_t direction : {-1, 1})
+	{
+		ms::PhysicsObject player = grounded_shoe(physics);
+		int ticks = 0;
+		while (direction * player.hspeed < ms::Physics::walk_speed(1.0))
+		{
+			player.walkdir = direction;
+			physics.move_object(player);
+			require(++ticks <= 12, "walking was slower to reach top speed than v83");
+		}
+		require(ticks == 12, "walking reached top speed faster than v83");
+		for (int tick = 0; tick < 50; ++tick)
+		{
+			player.walkdir = direction;
+			physics.move_object(player);
+			require(std::abs(player.hspeed * TICKS_PER_SECOND - direction * 125.0) < 1e-9, "walking left the v83 top speed");
+		}
+
+		double from = player.crnt_x();
+		ticks = 0;
+		while (player.hspeed != 0.0)
+		{
+			physics.move_object(player);
+			require(++ticks <= 20, "letting go slid further than v83");
+		}
+		double slide = direction * (player.crnt_x() - from);
+		require(ticks == 20 && slide > 9.0 && slide < 10.5, "letting go stopped at a different distance from v83");
+
+		// The SPEED stat scales the top speed but not the acceleration.
+		player.walkspeed = 1.4;
+		for (int tick = 0; tick < 50; ++tick)
+		{
+			player.walkdir = direction;
+			physics.move_object(player);
+		}
+		require(std::abs(player.hspeed * TICKS_PER_SECOND - direction * 175.0) < 1e-9, "140% speed did not walk at 175 px/s");
+	}
+}
+
+// A standing jump rises 555^2 / (2 * 2000) = 77 px and lands after 0.555 s.
+void standing_jump(const ms::Physics& physics)
+{
+	ms::PhysicsObject player = grounded_shoe(physics);
+	ms::Physics::jump(player, ms::Physics::jump_speed(1.0), 0);
+	require(player.hspeed == 0.0, "a standing jump gained sideways speed");
+	double peak = player.crnt_y();
+	int ticks = 0;
+	do
+	{
+		physics.move_object(player);
+		require(++ticks == 1 ? !player.onground && player.vspeed < 0.0 : true, "takeoff must become airborne on the same tick");
+		peak = std::min(peak, player.crnt_y());
+		require(ticks < 100, "jump never landed");
+	} while (!player.onground);
+	require(std::abs(100 - peak - 77.0) < 0.6, "jump height differs from v83");
+	require(ticks >= 69 && ticks <= 70, "jump airtime differs from v83");
+	require(player.crnt_y() == 100 && player.vspeed == 0.0, "landing must become grounded on the collision tick");
+}
+
+void running_jump(const ms::Physics& physics)
+{
+	for (int8_t direction : {-1, 1})
+	{
+		// Jumping from a standstill while holding a direction starts at 80%
+		// of the top walking speed.
+		ms::PhysicsObject player = grounded_shoe(physics);
+		ms::Physics::jump(player, ms::Physics::jump_speed(1.0), direction);
+		require(std::abs(player.hspeed * TICKS_PER_SECOND - direction * 100.0) < 1e-9, "a standing jump with a direction did not kick to 100 px/s");
+
+		player = grounded_shoe(physics);
+		for (int tick = 0; tick < 30; ++tick)
+		{
+			player.walkdir = direction;
+			physics.move_object(player);
+		}
+		double momentum = player.hspeed;
+		ms::Physics::jump(player, ms::Physics::jump_speed(1.0), direction);
+		require(player.hspeed == momentum, "a running jump changed the walking speed");
+		for (int tick = 0; tick < 100 && (tick == 0 || !player.onground); ++tick)
+		{
+			// Without input the air barely slows the jump, at 1 px/s^2.
+			physics.move_object(player);
+			require(direction * player.hspeed <= direction * momentum && direction * (momentum - player.hspeed) < 0.6 / TICKS_PER_SECOND, "jump lost horizontal momentum");
+		}
+		require(player.onground, "jump never landed");
+
+		// A jump requested immediately on landing must work without an
+		// extra settling tick.
+		ms::Physics::jump(player, ms::Physics::jump_speed(1.0), direction);
+		physics.move_object(player);
+		require(player.vspeed < 0.0 && !player.onground, "landing-time jump was lost");
+
+		// Holding the other way pulls the jump back at 200 px/s^2.
+		double before = player.hspeed;
+		for (int tick = 0; tick < 25; ++tick)
+		{
+			player.walkdir = -direction;
+			physics.move_object(player);
+		}
+		require(std::abs(direction * (before - player.hspeed) * TICKS_PER_SECOND - 40.0) < 1e-6, "steering against a jump differs from v83");
+	}
+}
+
+// Falls speed up at 2000 px/s^2 to at most 670 px/s.
+void falling(const ms::Physics& physics)
+{
+	ms::PhysicsObject player;
+	player.shoe = true;
+	player.set_x(0); player.set_y(-150);
+	double fastest = 0.0;
+	for (int tick = 0; tick < 100 && (tick == 0 || !player.onground); ++tick)
+	{
+		physics.move_object(player);
+		fastest = std::max(fastest, player.vspeed);
+		require(player.vspeed * TICKS_PER_SECOND <= 670.0 + 1e-9, "falling passed the v83 fall speed");
+	}
+	require(player.onground && std::abs(fastest * TICKS_PER_SECOND - 670.0) < 1e-9, "a long fall did not reach the v83 fall speed");
+}
+
 int main()
 {
 	std::filesystem::path path;
@@ -59,43 +234,14 @@ int main()
 		{
 			nl::file map(path.string());
 			ms::Physics physics(map.root());
-			for (double direction : {-1.0, 1.0})
-			{
-				ms::PhysicsObject player;
-				player.set_x(0); player.set_y(100);
-				physics.move_object(player);
-				require(player.onground && player.fhid != 0, "fixture did not find its floor");
-				player.hspeed = direction * 1.2;
-				player.hforce = direction * .16;
-				player.vforce = -4.5;
-				physics.move_object(player);
-				require(!player.onground && player.vspeed < 0.0, "takeoff must become airborne on the same tick");
-				double momentum = player.hspeed;
-				for (int tick = 0; tick < 100; ++tick)
-				{
-					// Releasing the direction key while airborne adds no force.
-					player.hforce = 0.0;
-					physics.move_object(player);
-					require(std::abs(player.hspeed - momentum) < 1e-9, "jump lost horizontal momentum");
-					if (player.vspeed == 0.0)
-					{
-						require(player.onground && player.crnt_y() == 100, "landing must become grounded on the collision tick");
-						break;
-					}
-					require(!player.onground, "airborne motion was classified as grounded");
-					require(tick < 99, "jump never landed");
-				}
-				// A jump requested immediately on landing must work without an
-				// extra settling tick, and maintain the running horizontal speed.
-				player.hforce = direction * .16;
-				player.vforce = -4.5;
-				physics.move_object(player);
-				require(player.vspeed < 0.0 && !player.onground, "landing-time jump was lost");
-				require(std::abs(player.hspeed - momentum) < 1e-9, "running restart lost momentum");
-			}
+			legacy_jumps_keep_momentum(physics);
+			walking(physics);
+			standing_jump(physics);
+			running_jump(physics);
+			falling(physics);
 		}
 		std::filesystem::remove(path);
-		std::cout << "Jump momentum and contact transitions passed\n";
+		std::cout << "Movement physics passed\n";
 		return 0;
 	}
 	catch (const std::exception& error)
