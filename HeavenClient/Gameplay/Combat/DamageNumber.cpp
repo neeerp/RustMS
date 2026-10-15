@@ -17,64 +17,64 @@
 //////////////////////////////////////////////////////////////////////////////////
 #include "DamageNumber.h"
 
-#include "../Constants.h"
+#include "DamageLayout.h"
+
+#include "../../Constants.h"
+#include "../../Util/Randomizer.h"
+
+#include <cmath>
+#include <string>
 
 #include <nlnx/nx.hpp>
 #include <nlnx/node.hpp>
 
 namespace ms
 {
-	DamageNumber::DamageNumber(Type t, int32_t damage, int16_t starty, int16_t x)
+	DamageNumber::DamageNumber(Type type, int32_t damage, int16_t l) : lift(l)
 	{
-		type = t;
+		rise.set(0.0f);
+		opacity.set(1.0f);
 
-		if (damage > 0)
+		if (damage <= 0)
 		{
-			miss = false;
+			const Texture& miss = misses[type];
+			Point<int16_t> origin = miss.get_origin();
+			int16_t left = damage_layout::left(miss.width());
 
-			std::string number = std::to_string(damage);
-			firstnum = number[0];
+			glyphs.push_back({ &miss, { static_cast<int16_t>(left + origin.x()),
+				static_cast<int16_t>(origin.y() - miss.height()) } });
 
-			if (number.size() > 1)
-			{
-				restnum = number.substr(1);
-				multiple = true;
-			} else
-			{
-				restnum = "";
-				multiple = false;
-			}
-
-			int16_t total = getadvance(firstnum, true);
-
-			for (size_t i = 0; i < restnum.length(); i++)
-			{
-				char c = restnum[i];
-				int16_t advance;
-
-				if (i < restnum.length() - 1)
-				{
-					char n = restnum[i + 1];
-					advance = (getadvance(c, false) + getadvance(n, false)) / 2;
-				} else
-				{
-					advance = getadvance(c, false);
-				}
-
-				total += advance;
-			}
-
-			shift = total / 2;
-		} else
-		{
-			shift = charsets[type][true].getw('M') / 2;
-			miss = true;
+			return;
 		}
 
-		moveobj.set_x(x);
-		moveobj.set_y(starty);
-		moveobj.vspeed = -0.25;
-		opacity.set(1.5f);
+		std::string number = std::to_string(damage);
+		std::vector<const Texture*> textures;
+		std::vector<damage_layout::Digit> sizes;
+		std::vector<int16_t> drops;
+		Randomizer random;
+
+		for (size_t i = 0; i < number.size(); i++)
+		{
+			const Texture& digit = digits[type][i == 0 ? 0 : 1][number[i] - '0'];
+
+			textures.push_back(&digit);
+			sizes.push_back({ digit.width(), digit.height(), digit.get_origin().x() });
+			drops.push_back(random.next_int<int16_t>(2));
+		}
+
+		bool critical = type == Type::CRITICAL;
+		std::vector<damage_layout::Placed> placed;
+		int16_t width = damage_layout::place(sizes, drops, critical, placed);
+		Point<int16_t> topleft(damage_layout::left(width), -damage_layout::TOP);
+
+		if (critical)
+			glyphs.push_back({ &critical_effect, topleft + critical_effect.get_origin() });
+
+		for (size_t i = 0; i < textures.size(); i++)
+		{
+			Point<int16_t> corner(placed[i].left, placed[i].top);
+			glyphs.push_back({ textures[i], topleft + corner + textures[i]->get_origin() });
+		}
 	}
 
 	DamageNumber::DamageNumber()
@@ -82,120 +82,56 @@ namespace ms
 
 	void DamageNumber::draw(double viewx, double viewy, float alpha) const
 	{
-		Point<int16_t> absolute = moveobj.get_absolute(viewx, viewy, alpha);
-		Point<int16_t> position = absolute - Point<int16_t>(0, shift);
+		Point<int16_t> position(
+			static_cast<int16_t>(std::round(anchor.x() + viewx)),
+			static_cast<int16_t>(std::round(anchor.y() + viewy - rise.get(alpha)))
+		);
 		float interopc = opacity.get(alpha);
 
-		if (miss)
-		{
-			charsets[type][true].draw('M', {position, interopc});
-		} else
-		{
-			charsets[type][false].draw(firstnum, {position, interopc});
-
-			if (multiple)
-			{
-				int16_t first_advance = getadvance(firstnum, true);
-				position.shift_x(first_advance);
-
-				for (size_t i = 0; i < restnum.length(); i++)
-				{
-					char c = restnum[i];
-						Point<int16_t> yshift = {0, static_cast<int16_t>((i % 2) ? -2 : 2)};
-					charsets[type][true].draw(c, {position + yshift, interopc});
-
-					int16_t advance;
-
-					if (i < restnum.length() - 1)
-					{
-						char n = restnum[i + 1];
-						int16_t c_advance = getadvance(c, false);
-						int16_t n_advance = getadvance(n, false);
-						advance = (c_advance + n_advance) / 2;
-					} else
-					{
-						advance = getadvance(c, false);
-					}
-
-					position.shift_x(advance);
-				}
-			}
-		}
+		for (const Glyph& glyph : glyphs)
+			glyph.texture->draw({ position + glyph.offset, interopc });
 	}
 
-	int16_t DamageNumber::getadvance(char c, bool first) const
+	void DamageNumber::set_anchor(Point<int16_t> a)
 	{
-		constexpr size_t LENGTH = 10;
-
-		constexpr int16_t advances[LENGTH] =
-				{
-						24, 20, 22, 22, 24, 23, 24, 22, 24, 24
-				};
-
-		size_t index = c - 48;
-
-		if (index < LENGTH)
-		{
-			int16_t advance = advances[index];
-
-			switch (type)
-			{
-				case DamageNumber::Type::CRITICAL:
-					if (first)
-						advance += 8;
-					else
-						advance += 4;
-
-					break;
-				default:
-					if (first)
-						advance += 2;
-
-					break;
-			}
-
-			return advance;
-		} else
-		{
-			return 0;
-		}
-	}
-
-	void DamageNumber::set_x(int16_t headx)
-	{
-		moveobj.set_x(headx);
+		anchor = a - Point<int16_t>(0, lift);
 	}
 
 	bool DamageNumber::update()
 	{
-		moveobj.move();
+		elapsed += Constants::TIMESTEP;
+		rise = damage_layout::rise(elapsed);
+		opacity = damage_layout::opacity(elapsed);
 
-		constexpr float FADE_STEP = Constants::TIMESTEP * 1.0f / FADE_TIME;
-		opacity -= FADE_STEP;
-
-		return opacity.last() <= 0.0f;
-	}
-
-	int16_t DamageNumber::rowheight(bool critical)
-	{
-		return critical ? 36 : 30;
+		return elapsed >= damage_layout::DURATION;
 	}
 
 	void DamageNumber::init()
 	{
-		charsets[DamageNumber::Type::NORMAL].set(false, nl::nx::effect["BasicEff.img"]["NoRed1"],
-												 Charset::Alignment::LEFT);
-		charsets[DamageNumber::Type::NORMAL].set(true, nl::nx::effect["BasicEff.img"]["NoRed0"],
-												 Charset::Alignment::LEFT);
-		charsets[DamageNumber::Type::CRITICAL].set(false, nl::nx::effect["BasicEff.img"]["NoCri1"],
-												   Charset::Alignment::LEFT);
-		charsets[DamageNumber::Type::CRITICAL].set(true, nl::nx::effect["BasicEff.img"]["NoCri0"],
-												   Charset::Alignment::LEFT);
-		charsets[DamageNumber::Type::TOPLAYER].set(false, nl::nx::effect["BasicEff.img"]["NoViolet1"],
-												   Charset::Alignment::LEFT);
-		charsets[DamageNumber::Type::TOPLAYER].set(true, nl::nx::effect["BasicEff.img"]["NoViolet0"],
-												   Charset::Alignment::LEFT);
+		nl::node basic = nl::nx::effect["BasicEff.img"];
+		const char* sets[NUM_TYPES] = { "NoRed", "NoCri", "NoViolet" };
+
+		for (size_t type = 0; type < NUM_TYPES; type++)
+		{
+			std::string name = sets[type];
+			nl::node first = basic[name + "1"];
+			nl::node rest = basic[name + "0"];
+
+			for (size_t digit = 0; digit < 10; digit++)
+			{
+				digits[type][0][digit] = first[std::to_string(digit)];
+				digits[type][1][digit] = rest[std::to_string(digit)];
+			}
+		}
+
+		// v83 shows a critical miss with the normal set.
+		misses[Type::NORMAL] = basic["NoRed0"]["Miss"];
+		misses[Type::CRITICAL] = basic["NoRed0"]["Miss"];
+		misses[Type::TOPLAYER] = basic["NoViolet0"]["Miss"];
+		critical_effect = basic["NoCri1"]["effect"];
 	}
 
-	BoolPair<Charset> DamageNumber::charsets[NUM_TYPES];
+	Texture DamageNumber::digits[NUM_TYPES][2][10];
+	Texture DamageNumber::misses[NUM_TYPES];
+	Texture DamageNumber::critical_effect;
 }

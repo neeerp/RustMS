@@ -24,6 +24,7 @@
 #include "Attack.h"
 
 #include "../../Character/Char.h"
+#include "../../Template/BoolPair.h"
 
 namespace ms
 {

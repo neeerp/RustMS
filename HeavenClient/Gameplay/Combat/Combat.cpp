@@ -17,6 +17,8 @@
 //////////////////////////////////////////////////////////////////////////////////
 #include "Combat.h"
 
+#include "DamageLayout.h"
+
 #include "../../Character/SkillId.h"
 #include "../../IO/Messages.h"
 
@@ -258,7 +260,7 @@ namespace ms
 	{
 		Point<int16_t> head_position = mobs.get_mob_head_position(effect.target_oid);
 		damagenumbers.push_back(effect.number);
-		damagenumbers.back().set_x(head_position.x());
+		damagenumbers.back().set_anchor(head_position);
 
 		const SpecialMove &move = get_move(effect.move_id);
 		mobs.apply_damage(effect.target_oid, effect.damage, effect.toleft, effect.user, move);
@@ -353,7 +355,7 @@ namespace ms
 
 				if (mobs.contains(oid))
 				{
-					std::vector<DamageNumber> numbers = place_numbers(oid, line.second);
+					std::vector<DamageNumber> numbers = place_numbers(line.second, move.get_id());
 					Point<int16_t> head = mobs.get_mob_head_position(oid);
 
 					size_t i = 0;
@@ -394,7 +396,7 @@ namespace ms
 
 				if (mobs.contains(oid))
 				{
-					std::vector<DamageNumber> numbers = place_numbers(oid, line.second);
+					std::vector<DamageNumber> numbers = place_numbers(line.second, move.get_id());
 
 					size_t i = 0;
 
@@ -418,19 +420,19 @@ namespace ms
 	}
 
 	std::vector<DamageNumber>
-	Combat::place_numbers(int32_t oid, const std::vector<std::pair<int32_t, bool>> &damagelines)
+	Combat::place_numbers(const std::vector<std::pair<int32_t, bool>> &damagelines, int32_t move_id)
 	{
+		// Demolition's many hits stack half as far apart.
+		bool close = move_id == 5121004;
 		std::vector<DamageNumber> numbers;
-		int16_t head = mobs.get_mob_head_position(oid).y();
 
-		for (auto &line : damagelines)
+		for (size_t line = 0; line < damagelines.size(); line++)
 		{
-			int32_t amount = line.first;
-			bool critical = line.second;
+			int32_t amount = damagelines[line].first;
+			bool critical = damagelines[line].second;
 			DamageNumber::Type type = critical ? DamageNumber::Type::CRITICAL : DamageNumber::Type::NORMAL;
-			numbers.emplace_back(type, amount, head);
-
-			head -= DamageNumber::rowheight(critical);
+			int16_t lift = damage_layout::mob_offset(static_cast<int16_t>(line), close);
+			numbers.emplace_back(type, amount, lift);
 		}
 
 		return numbers;
