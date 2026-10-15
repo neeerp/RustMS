@@ -143,6 +143,8 @@ pub struct Field {
     pub mobs: Vec<(i32, i32)>,
     /// Mobs this client controls.
     pub controlled: BTreeSet<i32>,
+    /// Mobs handed to this client with aggro, in order.
+    pub aggro: Vec<i32>,
     /// Mob movements relayed from their controller.
     pub moved: Vec<i32>,
     /// Answers to this client's own mob movements.
@@ -178,8 +180,15 @@ impl Field {
             r.read_byte().unwrap();
             self.mobs.push((oid, r.read_int().unwrap()));
         } else if op == SendOpcode::SpawnMonsterControl as i16 {
-            if r.read_byte().unwrap() == 1 {
-                self.controlled.insert(r.read_int().unwrap());
+            let mode = r.read_byte().unwrap();
+            let oid = r.read_int().unwrap();
+            if mode == 0 {
+                self.controlled.remove(&oid);
+            } else {
+                self.controlled.insert(oid);
+            }
+            if mode == 2 {
+                self.aggro.push(oid);
             }
         } else if op == SendOpcode::MoveMonster as i16 {
             self.moved.push(r.read_int().unwrap());

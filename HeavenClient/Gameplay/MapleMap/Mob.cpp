@@ -18,6 +18,7 @@
 #include "Mob.h"
 
 #include "../../Character/TouchDamage.h"
+#include "../../Constants.h"
 #include "../../Util/Misc.h"
 #include "../../Util/NxFiles.h"
 
@@ -27,6 +28,7 @@
 
 #include <algorithm>
 #include <cstdint>
+#include <cstdlib>
 
 namespace ms
 {
@@ -89,6 +91,11 @@ namespace ms
 		id = mid;
 		team = tm;
 		set_position(position);
+		hastarget = false;
+		targettime = 0;
+		aitime = 0;
+		thinktimer = 0;
+		movedir = 0;
 		set_control(mode);
 		phobj.fhid = fh;
 		phobj.set_flag(PhysicsObject::Flag::TURNATEDGES);
@@ -118,7 +125,7 @@ namespace ms
 			opacity.set(1.0f);
 		}
 
-		if (control && stance == Stance::STAND)
+		if (control && stance == Stance::STAND && canfly)
 			next_move();
 	}
 
@@ -243,7 +250,7 @@ namespace ms
 
 			physics.move_object(phobj);
 
-			if (control)
+			if (control && canfly)
 			{
 				counter++;
 
@@ -253,9 +260,6 @@ namespace ms
 				{
 					case Stance::HIT:
 						next = counter > 200;
-						break;
-					case Stance::JUMP:
-						next = phobj.onground;
 						break;
 					default:
 						next = aniend && counter > 200;
@@ -267,6 +271,42 @@ namespace ms
 					next_move();
 					update_movement();
 					counter = 0;
+				}
+			} else if (control)
+			{
+				// v83 gives up a chase 3 to 4 minutes after aggro (FUN_007f7f02).
+				if (hastarget)
+				{
+					targettime -= Constants::TIMESTEP;
+
+					if (targettime < 0)
+						hastarget = false;
+				}
+
+				switch (stance)
+				{
+					case Stance::HIT:
+						// v83 holds a hit mob still, then leaves it standing
+						// until its AI next decides.
+						if (++counter > 200)
+						{
+							set_stance(Stance::STAND);
+							update_movement();
+							counter = 0;
+						}
+
+						break;
+					case Stance::JUMP:
+						if (phobj.onground)
+							walk(movedir);
+
+						break;
+					default:
+						// The mob vecctrl steps its AI in 90 ms steps (FUN_007f72d9).
+						for (aitime += Constants::TIMESTEP; aitime >= 90; aitime -= 90)
+							think();
+
+						break;
 				}
 			}
 		} else
@@ -326,6 +366,83 @@ namespace ms
 		}
 	}
 
+	void Mob::think()
+	{
+		// FUN_007f8025 (standing mobs), FUN_007f81c8 (walking) and
+		// FUN_007f835e (jumping): each decision holds for a random time, in
+		// 90 ms steps.
+		if (thinktimer > 0)
+		{
+			thinktimer--;
+			return;
+		}
+
+		Point<int16_t> position = get_position();
+		int16_t dx = targetpos.x() - position.x();
+
+		if (!canmove)
+		{
+			if (hastarget)
+			{
+				thinktimer = (randomizer.next_int(400) + 800) / 90;
+
+				if (flip != (dx >= 0))
+				{
+					flip = dx >= 0;
+					update_movement();
+				}
+
+				// It forgets a target that leaves the 2000 x 1200 box around it.
+				int16_t dy = targetpos.y() - position.y();
+
+				if (dx < -1000 || dx >= 1000 || dy < -600 || dy >= 600)
+					hastarget = false;
+			}
+		} else if (hastarget)
+		{
+			// Head for the target, and keep going the way it was until 100 px
+			// past it. Turning at a platform's end is left to the walk.
+			thinktimer = (randomizer.next_int(400) + 800) / 90;
+
+			if (movedir == 0 || std::abs(dx) > 99)
+				movedir = dx >= 0 ? 1 : -1;
+
+			walk(movedir);
+		} else if (canjump && phobj.onground && randomizer.next_int(5) == 0)
+		{
+			// A fifth of a jumping mob's idle decisions are jumps, after
+			// which it decides again.
+			set_stance(Stance::JUMP);
+			update_movement();
+			return;
+		} else
+		{
+			thinktimer = (randomizer.next_int(2000) + 1000) / 90;
+			movedir = static_cast<int8_t>(randomizer.next_int(3) - 1);
+			walk(movedir);
+		}
+
+		thinktimer--;
+	}
+
+	void Mob::walk(int8_t direction)
+	{
+		Stance before = stance;
+		bool faced = flip;
+
+		if (direction == 0)
+		{
+			set_stance(Stance::STAND);
+		} else
+		{
+			set_stance(Stance::MOVE);
+			flip = direction > 0;
+		}
+
+		if (stance != before || flip != faced)
+			update_movement();
+	}
+
 	void Mob::update_movement()
 	{
 		MoveMobPacket(
@@ -375,7 +492,24 @@ namespace ms
 	void Mob::set_control(int8_t mode)
 	{
 		control = mode > 0;
-		aggro = mode == 2;
+
+		// v83 (FUN_005d511d -> FUN_007f73d8) has a mob given with aggro
+		// chase the local player for 180 to 240 s and decide at once.
+		if (mode == 2)
+		{
+			hastarget = true;
+			targettime = 180000 + randomizer.next_int(60000);
+			thinktimer = 0;
+			movedir = 0;
+		} else if (mode == 0)
+		{
+			hastarget = false;
+		}
+	}
+
+	void Mob::set_target(Point<int16_t> position)
+	{
+		targetpos = position;
 	}
 
 	void Mob::send_movement(Point<int16_t> start, std::vector<Movement> &&in_movements)

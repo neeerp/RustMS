@@ -41,11 +41,12 @@ pub fn build_spawn_mob(mob: &MobView) -> Result<Packet, NetworkError> {
     Ok(p)
 }
 
-/// SPAWN_MONSTER_CONTROL mode 1: this client now moves the mob.
-pub fn build_control_mob(mob: &MobView) -> Result<Packet, NetworkError> {
+/// SPAWN_MONSTER_CONTROL mode 1: this client now moves the mob. Mode 2
+/// (`aggro`) also has it chase this client's player.
+pub fn build_control_mob(mob: &MobView, aggro: bool) -> Result<Packet, NetworkError> {
     let mut p = Packet::new_empty();
     p.write_short(SendOpcode::SpawnMonsterControl as i16)?;
-    p.write_byte(1)?;
+    p.write_byte(if aggro { 2 } else { 1 })?;
     write_mob(
         &mut p,
         &MobView {
@@ -176,9 +177,13 @@ mod tests {
 
     #[test]
     fn control_has_a_mode_and_marks_the_mob_controlled() {
-        let packet = build_control_mob(&snail()).unwrap();
+        let packet = build_control_mob(&snail(), false).unwrap();
         let mut expect = Expect::new(&packet.bytes);
         expect.short(SendOpcode::SpawnMonsterControl as i16).byte(1);
+        expect.int(2_000_000_001).byte(1).int(100100);
+        let aggro = build_control_mob(&snail(), true).unwrap();
+        let mut expect = Expect::new(&aggro.bytes);
+        expect.short(SendOpcode::SpawnMonsterControl as i16).byte(2);
         expect.int(2_000_000_001).byte(1).int(100100);
         let stop = build_stop_controlling_mob(2_000_000_001).unwrap();
         let mut expect = Expect::new(&stop.bytes);
