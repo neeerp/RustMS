@@ -15,6 +15,11 @@ use tokio::time::{Duration, Instant};
 /// `mobTime` of its own.
 pub const RESPAWN_DELAY: Duration = Duration::from_secs(7);
 
+/// A v83 client chases its target for 180 to 240 s after being given a mob
+/// with aggro (FUN_007f73d8). Within the shortest of those, another hit by
+/// the same player needs no new aggro.
+pub const AGGRO_DURATION: Duration = Duration::from_secs(180);
+
 pub struct SpawnPoint {
     template: MapMobTemplate,
     info: MobInfo,
@@ -30,8 +35,11 @@ pub struct LiveMob {
     pub y: i16,
     pub stance: u8,
     pub foothold: i16,
+    pub home_foothold: i16,
     pub hp: i64,
     pub controller: Option<ClientId>,
+    /// Until when the controller's client is chasing its player with it.
+    pub aggro_until: Option<Instant>,
     /// Damage per player, for sharing EXP.
     pub damage_by: HashMap<ClientId, i64>,
 }
@@ -45,6 +53,7 @@ impl LiveMob {
             y: self.y,
             stance: self.stance,
             foothold: self.foothold,
+            home_foothold: self.home_foothold,
             fade_in,
             controlled: self.controller.is_some(),
         }
@@ -130,8 +139,10 @@ impl MobSet {
                     // Mob stances are 2 (moving) or 5 (standing), +1 facing left.
                     stance: if spawn.template.flip { 4 } else { 5 },
                     foothold: spawn.template.foothold,
+                    home_foothold: spawn.template.foothold,
                     hp: i64::from(spawn.info.max_hp),
                     controller: None,
+                    aggro_until: None,
                     damage_by: HashMap::new(),
                 },
             );
@@ -160,10 +171,30 @@ impl MobSet {
             .filter(|mob| mob.controller == Some(leaving))
             .map(|mob| {
                 mob.controller = next;
+                mob.aggro_until = None;
                 mob.damage_by.remove(&leaving);
                 mob.object_id
             })
             .collect()
+    }
+
+    /// `attacker` hit a mob that is still alive. As in v83 servers, it takes
+    /// control with aggro so its client chases it, unless it already has
+    /// aggro over the mob. Returns the previous controller when control
+    /// must be sent.
+    pub fn provoke(
+        &mut self,
+        attacker: ClientId,
+        object_id: i32,
+        now: Instant,
+    ) -> Option<Option<ClientId>> {
+        let mob = self.live.get_mut(&object_id)?;
+        if mob.controller == Some(attacker) && mob.aggro_until.is_some_and(|until| until > now) {
+            return None;
+        }
+        let previous = mob.controller.replace(attacker);
+        mob.aggro_until = Some(now + AGGRO_DURATION);
+        Some(previous)
     }
 
     /// Apply the controller's movement. `false` if `from` doesn't control it.
@@ -381,13 +412,18 @@ mod tests {
             (150, -25)
         );
         // Walking onto another platform: an absolute fragment with
-        // foothold 52; airborne fragments (foothold 0) keep the last one.
+        // foothold 52, which a relative one keeps.
         let walk = [
             2, 0, 0x96, 0, 0x2D, 0, 0, 0, 0, 0, 52, 0, 2, 100, 0, //
-            0, 0x96, 0, 0x30, 0, 0, 0, 0, 0, 0, 0, 2, 100, 0,
+            1, 0x0A, 0, 0, 0, 2, 100, 0,
         ];
         assert!(mobs.move_mob(1, snail, &walk));
-        assert_eq!(mobs.get(snail).unwrap().view(false).foothold, 52);
+        let view = mobs.get(snail).unwrap().view(false);
+        assert_eq!((view.foothold, view.home_foothold), (52, 45));
+        // An absolute fragment without a foothold leaves it airborne.
+        let fall = [1, 0, 0x96, 0, 0x30, 0, 0, 0, 0, 0, 0, 0, 2, 100, 0];
+        assert!(mobs.move_mob(1, snail, &fall));
+        assert_eq!(mobs.get(snail).unwrap().view(false).foothold, 0);
 
         assert_eq!(mobs.damage(1, snail, 3, now), Some(Ok(63)));
         let Some(Err(kill)) = mobs.damage(2, snail, 10, now) else {
@@ -425,6 +461,24 @@ mod tests {
         assert_eq!(mobs.live().next().unwrap().controller, Some(2));
         mobs.release(2, None);
         assert_eq!(mobs.live().next().unwrap().controller, None);
+    }
+
+    #[test]
+    fn a_hit_takes_control_with_aggro() {
+        let now = Instant::now();
+        let mut mobs = MobSet::new([snail_spawn(100)]);
+        let snail = mobs.respawn(now)[0];
+        mobs.assign_uncontrolled(1);
+        assert_eq!(mobs.provoke(2, snail, now), Some(Some(1)));
+        assert_eq!(mobs.get(snail).unwrap().controller, Some(2));
+        // Further hits while the chase lasts change nothing...
+        assert_eq!(mobs.provoke(2, snail, now + Duration::from_secs(60)), None);
+        // ...but renew it once it may have ended.
+        assert_eq!(mobs.provoke(2, snail, now + AGGRO_DURATION), Some(Some(2)));
+        // Handing the mob on drops the aggro.
+        mobs.release(2, Some(1));
+        assert_eq!(mobs.provoke(1, snail, now), Some(Some(1)));
+        assert!(mobs.provoke(1, 12345, now).is_none());
     }
 
     #[test]

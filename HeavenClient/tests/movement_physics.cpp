@@ -15,31 +15,41 @@ void require(bool condition, const char* message)
 	if (!condition) throw std::runtime_error(message);
 }
 
-// A tiny NX fixture with a single flat foothold. It exercises the production
-// collision/physics code without graphics, server processes, or game assets.
+// A tiny NX fixture: a flat floor from -1000 to 1000 at y = 100, above a wider
+// one at y = 500 that keeps the map walls clear of the first floor's ends. It
+// exercises the production collision/physics code without graphics, server
+// processes, or game assets.
 std::filesystem::path flat_map()
 {
-	std::vector<std::string> names {"", "0", "1", "next", "prev", "x1", "x2", "y1", "y2"};
-	std::vector<uint8_t> bytes(64 + 10 * 20 + names.size() * 8);
+	const int64_t footholds[][6] = {{0, 0, -1000, 1000, 100, 100}, {0, 0, -2000, 2000, 500, 500}};
+	const size_t count = std::size(footholds);
+	std::vector<std::string> names {"", "0", "next", "prev", "x1", "x2", "y1", "y2"};
+	for (size_t i = 0; i < count; ++i) names.push_back(std::to_string(i + 1));
+	const size_t nodes = 3 + 7 * count;
+	const size_t strings = 64 + nodes * 20;
+	std::vector<uint8_t> bytes(strings + names.size() * 8);
 	auto put = [&](size_t offset, uint64_t value, size_t count)
 	{
 		for (size_t i = 0; i < count; ++i) bytes[offset + i] = value >> (8 * i);
 	};
-	put(0, 0x34474b50, 4); put(4, 10, 4); put(8, 64, 8);
-	put(16, names.size(), 4); put(20, 264, 8);
+	put(0, 0x34474b50, 4); put(4, nodes, 4); put(8, 64, 8);
+	put(16, names.size(), 4); put(20, strings, 8);
 	auto node = [&](size_t id, uint32_t name, uint32_t children, uint16_t count, uint16_t type, int64_t data)
 	{
 		size_t offset = 64 + id * 20;
 		put(offset, name, 4); put(offset + 4, children, 4); put(offset + 8, count, 2);
 		put(offset + 10, type, 2); put(offset + 12, data, 8);
 	};
-	node(0, 0, 1, 1, 0, 0); node(1, 1, 2, 1, 0, 0);
-	node(2, 1, 3, 1, 0, 0); node(3, 2, 4, 6, 0, 0);
-	const int64_t values[] = {0, 0, -1000, 1000, 100, 100};
-	for (size_t i = 0; i < 6; ++i) node(i + 4, i + 3, 0, 0, 1, values[i]);
+	node(0, 0, 1, 1, 0, 0); node(1, 1, 2, 1, 0, 0); node(2, 1, 3, count, 0, 0);
+	for (size_t f = 0; f < count; ++f)
+	{
+		size_t values = 3 + count + 6 * f;
+		node(3 + f, 8 + f, values, 6, 0, 0);
+		for (size_t i = 0; i < 6; ++i) node(values + i, i + 2, 0, 0, 1, footholds[f][i]);
+	}
 	for (size_t i = 0; i < names.size(); ++i)
 	{
-		put(264 + i * 8, bytes.size(), 8);
+		put(strings + i * 8, bytes.size(), 8);
 		bytes.push_back(names[i].size()); bytes.push_back(0);
 		bytes.insert(bytes.end(), names[i].begin(), names[i].end());
 	}
@@ -239,6 +249,58 @@ int main()
 			standing_jump(physics);
 			running_jump(physics);
 			falling(physics);
+			// A knocked back mob sets its own ground speed; friction must not
+			// eat into it, even below the usual stopping threshold.
+			ms::PhysicsObject mob;
+			mob.set_x(0); mob.set_y(100);
+			physics.move_object(mob);
+			mob.set_flag(ms::PhysicsObject::Flag::NOFRICTION);
+			for (double speed : {1.04, 0.05})
+			{
+				mob.hspeed = speed;
+				double start = mob.crnt_x();
+				physics.move_object(mob);
+				require(mob.onground && mob.hspeed == speed, "ground friction slowed a NOFRICTION object");
+				require(std::abs(mob.crnt_x() - start - speed) < 1e-9, "NOFRICTION object moved the wrong distance");
+			}
+		}
+		{
+			// A walking-only mob turns 20 px before the loose ends of the
+			// floor, and is pulled back if it starts past that point.
+			nl::file map(path.string());
+			ms::Physics physics(map.root());
+			for (double start : {900.0, 990.0, -900.0, -990.0})
+			{
+				double direction = start > 0.0 ? 1.0 : -1.0;
+				ms::PhysicsObject mob;
+				mob.set_x(start); mob.set_y(100);
+				mob.set_flag(ms::PhysicsObject::Flag::TURNATEDGES);
+				mob.set_flag(ms::PhysicsObject::Flag::WALKONLY);
+				physics.move_object(mob);
+				require(mob.onground && mob.fhid != 0, "walker fixture did not find its floor");
+				for (int tick = 0; mob.is_flag_set(ms::PhysicsObject::Flag::TURNATEDGES); ++tick)
+				{
+					require(tick < 1000, "walker never reached the edge");
+					mob.hforce = direction * .1;
+					physics.move_object(mob);
+				}
+				require(mob.crnt_x() == direction * 980 && mob.onground, "walker did not stop 20 px from the edge");
+			}
+		}
+		{
+			// A mob that enters on a foothold stands on it, even if its
+			// position is a pixel below it, and stays there.
+			nl::file map(path.string());
+			ms::Physics physics(map.root());
+			ms::PhysicsObject mob;
+			mob.set_x(500); mob.set_y(101);
+			physics.get_fht().place_on_fh(mob, 1);
+			require(mob.crnt_y() == 100 && mob.onground && mob.fhid == 1, "spawn was not put on its foothold");
+			physics.move_object(mob);
+			require(mob.crnt_y() == 100 && mob.onground, "placed mob fell");
+			mob.set_x(1200); mob.set_y(50);
+			physics.get_fht().place_on_fh(mob, 1);
+			require(mob.crnt_x() == 1000 && mob.crnt_y() == 100, "placement was not clamped to the foothold");
 		}
 		std::filesystem::remove(path);
 		std::cout << "Movement physics passed\n";

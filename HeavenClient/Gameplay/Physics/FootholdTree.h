@@ -41,6 +41,9 @@ namespace ms
 		// Updates a PhysicsObject's fhid based on it's position.
 		void update_fh(PhysicsObject &touse) const;
 
+		// Puts a PhysicsObject on the platform the server says it stands on.
+		void place_on_fh(PhysicsObject &touse, uint16_t fhid) const;
+
 		// Determine the point on the ground below the specified position.
 		int16_t get_y_below(Point<int16_t> position) const;
 
@@ -56,6 +59,8 @@ namespace ms
 		double get_wall(uint16_t fhid, bool left, double fy) const;
 
 		double get_edge(uint16_t fhid, bool left) const;
+
+		double get_walk_edge(uint16_t fhid, bool left) const;
 
 		const Foothold &get_fh(uint16_t fhid) const;
 

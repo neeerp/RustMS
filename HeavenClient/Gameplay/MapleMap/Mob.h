@@ -72,7 +72,7 @@ namespace ms
 
 		// Construct a mob by combining data from game files with data sent by the server.
 		Mob(int32_t oid, int32_t mobid, int8_t mode, int8_t stance, uint16_t fhid, bool newspawn, int8_t team,
-			Point<int16_t> position);
+			Point<int16_t> position, const Physics &physics);
 
 		// Draw the mob
 		void draw(double viewx, double viewy, float alpha) const override;
@@ -83,6 +83,9 @@ namespace ms
 		// Change this mob's control mode:
 		// 0 - no control, 1 - control, 2 - aggro
 		void set_control(int8_t mode);
+
+		// Tell the mob where the local player is, whom it chases with aggro.
+		void set_target(Point<int16_t> position);
 
 		// Send movement to the mob.
 		void send_movement(Point<int16_t> start, std::vector<Movement> &&movements);
@@ -102,6 +105,9 @@ namespace ms
 
 		// Show an effect at the mob's position.
 		void show_effect(const Animation &animation, int8_t pos, int8_t z, bool flip);
+
+		// Show a weapon's hit spark where the attack meets the mob's body.
+		void show_hit(const Animation &animation, const Rectangle<int16_t> &range, bool flip);
 
 		// Calculate the damage to this mob with the specified attack.
 		std::vector<std::pair<int32_t, bool>> calculate_damage(const Attack &attack);
@@ -142,8 +148,15 @@ namespace ms
 		// Start the death animation.
 		void apply_death();
 
-		// Decide on the next state.
+		// Decide on the next state of a flying mob.
 		void next_move();
+
+		// Take one 90 ms step of a ground mob's AI.
+		void think();
+
+		// Stand (0) or walk left (-1) or right (1), telling the server if
+		// that changes anything.
+		void walk(int8_t direction);
 
 		// Send the current position and state to the server.
 		void update_movement();
@@ -200,8 +213,6 @@ namespace ms
 
 		std::vector<Movement> movements;
 		uint16_t counter;
-		// Ticks left to push back a mob that was knocked back.
-		uint8_t knockback_ticks;
 		// Hits queued against this mob that haven't landed yet.
 		uint16_t pending_hits;
 		// Ticks before a killed mob dies even if its pending hits never land.
@@ -213,7 +224,15 @@ namespace ms
 		bool dying;
 		bool dead;
 		bool control;
-		bool aggro;
+		// Whether the mob chases the local player, and for how many more ms.
+		bool hastarget;
+		int32_t targettime;
+		Point<int16_t> targetpos;
+		// Ms towards the next AI step, and AI steps until the next decision.
+		uint16_t aitime;
+		int16_t thinktimer;
+		// Where the AI means to go: -1 left, 0 nowhere, 1 right.
+		int8_t movedir;
 		Stance stance;
 		bool flip;
 		FlyDirection flydirection;

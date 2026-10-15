@@ -627,6 +627,11 @@ namespace ms
 		return stance.get();
 	}
 
+	Point<int16_t> CharLook::get_facepos() const
+	{
+		return drawinfo.getfacepos(stance.get(), stframe.get());
+	}
+
 	const Body *CharLook::get_body() const
 	{
 		return body;

@@ -159,11 +159,33 @@ the others a `FacialExpression` through `FieldRequest::Broadcast`. The sender
 has already changed its own face. Emotes above 7 need an emotion cash item
 and are dropped.
 
+## Portable chairs
+
+Double-clicking a 301xxxx Set-up item sits the client down at once and sends
+USE_CHAIR (0x2B: item id). Like the v83 client, it only does so on the ground,
+when not already seated, and at the chair's `info/reqLevel` or above.
+`UseChairHandler` checks that the item is a portable chair the player owns,
+then sends the field `FieldRequest::Chair(item_id)`. The field records it in
+the occupant's `FieldAvatar::chair` and shows the others SHOW_CHAIR (0xC4:
+character id, item id). A later joiner gets the chair in `SpawnPlayer`.
+
+The client never stands up on its own. Left, Right, Jump, Sit, or a hit that
+deals damage sends CANCEL_CHAIR (0x2A: seat, -1 for a portable chair) once.
+Up does not cancel. `CancelChairHandler` replies with CANCEL_CHAIR (0xCD: byte
+0), which stands the client up, and sends `Chair(0)`, so the others get
+SHOW_CHAIR with item 0. Map seats (a seat id other than -1) are not
+implemented and get no reply.
+
+The client draws `Item/Install/0301.img/<id>/effect` while the character
+sits. The effect is anchored at the face when `pos` is 1, otherwise at the
+feet, and drawn behind the character when `z` is negative. `effect2` comes
+from later data and is ignored. Chair HP/MP recovery is not implemented.
+
 ## Tests
 
 - Unit tests in `runtime/src/actor/field.rs`: join/leave visibility, a
-  stalled client being kicked without blocking others, and a character info
-  request reaching only its target.
+  stalled client being kicked without blocking others, a character info
+  request reaching only its target, and chairs being shown to the map.
 - Integration tests: same-map presence, movement, chat, emotes, portal transfers,
   NPC spawns, cross-channel isolation, starting equipment on spawn, and
-  character info (`char_info`).
+  character info (`char_info`), and portable chairs (`portable_chairs`).

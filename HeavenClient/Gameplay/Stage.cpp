@@ -161,7 +161,7 @@ namespace ms
 
 		reactors.update(physics);
 		npcs.update(physics);
-		mobs.update(physics);
+		mobs.update(physics, player.get_position());
 		chars.update(physics);
 		drops.update(physics);
 		player.update(physics);

@@ -109,6 +109,8 @@ namespace ms
 		ATTACKED_MAGIC = 188,
 
 		FACIAL_EXPRESSION = 193,
+		SHOW_CHAIR = 196,
+		CANCEL_CHAIR = 205,
 		UPDATE_CHARLOOK = 197,
 		SHOW_FOREIGN_EFFECT = 198,
 		SHOW_ITEM_GAIN_INCHAT = 206, // TODO: Rename this (Terribly named)
@@ -174,6 +176,8 @@ namespace ms
 		emplace<SPAWN_CHAR, SpawnCharHandler>();
 		emplace<CHAR_MOVED, CharMovedHandler>();
 		emplace<FACIAL_EXPRESSION, FacialExpressionHandler>();
+		emplace<SHOW_CHAIR, ShowChairHandler>();
+		emplace<CANCEL_CHAIR, CancelChairHandler>();
 		emplace<UPDATE_CHARLOOK, UpdateCharLookHandler>();
 		emplace<SHOW_FOREIGN_EFFECT, ShowForeignEffectHandler>();
 		emplace<REMOVE_CHAR, RemoveCharHandler>();

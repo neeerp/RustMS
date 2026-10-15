@@ -248,7 +248,20 @@ namespace ms
 			switch (ka)
 			{
 				case KeyAction::Id::DOWN:
-					player.set_state(Char::State::STAND);
+					// Getting up with Left or Right held walks on, as in v83.
+					if (player.is_key_down(KeyAction::Id::LEFT))
+					{
+						player.set_direction(false);
+						player.set_state(Char::State::WALK);
+					} else if (player.is_key_down(KeyAction::Id::RIGHT))
+					{
+						player.set_direction(true);
+						player.set_state(Char::State::WALK);
+					} else
+					{
+						player.set_state(Char::State::STAND);
+					}
+
 					break;
 			}
 		}
@@ -263,6 +276,16 @@ namespace ms
 	// Sitting
 	void PlayerSitState::send_action(Player &player, KeyAction::Id ka, bool down) const
 	{
+		// Getting off a portable chair waits for the server's CANCEL_CHAIR.
+		if (player.get_chair())
+		{
+			if (down && (ka == KeyAction::Id::LEFT || ka == KeyAction::Id::RIGHT ||
+						 ka == KeyAction::Id::JUMP || ka == KeyAction::Id::SIT))
+				player.leave_chair();
+
+			return;
+		}
+
 		if (down)
 		{
 			switch (ka)

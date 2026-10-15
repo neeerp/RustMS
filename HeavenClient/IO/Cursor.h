@@ -70,6 +70,7 @@ namespace ms
 		// pressed hand unless its state is a more specific one (grabbing,
 		// scrolling, ...).
 		void set_pressed(bool pressed);
+		bool is_pressed() const;
 
 		State get_state() const;
 

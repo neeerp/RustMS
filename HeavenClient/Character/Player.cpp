@@ -28,6 +28,9 @@
 #include "../Net/Packets/GameplayPackets.h"
 #include "../Net/Packets/PlayerPackets.h"
 #include "../Net/Packets/InventoryPackets.h"
+#include "../Util/Misc.h"
+
+#include <nlnx/nx.hpp>
 
 #include <algorithm>
 
@@ -87,6 +90,7 @@ namespace ms
 		keysdown.clear();
 		attacking = false;
 		ladder = nullptr;
+		set_chair(0);
 		nullstate.update_state(*this);
 	}
 
@@ -166,8 +170,12 @@ namespace ms
 		InventoryType::Id type = InventoryType::by_item_id(itemid);
 
 		if (int16_t slot = inventory.find_item(type, itemid))
+		{
 			if (type == InventoryType::Id::USE)
 				UseItemPacket(slot, itemid).dispatch();
+			else if (type == InventoryType::Id::SETUP && itemid / 10000 == 301)
+				sit_on_chair(itemid);
+		}
 	}
 
 	void Player::draw(Layer::Id layer, double viewx, double viewy, float alpha) const
@@ -306,6 +314,9 @@ namespace ms
 		{
 			Char::set_state(st);
 
+			if (st != Char::State::SIT)
+				set_chair(0);
+
 			const PlayerState *pst = get_state(st);
 
 			if (pst)
@@ -437,6 +448,11 @@ namespace ms
 		bool fromleft = attack.origin.x() > phobj.get_x();
 
 		bool missed = damage <= 0;
+
+		// Getting hurt knocks the player off a portable chair.
+		if (!missed)
+			leave_chair();
+
 		bool immovable = ladder || state == Char::State::DIED;
 		bool knockback = !missed && !immovable;
 
@@ -526,6 +542,51 @@ namespace ms
 			set_position(seat->getpos());
 			set_state(Char::State::SIT);
 		}
+	}
+
+	void Player::sit_on_chair(int32_t itemid)
+	{
+		if (!phobj.onground || is_sitting() || is_climbing() || attacking || is_dead())
+			return;
+
+		nl::node info = nl::nx::item["Install"]["0301.img"][string_format::extend_id(itemid, 8)]["info"];
+
+		if (stats.get_stat(MapleStat::Id::LEVEL) < info["reqLevel"].get_integer())
+			return;
+
+		phobj.hspeed = 0.0;
+		set_state(Char::State::SIT);
+		set_chair(itemid);
+		UseChairPacket(itemid).dispatch();
+	}
+
+	void Player::leave_chair()
+	{
+		if (!chair || leaving_chair)
+			return;
+
+		leaving_chair = true;
+		CancelChairPacket(-1).dispatch();
+	}
+
+	void Player::stand_up()
+	{
+		if (!is_sitting())
+			return;
+
+		set_state(Char::State::STAND);
+
+		if (is_key_down(KeyAction::Id::LEFT) != is_key_down(KeyAction::Id::RIGHT))
+		{
+			set_direction(is_key_down(KeyAction::Id::RIGHT));
+			set_state(Char::State::WALK);
+		}
+	}
+
+	void Player::set_chair(int32_t itemid)
+	{
+		Char::set_chair(itemid);
+		leaving_chair = false;
 	}
 
 	void Player::set_ladder(Optional<const Ladder> ldr)

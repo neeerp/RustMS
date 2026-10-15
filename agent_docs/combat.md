@@ -15,10 +15,29 @@ templates from `Mob.nx` (`maxHP`, `exp`, `PADamage`, `bodyAttack`,
   mobs and joiners pick up uncontrolled mobs; leaving hands them to another
   occupant. MOVE_LIFE from the controller updates the position, answers
   MOVE_MONSTER_RESPONSE, and relays MOVE_MONSTER to the others; movement from
-  anyone else is ignored.
+  anyone else is ignored. The last absolute fragment's foothold (0 while
+  airborne) becomes the mob's current foothold. In HeavenClient, a controlled
+  mob that can walk but neither jump nor fly turns 20 px before any foothold
+  end that does not lead on to another floor, as v83 does
+  (`FootholdTree::get_walk_edge`).
+- **Aggro:** a hit hands the mob to the attacker with aggro
+  (SPAWN_MONSTER_CONTROL 2) for `AGGRO_DURATION` (180 s, v83's minimum chase
+  time). The previous controller gets SPAWN_MONSTER_CONTROL 0, and later hits
+  from the same player within that time send nothing.
+- **Client AI:** HeavenClient decides each mob's movement in v83's 90 ms
+  steps. Each decision holds for a random time: 1 to 3 s when idle (walk
+  left, right, or stand), and 0.8 to 1.2 s when chasing. A mob given aggro
+  heads for the local player, keeping its direction until it is 100 px past
+  them, and gives up after 180 to 240 s. A mob that cannot move turns to
+  face the player and forgets them once they leave a 2000 x 1200 box.
+  Flying mobs still use the older HeavenClient random flight.
 
 Packets follow the v83 layout (16-byte temporary status mask after the mob
-id); HeavenClient used to skip 22 bytes there and now skips 16.
+id); HeavenClient used to skip 22 bytes there and now skips 16. After the
+stance come two footholds: the one the mob stands on, then its spawn point's.
+v83 puts the mob on the first, at the point along it nearest its x, so a mob
+whose `cy` is a pixel off a slope does not fall; with 0 it falls from its
+position. HeavenClient does the same (`FootholdTree::place_on_fh`).
 
 ## Attacks
 
@@ -181,7 +200,9 @@ to play the breaking animation) and the hitter rolls its drops
 (`net::loot::roll_reactor`) where it stood. A broken reactor comes back after
 the map's `reactorTime` seconds, under a new object id since HeavenClient
 keeps a broken reactor under its old one; one without a `reactorTime` stays
-broken.
+broken. With each state's hit animation, including the break, HeavenClient
+plays `Sound/Reactor.img/<id>/<state>/Hit`, with the id unpadded as v83
+formats it.
 
 Reactor drops come from the content pack's table, keyed by reactor id, plus
 `[reactors]` in `reward_overrides.toml`; see `server-content.md`. Reactor
