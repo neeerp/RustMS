@@ -408,6 +408,9 @@ namespace ms
 			case LineType::PINK:
 				color = Color::Name::MONALISA;
 				break;
+			case LineType::SKILL:
+				color = Color::Name::SUNDOWN;
+				break;
 			default:
 				color = Color::Name::WHITE;
 				break;
@@ -428,7 +431,8 @@ namespace ms
 		std::string message = Messages::messages[line];
 		send_chatline(message, type);
 
-		message_cooldowns[line] = MESSAGE_COOLDOWN;
+		bool cost = line == Messages::SKILL_HPCOST || line == Messages::SKILL_MPCOST;
+		message_cooldowns[line] = cost ? COST_MESSAGE_COOLDOWN : MESSAGE_COOLDOWN;
 	}
 
 	void UIChatBar::toggle_chat()

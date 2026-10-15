@@ -56,7 +56,9 @@ namespace ms
 			PARTY,
 			// Buddy chat
 			BUDDY,
-			PINK
+			PINK,
+			// A skill could not be used
+			SKILL
 		};
 
 		// Who a typed line goes to
@@ -136,6 +138,8 @@ namespace ms
 		static constexpr int16_t CHATROWS = 5;
 		static constexpr int16_t STRIP_WIDTH = 551;
 		static constexpr time_t MESSAGE_COOLDOWN = 1'000;
+		// The original repeats a missing HP or MP notice at most every two seconds.
+		static constexpr time_t COST_MESSAGE_COOLDOWN = 2'000;
 
 		enum Buttons : uint16_t
 		{
