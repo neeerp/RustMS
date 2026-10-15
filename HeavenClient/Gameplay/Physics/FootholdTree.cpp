@@ -92,8 +92,9 @@ namespace ms
 
 		// v83 (FUN_0085fe71) keeps objects 30 px inside the outermost
 		// footholds and up to 300 px above the highest. A map with VRLimit
-		// pulls those in to its view range. v83 doesn't stop a fall below
-		// the lowest foothold; this stops it 100 px below.
+		// pulls those in to its view range; like v83, it reads a missing edge
+		// as 0 and skips an edge of 0. v83 doesn't stop a fall below the
+		// lowest foothold; this stops it 100 px below.
 		int16_t left = leftw + 30;
 		int16_t right = rightw - 30;
 		int16_t top = topb - 300;
