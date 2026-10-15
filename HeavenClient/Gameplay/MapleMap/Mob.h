@@ -193,6 +193,7 @@ namespace ms
 
 		// Return the current 'head' position
 		Point<int16_t> get_head_position(Point<int16_t> position) const;
+		void draw_hp_bar(Point<int16_t> position) const;
 
 		// Load the level tag in one of ShowLevel's sets: 0 white, 1 yellow,
 		// 2 red.

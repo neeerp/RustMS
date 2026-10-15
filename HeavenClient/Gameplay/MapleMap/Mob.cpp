@@ -722,7 +722,6 @@ namespace ms
 	void Mob::draw(double viewx, double viewy, float alpha) const
 	{
 		Point<int16_t> absp = phobj.get_absolute(viewx, viewy, alpha);
-		Point<int16_t> headpos = get_head_position(absp);
 
 		effects.drawbelow(absp, alpha);
 
@@ -750,11 +749,28 @@ namespace ms
 				}
 
 				if (!dying && hppercent > 0)
-					hpbar.draw(headpos, hppercent);
+					draw_hp_bar(absp);
 			}
 		}
 
 		effects.drawabove(absp, alpha);
+	}
+
+	void Mob::draw_hp_bar(Point<int16_t> position) const
+	{
+		// As in v83 (FUN_005d004e), the bar sits centred over the body, its
+		// top 30 px above the body's. A frame without a body has no bar.
+		Rectangle<int16_t> body = animations.at(stance).get_bounds();
+
+		if (body.right() <= body.left() || body.bottom() <= body.top())
+			return;
+
+		int16_t centre = (body.left() + body.right()) / 2;
+
+		if (flip && !noflip)
+			centre = -centre;
+
+		hpbar.draw(position + Point<int16_t>(centre - MobHpBar::WIDTH / 2, body.top() - 30), hppercent);
 	}
 
 	void Mob::set_control(int8_t mode)
@@ -910,7 +926,9 @@ namespace ms
 			percent = 0;
 
 		hppercent = percent;
-		showhp.set_for(2000);
+		// v83 hides the bar and name 5 s after the player's last hit
+		// (FUN_005cbf42 stamps the hit; the mob's update checks it).
+		showhp.set_for(5000);
 	}
 
 	void Mob::show_effect(const Animation &animation, int8_t pos, int8_t z, bool f)

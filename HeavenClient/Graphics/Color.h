@@ -108,6 +108,7 @@ namespace ms
 			MONALISA,
 			CORNFLOWERBLUE,
 			SUNDOWN,
+			HPSHADE,
 			NUM_COLORS
 		};
 
@@ -143,7 +144,7 @@ namespace ms
 						{0.47f, 0.47f, 0.47f}, // Boulder
 						{0.00f, 0.75f, 0.00f}, // Green (Mob HP Bar)
 						{0.00f, 1.00f, 0.00f}, // Light Green (Mob HP Bar)
-						{0.00f, 0.50f, 0.00f}, // Japanese Laurel (Mob HP Bar)
+						{0.00f, 0.50f, 0.00f}, // Japanese Laurel
 						{0.67f, 0.67f, 0.60f}, // Gray Olive
 						{0.80f, 1.00f, 0.00f}, // Electric Lime
 						{1.00f, 0.80f, 0.00f}, // Supernova
@@ -165,7 +166,8 @@ namespace ms
 						{1.00f, 0.60f, 0.80f}, // Party pink (#FF99CC, party chat; not yet checked against footage)
 						{1.00f, 0.63f, 0.58f}, // Mona Lisa (#FFA194, Monster Book lines in the chat log, from footage)
 						{0.40f, 0.65f, 0.98f}, // Cornflower blue (#66A5FA, the names of upgraded equips in v83 tooltips, from footage)
-						{1.00f, 0.69f, 0.69f}  // Sundown (#FFAFAF, skill-refusal notices in the chat log, from the v83 client's chat fonts)
+						{1.00f, 0.69f, 0.69f}, // Sundown (#FFAFAF, skill-refusal notices in the chat log, from the v83 client's chat fonts)
+						{0.63f, 0.01f, 0.00f}  // HP shade (#A00300, the bottom row of v83's mob and party HP bars)
 				};
 
 		// Create a color by an array of real numbers [0.0f, 1.0f]

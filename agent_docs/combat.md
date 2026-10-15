@@ -115,6 +115,12 @@ from the player's own attacks and from other players' attacks as they
 arrive), and a killed mob starts its death animation when the last of them
 lands, or after 2 s if one never does.
 
+SHOW_MONSTER_HP shows the mob's HP bar and name tag in HeavenClient
+(`Mob::show_hp`) for 5 s, as v83 hides them 5 s after the player's last hit.
+The bar is v83's 52x10 box (`MobHpBar`), centred over the frame's body rect
+with its top 30 px above the rect's top. Party members' bars use the same box
+filled red.
+
 A dead mob's EXP is shared by damage dealt (the top damager gets any
 rounding remainder) and each share goes to that player's client actor
 (`ServerMessage::MobKilled`), which adds it with `Player::gain_exp`. A level
