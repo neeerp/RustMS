@@ -74,7 +74,12 @@ from `UI.nx`. Moved so far:
   the shared anchor.
 - **Chat** (`UIChatBar`): the input strip in the bar's top-left and the log
   above it. The status bar cuts that strip out of its background, so the two
-  can overlap in either draw order.
+  can overlap in either draw order. As in the original, the log has three
+  layouts: collapsed, the latest line sits in the strip; collapsed while
+  typing, it moves just above the strip; expanded, five lines sit above the
+  strip and the input field stays shown. Each is a uniform half-black panel
+  with a `Basic.img/VScr5` scroll bar. Its thumb is placed as the original
+  places it, which hit-tests only an arrow's height of it.
 - **NPC dialog** (`UINpcTalk`, `UIWindow.img/UtilDlgEx`): the frame,
   buttons, menu dots, quest list headers, and the `Basic.img/VScr4` scroll
   bar (`Slider::Type::CLASSIC`). See [npc-dialogue.md](npc-dialogue.md).
