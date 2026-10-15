@@ -17,6 +17,8 @@
 //////////////////////////////////////////////////////////////////////////////////
 #include "FootholdTree.h"
 
+#include <algorithm>
+#include <cmath>
 #include <iostream>
 
 namespace ms
@@ -114,8 +116,21 @@ namespace ms
 
 			if (!collision && phobj.is_flag_set(PhysicsObject::Flag::TURNATEDGES))
 			{
-				wall = get_edge(phobj.fhid, left);
-				collision = left ? crnt_x >= wall && next_x <= wall : crnt_x <= wall && next_x >= wall;
+				if (phobj.is_flag_set(PhysicsObject::Flag::WALKONLY))
+				{
+					// v83 checks this only while walking, and pulls the object
+					// back to the limit even if it started past it, e.g. when it
+					// spawned near the end of its foothold.
+					if (phobj.onground)
+					{
+						wall = get_walk_edge(phobj.fhid, left);
+						collision = left ? next_x < wall : next_x > wall;
+					}
+				} else
+				{
+					wall = get_edge(phobj.fhid, left);
+					collision = left ? crnt_x >= wall && next_x <= wall : crnt_x <= wall && next_x >= wall;
+				}
 			}
 
 			if (collision)
@@ -313,6 +328,30 @@ namespace ms
 
 			return walls.second();
 		}
+	}
+
+	double FootholdTree::get_walk_edge(uint16_t curid, bool left) const
+	{
+		// v83 (FUN_007f8d64, move ability 1) lets a mob walk on to the next
+		// foothold only if that one runs left to right; at a wall, a ceiling
+		// or a loose end it stops 20 px along this foothold from its end.
+		constexpr double MARGIN = 20.0;
+
+		const Foothold &fh = get_fh(curid);
+		const Foothold &neighbour = get_fh(left ? fh.prev() : fh.next());
+
+		if (neighbour.x2() > neighbour.x1())
+			return left ? walls.first() : walls.second();
+
+		double dx = fh.x2() - fh.x1();
+		double length = std::hypot(dx, fh.y2() - fh.y1());
+
+		if (length == 0.0)
+			return left ? fh.x1() : fh.x2();
+
+		double margin = std::min(MARGIN, length) * dx / length;
+
+		return left ? fh.x1() + margin : fh.x2() - margin;
 	}
 
 	uint16_t FootholdTree::get_fhid_below(double fx, double fy) const
