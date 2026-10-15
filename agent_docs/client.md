@@ -116,8 +116,9 @@ from `UI.nx`. Moved so far:
   behind DETAIL, the attack and defence panel (closed with `Basic.img/BtHide`),
   laid out from period footage. The job shows as the `Job/main` and `Job/sub`
   bitmaps for explorers and Cygnus Knights. Beginners get the greyed INT and
-  LUK labels and no HP or MP buttons. The AP buttons and AUTO-ASSIGN are
-  disabled without AP. EXP shows as "exp (pct%)" and updates as it is gained.
+  LUK labels and no HP or MP buttons. The AP buttons are disabled without AP.
+  v83 had no AP auto-assign: the window creates only the six AP-up buttons and
+  DETAIL. EXP shows as "exp (pct%)" and updates as it is gained.
 - **Skill window** (`UISkillBook`, `UIWindow.img/Skill`): one tab per job
   advancement (`Basic.img/Tab5`, drawn by `ClassicTabs`), the book and name of
   the selected one, four skill rows with a `VScr4` scroll bar, and the points
