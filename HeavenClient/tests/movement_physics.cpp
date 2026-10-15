@@ -15,18 +15,22 @@ void require(bool condition, const char* message)
 	if (!condition) throw std::runtime_error(message);
 }
 
-// A tiny NX fixture with a single flat foothold. It exercises the production
-// collision/physics code without graphics, server processes, or game assets.
-std::filesystem::path flat_map()
+// A tiny NX fixture of flat footholds from x -1000 to 1000 at the given
+// heights. It exercises the production collision/physics code without
+// graphics, server processes, or game assets.
+std::filesystem::path flat_map(const std::vector<int64_t>& floors)
 {
-	std::vector<std::string> names {"", "0", "1", "next", "prev", "x1", "x2", "y1", "y2"};
-	std::vector<uint8_t> bytes(64 + 10 * 20 + names.size() * 8);
+	std::vector<std::string> names {"", "0", "next", "prev", "x1", "x2", "y1", "y2"};
+	for (size_t i = 0; i < floors.size(); ++i) names.push_back(std::to_string(i + 1));
+	size_t count = 3 + 7 * floors.size();
+	size_t strings = 64 + count * 20;
+	std::vector<uint8_t> bytes(strings + names.size() * 8);
 	auto put = [&](size_t offset, uint64_t value, size_t count)
 	{
 		for (size_t i = 0; i < count; ++i) bytes[offset + i] = value >> (8 * i);
 	};
-	put(0, 0x34474b50, 4); put(4, 10, 4); put(8, 64, 8);
-	put(16, names.size(), 4); put(20, 264, 8);
+	put(0, 0x34474b50, 4); put(4, count, 4); put(8, 64, 8);
+	put(16, names.size(), 4); put(20, strings, 8);
 	auto node = [&](size_t id, uint32_t name, uint32_t children, uint16_t count, uint16_t type, int64_t data)
 	{
 		size_t offset = 64 + id * 20;
@@ -34,12 +38,17 @@ std::filesystem::path flat_map()
 		put(offset + 10, type, 2); put(offset + 12, data, 8);
 	};
 	node(0, 0, 1, 1, 0, 0); node(1, 1, 2, 1, 0, 0);
-	node(2, 1, 3, 1, 0, 0); node(3, 2, 4, 6, 0, 0);
-	const int64_t values[] = {0, 0, -1000, 1000, 100, 100};
-	for (size_t i = 0; i < 6; ++i) node(i + 4, i + 3, 0, 0, 1, values[i]);
+	node(2, 1, 3, floors.size(), 0, 0);
+	for (size_t i = 0; i < floors.size(); ++i)
+	{
+		size_t first = 3 + floors.size() + 6 * i;
+		node(3 + i, 8 + i, first, 6, 0, 0);
+		const int64_t values[] = {0, 0, -1000, 1000, floors[i], floors[i]};
+		for (size_t j = 0; j < 6; ++j) node(first + j, 2 + j, 0, 0, 1, values[j]);
+	}
 	for (size_t i = 0; i < names.size(); ++i)
 	{
-		put(264 + i * 8, bytes.size(), 8);
+		put(strings + i * 8, bytes.size(), 8);
 		bytes.push_back(names[i].size()); bytes.push_back(0);
 		bytes.insert(bytes.end(), names[i].begin(), names[i].end());
 	}
@@ -209,6 +218,41 @@ void running_jump(const ms::Physics& physics)
 	}
 }
 
+// A down-jump hops at 555 / sqrt(8) = 196 px/s, about 9.6 px, falls through
+// its own floor, and lands on the next one.
+void jumping_down(const ms::Physics& physics)
+{
+	ms::PhysicsObject player = grounded_shoe(physics);
+	player.set_flag(ms::PhysicsObject::Flag::CHECKBELOW);
+	physics.move_object(player);
+	require(player.enablejd, "a floor 150 px down did not allow a down-jump");
+
+	ms::Physics::jump_down(player);
+	require(player.hspeed == 0.0 && std::abs(player.vspeed * TICKS_PER_SECOND + 196.22) < 0.01, "the down-jump hop differs from v83");
+	double peak = player.crnt_y();
+	for (int tick = 0; tick < 200 && !player.onground; ++tick)
+	{
+		physics.move_object(player);
+		peak = std::min(peak, player.crnt_y());
+	}
+	require(std::abs(100 - peak - 9.6) < 0.6, "the down-jump hop height differs from v83");
+	require(player.onground && player.crnt_y() == 250 && player.fallstart == 0, "a down-jump did not land on the floor below");
+
+	// With nothing within 300 px, a floor 300 to 600 px down still counts.
+	player.set_flag(ms::PhysicsObject::Flag::CHECKBELOW);
+	physics.move_object(player);
+	require(player.enablejd, "a floor 350 px down did not allow a down-jump");
+	ms::Physics::jump_down(player);
+	for (int tick = 0; tick < 200 && !player.onground; ++tick)
+		physics.move_object(player);
+	require(player.crnt_y() == 600, "the second down-jump did not land 350 px down");
+
+	// A floor 700 px down is too far.
+	player.set_flag(ms::PhysicsObject::Flag::CHECKBELOW);
+	physics.move_object(player);
+	require(!player.enablejd, "a floor 700 px down allowed a down-jump");
+}
+
 // Falls speed up at 2000 px/s^2 to at most 670 px/s.
 void falling(const ms::Physics& physics)
 {
@@ -230,7 +274,7 @@ int main()
 	std::filesystem::path path;
 	try
 	{
-		path = flat_map();
+		path = flat_map({100, 250, 600, 1300});
 		{
 			nl::file map(path.string());
 			ms::Physics physics(map.root());
@@ -239,6 +283,7 @@ int main()
 			standing_jump(physics);
 			running_jump(physics);
 			falling(physics);
+			jumping_down(physics);
 		}
 		std::filesystem::remove(path);
 		std::cout << "Movement physics passed\n";

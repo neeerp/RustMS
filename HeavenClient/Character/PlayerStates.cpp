@@ -237,7 +237,7 @@ namespace ms
 					if (player.get_phobj().enablejd && player.is_key_down(KeyAction::Id::DOWN))
 					{
 						play_jumpsound();
-						player.get_phobj().y = player.get_phobj().groundbelow;
+						Physics::jump_down(player.get_phobj());
 						player.set_state(Char::State::FALL);
 					}
 
