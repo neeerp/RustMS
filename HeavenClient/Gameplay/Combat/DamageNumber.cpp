@@ -109,7 +109,7 @@ namespace ms
 	void DamageNumber::init()
 	{
 		nl::node basic = nl::nx::effect["BasicEff.img"];
-		const char* sets[NUM_TYPES] = { "NoRed", "NoCri", "NoViolet" };
+		const char* sets[NUM_TYPES] = { "NoRed", "NoCri", "NoViolet", "NoBlue" };
 
 		for (size_t type = 0; type < NUM_TYPES; type++)
 		{

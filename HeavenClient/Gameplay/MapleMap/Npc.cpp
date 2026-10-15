@@ -16,14 +16,12 @@
 //	along with this program.  If not, see <https://www.gnu.org/licenses/>.		//
 //////////////////////////////////////////////////////////////////////////////////
 #include "Npc.h"
+#include "NpcIdle.h"
 #include "../Stage.h"
 #include "../../Constants.h"
 #include "../../Util/NxFiles.h"
 
 #include <nlnx/nx.hpp>
-
-#include <algorithm>
-#include <cstdlib>
 
 namespace ms
 {
@@ -33,8 +31,7 @@ namespace ms
 		constexpr int16_t QUEST_MARKER_HALF = 22;
 	}
 
-	Npc::Npc(int32_t id, int32_t o, bool fl, uint16_t f, bool cnt, Point<int16_t> position, int16_t r0, int16_t r1)
-		: MapObject(o)
+	Npc::Npc(int32_t id, int32_t o, bool fl, uint16_t f, bool cnt, Point<int16_t> position) : MapObject(o)
 	{
 		std::string strid = std::to_string(id);
 		strid.insert(0, 7 - strid.size(), '0');
@@ -62,21 +59,30 @@ namespace ms
 			std::string state = npcnode.name();
 
 			if (state != "info")
-			{
 				animations[state] = npcnode;
-				states.push_back(state);
-			}
 
 			for (auto speaknode : npcnode["speak"])
 				lines[state].push_back(strsrc[speaknode.get_string()]);
+
+			if (state == "info" || state == "stand" || state == "move")
+				continue;
+
+			if (state == "shop")
+				shop = static_cast<int32_t>(actions.size());
+
+			if (npcnode["special"].get_integer() != 0)
+				specials++;
+
+			actions.push_back(state);
+			action_lines.push_back(static_cast<int32_t>(lines[state].size()));
 		}
 
 		if (lines.count("info"))
 			idle_lines = lines["info"];
 
 		speech = ChatBalloon("npc", true);
-		// Stagger the first line so the NPCs on a map don't all speak at once.
-		speech_cooldown = random.next_int<int32_t>(SPEECH_FIRST_MIN, SPEECH_FIRST_MAX);
+		// v83 starts the wait when the client takes control of the NPC.
+		wait_idle();
 
 		name = std::string(strsrc["name"]);
 		func = std::string(strsrc["func"]);
@@ -90,11 +96,8 @@ namespace ms
 		flip = !fl;
 		control = cnt;
 		stance = "stand";
-		rx0 = std::min(r0, r1);
-		rx1 = std::max(r0, r1);
 
 		phobj.fhid = f;
-		phobj.set_flag(PhysicsObject::Flag::TURNATEDGES);
 		set_position(position);
 	}
 
@@ -126,7 +129,6 @@ namespace ms
 		if (!active)
 			return phobj.fhlayer;
 
-		update_walk();
 		physics.move_object(phobj);
 		auto& player = Stage::get().get_player();
 		auto& quests = player.get_quests();
@@ -152,65 +154,19 @@ namespace ms
 		}
 		if (quest_marker != QuestMarker::NONE) quest_marker_animation.update();
 
-		update_speech();
+		speech.update();
+		update_idle();
 
 		if (animations.count(stance))
 		{
 			bool aniend = animations.at(stance).update();
 
-			// A walk keeps its stance until it ends.
-			if (aniend && !walking)
-				next_stance();
+			// An idle action plays once.
+			if (aniend && stance != "stand")
+				set_stance("stand");
 		}
 
 		return phobj.fhlayer;
-	}
-
-	void Npc::next_stance()
-	{
-		if (states.empty())
-			return;
-
-		std::string next = states[random.next_int(states.size())];
-
-		if (next == "move")
-		{
-			int16_t x = get_position().x();
-			int16_t target = random.next_int<int16_t>(rx0, rx1 + 1);
-
-			if (rx1 - rx0 < WALK_MIN || std::abs(target - x) < WALK_MIN)
-			{
-				next = "stand";
-			}
-			else
-			{
-				walking = true;
-				walk_target = target;
-				flip = target > x;
-			}
-		}
-
-		set_stance(next);
-	}
-
-	void Npc::update_walk()
-	{
-		if (!walking)
-			return;
-
-		int16_t x = get_position().x();
-		bool arrived = flip ? x >= walk_target : x <= walk_target;
-
-		// A wall or the edge of the floor ends the walk early.
-		if (arrived || phobj.is_flag_not_set(PhysicsObject::Flag::TURNATEDGES))
-		{
-			walking = false;
-			phobj.set_flag(PhysicsObject::Flag::TURNATEDGES);
-			set_stance("stand");
-			return;
-		}
-
-		phobj.hforce = flip ? WALKFORCE : -WALKFORCE;
 	}
 
 	void Npc::set_stance(const std::string &st)
@@ -277,20 +233,41 @@ namespace ms
 		return Point<int16_t>(20, -head_height() - 15);
 	}
 
-	void Npc::update_speech()
+	void Npc::update_idle()
 	{
-		speech.update();
+		if (idle_cooldown > 0)
+			idle_cooldown -= Constants::TIMESTEP;
 
-		if (idle_lines.empty() || speech.is_active())
+		// An action plays out before the next choice.
+		if (idle_cooldown > 0 || stance != "stand")
 			return;
 
-		speech_cooldown -= Constants::TIMESTEP;
+		wait_idle();
 
-		if (speech_cooldown > 0)
+		npc_idle::Choice choice;
+		int32_t roll = random.next_int(npc_idle::ROLL);
+		int32_t line_roll = random.next_int(npc_idle::ROLL);
+
+		if (!npc_idle::choose(action_lines, specials, shop, static_cast<int32_t>(idle_lines.size()), roll, line_roll,
+			choice))
 			return;
 
-		speech.change_text(idle_lines[random.next_int(idle_lines.size())]);
-		speech_cooldown = random.next_int<int32_t>(SPEECH_PAUSE_MIN, SPEECH_PAUSE_MAX);
+		if (choice.action < 0)
+		{
+			speech.change_text(idle_lines[choice.line]);
+			return;
+		}
+
+		const std::string& action = actions[choice.action];
+		set_stance(action);
+
+		if (choice.line >= 0)
+			speech.change_text(lines[action][choice.line]);
+	}
+
+	void Npc::wait_idle()
+	{
+		idle_cooldown = npc_idle::PAUSE_MIN + random.next_int(npc_idle::PAUSE_SPREAD);
 	}
 
 	std::string Npc::get_name()

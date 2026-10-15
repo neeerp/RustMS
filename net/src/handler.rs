@@ -325,6 +325,8 @@ pub enum FieldRequest {
         start: (i16, i16),
         movement: Vec<u8>,
     },
+    /// How far the player is from a firstAttack mob.
+    MobDistance { object_id: i32, distance: i32 },
     /// A validated attack: `broadcast` for the others, total damage per mob.
     Attack {
         broadcast: Packet,
@@ -431,6 +433,7 @@ fn world_routes() -> &'static HashMap<i16, WorldRoute> {
             (Op::ItemMove, InGame(&world::ItemMoveHandler)),
             (Op::UseItem, InGame(&world::UseItemHandler)),
             (Op::MoveLife, InGame(&world::MoveLifeHandler)),
+            (Op::MobDistance, InGame(&world::MobDistanceHandler)),
             (
                 Op::CloseRangeAttack,
                 InGame(&world::CloseRangeAttackHandler),
@@ -474,7 +477,7 @@ mod tests {
     fn every_registered_opcode_is_unique_per_server() {
         // The maps would silently drop duplicates; check the table sizes match.
         assert_eq!(login_routes().len(), 13);
-        assert_eq!(world_routes().len(), 40);
+        assert_eq!(world_routes().len(), 41);
     }
 
     #[test]

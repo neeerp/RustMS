@@ -35,6 +35,25 @@ impl WorldHandler for MoveLifeHandler {
     }
 }
 
+/// `MOB_DISTANCE`: once a second, every client says how far its player is
+/// from each firstAttack mob. Object id, then the distance.
+pub struct MobDistanceHandler;
+
+impl WorldHandler for MobDistanceHandler {
+    fn handle(&self, packet: &mut Packet, _ctx: &mut WorldContext) -> WorldResult {
+        let mut r = Cursor::new(&packet.bytes);
+        r.read_short()?;
+        let object_id = r.read_int()?;
+        let distance = r.read_int()?;
+        Ok(
+            HandlerResult::empty().with(WorldAction::Field(FieldRequest::MobDistance {
+                object_id,
+                distance,
+            })),
+        )
+    }
+}
+
 /// `CLOSE_RANGE_ATTACK`: a melee swing (Ctrl).
 pub struct CloseRangeAttackHandler;
 

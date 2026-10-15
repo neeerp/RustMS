@@ -31,13 +31,14 @@ namespace ms
 	class DamageNumber
 	{
 	public:
-		static const size_t NUM_TYPES = 3;
+		static const size_t NUM_TYPES = 4;
 
 		enum Type
 		{
 			NORMAL,
 			CRITICAL,
-			TOPLAYER
+			TOPLAYER,
+			HEAL
 		};
 
 		// A damage of 0 shows "Miss". The number is placed `lift` px above

@@ -230,6 +230,10 @@ impl FieldActor {
                     start,
                     movement,
                 } => self.handle_mob_move(from, object_id, move_id, start, &movement),
+                FieldRequest::MobDistance {
+                    object_id,
+                    distance,
+                } => self.handle_mob_distance(from, object_id, distance),
                 FieldRequest::Attack { broadcast, hits } => {
                     self.handle_attack(from, broadcast, hits)
                 }
@@ -439,7 +443,35 @@ impl FieldActor {
         let Some(previous) = self.mobs.provoke(from, object_id, now) else {
             return;
         };
-        if let Some(previous) = previous.filter(|&previous| previous != from) {
+        self.hand_over(object_id, previous, from, attacker, true);
+    }
+
+    /// `from` reported how far it is from a firstAttack mob; the closest
+    /// player moves it.
+    fn handle_mob_distance(&mut self, from: ClientId, object_id: i32, distance: i32) {
+        let Some(occupant) = self.occupants.get(&from) else {
+            return;
+        };
+        let handle = occupant.handle.clone();
+        let Some(previous) = self
+            .mobs
+            .report_distance(from, object_id, distance, Instant::now())
+        else {
+            return;
+        };
+        self.hand_over(object_id, previous, from, &handle, false);
+    }
+
+    /// Tell `previous` it no longer moves the mob, and `to` that it does.
+    fn hand_over(
+        &self,
+        object_id: i32,
+        previous: Option<ClientId>,
+        to: ClientId,
+        handle: &ClientHandle,
+        aggro: bool,
+    ) {
+        if let Some(previous) = previous.filter(|&previous| previous != to) {
             if let (Some(occupant), Ok(packet)) = (
                 self.occupants.get(&previous),
                 build_stop_controlling_mob(object_id),
@@ -448,8 +480,8 @@ impl FieldActor {
             }
         }
         if let Some(mob) = self.mobs.get(object_id) {
-            if let Ok(packet) = build_control_mob(&mob.view(false), true) {
-                attacker.send_packet(packet);
+            if let Ok(packet) = build_control_mob(&mob.view(false), aggro) {
+                handle.send_packet(packet);
             }
         }
     }
