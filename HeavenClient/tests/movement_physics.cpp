@@ -15,14 +15,38 @@ void require(bool condition, const char* message)
 	if (!condition) throw std::runtime_error(message);
 }
 
-// A tiny NX fixture of flat footholds from x -1000 to 1000 at the given
-// heights. It exercises the production collision/physics code without
-// graphics, server processes, or game assets.
-std::filesystem::path flat_map(const std::vector<int64_t>& floors)
+struct TestFoothold
 {
+	int64_t group, id, x1, y1, x2, y2, prev, next;
+};
+
+// A tiny NX fixture holding the given footholds in layer 0. It exercises
+// the production collision/physics code without graphics, server
+// processes, or game assets.
+std::filesystem::path foothold_map(std::vector<TestFoothold> footholds)
+{
+	// nlnx looks children up by name, so siblings are sorted by name.
+	auto sorted = [](const TestFoothold& a, const TestFoothold& b)
+	{
+		return std::make_pair(std::to_string(a.group), std::to_string(a.id)) <
+			std::make_pair(std::to_string(b.group), std::to_string(b.id));
+	};
+	std::sort(footholds.begin(), footholds.end(), sorted);
 	std::vector<std::string> names {"", "0", "next", "prev", "x1", "x2", "y1", "y2"};
-	for (size_t i = 0; i < floors.size(); ++i) names.push_back(std::to_string(i + 1));
-	size_t count = 3 + 7 * floors.size();
+	auto name = [&](const std::string& text)
+	{
+		auto found = std::find(names.begin(), names.end(), text);
+		if (found != names.end()) return static_cast<uint32_t>(found - names.begin());
+		names.push_back(text);
+		return static_cast<uint32_t>(names.size() - 1);
+	};
+	std::vector<int64_t> groups;
+	for (const TestFoothold& fh : footholds)
+	{
+		if (groups.empty() || groups.back() != fh.group) groups.push_back(fh.group);
+		name(std::to_string(fh.group)); name(std::to_string(fh.id));
+	}
+	size_t count = 2 + groups.size() + 7 * footholds.size();
 	size_t strings = 64 + count * 20;
 	std::vector<uint8_t> bytes(strings + names.size() * 8);
 	auto put = [&](size_t offset, uint64_t value, size_t count)
@@ -37,15 +61,23 @@ std::filesystem::path flat_map(const std::vector<int64_t>& floors)
 		put(offset, name, 4); put(offset + 4, children, 4); put(offset + 8, count, 2);
 		put(offset + 10, type, 2); put(offset + 12, data, 8);
 	};
-	node(0, 0, 1, 1, 0, 0); node(1, 1, 2, 1, 0, 0);
-	node(2, 1, 3, floors.size(), 0, 0);
-	for (size_t i = 0; i < floors.size(); ++i)
+	node(0, 0, 1, 1, 0, 0); node(1, 1, 2, groups.size(), 0, 0);
+	size_t first = 2 + groups.size();
+	for (size_t g = 0; g < groups.size(); ++g)
 	{
-		size_t first = 3 + floors.size() + 6 * i;
-		node(3 + i, 8 + i, first, 6, 0, 0);
-		const int64_t width = i + 1 == floors.size() ? 2000 : 1000;
-		const int64_t values[] = {0, 0, -width, width, floors[i], floors[i]};
-		for (size_t j = 0; j < 6; ++j) node(first + j, 2 + j, 0, 0, 1, values[j]);
+		size_t members = std::count_if(footholds.begin(), footholds.end(),
+			[&](const TestFoothold& fh) { return fh.group == groups[g]; });
+		size_t before = std::count_if(footholds.begin(), footholds.end(),
+			[&](const TestFoothold& fh) { return std::to_string(fh.group) < std::to_string(groups[g]); });
+		node(2 + g, name(std::to_string(groups[g])), first + before, members, 0, 0);
+	}
+	for (size_t i = 0; i < footholds.size(); ++i)
+	{
+		const TestFoothold& fh = footholds[i];
+		size_t leaves = first + footholds.size() + 6 * i;
+		node(first + i, name(std::to_string(fh.id)), leaves, 6, 0, 0);
+		const int64_t values[] = {fh.next, fh.prev, fh.x1, fh.x2, fh.y1, fh.y2};
+		for (size_t j = 0; j < 6; ++j) node(leaves + j, 2 + j, 0, 0, 1, values[j]);
 	}
 	for (size_t i = 0; i < names.size(); ++i)
 	{
@@ -57,8 +89,21 @@ std::filesystem::path flat_map(const std::vector<int64_t>& floors)
 		("rustms-movement-" + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()) + ".nx");
 	std::ofstream file(path, std::ios::binary);
 	file.write(reinterpret_cast<const char*>(bytes.data()), bytes.size());
-	require(bool(file), "could not write flat-map fixture");
+	require(bool(file), "could not write foothold fixture");
 	return path;
+}
+
+// Flat footholds from x -1000 to 1000 at the given heights, the last one
+// from -2000 to 2000.
+std::filesystem::path flat_map(const std::vector<int64_t>& floors)
+{
+	std::vector<TestFoothold> footholds;
+	for (size_t i = 0; i < floors.size(); ++i)
+	{
+		const int64_t width = i + 1 == floors.size() ? 2000 : 1000;
+		footholds.push_back({0, static_cast<int64_t>(i + 1), -width, floors[i], width, floors[i], 0, 0});
+	}
+	return foothold_map(footholds);
 }
 
 // One v83 tick is 8 ms, so 1 pixel per tick is 125 pixels per second.
@@ -306,6 +351,27 @@ void falling(const ms::Physics& physics)
 	require(player.onground && std::abs(fastest * TICKS_PER_SECOND - 670.0) < 1e-9, "a long fall did not reach the v83 fall speed");
 }
 
+// A 100 px wall stops a walking player whichever way the map draws it:
+// going up along the chain (y1 > y2) or going down (y1 < y2).
+void walls(const ms::Physics& physics)
+{
+	struct Case { double x; int8_t direction; uint16_t fhid; double stop; };
+	for (Case c : {Case {-100, 1, 1, 0}, Case {2100, -1, 6, 2000}})
+	{
+		ms::PhysicsObject player;
+		player.shoe = true;
+		player.set_x(c.x); player.set_y(0);
+		physics.move_object(player);
+		require(player.onground && player.fhid == c.fhid, "wall fixture did not find its floor");
+		for (int tick = 0; tick < 200; ++tick)
+		{
+			player.walkdir = c.direction;
+			physics.move_object(player);
+		}
+		require(player.onground && player.fhid == c.fhid && player.crnt_x() == c.stop, "a player walked through a wall");
+	}
+}
+
 int main()
 {
 	std::filesystem::path path;
@@ -376,6 +442,16 @@ int main()
 			mob.set_x(1200); mob.set_y(50);
 			physics.get_fht().place_on_fh(mob, 1);
 			require(mob.crnt_x() == 1000 && mob.crnt_y() == 100, "placement was not clamped to the foothold");
+		}
+		std::filesystem::remove(path);
+		path = foothold_map({
+			{1, 1, -500, 0, 0, 0, 0, 2}, {1, 2, 0, 0, 0, -100, 1, 3}, {1, 3, 0, -100, 500, -100, 2, 0},
+			{2, 4, 1500, -100, 2000, -100, 0, 5}, {2, 5, 2000, -100, 2000, 0, 4, 6}, {2, 6, 2000, 0, 2500, 0, 5, 0},
+			{3, 7, -3000, 600, 4000, 600, 0, 0}});
+		{
+			nl::file map(path.string());
+			ms::Physics physics(map.root());
+			walls(physics);
 		}
 		std::filesystem::remove(path);
 		std::cout << "Movement physics passed\n";
