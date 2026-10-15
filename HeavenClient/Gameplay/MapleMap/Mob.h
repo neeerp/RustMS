@@ -203,8 +203,6 @@ namespace ms
 
 		std::vector<Movement> movements;
 		uint16_t counter;
-		// Ticks left to push back a mob that was knocked back.
-		uint8_t knockback_ticks;
 		// Hits queued against this mob that haven't landed yet.
 		uint16_t pending_hits;
 		// Ticks before a killed mob dies even if its pending hits never land.
