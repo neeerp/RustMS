@@ -101,7 +101,8 @@ from `UI.nx`. Moved so far:
   bottom-centred on portals to other maps, NPCs, other players, and you.
   Hovering an NPC or portal shows its name. Period canvases had the map's
   background baked in; v83 `Map.nx` canvases are transparent there, so the
-  frame shows through.
+  frame shows through. Its middle is white at alpha 119 over black, as in
+  v83, so it comes out grey and the field doesn't show through.
 - **World Map** (`UIWorldMap`, `UIWindow.img/WorldMap`): the frame, title,
   and `Basic.img/BtClose` around the map's 640x470 `BaseImg`, laid out from
   period footage. The Big Bang search panel is gone. Esc steps up to the
