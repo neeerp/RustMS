@@ -31,6 +31,14 @@ templates from `Mob.nx` (`maxHP`, `exp`, `PADamage`, `bodyAttack`,
   them, and gives up after 180 to 240 s. A mob that cannot move turns to
   face the player and forgets them once they leave a 2000 x 1200 box.
   Flying mobs still use the older HeavenClient random flight.
+- **Jumping mobs:** a mob that can walk and jump stays within the reach of
+  its current foothold group and the group it spawned on, less 20 px a side
+  (`FootholdTree::limit_jumper`). At a loose foothold end or a wall it stops
+  and jumps on the next tick. It also jumps at a rising wall up to 40 px
+  ahead (`FootholdTree::get_wall_ahead`), and on a fifth of its idle
+  decisions. When chasing, it jumps toward a target on a higher group whose
+  reach covers it, walks down steps toward a target on its own group, and
+  jumps off an end toward a lower target only half the time.
 
 Packets follow the v83 layout (16-byte temporary status mask after the mob
 id); HeavenClient used to skip 22 bytes there and now skips 16. After the

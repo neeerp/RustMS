@@ -46,6 +46,18 @@ namespace ms
 
 			for (auto midf : basef)
 			{
+				uint16_t group;
+
+				try
+				{
+					group = static_cast<uint16_t>(std::stoi(midf.name()));
+				}
+				catch (const std::exception &ex)
+				{
+					std::cout << __func__ << ": " << ex.what() << std::endl;
+					continue;
+				}
+
 				for (auto lastf : midf)
 				{
 					uint16_t id;
@@ -63,8 +75,16 @@ namespace ms
 					const Foothold &foothold = footholds.emplace(
 							std::piecewise_construct,
 							std::forward_as_tuple(id),
-							std::forward_as_tuple(lastf, id, layer)
+							std::forward_as_tuple(lastf, id, layer, group)
 					).first->second;
+
+					// v83 (FUN_0085fe71) keeps how far each group reaches, walls
+					// included.
+					auto extent = groups.try_emplace(group, foothold.l(), foothold.r()).first;
+					extent->second = {
+						std::min(extent->second.first(), foothold.l()),
+						std::max(extent->second.second(), foothold.r())
+					};
 
 					if (foothold.l() < leftw)
 						leftw = foothold.l();
@@ -105,7 +125,10 @@ namespace ms
 
 	void FootholdTree::limit_movement(PhysicsObject &phobj) const
 	{
-		if (phobj.hmobile())
+		bool jumper = phobj.is_flag_set(PhysicsObject::Flag::JUMPER) &&
+					  phobj.is_flag_set(PhysicsObject::Flag::TURNATEDGES);
+
+		if (phobj.hmobile() && !(jumper && phobj.onground && limit_jumper(phobj)))
 		{
 			double crnt_x = phobj.crnt_x();
 			double next_x = phobj.next_x();
@@ -114,7 +137,7 @@ namespace ms
 			double wall = get_wall(phobj.fhid, left, phobj.next_y());
 			bool collision = left ? crnt_x >= wall && next_x <= wall : crnt_x <= wall && next_x >= wall;
 
-			if (!collision && phobj.is_flag_set(PhysicsObject::Flag::TURNATEDGES))
+			if (!collision && phobj.is_flag_set(PhysicsObject::Flag::TURNATEDGES) && !jumper)
 			{
 				if (phobj.is_flag_set(PhysicsObject::Flag::WALKONLY))
 				{
@@ -136,7 +159,13 @@ namespace ms
 			if (collision)
 			{
 				phobj.limitx(wall);
-				phobj.clear_flag(PhysicsObject::Flag::TURNATEDGES);
+
+				// A jumper only stops at a foothold wall, which it may jump
+				// next, but turns at the edge of the map.
+				bool mapedge = wall == (left ? walls.first() : walls.second());
+
+				if (!jumper || mapedge)
+					phobj.clear_flag(PhysicsObject::Flag::TURNATEDGES);
 			}
 		}
 
@@ -346,6 +375,135 @@ namespace ms
 		double margin = std::min(MARGIN, length) * dx / length;
 
 		return left ? fh.x1() + margin : fh.x2() - margin;
+	}
+
+	bool FootholdTree::limit_jumper(PhysicsObject &phobj) const
+	{
+		// v83 (FUN_007f8d64, move ability 2) keeps the mob within the reach
+		// of its foothold's group and its home group, less 20 px a side when
+		// that is wider than 40 px. Leaving it turns the mob around.
+		const Foothold &fh = get_fh(phobj.fhid);
+		Range<int16_t> crnt = get_group_reach(fh.group());
+		Range<int16_t> home = get_group_reach(phobj.homegroup);
+		int32_t left = std::min(crnt.first(), home.first());
+		int32_t right = std::max(crnt.second(), home.second());
+
+		if (right - left > 40)
+		{
+			left += 20;
+			right -= 20;
+		}
+
+		double next_x = phobj.next_x();
+
+		if (next_x < left || next_x > right)
+		{
+			phobj.limitx(next_x > right ? right : left);
+			phobj.clear_flag(PhysicsObject::Flag::TURNATEDGES);
+
+			return true;
+		}
+
+		// Walking past the end of its foothold, it carries on onto one that
+		// runs left to right, and down a step if that is in reach. At a loose
+		// end or any other wall it stops to jump, when edgejump says so.
+		bool toleft = phobj.hspeed < 0.0;
+
+		if (toleft ? next_x >= fh.x1() : next_x <= fh.x2())
+			return false;
+
+		uint16_t neighbourid = toleft ? fh.prev() : fh.next();
+
+		if (neighbourid)
+		{
+			const Foothold &neighbour = get_fh(neighbourid);
+
+			if (neighbour.x2() > neighbour.x1())
+				return false;
+
+			bool down = toleft ? neighbour.y2() < neighbour.y1() : neighbour.y2() > neighbour.y1();
+			bool inreach = toleft ? left < fh.x1() : fh.x2() < right;
+
+			if (down && inreach && phobj.stepdown)
+				return false;
+		}
+
+		if (!phobj.edgejump)
+			return false;
+
+		phobj.limitx(toleft ? fh.x1() : fh.x2());
+		phobj.jumprequest = true;
+
+		return true;
+	}
+
+	FootholdTree::WallAhead FootholdTree::get_wall_ahead(const PhysicsObject &phobj, int8_t dir) const
+	{
+		// The jumping mob AI (FUN_007f835e) follows the footholds 40 px
+		// ahead (FUN_0085f405), up to a loose end or the first one that
+		// doesn't run left to right.
+		constexpr double DISTANCE = 40.0;
+
+		const Foothold &crnt = get_fh(phobj.fhid);
+		double dx = crnt.x2() - crnt.x1();
+
+		if (dir == 0 || !phobj.onground || dx <= 0.0)
+			return WallAhead::NONE;
+
+		double length = std::hypot(dx, crnt.y2() - crnt.y1());
+		double along = (phobj.crnt_x() - crnt.x1()) * length / dx;
+		double ahead = DISTANCE - (dir > 0 ? length - along : along);
+		const Foothold *fh = &crnt;
+
+		while (ahead > 0.0)
+		{
+			uint16_t id = dir > 0 ? fh->next() : fh->prev();
+
+			if (!id)
+				return WallAhead::NONE;
+
+			fh = &get_fh(id);
+
+			if (fh->x2() <= fh->x1())
+				break;
+
+			ahead -= std::hypot(fh->x2() - fh->x1(), fh->y2() - fh->y1());
+		}
+
+		auto rising = [dir](const Foothold &wall)
+		{
+			return wall.x2() <= wall.x1() && (dir > 0 ? wall.y2() < wall.y1() : wall.y2() > wall.y1());
+		};
+
+		if (fh == &crnt || !rising(*fh))
+			return WallAhead::NONE;
+
+		// Pressed against the wall, the AI turns back instead of jumping
+		// again.
+		bool against = rising(get_fh(dir > 0 ? crnt.next() : crnt.prev())) &&
+					   (dir > 0 ? along > length - 1.0 : along < 1.0);
+
+		return against ? WallAhead::AGAINST : WallAhead::NEAR;
+	}
+
+	uint16_t FootholdTree::get_group(uint16_t fhid) const
+	{
+		return get_fh(fhid).group();
+	}
+
+	uint16_t FootholdTree::get_group_below(Point<int16_t> position) const
+	{
+		return get_fh(get_fhid_below(position.x(), position.y() - 1.0)).group();
+	}
+
+	Range<int16_t> FootholdTree::get_group_reach(uint16_t group) const
+	{
+		auto iter = groups.find(group);
+
+		if (iter == groups.end())
+			return {INT16_MAX, INT16_MIN};
+
+		return iter->second;
 	}
 
 	uint16_t FootholdTree::get_fhid_below(double fx, double fy, uint16_t ignore) const

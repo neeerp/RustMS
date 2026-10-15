@@ -52,8 +52,8 @@ namespace ms
 	class MobSpawn
 	{
 	public:
-		MobSpawn(int32_t oid, int32_t id, int8_t mode, int8_t stance, uint16_t fh, bool newspawn, int8_t team,
-				 Point<int16_t> position);
+		MobSpawn(int32_t oid, int32_t id, int8_t mode, int8_t stance, uint16_t fh, uint16_t homefh, bool newspawn,
+				 int8_t team, Point<int16_t> position);
 
 		int8_t get_mode() const;
 
@@ -67,6 +67,7 @@ namespace ms
 		int8_t mode;
 		int8_t stance;
 		uint16_t fh;
+		uint16_t homefh;
 		bool newspawn;
 		int8_t team;
 		Point<int16_t> position;

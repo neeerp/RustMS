@@ -19,12 +19,13 @@
 
 namespace ms
 {
-	Foothold::Foothold(nl::node src, uint16_t id, uint8_t ly) : m_prev(src["prev"]), m_next(src["next"]),
+	Foothold::Foothold(nl::node src, uint16_t id, uint8_t ly, uint16_t gr) : m_prev(src["prev"]), m_next(src["next"]),
 																m_horizontal(src["x1"], src["x2"]),
-																m_vertical(src["y1"], src["y2"]), m_id(id), m_layer(ly)
+																m_vertical(src["y1"], src["y2"]), m_id(id), m_layer(ly),
+																m_group(gr)
 	{}
 
-	Foothold::Foothold() : m_id(0), m_layer(0), m_next(0), m_prev(0)
+	Foothold::Foothold() : m_id(0), m_layer(0), m_group(0), m_next(0), m_prev(0)
 	{}
 
 	uint16_t Foothold::id() const
@@ -45,6 +46,11 @@ namespace ms
 	uint8_t Foothold::layer() const
 	{
 		return m_layer;
+	}
+
+	uint16_t Foothold::group() const
+	{
+		return m_group;
 	}
 
 	const Range<int16_t> &Foothold::horizontal() const
