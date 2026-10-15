@@ -363,12 +363,11 @@ namespace ms
 		bool flip = recv.read_bool();
 		uint16_t fh = recv.read_short();
 
-		// The range the NPC walks in.
-		int16_t rx0 = recv.read_short();
-		int16_t rx1 = recv.read_short();
+		recv.read_short(); // 'rx0'
+		recv.read_short(); // 'rx1'
 
 		Stage::get().get_npcs().spawn(
-			{ oid, id, position, flip, fh, rx0, rx1 }
+			{ oid, id, position, flip, fh }
 		);
 	}
 
@@ -388,12 +387,12 @@ namespace ms
 			bool flip = recv.read_bool();
 			uint16_t fh = recv.read_short();
 
-			int16_t rx0 = recv.read_short();
-			int16_t rx1 = recv.read_short();
+			recv.read_short();	// 'rx0'
+			recv.read_short();	// 'rx1'
 			recv.read_bool();	// 'minimap'
 
 			Stage::get().get_npcs().spawn(
-				{ oid, id, position, flip, fh, rx0, rx1 }
+				{ oid, id, position, flip, fh }
 			);
 		}
 	}
