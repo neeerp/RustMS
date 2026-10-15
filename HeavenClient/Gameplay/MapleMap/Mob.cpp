@@ -504,6 +504,37 @@ namespace ms
 		effects.add(animation, DrawArgument(shift, f), z);
 	}
 
+	void Mob::show_hit(const Animation &animation, const Rectangle<int16_t> &range, bool f)
+	{
+		if (!active)
+			return;
+
+		Rectangle<int16_t> body = animations.at(stance).get_bounds();
+		body.shift(get_position());
+
+		// As v83 does, centre the spark on the overlap of the attack and the
+		// body, first stretching an attack that falls short to touch it.
+		int16_t left = range.left();
+		int16_t right = range.right();
+		int16_t top = range.top();
+		int16_t bottom = range.bottom();
+
+		if (left >= body.right())
+			left = body.right() - 1;
+		else if (right <= body.left())
+			right = body.left() + 1;
+
+		if (top >= body.bottom())
+			top = body.bottom() - 1;
+		else if (bottom <= body.top())
+			bottom = body.top() + 1;
+
+		int16_t x = (std::max(left, body.left()) + std::min(right, body.right())) / 2;
+		int16_t y = (std::max(top, body.top()) + std::min(bottom, body.bottom())) / 2;
+
+		effects.add(animation, DrawArgument(Point<int16_t>(x, y) - get_position(), f), 0);
+	}
+
 	float Mob::calculate_hitchance(int16_t leveldelta, int32_t player_accuracy) const
 	{
 		float faccuracy = static_cast<float>(player_accuracy);
