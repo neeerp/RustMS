@@ -181,7 +181,9 @@ to play the breaking animation) and the hitter rolls its drops
 (`net::loot::roll_reactor`) where it stood. A broken reactor comes back after
 the map's `reactorTime` seconds, under a new object id since HeavenClient
 keeps a broken reactor under its old one; one without a `reactorTime` stays
-broken.
+broken. With each state's hit animation, including the break, HeavenClient
+plays `Sound/Reactor.img/<id>/<state>/Hit`, with the id unpadded as v83
+formats it.
 
 Reactor drops come from the content pack's table, keyed by reactor id, plus
 `[reactors]` in `reward_overrides.toml`; see `server-content.md`. Reactor

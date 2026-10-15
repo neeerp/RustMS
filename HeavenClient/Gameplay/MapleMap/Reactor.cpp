@@ -37,6 +37,26 @@ namespace ms
 			if (sub.name() == "event")
 				if (sub["0"]["type"].get_integer() == 0)
 					hittable = true;
+
+		// v83 formats the path with "%d/%d", so the id has no leading zeros
+		// (0x6345e0).
+		nl::node sounds = nl::nx::sound["Reactor.img"][std::to_string(rid)];
+
+		for (int8_t i = 0; sounds[std::to_string(i)]; i++)
+		{
+			nl::node hit = sounds[std::to_string(i)]["Hit"];
+
+			if (hit.data_type() == nl::node::type::audio)
+				hitsounds.emplace(i, Sound(hit));
+		}
+	}
+
+	void Reactor::play_hit(int8_t state)
+	{
+		auto sound = hitsounds.find(state);
+
+		if (sound != hitsounds.end())
+			sound->second.play();
 	}
 
 	void Reactor::draw(double viewx, double viewy, float alpha) const
@@ -69,11 +89,11 @@ namespace ms
 
 	void Reactor::set_state(int8_t state)
 	{
-		// TODO: hit/break sounds
 		if (hittable)
 		{
 			animations[this->state] = src[this->state]["hit"];
 			animation_ended = false;
+			play_hit(this->state);
 		}
 
 		this->state = state;
@@ -82,6 +102,7 @@ namespace ms
 	void Reactor::destroy(int8_t, Point<int16_t>)
 	{
 		animations[this->state] = src[this->state]["hit"];
+		play_hit(this->state);
 		state++;
 		dead = true;
 		animation_ended = false;
