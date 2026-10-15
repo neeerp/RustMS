@@ -25,15 +25,18 @@ namespace ms
 	{
 		nl::node info = src["info"];
 
-		if (info["VRLeft"].data_type() == nl::node::type::integer)
+		// v83 (FUN_005a768c) reads each edge of the view range on its own.
+		// One the map leaves out lies 20 px beyond the movement bounds at the
+		// sides, 60 px above them, and 110 px below the lowest foothold.
+		auto edge = [&info](const char *name, int16_t fallback)
 		{
-			mapwalls = Range<int16_t>(info["VRLeft"], info["VRRight"]);
-			mapborders = Range<int16_t>(info["VRTop"], info["VRBottom"]);
-		} else
-		{
-			mapwalls = walls;
-			mapborders = borders;
-		}
+			nl::node value = info[name];
+
+			return value.data_type() == nl::node::type::integer ? static_cast<int16_t>(value) : fallback;
+		};
+
+		mapwalls = Range<int16_t>(edge("VRLeft", walls.first() - 20), edge("VRRight", walls.second() + 20));
+		mapborders = Range<int16_t>(edge("VRTop", borders.first() - 60), edge("VRBottom", borders.second() + 10));
 
 		std::string bgmpath = info["bgm"];
 		size_t split = bgmpath.find('/');

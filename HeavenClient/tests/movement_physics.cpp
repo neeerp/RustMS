@@ -279,6 +279,9 @@ int main()
 		{
 			nl::file map(path.string());
 			ms::Physics physics(map.root());
+			// v83 keeps objects 30 px inside the outermost footholds.
+			auto walls = physics.get_fht().get_walls();
+			require(walls.first() == -1970 && walls.second() == 1970, "map walls are not 30 px inside the footholds");
 			legacy_jumps_keep_momentum(physics);
 			walking(physics);
 			standing_jump(physics);

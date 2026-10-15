@@ -27,7 +27,8 @@ namespace ms
 	class Physics
 	{
 	public:
-		Physics(nl::node src);
+		// src is the map's foothold node and info its info node.
+		Physics(nl::node src, nl::node info = {});
 
 		Physics();
 

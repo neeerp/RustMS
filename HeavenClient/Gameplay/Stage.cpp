@@ -96,7 +96,7 @@ namespace ms
 
 		tilesobjs = MapTilesObjs(src);
 		backgrounds = MapBackgrounds(src["back"]);
-		physics = Physics(src["foothold"]);
+		physics = Physics(src["foothold"], src["info"]);
 		mapinfo = MapInfo(src, physics.get_fht().get_walls(), physics.get_fht().get_borders());
 		portals = MapPortals(src["portal"], mapid);
 	}

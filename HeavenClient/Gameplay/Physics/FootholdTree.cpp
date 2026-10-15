@@ -23,7 +23,7 @@
 
 namespace ms
 {
-	FootholdTree::FootholdTree(nl::node src)
+	FootholdTree::FootholdTree(nl::node src, nl::node info)
 	{
 		int16_t leftw = 30000;
 		int16_t rightw = -30000;
@@ -90,14 +90,28 @@ namespace ms
 			}
 		}
 
-			walls = {
-				static_cast<int16_t>(leftw + 25),
-				static_cast<int16_t>(rightw - 25)
-			};
-			borders = {
-				static_cast<int16_t>(topb - 300),
-				static_cast<int16_t>(botb + 100)
-			};
+		// v83 (FUN_0085fe71) keeps objects 30 px inside the outermost
+		// footholds and up to 300 px above the highest. A map with VRLimit
+		// pulls those in to its view range. v83 doesn't stop a fall below
+		// the lowest foothold; this stops it 100 px below.
+		int16_t left = leftw + 30;
+		int16_t right = rightw - 30;
+		int16_t top = topb - 300;
+
+		if (info["VRLimit"].get_bool())
+		{
+			if (int16_t vrleft = info["VRLeft"])
+				left = std::max<int16_t>(left, vrleft + 20);
+
+			if (int16_t vrright = info["VRRight"])
+				right = std::min<int16_t>(right, vrright - 20);
+
+			if (int16_t vrtop = info["VRTop"])
+				top = std::max<int16_t>(top, vrtop + 65);
+		}
+
+		walls = {left, right};
+		borders = {top, static_cast<int16_t>(botb + 100)};
 	}
 
 	FootholdTree::FootholdTree()

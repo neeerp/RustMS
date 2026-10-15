@@ -448,6 +448,15 @@ force-and-friction model (`move_normal`).
   (`FootholdTree::can_jump_down`). `Physics::jump_down` hops up at 196 px/s
   and stores the platform in `phobj.fallstart`. Until the player lands
   elsewhere or grabs a rope, `update_fh` skips that platform.
+- **Map bounds.** `FootholdTree` keeps objects 30 px inside the outermost
+  footholds and at most 300 px above the highest. A map with `info/VRLimit`
+  pulls those in to its `VRLeft + 20`, `VRRight - 20` and `VRTop + 65`.
+  v83 never stops a fall; HeavenClient stops it 100 px below the lowest
+  foothold.
+- **View range.** `MapInfo` reads each `VR*` edge on its own. A missing edge
+  sits 20 px outside the bounds at the sides, 60 px above the top, and 110 px
+  below the lowest foothold. The camera centres a range smaller than the
+  screen.
 - **Not ported yet:**
   - v83 knockback speeds.
   - Swimming and flying.
