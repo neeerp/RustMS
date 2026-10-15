@@ -138,6 +138,13 @@ namespace ms
 		};
 
 		void scroll(int16_t rows);
+		// Drag the expanded log's top edge to the cursor's height.
+		void drag_log_edge(int16_t y);
+		// Whether the cursor is on the expanded log's top edge.
+		bool on_log_edge(Point<int16_t> cursorpos) const;
+		// Set the expanded log's height, keeping it within the original's
+		// bounds.
+		void set_log_height(int16_t height);
 		ScrollPart scroll_part_at(Point<int16_t> cursorpos) const;
 		void scroll_step(ScrollPart part);
 
@@ -163,9 +170,12 @@ namespace ms
 		void send_buddy_chat(const std::string& message);
 
 		static constexpr int16_t CHATROWHEIGHT = 13;
-		static constexpr int16_t CHATROWS = 5;
 		static constexpr int16_t LOG_WIDTH = 580;
 		static constexpr int16_t LOG_HEIGHT = 70;
+		static constexpr int16_t MIN_LOG_HEIGHT = 26;
+		static constexpr int16_t MAX_LOG_HEIGHT = 507;
+		// The original's edge is five pixels below the log's drawn top.
+		static constexpr int16_t EDGE_OFFSET = 5;
 		static constexpr int16_t LINE_LOG_HEIGHT = 24;
 		static constexpr time_t MESSAGE_COOLDOWN = 1'000;
 		// The original repeats a missing HP or MP notice at most every two seconds.
@@ -204,6 +214,12 @@ namespace ms
 		ScrollPart held_part;
 		Point<int16_t> held_cursor;
 		std::chrono::steady_clock::time_point held_last;
+		// The expanded log's height, whether its top edge is being dragged,
+		// and where the last step left the edge. The edge stays where it is
+		// until the cursor is a row and a bit away.
+		int16_t log_height;
+		bool edge_dragging;
+		std::optional<int16_t> edge_anchor;
 
 		EnumMap<Messages::Type, time_t> message_cooldowns;
 		std::vector<std::string> lastentered;
