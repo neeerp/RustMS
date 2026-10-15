@@ -506,3 +506,11 @@ These were corrected:
    CONFIRM_SHOP_TRANSACTION handler shows "You do not have enough mesos." and
    "Please check if your inventory is full or not."; codes 0 and 8 need no
    notice.
+10. v83 keeps one binding each for Ctrl, Alt, and Shift: the game reads a
+    key's scan code without the extended bit, so Right Ctrl and Right Alt
+    arrive as the left keys, and it folds Right Shift (54) onto Left Shift
+    (42). Key Config's right-hand faces store under the left keys
+    (`KeyConfig::fold`). The client had given the right-hand keys their own
+    keys at 85 to 87, so Right Ctrl did nothing, and had put F11 and F12 at 69
+    and 70 rather than v83's 87 and 88. The `v83_modifier_and_f_keys`
+    migration drops the old right-hand copies and moves F11 and F12.
