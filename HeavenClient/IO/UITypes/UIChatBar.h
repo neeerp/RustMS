@@ -22,6 +22,7 @@
 #include <cstddef>
 
 #include <cstdint>
+#include <optional>
 #include <unordered_map>
 #include <vector>
 
@@ -36,7 +37,8 @@ namespace ms
 {
 	// The v83 chat: a strip in the status bar that shows the latest line or,
 	// after Enter, the input field, and a log above the bar that the button
-	// at the strip's right end expands.
+	// at the strip's right end expands. The expanded log keeps the input
+	// field in the strip.
 	class UIChatBar : public UIElement
 	{
 	public:
@@ -125,18 +127,32 @@ namespace ms
 
 		void scroll(int16_t rows);
 
+		// The log shows the latest line in the strip, that line above the
+		// strip while typing, or several lines once expanded.
+		int16_t get_logrows() const;
+		int16_t get_logheight() const;
 		int16_t get_logtop() const;
 
-		Point<int16_t> get_arrow_pos(Arrow arrow) const;
-
-		Rectangle<int16_t> get_arrow_bounds(Arrow arrow) const;
+		// The scroll bar beside the log: its top and its length.
+		Point<int16_t> get_scrollbar_pos() const;
+		int16_t get_scrollbar_length() const;
+		// The scroll bar's positions and the current one, the first being
+		// the oldest lines. Fewer than two leave it disabled.
+		int16_t get_scrollrange() const;
+		int16_t get_scrollpos() const;
+		void set_scrollpos(int16_t pos);
+		// Where the top of a thumb this tall is below the scroll bar's, if
+		// it has one.
+		std::optional<int16_t> get_thumb_offset(int16_t height) const;
 
 		void send_party_chat(const std::string& message);
 		void send_buddy_chat(const std::string& message);
 
 		static constexpr int16_t CHATROWHEIGHT = 13;
 		static constexpr int16_t CHATROWS = 5;
-		static constexpr int16_t STRIP_WIDTH = 551;
+		static constexpr int16_t LOG_WIDTH = 580;
+		static constexpr int16_t LOG_HEIGHT = 70;
+		static constexpr int16_t LINE_LOG_HEIGHT = 24;
 		static constexpr time_t MESSAGE_COOLDOWN = 1'000;
 		// The original repeats a missing HP or MP notice at most every two seconds.
 		static constexpr time_t COST_MESSAGE_COOLDOWN = 2'000;
@@ -154,13 +170,21 @@ namespace ms
 		Texture chattarget;
 		Text chattarget_label;
 		Target chat_target;
-		Texture arrows[2][3];
+		Texture arrows[2][2];
 		Texture arrows_disabled[2];
 		Texture scrollbase;
+		Texture scrollbase_disabled;
+		Texture thumb[2];
 		Textfield chatfield;
 
-		// The arrow under the cursor, and whether it is held down.
-		int16_t arrow_state[2];
+		// Whether each arrow is held down
+		bool arrow_pressed[2];
+		// Whether the mouse was down over the scroll bar, and where the
+		// thumb was grabbed, if it was.
+		bool scrollbar_pressed;
+		bool thumb_dragging;
+		int16_t drag_y;
+		int16_t drag_pos;
 
 		EnumMap<Messages::Type, time_t> message_cooldowns;
 		std::vector<std::string> lastentered;
