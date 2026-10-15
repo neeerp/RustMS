@@ -448,8 +448,16 @@ force-and-friction model (`move_normal`).
   (`FootholdTree::can_jump_down`). `Physics::jump_down` hops up at 196 px/s
   and stores the platform in `phobj.fallstart`. Until the player lands
   elsewhere or grabs a rope, `update_fh` skips that platform.
+- **Knockback.** A hit that does damage, and that the stance roll doesn't
+  block, knocks the player away from the mob and up at 270 px/s, or 200 px/s
+  under Power Guard. It also knocks the player off ladders and ropes.
+  `Physics::knockback` queues the push for the next move. Each axis adds to
+  the speed without going past the push, so a fast fall barely slows. The
+  next move then lifts the player off the ground and truncates both speeds to
+  whole pixels per second. A knock from standing rises about 18 px and lands
+  about 73 px away.
 - **Not ported yet:**
-  - v83 knockback speeds.
+  - Mob attacks' own knockback speeds (900 or 1900 px/s, flat).
   - Swimming and flying.
 
 ## Cash Shop

@@ -453,13 +453,22 @@ namespace ms
 		if (!missed)
 			leave_chair();
 
-		bool immovable = ladder || state == Char::State::DIED;
-		bool knockback = !missed && !immovable;
+		bool knockback = !missed && state != Char::State::DIED;
 
+		// CUserLocal knocks the player away from the mob and up at 270
+		// pixels per second, or 200 under Power Guard, and off ladders and
+		// ropes too (FUN_007ad352).
 		if (knockback && randomizer.above(stats.get_stance()))
 		{
-			phobj.hspeed = fromleft ? -1.5 : 1.5;
-			phobj.vforce -= 3.5;
+			double power = has_buff(Buffstat::Id::POWERGUARD) ? 200.0 : 270.0;
+
+			if (ladder)
+			{
+				set_state(Char::State::FALL);
+				set_ladder(nullptr);
+			}
+
+			Physics::knockback(phobj, fromleft ? -power : power, -power);
 		}
 
 		uint8_t direction = fromleft ? 0 : 1;

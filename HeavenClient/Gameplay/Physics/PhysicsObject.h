@@ -224,6 +224,10 @@ namespace ms
 		bool shoe = false;
 		double walkspeed = 1.0;
 		int8_t walkdir = 0;
+		// A knockback queued for the next move, in pixels per second.
+		bool impact = false;
+		double impactx = 0.0;
+		double impacty = 0.0;
 
 		bool is_flag_set(Flag f)
 		{

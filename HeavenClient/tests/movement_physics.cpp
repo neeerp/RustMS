@@ -254,6 +254,47 @@ void jumping_down(const ms::Physics& physics)
 	require(!player.enablejd, "a floor 700 px down allowed a down-jump");
 }
 
+// A mob's hit knocks the player back and up at 270 px/s, about 18 px high
+// and 73 px away.
+void knockback(const ms::Physics& physics)
+{
+	for (double direction : {-1.0, 1.0})
+	{
+		ms::PhysicsObject player = grounded_shoe(physics);
+		ms::Physics::knockback(player, direction * 270.0, -270.0);
+		double peak = player.crnt_y();
+		int ticks = 0;
+		do
+		{
+			physics.move_object(player);
+			require(++ticks == 1 ? !player.onground && player.vspeed < 0.0 : true, "a knockback did not lift off on its first tick");
+			peak = std::min(peak, player.crnt_y());
+			require(ticks < 100, "knockback never landed");
+		} while (!player.onground);
+		require(std::abs(100 - peak - 18.2) < 0.6, "knockback height differs from v83");
+		require(std::abs(player.crnt_x() - direction * 73.0) < 1.5, "knockback distance differs from v83");
+		require(!player.impact, "a knockback stayed queued after landing");
+	}
+
+	// Walking into the hit softens it, walking away doesn't add to it, and
+	// the result is a whole number of pixels per second.
+	for (int8_t walk : {1, -1})
+	{
+		ms::PhysicsObject player = grounded_shoe(physics);
+		for (int tick = 0; tick < 3; ++tick)
+		{
+			player.walkdir = walk;
+			physics.move_object(player);
+		}
+		require(std::abs(player.hspeed * TICKS_PER_SECOND - walk * 33.6) < 1e-9, "three walking ticks did not reach 33.6 px/s");
+		ms::Physics::knockback(player, -270.0, -270.0);
+		ms::Physics::knockback(player, -270.0, -270.0);
+		physics.move_object(player);
+		double expected = walk > 0 ? -236.0 : -270.0;
+		require(std::abs(player.hspeed * TICKS_PER_SECOND - expected) < 0.01, "a knockback did not cap at its own speed");
+	}
+}
+
 // Falls speed up at 2000 px/s^2 to at most 670 px/s.
 void falling(const ms::Physics& physics)
 {
@@ -285,6 +326,7 @@ int main()
 			running_jump(physics);
 			falling(physics);
 			jumping_down(physics);
+			knockback(physics);
 			// A knocked back mob sets its own ground speed; friction must not
 			// eat into it, even below the usual stopping threshold.
 			ms::PhysicsObject mob;
