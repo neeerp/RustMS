@@ -5,7 +5,7 @@ use crate::message::{ClientHandle, FieldKey, FieldMessage, ServerMessage};
 use game::FieldAvatar;
 use net::packet::build::world::drop::{build_drop, build_remove_drop, DropAppearance};
 use net::packet::build::world::field::{
-    build_player_enter_field, build_player_leave_field, parse_movement_state,
+    build_player_enter_field, build_player_leave_field, build_show_chair, parse_movement_state,
 };
 use net::packet::build::world::mob::{
     build_control_mob, build_kill_mob, build_mob_hp, build_move_mob, build_move_mob_response,
@@ -148,6 +148,20 @@ impl FieldActor {
         }
     }
 
+    /// Seat `from` on a portable chair (0 to stand) and show the others.
+    fn handle_chair(&mut self, from: ClientId, item_id: i32) {
+        let Some(occupant) = self.occupants.get_mut(&from) else {
+            return;
+        };
+        if occupant.avatar.chair == item_id {
+            return;
+        }
+        occupant.avatar.chair = item_id;
+        if let Ok(packet) = build_show_chair(occupant.avatar.id, item_id) {
+            self.broadcast(Some(from), packet);
+        }
+    }
+
     fn handle_message(&mut self, message: FieldMessage) {
         match message {
             FieldMessage::Join {
@@ -170,13 +184,13 @@ impl FieldActor {
                     self.broadcast(Some(client_id), packet);
                 }
                 if let Some(occupant) = self.occupants.get_mut(&client_id) {
-                    // Keep the live position; take everything else.
-                    let (x, y, stance) =
-                        (occupant.avatar.x, occupant.avatar.y, occupant.avatar.stance);
+                    // Keep the live position and chair; take everything else.
+                    let live = &occupant.avatar;
                     occupant.avatar = FieldAvatar {
-                        x,
-                        y,
-                        stance,
+                        x: live.x,
+                        y: live.y,
+                        stance: live.stance,
+                        chair: live.chair,
                         ..avatar
                     };
                 }
@@ -220,6 +234,7 @@ impl FieldActor {
                     self.handle_attack(from, broadcast, hits)
                 }
                 FieldRequest::Broadcast(packet) => self.broadcast(Some(from), packet),
+                FieldRequest::Chair(item_id) => self.handle_chair(from, item_id),
                 FieldRequest::Pickup { object_id, x, y } => {
                     self.handle_pickup(from, object_id, x, y)
                 }
@@ -630,6 +645,7 @@ mod tests {
             x,
             y,
             stance: 2,
+            chair: 0,
         }
     }
 
@@ -656,15 +672,66 @@ mod tests {
         tx
     }
 
-    async fn next_opcode(rx: &mut mpsc::Receiver<ServerMessage>) -> i16 {
+    async fn next_packet(rx: &mut mpsc::Receiver<ServerMessage>) -> Packet {
         match timeout(Duration::from_secs(1), rx.recv())
             .await
             .unwrap()
             .unwrap()
         {
-            ServerMessage::SendPacket(packet) => packet.opcode(),
+            ServerMessage::SendPacket(packet) => packet,
             other => panic!("expected a packet, got {other:?}"),
         }
+    }
+
+    async fn next_opcode(rx: &mut mpsc::Receiver<ServerMessage>) -> i16 {
+        next_packet(rx).await.opcode()
+    }
+
+    #[tokio::test]
+    async fn the_map_sees_who_sits_on_a_chair() {
+        let field = spawn_field();
+        let (first, _first_rx) = client(1);
+        let (second, mut second_rx) = client(2);
+        let relaxer = 3010000i32.to_le_bytes();
+
+        field
+            .send(FieldMessage::Join {
+                handle: first,
+                avatar: avatar(1, 10, 20),
+                party: None,
+            })
+            .await
+            .unwrap();
+        field
+            .send(FieldMessage::FromClient {
+                from: 1,
+                request: FieldRequest::Chair(3010000),
+            })
+            .await
+            .unwrap();
+        // Someone arriving later sees the player already seated.
+        field
+            .send(FieldMessage::Join {
+                handle: second,
+                avatar: avatar(2, 30, 40),
+                party: None,
+            })
+            .await
+            .unwrap();
+        let spawn = next_packet(&mut second_rx).await;
+        assert_eq!(spawn.opcode(), SendOpcode::SpawnPlayer as i16);
+        assert!(spawn.bytes.windows(4).any(|bytes| bytes == relaxer));
+
+        field
+            .send(FieldMessage::FromClient {
+                from: 1,
+                request: FieldRequest::Chair(0),
+            })
+            .await
+            .unwrap();
+        let stood = next_packet(&mut second_rx).await;
+        assert_eq!(stood.opcode(), SendOpcode::ShowChair as i16);
+        assert_eq!(&stood.bytes[2..], &[1, 0, 0, 0, 0, 0, 0, 0]);
     }
 
     #[tokio::test]

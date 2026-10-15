@@ -31,6 +31,8 @@ pub enum RecvOpcode {
     EnterCashShop = 0x28,
 
     PlayerMove = 0x29,
+    CancelChair = 0x2A,
+    UseChair = 0x2B,
     CloseRangeAttack = 0x2C,
     TakeDamage = 0x30,
     AllChat = 0x31,

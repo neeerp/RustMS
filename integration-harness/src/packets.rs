@@ -426,6 +426,24 @@ pub fn build_face_expression(emote: i32) -> Result<Packet, String> {
     Ok(packet)
 }
 
+/// USE_CHAIR: sit on the portable chair `item_id`.
+pub fn build_use_chair(item_id: i32) -> Result<Packet, String> {
+    let mut packet = packet_with_opcode(RecvOpcode::UseChair as i16);
+    packet
+        .write_int(item_id)
+        .map_err(|e| format!("failed to write chair item: {e}"))?;
+    Ok(packet)
+}
+
+/// CANCEL_CHAIR: stand up from map seat `seat`, or -1 for a portable chair.
+pub fn build_cancel_chair(seat: i16) -> Result<Packet, String> {
+    let mut packet = packet_with_opcode(RecvOpcode::CancelChair as i16);
+    packet
+        .write_short(seat)
+        .map_err(|e| format!("failed to write chair seat: {e}"))?;
+    Ok(packet)
+}
+
 pub fn build_player_move(movement_bytes: &[u8]) -> Result<Packet, String> {
     let mut packet = packet_with_opcode(RecvOpcode::PlayerMove as i16);
     packet

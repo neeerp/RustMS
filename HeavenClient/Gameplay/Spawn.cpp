@@ -106,7 +106,8 @@ namespace ms
 	}
 
 	CharSpawn::CharSpawn(int32_t c, const LookEntry &lk, uint8_t l, int16_t j, const std::string &nm, int8_t st,
-						 Point<int16_t> p) : cid(c), look(lk), level(l), job(j), name(nm), stance(st), position(p)
+						 Point<int16_t> p, int32_t ch) : cid(c), look(lk), level(l), job(j), name(nm), stance(st),
+						 position(p), chair(ch)
 	{}
 
 	int32_t CharSpawn::get_cid() const
@@ -116,6 +117,9 @@ namespace ms
 
 	std::unique_ptr<MapObject> CharSpawn::instantiate() const
 	{
-		return std::make_unique<OtherChar>(cid, look, level, job, name, stance, position);
+		auto otherchar = std::make_unique<OtherChar>(cid, look, level, job, name, stance, position);
+		otherchar->set_chair(chair);
+
+		return otherchar;
 	}
 }

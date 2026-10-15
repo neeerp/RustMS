@@ -18,6 +18,7 @@
 #include "Char.h"
 
 #include "../Data/WeaponData.h"
+#include "../Util/Misc.h"
 
 #include <nlnx/nx.hpp>
 
@@ -60,7 +61,22 @@ namespace ms
 				static_cast<int16_t>(std::lround(-GHOST_RADIUS * std::cos(angle))));
 		}
 
+		bool on_chair = chair && state == State::SIT;
+		Point<int16_t> chairpos = absp;
+
+		if (on_chair && chair_at_face)
+		{
+			Point<int16_t> face = look.get_facepos();
+			chairpos += Point<int16_t>(facing_right ? -face.x() : face.x(), face.y());
+		}
+
+		if (on_chair && !chair_in_front)
+			chair_effect.draw(DrawArgument(chairpos, facing_right), alpha);
+
 		look.draw(DrawArgument(absp, color), alpha);
+
+		if (on_chair && chair_in_front)
+			chair_effect.draw(DrawArgument(chairpos, facing_right), alpha);
 
 		afterimage.draw(look.get_frame(), DrawArgument(absp, facing_right), alpha);
 
@@ -103,6 +119,7 @@ namespace ms
 		);
 
 		effects.update();
+		chair_effect.update();
 		chatballoon.update();
 		hintballoon.update();
 		invincible.update();
@@ -383,6 +400,27 @@ namespace ms
 	bool Char::is_sitting() const
 	{
 		return state == State::SIT;
+	}
+
+	void Char::set_chair(int32_t itemid)
+	{
+		if (itemid == chair)
+			return;
+
+		chair = itemid;
+
+		if (!chair)
+			return;
+
+		nl::node src = nl::nx::item["Install"]["0301.img"][string_format::extend_id(itemid, 8)]["effect"];
+		chair_effect = src;
+		chair_at_face = src["pos"].get_integer() == 1;
+		chair_in_front = src["z"].get_integer() >= 0;
+	}
+
+	int32_t Char::get_chair() const
+	{
+		return chair;
 	}
 
 	bool Char::is_climbing() const
