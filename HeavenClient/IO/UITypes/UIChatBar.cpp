@@ -113,6 +113,7 @@ namespace ms
 		thumb_dragging = false;
 		drag_y = 0;
 		drag_pos = 0;
+		held_part = ScrollPart::NONE;
 
 		nl::node base = NxFiles::ui_classic["StatusBar.img"]["base"];
 		nl::node basic = NxFiles::ui_classic["Basic.img"];
@@ -315,6 +316,17 @@ namespace ms
 
 		for (auto iter : message_cooldowns)
 			iter.second -= Constants::TIMESTEP;
+
+		if (held_part != ScrollPart::NONE)
+		{
+			auto now = std::chrono::steady_clock::now();
+
+			if (now - held_last > std::chrono::milliseconds(50) && scroll_part_at(held_cursor) == held_part)
+			{
+				held_last = now;
+				scroll_step(held_part);
+			}
+		}
 	}
 
 	void UIChatBar::update_screen(int16_t, int16_t new_height)
@@ -369,6 +381,13 @@ namespace ms
 			thumb_dragging = false;
 		}
 
+		// Like the original's mouse capture: the repeat in update follows
+		// the cursor until the button is released.
+		if (clicking)
+			held_cursor = cursorpos;
+		else
+			held_part = ScrollPart::NONE;
+
 		if (chatfieldopen)
 		{
 			if (Cursor::State new_state = chatfield.send_cursor(cursorpos, clicking))
@@ -382,48 +401,25 @@ namespace ms
 			return Cursor::State::CLICKING;
 		}
 
-		Point<int16_t> bar = position + get_scrollbar_pos();
-		Point<int16_t> rel = cursorpos - bar;
-		int16_t width = arrows[Arrow::PREV][0].width();
-		int16_t length = get_scrollbar_length();
-		int16_t button = arrows[Arrow::PREV][0].height();
-
 		arrow_pressed[Arrow::PREV] = false;
 		arrow_pressed[Arrow::NEXT] = false;
 
-		if (rel.x() < 0 || rel.x() >= width || rel.y() < 0 || rel.y() >= length)
+		ScrollPart part = scroll_part_at(cursorpos);
+
+		if (part == ScrollPart::NONE)
 			return UIElement::send_cursor(clicking, cursorpos);
 
 		if (get_scrollrange() < 2)
 			return Cursor::State::IDLE;
 
-		if (rel.y() < button)
-		{
+		if (part == ScrollPart::PREV)
 			arrow_pressed[Arrow::PREV] = clicking;
-
-			if (pressed)
-				scroll(-1);
-		} else if (rel.y() >= length - button)
-		{
+		else if (part == ScrollPart::NEXT)
 			arrow_pressed[Arrow::NEXT] = clicking;
 
-			if (pressed)
-				scroll(1);
-		} else if (pressed)
+		if (pressed)
 		{
-			// Clicking the track either side of the thumb pages through the
-			// log, at least sixteen lines at a time.
-			int16_t page = std::max<int16_t>(16, get_scrollrange() / 16);
-			// The original only counts an arrow's height of the thumb.
-			int16_t thumbtop = get_thumb_offset(button).value_or(button);
-
-			if (rel.y() < thumbtop)
-			{
-				set_scrollpos(get_scrollpos() - page);
-			} else if (rel.y() > thumbtop + button)
-			{
-				set_scrollpos(get_scrollpos() + page);
-			} else
+			if (part == ScrollPart::THUMB)
 			{
 				thumb_dragging = true;
 				drag_y = cursorpos.y();
@@ -431,6 +427,10 @@ namespace ms
 
 				return Cursor::State::VSCROLLIDLE;
 			}
+
+			held_part = part;
+			held_last = std::chrono::steady_clock::now();
+			scroll_step(part);
 		}
 
 		return clicking ? Cursor::State::CLICKING : Cursor::State::CANCLICK;
@@ -450,6 +450,7 @@ namespace ms
 		arrow_pressed[Arrow::NEXT] = false;
 		scrollbar_pressed = false;
 		thumb_dragging = false;
+		held_part = ScrollPart::NONE;
 	}
 
 	UIElement::Type UIChatBar::get_type() const
@@ -646,6 +647,58 @@ namespace ms
 	void UIChatBar::scroll(int16_t rows)
 	{
 		set_scrollpos(get_scrollpos() + rows);
+	}
+
+	UIChatBar::ScrollPart UIChatBar::scroll_part_at(Point<int16_t> cursorpos) const
+	{
+		Point<int16_t> rel = cursorpos - position - get_scrollbar_pos();
+		int16_t width = arrows[Arrow::PREV][0].width();
+		int16_t length = get_scrollbar_length();
+		int16_t button = arrows[Arrow::PREV][0].height();
+
+		if (rel.x() < 0 || rel.x() >= width || rel.y() < 0 || rel.y() >= length)
+			return ScrollPart::NONE;
+
+		if (rel.y() < button)
+			return ScrollPart::PREV;
+
+		if (rel.y() >= length - button)
+			return ScrollPart::NEXT;
+
+		// The original only counts an arrow's height of the thumb.
+		int16_t thumbtop = get_thumb_offset(button).value_or(button);
+
+		if (rel.y() < thumbtop)
+			return ScrollPart::PAGE_UP;
+
+		if (rel.y() > thumbtop + button)
+			return ScrollPart::PAGE_DOWN;
+
+		return ScrollPart::THUMB;
+	}
+
+	void UIChatBar::scroll_step(ScrollPart part)
+	{
+		// The track pages through the log, at least sixteen lines at a time.
+		int16_t page = std::max<int16_t>(16, get_scrollrange() / 16);
+
+		switch (part)
+		{
+			case ScrollPart::PREV:
+				scroll(-1);
+				break;
+			case ScrollPart::NEXT:
+				scroll(1);
+				break;
+			case ScrollPart::PAGE_UP:
+				set_scrollpos(get_scrollpos() - page);
+				break;
+			case ScrollPart::PAGE_DOWN:
+				set_scrollpos(get_scrollpos() + page);
+				break;
+			default:
+				break;
+		}
 	}
 
 	int16_t UIChatBar::get_logrows() const

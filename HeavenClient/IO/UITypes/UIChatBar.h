@@ -19,6 +19,7 @@
 
 #include <string>
 
+#include <chrono>
 #include <cstddef>
 
 #include <cstdint>
@@ -125,7 +126,20 @@ namespace ms
 			NEXT
 		};
 
+		// The parts of the scroll bar.
+		enum class ScrollPart
+		{
+			NONE,
+			PREV,
+			NEXT,
+			PAGE_UP,
+			PAGE_DOWN,
+			THUMB
+		};
+
 		void scroll(int16_t rows);
+		ScrollPart scroll_part_at(Point<int16_t> cursorpos) const;
+		void scroll_step(ScrollPart part);
 
 		// The log shows the latest line in the strip, that line above the
 		// strip while typing, or several lines once expanded.
@@ -185,6 +199,11 @@ namespace ms
 		bool thumb_dragging;
 		int16_t drag_y;
 		int16_t drag_pos;
+		// The arrow or track the mouse went down on. As in the original,
+		// its step repeats every 50 ms while the cursor stays over it.
+		ScrollPart held_part;
+		Point<int16_t> held_cursor;
+		std::chrono::steady_clock::time_point held_last;
 
 		EnumMap<Messages::Type, time_t> message_cooldowns;
 		std::vector<std::string> lastentered;
