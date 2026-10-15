@@ -50,7 +50,10 @@ namespace ms
 			STAND = 4,
 			JUMP = 6,
 			HIT = 8,
-			DIE = 10
+			DIE = 10,
+			// What v83 (FUN_005cc410) sends for a mob that walks with its
+			// chase animation.
+			CHASE = 32
 		};
 
 		static std::string nameof(Stance stance)
@@ -146,6 +149,9 @@ namespace ms
 		// Chase the local player for 180 to 240 s, deciding at once.
 		void chase();
 
+		// Set the walking and flying speeds, at chaseSpeed if chasing.
+		void update_shoe(bool chasing);
+
 		// Take one 90 ms step of a flying mob's AI.
 		void think_fly(const Physics &physics);
 
@@ -199,6 +205,7 @@ namespace ms
 		uint16_t level;
 		float speed;
 		float flyspeed;
+		float chasespeed;
 		uint16_t watk;
 		uint16_t matk;
 		uint16_t wdef;
@@ -214,6 +221,7 @@ namespace ms
 		bool canmove;
 		bool canjump;
 		bool canfly;
+		bool canchase;
 
 		EffectLayer effects;
 		Text namelabel;

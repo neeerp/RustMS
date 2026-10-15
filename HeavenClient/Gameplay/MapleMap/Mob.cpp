@@ -52,6 +52,7 @@ namespace ms
 		knockback = info["pushed"];
 		speed = info["speed"];
 		flyspeed = info["flySpeed"];
+		chasespeed = info["chaseSpeed"];
 		touchdamage = info["bodyAttack"].get_bool();
 		undead = info["undead"].get_bool();
 		noflip = info["noFlip"].get_bool();
@@ -60,6 +61,7 @@ namespace ms
 		canjump = src["jump"].size() > 0;
 		canfly = src["fly"].size() > 0;
 		canmove = src["move"].size() > 0 || canfly;
+		canchase = src["chase"].size() > 0;
 
 		if (canfly)
 		{
@@ -70,6 +72,9 @@ namespace ms
 			animations[Stance::STAND] = src["stand"];
 			animations[Stance::MOVE] = src["move"];
 		}
+
+		if (canchase)
+			animations[Stance::CHASE] = src["chase"];
 
 		animations[Stance::JUMP] = src["jump"];
 		animations[Stance::HIT] = src["hit1"];
@@ -82,19 +87,11 @@ namespace ms
 		hitsound = sndsrc["Damage"];
 		diesound = sndsrc["Die"];
 
-		// v83 mobs walk on a CAttrShoe (FUN_005c55cd): its speed is
-		// info/speed + 100 clamped to 10-140 percent, and info/fs scales
-		// both its acceleration and its drag. A flier's shoe flies and walks
-		// at info/flySpeed instead, the only speed most fliers have.
-		double shoespeed = std::clamp((canfly ? flyspeed : speed) + 100.0f, 10.0f, 140.0f) * 0.01;
-
+		// info/fs scales both the shoe's acceleration and its drag.
 		phobj.shoe = true;
-		phobj.walkspeed = canmove ? shoespeed : 0.0;
 		phobj.walkforce = info["fs"].get_real(1.0);
 		phobj.walkdrag = phobj.walkforce;
-
-		if (canfly)
-			phobj.flyspeed = shoespeed;
+		update_shoe(false);
 
 		id = mid;
 		team = tm;
@@ -178,7 +175,12 @@ namespace ms
 		if (stancebyte < Stance::MOVE)
 			stancebyte = Stance::MOVE;
 
-		set_stance(static_cast<Stance>(stancebyte));
+		auto newstance = static_cast<Stance>(stancebyte);
+
+		if (animations.count(newstance) == 0)
+			newstance = Stance::MOVE;
+
+		set_stance(newstance);
 	}
 
 	void Mob::set_stance(Stance newstance)
@@ -267,6 +269,7 @@ namespace ms
 			switch (stance)
 			{
 				case Stance::MOVE:
+				case Stance::CHASE:
 					if (!canfly)
 						phobj.walkdir = flip ? 1 : -1;
 
@@ -343,6 +346,11 @@ namespace ms
 						chase();
 				}
 
+				// v83 (FUN_005cc410) picks a walking mob's action as it goes:
+				// its chase animation for as long as it has a target.
+				if (!canfly && (stance == Stance::MOVE || stance == Stance::CHASE))
+					walk(input());
+
 				switch (stance)
 				{
 					case Stance::HIT:
@@ -383,7 +391,7 @@ namespace ms
 
 				// A jumper that stopped at the end of its foothold jumps on the
 				// next tick (FUN_007f1fec).
-				if (jumprequest && (stance == Stance::MOVE || stance == Stance::STAND))
+				if (jumprequest && (stance == Stance::MOVE || stance == Stance::CHASE || stance == Stance::STAND))
 					jump(input(), false);
 			}
 		} else
@@ -655,6 +663,7 @@ namespace ms
 		switch (stance)
 		{
 			case Stance::MOVE:
+			case Stance::CHASE:
 				return flip ? 1 : -1;
 			case Stance::JUMP:
 				return jumpdir;
@@ -673,7 +682,7 @@ namespace ms
 			set_stance(Stance::STAND);
 		} else
 		{
-			set_stance(Stance::MOVE);
+			set_stance(hastarget && canchase ? Stance::CHASE : Stance::MOVE);
 			flip = direction > 0;
 		}
 
@@ -739,6 +748,7 @@ namespace ms
 		} else if (mode == 0)
 		{
 			hastarget = false;
+			update_shoe(false);
 		}
 	}
 
@@ -749,6 +759,28 @@ namespace ms
 		targettime = 180000 + randomizer.next_int(60000);
 		thinktimer = 0;
 		movedir = 0;
+		update_shoe(true);
+	}
+
+	void Mob::update_shoe(bool chasing)
+	{
+		// v83 mobs walk on a CAttrShoe (FUN_005c55cd): its speed is
+		// info/speed + 100 clamped to 10-140 percent. A flier's shoe flies
+		// and walks at info/flySpeed instead, the only speed most fliers
+		// have. A mob with a chase animation walks at info/chaseSpeed while
+		// chasing. v83 sets the shoe when a chase starts, not when one runs
+		// out, so the mob keeps that speed until something else resets it.
+		auto shoespeed = [](float base)
+		{
+			return std::clamp(base + 100.0f, 10.0f, 140.0f) * 0.01;
+		};
+
+		float base = canfly ? flyspeed : speed;
+
+		phobj.walkspeed = canmove ? shoespeed(chasing && canchase ? chasespeed : base) : 0.0;
+
+		if (canfly)
+			phobj.flyspeed = shoespeed(base);
 	}
 
 	void Mob::set_target(Point<int16_t> position)
@@ -772,6 +804,7 @@ namespace ms
 
 		uint8_t laststance = lastmove.newstate;
 		set_stance(laststance);
+		update_shoe(stance == Stance::CHASE);
 		jumpdir = 0;
 
 		phobj.fhid = lastmove.fh;
