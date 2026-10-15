@@ -31,6 +31,14 @@ namespace ms
 	class FootholdTree
 	{
 	public:
+		// Where a rising wall is in front of a walking object.
+		enum class WallAhead
+		{
+			NONE,
+			NEAR,
+			AGAINST
+		};
+
 		FootholdTree(nl::node source);
 
 		FootholdTree();
@@ -53,7 +61,24 @@ namespace ms
 		// Returns the topmost and bottommost platform positions of the map.
 		Range<int16_t> get_borders() const;
 
+		// Returns the group of a platform.
+		uint16_t get_group(uint16_t fhid) const;
+
+		// Returns the group of the platform at or below a position, 0 if
+		// there is none.
+		uint16_t get_group_below(Point<int16_t> position) const;
+
+		// Returns the leftmost and rightmost x of a group's platforms, or an
+		// empty range for a group the map doesn't have.
+		Range<int16_t> get_group_reach(uint16_t group) const;
+
+		// Looks for a rising wall up to 40 px ahead of a grounded object
+		// walking in direction dir, and whether the object is against it.
+		WallAhead get_wall_ahead(const PhysicsObject &phobj, int8_t dir) const;
+
 	private:
+		bool limit_jumper(PhysicsObject &phobj) const;
+
 		uint16_t get_fhid_below(double fx, double fy, uint16_t ignore = 0) const;
 
 		bool can_jump_down(uint16_t fhid, double fx, double fy) const;
@@ -68,6 +93,7 @@ namespace ms
 
 		std::unordered_map<uint16_t, Foothold> footholds;
 		std::unordered_multimap<int16_t, uint16_t> footholdsbyx;
+		std::unordered_map<uint16_t, Range<int16_t>> groups;
 
 		Foothold nullfh;
 		Range<int16_t> walls;

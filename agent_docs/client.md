@@ -437,7 +437,9 @@ HeavenClient's older force-and-friction model (`move_normal`).
   and `info/fs` (default 1) as both walkforce and walkdrag. A snail (speed
   -65, fs 10) reaches 44 px/s in one tick and stops within four. A jump
   takes off at 555 px/s and keeps the walking speed. While a knocked-back mob
-  slides (`NOFRICTION`), `Mob` slows it itself.
+  slides (`NOFRICTION`), `Mob` slows it itself. A mob that can also jump
+  takes off like the player, holding its walking direction. It keeps within
+  its foothold groups (`JUMPER`); see `agent_docs/combat.md`.
 - **Walking.** On flat ground the player accelerates at 1400 px/s² toward
   125 px/s × walkspeed and brakes at 800 px/s². On a slope the push scales by
   1 ± slant², and a slant over 0.9 slides. Positions advance by the average of

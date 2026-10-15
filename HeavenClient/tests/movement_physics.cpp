@@ -372,6 +372,118 @@ void walls(const ms::Physics& physics)
 	}
 }
 
+// Group 1 is a floor at y 0 from x -500 to 500, a 100 px wall up at 500
+// and a floor on from there to 800, with a ledge from -300 to -100 at y
+// -150. Group 2 is a separate floor from 1000 to 1400, and group 3 keeps
+// the edges of the map out of the way.
+std::filesystem::path jumper_map()
+{
+	return foothold_map({
+		{3, 7, -2000, 500, -1500, 500, 0, 0},
+		{3, 8, 1500, 500, 2000, 500, 0, 0},
+		{1, 1, -500, 0, 0, 0, 0, 2},
+		{1, 2, 0, 0, 500, 0, 1, 3},
+		{1, 3, 500, 0, 500, -100, 2, 4},
+		{1, 4, 500, -100, 800, -100, 3, 0},
+		{1, 5, -300, -150, -100, -150, 0, 0},
+		{2, 6, 1000, 0, 1400, 0, 0, 0},
+	});
+}
+
+ms::PhysicsObject jumper_at(const ms::Physics& physics, double x, double y, uint16_t homegroup)
+{
+	ms::PhysicsObject mob;
+	mob.shoe = true;
+	mob.set_x(x); mob.set_y(y);
+	mob.set_flag(ms::PhysicsObject::Flag::TURNATEDGES);
+	mob.set_flag(ms::PhysicsObject::Flag::JUMPER);
+	mob.homegroup = homegroup;
+	physics.move_object(mob);
+	require(mob.onground && mob.fhid != 0, "jumper fixture did not find its floor");
+	return mob;
+}
+
+// Walks a jumper until it asks to jump, turns, or leaves the ground.
+void walk_jumper(const ms::Physics& physics, ms::PhysicsObject& mob, int8_t direction)
+{
+	for (int tick = 0; !mob.jumprequest && mob.onground && mob.is_flag_set(ms::PhysicsObject::Flag::TURNATEDGES); ++tick)
+	{
+		require(tick < 1000, "jumper never got anywhere");
+		mob.walkdir = direction;
+		physics.move_object(mob);
+	}
+}
+
+// v83 (FUN_007f8d64) keeps a jumping mob within its groups' reach and has
+// it stop to jump at loose ends and rising walls inside it.
+void jumping_mobs(const ms::Physics& physics)
+{
+	const ms::FootholdTree& fht = physics.get_fht();
+	require(fht.get_group_reach(1).first() == -500 && fht.get_group_reach(1).second() == 800, "group 1 reach was wrong");
+	require(fht.get_group_reach(9).first() > fht.get_group_reach(9).second(), "a missing group reached somewhere");
+	require(fht.get_group_below({-200, -150}) == 1 && fht.get_group_below({1200, -50}) == 2, "the group below was wrong");
+
+	// The reach is shrunk by 20 px a side, and leaving it turns the mob.
+	ms::PhysicsObject mob = jumper_at(physics, -400, 0, 1);
+	walk_jumper(physics, mob, -1);
+	require(mob.crnt_x() == -480 && mob.onground && !mob.jumprequest, "jumper did not turn 20 px inside its reach");
+	mob = jumper_at(physics, 700, -100, 1);
+	walk_jumper(physics, mob, 1);
+	require(mob.crnt_x() == 780 && !mob.jumprequest, "jumper did not turn 20 px inside its reach");
+
+	// Its home group widens the reach, so it gets to the loose end and
+	// stops there to jump.
+	mob = jumper_at(physics, 700, -100, 2);
+	walk_jumper(physics, mob, 1);
+	require(mob.crnt_x() == 800 && mob.onground && mob.jumprequest, "jumper did not stop to jump at a loose end");
+	require(mob.is_flag_set(ms::PhysicsObject::Flag::TURNATEDGES), "jumper turned at a loose end");
+
+	// At a rising wall it stops to jump; told not to, it only stops.
+	for (bool edgejump : {true, false})
+	{
+		mob = jumper_at(physics, 400, 0, 1);
+		mob.edgejump = edgejump;
+		for (int tick = 0; tick < 300; ++tick)
+		{
+			mob.walkdir = 1;
+			physics.move_object(mob);
+			if (mob.jumprequest) break;
+		}
+		require(mob.crnt_x() == 500 && mob.onground && mob.jumprequest == edgejump, "jumper did not stop at the wall");
+		require(mob.is_flag_set(ms::PhysicsObject::Flag::TURNATEDGES), "jumper turned at a wall");
+	}
+
+	// At a loose end of the ledge it stops to jump, or walks off.
+	mob = jumper_at(physics, -200, -150, 1);
+	walk_jumper(physics, mob, 1);
+	require(mob.crnt_x() == -100 && mob.jumprequest, "jumper did not stop to jump at the ledge's end");
+	mob = jumper_at(physics, -200, -150, 1);
+	mob.edgejump = false;
+	walk_jumper(physics, mob, 1);
+	require(!mob.onground && mob.crnt_x() > -100, "jumper did not walk off the ledge");
+
+	// Down the wall is a step it walks down, unless told to jump it.
+	mob = jumper_at(physics, 600, -100, 1);
+	walk_jumper(physics, mob, -1);
+	require(!mob.onground && mob.crnt_x() < 500, "jumper did not walk down the step");
+	mob = jumper_at(physics, 600, -100, 1);
+	mob.stepdown = false;
+	walk_jumper(physics, mob, -1);
+	require(mob.crnt_x() == 500 && mob.jumprequest, "jumper did not stop to jump down the step");
+
+	// The AI sees a rising wall 40 px ahead, and whether it is against it.
+	using WallAhead = ms::FootholdTree::WallAhead;
+	require(fht.get_wall_ahead(jumper_at(physics, 459, 0, 1), 1) == WallAhead::NONE, "a wall 41 px away was seen");
+	require(fht.get_wall_ahead(jumper_at(physics, 470, 0, 1), 1) == WallAhead::NEAR, "a wall 30 px away was missed");
+	require(fht.get_wall_ahead(jumper_at(physics, 470, 0, 1), -1) == WallAhead::NONE, "a wall behind was seen");
+	require(fht.get_wall_ahead(jumper_at(physics, -10, 0, 1), 1) == WallAhead::NONE, "a floor ahead was taken for a wall");
+	require(fht.get_wall_ahead(jumper_at(physics, 520, -100, 1), -1) == WallAhead::NONE, "a step down was taken for a wall");
+	require(fht.get_wall_ahead(jumper_at(physics, -110, -150, 1), 1) == WallAhead::NONE, "a loose end was taken for a wall");
+	mob = jumper_at(physics, 400, 0, 1);
+	walk_jumper(physics, mob, 1);
+	require(fht.get_wall_ahead(mob, 1) == WallAhead::AGAINST, "a mob at the wall was not against it");
+}
+
 int main()
 {
 	std::filesystem::path path;
@@ -427,6 +539,21 @@ int main()
 				}
 				require(mob.crnt_x() == direction * 980 && mob.onground, "walker did not stop 20 px from the edge");
 			}
+		}
+		{
+			std::filesystem::path jumpers = jumper_map();
+			try
+			{
+				nl::file map(jumpers.string());
+				ms::Physics physics(map.root());
+				jumping_mobs(physics);
+			}
+			catch (...)
+			{
+				std::filesystem::remove(jumpers);
+				throw;
+			}
+			std::filesystem::remove(jumpers);
 		}
 		{
 			// A mob that enters on a foothold stands on it, even if its

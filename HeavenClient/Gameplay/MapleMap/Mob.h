@@ -71,8 +71,8 @@ namespace ms
 		}
 
 		// Construct a mob by combining data from game files with data sent by the server.
-		Mob(int32_t oid, int32_t mobid, int8_t mode, int8_t stance, uint16_t fhid, bool newspawn, int8_t team,
-			Point<int16_t> position, const Physics &physics);
+		Mob(int32_t oid, int32_t mobid, int8_t mode, int8_t stance, uint16_t fhid, uint16_t homefh, bool newspawn,
+			int8_t team, Point<int16_t> position, const Physics &physics);
 
 		// Draw the mob
 		void draw(double viewx, double viewy, float alpha) const override;
@@ -152,7 +152,18 @@ namespace ms
 		void next_move();
 
 		// Take one 90 ms step of a ground mob's AI.
-		void think();
+		void think(const Physics &physics);
+
+		// The part of a jumping mob's AI step that comes before its usual
+		// decision. Returns whether it jumped instead.
+		bool think_jump(const Physics &physics);
+
+		// Jump on the next tick, holding direction dir. With check, turn
+		// around if the jump lands at the height it started from.
+		void jump(int8_t dir, bool check);
+
+		// Which way the mob is pushing: -1 left, 0 not at all, 1 right.
+		int8_t input() const;
 
 		// Stand (0) or walk left (-1) or right (1), telling the server if
 		// that changes anything.
@@ -233,6 +244,11 @@ namespace ms
 		int16_t thinktimer;
 		// Where the AI means to go: -1 left, 0 nowhere, 1 right.
 		int8_t movedir;
+		// The direction held through a jump, and whether to check the
+		// landing against jumpy, the height it jumped from.
+		int8_t jumpdir;
+		bool checkjump;
+		int16_t jumpy;
 		Stance stance;
 		bool flip;
 		FlyDirection flydirection;

@@ -33,7 +33,7 @@
 
 namespace ms
 {
-	Mob::Mob(int32_t oi, int32_t mid, int8_t mode, int8_t st, uint16_t fh, bool newspawn, int8_t tm,
+	Mob::Mob(int32_t oi, int32_t mid, int8_t mode, int8_t st, uint16_t fh, uint16_t homefh, bool newspawn, int8_t tm,
 			 Point<int16_t> position, const Physics &physics) : MapObject(oi)
 	{
 		std::string strid = string_format::extend_id(mid, 7);
@@ -105,6 +105,9 @@ namespace ms
 		aitime = 0;
 		thinktimer = 0;
 		movedir = 0;
+		jumpdir = 0;
+		checkjump = false;
+		jumpy = 0;
 		set_control(mode);
 		phobj.fhid = fh;
 
@@ -125,6 +128,14 @@ namespace ms
 		// (0x5d9785), which keeps it off the ends of its platform.
 		if (canmove && !canjump && !canfly)
 			phobj.set_flag(PhysicsObject::Flag::WALKONLY);
+
+		// One that can also jump gets move ability 2, and keeps near the
+		// group of the foothold it spawned on (FUN_005c3ed4).
+		if (canmove && canjump && !canfly)
+		{
+			phobj.set_flag(PhysicsObject::Flag::JUMPER);
+			phobj.homegroup = physics.get_fht().get_group(homefh);
+		}
 
 		hppercent = 0;
 		dying = false;
@@ -279,13 +290,32 @@ namespace ms
 
 					break;
 				case Stance::JUMP:
+					// CVecCtrl::Jump (FUN_007f1bb0) speeds the mob up in the
+					// direction it holds, and it keeps steering in the air.
 					if (phobj.onground)
-						phobj.vforce = -Physics::jump_speed(1.0);
+						Physics::jump(phobj, Physics::jump_speed(1.0), jumpdir);
+
+					phobj.walkdir = jumpdir;
 
 					break;
 			}
 
+			if (phobj.is_flag_set(PhysicsObject::Flag::JUMPER))
+			{
+				// At a loose end or a wall (FUN_007f8d64), a jumper jumps unless
+				// it is chasing a target below it, and then only half the time.
+				// Toward a target on its own group it walks down a step instead.
+				const FootholdTree &fht = physics.get_fht();
+				bool chasing = control && hastarget && stance != Stance::HIT;
+
+				phobj.edgejump = !chasing || targetpos.y() <= phobj.get_y() || randomizer.next_bool();
+				phobj.stepdown = !chasing || fht.get_group_below(targetpos) == fht.get_group(phobj.fhid);
+			}
+
 			physics.move_object(phobj);
+
+			bool jumprequest = phobj.jumprequest;
+			phobj.jumprequest = false;
 
 			if (control && canfly)
 			{
@@ -335,17 +365,30 @@ namespace ms
 
 						break;
 					case Stance::JUMP:
+						// It lands still holding the direction it jumped in,
+						// and its AI only counts down in the air.
 						if (phobj.onground)
-							walk(movedir);
+						{
+							walk(jumpdir);
+						} else
+						{
+							for (aitime += Constants::TIMESTEP; aitime >= 90; aitime -= 90)
+								thinktimer--;
+						}
 
 						break;
 					default:
 						// The mob vecctrl steps its AI in 90 ms steps (FUN_007f72d9).
 						for (aitime += Constants::TIMESTEP; aitime >= 90; aitime -= 90)
-							think();
+							think(physics);
 
 						break;
 				}
+
+				// A jumper that stopped at the end of its foothold jumps on the
+				// next tick (FUN_007f1fec).
+				if (jumprequest && (stance == Stance::MOVE || stance == Stance::STAND))
+					jump(input(), false);
 			}
 		} else
 		{
@@ -404,8 +447,11 @@ namespace ms
 		}
 	}
 
-	void Mob::think()
+	void Mob::think(const Physics &physics)
 	{
+		if (phobj.is_flag_set(PhysicsObject::Flag::JUMPER) && think_jump(physics))
+			return;
+
 		// FUN_007f8025 (standing mobs), FUN_007f81c8 (walking) and
 		// FUN_007f835e (jumping): each decision holds for a random time, in
 		// 90 ms steps.
@@ -450,8 +496,7 @@ namespace ms
 		{
 			// A fifth of a jumping mob's idle decisions are jumps, after
 			// which it decides again.
-			set_stance(Stance::JUMP);
-			update_movement();
+			jump(input(), false);
 			return;
 		} else
 		{
@@ -461,6 +506,96 @@ namespace ms
 		}
 
 		thinktimer--;
+	}
+
+	bool Mob::think_jump(const Physics &physics)
+	{
+		// FUN_007f835e only looks around on the ground.
+		if (!phobj.onground)
+		{
+			thinktimer--;
+			return true;
+		}
+
+		int8_t dir = input();
+
+		// A jump it chose that lands at the height it left from turns it
+		// around.
+		if (checkjump)
+		{
+			checkjump = false;
+
+			if (dir != 0 && phobj.get_y() == jumpy)
+			{
+				dir = -dir;
+				walk(dir);
+			}
+		}
+
+		// It jumps at a rising wall up to 40 px ahead while its decision
+		// lasts, or turns back once pressed against it.
+		const FootholdTree &fht = physics.get_fht();
+
+		switch (fht.get_wall_ahead(phobj, dir))
+		{
+			case FootholdTree::WallAhead::AGAINST:
+				dir = -dir;
+				walk(dir);
+				break;
+			case FootholdTree::WallAhead::NEAR:
+				if (thinktimer > 0)
+				{
+					jump(dir, true);
+					thinktimer--;
+					return true;
+				}
+
+				break;
+			default:
+				break;
+		}
+
+		// Chasing, a third of its steps under a target on another group
+		// that reaches over it are jumps, after which it decides again.
+		if (hastarget && thinktimer > 0)
+		{
+			uint16_t group = fht.get_group_below(targetpos);
+			Range<int16_t> reach = fht.get_group_reach(group);
+			int16_t x = phobj.get_x();
+
+			if (group != fht.get_group(phobj.fhid) && targetpos.y() < phobj.get_y() &&
+				x > reach.first() && x < reach.second() && randomizer.next_int(3) == 0)
+			{
+				movedir = 0;
+				thinktimer = -1;
+				jump(dir, true);
+				return true;
+			}
+		}
+
+		return false;
+	}
+
+	void Mob::jump(int8_t dir, bool check)
+	{
+		jumpdir = dir;
+		checkjump = check;
+		jumpy = phobj.get_y();
+		set_stance(Stance::JUMP);
+		update_movement();
+	}
+
+	int8_t Mob::input() const
+	{
+		switch (stance)
+		{
+			case Stance::MOVE:
+				return flip ? 1 : -1;
+			case Stance::JUMP:
+				return jumpdir;
+			default:
+				return 0;
+		}
 	}
 
 	void Mob::walk(int8_t direction)
@@ -566,6 +701,7 @@ namespace ms
 
 		uint8_t laststance = lastmove.newstate;
 		set_stance(laststance);
+		jumpdir = 0;
 
 		phobj.fhid = lastmove.fh;
 	}
