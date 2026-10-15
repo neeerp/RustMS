@@ -49,18 +49,32 @@ pub fn build_quest_action_result(
     Ok(p)
 }
 
-/// The white "You have gained experience" line; `party_bonus` is the extra
-/// EXP from sharing the kill with a party, shown as "(+N)".
+/// The white "You have gained experience" line on the right; `party_bonus`
+/// is the extra EXP from sharing the kill with a party, shown on its own
+/// line under it.
 pub fn build_gain_exp(gain: i32, party_bonus: i32) -> Result<Packet, NetworkError> {
+    write_gain_exp(gain, party_bonus, false)
+}
+
+/// "You have gained experience" in the chat log, as for quest EXP.
+pub fn build_gain_exp_in_chat(gain: i32) -> Result<Packet, NetworkError> {
+    write_gain_exp(gain, 0, true)
+}
+
+fn write_gain_exp(gain: i32, party_bonus: i32, in_chat: bool) -> Result<Packet, NetworkError> {
     let mut p = Packet::new_empty();
     p.write_short(SendOpcode::ShowStatusInfo as i16)?;
     p.write_byte(3)?;
     p.write_byte(1)?;
     p.write_int(gain)?;
-    p.write_byte(0)?;
+    p.write_byte(u8::from(in_chat))?;
     p.write_int(0)?;
     p.write_short(0)?;
     p.write_int(0)?;
+    if in_chat {
+        // Quest bonus EXP rate.
+        p.write_byte(0)?;
+    }
     p.write_byte(0)?;
     p.write_int(party_bonus)?;
     // Equipment, internet cafe, and rainbow week bonus EXP.
@@ -140,6 +154,21 @@ mod tests {
         expect.int(0);
         expect.byte(0);
         expect.int(3).int(0).int(0).int(0);
+        expect.end();
+    }
+
+    #[test]
+    fn gain_exp_in_chat_carries_the_quest_rate() {
+        let packet = build_gain_exp_in_chat(10).unwrap();
+
+        let mut expect = Expect::new(&packet.bytes);
+        expect.short(SendOpcode::ShowStatusInfo as i16).byte(3);
+        expect.byte(1).int(10).byte(1);
+        expect.int(0);
+        expect.byte(0).byte(0);
+        expect.int(0);
+        expect.byte(0).byte(0);
+        expect.int(0).int(0).int(0).int(0);
         expect.end();
     }
 }

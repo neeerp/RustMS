@@ -32,7 +32,12 @@ namespace ms
 	public:
 		void handle(InPacket& recv) const override;
 	private:
+		// A picked-up item's name is cut to this width.
+		static constexpr size_t PICKUP_NAME_WIDTH = 120;
+
 		void show_status(Color::Name color, const std::string& message) const;
+		// A grey line in the chat log.
+		void chat_line(const std::string& message) const;
 	};
 
 	// Show an instruction balloon above the player

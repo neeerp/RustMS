@@ -19,8 +19,9 @@ Quests run the way the original client ran them:
    asks the field whether that NPC is on the map within reach (1200×800
    around the player), and commits the change and its `Act.img` rewards
    atomically (`db::quest::start`/`complete`/`forfeit`).
-4. It answers with the quest record (`SHOW_STATUS_INFO` mode 1), EXP gain and
-   stats if any, and `UPDATE_QUEST_INFO` mode 8 (quest, NPC, next quest). A
+4. It answers with the quest record (`SHOW_STATUS_INFO` mode 1), EXP and
+   mesos with their stats if any (both shown in the chat log, as mode 3 with
+   its in-chat flag and mode 5), and `UPDATE_QUEST_INFO` mode 8 (quest, NPC, next quest). A
    nonzero next quest (`Act/1/nextQuest`) makes the client continue straight
    into that quest's offer once the current conversation ends.
 

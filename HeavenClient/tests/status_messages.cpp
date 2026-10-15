@@ -1,0 +1,84 @@
+#include "../Net/Handlers/StatusMessages.h"
+#include <cstring>
+#include <iostream>
+#include <stdexcept>
+#include <vector>
+
+void require(bool condition, const char* message)
+{
+	if (!condition) throw std::runtime_error(message);
+}
+
+struct Writer
+{
+	std::vector<int8_t> bytes;
+
+	template <typename T>
+	Writer& put(T value)
+	{
+		int8_t raw[sizeof(T)];
+		std::memcpy(raw, &value, sizeof(T));
+		bytes.insert(bytes.end(), raw, raw + sizeof(T));
+		return *this;
+	}
+
+	// SHOW_STATUS_INFO mode 3 after the mode, as the server sends it.
+	Writer& exp(bool white, int32_t gain, bool inchat, int32_t party)
+	{
+		put<int8_t>(white).put(gain).put<int8_t>(inchat).put<int32_t>(0).put<int16_t>(0).put<int32_t>(0);
+
+		if (inchat)
+			put<int8_t>(0);
+
+		return put<int8_t>(0).put(party).put<int32_t>(0).put<int32_t>(0).put<int32_t>(0);
+	}
+};
+
+int main()
+{
+	try
+	{
+		using namespace ms;
+		using namespace ms::status_messages;
+
+		require(item_line("Snail Shell", 1) == "You have gained an item (Snail Shell)", "one item");
+		require(item_line("Snail Shell", 3) == "You have gained items (3 Snail Shell)", "the count comes first");
+		require(meso_line(150) == "You have gained mesos (+150)", "gaining mesos");
+		require(meso_line(-150) == "You have lost mesos (-150)", "losing mesos");
+		require(fame_line(1) == "You have gained fame (+1)", "gaining fame");
+		require(fame_line(-1) == "You have lost fame (-1)", "losing fame");
+
+		Writer kill;
+		kill.exp(true, 25, false, 3);
+		InPacket recv(kill.bytes.data(), kill.bytes.size());
+		ExpGain exp = read_exp(recv);
+		require(!recv.available(), "the whole EXP message is read");
+		require(exp.white && exp.gain == 25 && !exp.inchat && exp.party == 3, "a party kill's EXP");
+
+		auto lines = exp_lines(exp);
+		require(lines.size() == 2, "the gain, then the party bonus");
+		require(lines[0].text == "You have gained experience (+25)" && !lines[0].yellow, "the gain is white");
+		require(lines[1].text == "Bonus EXP for PARTY (+3)" && lines[1].yellow, "the party bonus is yellow");
+
+		Writer solo;
+		solo.exp(false, 7, false, 0);
+		InPacket solo_recv(solo.bytes.data(), solo.bytes.size());
+		auto solo_lines = exp_lines(read_exp(solo_recv));
+		require(solo_lines.size() == 1 && solo_lines[0].yellow, "a solo kill has one line, yellow if not white");
+
+		Writer quest;
+		quest.exp(true, 10, true, 0);
+		InPacket quest_recv(quest.bytes.data(), quest.bytes.size());
+		ExpGain quest_exp = read_exp(quest_recv);
+		require(!quest_recv.available(), "quest EXP carries one more byte");
+		require(quest_exp.inchat && quest_exp.gain == 10, "quest EXP goes to the chat log");
+
+		std::cout << "Status messages passed\n";
+		return 0;
+	}
+	catch (const std::exception& error)
+	{
+		std::cerr << error.what() << '\n';
+		return 1;
+	}
+}

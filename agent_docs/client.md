@@ -71,7 +71,12 @@ from `UI.nx`. Moved so far:
   saves the keymap right away; an open Key Config shows the new binding.
   Status messages (`UIStatusMessenger`) stack upward from just above the
   quick slot panel, right-aligned with it; `UIStatusBar::QUICKSLOT_TOP` is
-  the shared anchor.
+  the shared anchor. Each fades out over 6 s. SHOW_STATUS_INFO is worded and
+  coloured as in the v83 client (`Net/Handlers/StatusMessages.h`): pickups
+  ("You have gained an item (Snail Shell)", names cut to 120 px), mesos, and
+  kill EXP with a yellow line per bonus ("Bonus EXP for PARTY (+N)") show
+  here; quest EXP (mode 3 with its in-chat flag), mode 4 fame and mode 5
+  mesos go to the chat log as grey lines.
 - **Chat** (`UIChatBar`): the input strip in the bar's top-left and the log
   above it. The status bar cuts that strip out of its background, so the two
   can overlap in either draw order. As in the original, the log has three
