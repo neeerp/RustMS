@@ -58,6 +58,10 @@ namespace ms
 		// Returns the general item data (name, price, etc.).
 		const ItemData &get_itemdata() const;
 
+		// Returns how much faster the wearer recovers on maps that already
+		// recover faster (info/recovery, 1 when absent).
+		double get_recovery() const;
+
 	private:
 		// Allow the cache to use the constructor
 		friend Cache<EquipData>;
@@ -74,5 +78,6 @@ namespace ms
 		uint8_t slots;
 		bool cash;
 		bool tradeblock;
+		double recovery;
 	};
 }

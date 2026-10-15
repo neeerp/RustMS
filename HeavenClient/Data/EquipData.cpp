@@ -30,6 +30,7 @@ namespace ms
 		cash = src["cash"].get_bool();
 		tradeblock = src["tradeBlock"].get_bool();
 		slots = src["tuc"];
+		recovery = src["recovery"].get_real(1.0);
 
 		reqstats[MapleStat::Id::LEVEL] = src["reqLevel"];
 		reqstats[MapleStat::Id::JOB] = src["reqJob"];
@@ -173,5 +174,10 @@ namespace ms
 	const ItemData &EquipData::get_itemdata() const
 	{
 		return itemdata;
+	}
+
+	double EquipData::get_recovery() const
+	{
+		return recovery;
 	}
 }

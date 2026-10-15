@@ -3,6 +3,7 @@ use crate::items;
 use crate::packet::build::world::stat::StatUpdate;
 use crate::packet::build::world::{inventory, stat};
 use crate::skills;
+use game::inventory::equip_slot;
 use game::{InventoryType, Player};
 use packet::{io::read::PktRead, Packet};
 use std::io::Cursor;
@@ -65,15 +66,16 @@ pub struct HealOverTimeHandler;
 const SEATED_RECOVERY_RATE: f64 = 1.5;
 
 /// Most the player may recover per tick: their natural amount at the map's
-/// `info/recovery` rate, seated, or a portable chair's
-/// `recoveryHP`/`recoveryMP` while they sit on one they still own.
+/// `info/recovery` rate (and their top's, see `top_recovery`), seated, or a
+/// portable chair's `recoveryHP`/`recoveryMP` while they sit on one they
+/// still own.
 fn max_heal(player: &Player) -> (i16, i16) {
     let natural = skills::natural_recovery(player);
-    let rate = crate::get_game_data()
+    let map_rate = crate::get_game_data()
         .ok()
         .and_then(|data| data.field(player.stats.map_id))
-        .map_or(1.0, |field| field.recovery)
-        * SEATED_RECOVERY_RATE;
+        .map_or(1.0, |field| field.recovery);
+    let rate = map_rate * top_recovery(player, map_rate) * SEATED_RECOVERY_RATE;
     let chair = (player.chair != 0 && player.inventory.count(player.chair) > 0)
         .then(|| items::info(player.chair))
         .flatten();
@@ -83,6 +85,21 @@ fn max_heal(player: &Player) -> (i16, i16) {
         i16::try_from(natural.max(chair)).unwrap_or(i16::MAX)
     };
     (bound(natural.hp, chair_hp), bound(natural.mp, chair_mp))
+}
+
+/// The worn top's `info/recovery`, which v83 only applies on a map that
+/// already recovers faster than usual, such as a sauna robe in the
+/// Sleepywood sauna.
+fn top_recovery(player: &Player, map_rate: f64) -> f64 {
+    if map_rate <= 1.0 {
+        return 1.0;
+    }
+    player
+        .inventory
+        .get(InventoryType::Equipped, equip_slot::TOP)
+        .and_then(|top| items::info(top.item_id))
+        .and_then(|info| info.equip?.recovery)
+        .unwrap_or(1.0)
 }
 
 impl WorldHandler for HealOverTimeHandler {
@@ -210,6 +227,22 @@ mod tests {
         // Not once the chair has left the inventory.
         player.inventory.take(InventoryType::Setup, 1, 1).unwrap();
         assert!(!heal_over_time(&mut player, 50, 0));
+    }
+
+    #[test]
+    fn a_sauna_robe_speeds_recovery_only_where_the_map_does() {
+        if items::data().is_err() {
+            return;
+        }
+        let mut player = crate::codec::stats::sample_player();
+        assert_eq!(top_recovery(&player, 2.0), 1.0);
+        player.inventory.insert(
+            InventoryType::Equipped,
+            equip_slot::TOP,
+            Item::stack(1050018, 1),
+        );
+        assert_eq!(top_recovery(&player, 2.0), 1.5);
+        assert_eq!(top_recovery(&player, 1.0), 1.0);
     }
 
     #[test]
