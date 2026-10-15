@@ -98,6 +98,9 @@ namespace ms
 
 			for (const auto& entry : entries)
 			{
+				if (&entry != &entries.front())
+					y += ROW;
+
 				entry.name.draw(position + Point<int16_t>(TEXT_X, y - 6));
 				y += entry.name.height() > ROW ? (entry.name.height() + ROW - 1) / ROW * ROW : ROW;
 
@@ -161,6 +164,10 @@ namespace ms
 
 		for (const auto& [id, objectives] : shown)
 		{
+			// As in the original (FUN_007052e6), a blank row separates quests.
+			if (!entries.empty())
+				y += ROW;
+
 			const QuestInfo* quest = QuestCatalog::get().find(id);
 			Entry entry { id, Text(Text::A12B, Text::LEFT, Color::Name::BLACK, quest ? quest->name : std::to_string(id),
 				WIDTH - TEXT_X - UNTRACK_ROOM) };
@@ -201,7 +208,7 @@ namespace ms
 		if (minimized || entries.empty())
 			return TOP_MINIMIZED;
 
-		int16_t rows = 0;
+		int16_t rows = static_cast<int16_t>(entries.size() - 1) * ROW;
 
 		for (const auto& entry : entries)
 		{
