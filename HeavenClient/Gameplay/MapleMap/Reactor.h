@@ -21,6 +21,7 @@
 
 #include "MapObject.h"
 
+#include "../Audio/Audio.h"
 #include "../Graphics/Animation.h"
 
 #include "../Gameplay/Physics/Physics.h"
@@ -61,6 +62,12 @@ namespace ms
 		nl::node src;
 		std::map<int8_t, Animation> animations;
 		bool animation_ended;
+
+		// Sound/Reactor.img/<id>/<state>/Hit, played with that state's hit
+		// animation.
+		std::map<int8_t, Sound> hitsounds;
+
+		void play_hit(int8_t state);
 
 		bool hittable;
 		bool dead;
