@@ -137,8 +137,10 @@ holds still while the bulb inside glows.
 The **Quest Helper** (`IO/UITypes/UIQuestHelper.cpp`) is the v83
 `UIWindow.img/QuestAlarm` from `UIClassic.nx`, laid out from period footage.
 It sits flush with the top-right corner, even with nothing tracked, and
-lists up to five tracked quests with what each still needs ("Snail 3/10"),
-the count green once met. Starting a quest with kills or items to bring
+lists up to five tracked quests with what each still needs ("Snail 3/10").
+As in the original's font choice (`FUN_00704c2c`), the count you have is red
+under a third of the way, pink under two thirds, orange until done, then
+green; the rest of the line is black. Starting a quest with kills or items to bring
 tracks it unless AUTO was switched off; the quest window's helper button
 tracks and untracks open quests. Each quest's ⓧ untracks it, the minimize
 button folds the helper to its title bar, and close hides it until the
