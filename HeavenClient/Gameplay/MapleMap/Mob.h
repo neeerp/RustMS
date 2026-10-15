@@ -88,7 +88,7 @@ namespace ms
 		void set_control(int8_t mode);
 
 		// Tell the mob where the local player is, whom it chases with aggro.
-		void set_target(Point<int16_t> position);
+		void set_target(Point<int16_t> position, bool dead);
 
 		// Send movement to the mob.
 		void send_movement(Point<int16_t> start, std::vector<Movement> &&movements);
@@ -248,6 +248,9 @@ namespace ms
 		bool hastarget;
 		int32_t targettime;
 		Point<int16_t> targetpos;
+		bool targetdead;
+		// Ms until a firstAttack mob next reports the local player's distance.
+		int16_t reporttime;
 		// Ms towards the next AI step, and AI steps until the next decision.
 		uint16_t aitime;
 		int16_t thinktimer;

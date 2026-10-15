@@ -38,7 +38,7 @@ namespace ms
 		void draw(Layer::Id layer, double viewx, double viewy, float alpha) const;
 
 		// Update all mobs. Those with aggro chase the player at `playerpos`.
-		void update(const Physics &physics, Point<int16_t> playerpos);
+		void update(const Physics &physics, Point<int16_t> playerpos, bool playerdead);
 
 		// Spawn a new mob.
 		void spawn(MobSpawn &&spawn);

@@ -414,6 +414,18 @@ namespace ms
 		}
 	};
 
+	// Opcode: MOB_DISTANCE(189)
+	class MobDistancePacket : public OutPacket
+	{
+	public:
+		// Tells the server how far the player is from a mob
+		MobDistancePacket(int32_t oid, int32_t distance) : OutPacket(OutPacket::Opcode::MOB_DISTANCE)
+		{
+			write_int(oid);
+			write_int(distance);
+		}
+	};
+
 	// Opcode: PICKUP_ITEM(202)
 	class PickupItemPacket : public OutPacket
 	{
