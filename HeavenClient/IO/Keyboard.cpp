@@ -42,14 +42,18 @@ namespace ms
 					GLFW_KEY_LEFT_ALT, GLFW_KEY_SPACE,
 					0, // 58
 					GLFW_KEY_F1, GLFW_KEY_F2, GLFW_KEY_F3, GLFW_KEY_F4, GLFW_KEY_F5, GLFW_KEY_F6, GLFW_KEY_F7,
-					GLFW_KEY_F8, GLFW_KEY_F9, GLFW_KEY_F10, GLFW_KEY_F11, GLFW_KEY_F12, GLFW_KEY_HOME,
+					GLFW_KEY_F8, GLFW_KEY_F9, GLFW_KEY_F10,
+					0, 0, // 70
+					GLFW_KEY_HOME,
 					0, // 72
 					GLFW_KEY_PAGE_UP,
 					0, 0, 0, 0, 0, // 78
 					GLFW_KEY_END,
 					0, // 80
-					GLFW_KEY_PAGE_DOWN, GLFW_KEY_INSERT, GLFW_KEY_DELETE, GLFW_KEY_ESCAPE, GLFW_KEY_RIGHT_CONTROL,
-					GLFW_KEY_RIGHT_SHIFT, GLFW_KEY_RIGHT_ALT, GLFW_KEY_SCROLL_LOCK
+					GLFW_KEY_PAGE_DOWN, GLFW_KEY_INSERT, GLFW_KEY_DELETE, GLFW_KEY_ESCAPE,
+					0, 0, // 86
+					GLFW_KEY_F11, GLFW_KEY_F12,
+					0 // 89
 			};
 
 	constexpr int32_t Shifttable[126] =
@@ -203,6 +207,21 @@ namespace ms
 
 	Keyboard::Mapping Keyboard::get_mapping(int32_t keycode) const
 	{
+		// v83 reads the right-hand Ctrl, Alt and Shift as the left ones, so
+		// they have no keys of their own.
+		switch (keycode)
+		{
+			case GLFW_KEY_RIGHT_CONTROL:
+				keycode = GLFW_KEY_LEFT_CONTROL;
+				break;
+			case GLFW_KEY_RIGHT_ALT:
+				keycode = GLFW_KEY_LEFT_ALT;
+				break;
+			case GLFW_KEY_RIGHT_SHIFT:
+				keycode = GLFW_KEY_LEFT_SHIFT;
+				break;
+		}
+
 		auto iter = keymap.find(keycode);
 
 		if (iter == keymap.end())

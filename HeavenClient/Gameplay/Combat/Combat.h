@@ -89,7 +89,12 @@ namespace ms
 
 		void apply_damage_effect(const DamageEffect &effect);
 
-		void extract_effects(const Char &user, const SpecialMove &move, const AttackResult &result);
+		// The area an attack covers, from the attacker's position and facing.
+		static Rectangle<int16_t> place_range(Point<int16_t> origin, Rectangle<int16_t> range, float hrange,
+											  bool toleft);
+
+		void extract_effects(const Char &user, const SpecialMove &move, const AttackResult &result,
+							 Rectangle<int16_t> range);
 
 		// Tell the targets how many hits are coming (sign 1) or cancel them (sign -1),
 		// so a mob the server kills waits for the hits before dying.

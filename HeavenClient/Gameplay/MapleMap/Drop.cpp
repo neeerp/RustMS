@@ -17,136 +17,222 @@
 //////////////////////////////////////////////////////////////////////////////////
 #include "Drop.h"
 
+#include "../../Audio/Audio.h"
+
 #include <algorithm>
+#include <chrono>
 #include <cmath>
 
 namespace ms
 {
 	namespace
 	{
-		const double DROPSPEED = -2.9;
-		const double DROPGRAVITY = 0.042;
+		const double PI = 3.14159265358979323846;
 
-		// A picked up drop rises about 50 px, slowing down, and disappears
-		// after about 0.37 s, fading only over the last few ticks.
-		const double PICKUPSPEED = -2.3;
-		const double PICKUPGRAVITY = 0.05;
-		const uint16_t PICKUPTIME = 46;
-		const uint16_t PICKUPFADETIME = 6;
+		// A drop flies up at 400 px/s (720 when it explodes out of a boss)
+		// against 800 px/s^2 of gravity, so a normal drop rises 100 px and
+		// comes back to its start height after one second.
+		const double GRAVITY = 400.0;
+		const double DROPSPEED = 400.0;
+		const double EXPLOSIVESPEED = 720.0;
 
-		// Ticks a falling drop needs to come down by dy pixels.
-		double air_ticks(double dy)
+		// Item drops spin once every 300 ms while they fly.
+		const double SPINSTEP = 2.0 * PI * Constants::TIMESTEP / 300.0;
+
+		// A lying drop bobs 3 px up and down every two seconds.
+		const double FLOATSTEP = PI * Constants::TIMESTEP / 1000.0;
+		const double FLOATHEIGHT = 3.0;
+
+		// A picked up drop arcs 40 px above the line to the looter's middle
+		// in 700 ms and fades to a quarter over the last 280 ms.
+		const int32_t PICKUPTIME = 700;
+		const int32_t PICKUPFADESTART = 420;
+		const double PICKUPARC = 40.0;
+		const int16_t LOOTERHALFHEIGHT = 32;
+
+		const int32_t FADETIME = 1000;
+		const int32_t DROPSOUNDGAP = 300;
+		const int8_t EXPLOSIVE = 3;
+
+		// Milliseconds the flight lasts. The drop comes back to its start height
+		// at the end, except when it lands higher up: then the flight is cut
+		// short when it should reach that height.
+		int32_t flight_time(int16_t starty, int16_t endy, bool explosive)
 		{
-			double ticks = (-DROPSPEED + std::sqrt(DROPSPEED * DROPSPEED + 2.0 * DROPGRAVITY * std::max(dy, 0.0))) / DROPGRAVITY;
+			double height = explosive ? 180.0 : 100.0;
+			double scale = explosive ? 1.8 : 1.0;
+			double longest = 1000.0 * scale;
 
-			return std::max(ticks, 1.0);
+			if (endy >= starty)
+				return static_cast<int32_t>(longest);
+
+			double rise = std::max(endy + height - starty, 0.0);
+			double time = 30.0 * (static_cast<int32_t>(std::sqrt(rise * 2.5)) + 1) + 500.0 * scale;
+
+			return static_cast<int32_t>(std::min(time, longest));
+		}
+
+		void play_dropsound()
+		{
+			using Clock = std::chrono::steady_clock;
+			static Clock::time_point last;
+
+			Clock::time_point now = Clock::now();
+
+			if (now - last > std::chrono::milliseconds(DROPSOUNDGAP))
+			{
+				last = now;
+				Sound(Sound::Name::DROP).play();
+			}
 		}
 	}
 
-	Drop::Drop(int32_t id, int32_t own, Point<int16_t> start, Point<int16_t> dst, int8_t type, int8_t mode, bool pldrp)
-			: MapObject(id)
+	Drop::Drop(int32_t id, int32_t own, Point<int16_t> strt, Point<int16_t> dst, int8_t type, int8_t md, int16_t dly,
+			   bool pldrp, bool spn) : MapObject(id)
 	{
 		owner = own;
-		set_position(start.x(), start.y() - 4);
-		dest = dst;
 		pickuptype = type;
+		mode = md;
 		playerdrop = pldrp;
+		spins = spn;
+		start = {strt.x(), static_cast<int16_t>(strt.y() - 4)};
+		dest = {dst.x(), static_cast<int16_t>(dst.y() - 4)};
 
+		phobj.type = PhysicsObject::Type::FIXATED;
 		angle.set(0.0f);
 		opacity.set(1.0f);
-		moved = 0.0f;
-		pickupticks = 0;
+		elapsed = 0;
+		delay = std::max<int32_t>(dly, 0);
+		flighttime = flight_time(start.y(), dest.y(), pickuptype == EXPLOSIVE);
+		phase = 0.0;
 		looter = nullptr;
 
-		switch (mode)
+		if (mode == 2)
 		{
-			case 0:
-			case 1:
-				state = Drop::State::DROPPED;
-				basey = static_cast<double>(dest.y() - 4);
-				// Drops fall under their own, lighter gravity: about 100 px up
-				// and about 1.1 s in the air, as in the original.
-				phobj.set_flag(PhysicsObject::Flag::NOGRAVITY);
-				phobj.vspeed = DROPSPEED;
-				phobj.hspeed = static_cast<double>(dest.x() - start.x()) / air_ticks(dest.y() - start.y() + 4);
-				break;
-			case 2:
-				state = Drop::State::FLOATING;
-				basey = phobj.crnt_y();
-				phobj.type = PhysicsObject::Type::FIXATED;
-				break;
-			case 3:
-				pick_up();
-				break;
+			state = Drop::State::FLOATING;
+			set_position(dest.x(), dest.y());
+		} else
+		{
+			// Hidden until the server's delay has passed.
+			state = Drop::State::WAITING;
+			opacity.set(0.0f);
+			set_position(start.x(), start.y());
 		}
 	}
 
 	int8_t Drop::update(const Physics &physics)
 	{
-		if (state == Drop::State::DROPPED)
-			phobj.vspeed += DROPGRAVITY;
-		else if (state == Drop::State::PICKEDUP)
-			phobj.vspeed += PICKUPGRAVITY;
+		elapsed += Constants::TIMESTEP;
 
-		physics.move_object(phobj);
+		if (state == Drop::State::WAITING)
+		{
+			if (elapsed < delay)
+				return phobj.fhlayer;
+
+			state = Drop::State::DROPPED;
+			elapsed = Constants::TIMESTEP;
+			opacity.set(1.0f);
+
+			if (mode == 1)
+				play_dropsound();
+		}
+
+		// These drops only show their flight, fading out as they go.
+		if (mode == 3 && (state == Drop::State::DROPPED || state == Drop::State::FALLING))
+			opacity -= static_cast<float>(Constants::TIMESTEP) / FADETIME;
+
+		double speed = pickuptype == EXPLOSIVE ? EXPLOSIVESPEED : DROPSPEED;
 
 		if (state == Drop::State::DROPPED)
 		{
-			if (phobj.onground)
+			if (elapsed < flighttime)
 			{
-				phobj.hspeed = 0.0;
-				phobj.type = PhysicsObject::Type::FIXATED;
-				phobj.clear_flag(PhysicsObject::Flag::NOGRAVITY);
-				state = Drop::State::FLOATING;
-				angle.set(0.0f);
-				set_position(dest.x(), dest.y() - 4);
+				// Half the way across in the first half second, the rest
+				// until the flight ends.
+				double rest = elapsed > 500 ? std::min((elapsed - 500.0) / (flighttime - 500.0), 1.0) : 0.0;
+				double first = std::min(elapsed / 500.0, 1.0);
+				double seconds = elapsed / 1000.0;
+
+				double x = start.x() + (first + rest) * (dest.x() - start.x()) / 2.0;
+				double y = start.y() - speed * seconds + GRAVITY * seconds * seconds;
+
+				move_to(physics, std::round(x), std::round(y));
+
+				if (spins)
+					angle += static_cast<float>(SPINSTEP);
+
+				return phobj.fhlayer;
+			}
+
+			if (start.y() < dest.y())
+			{
+				state = Drop::State::FALLING;
+				elapsed = 0;
 			} else
 			{
-				// About two turns over the 1.1 s flight, as before the
-				// flight was slowed down.
-				static const float SPINSTEP = 0.1f;
-				angle += SPINSTEP;
+				state = Drop::State::FLOATING;
 			}
+		}
+
+		if (state == Drop::State::FALLING)
+		{
+			// Back at its start height, the drop falls the rest of the way
+			// at its launch speed.
+			double y = start.y() + speed * elapsed / 1000.0;
+
+			if (y < dest.y())
+			{
+				move_to(physics, dest.x(), std::round(y));
+
+				if (spins)
+					angle += static_cast<float>(SPINSTEP);
+
+				return phobj.fhlayer;
+			}
+
+			state = Drop::State::FLOATING;
 		}
 
 		if (state == Drop::State::FLOATING)
 		{
-			phobj.y = basey + 5.0f + (cos(moved) - 1.0f) * 2.5f;
-			moved = (moved < 360.0f) ? moved + 0.025f : 0.0f;
+			if (mode == 0 || mode == 3)
+			{
+				MapObject::deactivate();
+				return -1;
+			}
+
+			angle.set(0.0f);
+			move_to(physics, dest.x(), std::round(dest.y() + FLOATHEIGHT * std::sin(phase)));
+			phase += FLOATSTEP;
 		}
 
 		if (state == Drop::State::PICKEDUP)
 		{
-			if (looter)
+			if (!looter || elapsed >= PICKUPTIME)
 			{
-				double hdelta = looter->x - phobj.x;
-				phobj.hspeed = looter->hspeed / 2.0 + (hdelta - 16.0) / PICKUPTIME;
-			}
-
-			pickupticks++;
-
-			if (pickupticks > PICKUPTIME - PICKUPFADETIME)
-				opacity -= 1.0f / PICKUPFADETIME;
-
-			if (pickupticks >= PICKUPTIME)
-			{
-				opacity.set(1.0f);
-
 				MapObject::deactivate();
 				return -1;
 			}
+
+			double t = elapsed;
+			double targetx = looter->get_x();
+			double targety = looter->get_y() - 4 - LOOTERHALFHEIGHT;
+			double x = ((PICKUPTIME - t) * pickupstart.x() + t * targetx) / PICKUPTIME;
+			double y = ((PICKUPTIME - t) * pickupstart.y() + t * targety) / PICKUPTIME
+				- PICKUPARC + PICKUPARC * (t - PICKUPTIME / 2) * (t - PICKUPTIME / 2) / (PICKUPTIME * PICKUPTIME / 4);
+
+			move_to(physics, std::round(x), std::round(y));
+
+			if (elapsed > PICKUPFADESTART)
+				opacity = 1.0f - 0.75f * (elapsed - PICKUPFADESTART) / (PICKUPTIME - PICKUPFADESTART);
 		}
 
 		if (state == Drop::State::EXPIRING)
 		{
-			static const float OPCSTEP = 1.0f / 48;
+			opacity -= static_cast<float>(Constants::TIMESTEP) / FADETIME;
 
-			opacity -= OPCSTEP;
-
-			if (opacity.last() <= OPCSTEP)
+			if (opacity.get() <= 0.0f)
 			{
-				opacity.set(1.0f);
-
 				MapObject::deactivate();
 				return -1;
 			}
@@ -155,18 +241,26 @@ namespace ms
 		return phobj.fhlayer;
 	}
 
+	void Drop::move_to(const Physics &physics, double x, double y)
+	{
+		phobj.hspeed = x - phobj.x.get();
+		phobj.vspeed = y - phobj.y.get();
+
+		physics.move_object(phobj);
+	}
+
 	void Drop::expire(int8_t type, const PhysicsObject *lt)
 	{
 		switch (type)
 		{
 			case 0:
-				phobj.clear_flag(PhysicsObject::Flag::NOGRAVITY);
+				angle.set(0.0f);
 				state = Drop::State::EXPIRING;
 				break;
 			case 1:
 				deactivate();
 				break;
-			case 2:
+			default:
 				looter = lt;
 				pick_up();
 				break;
@@ -176,17 +270,20 @@ namespace ms
 	void Drop::pick_up()
 	{
 		angle.set(0.0f);
+		opacity.set(1.0f);
 		state = Drop::State::PICKEDUP;
-		pickupticks = 0;
-		phobj.hspeed = 0.0;
-		phobj.vspeed = PICKUPSPEED;
-		phobj.type = PhysicsObject::Type::NORMAL;
-		phobj.set_flag(PhysicsObject::Flag::NOGRAVITY);
+		elapsed = 0;
+		pickupstart = phobj.get_position();
+	}
+
+	Point<int16_t> Drop::centred(Point<int16_t> position, Point<int16_t> origin, Point<int16_t> dimensions)
+	{
+		return position + Point<int16_t>(origin.x() - dimensions.x() / 2, 0);
 	}
 
 	Rectangle<int16_t> Drop::bounds() const
 	{
-		auto lt = get_position();
+		auto lt = get_position() - Point<int16_t>(16, 0);
 		auto rb = lt + Point<int16_t>(32, 32);
 
 		return Rectangle<int16_t>(lt, rb);

@@ -112,23 +112,19 @@ namespace ms
 		const Point<int16_t> CELL_SPACING = Point<int16_t>(35, 34);
 		const Point<int16_t> LABEL_SPACING = Point<int16_t>(35, 33);
 
-		// Bind a key, and its twin, to a mapping and tell the server. As in
-		// Key Config, the mapping leaves any other key it was on.
+		// Bind a key to a mapping and tell the server. As in Key Config, the
+		// mapping leaves any other key it was on.
 		void bind_key(int32_t key, Keyboard::Mapping mapping)
 		{
 			Keyboard &keyboard = UI::get().get_keyboard();
-			int32_t twin = KeyConfig::twin_of(key);
 			std::vector<std::tuple<KeyConfig::Key, KeyType::Id, int32_t>> changes;
 
 			for (auto const &[other, bound] : keyboard.get_maplekeys())
-				if (bound == mapping && other != key && other != twin)
+				if (bound == mapping && other != key)
 					changes.emplace_back(KeyConfig::actionbyid(other), KeyType::Id::NONE, KeyAction::Id::LENGTH);
 
 			if (keyboard.get_maple_mapping(key) != mapping)
 				changes.emplace_back(KeyConfig::actionbyid(key), mapping.type, mapping.action);
-
-			if (twin >= 0 && keyboard.get_maple_mapping(twin) != mapping)
-				changes.emplace_back(KeyConfig::actionbyid(twin), mapping.type, mapping.action);
 
 			if (changes.empty())
 				return;

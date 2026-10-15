@@ -93,6 +93,20 @@ int main()
 				require(player.vspeed < 0.0 && !player.onground, "landing-time jump was lost");
 				require(std::abs(player.hspeed - momentum) < 1e-9, "running restart lost momentum");
 			}
+			// A knocked back mob sets its own ground speed; friction must not
+			// eat into it, even below the usual stopping threshold.
+			ms::PhysicsObject mob;
+			mob.set_x(0); mob.set_y(100);
+			physics.move_object(mob);
+			mob.set_flag(ms::PhysicsObject::Flag::NOFRICTION);
+			for (double speed : {1.04, 0.05})
+			{
+				mob.hspeed = speed;
+				double start = mob.crnt_x();
+				physics.move_object(mob);
+				require(mob.onground && mob.hspeed == speed, "ground friction slowed a NOFRICTION object");
+				require(std::abs(mob.crnt_x() - start - speed) < 1e-9, "NOFRICTION object moved the wrong distance");
+			}
 		}
 		std::filesystem::remove(path);
 		std::cout << "Jump momentum and contact transitions passed\n";

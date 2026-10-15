@@ -396,14 +396,12 @@ namespace ms
 		recv.skip(4);
 
 		Point<int16_t> dropfrom;
+		int16_t delay = 0;
 
 		if (mode != 2)
 		{
 			dropfrom = recv.read_point();
-
-			recv.skip(2);
-
-			Sound(Sound::Name::DROP).play();
+			delay = recv.read_short();
 		}
 		else
 		{
@@ -416,7 +414,7 @@ namespace ms
 		bool playerdrop = !recv.read_bool();
 
 		Stage::get().get_drops().spawn(
-			{ oid, itemid, meso, owner, dropfrom, dropto, pickuptype, mode, playerdrop }
+			{ oid, itemid, meso, owner, dropfrom, dropto, pickuptype, mode, delay, playerdrop }
 		);
 	}
 
@@ -431,12 +429,15 @@ namespace ms
 		{
 			int32_t cid = recv.read_int();
 
+			// A pet's loot flies to its owner.
 			if (recv.length() > 0)
 				recv.read_byte(); // pet
-			else if (auto character = Stage::get().get_character(cid))
+
+			if (auto character = Stage::get().get_character(cid))
 				looter = character->get_phobj();
 
-			Sound(Sound::Name::PICKUP).play();
+			if (Stage::get().is_player(cid))
+				Sound(Sound::Name::PICKUP).play();
 		}
 
 		Stage::get().get_drops().remove(oid, mode, looter.get());

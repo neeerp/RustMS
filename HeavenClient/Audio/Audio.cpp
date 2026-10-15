@@ -40,53 +40,31 @@ namespace ms
 	alure::Source Music::music_src;
 	alure::Buffer Music::music_buff;
 	std::unordered_map<std::string, membuf *> Music::audiodb;
-	size_t Sound::source_inc;
-	alure::Source Sound::sound_srcs[100];
+	std::vector<alure::Source> Sound::sources;
 	float Sound::gain = 1.0f;
 
-	void Sound::create_alure_source()
+	alure::Source Sound::free_source()
 	{
-		/* TODO: create interface to batch sounds. If a large amount of sounds are queued up by say all the
-		 * monsters in a map being set to die in the next "update" cycle then more than the max number of sounds
-		 * will be required for the next few game ticks. AKA OpenAL will throw an uncatchable error. Below will
-		 * prevent this error but may not be ideal...
-		*/
-		//while (source_inc > 200); /* openal limits to 256 concurrent sources */
+		// Sources are shared between sounds and only taken while one plays,
+		// so two sounds started together, like a mob's last hit and its
+		// death cry, never cut each other off.
+		for (auto &source : sources)
+			if (!source.isPlaying())
+				return source;
 
-		bool create = true;
+		// OpenAL allows 256 sources per context; past the cap the sound is
+		// dropped.
+		if (sources.size() >= MAX_SOURCES)
+			return alure::Source();
 
-		while (sound_srcs[source_inc - 1] != nullptr && !sound_srcs[source_inc - 1].isPlaying())
-		{
-			sound_srcs[source_inc - 1].destroy();
-			sound_srcs[source_inc - 1] = NULL;
-			source_inc--;
-		}
+		sources.push_back(Music::ctx.createSource());
 
-		if (sound_srcs[source_inc])
-		{
-			if (source_inc > 99)
-			{
-				create = false;
-			}
-		}
-
-		if (create)
-		{
-			sound_src = Music::ctx.createSource();
-			sound_srcs[source_inc] = sound_src;
-			source_inc++;
-		}
+		return sources.back();
 	}
-
-	//Sound::~Sound()
-	//{
-	//    source_inc--;
-	//}
 
 	Sound::Sound(Name name)
 	{
 		id = soundids[name];
-		create_alure_source();
 	}
 
 	Sound::Sound(int32_t itemid)
@@ -106,19 +84,16 @@ namespace ms
 			else
 				id = itemids.at("02000000");
 		}
-		create_alure_source();
 	}
 
 	Sound::Sound(nl::node src)
 	{
 		id = add_sound(src);
-		create_alure_source();
 	}
 
 	Sound::Sound()
 	{
 		id = 0;
-		create_alure_source();
 	}
 
 	void Sound::play()
@@ -127,10 +102,11 @@ namespace ms
 		{
 			std::string id_s = std::to_string((uint32_t) id);
 			alure::Buffer buff = Music::ctx.getBuffer(id_s);
-			if (sound_src)
+
+			if (alure::Source source = free_source())
 			{
-				sound_src.setGain(gain);
-				sound_src.play(buff);
+				source.setGain(gain);
+				source.play(buff);
 			}
 		}
 	}
@@ -175,7 +151,6 @@ namespace ms
 		for (auto node : itemsrc)
 			add_sound(node.name(), node["Use"]);
 
-		source_inc = 1;
 		set_sfxvolume(configured_volume());
 
 		return Error::Code::NONE;
@@ -183,8 +158,10 @@ namespace ms
 
 	void Sound::close()
 	{
-		sound_srcs[source_inc - 1].destroy();
-		sound_srcs[source_inc - 1] = NULL;
+		for (auto &source : sources)
+			source.destroy();
+
+		sources.clear();
 		//BASS_Free();
 	}
 
