@@ -56,6 +56,21 @@ namespace ms
 		void handle(InPacket& recv) const override;
 	};
 
+	// Show another character sitting on a portable chair, or getting up with 0
+	// Opcode: SHOW_CHAIR(196)
+	class ShowChairHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
+	// Let the player get up from a portable chair (mode 0), or seat them on
+	// a map seat (mode 1, followed by its id)
+	// Opcode: CANCEL_CHAIR(205)
+	class CancelChairHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
 	// Update the look of a character
 	// Opcode: UPDATE_CHARLOOK(197)
 	class UpdateCharLookHandler : public PacketHandler

@@ -83,6 +83,9 @@ namespace ms
 
 		Stance::Id get_stance() const;
 
+		// Return the face's offset from the feet in the current frame, facing left.
+		Point<int16_t> get_facepos() const;
+
 		const Body *get_body() const;
 
 		const Hair *get_hair() const;

@@ -63,7 +63,7 @@ namespace ms
 
 		recv.read_int(); // count of 5110000 
 		recv.read_int(); // 'itemeffect'
-		recv.read_int(); // 'chair'
+		int32_t chair = recv.read_int();
 
 		Point<int16_t> position = recv.read_point();
 		int8_t stance = recv.read_byte();
@@ -106,7 +106,7 @@ namespace ms
 		recv.read_byte(); // team
 
 		Stage::get().get_chars().spawn(
-			{ cid, look, level, job, name, stance, position }
+			{ cid, look, level, job, name, stance, position, chair }
 		);
 	}
 
@@ -169,6 +169,21 @@ namespace ms
 		// The inverse of the FACE key action to emote mapping in Stage::send_key.
 		if (Optional<OtherChar> otherchar = Stage::get().get_chars().get_char(cid))
 			otherchar->set_expression(emote + 99);
+	}
+
+	void ShowChairHandler::handle(InPacket& recv) const
+	{
+		int32_t cid = recv.read_int();
+		int32_t itemid = recv.read_int();
+
+		if (Optional<OtherChar> otherchar = Stage::get().get_chars().get_char(cid))
+			otherchar->set_chair(itemid);
+	}
+
+	void CancelChairHandler::handle(InPacket& recv) const
+	{
+		if (recv.read_byte() == 0)
+			Stage::get().get_player().stand_up();
 	}
 
 	void UpdateCharLookHandler::handle(InPacket& recv) const

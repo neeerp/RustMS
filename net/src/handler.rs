@@ -332,6 +332,8 @@ pub enum FieldRequest {
     },
     /// Show everyone else on the map this packet.
     Broadcast(Packet),
+    /// Sit on the portable chair `item_id`, or stand up with 0.
+    Chair(i32),
     /// Pick up the drop `object_id`, answered with `ServerMessage::PickedUp`;
     /// the player stands at (x, y).
     Pickup { object_id: i32, x: i16, y: i16 },
@@ -405,6 +407,8 @@ fn world_routes() -> &'static HashMap<i16, WorldRoute> {
             ),
             (Op::AllChat, InGame(&world::AllChatHandler)),
             (Op::FaceExpression, InGame(&world::FaceExpressionHandler)),
+            (Op::UseChair, InGame(&world::UseChairHandler)),
+            (Op::CancelChair, InGame(&world::CancelChairHandler)),
             (Op::Whisper, InGame(&world::WhisperHandler)),
             (Op::PartyOperation, InGame(&world::PartyOperationHandler)),
             (
@@ -470,7 +474,7 @@ mod tests {
     fn every_registered_opcode_is_unique_per_server() {
         // The maps would silently drop duplicates; check the table sizes match.
         assert_eq!(login_routes().len(), 13);
-        assert_eq!(world_routes().len(), 38);
+        assert_eq!(world_routes().len(), 40);
     }
 
     #[test]

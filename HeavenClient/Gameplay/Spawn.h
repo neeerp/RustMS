@@ -120,7 +120,7 @@ namespace ms
 	{
 	public:
 		CharSpawn(int32_t cid, const LookEntry &look, uint8_t level, int16_t job, const std::string &name,
-				  int8_t stance, Point<int16_t> position);
+				  int8_t stance, Point<int16_t> position, int32_t chair);
 
 		int32_t get_cid() const;
 
@@ -133,6 +133,7 @@ namespace ms
 		std::string name;
 		int8_t stance;
 		Point<int16_t> position;
+		int32_t chair;
 		LookEntry look;
 	};
 }

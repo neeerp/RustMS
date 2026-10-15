@@ -158,6 +158,12 @@ namespace ms
 		// Return if the char is in the Char::State::SIT state
 		bool is_sitting() const;
 
+		// Sit on the portable chair itemid, or get up from it with 0.
+		virtual void set_chair(int32_t itemid);
+
+		// Return the portable chair the character sits on, or 0.
+		int32_t get_chair() const;
+
 		// Return if the char is in the Char::LADDER or Char::ROPE state.
 		bool is_climbing() const;
 
@@ -195,6 +201,7 @@ namespace ms
 		State state = State::STAND;
 		bool attacking;
 		bool facing_right;
+		int32_t chair = 0;
 
 	private:
 		Text namelabel;
@@ -202,6 +209,11 @@ namespace ms
 		ChatBalloon hintballoon;
 		EffectLayer effects;
 		Afterimage afterimage;
+		// The chair's effect sits on the face when its pos is 1 and on the
+		// feet otherwise; a negative z draws it behind the character.
+		Animation chair_effect;
+		bool chair_at_face = false;
+		bool chair_in_front = false;
 		TimedBool invincible;
 		TimedBool ironbody;
 		std::list<DamageNumber> damagenumbers;
