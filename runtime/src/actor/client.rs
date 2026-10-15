@@ -88,8 +88,9 @@ pub struct ClientActor {
     script: Option<npc_script::ActiveScript>,
     /// The NPC shop the player has open.
     shop: Option<net::shop::Shop>,
-    /// When natural recovery was last accepted.
-    last_heal: Option<tokio::time::Instant>,
+    /// When natural recovery of HP and of MP was last accepted; the client
+    /// times them separately.
+    last_heal: (Option<tokio::time::Instant>, Option<tokio::time::Instant>),
     /// When the player last sent movement; recovery needs them to rest.
     last_moved: Option<tokio::time::Instant>,
     /// A quest action waiting for its field to confirm the NPC is near.
@@ -145,7 +146,7 @@ impl ClientActor {
             conversation: None,
             script: None,
             shop: None,
-            last_heal: None,
+            last_heal: (None, None),
             last_moved: None,
             pending_quest: None,
             blocked_scripts: HashSet::new(),
@@ -463,6 +464,7 @@ impl ClientActor {
         self.shop = None;
         self.pending_quest = None;
         self.npc_request_id = self.npc_request_id.wrapping_add(1);
+        self.in_game_mut()?.player.chair = 0;
 
         self.send_to_field(FieldMessage::Leave {
             client_id: self.client_id,

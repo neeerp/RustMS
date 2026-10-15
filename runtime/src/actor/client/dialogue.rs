@@ -54,14 +54,19 @@ impl ClientActor {
         Ok(())
     }
 
-    /// Natural recovery reported by the client, at most every 9 seconds and
-    /// only once the player has stood still that long.
+    /// Natural recovery reported by the client. HP and MP each heal at most
+    /// every 9 seconds, and only once the player has stood still that long.
     pub(super) async fn natural_heal(&mut self, hp: i16, mp: i16) -> Result<(), RuntimeError> {
         let now = tokio::time::Instant::now();
         let recent = |at: Option<tokio::time::Instant>| {
             at.is_some_and(|at| now.duration_since(at) < NATURAL_HEAL_INTERVAL)
         };
-        if recent(self.last_heal) || recent(self.last_moved) {
+        if recent(self.last_moved) {
+            return Ok(());
+        }
+        let hp = if recent(self.last_heal.0) { 0 } else { hp };
+        let mp = if recent(self.last_heal.1) { 0 } else { mp };
+        if hp <= 0 && mp <= 0 {
             return Ok(());
         }
         let player = &mut self.in_game_mut()?.player;
@@ -70,11 +75,16 @@ impl ClientActor {
         }
         player.add_hp(i32::from(hp));
         player.add_mp(i32::from(mp));
-        let (hp, mp) = (player.stats.hp, player.stats.mp);
-        self.last_heal = Some(now);
+        let (hp_now, mp_now) = (player.stats.hp, player.stats.mp);
+        if hp > 0 {
+            self.last_heal.0 = Some(now);
+        }
+        if mp > 0 {
+            self.last_heal.1 = Some(now);
+        }
         let mut packet = net::packet::build::world::stat::build_stat_update(
             false,
-            &[StatUpdate::Hp(hp), StatUpdate::Mp(mp)],
+            &[StatUpdate::Hp(hp_now), StatUpdate::Mp(mp_now)],
         )
         .map_err(|e| RuntimeError::Handler(e.to_string()))?;
         self.send(&mut packet).await

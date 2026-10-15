@@ -181,7 +181,9 @@ implemented and get no reply.
 The client draws `Item/Install/0301.img/<id>/effect` while the character
 sits. The effect is anchored at the face when `pos` is 1, otherwise at the
 feet, and drawn behind the character when `z` is negative. `effect2` comes
-from later data and is ignored. Chair HP/MP recovery is not implemented.
+from later data and is ignored. Sitting heals by the chair's
+`recoveryHP`/`recoveryMP`; see "Using items and recovery" in
+[Inventory](./inventory.md).
 
 ## Tests
 
