@@ -16,7 +16,10 @@ templates from `Mob.nx` (`maxHP`, `exp`, `PADamage`, `bodyAttack`,
   occupant. MOVE_LIFE from the controller updates the position, answers
   MOVE_MONSTER_RESPONSE, and relays MOVE_MONSTER to the others; movement from
   anyone else is ignored. The last absolute fragment's foothold (0 while
-  airborne) becomes the mob's current foothold.
+  airborne) becomes the mob's current foothold. In HeavenClient, a controlled
+  mob that can walk but neither jump nor fly turns 20 px before any foothold
+  end that does not lead on to another floor, as v83 does
+  (`FootholdTree::get_walk_edge`).
 
 Packets follow the v83 layout (16-byte temporary status mask after the mob
 id); HeavenClient used to skip 22 bytes there and now skips 16. After the
@@ -186,7 +189,9 @@ to play the breaking animation) and the hitter rolls its drops
 (`net::loot::roll_reactor`) where it stood. A broken reactor comes back after
 the map's `reactorTime` seconds, under a new object id since HeavenClient
 keeps a broken reactor under its old one; one without a `reactorTime` stays
-broken.
+broken. With each state's hit animation, including the break, HeavenClient
+plays `Sound/Reactor.img/<id>/<state>/Hit`, with the id unpadded as v83
+formats it.
 
 Reactor drops come from the content pack's table, keyed by reactor id, plus
 `[reactors]` in `reward_overrides.toml`; see `server-content.md`. Reactor

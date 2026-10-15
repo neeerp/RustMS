@@ -26,6 +26,9 @@ async fn changed_keys_survive_logout() {
     assert_eq!(session.keymap[45], (5, 52));
     assert_eq!(session.keymap[57], (5, 55));
     assert_eq!(session.keymap[2], (4, 13));
+    // Alt jumps. v83 keeps one binding for both Alts, and 87 is F11.
+    assert_eq!(session.keymap[56], (5, 54));
+    assert_eq!(session.keymap[87], (0, 0));
 
     // Rebind an existing default key (the case the old upsert dropped), bind
     // a previously empty one, and bind a skill whose id needs 32 bits.

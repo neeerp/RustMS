@@ -92,7 +92,7 @@ namespace ms
 	{
 	public:
 		DropSpawn(int32_t oid, int32_t id, bool meso, int32_t owner, Point<int16_t> position,
-				  Point<int16_t> destination, int8_t droptype, int8_t mode, bool playerdrop);
+				  Point<int16_t> destination, int8_t droptype, int8_t mode, int16_t delay, bool playerdrop);
 
 		bool is_meso() const;
 
@@ -113,6 +113,7 @@ namespace ms
 		Point<int16_t> dest;
 		int8_t droptype;
 		int8_t mode;
+		int16_t delay;
 		bool playerdrop;
 	};
 

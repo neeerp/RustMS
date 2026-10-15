@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../UIElement.h"
+#include "../UIDragElement.h"
 
 #include "../../Character/QuestLog.h"
 #include "../../Character/QuestObjectives.h"
@@ -16,7 +16,7 @@ namespace ms
 
 	// The v83 Quest Helper (UIWindow.img/QuestAlarm): tracked quests and what
 	// each still needs, flush with the top-right corner of the screen.
-	class UIQuestHelper : public UIElement
+	class UIQuestHelper : public UIDragElement<PosQUESTHELPER>
 	{
 	public:
 		static constexpr Type TYPE = UIElement::Type::QUESTHELPER;
@@ -53,6 +53,10 @@ namespace ms
 			std::vector<Requirement> requirements;
 		};
 
+		// As in the original, it drags by its top, not by its buttons.
+		bool indragrange(Point<int16_t> cursorpos) const override;
+		// Where it sits until it is moved.
+		Point<int16_t> default_position() const;
 		void rebuild();
 		int16_t height() const;
 
@@ -64,6 +68,7 @@ namespace ms
 		// What the entries were built from, to rebuild only on changes.
 		std::vector<std::pair<int16_t, std::vector<QuestObjective>>> shown;
 		bool minimized = false;
+		bool moved;
 
 		static constexpr int16_t WIDTH = 223, ROW = 18, TOP = 25, TOP_MINIMIZED = 20, BOTTOM = 5;
 	};

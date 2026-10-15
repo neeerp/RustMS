@@ -14,7 +14,7 @@ pub const KEY_COUNT: i16 = 90;
 /// codes and actions HeavenClient's (`IO/KeyAction.h`); the layout is v83's.
 /// v83 also binds O to party search and F to family, which the client has
 /// no actions for.
-const DEFAULT_BINDINGS: [(i16, u8, i32); 40] = [
+const DEFAULT_BINDINGS: [(i16, u8, i32); 39] = [
     (59, 6, 100),
     (60, 6, 101),
     (61, 6, 102),
@@ -23,7 +23,6 @@ const DEFAULT_BINDINGS: [(i16, u8, i32); 40] = [
     (64, 6, 105),
     (65, 6, 106),
     (56, 5, 54),
-    (87, 5, 54),
     (18, 4, 1),
     (23, 4, 2),
     (31, 4, 3),
@@ -107,6 +106,6 @@ mod tests {
         assert!(keymap.get(59).is_some());
         keymap.bind(59, KeyBinding { kind: 0, action: 0 });
         assert!(keymap.get(59).is_none());
-        assert_eq!(keymap.iter().count(), 39);
+        assert_eq!(keymap.iter().count(), 38);
     }
 }
