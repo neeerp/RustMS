@@ -100,7 +100,7 @@ namespace ms
 		// so a mob the server kills waits for the hits before dying.
 		void expect_hits(const AttackResult &result, int32_t sign);
 
-		std::vector<DamageNumber> place_numbers(int32_t oid, const std::vector<std::pair<int32_t, bool>> &damagelines);
+		std::vector<DamageNumber> place_numbers(const std::vector<std::pair<int32_t, bool>> &damagelines, int32_t move_id);
 
 		const SpecialMove &get_move(int32_t move_id);
 

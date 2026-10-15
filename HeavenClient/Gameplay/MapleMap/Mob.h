@@ -50,7 +50,10 @@ namespace ms
 			STAND = 4,
 			JUMP = 6,
 			HIT = 8,
-			DIE = 10
+			DIE = 10,
+			// What v83 (FUN_005cc410) sends for a mob that walks with its
+			// chase animation.
+			CHASE = 32
 		};
 
 		static std::string nameof(Stance stance)
@@ -71,8 +74,8 @@ namespace ms
 		}
 
 		// Construct a mob by combining data from game files with data sent by the server.
-		Mob(int32_t oid, int32_t mobid, int8_t mode, int8_t stance, uint16_t fhid, bool newspawn, int8_t team,
-			Point<int16_t> position, const Physics &physics);
+		Mob(int32_t oid, int32_t mobid, int8_t mode, int8_t stance, uint16_t fhid, uint16_t homefh, bool newspawn,
+			int8_t team, Point<int16_t> position, const Physics &physics);
 
 		// Draw the mob
 		void draw(double viewx, double viewy, float alpha) const override;
@@ -85,7 +88,7 @@ namespace ms
 		void set_control(int8_t mode);
 
 		// Tell the mob where the local player is, whom it chases with aggro.
-		void set_target(Point<int16_t> position);
+		void set_target(Point<int16_t> position, bool dead);
 
 		// Send movement to the mob.
 		void send_movement(Point<int16_t> start, std::vector<Movement> &&movements);
@@ -131,14 +134,6 @@ namespace ms
 		Point<int16_t> get_head_position() const;
 
 	private:
-		enum FlyDirection
-		{
-			STRAIGHT,
-			UPWARDS,
-			DOWNWARDS,
-			NUM_DIRECTIONS
-		};
-
 		// Set the stance by byte value
 		void set_stance(uint8_t stancebyte);
 
@@ -148,11 +143,34 @@ namespace ms
 		// Start the death animation.
 		void apply_death();
 
-		// Decide on the next state of a flying mob.
-		void next_move();
-
 		// Take one 90 ms step of a ground mob's AI.
-		void think();
+		void think(const Physics &physics);
+
+		// Chase the local player for 180 to 240 s, deciding at once.
+		void chase();
+
+		// Set the walking and flying speeds, at chaseSpeed if chasing.
+		void update_shoe(bool chasing);
+
+		// Take one 90 ms step of a flying mob's AI.
+		void think_fly(const Physics &physics);
+
+		// Pick where a flier heads next.
+		void pick_waypoint(const Physics &physics);
+
+		// Steer a flier left (-1) or right (1), and glide (-1) or dive (0).
+		void fly(int8_t x, int8_t y);
+
+		// The part of a jumping mob's AI step that comes before its usual
+		// decision. Returns whether it jumped instead.
+		bool think_jump(const Physics &physics);
+
+		// Jump on the next tick, holding direction dir. With check, turn
+		// around if the jump lands at the height it started from.
+		void jump(int8_t dir, bool check);
+
+		// Which way the mob is pushing: -1 left, 0 not at all, 1 right.
+		int8_t input() const;
 
 		// Stand (0) or walk left (-1) or right (1), telling the server if
 		// that changes anything.
@@ -175,6 +193,7 @@ namespace ms
 
 		// Return the current 'head' position
 		Point<int16_t> get_head_position(Point<int16_t> position) const;
+		void draw_hp_bar(Point<int16_t> position) const;
 
 		// Load the level tag in one of ShowLevel's sets: 0 white, 1 yellow,
 		// 2 red.
@@ -187,6 +206,7 @@ namespace ms
 		uint16_t level;
 		float speed;
 		float flyspeed;
+		float chasespeed;
 		uint16_t watk;
 		uint16_t matk;
 		uint16_t wdef;
@@ -198,9 +218,11 @@ namespace ms
 		bool touchdamage;
 		bool noflip;
 		bool notattack;
+		bool firstattack;
 		bool canmove;
 		bool canjump;
 		bool canfly;
+		bool canchase;
 
 		EffectLayer effects;
 		Text namelabel;
@@ -212,7 +234,6 @@ namespace ms
 		TimedBool showhp;
 
 		std::vector<Movement> movements;
-		uint16_t counter;
 		// Hits queued against this mob that haven't landed yet.
 		uint16_t pending_hits;
 		// Ticks before a killed mob dies even if its pending hits never land.
@@ -228,14 +249,32 @@ namespace ms
 		bool hastarget;
 		int32_t targettime;
 		Point<int16_t> targetpos;
+		bool targetdead;
+		// Ms until a firstAttack mob next reports the local player's distance.
+		int16_t reporttime;
 		// Ms towards the next AI step, and AI steps until the next decision.
 		uint16_t aitime;
 		int16_t thinktimer;
 		// Where the AI means to go: -1 left, 0 nowhere, 1 right.
 		int8_t movedir;
+		// The direction held through a jump, and whether to check the
+		// landing against jumpy, the height it jumped from.
+		int8_t jumpdir;
+		bool checkjump;
+		int16_t jumpy;
 		Stance stance;
 		bool flip;
-		FlyDirection flydirection;
+		// A flier heads for a waypoint, near its target or on a random platform
+		// of the group it roams. flycount counts down the waypoints left
+		// before it picks another group, or gives up the chase.
+		bool haswaypoint;
+		Point<int16_t> waypoint;
+		int32_t flygroup;
+		int32_t flycount;
+		int8_t flyx;
+		int8_t flyy;
+		// AI steps since the flier last told the server where it is.
+		uint16_t flysteps;
 		float walkforce;
 		int8_t hppercent;
 		bool fading;

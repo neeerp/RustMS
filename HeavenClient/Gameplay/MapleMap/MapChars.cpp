@@ -91,10 +91,9 @@ namespace ms
 
 			if (Optional<const MapObject> chr = chars.get(member->id))
 			{
-				// MobHpBar::draw puts the top three bar heights above its point.
 				Point<int16_t> feet = chr->get_absolute(viewx, viewy, alpha);
 				auto percent = static_cast<int16_t>(100 * static_cast<int64_t>(member->hp) / member->maxhp);
-				party_hpbar.draw(feet - Point<int16_t>(0, PARTY_HP_RISE - 30), percent, Color::Name::RED, Color::Name::DARKRED);
+				party_hpbar.draw(feet - Point<int16_t>(MobHpBar::WIDTH / 2, PARTY_HP_RISE), percent, Color::Name::RED);
 			}
 		}
 	}

@@ -161,6 +161,9 @@ namespace ms
 		// Change players position to the seat's position and stance to Char::State::SIT
 		void set_seat(Optional<const Seat> seat);
 
+		// Scale natural recovery by the map's info/recovery.
+		void set_recovery_rate(double rate);
+
 		// Sit down on the portable chair itemid where the player stands.
 		void sit_on_chair(int32_t itemid);
 
@@ -208,17 +211,54 @@ namespace ms
 		const BuddyList &get_buddies() const;
 
 	private:
-		// Natural recovery: report a small heal after every 10 seconds spent
-		// standing, lying prone or sitting without moving, while not at full
-		// HP/MP (the server checks it).
+		// Natural recovery as v83 runs it (FUN_0083007f). MP heals every 10
+		// seconds while alive. HP heals every 10 seconds, or 5 for a warrior
+		// with Improved HP Recovery, while the player stands or sits without
+		// moving or being alert; on a ladder or rope only with Endure, at its
+		// interval. The map's info/recovery and a chair scale the amounts. A
+		// portable chair heals its recoveryHP/recoveryMP instead. Each timer
+		// restarts whenever its conditions fail.
+		struct Recovery
+		{
+			uint16_t timer = 0;
+			bool from_chair = false;
+
+			// Advance the timer and return the amount due after interval
+			// milliseconds, or 0. Like v83, the timer restarts when the source
+			// switches between chair and natural.
+			int16_t update(uint16_t interval, int16_t chair_amount, int16_t natural_amount);
+		};
+
 		static constexpr uint16_t RECOVERY_INTERVAL = 10000;
+		static constexpr uint16_t WARRIOR_HP_RECOVERY_INTERVAL = 5000;
 		static constexpr int16_t RECOVERY_HP = 10;
 		static constexpr int16_t RECOVERY_MP = 3;
-		uint16_t recovery_timer = 0;
+		static constexpr double CHAIR_RECOVERY_RATE = 1.5;
+		static constexpr int32_t IMPROVED_HP_RECOVERY = 1000000;
+		static constexpr int32_t WARRIOR_ENDURE = 1000002;
+		static constexpr int32_t FIGHTER_IMPROVED_MP_RECOVERY = 1110000;
+		static constexpr int32_t PAGE_IMPROVED_MP_RECOVERY = 1210000;
+		static constexpr int32_t IMPROVED_MP_RECOVERY = 2000000;
+		static constexpr int32_t ASSASSIN_ENDURE = 4100002;
+		static constexpr int32_t BANDIT_ENDURE = 4200001;
+		double recovery_rate = 1.0;
+		Recovery hp_recovery;
+		Recovery mp_recovery;
+		int16_t chair_recovery_hp = 0;
+		int16_t chair_recovery_mp = 0;
 		// Whether the player asked to get off their chair and waits for the server.
 		bool leaving_chair = false;
 
 		void update_recovery();
+
+		// What the player's skills add to each natural HP or MP heal
+		// (FUN_00652fa8, FUN_0065308e).
+		int16_t get_recovery_hp_bonus() const;
+		int16_t get_recovery_mp_bonus() const;
+
+		// Endure's milliseconds between HP heals on a ladder or rope, or 0
+		// without it (FUN_0065321e).
+		uint16_t get_endure_interval() const;
 
 		// Die when HP runs out, and get back up when it returns.
 		void update_death();

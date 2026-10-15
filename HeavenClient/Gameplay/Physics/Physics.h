@@ -51,8 +51,15 @@ namespace ms
 		// top walking speed, as CVecCtrl::Jump does.
 		static void jump(PhysicsObject &phobj, double jumpspeed, int8_t dir);
 
+		// Beat upwards with a flying shoe.
+		static void fly_jump(PhysicsObject &phobj);
+
 		// Hop off the current platform and fall through it.
 		static void jump_down(PhysicsObject &phobj);
+
+		// Queue a knockback, in pixels per second, which knocks a shoe
+		// object off its platform on its next move.
+		static void knockback(PhysicsObject &phobj, double vx, double vy);
 
 	private:
 		void move_shoe(PhysicsObject &) const;

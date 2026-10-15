@@ -50,6 +50,7 @@ namespace ms
 		mapmark = std::string(info["mapMark"]);
 		swim = info["swim"].get_bool();
 		town = info["town"].get_bool();
+		recovery = info["recovery"].get_real(1.0);
 
 		for (auto seat : src["seat"])
 			seats.push_back(seat);
@@ -69,6 +70,11 @@ namespace ms
 	std::string MapInfo::get_bgm() const
 	{
 		return bgm;
+	}
+
+	double MapInfo::get_recovery() const
+	{
+		return recovery;
 	}
 
 	Range<int16_t> MapInfo::get_walls() const

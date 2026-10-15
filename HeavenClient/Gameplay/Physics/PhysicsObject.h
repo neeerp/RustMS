@@ -197,7 +197,11 @@ namespace ms
 			// With TURNATEDGES, stop short of every foothold end that does not
 			// lead onto another floor, as v83 does for mobs that walk but
 			// cannot jump.
-			WALKONLY = 0x0010
+			WALKONLY = 0x0010,
+			// With TURNATEDGES, keep within the reach of the current and home
+			// foothold groups, and stop to jump at loose ends and rising
+			// walls, as v83 does for mobs that walk and jump.
+			JUMPER = 0x0020
 		};
 
 		Type type = Type::NORMAL;
@@ -219,11 +223,31 @@ namespace ms
 
 		// Objects wearing a shoe walk and fall by the v83 client's CVecCtrl
 		// rules, steered by walkdir (-1, 0, 1) instead of hforce. walkspeed
-		// is the shoe's speed multiplier. Everything else keeps
+		// is the shoe's speed multiplier, and walkforce and walkdrag scale
+		// its ground acceleration and drag. Everything else keeps
 		// HeavenClient's force-and-friction model.
 		bool shoe = false;
 		double walkspeed = 1.0;
+		double walkforce = 1.0;
+		double walkdrag = 1.0;
 		int8_t walkdir = 0;
+		// A knockback queued for the next move, in pixels per second.
+		bool impact = false;
+		double impactx = 0.0;
+		double impacty = 0.0;
+
+		// A shoe with a flyspeed flies through platforms, steered by walkdir
+		// and by flydir: -1 to glide down slowly, 0 to dive.
+		double flyspeed = 0.0;
+		int8_t flydir = 0;
+
+		// A JUMPER's home group, whether it jumps or carries on at the end of
+		// its foothold, and whether it walks down a step there rather than
+		// jumping. jumprequest is set when it stops at an end to jump.
+		uint16_t homegroup = 0;
+		bool edgejump = true;
+		bool stepdown = true;
+		bool jumprequest = false;
 
 		bool is_flag_set(Flag f)
 		{

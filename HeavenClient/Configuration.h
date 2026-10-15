@@ -552,6 +552,13 @@ namespace ms
 		{}
 	};
 
+	// The height the expanded chat log was dragged to
+	struct ChatHeight : public Configuration::ShortEntry
+	{
+		ChatHeight() : ShortEntry("ChatHeight", "70")
+		{}
+	};
+
 	// The default position of UIStatsInfo
 	struct PosSTATS : public Configuration::PointEntry
 	{

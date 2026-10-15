@@ -20,6 +20,8 @@ pub struct MobInfo {
     pub body_attack: bool,
     /// Never attacks.
     pub not_attack: bool,
+    /// Goes for nearby players without being hit first.
+    pub first_attack: bool,
     pub boss: bool,
     pub undead: bool,
 }
@@ -66,6 +68,7 @@ impl MobData {
             speed: int("speed")?,
             body_attack: int("bodyAttack")? != 0,
             not_attack: int("notAttack")? != 0,
+            first_attack: int("firstAttack")? != 0,
             boss: int("boss")? != 0,
             undead: int("undead")? != 0,
         }))
@@ -91,6 +94,16 @@ mod tests {
         let sentinel = data.info(9300018).unwrap().unwrap();
         assert!(sentinel.not_attack);
         assert!(data.info(9999998).unwrap().is_none());
+    }
+
+    #[test]
+    fn reads_numbers_stored_as_strings() {
+        let Some(path) = crate::test_assets::path("Mob.nx") else {
+            return;
+        };
+        let data = MobData::load(path).unwrap();
+        // 9400564's maxHP is the string "1000000".
+        assert_eq!(data.info(9400564).unwrap().unwrap().max_hp, 1_000_000);
     }
 
     #[test]

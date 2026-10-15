@@ -249,7 +249,7 @@ namespace ms
 		// The foothold the mob stands on (0 if airborne), then the one it
 		// spawned on.
 		uint16_t fh = recv.read_short();
-		recv.skip(2);
+		uint16_t homefh = recv.read_short();
 		int8_t effect = recv.read_byte();
 
 		if (effect > 0)
@@ -266,7 +266,7 @@ namespace ms
 		recv.skip(4);
 
 		Stage::get().get_mobs().spawn(
-			{ oid, id, 0, stance, fh, effect == -2, team, position }
+			{ oid, id, 0, stance, fh, homefh, effect == -2, team, position }
 		);
 	}
 
@@ -301,7 +301,7 @@ namespace ms
 				int8_t stance = recv.read_byte();
 
 				uint16_t fh = recv.read_short();
-				recv.skip(2); // spawn foothold
+				uint16_t homefh = recv.read_short();
 				int8_t effect = recv.read_byte();
 
 				if (effect > 0)
@@ -318,7 +318,7 @@ namespace ms
 				recv.skip(4);
 
 				Stage::get().get_mobs().spawn(
-					{ oid, id, mode, stance, fh, effect == -2, team, position }
+					{ oid, id, mode, stance, fh, homefh, effect == -2, team, position }
 				);
 			}
 			else
@@ -363,12 +363,11 @@ namespace ms
 		bool flip = recv.read_bool();
 		uint16_t fh = recv.read_short();
 
-		// The range the NPC walks in.
-		int16_t rx0 = recv.read_short();
-		int16_t rx1 = recv.read_short();
+		recv.read_short(); // 'rx0'
+		recv.read_short(); // 'rx1'
 
 		Stage::get().get_npcs().spawn(
-			{ oid, id, position, flip, fh, rx0, rx1 }
+			{ oid, id, position, flip, fh }
 		);
 	}
 
@@ -388,12 +387,12 @@ namespace ms
 			bool flip = recv.read_bool();
 			uint16_t fh = recv.read_short();
 
-			int16_t rx0 = recv.read_short();
-			int16_t rx1 = recv.read_short();
+			recv.read_short();	// 'rx0'
+			recv.read_short();	// 'rx1'
 			recv.read_bool();	// 'minimap'
 
 			Stage::get().get_npcs().spawn(
-				{ oid, id, position, flip, fh, rx0, rx1 }
+				{ oid, id, position, flip, fh }
 			);
 		}
 	}

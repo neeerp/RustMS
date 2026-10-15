@@ -1,5 +1,6 @@
 //! Mobs on Snail Hunting Ground I (40000): spawning, control, movement, melee
-//! attacks, kills and EXP, touch damage, respawning, and levelling up.
+//! attacks, kills and EXP, touch damage, respawning, and levelling up. Then
+//! control of a firstAttack mob by distance.
 
 use integration_harness::hunting::attack;
 use integration_harness::login_to_world_session;
@@ -11,6 +12,8 @@ use packet::Packet;
 
 const HUNTING_GROUND: i32 = 40_000;
 const SNAIL: i32 = 100100;
+/// A Crimsonwood Keep room whose mobs go for players unprovoked.
+const KEEP_ROOM: i32 = 610_030_011;
 
 fn move_mob(object_id: i32, x: i16, y: i16) -> Packet {
     let mut p = Packet::new_empty();
@@ -28,6 +31,14 @@ fn move_mob(object_id: i32, x: i16, y: i16) -> Packet {
     p.write_bytes(&[0; 6]).unwrap();
     p.write_byte(2).unwrap();
     p.write_short(100).unwrap();
+    p
+}
+
+fn report_distance(object_id: i32, distance: i32) -> Packet {
+    let mut p = Packet::new_empty();
+    p.write_short(RecvOpcode::MobDistance as i16).unwrap();
+    p.write_int(object_id).unwrap();
+    p.write_int(distance).unwrap();
     p
 }
 
@@ -161,4 +172,42 @@ async fn snails_spawn_move_fight_back_die_and_respawn() {
         t.field.mobs.len() > before
     })
     .await;
+}
+
+#[tokio::test]
+async fn the_closest_player_controls_a_first_attack_mob() {
+    let first_config = load_harness_config_or_fail().await;
+    let second_config = load_harness_config_or_fail().await;
+    let mut first = login_to_world_session(&first_config).await.unwrap();
+    let mut second = login_to_world_session(&second_config).await.unwrap();
+    let (f, s) = (&mut first.connection, &mut second.connection);
+
+    let mut ft = Trace::default();
+    assert_eq!(warp(f, KEEP_ROOM, "", &mut ft).await, KEEP_ROOM);
+    until(f, &mut ft, |t| !t.field.controlled.is_empty()).await;
+    let mob = *ft.field.controlled.first().unwrap();
+    let mut st = Trace::default();
+    assert_eq!(warp(s, KEEP_ROOM, "", &mut st).await, KEEP_ROOM);
+    until(s, &mut st, |t| !t.field.mobs.is_empty()).await;
+
+    // The controller is near; someone farther off changes nothing.
+    send(f, report_distance(mob, 20)).await;
+    read_for(f, &mut ft, 200).await;
+    send(s, report_distance(mob, 30)).await;
+    read_for(s, &mut st, 300).await;
+    assert!(st.field.controlled.is_empty());
+
+    // Someone closer takes it over, without aggro.
+    send(s, report_distance(mob, 10)).await;
+    until(s, &mut st, |t| t.field.controlled.contains(&mob)).await;
+    assert!(st.field.aggro.is_empty());
+    until(f, &mut ft, |t| !t.field.controlled.contains(&mob)).await;
+
+    // A hit gives it to the attacker for the chase, however far off.
+    send(f, attack(mob, 1)).await;
+    until(f, &mut ft, |t| t.field.aggro.contains(&mob)).await;
+    until(s, &mut st, |t| t.field.controlled.is_empty()).await;
+    send(s, report_distance(mob, 0)).await;
+    read_for(s, &mut st, 300).await;
+    assert!(st.field.controlled.is_empty());
 }
