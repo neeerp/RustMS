@@ -54,7 +54,9 @@ namespace ms
 		Range<int16_t> get_borders() const;
 
 	private:
-		uint16_t get_fhid_below(double fx, double fy) const;
+		uint16_t get_fhid_below(double fx, double fy, uint16_t ignore = 0) const;
+
+		bool can_jump_down(uint16_t fhid, double fx, double fy) const;
 
 		double get_wall(uint16_t fhid, bool left, double fy) const;
 

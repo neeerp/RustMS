@@ -159,6 +159,7 @@ namespace ms
 				// next tick drops landing-time jump input and adds a friction-only
 				// tick before the walking controller resumes.
 				phobj.onground = true;
+				phobj.fallstart = 0;
 
 				limit_movement(phobj);
 			} else
@@ -195,7 +196,7 @@ namespace ms
 				checkslope = true;
 		} else
 		{
-			phobj.fhid = get_fhid_below(x, y);
+			phobj.fhid = get_fhid_below(x, y, phobj.fallstart);
 		}
 
 		const Foothold &nextfh = get_fh(phobj.fhid);
@@ -223,20 +224,13 @@ namespace ms
 
 		phobj.onground = phobj.y == ground;
 
+		if (phobj.onground)
+			phobj.fallstart = 0;
+
 		if (phobj.enablejd || phobj.is_flag_set(PhysicsObject::Flag::CHECKBELOW))
 		{
-			uint16_t belowid = get_fhid_below(x, nextfh.ground_below(x) + 1.0);
-
-			if (belowid > 0)
-			{
-				double nextground = get_fh(belowid).ground_below(x);
-				phobj.enablejd = (nextground - ground) < 600.0;
-				phobj.groundbelow = ground + 1.0;
-			} else
-			{
-				phobj.enablejd = false;
-			}
-
+			phobj.enablejd = can_jump_down(phobj.fhid, x, ground);
+			phobj.groundbelow = ground + 1.0;
 			phobj.clear_flag(PhysicsObject::Flag::CHECKBELOW);
 		}
 
@@ -354,7 +348,7 @@ namespace ms
 		return left ? fh.x1() + margin : fh.x2() - margin;
 	}
 
-	uint16_t FootholdTree::get_fhid_below(double fx, double fy) const
+	uint16_t FootholdTree::get_fhid_below(double fx, double fy, uint16_t ignore) const
 	{
 		uint16_t ret = 0;
 		double comp = borders.second();
@@ -367,7 +361,7 @@ namespace ms
 			const Foothold &fh = footholds.at(iter->second);
 			double ycomp = fh.ground_below(fx);
 
-			if (comp >= ycomp && ycomp >= fy)
+			if (fh.id() != ignore && comp >= ycomp && ycomp >= fy)
 			{
 				comp = ycomp;
 				ret = fh.id();
@@ -399,6 +393,50 @@ namespace ms
 		phobj.fhid = fhid;
 		phobj.fhlayer = fh.layer();
 		phobj.onground = true;
+	}
+
+	// CUserLocal's down-jump check (FUN_007a44fe) looks for the lowest
+	// platform at most 300 px under the feet, or failing that the highest one
+	// 300 to 600 px under. Only platforms drawn left to right count, and one
+	// within 5 px of the feet doesn't.
+	bool FootholdTree::can_jump_down(uint16_t fhid, double fx, double fy) const
+	{
+		uint16_t lowest = 0;
+		double lowesty = 0.0;
+		uint16_t highest = 0;
+		double highesty = fy + 600.0;
+
+		auto range = footholdsbyx.equal_range(static_cast<int16_t>(fx));
+
+		for (auto iter = range.first; iter != range.second; ++iter)
+		{
+			const Foothold &fh = footholds.at(iter->second);
+
+			if (fh.x1() >= fh.x2())
+				continue;
+
+			double ycomp = fh.ground_below(fx);
+
+			if (ycomp <= fy + 300.0 && (!lowest || ycomp > lowesty))
+			{
+				lowest = fh.id();
+				lowesty = ycomp;
+			}
+
+			if (ycomp >= fy + 300.0 && ycomp < highesty)
+			{
+				highest = fh.id();
+				highesty = ycomp;
+			}
+		}
+
+		if (!lowest || lowest == fhid)
+		{
+			lowest = highest;
+			lowesty = highesty;
+		}
+
+		return lowest && std::abs(lowesty - fy) >= 5.0;
 	}
 
 	int16_t FootholdTree::get_y_below(Point<int16_t> position) const

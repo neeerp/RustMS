@@ -599,6 +599,7 @@ namespace ms
 			phobj.hspeed = 0.0;
 			phobj.vspeed = 0.0;
 			phobj.fhlayer = 7;
+			phobj.fallstart = 0;
 			set_state(ldr->is_ladder() ? Char::State::LADDER : Char::State::ROPE);
 			set_direction(false);
 		}

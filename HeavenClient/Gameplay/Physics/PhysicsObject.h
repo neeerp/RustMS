@@ -208,6 +208,9 @@ namespace ms
 		double groundbelow = 0.0;
 		bool onground = true;
 		bool enablejd = false;
+		// The platform a down-jump left, which the fall passes through until
+		// the object lands somewhere else.
+		uint16_t fallstart = 0;
 
 		double hforce = 0.0;
 		double vforce = 0.0;

@@ -35,6 +35,7 @@ namespace ms
 	const double GRAVITYACC = 2000.0;
 	const double FALLSPEED = 670.0;
 	const double JUMPSPEED = 555.0;
+	const double DOWNJUMPSPEED = JUMPSPEED * 0.35355339;
 	// CAttrShoe::walkSlant: slopes steeper than this slide.
 	const double WALKSLANT = 0.9;
 	// Steering in the air pushes at twice floatDrag2 towards a speed of
@@ -261,6 +262,17 @@ namespace ms
 			speed = dir * limit;
 
 		phobj.hspeed = speed * ux;
+	}
+
+	// CVecCtrl's down-jump (FUN_007f1ac6) rises at jumpSpeed / sqrt(8)
+	// whatever the shoe, stops moving sideways, and ignores the platform it
+	// left until it lands somewhere else.
+	void Physics::jump_down(PhysicsObject &phobj)
+	{
+		phobj.fallstart = phobj.fhid;
+		phobj.onground = false;
+		phobj.hspeed = 0.0;
+		phobj.vspeed = -DOWNJUMPSPEED * TICK;
 	}
 
 	void Physics::move_normal(PhysicsObject &phobj) const

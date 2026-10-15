@@ -443,8 +443,12 @@ force-and-friction model (`move_normal`).
 - **Jumping.** `Physics::jump` sets the takeoff speed. A held direction adds
   80% of the top walking speed, capped at the top speed. A rope jump uses half
   the jump speed and 1.3 times the walking speed.
+- **Down-jump.** Allowed when the lowest platform within 300 px below, or
+  else the highest one 300 to 600 px below, is at least 5 px under the feet
+  (`FootholdTree::can_jump_down`). `Physics::jump_down` hops up at 196 px/s
+  and stores the platform in `phobj.fallstart`. Until the player lands
+  elsewhere or grabs a rope, `update_fh` skips that platform.
 - **Not ported yet:**
-  - The down-jump's small hop (196 px/s, with the old foothold ignored).
   - v83 knockback speeds.
   - Swimming and flying.
 
