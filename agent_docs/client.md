@@ -79,7 +79,11 @@ from `UI.nx`. Moved so far:
   typing, it moves just above the strip; expanded, five lines sit above the
   strip and the input field stays shown. Each is a uniform half-black panel
   with a `Basic.img/VScr5` scroll bar. Its thumb is placed as the original
-  places it, which hit-tests only an arrow's height of it.
+  places it, which hit-tests only an arrow's height of it. As in the original
+  (`FUN_0073ecb5`), dragging the expanded log's top edge resizes it a 13-pixel
+  row at a time, from 2 to 39 rows, once the cursor is more than a row from
+  where the edge last stopped. The height is saved as `ChatHeight`, and logs
+  under four rows tall hide the thumb.
 - **NPC dialog** (`UINpcTalk`, `UIWindow.img/UtilDlgEx`): the frame,
   buttons, menu dots, quest list headers, and the `Basic.img/VScr4` scroll
   bar (`Slider::Type::CLASSIC`). See [npc-dialogue.md](npc-dialogue.md).
@@ -421,8 +425,8 @@ are registered (`Net/PacketSwitch.cpp`). Anything not listed there is silently i
 ## Movement physics
 
 The player follows v83's CVecCtrl rules (MapleLegends client, decompiled).
-`Player` sets `phobj.shoe`, and `Physics::move_shoe` handles it. Everything
-else, including mobs, NPCs, pets and drops, keeps HeavenClient's older
+`Player` and mobs set `phobj.shoe`, and `Physics::move_shoe` handles it.
+Everything else, including NPCs, pets and drops, keeps HeavenClient's older
 force-and-friction model (`move_normal`).
 
 - **Units.** The constants in `Physics.cpp` come from v83 `Map.wz/Physics.img`
@@ -430,7 +434,26 @@ force-and-friction model (`move_normal`).
   `vspeed` are still stored per tick.
 - **Steering.** Player states set `phobj.walkdir` (-1, 0 or 1) each tick
   instead of pushing with `hforce`. `phobj.walkspeed` is the shoe's speed
-  multiplier.
+  multiplier, and `walkforce` and `walkdrag` scale its ground acceleration
+  and drag. The drag factor is clamped to 0.05–2 and halved below 1.
+- **Mobs.** A walking mob's shoe (FUN_005c55cd) has walkspeed
+  clamp(`info/speed` + 100, 10, 140)/100, or 0 without a `move` animation,
+  and `info/fs` (default 1) as both walkforce and walkdrag. Chasing, a mob
+  with a `chase` animation walks at `info/chaseSpeed` instead. A snail (speed
+  -65, fs 10) reaches 44 px/s in one tick and stops within four. A jump
+  takes off at 555 px/s and keeps the walking speed. While a knocked-back mob
+  slides (`NOFRICTION`), `Mob` slows it itself. A mob that can also jump
+  takes off like the player, holding its walking direction. It keeps within
+  its foothold groups (`JUMPER`); see `agent_docs/combat.md`.
+- **Flying.** A flier's shoe sets `phobj.flyspeed` to `info/flySpeed` plus
+  100, clamped to 10-140 percent, and the flier is never on the ground. It passes through
+  platforms and walls, and `FootholdTree::limit_flight` keeps it within v83's
+  physical space: the platforms' extent, 30 px in from the sides, 300 px
+  above and 10 px below. It speeds up at 1200 px/s² toward 200 px/s ×
+  flyspeed, and slows at 1000 px/s² when not steering or when faster than
+  that. `phobj.flydir` -1 glides down at 0.3 of its top speed, and 0 dives at
+  1200 px/s². `Physics::fly_jump` beats up at its full top speed. Fliers are
+  drawn on the top layer.
 - **Walking.** On flat ground the player accelerates at 1400 px/s² toward
   125 px/s × walkspeed and brakes at 800 px/s². On a slope the push scales by
   1 ± slant², and a slant over 0.9 slides. Positions advance by the average of
@@ -448,9 +471,13 @@ force-and-friction model (`move_normal`).
   (`FootholdTree::can_jump_down`). `Physics::jump_down` hops up at 196 px/s
   and stores the platform in `phobj.fallstart`. Until the player lands
   elsewhere or grabs a rope, `update_fh` skips that platform.
+- **Walls.** A wall linked to the floor's end, or the foothold after it,
+  blocks if it reaches between 1 and 50 px above the feet
+  (`FootholdTree::get_wall`). Maps draw walls both top to bottom and bottom
+  to top, so `Foothold::is_blocking` sorts the ends first.
 - **Not ported yet:**
   - v83 knockback speeds.
-  - Swimming and flying.
+  - Swimming.
 
 ## Cash Shop
 

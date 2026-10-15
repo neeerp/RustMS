@@ -40,6 +40,8 @@ pub struct LiveMob {
     pub controller: Option<ClientId>,
     /// Until when the controller's client is chasing its player with it.
     pub aggro_until: Option<Instant>,
+    /// How far the controller last said it was from this firstAttack mob.
+    pub controller_distance: Option<i32>,
     /// Damage per player, for sharing EXP.
     pub damage_by: HashMap<ClientId, i64>,
 }
@@ -143,6 +145,7 @@ impl MobSet {
                     hp: i64::from(spawn.info.max_hp),
                     controller: None,
                     aggro_until: None,
+                    controller_distance: None,
                     damage_by: HashMap::new(),
                 },
             );
@@ -158,6 +161,7 @@ impl MobSet {
             .filter(|mob| mob.controller.is_none())
             .map(|mob| {
                 mob.controller = Some(candidate);
+                mob.controller_distance = None;
                 mob.object_id
             })
             .collect()
@@ -172,6 +176,7 @@ impl MobSet {
             .map(|mob| {
                 mob.controller = next;
                 mob.aggro_until = None;
+                mob.controller_distance = None;
                 mob.damage_by.remove(&leaving);
                 mob.object_id
             })
@@ -194,6 +199,38 @@ impl MobSet {
         }
         let previous = mob.controller.replace(attacker);
         mob.aggro_until = Some(now + AGGRO_DURATION);
+        mob.controller_distance = None;
+        Some(previous)
+    }
+
+    /// `from` is `distance` from a firstAttack mob (|dx| / 10 + |dy| / 3,
+    /// 100 more while dead). Unless a chase is on, the closest player
+    /// controls it, so their client starts one once they come near. Returns
+    /// the previous controller when control moves to `from`.
+    pub fn report_distance(
+        &mut self,
+        from: ClientId,
+        object_id: i32,
+        distance: i32,
+        now: Instant,
+    ) -> Option<Option<ClientId>> {
+        let mob = self.live.get_mut(&object_id)?;
+        if !mob.info.first_attack || mob.aggro_until.is_some_and(|until| until > now) {
+            return None;
+        }
+        if mob.controller == Some(from) {
+            mob.controller_distance = Some(distance);
+            return None;
+        }
+        if mob
+            .controller_distance
+            .is_some_and(|nearest| nearest <= distance)
+        {
+            return None;
+        }
+        let previous = mob.controller.replace(from);
+        mob.aggro_until = None;
+        mob.controller_distance = Some(distance);
         Some(previous)
     }
 
@@ -479,6 +516,39 @@ mod tests {
         mobs.release(2, Some(1));
         assert_eq!(mobs.provoke(1, snail, now), Some(Some(1)));
         assert!(mobs.provoke(1, 12345, now).is_none());
+    }
+
+    #[test]
+    fn the_closest_player_controls_a_first_attack_mob() {
+        let now = Instant::now();
+        let (template, mut info) = snail_spawn(100);
+        info.first_attack = true;
+        let mut mobs = MobSet::new([(template, info), snail_spawn(200)]);
+        let spawned = mobs.respawn(now);
+        let (mob, snail) = (spawned[0], spawned[1]);
+        mobs.assign_uncontrolled(1);
+
+        // Until the controller reports, anyone else is closer.
+        assert_eq!(mobs.report_distance(2, mob, 50, now), Some(Some(1)));
+        assert_eq!(mobs.report_distance(1, mob, 50, now), None);
+        assert_eq!(mobs.report_distance(1, mob, 20, now), Some(Some(2)));
+        assert_eq!(mobs.report_distance(2, mob, 30, now), None);
+        // The controller walking away lets the other take over.
+        assert_eq!(mobs.report_distance(1, mob, 40, now), None);
+        assert_eq!(mobs.report_distance(2, mob, 30, now), Some(Some(1)));
+
+        // A chase keeps its player in control.
+        assert_eq!(mobs.provoke(1, mob, now), Some(Some(2)));
+        assert_eq!(mobs.report_distance(2, mob, 0, now), None);
+        assert_eq!(
+            mobs.report_distance(2, mob, 0, now + AGGRO_DURATION),
+            Some(Some(1))
+        );
+
+        // Other mobs ignore reports.
+        assert_eq!(mobs.report_distance(2, snail, 0, now), None);
+        assert_eq!(mobs.get(snail).unwrap().controller, Some(1));
+        assert!(mobs.report_distance(2, 12345, 0, now).is_none());
     }
 
     #[test]

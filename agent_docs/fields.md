@@ -171,7 +171,9 @@ character id, item id). A later joiner gets the chair in `SpawnPlayer`.
 
 The client never stands up on its own. Left, Right, Jump, Sit, or a hit that
 deals damage sends CANCEL_CHAIR (0x2A: seat, -1 for a portable chair) once.
-Up does not cancel. `CancelChairHandler` replies with CANCEL_CHAIR (0xCD: byte
+So does an inventory operation that removes the last slot holding the chair
+the player sits on (dropping, selling, or trading it away). Up does not
+cancel. `CancelChairHandler` replies with CANCEL_CHAIR (0xCD: byte
 0), which stands the client up, and sends `Chair(0)`, so the others get
 SHOW_CHAIR with item 0. Map seats (a seat id other than -1) are not
 implemented and get no reply.
