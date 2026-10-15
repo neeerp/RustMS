@@ -12,6 +12,8 @@
 
 #include <nlnx/nx.hpp>
 
+#include <algorithm>
+
 namespace ms
 {
 	namespace
@@ -26,6 +28,22 @@ namespace ms
 		constexpr int16_t DRAG_HEIGHT = 25;
 		// The saved position before the helper is first moved
 		constexpr Point<int16_t> UNSET = Point<int16_t>(-1, -1);
+
+		// The original colours the count you have by how far along it is
+		// (FUN_00704c2c), in steps of a third.
+		Color::Name count_color(const QuestObjective& objective)
+		{
+			int32_t percent = objective.have * 100 / std::max(objective.need, 1);
+
+			if (percent <= 32)
+				return Color::Name::BRIGHTRED;
+			else if (percent <= 65)
+				return Color::Name::WILDSTRAWBERRY;
+			else if (percent < 100)
+				return Color::Name::PIZAZZ;
+			else
+				return Color::Name::DEEPGREEN;
+		}
 	}
 
 	UIQuestHelper::UIQuestHelper(QuestLog& quests, const Inventory& inventory) :
@@ -156,12 +174,11 @@ namespace ms
 					? nl::nx::string["Mob.img"][std::to_string(objective.id)]["name"].get_string()
 					: ItemData::get(objective.id).get_name();
 
-				// Only the count you have is coloured, once it is enough.
+				// Only the count you have is coloured.
 				entry.requirements.push_back({
-					Text(Text::A12M, Text::LEFT, Color::Name::DARKGREY, name),
-					Text(Text::A12M, Text::LEFT, objective.met() ? Color::Name::HIPPIEGREEN : Color::Name::DARKGREY,
-						std::to_string(objective.have)),
-					Text(Text::A12M, Text::LEFT, Color::Name::DARKGREY, "/" + std::to_string(objective.need))
+					Text(Text::A12M, Text::LEFT, Color::Name::BLACK, name),
+					Text(Text::A12M, Text::LEFT, count_color(objective), std::to_string(objective.have)),
+					Text(Text::A12M, Text::LEFT, Color::Name::BLACK, "/" + std::to_string(objective.need))
 				});
 				y += ROW;
 			}

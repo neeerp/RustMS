@@ -96,7 +96,10 @@ namespace ms
 			TORCHRED,
 			SILVER,
 			DUSKBLUE,
-			HIPPIEGREEN,
+			BRIGHTRED,
+			WILDSTRAWBERRY,
+			PIZAZZ,
+			DEEPGREEN,
 			SANJUAN,
 			STRATOS,
 			BLUEBELL,
@@ -151,7 +154,10 @@ namespace ms
 						{0.99f, 0.05f, 0.21f}, // Torch Red
 						{0.73f, 0.73f, 0.73f}, // Silver (#BBBBBB, quest item gains in the chat log)
 						{0.34f, 0.34f, 0.42f}, // Dusk blue (#56566B, quest list choices in the v83 NPC dialog, from footage)
-						{0.33f, 0.51f, 0.29f}, // Hippie green (#53824B, met counts in the v83 Quest Helper, from footage)
+						{1.00f, 0.13f, 0.13f}, // Bright red (#FF2020, v83 font 6: Quest Helper counts under a third done)
+						{1.00f, 0.20f, 0.60f}, // Wild strawberry (#FF3399, v83 font 10: Quest Helper counts under two thirds done)
+						{1.00f, 0.60f, 0.00f}, // Pizazz (#FF9900, v83 font 9: Quest Helper counts not yet done)
+						{0.20f, 0.40f, 0.00f}, // Deep green (#336600, v83 font 13: Quest Helper counts that are done)
 						{0.20f, 0.33f, 0.40f}, // San Juan (#335566, outlines the v83 minimap's names, from footage)
 						{0.00f, 0.00f, 0.27f}, // Stratos (#000044, fills v83 tooltips, from footage)
 						{0.60f, 0.60f, 0.80f}, // Blue Bell (#9999CC, edges v83 tooltips, from footage)
