@@ -17,6 +17,9 @@
 //////////////////////////////////////////////////////////////////////////////////
 #include "UIChatBar.h"
 
+#include <algorithm>
+#include <cstdlib>
+
 #include "UIStatusBar.h"
 
 #include "../Components/MapleButton.h"
@@ -113,6 +116,16 @@ namespace ms
 		thumb_dragging = false;
 		drag_y = 0;
 		drag_pos = 0;
+		held_part = ScrollPart::NONE;
+		edge_dragging = false;
+
+		// As in the original, a saved height out of bounds is forgotten.
+		int16_t saved_height = static_cast<int16_t>(Setting<ChatHeight>::get().load());
+
+		if (saved_height < MIN_LOG_HEIGHT || saved_height > MAX_LOG_HEIGHT)
+			saved_height = LOG_HEIGHT;
+
+		set_log_height(saved_height);
 
 		nl::node base = NxFiles::ui_classic["StatusBar.img"]["base"];
 		nl::node basic = NxFiles::ui_classic["Basic.img"];
@@ -315,6 +328,17 @@ namespace ms
 
 		for (auto iter : message_cooldowns)
 			iter.second -= Constants::TIMESTEP;
+
+		if (held_part != ScrollPart::NONE)
+		{
+			auto now = std::chrono::steady_clock::now();
+
+			if (now - held_last > std::chrono::milliseconds(50) && scroll_part_at(held_cursor) == held_part)
+			{
+				held_last = now;
+				scroll_step(held_part);
+			}
+		}
 	}
 
 	void UIChatBar::update_screen(int16_t, int16_t new_height)
@@ -369,6 +393,38 @@ namespace ms
 			thumb_dragging = false;
 		}
 
+		// Like the original's mouse capture: the repeat in update follows
+		// the cursor until the button is released.
+		if (clicking)
+			held_cursor = cursorpos;
+		else
+			held_part = ScrollPart::NONE;
+
+		if (edge_dragging)
+		{
+			if (clicking)
+			{
+				drag_log_edge(cursorpos.y() - position.y());
+
+				return Cursor::State::VSCROLLIDLE;
+			}
+
+			edge_dragging = false;
+		}
+
+		if (on_log_edge(cursorpos) && scroll_part_at(cursorpos) == ScrollPart::NONE)
+		{
+			if (pressed)
+			{
+				edge_dragging = true;
+
+				if (!edge_anchor)
+					edge_anchor = cursorpos.y() - position.y();
+			}
+
+			return Cursor::State::VSCROLLIDLE;
+		}
+
 		if (chatfieldopen)
 		{
 			if (Cursor::State new_state = chatfield.send_cursor(cursorpos, clicking))
@@ -382,48 +438,25 @@ namespace ms
 			return Cursor::State::CLICKING;
 		}
 
-		Point<int16_t> bar = position + get_scrollbar_pos();
-		Point<int16_t> rel = cursorpos - bar;
-		int16_t width = arrows[Arrow::PREV][0].width();
-		int16_t length = get_scrollbar_length();
-		int16_t button = arrows[Arrow::PREV][0].height();
-
 		arrow_pressed[Arrow::PREV] = false;
 		arrow_pressed[Arrow::NEXT] = false;
 
-		if (rel.x() < 0 || rel.x() >= width || rel.y() < 0 || rel.y() >= length)
+		ScrollPart part = scroll_part_at(cursorpos);
+
+		if (part == ScrollPart::NONE)
 			return UIElement::send_cursor(clicking, cursorpos);
 
 		if (get_scrollrange() < 2)
 			return Cursor::State::IDLE;
 
-		if (rel.y() < button)
-		{
+		if (part == ScrollPart::PREV)
 			arrow_pressed[Arrow::PREV] = clicking;
-
-			if (pressed)
-				scroll(-1);
-		} else if (rel.y() >= length - button)
-		{
+		else if (part == ScrollPart::NEXT)
 			arrow_pressed[Arrow::NEXT] = clicking;
 
-			if (pressed)
-				scroll(1);
-		} else if (pressed)
+		if (pressed)
 		{
-			// Clicking the track either side of the thumb pages through the
-			// log, at least sixteen lines at a time.
-			int16_t page = std::max<int16_t>(16, get_scrollrange() / 16);
-			// The original only counts an arrow's height of the thumb.
-			int16_t thumbtop = get_thumb_offset(button).value_or(button);
-
-			if (rel.y() < thumbtop)
-			{
-				set_scrollpos(get_scrollpos() - page);
-			} else if (rel.y() > thumbtop + button)
-			{
-				set_scrollpos(get_scrollpos() + page);
-			} else
+			if (part == ScrollPart::THUMB)
 			{
 				thumb_dragging = true;
 				drag_y = cursorpos.y();
@@ -431,6 +464,10 @@ namespace ms
 
 				return Cursor::State::VSCROLLIDLE;
 			}
+
+			held_part = part;
+			held_last = std::chrono::steady_clock::now();
+			scroll_step(part);
 		}
 
 		return clicking ? Cursor::State::CLICKING : Cursor::State::CANCLICK;
@@ -450,6 +487,8 @@ namespace ms
 		arrow_pressed[Arrow::NEXT] = false;
 		scrollbar_pressed = false;
 		thumb_dragging = false;
+		held_part = ScrollPart::NONE;
+		edge_dragging = false;
 	}
 
 	UIElement::Type UIChatBar::get_type() const
@@ -648,14 +687,106 @@ namespace ms
 		set_scrollpos(get_scrollpos() + rows);
 	}
 
+	// The original (FUN_0073ecb5) moves the edge in whole rows once the
+	// cursor is more than a row from where the last step left it.
+	void UIChatBar::drag_log_edge(int16_t y)
+	{
+		int16_t anchor = edge_anchor.value_or(y);
+		bool shrinking = y >= get_logtop() + EDGE_OFFSET;
+		int16_t distance = shrinking ? y - anchor : anchor - y;
+
+		if (distance <= CHATROWHEIGHT)
+			return;
+
+		if (shrinking ? log_height <= MIN_LOG_HEIGHT : log_height >= MAX_LOG_HEIGHT)
+			return;
+
+		set_log_height(log_height + (anchor - y) / CHATROWHEIGHT * CHATROWHEIGHT);
+		edge_anchor = get_logtop() + EDGE_OFFSET;
+		rowpos = rowmax;
+
+		Setting<ChatHeight>::get().save(log_height);
+	}
+
+	bool UIChatBar::on_log_edge(Point<int16_t> cursorpos) const
+	{
+		Point<int16_t> pos = cursorpos - position;
+
+		return chatopen && pos.x() < LOG_WIDTH && std::abs(pos.y() - (get_logtop() + EDGE_OFFSET)) < 5;
+	}
+
+	void UIChatBar::set_log_height(int16_t height)
+	{
+		height = std::clamp(height, MIN_LOG_HEIGHT, MAX_LOG_HEIGHT);
+
+		// The original keeps a height that is a whole number of rows two
+		// pixels taller.
+		if (height % CHATROWHEIGHT == 0)
+			height += 2;
+
+		log_height = height;
+	}
+
+	UIChatBar::ScrollPart UIChatBar::scroll_part_at(Point<int16_t> cursorpos) const
+	{
+		Point<int16_t> rel = cursorpos - position - get_scrollbar_pos();
+		int16_t width = arrows[Arrow::PREV][0].width();
+		int16_t length = get_scrollbar_length();
+		int16_t button = arrows[Arrow::PREV][0].height();
+
+		if (rel.x() < 0 || rel.x() >= width || rel.y() < 0 || rel.y() >= length)
+			return ScrollPart::NONE;
+
+		if (rel.y() < button)
+			return ScrollPart::PREV;
+
+		if (rel.y() >= length - button)
+			return ScrollPart::NEXT;
+
+		// The original only counts an arrow's height of the thumb.
+		int16_t thumbtop = get_thumb_offset(button).value_or(button);
+
+		if (rel.y() < thumbtop)
+			return ScrollPart::PAGE_UP;
+
+		if (rel.y() > thumbtop + button)
+			return ScrollPart::PAGE_DOWN;
+
+		return ScrollPart::THUMB;
+	}
+
+	void UIChatBar::scroll_step(ScrollPart part)
+	{
+		// The track pages through the log, at least sixteen lines at a time.
+		int16_t page = std::max<int16_t>(16, get_scrollrange() / 16);
+
+		switch (part)
+		{
+			case ScrollPart::PREV:
+				scroll(-1);
+				break;
+			case ScrollPart::NEXT:
+				scroll(1);
+				break;
+			case ScrollPart::PAGE_UP:
+				set_scrollpos(get_scrollpos() - page);
+				break;
+			case ScrollPart::PAGE_DOWN:
+				set_scrollpos(get_scrollpos() + page);
+				break;
+			default:
+				break;
+		}
+	}
+
 	int16_t UIChatBar::get_logrows() const
 	{
-		return chatopen ? CHATROWS : 1;
+		return chatopen ? log_height / CHATROWHEIGHT : 1;
 	}
 
 	int16_t UIChatBar::get_logheight() const
 	{
-		return chatopen ? LOG_HEIGHT : LINE_LOG_HEIGHT;
+		return chatopen ? log_height : LINE_LOG_HEIGHT;
 	}
 
 	// The original lays the chat out in a window 22 pixels below the top of
@@ -664,7 +795,7 @@ namespace ms
 	int16_t UIChatBar::get_logtop() const
 	{
 		if (chatopen)
-			return -3 - LOG_HEIGHT;
+			return -3 - log_height;
 
 		return chatfieldopen ? -26 : 1;
 	}
@@ -681,7 +812,7 @@ namespace ms
 
 	int16_t UIChatBar::get_scrollbar_length() const
 	{
-		return chatopen ? LOG_HEIGHT - 2 : LINE_LOG_HEIGHT + 1;
+		return chatopen ? log_height - 2 : LINE_LOG_HEIGHT + 1;
 	}
 
 	int16_t UIChatBar::get_scrollrange() const
@@ -706,8 +837,9 @@ namespace ms
 		int16_t button = arrows[Arrow::PREV][0].height();
 		int16_t travel = get_scrollbar_length() - 2 * button - height;
 
-		// The collapsed log's scroll bar is just its two arrows.
-		if (range < 2 || travel < 0)
+		// The collapsed log's scroll bar is just its two arrows, and the
+		// original hides the thumb of a log under four rows tall.
+		if (range < 2 || travel < 0 || (chatopen && log_height < 4 * CHATROWHEIGHT))
 			return std::nullopt;
 
 		return button + travel * get_scrollpos() / (range - 1);

@@ -314,6 +314,17 @@ namespace ms
 		return 0;
 	}
 
+	int16_t Inventory::count_slots(InventoryType::Id type, int32_t itemid) const
+	{
+		int16_t slots = 0;
+
+		for (auto &iter : inventories[type])
+			if (iter.second.item_id == itemid)
+				slots++;
+
+		return slots;
+	}
+
 	int16_t Inventory::get_item_count(InventoryType::Id type, int16_t slot) const
 	{
 		auto iter = inventories[type].find(slot);

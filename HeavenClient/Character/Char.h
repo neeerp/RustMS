@@ -128,6 +128,9 @@ namespace ms
 		// Display damage over the characters head.
 		void show_damage(int32_t damage);
 
+		// Display a heal over the characters head in blue.
+		void show_heal(int32_t amount);
+
 		// Display a chat bubble with the specified line in it.
 		void speak(const std::string &line);
 

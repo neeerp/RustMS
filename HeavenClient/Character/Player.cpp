@@ -222,7 +222,8 @@ namespace ms
 		{
 			MovePlayerPacket(newmove).dispatch();
 			lastmove = newmove;
-			recovery_timer = 0;
+			hp_recovery.timer = 0;
+			mp_recovery.timer = 0;
 		}
 
 		return get_layer();
@@ -260,31 +261,60 @@ namespace ms
 	void Player::update_recovery()
 	{
 		bool resting = state == Char::State::STAND || state == Char::State::PRONE || state == Char::State::SIT;
-
-		if (!resting)
-		{
-			recovery_timer = 0;
-			return;
-		}
-
-		recovery_timer += Constants::TIMESTEP;
-
-		if (recovery_timer < RECOVERY_INTERVAL)
-			return;
-
-		recovery_timer = 0;
-
 		int32_t hp = stats.get_stat(MapleStat::Id::HP);
 		int32_t mp = stats.get_stat(MapleStat::Id::MP);
 
-		if (hp <= 0)
+		if (!resting || hp <= 0)
+		{
+			hp_recovery.timer = 0;
+			mp_recovery.timer = 0;
 			return;
+		}
 
-		int16_t heal_hp = hp < stats.get_total(EquipStat::Id::HP) ? RECOVERY_HP : 0;
-		int16_t heal_mp = mp < stats.get_total(EquipStat::Id::MP) ? RECOVERY_MP : 0;
+		double rate = chair ? CHAIR_RECOVERY_RATE : 1.0;
+		int16_t heal_hp = 0;
+		int16_t heal_mp = 0;
 
-		if (heal_hp > 0 || heal_mp > 0)
-			HealOverTimePacket(heal_hp, heal_mp).dispatch();
+		if (hp < stats.get_total(EquipStat::Id::HP))
+			heal_hp = hp_recovery.update(chair_recovery_hp, static_cast<int16_t>(RECOVERY_HP * rate));
+		else
+			hp_recovery.timer = 0;
+
+		if (mp < stats.get_total(EquipStat::Id::MP))
+			heal_mp = mp_recovery.update(chair_recovery_mp, static_cast<int16_t>(RECOVERY_MP * rate));
+		else
+			mp_recovery.timer = 0;
+
+		// Like v83, HP and MP go out in separate packets, and an HP heal shows
+		// its amount in blue.
+		if (heal_hp > 0)
+		{
+			HealOverTimePacket(heal_hp, 0).dispatch();
+			show_heal(heal_hp);
+		}
+
+		if (heal_mp > 0)
+			HealOverTimePacket(0, heal_mp).dispatch();
+	}
+
+	int16_t Player::Recovery::update(int16_t chair_amount, int16_t natural_amount)
+	{
+		bool chair_source = chair_amount > 0;
+
+		if (chair_source != from_chair)
+		{
+			from_chair = chair_source;
+			timer = 0;
+		}
+
+		timer += Constants::TIMESTEP;
+
+		if (timer < RECOVERY_INTERVAL)
+			return 0;
+
+		timer = 0;
+
+		return chair_source ? chair_amount : natural_amount;
 	}
 
 	int8_t Player::get_integer_attackspeed() const
@@ -587,6 +617,10 @@ namespace ms
 	{
 		Char::set_chair(itemid);
 		leaving_chair = false;
+
+		nl::node info = nl::nx::item["Install"]["0301.img"][string_format::extend_id(itemid, 8)]["info"];
+		chair_recovery_hp = itemid ? static_cast<int16_t>(info["recoveryHP"].get_integer()) : 0;
+		chair_recovery_mp = itemid ? static_cast<int16_t>(info["recoveryMP"].get_integer()) : 0;
 	}
 
 	void Player::set_ladder(Optional<const Ladder> ldr)

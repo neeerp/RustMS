@@ -63,15 +63,32 @@ pub struct HealOverTimeHandler;
 /// Most a beginner recovers per tick without skills (HP, MP).
 pub const MAX_NATURAL_HEAL: (i16, i16) = (20, 10);
 
+/// Most the player may recover per tick: the natural maximum, or a portable
+/// chair's `recoveryHP`/`recoveryMP` while they sit on one they still own.
+fn max_heal(player: &Player) -> (i16, i16) {
+    let chair = (player.chair != 0 && player.inventory.count(player.chair) > 0)
+        .then(|| items::info(player.chair))
+        .flatten();
+    let Some(chair) = chair else {
+        return MAX_NATURAL_HEAL;
+    };
+    let bound = |natural: i16, chair: i32| natural.max(i16::try_from(chair).unwrap_or(i16::MAX));
+    (
+        bound(MAX_NATURAL_HEAL.0, chair.recovery_hp),
+        bound(MAX_NATURAL_HEAL.1, chair.recovery_mp),
+    )
+}
+
 impl WorldHandler for HealOverTimeHandler {
-    fn handle(&self, packet: &mut Packet, _ctx: &mut WorldContext) -> WorldResult {
+    fn handle(&self, packet: &mut Packet, ctx: &mut WorldContext) -> WorldResult {
         let mut reader = Cursor::new(&packet.bytes);
         reader.read_short()?;
         reader.read_int()?;
         reader.read_int()?;
         let hp = reader.read_short()?;
         let mp = reader.read_short()?;
-        if !(0..=MAX_NATURAL_HEAL.0).contains(&hp) || !(0..=MAX_NATURAL_HEAL.1).contains(&mp) {
+        let (max_hp, max_mp) = max_heal(ctx.player);
+        if !(0..=max_hp).contains(&hp) || !(0..=max_mp).contains(&mp) {
             debug!(hp, mp, "Natural recovery out of range");
             return Ok(HandlerResult::empty());
         }
@@ -147,5 +164,45 @@ mod tests {
                 .quantity,
             5
         );
+    }
+
+    fn heal_over_time(player: &mut Player, hp: i16, mp: i16) -> bool {
+        let mut packet = Packet::new_empty();
+        packet.write_short(RecvOpcode::HealOverTime as i16).unwrap();
+        packet.write_int(0).unwrap();
+        packet.write_int(0).unwrap();
+        packet.write_short(hp).unwrap();
+        packet.write_short(mp).unwrap();
+        let mut ctx = WorldContext {
+            client_id: 1,
+            channel_id: 0,
+            player,
+        };
+        let actions = HealOverTimeHandler
+            .handle(&mut packet, &mut ctx)
+            .unwrap()
+            .actions;
+        matches!(actions.as_slice(), [WorldAction::NaturalHeal { hp: h, mp: m }] if (*h, *m) == (hp, mp))
+    }
+
+    #[test]
+    fn a_portable_chair_raises_the_heal_bound() {
+        if items::data().is_err() {
+            return;
+        }
+        let mut player = crate::codec::stats::sample_player();
+        assert!(heal_over_time(&mut player, 10, 3));
+        assert!(!heal_over_time(&mut player, 50, 0));
+        // The Relaxer heals 50 HP.
+        player
+            .inventory
+            .insert(InventoryType::Setup, 1, Item::stack(3010000, 1));
+        player.chair = 3010000;
+        assert!(heal_over_time(&mut player, 50, 0));
+        assert!(heal_over_time(&mut player, 0, 4));
+        assert!(!heal_over_time(&mut player, 51, 0));
+        // Not once the chair has left the inventory.
+        player.inventory.take(InventoryType::Setup, 1, 1).unwrap();
+        assert!(!heal_over_time(&mut player, 50, 0));
     }
 }
