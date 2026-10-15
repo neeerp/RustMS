@@ -677,6 +677,13 @@ namespace ms
 		PosCHARINFO() : PointEntry("PosCHARINFO", "(264, 264)") {}
 	};
 
+	// Where UIQuestHelper was moved to. Until then, as in the original, it
+	// is unset and the helper takes its default place.
+	struct PosQUESTHELPER : public Configuration::PointEntry
+	{
+		PosQUESTHELPER() : PointEntry("PosQUESTHELPER", "(-1,-1)") {}
+	};
+
 	// The type of UIMiniMap on maps that aren't towns: 0 folded, 1 the map
 	// alone, 2 the map under its names
 	struct MiniMapType : public Configuration::ByteEntry

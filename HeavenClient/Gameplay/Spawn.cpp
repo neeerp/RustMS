@@ -76,8 +76,8 @@ namespace ms
 	}
 
 	DropSpawn::DropSpawn(int32_t o, int32_t i, bool ms, int32_t ow, Point<int16_t> p, Point<int16_t> d, int8_t t,
-						 int8_t m, bool pd) : oid(o), id(i), meso(ms), owner(ow), start(p), dest(d), droptype(t),
-											  mode(m), playerdrop(pd)
+						 int8_t m, int16_t dl, bool pd) : oid(o), id(i), meso(ms), owner(ow), start(p), dest(d),
+														  droptype(t), mode(m), delay(dl), playerdrop(pd)
 	{}
 
 	bool DropSpawn::is_meso() const
@@ -97,12 +97,12 @@ namespace ms
 
 	std::unique_ptr<MapObject> DropSpawn::instantiate(const Animation &icon) const
 	{
-		return std::make_unique<MesoDrop>(oid, owner, start, dest, droptype, mode, playerdrop, icon);
+		return std::make_unique<MesoDrop>(oid, owner, start, dest, droptype, mode, delay, playerdrop, icon);
 	}
 
 	std::unique_ptr<MapObject> DropSpawn::instantiate(const Texture &icon) const
 	{
-		return std::make_unique<ItemDrop>(oid, owner, start, dest, droptype, mode, id, playerdrop, icon);
+		return std::make_unique<ItemDrop>(oid, owner, start, dest, droptype, mode, delay, id, playerdrop, icon);
 	}
 
 	CharSpawn::CharSpawn(int32_t c, const LookEntry &lk, uint8_t l, int16_t j, const std::string &nm, int8_t st,

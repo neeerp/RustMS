@@ -125,26 +125,7 @@ namespace ms
 			move.apply_stats(player, attack);
 
 			Point<int16_t> origin = attack.origin;
-			Rectangle<int16_t> range = attack.range;
-			int16_t hrange = static_cast<int16_t>(range.left() * attack.hrange);
-
-			if (attack.toleft)
-			{
-					range = {
-							static_cast<int16_t>(origin.x() + hrange),
-							static_cast<int16_t>(origin.x() + range.right()),
-							static_cast<int16_t>(origin.y() + range.top()),
-							static_cast<int16_t>(origin.y() + range.bottom())
-					};
-			} else
-			{
-					range = {
-							static_cast<int16_t>(origin.x() - range.right()),
-							static_cast<int16_t>(origin.x() - hrange),
-							static_cast<int16_t>(origin.y() + range.top()),
-							static_cast<int16_t>(origin.y() + range.bottom())
-					};
-			}
+			Rectangle<int16_t> range = place_range(origin, attack.range, attack.hrange, attack.toleft);
 
 			// This approach should also make it easier to implement PvP
 			uint8_t mobcount = attack.mobcount;
@@ -159,7 +140,7 @@ namespace ms
 			mobs.send_attack(result, attack, mob_targets, mobcount);
 			result.attacker = player.get_oid();
 			expect_hits(result, 1);
-			extract_effects(player, move, result);
+			extract_effects(player, move, result, range);
 
 			apply_use_movement(move);
 			apply_result_movement(move, result);
@@ -313,20 +294,49 @@ namespace ms
 
 			user.set_afterimage(attack.skill);
 
-			extract_effects(user, move, attack);
+			Rectangle<int16_t> range = place_range(user.get_position(), user.get_afterimage().get_range(), 1.0f,
+												   attack.toleft);
+			extract_effects(user, move, attack, range);
 		} else
 		{
 			expect_hits(attack, -1);
 		}
 	}
 
-	void Combat::extract_effects(const Char &user, const SpecialMove &move, const AttackResult &result)
+	Rectangle<int16_t> Combat::place_range(Point<int16_t> origin, Rectangle<int16_t> range, float hrange, bool toleft)
+	{
+		int16_t reach = static_cast<int16_t>(range.left() * hrange);
+
+		if (toleft)
+		{
+			return {
+					static_cast<int16_t>(origin.x() + reach),
+					static_cast<int16_t>(origin.x() + range.right()),
+					static_cast<int16_t>(origin.y() + range.top()),
+					static_cast<int16_t>(origin.y() + range.bottom())
+			};
+		} else
+		{
+			return {
+					static_cast<int16_t>(origin.x() - range.right()),
+					static_cast<int16_t>(origin.x() - reach),
+					static_cast<int16_t>(origin.y() + range.top()),
+					static_cast<int16_t>(origin.y() + range.bottom())
+			};
+		}
+	}
+
+	void Combat::extract_effects(const Char &user, const SpecialMove &move, const AttackResult &result,
+								 Rectangle<int16_t> range)
 	{
 		AttackUser attackuser = {
 				user.get_skilllevel(move.get_id()),
 				user.get_level(),
 				user.is_twohanded(),
-				!result.toleft
+				!result.toleft,
+				user.get_look().get_equips().get_weapon(),
+				result.stance,
+				range
 		};
 
 		if (result.bullet)

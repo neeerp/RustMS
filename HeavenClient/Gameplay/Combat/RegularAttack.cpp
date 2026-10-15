@@ -17,6 +17,10 @@
 //////////////////////////////////////////////////////////////////////////////////
 #include "RegularAttack.h"
 
+#include "../../Util/Randomizer.h"
+
+#include <nlnx/nx.hpp>
+
 namespace ms
 {
 	void RegularAttack::apply_useeffects(Char &) const
@@ -39,8 +43,70 @@ namespace ms
 			attack.range = user.get_afterimage().get_range();
 	}
 
-	void RegularAttack::apply_hiteffects(const AttackUser &, Mob &) const
-	{}
+	void RegularAttack::apply_hiteffects(const AttackUser &user, Mob &target) const
+	{
+		if (const Animation *spark = get_spark(user))
+			target.show_hit(*spark, user.range, user.flip);
+	}
+
+	const Animation *RegularAttack::get_spark(const AttackUser &user) const
+	{
+		if (user.weapon / 1000000 != 1)
+			return nullptr;
+
+		// v83 sorts weapons into blades and blunts by their type.
+		std::string name;
+
+		switch (user.weapon / 10000 % 100)
+		{
+			case 30: // One-handed sword
+			case 31: // One-handed axe
+			case 33: // Dagger
+			case 40: // Two-handed sword
+			case 41: // Two-handed axe
+			case 43: // Spear
+			case 44: // Polearm
+				name = "sword";
+				break;
+			case 32: // One-handed mace
+			case 37: // Wand
+			case 38: // Staff
+			case 39:
+			case 42: // Two-handed mace
+			case 45: // Bow
+			case 46: // Crossbow
+			case 47: // Claw
+			case 48: // Knuckle
+			case 49: // Gun
+				name = "mace";
+				break;
+			default:
+				return nullptr;
+		}
+
+		// The last swing or stab of a combo gets the F set; any other hit
+		// picks one of the two plain sets at random.
+		switch (Stance::by_id(user.stance))
+		{
+			case Stance::Id::SWINGOF:
+			case Stance::Id::SWINGTF:
+			case Stance::Id::SWINGPF:
+			case Stance::Id::STABOF:
+			case Stance::Id::STABTF:
+				name += "F";
+				break;
+			default:
+				name += Randomizer().next_bool() ? "1" : "2";
+				break;
+		}
+
+		auto iter = sparks.find(name);
+
+		if (iter == sparks.end())
+			iter = sparks.emplace(name, nl::nx::character["Afterimage"]["hit.img"][name]).first;
+
+		return &iter->second;
+	}
 
 	Animation RegularAttack::get_bullet(const Char &user, int32_t bulletid) const
 	{

@@ -26,6 +26,7 @@
 #include <nlnx/nx.hpp>
 
 #include <algorithm>
+#include <cmath>
 #include <cstdint>
 
 namespace ms
@@ -105,7 +106,6 @@ namespace ms
 		set_stance(st);
 		flydirection = STRAIGHT;
 		counter = 0;
-		knockback_ticks = 0;
 		pending_hits = 0;
 		death_timeout = 0;
 
@@ -142,9 +142,8 @@ namespace ms
 
 	void Mob::set_stance(Stance newstance)
 	{
-		// A hit nudges the mob back a few pixels; it doesn't slide away.
-		if (newstance == Stance::HIT)
-			knockback_ticks = 3;
+		if (newstance != Stance::HIT)
+			phobj.clear_flag(PhysicsObject::Flag::NOFRICTION);
 
 		if (stance != newstance)
 		{
@@ -201,11 +200,12 @@ namespace ms
 			{
 				if (phobj.is_flag_not_set(PhysicsObject::Flag::TURNATEDGES))
 				{
-					flip = !flip;
-					phobj.set_flag(PhysicsObject::Flag::TURNATEDGES);
+					// A knocked back mob stops at the edge, still facing its
+					// attacker.
+					if (stance != Stance::HIT)
+						flip = !flip;
 
-					if (stance == Stance::HIT)
-						set_stance(Stance::STAND);
+					phobj.set_flag(PhysicsObject::Flag::TURNATEDGES);
 				}
 			}
 
@@ -232,12 +232,22 @@ namespace ms
 
 					break;
 				case Stance::HIT:
-					if (canmove && knockback_ticks > 0)
+					if (phobj.is_flag_set(PhysicsObject::Flag::NOFRICTION) && phobj.onground)
 					{
-						knockback_ticks--;
+						// v83 slows the push by 40000 / mass (100) px/s^2
+						// along the ground; walls and edges zero it.
+						constexpr double KBDECEL = 400.0 * Constants::TIMESTEP * Constants::TIMESTEP / 1000000.0;
 
-						double KBFORCE = phobj.onground ? 0.2 : 0.1;
-						phobj.hforce = flip ? -KBFORCE : KBFORCE;
+						double kbspeed = std::abs(phobj.hspeed) - KBDECEL;
+
+						if (kbspeed > 0.0)
+						{
+							phobj.hspeed = phobj.hspeed < 0.0 ? -kbspeed : kbspeed;
+						} else
+						{
+							phobj.hspeed = 0.0;
+							phobj.clear_flag(PhysicsObject::Flag::NOFRICTION);
+						}
 					}
 
 					break;
@@ -257,7 +267,8 @@ namespace ms
 				switch (stance)
 				{
 					case Stance::HIT:
-						next = counter > 200;
+						// The hit pose lasts one run of its animation.
+						next = aniend;
 						break;
 					case Stance::JUMP:
 						next = phobj.onground;
@@ -509,6 +520,37 @@ namespace ms
 		effects.add(animation, DrawArgument(shift, f), z);
 	}
 
+	void Mob::show_hit(const Animation &animation, const Rectangle<int16_t> &range, bool f)
+	{
+		if (!active)
+			return;
+
+		Rectangle<int16_t> body = animations.at(stance).get_bounds();
+		body.shift(get_position());
+
+		// As v83 does, centre the spark on the overlap of the attack and the
+		// body, first stretching an attack that falls short to touch it.
+		int16_t left = range.left();
+		int16_t right = range.right();
+		int16_t top = range.top();
+		int16_t bottom = range.bottom();
+
+		if (left >= body.right())
+			left = body.right() - 1;
+		else if (right <= body.left())
+			right = body.left() + 1;
+
+		if (top >= body.bottom())
+			top = body.bottom() - 1;
+		else if (bottom <= body.top())
+			bottom = body.top() + 1;
+
+		int16_t x = (std::max(left, body.left()) + std::min(right, body.right())) / 2;
+		int16_t y = (std::max(top, body.top()) + std::min(bottom, body.bottom())) / 2;
+
+		effects.add(animation, DrawArgument(Point<int16_t>(x, y) - get_position(), f), 0);
+	}
+
 	float Mob::calculate_hitchance(int16_t leveldelta, int32_t player_accuracy) const
 	{
 		float faccuracy = static_cast<float>(player_accuracy);
@@ -623,11 +665,20 @@ namespace ms
 		{
 			if (pending_hits == 0)
 				apply_death();
-		} else if (control && is_alive() && damage >= knockback)
+		} else if (control && is_alive() && damage >= knockback && stance != Stance::HIT)
 		{
 			flip = toleft;
-			counter = 170;
+			counter = 0;
 			set_stance(Stance::HIT);
+
+			// v83 pushes a flinching mob away from its attacker at 130 px/s.
+			if (canmove)
+			{
+				constexpr double KBSPEED = 130.0 * Constants::TIMESTEP / 1000.0;
+
+				phobj.hspeed = flip ? -KBSPEED : KBSPEED;
+				phobj.set_flag(PhysicsObject::Flag::NOFRICTION);
+			}
 
 			update_movement();
 		}

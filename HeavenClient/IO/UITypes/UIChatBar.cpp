@@ -89,9 +89,15 @@ namespace ms
 			return true;
 		}
 
-		// Lines sit on a dark band, and so does the latest line in the strip
-		// while the input field is closed.
-		constexpr float BAND_ALPHA = 0.55f;
+		// The original fills the whole log with black at half opacity.
+		constexpr float LOG_ALPHA = 0.5f;
+
+		// The input field, from the status bar's top left
+		constexpr Rectangle<int16_t> CHATFIELD = Rectangle<int16_t>(87, 530, 5, 25);
+
+		// The original places a line by the top of its text; text here is
+		// placed this far above that.
+		constexpr int16_t TEXT_RAISE = 7;
 	}
 
 	UIChatBar::UIChatBar()
@@ -101,12 +107,16 @@ namespace ms
 		lastpos = 0;
 		rowpos = 0;
 		rowmax = -1;
-		arrow_state[Arrow::PREV] = 0;
-		arrow_state[Arrow::NEXT] = 0;
+		arrow_pressed[Arrow::PREV] = false;
+		arrow_pressed[Arrow::NEXT] = false;
+		scrollbar_pressed = false;
+		thumb_dragging = false;
+		drag_y = 0;
+		drag_pos = 0;
 
 		nl::node base = NxFiles::ui_classic["StatusBar.img"]["base"];
 		nl::node basic = NxFiles::ui_classic["Basic.img"];
-		nl::node scrollbar = basic["VScr4"];
+		nl::node scrollbar = basic["VScr5"];
 
 		backgrnd = base["backgrnd"];
 		backgrnd2 = base["backgrnd2"];
@@ -114,15 +124,18 @@ namespace ms
 		chattarget_label = Text(Text::Font::A11M, Text::Alignment::LEFT, Color::Name::WHITE, "To All");
 		chat_target = Target::ALL;
 
-		for (size_t i = 0; i < 3; i++)
+		// The original's scroll bar has only a normal and a pressed look.
+		for (size_t i = 0; i < 2; i++)
 		{
 			arrows[Arrow::PREV][i] = scrollbar["enabled"]["prev" + std::to_string(i)];
 			arrows[Arrow::NEXT][i] = scrollbar["enabled"]["next" + std::to_string(i)];
+			thumb[i] = scrollbar["enabled"]["thumb" + std::to_string(i)];
 		}
 
 		arrows_disabled[Arrow::PREV] = scrollbar["disabled"]["prev"];
 		arrows_disabled[Arrow::NEXT] = scrollbar["disabled"]["next"];
 		scrollbase = scrollbar["enabled"]["base"];
+		scrollbase_disabled = scrollbar["disabled"]["base"];
 
 		buttons[Buttons::BT_OPENCHAT] = std::make_unique<MapleButton>(basic["BtMax"], Point<int16_t>(536, 12));
 		buttons[Buttons::BT_CLOSECHAT] = std::make_unique<MapleButton>(basic["BtMin"], Point<int16_t>(536, 12));
@@ -130,7 +143,7 @@ namespace ms
 		buttons[Buttons::BT_CLOSECHAT]->set_active(chatopen);
 
 		chatfield = Textfield(Text::A12M, Text::LEFT, Color::Name::BLACK,
-							  Rectangle<int16_t>(Point<int16_t>(87, 5), Point<int16_t>(530, 25)), 0);
+							  CHATFIELD, 0);
 		chatfield.set_state(Textfield::State::DISABLED);
 
 		chatfield.set_enter_callback(
@@ -235,66 +248,61 @@ namespace ms
 	void UIChatBar::draw(float inter) const
 	{
 		const Rectangle<int16_t> &strip = UIStatusBar::CHAT_STRIP;
-		Point<int16_t> strip_pos = position + strip.get_left_top();
 
 		backgrnd.draw(position, strip);
 		backgrnd2.draw(position, strip);
 
 		auto &graphics = GraphicsGL::get();
 
-		if (chatfieldopen)
+		if (chatfieldopen || chatopen)
 		{
 			chattarget.draw(position + Point<int16_t>(2, 8));
 			chattarget_label.draw(position + Point<int16_t>(6, 5));
 			chatfield.draw(position);
-		} else
-		{
-			graphics.drawrectangle(strip_pos.x(), strip_pos.y(), STRIP_WIDTH, strip.height(), 0.0f, 0.0f, 0.0f,
-								   BAND_ALPHA);
-
-			if (rowtexts.count(rowmax))
-				rowtexts.at(rowmax).draw(position + Point<int16_t>(3, 5));
 		}
 
-		if (chatopen)
+		int16_t sbwidth = arrows[Arrow::PREV][0].width();
+		int16_t logtop = get_logtop();
+		int16_t logheight = get_logheight();
+		int16_t logbottom = logtop + logheight;
+
+		graphics.drawrectangle(position.x(), position.y() + logtop, LOG_WIDTH - sbwidth, logheight, 0.0f, 0.0f, 0.0f,
+							   LOG_ALPHA);
+
+		for (int16_t i = 0; i < get_logrows(); i++)
 		{
-			for (int16_t i = 0; i < CHATROWS; i++)
-			{
-				int16_t rowid = rowpos - i;
+			auto row = rowtexts.find(rowpos - i);
 
-				if (!rowtexts.count(rowid))
-					break;
+			if (row == rowtexts.end())
+				break;
 
-				int16_t top = 1 - CHATROWHEIGHT * (i + 1);
+			int16_t top = logbottom - CHATROWHEIGHT * (i + 1);
 
-				graphics.drawrectangle(position.x(), position.y() + top, STRIP_WIDTH, CHATROWHEIGHT, 0.0f, 0.0f, 0.0f,
-									   BAND_ALPHA);
-				rowtexts.at(rowid).draw(position + Point<int16_t>(3, top - 7));
-			}
-
-			Point<int16_t> prev = get_arrow_pos(Arrow::PREV);
-			Point<int16_t> next = get_arrow_pos(Arrow::NEXT);
-			int16_t track = next.y() - prev.y() - CHATROWHEIGHT;
-
-			if (track > 0)
-				scrollbase.draw(DrawArgument(position + prev + Point<int16_t>(0, CHATROWHEIGHT),
-											 Point<int16_t>(0, track)));
+			row->second.draw(position + Point<int16_t>(3, top - TEXT_RAISE));
 		}
 
-		bool can_scroll[2] = {
-			chatopen && rowpos >= CHATROWS && rowtexts.count(rowpos - CHATROWS),
-			chatopen && rowpos < rowmax
-		};
+		Point<int16_t> bar = position + get_scrollbar_pos();
+		int16_t length = get_scrollbar_length();
+		int16_t button = arrows[Arrow::PREV][0].height();
+		int16_t track = length - 2 * button;
+		bool enabled = get_scrollrange() >= 2;
+
+		if (track > 0)
+			(enabled ? scrollbase : scrollbase_disabled).draw(DrawArgument(bar + Point<int16_t>(0, button),
+																		   Point<int16_t>(0, track)));
 
 		for (auto arrow : { Arrow::PREV, Arrow::NEXT })
 		{
-			Point<int16_t> pos = position + get_arrow_pos(arrow);
+			Point<int16_t> pos = bar + Point<int16_t>(0, arrow == Arrow::PREV ? 0 : length - button);
 
-			if (can_scroll[arrow])
-				arrows[arrow][arrow_state[arrow]].draw(pos);
+			if (enabled)
+				arrows[arrow][arrow_pressed[arrow] ? 1 : 0].draw(pos);
 			else
 				arrows_disabled[arrow].draw(pos);
 		}
+
+		if (std::optional<int16_t> offset = get_thumb_offset(thumb[0].height()))
+			thumb[thumb_dragging ? 1 : 0].draw(bar + Point<int16_t>(0, *offset));
 
 		UIElement::draw_buttons(inter);
 	}
@@ -332,31 +340,100 @@ namespace ms
 		if (UIStatusBar::CHAT_STRIP.contains(pos))
 			return true;
 
-		return chatopen && Rectangle<int16_t>(0, STRIP_WIDTH + 15, get_logtop(), 0).contains(pos);
+		int16_t logtop = get_logtop();
+		Point<int16_t> bar = get_scrollbar_pos();
+
+		return Rectangle<int16_t>(0, LOG_WIDTH, logtop, logtop + get_logheight()).contains(pos) ||
+			   Rectangle<int16_t>(bar, bar + Point<int16_t>(arrows[Arrow::PREV][0].width(),
+															 get_scrollbar_length())).contains(pos);
 	}
 
 	Cursor::State UIChatBar::send_cursor(bool clicking, Point<int16_t> cursorpos)
 	{
-		if (chatfieldopen)
-			if (Cursor::State new_state = chatfield.send_cursor(cursorpos, clicking))
-				return new_state;
+		bool pressed = clicking && !scrollbar_pressed;
+		scrollbar_pressed = clicking;
 
-		for (auto arrow : { Arrow::PREV, Arrow::NEXT })
+		if (thumb_dragging)
 		{
-			if (get_arrow_bounds(arrow).contains(cursorpos))
+			if (clicking)
 			{
-				if (clicking && arrow_state[arrow] != 2)
-					scroll(arrow == Arrow::PREV ? -1 : 1);
+				int16_t button = arrows[Arrow::PREV][0].height();
+				int16_t travel = get_scrollbar_length() - 3 * button;
 
-				arrow_state[arrow] = clicking ? 2 : 1;
+				if (travel > 0)
+					set_scrollpos(drag_pos + get_scrollrange() * (cursorpos.y() - drag_y) / travel);
 
-				return clicking ? Cursor::State::CLICKING : Cursor::State::CANCLICK;
+				return Cursor::State::VSCROLLIDLE;
 			}
 
-			arrow_state[arrow] = 0;
+			thumb_dragging = false;
 		}
 
-		return UIElement::send_cursor(clicking, cursorpos);
+		if (chatfieldopen)
+		{
+			if (Cursor::State new_state = chatfield.send_cursor(cursorpos, clicking))
+				return new_state;
+		} else if (chatopen && pressed && CHATFIELD.contains(cursorpos - position))
+		{
+			// The expanded log keeps the input field, so a click there starts
+			// typing.
+			toggle_chatfield(true);
+
+			return Cursor::State::CLICKING;
+		}
+
+		Point<int16_t> bar = position + get_scrollbar_pos();
+		Point<int16_t> rel = cursorpos - bar;
+		int16_t width = arrows[Arrow::PREV][0].width();
+		int16_t length = get_scrollbar_length();
+		int16_t button = arrows[Arrow::PREV][0].height();
+
+		arrow_pressed[Arrow::PREV] = false;
+		arrow_pressed[Arrow::NEXT] = false;
+
+		if (rel.x() < 0 || rel.x() >= width || rel.y() < 0 || rel.y() >= length)
+			return UIElement::send_cursor(clicking, cursorpos);
+
+		if (get_scrollrange() < 2)
+			return Cursor::State::IDLE;
+
+		if (rel.y() < button)
+		{
+			arrow_pressed[Arrow::PREV] = clicking;
+
+			if (pressed)
+				scroll(-1);
+		} else if (rel.y() >= length - button)
+		{
+			arrow_pressed[Arrow::NEXT] = clicking;
+
+			if (pressed)
+				scroll(1);
+		} else if (pressed)
+		{
+			// Clicking the track either side of the thumb pages through the
+			// log, at least sixteen lines at a time.
+			int16_t page = std::max<int16_t>(16, get_scrollrange() / 16);
+			// The original only counts an arrow's height of the thumb.
+			int16_t thumbtop = get_thumb_offset(button).value_or(button);
+
+			if (rel.y() < thumbtop)
+			{
+				set_scrollpos(get_scrollpos() - page);
+			} else if (rel.y() > thumbtop + button)
+			{
+				set_scrollpos(get_scrollpos() + page);
+			} else
+			{
+				thumb_dragging = true;
+				drag_y = cursorpos.y();
+				drag_pos = get_scrollpos();
+
+				return Cursor::State::VSCROLLIDLE;
+			}
+		}
+
+		return clicking ? Cursor::State::CLICKING : Cursor::State::CANCLICK;
 	}
 
 	void UIChatBar::send_scroll(double yoffset)
@@ -369,8 +446,10 @@ namespace ms
 	{
 		UIElement::remove_cursor();
 
-		arrow_state[Arrow::PREV] = 0;
-		arrow_state[Arrow::NEXT] = 0;
+		arrow_pressed[Arrow::PREV] = false;
+		arrow_pressed[Arrow::NEXT] = false;
+		scrollbar_pressed = false;
+		thumb_dragging = false;
 	}
 
 	UIElement::Type UIChatBar::get_type() const
@@ -408,6 +487,9 @@ namespace ms
 			case LineType::PINK:
 				color = Color::Name::MONALISA;
 				break;
+			case LineType::SKILL:
+				color = Color::Name::SUNDOWN;
+				break;
 			default:
 				color = Color::Name::WHITE;
 				break;
@@ -428,7 +510,8 @@ namespace ms
 		std::string message = Messages::messages[line];
 		send_chatline(message, type);
 
-		message_cooldowns[line] = MESSAGE_COOLDOWN;
+		bool cost = line == Messages::SKILL_HPCOST || line == Messages::SKILL_MPCOST;
+		message_cooldowns[line] = cost ? COST_MESSAGE_COOLDOWN : MESSAGE_COOLDOWN;
 	}
 
 	void UIChatBar::toggle_chat()
@@ -439,6 +522,9 @@ namespace ms
 	void UIChatBar::toggle_chat(bool chat_open)
 	{
 		chatopen = chat_open;
+		// As in the original, changing how the log shows returns it to the
+		// latest line.
+		rowpos = rowmax;
 
 		buttons[Buttons::BT_OPENCHAT]->set_active(!chatopen);
 		buttons[Buttons::BT_CLOSECHAT]->set_active(chatopen);
@@ -454,6 +540,10 @@ namespace ms
 	void UIChatBar::toggle_chatfield(bool chatfield_open)
 	{
 		chatfieldopen = chatfield_open;
+
+		// The collapsed log moves above the strip while typing.
+		if (!chatopen)
+			rowpos = rowmax;
 
 		if (chatfieldopen)
 		{
@@ -555,30 +645,71 @@ namespace ms
 
 	void UIChatBar::scroll(int16_t rows)
 	{
-		int16_t lowest = std::min<int16_t>(CHATROWS - 1, rowmax);
-
-		rowpos = std::max<int16_t>(lowest, std::min<int16_t>(rowmax, rowpos + rows));
+		set_scrollpos(get_scrollpos() + rows);
 	}
 
+	int16_t UIChatBar::get_logrows() const
+	{
+		return chatopen ? CHATROWS : 1;
+	}
+
+	int16_t UIChatBar::get_logheight() const
+	{
+		return chatopen ? LOG_HEIGHT : LINE_LOG_HEIGHT;
+	}
+
+	// The original lays the chat out in a window 22 pixels below the top of
+	// the screen, which puts the status bar 507 below that window's top. Its
+	// log sits five pixels above where its mode says.
 	int16_t UIChatBar::get_logtop() const
 	{
-		return 1 - CHATROWHEIGHT * CHATROWS;
-	}
-
-	Point<int16_t> UIChatBar::get_arrow_pos(Arrow arrow) const
-	{
-		// The arrows run down the side of the log, or sit in the strip while
-		// the log is collapsed.
 		if (chatopen)
-			return Point<int16_t>(STRIP_WIDTH, arrow == Arrow::PREV ? get_logtop() : 1 - CHATROWHEIGHT);
+			return -3 - LOG_HEIGHT;
 
-		return Point<int16_t>(STRIP_WIDTH, arrow == Arrow::PREV ? 6 : 6 + CHATROWHEIGHT);
+		return chatfieldopen ? -26 : 1;
 	}
 
-	Rectangle<int16_t> UIChatBar::get_arrow_bounds(Arrow arrow) const
+	Point<int16_t> UIChatBar::get_scrollbar_pos() const
 	{
-		Point<int16_t> lt = position + get_arrow_pos(arrow);
+		int16_t x = 566 - arrows[Arrow::PREV][0].width();
 
-		return Rectangle<int16_t>(lt, lt + arrows[arrow][0].get_dimensions());
+		if (chatopen || chatfieldopen)
+			return Point<int16_t>(x, 3 - get_logheight());
+
+		return Point<int16_t>(x, 6);
+	}
+
+	int16_t UIChatBar::get_scrollbar_length() const
+	{
+		return chatopen ? LOG_HEIGHT - 2 : LINE_LOG_HEIGHT + 1;
+	}
+
+	int16_t UIChatBar::get_scrollrange() const
+	{
+		return rowmax + 1 - get_logrows() + 1;
+	}
+
+	int16_t UIChatBar::get_scrollpos() const
+	{
+		return std::max<int16_t>(0, rowpos - get_logrows() + 1);
+	}
+
+	void UIChatBar::set_scrollpos(int16_t pos)
+	{
+		pos = std::max<int16_t>(0, std::min<int16_t>(pos, get_scrollrange() - 1));
+		rowpos = std::min<int16_t>(rowmax, pos + get_logrows() - 1);
+	}
+
+	std::optional<int16_t> UIChatBar::get_thumb_offset(int16_t height) const
+	{
+		int16_t range = get_scrollrange();
+		int16_t button = arrows[Arrow::PREV][0].height();
+		int16_t travel = get_scrollbar_length() - 2 * button - height;
+
+		// The collapsed log's scroll bar is just its two arrows.
+		if (range < 2 || travel < 0)
+			return std::nullopt;
+
+		return button + travel * get_scrollpos() / (range - 1);
 	}
 }
