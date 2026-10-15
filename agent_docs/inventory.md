@@ -75,8 +75,18 @@ stat update. Dead players can't use items.
 HEAL_OVER_TIME (`0x59`) is HeavenClient's natural recovery. As in v83, it
 comes only at rest: after every 10 s spent standing, lying prone or sitting
 without sending movement, the client reports +10 HP / +3 MP if below full.
-The server accepts at most +20 HP and +10 MP per report, one report per 9 s,
-and none within 9 s of the player's last PLAYER_MOVE; others are ignored.
+HP and MP keep separate timers and go out in separate reports, and an HP heal
+shows its amount over the player in blue (`BasicEff.img/NoBlue`). On a
+portable chair, a stat heals the chair's `info/recoveryHP` or `recoveryMP`
+(the Relaxer heals 50 HP), or 1.5 times the natural amount (15 HP, 4 MP) when
+the chair has none. Its timer restarts when it switches between the two,
+as in the v83 (MapleLegends) client.
+
+The server accepts at most +20 HP and +10 MP per report, or the chair's
+recovery values while the player sits on a chair they still own
+(`Player::chair`, set by USE_CHAIR and cleared by CANCEL_CHAIR and map
+changes). It takes HP at most once per 9 s and MP at most once per 9 s, and
+neither within 9 s of the player's last PLAYER_MOVE; anything else is ignored.
 
 ## NPC shops
 

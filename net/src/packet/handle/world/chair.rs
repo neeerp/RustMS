@@ -23,6 +23,7 @@ impl WorldHandler for UseChairHandler {
         if !is_portable_chair(item_id) || ctx.player.inventory.count(item_id) == 0 {
             return Ok(HandlerResult::empty());
         }
+        ctx.player.chair = item_id;
         Ok(HandlerResult::empty().with(WorldAction::Field(FieldRequest::Chair(item_id))))
     }
 }
@@ -32,7 +33,7 @@ impl WorldHandler for UseChairHandler {
 pub struct CancelChairHandler;
 
 impl WorldHandler for CancelChairHandler {
-    fn handle(&self, packet: &mut Packet, _ctx: &mut WorldContext) -> WorldResult {
+    fn handle(&self, packet: &mut Packet, ctx: &mut WorldContext) -> WorldResult {
         let mut reader = Cursor::new(&packet.bytes);
         reader.read_short()?;
         let seat = reader.read_short()?;
@@ -40,6 +41,7 @@ impl WorldHandler for CancelChairHandler {
         if seat != -1 {
             return Ok(HandlerResult::empty());
         }
+        ctx.player.chair = 0;
         Ok(HandlerResult::empty()
             .with(WorldAction::Reply(build_cancel_chair()?))
             .with(WorldAction::Field(FieldRequest::Chair(0))))

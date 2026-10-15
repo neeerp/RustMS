@@ -210,11 +210,27 @@ namespace ms
 	private:
 		// Natural recovery: report a small heal after every 10 seconds spent
 		// standing, lying prone or sitting without moving, while not at full
-		// HP/MP (the server checks it).
+		// HP/MP (the server checks it). HP and MP keep their own timers. A
+		// portable chair heals its recoveryHP/recoveryMP instead, or 1.5 times
+		// the natural amount when it has none.
+		struct Recovery
+		{
+			uint16_t timer = 0;
+			bool from_chair = false;
+
+			// Advance the timer and return the amount due, or 0. Like v83, the
+			// timer restarts when the source switches between chair and natural.
+			int16_t update(int16_t chair_amount, int16_t natural_amount);
+		};
+
 		static constexpr uint16_t RECOVERY_INTERVAL = 10000;
 		static constexpr int16_t RECOVERY_HP = 10;
 		static constexpr int16_t RECOVERY_MP = 3;
-		uint16_t recovery_timer = 0;
+		static constexpr double CHAIR_RECOVERY_RATE = 1.5;
+		Recovery hp_recovery;
+		Recovery mp_recovery;
+		int16_t chair_recovery_hp = 0;
+		int16_t chair_recovery_mp = 0;
 		// Whether the player asked to get off their chair and waits for the server.
 		bool leaving_chair = false;
 
