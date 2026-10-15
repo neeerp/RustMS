@@ -254,7 +254,20 @@ namespace ms
 			switch (ka)
 			{
 				case KeyAction::Id::DOWN:
-					player.set_state(Char::State::STAND);
+					// Getting up with Left or Right held walks on, as in v83.
+					if (player.is_key_down(KeyAction::Id::LEFT))
+					{
+						player.set_direction(false);
+						player.set_state(Char::State::WALK);
+					} else if (player.is_key_down(KeyAction::Id::RIGHT))
+					{
+						player.set_direction(true);
+						player.set_state(Char::State::WALK);
+					} else
+					{
+						player.set_state(Char::State::STAND);
+					}
+
 					break;
 			}
 		}
