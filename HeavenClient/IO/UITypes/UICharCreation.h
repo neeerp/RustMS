@@ -119,10 +119,6 @@ namespace ms
 		Textfield name;
 		Text values[ROW_COUNT];
 
-		Texture world_box;
-		Text world_name;
-		Text channel_name;
-
 		CharLook newchar;
 
 		// MakeCharInfo's choices for each row but gender, by gender.

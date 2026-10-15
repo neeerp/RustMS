@@ -18,14 +18,12 @@
 #include "UIRaceSelect.h"
 #include "UICharCreation.h"
 #include "UICharSelect.h"
-#include "UIWorldSelect.h"
 
 #include "../LoginScene.h"
 #include "../UI.h"
 
 #include "../Components/MapleButton.h"
 
-#include "../../Configuration.h"
 
 #include "../../Audio/Audio.h"
 #include "../../Util/NxFiles.h"
@@ -50,11 +48,6 @@ namespace ms
 		// Login.img/RaceSelect's folder and button for each race.
 		const char *RACE_NODE[3] = { "knight", "normal", "aran" };
 		const char *RACE_BUTTON[3] = { "BtKnight", "BtNormal", "BtAran" };
-
-		// The selected world box, as on the character select.
-		const Point<int16_t> WORLD_BOX_POS = Point<int16_t>(0, 95);
-		const Point<int16_t> WORLD_NAME_POS = Point<int16_t>(100, 103);
-		const Point<int16_t> CHANNEL_NAME_POS = Point<int16_t>(100, 118);
 	}
 
 	UIRaceSelect::UIRaceSelect() : UIElement(Point<int16_t>(0, 0), Point<int16_t>(800, 600)), selected(Race::EXPLORER)
@@ -80,19 +73,6 @@ namespace ms
 		buttons[Buttons::BT_BACK] = std::make_unique<MapleButton>(login["Common"]["BtStart"], Point<int16_t>(0, 433));
 
 		buttons[Buttons::BT_VIEWALLCHAR]->set_state(Button::State::DISABLED);
-
-		world_box = login["Common"]["selectWorld"];
-
-		std::string world;
-		uint8_t world_id = Configuration::get().get_worldid();
-		uint8_t channel_id = Configuration::get().get_channelid();
-
-		if (auto worldselect = UI::get().get_element<UIWorldSelect>())
-			world = worldselect->get_world_name(world_id);
-
-		world_name = Text(Text::Font::A11M, Text::Alignment::CENTER, Color::Name::GALLERY, world);
-		channel_name = Text(Text::Font::A11M, Text::Alignment::CENTER, Color::Name::GALLERY,
-			"CH." + std::to_string(channel_id + 1));
 	}
 
 	void UIRaceSelect::draw(float inter) const
@@ -105,11 +85,6 @@ namespace ms
 		// The picked race is drawn in colour over its button, which keeps
 		// the name plate under it.
 		race_on[selected].draw(position + RACE_POS[selected]);
-
-		// The selected world box sits over the Cygnus Knights.
-		world_box.draw(position + WORLD_BOX_POS);
-		world_name.draw(position + WORLD_NAME_POS);
-		channel_name.draw(position + CHANNEL_NAME_POS);
 	}
 
 	void UIRaceSelect::send_key(int32_t keycode, bool pressed, bool escape)

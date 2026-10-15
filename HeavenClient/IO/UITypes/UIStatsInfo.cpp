@@ -17,14 +17,11 @@
 //////////////////////////////////////////////////////////////////////////////////
 #include "UIStatsInfo.h"
 
-#include "UINotice.h"
-
 #include "../UI.h"
 
 #include "../Components/MapleButton.h"
 
 #include "../../Character/ExpTable.h"
-#include "../../Gameplay/Stage.h"
 #include "../../Net/Packets/PlayerPackets.h"
 #include "../../Util/NxFiles.h"
 
@@ -41,7 +38,6 @@ namespace ms
 		constexpr int16_t DETAIL_WIDTH = 177, DETAIL_HEIGHT = 203;
 
 		const Point<int16_t> CLOSE = { 156, 6 };
-		const Point<int16_t> AUTO = { 97, 197 };
 		const Point<int16_t> DETAIL_BUTTON = { 124, 324 };
 		const Point<int16_t> HIDE = { 155, 182 };
 
@@ -84,7 +80,6 @@ namespace ms
 		buttons[Buttons::BT_DEX] = std::make_unique<MapleButton>(apup, Point<int16_t>(APUP_X, ROW_DEX + 3));
 		buttons[Buttons::BT_INT] = std::make_unique<MapleButton>(apup, Point<int16_t>(APUP_X, ROW_INT + 3));
 		buttons[Buttons::BT_LUK] = std::make_unique<MapleButton>(apup, Point<int16_t>(APUP_X, ROW_LUK + 3));
-		buttons[Buttons::BT_AUTO] = std::make_unique<MapleButton>(Stat["BtAuto"], AUTO);
 		buttons[Buttons::BT_DETAIL] = std::make_unique<MapleButton>(Stat["BtDetail"], DETAIL_BUTTON);
 		buttons[Buttons::BT_HIDE] = std::make_unique<MapleButton>(NxFiles::ui_classic["Basic.img"]["BtHide"],
 																  DETAIL + HIDE);
@@ -222,8 +217,6 @@ namespace ms
 
 	Button::State UIStatsInfo::button_pressed(uint16_t id)
 	{
-		const Player &player = Stage::get().get_player();
-
 		switch (id)
 		{
 			case Buttons::BT_CLOSE:
@@ -246,64 +239,6 @@ namespace ms
 				break;
 			case Buttons::BT_LUK:
 				send_apup(MapleStat::Id::LUK);
-				break;
-			case Buttons::BT_AUTO:
-			{
-				uint16_t autostr = 0;
-				uint16_t autodex = 0;
-				uint16_t autoint = 0;
-				uint16_t autoluk = 0;
-				uint16_t nowap = stats.get_stat(MapleStat::Id::AP);
-				EquipStat::Id id = player.get_stats().get_job().get_primary(player.get_weapontype());
-
-				switch (id)
-				{
-					case EquipStat::Id::STR:
-						autostr = nowap;
-						break;
-					case EquipStat::Id::DEX:
-						autodex = nowap;
-						break;
-					case EquipStat::Id::INT:
-						autoint = nowap;
-						break;
-					case EquipStat::Id::LUK:
-						autoluk = nowap;
-						break;
-				}
-
-				std::string message =
-						"Your AP will be distributed as follows:\\r"
-						"\\nSTR : +" + std::to_string(autostr) +
-						"\\nDEX : +" + std::to_string(autodex) +
-						"\\nINT : +" + std::to_string(autoint) +
-						"\\nLUK : +" + std::to_string(autoluk) +
-						"\\r\\n";
-
-				std::function<void(bool)> yesnohandler = [&, autostr, autodex, autoint, autoluk](bool yes)
-				{
-					if (yes)
-					{
-						if (autostr > 0)
-							for (size_t i = 0; i < autostr; i++)
-								send_apup(MapleStat::Id::STR);
-
-						if (autodex > 0)
-							for (size_t i = 0; i < autodex; i++)
-								send_apup(MapleStat::Id::DEX);
-
-						if (autoint > 0)
-							for (size_t i = 0; i < autoint; i++)
-								send_apup(MapleStat::Id::INT);
-
-						if (autoluk > 0)
-							for (size_t i = 0; i < autoluk; i++)
-								send_apup(MapleStat::Id::LUK);
-					}
-				};
-
-				UI::get().emplace<UIYesNo>(message, yesnohandler, Text::Alignment::LEFT);
-			}
 				break;
 			case Buttons::BT_DETAIL:
 				set_detail(true);
@@ -342,7 +277,7 @@ namespace ms
 		bool hasap = stats.get_stat(MapleStat::Id::AP) > 0;
 		Button::State state = hasap ? Button::State::NORMAL : Button::State::DISABLED;
 
-		for (int i = Buttons::BT_HP; i <= Buttons::BT_AUTO; i++)
+		for (int i = Buttons::BT_HP; i <= Buttons::BT_LUK; i++)
 			buttons[i]->set_state(state);
 
 		// Beginners can't put AP into HP or MP.

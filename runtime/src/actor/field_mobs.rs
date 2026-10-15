@@ -35,6 +35,7 @@ pub struct LiveMob {
     pub y: i16,
     pub stance: u8,
     pub foothold: i16,
+    pub home_foothold: i16,
     pub hp: i64,
     pub controller: Option<ClientId>,
     /// Until when the controller's client is chasing its player with it.
@@ -52,6 +53,7 @@ impl LiveMob {
             y: self.y,
             stance: self.stance,
             foothold: self.foothold,
+            home_foothold: self.home_foothold,
             fade_in,
             controlled: self.controller.is_some(),
         }
@@ -137,6 +139,7 @@ impl MobSet {
                     // Mob stances are 2 (moving) or 5 (standing), +1 facing left.
                     stance: if spawn.template.flip { 4 } else { 5 },
                     foothold: spawn.template.foothold,
+                    home_foothold: spawn.template.foothold,
                     hp: i64::from(spawn.info.max_hp),
                     controller: None,
                     aggro_until: None,
@@ -409,13 +412,18 @@ mod tests {
             (150, -25)
         );
         // Walking onto another platform: an absolute fragment with
-        // foothold 52; airborne fragments (foothold 0) keep the last one.
+        // foothold 52, which a relative one keeps.
         let walk = [
             2, 0, 0x96, 0, 0x2D, 0, 0, 0, 0, 0, 52, 0, 2, 100, 0, //
-            0, 0x96, 0, 0x30, 0, 0, 0, 0, 0, 0, 0, 2, 100, 0,
+            1, 0x0A, 0, 0, 0, 2, 100, 0,
         ];
         assert!(mobs.move_mob(1, snail, &walk));
-        assert_eq!(mobs.get(snail).unwrap().view(false).foothold, 52);
+        let view = mobs.get(snail).unwrap().view(false);
+        assert_eq!((view.foothold, view.home_foothold), (52, 45));
+        // An absolute fragment without a foothold leaves it airborne.
+        let fall = [1, 0, 0x96, 0, 0x30, 0, 0, 0, 0, 0, 0, 0, 2, 100, 0];
+        assert!(mobs.move_mob(1, snail, &fall));
+        assert_eq!(mobs.get(snail).unwrap().view(false).foothold, 0);
 
         assert_eq!(mobs.damage(1, snail, 3, now), Some(Ok(63)));
         let Some(Err(kill)) = mobs.damage(2, snail, 10, now) else {

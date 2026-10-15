@@ -9,7 +9,10 @@ pub struct MobView {
     pub x: i16,
     pub y: i16,
     pub stance: u8,
+    /// The foothold the mob stands on, 0 if airborne. v83 puts the mob on it.
     pub foothold: i16,
+    /// The spawn point's foothold.
+    pub home_foothold: i16,
     /// Fade in (a fresh spawn) rather than just appear.
     pub fade_in: bool,
     pub controlled: bool,
@@ -25,8 +28,8 @@ fn write_mob(p: &mut Packet, mob: &MobView) -> Result<(), NetworkError> {
     p.write_short(mob.x)?;
     p.write_short(mob.y)?;
     p.write_byte(mob.stance)?;
-    p.write_short(0)?; // origin foothold
     p.write_short(mob.foothold)?;
+    p.write_short(mob.home_foothold)?;
     p.write_byte(if mob.fade_in { -2i8 as u8 } else { -1i8 as u8 })?;
     p.write_byte(-1i8 as u8)?; // team
     p.write_int(0)?; // item effect
@@ -158,6 +161,7 @@ mod tests {
             y: -25,
             stance: 5,
             foothold: 45,
+            home_foothold: 44,
             fade_in: true,
             controlled: false,
         }
@@ -170,7 +174,7 @@ mod tests {
         expect.short(SendOpcode::SpawnMonster as i16);
         expect.int(2_000_000_001).byte(5).int(100100);
         expect.bytes(&[0; 16]);
-        expect.short(147).short(-25).byte(5).short(0).short(45);
+        expect.short(147).short(-25).byte(5).short(45).short(44);
         expect.byte(-2i8 as u8).byte(-1i8 as u8).int(0);
         expect.end();
     }
