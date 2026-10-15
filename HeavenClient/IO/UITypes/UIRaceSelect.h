@@ -76,8 +76,5 @@ namespace ms
 		Texture title;
 		Texture race_on[RACE_COUNT];
 		Texture race_text[RACE_COUNT];
-		Texture world_box;
-		Text world_name;
-		Text channel_name;
 	};
 }

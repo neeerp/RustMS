@@ -20,14 +20,12 @@
 #include "UICharSelect.h"
 #include "UILoginNotice.h"
 #include "UIRaceSelect.h"
-#include "UIWorldSelect.h"
 
 #include "../LoginScene.h"
 #include "../UI.h"
 
 #include "../Components/MapleButton.h"
 
-#include "../../Configuration.h"
 #include "../../Constants.h"
 
 #include "../../Audio/Audio.h"
@@ -106,11 +104,6 @@ namespace ms
 		// narrower font to fit between the arrows.
 		const int16_t VALUE_WIDTH = 112;
 
-		// The selected world box, as on the character and race select.
-		const Point<int16_t> WORLD_BOX_POS = Point<int16_t>(0, 95);
-		const Point<int16_t> WORLD_NAME_POS = Point<int16_t>(100, 103);
-		const Point<int16_t> CHANNEL_NAME_POS = Point<int16_t>(100, 118);
-
 		const char *GENDER_NAME[2] = { "Male", "Female" };
 
 		std::string to_lower(std::string value)
@@ -167,19 +160,6 @@ namespace ms
 			}
 		);
 
-		world_box = login["Common"]["selectWorld"];
-
-		std::string world;
-		uint8_t world_id = Configuration::get().get_worldid();
-		uint8_t channel_id = Configuration::get().get_channelid();
-
-		if (auto worldselect = UI::get().get_element<UIWorldSelect>())
-			world = worldselect->get_world_name(world_id);
-
-		world_name = Text(Text::Font::A11M, Text::Alignment::CENTER, Color::Name::GALLERY, world);
-		channel_name = Text(Text::Font::A11M, Text::Alignment::CENTER, Color::Name::GALLERY,
-			"CH." + std::to_string(channel_id + 1));
-
 		nl::node info = nl::nx::etc["MakeCharInfo.img"];
 
 		if (race == Race::EXPLORER)
@@ -230,10 +210,6 @@ namespace ms
 		UIElement::draw(inter);
 
 		newchar.draw(position + CHAR_POS, inter);
-
-		world_box.draw(position + WORLD_BOX_POS);
-		world_name.draw(position + WORLD_NAME_POS);
-		channel_name.draw(position + CHANNEL_NAME_POS);
 	}
 
 	void UICharCreation::update()

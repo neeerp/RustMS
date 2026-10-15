@@ -218,10 +218,20 @@ from `UI.nx`. Moved so far:
   `Obj/login.img`. `UIStateLogin` loads the scene and draws it, then the book
   frame (`Login.img/Common/frame`) and the version, under the login windows.
   Each classic window calls `LoginScene::move_to` with its step. The first
-  call cuts straight to that step; later calls scroll the camera there. A
-  step with a new sign (`Login.img/Common/step`: 1 world, 2 character, 3
-  creation) slides it in from the left edge to rest at (0, 31), as the
-  original does.
+  call cuts straight to that step. Later calls follow v83
+  `CLogin::ChangeStep` (0x564909): the camera flies from the old step's stop
+  to the new one in 300 ms per step plus 500 ms, on a Hermite curve that
+  leaves at 3.5 times the distance per flight and arrives at rest, so it
+  overshoots by about 1% before it settles. The old step's sign fades out in
+  place over 300 ms. The step's windows stay hidden until the camera arrives
+  (`UIStateLogin` skips drawing, updating, and input for them), since v83
+  creates them only then. On arrival, the step's sign (`Login.img/Common/step`:
+  1 world, 2 character, 3 race select and creation) slides in from x -149 to
+  rest at (0, 33) over 300 ms. From the character select on, the world box
+  (`Common/selectWorld`) slides in to (0, 96) over 400 ms with the world and
+  channel names on it. It stays up through creation and fades out on the
+  way back to the world select or title. Once a sign or the box is in place,
+  its `Common/shadow` fades in under it over a second.
 - **Title** (`UILogin`, `Login.img/Title`): the ID and password fields and
   the buttons sit on the planks of the scene's signboard. The labels are part
   of the signboard art, and v83 places everything else in code, so the
@@ -251,8 +261,8 @@ from `UI.nx`. Moved so far:
   always used. The `pageL` and `pageR` arrows appear when the account has
   more than three slots. Tab toggles a focus hand (`keyFocused`) on the
   Start, Create, and Delete signs. Up and Down move the hand, Left and Right
-  move between characters, Enter starts, and Escape goes back. The selected
-  world and channel show in `Common/selectWorld`. Positions are checked
+  move between characters, Enter starts, and Escape goes back. It gives the
+  login scene the world and channel names for the world box. Positions are checked
   against footage from v55 and v1.0.
 - **Race select** (`UIRaceSelect`, `Login.img/RaceSelect`): Cygnus Knights
   (`knight`), Explorers (`normal`), and Aran stand under the `textGL` banner.

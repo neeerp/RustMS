@@ -58,10 +58,6 @@ namespace ms
 		const Point<int16_t> PAGE_LEFT_POS = Point<int16_t>(150, 318);
 		const Point<int16_t> PAGE_RIGHT_POS = Point<int16_t>(605, 318);
 
-		const Point<int16_t> WORLD_BOX_POS = Point<int16_t>(0, 95);
-		const Point<int16_t> WORLD_NAME_POS = Point<int16_t>(100, 103);
-		const Point<int16_t> CHANNEL_NAME_POS = Point<int16_t>(100, 118);
-
 		// The bottom centre of the balloon under the step sign.
 		const Point<int16_t> BALLOON_POS = Point<int16_t>(380, 78);
 
@@ -182,8 +178,6 @@ namespace ms
 		page_right.hovered = charselect["pageR"]["1"]["0"];
 		page_right.position = PAGE_RIGHT_POS;
 
-		world_box = login["Common"]["selectWorld"];
-
 		std::string world;
 		uint8_t world_id = Configuration::get().get_worldid();
 		uint8_t channel_id = Configuration::get().get_channelid();
@@ -191,9 +185,7 @@ namespace ms
 		if (auto worldselect = UI::get().get_element<UIWorldSelect>())
 			world = worldselect->get_world_name(world_id);
 
-		world_name = Text(Text::Font::A11M, Text::Alignment::CENTER, Color::Name::GALLERY, world);
-		channel_name = Text(Text::Font::A11M, Text::Alignment::CENTER, Color::Name::GALLERY,
-			"CH." + std::to_string(channel_id + 1));
+		LoginScene::get().set_world(world, "CH." + std::to_string(channel_id + 1));
 
 		chatballoon.change_text("Use the Tab key to toggle the menu.");
 
@@ -230,10 +222,6 @@ namespace ms
 
 	void UICharSelect::draw(float alpha) const
 	{
-		world_box.draw(position + WORLD_BOX_POS);
-		world_name.draw(position + WORLD_NAME_POS);
-		channel_name.draw(position + CHANNEL_NAME_POS);
-
 		bool on_page = selected >= 0 && selected / PAGESIZE == page;
 		Point<int16_t> selected_pos = on_page ? position + slot_pos(selected % PAGESIZE) : Point<int16_t>();
 
