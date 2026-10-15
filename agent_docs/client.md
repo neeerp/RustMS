@@ -495,6 +495,12 @@ force-and-friction model (`move_normal`).
   sits 20 px outside the bounds at the sides, 60 px above the top, and 110 px
   below the lowest foothold. The camera centres a range smaller than the
   screen.
+- **Camera follow.** The view aims 50 px above the player's feet. On each
+  axis it stays still while within 28 px of that point. Further off, it
+  closes the gap d at d² / 100 px/s, so a walking player leads the view by
+  about 110 px (v83 sets this up in `FUN_0042935a` as a Shape2D vector with
+  looseness 100). The followed point isn't held inside the view range; only
+  the view is.
 - **Not ported yet:**
   - Mob attacks' own knockback speeds (900 or 1900 px/s, flat).
   - Swimming knockback: impacts remain queued until normal movement resumes;

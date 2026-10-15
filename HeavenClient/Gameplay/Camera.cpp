@@ -21,10 +21,51 @@
 
 namespace ms
 {
+	namespace
+	{
+		// v83 aims the view 50 px above the player's feet.
+		constexpr int16_t LOOK_ABOVE = 50;
+
+		// v83 (Shape2D's loose vector, looseness 100, set up by
+		// FUN_0042935a) leaves the view still while it is within 28 px of
+		// its target on an axis. Further off, it closes the gap d at
+		// d² / 100 px/s: over dt ms, 1/d grows by dt / 100000.
+		double follow(double current, double target)
+		{
+			double gap = target - current;
+			double distance = std::abs(gap);
+
+			if (distance <= 28.0)
+				return current;
+
+			double left = 100000.0 * distance / (Constants::TIMESTEP * distance + 100000.0);
+
+			return gap > 0 ? target - left : target + left;
+		}
+
+		// Keep the view inside the map's range, or centre a range smaller
+		// than the view (v83 FUN_005a768c).
+		double limit(double next, Range<int16_t> bounds, int16_t view)
+		{
+			if (bounds.length() < view)
+				return (bounds.first() + bounds.second() + view) / 2;
+
+			if (next > bounds.first())
+				return bounds.first();
+
+			if (next < bounds.second() + view)
+				return bounds.second() + view;
+
+			return next;
+		}
+	}
+
 	Camera::Camera()
 	{
 		x.set(0.0);
 		y.set(0.0);
+		lookx = 0.0;
+		looky = 0.0;
 
 		VWIDTH = Constants::Constants::get().get_viewwidth();
 		VHEIGHT = Constants::Constants::get().get_viewheight();
@@ -32,59 +73,28 @@ namespace ms
 
 	void Camera::update(Point<int16_t> position)
 	{
-		int32_t new_width = Constants::Constants::get().get_viewwidth();
-		int32_t new_height = Constants::Constants::get().get_viewheight();
+		VWIDTH = Constants::Constants::get().get_viewwidth();
+		VHEIGHT = Constants::Constants::get().get_viewheight();
 
-		if (VWIDTH != new_width || VHEIGHT != new_height)
-		{
-			VWIDTH = new_width;
-			VHEIGHT = new_height;
-		}
+		// The followed point isn't held inside the map's range, so the view
+		// waits at a wall until the player comes back within 28 px of it.
+		lookx = follow(lookx, position.x());
+		looky = follow(looky, position.y() - LOOK_ABOVE);
 
-		double next_x = x.get();
-		double hdelta = VWIDTH / 2 - position.x() - next_x;
-
-		if (std::abs(hdelta) >= 5.0)
-			next_x += hdelta * (12.0 / VWIDTH);
-
-		double next_y = y.get();
-		double vdelta = VHEIGHT / 2 - position.y() - next_y;
-
-		if (std::abs(vdelta) >= 5.0)
-			next_y += vdelta * (12.0 / VHEIGHT);
-
-		// Like v83 (FUN_005a768c), centre a map smaller than the view.
-		if (hbounds.length() < VWIDTH)
-			next_x = (hbounds.first() + hbounds.second() + VWIDTH) / 2;
-		else if (next_x > hbounds.first())
-			next_x = hbounds.first();
-		else if (next_x < hbounds.second() + VWIDTH)
-			next_x = hbounds.second() + VWIDTH;
-
-		if (vbounds.length() < VHEIGHT)
-			next_y = (vbounds.first() + vbounds.second() + VHEIGHT) / 2;
-		else if (next_y > vbounds.first())
-			next_y = vbounds.first();
-		else if (next_y < vbounds.second() + VHEIGHT)
-			next_y = vbounds.second() + VHEIGHT;
-
-		x = next_x;
-		y = next_y;
+		x = limit(VWIDTH / 2 - lookx, hbounds, VWIDTH);
+		y = limit(VHEIGHT / 2 - looky, vbounds, VHEIGHT);
 	}
 
 	void Camera::set_position(Point<int16_t> position)
 	{
-		int32_t new_width = Constants::Constants::get().get_viewwidth();
-		int32_t new_height = Constants::Constants::get().get_viewheight();
+		VWIDTH = Constants::Constants::get().get_viewwidth();
+		VHEIGHT = Constants::Constants::get().get_viewheight();
 
-		if (VWIDTH != new_width || VHEIGHT != new_height)
-		{
-			VWIDTH = new_width;
-			VHEIGHT = new_height;
-		}
+		lookx = position.x();
+		looky = position.y() - LOOK_ABOVE;
 
-		x.set(VWIDTH / 2 - position.x());
-		y.set(VHEIGHT / 2 - position.y());
+		x.set(limit(VWIDTH / 2 - lookx, hbounds, VWIDTH));
+		y.set(limit(VHEIGHT / 2 - looky, vbounds, VHEIGHT));
 	}
 
 	void Camera::set_view(Range<int16_t> mapwalls, Range<int16_t> mapborders)

@@ -112,8 +112,8 @@ namespace ms
 		player.respawn(startpos, mapinfo.is_underwater());
 		player.set_recovery_rate(mapinfo.get_recovery());
 		left_ladder = nullptr;
-		camera.set_position(startpos);
 		camera.set_view(mapinfo.get_walls(), mapinfo.get_borders());
+		camera.set_position(startpos);
 	}
 
 	void Stage::draw(float alpha) const
