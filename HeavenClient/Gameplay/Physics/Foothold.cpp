@@ -129,7 +129,8 @@ namespace ms
 
 	bool Foothold::is_blocking(const Range<int16_t> &vertical) const
 	{
-		return is_wall() && m_vertical.overlaps(vertical);
+		// Maps draw walls both ways, so compare top to bottom.
+		return is_wall() && Range<int16_t>(t(), b()).overlaps(vertical);
 	}
 
 	int16_t Foothold::hdelta() const

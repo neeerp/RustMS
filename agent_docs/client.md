@@ -448,6 +448,10 @@ force-and-friction model (`move_normal`).
   (`FootholdTree::can_jump_down`). `Physics::jump_down` hops up at 196 px/s
   and stores the platform in `phobj.fallstart`. Until the player lands
   elsewhere or grabs a rope, `update_fh` skips that platform.
+- **Walls.** A wall linked to the floor's end, or the foothold after it,
+  blocks if it reaches between 1 and 50 px above the feet
+  (`FootholdTree::get_wall`). Maps draw walls both top to bottom and bottom
+  to top, so `Foothold::is_blocking` sorts the ends first.
 - **Not ported yet:**
   - v83 knockback speeds.
   - Swimming and flying.
