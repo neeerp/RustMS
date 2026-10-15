@@ -27,6 +27,7 @@
 #include <cstdint>
 #include <string>
 #include <array>
+#include <vector>
 
 #include <nlnx/node.hpp>
 #include <AL/al.h>
@@ -121,15 +122,14 @@ namespace ms
 
 		static void add_sound(std::string itemid, nl::node src);
 
-		void create_alure_source();
+		static alure::Source free_source();
 
 		static std::string format_id(int32_t itemid);
 
 		static EnumMap<Name, size_t> soundids;
 		static std::unordered_map<std::string, size_t> itemids;
-		alure::Source sound_src;
-		static size_t source_inc;
-		static alure::Source sound_srcs[100];
+		static constexpr size_t MAX_SOURCES = 100;
+		static std::vector<alure::Source> sources;
 		static float gain;
 	};
 

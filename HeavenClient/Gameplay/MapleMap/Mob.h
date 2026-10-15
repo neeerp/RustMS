@@ -103,6 +103,9 @@ namespace ms
 		// Show an effect at the mob's position.
 		void show_effect(const Animation &animation, int8_t pos, int8_t z, bool flip);
 
+		// Show a weapon's hit spark where the attack meets the mob's body.
+		void show_hit(const Animation &animation, const Rectangle<int16_t> &range, bool flip);
+
 		// Calculate the damage to this mob with the specified attack.
 		std::vector<std::pair<int32_t, bool>> calculate_damage(const Attack &attack);
 
