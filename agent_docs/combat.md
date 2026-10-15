@@ -30,6 +30,12 @@ templates from `Mob.nx` (`maxHP`, `exp`, `PADamage`, `bodyAttack`,
   heads for the local player, keeping its direction until it is 100 px past
   them, and gives up after 180 to 240 s. A mob that cannot move turns to
   face the player and forgets them once they leave a 2000 x 1200 box.
+- **Chase animation:** a mob with a `chase` animation plays it instead of
+  `move` while it walks with a target, and sends stance 32 (33 facing left),
+  as v83's FUN_005cc410 does. Its shoe switches to `info/chaseSpeed` when the
+  chase starts. When the chase runs out, v83 does not reset the shoe, so the
+  mob keeps that speed until the next chase or control change. Other clients
+  draw stance 32 with that animation.
 - **First-attack mobs:** a mob with `info/firstAttack` and without
   `notAttack` starts the same chase without being hit once the local player
   comes within |dx| / 10 + |dy| / 3 <= 40 of it (v83's FUN_005ce8c6). Only

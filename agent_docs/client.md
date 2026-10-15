@@ -438,7 +438,8 @@ force-and-friction model (`move_normal`).
   and drag. The drag factor is clamped to 0.05–2 and halved below 1.
 - **Mobs.** A walking mob's shoe (FUN_005c55cd) has walkspeed
   clamp(`info/speed` + 100, 10, 140)/100, or 0 without a `move` animation,
-  and `info/fs` (default 1) as both walkforce and walkdrag. A snail (speed
+  and `info/fs` (default 1) as both walkforce and walkdrag. Chasing, a mob
+  with a `chase` animation walks at `info/chaseSpeed` instead. A snail (speed
   -65, fs 10) reaches 44 px/s in one tick and stops within four. A jump
   takes off at 555 px/s and keeps the walking speed. While a knocked-back mob
   slides (`NOFRICTION`), `Mob` slows it itself. A mob that can also jump
@@ -477,7 +478,6 @@ force-and-friction model (`move_normal`).
 - **Not ported yet:**
   - v83 knockback speeds.
   - Swimming.
-  - A chasing flier's `chaseSpeed`.
 
 ## Cash Shop
 
