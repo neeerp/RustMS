@@ -421,9 +421,9 @@ are registered (`Net/PacketSwitch.cpp`). Anything not listed there is silently i
 ## Movement physics
 
 The player follows v83's CVecCtrl rules (MapleLegends client, decompiled).
-`Player` and walking mobs set `phobj.shoe`, and `Physics::move_shoe` handles
-it. Everything else, including flying mobs, NPCs, pets and drops, keeps
-HeavenClient's older force-and-friction model (`move_normal`).
+`Player` and mobs set `phobj.shoe`, and `Physics::move_shoe` handles it.
+Everything else, including NPCs, pets and drops, keeps HeavenClient's older
+force-and-friction model (`move_normal`).
 
 - **Units.** The constants in `Physics.cpp` come from v83 `Map.wz/Physics.img`
   and are in pixels and seconds. One 8 ms tick is 1/125 s. `hspeed` and
@@ -440,6 +440,15 @@ HeavenClient's older force-and-friction model (`move_normal`).
   slides (`NOFRICTION`), `Mob` slows it itself. A mob that can also jump
   takes off like the player, holding its walking direction. It keeps within
   its foothold groups (`JUMPER`); see `agent_docs/combat.md`.
+- **Flying.** A flier's shoe sets `phobj.flyspeed` to `info/flySpeed` plus
+  100, clamped to 10-140 percent, and the flier is never on the ground. It passes through
+  platforms and walls, and `FootholdTree::limit_flight` keeps it within v83's
+  physical space: the platforms' extent, 30 px in from the sides, 300 px
+  above and 10 px below. It speeds up at 1200 px/s² toward 200 px/s ×
+  flyspeed, and slows at 1000 px/s² when not steering or when faster than
+  that. `phobj.flydir` -1 glides down at 0.3 of its top speed, and 0 dives at
+  1200 px/s². `Physics::fly_jump` beats up at its full top speed. Fliers are
+  drawn on the top layer.
 - **Walking.** On flat ground the player accelerates at 1400 px/s² toward
   125 px/s × walkspeed and brakes at 800 px/s². On a slope the push scales by
   1 ± slant², and a slant over 0.9 slides. Positions advance by the average of
@@ -463,7 +472,8 @@ HeavenClient's older force-and-friction model (`move_normal`).
   to top, so `Foothold::is_blocking` sorts the ends first.
 - **Not ported yet:**
   - v83 knockback speeds.
-  - Swimming and flying.
+  - Swimming.
+  - A chasing flier's `chaseSpeed`.
 
 ## Cash Shop
 
