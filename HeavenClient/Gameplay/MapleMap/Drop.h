@@ -36,8 +36,8 @@ namespace ms
 		Rectangle<int16_t> bounds() const;
 
 	protected:
-		Drop(int32_t oid, int32_t owner, Point<int16_t> start,
-			 Point<int16_t> dest, int8_t type, int8_t mode, bool playerdrop);
+		Drop(int32_t oid, int32_t owner, Point<int16_t> start, Point<int16_t> dest,
+			 int8_t type, int8_t mode, int16_t delay, bool playerdrop, bool spins);
 
 		Linear<float> opacity;
 		Linear<float> angle;
@@ -45,25 +45,35 @@ namespace ms
 	private:
 		enum State
 		{
+			WAITING,
 			DROPPED,
+			FALLING,
 			FLOATING,
 			PICKEDUP,
 			EXPIRING
 		};
 
-		// Start rising toward the looter.
+		// Fly toward the looter's middle.
 		void pick_up();
+		// Move to a position computed for this tick.
+		void move_to(const Physics &physics, double x, double y);
 
 		int32_t owner;
 		int8_t pickuptype;
+		int8_t mode;
 		bool playerdrop;
+		bool spins;
 
 		const PhysicsObject *looter;
 		State state;
 
+		Point<int16_t> start;
 		Point<int16_t> dest;
-		double basey;
-		double moved;
-		uint16_t pickupticks;
+		// Milliseconds spent in the current state.
+		int32_t elapsed;
+		int32_t delay;
+		int32_t flighttime;
+		double phase;
+		Point<int16_t> pickupstart;
 	};
 }
