@@ -61,6 +61,15 @@ namespace ms
 		}
 	}
 
+	// CVecCtrl's ground drag factor: the shoe's walkDrag clamped to
+	// Physics.img's minFriction and maxFriction, halved when below 1.
+	double ground_drag(double walkdrag)
+	{
+		double drag = std::clamp(walkdrag, 0.05, 2.0);
+
+		return drag < 1.0 ? drag * 0.5 : drag;
+	}
+
 	// Slows an object faster than +-limit back towards it.
 	void decelerate(double &speed, double limit, double drag)
 	{
@@ -141,7 +150,11 @@ namespace ms
 		double hstart = hspeed;
 		double vstart = vspeed;
 
-		if (phobj.onground)
+		if (phobj.onground && phobj.is_flag_set(PhysicsObject::Flag::NOFRICTION))
+		{
+			// The owner slows a knocked-back object itself.
+			vspeed = 0.0;
+		} else if (phobj.onground)
 		{
 			// CVecCtrl's walking (FUN_007f21d2) works on the speed along the
 			// foothold, with uy the foothold's downward slant.
@@ -150,28 +163,30 @@ namespace ms
 			double slant = std::abs(uy);
 			double speed = hspeed / ux;
 			double limit = WALKSPEED * phobj.walkspeed;
+			double acc = WALKACC * phobj.walkforce;
+			double drag = WALKDRAG * ground_drag(phobj.walkdrag);
 
 			if (slant == 0.0)
 			{
-				decelerate(speed, limit, WALKDRAG);
+				decelerate(speed, limit, drag);
 
 				if (dir == 0)
-					decelerate(speed, 0.0, WALKDRAG);
+					decelerate(speed, 0.0, drag);
 				else
-					accelerate(speed, dir * WALKACC, limit);
+					accelerate(speed, dir * acc, limit);
 			} else
 			{
 				int8_t uphill = uy >= 0.0 ? -1 : 1;
 				double steep = slant * slant;
-				double force = dir * WALKACC * (uphill < 0 ? 1.0 + steep : 1.0 - steep);
+				double force = dir * acc * (uphill < 0 ? 1.0 + steep : 1.0 - steep);
 				double downhill = (1.0 + steep) * limit;
 
-				decelerate(speed, uphill * speed > 0.0 ? limit : downhill, WALKDRAG);
+				decelerate(speed, uphill * speed > 0.0 ? limit : downhill, drag);
 
 				if (slant <= WALKSLANT)
 				{
 					if (dir == 0)
-						decelerate(speed, 0.0, WALKDRAG);
+						decelerate(speed, 0.0, drag);
 					else
 						accelerate(speed, force, uphill * force > 0.0 ? limit : downhill);
 				} else
@@ -190,7 +205,7 @@ namespace ms
 					}
 
 					if (uphill * speed > 0.0)
-						decelerate(speed, 0.0, WALKDRAG);
+						decelerate(speed, 0.0, drag);
 
 					accelerate(speed, slip, sliplimit);
 				}

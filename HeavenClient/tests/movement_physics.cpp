@@ -74,7 +74,7 @@ ms::PhysicsObject grounded_shoe(const ms::Physics& physics)
 	return player;
 }
 
-// HeavenClient's own model, which mobs, NPCs and pets still use.
+// HeavenClient's own model, which flying mobs, NPCs and pets still use.
 void legacy_jumps_keep_momentum(const ms::Physics& physics)
 {
 	for (double direction : {-1.0, 1.0})
@@ -153,6 +153,42 @@ void walking(const ms::Physics& physics)
 		}
 		require(std::abs(player.hspeed * TICKS_PER_SECOND - direction * 175.0) < 1e-9, "140% speed did not walk at 175 px/s");
 	}
+}
+
+// A snail (info/speed -65, info/fs 10) walks at 35% of 125 px/s. Its fs
+// multiplies the shoe's acceleration and drag tenfold, so it starts and
+// stops almost at once.
+void mob_walking(const ms::Physics& physics)
+{
+	for (int8_t direction : {-1, 1})
+	{
+		ms::PhysicsObject snail = grounded_shoe(physics);
+		snail.walkspeed = 0.35;
+		snail.walkforce = 10.0;
+		snail.walkdrag = 10.0;
+		snail.walkdir = direction;
+		physics.move_object(snail);
+		require(std::abs(snail.hspeed * TICKS_PER_SECOND - direction * 43.75) < 1e-9, "a snail took more than a tick to reach top speed");
+
+		int ticks = 0;
+		while (snail.hspeed != 0.0)
+		{
+			physics.move_object(snail);
+			require(++ticks <= 4, "a snail slid further than v83");
+		}
+		require(ticks == 4, "a snail stopped sooner than v83");
+	}
+
+	// fs below 1 is clamped to 0.05 and halves the drag, but not the push.
+	ms::PhysicsObject slippery = grounded_shoe(physics);
+	slippery.walkforce = 0.5;
+	slippery.walkdrag = 0.5;
+	slippery.walkdir = 1;
+	physics.move_object(slippery);
+	require(std::abs(slippery.hspeed * TICKS_PER_SECOND - 700.0 * 0.008) < 1e-9, "fs 0.5 did not halve the push");
+	double speed = slippery.hspeed;
+	physics.move_object(slippery);
+	require(std::abs((speed - slippery.hspeed) * TICKS_PER_SECOND - 200.0 * 0.008) < 1e-9, "fs 0.5 did not quarter the drag");
 }
 
 // A standing jump rises 555^2 / (2 * 2000) = 77 px and lands after 0.555 s.
@@ -281,15 +317,16 @@ int main()
 			ms::Physics physics(map.root());
 			legacy_jumps_keep_momentum(physics);
 			walking(physics);
+			mob_walking(physics);
 			standing_jump(physics);
 			running_jump(physics);
 			falling(physics);
 			jumping_down(physics);
 			// A knocked back mob sets its own ground speed; friction must not
 			// eat into it, even below the usual stopping threshold.
-			ms::PhysicsObject mob;
-			mob.set_x(0); mob.set_y(100);
-			physics.move_object(mob);
+			ms::PhysicsObject mob = grounded_shoe(physics);
+			mob.walkforce = 10.0;
+			mob.walkdrag = 10.0;
 			mob.set_flag(ms::PhysicsObject::Flag::NOFRICTION);
 			for (double speed : {1.04, 0.05})
 			{
@@ -309,6 +346,8 @@ int main()
 			{
 				double direction = start > 0.0 ? 1.0 : -1.0;
 				ms::PhysicsObject mob;
+				mob.shoe = true;
+				mob.walkspeed = 0.35;
 				mob.set_x(start); mob.set_y(100);
 				mob.set_flag(ms::PhysicsObject::Flag::TURNATEDGES);
 				mob.set_flag(ms::PhysicsObject::Flag::WALKONLY);
@@ -317,7 +356,7 @@ int main()
 				for (int tick = 0; mob.is_flag_set(ms::PhysicsObject::Flag::TURNATEDGES); ++tick)
 				{
 					require(tick < 1000, "walker never reached the edge");
-					mob.hforce = direction * .1;
+					mob.walkdir = direction;
 					physics.move_object(mob);
 				}
 				require(mob.crnt_x() == direction * 980 && mob.onground, "walker did not stop 20 px from the edge");

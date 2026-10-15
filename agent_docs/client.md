@@ -421,16 +421,23 @@ are registered (`Net/PacketSwitch.cpp`). Anything not listed there is silently i
 ## Movement physics
 
 The player follows v83's CVecCtrl rules (MapleLegends client, decompiled).
-`Player` sets `phobj.shoe`, and `Physics::move_shoe` handles it. Everything
-else, including mobs, NPCs, pets and drops, keeps HeavenClient's older
-force-and-friction model (`move_normal`).
+`Player` and walking mobs set `phobj.shoe`, and `Physics::move_shoe` handles
+it. Everything else, including flying mobs, NPCs, pets and drops, keeps
+HeavenClient's older force-and-friction model (`move_normal`).
 
 - **Units.** The constants in `Physics.cpp` come from v83 `Map.wz/Physics.img`
   and are in pixels and seconds. One 8 ms tick is 1/125 s. `hspeed` and
   `vspeed` are still stored per tick.
 - **Steering.** Player states set `phobj.walkdir` (-1, 0 or 1) each tick
   instead of pushing with `hforce`. `phobj.walkspeed` is the shoe's speed
-  multiplier.
+  multiplier, and `walkforce` and `walkdrag` scale its ground acceleration
+  and drag. The drag factor is clamped to 0.05–2 and halved below 1.
+- **Mobs.** A walking mob's shoe (FUN_005c55cd) has walkspeed
+  clamp(`info/speed` + 100, 10, 140)/100, or 0 without a `move` animation,
+  and `info/fs` (default 1) as both walkforce and walkdrag. A snail (speed
+  -65, fs 10) reaches 44 px/s in one tick and stops within four. A jump
+  takes off at 555 px/s and keeps the walking speed. While a knocked-back mob
+  slides (`NOFRICTION`), `Mob` slows it itself.
 - **Walking.** On flat ground the player accelerates at 1400 px/s² toward
   125 px/s × walkspeed and brakes at 800 px/s². On a slope the push scales by
   1 ± slant², and a slant over 0.9 slides. Positions advance by the average of

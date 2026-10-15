@@ -80,14 +80,22 @@ namespace ms
 		hitsound = sndsrc["Damage"];
 		diesound = sndsrc["Die"];
 
-		speed += 100;
-		speed *= 0.001f;
-
 		flyspeed += 100;
 		flyspeed *= 0.0005f;
 
 		if (canfly)
+		{
 			phobj.type = PhysicsObject::Type::FLYING;
+		} else
+		{
+			// v83 mobs walk on a CAttrShoe (FUN_005c55cd): its speed is
+			// info/speed + 100 clamped to 10-140 percent, and info/fs scales
+			// both its acceleration and its drag.
+			phobj.shoe = true;
+			phobj.walkspeed = canmove ? std::clamp(speed + 100.0f, 10.0f, 140.0f) * 0.01 : 0.0;
+			phobj.walkforce = info["fs"].get_real(1.0);
+			phobj.walkdrag = phobj.walkforce;
+		}
 
 		id = mid;
 		team = tm;
@@ -246,7 +254,7 @@ namespace ms
 						}
 					} else
 					{
-						phobj.hforce = flip ? speed : -speed;
+						phobj.walkdir = flip ? 1 : -1;
 					}
 
 					break;
@@ -271,7 +279,9 @@ namespace ms
 
 					break;
 				case Stance::JUMP:
-					phobj.vforce = -5.0;
+					if (phobj.onground)
+						phobj.vforce = -Physics::jump_speed(1.0);
+
 					break;
 			}
 
