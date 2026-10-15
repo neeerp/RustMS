@@ -1,4 +1,5 @@
 #include "../Gameplay/Physics/Physics.h"
+#include "../Gameplay/MapleMap/MapInfo.h"
 #include <algorithm>
 #include <nlnx/file.hpp>
 #include <chrono>
@@ -108,6 +109,94 @@ std::filesystem::path flat_map(const std::vector<int64_t>& floors)
 
 // One v83 tick is 8 ms, so 1 pixel per tick is 125 pixels per second.
 const double TICKS_PER_SECOND = 125.0;
+
+// A map's info node, separate from its footholds, with numeric properties.
+std::filesystem::path map_info(std::vector<std::pair<std::string, int64_t>> properties)
+{
+	std::sort(properties.begin(), properties.end());
+	std::vector<std::string> names {"", "info"};
+	for (const auto& property : properties) names.push_back(property.first);
+	size_t nodes = 2 + properties.size();
+	size_t strings = 64 + nodes * 20;
+	std::vector<uint8_t> bytes(strings + names.size() * 8);
+	auto put = [&](size_t offset, uint64_t value, size_t count)
+	{
+		for (size_t i = 0; i < count; ++i) bytes[offset + i] = value >> (8 * i);
+	};
+	auto node = [&](size_t id, size_t name, size_t first, size_t count, int type, int64_t value)
+	{
+		size_t offset = 64 + id * 20;
+		put(offset, name, 4); put(offset + 4, first, 4); put(offset + 8, count, 2);
+		put(offset + 10, type, 2); put(offset + 12, value, 8);
+	};
+	put(0, 0x34474b50, 4); put(4, nodes, 4); put(8, 64, 8);
+	put(16, names.size(), 4); put(20, strings, 8);
+	node(0, 0, 1, 1, 0, 0); node(1, 1, 2, properties.size(), 0, 0);
+	for (size_t i = 0; i < properties.size(); ++i) node(2 + i, 2 + i, 0, 0, 1, properties[i].second);
+	for (size_t i = 0; i < names.size(); ++i)
+	{
+		put(strings + i * 8, bytes.size(), 8);
+		bytes.push_back(names[i].size()); bytes.push_back(0);
+		bytes.insert(bytes.end(), names[i].begin(), names[i].end());
+	}
+	auto path = std::filesystem::temp_directory_path() /
+		("rustms-map-info-" + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()) + ".nx");
+	std::ofstream file(path, std::ios::binary);
+	file.write(reinterpret_cast<const char*>(bytes.data()), bytes.size());
+	require(bool(file), "could not write map-info fixture");
+	return path;
+}
+
+// v83 uses zero as "no restriction" for movement, but as an actual camera edge.
+void view_limits(nl::node footholds)
+{
+	for (bool zero : {false, true})
+	{
+		std::vector<std::pair<std::string, int64_t>> values {{"VRLimit", 1}};
+		if (zero)
+			for (const char* key : {"VRLeft", "VRRight", "VRTop", "VRBottom"}) values.emplace_back(key, 0);
+		auto path = map_info(values);
+		{
+			nl::file info(path.string());
+			ms::Physics physics(footholds, info.root()["info"]);
+			auto walls = physics.get_fht().get_walls();
+			auto borders = physics.get_fht().get_borders();
+			require(walls.first() == -1970 && walls.second() == 1970 && borders.first() == -200,
+				"zero or missing movement edges narrowed the physical bounds");
+			ms::MapInfo view(info.root(), walls, borders);
+			require(view.get_walls().first() == (zero ? 0 : -1990) && view.get_walls().second() == (zero ? 0 : 1990),
+				"zero camera edges were treated as missing");
+			require(view.get_borders().first() == (zero ? 0 : -260) && view.get_borders().second() == (zero ? 0 : 1410),
+				"vertical camera edges used the wrong fallback");
+			ms::PhysicsObject flier;
+			flier.set_y(2000);
+			physics.get_fht().limit_flight(flier);
+			require(flier.crnt_y() == 1309, "a zero VRBottom narrowed the flying space");
+		}
+		std::filesystem::remove(path);
+	}
+	for (bool limit : {false, true})
+	{
+		auto path = map_info({{"VRLimit", limit}, {"VRLeft", -500}, {"VRRight", 600}, {"VRTop", -100}, {"VRBottom", 900}});
+		{
+			nl::file info(path.string());
+			ms::Physics physics(footholds, info.root()["info"]);
+			auto walls = physics.get_fht().get_walls();
+			auto borders = physics.get_fht().get_borders();
+			require(walls.first() == (limit ? -480 : -1970) && walls.second() == (limit ? 580 : 1970) &&
+				borders.first() == (limit ? -35 : -200), "nonzero movement edges ignored VRLimit");
+			ms::MapInfo view(info.root(), walls, borders);
+			require(view.get_walls().first() == -500 && view.get_walls().second() == 600 &&
+				view.get_borders().first() == -100 && view.get_borders().second() == 900,
+				"camera edges incorrectly depended on VRLimit");
+			ms::PhysicsObject flier;
+			flier.set_y(2000);
+			physics.get_fht().limit_flight(flier);
+			require(flier.crnt_y() == (limit ? 899 : 1309), "nonzero VRBottom did not limit the flying space");
+		}
+		std::filesystem::remove(path);
+	}
+}
 
 ms::PhysicsObject grounded_shoe(const ms::Physics& physics)
 {
@@ -610,6 +699,10 @@ int main()
 		{
 			nl::file map(path.string());
 			ms::Physics physics(map.root());
+			view_limits(map.root());
+			// v83 keeps objects 30 px inside the outermost footholds.
+			auto walls = physics.get_fht().get_walls();
+			require(walls.first() == -1970 && walls.second() == 1970, "map walls are not 30 px inside the footholds");
 			legacy_jumps_keep_momentum(physics);
 			walking(physics);
 			mob_walking(physics);

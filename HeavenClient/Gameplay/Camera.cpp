@@ -53,12 +53,17 @@ namespace ms
 		if (std::abs(vdelta) >= 5.0)
 			next_y += vdelta * (12.0 / VHEIGHT);
 
-		if (next_x > hbounds.first() || hbounds.length() < VWIDTH)
+		// Like v83 (FUN_005a768c), centre a map smaller than the view.
+		if (hbounds.length() < VWIDTH)
+			next_x = (hbounds.first() + hbounds.second() + VWIDTH) / 2;
+		else if (next_x > hbounds.first())
 			next_x = hbounds.first();
 		else if (next_x < hbounds.second() + VWIDTH)
 			next_x = hbounds.second() + VWIDTH;
 
-		if (next_y > vbounds.first() || vbounds.length() < VHEIGHT)
+		if (vbounds.length() < VHEIGHT)
+			next_y = (vbounds.first() + vbounds.second() + VHEIGHT) / 2;
+		else if (next_y > vbounds.first())
 			next_y = vbounds.first();
 		else if (next_y < vbounds.second() + VHEIGHT)
 			next_y = vbounds.second() + VHEIGHT;

@@ -483,6 +483,18 @@ force-and-friction model (`move_normal`).
   blocks if it reaches between 1 and 50 px above the feet
   (`FootholdTree::get_wall`). Maps draw walls both top to bottom and bottom
   to top, so `Foothold::is_blocking` sorts the ends first.
+- **Map bounds.** `FootholdTree` keeps objects 30 px inside the outermost
+  footholds and at most 300 px above the highest. A map with `info/VRLimit`
+  pulls those in to its `VRLeft + 20`, `VRRight - 20` and `VRTop + 65`,
+  skipping missing or zero edges as v83 does. A flying mob's lower bound
+  is also limited by a nonzero `VRBottom`.
+  v83 never stops a fall; HeavenClient stops it 100 px below the lowest
+  foothold.
+- **View range.** `MapInfo` reads each `VR*` edge on its own; zero is a real
+  camera edge. A missing edge
+  sits 20 px outside the bounds at the sides, 60 px above the top, and 110 px
+  below the lowest foothold. The camera centres a range smaller than the
+  screen.
 - **Not ported yet:**
   - Mob attacks' own knockback speeds (900 or 1900 px/s, flat).
   - Swimming knockback: impacts remain queued until normal movement resumes;

@@ -13,7 +13,8 @@ if(HEAVENCLIENT_BUILD_TESTS)
     add_executable(input_focus_tests tests/input_focus.cpp)
     add_test(NAME input_focus COMMAND input_focus_tests)
     add_executable(movement_physics_tests tests/movement_physics.cpp
-        Gameplay/Physics/Physics.cpp Gameplay/Physics/Foothold.cpp Gameplay/Physics/FootholdTree.cpp)
+        Gameplay/Physics/Physics.cpp Gameplay/Physics/Foothold.cpp Gameplay/Physics/FootholdTree.cpp
+        Gameplay/MapleMap/MapInfo.cpp)
     target_include_directories(movement_physics_tests PRIVATE ${PROJECT_SOURCE_DIR}/libs/NoLifeNx)
     target_link_libraries(movement_physics_tests PRIVATE
         ${PROJECT_SOURCE_DIR}/libs/NoLifeNx/nlnx/build/libNoLifeNx.a

@@ -101,9 +101,9 @@ namespace ms
 	const double FLYFRICTION = 0.05;
 	const double SWIMFRICTION = 0.08;
 
-	Physics::Physics(nl::node src)
+	Physics::Physics(nl::node src, nl::node info)
 	{
-		fht = src;
+		fht = FootholdTree(src, info);
 	}
 
 	Physics::Physics()
