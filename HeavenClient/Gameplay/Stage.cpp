@@ -111,8 +111,8 @@ namespace ms
 		Point<int16_t> startpos = physics.get_y_below(spawnpoint);
 		player.respawn(startpos, mapinfo.is_underwater());
 		left_ladder = nullptr;
-		camera.set_position(startpos);
 		camera.set_view(mapinfo.get_walls(), mapinfo.get_borders());
+		camera.set_position(startpos);
 	}
 
 	void Stage::draw(float alpha) const
