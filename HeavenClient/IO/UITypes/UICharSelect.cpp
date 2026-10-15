@@ -76,8 +76,17 @@ namespace ms
 		constexpr int16_t JOB_RANK_ROW = 133;
 		constexpr int16_t CHARINFO_WIDTH = 178;
 
-		// The name tag hangs just under the feet.
-		constexpr int16_t NAMETAG_Y = 2;
+		// The name tag's top edge is level with the feet and its centre sits
+		// a little right of them. It fits the name with 9 px to spare on
+		// each side, and is never narrower than 58 px. Its middle piece
+		// repeats every 9 px from the left edge; the end pieces go on top.
+		constexpr int16_t NAMETAG_X = 6;
+		constexpr int16_t NAMETAG_MIN_NAME = 40;
+		constexpr int16_t NAMETAG_PADDING = 18;
+		constexpr int16_t NAMETAG_RIGHT = 10;
+		// v83 draws the name 2 px below the tag's top; our text sits 4 px
+		// lower than the original's for the same position, as in the table.
+		constexpr int16_t NAMETAG_TEXT_Y = 2 - 4;
 
 		Point<int16_t> slot_pos(int16_t slot)
 		{
@@ -192,7 +201,7 @@ namespace ms
 		for (auto &entry : characters)
 		{
 			charlooks.emplace_back(entry.look);
-			names.emplace_back(Text::Font::A12M, Text::Alignment::CENTER, Color::Name::WHITE, entry.stats.name);
+			names.emplace_back(Text::Font::A12M, Text::Alignment::LEFT, Color::Name::DUSTYGRAY, entry.stats.name);
 		}
 
 		page_count = std::max<int16_t>(1, (std::max<int32_t>(slots, characters_count) + PAGESIZE - 1) / PAGESIZE);
@@ -224,6 +233,18 @@ namespace ms
 	{
 		bool on_page = selected >= 0 && selected / PAGESIZE == page;
 		Point<int16_t> selected_pos = on_page ? position + slot_pos(selected % PAGESIZE) : Point<int16_t>();
+
+		// The signposts stand behind the stats scroll.
+		for (int16_t i = 0; i < PAGESIZE; i++)
+		{
+			int16_t index = page * PAGESIZE + i;
+
+			if (index >= characters_count)
+				break;
+
+			uint16_t job = characters[index].stats.stats[MapleStat::Id::JOB];
+			signposts[job_set(job)].draw(position + slot_pos(i));
+		}
 
 		if (on_page && !beam_done)
 			beam.draw(selected_pos + BEAM_OFFSET, alpha);
@@ -298,21 +319,21 @@ namespace ms
 				break;
 
 			Point<int16_t> feet = position + slot_pos(i);
-			uint16_t job = characters[index].stats.stats[MapleStat::Id::JOB];
 
-			signposts[job_set(job)].draw(feet);
 			charlooks[index].draw(DrawArgument(feet, false), alpha);
 
-			bool chosen = index == selected;
-			const Texture *tag = nametags[chosen];
+			const Texture *tag = nametags[index == selected];
 			const Text &name = names[index];
-			int16_t width = name.width();
-			Point<int16_t> left = feet + Point<int16_t>(-width / 2 - tag[0].width(), NAMETAG_Y);
+			int16_t width = std::max(name.width(), NAMETAG_MIN_NAME) + NAMETAG_PADDING;
+			Point<int16_t> left = feet + Point<int16_t>(NAMETAG_X - width / 2, 0);
+			int16_t step = tag[1].width();
+
+			for (int16_t x = 0; step > 0 && x < width - NAMETAG_RIGHT; x += step)
+				tag[1].draw(left + Point<int16_t>(x, 0));
 
 			tag[0].draw(left);
-			tag[1].draw(DrawArgument(left + Point<int16_t>(tag[0].width(), 0), Point<int16_t>(width, 0)));
-			tag[2].draw(left + Point<int16_t>(tag[0].width() + width, 0));
-			name.draw(feet + Point<int16_t>(0, NAMETAG_Y + 2));
+			tag[2].draw(left + Point<int16_t>(width - NAMETAG_RIGHT, 0));
+			name.draw(left + Point<int16_t>((width - name.width()) / 2 - 1, NAMETAG_TEXT_Y));
 		}
 
 		if (on_page && !sparkle_done)
@@ -519,7 +540,7 @@ namespace ms
 	void UICharSelect::add_character(CharEntry &&character)
 	{
 		charlooks.emplace_back(character.look);
-		names.emplace_back(Text::Font::A12M, Text::Alignment::CENTER, Color::Name::WHITE, character.stats.name);
+		names.emplace_back(Text::Font::A12M, Text::Alignment::LEFT, Color::Name::DUSTYGRAY, character.stats.name);
 		characters.emplace_back(std::forward<CharEntry>(character));
 
 		characters_count++;
@@ -630,6 +651,9 @@ namespace ms
 
 		selected = index;
 		page = index / PAGESIZE;
+
+		for (size_t i = 0; i < names.size(); i++)
+			names[i].change_color(i == static_cast<size_t>(index) ? Color::Name::WHITE : Color::Name::DUSTYGRAY);
 
 		Sound(Sound::Name::CHARSELECT).play();
 

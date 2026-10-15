@@ -258,10 +258,14 @@ from `UI.nx`. Moved so far:
 - **Character select** (`UICharSelect`, `Login.img/CharSelect`): up to three
   characters stand on the scene's rope bridge, 125 pixels apart. Each one
   stands under a signpost for its job family (`adventure`, `knight`, or
-  `aran`) and has a `nameTag`, which turns black when the character is
-  picked. Picking a character plays the light from above (`effect/1`) and
-  the sparkle (`effect/0`), and the character walks in place. It also
-  unrolls `scroll/0` over the character, showing the `charInfo` table with
+  `aran`), which the stats scroll covers. The v83 client lays out each
+  `nameTag` (0x571ba9, 0x5732f8): its top is level with the feet, its centre
+  6 px right of them, and it is the name's width plus 18 px, at least 58 px.
+  The name is grey (`#999999`) on tag `0` and white on the picked
+  character's tag `1`. Picking a character plays the light from above
+  (`effect/1`) and the sparkle (`effect/0`), and the character walks in
+  place. It also unrolls `scroll/0` over the character, showing the
+  `charInfo` table with
   job, level, fame, stats, and world ranking. `charInfo1` and `scroll/2` add
   the job ranking, but RustMS sends no rankings, so the short scroll is
   always used. The `pageL` and `pageR` arrows appear when the account has
