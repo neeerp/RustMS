@@ -39,6 +39,10 @@ namespace ms
 		Drop(int32_t oid, int32_t owner, Point<int16_t> start,
 			 Point<int16_t> dest, int8_t type, int8_t mode, bool playerdrop);
 
+		// Where to draw an icon so it is centred on the drop, as the original
+		// centres a drop's layer on its position.
+		static Point<int16_t> centred(Point<int16_t> position, Point<int16_t> origin, Point<int16_t> dimensions);
+
 		Linear<float> opacity;
 		Linear<float> angle;
 
