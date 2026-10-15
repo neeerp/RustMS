@@ -29,7 +29,7 @@ namespace ms
 	{
 	public:
 		MesoDrop(int32_t oid, int32_t owner, Point<int16_t> start, Point<int16_t> dest, int8_t type, int8_t mode,
-				 bool playerdrop, const Animation &icon);
+				 int16_t delay, bool playerdrop, const Animation &icon);
 
 		void draw(double viewx, double viewy, float alpha) const override;
 

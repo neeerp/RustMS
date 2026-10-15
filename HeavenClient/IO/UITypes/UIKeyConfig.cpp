@@ -79,8 +79,11 @@ namespace ms
 					f[code] = { x, y, width, label < 0 ? code : label };
 				};
 
-				for (int16_t i = 0; i < 12; i++)
+				for (int16_t i = 0; i < 10; i++)
 					key(KeyConfig::Key::F1 + i, F_KEYS[i], R0);
+
+				key(KeyConfig::Key::F11, F_KEYS[10], R0);
+				key(KeyConfig::Key::F12, F_KEYS[11], R0);
 
 				key(KeyConfig::Key::GRAVE_ACCENT, 15, R1);
 
@@ -201,7 +204,6 @@ namespace ms
 			{ KeyConfig::Key::F6, { KeyType::Id::FACE, KeyAction::Id::FACE6 } },
 			{ KeyConfig::Key::F7, { KeyType::Id::FACE, KeyAction::Id::FACE7 } },
 			{ KeyConfig::Key::LEFT_ALT, { KeyType::Id::ACTION, KeyAction::Id::JUMP } },
-			{ KeyConfig::Key::RIGHT_ALT, { KeyType::Id::ACTION, KeyAction::Id::JUMP } },
 			{ KeyConfig::Key::E, { KeyType::Id::MENU, KeyAction::Id::EQUIPMENT } },
 			{ KeyConfig::Key::I, { KeyType::Id::MENU, KeyAction::Id::ITEMS } },
 			{ KeyConfig::Key::S, { KeyType::Id::MENU, KeyAction::Id::STATS } },
@@ -585,7 +587,6 @@ namespace ms
 					continue;
 
 				mappings.erase(key);
-				mappings.erase(KeyConfig::twin_of(key));
 
 				return true;
 			}
@@ -604,6 +605,8 @@ namespace ms
 		if (key == KeyConfig::Key::LENGTH)
 			return;
 
+		key = KeyConfig::fold(key);
+
 		Keyboard::Mapping prior_staged = get_staged_mapping(key);
 
 		if (prior_staged == mapping)
@@ -615,9 +618,6 @@ namespace ms
 		unbind(staged_mappings, mapping);
 
 		staged_mappings[key] = mapping;
-
-		if (int32_t twin = KeyConfig::twin_of(key); twin >= 0)
-			staged_mappings[twin] = mapping;
 
 		if (mapping.type == KeyType::Id::ITEM)
 		{
@@ -797,7 +797,7 @@ namespace ms
 
 	Keyboard::Mapping UIKeyConfig::get_staged_mapping(int32_t keycode) const
 	{
-		auto iter = staged_mappings.find(keycode);
+		auto iter = staged_mappings.find(KeyConfig::fold(keycode));
 
 		if (iter == staged_mappings.end())
 			return {};

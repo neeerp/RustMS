@@ -191,7 +191,9 @@ namespace ms
 		{
 			NOGRAVITY = 0x0001,
 			TURNATEDGES = 0x0002,
-			CHECKBELOW = 0x0004
+			CHECKBELOW = 0x0004,
+			// The owner sets hspeed itself; ground friction leaves it alone.
+			NOFRICTION = 0x0008
 		};
 
 		Type type = Type::NORMAL;

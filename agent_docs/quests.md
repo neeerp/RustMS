@@ -136,7 +136,10 @@ holds still while the bulb inside glows.
 
 The **Quest Helper** (`IO/UITypes/UIQuestHelper.cpp`) is the v83
 `UIWindow.img/QuestAlarm` from `UIClassic.nx`, laid out from period footage.
-It sits flush with the top-right corner, even with nothing tracked, and
+It sits flush with the top-right corner, below any party HP bars, even with
+nothing tracked, until it is dragged by its top 25 pixels (not its buttons),
+as the original's window base allows. From then on it stays where it was
+put, which is saved as `PosQUESTHELPER`. It
 lists up to five tracked quests with what each still needs ("Snail 3/10").
 As in the original's font choice (`FUN_00704c2c`), the count you have is red
 under a third of the way, pink under two thirds, orange until done, then

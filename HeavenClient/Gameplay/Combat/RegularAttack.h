@@ -23,6 +23,9 @@
 #include "SkillAction.h"
 #include "SkillBullet.h"
 
+#include <string>
+#include <unordered_map>
+
 namespace ms
 {
 	class RegularAttack : public SpecialMove
@@ -48,7 +51,12 @@ namespace ms
 							 uint16_t bullets) const override;
 
 	private:
+		// The Afterimage/hit.img set for a hit, or nullptr when the weapon
+		// has none.
+		const Animation *get_spark(const AttackUser &user) const;
+
 		RegularAction action;
 		RegularBullet bullet;
+		mutable std::unordered_map<std::string, Animation> sparks;
 	};
 }

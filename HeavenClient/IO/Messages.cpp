@@ -26,12 +26,12 @@ namespace ms
 	const EnumMap<Messages::Type, const char *> Messages::messages =
 			{
 					"",
-					"You cannot use this skill with this weapon.",
-					"You do not have enough hp to use this skill.",
-					"You do not have enough mp to use this skill.",
-					"You do not have enough arrows to use this attack.",
-					"You do not have enough bullets to use this attack.",
-					"You do not have enough throwing stars to use this attack.",
+					"You cannot use this skill with the weapon you're equipped with.",
+					"You don't have enough HP to use this skill.",
+					"You don't have enough MP to use this skill.",
+					"You have used up all of your arrows.",
+					"You do not have enough bullets to use this skill",
+					"You do not have enough throwing stars to use this skill.",
 					"You cannot use this skill as it is on cooldown.",
 					"The scroll lights up and it's mysterious powers have been transferred to the item.",
 					"The scroll lights up but the item remains as if nothing happened.",
@@ -49,7 +49,7 @@ namespace ms
 			return;
 
 		if (auto chatbar = UI::get().get_element<UIChatBar>())
-			chatbar->display_message(type, UIChatBar::RED);
+			chatbar->display_message(type, UIChatBar::SKILL);
 	}
 
 

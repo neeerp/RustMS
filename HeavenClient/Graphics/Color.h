@@ -107,6 +107,7 @@ namespace ms
 			PARTYPINK,
 			MONALISA,
 			CORNFLOWERBLUE,
+			SUNDOWN,
 			NUM_COLORS
 		};
 
@@ -163,7 +164,8 @@ namespace ms
 						{0.84f, 0.43f, 0.59f}, // Charm (#D76E96, the v83 Cash Shop's selected inventory tab, from footage)
 						{1.00f, 0.60f, 0.80f}, // Party pink (#FF99CC, party chat; not yet checked against footage)
 						{1.00f, 0.63f, 0.58f}, // Mona Lisa (#FFA194, Monster Book lines in the chat log, from footage)
-						{0.40f, 0.65f, 0.98f}  // Cornflower blue (#66A5FA, the names of upgraded equips in v83 tooltips, from footage)
+						{0.40f, 0.65f, 0.98f}, // Cornflower blue (#66A5FA, the names of upgraded equips in v83 tooltips, from footage)
+						{1.00f, 0.69f, 0.69f}  // Sundown (#FFAFAF, skill-refusal notices in the chat log, from the v83 client's chat fonts)
 				};
 
 		// Create a color by an array of real numbers [0.0f, 1.0f]

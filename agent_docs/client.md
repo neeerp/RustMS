@@ -74,7 +74,12 @@ from `UI.nx`. Moved so far:
   the shared anchor.
 - **Chat** (`UIChatBar`): the input strip in the bar's top-left and the log
   above it. The status bar cuts that strip out of its background, so the two
-  can overlap in either draw order.
+  can overlap in either draw order. As in the original, the log has three
+  layouts: collapsed, the latest line sits in the strip; collapsed while
+  typing, it moves just above the strip; expanded, five lines sit above the
+  strip and the input field stays shown. Each is a uniform half-black panel
+  with a `Basic.img/VScr5` scroll bar. Its thumb is placed as the original
+  places it, which hit-tests only an arrow's height of it.
 - **NPC dialog** (`UINpcTalk`, `UIWindow.img/UtilDlgEx`): the frame,
   buttons, menu dots, quest list headers, and the `Basic.img/VScr4` scroll
   bar (`Slider::Type::CLASSIC`). See [npc-dialogue.md](npc-dialogue.md).
@@ -506,3 +511,11 @@ These were corrected:
    CONFIRM_SHOP_TRANSACTION handler shows "You do not have enough mesos." and
    "Please check if your inventory is full or not."; codes 0 and 8 need no
    notice.
+10. v83 keeps one binding each for Ctrl, Alt, and Shift: the game reads a
+    key's scan code without the extended bit, so Right Ctrl and Right Alt
+    arrive as the left keys, and it folds Right Shift (54) onto Left Shift
+    (42). Key Config's right-hand faces store under the left keys
+    (`KeyConfig::fold`). The client had given the right-hand keys their own
+    keys at 85 to 87, so Right Ctrl did nothing, and had put F11 and F12 at 69
+    and 70 rather than v83's 87 and 88. The `v83_modifier_and_f_keys`
+    migration drops the old right-hand copies and moves F11 and F12.
