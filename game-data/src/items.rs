@@ -125,7 +125,7 @@ impl ItemData {
             let Some(info) = nx.child_by_name(node, "info")? else {
                 continue;
             };
-            if let Some(mob) = number(nx, info, "mob")? {
+            if let Some(mob) = nx.int_child(info, "mob")? {
                 found.push((card, mob));
             }
         }
@@ -151,21 +151,21 @@ impl ItemData {
             ..ItemInfo::default()
         };
         if let Some(meta) = nx.child_by_name(node, "info")? {
-            if let Some(max) = number(nx, meta, "slotMax")? {
+            if let Some(max) = nx.int_child(meta, "slotMax")? {
                 info.slot_max = i16::try_from(max).unwrap_or(i16::MAX).max(1);
             }
-            info.quest = number(nx, meta, "quest")? == Some(1);
-            info.only = number(nx, meta, "only")? == Some(1);
-            info.trade_block = number(nx, meta, "tradeBlock")? == Some(1);
-            info.price = number(nx, meta, "price")?.unwrap_or(0);
+            info.quest = nx.int_child(meta, "quest")? == Some(1);
+            info.only = nx.int_child(meta, "only")? == Some(1);
+            info.trade_block = nx.int_child(meta, "tradeBlock")? == Some(1);
+            info.price = nx.int_child(meta, "price")?.unwrap_or(0);
             info.unit_price = nx.real_child(meta, "unitPrice")?.unwrap_or(0.0);
         }
         if let Some(spec) = nx.child_by_name(node, "spec")? {
             info.spec = Some(ConsumeSpec {
-                hp: number(nx, spec, "hp")?.unwrap_or(0),
-                mp: number(nx, spec, "mp")?.unwrap_or(0),
-                hp_r: number(nx, spec, "hpR")?.unwrap_or(0),
-                mp_r: number(nx, spec, "mpR")?.unwrap_or(0),
+                hp: nx.int_child(spec, "hp")?.unwrap_or(0),
+                mp: nx.int_child(spec, "mp")?.unwrap_or(0),
+                hp_r: nx.int_child(spec, "hpR")?.unwrap_or(0),
+                mp_r: nx.int_child(spec, "mpR")?.unwrap_or(0),
             });
         }
         Ok(Some(info))
@@ -188,10 +188,12 @@ impl ItemData {
             return Ok(None);
         };
         let stat = |key: &str| -> Result<i16, GameDataError> {
-            Ok(number(nx, meta, key)?.map_or(0, |v| i16::try_from(v).unwrap_or(0)))
+            Ok(nx
+                .int_child(meta, key)?
+                .map_or(0, |v| i16::try_from(v).unwrap_or(0)))
         };
         let equip = EquipInfo {
-            upgrade_slots: u8::try_from(number(nx, meta, "tuc")?.unwrap_or(0)).unwrap_or(0),
+            upgrade_slots: u8::try_from(nx.int_child(meta, "tuc")?.unwrap_or(0)).unwrap_or(0),
             str: stat("incSTR")?,
             dex: stat("incDEX")?,
             int: stat("incINT")?,
@@ -213,30 +215,20 @@ impl ItemData {
             req_dex: stat("reqDEX")?,
             req_int: stat("reqINT")?,
             req_luk: stat("reqLUK")?,
-            cash: number(nx, meta, "cash")? == Some(1),
+            cash: nx.int_child(meta, "cash")? == Some(1),
         };
         Ok(Some(ItemInfo {
             item_id,
             slot_max: 1,
-            quest: number(nx, meta, "quest")? == Some(1),
-            only: number(nx, meta, "only")? == Some(1),
-            trade_block: number(nx, meta, "tradeBlock")? == Some(1),
-            price: number(nx, meta, "price")?.unwrap_or(0),
+            quest: nx.int_child(meta, "quest")? == Some(1),
+            only: nx.int_child(meta, "only")? == Some(1),
+            trade_block: nx.int_child(meta, "tradeBlock")? == Some(1),
+            price: nx.int_child(meta, "price")?.unwrap_or(0),
             unit_price: 0.0,
             spec: None,
             equip: Some(equip),
         }))
     }
-}
-
-/// An integer child, also accepting numbers stored as strings.
-fn number(nx: &NxDataFile, parent: u32, key: &str) -> Result<Option<i32>, GameDataError> {
-    if let Some(value) = nx.int_child(parent, key)? {
-        return Ok(Some(value));
-    }
-    Ok(nx
-        .string_child(parent, key)?
-        .and_then(|s| s.trim().parse().ok()))
 }
 
 fn path_index(nx: &NxDataFile, path: &str) -> Result<Option<u32>, GameDataError> {
