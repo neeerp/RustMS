@@ -83,6 +83,16 @@ namespace ms
 			speed = std::min(speed + drag * TICK, -limit);
 	}
 
+	// CVecCtrl adds an impact to a speed that hasn't reached it yet, but
+	// never past it (FUN_0067db5b, FUN_007f200a).
+	void add_impact(double &speed, double impact)
+	{
+		if (impact < 0.0 && speed > impact)
+			speed = std::max(speed + impact, impact);
+		else if (impact > 0.0 && speed < impact)
+			speed = std::min(speed + impact, impact);
+	}
+
 	const double GRAVFORCE = 0.14;
 	const double SWIMGRAVFORCE = 0.03;
 	const double FRICTION = 0.3;
@@ -153,6 +163,18 @@ namespace ms
 		if (phobj.onground && phobj.vforce < 0.0)
 		{
 			vspeed = phobj.vforce / TICK;
+			phobj.onground = false;
+		}
+
+		// A knockback lifts the object off its platform and leaves it with
+		// whole-pixel speeds (FUN_007f200a).
+		if (phobj.impact)
+		{
+			add_impact(hspeed, phobj.impactx);
+			add_impact(vspeed, phobj.impacty);
+			hspeed = std::trunc(hspeed);
+			vspeed = std::trunc(vspeed);
+			phobj.impact = false;
 			phobj.onground = false;
 		}
 
@@ -348,6 +370,21 @@ namespace ms
 		phobj.onground = false;
 		phobj.hspeed = 0.0;
 		phobj.vspeed = -DOWNJUMPSPEED * TICK;
+	}
+
+	// Knockbacks queued before the next move add up the same way they
+	// add to the speed (CVecCtrl's SetImpactNext, FUN_0067db5b).
+	void Physics::knockback(PhysicsObject &phobj, double vx, double vy)
+	{
+		if (!phobj.impact)
+		{
+			phobj.impact = true;
+			phobj.impactx = 0.0;
+			phobj.impacty = 0.0;
+		}
+
+		add_impact(phobj.impactx, vx);
+		add_impact(phobj.impacty, vy);
 	}
 
 	void Physics::move_normal(PhysicsObject &phobj) const

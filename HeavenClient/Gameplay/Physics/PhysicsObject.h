@@ -231,6 +231,10 @@ namespace ms
 		double walkforce = 1.0;
 		double walkdrag = 1.0;
 		int8_t walkdir = 0;
+		// A knockback queued for the next move, in pixels per second.
+		bool impact = false;
+		double impactx = 0.0;
+		double impacty = 0.0;
 
 		// A shoe with a flyspeed flies through platforms, steered by walkdir
 		// and by flydir: -1 to glide down slowly, 0 to dive.
