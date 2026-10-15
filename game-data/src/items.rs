@@ -21,6 +21,9 @@ pub struct ItemInfo {
     pub price: i32,
     /// What one throwing star or bullet costs to recharge (`unitPrice`).
     pub unit_price: f64,
+    /// What a portable chair heals every 10 seconds (`recoveryHP`/`recoveryMP`).
+    pub recovery_hp: i32,
+    pub recovery_mp: i32,
     /// `spec` of consumable items.
     pub spec: Option<ConsumeSpec>,
     pub equip: Option<EquipInfo>,
@@ -37,7 +40,7 @@ pub struct ConsumeSpec {
 }
 
 /// An equipment template (`Character.nx/<category>/<id>.img/info`).
-#[derive(Clone, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Debug, Default, PartialEq)]
 pub struct EquipInfo {
     pub upgrade_slots: u8,
     pub str: i16,
@@ -64,6 +67,9 @@ pub struct EquipInfo {
     pub req_int: i16,
     pub req_luk: i16,
     pub cash: bool,
+    /// `info/recovery`: how much faster the wearer recovers on a map whose
+    /// own recovery is above 1 (the sauna robes, 1.5).
+    pub recovery: Option<f64>,
 }
 
 /// Top-level `Item.nx` directory for a non-equipment item id.
@@ -125,7 +131,7 @@ impl ItemData {
             let Some(info) = nx.child_by_name(node, "info")? else {
                 continue;
             };
-            if let Some(mob) = number(nx, info, "mob")? {
+            if let Some(mob) = nx.int_child(info, "mob")? {
                 found.push((card, mob));
             }
         }
@@ -151,21 +157,23 @@ impl ItemData {
             ..ItemInfo::default()
         };
         if let Some(meta) = nx.child_by_name(node, "info")? {
-            if let Some(max) = number(nx, meta, "slotMax")? {
+            if let Some(max) = nx.int_child(meta, "slotMax")? {
                 info.slot_max = i16::try_from(max).unwrap_or(i16::MAX).max(1);
             }
-            info.quest = number(nx, meta, "quest")? == Some(1);
-            info.only = number(nx, meta, "only")? == Some(1);
-            info.trade_block = number(nx, meta, "tradeBlock")? == Some(1);
-            info.price = number(nx, meta, "price")?.unwrap_or(0);
+            info.quest = nx.int_child(meta, "quest")? == Some(1);
+            info.only = nx.int_child(meta, "only")? == Some(1);
+            info.trade_block = nx.int_child(meta, "tradeBlock")? == Some(1);
+            info.price = nx.int_child(meta, "price")?.unwrap_or(0);
             info.unit_price = nx.real_child(meta, "unitPrice")?.unwrap_or(0.0);
+            info.recovery_hp = nx.int_child(meta, "recoveryHP")?.unwrap_or(0);
+            info.recovery_mp = nx.int_child(meta, "recoveryMP")?.unwrap_or(0);
         }
         if let Some(spec) = nx.child_by_name(node, "spec")? {
             info.spec = Some(ConsumeSpec {
-                hp: number(nx, spec, "hp")?.unwrap_or(0),
-                mp: number(nx, spec, "mp")?.unwrap_or(0),
-                hp_r: number(nx, spec, "hpR")?.unwrap_or(0),
-                mp_r: number(nx, spec, "mpR")?.unwrap_or(0),
+                hp: nx.int_child(spec, "hp")?.unwrap_or(0),
+                mp: nx.int_child(spec, "mp")?.unwrap_or(0),
+                hp_r: nx.int_child(spec, "hpR")?.unwrap_or(0),
+                mp_r: nx.int_child(spec, "mpR")?.unwrap_or(0),
             });
         }
         Ok(Some(info))
@@ -188,10 +196,12 @@ impl ItemData {
             return Ok(None);
         };
         let stat = |key: &str| -> Result<i16, GameDataError> {
-            Ok(number(nx, meta, key)?.map_or(0, |v| i16::try_from(v).unwrap_or(0)))
+            Ok(nx
+                .int_child(meta, key)?
+                .map_or(0, |v| i16::try_from(v).unwrap_or(0)))
         };
         let equip = EquipInfo {
-            upgrade_slots: u8::try_from(number(nx, meta, "tuc")?.unwrap_or(0)).unwrap_or(0),
+            upgrade_slots: u8::try_from(nx.int_child(meta, "tuc")?.unwrap_or(0)).unwrap_or(0),
             str: stat("incSTR")?,
             dex: stat("incDEX")?,
             int: stat("incINT")?,
@@ -213,30 +223,23 @@ impl ItemData {
             req_dex: stat("reqDEX")?,
             req_int: stat("reqINT")?,
             req_luk: stat("reqLUK")?,
-            cash: number(nx, meta, "cash")? == Some(1),
+            cash: nx.int_child(meta, "cash")? == Some(1),
+            recovery: nx.real_child(meta, "recovery")?,
         };
         Ok(Some(ItemInfo {
             item_id,
             slot_max: 1,
-            quest: number(nx, meta, "quest")? == Some(1),
-            only: number(nx, meta, "only")? == Some(1),
-            trade_block: number(nx, meta, "tradeBlock")? == Some(1),
-            price: number(nx, meta, "price")?.unwrap_or(0),
+            quest: nx.int_child(meta, "quest")? == Some(1),
+            only: nx.int_child(meta, "only")? == Some(1),
+            trade_block: nx.int_child(meta, "tradeBlock")? == Some(1),
+            price: nx.int_child(meta, "price")?.unwrap_or(0),
             unit_price: 0.0,
+            recovery_hp: 0,
+            recovery_mp: 0,
             spec: None,
             equip: Some(equip),
         }))
     }
-}
-
-/// An integer child, also accepting numbers stored as strings.
-fn number(nx: &NxDataFile, parent: u32, key: &str) -> Result<Option<i32>, GameDataError> {
-    if let Some(value) = nx.int_child(parent, key)? {
-        return Ok(Some(value));
-    }
-    Ok(nx
-        .string_child(parent, key)?
-        .and_then(|s| s.trim().parse().ok()))
 }
 
 fn path_index(nx: &NxDataFile, path: &str) -> Result<Option<u32>, GameDataError> {
@@ -281,6 +284,8 @@ mod tests {
             (subi.price, subi.unit_price, subi.slot_max),
             (250, 0.3, 500)
         );
+        let relaxer = data.info(3010000).unwrap().unwrap();
+        assert_eq!((relaxer.recovery_hp, relaxer.recovery_mp), (50, 0));
     }
 
     #[test]
@@ -308,5 +313,8 @@ mod tests {
         assert_eq!(hat.slot_max, 1);
         let sword = data.info(1302000).unwrap().unwrap().equip.unwrap();
         assert!(sword.watk > 0);
+        assert_eq!(sword.recovery, None);
+        let robe = data.info(1050018).unwrap().unwrap().equip.unwrap();
+        assert_eq!(robe.recovery, Some(1.5));
     }
 }

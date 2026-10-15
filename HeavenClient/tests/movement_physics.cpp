@@ -15,14 +15,38 @@ void require(bool condition, const char* message)
 	if (!condition) throw std::runtime_error(message);
 }
 
-// A tiny NX fixture of flat footholds from x -1000 to 1000 at the given
-// heights. It exercises the production collision/physics code without
-// graphics, server processes, or game assets.
-std::filesystem::path flat_map(const std::vector<int64_t>& floors)
+struct TestFoothold
 {
+	int64_t group, id, x1, y1, x2, y2, prev, next;
+};
+
+// A tiny NX fixture holding the given footholds in layer 0. It exercises
+// the production collision/physics code without graphics, server
+// processes, or game assets.
+std::filesystem::path foothold_map(std::vector<TestFoothold> footholds)
+{
+	// nlnx looks children up by name, so siblings are sorted by name.
+	auto sorted = [](const TestFoothold& a, const TestFoothold& b)
+	{
+		return std::make_pair(std::to_string(a.group), std::to_string(a.id)) <
+			std::make_pair(std::to_string(b.group), std::to_string(b.id));
+	};
+	std::sort(footholds.begin(), footholds.end(), sorted);
 	std::vector<std::string> names {"", "0", "next", "prev", "x1", "x2", "y1", "y2"};
-	for (size_t i = 0; i < floors.size(); ++i) names.push_back(std::to_string(i + 1));
-	size_t count = 3 + 7 * floors.size();
+	auto name = [&](const std::string& text)
+	{
+		auto found = std::find(names.begin(), names.end(), text);
+		if (found != names.end()) return static_cast<uint32_t>(found - names.begin());
+		names.push_back(text);
+		return static_cast<uint32_t>(names.size() - 1);
+	};
+	std::vector<int64_t> groups;
+	for (const TestFoothold& fh : footholds)
+	{
+		if (groups.empty() || groups.back() != fh.group) groups.push_back(fh.group);
+		name(std::to_string(fh.group)); name(std::to_string(fh.id));
+	}
+	size_t count = 2 + groups.size() + 7 * footholds.size();
 	size_t strings = 64 + count * 20;
 	std::vector<uint8_t> bytes(strings + names.size() * 8);
 	auto put = [&](size_t offset, uint64_t value, size_t count)
@@ -37,15 +61,23 @@ std::filesystem::path flat_map(const std::vector<int64_t>& floors)
 		put(offset, name, 4); put(offset + 4, children, 4); put(offset + 8, count, 2);
 		put(offset + 10, type, 2); put(offset + 12, data, 8);
 	};
-	node(0, 0, 1, 1, 0, 0); node(1, 1, 2, 1, 0, 0);
-	node(2, 1, 3, floors.size(), 0, 0);
-	for (size_t i = 0; i < floors.size(); ++i)
+	node(0, 0, 1, 1, 0, 0); node(1, 1, 2, groups.size(), 0, 0);
+	size_t first = 2 + groups.size();
+	for (size_t g = 0; g < groups.size(); ++g)
 	{
-		size_t first = 3 + floors.size() + 6 * i;
-		node(3 + i, 8 + i, first, 6, 0, 0);
-		const int64_t width = i + 1 == floors.size() ? 2000 : 1000;
-		const int64_t values[] = {0, 0, -width, width, floors[i], floors[i]};
-		for (size_t j = 0; j < 6; ++j) node(first + j, 2 + j, 0, 0, 1, values[j]);
+		size_t members = std::count_if(footholds.begin(), footholds.end(),
+			[&](const TestFoothold& fh) { return fh.group == groups[g]; });
+		size_t before = std::count_if(footholds.begin(), footholds.end(),
+			[&](const TestFoothold& fh) { return std::to_string(fh.group) < std::to_string(groups[g]); });
+		node(2 + g, name(std::to_string(groups[g])), first + before, members, 0, 0);
+	}
+	for (size_t i = 0; i < footholds.size(); ++i)
+	{
+		const TestFoothold& fh = footholds[i];
+		size_t leaves = first + footholds.size() + 6 * i;
+		node(first + i, name(std::to_string(fh.id)), leaves, 6, 0, 0);
+		const int64_t values[] = {fh.next, fh.prev, fh.x1, fh.x2, fh.y1, fh.y2};
+		for (size_t j = 0; j < 6; ++j) node(leaves + j, 2 + j, 0, 0, 1, values[j]);
 	}
 	for (size_t i = 0; i < names.size(); ++i)
 	{
@@ -57,8 +89,21 @@ std::filesystem::path flat_map(const std::vector<int64_t>& floors)
 		("rustms-movement-" + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()) + ".nx");
 	std::ofstream file(path, std::ios::binary);
 	file.write(reinterpret_cast<const char*>(bytes.data()), bytes.size());
-	require(bool(file), "could not write flat-map fixture");
+	require(bool(file), "could not write foothold fixture");
 	return path;
+}
+
+// Flat footholds from x -1000 to 1000 at the given heights, the last one
+// from -2000 to 2000.
+std::filesystem::path flat_map(const std::vector<int64_t>& floors)
+{
+	std::vector<TestFoothold> footholds;
+	for (size_t i = 0; i < floors.size(); ++i)
+	{
+		const int64_t width = i + 1 == floors.size() ? 2000 : 1000;
+		footholds.push_back({0, static_cast<int64_t>(i + 1), -width, floors[i], width, floors[i], 0, 0});
+	}
+	return foothold_map(footholds);
 }
 
 // One v83 tick is 8 ms, so 1 pixel per tick is 125 pixels per second.
@@ -74,7 +119,7 @@ ms::PhysicsObject grounded_shoe(const ms::Physics& physics)
 	return player;
 }
 
-// HeavenClient's own model, which mobs, NPCs and pets still use.
+// HeavenClient's own model, which flying mobs, NPCs and pets still use.
 void legacy_jumps_keep_momentum(const ms::Physics& physics)
 {
 	for (double direction : {-1.0, 1.0})
@@ -153,6 +198,42 @@ void walking(const ms::Physics& physics)
 		}
 		require(std::abs(player.hspeed * TICKS_PER_SECOND - direction * 175.0) < 1e-9, "140% speed did not walk at 175 px/s");
 	}
+}
+
+// A snail (info/speed -65, info/fs 10) walks at 35% of 125 px/s. Its fs
+// multiplies the shoe's acceleration and drag tenfold, so it starts and
+// stops almost at once.
+void mob_walking(const ms::Physics& physics)
+{
+	for (int8_t direction : {-1, 1})
+	{
+		ms::PhysicsObject snail = grounded_shoe(physics);
+		snail.walkspeed = 0.35;
+		snail.walkforce = 10.0;
+		snail.walkdrag = 10.0;
+		snail.walkdir = direction;
+		physics.move_object(snail);
+		require(std::abs(snail.hspeed * TICKS_PER_SECOND - direction * 43.75) < 1e-9, "a snail took more than a tick to reach top speed");
+
+		int ticks = 0;
+		while (snail.hspeed != 0.0)
+		{
+			physics.move_object(snail);
+			require(++ticks <= 4, "a snail slid further than v83");
+		}
+		require(ticks == 4, "a snail stopped sooner than v83");
+	}
+
+	// fs below 1 is clamped to 0.05 and halves the drag, but not the push.
+	ms::PhysicsObject slippery = grounded_shoe(physics);
+	slippery.walkforce = 0.5;
+	slippery.walkdrag = 0.5;
+	slippery.walkdir = 1;
+	physics.move_object(slippery);
+	require(std::abs(slippery.hspeed * TICKS_PER_SECOND - 700.0 * 0.008) < 1e-9, "fs 0.5 did not halve the push");
+	double speed = slippery.hspeed;
+	physics.move_object(slippery);
+	require(std::abs((speed - slippery.hspeed) * TICKS_PER_SECOND - 200.0 * 0.008) < 1e-9, "fs 0.5 did not quarter the drag");
 }
 
 // A standing jump rises 555^2 / (2 * 2000) = 77 px and lands after 0.555 s.
@@ -311,6 +392,215 @@ void falling(const ms::Physics& physics)
 	require(player.onground && std::abs(fastest * TICKS_PER_SECOND - 670.0) < 1e-9, "a long fall did not reach the v83 fall speed");
 }
 
+// A flying shoe at flySpeed 1 pushes at 1200 px/s^2 up to 200 px/s.
+void flying(const ms::Physics& physics)
+{
+	auto flier = [&](double y)
+	{
+		ms::PhysicsObject mob;
+		mob.shoe = true;
+		mob.flyspeed = 1.0;
+		mob.onground = false;
+		mob.set_x(0); mob.set_y(y);
+		return mob;
+	};
+	auto speed = [](double perTick) { return perTick * TICKS_PER_SECOND; };
+
+	// Steering sideways while gliding: the glide settles on sinking at 60
+	// px/s, picking up at half the push.
+	ms::PhysicsObject mob = flier(-150);
+	mob.walkdir = 1;
+	mob.flydir = -1;
+	physics.move_object(mob);
+	require(std::abs(speed(mob.hspeed) - 9.6) < 1e-9, "a flier did not push at 1200 px/s^2");
+	require(std::abs(speed(mob.vspeed) - 4.8) < 1e-9, "a glide did not pick up at 600 px/s^2");
+	for (int tick = 0; tick < 50; ++tick)
+	{
+		mob.walkdir = 1;
+		physics.move_object(mob);
+	}
+	require(std::abs(speed(mob.hspeed) - 200.0) < 1e-9, "a flier did not top out at its flySpeed");
+	require(std::abs(speed(mob.vspeed) - 60.0) < 1e-9, "a glide did not sink at 0.3 of flySpeed");
+
+	// A glide brakes a faster fall at the full push.
+	mob.vspeed = 100.0 / TICKS_PER_SECOND;
+	physics.move_object(mob);
+	require(std::abs(speed(mob.vspeed) - 90.4) < 1e-9, "a glide did not brake a fall at 1200 px/s^2");
+
+	// Not steering, it slows by floatDrag1 / mass, and twice over while
+	// faster than its flySpeed.
+	mob = flier(-150);
+	mob.flydir = -1;
+	mob.hspeed = 300.0 / TICKS_PER_SECOND;
+	physics.move_object(mob);
+	require(std::abs(speed(mob.hspeed) - 284.0) < 1e-9, "a fast flier did not slow at twice 1000 px/s^2");
+	mob.walkdir = 1;
+	physics.move_object(mob);
+	require(std::abs(speed(mob.hspeed) - 276.0) < 1e-9, "a fast flier steering on did not slow at 1000 px/s^2");
+
+	// Diving speeds up to its flySpeed, through every floor, and stops at
+	// the bottom of the map's physical space, 10 px below its lowest floor.
+	mob = flier(-100);
+	double fastest = 0.0;
+	for (int tick = 0; tick < 1000; ++tick)
+	{
+		physics.move_object(mob);
+		fastest = std::max(fastest, speed(mob.vspeed));
+		require(!mob.onground, "a flier landed");
+	}
+	require(mob.crnt_y() == 1309 && std::abs(fastest - 200.0) < 1e-9, "a dive did not keep on at flySpeed to the map's bottom");
+	require(std::abs(speed(mob.vspeed) - 200.0) < 1e-9, "the map's bottom slowed a flier");
+
+	// The sides of the space are 30 px in from the platforms.
+	mob = flier(-150);
+	mob.set_x(-1960);
+	for (int tick = 0; tick < 20; ++tick)
+	{
+		mob.walkdir = -1;
+		physics.move_object(mob);
+	}
+	require(mob.crnt_x() == -1970, "a flier left the map's side");
+
+	// Its jump beats up at its full flySpeed, keeping its sideways speed.
+	mob = flier(-150);
+	mob.hspeed = 50.0 / TICKS_PER_SECOND;
+	ms::Physics::fly_jump(mob);
+	require(std::abs(speed(mob.vspeed) + 200.0) < 1e-9 && std::abs(speed(mob.hspeed) - 50.0) < 1e-9, "a flier's beat was wrong");
+}
+
+// A 100 px wall stops a walking player whichever way the map draws it:
+// going up along the chain (y1 > y2) or going down (y1 < y2).
+void walls(const ms::Physics& physics)
+{
+	struct Case { double x; int8_t direction; uint16_t fhid; double stop; };
+	for (Case c : {Case {-100, 1, 1, 0}, Case {2100, -1, 6, 2000}})
+	{
+		ms::PhysicsObject player;
+		player.shoe = true;
+		player.set_x(c.x); player.set_y(0);
+		physics.move_object(player);
+		require(player.onground && player.fhid == c.fhid, "wall fixture did not find its floor");
+		for (int tick = 0; tick < 200; ++tick)
+		{
+			player.walkdir = c.direction;
+			physics.move_object(player);
+		}
+		require(player.onground && player.fhid == c.fhid && player.crnt_x() == c.stop, "a player walked through a wall");
+	}
+}
+
+// Group 1 is a floor at y 0 from x -500 to 500, a 100 px wall up at 500
+// and a floor on from there to 800, with a ledge from -300 to -100 at y
+// -150. Group 2 is a separate floor from 1000 to 1400, and group 3 keeps
+// the edges of the map out of the way.
+std::filesystem::path jumper_map()
+{
+	return foothold_map({
+		{3, 7, -2000, 500, -1500, 500, 0, 0},
+		{3, 8, 1500, 500, 2000, 500, 0, 0},
+		{1, 1, -500, 0, 0, 0, 0, 2},
+		{1, 2, 0, 0, 500, 0, 1, 3},
+		{1, 3, 500, 0, 500, -100, 2, 4},
+		{1, 4, 500, -100, 800, -100, 3, 0},
+		{1, 5, -300, -150, -100, -150, 0, 0},
+		{2, 6, 1000, 0, 1400, 0, 0, 0},
+	});
+}
+
+ms::PhysicsObject jumper_at(const ms::Physics& physics, double x, double y, uint16_t homegroup)
+{
+	ms::PhysicsObject mob;
+	mob.shoe = true;
+	mob.set_x(x); mob.set_y(y);
+	mob.set_flag(ms::PhysicsObject::Flag::TURNATEDGES);
+	mob.set_flag(ms::PhysicsObject::Flag::JUMPER);
+	mob.homegroup = homegroup;
+	physics.move_object(mob);
+	require(mob.onground && mob.fhid != 0, "jumper fixture did not find its floor");
+	return mob;
+}
+
+// Walks a jumper until it asks to jump, turns, or leaves the ground.
+void walk_jumper(const ms::Physics& physics, ms::PhysicsObject& mob, int8_t direction)
+{
+	for (int tick = 0; !mob.jumprequest && mob.onground && mob.is_flag_set(ms::PhysicsObject::Flag::TURNATEDGES); ++tick)
+	{
+		require(tick < 1000, "jumper never got anywhere");
+		mob.walkdir = direction;
+		physics.move_object(mob);
+	}
+}
+
+// v83 (FUN_007f8d64) keeps a jumping mob within its groups' reach and has
+// it stop to jump at loose ends and rising walls inside it.
+void jumping_mobs(const ms::Physics& physics)
+{
+	const ms::FootholdTree& fht = physics.get_fht();
+	require(fht.get_group_reach(1).first() == -500 && fht.get_group_reach(1).second() == 800, "group 1 reach was wrong");
+	require(fht.get_group_reach(9).first() > fht.get_group_reach(9).second(), "a missing group reached somewhere");
+	require(fht.get_group_below({-200, -150}) == 1 && fht.get_group_below({1200, -50}) == 2, "the group below was wrong");
+
+	// The reach is shrunk by 20 px a side, and leaving it turns the mob.
+	ms::PhysicsObject mob = jumper_at(physics, -400, 0, 1);
+	walk_jumper(physics, mob, -1);
+	require(mob.crnt_x() == -480 && mob.onground && !mob.jumprequest, "jumper did not turn 20 px inside its reach");
+	mob = jumper_at(physics, 700, -100, 1);
+	walk_jumper(physics, mob, 1);
+	require(mob.crnt_x() == 780 && !mob.jumprequest, "jumper did not turn 20 px inside its reach");
+
+	// Its home group widens the reach, so it gets to the loose end and
+	// stops there to jump.
+	mob = jumper_at(physics, 700, -100, 2);
+	walk_jumper(physics, mob, 1);
+	require(mob.crnt_x() == 800 && mob.onground && mob.jumprequest, "jumper did not stop to jump at a loose end");
+	require(mob.is_flag_set(ms::PhysicsObject::Flag::TURNATEDGES), "jumper turned at a loose end");
+
+	// At a rising wall it stops to jump; told not to, it only stops.
+	for (bool edgejump : {true, false})
+	{
+		mob = jumper_at(physics, 400, 0, 1);
+		mob.edgejump = edgejump;
+		for (int tick = 0; tick < 300; ++tick)
+		{
+			mob.walkdir = 1;
+			physics.move_object(mob);
+			if (mob.jumprequest) break;
+		}
+		require(mob.crnt_x() == 500 && mob.onground && mob.jumprequest == edgejump, "jumper did not stop at the wall");
+		require(mob.is_flag_set(ms::PhysicsObject::Flag::TURNATEDGES), "jumper turned at a wall");
+	}
+
+	// At a loose end of the ledge it stops to jump, or walks off.
+	mob = jumper_at(physics, -200, -150, 1);
+	walk_jumper(physics, mob, 1);
+	require(mob.crnt_x() == -100 && mob.jumprequest, "jumper did not stop to jump at the ledge's end");
+	mob = jumper_at(physics, -200, -150, 1);
+	mob.edgejump = false;
+	walk_jumper(physics, mob, 1);
+	require(!mob.onground && mob.crnt_x() > -100, "jumper did not walk off the ledge");
+
+	// Down the wall is a step it walks down, unless told to jump it.
+	mob = jumper_at(physics, 600, -100, 1);
+	walk_jumper(physics, mob, -1);
+	require(!mob.onground && mob.crnt_x() < 500, "jumper did not walk down the step");
+	mob = jumper_at(physics, 600, -100, 1);
+	mob.stepdown = false;
+	walk_jumper(physics, mob, -1);
+	require(mob.crnt_x() == 500 && mob.jumprequest, "jumper did not stop to jump down the step");
+
+	// The AI sees a rising wall 40 px ahead, and whether it is against it.
+	using WallAhead = ms::FootholdTree::WallAhead;
+	require(fht.get_wall_ahead(jumper_at(physics, 459, 0, 1), 1) == WallAhead::NONE, "a wall 41 px away was seen");
+	require(fht.get_wall_ahead(jumper_at(physics, 470, 0, 1), 1) == WallAhead::NEAR, "a wall 30 px away was missed");
+	require(fht.get_wall_ahead(jumper_at(physics, 470, 0, 1), -1) == WallAhead::NONE, "a wall behind was seen");
+	require(fht.get_wall_ahead(jumper_at(physics, -10, 0, 1), 1) == WallAhead::NONE, "a floor ahead was taken for a wall");
+	require(fht.get_wall_ahead(jumper_at(physics, 520, -100, 1), -1) == WallAhead::NONE, "a step down was taken for a wall");
+	require(fht.get_wall_ahead(jumper_at(physics, -110, -150, 1), 1) == WallAhead::NONE, "a loose end was taken for a wall");
+	mob = jumper_at(physics, 400, 0, 1);
+	walk_jumper(physics, mob, 1);
+	require(fht.get_wall_ahead(mob, 1) == WallAhead::AGAINST, "a mob at the wall was not against it");
+}
+
 int main()
 {
 	std::filesystem::path path;
@@ -322,16 +612,18 @@ int main()
 			ms::Physics physics(map.root());
 			legacy_jumps_keep_momentum(physics);
 			walking(physics);
+			mob_walking(physics);
 			standing_jump(physics);
 			running_jump(physics);
 			falling(physics);
+			flying(physics);
 			jumping_down(physics);
 			knockback(physics);
 			// A knocked back mob sets its own ground speed; friction must not
 			// eat into it, even below the usual stopping threshold.
-			ms::PhysicsObject mob;
-			mob.set_x(0); mob.set_y(100);
-			physics.move_object(mob);
+			ms::PhysicsObject mob = grounded_shoe(physics);
+			mob.walkforce = 10.0;
+			mob.walkdrag = 10.0;
 			mob.set_flag(ms::PhysicsObject::Flag::NOFRICTION);
 			for (double speed : {1.04, 0.05})
 			{
@@ -351,6 +643,8 @@ int main()
 			{
 				double direction = start > 0.0 ? 1.0 : -1.0;
 				ms::PhysicsObject mob;
+				mob.shoe = true;
+				mob.walkspeed = 0.35;
 				mob.set_x(start); mob.set_y(100);
 				mob.set_flag(ms::PhysicsObject::Flag::TURNATEDGES);
 				mob.set_flag(ms::PhysicsObject::Flag::WALKONLY);
@@ -359,11 +653,26 @@ int main()
 				for (int tick = 0; mob.is_flag_set(ms::PhysicsObject::Flag::TURNATEDGES); ++tick)
 				{
 					require(tick < 1000, "walker never reached the edge");
-					mob.hforce = direction * .1;
+					mob.walkdir = direction;
 					physics.move_object(mob);
 				}
 				require(mob.crnt_x() == direction * 980 && mob.onground, "walker did not stop 20 px from the edge");
 			}
+		}
+		{
+			std::filesystem::path jumpers = jumper_map();
+			try
+			{
+				nl::file map(jumpers.string());
+				ms::Physics physics(map.root());
+				jumping_mobs(physics);
+			}
+			catch (...)
+			{
+				std::filesystem::remove(jumpers);
+				throw;
+			}
+			std::filesystem::remove(jumpers);
 		}
 		{
 			// A mob that enters on a foothold stands on it, even if its
@@ -379,6 +688,22 @@ int main()
 			mob.set_x(1200); mob.set_y(50);
 			physics.get_fht().place_on_fh(mob, 1);
 			require(mob.crnt_x() == 1000 && mob.crnt_y() == 100, "placement was not clamped to the foothold");
+		}
+		std::filesystem::remove(path);
+		path = foothold_map({
+			{1, 1, -500, 0, 0, 0, 0, 2}, {1, 2, 0, 0, 0, -100, 1, 3}, {1, 3, 0, -100, 500, -100, 2, 0},
+			{2, 4, 1500, -100, 2000, -100, 0, 5}, {2, 5, 2000, -100, 2000, 0, 4, 6}, {2, 6, 2000, 0, 2500, 0, 5, 0},
+			{3, 7, -3000, 600, 4000, 600, 0, 0}});
+		{
+			nl::file map(path.string());
+			ms::Physics physics(map.root());
+			walls(physics);
+			// Fliers pick their idle waypoints from a group's footholds.
+			const ms::FootholdTree& fht = physics.get_fht();
+			require(fht.get_groups() == std::vector<uint16_t>{1, 2, 3}, "foothold groups were not listed in load order");
+			require(fht.get_group_footholds(2) == std::vector<uint16_t>{4, 5, 6}, "a group's footholds were not listed");
+			require(fht.get_group_footholds(9).empty(), "a missing group had footholds");
+			require(fht.get_fh(2).length() == 100.0 && fht.get_fh(7).length() == 7000.0, "foothold lengths were wrong");
 		}
 		std::filesystem::remove(path);
 		std::cout << "Movement physics passed\n";

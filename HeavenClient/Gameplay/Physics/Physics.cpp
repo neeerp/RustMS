@@ -42,6 +42,10 @@ namespace ms
 	// walkSpeed / walkForce * floatDrag2.
 	const double AIRACC = 2.0 * FLOATDRAG;
 	const double AIRSPEED = 125.0 / 140000.0 * 10000.0;
+	// Flying pushes at flyForce towards flySpeed, and floatDrag1 slows it.
+	const double FLYACC = 120000.0 / 100.0;
+	const double FLYSPEED = 200.0;
+	const double FLYDRAG = 100000.0 / 100.0;
 	const double TICK = Constants::TIMESTEP / 1000.0;
 
 	// CVecCtrl's accelerate (FUN_007f29ab): speeds up towards +-limit and
@@ -59,6 +63,15 @@ namespace ms
 		{
 			speed = std::max(speed + acc * TICK, -limit);
 		}
+	}
+
+	// CVecCtrl's ground drag factor: the shoe's walkDrag clamped to
+	// Physics.img's minFriction and maxFriction, halved when below 1.
+	double ground_drag(double walkdrag)
+	{
+		double drag = std::clamp(walkdrag, 0.05, 2.0);
+
+		return drag < 1.0 ? drag * 0.5 : drag;
 	}
 
 	// Slows an object faster than +-limit back towards it.
@@ -98,6 +111,15 @@ namespace ms
 
 	void Physics::move_object(PhysicsObject &phobj) const
 	{
+		// A flier never stands on a platform: v83's mobs (FUN_007f9202)
+		// fly through them and only keep within the map.
+		if (phobj.shoe && phobj.flyspeed > 0.0)
+		{
+			phobj.onground = false;
+			move_shoe(phobj);
+			return;
+		}
+
 		// Determine which platform the object is currently on
 		fht.update_fh(phobj);
 
@@ -163,7 +185,11 @@ namespace ms
 		double hstart = hspeed;
 		double vstart = vspeed;
 
-		if (phobj.onground)
+		if (phobj.onground && phobj.is_flag_set(PhysicsObject::Flag::NOFRICTION))
+		{
+			// The owner slows a knocked-back object itself.
+			vspeed = 0.0;
+		} else if (phobj.onground)
 		{
 			// CVecCtrl's walking (FUN_007f21d2) works on the speed along the
 			// foothold, with uy the foothold's downward slant.
@@ -172,28 +198,30 @@ namespace ms
 			double slant = std::abs(uy);
 			double speed = hspeed / ux;
 			double limit = WALKSPEED * phobj.walkspeed;
+			double acc = WALKACC * phobj.walkforce;
+			double drag = WALKDRAG * ground_drag(phobj.walkdrag);
 
 			if (slant == 0.0)
 			{
-				decelerate(speed, limit, WALKDRAG);
+				decelerate(speed, limit, drag);
 
 				if (dir == 0)
-					decelerate(speed, 0.0, WALKDRAG);
+					decelerate(speed, 0.0, drag);
 				else
-					accelerate(speed, dir * WALKACC, limit);
+					accelerate(speed, dir * acc, limit);
 			} else
 			{
 				int8_t uphill = uy >= 0.0 ? -1 : 1;
 				double steep = slant * slant;
-				double force = dir * WALKACC * (uphill < 0 ? 1.0 + steep : 1.0 - steep);
+				double force = dir * acc * (uphill < 0 ? 1.0 + steep : 1.0 - steep);
 				double downhill = (1.0 + steep) * limit;
 
-				decelerate(speed, uphill * speed > 0.0 ? limit : downhill, WALKDRAG);
+				decelerate(speed, uphill * speed > 0.0 ? limit : downhill, drag);
 
 				if (slant <= WALKSLANT)
 				{
 					if (dir == 0)
-						decelerate(speed, 0.0, WALKDRAG);
+						decelerate(speed, 0.0, drag);
 					else
 						accelerate(speed, force, uphill * force > 0.0 ? limit : downhill);
 				} else
@@ -212,7 +240,7 @@ namespace ms
 					}
 
 					if (uphill * speed > 0.0)
-						decelerate(speed, 0.0, WALKDRAG);
+						decelerate(speed, 0.0, drag);
 
 					accelerate(speed, slip, sliplimit);
 				}
@@ -220,6 +248,35 @@ namespace ms
 
 			hspeed = speed * ux;
 			vspeed = 0.0;
+		} else if (phobj.flyspeed > 0.0)
+		{
+			// CVecCtrl's flying (FUN_007f2a1c) slows anything faster than
+			// flySpeed, then pushes the way the object steers.
+			double limit = FLYSPEED * phobj.flyspeed;
+
+			decelerate(hspeed, limit, FLYDRAG);
+
+			if (dir == 0)
+				decelerate(hspeed, 0.0, FLYDRAG);
+			else
+				accelerate(hspeed, dir * FLYACC, limit);
+
+			decelerate(vspeed, limit, FLYDRAG);
+
+			if (phobj.flydir < 0)
+			{
+				// Gliding settles on sinking at 0.3 of flySpeed, slowing a
+				// faster fall at the full push and picking up at half.
+				double glide = 0.3 * limit;
+
+				if (vspeed > glide)
+					vspeed = std::max(vspeed - FLYACC * TICK, glide);
+				else
+					vspeed = std::min(vspeed + 0.5 * FLYACC * TICK, glide);
+			} else
+			{
+				accelerate(vspeed, FLYACC, limit);
+			}
 		} else
 		{
 			// CVecCtrl's falling (FUN_007f2a1c).
@@ -239,6 +296,17 @@ namespace ms
 		// collision zeroes the step, and then the speed stays zero.
 		phobj.hspeed = (hstart + hspeed) / 2.0 * TICK;
 		phobj.vspeed = (vstart + vspeed) / 2.0 * TICK;
+
+		if (phobj.flyspeed > 0.0)
+		{
+			// The map's bounds stop a flier without slowing it.
+			phobj.move();
+			fht.limit_flight(phobj);
+			phobj.hspeed = hspeed * TICK;
+			phobj.vspeed = vspeed * TICK;
+
+			return;
+		}
 
 		bool hstep = phobj.hspeed != 0.0;
 		bool vstep = phobj.vspeed != 0.0;
@@ -284,6 +352,13 @@ namespace ms
 			speed = dir * limit;
 
 		phobj.hspeed = speed * ux;
+	}
+
+	// CVecCtrl::Jump (FUN_007f1bb0) for a flier in the air: it rises at
+	// its full flySpeed, keeping its sideways speed.
+	void Physics::fly_jump(PhysicsObject &phobj)
+	{
+		phobj.vspeed = -FLYSPEED * phobj.flyspeed * TICK;
 	}
 
 	// CVecCtrl's down-jump (FUN_007f1ac6) rises at jumpSpeed / sqrt(8)

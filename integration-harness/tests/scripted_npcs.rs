@@ -1,21 +1,25 @@
-//! Roger's Apple (quest 1021, scripted), using items, natural recovery,
+//! Roger's Apple (quest 1021, scripted), using items, natural and chair recovery,
 //! Robin's Q&A and Shanks's ship.
 
 use game_data::GameData;
+use integration_harness::database::grant_item;
 use integration_harness::hunting::{use_item, walk_to};
-use integration_harness::login_to_world_session;
+use integration_harness::packets::build_use_chair;
 use integration_harness::preconditions::load_harness_config_or_fail;
 use integration_harness::quests::{answer, build_quest_action, SCRIPT_END, SCRIPT_START};
 use integration_harness::trace::{barrier, send, stat, step, warp, Trace};
+use integration_harness::{login_to_world_session, relogin};
 use net::packet::op::RecvOpcode;
 use packet::io::write::PktWrite;
 use packet::Packet;
 use std::path::Path;
 use std::sync::OnceLock;
+use tokio::time::Duration;
 const ROGER: i32 = 2000;
 const ROGERS_APPLE: i32 = 2010007;
 const SOUTHPERRY: i32 = 60_000;
 const SHANKS: i32 = 22000;
+const RELAXER: i32 = 3010000;
 
 fn maps() -> &'static GameData {
     static MAPS: OnceLock<GameData> = OnceLock::new();
@@ -41,13 +45,13 @@ fn talk(map: i32, npc: i32) -> Packet {
     p
 }
 
-fn heal(hp: i16) -> Packet {
+fn heal(hp: i16, mp: i16) -> Packet {
     let mut p = Packet::new_empty();
     p.write_short(RecvOpcode::HealOverTime as i16).unwrap();
     p.write_int(0).unwrap();
     p.write_int(0).unwrap();
     p.write_short(hp).unwrap();
-    p.write_short(0).unwrap();
+    p.write_short(mp).unwrap();
     p
 }
 
@@ -108,7 +112,7 @@ async fn rogers_apple_teaches_using_items_and_pays_once() {
     assert!(t.prompts.is_empty() && t.gains.is_empty());
     drop(session);
 
-    let restored = integration_harness::relogin(&config).await;
+    let restored = relogin(&config).await;
     assert_eq!(restored.quests.get(&1021), Some(&2));
     assert_eq!(restored.exp, 10);
 }
@@ -126,12 +130,42 @@ async fn natural_recovery_is_rate_limited() {
     step(c, &m, answer(0, 1, None)).await;
     step(c, &m, answer(0, 1, None)).await;
     step(c, &m, answer(1, 1, None)).await; // HP 25
-    let t = step(c, &m, heal(10)).await;
+    let t = step(c, &m, heal(10, 0)).await;
     assert_eq!(t.stat_values(stat::HP), [35]);
-    let t = step(c, &m, heal(10)).await;
+    let t = step(c, &m, heal(10, 0)).await;
     assert!(t.stat_values(stat::HP).is_empty(), "too soon");
-    let t = step(c, &m, heal(500)).await;
+    let t = step(c, &m, heal(500, 0)).await;
     assert!(t.stat_values(stat::HP).is_empty(), "too much");
+    // MP keeps its own timer.
+    let t = step(c, &m, heal(0, 3)).await;
+    assert_eq!(t.stat_values(stat::HP), [35]);
+}
+
+#[tokio::test]
+async fn a_portable_chair_heals_its_recovery_hp() {
+    let config = load_harness_config_or_fail().await;
+    let m = config.character_name.clone();
+    // Make the character, and let its logout save before giving it a chair.
+    let character_id = login_to_world_session(&config).await.unwrap().character_id;
+    drop(relogin(&config).await);
+    tokio::time::sleep(Duration::from_millis(500)).await;
+    grant_item(character_id, 3, 1, RELAXER).await.unwrap();
+    let mut session = relogin(&config).await;
+    let c = &mut session.connection;
+    let mut trace = Trace::default();
+    assert_eq!(warp(c, -1, "out00", &mut trace).await, 10_000);
+    barrier(c, &m, &mut trace).await;
+    step(c, &m, build_quest_action(SCRIPT_START, 1021, ROGER)).await;
+    step(c, &m, answer(0, 1, None)).await;
+    step(c, &m, answer(0, 1, None)).await;
+    step(c, &m, answer(1, 1, None)).await; // HP 25
+
+    let t = step(c, &m, heal(50, 0)).await;
+    assert!(t.stat_values(stat::HP).is_empty(), "too much off the chair");
+    // The Relaxer heals 50 HP.
+    step(c, &m, build_use_chair(RELAXER).unwrap()).await;
+    let t = step(c, &m, heal(50, 0)).await;
+    assert_eq!(t.stat_values(stat::HP), [50]);
 }
 
 #[tokio::test]
@@ -146,8 +180,11 @@ async fn natural_recovery_waits_for_the_player_to_rest() {
 
     // The first heal of a session would count, but not right after moving.
     send(c, walk_to(100, 0)).await;
-    let t = step(c, &m, heal(10)).await;
+    let t = step(c, &m, heal(10, 0)).await;
     assert!(t.stat_values(stat::HP).is_empty(), "still moving");
+    // MP heals whatever the player does.
+    let t = step(c, &m, heal(0, 3)).await;
+    assert!(!t.stat_values(stat::MP).is_empty(), "MP heals while moving");
 }
 
 #[tokio::test]

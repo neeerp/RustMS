@@ -29,7 +29,7 @@ namespace ms
 	class Foothold
 	{
 	public:
-		Foothold(nl::node src, uint16_t id, uint8_t layer);
+		Foothold(nl::node src, uint16_t id, uint8_t layer, uint16_t group);
 
 		Foothold();
 
@@ -44,6 +44,9 @@ namespace ms
 
 		// Returns the platform's layer.
 		uint8_t layer() const;
+
+		// Returns the group of platforms this belongs to.
+		uint16_t group() const;
 
 		// Returns the horizontal component.
 		const Range<int16_t> &horizontal() const;
@@ -102,6 +105,9 @@ namespace ms
 		// Returns the height.
 		int16_t vdelta() const;
 
+		// Returns the distance from one end to the other.
+		double length() const;
+
 		// Returns the slope as a ratio of vertical/horizontal.
 		double slope() const;
 
@@ -113,6 +119,7 @@ namespace ms
 		uint16_t m_prev;
 		uint16_t m_next;
 		uint8_t m_layer;
+		uint16_t m_group;
 		Range<int16_t> m_horizontal;
 		Range<int16_t> m_vertical;
 	};

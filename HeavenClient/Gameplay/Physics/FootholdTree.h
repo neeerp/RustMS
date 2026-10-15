@@ -23,6 +23,7 @@
 #include "PhysicsObject.h"
 
 #include <unordered_map>
+#include <vector>
 
 namespace ms
 {
@@ -31,12 +32,23 @@ namespace ms
 	class FootholdTree
 	{
 	public:
+		// Where a rising wall is in front of a walking object.
+		enum class WallAhead
+		{
+			NONE,
+			NEAR,
+			AGAINST
+		};
+
 		FootholdTree(nl::node source);
 
 		FootholdTree();
 
 		// Takes an accelerated PhysicsObject and limits its movement based on the platforms in this tree.
 		void limit_movement(PhysicsObject &touse) const;
+
+		// Keeps a flier within the map's physical space.
+		void limit_flight(PhysicsObject &touse) const;
 
 		// Updates a PhysicsObject's fhid based on it's position.
 		void update_fh(PhysicsObject &touse) const;
@@ -53,7 +65,33 @@ namespace ms
 		// Returns the topmost and bottommost platform positions of the map.
 		Range<int16_t> get_borders() const;
 
+		// Returns the group of a platform.
+		uint16_t get_group(uint16_t fhid) const;
+
+		// Returns the group of the platform at or below a position, 0 if
+		// there is none.
+		uint16_t get_group_below(Point<int16_t> position) const;
+
+		// Returns the leftmost and rightmost x of a group's platforms, or an
+		// empty range for a group the map doesn't have.
+		Range<int16_t> get_group_reach(uint16_t group) const;
+
+		// Returns the map's groups, in the order it lists them.
+		const std::vector<uint16_t> &get_groups() const;
+
+		// Returns the platforms of a group, walls included.
+		const std::vector<uint16_t> &get_group_footholds(uint16_t group) const;
+
+		// Returns a platform, or an empty one for an id the map doesn't have.
+		const Foothold &get_fh(uint16_t fhid) const;
+
+		// Looks for a rising wall up to 40 px ahead of a grounded object
+		// walking in direction dir, and whether the object is against it.
+		WallAhead get_wall_ahead(const PhysicsObject &phobj, int8_t dir) const;
+
 	private:
+		bool limit_jumper(PhysicsObject &phobj) const;
+
 		uint16_t get_fhid_below(double fx, double fy, uint16_t ignore = 0) const;
 
 		bool can_jump_down(uint16_t fhid, double fx, double fy) const;
@@ -64,13 +102,16 @@ namespace ms
 
 		double get_walk_edge(uint16_t fhid, bool left) const;
 
-		const Foothold &get_fh(uint16_t fhid) const;
-
 		std::unordered_map<uint16_t, Foothold> footholds;
 		std::unordered_multimap<int16_t, uint16_t> footholdsbyx;
+		std::unordered_map<uint16_t, Range<int16_t>> groups;
+		std::vector<uint16_t> grouporder;
+		std::unordered_map<uint16_t, std::vector<uint16_t>> groupfootholds;
 
 		Foothold nullfh;
 		Range<int16_t> walls;
 		Range<int16_t> borders;
+		Range<int16_t> spacex;
+		Range<int16_t> spacey;
 	};
 }

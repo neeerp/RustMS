@@ -37,10 +37,8 @@ namespace ms
 	class Npc : public MapObject
 	{
 	public:
-		// Constructs an NPC by combining data from game files with data sent by the server.
-		// NPCs with a 'move' animation walk between rx0 and rx1.
-		Npc(int32_t npcid, int32_t oid, bool mirrored, uint16_t fhid, bool control, Point<int16_t> position,
-			int16_t rx0, int16_t rx1);
+		// Constructs an NPC by combining data from game files with data sent by the server
+		Npc(int32_t npcid, int32_t oid, bool mirrored, uint16_t fhid, bool control, Point<int16_t> position);
 
 		// Draws the current animation and name/function tags
 		void draw(double viewx, double viewy, float alpha) const override;
@@ -67,28 +65,21 @@ namespace ms
 	private:
 		Point<int16_t> quest_marker_offset() const;
 		int16_t head_height() const;
-		void update_speech();
-		// Pick the stance after one ends; 'move' starts a walk.
-		void next_stance();
-		void update_walk();
+		// Plays an idle action or says an idle line now and then; see npc_idle.
+		void update_idle();
+		void wait_idle();
 
-		// The walking force, as for a mob with speed 0. The v83 client's
-		// value is unknown.
-		static constexpr double WALKFORCE = 0.1;
-		// The shortest walk worth taking, in pixels.
-		static constexpr int16_t WALK_MIN = 20;
-
-		// Pauses between idle lines, in milliseconds. The v83 client's exact
-		// timing is unknown; these keep NPCs chatty without crowding the screen.
-		static constexpr int32_t SPEECH_FIRST_MIN = 2000;
-		static constexpr int32_t SPEECH_FIRST_MAX = 10000;
-		static constexpr int32_t SPEECH_PAUSE_MIN = 8000;
-		static constexpr int32_t SPEECH_PAUSE_MAX = 16000;
-
-		// Idle lines from info/speak, said now and then in the "npc" balloon style.
+		// Idle lines from info/speak, said in the "npc" balloon style.
 		std::vector<std::string> idle_lines;
 		ChatBalloon speech;
-		int32_t speech_cooldown = 0;
+		// The actions an idle NPC may play: every animation but info, stand
+		// and move, in template order, with their speak line counts.
+		std::vector<std::string> actions;
+		std::vector<int32_t> action_lines;
+		int32_t specials = 0;
+		int32_t shop = -1;
+		// Time until the next idle choice, in milliseconds.
+		int32_t idle_cooldown = 0;
 		QuestMarker quest_marker = QuestMarker::NONE;
 		Animation quest_marker_animation;
 		uint64_t quest_revision = std::numeric_limits<uint64_t>::max();
@@ -97,7 +88,6 @@ namespace ms
 		int16_t quest_refresh = 0;
 		std::map<std::string, Animation> animations;
 		std::map<std::string, std::vector<std::string>> lines;
-		std::vector<std::string> states;
 		std::string name;
 		std::string func;
 		bool hidename;
@@ -108,10 +98,6 @@ namespace ms
 		bool flip;
 		std::string stance;
 		bool control;
-		int16_t rx0;
-		int16_t rx1;
-		bool walking = false;
-		int16_t walk_target = 0;
 
 		Randomizer random;
 		Text namelabel;
