@@ -377,6 +377,30 @@ namespace ms
 		return ret;
 	}
 
+	void FootholdTree::place_on_fh(PhysicsObject &phobj, uint16_t fhid) const
+	{
+		// v83 (FUN_007f13de) measures how far along the foothold the object
+		// is, by x unless the foothold is steep, clamps that to the foothold
+		// and takes the point there.
+		const Foothold &fh = get_fh(fhid);
+		double dx = fh.x2() - fh.x1();
+		double dy = fh.y2() - fh.y1();
+		double length = std::hypot(dx, dy);
+
+		if (length == 0.0)
+			return;
+
+		double ux = dx / length;
+		double uy = dy / length;
+		double along = std::abs(ux) > 0.5 ? (phobj.crnt_x() - fh.x1()) / ux : (phobj.crnt_y() - fh.y1()) / uy;
+		along = std::clamp(along, 0.0, length);
+		phobj.set_x(fh.x1() + ux * along);
+		phobj.set_y(fh.y1() + uy * along);
+		phobj.fhid = fhid;
+		phobj.fhlayer = fh.layer();
+		phobj.onground = true;
+	}
+
 	int16_t FootholdTree::get_y_below(Point<int16_t> position) const
 	{
 		if (uint16_t fhid = get_fhid_below(position.x(), position.y()))

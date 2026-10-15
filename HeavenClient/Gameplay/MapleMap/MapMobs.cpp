@@ -45,7 +45,7 @@ namespace ms
 				mob->makeactive();
 			} else
 			{
-				mobs.add(spawn.instantiate());
+				mobs.add(spawn.instantiate(physics));
 			}
 		}
 

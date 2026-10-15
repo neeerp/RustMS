@@ -15,12 +15,18 @@ templates from `Mob.nx` (`maxHP`, `exp`, `PADamage`, `bodyAttack`,
   mobs and joiners pick up uncontrolled mobs; leaving hands them to another
   occupant. MOVE_LIFE from the controller updates the position, answers
   MOVE_MONSTER_RESPONSE, and relays MOVE_MONSTER to the others; movement from
-  anyone else is ignored. In HeavenClient, a controlled mob that can walk
-  but neither jump nor fly turns 20 px before any foothold end that does not
-  lead on to another floor, as v83 does (`FootholdTree::get_walk_edge`).
+  anyone else is ignored. The last absolute fragment's foothold (0 while
+  airborne) becomes the mob's current foothold. In HeavenClient, a controlled
+  mob that can walk but neither jump nor fly turns 20 px before any foothold
+  end that does not lead on to another floor, as v83 does
+  (`FootholdTree::get_walk_edge`).
 
 Packets follow the v83 layout (16-byte temporary status mask after the mob
-id); HeavenClient used to skip 22 bytes there and now skips 16.
+id); HeavenClient used to skip 22 bytes there and now skips 16. After the
+stance come two footholds: the one the mob stands on, then its spawn point's.
+v83 puts the mob on the first, at the point along it nearest its x, so a mob
+whose `cy` is a pixel off a slope does not fall; with 0 it falls from its
+position. HeavenClient does the same (`FootholdTree::place_on_fh`).
 
 ## Attacks
 

@@ -141,8 +141,23 @@ int main()
 				require(mob.crnt_x() == direction * 980 && mob.onground, "walker did not stop 20 px from the edge");
 			}
 		}
+		{
+			// A mob that enters on a foothold stands on it, even if its
+			// position is a pixel below it, and stays there.
+			nl::file map(path.string());
+			ms::Physics physics(map.root());
+			ms::PhysicsObject mob;
+			mob.set_x(500); mob.set_y(101);
+			physics.get_fht().place_on_fh(mob, 1);
+			require(mob.crnt_y() == 100 && mob.onground && mob.fhid == 1, "spawn was not put on its foothold");
+			physics.move_object(mob);
+			require(mob.crnt_y() == 100 && mob.onground, "placed mob fell");
+			mob.set_x(1200); mob.set_y(50);
+			physics.get_fht().place_on_fh(mob, 1);
+			require(mob.crnt_x() == 1000 && mob.crnt_y() == 100, "placement was not clamped to the foothold");
+		}
 		std::filesystem::remove(path);
-		std::cout << "Jump momentum, contact transitions and walker edges passed\n";
+		std::cout << "Movement physics passed\n";
 		return 0;
 	}
 	catch (const std::exception& error)

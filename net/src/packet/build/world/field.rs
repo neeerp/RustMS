@@ -135,8 +135,8 @@ pub fn parse_movement_state(
 }
 
 /// Like `parse_movement_state`, plus the foothold the mover ended up on:
-/// the last nonzero foothold of an absolute or jump-down fragment (0 means
-/// airborne), if any fragment had one.
+/// that of the last absolute or jump-down fragment (0 means airborne), if
+/// any fragment had one.
 pub fn parse_movement(
     movement_bytes: &[u8],
     current: (i16, i16, u8),
@@ -158,10 +158,7 @@ pub fn parse_movement(
                 y = cursor.read_short().ok()?;
                 let _ = cursor.read_short().ok()?;
                 let _ = cursor.read_short().ok()?;
-                let fh = cursor.read_short().ok()?;
-                if fh != 0 {
-                    foothold = Some(fh);
-                }
+                foothold = Some(cursor.read_short().ok()?);
                 stance = cursor.read_byte().ok()?;
                 let _ = cursor.read_short().ok()?;
             }
@@ -184,10 +181,7 @@ pub fn parse_movement(
                 let _ = cursor.read_short().ok()?;
                 let _ = cursor.read_short().ok()?;
                 let _ = cursor.read_short().ok()?;
-                let fh = cursor.read_short().ok()?;
-                if fh != 0 {
-                    foothold = Some(fh);
-                }
+                foothold = Some(cursor.read_short().ok()?);
                 stance = cursor.read_byte().ok()?;
                 let _ = cursor.read_short().ok()?;
             }
