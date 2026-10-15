@@ -30,6 +30,14 @@ templates from `Mob.nx` (`maxHP`, `exp`, `PADamage`, `bodyAttack`,
   heads for the local player, keeping its direction until it is 100 px past
   them, and gives up after 180 to 240 s. A mob that cannot move turns to
   face the player and forgets them once they leave a 2000 x 1200 box.
+- **First-attack mobs:** a mob with `info/firstAttack` and without
+  `notAttack` starts the same chase without being hit once the local player
+  comes within |dx| / 10 + |dy| / 3 <= 40 of it (v83's FUN_005ce8c6). Only
+  its controller's client checks this, and the server is not told. v83 also
+  starts the chase when one of the mob's attacks could reach the player, and
+  the controller reports its distance to the server about once a second
+  (0xBD, FUN_005ce6dc). HeavenClient has neither: it has no mob attacks, and
+  the server does not handle 0xBD.
 - **Flying mobs:** a flier (`Mob::think_fly`, v83's FUN_007f8875) heads for
   a waypoint every 90 ms step. Idle, it roams a random foothold group for
   (the group's width + 40 to 239) / 8 waypoints, each from 50 px above to
