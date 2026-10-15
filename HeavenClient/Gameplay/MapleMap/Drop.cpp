@@ -276,9 +276,14 @@ namespace ms
 		pickupstart = phobj.get_position();
 	}
 
+	Point<int16_t> Drop::centred(Point<int16_t> position, Point<int16_t> origin, Point<int16_t> dimensions)
+	{
+		return position + Point<int16_t>(origin.x() - dimensions.x() / 2, 0);
+	}
+
 	Rectangle<int16_t> Drop::bounds() const
 	{
-		auto lt = get_position();
+		auto lt = get_position() - Point<int16_t>(16, 0);
 		auto rb = lt + Point<int16_t>(32, 32);
 
 		return Rectangle<int16_t>(lt, rb);
