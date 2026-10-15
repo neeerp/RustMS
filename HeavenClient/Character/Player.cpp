@@ -32,6 +32,8 @@
 
 #include <nlnx/nx.hpp>
 
+#include <algorithm>
+
 namespace ms
 {
 	const PlayerNullState nullstate;
@@ -72,6 +74,7 @@ namespace ms
 	{
 		attacking = false;
 		underwater = false;
+		phobj.shoe = true;
 
 		set_state(Char::State::STAND);
 		set_direction(true);
@@ -189,6 +192,7 @@ namespace ms
 
 		if (pst)
 		{
+			phobj.walkspeed = get_walkspeed();
 			pst->update(*this);
 			physics.move_object(phobj);
 
@@ -600,14 +604,16 @@ namespace ms
 		}
 	}
 
-	float Player::get_walkforce() const
+	// CUserLocal clamps SPEED to 80-140 and JUMP to 80-123 before turning
+	// them into shoe multipliers (FUN_007a4dec).
+	double Player::get_walkspeed() const
 	{
-		return 0.05f + 0.11f * static_cast<float>(stats.get_total(EquipStat::Id::SPEED)) / 100;
+		return std::clamp<int32_t>(stats.get_total(EquipStat::Id::SPEED), 80, 140) / 100.0;
 	}
 
-	float Player::get_jumpforce() const
+	double Player::get_jumpforce() const
 	{
-		return 1.0f + 3.5f * static_cast<float>(stats.get_total(EquipStat::Id::JUMP)) / 100;
+		return Physics::jump_speed(std::clamp<int32_t>(stats.get_total(EquipStat::Id::JUMP), 80, 123) / 100.0);
 	}
 
 	float Player::get_climbforce() const

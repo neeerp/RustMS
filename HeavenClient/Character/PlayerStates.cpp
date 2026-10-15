@@ -19,6 +19,11 @@
 
 namespace ms
 {
+	// Jumping off a rope or ladder in CVecCtrl::Jump (FUN_007f1bb0): 130% of
+	// the walking speed sideways and half the takeoff speed upwards.
+	const double ROPEJUMPH = 1.3;
+	const double ROPEJUMPV = 0.5;
+
 	// Base class
 	void PlayerState::play_jumpsound() const
 	{
@@ -87,7 +92,7 @@ namespace ms
 					break;
 				case KeyAction::Id::JUMP:
 					play_jumpsound();
-					player.get_phobj().vforce = -player.get_jumpforce();
+					Physics::jump(player.get_phobj(), player.get_jumpforce(), 0);
 					break;
 				case KeyAction::Id::DOWN:
 					player.set_state(Char::State::PRONE);
@@ -131,7 +136,7 @@ namespace ms
 					break;
 				case KeyAction::Id::JUMP:
 					play_jumpsound();
-					player.get_phobj().vforce = -player.get_jumpforce();
+					Physics::jump(player.get_phobj(), player.get_jumpforce(), haswalkinput(player) ? (player.getflip() ? 1 : -1) : 0);
 					break;
 				case KeyAction::Id::DOWN:
 					player.set_state(Char::State::PRONE);
@@ -148,7 +153,7 @@ namespace ms
 	void PlayerWalkState::update(Player &player) const
 	{
 		if (!player.is_attacking() && haswalkinput(player))
-			player.get_phobj().hforce += player.getflip() ? player.get_walkforce() : -player.get_walkforce();
+			player.get_phobj().walkdir = player.getflip() ? 1 : -1;
 
 		if (player.get_phobj().enablejd == false)
 			player.get_phobj().set_flag(PhysicsObject::Flag::CHECKBELOW);
@@ -190,21 +195,10 @@ namespace ms
 
 	void PlayerFallState::update(Player &player) const
 	{
-		auto &hspeed = player.get_phobj().hspeed;
-
-		if (player.is_key_down(KeyAction::Id::LEFT) && hspeed > 0.0)
-		{
-			hspeed -= 0.025;
-
-			if (hspeed < 0.0)
-				hspeed = 0.0;
-		} else if (player.is_key_down(KeyAction::Id::RIGHT) && hspeed < 0.0)
-		{
-			hspeed += 0.025;
-
-			if (hspeed > 0.0)
-				hspeed = 0.0;
-		}
+		if (player.is_key_down(KeyAction::Id::LEFT))
+			player.get_phobj().walkdir = -1;
+		else if (player.is_key_down(KeyAction::Id::RIGHT))
+			player.get_phobj().walkdir = 1;
 	}
 
 	void PlayerFallState::update_state(Player &player) const
@@ -396,15 +390,15 @@ namespace ms
 					{
 						play_jumpsound();
 						player.set_direction(false);
-						player.get_phobj().hspeed = -player.get_walkforce() * 8.0;
-						player.get_phobj().vspeed = -player.get_jumpforce() / 1.5;
+						player.get_phobj().hspeed = -ROPEJUMPH * Physics::walk_speed(player.get_walkspeed());
+						player.get_phobj().vspeed = -ROPEJUMPV * player.get_jumpforce();
 						cancel_ladder(player);
 					} else if (player.is_key_down(KeyAction::Id::RIGHT))
 					{
 						play_jumpsound();
 						player.set_direction(true);
-						player.get_phobj().hspeed = player.get_walkforce() * 8.0;
-						player.get_phobj().vspeed = -player.get_jumpforce() / 1.5;
+						player.get_phobj().hspeed = ROPEJUMPH * Physics::walk_speed(player.get_walkspeed());
+						player.get_phobj().vspeed = -ROPEJUMPV * player.get_jumpforce();
 						cancel_ladder(player);
 					}
 

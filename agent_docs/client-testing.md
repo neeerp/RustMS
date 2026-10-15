@@ -17,7 +17,10 @@ The checks cover quest marker selection, keyboard routing when a focused panel
 closes, and jump momentum/contact transitions in both directions. The physics
 test creates a tiny temporary NX foothold fixture and uses the production
 collision code. It also checks that releasing an arrow in midair preserves
-speed and that takeoff and landing update the grounded flag immediately.
+speed and that takeoff and landing update the grounded flag immediately. Its
+shoe cases check the player's v83 numbers: walking acceleration and stopping
+distance, standing-jump height and airtime, the running-jump kick, air
+steering, and the 670 px/s fall cap.
 
 `frame_assembler_tests` covers the network receive loop (`Net/FrameAssembler.h`,
 used by `Session`): every split point of a multi-frame stream, a partial

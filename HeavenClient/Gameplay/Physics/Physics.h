@@ -40,7 +40,19 @@ namespace ms
 		// Return a reference to the collection of platforms.
 		const FootholdTree &get_fht() const;
 
+		// Top walking speed and takeoff speed, in pixels per tick, for the
+		// given shoe multipliers.
+		static double walk_speed(double walkspeed);
+
+		static double jump_speed(double walkjump);
+
+		// Start a jump from the ground. Holding a direction adds 80% of the
+		// top walking speed, as CVecCtrl::Jump does.
+		static void jump(PhysicsObject &phobj, double jumpspeed, int8_t dir);
+
 	private:
+		void move_shoe(PhysicsObject &) const;
+
 		void move_normal(PhysicsObject &) const;
 
 		void move_flying(PhysicsObject &) const;
