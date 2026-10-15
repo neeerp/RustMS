@@ -24,6 +24,8 @@
 
 #include "../Gameplay/Stage.h"
 
+#include "Components/Slider.h"
+
 #include "UITypes/UIChannel.h"
 #include "UITypes/UIChatBar.h"
 #include "UITypes/UIGameOption.h"
@@ -59,6 +61,8 @@ namespace ms
 	void UI::update()
 	{
 		state->update();
+
+		Slider::update_held(cursor.is_pressed());
 
 		scrollingnotice.update();
 
