@@ -164,6 +164,9 @@ pub struct FieldTemplate {
     pub mob_spawns: Vec<MapMobTemplate>,
     pub reactors: Vec<MapReactorTemplate>,
     pub mob_rate: f64,
+    /// `info/recovery`: how much faster players recover HP and MP at rest,
+    /// e.g. 2 in the Sleepywood sauna.
+    pub recovery: f64,
     pub footholds: footholds::Footholds,
     portals_by_id: BTreeMap<u32, PortalTemplate>,
     portal_ids_by_name: HashMap<String, Vec<u32>>,
@@ -288,6 +291,12 @@ fn build_field_template(
         .transpose()?
         .flatten()
         .unwrap_or(1.0);
+    let recovery = nx
+        .child_by_name(map_node_idx, "info")?
+        .map(|info| nx.real_child(info, "recovery"))
+        .transpose()?
+        .flatten()
+        .unwrap_or(1.0);
 
     let mut portals_by_id = BTreeMap::new();
 
@@ -345,6 +354,7 @@ fn build_field_template(
         mob_spawns,
         reactors,
         mob_rate,
+        recovery,
         footholds,
         portals_by_id,
         portal_ids_by_name,
@@ -759,6 +769,7 @@ mod tests {
             mob_spawns: Vec::new(),
             reactors: Vec::new(),
             mob_rate: 1.0,
+            recovery: 1.0,
             footholds: footholds::Footholds::default(),
             portals_by_id: BTreeMap::from([
                 (
@@ -822,6 +833,7 @@ mod tests {
             map_npcs: Vec::new(),
             mob_spawns: Vec::new(),
             mob_rate: 1.0,
+            recovery: 1.0,
             reactors: Vec::new(),
             footholds: footholds::Footholds::default(),
             portals_by_id: BTreeMap::from([
