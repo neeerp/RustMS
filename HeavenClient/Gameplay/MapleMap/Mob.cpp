@@ -137,6 +137,8 @@ namespace ms
 		}
 
 		hppercent = 0;
+		targetdead = false;
+		reporttime = 0;
 		dying = false;
 		dead = false;
 		fading = false;
@@ -236,6 +238,25 @@ namespace ms
 
 		effects.update();
 		showhp.update();
+
+		// Every client, controller or not, tells the server once a second how
+		// far the local player is from each firstAttack mob (FUN_005ce6dc).
+		if (!dying && firstattack)
+		{
+			if (reporttime > Constants::TIMESTEP)
+			{
+				reporttime -= Constants::TIMESTEP;
+			} else
+			{
+				reporttime = 1000;
+
+				Point<int16_t> position = get_position();
+				int32_t dx = std::abs(targetpos.x() - position.x());
+				int32_t dy = std::abs(targetpos.y() - position.y());
+
+				MobDistancePacket(oid, dx / 10 + dy / 3 + (targetdead ? 100 : 0)).dispatch();
+			}
+		}
 
 		if (!dying)
 		{
@@ -783,9 +804,10 @@ namespace ms
 			phobj.flyspeed = shoespeed(base);
 	}
 
-	void Mob::set_target(Point<int16_t> position)
+	void Mob::set_target(Point<int16_t> position, bool dead)
 	{
 		targetpos = position;
+		targetdead = dead;
 	}
 
 	void Mob::send_movement(Point<int16_t> start, std::vector<Movement> &&in_movements)

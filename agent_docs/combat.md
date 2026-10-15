@@ -40,10 +40,18 @@ templates from `Mob.nx` (`maxHP`, `exp`, `PADamage`, `bodyAttack`,
   `notAttack` starts the same chase without being hit once the local player
   comes within |dx| / 10 + |dy| / 3 <= 40 of it (v83's FUN_005ce8c6). Only
   its controller's client checks this, and the server is not told. v83 also
-  starts the chase when one of the mob's attacks could reach the player, and
-  the controller reports its distance to the server about once a second
-  (0xBD, FUN_005ce6dc). HeavenClient has neither: it has no mob attacks, and
-  the server does not handle 0xBD.
+  starts the chase when one of the mob's attacks could reach the player;
+  HeavenClient has no mob attacks.
+- **Distance reports:** so that the player a firstAttack mob goes for is the
+  one whose client checks, every client, controller or not, sends MOB_DISTANCE
+  (`0xBD`: object id, distance) once a second for each such mob, as v83's
+  FUN_005ce6dc does. The distance is the one above, plus 100 while the player
+  is dead. Unless someone has aggro on the mob, the server
+  (`MobSet::report_distance`) hands it to a reporter nearer than the
+  controller's last report, with SPAWN_MONSTER_CONTROL 1, or to anyone who
+  reports before the controller has. v83's server rule isn't visible from the
+  client; this one keeps the mob with the closest player. v83 also sends the
+  report for mobs with `info/pickUp`, but no v83 mob has it.
 - **Flying mobs:** a flier (`Mob::think_fly`, v83's FUN_007f8875) heads for
   a waypoint every 90 ms step. Idle, it roams a random foothold group for
   (the group's width + 40 to 239) / 8 waypoints, each from 50 px above to
@@ -280,11 +288,13 @@ Setting restores the same table.
 
 ## Tests
 
-`field_mobs` unit tests cover spawning, control hand-off, movement, damage,
-EXP sharing, and respawn; `net::combat` covers parsing, the damage cap, and
+`field_mobs` unit tests cover spawning, control hand-off (including by
+distance report), movement, damage, EXP sharing, and respawn; `net::combat` covers parsing, the damage cap, and
 the broadcast; `mob_combat` (integration) runs two players in Dangerous
 Forest through control, relayed movement, hits, kills, EXP, refused damage,
-touch damage, a level-up seen by the other player, and a respawn;
+touch damage, a level-up seen by the other player, and a respawn, then has
+two players report their distance from a firstAttack mob in Crimsonwood Keep
+(610030011) and checks control follows the closer one until a hit;
 `reactors` (integration) breaks two of Amherst's boxes, before and during
 Pio's quest;
 `drops_and_pickup` checks ownership, reach, pickup, replays, meso
