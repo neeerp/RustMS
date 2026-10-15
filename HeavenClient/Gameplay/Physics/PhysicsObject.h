@@ -219,10 +219,13 @@ namespace ms
 
 		// Objects wearing a shoe walk and fall by the v83 client's CVecCtrl
 		// rules, steered by walkdir (-1, 0, 1) instead of hforce. walkspeed
-		// is the shoe's speed multiplier. Everything else keeps
+		// is the shoe's speed multiplier, and walkforce and walkdrag scale
+		// its ground acceleration and drag. Everything else keeps
 		// HeavenClient's force-and-friction model.
 		bool shoe = false;
 		double walkspeed = 1.0;
+		double walkforce = 1.0;
+		double walkdrag = 1.0;
 		int8_t walkdir = 0;
 
 		bool is_flag_set(Flag f)
