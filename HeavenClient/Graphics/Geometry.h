@@ -79,16 +79,23 @@ namespace ms
 		float opacity;
 	};
 
+	// The HP bar over a mob or a party member, as v83 draws it (MapleLegends
+	// client: FUN_005d019c for mobs, FUN_0050c8d7 for party members): a black
+	// box with a white ring, and a fill 4 px tall whose bottom row is dark red.
 	class MobHpBar : public Geometry
 	{
 	public:
+		static constexpr int16_t WIDTH = 52;
+		static constexpr int16_t HEIGHT = 10;
+
+		// Draws the bar with its top-left at `position`, filled green.
 		void draw(Point<int16_t> position, int16_t hppercent) const;
 
-		// The same bar in other colors, as over party members' heads.
-		void draw(Point<int16_t> position, int16_t hppercent, Color::Name fill, Color::Name shade) const;
+		// The same bar in another color, as over party members' heads.
+		void draw(Point<int16_t> position, int16_t hppercent, Color::Name fill) const;
 
 	private:
-		static const int16_t WIDTH = 50;
-		static const int16_t HEIGHT = 10;
+		// The fill's width at full HP.
+		static constexpr int16_t FILL = 46;
 	};
 }
