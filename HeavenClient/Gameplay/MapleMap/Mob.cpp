@@ -31,7 +31,7 @@
 namespace ms
 {
 	Mob::Mob(int32_t oi, int32_t mid, int8_t mode, int8_t st, uint16_t fh, bool newspawn, int8_t tm,
-			 Point<int16_t> position) : MapObject(oi)
+			 Point<int16_t> position, const Physics &physics) : MapObject(oi)
 	{
 		std::string strid = string_format::extend_id(mid, 7);
 		nl::node src = nl::nx::mob[strid + ".img"];
@@ -91,6 +91,18 @@ namespace ms
 		set_position(position);
 		set_control(mode);
 		phobj.fhid = fh;
+
+		// v83 stands a new mob on the foothold it enters on (FUN_007f115f),
+		// even where its position is a little off that foothold, and drops
+		// it from where it is without one.
+		if (!canfly)
+		{
+			if (fh)
+				physics.get_fht().place_on_fh(phobj, fh);
+			else
+				phobj.onground = false;
+		}
+
 		phobj.set_flag(PhysicsObject::Flag::TURNATEDGES);
 
 		hppercent = 0;

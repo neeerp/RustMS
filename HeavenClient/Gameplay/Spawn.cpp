@@ -56,9 +56,9 @@ namespace ms
 		return oid;
 	}
 
-	std::unique_ptr<MapObject> MobSpawn::instantiate() const
+	std::unique_ptr<MapObject> MobSpawn::instantiate(const Physics &physics) const
 	{
-		return std::make_unique<Mob>(oid, id, mode, stance, fh, newspawn, team, position);
+		return std::make_unique<Mob>(oid, id, mode, stance, fh, newspawn, team, position, physics);
 	}
 
 	ReactorSpawn::ReactorSpawn(int32_t o, int32_t r, int8_t s, Point<int16_t> p) : oid(o), rid(r), state(s), position(p)

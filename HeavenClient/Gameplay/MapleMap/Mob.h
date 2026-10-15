@@ -72,7 +72,7 @@ namespace ms
 
 		// Construct a mob by combining data from game files with data sent by the server.
 		Mob(int32_t oid, int32_t mobid, int8_t mode, int8_t stance, uint16_t fhid, bool newspawn, int8_t team,
-			Point<int16_t> position);
+			Point<int16_t> position, const Physics &physics);
 
 		// Draw the mob
 		void draw(double viewx, double viewy, float alpha) const override;

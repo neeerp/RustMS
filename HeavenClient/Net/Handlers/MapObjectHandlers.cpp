@@ -231,9 +231,10 @@ namespace ms
 		Point<int16_t> position = recv.read_point();
 		int8_t stance = recv.read_byte();
 
-		recv.skip(2);
-
+		// The foothold the mob stands on (0 if airborne), then the one it
+		// spawned on.
 		uint16_t fh = recv.read_short();
+		recv.skip(2);
 		int8_t effect = recv.read_byte();
 
 		if (effect > 0)
@@ -284,9 +285,8 @@ namespace ms
 				Point<int16_t> position = recv.read_point();
 				int8_t stance = recv.read_byte();
 
-				recv.skip(2);
-
 				uint16_t fh = recv.read_short();
+				recv.skip(2); // spawn foothold
 				int8_t effect = recv.read_byte();
 
 				if (effect > 0)
