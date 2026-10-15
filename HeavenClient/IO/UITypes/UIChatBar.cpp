@@ -17,6 +17,9 @@
 //////////////////////////////////////////////////////////////////////////////////
 #include "UIChatBar.h"
 
+#include <algorithm>
+#include <cstdlib>
+
 #include "UIStatusBar.h"
 
 #include "../Components/MapleButton.h"
@@ -114,6 +117,15 @@ namespace ms
 		drag_y = 0;
 		drag_pos = 0;
 		held_part = ScrollPart::NONE;
+		edge_dragging = false;
+
+		// As in the original, a saved height out of bounds is forgotten.
+		int16_t saved_height = static_cast<int16_t>(Setting<ChatHeight>::get().load());
+
+		if (saved_height < MIN_LOG_HEIGHT || saved_height > MAX_LOG_HEIGHT)
+			saved_height = LOG_HEIGHT;
+
+		set_log_height(saved_height);
 
 		nl::node base = NxFiles::ui_classic["StatusBar.img"]["base"];
 		nl::node basic = NxFiles::ui_classic["Basic.img"];
@@ -388,6 +400,31 @@ namespace ms
 		else
 			held_part = ScrollPart::NONE;
 
+		if (edge_dragging)
+		{
+			if (clicking)
+			{
+				drag_log_edge(cursorpos.y() - position.y());
+
+				return Cursor::State::VSCROLLIDLE;
+			}
+
+			edge_dragging = false;
+		}
+
+		if (on_log_edge(cursorpos) && scroll_part_at(cursorpos) == ScrollPart::NONE)
+		{
+			if (pressed)
+			{
+				edge_dragging = true;
+
+				if (!edge_anchor)
+					edge_anchor = cursorpos.y() - position.y();
+			}
+
+			return Cursor::State::VSCROLLIDLE;
+		}
+
 		if (chatfieldopen)
 		{
 			if (Cursor::State new_state = chatfield.send_cursor(cursorpos, clicking))
@@ -451,6 +488,7 @@ namespace ms
 		scrollbar_pressed = false;
 		thumb_dragging = false;
 		held_part = ScrollPart::NONE;
+		edge_dragging = false;
 	}
 
 	UIElement::Type UIChatBar::get_type() const
@@ -649,6 +687,46 @@ namespace ms
 		set_scrollpos(get_scrollpos() + rows);
 	}
 
+	// The original (FUN_0073ecb5) moves the edge in whole rows once the
+	// cursor is more than a row from where the last step left it.
+	void UIChatBar::drag_log_edge(int16_t y)
+	{
+		int16_t anchor = edge_anchor.value_or(y);
+		bool shrinking = y >= get_logtop() + EDGE_OFFSET;
+		int16_t distance = shrinking ? y - anchor : anchor - y;
+
+		if (distance <= CHATROWHEIGHT)
+			return;
+
+		if (shrinking ? log_height <= MIN_LOG_HEIGHT : log_height >= MAX_LOG_HEIGHT)
+			return;
+
+		set_log_height(log_height + (anchor - y) / CHATROWHEIGHT * CHATROWHEIGHT);
+		edge_anchor = get_logtop() + EDGE_OFFSET;
+		rowpos = rowmax;
+
+		Setting<ChatHeight>::get().save(log_height);
+	}
+
+	bool UIChatBar::on_log_edge(Point<int16_t> cursorpos) const
+	{
+		Point<int16_t> pos = cursorpos - position;
+
+		return chatopen && pos.x() < LOG_WIDTH && std::abs(pos.y() - (get_logtop() + EDGE_OFFSET)) < 5;
+	}
+
+	void UIChatBar::set_log_height(int16_t height)
+	{
+		height = std::clamp(height, MIN_LOG_HEIGHT, MAX_LOG_HEIGHT);
+
+		// The original keeps a height that is a whole number of rows two
+		// pixels taller.
+		if (height % CHATROWHEIGHT == 0)
+			height += 2;
+
+		log_height = height;
+	}
+
 	UIChatBar::ScrollPart UIChatBar::scroll_part_at(Point<int16_t> cursorpos) const
 	{
 		Point<int16_t> rel = cursorpos - position - get_scrollbar_pos();
@@ -703,12 +781,12 @@ namespace ms
 
 	int16_t UIChatBar::get_logrows() const
 	{
-		return chatopen ? CHATROWS : 1;
+		return chatopen ? log_height / CHATROWHEIGHT : 1;
 	}
 
 	int16_t UIChatBar::get_logheight() const
 	{
-		return chatopen ? LOG_HEIGHT : LINE_LOG_HEIGHT;
+		return chatopen ? log_height : LINE_LOG_HEIGHT;
 	}
 
 	// The original lays the chat out in a window 22 pixels below the top of
@@ -717,7 +795,7 @@ namespace ms
 	int16_t UIChatBar::get_logtop() const
 	{
 		if (chatopen)
-			return -3 - LOG_HEIGHT;
+			return -3 - log_height;
 
 		return chatfieldopen ? -26 : 1;
 	}
@@ -734,7 +812,7 @@ namespace ms
 
 	int16_t UIChatBar::get_scrollbar_length() const
 	{
-		return chatopen ? LOG_HEIGHT - 2 : LINE_LOG_HEIGHT + 1;
+		return chatopen ? log_height - 2 : LINE_LOG_HEIGHT + 1;
 	}
 
 	int16_t UIChatBar::get_scrollrange() const
@@ -759,8 +837,9 @@ namespace ms
 		int16_t button = arrows[Arrow::PREV][0].height();
 		int16_t travel = get_scrollbar_length() - 2 * button - height;
 
-		// The collapsed log's scroll bar is just its two arrows.
-		if (range < 2 || travel < 0)
+		// The collapsed log's scroll bar is just its two arrows, and the
+		// original hides the thumb of a log under four rows tall.
+		if (range < 2 || travel < 0 || (chatopen && log_height < 4 * CHATROWHEIGHT))
 			return std::nullopt;
 
 		return button + travel * get_scrollpos() / (range - 1);
