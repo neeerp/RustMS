@@ -75,6 +75,14 @@ namespace ms
 	Slider::Slider() : Slider(0, {}, 0, 0, 0, {})
 	{}
 
+	Slider::~Slider()
+	{
+		if (hold.slider == this)
+			hold.slider = nullptr;
+	}
+
+	Slider::Hold Slider::hold;
+
 	bool Slider::isenabled() const
 	{
 		return enabled;
@@ -161,6 +169,9 @@ namespace ms
 	{
 		scrolling = false;
 
+		if (hold.slider == this)
+			hold.slider = nullptr;
+
 		thumb.set_state(Button::State::NORMAL);
 		next.set_state(Button::State::NORMAL);
 		prev.set_state(Button::State::NORMAL);
@@ -202,7 +213,21 @@ namespace ms
 			{
 				scrolling = false;
 			}
-		} else if (relative.x() < 0 || relative.y() < 0 || relative.x() > 8 || relative.y() > vertical.second())
+		} else if (hold.slider == this)
+		{
+			// Like the original's mouse capture: the repeat in update_held
+			// follows the cursor until the button is released.
+			if (pressed)
+			{
+				hold.cursor = cursor;
+
+				return Cursor::State::VSCROLLIDLE;
+			}
+
+			hold.slider = nullptr;
+		}
+
+		if (relative.x() < 0 || relative.y() < 0 || relative.x() > 8 || relative.y() > vertical.second())
 		{
 			thumb.set_state(Button::State::NORMAL);
 			next.set_state(Button::State::NORMAL);
@@ -236,12 +261,7 @@ namespace ms
 		{
 			if (pressed)
 			{
-				if (row > 0)
-				{
-					row--;
-					onmoved(true);
-				}
-
+				press(Part::PREV, cursor);
 				prev.set_state(Button::State::PRESSED);
 
 				return Cursor::State::VSCROLLIDLE;
@@ -260,12 +280,7 @@ namespace ms
 		{
 			if (pressed)
 			{
-				if (row < rowmax)
-				{
-					row++;
-					onmoved(false);
-				}
-
+				press(Part::NEXT, cursor);
 				next.set_state(Button::State::PRESSED);
 
 				return Cursor::State::VSCROLLIDLE;
@@ -284,38 +299,87 @@ namespace ms
 		{
 			if (pressed)
 			{
-				auto yoffset = static_cast<double>(relative.y() - buttonheight * 2);
-				auto cursorrow = static_cast<int16_t>(std::round(yoffset / rowheight));
-
-				if (cursorrow < 0)
-					cursorrow = 0;
-				else if (cursorrow > rowmax)
-					cursorrow = rowmax;
-
-				int16_t delta = row - cursorrow;
-
-				for (size_t i = 0; i < 2; i++)
-				{
-					if (delta > 0)
-					{
-						row--;
-						delta--;
-						onmoved(true);
-					}
-
-					if (delta < 0)
-					{
-						row++;
-						delta++;
-						onmoved(false);
-					}
-				}
+				press(cursor.y() < thumbpos.y() ? Part::PAGE_UP : Part::PAGE_DOWN, cursor);
 
 				return Cursor::State::VSCROLLIDLE;
 			}
 		}
 
 		return Cursor::State::VSCROLL;
+	}
+
+	Slider::Part Slider::part_at(Point<int16_t> cursor) const
+	{
+		Point<int16_t> relative = cursor - start;
+
+		if (relative.x() < 0 || relative.y() < 0 || relative.x() > 8 || relative.y() > vertical.second())
+			return Part::NONE;
+
+		Point<int16_t> thumbpos = getthumbpos();
+
+		if (thumb.bounds(thumbpos).contains(cursor))
+			return Part::THUMB;
+
+		if (prev.bounds(Point<int16_t>()).contains(cursor))
+			return Part::PREV;
+
+		if (next.bounds(Point<int16_t>()).contains(cursor))
+			return Part::NEXT;
+
+		if (cursor.y() < vertical.second())
+			return cursor.y() < thumbpos.y() ? Part::PAGE_UP : Part::PAGE_DOWN;
+
+		return Part::NONE;
+	}
+
+	void Slider::press(Part part, Point<int16_t> cursor)
+	{
+		hold = { this, part, cursor, std::chrono::steady_clock::now() };
+		step(part);
+	}
+
+	void Slider::step(Part part)
+	{
+		// The track pages by a sixteenth of the positions, but at least 16.
+		int16_t page = std::max<int16_t>(16, (rowmax + 1) / 16);
+		int16_t count = part == Part::PAGE_UP || part == Part::PAGE_DOWN ? page : 1;
+		bool upwards = part == Part::PREV || part == Part::PAGE_UP;
+
+		for (int16_t i = 0; i < count; i++)
+		{
+			if (upwards && row > 0)
+			{
+				row--;
+				onmoved(true);
+			} else if (!upwards && row < rowmax)
+			{
+				row++;
+				onmoved(false);
+			}
+		}
+	}
+
+	void Slider::update_held(bool mousedown)
+	{
+		if (!hold.slider)
+			return;
+
+		if (!mousedown)
+		{
+			hold.slider = nullptr;
+			return;
+		}
+
+		auto now = std::chrono::steady_clock::now();
+
+		if (now - hold.last <= std::chrono::milliseconds(50))
+			return;
+
+		if (hold.slider->part_at(hold.cursor) != hold.part)
+			return;
+
+		hold.last = now;
+		hold.slider->step(hold.part);
 	}
 
 	void Slider::send_scroll(double yoffset)

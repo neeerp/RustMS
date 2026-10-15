@@ -379,6 +379,14 @@ client draws text in Arial, which can't be shipped, so all text uses Arimo
 - **Old `Settings` files:** a file that still names the old Roboto defaults
   gets the Arimo defaults instead (`Configuration::load`).
 
+## Scroll bars
+
+`Slider` behaves like v83's `CScrollBar`. A press steps once right away: an
+arrow by one row, and the track by `max(16, positions / 16)` rows. While the
+button stays down, `Slider::update_held` (called from `UI::update`) repeats
+that step every 50 ms, as long as the cursor is over the part it went down
+on. Only one slider can be held at a time.
+
 ## What works and what is stubbed
 
 This is client-side capability only. The RustMS server currently implements

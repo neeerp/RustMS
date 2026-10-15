@@ -21,6 +21,7 @@
 
 #include "TwoSpriteButton.h"
 
+#include <chrono>
 #include <functional>
 
 namespace ms
@@ -32,6 +33,7 @@ namespace ms
 			   std::function<void(bool upwards)> onmoved);
 
 		Slider();
+		~Slider();
 
 		bool isenabled() const;
 
@@ -51,6 +53,10 @@ namespace ms
 		Cursor::State send_cursor(Point<int16_t> cursor, bool pressed);
 
 		void send_scroll(double yoffset);
+
+		// Repeats the step of the arrow or track held down every 50 ms while
+		// the cursor stays over it, as the original does. Call once per tick.
+		static void update_held(bool mousedown);
 
 		enum Type
 		{
@@ -86,7 +92,32 @@ namespace ms
 		};
 
 	private:
+		enum class Part
+		{
+			NONE,
+			PREV,
+			NEXT,
+			PAGE_UP,
+			PAGE_DOWN,
+			THUMB
+		};
+
 		Point<int16_t> getthumbpos() const;
+		Part part_at(Point<int16_t> cursor) const;
+		void press(Part part, Point<int16_t> cursor);
+		void step(Part part);
+
+		// The slider whose arrow or track the mouse went down on. There is
+		// one mouse, so only one can be held.
+		struct Hold
+		{
+			Slider *slider = nullptr;
+			Part part = Part::NONE;
+			Point<int16_t> cursor;
+			std::chrono::steady_clock::time_point last;
+		};
+
+		static Hold hold;
 
 		std::function<void(bool upwards)> onmoved;
 

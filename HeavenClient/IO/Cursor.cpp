@@ -94,6 +94,11 @@ namespace ms
 		}
 	}
 
+	bool Cursor::is_pressed() const
+	{
+		return pressed;
+	}
+
 	Cursor::State Cursor::shown() const
 	{
 		switch (state)
