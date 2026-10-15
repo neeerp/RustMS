@@ -103,6 +103,9 @@ namespace ms
 		// Show an effect at the mob's position.
 		void show_effect(const Animation &animation, int8_t pos, int8_t z, bool flip);
 
+		// Show a weapon's hit spark where the attack meets the mob's body.
+		void show_hit(const Animation &animation, const Rectangle<int16_t> &range, bool flip);
+
 		// Calculate the damage to this mob with the specified attack.
 		std::vector<std::pair<int32_t, bool>> calculate_damage(const Attack &attack);
 
@@ -200,8 +203,6 @@ namespace ms
 
 		std::vector<Movement> movements;
 		uint16_t counter;
-		// Ticks left to push back a mob that was knocked back.
-		uint8_t knockback_ticks;
 		// Hits queued against this mob that haven't landed yet.
 		uint16_t pending_hits;
 		// Ticks before a killed mob dies even if its pending hits never land.

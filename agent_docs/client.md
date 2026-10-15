@@ -74,7 +74,12 @@ from `UI.nx`. Moved so far:
   the shared anchor.
 - **Chat** (`UIChatBar`): the input strip in the bar's top-left and the log
   above it. The status bar cuts that strip out of its background, so the two
-  can overlap in either draw order.
+  can overlap in either draw order. As in the original, the log has three
+  layouts: collapsed, the latest line sits in the strip; collapsed while
+  typing, it moves just above the strip; expanded, five lines sit above the
+  strip and the input field stays shown. Each is a uniform half-black panel
+  with a `Basic.img/VScr5` scroll bar. Its thumb is placed as the original
+  places it, which hit-tests only an arrow's height of it.
 - **NPC dialog** (`UINpcTalk`, `UIWindow.img/UtilDlgEx`): the frame,
   buttons, menu dots, quest list headers, and the `Basic.img/VScr4` scroll
   bar (`Slider::Type::CLASSIC`). See [npc-dialogue.md](npc-dialogue.md).
@@ -116,8 +121,9 @@ from `UI.nx`. Moved so far:
   behind DETAIL, the attack and defence panel (closed with `Basic.img/BtHide`),
   laid out from period footage. The job shows as the `Job/main` and `Job/sub`
   bitmaps for explorers and Cygnus Knights. Beginners get the greyed INT and
-  LUK labels and no HP or MP buttons. The AP buttons and AUTO-ASSIGN are
-  disabled without AP. EXP shows as "exp (pct%)" and updates as it is gained.
+  LUK labels and no HP or MP buttons. The AP buttons are disabled without AP.
+  v83 had no AP auto-assign: the window creates only the six AP-up buttons and
+  DETAIL. EXP shows as "exp (pct%)" and updates as it is gained.
 - **Skill window** (`UISkillBook`, `UIWindow.img/Skill`): one tab per job
   advancement (`Basic.img/Tab5`, drawn by `ClassicTabs`), the book and name of
   the selected one, four skill rows with a `VScr4` scroll bar, and the points
@@ -218,10 +224,20 @@ from `UI.nx`. Moved so far:
   `Obj/login.img`. `UIStateLogin` loads the scene and draws it, then the book
   frame (`Login.img/Common/frame`) and the version, under the login windows.
   Each classic window calls `LoginScene::move_to` with its step. The first
-  call cuts straight to that step; later calls scroll the camera there. A
-  step with a new sign (`Login.img/Common/step`: 1 world, 2 character, 3
-  creation) slides it in from the left edge to rest at (0, 31), as the
-  original does.
+  call cuts straight to that step. Later calls follow v83
+  `CLogin::ChangeStep` (0x564909): the camera flies from the old step's stop
+  to the new one in 300 ms per step plus 500 ms, on a Hermite curve that
+  leaves at 3.5 times the distance per flight and arrives at rest, so it
+  overshoots by about 1% before it settles. The old step's sign fades out in
+  place over 300 ms. The step's windows stay hidden until the camera arrives
+  (`UIStateLogin` skips drawing, updating, and input for them), since v83
+  creates them only then. On arrival, the step's sign (`Login.img/Common/step`:
+  1 world, 2 character, 3 race select and creation) slides in from x -149 to
+  rest at (0, 33) over 300 ms. From the character select on, the world box
+  (`Common/selectWorld`) slides in to (0, 96) over 400 ms with the world and
+  channel names on it. It stays up through creation and fades out on the
+  way back to the world select or title. Once a sign or the box is in place,
+  its `Common/shadow` fades in under it over a second.
 - **Title** (`UILogin`, `Login.img/Title`): the ID and password fields and
   the buttons sit on the planks of the scene's signboard. The labels are part
   of the signboard art, and v83 places everything else in code, so the
@@ -242,10 +258,14 @@ from `UI.nx`. Moved so far:
 - **Character select** (`UICharSelect`, `Login.img/CharSelect`): up to three
   characters stand on the scene's rope bridge, 125 pixels apart. Each one
   stands under a signpost for its job family (`adventure`, `knight`, or
-  `aran`) and has a `nameTag`, which turns black when the character is
-  picked. Picking a character plays the light from above (`effect/1`) and
-  the sparkle (`effect/0`), and the character walks in place. It also
-  unrolls `scroll/0` over the character, showing the `charInfo` table with
+  `aran`), which the stats scroll covers. The v83 client lays out each
+  `nameTag` (0x571ba9, 0x5732f8): its top is level with the feet, its centre
+  6 px right of them, and it is the name's width plus 18 px, at least 58 px.
+  The name is grey (`#999999`) on tag `0` and white on the picked
+  character's tag `1`. Picking a character plays the light from above
+  (`effect/1`) and the sparkle (`effect/0`), and the character walks in
+  place. It also unrolls `scroll/0` over the character, showing the
+  `charInfo` table with
   job, level, fame, stats, and world ranking. `charInfo1` and `scroll/2` add
   the job ranking, but RustMS sends no rankings, so the short scroll is
   always used. The `pageL` and `pageR` arrows appear when the account has
@@ -253,8 +273,8 @@ from `UI.nx`. Moved so far:
   Start, Create, and Delete signs. Those three buttons are boards that hang
   on the map's `CharSelect/signboard` post, at the v83 offsets (see
   `MENU_POS`). Up and Down move the hand, Left and Right
-  move between characters, Enter starts, and Escape goes back. The selected
-  world and channel show in `Common/selectWorld`. Positions are checked
+  move between characters, Enter starts, and Escape goes back. It gives the
+  login scene the world and channel names for the world box. Positions are checked
   against footage from v55 and v1.0.
 - **Race select** (`UIRaceSelect`, `Login.img/RaceSelect`): Cygnus Knights
   (`knight`), Explorers (`normal`), and Aran stand under the `textGL` banner.
@@ -508,3 +528,11 @@ These were corrected:
    CONFIRM_SHOP_TRANSACTION handler shows "You do not have enough mesos." and
    "Please check if your inventory is full or not."; codes 0 and 8 need no
    notice.
+10. v83 keeps one binding each for Ctrl, Alt, and Shift: the game reads a
+    key's scan code without the extended bit, so Right Ctrl and Right Alt
+    arrive as the left keys, and it folds Right Shift (54) onto Left Shift
+    (42). Key Config's right-hand faces store under the left keys
+    (`KeyConfig::fold`). The client had given the right-hand keys their own
+    keys at 85 to 87, so Right Ctrl did nothing, and had put F11 and F12 at 69
+    and 70 rather than v83's 87 and 88. The `v83_modifier_and_f_keys`
+    migration drops the old right-hand copies and moves F11 and F12.

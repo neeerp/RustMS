@@ -78,6 +78,7 @@ namespace ms
 		settings.emplace<PosGAMEOPTION>();
 		settings.emplace<PosSYSTEMOPTION>();
 		settings.emplace<PosCHARINFO>();
+		settings.emplace<PosQUESTHELPER>();
 		settings.emplace<MiniMapType>();
 		settings.emplace<MiniMapSimpleMode>();
 		settings.emplace<MiniMapDefaultHelpers>();

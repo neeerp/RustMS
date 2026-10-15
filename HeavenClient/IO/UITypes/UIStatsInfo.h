@@ -88,7 +88,6 @@ namespace ms
 			BT_DEX,
 			BT_INT,
 			BT_LUK,
-			BT_AUTO,
 			BT_DETAIL,
 			BT_HIDE
 		};
