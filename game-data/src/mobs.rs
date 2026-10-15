@@ -97,6 +97,16 @@ mod tests {
     }
 
     #[test]
+    fn reads_numbers_stored_as_strings() {
+        let Some(path) = crate::test_assets::path("Mob.nx") else {
+            return;
+        };
+        let data = MobData::load(path).unwrap();
+        // 9400564's maxHP is the string "1000000".
+        assert_eq!(data.info(9400564).unwrap().unwrap().max_hp, 1_000_000);
+    }
+
+    #[test]
     fn maps_list_their_mob_spawns() {
         let Some(path) = crate::test_assets::path("Map.nx") else {
             return;

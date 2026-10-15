@@ -647,11 +647,14 @@ impl NxDataFile {
         };
 
         let node = self.node_at(child_index)?;
-        if node.data_type != 1 {
-            return Ok(None);
-        }
-
-        let signed = i64::from_le_bytes(node.data.to_le_bytes());
+        let signed = match node.data_type {
+            1 => i64::from_le_bytes(node.data.to_le_bytes()),
+            3 => match self.numeric_string(node)? {
+                Some(value) if (i32::MIN as f64..=i32::MAX as f64).contains(&value) => value as i64,
+                _ => return Ok(None),
+            },
+            _ => return Ok(None),
+        };
         i32::try_from(signed).map(Some).map_err(|_| {
             GameDataError::InvalidData(format!("integer '{key}' out of range: {signed}"))
         })
@@ -666,8 +669,24 @@ impl NxDataFile {
         Ok(match node.data_type {
             1 => Some(i64::from_le_bytes(node.data.to_le_bytes()) as f64),
             2 => Some(f64::from_bits(node.data)),
+            3 => self.numeric_string(node)?,
             _ => None,
         })
+    }
+
+    /// Some numbers are stored as strings (Mob.nx has maxHP "1000000"); the
+    /// client reads them as numbers, so we do too.
+    fn numeric_string(&self, node: NxNodeData) -> Result<Option<f64>, GameDataError> {
+        let string_index = u32::try_from(node.data)
+            .map_err(|_| GameDataError::InvalidData("string index out of range".to_string()))?;
+        let value = self.string_at(string_index)?;
+        let value = value.trim();
+        Ok(value
+            .parse::<i64>()
+            .map(|v| v as f64)
+            .or_else(|_| value.parse::<f64>())
+            .ok()
+            .filter(|v| v.is_finite()))
     }
 
     fn string_child(&self, parent_index: u32, key: &str) -> Result<Option<String>, GameDataError> {
