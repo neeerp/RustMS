@@ -29,7 +29,7 @@ namespace ms
 		mobs.draw(layer, viewx, viewy, alpha);
 	}
 
-	void MapMobs::update(const Physics &physics, Point<int16_t> playerpos)
+	void MapMobs::update(const Physics &physics, Point<int16_t> playerpos, bool playerdead)
 	{
 		for (; !spawns.empty(); spawns.pop())
 		{
@@ -54,7 +54,7 @@ namespace ms
 			Optional<Mob> mob = mmo.second.get();
 
 			if (mob)
-				mob->set_target(playerpos);
+				mob->set_target(playerpos, playerdead);
 		}
 
 		mobs.update(physics);

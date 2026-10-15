@@ -29,8 +29,14 @@ validate `QUEST_ACTION`. Normal speech has no quest or reward effects.
 transport. `net::dialogue::Prompt` and `build_prompt` also cover yes/no and
 menu prompts for server-driven NPCs (scripts).
 
-NPCs also say their `info/speak` lines now and then in an `npc`-style chat
-balloon (client only).
+NPCs also act on their own in HeavenClient (`npc_idle`, after the v83
+client). Every 3 to 9 s a standing NPC either plays one of its actions once
+(any animation but `stand` and `move`, perhaps saying one of that action's
+`speak` lines) or says one of its `info/speak` lines, in an `npc`-style chat
+balloon. NPCs never walk: v83 moves only those with `info/move`, and none
+have it. In v83 the controlling client sends each choice as NPC_ACTION
+(`0xA6`) for the server to echo to the map; RustMS doesn't control NPCs, so
+each client chooses locally and players see different actions.
 
 ## Scripted NPCs
 

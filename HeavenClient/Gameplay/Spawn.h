@@ -33,7 +33,7 @@ namespace ms
 	class NpcSpawn
 	{
 	public:
-		NpcSpawn(int32_t oid, int32_t npcid, Point<int16_t> position, bool mirrored, uint16_t fh, int16_t rx0, int16_t rx1);
+		NpcSpawn(int32_t oid, int32_t npcid, Point<int16_t> position, bool mirrored, uint16_t fh);
 
 		int32_t get_oid() const;
 
@@ -45,15 +45,13 @@ namespace ms
 		Point<int16_t> position;
 		bool flip;
 		uint16_t fh;
-		int16_t rx0;
-		int16_t rx1;
 	};
 
 	class MobSpawn
 	{
 	public:
-		MobSpawn(int32_t oid, int32_t id, int8_t mode, int8_t stance, uint16_t fh, bool newspawn, int8_t team,
-				 Point<int16_t> position);
+		MobSpawn(int32_t oid, int32_t id, int8_t mode, int8_t stance, uint16_t fh, uint16_t homefh, bool newspawn,
+				 int8_t team, Point<int16_t> position);
 
 		int8_t get_mode() const;
 
@@ -67,6 +65,7 @@ namespace ms
 		int8_t mode;
 		int8_t stance;
 		uint16_t fh;
+		uint16_t homefh;
 		bool newspawn;
 		int8_t team;
 		Point<int16_t> position;

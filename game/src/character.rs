@@ -142,6 +142,8 @@ pub struct Player {
     pub gm_level: i16,
     /// Active buffs and cooldowns; not saved.
     pub buffs: Buffs,
+    /// The portable chair the player sits on, or 0; not saved.
+    pub chair: i32,
     dirty: bool,
 }
 
@@ -169,6 +171,7 @@ impl Player {
             monster_book: MonsterBook::default(),
             gm_level: 0,
             buffs: Buffs::default(),
+            chair: 0,
             dirty: false,
         }
     }

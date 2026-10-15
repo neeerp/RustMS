@@ -110,6 +110,7 @@ namespace ms
 		Point<int16_t> spawnpoint = portals.get_portal_by_id(portalid);
 		Point<int16_t> startpos = physics.get_y_below(spawnpoint);
 		player.respawn(startpos, mapinfo.is_underwater());
+		player.set_recovery_rate(mapinfo.get_recovery());
 		left_ladder = nullptr;
 		camera.set_view(mapinfo.get_walls(), mapinfo.get_borders());
 		camera.set_position(startpos);
@@ -161,7 +162,7 @@ namespace ms
 
 		reactors.update(physics);
 		npcs.update(physics);
-		mobs.update(physics, player.get_position());
+		mobs.update(physics, player.get_position(), player.is_dead());
 		chars.update(physics);
 		drops.update(physics);
 		player.update(physics);

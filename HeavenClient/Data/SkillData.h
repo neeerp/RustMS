@@ -50,14 +50,20 @@ namespace ms
 			float ignoredef;
 			float hrange;
 			Rectangle<int16_t> range;
+			// HP and MP added to natural recovery, and Endure's seconds
+			// between heals on a ladder or rope.
+			int32_t hp;
+			int32_t mp;
+			int32_t time;
 
 			constexpr Stats(float damage, int32_t matk, int32_t fixdamage, int32_t mastery, uint8_t attackcount,
 							uint8_t mobcount, uint8_t bulletcount, int16_t bulletcost, int32_t hpcost, int32_t mpcost,
-							float chance, float critical, float ignoredef, float hrange, Rectangle<int16_t> range)
+							float chance, float critical, float ignoredef, float hrange, Rectangle<int16_t> range,
+							int32_t hp = 0, int32_t mp = 0, int32_t time = 0)
 					: damage(damage), matk(matk), fixdamage(fixdamage), mastery(mastery), attackcount(attackcount),
 					  mobcount(mobcount), bulletcount(bulletcount), bulletcost(bulletcost), hpcost(hpcost),
 					  mpcost(mpcost), chance(chance), critical(critical), ignoredef(ignoredef), hrange(hrange),
-					  range(range)
+					  range(range), hp(hp), mp(mp), time(time)
 			{}
 		};
 

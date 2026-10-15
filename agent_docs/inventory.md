@@ -72,11 +72,38 @@ applies its `spec` (`hp`, `mp`, and percent `hpR`/`mpR`, capped at the
 maximums), consumes one, and answers with the inventory change and an HP/MP
 stat update. Dead players can't use items.
 
-HEAL_OVER_TIME (`0x59`) is HeavenClient's natural recovery. As in v83, it
-comes only at rest: after every 10 s spent standing, lying prone or sitting
-without sending movement, the client reports +10 HP / +3 MP if below full.
-The server accepts at most +20 HP and +10 MP per report, one report per 9 s,
-and none within 9 s of the player's last PLAYER_MOVE; others are ignored.
+HEAL_OVER_TIME (`0x59`) is HeavenClient's natural recovery, which follows the
+v83 (MapleLegends) client's 30 ms recovery check. HP and MP keep separate
+timers, which restart whenever their conditions fail, and go out in separate
+reports; an HP heal shows its amount over the player in blue
+(`BasicEff.img/NoBlue`).
+
+- HP heals 10 every 10 s while the player stands (not alert) or sits without
+  moving. A warrior with Improved HP Recovery (1000000) heals every 5 s. On
+  a ladder or rope, only Endure heals HP (1000002 for warriors, 4100002 and
+  4200001 for assassins and bandits), every `time` seconds of its level.
+  Prone, walking, jumping and attacking heal no HP.
+- MP heals 3 every 10 s whatever the player does, while they are alive.
+- Skills add their `hp` and `mp` to each heal: Improved HP Recovery and the
+  thieves' Endures add HP, and the thieves' Endures, Fighter and Page
+  Improved MP Recovery (1110000, 1210000) add MP. A magician adds Improved
+  MP Recovery's (2000000) level times their level over 10.
+- The map's `info/recovery` scales both amounts (2 in the Sleepywood sauna,
+  10 in the Carnival rooms). On such a map (above 1), the worn top's
+  `info/recovery` scales them again (1.5 for the sauna robes), and sitting
+  scales them by another 1.5. A
+  portable chair heals its `info/recoveryHP` or `recoveryMP` instead when it
+  has one (the Relaxer heals 50 HP); its timer restarts when it switches
+  between that and the natural amount.
+
+The server allows each report up to the player's natural amount
+(`net::skills::natural_recovery`) times the map's rate, the top's rate
+where that applies, and the 1.5 sitting rate, or the chair's recovery values while the player sits on a chair they
+still own (`Player::chair`, set by USE_CHAIR and cleared by CANCEL_CHAIR and
+map changes). It takes HP at most once per HP interval (5 or 10 s), and not
+within that interval of the player's last PLAYER_MOVE, and MP at most once
+per 10 s, each with a second of slack; anything else is ignored. Endure's
+intervals are never shorter than 10 s, so climbing needs no separate check.
 
 ## NPC shops
 
