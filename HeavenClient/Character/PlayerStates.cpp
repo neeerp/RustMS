@@ -24,6 +24,10 @@ namespace ms
 	const double ROPEJUMPH = 1.3;
 	const double ROPEJUMPV = 0.5;
 
+	// Climbing in CUserLocal (FUN_00804bea): 3 px each 30 ms update,
+	// whatever the speed.
+	const double CLIMBSPEED = 3.0 * Constants::TIMESTEP / 30;
+
 	// Base class
 	void PlayerState::play_jumpsound() const
 	{
@@ -409,22 +413,41 @@ namespace ms
 
 	void PlayerClimbState::update(Player &player) const
 	{
-		if (player.is_key_down(KeyAction::Id::UP))
-			player.get_phobj().vspeed = -player.get_climbforce();
-		else if (player.is_key_down(KeyAction::Id::DOWN))
-			player.get_phobj().vspeed = player.get_climbforce();
-		else
-			player.get_phobj().vspeed = 0.0;
+		// Up and Down together cancel out.
+		int8_t dir = player.is_key_down(KeyAction::Id::DOWN) - player.is_key_down(KeyAction::Id::UP);
+		player.get_phobj().vspeed = dir * CLIMBSPEED;
 	}
 
 	void PlayerClimbState::update_state(Player &player) const
 	{
-		int16_t y = player.get_phobj().get_y();
-		bool downwards = player.is_key_down(KeyAction::Id::DOWN);
 		auto ladder = player.get_ladder();
 
-		if (ladder && ladder->felloff(y, downwards))
+		if (!ladder)
+			return;
+
+		// Past the top, the player stops, or steps 5 px above it if the
+		// ladder leads up to a platform. Past the bottom, they let go 1 px
+		// below it.
+		PhysicsObject &phobj = player.get_phobj();
+		double y = phobj.crnt_y();
+		int16_t top = ladder->get_top();
+		int16_t bottom = ladder->get_bottom();
+
+		if (phobj.vspeed < 0.0 && y < top)
+		{
+			if (ladder->leads_up())
+			{
+				phobj.set_y(top - 5);
+				cancel_ladder(player);
+			} else
+			{
+				phobj.set_y(top);
+			}
+		} else if (phobj.vspeed > 0.0 && y > bottom)
+		{
+			phobj.set_y(bottom + 1);
 			cancel_ladder(player);
+		}
 	}
 
 	void PlayerClimbState::cancel_ladder(Player &player) const

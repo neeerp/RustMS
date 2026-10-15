@@ -186,7 +186,8 @@ namespace ms
 				return static_cast<float>(std::abs(phobj.hspeed));
 			case State::LADDER:
 			case State::ROPE:
-				return static_cast<float>(std::abs(phobj.vspeed));
+				// Climbing plays at its own pace, and holds still between moves.
+				return phobj.vspeed != 0.0 ? 1.0f : 0.0f;
 			default:
 				return 1.0f;
 		}

@@ -767,11 +767,6 @@ namespace ms
 		return Physics::jump_speed(std::clamp<int32_t>(stats.get_total(EquipStat::Id::JUMP), 80, 123) / 100.0);
 	}
 
-	float Player::get_climbforce() const
-	{
-		return static_cast<float>(stats.get_total(EquipStat::Id::SPEED)) / 100;
-	}
-
 	float Player::get_flyforce() const
 	{
 		return 0.25f;

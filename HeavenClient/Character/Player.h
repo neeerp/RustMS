@@ -143,9 +143,6 @@ namespace ms
 		// Returns the takeoff speed in pixels per tick, from the total ES_JUMP stat.
 		double get_jumpforce() const;
 
-		// Returns the climbing force, calculated from the total ES_SPEED stat.
-		float get_climbforce() const;
-
 		// Returns the flying force.
 		float get_flyforce() const;
 
