@@ -43,6 +43,10 @@ pub struct SkillLevel {
     pub speed: i32,
     /// The skill's own value, e.g. Recovery's HP per heal.
     pub x: i32,
+    /// HP and MP added to each natural recovery, as Improved HP Recovery and
+    /// Endure do (`hp`, `mp`).
+    pub hp: i32,
+    pub mp: i32,
 }
 
 pub struct SkillData {
@@ -89,6 +93,8 @@ impl SkillData {
                     cooldown: int("cooltime")?,
                     speed: int("speed")?,
                     x: int("x")?,
+                    hp: int("hp")?,
+                    mp: int("mp")?,
                 });
             }
         }

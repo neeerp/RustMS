@@ -73,6 +73,9 @@ namespace ms
 
 		std::string get_bgm() const;
 
+		// How much faster players recover HP and MP at rest (info/recovery).
+		double get_recovery() const;
+
 		Range<int16_t> get_walls() const;
 
 		Range<int16_t> get_borders() const;
@@ -93,6 +96,7 @@ namespace ms
 		std::string mapmark;
 		bool swim;
 		bool town;
+		double recovery = 1.0;
 		bool hideminimap;
 		Range<int16_t> mapwalls;
 		Range<int16_t> mapborders;

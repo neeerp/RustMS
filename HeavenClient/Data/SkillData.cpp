@@ -62,13 +62,17 @@ namespace ms
 			float ignoredef = 0.0f;
 			float hrange = (float) sub["range"].get_real(100.0) / 100;
 			Rectangle<int16_t> range = sub;
+			int32_t hp = sub["hp"];
+			int32_t mp = sub["mp"];
+			int32_t time = sub["time"];
 			int32_t level = string_conversion::or_default<int32_t>(sub.name(), -1);
 
 			stats.emplace(
 					std::piecewise_construct,
 					std::forward_as_tuple(level),
 					std::forward_as_tuple(damage, matk, fixdamage, mastery, attackcount, mobcount, bulletcount,
-										  bulletcost, hpcost, mpcost, chance, critical, ignoredef, hrange, range)
+										  bulletcost, hpcost, mpcost, chance, critical, ignoredef, hrange, range, hp, mp,
+										  time)
 			);
 		}
 

@@ -36,3 +36,74 @@ pub fn learned(player: &Player, skill_id: i32) -> Option<Learned> {
         effect,
     })
 }
+
+/// What the v83 client heals on its own at rest (FUN_0083007f), before the
+/// map's `info/recovery` rate and a chair's.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct NaturalRecovery {
+    /// HP per heal: 10, plus a warrior's Improved HP Recovery `hp` or a
+    /// thief's Endure `hp`.
+    pub hp: i32,
+    /// MP per heal: 3, plus a magician's skill level in Improved MP Recovery
+    /// times their level over 10, a thief's Endure `mp`, or a Crusader's or
+    /// White Knight's Improved MP Recovery `mp`.
+    pub mp: i32,
+    /// Milliseconds between HP heals: 10000, or 5000 for a warrior with
+    /// Improved HP Recovery. MP always heals every 10000.
+    pub hp_interval: u64,
+}
+
+pub const IMPROVED_HP_RECOVERY: i32 = 1000000;
+pub const IMPROVED_MP_RECOVERY: i32 = 2000000;
+pub const ASSASSIN_ENDURE: i32 = 4100002;
+pub const BANDIT_ENDURE: i32 = 4200001;
+pub const FIGHTER_IMPROVED_MP_RECOVERY: i32 = 1110000;
+pub const PAGE_IMPROVED_MP_RECOVERY: i32 = 1210000;
+
+pub fn natural_recovery(player: &Player) -> NaturalRecovery {
+    let job = i32::from(player.stats.job);
+    let effect = |skill_id| learned(player, skill_id).map(|skill| skill.effect);
+    let hp_skill = if job / 100 == 1 {
+        effect(IMPROVED_HP_RECOVERY)
+    } else if in_line(job, 410) {
+        effect(ASSASSIN_ENDURE)
+    } else if in_line(job, 420) {
+        effect(BANDIT_ENDURE)
+    } else {
+        None
+    };
+    let mp_bonus = if job / 100 == 2 {
+        player.skills.level(IMPROVED_MP_RECOVERY) * i32::from(player.stats.level) / 10
+    } else {
+        let skill_id = [
+            (410, ASSASSIN_ENDURE),
+            (420, BANDIT_ENDURE),
+            (111, FIGHTER_IMPROVED_MP_RECOVERY),
+            (121, PAGE_IMPROVED_MP_RECOVERY),
+        ]
+        .into_iter()
+        .find(|&(line, _)| in_line(job, line))
+        .map(|(_, skill_id)| skill_id);
+        skill_id.and_then(effect).map_or(0, |effect| effect.mp)
+    };
+    let hp_interval = if job / 100 == 1 && player.skills.level(IMPROVED_HP_RECOVERY) > 0 {
+        5000
+    } else {
+        10000
+    };
+    NaturalRecovery {
+        hp: 10 + hp_skill.map_or(0, |effect| effect.hp),
+        mp: 3 + mp_bonus,
+        hp_interval,
+    }
+}
+
+/// Whether `job` is `base` or advanced from it, as the v83 client checks:
+/// 410 covers 410 to 412, and 100 every warrior.
+fn in_line(job: i32, base: i32) -> bool {
+    if base % 100 == 0 {
+        base / 100 == job / 100
+    } else {
+        base / 10 == job / 10 && base % 10 <= job % 10
+    }
+}

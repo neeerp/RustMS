@@ -182,6 +182,9 @@ async fn natural_recovery_waits_for_the_player_to_rest() {
     send(c, walk_to(100, 0)).await;
     let t = step(c, &m, heal(10, 0)).await;
     assert!(t.stat_values(stat::HP).is_empty(), "still moving");
+    // MP heals whatever the player does.
+    let t = step(c, &m, heal(0, 3)).await;
+    assert!(!t.stat_values(stat::MP).is_empty(), "MP heals while moving");
 }
 
 #[tokio::test]

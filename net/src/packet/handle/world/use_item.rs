@@ -2,6 +2,7 @@ use crate::handler::{HandlerResult, WorldAction, WorldContext, WorldHandler, Wor
 use crate::items;
 use crate::packet::build::world::stat::StatUpdate;
 use crate::packet::build::world::{inventory, stat};
+use crate::skills;
 use game::{InventoryType, Player};
 use packet::{io::read::PktRead, Packet};
 use std::io::Cursor;
@@ -60,23 +61,28 @@ fn use_item(player: &mut Player, slot: i16, item_id: i32) -> Option<Vec<game::In
 /// checks the timing; this only parses and bounds the amounts.
 pub struct HealOverTimeHandler;
 
-/// Most a beginner recovers per tick without skills (HP, MP).
-pub const MAX_NATURAL_HEAL: (i16, i16) = (20, 10);
+/// v83 heals 1.5 times as much on a chair or seat.
+const SEATED_RECOVERY_RATE: f64 = 1.5;
 
-/// Most the player may recover per tick: the natural maximum, or a portable
-/// chair's `recoveryHP`/`recoveryMP` while they sit on one they still own.
+/// Most the player may recover per tick: their natural amount at the map's
+/// `info/recovery` rate, seated, or a portable chair's
+/// `recoveryHP`/`recoveryMP` while they sit on one they still own.
 fn max_heal(player: &Player) -> (i16, i16) {
+    let natural = skills::natural_recovery(player);
+    let rate = crate::get_game_data()
+        .ok()
+        .and_then(|data| data.field(player.stats.map_id))
+        .map_or(1.0, |field| field.recovery)
+        * SEATED_RECOVERY_RATE;
     let chair = (player.chair != 0 && player.inventory.count(player.chair) > 0)
         .then(|| items::info(player.chair))
         .flatten();
-    let Some(chair) = chair else {
-        return MAX_NATURAL_HEAL;
+    let (chair_hp, chair_mp) = chair.map_or((0, 0), |chair| (chair.recovery_hp, chair.recovery_mp));
+    let bound = |natural: i32, chair: i32| {
+        let natural = (f64::from(natural) * rate) as i32;
+        i16::try_from(natural.max(chair)).unwrap_or(i16::MAX)
     };
-    let bound = |natural: i16, chair: i32| natural.max(i16::try_from(chair).unwrap_or(i16::MAX));
-    (
-        bound(MAX_NATURAL_HEAL.0, chair.recovery_hp),
-        bound(MAX_NATURAL_HEAL.1, chair.recovery_mp),
-    )
+    (bound(natural.hp, chair_hp), bound(natural.mp, chair_mp))
 }
 
 impl WorldHandler for HealOverTimeHandler {
@@ -204,5 +210,44 @@ mod tests {
         // Not once the chair has left the inventory.
         player.inventory.take(InventoryType::Setup, 1, 1).unwrap();
         assert!(!heal_over_time(&mut player, 50, 0));
+    }
+
+    #[test]
+    fn recovery_skills_raise_the_heal_bound() {
+        if skills::data().is_err() {
+            return;
+        }
+        let learn = |player: &mut Player, skill_id, level| {
+            player.skills.set(game::SkillRecord {
+                skill_id,
+                level,
+                master_level: 0,
+                expiration: None,
+            })
+        };
+        // Improved HP Recovery 16 adds 50 HP, seated 1.5 times (10 + 50).
+        let mut player = crate::codec::stats::sample_player();
+        learn(&mut player, skills::IMPROVED_HP_RECOVERY, 16);
+        assert!(heal_over_time(&mut player, 90, 4));
+        assert!(!heal_over_time(&mut player, 91, 0));
+        // A level 50 magician with Improved MP Recovery 16 adds 80 MP.
+        let mut player = crate::codec::stats::sample_player();
+        player.stats.job = 200;
+        player.stats.level = 50;
+        learn(&mut player, skills::IMPROVED_MP_RECOVERY, 16);
+        assert!(heal_over_time(&mut player, 15, 124));
+        assert!(!heal_over_time(&mut player, 0, 125));
+    }
+
+    #[test]
+    fn a_recovery_map_raises_the_heal_bound() {
+        if crate::get_game_data().is_err() {
+            return;
+        }
+        // The Sleepywood sauna heals twice as fast.
+        let mut player = crate::codec::stats::sample_player();
+        player.stats.map_id = 105040401;
+        assert!(heal_over_time(&mut player, 30, 9));
+        assert!(!heal_over_time(&mut player, 31, 0));
     }
 }
