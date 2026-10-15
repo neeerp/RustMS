@@ -20,6 +20,7 @@
 #include "PlayerStates.h"
 
 #include "../Audio/Audio.h"
+#include "../Data/SkillData.h"
 #include "../Data/WeaponData.h"
 #include "../IO/UI.h"
 
@@ -222,7 +223,6 @@ namespace ms
 		{
 			MovePlayerPacket(newmove).dispatch();
 			lastmove = newmove;
-			recovery_timer = 0;
 		}
 
 		return get_layer();
@@ -259,32 +259,159 @@ namespace ms
 
 	void Player::update_recovery()
 	{
-		bool resting = state == Char::State::STAND || state == Char::State::PRONE || state == Char::State::SIT;
-
-		if (!resting)
-		{
-			recovery_timer = 0;
-			return;
-		}
-
-		recovery_timer += Constants::TIMESTEP;
-
-		if (recovery_timer < RECOVERY_INTERVAL)
-			return;
-
-		recovery_timer = 0;
-
 		int32_t hp = stats.get_stat(MapleStat::Id::HP);
 		int32_t mp = stats.get_stat(MapleStat::Id::MP);
+		double rate = chair ? recovery_rate * CHAIR_RECOVERY_RATE : recovery_rate;
 
-		if (hp <= 0)
-			return;
+		// HP needs the player to keep still since the last frame. On a
+		// ladder or rope only Endure heals; otherwise they must stand or sit,
+		// not alert or attacking.
+		bool still = phobj.get_x() == phobj.get_last_x() && phobj.get_y() == phobj.get_last_y();
+		bool climbing = state == Char::State::LADDER || state == Char::State::ROPE;
+		bool resting = state == Char::State::SIT || (state == Char::State::STAND && !look.get_alerted());
+		uint16_t hp_interval = 0;
 
-		int16_t heal_hp = hp < stats.get_total(EquipStat::Id::HP) ? RECOVERY_HP : 0;
-		int16_t heal_mp = mp < stats.get_total(EquipStat::Id::MP) ? RECOVERY_MP : 0;
+		if (hp > 0 && hp < stats.get_total(EquipStat::Id::HP) && still && !attacking)
+		{
+			if (climbing)
+				hp_interval = get_endure_interval();
+			else if (resting)
+				hp_interval = stats.get_job().get_id() / 100 == 1 && skillbook.get_level(IMPROVED_HP_RECOVERY) > 0
+							  ? WARRIOR_HP_RECOVERY_INTERVAL
+							  : RECOVERY_INTERVAL;
+		}
 
-		if (heal_hp > 0 || heal_mp > 0)
-			HealOverTimePacket(heal_hp, heal_mp).dispatch();
+		int16_t heal_hp = 0;
+		int16_t heal_mp = 0;
+
+		if (hp_interval > 0)
+		{
+			int16_t natural = static_cast<int16_t>((RECOVERY_HP + get_recovery_hp_bonus()) * rate);
+			heal_hp = hp_recovery.update(hp_interval, chair_recovery_hp, natural);
+		} else
+		{
+			hp_recovery.timer = 0;
+		}
+
+		if (hp > 0 && mp < stats.get_total(EquipStat::Id::MP))
+		{
+			int16_t natural = static_cast<int16_t>((RECOVERY_MP + get_recovery_mp_bonus()) * rate);
+			heal_mp = mp_recovery.update(RECOVERY_INTERVAL, chair_recovery_mp, natural);
+		} else
+		{
+			mp_recovery.timer = 0;
+		}
+
+		// Like v83, HP and MP go out in separate packets, and an HP heal shows
+		// its amount in blue.
+		if (heal_hp > 0)
+		{
+			HealOverTimePacket(heal_hp, 0).dispatch();
+			show_heal(heal_hp);
+		}
+
+		if (heal_mp > 0)
+			HealOverTimePacket(0, heal_mp).dispatch();
+	}
+
+	int16_t Player::Recovery::update(uint16_t interval, int16_t chair_amount, int16_t natural_amount)
+	{
+		bool chair_source = chair_amount > 0;
+
+		if (chair_source != from_chair)
+		{
+			from_chair = chair_source;
+			timer = 0;
+		}
+
+		timer += Constants::TIMESTEP;
+
+		if (timer < interval)
+			return 0;
+
+		timer = 0;
+
+		return chair_source ? chair_amount : natural_amount;
+	}
+
+	namespace
+	{
+		// Whether job is base or advanced from it, as v83 checks (FUN_006545ca):
+		// 410 covers 410 to 412, and 100 every warrior.
+		bool in_job_line(int32_t job, int32_t base)
+		{
+			if (base % 100 == 0)
+				return base / 100 == job / 100;
+
+			return base / 10 == job / 10 && base % 10 <= job % 10;
+		}
+
+		const SkillData::Stats &skill_stats(const SkillBook &skillbook, int32_t skill_id)
+		{
+			return SkillData::get(skill_id).get_stats(skillbook.get_level(skill_id));
+		}
+	}
+
+	int16_t Player::get_recovery_hp_bonus() const
+	{
+		int32_t job = stats.get_job().get_id();
+
+		if (job / 100 == 1)
+			return static_cast<int16_t>(skill_stats(skillbook, IMPROVED_HP_RECOVERY).hp);
+
+		if (in_job_line(job, 410))
+			return static_cast<int16_t>(skill_stats(skillbook, ASSASSIN_ENDURE).hp);
+
+		if (in_job_line(job, 420))
+			return static_cast<int16_t>(skill_stats(skillbook, BANDIT_ENDURE).hp);
+
+		return 0;
+	}
+
+	int16_t Player::get_recovery_mp_bonus() const
+	{
+		int32_t job = stats.get_job().get_id();
+
+		// A magician recovers their skill level times their level over 10.
+		if (job / 100 == 2)
+			return static_cast<int16_t>(skillbook.get_level(IMPROVED_MP_RECOVERY) * get_level() / 10);
+
+		if (in_job_line(job, 410))
+			return static_cast<int16_t>(skill_stats(skillbook, ASSASSIN_ENDURE).mp);
+
+		if (in_job_line(job, 420))
+			return static_cast<int16_t>(skill_stats(skillbook, BANDIT_ENDURE).mp);
+
+		if (in_job_line(job, 111))
+			return static_cast<int16_t>(skill_stats(skillbook, FIGHTER_IMPROVED_MP_RECOVERY).mp);
+
+		if (in_job_line(job, 121))
+			return static_cast<int16_t>(skill_stats(skillbook, PAGE_IMPROVED_MP_RECOVERY).mp);
+
+		return 0;
+	}
+
+	uint16_t Player::get_endure_interval() const
+	{
+		int32_t job = stats.get_job().get_id();
+		int32_t skill_id = 0;
+
+		if (job / 100 == 1)
+			skill_id = WARRIOR_ENDURE;
+		else if (in_job_line(job, 410))
+			skill_id = ASSASSIN_ENDURE;
+		else if (in_job_line(job, 420))
+			skill_id = BANDIT_ENDURE;
+
+		if (skill_id == 0 || skillbook.get_level(skill_id) <= 0)
+			return 0;
+
+		return static_cast<uint16_t>(skill_stats(skillbook, skill_id).time * 1000);
+	}
+
+	void Player::set_recovery_rate(double rate)
+	{
+		recovery_rate = rate;
 	}
 
 	int8_t Player::get_integer_attackspeed() const
@@ -587,6 +714,10 @@ namespace ms
 	{
 		Char::set_chair(itemid);
 		leaving_chair = false;
+
+		nl::node info = nl::nx::item["Install"]["0301.img"][string_format::extend_id(itemid, 8)]["info"];
+		chair_recovery_hp = itemid ? static_cast<int16_t>(info["recoveryHP"].get_integer()) : 0;
+		chair_recovery_mp = itemid ? static_cast<int16_t>(info["recoveryMP"].get_integer()) : 0;
 	}
 
 	void Player::set_ladder(Optional<const Ladder> ldr)

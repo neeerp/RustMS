@@ -20,6 +20,8 @@ pub struct MobInfo {
     pub body_attack: bool,
     /// Never attacks.
     pub not_attack: bool,
+    /// Goes for nearby players without being hit first.
+    pub first_attack: bool,
     pub boss: bool,
     pub undead: bool,
 }
@@ -66,6 +68,7 @@ impl MobData {
             speed: int("speed")?,
             body_attack: int("bodyAttack")? != 0,
             not_attack: int("notAttack")? != 0,
+            first_attack: int("firstAttack")? != 0,
             boss: int("boss")? != 0,
             undead: int("undead")? != 0,
         }))

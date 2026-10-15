@@ -60,6 +60,7 @@ namespace ms
 		settings.emplace<DefaultRegion>();
 		settings.emplace<DefaultCharacter>();
 		settings.emplace<Chatopen>();
+		settings.emplace<ChatHeight>();
 		settings.emplace<PosSTATS>();
 		settings.emplace<PosEQINV>();
 		settings.emplace<PosINV>();

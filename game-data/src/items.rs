@@ -21,6 +21,9 @@ pub struct ItemInfo {
     pub price: i32,
     /// What one throwing star or bullet costs to recharge (`unitPrice`).
     pub unit_price: f64,
+    /// What a portable chair heals every 10 seconds (`recoveryHP`/`recoveryMP`).
+    pub recovery_hp: i32,
+    pub recovery_mp: i32,
     /// `spec` of consumable items.
     pub spec: Option<ConsumeSpec>,
     pub equip: Option<EquipInfo>,
@@ -159,6 +162,8 @@ impl ItemData {
             info.trade_block = nx.int_child(meta, "tradeBlock")? == Some(1);
             info.price = nx.int_child(meta, "price")?.unwrap_or(0);
             info.unit_price = nx.real_child(meta, "unitPrice")?.unwrap_or(0.0);
+            info.recovery_hp = nx.int_child(meta, "recoveryHP")?.unwrap_or(0);
+            info.recovery_mp = nx.int_child(meta, "recoveryMP")?.unwrap_or(0);
         }
         if let Some(spec) = nx.child_by_name(node, "spec")? {
             info.spec = Some(ConsumeSpec {
@@ -225,6 +230,8 @@ impl ItemData {
             trade_block: nx.int_child(meta, "tradeBlock")? == Some(1),
             price: nx.int_child(meta, "price")?.unwrap_or(0),
             unit_price: 0.0,
+            recovery_hp: 0,
+            recovery_mp: 0,
             spec: None,
             equip: Some(equip),
         }))
@@ -273,6 +280,8 @@ mod tests {
             (subi.price, subi.unit_price, subi.slot_max),
             (250, 0.3, 500)
         );
+        let relaxer = data.info(3010000).unwrap().unwrap();
+        assert_eq!((relaxer.recovery_hp, relaxer.recovery_mp), (50, 0));
     }
 
     #[test]

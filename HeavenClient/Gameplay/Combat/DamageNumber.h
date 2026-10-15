@@ -35,13 +35,14 @@ namespace ms
 	class DamageNumber
 	{
 	public:
-		static const size_t NUM_TYPES = 3;
+		static const size_t NUM_TYPES = 4;
 
 		enum Type
 		{
 			NORMAL,
 			CRITICAL,
-			TOPLAYER
+			TOPLAYER,
+			HEAL
 		};
 
 		DamageNumber(Type type, int32_t damage, int16_t starty, int16_t x = 0);

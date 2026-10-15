@@ -36,7 +36,9 @@ pub use self::change_channel::ChangeChannelHandler;
 pub use self::change_map::{warp, ChangeMapHandler};
 pub use self::char_info::CharInfoRequestHandler;
 pub use self::chat::AllChatHandler;
-pub use self::combat::{CloseRangeAttackHandler, MoveLifeHandler, TakeDamageHandler};
+pub use self::combat::{
+    CloseRangeAttackHandler, MobDistanceHandler, MoveLifeHandler, TakeDamageHandler,
+};
 pub use self::emote::FaceExpressionHandler;
 pub use self::item_move::ItemMoveHandler;
 pub use self::keybinds::ChangeKeybindsHandler;
@@ -56,6 +58,6 @@ pub use self::reactor::DamageReactorHandler;
 pub use self::rearrange::{GatherItemsHandler, SortItemsHandler};
 pub use self::script_portal::ChangeMapSpecialHandler;
 pub use self::spend_points::{SpendApHandler, SpendSpHandler};
-pub use self::use_item::{HealOverTimeHandler, UseItemHandler, MAX_NATURAL_HEAL};
+pub use self::use_item::{HealOverTimeHandler, UseItemHandler};
 pub use self::use_skill::UseSkillHandler;
 pub use self::whisper::WhisperHandler;
