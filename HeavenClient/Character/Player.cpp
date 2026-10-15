@@ -20,6 +20,7 @@
 #include "PlayerStates.h"
 
 #include "../Audio/Audio.h"
+#include "../Data/EquipData.h"
 #include "../Data/SkillData.h"
 #include "../Data/WeaponData.h"
 #include "../IO/UI.h"
@@ -261,7 +262,16 @@ namespace ms
 	{
 		int32_t hp = stats.get_stat(MapleStat::Id::HP);
 		int32_t mp = stats.get_stat(MapleStat::Id::MP);
-		double rate = chair ? recovery_rate * CHAIR_RECOVERY_RATE : recovery_rate;
+		double rate = recovery_rate;
+
+		// The worn top's info/recovery (the sauna robes) only counts on a map
+		// that already recovers faster (FUN_0083007f).
+		if (rate > 1.0)
+			if (int32_t top = inventory.get_item_id(InventoryType::Id::EQUIPPED, EquipSlot::Id::TOP))
+				rate *= EquipData::get(top).get_recovery();
+
+		if (chair)
+			rate *= CHAIR_RECOVERY_RATE;
 
 		// HP needs the player to keep still since the last frame. On a
 		// ladder or rope only Endure heals; otherwise they must stand or sit,

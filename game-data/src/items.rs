@@ -40,7 +40,7 @@ pub struct ConsumeSpec {
 }
 
 /// An equipment template (`Character.nx/<category>/<id>.img/info`).
-#[derive(Clone, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Debug, Default, PartialEq)]
 pub struct EquipInfo {
     pub upgrade_slots: u8,
     pub str: i16,
@@ -67,6 +67,9 @@ pub struct EquipInfo {
     pub req_int: i16,
     pub req_luk: i16,
     pub cash: bool,
+    /// `info/recovery`: how much faster the wearer recovers on a map whose
+    /// own recovery is above 1 (the sauna robes, 1.5).
+    pub recovery: Option<f64>,
 }
 
 /// Top-level `Item.nx` directory for a non-equipment item id.
@@ -221,6 +224,7 @@ impl ItemData {
             req_int: stat("reqINT")?,
             req_luk: stat("reqLUK")?,
             cash: nx.int_child(meta, "cash")? == Some(1),
+            recovery: nx.real_child(meta, "recovery")?,
         };
         Ok(Some(ItemInfo {
             item_id,
@@ -309,5 +313,8 @@ mod tests {
         assert_eq!(hat.slot_max, 1);
         let sword = data.info(1302000).unwrap().unwrap().equip.unwrap();
         assert!(sword.watk > 0);
+        assert_eq!(sword.recovery, None);
+        let robe = data.info(1050018).unwrap().unwrap().equip.unwrap();
+        assert_eq!(robe.recovery, Some(1.5));
     }
 }

@@ -89,14 +89,16 @@ reports; an HP heal shows its amount over the player in blue
   Improved MP Recovery (1110000, 1210000) add MP. A magician adds Improved
   MP Recovery's (2000000) level times their level over 10.
 - The map's `info/recovery` scales both amounts (2 in the Sleepywood sauna,
-  10 in the Carnival rooms), and sitting scales them by another 1.5. A
+  10 in the Carnival rooms). On such a map (above 1), the worn top's
+  `info/recovery` scales them again (1.5 for the sauna robes), and sitting
+  scales them by another 1.5. A
   portable chair heals its `info/recoveryHP` or `recoveryMP` instead when it
   has one (the Relaxer heals 50 HP); its timer restarts when it switches
   between that and the natural amount.
 
 The server allows each report up to the player's natural amount
-(`net::skills::natural_recovery`) times the map's rate and the 1.5 sitting
-rate, or the chair's recovery values while the player sits on a chair they
+(`net::skills::natural_recovery`) times the map's rate, the top's rate
+where that applies, and the 1.5 sitting rate, or the chair's recovery values while the player sits on a chair they
 still own (`Player::chair`, set by USE_CHAIR and cleared by CANCEL_CHAIR and
 map changes). It takes HP at most once per HP interval (5 or 10 s), and not
 within that interval of the player's last PLAYER_MOVE, and MP at most once
