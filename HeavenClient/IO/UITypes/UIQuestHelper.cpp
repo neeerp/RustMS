@@ -80,6 +80,12 @@ namespace ms
 		{
 			top_minimized.draw(position);
 		}
+		else if (entries.empty())
+		{
+			// The window is as short as when minimized, so only the top of
+			// the maximized art shows.
+			top.draw(position, Rectangle<int16_t>(0, WIDTH, 0, TOP_MINIMIZED));
+		}
 		else
 		{
 			top.draw(position);
@@ -191,7 +197,8 @@ namespace ms
 
 	int16_t UIQuestHelper::height() const
 	{
-		if (minimized)
+		// As in the original (FUN_007052e6), there is no body without quests.
+		if (minimized || entries.empty())
 			return TOP_MINIMIZED;
 
 		int16_t rows = 0;
