@@ -105,6 +105,9 @@ namespace ms
 		// Returns the height.
 		int16_t vdelta() const;
 
+		// Returns the distance from one end to the other.
+		double length() const;
+
 		// Returns the slope as a ratio of vertical/horizontal.
 		double slope() const;
 

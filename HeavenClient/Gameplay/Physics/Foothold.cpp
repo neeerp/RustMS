@@ -17,6 +17,8 @@
 //////////////////////////////////////////////////////////////////////////////////
 #include "Foothold.h"
 
+#include <cmath>
+
 namespace ms
 {
 	Foothold::Foothold(nl::node src, uint16_t id, uint8_t ly, uint16_t gr) : m_prev(src["prev"]), m_next(src["next"]),
@@ -147,6 +149,11 @@ namespace ms
 	int16_t Foothold::vdelta() const
 	{
 		return m_vertical.delta();
+	}
+
+	double Foothold::length() const
+	{
+		return std::hypot(hdelta(), vdelta());
 	}
 
 	double Foothold::slope() const

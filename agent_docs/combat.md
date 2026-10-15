@@ -30,7 +30,17 @@ templates from `Mob.nx` (`maxHP`, `exp`, `PADamage`, `bodyAttack`,
   heads for the local player, keeping its direction until it is 100 px past
   them, and gives up after 180 to 240 s. A mob that cannot move turns to
   face the player and forgets them once they leave a 2000 x 1200 box.
-  Flying mobs still use the older HeavenClient random flight.
+- **Flying mobs:** a flier (`Mob::think_fly`, v83's FUN_007f8875) heads for
+  a waypoint every 90 ms step. Idle, it roams a random foothold group for
+  (the group's width + 40 to 239) / 8 waypoints, each from 50 px above to
+  9 px below a random spot on one of the group's footholds. Chasing, each
+  waypoint is up to 120 px across and 40 px up or down from the player, and
+  it gives up after 59 to 118 of them. It steers across until within 10 px
+  of the waypoint, beats up while the waypoint is higher, and glides once
+  within 10 px of its height. It moves on once within 11 px, or once the
+  player is 150 px from the waypoint. It sends its movement at each new
+  waypoint and at least once a second, and between those updates another
+  client's flier glides the way it faces.
 - **Jumping mobs:** a mob that can walk and jump stays within the reach of
   its current foothold group and the group it spawned on, less 20 px a side
   (`FootholdTree::limit_jumper`). At a loose foothold end or a wall it stops

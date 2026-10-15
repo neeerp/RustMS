@@ -351,6 +351,82 @@ void falling(const ms::Physics& physics)
 	require(player.onground && std::abs(fastest * TICKS_PER_SECOND - 670.0) < 1e-9, "a long fall did not reach the v83 fall speed");
 }
 
+// A flying shoe at flySpeed 1 pushes at 1200 px/s^2 up to 200 px/s.
+void flying(const ms::Physics& physics)
+{
+	auto flier = [&](double y)
+	{
+		ms::PhysicsObject mob;
+		mob.shoe = true;
+		mob.flyspeed = 1.0;
+		mob.onground = false;
+		mob.set_x(0); mob.set_y(y);
+		return mob;
+	};
+	auto speed = [](double perTick) { return perTick * TICKS_PER_SECOND; };
+
+	// Steering sideways while gliding: the glide settles on sinking at 60
+	// px/s, picking up at half the push.
+	ms::PhysicsObject mob = flier(-150);
+	mob.walkdir = 1;
+	mob.flydir = -1;
+	physics.move_object(mob);
+	require(std::abs(speed(mob.hspeed) - 9.6) < 1e-9, "a flier did not push at 1200 px/s^2");
+	require(std::abs(speed(mob.vspeed) - 4.8) < 1e-9, "a glide did not pick up at 600 px/s^2");
+	for (int tick = 0; tick < 50; ++tick)
+	{
+		mob.walkdir = 1;
+		physics.move_object(mob);
+	}
+	require(std::abs(speed(mob.hspeed) - 200.0) < 1e-9, "a flier did not top out at its flySpeed");
+	require(std::abs(speed(mob.vspeed) - 60.0) < 1e-9, "a glide did not sink at 0.3 of flySpeed");
+
+	// A glide brakes a faster fall at the full push.
+	mob.vspeed = 100.0 / TICKS_PER_SECOND;
+	physics.move_object(mob);
+	require(std::abs(speed(mob.vspeed) - 90.4) < 1e-9, "a glide did not brake a fall at 1200 px/s^2");
+
+	// Not steering, it slows by floatDrag1 / mass, and twice over while
+	// faster than its flySpeed.
+	mob = flier(-150);
+	mob.flydir = -1;
+	mob.hspeed = 300.0 / TICKS_PER_SECOND;
+	physics.move_object(mob);
+	require(std::abs(speed(mob.hspeed) - 284.0) < 1e-9, "a fast flier did not slow at twice 1000 px/s^2");
+	mob.walkdir = 1;
+	physics.move_object(mob);
+	require(std::abs(speed(mob.hspeed) - 276.0) < 1e-9, "a fast flier steering on did not slow at 1000 px/s^2");
+
+	// Diving speeds up to its flySpeed, through every floor, and stops at
+	// the bottom of the map's physical space, 10 px below its lowest floor.
+	mob = flier(-100);
+	double fastest = 0.0;
+	for (int tick = 0; tick < 1000; ++tick)
+	{
+		physics.move_object(mob);
+		fastest = std::max(fastest, speed(mob.vspeed));
+		require(!mob.onground, "a flier landed");
+	}
+	require(mob.crnt_y() == 1309 && std::abs(fastest - 200.0) < 1e-9, "a dive did not keep on at flySpeed to the map's bottom");
+	require(std::abs(speed(mob.vspeed) - 200.0) < 1e-9, "the map's bottom slowed a flier");
+
+	// The sides of the space are 30 px in from the platforms.
+	mob = flier(-150);
+	mob.set_x(-1960);
+	for (int tick = 0; tick < 20; ++tick)
+	{
+		mob.walkdir = -1;
+		physics.move_object(mob);
+	}
+	require(mob.crnt_x() == -1970, "a flier left the map's side");
+
+	// Its jump beats up at its full flySpeed, keeping its sideways speed.
+	mob = flier(-150);
+	mob.hspeed = 50.0 / TICKS_PER_SECOND;
+	ms::Physics::fly_jump(mob);
+	require(std::abs(speed(mob.vspeed) + 200.0) < 1e-9 && std::abs(speed(mob.hspeed) - 50.0) < 1e-9, "a flier's beat was wrong");
+}
+
 // A 100 px wall stops a walking player whichever way the map draws it:
 // going up along the chain (y1 > y2) or going down (y1 < y2).
 void walls(const ms::Physics& physics)
@@ -499,6 +575,7 @@ int main()
 			standing_jump(physics);
 			running_jump(physics);
 			falling(physics);
+			flying(physics);
 			jumping_down(physics);
 			// A knocked back mob sets its own ground speed; friction must not
 			// eat into it, even below the usual stopping threshold.
@@ -579,6 +656,12 @@ int main()
 			nl::file map(path.string());
 			ms::Physics physics(map.root());
 			walls(physics);
+			// Fliers pick their idle waypoints from a group's footholds.
+			const ms::FootholdTree& fht = physics.get_fht();
+			require(fht.get_groups() == std::vector<uint16_t>{1, 2, 3}, "foothold groups were not listed in load order");
+			require(fht.get_group_footholds(2) == std::vector<uint16_t>{4, 5, 6}, "a group's footholds were not listed");
+			require(fht.get_group_footholds(9).empty(), "a missing group had footholds");
+			require(fht.get_fh(2).length() == 100.0 && fht.get_fh(7).length() == 7000.0, "foothold lengths were wrong");
 		}
 		std::filesystem::remove(path);
 		std::cout << "Movement physics passed\n";

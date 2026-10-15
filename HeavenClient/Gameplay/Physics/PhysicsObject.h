@@ -232,6 +232,11 @@ namespace ms
 		double walkdrag = 1.0;
 		int8_t walkdir = 0;
 
+		// A shoe with a flyspeed flies through platforms, steered by walkdir
+		// and by flydir: -1 to glide down slowly, 0 to dive.
+		double flyspeed = 0.0;
+		int8_t flydir = 0;
+
 		// A JUMPER's home group, whether it jumps or carries on at the end of
 		// its foothold, and whether it walks down a step there rather than
 		// jumping. jumprequest is set when it stops at an end to jump.

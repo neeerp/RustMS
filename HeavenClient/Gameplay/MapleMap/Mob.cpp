@@ -16,6 +16,7 @@
 //	along with this program.  If not, see <https://www.gnu.org/licenses/>.		//
 //////////////////////////////////////////////////////////////////////////////////
 #include "Mob.h"
+#include "Layer.h"
 
 #include "../../Character/TouchDamage.h"
 #include "../../Constants.h"
@@ -80,22 +81,19 @@ namespace ms
 		hitsound = sndsrc["Damage"];
 		diesound = sndsrc["Die"];
 
-		flyspeed += 100;
-		flyspeed *= 0.0005f;
+		// v83 mobs walk on a CAttrShoe (FUN_005c55cd): its speed is
+		// info/speed + 100 clamped to 10-140 percent, and info/fs scales
+		// both its acceleration and its drag. A flier's shoe flies and walks
+		// at info/flySpeed instead, the only speed most fliers have.
+		double shoespeed = std::clamp((canfly ? flyspeed : speed) + 100.0f, 10.0f, 140.0f) * 0.01;
+
+		phobj.shoe = true;
+		phobj.walkspeed = canmove ? shoespeed : 0.0;
+		phobj.walkforce = info["fs"].get_real(1.0);
+		phobj.walkdrag = phobj.walkforce;
 
 		if (canfly)
-		{
-			phobj.type = PhysicsObject::Type::FLYING;
-		} else
-		{
-			// v83 mobs walk on a CAttrShoe (FUN_005c55cd): its speed is
-			// info/speed + 100 clamped to 10-140 percent, and info/fs scales
-			// both its acceleration and its drag.
-			phobj.shoe = true;
-			phobj.walkspeed = canmove ? std::clamp(speed + 100.0f, 10.0f, 140.0f) * 0.01 : 0.0;
-			phobj.walkforce = info["fs"].get_real(1.0);
-			phobj.walkdrag = phobj.walkforce;
-		}
+			phobj.flyspeed = shoespeed;
 
 		id = mid;
 		team = tm;
@@ -114,15 +112,18 @@ namespace ms
 		// v83 stands a new mob on the foothold it enters on (FUN_007f115f),
 		// even where its position is a little off that foothold, and drops
 		// it from where it is without one.
-		if (!canfly)
-		{
-			if (fh)
-				physics.get_fht().place_on_fh(phobj, fh);
-			else
-				phobj.onground = false;
-		}
+		// A flier enters in the air, and v83 (FUN_005c6499) draws it above
+		// every layer.
+		if (fh && !canfly)
+			physics.get_fht().place_on_fh(phobj, fh);
+		else
+			phobj.onground = false;
 
-		phobj.set_flag(PhysicsObject::Flag::TURNATEDGES);
+		if (canfly)
+			phobj.fhlayer = Layer::Id::SEVEN;
+
+		if (!canfly)
+			phobj.set_flag(PhysicsObject::Flag::TURNATEDGES);
 
 		// v83 gives a mob with move but neither jump nor fly move ability 1
 		// (0x5d9785), which keeps it off the ends of its platform.
@@ -142,8 +143,12 @@ namespace ms
 		dead = false;
 		fading = false;
 		set_stance(st);
-		flydirection = STRAIGHT;
-		counter = 0;
+		haswaypoint = false;
+		flygroup = -1;
+		flycount = 0;
+		flyx = 0;
+		flyy = 0;
+		flysteps = 0;
 		pending_hits = 0;
 		death_timeout = 0;
 
@@ -160,9 +165,6 @@ namespace ms
 			fadein = false;
 			opacity.set(1.0f);
 		}
-
-		if (control && stance == Stance::STAND && canfly)
-			next_move();
 	}
 
 	void Mob::set_stance(uint8_t stancebyte)
@@ -247,26 +249,25 @@ namespace ms
 				}
 			}
 
+			if (canfly)
+			{
+				// Another client's flier glides the way it faces between the
+				// controller's updates.
+				if (!control)
+				{
+					flyx = stance == Stance::MOVE ? (flip ? 1 : -1) : 0;
+					flyy = stance == Stance::HIT ? 0 : -1;
+				}
+
+				phobj.walkdir = flyx;
+				phobj.flydir = flyy;
+			}
+
 			switch (stance)
 			{
 				case Stance::MOVE:
-					if (canfly)
-					{
-						phobj.hforce = flip ? flyspeed : -flyspeed;
-
-						switch (flydirection)
-						{
-							case FlyDirection::UPWARDS:
-								phobj.vforce = -flyspeed;
-								break;
-							case FlyDirection::DOWNWARDS:
-								phobj.vforce = flyspeed;
-								break;
-						}
-					} else
-					{
+					if (!canfly)
 						phobj.walkdir = flip ? 1 : -1;
-					}
 
 					break;
 				case Stance::HIT:
@@ -317,30 +318,7 @@ namespace ms
 			bool jumprequest = phobj.jumprequest;
 			phobj.jumprequest = false;
 
-			if (control && canfly)
-			{
-				counter++;
-
-				bool next;
-
-				switch (stance)
-				{
-					case Stance::HIT:
-						// The hit pose lasts one run of its animation.
-						next = aniend;
-						break;
-					default:
-						next = aniend && counter > 200;
-						break;
-				}
-
-				if (next)
-				{
-					next_move();
-					update_movement();
-					counter = 0;
-				}
-			} else if (control)
+			if (control)
 			{
 				// v83 gives up a chase 3 to 4 minutes after aggro (FUN_007f7f02).
 				if (hastarget)
@@ -360,7 +338,6 @@ namespace ms
 						{
 							set_stance(Stance::STAND);
 							update_movement();
-							counter = 0;
 						}
 
 						break;
@@ -380,7 +357,12 @@ namespace ms
 					default:
 						// The mob vecctrl steps its AI in 90 ms steps (FUN_007f72d9).
 						for (aitime += Constants::TIMESTEP; aitime >= 90; aitime -= 90)
-							think(physics);
+						{
+							if (canfly)
+								think_fly(physics);
+							else
+								think(physics);
+						}
 
 						break;
 				}
@@ -402,48 +384,117 @@ namespace ms
 		return phobj.fhlayer;
 	}
 
-	void Mob::next_move()
+	void Mob::think_fly(const Physics &physics)
 	{
-		if (canmove)
+		// FUN_007f8875 steers for the waypoint unless within 10 px of it
+		// across, glides once within 10 px of its height, and beats up while
+		// it is higher.
+		if (haswaypoint)
 		{
-			switch (stance)
+			double x = phobj.crnt_x();
+			double y = phobj.crnt_y();
+			int8_t xdir = 0;
+			int8_t ydir = 0;
+
+			if (std::abs(static_cast<int32_t>(x - waypoint.x())) > 9)
+				xdir = x <= waypoint.x() ? 1 : -1;
+
+			if (std::abs(static_cast<int32_t>(y - waypoint.y())) < 10)
+				ydir = -1;
+			else if (waypoint.y() < y)
+				Physics::fly_jump(phobj);
+
+			fly(xdir, ydir);
+
+			// It moves on once within 11 px of the waypoint, or once its
+			// target is 150 px from it.
+			auto within = [&](Point<int16_t> point, int16_t range)
 			{
-				case Stance::HIT:
-				case Stance::STAND:
-					set_stance(Stance::MOVE);
-					flip = randomizer.next_bool();
-					break;
-				case Stance::MOVE:
-				case Stance::JUMP:
-					if (canjump && phobj.onground && randomizer.below(0.25f))
-					{
-						set_stance(Stance::JUMP);
-					} else
-					{
-						switch (randomizer.next_int(3))
-						{
-							case 0:
-								set_stance(Stance::STAND);
-								break;
-							case 1:
-								set_stance(Stance::MOVE);
-								flip = false;
-								break;
-							case 2:
-								set_stance(Stance::MOVE);
-								flip = true;
-								break;
-						}
-					}
+				return point.x() >= waypoint.x() - range && point.x() < waypoint.x() + range &&
+					   point.y() >= waypoint.y() - range && point.y() < waypoint.y() + range;
+			};
 
-					break;
-			}
+			Point<int16_t> position(static_cast<int16_t>(x), static_cast<int16_t>(y));
 
-			if (stance == Stance::MOVE && canfly)
-				flydirection = randomizer.next_enum(FlyDirection::NUM_DIRECTIONS);
-		} else
+			if (within(position, 11) || (hastarget && !within(targetpos, 150)))
+				haswaypoint = false;
+		}
+
+		// It tells the server where it is at each new waypoint, and at
+		// least once a second.
+		if (!haswaypoint)
+			pick_waypoint(physics);
+		else if (++flysteps < 11)
+			return;
+
+		update_movement();
+		flysteps = 0;
+	}
+
+	void Mob::pick_waypoint(const Physics &physics)
+	{
+		// Chasing, it heads up to 120 px across and 40 px up or down from its
+		// target, and gives up after 59 to 118 more waypoints.
+		if (hastarget)
+		{
+			if (flycount == 0)
+				flycount = randomizer.next_int(60) + 60;
+
+			waypoint = targetpos + Point<int16_t>(randomizer.next_int(240) - 120, randomizer.next_int(80) - 40);
+			haswaypoint = true;
+			flygroup = -1;
+
+			if (--flycount < 1)
+				hastarget = false;
+			else
+				return;
+		}
+
+		// Otherwise it roams a random group for (its width + 40 to 239) / 8
+		// waypoints, each from 50 px above to 9 px below one of its platforms.
+		const FootholdTree &fht = physics.get_fht();
+		const std::vector<uint16_t> &groups = fht.get_groups();
+
+		if (groups.empty())
+			return;
+
+		if (flycount < 1 || flygroup < 0)
+		{
+			flygroup = groups[randomizer.next_int(groups.size())];
+
+			Range<int16_t> reach = fht.get_group_reach(flygroup);
+
+			flycount = (reach.second() - reach.first() + 40 + randomizer.next_int(200)) >> 3;
+		}
+
+		const std::vector<uint16_t> &footholds = fht.get_group_footholds(flygroup);
+		const Foothold &fh = fht.get_fh(footholds[randomizer.next_int(footholds.size())]);
+		double length = fh.length();
+		auto span = static_cast<int32_t>(length);
+		double along = span > 0 ? randomizer.next_int(span) : 0;
+		double ux = length > 0.0 ? fh.hdelta() / length : 0.0;
+		double uy = length > 0.0 ? fh.vdelta() / length : 0.0;
+
+		waypoint = {
+			static_cast<int16_t>(fh.x1() + ux * along),
+			static_cast<int16_t>(fh.y1() + uy * along + randomizer.next_int(60) - 50)
+		};
+		haswaypoint = true;
+		flycount--;
+	}
+
+	void Mob::fly(int8_t x, int8_t y)
+	{
+		flyx = x;
+		flyy = y;
+
+		if (x == 0)
 		{
 			set_stance(Stance::STAND);
+		} else
+		{
+			set_stance(Stance::MOVE);
+			flip = x > 0;
 		}
 	}
 
@@ -960,8 +1011,11 @@ namespace ms
 		} else if (control && is_alive() && damage >= knockback && stance != Stance::HIT)
 		{
 			flip = toleft;
-			counter = 0;
 			set_stance(Stance::HIT);
+
+			// It stops steering while hit, so a flier dives (FUN_007f7f02).
+			flyx = 0;
+			flyy = 0;
 
 			// v83 pushes a flinching mob away from its attacker at 130 px/s.
 			if (canmove)

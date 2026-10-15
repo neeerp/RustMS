@@ -80,7 +80,12 @@ namespace ms
 
 					// v83 (FUN_0085fe71) keeps how far each group reaches, walls
 					// included.
-					auto extent = groups.try_emplace(group, foothold.l(), foothold.r()).first;
+					auto [extent, added] = groups.try_emplace(group, foothold.l(), foothold.r());
+
+					if (added)
+						grouporder.push_back(group);
+
+					groupfootholds[group].push_back(id);
 					extent->second = {
 						std::min(extent->second.first(), foothold.l()),
 						std::max(extent->second.second(), foothold.r())
@@ -117,6 +122,16 @@ namespace ms
 			borders = {
 				static_cast<int16_t>(topb - 300),
 				static_cast<int16_t>(botb + 100)
+			};
+			// v83's physical space (FUN_0085fe71) spans the platforms, 30 px
+			// in from the sides, 300 px above and 10 px below.
+			spacex = {
+				static_cast<int16_t>(leftw + 30),
+				static_cast<int16_t>(rightw - 30)
+			};
+			spacey = {
+				static_cast<int16_t>(topb - 300),
+				static_cast<int16_t>(botb + 10)
 			};
 	}
 
@@ -199,6 +214,13 @@ namespace ms
 					phobj.limity(borders.second());
 			}
 		}
+	}
+
+	void FootholdTree::limit_flight(PhysicsObject &phobj) const
+	{
+		// FUN_007f9202 moves a flier back inside, leaving its speed alone.
+		phobj.x = std::clamp(phobj.crnt_x(), double(spacex.first()), spacex.second() - 1.0);
+		phobj.y = std::clamp(phobj.crnt_y(), double(spacey.first()), spacey.second() - 1.0);
 	}
 
 	void FootholdTree::update_fh(PhysicsObject &phobj) const
@@ -504,6 +526,20 @@ namespace ms
 			return {INT16_MAX, INT16_MIN};
 
 		return iter->second;
+	}
+
+	const std::vector<uint16_t> &FootholdTree::get_groups() const
+	{
+		return grouporder;
+	}
+
+	const std::vector<uint16_t> &FootholdTree::get_group_footholds(uint16_t group) const
+	{
+		static const std::vector<uint16_t> none;
+
+		auto iter = groupfootholds.find(group);
+
+		return iter == groupfootholds.end() ? none : iter->second;
 	}
 
 	uint16_t FootholdTree::get_fhid_below(double fx, double fy, uint16_t ignore) const

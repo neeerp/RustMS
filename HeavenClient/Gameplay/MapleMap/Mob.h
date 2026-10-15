@@ -131,14 +131,6 @@ namespace ms
 		Point<int16_t> get_head_position() const;
 
 	private:
-		enum FlyDirection
-		{
-			STRAIGHT,
-			UPWARDS,
-			DOWNWARDS,
-			NUM_DIRECTIONS
-		};
-
 		// Set the stance by byte value
 		void set_stance(uint8_t stancebyte);
 
@@ -148,11 +140,17 @@ namespace ms
 		// Start the death animation.
 		void apply_death();
 
-		// Decide on the next state of a flying mob.
-		void next_move();
-
 		// Take one 90 ms step of a ground mob's AI.
 		void think(const Physics &physics);
+
+		// Take one 90 ms step of a flying mob's AI.
+		void think_fly(const Physics &physics);
+
+		// Pick where a flier heads next.
+		void pick_waypoint(const Physics &physics);
+
+		// Steer a flier left (-1) or right (1), and glide (-1) or dive (0).
+		void fly(int8_t x, int8_t y);
 
 		// The part of a jumping mob's AI step that comes before its usual
 		// decision. Returns whether it jumped instead.
@@ -223,7 +221,6 @@ namespace ms
 		TimedBool showhp;
 
 		std::vector<Movement> movements;
-		uint16_t counter;
 		// Hits queued against this mob that haven't landed yet.
 		uint16_t pending_hits;
 		// Ticks before a killed mob dies even if its pending hits never land.
@@ -251,7 +248,17 @@ namespace ms
 		int16_t jumpy;
 		Stance stance;
 		bool flip;
-		FlyDirection flydirection;
+		// A flier heads for a waypoint, near its target or on a random platform
+		// of the group it roams. flycount counts down the waypoints left
+		// before it picks another group, or gives up the chase.
+		bool haswaypoint;
+		Point<int16_t> waypoint;
+		int32_t flygroup;
+		int32_t flycount;
+		int8_t flyx;
+		int8_t flyy;
+		// AI steps since the flier last told the server where it is.
+		uint16_t flysteps;
 		float walkforce;
 		int8_t hppercent;
 		bool fading;
