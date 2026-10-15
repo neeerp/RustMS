@@ -56,6 +56,7 @@ namespace ms
 		undead = info["undead"].get_bool();
 		noflip = info["noFlip"].get_bool();
 		notattack = info["notAttack"].get_bool();
+		firstattack = info["firstAttack"].get_bool();
 		canjump = src["jump"].size() > 0;
 		canfly = src["fly"].size() > 0;
 		canmove = src["move"].size() > 0 || canfly;
@@ -327,6 +328,19 @@ namespace ms
 
 					if (targettime < 0)
 						hastarget = false;
+				}
+
+				// A firstAttack mob that can attack (FUN_005ce8c6) starts
+				// chasing the local player once they come within
+				// |dx| / 10 + |dy| / 3 <= 40 of it.
+				if (firstattack && !notattack && !hastarget)
+				{
+					Point<int16_t> position = get_position();
+					int32_t dx = std::abs(targetpos.x() - position.x());
+					int32_t dy = std::abs(targetpos.y() - position.y());
+
+					if (dx / 10 + dy / 3 <= 40)
+						chase();
 				}
 
 				switch (stance)
@@ -717,18 +731,24 @@ namespace ms
 	{
 		control = mode > 0;
 
-		// v83 (FUN_005d511d -> FUN_007f73d8) has a mob given with aggro
-		// chase the local player for 180 to 240 s and decide at once.
+		// v83 (FUN_005d511d) has a mob given with aggro chase the local
+		// player.
 		if (mode == 2)
 		{
-			hastarget = true;
-			targettime = 180000 + randomizer.next_int(60000);
-			thinktimer = 0;
-			movedir = 0;
+			chase();
 		} else if (mode == 0)
 		{
 			hastarget = false;
 		}
+	}
+
+	void Mob::chase()
+	{
+		// FUN_007f73d8
+		hastarget = true;
+		targettime = 180000 + randomizer.next_int(60000);
+		thinktimer = 0;
+		movedir = 0;
 	}
 
 	void Mob::set_target(Point<int16_t> position)

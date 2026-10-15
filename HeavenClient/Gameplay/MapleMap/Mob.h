@@ -143,6 +143,9 @@ namespace ms
 		// Take one 90 ms step of a ground mob's AI.
 		void think(const Physics &physics);
 
+		// Chase the local player for 180 to 240 s, deciding at once.
+		void chase();
+
 		// Take one 90 ms step of a flying mob's AI.
 		void think_fly(const Physics &physics);
 
@@ -207,6 +210,7 @@ namespace ms
 		bool touchdamage;
 		bool noflip;
 		bool notattack;
+		bool firstattack;
 		bool canmove;
 		bool canjump;
 		bool canfly;
