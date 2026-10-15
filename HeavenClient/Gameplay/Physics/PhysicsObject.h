@@ -191,7 +191,11 @@ namespace ms
 		{
 			NOGRAVITY = 0x0001,
 			TURNATEDGES = 0x0002,
-			CHECKBELOW = 0x0004
+			CHECKBELOW = 0x0004,
+			// With TURNATEDGES, stop short of every foothold end that does not
+			// lead onto another floor, as v83 does for mobs that walk but
+			// cannot jump.
+			WALKONLY = 0x0008
 		};
 
 		Type type = Type::NORMAL;

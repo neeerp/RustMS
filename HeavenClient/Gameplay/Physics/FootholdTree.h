@@ -57,6 +57,8 @@ namespace ms
 
 		double get_edge(uint16_t fhid, bool left) const;
 
+		double get_walk_edge(uint16_t fhid, bool left) const;
+
 		const Foothold &get_fh(uint16_t fhid) const;
 
 		std::unordered_map<uint16_t, Foothold> footholds;

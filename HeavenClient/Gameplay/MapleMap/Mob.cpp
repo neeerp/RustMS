@@ -93,6 +93,11 @@ namespace ms
 		phobj.fhid = fh;
 		phobj.set_flag(PhysicsObject::Flag::TURNATEDGES);
 
+		// v83 gives a mob with move but neither jump nor fly move ability 1
+		// (0x5d9785), which keeps it off the ends of its platform.
+		if (canmove && !canjump && !canfly)
+			phobj.set_flag(PhysicsObject::Flag::WALKONLY);
+
 		hppercent = 0;
 		dying = false;
 		dead = false;
