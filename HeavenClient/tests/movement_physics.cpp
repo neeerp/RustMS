@@ -43,7 +43,8 @@ std::filesystem::path flat_map(const std::vector<int64_t>& floors)
 	{
 		size_t first = 3 + floors.size() + 6 * i;
 		node(3 + i, 8 + i, first, 6, 0, 0);
-		const int64_t values[] = {0, 0, -1000, 1000, floors[i], floors[i]};
+		const int64_t width = i + 1 == floors.size() ? 2000 : 1000;
+		const int64_t values[] = {0, 0, -width, width, floors[i], floors[i]};
 		for (size_t j = 0; j < 6; ++j) node(first + j, 2 + j, 0, 0, 1, values[j]);
 	}
 	for (size_t i = 0; i < names.size(); ++i)
@@ -284,6 +285,58 @@ int main()
 			running_jump(physics);
 			falling(physics);
 			jumping_down(physics);
+			// A knocked back mob sets its own ground speed; friction must not
+			// eat into it, even below the usual stopping threshold.
+			ms::PhysicsObject mob;
+			mob.set_x(0); mob.set_y(100);
+			physics.move_object(mob);
+			mob.set_flag(ms::PhysicsObject::Flag::NOFRICTION);
+			for (double speed : {1.04, 0.05})
+			{
+				mob.hspeed = speed;
+				double start = mob.crnt_x();
+				physics.move_object(mob);
+				require(mob.onground && mob.hspeed == speed, "ground friction slowed a NOFRICTION object");
+				require(std::abs(mob.crnt_x() - start - speed) < 1e-9, "NOFRICTION object moved the wrong distance");
+			}
+		}
+		{
+			// A walking-only mob turns 20 px before the loose ends of the
+			// floor, and is pulled back if it starts past that point.
+			nl::file map(path.string());
+			ms::Physics physics(map.root());
+			for (double start : {900.0, 990.0, -900.0, -990.0})
+			{
+				double direction = start > 0.0 ? 1.0 : -1.0;
+				ms::PhysicsObject mob;
+				mob.set_x(start); mob.set_y(100);
+				mob.set_flag(ms::PhysicsObject::Flag::TURNATEDGES);
+				mob.set_flag(ms::PhysicsObject::Flag::WALKONLY);
+				physics.move_object(mob);
+				require(mob.onground && mob.fhid != 0, "walker fixture did not find its floor");
+				for (int tick = 0; mob.is_flag_set(ms::PhysicsObject::Flag::TURNATEDGES); ++tick)
+				{
+					require(tick < 1000, "walker never reached the edge");
+					mob.hforce = direction * .1;
+					physics.move_object(mob);
+				}
+				require(mob.crnt_x() == direction * 980 && mob.onground, "walker did not stop 20 px from the edge");
+			}
+		}
+		{
+			// A mob that enters on a foothold stands on it, even if its
+			// position is a pixel below it, and stays there.
+			nl::file map(path.string());
+			ms::Physics physics(map.root());
+			ms::PhysicsObject mob;
+			mob.set_x(500); mob.set_y(101);
+			physics.get_fht().place_on_fh(mob, 1);
+			require(mob.crnt_y() == 100 && mob.onground && mob.fhid == 1, "spawn was not put on its foothold");
+			physics.move_object(mob);
+			require(mob.crnt_y() == 100 && mob.onground, "placed mob fell");
+			mob.set_x(1200); mob.set_y(50);
+			physics.get_fht().place_on_fh(mob, 1);
+			require(mob.crnt_x() == 1000 && mob.crnt_y() == 100, "placement was not clamped to the foothold");
 		}
 		std::filesystem::remove(path);
 		std::cout << "Movement physics passed\n";

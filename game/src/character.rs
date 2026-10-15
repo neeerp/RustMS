@@ -120,6 +120,8 @@ pub struct FieldAvatar {
     pub x: i16,
     pub y: i16,
     pub stance: u8,
+    /// The portable chair (a 301xxxx setup item) the player sits on, or 0.
+    pub chair: i32,
 }
 
 /// A character that is logged in. The owning client actor holds the only
@@ -194,6 +196,7 @@ impl Player {
             x,
             y,
             stance,
+            chair: 0,
         }
     }
 

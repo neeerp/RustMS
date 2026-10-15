@@ -12,6 +12,8 @@
 
 #include <nlnx/nx.hpp>
 
+#include <algorithm>
+
 namespace ms
 {
 	namespace
@@ -22,11 +24,33 @@ namespace ms
 		constexpr int16_t UNTRACK_ROOM = 24;
 		// Between a requirement's name and its count.
 		constexpr int16_t COUNT_GAP = 12;
+		// The original's windows drag by their top 25 pixels.
+		constexpr int16_t DRAG_HEIGHT = 25;
+		// The saved position before the helper is first moved
+		constexpr Point<int16_t> UNSET = Point<int16_t>(-1, -1);
+
+		// The original colours the count you have by how far along it is
+		// (FUN_00704c2c), in steps of a third.
+		Color::Name count_color(const QuestObjective& objective)
+		{
+			int32_t percent = objective.have * 100 / std::max(objective.need, 1);
+
+			if (percent <= 32)
+				return Color::Name::BRIGHTRED;
+			else if (percent <= 65)
+				return Color::Name::WILDSTRAWBERRY;
+			else if (percent < 100)
+				return Color::Name::PIZAZZ;
+			else
+				return Color::Name::DEEPGREEN;
+		}
 	}
 
 	UIQuestHelper::UIQuestHelper(QuestLog& quests, const Inventory& inventory) :
-		UIElement(Point<int16_t>(), Point<int16_t>(WIDTH, 0)), quests(quests), inventory(inventory)
+		quests(quests), inventory(inventory), moved(position != UNSET)
 	{
+		dimension = Point<int16_t>(WIDTH, 0);
+
 		nl::node alarm = NxFiles::ui_classic["UIWindow.img"]["QuestAlarm"];
 		nl::node basic = NxFiles::ui_classic["Basic.img"];
 
@@ -44,7 +68,9 @@ namespace ms
 		buttons[CLOSE] = std::make_unique<MapleButton>(basic["BtClose"], Point<int16_t>(203, 4));
 		buttons[MAXIMIZE]->set_active(false);
 
-		update_screen(Constants::Constants::get().get_viewwidth(), Constants::Constants::get().get_viewheight());
+		if (!moved)
+			position = default_position();
+
 		rebuild();
 	}
 
@@ -53,6 +79,12 @@ namespace ms
 		if (minimized)
 		{
 			top_minimized.draw(position);
+		}
+		else if (entries.empty())
+		{
+			// The window is as short as when minimized, so only the top of
+			// the maximized art shows.
+			top.draw(position, Rectangle<int16_t>(0, WIDTH, 0, TOP_MINIMIZED));
 		}
 		else
 		{
@@ -89,8 +121,8 @@ namespace ms
 
 	void UIQuestHelper::update()
 	{
-		// Below the party HP list, when there is one.
-		position = Point<int16_t>(position.x(), UIPartyHP::height_for(Stage::get().get_player().get_party()));
+		if (!moved)
+			position = default_position();
 
 		std::vector<std::pair<int16_t, std::vector<QuestObjective>>> current;
 		const auto& started = quests.started_quests();
@@ -148,12 +180,11 @@ namespace ms
 					? nl::nx::string["Mob.img"][std::to_string(objective.id)]["name"].get_string()
 					: ItemData::get(objective.id).get_name();
 
-				// Only the count you have is coloured, once it is enough.
+				// Only the count you have is coloured.
 				entry.requirements.push_back({
-					Text(Text::A12M, Text::LEFT, Color::Name::DARKGREY, name),
-					Text(Text::A12M, Text::LEFT, objective.met() ? Color::Name::HIPPIEGREEN : Color::Name::DARKGREY,
-						std::to_string(objective.have)),
-					Text(Text::A12M, Text::LEFT, Color::Name::DARKGREY, "/" + std::to_string(objective.need))
+					Text(Text::A12M, Text::LEFT, Color::Name::BLACK, name),
+					Text(Text::A12M, Text::LEFT, count_color(objective), std::to_string(objective.have)),
+					Text(Text::A12M, Text::LEFT, Color::Name::BLACK, "/" + std::to_string(objective.need))
 				});
 				y += ROW;
 			}
@@ -166,7 +197,8 @@ namespace ms
 
 	int16_t UIQuestHelper::height() const
 	{
-		if (minimized)
+		// As in the original (FUN_007052e6), there is no body without quests.
+		if (minimized || entries.empty())
 			return TOP_MINIMIZED;
 
 		int16_t rows = 0;
@@ -180,9 +212,18 @@ namespace ms
 		return TOP + rows + BOTTOM;
 	}
 
-	void UIQuestHelper::update_screen(int16_t new_width, int16_t)
+	Point<int16_t> UIQuestHelper::default_position() const
 	{
-		position = Point<int16_t>(new_width - WIDTH, 0);
+		// Flush with the top-right corner, below the party HP list when there
+		// is one.
+		return Point<int16_t>(Constants::Constants::get().get_viewwidth() - WIDTH,
+			UIPartyHP::height_for(Stage::get().get_player().get_party()));
+	}
+
+	void UIQuestHelper::update_screen(int16_t, int16_t)
+	{
+		if (!moved)
+			position = default_position();
 	}
 
 	bool UIQuestHelper::is_in_range(Point<int16_t> cursorpos) const
@@ -192,7 +233,26 @@ namespace ms
 
 	Cursor::State UIQuestHelper::send_cursor(bool clicked, Point<int16_t> cursorpos)
 	{
-		return UIElement::send_cursor(clicked, cursorpos);
+		Cursor::State state = UIDragElement::send_cursor(clicked, cursorpos);
+
+		if (dragged)
+			moved = true;
+
+		return state;
+	}
+
+	bool UIQuestHelper::indragrange(Point<int16_t> cursorpos) const
+	{
+		Rectangle<int16_t> top(position, position + Point<int16_t>(WIDTH, std::min(DRAG_HEIGHT, height())));
+
+		if (!top.contains(cursorpos))
+			return false;
+
+		for (const auto& [id, button] : buttons)
+			if (button->is_active() && button->bounds(position).contains(cursorpos))
+				return false;
+
+		return true;
 	}
 
 	Button::State UIQuestHelper::button_pressed(uint16_t buttonid)

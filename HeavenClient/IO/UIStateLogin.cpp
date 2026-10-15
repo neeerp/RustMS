@@ -27,6 +27,27 @@
 
 namespace ms
 {
+	namespace
+	{
+		// The windows that belong to a login step. Like v83, which creates
+		// them once the camera arrives, they stay hidden while it flies.
+		bool waits_for_camera(UIElement::Type type)
+		{
+			switch (type)
+			{
+			case UIElement::Type::LOGIN:
+			case UIElement::Type::WORLDSELECT:
+			case UIElement::Type::REGION:
+			case UIElement::Type::CHARSELECT:
+			case UIElement::Type::RACESELECT:
+			case UIElement::Type::CLASSCREATION:
+				return LoginScene::get().moving();
+			default:
+				return false;
+			}
+		}
+	}
+
 	UIStateLogin::UIStateLogin()
 	{
 		focused = UIElement::Type::NONE;
@@ -52,9 +73,11 @@ namespace ms
 		{
 			UIElement *element = iter.second.get();
 
-			if (element && element->is_active())
+			if (element && element->is_active() && !waits_for_camera(element->get_type()))
 				element->draw(inter);
 		}
+
+		LoginScene::get().draw_world_box(inter);
 
 		if (tooltip)
 			tooltip->draw(cursor + Point<int16_t>(0, 22));
@@ -68,13 +91,16 @@ namespace ms
 		{
 			UIElement *element = iter.second.get();
 
-			if (element && element->is_active())
+			if (element && element->is_active() && !waits_for_camera(element->get_type()))
 				element->update();
 		}
 	}
 
 	void UIStateLogin::doubleclick(Point<int16_t> pos)
 	{
+		if (waits_for_camera(UIElement::Type::CHARSELECT))
+			return;
+
 		if (auto charselect = UI::get().get_element<UICharSelect>())
 			charselect->doubleclick(pos);
 	}
@@ -83,6 +109,9 @@ namespace ms
 	{
 		if (UIElement *focusedelement = get(focused))
 		{
+			if (waits_for_camera(focused))
+				return;
+
 			if (focusedelement->is_active())
 			{
 				return focusedelement->send_key(action, pressed, escape);
@@ -102,6 +131,9 @@ namespace ms
 
 		if (auto focusedelement = get(focused))
 		{
+			if (waits_for_camera(focused))
+				return Cursor::State::IDLE;
+
 			if (focusedelement->is_active())
 			{
 				remove_cursor(focusedelement->get_type());
@@ -117,6 +149,9 @@ namespace ms
 		{
 			if (auto front = get_front())
 			{
+				if (waits_for_camera(front->get_type()))
+					return Cursor::State::IDLE;
+
 				remove_cursor(front->get_type());
 
 				return front->send_cursor(clicked, cursorpos);

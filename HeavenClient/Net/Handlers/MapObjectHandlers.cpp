@@ -63,7 +63,7 @@ namespace ms
 
 		recv.read_int(); // count of 5110000 
 		recv.read_int(); // 'itemeffect'
-		recv.read_int(); // 'chair'
+		int32_t chair = recv.read_int();
 
 		Point<int16_t> position = recv.read_point();
 		int8_t stance = recv.read_byte();
@@ -106,7 +106,7 @@ namespace ms
 		recv.read_byte(); // team
 
 		Stage::get().get_chars().spawn(
-			{ cid, look, level, job, name, stance, position }
+			{ cid, look, level, job, name, stance, position, chair }
 		);
 	}
 
@@ -171,6 +171,21 @@ namespace ms
 			otherchar->set_expression(emote + 99);
 	}
 
+	void ShowChairHandler::handle(InPacket& recv) const
+	{
+		int32_t cid = recv.read_int();
+		int32_t itemid = recv.read_int();
+
+		if (Optional<OtherChar> otherchar = Stage::get().get_chars().get_char(cid))
+			otherchar->set_chair(itemid);
+	}
+
+	void CancelChairHandler::handle(InPacket& recv) const
+	{
+		if (recv.read_byte() == 0)
+			Stage::get().get_player().stand_up();
+	}
+
 	void UpdateCharLookHandler::handle(InPacket& recv) const
 	{
 		int32_t cid = recv.read_int();
@@ -231,9 +246,10 @@ namespace ms
 		Point<int16_t> position = recv.read_point();
 		int8_t stance = recv.read_byte();
 
-		recv.skip(2);
-
+		// The foothold the mob stands on (0 if airborne), then the one it
+		// spawned on.
 		uint16_t fh = recv.read_short();
+		recv.skip(2);
 		int8_t effect = recv.read_byte();
 
 		if (effect > 0)
@@ -284,9 +300,8 @@ namespace ms
 				Point<int16_t> position = recv.read_point();
 				int8_t stance = recv.read_byte();
 
-				recv.skip(2);
-
 				uint16_t fh = recv.read_short();
+				recv.skip(2); // spawn foothold
 				int8_t effect = recv.read_byte();
 
 				if (effect > 0)
@@ -396,14 +411,12 @@ namespace ms
 		recv.skip(4);
 
 		Point<int16_t> dropfrom;
+		int16_t delay = 0;
 
 		if (mode != 2)
 		{
 			dropfrom = recv.read_point();
-
-			recv.skip(2);
-
-			Sound(Sound::Name::DROP).play();
+			delay = recv.read_short();
 		}
 		else
 		{
@@ -416,7 +429,7 @@ namespace ms
 		bool playerdrop = !recv.read_bool();
 
 		Stage::get().get_drops().spawn(
-			{ oid, itemid, meso, owner, dropfrom, dropto, pickuptype, mode, playerdrop }
+			{ oid, itemid, meso, owner, dropfrom, dropto, pickuptype, mode, delay, playerdrop }
 		);
 	}
 
@@ -431,12 +444,15 @@ namespace ms
 		{
 			int32_t cid = recv.read_int();
 
+			// A pet's loot flies to its owner.
 			if (recv.length() > 0)
 				recv.read_byte(); // pet
-			else if (auto character = Stage::get().get_character(cid))
+
+			if (auto character = Stage::get().get_character(cid))
 				looter = character->get_phobj();
 
-			Sound(Sound::Name::PICKUP).play();
+			if (Stage::get().is_player(cid))
+				Sound(Sound::Name::PICKUP).play();
 		}
 
 		Stage::get().get_drops().remove(oid, mode, looter.get());

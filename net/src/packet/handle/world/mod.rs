@@ -1,5 +1,6 @@
 mod buddy;
 mod cash_shop;
+mod chair;
 mod change_channel;
 mod change_map;
 mod char_info;
@@ -30,6 +31,7 @@ mod whisper;
 
 pub use self::buddy::BuddyListModifyHandler;
 pub use self::cash_shop::{CashShopOperationHandler, EnterCashShopHandler};
+pub use self::chair::{CancelChairHandler, UseChairHandler};
 pub use self::change_channel::ChangeChannelHandler;
 pub use self::change_map::{warp, ChangeMapHandler};
 pub use self::char_info::CharInfoRequestHandler;

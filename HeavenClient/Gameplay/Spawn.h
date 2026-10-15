@@ -59,7 +59,7 @@ namespace ms
 
 		int32_t get_oid() const;
 
-		std::unique_ptr<MapObject> instantiate() const;
+		std::unique_ptr<MapObject> instantiate(const Physics &physics) const;
 
 	private:
 		int32_t oid;
@@ -92,7 +92,7 @@ namespace ms
 	{
 	public:
 		DropSpawn(int32_t oid, int32_t id, bool meso, int32_t owner, Point<int16_t> position,
-				  Point<int16_t> destination, int8_t droptype, int8_t mode, bool playerdrop);
+				  Point<int16_t> destination, int8_t droptype, int8_t mode, int16_t delay, bool playerdrop);
 
 		bool is_meso() const;
 
@@ -113,6 +113,7 @@ namespace ms
 		Point<int16_t> dest;
 		int8_t droptype;
 		int8_t mode;
+		int16_t delay;
 		bool playerdrop;
 	};
 
@@ -120,7 +121,7 @@ namespace ms
 	{
 	public:
 		CharSpawn(int32_t cid, const LookEntry &look, uint8_t level, int16_t job, const std::string &name,
-				  int8_t stance, Point<int16_t> position);
+				  int8_t stance, Point<int16_t> position, int32_t chair);
 
 		int32_t get_cid() const;
 
@@ -133,6 +134,7 @@ namespace ms
 		std::string name;
 		int8_t stance;
 		Point<int16_t> position;
+		int32_t chair;
 		LookEntry look;
 	};
 }

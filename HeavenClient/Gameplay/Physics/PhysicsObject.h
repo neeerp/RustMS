@@ -191,7 +191,13 @@ namespace ms
 		{
 			NOGRAVITY = 0x0001,
 			TURNATEDGES = 0x0002,
-			CHECKBELOW = 0x0004
+			CHECKBELOW = 0x0004,
+			// The owner sets hspeed itself; ground friction leaves it alone.
+			NOFRICTION = 0x0008,
+			// With TURNATEDGES, stop short of every foothold end that does not
+			// lead onto another floor, as v83 does for mobs that walk but
+			// cannot jump.
+			WALKONLY = 0x0010
 		};
 
 		Type type = Type::NORMAL;

@@ -20,7 +20,7 @@
 namespace ms
 {
 	MesoDrop::MesoDrop(int32_t oid, int32_t owner, Point<int16_t> start, Point<int16_t> dest, int8_t type, int8_t mode,
-					   bool pd, const Animation &icn) : Drop(oid, owner, start, dest, type, mode, pd), icon(icn)
+					   int16_t delay, bool pd, const Animation &icn) : Drop(oid, owner, start, dest, type, mode, delay, pd, false), icon(icn)
 	{}
 
 	void MesoDrop::draw(double viewx, double viewy, float alpha) const
@@ -28,7 +28,7 @@ namespace ms
 		if (!active)
 			return;
 
-		Point<int16_t> absp = phobj.get_absolute(viewx, viewy, alpha);
+		Point<int16_t> absp = centred(phobj.get_absolute(viewx, viewy, alpha), icon.get_origin(), icon.get_dimensions());
 		icon.draw({angle.get(alpha), absp, opacity.get(alpha)}, alpha);
 	}
 }

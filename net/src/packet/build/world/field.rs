@@ -24,7 +24,7 @@ pub fn build_player_enter_field(avatar: &FieldAvatar) -> Result<Packet, NetworkE
     encode_avatar_look(&mut packet, &avatar.look, false)?;
     packet.write_int(0)?; // count of item 5110000
     packet.write_int(0)?; // item effect
-    packet.write_int(0)?; // chair
+    packet.write_int(avatar.chair)?;
 
     packet.write_short(avatar.x)?;
     packet.write_short(avatar.y)?;
@@ -127,6 +127,25 @@ pub fn build_facial_expression(character_id: i32, emote: i32) -> Result<Packet, 
     Ok(packet)
 }
 
+/// SHOW_CHAIR: show the others on the map that a player sat on the portable
+/// chair `item_id`, or stood up from it when `item_id` is 0.
+pub fn build_show_chair(character_id: i32, item_id: i32) -> Result<Packet, NetworkError> {
+    let mut packet = Packet::new_empty();
+    packet.write_short(SendOpcode::ShowChair as i16)?;
+    packet.write_int(character_id)?;
+    packet.write_int(item_id)?;
+    Ok(packet)
+}
+
+/// CANCEL_CHAIR: let the player stand up from a portable chair. (Byte 1
+/// followed by a seat id would sit them on a map seat instead.)
+pub fn build_cancel_chair() -> Result<Packet, NetworkError> {
+    let mut packet = Packet::new_empty();
+    packet.write_short(SendOpcode::CancelChair as i16)?;
+    packet.write_byte(0)?;
+    Ok(packet)
+}
+
 pub fn parse_movement_state(
     movement_bytes: &[u8],
     current: (i16, i16, u8),
@@ -135,8 +154,8 @@ pub fn parse_movement_state(
 }
 
 /// Like `parse_movement_state`, plus the foothold the mover ended up on:
-/// the last nonzero foothold of an absolute or jump-down fragment (0 means
-/// airborne), if any fragment had one.
+/// that of the last absolute or jump-down fragment (0 means airborne), if
+/// any fragment had one.
 pub fn parse_movement(
     movement_bytes: &[u8],
     current: (i16, i16, u8),
@@ -158,10 +177,7 @@ pub fn parse_movement(
                 y = cursor.read_short().ok()?;
                 let _ = cursor.read_short().ok()?;
                 let _ = cursor.read_short().ok()?;
-                let fh = cursor.read_short().ok()?;
-                if fh != 0 {
-                    foothold = Some(fh);
-                }
+                foothold = Some(cursor.read_short().ok()?);
                 stance = cursor.read_byte().ok()?;
                 let _ = cursor.read_short().ok()?;
             }
@@ -184,10 +200,7 @@ pub fn parse_movement(
                 let _ = cursor.read_short().ok()?;
                 let _ = cursor.read_short().ok()?;
                 let _ = cursor.read_short().ok()?;
-                let fh = cursor.read_short().ok()?;
-                if fh != 0 {
-                    foothold = Some(fh);
-                }
+                foothold = Some(cursor.read_short().ok()?);
                 stance = cursor.read_byte().ok()?;
                 let _ = cursor.read_short().ok()?;
             }
@@ -224,6 +237,7 @@ mod tests {
             x: -120,
             y: 275,
             stance: 4,
+            chair: 3010000,
         }
     }
 
@@ -264,7 +278,7 @@ mod tests {
         foreign_buffs(&mut expect);
         expect.short(100);
         expect.look(&avatar.look, false);
-        expect.int(0).int(0).int(0); // 5110000 count, item effect, chair
+        expect.int(0).int(0).int(3010000); // 5110000 count, item effect, chair
         expect.short(-120).short(275).byte(4).short(0).byte(0);
         expect.byte(0); // end of pets
         expect.int(1).long(0); // mount level, exp and tiredness
@@ -274,6 +288,21 @@ mod tests {
         expect.byte(0).byte(0).byte(0); // new year cards, two zero bytes
         expect.byte(0); // team
         expect.end();
+    }
+
+    #[test]
+    fn chair_packets_match_reference() {
+        let shown = build_show_chair(0x0102_0304, 3010000).unwrap();
+        Expect::new(&shown.bytes)
+            .short(SendOpcode::ShowChair as i16)
+            .int(0x0102_0304)
+            .int(3010000)
+            .end();
+        let cancel = build_cancel_chair().unwrap();
+        Expect::new(&cancel.bytes)
+            .short(SendOpcode::CancelChair as i16)
+            .byte(0)
+            .end();
     }
 
     #[test]

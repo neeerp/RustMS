@@ -54,6 +54,10 @@ down are in reach, and the horizontally nearest wins.
 `enter_number_tests` covers what a number entry box accepts
 (`IO/UITypes/EnterNumber.h`): digits from 1 to the box's maximum, with empty,
 zero, too-large (however many digits), and non-digit input refused.
+`keyboard_tests` covers how keys find their bindings (`IO/Keyboard.cpp`,
+`IO/KeyConfig.h`): Right Ctrl, Alt, and Shift use the left keys' bindings, as
+do Key Config's right-hand faces, and F11 and F12 are keys 87 and 88.
+
 `char_click_tests` covers which clicks land on a character for the character
 info window (`Gameplay/MapleMap/CharClick.h`): a box 18 px either side of the
 feet and 70 px tall above them.

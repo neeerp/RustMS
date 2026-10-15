@@ -285,7 +285,9 @@ namespace ms
 			phobj.vacc += phobj.vforce;
 			phobj.hacc += phobj.hforce;
 
-			if (phobj.hacc == 0.0 && phobj.hspeed < 0.1 && phobj.hspeed > -0.1)
+			if (phobj.is_flag_set(PhysicsObject::Flag::NOFRICTION))
+			{
+			} else if (phobj.hacc == 0.0 && phobj.hspeed < 0.1 && phobj.hspeed > -0.1)
 			{
 				phobj.hspeed = 0.0;
 			} else

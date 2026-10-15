@@ -134,10 +134,6 @@ namespace ms
 		PageArrow page_left;
 		PageArrow page_right;
 
-		Texture world_box;
-		Text world_name;
-		Text channel_name;
-
 		ChatBalloonHorizontal chatballoon;
 	};
 }

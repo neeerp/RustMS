@@ -22,12 +22,19 @@
 #include "../Graphics/Text.h"
 #include "../Template/Singleton.h"
 
+#include <optional>
+#include <vector>
+
 namespace ms
 {
 	// The v83 login screens are one map, UIClassic.nx MapLogin.img, with a
 	// stop for each step stacked 600 pixels apart going up. The windows sit
 	// on top and move the camera between stops, under the book frame that
 	// borders every step.
+	//
+	// As in v83 CLogin::ChangeStep, a step change flies the camera to the
+	// new stop and fades out the old step's sign. The new step's windows and
+	// sign only appear once the camera arrives.
 	class LoginScene : public Singleton<LoginScene>
 	{
 	public:
@@ -45,29 +52,71 @@ namespace ms
 		void load();
 		void unload();
 
-		// The first step shown cuts straight to its stop; later ones scroll.
-		// A step with a new sign slides it in from the left edge.
+		// The first step shown cuts straight to its stop; later ones fly.
 		void move_to(Step step);
 
+		// Whether the camera is still flying to the current step's stop.
+		// The step's windows are hidden until it arrives.
+		bool moving() const;
+
+		// The names written on the world box from the character select on.
+		void set_world(const std::string& world, const std::string& channel);
+
 		void draw(float alpha) const;
+
+		// The world box goes over the step windows, the Cygnus Knights on
+		// the race select among them.
+		void draw_world_box(float alpha) const;
+
 		void update();
 
 	private:
+		// A board that slides in from the left edge once its step arrives,
+		// gets a shadow under it, and fades out in place when closed.
+		struct Panel
+		{
+			Texture art;
+			int16_t y = 0;
+			double slide_time = 0.0;
+			double opened = 0.0;
+			double closed = -1.0;
+
+			int16_t x(double time) const;
+			float opacity(double time) const;
+			float shadow_opacity(double time) const;
+			bool gone(double time) const;
+		};
+
+		void arrive();
+		void open_sign(uint8_t id);
+		double draw_time(float alpha) const;
+		void draw_panel(const Panel& panel, double time) const;
+
 		bool loaded = false;
 		bool visible = false;
 
 		MapBackgrounds backgrounds;
 		MapTilesObjs tilesobjs;
 		Texture frame;
+		Texture shadow;
 		Text version;
 
-		double y = 0.0;
-		double last_y = 0.0;
-		double target_y = 0.0;
+		// Milliseconds since the scene loaded, advanced each update.
+		double now = 0.0;
 
-		Texture sign;
+		Step step = Step::TITLE;
+		double from_y = 0.0;
+		double to_y = 0.0;
+		double fly_start = 0.0;
+		double fly_end = 0.0;
+		bool flying = false;
+
 		uint8_t sign_id = 0;
-		double sign_x = 0.0;
-		double last_sign_x = 0.0;
+		std::optional<Panel> sign;
+		std::optional<Panel> world_box;
+		std::vector<Panel> closing;
+
+		Text world_name;
+		Text channel_name;
 	};
 }

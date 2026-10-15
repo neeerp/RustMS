@@ -43,6 +43,29 @@ namespace ms
 		}
 	};
 
+	// Reports sitting down on a portable chair (a 301xxxx setup item)
+	// Opcode: USE_CHAIR(43)
+	class UseChairPacket : public OutPacket
+	{
+	public:
+		UseChairPacket(int32_t itemid) : OutPacket(OutPacket::Opcode::USE_CHAIR)
+		{
+			write_int(itemid);
+		}
+	};
+
+	// Asks to stand up from a chair; -1 is a portable chair, otherwise the map
+	// seat's id
+	// Opcode: CANCEL_CHAIR(42)
+	class CancelChairPacket : public OutPacket
+	{
+	public:
+		CancelChairPacket(int16_t seat) : OutPacket(OutPacket::Opcode::CANCEL_CHAIR)
+		{
+			write_short(seat);
+		}
+	};
+
 	// Requests a stat increase by spending AP. HP and MP buttons send the
 	// MAXHP and MAXMP codes.
 	// Opcode: SPEND_AP(87)

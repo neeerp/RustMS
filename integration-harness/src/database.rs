@@ -3,7 +3,7 @@
 
 use crate::HarnessError;
 use diesel::prelude::*;
-use diesel::sql_types::{Integer, Text};
+use diesel::sql_types::{Integer, SmallInt, Text};
 
 const DEFAULT_DATABASE_URL: &str = "postgres://maplestory:pass@127.0.0.1:15432/maplestory_test";
 
@@ -33,5 +33,36 @@ pub async fn set_nx_credit(user_name: &str, credit: i32) -> Result<(), HarnessEr
     if updated == 0 {
         return Err(fixture("no such account".to_string()));
     }
+    Ok(())
+}
+
+/// Put `item_id` in slot `slot` of the logged-out character `character_id`'s
+/// inventory `inventory_type`.
+pub async fn grant_item(
+    character_id: i32,
+    inventory_type: i16,
+    slot: i16,
+    item_id: i32,
+) -> Result<(), HarnessError> {
+    let fixture = |message: String| HarnessError::Fixture {
+        phase: "grant item",
+        message,
+    };
+    tokio::task::spawn_blocking(move || {
+        let mut conn = PgConnection::establish(&database_url()).map_err(|e| e.to_string())?;
+        diesel::sql_query(
+            "INSERT INTO inventory_items (character_id, inventory_type, slot, item_id, quantity, owner, flags) \
+             VALUES ($1, $2, $3, $4, 1, '', 0)",
+        )
+        .bind::<Integer, _>(character_id)
+        .bind::<SmallInt, _>(inventory_type)
+        .bind::<SmallInt, _>(slot)
+        .bind::<Integer, _>(item_id)
+        .execute(&mut conn)
+        .map_err(|e| e.to_string())
+    })
+    .await
+    .map_err(|e| fixture(e.to_string()))?
+    .map_err(fixture)?;
     Ok(())
 }

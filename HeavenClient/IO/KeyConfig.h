@@ -73,6 +73,9 @@ namespace ms
 			M,
 			COMMA,
 			PERIOD,
+			// The right-hand Shift, Ctrl and Alt are faces in Key Config
+			// only: the game reads them as the left keys (see fold).
+			RIGHT_SHIFT = 54,
 			LEFT_ALT = 56,
 			SPACE,
 			F1 = 59,
@@ -85,19 +88,17 @@ namespace ms
 			F8,
 			F9,
 			F10,
-			F11,
-			F12,
-			HOME,
+			HOME = 71,
 			PAGE_UP = 73,
 			END = 79,
 			PAGE_DOWN = 81,
 			INSERT,
 			DELETE,
 			ESCAPE,
+			F11 = 87,
+			F12,
 			RIGHT_CONTROL,
-			RIGHT_SHIFT,
 			RIGHT_ALT,
-			SCROLL_LOCK,
 			LENGTH
 		};
 
@@ -106,26 +107,21 @@ namespace ms
 			return static_cast<Key>(id);
 		}
 
-		// The game reads either Ctrl, Alt or Shift as the same key, so the
-		// pairs are bound together. Other keys have no twin (-1).
-		inline int32_t twin_of(int32_t key)
+		// The key a face stores its binding under. v83 keeps one binding
+		// each for Shift, Ctrl and Alt, so the right-hand faces fold onto
+		// the left keys.
+		inline int32_t fold(int32_t key)
 		{
 			switch (key)
 			{
-			case Key::LEFT_CONTROL:
-				return Key::RIGHT_CONTROL;
-			case Key::RIGHT_CONTROL:
-				return Key::LEFT_CONTROL;
-			case Key::LEFT_ALT:
-				return Key::RIGHT_ALT;
-			case Key::RIGHT_ALT:
-				return Key::LEFT_ALT;
-			case Key::LEFT_SHIFT:
-				return Key::RIGHT_SHIFT;
 			case Key::RIGHT_SHIFT:
 				return Key::LEFT_SHIFT;
+			case Key::RIGHT_CONTROL:
+				return Key::LEFT_CONTROL;
+			case Key::RIGHT_ALT:
+				return Key::LEFT_ALT;
 			default:
-				return -1;
+				return key;
 			}
 		}
 	}

@@ -144,5 +144,9 @@ namespace ms
 		uint16_t level;
 		bool secondweapon;
 		bool flip;
+		int32_t weapon;
+		uint8_t stance;
+		// Where the attack reached, in map coordinates.
+		Rectangle<int16_t> range;
 	};
 }

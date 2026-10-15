@@ -116,6 +116,19 @@ async fn snails_spawn_move_fight_back_die_and_respawn() {
     read_for(&mut hunter.connection, &mut h, 400).await;
     assert!(!h.field.hp_bars.iter().any(|(oid, _)| *oid == snails[1]));
 
+    // Hitting a snail hands it to the attacker with aggro.
+    let provoked = snails[5];
+    send(&mut watcher.connection, attack(provoked, 1)).await;
+    until(&mut watcher.connection, &mut w, |t| {
+        t.field.aggro.contains(&provoked)
+    })
+    .await;
+    assert_eq!(w.field.controlled, [provoked].into());
+    until(&mut hunter.connection, &mut h, |t| {
+        !t.field.controlled.contains(&provoked)
+    })
+    .await;
+
     // Touching a snail hurts up to its attack (12), no more.
     send(&mut hunter.connection, touched(12, SNAIL)).await;
     until(&mut hunter.connection, &mut h, |t| {

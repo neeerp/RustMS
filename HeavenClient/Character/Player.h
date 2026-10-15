@@ -161,6 +161,17 @@ namespace ms
 		// Change players position to the seat's position and stance to Char::State::SIT
 		void set_seat(Optional<const Seat> seat);
 
+		// Sit down on the portable chair itemid where the player stands.
+		void sit_on_chair(int32_t itemid);
+
+		// Ask the server to let the player up from their portable chair.
+		void leave_chair();
+
+		// Get up from the portable chair once the server allows it.
+		void stand_up();
+
+		void set_chair(int32_t itemid) override;
+
 		// Change players x-pos to the ladder x and change stance to Char::LADDER or Char::ROPE.
 		void set_ladder(Optional<const Ladder> ladder);
 
@@ -204,6 +215,8 @@ namespace ms
 		static constexpr int16_t RECOVERY_HP = 10;
 		static constexpr int16_t RECOVERY_MP = 3;
 		uint16_t recovery_timer = 0;
+		// Whether the player asked to get off their chair and waits for the server.
+		bool leaving_chair = false;
 
 		void update_recovery();
 

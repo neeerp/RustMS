@@ -56,6 +56,8 @@ pub enum SendOpcode {
     ShowForeignEffect = 0xC6,
     UpdateCharLook = 0xC5,
     UpdatePartyMemberHp = 0xC9,
+    ShowChair = 0xC4,
+    CancelChair = 0xCD,
     SpawnNpc = 0x101,
     DropItemFromMapObject = 0x10C,
     RemoveItemFromMap = 0x10D,
