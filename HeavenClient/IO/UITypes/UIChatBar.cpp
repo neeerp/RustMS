@@ -556,8 +556,9 @@ namespace ms
 		std::string message = Messages::messages[line];
 		send_chatline(message, type);
 
-		bool cost = line == Messages::SKILL_HPCOST || line == Messages::SKILL_MPCOST;
-		message_cooldowns[line] = cost ? COST_MESSAGE_COOLDOWN : MESSAGE_COOLDOWN;
+		bool slow = line == Messages::SKILL_HPCOST || line == Messages::SKILL_MPCOST ||
+			line == Messages::ATTACK_NOWEAPON;
+		message_cooldowns[line] = slow ? COST_MESSAGE_COOLDOWN : MESSAGE_COOLDOWN;
 	}
 
 	void UIChatBar::toggle_chat()
