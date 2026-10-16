@@ -41,7 +41,6 @@ namespace ms
 	{
 		// An in-map portal's move lands 120 ms after Up; the portal then
 		// waits 600 ms (v83 FUN_00957b74, FUN_0094e5e5).
-		constexpr int16_t TELEPORT_DELAY = 120;
 		constexpr int16_t TELEPORT_COOLDOWN = 600;
 	}
 
@@ -124,7 +123,7 @@ namespace ms
 		Point<int16_t> startpos = physics.get_y_below(spawnpoint);
 		player.respawn(startpos, mapinfo.is_underwater());
 		player.set_recovery_rate(mapinfo.get_recovery());
-		teleport_delay = 0;
+		pending_teleport.reset();
 		teleport_cooldown = 0;
 		camera.set_view(mapinfo.get_walls(), mapinfo.get_borders());
 		camera.set_position(startpos);
@@ -293,12 +292,11 @@ namespace ms
 		{
 			// v83 ignores the portal while a move is pending and for a
 			// while after one.
-			if (teleport_delay > 0 || teleport_cooldown > 0)
+			if (pending_teleport || teleport_cooldown > 0)
 				return;
 
 			Point<int16_t> spawnpoint = portals.get_portal_by_name(warpinfo.toname);
-			teleport_target = physics.get_y_below(spawnpoint);
-			teleport_delay = TELEPORT_DELAY;
+			pending_teleport = Teleport{ physics.get_y_below(spawnpoint), std::nullopt };
 
 			player.show_effect_id(CharEffect::Id::TELEPORT);
 			Sound(Sound::Name::PORTAL).play();
@@ -361,23 +359,44 @@ namespace ms
 		ground_effects.add(jump_effect, DrawArgument(player.get_position(), flip));
 	}
 
+	// v83 makes a pending in-map move on the next update, by portal or by
+	// skill, and allows no other for 600 ms after (FUN_0094e5e5).
 	bool Stage::update_teleport()
 	{
 		if (teleport_cooldown > 0)
 			teleport_cooldown -= Constants::TIMESTEP;
 
-		if (teleport_delay <= 0)
+		if (!pending_teleport)
 			return false;
 
-		teleport_delay -= Constants::TIMESTEP;
+		if (pending_teleport->foothold)
+		{
+			// A skill keeps the keys held, and puts the player on the floor
+			// it chose, so they don't slide back along their last.
+			player.set_position(pending_teleport->target);
+			player.get_phobj().fhid = *pending_teleport->foothold;
+		} else
+		{
+			player.respawn(pending_teleport->target, mapinfo.is_underwater());
+		}
 
-		if (teleport_delay > 0)
-			return false;
-
-		player.respawn(teleport_target, mapinfo.is_underwater());
+		pending_teleport.reset();
 		teleport_cooldown = TELEPORT_COOLDOWN;
 
 		return true;
+	}
+
+	// v83 checks a Teleport skill against the map and any pending move
+	// before it looks for where to go (FUN_00957b74).
+	void Stage::use_teleport(int32_t skill)
+	{
+		bool allowed = mapinfo.can_use_movement_skills() && !pending_teleport && teleport_cooldown <= 0;
+
+		if (std::optional<teleport::Spot> spot = combat.use_teleport(skill, allowed))
+		{
+			pending_teleport = Teleport{ spot->position, spot->foothold };
+			player.show_effect_id(CharEffect::Id::TELEPORT);
+		}
 	}
 
 	void Stage::check_seats()
@@ -480,7 +499,9 @@ namespace ms
 			// v83 uses skills and items only as their key goes down
 			// (FUN_0094c856).
 			case KeyType::Id::SKILL:
-				if (down)
+				if (down && teleport::teleports(action))
+					use_teleport(action);
+				else if (down)
 					combat.use_move(action);
 
 				break;

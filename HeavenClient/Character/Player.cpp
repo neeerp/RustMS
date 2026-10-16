@@ -531,8 +531,11 @@ namespace ms
 
 	SpecialMove::ForbidReason Player::can_use(const SpecialMove &move) const
 	{
-		// A spell cast while prone stabs instead (Combat::use_move).
-		if (move.is_skill() && state == Char::State::PRONE && !SkillData::get(move.get_id()).is_spell())
+		// A spell cast while prone stabs instead (Combat::use_move). Teleport
+		// works prone, so the player can hold Down and teleport down
+		// (FUN_00957b74 never looks at the action).
+		if (move.is_skill() && state == Char::State::PRONE && !SkillData::get(move.get_id()).is_spell()
+			&& !teleport::teleports(move.get_id()))
 			return SpecialMove::ForbidReason::FBR_OTHER;
 
 		if (move.is_attack() && (state == Char::State::LADDER || state == Char::State::ROPE))

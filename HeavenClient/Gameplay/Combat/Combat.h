@@ -21,6 +21,7 @@
 
 #include "RegularAttack.h"
 #include "ShotPath.h"
+#include "Teleport.h"
 
 #include "../MapleMap/MapChars.h"
 #include "../MapleMap/MapMobs.h"
@@ -46,6 +47,10 @@ namespace ms
 		// Make the player use a special move
 		void use_move(int32_t move_id);
 
+		// Make the player use a Teleport skill, if the stage `allowed` it.
+		// Where the player should be moved to, if the skill was used.
+		std::optional<teleport::Spot> use_teleport(int32_t move_id, bool allowed);
+
 		// Add an attack to the attack queue.
 		void push_attack(const AttackResult &attack);
 
@@ -68,6 +73,12 @@ namespace ms
 
 		void apply_attack(const AttackResult &attack);
 
+		// Whether the player may use the move now, saying why not if not.
+		bool can_use_move(const SpecialMove &move) const;
+
+		// Use a skill that doesn't attack. Whether it could ask the server.
+		bool request_skill(const SpecialMove &move);
+
 		void apply_move(const SpecialMove &move);
 
 		// The melee stance a regular ranged attack whacks a mob right in
@@ -87,6 +98,9 @@ namespace ms
 
 		// The mobs Chain Lightning hits, starting with `first`.
 		std::vector<int32_t> find_chain(int32_t first, uint8_t count, bool toleft) const;
+
+		// The platforms a Teleport might land on.
+		std::vector<teleport::Floor> find_floors() const;
 
 		// The platforms a shot from `from` to `to` could run into.
 		std::vector<shot_path::Platform> find_platforms(Point<int16_t> from, Point<int16_t> to) const;
