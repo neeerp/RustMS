@@ -486,7 +486,7 @@ mod tests {
     fn every_registered_opcode_is_unique_per_server() {
         // The maps would silently drop duplicates; check the table sizes match.
         assert_eq!(login_routes().len(), 13);
-        assert_eq!(world_routes().len(), 41);
+        assert_eq!(world_routes().len(), 43);
     }
 
     #[test]
