@@ -44,6 +44,16 @@ int main()
 		require(!touch_portal(0, 0, 40, 20).touch({20, 0}), "a custom range reached past hRange / 2");
 		require(!touch_portal(0, 0, 40, 20).touch({0, 10}), "a custom range reached past vRange / 2");
 
+		// Up-key portals use the same box. Ellinia's in00 sits on its floor
+		// at y = -2281 and reaches 49 px to the left and 50 px above.
+		ms::Portal in00(nullptr, ms::Portal::REGULAR, "in00", false, {786, -2281}, 101000001, "out00",
+			ms::Portal::DEFAULT_RANGE, ms::Portal::DEFAULT_RANGE);
+		require(in00.range_bounds().contains({830, -2281}), "the Up-key box missed a player 44 px away");
+		require(in00.range_bounds().contains({737, -2281}), "the Up-key box missed a player 49 px away");
+		require(!in00.range_bounds().contains({836, -2281}), "the Up-key box reached 50 px to the right");
+		require(in00.range_bounds().contains({786, -2331}), "the Up-key box missed a player 50 px above");
+		require(!in00.range_bounds().contains({786, -2332}), "the Up-key box reached 51 px above");
+
 		std::cout << "Portal touch ranges passed\n";
 		return 0;
 	}

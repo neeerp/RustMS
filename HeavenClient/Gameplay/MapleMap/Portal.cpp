@@ -37,7 +37,7 @@ namespace ms
 	bool Portal::touch(Point<int16_t> playerpos)
 	{
 		bool was_touched = touched;
-		touched = touch_bounds().contains(playerpos);
+		touched = range_bounds().contains(playerpos);
 
 		return touched && !was_touched;
 	}
@@ -73,7 +73,7 @@ namespace ms
 		return Rectangle<int16_t>(lt, rb);
 	}
 
-	Rectangle<int16_t> Portal::touch_bounds() const
+	Rectangle<int16_t> Portal::range_bounds() const
 	{
 		auto lt = position - Point<int16_t>(hrange / 2, vrange / 2);
 		auto rb = position + Point<int16_t>(hrange / 2 - 1, vrange / 2 - 1);
