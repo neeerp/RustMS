@@ -81,6 +81,14 @@ namespace ms
 		return Rectangle<int16_t>(lt, rb);
 	}
 
+	Rectangle<int16_t> Portal::warp_bounds() const
+	{
+		auto lt = position - Point<int16_t>(20, 50);
+		auto rb = position + Point<int16_t>(19, 49);
+
+		return Rectangle<int16_t>(lt, rb);
+	}
+
 	Portal::WarpInfo Portal::getwarpinfo() const
 	{
 		return warpinfo;
