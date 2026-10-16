@@ -68,11 +68,17 @@ reconstruction of v83:
   the map. The HP MARK button turns these bars on and off.
 - In `UIChatBar`, the party chat key (2 by default) or the Talk button sets
   the target to "To the party". The say key sets it back to "To All".
+- Party notices and errors take their text from the v83 client's
+  StringPool, and are logged in its notice colour (#FFAFAF, chat type 0xc),
+  as in its party result handler (FUN_00a3e31c). Codes the client doesn't
+  know log "Your request for a party didn't work due to an unexpected
+  error."
 
 ## Unverified against period footage
 
 - The party chat colour (#FF99CC).
-- The exact wording of "has become the leader" and the invite prompt.
+- The invite prompt's wording, and whether the leading tab in v83's
+  "has become the leader" line shows.
 - The bottom button grid's exact pitch.
 - v83 used a fading notice for invitations; this uses a plain yes/no box.
 - Whisper fills in `/w name` in the chat bar. In footage, v83 asked for the

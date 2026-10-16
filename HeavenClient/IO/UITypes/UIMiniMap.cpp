@@ -58,6 +58,7 @@ namespace ms
 		if (middle > 0)
 		{
 			w.draw(DrawArgument(position + Point<int16_t>(0, top()), Point<int16_t>(0, middle)));
+			backdrop.draw(DrawArgument(position + Point<int16_t>(BORDER, top()), Point<int16_t>(inner, middle)));
 			c.draw(DrawArgument(position + Point<int16_t>(BORDER, top()), Point<int16_t>(inner, middle)));
 			e.draw(DrawArgument(position + Point<int16_t>(width - BORDER, top()), Point<int16_t>(0, middle)));
 		}

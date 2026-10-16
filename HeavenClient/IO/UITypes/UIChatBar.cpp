@@ -18,9 +18,13 @@
 #include "UIChatBar.h"
 
 #include <algorithm>
+#include <cctype>
 #include <cstdlib>
 
+#include "UINotice.h"
 #include "UIStatusBar.h"
+
+#include "../UI.h"
 
 #include "../Components/MapleButton.h"
 
@@ -74,6 +78,13 @@ namespace ms
 
 			message = input.substr(message_start);
 			return message.empty() ? WhisperParseResult::InvalidWhisper : WhisperParseResult::ValidWhisper;
+		}
+
+		// v83 compares whisper targets without regard to case (_stricmp).
+		bool same_name(const std::string& a, const std::string& b)
+		{
+			return a.size() == b.size() && std::equal(a.begin(), a.end(), b.begin(),
+				[](unsigned char x, unsigned char y) { return std::tolower(x) == std::tolower(y); });
 		}
 
 		// Whether input is /find, with the name it looks for, if any.
@@ -173,7 +184,13 @@ namespace ms
 							std::string message;
 							WhisperParseResult whisper_result = parse_whisper_command(msg, target, message);
 
-							if (whisper_result == WhisperParseResult::ValidWhisper)
+							if (whisper_result == WhisperParseResult::ValidWhisper
+								&& same_name(target, Stage::get().get_player().get_stats().get_name()))
+							{
+								// v83 refuses before sending anything (FUN_0052c40c).
+								send_chatline("You can't whisper to yourself.", LineType::SKILL);
+							}
+							else if (whisper_result == WhisperParseResult::ValidWhisper)
 							{
 								WhisperPacket(target, message).dispatch();
 								send_chatline("#g" + target + "<<" + message, LineType::WHITE);
@@ -188,6 +205,10 @@ namespace ms
 									send_chatline("Usage: /find <name>", LineType::RED);
 								else
 									FindPacket(target).dispatch();
+							}
+							else if (msg[0] != '/' && !flood_guard_allows(msg))
+							{
+								// Refused: nothing is sent or shown.
 							}
 							else if (chat_target == Target::PARTY)
 							{
@@ -549,8 +570,9 @@ namespace ms
 		std::string message = Messages::messages[line];
 		send_chatline(message, type);
 
-		bool cost = line == Messages::SKILL_HPCOST || line == Messages::SKILL_MPCOST;
-		message_cooldowns[line] = cost ? COST_MESSAGE_COOLDOWN : MESSAGE_COOLDOWN;
+		bool slow = line == Messages::SKILL_HPCOST || line == Messages::SKILL_MPCOST ||
+			line == Messages::ATTACK_NOWEAPON;
+		message_cooldowns[line] = slow ? COST_MESSAGE_COOLDOWN : MESSAGE_COOLDOWN;
 	}
 
 	void UIChatBar::toggle_chat()
@@ -628,6 +650,28 @@ namespace ms
 	{
 		toggle_chatfield(true);
 		chatfield.change_text("/w " + name + " ");
+	}
+
+	bool UIChatBar::flood_guard_allows(const std::string& line)
+	{
+		auto now = std::chrono::duration_cast<std::chrono::milliseconds>(
+			std::chrono::steady_clock::now().time_since_epoch()).count();
+
+		switch (flood_guard.check(line, now))
+		{
+			case ChatFloodGuard::Result::SEND:
+				return true;
+			case ChatFloodGuard::Result::REPEATED:
+				UI::get().emplace<UIOk>("Repeating the same line over and over\\ncan negatively affect other users.", [](bool) {});
+				break;
+			case ChatFloodGuard::Result::TOO_FAST:
+				UI::get().emplace<UIOk>("Too much chatting can disrupt\\nother players' ability to play the game.", [](bool) {});
+				break;
+			case ChatFloodGuard::Result::MUTED:
+				break;
+		}
+
+		return false;
 	}
 
 	void UIChatBar::send_party_chat(const std::string& message)

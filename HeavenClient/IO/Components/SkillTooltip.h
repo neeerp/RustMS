@@ -27,8 +27,9 @@
 
 namespace ms
 {
-	// The v83 skill tooltip: the name, the icon with the description beside
-	// it, and under a line the current and next levels' effects.
+	// The v83 skill tooltip (FUN_008f25d0): the name, the icon with the
+	// description beside it, and under a line the current and next levels'
+	// effects. The buff row's tooltip leaves the levels out.
 	class SkillTooltip : public Tooltip
 	{
 	public:
@@ -36,12 +37,13 @@ namespace ms
 
 		void draw(Point<int16_t> position) const override;
 
-		void set_skill(int32_t id, int32_t level, int32_t masterlevel, int64_t expiration);
+		void set_skill(int32_t id, int32_t level, int32_t masterlevel, int64_t expiration, bool levels);
 
 	private:
 		int32_t skill_id;
 		int32_t skill_level;
 		int32_t skill_masterlevel;
+		bool skill_levels;
 		Point<int16_t> size;
 		int16_t line_y;
 

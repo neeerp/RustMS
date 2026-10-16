@@ -156,7 +156,7 @@ impl ClientActor {
                 false,
                 &[stat::StatUpdate::Meso(next.meso)],
             )?);
-            packets.push(drop::build_meso_gain(template.money)?);
+            packets.push(drop::build_meso_gain_in_chat(template.money)?);
         }
         if template.exp > 0 {
             gain_exp(&mut next, template.exp, &mut packets)?;
@@ -331,16 +331,21 @@ impl ClientActor {
     }
 }
 
-/// Add EXP to `next`, with the stat update and the EXP message.
+/// Add quest or script EXP to `next`, with the stat update and the EXP
+/// message in the chat log.
 pub(super) fn gain_exp(
     next: &mut Player,
     amount: i32,
     packets: &mut Vec<Packet>,
 ) -> Result<(), RuntimeError> {
-    gain_exp_with_bonus(next, amount, 0, packets)
+    let levelled = next.gain_exp(amount) > 0;
+    packets.push(stat::build_exp_stats(&next.stats, levelled)?);
+    packets.push(quest::build_gain_exp_in_chat(amount)?);
+    Ok(())
 }
 
-/// `gain_exp` plus a party bonus the message shows separately.
+/// Add kill EXP to `next`, with the stat update and the EXP message on the
+/// right; the party bonus shows on its own line.
 pub(super) fn gain_exp_with_bonus(
     next: &mut Player,
     amount: i32,
