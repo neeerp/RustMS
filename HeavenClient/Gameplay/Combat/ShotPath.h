@@ -1,10 +1,13 @@
 #pragma once
 
+#include "../../Character/Inventory/Weapon.h"
 #include "../../Template/Rectangle.h"
 
+#include <algorithm>
 #include <cmath>
 #include <cstdint>
 #include <cstdlib>
+#include <vector>
 
 namespace ms
 {
@@ -17,6 +20,90 @@ namespace ms
 
 		// How long a bullet or the hit takes per pixel, in ms.
 		constexpr double MS_PER_PIXEL = 1.5;
+
+		// How far a shot's search for its target widens per pixel from the user.
+		constexpr int16_t SPREAD_DIVISOR = 4;
+
+		// How wide each step of that search is.
+		constexpr int16_t STEP = 20;
+
+		// The skill that lets this job's shots with this weapon reach further:
+		// Eye of Amazon for bows and crossbows, Keen Eyes for claws, or their
+		// Cygnus versions.
+		inline int32_t range_skill(Weapon::Type weapon, uint16_t job)
+		{
+			bool cygnus = job / 1000 == 1;
+
+			switch (weapon)
+			{
+			case Weapon::Type::BOW:
+			case Weapon::Type::CROSSBOW:
+				return cygnus ? 13000001 : 3000002;
+			case Weapon::Type::CLAW:
+				return cygnus ? 14000001 : 4000001;
+			default:
+				return 0;
+			}
+		}
+
+		// How far in front of the user a shot reaches (FUN_00761845): the
+		// skill's own range if it has one, else the weapon's plus that of its
+		// range skill.
+		inline int16_t range(int32_t skill, int16_t skill_range, Weapon::Type weapon, int16_t skill_bonus)
+		{
+			if (skill_range > 0)
+				return skill_range;
+
+			if (skill == 4121003 || skill == 4221003)
+				return 300;
+
+			switch (weapon)
+			{
+			case Weapon::Type::BOW:
+			case Weapon::Type::CROSSBOW:
+				return static_cast<int16_t>(300 + skill_bonus);
+			case Weapon::Type::CLAW:
+				return static_cast<int16_t>(200 + skill_bonus);
+			case Weapon::Type::GUN:
+				return 200;
+			default:
+				return 0;
+			}
+		}
+
+		// Where a shot from `origin` toward `end_x` looks for its target, step
+		// by step from the nearest. Each step is 20 px wide and reaches 1 px
+		// above and below the shot per 4 px it starts from the user
+		// (FUN_006789ed), so the first steps of a skill's shot are empty.
+		inline std::vector<Rectangle<int16_t>> search_steps(int16_t user_x, Point<int16_t> origin, int16_t end_x)
+		{
+			std::vector<Rectangle<int16_t>> steps;
+			bool forward = origin.x() <= end_x;
+
+			for (int32_t x = origin.x(); forward ? x < end_x : end_x < x; x += forward ? STEP : -STEP)
+			{
+				int32_t left = forward ? x : std::max<int32_t>(x - STEP, end_x);
+				int32_t right = forward ? std::min<int32_t>(x + STEP, end_x) : x;
+				int32_t spread = (forward ? x - user_x : user_x - x) / SPREAD_DIVISOR;
+
+				steps.emplace_back(
+					static_cast<int16_t>(left),
+					static_cast<int16_t>(right),
+					static_cast<int16_t>(origin.y() - spread),
+					static_cast<int16_t>(origin.y() + spread)
+				);
+			}
+
+			return steps;
+		}
+
+		// Whether a mob with these bounds is in a search step, as
+		// IntersectRect sees it: nothing is in an empty step.
+		inline bool in_step(Rectangle<int16_t> step, Rectangle<int16_t> body)
+		{
+			return std::max(step.left(), body.left()) < std::min(step.right(), body.right())
+				&& std::max(step.top(), body.top()) < std::min(step.bottom(), body.bottom());
+		}
 
 		// Where a shot leaves the user. A regular attack's reach is the
 		// point-blank whack range's; a skill's is 0.

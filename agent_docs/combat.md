@@ -138,6 +138,16 @@ Every hit on a target lands at the attack's hit frame plus 1.5 ms per pixel
 between the shot's start and the target, not when a bullet arrives
 (`Gameplay/Combat/ShotPath.h`, `Combat::extract_effects`).
 
+A shot at one mob hits the first mob in its path, not the closest one in a
+box. v83 searches 20 px steps from the shot's start out to its range. Each step
+reaches 1 px above and below the shot per 4 px it is from the user, so a mob
+well below a raised user is missed. The nearest step with any mob in it gives
+the one that entered the map first. The range is the skill's own `range` if it
+has one. Otherwise it is 300 px plus Eye of Amazon's range for bows and
+crossbows, 200 px plus Keen Eyes' for claws, and 200 px for guns
+(`shot_path::range`, `Combat::find_shot_target`). Other players' shots leave
+out their range skill, whose level the client does not know.
+
 Damage numbers follow v83 (`Gameplay/Combat/DamageLayout.h`). The first digit
 comes from the larger `NoRed1` set and the rest from `NoRed0`. Each digit
 overlaps the previous one by 3/5 of its part right of the origin, and digits

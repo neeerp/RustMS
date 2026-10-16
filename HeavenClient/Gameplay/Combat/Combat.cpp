@@ -23,6 +23,7 @@
 #include "ShotPath.h"
 
 #include "../../Character/SkillId.h"
+#include "../../Data/SkillData.h"
 #include "../../IO/Messages.h"
 
 #include "../../Net/Packets/AttackAndSkillPackets.h"
@@ -150,13 +151,24 @@ namespace ms
 			// As in v83, ranged attacks hit the mobs closest to the player, while
 			// melee and magic attacks hit them in the order they entered the map.
 			bool closest_first = attack.type == Attack::Type::RANGED;
-			std::vector<int32_t> mob_targets = find_targets(mob_objs, range, origin, mobcount, true, closest_first);
+			std::vector<int32_t> mob_targets;
 			std::vector<int32_t> reactor_targets = find_targets(reactor_objs, range, origin, mobcount, false, true);
+			int16_t shot_end = attack.toleft ? range.left() : range.right();
+
+			// A shot at one mob hits the first in its path instead.
+			if (attack.type == Attack::Type::RANGED && whack == Stance::Id::NONE && mobcount == 1)
+			{
+				int16_t shot_range = get_shot_range(attack);
+				shot_end = origin.x() + (attack.toleft ? -shot_range : shot_range);
+				mob_targets = find_shot_target(shot_path::origin(origin, reach, attack.toleft), shot_end);
+			} else
+			{
+				mob_targets = find_targets(mob_objs, range, origin, mobcount, true, closest_first);
+			}
 
 			mobs.send_attack(result, attack, mob_targets, mobcount);
 			result.attacker = player.get_oid();
 			expect_hits(result, 1);
-			int16_t shot_end = attack.toleft ? range.left() : range.right();
 			extract_effects(player, move, result, range, reach, shot_end);
 
 			apply_use_movement(move);
@@ -190,7 +202,7 @@ namespace ms
 		reach = -range.left();
 		range = place_range(attack.origin, range, 1.0f, attack.toleft);
 
-		if (find_targets(mobs.get_mobs(), range, attack.origin, 1, true, false).empty())
+		if (find_targets(mobs.get_mobs(), range, attack.origin, 1, true, true).empty())
 			return Stance::Id::NONE;
 
 		return stance;
@@ -199,6 +211,51 @@ namespace ms
 	int16_t Combat::get_whack_reach(const Char &user, Stance::Id stance)
 	{
 		return -point_blank::range(user.get_afterimage_range(stance)).left();
+	}
+
+	int16_t Combat::get_shot_range(const Attack &attack) const
+	{
+		Weapon::Type weapon = player.get_stats().get_weapontype();
+		int32_t range_skill = shot_path::range_skill(weapon, player.get_stats().get_job().get_id());
+		int16_t bonus = 0;
+
+		if (int32_t level = player.get_skills().get_level(range_skill))
+			bonus = SkillData::get(range_skill).get_stats(level).shotrange;
+
+		return shot_path::range(attack.skill, attack.shotrange, weapon, bonus);
+	}
+
+	std::vector<int32_t> Combat::find_shot_target(Point<int16_t> origin, int16_t end_x) const
+	{
+		MapObjects *objs = mobs.get_mobs();
+
+		for (Rectangle<int16_t> step : shot_path::search_steps(player.get_position().x(), origin, end_x))
+		{
+			// The mobs in one step are tried in the order they entered the map.
+			int32_t target = 0;
+			uint32_t first = UINT32_MAX;
+
+			for (auto &mmo : *objs)
+			{
+				const Mob *mob = static_cast<const Mob *>(mmo.second.get());
+
+				if (mob && mob->is_alive() && shot_path::in_step(step, mob->get_body()))
+				{
+					uint32_t entry = objs->entry_order(mob->get_oid());
+
+					if (entry < first)
+					{
+						first = entry;
+						target = mob->get_oid();
+					}
+				}
+			}
+
+			if (first != UINT32_MAX)
+				return { target };
+		}
+
+		return {};
 	}
 
 	std::vector<int32_t>
@@ -332,13 +389,16 @@ namespace ms
 			Rectangle<int16_t> range = place_range(user.get_position(), user.get_afterimage().get_range(), 1.0f,
 												   attack.toleft);
 			// Other players' shots start where a whack would reach, as the
-			// player's own do, and fly as far as the player's.
+			// player's own do.
 			int16_t reach = 0;
 
 			if (attack.type == Attack::Type::RANGED && attack.skill == 0)
 				reach = get_whack_reach(user, user.get_look().get_attackstance(true));
 
-			int16_t shot_range = -player.get_stats().get_range().left();
+			// Their range skills' levels are unknown, so their shots reach
+			// only as far as the weapon or skill alone does.
+			int16_t skill_range = attack.skill ? SkillData::get(attack.skill).get_stats(attack.level).shotrange : 0;
+			int16_t shot_range = shot_path::range(attack.skill, skill_range, user.get_weapontype(), 0);
 			int16_t shot_end = user.get_position().x() + (attack.toleft ? -shot_range : shot_range);
 			extract_effects(user, move, attack, range, reach, shot_end);
 		} else
