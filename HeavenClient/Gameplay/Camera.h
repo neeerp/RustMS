@@ -35,7 +35,8 @@ namespace ms
 		// Update the view with the current player position. (Or any other target)
 		void update(Point<int16_t> position);
 
-		// Set the position, changing the view immediately.
+		// Set the position, changing the view immediately. Set the view's
+		// boundaries first.
 		void set_position(Point<int16_t> position);
 
 		// Updates the view's boundaries. Determined by mapinfo or footholds.
@@ -54,6 +55,10 @@ namespace ms
 		// Movement variables.
 		Linear<double> x;
 		Linear<double> y;
+
+		// The point the view follows, before it is kept inside the map.
+		double lookx;
+		double looky;
 
 		// View limits.
 		Range<int16_t> hbounds;

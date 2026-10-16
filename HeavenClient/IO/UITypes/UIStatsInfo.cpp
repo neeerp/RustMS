@@ -22,6 +22,7 @@
 #include "../Components/MapleButton.h"
 
 #include "../../Character/ExpTable.h"
+#include "../../Gameplay/Stage.h"
 #include "../../Net/Packets/PlayerPackets.h"
 #include "../../Util/NxFiles.h"
 
@@ -255,8 +256,7 @@ namespace ms
 
 	void UIStatsInfo::send_apup(MapleStat::Id stat) const
 	{
-		SpendApPacket(stat).dispatch();
-		UI::get().disable();
+		Stage::get().get_player().request(SpendApPacket(stat), ExclRequest::WAIT);
 	}
 
 	void UIStatsInfo::set_detail(bool enabled)
@@ -275,10 +275,16 @@ namespace ms
 	void UIStatsInfo::update_ap()
 	{
 		bool hasap = stats.get_stat(MapleStat::Id::AP) > 0;
-		Button::State state = hasap ? Button::State::NORMAL : Button::State::DISABLED;
 
+		// Keep an enabled button's hover, as v83 only toggles whether it is
+		// enabled (FUN_004c0e05).
 		for (int i = Buttons::BT_HP; i <= Buttons::BT_LUK; i++)
-			buttons[i]->set_state(state);
+		{
+			if (!hasap)
+				buttons[i]->set_state(Button::State::DISABLED);
+			else if (buttons[i]->get_state() == Button::State::DISABLED)
+				buttons[i]->set_state(Button::State::NORMAL);
+		}
 
 		// Beginners can't put AP into HP or MP.
 		if (is_beginner())

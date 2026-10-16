@@ -27,6 +27,7 @@
 #include "../Util/Misc.h"
 #include "../Util/NxFiles.h"
 
+#include "../IO/UITypes/UINotice.h"
 #include "../IO/UITypes/UINpcTalk.h"
 #include "../IO/UITypes/UIStatusBar.h"
 #include "../Net/Packets/AttackAndSkillPackets.h"
@@ -36,6 +37,14 @@
 
 namespace ms
 {
+	namespace
+	{
+		// An in-map portal's move lands 120 ms after Up; the portal then
+		// waits 600 ms (v83 FUN_00957b74, FUN_0094e5e5).
+		constexpr int16_t TELEPORT_DELAY = 120;
+		constexpr int16_t TELEPORT_COOLDOWN = 600;
+	}
+
 	Stage::Stage() : combat(player, chars, mobs, reactors)
 	{
 		state = State::INACTIVE;
@@ -44,6 +53,8 @@ namespace ms
 	void Stage::init()
 	{
 		drops.init();
+
+		jump_effect = nl::nx::effect["BasicEff.img"]["VerticalJump"];
 	}
 
 	void Stage::load(int32_t mapid, int8_t portalid)
@@ -68,6 +79,7 @@ namespace ms
 		playable = player;
 
 		start = ContinuousTimer::get().start();
+		emote_cooldown = {};
 
 		CharStats stats = player.get_stats();
 		levelBefore = stats.get_stat(MapleStat::Id::LEVEL);
@@ -96,9 +108,10 @@ namespace ms
 
 		tilesobjs = MapTilesObjs(src);
 		backgrounds = MapBackgrounds(src["back"]);
-		physics = Physics(src["foothold"]);
+		physics = Physics(src["foothold"], src["info"]);
 		mapinfo = MapInfo(src, physics.get_fht().get_walls(), physics.get_fht().get_borders());
 		portals = MapPortals(src["portal"], mapid);
+		ground_effects = EffectLayer();
 	}
 
 	void Stage::respawn(int8_t portalid)
@@ -111,8 +124,10 @@ namespace ms
 		Point<int16_t> startpos = physics.get_y_below(spawnpoint);
 		player.respawn(startpos, mapinfo.is_underwater());
 		player.set_recovery_rate(mapinfo.get_recovery());
-		camera.set_position(startpos);
+		teleport_delay = 0;
+		teleport_cooldown = 0;
 		camera.set_view(mapinfo.get_walls(), mapinfo.get_borders());
+		camera.set_position(startpos);
 	}
 
 	void Stage::draw(float alpha) const
@@ -144,6 +159,7 @@ namespace ms
 			chars.draw_party_hp(party, player.get_oid(), mapid, viewx, viewy, alpha);
 
 		combat.draw(viewx, viewy, alpha);
+		ground_effects.drawabove(viewpos, alpha);
 		portals.draw(viewpos, alpha);
 		backgrounds.drawforegrounds(viewx, viewy, alpha);
 		effect.draw();
@@ -157,6 +173,7 @@ namespace ms
 		combat.update();
 		backgrounds.update();
 		effect.update();
+		ground_effects.update();
 		tilesobjs.update();
 
 		reactors.update(physics);
@@ -164,11 +181,22 @@ namespace ms
 		mobs.update(physics, player.get_position(), player.is_dead());
 		chars.update(physics);
 		drops.update(physics);
-		Point<int16_t> before = player.get_position();
+
+		// v83 tests touch portals and jump pads against where the player is
+		// drawn, between its last two 30 ms physics steps (FUN_009b6205), so
+		// a player landing is still tested above the floor. The nearest here
+		// is where this step started, unless the player was moved there.
+		Point<int16_t> drawn = player.get_position();
+
+		Point<int16_t> before = drawn;
 		player.update(physics);
 		catch_ladders(before);
 
+		if (update_teleport())
+			drawn = player.get_position();
+
 		portals.update(player.get_position());
+		check_touch_portals(drawn);
 		camera.update(player.get_position());
 
 		if (player.is_invincible())
@@ -192,28 +220,164 @@ namespace ms
 
 	void Stage::check_portals()
 	{
-		if (player.is_attacking())
+		// v83 takes a portal only while the player stands on a foothold, not
+		// in the air or on a ladder (FUN_0094df9b). Holding Up repeats the key,
+		// so a player who lands on a portal with Up held goes through.
+		if (player.is_attacking() || !player.get_phobj().onground || player.is_climbing())
 			return;
 
 		Point<int16_t> playerpos = player.get_position();
-		Portal::WarpInfo warpinfo = portals.find_warp_at(playerpos);
+		const Portal *portal = portals.find_up_portal(playerpos);
 
+		if (!portal)
+			return;
+
+		Portal::WarpInfo warpinfo = portal->getwarpinfo();
+
+		if (warpinfo.valid)
+		{
+			enter_portal(warpinfo);
+
+			return;
+		}
+
+		// A script portal with nowhere to lead runs its script on the server
+		// (v83 FUN_0094df9b).
+		switch (portal->get_type())
+		{
+			case Portal::SCRIPTED:
+			case Portal::SCRIPTED_INVISIBLE:
+			case Portal::SCRIPTED_HIDDEN:
+				player.request(ChangeMapSpecialPacket(field_key, portal->get_name(), playerpos), ExclRequest::WAIT);
+				break;
+			default:
+				break;
+		}
+	}
+
+	// v83 checks touch portals every update, whatever the player is doing
+	// (FUN_0094dac6, called from CUserLocal::Update).
+	void Stage::check_touch_portals(Point<int16_t> drawn)
+	{
+		Point<int16_t> playerpos = player.get_position();
+		const Portal *portal = portals.find_touch_portal(drawn);
+
+		if (!portal)
+			return;
+
+		switch (portal->get_type())
+		{
+			case Portal::TOUCH:
+				if (portal->getwarpinfo().valid)
+					enter_portal(portal->getwarpinfo());
+				break;
+			case Portal::SCRIPTED_TOUCH:
+				// The script runs again whenever the player may send a request
+				// and the portal's delay has passed, unless it runs only once.
+				if (portals.may_run_script(*portal) &&
+					player.request(ChangeMapSpecialPacket(field_key, portal->get_name(), playerpos), portal->get_delay()))
+					portals.ran_script(*portal);
+				break;
+			case Portal::SPRING1:
+			case Portal::SPRING2:
+				use_jump_pad(*portal);
+				break;
+			default:
+				break;
+		}
+	}
+
+	void Stage::enter_portal(const Portal::WarpInfo &warpinfo)
+	{
 		if (warpinfo.intramap)
 		{
-			Point<int16_t> spawnpoint = portals.get_portal_by_name(warpinfo.toname);
-			Point<int16_t> startpos = physics.get_y_below(spawnpoint);
+			// v83 ignores the portal while a move is pending and for a
+			// while after one.
+			if (teleport_delay > 0 || teleport_cooldown > 0)
+				return;
 
-			player.respawn(startpos, mapinfo.is_underwater());
+			Point<int16_t> spawnpoint = portals.get_portal_by_name(warpinfo.toname);
+			teleport_target = physics.get_y_below(spawnpoint);
+			teleport_delay = TELEPORT_DELAY;
+
+			player.show_effect_id(CharEffect::Id::TELEPORT);
+			Sound(Sound::Name::PORTAL).play();
 		} else if (warpinfo.valid)
 		{
-			ChangeMapPacket(false, -1, warpinfo.name, false).dispatch();
+			// v83 asks to change map only when no request waits on the server
+			// and 500 ms have passed since the last one, dead or alive
+			// (FUN_0053035d).
+			if (!player.request(ChangeMapPacket(field_key, warpinfo.name, player.get_position()), ExclRequest::WAIT, true))
+				return;
 
-			CharStats &stats = Stage::get().get_player().get_stats();
-
-			stats.set_mapid(warpinfo.mapid);
+			player.get_stats().set_mapid(warpinfo.mapid);
 
 			Sound(Sound::Name::PORTAL).play();
 		}
+	}
+
+	// v83 throws a player standing on a jump pad into the air and leaves a
+	// burst where they took off (FUN_0094de22 for type 12, FUN_0094dac6 for
+	// type 13).
+	void Stage::use_jump_pad(const Portal &portal)
+	{
+		if (!player.get_phobj().onground || player.is_climbing())
+			return;
+
+		double hspeed;
+		double vspeed;
+		bool flip;
+
+		if (portal.get_type() == Portal::SPRING1)
+		{
+			// 2300 px/s up and 200 px/s the way the player faces, with
+			// 100 px/s more to the left or right for each arrow key held.
+			bool left = !player.getflip();
+
+			hspeed = left ? -200.0 : 200.0;
+
+			if (player.is_key_down(KeyAction::Id::LEFT))
+				hspeed -= 100.0;
+
+			if (player.is_key_down(KeyAction::Id::RIGHT))
+				hspeed += 100.0;
+
+			vspeed = -2300.0;
+			flip = !left;
+		} else
+		{
+			// The portal's own speeds; the burst is mirrored whenever it
+			// throws sideways, either way. v83 also requires a field type of
+			// 19-21 or 25, or a reactor the portal names to be in state 1,
+			// but every map with these pads passes and none names a reactor.
+			Point<int16_t> impact = portal.get_impact();
+
+			hspeed = impact.x();
+			vspeed = -impact.y();
+			flip = impact.x() != 0;
+		}
+
+		Physics::knockback(player.get_phobj(), hspeed, vspeed);
+		ground_effects.add(jump_effect, DrawArgument(player.get_position(), flip));
+	}
+
+	bool Stage::update_teleport()
+	{
+		if (teleport_cooldown > 0)
+			teleport_cooldown -= Constants::TIMESTEP;
+
+		if (teleport_delay <= 0)
+			return false;
+
+		teleport_delay -= Constants::TIMESTEP;
+
+		if (teleport_delay > 0)
+			return false;
+
+		player.respawn(teleport_target, mapinfo.is_underwater());
+		teleport_cooldown = TELEPORT_COOLDOWN;
+
+		return true;
 	}
 
 	void Stage::check_seats()
@@ -270,11 +434,15 @@ namespace ms
 
 	void Stage::check_drops()
 	{
+		// The v83 client looks for a drop only when it may ask for one.
+		if (!player.can_request(ExclRequest::PICKUP_WAIT))
+			return;
+
 		Point<int16_t> playerpos = player.get_position();
-		MapDrops::Loot loot = drops.find_loot_at(playerpos);
+		MapDrops::Loot loot = drops.find_loot_at(playerpos, player.get_oid(), player.get_party().get_id());
 
 		if (loot.first)
-			PickupItemPacket(loot.first, loot.second).dispatch();
+			player.request(PickupItemPacket(loot.first, loot.second), ExclRequest::PICKUP_WAIT);
 	}
 
 	void Stage::send_key(KeyType::Id type, int32_t action, bool down)
@@ -309,14 +477,20 @@ namespace ms
 
 				playable->send_action(KeyAction::actionbyid(action), down);
 				break;
+			// v83 uses skills and items only as their key goes down
+			// (FUN_0094c856).
 			case KeyType::Id::SKILL:
-				combat.use_move(action);
+				if (down)
+					combat.use_move(action);
+
 				break;
 			case KeyType::Id::ITEM:
-				player.use_item(action);
+				if (down)
+					player.use_item(action);
+
 				break;
 			case KeyType::Id::FACE:
-				if (down)
+				if (down && emote_cooldown.try_start(get_uptime() / 1000))
 				{
 					player.set_expression(action);
 					// v83 numbers emotes from F1's action (100) as 1.
@@ -442,6 +616,16 @@ namespace ms
 		return mapid;
 	}
 
+	void Stage::set_field_key(uint8_t key)
+	{
+		field_key = key;
+	}
+
+	uint8_t Stage::get_field_key() const
+	{
+		return field_key;
+	}
+
 	void Stage::add_effect(std::string path)
 	{
 		effect = MapEffect(path);
@@ -468,5 +652,61 @@ namespace ms
 
 		if (Configuration::get().get_admin())
 			AdminEnterMapPacket(AdminEnterMapPacket::Operation::ALERT_ADMINS).dispatch();
+	}
+
+	namespace
+	{
+		void notice(const char *message)
+		{
+			UI::get().emplace<UIOk>(message, [](bool) {});
+		}
+
+		// v83's notices 0x10a and 0x115.
+		const char *const CATCH_BREATH = "You can't do it right now.\\nCatch your breath and then try again.";
+		const char *const NOT_HERE = "You can't do it here in this map.";
+	}
+
+	// v83 FUN_005304af: the request gate, then the alert a hit or attack
+	// leaves for 5 seconds (GMs aside), then fieldLimit.
+	bool Stage::change_channel(uint8_t channel)
+	{
+		if (!player.can_request(ExclRequest::WAIT))
+			return false;
+
+		if (player.get_look().get_alerted() && !Configuration::get().get_admin())
+		{
+			notice(CATCH_BREATH);
+			return false;
+		}
+
+		if (!mapinfo.can_migrate())
+		{
+			notice(NOT_HERE);
+			return false;
+		}
+
+		return player.request(ChangeChannelPacket(channel), ExclRequest::WAIT);
+	}
+
+	// v83 FUN_00a04dca: the alert first, and the request gate without its
+	// check that the player is alive.
+	void Stage::enter_cash_shop()
+	{
+		if (player.get_look().get_alerted())
+		{
+			notice(CATCH_BREATH);
+			return;
+		}
+
+		if (!player.can_request(ExclRequest::WAIT, true))
+			return;
+
+		if (!mapinfo.can_migrate())
+		{
+			notice(NOT_HERE);
+			return;
+		}
+
+		player.request(EnterCashShopPacket(), ExclRequest::WAIT, true);
 	}
 }

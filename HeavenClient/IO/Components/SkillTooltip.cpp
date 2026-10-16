@@ -35,6 +35,9 @@ namespace ms
 		constexpr int16_t LINE_X = 6;
 		const Point<int16_t> LEVEL_POS = { 9, 4 };
 		constexpr int16_t LEVEL_WIDTH = 294;
+		// FUN_008f25d0 sizes the box 0x80 tall plus any description lines
+		// past the fourth.
+		constexpr int16_t NO_LEVELS_HEIGHT = 0x80;
 	}
 
 	SkillTooltip::SkillTooltip() :
@@ -43,17 +46,19 @@ namespace ms
 		skill_id = 0;
 		skill_level = 0;
 		skill_masterlevel = 0;
+		skill_levels = true;
 		line_y = 0;
 	}
 
-	void SkillTooltip::set_skill(int32_t id, int32_t level, int32_t mlevel, int64_t expiration)
+	void SkillTooltip::set_skill(int32_t id, int32_t level, int32_t mlevel, int64_t expiration, bool levels)
 	{
-		if (skill_id == id && skill_level == level && skill_masterlevel == mlevel)
+		if (skill_id == id && skill_level == level && skill_masterlevel == mlevel && skill_levels == levels)
 			return;
 
 		skill_id = id;
 		skill_level = level;
 		skill_masterlevel = mlevel;
+		skill_levels = levels;
 
 		if (skill_id == 0)
 			return;
@@ -118,8 +123,8 @@ namespace ms
 		}
 
 		std::string levelstr;
-		bool current = level > 0;
-		bool next = level < masterlevel;
+		bool current = levels && level > 0;
+		bool next = levels && level < masterlevel;
 
 		if (current)
 			levelstr += "[Current Level " + std::to_string(level) + "]\\n" + data.get_level_desc(level);
@@ -136,7 +141,11 @@ namespace ms
 		leveldesc = Text(Text::Font::A12M, Text::Alignment::LEFT, Color::Name::WHITE, levelstr, LEVEL_WIDTH, true, tooltip::LINE_ADJ);
 
 		line_y = std::max<int16_t>(LINE_MIN_Y, DESC_POS.y() + desc.height() + LINE_DESC_GAP);
-		size = Point<int16_t>(WIDTH, line_y + LEVEL_POS.y() + leveldesc.height() + tooltip::BOTTOM);
+
+		if (levels)
+			size = Point<int16_t>(WIDTH, line_y + LEVEL_POS.y() + leveldesc.height() + tooltip::BOTTOM);
+		else
+			size = Point<int16_t>(WIDTH, std::max<int16_t>(NO_LEVELS_HEIGHT, DESC_POS.y() + desc.height() + tooltip::BOTTOM));
 	}
 
 	void SkillTooltip::draw(Point<int16_t> pos) const
@@ -151,6 +160,9 @@ namespace ms
 		name.draw(pos + tooltip::NAME_POS);
 		icon.draw(skillicon, pos + tooltip::ICON_POS);
 		desc.draw(pos + DESC_POS);
+
+		if (!skill_levels)
+			return;
 
 		pos.shift_y(line_y);
 		line.draw(pos + Point<int16_t>(LINE_X, 0));

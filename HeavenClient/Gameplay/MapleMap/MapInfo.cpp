@@ -18,9 +18,9 @@
 #include "MapInfo.h"
 
 #include "../Constants.h"
-#include "../../Util/Misc.h"
 
 #include <algorithm>
+#include <charconv>
 
 namespace ms
 {
@@ -28,15 +28,18 @@ namespace ms
 	{
 		nl::node info = src["info"];
 
-		if (info["VRLeft"].data_type() == nl::node::type::integer)
+		// v83 (FUN_005a768c) reads each edge of the view range on its own.
+		// One the map leaves out lies 20 px beyond the movement bounds at the
+		// sides, 60 px above them, and 110 px below the lowest foothold.
+		auto edge = [&info](const char *name, int16_t fallback)
 		{
-			mapwalls = Range<int16_t>(info["VRLeft"], info["VRRight"]);
-			mapborders = Range<int16_t>(info["VRTop"], info["VRBottom"]);
-		} else
-		{
-			mapwalls = walls;
-			mapborders = borders;
-		}
+			nl::node value = info[name];
+
+			return value.data_type() == nl::node::type::integer ? static_cast<int16_t>(value) : fallback;
+		};
+
+		mapwalls = Range<int16_t>(edge("VRLeft", walls.first() - 20), edge("VRRight", walls.second() + 20));
+		mapborders = Range<int16_t>(edge("VRTop", borders.first() - 60), edge("VRBottom", borders.second() + 10));
 
 		std::string bgmpath = info["bgm"];
 		size_t split = bgmpath.find('/');
@@ -62,7 +65,12 @@ namespace ms
 			ropes.push_back(rope);
 
 		std::stable_sort(ropes.begin(), ropes.end(), [](nl::node a, nl::node b) {
-			return string_conversion::or_zero<int32_t>(a.name()) < string_conversion::or_zero<int32_t>(b.name());
+			auto number = [](const std::string& name) {
+				int32_t value = 0;
+				std::from_chars(name.data(), name.data() + name.size(), value);
+				return value;
+			};
+			return number(a.name()) < number(b.name());
 		});
 
 		for (auto ladder : ropes)
@@ -75,6 +83,11 @@ namespace ms
 	bool MapInfo::is_underwater() const
 	{
 		return swim;
+	}
+
+	bool MapInfo::can_migrate() const
+	{
+		return (fieldlimit & 0x10) == 0;
 	}
 
 	std::string MapInfo::get_bgm() const

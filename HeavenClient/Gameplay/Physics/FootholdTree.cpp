@@ -23,7 +23,7 @@
 
 namespace ms
 {
-	FootholdTree::FootholdTree(nl::node src)
+	FootholdTree::FootholdTree(nl::node src, nl::node info)
 	{
 		int16_t leftw = 30000;
 		int16_t rightw = -30000;
@@ -115,24 +115,37 @@ namespace ms
 			}
 		}
 
-			walls = {
-				static_cast<int16_t>(leftw + 25),
-				static_cast<int16_t>(rightw - 25)
-			};
-			borders = {
-				static_cast<int16_t>(topb - 300),
-				static_cast<int16_t>(botb + 100)
-			};
-			// v83's physical space (FUN_0085fe71) spans the platforms, 30 px
-			// in from the sides, 300 px above and 10 px below.
-			spacex = {
-				static_cast<int16_t>(leftw + 30),
-				static_cast<int16_t>(rightw - 30)
-			};
-			spacey = {
-				static_cast<int16_t>(topb - 300),
-				static_cast<int16_t>(botb + 10)
-			};
+		// v83 (FUN_0085fe71) keeps objects 30 px inside the outermost
+		// footholds and up to 300 px above the highest. A map with VRLimit
+		// pulls those in to its view range; like v83, it reads a missing edge
+		// as 0 and skips an edge of 0. v83 doesn't stop a fall below the
+		// lowest foothold; this stops it 100 px below.
+		int16_t left = leftw + 30;
+		int16_t right = rightw - 30;
+		int16_t top = topb - 300;
+
+		if (info["VRLimit"].get_bool())
+		{
+			if (int16_t vrleft = info["VRLeft"])
+				left = std::max<int16_t>(left, vrleft + 20);
+
+			if (int16_t vrright = info["VRRight"])
+				right = std::min<int16_t>(right, vrright - 20);
+
+			if (int16_t vrtop = info["VRTop"])
+				top = std::max<int16_t>(top, vrtop + 65);
+		}
+
+		walls = {left, right};
+		borders = {top, static_cast<int16_t>(botb + 100)};
+		spacex = {left, right};
+		int16_t bottom = botb + 10;
+
+		if (info["VRLimit"].get_bool())
+			if (int16_t vrbottom = info["VRBottom"])
+				bottom = std::min(bottom, vrbottom);
+
+		spacey = {top, bottom};
 	}
 
 	FootholdTree::FootholdTree()
@@ -255,7 +268,12 @@ namespace ms
 
 		double ground = nextfh.ground_below(x);
 
-		if (phobj.vspeed == 0.0 && checkslope)
+		if (phobj.vspeed == 0.0 && checkslope && phobj.fhid == curfh.id())
+		{
+			// v83 moves a grounded object along its foothold (FUN_007f13de),
+			// so it stays on the line, even on the tick it stops on a slope.
+			phobj.y = ground;
+		} else if (phobj.vspeed == 0.0 && checkslope)
 		{
 			double vdelta = abs(phobj.fhslope);
 

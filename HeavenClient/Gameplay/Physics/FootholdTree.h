@@ -40,7 +40,8 @@ namespace ms
 			AGAINST
 		};
 
-		FootholdTree(nl::node source);
+		// info is the map's info node, whose VRLimit can narrow the bounds.
+		FootholdTree(nl::node source, nl::node info = {});
 
 		FootholdTree();
 
@@ -59,10 +60,11 @@ namespace ms
 		// Determine the point on the ground below the specified position.
 		int16_t get_y_below(Point<int16_t> position) const;
 
-		// Returns the leftmost and rightmost platform positions of the map.
+		// Returns the leftmost and rightmost positions objects may reach.
 		Range<int16_t> get_walls() const;
 
-		// Returns the topmost and bottommost platform positions of the map.
+		// Returns the highest position objects may reach and the lowest they
+		// may fall to.
 		Range<int16_t> get_borders() const;
 
 		// Returns the group of a platform.

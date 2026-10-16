@@ -20,6 +20,7 @@
 #include "../UIDragElement.h"
 
 #include "../../Gameplay/Stage.h"
+#include "../../Graphics/Geometry.h"
 #include "../../Graphics/SpecialText.h"
 
 #include <cstdint>
@@ -58,6 +59,9 @@ namespace ms
 		struct Frame
 		{
 			Texture nw, n, ne, w, c, e, sw, s, se;
+			// v83 draws the translucent white middle over black, so the field
+			// doesn't show through: it comes out grey (119, 119, 119).
+			ColorBox backdrop = ColorBox(1, 1, Color::Name::BLACK, 1.0f);
 
 			Frame() = default;
 			Frame(nl::node src);

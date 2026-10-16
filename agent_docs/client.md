@@ -71,7 +71,13 @@ from `UI.nx`. Moved so far:
   saves the keymap right away; an open Key Config shows the new binding.
   Status messages (`UIStatusMessenger`) stack upward from just above the
   quick slot panel, right-aligned with it; `UIStatusBar::QUICKSLOT_TOP` is
-  the shared anchor.
+  the shared anchor. Each fades out over 6 s. SHOW_STATUS_INFO is worded and
+  coloured as in the v83 client (`Net/Handlers/StatusMessages.h`): pickups
+  ("You have gained an item in the Etc tab (Snail Shell)", names cut to
+  120 px, or 96 px when a count follows), mesos, and kill EXP with a yellow
+  line per bonus ("Bonus EXP for PARTY (+N)") show here; quest EXP (mode 3
+  with its in-chat flag), mode 4 fame and mode 5 mesos go to the chat log as
+  grey lines.
 - **Chat** (`UIChatBar`): the input strip in the bar's top-left and the log
   above it. The status bar cuts that strip out of its background, so the two
   can overlap in either draw order. As in the original, the log has three
@@ -101,7 +107,8 @@ from `UI.nx`. Moved so far:
   bottom-centred on portals to other maps, NPCs, other players, and you.
   Hovering an NPC or portal shows its name. Period canvases had the map's
   background baked in; v83 `Map.nx` canvases are transparent there, so the
-  frame shows through.
+  frame shows through. Its middle is white at alpha 119 over black, as in
+  v83, so it comes out grey and the field doesn't show through.
 - **World Map** (`UIWorldMap`, `UIWindow.img/WorldMap`): the frame, title,
   and `Basic.img/BtClose` around the map's 640x470 `BaseImg`, laid out from
   period footage. The Big Bang search panel is gone. Esc steps up to the
@@ -133,8 +140,10 @@ from `UI.nx`. Moved so far:
   the selected one, four skill rows with a `VScr4` scroll bar, and the points
   left, laid out from period footage. The job name is 10 px Arimo
   (`Text::Font::A10M`). Rows are grey when a required skill is missing. SP-up
-  spends a point at once; v83 had no allocation popup. The MACRO button and the
-  `SkillMacro` window are not drawn yet.
+  spends a point at once; v83 had no allocation popup. A `recommend/0` frame
+  marks the skill `Etc/RecommendSkill.img` names for the SP spent in the tab
+  (`recommended_skill`). The MACRO button and the `SkillMacro` window are not
+  drawn yet.
 - **Item window** (`UIItemInventory`, `UIWindow.img/Item`): five tabs
   (`Item/Tab`, drawn by `ClassicTabs`), six rows of four slots with a `VScr4`
   scroll bar, and the mesos, laid out from period footage. BtFull widens it to
@@ -407,7 +416,7 @@ side yet.
 | Skills, stat/AP/SP allocation, buffs, keymap | Implemented |
 | NPC dialogue and NPC shop | Implemented (`UINpcTalk`, `UIShop`) |
 | Quest log and markers | Implemented (`UIQuestLog`); progress arrives via SHOW_STATUS_INFO, quest start/complete is driven by NPC dialogue |
-| Chat, whisper, `/find`, server messages | Implemented; buddy whisper/find modes ignored |
+| Chat, whisper, `/find`, `/?`, `/party`, `/buddy`, `/all`, server messages | Implemented; buddy whisper/find modes ignored; other commands are dropped, as v83 does for non-GMs |
 | Character info, minimap, world map | Implemented |
 | Party (`UIUserList` Party tab, `UIPartyHP`, party chat) | Implemented; see `parties.md` |
 | Buddy list (`UIUserList` Friend tab, buddy chat) | Implemented without groups; see `buddies.md` |
@@ -495,6 +504,24 @@ force-and-friction model (`move_normal`).
   blocks if it reaches between 1 and 50 px above the feet
   (`FootholdTree::get_wall`). Maps draw walls both top to bottom and bottom
   to top, so `Foothold::is_blocking` sorts the ends first.
+- **Map bounds.** `FootholdTree` keeps objects 30 px inside the outermost
+  footholds and at most 300 px above the highest. A map with `info/VRLimit`
+  pulls those in to its `VRLeft + 20`, `VRRight - 20` and `VRTop + 65`,
+  skipping missing or zero edges as v83 does. A flying mob's lower bound
+  is also limited by a nonzero `VRBottom`.
+  v83 never stops a fall; HeavenClient stops it 100 px below the lowest
+  foothold.
+- **View range.** `MapInfo` reads each `VR*` edge on its own; zero is a real
+  camera edge. A missing edge
+  sits 20 px outside the bounds at the sides, 60 px above the top, and 110 px
+  below the lowest foothold. The camera centres a range smaller than the
+  screen.
+- **Camera follow.** The view aims 50 px above the player's feet. On each
+  axis it stays still while within 28 px of that point. Further off, it
+  closes the gap d at d² / 100 px/s, so a walking player leads the view by
+  about 110 px (v83 sets this up in `FUN_0042935a` as a Shape2D vector with
+  looseness 100). The followed point isn't held inside the view range; only
+  the view is.
 - **Not ported yet:**
   - Mob attacks' own knockback speeds (900 or 1900 px/s, flat).
   - Swimming knockback: impacts remain queued until normal movement resumes;
@@ -597,9 +624,11 @@ These were corrected:
 7. SHOW_ITEM_GAIN_INCHAT mode 3 (quest item gains and losses) is a count byte
    followed by an item id and quantity for each. The client read the count as a
    sub-mode and showed nothing unless it was 1. It now shows each item as its
-   own grey (`#BBBBBB`) chat line, worded as in period footage: "You have
-   gained an item (Roger's Apple)", "You have gained items (3 Green Apple)",
-   and "You have lost ..." for losses.
+   own grey (`#BBBBBB`) chat line, worded as the 2025 MapleRoyals client does:
+   "You have gained an item in the Use tab (Roger's Apple)", "You have gained
+   items in the Use tab (Green Apple 3)", "You have lost an item (X)" and "You
+   have lost items (X 3)". A count of 0 instead carries a message and an
+   `Effect/Quest.img` effect number; the message is a `#64B4F0` status line.
 8. The stat window's HP and MP buttons sent SPEND_AP with the current HP and
    MP codes (0x400, 0x1000). They now send MaxHP and MaxMP (0x800, 0x2000),
    which is what AP raises.
@@ -626,3 +655,9 @@ These were corrected:
     keys at 85 to 87, so Right Ctrl did nothing, and had put F11 and F12 at 69
     and 70 rather than v83's 87 and 88. The `v83_modifier_and_f_keys`
     migration drops the old right-hand copies and moves F11 and F12.
+11. SET_FIELD's first byte after the channel is the new field's key, and the
+    second says whether character data follows. The client took the
+    change-map branch only when both were 0. It now branches on the second
+    byte and keeps the key (`Stage::get_field_key`). As in v83, every
+    CHANGE_MAP and CHANGE_MAP_SPECIAL starts with that key. Before, they
+    started with 0, or with 1 for "died" on the death respawn.
