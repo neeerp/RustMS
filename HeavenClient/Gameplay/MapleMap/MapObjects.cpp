@@ -56,7 +56,10 @@ namespace ms
 			}
 
 			if (remove_mob)
+			{
+				entries.erase(iter->first);
 				iter = objects.erase(iter);
+			}
 			else
 				iter++;
 		}
@@ -65,6 +68,7 @@ namespace ms
 	void MapObjects::clear()
 	{
 		objects.clear();
+		entries.clear();
 
 		for (auto &layer : layers)
 			layer.clear();
@@ -81,6 +85,7 @@ namespace ms
 		int8_t layer = toadd->get_layer();
 		objects[oid] = std::move(toadd);
 		layers[layer].insert(oid);
+		entries.emplace(oid, next_entry++);
 	}
 
 	void MapObjects::remove(int32_t oid)
@@ -91,9 +96,17 @@ namespace ms
 		{
 			int8_t layer = iter->second->get_layer();
 			objects.erase(iter);
+			entries.erase(oid);
 
 			layers[layer].erase(oid);
 		}
+	}
+
+	uint32_t MapObjects::entry_order(int32_t oid) const
+	{
+		auto iter = entries.find(oid);
+
+		return iter != entries.end() ? iter->second : UINT32_MAX;
 	}
 
 	Optional<MapObject> MapObjects::get(int32_t oid)

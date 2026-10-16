@@ -139,8 +139,11 @@ namespace ms
 			MapObjects *mob_objs = mobs.get_mobs();
 			MapObjects *reactor_objs = reactors.get_reactors();
 
-			std::vector<int32_t> mob_targets = find_closest(mob_objs, range, origin, mobcount, true);
-			std::vector<int32_t> reactor_targets = find_closest(reactor_objs, range, origin, mobcount, false);
+			// As in v83, ranged attacks hit the mobs closest to the player, while
+			// melee and magic attacks hit them in the order they entered the map.
+			bool closest_first = attack.type == Attack::Type::RANGED;
+			std::vector<int32_t> mob_targets = find_targets(mob_objs, range, origin, mobcount, true, closest_first);
+			std::vector<int32_t> reactor_targets = find_targets(reactor_objs, range, origin, mobcount, false, true);
 
 			mobs.send_attack(result, attack, mob_targets, mobcount);
 			result.attacker = player.get_oid();
@@ -174,7 +177,7 @@ namespace ms
 		reach = -range.left();
 		range = place_range(attack.origin, range, 1.0f, attack.toleft);
 
-		if (find_closest(mobs.get_mobs(), range, attack.origin, 1, true).empty())
+		if (find_targets(mobs.get_mobs(), range, attack.origin, 1, true, true).empty())
 			return Stance::Id::NONE;
 
 		return stance;
@@ -186,10 +189,10 @@ namespace ms
 	}
 
 	std::vector<int32_t>
-	Combat::find_closest(MapObjects *objs, Rectangle<int16_t> range, Point<int16_t> origin, uint8_t objcount,
-						 bool use_mobs) const
+	Combat::find_targets(MapObjects *objs, Rectangle<int16_t> range, Point<int16_t> origin, uint8_t objcount,
+						 bool use_mobs, bool closest_first) const
 	{
-		std::multimap<uint16_t, int32_t> distances;
+		std::multimap<uint32_t, int32_t> candidates;
 
 		for (auto &mmo : *objs)
 		{
@@ -200,8 +203,8 @@ namespace ms
 				if (mob && mob->is_alive() && mob->is_in_range(range))
 				{
 					int32_t oid = mob->get_oid();
-					uint16_t distance = mob->get_position().distance(origin);
-					distances.emplace(distance, oid);
+					uint32_t key = closest_first ? mob->get_position().distance(origin) : objs->entry_order(oid);
+					candidates.emplace(key, oid);
 				}
 			} else
 			{
@@ -211,21 +214,22 @@ namespace ms
 				if (reactor && reactor->is_hittable() && reactor->is_in_range(range))
 				{
 					int32_t oid = reactor->get_oid();
-					uint16_t distance = reactor->get_position().distance(origin);
-					distances.emplace(distance, oid);
+					uint32_t key = closest_first ? reactor->get_position().distance(origin) : objs->entry_order(oid);
+					candidates.emplace(key, oid);
 				}
 			}
 		}
 
 		std::vector<int32_t> targets;
 
-		for (auto &iter : distances)
+		for (auto &iter : candidates)
 		{
 			if (targets.size() >= objcount)
 				break;
 
 			targets.push_back(iter.second);
 		}
+
 
 		return targets;
 	}
