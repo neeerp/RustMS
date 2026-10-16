@@ -67,6 +67,11 @@ namespace ms
 		return swim;
 	}
 
+	bool MapInfo::can_migrate() const
+	{
+		return (fieldlimit & 0x10) == 0;
+	}
+
 	std::string MapInfo::get_bgm() const
 	{
 		return bgm;
@@ -129,6 +134,7 @@ namespace ms
 		y1 = src["y1"];
 		y2 = src["y2"];
 		ladder = src["l"].get_bool();
+		uf = src["uf"].get_bool();
 	}
 
 	bool Ladder::is_ladder() const
@@ -148,15 +154,23 @@ namespace ms
 		return hor.contains(x) && ver.contains(y);
 	}
 
-	bool Ladder::felloff(int16_t y, bool downwards) const
+	bool Ladder::leads_up() const
 	{
-		int16_t dy = downwards ? y + 5 : y - 5;
-
-		return dy > y2 || y + 5 < y1;
+		return uf;
 	}
 
 	int16_t Ladder::get_x() const
 	{
 		return x;
+	}
+
+	int16_t Ladder::get_top() const
+	{
+		return y1;
+	}
+
+	int16_t Ladder::get_bottom() const
+	{
+		return y2;
 	}
 }

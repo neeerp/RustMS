@@ -34,10 +34,7 @@ namespace ms
 			Constants::Constants::get().set_viewwidth(800);
 			Constants::Constants::get().set_viewheight(600);
 
-			float fadestep = 0.025f;
-
 			Window::get().fadeout(
-					fadestep,
 					[]()
 					{
 						GraphicsGL::get().clear();

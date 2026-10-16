@@ -165,6 +165,7 @@ namespace ms
 		Texture skille;
 		Texture skilld;
 		Texture line;
+		Texture recommend;
 		Texture bookicon;
 		Text booktext;
 		Text splabel;
@@ -177,6 +178,8 @@ namespace ms
 		uint16_t offset;
 
 		std::vector<SkillDisplayMeta> skills;
+		// The skill v83 recommends raising, or 0.
+		int32_t recommended = 0;
 		bool grabbing;
 	};
 }

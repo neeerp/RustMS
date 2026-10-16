@@ -26,8 +26,10 @@
 #include "../Gameplay/Stage.h"
 #include "../IO/UI.h"
 
-#include "../IO/UITypes/UINotice.h"
+#include "../IO/UITypes/UIRevive.h"
+#include "../IO/UITypes/UISkillBook.h"
 #include "../IO/UITypes/UIStatsInfo.h"
+#include "../IO/UITypes/UIStatusBar.h"
 #include "../Net/Packets/GameplayPackets.h"
 #include "../Net/Packets/PlayerPackets.h"
 #include "../Net/Packets/InventoryPackets.h"
@@ -271,29 +273,29 @@ namespace ms
 	{
 		bool dead = stats.get_stat(MapleStat::Id::HP) <= 0;
 
-		if (dead == is_dead())
-			return;
-
-		attacking = false;
-		keysdown.clear();
-
-		if (dead)
+		if (dead != is_dead())
 		{
-			ladder = nullptr;
-			phobj.hspeed = 0.0;
-			phobj.type = PhysicsObject::Type::NORMAL;
-			set_state(Char::State::DIED);
-			Sound(Sound::Name::TOMBSTONE).play();
+			attacking = false;
+			keysdown.clear();
 
-			// Any answer sends the player to the map's return map with a little HP.
-			UI::get().emplace<UIOk>("You have died.\\nYou will be revived in the nearest town.", [](bool)
+			if (dead)
 			{
-				ChangeMapPacket(Stage::get().get_field_key(), 0, "", false).dispatch();
-			});
-		} else
-		{
-			nullstate.update_state(*this);
+				ladder = nullptr;
+				phobj.hspeed = 0.0;
+				phobj.type = PhysicsObject::Type::NORMAL;
+				set_state(Char::State::DIED);
+				Sound(Sound::Name::TOMBSTONE).play();
+				death_ticks = 0;
+			} else
+			{
+				nullstate.update_state(*this);
+				UI::get().remove(UIElement::Type::REVIVE);
+			}
 		}
+
+		// Like v83 (FUN_00a03350), offer the revive a little after the tombstone lands.
+		if (dead && death_ticks <= REVIVE_DELAY && ++death_ticks > REVIVE_DELAY)
+			UI::get().emplace<UIRevive>();
 	}
 
 	void Player::update_recovery()
@@ -506,7 +508,7 @@ namespace ms
 
 	bool Player::can_attack() const
 	{
-		return !attacking && !is_dead() && !is_climbing() && !is_sitting() && look.get_equips().has_weapon();
+		return !attacking && !is_dead() && !is_climbing() && !is_sitting();
 	}
 
 	SpecialMove::ForbidReason Player::can_use(const SpecialMove &move) const
@@ -698,9 +700,26 @@ namespace ms
 		{
 			show_effect_id(CharEffect::Id::LEVELUP);
 			Sound(Sound::Name::LEVELUP).play();
+
+			// Up to level 10, v83 also makes the stat key glow (FUN_00a1fb52).
+			if (level < 11)
+				if (auto statusbar = UI::get().get_element<UIStatusBar>())
+					statusbar->show_key_hint(UIStatusBar::KEY_STAT);
 		}
 
 		stats.set_stat(MapleStat::Id::LEVEL, level);
+
+		// Reaching level 2 opens a fresh skill window for the first SP, without a sound (FUN_00a1fb52).
+		if (level == 2 && level > oldlevel)
+		{
+			auto window = UI::get().get_element<UISkillBook>();
+
+			if (!window || !window->is_active())
+			{
+				UI::get().remove(UISkillBook::TYPE);
+				UI::get().emplace<UISkillBook>(stats, skillbook);
+			}
+		}
 	}
 
 	uint16_t Player::get_level() const
@@ -730,6 +749,15 @@ namespace ms
 
 	void Player::sit_on_chair(int32_t itemid)
 	{
+		// v83 sits only when it may ask the server, as for an item
+		// (FUN_00a0f9e2).
+		if (!can_request(ExclRequest::USE_WAIT))
+			return;
+
+		// Nor for the 5 seconds a hit or an attack keeps it alert.
+		if (look.get_alerted())
+			return;
+
 		if (!phobj.onground || is_sitting() || is_climbing() || attacking || is_dead())
 			return;
 
@@ -741,7 +769,7 @@ namespace ms
 		phobj.hspeed = 0.0;
 		set_state(Char::State::SIT);
 		set_chair(itemid);
-		UseChairPacket(itemid).dispatch();
+		request(UseChairPacket(itemid), ExclRequest::USE_WAIT);
 	}
 
 	void Player::leave_chair()
@@ -793,6 +821,11 @@ namespace ms
 		}
 	}
 
+	int32_t Player::get_walk_animation_speed() const
+	{
+		return stats.get_total(EquipStat::Id::SPEED);
+	}
+
 	// CUserLocal clamps SPEED to 80-140 and JUMP to 80-123 before turning
 	// them into shoe multipliers (FUN_007a4dec).
 	double Player::get_walkspeed() const
@@ -803,11 +836,6 @@ namespace ms
 	double Player::get_jumpforce() const
 	{
 		return Physics::jump_speed(std::clamp<int32_t>(stats.get_total(EquipStat::Id::JUMP), 80, 123) / 100.0);
-	}
-
-	float Player::get_climbforce() const
-	{
-		return static_cast<float>(stats.get_total(EquipStat::Id::SPEED)) / 100;
 	}
 
 	float Player::get_flyforce() const

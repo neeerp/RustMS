@@ -73,11 +73,18 @@ namespace ms
 		// Key focus outlines the button in whatever state it is in.
 		void set_focused(bool focused);
 
+		// Make this button a tab, which v83 chooses as the mouse goes down
+		// rather than as it comes back up (FUN_004dc26c).
+		void set_tab();
+
+		bool is_tab() const;
+
 	protected:
 		State state;
 		Point<int16_t> position;
 		bool active;
 		bool pressed;
 		bool focused = false;
+		bool tab = false;
 	};
 }

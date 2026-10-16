@@ -436,9 +436,10 @@ namespace ms
 	}
 
 	void
-	UI::show_skill(Tooltip::Parent parent, int32_t skill_id, int32_t level, int32_t masterlevel, int64_t expiration)
+	UI::show_skill(Tooltip::Parent parent, int32_t skill_id, int32_t level, int32_t masterlevel, int64_t expiration,
+				   bool levels)
 	{
-		state->show_skill(parent, skill_id, level, masterlevel, expiration);
+		state->show_skill(parent, skill_id, level, masterlevel, expiration, levels);
 	}
 
 	void UI::show_text(Tooltip::Parent parent, std::string text)

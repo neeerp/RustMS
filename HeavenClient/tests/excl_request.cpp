@@ -23,6 +23,8 @@ int main()
 		require(!excl.can_send(5499, ExclRequest::WAIT), "the next request waits after the answer");
 		require(excl.can_send(5500, ExclRequest::WAIT), "the next request goes once the wait is over");
 		require(excl.can_send(5200, ExclRequest::USE_WAIT), "an item use waits less");
+		require(!excl.can_send(5299, ExclRequest::SKILL_WAIT), "a skill waits");
+		require(excl.can_send(5300, ExclRequest::SKILL_WAIT), "a skill waits less than a move");
 		require(!excl.can_send(5029, ExclRequest::PICKUP_WAIT), "a pickup waits too");
 		require(excl.can_send(5030, ExclRequest::PICKUP_WAIT), "a pickup waits least");
 

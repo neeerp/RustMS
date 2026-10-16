@@ -267,7 +267,11 @@ namespace ms
 	class LeavePartyPacket : public PartyOperationPacket
 	{
 	public:
-		LeavePartyPacket() : PartyOperationPacket(PartyOperationPacket::Operation::LEAVE) {}
+		// v83 follows the operation with a zero byte (FUN_0052fe00).
+		LeavePartyPacket() : PartyOperationPacket(PartyOperationPacket::Operation::LEAVE)
+		{
+			write_byte(0);
+		}
 	};
 
 	// Joins a party
