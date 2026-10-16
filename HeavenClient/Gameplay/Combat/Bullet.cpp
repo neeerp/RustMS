@@ -24,8 +24,9 @@
 
 namespace ms
 {
-	Bullet::Bullet(Animation a, Point<int16_t> o, Point<int16_t> t, uint16_t d) : animation(a), origin(o), target(t),
-																				   duration(d), elapsed(0)
+	Bullet::Bullet(Animation a, Point<int16_t> o, Point<int16_t> t, uint16_t d, float r) : animation(a), origin(o),
+																						   target(t), duration(d),
+																						   elapsed(0), angle(r)
 	{
 		flip = target.x() > origin.x();
 	}
@@ -38,7 +39,7 @@ namespace ms
 				static_cast<int16_t>(std::round(position.y() + viewy))
 		);
 
-		DrawArgument args(bulletpos, flip);
+		DrawArgument args(angle, bulletpos, flip, 1.0f);
 		animation.draw(args, alpha);
 	}
 

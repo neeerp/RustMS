@@ -30,11 +30,20 @@ namespace ms
 	SingleBullet::SingleBullet(nl::node src)
 	{
 		ball = src["ball"];
+
+		// Chain Lightning's ball is three kinds of ball, each animated.
+		for (size_t kind = 0; src["ball"][std::to_string(kind)]["0"].data_type() == nl::node::type::bitmap; kind++)
+			kinds.emplace_back(src["ball"][std::to_string(kind)]);
 	}
 
 	Animation SingleBullet::get(const Char &, int32_t) const
 	{
 		return ball.animation;
+	}
+
+	Animation SingleBullet::get_kind(size_t kind) const
+	{
+		return kind < kinds.size() ? kinds[kind].animation : Animation();
 	}
 
 	BySkillLevelBullet::BySkillLevelBullet(nl::node src, int32_t id)

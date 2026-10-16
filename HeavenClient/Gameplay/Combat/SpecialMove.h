@@ -54,6 +54,13 @@ namespace ms
 
 		virtual Animation get_bullet(const Char &user, int32_t bulletid) const = 0;
 
+		// One of the kinds of ball the move draws together, as Chain
+		// Lightning's bolt is made of.
+		virtual Animation get_ball(size_t) const
+		{
+			return {};
+		}
+
 		virtual bool is_attack() const = 0;
 
 		virtual bool is_skill() const = 0;

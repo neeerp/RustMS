@@ -35,8 +35,7 @@ namespace ms
 
 		// Whether a spell is aimed at the first mob in its path like a shot
 		// (FUN_0095571f), rather than at all the mobs in its area. Chain
-		// Lightning picks its first mob the same way, but its chain is not
-		// copied yet.
+		// Lightning picks its first mob the same way.
 		inline bool aimed_spell(int32_t skill)
 		{
 			switch (skill)
@@ -49,7 +48,6 @@ namespace ms
 			case 2211002: // Ice Strike
 			case 2221001: // Big Bang
 			case 2221003: // Ice Demon
-			case 2221006: // Chain Lightning
 			case 2221007: // Blizzard
 			case 2301002: // Heal
 			case 2311004: // Shining Ray

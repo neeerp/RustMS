@@ -46,6 +46,8 @@ namespace ms
 
 		Animation get_bullet(const Char &user, int32_t bulletid) const override;
 
+		Animation get_ball(size_t kind) const override;
+
 		bool is_attack() const override;
 
 		bool is_skill() const override;

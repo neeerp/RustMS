@@ -29,7 +29,8 @@ namespace ms
 	class Bullet
 	{
 	public:
-		Bullet(Animation animation, Point<int16_t> origin, Point<int16_t> target, uint16_t duration);
+		// A bullet may be turned by `angle` radians, clockwise.
+		Bullet(Animation animation, Point<int16_t> origin, Point<int16_t> target, uint16_t duration, float angle = 0.0f);
 
 		void draw(double viewx, double viewy, float alpha) const;
 
@@ -45,5 +46,6 @@ namespace ms
 		uint16_t duration;
 		uint16_t elapsed;
 		bool flip;
+		float angle;
 	};
 }

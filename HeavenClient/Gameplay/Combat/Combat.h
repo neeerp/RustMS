@@ -85,6 +85,9 @@ namespace ms
 		// its path, as it widens away from the player.
 		std::vector<int32_t> find_shot_target(Point<int16_t> origin, int16_t end_x) const;
 
+		// The mobs Chain Lightning hits, starting with `first`.
+		std::vector<int32_t> find_chain(int32_t first, uint8_t count, bool toleft) const;
+
 		// The platforms a shot from `from` to `to` could run into.
 		std::vector<shot_path::Platform> find_platforms(Point<int16_t> from, Point<int16_t> to) const;
 
@@ -110,6 +113,9 @@ namespace ms
 		// as far as it reaches or where a platform stops it.
 		void extract_effects(const Char &user, const SpecialMove &move, const AttackResult &result,
 							 Rectangle<int16_t> range, int16_t reach, Point<int16_t> shot_end);
+
+		// Draw Chain Lightning's bolt from the user through its targets.
+		void draw_chain(const Char &user, const SpecialMove &move, const AttackResult &result);
 
 		// Tell the targets how many hits are coming (sign 1) or cancel them (sign -1),
 		// so a mob the server kills waits for the hits before dying.

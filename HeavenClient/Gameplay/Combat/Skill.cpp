@@ -246,6 +246,11 @@ namespace ms
 		return bullet->get(user, bulletid);
 	}
 
+	Animation Skill::get_ball(size_t kind) const
+	{
+		return bullet->get_kind(kind);
+	}
+
 	bool Skill::is_attack() const
 	{
 		return SkillData::get(skillid).is_attack();
