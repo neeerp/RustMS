@@ -100,6 +100,12 @@ In HeavenClient a hit of at least the mob's `pushed` value puts it in its
 `hit1` stance for about a quarter second, with a three-tick push that moves it
 a few pixels (`Mob::knockback_ticks`), as in period footage.
 
+A regular attack's stance is picked at random from v83's list for the
+weapon's `info/attack` (`Character/Look/AttackStances.h`). Spears and polearms
+swing T2, P1, and P2 and stab T1 and T2. Wands and staves swing O2. Knuckles,
+and claws without stars, stab O1 and O2. Guns without bullets swing T1, or T2
+two times in three. Claws throw with swing O1, O2, or O3.
+
 Damage numbers follow v83 (`Gameplay/Combat/DamageLayout.h`). The first digit
 comes from the larger `NoRed1` set and the rest from `NoRed0`. Each digit
 overlaps the previous one by 3/5 of its part right of the origin, and digits
