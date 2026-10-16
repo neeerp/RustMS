@@ -25,6 +25,7 @@
 #include "../Components/MapleButton.h"
 #include "../UITypes/UIKeyConfig.h"
 
+#include "../../Character/Inventory/ItemDrop.h"
 #include "../../Data/EquipData.h"
 #include "../../Gameplay/Stage.h"
 #include "../../Util/NxFiles.h"
@@ -87,6 +88,7 @@ namespace ms
 
 			buttons[Buttons::BT_TAB0 + i] = std::make_unique<AreaButton>(tab_pos,
 																		 Point<int16_t>(tabs.pitch(), tabs.height()));
+			buttons[Buttons::BT_TAB0 + i]->set_tab();
 		}
 
 		buttons[Buttons::BT_COIN] = std::make_unique<MapleButton>(Item["BtCoin"]);
@@ -205,13 +207,16 @@ namespace ms
 			else
 				count = inventory.get_item_count(tab, slot);
 
-			const bool untradable = ItemData::get(item_id).is_untradable();
-			const bool cashitem = ItemData::get(item_id).is_cashitem();
-			const Texture &texture = ItemData::get(item_id).get_icon(false);
+			const ItemData &idata = ItemData::get(item_id);
+			const bool questitem = idata.is_questitem();
+			const bool untradable = idata.is_untradable();
+			const bool cashitem = idata.is_cashitem() || inventory.get_cash_id(tab, slot) != 0;
+			const Texture &texture = idata.get_icon(false);
 			EquipSlot::Id eqslot = inventory.find_equipslot(item_id);
 
 			icons[slot] = std::make_unique<Icon>(
-					std::make_unique<ItemIcon>(*this, tab, eqslot, slot, item_id, count, untradable, cashitem),
+					std::make_unique<ItemIcon>(*this, tab, eqslot, slot, item_id, count, questitem, untradable,
+											   cashitem),
 					texture, count
 			);
 		} else if (icons.count(slot))
@@ -325,6 +330,14 @@ namespace ms
 						break;
 					case InventoryType::Id::SETUP:
 						Stage::get().get_player().use_item(item_id);
+						break;
+					case InventoryType::Id::CASH:
+						// As in v83, a face item (516xxxx) makes its emote
+						// (id % 100 + 8) as a face key would, without being
+						// used up.
+						if (item_id / 10000 == 516)
+							Stage::get().send_key(KeyType::Id::FACE, 99 + item_id % 100 + 8, true);
+
 						break;
 				}
 			}
@@ -727,13 +740,14 @@ namespace ms
 	}
 
 	UIItemInventory::ItemIcon::ItemIcon(const UIItemInventory &parent, InventoryType::Id st, EquipSlot::Id eqs,
-										int16_t s, int32_t iid, int16_t c, bool u, bool cash) : parent(parent)
+										int16_t s, int32_t iid, int16_t c, bool q, bool u, bool cash) : parent(parent)
 	{
 		sourcetab = st;
 		eqsource = eqs;
 		source = s;
 		item_id = iid;
 		count = c;
+		questitem = q;
 		untradable = u;
 		cashitem = cash;
 	}
@@ -741,52 +755,46 @@ namespace ms
 	void UIItemInventory::ItemIcon::drop_on_stage() const
 	{
 		constexpr const char *dropmessage = "How many will you drop?";
-		constexpr const char *untradablemessage = "This item can't be taken back once thrown away.\\nWill you still drop it?";
+		constexpr const char *untradablemessage = "This item can't be taken back once\\nthrown away. Will you still drop it?";
 		constexpr const char *cashmessage = "You can't drop this item.";
 
-		if (cashitem)
+		if (item_drop::refused(item_id, cashitem))
 		{
 			UI::get().emplace<UIOk>(cashmessage, [](bool)
 			{});
-		} else
-		{
-			if (untradable)
-			{
-				auto onok = [&, dropmessage](bool ok)
-				{
-					if (ok)
-					{
-						if (count <= 1)
-						{
-							Stage::get().get_player().request(MoveItemPacket(sourcetab, source, 0, 1), ExclRequest::WAIT);
-						} else
-						{
-							auto onenter = [&](int32_t qty)
-							{
-								Stage::get().get_player().request(MoveItemPacket(sourcetab, source, 0, qty), ExclRequest::WAIT);
-							};
 
-							UI::get().emplace<UIEnterNumber>(dropmessage, onenter, count, count);
-						}
-					}
+			return;
+		}
+
+		auto drop = [tab = sourcetab, slot = source, id = item_id, max = count, dropmessage]()
+		{
+			if (item_drop::asks_count(id, max))
+			{
+				auto onenter = [tab, slot](int32_t qty)
+				{
+					Stage::get().get_player().request(MoveItemPacket(tab, slot, 0, qty), ExclRequest::WAIT);
 				};
 
-				UI::get().emplace<UIYesNo>(untradablemessage, onok);
+				UI::get().emplace<UIEnterNumber>(dropmessage, onenter, max, max);
 			} else
 			{
-				if (count <= 1)
-				{
-					Stage::get().get_player().request(MoveItemPacket(sourcetab, source, 0, 1), ExclRequest::WAIT);
-				} else
-				{
-					auto onenter = [&](int32_t qty)
-					{
-						Stage::get().get_player().request(MoveItemPacket(sourcetab, source, 0, qty), ExclRequest::WAIT);
-					};
-
-					UI::get().emplace<UIEnterNumber>(dropmessage, onenter, count, count);
-				}
+				Stage::get().get_player().request(MoveItemPacket(tab, slot, 0, 1), ExclRequest::WAIT);
 			}
+		};
+
+		// As in v83, a quest item that is also untradable asks twice.
+		if (uint8_t asks = item_drop::asks(questitem, untradable))
+		{
+			auto onok = [drop](bool ok)
+			{
+				if (ok)
+					drop();
+			};
+
+			UI::get().emplace<UIYesNo>(untradablemessage, onok, Text::Alignment::CENTER, asks);
+		} else
+		{
+			drop();
 		}
 	}
 

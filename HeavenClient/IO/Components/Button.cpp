@@ -71,4 +71,14 @@ namespace ms
 	{
 		focused = f;
 	}
+
+	void Button::set_tab()
+	{
+		tab = true;
+	}
+
+	bool Button::is_tab() const
+	{
+		return tab;
+	}
 }

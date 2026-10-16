@@ -45,6 +45,9 @@ namespace ms
 
 		Point<int16_t> origin() const;
 
+		// For a button on a window that fades in and out.
+		void set_opacity(float value);
+
 		Cursor::State send_cursor(bool, Point<int16_t>)
 		{ return Cursor::State::IDLE; }
 
@@ -53,5 +56,6 @@ namespace ms
 		Animation animations[Button::State::NUM_STATES];
 		// Drawn over the state's texture while the button has key focus.
 		Texture focus;
+		float opacity = 1.0f;
 	};
 }

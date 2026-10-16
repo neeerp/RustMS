@@ -83,13 +83,13 @@ namespace ms
 		void use_item(int32_t itemid);
 
 		// Whether an item or stat request may go to the server now: the
-		// player is alive, no request waits on an answer, and wait
-		// milliseconds have passed since the last request or answer.
-		bool can_request(int32_t wait) const;
+		// player is alive (unless any_hp), no request waits on an answer,
+		// and wait milliseconds have passed since the last request or answer.
+		bool can_request(int32_t wait, bool any_hp = false) const;
 
 		// Send the request if it may go now, and note that it waits on its
 		// answer. Return whether it went.
-		bool request(OutPacket &&packet, int32_t wait);
+		bool request(OutPacket &&packet, int32_t wait, bool any_hp = false);
 
 		// Note the server answered, as an update with its first byte set does.
 		void request_answered();
@@ -100,7 +100,7 @@ namespace ms
 		// Return if the player is attacking
 		bool is_attacking() const;
 
-		// Return whether the player can attack or not.
+		// Return whether the player is free to attack, weapon aside.
 		bool can_attack() const;
 
 		// Return whether the player can use a skill or not.
@@ -154,14 +154,14 @@ namespace ms
 		// Return the character's attacking speed.
 		int8_t get_integer_attackspeed() const override;
 
+		// Return the total ES_SPEED stat.
+		int32_t get_walk_animation_speed() const override;
+
 		// Returns the shoe's walking speed multiplier, from the total ES_SPEED stat.
 		double get_walkspeed() const;
 
 		// Returns the takeoff speed in pixels per tick, from the total ES_JUMP stat.
 		double get_jumpforce() const;
-
-		// Returns the climbing force, calculated from the total ES_SPEED stat.
-		float get_climbforce() const;
 
 		// Returns the flying force.
 		float get_flyforce() const;
@@ -279,6 +279,10 @@ namespace ms
 
 		// Die when HP runs out, and get back up when it returns.
 		void update_death();
+
+		// Steps since the player died; the revive window opens after 2.2 seconds.
+		static constexpr uint16_t REVIVE_DELAY = 2200 / Constants::TIMESTEP;
+		uint16_t death_ticks = 0;
 
 		CharStats stats;
 		Inventory inventory;

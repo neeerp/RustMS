@@ -82,6 +82,11 @@ namespace ms
 			return value != b;
 		}
 
+		int64_t elapsed() const
+		{
+			return last - delay;
+		}
+
 		float alpha() const
 		{
 			return 1.0f - static_cast<float>(static_cast<float>(delay) / last);

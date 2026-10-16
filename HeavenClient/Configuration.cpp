@@ -391,6 +391,21 @@ namespace ms
 		world_channel_counts[world_id] = count;
 	}
 
+	std::string Configuration::get_channel_name(uint8_t world_id, int32_t channel)
+	{
+		auto iter = world_channel_names.find(world_id);
+
+		if (iter == world_channel_names.end() || channel < 0 || channel >= static_cast<int32_t>(iter->second.size()))
+			return "";
+
+		return iter->second[channel];
+	}
+
+	void Configuration::set_world_channel_names(uint8_t world_id, const std::vector<std::string>& names)
+	{
+		world_channel_names[world_id] = names;
+	}
+
 	bool Configuration::get_admin()
 	{
 		return admin;

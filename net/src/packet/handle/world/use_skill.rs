@@ -12,6 +12,8 @@ use tracing::debug;
 
 /// `USE_SKILL`: a skill that doesn't attack. Only the beginner buffs
 /// (Recovery and Nimble Feet, for every beginner job) do anything yet.
+/// Every answer unlocks the client, which waits on it before using
+/// another skill or item.
 pub struct UseSkillHandler;
 
 impl WorldHandler for UseSkillHandler {
@@ -25,9 +27,26 @@ impl WorldHandler for UseSkillHandler {
             Ok(used) => announce(ctx.player, &used),
             Err(refusal) => {
                 debug!(skill_id, level, ?refusal, "Skill use refused");
-                Ok(HandlerResult::empty())
+                Ok(HandlerResult::reply(stat::build_stat_update(true, &[])?))
             }
         }
+    }
+}
+
+/// `CANCEL_BUFF`: the player right-clicked a skill's buff icon. End its
+/// buffs and tell the client, which then drops the icon.
+pub struct CancelBuffHandler;
+
+impl WorldHandler for CancelBuffHandler {
+    fn handle(&self, packet: &mut Packet, ctx: &mut WorldContext) -> WorldResult {
+        let mut r = Cursor::new(&packet.bytes);
+        r.read_short()?;
+        let skill_id = r.read_int()?;
+        let ended = ctx.player.buffs.cancel(skill_id);
+        if ended.is_empty() {
+            return Ok(HandlerResult::empty());
+        }
+        Ok(HandlerResult::reply(buff::build_cancel_buff(&ended)?))
     }
 }
 
@@ -100,7 +119,7 @@ fn announce(player: &Player, used: &Used) -> WorldResult {
     let Used { skill, stat, value } = used;
     let effect = &skill.effect;
     let mut result = HandlerResult::reply(stat::build_stat_update(
-        false,
+        true,
         &[StatUpdate::Mp(player.stats.mp)],
     )?)
     .with_reply(buff::build_give_buff(
@@ -127,8 +146,9 @@ fn announce(player: &Player, used: &Used) -> WorldResult {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::packet::op::SendOpcode;
+    use crate::packet::op::{RecvOpcode, SendOpcode};
     use game::SkillRecord;
+    use packet::io::write::PktWrite;
 
     fn beginner_with(skill_id: i32, level: i32) -> Player {
         let mut player = crate::codec::stats::sample_player();
@@ -142,6 +162,29 @@ mod tests {
             expiration: None,
         });
         player
+    }
+
+    fn handle(player: &mut Player, skill_id: i32, level: u8) -> Vec<WorldAction> {
+        let mut packet = Packet::new_empty();
+        packet.write_short(RecvOpcode::UseSkill as i16).unwrap();
+        packet.write_int(0).unwrap();
+        packet.write_int(skill_id).unwrap();
+        packet.write_byte(level).unwrap();
+        let mut ctx = WorldContext {
+            client_id: 1,
+            channel_id: 0,
+            player,
+        };
+        UseSkillHandler
+            .handle(&mut packet, &mut ctx)
+            .unwrap()
+            .actions
+    }
+
+    /// Whether the action is a stat update that unlocks the client.
+    fn unlocks(action: &WorldAction) -> bool {
+        matches!(action, WorldAction::Reply(p)
+            if p.opcode() == SendOpcode::StatChange as i16 && p.bytes[2] == 1)
     }
 
     fn opcodes(result: WorldResult) -> Vec<i16> {
@@ -195,6 +238,37 @@ mod tests {
     }
 
     #[test]
+    fn cancelling_a_buff_ends_it_and_tells_the_client() {
+        use crate::packet::op::RecvOpcode;
+        use packet::io::write::PktWrite;
+
+        let mut player = beginner_with(1002, 2);
+        let now = Instant::now();
+        player.buffs.give(Buff::new(
+            1002,
+            BuffStat::Speed,
+            15,
+            now,
+            Duration::from_secs(8),
+        ));
+        let mut cancel = |skill_id: i32| {
+            let mut packet = Packet::new_empty();
+            packet.write_short(RecvOpcode::CancelBuff as i16).unwrap();
+            packet.write_int(skill_id).unwrap();
+            let mut ctx = WorldContext {
+                client_id: 1,
+                channel_id: 0,
+                player: &mut player,
+            };
+            opcodes(CancelBuffHandler.handle(&mut packet, &mut ctx))
+        };
+        assert_eq!(cancel(1001), Vec::<i16>::new());
+        assert_eq!(cancel(1002), [SendOpcode::CancelBuff as i16]);
+        assert_eq!(cancel(1002), Vec::<i16>::new());
+        assert!(player.buffs.active().is_empty());
+    }
+
+    #[test]
     fn recovery_heals_by_its_x_and_attacks_are_not_buffs() {
         if skills::data().is_err() {
             return;
@@ -209,5 +283,18 @@ mod tests {
             use_skill(&mut player, 1000, 1, Instant::now()).unwrap_err(),
             Refusal::Unsupported
         );
+    }
+
+    #[test]
+    fn using_or_refusing_a_skill_unlocks_the_client() {
+        let mut player = beginner_with(1000, 1);
+        let actions = handle(&mut player, 1000, 1);
+        assert!(matches!(actions.as_slice(), [only] if unlocks(only)));
+
+        if skills::data().is_err() {
+            return;
+        }
+        let mut player = beginner_with(1002, 2);
+        assert!(unlocks(&handle(&mut player, 1002, 2)[0]));
     }
 }
