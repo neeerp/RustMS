@@ -187,8 +187,9 @@ namespace ms
 		{
 			cooldown = WARPCD;
 
-			// v83 (FUN_00712b61) searches from the last portal to the first,
-			// so the highest id wins where two overlap.
+			// v83's Up key (FUN_0094df9b, FUN_00712ab1) searches from the
+			// last portal to the first, so the highest id wins where two
+			// overlap.
 			const Portal *found = nullptr;
 			uint8_t found_id = 0;
 
@@ -198,7 +199,7 @@ namespace ms
 
 				// Spawn points and tutorial triggers can overlap a real exit.
 				// They have no travel destination and must not mask that exit.
-				if (portal.getwarpinfo().valid && portal.range_bounds().contains(playerpos) &&
+				if (portal.getwarpinfo().valid && portal.warp_bounds().contains(playerpos) &&
 					(!found || iter.first > found_id))
 				{
 					found = &portal;

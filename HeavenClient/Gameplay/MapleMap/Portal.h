@@ -91,10 +91,15 @@ namespace ms
 
 		Point<int16_t> get_position() const;
 
-		// The box v83 searches for both Up-key and touch portals
+		// The box v83 checks touch portals against every update
 		// (FUN_00712b61, FindPortal_Collision): hRange by vRange centred on
 		// the portal, with the right and bottom edges excluded.
 		Rectangle<int16_t> range_bounds() const;
+
+		// The box the Up key finds a portal in (v83 FUN_00712ab1): 20 px
+		// either side and 50 px above and below, without the right and
+		// bottom edges.
+		Rectangle<int16_t> warp_bounds() const;
 
 		// The box a hidden portal shows itself in (v83 FUN_00712c57): 100 px
 		// either side and 50 px above and below, without the right and
