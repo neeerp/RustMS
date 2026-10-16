@@ -43,7 +43,10 @@ namespace ms
 			auto hrange = static_cast<int16_t>(sub["hRange"].get_integer(Portal::DEFAULT_RANGE));
 			auto vrange = static_cast<int16_t>(sub["vRange"].get_integer(Portal::DEFAULT_RANGE));
 
-			const Animation *animation = &animations[type];
+			// v83 draws pv for regular, type 4 and scripted portals alike
+			// (FUN_0071165a, FUN_00712313).
+			bool visible = type == Portal::REGULAR || type == Portal::TYPE4 || type == Portal::SCRIPTED;
+			const Animation *animation = visible ? &animations[Portal::REGULAR] : nullptr;
 			bool intramap = target_id == mapid;
 
 			portals_by_id.emplace(
