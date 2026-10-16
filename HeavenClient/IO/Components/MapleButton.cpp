@@ -48,8 +48,8 @@ namespace ms
 	{
 		if (active)
 		{
-			textures[state].draw(position + parentpos);
-			animations[state].draw(position + parentpos, 1.0f);
+			textures[state].draw(DrawArgument(position + parentpos, opacity));
+			animations[state].draw(DrawArgument(position + parentpos, opacity), 1.0f);
 
 			if (focused)
 				focus.draw(position + parentpos);
@@ -60,6 +60,11 @@ namespace ms
 	{
 		if (active)
 			animations[state].update(6);
+	}
+
+	void MapleButton::set_opacity(float value)
+	{
+		opacity = value;
 	}
 
 	Rectangle<int16_t> MapleButton::bounds(Point<int16_t> parentpos) const

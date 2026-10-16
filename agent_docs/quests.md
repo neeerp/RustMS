@@ -19,8 +19,9 @@ Quests run the way the original client ran them:
    asks the field whether that NPC is on the map within reach (1200×800
    around the player), and commits the change and its `Act.img` rewards
    atomically (`db::quest::start`/`complete`/`forfeit`).
-4. It answers with the quest record (`SHOW_STATUS_INFO` mode 1), EXP gain and
-   stats if any, and `UPDATE_QUEST_INFO` mode 8 (quest, NPC, next quest). A
+4. It answers with the quest record (`SHOW_STATUS_INFO` mode 1), EXP and
+   mesos with their stats if any (both shown in the chat log, as mode 3 with
+   its in-chat flag and mode 5), and `UPDATE_QUEST_INFO` mode 8 (quest, NPC, next quest). A
    nonzero next quest (`Act/1/nextQuest`) makes the client continue straight
    into that quest's offer once the current conversation ends.
 
@@ -160,9 +161,12 @@ objectives (kills and items), and `QuestCompletion` reports those whose last
 objective was just met. A quest is judged from when it is first seen, so one
 already met when started or on login doesn't get a notice. O opens the quest
 on the quest log's In Progress tab (`UIQuestLog::show_quest`) and X dismisses
-it. Otherwise the notice stays, across map changes, until the quest is handed
-in or forfeited, as in footage. Newer notices stack above older ones, up to
-four. Footage shows only one notice, so the stacking is a guess.
+it. As in the v83 client (type 7 of its fading Yes/No windows, `FUN_00523408`),
+it plays UI.img/Invite and fades in over a second. It fades out over a second
+once a button is pressed or 30 s after it appeared, whichever comes first.
+`IO/Components/FadeNotice.h` keeps that timing. Each newer notice sits 5 px
+above the last, over it, and when one goes, those above it move down 5 px.
+Handing in or forfeiting the quest also takes its notice away.
 
 ## Persistence and rewards
 

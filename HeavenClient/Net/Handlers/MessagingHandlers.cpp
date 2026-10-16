@@ -24,6 +24,7 @@
 #include "../../Gameplay/Stage.h"
 #include "../../IO/UI.h"
 #include "../Packets/MessagingPackets.h"
+#include "StatusMessages.h"
 
 #include "../../IO/UITypes/UIChatBar.h"
 #include "../../IO/UITypes/UIMessenger.h"
@@ -32,8 +33,6 @@
 #include "../../Util/Misc.h"
 
 #include <nlnx/nx.hpp>
-
-#include <cstdlib>
 
 namespace ms
 {
@@ -71,26 +70,46 @@ namespace ms
 			return "#g" + display_name + ">>" + message;
 		}
 
-		// A quest item gain or loss, worded as in the original client (period GMS footage):
-		// "You have gained an item (Roger's Apple)", "You have gained items (3 Green Apple)".
-		std::string build_item_gain_chatline(const std::string& name, int32_t quantity)
+		// The inventory tab an item goes to, as the v83 client names it (FUN_005cfa86).
+		std::string tab_name(int32_t itemid)
 		{
-			std::string verb = quantity < 0 ? "You have lost " : "You have gained ";
-			int32_t count = std::abs(quantity);
+			switch (itemid / 1'000'000)
+			{
+				case 1: return "Eqp";
+				case 2: return "Use";
+				case 3: return "Setup";
+				case 4: return "Etc";
+				case 5: return "Cash";
+				default: return "";
+			}
+		}
 
-			if (count == 1)
-				return verb + "an item (" + name + ")";
+		// A quest item gain or loss, worded as in the 2025 MapleRoyals v83 client
+		// (FUN_009377d9): gains name the tab, losses don't. Nothing for a zero quantity.
+		std::string build_item_gain_chatline(int32_t itemid, const std::string& name, int32_t quantity)
+		{
+			if (quantity > 1)
+				return "You have gained items in the " + tab_name(itemid) + " tab (" + name + " " + std::to_string(quantity) + ")";
 
-			return verb + "items (" + std::to_string(count) + " " + name + ")";
+			if (quantity == 1)
+				return "You have gained an item in the " + tab_name(itemid) + " tab (" + name + ")";
+
+			if (quantity == -1)
+				return "You have lost an item (" + name + ")";
+
+			if (quantity < -1)
+				return "You have lost items (" + name + " " + std::to_string(-quantity) + ")";
+
+			return {};
 		}
 	}
 
 	// Modes:
-	// 0 - Item(0) or Meso(1) 
-	// 3 - Exp gain
-	// 4 - Fame
-	// 5 - Mesos
-	// 6 - Guild points
+	// 0 - Picking up an item or mesos
+	// 1 - Quest progress
+	// 3 - EXP
+	// 4 - Fame, in the chat log
+	// 5 - Mesos, in the chat log
 	void ShowStatusInfoHandler::handle(InPacket& recv) const
 	{
 		int8_t mode = recv.read_byte();
@@ -99,77 +118,52 @@ namespace ms
 		{
 			int8_t mode2 = recv.read_byte();
 
-			if (mode2 == -1)
-			{
-				show_status(Color::Name::WHITE, "You can't get anymore items.");
-			}
-			else if (mode2 == 0)
+			if (mode2 == 0 || mode2 == 2)
 			{
 				int32_t itemid = recv.read_int();
-				int32_t qty = recv.read_int();
+				int32_t qty = mode2 == 0 ? recv.read_int() : 1;
 
 				const ItemData& idata = ItemData::get(itemid);
 
 				if (!idata.is_valid())
 					return;
 
-				std::string name = idata.get_name();
+				// The name is cut with "..", shorter when a count follows it.
+				size_t width = qty < 2 ? PICKUP_NAME_WIDTH : PICKUP_STACK_NAME_WIDTH;
+				Text name(Text::Font::A12M, Text::Alignment::LEFT, Color::Name::WHITE, idata.get_name());
 
-				if (name.length() > 21)
-				{
-					name = name.substr(0, 21);
-					name += "..";
-				}
+				if (name.width() > width)
+					string_format::format_with_ellipsis(name, width);
 
-				InventoryType::Id type = InventoryType::by_item_id(itemid);
-
-				std::string tab = "";
-
-				switch (type)
-				{
-				case InventoryType::Id::EQUIP:
-					tab = "Eqp";
-					break;
-				case InventoryType::Id::USE:
-					tab = "Use";
-					break;
-				case InventoryType::Id::SETUP:
-					tab = "Setup";
-					break;
-				case InventoryType::Id::ETC:
-					tab = "Etc";
-					break;
-				case InventoryType::Id::CASH:
-					tab = "Cash";
-					break;
-				default:
-					tab = "UNKNOWN";
-					break;
-				}
-
-				// TODO: show_status(Color::Name::WHITE, "You have lost items in the " + tab + " tab (" + name + " " + std::to_string(qty) + ")");
-
-				if (qty < 0)
-					show_status(Color::Name::WHITE, "You have lost an item in the " + tab + " tab (" + name + ")");
-				else if (qty == 1)
-					show_status(Color::Name::WHITE, "You have gained an item in the " + tab + " tab (" + name + ")");
-				else
-					show_status(Color::Name::WHITE, "You have gained items in the " + tab + " tab (" + name + " " + std::to_string(qty) + ")");
+				show_status(Color::Name::WHITE, status_messages::item_line(status_messages::tab_name(itemid), name.get_text(), qty));
 			}
 			else if (mode2 == 1)
 			{
-				recv.skip(1);
-
+				// Set when part of the mesos was lost.
+				bool portion = recv.read_bool();
 				int32_t gain = recv.read_int();
+				int16_t cafe = recv.read_short();
 
-				if (gain < 0)
-					show_status(Color::Name::WHITE, "You have lost mesos (" + std::to_string(gain) + ")");
-				else
-					show_status(Color::Name::WHITE, "You have gained mesos (+" + std::to_string(gain) + ")");
+				show_status(Color::Name::WHITE, "You have gained mesos (+" + std::to_string(gain) + ")");
+
+				if (portion)
+					chat_line("A portion was not found after falling on the ground.", UIChatBar::LineType::YELLOW);
+
+				if (cafe != 0)
+					show_status(Color::Name::YELLOW, "Internet Cafe Meso Bonus (+" + std::to_string(cafe) + ")");
+			}
+			else if (mode2 == -2)
+			{
+				show_status(Color::Name::WHITE, "This item is unavailable for the pick-up.");
+			}
+			else if (mode2 == -3)
+			{
+				show_status(Color::Name::WHITE, "You cannot acquire any items.");
+				chat_line("You cannot acquire any items because the game file has been damaged. Please try again after reinstalling the game.", UIChatBar::LineType::SKILL);
 			}
 			else
 			{
-				show_status(Color::Name::RED, "Mode: 0, Mode 2: " + std::to_string(mode2) + " is not handled.");
+				show_status(Color::Name::WHITE, "You can't get anymore items.");
 			}
 		}
 		else if (mode == 1)
@@ -186,44 +180,37 @@ namespace ms
 		}
 		else if (mode == 3)
 		{
-			bool white = recv.read_bool();
-			int32_t gain = recv.read_int();
-			bool inchat = recv.read_bool();
-			int32_t bonus1 = recv.read_int();
+			status_messages::ExpGain exp = status_messages::read_exp(recv);
 
-			recv.read_short();
-			recv.read_int();	// bonus 2
-			recv.read_bool();	// 'event or party'
-			recv.read_int();	// bonus 3
-			recv.read_int();	// bonus 4
-			recv.read_int();	// bonus 5
-
-			std::string message = "You have gained experience (+" + std::to_string(gain) + ")";
-
-			if (inchat)
+			if (exp.inchat)
 			{
-				show_status(Color::Name::RED, "Mode: 3, inchat is not handled.");
+				for (const auto& line : status_messages::chat_exp_lines(exp))
+					chat_line(line);
 			}
 			else
 			{
-				show_status(white ? Color::Name::WHITE : Color::Name::YELLOW, message);
-
-				if (bonus1 > 0)
-					show_status(Color::Name::YELLOW, "+ Bonus EXP (+" + std::to_string(bonus1) + ")");
+				for (const auto& line : status_messages::exp_lines(exp))
+					show_status(line.yellow ? Color::Name::YELLOW : Color::Name::WHITE, line.text);
 			}
 		}
 		else if (mode == 4)
 		{
-			int32_t gain = recv.read_int();
-			std::string sign = (gain < 0) ? "-" : "+";
-
-			// TODO: Lose fame?
-			show_status(Color::Name::WHITE, "You have gained fame. (" + sign + std::to_string(gain) + ")");
+			chat_line(status_messages::fame_line(recv.read_int()));
+		}
+		else if (mode == 5)
+		{
+			chat_line(status_messages::meso_line(recv.read_int()));
 		}
 		else
 		{
 			show_status(Color::Name::RED, "Mode: " + std::to_string(mode) + " is not handled.");
 		}
+	}
+
+	void ShowStatusInfoHandler::chat_line(const std::string& message, UIChatBar::LineType type) const
+	{
+		if (auto chatbar = UI::get().get_element<UIChatBar>())
+			chatbar->send_chatline(message, type);
 	}
 
 	void ShowStatusInfoHandler::show_status(Color::Name color, const std::string& message) const
@@ -484,7 +471,7 @@ namespace ms
 		if (mode1 == 3)
 		{
 			// Quest item gains and losses: a count, then an item id and quantity for each,
-			// shown as one grey chat line per item.
+			// shown as one grey chat line per item (chat type 7).
 			uint8_t count = recv.read_byte();
 
 			for (uint8_t i = 0; i < count; i++)
@@ -497,8 +484,29 @@ namespace ms
 				if (!idata.is_valid())
 					continue;
 
+				std::string line = build_item_gain_chatline(itemid, idata.get_name(), qty);
+
+				if (line.empty())
+					continue;
+
 				if (auto chatbar = UI::get().get_element<UIChatBar>())
-					chatbar->send_chatline(build_item_gain_chatline(idata.get_name(), qty), UIChatBar::LineType::GREY);
+					chatbar->send_chatline(line, UIChatBar::LineType::GREY);
+			}
+
+			// A count of 0 is a quest message instead: a light blue status line,
+			// with Effect/Quest.img/N on the player when N isn't negative.
+			if (count == 0)
+			{
+				std::string message = recv.read_string();
+				int32_t effect = recv.read_int();
+
+				if (effect >= 0)
+					if (nl::node animation = nl::nx::effect["Quest.img"][std::to_string(effect)])
+						Stage::get().get_player().show_effect(Animation(animation));
+
+				if (!message.empty())
+					if (auto messenger = UI::get().get_element<UIStatusMessenger>())
+						messenger->show_status(Color::Name::PICTONBLUE, message);
 			}
 		}
 		else if (mode1 == 8) // job change

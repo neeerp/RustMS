@@ -104,6 +104,14 @@ pub fn use_skill(skill_id: i32, level: u8) -> Packet {
     p
 }
 
+/// CANCEL_BUFF: right-clicking a skill's buff icon.
+pub fn cancel_buff(skill_id: i32) -> Packet {
+    let mut p = Packet::new_empty();
+    p.write_short(RecvOpcode::CancelBuff as i16).unwrap();
+    p.write_int(skill_id).unwrap();
+    p
+}
+
 /// MOVE_PLAYER: one absolute movement to (x, y), standing.
 pub fn walk_to(x: i16, y: i16) -> Packet {
     let mut movement = vec![1u8, 0];
