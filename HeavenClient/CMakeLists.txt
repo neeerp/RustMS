@@ -26,6 +26,8 @@ if(HEAVENCLIENT_BUILD_TESTS)
     add_test(NAME quest_dialogue COMMAND quest_dialogue_tests)
     add_executable(npc_text_tests tests/npc_text.cpp)
     add_test(NAME npc_text COMMAND npc_text_tests)
+    add_executable(chat_wrap_tests tests/chat_wrap.cpp)
+    add_test(NAME chat_wrap COMMAND chat_wrap_tests)
     add_executable(map_tooltip_tests tests/map_tooltip.cpp)
     add_test(NAME map_tooltip COMMAND map_tooltip_tests)
     add_executable(cash_catalog_tests tests/cash_catalog.cpp)
@@ -539,6 +541,7 @@ add_executable(HeavenClient
     Template/Singleton.h
     Template/TimedQueue.h
     Template/TypeMap.h
+    Util/ChatWrap.h
     Util/HardwareInfo.h
     Util/Lerp.h
     Util/Misc.cpp

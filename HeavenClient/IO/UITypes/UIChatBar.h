@@ -23,8 +23,8 @@
 #include <cstddef>
 
 #include <cstdint>
+#include <deque>
 #include <optional>
-#include <unordered_map>
 #include <vector>
 
 #include "../Messages.h"
@@ -227,6 +227,7 @@ namespace ms
 
 		int16_t rowpos;
 		int16_t rowmax;
-		std::unordered_map<int16_t, Text> rowtexts;
+		// The log's rows, oldest first
+		std::deque<Text> rowtexts;
 	};
 }

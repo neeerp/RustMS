@@ -28,6 +28,7 @@
 #include "../../Gameplay/Stage.h"
 #include "../../Graphics/GraphicsGL.h"
 #include "../../Net/Packets/MessagingPackets.h"
+#include "../../Util/ChatWrap.h"
 #include "../../Util/NxFiles.h"
 
 namespace ms
@@ -101,6 +102,13 @@ namespace ms
 		// The original places a line by the top of its text; text here is
 		// placed this far above that.
 		constexpr int16_t TEXT_RAISE = 7;
+
+		// The original wraps a line at 550 pixels less the scroll bar's
+		// width, and keeps the latest 64 rows (FUN_008db070).
+		constexpr int16_t WRAP_WIDTH = 550;
+		constexpr size_t MAX_ROWS = 64;
+		// Wide enough that measuring a line never wraps it
+		constexpr uint16_t MEASURE_WIDTH = 16'000;
 	}
 
 	UIChatBar::UIChatBar()
@@ -284,14 +292,14 @@ namespace ms
 
 		for (int16_t i = 0; i < get_logrows(); i++)
 		{
-			auto row = rowtexts.find(rowpos - i);
+			int16_t row = rowpos - i;
 
-			if (row == rowtexts.end())
+			if (row < 0 || row > rowmax)
 				break;
 
 			int16_t top = logbottom - CHATROWHEIGHT * (i + 1);
 
-			row->second.draw(position + Point<int16_t>(3, top - TEXT_RAISE));
+			rowtexts[row].draw(position + Point<int16_t>(3, top - TEXT_RAISE));
 		}
 
 		Point<int16_t> bar = position + get_scrollbar_pos();
@@ -498,9 +506,6 @@ namespace ms
 
 	void UIChatBar::send_chatline(const std::string &line, LineType type)
 	{
-		rowmax++;
-		rowpos = rowmax;
-
 		Color::Name color;
 
 		switch (type)
@@ -534,11 +539,31 @@ namespace ms
 				break;
 		}
 
-		rowtexts.emplace(
-				std::piecewise_construct,
-				std::forward_as_tuple(rowmax),
-				std::forward_as_tuple(Text::Font::A12M, Text::Alignment::LEFT, color, line)
-		);
+		// The original indents the rows after the first, except for its
+		// notice and error colours.
+		bool indent = type == LineType::UNK0 || type == LineType::WHITE || type == LineType::PARTY ||
+					  type == LineType::BUDDY;
+		int16_t width = WRAP_WIDTH - arrows[Arrow::PREV][0].width();
+
+		auto fit = [&](const std::string& text)
+		{
+			Text measured(Text::Font::A12M, Text::Alignment::LEFT, color, text, MEASURE_WIDTH);
+			size_t count = 0;
+
+			while (count < text.size() && measured.advance(count + 1) <= width)
+				count++;
+
+			return count;
+		};
+
+		for (const auto& row : ChatWrap::wrap(line, indent, fit))
+			rowtexts.emplace_back(Text::Font::A12M, Text::Alignment::LEFT, color, row);
+
+		while (rowtexts.size() > MAX_ROWS)
+			rowtexts.pop_front();
+
+		rowmax = static_cast<int16_t>(rowtexts.size()) - 1;
+		rowpos = rowmax;
 	}
 
 	void UIChatBar::display_message(Messages::Type line, UIChatBar::LineType type)
