@@ -7,6 +7,15 @@ use std::io::Cursor;
 
 /// Emotes F1-F7 are free; higher ones need an emotion cash item.
 const FREE_EMOTES: std::ops::RangeInclusive<i32> = 1..=7;
+/// The face items (5160000 Queasy to 5160014 Bleh) give emotes 8 to 22.
+const ITEM_EMOTES: std::ops::RangeInclusive<i32> = 8..=22;
+const FACE_ITEM_BASE: i32 = 5_159_992;
+
+/// Whether the player may show `emote`: free, or from a face item they own.
+fn can_show(player: &game::Player, emote: i32) -> bool {
+    FREE_EMOTES.contains(&emote)
+        || (ITEM_EMOTES.contains(&emote) && player.inventory.count(FACE_ITEM_BASE + emote) > 0)
+}
 
 /// FACE_EXPRESSION: show the player's emote to the rest of the map.
 pub struct FaceExpressionHandler;
@@ -17,7 +26,7 @@ impl WorldHandler for FaceExpressionHandler {
         reader.read_short()?;
         let emote = reader.read_int()?;
 
-        if !FREE_EMOTES.contains(&emote) {
+        if !can_show(ctx.player, emote) {
             return Ok(HandlerResult::empty());
         }
 
@@ -33,7 +42,10 @@ mod tests {
     use packet::io::write::PktWrite;
 
     fn handle(emote: i32) -> Vec<WorldAction> {
-        let mut player = crate::codec::stats::sample_player();
+        handle_as(crate::codec::stats::sample_player(), emote)
+    }
+
+    fn handle_as(mut player: game::Player, emote: i32) -> Vec<WorldAction> {
         let mut packet = Packet::new_empty();
         packet
             .write_short(RecvOpcode::FaceExpression as i16)
@@ -60,5 +72,22 @@ mod tests {
         }
         assert!(handle(0).is_empty());
         assert!(handle(8).is_empty());
+    }
+
+    #[test]
+    fn item_emotes_need_their_face_item() {
+        let mut player = crate::codec::stats::sample_player();
+        player.inventory.insert(
+            game::InventoryType::Cash,
+            1,
+            game::Item::stack(5_160_006, 1),
+        );
+
+        assert!(matches!(
+            handle_as(player.clone(), 14).as_slice(),
+            [WorldAction::Field(FieldRequest::Broadcast(_))]
+        ));
+        assert!(handle_as(player.clone(), 8).is_empty());
+        assert!(handle_as(player, 23).is_empty());
     }
 }

@@ -48,7 +48,9 @@ namespace ms
 
 	void ModifyInventoryHandler::handle(InPacket& recv) const
 	{
-		recv.read_bool(); // 'updatetick'
+		// Set when this answers the player's item request.
+		if (recv.read_bool())
+			Stage::get().get_player().request_answered();
 
 		// A dragged icon points into the inventory windows' icons, which the
 		// changes below rebuild; drop the drag while it is still valid.

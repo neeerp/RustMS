@@ -27,6 +27,7 @@ namespace ms
 		unique = false;
 		unsellable = false;
 		cashitem = false;
+		questitem = false;
 		gender = 0;
 
 		nl::node src;
@@ -90,6 +91,7 @@ namespace ms
 			unique = src["only"].get_bool();
 			unsellable = src["notSale"].get_bool();
 			cashitem = src["cash"].get_bool();
+			questitem = src["quest"].get_bool();
 			gender = get_item_gender(itemid);
 
 			name = std::string(strsrc["name"]);
@@ -180,6 +182,11 @@ namespace ms
 	bool ItemData::is_cashitem() const
 	{
 		return cashitem;
+	}
+
+	bool ItemData::is_questitem() const
+	{
+		return questitem;
 	}
 
 	ItemData::operator bool() const

@@ -18,6 +18,7 @@
 #include "Combat.h"
 
 #include "DamageLayout.h"
+#include "HitTiming.h"
 #include "PointBlank.h"
 #include "ShotPath.h"
 
@@ -87,6 +88,13 @@ namespace ms
 	{
 		if (!player.can_attack())
 			return;
+
+		// v83 says why it won't attack bare-handed (FUN_0095b85a).
+		if (!player.get_look().get_equips().has_weapon())
+		{
+			InChatMessage(Messages::ATTACK_NOWEAPON).drop();
+			return;
+		}
 
 		const SpecialMove &move = get_move(move_id);
 		SpecialMove::ForbidReason reason = player.can_use(move);
@@ -188,12 +196,17 @@ namespace ms
 					DamageReactorPacket(reactor->get_oid(), player.get_position(), 0, 0).dispatch();
 		} else
 		{
+			// v83 uses a skill that doesn't attack only when it may ask the
+			// server, as for an item (FUN_0096b140).
+			if (!player.can_request(ExclRequest::SKILL_WAIT))
+				return;
+
 			move.apply_useeffects(player);
 			move.apply_actions(player, Attack::Type::MAGIC);
 
 			int32_t moveid = move.get_id();
 			int32_t level = player.get_skills().get_level(moveid);
-			UseSkillPacket(moveid, level).dispatch();
+			player.request(UseSkillPacket(moveid, level), ExclRequest::SKILL_WAIT);
 		}
 	}
 
@@ -536,20 +549,26 @@ namespace ms
 				shoot(shot_end, result.hitcount);
 		} else
 		{
-			for (auto &line : result.damagelines)
+			// As in v83, every hit on a mob lands at once, at the frame the
+			// attack hits on, and each later target a little after.
+			uint16_t delay = user.get_attackdelay(0);
+
+			for (size_t target = 0; target < result.damagelines.size(); target++)
 			{
+				auto &line = result.damagelines[target];
 				int32_t oid = line.first;
 
 				if (mobs.contains(oid))
 				{
 					std::vector<DamageNumber> numbers = place_numbers(line.second, move.get_id());
+					uint16_t target_delay = hit_timing::target_delay(result.type, result.skill, target);
 
 					size_t i = 0;
 
 					for (auto &number : numbers)
 					{
 						damageeffects.emplace(
-								user.get_attackdelay(i),
+								delay + target_delay,
 								attackuser,
 								number,
 								line.second[i].first,

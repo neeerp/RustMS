@@ -32,6 +32,7 @@ namespace ms
 			SCROLL_FAILURE,
 			MONSTER_CARD,
 			QUEST_CLEAR,
+			TELEPORT,
 			LENGTH
 		};
 

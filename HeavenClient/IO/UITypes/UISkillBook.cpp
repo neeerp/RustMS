@@ -21,6 +21,7 @@
 
 #include "../Components/AreaButton.h"
 #include "../Components/MapleButton.h"
+#include "../Components/SkillRecommendation.h"
 
 #include "../../Character/SkillId.h"
 #include "../../Data/JobData.h"
@@ -52,6 +53,8 @@ namespace ms
 		constexpr Point<int16_t> ROW_NAME = Point<int16_t>(40, -5);
 		constexpr Point<int16_t> ROW_LEVEL = Point<int16_t>(40, 13);
 		constexpr Point<int16_t> ROW_SPUP = Point<int16_t>(124, 20);
+		// The recommended skill's frame, ignoring its origin like v83.
+		constexpr Point<int16_t> ROW_RECOMMEND = Point<int16_t>(36, 0);
 		constexpr int16_t SLIDER_X = 153;
 		constexpr Point<int16_t> SP_LABEL = Point<int16_t>(110, 259);
 		constexpr int16_t ICON_SIZE = 32;
@@ -141,6 +144,7 @@ namespace ms
 		skilld = Skill["skill0"];
 		skille = Skill["skill1"];
 		line = Skill["line"];
+		recommend = Skill["recommend"]["0"];
 
 		tabs = ClassicTabs(ClassicTabs::TAB5, Skill["Tab"]["enabled"], Skill["Tab"]["disabled"], TAB_FILL);
 
@@ -152,6 +156,7 @@ namespace ms
 
 			buttons[Buttons::BT_TAB0 + i] = std::make_unique<AreaButton>(tab_pos,
 																		 Point<int16_t>(tabs.pitch(), tabs.height()));
+			buttons[Buttons::BT_TAB0 + i]->set_tab();
 		}
 
 		for (uint16_t i = 0; i < ROWS; i++)
@@ -212,6 +217,9 @@ namespace ms
 				skilld.draw(row_pos);
 				skills[index].get_icon()->set_state(StatefulIcon::State::DISABLED);
 			}
+
+			if (skills[index].get_id() == recommended)
+				recommend.draw(row_pos + ROW_RECOMMEND + recommend.get_origin());
 
 			skills[index].draw(row_pos);
 
@@ -472,6 +480,19 @@ namespace ms
 
 			skills.emplace_back(skill_id, level);
 		}
+
+		// FUN_008abf71
+		int32_t spent = 0;
+
+		for (int32_t skill_id : data.get_skills())
+			spent += skillbook.get_level(skill_id);
+
+		std::vector<std::pair<int32_t, int32_t>> table;
+
+		for (nl::node entry : nl::nx::etc["RecommendSkill.img"][std::to_string(subid)])
+			table.emplace_back(std::stoi(entry.name()), entry.get_integer());
+
+		recommended = recommended_skill(table, spent);
 	}
 
 	void UISkillBook::change_offset(uint16_t new_offset)
@@ -536,9 +557,7 @@ namespace ms
 
 	void UISkillBook::spend_sp(int32_t skill_id)
 	{
-		SpendSpPacket(skill_id).dispatch();
-
-		UI::get().disable();
+		Stage::get().get_player().request(SpendSpPacket(skill_id), ExclRequest::WAIT);
 	}
 
 	Job::Level UISkillBook::joblevel_by_tab(uint16_t t) const

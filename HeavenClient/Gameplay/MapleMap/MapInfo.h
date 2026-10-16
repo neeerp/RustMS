@@ -49,17 +49,19 @@ namespace ms
 
 		bool is_ladder() const;
 
-		bool inrange(Point<int16_t> position, bool upwards) const;
-
-		bool felloff(int16_t y, bool downwards) const;
+		// Whether climbing past the top steps onto a platform (uf).
+		bool leads_up() const;
 
 		int16_t get_x() const;
+		int16_t get_top() const;
+		int16_t get_bottom() const;
 
 	private:
 		int16_t x;
 		int16_t y1;
 		int16_t y2;
 		bool ladder;
+		bool uf;
 	};
 
 	class MapInfo
@@ -76,15 +78,19 @@ namespace ms
 		// How much faster players recover HP and MP at rest (info/recovery).
 		double get_recovery() const;
 
+		// Whether players may leave the map for another channel or the Cash
+		// Shop: fieldLimit bit 0x10 is unset.
+		bool can_migrate() const;
+
 		Range<int16_t> get_walls() const;
 
 		Range<int16_t> get_borders() const;
 
 		// Find a seat the player's position
 		Optional<const Seat> findseat(Point<int16_t> position) const;
-		// Find a ladder at the player's position
-		// !upwards - implies downwards
-		Optional<const Ladder> findladder(Point<int16_t> position, bool upwards) const;
+		// The first ladder or rope that the segment from a to b reaches: one
+		// within 10 px of it across and overlapping it down (FUN_00a45b03).
+		Optional<const Ladder> findladder(Point<int16_t> a, Point<int16_t> b) const;
 
 	private:
 		int32_t fieldlimit;
