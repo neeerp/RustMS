@@ -23,9 +23,8 @@
 #include <cstddef>
 
 #include <cstdint>
+#include <deque>
 #include <optional>
-#include <unordered_map>
-#include <unordered_set>
 #include <vector>
 
 #include "../Messages.h"
@@ -248,8 +247,12 @@ namespace ms
 
 		int16_t rowpos;
 		int16_t rowmax;
-		std::unordered_map<int16_t, Text> rowtexts;
-		// The rows drawn on a light strip, as v83 draws GM chat
-		std::unordered_set<int16_t> highlighted_rows;
+		struct ChatRow
+		{
+			Text text;
+			bool highlighted;
+		};
+		// Oldest first; a wrapped GM row keeps its background when old rows leave.
+		std::deque<ChatRow> rowtexts;
 	};
 }
