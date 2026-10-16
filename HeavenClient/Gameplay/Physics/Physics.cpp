@@ -93,6 +93,20 @@ namespace ms
 			speed = std::min(speed + impact, impact);
 	}
 
+	// CVecCtrl applies a queued impact at the start of every step, before
+	// it walks, falls or swims (0x9b19d0 calls 0x9b222a). The object leaves
+	// its platform and keeps whole-pixel speeds (FUN_007f200a). Speeds are
+	// in pixels per second.
+	void apply_impact(PhysicsObject &phobj, double &hspeed, double &vspeed)
+	{
+		add_impact(hspeed, phobj.impactx);
+		add_impact(vspeed, phobj.impacty);
+		hspeed = std::trunc(hspeed);
+		vspeed = std::trunc(vspeed);
+		phobj.impact = false;
+		phobj.onground = false;
+	}
+
 	const double GRAVFORCE = 0.14;
 	const double SWIMGRAVFORCE = 0.03;
 	const double FRICTION = 0.3;
@@ -127,6 +141,19 @@ namespace ms
 		{
 			move_shoe(phobj);
 			return;
+		}
+
+		// A hit while swimming or flying pushes now, not when the object
+		// next walks.
+		if (phobj.impact)
+		{
+			double hspeed = phobj.hspeed / TICK;
+			double vspeed = phobj.vspeed / TICK;
+
+			apply_impact(phobj, hspeed, vspeed);
+
+			phobj.hspeed = hspeed * TICK;
+			phobj.vspeed = vspeed * TICK;
 		}
 
 		// Use the appropriate physics for the terrain the object is on
@@ -166,17 +193,8 @@ namespace ms
 			phobj.onground = false;
 		}
 
-		// A knockback lifts the object off its platform and leaves it with
-		// whole-pixel speeds (FUN_007f200a).
 		if (phobj.impact)
-		{
-			add_impact(hspeed, phobj.impactx);
-			add_impact(vspeed, phobj.impacty);
-			hspeed = std::trunc(hspeed);
-			vspeed = std::trunc(vspeed);
-			phobj.impact = false;
-			phobj.onground = false;
-		}
+			apply_impact(phobj, hspeed, vspeed);
 
 		phobj.hforce = 0.0;
 		phobj.vforce = 0.0;
