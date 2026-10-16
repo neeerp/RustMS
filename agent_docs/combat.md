@@ -103,6 +103,13 @@ basic attack can pass the mob in front for one that spawned earlier. A mob
 that is spawned again under the same oid keeps its place. Ranged attacks take
 the closest mobs, which is what v83's outward sweep finds.
 
+`AttackResult::damagelines` keeps the targets in that order, and the attack
+packet lists them in it. Without a bullet, every hit on a mob lands at once,
+at the attack's first hit frame (`Char::get_attackdelay(0)`), and each later
+target lands a little after (`hit_timing::target_delay`): melee 70 ms per
+target up to 280 ms, the multi-target spells 50 ms, and Chain Lightning
+100 ms.
+
 In HeavenClient a hit of at least the mob's `pushed` value puts it in its
 `hit1` stance for about a quarter second, with a three-tick push that moves it
 a few pixels (`Mob::knockback_ticks`), as in period footage.

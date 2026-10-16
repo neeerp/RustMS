@@ -18,6 +18,7 @@
 #include "Combat.h"
 
 #include "DamageLayout.h"
+#include "HitTiming.h"
 
 #include "../../Character/SkillId.h"
 #include "../../IO/Messages.h"
@@ -406,20 +407,26 @@ namespace ms
 			}
 		} else
 		{
-			for (auto &line : result.damagelines)
+			// As in v83, every hit on a mob lands at once, at the frame the
+			// attack hits on, and each later target a little after.
+			uint16_t delay = user.get_attackdelay(0);
+
+			for (size_t target = 0; target < result.damagelines.size(); target++)
 			{
+				auto &line = result.damagelines[target];
 				int32_t oid = line.first;
 
 				if (mobs.contains(oid))
 				{
 					std::vector<DamageNumber> numbers = place_numbers(line.second, move.get_id());
+					uint16_t target_delay = hit_timing::target_delay(result.type, result.skill, target);
 
 					size_t i = 0;
 
 					for (auto &number : numbers)
 					{
 						damageeffects.emplace(
-								user.get_attackdelay(i),
+								delay + target_delay,
 								attackuser,
 								number,
 								line.second[i].first,
