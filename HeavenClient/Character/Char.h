@@ -86,6 +86,10 @@ namespace ms
 		// Return the character's base attacking speed.
 		virtual int8_t get_integer_attackspeed() const = 0;
 
+		// Return the speed stat that paces the walk animation. Others walk
+		// at the base 100.
+		virtual int32_t get_walk_animation_speed() const;
+
 		// Return the attack speed as a multiplier
 		float get_real_attackspeed() const;
 

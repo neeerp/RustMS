@@ -192,13 +192,20 @@ namespace ms
 		switch (state)
 		{
 			case State::WALK:
-				return static_cast<float>(std::abs(phobj.hspeed));
+				// v83 paces each walk frame to delay * 100 / speed, holding the
+				// speed to 70..140, however fast the body moves (FUN_00453ad1).
+				return std::clamp<int32_t>(get_walk_animation_speed(), 70, 140) / 100.0f;
 			case State::LADDER:
 			case State::ROPE:
 				return static_cast<float>(std::abs(phobj.vspeed));
 			default:
 				return 1.0f;
 		}
+	}
+
+	int32_t Char::get_walk_animation_speed() const
+	{
+		return 100;
 	}
 
 	float Char::get_real_attackspeed() const

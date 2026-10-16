@@ -137,6 +137,9 @@ namespace ms
 		// Return the character's attacking speed.
 		int8_t get_integer_attackspeed() const override;
 
+		// Return the total ES_SPEED stat.
+		int32_t get_walk_animation_speed() const override;
+
 		// Returns the shoe's walking speed multiplier, from the total ES_SPEED stat.
 		double get_walkspeed() const;
 
