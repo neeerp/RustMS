@@ -445,6 +445,7 @@ fn world_routes() -> &'static HashMap<i16, WorldRoute> {
             (Op::SpendAp, InGame(&world::SpendApHandler)),
             (Op::SpendSp, InGame(&world::SpendSpHandler)),
             (Op::UseSkill, InGame(&world::UseSkillHandler)),
+            (Op::CancelBuff, InGame(&world::CancelBuffHandler)),
             (Op::MesoDrop, InGame(&world::MesoDropHandler)),
             (Op::CharInfoRequest, InGame(&world::CharInfoRequestHandler)),
         ];

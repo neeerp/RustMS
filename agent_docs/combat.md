@@ -144,8 +144,10 @@ the map sees SHOW_FOREIGN_EFFECT 1 with the skill.
 saved. A new buff replaces one on the same stat. The client actor sleeps until
 the next deadline (`actor::client::buff`): Recovery heals its `x` every 5 s
 while the player is hurt (HP stat update), and an expired buff sends
-CANCEL_BUFF, since the client never ends buffs itself. Dying and changing
-channel end every buff; cooldowns keep running.
+CANCEL_BUFF, since the client never ends buffs itself. Right-clicking a buff
+icon sends CANCEL_BUFF (`0x5C`, the skill id), which ends that skill's buffs
+and answers with CANCEL_BUFF. Dying and changing channel end every buff;
+cooldowns keep running.
 
 ## Spending AP and SP
 
