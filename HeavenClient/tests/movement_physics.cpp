@@ -463,6 +463,20 @@ void knockback(const ms::Physics& physics)
 		double expected = walk > 0 ? -236.0 : -270.0;
 		require(std::abs(player.hspeed * TICKS_PER_SECOND - expected) < 0.01, "a knockback did not cap at its own speed");
 	}
+
+	// Issue #341: a hit while swimming pushes at once, and leaving the water
+	// doesn't replay it.
+	ms::PhysicsObject swimmer = grounded_shoe(physics);
+	swimmer.type = ms::PhysicsObject::Type::SWIMMING;
+	ms::Physics::knockback(swimmer, -270.0, -270.0);
+	physics.move_object(swimmer);
+	require(!swimmer.impact && swimmer.hspeed < 0.0 && swimmer.vspeed < 0.0, "a swimming hit did not push on its first tick");
+	for (int tick = 0; tick < 9; ++tick)
+		physics.move_object(swimmer);
+	double swimspeed = swimmer.hspeed;
+	swimmer.type = ms::PhysicsObject::Type::NORMAL;
+	physics.move_object(swimmer);
+	require(swimmer.hspeed >= swimspeed, "leaving the water replayed a swimming hit");
 }
 
 // Falls speed up at 2000 px/s^2 to at most 670 px/s.
