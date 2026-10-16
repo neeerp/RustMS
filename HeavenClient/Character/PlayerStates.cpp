@@ -24,7 +24,7 @@ namespace ms
 	const double ROPEJUMPH = 1.3;
 	const double ROPEJUMPV = 0.5;
 
-	// Climbing in CUserLocal (FUN_00804bea): 3 px each 30 ms update,
+	// Climbing in CUserLocal (FUN_009cfdb1): 3 px each 30 ms update,
 	// whatever the speed.
 	const double CLIMBSPEED = 3.0 * Constants::TIMESTEP / 30;
 
