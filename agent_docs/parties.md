@@ -68,6 +68,14 @@ reconstruction of v83:
   the map. The HP MARK button turns these bars on and off.
 - In `UIChatBar`, the party chat key (2 by default) or the Talk button sets
   the target to "To Party". The say key sets it back to "To All".
+- `IO/PartyCommands` runs `/partyinfo`, `/makeparty`, `/leaveparty`,
+  `/partyinvite name` and `/partyexpel name` from the chat bar. The party
+  window's Create, Leave, Invite and Expel buttons go through it too, as in
+  v83. It refuses what v83 refuses before contacting the server: creating or
+  inviting as a Beginner, Noblesse or Legend below level 10, inviting
+  yourself, inviting or expelling without leading the party, inviting into a
+  full party, and expelling someone who isn't a member. v83's check for maps
+  where leaving or expelling isn't allowed is not implemented.
 
 ## Unverified against period footage
 

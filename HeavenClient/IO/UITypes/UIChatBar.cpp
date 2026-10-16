@@ -24,6 +24,8 @@
 
 #include "../Components/MapleButton.h"
 
+#include "../PartyCommands.h"
+
 #include "../../Configuration.h"
 #include "../../Gameplay/Stage.h"
 #include "../../Graphics/GraphicsGL.h"
@@ -188,6 +190,9 @@ namespace ms
 									send_chatline("Usage: /find <name>", LineType::RED);
 								else
 									FindPacket(target).dispatch();
+							}
+							else if (PartyCommands::run(msg))
+							{
 							}
 							else if (chat_target == Target::PARTY)
 							{
