@@ -10,6 +10,8 @@ if(HEAVENCLIENT_BUILD_TESTS)
     add_test(NAME quest_markers COMMAND quest_marker_tests)
     add_executable(quest_completion_tests tests/quest_completion.cpp)
     add_test(NAME quest_completion COMMAND quest_completion_tests)
+    add_executable(fade_notice_tests tests/fade_notice.cpp)
+    add_test(NAME fade_notice COMMAND fade_notice_tests)
     add_executable(input_focus_tests tests/input_focus.cpp)
     add_test(NAME input_focus COMMAND input_focus_tests)
     add_executable(movement_physics_tests tests/movement_physics.cpp
@@ -20,12 +22,26 @@ if(HEAVENCLIENT_BUILD_TESTS)
         ${PROJECT_SOURCE_DIR}/libs/NoLifeNx/nlnx/build/libNoLifeNx.a
         ${PROJECT_SOURCE_DIR}/libs/lz4/lib/liblz4.a)
     add_test(NAME movement_physics COMMAND movement_physics_tests)
+    add_executable(map_objects_tests tests/map_objects.cpp
+        Gameplay/MapleMap/MapObjects.cpp Gameplay/MapleMap/MapObject.cpp
+        Gameplay/Physics/Physics.cpp Gameplay/Physics/Foothold.cpp Gameplay/Physics/FootholdTree.cpp)
+    target_include_directories(map_objects_tests PRIVATE ${PROJECT_SOURCE_DIR}/libs/NoLifeNx)
+    target_link_libraries(map_objects_tests PRIVATE
+        ${PROJECT_SOURCE_DIR}/libs/NoLifeNx/nlnx/build/libNoLifeNx.a
+        ${PROJECT_SOURCE_DIR}/libs/lz4/lib/liblz4.a)
+    add_test(NAME map_objects COMMAND map_objects_tests)
     add_executable(frame_assembler_tests tests/frame_assembler.cpp Net/Cryptography.cpp)
     add_test(NAME frame_assembler COMMAND frame_assembler_tests)
     add_executable(quest_dialogue_tests tests/quest_dialogue.cpp)
     add_test(NAME quest_dialogue COMMAND quest_dialogue_tests)
     add_executable(npc_text_tests tests/npc_text.cpp)
     add_test(NAME npc_text COMMAND npc_text_tests)
+    add_executable(swindle_words_tests tests/swindle_words.cpp)
+    add_test(NAME swindle_words COMMAND swindle_words_tests)
+    add_executable(chat_wrap_tests tests/chat_wrap.cpp)
+    add_test(NAME chat_wrap COMMAND chat_wrap_tests)
+    add_executable(curse_words_tests tests/curse_words.cpp)
+    add_test(NAME curse_words COMMAND curse_words_tests)
     add_executable(map_tooltip_tests tests/map_tooltip.cpp)
     add_test(NAME map_tooltip COMMAND map_tooltip_tests)
     add_executable(cash_catalog_tests tests/cash_catalog.cpp)
@@ -57,14 +73,44 @@ if(HEAVENCLIENT_BUILD_TESTS)
     add_test(NAME keyboard COMMAND keyboard_tests)
     add_executable(touch_damage_tests tests/touch_damage.cpp)
     add_test(NAME touch_damage COMMAND touch_damage_tests)
+    add_executable(buff_row_tests tests/buff_row.cpp)
+    add_test(NAME buff_row COMMAND buff_row_tests)
+    add_executable(item_drop_tests tests/item_drop.cpp)
+    add_test(NAME item_drop COMMAND item_drop_tests)
+    add_executable(pickup_tests tests/pickup.cpp)
+    target_include_directories(pickup_tests PRIVATE ${PROJECT_SOURCE_DIR}/libs/NoLifeNx)
+    add_test(NAME pickup COMMAND pickup_tests)
     add_executable(damage_layout_tests tests/damage_layout.cpp)
     add_test(NAME damage_layout COMMAND damage_layout_tests)
+    add_executable(hit_timing_tests tests/hit_timing.cpp)
+    target_include_directories(hit_timing_tests PRIVATE ${PROJECT_SOURCE_DIR}/libs/NoLifeNx)
+    add_test(NAME hit_timing COMMAND hit_timing_tests)
+    add_executable(attack_stances_tests tests/attack_stances.cpp)
+    target_include_directories(attack_stances_tests PRIVATE ${PROJECT_SOURCE_DIR}/Character)
+    add_test(NAME attack_stances COMMAND attack_stances_tests)
+    add_executable(point_blank_tests tests/point_blank.cpp)
+    target_include_directories(point_blank_tests PRIVATE ${PROJECT_SOURCE_DIR}/libs/NoLifeNx)
+    add_test(NAME point_blank COMMAND point_blank_tests)
+    add_executable(shot_path_tests tests/shot_path.cpp)
+    target_include_directories(shot_path_tests PRIVATE ${PROJECT_SOURCE_DIR}/libs/NoLifeNx)
+    add_test(NAME shot_path COMMAND shot_path_tests)
     add_executable(shop_list_tests tests/shop_list.cpp Net/InPacket.cpp)
     target_include_directories(shop_list_tests PRIVATE ${PROJECT_SOURCE_DIR}/libs/NoLifeNx)
     add_test(NAME shop_list COMMAND shop_list_tests)
+    add_executable(status_messages_tests tests/status_messages.cpp Net/InPacket.cpp)
+    target_include_directories(status_messages_tests PRIVATE ${PROJECT_SOURCE_DIR}/libs/NoLifeNx)
+    add_test(NAME status_messages COMMAND status_messages_tests)
+    add_executable(skill_recommendation_tests tests/skill_recommendation.cpp)
+    add_test(NAME skill_recommendation COMMAND skill_recommendation_tests)
+    add_executable(emote_cooldown_tests tests/emote_cooldown.cpp)
+    add_test(NAME emote_cooldown COMMAND emote_cooldown_tests)
+    add_executable(chat_flood_guard_tests tests/chat_flood_guard.cpp)
+    add_test(NAME chat_flood_guard COMMAND chat_flood_guard_tests)
     add_executable(char_click_tests tests/char_click.cpp)
     target_include_directories(char_click_tests PRIVATE ${PROJECT_SOURCE_DIR}/libs/NoLifeNx)
     add_test(NAME char_click COMMAND char_click_tests)
+    add_executable(excl_request_tests tests/excl_request.cpp)
+    add_test(NAME excl_request COMMAND excl_request_tests)
     add_executable(portal_touch_tests tests/portal_touch.cpp Gameplay/MapleMap/Portal.cpp)
     target_include_directories(portal_touch_tests PRIVATE
         ${PROJECT_SOURCE_DIR}/libs/NoLifeNx ${PROJECT_SOURCE_DIR}/libs/glad/build/include)
@@ -189,6 +235,8 @@ add_executable(HeavenClient
     Character/TeleportRock.h
     Data/BulletData.cpp
     Data/BulletData.h
+    Data/CurseData.cpp
+    Data/CurseData.h
     Data/EquipData.cpp
     Data/EquipData.h
     Data/ItemData.cpp
@@ -198,6 +246,8 @@ add_executable(HeavenClient
     Data/JobData.h
     Data/SkillData.cpp
     Data/SkillData.h
+    Data/SwindleData.cpp
+    Data/SwindleData.h
     Data/WeaponData.cpp
     Data/WeaponData.h
     Gameplay/Combat/Attack.h
@@ -302,6 +352,7 @@ add_executable(HeavenClient
     Graphics/Texture.h
     IO/Components/AreaButton.cpp
     IO/Components/AreaButton.h
+    IO/Components/BuffRow.h
     IO/Components/Button.cpp
     IO/Components/Button.h
     IO/Components/Charset.cpp
@@ -315,12 +366,11 @@ add_executable(HeavenClient
     IO/Components/SliderSteps.h
     IO/Components/EquipTooltip.cpp
     IO/Components/EquipTooltip.h
+    IO/Components/FadeNotice.h
     IO/Components/Gauge.cpp
     IO/Components/Gauge.h
     IO/Components/Icon.cpp
     IO/Components/Icon.h
-    IO/Components/IconCover.cpp
-    IO/Components/IconCover.h
     IO/Components/ItemTooltip.cpp
     IO/Components/ItemTooltip.h
     IO/Components/MapleButton.cpp
@@ -409,6 +459,8 @@ add_executable(HeavenClient
     IO/UITypes/UIQuit.h
     IO/UITypes/UIRaceSelect.cpp
     IO/UITypes/UIRaceSelect.h
+    IO/UITypes/UIRevive.cpp
+    IO/UITypes/UIRevive.h
     IO/UITypes/UIShop.cpp
     IO/UITypes/UIShop.h
     IO/UITypes/UIMonsterBook.cpp
@@ -442,6 +494,8 @@ add_executable(HeavenClient
     IO/KeyType.h
     IO/Messages.cpp
     IO/Messages.h
+    IO/PartyCommands.cpp
+    IO/PartyCommands.h
     IO/UI.cpp
     IO/UI.h
     IO/UIDragElement.h
@@ -539,11 +593,14 @@ add_executable(HeavenClient
     Template/Singleton.h
     Template/TimedQueue.h
     Template/TypeMap.h
+    Util/ChatWrap.h
+    Util/CurseWords.h
     Util/HardwareInfo.h
     Util/Lerp.h
     Util/Misc.cpp
     Util/Misc.h
     Util/NpcTextMarkup.h
+    Util/SwindleWords.h
     Util/NxFiles.cpp
     Util/NxFiles.h
     Util/QuadTree.h

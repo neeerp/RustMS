@@ -86,8 +86,16 @@ namespace ms
 		// Return the character's base attacking speed.
 		virtual int8_t get_integer_attackspeed() const = 0;
 
+		// Return the speed stat that paces the walk animation. Others walk
+		// at the base 100.
+		virtual int32_t get_walk_animation_speed() const;
+
 		// Return the attack speed as a multiplier
 		float get_real_attackspeed() const;
+
+		// Return the attack speed degree that stretches an action's frames,
+		// from 2 (fastest) to 10 (slowest); 6 plays them as drawn.
+		int8_t get_action_speed() const;
 
 		// Return the delay until applying an attack.
 		uint16_t get_attackdelay(size_t no) const;
@@ -107,11 +115,18 @@ namespace ms
 		// Change the character's stance to it's regular attack.
 		void attack(bool degenerate);
 
+		// Change the character's stance to a regular attack stance picked
+		// with CharLook::get_attackstance.
+		void attack(bool degenerate, Stance::Id stance);
+
 		// Set the afterimage for an attack.
 		void set_afterimage(int32_t skill_id);
 
 		// Return the current afterimage.
 		const Afterimage &get_afterimage() const;
+
+		// Return the range of a regular attack's afterimage in a stance.
+		Rectangle<int16_t> get_afterimage_range(Stance::Id stance) const;
 
 		// Display an animation as an effect with the character
 		void show_attack_effect(Animation animation, int8_t z);
@@ -203,6 +218,9 @@ namespace ms
 
 		State state = State::STAND;
 		bool attacking;
+		// The milliseconds of animation time a speed left over from its last
+		// whole step.
+		float stance_carry = 0.0f;
 		bool facing_right;
 		int32_t chair = 0;
 
@@ -218,19 +236,21 @@ namespace ms
 		bool chair_at_face = false;
 		bool chair_in_front = false;
 		TimedBool invincible;
+		bool blinking = false;
 		TimedBool ironbody;
 		std::list<DamageNumber> damagenumbers;
 
-		// A dead character's ghost fades in over two seconds while its tombstone drops from above behind it.
-		// The ghost then circles the tombstone, as in the original client: clockwise, 9 pixels out, once
-		// every two seconds.
-		static constexpr int16_t TOMB_DROP = 240;
-		static constexpr int16_t TOMB_SPEED = 2;
-		static constexpr float GHOST_FADE = 0.004f;
-		static constexpr float GHOST_RADIUS = 9.0f;
+		// As v83 does it (FUN_0092fd5a): a dead character's tombstone drops 600 pixels onto it in 880 ms
+		// while the ghost fades in over 2.5 seconds. The ghost circles a point 20 pixels above the
+		// tombstone: clockwise from the top, 10 pixels out, once every two seconds.
+		static constexpr int16_t TOMB_DROP = 600;
+		static constexpr uint16_t TOMB_FALL = 880 / Constants::TIMESTEP;
+		static constexpr float GHOST_FADE = Constants::TIMESTEP / 2500.0f;
+		static constexpr float GHOST_RADIUS = 10.0f;
+		static constexpr int16_t GHOST_RISE = 20;
 		static constexpr uint16_t GHOST_LAP = 2000 / Constants::TIMESTEP;
 		Animation tomb;
-		int16_t tomb_drop = 0;
+		uint16_t tomb_tick = 0;
 		bool tomb_landed = false;
 		Linear<float> ghost_opacity;
 		uint16_t ghost_tick = 0;

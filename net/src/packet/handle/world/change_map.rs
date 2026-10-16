@@ -22,7 +22,7 @@ impl WorldHandler for ChangeMapHandler {
         }
         let mut reader = Cursor::new(&packet.bytes);
         reader.read_short()?;
-        reader.read_byte()?; // 1 when the player died
+        reader.read_byte()?; // the key SET_FIELD gave the field
         let target = reader.read_int()?;
         let portal_name = reader.read_str_with_length()?;
 

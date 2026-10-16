@@ -268,7 +268,12 @@ namespace ms
 
 		double ground = nextfh.ground_below(x);
 
-		if (phobj.vspeed == 0.0 && checkslope)
+		if (phobj.vspeed == 0.0 && checkslope && phobj.fhid == curfh.id())
+		{
+			// v83 moves a grounded object along its foothold (FUN_007f13de),
+			// so it stays on the line, even on the tick it stops on a slope.
+			phobj.y = ground;
+		} else if (phobj.vspeed == 0.0 && checkslope)
 		{
 			double vdelta = abs(phobj.fhslope);
 
@@ -300,6 +305,9 @@ namespace ms
 
 		if (phobj.fhlayer == 0 || phobj.onground)
 			phobj.fhlayer = nextfh.layer();
+
+		if (phobj.onground)
+			phobj.fhgroup = nextfh.group();
 
 		if (phobj.fhid == 0)
 		{
@@ -599,6 +607,7 @@ namespace ms
 		phobj.set_y(fh.y1() + uy * along);
 		phobj.fhid = fhid;
 		phobj.fhlayer = fh.layer();
+		phobj.fhgroup = fh.group();
 		phobj.onground = true;
 	}
 

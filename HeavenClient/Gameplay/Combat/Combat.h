@@ -20,10 +20,12 @@
 #include <cstdint>
 
 #include "RegularAttack.h"
+#include "ShotPath.h"
 
 #include "../MapleMap/MapChars.h"
 #include "../MapleMap/MapMobs.h"
 #include "../MapleMap/MapReactors.h"
+#include "../Physics/Physics.h"
 
 #include "../../Character/Player.h"
 #include "../../Template/TimedQueue.h"
@@ -33,7 +35,7 @@ namespace ms
 	class Combat
 	{
 	public:
-		Combat(Player &player, MapChars &chars, MapMobs &mobs, MapReactors &reactors);
+		Combat(Player &player, MapChars &chars, MapMobs &mobs, MapReactors &reactors, const Physics &physics);
 
 		// Draw bullets, damage numbers etc.
 		void draw(double viewx, double viewy, float alpha) const;
@@ -64,20 +66,31 @@ namespace ms
 			int32_t move_id;
 		};
 
-		struct BulletEffect
-		{
-			DamageEffect damageeffect;
-			Bullet bullet;
-			Point<int16_t> target;
-		};
-
 		void apply_attack(const AttackResult &attack);
 
 		void apply_move(const SpecialMove &move);
 
+		// The melee stance a regular ranged attack whacks a mob right in
+		// front of the player with, or NONE to shoot. Either way, `reach` is
+		// how far in front of the player the whack reaches.
+		Stance::Id find_whack(const Attack &attack, int16_t &reach) const;
+
+		// How far in front of the user a whack in this stance reaches.
+		static int16_t get_whack_reach(const Char &user, Stance::Id stance);
+
+		// How far in front of the player their shot with this attack reaches.
+		int16_t get_shot_range(const Attack &attack) const;
+
+		// The mob a shot from `origin` toward `end_x` hits: the first one in
+		// its path, as it widens away from the player.
+		std::vector<int32_t> find_shot_target(Point<int16_t> origin, int16_t end_x) const;
+
+		// The platforms a shot from `from` to `to` could run into.
+		std::vector<shot_path::Platform> find_platforms(Point<int16_t> from, Point<int16_t> to) const;
+
 		std::vector<int32_t>
-		find_closest(MapObjects *objs, Rectangle<int16_t> range, Point<int16_t> origin, uint8_t objcount,
-					 bool use_mobs) const;
+		find_targets(MapObjects *objs, Rectangle<int16_t> range, Point<int16_t> origin, uint8_t objcount,
+					 bool use_mobs, bool closest_first) const;
 
 		void apply_use_movement(const SpecialMove &move);
 
@@ -85,7 +98,7 @@ namespace ms
 
 		void apply_rush(const AttackResult &result);
 
-		void apply_bullet_effect(const BulletEffect &effect);
+		void apply_bullet_effect(const Bullet &bullet);
 
 		void apply_damage_effect(const DamageEffect &effect);
 
@@ -93,8 +106,10 @@ namespace ms
 		static Rectangle<int16_t> place_range(Point<int16_t> origin, Rectangle<int16_t> range, float hrange,
 											  bool toleft);
 
+		// A shot starts `reach` px in front of the user and flies to `shot_end`,
+		// as far as it reaches or where a platform stops it.
 		void extract_effects(const Char &user, const SpecialMove &move, const AttackResult &result,
-							 Rectangle<int16_t> range);
+							 Rectangle<int16_t> range, int16_t reach, Point<int16_t> shot_end);
 
 		// Tell the targets how many hits are coming (sign 1) or cancel them (sign -1),
 		// so a mob the server kills waits for the hits before dying.
@@ -108,15 +123,16 @@ namespace ms
 		MapChars &chars;
 		MapMobs &mobs;
 		MapReactors &reactors;
+		const Physics &physics;
 
 		std::unordered_map<int32_t, Skill> skills;
 		RegularAttack regularattack;
 
 		TimedQueue<AttackResult> attackresults;
-		TimedQueue<BulletEffect> bulleteffects;
+		TimedQueue<Bullet> bulleteffects;
 		TimedQueue<DamageEffect> damageeffects;
 
-		std::list<BulletEffect> bullets;
+		std::list<Bullet> bullets;
 		std::list<DamageNumber> damagenumbers;
 	};
 }

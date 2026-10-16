@@ -103,9 +103,79 @@ that the weapon fires, `net::combat::ammo`) to the others, applies the damage,
 sends the attacker SHOW_MONSTER_HP, and on death KILL_MONSTER to everyone; the
 attacker gets the MP left as STAT_CHANGED. Shots don't use up ammo yet.
 
+HeavenClient picks targets as v83 does (`Combat::find_targets`). Melee and
+magic attacks take the mobs whose body overlaps the attack range in the order
+they entered the map (`MapObjects::entry_order`), not the closest ones, so a
+basic attack can pass the mob in front for one that spawned earlier. A mob
+that is spawned again under the same oid keeps its place. Ranged attacks take
+the closest mobs, which is what v83's outward sweep finds.
+
+`AttackResult::damagelines` keeps the targets in that order, and the attack
+packet lists them in it. Without a bullet, every hit on a mob lands at once,
+at the attack's first hit frame (`Char::get_attackdelay(0)`), and each later
+target lands a little after (`hit_timing::target_delay`): melee 70 ms per
+target up to 280 ms, the multi-target spells 50 ms, and Chain Lightning
+100 ms.
+
 In HeavenClient a hit of at least the mob's `pushed` value puts it in its
 `hit1` stance for about a quarter second, with a three-tick push that moves it
 a few pixels (`Mob::knockback_ticks`), as in period footage.
+
+A regular attack's stance is picked at random from v83's list for the
+weapon's `info/attack` (`Character/Look/AttackStances.h`). Spears and polearms
+swing T2, P1, and P2 and stab T1 and T2. Wands and staves swing O2. Knuckles,
+and claws without stars, stab O1 and O2. Guns without bullets swing T1, or T2
+two times in three. Claws throw with swing O1, O2, or O3.
+
+A bow, crossbow, claw, or gun with no ammo still attacks, as in v83: the
+regular attack becomes that weak melee hit at a tenth of the damage, with no
+notice (`RegularAttack::can_use`, `Player::prepare_attack`).
+With ammo, a regular attack still whacks instead of shooting when a mob is
+right in front: v83 picks the melee stance first and looks for a mob in its
+afterimage range, cut to reach at most 65 px forward
+(`Gameplay/Combat/PointBlank.h`, `Combat::find_whack`). Only when there is
+none does it shoot.
+
+A shot leaves the user 28 px up and, for a regular attack, as far forward as
+the whack would reach (skills shoot from the user). Each bullet flies straight
+to where the shot's row crosses the target's body, or to the end of the range,
+taking 1.5 ms per pixel. Bullets after the first leave 120 ms apart for stars
+and some skills, and several bullets spread 14 px apart around the target.
+Every hit on a target lands at the attack's hit frame plus 1.5 ms per pixel
+between the shot's start and the target, not when a bullet arrives
+(`Gameplay/Combat/ShotPath.h`, `Combat::extract_effects`).
+
+A shot at one mob hits the first mob in its path, not the closest one in a
+box. v83 searches 20 px steps from the shot's start out to its range. Each step
+reaches 1 px above and below the shot per 4 px it is from the user, so a mob
+well below a raised user is missed. The nearest step with any mob in it gives
+the one that entered the map first. The range is the skill's own `range` if it
+has one. Otherwise it is 300 px plus Eye of Amazon's range for bows and
+crossbows, 200 px plus Keen Eyes' for claws, and 200 px for guns
+(`shot_path::range`, `Combat::find_shot_target`). Other players' shots leave
+out their range skill, whose level the client does not know.
+
+Platforms stop such a shot. v83 draws a line from 28 px above the user's feet
+to where the shot hits its target, or to the end of its range, and stops it at
+the first platform the line enters from the open side. That means a floor from
+above, or a wall or ceiling from the side it faces. Walls and ceilings only
+count when they have no group or the group of the platform the user last stood
+on. A line through the end of a platform only stops if it ends up behind the
+platform joined there too. A stopped shot loses its target, and its bullet
+flies from where it started to the platform (`shot_path::blocked`,
+`Combat::find_platforms`). The line of sight in v83's other attack paths, such
+as shots at several mobs, is not copied yet, and other players' shots never
+stop.
+
+Most single-target spells, such as Energy Bolt and Magic Claw, are aimed the
+same way (`shot_path::aimed_spell`). The search starts 50 px in front of the
+user and reaches 300 px, whatever the skill's `lt`/`rb`. A spell with a ball
+flies it from that start to the hit, as one ball however many times it hits,
+and its damage lands 1.5 ms per pixel of that straight path after the hit
+frame. Platforms stop it as they stop a shot. A spell without a ball is never
+stopped. Area spells such as Thunder Bolt, Big Bang, Heal, and the Demons
+still take every mob in their range. Chain Lightning picks its first mob like
+an aimed spell in v83, then chains from it; neither is copied yet.
 
 Damage numbers follow v83 (`Gameplay/Combat/DamageLayout.h`). The first digit
 comes from the larger `NoRed1` set and the rest from `NoRed0`. Each digit
@@ -126,7 +196,11 @@ SHOW_MONSTER_HP shows the mob's HP bar and name tag in HeavenClient
 (`Mob::show_hp`) for 5 s, as v83 hides them 5 s after the player's last hit.
 The bar is v83's 52x10 box (`MobHpBar`), centred over the frame's body rect
 with its top 30 px above the rect's top. Party members' bars use the same box
-filled red.
+filled red. As in v83, the name is orange for a mob 20 or more levels above
+the player, yellow for one 20 or more below, and white otherwise. A "Lv. N"
+tag (`Basic.img/ShowLevel`) sits left of the name, except for bosses, mobs
+whose `info` hides their level, HP or name, and 9xxxxxx mobs outside 94xxxxx
+and 96xxxxx.
 
 A dead mob's EXP is shared by damage dealt (the top damager gets any
 rounding remainder) and each share goes to that player's client actor
@@ -151,8 +225,10 @@ the map sees SHOW_FOREIGN_EFFECT 1 with the skill.
 saved. A new buff replaces one on the same stat. The client actor sleeps until
 the next deadline (`actor::client::buff`): Recovery heals its `x` every 5 s
 while the player is hurt (HP stat update), and an expired buff sends
-CANCEL_BUFF, since the client never ends buffs itself. Dying and changing
-channel end every buff; cooldowns keep running.
+CANCEL_BUFF, since the client never ends buffs itself. Right-clicking a buff
+icon sends CANCEL_BUFF (`0x5C`, the skill id), which ends that skill's buffs
+and answers with CANCEL_BUFF. Dying and changing channel end every buff;
+cooldowns keep running.
 
 ## Spending AP and SP
 
@@ -288,6 +364,10 @@ term and no avoid check. HP drops, others see DAMAGE_PLAYER, and at 0 HP the pla
 non-beginners lose 10% of their level's EXP; the client's respawn
 (CHANGE_MAP with a target while dead) returns them to the map's return map
 with 50 HP.
+
+After a hit, HeavenClient ignores touches for 1500 ms, as v83 does. If the hit
+did damage, the player blinks meanwhile: half brightness for 60 ms, then
+normal for 60 ms. Other players don't blink.
 
 HeavenClient's `Player::update_death` notices HP reaching 0: the player
 becomes a ghost (`Char::State::DIED`), the tombstone from `Effect.nx/Tomb.img`

@@ -17,60 +17,50 @@
 //////////////////////////////////////////////////////////////////////////////////
 #include "Bullet.h"
 
+#include "../../Constants.h"
+
+#include <algorithm>
+#include <cmath>
+
 namespace ms
 {
-	Bullet::Bullet(Animation a, Point<int16_t> origin, bool toleft)
+	Bullet::Bullet(Animation a, Point<int16_t> o, Point<int16_t> t, uint16_t d) : animation(a), origin(o), target(t),
+																				   duration(d), elapsed(0)
 	{
-		animation = a;
-
-		moveobj.set_x(origin.x() + (toleft ? -30.0 : 30.0));
-		moveobj.set_y(origin.y() - 26.0);
+		flip = target.x() > origin.x();
 	}
 
 	void Bullet::draw(double viewx, double viewy, float alpha) const
 	{
-		Point<int16_t> bulletpos = moveobj.get_absolute(viewx, viewy, alpha);
+		Point<double> position = get_position(alpha);
+		Point<int16_t> bulletpos(
+				static_cast<int16_t>(std::round(position.x() + viewx)),
+				static_cast<int16_t>(std::round(position.y() + viewy))
+		);
+
 		DrawArgument args(bulletpos, flip);
 		animation.draw(args, alpha);
 	}
 
-	bool Bullet::settarget(Point<int16_t> target)
-	{
-		double xdelta = target.x() - moveobj.crnt_x();
-		double ydelta = target.y() - moveobj.crnt_y();
-
-		if (std::abs(xdelta) < 10.0)
-			return true;
-
-		flip = xdelta > 0.0;
-
-		moveobj.hspeed = xdelta / 32;
-
-		if (xdelta > 0.0)
-		{
-			if (moveobj.hspeed < 3.0)
-				moveobj.hspeed = 3.0;
-			else if (moveobj.hspeed > 6.0)
-				moveobj.hspeed = 6.0;
-		} else if (xdelta < 0.0)
-		{
-			if (moveobj.hspeed > -3.0)
-				moveobj.hspeed = -3.0;
-			else if (moveobj.hspeed < -6.0)
-				moveobj.hspeed = -6.0;
-		}
-
-		moveobj.vspeed = moveobj.hspeed * ydelta / xdelta;
-
-		return false;
-	}
-
-	bool Bullet::update(Point<int16_t> target)
+	bool Bullet::update()
 	{
 		animation.update();
-		moveobj.move();
+		elapsed = static_cast<uint16_t>(std::min<int32_t>(elapsed + Constants::TIMESTEP, duration));
 
-		int16_t xdelta = target.x() - moveobj.get_x();
-		return moveobj.hspeed > 0.0 ? xdelta < 10 : xdelta > 10;
+		return elapsed >= duration;
+	}
+
+	Point<double> Bullet::get_position(float alpha) const
+	{
+		if (duration == 0)
+			return { static_cast<double>(target.x()), static_cast<double>(target.y()) };
+
+		double time = elapsed - Constants::TIMESTEP * (1.0 - alpha);
+		double progress = std::clamp(time / duration, 0.0, 1.0);
+
+		return {
+				origin.x() + (target.x() - origin.x()) * progress,
+				origin.y() + (target.y() - origin.y()) * progress
+		};
 	}
 }

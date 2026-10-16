@@ -22,27 +22,57 @@ int main()
 	{
 		// Map 10000's infoMinimap trigger sits 30 px above the floor at y = 485.
 		ms::Portal minimap = touch_portal(280, 455);
-		require(!minimap.touch({200, 485}), "touched the portal from 80 px away");
-		require(minimap.touch({240, 485}), "walking along the floor did not touch the portal");
-		require(!minimap.touch({280, 485}), "touched again without leaving the portal");
-		require(!minimap.touch({340, 485}), "touched the portal after walking past it");
-		require(minimap.touch({280, 485}), "re-entering did not touch the portal again");
+		require(!minimap.range_bounds().contains({200, 485}), "touched the portal from 80 px away");
+		require(minimap.range_bounds().contains({240, 485}), "walking along the floor did not touch the portal");
 
 		// The box is hRange by vRange around the portal, without its right and bottom edges.
-		require(touch_portal(280, 455).touch({230, 405}), "the top-left corner is outside the box");
-		require(touch_portal(280, 455).touch({329, 504}), "the bottom-right corner is outside the box");
-		require(!touch_portal(280, 455).touch({330, 455}), "the right edge is inside the box");
-		require(!touch_portal(280, 455).touch({280, 505}), "the bottom edge is inside the box");
+		require(touch_portal(280, 455).range_bounds().contains({230, 405}), "the top-left corner is outside the box");
+		require(touch_portal(280, 455).range_bounds().contains({329, 504}), "the bottom-right corner is outside the box");
+		require(!touch_portal(280, 455).range_bounds().contains({330, 455}), "the right edge is inside the box");
+		require(!touch_portal(280, 455).range_bounds().contains({280, 505}), "the bottom edge is inside the box");
 
 		// Map 10000's exit warnings are 55 px above the floor and 65 px below the
 		// platform over them, so neither reaches them.
-		require(!touch_portal(987, 430).touch({987, 485}), "the exit warning fired from the floor");
-		require(!touch_portal(987, 430).touch({987, 365}), "the exit warning fired from the platform");
+		require(!touch_portal(987, 430).range_bounds().contains({987, 485}), "the exit warning fired from the floor");
+		require(!touch_portal(987, 430).range_bounds().contains({987, 365}), "the exit warning fired from the platform");
+
+		// The chimney's jump pads (682010200) sit 51 px above its floor at
+		// y = 109, so walking under them misses, but a player landing there is
+		// still tested from a few pixels up.
+		ms::Portal jump00(nullptr, ms::Portal::SPRING1, "jump00", false, {-61, 58}, 999999999, "",
+			ms::Portal::DEFAULT_RANGE, ms::Portal::DEFAULT_RANGE);
+		require(!jump00.range_bounds().contains({-61, 109}), "walking under a jump pad touched it");
+		require(jump00.range_bounds().contains({-61, 105}), "landing under a jump pad missed it");
 
 		// A map can set its own ranges.
-		require(touch_portal(0, 0, 40, 20).touch({19, 9}), "a custom range missed a point inside it");
-		require(!touch_portal(0, 0, 40, 20).touch({20, 0}), "a custom range reached past hRange / 2");
-		require(!touch_portal(0, 0, 40, 20).touch({0, 10}), "a custom range reached past vRange / 2");
+		require(touch_portal(0, 0, 40, 20).range_bounds().contains({19, 9}), "a custom range missed a point inside it");
+		require(!touch_portal(0, 0, 40, 20).range_bounds().contains({20, 0}), "a custom range reached past hRange / 2");
+		require(!touch_portal(0, 0, 40, 20).range_bounds().contains({0, 10}), "a custom range reached past vRange / 2");
+
+		// The Up key searches a smaller box: 20 px either side and 50 px
+		// above and below, without the right and bottom edges. Ellinia's
+		// in00 sits on its floor at y = -2281.
+		ms::Portal in00(nullptr, ms::Portal::REGULAR, "in00", false, {786, -2281}, 101000001, "out00",
+			ms::Portal::DEFAULT_RANGE, ms::Portal::DEFAULT_RANGE);
+		require(in00.warp_bounds().contains({805, -2281}), "the Up-key box missed a player 19 px right");
+		require(!in00.warp_bounds().contains({806, -2281}), "the Up-key box reached 20 px right");
+		require(in00.warp_bounds().contains({766, -2281}), "the Up-key box missed a player 20 px left");
+		require(!in00.warp_bounds().contains({765, -2281}), "the Up-key box reached 21 px left");
+		require(in00.warp_bounds().contains({786, -2331}), "the Up-key box missed a player 50 px above");
+		require(!in00.warp_bounds().contains({786, -2332}), "the Up-key box reached 51 px above");
+		require(!in00.warp_bounds().contains({786, -2231}), "the Up-key box reached 50 px below");
+
+		// A hidden portal shows from 100 px to the left to 99 px to the right
+		// and from 50 px above to 49 px below, whatever its ranges.
+		ms::Portal ph00(nullptr, ms::Portal::HIDDEN, "ph00", true, {-1068, -2475}, 101000000, "ph00_1", 40, 20);
+		require(ph00.reveal_bounds().contains({-1168, -2475}), "a hidden portal hid from 100 px to the left");
+		require(!ph00.reveal_bounds().contains({-1169, -2475}), "a hidden portal showed from 101 px to the left");
+		require(ph00.reveal_bounds().contains({-969, -2475}), "a hidden portal hid from 99 px to the right");
+		require(!ph00.reveal_bounds().contains({-968, -2475}), "a hidden portal showed from 100 px to the right");
+		require(ph00.reveal_bounds().contains({-1068, -2525}), "a hidden portal hid from 50 px above");
+		require(!ph00.reveal_bounds().contains({-1068, -2526}), "a hidden portal showed from 51 px above");
+		require(ph00.reveal_bounds().contains({-1068, -2426}), "a hidden portal hid from 49 px below");
+		require(!ph00.reveal_bounds().contains({-1068, -2425}), "a hidden portal showed from 50 px below");
 
 		std::cout << "Portal touch ranges passed\n";
 		return 0;

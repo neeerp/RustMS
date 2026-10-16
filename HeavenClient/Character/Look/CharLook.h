@@ -61,7 +61,13 @@ namespace ms
 
 		void attack(bool degenerate);
 
+		// Change to a regular attack stance from get_attackstance.
+		void attack(bool degenerate, Stance::Id stance);
+
 		void attack(Stance::Id stance);
+
+		// Pick a stance for the weapon's regular attack at random.
+		Stance::Id get_attackstance(bool degenerate) const;
 
 		void set_stance(Stance::Id stance);
 
@@ -99,6 +105,7 @@ namespace ms
 
 	private:
 		void updatetwohanded();
+		void update_expression(uint16_t timestep);
 
 		void draw(const DrawArgument &args, Stance::Id interstance, Expression::Id interexp, uint8_t interframe,
 				  uint8_t interfcframe) const;
