@@ -122,10 +122,11 @@ namespace ms
 		return TEXT_TOP + TEXT_PADDING + question.height() + FIELD_GAP;
 	}
 
-	UIYesNo::UIYesNo(std::string message, std::function<void(bool yes)> yh, Text::Alignment alignment) : UINotice(
-			message, NoticeType::YESNO, alignment)
+	UIYesNo::UIYesNo(std::string message, std::function<void(bool yes)> yh, Text::Alignment alignment,
+					 uint8_t a) : UINotice(message, NoticeType::YESNO, alignment)
 	{
 		yesnohandler = yh;
+		asks = a;
 
 		nl::node src = NxFiles::ui_classic["Basic.img"];
 
@@ -145,15 +146,13 @@ namespace ms
 
 	void UIYesNo::send_key(int32_t keycode, bool pressed, bool escape)
 	{
+		if (!pressed)
+			return;
+
 		if (keycode == KeyAction::Id::RETURN)
-		{
-			yesnohandler(true);
-			deactivate();
-		} else if (escape)
-		{
-			yesnohandler(false);
-			deactivate();
-		}
+			answer(true);
+		else if (escape)
+			answer(false);
 	}
 
 	UIElement::Type UIYesNo::get_type() const
@@ -163,19 +162,33 @@ namespace ms
 
 	Button::State UIYesNo::button_pressed(uint16_t buttonid)
 	{
-		deactivate();
-
 		switch (buttonid)
 		{
 			case Buttons::YES:
-				yesnohandler(true);
+				if (!answer(true))
+					return Button::State::NORMAL;
 				break;
 			case Buttons::NO:
-				yesnohandler(false);
+				answer(false);
 				break;
 		}
 
 		return Button::State::PRESSED;
+	}
+
+	bool UIYesNo::answer(bool yes)
+	{
+		if (yes && asks > 1)
+		{
+			asks--;
+
+			return false;
+		}
+
+		deactivate();
+		yesnohandler(yes);
+
+		return true;
 	}
 
 	UIEnterNumber::UIEnterNumber(std::string message, std::function<void(int32_t)> nh, int32_t m, int32_t quantity)
