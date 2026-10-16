@@ -82,6 +82,9 @@ namespace ms
 		// Shop: fieldLimit bit 0x10 is unset.
 		bool can_migrate() const;
 
+		// Whether the map lets the player use Teleport (fieldLimit bit 0x2).
+		bool can_use_movement_skills() const;
+
 		Range<int16_t> get_walls() const;
 
 		Range<int16_t> get_borders() const;

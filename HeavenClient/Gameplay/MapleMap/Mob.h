@@ -131,6 +131,9 @@ namespace ms
 		// Check if this mob is still alive.
 		bool is_alive() const;
 
+		// Whether a Teleport can't take the player past this mob.
+		bool blocks_teleport() const;
+
 		// Return the head position.
 		Point<int16_t> get_head_position() const;
 
@@ -225,6 +228,7 @@ namespace ms
 		bool undead;
 		bool touchdamage;
 		bool noflip;
+		bool blocksteleport;
 		bool notattack;
 		bool firstattack;
 		bool canmove;

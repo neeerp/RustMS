@@ -90,6 +90,11 @@ namespace ms
 		return (fieldlimit & 0x10) == 0;
 	}
 
+	bool MapInfo::can_use_movement_skills() const
+	{
+		return (fieldlimit & 0x2) == 0;
+	}
+
 	std::string MapInfo::get_bgm() const
 	{
 		return bgm;

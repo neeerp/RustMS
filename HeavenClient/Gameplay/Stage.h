@@ -20,6 +20,7 @@
 #include <string>
 
 #include <cstdint>
+#include <optional>
 
 #include "Combat/Combat.h"
 #include "EmoteCooldown.h"
@@ -158,6 +159,8 @@ namespace ms
 		// Returns whether the player was moved to the target.
 		bool update_teleport();
 
+		void use_teleport(int32_t skill);
+
 		void check_seats();
 
 		void catch_ladders(Point<int16_t> before);
@@ -181,11 +184,17 @@ namespace ms
 		uint8_t field_key = 0;
 
 		MapInfo mapinfo;
-		// The ms until an in-map portal's move lands, and then until the
-		// portal works again.
-		int16_t teleport_delay = 0;
+		// An in-map move waiting for the next update: by portal, or by skill
+		// onto a foothold.
+		struct Teleport
+		{
+			Point<int16_t> target;
+			std::optional<uint16_t> foothold;
+		};
+
+		std::optional<Teleport> pending_teleport;
+		// The ms until the player may move in the map again.
 		int16_t teleport_cooldown = 0;
-		Point<int16_t> teleport_target;
 		MapTilesObjs tilesobjs;
 		MapBackgrounds backgrounds;
 		MapPortals portals;

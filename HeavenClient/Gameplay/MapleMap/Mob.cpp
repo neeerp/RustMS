@@ -57,6 +57,7 @@ namespace ms
 		touchdamage = info["bodyAttack"].get_bool();
 		undead = info["undead"].get_bool();
 		noflip = info["noFlip"].get_bool();
+		blocksteleport = info["cantPassByTeleport"].get_bool();
 		notattack = info["notAttack"].get_bool();
 		firstattack = info["firstAttack"].get_bool();
 		showleveltag = !info["hideLevel"].get_bool() && !info["hideHP"].get_bool() &&
@@ -1176,6 +1177,11 @@ namespace ms
 	bool Mob::is_alive() const
 	{
 		return active && !dying;
+	}
+
+	bool Mob::blocks_teleport() const
+	{
+		return blocksteleport;
 	}
 
 	bool Mob::deals_touch_damage() const

@@ -88,26 +88,10 @@ namespace ms
 
 	void Combat::use_move(int32_t move_id)
 	{
-		if (!player.can_attack())
-			return;
-
 		const SpecialMove &move = get_move(move_id);
-		SpecialMove::ForbidReason reason = player.can_use(move);
-		Weapon::Type weapontype = player.get_stats().get_weapontype();
 
-		if (reason != SpecialMove::ForbidReason::FBR_NONE)
-		{
-			ForbidSkillMessage(reason, weapontype).drop();
+		if (!can_use_move(move))
 			return;
-		}
-
-		// v83 says why it won't attack bare-handed (FUN_0095b85a), once
-		// DoActiveSkill has let the skill through. Buffs need no weapon.
-		if (move.is_attack() && !player.get_look().get_equips().has_weapon())
-		{
-			InChatMessage(Messages::ATTACK_NOWEAPON).drop();
-			return;
-		}
 
 		// v83's spell handler swings a regular attack instead when the player
 		// is prone (0x969b10).
@@ -115,6 +99,107 @@ namespace ms
 			apply_move(regularattack);
 		else
 			apply_move(move);
+	}
+
+	std::optional<teleport::Spot> Combat::use_teleport(int32_t move_id, bool allowed)
+	{
+		const SpecialMove &move = get_move(move_id);
+
+		if (!can_use_move(move) || !allowed)
+			return std::nullopt;
+
+		// v83 teleports only from a platform, the way the arrow keys point,
+		// reversed while confused (FUN_00957b74).
+		const PhysicsObject &phobj = player.get_phobj();
+
+		if (!phobj.onground || player.get_ladder())
+			return std::nullopt;
+
+		int32_t dx = player.is_key_down(KeyAction::Id::RIGHT) - player.is_key_down(KeyAction::Id::LEFT);
+		int32_t dy = player.is_key_down(KeyAction::Id::DOWN) - player.is_key_down(KeyAction::Id::UP);
+
+		if (player.has_buff(Buffstat::Id::CONFUSE))
+		{
+			dx = -dx;
+			dy = -dy;
+		}
+
+		int32_t level = player.get_skills().get_level(move_id);
+		int32_t range = SkillData::get(move_id).get_stats(level).shotrange;
+		Point<int16_t> position = player.get_position();
+		std::optional<Rectangle<int16_t>> area = teleport::mob_area(position, dx, dy, range);
+
+		if (!area)
+			return std::nullopt;
+
+		MapObjects *objs = mobs.get_mobs();
+		std::vector<teleport::Mob> nearby;
+
+		for (auto &mmo : *objs)
+		{
+			const Mob *mob = static_cast<const Mob *>(mmo.second.get());
+
+			if (mob && mob->is_alive())
+				nearby.push_back({ mob->get_body(), objs->entry_order(mob->get_oid()), mob->blocks_teleport() });
+		}
+
+		if (teleport::mob_in_way(*area, nearby))
+			return std::nullopt;
+
+		uint16_t group = phobj.fhgroup;
+		auto clear = [&](Point<int16_t> from, Point<int16_t> to)
+		{
+			return !shot_path::blocked(from, to, find_platforms(from, to), group);
+		};
+
+		std::optional<teleport::Spot> target = teleport::destination(position, phobj.fhid, dx, dy, range, find_floors(), clear);
+
+		if (!target || !request_skill(move))
+			return std::nullopt;
+
+		return target;
+	}
+
+	bool Combat::can_use_move(const SpecialMove &move) const
+	{
+		if (!player.can_attack())
+			return false;
+
+		SpecialMove::ForbidReason reason = player.can_use(move);
+		Weapon::Type weapontype = player.get_stats().get_weapontype();
+
+		if (reason != SpecialMove::ForbidReason::FBR_NONE)
+		{
+			ForbidSkillMessage(reason, weapontype).drop();
+			return false;
+		}
+
+		// v83 says why it won't attack bare-handed (FUN_0095b85a), once
+		// DoActiveSkill has let the skill through. Buffs need no weapon.
+		if (move.is_attack() && !player.get_look().get_equips().has_weapon())
+		{
+			InChatMessage(Messages::ATTACK_NOWEAPON).drop();
+			return false;
+		}
+
+		return true;
+	}
+
+	bool Combat::request_skill(const SpecialMove &move)
+	{
+		// v83 uses a skill that doesn't attack only when it may ask the
+		// server, as for an item (FUN_0096b140).
+		if (!player.can_request(ExclRequest::SKILL_WAIT))
+			return false;
+
+		move.apply_useeffects(player);
+		move.apply_actions(player, Attack::Type::MAGIC);
+
+		int32_t moveid = move.get_id();
+		int32_t level = player.get_skills().get_level(moveid);
+		player.request(UseSkillPacket(moveid, level), ExclRequest::SKILL_WAIT);
+
+		return true;
 	}
 
 	void Combat::apply_move(const SpecialMove &move)
@@ -226,17 +311,7 @@ namespace ms
 					DamageReactorPacket(reactor->get_oid(), player.get_position(), 0, 0).dispatch();
 		} else
 		{
-			// v83 uses a skill that doesn't attack only when it may ask the
-			// server, as for an item (FUN_0096b140).
-			if (!player.can_request(ExclRequest::SKILL_WAIT))
-				return;
-
-			move.apply_useeffects(player);
-			move.apply_actions(player, Attack::Type::MAGIC);
-
-			int32_t moveid = move.get_id();
-			int32_t level = player.get_skills().get_level(moveid);
-			player.request(UseSkillPacket(moveid, level), ExclRequest::SKILL_WAIT);
+			request_skill(move);
 		}
 	}
 
@@ -330,6 +405,24 @@ namespace ms
 			return {};
 
 		return chain_lightning::chain(*start, alive, count, toleft);
+	}
+
+	std::vector<teleport::Floor> Combat::find_floors() const
+	{
+		const FootholdTree &fht = physics.get_fht();
+		std::vector<teleport::Floor> floors;
+
+		for (uint16_t group : fht.get_groups())
+		{
+			for (uint16_t fhid : fht.get_group_footholds(group))
+			{
+				const Foothold &fh = fht.get_fh(fhid);
+
+				floors.push_back({ fhid, { fh.x1(), fh.y1(), fh.x2(), fh.y2() } });
+			}
+		}
+
+		return floors;
 	}
 
 	std::vector<shot_path::Platform> Combat::find_platforms(Point<int16_t> from, Point<int16_t> to) const
