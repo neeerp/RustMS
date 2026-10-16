@@ -43,6 +43,19 @@ namespace ms
 	protected:
 		// Play the jumping sound
 		void play_jumpsound() const;
+
+		// v83 reads the arrows as x = Right - Left and y = Down - Up
+		// (FUN_009cbefb) and picks the stance on a foothold from them
+		// (FUN_00936d99): walk while x is not 0, turning that way unless
+		// attacking, else lie down while y > 0, else stand.
+		Char::State ground_state(Player &player) const;
+
+		// Move to the stance the arrows ask for if it is not the current one.
+		void stand_by_input(Player &player, Char::State current) const;
+
+		// Jump from a foothold. While Down is held v83 jumps down through it
+		// instead, and does nothing when no foothold is below (FUN_0094f2ed).
+		void ground_jump(Player &player, int8_t dir) const;
 	};
 
 	// The initial state, determines which state the player should be in.
@@ -113,8 +126,7 @@ namespace ms
 
 		void update(Player &) const override;
 
-		void update_state(Player &) const override
-		{}
+		void update_state(Player &player) const override;
 	};
 
 	// The sitting state
