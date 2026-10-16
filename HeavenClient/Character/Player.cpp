@@ -26,6 +26,7 @@
 #include "../IO/UI.h"
 
 #include "../IO/UITypes/UINotice.h"
+#include "../IO/UITypes/UISkillBook.h"
 #include "../IO/UITypes/UIStatsInfo.h"
 #include "../Net/Packets/GameplayPackets.h"
 #include "../Net/Packets/PlayerPackets.h"
@@ -663,6 +664,18 @@ namespace ms
 		}
 
 		stats.set_stat(MapleStat::Id::LEVEL, level);
+
+		// Reaching level 2 opens a fresh skill window for the first SP, without a sound (FUN_00a1fb52).
+		if (level == 2 && level > oldlevel)
+		{
+			auto window = UI::get().get_element<UISkillBook>();
+
+			if (!window || !window->is_active())
+			{
+				UI::get().remove(UISkillBook::TYPE);
+				UI::get().emplace<UISkillBook>(stats, skillbook);
+			}
+		}
 	}
 
 	uint16_t Player::get_level() const
