@@ -626,6 +626,7 @@ namespace ms
 		return chatfieldopen;
 	}
 
+	// The labels are v83's chat target list (StringPool 0x312-0x314).
 	void UIChatBar::set_target(Target new_target)
 	{
 		chat_target = new_target;
@@ -633,10 +634,10 @@ namespace ms
 		switch (chat_target)
 		{
 			case Target::PARTY:
-				chattarget_label.change_text("To Party");
+				chattarget_label.change_text("To the party");
 				break;
 			case Target::BUDDY:
-				chattarget_label.change_text("To Buddy");
+				chattarget_label.change_text("To a buddy");
 				break;
 			default:
 				chattarget_label.change_text("To All");
@@ -678,17 +679,18 @@ namespace ms
 		Player& player = Stage::get().get_player();
 		const Party& party = player.get_party();
 
-		if (!party.exists())
-		{
-			send_chatline("You are not in a party.", LineType::RED);
-			return;
-		}
-
 		std::vector<int32_t> recipients;
 
 		for (auto& member : party.get_members())
-			if (member.id != player.get_oid())
+			if (member.id != player.get_oid() && member.online())
 				recipients.push_back(member.id);
+
+		// v83 sends party chat only to members logged on (FUN_00a3f975).
+		if (recipients.empty())
+		{
+			send_chatline("Either the party doesn't exist or no member of your party is logged on.", LineType::SKILL);
+			return;
+		}
 
 		MultiChatPacket(MultiChatPacket::Mode::PARTY, recipients, message).dispatch();
 
@@ -703,7 +705,7 @@ namespace ms
 
 		if (recipients.empty())
 		{
-			send_chatline("None of your buddies are online.", LineType::RED);
+			send_chatline("You have no buddy available for chat.", LineType::SKILL);
 			return;
 		}
 

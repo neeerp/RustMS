@@ -67,7 +67,7 @@ reconstruction of v83:
 - `MapChars::draw_party_hp` draws a red bar over the head of each member on
   the map. The HP MARK button turns these bars on and off.
 - In `UIChatBar`, the party chat key (2 by default) or the Talk button sets
-  the target to "To Party". The say key sets it back to "To All".
+  the target to "To the party". The say key sets it back to "To All".
 - Party notices and errors take their text from the v83 client's
   StringPool, and are logged in its notice colour (#FFAFAF, chat type 0xc),
   as in its party result handler (FUN_00a3e31c). Codes the client doesn't

@@ -322,11 +322,18 @@ namespace ms
 								EnterCashShopPacket().dispatch();
 								break;
 							case KeyAction::Id::SAY:
+								if (auto chatbar = UI::get().get_element<UIChatBar>())
+									chatbar->set_target(UIChatBar::Target::ALL);
+
+								break;
 							case KeyAction::Id::PARTYCHAT:
 								if (auto chatbar = UI::get().get_element<UIChatBar>())
-									chatbar->set_target(action == KeyAction::Id::PARTYCHAT
-										? UIChatBar::Target::PARTY
-										: UIChatBar::Target::ALL);
+									chatbar->set_target(UIChatBar::Target::PARTY);
+
+								break;
+							case KeyAction::Id::FRIENDSCHAT:
+								if (auto chatbar = UI::get().get_element<UIChatBar>())
+									chatbar->set_target(UIChatBar::Target::BUDDY);
 
 								break;
 							case KeyAction::Id::TOGGLECHAT:
