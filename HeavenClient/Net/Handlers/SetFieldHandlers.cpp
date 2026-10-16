@@ -44,10 +44,7 @@ namespace ms
 
 	void SetFieldHandler::transition(int32_t mapid, uint8_t portalid) const
 	{
-		float fadestep = 0.025f;
-
 		Window::get().fadeout(
-			fadestep,
 			[mapid, portalid]()
 			{
 				GraphicsGL::get().clear();

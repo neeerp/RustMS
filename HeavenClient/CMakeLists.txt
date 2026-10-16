@@ -10,6 +10,8 @@ if(HEAVENCLIENT_BUILD_TESTS)
     add_test(NAME quest_markers COMMAND quest_marker_tests)
     add_executable(quest_completion_tests tests/quest_completion.cpp)
     add_test(NAME quest_completion COMMAND quest_completion_tests)
+    add_executable(fade_notice_tests tests/fade_notice.cpp)
+    add_test(NAME fade_notice COMMAND fade_notice_tests)
     add_executable(input_focus_tests tests/input_focus.cpp)
     add_test(NAME input_focus COMMAND input_focus_tests)
     add_executable(movement_physics_tests tests/movement_physics.cpp
@@ -57,11 +59,20 @@ if(HEAVENCLIENT_BUILD_TESTS)
     add_test(NAME keyboard COMMAND keyboard_tests)
     add_executable(touch_damage_tests tests/touch_damage.cpp)
     add_test(NAME touch_damage COMMAND touch_damage_tests)
+    add_executable(buff_row_tests tests/buff_row.cpp)
+    add_test(NAME buff_row COMMAND buff_row_tests)
     add_executable(damage_layout_tests tests/damage_layout.cpp)
     add_test(NAME damage_layout COMMAND damage_layout_tests)
     add_executable(shop_list_tests tests/shop_list.cpp Net/InPacket.cpp)
     target_include_directories(shop_list_tests PRIVATE ${PROJECT_SOURCE_DIR}/libs/NoLifeNx)
     add_test(NAME shop_list COMMAND shop_list_tests)
+    add_executable(status_messages_tests tests/status_messages.cpp Net/InPacket.cpp)
+    target_include_directories(status_messages_tests PRIVATE ${PROJECT_SOURCE_DIR}/libs/NoLifeNx)
+    add_test(NAME status_messages COMMAND status_messages_tests)
+    add_executable(skill_recommendation_tests tests/skill_recommendation.cpp)
+    add_test(NAME skill_recommendation COMMAND skill_recommendation_tests)
+    add_executable(emote_cooldown_tests tests/emote_cooldown.cpp)
+    add_test(NAME emote_cooldown COMMAND emote_cooldown_tests)
     add_executable(chat_flood_guard_tests tests/chat_flood_guard.cpp)
     add_test(NAME chat_flood_guard COMMAND chat_flood_guard_tests)
     add_executable(char_click_tests tests/char_click.cpp)
@@ -304,6 +315,7 @@ add_executable(HeavenClient
     Graphics/Texture.h
     IO/Components/AreaButton.cpp
     IO/Components/AreaButton.h
+    IO/Components/BuffRow.h
     IO/Components/Button.cpp
     IO/Components/Button.h
     IO/Components/Charset.cpp
@@ -317,12 +329,11 @@ add_executable(HeavenClient
     IO/Components/SliderSteps.h
     IO/Components/EquipTooltip.cpp
     IO/Components/EquipTooltip.h
+    IO/Components/FadeNotice.h
     IO/Components/Gauge.cpp
     IO/Components/Gauge.h
     IO/Components/Icon.cpp
     IO/Components/Icon.h
-    IO/Components/IconCover.cpp
-    IO/Components/IconCover.h
     IO/Components/ItemTooltip.cpp
     IO/Components/ItemTooltip.h
     IO/Components/MapleButton.cpp
@@ -411,6 +422,8 @@ add_executable(HeavenClient
     IO/UITypes/UIQuit.h
     IO/UITypes/UIRaceSelect.cpp
     IO/UITypes/UIRaceSelect.h
+    IO/UITypes/UIRevive.cpp
+    IO/UITypes/UIRevive.h
     IO/UITypes/UIShop.cpp
     IO/UITypes/UIShop.h
     IO/UITypes/UIMonsterBook.cpp
