@@ -22,6 +22,7 @@
 #include <cstdint>
 
 #include "Combat/Combat.h"
+#include "EmoteCooldown.h"
 #include "MapleMap/MapInfo.h"
 #include "MapleMap/MapTilesObjs.h"
 #include "MapleMap/MapBackgrounds.h"
@@ -35,6 +36,7 @@
 #include "Physics/Physics.h"
 
 #include "../Character/Player.h"
+#include "../Graphics/EffectLayer.h"
 #include "../IO/KeyType.h"
 
 namespace ms
@@ -110,6 +112,11 @@ namespace ms
 		// Returns the current map ID.
 		int32_t get_mapid();
 
+		// Keeps the key the server gave the field, which map change and
+		// portal script requests repeat.
+		void set_field_key(uint8_t key);
+		uint8_t get_field_key() const;
+
 		// Return a pointer to a character, possibly the player.
 		Optional<Char> get_character(int32_t cid);
 
@@ -126,6 +133,15 @@ namespace ms
 		// Notify the server that the player has moved maps
 		void transfer_player();
 
+		// Ask to move to another channel, unless the player is alert (and
+		// not a GM) or the map forbids it, which a notice explains. Return
+		// whether the request went.
+		bool change_channel(uint8_t channel);
+
+		// Ask to enter the Cash Shop, with the same refusals; GMs too must
+		// catch their breath.
+		void enter_cash_shop();
+
 	private:
 		void load_map(int32_t mapid);
 
@@ -133,11 +149,18 @@ namespace ms
 
 		void check_portals();
 
+		void check_touch_portals(Point<int16_t> drawn);
+
+		void enter_portal(const Portal::WarpInfo &warpinfo);
+
+		void use_jump_pad(const Portal &portal);
+
+		// Returns whether the player was moved to the target.
+		bool update_teleport();
+
 		void check_seats();
 
-		void check_ladders(bool up);
-
-		void check_held_ladders();
+		void catch_ladders(Point<int16_t> before);
 
 		void check_drops();
 
@@ -155,10 +178,14 @@ namespace ms
 		Optional<Playable> playable;
 		State state;
 		int32_t mapid;
+		uint8_t field_key = 0;
 
 		MapInfo mapinfo;
-		// The ladder or rope the player last climbed, until they land.
-		Optional<const Ladder> left_ladder;
+		// The ms until an in-map portal's move lands, and then until the
+		// portal works again.
+		int16_t teleport_delay = 0;
+		int16_t teleport_cooldown = 0;
+		Point<int16_t> teleport_target;
 		MapTilesObjs tilesobjs;
 		MapBackgrounds backgrounds;
 		MapPortals portals;
@@ -168,8 +195,12 @@ namespace ms
 		MapMobs mobs;
 		MapDrops drops;
 		MapEffect effect;
+		// Effects left where they started, such as a jump pad's burst.
+		EffectLayer ground_effects;
+		Animation jump_effect;
 
 		Combat combat;
+		EmoteCooldown emote_cooldown;
 
 		std::chrono::time_point<std::chrono::steady_clock> start;
 		uint16_t levelBefore;

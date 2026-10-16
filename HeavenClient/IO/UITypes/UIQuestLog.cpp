@@ -257,8 +257,11 @@ namespace ms
 		tabs = ClassicTabs(ClassicTabs::TAB2, Quest["Tab"]["enabled"], Quest["Tab"]["disabled"], TAB_FILL);
 
 		for (uint16_t i = 0; i < 3; i++)
+		{
 			buttons[TAB0 + i] = std::make_unique<AreaButton>(TAB_STRIP + Point<int16_t>(tabs.pitch() * i, 0),
 				Point<int16_t>(tabs.pitch(), tabs.height()));
+			buttons[TAB0 + i]->set_tab();
+		}
 
 		Point<int16_t> detail = Point<int16_t>(DETAIL_X, 0);
 

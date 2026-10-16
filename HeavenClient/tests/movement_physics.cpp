@@ -783,6 +783,29 @@ int main()
 			require(mob.crnt_x() == 1000 && mob.crnt_y() == 100, "placement was not clamped to the foothold");
 		}
 		std::filesystem::remove(path);
+		// Ellinia's in00 stands on a foothold rising 3 px over 105, over a
+		// floor 165 px down. Stopping on it must not drop through it.
+		path = foothold_map({{1, 1, 757, -2280, 862, -2283, 0, 0}, {2, 2, 600, -2116, 1000, -2116, 0, 0}});
+		{
+			nl::file map(path.string());
+			ms::Physics physics(map.root());
+			for (int8_t direction : {-1, 1})
+			{
+				ms::PhysicsObject player;
+				player.shoe = true;
+				player.set_x(810); player.set_y(physics.get_y_below({810, -2300}).y());
+				for (int tick = 0; tick < 5; ++tick)
+					physics.move_object(player);
+				for (int tick = 0; tick < 60; ++tick)
+				{
+					player.walkdir = tick < 10 ? direction : 0;
+					physics.move_object(player);
+					require(player.onground && player.fhid == 1, "stopping on a slope dropped through it");
+				}
+				require(player.hspeed == 0.0, "the walker did not stop");
+			}
+		}
+		std::filesystem::remove(path);
 		path = foothold_map({
 			{1, 1, -500, 0, 0, 0, 0, 2}, {1, 2, 0, 0, 0, -100, 1, 3}, {1, 3, 0, -100, 500, -100, 2, 0},
 			{2, 4, 1500, -100, 2000, -100, 0, 5}, {2, 5, 2000, -100, 2000, 0, 4, 6}, {2, 6, 2000, 0, 2500, 0, 5, 0},

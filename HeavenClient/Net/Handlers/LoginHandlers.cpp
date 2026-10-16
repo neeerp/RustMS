@@ -134,6 +134,7 @@ namespace ms
 			if (world.wid != -1)
 			{
 				Configuration::get().set_world_channel_count(static_cast<uint8_t>(world.wid), world.channelcount);
+				Configuration::get().set_world_channel_names(static_cast<uint8_t>(world.wid), world.chnames);
 				worldselect->add_world(world);
 			}
 			else

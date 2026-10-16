@@ -47,6 +47,9 @@ namespace ms
 		// Returns whether the item is a cash item or not.
 		bool is_cashitem() const;
 
+		// Returns whether the item is marked as a quest item.
+		bool is_questitem() const;
+
 		// Returns whether the item was loaded correctly.
 		explicit operator bool() const;
 
@@ -99,5 +102,6 @@ namespace ms
 		bool unique;
 		bool unsellable;
 		bool cashitem;
+		bool questitem;
 	};
 }

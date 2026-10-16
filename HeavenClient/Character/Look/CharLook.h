@@ -105,6 +105,7 @@ namespace ms
 
 	private:
 		void updatetwohanded();
+		void update_expression(uint16_t timestep);
 
 		void draw(const DrawArgument &args, Stance::Id interstance, Expression::Id interexp, uint8_t interframe,
 				  uint8_t interfcframe) const;

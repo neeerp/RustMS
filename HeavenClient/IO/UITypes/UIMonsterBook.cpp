@@ -236,6 +236,7 @@ namespace ms
 
 			Point<int16_t> tab_pos = LEFT_TAB + Point<int16_t>(0, LEFT_TAB_SIZE.y() * i);
 			buttons[Buttons::BT_TAB0 + i] = std::make_unique<AreaButton>(tab_pos, LEFT_TAB_SIZE);
+			buttons[Buttons::BT_TAB0 + i]->set_tab();
 		}
 
 		infotab[false] = MonsterBook["LeftTabInfo"]["0"]["normal"]["0"];
@@ -252,6 +253,7 @@ namespace ms
 
 			Point<int16_t> tab_pos = RIGHT_TAB + Point<int16_t>(0, RIGHT_TAB_PITCH * i);
 			buttons[Buttons::BT_RIGHTTAB0 + i] = std::make_unique<AreaButton>(tab_pos, RIGHT_TAB_SIZE);
+			buttons[Buttons::BT_RIGHTTAB0 + i]->set_tab();
 		}
 
 		buttons[Buttons::BT_CLOSE] = std::make_unique<MapleButton>(MonsterBook["BtClose"], CLOSE);

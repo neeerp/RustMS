@@ -43,19 +43,42 @@ namespace ms
 
 		void draw(Point<int16_t> viewpos, float inter) const;
 
-		Portal::WarpInfo find_warp_at(Point<int16_t> playerpos);
+		// The portal the Up key uses where the player stands, if any.
+		const Portal *find_up_portal(Point<int16_t> playerpos) const;
+
+		// The touch, touch script or jump portal the player stands in, if any.
+		const Portal *find_touch_portal(Point<int16_t> playerpos) const;
+
+		// Whether a touch script may run: one that runs only once must wait
+		// until another has run since (v83 FUN_0094dac6).
+		bool may_run_script(const Portal &portal) const;
+
+		void ran_script(const Portal &portal);
 
 		Point<int16_t> get_portal_by_id(uint8_t id) const;
 
 		Point<int16_t> get_portal_by_name(const std::string &name) const;
 
 	private:
+		void update_hidden(Point<int16_t> playerpos);
+
 		static std::unordered_map<Portal::Type, Animation> animations;
+
+		// Each hidden portal's ph or psh image, which holds its portalStart,
+		// portalContinue and portalExit.
+		std::unordered_map<uint8_t, nl::node> hidden_images;
+
+		// The one hidden portal showing, and one still playing its exit.
+		int16_t shown = -1;
+		Animation shown_animation;
+		bool shown_continues = false;
+		int16_t hiding = -1;
+		Animation hiding_animation;
 
 		std::unordered_map<uint8_t, Portal> portals_by_id;
 		std::unordered_map<std::string, uint8_t> portal_ids_by_name;
 
-		static const int16_t WARPCD = 48;
-		int16_t cooldown;
+		// The touch script that ran last in this field.
+		const Portal *last_script = nullptr;
 	};
 }

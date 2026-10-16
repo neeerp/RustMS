@@ -96,6 +96,20 @@ others see the skill's effect) to the others, applies the damage, sends the
 attacker SHOW_MONSTER_HP, and on death KILL_MONSTER to everyone; the attacker
 gets the MP left as STAT_CHANGED.
 
+HeavenClient picks targets as v83 does (`Combat::find_targets`). Melee and
+magic attacks take the mobs whose body overlaps the attack range in the order
+they entered the map (`MapObjects::entry_order`), not the closest ones, so a
+basic attack can pass the mob in front for one that spawned earlier. A mob
+that is spawned again under the same oid keeps its place. Ranged attacks take
+the closest mobs, which is what v83's outward sweep finds.
+
+`AttackResult::damagelines` keeps the targets in that order, and the attack
+packet lists them in it. Without a bullet, every hit on a mob lands at once,
+at the attack's first hit frame (`Char::get_attackdelay(0)`), and each later
+target lands a little after (`hit_timing::target_delay`): melee 70 ms per
+target up to 280 ms, the multi-target spells 50 ms, and Chain Lightning
+100 ms.
+
 In HeavenClient a hit of at least the mob's `pushed` value puts it in its
 `hit1` stance for about a quarter second, with a three-tick push that moves it
 a few pixels (`Mob::knockback_ticks`), as in period footage.
@@ -134,7 +148,11 @@ SHOW_MONSTER_HP shows the mob's HP bar and name tag in HeavenClient
 (`Mob::show_hp`) for 5 s, as v83 hides them 5 s after the player's last hit.
 The bar is v83's 52x10 box (`MobHpBar`), centred over the frame's body rect
 with its top 30 px above the rect's top. Party members' bars use the same box
-filled red.
+filled red. As in v83, the name is orange for a mob 20 or more levels above
+the player, yellow for one 20 or more below, and white otherwise. A "Lv. N"
+tag (`Basic.img/ShowLevel`) sits left of the name, except for bosses, mobs
+whose `info` hides their level, HP or name, and 9xxxxxx mobs outside 94xxxxx
+and 96xxxxx.
 
 A dead mob's EXP is shared by damage dealt (the top damager gets any
 rounding remainder) and each share goes to that player's client actor
@@ -159,8 +177,10 @@ the map sees SHOW_FOREIGN_EFFECT 1 with the skill.
 saved. A new buff replaces one on the same stat. The client actor sleeps until
 the next deadline (`actor::client::buff`): Recovery heals its `x` every 5 s
 while the player is hurt (HP stat update), and an expired buff sends
-CANCEL_BUFF, since the client never ends buffs itself. Dying and changing
-channel end every buff; cooldowns keep running.
+CANCEL_BUFF, since the client never ends buffs itself. Right-clicking a buff
+icon sends CANCEL_BUFF (`0x5C`, the skill id), which ends that skill's buffs
+and answers with CANCEL_BUFF. Dying and changing channel end every buff;
+cooldowns keep running.
 
 ## Spending AP and SP
 
@@ -296,6 +316,10 @@ term and no avoid check. HP drops, others see DAMAGE_PLAYER, and at 0 HP the pla
 non-beginners lose 10% of their level's EXP; the client's respawn
 (CHANGE_MAP with a target while dead) returns them to the map's return map
 with 50 HP.
+
+After a hit, HeavenClient ignores touches for 1500 ms, as v83 does. If the hit
+did damage, the player blinks meanwhile: half brightness for 60 ms, then
+normal for 60 ms. Other players don't blink.
 
 HeavenClient's `Player::update_death` notices HP reaching 0: the player
 becomes a ghost (`Char::State::DIED`), the tombstone from `Effect.nx/Tomb.img`

@@ -251,16 +251,17 @@ namespace ms
 
 	bool CharLook::update(uint16_t timestep)
 	{
+		// The face and the alert keep the clock's time, even while the body
+		// holds still on a rope or speeds through an attack.
+		alerted.update();
+		update_expression(Constants::TIMESTEP);
+
 		if (timestep == 0)
 		{
 			stance.normalize();
 			stframe.normalize();
-			expression.normalize();
-			expframe.normalize();
 			return false;
 		}
-
-		alerted.update();
 
 		bool aniend = false;
 
@@ -319,6 +320,11 @@ namespace ms
 			}
 		}
 
+		return aniend;
+	}
+
+	void CharLook::update_expression(uint16_t timestep)
+	{
 		uint16_t expdelay = face->get_delay(expression.get(), expframe.get());
 		uint16_t expdelta = expdelay - expelapsed;
 
@@ -344,8 +350,6 @@ namespace ms
 
 			expelapsed += timestep;
 		}
-
-		return aniend;
 	}
 
 	void CharLook::set_body(int32_t skin_id)

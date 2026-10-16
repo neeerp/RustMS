@@ -80,8 +80,8 @@ namespace ms
 		Stance::Id find_whack(const Attack &attack) const;
 
 		std::vector<int32_t>
-		find_closest(MapObjects *objs, Rectangle<int16_t> range, Point<int16_t> origin, uint8_t objcount,
-					 bool use_mobs) const;
+		find_targets(MapObjects *objs, Rectangle<int16_t> range, Point<int16_t> origin, uint8_t objcount,
+					 bool use_mobs, bool closest_first) const;
 
 		void apply_use_movement(const SpecialMove &move);
 

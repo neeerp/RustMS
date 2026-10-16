@@ -62,7 +62,8 @@ namespace ms
 
 		void end() const;
 
-		void fadeout(float step, std::function<void()> fadeprocedure);
+		// Fade the screen to black, run fadeprocedure, then fade back in.
+		void fadeout(std::function<void()> fadeprocedure);
 
 		void check_events();
 
