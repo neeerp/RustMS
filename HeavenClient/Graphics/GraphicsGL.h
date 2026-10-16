@@ -226,7 +226,20 @@ namespace ms
 			GLshort width;
 			GLshort height;
 			GLshort lineheight;
-			Char chars[128];
+			// Code page 1252's characters: ASCII and Latin-1 by code point,
+			// the rest in `extras`. Others draw as '?'.
+			Char chars[256] = {};
+			std::map<char32_t, Char> extras;
+
+			const Char &glyph(char32_t codepoint) const
+			{
+				if (codepoint < 256)
+					return chars[codepoint];
+
+				auto extra = extras.find(codepoint);
+
+				return extra != extras.end() ? extra->second : chars['?'];
+			}
 
 			Font(GLshort w, GLshort h, GLshort lh)
 			{
@@ -246,50 +259,6 @@ namespace ms
 			{
 				return lineheight;
 			}
-		};
-
-		class LayoutBuilder
-		{
-		public:
-			LayoutBuilder(const Font &font, Text::Alignment alignment, int16_t maxwidth, bool formatted,
-						  int16_t line_adj, const std::string &text, const std::vector<Point<int16_t>> &boxes);
-
-			size_t add(const char *text, size_t prev, size_t first, size_t last);
-
-			Text::Layout finish(size_t first, size_t last);
-
-		private:
-			void add_word(size_t first, size_t last, Text::Font font, Color::Name color);
-
-			void add_line();
-
-			// The advance of the character at `pos`: an inline box's width.
-			int16_t advance_of(const char *text, size_t pos) const;
-
-			const Font &font;
-
-			Text::Alignment alignment;
-			Text::Font fontid;
-			Color::Name color;
-			int16_t maxwidth;
-			bool formatted;
-
-			int16_t ax;
-			int16_t ay;
-
-			std::vector<Text::Layout::Line> lines;
-			std::vector<Text::Layout::Word> words;
-			std::vector<int16_t> advances;
-			int16_t width;
-			int16_t endy;
-			int16_t line_adj;
-
-			// Inline boxes: their sizes by text position, the ones on the
-			// current line, and where each was placed.
-			std::map<size_t, Point<int16_t>> boxes;
-			std::vector<std::pair<size_t, int16_t>> line_boxes;
-			std::map<size_t, Point<int16_t>> box_positions;
-			int16_t line_top;
 		};
 
 		int16_t VWIDTH;

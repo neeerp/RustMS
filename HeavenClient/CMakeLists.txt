@@ -38,6 +38,10 @@ if(HEAVENCLIENT_BUILD_TESTS)
     add_test(NAME npc_text COMMAND npc_text_tests)
     add_executable(swindle_words_tests tests/swindle_words.cpp)
     add_test(NAME swindle_words COMMAND swindle_words_tests)
+    add_executable(text_layout_tests tests/text_layout.cpp Graphics/TextLayout.cpp)
+    target_include_directories(text_layout_tests PRIVATE
+        ${PROJECT_SOURCE_DIR}/libs/NoLifeNx ${PROJECT_SOURCE_DIR}/libs/glad/build/include)
+    add_test(NAME text_layout COMMAND text_layout_tests)
     add_executable(chat_wrap_tests tests/chat_wrap.cpp)
     add_test(NAME chat_wrap COMMAND chat_wrap_tests)
     add_executable(curse_words_tests tests/curse_words.cpp)
@@ -350,6 +354,9 @@ add_executable(HeavenClient
     Graphics/Sprite.h
     Graphics/Text.cpp
     Graphics/Text.h
+    Graphics/TextLayout.cpp
+    Graphics/TextLayout.h
+    Graphics/Utf8.h
     Graphics/Texture.cpp
     Graphics/Texture.h
     IO/Components/AreaButton.cpp
