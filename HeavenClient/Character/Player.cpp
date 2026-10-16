@@ -753,6 +753,10 @@ namespace ms
 		if (!can_request(ExclRequest::USE_WAIT))
 			return;
 
+		// Nor for the 5 seconds a hit or an attack keeps it alert.
+		if (look.get_alerted())
+			return;
+
 		if (!phobj.onground || is_sitting() || is_climbing() || attacking || is_dead())
 			return;
 
