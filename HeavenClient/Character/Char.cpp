@@ -362,6 +362,14 @@ namespace ms
 		look.set_alerted(5000);
 	}
 
+	void Char::attack(bool degenerate, Stance::Id stance)
+	{
+		look.attack(degenerate, stance);
+
+		attacking = true;
+		look.set_alerted(5000);
+	}
+
 	void Char::set_afterimage(int32_t skill_id)
 	{
 		int32_t weapon_id = look.get_equips().get_weapon();
@@ -381,6 +389,20 @@ namespace ms
 	const Afterimage &Char::get_afterimage() const
 	{
 		return afterimage;
+	}
+
+	Rectangle<int16_t> Char::get_afterimage_range(Stance::Id stance) const
+	{
+		int32_t weapon_id = look.get_equips().get_weapon();
+
+		if (weapon_id <= 0)
+			return {};
+
+		const WeaponData &weapon = WeaponData::get(weapon_id);
+		int16_t weapon_level = weapon.get_equipdata().get_reqstat(MapleStat::Id::LEVEL);
+		nl::node src = nl::nx::character["Afterimage"][weapon.get_afterimage() + ".img"];
+
+		return Rectangle<int16_t>(src[weapon_level / 10][Stance::names[stance]]);
 	}
 
 	void Char::set_direction(bool f)

@@ -532,12 +532,12 @@ namespace ms
 		return move.can_use(level, weapon, job, hp, mp, bullets);
 	}
 
-	Attack Player::prepare_attack(bool skill) const
+	Attack Player::prepare_attack(bool skill, bool whack) const
 	{
 		Attack::Type attacktype;
 		bool degenerate;
 
-		if (state == Char::State::PRONE)
+		if (state == Char::State::PRONE || whack)
 		{
 			degenerate = true;
 			attacktype = Attack::Type::CLOSE;
@@ -583,10 +583,13 @@ namespace ms
 		attack.accuracy = stats.get_total(EquipStat::Id::ACC);
 		attack.playerlevel = stats.get_stat(MapleStat::Id::LEVEL);
 		attack.range = stats.get_range();
-		attack.bullet = inventory.get_bulletid();
 		attack.origin = get_position();
 		attack.toleft = !facing_right;
 		attack.speed = get_integer_attackspeed();
+
+		// A swing or stab throws or fires nothing, even with ammo.
+		if (attacktype == Attack::Type::RANGED)
+			attack.bullet = inventory.get_bulletid();
 
 		return attack;
 	}

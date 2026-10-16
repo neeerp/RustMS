@@ -416,27 +416,38 @@ namespace ms
 
 	void CharLook::attack(bool degenerate)
 	{
+		attack(degenerate, get_attackstance(degenerate));
+	}
+
+	void CharLook::attack(bool degenerate, Stance::Id newstance)
+	{
 		int32_t weapon_id = equips.get_weapon();
 
 		if (weapon_id <= 0)
 			return;
 
-		const WeaponData &weapon = WeaponData::get(weapon_id);
-
-		uint8_t attacktype = weapon.get_attack();
-
-		if (attacktype == 9 && !degenerate)
+		if (newstance == Stance::Id::SHOT)
 		{
 			stance.set(Stance::Id::SHOT);
 			set_action("handgun");
 		} else
 		{
-			stance.set(getattackstance(attacktype, degenerate));
+			stance.set(newstance);
 			stframe.set(0);
 			stelapsed = 0;
 		}
 
-		weapon.get_usesound(degenerate).play();
+		WeaponData::get(weapon_id).get_usesound(degenerate).play();
+	}
+
+	Stance::Id CharLook::get_attackstance(bool degenerate) const
+	{
+		int32_t weapon_id = equips.get_weapon();
+
+		if (weapon_id <= 0)
+			return Stance::Id::NONE;
+
+		return getattackstance(WeaponData::get(weapon_id).get_attack(), degenerate);
 	}
 
 	void CharLook::attack(Stance::Id newstance)
