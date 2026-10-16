@@ -21,7 +21,6 @@
 
 #include "../../Character/Job.h"
 #include "../../Gameplay/Stage.h"
-#include "../../Net/Packets/PlayerInteractionPackets.h"
 #include "../../Util/NxFiles.h"
 
 #include <nlnx/nx.hpp>
@@ -116,8 +115,6 @@ namespace ms
 
 		set_mode(Mode::MAIN);
 		set_panel(Panel::NO_PANEL);
-
-		CharInfoRequestPacket(cid).dispatch();
 	}
 
 	void UICharInfo::draw(float alpha) const
