@@ -103,6 +103,21 @@ namespace ms
 
 		float getmppercent() const;
 
+		// A gauge's warning flash. v83 (FUN_008d850b) plays it once each
+		// time the value falls while under the warning level.
+		struct GaugeFlash
+		{
+			Animation animation;
+			Point<int16_t> pos;
+			bool active = false;
+			// The value at the last check; -1 until the first.
+			int32_t last = -1;
+
+			void check(int32_t value, int32_t max);
+			void update();
+			void draw(Point<int16_t> parent) const;
+		};
+
 		void toggle_menu(Menu menu);
 
 		void set_menu(Menu menu);
@@ -151,6 +166,8 @@ namespace ms
 		Texture gaugebar;
 		Texture gaugegray;
 		Texture graduation;
+		GaugeFlash hpflash;
+		GaugeFlash mpflash;
 		Texture quickslot;
 		Texture keylabels[8];
 		Texture gamemenu;
