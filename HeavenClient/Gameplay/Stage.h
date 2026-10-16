@@ -135,9 +135,7 @@ namespace ms
 
 		void check_seats();
 
-		void check_ladders(bool up);
-
-		void check_held_ladders();
+		void catch_ladders(Point<int16_t> before);
 
 		void check_drops();
 
@@ -157,8 +155,6 @@ namespace ms
 		int32_t mapid;
 
 		MapInfo mapinfo;
-		// The ladder or rope the player last climbed, until they land.
-		Optional<const Ladder> left_ladder;
 		MapTilesObjs tilesobjs;
 		MapBackgrounds backgrounds;
 		MapPortals portals;

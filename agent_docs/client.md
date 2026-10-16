@@ -470,6 +470,14 @@ force-and-friction model (`move_normal`).
   and Down together hold still. Past the top, the player stops there, or
   steps 5 px above it onto a platform if the ladder has `uf`. Past the bottom,
   they let go 1 px below it.
+- **Grabbing.** `Stage::catch_ladders` runs after every move while an arrow
+  is held, unless the player is climbing or attacking. On a foothold, Up
+  grabs a ladder that reaches within 20 px above the feet, and the feet rise
+  to its bottom. Down grabs one whose top is 0 to 10 px below the feet, and
+  the feet move to its top. In the air, Up grabs only while falling: it
+  grabs any ladder within 10 px of the path since the last move, at the
+  current height. `MapInfo::findladder` checks ladders in number order and
+  returns the first one that matches.
 - **Down-jump.** Allowed when the lowest platform within 300 px below, or
   else the highest one 300 to 600 px below, is at least 5 px under the feet
   (`FootholdTree::can_jump_down`). `Physics::jump_down` hops up at 196 px/s
