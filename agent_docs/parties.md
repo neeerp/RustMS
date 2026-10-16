@@ -67,7 +67,7 @@ reconstruction of v83:
 - `MapChars::draw_party_hp` draws a red bar over the head of each member on
   the map. The HP MARK button turns these bars on and off.
 - In `UIChatBar`, the party chat key (2 by default) or the Talk button sets
-  the target to "To Party". The say key sets it back to "To All".
+  the target to "To the party". The say key sets it back to "To All".
 
 ## Unverified against period footage
 
