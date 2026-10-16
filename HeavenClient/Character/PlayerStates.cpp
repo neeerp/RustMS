@@ -30,6 +30,48 @@ namespace ms
 		Sound(Sound::JUMP).play();
 	}
 
+	Char::State PlayerState::ground_state(Player &player) const
+	{
+		int x = player.is_key_down(KeyAction::Id::RIGHT) - player.is_key_down(KeyAction::Id::LEFT);
+		int y = player.is_key_down(KeyAction::Id::DOWN) - player.is_key_down(KeyAction::Id::UP);
+
+		if (x != 0)
+		{
+			if (!player.is_attacking())
+				player.set_direction(x > 0);
+
+			return Char::State::WALK;
+		}
+
+		return y > 0 ? Char::State::PRONE : Char::State::STAND;
+	}
+
+	void PlayerState::stand_by_input(Player &player, Char::State current) const
+	{
+		Char::State next = ground_state(player);
+
+		if (next != current)
+			player.set_state(next);
+	}
+
+	void PlayerState::ground_jump(Player &player, int8_t dir) const
+	{
+		if (player.is_key_down(KeyAction::Id::DOWN))
+		{
+			if (player.get_phobj().enablejd)
+			{
+				play_jumpsound();
+				Physics::jump_down(player.get_phobj());
+				player.set_state(Char::State::FALL);
+			}
+
+			return;
+		}
+
+		play_jumpsound();
+		Physics::jump(player.get_phobj(), player.get_jumpforce(), dir);
+	}
+
 	// Null state
 	void PlayerNullState::update_state(Player &player) const
 	{
@@ -37,21 +79,7 @@ namespace ms
 
 		if (player.get_phobj().onground)
 		{
-			if (player.is_key_down(KeyAction::Id::LEFT))
-			{
-				state = Char::State::WALK;
-				player.set_direction(false);
-			} else if (player.is_key_down(KeyAction::Id::RIGHT))
-			{
-				state = Char::State::WALK;
-				player.set_direction(true);
-			} else if (player.is_key_down(KeyAction::Id::DOWN))
-			{
-				state = Char::State::PRONE;
-			} else
-			{
-				state = Char::State::STAND;
-			}
+			state = ground_state(player);
 		} else
 		{
 			Optional<const Ladder> ladder = player.get_ladder();
@@ -78,27 +106,8 @@ namespace ms
 		if (player.is_attacking())
 			return;
 
-		if (down)
-		{
-			switch (ka)
-			{
-				case KeyAction::Id::LEFT:
-					player.set_direction(false);
-					player.set_state(Char::State::WALK);
-					break;
-				case KeyAction::Id::RIGHT:
-					player.set_direction(true);
-					player.set_state(Char::State::WALK);
-					break;
-				case KeyAction::Id::JUMP:
-					play_jumpsound();
-					Physics::jump(player.get_phobj(), player.get_jumpforce(), 0);
-					break;
-				case KeyAction::Id::DOWN:
-					player.set_state(Char::State::PRONE);
-					break;
-			}
-		}
+		if (down && ka == KeyAction::Id::JUMP)
+			ground_jump(player, 0);
 	}
 
 	void PlayerStandState::update(Player &player) const
@@ -109,22 +118,10 @@ namespace ms
 
 	void PlayerStandState::update_state(Player &player) const
 	{
-		if (!player.get_phobj().onground)
-		{
+		if (player.get_phobj().onground)
+			stand_by_input(player, Char::State::STAND);
+		else
 			player.set_state(Char::State::FALL);
-			return;
-		}
-
-		// v83 picks the stance from the arrows held (FUN_00936d99), so an
-		// arrow still held when an attack ends walks on.
-		bool left = player.is_key_down(KeyAction::Id::LEFT);
-		bool right = player.is_key_down(KeyAction::Id::RIGHT);
-
-		if (!player.is_attacking() && left != right)
-		{
-			player.set_direction(right);
-			player.set_state(Char::State::WALK);
-		}
 	}
 
 	// Walking
@@ -138,25 +135,8 @@ namespace ms
 		if (player.is_attacking())
 			return;
 
-		if (down)
-		{
-			switch (ka)
-			{
-				case KeyAction::Id::LEFT:
-					player.set_direction(false);
-					break;
-				case KeyAction::Id::RIGHT:
-					player.set_direction(true);
-					break;
-				case KeyAction::Id::JUMP:
-					play_jumpsound();
-					Physics::jump(player.get_phobj(), player.get_jumpforce(), haswalkinput(player) ? (player.getflip() ? 1 : -1) : 0);
-					break;
-				case KeyAction::Id::DOWN:
-					player.set_state(Char::State::PRONE);
-					break;
-			}
-		}
+		if (down && ka == KeyAction::Id::JUMP)
+			ground_jump(player, haswalkinput(player) ? (player.getflip() ? 1 : -1) : 0);
 	}
 
 	bool PlayerWalkState::haswalkinput(const Player &player) const
@@ -167,16 +147,7 @@ namespace ms
 	void PlayerWalkState::update(Player &player) const
 	{
 		if (!player.is_attacking() && haswalkinput(player))
-		{
-			// Letting go of one of two arrows walks the way of the other.
-			bool left = player.is_key_down(KeyAction::Id::LEFT);
-			bool right = player.is_key_down(KeyAction::Id::RIGHT);
-
-			if (left != right)
-				player.set_direction(right);
-
 			player.get_phobj().walkdir = player.getflip() ? 1 : -1;
-		}
 
 		if (player.get_phobj().enablejd == false)
 			player.get_phobj().set_flag(PhysicsObject::Flag::CHECKBELOW);
@@ -184,12 +155,10 @@ namespace ms
 
 	void PlayerWalkState::update_state(Player &player) const
 	{
+		// A wall stopping the player does not end the walk.
 		if (player.get_phobj().onground)
 		{
-			// v83 (FUN_00936d99) walks while an arrow is held on a foothold,
-			// even when a wall stops the player.
-			if (!haswalkinput(player))
-				player.set_state(Char::State::STAND);
+			stand_by_input(player, Char::State::WALK);
 		} else
 		{
 			player.set_state(Char::State::FALL);
@@ -230,21 +199,7 @@ namespace ms
 	{
 		if (player.get_phobj().onground)
 		{
-			if (player.is_key_down(KeyAction::Id::LEFT))
-			{
-				player.set_direction(false);
-				player.set_state(Char::State::WALK);
-			} else if (player.is_key_down(KeyAction::Id::RIGHT))
-			{
-				player.set_direction(true);
-				player.set_state(Char::State::WALK);
-			} else if (player.is_key_down(KeyAction::Id::DOWN))
-			{
-				player.set_state(Char::State::PRONE);
-			} else
-			{
-				player.set_state(Char::State::STAND);
-			}
+			player.set_state(ground_state(player));
 		} else if (player.is_underwater())
 		{
 			player.set_state(Char::State::SWIM);
@@ -254,48 +209,20 @@ namespace ms
 	// Prone
 	void PlayerProneState::send_action(Player &player, KeyAction::Id ka, bool down) const
 	{
-		if (down)
-		{
-			switch (ka)
-			{
-				case KeyAction::Id::JUMP:
-					if (player.get_phobj().enablejd && player.is_key_down(KeyAction::Id::DOWN))
-					{
-						play_jumpsound();
-						Physics::jump_down(player.get_phobj());
-						player.set_state(Char::State::FALL);
-					}
-
-					break;
-			}
-		} else
-		{
-			switch (ka)
-			{
-				case KeyAction::Id::DOWN:
-					// Getting up with Left or Right held walks on, as in v83.
-					if (player.is_key_down(KeyAction::Id::LEFT))
-					{
-						player.set_direction(false);
-						player.set_state(Char::State::WALK);
-					} else if (player.is_key_down(KeyAction::Id::RIGHT))
-					{
-						player.set_direction(true);
-						player.set_state(Char::State::WALK);
-					} else
-					{
-						player.set_state(Char::State::STAND);
-					}
-
-					break;
-			}
-		}
+		if (down && ka == KeyAction::Id::JUMP)
+			ground_jump(player, 0);
 	}
 
 	void PlayerProneState::update(Player &player) const
 	{
 		if (player.get_phobj().enablejd == false)
 			player.get_phobj().set_flag(PhysicsObject::Flag::CHECKBELOW);
+	}
+
+	void PlayerProneState::update_state(Player &player) const
+	{
+		if (player.get_phobj().onground)
+			stand_by_input(player, Char::State::PRONE);
 	}
 
 	// Sitting
