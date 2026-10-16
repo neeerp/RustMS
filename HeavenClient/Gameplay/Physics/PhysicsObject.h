@@ -209,6 +209,8 @@ namespace ms
 		uint16_t fhid = 0;
 		double fhslope = 0.0;
 		int8_t fhlayer = 0;
+		// The group of the platform the object last stood on.
+		uint16_t fhgroup = 0;
 		double groundbelow = 0.0;
 		bool onground = true;
 		bool enablejd = false;
