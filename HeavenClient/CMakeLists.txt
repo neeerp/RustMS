@@ -62,6 +62,9 @@ if(HEAVENCLIENT_BUILD_TESTS)
     add_executable(shop_list_tests tests/shop_list.cpp Net/InPacket.cpp)
     target_include_directories(shop_list_tests PRIVATE ${PROJECT_SOURCE_DIR}/libs/NoLifeNx)
     add_test(NAME shop_list COMMAND shop_list_tests)
+    add_executable(status_messages_tests tests/status_messages.cpp Net/InPacket.cpp)
+    target_include_directories(status_messages_tests PRIVATE ${PROJECT_SOURCE_DIR}/libs/NoLifeNx)
+    add_test(NAME status_messages COMMAND status_messages_tests)
     add_executable(char_click_tests tests/char_click.cpp)
     target_include_directories(char_click_tests PRIVATE ${PROJECT_SOURCE_DIR}/libs/NoLifeNx)
     add_test(NAME char_click COMMAND char_click_tests)
@@ -409,6 +412,8 @@ add_executable(HeavenClient
     IO/UITypes/UIQuit.h
     IO/UITypes/UIRaceSelect.cpp
     IO/UITypes/UIRaceSelect.h
+    IO/UITypes/UIRevive.cpp
+    IO/UITypes/UIRevive.h
     IO/UITypes/UIShop.cpp
     IO/UITypes/UIShop.h
     IO/UITypes/UIMonsterBook.cpp

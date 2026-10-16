@@ -25,9 +25,10 @@
 #include "../Data/WeaponData.h"
 #include "../IO/UI.h"
 
-#include "../IO/UITypes/UINotice.h"
+#include "../IO/UITypes/UIRevive.h"
 #include "../IO/UITypes/UISkillBook.h"
 #include "../IO/UITypes/UIStatsInfo.h"
+#include "../IO/UITypes/UIStatusBar.h"
 #include "../Net/Packets/GameplayPackets.h"
 #include "../Net/Packets/PlayerPackets.h"
 #include "../Net/Packets/InventoryPackets.h"
@@ -234,29 +235,29 @@ namespace ms
 	{
 		bool dead = stats.get_stat(MapleStat::Id::HP) <= 0;
 
-		if (dead == is_dead())
-			return;
-
-		attacking = false;
-		keysdown.clear();
-
-		if (dead)
+		if (dead != is_dead())
 		{
-			ladder = nullptr;
-			phobj.hspeed = 0.0;
-			phobj.type = PhysicsObject::Type::NORMAL;
-			set_state(Char::State::DIED);
-			Sound(Sound::Name::TOMBSTONE).play();
+			attacking = false;
+			keysdown.clear();
 
-			// Any answer sends the player to the map's return map with a little HP.
-			UI::get().emplace<UIOk>("You have died.\\nYou will be revived in the nearest town.", [](bool)
+			if (dead)
 			{
-				ChangeMapPacket(true, 0, "", false).dispatch();
-			});
-		} else
-		{
-			nullstate.update_state(*this);
+				ladder = nullptr;
+				phobj.hspeed = 0.0;
+				phobj.type = PhysicsObject::Type::NORMAL;
+				set_state(Char::State::DIED);
+				Sound(Sound::Name::TOMBSTONE).play();
+				death_ticks = 0;
+			} else
+			{
+				nullstate.update_state(*this);
+				UI::get().remove(UIElement::Type::REVIVE);
+			}
 		}
+
+		// Like v83 (FUN_00a03350), offer the revive a little after the tombstone lands.
+		if (dead && death_ticks <= REVIVE_DELAY && ++death_ticks > REVIVE_DELAY)
+			UI::get().emplace<UIRevive>();
 	}
 
 	void Player::update_recovery()
@@ -661,6 +662,11 @@ namespace ms
 		{
 			show_effect_id(CharEffect::Id::LEVELUP);
 			Sound(Sound::Name::LEVELUP).play();
+
+			// Up to level 10, v83 also makes the stat key glow (FUN_00a1fb52).
+			if (level < 11)
+				if (auto statusbar = UI::get().get_element<UIStatusBar>())
+					statusbar->show_key_hint(UIStatusBar::KEY_STAT);
 		}
 
 		stats.set_stat(MapleStat::Id::LEVEL, level);
@@ -778,11 +784,6 @@ namespace ms
 	double Player::get_jumpforce() const
 	{
 		return Physics::jump_speed(std::clamp<int32_t>(stats.get_total(EquipStat::Id::JUMP), 80, 123) / 100.0);
-	}
-
-	float Player::get_climbforce() const
-	{
-		return static_cast<float>(stats.get_total(EquipStat::Id::SPEED)) / 100;
 	}
 
 	float Player::get_flyforce() const

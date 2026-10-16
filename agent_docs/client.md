@@ -71,7 +71,13 @@ from `UI.nx`. Moved so far:
   saves the keymap right away; an open Key Config shows the new binding.
   Status messages (`UIStatusMessenger`) stack upward from just above the
   quick slot panel, right-aligned with it; `UIStatusBar::QUICKSLOT_TOP` is
-  the shared anchor.
+  the shared anchor. Each fades out over 6 s. SHOW_STATUS_INFO is worded and
+  coloured as in the v83 client (`Net/Handlers/StatusMessages.h`): pickups
+  ("You have gained an item in the Etc tab (Snail Shell)", names cut to
+  120 px, or 96 px when a count follows), mesos, and kill EXP with a yellow
+  line per bonus ("Bonus EXP for PARTY (+N)") show here; quest EXP (mode 3
+  with its in-chat flag), mode 4 fame and mode 5 mesos go to the chat log as
+  grey lines.
 - **Chat** (`UIChatBar`): the input strip in the bar's top-left and the log
   above it. The status bar cuts that strip out of its background, so the two
   can overlap in either draw order. As in the original, the log has three
@@ -101,7 +107,8 @@ from `UI.nx`. Moved so far:
   bottom-centred on portals to other maps, NPCs, other players, and you.
   Hovering an NPC or portal shows its name. Period canvases had the map's
   background baked in; v83 `Map.nx` canvases are transparent there, so the
-  frame shows through.
+  frame shows through. Its middle is white at alpha 119 over black, as in
+  v83, so it comes out grey and the field doesn't show through.
 - **World Map** (`UIWorldMap`, `UIWindow.img/WorldMap`): the frame, title,
   and `Basic.img/BtClose` around the map's 640x470 `BaseImg`, laid out from
   period footage. The Big Bang search panel is gone. Esc steps up to the
@@ -466,6 +473,10 @@ force-and-friction model (`move_normal`).
 - **Jumping.** `Physics::jump` sets the takeoff speed. A held direction adds
   80% of the top walking speed, capped at the top speed. A rope jump uses half
   the jump speed and 1.3 times the walking speed.
+- **Climbing.** Ladders and ropes climb at 100 px/s whatever the SPEED, and Up
+  and Down together hold still. Past the top, the player stops there, or
+  steps 5 px above it onto a platform if the ladder has `uf`. Past the bottom,
+  they let go 1 px below it.
 - **Down-jump.** Allowed when the lowest platform within 300 px below, or
   else the highest one 300 to 600 px below, is at least 5 px under the feet
   (`FootholdTree::can_jump_down`). `Physics::jump_down` hops up at 196 px/s
@@ -603,9 +614,11 @@ These were corrected:
 7. SHOW_ITEM_GAIN_INCHAT mode 3 (quest item gains and losses) is a count byte
    followed by an item id and quantity for each. The client read the count as a
    sub-mode and showed nothing unless it was 1. It now shows each item as its
-   own grey (`#BBBBBB`) chat line, worded as in period footage: "You have
-   gained an item (Roger's Apple)", "You have gained items (3 Green Apple)",
-   and "You have lost ..." for losses.
+   own grey (`#BBBBBB`) chat line, worded as the 2025 MapleRoyals client does:
+   "You have gained an item in the Use tab (Roger's Apple)", "You have gained
+   items in the Use tab (Green Apple 3)", "You have lost an item (X)" and "You
+   have lost items (X 3)". A count of 0 instead carries a message and an
+   `Effect/Quest.img` effect number; the message is a `#64B4F0` status line.
 8. The stat window's HP and MP buttons sent SPEND_AP with the current HP and
    MP codes (0x400, 0x1000). They now send MaxHP and MaxMP (0x800, 0x2000),
    which is what AP raises.
