@@ -128,9 +128,12 @@ Completing a quest also plays the v83 "Quest Clear" effect
   `stop/item` while items are.
 - No pages at all: the action is sent immediately (Sen's completion of 1032).
 
-Markers use the same catalog (`QuestLog::supported_rules`): bulb for an
-available quest, open book while in progress at the start NPC, closed book at
-the finishing NPC once its kills and items are in (open book until then).
+Markers use the same catalog (`QuestLog::supported_rules`) and v83's rules
+(`FUN_006d1779`). An NPC's quests are those it starts or finishes, less party
+quests (1200-1399). The closed book shows if a started quest can be finished
+there (no finishing NPC or this one, kills and items in). Otherwise the bulb
+shows if a quest can be started there, and otherwise the open book if a quest
+is in progress. So an available quest outranks a started one.
 The marker is the v83 `UIWindow.img/QuestIcon` bubble. As in footage, it
 sits right of the NPC's centre with its tail resting on the head, and it
 holds still while the bulb inside glows.
