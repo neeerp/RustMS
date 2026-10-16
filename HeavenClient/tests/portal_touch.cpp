@@ -36,6 +36,14 @@ int main()
 		require(!touch_portal(987, 430).range_bounds().contains({987, 485}), "the exit warning fired from the floor");
 		require(!touch_portal(987, 430).range_bounds().contains({987, 365}), "the exit warning fired from the platform");
 
+		// The chimney's jump pads (682010200) sit 51 px above its floor at
+		// y = 109, so walking under them misses, but a player landing there is
+		// still tested from a few pixels up.
+		ms::Portal jump00(nullptr, ms::Portal::SPRING1, "jump00", false, {-61, 58}, 999999999, "",
+			ms::Portal::DEFAULT_RANGE, ms::Portal::DEFAULT_RANGE);
+		require(!jump00.range_bounds().contains({-61, 109}), "walking under a jump pad touched it");
+		require(jump00.range_bounds().contains({-61, 105}), "landing under a jump pad missed it");
+
 		// A map can set its own ranges.
 		require(touch_portal(0, 0, 40, 20).range_bounds().contains({19, 9}), "a custom range missed a point inside it");
 		require(!touch_portal(0, 0, 40, 20).range_bounds().contains({20, 0}), "a custom range reached past hRange / 2");

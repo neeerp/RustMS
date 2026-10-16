@@ -77,7 +77,7 @@ namespace ms
 
 		Portal(const Animation *animation, Type type, std::string name, bool intramap, Point<int16_t> position,
 			   int32_t tomap, std::string toname, int16_t hrange, int16_t vrange, int32_t delay = 0,
-			   bool only_once = false);
+			   bool only_once = false, Point<int16_t> impact = {});
 
 		Portal();
 
@@ -113,6 +113,10 @@ namespace ms
 		// Whether a touch script runs again only after another has run.
 		bool is_only_once() const;
 
+		// The speed a type 13 jump pad throws the player at: its
+		// horizontalImpact sideways and its verticalImpact upwards.
+		Point<int16_t> get_impact() const;
+
 	private:
 
 		const Animation *animation;
@@ -124,5 +128,6 @@ namespace ms
 		int16_t vrange;
 		int32_t delay;
 		bool only_once;
+		Point<int16_t> impact;
 	};
 }

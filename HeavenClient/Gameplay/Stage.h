@@ -35,6 +35,7 @@
 #include "Physics/Physics.h"
 
 #include "../Character/Player.h"
+#include "../Graphics/EffectLayer.h"
 #include "../IO/KeyType.h"
 
 namespace ms
@@ -133,11 +134,14 @@ namespace ms
 
 		void check_portals();
 
-		void check_touch_portals();
+		void check_touch_portals(Point<int16_t> drawn);
 
 		void enter_portal(const Portal::WarpInfo &warpinfo);
 
-		void update_teleport();
+		void use_jump_pad(const Portal &portal);
+
+		// Returns whether the player was moved to the target.
+		bool update_teleport();
 
 		void check_seats();
 
@@ -179,6 +183,9 @@ namespace ms
 		MapMobs mobs;
 		MapDrops drops;
 		MapEffect effect;
+		// Effects left where they started, such as a jump pad's burst.
+		EffectLayer ground_effects;
+		Animation jump_effect;
 
 		Combat combat;
 

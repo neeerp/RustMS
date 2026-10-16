@@ -52,6 +52,8 @@ namespace ms
 	void Stage::init()
 	{
 		drops.init();
+
+		jump_effect = nl::nx::effect["BasicEff.img"]["VerticalJump"];
 	}
 
 	void Stage::load(int32_t mapid, int8_t portalid)
@@ -107,6 +109,7 @@ namespace ms
 		physics = Physics(src["foothold"], src["info"]);
 		mapinfo = MapInfo(src, physics.get_fht().get_walls(), physics.get_fht().get_borders());
 		portals = MapPortals(src["portal"], mapid);
+		ground_effects = EffectLayer();
 	}
 
 	void Stage::respawn(int8_t portalid)
@@ -155,6 +158,7 @@ namespace ms
 			chars.draw_party_hp(party, player.get_oid(), mapid, viewx, viewy, alpha);
 
 		combat.draw(viewx, viewy, alpha);
+		ground_effects.drawabove(viewpos, alpha);
 		portals.draw(viewpos, alpha);
 		backgrounds.drawforegrounds(viewx, viewy, alpha);
 		effect.draw();
@@ -168,6 +172,7 @@ namespace ms
 		combat.update();
 		backgrounds.update();
 		effect.update();
+		ground_effects.update();
 		tilesobjs.update();
 
 		reactors.update(physics);
@@ -175,12 +180,21 @@ namespace ms
 		mobs.update(physics, player.get_position(), player.is_dead());
 		chars.update(physics);
 		drops.update(physics);
+
+		// v83 tests touch portals and jump pads against where the player is
+		// drawn, between its last two 30 ms physics steps (FUN_009b6205), so
+		// a player landing is still tested above the floor. The nearest here
+		// is where this step started, unless the player was moved there.
+		Point<int16_t> drawn = player.get_position();
+
 		player.update(physics);
 		check_held_ladders();
-		update_teleport();
+
+		if (update_teleport())
+			drawn = player.get_position();
 
 		portals.update(player.get_position());
-		check_touch_portals();
+		check_touch_portals(drawn);
 		camera.update(player.get_position());
 
 		if (player.is_invincible())
@@ -238,10 +252,10 @@ namespace ms
 
 	// v83 checks touch portals every update, whatever the player is doing
 	// (FUN_0094dac6, called from CUserLocal::Update).
-	void Stage::check_touch_portals()
+	void Stage::check_touch_portals(Point<int16_t> drawn)
 	{
 		Point<int16_t> playerpos = player.get_position();
-		const Portal *portal = portals.find_touch_portal(playerpos);
+		const Portal *portal = portals.find_touch_portal(drawn);
 
 		if (!portal)
 			return;
@@ -258,6 +272,10 @@ namespace ms
 				if (portals.may_run_script(*portal) &&
 					player.request(ChangeMapSpecialPacket(portal->get_name(), playerpos), portal->get_delay()))
 					portals.ran_script(*portal);
+				break;
+			case Portal::SPRING1:
+			case Portal::SPRING2:
+				use_jump_pad(*portal);
 				break;
 			default:
 				break;
@@ -293,22 +311,69 @@ namespace ms
 		}
 	}
 
-	void Stage::update_teleport()
+	// v83 throws a player standing on a jump pad into the air and leaves a
+	// burst where they took off (FUN_0094de22 for type 12, FUN_0094dac6 for
+	// type 13).
+	void Stage::use_jump_pad(const Portal &portal)
+	{
+		if (!player.get_phobj().onground || player.is_climbing())
+			return;
+
+		double hspeed;
+		double vspeed;
+		bool flip;
+
+		if (portal.get_type() == Portal::SPRING1)
+		{
+			// 2300 px/s up and 200 px/s the way the player faces, with
+			// 100 px/s more to the left or right for each arrow key held.
+			bool left = !player.getflip();
+
+			hspeed = left ? -200.0 : 200.0;
+
+			if (player.is_key_down(KeyAction::Id::LEFT))
+				hspeed -= 100.0;
+
+			if (player.is_key_down(KeyAction::Id::RIGHT))
+				hspeed += 100.0;
+
+			vspeed = -2300.0;
+			flip = !left;
+		} else
+		{
+			// The portal's own speeds; the burst is mirrored whenever it
+			// throws sideways, either way. v83 also requires a field type of
+			// 19-21 or 25, or a reactor the portal names to be in state 1,
+			// but every map with these pads passes and none names a reactor.
+			Point<int16_t> impact = portal.get_impact();
+
+			hspeed = impact.x();
+			vspeed = -impact.y();
+			flip = impact.x() != 0;
+		}
+
+		Physics::knockback(player.get_phobj(), hspeed, vspeed);
+		ground_effects.add(jump_effect, DrawArgument(player.get_position(), flip));
+	}
+
+	bool Stage::update_teleport()
 	{
 		if (teleport_cooldown > 0)
 			teleport_cooldown -= Constants::TIMESTEP;
 
 		if (teleport_delay <= 0)
-			return;
+			return false;
 
 		teleport_delay -= Constants::TIMESTEP;
 
-		if (teleport_delay <= 0)
-		{
-			player.respawn(teleport_target, mapinfo.is_underwater());
-			left_ladder = nullptr;
-			teleport_cooldown = TELEPORT_COOLDOWN;
-		}
+		if (teleport_delay > 0)
+			return false;
+
+		player.respawn(teleport_target, mapinfo.is_underwater());
+		left_ladder = nullptr;
+		teleport_cooldown = TELEPORT_COOLDOWN;
+
+		return true;
 	}
 
 	void Stage::check_seats()
