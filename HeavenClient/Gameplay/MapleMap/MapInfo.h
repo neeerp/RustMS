@@ -76,6 +76,10 @@ namespace ms
 		// How much faster players recover HP and MP at rest (info/recovery).
 		double get_recovery() const;
 
+		// Whether players may leave the map for another channel or the Cash
+		// Shop: fieldLimit bit 0x10 is unset.
+		bool can_migrate() const;
+
 		Range<int16_t> get_walls() const;
 
 		Range<int16_t> get_borders() const;

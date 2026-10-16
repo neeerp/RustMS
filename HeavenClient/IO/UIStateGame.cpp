@@ -317,7 +317,7 @@ namespace ms
 
 								break;
 							case KeyAction::Id::CASHSHOP:
-								EnterCashShopPacket().dispatch();
+								Stage::get().enter_cash_shop();
 								break;
 							case KeyAction::Id::SAY:
 							case KeyAction::Id::PARTYCHAT:

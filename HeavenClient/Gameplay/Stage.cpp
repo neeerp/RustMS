@@ -27,6 +27,7 @@
 #include "../Util/Misc.h"
 #include "../Util/NxFiles.h"
 
+#include "../IO/UITypes/UINotice.h"
 #include "../IO/UITypes/UINpcTalk.h"
 #include "../IO/UITypes/UIStatusBar.h"
 #include "../Net/Packets/AttackAndSkillPackets.h"
@@ -466,5 +467,61 @@ namespace ms
 
 		if (Configuration::get().get_admin())
 			AdminEnterMapPacket(AdminEnterMapPacket::Operation::ALERT_ADMINS).dispatch();
+	}
+
+	namespace
+	{
+		void notice(const char *message)
+		{
+			UI::get().emplace<UIOk>(message, [](bool) {});
+		}
+
+		// v83's notices 0x10a and 0x115.
+		const char *const CATCH_BREATH = "You can't do it right now.\\nCatch your breath and then try again.";
+		const char *const NOT_HERE = "You can't do it here in this map.";
+	}
+
+	// v83 FUN_005304af: the request gate, then the alert a hit or attack
+	// leaves for 5 seconds (GMs aside), then fieldLimit.
+	bool Stage::change_channel(uint8_t channel)
+	{
+		if (!player.can_request(ExclRequest::WAIT))
+			return false;
+
+		if (player.get_look().get_alerted() && !Configuration::get().get_admin())
+		{
+			notice(CATCH_BREATH);
+			return false;
+		}
+
+		if (!mapinfo.can_migrate())
+		{
+			notice(NOT_HERE);
+			return false;
+		}
+
+		return player.request(ChangeChannelPacket(channel), ExclRequest::WAIT);
+	}
+
+	// v83 FUN_00a04dca: the alert first, and the request gate without its
+	// check that the player is alive.
+	void Stage::enter_cash_shop()
+	{
+		if (player.get_look().get_alerted())
+		{
+			notice(CATCH_BREATH);
+			return;
+		}
+
+		if (!player.can_request(ExclRequest::WAIT, true))
+			return;
+
+		if (!mapinfo.can_migrate())
+		{
+			notice(NOT_HERE);
+			return;
+		}
+
+		player.request(EnterCashShopPacket(), ExclRequest::WAIT, true);
 	}
 }

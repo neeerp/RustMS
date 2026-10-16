@@ -475,7 +475,7 @@ namespace ms
 				toggle_qs();
 				return Button::State::NORMAL;
 			case Buttons::BT_CASHSHOP:
-				EnterCashShopPacket().dispatch();
+				Stage::get().enter_cash_shop();
 				break;
 			case Buttons::BT_MENU:
 				toggle_menu(Menu::GAME);

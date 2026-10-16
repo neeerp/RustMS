@@ -67,6 +67,11 @@ namespace ms
 		return swim;
 	}
 
+	bool MapInfo::can_migrate() const
+	{
+		return (fieldlimit & 0x10) == 0;
+	}
+
 	std::string MapInfo::get_bgm() const
 	{
 		return bgm;
