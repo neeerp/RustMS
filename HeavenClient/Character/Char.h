@@ -218,6 +218,7 @@ namespace ms
 		bool chair_at_face = false;
 		bool chair_in_front = false;
 		TimedBool invincible;
+		bool blinking = false;
 		TimedBool ironbody;
 		std::list<DamageNumber> damagenumbers;
 

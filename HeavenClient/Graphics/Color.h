@@ -109,6 +109,8 @@ namespace ms
 			CORNFLOWERBLUE,
 			SUNDOWN,
 			HPSHADE,
+			WEAKMOB,
+			STRONGMOB,
 			PICTONBLUE,
 			NUM_COLORS
 		};
@@ -169,6 +171,8 @@ namespace ms
 						{0.40f, 0.65f, 0.98f}, // Cornflower blue (#66A5FA, the names of upgraded equips in v83 tooltips, from footage)
 						{1.00f, 0.69f, 0.69f}, // Sundown (#FFAFAF, skill-refusal notices in the chat log, from the v83 client's chat fonts)
 						{0.63f, 0.01f, 0.00f}, // HP shade (#A00300, the bottom row of v83's mob and party HP bars)
+						{1.00f, 1.00f, 0.13f}, // Weak mob (#FFFF20, v83 font 3: names of mobs 20+ levels below the player)
+						{0.75f, 0.24f, 0.01f}, // Strong mob (#BE3C03, v83 font 42: names of mobs 20+ levels above the player)
 						{0.39f, 0.71f, 0.94f}  // Picton blue (#64B4F0, v83 font 5: quest messages in the status lines)
 				};
 
