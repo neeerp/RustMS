@@ -52,6 +52,14 @@ namespace ms
 		int32_t accuracy = 0;
 		int32_t fixdamage = 0;
 		int16_t playerlevel = 1;
+		// What a spell's damage comes from: the player's magic, INT and LUK,
+		// the spell's mastery and element, and Element Amplification's percent.
+		int32_t magic = 0;
+		int32_t intelligence = 0;
+		int32_t luck = 0;
+		int32_t mastery = 0;
+		int32_t amplify = 100;
+		uint8_t element = 0;
 
 		uint8_t hitcount = 0;
 		uint8_t mobcount = 0;

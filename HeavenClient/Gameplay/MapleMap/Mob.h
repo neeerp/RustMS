@@ -29,6 +29,7 @@
 
 #include "../Combat/Attack.h"
 #include "../Combat/Bullet.h"
+#include "../Combat/MagicDamage.h"
 
 #include "../../Audio/Audio.h"
 #include "../../Graphics/EffectLayer.h"
@@ -186,13 +187,16 @@ namespace ms
 		float calculate_hitchance(int16_t leveldelta, int32_t accuracy) const;
 
 		// Calculate the minimum damage.
-		double calculate_mindamage(int16_t leveldelta, double mindamage, bool magic) const;
+		double calculate_mindamage(int16_t leveldelta, double mindamage) const;
 
 		// Calculate the maximum damage.
-		double calculate_maxdamage(int16_t leveldelta, double maxdamage, bool magic) const;
+		double calculate_maxdamage(int16_t leveldelta, double maxdamage) const;
 
 		// Calculate a random damage line based on the specified values.
 		std::pair<int32_t, bool> next_damage(double mindamage, double maxdamage, float hitchance, float critical) const;
+
+		// Roll one hit of a spell (magic_damage).
+		int32_t next_magic_damage(const Attack &attack) const;
 
 		// Return the current 'head' position
 		Point<int16_t> get_head_position(Point<int16_t> position) const;
@@ -217,6 +221,7 @@ namespace ms
 		uint16_t accuracy;
 		uint16_t avoid;
 		uint16_t knockback;
+		magic_damage::Attributes elements;
 		bool undead;
 		bool touchdamage;
 		bool noflip;

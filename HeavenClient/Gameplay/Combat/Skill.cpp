@@ -171,6 +171,8 @@ namespace ms
 		} else if (stats.matk)
 		{
 			attack.matk += stats.matk;
+			attack.mastery = stats.mastery;
+			attack.element = SkillData::get(skillid).get_element();
 			attack.damagetype = Attack::DMG_MAGIC;
 		} else
 		{

@@ -51,6 +51,8 @@ pub struct SkillLevel {
     pub speed: i32,
     /// The skill's own value, e.g. Recovery's HP per heal.
     pub x: i32,
+    /// A second value, e.g. Element Amplification's damage percent.
+    pub y: i32,
     /// HP and MP added to each natural recovery, as Improved HP Recovery and
     /// Endure do (`hp`, `mp`).
     pub hp: i32,
@@ -104,6 +106,7 @@ impl SkillData {
                     cooldown: int("cooltime")?,
                     speed: int("speed")?,
                     x: int("x")?,
+                    y: int("y")?,
                     hp: int("hp")?,
                     mp: int("mp")?,
                 });

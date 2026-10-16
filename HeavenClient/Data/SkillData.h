@@ -58,15 +58,17 @@ namespace ms
 			// How far a shot reaches, from the same value as hrange; 0 if the
 			// level has none.
 			int16_t shotrange;
+			// The skill's own value, as Element Amplification's damage percent.
+			int32_t y;
 
 			constexpr Stats(float damage, int32_t matk, int32_t fixdamage, int32_t mastery, uint8_t attackcount,
 							uint8_t mobcount, uint8_t bulletcount, int16_t bulletcost, int32_t hpcost, int32_t mpcost,
 							float chance, float critical, float ignoredef, float hrange, Rectangle<int16_t> range,
-							int32_t hp = 0, int32_t mp = 0, int32_t time = 0, int16_t shotrange = 0)
+							int32_t hp = 0, int32_t mp = 0, int32_t time = 0, int16_t shotrange = 0, int32_t y = 0)
 					: damage(damage), matk(matk), fixdamage(fixdamage), mastery(mastery), attackcount(attackcount),
 					  mobcount(mobcount), bulletcount(bulletcount), bulletcost(bulletcost), hpcost(hpcost),
 					  mpcost(mpcost), chance(chance), critical(critical), ignoredef(ignoredef), hrange(hrange),
-					  range(range), hp(hp), mp(mp), time(time), shotrange(shotrange)
+					  range(range), hp(hp), mp(mp), time(time), shotrange(shotrange), y(y)
 			{}
 		};
 
@@ -107,6 +109,9 @@ namespace ms
 
 		// Return whether the skill needs a one-handed weapon, a wand or a staff.
 		bool needs_onehanded() const;
+
+		// Return the skill's element (magic_damage::element), 0 if it has none.
+		uint8_t get_element() const;
 
 		// Return whether this skill is invisible in the skill book ui.
 		bool is_invisible() const;

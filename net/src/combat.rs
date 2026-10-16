@@ -299,7 +299,10 @@ pub fn validate(attack: &Attack, player: &Player) -> Result<Uses, AttackRejectio
         let cap = if effect.fixed_damage != 0 {
             effect.fixed_damage
         } else if effect.magic != 0 {
-            (max_magic_damage(player, effect.magic) * 2).max(10)
+            // Twice the formula for the roll, Element Amplification, and half
+            // again for a monster weak to the spell's element (FUN_00790782).
+            let max = max_magic_damage(player, effect.magic) * skills::amplification(player) / 100;
+            (max * 3).max(10)
         } else if effect.damage != 0 {
             (base_cap * effect.damage / 100).max(10)
         } else {
@@ -607,13 +610,26 @@ mod tests {
         player.stats.int = 200;
         player.stats.mp = 100;
         learn(&mut player, 2001004, 20);
-        // M = 200: ((40 + 200) / 30 + 1) * 55 = 495, twice that at most.
+        // M = 200: ((40 + 200) / 30 + 1) * 55 = 495, twice that and half
+        // again for a weak monster at most.
         assert_eq!(max_magic_damage(&player, 55), 495);
-        assert!(validate(&bolt(990), &player).is_ok());
+        assert!(validate(&bolt(1485), &player).is_ok());
         assert_eq!(
-            validate(&bolt(991), &player).unwrap_err(),
+            validate(&bolt(1486), &player).unwrap_err(),
             AttackRejection::Damage
         );
+        // Element Amplification at level 30 makes spells 140%, for a fire
+        // and poison wizard and not a cleric.
+        player.stats.job = 211;
+        learn(&mut player, 2110001, 30);
+        assert_eq!(skills::amplification(&player), 140);
+        assert!(validate(&bolt(2079), &player).is_ok());
+        assert_eq!(
+            validate(&bolt(2080), &player).unwrap_err(),
+            AttackRejection::Damage
+        );
+        player.stats.job = 230;
+        assert_eq!(skills::amplification(&player), 100);
         let unskilled = parse_attack(
             &kind_attack_packet(AttackKind::Magic, 0, 0, &[1]),
             AttackKind::Magic,

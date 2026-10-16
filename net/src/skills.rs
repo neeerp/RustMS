@@ -98,6 +98,17 @@ pub fn natural_recovery(player: &Player) -> NaturalRecovery {
     }
 }
 
+/// The percent Element Amplification scales the player's spells by (its
+/// `y`), or 100 without it (v83 FUN_00765771).
+pub fn amplification(player: &Player) -> i32 {
+    let job = i32::from(player.stats.job);
+    [(211, 2110001), (221, 2210001), (1211, 12110001)]
+        .into_iter()
+        .find(|&(line, _)| in_line(job, line))
+        .and_then(|(_, skill_id)| learned(player, skill_id))
+        .map_or(100, |skill| skill.effect.y)
+}
+
 /// Whether `job` is `base` or advanced from it, as the v83 client checks:
 /// 410 covers 410 to 412, and 100 every warrior.
 fn in_line(job: i32, base: i32) -> bool {
