@@ -16,6 +16,7 @@
 //	along with this program.  If not, see <https://www.gnu.org/licenses/>.		//
 //////////////////////////////////////////////////////////////////////////////////
 #include "Drop.h"
+#include "Pickup.h"
 
 #include "../../Audio/Audio.h"
 
@@ -97,11 +98,14 @@ namespace ms
 		spins = spn;
 		start = {strt.x(), static_cast<int16_t>(strt.y() - 4)};
 		dest = {dst.x(), static_cast<int16_t>(dst.y() - 4)};
+		spot = dst;
 
 		phobj.type = PhysicsObject::Type::FIXATED;
 		angle.set(0.0f);
 		opacity.set(1.0f);
 		elapsed = 0;
+		age = 0;
+		sincetry = pickup::RETRY;
 		delay = std::max<int32_t>(dly, 0);
 		flighttime = flight_time(start.y(), dest.y(), pickuptype == EXPLOSIVE);
 		phase = 0.0;
@@ -123,6 +127,8 @@ namespace ms
 	int8_t Drop::update(const Physics &physics)
 	{
 		elapsed += Constants::TIMESTEP;
+		age += Constants::TIMESTEP;
+		sincetry = std::min(sincetry + Constants::TIMESTEP, pickup::RETRY);
 
 		if (state == Drop::State::WAITING)
 		{
@@ -281,11 +287,20 @@ namespace ms
 		return position + Point<int16_t>(origin.x() - dimensions.x() / 2, 0);
 	}
 
-	Rectangle<int16_t> Drop::bounds() const
+	bool Drop::lootable(Point<int16_t> feet, int32_t self, int32_t party) const
 	{
-		auto lt = get_position() - Point<int16_t>(16, 0);
-		auto rb = lt + Point<int16_t>(32, 32);
+		// Only a drop that has landed, and wasn't tried in the last 3 s.
+		if (state != Drop::State::FLOATING || sincetry < pickup::RETRY)
+			return false;
 
-		return Rectangle<int16_t>(lt, rb);
+		if (pickup::owned_by_other(pickuptype, owner, self, party, age - delay))
+			return false;
+
+		return pickup::in_reach(feet, spot);
+	}
+
+	void Drop::try_loot()
+	{
+		sincetry = 0;
 	}
 }

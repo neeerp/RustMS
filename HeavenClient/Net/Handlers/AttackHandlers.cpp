@@ -64,12 +64,13 @@ namespace ms
 
 			uint8_t length = (attack.skill == SkillId::Id::MESO_EXPLOSION) ? recv.read_byte() : attack.hitcount;
 
+			auto &lines = attack.damagelines.emplace_back(oid, std::vector<std::pair<int32_t, bool>>()).second;
+
 			for (uint8_t j = 0; j < length; j++)
 			{
 				int32_t damage = recv.read_int();
 				bool critical = false; // TODO: ?
-				auto singledamage = std::make_pair(damage, critical);
-				attack.damagelines[oid].push_back(singledamage);
+				lines.push_back(std::make_pair(damage, critical));
 			}
 		}
 
