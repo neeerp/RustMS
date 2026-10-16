@@ -21,6 +21,7 @@
 
 #include "../../Audio/Audio.h"
 #include "../../Data/ItemData.h"
+#include "../../Data/SwindleData.h"
 #include "../../Gameplay/Stage.h"
 #include "../../IO/UI.h"
 #include "../Packets/MessagingPackets.h"
@@ -280,6 +281,8 @@ namespace ms
 		std::string message = recv.read_string();
 		int8_t type = recv.read_byte();
 
+		auto warning = SwindleData::warning(message);
+
 		if (auto character = Stage::get().get_character(charid))
 		{
 			message = character->get_name() + " : " + message;
@@ -289,7 +292,13 @@ namespace ms
 		auto linetype = static_cast<UIChatBar::LineType>(type);
 
 		if (auto chatbar = UI::get().get_element<UIChatBar>())
+		{
 			chatbar->send_chatline(message, linetype);
+
+			// v83 follows the line with a scam warning (FUN_00937138).
+			if (warning)
+				chatbar->send_chatline(*warning, UIChatBar::LineType::YELLOW);
+		}
 	}
 
 	void WhisperHandler::handle(InPacket& recv) const
@@ -303,8 +312,14 @@ namespace ms
 			bool from_admin = recv.read_bool();
 			std::string message = recv.read_string();
 
+			// v83 prints a scam warning before the whisper (FUN_0053228e).
+			auto warning = SwindleData::warning(message);
+
 			if (auto chatbar = UI::get().get_element<UIChatBar>())
 			{
+				if (warning)
+					chatbar->send_chatline(*warning, UIChatBar::LineType::YELLOW);
+
 				chatbar->send_chatline(
 						build_whisper_chatline(sender, from_admin, message),
 						UIChatBar::LineType::WHITE
