@@ -16,6 +16,8 @@
 //	along with this program.  If not, see <https://www.gnu.org/licenses/>.		//
 //////////////////////////////////////////////////////////////////////////////////
 #include "GraphicsGL.h"
+#include "TextLayout.h"
+#include "Utf8.h"
 
 #include "../Configuration.h"
 
@@ -313,12 +315,27 @@ namespace ms
 
 		FT_GlyphSlot g = face->glyph;
 
+		std::vector<char32_t> codepoints;
+
+		for (char32_t c = 32; c < 128; c++)
+			codepoints.push_back(c);
+
+		for (char32_t c = 160; c < 256; c++)
+			codepoints.push_back(c);
+
+		codepoints.insert(codepoints.end(), Utf8::CP1252_EXTRAS.begin(), Utf8::CP1252_EXTRAS.end());
+
+		auto load = [&](char32_t c)
+		{
+			return FT_Get_Char_Index(face, c) != 0 && !FT_Load_Char(face, c, FT_LOAD_RENDER);
+		};
+
 		GLshort width = 0;
 		GLshort height = 0;
 
-		for (uint8_t c = 32; c < 128; c++)
+		for (char32_t c : codepoints)
 		{
-			if (FT_Load_Char(face, c, FT_LOAD_RENDER))
+			if (!load(c))
 				continue;
 
 			GLshort w = static_cast<GLshort>(g->bitmap.width);
@@ -353,10 +370,15 @@ namespace ms
 		GLshort ox = x;
 		GLshort oy = y;
 
-		for (uint8_t c = 32; c < 128; c++)
+		std::vector<char32_t> missing;
+
+		for (char32_t c : codepoints)
 		{
-			if (FT_Load_Char(face, c, FT_LOAD_RENDER))
+			if (!load(c))
+			{
+				missing.push_back(c);
 				continue;
+			}
 
 			GLshort ax = static_cast<GLshort>(g->advance.x >> 6);
 			GLshort ay = static_cast<GLshort>(g->advance.y >> 6);
@@ -368,9 +390,23 @@ namespace ms
 			glTexSubImage2D(GL_TEXTURE_2D, 0, ox, oy, w, h, GL_RED, GL_UNSIGNED_BYTE, g->bitmap.buffer);
 
 			Offset offset = Offset(ox, oy, w, h);
-			fonts[id].chars[c] = {ax, ay, w, h, l, t, offset};
+			Font::Char ch = {ax, ay, w, h, l, t, offset};
+
+			if (c < 256)
+				fonts[id].chars[c] = ch;
+			else
+				fonts[id].extras[c] = ch;
 
 			ox += w;
+		}
+
+		// Characters the face lacks draw as '?'.
+		for (char32_t c : missing)
+		{
+			if (c < 256)
+				fonts[id].chars[c] = fonts[id].chars['?'];
+			else
+				fonts[id].extras[c] = fonts[id].chars['?'];
 		}
 
 		return true;
@@ -599,251 +635,12 @@ namespace ms
 	GraphicsGL::createlayout(const std::string &text, Text::Font id, Text::Alignment alignment, int16_t maxwidth,
 							 bool formatted, int16_t line_adj, const std::vector<Point<int16_t>> &boxes)
 	{
-		size_t length = text.length();
+		const Font &font = fonts[id];
 
-		if (length == 0)
-			return Text::Layout();
-
-		LayoutBuilder builder(fonts[id], alignment, maxwidth, formatted, line_adj, text, boxes);
-
-		const char *p_text = text.c_str();
-		const std::string separators = { ' ', '\\', '#', Text::BOX };
-
-		size_t first = 0;
-		size_t offset = 0;
-
-		while (offset < length)
+		return layout_text(text, font.linespace(), [&font](char32_t c)
 		{
-			size_t last = text.find_first_of(separators, offset + 1);
-
-			if (last == std::string::npos)
-				last = length;
-
-			first = builder.add(p_text, first, offset, last);
-			offset = last;
-		}
-
-		return builder.finish(first, offset);
-	}
-
-	GraphicsGL::LayoutBuilder::LayoutBuilder(const Font &f, Text::Alignment a, int16_t mw, bool fm, int16_t la,
-											 const std::string &text, const std::vector<Point<int16_t>> &b) : font(
-			f), alignment(a), maxwidth(mw), formatted(fm), line_adj(la)
-	{
-		fontid = Text::Font::NUM_FONTS;
-		color = Color::Name::NUM_COLORS;
-		ax = 0;
-		ay = font.linespace();
-		width = 0;
-		endy = 0;
-		line_top = 0;
-
-		size_t next_box = 0;
-
-		for (size_t pos = 0; pos < text.size() && next_box < b.size(); pos++)
-			if (text[pos] == Text::BOX)
-				boxes[pos] = b[next_box++];
-
-		if (maxwidth == 0)
-			maxwidth = 800;
-	}
-
-	size_t GraphicsGL::LayoutBuilder::add(const char *text, size_t prev, size_t first, size_t last)
-	{
-		if (first == last)
-			return prev;
-
-		Text::Font last_font = fontid;
-		Color::Name last_color = color;
-		size_t skip = 0;
-		bool linebreak = false;
-
-		if (formatted)
-		{
-			switch (text[first])
-			{
-				case '\\':
-					if (first + 1 < last)
-					{
-						switch (text[first + 1])
-						{
-							case 'n':
-								linebreak = true;
-								break;
-							case 'r':
-								linebreak = ax > 0;
-								break;
-						}
-
-						skip++;
-					}
-
-					skip++;
-					break;
-				case '#':
-					if (first + 1 < last)
-					{
-						switch (text[first + 1])
-						{
-							case 'k':
-								// Back to the text's own colour: dark grey in NPC
-								// dialogue, black in quest descriptions.
-								color = Color::Name::NUM_COLORS;
-								break;
-							case 'b':
-								color = Color::Name::BLUE;
-								break;
-							case 'g':
-								color = Color::Name::GREEN;
-								break;
-							case 'r':
-								color = Color::Name::RED;
-								break;
-							case 'c':
-								color = Color::Name::ORANGE;
-								break;
-							case 'w':
-								color = Color::Name::WHITE;
-								break;
-						}
-
-						skip++;
-					}
-
-					skip++;
-					break;
-			}
-		}
-
-		int16_t wordwidth = 0;
-
-		if (!linebreak)
-		{
-			// Markup such as #k takes no room, so it can't push a word onto
-			// the next line (leaving the space after it at the line's start).
-			for (size_t i = first + skip; i < last; i++)
-			{
-				wordwidth += advance_of(text, i);
-
-				if (wordwidth > maxwidth)
-				{
-					if (last - first == 1)
-					{
-						return last;
-					} else
-					{
-						prev = add(text, prev, first, i);
-						return add(text, prev, i, last);
-					}
-				}
-			}
-		}
-
-		bool newword = skip > 0;
-		bool newline = linebreak || ax + wordwidth > maxwidth;
-
-		if (newword || newline)
-			add_word(prev, first, last_font, last_color);
-
-		if (newline)
-		{
-			add_line();
-
-			endy = ay;
-			ax = 0;
-			ay += font.linespace();
-
-			if (lines.size() > 0)
-				ay -= line_adj;
-
-			line_top = ay - font.linespace();
-		}
-
-		for (size_t pos = first; pos < last; pos++)
-		{
-			char c = text[pos];
-
-			advances.push_back(ax);
-
-			if (pos < first + skip || newline && c == ' ')
-				continue;
-
-			auto box = boxes.find(pos);
-
-			if (box != boxes.end())
-			{
-				// A box sits on the baseline, pushing the line down if it is taller.
-				line_boxes.emplace_back(pos, ax);
-				ay = std::max<int16_t>(ay, line_top + box->second.y());
-			}
-
-			ax += advance_of(text, pos);
-
-			if (width < ax)
-				width = ax;
-		}
-
-		if (newword || newline)
-			return first + skip;
-		else
-			return prev;
-	}
-
-	Text::Layout GraphicsGL::LayoutBuilder::finish(size_t first, size_t last)
-	{
-		add_word(first, last, fontid, color);
-		add_line();
-
-		advances.push_back(ax);
-
-		std::vector<Point<int16_t>> positions;
-
-		for (const auto &box : boxes)
-		{
-			auto placed = box_positions.find(box.first);
-			positions.push_back(placed == box_positions.end() ? Point<int16_t>() : placed->second);
-		}
-
-		return Text::Layout(lines, advances, width, ay, ax, endy, positions);
-	}
-
-	int16_t GraphicsGL::LayoutBuilder::advance_of(const char *text, size_t pos) const
-	{
-		auto box = boxes.find(pos);
-
-		if (box != boxes.end())
-			return box->second.x();
-
-		return font.chars[text[pos]].ax;
-	}
-
-	void GraphicsGL::LayoutBuilder::add_word(size_t word_first, size_t word_last, Text::Font word_font,
-											 Color::Name word_color)
-	{
-		words.push_back({word_first, word_last, word_font, word_color});
-	}
-
-	void GraphicsGL::LayoutBuilder::add_line()
-	{
-		int16_t line_x = 0;
-		int16_t line_y = ay;
-
-		switch (alignment)
-		{
-			case Text::Alignment::CENTER:
-				line_x -= ax / 2;
-				break;
-			case Text::Alignment::RIGHT:
-				line_x -= ax;
-				break;
-		}
-
-		for (const auto &box : line_boxes)
-			box_positions[box.first] = Point<int16_t>(line_x + box.second, line_y - boxes[box.first].y());
-
-		lines.push_back({words, {line_x, line_y}});
-		words.clear();
-		line_boxes.clear();
+			return font.glyph(c).ax;
+		}, alignment, maxwidth, formatted, line_adj, boxes);
 	}
 
 	void GraphicsGL::drawtext(const DrawArgument &args, const Range<int16_t> &vertical, const std::string &text,
@@ -921,8 +718,12 @@ namespace ms
 							continue;
 					}
 
-					const char c = text[pos];
-					const Font::Char &ch = font.chars[c];
+					char32_t c;
+
+					if (Utf8::decode(text, pos, c) == 0)
+						continue;
+
+					const Font::Char &ch = font.glyph(c);
 
 					// The layout already places every character, including giving a
 					// wrapped line's leading space no width, so use its advances

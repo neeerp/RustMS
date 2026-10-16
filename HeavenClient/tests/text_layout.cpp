@@ -1,0 +1,74 @@
+#include "../Graphics/TextLayout.h"
+#include "../Graphics/Utf8.h"
+#include <iostream>
+#include <stdexcept>
+
+void require(bool condition, const char* message)
+{
+	if (!condition) throw std::runtime_error(message);
+}
+
+namespace
+{
+	// 6 px per character, the ellipsis 12, anything else 7.
+	int16_t advance(char32_t c)
+	{
+		if (c == 0x2026)
+			return 12;
+
+		return c < 128 ? 6 : 7;
+	}
+
+	ms::Text::Layout layout(const std::string &text, int16_t maxwidth, const std::vector<ms::Point<int16_t>> &boxes = {})
+	{
+		return ms::layout_text(text, 15, advance, ms::Text::Alignment::LEFT, maxwidth, true, 0, boxes);
+	}
+
+	size_t line_count(const ms::Text::Layout &l)
+	{
+		size_t count = 0;
+
+		for (auto it = l.begin(); it != l.end(); ++it)
+			count++;
+
+		return count;
+	}
+}
+
+int main()
+{
+	try
+	{
+		char32_t c;
+		const std::string puro = "Nothing to do\xE2\x80\xA6 lalala.";
+		require(ms::Utf8::decode(puro, 13, c) == 3 && c == 0x2026, "ellipsis decodes");
+		require(ms::Utf8::decode(puro, 14, c) == 0, "continuation bytes have no character");
+		require(ms::Utf8::decode("\xC3\xA9", 0, c) == 2 && c == 0xE9, "two-byte character");
+		require(ms::Utf8::decode("\xE2\x80", 0, c) == 1 && c == ms::Utf8::REPLACEMENT, "truncated sequence");
+		require(ms::Utf8::decode("\xFF" "a", 0, c) == 1 && c == ms::Utf8::REPLACEMENT, "invalid lead byte");
+
+		// Issue #495: Puro's balloon line, 84 px wide.
+		auto l = layout(puro, 84);
+		require(line_count(l) == 2, "\" do\xE2\x80\xA6\" moves to the second line");
+		require(l.advance(13) == 12 && l.advance(14) == 24 && l.advance(15) == 24 && l.advance(16) == 24,
+			"the ellipsis advances once, its later bytes take no room");
+
+		// Characters wider than the line still make progress.
+		auto narrow = layout("\xE2\x80\xA6\xE2\x80\xA6", 5);
+		require(line_count(narrow) == 2, "each too-wide character takes its own line");
+		auto ascii = layout("abc", 3);
+		require(line_count(ascii) == 3 && ascii.advance(1) == 0 && ascii.advance(2) == 0,
+			"each too-wide ASCII character takes its own line");
+		auto box = layout("\x01" "ab", 12, {{40, 10}});
+		require(line_count(box) == 2 && box.box(0).x() == 0, "a box wider than the line sits alone");
+		require(layout("a", 3).advance(1) == 6, "a lone character wider than the line is still placed");
+
+		std::cout << "text layout tests passed\n";
+		return 0;
+	}
+	catch (const std::exception &e)
+	{
+		std::cerr << e.what() << "\n";
+		return 1;
+	}
+}
