@@ -27,6 +27,7 @@
 #include "../Util/Misc.h"
 #include "../Util/NxFiles.h"
 
+#include "../IO/UITypes/UINotice.h"
 #include "../IO/UITypes/UINpcTalk.h"
 #include "../IO/UITypes/UIStatusBar.h"
 #include "../Net/Packets/AttackAndSkillPackets.h"
@@ -68,6 +69,7 @@ namespace ms
 		playable = player;
 
 		start = ContinuousTimer::get().start();
+		emote_cooldown = {};
 
 		CharStats stats = player.get_stats();
 		levelBefore = stats.get_stat(MapleStat::Id::LEVEL);
@@ -260,11 +262,15 @@ namespace ms
 
 	void Stage::check_drops()
 	{
+		// The v83 client looks for a drop only when it may ask for one.
+		if (!player.can_request(ExclRequest::PICKUP_WAIT))
+			return;
+
 		Point<int16_t> playerpos = player.get_position();
-		MapDrops::Loot loot = drops.find_loot_at(playerpos);
+		MapDrops::Loot loot = drops.find_loot_at(playerpos, player.get_oid(), player.get_party().get_id());
 
 		if (loot.first)
-			PickupItemPacket(loot.first, loot.second).dispatch();
+			player.request(PickupItemPacket(loot.first, loot.second), ExclRequest::PICKUP_WAIT);
 	}
 
 	void Stage::send_key(KeyType::Id type, int32_t action, bool down)
@@ -303,14 +309,20 @@ namespace ms
 
 				playable->send_action(KeyAction::actionbyid(action), down);
 				break;
+			// v83 uses skills and items only as their key goes down
+			// (FUN_0094c856).
 			case KeyType::Id::SKILL:
-				combat.use_move(action);
+				if (down)
+					combat.use_move(action);
+
 				break;
 			case KeyType::Id::ITEM:
-				player.use_item(action);
+				if (down)
+					player.use_item(action);
+
 				break;
 			case KeyType::Id::FACE:
-				if (down)
+				if (down && emote_cooldown.try_start(get_uptime() / 1000))
 				{
 					player.set_expression(action);
 					// v83 numbers emotes from F1's action (100) as 1.
@@ -462,5 +474,61 @@ namespace ms
 
 		if (Configuration::get().get_admin())
 			AdminEnterMapPacket(AdminEnterMapPacket::Operation::ALERT_ADMINS).dispatch();
+	}
+
+	namespace
+	{
+		void notice(const char *message)
+		{
+			UI::get().emplace<UIOk>(message, [](bool) {});
+		}
+
+		// v83's notices 0x10a and 0x115.
+		const char *const CATCH_BREATH = "You can't do it right now.\\nCatch your breath and then try again.";
+		const char *const NOT_HERE = "You can't do it here in this map.";
+	}
+
+	// v83 FUN_005304af: the request gate, then the alert a hit or attack
+	// leaves for 5 seconds (GMs aside), then fieldLimit.
+	bool Stage::change_channel(uint8_t channel)
+	{
+		if (!player.can_request(ExclRequest::WAIT))
+			return false;
+
+		if (player.get_look().get_alerted() && !Configuration::get().get_admin())
+		{
+			notice(CATCH_BREATH);
+			return false;
+		}
+
+		if (!mapinfo.can_migrate())
+		{
+			notice(NOT_HERE);
+			return false;
+		}
+
+		return player.request(ChangeChannelPacket(channel), ExclRequest::WAIT);
+	}
+
+	// v83 FUN_00a04dca: the alert first, and the request gate without its
+	// check that the player is alive.
+	void Stage::enter_cash_shop()
+	{
+		if (player.get_look().get_alerted())
+		{
+			notice(CATCH_BREATH);
+			return;
+		}
+
+		if (!player.can_request(ExclRequest::WAIT, true))
+			return;
+
+		if (!mapinfo.can_migrate())
+		{
+			notice(NOT_HERE);
+			return;
+		}
+
+		player.request(EnterCashShopPacket(), ExclRequest::WAIT, true);
 	}
 }

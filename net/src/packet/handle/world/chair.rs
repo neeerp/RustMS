@@ -2,6 +2,7 @@ use crate::handler::{
     FieldRequest, HandlerResult, WorldAction, WorldContext, WorldHandler, WorldResult,
 };
 use crate::packet::build::world::field::build_cancel_chair;
+use crate::packet::build::world::stat::build_stat_update;
 use packet::{io::read::PktRead, Packet};
 use std::io::Cursor;
 
@@ -11,7 +12,8 @@ fn is_portable_chair(item_id: i32) -> bool {
 }
 
 /// USE_CHAIR: the client has already sat down on a portable chair it owns;
-/// show the others on the map.
+/// show the others on the map. Every answer unlocks the client, which waits
+/// on it before sitting or using an item again.
 pub struct UseChairHandler;
 
 impl WorldHandler for UseChairHandler {
@@ -19,12 +21,13 @@ impl WorldHandler for UseChairHandler {
         let mut reader = Cursor::new(&packet.bytes);
         reader.read_short()?;
         let item_id = reader.read_int()?;
+        let unlock = HandlerResult::reply(build_stat_update(true, &[])?);
 
         if !is_portable_chair(item_id) || ctx.player.inventory.count(item_id) == 0 {
-            return Ok(HandlerResult::empty());
+            return Ok(unlock);
         }
         ctx.player.chair = item_id;
-        Ok(HandlerResult::empty().with(WorldAction::Field(FieldRequest::Chair(item_id))))
+        Ok(unlock.with(WorldAction::Field(FieldRequest::Chair(item_id))))
     }
 }
 
@@ -51,7 +54,7 @@ impl WorldHandler for CancelChairHandler {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::packet::op::RecvOpcode;
+    use crate::packet::op::{RecvOpcode, SendOpcode};
     use game::{InventoryType, Item};
     use packet::io::write::PktWrite;
 
@@ -82,16 +85,24 @@ mod tests {
         )
     }
 
+    fn unlocks(action: &WorldAction) -> bool {
+        matches!(action, WorldAction::Reply(p)
+            if p.bytes[..2] == (SendOpcode::StatChange as i16).to_le_bytes() && p.bytes[2] == 1)
+    }
+
     #[test]
     fn sitting_needs_an_owned_portable_chair() {
+        let actions = use_chair(3010000);
         assert!(matches!(
-            use_chair(3010000).as_slice(),
-            [WorldAction::Field(FieldRequest::Chair(3010000))]
+            actions.as_slice(),
+            [_, WorldAction::Field(FieldRequest::Chair(3010000))]
         ));
-        // Not owned.
-        assert!(use_chair(3010001).is_empty());
-        // Owned, but not a chair.
-        assert!(use_chair(3994000).is_empty());
+        assert!(unlocks(&actions[0]));
+        // Not owned, or owned but not a chair: only unlocked.
+        for item_id in [3010001, 3994000] {
+            let actions = use_chair(item_id);
+            assert!(matches!(actions.as_slice(), [a] if unlocks(a)));
+        }
     }
 
     #[test]
