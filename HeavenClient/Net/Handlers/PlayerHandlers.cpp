@@ -219,12 +219,15 @@ namespace ms
 		Stage::get().get_player().give_buff({ bs, value, skillid, duration });
 
 		if (auto bufflist = UI::get().get_element<UIBuffList>())
-			bufflist->add_buff(skillid, duration);
+			bufflist->add_buff(skillid, bs, duration);
 	}
 
 	void CancelBuffHandler::handle_buff(InPacket&, Buffstat::Id bs) const
 	{
 		Stage::get().get_player().cancel_buff(bs);
+
+		if (auto bufflist = UI::get().get_element<UIBuffList>())
+			bufflist->cancel_buff(bs);
 	}
 
 	void RecalculateStatsHandler::handle(InPacket&) const
