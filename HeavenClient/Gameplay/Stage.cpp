@@ -182,6 +182,7 @@ namespace ms
 		update_teleport();
 
 		portals.update(player.get_position());
+		check_touch_portals();
 		camera.update(player.get_position());
 
 		if (player.is_invincible())
@@ -208,9 +209,18 @@ namespace ms
 		if (player.is_attacking())
 			return;
 
-		Point<int16_t> playerpos = player.get_position();
-		Portal::WarpInfo warpinfo = portals.find_warp_at(playerpos);
+		enter_portal(portals.find_warp_at(player.get_position()));
+	}
 
+	// v83 checks touch portals every update, whatever the player is doing
+	// (FUN_0094dac6, called from CUserLocal::Update).
+	void Stage::check_touch_portals()
+	{
+		enter_portal(portals.find_touch_warp(player.get_position()));
+	}
+
+	void Stage::enter_portal(const Portal::WarpInfo &warpinfo)
+	{
 		if (warpinfo.intramap)
 		{
 			// v83 ignores the portal while a move is pending and for a

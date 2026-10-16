@@ -217,6 +217,44 @@ namespace ms
 		return {};
 	}
 
+	Portal::WarpInfo MapPortals::find_touch_warp(Point<int16_t> playerpos)
+	{
+		// v83 (FUN_00712b61) keeps types 3, 9, 12 and 13 in a list of their
+		// own and takes the last one whose hRange by vRange box holds the
+		// player. Only type 3 leads anywhere from here; FUN_0094dac6 sends
+		// the player through it as long as it has a destination.
+		const Portal *found = nullptr;
+		uint8_t found_id = 0;
+
+		for (auto &iter : portals_by_id)
+		{
+			const Portal &portal = iter.second;
+
+			switch (portal.get_type())
+			{
+				case Portal::TOUCH:
+				case Portal::SCRIPTED_TOUCH:
+				case Portal::SPRING1:
+				case Portal::SPRING2:
+					if (portal.range_bounds().contains(playerpos) && (!found || iter.first > found_id))
+					{
+						found = &portal;
+						found_id = iter.first;
+					}
+					break;
+				default:
+					break;
+			}
+		}
+
+		if (!found || found->get_type() != Portal::TOUCH || !found->getwarpinfo().valid || cooldown > 0)
+			return {};
+
+		cooldown = WARPCD;
+
+		return found->getwarpinfo();
+	}
+
 	void MapPortals::init()
 	{
 		nl::node src = nl::nx::map["MapHelper.img"]["portal"]["game"];

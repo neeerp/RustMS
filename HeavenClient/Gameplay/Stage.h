@@ -143,6 +143,10 @@ namespace ms
 
 		void check_portals();
 
+		void check_touch_portals();
+
+		void enter_portal(const Portal::WarpInfo &warpinfo);
+
 		void update_teleport();
 
 		void check_seats();
