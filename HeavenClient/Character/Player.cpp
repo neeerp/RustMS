@@ -27,6 +27,7 @@
 
 #include "../IO/UITypes/UINotice.h"
 #include "../IO/UITypes/UIStatsInfo.h"
+#include "../IO/UITypes/UIStatusBar.h"
 #include "../Net/Packets/GameplayPackets.h"
 #include "../Net/Packets/PlayerPackets.h"
 #include "../Net/Packets/InventoryPackets.h"
@@ -660,6 +661,11 @@ namespace ms
 		{
 			show_effect_id(CharEffect::Id::LEVELUP);
 			Sound(Sound::Name::LEVELUP).play();
+
+			// Up to level 10, v83 also makes the stat key glow (FUN_00a1fb52).
+			if (level < 11)
+				if (auto statusbar = UI::get().get_element<UIStatusBar>())
+					statusbar->show_key_hint(UIStatusBar::KEY_STAT);
 		}
 
 		stats.set_stat(MapleStat::Id::LEVEL, level);
