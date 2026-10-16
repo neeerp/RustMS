@@ -109,6 +109,7 @@ namespace ms
 
 			buttons[Buttons::BT_TAB0 + i] = std::make_unique<AreaButton>(tab_pos,
 																		 Point<int16_t>(tabs.pitch(), tabs.height()));
+			buttons[Buttons::BT_TAB0 + i]->set_tab();
 		}
 
 		const char* party_buttons[] = {

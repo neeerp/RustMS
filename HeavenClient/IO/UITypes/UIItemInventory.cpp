@@ -88,6 +88,7 @@ namespace ms
 
 			buttons[Buttons::BT_TAB0 + i] = std::make_unique<AreaButton>(tab_pos,
 																		 Point<int16_t>(tabs.pitch(), tabs.height()));
+			buttons[Buttons::BT_TAB0 + i]->set_tab();
 		}
 
 		buttons[Buttons::BT_COIN] = std::make_unique<MapleButton>(Item["BtCoin"]);
