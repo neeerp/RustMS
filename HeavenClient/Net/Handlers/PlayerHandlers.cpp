@@ -31,6 +31,7 @@
 #include "../../IO/UITypes/UICashShop.h"
 #include "../../IO/UITypes/UIChatBar.h"
 #include "../../IO/UITypes/UIMonsterBook.h"
+#include "../../IO/UITypes/UINotice.h"
 #include "../../IO/UITypes/UISkillBook.h"
 #include "../../IO/UITypes/UIStatsInfo.h"
 
@@ -42,10 +43,7 @@ namespace ms
 	{
 		void transition_channel_change()
 		{
-			float fadestep = 0.025f;
-
 			Window::get().fadeout(
-				fadestep,
 				[]()
 				{
 					GraphicsGL::get().clear();
@@ -81,6 +79,8 @@ namespace ms
 		recv.read_bool(); // 'itemreaction'
 		int32_t updatemask = recv.read_int();
 
+		Player& player = Stage::get().get_player();
+		uint16_t oldlevel = player.get_level();
 		bool recalculate = false;
 
 		for (auto iter : MapleStat::codes)
@@ -88,7 +88,16 @@ namespace ms
 				recalculate |= handle_stat(iter.first, recv);
 
 		if (recalculate)
-			Stage::get().get_player().recalc_stats(false);
+			player.recalc_stats(false);
+
+		// After a level-up, v83 tells anyone but a GM to spend AP once more than 199 pile up (FUN_00a1fb52).
+		const CharStats& stats = player.get_stats();
+
+		if (player.get_level() > oldlevel && stats.get_stat(MapleStat::Id::AP) > 199
+			&& stats.get_job().get_id() % 1000 / 100 != 9)
+			UI::get().emplace<UIOk>(
+				"If you do not use your AP when you level up, \\nthen you won't be able to receive any additional AP.\\nPlease use your AP.",
+				[](bool) {});
 
 		UI::get().enable();
 	}
@@ -210,12 +219,15 @@ namespace ms
 		Stage::get().get_player().give_buff({ bs, value, skillid, duration });
 
 		if (auto bufflist = UI::get().get_element<UIBuffList>())
-			bufflist->add_buff(skillid, duration);
+			bufflist->add_buff(skillid, bs, duration);
 	}
 
 	void CancelBuffHandler::handle_buff(InPacket&, Buffstat::Id bs) const
 	{
 		Stage::get().get_player().cancel_buff(bs);
+
+		if (auto bufflist = UI::get().get_element<UIBuffList>())
+			bufflist->cancel_buff(bs);
 	}
 
 	void RecalculateStatsHandler::handle(InPacket&) const
