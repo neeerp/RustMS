@@ -22,6 +22,7 @@
 #include "../OutPacket.h"
 
 #include "../Gameplay/Combat/Attack.h"
+#include "../Gameplay/Combat/Prepare.h"
 
 namespace ms
 {
@@ -39,10 +40,12 @@ namespace ms
 			write_byte((attack.mobcount << 4) | attack.hitcount);
 			write_int(attack.skill);
 
-			if (attack.charge > 0)
-				write_int(attack.charge);
-
 			skip(8);
+
+			// How long a held skill was charged, sent even when it is 0
+			// (0x95292e, 0x955210, 0x956e66).
+			if (prepare::sends_charge(attack.skill, attack.type == Attack::Type::MAGIC))
+				write_int(attack.charge);
 
 			write_byte(attack.display);
 			write_byte(attack.toleft);
@@ -58,7 +61,6 @@ namespace ms
 				write_short(attack.bulletslot);
 				write_short(0);
 				write_byte(0);
-				// TODO: skip(4); If hurricane, piercing arrow or rapidfire
 			}
 			else
 			{
