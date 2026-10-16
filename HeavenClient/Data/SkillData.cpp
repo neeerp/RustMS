@@ -107,11 +107,10 @@ namespace ms
 		// How v83's CUserLocal::DoActiveSkill dispatches each skill: to a
 		// swing, a shot, or a spell. Every other skill is a special move.
 		// Skills that charge first (Big Bang, Hurricane, Corkscrew Blow...)
-		// aren't here; HeavenClient can't charge them yet. v83 casts Three
-		// Snails as a spell, but RustMS reads it as a swing.
+		// aren't here; HeavenClient can't charge them yet.
 		static const std::unordered_set<int32_t> swings =
 				{
-				1000, 1009, 1020,
+				1009, 1020,
 				1001004, 1001005,
 				1111003, 1111004, 1111005, 1111006, 1111008,
 				1121006, 1121008,
@@ -133,14 +132,14 @@ namespace ms
 				5201004,
 				5221003,
 				9001001,
-				10001000, 10001009, 10001020,
+				10001009, 10001020,
 				11001002, 11001003,
 				11111002, 11111003, 11111004, 11111006,
 				14001002,
 				15001001, 15001002,
 				15101005,
 				15111001, 15111003, 15111004,
-				20000014, 20000015, 20000016, 20001000, 20001009, 20001020,
+				20000014, 20000015, 20000016, 20001009, 20001020,
 				21000002,
 				21100001, 21100002,
 				21110003, 21110006,
@@ -206,6 +205,11 @@ namespace ms
 		if (shots.count(id))
 			return ammo_free.count(id) ? ATTACK | RANGED | NOAMMO : ATTACK | RANGED;
 
+		// Three Snails is cast, but only with a one-handed weapon, a wand or
+		// a staff (case 1000 in DoActiveSkill, notice 0xe0e).
+		if (id == 1000 || id == 10001000 || id == 20001000)
+			return ATTACK | MAGIC | ONEHANDED;
+
 		if (spells.count(id))
 			return ATTACK | MAGIC;
 
@@ -235,6 +239,11 @@ namespace ms
 	bool SkillData::uses_ammo() const
 	{
 		return (flags & RANGED) && !(flags & NOAMMO);
+	}
+
+	bool SkillData::needs_onehanded() const
+	{
+		return flags & ONEHANDED;
 	}
 
 	bool SkillData::is_invisible() const

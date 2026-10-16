@@ -35,6 +35,7 @@ namespace ms
 			SKILL_NOBULLETS,
 			SKILL_NOSTARS,
 			SKILL_COOLDOWN,
+			SKILL_ONEHANDED,
 			// Attacking without a weapon
 			ATTACK_NOWEAPON,
 

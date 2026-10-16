@@ -77,7 +77,8 @@ namespace ms
 			ATTACK = 0x0001,
 			RANGED = 0x0002,
 			MAGIC = 0x0004,
-			NOAMMO = 0x0008
+			NOAMMO = 0x0008,
+			ONEHANDED = 0x0010
 		};
 
 		// Icon types
@@ -103,6 +104,9 @@ namespace ms
 
 		// Return whether the skill's shot uses up ammo.
 		bool uses_ammo() const;
+
+		// Return whether the skill needs a one-handed weapon, a wand or a staff.
+		bool needs_onehanded() const;
 
 		// Return whether this skill is invisible in the skill book ui.
 		bool is_invisible() const;

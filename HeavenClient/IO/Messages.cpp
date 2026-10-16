@@ -33,6 +33,7 @@ namespace ms
 					"You do not have enough bullets to use this skill",
 					"You do not have enough throwing stars to use this skill.",
 					"You cannot use this skill as it is on cooldown.",
+					"You may only use this skill with a one-handed weapon equipped.",
 					"Since you are not using a weapon, you are unable to attack.",
 					"The scroll lights up and it's mysterious powers have been transferred to the item.",
 					"The scroll lights up but the item remains as if nothing happened.",
@@ -70,6 +71,8 @@ namespace ms
 				return Messages::SKILL_MPCOST;
 			case SpecialMove::FBR_COOLDOWN:
 				return Messages::SKILL_COOLDOWN;
+			case SpecialMove::FBR_ONEHANDED:
+				return Messages::SKILL_ONEHANDED;
 			case SpecialMove::FBR_BULLETCOST:
 				return message_by_weapon(weapon);
 			default:

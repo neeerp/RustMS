@@ -460,6 +460,11 @@ namespace ms
 		return state == State::SIT;
 	}
 
+	bool Char::is_prone() const
+	{
+		return state == State::PRONE;
+	}
+
 	void Char::set_chair(int32_t itemid)
 	{
 		if (itemid == chair)

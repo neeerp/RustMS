@@ -500,6 +500,26 @@ mod tests {
             validate(&snails(26), &player).unwrap_err(),
             AttackRejection::Damage
         );
+        // v83 casts it, so it arrives as MAGIC_ATTACK.
+        let cast = |damage| {
+            parse_attack(
+                &kind_attack_packet(AttackKind::Magic, 1000, 0, &[damage]),
+                AttackKind::Magic,
+            )
+            .unwrap()
+        };
+        assert_eq!(
+            validate(&cast(25), &player)
+                .unwrap()
+                .skill
+                .unwrap()
+                .skill_id,
+            1000
+        );
+        assert_eq!(
+            validate(&cast(26), &player).unwrap_err(),
+            AttackRejection::Damage
+        );
         // Recovery doesn't attack.
         player.skills.set(game::SkillRecord {
             skill_id: 1001,

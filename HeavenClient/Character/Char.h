@@ -176,6 +176,9 @@ namespace ms
 		// Return if the char is in the Char::State::SIT state
 		bool is_sitting() const;
 
+		// Return if the char is in the Char::State::PRONE state
+		bool is_prone() const;
+
 		// Sit on the portable chair itemid, or get up from it with 0.
 		virtual void set_chair(int32_t itemid);
 
