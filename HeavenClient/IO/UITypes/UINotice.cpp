@@ -223,7 +223,7 @@ namespace ms
 				KeyAction::Id::ESCAPE,
 				[&]()
 				{
-					deactivate();
+					close();
 				}
 		);
 
@@ -269,7 +269,7 @@ namespace ms
 			handlestring(numfield.get_text());
 		} else if (escape)
 		{
-			deactivate();
+			close();
 		}
 	}
 
@@ -286,7 +286,7 @@ namespace ms
 				handlestring(numfield.get_text());
 				break;
 			case Buttons::CANCEL:
-				deactivate();
+				close();
 				break;
 		}
 
@@ -308,7 +308,7 @@ namespace ms
 		{
 			case enter_number::Problem::NONE:
 				numhandler(checked.number);
-				deactivate();
+				close();
 				buttons[Buttons::OK]->set_state(Button::State::NORMAL);
 				return;
 			case enter_number::Problem::NOT_A_NUMBER:
@@ -324,6 +324,12 @@ namespace ms
 
 		numfield.set_state(Textfield::State::DISABLED);
 		UI::get().emplace<UIOk>(problem, okhandler);
+	}
+
+	void UIEnterNumber::close()
+	{
+		numfield.set_state(Textfield::State::DISABLED);
+		deactivate();
 	}
 
 	UIEnterText::UIEnterText(std::string message, std::function<void(const std::string &)> th, size_t limit)
