@@ -117,6 +117,9 @@ namespace ms
 	private:
 		void handlestring(std::string numstr);
 
+		// Close and give the keys back to the game.
+		void close();
+
 		enum Buttons : int16_t
 		{
 			OK, CANCEL
