@@ -74,6 +74,43 @@ int main()
 		require(!in_step(steps[1], { 50, 70, 177, 200 }), "a body only touching a step's bottom is not");
 		require(!in_step(steps[1], { 40, 60, 100, 200 }), "a body only touching its side is not");
 
+		Line floor = { 0, 100, 200, 100 };
+		Point<int16_t> to = { 150, 150 };
+		require(blocked({ 50, 50 }, to, { { floor, 1 } }, 2), "a shot down through a floor stops");
+		require(to.x() == 100 && to.y() == 100, "where it meets the floor");
+		to = { 50, 50 };
+		require(!blocked({ 150, 150 }, to, { { floor, 1 } }, 2), "a shot up through a floor goes on");
+		require(to.x() == 50 && to.y() == 50, "to where it was going");
+
+		Line wall = { 100, 0, 100, 100 };
+		to = { 50, 50 };
+		require(blocked({ 150, 50 }, to, { { wall, 3 } }, 3), "a shot into a wall of the user's group stops");
+		require(to.x() == 100 && to.y() == 50, "at the wall");
+		to = { 50, 50 };
+		require(!blocked({ 150, 50 }, to, { { wall, 3 } }, 5), "a wall of another group lets it through");
+		to = { 50, 50 };
+		require(blocked({ 150, 50 }, to, { { wall, 0 } }, 5), "a wall of no group does not");
+		to = { 150, 50 };
+		require(!blocked({ 50, 50 }, to, { { wall, 3 } }, 3), "a shot out of a wall's back goes on");
+
+		to = { 50, 150 };
+		require(blocked({ 50, 50 }, to, { { floor, 1 }, { { 0, 80, 200, 80 }, 1 } }, 1), "a shot through two floors");
+		require(to.y() == 80, "stops at the nearer");
+
+		Line low = { 0, 100, 100, 100 };
+		Line rest = { 100, 100, 200, 100 };
+		to = { 100, 150 };
+		require(blocked({ 100, 50 }, to, { { low, 1, std::nullopt, rest } }, 1), "a shot down where two floors meet stops");
+		require(to.y() == 100, "where they meet");
+		to = { 100, 150 };
+		require(!blocked({ 100, 50 }, to, { { low, 1 } }, 1), "a shot down past a floor's loose end goes on");
+
+		Line ledge = { 100, 100, 100, 200 };
+		to = { 50, 150 };
+		require(blocked({ 150, 50 }, to, { { low, 1, std::nullopt, ledge } }, 1), "a shot into a ledge's tip stops");
+		to = { 150, 150 };
+		require(!blocked({ 50, 50 }, to, { { low, 1, std::nullopt, ledge } }, 1), "one grazing it goes on");
+
 		std::cout << "Shot path passed\n";
 		return 0;
 	}

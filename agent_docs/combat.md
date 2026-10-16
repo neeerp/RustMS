@@ -148,6 +148,18 @@ crossbows, 200 px plus Keen Eyes' for claws, and 200 px for guns
 (`shot_path::range`, `Combat::find_shot_target`). Other players' shots leave
 out their range skill, whose level the client does not know.
 
+Platforms stop such a shot. v83 draws a line from 28 px above the user's feet
+to where the shot hits its target, or to the end of its range, and stops it at
+the first platform the line enters from the open side. That means a floor from
+above, or a wall or ceiling from the side it faces. Walls and ceilings only
+count when they have no group or the group of the platform the user last stood
+on. A line through the end of a platform only stops if it ends up behind the
+platform joined there too. A stopped shot loses its target, and its bullet
+flies from where it started to the platform (`shot_path::blocked`,
+`Combat::find_platforms`). The line of sight in v83's other attack paths, such
+as magic and shots at several mobs, is not copied yet, and other players'
+shots never stop.
+
 Damage numbers follow v83 (`Gameplay/Combat/DamageLayout.h`). The first digit
 comes from the larger `NoRed1` set and the rest from `NoRed0`. Each digit
 overlaps the previous one by 3/5 of its part right of the origin, and digits

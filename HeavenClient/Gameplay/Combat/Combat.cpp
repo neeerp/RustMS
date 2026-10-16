@@ -31,8 +31,9 @@
 
 namespace ms
 {
-	Combat::Combat(Player &in_player, MapChars &in_chars, MapMobs &in_mobs, MapReactors &in_reactors) : player(
-			in_player), chars(in_chars), mobs(in_mobs), reactors(in_reactors),
+	Combat::Combat(Player &in_player, MapChars &in_chars, MapMobs &in_mobs, MapReactors &in_reactors,
+				   const Physics &in_physics) : player(
+			in_player), chars(in_chars), mobs(in_mobs), reactors(in_reactors), physics(in_physics),
 																										attackresults(
 																												[&](const AttackResult &attack)
 																												{
@@ -153,14 +154,28 @@ namespace ms
 			bool closest_first = attack.type == Attack::Type::RANGED;
 			std::vector<int32_t> mob_targets;
 			std::vector<int32_t> reactor_targets = find_targets(reactor_objs, range, origin, mobcount, false, true);
-			int16_t shot_end = attack.toleft ? range.left() : range.right();
+			Point<int16_t> shot_start = shot_path::origin(origin, reach, attack.toleft);
+			Point<int16_t> shot_end(attack.toleft ? range.left() : range.right(), shot_start.y());
 
-			// A shot at one mob hits the first in its path instead.
+			// A shot at one mob hits the first in its path instead, unless a
+			// platform between the player and it stops the shot.
 			if (attack.type == Attack::Type::RANGED && whack == Stance::Id::NONE && mobcount == 1)
 			{
 				int16_t shot_range = get_shot_range(attack);
-				shot_end = origin.x() + (attack.toleft ? -shot_range : shot_range);
-				mob_targets = find_shot_target(shot_path::origin(origin, reach, attack.toleft), shot_end);
+				shot_end.set_x(origin.x() + (attack.toleft ? -shot_range : shot_range));
+				mob_targets = find_shot_target(shot_start, shot_end.x());
+
+				Point<int16_t> sight = shot_path::origin(origin, 0, attack.toleft);
+				Point<int16_t> stop = shot_end;
+
+				if (!mob_targets.empty())
+					stop = shot_path::hit_point(shot_start, shot_end.x(), mobs.get_mob_body(mob_targets[0]));
+
+				if (shot_path::blocked(sight, stop, find_platforms(sight, stop), player.get_phobj().fhgroup))
+				{
+					mob_targets.clear();
+					shot_end = stop;
+				}
 			} else
 			{
 				mob_targets = find_targets(mob_objs, range, origin, mobcount, true, closest_first);
@@ -256,6 +271,42 @@ namespace ms
 		}
 
 		return {};
+	}
+
+	std::vector<shot_path::Platform> Combat::find_platforms(Point<int16_t> from, Point<int16_t> to) const
+	{
+		const FootholdTree &fht = physics.get_fht();
+		Range<int16_t> across(std::min(from.x(), to.x()), std::max(from.x(), to.x()));
+		Range<int16_t> down(std::min(from.y(), to.y()), std::max(from.y(), to.y()));
+
+		auto line = [&](uint16_t fhid) -> std::optional<shot_path::Line>
+		{
+			const Foothold &fh = fht.get_fh(fhid);
+
+			if (fhid == 0 || fh.id() != fhid)
+				return std::nullopt;
+
+			return shot_path::Line{ fh.x1(), fh.y1(), fh.x2(), fh.y2() };
+		};
+
+		std::vector<shot_path::Platform> platforms;
+
+		for (uint16_t group : fht.get_groups())
+		{
+			for (uint16_t fhid : fht.get_group_footholds(group))
+			{
+				const Foothold &fh = fht.get_fh(fhid);
+
+				// v83 asks its foothold tree for those whose bounds touch the
+				// shot's (FUN_00508740).
+				if (fh.l() > across.second() || fh.r() < across.first() || fh.t() > down.second() || fh.b() < down.first())
+					continue;
+
+				platforms.push_back({ *line(fhid), group, line(fh.prev()), line(fh.next()) });
+			}
+		}
+
+		return platforms;
 	}
 
 	std::vector<int32_t>
@@ -399,7 +450,7 @@ namespace ms
 			// only as far as the weapon or skill alone does.
 			int16_t skill_range = attack.skill ? SkillData::get(attack.skill).get_stats(attack.level).shotrange : 0;
 			int16_t shot_range = shot_path::range(attack.skill, skill_range, user.get_weapontype(), 0);
-			int16_t shot_end = user.get_position().x() + (attack.toleft ? -shot_range : shot_range);
+			Point<int16_t> shot_end = shot_path::origin(user.get_position(), shot_range, attack.toleft);
 			extract_effects(user, move, attack, range, reach, shot_end);
 		} else
 		{
@@ -431,7 +482,7 @@ namespace ms
 	}
 
 	void Combat::extract_effects(const Char &user, const SpecialMove &move, const AttackResult &result,
-								 Rectangle<int16_t> range, int16_t reach, int16_t shot_end)
+								 Rectangle<int16_t> range, int16_t reach, Point<int16_t> shot_end)
 	{
 		AttackUser attackuser = {
 				user.get_skilllevel(move.get_id()),
@@ -470,7 +521,7 @@ namespace ms
 				if (mobs.contains(oid))
 				{
 					std::vector<DamageNumber> numbers = place_numbers(line.second, move.get_id());
-					Point<int16_t> hit = shot_path::hit_point(origin, shot_end, mobs.get_mob_body(oid));
+					Point<int16_t> hit = shot_path::hit_point(origin, shot_end.x(), mobs.get_mob_body(oid));
 					uint16_t hit_delay = delay + shot_path::hit_delay(origin, hit);
 
 					shoot(hit, static_cast<uint8_t>(numbers.size()));
@@ -495,7 +546,7 @@ namespace ms
 			}
 
 			if (result.damagelines.empty())
-				shoot(Point<int16_t>(shot_end, origin.y()), result.hitcount);
+				shoot(shot_end, result.hitcount);
 		} else
 		{
 			// As in v83, every hit on a mob lands at once, at the frame the

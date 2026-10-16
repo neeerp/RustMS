@@ -7,6 +7,7 @@
 #include <cmath>
 #include <cstdint>
 #include <cstdlib>
+#include <optional>
 #include <vector>
 
 namespace ms
@@ -103,6 +104,112 @@ namespace ms
 		{
 			return std::max(step.left(), body.left()) < std::min(step.right(), body.right())
 				&& std::max(step.top(), body.top()) < std::min(step.bottom(), body.bottom());
+		}
+
+		// A platform's line, from where it starts to where it ends.
+		struct Line
+		{
+			int32_t x1, y1, x2, y2;
+		};
+
+		// A platform as a shot sees it, with those joined to either end.
+		struct Platform
+		{
+			Line line;
+			uint16_t group;
+			std::optional<Line> prev;
+			std::optional<Line> next;
+		};
+
+		// Which side of a line a point is on: negative left of it, which for
+		// a platform is the open side above a floor, positive right of it.
+		inline int32_t side(Line line, int32_t x, int32_t y)
+		{
+			return (line.x2 - line.x1) * (y - line.y1) - (line.y2 - line.y1) * (x - line.x1);
+		}
+
+		// Whether a point is behind the corner where `first` runs into
+		// `second` (FUN_009b3f1b): behind either of them where they turn
+		// toward their open side, like a step up, and behind both where they
+		// turn away from it, like a ledge.
+		inline bool behind_corner(Line first, Line second, int32_t x, int32_t y)
+		{
+			bool behind_first = side(first, x, y) > 0;
+			bool behind_second = side(second, x, y) > 0;
+
+			if (side(first, second.x2, second.y2) <= 0)
+				return behind_first || behind_second;
+			else
+				return behind_first && behind_second;
+		}
+
+		// Whether a shot from `from` to `to` runs into a platform first
+		// (FUN_00a457d0). It only stops going into one from its open side, at
+		// a floor or at a wall or ceiling with no group or the `group` the
+		// user last stood on. If it does, `to` moves to where it stops.
+		inline bool blocked(Point<int16_t> from, Point<int16_t> &to, const std::vector<Platform> &platforms, uint16_t group)
+		{
+			Line shot = { from.x(), from.y(), to.x(), to.y() };
+
+			if (shot.x1 == shot.x2 && shot.y1 == shot.y2)
+				return false;
+
+			// How far along the shot the nearest platform is, as a fraction.
+			int64_t near = 2;
+			int64_t far = 1;
+			bool found = false;
+
+			for (const Platform &platform : platforms)
+			{
+				Line line = platform.line;
+
+				if (line.x2 <= line.x1 && platform.group != 0 && platform.group != group)
+					continue;
+
+				int32_t start = side(line, shot.x1, shot.y1);
+				int32_t end = side(line, shot.x2, shot.y2);
+
+				if (start > 0 || end < 0 || (start == 0 && end == 0))
+					continue;
+
+				int32_t first = side(shot, line.x1, line.y1);
+				int32_t second = side(shot, line.x2, line.y2);
+
+				if ((first < 0 && second < 0) || (first > 0 && second > 0))
+					continue;
+
+				// Through an end, it has to go behind the platform there too.
+				if (first == 0)
+				{
+					if (!platform.prev || !behind_corner(*platform.prev, line, shot.x2, shot.y2))
+						continue;
+				} else if (second == 0)
+				{
+					if (!platform.next || !behind_corner(line, *platform.next, shot.x2, shot.y2))
+						continue;
+				}
+
+				int64_t across = end - start;
+				int64_t along = -start;
+
+				if (across * near > along * far)
+				{
+					near = along;
+					far = across;
+					found = true;
+				}
+			}
+
+			if (!found)
+				return false;
+
+			double t = static_cast<double>(near) / far;
+			to = {
+				static_cast<int16_t>((shot.x2 - shot.x1) * t + shot.x1),
+				static_cast<int16_t>((shot.y2 - shot.y1) * t + shot.y1)
+			};
+
+			return true;
 		}
 
 		// Where a shot leaves the user. A regular attack's reach is the

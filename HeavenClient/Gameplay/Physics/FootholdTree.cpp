@@ -306,6 +306,9 @@ namespace ms
 		if (phobj.fhlayer == 0 || phobj.onground)
 			phobj.fhlayer = nextfh.layer();
 
+		if (phobj.onground)
+			phobj.fhgroup = nextfh.group();
+
 		if (phobj.fhid == 0)
 		{
 			phobj.fhid = curfh.id();
@@ -604,6 +607,7 @@ namespace ms
 		phobj.set_y(fh.y1() + uy * along);
 		phobj.fhid = fhid;
 		phobj.fhlayer = fh.layer();
+		phobj.fhgroup = fh.group();
 		phobj.onground = true;
 	}
 
