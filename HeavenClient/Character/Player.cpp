@@ -23,6 +23,7 @@
 #include "../Data/EquipData.h"
 #include "../Data/SkillData.h"
 #include "../Data/WeaponData.h"
+#include "../Gameplay/Stage.h"
 #include "../IO/UI.h"
 
 #include "../IO/UITypes/UIRevive.h"

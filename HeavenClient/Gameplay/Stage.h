@@ -112,6 +112,11 @@ namespace ms
 		// Returns the current map ID.
 		int32_t get_mapid();
 
+		// Keeps the key the server gave the field, which map change and
+		// portal script requests repeat.
+		void set_field_key(uint8_t key);
+		uint8_t get_field_key() const;
+
 		// Return a pointer to a character, possibly the player.
 		Optional<Char> get_character(int32_t cid);
 
@@ -175,6 +180,7 @@ namespace ms
 		Optional<Playable> playable;
 		State state;
 		int32_t mapid;
+		uint8_t field_key = 0;
 
 		MapInfo mapinfo;
 		// The ladder or rope the player last climbed, until they land.

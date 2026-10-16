@@ -3,6 +3,7 @@
 #include "../Components/MapleButton.h"
 
 #include "../../Constants.h"
+#include "../../Gameplay/Stage.h"
 #include "../../Net/Packets/GameplayPackets.h"
 #include "../../Util/NxFiles.h"
 
@@ -56,7 +57,7 @@ namespace ms
 	void UIRevive::revive()
 	{
 		// Back to the map's return map with a little HP.
-		ChangeMapPacket(true, 0, "", false).dispatch();
+		ChangeMapPacket(Stage::get().get_field_key(), 0, "", false).dispatch();
 		deactivate();
 	}
 }

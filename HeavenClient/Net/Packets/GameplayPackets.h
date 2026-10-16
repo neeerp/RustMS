@@ -45,12 +45,10 @@ namespace ms
 	class ChangeMapSpecialPacket : public OutPacket
 	{
 	public:
-		ChangeMapSpecialPacket(const std::string &portal, Point<int16_t> position) :
+		ChangeMapSpecialPacket(uint8_t fieldkey, const std::string &portal, Point<int16_t> position) :
 				OutPacket(OutPacket::Opcode::CHANGE_MAP_SPECIAL)
 		{
-			// v83 starts with a byte the field keeps (CField+0x134); the
-			// server skips it.
-			write_byte(0);
+			write_byte(fieldkey);
 			write_string(portal);
 			write_point(position);
 		}
@@ -60,10 +58,12 @@ namespace ms
 	class ChangeMapPacket : public OutPacket
 	{
 	public:
-		// Request the server to warp the player to a different map
-		ChangeMapPacket(bool died, int32_t targetid, const std::string& targetp, bool usewheel) : OutPacket(OutPacket::Opcode::CHANGEMAP)
+		// Request the server to warp the player to a different map. v83
+		// starts every request with the field's key (FUN_0053035d), dead
+		// or alive.
+		ChangeMapPacket(uint8_t fieldkey, int32_t targetid, const std::string& targetp, bool usewheel) : OutPacket(OutPacket::Opcode::CHANGEMAP)
 		{
-			write_byte(died);
+			write_byte(fieldkey);
 			write_int(targetid);
 			write_string(targetp);
 			skip(1);
@@ -72,9 +72,9 @@ namespace ms
 
 		// Ask to go through a portal, from where the player stands (v83
 		// FUN_0053035d)
-		ChangeMapPacket(const std::string &portal, Point<int16_t> position) : OutPacket(OutPacket::Opcode::CHANGEMAP)
+		ChangeMapPacket(uint8_t fieldkey, const std::string &portal, Point<int16_t> position) : OutPacket(OutPacket::Opcode::CHANGEMAP)
 		{
-			write_byte(0);
+			write_byte(fieldkey);
 			write_int(-1);
 			write_string(portal);
 			write_point(position);

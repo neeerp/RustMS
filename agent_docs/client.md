@@ -647,3 +647,9 @@ These were corrected:
     keys at 85 to 87, so Right Ctrl did nothing, and had put F11 and F12 at 69
     and 70 rather than v83's 87 and 88. The `v83_modifier_and_f_keys`
     migration drops the old right-hand copies and moves F11 and F12.
+11. SET_FIELD's first byte after the channel is the new field's key, and the
+    second says whether character data follows. The client took the
+    change-map branch only when both were 0. It now branches on the second
+    byte and keeps the key (`Stage::get_field_key`). As in v83, every
+    CHANGE_MAP and CHANGE_MAP_SPECIAL starts with that key. Before, they
+    started with 0, or with 1 for "died" on the death respawn.
