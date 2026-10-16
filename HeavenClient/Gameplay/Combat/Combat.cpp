@@ -21,8 +21,10 @@
 #include "DamageLayout.h"
 #include "HitTiming.h"
 #include "PointBlank.h"
+#include "Prepare.h"
 #include "ShotPath.h"
 
+#include "../../Constants.h"
 #include "../../Character/SkillId.h"
 #include "../../Data/SkillData.h"
 #include "../../IO/Messages.h"
@@ -30,6 +32,8 @@
 
 #include "../../Net/Packets/AttackAndSkillPackets.h"
 #include "../../Net/Packets/GameplayPackets.h"
+
+#include <nlnx/nx.hpp>
 
 namespace ms
 {
@@ -54,7 +58,26 @@ namespace ms
 																													apply_damage_effect(
 																															effect);
 																												})
-	{}
+	{
+	}
+
+	void Combat::init()
+	{
+		nl::node basic = nl::nx::ui["Basic.img"];
+		nl::node bars[2] = { basic["KeyDownBar"], basic["KeyDownBar1"] };
+
+		for (size_t i = 0; i < 2; i++)
+		{
+			gauge_bar[i] = bars[i]["bar"];
+			gauge_fill[i] = bars[i]["gauge"];
+			// KeyDownBar1's graduation only links to KeyDownBar's.
+			gauge_graduation[i] = bars[0]["graduation"];
+		}
+	}
+
+	Texture Combat::gauge_bar[2];
+	Texture Combat::gauge_fill[2];
+	Texture Combat::gauge_graduation[2];
 
 	void Combat::draw(double viewx, double viewy, float alpha) const
 	{
@@ -63,10 +86,35 @@ namespace ms
 
 		for (auto &dn : damagenumbers)
 			dn.draw(viewx, viewy, alpha);
+
+		draw_gauge(viewx, viewy, alpha);
+	}
+
+	void Combat::draw_gauge(double viewx, double viewy, float alpha) const
+	{
+		if (!preparing || !prepare::shows_gauge(preparing->skill))
+			return;
+
+		// The bar, filled a column at a time, under its graduation, with its
+		// top left 36 px left of the player and 100 px up (0x95c375, 0x95c3e3).
+		int32_t kind = prepare::gauge_kind(preparing->skill);
+		Point<int16_t> topleft = player.get_phobj().get_absolute(viewx, viewy, alpha) + Point<int16_t>(-36, -100);
+
+		gauge_bar[kind].draw(topleft + gauge_bar[kind].get_origin());
+
+		int32_t end = prepare::gauge(preparing->skill, preparing->held);
+
+		for (int32_t x = prepare::GAUGE_START; x <= end; x++)
+			gauge_fill[kind].draw(topleft + Point<int16_t>(x, 2) + gauge_fill[kind].get_origin());
+
+		gauge_graduation[kind].draw(topleft + gauge_graduation[kind].get_origin());
 	}
 
 	void Combat::update()
 	{
+		now += Constants::TIMESTEP;
+		update_prepare();
+
 		attackresults.update();
 		bulleteffects.update();
 		damageeffects.update();
@@ -88,6 +136,29 @@ namespace ms
 
 	void Combat::use_move(int32_t move_id)
 	{
+		if (prepare::held(move_id))
+		{
+			// A skill that keeps firing whacks a mob right in front of the
+			// player, or stabs while prone, instead (0x96ae26).
+			if (prepare::repeats(move_id) && !preparing && player.can_attack())
+			{
+				int16_t reach = 0;
+
+				if (player.is_prone() || find_whack(player.prepare_attack(0), reach) != Stance::Id::NONE)
+				{
+					use_move(0);
+					return;
+				}
+			}
+
+			const Skill &skill = get_skill(move_id);
+
+			if (can_use_move(skill))
+				start_prepare(skill);
+
+			return;
+		}
+
 		const SpecialMove &move = get_move(move_id);
 
 		if (!can_use_move(move))
@@ -162,7 +233,8 @@ namespace ms
 
 	bool Combat::can_use_move(const SpecialMove &move) const
 	{
-		if (!player.can_attack())
+		// v83 takes no other move while a skill is held (0x96a86e).
+		if (preparing || !player.can_attack())
 			return false;
 
 		SpecialMove::ForbidReason reason = player.can_use(move);
@@ -202,11 +274,12 @@ namespace ms
 		return true;
 	}
 
-	void Combat::apply_move(const SpecialMove &move)
+	void Combat::apply_move(const SpecialMove &move, int32_t charge, bool held)
 	{
 		if (move.is_attack())
 		{
 			Attack attack = player.prepare_attack(move.is_skill() ? move.get_id() : 0);
+			attack.charge = charge;
 			Stance::Id whack = Stance::Id::NONE;
 			int16_t reach = 0;
 
@@ -216,11 +289,13 @@ namespace ms
 			if (whack != Stance::Id::NONE)
 				attack = player.prepare_attack(0, true);
 
-			move.apply_useeffects(player);
+			// A held skill's shots keep the body as it is (0x954165).
+			if (!held)
+				move.apply_useeffects(player);
 
 			if (whack != Stance::Id::NONE)
 				player.attack(true, whack);
-			else
+			else if (!held)
 				move.apply_actions(player, attack.type);
 
 			player.set_afterimage(move.get_id());
@@ -816,6 +891,163 @@ namespace ms
 	void Combat::show_player_buff(int32_t skillid)
 	{
 		get_move(skillid).apply_useeffects(player);
+	}
+
+	void Combat::start_prepare(const Skill &skill)
+	{
+		int32_t id = skill.get_id();
+
+		// Like a skill that doesn't attack, a held one waits until the
+		// player may ask the server, but holds nothing up itself (0x485bf7).
+		// It starts only from a platform.
+		if (!player.can_request(ExclRequest::SKILL_WAIT) || !player.get_phobj().onground || player.get_ladder())
+			return;
+
+		const SkillPrepare &data = skill.get_prepare();
+		int16_t action = prepare::action_id(data.action);
+		int32_t level = player.get_skills().get_level(id);
+		bool forced = action >= 0;
+
+		// The skills that keep firing take up their action and stay on one
+		// frame of it. A `dash` is no action: the player keeps walking.
+		if (forced)
+		{
+			player.attack(data.action);
+			player.hold_attack(prepare::held_frame(data.action));
+		}
+
+		player.clear_held_effects();
+		player.show_held_effect(data.prepare.animation, data.prepare.z, false);
+
+		// The skills that keep firing sound as they're used, the others
+		// over and over while they charge (0x9692d1).
+		if (prepare::repeats(id))
+			skill.play_use();
+		else
+			skill.play_loop();
+
+		uint16_t action_and_facing = prepare::action_and_facing(action, !player.getflip());
+		PrepareSkillPacket(id, level, action_and_facing, player.get_action_speed()).dispatch();
+
+		preparing = Preparing{ id, level, 0, forced, false };
+	}
+
+	void Combat::update_prepare()
+	{
+		if (!preparing)
+			return;
+
+		preparing->held += Constants::TIMESTEP;
+
+		const Skill &skill = get_skill(preparing->skill);
+		const SkillPrepare &data = skill.get_prepare();
+
+		// The prepare effect gives way to the keydown one, played over and
+		// over, once the skill's time has passed (0x96cf9f).
+		if (!preparing->keydown && preparing->held >= data.time)
+		{
+			preparing->keydown = true;
+			player.clear_held_effects();
+			player.show_held_effect(data.keydown.animation, data.keydown.z, true);
+		}
+
+		if (prepare::repeats(preparing->skill))
+			shoot_prepare(skill);
+	}
+
+	void Combat::shoot_prepare(const Skill &skill)
+	{
+		int32_t id = skill.get_id();
+		int64_t &last = id == prepare::RAPID_FIRE ? last_rapidfire : last_hurricane;
+
+		if (!prepare::shot_due(now, last))
+			return;
+
+		last = now;
+
+		// Each shot needs its arrows or bullets, and the MP, or the skill is
+		// let go (0x94bae5).
+		SpecialMove::ForbidReason reason = player.can_use(skill);
+
+		if (reason != SpecialMove::ForbidReason::FBR_NONE)
+		{
+			ForbidSkillMessage(reason, player.get_stats().get_weapontype()).drop();
+			finish_prepare();
+			return;
+		}
+
+		// Hurricane sounds with each arrow, Rapid Fire only as it starts
+		// (0x94bbed).
+		if (id != prepare::RAPID_FIRE)
+			skill.play_use();
+
+		apply_move(skill, 0, true);
+	}
+
+	void Combat::release_prepare(int32_t move_id)
+	{
+		if (preparing && preparing->skill == move_id)
+			finish_prepare();
+	}
+
+	void Combat::interrupt_prepare(int32_t damage)
+	{
+		if (preparing && damage > 0 && prepare::repeats(preparing->skill))
+			finish_prepare();
+	}
+
+	void Combat::clear_prepare()
+	{
+		if (!preparing)
+			return;
+
+		get_skill(preparing->skill).stop_loop();
+		player.clear_held_effects();
+
+		if (preparing->forced)
+			player.end_attack();
+
+		preparing.reset();
+	}
+
+	void Combat::finish_prepare()
+	{
+		if (!preparing)
+			return;
+
+		Preparing held = *preparing;
+		const Skill &skill = get_skill(held.skill);
+
+		clear_prepare();
+		player.show_held_effect(skill.get_prepare().keydownend.animation, skill.get_prepare().keydownend.z, false);
+
+		// The skills that keep firing just stop, and say so.
+		if (prepare::repeats(held.skill))
+		{
+			CancelBuffPacket(held.skill).dispatch();
+			return;
+		}
+
+		// Piercing Arrow whacks a mob right in front of the player instead
+		// (0x95c090).
+		int16_t reach = 0;
+
+		if (held.skill == prepare::PIERCING_ARROW && can_use_move(regularattack)
+			&& find_whack(player.prepare_attack(0), reach) != Stance::Id::NONE)
+		{
+			apply_move(regularattack);
+			return;
+		}
+
+		if (can_use_move(skill))
+			apply_move(skill, prepare::release_charge(held.skill, held.held));
+		else if (held.skill != prepare::CORKSCREW_BLOW && held.skill != prepare::CORKSCREW_BLOW_TB)
+			CancelBuffPacket(held.skill).dispatch();
+	}
+
+	const Skill &Combat::get_skill(int32_t skill_id)
+	{
+		return static_cast<const Skill &>(get_move(skill_id));
 	}
 
 	const SpecialMove &Combat::get_move(int32_t move_id)

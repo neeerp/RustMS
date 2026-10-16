@@ -71,6 +71,13 @@ namespace ms
 
 		void set_stance(Stance::Id stance);
 
+		// Hold the attack on this frame until end_attack, as v83 holds a
+		// held skill's prepare action (0x4547eb).
+		void hold(uint8_t frame);
+
+		// Stop the attack, held or not, where it is.
+		void end_attack();
+
 		void set_expression(Expression::Id expression);
 
 		void set_action(const std::string &action);
@@ -132,6 +139,7 @@ namespace ms
 		const BodyAction *action;
 		std::string actionstr;
 		uint8_t actframe;
+		int16_t heldframe = -1;
 
 		const Body *body;
 		const Hair *hair;

@@ -97,6 +97,10 @@ namespace ms
 		// Forget a request waiting on its answer, as entering a field does.
 		void clear_request();
 
+		// End the attack now, held or not, and take up the state the player
+		// is in.
+		void end_attack();
+
 		// Return if the player is attacking
 		bool is_attacking() const;
 

@@ -65,4 +65,14 @@ namespace ms
 	{
 		add(animation, {}, 0, 1.0f);
 	}
+
+	void EffectLayer::add_looping(const Animation &animation, const DrawArgument &args, int8_t z, float speed)
+	{
+		effects[z].emplace_back(animation, args, speed, true);
+	}
+
+	void EffectLayer::clear()
+	{
+		effects.clear();
+	}
 }

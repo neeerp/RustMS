@@ -519,6 +519,12 @@ namespace ms
 		}
 	}
 
+	void Player::end_attack()
+	{
+		Char::end_attack();
+		nullstate.update_state(*this);
+	}
+
 	bool Player::is_attacking() const
 	{
 		return attacking;

@@ -144,6 +144,21 @@ namespace ms
 		}
 	};
 
+	// Tells the server the player started holding down a skill, or timing
+	// one, so others see it (FUN_0096a86e).
+	// Opcode: SKILL_EFFECT(93)
+	class PrepareSkillPacket : public OutPacket
+	{
+	public:
+		PrepareSkillPacket(int32_t skillid, int32_t level, uint16_t action_and_facing, int8_t speed) : OutPacket(OutPacket::Opcode::SKILL_EFFECT)
+		{
+			write_int(skillid);
+			write_byte(static_cast<uint8_t>(level));
+			write_short(static_cast<int16_t>(action_and_facing));
+			write_byte(speed);
+		}
+	};
+
 	// Ends one of the player's skill buffs, as right-clicking its icon does
 	// (FUN_0096d873).
 	// Opcode: CANCEL_BUFF(92)

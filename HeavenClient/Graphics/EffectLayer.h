@@ -46,11 +46,17 @@ namespace ms
 
 		void add(const Animation &effect);
 
+		// Add an effect that plays over and over until the layer is cleared.
+		void add_looping(const Animation &effect, const DrawArgument &args, int8_t z, float speed);
+
+		void clear();
+
 	private:
 		class Effect
 		{
 		public:
-			Effect(const Animation &a, const DrawArgument &args, float s) : sprite(a, args), speed(s)
+			Effect(const Animation &a, const DrawArgument &args, float s, bool l = false) : sprite(a, args), speed(s),
+																						   looping(l)
 			{}
 
 			void draw(Point<int16_t> position, float alpha) const
@@ -65,12 +71,13 @@ namespace ms
 				uint16_t timestep = static_cast<uint16_t>(step);
 				carry = step - timestep;
 
-				return sprite.update(timestep);
+				return sprite.update(timestep) && !looping;
 			}
 
 		private:
 			Sprite sprite;
 			float speed;
+			bool looping;
 			float carry = 0.0f;
 		};
 

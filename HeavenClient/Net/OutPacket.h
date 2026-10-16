@@ -107,6 +107,7 @@ namespace ms
 			/// Skill
 			USE_SKILL = 91,
 			CANCEL_BUFF = 92,
+			SKILL_EFFECT = 93,
 
 			/// Gameplay 2
 			CHANGE_MAP_SPECIAL = 100,

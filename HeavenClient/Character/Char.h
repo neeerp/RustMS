@@ -119,6 +119,12 @@ namespace ms
 		// with CharLook::get_attackstance.
 		void attack(bool degenerate, Stance::Id stance);
 
+		// Hold the attack on this frame until end_attack.
+		void hold_attack(uint8_t frame);
+
+		// End the attack now, held or not.
+		void end_attack();
+
 		// Set the afterimage for an attack.
 		void set_afterimage(int32_t skill_id);
 
@@ -130,6 +136,12 @@ namespace ms
 
 		// Display an animation as an effect with the character
 		void show_attack_effect(Animation animation, int8_t z);
+
+		// Display a held skill's effect with the character, once or over and
+		// over until clear_held_effects.
+		void show_held_effect(Animation animation, int8_t z, bool looping);
+
+		void clear_held_effects();
 
 		// Display an animation as an effect on top of the character.
 		void show_effect_id(CharEffect::Id toshow);
@@ -232,6 +244,7 @@ namespace ms
 		ChatBalloon chatballoon;
 		ChatBalloon hintballoon;
 		EffectLayer effects;
+		EffectLayer held_effects;
 		Afterimage afterimage;
 		// The chair's effect sits on the face when its pos is 1 and on the
 		// feet otherwise; a negative z draws it behind the character.

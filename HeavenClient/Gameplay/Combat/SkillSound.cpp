@@ -27,6 +27,7 @@ namespace ms
 
 		usesound = soundsrc["Use"];
 		hitsound = soundsrc["Hit"];
+		loopsound = soundsrc["Loop"];
 	}
 
 	void SingleSkillSound::play_use()
@@ -37,5 +38,15 @@ namespace ms
 	void SingleSkillSound::play_hit()
 	{
 		hitsound.play();
+	}
+
+	void SingleSkillSound::play_loop()
+	{
+		loopsound.play_loop();
+	}
+
+	void SingleSkillSound::stop_loop()
+	{
+		loopsound.stop();
 	}
 }

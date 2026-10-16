@@ -121,6 +121,7 @@ namespace ms
 
 		Point<int16_t> spawnpoint = portals.get_portal_by_id(portalid);
 		Point<int16_t> startpos = physics.get_y_below(spawnpoint);
+		combat.clear_prepare();
 		player.respawn(startpos, mapinfo.is_underwater());
 		player.set_recovery_rate(mapinfo.get_recovery());
 		pending_teleport.reset();
@@ -207,6 +208,7 @@ namespace ms
 			{
 				MobAttackResult result = player.damage(attack);
 				TakeDamagePacket(result, TakeDamagePacket::From::TOUCH).dispatch();
+				combat.interrupt_prepare(result.damage);
 			}
 		}
 	}
@@ -558,14 +560,24 @@ namespace ms
 
 	void Stage::release_key(KeyType::Id type, int32_t action)
 	{
-		if (state == State::ACTIVE && type == KeyType::Id::ACTION)
+		if (state != State::ACTIVE)
+			return;
+
+		if (type == KeyType::Id::ACTION)
 			player.release_key(KeyAction::actionbyid(action));
+
+		// A skill held down goes off as its key comes up (0x95bedf).
+		if (type == KeyType::Id::SKILL)
+			combat.release_prepare(action);
 	}
 
 	void Stage::release_keys()
 	{
-		if (state == State::ACTIVE)
-			player.release_keys();
+		if (state != State::ACTIVE)
+			return;
+
+		player.release_keys();
+		combat.finish_prepare();
 	}
 
 	Cursor::State Stage::send_cursor(bool pressed, Point<int16_t> position)

@@ -103,6 +103,12 @@ namespace ms
 
 		void play();
 
+		// Play the sound over and over until stop.
+		void play_loop();
+
+		// Stop the sound play_loop started.
+		void stop();
+
 		static Error init();
 
 		static void close();
@@ -115,6 +121,7 @@ namespace ms
 
 	private:
 		size_t id;
+		alure::Source looping;
 
 
 		static size_t add_sound(nl::node src);

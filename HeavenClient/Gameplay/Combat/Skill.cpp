@@ -41,6 +41,13 @@ namespace ms
 		projectile = true;
 		overregular = false;
 
+		nl::node preparesrc = src["prepare"];
+		prepare.action = std::string(preparesrc["action"]);
+		prepare.time = preparesrc["time"];
+		prepare.prepare = { preparesrc, preparesrc["z"] };
+		prepare.keydown = { src["keydown"], src["keydown"]["z"] };
+		prepare.keydownend = { src["keydownend"], src["keydownend"]["z"] };
+
 		sound = std::make_unique<SingleSkillSound>(strid);
 
 		bool byleveleffect = src["CharLevel"]["10"]["effect"].size() > 0;
@@ -152,6 +159,21 @@ namespace ms
 		sound->play_use();
 	}
 
+	void Skill::play_use() const
+	{
+		sound->play_use();
+	}
+
+	void Skill::play_loop() const
+	{
+		sound->play_loop();
+	}
+
+	void Skill::stop_loop() const
+	{
+		sound->stop_loop();
+	}
+
 	void Skill::apply_actions(Char &user, Attack::Type type) const
 	{
 		action->apply(user, type);
@@ -259,6 +281,11 @@ namespace ms
 	bool Skill::is_skill() const
 	{
 		return true;
+	}
+
+	const SkillPrepare &Skill::get_prepare() const
+	{
+		return prepare;
 	}
 
 	int32_t Skill::get_id() const
