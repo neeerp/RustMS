@@ -133,8 +133,10 @@ from `UI.nx`. Moved so far:
   the selected one, four skill rows with a `VScr4` scroll bar, and the points
   left, laid out from period footage. The job name is 10 px Arimo
   (`Text::Font::A10M`). Rows are grey when a required skill is missing. SP-up
-  spends a point at once; v83 had no allocation popup. The MACRO button and the
-  `SkillMacro` window are not drawn yet.
+  spends a point at once; v83 had no allocation popup. A `recommend/0` frame
+  marks the skill `Etc/RecommendSkill.img` names for the SP spent in the tab
+  (`recommended_skill`). The MACRO button and the `SkillMacro` window are not
+  drawn yet.
 - **Item window** (`UIItemInventory`, `UIWindow.img/Item`): five tabs
   (`Item/Tab`, drawn by `ClassicTabs`), six rows of four slots with a `VScr4`
   scroll bar, and the mesos, laid out from period footage. BtFull widens it to
