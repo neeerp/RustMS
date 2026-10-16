@@ -457,6 +457,8 @@ add_executable(HeavenClient
     IO/KeyType.h
     IO/Messages.cpp
     IO/Messages.h
+    IO/PartyCommands.cpp
+    IO/PartyCommands.h
     IO/UI.cpp
     IO/UI.h
     IO/UIDragElement.h

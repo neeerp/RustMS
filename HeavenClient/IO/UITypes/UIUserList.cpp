@@ -20,6 +20,7 @@
 #include "UIChatBar.h"
 #include "UIEnterText.h"
 
+#include "../PartyCommands.h"
 #include "../UI.h"
 
 #include "../Components/AreaButton.h"
@@ -407,14 +408,14 @@ namespace ms
 
 				break;
 			case Buttons::BT_CREATE:
-				CreatePartyPacket().dispatch();
+				PartyCommands::create();
 				break;
 			case Buttons::BT_LEAVE:
-				LeavePartyPacket().dispatch();
+				PartyCommands::leave();
 				break;
 			case Buttons::BT_EXPEL:
 				if (member)
-					ExpelFromPartyPacket(member->id).dispatch();
+					PartyCommands::expel(member->name);
 
 				break;
 			case Buttons::BT_INVITE:
@@ -422,7 +423,7 @@ namespace ms
 						"Who do you want to invite?",
 						[](const std::string& name)
 						{
-							InviteToPartyPacket(name).dispatch();
+							PartyCommands::invite(name);
 						},
 						NAME_LIMIT
 				);
@@ -466,7 +467,7 @@ namespace ms
 				break;
 			case Buttons::BT_INVITE_BUDDY:
 				if (buddy)
-					InviteToPartyPacket(buddy->name).dispatch();
+					PartyCommands::invite(buddy->name);
 
 				break;
 			case Buttons::BT_SHOW_ONLINE:

@@ -28,6 +28,8 @@
 
 #include "../Components/MapleButton.h"
 
+#include "../PartyCommands.h"
+
 #include "../../Configuration.h"
 #include "../../Gameplay/Stage.h"
 #include "../../Graphics/GraphicsGL.h"
@@ -255,6 +257,9 @@ namespace ms
 									send_chatline("Usage: /find <name>", LineType::RED);
 								else
 									FindPacket(target).dispatch();
+							}
+							else if (PartyCommands::run(msg))
+							{
 							}
 							// Commands the client doesn't know aren't chat, whatever
 							// the target; v83 sends them only for GMs.
