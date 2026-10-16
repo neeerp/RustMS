@@ -25,6 +25,7 @@
 #include "../Components/Charset.h"
 
 #include "../../Character/CharStats.h"
+#include "../../Graphics/Animation.h"
 #include "../../Graphics/Text.h"
 
 namespace ms
@@ -69,6 +70,20 @@ namespace ms
 		void remove_menus();
 
 		bool is_menu_active();
+
+		// The equip, item, stat and skill keys, left to right.
+		enum Key : uint8_t
+		{
+			KEY_EQUIP,
+			KEY_ITEM,
+			KEY_STAT,
+			KEY_SKILL,
+			NUM_KEYS
+		};
+
+		// Makes a key glow (StatusBar.img/<key>/ani, FUN_008dfe21) until it is clicked, or for 90 seconds.
+		// A key that already glows keeps its time.
+		void show_key_hint(Key key);
 
 	protected:
 		Button::State button_pressed(uint16_t buttonid) override;
@@ -158,5 +173,9 @@ namespace ms
 
 		bool quickslot_active;
 		Menu menu;
+
+		Animation key_hints[Key::NUM_KEYS];
+		// Steps left for each key's glow; 0 when it is off.
+		uint16_t key_hint_left[Key::NUM_KEYS] = {};
 	};
 }

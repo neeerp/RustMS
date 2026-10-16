@@ -119,7 +119,11 @@ SHOW_MONSTER_HP shows the mob's HP bar and name tag in HeavenClient
 (`Mob::show_hp`) for 5 s, as v83 hides them 5 s after the player's last hit.
 The bar is v83's 52x10 box (`MobHpBar`), centred over the frame's body rect
 with its top 30 px above the rect's top. Party members' bars use the same box
-filled red.
+filled red. As in v83, the name is orange for a mob 20 or more levels above
+the player, yellow for one 20 or more below, and white otherwise. A "Lv. N"
+tag (`Basic.img/ShowLevel`) sits left of the name, except for bosses, mobs
+whose `info` hides their level, HP or name, and 9xxxxxx mobs outside 94xxxxx
+and 96xxxxx.
 
 A dead mob's EXP is shared by damage dealt (the top damager gets any
 rounding remainder) and each share goes to that player's client actor
@@ -283,6 +287,10 @@ term and no avoid check. HP drops, others see DAMAGE_PLAYER, and at 0 HP the pla
 non-beginners lose 10% of their level's EXP; the client's respawn
 (CHANGE_MAP with a target while dead) returns them to the map's return map
 with 50 HP.
+
+After a hit, HeavenClient ignores touches for 1500 ms, as v83 does. If the hit
+did damage, the player blinks meanwhile: half brightness for 60 ms, then
+normal for 60 ms. Other players don't blink.
 
 HeavenClient's `Player::update_death` notices HP reaching 0: the player
 becomes a ghost (`Char::State::DIED`), the tombstone from `Effect.nx/Tomb.img`

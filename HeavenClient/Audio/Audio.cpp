@@ -122,6 +122,7 @@ namespace ms
 		add_sound(Sound::Name::BUTTONOVER, uisrc["BtMouseOver"]);
 		add_sound(Sound::Name::CHARSELECT, uisrc["CharSelect"]);
 		add_sound(Sound::Name::DLGNOTICE, uisrc["DlgNotice"]);
+		add_sound(Sound::Name::INVITE, uisrc["Invite"]);
 		add_sound(Sound::Name::MENUDOWN, uisrc["MenuDown"]);
 		add_sound(Sound::Name::MENUUP, uisrc["MenuUp"]);
 		add_sound(Sound::Name::RACESELECT, uisrc["RaceSelect"]);

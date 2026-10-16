@@ -579,7 +579,8 @@ namespace ms
 					UIElement::Type::QUESTCOMPLETE,
 					UIElement::Type::PARTYHP,
 					UIElement::Type::NPCTALK,
-					UIElement::Type::SHOP
+					UIElement::Type::SHOP,
+					UIElement::Type::REVIVE
 			};
 
 			if (std::find(silent_types.begin(), silent_types.end(), T::TYPE) == silent_types.end())
