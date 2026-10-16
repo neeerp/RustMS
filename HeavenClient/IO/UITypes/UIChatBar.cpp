@@ -18,6 +18,7 @@
 #include "UIChatBar.h"
 
 #include <algorithm>
+#include <cctype>
 #include <cstdlib>
 
 #include "UIStatusBar.h"
@@ -76,21 +77,23 @@ namespace ms
 			return message.empty() ? WhisperParseResult::InvalidWhisper : WhisperParseResult::ValidWhisper;
 		}
 
-		// Whether input is /find, with the name it looks for, if any.
+		// Whether input is /find, with the name it looks for: whatever
+		// follows the command and one space, if anything (FUN_004a8e3d).
 		bool parse_find_command(const std::string& input, std::string& target)
 		{
-			static const std::string COMMAND = "/find";
+			static const std::string COMMAND = "/find ";
 
-			if (input != COMMAND && input.rfind(COMMAND + " ", 0) != 0)
+			auto same = [](unsigned char a, unsigned char b) { return std::tolower(a) == std::tolower(b); };
+
+			if (input.size() <= COMMAND.size() || !std::equal(COMMAND.begin(), COMMAND.end(), input.begin(), same))
 				return false;
 
-			size_t target_start = input.find_first_not_of(' ', COMMAND.length());
-
-			if (target_start != std::string::npos)
-				target = input.substr(target_start, input.find(' ', target_start) - target_start);
-
+			target = input.substr(COMMAND.size());
 			return true;
 		}
+
+		// A whisper or find unanswered this long no longer holds back the next.
+		constexpr auto WHISPER_WAIT = std::chrono::milliseconds(3000);
 
 		// The original fills the whole log with black at half opacity.
 		constexpr float LOG_ALPHA = 0.5f;
@@ -118,6 +121,7 @@ namespace ms
 		drag_pos = 0;
 		held_part = ScrollPart::NONE;
 		edge_dragging = false;
+		whisper_waiting = false;
 
 		// As in the original, a saved height out of bounds is forgotten.
 		int16_t saved_height = static_cast<int16_t>(Setting<ChatHeight>::get().load());
@@ -175,8 +179,7 @@ namespace ms
 
 							if (whisper_result == WhisperParseResult::ValidWhisper)
 							{
-								WhisperPacket(target, message).dispatch();
-								send_chatline("#g" + target + "<<" + message, LineType::WHITE);
+								send_whisper(target, message);
 							}
 							else if (whisper_result == WhisperParseResult::InvalidWhisper)
 							{
@@ -184,10 +187,7 @@ namespace ms
 							}
 							else if (parse_find_command(msg, target))
 							{
-								if (target.empty())
-									send_chatline("Usage: /find <name>", LineType::RED);
-								else
-									FindPacket(target).dispatch();
+								send_whisper(target, "");
 							}
 							else if (chat_target == Target::PARTY)
 							{
@@ -328,6 +328,9 @@ namespace ms
 
 		for (auto iter : message_cooldowns)
 			iter.second -= Constants::TIMESTEP;
+
+		if (whisper_waiting && std::chrono::steady_clock::now() - whisper_sent > WHISPER_WAIT)
+			whisper_waiting = false;
 
 		if (held_part != ScrollPart::NONE)
 		{
@@ -529,6 +532,9 @@ namespace ms
 			case LineType::SKILL:
 				color = Color::Name::SUNDOWN;
 				break;
+			case LineType::WHISPER:
+				color = Color::Name::LIGHTGREEN;
+				break;
 			default:
 				color = Color::Name::WHITE;
 				break;
@@ -627,6 +633,31 @@ namespace ms
 	{
 		toggle_chatfield(true);
 		chatfield.change_text("/w " + name + " ");
+	}
+
+	void UIChatBar::send_whisper(const std::string& name, const std::string& message)
+	{
+		if (name == Stage::get().get_player().get_stats().get_name())
+			return;
+
+		if (whisper_waiting)
+			return send_chatline("Please try again.", LineType::SKILL);
+
+		if (message.empty())
+			FindPacket(name).dispatch();
+		else
+			WhisperPacket(name, message).dispatch();
+
+		// The line "name<< message" waits for the server's answer.
+		whisper_waiting = true;
+		whisper_sent = std::chrono::steady_clock::now();
+		whisper_message = message;
+	}
+
+	std::string UIChatBar::whisper_answered()
+	{
+		whisper_waiting = false;
+		return whisper_message;
 	}
 
 	void UIChatBar::send_party_chat(const std::string& message)
