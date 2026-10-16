@@ -21,6 +21,7 @@
 
 #include "../../Configuration.h"
 #include "../../Audio/Audio.h"
+#include "../../Data/CurseData.h"
 #include "../../Data/ItemData.h"
 #include "../../Data/SwindleData.h"
 #include "../../Gameplay/Stage.h"
@@ -32,6 +33,7 @@
 #include "../../IO/UITypes/UIMessenger.h"
 #include "../../IO/UITypes/UINotice.h"
 #include "../../IO/UITypes/UIStatusMessenger.h"
+#include "../../Util/CurseWords.h"
 #include "../../Util/Misc.h"
 
 #include <nlnx/nx.hpp>
@@ -313,6 +315,13 @@ namespace ms
 
 		auto warning = SwindleData::warning(message);
 
+		// v83 stars out curse words in other players' chat, and shows what
+		// it can't print as spaces (FUN_00937138).
+		if (!Stage::get().is_player(charid))
+			message = CurseData::filter(message);
+
+		message = CurseWords::printable(message);
+
 		if (auto character = Stage::get().get_character(charid))
 		{
 			message = character->get_name() + " : " + message;
@@ -349,7 +358,7 @@ namespace ms
 			// From an admin: v83 shows it even with whispers blocked, which
 			// HeavenClient can't do.
 			recv.read_bool();
-			std::string message = recv.read_string();
+			std::string message = CurseData::filter(recv.read_string());
 
 			// Print the warning before the whisper.
 			if (auto warning = SwindleData::warning(message))

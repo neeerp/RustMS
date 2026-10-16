@@ -4,6 +4,7 @@
 #include "../Packets/MessagingPackets.h"
 
 #include "../../Configuration.h"
+#include "../../Data/CurseData.h"
 
 #include "../../Data/SwindleData.h"
 
@@ -11,6 +12,7 @@
 #include "../../IO/UI.h"
 #include "../../IO/UITypes/UIChatBar.h"
 #include "../../IO/UITypes/UINotice.h"
+#include "../../Util/CurseWords.h"
 
 namespace ms
 {
@@ -286,7 +288,9 @@ namespace ms
 	{
 		int8_t mode = recv.read_byte();
 		std::string name = recv.read_string();
-		std::string text = recv.read_string();
+		// As with nearby chat, v83 stars out curse words and shows what it
+		// can't print as spaces (FUN_00531e00).
+		std::string text = CurseWords::printable(CurseData::filter(recv.read_string()));
 
 		if (mode == MultiChatPacket::Mode::PARTY)
 			party_line(name + " : " + text, UIChatBar::LineType::PARTY);

@@ -32,6 +32,8 @@ if(HEAVENCLIENT_BUILD_TESTS)
     add_test(NAME swindle_words COMMAND swindle_words_tests)
     add_executable(chat_wrap_tests tests/chat_wrap.cpp)
     add_test(NAME chat_wrap COMMAND chat_wrap_tests)
+    add_executable(curse_words_tests tests/curse_words.cpp)
+    add_test(NAME curse_words COMMAND curse_words_tests)
     add_executable(map_tooltip_tests tests/map_tooltip.cpp)
     add_test(NAME map_tooltip COMMAND map_tooltip_tests)
     add_executable(cash_catalog_tests tests/cash_catalog.cpp)
@@ -206,6 +208,8 @@ add_executable(HeavenClient
     Character/TeleportRock.h
     Data/BulletData.cpp
     Data/BulletData.h
+    Data/CurseData.cpp
+    Data/CurseData.h
     Data/EquipData.cpp
     Data/EquipData.h
     Data/ItemData.cpp
@@ -563,6 +567,7 @@ add_executable(HeavenClient
     Template/TimedQueue.h
     Template/TypeMap.h
     Util/ChatWrap.h
+    Util/CurseWords.h
     Util/HardwareInfo.h
     Util/Lerp.h
     Util/Misc.cpp
