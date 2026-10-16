@@ -18,27 +18,25 @@
 #include "UIBuffList.h"
 
 #include "../Data/ItemData.h"
-#include "../Util/Misc.h"
+#include "../Data/SkillData.h"
 #include "../Util/NxFiles.h"
 
-#include <nlnx/nx.hpp>
 #include <nlnx/node.hpp>
 
 namespace ms
 {
 	namespace
 	{
-		// FUN_007b3176 uses iconRaw, except for skills of job 238.
+		// FUN_007b3176: a skill's icon, or an item's iconRaw (icon for
+		// 238xxxx items).
 		Texture buff_icon(int32_t buffid)
 		{
-			if (buffid < 0)
-				return ItemData::get(-buffid).get_icon(true);
+			if (buffid >= 0)
+				return SkillData::get(buffid).get_icon(SkillData::Icon::NORMAL);
 
-			std::string strid = string_format::extend_id(buffid, 7);
-			nl::node src = nl::nx::skill[strid.substr(0, 3) + ".img"]["skill"][strid];
-			nl::node raw = src["iconRaw"];
+			int32_t itemid = -buffid;
 
-			return buffid / 10000 != 238 && raw ? raw : src["icon"];
+			return ItemData::get(itemid).get_icon(itemid / 10000 != 238);
 		}
 
 		// Centred in a cell, whatever the bitmap's origin.

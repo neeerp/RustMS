@@ -29,7 +29,7 @@ namespace ms
 {
 	// v83's buff icons in the top right (FUN_007b2bb0): 32x32 cells ending
 	// 3 px from the right edge at y 23. Each has IconBase/0 under the
-	// buff's raw icon, centred, with the timer's CoolTime frame on top.
+	// buff's icon, centred, with the timer's CoolTime frame on top.
 	class UIBuffList : public UIElement
 	{
 	public:
