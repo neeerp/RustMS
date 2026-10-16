@@ -54,9 +54,10 @@ namespace ms
 
 			if (attack.type == Attack::Type::RANGED)
 			{
-				skip(1);
-				write_byte(attack.toleft);
-				skip(7);
+				write_int(0);
+				write_short(attack.bulletslot);
+				write_short(0);
+				write_byte(0);
 				// TODO: skip(4); If hurricane, piercing arrow or rapidfire
 			}
 			else

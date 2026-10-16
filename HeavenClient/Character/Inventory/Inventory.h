@@ -102,6 +102,13 @@ namespace ms
 		// Return the itemid of the currently active projectile.
 		int32_t get_bulletid() const;
 
+		// Return the first projectile slot holding at least cost, which v83
+		// shoots from, or 0 if none does.
+		int16_t find_bulletslot(int16_t cost) const;
+
+		// Return the size of the largest projectile stack.
+		uint16_t get_most_bullets() const;
+
 		// Return the number of slots for the specified inventory.
 		uint8_t get_slotmax(InventoryType::Id type) const;
 
@@ -172,5 +179,6 @@ namespace ms
 		EnumMap<InventoryType::Id, uint8_t> slotmaxima;
 		int64_t meso;
 		int16_t bulletslot;
+		int32_t bulletprefix;
 	};
 }

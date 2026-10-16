@@ -61,6 +61,9 @@ namespace ms
 		// How far the skill's shot reaches, if it says.
 		int16_t shotrange = 0;
 		int32_t bullet = 0;
+		// Ammo a shot uses up, and the USE slot it comes from.
+		int16_t bulletcost = 1;
+		int16_t bulletslot = 0;
 
 		Point<int16_t> origin;
 		Rectangle<int16_t> range;
@@ -117,6 +120,7 @@ namespace ms
 			speed = attack.speed;
 			stance = attack.stance;
 			bullet = attack.bullet;
+			bulletslot = attack.bulletslot;
 			toleft = attack.toleft;
 		}
 
@@ -130,6 +134,7 @@ namespace ms
 		int32_t skill = 0;
 		int32_t charge = 0;
 		int32_t bullet = 0;
+		int16_t bulletslot = 0;
 		uint8_t level = 0;
 		uint8_t display = 0;
 		uint8_t stance = 0;

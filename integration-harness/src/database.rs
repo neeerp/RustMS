@@ -44,25 +44,70 @@ pub async fn grant_item(
     slot: i16,
     item_id: i32,
 ) -> Result<(), HarnessError> {
-    let fixture = |message: String| HarnessError::Fixture {
-        phase: "grant item",
-        message,
-    };
-    tokio::task::spawn_blocking(move || {
-        let mut conn = PgConnection::establish(&database_url()).map_err(|e| e.to_string())?;
+    grant_stack(character_id, inventory_type, slot, item_id, 1).await
+}
+
+/// Put `quantity` of `item_id` in slot `slot` of the logged-out character
+/// `character_id`'s inventory `inventory_type`.
+pub async fn grant_stack(
+    character_id: i32,
+    inventory_type: i16,
+    slot: i16,
+    item_id: i32,
+    quantity: i16,
+) -> Result<(), HarnessError> {
+    change_one_row("grant item", move |conn| {
         diesel::sql_query(
             "INSERT INTO inventory_items (character_id, inventory_type, slot, item_id, quantity, owner, flags) \
-             VALUES ($1, $2, $3, $4, 1, '', 0)",
+             VALUES ($1, $2, $3, $4, $5, '', 0)",
         )
         .bind::<Integer, _>(character_id)
         .bind::<SmallInt, _>(inventory_type)
         .bind::<SmallInt, _>(slot)
         .bind::<Integer, _>(item_id)
-        .execute(&mut conn)
-        .map_err(|e| e.to_string())
+        .bind::<SmallInt, _>(quantity)
+        .execute(conn)
+    })
+    .await
+}
+
+/// Turn the item in slot `slot` of the logged-out character `character_id`'s
+/// inventory `inventory_type` into `item_id`, keeping its stats (e.g. a
+/// beginner's sword into a claw).
+pub async fn replace_item(
+    character_id: i32,
+    inventory_type: i16,
+    slot: i16,
+    item_id: i32,
+) -> Result<(), HarnessError> {
+    change_one_row("replace item", move |conn| {
+        diesel::sql_query(
+            "UPDATE inventory_items SET item_id = $4 \
+             WHERE character_id = $1 AND inventory_type = $2 AND slot = $3",
+        )
+        .bind::<Integer, _>(character_id)
+        .bind::<SmallInt, _>(inventory_type)
+        .bind::<SmallInt, _>(slot)
+        .bind::<Integer, _>(item_id)
+        .execute(conn)
+    })
+    .await
+}
+
+async fn change_one_row(
+    phase: &'static str,
+    query: impl FnOnce(&mut PgConnection) -> QueryResult<usize> + Send + 'static,
+) -> Result<(), HarnessError> {
+    let fixture = |message: String| HarnessError::Fixture { phase, message };
+    let rows = tokio::task::spawn_blocking(move || {
+        let mut conn = PgConnection::establish(&database_url()).map_err(|e| e.to_string())?;
+        query(&mut conn).map_err(|e| e.to_string())
     })
     .await
     .map_err(|e| fixture(e.to_string()))?
     .map_err(fixture)?;
+    if rows != 1 {
+        return Err(fixture(format!("{rows} rows changed")));
+    }
     Ok(())
 }

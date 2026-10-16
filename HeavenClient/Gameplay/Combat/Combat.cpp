@@ -138,6 +138,14 @@ namespace ms
 
 			if (whack != Stance::Id::NONE)
 				attack.range = point_blank::range(player.get_afterimage_range(whack));
+			// Like v83, shoot from the first stack that covers the cost.
+			const Inventory &inventory = player.get_inventory();
+
+			if (attack.type == Attack::Type::RANGED && attack.bullet == inventory.get_bulletid())
+			{
+				attack.bulletslot = inventory.find_bulletslot(attack.bulletcost);
+				attack.bullet = inventory.get_item_id(InventoryType::Id::USE, attack.bulletslot);
+			}
 
 			Point<int16_t> origin = attack.origin;
 			Rectangle<int16_t> range = place_range(origin, attack.range, attack.hrange, attack.toleft);

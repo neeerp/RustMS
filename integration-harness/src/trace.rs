@@ -68,6 +68,10 @@ pub struct Trace {
     pub items: Vec<(i32, i32)>,
     /// Items added to the bags: (inventory type, slot, item id).
     pub added: Vec<(u8, i16, i32)>,
+    /// Stacks whose count changed: (inventory type, slot, quantity).
+    pub quantities: Vec<(u8, i16, i16)>,
+    /// Slots emptied: (inventory type, slot).
+    pub removed: Vec<(u8, i16)>,
     /// "Quest Clear" effects (SHOW_ITEM_GAIN_INCHAT 9).
     pub cleared: usize,
     /// "Card get" effects (SHOW_ITEM_GAIN_INCHAT 0x0D).
@@ -197,9 +201,13 @@ impl Trace {
                         // The rest of the item is not needed.
                         return;
                     }
-                    1 | 2 => {
+                    1 => {
+                        self.quantities.push((kind, slot, r.read_short().unwrap()));
+                    }
+                    2 => {
                         r.read_short().unwrap();
                     }
+                    3 => self.removed.push((kind, slot)),
                     _ => {}
                 }
             }

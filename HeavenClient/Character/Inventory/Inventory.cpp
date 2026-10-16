@@ -20,6 +20,7 @@
 #include "../../Data/BulletData.h"
 #include "../../Data/EquipData.h"
 
+#include <algorithm>
 #include <iostream>
 
 namespace ms
@@ -27,6 +28,7 @@ namespace ms
 	Inventory::Inventory()
 	{
 		bulletslot = 0;
+		bulletprefix = 0;
 		meso = 0;
 		running_uid = 0;
 		slotmaxima[InventoryType::Id::EQUIPPED] = EquipSlot::Id::LENGTH;
@@ -70,6 +72,7 @@ namespace ms
 				break;
 		}
 
+		bulletprefix = prefix;
 		bulletslot = 0;
 
 		if (prefix)
@@ -261,6 +264,34 @@ namespace ms
 	int32_t Inventory::get_bulletid() const
 	{
 		return get_item_id(InventoryType::Id::USE, bulletslot);
+	}
+
+	int16_t Inventory::find_bulletslot(int16_t cost) const
+	{
+		if (!bulletprefix)
+			return 0;
+
+		for (auto &iter : inventories[InventoryType::Id::USE])
+		{
+			const Slot &slot = iter.second;
+
+			if (slot.count >= std::max<int16_t>(cost, 1) && slot.item_id / 1000 == bulletprefix)
+				return iter.first;
+		}
+
+		return 0;
+	}
+
+	uint16_t Inventory::get_most_bullets() const
+	{
+		uint16_t most = 0;
+
+		if (bulletprefix)
+			for (auto &iter : inventories[InventoryType::Id::USE])
+				if (iter.second.item_id / 1000 == bulletprefix)
+					most = std::max<uint16_t>(most, iter.second.count);
+
+		return most;
 	}
 
 	EquipSlot::Id Inventory::find_equipslot(int32_t itemid) const

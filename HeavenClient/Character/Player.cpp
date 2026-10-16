@@ -527,7 +527,7 @@ namespace ms
 		const Job &job = stats.get_job();
 		uint16_t hp = stats.get_stat(MapleStat::Id::HP);
 		uint16_t mp = stats.get_stat(MapleStat::Id::MP);
-		uint16_t bullets = inventory.get_bulletcount();
+		uint16_t bullets = inventory.get_most_bullets();
 
 		return move.can_use(level, weapon, job, hp, mp, bullets);
 	}
