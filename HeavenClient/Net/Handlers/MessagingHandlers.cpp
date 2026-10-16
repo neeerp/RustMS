@@ -19,6 +19,7 @@
 
 #include "Helpers/LoginParser.h"
 
+#include "../../Configuration.h"
 #include "../../Audio/Audio.h"
 #include "../../Data/ItemData.h"
 #include "../../Gameplay/Stage.h"
@@ -48,26 +49,68 @@ namespace ms
 		constexpr int8_t WHISPER_RESULT_MODE = 0x0A;
 		constexpr int8_t WHISPER_RECEIVE_MODE = 0x12;
 
-		// Where a /find found its character, or nothing for an unknown answer.
-		std::string build_find_chatline(const std::string& target, int8_t where, int32_t value)
+		std::string unable_to_find(const std::string& target)
+		{
+			return "Unable to find '" + target + "'";
+		}
+
+		// The name the server list gave a channel (0-based) of this world.
+		std::string channel_name(int32_t channel)
+		{
+			Configuration& config = Configuration::get();
+			return config.get_channel_name(config.get_worldid(), channel);
+		}
+
+		struct FindLine
+		{
+			std::string text;
+			UIChatBar::LineType type;
+		};
+
+		// Where a /find found its character, worded as v83 does (FUN_0053228e).
+		// A map is grey, anything else pink.
+		FindLine build_find_chatline(const std::string& target, int8_t where, int32_t value)
 		{
 			switch (where)
 			{
 				case 1:
-					return "'" + target + "' is in " + NxHelper::Map::get_map_info_by_id(value).name + ".";
+				{
+					// Event maps, whose ids read x09 xxx xxx, aren't named.
+					if (static_cast<uint32_t>(value) / 1000000 % 100 == 9)
+						return { "'" + target + "' is at the event map.", UIChatBar::LineType::SKILL };
+
+					NxHelper::Map::MapInfo map = NxHelper::Map::get_map_info_by_id(value);
+
+					// v83 prints an empty line for a map it has no name for.
+					if (map.street_name.empty() && map.name.empty())
+						return {};
+
+					std::string place = map.name.empty() ? map.street_name : map.street_name + " : " + map.name;
+					return { "'" + target + "' is currently at '" + place + "'.", UIChatBar::LineType::GREY };
+				}
 				case 2:
-					return "'" + target + "' is in the Cash Shop.";
+					return { "'" + target + "' is at the Cash Shop.", UIChatBar::LineType::SKILL };
 				case 3:
-					return "'" + target + "' is in Channel " + std::to_string(value + 1) + ".";
+				{
+					std::string channel = channel_name(value);
+
+					if (channel.empty())
+						return { unable_to_find(target), UIChatBar::LineType::SKILL };
+
+					return { "'" + target + "' is at '" + channel + "'.", UIChatBar::LineType::SKILL };
+				}
 				default:
-					return {};
+					return { unable_to_find(target), UIChatBar::LineType::SKILL };
 			}
 		}
 
-		std::string build_whisper_chatline(const std::string& sender, bool from_admin, const std::string& message)
+		// A whisper from another channel names it.
+		std::string build_whisper_chatline(const std::string& sender, int8_t channel, const std::string& message)
 		{
-			std::string display_name = from_admin ? "[GM]" + sender : sender;
-			return "#g" + display_name + ">>" + message;
+			if (channel == Configuration::get().get_channelid())
+				return sender + ">> " + message;
+
+			return sender + "[" + channel_name(channel) + "]>> " + message;
 		}
 
 		// The inventory tab an item goes to, as the v83 client names it (FUN_005cfa86).
@@ -283,44 +326,46 @@ namespace ms
 	{
 		int8_t mode = recv.read_byte();
 
+		auto chatbar = UI::get().get_element<UIChatBar>();
+
+		if (!chatbar)
+			return;
+
 		if (mode == WHISPER_RECEIVE_MODE)
 		{
 			std::string sender = recv.read_string();
-			recv.read_byte(); // channel the sender is on (0-based)
-			bool from_admin = recv.read_bool();
+			int8_t channel = recv.read_byte();
+			// From an admin: v83 shows it even with whispers blocked, which
+			// HeavenClient can't do.
+			recv.read_bool();
 			std::string message = recv.read_string();
 
-			if (auto chatbar = UI::get().get_element<UIChatBar>())
-			{
-				chatbar->send_chatline(
-						build_whisper_chatline(sender, from_admin, message),
-						UIChatBar::LineType::WHITE
-				);
-			}
+			chatbar->send_chatline(build_whisper_chatline(sender, channel, message), UIChatBar::LineType::WHISPER);
 		}
 		else if (mode == WHISPER_RESULT_MODE)
 		{
 			std::string target = recv.read_string();
 			bool success = recv.read_bool();
+			std::string message = chatbar->whisper_answered();
+
+			// v83 shows the whisper once the server has answered, delivered or not.
+			if (!message.empty())
+				chatbar->send_chatline(target + "<< " + message, UIChatBar::LineType::WHISPER);
 
 			if (!success)
-			{
-				if (auto chatbar = UI::get().get_element<UIChatBar>())
-					chatbar->send_chatline("Unable to find '" + target + "'.", UIChatBar::LineType::RED);
-			}
+				chatbar->send_chatline(unable_to_find(target), UIChatBar::LineType::SKILL);
 		}
 		else if (mode == FIND_RESULT_MODE)
 		{
 			std::string target = recv.read_string();
 			int8_t where = recv.read_byte();
 			int32_t value = recv.read_int();
-			std::string line = build_find_chatline(target, where, value);
+			FindLine line = build_find_chatline(target, where, value);
 
-			if (line.empty())
-				return;
+			chatbar->whisper_answered();
 
-			if (auto chatbar = UI::get().get_element<UIChatBar>())
-				chatbar->send_chatline(line, UIChatBar::LineType::YELLOW);
+			if (!line.text.empty())
+				chatbar->send_chatline(line.text, line.type);
 		}
 	}
 

@@ -62,7 +62,9 @@ namespace ms
 			BUDDY,
 			PINK,
 			// A skill could not be used
-			SKILL
+			SKILL,
+			// Whispers sent and received
+			WHISPER
 		};
 
 		// Who a typed line goes to
@@ -116,6 +118,12 @@ namespace ms
 		void set_target(Target new_target);
 		// Open the chat field with "/w name " typed, ready for the message.
 		void start_whisper(const std::string& name);
+		// Whisper message to name, or ask where name is if message is empty
+		// (FUN_0052f185). Only one request waits for an answer at a time.
+		void send_whisper(const std::string& name, const std::string& message);
+		// The server answered the waiting request; returns the message it
+		// carried, empty for a find.
+		std::string whisper_answered();
 
 	protected:
 		Button::State button_pressed(uint16_t buttonid) override;
@@ -224,6 +232,11 @@ namespace ms
 		int16_t log_height;
 		bool edge_dragging;
 		std::optional<int16_t> edge_anchor;
+		// The whisper or find waiting for an answer, sent at whisper_sent;
+		// after 3 s another may go.
+		bool whisper_waiting;
+		std::chrono::steady_clock::time_point whisper_sent;
+		std::string whisper_message;
 
 		EnumMap<Messages::Type, time_t> message_cooldowns;
 		ChatFloodGuard flood_guard;
