@@ -820,6 +820,11 @@ namespace ms
 		}
 	}
 
+	int32_t Player::get_walk_animation_speed() const
+	{
+		return stats.get_total(EquipStat::Id::SPEED);
+	}
+
 	// CUserLocal clamps SPEED to 80-140 and JUMP to 80-123 before turning
 	// them into shoe multipliers (FUN_007a4dec).
 	double Player::get_walkspeed() const
