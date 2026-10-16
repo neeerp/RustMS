@@ -44,6 +44,7 @@ namespace ms
 		std::string name;
 		std::string message;
 		std::vector<int32_t> chloads;
+		std::vector<std::string> chnames;
 		uint8_t channelcount;
 		uint8_t flag;
 		int8_t wid;

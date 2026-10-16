@@ -51,15 +51,19 @@ namespace ms
 
 		bool inrange(Point<int16_t> position, bool upwards) const;
 
-		bool felloff(int16_t y, bool downwards) const;
+		// Whether climbing past the top steps onto a platform (uf).
+		bool leads_up() const;
 
 		int16_t get_x() const;
+		int16_t get_top() const;
+		int16_t get_bottom() const;
 
 	private:
 		int16_t x;
 		int16_t y1;
 		int16_t y2;
 		bool ladder;
+		bool uf;
 	};
 
 	class MapInfo

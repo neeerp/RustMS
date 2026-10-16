@@ -5,7 +5,7 @@ use crate::error::RuntimeError;
 use net::dialogue::Prompt;
 use net::npc_scripts::{self, NpcScript, Step};
 use net::packet::build::world::stat::StatUpdate;
-use net::packet::build::world::{effect, inventory, npc, stat};
+use net::packet::build::world::{drop, effect, inventory, npc, stat};
 use net::quests::{self, QuestTemplate};
 use net::scripts::Effect;
 use tracing::{debug, warn};
@@ -147,6 +147,7 @@ impl ClientActor {
                         false,
                         &[StatUpdate::Meso(next.meso)],
                     )?);
+                    packets.push(drop::build_meso_gain_in_chat(-amount)?);
                 }
                 Effect::GainExp(amount) => {
                     gain_exp(&mut next, *amount, &mut packets)?;
