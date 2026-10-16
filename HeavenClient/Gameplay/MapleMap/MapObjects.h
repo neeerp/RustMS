@@ -53,6 +53,10 @@ namespace ms
 		// Check if a map object with the specified id exists on the map
 		bool contains(int32_t oid) const;
 
+		// Position of the mapobject with the given oid in the order the objects
+		// entered the map. A respawned oid keeps its original position.
+		uint32_t entry_order(int32_t oid) const;
+
 		// Obtains a pointer to the mapobject with the given oid.
 		Optional<MapObject> get(int32_t oid);
 
@@ -79,5 +83,7 @@ namespace ms
 	private:
 		std::unordered_map<int32_t, std::unique_ptr<MapObject>> objects;
 		std::array<std::unordered_set<int32_t>, Layer::Id::LENGTH> layers;
+		std::unordered_map<int32_t, uint32_t> entries;
+		uint32_t next_entry = 0;
 	};
 }
