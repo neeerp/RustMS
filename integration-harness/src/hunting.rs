@@ -16,22 +16,35 @@ pub fn attack(object_id: i32, damage: i32) -> Packet {
 
 /// CLOSE_RANGE_ATTACK with a skill (0 for none), hitting one mob once.
 pub fn skill_attack(skill_id: i32, object_id: i32, damage: i32) -> Packet {
-    kind_attack(RecvOpcode::CloseRangeAttack, skill_id, object_id, damage)
+    kind_attack(RecvOpcode::CloseRangeAttack, skill_id, 0, object_id, damage)
 }
 
-/// RANGED_ATTACK with a skill (0 for none), hitting one mob once.
-pub fn ranged_attack(skill_id: i32, object_id: i32, damage: i32) -> Packet {
-    kind_attack(RecvOpcode::RangedAttack, skill_id, object_id, damage)
+/// RANGED_ATTACK with a skill (0 for none) firing the ammo in USE slot
+/// `ammo_slot`, hitting one mob once.
+pub fn ranged_attack(skill_id: i32, ammo_slot: i16, object_id: i32, damage: i32) -> Packet {
+    kind_attack(
+        RecvOpcode::RangedAttack,
+        skill_id,
+        ammo_slot,
+        object_id,
+        damage,
+    )
 }
 
 /// MAGIC_ATTACK with a skill, hitting one mob once.
 pub fn magic_attack(skill_id: i32, object_id: i32, damage: i32) -> Packet {
-    kind_attack(RecvOpcode::MagicAttack, skill_id, object_id, damage)
+    kind_attack(RecvOpcode::MagicAttack, skill_id, 0, object_id, damage)
 }
 
-/// An attack hitting one mob once, as HeavenClient sends it: a shot has 5
-/// more bytes before its target, its direction among them.
-fn kind_attack(op: RecvOpcode, skill_id: i32, object_id: i32, damage: i32) -> Packet {
+/// An attack hitting one mob once: a shot has 5 more bytes before its
+/// target, its ammo slot among them.
+fn kind_attack(
+    op: RecvOpcode,
+    skill_id: i32,
+    ammo_slot: i16,
+    object_id: i32,
+    damage: i32,
+) -> Packet {
     let ranged = matches!(op, RecvOpcode::RangedAttack);
     let mut p = Packet::new_empty();
     p.write_short(op as i16).unwrap();
@@ -43,7 +56,10 @@ fn kind_attack(op: RecvOpcode, skill_id: i32, object_id: i32, damage: i32) -> Pa
         p.write_byte(b).unwrap();
     }
     if ranged {
-        p.write_bytes(&[0, 0x80, 0, 0, 0, 0, 0, 0, 0]).unwrap();
+        p.write_int(0).unwrap();
+        p.write_short(ammo_slot).unwrap();
+        p.write_short(0).unwrap();
+        p.write_byte(0).unwrap();
     } else {
         p.write_bytes(&[0; 4]).unwrap();
     }

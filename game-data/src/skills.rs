@@ -41,6 +41,9 @@ pub struct SkillLevel {
     /// Stars, arrows, or bullets a shot fires, each hitting once
     /// (`bulletCount`).
     pub bullet_count: i32,
+    /// Ammo a shot uses up when it isn't its bullet count
+    /// (`bulletConsume`), as Avenger's 3 for one star.
+    pub bullet_consume: i32,
     /// Buff duration in seconds (`time`).
     pub duration: i32,
     /// Seconds before the skill can be used again (`cooltime`).
@@ -96,6 +99,7 @@ impl SkillData {
                     mob_count: nx.int_child(level, "mobCount")?.unwrap_or(1),
                     attack_count: nx.int_child(level, "attackCount")?.unwrap_or(1),
                     bullet_count: nx.int_child(level, "bulletCount")?.unwrap_or(1),
+                    bullet_consume: int("bulletConsume")?,
                     duration: int("time")?,
                     cooldown: int("cooltime")?,
                     speed: int("speed")?,
@@ -168,6 +172,8 @@ mod tests {
         assert_eq!((energy_bolt.magic, energy_bolt.mp_cost), (55, 14));
         let lucky_seven = data.info(4001344).unwrap().unwrap().levels[19].clone();
         assert_eq!((lucky_seven.bullet_count, lucky_seven.damage), (2, 150));
+        let avenger = data.info(4111005).unwrap().unwrap().levels[29].clone();
+        assert_eq!((avenger.bullet_count, avenger.bullet_consume), (1, 3));
 
         let maple_warrior = data.info(2121000).unwrap().unwrap();
         assert!(maple_warrior.invisible);

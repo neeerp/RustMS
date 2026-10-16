@@ -83,8 +83,9 @@ position. HeavenClient does the same (`FootholdTree::place_on_fh`).
 
 CLOSE_RANGE_ATTACK, RANGED_ATTACK, and MAGIC_ATTACK (`net::combat::
 parse_attack`, one `AttackHandler` per `AttackKind`) share a layout; a shot
-has 5 more bytes before its targets, and 4 more for Hurricane, Piercing Arrow,
-and Rapid Fire. Each is checked before it reaches the field (`validate`): the
+has 5 more bytes before its targets (an int, the USE slot it fires from, the
+cash ammo slot, and a byte), and 4 more for Hurricane, Piercing Arrow, and
+Rapid Fire. Each is checked before it reaches the field (`validate`): the
 attacker must be alive, and a basic attack (skill 0) hits one mob once, each
 hit at most twice the character's basic maximum (`max_base_damage`, v83's
 weapon multiplier × main stat + secondary stat, × weapon attack / 100). An
@@ -98,10 +99,21 @@ skill for that percentage of the basic cap, and a skill with none is not an
 attack. A spell must name a skill. Too little MP refuses the attack.
 HeavenClient sends Three Snails as a swing for melee weapons. The field shows
 the attack under its own opcode (with the skill id and level, so others see
-the skill's effect, and for a shot the first star, arrow, or bullet in USE
-that the weapon fires, `net::combat::ammo`) to the others, applies the damage,
-sends the attacker SHOW_MONSTER_HP, and on death KILL_MONSTER to everyone; the
-attacker gets the MP left as STAT_CHANGED. Shots don't use up ammo yet.
+the skill's effect, and for a shot the star, arrow, or bullet it fired) to the
+others, applies the damage, sends the attacker SHOW_MONSTER_HP, and on death
+KILL_MONSTER to everyone; the attacker gets the MP left as STAT_CHANGED.
+
+A shot fires from the USE slot the client names, as in v83 (`shot_ammo`). The
+item there must fit the weapon (stars for claws, arrows for bows and the
+Arrow claw 1472063, crossbow arrows, bullets for guns) and cover the cost:
+the skill's `bulletConsume` if it has one (Avenger's 3), otherwise its
+`bulletCount` (Lucky Seven's 2), or 1 for a basic shot. Anything else refuses
+the attack. The cost is taken from that slot and the attacker gets
+INVENTORY_OPERATION. Skills v83 fires without ammo (Shadow Meso, Taunt,
+Energy Orb, and some Cygnus and Aran skills; `AMMO_FREE`) use none. The
+server tracks neither Shadow Partner, which doubles the cost, nor Soul
+Arrow's buff, nor the cash ammo slot. HeavenClient, like v83, fires from the
+first fitting stack that covers the cost (`Inventory::find_bulletslot`).
 
 In HeavenClient a hit of at least the mob's `pushed` value puts it in its
 `hit1` stance for about a quarter second, with a three-tick push that moves it

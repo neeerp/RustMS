@@ -45,6 +45,25 @@ const LONG_SHOTS: [i32; 4] = [
 /// Rapid Fire's targets end without the usual 4 bytes.
 const RAPID_FIRE: i32 = 5221004;
 
+/// Skills sent as shots that fire no ammo (the v83 client's FUN_007667ee).
+const AMMO_FREE: [i32; 12] = [
+    4111004,  // Shadow Meso
+    4121003,  // Taunt
+    4221003,  // Taunt
+    5121002,  // Energy Orb
+    11101004, // Soul Blade
+    13101005, // Storm Break
+    14101006, // Vampire
+    15111006, // Spark
+    15111007, // Shark Wave
+    21100004, // Combo Smash
+    21110004, // Combo Fenrir
+    21120006, // Combo Tempest
+];
+
+/// A claw that throws arrows instead of stars.
+const ARROW_CLAW: i32 = 1472063;
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Attack {
     pub kind: AttackKind,
@@ -55,6 +74,8 @@ pub struct Attack {
     pub direction: u8,
     pub stance: u8,
     pub speed: u8,
+    /// The USE slot of the star, arrow, or bullet a shot fires; 0 for none.
+    pub ammo_slot: i16,
     pub hits: Vec<AttackHit>,
 }
 
@@ -65,8 +86,9 @@ pub fn parse_close_attack(packet: &Packet) -> Result<Attack, NetworkError> {
 
 /// An attack packet's body (after the opcode). RANGED_ATTACK and
 /// MAGIC_ATTACK share CLOSE_RANGE_ATTACK's layout; a shot adds 5 bytes
-/// before its targets, its direction among them, and 4 more for a few
-/// skills.
+/// before its targets (an int, then its ammo slot and its cash ammo slot
+/// as shorts, then a byte where the others have an int), and 4 more for a
+/// few skills.
 pub fn parse_attack(packet: &Packet, kind: AttackKind) -> Result<Attack, NetworkError> {
     let mut r = Cursor::new(&packet.bytes);
     r.read_short()?;
@@ -79,8 +101,12 @@ pub fn parse_attack(packet: &Packet, kind: AttackKind) -> Result<Attack, Network
     let stance = r.read_byte()?;
     r.read_byte()?;
     let speed = r.read_byte()?;
+    let mut ammo_slot = 0;
     if kind == AttackKind::Ranged {
-        r.read_bytes(9)?;
+        r.read_int()?;
+        ammo_slot = r.read_short()?;
+        r.read_short()?;
+        r.read_byte()?;
         if LONG_SHOTS.contains(&skill) {
             r.read_bytes(4)?;
         }
@@ -109,6 +135,7 @@ pub fn parse_attack(packet: &Packet, kind: AttackKind) -> Result<Attack, Network
         direction,
         stance,
         speed,
+        ammo_slot,
         hits,
     })
 }
@@ -171,25 +198,71 @@ pub fn max_magic_damage(player: &Player, spell: i32) -> i32 {
     max.ceil() as i32
 }
 
-/// The first stack in USE that the player's weapon shoots: throwing stars
-/// for a claw, arrows for a bow or crossbow, bullets for a gun.
-pub fn ammo(player: &Player) -> Option<i32> {
-    let weapon = player
-        .inventory
-        .get(InventoryType::Equipped, equip_slot::WEAPON)?
-        .item_id;
-    let fits = |item_id: i32| match weapon / 10_000 {
+/// Whether `weapon` shoots `item_id`: throwing stars from a claw, arrows
+/// from a bow, crossbow arrows from a crossbow, bullets from a gun.
+fn shoots(weapon: i32, item_id: i32) -> bool {
+    if weapon == ARROW_CLAW {
+        return item_id / 1000 == 2060;
+    }
+    match weapon / 10_000 {
         145 => item_id / 1000 == 2060,
         146 => item_id / 1000 == 2061,
         147 => item_id / 10_000 == 207,
         149 => item_id / 10_000 == 233,
         _ => false,
-    };
-    player
+    }
+}
+
+/// The ammo a shot uses up.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Ammo {
+    pub slot: i16,
+    pub item_id: i32,
+    pub quantity: i16,
+}
+
+/// What a valid attack uses: its skill, whose MP the caller spends, and a
+/// shot's ammo, which the caller takes.
+#[derive(Clone, Debug, PartialEq)]
+pub struct Uses {
+    pub skill: Option<Learned>,
+    pub ammo: Option<Ammo>,
+}
+
+/// A shot fires the stack in the slot the client names, which the weapon
+/// must shoot and which must hold the skill's `bulletConsume`, else its
+/// `bulletCount`, else one. A few skills fire none.
+fn shot_ammo(
+    attack: &Attack,
+    player: &Player,
+    skill: Option<&Learned>,
+) -> Result<Option<Ammo>, AttackRejection> {
+    if attack.kind != AttackKind::Ranged || AMMO_FREE.contains(&attack.skill) {
+        return Ok(None);
+    }
+    let weapon = player
         .inventory
-        .items(InventoryType::Use)
-        .find(|(_, item)| fits(item.item_id) && item.quantity > 0)
-        .map(|(_, item)| item.item_id)
+        .get(InventoryType::Equipped, equip_slot::WEAPON)
+        .ok_or(AttackRejection::Ammo)?
+        .item_id;
+    let quantity = skill.map_or(1, |skill| {
+        let effect = &skill.effect;
+        if effect.bullet_consume != 0 {
+            effect.bullet_consume
+        } else {
+            effect.bullet_count
+        }
+    });
+    let item = player
+        .inventory
+        .get(InventoryType::Use, attack.ammo_slot)
+        .filter(|item| shoots(weapon, item.item_id) && i32::from(item.quantity) >= quantity)
+        .ok_or(AttackRejection::Ammo)?;
+    Ok(Some(Ammo {
+        slot: attack.ammo_slot,
+        item_id: item.item_id,
+        quantity: quantity as i16,
+    }))
 }
 
 /// Why an attack is refused.
@@ -201,15 +274,16 @@ pub enum AttackRejection {
     NotEnoughMp,
     TooManyTargets,
     Damage,
+    /// A shot without enough of an ammo its weapon fires.
+    Ammo,
 }
 
 /// Basic attacks hit one mob once; each hit must stay under twice the base
 /// maximum (room for the client's own rolls, never a multiple of it). A
 /// skill attack takes its limits from the skill's level: its mob and hit
 /// counts (a shot's bullets), and its fixed damage, its magic attack, or its
-/// damage percent. A spell must be a skill. Returns the skill used, whose MP
-/// the caller spends.
-pub fn validate(attack: &Attack, player: &Player) -> Result<Option<Learned>, AttackRejection> {
+/// damage percent. A spell must be a skill, and a shot needs ammo.
+pub fn validate(attack: &Attack, player: &Player) -> Result<Uses, AttackRejection> {
     if player.stats.hp <= 0 {
         return Err(AttackRejection::Dead);
     }
@@ -255,7 +329,8 @@ pub fn validate(attack: &Attack, player: &Player) -> Result<Option<Learned>, Att
     {
         return Err(AttackRejection::Damage);
     }
-    Ok(skill)
+    let ammo = shot_ammo(attack, player, skill.as_ref())?;
+    Ok(Uses { skill, ammo })
 }
 
 /// The attack as other players see it (`addAttackBody`), under the opcode
@@ -375,7 +450,10 @@ mod tests {
         assert_eq!(max_base_damage(&player), 10);
         assert_eq!(
             validate(&parse_close_attack(&attack_packet(1, 20)).unwrap(), &player),
-            Ok(None)
+            Ok(Uses {
+                skill: None,
+                ammo: None
+            })
         );
         assert_eq!(
             validate(&parse_close_attack(&attack_packet(1, 21)).unwrap(), &player),
@@ -413,7 +491,7 @@ mod tests {
         );
         player.stats.mp = 5;
         // Level 2 does 25, more than twice a basic hit.
-        let used = validate(&snails(25), &player).unwrap().unwrap();
+        let used = validate(&snails(25), &player).unwrap().skill.unwrap();
         assert_eq!(
             (used.skill_id, used.level, used.effect.mp_cost),
             (1000, 2, 5)
@@ -437,8 +515,8 @@ mod tests {
     }
 
     /// A shot or spell at one mob: CLOSE_RANGE_ATTACK's layout, plus a
-    /// shot's 5 bytes before its targets.
-    fn kind_attack_packet(kind: AttackKind, skill: i32, damage: &[i32]) -> Packet {
+    /// shot's 5 bytes before its targets, with its ammo slot.
+    fn kind_attack_packet(kind: AttackKind, skill: i32, ammo_slot: i16, damage: &[i32]) -> Packet {
         let mut p = Packet::new_empty();
         p.write_short(0x2D).unwrap();
         p.write_byte(0).unwrap();
@@ -451,7 +529,10 @@ mod tests {
         p.write_byte(0).unwrap();
         p.write_byte(4).unwrap(); // speed
         if kind == AttackKind::Ranged {
-            p.write_bytes(&[0, 0x80, 0, 0, 0, 0, 0, 0, 0]).unwrap();
+            p.write_int(0).unwrap();
+            p.write_short(ammo_slot).unwrap();
+            p.write_short(0).unwrap();
+            p.write_byte(0).unwrap();
         } else {
             p.write_bytes(&[0; 4]).unwrap();
         }
@@ -476,11 +557,11 @@ mod tests {
     #[test]
     fn parses_a_shot() {
         let attack = parse_attack(
-            &kind_attack_packet(AttackKind::Ranged, 0, &[12]),
+            &kind_attack_packet(AttackKind::Ranged, 0, 1, &[12]),
             AttackKind::Ranged,
         )
         .unwrap();
-        assert_eq!(attack.kind, AttackKind::Ranged);
+        assert_eq!((attack.kind, attack.ammo_slot), (AttackKind::Ranged, 1));
         assert_eq!(
             attack.hits,
             [AttackHit {
@@ -497,7 +578,7 @@ mod tests {
         }
         let bolt = |damage| {
             parse_attack(
-                &kind_attack_packet(AttackKind::Magic, 2001004, &[damage]),
+                &kind_attack_packet(AttackKind::Magic, 2001004, 0, &[damage]),
                 AttackKind::Magic,
             )
             .unwrap()
@@ -514,7 +595,7 @@ mod tests {
             AttackRejection::Damage
         );
         let unskilled = parse_attack(
-            &kind_attack_packet(AttackKind::Magic, 0, &[1]),
+            &kind_attack_packet(AttackKind::Magic, 0, 0, &[1]),
             AttackKind::Magic,
         )
         .unwrap();
@@ -531,12 +612,12 @@ mod tests {
         }
         let seven = |damage: &[i32]| {
             parse_attack(
-                &kind_attack_packet(AttackKind::Ranged, 4001344, damage),
+                &kind_attack_packet(AttackKind::Ranged, 4001344, 1, damage),
                 AttackKind::Ranged,
             )
             .unwrap()
         };
-        let mut player = beginner_with_sword();
+        let mut player = rogue_with_stars(100);
         player.stats.mp = 100;
         learn(&mut player, 4001344, 20);
         assert!(validate(&seven(&[1, 1]), &player).is_ok());
@@ -546,8 +627,8 @@ mod tests {
         );
     }
 
-    #[test]
-    fn a_shot_broadcast_names_its_ammo() {
+    /// A claw, with `stars` Subis in USE slot 1.
+    fn rogue_with_stars(stars: i16) -> Player {
         let mut player = beginner_with_sword();
         player.inventory.insert(
             InventoryType::Equipped,
@@ -556,14 +637,72 @@ mod tests {
         );
         player
             .inventory
-            .insert(InventoryType::Use, 1, Item::stack(2060000, 100));
+            .insert(InventoryType::Use, 1, Item::stack(2070000, stars));
+        player
+    }
+
+    #[test]
+    fn a_shot_uses_ammo_from_its_slot() {
+        let mut player = rogue_with_stars(1);
         player
             .inventory
-            .insert(InventoryType::Use, 2, Item::stack(2070000, 100));
-        assert_eq!(ammo(&player), Some(2070000));
+            .insert(InventoryType::Use, 2, Item::stack(2060000, 100));
+        let shot = |skill, slot| {
+            parse_attack(
+                &kind_attack_packet(AttackKind::Ranged, skill, slot, &[1]),
+                AttackKind::Ranged,
+            )
+            .unwrap()
+        };
+        assert_eq!(
+            validate(&shot(0, 1), &player).unwrap(),
+            Uses {
+                skill: None,
+                ammo: Some(Ammo {
+                    slot: 1,
+                    item_id: 2070000,
+                    quantity: 1
+                })
+            }
+        );
+        // Arrows don't fit a claw, and an empty slot holds nothing.
+        for slot in [2, 3] {
+            assert_eq!(
+                validate(&shot(0, slot), &player).unwrap_err(),
+                AttackRejection::Ammo
+            );
+        }
+        // A spell or a swing needs none.
+        let swing = parse_close_attack(&attack_packet(1, 1)).unwrap();
+        assert_eq!(validate(&swing, &player).unwrap().ammo, None);
 
+        if skills::data().is_err() {
+            return;
+        }
+        // Lucky Seven throws two stars.
+        player.stats.mp = 100;
+        learn(&mut player, 4001344, 20);
+        assert_eq!(
+            validate(&shot(4001344, 1), &player).unwrap_err(),
+            AttackRejection::Ammo
+        );
+        player
+            .inventory
+            .insert(InventoryType::Use, 1, Item::stack(2070000, 2));
+        assert_eq!(
+            validate(&shot(4001344, 1), &player)
+                .unwrap()
+                .ammo
+                .unwrap()
+                .quantity,
+            2
+        );
+    }
+
+    #[test]
+    fn a_shot_broadcast_names_its_ammo() {
         let attack = parse_attack(
-            &kind_attack_packet(AttackKind::Ranged, 0, &[12]),
+            &kind_attack_packet(AttackKind::Ranged, 0, 1, &[12]),
             AttackKind::Ranged,
         )
         .unwrap();

@@ -1,9 +1,12 @@
 use crate::combat::{self, AttackKind};
+use crate::error::NetworkError;
 use crate::handler::{
     FieldRequest, HandlerResult, WorldAction, WorldContext, WorldHandler, WorldResult,
 };
+use crate::packet::build::world::inventory;
 use crate::packet::build::world::mob::{self, FROM_TOUCH};
 use crate::packet::build::world::stat::{self, StatUpdate};
+use game::InventoryType;
 use packet::{io::read::PktRead, Packet};
 use std::io::Cursor;
 use tracing::debug;
@@ -61,8 +64,8 @@ pub struct AttackHandler(pub AttackKind);
 impl WorldHandler for AttackHandler {
     fn handle(&self, packet: &mut Packet, ctx: &mut WorldContext) -> WorldResult {
         let attack = combat::parse_attack(packet, self.0)?;
-        let skill = match combat::validate(&attack, ctx.player) {
-            Ok(skill) => skill,
+        let uses = match combat::validate(&attack, ctx.player) {
+            Ok(uses) => uses,
             Err(rejection) => {
                 debug!(?rejection, skill = attack.skill, "Attack refused");
                 return Ok(HandlerResult::empty());
@@ -70,15 +73,21 @@ impl WorldHandler for AttackHandler {
         };
         let mut result = HandlerResult::empty();
         let mut skill_level = 0;
-        if let Some(skill) = skill {
+        if let Some(skill) = uses.skill {
             let mp = ctx.player.add_mp(-skill.effect.mp_cost);
             result = HandlerResult::reply(stat::build_stat_update(false, &[StatUpdate::Mp(mp)])?);
             skill_level = skill.level as u8;
         }
-        let projectile = match attack.kind {
-            AttackKind::Ranged => combat::ammo(ctx.player).unwrap_or(0),
-            _ => 0,
-        };
+        let mut projectile = 0;
+        if let Some(ammo) = uses.ammo {
+            let changes = ctx
+                .player
+                .inventory_mut()
+                .take(InventoryType::Use, ammo.slot, ammo.quantity)
+                .map_err(|_| NetworkError::PacketHandlerError("ammo vanished"))?;
+            result = result.with_reply(inventory::build_inventory_operation(false, &changes)?);
+            projectile = ammo.item_id;
+        }
         let broadcast = combat::build_attack(ctx.player.id(), &attack, skill_level, projectile)?;
         let hits = attack
             .hits
