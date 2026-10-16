@@ -59,7 +59,7 @@ int main()
 		require(aimed_spell(2001004), "Energy Bolt is aimed at the first mob in its path");
 		require(aimed_spell(2001005), "so is Magic Claw");
 		require(!aimed_spell(2201005), "Thunder Bolt hits all the mobs in its area");
-		require(!aimed_spell(2221006), "Chain Lightning's chain is not aimed");
+		require(aimed_spell(2221006), "Chain Lightning's first mob is the first in its path");
 
 		std::vector<Rectangle<int16_t>> steps = search_steps(100, { 165, 172 }, 300);
 		require(steps.size() == 7, "a shot searches 20 px steps up to its range");

@@ -17,6 +17,7 @@
 //////////////////////////////////////////////////////////////////////////////////
 #include "Combat.h"
 
+#include "ChainLightning.h"
 #include "DamageLayout.h"
 #include "HitTiming.h"
 #include "PointBlank.h"
@@ -25,6 +26,7 @@
 #include "../../Character/SkillId.h"
 #include "../../Data/SkillData.h"
 #include "../../IO/Messages.h"
+#include "../../Util/Randomizer.h"
 
 #include "../../Net/Packets/AttackAndSkillPackets.h"
 #include "../../Net/Packets/GameplayPackets.h"
@@ -187,13 +189,22 @@ namespace ms
 				Point<int16_t> sight = shot_path::origin(origin, 0, attack.toleft);
 				Point<int16_t> stop = shot_end;
 
-				if (!mob_targets.empty())
-					stop = shot_path::hit_point(shot_start, shot_end.x(), mobs.get_mob_body(mob_targets[0]));
-
-				if (attack.bullet && shot_path::blocked(sight, stop, find_platforms(sight, stop), player.get_phobj().fhgroup))
+				// Chain Lightning strikes its first mob without flying there,
+				// and jumps on from it.
+				if (chain_lightning::chains(attack.skill))
 				{
-					mob_targets.clear();
-					shot_end = stop;
+					if (!mob_targets.empty())
+						mob_targets = find_chain(mob_targets[0], mobcount, attack.toleft);
+				} else
+				{
+					if (!mob_targets.empty())
+						stop = shot_path::hit_point(shot_start, shot_end.x(), mobs.get_mob_body(mob_targets[0]));
+
+					if (attack.bullet && shot_path::blocked(sight, stop, find_platforms(sight, stop), player.get_phobj().fhgroup))
+					{
+						mob_targets.clear();
+						shot_end = stop;
+					}
 				}
 			} else
 			{
@@ -290,6 +301,35 @@ namespace ms
 		}
 
 		return {};
+	}
+
+	std::vector<int32_t> Combat::find_chain(int32_t first, uint8_t count, bool toleft) const
+	{
+		MapObjects *objs = mobs.get_mobs();
+		std::vector<chain_lightning::Mob> alive;
+		std::optional<chain_lightning::Mob> start;
+
+		for (auto &mmo : *objs)
+		{
+			const Mob *mob = static_cast<const Mob *>(mmo.second.get());
+
+			if (!mob || !mob->is_alive())
+				continue;
+
+			chain_lightning::Mob candidate = {
+				mob->get_oid(), mob->get_position(), mob->get_body(), objs->entry_order(mob->get_oid())
+			};
+
+			if (candidate.oid == first)
+				start = candidate;
+
+			alive.push_back(candidate);
+		}
+
+		if (!start)
+			return {};
+
+		return chain_lightning::chain(*start, alive, count, toleft);
 	}
 
 	std::vector<shot_path::Platform> Combat::find_platforms(Point<int16_t> from, Point<int16_t> to) const
@@ -518,7 +558,12 @@ namespace ms
 				range
 		};
 
-		if (result.bullet)
+		bool chain = chain_lightning::chains(result.skill);
+
+		if (chain)
+			draw_chain(user, move, result);
+
+		if (result.bullet && !chain)
 		{
 			// As in v83, the bullets fly straight from in front of the user to
 			// where the shot crosses each target, or as far as the shot goes.
@@ -610,6 +655,36 @@ namespace ms
 					}
 				}
 			}
+		}
+	}
+
+	void Combat::draw_chain(const Char &user, const SpecialMove &move, const AttackResult &result)
+	{
+		// The bolt jumps from the user to each mob in turn as it is hit,
+		// one ball after another along each jump, every one of the three
+		// kinds of ball at random.
+		Randomizer random;
+		Point<int16_t> from = chain_lightning::start(user.get_position(), result.toleft);
+		uint16_t delay = user.get_attackdelay(0);
+
+		for (size_t target = 0; target < result.damagelines.size(); target++)
+		{
+			int32_t oid = result.damagelines[target].first;
+
+			if (!mobs.contains(oid))
+				continue;
+
+			Point<int16_t> to = chain_lightning::middle(mobs.get_mob_body(oid));
+			uint16_t start = delay + hit_timing::target_delay(result.type, result.skill, target);
+
+			for (chain_lightning::Ball ball : chain_lightning::bolt(from, to))
+			{
+				Animation animation = move.get_ball(random.next_int(chain_lightning::BALL_KINDS));
+				float angle = static_cast<float>(ball.degrees * M_PI / 180.0);
+				bulleteffects.push(start, Bullet(animation, ball.position, ball.position, chain_lightning::BOLT_TIME, angle));
+			}
+
+			from = to;
 		}
 	}
 

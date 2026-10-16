@@ -23,6 +23,7 @@
 #include "../Graphics/Animation.h"
 
 #include <unordered_map>
+#include <vector>
 
 namespace ms
 {
@@ -33,6 +34,13 @@ namespace ms
 		{}
 
 		virtual Animation get(const Char &user, int32_t bulletid) const = 0;
+
+		// One of the kinds of ball a skill such as Chain Lightning draws
+		// together, if it has them.
+		virtual Animation get_kind(size_t) const
+		{
+			return {};
+		}
 
 	protected:
 		struct Ball
@@ -62,8 +70,11 @@ namespace ms
 
 		Animation get(const Char &user, int32_t bulletid) const override;
 
+		Animation get_kind(size_t kind) const override;
+
 	private:
 		Ball ball;
+		std::vector<Ball> kinds;
 	};
 
 	class BySkillLevelBullet : public SkillBullet
