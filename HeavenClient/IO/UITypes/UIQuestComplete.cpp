@@ -6,6 +6,7 @@
 
 #include "../Components/MapleButton.h"
 
+#include "../../Audio/Audio.h"
 #include "../../Character/QuestCatalog.h"
 #include "../../Constants.h"
 #include "../../Util/Misc.h"
@@ -17,14 +18,15 @@ namespace ms
 {
 	namespace
 	{
-		// Laid out from footage (FRS4wNJWWIE, 2:00): the box's left edge and
-		// how far its top sits above the bottom of the screen.
-		constexpr int16_t LEFT = 464, ABOVE_BOTTOM = 97;
+		// The first notice's left edge and how far its top sits above the
+		// bottom of the screen; each later one sits 5 px higher, over the last
+		// (FUN_00523408). The text is laid out from footage (FRS4wNJWWIE, 2:00).
+		constexpr int16_t LEFT = 464, ABOVE_BOTTOM = 97, CASCADE = 5;
 		constexpr int16_t TEXT_X = 24, NAME_WIDTH = 104;
-		const Point<int16_t> ICON(5, 12), HEADING(TEXT_X, 2), NAME(TEXT_X, 15);
+		const Point<int16_t> ICON(6, 12), HEADING(TEXT_X, 2), NAME(TEXT_X, 15);
 		const Point<int16_t> OK_AT(133, 5), CANCEL_AT(133, 19);
-		// Shown at most; the oldest gives way.
-		constexpr size_t MAX_NOTICES = 4;
+		// How long from appearing until it fades out unanswered.
+		constexpr uint32_t LIFETIME = 30000;
 	}
 
 	UIQuestComplete::UIQuestComplete(QuestLog& quests, const Inventory& inventory) :
@@ -43,12 +45,22 @@ namespace ms
 	{
 		for (size_t i = 0; i < notices.size(); i++)
 		{
-			Point<int16_t> at = position - Point<int16_t>(0, static_cast<int16_t>((notices.size() - 1 - i) * HEIGHT));
+			Point<int16_t> at = position + offset(i);
+			float opacity = notices[i].life.opacity();
 
-			background.draw(at);
-			icon.draw(at + ICON);
-			heading.draw(at + HEADING);
-			notices[i].name.draw(at + NAME);
+			background.draw(DrawArgument(at, opacity));
+			icon.draw(DrawArgument(at + ICON, opacity));
+			heading.draw(DrawArgument(at + HEADING, opacity));
+			notices[i].name.draw(DrawArgument(at + NAME, opacity));
+		}
+
+		// Only the top notice can be reached; the others' buttons lie under it.
+		if (!notices.empty())
+		{
+			float opacity = notices.back().life.opacity();
+
+			for (auto& [id, button] : buttons)
+				static_cast<MapleButton*>(button.get())->set_opacity(opacity);
 		}
 
 		UIElement::draw_buttons(alpha);
@@ -65,10 +77,13 @@ namespace ms
 
 		bool changed = false;
 
-		// Quests handed in or forfeited take their notice with them.
+		// Quests handed in or forfeited take their notice with them; the rest
+		// fade, and those below a notice that leaves move down.
 		for (auto it = notices.begin(); it != notices.end();)
 		{
-			if (it->closed || !started.count(it->id))
+			it->life.update(Constants::TIMESTEP);
+
+			if (it->life.gone() || !started.count(it->id))
 			{
 				it = notices.erase(it);
 				changed = true;
@@ -87,10 +102,8 @@ namespace ms
 
 			notices.erase(std::remove_if(notices.begin(), notices.end(), [&](const Notice& n) { return n.id == id; }),
 				notices.end());
-			notices.push_back({ id, std::move(name), false });
-
-			if (notices.size() > MAX_NOTICES)
-				notices.erase(notices.begin());
+			notices.push_back({ id, std::move(name), FadeNotice(LIFETIME) });
+			Sound(Sound::Name::INVITE).play();
 
 			changed = true;
 		}
@@ -107,14 +120,18 @@ namespace ms
 
 		nl::node fade = NxFiles::ui_classic["UIWindow.img"]["FadeYesNo"];
 
-		for (size_t i = 0; i < notices.size(); i++)
-		{
-			Point<int16_t> at(0, -static_cast<int16_t>((notices.size() - 1 - i) * HEIGHT));
-			uint16_t base = static_cast<uint16_t>(2 * i);
+		if (notices.empty())
+			return;
 
-			buttons[OK + base] = std::make_unique<MapleButton>(fade["BtOK"], at + OK_AT);
-			buttons[CANCEL + base] = std::make_unique<MapleButton>(fade["BtCancel"], at + CANCEL_AT);
-		}
+		Point<int16_t> at = offset(notices.size() - 1);
+
+		buttons[OK] = std::make_unique<MapleButton>(fade["BtOK"], at + OK_AT);
+		buttons[CANCEL] = std::make_unique<MapleButton>(fade["BtCancel"], at + CANCEL_AT);
+	}
+
+	Point<int16_t> UIQuestComplete::offset(size_t index) const
+	{
+		return Point<int16_t>(0, -static_cast<int16_t>(index * CASCADE));
 	}
 
 	void UIQuestComplete::update_screen(int16_t, int16_t new_height)
@@ -127,24 +144,22 @@ namespace ms
 		if (notices.empty())
 			return false;
 
-		Point<int16_t> top = position - Point<int16_t>(0, static_cast<int16_t>((notices.size() - 1) * HEIGHT));
+		Point<int16_t> top = position + offset(notices.size() - 1);
 
 		return Rectangle<int16_t>(top, position + Point<int16_t>(WIDTH, HEIGHT)).contains(cursorpos);
 	}
 
 	Button::State UIQuestComplete::button_pressed(uint16_t buttonid)
 	{
-		size_t index = buttonid / 2;
-
-		// One press can arrive twice; act on the first.
-		if (index >= notices.size() || notices[index].closed)
+		// One press can arrive twice, and a notice fading out ignores more;
+		// act on the first.
+		if (notices.empty() || notices.back().life.closed())
 			return Button::State::NORMAL;
 
-		// The buttons are rebuilt on the next update, not while the caller
-		// walks them.
-		notices[index].closed = true;
+		Notice& notice = notices.back();
+		notice.life.close();
 
-		if (buttonid % 2 == OK)
+		if (buttonid == OK)
 		{
 			auto log = UI::get().get_element<UIQuestLog>();
 
@@ -152,7 +167,7 @@ namespace ms
 				UI::get().emplace<UIQuestLog>(quests);
 
 			if (auto opened = UI::get().get_element<UIQuestLog>())
-				opened->show_quest(notices[index].id);
+				opened->show_quest(notice.id);
 		}
 
 		return Button::State::NORMAL;

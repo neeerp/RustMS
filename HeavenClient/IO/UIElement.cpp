@@ -91,6 +91,8 @@ namespace ms
 
 	void UIElement::remove_cursor()
 	{
+		release_button();
+
 		for (auto &btit : buttons)
 		{
 			auto button = btit.second.get();
@@ -102,12 +104,48 @@ namespace ms
 
 	Cursor::State UIElement::send_cursor(bool down, Point<int16_t> pos)
 	{
+		if (holding)
+		{
+			auto btit = buttons.find(held_button);
+
+			if (btit == buttons.end())
+			{
+				holding = false;
+			} else if (down)
+			{
+				// The pressed button keeps the cursor, and looks pressed only
+				// while under it (FUN_004c0ad9).
+				Button *button = btit->second.get();
+				Button::State state = button->get_state();
+
+				if (button_under(btit->first, pos))
+				{
+					if (state == Button::State::NORMAL)
+						button->set_state(Button::State::PRESSED);
+				} else if (state == Button::State::PRESSED)
+				{
+					button->set_state(Button::State::NORMAL);
+				}
+
+				return Cursor::State::CLICKING;
+			} else if (button_under(btit->first, pos) && btit->second->get_state() == Button::State::PRESSED)
+			{
+				// v83 clicks a button as the mouse comes back up over it
+				// (FUN_004c107d).
+				holding = false;
+
+				return click_button(btit->first);
+			} else
+			{
+				release_button();
+			}
+		}
+
 		Cursor::State ret = down ? Cursor::State::CLICKING : Cursor::State::IDLE;
 
 		for (auto &btit : buttons)
 		{
-			if (btit.second->is_active() && btit.second->bounds(position).contains(pos)
-				&& !button_covered(btit.first, pos))
+			if (button_under(btit.first, pos))
 			{
 				if (btit.second->get_state() == Button::State::NORMAL)
 				{
@@ -117,14 +155,20 @@ namespace ms
 					ret = Cursor::State::CANCLICK;
 				} else if (btit.second->get_state() == Button::State::MOUSEOVER)
 				{
-					if (down)
+					if (down && !holding && btit.second->is_tab())
 					{
-						Sound(Sound::Name::BUTTONCLICK).play();
+						ret = click_button(btit.first);
+					} else if (down && !holding)
+					{
+						// v83 only presses a button as the mouse goes down
+						// (FUN_004c1059).
+						holding = true;
+						held_button = btit.first;
 
-						btit.second->set_state(button_pressed(btit.first));
+						btit.second->set_state(Button::State::PRESSED);
 
-						ret = Cursor::State::IDLE;
-					} else
+						ret = Cursor::State::CLICKING;
+					} else if (!down)
 					{
 						ret = Cursor::State::CANCLICK;
 					}
@@ -136,5 +180,46 @@ namespace ms
 		}
 
 		return ret;
+	}
+
+	Cursor::State UIElement::click_button(uint16_t buttonid)
+	{
+		Sound(Sound::Name::BUTTONCLICK).play();
+
+		Button::State state = button_pressed(buttonid);
+		auto btit = buttons.find(buttonid);
+
+		if (btit == buttons.end())
+			return Cursor::State::IDLE;
+
+		// v83 puts a clicked button back under the cursor, so the next click
+		// needs no fresh hover (FUN_004c107d).
+		if (state == Button::State::NORMAL && active && btit->second->is_active())
+			state = Button::State::MOUSEOVER;
+
+		btit->second->set_state(state);
+
+		return state == Button::State::MOUSEOVER ? Cursor::State::CANCLICK : Cursor::State::IDLE;
+	}
+
+	bool UIElement::button_under(uint16_t buttonid, Point<int16_t> pos) const
+	{
+		auto btit = buttons.find(buttonid);
+
+		return btit != buttons.end() && btit->second->is_active() && btit->second->bounds(position).contains(pos)
+			&& !button_covered(buttonid, pos);
+	}
+
+	void UIElement::release_button()
+	{
+		if (!holding)
+			return;
+
+		holding = false;
+
+		auto btit = buttons.find(held_button);
+
+		if (btit != buttons.end() && btit->second->get_state() == Button::State::PRESSED)
+			btit->second->set_state(Button::State::NORMAL);
 	}
 }

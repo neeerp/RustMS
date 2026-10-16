@@ -60,14 +60,18 @@ namespace ms
 
 			bool update()
 			{
-				return sprite.update(
-						static_cast<uint16_t>(Constants::TIMESTEP * speed)
-				);
+				// Keep the fraction of a millisecond the speed leaves over.
+				float step = Constants::TIMESTEP * speed + carry;
+				uint16_t timestep = static_cast<uint16_t>(step);
+				carry = step - timestep;
+
+				return sprite.update(timestep);
 			}
 
 		private:
 			Sprite sprite;
 			float speed;
+			float carry = 0.0f;
 		};
 
 		std::map<int8_t, std::list<Effect>> effects;

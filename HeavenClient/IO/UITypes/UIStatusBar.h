@@ -25,6 +25,7 @@
 #include "../Components/Charset.h"
 
 #include "../../Character/CharStats.h"
+#include "../../Graphics/Animation.h"
 #include "../../Graphics/Text.h"
 
 namespace ms
@@ -70,6 +71,20 @@ namespace ms
 
 		bool is_menu_active();
 
+		// The equip, item, stat and skill keys, left to right.
+		enum Key : uint8_t
+		{
+			KEY_EQUIP,
+			KEY_ITEM,
+			KEY_STAT,
+			KEY_SKILL,
+			NUM_KEYS
+		};
+
+		// Makes a key glow (StatusBar.img/<key>/ani, FUN_008dfe21) until it is clicked, or for 90 seconds.
+		// A key that already glows keeps its time.
+		void show_key_hint(Key key);
+
 	protected:
 		Button::State button_pressed(uint16_t buttonid) override;
 		bool button_covered(uint16_t buttonid, Point<int16_t> cursorpos) const override;
@@ -87,6 +102,21 @@ namespace ms
 		float gethppercent() const;
 
 		float getmppercent() const;
+
+		// A gauge's warning flash. v83 (FUN_008d850b) plays it once each
+		// time the value falls while under the warning level.
+		struct GaugeFlash
+		{
+			Animation animation;
+			Point<int16_t> pos;
+			bool active = false;
+			// The value at the last check; -1 until the first.
+			int32_t last = -1;
+
+			void check(int32_t value, int32_t max);
+			void update();
+			void draw(Point<int16_t> parent) const;
+		};
 
 		void toggle_menu(Menu menu);
 
@@ -136,6 +166,8 @@ namespace ms
 		Texture gaugebar;
 		Texture gaugegray;
 		Texture graduation;
+		GaugeFlash hpflash;
+		GaugeFlash mpflash;
 		Texture quickslot;
 		Texture keylabels[8];
 		Texture gamemenu;
@@ -158,5 +190,9 @@ namespace ms
 
 		bool quickslot_active;
 		Menu menu;
+
+		Animation key_hints[Key::NUM_KEYS];
+		// Steps left for each key's glow; 0 when it is off.
+		uint16_t key_hint_left[Key::NUM_KEYS] = {};
 	};
 }

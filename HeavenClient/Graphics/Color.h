@@ -109,6 +109,9 @@ namespace ms
 			CORNFLOWERBLUE,
 			SUNDOWN,
 			HPSHADE,
+			WEAKMOB,
+			STRONGMOB,
+			PICTONBLUE,
 			NUM_COLORS
 		};
 
@@ -157,17 +160,20 @@ namespace ms
 						{0.34f, 0.34f, 0.42f}, // Dusk blue (#56566B, quest list choices in the v83 NPC dialog, from footage)
 						{1.00f, 0.13f, 0.13f}, // Bright red (#FF2020, v83 font 6: Quest Helper counts under a third done)
 						{1.00f, 0.20f, 0.60f}, // Wild strawberry (#FF3399, v83 font 10: Quest Helper counts under two thirds done)
-						{1.00f, 0.60f, 0.00f}, // Pizazz (#FF9900, v83 font 9: Quest Helper counts not yet done)
+						{1.00f, 0.60f, 0.00f}, // Pizazz (#FF9900, v83 font 9: Quest Helper counts not yet done; v83 chat font 3: buddy chat)
 						{0.20f, 0.40f, 0.00f}, // Deep green (#336600, v83 font 13: Quest Helper counts that are done)
 						{0.20f, 0.33f, 0.40f}, // San Juan (#335566, outlines the v83 minimap's names, from footage)
 						{0.00f, 0.00f, 0.27f}, // Stratos (#000044, fills v83 tooltips, from footage)
 						{0.60f, 0.60f, 0.80f}, // Blue Bell (#9999CC, edges v83 tooltips, from footage)
 						{0.84f, 0.43f, 0.59f}, // Charm (#D76E96, the v83 Cash Shop's selected inventory tab, from footage)
-						{1.00f, 0.60f, 0.80f}, // Party pink (#FF99CC, party chat; not yet checked against footage)
+						{1.00f, 0.60f, 0.80f}, // Party pink (#FF99CC, party chat, from the v83 client's chat fonts)
 						{1.00f, 0.63f, 0.58f}, // Mona Lisa (#FFA194, Monster Book lines in the chat log, from footage)
 						{0.40f, 0.65f, 0.98f}, // Cornflower blue (#66A5FA, the names of upgraded equips in v83 tooltips, from footage)
 						{1.00f, 0.69f, 0.69f}, // Sundown (#FFAFAF, skill-refusal notices in the chat log, from the v83 client's chat fonts)
-						{0.63f, 0.01f, 0.00f}  // HP shade (#A00300, the bottom row of v83's mob and party HP bars)
+						{0.63f, 0.01f, 0.00f}, // HP shade (#A00300, the bottom row of v83's mob and party HP bars)
+						{1.00f, 1.00f, 0.13f}, // Weak mob (#FFFF20, v83 font 3: names of mobs 20+ levels below the player)
+						{0.75f, 0.24f, 0.01f}, // Strong mob (#BE3C03, v83 font 42: names of mobs 20+ levels above the player)
+						{0.39f, 0.71f, 0.94f}  // Picton blue (#64B4F0, v83 font 5: quest messages in the status lines)
 				};
 
 		// Create a color by an array of real numbers [0.0f, 1.0f]

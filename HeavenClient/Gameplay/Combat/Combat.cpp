@@ -18,6 +18,7 @@
 #include "Combat.h"
 
 #include "DamageLayout.h"
+#include "HitTiming.h"
 
 #include "../../Character/SkillId.h"
 #include "../../IO/Messages.h"
@@ -98,6 +99,13 @@ namespace ms
 		if (!player.can_attack())
 			return;
 
+		// v83 says why it won't attack bare-handed (FUN_0095b85a).
+		if (!player.get_look().get_equips().has_weapon())
+		{
+			InChatMessage(Messages::ATTACK_NOWEAPON).drop();
+			return;
+		}
+
 		const SpecialMove &move = get_move(move_id);
 		SpecialMove::ForbidReason reason = player.can_use(move);
 		Weapon::Type weapontype = player.get_stats().get_weapontype();
@@ -136,8 +144,11 @@ namespace ms
 			MapObjects *mob_objs = mobs.get_mobs();
 			MapObjects *reactor_objs = reactors.get_reactors();
 
-			std::vector<int32_t> mob_targets = find_closest(mob_objs, range, origin, mobcount, true);
-			std::vector<int32_t> reactor_targets = find_closest(reactor_objs, range, origin, mobcount, false);
+			// As in v83, ranged attacks hit the mobs closest to the player, while
+			// melee and magic attacks hit them in the order they entered the map.
+			bool closest_first = attack.type == Attack::Type::RANGED;
+			std::vector<int32_t> mob_targets = find_targets(mob_objs, range, origin, mobcount, true, closest_first);
+			std::vector<int32_t> reactor_targets = find_targets(reactor_objs, range, origin, mobcount, false, true);
 
 			mobs.send_attack(result, attack, mob_targets, mobcount);
 			result.attacker = player.get_oid();
@@ -154,20 +165,25 @@ namespace ms
 					DamageReactorPacket(reactor->get_oid(), player.get_position(), 0, 0).dispatch();
 		} else
 		{
+			// v83 uses a skill that doesn't attack only when it may ask the
+			// server, as for an item (FUN_0096b140).
+			if (!player.can_request(ExclRequest::SKILL_WAIT))
+				return;
+
 			move.apply_useeffects(player);
 			move.apply_actions(player, Attack::Type::MAGIC);
 
 			int32_t moveid = move.get_id();
 			int32_t level = player.get_skills().get_level(moveid);
-			UseSkillPacket(moveid, level).dispatch();
+			player.request(UseSkillPacket(moveid, level), ExclRequest::SKILL_WAIT);
 		}
 	}
 
 	std::vector<int32_t>
-	Combat::find_closest(MapObjects *objs, Rectangle<int16_t> range, Point<int16_t> origin, uint8_t objcount,
-						 bool use_mobs) const
+	Combat::find_targets(MapObjects *objs, Rectangle<int16_t> range, Point<int16_t> origin, uint8_t objcount,
+						 bool use_mobs, bool closest_first) const
 	{
-		std::multimap<uint16_t, int32_t> distances;
+		std::multimap<uint32_t, int32_t> candidates;
 
 		for (auto &mmo : *objs)
 		{
@@ -178,8 +194,8 @@ namespace ms
 				if (mob && mob->is_alive() && mob->is_in_range(range))
 				{
 					int32_t oid = mob->get_oid();
-					uint16_t distance = mob->get_position().distance(origin);
-					distances.emplace(distance, oid);
+					uint32_t key = closest_first ? mob->get_position().distance(origin) : objs->entry_order(oid);
+					candidates.emplace(key, oid);
 				}
 			} else
 			{
@@ -189,21 +205,22 @@ namespace ms
 				if (reactor && reactor->is_hittable() && reactor->is_in_range(range))
 				{
 					int32_t oid = reactor->get_oid();
-					uint16_t distance = reactor->get_position().distance(origin);
-					distances.emplace(distance, oid);
+					uint32_t key = closest_first ? reactor->get_position().distance(origin) : objs->entry_order(oid);
+					candidates.emplace(key, oid);
 				}
 			}
 		}
 
 		std::vector<int32_t> targets;
 
-		for (auto &iter : distances)
+		for (auto &iter : candidates)
 		{
 			if (targets.size() >= objcount)
 				break;
 
 			targets.push_back(iter.second);
 		}
+
 
 		return targets;
 	}
@@ -390,20 +407,26 @@ namespace ms
 			}
 		} else
 		{
-			for (auto &line : result.damagelines)
+			// As in v83, every hit on a mob lands at once, at the frame the
+			// attack hits on, and each later target a little after.
+			uint16_t delay = user.get_attackdelay(0);
+
+			for (size_t target = 0; target < result.damagelines.size(); target++)
 			{
+				auto &line = result.damagelines[target];
 				int32_t oid = line.first;
 
 				if (mobs.contains(oid))
 				{
 					std::vector<DamageNumber> numbers = place_numbers(line.second, move.get_id());
+					uint16_t target_delay = hit_timing::target_delay(result.type, result.skill, target);
 
 					size_t i = 0;
 
 					for (auto &number : numbers)
 					{
 						damageeffects.emplace(
-								user.get_attackdelay(i),
+								delay + target_delay,
 								attackuser,
 								number,
 								line.second[i].first,

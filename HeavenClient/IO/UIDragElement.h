@@ -53,10 +53,16 @@ namespace ms
 					return Cursor::State::CLICKING;
 				} else if (indragrange(cursorpos))
 				{
-					cursoroffset = cursorpos - position;
-					dragged = true;
+					Cursor::State ret = UIElement::send_cursor(clicked, cursorpos);
 
-					return UIElement::send_cursor(clicked, cursorpos);
+					// A button pressed in the title bar doesn't move the window.
+					if (!is_holding_button())
+					{
+						cursoroffset = cursorpos - position;
+						dragged = true;
+					}
+
+					return ret;
 				}
 			} else
 			{

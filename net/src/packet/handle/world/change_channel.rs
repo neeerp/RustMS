@@ -1,6 +1,6 @@
-use crate::error::NetworkError;
 use crate::handler::{HandlerResult, WorldAction, WorldContext, WorldHandler, WorldResult};
 use crate::login_world::resolve_login_channel;
+use crate::packet::build;
 use packet::{io::read::PktRead, Packet};
 use std::io::Cursor;
 
@@ -13,12 +13,14 @@ impl WorldHandler for ChangeChannelHandler {
         let target_channel_id = reader.read_byte()?;
         let _tick = reader.read_int()?;
 
-        if target_channel_id == ctx.channel_id {
-            return Ok(HandlerResult::empty());
+        // The client waits on an answer before it sends another request, so
+        // a refusal still answers.
+        if target_channel_id == ctx.channel_id
+            || resolve_login_channel(ctx.player.world_id, target_channel_id).is_err()
+        {
+            let enable_actions = build::world::stat::build_stat_update(true, &[])?;
+            return Ok(HandlerResult::reply(enable_actions));
         }
-
-        resolve_login_channel(ctx.player.world_id, target_channel_id)
-            .map_err(|_| NetworkError::PacketHandlerError("Selected channel is not configured"))?;
 
         Ok(HandlerResult::empty().with(WorldAction::ChangeChannel {
             channel_id: target_channel_id,
