@@ -18,6 +18,7 @@
 #include "Mob.h"
 #include "Layer.h"
 
+#include "../Combat/Prepare.h"
 #include "../../Character/TouchDamage.h"
 #include "../../Constants.h"
 #include "../../Util/Misc.h"
@@ -1070,7 +1071,7 @@ namespace ms
 				result.begin(), result.end(),
 				[&]()
 				{
-					return next_damage(mindamage, maxdamage, hitchance, critical);
+					return next_damage(mindamage, maxdamage, hitchance, critical, attack);
 				}
 		);
 
@@ -1079,7 +1080,8 @@ namespace ms
 		return result;
 	}
 
-	std::pair<int32_t, bool> Mob::next_damage(double mindamage, double maxdamage, float hitchance, float critical) const
+	std::pair<int32_t, bool> Mob::next_damage(double mindamage, double maxdamage, float hitchance, float critical,
+											  const Attack &attack) const
 	{
 		bool hit = randomizer.below(hitchance);
 
@@ -1093,6 +1095,9 @@ namespace ms
 
 		if (iscritical)
 			damage *= 1.5;
+
+		// A held skill hits harder the longer it was charged (0x79048c).
+		damage = prepare::charge_percent(attack.skill, attack.charge) * damage * 0.01;
 
 		if (damage < 1)
 			damage = 1;
@@ -1118,6 +1123,7 @@ namespace ms
 		damage = damage * attack.amplify * 0.01;
 		damage = elemental(damage, attack.skill, attack.element, elements);
 		damage = defend(damage, mdef, randomizer.next_real(1.0));
+		damage = prepare::charge_percent(attack.skill, attack.charge) * damage * 0.01;
 
 		return finish(damage);
 	}
