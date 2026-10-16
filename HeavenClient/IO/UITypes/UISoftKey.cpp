@@ -51,6 +51,7 @@ namespace ms
 		for (size_t i = 0; i < 3; i++)
 		{
 			buttons[Buttons::TAB0 + i] = std::make_unique<TwoSpriteButton>(TabNormal[i], TabSelected[i], screen_adj);
+			buttons[Buttons::TAB0 + i]->set_tab();
 
 			if (i == 0)
 				buttons[Buttons::TAB0 + i]->set_state(Button::State::PRESSED);

@@ -49,6 +49,9 @@ impl Buff {
 #[derive(Debug, Default, PartialEq, Eq)]
 pub struct BuffTick {
     pub expired: Vec<BuffStat>,
+    /// Skills whose cooldowns ran out. The client keeps a skill on cooldown
+    /// until it is told.
+    pub cooled: Vec<i32>,
     /// HP that Recovery heals now.
     pub heal: i32,
 }
@@ -78,18 +81,19 @@ impl Buffs {
     }
 
     pub fn start_cooldown(&mut self, skill_id: i32, now: Instant, length: Duration) {
-        self.cooldowns
-            .retain(|&(id, until)| id != skill_id && until > now);
+        self.cooldowns.retain(|&(id, _)| id != skill_id);
         self.cooldowns.push((skill_id, now + length));
     }
 
     /// When `advance` next has something to do.
     pub fn next_deadline(&self) -> Option<Instant> {
-        self.active.iter().map(Buff::next_deadline).min()
+        let buffs = self.active.iter().map(Buff::next_deadline);
+        let cooldowns = self.cooldowns.iter().map(|&(_, until)| until);
+        buffs.chain(cooldowns).min()
     }
 
     /// Heal for each Recovery interval that has passed, then end the buffs
-    /// that ran out.
+    /// and cooldowns that ran out.
     pub fn advance(&mut self, now: Instant) -> BuffTick {
         let mut tick = BuffTick::default();
         for buff in &mut self.active {
@@ -105,7 +109,28 @@ impl Buffs {
             }
             running
         });
+        self.cooldowns.retain(|&(id, until)| {
+            let running = until > now;
+            if !running {
+                tick.cooled.push(id);
+            }
+            running
+        });
         tick
+    }
+
+    /// End the buffs a skill gave, e.g. when the player right-clicks its
+    /// icon. Its cooldown keeps running.
+    pub fn cancel(&mut self, skill_id: i32) -> Vec<BuffStat> {
+        let mut ended = Vec::new();
+        self.active.retain(|buff| {
+            let cancelled = buff.skill_id == skill_id;
+            if cancelled {
+                ended.push(buff.stat);
+            }
+            !cancelled
+        });
+        ended
     }
 
     /// End every buff, e.g. on death. Cooldowns keep running.
@@ -149,6 +174,19 @@ mod tests {
     }
 
     #[test]
+    fn cancelling_a_skill_ends_only_its_buffs() {
+        let start = Instant::now();
+        let mut buffs = Buffs::default();
+        buffs.give(Buff::new(1001, BuffStat::Recovery, 4, start, 30 * SECOND));
+        buffs.give(Buff::new(1002, BuffStat::Speed, 20, start, 12 * SECOND));
+        buffs.start_cooldown(1002, start, 60 * SECOND);
+        assert_eq!(buffs.cancel(1002), vec![BuffStat::Speed]);
+        assert_eq!(buffs.cancel(1002), vec![]);
+        assert_eq!(buffs.active()[0].stat, BuffStat::Recovery);
+        assert!(buffs.cooling_down(1002, start + SECOND));
+    }
+
+    #[test]
     fn cooldowns_run_out() {
         let start = Instant::now();
         let mut buffs = Buffs::default();
@@ -156,5 +194,23 @@ mod tests {
         assert!(buffs.cooling_down(1002, start + 59 * SECOND));
         assert!(!buffs.cooling_down(1001, start));
         assert!(!buffs.cooling_down(1002, start + 60 * SECOND));
+    }
+
+    #[test]
+    fn advancing_reports_each_cooldown_that_ran_out() {
+        let start = Instant::now();
+        let mut buffs = Buffs::default();
+        buffs.start_cooldown(1002, start, 60 * SECOND);
+        buffs.start_cooldown(1001003, start, 30 * SECOND);
+        assert_eq!(buffs.next_deadline(), Some(start + 30 * SECOND));
+        assert!(buffs.advance(start + 29 * SECOND).cooled.is_empty());
+        // Another skill's cooldown starting doesn't drop one that ran out.
+        buffs.start_cooldown(1001, start + 31 * SECOND, 60 * SECOND);
+        assert_eq!(buffs.advance(start + 31 * SECOND).cooled, vec![1001003]);
+        assert_eq!(buffs.next_deadline(), Some(start + 60 * SECOND));
+        assert_eq!(buffs.advance(start + 60 * SECOND).cooled, vec![1002]);
+        // Death ends buffs but not cooldowns.
+        assert!(buffs.clear().is_empty());
+        assert_eq!(buffs.next_deadline(), Some(start + 91 * SECOND));
     }
 }

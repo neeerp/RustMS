@@ -84,6 +84,9 @@ namespace ms
 		// Return the head position of a mob.
 		Point<int16_t> get_mob_head_position(int32_t oid) const;
 
+		// Return a mob's body bounds on the map.
+		Rectangle<int16_t> get_mob_body(int32_t oid) const;
+
 		// Return all mob map objects
 		MapObjects *get_mobs();
 

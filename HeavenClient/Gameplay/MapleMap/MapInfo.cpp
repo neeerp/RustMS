@@ -19,6 +19,9 @@
 
 #include "../Constants.h"
 
+#include <algorithm>
+#include <charconv>
+
 namespace ms
 {
 	MapInfo::MapInfo(nl::node src, Range<int16_t> walls, Range<int16_t> borders)
@@ -55,7 +58,22 @@ namespace ms
 		for (auto seat : src["seat"])
 			seats.push_back(seat);
 
-		for (auto ladder : src["ladderRope"])
+		// v83 searches ladders and ropes by number, so 2 comes before 10.
+		std::vector<nl::node> ropes;
+
+		for (auto rope : src["ladderRope"])
+			ropes.push_back(rope);
+
+		std::stable_sort(ropes.begin(), ropes.end(), [](nl::node a, nl::node b) {
+			auto number = [](const std::string& name) {
+				int32_t value = 0;
+				std::from_chars(name.data(), name.data() + name.size(), value);
+				return value;
+			};
+			return number(a.name()) < number(b.name());
+		});
+
+		for (auto ladder : ropes)
 			ladders.push_back(ladder);
 	}
 
@@ -65,6 +83,11 @@ namespace ms
 	bool MapInfo::is_underwater() const
 	{
 		return swim;
+	}
+
+	bool MapInfo::can_migrate() const
+	{
+		return (fieldlimit & 0x10) == 0;
 	}
 
 	std::string MapInfo::get_bgm() const
@@ -96,10 +119,13 @@ namespace ms
 		return nullptr;
 	}
 
-	Optional<const Ladder> MapInfo::findladder(Point<int16_t> position, bool upwards) const
+	Optional<const Ladder> MapInfo::findladder(Point<int16_t> a, Point<int16_t> b) const
 	{
+		auto hor = Range<int16_t>(std::min(a.x(), b.x()) - 10, std::max(a.x(), b.x()) + 10);
+		auto ver = Range<int16_t>(std::min(a.y(), b.y()), std::max(a.y(), b.y()));
+
 		for (auto &ladder : ladders)
-			if (ladder.inrange(position, upwards))
+			if (hor.contains(ladder.get_x()) && ver.overlaps({ladder.get_top(), ladder.get_bottom()}))
 				return ladder;
 
 		return nullptr;
@@ -129,6 +155,7 @@ namespace ms
 		y1 = src["y1"];
 		y2 = src["y2"];
 		ladder = src["l"].get_bool();
+		uf = src["uf"].get_bool();
 	}
 
 	bool Ladder::is_ladder() const
@@ -136,27 +163,23 @@ namespace ms
 		return ladder;
 	}
 
-	bool Ladder::inrange(Point<int16_t> position, bool upwards) const
+	bool Ladder::leads_up() const
 	{
-		auto hor = Range<int16_t>::symmetric(position.x(), 10);
-		auto ver = Range<int16_t>(y1, y2);
-
-		int16_t y = upwards ?
-					position.y() - 5 :
-					position.y() + 5;
-
-		return hor.contains(x) && ver.contains(y);
-	}
-
-	bool Ladder::felloff(int16_t y, bool downwards) const
-	{
-		int16_t dy = downwards ? y + 5 : y - 5;
-
-		return dy > y2 || y + 5 < y1;
+		return uf;
 	}
 
 	int16_t Ladder::get_x() const
 	{
 		return x;
+	}
+
+	int16_t Ladder::get_top() const
+	{
+		return y1;
+	}
+
+	int16_t Ladder::get_bottom() const
+	{
+		return y2;
 	}
 }

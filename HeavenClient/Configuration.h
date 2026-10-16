@@ -17,7 +17,9 @@
 //////////////////////////////////////////////////////////////////////////////////
 #pragma once
 
+#include <map>
 #include <string>
+#include <vector>
 
 #include <cstdint>
 
@@ -155,6 +157,13 @@ namespace ms
 
 		// Update the known channel count for a world.
 		void set_world_channel_count(uint8_t world_id, uint8_t count);
+
+		// The name the server list gave a world's channel (0-based), or
+		// nothing if it gave none.
+		std::string get_channel_name(uint8_t world_id, int32_t channel);
+
+		// Update the channel names the server list gave a world.
+		void set_world_channel_names(uint8_t world_id, const std::vector<std::string>& names);
 		// Check if the current account is an admin account
 		bool get_admin();
 		// Check whether the current account is an admin account
@@ -295,6 +304,7 @@ namespace ms
 		uint8_t worldid;
 		uint8_t channelid;
 		std::map<uint8_t, uint8_t> world_channel_counts;
+		std::map<uint8_t, std::vector<std::string>> world_channel_names;
 		bool admin;
 		TypeMap<Entry> settings;
 	};

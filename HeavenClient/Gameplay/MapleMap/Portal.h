@@ -76,14 +76,10 @@ namespace ms
 		};
 
 		Portal(const Animation *animation, Type type, std::string name, bool intramap, Point<int16_t> position,
-			   int32_t tomap, std::string toname, int16_t hrange, int16_t vrange);
+			   int32_t tomap, std::string toname, int16_t hrange, int16_t vrange, int32_t delay = 0,
+			   bool only_once = false, Point<int16_t> impact = {});
 
 		Portal();
-
-		void update(Point<int16_t> playerpos);
-
-		// Track contact; true only on the update the player first touches it.
-		bool touch(Point<int16_t> playerpos);
 
 		void draw(Point<int16_t> viewpos, float alpha) const;
 
@@ -93,14 +89,35 @@ namespace ms
 
 		Point<int16_t> get_position() const;
 
-		Rectangle<int16_t> bounds() const;
+		// The box v83 checks touch portals against every update
+		// (FUN_00712b61, FindPortal_Collision): hRange by vRange centred on
+		// the portal, with the right and bottom edges excluded.
+		Rectangle<int16_t> range_bounds() const;
+
+		// The box the Up key finds a portal in (v83 FUN_00712ab1): 20 px
+		// either side and 50 px above and below, without the right and
+		// bottom edges.
+		Rectangle<int16_t> warp_bounds() const;
+
+		// The box a hidden portal shows itself in (v83 FUN_00712c57): 100 px
+		// either side and 50 px above and below, without the right and
+		// bottom edges.
+		Rectangle<int16_t> reveal_bounds() const;
 
 		WarpInfo getwarpinfo() const;
 
+		// Milliseconds a touch script waits after the player's last request
+		// or its answer.
+		int32_t get_delay() const;
+
+		// Whether a touch script runs again only after another has run.
+		bool is_only_once() const;
+
+		// The speed a type 13 jump pad throws the player at: its
+		// horizontalImpact sideways and its verticalImpact upwards.
+		Point<int16_t> get_impact() const;
+
 	private:
-		// The original's CPortalList::FindPortal_Collision box: hRange by vRange
-		// centred on the portal, with the right and bottom edges excluded.
-		Rectangle<int16_t> touch_bounds() const;
 
 		const Animation *animation;
 		Type type;
@@ -109,6 +126,8 @@ namespace ms
 		WarpInfo warpinfo;
 		int16_t hrange;
 		int16_t vrange;
-		bool touched;
+		int32_t delay;
+		bool only_once;
+		Point<int16_t> impact;
 	};
 }

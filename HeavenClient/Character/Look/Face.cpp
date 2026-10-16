@@ -18,6 +18,7 @@
 #include "Face.h"
 
 #include <iostream>
+#include <iterator>
 
 #include <nlnx/nx.hpp>
 
@@ -25,10 +26,18 @@ namespace ms
 {
 	Expression::Id Expression::byaction(size_t action)
 	{
-		action -= 98;
+		// The v83 client's faces by emotion number, F1's action (100)
+		// being 1. The face items start at 8.
+		static constexpr Id BY_EMOTION[] = {
+			BLINK, HIT, SMILE, TROUBLED, CRY, ANGRY, BEWILDERED, STUNNED,
+			VOMIT, OOPS, CHEERS, CHU, WINK, PAIN, GLITTER, BLAZE,
+			SHINE, LOVE, DESPAIR, HUM, BOWING, HOT, DAM
+		};
 
-		if (action < Expression::Id::LENGTH)
-			return static_cast<Id>(action);
+		size_t emotion = action - 99;
+
+		if (emotion < std::size(BY_EMOTION))
+			return BY_EMOTION[emotion];
 
 		std::cout << "Unknown Expression::Id action: [" << action << "]" << std::endl;
 

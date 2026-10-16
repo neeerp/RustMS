@@ -89,6 +89,16 @@ pub fn build_meso_gain(amount: i32) -> Result<Packet, NetworkError> {
     Ok(p)
 }
 
+/// SHOW_STATUS_INFO 5: "You have gained mesos (+n)" or "You have lost mesos
+/// (-n)" in the chat log, as for quest rewards.
+pub fn build_meso_gain_in_chat(amount: i32) -> Result<Packet, NetworkError> {
+    let mut p = Packet::new_empty();
+    p.write_short(SendOpcode::ShowStatusInfo as i16)?;
+    p.write_byte(5)?;
+    p.write_int(amount)?;
+    Ok(p)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -195,6 +205,13 @@ mod tests {
             .short(1)
             .int(5)
             .short(0);
+        expect.end();
+        let spent = build_meso_gain_in_chat(-150).unwrap();
+        let mut expect = Expect::new(&spent.bytes);
+        expect
+            .short(SendOpcode::ShowStatusInfo as i16)
+            .byte(5)
+            .int(-150);
         expect.end();
     }
 }

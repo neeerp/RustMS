@@ -298,7 +298,7 @@ namespace ms
 
 		if (icons[slot])
 			if (int16_t freeslot = inventory.find_free_slot(InventoryType::Id::EQUIP))
-				UnequipItemPacket(slot, freeslot).dispatch();
+				Stage::get().get_player().request(UnequipItemPacket(slot, freeslot), ExclRequest::WAIT);
 	}
 
 	bool UIEquipInventory::is_in_range(Point<int16_t> cursorpos) const
@@ -406,10 +406,10 @@ namespace ms
 		if (equip)
 		{
 			if (eqslot == source)
-				EquipItemPacket(slot, eqslot).dispatch();
+				Stage::get().get_player().request(EquipItemPacket(slot, eqslot), ExclRequest::WAIT);
 		} else
 		{
-			UnequipItemPacket(source, slot).dispatch();
+			Stage::get().get_player().request(UnequipItemPacket(source, slot), ExclRequest::WAIT);
 		}
 
 		return true;

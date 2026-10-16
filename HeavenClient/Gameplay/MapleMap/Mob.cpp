@@ -58,6 +58,9 @@ namespace ms
 		noflip = info["noFlip"].get_bool();
 		notattack = info["notAttack"].get_bool();
 		firstattack = info["firstAttack"].get_bool();
+		showleveltag = !info["hideLevel"].get_bool() && !info["hideHP"].get_bool() &&
+					   !info["hideName"].get_bool() && !info["boss"].get_bool() &&
+					   (mid / 1000000 != 9 || mid / 100000 == 94 || mid / 100000 == 96);
 		canjump = src["jump"].size() > 0;
 		canfly = src["fly"].size() > 0;
 		canmove = src["move"].size() > 0 || canfly;
@@ -735,17 +738,22 @@ namespace ms
 			{
 				namelabel.draw(absp);
 
-				int16_t width = 0;
-
-				for (const Texture& part : leveltag)
-					width += part.width();
-
-				Point<int16_t> tagpos = absp + Point<int16_t>(-namelabel.width() / 2 - width - 3, 5);
-
-				for (const Texture& part : leveltag)
+				if (showleveltag)
 				{
-					part.draw(tagpos);
-					tagpos.shift_x(part.width());
+					int16_t width = 0;
+
+					for (const Texture& part : leveltag)
+						width += part.width();
+
+					// v83 ends the tag 1 px left of the name box and starts
+					// it 2 px below the box's top, level with the text.
+					Point<int16_t> tagpos = absp + Point<int16_t>(-namelabel.width() / 2 - width - 3, 8);
+
+					for (const Texture& part : leveltag)
+					{
+						part.draw(tagpos);
+						tagpos.shift_x(part.width());
+					}
 				}
 
 				if (!dying && hppercent > 0)
@@ -904,19 +912,20 @@ namespace ms
 
 	void Mob::show_hp(int8_t percent, uint16_t playerlevel)
 	{
+		// v83 picks the name's font and tag set when it first builds the
+		// tag (FUN_0066c734): 20 or more levels above the player is orange,
+		// 20 or more below is yellow.
 		if (hppercent == 0)
 		{
-			int16_t delta = playerlevel - level;
-
-			if (delta > 9)
+			if (level >= playerlevel + 20)
 			{
-				namelabel.change_color(Color::Name::YELLOW);
-				set_level_tag(1);
-			}
-			else if (delta < -9)
-			{
-				namelabel.change_color(Color::Name::RED);
+				namelabel.change_color(Color::Name::STRONGMOB);
 				set_level_tag(2);
+			}
+			else if (level + 20 <= playerlevel)
+			{
+				namelabel.change_color(Color::Name::WEAKMOB);
+				set_level_tag(1);
 			}
 		}
 
@@ -1161,6 +1170,18 @@ namespace ms
 		bounds.shift(get_position());
 
 		return range.overlaps(bounds);
+	}
+
+	Rectangle<int16_t> Mob::get_body() const
+	{
+		Rectangle<int16_t> body = animations.at(stance).get_bounds();
+
+		if (flip && !noflip)
+			body = Rectangle<int16_t>(-body.right(), -body.left(), body.top(), body.bottom());
+
+		body.shift(get_position());
+
+		return body;
 	}
 
 	Point<int16_t> Mob::get_head_position() const
