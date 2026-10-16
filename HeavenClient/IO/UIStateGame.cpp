@@ -325,7 +325,7 @@ namespace ms
 
 								break;
 							case KeyAction::Id::CASHSHOP:
-								EnterCashShopPacket().dispatch();
+								Stage::get().enter_cash_shop();
 								break;
 							case KeyAction::Id::SAY:
 								if (auto chatbar = UI::get().get_element<UIChatBar>())

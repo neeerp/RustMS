@@ -127,6 +127,15 @@ namespace ms
 		// Notify the server that the player has moved maps
 		void transfer_player();
 
+		// Ask to move to another channel, unless the player is alert (and
+		// not a GM) or the map forbids it, which a notice explains. Return
+		// whether the request went.
+		bool change_channel(uint8_t channel);
+
+		// Ask to enter the Cash Shop, with the same refusals; GMs too must
+		// catch their breath.
+		void enter_cash_shop();
+
 	private:
 		void load_map(int32_t mapid);
 
