@@ -196,7 +196,8 @@ namespace ms
 		double calculate_maxdamage(int16_t leveldelta, double maxdamage) const;
 
 		// Calculate a random damage line based on the specified values.
-		std::pair<int32_t, bool> next_damage(double mindamage, double maxdamage, float hitchance, float critical) const;
+		std::pair<int32_t, bool> next_damage(double mindamage, double maxdamage, float hitchance, float critical,
+											 const Attack &attack) const;
 
 		// Roll one hit of a spell (magic_damage).
 		int32_t next_magic_damage(const Attack &attack) const;

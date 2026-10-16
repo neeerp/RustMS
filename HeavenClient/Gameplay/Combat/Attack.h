@@ -66,6 +66,8 @@ namespace ms
 		uint8_t speed = 0;
 		uint8_t stance = 0;
 		int32_t skill = 0;
+		// How long a held skill was charged, in ms.
+		int32_t charge = 0;
 		// How far the skill's shot reaches, if it says.
 		int16_t shotrange = 0;
 		int32_t bullet = 0;
@@ -125,6 +127,7 @@ namespace ms
 			type = attack.type;
 			hitcount = attack.hitcount;
 			skill = attack.skill;
+			charge = attack.charge;
 			speed = attack.speed;
 			stance = attack.stance;
 			bullet = attack.bullet;
