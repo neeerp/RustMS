@@ -100,6 +100,9 @@ namespace ms
 		// Return the delay until applying an attack.
 		uint16_t get_attackdelay(size_t no) const;
 
+		// How long a body action plays at the character's speed.
+		int32_t get_action_duration(const std::string &action) const;
+
 		// Set if the character sprite is mirrored (true = facing right)
 		virtual void set_direction(bool flipped);
 

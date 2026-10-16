@@ -235,6 +235,16 @@ namespace ms
 		return static_cast<uint16_t>(delay * (get_action_speed() + 10) / 16);
 	}
 
+	int32_t Char::get_action_duration(const std::string &action) const
+	{
+		int32_t duration = 0;
+
+		for (uint16_t delay : look.get_action_delays(action))
+			duration += delay * (get_action_speed() + 10) / 16;
+
+		return duration;
+	}
+
 	int8_t Char::update(const Physics &physics)
 	{
 		update(physics, 1.0f);

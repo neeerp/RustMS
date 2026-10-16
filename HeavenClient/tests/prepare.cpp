@@ -60,6 +60,12 @@ int main()
 		require(!shot_due(119, 0) && shot_due(120, 0), "a shooter fires every 120 ms");
 		require(shot_due(0, INT32_MIN), "and at once the first time");
 
+		require(timed(2111002) && timed(4211001) && !timed(2121001) && !timed(3121004), "Explosion and Chakra are timed");
+		require(!sends_charge(2111002, true) && charge_cap(4211001) == 0, "and charge nothing");
+		require(chakra_allowed(49, 100) && !chakra_allowed(50, 100), "Chakra needs under half HP");
+		require(chakra_allowed(199, 400) && !chakra_allowed(200, 400) && !chakra_allowed(1, 0), "in whole percent");
+		require(action_id("alert3") == 0x2a, "Chakra prepares with alert3");
+
 		require(gauge_kind(1121001) == 1 && gauge_kind(15101003) == 1, "Monster Magnet and Corkscrew Blow have their own gauge");
 		require(gauge_kind(2121001) == 0 && gauge_kind(3221001) == 0, "the others share one");
 

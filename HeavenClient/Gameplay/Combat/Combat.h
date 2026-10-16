@@ -107,6 +107,9 @@ namespace ms
 		// Hold the skill another step: its effects, and its next shot.
 		void update_prepare();
 
+		// Set off a timed skill, its action over (0x96d01e).
+		void complete_prepare();
+
 		// Fire a skill that keeps firing, if it can, or let it go.
 		void shoot_prepare(const Skill &skill);
 
@@ -197,6 +200,8 @@ namespace ms
 			int32_t held = 0;
 			bool forced = false;
 			bool keydown = false;
+			// How long a timed skill prepares for.
+			int32_t duration = 0;
 		};
 
 		std::optional<Preparing> preparing;

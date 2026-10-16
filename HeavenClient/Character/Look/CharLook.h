@@ -92,6 +92,9 @@ namespace ms
 
 		uint16_t get_attackdelay(size_t no, uint8_t first_frame) const;
 
+		// The delay of each frame of a body action, in order.
+		std::vector<uint16_t> get_action_delays(const std::string &action) const;
+
 		uint8_t get_frame() const;
 
 		Stance::Id get_stance() const;

@@ -16,6 +16,8 @@ namespace ms
 		constexpr int32_t PIERCING_ARROW = 3221001;
 		constexpr int32_t CORKSCREW_BLOW = 5101004;
 		constexpr int32_t CORKSCREW_BLOW_TB = 15101003;
+		constexpr int32_t EXPLOSION = 2111002;
+		constexpr int32_t CHAKRA = 4211001;
 
 		// Whether the skill is held down to charge or keep firing
 		// (FUN_004fb08f).
@@ -98,6 +100,20 @@ namespace ms
 			default:
 				return keydown(skill);
 			}
+		}
+
+		// Whether the skill is timed instead: it prepares for as long as its
+		// action plays, then goes off by itself (0x96b03b, 0x96d01e).
+		inline bool timed(int32_t skill)
+		{
+			return skill == EXPLOSION || skill == CHAKRA;
+		}
+
+		// Whether Chakra may be used: only below half HP, in whole percent
+		// (0x96ae6d).
+		inline bool chakra_allowed(int32_t hp, int32_t maxhp)
+		{
+			return maxhp > 0 && hp * 100 / maxhp < 50;
 		}
 
 		// The v83 number of a prepare action, or -1 for none: these skills'
