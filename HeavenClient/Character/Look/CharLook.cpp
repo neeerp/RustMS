@@ -264,8 +264,13 @@ namespace ms
 		}
 
 		bool aniend = false;
+		uint8_t frame = action ? actframe : stframe.get();
 
-		if (action == nullptr)
+		if (heldframe >= 0 && frame == heldframe)
+		{
+			stance.normalize();
+			stframe.normalize();
+		} else if (action == nullptr)
 		{
 			uint16_t delay = get_delay(stance.get(), stframe.get());
 			uint16_t delta = delay - stelapsed;
@@ -475,10 +480,23 @@ namespace ms
 
 		if (stance != adjstance)
 		{
+			heldframe = -1;
 			stance.set(adjstance);
 			stframe.set(0);
 			stelapsed = 0;
 		}
+	}
+
+	void CharLook::hold(uint8_t frame)
+	{
+		heldframe = frame;
+	}
+
+	void CharLook::end_attack()
+	{
+		heldframe = -1;
+		action = nullptr;
+		actionstr = "";
 	}
 
 	Stance::Id CharLook::getattackstance(uint8_t attack, bool degenerate) const

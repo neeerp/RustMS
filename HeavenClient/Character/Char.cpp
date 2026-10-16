@@ -35,6 +35,7 @@ namespace ms
 		Point<int16_t> absp = phobj.get_absolute(viewx, viewy, alpha);
 
 		effects.drawbelow(absp, alpha);
+		held_effects.drawbelow(absp, alpha);
 
 		Color color;
 
@@ -100,6 +101,7 @@ namespace ms
 		hintballoon.draw(absp - Point<int16_t>(0, 85));
 
 		effects.drawabove(absp, alpha);
+		held_effects.drawabove(absp, alpha);
 
 		for (auto &number : damagenumbers)
 			number.draw(viewx, viewy, alpha);
@@ -120,6 +122,7 @@ namespace ms
 		);
 
 		effects.update();
+		held_effects.update();
 		chair_effect.update();
 		chatballoon.update();
 		hintballoon.update();
@@ -251,6 +254,21 @@ namespace ms
 		effects.add(toshow, DrawArgument(facing_right), z, attackspeed);
 	}
 
+	void Char::show_held_effect(Animation toshow, int8_t z, bool looping)
+	{
+		float attackspeed = get_real_attackspeed();
+
+		if (looping)
+			held_effects.add_looping(toshow, DrawArgument(facing_right), z, attackspeed);
+		else
+			held_effects.add(toshow, DrawArgument(facing_right), z, attackspeed);
+	}
+
+	void Char::clear_held_effects()
+	{
+		held_effects.clear();
+	}
+
 	void Char::show_effect_id(CharEffect::Id toshow)
 	{
 		effects.add(chareffects[toshow]);
@@ -368,6 +386,18 @@ namespace ms
 
 		attacking = true;
 		look.set_alerted(5000);
+	}
+
+	void Char::hold_attack(uint8_t frame)
+	{
+		look.hold(frame);
+	}
+
+	void Char::end_attack()
+	{
+		look.end_attack();
+
+		attacking = false;
 	}
 
 	void Char::set_afterimage(int32_t skill_id)

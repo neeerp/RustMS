@@ -106,8 +106,37 @@ namespace ms
 			if (alure::Source source = free_source())
 			{
 				source.setGain(gain);
+				source.setLooping(false);
 				source.play(buff);
 			}
+		}
+	}
+
+	void Sound::play_loop()
+	{
+		stop();
+
+		if (id > 0)
+		{
+			std::string id_s = std::to_string((uint32_t) id);
+			alure::Buffer buff = Music::ctx.getBuffer(id_s);
+
+			if (alure::Source source = free_source())
+			{
+				source.setGain(gain);
+				source.setLooping(true);
+				source.play(buff);
+				looping = source;
+			}
+		}
+	}
+
+	void Sound::stop()
+	{
+		if (looping)
+		{
+			looping.stop();
+			looping = alure::Source();
 		}
 	}
 

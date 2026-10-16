@@ -38,6 +38,9 @@ namespace ms
 	public:
 		Combat(Player &player, MapChars &chars, MapMobs &mobs, MapReactors &reactors, const Physics &physics);
 
+		// Load the charge gauge, once the NX files are open.
+		static void init();
+
 		// Draw bullets, damage numbers etc.
 		void draw(double viewx, double viewy, float alpha) const;
 
@@ -46,6 +49,21 @@ namespace ms
 
 		// Make the player use a special move
 		void use_move(int32_t move_id);
+
+		// Let go of the skill held down, as its key comes up.
+		void release_prepare(int32_t move_id);
+
+		// Let go of the skill held down, if any, and use it, as when the
+		// window loses focus (FUN_0095bedf).
+		void finish_prepare();
+
+		// The player was hit for `damage`: a hit lets go of a skill that keeps
+		// firing (0x95924f).
+		void interrupt_prepare(int32_t damage);
+
+		// Stop holding a skill without using it, as on leaving the map
+		// (0x9785bd).
+		void clear_prepare();
 
 		// Make the player use a Teleport skill, if the stage `allowed` it.
 		// Where the player should be moved to, if the skill was used.
@@ -79,7 +97,20 @@ namespace ms
 		// Use a skill that doesn't attack. Whether it could ask the server.
 		bool request_skill(const SpecialMove &move);
 
-		void apply_move(const SpecialMove &move);
+		// Use the move. A held skill hits with its `charge`, and its shots
+		// while held keep the body's action (`held`).
+		void apply_move(const SpecialMove &move, int32_t charge = 0, bool held = false);
+
+		// Start holding a skill down (FUN_0096a86e).
+		void start_prepare(const Skill &skill);
+
+		// Hold the skill another step: its effects, and its next shot.
+		void update_prepare();
+
+		// Fire a skill that keeps firing, if it can, or let it go.
+		void shoot_prepare(const Skill &skill);
+
+		void draw_gauge(double viewx, double viewy, float alpha) const;
 
 		// The melee stance a regular ranged attack whacks a mob right in
 		// front of the player with, or NONE to shoot. Either way, `reach` is
@@ -139,6 +170,8 @@ namespace ms
 
 		const SpecialMove &get_move(int32_t move_id);
 
+		const Skill &get_skill(int32_t skill_id);
+
 		Player &player;
 		MapChars &chars;
 		MapMobs &mobs;
@@ -154,5 +187,29 @@ namespace ms
 
 		std::list<Bullet> bullets;
 		std::list<DamageNumber> damagenumbers;
+
+		// A skill held down: how long, in ms, and whether its effect has
+		// turned to the keydown one.
+		struct Preparing
+		{
+			int32_t skill;
+			int32_t level;
+			int32_t held = 0;
+			bool forced = false;
+			bool keydown = false;
+		};
+
+		std::optional<Preparing> preparing;
+
+		// Game time in ms, for the shots of the skills that keep firing.
+		int64_t now = 0;
+		// When Hurricane and Rapid Fire last shot. They outlast a hold, so
+		// letting go and pressing again doesn't shoot sooner (0x948ee5).
+		int64_t last_hurricane = INT32_MIN;
+		int64_t last_rapidfire = INT32_MIN;
+
+		static Texture gauge_bar[2];
+		static Texture gauge_fill[2];
+		static Texture gauge_graduation[2];
 	};
 }
