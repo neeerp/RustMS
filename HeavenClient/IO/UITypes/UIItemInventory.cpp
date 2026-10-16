@@ -271,10 +271,10 @@ namespace ms
 				break;
 			}
 			case Buttons::BT_GATHER:
-				GatherItemsPacket(tab).dispatch();
+				Stage::get().get_player().request(GatherItemsPacket(tab), ExclRequest::WAIT);
 				break;
 			case Buttons::BT_SORT:
-				SortItemsPacket(tab).dispatch();
+				Stage::get().get_player().request(SortItemsPacket(tab), ExclRequest::WAIT);
 				break;
 			case Buttons::BT_FULL:
 				set_full(true);
@@ -294,7 +294,7 @@ namespace ms
 				{
 					auto onenter = [](int32_t amount)
 					{
-						MesoDropPacket(amount).dispatch();
+						Stage::get().get_player().request(MesoDropPacket(amount), ExclRequest::USE_WAIT);
 					};
 
 					UI::get().emplace<UIEnterNumber>("How many mesos will you drop?", onenter, most, MESO_DROP_MIN);
@@ -321,11 +321,11 @@ namespace ms
 				{
 					case InventoryType::Id::EQUIP:
 						if (can_wear_equip(slot))
-							EquipItemPacket(slot, inventory.find_equipslot(item_id)).dispatch();
+							Stage::get().get_player().request(EquipItemPacket(slot, inventory.find_equipslot(item_id)), ExclRequest::WAIT);
 
 						break;
 					case InventoryType::Id::USE:
-						UseItemPacket(slot, item_id).dispatch();
+						Stage::get().get_player().request(UseItemPacket(slot, item_id), ExclRequest::USE_WAIT);
 						break;
 					case InventoryType::Id::SETUP:
 						Stage::get().get_player().use_item(item_id);
@@ -771,13 +771,13 @@ namespace ms
 			{
 				auto onenter = [tab, slot](int32_t qty)
 				{
-					MoveItemPacket(tab, slot, 0, qty).dispatch();
+					Stage::get().get_player().request(MoveItemPacket(tab, slot, 0, qty), ExclRequest::WAIT);
 				};
 
 				UI::get().emplace<UIEnterNumber>(dropmessage, onenter, max, max);
 			} else
 			{
-				MoveItemPacket(tab, slot, 0, 1).dispatch();
+				Stage::get().get_player().request(MoveItemPacket(tab, slot, 0, 1), ExclRequest::WAIT);
 			}
 		};
 
@@ -804,7 +804,7 @@ namespace ms
 			case InventoryType::Id::EQUIP:
 				if (eqsource == eqslot)
 					if (parent.can_wear_equip(source))
-						EquipItemPacket(source, eqslot).dispatch();
+						Stage::get().get_player().request(EquipItemPacket(source, eqslot), ExclRequest::WAIT);
 
 				Sound(Sound::Name::DRAGEND).play();
 
@@ -820,7 +820,7 @@ namespace ms
 		if (tab != sourcetab || slot == source)
 			return true;
 
-		MoveItemPacket(tab, source, slot, 1).dispatch();
+		Stage::get().get_player().request(MoveItemPacket(tab, source, slot, 1), ExclRequest::WAIT);
 
 		return true;
 	}

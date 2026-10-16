@@ -76,7 +76,10 @@ namespace ms
 
 	void ChangeStatsHandler::handle(InPacket& recv) const
 	{
-		recv.read_bool(); // 'itemreaction'
+		// Set when this answers the player's item or stat request.
+		if (recv.read_bool())
+			Stage::get().get_player().request_answered();
+
 		int32_t updatemask = recv.read_int();
 
 		Player& player = Stage::get().get_player();
@@ -237,7 +240,11 @@ namespace ms
 
 	void UpdateSkillHandler::handle(InPacket& recv) const
 	{
-		recv.skip(3);
+		// Set when this answers the player's SP request.
+		if (recv.read_bool())
+			Stage::get().get_player().request_answered();
+
+		recv.skip(2);
 
 		int32_t skillid = recv.read_int();
 		int32_t level = recv.read_int();
