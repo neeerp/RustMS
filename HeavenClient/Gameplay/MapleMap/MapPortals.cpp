@@ -20,7 +20,6 @@
 #include "../../Constants.h"
 
 #include "../../Util/Misc.h"
-#include "../../Net/Packets/GameplayPackets.h"
 
 #include <nlnx/nx.hpp>
 
@@ -42,6 +41,8 @@ namespace ms
 			Point<int16_t> position = {sub["x"], sub["y"]};
 			auto hrange = static_cast<int16_t>(sub["hRange"].get_integer(Portal::DEFAULT_RANGE));
 			auto vrange = static_cast<int16_t>(sub["vRange"].get_integer(Portal::DEFAULT_RANGE));
+			auto delay = static_cast<int32_t>(sub["delay"].get_integer());
+			bool only_once = sub["onlyOnce"].get_bool();
 
 			// v83 draws pv for regular, type 4 and scripted portals alike
 			// (FUN_0071165a, FUN_00712313).
@@ -53,7 +54,7 @@ namespace ms
 					std::piecewise_construct,
 					std::forward_as_tuple(portal_id),
 					std::forward_as_tuple(animation, type, name, intramap, position, target_id, target_name, hrange,
-										  vrange)
+										  vrange, delay, only_once)
 			);
 
 			portal_ids_by_name.emplace(name, portal_id);
@@ -81,21 +82,6 @@ namespace ms
 	void MapPortals::update(Point<int16_t> playerpos)
 	{
 		animations[Portal::REGULAR].update(Constants::TIMESTEP);
-
-		for (auto &iter : portals_by_id)
-		{
-			Portal &portal = iter.second;
-			switch (portal.get_type())
-			{
-				case Portal::SCRIPTED_TOUCH:
-					// Tutorial hints and other touch scripts run on the server.
-					if (portal.touch(playerpos))
-						ChangeMapSpecialPacket(portal.get_name()).dispatch();
-					break;
-				default:
-					break;
-			}
-		}
 
 		update_hidden(playerpos);
 
@@ -184,45 +170,34 @@ namespace ms
 			return {};
 	}
 
-	Portal::WarpInfo MapPortals::find_warp_at(Point<int16_t> playerpos)
+	const Portal *MapPortals::find_up_portal(Point<int16_t> playerpos) const
 	{
-		if (cooldown == 0)
+		// v83's Up key (FUN_0094df9b, FUN_00712ab1) takes the last portal
+		// other than a spawn point whose box holds the player, even one
+		// that leads nowhere.
+		const Portal *found = nullptr;
+		uint8_t found_id = 0;
+
+		for (auto &iter : portals_by_id)
 		{
-			cooldown = WARPCD;
+			const Portal &portal = iter.second;
 
-			// v83's Up key (FUN_0094df9b, FUN_00712ab1) searches from the
-			// last portal to the first, so the highest id wins where two
-			// overlap.
-			const Portal *found = nullptr;
-			uint8_t found_id = 0;
-
-			for (auto &iter : portals_by_id)
+			if (portal.get_type() != Portal::SPAWN && portal.warp_bounds().contains(playerpos) &&
+				(!found || iter.first > found_id))
 			{
-				const Portal &portal = iter.second;
-
-				// Spawn points and tutorial triggers can overlap a real exit.
-				// They have no travel destination and must not mask that exit.
-				if (portal.getwarpinfo().valid && portal.warp_bounds().contains(playerpos) &&
-					(!found || iter.first > found_id))
-				{
-					found = &portal;
-					found_id = iter.first;
-				}
+				found = &portal;
+				found_id = iter.first;
 			}
-
-			if (found)
-				return found->getwarpinfo();
 		}
 
-		return {};
+		return found;
 	}
 
-	Portal::WarpInfo MapPortals::find_touch_warp(Point<int16_t> playerpos)
+	const Portal *MapPortals::find_touch_portal(Point<int16_t> playerpos) const
 	{
 		// v83 (FUN_00712b61) keeps types 3, 9, 12 and 13 in a list of their
 		// own and takes the last one whose hRange by vRange box holds the
-		// player. Only type 3 leads anywhere from here; FUN_0094dac6 sends
-		// the player through it as long as it has a destination.
+		// player.
 		const Portal *found = nullptr;
 		uint8_t found_id = 0;
 
@@ -247,12 +222,27 @@ namespace ms
 			}
 		}
 
-		if (!found || found->get_type() != Portal::TOUCH || !found->getwarpinfo().valid || cooldown > 0)
-			return {};
+		return found;
+	}
+
+	bool MapPortals::may_run_script(const Portal &portal) const
+	{
+		return !portal.is_only_once() || &portal != last_script;
+	}
+
+	void MapPortals::ran_script(const Portal &portal)
+	{
+		last_script = &portal;
+	}
+
+	bool MapPortals::start_cooldown()
+	{
+		if (cooldown > 0)
+			return false;
 
 		cooldown = WARPCD;
 
-		return found->getwarpinfo();
+		return true;
 	}
 
 	void MapPortals::init()

@@ -20,22 +20,12 @@
 namespace ms
 {
 	Portal::Portal(const Animation *a, Type t, std::string nm, bool intramap, Point<int16_t> p, int32_t tid,
-				   std::string tnm, int16_t hr, int16_t vr) : animation(a), type(t), name(nm), position(p),
-				   warpinfo(tid, intramap, tnm, nm), hrange(hr), vrange(vr)
-	{
-		touched = false;
-	}
+				   std::string tnm, int16_t hr, int16_t vr, int32_t dl, bool once) : animation(a), type(t), name(nm),
+				   position(p), warpinfo(tid, intramap, tnm, nm), hrange(hr), vrange(vr), delay(dl), only_once(once)
+	{}
 
 	Portal::Portal() : Portal(nullptr, SPAWN, "", false, Point<int16_t>(), 0, "", DEFAULT_RANGE, DEFAULT_RANGE)
 	{}
-
-	bool Portal::touch(Point<int16_t> playerpos)
-	{
-		bool was_touched = touched;
-		touched = range_bounds().contains(playerpos);
-
-		return touched && !was_touched;
-	}
 
 	void Portal::draw(Point<int16_t> viewpos, float inter) const
 	{
@@ -88,5 +78,15 @@ namespace ms
 	Portal::WarpInfo Portal::getwarpinfo() const
 	{
 		return warpinfo;
+	}
+
+	int32_t Portal::get_delay() const
+	{
+		return delay;
+	}
+
+	bool Portal::is_only_once() const
+	{
+		return only_once;
 	}
 }

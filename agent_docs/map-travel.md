@@ -53,11 +53,15 @@ and `tutoChatNPC`, were for the revamped island's maps and are unused. The
 original island's touch portals run `advice00`-`advice09` and `adviceMap`,
 which have no implementation yet, so they do nothing.
 
-HeavenClient sends CHANGE_MAP_SPECIAL (`0x64`, portal name) when the player's
-feet first enter a script portal's box, and the server answers with the effects
-and an enable-actions stat update. As in the original, the box is the portal's
-`hRange` by `vRange` (100 by default) centred on it, so the triggers that sit
-30-40 px above the floor fire as the player walks past. An `info*` hint runs once per session after it
+HeavenClient sends CHANGE_MAP_SPECIAL (`0x64`, portal name, player x and y)
+while the player stands in a script portal's box, and the server answers with
+the effects and an enable-actions stat update. As in the original, the box is
+the portal's `hRange` by `vRange` (100 by default) centred on it, so the
+triggers that sit 30-40 px above the floor fire as the player walks past. The
+client sends again once that answer arrives and the portal's `delay` (ms) has
+passed, unless the portal is `onlyOnce` and was the last to run in the map.
+Pressing Up on a type 7, 8 or 11 script portal with no destination sends the
+same packet, at most once per 500 ms. An `info*` hint runs once per session after it
 was shown; the exit warning repeats. Hint text comes from the
 [server content pack](./server-content.md). `tutoChatNPC` (the skip offer)
 belongs with scripted NPCs. Explicit direct

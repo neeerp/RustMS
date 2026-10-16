@@ -43,10 +43,21 @@ namespace ms
 
 		void draw(Point<int16_t> viewpos, float inter) const;
 
-		Portal::WarpInfo find_warp_at(Point<int16_t> playerpos);
+		// The portal the Up key uses where the player stands, if any.
+		const Portal *find_up_portal(Point<int16_t> playerpos) const;
 
-		// Where a touch portal the player stands in leads, if anywhere.
-		Portal::WarpInfo find_touch_warp(Point<int16_t> playerpos);
+		// The touch, touch script or jump portal the player stands in, if any.
+		const Portal *find_touch_portal(Point<int16_t> playerpos) const;
+
+		// Whether a touch script may run: one that runs only once must wait
+		// until another has run since (v83 FUN_0094dac6).
+		bool may_run_script(const Portal &portal) const;
+
+		void ran_script(const Portal &portal);
+
+		// Start the wait between warps if the last one is over, and return
+		// whether it was.
+		bool start_cooldown();
 
 		Point<int16_t> get_portal_by_id(uint8_t id) const;
 
@@ -73,5 +84,8 @@ namespace ms
 
 		static const int16_t WARPCD = 48;
 		int16_t cooldown;
+
+		// The touch script that ran last in this field.
+		const Portal *last_script = nullptr;
 	};
 }

@@ -22,27 +22,24 @@ int main()
 	{
 		// Map 10000's infoMinimap trigger sits 30 px above the floor at y = 485.
 		ms::Portal minimap = touch_portal(280, 455);
-		require(!minimap.touch({200, 485}), "touched the portal from 80 px away");
-		require(minimap.touch({240, 485}), "walking along the floor did not touch the portal");
-		require(!minimap.touch({280, 485}), "touched again without leaving the portal");
-		require(!minimap.touch({340, 485}), "touched the portal after walking past it");
-		require(minimap.touch({280, 485}), "re-entering did not touch the portal again");
+		require(!minimap.range_bounds().contains({200, 485}), "touched the portal from 80 px away");
+		require(minimap.range_bounds().contains({240, 485}), "walking along the floor did not touch the portal");
 
 		// The box is hRange by vRange around the portal, without its right and bottom edges.
-		require(touch_portal(280, 455).touch({230, 405}), "the top-left corner is outside the box");
-		require(touch_portal(280, 455).touch({329, 504}), "the bottom-right corner is outside the box");
-		require(!touch_portal(280, 455).touch({330, 455}), "the right edge is inside the box");
-		require(!touch_portal(280, 455).touch({280, 505}), "the bottom edge is inside the box");
+		require(touch_portal(280, 455).range_bounds().contains({230, 405}), "the top-left corner is outside the box");
+		require(touch_portal(280, 455).range_bounds().contains({329, 504}), "the bottom-right corner is outside the box");
+		require(!touch_portal(280, 455).range_bounds().contains({330, 455}), "the right edge is inside the box");
+		require(!touch_portal(280, 455).range_bounds().contains({280, 505}), "the bottom edge is inside the box");
 
 		// Map 10000's exit warnings are 55 px above the floor and 65 px below the
 		// platform over them, so neither reaches them.
-		require(!touch_portal(987, 430).touch({987, 485}), "the exit warning fired from the floor");
-		require(!touch_portal(987, 430).touch({987, 365}), "the exit warning fired from the platform");
+		require(!touch_portal(987, 430).range_bounds().contains({987, 485}), "the exit warning fired from the floor");
+		require(!touch_portal(987, 430).range_bounds().contains({987, 365}), "the exit warning fired from the platform");
 
 		// A map can set its own ranges.
-		require(touch_portal(0, 0, 40, 20).touch({19, 9}), "a custom range missed a point inside it");
-		require(!touch_portal(0, 0, 40, 20).touch({20, 0}), "a custom range reached past hRange / 2");
-		require(!touch_portal(0, 0, 40, 20).touch({0, 10}), "a custom range reached past vRange / 2");
+		require(touch_portal(0, 0, 40, 20).range_bounds().contains({19, 9}), "a custom range missed a point inside it");
+		require(!touch_portal(0, 0, 40, 20).range_bounds().contains({20, 0}), "a custom range reached past hRange / 2");
+		require(!touch_portal(0, 0, 40, 20).range_bounds().contains({0, 10}), "a custom range reached past vRange / 2");
 
 		// The Up key searches a smaller box: 20 px either side and 50 px
 		// above and below, without the right and bottom edges. Ellinia's
