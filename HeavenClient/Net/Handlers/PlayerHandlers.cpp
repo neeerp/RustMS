@@ -42,10 +42,7 @@ namespace ms
 	{
 		void transition_channel_change()
 		{
-			float fadestep = 0.025f;
-
 			Window::get().fadeout(
-				fadestep,
 				[]()
 				{
 					GraphicsGL::get().clear();

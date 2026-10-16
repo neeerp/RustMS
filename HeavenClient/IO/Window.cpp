@@ -20,6 +20,7 @@
 #include "UI.h"
 
 #include "../Configuration.h"
+#include "../Constants.h"
 #include "../Timer.h"
 
 #define STB_IMAGE_IMPLEMENTATION
@@ -266,9 +267,11 @@ namespace ms
 		glfwSwapBuffers(glwnd);
 	}
 
-	void Window::fadeout(float step, std::function<void()> fadeproc)
+	void Window::fadeout(std::function<void()> fadeproc)
 	{
-		opcstep = -step;
+		// v83 fades a closing stage to black over 600 ms (FUN_00776e65) and
+		// the next one back in over 600 ms (FUN_00776b64).
+		opcstep = -static_cast<float>(Constants::TIMESTEP) / 600.0f;
 		fadeprocedure = fadeproc;
 	}
 
