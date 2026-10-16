@@ -146,14 +146,21 @@ namespace ms
 			bool closest_first = attack.type == Attack::Type::RANGED;
 			std::vector<int32_t> mob_targets;
 			std::vector<int32_t> reactor_targets = find_targets(reactor_objs, range, origin, mobcount, false, true);
+			bool shot = attack.type == Attack::Type::RANGED && whack == Stance::Id::NONE && mobcount == 1;
+			bool spell = attack.type == Attack::Type::MAGIC && shot_path::aimed_spell(attack.skill);
+
+			if (spell)
+				reach = shot_path::SPELL_REACH;
+
 			Point<int16_t> shot_start = shot_path::origin(origin, reach, attack.toleft);
 			Point<int16_t> shot_end(attack.toleft ? range.left() : range.right(), shot_start.y());
 
-			// A shot at one mob hits the first in its path instead, unless a
-			// platform between the player and it stops the shot.
-			if (attack.type == Attack::Type::RANGED && whack == Stance::Id::NONE && mobcount == 1)
+			// A shot at one mob, or an aimed spell, hits the first in its path
+			// instead. A platform between the player and it stops a shot, or a
+			// spell that flies.
+			if (shot || spell)
 			{
-				int16_t shot_range = get_shot_range(attack);
+				int16_t shot_range = spell ? shot_path::SPELL_RANGE : get_shot_range(attack);
 				shot_end.set_x(origin.x() + (attack.toleft ? -shot_range : shot_range));
 				mob_targets = find_shot_target(shot_start, shot_end.x());
 
@@ -163,7 +170,7 @@ namespace ms
 				if (!mob_targets.empty())
 					stop = shot_path::hit_point(shot_start, shot_end.x(), mobs.get_mob_body(mob_targets[0]));
 
-				if (shot_path::blocked(sight, stop, find_platforms(sight, stop), player.get_phobj().fhgroup))
+				if (attack.bullet && shot_path::blocked(sight, stop, find_platforms(sight, stop), player.get_phobj().fhgroup))
 				{
 					mob_targets.clear();
 					shot_end = stop;
@@ -430,13 +437,18 @@ namespace ms
 			// player's own do.
 			int16_t reach = 0;
 
+			bool spell = attack.type == Attack::Type::MAGIC && shot_path::aimed_spell(attack.skill);
+
 			if (attack.type == Attack::Type::RANGED && attack.skill == 0)
 				reach = get_whack_reach(user, user.get_look().get_attackstance(true));
+			else if (spell)
+				reach = shot_path::SPELL_REACH;
 
 			// Their range skills' levels are unknown, so their shots reach
 			// only as far as the weapon or skill alone does.
 			int16_t skill_range = attack.skill ? SkillData::get(attack.skill).get_stats(attack.level).shotrange : 0;
-			int16_t shot_range = shot_path::range(attack.skill, skill_range, user.get_weapontype(), 0);
+			int16_t shot_range = spell ? shot_path::SPELL_RANGE
+				: shot_path::range(attack.skill, skill_range, user.get_weapontype(), 0);
 			Point<int16_t> shot_end = shot_path::origin(user.get_position(), shot_range, attack.toleft);
 			extract_effects(user, move, attack, range, reach, shot_end);
 		} else
@@ -485,14 +497,19 @@ namespace ms
 		{
 			// As in v83, the bullets fly straight from in front of the user to
 			// where the shot crosses each target, or as far as the shot goes.
-			// A target's hits all land 1.5 ms per pixel it is away, after the
-			// attack's hit frame.
+			// A target's hits all land 1.5 ms per pixel it is away across, or
+			// along a spell's path, after the attack's hit frame. A spell
+			// flies as one ball however many times it hits.
 			Animation animation = move.get_bullet(user, result.bullet);
 			Point<int16_t> origin = shot_path::origin(user.get_position(), reach, result.toleft);
 			uint16_t delay = user.get_attackdelay(0);
+			bool spell = result.type == Attack::Type::MAGIC;
 
 			auto shoot = [&](Point<int16_t> target, uint8_t count)
 			{
+				if (spell)
+					count = 1;
+
 				for (uint8_t i = 0; i < count; i++)
 				{
 					Point<int16_t> end = target + Point<int16_t>(0, shot_path::spread(i, count));
@@ -509,7 +526,7 @@ namespace ms
 				{
 					std::vector<DamageNumber> numbers = place_numbers(line.second, move.get_id());
 					Point<int16_t> hit = shot_path::hit_point(origin, shot_end.x(), mobs.get_mob_body(oid));
-					uint16_t hit_delay = delay + shot_path::hit_delay(origin, hit);
+					uint16_t hit_delay = delay + (spell ? shot_path::flight_time(origin, hit) : shot_path::hit_delay(origin, hit));
 
 					shoot(hit, static_cast<uint8_t>(numbers.size()));
 
