@@ -37,6 +37,14 @@
 
 namespace ms
 {
+	namespace
+	{
+		// An in-map portal's move lands 120 ms after Up; the portal then
+		// waits 600 ms (v83 FUN_00957b74, FUN_0094e5e5).
+		constexpr int16_t TELEPORT_DELAY = 120;
+		constexpr int16_t TELEPORT_COOLDOWN = 600;
+	}
+
 	Stage::Stage() : combat(player, chars, mobs, reactors)
 	{
 		state = State::INACTIVE;
@@ -114,6 +122,8 @@ namespace ms
 		player.respawn(startpos, mapinfo.is_underwater());
 		player.set_recovery_rate(mapinfo.get_recovery());
 		left_ladder = nullptr;
+		teleport_delay = 0;
+		teleport_cooldown = 0;
 		camera.set_view(mapinfo.get_walls(), mapinfo.get_borders());
 		camera.set_position(startpos);
 	}
@@ -169,6 +179,7 @@ namespace ms
 		drops.update(physics);
 		player.update(physics);
 		check_held_ladders();
+		update_teleport();
 
 		portals.update(player.get_position());
 		camera.update(player.get_position());
@@ -202,11 +213,17 @@ namespace ms
 
 		if (warpinfo.intramap)
 		{
-			Point<int16_t> spawnpoint = portals.get_portal_by_name(warpinfo.toname);
-			Point<int16_t> startpos = physics.get_y_below(spawnpoint);
+			// v83 ignores the portal while a move is pending and for a
+			// while after one.
+			if (teleport_delay > 0 || teleport_cooldown > 0)
+				return;
 
-			player.respawn(startpos, mapinfo.is_underwater());
-			left_ladder = nullptr;
+			Point<int16_t> spawnpoint = portals.get_portal_by_name(warpinfo.toname);
+			teleport_target = physics.get_y_below(spawnpoint);
+			teleport_delay = TELEPORT_DELAY;
+
+			player.show_effect_id(CharEffect::Id::TELEPORT);
+			Sound(Sound::Name::PORTAL).play();
 		} else if (warpinfo.valid)
 		{
 			ChangeMapPacket(false, -1, warpinfo.name, false).dispatch();
@@ -216,6 +233,24 @@ namespace ms
 			stats.set_mapid(warpinfo.mapid);
 
 			Sound(Sound::Name::PORTAL).play();
+		}
+	}
+
+	void Stage::update_teleport()
+	{
+		if (teleport_cooldown > 0)
+			teleport_cooldown -= Constants::TIMESTEP;
+
+		if (teleport_delay <= 0)
+			return;
+
+		teleport_delay -= Constants::TIMESTEP;
+
+		if (teleport_delay <= 0)
+		{
+			player.respawn(teleport_target, mapinfo.is_underwater());
+			left_ladder = nullptr;
+			teleport_cooldown = TELEPORT_COOLDOWN;
 		}
 	}
 
