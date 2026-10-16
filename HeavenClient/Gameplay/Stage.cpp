@@ -262,7 +262,7 @@ namespace ms
 	void Stage::check_drops()
 	{
 		Point<int16_t> playerpos = player.get_position();
-		MapDrops::Loot loot = drops.find_loot_at(playerpos);
+		MapDrops::Loot loot = drops.find_loot_at(playerpos, player.get_oid(), player.get_party().get_id());
 
 		if (loot.first)
 			PickupItemPacket(loot.first, loot.second).dispatch();
