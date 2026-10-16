@@ -44,6 +44,7 @@
 #include "UITypes/UIWorldMap.h"
 
 #include "../Net/Packets/GameplayPackets.h"
+#include "../Net/Packets/PlayerInteractionPackets.h"
 
 namespace ms
 {
@@ -205,7 +206,12 @@ namespace ms
 		if (UIElement *front = get_front(pos))
 			front->doubleclick(pos);
 		else if (int32_t cid = Stage::get().character_at(pos))
-			emplace<UICharInfo>(cid);
+		{
+			// v83 asks only when it may ask the server, as for an item
+			// (FUN_00a23fba).
+			if (Stage::get().get_player().request(CharInfoRequestPacket(cid), ExclRequest::USE_WAIT))
+				emplace<UICharInfo>(cid);
+		}
 	}
 
 	void UIStateGame::rightclick(Point<int16_t> pos)

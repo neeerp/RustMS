@@ -7,13 +7,14 @@ namespace ms
 	// The v83 client lets one item, stat or skill request wait on the server
 	// at a time (FUN_00485bf7). A request may go when none is waiting and
 	// some milliseconds have passed since the last request or answer; the
-	// answer is an inventory, stat or skill update with its first byte set.
+	// answer is an inventory, stat or skill update with its first byte set,
+	// or character info.
 	class ExclRequest
 	{
 	public:
-		// Milliseconds a pickup, an item use, meso drop or chair, a skill
-		// that doesn't attack, and anything else (moving, gathering and sorting
-		// items, AP and SP) wait.
+		// Milliseconds a pickup, an item use, meso drop, chair or character
+		// info, a skill that doesn't attack, and anything else (moving,
+		// gathering and sorting items, AP and SP) wait.
 		static constexpr int32_t PICKUP_WAIT = 30;
 		static constexpr int32_t USE_WAIT = 200;
 		static constexpr int32_t SKILL_WAIT = 300;

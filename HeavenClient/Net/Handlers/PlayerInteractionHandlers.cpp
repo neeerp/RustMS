@@ -19,12 +19,15 @@
 
 #include "../../IO/UI.h"
 
+#include "../../Gameplay/Stage.h"
 #include "../../IO/UITypes/UICharInfo.h"
 
 namespace ms
 {
 	void CharInfoHandler::handle(InPacket& recv) const
 	{
+		Stage::get().get_player().request_answered();
+
 		int32_t character_id = recv.read_int();
 		int8_t character_level = recv.read_byte();
 		int16_t character_job_id = recv.read_short();
