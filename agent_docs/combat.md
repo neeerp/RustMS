@@ -120,6 +120,10 @@ swing T2, P1, and P2 and stab T1 and T2. Wands and staves swing O2. Knuckles,
 and claws without stars, stab O1 and O2. Guns without bullets swing T1, or T2
 two times in three. Claws throw with swing O1, O2, or O3.
 
+A bow, crossbow, claw, or gun with no ammo still attacks, as in v83: the
+regular attack becomes that weak melee hit at a tenth of the damage, with no
+notice (`RegularAttack::can_use`, `Player::prepare_attack`).
+
 Damage numbers follow v83 (`Gameplay/Combat/DamageLayout.h`). The first digit
 comes from the larger `NoRed1` set and the rest from `NoRed0`. Each digit
 overlaps the previous one by 3/5 of its part right of the origin, and digits

@@ -129,17 +129,10 @@ namespace ms
 	}
 
 	SpecialMove::ForbidReason
-	RegularAttack::can_use(int32_t, Weapon::Type weapon, const Job &, uint16_t, uint16_t, uint16_t bullets) const
+	RegularAttack::can_use(int32_t, Weapon::Type, const Job &, uint16_t, uint16_t, uint16_t) const
 	{
-		switch (weapon)
-		{
-			case Weapon::BOW:
-			case Weapon::CROSSBOW:
-			case Weapon::CLAW:
-			case Weapon::GUN:
-				return bullets ? FBR_NONE : FBR_BULLETCOST;
-			default:
-				return FBR_NONE;
-		}
+		// v83 never refuses a regular attack: a bow, crossbow, claw or gun
+		// without ammo swings or stabs instead (Player::prepare_attack).
+		return FBR_NONE;
 	}
 }
