@@ -614,9 +614,11 @@ These were corrected:
 7. SHOW_ITEM_GAIN_INCHAT mode 3 (quest item gains and losses) is a count byte
    followed by an item id and quantity for each. The client read the count as a
    sub-mode and showed nothing unless it was 1. It now shows each item as its
-   own grey (`#BBBBBB`) chat line, worded as in period footage: "You have
-   gained an item (Roger's Apple)", "You have gained items (3 Green Apple)",
-   and "You have lost ..." for losses.
+   own grey (`#BBBBBB`) chat line, worded as the 2025 MapleRoyals client does:
+   "You have gained an item in the Use tab (Roger's Apple)", "You have gained
+   items in the Use tab (Green Apple 3)", "You have lost an item (X)" and "You
+   have lost items (X 3)". A count of 0 instead carries a message and an
+   `Effect/Quest.img` effect number; the message is a `#64B4F0` status line.
 8. The stat window's HP and MP buttons sent SPEND_AP with the current HP and
    MP codes (0x400, 0x1000). They now send MaxHP and MaxMP (0x800, 0x2000),
    which is what AP raises.

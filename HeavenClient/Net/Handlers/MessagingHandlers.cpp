@@ -34,8 +34,6 @@
 
 #include <nlnx/nx.hpp>
 
-#include <cstdlib>
-
 namespace ms
 {
 	namespace
@@ -72,17 +70,37 @@ namespace ms
 			return "#g" + display_name + ">>" + message;
 		}
 
-		// A quest item gain or loss, worded as in the original client (period GMS footage):
-		// "You have gained an item (Roger's Apple)", "You have gained items (3 Green Apple)".
-		std::string build_item_gain_chatline(const std::string& name, int32_t quantity)
+		// The inventory tab an item goes to, as the v83 client names it (FUN_005cfa86).
+		std::string tab_name(int32_t itemid)
 		{
-			std::string verb = quantity < 0 ? "You have lost " : "You have gained ";
-			int32_t count = std::abs(quantity);
+			switch (itemid / 1'000'000)
+			{
+				case 1: return "Eqp";
+				case 2: return "Use";
+				case 3: return "Setup";
+				case 4: return "Etc";
+				case 5: return "Cash";
+				default: return "";
+			}
+		}
 
-			if (count == 1)
-				return verb + "an item (" + name + ")";
+		// A quest item gain or loss, worded as in the 2025 MapleRoyals v83 client
+		// (FUN_009377d9): gains name the tab, losses don't. Nothing for a zero quantity.
+		std::string build_item_gain_chatline(int32_t itemid, const std::string& name, int32_t quantity)
+		{
+			if (quantity > 1)
+				return "You have gained items in the " + tab_name(itemid) + " tab (" + name + " " + std::to_string(quantity) + ")";
 
-			return verb + "items (" + std::to_string(count) + " " + name + ")";
+			if (quantity == 1)
+				return "You have gained an item in the " + tab_name(itemid) + " tab (" + name + ")";
+
+			if (quantity == -1)
+				return "You have lost an item (" + name + ")";
+
+			if (quantity < -1)
+				return "You have lost items (" + name + " " + std::to_string(-quantity) + ")";
+
+			return {};
 		}
 	}
 
@@ -453,7 +471,7 @@ namespace ms
 		if (mode1 == 3)
 		{
 			// Quest item gains and losses: a count, then an item id and quantity for each,
-			// shown as one grey chat line per item.
+			// shown as one grey chat line per item (chat type 7).
 			uint8_t count = recv.read_byte();
 
 			for (uint8_t i = 0; i < count; i++)
@@ -466,8 +484,29 @@ namespace ms
 				if (!idata.is_valid())
 					continue;
 
+				std::string line = build_item_gain_chatline(itemid, idata.get_name(), qty);
+
+				if (line.empty())
+					continue;
+
 				if (auto chatbar = UI::get().get_element<UIChatBar>())
-					chatbar->send_chatline(build_item_gain_chatline(idata.get_name(), qty), UIChatBar::LineType::GREY);
+					chatbar->send_chatline(line, UIChatBar::LineType::GREY);
+			}
+
+			// A count of 0 is a quest message instead: a light blue status line,
+			// with Effect/Quest.img/N on the player when N isn't negative.
+			if (count == 0)
+			{
+				std::string message = recv.read_string();
+				int32_t effect = recv.read_int();
+
+				if (effect >= 0)
+					if (nl::node animation = nl::nx::effect["Quest.img"][std::to_string(effect)])
+						Stage::get().get_player().show_effect(Animation(animation));
+
+				if (!message.empty())
+					if (auto messenger = UI::get().get_element<UIStatusMessenger>())
+						messenger->show_status(Color::Name::PICTONBLUE, message);
 			}
 		}
 		else if (mode1 == 8) // job change
