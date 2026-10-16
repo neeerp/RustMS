@@ -326,6 +326,14 @@ namespace ms
 					case InventoryType::Id::SETUP:
 						Stage::get().get_player().use_item(item_id);
 						break;
+					case InventoryType::Id::CASH:
+						// As in v83, a face item (516xxxx) makes its emote
+						// (id % 100 + 8) as a face key would, without being
+						// used up.
+						if (item_id / 10000 == 516)
+							Stage::get().send_key(KeyType::Id::FACE, 99 + item_id % 100 + 8, true);
+
+						break;
 				}
 			}
 		}
