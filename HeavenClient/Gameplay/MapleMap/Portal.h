@@ -76,12 +76,10 @@ namespace ms
 		};
 
 		Portal(const Animation *animation, Type type, std::string name, bool intramap, Point<int16_t> position,
-			   int32_t tomap, std::string toname, int16_t hrange, int16_t vrange);
+			   int32_t tomap, std::string toname, int16_t hrange, int16_t vrange, int32_t delay = 0,
+			   bool only_once = false);
 
 		Portal();
-
-		// Track contact; true only on the update the player first touches it.
-		bool touch(Point<int16_t> playerpos);
 
 		void draw(Point<int16_t> viewpos, float alpha) const;
 
@@ -108,6 +106,13 @@ namespace ms
 
 		WarpInfo getwarpinfo() const;
 
+		// Milliseconds a touch script waits after the player's last request
+		// or its answer.
+		int32_t get_delay() const;
+
+		// Whether a touch script runs again only after another has run.
+		bool is_only_once() const;
+
 	private:
 
 		const Animation *animation;
@@ -117,6 +122,7 @@ namespace ms
 		WarpInfo warpinfo;
 		int16_t hrange;
 		int16_t vrange;
-		bool touched;
+		int32_t delay;
+		bool only_once;
 	};
 }

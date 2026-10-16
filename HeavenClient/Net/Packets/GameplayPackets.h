@@ -39,20 +39,24 @@ namespace ms
 		}
 	};
 
-	// Opcode: CHANGE_MAP(38)
-	// Tells the server the player touched a script portal (e.g. a tutorial hint)
+	// Tells the server the player entered a script portal (e.g. a tutorial
+	// hint), as v83 does from FUN_0094dac6 and FUN_0094df9b
 	// Opcode: CHANGE_MAP_SPECIAL(100)
 	class ChangeMapSpecialPacket : public OutPacket
 	{
 	public:
-		ChangeMapSpecialPacket(const std::string &portal) : OutPacket(OutPacket::Opcode::CHANGE_MAP_SPECIAL)
+		ChangeMapSpecialPacket(const std::string &portal, Point<int16_t> position) :
+				OutPacket(OutPacket::Opcode::CHANGE_MAP_SPECIAL)
 		{
+			// v83 starts with a byte the field keeps (CField+0x134); the
+			// server skips it.
 			write_byte(0);
 			write_string(portal);
-			write_short(0);
+			write_point(position);
 		}
 	};
 
+	// Opcode: CHANGE_MAP(38)
 	class ChangeMapPacket : public OutPacket
 	{
 	public:

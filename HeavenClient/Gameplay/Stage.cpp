@@ -207,14 +207,62 @@ namespace ms
 		if (player.is_attacking())
 			return;
 
-		enter_portal(portals.find_warp_at(player.get_position()));
+		Point<int16_t> playerpos = player.get_position();
+		const Portal *portal = portals.find_up_portal(playerpos);
+
+		if (!portal)
+			return;
+
+		Portal::WarpInfo warpinfo = portal->getwarpinfo();
+
+		if (warpinfo.valid)
+		{
+			if (portals.start_cooldown())
+				enter_portal(warpinfo);
+
+			return;
+		}
+
+		// A script portal with nowhere to lead runs its script on the server
+		// (v83 FUN_0094df9b).
+		switch (portal->get_type())
+		{
+			case Portal::SCRIPTED:
+			case Portal::SCRIPTED_INVISIBLE:
+			case Portal::SCRIPTED_HIDDEN:
+				player.request(ChangeMapSpecialPacket(portal->get_name(), playerpos), ExclRequest::WAIT);
+				break;
+			default:
+				break;
+		}
 	}
 
 	// v83 checks touch portals every update, whatever the player is doing
 	// (FUN_0094dac6, called from CUserLocal::Update).
 	void Stage::check_touch_portals()
 	{
-		enter_portal(portals.find_touch_warp(player.get_position()));
+		Point<int16_t> playerpos = player.get_position();
+		const Portal *portal = portals.find_touch_portal(playerpos);
+
+		if (!portal)
+			return;
+
+		switch (portal->get_type())
+		{
+			case Portal::TOUCH:
+				if (portal->getwarpinfo().valid && portals.start_cooldown())
+					enter_portal(portal->getwarpinfo());
+				break;
+			case Portal::SCRIPTED_TOUCH:
+				// The script runs again whenever the player may send a request
+				// and the portal's delay has passed, unless it runs only once.
+				if (portals.may_run_script(*portal) &&
+					player.request(ChangeMapSpecialPacket(portal->get_name(), playerpos), portal->get_delay()))
+					portals.ran_script(*portal);
+				break;
+			default:
+				break;
+		}
 	}
 
 	void Stage::enter_portal(const Portal::WarpInfo &warpinfo)
