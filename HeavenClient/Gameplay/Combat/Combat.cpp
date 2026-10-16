@@ -115,7 +115,7 @@ namespace ms
 	{
 		if (move.is_attack())
 		{
-			Attack attack = player.prepare_attack(move.is_skill());
+			Attack attack = player.prepare_attack(move.is_skill() ? move.get_id() : 0);
 			Stance::Id whack = Stance::Id::NONE;
 			int16_t reach = 0;
 
@@ -123,7 +123,7 @@ namespace ms
 				whack = find_whack(attack, reach);
 
 			if (whack != Stance::Id::NONE)
-				attack = player.prepare_attack(false, true);
+				attack = player.prepare_attack(0, true);
 
 			move.apply_useeffects(player);
 

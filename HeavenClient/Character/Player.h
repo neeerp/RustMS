@@ -106,9 +106,8 @@ namespace ms
 		// Return whether the player can use a skill or not.
 		SpecialMove::ForbidReason can_use(const SpecialMove &move) const;
 
-		// Create an attack struct using the player's stats. A whack is the
-		// melee attack of a ranged weapon that has ammo.
-		Attack prepare_attack(bool skill, bool whack = false) const;
+		// Build a skill (0 for regular) or a point-blank whack from the player's stats.
+		Attack prepare_attack(int32_t skill, bool whack = false) const;
 
 		// Execute a rush movement
 		void rush(double targetx);

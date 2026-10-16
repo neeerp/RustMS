@@ -97,7 +97,12 @@ spell for twice v83's magic maximum (`max_magic_damage`: ((M² / 1000 + M) / 30
 + INT / 200) × `mad`, where M is INT plus equipment magic attack), a `damage`
 skill for that percentage of the basic cap, and a skill with none is not an
 attack. A spell must name a skill. Too little MP refuses the attack.
-HeavenClient sends Three Snails as a swing for melee weapons. The field shows
+HeavenClient sends a skill as the attack v83's `CUserLocal::DoActiveSkill`
+makes it, whatever the weapon: a swing, a shot, or a spell
+(`SkillData::flags_of`). Any other skill goes out as SPECIAL_MOVE. Skills
+that charge first (Big Bang, Hurricane, Corkscrew Blow) aren't supported. v83
+casts Three Snails as a spell; RustMS and HeavenClient treat it as a swing.
+The field shows
 the attack under its own opcode (with the skill id and level, so others see
 the skill's effect, and for a shot the star, arrow, or bullet it fired) to the
 others, applies the damage, sends the attacker SHOW_MONSTER_HP, and on death

@@ -42,7 +42,7 @@ namespace ms
 		template <typename...Args>
 		void emplace(int64_t delay, Args&& ...args)
 		{
-			queue.emplace(time + delay, std::move(args)...);
+			queue.emplace(time + delay, std::forward<Args>(args)...);
 		}
 
 		void update(int64_t timestep = Constants::TIMESTEP)

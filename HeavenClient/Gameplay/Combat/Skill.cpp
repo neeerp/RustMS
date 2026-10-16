@@ -281,6 +281,9 @@ namespace ms
 		if (weapon != reqweapon && reqweapon != Weapon::NONE)
 			return FBR_WEAPONTYPE;
 
+		if (!SkillData::get(skillid).uses_ammo())
+			return FBR_NONE;
+
 		switch (weapon)
 		{
 			case Weapon::BOW:

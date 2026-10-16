@@ -70,12 +70,14 @@ namespace ms
 			{}
 		};
 
-		// Skill flags, unfortunately these just have to be hard-coded
+		// Skill flags, taken from the v83 client
 		enum Flags
 		{
 			NONE = 0x0000,
 			ATTACK = 0x0001,
-			RANGED = 0x0002
+			RANGED = 0x0002,
+			MAGIC = 0x0004,
+			NOAMMO = 0x0008
 		};
 
 		// Icon types
@@ -92,6 +94,15 @@ namespace ms
 
 		// Return whether the skill is an attack skill.
 		bool is_attack() const;
+
+		// Return whether the skill attacks with a shot.
+		bool is_shot() const;
+
+		// Return whether the skill attacks with a spell.
+		bool is_spell() const;
+
+		// Return whether the skill's shot uses up ammo.
+		bool uses_ammo() const;
 
 		// Return whether this skill is invisible in the skill book ui.
 		bool is_invisible() const;
