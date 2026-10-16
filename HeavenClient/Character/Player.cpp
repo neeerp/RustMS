@@ -25,7 +25,7 @@
 #include "../Data/WeaponData.h"
 #include "../IO/UI.h"
 
-#include "../IO/UITypes/UINotice.h"
+#include "../IO/UITypes/UIRevive.h"
 #include "../IO/UITypes/UIStatsInfo.h"
 #include "../Net/Packets/GameplayPackets.h"
 #include "../Net/Packets/PlayerPackets.h"
@@ -233,29 +233,29 @@ namespace ms
 	{
 		bool dead = stats.get_stat(MapleStat::Id::HP) <= 0;
 
-		if (dead == is_dead())
-			return;
-
-		attacking = false;
-		keysdown.clear();
-
-		if (dead)
+		if (dead != is_dead())
 		{
-			ladder = nullptr;
-			phobj.hspeed = 0.0;
-			phobj.type = PhysicsObject::Type::NORMAL;
-			set_state(Char::State::DIED);
-			Sound(Sound::Name::TOMBSTONE).play();
+			attacking = false;
+			keysdown.clear();
 
-			// Any answer sends the player to the map's return map with a little HP.
-			UI::get().emplace<UIOk>("You have died.\\nYou will be revived in the nearest town.", [](bool)
+			if (dead)
 			{
-				ChangeMapPacket(true, 0, "", false).dispatch();
-			});
-		} else
-		{
-			nullstate.update_state(*this);
+				ladder = nullptr;
+				phobj.hspeed = 0.0;
+				phobj.type = PhysicsObject::Type::NORMAL;
+				set_state(Char::State::DIED);
+				Sound(Sound::Name::TOMBSTONE).play();
+				death_ticks = 0;
+			} else
+			{
+				nullstate.update_state(*this);
+				UI::get().remove(UIElement::Type::REVIVE);
+			}
 		}
+
+		// Like v83 (FUN_00a03350), offer the revive a little after the tombstone lands.
+		if (dead && death_ticks <= REVIVE_DELAY && ++death_ticks > REVIVE_DELAY)
+			UI::get().emplace<UIRevive>();
 	}
 
 	void Player::update_recovery()

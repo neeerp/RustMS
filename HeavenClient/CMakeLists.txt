@@ -412,6 +412,8 @@ add_executable(HeavenClient
     IO/UITypes/UIQuit.h
     IO/UITypes/UIRaceSelect.cpp
     IO/UITypes/UIRaceSelect.h
+    IO/UITypes/UIRevive.cpp
+    IO/UITypes/UIRevive.h
     IO/UITypes/UIShop.cpp
     IO/UITypes/UIShop.h
     IO/UITypes/UIMonsterBook.cpp
