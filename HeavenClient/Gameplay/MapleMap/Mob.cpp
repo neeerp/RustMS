@@ -1172,6 +1172,18 @@ namespace ms
 		return range.overlaps(bounds);
 	}
 
+	Rectangle<int16_t> Mob::get_body() const
+	{
+		Rectangle<int16_t> body = animations.at(stance).get_bounds();
+
+		if (flip && !noflip)
+			body = Rectangle<int16_t>(-body.right(), -body.left(), body.top(), body.bottom());
+
+		body.shift(get_position());
+
+		return body;
+	}
+
 	Point<int16_t> Mob::get_head_position() const
 	{
 		Point<int16_t> position = get_position();

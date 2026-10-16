@@ -64,20 +64,17 @@ namespace ms
 			int32_t move_id;
 		};
 
-		struct BulletEffect
-		{
-			DamageEffect damageeffect;
-			Bullet bullet;
-			Point<int16_t> target;
-		};
-
 		void apply_attack(const AttackResult &attack);
 
 		void apply_move(const SpecialMove &move);
 
 		// The melee stance a regular ranged attack whacks a mob right in
-		// front of the player with, or NONE to shoot.
-		Stance::Id find_whack(const Attack &attack) const;
+		// front of the player with, or NONE to shoot. Either way, `reach` is
+		// how far in front of the player the whack reaches.
+		Stance::Id find_whack(const Attack &attack, int16_t &reach) const;
+
+		// How far in front of the user a whack in this stance reaches.
+		static int16_t get_whack_reach(const Char &user, Stance::Id stance);
 
 		std::vector<int32_t>
 		find_targets(MapObjects *objs, Rectangle<int16_t> range, Point<int16_t> origin, uint8_t objcount,
@@ -89,7 +86,7 @@ namespace ms
 
 		void apply_rush(const AttackResult &result);
 
-		void apply_bullet_effect(const BulletEffect &effect);
+		void apply_bullet_effect(const Bullet &bullet);
 
 		void apply_damage_effect(const DamageEffect &effect);
 
@@ -97,8 +94,9 @@ namespace ms
 		static Rectangle<int16_t> place_range(Point<int16_t> origin, Rectangle<int16_t> range, float hrange,
 											  bool toleft);
 
+		// A shot starts `reach` px in front of the user and flies to `shot_end`.
 		void extract_effects(const Char &user, const SpecialMove &move, const AttackResult &result,
-							 Rectangle<int16_t> range);
+							 Rectangle<int16_t> range, int16_t reach, int16_t shot_end);
 
 		// Tell the targets how many hits are coming (sign 1) or cancel them (sign -1),
 		// so a mob the server kills waits for the hits before dying.
@@ -117,10 +115,10 @@ namespace ms
 		RegularAttack regularattack;
 
 		TimedQueue<AttackResult> attackresults;
-		TimedQueue<BulletEffect> bulleteffects;
+		TimedQueue<Bullet> bulleteffects;
 		TimedQueue<DamageEffect> damageeffects;
 
-		std::list<BulletEffect> bullets;
+		std::list<Bullet> bullets;
 		std::list<DamageNumber> damagenumbers;
 	};
 }

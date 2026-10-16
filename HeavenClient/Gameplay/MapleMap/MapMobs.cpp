@@ -191,6 +191,14 @@ namespace ms
 			return Point<int16_t>(0, 0);
 	}
 
+	Rectangle<int16_t> MapMobs::get_mob_body(int32_t oid) const
+	{
+		if (Optional<const Mob> mob = mobs.get(oid))
+			return mob->get_body();
+		else
+			return Rectangle<int16_t>();
+	}
+
 	MapObjects *MapMobs::get_mobs()
 	{
 		return &mobs;

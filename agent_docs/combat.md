@@ -129,6 +129,15 @@ afterimage range, cut to reach at most 65 px forward
 (`Gameplay/Combat/PointBlank.h`, `Combat::find_whack`). Only when there is
 none does it shoot.
 
+A shot leaves the user 28 px up and, for a regular attack, as far forward as
+the whack would reach (skills shoot from the user). Each bullet flies straight
+to where the shot's row crosses the target's body, or to the end of the range,
+taking 1.5 ms per pixel. Bullets after the first leave 120 ms apart for stars
+and some skills, and several bullets spread 14 px apart around the target.
+Every hit on a target lands at the attack's hit frame plus 1.5 ms per pixel
+between the shot's start and the target, not when a bullet arrives
+(`Gameplay/Combat/ShotPath.h`, `Combat::extract_effects`).
+
 Damage numbers follow v83 (`Gameplay/Combat/DamageLayout.h`). The first digit
 comes from the larger `NoRed1` set and the rest from `NoRed0`. Each digit
 overlaps the previous one by 3/5 of its part right of the origin, and digits
