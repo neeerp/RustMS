@@ -276,6 +276,22 @@ namespace ms
 		if (mp < stats.mpcost)
 			return FBR_MPCOST;
 
+		if (SkillData::get(skillid).needs_onehanded())
+		{
+			switch (weapon)
+			{
+				case Weapon::SWORD_1H:
+				case Weapon::AXE_1H:
+				case Weapon::MACE_1H:
+				case Weapon::DAGGER:
+				case Weapon::WAND:
+				case Weapon::STAFF:
+					break;
+				default:
+					return FBR_ONEHANDED;
+			}
+		}
+
 		Weapon::Type reqweapon = SkillData::get(skillid).get_required_weapon();
 
 		if (weapon != reqweapon && reqweapon != Weapon::NONE)

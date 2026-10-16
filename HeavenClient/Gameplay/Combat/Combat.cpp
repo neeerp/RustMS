@@ -89,26 +89,30 @@ namespace ms
 		if (!player.can_attack())
 			return;
 
-		// v83 says why it won't attack bare-handed (FUN_0095b85a).
-		if (!player.get_look().get_equips().has_weapon())
+		const SpecialMove &move = get_move(move_id);
+		SpecialMove::ForbidReason reason = player.can_use(move);
+		Weapon::Type weapontype = player.get_stats().get_weapontype();
+
+		if (reason != SpecialMove::ForbidReason::FBR_NONE)
+		{
+			ForbidSkillMessage(reason, weapontype).drop();
+			return;
+		}
+
+		// v83 says why it won't attack bare-handed (FUN_0095b85a), once
+		// DoActiveSkill has let the skill through. Buffs need no weapon.
+		if (move.is_attack() && !player.get_look().get_equips().has_weapon())
 		{
 			InChatMessage(Messages::ATTACK_NOWEAPON).drop();
 			return;
 		}
 
-		const SpecialMove &move = get_move(move_id);
-		SpecialMove::ForbidReason reason = player.can_use(move);
-		Weapon::Type weapontype = player.get_stats().get_weapontype();
-
-		switch (reason)
-		{
-			case SpecialMove::ForbidReason::FBR_NONE:
-				apply_move(move);
-				break;
-			default:
-				ForbidSkillMessage(reason, weapontype).drop();
-				break;
-		}
+		// v83's spell handler swings a regular attack instead when the player
+		// is prone (0x969b10).
+		if (move.is_skill() && player.is_prone() && SkillData::get(move_id).is_spell())
+			apply_move(regularattack);
+		else
+			apply_move(move);
 	}
 
 	void Combat::apply_move(const SpecialMove &move)

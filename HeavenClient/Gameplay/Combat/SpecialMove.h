@@ -37,6 +37,7 @@ namespace ms
 			FBR_MPCOST,
 			FBR_BULLETCOST,
 			FBR_COOLDOWN,
+			FBR_ONEHANDED,
 			FBR_OTHER
 		};
 

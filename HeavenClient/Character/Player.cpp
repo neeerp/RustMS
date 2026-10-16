@@ -513,7 +513,8 @@ namespace ms
 
 	SpecialMove::ForbidReason Player::can_use(const SpecialMove &move) const
 	{
-		if (move.is_skill() && state == Char::State::PRONE)
+		// A spell cast while prone stabs instead (Combat::use_move).
+		if (move.is_skill() && state == Char::State::PRONE && !SkillData::get(move.get_id()).is_spell())
 			return SpecialMove::ForbidReason::FBR_OTHER;
 
 		if (move.is_attack() && (state == Char::State::LADDER || state == Char::State::ROPE))
