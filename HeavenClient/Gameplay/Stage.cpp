@@ -220,7 +220,10 @@ namespace ms
 
 	void Stage::check_portals()
 	{
-		if (player.is_attacking())
+		// v83 takes a portal only while the player stands on a foothold, not
+		// in the air or on a ladder (FUN_0094df9b). Holding Up repeats the key,
+		// so a player who lands on a portal with Up held goes through.
+		if (player.is_attacking() || !player.get_phobj().onground || player.is_climbing())
 			return;
 
 		Point<int16_t> playerpos = player.get_position();
