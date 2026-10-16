@@ -124,7 +124,6 @@ namespace ms
 		Point<int16_t> startpos = physics.get_y_below(spawnpoint);
 		player.respawn(startpos, mapinfo.is_underwater());
 		player.set_recovery_rate(mapinfo.get_recovery());
-		left_ladder = nullptr;
 		teleport_delay = 0;
 		teleport_cooldown = 0;
 		camera.set_view(mapinfo.get_walls(), mapinfo.get_borders());
@@ -189,8 +188,9 @@ namespace ms
 		// is where this step started, unless the player was moved there.
 		Point<int16_t> drawn = player.get_position();
 
+		Point<int16_t> before = drawn;
 		player.update(physics);
-		check_held_ladders();
+		catch_ladders(before);
 
 		if (update_teleport())
 			drawn = player.get_position();
@@ -375,7 +375,6 @@ namespace ms
 			return false;
 
 		player.respawn(teleport_target, mapinfo.is_underwater());
-		left_ladder = nullptr;
 		teleport_cooldown = TELEPORT_COOLDOWN;
 
 		return true;
@@ -390,36 +389,47 @@ namespace ms
 		player.set_seat(seat);
 	}
 
-	void Stage::check_ladders(bool up)
+	// After the player moves, v83 catches the ladder or rope the arrows ask
+	// for, unless already climbing or attacking (FUN_009cbefb):
+	// - In the air, Up catches one passed since the last update, but only
+	//   while falling. The player keeps their height.
+	// - On a foothold, Up catches one reaching within 20 px above the feet.
+	//   Feet below its bottom rise to it.
+	// - On a foothold, Down catches the first one reaching 10 px below the
+	//   feet if its top is in that span, and puts the feet at its top.
+	void Stage::catch_ladders(Point<int16_t> before)
 	{
 		if (player.is_climbing() || player.is_attacking())
 			return;
 
-		Optional<const Ladder> ladder = mapinfo.findladder(player.get_position(), up);
-		player.set_ladder(ladder);
-	}
+		int8_t dir = player.is_key_down(KeyAction::Id::DOWN) - player.is_key_down(KeyAction::Id::UP);
+		PhysicsObject &phobj = player.get_phobj();
+		Point<int16_t> pos = player.get_position();
 
-	// Holding Up catches any ladder or rope the player reaches, as pressing
-	// it there does. The one they just climbed off waits until they land, so
-	// jumping off it sideways with Up still held does not catch it again.
-	void Stage::check_held_ladders()
-	{
-		if (player.is_climbing())
+		if (!phobj.onground)
 		{
-			left_ladder = player.get_ladder();
-			return;
+			if (dir < 0 && phobj.vspeed > 0.0)
+				if (Optional<const Ladder> ladder = mapinfo.findladder(before, pos))
+					player.set_ladder(ladder);
+		} else if (dir < 0)
+		{
+			if (Optional<const Ladder> ladder = mapinfo.findladder(pos - Point<int16_t>(0, 20), pos))
+			{
+				player.set_ladder(ladder);
+
+				if (pos.y() > ladder->get_bottom())
+					phobj.set_y(ladder->get_bottom());
+			}
+		} else if (dir > 0)
+		{
+			Optional<const Ladder> ladder = mapinfo.findladder(pos, pos + Point<int16_t>(0, 10));
+
+			if (ladder && ladder->get_top() >= pos.y() && ladder->get_top() <= pos.y() + 10)
+			{
+				player.set_ladder(ladder);
+				phobj.set_y(ladder->get_top());
+			}
 		}
-
-		if (player.get_phobj().onground)
-			left_ladder = nullptr;
-
-		if (!player.is_key_down(KeyAction::Id::UP))
-			return;
-
-		Optional<const Ladder> ladder = mapinfo.findladder(player.get_position(), true);
-
-		if (ladder && ladder.get() != left_ladder.get())
-			check_ladders(true);
 	}
 
 	void Stage::check_drops()
@@ -448,11 +458,7 @@ namespace ms
 					switch (action)
 					{
 						case KeyAction::Id::UP:
-							check_ladders(true);
 							check_portals();
-							break;
-						case KeyAction::Id::DOWN:
-							check_ladders(false);
 							break;
 						case KeyAction::Id::SIT:
 							check_seats();

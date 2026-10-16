@@ -160,9 +160,7 @@ namespace ms
 
 		void check_seats();
 
-		void check_ladders(bool up);
-
-		void check_held_ladders();
+		void catch_ladders(Point<int16_t> before);
 
 		void check_drops();
 
@@ -183,8 +181,6 @@ namespace ms
 		uint8_t field_key = 0;
 
 		MapInfo mapinfo;
-		// The ladder or rope the player last climbed, until they land.
-		Optional<const Ladder> left_ladder;
 		// The ms until an in-map portal's move lands, and then until the
 		// portal works again.
 		int16_t teleport_delay = 0;
