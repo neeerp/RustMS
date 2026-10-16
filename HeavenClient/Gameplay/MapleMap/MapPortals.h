@@ -45,6 +45,9 @@ namespace ms
 
 		Portal::WarpInfo find_warp_at(Point<int16_t> playerpos);
 
+		// Where a touch portal the player stands in leads, if anywhere.
+		Portal::WarpInfo find_touch_warp(Point<int16_t> playerpos);
+
 		Point<int16_t> get_portal_by_id(uint8_t id) const;
 
 		Point<int16_t> get_portal_by_name(const std::string &name) const;
