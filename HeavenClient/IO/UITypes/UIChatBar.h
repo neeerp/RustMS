@@ -30,6 +30,7 @@
 #include "../Messages.h"
 #include "../UIElement.h"
 
+#include "../Components/ChatFloodGuard.h"
 #include "../Components/Textfield.h"
 
 #include "../../Template/EnumMap.h"
@@ -166,6 +167,8 @@ namespace ms
 		// it has one.
 		std::optional<int16_t> get_thumb_offset(int16_t height) const;
 
+		// Whether a chat line may be sent; if not, warns as v83 does.
+		bool flood_guard_allows(const std::string& line);
 		void send_party_chat(const std::string& message);
 		void send_buddy_chat(const std::string& message);
 
@@ -222,6 +225,7 @@ namespace ms
 		std::optional<int16_t> edge_anchor;
 
 		EnumMap<Messages::Type, time_t> message_cooldowns;
+		ChatFloodGuard flood_guard;
 		std::vector<std::string> lastentered;
 		size_t lastpos;
 

@@ -20,7 +20,10 @@
 #include <algorithm>
 #include <cstdlib>
 
+#include "UINotice.h"
 #include "UIStatusBar.h"
+
+#include "../UI.h"
 
 #include "../Components/MapleButton.h"
 
@@ -188,6 +191,10 @@ namespace ms
 									send_chatline("Usage: /find <name>", LineType::RED);
 								else
 									FindPacket(target).dispatch();
+							}
+							else if (msg[0] != '/' && !flood_guard_allows(msg))
+							{
+								// Refused: nothing is sent or shown.
 							}
 							else if (chat_target == Target::PARTY)
 							{
@@ -627,6 +634,28 @@ namespace ms
 	{
 		toggle_chatfield(true);
 		chatfield.change_text("/w " + name + " ");
+	}
+
+	bool UIChatBar::flood_guard_allows(const std::string& line)
+	{
+		auto now = std::chrono::duration_cast<std::chrono::milliseconds>(
+			std::chrono::steady_clock::now().time_since_epoch()).count();
+
+		switch (flood_guard.check(line, now))
+		{
+			case ChatFloodGuard::Result::SEND:
+				return true;
+			case ChatFloodGuard::Result::REPEATED:
+				UI::get().emplace<UIOk>("Repeating the same line over and over\\ncan negatively affect other users.", [](bool) {});
+				break;
+			case ChatFloodGuard::Result::TOO_FAST:
+				UI::get().emplace<UIOk>("Too much chatting can disrupt\\nother players' ability to play the game.", [](bool) {});
+				break;
+			case ChatFloodGuard::Result::MUTED:
+				break;
+		}
+
+		return false;
 	}
 
 	void UIChatBar::send_party_chat(const std::string& message)
