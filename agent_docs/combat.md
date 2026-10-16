@@ -282,6 +282,10 @@ non-beginners lose 10% of their level's EXP; the client's respawn
 (CHANGE_MAP with a target while dead) returns them to the map's return map
 with 50 HP.
 
+After a hit, HeavenClient ignores touches for 1500 ms, as v83 does. If the hit
+did damage, the player blinks meanwhile: half brightness for 60 ms, then
+normal for 60 ms. Other players don't blink.
+
 HeavenClient's `Player::update_death` notices HP reaching 0: the player
 becomes a ghost (`Char::State::DIED`), the tombstone from `Effect.nx/Tomb.img`
 drops behind them (drawn by `Char`) as `Sound.nx/Game.img/Tombstone` plays,
