@@ -88,10 +88,7 @@ namespace ms
 
 	void SetCashShopHandler::transition() const
 	{
-		float fadestep = 0.025f;
-
 		Window::get().fadeout(
-			fadestep,
 			[]()
 			{
 				GraphicsGL::get().clear();

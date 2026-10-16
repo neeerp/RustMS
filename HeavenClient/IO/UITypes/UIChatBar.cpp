@@ -18,9 +18,13 @@
 #include "UIChatBar.h"
 
 #include <algorithm>
+#include <cctype>
 #include <cstdlib>
 
+#include "UINotice.h"
 #include "UIStatusBar.h"
+
+#include "../UI.h"
 
 #include "../Components/MapleButton.h"
 
@@ -78,6 +82,13 @@ namespace ms
 			return message.empty() ? WhisperParseResult::InvalidWhisper : WhisperParseResult::ValidWhisper;
 		}
 
+		// v83 compares whisper targets without regard to case (_stricmp).
+		bool same_name(const std::string& a, const std::string& b)
+		{
+			return a.size() == b.size() && std::equal(a.begin(), a.end(), b.begin(),
+				[](unsigned char x, unsigned char y) { return std::tolower(x) == std::tolower(y); });
+		}
+
 		// Whether input is /find, with the name it looks for, if any.
 		bool parse_find_command(const std::string& input, std::string& target)
 		{
@@ -93,6 +104,38 @@ namespace ms
 
 			return true;
 		}
+
+		// Whether input is exactly command, ignoring case, as v83 compares
+		// commands (FUN_004a8def).
+		bool is_command(const std::string& input, const std::string& command)
+		{
+			return input.size() == command.size() && std::equal(input.begin(), input.end(), command.begin(),
+				[](unsigned char a, unsigned char b) { return std::tolower(a) == std::tolower(b); });
+		}
+
+		// v83's /? and /Help (StringPool 0x39a-0x3ac and 0x14c4).
+		constexpr const char* HELP[] = {
+			"----------------- HELP -----------------",
+			"/partyinfo : Show the current party information.",
+			"/makeparty : create a new party",
+			"/leaveparty : If you are a member of the party, it'll let you leave..",
+			"/partyinvite character-name : invite to our party (only for the party leader)",
+			"/partyexpel character-name: Expel someone from the party (only for the party leader)",
+			"/guildinfo : Give information about the guild",
+			"/leaveguild : Quit the guild",
+			"/guildinvite : Invite the user to the guild (only available to the master)",
+			"/guildexpel : Expel the user from the guild (only available to the master)",
+			"/find CharacterName : Give information about the chracter whether he or she is on-line or not.",
+			"/gametrade charactername: Request to trade game items.",
+			"/tradecash Charactername: Request to trade cash items.",
+			"/buddy: Talk to your buddy.",
+			"/party: Talk to party members.",
+			"/guild: Talk to your guild members.",
+			"/whisper charactername: Send a whisper (if no name is written, it'll be directed to your last contact).",
+			"/all: Regular chat, not a whisper.",
+			"* Open up the chat window and press tab, or close the chat window and",
+			"press 1, 2, or 3 to change the group you'd like to talk to."
+		};
 
 		// The original fills the whole log with black at half opacity.
 		constexpr float LOG_ALPHA = 0.5f;
@@ -175,7 +218,13 @@ namespace ms
 							std::string message;
 							WhisperParseResult whisper_result = parse_whisper_command(msg, target, message);
 
-							if (whisper_result == WhisperParseResult::ValidWhisper)
+							if (whisper_result == WhisperParseResult::ValidWhisper
+								&& same_name(target, Stage::get().get_player().get_stats().get_name()))
+							{
+								// v83 refuses before sending anything (FUN_0052c40c).
+								send_chatline("You can't whisper to yourself.", LineType::SKILL);
+							}
+							else if (whisper_result == WhisperParseResult::ValidWhisper)
 							{
 								WhisperPacket(target, message).dispatch();
 								send_chatline("#g" + target + "<<" + message, LineType::WHITE);
@@ -183,6 +232,24 @@ namespace ms
 							else if (whisper_result == WhisperParseResult::InvalidWhisper)
 							{
 								send_chatline("Usage: /w <name> <message>", LineType::RED);
+							}
+							else if (is_command(msg, "/?") || is_command(msg, "/Help"))
+							{
+								for (const char* line : HELP)
+									send_chatline(line, LineType::YELLOW);
+							}
+							// Like the chat target keys, these only switch the target.
+							else if (is_command(msg, "/party"))
+							{
+								set_target(Target::PARTY);
+							}
+							else if (is_command(msg, "/buddy"))
+							{
+								set_target(Target::BUDDY);
+							}
+							else if (is_command(msg, "/all"))
+							{
+								set_target(Target::ALL);
 							}
 							else if (parse_find_command(msg, target))
 							{
@@ -194,6 +261,15 @@ namespace ms
 							else if (PartyCommands::run(msg))
 							{
 							}
+							// Commands the client doesn't know aren't chat, whatever
+							// the target; v83 sends them only for GMs.
+							else if (msg[0] == '/')
+							{
+							}
+							else if (!flood_guard_allows(msg))
+							{
+								// Refused: nothing is sent or shown.
+							}
 							else if (chat_target == Target::PARTY)
 							{
 								send_party_chat(msg);
@@ -202,8 +278,7 @@ namespace ms
 							{
 								send_buddy_chat(msg);
 							}
-							// Commands the client doesn't know aren't chat.
-							else if (msg[0] != '/')
+							else
 							{
 								GeneralChatPacket(msg, true).dispatch();
 							}
@@ -554,8 +629,9 @@ namespace ms
 		std::string message = Messages::messages[line];
 		send_chatline(message, type);
 
-		bool cost = line == Messages::SKILL_HPCOST || line == Messages::SKILL_MPCOST;
-		message_cooldowns[line] = cost ? COST_MESSAGE_COOLDOWN : MESSAGE_COOLDOWN;
+		bool slow = line == Messages::SKILL_HPCOST || line == Messages::SKILL_MPCOST ||
+			line == Messages::ATTACK_NOWEAPON;
+		message_cooldowns[line] = slow ? COST_MESSAGE_COOLDOWN : MESSAGE_COOLDOWN;
 	}
 
 	void UIChatBar::toggle_chat()
@@ -609,6 +685,7 @@ namespace ms
 		return chatfieldopen;
 	}
 
+	// The labels are v83's chat target list (StringPool 0x312-0x314).
 	void UIChatBar::set_target(Target new_target)
 	{
 		chat_target = new_target;
@@ -616,10 +693,10 @@ namespace ms
 		switch (chat_target)
 		{
 			case Target::PARTY:
-				chattarget_label.change_text("To Party");
+				chattarget_label.change_text("To the party");
 				break;
 			case Target::BUDDY:
-				chattarget_label.change_text("To Buddy");
+				chattarget_label.change_text("To a buddy");
 				break;
 			default:
 				chattarget_label.change_text("To All");
@@ -634,22 +711,45 @@ namespace ms
 		chatfield.change_text("/w " + name + " ");
 	}
 
+	bool UIChatBar::flood_guard_allows(const std::string& line)
+	{
+		auto now = std::chrono::duration_cast<std::chrono::milliseconds>(
+			std::chrono::steady_clock::now().time_since_epoch()).count();
+
+		switch (flood_guard.check(line, now))
+		{
+			case ChatFloodGuard::Result::SEND:
+				return true;
+			case ChatFloodGuard::Result::REPEATED:
+				UI::get().emplace<UIOk>("Repeating the same line over and over\\ncan negatively affect other users.", [](bool) {});
+				break;
+			case ChatFloodGuard::Result::TOO_FAST:
+				UI::get().emplace<UIOk>("Too much chatting can disrupt\\nother players' ability to play the game.", [](bool) {});
+				break;
+			case ChatFloodGuard::Result::MUTED:
+				break;
+		}
+
+		return false;
+	}
+
 	void UIChatBar::send_party_chat(const std::string& message)
 	{
 		Player& player = Stage::get().get_player();
 		const Party& party = player.get_party();
 
-		if (!party.exists())
-		{
-			send_chatline("You are not in a party.", LineType::RED);
-			return;
-		}
-
 		std::vector<int32_t> recipients;
 
 		for (auto& member : party.get_members())
-			if (member.id != player.get_oid())
+			if (member.id != player.get_oid() && member.online())
 				recipients.push_back(member.id);
+
+		// v83 sends party chat only to members logged on (FUN_00a3f975).
+		if (recipients.empty())
+		{
+			send_chatline("Either the party doesn't exist or no member of your party is logged on.", LineType::SKILL);
+			return;
+		}
 
 		MultiChatPacket(MultiChatPacket::Mode::PARTY, recipients, message).dispatch();
 
@@ -664,7 +764,7 @@ namespace ms
 
 		if (recipients.empty())
 		{
-			send_chatline("None of your buddies are online.", LineType::RED);
+			send_chatline("You have no buddy available for chat.", LineType::SKILL);
 			return;
 		}
 

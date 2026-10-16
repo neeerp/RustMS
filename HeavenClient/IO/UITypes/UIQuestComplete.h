@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../UIElement.h"
+#include "../Components/FadeNotice.h"
 
 #include "../../Character/Inventory/Inventory.h"
 #include "../../Character/QuestCompletion.h"
@@ -45,11 +46,12 @@ namespace ms
 		{
 			int16_t id;
 			Text name;
-			// Answered; removed on the next update.
-			bool closed;
+			FadeNotice life;
 		};
 
 		void rebuild();
+		// From the first notice to the one at `index`.
+		Point<int16_t> offset(size_t index) const;
 
 		QuestLog& quests;
 		const Inventory& inventory;
@@ -59,6 +61,6 @@ namespace ms
 		// Oldest first; the newest is drawn lowest.
 		std::vector<Notice> notices;
 
-		static constexpr int16_t WIDTH = 154, HEIGHT = 44;
+		static constexpr int16_t WIDTH = 155, HEIGHT = 44;
 	};
 }
