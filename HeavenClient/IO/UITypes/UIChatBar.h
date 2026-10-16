@@ -31,6 +31,7 @@
 #include "../Messages.h"
 #include "../UIElement.h"
 
+#include "../Components/ChatFloodGuard.h"
 #include "../Components/Textfield.h"
 
 #include "../../Template/EnumMap.h"
@@ -63,6 +64,8 @@ namespace ms
 			PINK,
 			// A skill could not be used
 			SKILL,
+			// Whispers sent and received
+			WHISPER,
 			// What a GM says nearby
 			GM
 		};
@@ -118,6 +121,12 @@ namespace ms
 		void set_target(Target new_target);
 		// Open the chat field with "/w name " typed, ready for the message.
 		void start_whisper(const std::string& name);
+		// Whisper message to name, or ask where name is if message is empty
+		// (FUN_0052f185). Only one request waits for an answer at a time.
+		void send_whisper(const std::string& name, const std::string& message);
+		// The server answered the waiting request; returns the message it
+		// carried, empty for a find.
+		std::string whisper_answered();
 
 	protected:
 		Button::State button_pressed(uint16_t buttonid) override;
@@ -169,6 +178,8 @@ namespace ms
 		// it has one.
 		std::optional<int16_t> get_thumb_offset(int16_t height) const;
 
+		// Whether a chat line may be sent; if not, warns as v83 does.
+		bool flood_guard_allows(const std::string& line);
 		void send_party_chat(const std::string& message);
 		void send_buddy_chat(const std::string& message);
 
@@ -181,7 +192,8 @@ namespace ms
 		static constexpr int16_t EDGE_OFFSET = 5;
 		static constexpr int16_t LINE_LOG_HEIGHT = 24;
 		static constexpr time_t MESSAGE_COOLDOWN = 1'000;
-		// The original repeats a missing HP or MP notice at most every two seconds.
+		// The original repeats a missing HP or MP notice, or the missing weapon
+		// one, at most every two seconds.
 		static constexpr time_t COST_MESSAGE_COOLDOWN = 2'000;
 
 		enum Buttons : uint16_t
@@ -223,8 +235,14 @@ namespace ms
 		int16_t log_height;
 		bool edge_dragging;
 		std::optional<int16_t> edge_anchor;
+		// The whisper or find waiting for an answer, sent at whisper_sent;
+		// after 3 s another may go.
+		bool whisper_waiting;
+		std::chrono::steady_clock::time_point whisper_sent;
+		std::string whisper_message;
 
 		EnumMap<Messages::Type, time_t> message_cooldowns;
+		ChatFloodGuard flood_guard;
 		std::vector<std::string> lastentered;
 		size_t lastpos;
 

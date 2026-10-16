@@ -56,7 +56,7 @@ namespace ms
 		int8_t wid = recv.read_byte();
 
 		if (wid == -1)
-			return { {}, {}, {}, 0, 0, wid };
+			return { {}, {}, {}, {}, 0, 0, wid };
 
 		std::string name = recv.read_string();
 		uint8_t flag = recv.read_byte();
@@ -65,12 +65,12 @@ namespace ms
 		recv.skip(5);
 
 		std::vector<int32_t> chloads;
+		std::vector<std::string> chnames;
 		uint8_t channelcount = recv.read_byte();
 
 		for (uint8_t i = 0; i < channelcount; ++i)
 		{
-			recv.read_string(); // channel name
-
+			chnames.push_back(recv.read_string());
 			chloads.push_back(recv.read_int());
 
 			recv.skip(1);
@@ -79,7 +79,7 @@ namespace ms
 
 		recv.skip(2);
 
-		return { name, message, chloads, channelcount, flag, wid };
+		return { name, message, chloads, chnames, channelcount, flag, wid };
 	}
 
 	RecommendedWorld LoginParser::parse_recommended_world(InPacket& recv)

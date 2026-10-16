@@ -108,6 +108,20 @@ impl Buffs {
         tick
     }
 
+    /// End the buffs a skill gave, e.g. when the player right-clicks its
+    /// icon. Its cooldown keeps running.
+    pub fn cancel(&mut self, skill_id: i32) -> Vec<BuffStat> {
+        let mut ended = Vec::new();
+        self.active.retain(|buff| {
+            let cancelled = buff.skill_id == skill_id;
+            if cancelled {
+                ended.push(buff.stat);
+            }
+            !cancelled
+        });
+        ended
+    }
+
     /// End every buff, e.g. on death. Cooldowns keep running.
     pub fn clear(&mut self) -> Vec<BuffStat> {
         self.active.drain(..).map(|buff| buff.stat).collect()
@@ -146,6 +160,19 @@ mod tests {
         assert_eq!(buffs.next_deadline(), Some(start + 5 * SECOND));
         assert!(buffs.advance(start + 4 * SECOND).expired.is_empty());
         assert_eq!(buffs.clear(), vec![BuffStat::Recovery, BuffStat::Speed]);
+    }
+
+    #[test]
+    fn cancelling_a_skill_ends_only_its_buffs() {
+        let start = Instant::now();
+        let mut buffs = Buffs::default();
+        buffs.give(Buff::new(1001, BuffStat::Recovery, 4, start, 30 * SECOND));
+        buffs.give(Buff::new(1002, BuffStat::Speed, 20, start, 12 * SECOND));
+        buffs.start_cooldown(1002, start, 60 * SECOND);
+        assert_eq!(buffs.cancel(1002), vec![BuffStat::Speed]);
+        assert_eq!(buffs.cancel(1002), vec![]);
+        assert_eq!(buffs.active()[0].stat, BuffStat::Recovery);
+        assert!(buffs.cooling_down(1002, start + SECOND));
     }
 
     #[test]
