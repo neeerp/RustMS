@@ -197,6 +197,18 @@ namespace ms
 		return 0;
 	}
 
+	std::vector<uint16_t> BodyDrawInfo::get_action_delays(const std::string &action) const
+	{
+		std::vector<uint16_t> delays;
+		auto action_iter = body_actions.find(action);
+
+		if (action_iter != body_actions.end())
+			for (uint8_t frame = 0; action_iter->second.count(frame); frame++)
+				delays.push_back(action_iter->second.at(frame).get_delay());
+
+		return delays;
+	}
+
 	uint8_t BodyDrawInfo::next_actionframe(std::string action, uint8_t frame) const
 	{
 		auto action_iter = body_actions.find(action);

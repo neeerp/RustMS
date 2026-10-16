@@ -136,7 +136,7 @@ namespace ms
 
 	void Combat::use_move(int32_t move_id)
 	{
-		if (prepare::held(move_id))
+		if (prepare::held(move_id) || prepare::timed(move_id))
 		{
 			// A skill that keeps firing whacks a mob right in front of the
 			// player, or stabs while prone, instead (0x96ae26).
@@ -903,25 +903,36 @@ namespace ms
 		if (!player.can_request(ExclRequest::SKILL_WAIT) || !player.get_phobj().onground || player.get_ladder())
 			return;
 
+		// Chakra says nothing when the player has too much HP.
+		const CharStats &stats = player.get_stats();
+
+		if (id == prepare::CHAKRA
+			&& !prepare::chakra_allowed(stats.get_stat(MapleStat::Id::HP), stats.get_total(EquipStat::Id::HP)))
+			return;
+
 		const SkillPrepare &data = skill.get_prepare();
 		int16_t action = prepare::action_id(data.action);
 		int32_t level = player.get_skills().get_level(id);
 		bool forced = action >= 0;
+		bool timed = prepare::timed(id);
 
 		// The skills that keep firing take up their action and stay on one
-		// frame of it. A `dash` is no action: the player keeps walking.
+		// frame of it; the timed ones play it once. A `dash` is no action:
+		// the player keeps walking.
 		if (forced)
 		{
 			player.attack(data.action);
-			player.hold_attack(prepare::held_frame(data.action));
+
+			if (!timed)
+				player.hold_attack(prepare::held_frame(data.action));
 		}
 
 		player.clear_held_effects();
 		player.show_held_effect(data.prepare.animation, data.prepare.z, false);
 
-		// The skills that keep firing sound as they're used, the others
-		// over and over while they charge (0x9692d1).
-		if (prepare::repeats(id))
+		// The skills that keep firing, and the timed ones, sound as they're
+		// used, the others over and over while they charge (0x9692d1).
+		if (prepare::repeats(id) || timed)
 			skill.play_use();
 		else
 			skill.play_loop();
@@ -929,7 +940,8 @@ namespace ms
 		uint16_t action_and_facing = prepare::action_and_facing(action, !player.getflip());
 		PrepareSkillPacket(id, level, action_and_facing, player.get_action_speed()).dispatch();
 
-		preparing = Preparing{ id, level, 0, forced, false };
+		int32_t duration = timed && forced ? player.get_action_duration(data.action) : 0;
+		preparing = Preparing{ id, level, 0, forced, false, duration };
 	}
 
 	void Combat::update_prepare()
@@ -938,6 +950,14 @@ namespace ms
 			return;
 
 		preparing->held += Constants::TIMESTEP;
+
+		if (prepare::timed(preparing->skill))
+		{
+			if (preparing->held >= preparing->duration)
+				complete_prepare();
+
+			return;
+		}
 
 		const Skill &skill = get_skill(preparing->skill);
 		const SkillPrepare &data = skill.get_prepare();
@@ -984,6 +1004,26 @@ namespace ms
 		apply_move(skill, 0, true);
 	}
 
+	void Combat::complete_prepare()
+	{
+		int32_t id = preparing->skill;
+		const Skill &skill = get_skill(id);
+
+		// The action is over; its effect plays out by itself.
+		if (preparing->forced && player.is_attacking())
+			player.end_attack();
+
+		preparing.reset();
+
+		if (!player.can_attack())
+			return;
+
+		if (id == prepare::EXPLOSION)
+			apply_move(skill);
+		else
+			request_skill(skill);
+	}
+
 	void Combat::release_prepare(int32_t move_id)
 	{
 		if (preparing && preparing->skill == move_id)
@@ -1012,7 +1052,8 @@ namespace ms
 
 	void Combat::finish_prepare()
 	{
-		if (!preparing)
+		// A timed skill isn't let go: it goes off when its time is up.
+		if (!preparing || prepare::timed(preparing->skill))
 			return;
 
 		Preparing held = *preparing;

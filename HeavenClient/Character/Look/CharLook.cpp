@@ -607,6 +607,11 @@ namespace ms
 		}
 	}
 
+	std::vector<uint16_t> CharLook::get_action_delays(const std::string &action) const
+	{
+		return drawinfo.get_action_delays(action);
+	}
+
 	uint8_t CharLook::get_frame() const
 	{
 		return stframe.get();
