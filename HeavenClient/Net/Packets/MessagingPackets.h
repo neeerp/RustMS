@@ -29,10 +29,12 @@ namespace ms
 	class GeneralChatPacket : public OutPacket
 	{
 	public:
-		GeneralChatPacket(const std::string& message, bool show) : OutPacket(OutPacket::Opcode::GENERAL_CHAT)
+		// A balloon-only line isn't written to anyone's chat log. v83's chat
+		// bar never sends one (it calls FUN_0052c315 with 0).
+		GeneralChatPacket(const std::string& message, bool balloon_only) : OutPacket(OutPacket::Opcode::GENERAL_CHAT)
 		{
 			write_string(message);
-			write_byte(show);
+			write_byte(balloon_only);
 		}
 	};
 

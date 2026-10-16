@@ -45,8 +45,9 @@ namespace ms
 		Text shadow;
 		Linear<float> opacity;
 
-		// 8 seconds.
-		static constexpr int64_t FADE_DURATION = 8'000;
+		// A line fades out over 6 seconds, as in v83 (2025 MapleRoyals client,
+		// FUN_0089b159).
+		static constexpr int64_t FADE_DURATION = 6'000;
 	};
 
 

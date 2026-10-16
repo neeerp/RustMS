@@ -146,6 +146,9 @@ namespace ms
 
 	void UIYesNo::send_key(int32_t keycode, bool pressed, bool escape)
 	{
+		if (!pressed)
+			return;
+
 		if (keycode == KeyAction::Id::RETURN)
 			answer(true);
 		else if (escape)

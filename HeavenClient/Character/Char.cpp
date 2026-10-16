@@ -38,12 +38,11 @@ namespace ms
 
 		Color color;
 
-		if (invincible)
+		// While blinking, the avatar is drawn at half brightness for two of
+		// every four 30 ms updates (FUN_00930b27).
+		if (invincible && blinking && invincible.elapsed() / 30 % 4 < 2)
 		{
-			float phi = invincible.alpha() * 30;
-			float rgb = 0.9f - 0.5f * std::abs(std::sin(phi));
-
-			color = Color(rgb, rgb, rgb, 1.0f);
+			color = Color(0.5f, 0.5f, 0.5f, 1.0f);
 		} else
 		{
 			color = Color::Code::CWHITE;
@@ -52,13 +51,15 @@ namespace ms
 		if (state == State::DIED)
 		{
 			// The ghost floats in front of its tombstone, circling it from the top.
-			tomb.draw(absp - Point<int16_t>(0, tomb_drop), alpha);
+			float falling = std::max(TOMB_FALL - (tomb_tick + alpha), 0.0f);
+			int16_t drop = static_cast<int16_t>(std::lround(TOMB_DROP * falling / TOMB_FALL));
+			tomb.draw(absp - Point<int16_t>(0, drop), alpha);
 			color = color * Color(1.0f, 1.0f, 1.0f, ghost_opacity.get(alpha));
 
 			float angle = 6.2831853f * (ghost_tick + alpha) / GHOST_LAP;
 			absp = absp + Point<int16_t>(
 				static_cast<int16_t>(std::lround(GHOST_RADIUS * std::sin(angle))),
-				static_cast<int16_t>(std::lround(-GHOST_RADIUS * std::cos(angle))));
+				static_cast<int16_t>(std::lround(-GHOST_RISE - GHOST_RADIUS * std::cos(angle))));
 		}
 
 		bool on_chair = chair && state == State::SIT;
@@ -127,7 +128,9 @@ namespace ms
 
 		if (state == State::DIED)
 		{
-			tomb_drop = std::max<int16_t>(tomb_drop - TOMB_SPEED, 0);
+			if (tomb_tick < TOMB_FALL)
+				tomb_tick++;
+
 			ghost_opacity += GHOST_FADE;
 			ghost_tick = (ghost_tick + 1) % GHOST_LAP;
 
@@ -186,7 +189,8 @@ namespace ms
 				return static_cast<float>(std::abs(phobj.hspeed));
 			case State::LADDER:
 			case State::ROPE:
-				return static_cast<float>(std::abs(phobj.vspeed));
+				// Climbing plays at its own pace, and holds still between moves.
+				return phobj.vspeed != 0.0 ? 1.0f : 0.0f;
 			default:
 				return 1.0f;
 		}
@@ -250,7 +254,10 @@ namespace ms
 		damagenumbers.back().set_anchor(Point<int16_t>(phobj.get_x(), phobj.get_y() - 64));
 
 		look.set_alerted(5000);
-		invincible.set_for(2000);
+		// CUserLocal is invincible for 1500 ms after a hit, and blinks
+		// only if the hit did damage (FUN_009581a9).
+		invincible.set_for(1500);
+		blinking = damage > 0;
 	}
 
 	void Char::show_heal(int32_t amount)
@@ -367,7 +374,7 @@ namespace ms
 		if (st == State::DIED && state != State::DIED)
 		{
 			tomb = tomb_fall;
-			tomb_drop = TOMB_DROP;
+			tomb_tick = 0;
 			tomb_landed = false;
 			ghost_opacity.set(0.0f);
 			ghost_tick = 0;
