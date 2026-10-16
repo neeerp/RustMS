@@ -20,6 +20,7 @@
 #include "Helpers/LoginParser.h"
 
 #include "../../Audio/Audio.h"
+#include "../../Data/CurseData.h"
 #include "../../Data/ItemData.h"
 #include "../../Gameplay/Stage.h"
 #include "../../IO/UI.h"
@@ -29,6 +30,7 @@
 #include "../../IO/UITypes/UIMessenger.h"
 #include "../../IO/UITypes/UINotice.h"
 #include "../../IO/UITypes/UIStatusMessenger.h"
+#include "../../Util/CurseWords.h"
 #include "../../Util/Misc.h"
 
 #include <nlnx/nx.hpp>
@@ -280,6 +282,13 @@ namespace ms
 		std::string message = recv.read_string();
 		int8_t type = recv.read_byte();
 
+		// v83 stars out curse words in other players' chat, and shows what
+		// it can't print as spaces (FUN_00937138).
+		if (!Stage::get().is_player(charid))
+			message = CurseData::filter(message);
+
+		message = CurseWords::printable(message);
+
 		if (auto character = Stage::get().get_character(charid))
 		{
 			message = character->get_name() + " : " + message;
@@ -301,7 +310,8 @@ namespace ms
 			std::string sender = recv.read_string();
 			recv.read_byte(); // channel the sender is on (0-based)
 			bool from_admin = recv.read_bool();
-			std::string message = recv.read_string();
+			// v83 stars out curse words in whispers too (FUN_0053228e).
+			std::string message = CurseData::filter(recv.read_string());
 
 			if (auto chatbar = UI::get().get_element<UIChatBar>())
 			{
