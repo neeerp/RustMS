@@ -49,17 +49,23 @@ int main()
 			states[id] = 2;
 		}
 		require(marker() == QuestMarker::NONE, "completed chain must clear its marker");
-		states.clear();
-		states[1010] = 1;
-		require(marker() == QuestMarker::AVAILABLE, "started later quiz cannot bypass its prerequisite");
 		chain.push_back(quest(2000, 12101, 999));
 		states[2000] = 1;
-		require(marker() == QuestMarker::IN_PROGRESS, "active quest takes priority over an available quest");
+		require(marker() == QuestMarker::IN_PROGRESS, "an active quest shows once nothing is available");
+		states[1015] = 0;
+		require(marker() == QuestMarker::AVAILABLE, "an available quest outranks an active one");
 		chain.push_back(quest(2001, 999, 12101));
 		states[2001] = 1;
 		require(marker() == QuestMarker::READY, "ready turn-in takes priority over other markers");
 		states.clear();
 		require(marker() == QuestMarker::AVAILABLE, "another character's progress must not affect availability");
+		auto lone = [&](const ms::QuestInfo& info, int16_t state)
+		{
+			return ms::select_quest_marker(12101, 0, {info}, [&](int16_t) { return state; }, 1,
+				[](int32_t) { return 0; }, [](int16_t) { return std::string(); });
+		};
+		require(lone(quest(1250, 12101, 12101), 0) == QuestMarker::NONE, "party quests get no icon");
+		require(lone(quest(2002, 12101, 0), 1) == QuestMarker::READY, "a quest without a finishing NPC is ready anywhere");
 		std::vector<ms::QuestInfo> contact { quest(1032, 2102, 2001, {}, 10), quest(1033, 2001, 2102, {{1032, 2}}, 10) };
 		auto contact_marker = [&](int32_t npc, int16_t level = 1) {
 			return ms::select_quest_marker(npc, 0, contact, [&](int16_t id) { return states[id]; }, level,

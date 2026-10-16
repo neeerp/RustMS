@@ -77,6 +77,7 @@ namespace ms
 			QUESTCOMPLETE,
 			PARTYHP,
 			MONSTERBOOK,
+			REVIVE,
 			NUM_TYPES
 		};
 
