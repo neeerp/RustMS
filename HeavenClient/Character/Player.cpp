@@ -468,7 +468,7 @@ namespace ms
 
 	bool Player::can_attack() const
 	{
-		return !attacking && !is_dead() && !is_climbing() && !is_sitting() && look.get_equips().has_weapon();
+		return !attacking && !is_dead() && !is_climbing() && !is_sitting();
 	}
 
 	SpecialMove::ForbidReason Player::can_use(const SpecialMove &move) const

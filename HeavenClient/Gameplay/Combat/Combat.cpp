@@ -98,6 +98,13 @@ namespace ms
 		if (!player.can_attack())
 			return;
 
+		// v83 says why it won't attack bare-handed (FUN_0095b85a).
+		if (!player.get_look().get_equips().has_weapon())
+		{
+			InChatMessage(Messages::ATTACK_NOWEAPON).drop();
+			return;
+		}
+
 		const SpecialMove &move = get_move(move_id);
 		SpecialMove::ForbidReason reason = player.can_use(move);
 		Weapon::Type weapontype = player.get_stats().get_weapontype();

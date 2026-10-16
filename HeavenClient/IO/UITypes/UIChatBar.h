@@ -178,7 +178,8 @@ namespace ms
 		static constexpr int16_t EDGE_OFFSET = 5;
 		static constexpr int16_t LINE_LOG_HEIGHT = 24;
 		static constexpr time_t MESSAGE_COOLDOWN = 1'000;
-		// The original repeats a missing HP or MP notice at most every two seconds.
+		// The original repeats a missing HP or MP notice, or the missing weapon
+		// one, at most every two seconds.
 		static constexpr time_t COST_MESSAGE_COOLDOWN = 2'000;
 
 		enum Buttons : uint16_t

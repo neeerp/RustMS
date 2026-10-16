@@ -83,7 +83,7 @@ namespace ms
 		// Return if the player is attacking
 		bool is_attacking() const;
 
-		// Return whether the player can attack or not.
+		// Return whether the player is free to attack, weapon aside.
 		bool can_attack() const;
 
 		// Return whether the player can use a skill or not.
