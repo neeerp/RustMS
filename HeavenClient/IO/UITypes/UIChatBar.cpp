@@ -103,6 +103,38 @@ namespace ms
 			return true;
 		}
 
+		// Whether input is exactly command, ignoring case, as v83 compares
+		// commands (FUN_004a8def).
+		bool is_command(const std::string& input, const std::string& command)
+		{
+			return input.size() == command.size() && std::equal(input.begin(), input.end(), command.begin(),
+				[](unsigned char a, unsigned char b) { return std::tolower(a) == std::tolower(b); });
+		}
+
+		// v83's /? and /Help (StringPool 0x39a-0x3ac and 0x14c4).
+		constexpr const char* HELP[] = {
+			"----------------- HELP -----------------",
+			"/partyinfo : Show the current party information.",
+			"/makeparty : create a new party",
+			"/leaveparty : If you are a member of the party, it'll let you leave..",
+			"/partyinvite character-name : invite to our party (only for the party leader)",
+			"/partyexpel character-name: Expel someone from the party (only for the party leader)",
+			"/guildinfo : Give information about the guild",
+			"/leaveguild : Quit the guild",
+			"/guildinvite : Invite the user to the guild (only available to the master)",
+			"/guildexpel : Expel the user from the guild (only available to the master)",
+			"/find CharacterName : Give information about the chracter whether he or she is on-line or not.",
+			"/gametrade charactername: Request to trade game items.",
+			"/tradecash Charactername: Request to trade cash items.",
+			"/buddy: Talk to your buddy.",
+			"/party: Talk to party members.",
+			"/guild: Talk to your guild members.",
+			"/whisper charactername: Send a whisper (if no name is written, it'll be directed to your last contact).",
+			"/all: Regular chat, not a whisper.",
+			"* Open up the chat window and press tab, or close the chat window and",
+			"press 1, 2, or 3 to change the group you'd like to talk to."
+		};
+
 		// The original fills the whole log with black at half opacity.
 		constexpr float LOG_ALPHA = 0.5f;
 
@@ -199,6 +231,24 @@ namespace ms
 							{
 								send_chatline("Usage: /w <name> <message>", LineType::RED);
 							}
+							else if (is_command(msg, "/?") || is_command(msg, "/Help"))
+							{
+								for (const char* line : HELP)
+									send_chatline(line, LineType::YELLOW);
+							}
+							// Like the chat target keys, these only switch the target.
+							else if (is_command(msg, "/party"))
+							{
+								set_target(Target::PARTY);
+							}
+							else if (is_command(msg, "/buddy"))
+							{
+								set_target(Target::BUDDY);
+							}
+							else if (is_command(msg, "/all"))
+							{
+								set_target(Target::ALL);
+							}
 							else if (parse_find_command(msg, target))
 							{
 								if (target.empty())
@@ -206,7 +256,12 @@ namespace ms
 								else
 									FindPacket(target).dispatch();
 							}
-							else if (msg[0] != '/' && !flood_guard_allows(msg))
+							// Commands the client doesn't know aren't chat, whatever
+							// the target; v83 sends them only for GMs.
+							else if (msg[0] == '/')
+							{
+							}
+							else if (!flood_guard_allows(msg))
 							{
 								// Refused: nothing is sent or shown.
 							}
@@ -218,8 +273,7 @@ namespace ms
 							{
 								send_buddy_chat(msg);
 							}
-							// Commands the client doesn't know aren't chat.
-							else if (msg[0] != '/')
+							else
 							{
 								GeneralChatPacket(msg, true).dispatch();
 							}
