@@ -109,6 +109,15 @@ namespace ms
 		constexpr int16_t EXP_WIDTH = 115;
 
 		const Point<int16_t> GAUGE_POS = Point<int16_t>(218, 38);
+
+		// The warning flashes sit over the HP and MP fills, at (218, 580) and
+		// (326, 580) on v83's 800x600 screen.
+		const Point<int16_t> HPFLASH_POS = Point<int16_t>(218, 51);
+		const Point<int16_t> MPFLASH_POS = Point<int16_t>(326, 51);
+
+		// The soHPFlash and soMPFlash options, in 5% steps. v83 reads them
+		// from the registry, 10 (50%) unless set in the options.
+		constexpr int32_t FLASH_LEVEL = 10;
 		const Point<int16_t> CELL_SPACING = Point<int16_t>(35, 34);
 		const Point<int16_t> LABEL_SPACING = Point<int16_t>(35, 33);
 
@@ -166,6 +175,10 @@ namespace ms
 		gaugebar = gauge["bar"];
 		gaugegray = gauge["gray"];
 		graduation = gauge["graduation"];
+		hpflash.animation = gauge["hpFlash"];
+		hpflash.pos = HPFLASH_POS;
+		mpflash.animation = gauge["mpFlash"];
+		mpflash.pos = MPFLASH_POS;
 		quickslot = base["quickSlot"];
 
 		for (size_t i = 0; i < 8; i++)
@@ -272,6 +285,8 @@ namespace ms
 		draw_gauge(MP_LEFT, HPMP_WIDTH, getmppercent());
 		draw_gauge(EXP_LEFT, EXP_WIDTH, getexppercent());
 		graduation.draw(position + GAUGE_POS);
+		hpflash.draw(position);
+		mpflash.draw(position);
 
 		int16_t level = stats.get_stat(MapleStat::Id::LEVEL);
 		int16_t hp = stats.get_stat(MapleStat::Id::HP);
@@ -437,6 +452,11 @@ namespace ms
 	void UIStatusBar::update()
 	{
 		UIElement::update();
+
+		hpflash.check(stats.get_stat(MapleStat::Id::HP), stats.get_total(EquipStat::Id::HP));
+		mpflash.check(stats.get_stat(MapleStat::Id::MP), stats.get_total(EquipStat::Id::MP));
+		hpflash.update();
+		mpflash.update();
 
 		joblabel.change_text(stats.get_jobname());
 		namelabel.change_text(stats.get_name());
@@ -721,6 +741,38 @@ namespace ms
 		return static_cast<float>(
 				static_cast<double>(exp) / ExpTable::values[level]
 		);
+	}
+
+	void UIStatusBar::GaugeFlash::check(int32_t value, int32_t max)
+	{
+		int32_t level = 5 * FLASH_LEVEL;
+
+		if (level != 0 && max > 0 && value * 100 / max < level)
+		{
+			if (last > value)
+			{
+				animation.reset();
+				active = true;
+			}
+
+			last = value;
+		} else
+		{
+			// Falling under the level counts as a fall.
+			last = level * max / 100;
+		}
+	}
+
+	void UIStatusBar::GaugeFlash::update()
+	{
+		if (active && animation.update())
+			active = false;
+	}
+
+	void UIStatusBar::GaugeFlash::draw(Point<int16_t> parent) const
+	{
+		if (active)
+			animation.draw(parent + pos, 1.0f);
 	}
 
 	float UIStatusBar::gethppercent() const
