@@ -99,6 +99,9 @@ namespace ms
 			{ KeyAction::Id::FACE7, 106 }
 		};
 
+		// How long a key glows unless it is clicked (FUN_008de964 checks for 90000 ms).
+		constexpr uint16_t KEY_HINT_TIME = 90000 / Constants::TIMESTEP;
+
 		// Inner left edge and width of the HP, MP and EXP fills in gauge/bar.
 		constexpr int16_t GAUGE_TOP = 15;
 		constexpr int16_t GAUGE_HEIGHT = 14;
@@ -173,6 +176,11 @@ namespace ms
 
 		for (auto &iter : ACTION_ICONS)
 			action_icons[iter.first] = window["KeyConfig"]["icon"][std::to_string(iter.second)];
+
+		const char *hint_keys[Key::NUM_KEYS] = { "EquipKey", "InvenKey", "StatKey", "SkillKey" };
+
+		for (size_t i = 0; i < Key::NUM_KEYS; i++)
+			key_hints[i] = src[hint_keys[i]]["ani"];
 
 		sprites.emplace_back(base["box"], Point<int16_t>(573 + right, 8));
 		sprites.emplace_back(base["iconMemo"], Point<int16_t>(599 + right, 12));
@@ -306,6 +314,10 @@ namespace ms
 			if (iter.first < Buttons::BT_GAME_CHANNEL && iter.second)
 				iter.second->draw(position);
 
+		for (size_t i = 0; i < Key::NUM_KEYS; i++)
+			if (key_hint_left[i] > 0)
+				key_hints[i].draw(position + Point<int16_t>(618 + right + 30 * static_cast<int16_t>(i), 8), alpha);
+
 		if (menu == Menu::GAME)
 			gamemenu.draw(position + gamemenu_pos);
 		else if (menu == Menu::SHORTCUT)
@@ -438,13 +450,35 @@ namespace ms
 	{
 		UIElement::update();
 
+		for (size_t i = 0; i < Key::NUM_KEYS; i++)
+		{
+			if (key_hint_left[i] > 0)
+			{
+				key_hints[i].update();
+				key_hint_left[i]--;
+			}
+		}
+
 		joblabel.change_text(stats.get_jobname());
 		namelabel.change_text(stats.get_name());
+	}
+
+	void UIStatusBar::show_key_hint(Key key)
+	{
+		if (key_hint_left[key] > 0)
+			return;
+
+		key_hints[key].reset();
+		key_hint_left[key] = KEY_HINT_TIME;
 	}
 
 	Button::State UIStatusBar::button_pressed(uint16_t id)
 	{
 		Player &player = Stage::get().get_player();
+
+		// Clicking a glowing key puts its glow out.
+		if (id >= Buttons::BT_EQUIP && id <= Buttons::BT_SKILL)
+			key_hint_left[id - Buttons::BT_EQUIP] = 0;
 
 		switch (id)
 		{

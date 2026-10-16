@@ -41,7 +41,8 @@ namespace ms
 			KEYCONFIG,
 			WORLDMAP,
 			MINIMAP,
-			MONSTERBOOK
+			MONSTERBOOK,
+			BUFFLIST
 		};
 
 		virtual ~Tooltip()

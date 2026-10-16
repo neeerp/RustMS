@@ -218,19 +218,21 @@ namespace ms
 		bool chair_at_face = false;
 		bool chair_in_front = false;
 		TimedBool invincible;
+		bool blinking = false;
 		TimedBool ironbody;
 		std::list<DamageNumber> damagenumbers;
 
-		// A dead character's ghost fades in over two seconds while its tombstone drops from above behind it.
-		// The ghost then circles the tombstone, as in the original client: clockwise, 9 pixels out, once
-		// every two seconds.
-		static constexpr int16_t TOMB_DROP = 240;
-		static constexpr int16_t TOMB_SPEED = 2;
-		static constexpr float GHOST_FADE = 0.004f;
-		static constexpr float GHOST_RADIUS = 9.0f;
+		// As v83 does it (FUN_0092fd5a): a dead character's tombstone drops 600 pixels onto it in 880 ms
+		// while the ghost fades in over 2.5 seconds. The ghost circles a point 20 pixels above the
+		// tombstone: clockwise from the top, 10 pixels out, once every two seconds.
+		static constexpr int16_t TOMB_DROP = 600;
+		static constexpr uint16_t TOMB_FALL = 880 / Constants::TIMESTEP;
+		static constexpr float GHOST_FADE = Constants::TIMESTEP / 2500.0f;
+		static constexpr float GHOST_RADIUS = 10.0f;
+		static constexpr int16_t GHOST_RISE = 20;
 		static constexpr uint16_t GHOST_LAP = 2000 / Constants::TIMESTEP;
 		Animation tomb;
-		int16_t tomb_drop = 0;
+		uint16_t tomb_tick = 0;
 		bool tomb_landed = false;
 		Linear<float> ghost_opacity;
 		uint16_t ghost_tick = 0;

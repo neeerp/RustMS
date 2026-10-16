@@ -62,8 +62,9 @@ entry is the 39-byte `GW_Friend` record. Its channel is zero-based, or -1.
     covers buddies who haven't added the player back.
   - Clicking a name selects that buddy.
   - The buttons are ADD BUDDY (asks for a name with `UIEnterText`), DELETE
-    (asks for confirmation), WHISPER, TALK (sets the chat target to "To
-    Buddy"), and INVITE TO PARTY. MAP is always disabled.
+    (asks for confirmation), WHISPER, TALK (sets the chat target to "To a
+    buddy", as does the buddy chat key, 3 by default), and INVITE TO PARTY.
+    MAP is always disabled.
   - SHOW ONLINE / SHOW ALL hides or shows the offline section. The two
     buttons share a spot, so `filter_clicked` makes sure one press toggles
     only once.

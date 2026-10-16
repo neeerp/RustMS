@@ -22,6 +22,7 @@
 #include <cstdint>
 
 #include "Combat/Combat.h"
+#include "EmoteCooldown.h"
 #include "MapleMap/MapInfo.h"
 #include "MapleMap/MapTilesObjs.h"
 #include "MapleMap/MapBackgrounds.h"
@@ -170,6 +171,7 @@ namespace ms
 		MapEffect effect;
 
 		Combat combat;
+		EmoteCooldown emote_cooldown;
 
 		std::chrono::time_point<std::chrono::steady_clock> start;
 		uint16_t levelBefore;
