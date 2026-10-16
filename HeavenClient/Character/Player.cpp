@@ -191,14 +191,14 @@ namespace ms
 		}
 	}
 
-	bool Player::can_request(int32_t wait) const
+	bool Player::can_request(int32_t wait, bool allow_dead) const
 	{
-		return stats.get_stat(MapleStat::Id::HP) > 0 && excl.can_send(now_ms(), wait);
+		return (allow_dead || stats.get_stat(MapleStat::Id::HP) > 0) && excl.can_send(now_ms(), wait);
 	}
 
-	bool Player::request(OutPacket &&packet, int32_t wait)
+	bool Player::request(OutPacket &&packet, int32_t wait, bool allow_dead)
 	{
-		if (!can_request(wait))
+		if (!can_request(wait, allow_dead))
 			return false;
 
 		packet.dispatch();

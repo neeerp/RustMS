@@ -83,13 +83,13 @@ namespace ms
 		void use_item(int32_t itemid);
 
 		// Whether an item or stat request may go to the server now: the
-		// player is alive, no request waits on an answer, and wait
-		// milliseconds have passed since the last request or answer.
-		bool can_request(int32_t wait) const;
+		// player is alive unless allow_dead, no request waits on an answer,
+		// and wait milliseconds have passed since the last request or answer.
+		bool can_request(int32_t wait, bool allow_dead = false) const;
 
 		// Send the request if it may go now, and note that it waits on its
 		// answer. Return whether it went.
-		bool request(OutPacket &&packet, int32_t wait);
+		bool request(OutPacket &&packet, int32_t wait, bool allow_dead = false);
 
 		// Note the server answered, as an update with its first byte set does.
 		void request_answered();

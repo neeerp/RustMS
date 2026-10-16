@@ -217,8 +217,7 @@ namespace ms
 
 		if (warpinfo.valid)
 		{
-			if (portals.start_cooldown())
-				enter_portal(warpinfo);
+			enter_portal(warpinfo);
 
 			return;
 		}
@@ -250,7 +249,7 @@ namespace ms
 		switch (portal->get_type())
 		{
 			case Portal::TOUCH:
-				if (portal->getwarpinfo().valid && portals.start_cooldown())
+				if (portal->getwarpinfo().valid)
 					enter_portal(portal->getwarpinfo());
 				break;
 			case Portal::SCRIPTED_TOUCH:
@@ -282,11 +281,13 @@ namespace ms
 			Sound(Sound::Name::PORTAL).play();
 		} else if (warpinfo.valid)
 		{
-			ChangeMapPacket(false, -1, warpinfo.name, false).dispatch();
+			// v83 asks to change map only when no request waits on the server
+			// and 500 ms have passed since the last one, dead or alive
+			// (FUN_0053035d).
+			if (!player.request(ChangeMapPacket(warpinfo.name, player.get_position()), ExclRequest::WAIT, true))
+				return;
 
-			CharStats &stats = Stage::get().get_player().get_stats();
-
-			stats.set_mapid(warpinfo.mapid);
+			player.get_stats().set_mapid(warpinfo.mapid);
 
 			Sound(Sound::Name::PORTAL).play();
 		}

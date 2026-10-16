@@ -70,23 +70,15 @@ namespace ms
 				hidden_images.emplace(portal_id, game[type == Portal::HIDDEN ? "ph" : "psh"][image]);
 			}
 		}
-
-		cooldown = WARPCD;
 	}
 
-	MapPortals::MapPortals()
-	{
-		cooldown = WARPCD;
-	}
+	MapPortals::MapPortals() = default;
 
 	void MapPortals::update(Point<int16_t> playerpos)
 	{
 		animations[Portal::REGULAR].update(Constants::TIMESTEP);
 
 		update_hidden(playerpos);
-
-		if (cooldown > 0)
-			cooldown--;
 	}
 
 	void MapPortals::update_hidden(Point<int16_t> playerpos)
@@ -233,16 +225,6 @@ namespace ms
 	void MapPortals::ran_script(const Portal &portal)
 	{
 		last_script = &portal;
-	}
-
-	bool MapPortals::start_cooldown()
-	{
-		if (cooldown > 0)
-			return false;
-
-		cooldown = WARPCD;
-
-		return true;
 	}
 
 	void MapPortals::init()
