@@ -70,6 +70,18 @@ namespace ms
 			write_short(usewheel ? 1 : 0);
 		}
 
+		// Ask to go through a portal, from where the player stands (v83
+		// FUN_0053035d)
+		ChangeMapPacket(const std::string &portal, Point<int16_t> position) : OutPacket(OutPacket::Opcode::CHANGEMAP)
+		{
+			write_byte(0);
+			write_int(-1);
+			write_string(portal);
+			write_point(position);
+			skip(1);
+			write_short(0);
+		}
+
 		// Request the server to exit the cash shop
 		ChangeMapPacket() : OutPacket(OutPacket::Opcode::CHANGEMAP) {}
 	};

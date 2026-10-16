@@ -55,10 +55,6 @@ namespace ms
 
 		void ran_script(const Portal &portal);
 
-		// Start the wait between warps if the last one is over, and return
-		// whether it was.
-		bool start_cooldown();
-
 		Point<int16_t> get_portal_by_id(uint8_t id) const;
 
 		Point<int16_t> get_portal_by_name(const std::string &name) const;
@@ -81,9 +77,6 @@ namespace ms
 
 		std::unordered_map<uint8_t, Portal> portals_by_id;
 		std::unordered_map<std::string, uint8_t> portal_ids_by_name;
-
-		static const int16_t WARPCD = 48;
-		int16_t cooldown;
 
 		// The touch script that ran last in this field.
 		const Portal *last_script = nullptr;
