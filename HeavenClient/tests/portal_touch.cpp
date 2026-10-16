@@ -57,6 +57,18 @@ int main()
 		require(!in00.warp_bounds().contains({786, -2332}), "the Up-key box reached 51 px above");
 		require(!in00.warp_bounds().contains({786, -2231}), "the Up-key box reached 50 px below");
 
+		// A hidden portal shows from 100 px to the left to 99 px to the right
+		// and from 50 px above to 49 px below, whatever its ranges.
+		ms::Portal ph00(nullptr, ms::Portal::HIDDEN, "ph00", true, {-1068, -2475}, 101000000, "ph00_1", 40, 20);
+		require(ph00.reveal_bounds().contains({-1168, -2475}), "a hidden portal hid from 100 px to the left");
+		require(!ph00.reveal_bounds().contains({-1169, -2475}), "a hidden portal showed from 101 px to the left");
+		require(ph00.reveal_bounds().contains({-969, -2475}), "a hidden portal hid from 99 px to the right");
+		require(!ph00.reveal_bounds().contains({-968, -2475}), "a hidden portal showed from 100 px to the right");
+		require(ph00.reveal_bounds().contains({-1068, -2525}), "a hidden portal hid from 50 px above");
+		require(!ph00.reveal_bounds().contains({-1068, -2526}), "a hidden portal showed from 51 px above");
+		require(ph00.reveal_bounds().contains({-1068, -2426}), "a hidden portal hid from 49 px below");
+		require(!ph00.reveal_bounds().contains({-1068, -2425}), "a hidden portal showed from 50 px below");
+
 		std::cout << "Portal touch ranges passed\n";
 		return 0;
 	}

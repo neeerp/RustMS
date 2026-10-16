@@ -54,6 +54,17 @@ namespace ms
 			);
 
 			portal_ids_by_name.emplace(name, portal_id);
+
+			if (type == Portal::HIDDEN || type == Portal::SCRIPTED_HIDDEN)
+			{
+				std::string image = sub["image"];
+
+				if (image.empty())
+					image = "default";
+
+				nl::node game = nl::nx::map["MapHelper.img"]["portal"]["game"];
+				hidden_images.emplace(portal_id, game[type == Portal::HIDDEN ? "ph" : "psh"][image]);
+			}
 		}
 
 		cooldown = WARPCD;
@@ -67,17 +78,12 @@ namespace ms
 	void MapPortals::update(Point<int16_t> playerpos)
 	{
 		animations[Portal::REGULAR].update(Constants::TIMESTEP);
-		animations[Portal::HIDDEN].update(Constants::TIMESTEP);
 
 		for (auto &iter : portals_by_id)
 		{
 			Portal &portal = iter.second;
 			switch (portal.get_type())
 			{
-				case Portal::HIDDEN:
-				case Portal::TOUCH:
-					portal.update(playerpos);
-					break;
 				case Portal::SCRIPTED_TOUCH:
 					// Tutorial hints and other touch scripts run on the server.
 					if (portal.touch(playerpos))
@@ -88,14 +94,66 @@ namespace ms
 			}
 		}
 
+		update_hidden(playerpos);
+
 		if (cooldown > 0)
 			cooldown--;
+	}
+
+	void MapPortals::update_hidden(Point<int16_t> playerpos)
+	{
+		// v83 shows one hidden portal at a time, searching from the last
+		// portal to the first (FUN_00712c57).
+		int16_t found = -1;
+
+		for (auto &iter : hidden_images)
+		{
+			uint8_t id = iter.first;
+
+			if (id > found && portals_by_id.at(id).reveal_bounds().contains(playerpos))
+				found = id;
+		}
+
+		// The portal left behind plays portalExit once. The new one plays
+		// portalStart once, then loops portalContinue (FUN_00712d35,
+		// FUN_0071332c).
+		if (found != shown)
+		{
+			if (shown >= 0)
+			{
+				hiding = shown;
+				hiding_animation = hidden_images.at(shown)["portalExit"];
+			}
+
+			shown = found;
+
+			if (shown >= 0)
+			{
+				shown_animation = hidden_images.at(shown)["portalStart"];
+				shown_continues = false;
+			}
+		}
+
+		if (shown >= 0 && shown_animation.update() && !shown_continues)
+		{
+			shown_animation = hidden_images.at(shown)["portalContinue"];
+			shown_continues = true;
+		}
+
+		if (hiding >= 0 && hiding_animation.update())
+			hiding = -1;
 	}
 
 	void MapPortals::draw(Point<int16_t> viewpos, float inter) const
 	{
 		for (auto &ptit : portals_by_id)
 			ptit.second.draw(viewpos, inter);
+
+		if (hiding >= 0)
+			hiding_animation.draw(portals_by_id.at(hiding).get_position() + viewpos, inter);
+
+		if (shown >= 0)
+			shown_animation.draw(portals_by_id.at(shown).get_position() + viewpos, inter);
 	}
 
 	Point<int16_t> MapPortals::get_portal_by_id(uint8_t portal_id) const
@@ -160,7 +218,6 @@ namespace ms
 	{
 		nl::node src = nl::nx::map["MapHelper.img"]["portal"]["game"];
 
-		animations[Portal::HIDDEN] = src["ph"]["default"]["portalContinue"];
 		animations[Portal::REGULAR] = src["pv"];
 	}
 
