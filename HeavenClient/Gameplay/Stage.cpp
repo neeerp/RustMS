@@ -246,7 +246,7 @@ namespace ms
 			case Portal::SCRIPTED:
 			case Portal::SCRIPTED_INVISIBLE:
 			case Portal::SCRIPTED_HIDDEN:
-				player.request(ChangeMapSpecialPacket(portal->get_name(), playerpos), ExclRequest::WAIT);
+				player.request(ChangeMapSpecialPacket(field_key, portal->get_name(), playerpos), ExclRequest::WAIT);
 				break;
 			default:
 				break;
@@ -273,7 +273,7 @@ namespace ms
 				// The script runs again whenever the player may send a request
 				// and the portal's delay has passed, unless it runs only once.
 				if (portals.may_run_script(*portal) &&
-					player.request(ChangeMapSpecialPacket(portal->get_name(), playerpos), portal->get_delay()))
+					player.request(ChangeMapSpecialPacket(field_key, portal->get_name(), playerpos), portal->get_delay()))
 					portals.ran_script(*portal);
 				break;
 			case Portal::SPRING1:
@@ -305,7 +305,7 @@ namespace ms
 			// v83 asks to change map only when no request waits on the server
 			// and 500 ms have passed since the last one, dead or alive
 			// (FUN_0053035d).
-			if (!player.request(ChangeMapPacket(warpinfo.name, player.get_position()), ExclRequest::WAIT, true))
+			if (!player.request(ChangeMapPacket(field_key, warpinfo.name, player.get_position()), ExclRequest::WAIT, true))
 				return;
 
 			player.get_stats().set_mapid(warpinfo.mapid);
@@ -600,6 +600,16 @@ namespace ms
 	int Stage::get_mapid()
 	{
 		return mapid;
+	}
+
+	void Stage::set_field_key(uint8_t key)
+	{
+		field_key = key;
+	}
+
+	uint8_t Stage::get_field_key() const
+	{
+		return field_key;
 	}
 
 	void Stage::add_effect(std::string path)

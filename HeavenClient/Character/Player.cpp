@@ -23,6 +23,7 @@
 #include "../Data/EquipData.h"
 #include "../Data/SkillData.h"
 #include "../Data/WeaponData.h"
+#include "../Gameplay/Stage.h"
 #include "../IO/UI.h"
 
 #include "../IO/UITypes/UINotice.h"
@@ -287,7 +288,7 @@ namespace ms
 			// Any answer sends the player to the map's return map with a little HP.
 			UI::get().emplace<UIOk>("You have died.\\nYou will be revived in the nearest town.", [](bool)
 			{
-				ChangeMapPacket(true, 0, "", false).dispatch();
+				ChangeMapPacket(Stage::get().get_field_key(), 0, "", false).dispatch();
 			});
 		} else
 		{
