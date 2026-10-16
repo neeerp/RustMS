@@ -415,10 +415,7 @@ namespace ms
 			return Button::State::PRESSED;
 		case Buttons::BT_EXIT:
 		{
-			float fadestep = 0.025f;
-
 			Window::get().fadeout(
-				fadestep,
 				[]()
 				{
 					GraphicsGL::get().clear();

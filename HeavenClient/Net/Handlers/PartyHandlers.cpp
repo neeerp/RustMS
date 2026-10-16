@@ -23,18 +23,38 @@ namespace ms
 			CREATED = 0x08,
 			LEAVE = 0x0C,
 			JOIN = 0x0F,
+			CHANGE_LEADER = 0x1B,
+			// No message; doors and the like, which the client lacks.
+			QUIET = 0x12,
+			DOOR_TOWN = 0x22,
+			DOOR_FIELD = 0x23,
+			DOOR_REMOVE = 0x25,
+			// Messages, some carrying text.
+			ALREADY_JOINED = 0x09,
+			BEGINNER = 0x0A,
+			NOT_JOINED = 0x0D,
 			ALREADY_IN_PARTY = 0x10,
 			FULL = 0x11,
 			NOT_FOUND = 0x13,
+			BLOCKING = 0x15,
 			BUSY = 0x16,
 			DECLINED = 0x17,
-			CHANGE_LEADER = 0x1B
+			KICK_MAP = 0x19,
+			LEADER_NOT_NEAR = 0x1C,
+			NOBODY_NEAR = 0x1D,
+			OTHER_CHANNEL = 0x1E,
+			GM = 0x20,
+			NO_CHARACTER = 0x21,
+			SERVER_NOTICE = 0x24
 		};
+
+		constexpr char UNEXPECTED[] = "Your request for a party didn't work due to an unexpected error.";
 
 		constexpr size_t CAPACITY = 6;
 		constexpr uint16_t NAME_LENGTH = 13;
 
-		void party_line(const std::string& line, UIChatBar::LineType type = UIChatBar::LineType::PARTY)
+		// v83 logs every party notice in chat type 0xc; party chat has its own.
+		void party_line(const std::string& line, UIChatBar::LineType type = UIChatBar::LineType::SKILL)
 		{
 			if (auto chatbar = UI::get().get_element<UIChatBar>())
 				chatbar->send_chatline(line, type);
@@ -146,7 +166,7 @@ namespace ms
 				if (led)
 					party_line("You have quit as the leader of the party. The party has been disbanded.");
 				else
-					party_line("The leader of the party has quit the party. The party has been disbanded.");
+					party_line("You have left the party since the party leader quit.");
 
 				break;
 			}
@@ -162,7 +182,7 @@ namespace ms
 			else
 			{
 				read_party(recv, party_id);
-				party_line("'" + name + (expelled ? "' has been expelled from the party." : "' has left the party."));
+				party_line("'" + name + (expelled ? "' have been expelled from the party." : "' have left the party."));
 			}
 
 			break;
@@ -180,32 +200,75 @@ namespace ms
 
 			break;
 		}
+		case Operation::ALREADY_JOINED:
 		case Operation::ALREADY_IN_PARTY:
-			party_line("Already have joined a party.", UIChatBar::LineType::RED);
+			party_line("Already have joined a party.");
+			break;
+		case Operation::BEGINNER:
+			party_line("A beginner can't create a party.");
+			break;
+		case Operation::NOT_JOINED:
+			party_line("You have yet to join a party.");
 			break;
 		case Operation::FULL:
-			party_line("The party you're trying to join is already in full capacity.", UIChatBar::LineType::RED);
+			party_line("The party you're trying to join is already in full capacity.");
 			break;
 		case Operation::NOT_FOUND:
-			party_line("Unable to find the requested character in this channel.", UIChatBar::LineType::RED);
+			party_line("Unable to find the requested character in this channel.");
+			break;
+		case Operation::BLOCKING:
+			party_line(recv.read_string() + " is currently blocking any party invitations.");
 			break;
 		case Operation::BUSY:
-			party_line("'" + recv.read_string() + "' is currently taking care of another invitation.", UIChatBar::LineType::RED);
+			party_line("'" + recv.read_string() + "' is taking care of another invitation.");
 			break;
 		case Operation::DECLINED:
-			party_line("'" + recv.read_string() + "' has denied the party request.", UIChatBar::LineType::RED);
+			party_line(recv.read_string() + " have denied request to the party.");
+			break;
+		case Operation::KICK_MAP:
+			party_line("Cannot kick another user in this map");
+			break;
+		case Operation::LEADER_NOT_NEAR:
+			party_line("This can only be given to a party member within the vicinity.");
+			break;
+		case Operation::NOBODY_NEAR:
+			party_line("Unable to hand over the leadership post; No party member is currently within the vicinity of the party leader.");
+			break;
+		case Operation::OTHER_CHANNEL:
+			party_line("You may only change with the party member that's on the same channel.");
+			break;
+		case Operation::GM:
+			party_line("As a GM, you're forbidden from creating a party.");
+			break;
+		case Operation::NO_CHARACTER:
+			party_line("Unable to find the character.");
+			break;
+		case Operation::SERVER_NOTICE:
+			party_line(recv.read_bool() ? recv.read_string() : UNEXPECTED);
 			break;
 		case Operation::CHANGE_LEADER:
 		{
 			int32_t leader = recv.read_int();
+			bool disconnected = recv.read_bool();
 			party.set_leader(leader);
 
 			if (auto member = party.find(leader))
-				party_line("'" + member->name + "' has become the leader of the party.");
+			{
+				if (disconnected)
+					party_line("Due to the party leader disconnecting from the game, " + member->name + " has been assigned as the new leader.");
+				else
+					party_line(member->name + " has become the leader of the party.");
+			}
 
 			break;
 		}
+		case Operation::QUIET:
+		case Operation::DOOR_TOWN:
+		case Operation::DOOR_FIELD:
+		case Operation::DOOR_REMOVE:
+			break;
 		default:
+			party_line(UNEXPECTED);
 			break;
 		}
 	}
@@ -226,7 +289,7 @@ namespace ms
 		std::string text = recv.read_string();
 
 		if (mode == MultiChatPacket::Mode::PARTY)
-			party_line(name + " : " + text);
+			party_line(name + " : " + text, UIChatBar::LineType::PARTY);
 		else if (mode == MultiChatPacket::Mode::BUDDY)
 			party_line(name + " : " + text, UIChatBar::LineType::BUDDY);
 		else

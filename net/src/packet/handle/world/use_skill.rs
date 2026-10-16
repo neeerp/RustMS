@@ -31,6 +31,23 @@ impl WorldHandler for UseSkillHandler {
     }
 }
 
+/// `CANCEL_BUFF`: the player right-clicked a skill's buff icon. End its
+/// buffs and tell the client, which then drops the icon.
+pub struct CancelBuffHandler;
+
+impl WorldHandler for CancelBuffHandler {
+    fn handle(&self, packet: &mut Packet, ctx: &mut WorldContext) -> WorldResult {
+        let mut r = Cursor::new(&packet.bytes);
+        r.read_short()?;
+        let skill_id = r.read_int()?;
+        let ended = ctx.player.buffs.cancel(skill_id);
+        if ended.is_empty() {
+            return Ok(HandlerResult::empty());
+        }
+        Ok(HandlerResult::reply(buff::build_cancel_buff(&ended)?))
+    }
+}
+
 #[derive(Debug, PartialEq, Eq)]
 enum Refusal {
     Dead,
@@ -192,6 +209,37 @@ mod tests {
             use_skill(&mut player, 1002, 2, now + Duration::from_secs(60)).unwrap_err(),
             Refusal::NotEnoughMp
         );
+    }
+
+    #[test]
+    fn cancelling_a_buff_ends_it_and_tells_the_client() {
+        use crate::packet::op::RecvOpcode;
+        use packet::io::write::PktWrite;
+
+        let mut player = beginner_with(1002, 2);
+        let now = Instant::now();
+        player.buffs.give(Buff::new(
+            1002,
+            BuffStat::Speed,
+            15,
+            now,
+            Duration::from_secs(8),
+        ));
+        let mut cancel = |skill_id: i32| {
+            let mut packet = Packet::new_empty();
+            packet.write_short(RecvOpcode::CancelBuff as i16).unwrap();
+            packet.write_int(skill_id).unwrap();
+            let mut ctx = WorldContext {
+                client_id: 1,
+                channel_id: 0,
+                player: &mut player,
+            };
+            opcodes(CancelBuffHandler.handle(&mut packet, &mut ctx))
+        };
+        assert_eq!(cancel(1001), Vec::<i16>::new());
+        assert_eq!(cancel(1002), [SendOpcode::CancelBuff as i16]);
+        assert_eq!(cancel(1002), Vec::<i16>::new());
+        assert!(player.buffs.active().is_empty());
     }
 
     #[test]

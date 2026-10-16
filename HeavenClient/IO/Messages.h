@@ -35,6 +35,8 @@ namespace ms
 			SKILL_NOBULLETS,
 			SKILL_NOSTARS,
 			SKILL_COOLDOWN,
+			// Attacking without a weapon
+			ATTACK_NOWEAPON,
 
 			// Scrolling result
 					SCROLL_SUCCESS,
