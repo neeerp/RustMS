@@ -19,6 +19,7 @@
 
 #include "../Data/ItemData.h"
 #include "../Data/SkillData.h"
+#include "../UI.h"
 #include "../Util/NxFiles.h"
 
 #include <nlnx/node.hpp>
@@ -93,9 +94,31 @@ namespace ms
 		dimension = Point<int16_t>(position.x(), CELL);
 	}
 
-	Cursor::State UIBuffList::send_cursor(bool pressed, Point<int16_t> cursorposition)
+	Cursor::State UIBuffList::send_cursor(bool, Point<int16_t> cursorpos)
 	{
-		return UIElement::send_cursor(pressed, cursorposition);
+		// FUN_007b2e58
+		if (auto entry = entry_at(cursorpos))
+		{
+			if (entry->id >= 0)
+				UI::get().show_skill(Tooltip::Parent::BUFFLIST, entry->id, 0, 0, 0, false);
+			else
+				UI::get().show_item(Tooltip::Parent::BUFFLIST, -entry->id);
+		} else
+		{
+			UI::get().clear_tooltip(Tooltip::Parent::BUFFLIST);
+		}
+
+		return Cursor::State::IDLE;
+	}
+
+	bool UIBuffList::is_in_range(Point<int16_t> cursorpos) const
+	{
+		return entry_at(cursorpos) != nullptr;
+	}
+
+	void UIBuffList::remove_cursor()
+	{
+		UI::get().clear_tooltip(Tooltip::Parent::BUFFLIST);
 	}
 
 	UIElement::Type UIBuffList::get_type() const
@@ -111,5 +134,18 @@ namespace ms
 	void UIBuffList::cancel_buff(int32_t stat)
 	{
 		row.cancel(stat);
+	}
+
+	const BuffRow<Texture>::Entry* UIBuffList::entry_at(Point<int16_t> cursorpos) const
+	{
+		auto& icons = row.icons();
+		int16_t right = position.x() + CELL;
+		int16_t x = cursorpos.x() - (right - CELL * static_cast<int16_t>(icons.size()));
+		int16_t y = cursorpos.y() - position.y();
+
+		if (y < 0 || y >= CELL || x < 0 || cursorpos.x() >= right)
+			return nullptr;
+
+		return &icons[x / CELL];
 	}
 }
