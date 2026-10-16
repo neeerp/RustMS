@@ -43,6 +43,7 @@ namespace ms
 			auto vrange = static_cast<int16_t>(sub["vRange"].get_integer(Portal::DEFAULT_RANGE));
 			auto delay = static_cast<int32_t>(sub["delay"].get_integer());
 			bool only_once = sub["onlyOnce"].get_bool();
+			Point<int16_t> impact = {sub["horizontalImpact"], sub["verticalImpact"]};
 
 			// v83 draws pv for regular, type 4 and scripted portals alike
 			// (FUN_0071165a, FUN_00712313).
@@ -54,7 +55,7 @@ namespace ms
 					std::piecewise_construct,
 					std::forward_as_tuple(portal_id),
 					std::forward_as_tuple(animation, type, name, intramap, position, target_id, target_name, hrange,
-										  vrange, delay, only_once)
+										  vrange, delay, only_once, impact)
 			);
 
 			portal_ids_by_name.emplace(name, portal_id);
