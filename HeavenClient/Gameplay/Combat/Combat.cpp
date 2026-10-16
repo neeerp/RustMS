@@ -19,6 +19,7 @@
 
 #include "DamageLayout.h"
 #include "PointBlank.h"
+#include "ShotPath.h"
 
 #include "../../Character/SkillId.h"
 #include "../../IO/Messages.h"
@@ -37,10 +38,10 @@ namespace ms
 																															attack);
 																												}),
 																										bulleteffects(
-																												[&](const BulletEffect &effect)
+																												[&](const Bullet &bullet)
 																												{
 																													apply_bullet_effect(
-																															effect);
+																															bullet);
 																												}),
 																										damageeffects(
 																												[&](const DamageEffect &effect)
@@ -52,8 +53,8 @@ namespace ms
 
 	void Combat::draw(double viewx, double viewy, float alpha) const
 	{
-		for (auto &be : bullets)
-			be.bullet.draw(viewx, viewy, alpha);
+		for (auto &bullet : bullets)
+			bullet.draw(viewx, viewy, alpha);
 
 		for (auto &dn : damagenumbers)
 			dn.draw(viewx, viewy, alpha);
@@ -66,23 +67,9 @@ namespace ms
 		damageeffects.update();
 
 		bullets.remove_if(
-				[&](BulletEffect &mb)
+				[](Bullet &bullet)
 				{
-					int32_t target_oid = mb.damageeffect.target_oid;
-
-					if (mobs.contains(target_oid))
-					{
-						mb.target = mobs.get_mob_head_position(target_oid);
-						bool apply = mb.bullet.update(mb.target);
-
-						if (apply)
-							apply_damage_effect(mb.damageeffect);
-
-						return apply;
-					} else
-					{
-						return mb.bullet.update(mb.target);
-					}
+					return bullet.update();
 				}
 		);
 
@@ -120,9 +107,10 @@ namespace ms
 		{
 			Attack attack = player.prepare_attack(move.is_skill());
 			Stance::Id whack = Stance::Id::NONE;
+			int16_t reach = 0;
 
 			if (attack.type == Attack::Type::RANGED && !move.is_skill())
-				whack = find_whack(attack);
+				whack = find_whack(attack, reach);
 
 			if (whack != Stance::Id::NONE)
 				attack = player.prepare_attack(false, true);
@@ -157,7 +145,8 @@ namespace ms
 			mobs.send_attack(result, attack, mob_targets, mobcount);
 			result.attacker = player.get_oid();
 			expect_hits(result, 1);
-			extract_effects(player, move, result, range);
+			int16_t shot_end = attack.toleft ? range.left() : range.right();
+			extract_effects(player, move, result, range, reach, shot_end);
 
 			apply_use_movement(move);
 			apply_result_movement(move, result);
@@ -178,16 +167,22 @@ namespace ms
 		}
 	}
 
-	Stance::Id Combat::find_whack(const Attack &attack) const
+	Stance::Id Combat::find_whack(const Attack &attack, int16_t &reach) const
 	{
 		Stance::Id stance = player.get_look().get_attackstance(true);
 		Rectangle<int16_t> range = point_blank::range(player.get_afterimage_range(stance));
+		reach = -range.left();
 		range = place_range(attack.origin, range, 1.0f, attack.toleft);
 
 		if (find_closest(mobs.get_mobs(), range, attack.origin, 1, true).empty())
 			return Stance::Id::NONE;
 
 		return stance;
+	}
+
+	int16_t Combat::get_whack_reach(const Char &user, Stance::Id stance)
+	{
+		return -point_blank::range(user.get_afterimage_range(stance)).left();
 	}
 
 	std::vector<int32_t>
@@ -272,15 +267,9 @@ namespace ms
 		player.rush(targetx);
 	}
 
-	void Combat::apply_bullet_effect(const BulletEffect &effect)
+	void Combat::apply_bullet_effect(const Bullet &bullet)
 	{
-		bullets.push_back(effect);
-
-		if (bullets.back().bullet.settarget(effect.target))
-		{
-			apply_damage_effect(effect.damageeffect);
-			bullets.pop_back();
-		}
+		bullets.push_back(bullet);
 	}
 
 	void Combat::apply_damage_effect(const DamageEffect &effect)
@@ -325,7 +314,16 @@ namespace ms
 
 			Rectangle<int16_t> range = place_range(user.get_position(), user.get_afterimage().get_range(), 1.0f,
 												   attack.toleft);
-			extract_effects(user, move, attack, range);
+			// Other players' shots start where a whack would reach, as the
+			// player's own do, and fly as far as the player's.
+			int16_t reach = 0;
+
+			if (attack.type == Attack::Type::RANGED && attack.skill == 0)
+				reach = get_whack_reach(user, user.get_look().get_attackstance(true));
+
+			int16_t shot_range = -player.get_stats().get_range().left();
+			int16_t shot_end = user.get_position().x() + (attack.toleft ? -shot_range : shot_range);
+			extract_effects(user, move, attack, range, reach, shot_end);
 		} else
 		{
 			expect_hits(attack, -1);
@@ -356,7 +354,7 @@ namespace ms
 	}
 
 	void Combat::extract_effects(const Char &user, const SpecialMove &move, const AttackResult &result,
-								 Rectangle<int16_t> range)
+								 Rectangle<int16_t> range, int16_t reach, int16_t shot_end)
 	{
 		AttackUser attackuser = {
 				user.get_skilllevel(move.get_id()),
@@ -370,10 +368,22 @@ namespace ms
 
 		if (result.bullet)
 		{
-			Bullet bullet{
-					move.get_bullet(user, result.bullet),
-					user.get_position(),
-					result.toleft
+			// As in v83, the bullets fly straight from in front of the user to
+			// where the shot crosses each target, or as far as the shot goes.
+			// A target's hits all land 1.5 ms per pixel it is away, after the
+			// attack's hit frame.
+			Animation animation = move.get_bullet(user, result.bullet);
+			Point<int16_t> origin = shot_path::origin(user.get_position(), reach, result.toleft);
+			uint16_t delay = user.get_attackdelay(0);
+
+			auto shoot = [&](Point<int16_t> target, uint8_t count)
+			{
+				for (uint8_t i = 0; i < count; i++)
+				{
+					Point<int16_t> end = target + Point<int16_t>(0, shot_path::spread(i, count));
+					uint16_t start = delay + shot_path::bullet_delay(result.bullet, result.skill, i);
+					bulleteffects.push(start, Bullet(animation, origin, end, shot_path::flight_time(origin, end)));
+				}
 			};
 
 			for (auto &line : result.damagelines)
@@ -383,38 +393,32 @@ namespace ms
 				if (mobs.contains(oid))
 				{
 					std::vector<DamageNumber> numbers = place_numbers(line.second, move.get_id());
-					Point<int16_t> head = mobs.get_mob_head_position(oid);
+					Point<int16_t> hit = shot_path::hit_point(origin, shot_end, mobs.get_mob_body(oid));
+					uint16_t hit_delay = delay + shot_path::hit_delay(origin, hit);
+
+					shoot(hit, static_cast<uint8_t>(numbers.size()));
 
 					size_t i = 0;
 
 					for (auto &number : numbers)
 					{
-						DamageEffect effect{
+						damageeffects.emplace(
+								hit_delay,
 								attackuser,
 								number,
 								line.second[i].first,
 								result.toleft,
 								oid,
 								move.get_id()
-						};
+						);
 
-						bulleteffects.emplace(user.get_attackdelay(i), std::move(effect), bullet, head);
 						i++;
 					}
 				}
 			}
 
 			if (result.damagelines.empty())
-			{
-				int16_t xshift = result.toleft ? -400 : 400;
-				Point<int16_t> target = user.get_position() + Point<int16_t>(xshift, -26);
-
-				for (uint8_t i = 0; i < result.hitcount; i++)
-				{
-					DamageEffect effect{attackuser, {}, 0, false, 0, 0};
-					bulleteffects.emplace(user.get_attackdelay(i), std::move(effect), bullet, target);
-				}
-			}
+				shoot(Point<int16_t>(shot_end, origin.y()), result.hitcount);
 		} else
 		{
 			for (auto &line : result.damagelines)

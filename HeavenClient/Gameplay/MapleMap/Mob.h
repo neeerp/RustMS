@@ -133,6 +133,9 @@ namespace ms
 		// Return the head position.
 		Point<int16_t> get_head_position() const;
 
+		// Return the body's bounds on the map, turned the way the mob faces.
+		Rectangle<int16_t> get_body() const;
+
 	private:
 		// Set the stance by byte value
 		void set_stance(uint8_t stancebyte);

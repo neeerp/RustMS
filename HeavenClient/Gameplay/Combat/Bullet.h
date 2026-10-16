@@ -19,27 +19,31 @@
 
 #include <cstdint>
 
-#include "../Physics/PhysicsObject.h"
 #include "../Graphics/Animation.h"
 #include "../Template/Point.h"
 
 namespace ms
 {
-	// Represents a projectile on a map.
+	// Represents a projectile on a map. It flies straight from where it is
+	// thrown or fired to its target in a set time, as in v83.
 	class Bullet
 	{
 	public:
-		Bullet(Animation animation, Point<int16_t> origin, bool toleft);
+		Bullet(Animation animation, Point<int16_t> origin, Point<int16_t> target, uint16_t duration);
 
 		void draw(double viewx, double viewy, float alpha) const;
 
-		bool settarget(Point<int16_t> target);
-
-		bool update(Point<int16_t> target);
+		// Return whether the bullet has arrived.
+		bool update();
 
 	private:
+		Point<double> get_position(float alpha) const;
+
 		Animation animation;
-		MovingObject moveobj;
+		Point<int16_t> origin;
+		Point<int16_t> target;
+		uint16_t duration;
+		uint16_t elapsed;
 		bool flip;
 	};
 }
