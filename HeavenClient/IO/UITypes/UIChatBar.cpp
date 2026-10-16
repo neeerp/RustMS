@@ -18,6 +18,7 @@
 #include "UIChatBar.h"
 
 #include <algorithm>
+#include <cctype>
 #include <cstdlib>
 
 #include "UIStatusBar.h"
@@ -91,6 +92,42 @@ namespace ms
 
 			return true;
 		}
+
+		// Whether input is /? or /help, in any case.
+		bool is_help_command(const std::string& input)
+		{
+			std::string lower = input;
+
+			std::transform(lower.begin(), lower.end(), lower.begin(),
+						   [](unsigned char c) { return std::tolower(c); });
+
+			return lower == "/?" || lower == "/help";
+		}
+
+		// What the original prints for /? or /help, typos included
+		// (FUN_0052c40c).
+		const std::vector<std::string> HELP_LINES = {
+			"----------------- HELP -----------------",
+			"/partyinfo : Show the current party information.",
+			"/makeparty : create a new party",
+			"/leaveparty : If you are a member of the party, it'll let you leave..",
+			"/partyinvite character-name : invite to our party (only for the party leader)",
+			"/partyexpel character-name: Expel someone from the party (only for the party leader)",
+			"/guildinfo : Give information about the guild",
+			"/leaveguild : Quit the guild",
+			"/guildinvite : Invite the user to the guild (only available to the master)",
+			"/guildexpel : Expel the user from the guild (only available to the master)",
+			"/find CharacterName : Give information about the chracter whether he or she is on-line or not.",
+			"/gametrade charactername: Request to trade game items.",
+			"/tradecash Charactername: Request to trade cash items.",
+			"/buddy: Talk to your buddy.",
+			"/party: Talk to party members.",
+			"/guild: Talk to your guild members.",
+			"/whisper charactername: Send a whisper (if no name is written, it'll be directed to your last contact).",
+			"/all: Regular chat, not a whisper.",
+			"* Open up the chat window and press tab, or close the chat window and",
+			"press 1, 2, or 3 to change the group you'd like to talk to."
+		};
 
 		// The original fills the whole log with black at half opacity.
 		constexpr float LOG_ALPHA = 0.5f;
@@ -188,6 +225,11 @@ namespace ms
 									send_chatline("Usage: /find <name>", LineType::RED);
 								else
 									FindPacket(target).dispatch();
+							}
+							else if (is_help_command(msg))
+							{
+								for (const auto& line : HELP_LINES)
+									send_chatline(line, LineType::YELLOW);
 							}
 							else if (chat_target == Target::PARTY)
 							{
