@@ -729,6 +729,11 @@ namespace ms
 
 	void Player::sit_on_chair(int32_t itemid)
 	{
+		// v83 sits only when it may ask the server, as for an item
+		// (FUN_00a0f9e2).
+		if (!can_request(ExclRequest::USE_WAIT))
+			return;
+
 		if (!phobj.onground || is_sitting() || is_climbing() || attacking || is_dead())
 			return;
 
@@ -740,7 +745,7 @@ namespace ms
 		phobj.hspeed = 0.0;
 		set_state(Char::State::SIT);
 		set_chair(itemid);
-		UseChairPacket(itemid).dispatch();
+		request(UseChairPacket(itemid), ExclRequest::USE_WAIT);
 	}
 
 	void Player::leave_chair()
