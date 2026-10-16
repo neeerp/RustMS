@@ -89,6 +89,10 @@ namespace ms
 		// Return the attack speed as a multiplier
 		float get_real_attackspeed() const;
 
+		// Return the attack speed degree that stretches an action's frames,
+		// from 2 (fastest) to 10 (slowest); 6 plays them as drawn.
+		int8_t get_action_speed() const;
+
 		// Return the delay until applying an attack.
 		uint16_t get_attackdelay(size_t no) const;
 
@@ -203,6 +207,9 @@ namespace ms
 
 		State state = State::STAND;
 		bool attacking;
+		// The milliseconds of animation time a speed left over from its last
+		// whole step.
+		float stance_carry = 0.0f;
 		bool facing_right;
 		int32_t chair = 0;
 

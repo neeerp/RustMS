@@ -168,7 +168,16 @@ namespace ms
 		uint16_t stancespeed = 0;
 
 		if (speed >= 1.0f / Constants::TIMESTEP)
-			stancespeed = static_cast<uint16_t>(Constants::TIMESTEP * speed);
+		{
+			// Keep the fraction, or a speed of 16/14 would step 9 ms and
+			// play no faster than 9/8.
+			float step = Constants::TIMESTEP * speed + stance_carry;
+			stancespeed = static_cast<uint16_t>(step);
+			stance_carry = step - stancespeed;
+		} else
+		{
+			stance_carry = 0.0f;
+		}
 
 		afterimage.update(look.get_frame(), stancespeed);
 
@@ -194,18 +203,22 @@ namespace ms
 
 	float Char::get_real_attackspeed() const
 	{
-		int8_t speed = get_integer_attackspeed();
+		return 16.0f / (get_action_speed() + 10);
+	}
 
-		return 1.7f - static_cast<float>(speed) / 10;
+	int8_t Char::get_action_speed() const
+	{
+		// v83 stretches each frame of an action to delay * (speed + 10) / 16,
+		// holding the speed to 2..10 (FUN_00453ad1).
+		return std::clamp<int8_t>(get_integer_attackspeed(), 2, 10);
 	}
 
 	uint16_t Char::get_attackdelay(size_t no) const
 	{
 		uint8_t first_frame = afterimage.get_first_frame();
 		uint16_t delay = look.get_attackdelay(no, first_frame);
-		float fspeed = get_real_attackspeed();
 
-		return static_cast<uint16_t>(delay / fspeed);
+		return static_cast<uint16_t>(delay * (get_action_speed() + 10) / 16);
 	}
 
 	int8_t Char::update(const Physics &physics)
