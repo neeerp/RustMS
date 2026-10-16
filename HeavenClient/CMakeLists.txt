@@ -22,6 +22,14 @@ if(HEAVENCLIENT_BUILD_TESTS)
         ${PROJECT_SOURCE_DIR}/libs/NoLifeNx/nlnx/build/libNoLifeNx.a
         ${PROJECT_SOURCE_DIR}/libs/lz4/lib/liblz4.a)
     add_test(NAME movement_physics COMMAND movement_physics_tests)
+    add_executable(map_objects_tests tests/map_objects.cpp
+        Gameplay/MapleMap/MapObjects.cpp Gameplay/MapleMap/MapObject.cpp
+        Gameplay/Physics/Physics.cpp Gameplay/Physics/Foothold.cpp Gameplay/Physics/FootholdTree.cpp)
+    target_include_directories(map_objects_tests PRIVATE ${PROJECT_SOURCE_DIR}/libs/NoLifeNx)
+    target_link_libraries(map_objects_tests PRIVATE
+        ${PROJECT_SOURCE_DIR}/libs/NoLifeNx/nlnx/build/libNoLifeNx.a
+        ${PROJECT_SOURCE_DIR}/libs/lz4/lib/liblz4.a)
+    add_test(NAME map_objects COMMAND map_objects_tests)
     add_executable(frame_assembler_tests tests/frame_assembler.cpp Net/Cryptography.cpp)
     add_test(NAME frame_assembler COMMAND frame_assembler_tests)
     add_executable(quest_dialogue_tests tests/quest_dialogue.cpp)

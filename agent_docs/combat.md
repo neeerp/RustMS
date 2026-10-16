@@ -96,6 +96,13 @@ others see the skill's effect) to the others, applies the damage, sends the
 attacker SHOW_MONSTER_HP, and on death KILL_MONSTER to everyone; the attacker
 gets the MP left as STAT_CHANGED.
 
+HeavenClient picks targets as v83 does (`Combat::find_targets`). Melee and
+magic attacks take the mobs whose body overlaps the attack range in the order
+they entered the map (`MapObjects::entry_order`), not the closest ones, so a
+basic attack can pass the mob in front for one that spawned earlier. A mob
+that is spawned again under the same oid keeps its place. Ranged attacks take
+the closest mobs, which is what v83's outward sweep finds.
+
 In HeavenClient a hit of at least the mob's `pushed` value puts it in its
 `hit1` stance for about a quarter second, with a three-tick push that moves it
 a few pixels (`Mob::knockback_ticks`), as in period footage.
