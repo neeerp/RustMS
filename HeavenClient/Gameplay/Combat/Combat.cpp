@@ -161,12 +161,17 @@ namespace ms
 					DamageReactorPacket(reactor->get_oid(), player.get_position(), 0, 0).dispatch();
 		} else
 		{
+			// v83 uses a skill that doesn't attack only when it may ask the
+			// server, as for an item (FUN_0096b140).
+			if (!player.can_request(ExclRequest::SKILL_WAIT))
+				return;
+
 			move.apply_useeffects(player);
 			move.apply_actions(player, Attack::Type::MAGIC);
 
 			int32_t moveid = move.get_id();
 			int32_t level = player.get_skills().get_level(moveid);
-			UseSkillPacket(moveid, level).dispatch();
+			player.request(UseSkillPacket(moveid, level), ExclRequest::SKILL_WAIT);
 		}
 	}
 
