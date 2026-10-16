@@ -25,6 +25,7 @@
 #include <cstdint>
 #include <optional>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 #include "../Messages.h"
@@ -61,7 +62,9 @@ namespace ms
 			BUDDY,
 			PINK,
 			// A skill could not be used
-			SKILL
+			SKILL,
+			// What a GM says nearby
+			GM
 		};
 
 		// Who a typed line goes to
@@ -228,5 +231,7 @@ namespace ms
 		int16_t rowpos;
 		int16_t rowmax;
 		std::unordered_map<int16_t, Text> rowtexts;
+		// The rows drawn on a light strip, as v83 draws GM chat
+		std::unordered_set<int16_t> highlighted_rows;
 	};
 }
