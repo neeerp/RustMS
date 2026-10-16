@@ -473,6 +473,10 @@ force-and-friction model (`move_normal`).
 - **Jumping.** `Physics::jump` sets the takeoff speed. A held direction adds
   80% of the top walking speed, capped at the top speed. A rope jump uses half
   the jump speed and 1.3 times the walking speed.
+- **Climbing.** Ladders and ropes climb at 100 px/s whatever the SPEED, and Up
+  and Down together hold still. Past the top, the player stops there, or
+  steps 5 px above it onto a platform if the ladder has `uf`. Past the bottom,
+  they let go 1 px below it.
 - **Down-jump.** Allowed when the lowest platform within 300 px below, or
   else the highest one 300 to 600 px below, is at least 5 px under the feet
   (`FootholdTree::can_jump_down`). `Physics::jump_down` hops up at 196 px/s
