@@ -56,6 +56,11 @@ int main()
 		require(range(5001003, 350, Weapon::Type::GUN, 0) == 350, "a skill's own range wins");
 		require(range(0, 0, Weapon::Type::SWORD_1H, 0) == 0, "a sword shoots nowhere");
 
+		require(aimed_spell(2001004), "Energy Bolt is aimed at the first mob in its path");
+		require(aimed_spell(2001005), "so is Magic Claw");
+		require(!aimed_spell(2201005), "Thunder Bolt hits all the mobs in its area");
+		require(!aimed_spell(2221006), "Chain Lightning's chain is not aimed");
+
 		std::vector<Rectangle<int16_t>> steps = search_steps(100, { 165, 172 }, 300);
 		require(steps.size() == 7, "a shot searches 20 px steps up to its range");
 		require(steps[0].left() == 165 && steps[0].right() == 185, "the first step starts at the shot's origin");

@@ -157,8 +157,18 @@ on. A line through the end of a platform only stops if it ends up behind the
 platform joined there too. A stopped shot loses its target, and its bullet
 flies from where it started to the platform (`shot_path::blocked`,
 `Combat::find_platforms`). The line of sight in v83's other attack paths, such
-as magic and shots at several mobs, is not copied yet, and other players'
-shots never stop.
+as shots at several mobs, is not copied yet, and other players' shots never
+stop.
+
+Most single-target spells, such as Energy Bolt and Magic Claw, are aimed the
+same way (`shot_path::aimed_spell`). The search starts 50 px in front of the
+user and reaches 300 px, whatever the skill's `lt`/`rb`. A spell with a ball
+flies it from that start to the hit, as one ball however many times it hits,
+and its damage lands 1.5 ms per pixel of that straight path after the hit
+frame. Platforms stop it as they stop a shot. A spell without a ball is never
+stopped. Area spells such as Thunder Bolt, Big Bang, Heal, and the Demons
+still take every mob in their range. Chain Lightning picks its first mob like
+an aimed spell in v83, then chains from it; neither is copied yet.
 
 Damage numbers follow v83 (`Gameplay/Combat/DamageLayout.h`). The first digit
 comes from the larger `NoRed1` set and the rest from `NoRed0`. Each digit

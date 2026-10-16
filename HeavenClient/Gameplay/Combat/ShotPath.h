@@ -28,6 +28,44 @@ namespace ms
 		// How wide each step of that search is.
 		constexpr int16_t STEP = 20;
 
+		// How far in front of the user an aimed spell starts, and how far it
+		// reaches.
+		constexpr int16_t SPELL_REACH = 50;
+		constexpr int16_t SPELL_RANGE = 300;
+
+		// Whether a spell is aimed at the first mob in its path like a shot
+		// (FUN_0095571f), rather than at all the mobs in its area. Chain
+		// Lightning picks its first mob the same way, but its chain is not
+		// copied yet.
+		inline bool aimed_spell(int32_t skill)
+		{
+			switch (skill)
+			{
+			case 2111002: // Explosion
+			case 2121001: // Big Bang
+			case 2121003: // Fire Demon
+			case 2121007: // Meteor Shower
+			case 2201005: // Thunder Bolt
+			case 2211002: // Ice Strike
+			case 2221001: // Big Bang
+			case 2221003: // Ice Demon
+			case 2221006: // Chain Lightning
+			case 2221007: // Blizzard
+			case 2301002: // Heal
+			case 2311004: // Shining Ray
+			case 2321001: // Big Bang
+			case 2321008: // Genesis
+			case 4121004: // Ninja Ambush
+			case 4221004:
+			case 12101006: // Fire Pillar
+			case 12111003: // Meteor Shower
+			case 12111006: // Fire Strike
+				return false;
+			default:
+				return true;
+			}
+		}
+
 		// The skill that lets this job's shots with this weapon reach further:
 		// Eye of Amazon for bows and crossbows, Keen Eyes for claws, or their
 		// Cygnus versions.
