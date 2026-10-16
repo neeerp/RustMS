@@ -23,6 +23,7 @@
 #include "../Data/EquipData.h"
 #include "../Data/SkillData.h"
 #include "../Data/WeaponData.h"
+#include "../Gameplay/Combat/MagicDamage.h"
 #include "../Gameplay/Stage.h"
 #include "../IO/UI.h"
 
@@ -400,6 +401,23 @@ namespace ms
 		{
 			return SkillData::get(skill_id).get_stats(skillbook.get_level(skill_id));
 		}
+
+		// The percent Element Amplification makes a spell, 100 without it
+		// (FUN_00765771): the F/P, I/L and Blaze Wizard ones, each in its job.
+		int32_t amplification(const SkillBook &skillbook, int32_t job)
+		{
+			constexpr std::pair<int32_t, int32_t> amplifications[] = {
+					{211, 2110001},
+					{221, 2210001},
+					{1211, 12110001}
+			};
+
+			for (auto [line, skill] : amplifications)
+				if (in_job_line(job, line) && skillbook.get_level(skill) > 0)
+					return skill_stats(skillbook, skill).y;
+
+			return 100;
+		}
 	}
 
 	int16_t Player::get_recovery_hp_bonus() const
@@ -599,6 +617,10 @@ namespace ms
 		attack.ignoredef = stats.get_ignoredef();
 		attack.accuracy = stats.get_total(EquipStat::Id::ACC);
 		attack.playerlevel = stats.get_stat(MapleStat::Id::LEVEL);
+		attack.intelligence = stats.get_total(EquipStat::Id::INT);
+		attack.luck = stats.get_total(EquipStat::Id::LUK);
+		attack.magic = magic_damage::magic(attack.intelligence, stats.get_total(EquipStat::Id::MAGIC));
+		attack.amplify = amplification(skillbook, stats.get_job().get_id());
 		attack.range = stats.get_range();
 		attack.origin = get_position();
 		attack.toleft = !facing_right;

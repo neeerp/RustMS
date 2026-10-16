@@ -17,6 +17,7 @@
 //////////////////////////////////////////////////////////////////////////////////
 #include "SkillData.h"
 
+#include "../Gameplay/Combat/MagicDamage.h"
 #include "../Util/Misc.h"
 
 #include <nlnx/nx.hpp>
@@ -67,6 +68,7 @@ namespace ms
 			int32_t hp = sub["hp"];
 			int32_t mp = sub["mp"];
 			int32_t time = sub["time"];
+			int32_t y = sub["y"];
 			int32_t level = string_conversion::or_default<int32_t>(sub.name(), -1);
 
 			stats.emplace(
@@ -74,7 +76,7 @@ namespace ms
 					std::forward_as_tuple(level),
 					std::forward_as_tuple(damage, matk, fixdamage, mastery, attackcount, mobcount, bulletcount,
 										  bulletcost, hpcost, mpcost, chance, critical, ignoredef, hrange, range, hp, mp,
-										  time, shotrange)
+										  time, shotrange, y)
 			);
 		}
 
@@ -244,6 +246,11 @@ namespace ms
 	bool SkillData::needs_onehanded() const
 	{
 		return flags & ONEHANDED;
+	}
+
+	uint8_t SkillData::get_element() const
+	{
+		return element.empty() ? 0 : magic_damage::element(element[0]);
 	}
 
 	bool SkillData::is_invisible() const

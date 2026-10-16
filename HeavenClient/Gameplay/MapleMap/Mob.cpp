@@ -49,6 +49,7 @@ namespace ms
 		mdef = info["MDDamage"];
 		accuracy = info["acc"];
 		avoid = info["eva"];
+		elements = magic_damage::attributes(std::string(info["elemAttr"]));
 		knockback = info["pushed"];
 		speed = info["speed"];
 		flyspeed = info["flySpeed"];
@@ -1007,22 +1008,16 @@ namespace ms
 		return hitchance;
 	}
 
-	double Mob::calculate_mindamage(int16_t leveldelta, double damage, bool magic) const
+	double Mob::calculate_mindamage(int16_t leveldelta, double damage) const
 	{
-		double mindamage =
-				magic ?
-				damage - (1 + 0.01 * leveldelta) * mdef * 0.6 :
-				damage * (1 - 0.01 * leveldelta) - wdef * 0.6;
+		double mindamage = damage * (1 - 0.01 * leveldelta) - wdef * 0.6;
 
 		return mindamage < 1.0 ? 1.0 : mindamage;
 	}
 
-	double Mob::calculate_maxdamage(int16_t leveldelta, double damage, bool magic) const
+	double Mob::calculate_maxdamage(int16_t leveldelta, double damage) const
 	{
-		double maxdamage =
-				magic ?
-				damage - (1 + 0.01 * leveldelta) * mdef * 0.5 :
-				damage * (1 - 0.01 * leveldelta) - wdef * 0.5;
+		double maxdamage = damage * (1 - 0.01 * leveldelta) - wdef * 0.5;
 
 		return maxdamage < 1.0 ? 1.0 : maxdamage;
 	}
@@ -1040,14 +1035,25 @@ namespace ms
 
 		Attack::DamageType damagetype = attack.damagetype;
 
+		std::vector<std::pair<int32_t, bool>> result(attack.hitcount);
+
+		// A spell rolls by v83's own formula, and never crits.
+		if (damagetype == Attack::DamageType::DMG_MAGIC)
+		{
+			for (auto &hit : result)
+				hit = {next_magic_damage(attack), false};
+
+			update_movement();
+
+			return result;
+		}
+
 		switch (damagetype)
 		{
 			case Attack::DamageType::DMG_WEAPON:
 			case Attack::DamageType::DMG_MAGIC:
-				mindamage = calculate_mindamage(leveldelta, attack.mindamage,
-												damagetype == Attack::DamageType::DMG_MAGIC);
-				maxdamage = calculate_maxdamage(leveldelta, attack.maxdamage,
-												damagetype == Attack::DamageType::DMG_MAGIC);
+				mindamage = calculate_mindamage(leveldelta, attack.mindamage);
+				maxdamage = calculate_maxdamage(leveldelta, attack.maxdamage);
 				hitchance = calculate_hitchance(leveldelta, attack.accuracy);
 				critical = attack.critical;
 				break;
@@ -1058,8 +1064,6 @@ namespace ms
 				critical = 0.0f;
 				break;
 		}
-
-		std::vector<std::pair<int32_t, bool>> result(attack.hitcount);
 
 		std::generate(
 				result.begin(), result.end(),
@@ -1097,6 +1101,24 @@ namespace ms
 		auto intdamage = static_cast<int32_t>(damage);
 
 		return std::pair<int32_t, bool>(intdamage, iscritical);
+	}
+
+	int32_t Mob::next_magic_damage(const Attack &attack) const
+	{
+		using namespace magic_damage;
+
+		double hitroll = randomizer.next_real(1.0);
+		double accuracy = magic_damage::accuracy(attack.intelligence, attack.luck, attack.playerlevel, level);
+
+		if (!hits(accuracy, avoid, hitroll))
+			return 0;
+
+		double damage = base(attack.magic, attack.intelligence, attack.mastery, attack.matk, randomizer.next_real(1.0));
+		damage = damage * attack.amplify * 0.01;
+		damage = elemental(damage, attack.skill, attack.element, elements);
+		damage = defend(damage, mdef, randomizer.next_real(1.0));
+
+		return finish(damage);
 	}
 
 	void Mob::apply_damage(int32_t damage, bool toleft)
