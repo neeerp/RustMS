@@ -103,7 +103,7 @@ namespace ms
 		{
 			if (Optional<Mob> mob = mobs.get(target))
 			{
-				result.damagelines[target] = mob->calculate_damage(attack);
+				result.damagelines.emplace_back(target, mob->calculate_damage(attack));
 				result.mobcount++;
 
 				if (result.mobcount == 1)
