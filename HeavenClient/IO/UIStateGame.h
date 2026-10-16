@@ -70,7 +70,7 @@ namespace ms
 		void show_item(Tooltip::Parent parent, int32_t itemid) override;
 
 		void show_skill(Tooltip::Parent parent, int32_t skill_id, int32_t level, int32_t masterlevel,
-						int64_t expiration) override;
+						int64_t expiration, bool levels) override;
 
 		void show_text(Tooltip::Parent parent, std::string text) override;
 

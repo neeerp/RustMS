@@ -103,7 +103,7 @@ namespace ms
 		{
 			if (Optional<Mob> mob = mobs.get(target))
 			{
-				result.damagelines[target] = mob->calculate_damage(attack);
+				result.damagelines.emplace_back(target, mob->calculate_damage(attack));
 				result.mobcount++;
 
 				if (result.mobcount == 1)
@@ -189,6 +189,14 @@ namespace ms
 			return mob->get_head_position();
 		else
 			return Point<int16_t>(0, 0);
+	}
+
+	Rectangle<int16_t> MapMobs::get_mob_body(int32_t oid) const
+	{
+		if (Optional<const Mob> mob = mobs.get(oid))
+			return mob->get_body();
+		else
+			return Rectangle<int16_t>();
 	}
 
 	MapObjects *MapMobs::get_mobs()

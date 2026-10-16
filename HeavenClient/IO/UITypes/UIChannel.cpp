@@ -26,7 +26,7 @@
 #include "../Audio/Audio.h"
 
 #include "../../Configuration.h"
-#include "../../Net/Packets/GameplayPackets.h"
+#include "../../Gameplay/Stage.h"
 #include "../../Util/NxFiles.h"
 
 #include <algorithm>
@@ -242,11 +242,8 @@ namespace ms
 
 	void UIChannel::change_channel()
 	{
-		if (selected_channel != current_channel)
-		{
+		if (selected_channel != current_channel && Stage::get().change_channel(selected_channel))
 			Configuration::get().set_channelid(selected_channel);
-			ChangeChannelPacket(selected_channel).dispatch();
-		}
 
 		cancel();
 	}

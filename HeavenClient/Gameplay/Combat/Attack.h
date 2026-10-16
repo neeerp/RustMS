@@ -58,6 +58,8 @@ namespace ms
 		uint8_t speed = 0;
 		uint8_t stance = 0;
 		int32_t skill = 0;
+		// How far the skill's shot reaches, if it says.
+		int16_t shotrange = 0;
 		int32_t bullet = 0;
 		// Ammo a shot uses up, and the USE slot it comes from.
 		int16_t bulletcost = 1;
@@ -138,7 +140,8 @@ namespace ms
 		uint8_t stance = 0;
 		uint8_t speed = 0;
 		bool toleft = false;
-		std::unordered_map<int32_t, std::vector<std::pair<int32_t, bool>>> damagelines;
+		// Each target's oid and damage, in target order.
+		std::vector<std::pair<int32_t, std::vector<std::pair<int32_t, bool>>>> damagelines;
 		int32_t first_oid;
 		int32_t last_oid;
 	};

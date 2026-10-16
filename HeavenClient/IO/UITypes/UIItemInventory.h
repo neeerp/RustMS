@@ -96,7 +96,7 @@ namespace ms
 		{
 		public:
 			ItemIcon(const UIItemInventory &parent, InventoryType::Id sourcetab, EquipSlot::Id eqsource, int16_t source,
-					 int32_t item_id, int16_t count, bool untradable, bool cashitem);
+					 int32_t item_id, int16_t count, bool questitem, bool untradable, bool cashitem);
 
 			void drop_on_stage() const override;
 
@@ -117,7 +117,9 @@ namespace ms
 			int16_t source;
 			int32_t item_id;
 			int16_t count;
+			bool questitem;
 			bool untradable;
+			// A cash item or one with a Cash Shop serial
 			bool cashitem;
 			const UIItemInventory &parent;
 		};

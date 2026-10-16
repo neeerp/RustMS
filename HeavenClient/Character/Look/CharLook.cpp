@@ -17,6 +17,8 @@
 //////////////////////////////////////////////////////////////////////////////////
 #include "CharLook.h"
 
+#include "AttackStances.h"
+
 #include "../../Data/WeaponData.h"
 
 namespace ms
@@ -249,16 +251,17 @@ namespace ms
 
 	bool CharLook::update(uint16_t timestep)
 	{
+		// The face and the alert keep the clock's time, even while the body
+		// holds still on a rope or speeds through an attack.
+		alerted.update();
+		update_expression(Constants::TIMESTEP);
+
 		if (timestep == 0)
 		{
 			stance.normalize();
 			stframe.normalize();
-			expression.normalize();
-			expframe.normalize();
 			return false;
 		}
-
-		alerted.update();
 
 		bool aniend = false;
 
@@ -317,6 +320,11 @@ namespace ms
 			}
 		}
 
+		return aniend;
+	}
+
+	void CharLook::update_expression(uint16_t timestep)
+	{
 		uint16_t expdelay = face->get_delay(expression.get(), expframe.get());
 		uint16_t expdelta = expdelay - expelapsed;
 
@@ -342,8 +350,6 @@ namespace ms
 
 			expelapsed += timestep;
 		}
-
-		return aniend;
 	}
 
 	void CharLook::set_body(int32_t skin_id)
@@ -410,27 +416,38 @@ namespace ms
 
 	void CharLook::attack(bool degenerate)
 	{
+		attack(degenerate, get_attackstance(degenerate));
+	}
+
+	void CharLook::attack(bool degenerate, Stance::Id newstance)
+	{
 		int32_t weapon_id = equips.get_weapon();
 
 		if (weapon_id <= 0)
 			return;
 
-		const WeaponData &weapon = WeaponData::get(weapon_id);
-
-		uint8_t attacktype = weapon.get_attack();
-
-		if (attacktype == 9 && !degenerate)
+		if (newstance == Stance::Id::SHOT)
 		{
 			stance.set(Stance::Id::SHOT);
 			set_action("handgun");
 		} else
 		{
-			stance.set(getattackstance(attacktype, degenerate));
+			stance.set(newstance);
 			stframe.set(0);
 			stelapsed = 0;
 		}
 
-		weapon.get_usesound(degenerate).play();
+		WeaponData::get(weapon_id).get_usesound(degenerate).play();
+	}
+
+	Stance::Id CharLook::get_attackstance(bool degenerate) const
+	{
+		int32_t weapon_id = equips.get_weapon();
+
+		if (weapon_id <= 0)
+			return Stance::Id::NONE;
+
+		return getattackstance(WeaponData::get(weapon_id).get_attack(), degenerate);
 	}
 
 	void CharLook::attack(Stance::Id newstance)
@@ -469,54 +486,9 @@ namespace ms
 		if (stance == Stance::Id::PRONE)
 			return Stance::Id::PRONESTAB;
 
-		enum Attack
-		{
-			NONE = 0,
-			S1A1M1D = 1,
-			SPEAR = 2,
-			BOW = 3,
-			CROSSBOW = 4,
-			S2A2M2 = 5,
-			WAND = 6,
-			CLAW = 7,
-			GUN = 9,
-			NUM_ATTACKS
-		};
-
-		static const std::array<std::vector<Stance::Id>, Attack::NUM_ATTACKS> degen_stances = {
-				{
-						{Stance::Id::NONE},
-						{Stance::Id::NONE},
-						{Stance::Id::NONE},
-						{Stance::Id::SWINGT1, Stance::Id::SWINGT3},
-						{Stance::Id::SWINGT1, Stance::Id::STABT1},
-						{Stance::Id::NONE},
-						{Stance::Id::NONE},
-						{Stance::Id::SWINGT1, Stance::Id::STABT1},
-						{Stance::Id::NONE},
-						{Stance::Id::SWINGP1, Stance::Id::STABT2}
-				}
-		};
-
-		static const std::array<std::vector<Stance::Id>, NUM_ATTACKS> attack_stances = {
-				{
-						{Stance::Id::NONE},
-						{Stance::Id::STABO1, Stance::Id::STABO2, Stance::Id::SWINGO1, Stance::Id::SWINGO2, Stance::Id::SWINGO3},
-						{Stance::Id::STABT1, Stance::Id::SWINGP1},
-						{Stance::Id::SHOOT1},
-						{Stance::Id::SHOOT2},
-						{Stance::Id::STABO1, Stance::Id::STABO2, Stance::Id::SWINGT1, Stance::Id::SWINGT2, Stance::Id::SWINGT3},
-						{Stance::Id::SWINGO1, Stance::Id::SWINGO2},
-						{Stance::Id::SWINGO1, Stance::Id::SWINGO2},
-						{Stance::Id::NONE},
-						{Stance::Id::SHOT}
-				}
-		};
-
-		if (attack <= Attack::NONE || attack >= Attack::NUM_ATTACKS)
-			return Stance::Id::STAND1;
-
-		const auto &stances = degenerate ? degen_stances[attack] : attack_stances[attack];
+		const std::vector<Stance::Id> &shots = attack_stances::get(attack, true);
+		const std::vector<Stance::Id> &stances =
+				!degenerate && !shots.empty() ? shots : attack_stances::get(attack, false);
 
 		if (stances.empty())
 			return Stance::Id::STAND1;

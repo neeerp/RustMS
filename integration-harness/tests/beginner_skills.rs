@@ -2,7 +2,7 @@
 //! through CLOSE_RANGE_ATTACK, and Recovery and Nimble Feet are buffs from
 //! USE_SKILL. Each spends its MP, and the map sees it used.
 
-use integration_harness::hunting::{attack, skill_attack, spend_sp, use_skill};
+use integration_harness::hunting::{attack, cancel_buff, skill_attack, spend_sp, use_skill};
 use integration_harness::preconditions::load_harness_config_or_fail;
 use integration_harness::trace::{barrier, read_for, send, stat, until, warp, Trace};
 use integration_harness::{login_to_world_session, WorldSession};
@@ -103,9 +103,16 @@ async fn beginner_skills_spend_mp_and_take_effect() {
         t.field.effects.contains(&(b.character_id, 1))
     })
     .await;
+    // Cooling down, so refused; right-clicking the icon ends it early.
     send(&mut b.connection, use_skill(NIMBLE_FEET, 1)).await;
-    until(&mut b.connection, tb, |t| t.cancelled_buffs == [SPEED_MASK]).await;
+    send(&mut b.connection, cancel_buff(RECOVERY)).await;
+    send(&mut b.connection, cancel_buff(NIMBLE_FEET)).await;
+    barrier(&mut b.connection, "cancelled", tb).await;
     assert_eq!(tb.buffs.len(), 1);
+    assert_eq!(tb.cancelled_buffs, [SPEED_MASK]);
+    // Nothing is left to expire.
+    read_for(&mut b.connection, tb, 4500).await;
+    assert_eq!(tb.cancelled_buffs, [SPEED_MASK]);
 
     // Recovery: 5 MP, then 4 HP every 5 seconds while hurt.
     let hurt = tc.stat(stat::HP).unwrap() - 12;

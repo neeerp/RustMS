@@ -183,6 +183,7 @@ namespace ms
 		attack.ignoredef += stats.ignoredef;
 		attack.mobcount = stats.mobcount;
 		attack.hrange = stats.hrange;
+		attack.shotrange = stats.shotrange;
 		attack.bulletcost = stats.bulletcost;
 
 		switch (attack.type)

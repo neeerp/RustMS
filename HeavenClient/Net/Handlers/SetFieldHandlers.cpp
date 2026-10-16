@@ -44,10 +44,7 @@ namespace ms
 
 	void SetFieldHandler::transition(int32_t mapid, uint8_t portalid) const
 	{
-		float fadestep = 0.025f;
-
 		Window::get().fadeout(
-			fadestep,
 			[mapid, portalid]()
 			{
 				GraphicsGL::get().clear();
@@ -73,13 +70,16 @@ namespace ms
 
 		int32_t channel = recv.read_int();
 		Configuration::get().set_channelid(static_cast<uint8_t>(channel));
-		int8_t mode1 = recv.read_byte();
-		int8_t mode2 = recv.read_byte();
 
-		if (mode1 == 0 && mode2 == 0)
-			change_map(recv, channel);
-		else
+		// v83 (FUN_00776020) gives the new field the first byte as its key.
+		// The second says whether the character's data follows.
+		Stage::get().set_field_key(recv.read_byte());
+		bool chardata = recv.read_bool();
+
+		if (chardata)
 			set_field(recv);
+		else
+			change_map(recv, channel);
 	}
 
 	void SetFieldHandler::change_map(InPacket& recv, int32_t) const
@@ -97,6 +97,9 @@ namespace ms
 		// every frame.
 		if (auto statsinfo = UI::get().get_element<UIStatsInfo>())
 			statsinfo->update_stat(MapleStat::Id::HP);
+
+		// A request still waiting is forgotten in the new field.
+		Stage::get().get_player().clear_request();
 
 		transition(mapid, portalid);
 	}

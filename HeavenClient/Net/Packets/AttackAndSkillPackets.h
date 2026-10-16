@@ -141,4 +141,16 @@ namespace ms
 			// TODO: A point (4 bytes) could be added at the end
 		}
 	};
+
+	// Ends one of the player's skill buffs, as right-clicking its icon does
+	// (FUN_0096d873).
+	// Opcode: CANCEL_BUFF(92)
+	class CancelBuffPacket : public OutPacket
+	{
+	public:
+		CancelBuffPacket(int32_t skillid) : OutPacket(OutPacket::Opcode::CANCEL_BUFF)
+		{
+			write_int(skillid);
+		}
+	};
 }

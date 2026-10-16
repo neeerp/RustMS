@@ -53,11 +53,31 @@ and `tutoChatNPC`, were for the revamped island's maps and are unused. The
 original island's touch portals run `advice00`-`advice09` and `adviceMap`,
 which have no implementation yet, so they do nothing.
 
-HeavenClient sends CHANGE_MAP_SPECIAL (`0x64`, portal name) when the player's
-feet first enter a script portal's box, and the server answers with the effects
-and an enable-actions stat update. As in the original, the box is the portal's
-`hRange` by `vRange` (100 by default) centred on it, so the triggers that sit
-30-40 px above the floor fire as the player walks past. An `info*` hint runs once per session after it
+HeavenClient sends CHANGE_MAP_SPECIAL (`0x64`, portal name, player x and y)
+while the player stands in a script portal's box, and the server answers with
+the effects and an enable-actions stat update. As in the original, the box is
+the portal's `hRange` by `vRange` (100 by default) centred on it, so the
+triggers that sit 30-40 px above the floor fire as the player walks past. The
+client sends again once that answer arrives and the portal's `delay` (ms) has
+passed, unless the portal is `onlyOnce` and was the last to run in the map.
+Pressing Up on a type 7, 8 or 11 script portal with no destination sends the
+same packet, at most once per 500 ms.
+
+Touch portals and jump pads test where the player was at the start of the
+physics step, not where it ended. v83 tests the drawn position, which lies
+between its last two 30 ms steps and so trails the player. A player landing
+is therefore still tested a few pixels above the floor.
+
+Jump pads (`pt` 12 and 13) throw a grounded, non-climbing player into the air
+and play `Effect/BasicEff.img/VerticalJump` where they took off:
+
+- Type 12 throws at 2300 px/s up and 200 px/s the way the player faces, plus
+  100 px/s for each arrow key held.
+- Type 13 uses the portal's `horizontalImpact` and `verticalImpact`.
+
+Most pads sit 30-56 px above their floor. Those more than 49 px up, such as
+the Haunted House chimney's (`682010200`), fire only when the player lands on
+them, not when walking. An `info*` hint runs once per session after it
 was shown; the exit warning repeats. Hint text comes from the
 [server content pack](./server-content.md). `tutoChatNPC` (the skip offer)
 belongs with scripted NPCs. Explicit direct

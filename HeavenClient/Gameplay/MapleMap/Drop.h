@@ -33,7 +33,12 @@ namespace ms
 
 		void expire(int8_t, const PhysicsObject *);
 
-		Rectangle<int16_t> bounds() const;
+		// Whether the player with these feet, id and party could pick the
+		// drop up now.
+		bool lootable(Point<int16_t> feet, int32_t self, int32_t party) const;
+
+		// Note a pickup request, so the drop isn't tried again for a while.
+		void try_loot();
 
 	protected:
 		Drop(int32_t oid, int32_t owner, Point<int16_t> start, Point<int16_t> dest,
@@ -73,8 +78,14 @@ namespace ms
 
 		Point<int16_t> start;
 		Point<int16_t> dest;
+		// Where the server put the drop
+		Point<int16_t> spot;
 		// Milliseconds spent in the current state.
 		int32_t elapsed;
+		// Milliseconds since the drop arrived, and since the last pickup
+		// request for it.
+		int32_t age;
+		int32_t sincetry;
 		int32_t delay;
 		int32_t flighttime;
 		double phase;

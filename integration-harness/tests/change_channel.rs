@@ -4,8 +4,10 @@ use integration_harness::packets::{
     opcode_name,
 };
 use integration_harness::preconditions::load_harness_config_or_fail;
+use integration_harness::trace::step;
 use integration_harness::{login_to_world_session, HarnessError};
 use net::packet::op::SendOpcode;
+use std::collections::BTreeMap;
 use tokio::time::{timeout, Duration};
 
 async fn read_world_entry(
@@ -190,4 +192,23 @@ async fn change_channel_redirects_and_updates_presence() {
     let new_spawn =
         decode_spawn_player(&new_presence.packet).expect("failed to decode new-channel join");
     assert_eq!(new_spawn.character_id, migrant.character_id);
+}
+
+#[tokio::test]
+async fn refused_channel_changes_still_answer() {
+    // Channel 2, out of the way of the presence test on channels 0 and 1.
+    let config = load_harness_config_or_fail().await.with_channel(0, 2);
+    let mut session = login_to_world_session(&config)
+        .await
+        .expect("player failed to login");
+    let c = &mut session.connection;
+    let only_unlock = [BTreeMap::new()];
+
+    // The client waits on an answer before its next request, so asking for
+    // the channel it is on, or one that doesn't exist, still answers.
+    for (marker, channel) in [("same channel", 2), ("unknown channel", 200)] {
+        let request = build_change_channel(channel).expect("build change-channel request");
+        let t = step(c, marker, request).await;
+        assert_eq!(t.stat_updates, only_unlock, "{marker}");
+    }
 }

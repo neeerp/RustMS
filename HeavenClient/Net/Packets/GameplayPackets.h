@@ -39,31 +39,47 @@ namespace ms
 		}
 	};
 
-	// Opcode: CHANGE_MAP(38)
-	// Tells the server the player touched a script portal (e.g. a tutorial hint)
+	// Tells the server the player entered a script portal (e.g. a tutorial
+	// hint), as v83 does from FUN_0094dac6 and FUN_0094df9b
 	// Opcode: CHANGE_MAP_SPECIAL(100)
 	class ChangeMapSpecialPacket : public OutPacket
 	{
 	public:
-		ChangeMapSpecialPacket(const std::string &portal) : OutPacket(OutPacket::Opcode::CHANGE_MAP_SPECIAL)
+		ChangeMapSpecialPacket(uint8_t fieldkey, const std::string &portal, Point<int16_t> position) :
+				OutPacket(OutPacket::Opcode::CHANGE_MAP_SPECIAL)
 		{
-			write_byte(0);
+			write_byte(fieldkey);
 			write_string(portal);
-			write_short(0);
+			write_point(position);
 		}
 	};
 
+	// Opcode: CHANGE_MAP(38)
 	class ChangeMapPacket : public OutPacket
 	{
 	public:
-		// Request the server to warp the player to a different map
-		ChangeMapPacket(bool died, int32_t targetid, const std::string& targetp, bool usewheel) : OutPacket(OutPacket::Opcode::CHANGEMAP)
+		// Request the server to warp the player to a different map. v83
+		// starts every request with the field's key (FUN_0053035d), dead
+		// or alive.
+		ChangeMapPacket(uint8_t fieldkey, int32_t targetid, const std::string& targetp, bool usewheel) : OutPacket(OutPacket::Opcode::CHANGEMAP)
 		{
-			write_byte(died);
+			write_byte(fieldkey);
 			write_int(targetid);
 			write_string(targetp);
 			skip(1);
 			write_short(usewheel ? 1 : 0);
+		}
+
+		// Ask to go through a portal, from where the player stands (v83
+		// FUN_0053035d)
+		ChangeMapPacket(uint8_t fieldkey, const std::string &portal, Point<int16_t> position) : OutPacket(OutPacket::Opcode::CHANGEMAP)
+		{
+			write_byte(fieldkey);
+			write_int(-1);
+			write_string(portal);
+			write_point(position);
+			skip(1);
+			write_short(0);
 		}
 
 		// Request the server to exit the cash shop
@@ -251,7 +267,11 @@ namespace ms
 	class LeavePartyPacket : public PartyOperationPacket
 	{
 	public:
-		LeavePartyPacket() : PartyOperationPacket(PartyOperationPacket::Operation::LEAVE) {}
+		// v83 follows the operation with a zero byte (FUN_0052fe00).
+		LeavePartyPacket() : PartyOperationPacket(PartyOperationPacket::Operation::LEAVE)
+		{
+			write_byte(0);
+		}
 	};
 
 	// Joins a party
