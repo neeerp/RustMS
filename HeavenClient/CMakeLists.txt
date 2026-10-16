@@ -10,6 +10,8 @@ if(HEAVENCLIENT_BUILD_TESTS)
     add_test(NAME quest_markers COMMAND quest_marker_tests)
     add_executable(quest_completion_tests tests/quest_completion.cpp)
     add_test(NAME quest_completion COMMAND quest_completion_tests)
+    add_executable(fade_notice_tests tests/fade_notice.cpp)
+    add_test(NAME fade_notice COMMAND fade_notice_tests)
     add_executable(input_focus_tests tests/input_focus.cpp)
     add_test(NAME input_focus COMMAND input_focus_tests)
     add_executable(movement_physics_tests tests/movement_physics.cpp
@@ -318,6 +320,7 @@ add_executable(HeavenClient
     IO/Components/SliderSteps.h
     IO/Components/EquipTooltip.cpp
     IO/Components/EquipTooltip.h
+    IO/Components/FadeNotice.h
     IO/Components/Gauge.cpp
     IO/Components/Gauge.h
     IO/Components/Icon.cpp

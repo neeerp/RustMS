@@ -161,9 +161,12 @@ objectives (kills and items), and `QuestCompletion` reports those whose last
 objective was just met. A quest is judged from when it is first seen, so one
 already met when started or on login doesn't get a notice. O opens the quest
 on the quest log's In Progress tab (`UIQuestLog::show_quest`) and X dismisses
-it. Otherwise the notice stays, across map changes, until the quest is handed
-in or forfeited, as in footage. Newer notices stack above older ones, up to
-four. Footage shows only one notice, so the stacking is a guess.
+it. As in the v83 client (type 7 of its fading Yes/No windows, `FUN_00523408`),
+it plays UI.img/Invite and fades in over a second. It fades out over a second
+once a button is pressed or 30 s after it appeared, whichever comes first.
+`IO/Components/FadeNotice.h` keeps that timing. Each newer notice sits 5 px
+above the last, over it, and when one goes, those above it move down 5 px.
+Handing in or forfeiting the quest also takes its notice away.
 
 ## Persistence and rewards
 

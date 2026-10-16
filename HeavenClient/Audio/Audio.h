@@ -64,6 +64,7 @@ namespace ms
 			BUTTONOVER,
 			CHARSELECT,
 			DLGNOTICE,
+			INVITE,
 			MENUDOWN,
 			MENUUP,
 			RACESELECT,
