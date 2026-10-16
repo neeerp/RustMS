@@ -17,6 +17,8 @@
 //////////////////////////////////////////////////////////////////////////////////
 #include "CharLook.h"
 
+#include "AttackStances.h"
+
 #include "../../Data/WeaponData.h"
 
 namespace ms
@@ -473,54 +475,9 @@ namespace ms
 		if (stance == Stance::Id::PRONE)
 			return Stance::Id::PRONESTAB;
 
-		enum Attack
-		{
-			NONE = 0,
-			S1A1M1D = 1,
-			SPEAR = 2,
-			BOW = 3,
-			CROSSBOW = 4,
-			S2A2M2 = 5,
-			WAND = 6,
-			CLAW = 7,
-			GUN = 9,
-			NUM_ATTACKS
-		};
-
-		static const std::array<std::vector<Stance::Id>, Attack::NUM_ATTACKS> degen_stances = {
-				{
-						{Stance::Id::NONE},
-						{Stance::Id::NONE},
-						{Stance::Id::NONE},
-						{Stance::Id::SWINGT1, Stance::Id::SWINGT3},
-						{Stance::Id::SWINGT1, Stance::Id::STABT1},
-						{Stance::Id::NONE},
-						{Stance::Id::NONE},
-						{Stance::Id::SWINGT1, Stance::Id::STABT1},
-						{Stance::Id::NONE},
-						{Stance::Id::SWINGP1, Stance::Id::STABT2}
-				}
-		};
-
-		static const std::array<std::vector<Stance::Id>, NUM_ATTACKS> attack_stances = {
-				{
-						{Stance::Id::NONE},
-						{Stance::Id::STABO1, Stance::Id::STABO2, Stance::Id::SWINGO1, Stance::Id::SWINGO2, Stance::Id::SWINGO3},
-						{Stance::Id::STABT1, Stance::Id::SWINGP1},
-						{Stance::Id::SHOOT1},
-						{Stance::Id::SHOOT2},
-						{Stance::Id::STABO1, Stance::Id::STABO2, Stance::Id::SWINGT1, Stance::Id::SWINGT2, Stance::Id::SWINGT3},
-						{Stance::Id::SWINGO1, Stance::Id::SWINGO2},
-						{Stance::Id::SWINGO1, Stance::Id::SWINGO2},
-						{Stance::Id::NONE},
-						{Stance::Id::SHOT}
-				}
-		};
-
-		if (attack <= Attack::NONE || attack >= Attack::NUM_ATTACKS)
-			return Stance::Id::STAND1;
-
-		const auto &stances = degenerate ? degen_stances[attack] : attack_stances[attack];
+		const std::vector<Stance::Id> &shots = attack_stances::get(attack, true);
+		const std::vector<Stance::Id> &stances =
+				!degenerate && !shots.empty() ? shots : attack_stances::get(attack, false);
 
 		if (stances.empty())
 			return Stance::Id::STAND1;
