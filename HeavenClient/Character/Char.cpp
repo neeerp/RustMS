@@ -39,7 +39,7 @@ namespace ms
 		Color color;
 
 		// While blinking, the avatar is drawn at half brightness for two of
-		// every four 30 ms updates (FUN_0078ded5).
+		// every four 30 ms updates (FUN_00930b27).
 		if (invincible && blinking && invincible.elapsed() / 30 % 4 < 2)
 		{
 			color = Color(0.5f, 0.5f, 0.5f, 1.0f);
@@ -250,7 +250,7 @@ namespace ms
 
 		look.set_alerted(5000);
 		// CUserLocal is invincible for 1500 ms after a hit, and blinks
-		// only if the hit did damage (FUN_007ad352).
+		// only if the hit did damage (FUN_009581a9).
 		invincible.set_for(1500);
 		blinking = damage > 0;
 	}
