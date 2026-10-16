@@ -34,8 +34,13 @@ pub struct SkillLevel {
     pub damage: i32,
     /// Damage that ignores stats (`fixdamage`), as Three Snails does.
     pub fixed_damage: i32,
+    /// A spell's magic attack (`mad`).
+    pub magic: i32,
     pub mob_count: i32,
     pub attack_count: i32,
+    /// Stars, arrows, or bullets a shot fires, each hitting once
+    /// (`bulletCount`).
+    pub bullet_count: i32,
     /// Buff duration in seconds (`time`).
     pub duration: i32,
     /// Seconds before the skill can be used again (`cooltime`).
@@ -87,8 +92,10 @@ impl SkillData {
                     mp_cost: int("mpCon")?,
                     damage: int("damage")?,
                     fixed_damage: int("fixdamage")?,
+                    magic: int("mad")?,
                     mob_count: nx.int_child(level, "mobCount")?.unwrap_or(1),
                     attack_count: nx.int_child(level, "attackCount")?.unwrap_or(1),
+                    bullet_count: nx.int_child(level, "bulletCount")?.unwrap_or(1),
                     duration: int("time")?,
                     cooldown: int("cooltime")?,
                     speed: int("speed")?,
@@ -156,6 +163,11 @@ mod tests {
         assert_eq!(power_strike.max_level, 20);
         let slash_blast = data.info(1001005).unwrap().unwrap();
         assert_eq!(slash_blast.requirements, vec![(1001004, 1)]);
+
+        let energy_bolt = data.info(2001004).unwrap().unwrap().levels[19].clone();
+        assert_eq!((energy_bolt.magic, energy_bolt.mp_cost), (55, 14));
+        let lucky_seven = data.info(4001344).unwrap().unwrap().levels[19].clone();
+        assert_eq!((lucky_seven.bullet_count, lucky_seven.damage), (2, 150));
 
         let maple_warrior = data.info(2121000).unwrap().unwrap();
         assert!(maple_warrior.invisible);

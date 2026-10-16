@@ -16,8 +16,25 @@ pub fn attack(object_id: i32, damage: i32) -> Packet {
 
 /// CLOSE_RANGE_ATTACK with a skill (0 for none), hitting one mob once.
 pub fn skill_attack(skill_id: i32, object_id: i32, damage: i32) -> Packet {
+    kind_attack(RecvOpcode::CloseRangeAttack, skill_id, object_id, damage)
+}
+
+/// RANGED_ATTACK with a skill (0 for none), hitting one mob once.
+pub fn ranged_attack(skill_id: i32, object_id: i32, damage: i32) -> Packet {
+    kind_attack(RecvOpcode::RangedAttack, skill_id, object_id, damage)
+}
+
+/// MAGIC_ATTACK with a skill, hitting one mob once.
+pub fn magic_attack(skill_id: i32, object_id: i32, damage: i32) -> Packet {
+    kind_attack(RecvOpcode::MagicAttack, skill_id, object_id, damage)
+}
+
+/// An attack hitting one mob once, as HeavenClient sends it: a shot has 5
+/// more bytes before its target, its direction among them.
+fn kind_attack(op: RecvOpcode, skill_id: i32, object_id: i32, damage: i32) -> Packet {
+    let ranged = matches!(op, RecvOpcode::RangedAttack);
     let mut p = Packet::new_empty();
-    p.write_short(RecvOpcode::CloseRangeAttack as i16).unwrap();
+    p.write_short(op as i16).unwrap();
     p.write_byte(0).unwrap();
     p.write_byte(0x11).unwrap();
     p.write_int(skill_id).unwrap();
@@ -25,7 +42,11 @@ pub fn skill_attack(skill_id: i32, object_id: i32, damage: i32) -> Packet {
     for b in [0u8, 0x80, 5, 0, 4] {
         p.write_byte(b).unwrap();
     }
-    p.write_bytes(&[0; 4]).unwrap();
+    if ranged {
+        p.write_bytes(&[0, 0x80, 0, 0, 0, 0, 0, 0, 0]).unwrap();
+    } else {
+        p.write_bytes(&[0; 4]).unwrap();
+    }
     p.write_int(object_id).unwrap();
     p.write_bytes(&[0; 14]).unwrap();
     p.write_int(damage).unwrap();
@@ -156,6 +177,8 @@ pub struct Field {
     pub attacks_by: Vec<i32>,
     /// The skill of each attack seen: (character id, skill id, level).
     pub attack_skills: Vec<(i32, i32, u8)>,
+    /// The opcode of each attack seen.
+    pub attack_ops: Vec<i16>,
     pub drops: Vec<MapDrop>,
     /// (object id, character who picked it up)
     pub removed: Vec<(i32, Option<i32>)>,
@@ -199,7 +222,11 @@ impl Field {
                 .push((r.read_int().unwrap(), r.read_byte().unwrap()));
         } else if op == SendOpcode::KillMonster as i16 {
             self.killed.push(r.read_int().unwrap());
-        } else if op == SendOpcode::CloseRangeAttack as i16 {
+        } else if op == SendOpcode::CloseRangeAttack as i16
+            || op == SendOpcode::RangedAttack as i16
+            || op == SendOpcode::MagicAttack as i16
+        {
+            self.attack_ops.push(op);
             let character_id = r.read_int().unwrap();
             self.attacks_by.push(character_id);
             r.read_bytes(2).unwrap();

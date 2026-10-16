@@ -81,20 +81,27 @@ position. HeavenClient does the same (`FootholdTree::place_on_fh`).
 
 ## Attacks
 
-CLOSE_RANGE_ATTACK (`net::combat::parse_close_attack`) is checked before it
-reaches the field (`validate`): the attacker must be alive, and a basic
-attack (skill 0) hits one mob once, each hit at most twice the character's
-basic maximum (`max_base_damage`, v83's weapon multiplier × main stat +
-secondary stat, × weapon attack / 100). An attack naming a skill needs that
-skill learned at some level; its `Skill.nx` level (`game_data::skills::
-SkillLevel`) gives the mobs and hits allowed, the MP spent, and the cap: a
-`fixdamage` skill (Three Snails: 10/25/40) hits for at most that, a `damage`
-skill for that percentage of the basic cap, and a skill with neither is not an
-attack. Too little MP refuses the attack. HeavenClient sends Three Snails here
-for melee weapons. The field shows the swing (with the skill id and level, so
-others see the skill's effect) to the others, applies the damage, sends the
-attacker SHOW_MONSTER_HP, and on death KILL_MONSTER to everyone; the attacker
-gets the MP left as STAT_CHANGED.
+CLOSE_RANGE_ATTACK, RANGED_ATTACK, and MAGIC_ATTACK (`net::combat::
+parse_attack`, one `AttackHandler` per `AttackKind`) share a layout; a shot
+has 5 more bytes before its targets, and 4 more for Hurricane, Piercing Arrow,
+and Rapid Fire. Each is checked before it reaches the field (`validate`): the
+attacker must be alive, and a basic attack (skill 0) hits one mob once, each
+hit at most twice the character's basic maximum (`max_base_damage`, v83's
+weapon multiplier × main stat + secondary stat, × weapon attack / 100). An
+attack naming a skill needs that skill learned at some level; its `Skill.nx`
+level (`game_data::skills::SkillLevel`) gives the mobs allowed, the hits (a
+shot's `bulletCount`, otherwise `attackCount`), the MP spent, and the cap: a
+`fixdamage` skill (Three Snails: 10/25/40) hits for at most that, a `mad`
+spell for twice v83's magic maximum (`max_magic_damage`: ((M² / 1000 + M) / 30
++ INT / 200) × `mad`, where M is INT plus equipment magic attack), a `damage`
+skill for that percentage of the basic cap, and a skill with none is not an
+attack. A spell must name a skill. Too little MP refuses the attack.
+HeavenClient sends Three Snails as a swing for melee weapons. The field shows
+the attack under its own opcode (with the skill id and level, so others see
+the skill's effect, and for a shot the first star, arrow, or bullet in USE
+that the weapon fires, `net::combat::ammo`) to the others, applies the damage,
+sends the attacker SHOW_MONSTER_HP, and on death KILL_MONSTER to everyone; the
+attacker gets the MP left as STAT_CHANGED. Shots don't use up ammo yet.
 
 In HeavenClient a hit of at least the mob's `pushed` value puts it in its
 `hit1` stance for about a quarter second, with a three-tick push that moves it

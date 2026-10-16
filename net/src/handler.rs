@@ -6,6 +6,7 @@
 //! the client must be in; the runtime dispatches through `login_route` /
 //! `world_route` and never matches on opcodes itself.
 
+use crate::combat::AttackKind;
 use crate::dialogue::NpcInteraction;
 use crate::error::NetworkError;
 use crate::packet::handle::{login, world};
@@ -436,7 +437,15 @@ fn world_routes() -> &'static HashMap<i16, WorldRoute> {
             (Op::MobDistance, InGame(&world::MobDistanceHandler)),
             (
                 Op::CloseRangeAttack,
-                InGame(&world::CloseRangeAttackHandler),
+                InGame(&world::AttackHandler(AttackKind::Close)),
+            ),
+            (
+                Op::RangedAttack,
+                InGame(&world::AttackHandler(AttackKind::Ranged)),
+            ),
+            (
+                Op::MagicAttack,
+                InGame(&world::AttackHandler(AttackKind::Magic)),
             ),
             (Op::TakeDamage, InGame(&world::TakeDamageHandler)),
             (Op::ItemPickup, InGame(&world::ItemPickupHandler)),

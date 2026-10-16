@@ -1,4 +1,4 @@
-use crate::combat;
+use crate::combat::{self, AttackKind};
 use crate::handler::{
     FieldRequest, HandlerResult, WorldAction, WorldContext, WorldHandler, WorldResult,
 };
@@ -54,12 +54,13 @@ impl WorldHandler for MobDistanceHandler {
     }
 }
 
-/// `CLOSE_RANGE_ATTACK`: a melee swing (Ctrl).
-pub struct CloseRangeAttackHandler;
+/// `CLOSE_RANGE_ATTACK`, `RANGED_ATTACK`, and `MAGIC_ATTACK`: a swing, a
+/// shot, or a spell.
+pub struct AttackHandler(pub AttackKind);
 
-impl WorldHandler for CloseRangeAttackHandler {
+impl WorldHandler for AttackHandler {
     fn handle(&self, packet: &mut Packet, ctx: &mut WorldContext) -> WorldResult {
-        let attack = combat::parse_close_attack(packet)?;
+        let attack = combat::parse_attack(packet, self.0)?;
         let skill = match combat::validate(&attack, ctx.player) {
             Ok(skill) => skill,
             Err(rejection) => {
@@ -74,7 +75,11 @@ impl WorldHandler for CloseRangeAttackHandler {
             result = HandlerResult::reply(stat::build_stat_update(false, &[StatUpdate::Mp(mp)])?);
             skill_level = skill.level as u8;
         }
-        let broadcast = combat::build_close_attack(ctx.player.id(), &attack, skill_level)?;
+        let projectile = match attack.kind {
+            AttackKind::Ranged => combat::ammo(ctx.player).unwrap_or(0),
+            _ => 0,
+        };
+        let broadcast = combat::build_attack(ctx.player.id(), &attack, skill_level, projectile)?;
         let hits = attack
             .hits
             .into_iter()
