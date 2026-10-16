@@ -140,6 +140,8 @@ namespace ms
 
 		// The original fills the whole log with black at half opacity.
 		constexpr float LOG_ALPHA = 0.5f;
+		// It puts GM chat on a white strip of opacity 0xB0 (FUN_008db070).
+		constexpr float GM_ROW_ALPHA = 0xB0 / 255.0f;
 
 		// The input field, from the status bar's top left
 		constexpr Rectangle<int16_t> CHATFIELD = Rectangle<int16_t>(87, 530, 5, 25);
@@ -278,7 +280,7 @@ namespace ms
 							}
 							else
 							{
-								GeneralChatPacket(msg, true).dispatch();
+								GeneralChatPacket(msg, false).dispatch();
 							}
 
 							lastentered.push_back(msg);
@@ -368,6 +370,10 @@ namespace ms
 				break;
 
 			int16_t top = logbottom - CHATROWHEIGHT * (i + 1);
+
+			if (highlighted_rows.count(row->first))
+				graphics.drawrectangle(position.x(), position.y() + top, LOG_WIDTH - sbwidth, CHATROWHEIGHT, 1.0f,
+									   1.0f, 1.0f, GM_ROW_ALPHA);
 
 			row->second.draw(position + Point<int16_t>(3, top - TEXT_RAISE));
 		}
@@ -602,7 +608,7 @@ namespace ms
 				color = Color::Name::PARTYPINK;
 				break;
 			case LineType::BUDDY:
-				color = Color::Name::ORANGE;
+				color = Color::Name::PIZAZZ;
 				break;
 			case LineType::PINK:
 				color = Color::Name::MONALISA;
@@ -612,6 +618,10 @@ namespace ms
 				break;
 			case LineType::WHISPER:
 				color = Color::Name::LIGHTGREEN;
+				break;
+			case LineType::GM:
+				color = Color::Name::BLACK;
+				highlighted_rows.insert(rowmax);
 				break;
 			default:
 				color = Color::Name::WHITE;

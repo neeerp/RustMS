@@ -305,10 +305,10 @@ namespace ms
 	{
 		int32_t charid = recv.read_int();
 
-		recv.read_bool(); // 'gm'
+		bool gm = recv.read_bool();
 
 		std::string message = recv.read_string();
-		int8_t type = recv.read_byte();
+		bool balloon_only = recv.read_bool();
 
 		if (auto character = Stage::get().get_character(charid))
 		{
@@ -316,10 +316,12 @@ namespace ms
 			character->speak(message);
 		}
 
-		auto linetype = static_cast<UIChatBar::LineType>(type);
+		// As in v83 (FUN_00937138), a balloon-only line stays out of the log.
+		if (balloon_only)
+			return;
 
 		if (auto chatbar = UI::get().get_element<UIChatBar>())
-			chatbar->send_chatline(message, linetype);
+			chatbar->send_chatline(message, gm ? UIChatBar::LineType::GM : UIChatBar::LineType::WHITE);
 	}
 
 	void WhisperHandler::handle(InPacket& recv) const
