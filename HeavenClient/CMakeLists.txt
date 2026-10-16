@@ -28,6 +28,8 @@ if(HEAVENCLIENT_BUILD_TESTS)
     add_test(NAME quest_dialogue COMMAND quest_dialogue_tests)
     add_executable(npc_text_tests tests/npc_text.cpp)
     add_test(NAME npc_text COMMAND npc_text_tests)
+    add_executable(swindle_words_tests tests/swindle_words.cpp)
+    add_test(NAME swindle_words COMMAND swindle_words_tests)
     add_executable(map_tooltip_tests tests/map_tooltip.cpp)
     add_test(NAME map_tooltip COMMAND map_tooltip_tests)
     add_executable(cash_catalog_tests tests/cash_catalog.cpp)
@@ -211,6 +213,8 @@ add_executable(HeavenClient
     Data/JobData.h
     Data/SkillData.cpp
     Data/SkillData.h
+    Data/SwindleData.cpp
+    Data/SwindleData.h
     Data/WeaponData.cpp
     Data/WeaponData.h
     Gameplay/Combat/Attack.h
@@ -561,6 +565,7 @@ add_executable(HeavenClient
     Util/Misc.cpp
     Util/Misc.h
     Util/NpcTextMarkup.h
+    Util/SwindleWords.h
     Util/NxFiles.cpp
     Util/NxFiles.h
     Util/QuadTree.h

@@ -5,6 +5,8 @@
 
 #include "../../Configuration.h"
 
+#include "../../Data/SwindleData.h"
+
 #include "../../Gameplay/Stage.h"
 #include "../../IO/UI.h"
 #include "../../IO/UITypes/UIChatBar.h"
@@ -290,5 +292,14 @@ namespace ms
 			party_line(name + " : " + text, UIChatBar::LineType::PARTY);
 		else if (mode == MultiChatPacket::Mode::BUDDY)
 			party_line(name + " : " + text, UIChatBar::LineType::BUDDY);
+		else
+			return;
+
+		// v83 checks every line for a scam warning but only prints one
+		// after party chat (FUN_00531e00).
+		auto warning = SwindleData::warning(text);
+
+		if (warning && mode == MultiChatPacket::Mode::PARTY)
+			party_line(*warning, UIChatBar::LineType::YELLOW);
 	}
 }

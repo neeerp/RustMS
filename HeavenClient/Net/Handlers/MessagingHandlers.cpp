@@ -22,6 +22,7 @@
 #include "../../Configuration.h"
 #include "../../Audio/Audio.h"
 #include "../../Data/ItemData.h"
+#include "../../Data/SwindleData.h"
 #include "../../Gameplay/Stage.h"
 #include "../../IO/UI.h"
 #include "../Packets/MessagingPackets.h"
@@ -310,6 +311,8 @@ namespace ms
 		std::string message = recv.read_string();
 		bool balloon_only = recv.read_bool();
 
+		auto warning = SwindleData::warning(message);
+
 		if (auto character = Stage::get().get_character(charid))
 		{
 			message = character->get_name() + " : " + message;
@@ -321,7 +324,13 @@ namespace ms
 			return;
 
 		if (auto chatbar = UI::get().get_element<UIChatBar>())
+		{
 			chatbar->send_chatline(message, gm ? UIChatBar::LineType::GM : UIChatBar::LineType::WHITE);
+
+			// v83 follows the line with a scam warning (FUN_00937138).
+			if (warning)
+				chatbar->send_chatline(*warning, UIChatBar::LineType::YELLOW);
+		}
 	}
 
 	void WhisperHandler::handle(InPacket& recv) const
@@ -341,6 +350,10 @@ namespace ms
 			// HeavenClient can't do.
 			recv.read_bool();
 			std::string message = recv.read_string();
+
+			// Print the warning before the whisper.
+			if (auto warning = SwindleData::warning(message))
+				chatbar->send_chatline(*warning, UIChatBar::LineType::YELLOW);
 
 			chatbar->send_chatline(build_whisper_chatline(sender, channel, message), UIChatBar::LineType::WHISPER);
 		}
