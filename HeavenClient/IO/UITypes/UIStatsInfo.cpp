@@ -22,6 +22,7 @@
 #include "../Components/MapleButton.h"
 
 #include "../../Character/ExpTable.h"
+#include "../../Gameplay/Stage.h"
 #include "../../Net/Packets/PlayerPackets.h"
 #include "../../Util/NxFiles.h"
 
@@ -255,8 +256,7 @@ namespace ms
 
 	void UIStatsInfo::send_apup(MapleStat::Id stat) const
 	{
-		SpendApPacket(stat).dispatch();
-		UI::get().disable();
+		Stage::get().get_player().request(SpendApPacket(stat), ExclRequest::WAIT);
 	}
 
 	void UIStatsInfo::set_detail(bool enabled)

@@ -35,10 +35,21 @@
 #include <nlnx/nx.hpp>
 
 #include <algorithm>
+#include <chrono>
 
 namespace ms
 {
 	const PlayerNullState nullstate;
+
+	namespace
+	{
+		int64_t now_ms()
+		{
+			using namespace std::chrono;
+
+			return duration_cast<milliseconds>(steady_clock::now().time_since_epoch()).count();
+		}
+	}
 
 	const PlayerState *get_state(Char::State state)
 	{
@@ -174,10 +185,36 @@ namespace ms
 		if (int16_t slot = inventory.find_item(type, itemid))
 		{
 			if (type == InventoryType::Id::USE)
-				UseItemPacket(slot, itemid).dispatch();
+				request(UseItemPacket(slot, itemid), ExclRequest::USE_WAIT);
 			else if (type == InventoryType::Id::SETUP && itemid / 10000 == 301)
 				sit_on_chair(itemid);
 		}
+	}
+
+	bool Player::can_request(int32_t wait) const
+	{
+		return stats.get_stat(MapleStat::Id::HP) > 0 && excl.can_send(now_ms(), wait);
+	}
+
+	bool Player::request(OutPacket &&packet, int32_t wait)
+	{
+		if (!can_request(wait))
+			return false;
+
+		packet.dispatch();
+		excl.sent(now_ms());
+
+		return true;
+	}
+
+	void Player::request_answered()
+	{
+		excl.answered(now_ms());
+	}
+
+	void Player::clear_request()
+	{
+		excl.clear();
 	}
 
 	void Player::draw(Layer::Id layer, double viewx, double viewy, float alpha) const

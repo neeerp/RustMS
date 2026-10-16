@@ -53,10 +53,11 @@ namespace ms
 		// Remove all drops.
 		void clear();
 
-		// Find a drop which can be picked up at the specified position.
+		// Find a drop the player with these feet, id and party can pick
+		// up, and note the try. As in v83, the first one that qualifies.
 		using Loot = std::pair<int32_t, Point<int16_t>>;
 
-		Loot find_loot_at(Point<int16_t> playerpos);
+		Loot find_loot_at(Point<int16_t> playerpos, int32_t self, int32_t party);
 
 	private:
 		MapObjects drops;
@@ -71,7 +72,6 @@ namespace ms
 		};
 
 		std::array<Animation, MesoIcon::NUM_ICONS> mesoicons;
-		bool lootenabled;
 
 		std::queue<DropSpawn> spawns;
 	};
