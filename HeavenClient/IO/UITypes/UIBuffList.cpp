@@ -19,6 +19,7 @@
 
 #include "../Data/ItemData.h"
 #include "../Data/SkillData.h"
+#include "../../Net/Packets/AttackAndSkillPackets.h"
 #include "../UI.h"
 #include "../Util/NxFiles.h"
 
@@ -121,6 +122,18 @@ namespace ms
 		UI::get().clear_tooltip(Tooltip::Parent::BUFFLIST);
 	}
 
+	void UIBuffList::rightclick(Point<int16_t> cursorpos)
+	{
+		// FUN_0045b9fc. The icon goes when the server cancels the buff.
+		// Dragon Roar's can't be cancelled. Item buffs would send
+		// CANCEL_ITEM_EFFECT, which the server doesn't handle.
+		constexpr int32_t DRAGON_ROAR = 1311006;
+
+		if (auto entry = entry_at(cursorpos))
+			if (entry->id >= 0 && entry->id != DRAGON_ROAR)
+				CancelBuffPacket(entry->id).dispatch();
+	}
+
 	UIElement::Type UIBuffList::get_type() const
 	{
 		return TYPE;
@@ -129,11 +142,18 @@ namespace ms
 	void UIBuffList::add_buff(int32_t buffid, int32_t stat, int32_t duration)
 	{
 		row.add(buffid, stat, duration, [buffid] { return buff_icon(buffid); });
+		remove_cursor();
 	}
 
 	void UIBuffList::cancel_buff(int32_t stat)
 	{
+		size_t count = row.icons().size();
 		row.cancel(stat);
+
+		// The icon under the cursor may have moved or gone; its tooltip comes
+		// back when the cursor moves.
+		if (row.icons().size() != count)
+			remove_cursor();
 	}
 
 	const BuffRow<Texture>::Entry* UIBuffList::entry_at(Point<int16_t> cursorpos) const

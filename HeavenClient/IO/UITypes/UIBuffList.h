@@ -49,6 +49,7 @@ namespace ms
 		Cursor::State send_cursor(bool pressed, Point<int16_t> position) override;
 		bool is_in_range(Point<int16_t> cursorpos) const override;
 		void remove_cursor() override;
+		void rightclick(Point<int16_t> cursorpos) override;
 
 		UIElement::Type get_type() const override;
 
