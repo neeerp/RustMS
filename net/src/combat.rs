@@ -34,14 +34,6 @@ impl AttackKind {
     }
 }
 
-/// Skills whose shot carries 4 more bytes before its targets.
-const LONG_SHOTS: [i32; 4] = [
-    3121004,  // Hurricane
-    3221001,  // Piercing Arrow
-    5221004,  // Rapid Fire
-    13111002, // Hurricane (Wind Archer)
-];
-
 /// Rapid Fire's targets end without the usual 4 bytes.
 const RAPID_FIRE: i32 = 5221004;
 
@@ -74,6 +66,8 @@ pub struct Attack {
     pub direction: u8,
     pub stance: u8,
     pub speed: u8,
+    /// How long a held skill was charged, in ms; 0 for the rest.
+    pub charge: i32,
     /// The USE slot of the star, arrow, or bullet a shot fires; 0 for none.
     pub ammo_slot: i16,
     pub hits: Vec<AttackHit>,
@@ -87,8 +81,9 @@ pub fn parse_close_attack(packet: &Packet) -> Result<Attack, NetworkError> {
 /// An attack packet's body (after the opcode). RANGED_ATTACK and
 /// MAGIC_ATTACK share CLOSE_RANGE_ATTACK's layout; a shot adds 5 bytes
 /// before its targets (an int, then its ammo slot and its cash ammo slot
-/// as shorts, then a byte where the others have an int), and 4 more for a
-/// few skills.
+/// as shorts, then a byte where the others have an int). A held skill's
+/// charge (an int) follows the 8 bytes after the skill (v83 0x95292e,
+/// 0x955210, 0x956e66).
 pub fn parse_attack(packet: &Packet, kind: AttackKind) -> Result<Attack, NetworkError> {
     let mut r = Cursor::new(&packet.bytes);
     r.read_short()?;
@@ -96,6 +91,12 @@ pub fn parse_attack(packet: &Packet, kind: AttackKind) -> Result<Attack, Network
     let counts = r.read_byte()?;
     let skill = r.read_int()?;
     r.read_bytes(8)?;
+    let sends_charge = if kind == AttackKind::Magic {
+        skills::CHARGED_SPELLS.contains(&skill)
+    } else {
+        skills::keydown(skill)
+    };
+    let charge = if sends_charge { r.read_int()? } else { 0 };
     let display = r.read_byte()?;
     let direction = r.read_byte()?;
     let stance = r.read_byte()?;
@@ -107,9 +108,6 @@ pub fn parse_attack(packet: &Packet, kind: AttackKind) -> Result<Attack, Network
         ammo_slot = r.read_short()?;
         r.read_short()?;
         r.read_byte()?;
-        if LONG_SHOTS.contains(&skill) {
-            r.read_bytes(4)?;
-        }
     } else {
         r.read_bytes(4)?;
     }
@@ -135,6 +133,7 @@ pub fn parse_attack(packet: &Packet, kind: AttackKind) -> Result<Attack, Network
         direction,
         stance,
         speed,
+        charge,
         ammo_slot,
         hits,
     })
@@ -369,6 +368,10 @@ pub fn build_attack(
     if attack.kind == AttackKind::Ranged {
         p.write_int(0)?;
     }
+    // A held spell's charge, after its targets (v83 0x98066e).
+    if skills::CHARGED_SPELLS.contains(&attack.skill) {
+        p.write_int(attack.charge)?;
+    }
     Ok(p)
 }
 
@@ -540,12 +543,26 @@ mod tests {
     /// A shot or spell at one mob: CLOSE_RANGE_ATTACK's layout, plus a
     /// shot's 5 bytes before its targets, with its ammo slot.
     fn kind_attack_packet(kind: AttackKind, skill: i32, ammo_slot: i16, damage: &[i32]) -> Packet {
+        charged_attack_packet(kind, skill, None, ammo_slot, damage)
+    }
+
+    /// The same, with a held skill's charge.
+    fn charged_attack_packet(
+        kind: AttackKind,
+        skill: i32,
+        charge: Option<i32>,
+        ammo_slot: i16,
+        damage: &[i32],
+    ) -> Packet {
         let mut p = Packet::new_empty();
         p.write_short(0x2D).unwrap();
         p.write_byte(0).unwrap();
         p.write_byte(0x10 | damage.len() as u8).unwrap();
         p.write_int(skill).unwrap();
         p.write_bytes(&[0; 8]).unwrap();
+        if let Some(charge) = charge {
+            p.write_int(charge).unwrap();
+        }
         p.write_byte(3).unwrap(); // display
         p.write_byte(0x80).unwrap(); // direction
         p.write_byte(5).unwrap(); // stance
@@ -592,6 +609,33 @@ mod tests {
                 damage: vec![12]
             }]
         );
+    }
+
+    #[test]
+    fn a_held_skill_says_how_long_it_was_charged() {
+        let parse = |kind, skill, charge| {
+            parse_attack(
+                &charged_attack_packet(kind, skill, charge, 1, &[12, 13]),
+                kind,
+            )
+            .unwrap()
+        };
+        // Piercing Arrow, Corkscrew Blow and Big Bang carry it.
+        for (kind, skill) in [
+            (AttackKind::Ranged, 3221001),
+            (AttackKind::Close, 5101004),
+            (AttackKind::Magic, 2221001),
+        ] {
+            let attack = parse(kind, skill, Some(640));
+            assert_eq!((attack.charge, attack.display, attack.speed), (640, 3, 4));
+            assert_eq!(attack.hits[0].damage, [12, 13]);
+        }
+        // So does Hurricane, at 0.
+        let hurricane = parse(AttackKind::Ranged, 3121004, Some(0));
+        assert_eq!((hurricane.ammo_slot, hurricane.hits[0].object_id), (1, 77));
+        // Explosion and the rest don't.
+        assert_eq!(parse(AttackKind::Magic, 2111002, None).charge, 0);
+        assert_eq!(parse(AttackKind::Ranged, 3001004, None).ammo_slot, 1);
     }
 
     #[test]
@@ -775,6 +819,27 @@ mod tests {
             .int(1000);
         expect.byte(3).byte(0x80).byte(5).byte(4).byte(0x0A).int(0);
         expect.int(77).byte(0).int(25);
+        expect.end();
+    }
+
+    #[test]
+    fn a_held_spell_broadcast_ends_with_its_charge() {
+        let attack = parse_attack(
+            &charged_attack_packet(AttackKind::Magic, 2121001, Some(640), 0, &[12]),
+            AttackKind::Magic,
+        )
+        .unwrap();
+        let packet = build_attack(5, &attack, 30, 0).unwrap();
+        let mut expect = Expect::new(&packet.bytes);
+        expect
+            .short(SendOpcode::MagicAttack as i16)
+            .int(5)
+            .byte(0x11)
+            .byte(0x5B)
+            .byte(30)
+            .int(2121001);
+        expect.byte(3).byte(0x80).byte(5).byte(4).byte(0x0A).int(0);
+        expect.int(77).byte(0).int(12).int(640);
         expect.end();
     }
 

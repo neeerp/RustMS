@@ -118,3 +118,31 @@ fn in_line(job: i32, base: i32) -> bool {
         base / 10 == job / 10 && base % 10 <= job % 10
     }
 }
+
+/// Skills held down to charge or keep firing (the v83 client's
+/// FUN_004fb08f).
+pub const KEYDOWN: [i32; 16] = [
+    1121001,  // Monster Magnet (Hero)
+    1221001,  // Monster Magnet (Paladin)
+    1321001,  // Monster Magnet (Dark Knight)
+    2121001,  // Big Bang (Fire/Poison)
+    2221001,  // Big Bang (Ice/Lightning)
+    2321001,  // Big Bang (Bishop)
+    3121004,  // Hurricane
+    3221001,  // Piercing Arrow
+    5101004,  // Corkscrew Blow
+    5201002,  // Grenade
+    5221004,  // Rapid Fire
+    13111002, // Hurricane (Wind Archer)
+    14111006, // Poison Bomb
+    15101003, // Corkscrew Blow (Thunder Breaker)
+    22121000, // Evan
+    22151001, // Evan
+];
+
+/// The held spells, whose MAGIC_ATTACK says how long they were charged.
+pub const CHARGED_SPELLS: [i32; 5] = [2121001, 2221001, 2321001, 22121000, 22151001];
+
+pub fn keydown(skill_id: i32) -> bool {
+    KEYDOWN.contains(&skill_id)
+}

@@ -18,6 +18,7 @@
 #include "AttackHandlers.h"
 
 #include "../Character/SkillId.h"
+#include "../Gameplay/Combat/Prepare.h"
 #include "../Gameplay/Stage.h"
 
 #include <unordered_map>
@@ -73,6 +74,14 @@ namespace ms
 				lines.push_back(std::make_pair(damage, critical));
 			}
 		}
+
+		// A shot ends with where it went, and a held spell with its charge
+		// (0x980645, 0x98066e).
+		if (type == Attack::Type::RANGED)
+			recv.skip(4);
+
+		if (prepare::sends_charge(attack.skill, true))
+			attack.charge = recv.read_int();
 
 		Stage::get().get_combat().push_attack(attack);
 	}
