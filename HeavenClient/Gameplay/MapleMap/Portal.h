@@ -80,8 +80,6 @@ namespace ms
 
 		Portal();
 
-		void update(Point<int16_t> playerpos);
-
 		// Track contact; true only on the update the player first touches it.
 		bool touch(Point<int16_t> playerpos);
 
@@ -93,12 +91,15 @@ namespace ms
 
 		Point<int16_t> get_position() const;
 
-		Rectangle<int16_t> bounds() const;
-
 		// The box v83 searches for both Up-key and touch portals
 		// (FUN_00712b61, FindPortal_Collision): hRange by vRange centred on
 		// the portal, with the right and bottom edges excluded.
 		Rectangle<int16_t> range_bounds() const;
+
+		// The box a hidden portal shows itself in (v83 FUN_00712c57): 100 px
+		// either side and 50 px above and below, without the right and
+		// bottom edges.
+		Rectangle<int16_t> reveal_bounds() const;
 
 		WarpInfo getwarpinfo() const;
 

@@ -29,11 +29,6 @@ namespace ms
 	Portal::Portal() : Portal(nullptr, SPAWN, "", false, Point<int16_t>(), 0, "", DEFAULT_RANGE, DEFAULT_RANGE)
 	{}
 
-	void Portal::update(Point<int16_t> playerpos)
-	{
-		touched = bounds().contains(playerpos);
-	}
-
 	bool Portal::touch(Point<int16_t> playerpos)
 	{
 		bool was_touched = touched;
@@ -44,7 +39,8 @@ namespace ms
 
 	void Portal::draw(Point<int16_t> viewpos, float inter) const
 	{
-		if (!animation || (type == HIDDEN && !touched))
+		// MapPortals draws hidden portals as they show and hide.
+		if (!animation || type == HIDDEN || type == SCRIPTED_HIDDEN)
 			return;
 
 		animation->draw(position + viewpos, inter);
@@ -65,18 +61,18 @@ namespace ms
 		return position;
 	}
 
-	Rectangle<int16_t> Portal::bounds() const
-	{
-		auto lt = position + Point<int16_t>(-25, -100);
-		auto rb = position + Point<int16_t>(25, 25);
-
-		return Rectangle<int16_t>(lt, rb);
-	}
-
 	Rectangle<int16_t> Portal::range_bounds() const
 	{
 		auto lt = position - Point<int16_t>(hrange / 2, vrange / 2);
 		auto rb = position + Point<int16_t>(hrange / 2 - 1, vrange / 2 - 1);
+
+		return Rectangle<int16_t>(lt, rb);
+	}
+
+	Rectangle<int16_t> Portal::reveal_bounds() const
+	{
+		auto lt = position - Point<int16_t>(100, 50);
+		auto rb = position + Point<int16_t>(99, 49);
 
 		return Rectangle<int16_t>(lt, rb);
 	}

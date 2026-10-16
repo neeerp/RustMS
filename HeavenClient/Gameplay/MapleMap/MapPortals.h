@@ -50,7 +50,20 @@ namespace ms
 		Point<int16_t> get_portal_by_name(const std::string &name) const;
 
 	private:
+		void update_hidden(Point<int16_t> playerpos);
+
 		static std::unordered_map<Portal::Type, Animation> animations;
+
+		// Each hidden portal's ph or psh image, which holds its portalStart,
+		// portalContinue and portalExit.
+		std::unordered_map<uint8_t, nl::node> hidden_images;
+
+		// The one hidden portal showing, and one still playing its exit.
+		int16_t shown = -1;
+		Animation shown_animation;
+		bool shown_continues = false;
+		int16_t hiding = -1;
+		Animation hiding_animation;
 
 		std::unordered_map<uint8_t, Portal> portals_by_id;
 		std::unordered_map<std::string, uint8_t> portal_ids_by_name;
