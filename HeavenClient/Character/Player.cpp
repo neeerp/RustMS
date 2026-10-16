@@ -492,15 +492,31 @@ namespace ms
 		return move.can_use(level, weapon, job, hp, mp, bullets);
 	}
 
-	Attack Player::prepare_attack(bool skill) const
+	Attack Player::prepare_attack(int32_t skill) const
 	{
 		Attack::Type attacktype;
 		bool degenerate;
+		int32_t bullet = inventory.get_bulletid();
 
 		if (state == Char::State::PRONE)
 		{
 			degenerate = true;
 			attacktype = Attack::Type::CLOSE;
+		} else if (skill)
+		{
+			// Like v83, a skill attacks as the skill does, whatever the weapon.
+			const SkillData &data = SkillData::get(skill);
+			degenerate = false;
+
+			if (data.is_shot())
+				attacktype = Attack::Type::RANGED;
+			else if (data.is_spell())
+				attacktype = Attack::Type::MAGIC;
+			else
+				attacktype = Attack::Type::CLOSE;
+
+			if (!data.uses_ammo())
+				bullet = 0;
 		} else
 		{
 			Weapon::Type weapontype;
@@ -517,8 +533,8 @@ namespace ms
 					break;
 				case Weapon::Type::WAND:
 				case Weapon::Type::STAFF:
-					degenerate = !skill;
-					attacktype = degenerate ? Attack::Type::CLOSE : Attack::Type::MAGIC;
+					degenerate = true;
+					attacktype = Attack::Type::CLOSE;
 					break;
 				default:
 					attacktype = Attack::Type::CLOSE;
@@ -543,7 +559,7 @@ namespace ms
 		attack.accuracy = stats.get_total(EquipStat::Id::ACC);
 		attack.playerlevel = stats.get_stat(MapleStat::Id::LEVEL);
 		attack.range = stats.get_range();
-		attack.bullet = inventory.get_bulletid();
+		attack.bullet = bullet;
 		attack.origin = get_position();
 		attack.toleft = !facing_right;
 		attack.speed = get_integer_attackspeed();

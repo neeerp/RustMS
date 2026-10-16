@@ -17,10 +17,11 @@
 //////////////////////////////////////////////////////////////////////////////////
 #include "SkillData.h"
 
-#include "../Character/SkillId.h"
 #include "../Util/Misc.h"
 
 #include <nlnx/nx.hpp>
+
+#include <unordered_set>
 
 namespace ms
 {
@@ -102,64 +103,112 @@ namespace ms
 
 	int32_t SkillData::flags_of(int32_t id) const
 	{
-		static const std::unordered_map<int32_t, int32_t> skill_flags =
+		// How v83's CUserLocal::DoActiveSkill dispatches each skill: to a
+		// swing, a shot, or a spell. Every other skill is a special move.
+		// Skills that charge first (Big Bang, Hurricane, Corkscrew Blow...)
+		// aren't here; HeavenClient can't charge them yet. v83 casts Three
+		// Snails as a spell, but RustMS reads it as a swing.
+		static const std::unordered_set<int32_t> swings =
 				{
-						// Beginner
-						{SkillId::THREE_SNAILS,           ATTACK},
-						// Warrior
-						{SkillId::POWER_STRIKE,           ATTACK},
-						{SkillId::SLASH_BLAST,            ATTACK},
-						// Fighter
-						// Page
-						// Crusader
-						{SkillId::SWORD_PANIC,            ATTACK},
-						{SkillId::AXE_PANIC,              ATTACK},
-						{SkillId::SWORD_COMA,             ATTACK},
-						{SkillId::AXE_COMA,               ATTACK},
-						// Hero
-						{SkillId::RUSH_HERO,              ATTACK},
-						{SkillId::BRANDISH,               ATTACK},
-						// Page
-						// White Knight
-						{SkillId::CHARGE,                 ATTACK},
-						// Paladin
-						{SkillId::RUSH_PALADIN,           ATTACK},
-						{SkillId::BLAST,                  ATTACK},
-						{SkillId::HEAVENS_HAMMER,         ATTACK},
-						// Spearman
-						// Dragon Knight
-						{SkillId::DRAGON_BUSTER,          ATTACK},
-						{SkillId::DRAGON_FURY,            ATTACK},
-						{SkillId::PA_BUSTER,              ATTACK},
-						{SkillId::PA_FURY,                ATTACK},
-						{SkillId::SACRIFICE,              ATTACK},
-						{SkillId::DRAGONS_ROAR,           ATTACK},
-						// Dark Knight
-						{SkillId::RUSH_DK,                ATTACK},
-						// Mage
-						{SkillId::ENERGY_BOLT,            ATTACK | RANGED},
-						{SkillId::MAGIC_CLAW,             ATTACK | RANGED},
-						// F/P Mage
-						{SkillId::SLOW_FP,                ATTACK},
-						{SkillId::FIRE_ARROW,             ATTACK | RANGED},
-						{SkillId::POISON_BREATH,          ATTACK | RANGED},
-						// F/P ArchMage
-						{SkillId::EXPLOSION,              ATTACK},
-						{SkillId::POISON_BREATH,          ATTACK},
-						{SkillId::SEAL_FP,                ATTACK},
-						{SkillId::ELEMENT_COMPOSITION_FP, ATTACK | RANGED},
-						//
-						{SkillId::FIRE_DEMON,             ATTACK},
-						{SkillId::PARALYZE,               ATTACK | RANGED},
-						{SkillId::METEOR_SHOWER,          ATTACK}
+				1000, 1009, 1020,
+				1001004, 1001005,
+				1111003, 1111004, 1111005, 1111006, 1111008,
+				1121006, 1121008,
+				1211002,
+				1221007, 1221009, 1221011,
+				1311001, 1311002, 1311003, 1311004, 1311005, 1311006,
+				1321003,
+				3101003,
+				3201003,
+				4001002, 4001334,
+				4121008,
+				4201004, 4201005,
+				4211002, 4211004,
+				4221001, 4221007,
+				5001001, 5001002,
+				5101002, 5101003,
+				5111002, 5111004, 5111006,
+				5121001, 5121004, 5121005, 5121007,
+				5201004,
+				5221003,
+				9001001,
+				10001000, 10001009, 10001020,
+				11001002, 11001003,
+				11111002, 11111003, 11111004, 11111006,
+				14001002,
+				15001001, 15001002,
+				15101005,
+				15111001, 15111003, 15111004,
+				20000014, 20000015, 20000016, 20001000, 20001009, 20001020,
+				21000002,
+				21100001, 21100002,
+				21110003, 21110006,
+				21120005
+				};
+		static const std::unordered_set<int32_t> shots =
+				{
+				3001004, 3001005,
+				3101005,
+				3111003, 3111004, 3111006,
+				3121003,
+				3201005,
+				3211003, 3211004, 3211006,
+				3221003, 3221007,
+				4001344,
+				4101005,
+				4111004, 4111005,
+				4121003, 4121007,
+				4221003,
+				5001003,
+				5121002,
+				5201001, 5201006,
+				5210000, 5211004, 5211005, 5211006,
+				5220011, 5221009,
+				11101004,
+				13001003,
+				13101005,
+				13111000, 13111001, 13111006, 13111007,
+				14001004,
+				14101006,
+				14111002, 14111005,
+				15111007,
+				21100004,
+				21110004,
+				21120006
+				};
+		// Shots that throw no ammo, as v83's FUN_007667ee decides.
+		static const std::unordered_set<int32_t> ammo_free =
+				{
+				4111004, 4121003, 4221003, 5121002, 11101004, 13101005, 14101006, 15111007, 21100004, 21110004,
+				21120006
+				};
+		static const std::unordered_set<int32_t> spells =
+				{
+				2001004, 2001005,
+				2101004, 2101005,
+				2111003, 2111006,
+				2121003, 2121006, 2121007,
+				2201004, 2201005,
+				2211002, 2211003, 2211006,
+				2221003, 2221006, 2221007,
+				2301005,
+				2311004,
+				2321007, 2321008,
+				12001003,
+				12101002, 12101006,
+				12111003, 12111005, 12111006
 				};
 
-		auto iter = skill_flags.find(id);
+		if (swings.count(id))
+			return ATTACK;
 
-		if (iter == skill_flags.end())
-			return NONE;
+		if (shots.count(id))
+			return ammo_free.count(id) ? ATTACK | RANGED | NOAMMO : ATTACK | RANGED;
 
-		return iter->second;
+		if (spells.count(id))
+			return ATTACK | MAGIC;
+
+		return NONE;
 	}
 
 	bool SkillData::is_passive() const
@@ -169,7 +218,22 @@ namespace ms
 
 	bool SkillData::is_attack() const
 	{
-		return !passive && (flags & ATTACK);
+		return flags & ATTACK;
+	}
+
+	bool SkillData::is_shot() const
+	{
+		return flags & RANGED;
+	}
+
+	bool SkillData::is_spell() const
+	{
+		return flags & MAGIC;
+	}
+
+	bool SkillData::uses_ammo() const
+	{
+		return (flags & RANGED) && !(flags & NOAMMO);
 	}
 
 	bool SkillData::is_invisible() const

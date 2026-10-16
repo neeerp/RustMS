@@ -89,8 +89,9 @@ namespace ms
 		// Return whether the player can use a skill or not.
 		SpecialMove::ForbidReason can_use(const SpecialMove &move) const;
 
-		// Create an attack struct using the player's stats.
-		Attack prepare_attack(bool skill) const;
+		// Create an attack struct using the player's stats, for a skill or, if
+		// skill is 0, a regular attack.
+		Attack prepare_attack(int32_t skill) const;
 
 		// Execute a rush movement
 		void rush(double targetx);

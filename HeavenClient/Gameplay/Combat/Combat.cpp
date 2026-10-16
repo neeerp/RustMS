@@ -117,7 +117,7 @@ namespace ms
 	{
 		if (move.is_attack())
 		{
-			Attack attack = player.prepare_attack(move.is_skill());
+			Attack attack = player.prepare_attack(move.is_skill() ? move.get_id() : 0);
 
 			move.apply_useeffects(player);
 			move.apply_actions(player, attack.type);
