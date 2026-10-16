@@ -303,11 +303,17 @@ namespace ms
 
 				playable->send_action(KeyAction::actionbyid(action), down);
 				break;
+			// v83 uses skills and items only as their key goes down
+			// (FUN_0094c856).
 			case KeyType::Id::SKILL:
-				combat.use_move(action);
+				if (down)
+					combat.use_move(action);
+
 				break;
 			case KeyType::Id::ITEM:
-				player.use_item(action);
+				if (down)
+					player.use_item(action);
+
 				break;
 			case KeyType::Id::FACE:
 				if (down)
