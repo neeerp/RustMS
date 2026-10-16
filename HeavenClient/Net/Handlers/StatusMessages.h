@@ -25,36 +25,58 @@
 
 namespace ms
 {
-	// SHOW_STATUS_INFO lines, worded as in the v83 client (MapleLegends
-	// client: the message handlers at 0x846d5a and its string pool).
+	// SHOW_STATUS_INFO lines, worded as in the 2025 MapleRoyals client (its
+	// handlers under FUN_00a209d4, and its string pool).
 	namespace status_messages
 	{
-		// An item picked up: the count comes first, and one is "an item".
-		inline std::string item_line(const std::string& name, int32_t count)
+		// The inventory tab an item goes to, by its id.
+		inline std::string tab_name(int32_t itemid)
 		{
-			if (count < 2)
-				return "You have gained an item (" + name + ")";
-
-			return "You have gained items (" + std::to_string(count) + " " + name + ")";
+			switch (itemid / 1000000)
+			{
+			case 1:
+				return "Eqp";
+			case 2:
+				return "Use";
+			case 3:
+				return "Setup";
+			case 4:
+				return "Etc";
+			case 5:
+				return "Cash";
+			default:
+				return "";
+			}
 		}
 
+		// An item picked up: one is "an item", and the count follows the name.
+		inline std::string item_line(const std::string& tab, const std::string& name, int32_t count)
+		{
+			if (count < 2)
+				return "You have gained an item in the " + tab + " tab (" + name + ")";
+
+			return "You have gained items in the " + tab + " tab (" + name + " " + std::to_string(count) + ")";
+		}
+
+		// Mode 5. Zero counts as a loss.
 		inline std::string meso_line(int32_t amount)
 		{
 			if (amount > 0)
 				return "You have gained mesos (+" + std::to_string(amount) + ")";
 
-			return "You have lost mesos (" + std::to_string(amount) + ")";
+			return "You have lost mesos. (" + std::to_string(amount) + ")";
 		}
 
+		// Mode 4. Zero counts as a gain.
 		inline std::string fame_line(int32_t amount)
 		{
 			if (amount < 0)
 				return "You have lost fame (" + std::to_string(amount) + ")";
 
-			return "You have gained fame (+" + std::to_string(amount) + ")";
+			return "You have gained fame. (+" + std::to_string(amount) + ")";
 		}
 
-		// SHOW_STATUS_INFO mode 3, in the OdinMS v83 layout.
+		// SHOW_STATUS_INFO mode 3, as FUN_00a21ac5 reads it.
 		struct ExpGain
 		{
 			bool white;
@@ -62,12 +84,19 @@ namespace ms
 			// Quest EXP, which goes to the chat log instead.
 			bool inchat;
 			int32_t event;
+			// The bonus percent for hunting a while, and for how many hours.
+			uint8_t hunting_rate;
+			uint8_t hunting_hours;
 			int32_t wedding;
+			// Spirit Week quest bonus: a percent, and how many quests it lasts.
+			uint8_t quest_rate;
+			uint8_t quest_count;
 			// 0, or the event's party EXP rate in percent.
 			uint8_t party_rate;
 			int32_t party;
 			int32_t equip;
 			int32_t cafe;
+			int32_t rainbow;
 		};
 
 		inline ExpGain read_exp(InPacket& recv)
@@ -77,11 +106,20 @@ namespace ms
 			exp.gain = recv.read_int();
 			exp.inchat = recv.read_bool();
 			exp.event = recv.read_int();
-			recv.skip(2);
+			exp.hunting_rate = static_cast<uint8_t>(recv.read_byte());
+			recv.skip(1);
 			exp.wedding = recv.read_int();
 
+			if (exp.hunting_rate > 0)
+				exp.hunting_hours = static_cast<uint8_t>(recv.read_byte());
+
 			if (exp.inchat)
-				recv.skip(1);
+			{
+				exp.quest_rate = static_cast<uint8_t>(recv.read_byte());
+
+				if (exp.quest_rate > 0)
+					exp.quest_count = static_cast<uint8_t>(recv.read_byte());
+			}
 
 			exp.party_rate = static_cast<uint8_t>(recv.read_byte());
 			exp.party = recv.read_int();
@@ -92,9 +130,8 @@ namespace ms
 			if (recv.length() >= 4)
 				exp.cafe = recv.read_int();
 
-			// Rainbow week bonus EXP, which v83 does not show.
 			if (recv.length() >= 4)
-				recv.skip(4);
+				exp.rainbow = recv.read_int();
 
 			return exp;
 		}
@@ -106,12 +143,14 @@ namespace ms
 		};
 
 		// The status lines for EXP not gained in chat: the gain, white unless
-		// the server says otherwise, then each bonus in yellow. v83 has no
-		// line for an equipment bonus.
+		// the server says otherwise, then each bonus in yellow.
 		inline std::vector<Line> exp_lines(const ExpGain& exp)
 		{
 			std::vector<Line> lines;
 			lines.push_back({ "You have gained experience (+" + std::to_string(exp.gain) + ")", !exp.white });
+
+			if (exp.equip != 0)
+				lines.push_back({ "Equip Item Bonus EXP (+" + std::to_string(exp.equip) + ")", true });
 
 			if (exp.wedding != 0)
 				lines.push_back({ "Bonus Wedding EXP (+" + std::to_string(exp.wedding) + ")", true });
@@ -127,8 +166,37 @@ namespace ms
 			if (exp.cafe != 0)
 				lines.push_back({ "Internet Cafe EXP Bonus (+" + std::to_string(exp.cafe) + ")", true });
 
+			if (exp.hunting_hours != 0 && exp.white)
+			{
+				int32_t bonus = exp.hunting_rate * exp.gain / 100;
+				lines.push_back({ "Bonus EXP for hunting over " + std::to_string(exp.hunting_hours) + " hrs. (+" + std::to_string(bonus) + ")", true });
+			}
+
 			if (exp.event != 0)
 				lines.push_back({ "Bonus Event EXP (+" + std::to_string(exp.event) + ")", true });
+
+			if (exp.rainbow != 0)
+				lines.push_back({ "Rainbow Week Bonus EXP (+" + std::to_string(exp.rainbow) + ")", true });
+
+			return lines;
+		}
+
+		// The chat-log lines for EXP gained in chat: the gain, then any Spirit
+		// Week quest bonus.
+		inline std::vector<std::string> chat_exp_lines(const ExpGain& exp)
+		{
+			std::vector<std::string> lines;
+			lines.push_back("You have gained experience (+" + std::to_string(exp.gain) + ")");
+
+			int32_t bonus = exp.quest_rate * exp.gain / 100;
+
+			if (bonus != 0)
+			{
+				lines.push_back("Earned 'Spirit Week Event' bonus EXP. (+" + std::to_string(bonus) + ")");
+
+				if (exp.quest_count != 0)
+					lines.push_back("The next " + std::to_string(exp.quest_count) + " completed quests will include additional Event Bonus EXP.");
+			}
 
 			return lines;
 		}

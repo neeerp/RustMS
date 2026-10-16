@@ -22,6 +22,7 @@
 #include "../PacketHandler.h"
 
 #include "../../Graphics/Text.h"
+#include "../../IO/UITypes/UIChatBar.h"
 
 namespace ms
 {
@@ -32,12 +33,14 @@ namespace ms
 	public:
 		void handle(InPacket& recv) const override;
 	private:
-		// A picked-up item's name is cut to this width.
+		// A picked-up item's name is cut to these widths, for one item or
+		// several.
 		static constexpr size_t PICKUP_NAME_WIDTH = 120;
+		static constexpr size_t PICKUP_STACK_NAME_WIDTH = 96;
 
 		void show_status(Color::Name color, const std::string& message) const;
-		// A grey line in the chat log.
-		void chat_line(const std::string& message) const;
+		// A line in the chat log, grey unless given another type.
+		void chat_line(const std::string& message, UIChatBar::LineType type = UIChatBar::LineType::GREY) const;
 	};
 
 	// Show an instruction balloon above the player

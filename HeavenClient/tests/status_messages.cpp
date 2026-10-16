@@ -41,11 +41,12 @@ int main()
 		using namespace ms;
 		using namespace ms::status_messages;
 
-		require(item_line("Snail Shell", 1) == "You have gained an item (Snail Shell)", "one item");
-		require(item_line("Snail Shell", 3) == "You have gained items (3 Snail Shell)", "the count comes first");
+		require(tab_name(4000019) == "Etc" && tab_name(2000000) == "Use" && tab_name(1302000) == "Eqp", "tabs by item id");
+		require(item_line("Etc", "Snail Shell", 1) == "You have gained an item in the Etc tab (Snail Shell)", "one item");
+		require(item_line("Etc", "Snail Shell", 3) == "You have gained items in the Etc tab (Snail Shell 3)", "the count follows the name");
 		require(meso_line(150) == "You have gained mesos (+150)", "gaining mesos");
-		require(meso_line(-150) == "You have lost mesos (-150)", "losing mesos");
-		require(fame_line(1) == "You have gained fame (+1)", "gaining fame");
+		require(meso_line(-150) == "You have lost mesos. (-150)", "losing mesos");
+		require(fame_line(1) == "You have gained fame. (+1)", "gaining fame");
 		require(fame_line(-1) == "You have lost fame (-1)", "losing fame");
 
 		Writer kill;
@@ -72,6 +73,20 @@ int main()
 		ExpGain quest_exp = read_exp(quest_recv);
 		require(!quest_recv.available(), "quest EXP carries one more byte");
 		require(quest_exp.inchat && quest_exp.gain == 10, "quest EXP goes to the chat log");
+		require(chat_exp_lines(quest_exp).size() == 1, "quest EXP without a Spirit Week bonus is one line");
+
+		Writer bonus;
+		bonus.put<int8_t>(1).put<int32_t>(100).put<int8_t>(0).put<int32_t>(4).put<int8_t>(10).put<int8_t>(0).put<int32_t>(0)
+			.put<int8_t>(2).put<int8_t>(0).put<int32_t>(0).put<int32_t>(5).put<int32_t>(0).put<int32_t>(6);
+		InPacket bonus_recv(bonus.bytes.data(), bonus.bytes.size());
+		ExpGain bonus_exp = read_exp(bonus_recv);
+		require(!bonus_recv.available(), "a hunting bonus carries its hours");
+		auto bonus_lines = exp_lines(bonus_exp);
+		require(bonus_lines.size() == 5, "the gain and four bonuses");
+		require(bonus_lines[1].text == "Equip Item Bonus EXP (+5)", "the equipment bonus comes first");
+		require(bonus_lines[2].text == "Bonus EXP for hunting over 2 hrs. (+10)", "the hunting bonus");
+		require(bonus_lines[3].text == "Bonus Event EXP (+4)", "the event bonus");
+		require(bonus_lines[4].text == "Rainbow Week Bonus EXP (+6)", "the rainbow week bonus comes last");
 
 		std::cout << "Status messages passed\n";
 		return 0;

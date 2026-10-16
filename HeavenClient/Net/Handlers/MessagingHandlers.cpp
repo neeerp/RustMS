@@ -110,30 +110,38 @@ namespace ms
 				if (!idata.is_valid())
 					return;
 
-				// v83 cuts the name to 120 pixels with "..".
+				// The name is cut with "..", shorter when a count follows it.
+				size_t width = qty < 2 ? PICKUP_NAME_WIDTH : PICKUP_STACK_NAME_WIDTH;
 				Text name(Text::Font::A12M, Text::Alignment::LEFT, Color::Name::WHITE, idata.get_name());
 
-				if (name.width() > PICKUP_NAME_WIDTH)
-					string_format::format_with_ellipsis(name, PICKUP_NAME_WIDTH);
+				if (name.width() > width)
+					string_format::format_with_ellipsis(name, width);
 
-				show_status(Color::Name::WHITE, status_messages::item_line(name.get_text(), qty));
+				show_status(Color::Name::WHITE, status_messages::item_line(status_messages::tab_name(itemid), name.get_text(), qty));
 			}
 			else if (mode2 == 1)
 			{
-				// OdinMS v83 sends a byte the v83 client has no use for.
-				recv.skip(1);
-
+				// Set when part of the mesos was lost.
+				bool portion = recv.read_bool();
 				int32_t gain = recv.read_int();
 				int16_t cafe = recv.read_short();
 
 				show_status(Color::Name::WHITE, "You have gained mesos (+" + std::to_string(gain) + ")");
+
+				if (portion)
+					chat_line("A portion was not found after falling on the ground.", UIChatBar::LineType::YELLOW);
 
 				if (cafe != 0)
 					show_status(Color::Name::YELLOW, "Internet Cafe Meso Bonus (+" + std::to_string(cafe) + ")");
 			}
 			else if (mode2 == -2)
 			{
-				show_status(Color::Name::WHITE, "This item is unavailable for pick up.");
+				show_status(Color::Name::WHITE, "This item is unavailable for the pick-up.");
+			}
+			else if (mode2 == -3)
+			{
+				show_status(Color::Name::WHITE, "You cannot acquire any items.");
+				chat_line("You cannot acquire any items because the game file has been damaged. Please try again after reinstalling the game.", UIChatBar::LineType::SKILL);
 			}
 			else
 			{
@@ -155,15 +163,15 @@ namespace ms
 		else if (mode == 3)
 		{
 			status_messages::ExpGain exp = status_messages::read_exp(recv);
-			std::vector<status_messages::Line> lines = status_messages::exp_lines(exp);
 
 			if (exp.inchat)
 			{
-				chat_line(lines.front().text);
+				for (const auto& line : status_messages::chat_exp_lines(exp))
+					chat_line(line);
 			}
 			else
 			{
-				for (const auto& line : lines)
+				for (const auto& line : status_messages::exp_lines(exp))
 					show_status(line.yellow ? Color::Name::YELLOW : Color::Name::WHITE, line.text);
 			}
 		}
@@ -181,10 +189,10 @@ namespace ms
 		}
 	}
 
-	void ShowStatusInfoHandler::chat_line(const std::string& message) const
+	void ShowStatusInfoHandler::chat_line(const std::string& message, UIChatBar::LineType type) const
 	{
 		if (auto chatbar = UI::get().get_element<UIChatBar>())
-			chatbar->send_chatline(message, UIChatBar::LineType::GREY);
+			chatbar->send_chatline(message, type);
 	}
 
 	void ShowStatusInfoHandler::show_status(Color::Name color, const std::string& message) const

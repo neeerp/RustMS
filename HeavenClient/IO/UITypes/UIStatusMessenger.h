@@ -45,8 +45,8 @@ namespace ms
 		Text shadow;
 		Linear<float> opacity;
 
-		// A line fades out over 6 seconds, as in v83 (MapleLegends client
-		// 0x712b76).
+		// A line fades out over 6 seconds, as in v83 (2025 MapleRoyals client,
+		// FUN_0089b159).
 		static constexpr int64_t FADE_DURATION = 6'000;
 	};
 
