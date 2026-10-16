@@ -30,9 +30,9 @@ pub enum PartyStatus {
     Full = 17,
     /// "Unable to find the requested character in this channel."
     NotFound = 19,
-    /// "'name' is currently taking care of another invitation."
+    /// "'name' is taking care of another invitation."
     BusyWithInvite = 22,
-    /// "'name' has denied the party request."
+    /// "name have denied request to the party."
     Declined = 23,
 }
 
