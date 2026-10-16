@@ -107,11 +107,18 @@ namespace ms
 		// Change the character's stance to it's regular attack.
 		void attack(bool degenerate);
 
+		// Change the character's stance to a regular attack stance picked
+		// with CharLook::get_attackstance.
+		void attack(bool degenerate, Stance::Id stance);
+
 		// Set the afterimage for an attack.
 		void set_afterimage(int32_t skill_id);
 
 		// Return the current afterimage.
 		const Afterimage &get_afterimage() const;
+
+		// Return the range of a regular attack's afterimage in a stance.
+		Rectangle<int16_t> get_afterimage_range(Stance::Id stance) const;
 
 		// Display an animation as an effect with the character
 		void show_attack_effect(Animation animation, int8_t z);

@@ -75,6 +75,10 @@ namespace ms
 
 		void apply_move(const SpecialMove &move);
 
+		// The melee stance a regular ranged attack whacks a mob right in
+		// front of the player with, or NONE to shoot.
+		Stance::Id find_whack(const Attack &attack) const;
+
 		std::vector<int32_t>
 		find_closest(MapObjects *objs, Rectangle<int16_t> range, Point<int16_t> origin, uint8_t objcount,
 					 bool use_mobs) const;

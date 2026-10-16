@@ -492,12 +492,12 @@ namespace ms
 		return move.can_use(level, weapon, job, hp, mp, bullets);
 	}
 
-	Attack Player::prepare_attack(bool skill) const
+	Attack Player::prepare_attack(bool skill, bool whack) const
 	{
 		Attack::Type attacktype;
 		bool degenerate;
 
-		if (state == Char::State::PRONE)
+		if (state == Char::State::PRONE || whack)
 		{
 			degenerate = true;
 			attacktype = Attack::Type::CLOSE;

@@ -18,6 +18,7 @@
 #include "Combat.h"
 
 #include "DamageLayout.h"
+#include "PointBlank.h"
 
 #include "../../Character/SkillId.h"
 #include "../../IO/Messages.h"
@@ -118,13 +119,27 @@ namespace ms
 		if (move.is_attack())
 		{
 			Attack attack = player.prepare_attack(move.is_skill());
+			Stance::Id whack = Stance::Id::NONE;
+
+			if (attack.type == Attack::Type::RANGED && !move.is_skill())
+				whack = find_whack(attack);
+
+			if (whack != Stance::Id::NONE)
+				attack = player.prepare_attack(false, true);
 
 			move.apply_useeffects(player);
-			move.apply_actions(player, attack.type);
+
+			if (whack != Stance::Id::NONE)
+				player.attack(true, whack);
+			else
+				move.apply_actions(player, attack.type);
 
 			player.set_afterimage(move.get_id());
 
 			move.apply_stats(player, attack);
+
+			if (whack != Stance::Id::NONE)
+				attack.range = point_blank::range(player.get_afterimage_range(whack));
 
 			Point<int16_t> origin = attack.origin;
 			Rectangle<int16_t> range = place_range(origin, attack.range, attack.hrange, attack.toleft);
@@ -161,6 +176,18 @@ namespace ms
 			int32_t level = player.get_skills().get_level(moveid);
 			UseSkillPacket(moveid, level).dispatch();
 		}
+	}
+
+	Stance::Id Combat::find_whack(const Attack &attack) const
+	{
+		Stance::Id stance = player.get_look().get_attackstance(true);
+		Rectangle<int16_t> range = point_blank::range(player.get_afterimage_range(stance));
+		range = place_range(attack.origin, range, 1.0f, attack.toleft);
+
+		if (find_closest(mobs.get_mobs(), range, attack.origin, 1, true).empty())
+			return Stance::Id::NONE;
+
+		return stance;
 	}
 
 	std::vector<int32_t>

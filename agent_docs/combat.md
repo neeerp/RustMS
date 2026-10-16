@@ -109,6 +109,11 @@ two times in three. Claws throw with swing O1, O2, or O3.
 A bow, crossbow, claw, or gun with no ammo still attacks, as in v83: the
 regular attack becomes that weak melee hit at a tenth of the damage, with no
 notice (`RegularAttack::can_use`, `Player::prepare_attack`).
+With ammo, a regular attack still whacks instead of shooting when a mob is
+right in front: v83 picks the melee stance first and looks for a mob in its
+afterimage range, cut to reach at most 65 px forward
+(`Gameplay/Combat/PointBlank.h`, `Combat::find_whack`). Only when there is
+none does it shoot.
 
 Damage numbers follow v83 (`Gameplay/Combat/DamageLayout.h`). The first digit
 comes from the larger `NoRed1` set and the rest from `NoRed0`. Each digit
