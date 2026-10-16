@@ -18,6 +18,7 @@
 #include "UIChatBar.h"
 
 #include <algorithm>
+#include <cctype>
 #include <cstdlib>
 
 #include "UINotice.h"
@@ -77,6 +78,13 @@ namespace ms
 
 			message = input.substr(message_start);
 			return message.empty() ? WhisperParseResult::InvalidWhisper : WhisperParseResult::ValidWhisper;
+		}
+
+		// v83 compares whisper targets without regard to case (_stricmp).
+		bool same_name(const std::string& a, const std::string& b)
+		{
+			return a.size() == b.size() && std::equal(a.begin(), a.end(), b.begin(),
+				[](unsigned char x, unsigned char y) { return std::tolower(x) == std::tolower(y); });
 		}
 
 		// Whether input is /find, with the name it looks for, if any.
@@ -176,7 +184,13 @@ namespace ms
 							std::string message;
 							WhisperParseResult whisper_result = parse_whisper_command(msg, target, message);
 
-							if (whisper_result == WhisperParseResult::ValidWhisper)
+							if (whisper_result == WhisperParseResult::ValidWhisper
+								&& same_name(target, Stage::get().get_player().get_stats().get_name()))
+							{
+								// v83 refuses before sending anything (FUN_0052c40c).
+								send_chatline("You can't whisper to yourself.", LineType::SKILL);
+							}
+							else if (whisper_result == WhisperParseResult::ValidWhisper)
 							{
 								WhisperPacket(target, message).dispatch();
 								send_chatline("#g" + target + "<<" + message, LineType::WHITE);
