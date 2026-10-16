@@ -543,10 +543,13 @@ namespace ms
 		attack.accuracy = stats.get_total(EquipStat::Id::ACC);
 		attack.playerlevel = stats.get_stat(MapleStat::Id::LEVEL);
 		attack.range = stats.get_range();
-		attack.bullet = inventory.get_bulletid();
 		attack.origin = get_position();
 		attack.toleft = !facing_right;
 		attack.speed = get_integer_attackspeed();
+
+		// A swing or stab throws or fires nothing, even with ammo.
+		if (attacktype == Attack::Type::RANGED)
+			attack.bullet = inventory.get_bulletid();
 
 		return attack;
 	}
