@@ -71,6 +71,8 @@ namespace ms
 					return Tooltip::Parent::MINIMAP;
 				case UIElement::Type::MONSTERBOOK:
 					return Tooltip::Parent::MONSTERBOOK;
+				case UIElement::Type::BUFFLIST:
+					return Tooltip::Parent::BUFFLIST;
 				default:
 					return Tooltip::Parent::NONE;
 			}
@@ -320,11 +322,18 @@ namespace ms
 								EnterCashShopPacket().dispatch();
 								break;
 							case KeyAction::Id::SAY:
+								if (auto chatbar = UI::get().get_element<UIChatBar>())
+									chatbar->set_target(UIChatBar::Target::ALL);
+
+								break;
 							case KeyAction::Id::PARTYCHAT:
 								if (auto chatbar = UI::get().get_element<UIChatBar>())
-									chatbar->set_target(action == KeyAction::Id::PARTYCHAT
-										? UIChatBar::Target::PARTY
-										: UIChatBar::Target::ALL);
+									chatbar->set_target(UIChatBar::Target::PARTY);
+
+								break;
+							case KeyAction::Id::FRIENDSCHAT:
+								if (auto chatbar = UI::get().get_element<UIChatBar>())
+									chatbar->set_target(UIChatBar::Target::BUDDY);
 
 								break;
 							case KeyAction::Id::TOGGLECHAT:
@@ -493,7 +502,7 @@ namespace ms
 		{
 			eqtooltip.set_equip(Tooltip::Parent::NONE, 0);
 			ittooltip.set_item(0);
-			sktooltip.set_skill(0, 0, 0, 0);
+			sktooltip.set_skill(0, 0, 0, 0, true);
 			tetooltip.set_text("");
 			matooltip.reset();
 			tooltip = {};
@@ -524,9 +533,9 @@ namespace ms
 	}
 
 	void UIStateGame::show_skill(Tooltip::Parent parent, int32_t skill_id, int32_t level, int32_t masterlevel,
-								 int64_t expiration)
+								 int64_t expiration, bool levels)
 	{
-		sktooltip.set_skill(skill_id, level, masterlevel, expiration);
+		sktooltip.set_skill(skill_id, level, masterlevel, expiration, levels);
 
 		if (skill_id)
 		{
@@ -577,7 +586,8 @@ namespace ms
 					UIElement::Type::QUESTCOMPLETE,
 					UIElement::Type::PARTYHP,
 					UIElement::Type::NPCTALK,
-					UIElement::Type::SHOP
+					UIElement::Type::SHOP,
+					UIElement::Type::REVIVE
 			};
 
 			if (std::find(silent_types.begin(), silent_types.end(), T::TYPE) == silent_types.end())

@@ -18,16 +18,23 @@
 #include "UIChatBar.h"
 
 #include <algorithm>
+#include <cctype>
 #include <cstdlib>
 
+#include "UINotice.h"
 #include "UIStatusBar.h"
 
+#include "../UI.h"
+
 #include "../Components/MapleButton.h"
+
+#include "../PartyCommands.h"
 
 #include "../../Configuration.h"
 #include "../../Gameplay/Stage.h"
 #include "../../Graphics/GraphicsGL.h"
 #include "../../Net/Packets/MessagingPackets.h"
+#include "../../Util/ChatWrap.h"
 #include "../../Util/NxFiles.h"
 
 namespace ms
@@ -76,24 +83,66 @@ namespace ms
 			return message.empty() ? WhisperParseResult::InvalidWhisper : WhisperParseResult::ValidWhisper;
 		}
 
-		// Whether input is /find, with the name it looks for, if any.
+		// v83 compares whisper targets without regard to case (_stricmp).
+		bool same_name(const std::string& a, const std::string& b)
+		{
+			return a.size() == b.size() && std::equal(a.begin(), a.end(), b.begin(),
+				[](unsigned char x, unsigned char y) { return std::tolower(x) == std::tolower(y); });
+		}
+
+		// Whether input is /find, with the name it looks for: whatever
+		// follows the command and one space, if anything (FUN_004a8e3d).
 		bool parse_find_command(const std::string& input, std::string& target)
 		{
-			static const std::string COMMAND = "/find";
+			static const std::string COMMAND = "/find ";
 
-			if (input != COMMAND && input.rfind(COMMAND + " ", 0) != 0)
+			auto same = [](unsigned char a, unsigned char b) { return std::tolower(a) == std::tolower(b); };
+
+			if (input.size() <= COMMAND.size() || !std::equal(COMMAND.begin(), COMMAND.end(), input.begin(), same))
 				return false;
 
-			size_t target_start = input.find_first_not_of(' ', COMMAND.length());
-
-			if (target_start != std::string::npos)
-				target = input.substr(target_start, input.find(' ', target_start) - target_start);
-
+			target = input.substr(COMMAND.size());
 			return true;
 		}
 
+		// Whether input is exactly command, ignoring case, as v83 compares
+		// commands (FUN_004a8def).
+		bool is_command(const std::string& input, const std::string& command)
+		{
+			return input.size() == command.size() && std::equal(input.begin(), input.end(), command.begin(),
+				[](unsigned char a, unsigned char b) { return std::tolower(a) == std::tolower(b); });
+		}
+
+		// v83's /? and /Help (StringPool 0x39a-0x3ac and 0x14c4).
+		constexpr const char* HELP[] = {
+			"----------------- HELP -----------------",
+			"/partyinfo : Show the current party information.",
+			"/makeparty : create a new party",
+			"/leaveparty : If you are a member of the party, it'll let you leave..",
+			"/partyinvite character-name : invite to our party (only for the party leader)",
+			"/partyexpel character-name: Expel someone from the party (only for the party leader)",
+			"/guildinfo : Give information about the guild",
+			"/leaveguild : Quit the guild",
+			"/guildinvite : Invite the user to the guild (only available to the master)",
+			"/guildexpel : Expel the user from the guild (only available to the master)",
+			"/find CharacterName : Give information about the chracter whether he or she is on-line or not.",
+			"/gametrade charactername: Request to trade game items.",
+			"/tradecash Charactername: Request to trade cash items.",
+			"/buddy: Talk to your buddy.",
+			"/party: Talk to party members.",
+			"/guild: Talk to your guild members.",
+			"/whisper charactername: Send a whisper (if no name is written, it'll be directed to your last contact).",
+			"/all: Regular chat, not a whisper.",
+			"* Open up the chat window and press tab, or close the chat window and",
+			"press 1, 2, or 3 to change the group you'd like to talk to."
+		};
+		// A whisper or find unanswered this long no longer holds back the next.
+		constexpr auto WHISPER_WAIT = std::chrono::milliseconds(3000);
+
 		// The original fills the whole log with black at half opacity.
 		constexpr float LOG_ALPHA = 0.5f;
+		// It puts GM chat on a white strip of opacity 0xB0 (FUN_008db070).
+		constexpr float GM_ROW_ALPHA = 0xB0 / 255.0f;
 
 		// The input field, from the status bar's top left
 		constexpr Rectangle<int16_t> CHATFIELD = Rectangle<int16_t>(87, 530, 5, 25);
@@ -101,6 +150,13 @@ namespace ms
 		// The original places a line by the top of its text; text here is
 		// placed this far above that.
 		constexpr int16_t TEXT_RAISE = 7;
+
+		// The original wraps a line at 550 pixels less the scroll bar's
+		// width, and keeps the latest 64 rows (FUN_008db070).
+		constexpr int16_t WRAP_WIDTH = 550;
+		constexpr size_t MAX_ROWS = 64;
+		// Wide enough that measuring a line never wraps it
+		constexpr uint16_t MEASURE_WIDTH = 16'000;
 	}
 
 	UIChatBar::UIChatBar()
@@ -118,6 +174,7 @@ namespace ms
 		drag_pos = 0;
 		held_part = ScrollPart::NONE;
 		edge_dragging = false;
+		whisper_waiting = false;
 
 		// As in the original, a saved height out of bounds is forgotten.
 		int16_t saved_height = static_cast<int16_t>(Setting<ChatHeight>::get().load());
@@ -173,21 +230,53 @@ namespace ms
 							std::string message;
 							WhisperParseResult whisper_result = parse_whisper_command(msg, target, message);
 
-							if (whisper_result == WhisperParseResult::ValidWhisper)
+							if (whisper_result == WhisperParseResult::ValidWhisper
+								&& same_name(target, Stage::get().get_player().get_stats().get_name()))
 							{
-								WhisperPacket(target, message).dispatch();
-								send_chatline("#g" + target + "<<" + message, LineType::WHITE);
+								// v83 refuses before sending anything (FUN_0052c40c).
+								send_chatline("You can't whisper to yourself.", LineType::SKILL);
+							}
+							else if (whisper_result == WhisperParseResult::ValidWhisper)
+							{
+								send_whisper(target, message);
 							}
 							else if (whisper_result == WhisperParseResult::InvalidWhisper)
 							{
 								send_chatline("Usage: /w <name> <message>", LineType::RED);
 							}
+							else if (is_command(msg, "/?") || is_command(msg, "/Help"))
+							{
+								for (const char* line : HELP)
+									send_chatline(line, LineType::YELLOW);
+							}
+							// Like the chat target keys, these only switch the target.
+							else if (is_command(msg, "/party"))
+							{
+								set_target(Target::PARTY);
+							}
+							else if (is_command(msg, "/buddy"))
+							{
+								set_target(Target::BUDDY);
+							}
+							else if (is_command(msg, "/all"))
+							{
+								set_target(Target::ALL);
+							}
 							else if (parse_find_command(msg, target))
 							{
-								if (target.empty())
-									send_chatline("Usage: /find <name>", LineType::RED);
-								else
-									FindPacket(target).dispatch();
+								send_whisper(target, "");
+							}
+							else if (PartyCommands::run(msg))
+							{
+							}
+							// Commands the client doesn't know aren't chat, whatever
+							// the target; v83 sends them only for GMs.
+							else if (msg[0] == '/')
+							{
+							}
+							else if (!flood_guard_allows(msg))
+							{
+								// Refused: nothing is sent or shown.
 							}
 							else if (chat_target == Target::PARTY)
 							{
@@ -197,10 +286,9 @@ namespace ms
 							{
 								send_buddy_chat(msg);
 							}
-							// Commands the client doesn't know aren't chat.
-							else if (msg[0] != '/')
+							else
 							{
-								GeneralChatPacket(msg, true).dispatch();
+								GeneralChatPacket(msg, false).dispatch();
 							}
 
 							lastentered.push_back(msg);
@@ -284,14 +372,18 @@ namespace ms
 
 		for (int16_t i = 0; i < get_logrows(); i++)
 		{
-			auto row = rowtexts.find(rowpos - i);
+			int16_t row = rowpos - i;
 
-			if (row == rowtexts.end())
+			if (row < 0 || row > rowmax)
 				break;
 
 			int16_t top = logbottom - CHATROWHEIGHT * (i + 1);
 
-			row->second.draw(position + Point<int16_t>(3, top - TEXT_RAISE));
+			if (rowtexts[row].highlighted)
+				graphics.drawrectangle(position.x(), position.y() + top, LOG_WIDTH - sbwidth, CHATROWHEIGHT, 1.0f,
+									   1.0f, 1.0f, GM_ROW_ALPHA);
+
+			rowtexts[row].text.draw(position + Point<int16_t>(3, top - TEXT_RAISE));
 		}
 
 		Point<int16_t> bar = position + get_scrollbar_pos();
@@ -328,6 +420,9 @@ namespace ms
 
 		for (auto iter : message_cooldowns)
 			iter.second -= Constants::TIMESTEP;
+
+		if (whisper_waiting && std::chrono::steady_clock::now() - whisper_sent > WHISPER_WAIT)
+			whisper_waiting = false;
 
 		if (held_part != ScrollPart::NONE)
 		{
@@ -498,9 +593,6 @@ namespace ms
 
 	void UIChatBar::send_chatline(const std::string &line, LineType type)
 	{
-		rowmax++;
-		rowpos = rowmax;
-
 		Color::Name color;
 
 		switch (type)
@@ -521,7 +613,7 @@ namespace ms
 				color = Color::Name::PARTYPINK;
 				break;
 			case LineType::BUDDY:
-				color = Color::Name::ORANGE;
+				color = Color::Name::PIZAZZ;
 				break;
 			case LineType::PINK:
 				color = Color::Name::MONALISA;
@@ -529,16 +621,42 @@ namespace ms
 			case LineType::SKILL:
 				color = Color::Name::SUNDOWN;
 				break;
+			case LineType::WHISPER:
+				color = Color::Name::LIGHTGREEN;
+				break;
+			case LineType::GM:
+				color = Color::Name::BLACK;
+				break;
 			default:
 				color = Color::Name::WHITE;
 				break;
 		}
 
-		rowtexts.emplace(
-				std::piecewise_construct,
-				std::forward_as_tuple(rowmax),
-				std::forward_as_tuple(Text::Font::A12M, Text::Alignment::LEFT, color, line)
-		);
+		// The original indents the rows after the first, except for its
+		// notice and error colours.
+		bool indent = type == LineType::UNK0 || type == LineType::WHITE || type == LineType::PARTY ||
+					  type == LineType::BUDDY || type == LineType::WHISPER || type == LineType::GM;
+		int16_t width = WRAP_WIDTH - arrows[Arrow::PREV][0].width();
+
+		auto fit = [&](const std::string& text)
+		{
+			Text measured(Text::Font::A12M, Text::Alignment::LEFT, color, text, MEASURE_WIDTH);
+			size_t count = 0;
+
+			while (count < text.size() && measured.advance(count + 1) <= width)
+				count++;
+
+			return count;
+		};
+
+		for (const auto& row : ChatWrap::wrap(line, indent, fit))
+			rowtexts.push_back({ Text(Text::Font::A12M, Text::Alignment::LEFT, color, row), type == LineType::GM });
+
+		while (rowtexts.size() > MAX_ROWS)
+			rowtexts.pop_front();
+
+		rowmax = static_cast<int16_t>(rowtexts.size()) - 1;
+		rowpos = rowmax;
 	}
 
 	void UIChatBar::display_message(Messages::Type line, UIChatBar::LineType type)
@@ -549,8 +667,9 @@ namespace ms
 		std::string message = Messages::messages[line];
 		send_chatline(message, type);
 
-		bool cost = line == Messages::SKILL_HPCOST || line == Messages::SKILL_MPCOST;
-		message_cooldowns[line] = cost ? COST_MESSAGE_COOLDOWN : MESSAGE_COOLDOWN;
+		bool slow = line == Messages::SKILL_HPCOST || line == Messages::SKILL_MPCOST ||
+			line == Messages::ATTACK_NOWEAPON;
+		message_cooldowns[line] = slow ? COST_MESSAGE_COOLDOWN : MESSAGE_COOLDOWN;
 	}
 
 	void UIChatBar::toggle_chat()
@@ -604,6 +723,7 @@ namespace ms
 		return chatfieldopen;
 	}
 
+	// The labels are v83's chat target list (StringPool 0x312-0x314).
 	void UIChatBar::set_target(Target new_target)
 	{
 		chat_target = new_target;
@@ -611,10 +731,10 @@ namespace ms
 		switch (chat_target)
 		{
 			case Target::PARTY:
-				chattarget_label.change_text("To Party");
+				chattarget_label.change_text("To the party");
 				break;
 			case Target::BUDDY:
-				chattarget_label.change_text("To Buddy");
+				chattarget_label.change_text("To a buddy");
 				break;
 			default:
 				chattarget_label.change_text("To All");
@@ -629,22 +749,70 @@ namespace ms
 		chatfield.change_text("/w " + name + " ");
 	}
 
+	bool UIChatBar::flood_guard_allows(const std::string& line)
+	{
+		auto now = std::chrono::duration_cast<std::chrono::milliseconds>(
+			std::chrono::steady_clock::now().time_since_epoch()).count();
+
+		switch (flood_guard.check(line, now))
+		{
+			case ChatFloodGuard::Result::SEND:
+				return true;
+			case ChatFloodGuard::Result::REPEATED:
+				UI::get().emplace<UIOk>("Repeating the same line over and over\\ncan negatively affect other users.", [](bool) {});
+				break;
+			case ChatFloodGuard::Result::TOO_FAST:
+				UI::get().emplace<UIOk>("Too much chatting can disrupt\\nother players' ability to play the game.", [](bool) {});
+				break;
+			case ChatFloodGuard::Result::MUTED:
+				break;
+		}
+
+		return false;
+	}
+
+	void UIChatBar::send_whisper(const std::string& name, const std::string& message)
+	{
+		if (name == Stage::get().get_player().get_stats().get_name())
+			return;
+
+		if (whisper_waiting)
+			return send_chatline("Please try again.", LineType::SKILL);
+
+		if (message.empty())
+			FindPacket(name).dispatch();
+		else
+			WhisperPacket(name, message).dispatch();
+
+		// The line "name<< message" waits for the server's answer.
+		whisper_waiting = true;
+		whisper_sent = std::chrono::steady_clock::now();
+		whisper_message = message;
+	}
+
+	std::string UIChatBar::whisper_answered()
+	{
+		whisper_waiting = false;
+		return whisper_message;
+	}
+
 	void UIChatBar::send_party_chat(const std::string& message)
 	{
 		Player& player = Stage::get().get_player();
 		const Party& party = player.get_party();
 
-		if (!party.exists())
-		{
-			send_chatline("You are not in a party.", LineType::RED);
-			return;
-		}
-
 		std::vector<int32_t> recipients;
 
 		for (auto& member : party.get_members())
-			if (member.id != player.get_oid())
+			if (member.id != player.get_oid() && member.online())
 				recipients.push_back(member.id);
+
+		// v83 sends party chat only to members logged on (FUN_00a3f975).
+		if (recipients.empty())
+		{
+			send_chatline("Either the party doesn't exist or no member of your party is logged on.", LineType::SKILL);
+			return;
+		}
 
 		MultiChatPacket(MultiChatPacket::Mode::PARTY, recipients, message).dispatch();
 
@@ -659,7 +827,7 @@ namespace ms
 
 		if (recipients.empty())
 		{
-			send_chatline("None of your buddies are online.", LineType::RED);
+			send_chatline("You have no buddy available for chat.", LineType::SKILL);
 			return;
 		}
 

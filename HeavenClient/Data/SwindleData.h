@@ -17,33 +17,17 @@
 //////////////////////////////////////////////////////////////////////////////////
 #pragma once
 
-#include <cstdint>
-
-#include "../../Graphics/Geometry.h"
-#include "../../Template/Interpolated.h"
+#include <optional>
+#include <string>
 
 namespace ms
 {
-	// A transparent rectangle with icon size (30x30)
-	class IconCover
+	// v83's scam warning (FUN_007a09ca): chat with a word from
+	// Etc/Swindle.img gets one of that entry's warnings, at most once every
+	// ten seconds.
+	namespace SwindleData
 	{
-	public:
-		enum Type
-		{
-			BUFF,
-			COOLDOWN
-		};
-
-		IconCover(Type type, int32_t duration);
-
-		void draw(Point<int16_t> position, float alpha) const;
-
-		void update();
-
-	private:
-		ColorBox cover;
-		Linear<float> yscale;
-		float scalestep;
-		Type type;
-	};
+		// The warning to print after this chat line, if any.
+		std::optional<std::string> warning(const std::string& message);
+	}
 }

@@ -70,7 +70,10 @@ namespace ms
 	class UIYesNo : public UINotice
 	{
 	public:
-		UIYesNo(std::string message, std::function<void(bool yes)> yesnohandler, Text::Alignment alignment);
+		// With several asks, Yes only gives its answer after that many
+		// presses; No or Escape answers at once.
+		UIYesNo(std::string message, std::function<void(bool yes)> yesnohandler, Text::Alignment alignment,
+				uint8_t asks = 1);
 
 		UIYesNo(std::string message, std::function<void(bool yes)> yesnohandler);
 
@@ -89,7 +92,11 @@ namespace ms
 			YES, NO
 		};
 
+		// Returns whether the notice closed.
+		bool answer(bool yes);
+
 		std::function<void(bool yes)> yesnohandler;
+		uint8_t asks;
 	};
 
 	class UIEnterNumber : public UINotice

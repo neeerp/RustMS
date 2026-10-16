@@ -68,6 +68,7 @@ namespace ms
 		playable = player;
 
 		start = ContinuousTimer::get().start();
+		emote_cooldown = {};
 
 		CharStats stats = player.get_stats();
 		levelBefore = stats.get_stat(MapleStat::Id::LEVEL);
@@ -310,7 +311,7 @@ namespace ms
 				player.use_item(action);
 				break;
 			case KeyType::Id::FACE:
-				if (down)
+				if (down && emote_cooldown.try_start(get_uptime() / 1000))
 				{
 					player.set_expression(action);
 					// v83 numbers emotes from F1's action (100) as 1.
