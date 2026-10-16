@@ -11,8 +11,8 @@ namespace ms
 	class ExclRequest
 	{
 	public:
-		// Milliseconds a pickup, an item use or meso drop, a skill that
-		// doesn't attack, and anything else (moving, gathering and sorting
+		// Milliseconds a pickup, an item use, meso drop or chair, a skill
+		// that doesn't attack, and anything else (moving, gathering and sorting
 		// items, AP and SP) wait.
 		static constexpr int32_t PICKUP_WAIT = 30;
 		static constexpr int32_t USE_WAIT = 200;
