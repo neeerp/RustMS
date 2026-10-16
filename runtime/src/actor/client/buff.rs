@@ -10,7 +10,7 @@ impl ClientActor {
         Some(tokio::time::Instant::from_std(deadline))
     }
 
-    /// Heal from Recovery and end the buffs that ran out.
+    /// Heal from Recovery and end the buffs and cooldowns that ran out.
     pub(super) async fn update_buffs(&mut self) -> Result<(), RuntimeError> {
         let player = &mut self.in_game_mut()?.player;
         let tick = player.buffs.advance(std::time::Instant::now());
@@ -22,6 +22,9 @@ impl ClientActor {
         }
         if !tick.expired.is_empty() {
             packets.push(buff::build_cancel_buff(&tick.expired)?);
+        }
+        for skill_id in tick.cooled {
+            packets.push(buff::build_cooldown(skill_id, 0)?);
         }
         self.send_all(&mut packets).await
     }

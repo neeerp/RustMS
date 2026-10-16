@@ -44,10 +44,7 @@ namespace ms
 
 	void SetFieldHandler::transition(int32_t mapid, uint8_t portalid) const
 	{
-		float fadestep = 0.025f;
-
 		Window::get().fadeout(
-			fadestep,
 			[mapid, portalid]()
 			{
 				GraphicsGL::get().clear();
@@ -97,6 +94,9 @@ namespace ms
 		// every frame.
 		if (auto statsinfo = UI::get().get_element<UIStatsInfo>())
 			statsinfo->update_stat(MapleStat::Id::HP);
+
+		// A request still waiting is forgotten in the new field.
+		Stage::get().get_player().clear_request();
 
 		transition(mapid, portalid);
 	}

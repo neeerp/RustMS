@@ -77,6 +77,7 @@ namespace ms
 			QUESTCOMPLETE,
 			PARTYHP,
 			MONSTERBOOK,
+			REVIVE,
 			NUM_TYPES
 		};
 
@@ -139,10 +140,26 @@ namespace ms
 		virtual bool button_covered(uint16_t buttonid, Point<int16_t> cursorpos) const
 		{ return false; }
 
+		// Whether a button pressed here waits for the mouse to come back up.
+		bool is_holding_button() const
+		{ return holding; }
+
 		std::map<uint16_t, std::unique_ptr<Button>> buttons;
 		std::vector<Sprite> sprites;
 		Point<int16_t> position;
 		Point<int16_t> dimension;
 		bool active;
+
+	private:
+		// Click the button and return the cursor's state after.
+		Cursor::State click_button(uint16_t buttonid);
+
+		bool button_under(uint16_t buttonid, Point<int16_t> pos) const;
+
+		// Let go of the pressed button without clicking it.
+		void release_button();
+
+		bool holding = false;
+		uint16_t held_button = 0;
 	};
 }

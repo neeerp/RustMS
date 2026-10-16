@@ -307,6 +307,9 @@ impl FieldActor {
             target.handle.send(ServerMessage::CharInfoRequested {
                 requester: requester.handle.clone(),
             });
+        } else if let Ok(packet) = net::packet::build::world::stat::build_stat_update(true, &[]) {
+            // Unlock the client, which waits on CHAR_INFO otherwise.
+            requester.handle.send_packet(packet);
         }
     }
 
@@ -955,7 +958,8 @@ mod tests {
         next_opcode(&mut first_rx).await;
         next_opcode(&mut second_rx).await;
 
-        // Character 3 is not here, so only the request for 2 reaches anyone.
+        // Character 3 is not here, so only the request for 2 reaches anyone;
+        // the requester is unlocked instead.
         for character_id in [3, 2] {
             field
                 .send(FieldMessage::FromClient {
@@ -973,6 +977,10 @@ mod tests {
             ServerMessage::CharInfoRequested { requester } => assert_eq!(requester.client_id, 1),
             other => panic!("expected a char info request, got {other:?}"),
         }
+        assert_eq!(
+            next_opcode(&mut first_rx).await,
+            SendOpcode::StatChange as i16
+        );
         assert!(first_rx.try_recv().is_err());
     }
 }

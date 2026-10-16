@@ -268,7 +268,12 @@ namespace ms
 
 		double ground = nextfh.ground_below(x);
 
-		if (phobj.vspeed == 0.0 && checkslope)
+		if (phobj.vspeed == 0.0 && checkslope && phobj.fhid == curfh.id())
+		{
+			// v83 moves a grounded object along its foothold (FUN_007f13de),
+			// so it stays on the line, even on the tick it stops on a slope.
+			phobj.y = ground;
+		} else if (phobj.vspeed == 0.0 && checkslope)
 		{
 			double vdelta = abs(phobj.fhslope);
 
