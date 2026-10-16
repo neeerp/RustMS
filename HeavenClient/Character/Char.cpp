@@ -52,13 +52,15 @@ namespace ms
 		if (state == State::DIED)
 		{
 			// The ghost floats in front of its tombstone, circling it from the top.
-			tomb.draw(absp - Point<int16_t>(0, tomb_drop), alpha);
+			float falling = std::max(TOMB_FALL - (tomb_tick + alpha), 0.0f);
+			int16_t drop = static_cast<int16_t>(std::lround(TOMB_DROP * falling / TOMB_FALL));
+			tomb.draw(absp - Point<int16_t>(0, drop), alpha);
 			color = color * Color(1.0f, 1.0f, 1.0f, ghost_opacity.get(alpha));
 
 			float angle = 6.2831853f * (ghost_tick + alpha) / GHOST_LAP;
 			absp = absp + Point<int16_t>(
 				static_cast<int16_t>(std::lround(GHOST_RADIUS * std::sin(angle))),
-				static_cast<int16_t>(std::lround(-GHOST_RADIUS * std::cos(angle))));
+				static_cast<int16_t>(std::lround(-GHOST_RISE - GHOST_RADIUS * std::cos(angle))));
 		}
 
 		bool on_chair = chair && state == State::SIT;
@@ -127,7 +129,9 @@ namespace ms
 
 		if (state == State::DIED)
 		{
-			tomb_drop = std::max<int16_t>(tomb_drop - TOMB_SPEED, 0);
+			if (tomb_tick < TOMB_FALL)
+				tomb_tick++;
+
 			ghost_opacity += GHOST_FADE;
 			ghost_tick = (ghost_tick + 1) % GHOST_LAP;
 
@@ -367,7 +371,7 @@ namespace ms
 		if (st == State::DIED && state != State::DIED)
 		{
 			tomb = tomb_fall;
-			tomb_drop = TOMB_DROP;
+			tomb_tick = 0;
 			tomb_landed = false;
 			ghost_opacity.set(0.0f);
 			ghost_tick = 0;
