@@ -22,34 +22,14 @@
 #include "../UIElement.h"
 #include "../Constants.h"
 
-#include "../Components/IconCover.h"
+#include "../Components/BuffRow.h"
 #include "../Graphics/Texture.h"
-
-#include <unordered_map>
 
 namespace ms
 {
-	class BuffIcon
-	{
-	public:
-		BuffIcon(int32_t buff, int32_t dur);
-
-		void draw(Point<int16_t> position, float alpha) const;
-
-		bool update();
-
-	private:
-		static const uint16_t FLASH_TIME = 3'000;
-
-		Texture icon;
-		IconCover cover;
-		int32_t buffid;
-		int32_t duration;
-		Linear<float> opacity;
-		float opcstep;
-	};
-
-
+	// v83's buff icons in the top right (FUN_007b2bb0): 32x32 cells ending
+	// 3 px from the right edge at y 23. Each has IconBase/0 under the
+	// buff's raw icon, centred, with the timer's CoolTime frame on top.
 	class UIBuffList : public UIElement
 	{
 	public:
@@ -69,9 +49,15 @@ namespace ms
 
 		UIElement::Type get_type() const override;
 
-		void add_buff(int32_t buffid, int32_t duration);
+		// Item buffs have negative ids.
+		void add_buff(int32_t buffid, int32_t stat, int32_t duration);
+		void cancel_buff(int32_t stat);
 
 	private:
-		std::unordered_map<int32_t, BuffIcon> icons;
+		static constexpr int16_t CELL = 32;
+
+		BuffRow<Texture> row;
+		Texture base;
+		Texture shadows[BuffTimer::SHADOWS];
 	};
 }

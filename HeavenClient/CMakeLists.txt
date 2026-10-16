@@ -57,6 +57,8 @@ if(HEAVENCLIENT_BUILD_TESTS)
     add_test(NAME keyboard COMMAND keyboard_tests)
     add_executable(touch_damage_tests tests/touch_damage.cpp)
     add_test(NAME touch_damage COMMAND touch_damage_tests)
+    add_executable(buff_row_tests tests/buff_row.cpp)
+    add_test(NAME buff_row COMMAND buff_row_tests)
     add_executable(damage_layout_tests tests/damage_layout.cpp)
     add_test(NAME damage_layout COMMAND damage_layout_tests)
     add_executable(shop_list_tests tests/shop_list.cpp Net/InPacket.cpp)
@@ -302,6 +304,7 @@ add_executable(HeavenClient
     Graphics/Texture.h
     IO/Components/AreaButton.cpp
     IO/Components/AreaButton.h
+    IO/Components/BuffRow.h
     IO/Components/Button.cpp
     IO/Components/Button.h
     IO/Components/Charset.cpp
@@ -319,8 +322,6 @@ add_executable(HeavenClient
     IO/Components/Gauge.h
     IO/Components/Icon.cpp
     IO/Components/Icon.h
-    IO/Components/IconCover.cpp
-    IO/Components/IconCover.h
     IO/Components/ItemTooltip.cpp
     IO/Components/ItemTooltip.h
     IO/Components/MapleButton.cpp
