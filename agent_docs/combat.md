@@ -119,7 +119,11 @@ SHOW_MONSTER_HP shows the mob's HP bar and name tag in HeavenClient
 (`Mob::show_hp`) for 5 s, as v83 hides them 5 s after the player's last hit.
 The bar is v83's 52x10 box (`MobHpBar`), centred over the frame's body rect
 with its top 30 px above the rect's top. Party members' bars use the same box
-filled red.
+filled red. As in v83, the name is orange for a mob 20 or more levels above
+the player, yellow for one 20 or more below, and white otherwise. A "Lv. N"
+tag (`Basic.img/ShowLevel`) sits left of the name, except for bosses, mobs
+whose `info` hides their level, HP or name, and 9xxxxxx mobs outside 94xxxxx
+and 96xxxxx.
 
 A dead mob's EXP is shared by damage dealt (the top damager gets any
 rounding remainder) and each share goes to that player's client actor

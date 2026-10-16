@@ -196,7 +196,7 @@ namespace ms
 		void draw_hp_bar(Point<int16_t> position) const;
 
 		// Load the level tag in one of ShowLevel's sets: 0 white, 1 yellow,
-		// 2 red.
+		// 2 orange.
 		void set_level_tag(uint8_t set);
 
 		std::map<Stance, Animation> animations;
@@ -228,6 +228,9 @@ namespace ms
 		Text namelabel;
 		// "Lv. N", drawn left of the name tag (Basic.img/ShowLevel).
 		std::vector<Texture> leveltag;
+		// v83 skips the tag for bosses, mobs that hide their level, HP or
+		// name, and 9xxxxxx mobs outside 94xxxxx and 96xxxxx.
+		bool showleveltag;
 		MobHpBar hpbar;
 		Randomizer randomizer;
 
