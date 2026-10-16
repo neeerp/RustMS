@@ -76,6 +76,13 @@ namespace ms
 		// How far in front of the user a whack in this stance reaches.
 		static int16_t get_whack_reach(const Char &user, Stance::Id stance);
 
+		// How far in front of the player their shot with this attack reaches.
+		int16_t get_shot_range(const Attack &attack) const;
+
+		// The mob a shot from `origin` toward `end_x` hits: the first one in
+		// its path, as it widens away from the player.
+		std::vector<int32_t> find_shot_target(Point<int16_t> origin, int16_t end_x) const;
+
 		std::vector<int32_t>
 		find_targets(MapObjects *objs, Rectangle<int16_t> range, Point<int16_t> origin, uint8_t objcount,
 					 bool use_mobs, bool closest_first) const;

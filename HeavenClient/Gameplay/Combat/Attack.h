@@ -58,6 +58,8 @@ namespace ms
 		uint8_t speed = 0;
 		uint8_t stance = 0;
 		int32_t skill = 0;
+		// How far the skill's shot reaches, if it says.
+		int16_t shotrange = 0;
 		int32_t bullet = 0;
 
 		Point<int16_t> origin;

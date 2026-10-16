@@ -45,6 +45,35 @@ int main()
 		require(bullet_delay(2060000, 3111006, 3) == 180, "Strafe's arrows leave 60 ms apart");
 		require(bullet_delay(2330000, 5001003, 1) == 240, "Double Shot's bullets leave 240 ms apart");
 
+		require(range_skill(Weapon::Type::BOW, 320) == 3000002, "a hunter's bow reaches further with Eye of Amazon");
+		require(range_skill(Weapon::Type::CROSSBOW, 1310) == 13000001, "a wind archer's uses the Cygnus one");
+		require(range_skill(Weapon::Type::CLAW, 410) == 4000001, "a claw reaches further with Keen Eyes");
+		require(range_skill(Weapon::Type::GUN, 510) == 0, "a gun has no range skill");
+
+		require(range(0, 0, Weapon::Type::BOW, 120) == 420, "a bow reaches 300 px plus Eye of Amazon's range");
+		require(range(0, 0, Weapon::Type::CLAW, 0) == 200, "a claw reaches 200 px without Keen Eyes");
+		require(range(0, 0, Weapon::Type::GUN, 100) == 200, "a gun always reaches 200 px");
+		require(range(5001003, 350, Weapon::Type::GUN, 0) == 350, "a skill's own range wins");
+		require(range(0, 0, Weapon::Type::SWORD_1H, 0) == 0, "a sword shoots nowhere");
+
+		std::vector<Rectangle<int16_t>> steps = search_steps(100, { 165, 172 }, 300);
+		require(steps.size() == 7, "a shot searches 20 px steps up to its range");
+		require(steps[0].left() == 165 && steps[0].right() == 185, "the first step starts at the shot's origin");
+		require(steps[0].top() == 156 && steps[0].bottom() == 188, "it reaches 1 px up and down per 4 px from the user");
+		require(steps[6].left() == 285 && steps[6].right() == 300, "the last step stops at the range");
+		require(steps[6].top() == 126 && steps[6].bottom() == 218, "the steps widen further away");
+
+		steps = search_steps(100, { 100, 172 }, -100);
+		require(steps.size() == 10, "a skill's shot to the left starts at the user");
+		require(steps[0].left() == 80 && steps[0].right() == 100, "the first step is left of the user");
+		require(steps[0].top() == 172 && steps[0].bottom() == 172, "and empty");
+		require(steps[1].top() == 167 && steps[1].bottom() == 177, "the next is 5 px each way");
+
+		require(!in_step(steps[0], { 70, 110, 100, 200 }), "nothing is in an empty step");
+		require(in_step(steps[1], { 50, 70, 176, 200 }), "a body overlapping a step is in it");
+		require(!in_step(steps[1], { 50, 70, 177, 200 }), "a body only touching a step's bottom is not");
+		require(!in_step(steps[1], { 40, 60, 100, 200 }), "a body only touching its side is not");
+
 		std::cout << "Shot path passed\n";
 		return 0;
 	}
