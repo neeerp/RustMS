@@ -34,6 +34,8 @@ pub enum RecvOpcode {
     CancelChair = 0x2A,
     UseChair = 0x2B,
     CloseRangeAttack = 0x2C,
+    RangedAttack = 0x2D,
+    MagicAttack = 0x2E,
     TakeDamage = 0x30,
     AllChat = 0x31,
     MultiChat = 0x77,

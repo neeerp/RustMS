@@ -51,6 +51,8 @@ pub enum SendOpcode {
     PlayerHint = 0xD6,
     MovePlayer = 0xB9,
     CloseRangeAttack = 0xBA,
+    RangedAttack = 0xBB,
+    MagicAttack = 0xBC,
     DamagePlayer = 0xC0,
     FacialExpression = 0xC1,
     ShowForeignEffect = 0xC6,
