@@ -26,6 +26,7 @@ namespace ms
 					"Enchant/Success",
 					"Enchant/Failure",
 					"MonsterBook/cardGet",
-					"QuestClear"
+					"QuestClear",
+					"Teleport"
 			};
 }
