@@ -110,7 +110,21 @@ namespace ms
 	void PlayerStandState::update_state(Player &player) const
 	{
 		if (!player.get_phobj().onground)
+		{
 			player.set_state(Char::State::FALL);
+			return;
+		}
+
+		// v83 picks the stance from the arrows held (FUN_00936d99), so an
+		// arrow still held when an attack ends walks on.
+		bool left = player.is_key_down(KeyAction::Id::LEFT);
+		bool right = player.is_key_down(KeyAction::Id::RIGHT);
+
+		if (!player.is_attacking() && left != right)
+		{
+			player.set_direction(right);
+			player.set_state(Char::State::WALK);
+		}
 	}
 
 	// Walking
@@ -153,7 +167,16 @@ namespace ms
 	void PlayerWalkState::update(Player &player) const
 	{
 		if (!player.is_attacking() && haswalkinput(player))
+		{
+			// Letting go of one of two arrows walks the way of the other.
+			bool left = player.is_key_down(KeyAction::Id::LEFT);
+			bool right = player.is_key_down(KeyAction::Id::RIGHT);
+
+			if (left != right)
+				player.set_direction(right);
+
 			player.get_phobj().walkdir = player.getflip() ? 1 : -1;
+		}
 
 		if (player.get_phobj().enablejd == false)
 			player.get_phobj().set_flag(PhysicsObject::Flag::CHECKBELOW);
@@ -163,7 +186,9 @@ namespace ms
 	{
 		if (player.get_phobj().onground)
 		{
-			if (!haswalkinput(player) || player.get_phobj().hspeed == 0.0f)
+			// v83 (FUN_00936d99) walks while an arrow is held on a foothold,
+			// even when a wall stops the player.
+			if (!haswalkinput(player))
 				player.set_state(Char::State::STAND);
 		} else
 		{
