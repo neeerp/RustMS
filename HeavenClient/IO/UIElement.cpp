@@ -121,7 +121,14 @@ namespace ms
 					{
 						Sound(Sound::Name::BUTTONCLICK).play();
 
-						btit.second->set_state(button_pressed(btit.first));
+						Button::State state = button_pressed(btit.first);
+
+						// v83 puts a clicked button back under the cursor, so
+						// the next click needs no fresh hover (FUN_004c107d).
+						if (state == Button::State::NORMAL && active && btit.second->is_active())
+							state = Button::State::MOUSEOVER;
+
+						btit.second->set_state(state);
 
 						ret = Cursor::State::IDLE;
 					} else
