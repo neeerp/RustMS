@@ -95,12 +95,19 @@ namespace ms
 
 		Rectangle<int16_t> bounds() const;
 
+		// The box v83 checks touch portals against every update
+		// (FUN_00712b61, FindPortal_Collision): hRange by vRange centred on
+		// the portal, with the right and bottom edges excluded.
+		Rectangle<int16_t> range_bounds() const;
+
+		// The box the Up key finds a portal in (v83 FUN_00712ab1): 20 px
+		// either side and 50 px above and below, without the right and
+		// bottom edges.
+		Rectangle<int16_t> warp_bounds() const;
+
 		WarpInfo getwarpinfo() const;
 
 	private:
-		// The original's CPortalList::FindPortal_Collision box: hRange by vRange
-		// centred on the portal, with the right and bottom edges excluded.
-		Rectangle<int16_t> touch_bounds() const;
 
 		const Animation *animation;
 		Type type;
