@@ -536,9 +536,7 @@ namespace ms
 
 	void UISkillBook::spend_sp(int32_t skill_id)
 	{
-		SpendSpPacket(skill_id).dispatch();
-
-		UI::get().disable();
+		Stage::get().get_player().request(SpendSpPacket(skill_id), ExclRequest::WAIT);
 	}
 
 	Job::Level UISkillBook::joblevel_by_tab(uint16_t t) const

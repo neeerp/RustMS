@@ -30,10 +30,7 @@
 
 namespace ms
 {
-	MapDrops::MapDrops()
-	{
-		lootenabled = false;
-	}
+	MapDrops::MapDrops() = default;
 
 	void MapDrops::init()
 	{
@@ -87,8 +84,6 @@ namespace ms
 			mesoicon.update();
 
 		drops.update(physics);
-
-		lootenabled = true;
 	}
 
 	void MapDrops::spawn(DropSpawn &&spawn)
@@ -109,16 +104,12 @@ namespace ms
 
 	MapDrops::Loot MapDrops::find_loot_at(Point<int16_t> playerpos, int32_t self, int32_t party)
 	{
-		if (!lootenabled)
-			return {0, {}};
-
 		for (auto &mmo : drops)
 		{
 			Optional<Drop> drop = mmo.second.get();
 
 			if (drop && drop->lootable(playerpos, self, party))
 			{
-				lootenabled = false;
 				drop->try_loot();
 
 				int32_t oid = mmo.first;

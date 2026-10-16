@@ -72,7 +72,6 @@ namespace ms
 		};
 
 		std::array<Animation, MesoIcon::NUM_ICONS> mesoicons;
-		bool lootenabled;
 
 		std::queue<DropSpawn> spawns;
 	};

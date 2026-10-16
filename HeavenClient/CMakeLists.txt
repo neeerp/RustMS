@@ -68,6 +68,8 @@ if(HEAVENCLIENT_BUILD_TESTS)
     add_executable(char_click_tests tests/char_click.cpp)
     target_include_directories(char_click_tests PRIVATE ${PROJECT_SOURCE_DIR}/libs/NoLifeNx)
     add_test(NAME char_click COMMAND char_click_tests)
+    add_executable(excl_request_tests tests/excl_request.cpp)
+    add_test(NAME excl_request COMMAND excl_request_tests)
     add_executable(portal_touch_tests tests/portal_touch.cpp Gameplay/MapleMap/Portal.cpp)
     target_include_directories(portal_touch_tests PRIVATE
         ${PROJECT_SOURCE_DIR}/libs/NoLifeNx ${PROJECT_SOURCE_DIR}/libs/glad/build/include)

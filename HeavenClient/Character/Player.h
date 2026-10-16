@@ -21,6 +21,7 @@
 
 #include "ActiveBuffs.h"
 #include "BuddyList.h"
+#include "ExclRequest.h"
 #include "MonsterBook.h"
 #include "Party.h"
 #include "PassiveBuffs.h"
@@ -36,6 +37,7 @@
 #include "../Gameplay/MapleMap/Layer.h"
 #include "../Gameplay/MapleMap/MapInfo.h"
 #include "../Gameplay/Physics/Physics.h"
+#include "../Net/OutPacket.h"
 
 namespace ms
 {
@@ -79,6 +81,21 @@ namespace ms
 
 		// Use the item from the player's inventory with the given id.
 		void use_item(int32_t itemid);
+
+		// Whether an item or stat request may go to the server now: the
+		// player is alive, no request waits on an answer, and wait
+		// milliseconds have passed since the last request or answer.
+		bool can_request(int32_t wait) const;
+
+		// Send the request if it may go now, and note that it waits on its
+		// answer. Return whether it went.
+		bool request(OutPacket &&packet, int32_t wait);
+
+		// Note the server answered, as an update with its first byte set does.
+		void request_answered();
+
+		// Forget a request waiting on its answer, as entering a field does.
+		void clear_request();
 
 		// Return if the player is attacking
 		bool is_attacking() const;
@@ -277,6 +294,8 @@ namespace ms
 		PassiveBuffs passive_buffs;
 
 		std::unordered_map<int32_t, int32_t> cooldowns;
+
+		ExclRequest excl;
 
 		std::map<KeyAction::Id, bool> keysdown;
 

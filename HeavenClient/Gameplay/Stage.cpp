@@ -260,11 +260,15 @@ namespace ms
 
 	void Stage::check_drops()
 	{
+		// The v83 client looks for a drop only when it may ask for one.
+		if (!player.can_request(ExclRequest::PICKUP_WAIT))
+			return;
+
 		Point<int16_t> playerpos = player.get_position();
 		MapDrops::Loot loot = drops.find_loot_at(playerpos, player.get_oid(), player.get_party().get_id());
 
 		if (loot.first)
-			PickupItemPacket(loot.first, loot.second).dispatch();
+			player.request(PickupItemPacket(loot.first, loot.second), ExclRequest::PICKUP_WAIT);
 	}
 
 	void Stage::send_key(KeyType::Id type, int32_t action, bool down)

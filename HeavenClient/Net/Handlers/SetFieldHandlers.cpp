@@ -98,6 +98,9 @@ namespace ms
 		if (auto statsinfo = UI::get().get_element<UIStatsInfo>())
 			statsinfo->update_stat(MapleStat::Id::HP);
 
+		// A request still waiting is forgotten in the new field.
+		Stage::get().get_player().clear_request();
+
 		transition(mapid, portalid);
 	}
 
