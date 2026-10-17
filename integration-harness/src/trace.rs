@@ -116,6 +116,8 @@ pub struct Trace {
     pub cancelled_buffs: Vec<i64>,
     /// COOLDOWN: (skill id, seconds).
     pub cooldowns: Vec<(i32, i16)>,
+    /// SKILL_LEARN_ITEM_RESULT: (reader, skill, master level, used, success).
+    pub books: Vec<(i32, i32, i32, bool, bool)>,
     /// Mobs and drops on the current field.
     pub field: Field,
 }
@@ -180,6 +182,19 @@ impl Trace {
                 values.insert(bit, value);
             }
             self.stat_updates.push(values);
+        } else if op == SendOpcode::SkillBookResult as i16 {
+            let reader = r.read_int().unwrap();
+            r.read_byte().unwrap();
+            let skill_id = r.read_int().unwrap();
+            let master_level = r.read_int().unwrap();
+            let used = r.read_byte().unwrap() != 0;
+            self.books.push((
+                reader,
+                skill_id,
+                master_level,
+                used,
+                r.read_byte().unwrap() != 0,
+            ));
         } else if op == SendOpcode::UpdateSkills as i16 {
             r.read_byte().unwrap();
             for _ in 0..r.read_short().unwrap() {

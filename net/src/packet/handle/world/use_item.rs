@@ -1,11 +1,15 @@
-use crate::handler::{HandlerResult, WorldAction, WorldContext, WorldHandler, WorldResult};
+use crate::handler::{
+    FieldRequest, HandlerResult, WorldAction, WorldContext, WorldHandler, WorldResult,
+};
 use crate::items;
+use crate::packet::build::world::skill::{self, BookResult};
 use crate::packet::build::world::stat::StatUpdate;
 use crate::packet::build::world::{inventory, stat};
 use crate::skills;
 use game::inventory::equip_slot;
-use game::{InventoryType, Player};
+use game::{InventoryChange, InventoryType, Player, SkillRecord};
 use packet::{io::read::PktRead, Packet};
+use rand::Rng;
 use std::io::Cursor;
 use tracing::debug;
 
@@ -56,6 +60,100 @@ fn use_item(player: &mut Player, slot: i16, item_id: i32) -> Option<Vec<game::In
     player.add_hp(spec.hp + max_hp * spec.hp_r / 100);
     player.add_mp(spec.mp + max_mp * spec.mp_r / 100);
     Some(changes)
+}
+
+/// `USE_SKILL_BOOK` (0x52, v83 FUN_00a0a1b2): tick, slot in the USE bag,
+/// item id. The book raises the master level of its skill for the reader's
+/// job (OdinMS family: the job must match, the skill must be at
+/// `reqSkillLevel` and below the book's master level). A usable book is spent
+/// whether or not it works. Everyone on the map sees the result.
+pub struct UseSkillBookHandler;
+
+impl WorldHandler for UseSkillBookHandler {
+    fn handle(&self, packet: &mut Packet, ctx: &mut WorldContext) -> WorldResult {
+        let mut reader = Cursor::new(&packet.bytes);
+        reader.read_short()?;
+        reader.read_int()?; // client tick
+        let slot = reader.read_short()?;
+        let item_id = reader.read_int()?;
+        let Some(read) = read_book(ctx.player, slot, item_id, |success| {
+            rand::thread_rng().gen_range(0, 100) < success
+        }) else {
+            debug!(slot, item_id, "Skill book use refused");
+            return Ok(HandlerResult::reply(stat::build_stat_update(true, &[])?));
+        };
+        let mut result = HandlerResult::empty();
+        if !read.changes.is_empty() {
+            result = result.with_reply(inventory::build_inventory_operation(true, &read.changes)?);
+        }
+        if let Some(record) = &read.record {
+            result = result.with_reply(skill::build_update_skill(record)?);
+        }
+        let shown = skill::build_skill_book_result(&read.result)?;
+        Ok(result
+            .with_reply(shown.clone())
+            .with(WorldAction::Field(FieldRequest::Broadcast(shown))))
+    }
+}
+
+struct BookRead {
+    result: BookResult,
+    changes: Vec<InventoryChange>,
+    /// The skill with its new master level, when the book worked.
+    record: Option<SkillRecord>,
+}
+
+/// Read the skill or mastery book in `slot`; `works(success)` rolls the
+/// book's percent chance. `None` when there is no such book there.
+fn read_book(
+    player: &mut Player,
+    slot: i16,
+    item_id: i32,
+    works: impl FnOnce(i32) -> bool,
+) -> Option<BookRead> {
+    if player.inventory.get(InventoryType::Use, slot)?.item_id != item_id {
+        return None;
+    }
+    let book = items::info(item_id)?.book?;
+    let mut read = BookRead {
+        result: BookResult {
+            character_id: player.id(),
+            mastery: item_id / 10_000 == 229,
+            skill_id: 0,
+            master_level: 0,
+            used: false,
+            success: false,
+        },
+        changes: Vec::new(),
+        record: None,
+    };
+    let job = i32::from(player.stats.job);
+    let Some(&skill_id) = book.skills.iter().find(|&&skill| skill / 10_000 == job) else {
+        return Some(read);
+    };
+    read.result.skill_id = skill_id;
+    read.result.master_level = book.master_level;
+    let mut record = player.skills.get(skill_id).cloned().unwrap_or(SkillRecord {
+        skill_id,
+        level: 0,
+        master_level: 0,
+        expiration: None,
+    });
+    if record.level < book.req_skill_level || record.master_level >= book.master_level {
+        return Some(read);
+    }
+    read.changes = player
+        .inventory_mut()
+        .take(InventoryType::Use, slot, 1)
+        .ok()?;
+    read.result.used = true;
+    if works(book.success) {
+        record.master_level = book.master_level;
+        player.skills.set(record.clone());
+        read.result.success = true;
+        read.record = Some(record);
+    }
+    Some(read)
 }
 
 /// `HEAL_OVER_TIME`: the client's periodic natural recovery. The runtime
@@ -166,6 +264,88 @@ mod tests {
         );
         assert_eq!(player.stats.hp, 50);
         assert!(player.inventory.get(InventoryType::Use, 3).is_none());
+    }
+
+    fn hero_with_book(slot: i16, item_id: i32) -> Player {
+        let mut player = crate::codec::stats::sample_player();
+        player.stats.job = 112;
+        player
+            .inventory
+            .insert(InventoryType::Use, slot, Item::stack(item_id, 1));
+        player
+    }
+
+    fn skill(player: &Player, skill_id: i32) -> (i32, i32) {
+        player
+            .skills
+            .get(skill_id)
+            .map_or((0, 0), |s| (s.level, s.master_level))
+    }
+
+    #[test]
+    fn a_mastery_book_needs_its_skill_level_then_raises_the_master_level() {
+        if items::data().is_err() {
+            return;
+        }
+        // Mastery Book 2290000: Monster Magnet for Heroes, Paladins and Dark
+        // Knights to master level 20 from skill level 5, 70%.
+        let mut player = hero_with_book(2, 2290000);
+        let read = read_book(&mut player, 2, 2290000, |_| true).unwrap();
+        assert_eq!((read.result.skill_id, read.result.used), (1121001, false));
+        assert!(read.result.mastery && read.changes.is_empty());
+
+        player.skills.set(SkillRecord {
+            skill_id: 1121001,
+            level: 5,
+            master_level: 10,
+            expiration: None,
+        });
+        let read = read_book(&mut player, 2, 2290000, |success| {
+            assert_eq!(success, 70);
+            false
+        })
+        .unwrap();
+        assert!(read.result.used && !read.result.success && read.record.is_none());
+        assert_eq!(skill(&player, 1121001), (5, 10));
+        assert!(player.inventory.get(InventoryType::Use, 2).is_none());
+
+        player
+            .inventory
+            .insert(InventoryType::Use, 2, Item::stack(2290000, 1));
+        let read = read_book(&mut player, 2, 2290000, |_| true).unwrap();
+        assert!(read.result.used && read.result.success);
+        assert_eq!(read.result.master_level, 20);
+        assert_eq!(skill(&player, 1121001), (5, 20));
+
+        // Already at the book's master level: not used, not spent.
+        player
+            .inventory
+            .insert(InventoryType::Use, 2, Item::stack(2290000, 1));
+        let read = read_book(&mut player, 2, 2290000, |_| true).unwrap();
+        assert!(!read.result.used);
+        assert!(player.inventory.get(InventoryType::Use, 2).is_some());
+    }
+
+    #[test]
+    fn a_book_for_another_job_is_not_used() {
+        if items::data().is_err() {
+            return;
+        }
+        // Skill Book 2280000 teaches Fire Demon (2121003) to Arch Mage (F/P).
+        let mut player = hero_with_book(1, 2280000);
+        let read = read_book(&mut player, 1, 2280000, |_| true).unwrap();
+        assert_eq!(
+            read.result,
+            BookResult {
+                character_id: player.id(),
+                mastery: false,
+                skill_id: 0,
+                master_level: 0,
+                used: false,
+                success: false,
+            }
+        );
+        assert!(read_book(&mut player, 1, 2290000, |_| true).is_none());
     }
 
     #[test]
