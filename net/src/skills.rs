@@ -125,8 +125,34 @@ pub fn at_level(skill_id: i32, level: i32) -> Option<Learned> {
 pub const SHADOW_STARS: i32 = 4121006;
 pub const DISPEL: i32 = 2311001;
 pub const RESURRECTION: i32 = 2321006;
+pub const CHAKRA: i32 = 4211001;
+pub const TIME_LEAP: i32 = 5121010;
 
 pub const MYSTIC_DOOR: i32 = 2311002;
+
+/// The Teleport skills (v83 FUN_00957b74): the client moves the player and
+/// asks only for the MP.
+pub const TELEPORTS: [i32; 5] = [2101002, 2201002, 2301001, 12101003, 22101001];
+
+/// Skills that neither buff nor debuff: the handler does their work.
+/// Chakra heals the user, Resurrection raises dead party members, Time Leap
+/// ends cooldowns, and Mystic Door opens a door. Teleport has no work.
+pub fn acts_alone(skill_id: i32) -> bool {
+    matches!(skill_id, MYSTIC_DOOR | CHAKRA | RESURRECTION | TIME_LEAP)
+        || TELEPORTS.contains(&skill_id)
+}
+
+/// The HP Chakra heals: from 2.3 to 3.5 times the user's LUK, with
+/// equipment, times the level's `y` percent; `roll`, from 0 to 1, picks
+/// between them. The v83 client leaves it to the server, so this is
+/// OdinMS-family servers' formula.
+pub fn chakra_heal(player: &Player, y: i32, roll: f64) -> i32 {
+    let (_, _, luk) = total_stats(player);
+    let rate = f64::from(y) / 100.0;
+    let low = (f64::from(luk) * 2.3 * rate) as i32;
+    let high = (f64::from(luk) * 3.5 * rate) as i32;
+    (low + (roll * f64::from(high - low + 1)) as i32).min(high)
+}
 
 /// How close to a portal Mystic Door may not open (v83 FUN_00712ab1).
 const DOOR_PORTAL_REACH: i32 = 50;
