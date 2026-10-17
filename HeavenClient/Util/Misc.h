@@ -64,6 +64,10 @@ namespace ms
 		// Prefix an id with zeros so that it has the minimum specified length
 		std::string extend_id(int32_t id, size_t length);
 
+		// The Skill.wz image a skill is in, named for its job: 000.img for
+		// 1002, 1411.img for 14111006
+		std::string skill_img(int32_t skill_id);
+
 		// Cut off a string at a specified length with an ellipsis
 		void format_with_ellipsis(Text& input, size_t length);
 	};

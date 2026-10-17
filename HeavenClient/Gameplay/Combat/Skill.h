@@ -76,8 +76,14 @@ namespace ms
 
 		const SkillPrepare &get_prepare() const;
 
+		// The effect shown where a thrown grenade goes off.
+		Animation get_special() const;
+
 		// Play the sound of using the skill, without its effect.
 		void play_use() const;
+
+		// Play the skill's second use sound, as a thrown grenade goes off.
+		void play_use2() const;
 
 		// Play the sound a held skill makes while it charges, until
 		// stop_loop.
@@ -95,6 +101,7 @@ namespace ms
 		std::unique_ptr<SkillUseEffect> useeffect;
 		std::unique_ptr<SkillHitEffect> hiteffect;
 		SkillPrepare prepare;
+		Animation special;
 
 		int32_t skillid;
 		bool overregular;

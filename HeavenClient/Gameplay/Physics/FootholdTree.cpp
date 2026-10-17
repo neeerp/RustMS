@@ -187,6 +187,7 @@ namespace ms
 			if (collision)
 			{
 				phobj.limitx(wall);
+				phobj.walled = true;
 
 				// A jumper only stops at a foothold wall, which it may jump
 				// next, but turns at the edge of the map.

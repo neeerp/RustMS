@@ -70,6 +70,36 @@ impl WorldHandler for SkillEffectHandler {
     }
 }
 
+/// `THROW_GRENADE`: the player let go of Grenade or Poison Bomb, throwing
+/// it from where they stood (0x95efc5). Show the rest of the map the throw,
+/// and end the prepare it showed: the client sends no `CANCEL_BUFF` for a
+/// throw, and the attack comes only once the grenade goes off. The attack
+/// is checked and spends MP then, as any other.
+pub struct ThrowGrenadeHandler;
+
+impl WorldHandler for ThrowGrenadeHandler {
+    fn handle(&self, packet: &mut Packet, ctx: &mut WorldContext) -> WorldResult {
+        let mut r = Cursor::new(&packet.bytes);
+        r.read_short()?;
+        let x = r.read_int()?;
+        let y = r.read_int()?;
+        let charge = r.read_int()?;
+        let skill_id = r.read_int()?;
+        if ctx.player.stats.hp <= 0
+            || !skills::throws(skill_id)
+            || skills::learned(ctx.player, skill_id).is_none()
+        {
+            return Ok(HandlerResult::empty());
+        }
+        let id = ctx.player.id();
+        let ended = skill::build_cancel_skill_prepare(id, skill_id)?;
+        let thrown = skill::build_throw_grenade(id, x, y, charge, skill_id)?;
+        Ok(HandlerResult::empty()
+            .with(WorldAction::Field(FieldRequest::Broadcast(ended)))
+            .with(WorldAction::Field(FieldRequest::Broadcast(thrown))))
+    }
+}
+
 /// `CANCEL_BUFF`: the player right-clicked a skill's buff icon, or let go
 /// of a held skill without using it. End the buffs and tell the client,
 /// which then drops the icon; or show the rest of the map the skill was
@@ -515,6 +545,23 @@ mod tests {
             .actions
     }
 
+    fn throw(player: &mut Player, skill_id: i32) -> Vec<WorldAction> {
+        let mut packet = Packet::new_empty();
+        packet.write_short(RecvOpcode::ThrowGrenade as i16).unwrap();
+        for value in [120, -45, 640, skill_id] {
+            packet.write_int(value).unwrap();
+        }
+        let mut ctx = WorldContext {
+            client_id: 1,
+            channel_id: 0,
+            player,
+        };
+        ThrowGrenadeHandler
+            .handle(&mut packet, &mut ctx)
+            .unwrap()
+            .actions
+    }
+
     fn broadcast_opcodes(actions: &[WorldAction]) -> Vec<i16> {
         actions
             .iter()
@@ -553,5 +600,34 @@ mod tests {
             [SendOpcode::CancelSkillEffect as i16]
         );
         assert!(cancel(&mut player, 1002).is_empty());
+    }
+
+    #[test]
+    fn a_throw_ends_the_prepare_and_is_shown_to_the_map() {
+        if skills::data().is_err() {
+            return;
+        }
+        let mut player = beginner_with(5201002, 10);
+        player.stats.job = 520;
+        assert_eq!(
+            broadcast_opcodes(&throw(&mut player, 5201002)),
+            [
+                SendOpcode::CancelSkillEffect as i16,
+                SendOpcode::ThrowGrenade as i16
+            ]
+        );
+        player.stats.hp = 0;
+        assert!(throw(&mut player, 5201002).is_empty());
+    }
+
+    #[test]
+    fn only_a_learned_throw_is_shown() {
+        if skills::data().is_err() {
+            return;
+        }
+        let mut player = beginner_with(5201002, 10);
+        assert!(throw(&mut player, 14111006).is_empty());
+        let mut player = beginner_with(5221004, 10);
+        assert!(throw(&mut player, 5221004).is_empty());
     }
 }

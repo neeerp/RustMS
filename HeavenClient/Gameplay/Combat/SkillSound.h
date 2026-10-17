@@ -30,6 +30,8 @@ namespace ms
 
 		virtual void play_hit() = 0;
 
+		virtual void play_use2() = 0;
+
 		// Play the sound a held skill makes while it charges, until
 		// stop_loop.
 		virtual void play_loop() = 0;
@@ -45,6 +47,9 @@ namespace ms
 		{}
 
 		void play_hit() override
+		{}
+
+		void play_use2() override
 		{}
 
 		void play_loop() override
@@ -64,6 +69,8 @@ namespace ms
 
 		void play_hit() override;
 
+		void play_use2() override;
+
 		void play_loop() override;
 
 		void stop_loop() override;
@@ -71,6 +78,7 @@ namespace ms
 	private:
 		Sound usesound;
 		Sound hitsound;
+		Sound use2sound;
 		Sound loopsound;
 	};
 }

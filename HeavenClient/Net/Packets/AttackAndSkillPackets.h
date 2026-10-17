@@ -36,7 +36,9 @@ namespace ms
 	class AttackPacket : public OutPacket
 	{
 	public:
-		AttackPacket(const AttackResult& attack) : OutPacket(opcodefor(attack.type))
+		// A close attack ends with where the user stands, and Poison Bomb's
+		// with where its grenade went off too (0x952b58).
+		AttackPacket(const AttackResult& attack, Point<int16_t> position, std::optional<Point<int16_t>> grenade = std::nullopt) : OutPacket(opcodefor(attack.type))
 		{
 			skip(1);
 
@@ -84,6 +86,18 @@ namespace ms
 
 				if (attack.skill != 5221004)
 					skip(4);
+			}
+
+			if (attack.type == Attack::Type::CLOSE)
+			{
+				write_short(position.x());
+				write_short(position.y());
+
+				if (attack.skill == prepare::POISON_BOMB && grenade)
+				{
+					write_short(grenade->x());
+					write_short(grenade->y());
+				}
 			}
 		}
 
@@ -204,6 +218,21 @@ namespace ms
 			}
 
 			write_byte(toleft);
+		}
+	};
+
+	// Tells the server the player threw a grenade from where they stand,
+	// held for `charge` ms (0x95efc5).
+	// Opcode: THROW_GRENADE(109)
+	class ThrowGrenadePacket : public OutPacket
+	{
+	public:
+		ThrowGrenadePacket(Point<int16_t> position, int32_t charge, int32_t skillid) : OutPacket(OutPacket::Opcode::THROW_GRENADE)
+		{
+			write_int(position.x());
+			write_int(position.y());
+			write_int(charge);
+			write_int(skillid);
 		}
 	};
 

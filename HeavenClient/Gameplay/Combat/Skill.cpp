@@ -17,6 +17,8 @@
 //////////////////////////////////////////////////////////////////////////////////
 #include "Skill.h"
 
+#include "Prepare.h"
+
 #include "../../Character/SkillId.h"
 #include "../../Data/SkillData.h"
 #include "../../Util/Misc.h"
@@ -36,7 +38,7 @@ namespace ms
 		else
 			strid = std::to_string(skillid);
 
-		nl::node src = nl::nx::skill[strid.substr(0, 3) + ".img"]["skill"][strid];
+		nl::node src = nl::nx::skill[string_format::skill_img(skillid)]["skill"][strid];
 
 		projectile = true;
 		overregular = false;
@@ -47,6 +49,7 @@ namespace ms
 		prepare.prepare = { preparesrc, preparesrc["z"] };
 		prepare.keydown = { src["keydown"], src["keydown"]["z"] };
 		prepare.keydownend = { src["keydownend"], src["keydownend"]["z"] };
+		special = src["special"];
 
 		sound = std::make_unique<SingleSkillSound>(strid);
 
@@ -113,7 +116,14 @@ namespace ms
 		bool hasaction0 = src["action"]["0"].data_type() == nl::node::type::string;
 		bool hasaction1 = src["action"]["1"].data_type() == nl::node::type::string;
 
-		if (hasaction0 && hasaction1)
+		// A thrown grenade hits with no action, and flies as no bullet: it
+		// shows its own effect where it lands (0x950921, 0x936528).
+		bool thrown = prepare::throws(skillid);
+
+		if (thrown)
+		{
+			action = std::make_unique<NoAction>();
+		} else if (hasaction0 && hasaction1)
 		{
 			action = std::make_unique<TwoHandedAction>(src);
 		} else if (hasaction0)
@@ -139,7 +149,11 @@ namespace ms
 		bool hasball = src["ball"].size() > 0;
 		bool bylevelball = src["level"]["1"]["ball"].size() > 0;
 
-		if (bylevelball)
+		if (thrown)
+		{
+			bullet = std::make_unique<RegularBullet>();
+			projectile = false;
+		} else if (bylevelball)
 		{
 			bullet = std::make_unique<BySkillLevelBullet>(src, skillid);
 		} else if (hasball)
@@ -162,6 +176,11 @@ namespace ms
 	void Skill::play_use() const
 	{
 		sound->play_use();
+	}
+
+	void Skill::play_use2() const
+	{
+		sound->play_use2();
 	}
 
 	void Skill::play_loop() const
@@ -286,6 +305,11 @@ namespace ms
 	bool Skill::is_skill() const
 	{
 		return true;
+	}
+
+	Animation Skill::get_special() const
+	{
+		return special;
 	}
 
 	const SkillPrepare &Skill::get_prepare() const

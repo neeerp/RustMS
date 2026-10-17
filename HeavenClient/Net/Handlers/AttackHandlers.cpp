@@ -104,4 +104,16 @@ namespace ms
 
 		Stage::get().get_combat().cancel_prepare(cid, skillid);
 	}
+
+	void ThrowGrenadeHandler::handle(InPacket& recv) const
+	{
+		int32_t cid = recv.read_int();
+		int32_t x = recv.read_int();
+		int32_t y = recv.read_int();
+		int32_t charge = recv.read_int();
+		int32_t skillid = recv.read_int();
+
+		Point<int16_t> position(static_cast<int16_t>(x), static_cast<int16_t>(y));
+		Stage::get().get_combat().show_throw(cid, position, charge, skillid);
+	}
 }

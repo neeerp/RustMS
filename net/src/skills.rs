@@ -155,6 +155,14 @@ pub fn is_magnet(skill_id: i32) -> bool {
     MONSTER_MAGNETS.contains(&skill_id)
 }
 
+/// Grenade and Poison Bomb: held, then thrown, going off where they land
+/// (0x95efc5).
+pub const THROWS: [i32; 2] = [5201002, 14111006];
+
+pub fn throws(skill_id: i32) -> bool {
+    THROWS.contains(&skill_id)
+}
+
 /// Explosion and Chakra prepare too, but by a timer rather than a held key.
 pub const TIMED: [i32; 2] = [2111002, 4211001];
 

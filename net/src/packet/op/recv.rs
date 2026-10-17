@@ -63,6 +63,7 @@ pub enum RecvOpcode {
     CharInfoRequest = 0x61,
     ChangeMapSpecial = 0x64,
     QuestAction = 0x6B,
+    ThrowGrenade = 0x6D,
 
     ChangeKeybinds = 0x87,
     MoveLife = 0xBC,

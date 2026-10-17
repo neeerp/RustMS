@@ -93,6 +93,13 @@ namespace ms
 		// (0x66d6b9, 0x438eb6).
 		void show_catch(int32_t oid, bool success);
 
+		// Show another user throwing a grenade from `position`, held for
+		// `charge` ms (0x983bc1).
+		void show_throw(int32_t cid, Point<int16_t> position, int32_t charge, int32_t skillid);
+
+		// Drop the grenades in flight, as on leaving the map.
+		void clear_grenades();
+
 	private:
 		struct DamageEffect
 		{
@@ -124,6 +131,18 @@ namespace ms
 		// Let go of Monster Magnet, held for `charge` ms: it catches the mobs
 		// in front of the player (0x96c215). Whether it was used.
 		bool use_magnet(const Skill &skill, int32_t level, int32_t charge);
+
+		// Throw a grenade for the user `owner` from `position`, harder the
+		// longer it was held (0x9420c6).
+		void throw_grenade(int32_t owner, int32_t skill, int32_t charge, Point<int16_t> position, bool toleft);
+
+		// Move the grenades, and set off the ones that hit something
+		// (0x58fc1e).
+		void update_grenades();
+
+		// A grenade goes off: the player's own hits the mobs around it
+		// (0x950921), anyone else's only shows its effect (0x936528).
+		void explode(int32_t owner, int32_t skill, Point<int16_t> position);
 
 		// Start holding a skill down (FUN_0096a86e).
 		void start_prepare(const Skill &skill);
@@ -230,7 +249,24 @@ namespace ms
 		};
 
 		TimedQueue<MagnetCatch> magnetcatches;
-		EffectLayer catcheffects;
+		// Effects fixed in the map: Monster Magnet's catches, and grenades
+		// going off.
+		EffectLayer fieldeffects;
+
+		// A grenade in flight, thrown by the user `owner`.
+		struct Grenade
+		{
+			int32_t owner;
+			int32_t skill;
+			PhysicsObject phobj;
+			Animation ball;
+		};
+
+		std::list<Grenade> grenades;
+
+		// When Monster Magnet and the throws may be held again, by skill
+		// (user+0x3158).
+		std::unordered_map<int32_t, int64_t> reuse_times;
 
 		std::list<Bullet> bullets;
 		std::list<DamageNumber> damagenumbers;
@@ -275,5 +311,6 @@ namespace ms
 		static Texture gauge_graduation[2];
 		static Animation catch_success;
 		static Animation catch_fail;
+		static Animation grenade_ball;
 	};
 }

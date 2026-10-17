@@ -67,4 +67,11 @@ namespace ms
 	{
 		void handle(InPacket& recv) const override;
 	};
+
+	// Another user threw a grenade (0x983bc1).
+	// Opcode: THROW_GRENADE(204)
+	class ThrowGrenadeHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
 }

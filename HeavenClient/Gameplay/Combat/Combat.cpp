@@ -93,6 +93,9 @@ namespace ms
 		nl::node catcheffect = nl::nx::effect["BasicEff.img"]["Catch"];
 		catch_success = catcheffect["Success"];
 		catch_fail = std::vector<Frame>{ Frame(catcheffect["Fail"], 200, 255, 255), Frame(catcheffect["Fail"], 200, 255, 0) };
+
+		// Poison Bomb throws Grenade's grenade too (0x58f761).
+		grenade_ball = nl::nx::skill["520.img"]["skill"]["5201002"]["ball"];
 	}
 
 	Texture Combat::gauge_bar[2];
@@ -100,16 +103,20 @@ namespace ms
 	Texture Combat::gauge_graduation[2];
 	Animation Combat::catch_success;
 	Animation Combat::catch_fail;
+	Animation Combat::grenade_ball;
 
 	void Combat::draw(double viewx, double viewy, float alpha) const
 	{
 		for (auto &bullet : bullets)
 			bullet.draw(viewx, viewy, alpha);
 
+		for (auto &grenade : grenades)
+			grenade.ball.draw(DrawArgument(grenade.phobj.get_absolute(viewx, viewy, alpha)), alpha);
+
 		for (auto &dn : damagenumbers)
 			dn.draw(viewx, viewy, alpha);
 
-		catcheffects.drawabove(Point<int16_t>(static_cast<int16_t>(viewx), static_cast<int16_t>(viewy)), alpha);
+		fieldeffects.drawabove(Point<int16_t>(static_cast<int16_t>(viewx), static_cast<int16_t>(viewy)), alpha);
 
 		draw_gauge(viewx, viewy, alpha);
 	}
@@ -139,12 +146,13 @@ namespace ms
 		now += Constants::TIMESTEP;
 		update_prepare();
 		update_remote_prepares();
+		update_grenades();
 
 		attackresults.update();
 		bulleteffects.update();
 		damageeffects.update();
 		magnetcatches.update();
-		catcheffects.update();
+		fieldeffects.update();
 
 		bullets.remove_if(
 				[](Bullet &bullet)
@@ -496,7 +504,7 @@ namespace ms
 			apply_use_movement(move);
 			apply_result_movement(move, result);
 
-			AttackPacket(result).dispatch();
+			AttackPacket(result, player.get_position()).dispatch();
 
 			if (reactor_targets.size())
 				if (Optional<Reactor> reactor = reactor_objs->get(reactor_targets.at(0)))
@@ -777,12 +785,18 @@ namespace ms
 				end_remote_prepare(user);
 
 			const SpecialMove &move = get_move(attack.skill);
-			move.apply_useeffects(user);
 
-			if (Stance::Id stance = Stance::by_id(attack.stance))
-				user.attack(stance);
-			else
-				move.apply_actions(user, attack.type);
+			// A grenade going off moves no one, and has its own effect
+			// (0x980712).
+			if (!prepare::throws(attack.skill))
+			{
+				move.apply_useeffects(user);
+
+				if (Stance::Id stance = Stance::by_id(attack.stance))
+					user.attack(stance);
+				else
+					move.apply_actions(user, attack.type);
+			}
 
 			user.set_afterimage(attack.skill);
 
@@ -914,8 +928,9 @@ namespace ms
 		} else
 		{
 			// As in v83, every hit on a mob lands at once, at the frame the
-			// attack hits on, and each later target a little after.
-			uint16_t delay = user.get_attackdelay(0);
+			// attack hits on, and each later target a little after. A
+			// grenade's land as it goes off.
+			uint16_t delay = prepare::throws(result.skill) ? 0 : user.get_attackdelay(0);
 
 			for (size_t target = 0; target < result.damagelines.size(); target++)
 			{
@@ -1124,9 +1139,25 @@ namespace ms
 
 		// Like a skill that doesn't attack, a held one waits until the
 		// player may ask the server, but holds nothing up itself (0x485bf7).
-		// It starts only from a platform.
-		if (!player.can_request(ExclRequest::SKILL_WAIT) || !player.get_phobj().onground || player.get_ladder())
+		// It starts only from a platform, but a grenade may be thrown from
+		// the air.
+		bool thrown = prepare::throws(id);
+
+		if (!player.can_request(ExclRequest::SKILL_WAIT) || (!thrown && !player.get_phobj().onground)
+			|| player.get_ladder())
 			return;
+
+		// Monster Magnet and the throws wait a while to be held again
+		// (0x96a9ab).
+		int32_t reuse = prepare::reuse_delay(id);
+
+		if (reuse > 0)
+		{
+			auto iter = reuse_times.find(id);
+
+			if (iter != reuse_times.end() && now < iter->second)
+				return;
+		}
 
 		// Chakra says nothing when the player has too much HP.
 		const CharStats &stats = player.get_stats();
@@ -1167,6 +1198,9 @@ namespace ms
 
 		int32_t duration = timed && forced ? player.get_action_duration(data.action) : 0;
 		preparing = Preparing{ id, level, 0, forced, false, duration };
+
+		if (reuse > 0)
+			reuse_times[id] = now + reuse;
 	}
 
 	void Combat::update_prepare()
@@ -1294,6 +1328,22 @@ namespace ms
 			return;
 		}
 
+		// A grenade is thrown, unless the player is on a ladder, and hits
+		// where it lands (0x95c13b).
+		if (prepare::throws(held.skill))
+		{
+			if (!player.get_ladder())
+			{
+				int32_t charge = prepare::release_charge(held.skill, held.held);
+				Point<int16_t> position = player.get_position();
+
+				throw_grenade(player.get_oid(), held.skill, charge, position, !player.getflip());
+				ThrowGrenadePacket(position, charge, held.skill).dispatch();
+			}
+
+			return;
+		}
+
 		if (magnet::is_magnet(held.skill))
 		{
 			if (!use_magnet(skill, held.level, prepare::release_charge(held.skill, held.held)))
@@ -1410,7 +1460,88 @@ namespace ms
 
 		Point<int16_t> position = mobs.get_mob_position(oid) + Point<int16_t>(0, -15);
 
-		catcheffects.add(success ? catch_success : catch_fail, DrawArgument(position), 0);
+		fieldeffects.add(success ? catch_success : catch_fail, DrawArgument(position), 0);
+	}
+
+	void Combat::show_throw(int32_t cid, Point<int16_t> position, int32_t charge, int32_t skillid)
+	{
+		if (Optional<OtherChar> user = chars.get_char(cid))
+			throw_grenade(cid, skillid, charge, position, !user->getflip());
+	}
+
+	void Combat::throw_grenade(int32_t owner, int32_t skill, int32_t charge, Point<int16_t> position, bool toleft)
+	{
+		// It flies up and away from the user as fast as it was held long,
+		// as a knockback would push it, and falls as anything does.
+		int32_t speed = prepare::throw_speed(charge);
+		Point<int16_t> start = prepare::throw_start(position, toleft);
+
+		Grenade grenade{ owner, skill, {}, grenade_ball };
+		grenade.phobj.shoe = true;
+		grenade.phobj.onground = false;
+		grenade.phobj.set_x(start.x());
+		grenade.phobj.set_y(start.y());
+		grenade.phobj.impact = true;
+		grenade.phobj.impactx = toleft ? -speed : speed;
+		grenade.phobj.impacty = -speed;
+
+		grenades.push_back(grenade);
+	}
+
+	void Combat::update_grenades()
+	{
+		for (auto iter = grenades.begin(); iter != grenades.end();)
+		{
+			Grenade &grenade = *iter;
+			grenade.ball.update();
+			physics.move_object(grenade.phobj);
+
+			// It goes off as it lands on a platform or hits a wall
+			// (0x9ba95a).
+			if (grenade.phobj.onground || grenade.phobj.walled)
+			{
+				Grenade done = grenade;
+				iter = grenades.erase(iter);
+				explode(done.owner, done.skill, done.phobj.get_position());
+			} else
+			{
+				++iter;
+			}
+		}
+	}
+
+	void Combat::explode(int32_t owner, int32_t skillid, Point<int16_t> position)
+	{
+		const Skill &skill = get_skill(skillid);
+		fieldeffects.add(skill.get_special(), DrawArgument(position), 0);
+
+		if (owner != player.get_oid())
+			return;
+
+		skill.play_use2();
+
+		// It hits the mobs around it as a swing would, in front of where
+		// the player now faces, all at once and with no charge.
+		Attack attack = player.prepare_attack(skillid);
+		skill.apply_stats(player, attack);
+		attack.charge = 0;
+		attack.origin = position;
+
+		Rectangle<int16_t> range = place_range(position, attack.range, 1.0f, attack.toleft);
+		std::vector<int32_t> targets = find_targets(mobs.get_mobs(), range, position, attack.mobcount, true, false);
+
+		AttackResult result = attack;
+		mobs.send_attack(result, attack, targets, attack.mobcount);
+		result.attacker = player.get_oid();
+		expect_hits(result, 1);
+		extract_effects(player, skill, result, range, 0, position);
+
+		AttackPacket(result, player.get_position(), position).dispatch();
+	}
+
+	void Combat::clear_grenades()
+	{
+		grenades.clear();
 	}
 
 	const Skill &Combat::get_skill(int32_t skill_id)

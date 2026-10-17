@@ -125,6 +125,8 @@ namespace ms
 
 	void Physics::move_object(PhysicsObject &phobj) const
 	{
+		phobj.walled = false;
+
 		// A flier never stands on a platform: v83's mobs (FUN_007f9202)
 		// fly through them and only keep within the map.
 		if (phobj.shoe && phobj.flyspeed > 0.0)

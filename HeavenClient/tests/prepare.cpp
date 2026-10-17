@@ -47,7 +47,17 @@ int main()
 
 		require(held(2121001) && held(3121004) && held(5221004), "Big Bang and the shooters are held here");
 		require(held(1121001) && held(1221001) && held(1321001), "Monster Magnet is held here");
-		require(!held(5201002) && !held(14111006), "the throws aren't yet");
+		require(held(5201002) && held(14111006), "as are the throws");
+		require(throws(5201002) && throws(14111006) && !throws(1121001), "Grenade and Poison Bomb throw");
+
+		require(reuse_delay(1121001) == 2000 && reuse_delay(1321001) == 2000, "Monster Magnet waits 2 s to be held again");
+		require(reuse_delay(5201002) == 1000 && reuse_delay(14111006) == 1500, "Grenade 1 s, Poison Bomb 1.5 s");
+		require(reuse_delay(2121001) == 0, "others don't wait");
+
+		require(throw_speed(30) == 18 && throw_speed(1000) == 600, "a grenade flies 0.6 px/s a ms held");
+		require(throw_speed(555) == 333, "cut down to a whole px/s");
+		require(throw_start({ 100, 200 }, true) == ms::Point<int16_t>(101, 180), "it starts 20 px up, a pixel behind");
+		require(throw_start({ 100, 200 }, false) == ms::Point<int16_t>(99, 180), "whichever way the user faces");
 		require(!held(2111002), "nor is Explosion");
 
 		require(action_id("shoot1") == 0x16 && action_id("rapidfire") == 0x63 && action_id("alert5") == 0x2c,

@@ -4,6 +4,8 @@
 #include <cstdint>
 #include <string>
 
+#include "../../Template/Point.h"
+
 namespace ms
 {
 	// The skills a user prepares by holding their key, as in the MapleRoyals
@@ -85,18 +87,53 @@ namespace ms
 			}
 		}
 
-		// Whether the skill is held here: the throws let go their own way, and
-		// aren't yet.
+		constexpr int32_t GRENADE = 5201002;
+		constexpr int32_t POISON_BOMB = 14111006;
+
+		// Whether the skill is held here: all of them are.
 		inline bool held(int32_t skill)
+		{
+			return keydown(skill);
+		}
+
+		// Whether letting go of the skill throws a grenade, which hits where
+		// it lands (0x95c035).
+		inline bool throws(int32_t skill)
+		{
+			return skill == GRENADE || skill == POISON_BOMB;
+		}
+
+		// How long after the skill starts to be held it may be held again, in
+		// ms, or 0 for no wait: Monster Magnet's and the throws' (0x9535e3).
+		inline int32_t reuse_delay(int32_t skill)
 		{
 			switch (skill)
 			{
-			case 5201002:
-			case 14111006:
-				return false;
+			case 1121001:
+			case 1221001:
+			case 1321001:
+				return 2000;
+			case GRENADE:
+				return 1000;
+			case POISON_BOMB:
+				return 1500;
 			default:
-				return keydown(skill);
+				return 0;
 			}
+		}
+
+		// The speed, in px/s, a grenade is thrown with, forward and up alike,
+		// for a skill held `charge` ms (0x9420c6).
+		inline int32_t throw_speed(int32_t charge)
+		{
+			return static_cast<int32_t>(charge * 0.001 * 600.0);
+		}
+
+		// Where a grenade starts: 20 px above the user, a pixel behind them
+		// (0x58f761).
+		inline Point<int16_t> throw_start(Point<int16_t> user, bool toleft)
+		{
+			return { static_cast<int16_t>(user.x() + (toleft ? 1 : -1)), static_cast<int16_t>(user.y() - 20) };
 		}
 
 		// Whether the skill is timed instead: it prepares for as long as its
