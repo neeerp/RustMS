@@ -213,6 +213,9 @@ namespace ms
 		uint16_t fhgroup = 0;
 		double groundbelow = 0.0;
 		bool onground = true;
+		// Whether a wall, or an edge it turns at, stopped the object in its
+		// last move.
+		bool walled = false;
 		bool enablejd = false;
 		// The platform a down-jump left, which the fall passes through until
 		// the object lands somewhere else.

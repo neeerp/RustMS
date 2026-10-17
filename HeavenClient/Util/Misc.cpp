@@ -39,6 +39,11 @@ namespace ms
 			return strid;
 		}
 
+		std::string skill_img(int32_t skill_id)
+		{
+			return extend_id(skill_id / 10000, 3) + ".img";
+		}
+
 		void format_with_ellipsis(Text& input, size_t length)
 		{
 			std::string text = input.get_text();

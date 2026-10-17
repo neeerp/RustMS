@@ -30,8 +30,7 @@ namespace ms
 	{
 		/// Locate sources
 		std::string strid = string_format::extend_id(id, 7);
-		std::string jobid = strid.substr(0, 3);
-		nl::node src = nl::nx::skill[jobid + ".img"]["skill"][strid];
+		nl::node src = nl::nx::skill[string_format::skill_img(id)]["skill"][strid];
 		nl::node strsrc = nl::nx::string["Skill.img"][strid];
 
 		// Load icons
@@ -82,10 +81,16 @@ namespace ms
 
 		element = std::string(src["elemAttr"]);
 
-		if (jobid == "900" || jobid == "910")
+		int32_t job = id / 10000;
+
+		if (job == 900 || job == 910)
 			reqweapon = Weapon::Type::NONE;
 		else
 			reqweapon = Weapon::by_value(100 + (int32_t) src["weapon"]);
+
+		// Grenade says nothing of its gun, but needs one (0x96a86e).
+		if (id == 5201002)
+			reqweapon = Weapon::Type::GUN;
 
 		masterlevel = static_cast<int32_t>(stats.size());
 		passive = (id % 10000) / 1000 == 0;
@@ -109,7 +114,7 @@ namespace ms
 		// How v83's CUserLocal::DoActiveSkill dispatches each skill: to a
 		// swing, a shot, or a spell, and how a held skill lets go
 		// (FUN_0095bedf). Every other skill is a special move. Monster
-		// Magnet and the throws are let go their own way, and aren't here.
+		// Magnet is let go its own way, and isn't here.
 		static const std::unordered_set<int32_t> swings =
 				{
 				1009, 1020,
@@ -201,7 +206,8 @@ namespace ms
 				12111003, 12111005, 12111006
 				};
 
-		if (swings.count(id))
+		// A thrown grenade hits as a swing does where it lands (0x950921).
+		if (swings.count(id) || id == 5201002 || id == 14111006)
 			return ATTACK;
 
 		if (shots.count(id))

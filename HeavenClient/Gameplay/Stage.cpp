@@ -122,6 +122,7 @@ namespace ms
 		Point<int16_t> spawnpoint = portals.get_portal_by_id(portalid);
 		Point<int16_t> startpos = physics.get_y_below(spawnpoint);
 		combat.clear_prepare();
+		combat.clear_grenades();
 		player.respawn(startpos, mapinfo.is_underwater());
 		player.set_recovery_rate(mapinfo.get_recovery());
 		pending_teleport.reset();

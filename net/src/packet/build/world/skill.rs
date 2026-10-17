@@ -48,6 +48,25 @@ pub fn build_cancel_skill_prepare(
     Ok(packet)
 }
 
+/// THROW_GRENADE: another player threw a grenade from where they stood,
+/// held for `charge` ms (0x983bc1).
+pub fn build_throw_grenade(
+    character_id: i32,
+    x: i32,
+    y: i32,
+    charge: i32,
+    skill_id: i32,
+) -> Result<Packet, NetworkError> {
+    let mut packet = Packet::new_empty();
+    packet.write_short(SendOpcode::ThrowGrenade as i16)?;
+    packet.write_int(character_id)?;
+    packet.write_int(x)?;
+    packet.write_int(y)?;
+    packet.write_int(charge)?;
+    packet.write_int(skill_id)?;
+    Ok(packet)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -92,6 +111,15 @@ mod tests {
         let mut expect = Expect::new(&packet.bytes);
         expect.short(SendOpcode::CancelSkillEffect as i16);
         expect.int(7).int(5221004);
+        expect.end();
+    }
+
+    #[test]
+    fn a_throw_names_the_player_where_they_stood_and_the_charge() {
+        let packet = build_throw_grenade(7, 120, -45, 640, 5201002).unwrap();
+        let mut expect = Expect::new(&packet.bytes);
+        expect.short(SendOpcode::ThrowGrenade as i16);
+        expect.int(7).int(120).int(-45).int(640).int(5201002);
         expect.end();
     }
 }

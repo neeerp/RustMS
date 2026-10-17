@@ -62,6 +62,7 @@ pub enum SendOpcode {
     UpdateCharLook = 0xC5,
     UpdatePartyMemberHp = 0xC9,
     ShowChair = 0xC4,
+    ThrowGrenade = 0xCC,
     CancelChair = 0xCD,
     SpawnNpc = 0x101,
     DropItemFromMapObject = 0x10C,
