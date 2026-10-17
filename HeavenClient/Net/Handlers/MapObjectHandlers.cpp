@@ -346,6 +346,20 @@ namespace ms
 		Stage::get().get_mobs().send_movement(oid, position, std::move(movements));
 	}
 
+	void MoveMobResponseHandler::handle(InPacket& recv) const
+	{
+		int32_t oid = recv.read_int();
+		int16_t moveid = recv.read_short();
+		bool nextattack = recv.read_bool();
+
+		// Its MP and a skill to cast next: mob skills aren't modeled yet.
+		recv.read_short();
+		recv.read_byte();
+		recv.read_byte();
+
+		Stage::get().get_mobs().acknowledge(oid, moveid, nextattack);
+	}
+
 	void ShowMobHpHandler::handle(InPacket& recv) const
 	{
 		int32_t oid = recv.read_int();

@@ -106,6 +106,13 @@ namespace ms
 		void handle(InPacket& recv) const override;
 	};
 
+	// The server got the controller's move of a mob (FUN_0066c23b).
+	// Opcode: MOVE_MOB_RESPONSE(240)
+	class MoveMobResponseHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
 	// Update mob state and position with the client
 	// Opcode: MOB_MOVED(239)
 	class MobMovedHandler : public PacketHandler

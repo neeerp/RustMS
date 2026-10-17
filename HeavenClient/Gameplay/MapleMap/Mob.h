@@ -92,6 +92,10 @@ namespace ms
 		// Tell the mob where the local player is, whom it chases with aggro.
 		void set_target(Point<int16_t> position, bool dead);
 
+		// The server got the move with this id (FUN_0066c23b), saying whether
+		// the mob may attack or cast next.
+		void acknowledge(int16_t moveid, bool nextattack);
+
 		// Send movement to the mob.
 		void send_movement(Point<int16_t> start, std::vector<Movement> &&movements);
 
@@ -276,7 +280,16 @@ namespace ms
 		int8_t team;
 		bool dying;
 		bool dead;
-		bool control;
+		bool control = false;
+		// v83's control state (CMob +0x130): 3 when the controller may send
+		// a move, 4 when it may also attack or cast, 2 while a move awaits
+		// the server's ack, 1 after a move sent without control, and below 0
+		// when not controlling (FUN_006637ec).
+		int8_t ctrlstate = -1;
+		// The id of the last move sent, one more each move.
+		int16_t moveid = 0;
+		// Whether a move came up while awaiting an ack, to be sent with it.
+		bool movepending = false;
 		// Whether the mob chases the local player, and for how many more ms.
 		bool hastarget;
 		int32_t targettime;

@@ -752,10 +752,41 @@ namespace ms
 
 	void Mob::update_movement()
 	{
+		// The controller sends nothing new until its last move is acked,
+		// then its latest (0x6685ac).
+		if (control && ctrlstate == 2)
+		{
+			movepending = true;
+			return;
+		}
+
+		movepending = false;
+
+		// It asks to attack when chasing, unless controlling, then 70% of
+		// the time.
+		bool wantattack = hastarget && (ctrlstate < 0 || randomizer.next_int(100) < 70);
+		int8_t flags = (ctrlstate < 0 ? 0x10 : 0) | (wantattack ? 1 : 0);
+
 		MoveMobPacket(
-				oid, 1, 0, 0, 0, 0, 0, 0, get_position(),
+				oid, ++moveid, flags, -1, false, 0, canfly, get_position(),
 				Movement(phobj, value_of(stance, flip))
 		).dispatch();
+
+		ctrlstate = ctrlstate == -2 || ctrlstate == 1 ? 1 : 2;
+	}
+
+	void Mob::acknowledge(int16_t ackid, bool nextattack)
+	{
+		if (!control)
+			set_control(1);
+
+		if (ackid < moveid)
+			ctrlstate = 2;
+		else
+			ctrlstate = nextattack ? 4 : 3;
+
+		if (ctrlstate != 2 && movepending)
+			update_movement();
 	}
 
 	void Mob::draw(double viewx, double viewy, float alpha) const
@@ -819,6 +850,13 @@ namespace ms
 
 	void Mob::set_control(int8_t mode)
 	{
+		// Taking control lets it move at once; it may attack only once a
+		// move is acked. Letting go remembers whether it could have.
+		if (mode > 0 && !control)
+			ctrlstate = 3;
+		else if (mode == 0 && control)
+			ctrlstate = ctrlstate == 3 ? -2 : ctrlstate == 4 ? -3 : -1;
+
 		control = mode > 0;
 
 		// v83 (FUN_005d511d) has a mob given with aggro chase the local

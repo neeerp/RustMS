@@ -84,6 +84,12 @@ namespace ms
 			mob->set_control(mode);
 	}
 
+	void MapMobs::acknowledge(int32_t oid, int16_t moveid, bool nextattack)
+	{
+		if (Optional<Mob> mob = mobs.get(oid))
+			mob->acknowledge(moveid, nextattack);
+	}
+
 	void MapMobs::send_mobhp(int32_t oid, int8_t percent, uint16_t playerlevel)
 	{
 		if (Optional<Mob> mob = mobs.get(oid))

@@ -413,19 +413,23 @@ namespace ms
 	class MoveMobPacket : public MovementPacket
 	{
 	public:
-		// Updates a mob's position with the server
-		MoveMobPacket(int32_t oid, int16_t type, int8_t skillb, int8_t skill0, int8_t skill1, int8_t skill2, int8_t skill3, int8_t skill4, Point<int16_t> startpos, const Movement& movement) : MovementPacket(OutPacket::Opcode::MOVE_MONSTER)
+		// Updates a mob's position with the server, as v83 does
+		// (FUN_0066b6fc): its move id, flags, its action (-1 for none) and
+		// facing, skill data, an anti-cheat byte and reason, and two ints a
+		// flyer fills in but others leave at 0xFFDDCC.
+		MoveMobPacket(int32_t oid, int16_t moveid, int8_t flags, int8_t action, bool left, int32_t skilldata, bool flying, Point<int16_t> startpos, const Movement& movement) : MovementPacket(OutPacket::Opcode::MOVE_MONSTER)
 		{
 			write_int(oid);
-			write_short(type);
-			write_byte(skillb);
-			write_byte(skill0);
-			write_byte(skill1);
-			write_byte(skill2);
-			write_byte(skill3);
-			write_byte(skill4);
+			write_short(moveid);
+			write_byte(flags);
+			write_byte(action < 0 ? -1 : (action << 1) | left);
+			write_int(skilldata);
+			write_byte(0);
+			write_int(0);
 
-			skip(13);
+			int32_t unknown = flying ? 0 : 0x00FFDDCC;
+			write_int(unknown);
+			write_int(unknown);
 
 			write_point(startpos);
 
