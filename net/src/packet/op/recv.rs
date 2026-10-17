@@ -53,6 +53,7 @@ pub enum RecvOpcode {
     SortItems = 0x46,
     ItemMove = 0x47,
     UseItem = 0x48,
+    UseSkillBook = 0x52,
     SpendAp = 0x57,
     HealOverTime = 0x59,
     SpendSp = 0x5A,

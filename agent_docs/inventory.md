@@ -105,6 +105,22 @@ within that interval of the player's last PLAYER_MOVE, and MP at most once
 per 10 s, each with a second of slack; anything else is ignored. Endure's
 intervals are never shorter than 10 s, so climbing needs no separate check.
 
+### Skill and mastery books
+
+USE_SKILL_BOOK (`0x52`: tick, slot, item id) reads a skill book (228xxxx)
+or a mastery book (229xxxx). v83 sends it from the item-use path with the
+usual exclusive-request gate and checks nothing itself. The book's
+`info/skill` lists skills; the server takes the one whose job
+(skill / 10000) is the reader's own job, and refuses the book (kept, `used`
+0) when there is none, when the reader's level in it is below
+`info/reqSkillLevel`, or when their master level is already the book's
+`info/masterLevel`. Otherwise it spends the book and rolls `info/success`
+(percent, 100 when absent): on success the skill's master level becomes the
+book's, sent with UPDATE_SKILLS. SKILL_LEARN_ITEM_RESULT (`0x33`: reader,
+mastery, skill, master level, used, success) goes to the reader and the map.
+HeavenClient plays the `BasicEff.img/SkillBook` glow on the reader, and for
+the reader the Enchant sound and the v83 chat line.
+
 ## NPC shops
 
 Clicking an NPC that keeps a shop (`content::shops()`, from the pack's
@@ -149,4 +165,5 @@ to pick up and drops mesos earned from snails, checking both losses are saved;
 `net::shop` covers buying, selling, recharging, and their refusals, and
 `npc_shops` (integration, needs the pack's `shops.json`) opens the Henesys
 grocer, is refused for want of mesos, sells a sword, buys an arrow with it,
-and checks both are saved.
+and checks both are saved. `skill_books` (integration) refuses a mastery
+book for another job and teaches Fire Demon to an Arch Mage.

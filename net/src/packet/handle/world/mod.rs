@@ -58,7 +58,7 @@ pub use self::reactor::DamageReactorHandler;
 pub use self::rearrange::{GatherItemsHandler, SortItemsHandler};
 pub use self::script_portal::ChangeMapSpecialHandler;
 pub use self::spend_points::{SpendApHandler, SpendSpHandler};
-pub use self::use_item::{HealOverTimeHandler, UseItemHandler};
+pub use self::use_item::{HealOverTimeHandler, UseItemHandler, UseSkillBookHandler};
 pub use self::use_skill::{
     party_skill_reached, CancelBuffHandler, SkillEffectHandler, ThrowGrenadeHandler,
     UseSkillHandler,

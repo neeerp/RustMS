@@ -116,6 +116,16 @@ pub fn use_item(slot: i16, item_id: i32) -> Packet {
     p
 }
 
+/// USE_SKILL_BOOK of the skill or mastery book in a USE slot.
+pub fn use_skill_book(slot: i16, item_id: i32) -> Packet {
+    let mut p = Packet::new_empty();
+    p.write_short(RecvOpcode::UseSkillBook as i16).unwrap();
+    p.write_int(0).unwrap();
+    p.write_short(slot).unwrap();
+    p.write_int(item_id).unwrap();
+    p
+}
+
 /// SPEND_AP on the stat with this STAT_CHANGED mask bit.
 pub fn spend_ap(stat: i32) -> Packet {
     let mut p = Packet::new_empty();

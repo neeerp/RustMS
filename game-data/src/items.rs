@@ -26,7 +26,22 @@ pub struct ItemInfo {
     pub recovery_mp: i32,
     /// `spec` of consumable items.
     pub spec: Option<ConsumeSpec>,
+    /// What a skill or mastery book teaches (`info/skill`).
+    pub book: Option<BookInfo>,
     pub equip: Option<EquipInfo>,
+}
+
+/// A skill book (228xxxx) or mastery book (229xxxx).
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct BookInfo {
+    /// The skills it can raise, one per job (`info/skill`).
+    pub skills: Vec<i32>,
+    /// The master level it grants (`masterLevel`).
+    pub master_level: i32,
+    /// The skill level the reader needs first (`reqSkillLevel`).
+    pub req_skill_level: i32,
+    /// Percent chance it works (`success`).
+    pub success: i32,
 }
 
 /// What using a consumable does (`spec`).
@@ -167,6 +182,18 @@ impl ItemData {
             info.unit_price = nx.real_child(meta, "unitPrice")?.unwrap_or(0.0);
             info.recovery_hp = nx.int_child(meta, "recoveryHP")?.unwrap_or(0);
             info.recovery_mp = nx.int_child(meta, "recoveryMP")?.unwrap_or(0);
+            if let Some(skills) = nx.child_by_name(meta, "skill")? {
+                let mut book = BookInfo {
+                    master_level: nx.int_child(meta, "masterLevel")?.unwrap_or(0),
+                    req_skill_level: nx.int_child(meta, "reqSkillLevel")?.unwrap_or(0),
+                    success: nx.int_child(meta, "success")?.unwrap_or(100),
+                    ..BookInfo::default()
+                };
+                while let Some(skill) = nx.int_child(skills, &book.skills.len().to_string())? {
+                    book.skills.push(skill);
+                }
+                info.book = Some(book);
+            }
         }
         if let Some(spec) = nx.child_by_name(node, "spec")? {
             info.spec = Some(ConsumeSpec {
@@ -237,6 +264,7 @@ impl ItemData {
             recovery_hp: 0,
             recovery_mp: 0,
             spec: None,
+            book: None,
             equip: Some(equip),
         }))
     }
@@ -286,6 +314,29 @@ mod tests {
         );
         let relaxer = data.info(3010000).unwrap().unwrap();
         assert_eq!((relaxer.recovery_hp, relaxer.recovery_mp), (50, 0));
+    }
+
+    #[test]
+    fn reads_skill_and_mastery_books() {
+        let Some(data) = data() else {
+            return;
+        };
+        let book = data.info(2290000).unwrap().unwrap().book.unwrap();
+        assert_eq!(
+            book,
+            BookInfo {
+                skills: vec![1121001, 1221001, 1321001],
+                master_level: 20,
+                req_skill_level: 5,
+                success: 70,
+            }
+        );
+        let book = data.info(2280000).unwrap().unwrap().book.unwrap();
+        assert_eq!(
+            (book.skills, book.master_level, book.req_skill_level),
+            (vec![2121003], 10, 0)
+        );
+        assert!(data.info(2010007).unwrap().unwrap().book.is_none());
     }
 
     #[test]

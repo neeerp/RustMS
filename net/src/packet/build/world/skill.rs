@@ -17,6 +17,34 @@ pub fn build_update_skill(skill: &SkillRecord) -> Result<Packet, NetworkError> {
     Ok(packet)
 }
 
+/// How reading a skill or mastery book went.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct BookResult {
+    pub character_id: i32,
+    /// A mastery book (229xxxx) rather than a skill book (228xxxx).
+    pub mastery: bool,
+    pub skill_id: i32,
+    pub master_level: i32,
+    /// The reader could use it: it was spent.
+    pub used: bool,
+    pub success: bool,
+}
+
+/// SKILL_LEARN_ITEM_RESULT (0x33, v83 FUN_00a1e5af): the map sees the book's
+/// glow on the reader when it was used; the reader also gets the chat line
+/// and their next request.
+pub fn build_skill_book_result(result: &BookResult) -> Result<Packet, NetworkError> {
+    let mut packet = Packet::new_empty();
+    packet.write_short(SendOpcode::SkillBookResult as i16)?;
+    packet.write_int(result.character_id)?;
+    packet.write_byte(u8::from(result.mastery))?;
+    packet.write_int(result.skill_id)?;
+    packet.write_int(result.master_level)?;
+    packet.write_byte(u8::from(result.used))?;
+    packet.write_byte(u8::from(result.success))?;
+    Ok(packet)
+}
+
 /// SKILL_EFFECT: another player started preparing a skill. The client
 /// takes `action_and_facing` and `speed` as that player sent them.
 pub fn build_skill_prepare(
@@ -89,6 +117,22 @@ mod tests {
             .short(1);
         expect.int(2001002).int(3).int(0).long(DEFAULT_TIME).byte(4);
         expect.end();
+    }
+
+    #[test]
+    fn a_book_result_names_the_reader_skill_and_outcome() {
+        let packet = build_skill_book_result(&BookResult {
+            character_id: 7,
+            mastery: true,
+            skill_id: 1121001,
+            master_level: 20,
+            used: true,
+            success: false,
+        })
+        .unwrap();
+        let mut expect = Expect::new(&packet.bytes);
+        expect.short(0x33).int(7).byte(1).int(1121001).int(20);
+        expect.byte(1).byte(0).end();
     }
 
     #[test]
