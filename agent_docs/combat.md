@@ -72,8 +72,8 @@ templates from `Mob.nx` (`maxHP`, `exp`, `PADamage`, `bodyAttack`,
   reach covers it, walks down steps toward a target on its own group, and
   jumps off an end toward a lower target only half the time.
 
-Packets follow the v83 layout (16-byte temporary status mask after the mob
-id); HeavenClient used to skip 22 bytes there and now skips 16. After the
+Packets follow the v83 layout (the mob's statuses, a 16-byte mask and its
+entries, after the mob id; see "Mob statuses"). After the
 stance come two footholds: the one the mob stands on, then its spawn point's.
 v83 puts the mob on the first, at the point along it nearest its x, so a mob
 whose `cy` is a pixel off a slope does not fall; with 0 it falls from its
@@ -348,6 +348,36 @@ the v83 book from `UIClassic.nx`, laid out from 2008 footage:
 
 A new card also prints "[Card name] has been successfully registered in the
 Monster Book." in the chat log in pink (`#FFA194`, from footage).
+## Mob statuses
+
+Players' skills put temporary statuses on mobs (`game::MobStat`, by their
+bit in v83's 128-bit mask). MOB_STAT_SET (0xF2) shows one put on to the
+whole map and MOB_STAT_RESET (0xF3) shows it wear off; both spawn packets
+carry the statuses a mob has. Entries come in the client's decode order
+(`MobStat::DECODE_ORDER`), not bit order.
+
+- USE_SKILL carries the mobs the client found in the skill's area.
+  `skills::mob_debuffs` says what such a skill puts on (Threaten, Slow,
+  Seal, Doom, Shadow Web, Ninja Ambush), and the field rolls its `prop` for
+  each mob still in the area (`FieldRequest::MobDebuff`). The Crashes and
+  Dispel take mob buffs off instead.
+- An attack's hits carry `skills::on_hit`: the attack skill's own status
+  (stuns, Panic's darkness, freezes, poisons) and a learned Venom's poison.
+  Each mob hit for more than 0 rolls each.
+- Bosses shrug off Stun, Freeze, Seal, Doom and Web. A mob immune to poison
+  (`elemAttr` S1) or ice (I1) shrugs off Poison or Freeze.
+- Poison, Venom and Ambush take HP each second on the field tick
+  (`MobSet::hurt_by_statuses`), the mob's `fixedDamage` instead if it has
+  one, never below 1 HP. The damage counts toward the inflicter's EXP share,
+  and they see the HP bar. Every client shows the numbers itself
+  (HeavenClient `MobHurts`).
+- Statuses wear off on the field tick.
+
+HeavenClient keeps a mob's statuses (`MobStatParser`): Slow feeds its speed,
+Doom shows it as a Blue Snail, Stun, Freeze and Web hold it, and the
+reason skill's `mob` effect plays. The formulas for poison, Venom and Ambush
+come from OdinMS-family servers; `v83ref` report 157 has the detail.
+
 ## Reactors
 
 A map's `reactor` nodes (`game_data::MapReactorTemplate`) place reactors such

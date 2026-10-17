@@ -173,6 +173,13 @@ namespace ms
 					return dn.update();
 				}
 		);
+
+		// Poison and the like show as a plain first hit (0x6691d3).
+		for (const auto &[head, number] : mobs.take_hurts())
+		{
+			damagenumbers.emplace_back(DamageNumber::Type::NORMAL, number, damage_layout::mob_offset(0, false));
+			damagenumbers.back().set_anchor(head);
+		}
 	}
 
 	void Combat::use_move(int32_t move_id)

@@ -6,6 +6,7 @@ use crate::handler::{
 use crate::packet::build::world::inventory;
 use crate::packet::build::world::mob::{self, FROM_TOUCH};
 use crate::packet::build::world::stat::{self, StatUpdate};
+use crate::skills;
 use game::InventoryType;
 use packet::{io::read::PktRead, Packet};
 use std::io::Cursor;
@@ -96,6 +97,8 @@ impl WorldHandler for AttackHandler {
         };
         let mut result = HandlerResult::empty();
         let mut skill_level = 0;
+        let ranged = attack.kind == AttackKind::Ranged;
+        let inflicts = skills::on_hit(ctx.player, uses.skill.as_ref(), ranged, rand::random());
         if let Some(skill) = uses.skill {
             let mp = ctx.player.add_mp(-combat::attack_mp_cost(&skill));
             result = HandlerResult::reply(stat::build_stat_update(false, &[StatUpdate::Mp(mp)])?);
@@ -122,7 +125,11 @@ impl WorldHandler for AttackHandler {
                 )
             })
             .collect();
-        Ok(result.with(WorldAction::Field(FieldRequest::Attack { broadcast, hits })))
+        Ok(result.with(WorldAction::Field(FieldRequest::Attack {
+            broadcast,
+            hits,
+            inflicts,
+        })))
     }
 }
 
