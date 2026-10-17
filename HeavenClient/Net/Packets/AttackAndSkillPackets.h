@@ -197,6 +197,68 @@ namespace ms
 		}
 	};
 
+	// Opcode: USE_SKILL(91)
+	class SummonSkillPacket : public OutPacket
+	{
+	public:
+		// Cast a summon where it should appear, facing as the player
+		// (FUN_0096b140). Unlike the other skills it ends with no lock.
+		SummonSkillPacket(int32_t skillid, int32_t level, Point<int16_t> position, bool left) : OutPacket(OutPacket::Opcode::USE_SKILL)
+		{
+			write_time();
+			write_int(skillid);
+			write_byte(static_cast<uint8_t>(level));
+			write_point(position);
+			write_byte(left);
+		}
+	};
+
+	// Opcode: SUMMON_ATTACK(176)
+	class SummonAttackPacket : public OutPacket
+	{
+	public:
+		// One hit on a mob.
+		struct Hit
+		{
+			int32_t oid;
+			int32_t mobid;
+			Point<int16_t> position;
+			bool mobleft;
+			int16_t delay;
+			int32_t damage;
+		};
+
+		// The player's summon attacked with its `action` (0x7a57d4): where
+		// the player and it are, then each mob it hit once.
+		SummonAttackPacket(int32_t oid, uint8_t action, bool left, Point<int16_t> owner, Point<int16_t> summon, const std::vector<Hit>& hits) : OutPacket(OutPacket::Opcode::SUMMON_ATTACK)
+		{
+			write_int(oid);
+			write_time();
+			write_byte(static_cast<int8_t>((left ? 0x80 : 0) | (action & 0x7F)));
+			write_byte(static_cast<int8_t>(hits.size()));
+			write_point(owner);
+			write_point(summon);
+
+			for (const Hit& hit : hits)
+			{
+				write_int(hit.oid);
+				write_int(hit.mobid);
+				// Its hit action, facing, and the damage stat.
+				write_byte(6);
+				write_byte(static_cast<int8_t>(hit.mobleft ? 0x80 : 0));
+				write_byte(0);
+				write_byte(0);
+				write_point(hit.position);
+				write_point(hit.position);
+				write_short(hit.delay);
+				write_int(hit.damage);
+			}
+
+			// The skill data's checksum.
+			write_int(0);
+		}
+	};
+
 	// Tells the server which mobs Monster Magnet reached: each one's oid, 0
 	// for one out of sight, and whether it was caught (0x96c62a). It may
 	// reach none.

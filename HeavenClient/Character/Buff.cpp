@@ -69,6 +69,7 @@ namespace ms
 			case 43: return HAMSTRING;
 			case 44: return BLIND;
 			case 45: return CONCENTRATE;
+			case 46: return PUPPET;
 			case 47: return ECHO_OF_HERO;
 			case 49: return GHOST_MORPH;
 			case 82: return ENERGY_CHARGE;

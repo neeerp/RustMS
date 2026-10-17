@@ -1546,6 +1546,11 @@ namespace ms
 		return active && !dying;
 	}
 
+	int32_t Mob::get_id() const
+	{
+		return id;
+	}
+
 	bool Mob::blocks_teleport() const
 	{
 		return blocksteleport;

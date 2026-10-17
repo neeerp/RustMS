@@ -26,6 +26,7 @@ mod reactor;
 mod rearrange;
 mod script_portal;
 mod spend_points;
+mod summon;
 mod use_item;
 mod use_skill;
 mod whisper;
@@ -60,6 +61,7 @@ pub use self::reactor::DamageReactorHandler;
 pub use self::rearrange::{GatherItemsHandler, SortItemsHandler};
 pub use self::script_portal::ChangeMapSpecialHandler;
 pub use self::spend_points::{SpendApHandler, SpendSpHandler};
+pub use self::summon::{DamageSummonHandler, MoveSummonHandler, SummonAttackHandler};
 pub use self::use_item::{HealOverTimeHandler, UseItemHandler, UseSkillBookHandler};
 pub use self::use_skill::{
     party_skill_reached, CancelBuffHandler, SkillEffectHandler, ThrowGrenadeHandler,

@@ -68,6 +68,9 @@ pub enum RecvOpcode {
     ThrowGrenade = 0x6D,
 
     ChangeKeybinds = 0x87,
+    MoveSummon = 0xAF,
+    SummonAttack = 0xB0,
+    DamageSummon = 0xB1,
     MoveLife = 0xBC,
     MobDistance = 0xBD,
     NpcAction = 0xC5,

@@ -154,6 +154,47 @@ pub fn use_skill(skill_id: i32, level: u8) -> Packet {
     p
 }
 
+/// USE_SKILL of a summon skill, putting it at (x, y) facing left or not.
+pub fn summon(skill_id: i32, level: u8, x: i16, y: i16, left: bool) -> Packet {
+    let mut p = use_skill(skill_id, level);
+    p.write_short(x).unwrap();
+    p.write_short(y).unwrap();
+    p.write_byte(u8::from(left)).unwrap();
+    p
+}
+
+/// SUMMON_ATTACK: summon `object_id` hitting mob `mob` once, as HeavenClient
+/// sends it (0x7a57d4).
+pub fn summon_attack(object_id: i32, mob: i32, mob_id: i32, damage: i32) -> Packet {
+    let mut p = Packet::new_empty();
+    p.write_short(RecvOpcode::SummonAttack as i16).unwrap();
+    p.write_int(object_id).unwrap();
+    p.write_int(0).unwrap();
+    p.write_byte(0x84).unwrap();
+    p.write_byte(1).unwrap();
+    p.write_bytes(&[0; 8]).unwrap();
+    p.write_int(mob).unwrap();
+    p.write_int(mob_id).unwrap();
+    p.write_bytes(&[6, 0x80, 0, 0]).unwrap();
+    p.write_bytes(&[0; 8]).unwrap();
+    p.write_short(100).unwrap();
+    p.write_int(damage).unwrap();
+    p.write_int(0).unwrap();
+    p
+}
+
+/// DAMAGE_SUMMON: a mob's touch (attack -1) hurting summon `object_id`.
+pub fn damage_summon(object_id: i32, damage: i32, mob_id: i32) -> Packet {
+    let mut p = Packet::new_empty();
+    p.write_short(RecvOpcode::DamageSummon as i16).unwrap();
+    p.write_int(object_id).unwrap();
+    p.write_byte(0xFF).unwrap();
+    p.write_int(damage).unwrap();
+    p.write_int(mob_id).unwrap();
+    p.write_byte(0).unwrap();
+    p
+}
+
 /// CANCEL_BUFF: right-clicking a skill's buff icon.
 pub fn cancel_buff(skill_id: i32) -> Packet {
     let mut p = Packet::new_empty();
@@ -238,6 +279,27 @@ pub struct Field {
     pub mists: Vec<MapMist>,
     /// Object ids of the mists removed.
     pub mists_removed: Vec<i32>,
+    pub summons: Vec<MapSummon>,
+    /// (object id, why it went)
+    pub summons_removed: Vec<(i32, u8)>,
+    /// Summon paths relayed from their owners: object ids.
+    pub summons_moved: Vec<i32>,
+    /// (object id, action, (mob object id, damage) per hit)
+    pub summon_attacks: Vec<(i32, u8, Vec<(i32, i32)>)>,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct MapSummon {
+    pub owner_id: i32,
+    pub object_id: i32,
+    pub skill_id: i32,
+    pub level: u8,
+    pub x: i16,
+    pub y: i16,
+    pub moves: u8,
+    pub assist: u8,
+    /// Whether it plays its `summoned` animation.
+    pub appears: bool,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -301,6 +363,48 @@ impl Field {
             });
         } else if op == SendOpcode::RemoveMist as i16 {
             self.mists_removed.push(r.read_int().unwrap());
+        } else if op == SendOpcode::SpawnSummon as i16 {
+            let owner_id = r.read_int().unwrap();
+            let object_id = r.read_int().unwrap();
+            let skill_id = r.read_int().unwrap();
+            r.read_byte().unwrap();
+            let level = r.read_byte().unwrap();
+            let (x, y) = (r.read_short().unwrap(), r.read_short().unwrap());
+            r.read_byte().unwrap();
+            r.read_short().unwrap();
+            self.summons.push(MapSummon {
+                owner_id,
+                object_id,
+                skill_id,
+                level,
+                x,
+                y,
+                moves: r.read_byte().unwrap(),
+                assist: r.read_byte().unwrap(),
+                appears: r.read_byte().unwrap() == 0,
+            });
+        } else if op == SendOpcode::RemoveSummon as i16 {
+            r.read_int().unwrap();
+            let object_id = r.read_int().unwrap();
+            self.summons_removed
+                .push((object_id, r.read_byte().unwrap()));
+        } else if op == SendOpcode::MoveSummon as i16 {
+            r.read_int().unwrap();
+            self.summons_moved.push(r.read_int().unwrap());
+        } else if op == SendOpcode::SummonAttack as i16 {
+            r.read_int().unwrap();
+            let object_id = r.read_int().unwrap();
+            r.read_byte().unwrap();
+            let action = r.read_byte().unwrap();
+            let count = r.read_byte().unwrap();
+            let hits = (0..count)
+                .map(|_| {
+                    let mob = r.read_int().unwrap();
+                    r.read_byte().unwrap();
+                    (mob, r.read_int().unwrap())
+                })
+                .collect();
+            self.summon_attacks.push((object_id, action, hits));
         } else if op == SendOpcode::SpawnMonsterControl as i16 {
             let mode = r.read_byte().unwrap();
             let oid = r.read_int().unwrap();

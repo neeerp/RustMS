@@ -414,6 +414,36 @@ pub enum FieldRequest {
         giver_name: String,
         up: bool,
     },
+    /// The player called up their skill's summon at `at`, facing left or
+    /// not, for `lasts`, replacing the one their buff of that kind gave.
+    /// With `appear` it plays its `summoned` animation, but not when it
+    /// follows them to a new map.
+    Summon {
+        skill_id: i32,
+        level: i32,
+        at: (i16, i16),
+        left: bool,
+        lasts: std::time::Duration,
+        appear: bool,
+    },
+    /// Send away the player's summon of this skill, or all of them.
+    Unsummon {
+        skill_id: Option<i32>,
+        why: crate::packet::build::world::summon::Gone,
+    },
+    /// The player's client moved their summon.
+    SummonMove {
+        object_id: i32,
+        start: (i16, i16),
+        movement: Vec<u8>,
+    },
+    /// The player's summon attacked; it must keep to its skill's limits.
+    SummonAttack {
+        attack: crate::summons::SummonAttack,
+        limits: Vec<crate::summons::Limit>,
+    },
+    /// A mob hurt the player's Puppet.
+    SummonDamage(crate::summons::SummonDamage),
 }
 
 impl ReplyAction for WorldAction {
@@ -521,6 +551,9 @@ fn world_routes() -> &'static HashMap<i16, WorldRoute> {
             (Op::MesoDrop, InGame(&world::MesoDropHandler)),
             (Op::CharInfoRequest, InGame(&world::CharInfoRequestHandler)),
             (Op::GiveFame, InGame(&world::GiveFameHandler)),
+            (Op::MoveSummon, InGame(&world::MoveSummonHandler)),
+            (Op::SummonAttack, InGame(&world::SummonAttackHandler)),
+            (Op::DamageSummon, InGame(&world::DamageSummonHandler)),
         ];
         table
             .into_iter()
@@ -551,7 +584,7 @@ mod tests {
     fn every_registered_opcode_is_unique_per_server() {
         // The maps would silently drop duplicates; check the table sizes match.
         assert_eq!(login_routes().len(), 13);
-        assert_eq!(world_routes().len(), 49);
+        assert_eq!(world_routes().len(), 52);
     }
 
     #[test]

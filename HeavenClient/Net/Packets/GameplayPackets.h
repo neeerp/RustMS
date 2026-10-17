@@ -226,6 +226,19 @@ namespace ms
 		}
 	};
 
+	// Opcode: MOVE_SUMMON(175)
+	class MoveSummonPacket : public MovementPacket
+	{
+	public:
+		// The player's summon moved (FUN_009c84e9): its object id, then a
+		// path as the player's.
+		MoveSummonPacket(int32_t oid, const move_path::Path& path) : MovementPacket(OutPacket::Opcode::MOVE_SUMMON)
+		{
+			write_int(oid);
+			writepath(path.start, path.elements);
+		}
+	};
+
 	// Shows the player's emote to the rest of the map
 	// Opcode: FACE_EXPRESSION(51)
 	class FaceExpressionPacket : public OutPacket

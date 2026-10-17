@@ -2,6 +2,7 @@ use crate::actor::field_drops::{Drop, DropSet};
 use crate::actor::field_mists::MistSet;
 use crate::actor::field_mobs::{split_exp, MobSet, Sharer};
 use crate::actor::field_reactors::{Hit, ReactorSet};
+use crate::actor::field_summons::SummonSet;
 use crate::message::{ClientHandle, FieldKey, FieldMessage, ServerMessage};
 use game::FieldAvatar;
 use net::packet::build::world::drop::{build_drop, build_remove_drop, DropAppearance};
@@ -20,7 +21,12 @@ use net::packet::build::world::npc::{
 use net::packet::build::world::reactor::{
     build_hit_reactor, build_remove_reactor, build_spawn_reactor,
 };
+use net::packet::build::world::summon::{
+    build_damage_summon, build_move_summon, build_remove_summon, build_spawn_summon,
+    build_summon_attack, Gone, SummonView,
+};
 use net::skills::{self, Inflict};
+use net::summons::{self, Limit, SummonAttack, SummonDamage};
 use net::{ClientId, FieldRequest};
 use packet::Packet;
 use std::collections::HashMap;
@@ -56,9 +62,14 @@ const QUEST_NPC_REACH_Y: i32 = 800;
 /// servers; v83's client starts the mist's time then).
 const MIST_DELAY: i16 = 8;
 
+/// How far from its owner a client may put a summon: a Puppet goes 200 px
+/// ahead, onto a foothold within 80 px up or down (FUN_0096b140).
+const SUMMON_REACH_X: i32 = 250;
+const SUMMON_REACH_Y: i32 = 150;
+
 /// One live copy of a map. It owns everything local to that map: who is on
 /// it and where, its NPCs, mobs, drops, and reactors, which advance on
-/// `tick`.
+/// `tick`, and its players' mists and summons.
 pub struct FieldActor {
     key: FieldKey,
     rx: mpsc::Receiver<FieldMessage>,
@@ -70,6 +81,7 @@ pub struct FieldActor {
     drops: DropSet,
     reactors: ReactorSet,
     mists: MistSet,
+    summons: SummonSet,
     tick: Duration,
 }
 
@@ -95,6 +107,7 @@ impl FieldActor {
             drops,
             reactors,
             mists: MistSet::default(),
+            summons: SummonSet::default(),
             tick,
         }
     }
@@ -136,6 +149,12 @@ impl FieldActor {
             }
         }
         self.reach_from_mists(now);
+        for summon in self.summons.expire(now) {
+            let view = summon.view;
+            if let Ok(packet) = build_remove_summon(view.owner_id, view.object_id, Gone::Expired) {
+                self.broadcast(None, packet);
+            }
+        }
         for hurt in self.mobs.hurt_by_statuses(now) {
             if let (Some(occupant), Ok(packet)) = (
                 self.occupants.get(&hurt.from),
@@ -335,6 +354,26 @@ impl FieldActor {
                     giver_name,
                     up,
                 } => self.handle_fame(from, target, giver_name, up),
+                FieldRequest::Summon {
+                    skill_id,
+                    level,
+                    at,
+                    left,
+                    lasts,
+                    appear,
+                } => self.handle_summon(from, skill_id, level, at, left, lasts, appear),
+                FieldRequest::Unsummon { skill_id, why } => {
+                    self.handle_unsummon(from, skill_id, why)
+                }
+                FieldRequest::SummonMove {
+                    object_id,
+                    start,
+                    movement,
+                } => self.handle_summon_move(from, object_id, start, movement),
+                FieldRequest::SummonAttack { attack, limits } => {
+                    self.handle_summon_attack(from, attack, &limits)
+                }
+                FieldRequest::SummonDamage(damage) => self.handle_summon_damage(from, damage),
             },
             FieldMessage::SpawnLoot {
                 owner,
@@ -659,6 +698,152 @@ impl FieldActor {
         }
     }
 
+    /// `from` called up a summon. It replaces their summon of that kind,
+    /// which the others see dismissed.
+    #[allow(clippy::too_many_arguments)]
+    fn handle_summon(
+        &mut self,
+        from: ClientId,
+        skill_id: i32,
+        level: i32,
+        at: (i16, i16),
+        left: bool,
+        lasts: Duration,
+        appear: bool,
+    ) {
+        let Some(owner) = self.occupants.get(&from) else {
+            return;
+        };
+        let (Some((moves, assist)), Some(skill)) =
+            (summons::kind(skill_id), skills::at_level(skill_id, level))
+        else {
+            return;
+        };
+        let avatar = &owner.avatar;
+        let near = (i32::from(at.0) - i32::from(avatar.x)).abs() <= SUMMON_REACH_X
+            && (i32::from(at.1) - i32::from(avatar.y)).abs() <= SUMMON_REACH_Y;
+        let (x, y) = if near { at } else { (avatar.x, avatar.y) };
+        let view = SummonView {
+            owner_id: avatar.id,
+            object_id: 0,
+            skill_id,
+            owner_level: avatar.level,
+            level: level as u8,
+            x,
+            y,
+            stance: u8::from(left),
+            moves,
+            assist,
+        };
+        let hp = summons::hp(&skill);
+        let (view, replaced) = self.summons.add(view, from, hp, lasts, Instant::now());
+        if let Some(old) = replaced {
+            self.remove_summon(&old.view, Gone::Dismissed);
+        }
+        if let Ok(packet) = build_spawn_summon(&view, appear) {
+            self.broadcast(None, packet);
+        }
+    }
+
+    fn handle_unsummon(&mut self, from: ClientId, skill_id: Option<i32>, why: Gone) {
+        for summon in self.summons.remove_owned(from, skill_id) {
+            self.remove_summon(&summon.view, why);
+        }
+    }
+
+    fn remove_summon(&self, view: &SummonView, why: Gone) {
+        if let Ok(packet) = build_remove_summon(view.owner_id, view.object_id, why) {
+            self.broadcast(None, packet);
+        }
+    }
+
+    fn handle_summon_move(
+        &mut self,
+        from: ClientId,
+        object_id: i32,
+        start: (i16, i16),
+        movement: Vec<u8>,
+    ) {
+        let Some(summon) = self.summons.owned(from, object_id) else {
+            return;
+        };
+        let view = &mut summon.view;
+        if let Some((x, y, stance)) =
+            parse_movement_state(&movement, (start.0, start.1, view.stance))
+        {
+            (view.x, view.y, view.stance) = (x, y, stance);
+        }
+        let owner_id = view.owner_id;
+        if let Ok(packet) = build_move_summon(owner_id, object_id, start, &movement) {
+            self.broadcast(Some(from), packet);
+        }
+    }
+
+    /// `from`'s summon attacked. An attack beyond its skill's reach or
+    /// damage cap, or one that hits a mob twice, counts for nothing.
+    fn handle_summon_attack(&mut self, from: ClientId, attack: SummonAttack, limits: &[Limit]) {
+        let Some(summon) = self.summons.owned(from, attack.object_id) else {
+            return;
+        };
+        let view = summon.view;
+        let Some(limit) = limits.iter().find(|limit| limit.skill_id == view.skill_id) else {
+            return;
+        };
+        let hits = &attack.hits;
+        let mut mobs: Vec<i32> = hits.iter().map(|hit| hit.object_id).collect();
+        mobs.sort_unstable();
+        mobs.dedup();
+        if hits.len() > limit.mob_count as usize
+            || mobs.len() != hits.len()
+            || hits
+                .iter()
+                .any(|hit| !(0..=limit.max_damage).contains(&hit.damage))
+        {
+            warn!(
+                from,
+                skill_id = view.skill_id,
+                ?attack,
+                ?limit,
+                "Summon attack refused"
+            );
+            return;
+        }
+        let Ok(broadcast) = build_summon_attack(&view, attack.action, hits) else {
+            return;
+        };
+        let hits = hits
+            .iter()
+            .map(|hit| (hit.object_id, i64::from(hit.damage)))
+            .collect();
+        self.handle_attack(from, broadcast, hits, &[]);
+    }
+
+    /// A mob hurt `from`'s Puppet: the others see it, and it breaks at
+    /// 0 HP, ending its owner's buff.
+    fn handle_summon_damage(&mut self, from: ClientId, damage: SummonDamage) {
+        let Some(summon) = self.summons.owned(from, damage.object_id) else {
+            return;
+        };
+        let Some(hp) = summon.hp.as_mut() else {
+            return;
+        };
+        *hp -= damage.damage;
+        let (broken, view) = (*hp <= 0, summon.view);
+        if let Ok(packet) = build_damage_summon(view.owner_id, &damage) {
+            self.broadcast(Some(from), packet);
+        }
+        if !broken {
+            return;
+        }
+        self.summons.remove(view.object_id);
+        self.remove_summon(&view, Gone::Broken);
+        if let Some(owner) = self.occupants.get(&from) {
+            owner.handle.send(ServerMessage::SummonBroken {
+                skill_id: view.skill_id,
+            });
+        }
+    }
+
     /// Each mist due puts its statuses, with its chance, on the live mobs
     /// in it that lack them (OdinMS-family servers).
     fn reach_from_mists(&mut self, now: Instant) {
@@ -803,6 +988,10 @@ impl FieldActor {
         let client_id = handle.client_id;
         // A rejoin replaces the previous entry without announcing a leave.
         self.occupants.remove(&client_id);
+        // Its summons come back with it.
+        for summon in self.summons.remove_owned(client_id, None) {
+            self.remove_summon(&summon.view, Gone::Silently);
+        }
 
         for map_npc in &self.map_npcs {
             match build_spawn_npc(&to_foreign_npc(map_npc)) {
@@ -847,6 +1036,13 @@ impl FieldActor {
             }
         }
 
+        // After their owners, whose summons they are.
+        for summon in self.summons.views() {
+            if let Ok(packet) = build_spawn_summon(summon, false) {
+                handle.send_packet(packet);
+            }
+        }
+
         let now = Instant::now();
         for drop in self.drops.all().filter(|drop| drop.visible_to(client_id)) {
             if let Ok(packet) = build_drop(&drop.view(now), DropAppearance::Lying) {
@@ -874,6 +1070,8 @@ impl FieldActor {
         if self.occupants.remove(&client_id).is_none() {
             return;
         }
+        // The others drop a player's summons with the player.
+        self.summons.remove_owned(client_id, None);
         // Everyone sees the player go before control passes on.
         match build_player_leave_field(client_id) {
             Ok(packet) => self.broadcast(None, packet),
@@ -1471,5 +1669,172 @@ mod tests {
             other => panic!("expected a miss, got {other:?}"),
         }
         assert!(first_rx.try_recv().is_err());
+    }
+
+    /// Two players on a field with a long tick, everything they got so far
+    /// read.
+    async fn two_players() -> (
+        mpsc::Sender<FieldMessage>,
+        mpsc::Receiver<ServerMessage>,
+        mpsc::Receiver<ServerMessage>,
+    ) {
+        let field = spawn_field();
+        let (first, mut first_rx) = client(1);
+        let (second, mut second_rx) = client(2);
+        for (handle, id) in [(first, 1), (second, 2)] {
+            field
+                .send(FieldMessage::Join {
+                    handle,
+                    avatar: avatar(id, 0, 0),
+                    party: None,
+                })
+                .await
+                .unwrap();
+        }
+        opcodes(&mut first_rx).await;
+        opcodes(&mut second_rx).await;
+        (field, first_rx, second_rx)
+    }
+
+    fn summon(skill_id: i32, at: (i16, i16), lasts: Duration) -> FieldMessage {
+        FieldMessage::FromClient {
+            from: 1,
+            request: FieldRequest::Summon {
+                skill_id,
+                level: 20,
+                at,
+                left: true,
+                lasts,
+                appear: true,
+            },
+        }
+    }
+
+    #[tokio::test]
+    async fn a_puppet_shows_to_all_takes_its_owners_hits_and_breaks() {
+        if skills::data().is_err() {
+            return;
+        }
+        let (field, mut first_rx, mut second_rx) = two_players().await;
+        let puppet = summons::PUPPETS[0];
+        // Too far from its owner: it goes where they stand.
+        field
+            .send(summon(puppet, (900, 0), Duration::from_secs(60)))
+            .await
+            .unwrap();
+        let spawned = next_packet(&mut second_rx).await;
+        assert_eq!(spawned.opcode(), SendOpcode::SpawnSummon as i16);
+        let object_id = i32::from_le_bytes(spawned.bytes[6..10].try_into().unwrap());
+        assert_eq!(&spawned.bytes[16..20], [0, 0, 0, 0]);
+        assert_eq!(
+            next_opcode(&mut first_rx).await,
+            SendOpcode::SpawnSummon as i16
+        );
+
+        // Someone arriving sees it after its owner.
+        let (third, mut third_rx) = client(3);
+        field
+            .send(FieldMessage::Join {
+                handle: third,
+                avatar: avatar(3, 0, 0),
+                party: None,
+            })
+            .await
+            .unwrap();
+        let seen = opcodes(&mut third_rx).await;
+        let at = |op: SendOpcode| {
+            let op = op as i16;
+            seen.iter().position(|&seen| seen == op).unwrap()
+        };
+        assert!(at(SendOpcode::SpawnPlayer) < at(SendOpcode::SpawnSummon));
+        opcodes(&mut first_rx).await;
+        opcodes(&mut second_rx).await;
+
+        let hit = |from, damage| FieldMessage::FromClient {
+            from,
+            request: FieldRequest::SummonDamage(SummonDamage {
+                object_id,
+                attack: -1,
+                damage,
+                mob: Some((100100, false)),
+            }),
+        };
+        // Only its owner's client says what hurt it.
+        field.send(hit(2, 1_000_000)).await.unwrap();
+        field.send(hit(1, 10)).await.unwrap();
+        assert_eq!(
+            next_opcode(&mut second_rx).await,
+            SendOpcode::DamageSummon as i16
+        );
+        let hp = summons::hp(&skills::at_level(puppet, 20).unwrap()).unwrap();
+        field.send(hit(1, hp)).await.unwrap();
+        assert_eq!(
+            next_opcode(&mut second_rx).await,
+            SendOpcode::DamageSummon as i16
+        );
+        let removed = next_packet(&mut second_rx).await;
+        assert_eq!(removed.opcode(), SendOpcode::RemoveSummon as i16);
+        assert_eq!(removed.bytes[10], Gone::Broken as u8);
+        assert_eq!(
+            next_opcode(&mut first_rx).await,
+            SendOpcode::RemoveSummon as i16
+        );
+        match timeout(Duration::from_secs(1), first_rx.recv()).await {
+            Ok(Some(ServerMessage::SummonBroken { skill_id })) => assert_eq!(skill_id, puppet),
+            other => panic!("expected the puppet broken, got {other:?}"),
+        }
+    }
+
+    #[tokio::test]
+    async fn a_summon_attacks_within_its_limits_and_goes_when_its_time_is_up() {
+        if skills::data().is_err() {
+            return;
+        }
+        let (field, mut first_rx, mut second_rx) = two_players().await;
+        let hawk = 3111005;
+        field
+            .send(summon(hawk, (0, 0), Duration::from_millis(300)))
+            .await
+            .unwrap();
+        let spawned = next_packet(&mut second_rx).await;
+        let object_id = i32::from_le_bytes(spawned.bytes[6..10].try_into().unwrap());
+        opcodes(&mut first_rx).await;
+
+        let attack = |damage: &[i32]| FieldMessage::FromClient {
+            from: 1,
+            request: FieldRequest::SummonAttack {
+                attack: SummonAttack {
+                    object_id,
+                    action: 0x84,
+                    hits: damage
+                        .iter()
+                        .enumerate()
+                        .map(|(i, &damage)| summons::SummonHit {
+                            object_id: 2_000_000_000 + i as i32,
+                            action: 6,
+                            damage,
+                        })
+                        .collect(),
+                },
+                limits: vec![Limit {
+                    skill_id: hawk,
+                    mob_count: 1,
+                    max_damage: 100,
+                }],
+            },
+        };
+        field.send(attack(&[101])).await.unwrap();
+        field.send(attack(&[50, 50])).await.unwrap();
+        field.send(attack(&[100])).await.unwrap();
+        // Only the last keeps to the limits; its owner already saw it.
+        assert_eq!(
+            opcodes(&mut second_rx).await,
+            [SendOpcode::SummonAttack as i16]
+        );
+        assert!(first_rx.try_recv().is_err());
+
+        let removed = next_packet(&mut second_rx).await;
+        assert_eq!(removed.opcode(), SendOpcode::RemoveSummon as i16);
+        assert_eq!(removed.bytes[10], Gone::Expired as u8);
     }
 }
