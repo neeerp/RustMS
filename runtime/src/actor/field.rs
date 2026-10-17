@@ -820,7 +820,7 @@ impl FieldActor {
             .iter()
             .map(|hit| (hit.object_id, i64::from(hit.damage)))
             .collect();
-        self.handle_attack(from, broadcast, hits, &[]);
+        self.handle_attack(from, broadcast, hits, limit.inflict.as_slice());
     }
 
     /// A mob hurt `from`'s Puppet: the others see it, and it breaks at
@@ -1844,6 +1844,7 @@ mod tests {
                     skill_id: hawk,
                     mob_count: 1,
                     max_damage: 100,
+                    inflict: None,
                 }],
             },
         };
