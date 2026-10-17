@@ -417,7 +417,7 @@ side yet.
 | --- | --- |
 | Login, world/channel select, character list/create/delete, PIC | Implemented |
 | In-map play: movement, jumping, portals, map change, channel change | Implemented |
-| Combat: melee/ranged/magic attacks, mob HP/death, drops, pickup | Implemented |
+| Combat: melee/ranged/magic attacks, mob HP/death, mob attacks, drops, pickup | Implemented; mob skills absent; see `combat.md` |
 | Inventory, equip, item use, scroll, sort/gather | Implemented |
 | Skills, stat/AP/SP allocation, buffs, keymap | Implemented |
 | NPC dialogue and NPC shop | Implemented (`UINpcTalk`, `UIShop`) |

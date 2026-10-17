@@ -200,7 +200,12 @@ namespace ms
 		mists.update();
 		doors.update(physics);
 		npcs.update(physics);
-		mobs.update(physics, player.get_position(), player.is_dead());
+		Point<int16_t> playerpos = player.get_position();
+		mob_attack::Box playerbody = mob_attack::user_body(playerpos.x(), playerpos.y(), player.is_prone(),
+														   !player.getflip());
+
+		mobs.update(physics, { player.get_oid(), playerpos, playerbody, player.get_phobj().onground,
+							   player.is_dead(), player.has_buff(Buffstat::Id::DARKSIGHT) });
 		chars.update(physics);
 		drops.update(physics);
 
@@ -224,6 +229,21 @@ namespace ms
 		check_touch_portals(drawn);
 		camera.update(player.get_position());
 
+		// Mob attacks land on the player where the mob's update found them,
+		// Dark Sight or not; the first takes the player's invincibility.
+		for (Mob::Landed &landed : mobs.take_attacks())
+		{
+			if (player.is_dead() || player.Char::is_invincible())
+				break;
+
+			MobAttackResult result = player.damage(landed.attack);
+			TakeDamagePacket(result).dispatch();
+			combat.interrupt_prepare(result.damage);
+
+			if (result.damage > 0)
+				player.show_attack_effect(landed.hit, 1);
+		}
+
 		if (player.is_invincible())
 			return;
 
@@ -232,7 +252,7 @@ namespace ms
 			if (MobAttack attack = mobs.create_attack(oid_id))
 			{
 				MobAttackResult result = player.damage(attack);
-				TakeDamagePacket(result, TakeDamagePacket::From::TOUCH).dispatch();
+				TakeDamagePacket(result).dispatch();
 				combat.interrupt_prepare(result.damage);
 			}
 		}

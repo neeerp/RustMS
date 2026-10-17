@@ -20,6 +20,7 @@
 #include <cstdint>
 
 #include "MapObjects.h"
+#include "Mob.h"
 
 #include "../Spawn.h"
 
@@ -37,8 +38,12 @@ namespace ms
 		// Draw all mobs on a layer.
 		void draw(Layer::Id layer, double viewx, double viewy, float alpha) const;
 
-		// Update all mobs. Those with aggro chase the player at `playerpos`.
-		void update(const Physics &physics, Point<int16_t> playerpos, bool playerdead);
+		// Update all mobs. Those with aggro chase the local player, whom all
+		// their attacks may hit.
+		void update(const Physics &physics, const Mob::Target &target);
+
+		// The local player's hits from mob attacks since last asked.
+		std::vector<Mob::Landed> take_attacks();
 
 		// Spawn a new mob.
 		void spawn(MobSpawn &&spawn);
@@ -62,10 +67,11 @@ namespace ms
 		void reset_statuses(int32_t oid, const BuffParser::Flags &flags);
 
 		// The server got a mob's move.
-		void acknowledge(int32_t oid, int16_t moveid, bool nextattack);
+		void acknowledge(int32_t oid, int16_t moveid, bool nextattack, int16_t mp);
 
-		// Update a mob's movements.
-		void send_movement(int32_t oid, Point<int16_t> start, std::vector<Movement> &&movements);
+		// Update a mob's movements, and what it did where they start.
+		void send_movement(int32_t oid, Point<int16_t> start, std::vector<Movement> &&movements, int8_t action,
+						   bool left, int32_t skilldata);
 
 		// Calculate the results of an attack.
 		void

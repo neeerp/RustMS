@@ -27,6 +27,7 @@
 #include <cstdint>
 
 #include "MapObject.h"
+#include "MobAttackRules.h"
 #include "MobHurts.h"
 
 #include "../Movement.h"
@@ -50,6 +51,8 @@ namespace ms
 	{
 	public:
 		static const size_t NUM_STANCES = 6;
+		// The action of attack1; attack2 and on follow (FUN_0066b6fc).
+		static constexpr int8_t ATTACK1 = 12;
 
 		enum Stance : uint8_t
 		{
@@ -95,8 +98,23 @@ namespace ms
 		// 0 - no control, 1 - control, 2 - aggro
 		void set_control(int8_t mode);
 
-		// Tell the mob where the local player is, whom it chases with aggro.
-		void set_target(Point<int16_t> position, bool dead);
+		// The local player, as a mob chases and attacks them.
+		struct Target
+		{
+			int32_t id;
+			Point<int16_t> position;
+			// Where the player's body is, and whether they stand on a
+			// foothold.
+			mob_attack::Box body;
+			bool onground;
+			bool dead;
+			// Dark Sight keeps physical attacks off.
+			bool darksight;
+		};
+
+		// Tell the mob where the local player is, whom it chases with aggro
+		// and whom its attacks hit.
+		void set_target(const Target &target);
 
 		// The player's Puppet `oid` came at `position`: a mob this client
 		// moves that chases someone turns on it, and keeps to it until it
@@ -110,11 +128,24 @@ namespace ms
 		int32_t roll_puppet_damage(int32_t level) const;
 
 		// The server got the move with this id (FUN_0066c23b), saying whether
-		// the mob may attack or cast next.
-		void acknowledge(int16_t moveid, bool nextattack);
+		// the mob may attack or cast next and how much MP it has.
+		void acknowledge(int16_t moveid, bool nextattack, int16_t mp);
 
-		// Queue the controller's path to play (0xEF).
-		void send_movement(Point<int16_t> start, std::vector<Movement> &&movements);
+		// Queue the controller's path to play (0xEF), and what it did where
+		// the path starts: `action` (-1 for nothing), facing left if `left`.
+		void send_movement(Point<int16_t> start, std::vector<Movement> &&movements, int8_t action, bool left,
+						   int32_t skilldata);
+
+		// A hit on the local player from one of the mob's attacks, and what
+		// shows on them.
+		struct Landed
+		{
+			MobAttack attack;
+			Animation hit;
+		};
+
+		// The local player's hits from this mob's attacks since last asked.
+		std::vector<Landed> take_attacks();
 
 		// Kill the mob with the appropriate type:
 		// 0 - make inactive 1 - death animation 2 - fade out
@@ -209,9 +240,45 @@ namespace ms
 		// Start the AI where the shown paths end (FUN_009bbd3d).
 		void seat_body(const Physics &physics);
 
-		// Step the AI ahead until it has a path to send, then send it and
-		// play it (FUN_0066b6fc).
-		void plan(const Physics &physics);
+		// Step the AI ahead until it has a path to send, then send it with
+		// what the mob did (`action`, -1 for nothing) and play it
+		// (FUN_0066b6fc).
+		void plan(const Physics &physics, int8_t action = -1, bool left = false, int32_t skilldata = 0);
+
+		// Pick an attack that reaches the player, if any, and its facing
+		// and skill data (FUN_0066a517).
+		struct Pick
+		{
+			uint8_t index;
+			bool left;
+			int32_t skilldata;
+		};
+
+		std::optional<Pick> pick_attack(const Physics &physics);
+
+		// Attack where the shown path is, hold the AI still while it plays,
+		// and send it (FUN_0066b6fc).
+		void attack(const Physics &physics, const Pick &pick);
+
+		// Play attack `index` from (x, y) and queue what it hits
+		// (FUN_0066d9c0).
+		void do_attack(const Physics &physics, uint8_t index, bool left, int32_t skilldata, Point<int16_t> at);
+
+		// Land the attacks that are due on the local player, and fly the
+		// balls on (FUN_00666362).
+		void update_attacks();
+
+		// What one of the mob's attacks does to the player.
+		MobAttack make_attack(uint8_t index, bool left) const;
+
+		// What its body does to the player, touching or not.
+		MobAttack create_touch_attack_base() const;
+
+		// The value of a status on the mob, or 0.
+		int32_t status_value(uint8_t stat) const;
+
+		// The ground within 100 px up or down of (x, y), if any.
+		std::optional<int16_t> ground_below(const Physics &physics, int16_t x, int16_t y) const;
 
 		// One step of the AI and its physics, recorded into the path.
 		void step_body(const Physics &physics);
@@ -292,6 +359,96 @@ namespace ms
 		void set_level_tag(uint8_t set);
 
 		std::map<Stance, Animation> animations;
+
+		// One of the mob's attacks (attackN/info, FUN_0067fd81). Ranges are
+		// drawn for a mob facing left.
+		struct AttackInfo
+		{
+			// 0 a box in front, 1 a direct shot, 2 a ball, 3 cells on the
+			// ground, 4 cells at the mob's height.
+			uint8_t type;
+			bool magic;
+			uint8_t element;
+			int32_t watk;
+			int32_t conmp;
+			// Ms after the attack starts that it lands and that its effect
+			// shows.
+			int32_t after;
+			int32_t effectafter;
+			// Whether only a player standing on a foothold is hit.
+			bool jump;
+			bool tremble;
+			bool deadly;
+			bool mpburn;
+			mob_attack::Box range;
+			Point<int16_t> sp;
+			int32_t r;
+			mob_attack::Area area;
+			int32_t attackcount;
+			int32_t bulletspeed;
+			// The mob's own action, and what shows on it, flies, lands on the
+			// player and warns of a cell.
+			Animation animation;
+			std::optional<Animation> effect;
+			std::optional<Animation> ball;
+			Animation hit;
+			std::optional<Animation> warning;
+		};
+
+		std::vector<AttackInfo> attacks;
+		// The attack the mob shows, if any, facing left if `attackleft`.
+		std::optional<uint8_t> attacking;
+		bool attackleft = false;
+		// Ms more the AI stands still for its attack.
+		int16_t attackhold = 0;
+		int32_t mp;
+		// Ms the mob has been shown, which its attacks are timed by, and
+		// when it last made an area attack.
+		int32_t clock = 0;
+		int32_t lastarea = -10000;
+		// An attack the controller made where its path starts, to play
+		// next update.
+		std::optional<std::pair<Pick, Point<int16_t>>> remoteattack;
+
+		// A hit on its way: a box that hits the player where it is when
+		// due, or a direct shot (no box) that hits them anyway.
+		struct PendingHit
+		{
+			int32_t due;
+			uint8_t index;
+			bool left;
+			std::optional<mob_attack::Box> box;
+		};
+
+		std::vector<PendingHit> pendinghits;
+
+		// A ball flying from one point to another between two times.
+		struct Ball
+		{
+			int32_t start;
+			int32_t end;
+			Point<int16_t> from;
+			Point<int16_t> to;
+			uint8_t index;
+			bool left;
+			Animation animation;
+		};
+
+		std::vector<Ball> balls;
+		// An effect to show on the mob once due.
+		struct PendingEffect
+		{
+			int32_t due;
+			Animation animation;
+			bool left;
+		};
+
+		std::vector<PendingEffect> pendingeffects;
+		std::vector<Landed> landed;
+		int32_t targetid = 0;
+		mob_attack::Box targetbody{};
+		bool targetonground = false;
+		bool targetdarksight = false;
 		// Its own look, while Doom shows another.
 		std::optional<std::map<Stance, Animation>> ownlook;
 		std::string name;

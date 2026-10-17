@@ -29,7 +29,7 @@ namespace ms
 		mobs.draw(layer, viewx, viewy, alpha);
 	}
 
-	void MapMobs::update(const Physics &physics, Point<int16_t> playerpos, bool playerdead)
+	void MapMobs::update(const Physics &physics, const Mob::Target &target)
 	{
 		for (; !spawns.empty(); spawns.pop())
 		{
@@ -54,10 +54,26 @@ namespace ms
 			Optional<Mob> mob = mmo.second.get();
 
 			if (mob)
-				mob->set_target(playerpos, playerdead);
+				mob->set_target(target);
 		}
 
 		mobs.update(physics);
+	}
+
+	std::vector<Mob::Landed> MapMobs::take_attacks()
+	{
+		std::vector<Mob::Landed> landed;
+
+		for (auto &mmo : mobs)
+		{
+			if (Optional<Mob> mob = mmo.second.get())
+			{
+				for (Mob::Landed &hit : mob->take_attacks())
+					landed.push_back(std::move(hit));
+			}
+		}
+
+		return landed;
 	}
 
 	void MapMobs::spawn(MobSpawn &&spawn)
@@ -84,10 +100,10 @@ namespace ms
 			mob->set_control(mode);
 	}
 
-	void MapMobs::acknowledge(int32_t oid, int16_t moveid, bool nextattack)
+	void MapMobs::acknowledge(int32_t oid, int16_t moveid, bool nextattack, int16_t mp)
 	{
 		if (Optional<Mob> mob = mobs.get(oid))
-			mob->acknowledge(moveid, nextattack);
+			mob->acknowledge(moveid, nextattack, mp);
 	}
 
 	void MapMobs::send_mobhp(int32_t oid, int8_t percent, uint16_t playerlevel)
@@ -114,10 +130,11 @@ namespace ms
 			mob->catch_by(user);
 	}
 
-	void MapMobs::send_movement(int32_t oid, Point<int16_t> start, std::vector<Movement> &&movements)
+	void MapMobs::send_movement(int32_t oid, Point<int16_t> start, std::vector<Movement> &&movements,
+								int8_t action, bool left, int32_t skilldata)
 	{
 		if (Optional<Mob> mob = mobs.get(oid))
-			mob->send_movement(start, std::move(movements));
+			mob->send_movement(start, std::move(movements), action, left, skilldata);
 	}
 
 	void MapMobs::send_attack(AttackResult &result, const Attack &attack, const std::vector<int32_t> &targets,

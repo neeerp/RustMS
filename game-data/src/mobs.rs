@@ -12,6 +12,8 @@ pub struct MobInfo {
     pub exp: i32,
     /// Physical attack (`PADamage`): the most touching it can hurt.
     pub attack: i32,
+    /// Magic attack (`MADamage`), behind its magic attacks.
+    pub magic_attack: i32,
     pub defense: i32,
     pub accuracy: i32,
     pub avoid: i32,
@@ -30,6 +32,29 @@ pub struct MobInfo {
     /// How each element hurts it (`elemAttr`): pairs of an element letter
     /// and a degree, `1` for immune, as "I1S2".
     pub element: String,
+    /// Its attacks (`attack1/info`, `attack2/info`, ...), in order: the
+    /// client names attack `i` by `i`.
+    pub attacks: Vec<MobAttack>,
+}
+
+/// One of a mob's attacks (`attackN/info`), as far as the server cares.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct MobAttack {
+    /// 0 a rectangle, 1 a shot at a target, 2 a ball, 3 and 4 an area.
+    pub kind: i32,
+    /// Hurts with the mob's magic attack rather than its physical one.
+    pub magic: bool,
+    /// The MP it costs the mob (`conMP`).
+    pub mp_cost: i32,
+    /// Its own physical attack (`PADamage`), or 0 for the mob's.
+    pub attack: i32,
+    /// Leaves its victim at 1 HP (`deadlyAttack`).
+    pub deadly: bool,
+    /// The MP it burns (`mpBurn`), or 0.
+    pub mp_burn: i32,
+    /// The mob skill it inflicts (`disease`, `level`): 0 for none.
+    pub disease: i32,
+    pub disease_level: i32,
 }
 
 impl MobInfo {
@@ -63,9 +88,11 @@ impl MobData {
         let Some(mut info) = nx.child_by_name(image, "info")? else {
             return Ok(None);
         };
+        let mut image = image;
         if let Some(link) = nx.string_child(info, "link")? {
             if let Some(linked) = nx.child_by_name(0, &format!("{link}.img"))? {
                 if let Some(linked_info) = nx.child_by_name(linked, "info")? {
+                    image = linked;
                     info = linked_info;
                 }
             }
@@ -79,6 +106,7 @@ impl MobData {
             max_mp: int("maxMP")?,
             exp: int("exp")?,
             attack: int("PADamage")?,
+            magic_attack: int("MADamage")?,
             defense: int("PDDamage")?,
             accuracy: int("acc")?,
             avoid: int("eva")?,
@@ -90,7 +118,32 @@ impl MobData {
             undead: int("undead")? != 0,
             fixed_damage: int("fixedDamage")?,
             element: nx.string_child(info, "elemAttr")?.unwrap_or_default(),
+            attacks: self.attacks(image)?,
         }))
+    }
+
+    fn attacks(&self, image: u32) -> Result<Vec<MobAttack>, GameDataError> {
+        let nx = &self.nx;
+        let mut attacks = Vec::new();
+        while let Some(attack) = nx.child_by_name(image, &format!("attack{}", attacks.len() + 1))? {
+            let Some(info) = nx.child_by_name(attack, "info")? else {
+                break;
+            };
+            let int = |key: &str| -> Result<i32, GameDataError> {
+                Ok(nx.int_child(info, key)?.unwrap_or(0))
+            };
+            attacks.push(MobAttack {
+                kind: int("type")?,
+                magic: int("magic")? != 0,
+                mp_cost: int("conMP")?,
+                attack: int("PADamage")?,
+                deadly: int("deadlyAttack")? != 0,
+                mp_burn: int("mpBurn")?,
+                disease: int("disease")?,
+                disease_level: int("level")?,
+            });
+        }
+        Ok(attacks)
     }
 }
 
@@ -129,6 +182,25 @@ mod tests {
         assert!(!mob(130100).immune_to('F'));
         assert_eq!(mob(9300295).fixed_damage, 1);
         assert_eq!(mob(100100).fixed_damage, 0);
+    }
+
+    #[test]
+    fn reads_attacks() {
+        let Some(path) = crate::test_assets::path("Mob.nx") else {
+            return;
+        };
+        let data = MobData::load(path).unwrap();
+        let mob = |id| data.info(id).unwrap().unwrap();
+        assert!(mob(100100).attacks.is_empty());
+        // Star Pixie: a magic ball for 1 MP.
+        let pixie = mob(3230200);
+        assert_eq!(pixie.magic_attack, 130);
+        assert_eq!(pixie.attacks.len(), 1);
+        let ball = &pixie.attacks[0];
+        assert_eq!((ball.kind, ball.magic, ball.mp_cost), (2, true, 1));
+        // Stumpy's second attack hits harder than its body (125).
+        let second = &mob(3220000).attacks[1];
+        assert_eq!((second.kind, second.magic, second.attack), (2, false, 135));
     }
 
     #[test]
