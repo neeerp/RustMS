@@ -34,4 +34,20 @@ namespace ms
 		void change_map(InPacket& recv, int32_t map_id) const;
 		void set_field(InPacket& recv) const;
 	};
+
+	// A map change the server refused (v83 FUN_0053185c): the request is
+	// answered, and the reason goes to chat or, for 4 and 7, a notice.
+	class BlockedMapHandler : public PacketHandler
+	{
+	public:
+		void handle(InPacket& recv) const override;
+	};
+
+	// A channel, cash shop or trade shop move the server refused (v83
+	// FUN_00531a08): the request is answered and the reason goes to chat.
+	class BlockedServerHandler : public PacketHandler
+	{
+	public:
+		void handle(InPacket& recv) const override;
+	};
 }

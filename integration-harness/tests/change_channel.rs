@@ -7,7 +7,6 @@ use integration_harness::preconditions::load_harness_config_or_fail;
 use integration_harness::trace::step;
 use integration_harness::{login_to_world_session, HarnessError};
 use net::packet::op::SendOpcode;
-use std::collections::BTreeMap;
 use tokio::time::{timeout, Duration};
 
 async fn read_world_entry(
@@ -204,13 +203,17 @@ async fn refused_channel_changes_still_answer() {
         .await
         .expect("player failed to login");
     let c = &mut session.connection;
-    let only_unlock = [BTreeMap::new()];
-
     // The client waits on an answer before its next request, so asking for
-    // the channel it is on, or one that doesn't exist, still answers.
+    // the channel it is on, or one that doesn't exist, still answers:
+    // BLOCKED_SERVER 1, "You cannot move that channel."
     for (marker, channel) in [("same channel", 2), ("unknown channel", 200)] {
         let request = build_change_channel(channel).expect("build change-channel request");
         let t = step(c, marker, request).await;
-        assert_eq!(t.stat_updates, only_unlock, "{marker}");
+        assert_eq!(
+            t.blocked,
+            [(SendOpcode::BlockedServer as i16, 1)],
+            "{marker}"
+        );
+        assert!(t.stat_updates.is_empty(), "{marker}");
     }
 }

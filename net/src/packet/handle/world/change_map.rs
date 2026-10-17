@@ -3,6 +3,7 @@ use crate::handler::{
     HandlerResult, SpawnPosition, WorldAction, WorldContext, WorldHandler, WorldResult,
 };
 use crate::packet::build;
+use crate::packet::build::world::map::BlockedMap;
 use crate::policy;
 use game::Player;
 use packet::{io::read::PktRead, Packet};
@@ -44,22 +45,19 @@ impl WorldHandler for ChangeMapHandler {
             let source_portal = source_field
                 .portal_by_name(portal_name.as_str())
                 .ok_or(NetworkError::PacketHandlerError("Source portal not found"))?;
-            let destination_map = source_portal
-                .to_map
-                .ok_or(NetworkError::PacketHandlerError(
-                    "Portal has no destination",
-                ))?;
-            let destination_field =
-                game_data
-                    .field(destination_map)
-                    .ok_or(NetworkError::PacketHandlerError(
-                        "Destination field not found",
-                    ))?;
-            let spawn_portal = destination_field
-                .resolve_spawn_portal(source_portal.to_name.as_str())
-                .ok_or(NetworkError::PacketHandlerError(
-                    "Destination spawn portal not found",
-                ))?;
+            // A portal to a map or spawn portal this server lacks is closed,
+            // and the client may try again.
+            let Some((destination_map, spawn_portal)) = source_portal.to_map.and_then(|map_id| {
+                let field = game_data.field(map_id)?;
+                Some((
+                    map_id,
+                    field.resolve_spawn_portal(source_portal.to_name.as_str())?,
+                ))
+            }) else {
+                return Ok(HandlerResult::reply(build::world::map::build_blocked_map(
+                    BlockedMap::PortalClosed,
+                )?));
+            };
             let spawn_point = u8::try_from(spawn_portal.id).map_err(|_| {
                 NetworkError::PacketHandlerError("Destination spawn portal id out of range")
             })?;

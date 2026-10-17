@@ -34,6 +34,8 @@ pub enum SendOpcode {
     FamilyList = 0x64,
     SetField = 0x7D,
     SetCashShop = 0x7F,
+    BlockedMap = 0x83,
+    BlockedServer = 0x84,
     FieldEffect = 0x8A,
     MultiChat = 0x86,
     Whisper = 0x87,
