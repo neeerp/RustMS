@@ -280,6 +280,15 @@ pub enum AttackRejection {
     Ammo,
 }
 
+/// The MP a skill's attack spends: none for Heal, whose USE_SKILL paid.
+pub fn attack_mp_cost(skill: &Learned) -> i32 {
+    if skill.skill_id == skills::HEAL {
+        0
+    } else {
+        skill.effect.mp_cost
+    }
+}
+
 /// Basic attacks hit one mob once; each hit must stay under twice the base
 /// maximum (room for the client's own rolls, never a multiple of it). A
 /// skill attack takes its limits from the skill's level: its mob and hit
@@ -305,12 +314,19 @@ pub fn validate(attack: &Attack, player: &Player) -> Result<Uses, AttackRejectio
             // again for a monster weak to the spell's element (FUN_00790782).
             let max = max_magic_damage(player, effect.magic) * skills::amplification(player) / 100;
             (max * 3).max(10)
+        } else if skill.skill_id == skills::HEAL {
+            // Heal hurts the undead most when it reaches only one, by the
+            // highest roll, and half again on one weak to it.
+            let max = skills::heal_amount(player, effect.hp, 1, 1.0)
+                * f64::from(skills::amplification(player))
+                / 100.0;
+            ((max * 1.5).ceil() as i32).max(10)
         } else if let Some(percent) = damage_percent(&skill) {
             (base_cap * percent / 100).max(10)
         } else {
             return Err(AttackRejection::Skill);
         };
-        if i32::from(player.stats.mp) < effect.mp_cost {
+        if i32::from(player.stats.mp) < attack_mp_cost(&skill) {
             return Err(AttackRejection::NotEnoughMp);
         }
         let hit_count = match attack.kind {

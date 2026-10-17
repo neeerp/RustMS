@@ -37,6 +37,22 @@ impl WorldHandler for UseSkillHandler {
                 }
             };
         }
+        if skill_id == skills::HEAL {
+            let party = r.read_byte()?;
+            return match heal(ctx.player, level, party, rand::random()) {
+                Ok(hp) => {
+                    let mp = ctx.player.stats.mp;
+                    Ok(HandlerResult::reply(stat::build_stat_update(
+                        true,
+                        &[StatUpdate::Hp(hp), StatUpdate::Mp(mp)],
+                    )?))
+                }
+                Err(refusal) => {
+                    debug!(skill_id, level, ?refusal, "Heal refused");
+                    Ok(HandlerResult::reply(stat::build_stat_update(true, &[])?))
+                }
+            };
+        }
         match use_skill(ctx.player, skill_id, level, Instant::now()) {
             Ok(used) => announce(ctx.player, &used),
             Err(refusal) => {
@@ -203,6 +219,26 @@ fn announce_magnet(
         &[StatUpdate::Mp(player.stats.mp)],
     )?)
     .with(WorldAction::Field(FieldRequest::Magnet { effect, caught })))
+}
+
+/// Heal comes before its attack, with a bit for each party member it
+/// reaches (0x96a69d), or 0x80 without a party. It heals the cleric by each
+/// one's share; the party members besides them aren't healed yet. It spends
+/// the MP, so the attack doesn't.
+fn heal(player: &mut Player, level: i32, party: u8, roll: f64) -> Result<i16, Refusal> {
+    if player.stats.hp <= 0 {
+        return Err(Refusal::Dead);
+    }
+    let skill = skills::learned(player, skills::HEAL)
+        .filter(|skill| skill.level == level)
+        .ok_or(Refusal::NotLearned)?;
+    if i32::from(player.stats.mp) < skill.effect.mp_cost {
+        return Err(Refusal::NotEnoughMp);
+    }
+    player.add_mp(-skill.effect.mp_cost);
+    let reached = party.count_ones() as i32;
+    let amount = skills::heal_amount(player, skill.effect.hp, reached, roll);
+    Ok(player.add_hp(amount as i32))
 }
 
 /// The buff a skill gives, and its value at this level.
@@ -428,6 +464,40 @@ mod tests {
             use_skill(&mut player, 1000, 1, Instant::now()).unwrap_err(),
             Refusal::Unsupported
         );
+    }
+
+    #[test]
+    fn heal_heals_the_cleric_by_their_share() {
+        if skills::data().is_err() {
+            return;
+        }
+        let cleric = || {
+            let mut player = beginner_with(skills::HEAL, 30);
+            player.stats.int = 400;
+            player.stats.luk = 100;
+            player.stats.max_hp = 10_000;
+            player.stats.mp = 100;
+            player.stats.max_mp = 100;
+            player
+        };
+        // Alone, the lowest roll: (0.3 + 1) * 300% * (80 * 1.5 + 100) * 400
+        // * 0.005.
+        let mut player = cleric();
+        assert_eq!(heal(&mut player, 30, 0x80, 0.0), Ok(50 + 1716));
+        // Reaching two, each gets (0.6 + 1) / 2 of it.
+        let mut player = cleric();
+        assert_eq!(heal(&mut player, 30, 0x30, 0.0), Ok(50 + 1056));
+        // Heal spends the MP, not its attack.
+        let cost = skills::learned(&player, skills::HEAL)
+            .unwrap()
+            .effect
+            .mp_cost;
+        assert!(cost > 0);
+        assert_eq!(i32::from(player.stats.mp), 100 - cost);
+
+        assert_eq!(heal(&mut player, 29, 0x80, 0.0), Err(Refusal::NotLearned));
+        player.stats.mp = 0;
+        assert_eq!(heal(&mut player, 30, 0x80, 0.0), Err(Refusal::NotEnoughMp));
     }
 
     #[test]

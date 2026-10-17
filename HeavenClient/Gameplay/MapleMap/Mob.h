@@ -149,6 +149,9 @@ namespace ms
 		// Whether Monster Magnet can't catch the mob.
 		bool is_boss() const;
 
+		// Whether Heal hurts the mob.
+		bool is_undead() const;
+
 		// Whether the mob walks or flies.
 		bool can_move() const;
 

@@ -18,6 +18,7 @@
 #include "Mob.h"
 #include "Layer.h"
 
+#include "../Combat/Heal.h"
 #include "../Combat/HitPoint.h"
 #include "../Combat/MonsterMagnet.h"
 #include "../Combat/Prepare.h"
@@ -1181,7 +1182,10 @@ namespace ms
 		if (!hits(accuracy, avoid, hitroll))
 			return 0;
 
-		double damage = base(attack.magic, attack.intelligence, attack.mastery, attack.matk, randomizer.next_real(1.0));
+		double roll = randomizer.next_real(1.0);
+		double damage = attack.heal
+				? heal::base(attack.heal, attack.magic, attack.intelligence, attack.luck, attack.healed, roll)
+				: base(attack.magic, attack.intelligence, attack.mastery, attack.matk, roll);
 		damage = damage * attack.amplify * 0.01;
 		damage = elemental(damage, attack.skill, attack.element, elements);
 		damage = defend(damage, mdef, randomizer.next_real(1.0));
@@ -1274,6 +1278,11 @@ namespace ms
 	bool Mob::blocks_teleport() const
 	{
 		return blocksteleport;
+	}
+
+	bool Mob::is_undead() const
+	{
+		return undead;
 	}
 
 	bool Mob::is_boss() const

@@ -126,6 +126,18 @@ namespace ms
 		// to raise.
 		std::optional<UseSkillPacket::Reach> find_reach(int32_t skill, int32_t level);
 
+		// The party members a skill reaches in `range`, a bit for each in
+		// `mask`, and how many (0x96db3f).
+		int32_t find_party(int32_t skill, Rectangle<int16_t> range, uint8_t &mask) const;
+
+		// Tell the server whom in the party Heal heals (0x96a69d), and how
+		// many.
+		int32_t request_heal();
+
+		// The undead in `range` that Heal hurts, at most `count`, in the
+		// order they entered the map (FUN_00678760).
+		std::vector<int32_t> find_undead(Rectangle<int16_t> range, uint8_t count) const;
+
 		// Use the move. A held skill hits with its `charge`, and its shots
 		// while held keep the body's action (`held`).
 		void apply_move(const SpecialMove &move, int32_t charge = 0, bool held = false);

@@ -19,6 +19,7 @@
 
 #include "ChainLightning.h"
 #include "DamageLayout.h"
+#include "Heal.h"
 #include "HitTiming.h"
 #include "PointBlank.h"
 #include "Prepare.h"
@@ -359,39 +360,7 @@ namespace ms
 
 		if (kinds & skill_use::PARTY)
 		{
-			const Party &party = player.get_party();
-
-			if (!party.exists())
-			{
-				reach.party = skill_use::ALONE;
-				members = 1;
-			}
-
-			for (const PartyMember &member : party.get_members())
-			{
-				bool self = member.id == player.get_oid();
-				bool dead = false;
-
-				if (self)
-				{
-					dead = player.is_dead();
-				}
-				else
-				{
-					Optional<OtherChar> other = chars.get_char(member.id);
-
-					if (!other || !range.contains(other->get_position()))
-						continue;
-
-					dead = other->is_dead();
-				}
-
-				if (skill_use::reaches(skill, self, dead))
-				{
-					reach.party |= skill_use::party_bit(member.slot);
-					members++;
-				}
-			}
+			members = find_party(skill, range, reach.party);
 
 			if (!skill_use::sends(skill, reach.party))
 				return std::nullopt;
@@ -404,10 +373,101 @@ namespace ms
 		return reach;
 	}
 
+	int32_t Combat::find_party(int32_t skill, Rectangle<int16_t> range, uint8_t &mask) const
+	{
+		const Party &party = player.get_party();
+		int32_t members = 0;
+
+		if (!party.exists())
+		{
+			mask = skill_use::ALONE;
+			members = 1;
+		}
+
+		for (const PartyMember &member : party.get_members())
+		{
+			bool self = member.id == player.get_oid();
+			bool dead = false;
+
+			if (self)
+			{
+				dead = player.is_dead();
+			}
+			else
+			{
+				Optional<OtherChar> other = chars.get_char(member.id);
+
+				if (!other || !range.contains(other->get_position()))
+					continue;
+
+				dead = other->is_dead();
+			}
+
+			if (skill_use::reaches(skill, self, dead))
+			{
+				mask |= skill_use::party_bit(member.slot);
+				members++;
+			}
+		}
+
+		return members;
+	}
+
+	int32_t Combat::request_heal()
+	{
+		int32_t level = player.get_skills().get_level(heal::ID);
+		const SkillData::Stats &stats = SkillData::get(heal::ID).get_stats(level);
+		Rectangle<int16_t> range = place_range(player.get_position(), stats.range, 1.0f, !player.getflip());
+
+		UseSkillPacket::Reach reach;
+		int32_t members = find_party(heal::ID, range, reach.party);
+
+		player.request(UseSkillPacket(heal::ID, level, 0, reach), ExclRequest::SKILL_WAIT);
+
+		return members;
+	}
+
+	std::vector<int32_t> Combat::find_undead(Rectangle<int16_t> range, uint8_t count) const
+	{
+		MapObjects *objs = mobs.get_mobs();
+		std::multimap<uint32_t, int32_t> candidates;
+
+		for (auto &mmo : *objs)
+		{
+			const Mob *mob = static_cast<const Mob *>(mmo.second.get());
+
+			if (mob && mob->is_alive() && mob->is_undead() && mob->is_in_range(range))
+				candidates.emplace(objs->entry_order(mob->get_oid()), mob->get_oid());
+		}
+
+		std::vector<int32_t> targets;
+
+		for (auto &candidate : candidates)
+		{
+			if (targets.size() >= count)
+				break;
+
+			targets.push_back(candidate.second);
+		}
+
+		return targets;
+	}
+
 	void Combat::apply_move(const SpecialMove &move, int32_t charge, bool held)
 	{
 		if (move.is_attack())
 		{
+			// Heal asks the server first, as a skill that doesn't attack.
+			int32_t healed = 0;
+
+			if (move.get_id() == heal::ID)
+			{
+				if (!player.can_request(ExclRequest::SKILL_WAIT))
+					return;
+
+				healed = request_heal();
+			}
+
 			Attack attack = player.prepare_attack(move.is_skill() ? move.get_id() : 0);
 			attack.charge = charge;
 			Stance::Id whack = Stance::Id::NONE;
@@ -527,6 +587,13 @@ namespace ms
 						}
 					}
 				}
+			} else if (attack.skill == heal::ID)
+			{
+				// It hurts fewer mobs the more of the party it heals, and each
+				// less the more it reaches.
+				range = place_range(origin, heal::area(attack.range), 1.0f, attack.toleft);
+				mob_targets = find_undead(range, skill_use::mob_limit(mobcount, healed));
+				attack.healed = healed + static_cast<int32_t>(mob_targets.size());
 			} else
 			{
 				mob_targets = find_targets(mob_objs, range, origin, mobcount, true, closest_first);
