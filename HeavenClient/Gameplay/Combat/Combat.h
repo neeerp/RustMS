@@ -22,6 +22,7 @@
 #include "MonsterMagnet.h"
 #include "RegularAttack.h"
 #include "ShotPath.h"
+#include "ShotRain.h"
 #include "Teleport.h"
 
 #include "../MapleMap/MapChars.h"
@@ -165,6 +166,24 @@ namespace ms
 
 		void draw_gauge(double viewx, double viewy, float alpha) const;
 
+		// Rain what a shot rains once it hits, `hit` ms from now: over the
+		// user, around where it hits its first mob (`first`), or over each
+		// mob it hits (`bodies`), as in v83 (0x95496f, 0x9821f7).
+		void rain_shot(int32_t skill, Rectangle<int16_t> lt_rb, Point<int16_t> user, bool toleft, int64_t hit,
+					   Point<int16_t> first, const std::vector<Rectangle<int16_t>> &bodies);
+
+		// Drop a skill's rain over an area from `hit` ms from now
+		// (FUN_0043612f).
+		void start_rain(const Skill &skill, Rectangle<int16_t> area, bool toleft, int64_t hit);
+
+		// Set the ground across an area on fire `hit` ms from now
+		// (FUN_00436ce9).
+		void burn(const Skill &skill, Rectangle<int16_t> area, int64_t hit);
+
+		void update_rains();
+
+		void draw_rains(double viewx, double viewy, float alpha) const;
+
 		// The melee stance a regular ranged attack whacks a mob right in
 		// front of the player with, or NONE to shoot. Either way, `reach` is
 		// how far in front of the player the whack reaches.
@@ -283,6 +302,40 @@ namespace ms
 
 		std::list<Bullet> bullets;
 		std::list<DamageNumber> damagenumbers;
+
+		// A shot's rain, dropping its sprites a few at a time.
+		struct Rain
+		{
+			int32_t skill;
+			Rectangle<int16_t> area;
+			bool toleft;
+			shot_rain::Schedule schedule;
+		};
+
+		struct RainDrop
+		{
+			Animation animation;
+			Point<int16_t> start;
+			Point<int16_t> fall;
+			bool flip;
+			int64_t launch;
+			int32_t flight;
+			float opacity;
+		};
+
+		// One of Inferno's flames on the ground.
+		struct Flame
+		{
+			Animation animation;
+			Point<int16_t> position;
+			int64_t start;
+			int32_t fade;
+			float opacity;
+		};
+
+		std::list<Rain> rains;
+		std::list<RainDrop> raindrops;
+		std::list<Flame> flames;
 
 		// A skill held down: how long, in ms, and whether its effect has
 		// turned to the keydown one.

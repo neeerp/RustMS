@@ -19,6 +19,7 @@
 
 #include <cstdint>
 
+#include "ShotRain.h"
 #include "SkillAction.h"
 #include "SkillBullet.h"
 #include "SkillHitEffect.h"
@@ -46,6 +47,17 @@ namespace ms
 		Effect prepare;
 		Effect keydown;
 		Effect keydownend;
+	};
+
+	// What a raining shot drops (its `special` node), and the fire Inferno
+	// leaves on the ground (its `tile` node).
+	struct SkillRain
+	{
+		shot_rain::Params params;
+		std::vector<Animation> drops;
+		std::vector<Animation> flames;
+		// How far apart the flames are.
+		int16_t distance = 0;
 	};
 
 	// The skill implementation of special move
@@ -81,6 +93,9 @@ namespace ms
 		// The effect shown where a thrown grenade goes off.
 		Animation get_special() const;
 
+		// What the skill rains once its shot hits, if it's one that does.
+		const SkillRain &get_rain() const;
+
 		// Play the sound of using the skill, without its effect.
 		void play_use() const;
 
@@ -104,6 +119,7 @@ namespace ms
 		std::unique_ptr<SkillHitEffect> hiteffect;
 		SkillPrepare prepare;
 		Animation special;
+		SkillRain rain;
 
 		int32_t skillid;
 		bool overregular;
