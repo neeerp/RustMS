@@ -19,6 +19,7 @@
 
 #include "Helpers/BuffParser.h"
 #include "Helpers/LoginParser.h"
+#include "../../Audio/Audio.h"
 
 #include "../Packets/LoginPackets.h"
 
@@ -251,6 +252,52 @@ namespace ms
 			skillbook->update_skills(skillid);
 
 		UI::get().enable();
+	}
+
+	void SkillUseResultHandler::handle(InPacket& recv) const
+	{
+		recv.skip_byte();
+
+		Stage::get().get_player().request_answered();
+	}
+
+	void SkillLearnItemResultHandler::handle(InPacket& recv) const
+	{
+		int32_t cid = recv.read_int();
+		auto character = Stage::get().get_character(cid);
+
+		if (!character)
+			return;
+
+		bool mastery = recv.read_bool();
+		recv.skip_int();	// skill
+		recv.skip_int();	// master level
+		bool used = recv.read_bool();
+		bool success = recv.read_bool();
+
+		if (used)
+			character->show_skill_book(success);
+
+		if (!Stage::get().is_player(cid))
+			return;
+
+		Stage::get().get_player().request_answered();
+		Sound(success ? Sound::Name::ENCHANTSUCCESS : Sound::Name::ENCHANTFAILURE).play();
+
+		std::string book = mastery ? "Mastery Book" : "Skill Book";
+		std::string message;
+
+		if (!used)
+			message = "You cannot use " + book + ".";
+		else if (!success)
+			message = "Despite using " + book + ", the effect was nowhere to be found.";
+		else if (mastery)
+			message = "The Book of Mastery glows brightly, and the current skills have gone through an upgrade.";
+		else
+			message = "The Skill Book glows brightly, and new skills have now been added.";
+
+		if (auto chatbar = UI::get().get_element<UIChatBar>())
+			chatbar->send_chatline(message, UIChatBar::LineType::SKILL);
 	}
 
 	void SkillMacrosHandler::handle(InPacket& recv) const

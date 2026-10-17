@@ -46,6 +46,17 @@ namespace ms
 		}
 	}
 
+	void InventoryGrowHandler::handle(InPacket& recv) const
+	{
+		InventoryType::Id type = InventoryType::by_value(recv.read_byte());
+		uint8_t slots = recv.read_byte();
+
+		Stage::get().get_player().get_inventory().set_slotmax(type, slots);
+
+		if (auto iteminventory = UI::get().get_element<UIItemInventory>())
+			iteminventory->refresh_slots();
+	}
+
 	void ModifyInventoryHandler::handle(InPacket& recv) const
 	{
 		// Set when this answers the player's item request.

@@ -33,6 +33,13 @@ namespace ms
 		void handle(InPacket& recv) const override;
 	};
 
+	// Handler for a packet which gives an inventory tab more slots (v83
+	// FUN_00a1f881): type, then the new slot count.
+	class InventoryGrowHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
 	// Handler for a packet which modifies the player's inventory.
 	class ModifyInventoryHandler : public PacketHandler
 	{

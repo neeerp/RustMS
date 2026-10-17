@@ -62,6 +62,9 @@ namespace ms
 
 		void clear_new();
 
+		// Show a tab's new slot count.
+		void refresh_slots();
+
 	protected:
 		Button::State button_pressed(uint16_t buttonid) override;
 
