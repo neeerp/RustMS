@@ -1,11 +1,13 @@
 use super::ClientActor;
 use crate::error::RuntimeError;
 use crate::message::FieldMessage;
+use game::buff::Buff;
 use game::BuffStat;
 use net::packet::build::world::buff;
 use net::packet::build::world::stat::{self, StatUpdate};
 use net::packet::build::world::summon::Gone;
 use net::packet::handle::world::party_skill_reached;
+use net::summons::Support;
 use net::{summons, FieldRequest, PartySkill, SpawnPosition};
 use packet::Packet;
 
@@ -131,6 +133,32 @@ impl ClientActor {
 
     pub(super) async fn summon_broken(&mut self, skill_id: i32) -> Result<(), RuntimeError> {
         self.end_buff(skill_id).await
+    }
+
+    /// The player's Beholder heals them, or buffs one stat, while they
+    /// live.
+    pub(super) async fn beholder_support(&mut self, support: Support) -> Result<(), RuntimeError> {
+        let player = &mut self.in_game_mut()?.player;
+        if player.stats.hp <= 0 {
+            return Ok(());
+        }
+        let mut packet = match support {
+            Support::Heal { hp, .. } => {
+                let hp = player.add_hp(hp);
+                stat::build_stat_update(false, &[StatUpdate::Hp(hp)])?
+            }
+            Support::Hex {
+                stat, value, lasts, ..
+            } => {
+                let now = std::time::Instant::now();
+                let skill_id = support.skill_id();
+                player
+                    .buffs
+                    .give(Buff::new(skill_id, stat, value, now, lasts));
+                buff::build_give_buff(skill_id, lasts.as_millis() as i32, &[(stat, value)])?
+            }
+        };
+        self.send(&mut packet).await
     }
 
     /// On a new map the summons that follow the player come along, at

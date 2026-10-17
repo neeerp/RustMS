@@ -23,17 +23,17 @@ use net::packet::build::world::reactor::{
 };
 use net::packet::build::world::summon::{
     build_damage_summon, build_move_summon, build_remove_summon, build_spawn_summon,
-    build_summon_attack, Gone, SummonView,
+    build_summon_attack, build_summon_skill, Gone, SummonView,
 };
 use net::skills::{self, Inflict};
-use net::summons::{self, Limit, SummonAttack, SummonDamage};
+use net::summons::{self, Limit, SummonAttack, SummonDamage, Support};
 use net::{ClientId, FieldRequest};
 use packet::Packet;
 use std::collections::HashMap;
 use std::time::Duration;
 use tokio::sync::mpsc;
 use tokio::time::{interval, Instant, MissedTickBehavior};
-use tracing::{info, warn};
+use tracing::{debug, info, warn};
 
 struct Occupant {
     handle: ClientHandle,
@@ -374,6 +374,11 @@ impl FieldActor {
                     self.handle_summon_attack(from, attack, &limits)
                 }
                 FieldRequest::SummonDamage(damage) => self.handle_summon_damage(from, damage),
+                FieldRequest::Beholder {
+                    object_id,
+                    action,
+                    support,
+                } => self.handle_beholder(from, object_id, action, support),
             },
             FieldMessage::SpawnLoot {
                 owner,
@@ -841,6 +846,25 @@ impl FieldActor {
             owner.handle.send(ServerMessage::SummonBroken {
                 skill_id: view.skill_id,
             });
+        }
+    }
+
+    /// `from`'s Beholder heals or buffs them, if it may yet: the others see
+    /// it act.
+    fn handle_beholder(&mut self, from: ClientId, object_id: i32, action: u8, support: Support) {
+        let Some(summon) = self.summons.owned(from, object_id) else {
+            return;
+        };
+        if !summon.may_support(&support, Instant::now()) {
+            debug!(object_id, ?support, "Beholder too soon");
+            return;
+        }
+        let owner_id = summon.view.owner_id;
+        if let Ok(packet) = build_summon_skill(owner_id, object_id, action) {
+            self.broadcast(Some(from), packet);
+        }
+        if let Some(owner) = self.occupants.get(&from) {
+            owner.handle.send(ServerMessage::Beholder(support));
         }
     }
 

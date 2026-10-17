@@ -195,6 +195,21 @@ pub fn damage_summon(object_id: i32, damage: i32, mob_id: i32) -> Packet {
     p
 }
 
+/// BEHOLDER: Beholder `object_id` healing its owner (Aura of the
+/// Beholder), or buffing stat `buff` (Hex of the Beholder), as the client
+/// sends it (FUN_007a5ab4 / FUN_007a5c99).
+pub fn beholder(object_id: i32, skill_id: i32, buff: Option<u8>) -> Packet {
+    let mut p = Packet::new_empty();
+    p.write_short(RecvOpcode::Beholder as i16).unwrap();
+    p.write_int(object_id).unwrap();
+    p.write_int(skill_id).unwrap();
+    p.write_byte(buff.map_or(6, |buff| 7 + buff)).unwrap();
+    if let Some(buff) = buff {
+        p.write_byte(buff).unwrap();
+    }
+    p
+}
+
 /// CANCEL_BUFF: right-clicking a skill's buff icon.
 pub fn cancel_buff(skill_id: i32) -> Packet {
     let mut p = Packet::new_empty();
@@ -286,6 +301,8 @@ pub struct Field {
     pub summons_moved: Vec<i32>,
     /// (object id, action, (mob object id, damage) per hit)
     pub summon_attacks: Vec<(i32, u8, Vec<(i32, i32)>)>,
+    /// SUMMON_SKILL: (object id, action).
+    pub summon_skills: Vec<(i32, u8)>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -405,6 +422,10 @@ impl Field {
                 })
                 .collect();
             self.summon_attacks.push((object_id, action, hits));
+        } else if op == SendOpcode::SummonSkill as i16 {
+            r.read_int().unwrap();
+            let object_id = r.read_int().unwrap();
+            self.summon_skills.push((object_id, r.read_byte().unwrap()));
         } else if op == SendOpcode::SpawnMonsterControl as i16 {
             let mode = r.read_byte().unwrap();
             let oid = r.read_int().unwrap();

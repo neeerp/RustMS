@@ -417,6 +417,29 @@ namespace ms
 		if (player.is_dead())
 			return;
 
+		// A Beholder heals its owner when it can, else buffs them, each in
+		// its skill's time (FUN_007a4080).
+		for (auto &[oid, summon] : summons.get_local())
+		{
+			if (summon->get_assist() != summon_rules::SUPPORT)
+				continue;
+
+			if (summon->next_heal < 0)
+			{
+				summon->next_heal = now + summon_rules::SUPPORT_DELAY;
+				summon->next_hex = now + summon_rules::SUPPORT_DELAY;
+			}
+
+			if (!summon->is_idle())
+				continue;
+
+			if (now > summon->next_heal && beholder_heal(oid, *summon))
+				continue;
+
+			if (now > summon->next_hex)
+				beholder_hex(oid, *summon);
+		}
+
 		for (auto &[oid, summon] : summons.get_local())
 		{
 			int32_t skill = summon->get_skill();
@@ -532,6 +555,70 @@ namespace ms
 
 			SummonAttackPacket(oid, action, left, player.get_position(), position, hits).dispatch();
 		}
+	}
+
+	namespace
+	{
+		nl::node skill_level(int32_t skill, int32_t level)
+		{
+			return nl::nx::skill[string_format::extend_id(skill / 10000, 3) + ".img"]["skill"]
+			[string_format::extend_id(skill, 7)]["level"][std::to_string(level)];
+		}
+	}
+
+	bool Combat::beholder_heal(int32_t oid, Summon &beholder)
+	{
+		SkillBook &skills = player.get_skills();
+		int32_t level = skills.get_level(summon_rules::AURA_OF_THE_BEHOLDER);
+
+		if (level <= 0)
+			return false;
+
+		nl::node aura = skill_level(summon_rules::AURA_OF_THE_BEHOLDER, level);
+		int32_t berserk_level = skills.get_level(SkillId::Id::BERSERK);
+		int32_t berserk = berserk_level > 0
+						  ? static_cast<int32_t>(skill_level(SkillId::Id::BERSERK, berserk_level)["x"].get_integer())
+						  : 0;
+		const CharStats &stats = player.get_stats();
+
+		if (!summon_rules::aura_heals(stats.get_stat(MapleStat::Id::HP), stats.get_total(EquipStat::Id::HP),
+									  static_cast<int32_t>(aura["hp"].get_integer()), berserk))
+			return false;
+
+		BeholderPacket(oid, beholder.is_left(), -1).dispatch();
+		beholder.next_heal = now + aura["x"].get_integer() * 1000;
+		beholder.play(summon_rules::SKILL1);
+
+		return true;
+	}
+
+	void Combat::beholder_hex(int32_t oid, Summon &beholder)
+	{
+		int32_t level = player.get_skills().get_level(summon_rules::HEX_OF_THE_BEHOLDER);
+
+		if (level <= 0)
+			return;
+
+		nl::node hex = skill_level(summon_rules::HEX_OF_THE_BEHOLDER, level);
+		std::array<int32_t, 5> gives = {
+				static_cast<int32_t>(hex["pdd"].get_integer()), static_cast<int32_t>(hex["mdd"].get_integer()),
+				static_cast<int32_t>(hex["acc"].get_integer()), static_cast<int32_t>(hex["eva"].get_integer()),
+				static_cast<int32_t>(hex["pad"].get_integer())
+		};
+		std::array<int32_t, 5> has = {
+				player.get_buff_value(Buffstat::Id::WDEF), player.get_buff_value(Buffstat::Id::MDEF),
+				player.get_buff_value(Buffstat::Id::ACC), player.get_buff_value(Buffstat::Id::AVOID),
+				player.get_buff_value(Buffstat::Id::WATK)
+		};
+		Randomizer random;
+		int8_t hexed = summon_rules::hex_pick(gives, has, random.next_int<uint32_t>(UINT32_MAX));
+
+		if (hexed < 0)
+			return;
+
+		BeholderPacket(oid, beholder.is_left(), hexed).dispatch();
+		beholder.next_hex = now + hex["x"].get_integer() * 1000;
+		beholder.play(static_cast<summon_rules::Action>(summon_rules::SKILL1 + 1 + hexed));
 	}
 
 	void Combat::apply_summon_hit(const SummonHit &hit)

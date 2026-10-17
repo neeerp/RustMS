@@ -1,13 +1,19 @@
 //! Summons on Snail Hunting Ground II (40001): a Ranger's Silver Hawk
 //! and Puppet appear for the map, the Hawk's attacks reach the others
 //! within its damage cap, a Puppet breaks when hurt past its HP, and the
-//! Hawk follows its owner to the next map.
+//! Hawk follows its owner to the next map. A Dark Knight's Beholder heals
+//! and buffs them, no sooner than its skills allow.
 
 use integration_harness::database::{grant_skill, grant_stack, set_job};
-use integration_harness::hunting::{attack, damage_summon, summon, summon_attack, walk_to};
+use integration_harness::hunting::{
+    attack, beholder, damage_summon, summon, summon_attack, walk_to,
+};
 use integration_harness::preconditions::load_harness_config_or_fail;
-use integration_harness::trace::{read_for, send, until, warp, Trace};
+use integration_harness::trace::{read_for, send, stat, until, warp, Trace};
 use integration_harness::{login_to_world_session, relogin};
+use net::packet::op::RecvOpcode;
+use packet::io::write::PktWrite;
+use packet::Packet;
 use tokio::time::Duration;
 
 const HUNTING_GROUND: i32 = 40_001;
@@ -18,6 +24,12 @@ const SILVER_HAWK: i32 = 3111005;
 const PUPPET: i32 = 3111002;
 const ETC: i16 = 4;
 const SUMMONING_ROCK: i32 = 4006001;
+/// Henesys Hunting Ground I, apart from the ranger's test.
+const HENESYS_HUNTING_GROUND: i32 = 104_040_000;
+const DARK_KNIGHT: i16 = 132;
+const BEHOLDER: i32 = 1321007;
+const AURA: i32 = 1320008;
+const HEX: i32 = 1320009;
 
 #[tokio::test]
 async fn a_rangers_hawk_attacks_and_follows_and_their_puppet_breaks() {
@@ -123,4 +135,87 @@ async fn a_rangers_hawk_attacks_and_follows_and_their_puppet_breaks() {
         (again.owner_id, again.skill_id, again.appears),
         (ranger_id, SILVER_HAWK, false)
     );
+}
+
+/// TAKE_DAMAGE: a snail's touch.
+fn touched(damage: i32) -> Packet {
+    let mut p = Packet::new_empty();
+    p.write_short(RecvOpcode::TakeDamage as i16).unwrap();
+    p.write_int(0).unwrap();
+    p.write_byte(-1i8 as u8).unwrap();
+    p.write_byte(0).unwrap();
+    p.write_int(damage).unwrap();
+    p.write_int(SNAIL).unwrap();
+    p.write_int(0).unwrap();
+    p.write_byte(0).unwrap();
+    p
+}
+
+#[tokio::test]
+async fn a_dark_knights_beholder_heals_and_hexes_them_in_its_own_time() {
+    let config = load_harness_config_or_fail().await;
+    let knight_id = login_to_world_session(&config)
+        .await
+        .expect("first login failed")
+        .character_id;
+    drop(relogin(&config).await);
+    tokio::time::sleep(Duration::from_millis(500)).await;
+    set_job(knight_id, DARK_KNIGHT, 120, 2000)
+        .await
+        .expect("make a dark knight");
+    // Level 1: Aura heals 40 every 10 s; Hex raises weapon defense by 20
+    // for 20 s, every 48 s.
+    for skill_id in [BEHOLDER, AURA, HEX] {
+        grant_skill(knight_id, skill_id, 1)
+            .await
+            .expect("teach the Beholder");
+    }
+
+    let mut knight = relogin(&config).await;
+    let watcher_config = load_harness_config_or_fail().await;
+    let mut watcher = login_to_world_session(&watcher_config).await.unwrap();
+    let (k, w) = (&mut knight.connection, &mut watcher.connection);
+    let (mut kt, mut wt) = (Trace::default(), Trace::default());
+    let map = HENESYS_HUNTING_GROUND;
+    assert_eq!(warp(w, map, "", &mut wt).await, map);
+    assert_eq!(warp(k, map, "", &mut kt).await, map);
+    send(k, summon(BEHOLDER, 1, 0, 0, false)).await;
+    until(w, &mut wt, |t| !t.field.summons.is_empty()).await;
+    let summoned = std::time::Instant::now();
+    let eye = wt.field.summons[0];
+    assert_eq!(
+        (eye.owner_id, eye.skill_id, eye.moves, eye.assist),
+        (knight_id, BEHOLDER, 1, 2)
+    );
+    send(k, touched(12)).await;
+    until(k, &mut kt, |t| t.stat(stat::HP).is_some()).await;
+    let hurt = kt.stat(stat::HP).unwrap();
+
+    // Not in its first 10 s.
+    send(k, beholder(eye.object_id, AURA, None)).await;
+    read_for(w, &mut wt, 300).await;
+    assert!(wt.field.summon_skills.is_empty());
+
+    tokio::time::sleep(Duration::from_secs(10).saturating_sub(summoned.elapsed())).await;
+    send(k, beholder(eye.object_id, AURA, None)).await;
+    until(w, &mut wt, |t| !t.field.summon_skills.is_empty()).await;
+    until(k, &mut kt, |t| t.stat(stat::HP) != Some(hurt)).await;
+    assert_eq!(kt.stat(stat::HP), Some(hurt + 12));
+
+    // Hex level 1 raises only weapon defense, its own time apart.
+    send(k, beholder(eye.object_id, HEX, Some(4))).await;
+    send(k, beholder(eye.object_id, HEX, Some(0))).await;
+    until(k, &mut kt, |t| t.buffs.len() == 2).await;
+    assert_eq!(kt.buffs[1], (HEX, 20, 20_000));
+
+    // Neither again so soon.
+    send(k, beholder(eye.object_id, AURA, None)).await;
+    send(k, beholder(eye.object_id, HEX, Some(0))).await;
+    read_for(w, &mut wt, 300).await;
+    read_for(k, &mut kt, 300).await;
+    assert_eq!(
+        wt.field.summon_skills,
+        vec![(eye.object_id, 6), (eye.object_id, 7)]
+    );
+    assert_eq!(kt.buffs.len(), 2);
 }

@@ -275,6 +275,24 @@ namespace ms
 		}
 	};
 
+	// The player's Beholder heals them (Aura of the Beholder, `hexed` -1)
+	// or buffs Hex stat `hexed` (FUN_007a5ab4 / FUN_007a5c99), playing
+	// skill1, or skill2 on.
+	// Opcode: BEHOLDER(178)
+	class BeholderPacket : public OutPacket
+	{
+	public:
+		BeholderPacket(int32_t oid, bool left, int8_t hexed) : OutPacket(OutPacket::Opcode::BEHOLDER)
+		{
+			write_int(oid);
+			write_int(hexed < 0 ? 1320008 : 1320009);
+			write_byte(static_cast<int8_t>(left << 7 | (hexed < 0 ? 6 : 7 + hexed)));
+
+			if (hexed >= 0)
+				write_byte(hexed);
+		}
+	};
+
 	// Tells the server which mobs Monster Magnet reached: each one's oid, 0
 	// for one out of sight, and whether it was caught (0x96c62a). It may
 	// reach none.
