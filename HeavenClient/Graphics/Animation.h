@@ -91,6 +91,9 @@ namespace ms
 
 		uint16_t getdelayuntil(int16_t frame) const;
 
+		// How long one play through every frame takes.
+		uint16_t get_duration() const;
+
 		Point<int16_t> get_origin() const;
 
 		Point<int16_t> get_dimensions() const;

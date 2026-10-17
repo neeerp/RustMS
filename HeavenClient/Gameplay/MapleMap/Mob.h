@@ -27,6 +27,7 @@
 #include "MapObject.h"
 
 #include "../Movement.h"
+#include "../MovePath.h"
 
 #include "../Combat/Attack.h"
 #include "../Combat/Bullet.h"
@@ -96,7 +97,7 @@ namespace ms
 		// the mob may attack or cast next.
 		void acknowledge(int16_t moveid, bool nextattack);
 
-		// Send movement to the mob.
+		// Queue the controller's path to play (0xEF).
 		void send_movement(Point<int16_t> start, std::vector<Movement> &&movements);
 
 		// Kill the mob with the appropriate type:
@@ -162,11 +163,34 @@ namespace ms
 		Rectangle<int16_t> get_body() const;
 
 	private:
-		// Set the stance by byte value
-		void set_stance(uint8_t stancebyte);
+		// The stance and facing a stance byte stands for.
+		Stance stance_of(uint8_t stancebyte, bool &left) const;
 
-		// Set the stance by enum value.
-		void set_stance(Stance newstance);
+		// Show the stance a path gives.
+		void show_stance(uint8_t stancebyte);
+
+		// Show a stance, facing right if `right`.
+		void show_stance(Stance newstance, bool right);
+
+		// Set the stance the AI moves in.
+		void set_body_stance(Stance newstance);
+
+		// Where the AI has the mob.
+		Point<int16_t> body_position() const;
+
+		// Start the AI where the shown paths end (FUN_009bbd3d).
+		void seat_body(const Physics &physics);
+
+		// Step the AI ahead until it has a path to send, then send it and
+		// play it (FUN_0066b6fc).
+		void plan(const Physics &physics);
+
+		// One step of the AI and its physics, recorded into the path.
+		void step_body(const Physics &physics);
+
+		// Stop what is shown at the next foothold, flinch from there, and
+		// send the path at once.
+		void flinch_body(const Physics &physics);
 
 		// Start the death animation.
 		void apply_death();
@@ -200,12 +224,8 @@ namespace ms
 		// Which way the mob is pushing: -1 left, 0 not at all, 1 right.
 		int8_t input() const;
 
-		// Stand (0) or walk left (-1) or right (1), telling the server if
-		// that changes anything.
+		// Stand (0) or walk left (-1) or right (1).
 		void walk(int8_t direction);
-
-		// Send the current position and state to the server.
-		void update_movement();
 
 		// Calculate the hit chance
 		float calculate_hitchance(int16_t leveldelta, int32_t accuracy) const;
@@ -278,7 +298,6 @@ namespace ms
 
 		TimedBool showhp;
 
-		std::vector<Movement> movements;
 		// Hits queued against this mob that haven't landed yet.
 		uint16_t pending_hits;
 		// Ticks before a killed mob dies even if its pending hits never land.
@@ -297,8 +316,31 @@ namespace ms
 		int8_t ctrlstate = -1;
 		// The id of the last move sent, one more each move.
 		int16_t moveid = 0;
-		// Whether a move came up while awaiting an ack, to be sent with it.
-		bool movepending = false;
+		// What the mob shows (phobj, stance, flip) plays its paths, as v83's
+		// displayed vecctrl (CMob +0x118) does. The controller runs the AI
+		// on its own body ahead of that (+0x11c) and records the path it
+		// sends next.
+		move_path::Player shown;
+		PhysicsObject body;
+		Stance bodystance;
+		bool bodyflip;
+		move_path::Recorder recorder;
+		// Whether the body starts over where the shown paths end.
+		bool seated = false;
+		// Whether a hit shows over the path until its animation ends.
+		bool acting = false;
+		// Ms more a hit mob holds still.
+		int16_t hittime = 0;
+
+		// A flinch for the AI to take next update: away from its attacker,
+		// or toward the user Monster Magnet caught it for.
+		struct Flinch
+		{
+			bool left;
+			std::optional<Point<int16_t>> user;
+		};
+
+		std::optional<Flinch> flinch;
 		// Whether the mob chases the local player, and for how many more ms.
 		bool hastarget;
 		int32_t targettime;
@@ -327,8 +369,6 @@ namespace ms
 		int32_t flycount;
 		int8_t flyx;
 		int8_t flyy;
-		// AI steps since the flier last told the server where it is.
-		uint16_t flysteps;
 		float walkforce;
 		int8_t hppercent;
 		bool fading;

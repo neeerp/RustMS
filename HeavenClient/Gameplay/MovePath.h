@@ -31,6 +31,9 @@ namespace ms
 		{
 			Point<int16_t> start;
 			std::vector<Movement> elements;
+			// Whether it ends as the last path did, with no type 10 element:
+			// the user sends no such path.
+			bool idle;
 		};
 
 		// The user's movement since the last path went out.
@@ -73,21 +76,31 @@ namespace ms
 				append(element);
 			}
 
-			// The path to send, once there is a second of movement with
-			// something on a foothold in it. What comes after the last
-			// element on a foothold waits for the next path, and a user who
-			// has stayed put sends nothing.
-			std::optional<Path> flush()
+			// Whether a path should go out: a second of movement with
+			// something on a foothold in it, or with anything for a flier
+			// (FUN_0068a828).
+			bool ready(bool flying = false) const
 			{
-				bool ready = !elements.empty() && recorded >= SEND_MS &&
-							 std::any_of(elements.begin(), elements.end(), grounded);
+				return !elements.empty() && recorded >= SEND_MS &&
+					   (flying || std::any_of(elements.begin(), elements.end(), grounded));
+			}
 
-				if (!ready)
-					return std::nullopt;
+			// The path to send. What comes after the last element on a
+			// foothold waits for the next path, except for a flier, or when
+			// nothing is on one.
+			Path flush(bool flying = false)
+			{
+				auto held = elements.end();
 
-				auto held = std::find_if(elements.rbegin(), elements.rend(), grounded).base();
+				if (!flying)
+				{
+					held = std::find_if(elements.rbegin(), elements.rend(), grounded).base();
 
-				Path path{ start, std::vector<Movement>(elements.begin(), held) };
+					if (held == elements.begin())
+						held = elements.end();
+				}
+
+				Path path{ start, std::vector<Movement>(elements.begin(), held), false };
 				elements.erase(elements.begin(), held);
 
 				recorded = 0;
@@ -96,7 +109,7 @@ namespace ms
 					recorded += element.duration;
 
 				const Movement &tail = path.elements.back();
-				bool idle = tail.command == 0 && !last.hasmoved(tail) && tail.fh == last.fh &&
+				path.idle = tail.command == 0 && !last.hasmoved(tail) && tail.fh == last.fh &&
 							std::none_of(path.elements.begin(), path.elements.end(), [](const Movement &element)
 							{
 								return element.command == 10;
@@ -104,9 +117,6 @@ namespace ms
 
 				last = tail;
 				start = { tail.xpos, tail.ypos };
-
-				if (idle)
-					return std::nullopt;
 
 				return path;
 			}
@@ -241,6 +251,41 @@ namespace ms
 
 				state.fh = head.fh;
 				state.stance = head.newstate;
+			}
+
+			// Stop at the first element on a foothold from the one playing
+			// now, dropping the rest. A flier, or one with none ahead,
+			// stops where it is (FUN_0068b16f).
+			void land(bool flying)
+			{
+				auto stop = flying ? queue.end() : std::find_if(queue.begin(), queue.end(), grounded);
+
+				if (stop == queue.end())
+				{
+					queue.clear();
+					from = state;
+					elapsed = 0;
+					queued = 0;
+
+					return;
+				}
+
+				for (auto element = stop + 1; element != queue.end(); ++element)
+					queued -= element->duration * TICK;
+
+				queue.erase(stop + 1, queue.end());
+			}
+
+			// Where the queued paths end, or the state with none.
+			State end() const
+			{
+				if (queue.empty())
+					return state;
+
+				const Movement &tail = queue.back();
+
+				return { static_cast<double>(tail.xpos), static_cast<double>(tail.ypos), static_cast<double>(tail.vx),
+						 static_cast<double>(tail.vy), tail.fh, tail.newstate };
 			}
 
 			const State &get_state() const
