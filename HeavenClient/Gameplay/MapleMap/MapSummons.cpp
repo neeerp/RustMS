@@ -313,6 +313,30 @@ namespace ms
 		return !dying && oneshot == NONE && can_act(moves, skill);
 	}
 
+	bool Summon::can_be_hit() const
+	{
+		return !dying && !removed && !can_act(moves, skill) && hitcountdown == 0;
+	}
+
+	Rectangle<int16_t> Summon::get_body() const
+	{
+		auto iter = animations.find(showing);
+		Point<int16_t> position = get_position();
+
+		if (iter == animations.end())
+			return Rectangle<int16_t>(position, position);
+
+		Rectangle<int16_t> bounds = iter->second.get_bounds();
+
+		// The art faces left; facing right mirrors it.
+		if (left)
+			return Rectangle<int16_t>(position.x() + bounds.left(), position.x() + bounds.right(),
+									  position.y() + bounds.top(), position.y() + bounds.bottom());
+
+		return Rectangle<int16_t>(position.x() - bounds.right(), position.x() - bounds.left(),
+								  position.y() + bounds.top(), position.y() + bounds.bottom());
+	}
+
 	void MapSummons::spawn(int32_t owner, int32_t oid, int32_t skill, uint8_t level, Point<int16_t> position,
 						   uint8_t action, uint8_t moves, uint8_t assist, bool appear, bool local)
 	{

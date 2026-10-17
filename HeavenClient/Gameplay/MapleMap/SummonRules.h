@@ -332,6 +332,23 @@ namespace ms::summon_rules
 		return std::max(1, static_cast<int32_t>(damage));
 	}
 
+	// What a mob's touch does to a Puppet of skill level `level`
+	// (FUN_00793687): its attack `attack` (PADamage and any PAD up) times a
+	// roll of 10-85% of itself, times 40 / (level + 70), over 100. `roll` is
+	// in [0, 1).
+	inline int32_t touch_damage(int32_t attack, int32_t level, double roll)
+	{
+		double low = attack * 0.1;
+		double high = attack * 0.85;
+
+		if (low > high)
+			std::swap(low, high);
+
+		double rolled = low + (high - low) * roll;
+
+		return static_cast<int32_t>(40.0 / (level + 70) * attack * rolled * 0.01);
+	}
+
 	// The main stat of a summoner's job: STR for warriors, LUK for
 	// thieves, DEX for bowmen and pirates, INT for magicians.
 	enum MainStat

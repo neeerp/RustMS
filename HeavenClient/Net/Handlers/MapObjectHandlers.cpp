@@ -613,8 +613,15 @@ namespace ms
 		uint8_t assist = recv.read_byte();
 		bool appear = recv.length() > 0 ? recv.read_byte() == 0 : true;
 
-		Stage::get().get_summons().spawn(owner, oid, skillid, level, position, action, moves, assist, appear,
-										 Stage::get().is_player(owner));
+		bool local = Stage::get().is_player(owner);
+		Stage::get().get_summons().spawn(owner, oid, skillid, level, position, action, moves, assist, appear, local);
+
+		// The mobs this client moves that chase someone turn on the player's
+		// Puppet (FUN_00679847).
+		Summon *summon = Stage::get().get_summons().get(oid);
+
+		if (local && summon && summon_rules::is_puppet(skillid))
+			Stage::get().get_mobs().aggro_puppet(oid, summon->get_position());
 	}
 
 	void RemoveSummonHandler::handle(InPacket& recv) const
@@ -625,6 +632,7 @@ namespace ms
 		uint8_t reason = recv.read_byte();
 
 		int32_t skillid = Stage::get().get_summons().remove(oid, reason);
+		Stage::get().get_mobs().release_puppet(oid);
 
 		if (skillid == 0 || !Stage::get().is_player(owner) || (reason != 0 && reason != 3))
 			return;
