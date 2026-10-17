@@ -68,8 +68,11 @@ namespace ms
 		{
 			PartyMember slots[CAPACITY];
 
-			for (auto& slot : slots)
-				slot.id = recv.read_int();
+			for (size_t i = 0; i < CAPACITY; i++)
+			{
+				slots[i].id = recv.read_int();
+				slots[i].slot = i;
+			}
 
 			for (auto& slot : slots)
 				slot.name = recv.read_padded_string(NAME_LENGTH);

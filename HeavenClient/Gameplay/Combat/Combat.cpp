@@ -265,16 +265,104 @@ namespace ms
 		if (!player.can_request(ExclRequest::SKILL_WAIT))
 			return false;
 
+		int32_t moveid = move.get_id();
+		int32_t level = player.get_skills().get_level(moveid);
+		std::optional<UseSkillPacket::Reach> reach = find_reach(moveid, level);
+
+		if (!reach)
+			return false;
+
 		move.apply_useeffects(player);
 		move.apply_actions(player, Attack::Type::MAGIC);
 
-		int32_t moveid = move.get_id();
-		int32_t level = player.get_skills().get_level(moveid);
 		std::string action = move.get_action(player);
 		uint16_t lock = action.empty() ? 0 : player.get_action_lock(action);
-		player.request(UseSkillPacket(moveid, level, lock), ExclRequest::SKILL_WAIT);
+		player.request(UseSkillPacket(moveid, level, lock, *reach), ExclRequest::SKILL_WAIT);
 
 		return true;
+	}
+
+	std::optional<UseSkillPacket::Reach> Combat::find_reach(int32_t skill, int32_t level)
+	{
+		UseSkillPacket::Reach reach;
+		const SkillData::Stats &stats = SkillData::get(skill).get_stats(level);
+		Point<int16_t> position = player.get_position();
+
+		if (skill_use::sends_position(skill))
+			reach.position = position;
+
+		if (skill == skill_use::SHADOW_STARS)
+		{
+			if (player.get_stats().get_weapontype() == Weapon::CLAW)
+			{
+				const Inventory &inventory = player.get_inventory();
+				std::vector<std::pair<int32_t, int32_t>> slots;
+
+				for (int16_t slot = 1; slot <= inventory.get_slotmax(InventoryType::Id::USE); slot++)
+					slots.emplace_back(inventory.get_item_id(InventoryType::Id::USE, slot),
+									   inventory.get_item_count(InventoryType::Id::USE, slot));
+
+				reach.star = skill_use::shadow_star(slots, stats.bulletcost);
+			}
+
+			if (reach.star == 0)
+			{
+				InChatMessage(Messages::SKILL_NOSTARS).drop();
+				return std::nullopt;
+			}
+		}
+
+		// The party members and mobs in the skill's area, in front of the
+		// player (0x96db3f, 0x96dd2b).
+		Rectangle<int16_t> range = place_range(position, stats.range, 1.0f, !player.getflip());
+		uint8_t kinds = skill_use::reach(skill);
+		int32_t members = 0;
+
+		if (kinds & skill_use::PARTY)
+		{
+			const Party &party = player.get_party();
+
+			if (!party.exists())
+			{
+				reach.party = skill_use::ALONE;
+				members = 1;
+			}
+
+			for (const PartyMember &member : party.get_members())
+			{
+				bool self = member.id == player.get_oid();
+				bool dead = false;
+
+				if (self)
+				{
+					dead = player.is_dead();
+				}
+				else
+				{
+					Optional<OtherChar> other = chars.get_char(member.id);
+
+					if (!other || !range.contains(other->get_position()))
+						continue;
+
+					dead = other->is_dead();
+				}
+
+				if (skill_use::reaches(skill, self, dead))
+				{
+					reach.party |= skill_use::party_bit(member.slot);
+					members++;
+				}
+			}
+
+			if (!skill_use::sends(skill, reach.party))
+				return std::nullopt;
+		}
+
+		if (kinds & skill_use::MOBS)
+			reach.mobs = find_targets(mobs.get_mobs(), range, position, skill_use::mob_limit(stats.mobcount, members),
+									  true, false);
+
+		return reach;
 	}
 
 	void Combat::apply_move(const SpecialMove &move, int32_t charge, bool held)

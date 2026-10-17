@@ -652,11 +652,6 @@ namespace ms
 		}
 	}
 
-	bool Player::is_dead() const
-	{
-		return state == Char::State::DIED;
-	}
-
 	bool Player::is_invincible() const
 	{
 		if (state == Char::State::DIED)

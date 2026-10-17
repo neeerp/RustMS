@@ -29,6 +29,7 @@
 #include "../Physics/Physics.h"
 
 #include "../../Character/Player.h"
+#include "../../Net/Packets/AttackAndSkillPackets.h"
 #include "../../Template/TimedQueue.h"
 
 namespace ms
@@ -102,6 +103,11 @@ namespace ms
 
 		// Use a skill that doesn't attack. Whether it could ask the server.
 		bool request_skill(const SpecialMove &move);
+
+		// What the skill's packet carries besides it, or nothing if it isn't
+		// sent: Shadow Stars without its stars, or Resurrection with no one
+		// to raise.
+		std::optional<UseSkillPacket::Reach> find_reach(int32_t skill, int32_t level);
 
 		// Use the move. A held skill hits with its `charge`, and its shots
 		// while held keep the body's action (`held`).

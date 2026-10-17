@@ -510,6 +510,11 @@ namespace ms
 		return state == State::PRONE;
 	}
 
+	bool Char::is_dead() const
+	{
+		return state == State::DIED;
+	}
+
 	void Char::set_chair(int32_t itemid)
 	{
 		if (itemid == chair)

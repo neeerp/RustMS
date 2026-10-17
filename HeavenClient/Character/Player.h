@@ -119,9 +119,6 @@ namespace ms
 		// Check whether the player is invincible
 		bool is_invincible() const override;
 
-		// Return whether the player is lying dead under a tombstone.
-		bool is_dead() const;
-
 		// Handle an attack to the player.
 		MobAttackResult damage(const MobAttack &attack);
 
