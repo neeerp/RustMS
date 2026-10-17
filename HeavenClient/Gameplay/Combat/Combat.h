@@ -212,8 +212,14 @@ namespace ms
 		void extract_effects(const Char &user, const SpecialMove &move, const AttackResult &result,
 							 Rectangle<int16_t> range, int16_t reach, Point<int16_t> shot_end);
 
-		// Draw Chain Lightning's bolt from the user through its targets.
-		void draw_chain(const Char &user, const SpecialMove &move, const AttackResult &result);
+		// Show another user's spell: its balls, and its hits as they get
+		// there (FUN_0098250d).
+		void show_remote_spell(const Char &user, const SpecialMove &move, const AttackResult &result,
+							   Rectangle<int16_t> range);
+
+		// Draw Chain Lightning's bolt from the user through its targets, each
+		// part as its target is hit (`staggered`) or all at once.
+		void draw_chain(const Char &user, const SpecialMove &move, const AttackResult &result, bool staggered);
 
 		// Tell the targets how many hits are coming (sign 1) or cancel them (sign -1),
 		// so a mob the server kills waits for the hits before dying.

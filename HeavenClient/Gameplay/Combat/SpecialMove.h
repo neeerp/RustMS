@@ -67,6 +67,12 @@ namespace ms
 			return {};
 		}
 
+		// Whether the move flies a ball of its own, as a spell's.
+		virtual bool has_ball() const
+		{
+			return false;
+		}
+
 		virtual bool is_attack() const = 0;
 
 		virtual bool is_skill() const = 0;

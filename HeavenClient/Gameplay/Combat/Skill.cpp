@@ -297,6 +297,11 @@ namespace ms
 		return bullet->get_kind(kind);
 	}
 
+	bool Skill::has_ball() const
+	{
+		return projectile;
+	}
+
 	bool Skill::is_attack() const
 	{
 		return SkillData::get(skillid).is_attack();
