@@ -41,7 +41,7 @@ pub use self::change_map::{door_warp, warp, ChangeMapHandler, DoorExit};
 pub use self::char_info::CharInfoRequestHandler;
 pub use self::chat::AllChatHandler;
 pub use self::combat::{
-    catch_disease, AttackHandler, MobDistanceHandler, MoveLifeHandler, NpcActionHandler,
+    catch_disease, countered, AttackHandler, MobDistanceHandler, MoveLifeHandler, NpcActionHandler,
     TakeDamageHandler,
 };
 pub use self::door::UseDoorHandler;

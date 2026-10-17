@@ -17,6 +17,8 @@
 #pragma once
 #include "MobStatParser.h"
 
+#include <algorithm>
+
 namespace ms
 {
 	namespace
@@ -51,14 +53,36 @@ namespace ms
 			recv.skip(12 * count);
 		}
 
-		if (flags.has(PCOUNTER))
-			recv.skip(4);
+		auto find = [&statuses](uint8_t stat)
+		{
+			return std::find_if(statuses.begin(), statuses.end(),
+								[stat](const Status &status) { return status.stat == stat; });
+		};
 
-		if (flags.has(MCOUNTER))
-			recv.skip(4);
+		for (uint8_t stat : { PCOUNTER, MCOUNTER })
+		{
+			if (!flags.has(stat))
+				continue;
+
+			int32_t spread = recv.read_int();
+			auto found = find(stat);
+
+			if (found != statuses.end())
+				found->spread = spread;
+		}
 
 		if (flags.has(PCOUNTER) || flags.has(MCOUNTER))
-			recv.skip(4);
+		{
+			int32_t chance = recv.read_int();
+
+			for (uint8_t stat : { PCOUNTER, MCOUNTER })
+			{
+				auto found = find(stat);
+
+				if (found != statuses.end())
+					found->chance = chance;
+			}
+		}
 
 		if (flags.has(DISABLE))
 		{

@@ -966,6 +966,7 @@ impl ClientActor {
             ServerMessage::SummonBroken { skill_id } => self.summon_broken(skill_id).await?,
             ServerMessage::Beholder(support) => self.beholder_support(support).await?,
             ServerMessage::Diseased { disease, map_id } => self.diseased(disease, map_id).await?,
+            ServerMessage::Countered { damage, map_id } => self.countered(damage, map_id).await?,
             ServerMessage::DoorWarp {
                 from_map,
                 map_id,

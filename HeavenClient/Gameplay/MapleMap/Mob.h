@@ -227,6 +227,10 @@ namespace ms
 		// miss (FUN_006691d3).
 		void show_damage(int32_t damage);
 
+		// What its counter hurts the player with for one of their attacks,
+		// a spell's (MCounter) or the rest (PCounter), or 0 (FUN_007937e3).
+		int32_t counter(bool magic) const;
+
 		// Return the body's bounds on the map, turned the way the mob faces.
 		Rectangle<int16_t> get_body() const;
 

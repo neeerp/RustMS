@@ -60,7 +60,18 @@ int main()
 		require(statuses[2].stat == MobStatParser::DOOM && statuses[2].reason == 2311005, "Then Doom");
 		require(statuses[3].stat == MobStatParser::WEB && statuses[3].duration == 16, "Then Web");
 		require(statuses[4].stat == MobStatParser::PCOUNTER, "And the counter");
-		require(recv.read_short() == -1, "The counter's two ints are read past");
+		require(statuses[4].spread == 7 && statuses[4].chance == 8, "The counter keeps its spread and chance");
+		require(recv.read_short() == -1, "The counter's two ints are read");
+
+		// Its value give or take half its spread, when the chance comes up.
+		MobStatParser::Status counter = { MobStatParser::PCOUNTER, 220, 145 | 5 << 16, 20, 98, 0 };
+		require(MobStatParser::counter(counter, 99, 0) == 220 - 49, "Half the spread off");
+		require(MobStatParser::counter(counter, 99, 97) == 220 + 48, "Up to half the spread on");
+		counter.spread = 0;
+		require(MobStatParser::counter(counter, 99, 97) == 220, "No spread, just the value");
+		counter.chance = 30;
+		require(MobStatParser::counter(counter, 129, 0) == 220, "Under the chance it hurts");
+		require(MobStatParser::counter(counter, 130, 0) == 0, "At it or over, not");
 
 		require(MobStatParser::stops(flags), "Doom stops the mob");
 
