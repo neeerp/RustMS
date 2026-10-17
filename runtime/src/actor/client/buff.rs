@@ -1,7 +1,7 @@
 use super::ClientActor;
 use crate::error::RuntimeError;
 use crate::message::FieldMessage;
-use game::buff::Buff;
+use game::buff::{Buff, Buffs};
 use game::BuffStat;
 use net::packet::build::world::buff;
 use net::packet::build::world::stat::{self, StatUpdate};
@@ -144,12 +144,35 @@ impl ClientActor {
     /// End every buff now, e.g. on death. Buffs don't follow the player to
     /// another channel either.
     pub(super) async fn cancel_buffs(&mut self) -> Result<(), RuntimeError> {
+        self.end_buffs(Buffs::clear).await
+    }
+
+    /// A mob's Dispel ends the player's skills' buffs, if they are alive,
+    /// still on its map and out of the Cash Shop. Diseases stay.
+    pub(super) async fn dispelled(&mut self, map_id: i32) -> Result<(), RuntimeError> {
+        if self.in_cash_shop {
+            return Ok(());
+        }
+        let Some(game) = self.game.as_ref() else {
+            return Ok(());
+        };
+        if game.player.stats.map_id != map_id || game.player.stats.hp <= 0 {
+            return Ok(());
+        }
+        self.end_buffs(Buffs::dispel).await
+    }
+
+    /// End the buffs `end` ends, the summons with theirs.
+    async fn end_buffs(
+        &mut self,
+        end: fn(&mut Buffs) -> Vec<BuffStat>,
+    ) -> Result<(), RuntimeError> {
         let buffs = &mut self.in_game_mut()?.player.buffs;
         let summoned = buffs
             .active()
             .iter()
             .any(|buff| summons::kind(buff.skill_id).is_some());
-        let ended = buffs.clear();
+        let ended = end(buffs);
         if ended.is_empty() {
             return Ok(());
         }

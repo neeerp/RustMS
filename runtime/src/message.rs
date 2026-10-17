@@ -124,6 +124,15 @@ pub enum ServerMessage {
         disease: game::Disease,
         map_id: i32,
     },
+    /// A mob's Dispel on `map_id` reached this player.
+    Dispelled {
+        map_id: i32,
+    },
+    /// A mob's Banish on `map_id` sends this player away.
+    Banished {
+        to: game_data::mobs::Banish,
+        map_id: i32,
+    },
     /// Mobs on `map_id` this player attacked countered it for `damage`.
     Countered {
         damage: i32,

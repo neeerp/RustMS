@@ -5,12 +5,10 @@
 //! from a Jr. Cerebes.
 
 use integration_harness::database::{set_job, set_str};
-use integration_harness::hunting::attack;
+use integration_harness::hunting::{attack, move_mob};
 use integration_harness::preconditions::load_harness_config_or_fail;
 use integration_harness::trace::{read_for, send, until, warp, Trace};
 use integration_harness::{login_to_world_session, relogin};
-use net::packet::op::RecvOpcode;
-use packet::io::write::PktWrite;
 use packet::Packet;
 use tokio::time::Duration;
 
@@ -23,41 +21,12 @@ const POWER_UP_STAT: u128 = 1 << 12;
 const WOLF_MAP: i32 = 211_041_100;
 const LYCANTHROPE: i32 = 6_090_000;
 const HEAL: u8 = 114;
+const BANISH: u8 = 129;
 /// A Ludibrium clocktower map with Jr. Cerebes.
 const CEREBES_MAP: i32 = 221_040_201;
 const JR_CEREBES: i32 = 4_240_000;
 const SUMMON: u8 = 200;
 const SUMMONED: i32 = 4_230_116;
-
-/// MOVE_LIFE for `object_id` at (x, y): wanting to attack, or playing
-/// `action` (its first skill animation is 21, doubled with the facing)
-/// with `skill_data` (skill | level << 8 | delay << 16).
-fn move_mob(
-    object_id: i32,
-    (x, y): (i16, i16),
-    want_attack: bool,
-    action: u8,
-    skill_data: i32,
-) -> Packet {
-    let mut p = Packet::new_empty();
-    p.write_short(RecvOpcode::MoveLife as i16).unwrap();
-    p.write_int(object_id).unwrap();
-    p.write_short(1).unwrap();
-    p.write_byte(u8::from(want_attack)).unwrap();
-    p.write_byte(action).unwrap();
-    p.write_int(skill_data).unwrap();
-    p.write_bytes(&[0; 13]).unwrap();
-    p.write_short(x).unwrap();
-    p.write_short(y).unwrap();
-    p.write_byte(1).unwrap();
-    p.write_byte(0).unwrap();
-    p.write_short(x).unwrap();
-    p.write_short(y).unwrap();
-    p.write_bytes(&[0; 6]).unwrap();
-    p.write_byte(4).unwrap();
-    p.write_short(100).unwrap();
-    p
-}
 
 /// The movement casting the `skill` at `level` from the mob's `nth`
 /// skill animation (1-based), `delay` ms into it.
@@ -150,8 +119,17 @@ async fn wounded_mobs_heal_and_summon() {
     let at = t.field.mob_positions[&wolf];
     send(c, attack(wolf, 4_000)).await;
     until(c, &mut t, |t| t.field.controlled.contains(&wolf)).await;
-    send(c, move_mob(wolf, at, true, 0, 0)).await;
-    until(c, &mut t, |t| !t.field.grants.is_empty()).await;
+    // It may be granted its Banish instead, a grant that lapses after 10
+    // seconds uncast.
+    for _ in 0..8 {
+        send(c, move_mob(wolf, at, true, 0, 0)).await;
+        until(c, &mut t, |t| !t.field.grants.is_empty()).await;
+        if t.field.grants != [(wolf, BANISH, 1)] {
+            break;
+        }
+        t.field.grants.clear();
+        tokio::time::sleep(Duration::from_millis(10_500)).await;
+    }
     assert_eq!(t.field.grants, [(wolf, HEAL, 12)]);
     send(c, cast(wolf, at, 2, HEAL, 12, 1_000)).await;
     until(c, &mut t, |t| !t.field.heals.is_empty()).await;

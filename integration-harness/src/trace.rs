@@ -133,6 +133,9 @@ pub struct Trace {
     /// FAME_RESPONSE: (mode, name, up, new fame); the name, up and fame are
     /// empty, false and 0 where the mode has none.
     pub fame: Vec<(u8, String, bool, i32)>,
+    /// BROADCAST_MSG: (kind, message) of each whose kind carries only its
+    /// message (0, 1, 5).
+    pub broadcasts: Vec<(u8, String)>,
     /// Mobs and drops on the current field.
     pub field: Field,
 }
@@ -242,6 +245,12 @@ impl Trace {
             self.stat_updates.push(values);
         } else if op == SendOpcode::BlockedMap as i16 || op == SendOpcode::BlockedServer as i16 {
             self.blocked.push((op, r.read_byte().unwrap()));
+        } else if op == SendOpcode::BroadcastMsg as i16 {
+            let kind = r.read_byte().unwrap();
+            if matches!(kind, 0 | 1 | 5) {
+                self.broadcasts
+                    .push((kind, r.read_str_with_length().unwrap()));
+            }
         } else if op == SendOpcode::FameResponse as i16 {
             let mode = r.read_byte().unwrap();
             let (name, up, fame) = match mode {

@@ -37,6 +37,17 @@ pub struct MobInfo {
     pub attacks: Vec<MobAttack>,
     /// The mob skills it may cast (`skill/<n>`), in order.
     pub skills: Vec<MobSkillEntry>,
+    /// Where its Banish sends players (`ban`).
+    pub banish: Option<Banish>,
+}
+
+/// Where a mob's Banish sends players (`ban/banMap/0`), and what it tells
+/// them (`banMsg`).
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct Banish {
+    pub map_id: i32,
+    pub portal: String,
+    pub message: String,
 }
 
 /// One of a mob's skills (`skill/<n>`).
@@ -135,6 +146,30 @@ impl MobData {
             element: nx.string_child(info, "elemAttr")?.unwrap_or_default(),
             attacks: self.attacks(image)?,
             skills: self.skills(info)?,
+            banish: self.banish(info)?,
+        }))
+    }
+
+    fn banish(&self, info: u32) -> Result<Option<Banish>, GameDataError> {
+        let nx = &self.nx;
+        let Some(ban) = nx.child_by_name(info, "ban")? else {
+            return Ok(None);
+        };
+        let Some(to) = nx
+            .child_by_name(ban, "banMap")?
+            .map(|maps| nx.child_by_name(maps, "0"))
+            .transpose()?
+            .flatten()
+        else {
+            return Ok(None);
+        };
+        let Some(map_id) = nx.int_child(to, "field")? else {
+            return Ok(None);
+        };
+        Ok(Some(Banish {
+            map_id,
+            portal: nx.string_child(to, "portal")?.unwrap_or_default(),
+            message: nx.string_child(ban, "banMsg")?.unwrap_or_default(),
         }))
     }
 
@@ -202,6 +237,19 @@ mod tests {
         let sentinel = data.info(9300018).unwrap().unwrap();
         assert!(sentinel.not_attack);
         assert!(data.info(9999998).unwrap().is_none());
+    }
+
+    #[test]
+    fn reads_where_banish_sends_players() {
+        let Some(path) = crate::test_assets::path("Mob.nx") else {
+            return;
+        };
+        let data = MobData::load(path).unwrap();
+        // Shade: to Kerning City's subway ticketing booth.
+        let banish = data.info(5090000).unwrap().unwrap().banish.unwrap();
+        assert_eq!((banish.map_id, banish.portal.as_str()), (103000100, "sp"));
+        assert!(banish.message.ends_with("Subway Ticketing Booth."));
+        assert_eq!(data.info(100100).unwrap().unwrap().banish, None);
     }
 
     #[test]

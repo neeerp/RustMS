@@ -1,7 +1,9 @@
 use super::quest::gain_exp_with_bonus;
 use super::ClientActor;
 use crate::error::RuntimeError;
+use net::packet::build::world::messaging::{build_broadcast, Broadcast};
 use net::packet::build::world::stat::{self, StatUpdate};
+use net::packet::handle::world::warp;
 
 impl ClientActor {
     /// This player helped kill a mob, or shares in a party member's kill:
@@ -44,5 +46,36 @@ impl ClientActor {
         let exp = player.stats.exp;
         let mut packet = stat::build_stat_update(false, &[StatUpdate::Exp(exp)])?;
         self.send(&mut packet).await
+    }
+}
+
+impl ClientActor {
+    /// A mob's Banish sends the player to `to`, telling them why in pink
+    /// (Cosmic's changeMapBanish), if they are alive, still on its map and
+    /// out of the Cash Shop.
+    pub(super) async fn banished(
+        &mut self,
+        to: game_data::mobs::Banish,
+        map_id: i32,
+    ) -> Result<(), RuntimeError> {
+        if self.in_cash_shop {
+            return Ok(());
+        }
+        let channel_id = self.channel_id;
+        let Some(game) = self.game.as_mut() else {
+            return Ok(());
+        };
+        if game.player.stats.map_id != map_id || game.player.stats.hp <= 0 {
+            return Ok(());
+        }
+        let actions = warp(&mut game.player, to.map_id, &to.portal, channel_id)?;
+        if !to.message.is_empty() {
+            let mut told = build_broadcast(Broadcast::Pink, &to.message)?;
+            self.send(&mut told).await?;
+        }
+        for action in actions {
+            self.apply(action).await?;
+        }
+        Ok(())
     }
 }

@@ -8,12 +8,10 @@
 //! must wait that out.
 
 use integration_harness::database::{set_hp, set_job, set_str, set_weapon_attack};
-use integration_harness::hunting::attack;
+use integration_harness::hunting::{attack, move_mob};
 use integration_harness::preconditions::load_harness_config_or_fail;
 use integration_harness::trace::{send, stat, until, warp, Trace};
 use integration_harness::{login_to_world_session, relogin};
-use net::packet::op::RecvOpcode;
-use packet::io::write::PktWrite;
 use packet::Packet;
 use tokio::time::Duration;
 
@@ -25,35 +23,6 @@ const COUNTER: u8 = 145;
 const PCOUNTER: u128 = 1 << 29;
 const MCOUNTER: u128 = 1 << 30;
 const MAX_HP: i16 = 30_000;
-
-/// MOVE_LIFE for `object_id` at (x, y): wanting to attack, or playing
-/// `action` with `skill_data` (skill | level << 8 | delay << 16).
-fn move_mob(
-    object_id: i32,
-    (x, y): (i16, i16),
-    want_attack: bool,
-    action: u8,
-    skill_data: i32,
-) -> Packet {
-    let mut p = Packet::new_empty();
-    p.write_short(RecvOpcode::MoveLife as i16).unwrap();
-    p.write_int(object_id).unwrap();
-    p.write_short(1).unwrap();
-    p.write_byte(u8::from(want_attack)).unwrap();
-    p.write_byte(action).unwrap();
-    p.write_int(skill_data).unwrap();
-    p.write_bytes(&[0; 13]).unwrap();
-    p.write_short(x).unwrap();
-    p.write_short(y).unwrap();
-    p.write_byte(1).unwrap();
-    p.write_byte(0).unwrap();
-    p.write_short(x).unwrap();
-    p.write_short(y).unwrap();
-    p.write_bytes(&[0; 6]).unwrap();
-    p.write_byte(4).unwrap();
-    p.write_short(100).unwrap();
-    p
-}
 
 /// The movement casting `skill` at `level` from the mob's `nth` skill
 /// animation.

@@ -601,7 +601,7 @@ namespace ms
 				color = Color::Name::DARKRED;
 				break;
 			case LineType::BLUE:
-				color = Color::Name::MEDIUMBLUE;
+				color = Color::Name::MAYABLUE;
 				break;
 			case LineType::YELLOW:
 				color = Color::Name::YELLOW;

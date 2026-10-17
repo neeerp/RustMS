@@ -83,16 +83,21 @@ impl WorldHandler for ChangeMapHandler {
     }
 }
 
-/// Send the player to `map_id`'s default spawn point (script warps).
+/// Send the player to `map_id`'s portal named `portal`, or its default
+/// spawn point without one (script warps, Banish).
 pub fn warp(
     player: &mut Player,
     map_id: i32,
+    portal: &str,
     channel_id: u8,
 ) -> Result<Vec<WorldAction>, NetworkError> {
-    if !crate::game_data::get()?.field_exists(map_id) {
-        return Err(NetworkError::PacketHandlerError("Target field not found"));
-    }
-    player.move_to(map_id, 0);
+    let field = crate::game_data::get()?
+        .field(map_id)
+        .ok_or(NetworkError::PacketHandlerError("Target field not found"))?;
+    let spawn_point = field
+        .portal_by_name(portal)
+        .map_or(0, |portal| u8::try_from(portal.id).unwrap_or(0));
+    player.move_to(map_id, spawn_point);
     Ok(vec![
         WorldAction::Reply(build::world::map::build_warp_to_map(
             &player.stats,
@@ -101,7 +106,7 @@ pub fn warp(
         )?),
         WorldAction::ChangeField {
             map_id,
-            spawn: crate::spawn_position(map_id, 0),
+            spawn: crate::spawn_position(map_id, spawn_point),
         },
     ])
 }
