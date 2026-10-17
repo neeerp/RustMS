@@ -61,7 +61,12 @@ namespace ms
 			recv.skip(4);
 
 		if (flags.has(DISABLE))
-			recv.skip(2);
+		{
+			int16_t value = static_cast<uint8_t>(recv.read_byte());
+			recv.skip(1);
+
+			statuses.push_back({ DISABLE, value, 0, 0 });
+		}
 
 		return statuses;
 	}

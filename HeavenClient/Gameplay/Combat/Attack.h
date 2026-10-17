@@ -61,6 +61,8 @@ namespace ms
 		int32_t mastery = 0;
 		int32_t amplify = 100;
 		uint8_t element = 0;
+		// The weapon's percent for that element (an Elemental Wand or Staff).
+		int32_t elemboost = 100;
 		// Heal's `hp` percent, which it hurts the undead with in place of a
 		// magic attack, and how many it reaches, mobs and party members.
 		int32_t heal = 0;

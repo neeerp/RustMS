@@ -32,6 +32,18 @@ namespace ms
 		slots = src["tuc"];
 		recovery = src["recovery"].get_real(1.0);
 
+		// A field of 0 or less makes the spell do nothing.
+		int16_t elemdefault = static_cast<int16_t>(src["elemDefault"].get_integer(100));
+		const char *boosts[] = { "", "incRMAI", "incRMAF", "incRMAL", "incRMAS", "incRMAH", "", "" };
+
+		for (size_t element = 0; element < elemboost.size(); element++)
+		{
+			int16_t boost = *boosts[element]
+				? static_cast<int16_t>(src[boosts[element]].get_integer(elemdefault))
+				: 100;
+			elemboost[element] = boost > 0 ? boost : 0;
+		}
+
 		reqstats[MapleStat::Id::LEVEL] = src["reqLevel"];
 		reqstats[MapleStat::Id::JOB] = src["reqJob"];
 		reqstats[MapleStat::Id::STR] = src["reqSTR"];
@@ -179,5 +191,10 @@ namespace ms
 	double EquipData::get_recovery() const
 	{
 		return recovery;
+	}
+
+	int16_t EquipData::get_elemboost(uint8_t element) const
+	{
+		return element < elemboost.size() ? elemboost[element] : 100;
 	}
 }
