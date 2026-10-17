@@ -1,7 +1,7 @@
 //! Skill templates (`Skill.nx`), loaded once.
 
 use crate::load::{self, asset_path};
-use game::{BuffStat, InventoryType, Player};
+use game::{BuffStat, InventoryType, MobStat, Player};
 use game_data::skills::{SkillData, SkillInfo, SkillLevel};
 use std::sync::OnceLock;
 
@@ -239,6 +239,49 @@ pub fn reaches_mobs(skill_id: i32) -> bool {
             | 14111001
             | DISPEL
     )
+}
+
+/// What a skill that reaches mobs puts on each it takes hold of: the
+/// statuses and their values. None for one that doesn't (yet).
+pub fn mob_debuffs(skill: &Learned) -> Option<Vec<(MobStat, i16)>> {
+    let effect = &skill.effect;
+    let statuses = match skill.skill_id {
+        // Threaten.
+        1201006 => vec![
+            (MobStat::Pad, effect.x as i16),
+            (MobStat::Pdr, effect.y as i16),
+        ],
+        // Slow.
+        2101003 | 2201003 | 12101001 => vec![(MobStat::Speed, effect.x as i16)],
+        // Seal.
+        2111004 | 2211004 | 12111002 => vec![(MobStat::Seal, 1)],
+        // Doom.
+        2311005 => vec![(MobStat::Doom, 1)],
+        // Shadow Web.
+        4111003 | 14111001 => vec![(MobStat::Web, 1)],
+        _ if !mob_cancels(skill.skill_id).is_empty() => vec![],
+        _ => return None,
+    };
+    Some(statuses)
+}
+
+/// The mob buffs a skill that reaches mobs takes away: the Crashes, and
+/// Dispel the lot.
+pub fn mob_cancels(skill_id: i32) -> &'static [MobStat] {
+    match skill_id {
+        1111007 => &[MobStat::PGuardUp],
+        1211009 => &[MobStat::MGuardUp],
+        1311007 => &[MobStat::PowerUp],
+        DISPEL => &[
+            MobStat::PowerUp,
+            MobStat::MagicUp,
+            MobStat::PGuardUp,
+            MobStat::MGuardUp,
+            MobStat::PImmune,
+            MobStat::MImmune,
+        ],
+        _ => &[],
+    }
 }
 
 /// The party a skill reached without one: the player alone.

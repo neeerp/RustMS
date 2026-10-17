@@ -8,8 +8,9 @@ use net::packet::build::world::field::{
     build_player_enter_field, build_player_leave_field, build_show_chair, parse_movement_state,
 };
 use net::packet::build::world::mob::{
-    build_control_mob, build_kill_mob, build_mob_hp, build_move_mob, build_move_mob_response,
-    build_show_magnet, build_spawn_mob, build_stop_controlling_mob,
+    build_control_mob, build_kill_mob, build_mob_hp, build_mob_stat_reset, build_mob_stat_set,
+    build_move_mob, build_move_mob_response, build_show_magnet, build_spawn_mob,
+    build_stop_controlling_mob,
 };
 use net::packet::build::world::npc::{
     build_control_npc, build_npc_action, build_spawn_npc, ForeignNpc,
@@ -17,7 +18,7 @@ use net::packet::build::world::npc::{
 use net::packet::build::world::reactor::{
     build_hit_reactor, build_remove_reactor, build_spawn_reactor,
 };
-use net::{ClientId, FieldRequest};
+use net::{skills, ClientId, FieldRequest};
 use packet::Packet;
 use std::collections::HashMap;
 use std::time::Duration;
@@ -118,6 +119,11 @@ impl FieldActor {
                 if let Ok(packet) = build_spawn_reactor(&reactor.view()) {
                     self.broadcast(None, packet);
                 }
+            }
+        }
+        for (object_id, lost) in self.mobs.expire_statuses(now) {
+            if let Ok(packet) = build_mob_stat_reset(object_id, &lost) {
+                self.broadcast(None, packet);
             }
         }
         let spawned = self.mobs.respawn(now);
@@ -273,6 +279,12 @@ impl FieldActor {
                 }
                 FieldRequest::Broadcast(packet) => self.broadcast(Some(from), packet),
                 FieldRequest::Magnet { effect, caught } => self.handle_magnet(from, effect, caught),
+                FieldRequest::MobDebuff {
+                    skill_id,
+                    level,
+                    origin,
+                    mobs,
+                } => self.handle_mob_debuff(from, skill_id, level, origin, &mobs),
                 FieldRequest::Chair(item_id) => self.handle_chair(from, item_id),
                 FieldRequest::Pickup { object_id, x, y } => {
                     self.handle_pickup(from, object_id, x, y)
@@ -497,6 +509,71 @@ impl FieldActor {
             }
         }
         self.broadcast(Some(from), effect);
+    }
+
+    /// `from` used a skill that reaches mobs on these, as their client saw
+    /// them. Each in its area takes its statuses, or loses the buffs it
+    /// takes away, with the skill's chance (`prop`), and everyone sees.
+    fn handle_mob_debuff(
+        &mut self,
+        from: ClientId,
+        skill_id: i32,
+        level: i32,
+        origin: Option<(i16, i16)>,
+        mobs: &[i32],
+    ) {
+        let Some(user) = self.occupants.get(&from) else {
+            return;
+        };
+        let origin = origin.unwrap_or((user.avatar.x, user.avatar.y));
+        let Some(skill) = skills::at_level(skill_id, level) else {
+            return;
+        };
+        let Some(debuffs) = skills::mob_debuffs(&skill) else {
+            return;
+        };
+        let cancels = skills::mob_cancels(skill_id);
+        let effect = &skill.effect;
+        let now = Instant::now();
+        let until = now + Duration::from_secs(effect.duration.max(0) as u64);
+        let mut reached: Vec<i32> = Vec::new();
+        for &object_id in mobs {
+            if reached.len() >= effect.mob_count.max(1) as usize || reached.contains(&object_id) {
+                continue;
+            }
+            let Some(mob) = self.mobs.get(object_id) else {
+                continue;
+            };
+            if mob.hp > 0 && skills::in_area(effect, origin, (mob.x, mob.y)) {
+                reached.push(object_id);
+            }
+        }
+        for object_id in reached {
+            if effect.prop > 0 && rand::random::<f64>() * 100.0 >= f64::from(effect.prop) {
+                continue;
+            }
+            let lost = self.mobs.remove_statuses(object_id, cancels);
+            if !lost.is_empty() {
+                if let Ok(packet) = build_mob_stat_reset(object_id, &lost) {
+                    self.broadcast(None, packet);
+                }
+            }
+            let given = self.mobs.add_statuses(object_id, &debuffs, skill_id, until);
+            let Some(mob) = self.mobs.get(object_id) else {
+                continue;
+            };
+            let views: Vec<_> = mob
+                .status_views(now)
+                .into_iter()
+                .filter(|view| given.contains(&view.stat))
+                .collect();
+            if views.is_empty() {
+                continue;
+            }
+            if let Ok(packet) = build_mob_stat_set(object_id, &views) {
+                self.broadcast(None, packet);
+            }
+        }
     }
 
     /// Give the mob `from` hit to its client with aggro, taking it from

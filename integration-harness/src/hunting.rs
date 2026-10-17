@@ -6,7 +6,7 @@ use crate::packets::build_player_move;
 use net::packet::op::{RecvOpcode, SendOpcode};
 use packet::io::{read::PktRead, write::PktWrite};
 use packet::Packet;
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 use std::io::Cursor;
 
 /// CLOSE_RANGE_ATTACK hitting one mob once for `damage`.
@@ -218,6 +218,21 @@ pub struct Field {
     pub reactors_removed: Vec<(i32, u8)>,
     /// (object id, NPC id)
     pub npcs: Vec<(i32, i32)>,
+    /// Where each mob spawned.
+    pub mob_positions: BTreeMap<i32, (i16, i16)>,
+    /// Statuses put on mobs: (object id, stats, first one's value, first
+    /// one's skill).
+    pub stat_sets: Vec<(i32, u128, i16, i32)>,
+    /// Statuses taken off mobs: (object id, stats).
+    pub stat_resets: Vec<(i32, u128)>,
+}
+
+/// A mob's 16 status flag bytes as bits by stat: the second long holds
+/// stats 0 to 63, the first the rest, each with its dwords swapped.
+fn read_mob_stats(r: &mut Cursor<&Vec<u8>>) -> u128 {
+    let high = r.read_long().unwrap() as u64;
+    let low = r.read_long().unwrap() as u64;
+    ((high.rotate_left(32) as u128) << 64) | low.rotate_left(32) as u128
 }
 
 impl Field {
@@ -229,6 +244,21 @@ impl Field {
             let oid = r.read_int().unwrap();
             r.read_byte().unwrap();
             self.mobs.push((oid, r.read_int().unwrap()));
+            // Each status the server sends is a value, a skill, and a
+            // duration.
+            let stats = read_mob_stats(&mut r);
+            r.read_bytes(8 * stats.count_ones() as usize).unwrap();
+            let position = (r.read_short().unwrap(), r.read_short().unwrap());
+            self.mob_positions.insert(oid, position);
+        } else if op == SendOpcode::MobStatSet as i16 {
+            let oid = r.read_int().unwrap();
+            let stats = read_mob_stats(&mut r);
+            let value = r.read_short().unwrap();
+            let skill_id = r.read_int().unwrap();
+            self.stat_sets.push((oid, stats, value, skill_id));
+        } else if op == SendOpcode::MobStatReset as i16 {
+            let oid = r.read_int().unwrap();
+            self.stat_resets.push((oid, read_mob_stats(&mut r)));
         } else if op == SendOpcode::SpawnMonsterControl as i16 {
             let mode = r.read_byte().unwrap();
             let oid = r.read_int().unwrap();

@@ -96,6 +96,18 @@ namespace ms
 			mob->show_hp(percent, playerlevel);
 	}
 
+	void MapMobs::set_statuses(int32_t oid, const std::vector<MobStatParser::Status> &statuses)
+	{
+		if (Optional<Mob> mob = mobs.get(oid))
+			mob->set_statuses(statuses, true);
+	}
+
+	void MapMobs::reset_statuses(int32_t oid, const BuffParser::Flags &flags)
+	{
+		if (Optional<Mob> mob = mobs.get(oid))
+			mob->reset_statuses(flags);
+	}
+
 	void MapMobs::catch_mob(int32_t oid, Point<int16_t> user)
 	{
 		if (Optional<Mob> mob = mobs.get(oid))

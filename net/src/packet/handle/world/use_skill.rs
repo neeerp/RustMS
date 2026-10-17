@@ -55,15 +55,26 @@ impl WorldHandler for UseSkillHandler {
                 }
             };
         }
-        let party = read_party(&mut r, skill_id);
+        let extras = read_extras(&mut r, skill_id);
         match use_skill(ctx.player, skill_id, level, Instant::now()) {
-            Ok(used) => Ok(with_party(
-                announce(ctx.player, &used)?,
-                skill_id,
-                level,
-                party,
-                0,
-            )),
+            Ok(used) => {
+                let result = with_party(
+                    announce(ctx.player, &used)?,
+                    skill_id,
+                    level,
+                    extras.party,
+                    0,
+                );
+                if !used.debuffs {
+                    return Ok(result);
+                }
+                Ok(result.with(WorldAction::Field(FieldRequest::MobDebuff {
+                    skill_id,
+                    level,
+                    origin: extras.position,
+                    mobs: extras.mobs,
+                })))
+            }
             Err(refusal) => {
                 debug!(skill_id, level, ?refusal, "Skill use refused");
                 Ok(HandlerResult::reply(stat::build_stat_update(true, &[])?))
@@ -170,22 +181,57 @@ enum Refusal {
     NoItem,
 }
 
-/// The party bits USE_SKILL carries after the level (0x96d399), for a skill
-/// that reaches the party: after where the player stands, for a skill that
-/// sends it, and Shadow Stars' star. None for any other skill, or a packet
-/// cut short.
-fn read_party(r: &mut Cursor<&Vec<u8>>, skill_id: i32) -> Option<u8> {
-    if !skills::reaches_party(skill_id) {
-        return None;
-    }
+/// What USE_SKILL carries after the level (0x96d399), each part only for
+/// the skills that send it.
+#[derive(Debug, Default, PartialEq, Eq)]
+struct Extras {
+    /// Where the player stood, for a skill that places something or
+    /// reaches those around them.
+    position: Option<(i16, i16)>,
+    /// A bit for each party member reached, for a skill that reaches the
+    /// party.
+    party: Option<u8>,
+    /// The mobs reached, for a skill that reaches mobs.
+    mobs: Vec<i32>,
+}
+
+/// Read what follows the level: where the player stands, Shadow Stars'
+/// star, the party bits (with Dispel's delay), and the mobs reached, each
+/// for the skills that send it. As much as was there, for a packet cut
+/// short.
+fn read_extras(r: &mut Cursor<&Vec<u8>>, skill_id: i32) -> Extras {
+    let mut extras = Extras::default();
+    let _ = read_extras_into(r, skill_id, &mut extras);
+    extras
+}
+
+fn read_extras_into(
+    r: &mut Cursor<&Vec<u8>>,
+    skill_id: i32,
+    extras: &mut Extras,
+) -> Result<(), NetworkError> {
     if skills::sends_position(skill_id) {
-        r.read_short().ok()?;
-        r.read_short().ok()?;
+        extras.position = Some((r.read_short()?, r.read_short()?));
     }
     if skill_id == skills::SHADOW_STARS {
-        r.read_int().ok()?;
+        r.read_int()?;
     }
-    r.read_byte().ok()
+    if skills::reaches_party(skill_id) {
+        extras.party = Some(r.read_byte()?);
+        if skill_id == skills::DISPEL {
+            r.read_short()?;
+        }
+    }
+    if skills::reaches_mobs(skill_id) {
+        let count = r.read_byte()?;
+        for _ in 0..count {
+            let object_id = r.read_int()?;
+            if object_id != 0 {
+                extras.mobs.push(object_id);
+            }
+        }
+    }
+    Ok(())
 }
 
 /// Pass a used skill on to the party members it reached besides the
@@ -298,12 +344,14 @@ fn heal(player: &mut Player, level: i32, party: u8, roll: f64) -> Result<(i16, i
     Ok((player.add_hp(amount), amount))
 }
 
-/// A buff skill that was used: the stats it gave, and the items it cost.
+/// A skill that was used: the buffs it gave, and the items it cost. A
+/// skill that `debuffs` the mobs it reached gives no buffs.
 #[derive(Debug)]
 struct Used {
     skill: Learned,
     stats: Vec<(BuffStat, i16)>,
     items: Vec<InventoryChange>,
+    debuffs: bool,
 }
 
 /// Check the skill can be used now, then spend its MP and items and start
@@ -320,7 +368,11 @@ fn use_skill(
     let skill = skills::learned(player, skill_id)
         .filter(|skill| skill.level == level)
         .ok_or(Refusal::NotLearned)?;
-    let stats = skills::buffs(&skill).ok_or(Refusal::Unsupported)?;
+    let stats = skills::buffs(&skill);
+    let debuffs = stats.is_none();
+    if debuffs && skills::mob_debuffs(&skill).is_none() {
+        return Err(Refusal::Unsupported);
+    }
     if player.buffs.cooling_down(skill_id, now) {
         return Err(Refusal::CoolingDown);
     }
@@ -342,7 +394,7 @@ fn use_skill(
     } else {
         Vec::new()
     };
-    let stats = give(player, &skill, stats, now);
+    let stats = stats.map_or_else(Vec::new, |stats| give(player, &skill, stats, now));
     if effect.cooldown > 0 {
         let length = Duration::from_secs(effect.cooldown as u64);
         player.buffs.start_cooldown(skill_id, now, length);
@@ -351,6 +403,7 @@ fn use_skill(
         skill,
         stats,
         items,
+        debuffs,
     })
 }
 
@@ -438,6 +491,7 @@ fn announce(player: &Player, used: &Used) -> WorldResult {
         skill,
         stats,
         items,
+        debuffs,
     } = used;
     let effect = &skill.effect;
     let mut result = HandlerResult::reply(stat::build_stat_update(
@@ -447,11 +501,13 @@ fn announce(player: &Player, used: &Used) -> WorldResult {
     if !items.is_empty() {
         result = result.with_reply(inventory::build_inventory_operation(false, items)?);
     }
-    result = result.with_reply(buff::build_give_buff(
-        skill.skill_id,
-        effect.duration * 1000,
-        stats,
-    )?);
+    if !debuffs {
+        result = result.with_reply(buff::build_give_buff(
+            skill.skill_id,
+            effect.duration * 1000,
+            stats,
+        )?);
+    }
     if effect.cooldown > 0 {
         result = result.with_reply(buff::build_cooldown(
             skill.skill_id,
@@ -790,6 +846,79 @@ mod tests {
         assert_eq!(used.len(), 1);
         assert_eq!(used[0].slots, 0x30);
         assert_eq!(player.stats.hp as i32, 50 + used[0].heal);
+    }
+
+    #[test]
+    fn debuff_skills_pass_the_mobs_they_reached_to_the_field() {
+        if skills::data().is_err() {
+            return;
+        }
+        // Threaten: where the page stands, then two mobs, then the delay.
+        let mut player = beginner_with(1201006, 20);
+        (player.stats.mp, player.stats.max_mp) = (100, 100);
+        let mut packet = Packet::new_empty();
+        packet.write_short(RecvOpcode::UseSkill as i16).unwrap();
+        packet.write_int(0).unwrap();
+        packet.write_int(1201006).unwrap();
+        packet.write_byte(20).unwrap();
+        packet.write_short(-120).unwrap();
+        packet.write_short(35).unwrap();
+        packet.write_byte(2).unwrap();
+        packet.write_int(1000).unwrap();
+        packet.write_int(1001).unwrap();
+        packet.write_short(0).unwrap();
+        let mut ctx = WorldContext {
+            client_id: 1,
+            channel_id: 0,
+            player: &mut player,
+        };
+        let actions = UseSkillHandler
+            .handle(&mut packet, &mut ctx)
+            .unwrap()
+            .actions;
+        assert!(actions.iter().any(unlocks));
+        let debuff = actions.iter().find_map(|action| match action {
+            WorldAction::Field(FieldRequest::MobDebuff {
+                skill_id,
+                level,
+                origin,
+                mobs,
+            }) => Some((*skill_id, *level, *origin, mobs.clone())),
+            _ => None,
+        });
+        assert_eq!(
+            debuff,
+            Some((1201006, 20, Some((-120, 35)), vec![1000, 1001]))
+        );
+        // No buff for the page, but the MP is spent.
+        assert!(!actions.iter().any(|action| matches!(action,
+            WorldAction::Reply(p) if p.opcode() == SendOpcode::GiveBuff as i16)));
+        assert_eq!(player.stats.mp, 80);
+    }
+
+    #[test]
+    fn extras_follow_the_client_order() {
+        let read = |skill_id, bytes: &[u8]| {
+            let bytes = bytes.to_vec();
+            read_extras(&mut Cursor::new(&bytes), skill_id)
+        };
+        // Dispel: where, the party, its delay, then the mobs.
+        let extras = read(
+            skills::DISPEL,
+            &[1, 0, 2, 0, 0x80, 9, 0, 1, 7, 0, 0, 0, 0, 0],
+        );
+        assert_eq!(
+            extras,
+            Extras {
+                position: Some((1, 2)),
+                party: Some(0x80),
+                mobs: vec![7],
+            }
+        );
+        // Seal sends only the mobs, and an out-of-sight 0 is dropped.
+        let extras = read(2111004, &[2, 0, 0, 0, 0, 5, 0, 0, 0]);
+        assert_eq!(extras.mobs, [5]);
+        assert_eq!(extras.position, None);
     }
 
     #[test]

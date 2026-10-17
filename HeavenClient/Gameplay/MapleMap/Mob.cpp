@@ -39,7 +39,8 @@
 namespace ms
 {
 	Mob::Mob(int32_t oi, int32_t mid, int8_t mode, int8_t st, uint16_t fh, uint16_t homefh, bool newspawn, int8_t tm,
-			 Point<int16_t> position, const Physics &physics) : MapObject(oi), shown(move_path::Player::State{})
+			 Point<int16_t> position, const std::vector<MobStatParser::Status> &spawnstatuses,
+			 const Physics &physics) : MapObject(oi), shown(move_path::Player::State{})
 	{
 		std::string strid = string_format::extend_id(mid, 7);
 		nl::node src = nl::nx::mob[strid + ".img"];
@@ -170,6 +171,7 @@ namespace ms
 		bodystance = stance;
 		bodyflip = flip;
 		update_shoe(false);
+		set_statuses(spawnstatuses, false);
 		set_control(mode);
 
 		namelabel = Text(Text::Font::A13M, Text::Alignment::CENTER, Color::Name::WHITE, Text::Background::NAMETAG,
@@ -289,6 +291,9 @@ namespace ms
 		effects.update();
 		headeffects.update();
 		fieldeffects.update();
+
+		for (StatusEffect &effect : statuseffects)
+			effect.animation.update();
 		showhp.update();
 
 		// Every client, controller or not, tells the server once a second how
@@ -459,6 +464,19 @@ namespace ms
 
 	void Mob::step_body(const Physics &physics)
 	{
+		// A stunned, frozen or webbed mob stands where it is, and its AI
+		// waits (inferred: the hold itself wasn't traced in v83).
+		bool hold = held() && bodystance != Stance::HIT && bodystance != Stance::JUMP;
+
+		if (hold)
+		{
+			if (bodystance != Stance::STAND)
+				set_body_stance(Stance::STAND);
+
+			flyx = 0;
+			flyy = -1;
+		}
+
 		if (!canfly)
 		{
 			if (body.is_flag_not_set(PhysicsObject::Flag::TURNATEDGES))
@@ -592,6 +610,9 @@ namespace ms
 
 				break;
 			default:
+				if (hold)
+					break;
+
 				// The mob vecctrl steps its AI in 90 ms steps (FUN_007f72d9).
 				for (aitime += Constants::TIMESTEP; aitime >= 90; aitime -= 90)
 				{
@@ -606,7 +627,7 @@ namespace ms
 
 		// A jumper that stopped at the end of its foothold jumps on the
 		// next tick (FUN_007f1fec).
-		if (jumprequest &&
+		if (jumprequest && !hold &&
 			(bodystance == Stance::MOVE || bodystance == Stance::CHASE || bodystance == Stance::STAND))
 			jump(input(), false);
 
@@ -939,6 +960,38 @@ namespace ms
 			}
 		}
 
+		if (!dead)
+		{
+			Rectangle<int16_t> body = get_body();
+			Point<int16_t> position = get_position();
+
+			for (const StatusEffect &effect : statuseffects)
+			{
+				std::optional<hit_point::Placement> placement =
+						hit_point::place(effect.pos, body, position, hit_point::centre(body, body));
+
+				if (!placement)
+					continue;
+
+				Point<int16_t> at = placement->offset;
+
+				switch (placement->anchor)
+				{
+					case hit_point::Anchor::FEET:
+						at += absp;
+						break;
+					case hit_point::Anchor::HEAD:
+						at += headp;
+						break;
+					case hit_point::Anchor::FIELD:
+						at += viewp;
+						break;
+				}
+
+				effect.animation.draw(DrawArgument(at, flip && !noflip), alpha);
+			}
+		}
+
 		effects.drawabove(absp, alpha);
 		headeffects.drawabove(headp, alpha);
 		fieldeffects.drawabove(viewp, alpha);
@@ -1006,10 +1059,17 @@ namespace ms
 		// have. A mob with a chase animation walks at info/chaseSpeed while
 		// chasing. v83 sets the shoe when a chase starts, not when one runs
 		// out, so the mob keeps that speed until something else resets it.
-		auto shoespeed = [](float base)
+		// A Speed status (Slow) adds its value to the percentage
+		// (FUN_006642b0).
+		auto found = statuses.find(MobStatParser::SPEED);
+		float change = found != statuses.end() ? found->second.value : 0.0f;
+
+		auto shoespeed = [change](float base)
 		{
-			return std::clamp(base + 100.0f, 10.0f, 140.0f) * 0.01;
+			return std::clamp(base + 100.0f + change, 10.0f, 140.0f) * 0.01;
 		};
+
+		chaseshoe = chasing;
 
 		float base = canfly ? flyspeed : speed;
 
@@ -1146,6 +1206,139 @@ namespace ms
 				fieldeffects.add(animation, args, z);
 				break;
 		}
+	}
+
+	void Mob::set_statuses(const std::vector<MobStatParser::Status> &given, bool effects)
+	{
+		std::vector<int32_t> reasons;
+
+		for (const MobStatParser::Status &status : given)
+		{
+			statuses[status.stat] = status;
+
+			if (std::find(reasons.begin(), reasons.end(), status.reason) == reasons.end())
+				reasons.push_back(status.reason);
+
+			if (status.stat == MobStatParser::SPEED)
+				update_shoe(chaseshoe);
+
+			// Doom shows the mob as a Blue Snail (FUN_00789efd with 100101).
+			if (status.stat == MobStatParser::DOOM)
+				show_look(100101);
+		}
+
+		for (int32_t reason : reasons)
+			show_status(reason, effects);
+	}
+
+	void Mob::reset_statuses(const BuffParser::Flags &flags)
+	{
+		for (auto iter = statuses.begin(); iter != statuses.end();)
+		{
+			if (flags.has(iter->first))
+				iter = statuses.erase(iter);
+			else
+				++iter;
+		}
+
+		statuseffects.erase(
+				std::remove_if(statuseffects.begin(), statuseffects.end(),
+							   [this](const StatusEffect &effect)
+							   {
+								   return std::none_of(statuses.begin(), statuses.end(),
+													   [&effect](const auto &status)
+													   {
+														   return status.second.reason == effect.reason;
+													   });
+							   }),
+				statuseffects.end());
+
+		if (flags.has(MobStatParser::SPEED))
+			update_shoe(chaseshoe);
+
+		// And its own look again (FUN_00789dc7).
+		if (flags.has(MobStatParser::DOOM))
+			show_look(0);
+	}
+
+	bool Mob::held() const
+	{
+		return statuses.count(MobStatParser::STUN) || statuses.count(MobStatParser::FREEZE) ||
+			   statuses.count(MobStatParser::WEB);
+	}
+
+	void Mob::show_status(int32_t reason, bool effects)
+	{
+		// A player's skill, or a mob skill's id and level (0x5d3d02).
+		nl::node src = nl::nx::skill[string_format::extend_id(reason / 10000, 3) + ".img"]["skill"]
+		[string_format::extend_id(reason, 7)];
+
+		if (!src)
+			src = nl::nx::skill["MobSkill.img"][string_format::extend_id(reason & 0xFFFF, 3)]["level"]
+			[std::to_string(reason >> 16)];
+
+		// Which of the `mob` effects repeat comes from the data (the draw
+		// code wasn't traced).
+		for (uint8_t part = 0; part < 2; part++)
+		{
+			nl::node effect = src[part == 0 ? "mob" : "mob0"];
+
+			if (effect.size() == 0)
+				continue;
+
+			auto pos = static_cast<int8_t>(effect["pos"].get_integer());
+			bool lasts = part == 1 || effect["repeat"].get_bool();
+
+			if (!lasts)
+			{
+				if (effects)
+					show_effect(effect, pos, 0, flip, get_body());
+
+				continue;
+			}
+
+			bool shown = std::any_of(statuseffects.begin(), statuseffects.end(),
+									 [reason, part](const StatusEffect &other)
+									 {
+										 return other.reason == reason && other.part == part;
+									 });
+
+			if (!shown)
+				statuseffects.push_back({ reason, part, effect, pos });
+		}
+	}
+
+	void Mob::show_look(int32_t mobid)
+	{
+		if (mobid == 0)
+		{
+			if (ownlook)
+			{
+				animations = std::move(*ownlook);
+				ownlook.reset();
+				animations.at(stance).reset();
+			}
+
+			return;
+		}
+
+		if (ownlook)
+			return;
+
+		nl::node src = nl::nx::mob[string_format::extend_id(mobid, 7) + ".img"];
+		std::map<Stance, Animation> look;
+
+		// Every stance the mob takes needs a frame; what the other lacks it
+		// stands for.
+		for (const auto &own : animations)
+		{
+			nl::node stancesrc = src[own.first == Stance::CHASE ? "move" : nameof(own.first)];
+
+			look[own.first] = stancesrc.size() > 0 ? stancesrc : src["stand"];
+		}
+
+		ownlook = std::move(animations);
+		animations = std::move(look);
 	}
 
 	void Mob::show_hit(const Animation &animation, const Rectangle<int16_t> &range, bool f)
