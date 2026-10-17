@@ -20,6 +20,7 @@ pub enum SendOpcode {
     CancelBuff = 0x21,
     StatChange = 0x1F,
     UpdateSkills = 0x24,
+    FameResponse = 0x26,
     ShowStatusInfo = 0x27,
     SkillBookResult = 0x33,
     GatherItemResult = 0x34,

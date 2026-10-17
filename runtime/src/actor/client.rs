@@ -2,6 +2,7 @@ mod buddies;
 mod buff;
 mod combat;
 mod dialogue;
+mod fame;
 mod loot;
 mod npc_script;
 mod quest;
@@ -367,6 +368,7 @@ impl ClientActor {
                 .await?
             }
             WorldAction::Buddy(request) => self.buddy_request(request).await?,
+            WorldAction::GiveFame { target, up } => self.give_fame(target, up).await?,
             WorldAction::Find { target_name } => {
                 self.send_to_directory(DirectoryMessage::Find {
                     from: self.client_id,
@@ -936,6 +938,12 @@ impl ClientActor {
                     .map_err(|e| RuntimeError::Handler(e.to_string()))?;
                 requester.send_packet(packet);
             }
+            ServerMessage::Famed {
+                giver,
+                giver_name,
+                up,
+            } => self.take_fame(giver, giver_name, up).await?,
+            ServerMessage::FameMissed { target } => self.fame_missed(target).await?,
             ServerMessage::SendPacket(mut packet) => self.send(&mut packet).await?,
         }
         Ok(())

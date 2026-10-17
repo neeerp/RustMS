@@ -34,4 +34,16 @@ namespace ms
 			write_int(character_id);
 		}
 	};
+
+	// Raise (or drop) the fame of a character on the map (v83 FUN_00a23eb5)
+	// Opcode: GIVE_FAME(95)
+	class GiveFamePacket : public OutPacket
+	{
+	public:
+		GiveFamePacket(int32_t character_id, bool up) : OutPacket(OutPacket::Opcode::GIVE_FAME)
+		{
+			write_int(character_id);
+			write_byte(up);
+		}
+	};
 }

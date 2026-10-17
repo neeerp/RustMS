@@ -68,6 +68,7 @@ namespace ms
 		RECALCULATE_STATS = 35,
 		UPDATE_SKILL = 36,
 		SKILL_USE_RESULT = 37,
+		FAME_RESPONSE = 38,
 		SKILL_LEARN_ITEM_RESULT = 51,
 
 		/// Messaging 1
@@ -277,6 +278,7 @@ namespace ms
 
 		// Player Interaction
 		emplace<CHAR_INFO, CharInfoHandler>();
+		emplace<FAME_RESPONSE, FameResponseHandler>();
 
 		// Party handlers
 		emplace<PARTY_OPERATION, PartyOperationHandler>();
