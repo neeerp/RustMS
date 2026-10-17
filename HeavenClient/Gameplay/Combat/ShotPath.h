@@ -473,6 +473,40 @@ namespace ms
 			return static_cast<uint16_t>(MS_PER_PIXEL * std::sqrt(dx * dx + dy * dy));
 		}
 
+		// Whether a shot's ball jumps from mob to mob instead, each hit when
+		// it gets there: Energy Orb and Spark (FUN_0094289f).
+		inline bool hops(int32_t skill)
+		{
+			return skill == 5121002 || skill == 15111006;
+		}
+
+		// Where the ball's first jump starts: 25 px ahead of `origin`.
+		inline Point<int16_t> hop_start(Point<int16_t> origin, bool toleft)
+		{
+			return { static_cast<int16_t>(origin.x() + (toleft ? -25 : 25)), origin.y() };
+		}
+
+		// Where the ball jumps to on a mob with these bounds: their middle.
+		inline Point<int16_t> hop_point(Rectangle<int16_t> body)
+		{
+			return {
+				static_cast<int16_t>((body.left() + body.right()) / 2),
+				static_cast<int16_t>((body.top() + body.bottom()) / 2)
+			};
+		}
+
+		// How long the ball's jump from `from` to `to` takes: 1.25 ms per
+		// pixel, Spark's 2. Each mob is hit when the ball gets there, a jump
+		// after the last.
+		inline uint16_t hop_time(int32_t skill, Point<int16_t> from, Point<int16_t> to)
+		{
+			double dx = to.x() - from.x();
+			double dy = to.y() - from.y();
+			double per_pixel = skill == 15111006 ? 2.0 : 1.25;
+
+			return static_cast<uint16_t>(per_pixel * std::sqrt(dx * dx + dy * dy));
+		}
+
 		// How long after the attack's hit frame the damage at `hit` lands.
 		// It only counts the horizontal distance.
 		inline uint16_t hit_delay(Point<int16_t> origin, Point<int16_t> hit)
