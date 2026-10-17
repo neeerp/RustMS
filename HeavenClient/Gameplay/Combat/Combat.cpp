@@ -1660,6 +1660,21 @@ namespace ms
 		get_move(skillid).apply_useeffects(player);
 	}
 
+	void Combat::show_affected(int32_t cid, int32_t skillid)
+	{
+		if (Optional<OtherChar> ouser = chars.get_char(cid))
+		{
+			const SkillPrepare::Effect &affected = get_skill(skillid).get_affected();
+			ouser->show_attack_effect(affected.animation, affected.z);
+		}
+	}
+
+	void Combat::show_player_affected(int32_t skillid)
+	{
+		const SkillPrepare::Effect &affected = get_skill(skillid).get_affected();
+		player.show_attack_effect(affected.animation, affected.z);
+	}
+
 	void Combat::show_prepare(int32_t cid, int32_t skillid, uint8_t level, uint16_t action_and_facing, uint8_t speed)
 	{
 		Optional<OtherChar> ouser = chars.get_char(cid);

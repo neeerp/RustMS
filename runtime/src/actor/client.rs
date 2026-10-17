@@ -357,6 +357,15 @@ impl ClientActor {
                 })
                 .await?
             }
+            WorldAction::PartySkill(used) => {
+                let origin = self.in_game()?.position;
+                self.send_to_directory(DirectoryMessage::PartySkill {
+                    from: self.client_id,
+                    used,
+                    origin,
+                })
+                .await?
+            }
             WorldAction::Buddy(request) => self.buddy_request(request).await?,
             WorldAction::Find { target_name } => {
                 self.send_to_directory(DirectoryMessage::Find {
@@ -909,6 +918,11 @@ impl ClientActor {
                 })
                 .await?
             }
+            ServerMessage::PartySkill {
+                used,
+                origin,
+                map_id,
+            } => self.party_skill_reached(used, origin, map_id).await?,
             ServerMessage::ReactorBroken {
                 reactor_id,
                 object_id,

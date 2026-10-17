@@ -60,6 +60,7 @@ pub use self::script_portal::ChangeMapSpecialHandler;
 pub use self::spend_points::{SpendApHandler, SpendSpHandler};
 pub use self::use_item::{HealOverTimeHandler, UseItemHandler};
 pub use self::use_skill::{
-    CancelBuffHandler, SkillEffectHandler, ThrowGrenadeHandler, UseSkillHandler,
+    party_skill_reached, CancelBuffHandler, SkillEffectHandler, ThrowGrenadeHandler,
+    UseSkillHandler,
 };
 pub use self::whisper::WhisperHandler;

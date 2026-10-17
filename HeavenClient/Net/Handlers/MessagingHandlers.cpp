@@ -592,6 +592,13 @@ namespace ms
 		{
 			Stage::get().get_player().show_effect_id(CharEffect::Id::MONSTER_CARD);
 		}
+		else if (mode1 == 2) // a party member's skill reached the player
+		{
+			int32_t skillid = recv.read_int();
+			recv.read_byte(); // level
+
+			Stage::get().get_combat().show_player_affected(skillid);
+		}
 		else if (mode1 == 18) // intro effect
 		{
 			recv.read_string(); // path

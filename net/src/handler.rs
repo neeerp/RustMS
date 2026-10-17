@@ -303,6 +303,8 @@ pub enum WorldAction {
     Died,
     Whisper(WhisperDelivery),
     Party(PartyRequest),
+    /// A skill the player used reached party members; see `PartySkill`.
+    PartySkill(PartySkill),
     Buddy(BuddyRequest),
     /// Tell the player where a character is (`/find`).
     Find {
@@ -319,6 +321,18 @@ pub enum WorldAction {
     /// Buy something or save the wish list, in the Cash Shop.
     CashShop(crate::cash_shop::CashShopRequest),
     Disconnect,
+}
+
+/// A skill a player used that reached their party: the members in the
+/// slots set in `slots` (a bit each, the first slot highest, as USE_SKILL
+/// has them) get its buffs, or `heal` HP from Heal, if they are alive and
+/// in its area.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct PartySkill {
+    pub skill_id: i32,
+    pub level: i32,
+    pub slots: u8,
+    pub heal: i32,
 }
 
 /// A request a player makes of their field, which owns its mobs.

@@ -60,6 +60,8 @@ namespace ms
 		buffs[Buffstat::Id::MDEF] = std::make_unique<SimpleStatBuff<EquipStat::Id::MDEF>>();
 		buffs[Buffstat::Id::SPEED] = std::make_unique<SimpleStatBuff<EquipStat::Id::SPEED>>();
 		buffs[Buffstat::Id::JUMP] = std::make_unique<SimpleStatBuff<EquipStat::Id::JUMP>>();
+		buffs[Buffstat::Id::ACC] = std::make_unique<SimpleStatBuff<EquipStat::Id::ACC>>();
+		buffs[Buffstat::Id::AVOID] = std::make_unique<SimpleStatBuff<EquipStat::Id::AVOID>>();
 		buffs[Buffstat::Id::HYPERBODYHP] = std::make_unique<PercentageStatBuff<EquipStat::Id::HP>>();
 		buffs[Buffstat::Id::HYPERBODYMP] = std::make_unique<PercentageStatBuff<EquipStat::Id::MP>>();
 	}

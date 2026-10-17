@@ -157,6 +157,32 @@ pub fn build_skill_effect(
     Ok(p)
 }
 
+/// SHOW_ITEM_GAIN_INCHAT 2: a party member's skill reached the player,
+/// who plays its `affected` animation (0x93632a).
+pub fn build_own_affected(skill_id: i32, skill_level: u8) -> Result<Packet, NetworkError> {
+    let mut p = Packet::new_empty();
+    p.write_short(SendOpcode::ShowItemGainInChat as i16)?;
+    p.write_byte(2)?;
+    p.write_int(skill_id)?;
+    p.write_byte(skill_level)?;
+    Ok(p)
+}
+
+/// SHOW_FOREIGN_EFFECT 2: the same, on another player.
+pub fn build_foreign_affected(
+    character_id: i32,
+    skill_id: i32,
+    skill_level: u8,
+) -> Result<Packet, NetworkError> {
+    let mut p = Packet::new_empty();
+    p.write_short(SendOpcode::ShowForeignEffect as i16)?;
+    p.write_int(character_id)?;
+    p.write_byte(2)?;
+    p.write_int(skill_id)?;
+    p.write_byte(skill_level)?;
+    Ok(p)
+}
+
 /// The skill effect of a Monster Magnet, which also says which way the
 /// player faced (0x937b42).
 pub fn build_magnet_effect(
@@ -247,6 +273,21 @@ mod tests {
         let mut expect = Expect::new(&packet.bytes);
         expect.short(SendOpcode::ShowForeignEffect as i16).int(7);
         expect.byte(1).int(1001).byte(12).byte(3);
+        expect.end();
+    }
+
+    #[test]
+    fn affected_effects_carry_the_skill_and_its_level() {
+        let packet = build_own_affected(2301004, 20).unwrap();
+        let mut expect = Expect::new(&packet.bytes);
+        expect.short(SendOpcode::ShowItemGainInChat as i16);
+        expect.byte(2).int(2301004).byte(20);
+        expect.end();
+
+        let packet = build_foreign_affected(7, 2301004, 20).unwrap();
+        let mut expect = Expect::new(&packet.bytes);
+        expect.short(SendOpcode::ShowForeignEffect as i16).int(7);
+        expect.byte(2).int(2301004).byte(20);
         expect.end();
     }
 }

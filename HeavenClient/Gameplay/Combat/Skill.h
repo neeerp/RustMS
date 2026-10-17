@@ -93,6 +93,10 @@ namespace ms
 		// The effect shown where a thrown grenade goes off.
 		Animation get_special() const;
 
+		// What a party member the skill reached shows (its `affected`
+		// node, 0x93632a).
+		const SkillPrepare::Effect &get_affected() const;
+
 		// What the skill rains once its shot hits, if it's one that does.
 		const SkillRain &get_rain() const;
 
@@ -118,6 +122,7 @@ namespace ms
 		std::unique_ptr<SkillUseEffect> useeffect;
 		std::unique_ptr<SkillHitEffect> hiteffect;
 		SkillPrepare prepare;
+		SkillPrepare::Effect affected;
 		Animation special;
 		SkillRain rain;
 
