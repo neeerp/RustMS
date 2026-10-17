@@ -58,6 +58,7 @@ pub enum RecvOpcode {
     SpendSp = 0x5A,
     UseSkill = 0x5B,
     CancelBuff = 0x5C,
+    SkillEffect = 0x5D,
     MesoDrop = 0x5E,
     CharInfoRequest = 0x61,
     ChangeMapSpecial = 0x64,

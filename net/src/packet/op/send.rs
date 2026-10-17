@@ -53,6 +53,8 @@ pub enum SendOpcode {
     CloseRangeAttack = 0xBA,
     RangedAttack = 0xBB,
     MagicAttack = 0xBC,
+    SkillEffect = 0xBE,
+    CancelSkillEffect = 0xBF,
     DamagePlayer = 0xC0,
     FacialExpression = 0xC1,
     ShowForeignEffect = 0xC6,
