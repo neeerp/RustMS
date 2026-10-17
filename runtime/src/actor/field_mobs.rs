@@ -234,15 +234,23 @@ impl MobSet {
         Some(previous)
     }
 
-    /// Apply the controller's movement. `false` if `from` doesn't control it.
-    pub fn move_mob(&mut self, from: ClientId, object_id: i32, movement: &[u8]) -> bool {
+    /// Apply the controller's movement, a path from `start`. `false` if
+    /// `from` doesn't control it.
+    pub fn move_mob(
+        &mut self,
+        from: ClientId,
+        object_id: i32,
+        start: (i16, i16),
+        movement: &[u8],
+    ) -> bool {
         let Some(mob) = self.live.get_mut(&object_id) else {
             return false;
         };
         if mob.controller != Some(from) {
             return false;
         }
-        if let Some((x, y, stance, foothold)) = parse_movement(movement, (mob.x, mob.y, mob.stance))
+        if let Some((x, y, stance, foothold)) =
+            parse_movement(movement, (start.0, start.1, mob.stance))
         {
             mob.x = x;
             mob.y = y;
@@ -442,8 +450,8 @@ mod tests {
 
         // Only the controller may move it.
         let movement = [1, 0, 0x96, 0, 0xE7, 0xFF, 0, 0, 0, 0, 0, 0, 2, 0, 0];
-        assert!(!mobs.move_mob(2, snail, &movement));
-        assert!(mobs.move_mob(1, snail, &movement));
+        assert!(!mobs.move_mob(2, snail, (150, -25), &movement));
+        assert!(mobs.move_mob(1, snail, (150, -25), &movement));
         assert_eq!(
             (mobs.get(snail).unwrap().x, mobs.get(snail).unwrap().y),
             (150, -25)
@@ -454,12 +462,12 @@ mod tests {
             2, 0, 0x96, 0, 0x2D, 0, 0, 0, 0, 0, 52, 0, 2, 100, 0, //
             1, 0x0A, 0, 0, 0, 2, 100, 0,
         ];
-        assert!(mobs.move_mob(1, snail, &walk));
+        assert!(mobs.move_mob(1, snail, (150, -25), &walk));
         let view = mobs.get(snail).unwrap().view(false);
         assert_eq!((view.foothold, view.home_foothold), (52, 45));
         // An absolute fragment without a foothold leaves it airborne.
         let fall = [1, 0, 0x96, 0, 0x30, 0, 0, 0, 0, 0, 0, 0, 2, 100, 0];
-        assert!(mobs.move_mob(1, snail, &fall));
+        assert!(mobs.move_mob(1, snail, (150, 45), &fall));
         assert_eq!(mobs.get(snail).unwrap().view(false).foothold, 0);
 
         assert_eq!(mobs.damage(1, snail, 3, now), Some(Ok(63)));

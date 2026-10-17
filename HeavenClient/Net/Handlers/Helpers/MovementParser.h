@@ -26,6 +26,9 @@ namespace ms
 {
 	namespace MovementParser
 	{
-		std::vector<Movement> parse_movements(InPacket& recv);
+		// A path's elements after its start position, as v83 reads them
+		// (FUN_0068a33c). Elements that carry no position keep the one
+		// before, starting from `start`.
+		std::vector<Movement> parse_movements(InPacket& recv, Point<int16_t> start);
 	}
 }

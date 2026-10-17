@@ -199,12 +199,13 @@ impl FieldActor {
             FieldMessage::Move {
                 from,
                 packet,
+                start,
                 movement_bytes,
             } => {
                 if let Some(occupant) = self.occupants.get_mut(&from) {
                     let avatar = &mut occupant.avatar;
                     if let Some((x, y, stance)) =
-                        parse_movement_state(&movement_bytes, (avatar.x, avatar.y, avatar.stance))
+                        parse_movement_state(&movement_bytes, (start.0, start.1, avatar.stance))
                     {
                         avatar.x = x;
                         avatar.y = y;
@@ -381,7 +382,7 @@ impl FieldActor {
         start: (i16, i16),
         movement: &[u8],
     ) {
-        if !self.mobs.move_mob(from, object_id, movement) {
+        if !self.mobs.move_mob(from, object_id, start, movement) {
             return;
         }
         if let Some(occupant) = self.occupants.get(&from) {

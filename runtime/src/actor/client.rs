@@ -271,18 +271,21 @@ impl ClientActor {
             }
             WorldAction::FieldMove {
                 packet,
+                start,
                 movement_bytes,
             } => {
                 self.last_moved = Some(tokio::time::Instant::now());
                 if let Some(game) = self.game.as_mut() {
-                    let (x, y) = game.position;
-                    if let Some((x, y, _)) = parse_movement_state(&movement_bytes, (x, y, 0)) {
+                    if let Some((x, y, _)) =
+                        parse_movement_state(&movement_bytes, (start.0, start.1, 0))
+                    {
                         game.position = (x, y);
                     }
                 }
                 self.send_to_field(FieldMessage::Move {
                     from: self.client_id,
                     packet,
+                    start,
                     movement_bytes,
                 })
                 .await?

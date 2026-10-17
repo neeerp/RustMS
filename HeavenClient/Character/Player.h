@@ -64,6 +64,10 @@ namespace ms
 		// Respawn the player at the given position
 		void respawn(Point<int16_t> position, bool underwater);
 
+		// Tell the server, as path element `command` of no duration, where
+		// the player is now (v83 FUN_0052ef17).
+		void record_move(uint8_t command);
+
 		// Sends a Keyaction to the player's state, to apply forces, change the state and other behaviour.
 		void send_action(KeyAction::Id action, bool pressed);
 
@@ -305,6 +309,8 @@ namespace ms
 		std::map<KeyAction::Id, bool> keysdown;
 
 		Movement lastmove;
+
+		uint8_t get_stancebyte() const;
 
 		Randomizer randomizer;
 
