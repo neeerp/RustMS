@@ -3,6 +3,7 @@ pub mod buff;
 pub mod cash_shop;
 pub mod channel;
 pub mod char;
+pub mod door;
 pub mod drop;
 pub mod effect;
 pub mod fame;

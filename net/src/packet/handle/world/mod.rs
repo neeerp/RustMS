@@ -6,6 +6,7 @@ mod change_map;
 mod char_info;
 mod chat;
 mod combat;
+mod door;
 mod emote;
 mod fame;
 mod item_move;
@@ -36,12 +37,13 @@ pub use self::buddy::BuddyListModifyHandler;
 pub use self::cash_shop::{CashShopOperationHandler, EnterCashShopHandler};
 pub use self::chair::{CancelChairHandler, UseChairHandler};
 pub use self::change_channel::ChangeChannelHandler;
-pub use self::change_map::{warp, ChangeMapHandler};
+pub use self::change_map::{door_warp, warp, ChangeMapHandler, DoorExit};
 pub use self::char_info::CharInfoRequestHandler;
 pub use self::chat::AllChatHandler;
 pub use self::combat::{
     AttackHandler, MobDistanceHandler, MoveLifeHandler, NpcActionHandler, TakeDamageHandler,
 };
+pub use self::door::UseDoorHandler;
 pub use self::emote::FaceExpressionHandler;
 pub use self::fame::{GiveFameHandler, MIN_FAME_LEVEL};
 pub use self::item_move::ItemMoveHandler;

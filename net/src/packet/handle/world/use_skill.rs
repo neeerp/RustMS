@@ -81,6 +81,35 @@ impl WorldHandler for UseSkillHandler {
                 }
             };
         }
+        if skill_id == skills::MYSTIC_DOOR {
+            // Where the player stands (0x969bf9).
+            let at = (r.read_short()?, r.read_short()?);
+            let town = crate::game_data::get()?
+                .field(ctx.player.stats.map_id)
+                .and_then(|field| skills::door_town(field, at));
+            let opened = match town {
+                Some(town) => {
+                    use_skill(ctx.player, skill_id, level, Instant::now()).map(|used| (town, used))
+                }
+                None => Err(Refusal::NoDoorHere),
+            };
+            return match opened {
+                Ok((town, used)) => {
+                    let lasts = Duration::from_secs(used.skill.effect.duration.max(0) as u64);
+                    Ok(
+                        announce(ctx.player, &used)?.with(WorldAction::OpenDoor {
+                            town,
+                            at,
+                            lasts,
+                        }),
+                    )
+                }
+                Err(refusal) => {
+                    debug!(skill_id, level, ?refusal, "Mystic Door refused");
+                    Ok(HandlerResult::reply(stat::build_stat_update(true, &[])?))
+                }
+            };
+        }
         let extras = read_extras(&mut r, skill_id);
         match use_skill(ctx.player, skill_id, level, Instant::now()) {
             Ok(used) => {
@@ -212,6 +241,8 @@ enum Refusal {
     NotEnoughMp,
     /// Without the item the skill costs.
     NoItem,
+    /// Mystic Door where no door may open.
+    NoDoorHere,
 }
 
 /// What USE_SKILL carries after the level (0x96d399), each part only for
@@ -382,6 +413,8 @@ fn heal(player: &mut Player, level: i32, party: u8, roll: f64) -> Result<(i16, i
 #[derive(Debug)]
 struct Used {
     skill: Learned,
+    /// Whether the skill buffs: Mystic Door neither buffs nor debuffs.
+    buffs: bool,
     stats: Vec<(BuffStat, i16)>,
     items: Vec<InventoryChange>,
     debuffs: Option<Inflict>,
@@ -402,8 +435,10 @@ fn use_skill(
         .filter(|skill| skill.level == level)
         .ok_or(Refusal::NotLearned)?;
     let stats = skills::buffs(&skill);
+    let buffs = stats.is_some();
     let debuffs = match stats {
         Some(_) => None,
+        None if skill_id == skills::MYSTIC_DOOR => None,
         None => Some(skills::mob_debuffs(&skill, player).ok_or(Refusal::Unsupported)?),
     };
     if player.buffs.cooling_down(skill_id, now) {
@@ -434,6 +469,7 @@ fn use_skill(
     }
     Ok(Used {
         skill,
+        buffs,
         stats,
         items,
         debuffs,
@@ -522,9 +558,10 @@ pub fn party_skill_reached(
 fn announce(player: &Player, used: &Used) -> WorldResult {
     let Used {
         skill,
+        buffs,
         stats,
         items,
-        debuffs,
+        ..
     } = used;
     let effect = &skill.effect;
     let mut result = HandlerResult::reply(stat::build_stat_update(
@@ -534,7 +571,7 @@ fn announce(player: &Player, used: &Used) -> WorldResult {
     if !items.is_empty() {
         result = result.with_reply(inventory::build_inventory_operation(false, items)?);
     }
-    if debuffs.is_none() {
+    if *buffs {
         result = result.with_reply(buff::build_give_buff(
             skill.skill_id,
             effect.duration * 1000,

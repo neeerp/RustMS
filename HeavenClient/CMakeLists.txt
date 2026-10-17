@@ -61,7 +61,11 @@ if(HEAVENCLIENT_BUILD_TESTS)
     target_include_directories(menu_cover_tests PRIVATE ${PROJECT_SOURCE_DIR}/libs/NoLifeNx)
     add_test(NAME menu_cover COMMAND menu_cover_tests)
     add_executable(party_tests tests/party.cpp Character/Party.cpp)
+    target_include_directories(party_tests PRIVATE ${PROJECT_SOURCE_DIR}/libs/NoLifeNx)
     add_test(NAME party COMMAND party_tests)
+    add_executable(door_rules_tests tests/door_rules.cpp Character/Party.cpp)
+    target_include_directories(door_rules_tests PRIVATE ${PROJECT_SOURCE_DIR}/libs/NoLifeNx)
+    add_test(NAME door_rules COMMAND door_rules_tests)
     add_executable(buddy_list_tests tests/buddy_list.cpp Character/BuddyList.cpp)
     add_test(NAME buddy_list COMMAND buddy_list_tests)
     add_executable(npc_reach_tests tests/npc_reach.cpp)
@@ -348,6 +352,7 @@ add_executable(HeavenClient
     Gameplay/MapleMap/MapInfo.cpp
     Gameplay/MapleMap/MapInfo.h
     Gameplay/MapleMap/MapMists.cpp
+    Gameplay/MapleMap/MapDoors.cpp
     Gameplay/MapleMap/MapMists.h
     Gameplay/MapleMap/MapSummons.cpp
     Gameplay/MapleMap/MapSummons.h

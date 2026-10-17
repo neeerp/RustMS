@@ -220,6 +220,27 @@ namespace ms
 		void handle(InPacket& recv) const override;
 	};
 
+	// A Mystic Door appears in the field
+	// Opcode: SPAWN_DOOR(275)
+	class SpawnDoorHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
+	// A Mystic Door closes
+	// Opcode: REMOVE_DOOR(276)
+	class RemoveDoorHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
+	// Where the player's own Mystic Door leads, or that it closed
+	// Opcode: SPAWN_PORTAL(67)
+	class SpawnPortalHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
 	// A user's summon appears
 	// Opcode: SPAWN_SUMMON(175)
 	class SpawnSummonHandler : public PacketHandler

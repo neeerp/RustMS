@@ -44,14 +44,14 @@ namespace ms
 		std::optional<CharEntry> cached_player_entry;
 	}
 
-	void SetFieldHandler::transition(int32_t mapid, uint8_t portalid) const
+	void SetFieldHandler::transition(int32_t mapid, uint8_t portalid, std::optional<Point<int16_t>> chase) const
 	{
 		Window::get().fadeout(
-			[mapid, portalid]()
+			[mapid, portalid, chase]()
 			{
 				GraphicsGL::get().clear();
 
-				Stage::get().load(mapid, portalid);
+				Stage::get().load(mapid, portalid, chase);
 
 				UI::get().enable();
 				Timer::get().start();
@@ -92,6 +92,17 @@ namespace ms
 		int8_t portalid = recv.read_byte();
 		int16_t hp = recv.read_short();
 
+		// v83 (FUN_00776020) puts the player at a point instead of the
+		// portal when chased there, as back through a Mystic Door.
+		std::optional<Point<int16_t>> chase;
+
+		if (recv.length() > 0 && recv.read_bool())
+		{
+			auto x = static_cast<int16_t>(recv.read_int());
+			auto y = static_cast<int16_t>(recv.read_int());
+			chase = Point<int16_t>(x, y);
+		}
+
 		// Respawning after death restores some HP.
 		Stage::get().get_player().get_stats().set_stat(MapleStat::Id::HP, hp);
 
@@ -103,7 +114,7 @@ namespace ms
 		// A request still waiting is forgotten in the new field.
 		Stage::get().get_player().clear_request();
 
-		transition(mapid, portalid);
+		transition(mapid, portalid, chase);
 	}
 
 	void SetFieldHandler::set_field(InPacket& recv) const

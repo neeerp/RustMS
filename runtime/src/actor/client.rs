@@ -2,6 +2,7 @@ mod buddies;
 mod buff;
 mod combat;
 mod dialogue;
+mod door;
 mod fame;
 mod loot;
 mod npc_script;
@@ -110,6 +111,8 @@ pub struct ClientActor {
     party_id: Option<i32>,
     /// What the directory last heard of the player.
     presence: Option<Presence>,
+    /// The player's open Mystic Door.
+    door: Option<door::OpenDoor>,
 }
 
 impl ClientActor {
@@ -160,6 +163,7 @@ impl ClientActor {
             in_cash_shop: false,
             party_id: None,
             presence: None,
+            door: None,
         })
     }
 
@@ -171,6 +175,7 @@ impl ClientActor {
 
         let outcome = loop {
             let buffs_due = self.buffs_due();
+            let door_due = self.door_due();
             let step = tokio::select! {
                 biased;
                 _ = kill.cancelled() => Err(RuntimeError::ClientDisconnected),
@@ -182,6 +187,9 @@ impl ClientActor {
                 _ = autosave.tick() => self.save_if_dirty().await,
                 _ = sleep_until(buffs_due.unwrap_or_else(Instant::now)), if buffs_due.is_some() => {
                     self.update_buffs().await
+                }
+                _ = sleep_until(door_due.unwrap_or_else(Instant::now)), if door_due.is_some() => {
+                    self.close_door().await
                 }
             };
             if let Err(error) = step {
@@ -375,6 +383,8 @@ impl ClientActor {
             }
             WorldAction::Buddy(request) => self.buddy_request(request).await?,
             WorldAction::GiveFame { target, up } => self.give_fame(target, up).await?,
+            WorldAction::OpenDoor { town, at, lasts } => self.open_door(town, at, lasts).await?,
+            WorldAction::UseDoor { owner, from_town } => self.use_door(owner, from_town).await?,
             WorldAction::Find { target_name } => {
                 self.send_to_directory(DirectoryMessage::Find {
                     from: self.client_id,
@@ -528,6 +538,7 @@ impl ClientActor {
 
         self.remember_spawn_point();
         self.cancel_buffs().await?;
+        self.close_door().await?;
         self.flush().await?;
         spawn_db(move || db::session::begin_channel_transition(session_id, i16::from(channel_id)))
             .await?;
@@ -954,6 +965,11 @@ impl ClientActor {
             ServerMessage::FameMissed { target } => self.fame_missed(target).await?,
             ServerMessage::SummonBroken { skill_id } => self.summon_broken(skill_id).await?,
             ServerMessage::Beholder(support) => self.beholder_support(support).await?,
+            ServerMessage::DoorWarp {
+                from_map,
+                map_id,
+                exit,
+            } => self.door_warp(from_map, map_id, exit).await?,
             ServerMessage::SendPacket(mut packet) => self.send(&mut packet).await?,
         }
         Ok(())
@@ -1093,6 +1109,9 @@ impl ClientActor {
                         client_id: self.client_id,
                     })
                     .await;
+            }
+            if let Err(error) = self.close_door().await {
+                warn!(self.client_id, %error, "Failed to close Mystic Door");
             }
             if !self.changing_channel {
                 if let Err(error) = self.announce_offline().await {

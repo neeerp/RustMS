@@ -77,6 +77,12 @@ namespace ms
 
 		bool is_underwater() const;
 
+		// Whether the map is a town (info/town).
+		bool is_town() const;
+
+		// The map's fieldLimit bits.
+		int32_t get_fieldlimit() const;
+
 		std::string get_bgm() const;
 
 		// How much faster players recover HP and MP at rest (info/recovery).

@@ -85,6 +85,10 @@ warp), updates the player's map and spawn point, sends the warp, and returns
 `WorldAction::ChangeField`. The client actor then leaves the old field and
 joins the new one at the spawn portal's position.
 
+A Mystic Door warp (`net::door_warp`) lands at a town door portal, or back
+at the door through SET_FIELD's chase position
+([Mystic Door](./combat.md#mystic-door)).
+
 World entry uses the same spawn-portal lookup (`net::spawn_position`) instead
 of a hard-coded position.
 

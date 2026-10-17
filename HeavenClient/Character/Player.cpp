@@ -984,6 +984,16 @@ namespace ms
 		return party;
 	}
 
+	MysticDoor &Player::get_door()
+	{
+		return door;
+	}
+
+	const MysticDoor &Player::get_door() const
+	{
+		return door;
+	}
+
 	BuddyList &Player::get_buddies()
 	{
 		return buddies;

@@ -28,6 +28,8 @@
 #include "RemoteSpell.h"
 #include "ShotPath.h"
 
+#include "../MapleMap/DoorRules.h"
+
 #include "../../Constants.h"
 #include "../../Character/SkillId.h"
 #include "../../Data/SkillData.h"
@@ -46,9 +48,10 @@
 namespace ms
 {
 	Combat::Combat(Player &in_player, MapChars &in_chars, MapMobs &in_mobs, MapReactors &in_reactors,
-				   MapSummons &in_summons, const Physics &in_physics, const MapInfo &in_mapinfo) : player(
+				   MapSummons &in_summons, const Physics &in_physics, const MapInfo &in_mapinfo,
+				   const MapPortals &in_portals) : player(
 			in_player), chars(in_chars), mobs(in_mobs), reactors(in_reactors), summons(in_summons),
-			physics(in_physics), mapinfo(in_mapinfo),
+			physics(in_physics), mapinfo(in_mapinfo), portals(in_portals),
 																										attackresults(
 																												[&](const AttackResult &attack)
 																												{
@@ -328,6 +331,9 @@ namespace ms
 		if (summon_rules::is_summon(moveid))
 			return request_summon(move, level);
 
+		if (moveid == door_rules::MYSTIC_DOOR)
+			return request_door(move, level);
+
 		std::optional<UseSkillPacket::Reach> reach = find_reach(moveid, level);
 
 		if (!reach)
@@ -365,6 +371,35 @@ namespace ms
 		player.fix_action_speed(6);
 		player.request(SummonSkillPacket(moveid, level, Point<int16_t>(spot->first, spot->second), left),
 					   ExclRequest::SKILL_WAIT);
+
+		return true;
+	}
+
+	bool Combat::request_door(const SpecialMove &move, int32_t level)
+	{
+		Point<int16_t> position = player.get_position();
+		door_rules::Cast cast = door_rules::may_cast(mapinfo.get_fieldlimit(), player.get_stats().get_mapid(),
+													 mapinfo.is_town(), player.get_phobj().onground,
+													 portals.blocks_door(position));
+
+		switch (cast)
+		{
+			case door_rules::Cast::FORBIDDEN:
+				InChatMessage(Messages::SKILL_FIELD).drop();
+				return false;
+			case door_rules::Cast::NEAR_PORTAL:
+				InChatMessage(Messages::DOOR_PORTAL).drop();
+				return false;
+			case door_rules::Cast::SILENT:
+				return false;
+			case door_rules::Cast::OPEN:
+				break;
+		}
+
+		move.apply_useeffects(player);
+		move.apply_actions(player, Attack::Type::MAGIC);
+		player.fix_action_speed(6);
+		player.request(DoorSkillPacket(move.get_id(), level, position), ExclRequest::SKILL_WAIT);
 
 		return true;
 	}

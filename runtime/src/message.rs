@@ -13,6 +13,7 @@
 //! whose queue is full is kicked instead. That makes wait cycles impossible.
 
 use game::{AvatarLook, FieldAvatar, Player};
+use net::packet::build::world::door::DoorView;
 use net::{
     BroadcastScope, ClientId, FieldRequest, MessengerRequest, PartyRequest, PartySkill,
     WhisperDelivery,
@@ -118,6 +119,12 @@ pub enum ServerMessage {
     },
     /// This player's Beholder heals or buffs them.
     Beholder(net::summons::Support),
+    /// The Mystic Door this player entered on `from_map` leads to `map_id`.
+    DoorWarp {
+        from_map: i32,
+        map_id: i32,
+        exit: net::packet::handle::world::DoorExit,
+    },
     SendPacket(Packet),
 }
 
@@ -236,6 +243,15 @@ pub enum FieldMessage {
         npc_id: i32,
         request_id: u64,
     },
+    /// `owner` cast Mystic Door here, at `at`.
+    OpenDoor {
+        owner: ClientId,
+        at: (i16, i16),
+    },
+    /// `owner`'s Mystic Door here closed.
+    CloseDoor {
+        owner: ClientId,
+    },
 }
 
 /// A way to reach one field actor.
@@ -341,5 +357,20 @@ pub enum DirectoryMessage {
     LookChanged {
         client_id: ClientId,
         look: AvatarLook,
+    },
+    /// `owner` opened a Mystic Door, replacing any they had.
+    DoorOpened {
+        owner: ClientId,
+        door: DoorView,
+    },
+    DoorClosed {
+        owner: ClientId,
+    },
+    /// `from` entered `owner`'s Mystic Door, in its town or its field;
+    /// answered with `ServerMessage::DoorWarp` if they may.
+    UseDoor {
+        from: ClientId,
+        owner: ClientId,
+        from_town: bool,
     },
 }
