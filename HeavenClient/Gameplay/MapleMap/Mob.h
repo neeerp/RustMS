@@ -354,6 +354,9 @@ namespace ms
 		// Calculate the hit chance
 		float calculate_hitchance(int16_t leveldelta, int32_t accuracy) const;
 
+		// The weapon defense a blow meets.
+		int32_t defense() const;
+
 		// Calculate the minimum damage.
 		double calculate_mindamage(int16_t leveldelta, double mindamage) const;
 

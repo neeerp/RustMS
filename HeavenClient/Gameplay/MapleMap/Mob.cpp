@@ -23,6 +23,7 @@
 #include "../Combat/HitPoint.h"
 #include "../Combat/MonsterMagnet.h"
 #include "../Combat/Prepare.h"
+#include "../../Character/SkillId.h"
 #include "../../Constants.h"
 #include "../../Util/Misc.h"
 #include "../../Util/NxFiles.h"
@@ -1992,7 +1993,9 @@ namespace ms
 	float Mob::calculate_hitchance(int16_t leveldelta, int32_t player_accuracy) const
 	{
 		float faccuracy = static_cast<float>(player_accuracy);
-		float hitchance = faccuracy / (((1.84f + 0.07f * leveldelta) * avoid) + 1.0f);
+		// A monster's EVA status adds to its avoid (FUN_0078df87).
+		int32_t evasion = avoid + status_value(MobStatParser::EVA);
+		float hitchance = faccuracy / (((1.84f + 0.07f * leveldelta) * evasion) + 1.0f);
 
 		if (hitchance < 0.01f)
 			hitchance = 0.01f;
@@ -2000,16 +2003,22 @@ namespace ms
 		return hitchance;
 	}
 
+	// A monster's PDR status adds to its weapon defense.
+	int32_t Mob::defense() const
+	{
+		return wdef + status_value(MobStatParser::PDR);
+	}
+
 	double Mob::calculate_mindamage(int16_t leveldelta, double damage) const
 	{
-		double mindamage = damage * (1 - 0.01 * leveldelta) - wdef * 0.6;
+		double mindamage = damage * (1 - 0.01 * leveldelta) - defense() * 0.6;
 
 		return mindamage < 1.0 ? 1.0 : mindamage;
 	}
 
 	double Mob::calculate_maxdamage(int16_t leveldelta, double damage) const
 	{
-		double maxdamage = damage * (1 - 0.01 * leveldelta) - wdef * 0.5;
+		double maxdamage = damage * (1 - 0.01 * leveldelta) - defense() * 0.5;
 
 		return maxdamage < 1.0 ? 1.0 : maxdamage;
 	}
@@ -2069,6 +2078,18 @@ namespace ms
 	std::pair<int32_t, bool> Mob::next_damage(double mindamage, double maxdamage, float hitchance, float critical,
 											  const Attack &attack) const
 	{
+		using namespace magic_damage;
+
+		// A blow meets the same statuses a spell does (FUN_0078df87), but
+		// fixed damage skips them.
+		bool weapon = attack.damagetype == Attack::DamageType::DMG_WEAPON;
+
+		if (weapon && status_value(MobStatParser::DISABLE))
+			return std::pair<int32_t, bool>(0, false);
+
+		if (weapon && status_value(MobStatParser::PIMMUNE) && !pierces(randomizer.next_int(100), 0))
+			return std::pair<int32_t, bool>(1, false);
+
 		bool hit = randomizer.below(hitchance);
 
 		if (!hit)
@@ -2082,8 +2103,16 @@ namespace ms
 		if (iscritical)
 			damage *= 1.5;
 
+		// Sacrifice goes through a Power Guard Up.
+		if (weapon && attack.skill != static_cast<int32_t>(SkillId::SACRIFICE))
+			damage = guarded(damage, status_value(MobStatParser::PGUARD_UP));
+
 		// A held skill hits harder the longer it was charged (0x79048c).
 		damage = prepare::charge_percent(attack.skill, attack.charge) * damage * 0.01;
+
+		// Only a critical hit gets through Hard Skin (0x7904ba).
+		if (weapon && status_value(MobStatParser::HARD_SKIN) && !iscritical)
+			return std::pair<int32_t, bool>(0, false);
 
 		if (damage < 1)
 			damage = 1;
