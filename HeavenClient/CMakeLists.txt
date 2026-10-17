@@ -159,6 +159,8 @@ if(HEAVENCLIENT_BUILD_TESTS)
     add_test(NAME emote_cooldown COMMAND emote_cooldown_tests)
     add_executable(fame_cooldown_tests tests/fame_cooldown.cpp)
     add_test(NAME fame_cooldown COMMAND fame_cooldown_tests)
+    add_executable(summon_rules_tests tests/summon_rules.cpp)
+    add_test(NAME summon_rules COMMAND summon_rules_tests)
     add_executable(chat_flood_guard_tests tests/chat_flood_guard.cpp)
     add_test(NAME chat_flood_guard COMMAND chat_flood_guard_tests)
     add_executable(char_click_tests tests/char_click.cpp)
@@ -344,6 +346,9 @@ add_executable(HeavenClient
     Gameplay/MapleMap/MapInfo.h
     Gameplay/MapleMap/MapMists.cpp
     Gameplay/MapleMap/MapMists.h
+    Gameplay/MapleMap/MapSummons.cpp
+    Gameplay/MapleMap/MapSummons.h
+    Gameplay/MapleMap/SummonRules.h
     Gameplay/MapleMap/MapMobs.cpp
     Gameplay/MapleMap/MapMobs.h
     Gameplay/MapleMap/MapNpcs.cpp

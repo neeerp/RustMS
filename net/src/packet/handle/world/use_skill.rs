@@ -3,8 +3,10 @@ use crate::handler::{
     FieldRequest, HandlerResult, PartySkill, WorldAction, WorldContext, WorldHandler, WorldResult,
 };
 use crate::packet::build::world::stat::{self, StatUpdate};
+use crate::packet::build::world::summon::Gone;
 use crate::packet::build::world::{buff, inventory, skill};
 use crate::skills::{self, Inflict, Learned};
+use crate::summons;
 use game::{Buff, BuffStat, InventoryChange, Player};
 use packet::{io::read::PktRead, Packet};
 use std::io::Cursor;
@@ -12,10 +14,10 @@ use std::time::{Duration, Instant};
 use tracing::debug;
 
 /// `USE_SKILL`: a skill that doesn't attack: the buffs (see
-/// `skills::buffs`), Heal, and Monster Magnet. Every answer unlocks the client, which waits on it
-/// before using another skill or item. A skill that reaches the party
-/// gives its buffs, or Heal its HP, to the members the client found around
-/// the player too.
+/// `skills::buffs`), the summons, Heal, and Monster Magnet. Every answer
+/// unlocks the client, which waits on it before using another skill or
+/// item. A skill that reaches the party gives its buffs, or Heal its HP, to
+/// the members the client found around the player too.
 pub struct UseSkillHandler;
 
 impl WorldHandler for UseSkillHandler {
@@ -51,6 +53,30 @@ impl WorldHandler for UseSkillHandler {
                 }
                 Err(refusal) => {
                     debug!(skill_id, level, ?refusal, "Heal refused");
+                    Ok(HandlerResult::reply(stat::build_stat_update(true, &[])?))
+                }
+            };
+        }
+        if summons::kind(skill_id).is_some() {
+            // Where the client put it (FUN_0096b140) and which way it faces.
+            let at = (r.read_short()?, r.read_short()?);
+            let left = r.read_byte()? != 0;
+            return match use_skill(ctx.player, skill_id, level, Instant::now()) {
+                Ok(used) => {
+                    let lasts = Duration::from_secs(used.skill.effect.duration.max(0) as u64);
+                    Ok(announce(ctx.player, &used)?.with(WorldAction::Field(
+                        FieldRequest::Summon {
+                            skill_id,
+                            level,
+                            at,
+                            left,
+                            lasts,
+                            appear: true,
+                        },
+                    )))
+                }
+                Err(refusal) => {
+                    debug!(skill_id, level, ?refusal, "Summon refused");
                     Ok(HandlerResult::reply(stat::build_stat_update(true, &[])?))
                 }
             };
@@ -158,7 +184,13 @@ impl WorldHandler for CancelBuffHandler {
         if ended.is_empty() {
             return Ok(HandlerResult::empty());
         }
-        let result = HandlerResult::reply(buff::build_cancel_buff(&ended)?);
+        let mut result = HandlerResult::reply(buff::build_cancel_buff(&ended)?);
+        if summons::kind(skill_id).is_some() {
+            result = result.with(WorldAction::Field(FieldRequest::Unsummon {
+                skill_id: Some(skill_id),
+                why: Gone::Dismissed,
+            }));
+        }
         let unseen: Vec<_> = ended.into_iter().filter(|stat| stat.shown()).collect();
         if unseen.is_empty() {
             return Ok(result);

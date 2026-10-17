@@ -44,7 +44,7 @@ namespace ms
 		constexpr int16_t TELEPORT_COOLDOWN = 600;
 	}
 
-	Stage::Stage() : combat(player, chars, mobs, reactors, physics, mapinfo)
+	Stage::Stage() : combat(player, chars, mobs, reactors, summons, physics, mapinfo)
 	{
 		state = State::INACTIVE;
 	}
@@ -96,6 +96,7 @@ namespace ms
 		drops.clear();
 		reactors.clear();
 		mists.clear();
+		summons.clear();
 	}
 
 	void Stage::load_map(int32_t mapid)
@@ -154,7 +155,10 @@ namespace ms
 			chars.draw(id, viewx, viewy, alpha);
 			player.draw(id, viewx, viewy, alpha);
 			drops.draw(id, viewx, viewy, alpha);
+			summons.draw(id, viewx, viewy, alpha);
 		}
+
+		summons.draw(-1, viewx, viewy, alpha);
 
 		const Party &party = player.get_party();
 
@@ -201,6 +205,9 @@ namespace ms
 
 		if (update_teleport())
 			drawn = player.get_position();
+
+		// The player's summons follow where the player now is.
+		summons.update(physics, player.get_position(), player.is_climbing());
 
 		portals.update(player.get_position());
 		check_touch_portals(drawn);
@@ -635,6 +642,11 @@ namespace ms
 	MapMists &Stage::get_mists()
 	{
 		return mists;
+	}
+
+	MapSummons &Stage::get_summons()
+	{
+		return summons;
 	}
 
 	MapDrops &Stage::get_drops()

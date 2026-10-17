@@ -220,6 +220,48 @@ namespace ms
 		void handle(InPacket& recv) const override;
 	};
 
+	// A user's summon appears
+	// Opcode: SPAWN_SUMMON(175)
+	class SpawnSummonHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
+	// A summon goes; the player reads why theirs did
+	// Opcode: REMOVE_SUMMON(176)
+	class RemoveSummonHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
+	// Another user's summon moves
+	// Opcode: MOVE_SUMMON(177)
+	class MoveSummonHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
+	// Another user's summon attacks
+	// Opcode: SUMMON_ATTACK(178)
+	class SummonAttackHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
+	// Another user's Beholder heals or buffs them
+	// Opcode: SUMMON_SKILL(179)
+	class SummonSkillHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
+	// A mob hurts another user's Puppet
+	// Opcode: DAMAGE_SUMMON(180)
+	class DamageSummonHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
 	// Change state of reactor
 	// Opcode: HIT_REACTOR(277)
 	class HitReactorHandler : public PacketHandler

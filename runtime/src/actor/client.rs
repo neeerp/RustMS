@@ -507,6 +507,7 @@ impl ClientActor {
             party,
         })
         .await?;
+        self.bring_summons(spawn).await?;
         self.run_map_enter_script().await
     }
 
@@ -944,6 +945,7 @@ impl ClientActor {
                 up,
             } => self.take_fame(giver, giver_name, up).await?,
             ServerMessage::FameMissed { target } => self.fame_missed(target).await?,
+            ServerMessage::SummonBroken { skill_id } => self.summon_broken(skill_id).await?,
             ServerMessage::SendPacket(mut packet) => self.send(&mut packet).await?,
         }
         Ok(())

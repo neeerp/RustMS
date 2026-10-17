@@ -155,6 +155,8 @@ namespace ms
 
 		// Check if this mob is still alive.
 		bool is_alive() const;
+		// Its template id, as Mob.wz names it.
+		int32_t get_id() const;
 
 		// Whether a Teleport can't take the player past this mob.
 		bool blocks_teleport() const;

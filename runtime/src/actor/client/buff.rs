@@ -4,8 +4,9 @@ use crate::message::FieldMessage;
 use game::BuffStat;
 use net::packet::build::world::buff;
 use net::packet::build::world::stat::{self, StatUpdate};
+use net::packet::build::world::summon::Gone;
 use net::packet::handle::world::party_skill_reached;
-use net::PartySkill;
+use net::{summons, FieldRequest, PartySkill, SpawnPosition};
 use packet::Packet;
 
 impl ClientActor {
@@ -93,12 +94,82 @@ impl ClientActor {
     /// End every buff now, e.g. on death. Buffs don't follow the player to
     /// another channel either.
     pub(super) async fn cancel_buffs(&mut self) -> Result<(), RuntimeError> {
-        let ended = self.in_game_mut()?.player.buffs.clear();
+        let buffs = &mut self.in_game_mut()?.player.buffs;
+        let summoned = buffs
+            .active()
+            .iter()
+            .any(|buff| summons::kind(buff.skill_id).is_some());
+        let ended = buffs.clear();
+        if ended.is_empty() {
+            return Ok(());
+        }
+        if summoned {
+            self.send_to_field(FieldMessage::FromClient {
+                from: self.client_id,
+                request: FieldRequest::Unsummon {
+                    skill_id: None,
+                    why: Gone::Dismissed,
+                },
+            })
+            .await?;
+        }
+        let mut packet = buff::build_cancel_buff(&ended)?;
+        self.send(&mut packet).await?;
+        self.hide_buffs(&ended).await
+    }
+
+    /// End one buff, e.g. a Puppet's when a mob broke it.
+    async fn end_buff(&mut self, skill_id: i32) -> Result<(), RuntimeError> {
+        let ended = self.in_game_mut()?.player.buffs.cancel(skill_id);
         if ended.is_empty() {
             return Ok(());
         }
         let mut packet = buff::build_cancel_buff(&ended)?;
         self.send(&mut packet).await?;
         self.hide_buffs(&ended).await
+    }
+
+    pub(super) async fn summon_broken(&mut self, skill_id: i32) -> Result<(), RuntimeError> {
+        self.end_buff(skill_id).await
+    }
+
+    /// On a new map the summons that follow the player come along, at
+    /// `spawn`; those that stay where they were put are gone.
+    pub(super) async fn bring_summons(&mut self, spawn: SpawnPosition) -> Result<(), RuntimeError> {
+        let player = &self.in_game()?.player;
+        let now = std::time::Instant::now();
+        let summoned: Vec<_> = player
+            .buffs
+            .active()
+            .iter()
+            .filter(|buff| summons::kind(buff.skill_id).is_some())
+            .map(|buff| {
+                let level = player.skills.level(buff.skill_id);
+                (
+                    buff.skill_id,
+                    level,
+                    buff.expires.saturating_duration_since(now),
+                )
+            })
+            .collect();
+        for (skill_id, level, lasts) in summoned {
+            if summons::stationary(skill_id) {
+                self.end_buff(skill_id).await?;
+                continue;
+            }
+            self.send_to_field(FieldMessage::FromClient {
+                from: self.client_id,
+                request: FieldRequest::Summon {
+                    skill_id,
+                    level,
+                    at: (spawn.x, spawn.y),
+                    left: false,
+                    lasts,
+                    appear: false,
+                },
+            })
+            .await?;
+        }
+        Ok(())
     }
 }

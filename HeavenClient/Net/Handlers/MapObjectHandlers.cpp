@@ -22,7 +22,10 @@
 #include "Helpers/MobStatParser.h"
 #include "Helpers/MovementParser.h"
 
+#include "../../Data/SkillData.h"
 #include "../../Gameplay/Stage.h"
+#include "../../IO/UI.h"
+#include "../../IO/UITypes/UIChatBar.h"
 
 namespace ms
 {
@@ -122,6 +125,7 @@ namespace ms
 		int32_t cid = recv.read_int();
 
 		Stage::get().get_chars().remove(cid);
+		Stage::get().get_summons().remove_owner(cid);
 	}
 
 	void SpawnPetHandler::handle(InPacket& recv) const
@@ -591,6 +595,100 @@ namespace ms
 		int32_t oid = recv.read_int();
 
 		Stage::get().get_mists().remove(oid);
+	}
+
+	void SpawnSummonHandler::handle(InPacket& recv) const
+	{
+		// v83 FUN_0095adec (the player's) and FUN_00938f61 (another
+		// user's). The foothold is found again here.
+		int32_t owner = recv.read_int();
+		int32_t oid = recv.read_int();
+		int32_t skillid = recv.read_int();
+		recv.skip_byte();
+		uint8_t level = recv.read_byte();
+		Point<int16_t> position = recv.read_point();
+		uint8_t action = recv.read_byte();
+		recv.skip_short();
+		uint8_t moves = recv.read_byte();
+		uint8_t assist = recv.read_byte();
+		bool appear = recv.length() > 0 ? recv.read_byte() == 0 : true;
+
+		Stage::get().get_summons().spawn(owner, oid, skillid, level, position, action, moves, assist, appear,
+										 Stage::get().is_player(owner));
+	}
+
+	void RemoveSummonHandler::handle(InPacket& recv) const
+	{
+		// v83 FUN_007a64eb.
+		int32_t owner = recv.read_int();
+		int32_t oid = recv.read_int();
+		uint8_t reason = recv.read_byte();
+
+		int32_t skillid = Stage::get().get_summons().remove(oid, reason);
+
+		if (skillid == 0 || !Stage::get().is_player(owner) || (reason != 0 && reason != 3))
+			return;
+
+		const std::string &name = SkillData::get(skillid).get_name();
+		std::string message = reason == 0 ? name + "'s time has run out, and will disappear."
+										  : name + " is disappearing.";
+
+		if (auto chatbar = UI::get().get_element<UIChatBar>())
+			chatbar->send_chatline(message, UIChatBar::LineType::SKILL);
+	}
+
+	void MoveSummonHandler::handle(InPacket& recv) const
+	{
+		recv.skip_int();
+		int32_t oid = recv.read_int();
+		Point<int16_t> start = recv.read_point();
+		std::vector<Movement> movements = MovementParser::parse_movements(recv, start);
+
+		Stage::get().get_summons().move(oid, movements);
+	}
+
+	void SummonAttackHandler::handle(InPacket& recv) const
+	{
+		// v83 FUN_007a6882: one hit on each mob.
+		recv.skip_int();
+		int32_t oid = recv.read_int();
+		recv.skip_byte();
+		uint8_t action = recv.read_byte();
+		uint8_t count = recv.read_byte();
+		std::vector<std::pair<int32_t, int32_t>> hits;
+
+		for (uint8_t i = 0; i < count; i++)
+		{
+			int32_t mob = recv.read_int();
+
+			if (mob == 0)
+				continue;
+
+			recv.skip_byte();
+			hits.emplace_back(mob, recv.read_int());
+		}
+
+		Stage::get().get_combat().show_summon_attack(oid, action, hits);
+	}
+
+	void SummonSkillHandler::handle(InPacket& recv) const
+	{
+		recv.skip_int();
+		int32_t oid = recv.read_int();
+		uint8_t action = recv.read_byte();
+
+		Stage::get().get_summons().act(oid, action);
+	}
+
+	void DamageSummonHandler::handle(InPacket& recv) const
+	{
+		// v83 FUN_007a6ebe; the mob that hit it, if any, follows.
+		recv.skip_int();
+		int32_t oid = recv.read_int();
+		recv.skip_byte();
+		int32_t damage = recv.read_int();
+
+		Stage::get().get_summons().hurt(oid, damage);
 	}
 
 	void RemoveReactorHandler::handle(InPacket& recv) const

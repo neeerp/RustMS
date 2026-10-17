@@ -109,6 +109,12 @@ namespace ms
 		/// MapObject
 		SPAWN_PET = 168,
 		CHAR_MOVED = 185,
+		SPAWN_SUMMON = 175,
+		REMOVE_SUMMON = 176,
+		MOVE_SUMMON = 177,
+		SUMMON_ATTACK = 178,
+		SUMMON_SKILL = 179,
+		DAMAGE_SUMMON = 180,
 
 		/// Attack
 		ATTACKED_CLOSE = 186,
@@ -225,6 +231,12 @@ namespace ms
 		emplace<REMOVE_LOOT, RemoveLootHandler>();
 		emplace<SPAWN_MIST, SpawnMistHandler>();
 		emplace<REMOVE_MIST, RemoveMistHandler>();
+		emplace<SPAWN_SUMMON, SpawnSummonHandler>();
+		emplace<REMOVE_SUMMON, RemoveSummonHandler>();
+		emplace<MOVE_SUMMON, MoveSummonHandler>();
+		emplace<SUMMON_ATTACK, SummonAttackHandler>();
+		emplace<SUMMON_SKILL, SummonSkillHandler>();
+		emplace<DAMAGE_SUMMON, DamageSummonHandler>();
 		emplace<HIT_REACTOR, HitReactorHandler>();
 		emplace<SPAWN_REACTOR, SpawnReactorHandler>();
 		emplace<REMOVE_REACTOR, RemoveReactorHandler>();
