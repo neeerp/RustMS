@@ -116,6 +116,39 @@ int main()
 		to = { 150, 150 };
 		require(!blocked({ 50, 50 }, to, { { low, 1, std::nullopt, ledge } }, 1), "one grazing it goes on");
 
+		require(area_shot(4111005) && area_shot(3111004) && area_shot(5221008), "Avenger and Arrow Rain hit an area");
+		require(!area_shot(15111006) && !area_shot(3101005) && !area_shot(0), "Spark, Arrow Bomb and plain shots don't");
+		require(hides_bullet(3111004) && !hides_bullet(5221008) && !hides_bullet(4111005), "Arrow Rain shows no arrow");
+
+		Rectangle<int16_t> row = area(0, { 100, 200 }, { 100, 172 }, 400, { -150, 150, -100, 100 }, false);
+		require(row.left() == 100 && row.right() == 400 && row.top() == 172 && row.bottom() == 173,
+				"a plain shot covers its 1 px row");
+		Rectangle<int16_t> avenger = area(4111005, { 100, 200 }, { 100, 172 }, -100, {}, true);
+		require(avenger.left() == -100 && avenger.right() == 100 && avenger.top() == 136 && avenger.bottom() == 209,
+				"Avenger's row widens 36 px up and down");
+		Rectangle<int16_t> rain_left = area(5211004, { 100, 200 }, { 100, 172 }, -300, { -350, 0, -100, 0 }, true);
+		require(rain_left.left() == -250 && rain_left.right() == 100 && rain_left.top() == 100 && rain_left.bottom() == 200,
+				"Flamethrower covers its area around the user, to the left");
+		Rectangle<int16_t> rain_right = area(5211004, { 100, 200 }, { 100, 172 }, 500, { -350, 0, -100, 0 }, false);
+		require(rain_right.left() == 100 && rain_right.right() == 450, "and turns to the right");
+
+		Rectangle<int16_t> splash = splash_area({ 300, 172 }, { -150, 150, -100, 100 });
+		require(splash.left() == 150 && splash.right() == 450 && splash.top() == 72 && splash.bottom() == 272,
+				"Arrow Bomb's splash centres on where it hits, whichever way it flies");
+
+		hit = hit_point(avenger, { -60, -20, 150, 200 });
+		require(hit.x() == -40 && hit.y() == 175, "an area shot hits the middle of where it crosses a body");
+
+		require(target_delay(0, 0, 0, { 100, 172 }, { 300, 172 }) == 300, "a mob 200 px away is hit 300 ms on");
+		require(target_delay(3101005, 0, 0, { 100, 172 }, { 300, 172 }) == 300, "Arrow Bomb's first mob too");
+		require(target_delay(3101005, 2, 300, { 100, 172 }, { 50, 172 }) == 500, "the mobs around it 200 ms later");
+		require(target_delay(3111003, 1, 300, { 100, 172 }, { 50, 172 }) == 450, "Inferno's 120 ms and 30 more each");
+		require(target_delay(3111003, 3, 300, { 100, 172 }, { 50, 172 }) == 510, "the third 90 ms more");
+		require(target_delay(3111004, 0, 0, { 100, 172 }, { 900, 172 }) == 400, "Arrow Rain hits all at 400 ms");
+
+		require(bullet_start(15111007, { 100, 172 }, true).x() == -50, "Shark Wave starts 150 px ahead");
+		require(bullet_start(0, { 100, 172 }, false).x() == 100, "a plain shot from its origin");
+
 		std::cout << "Shot path passed\n";
 		return 0;
 	}
