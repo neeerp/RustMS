@@ -9,7 +9,9 @@ namespace ms
 	// FUN_005eaf3e and its chooser FUN_005eb2b4). NPCs never walk. Every 3 to
 	// 9 s, an NPC that is standing either plays one of its actions once,
 	// perhaps saying one of that action's lines, or says one of its
-	// info/speak lines.
+	// info/speak lines. Only the NPC's controller chooses, and everyone plays
+	// the choice when the server sends it back (MapleRoyals: FUN_006d2918,
+	// 006d2c8c, 006d3273, 006d2e07).
 	namespace npc_idle
 	{
 		// The pause before the next choice is PAUSE_MIN + rand() % PAUSE_SPREAD ms.

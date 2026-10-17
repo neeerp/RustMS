@@ -48,6 +48,31 @@ pub struct ForeignNpc {
 pub fn build_spawn_npc(npc: &ForeignNpc) -> Result<Packet, NetworkError> {
     let mut packet = Packet::new_empty();
     packet.write_short(SendOpcode::SpawnNpc as i16)?;
+    write_npc(&mut packet, npc)?;
+    Ok(packet)
+}
+
+/// The client now picks the NPC's idle actions: mode 1, then the NPC as
+/// SPAWN_NPC writes it, for a client that hasn't seen it yet.
+pub fn build_control_npc(npc: &ForeignNpc) -> Result<Packet, NetworkError> {
+    let mut packet = Packet::new_empty();
+    packet.write_short(SendOpcode::SpawnNpcRequestController as i16)?;
+    packet.write_byte(1)?;
+    write_npc(&mut packet, npc)?;
+    Ok(packet)
+}
+
+/// NPC_ACTION: everyone, the controller too, plays the action and line it
+/// chose. `action` is what followed the object id in its request.
+pub fn build_npc_action(object_id: i32, action: &[u8]) -> Result<Packet, NetworkError> {
+    let mut packet = Packet::new_empty();
+    packet.write_short(SendOpcode::NpcAction as i16)?;
+    packet.write_int(object_id)?;
+    packet.write_bytes(action)?;
+    Ok(packet)
+}
+
+fn write_npc(packet: &mut Packet, npc: &ForeignNpc) -> Result<(), NetworkError> {
     packet.write_int(npc.object_id)?;
     packet.write_int(npc.npc_id)?;
     packet.write_short(npc.x)?;
@@ -57,7 +82,7 @@ pub fn build_spawn_npc(npc: &ForeignNpc) -> Result<Packet, NetworkError> {
     packet.write_short(npc.rx0)?;
     packet.write_short(npc.rx1)?;
     packet.write_byte(1)?; // show on the minimap
-    Ok(packet)
+    Ok(())
 }
 
 #[cfg(test)]
@@ -104,6 +129,28 @@ mod tests {
         expect.int(1_000_000_001).int(2100);
         expect.short(1200).short(-175).byte(0);
         expect.short(32).short(1150).short(1250).byte(1);
+        expect.end();
+    }
+
+    #[test]
+    fn control_npc_is_mode_one_and_the_spawn() {
+        let packet = build_control_npc(&foreign_npc(true)).unwrap();
+
+        let mut expect = Expect::new(&packet.bytes);
+        expect.short(SendOpcode::SpawnNpcRequestController as i16);
+        expect.byte(1).int(1_000_000_001).int(2100);
+        expect.short(1200).short(-175).byte(1);
+        expect.short(32).short(1150).short(1250).byte(1);
+        expect.end();
+    }
+
+    #[test]
+    fn npc_action_relays_the_choice() {
+        let packet = build_npc_action(1_000_000_001, &[3, 0xff]).unwrap();
+
+        let mut expect = Expect::new(&packet.bytes);
+        expect.short(SendOpcode::NpcAction as i16);
+        expect.int(1_000_000_001).byte(3).byte(0xff);
         expect.end();
     }
 

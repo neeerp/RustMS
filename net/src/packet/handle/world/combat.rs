@@ -57,6 +57,29 @@ impl WorldHandler for MobDistanceHandler {
     }
 }
 
+/// `NPC_ACTION`: the NPCs' controller chose an idle action. Object id, the
+/// action (an animation index from 2, or -1 for a line alone), the line
+/// (-1 for none), then a path for an NPC that walks.
+pub struct NpcActionHandler;
+
+impl WorldHandler for NpcActionHandler {
+    fn handle(&self, packet: &mut Packet, _ctx: &mut WorldContext) -> WorldResult {
+        let mut r = Cursor::new(&packet.bytes);
+        r.read_short()?;
+        let object_id = r.read_int()?;
+        let action = packet.bytes[r.position() as usize..].to_vec();
+        if action.len() < 2 {
+            return Ok(HandlerResult::empty());
+        }
+        Ok(
+            HandlerResult::empty().with(WorldAction::Field(FieldRequest::NpcAction {
+                object_id,
+                action,
+            })),
+        )
+    }
+}
+
 /// `CLOSE_RANGE_ATTACK`, `RANGED_ATTACK`, and `MAGIC_ATTACK`: a swing, a
 /// shot, or a spell.
 pub struct AttackHandler(pub AttackKind);
