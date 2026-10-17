@@ -387,4 +387,16 @@ namespace ms
 			write_int(skillid);
 		}
 	};
+
+	// Ends one of the player's item buffs, as right-clicking its icon does
+	// (FUN_00a096af). The id is the buff's, minus the item id.
+	// Opcode: CANCEL_ITEM_EFFECT(73)
+	class CancelItemEffectPacket : public OutPacket
+	{
+	public:
+		CancelItemEffectPacket(int32_t buffid) : OutPacket(OutPacket::Opcode::CANCEL_ITEM_EFFECT)
+		{
+			write_int(buffid);
+		}
+	};
 }
