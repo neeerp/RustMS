@@ -110,6 +110,17 @@ pub async fn set_job(character_id: i32, job: i16, level: i16, mp: i16) -> Result
     .await
 }
 
+/// Give the logged-out character `character_id` `meso` mesos.
+pub async fn set_meso(character_id: i32, meso: i32) -> Result<(), HarnessError> {
+    change_one_row("set meso", move |conn| {
+        diesel::sql_query("UPDATE characters SET meso = $2 WHERE id = $1")
+            .bind::<Integer, _>(character_id)
+            .bind::<Integer, _>(meso)
+            .execute(conn)
+    })
+    .await
+}
+
 /// Teach the logged-out character `character_id` skill `skill_id` at
 /// `level`.
 pub async fn grant_skill(character_id: i32, skill_id: i32, level: i32) -> Result<(), HarnessError> {

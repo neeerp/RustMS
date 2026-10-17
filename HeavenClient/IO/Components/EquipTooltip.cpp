@@ -164,6 +164,7 @@ namespace ms
 		{
 			case Tooltip::Parent::ITEMINVENTORY:
 			case Tooltip::Parent::SHOP:
+			case Tooltip::Parent::STORAGE:
 				invtype = InventoryType::Id::EQUIP;
 				break;
 			case Tooltip::Parent::EQUIPINVENTORY:

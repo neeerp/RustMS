@@ -53,31 +53,93 @@ struct NewInventoryItem<'a> {
     cash_serial: Option<i64>,
 }
 
-#[derive(Queryable, Insertable)]
-#[diesel(table_name = equipment_stats)]
-pub struct EquipmentStatsRow {
-    pub item_row_id: i64,
-    pub upgrade_slots: i16,
-    pub level: i16,
-    pub stre: i16,
-    pub dex: i16,
-    pub int: i16,
-    pub luk: i16,
-    pub hp: i16,
-    pub mp: i16,
-    pub watk: i16,
-    pub matk: i16,
-    pub wdef: i16,
-    pub mdef: i16,
-    pub acc: i16,
-    pub avoid: i16,
-    pub hands: i16,
-    pub speed: i16,
-    pub jump: i16,
-    pub vicious: i32,
-    pub item_level: i16,
-    pub item_exp: i32,
+/// A table of per-instance equipment stats keyed by an item row: carried
+/// items' `equipment_stats` and stored items' `storage_equipment_stats`.
+macro_rules! equipment_stats_row {
+    ($row:ident, $table:ident, $key:ident) => {
+        #[derive(Queryable, Insertable)]
+        #[diesel(table_name = $table)]
+        pub struct $row {
+            pub $key: i64,
+            pub upgrade_slots: i16,
+            pub level: i16,
+            pub stre: i16,
+            pub dex: i16,
+            pub int: i16,
+            pub luk: i16,
+            pub hp: i16,
+            pub mp: i16,
+            pub watk: i16,
+            pub matk: i16,
+            pub wdef: i16,
+            pub mdef: i16,
+            pub acc: i16,
+            pub avoid: i16,
+            pub hands: i16,
+            pub speed: i16,
+            pub jump: i16,
+            pub vicious: i32,
+            pub item_level: i16,
+            pub item_exp: i32,
+        }
+
+        impl $row {
+            pub fn new($key: i64, e: &EquipStats) -> Self {
+                Self {
+                    $key,
+                    upgrade_slots: i16::from(e.upgrade_slots),
+                    level: i16::from(e.level),
+                    stre: e.str,
+                    dex: e.dex,
+                    int: e.int,
+                    luk: e.luk,
+                    hp: e.hp,
+                    mp: e.mp,
+                    watk: e.watk,
+                    matk: e.matk,
+                    wdef: e.wdef,
+                    mdef: e.mdef,
+                    acc: e.acc,
+                    avoid: e.avoid,
+                    hands: e.hands,
+                    speed: e.speed,
+                    jump: e.jump,
+                    vicious: e.vicious,
+                    item_level: i16::from(e.item_level),
+                    item_exp: e.item_exp,
+                }
+            }
+
+            pub fn stats(self) -> EquipStats {
+                EquipStats {
+                    upgrade_slots: u8::try_from(self.upgrade_slots).unwrap_or(0),
+                    level: u8::try_from(self.level).unwrap_or(0),
+                    str: self.stre,
+                    dex: self.dex,
+                    int: self.int,
+                    luk: self.luk,
+                    hp: self.hp,
+                    mp: self.mp,
+                    watk: self.watk,
+                    matk: self.matk,
+                    wdef: self.wdef,
+                    mdef: self.mdef,
+                    acc: self.acc,
+                    avoid: self.avoid,
+                    hands: self.hands,
+                    speed: self.speed,
+                    jump: self.jump,
+                    vicious: self.vicious,
+                    item_level: u8::try_from(self.item_level).unwrap_or(0),
+                    item_exp: self.item_exp,
+                }
+            }
+        }
+    };
 }
+pub(crate) use equipment_stats_row;
+
+equipment_stats_row!(EquipmentStatsRow, equipment_stats, item_row_id);
 
 #[derive(Queryable, Insertable)]
 #[diesel(table_name = skills)]
@@ -397,28 +459,7 @@ fn load_inventory(
             flags: row.flags,
             expiration: row.expires_at,
             cash_serial: row.cash_serial,
-            equip: equip.map(|e| EquipStats {
-                upgrade_slots: u8::try_from(e.upgrade_slots).unwrap_or(0),
-                level: u8::try_from(e.level).unwrap_or(0),
-                str: e.stre,
-                dex: e.dex,
-                int: e.int,
-                luk: e.luk,
-                hp: e.hp,
-                mp: e.mp,
-                watk: e.watk,
-                matk: e.matk,
-                wdef: e.wdef,
-                mdef: e.mdef,
-                acc: e.acc,
-                avoid: e.avoid,
-                hands: e.hands,
-                speed: e.speed,
-                jump: e.jump,
-                vicious: e.vicious,
-                item_level: u8::try_from(e.item_level).unwrap_or(0),
-                item_exp: e.item_exp,
-            }),
+            equip: equip.map(EquipmentStatsRow::stats),
         };
         inventories
             .entry(row.character_id)
@@ -466,29 +507,7 @@ fn insert_item(
 
     if let Some(e) = &item.equip {
         diesel::insert_into(equipment_stats::table)
-            .values(&EquipmentStatsRow {
-                item_row_id: row_id,
-                upgrade_slots: i16::from(e.upgrade_slots),
-                level: i16::from(e.level),
-                stre: e.str,
-                dex: e.dex,
-                int: e.int,
-                luk: e.luk,
-                hp: e.hp,
-                mp: e.mp,
-                watk: e.watk,
-                matk: e.matk,
-                wdef: e.wdef,
-                mdef: e.mdef,
-                acc: e.acc,
-                avoid: e.avoid,
-                hands: e.hands,
-                speed: e.speed,
-                jump: e.jump,
-                vicious: e.vicious,
-                item_level: i16::from(e.item_level),
-                item_exp: e.item_exp,
-            })
+            .values(&EquipmentStatsRow::new(row_id, e))
             .execute(conn)?;
     }
     Ok(())

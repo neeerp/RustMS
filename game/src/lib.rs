@@ -13,6 +13,7 @@ pub mod mob_stat;
 pub mod monster_book;
 pub mod quest;
 pub mod skill;
+pub mod storage;
 
 pub use buff::{Buff, BuffStat, Buffs};
 pub use character::{ApStat, AvatarLook, CharacterStats, FieldAvatar, Player};
@@ -22,3 +23,4 @@ pub use mob_stat::MobStat;
 pub use monster_book::MonsterBook;
 pub use quest::{QuestLog, QuestRecord, QuestState, QuestStatus};
 pub use skill::{SkillBook, SkillRecord};
+pub use storage::Storage;

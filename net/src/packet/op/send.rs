@@ -94,6 +94,7 @@ pub enum SendOpcode {
     Messenger = 0x139,
     OpenNpcShop = 0x131,
     ConfirmShopTransaction = 0x132,
+    TrunkResult = 0x135,
 
     KeyMap = 0x14F,
 }
