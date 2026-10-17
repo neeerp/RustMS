@@ -55,6 +55,9 @@ namespace ms
 		// Update a mob's hp display.
 		void send_mobhp(int32_t oid, int8_t percent, uint16_t playerlevel);
 
+		// The server got a mob's move.
+		void acknowledge(int32_t oid, int16_t moveid, bool nextattack);
+
 		// Update a mob's movements.
 		void send_movement(int32_t oid, Point<int16_t> start, std::vector<Movement> &&movements);
 

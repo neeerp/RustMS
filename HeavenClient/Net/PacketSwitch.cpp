@@ -127,6 +127,7 @@ namespace ms
 		KILL_MOB = 237,
 		SPAWN_MOB_C = 238,
 		MOB_MOVED = 239,
+		MOVE_MOB_RESPONSE = 240,
 		SHOW_MOB_HP = 250,
 		SHOW_MAGNET = 251,
 		SPAWN_NPC = 257,
@@ -192,6 +193,7 @@ namespace ms
 		emplace<SPAWN_MOB, SpawnMobHandler>();
 		emplace<SPAWN_MOB_C, SpawnMobControllerHandler>();
 		emplace<MOB_MOVED, MobMovedHandler>();
+		emplace<MOVE_MOB_RESPONSE, MoveMobResponseHandler>();
 		emplace<SHOW_MOB_HP, ShowMobHpHandler>();
 		emplace<SHOW_MAGNET, ShowMagnetHandler>();
 		emplace<KILL_MOB, KillMobHandler>();
