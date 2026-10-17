@@ -258,7 +258,7 @@ namespace ms
 
 		// Show another user's shot: its bullets, and its hits as they would
 		// get there (FUN_00981211).
-		void show_remote_shot(const Char &user, const SpecialMove &move, const AttackResult &result,
+		void show_remote_shot(const OtherChar &user, const SpecialMove &move, const AttackResult &result,
 							  Rectangle<int16_t> range);
 
 		// Draw Chain Lightning's bolt from the user through its targets, each

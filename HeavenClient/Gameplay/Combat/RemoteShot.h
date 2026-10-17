@@ -227,5 +227,21 @@ namespace ms
 		{
 			return static_cast<int16_t>(8 * bullet - 4 * count + 4);
 		}
+
+		// Whether the bullets at the `target`th mob fly from behind the user,
+		// with Shadow Partner (`sets` 2). The client compares the mob's
+		// index, not the bullet's, with the bullets in a set, so with one
+		// bullet all of them do, and with more none at the first mob
+		// (0x981ae3). Battleship Torpedo's only check the bullets in a set
+		// (0x9819fd).
+		inline bool partner_starts(int32_t skill, size_t target, uint8_t bullets, uint8_t sets)
+		{
+			if (sets < 2)
+				return false;
+
+			size_t per_set = bullets / sets;
+
+			return skill == 5221008 ? per_set == 0 : target >= per_set;
+		}
 	}
 }

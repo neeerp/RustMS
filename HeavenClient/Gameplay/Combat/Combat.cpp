@@ -492,6 +492,14 @@ namespace ms
 
 			move.apply_stats(player, attack);
 
+			// Shadow Partner throws each bullet again, for twice the hits.
+			if (attack.type == Attack::Type::RANGED && player.has_buff(Buffstat::Id::SHADOWPARTNER) &&
+				shot_path::partner_shoots(attack.skill))
+			{
+				attack.sets = 2;
+				attack.hitcount = shot_path::partner_hits(attack.hitcount);
+			}
+
 			if (whack != Stance::Id::NONE)
 				attack.range = point_blank::range(player.get_afterimage_range(whack));
 			// Like v83, shoot from the first stack that covers the cost.
@@ -1011,18 +1019,25 @@ namespace ms
 			uint16_t delay = user.get_attackdelay(0);
 			bool spell = result.type == Attack::Type::MAGIC;
 
+			// Shadow Partner's set follows the user's, from behind them, each
+			// bullet further below the last.
 			auto shoot = [&](Point<int16_t> target, uint8_t count)
 			{
+				uint8_t sets = result.sets;
+
 				if (spell)
-					count = 1;
+					count = sets = 1;
 				else if (shot_path::hides_bullet(result.skill))
 					return;
 
+				uint8_t per_set = std::max(count / sets, 1);
+
 				for (uint8_t i = 0; i < count; i++)
 				{
-					Point<int16_t> end = target + Point<int16_t>(0, shot_path::spread(i, count));
+					Point<int16_t> from = i < per_set ? start : shot_path::partner_start(start, result.toleft);
+					Point<int16_t> end = target + Point<int16_t>(0, shot_path::spread(i, per_set));
 					uint16_t time = delay + shot_path::bullet_delay(result.bullet, result.skill, i);
-					bulleteffects.push(time, Bullet(animation, start, end, shot_path::flight_time(start, end)));
+					bulleteffects.push(time, Bullet(animation, from, end, shot_path::flight_time(from, end)));
 				}
 			};
 
@@ -1226,7 +1241,7 @@ namespace ms
 		}
 	}
 
-	void Combat::show_remote_shot(const Char &user, const SpecialMove &move, const AttackResult &result,
+	void Combat::show_remote_shot(const OtherChar &user, const SpecialMove &move, const AttackResult &result,
 								  Rectangle<int16_t> range)
 	{
 		AttackUser attackuser = {
@@ -1252,6 +1267,8 @@ namespace ms
 			lt_rb = stats.range;
 		}
 
+		// Shadow Partner throws every bullet twice (0x981447).
+		uint8_t sets = user.get_buff(Buffstat::Id::SHADOWPARTNER) ? 2 : 1;
 		Animation animation = move.get_bullet(user, result.bullet);
 		Point<int16_t> position = user.get_position();
 		uint16_t delay = remote_shot::attack_delay(skill, user.get_attackdelay(0));
@@ -1296,7 +1313,7 @@ namespace ms
 			bodies.push_back(body);
 
 			std::vector<DamageNumber> numbers = place_numbers(line.second, move.get_id());
-			size_t shown = remote_shot::shown_hits(numbers.size(), bullets, attacks);
+			size_t shown = remote_shot::shown_hits(numbers.size(), sets * bullets, attacks);
 
 			for (size_t i = 0; i < shown; i++)
 				damageeffects.emplace(
@@ -1318,16 +1335,17 @@ namespace ms
 			// Each bullet flies as long as the hits take to land, to at most
 			// 400 px along the way, each a few px below the last.
 			Point<int16_t> end = remote_shot::end(start, aim);
+			Point<int16_t> from = remote_shot::partner_starts(skill, target, bullets, sets)
+				? shot_path::partner_start(start, result.toleft) : start;
 
-			for (uint8_t i = 0; i < bullets; i++)
+			for (uint8_t i = 0; i < sets * bullets; i++)
 			{
 				Point<int16_t> to = end + Point<int16_t>(0, shot_path::spread(i, bullets));
 				uint16_t time = delay + shot_path::bullet_delay(result.bullet, skill, i);
-				bulleteffects.push(time, Bullet(animation, start, to, hit));
+				bulleteffects.push(time, Bullet(animation, from, to, hit));
 			}
 		}
 
-		if (first_hit)
 		if (first_hit)
 			rain_shot(skill, lt_rb, position, result.toleft, delay + first, *first_hit, bodies);
 
@@ -1342,7 +1360,11 @@ namespace ms
 		int16_t end_x = position.x() + (result.toleft ? -reach : reach);
 		uint16_t flight = remote_shot::miss_flight(skill, start.x(), end_x);
 
-		for (uint8_t i = 0; i < bullets; i++)
+		// With Shadow Partner they all stop 30 px short, as fast.
+		if (sets > 1)
+			end_x = shot_path::partner_start(Point<int16_t>(end_x, y), result.toleft).x();
+
+		for (uint8_t i = 0; i < sets * bullets; i++)
 		{
 			Point<int16_t> end(end_x, static_cast<int16_t>(y + remote_shot::miss_spread(i, bullets)));
 			uint16_t time = delay + shot_path::bullet_delay(result.bullet, skill, i);
