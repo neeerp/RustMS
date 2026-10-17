@@ -112,6 +112,7 @@ namespace ms
 			WEAKMOB,
 			STRONGMOB,
 			PICTONBLUE,
+			MAYABLUE,
 			NUM_COLORS
 		};
 
@@ -173,7 +174,8 @@ namespace ms
 						{0.63f, 0.01f, 0.00f}, // HP shade (#A00300, the bottom row of v83's mob and party HP bars)
 						{1.00f, 1.00f, 0.13f}, // Weak mob (#FFFF20, v83 font 3: names of mobs 20+ levels below the player)
 						{0.75f, 0.24f, 0.01f}, // Strong mob (#BE3C03, v83 font 42: names of mobs 20+ levels above the player)
-						{0.39f, 0.71f, 0.94f}  // Picton blue (#64B4F0, v83 font 5: quest messages in the status lines)
+						{0.39f, 0.71f, 0.94f}, // Picton blue (#64B4F0, v83 font 5: quest messages in the status lines)
+						{0.38f, 0.81f, 1.00f}  // Maya blue (#60CEFF, v83 chat font 10: server notices)
 				};
 
 		// Create a color by an array of real numbers [0.0f, 1.0f]

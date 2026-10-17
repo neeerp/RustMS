@@ -5,6 +5,7 @@
 //! the HP, refuses more than x, and clears the mist when its time is up.
 
 use integration_harness::connection::MapleTestConnection;
+use integration_harness::hunting::move_mob;
 use integration_harness::login_to_world_session;
 use integration_harness::preconditions::load_harness_config_or_fail;
 use integration_harness::trace::{barrier, read_for, send, stat, until, warp, Trace};
@@ -19,35 +20,6 @@ const POISON_MIST: u8 = 131;
 const LEVEL: u8 = 5;
 /// Its `x`: the most it hurts a second.
 const X: i32 = 200;
-
-/// MOVE_LIFE for `object_id` at (x, y): wanting to attack, or playing
-/// `action` with `skill_data` (skill | level << 8 | delay << 16).
-fn move_mob(
-    object_id: i32,
-    (x, y): (i16, i16),
-    want_attack: bool,
-    action: u8,
-    skill_data: i32,
-) -> Packet {
-    let mut p = Packet::new_empty();
-    p.write_short(RecvOpcode::MoveLife as i16).unwrap();
-    p.write_int(object_id).unwrap();
-    p.write_short(1).unwrap();
-    p.write_byte(u8::from(want_attack)).unwrap();
-    p.write_byte(action).unwrap();
-    p.write_int(skill_data).unwrap();
-    p.write_bytes(&[0; 13]).unwrap();
-    p.write_short(x).unwrap();
-    p.write_short(y).unwrap();
-    p.write_byte(1).unwrap();
-    p.write_byte(0).unwrap();
-    p.write_short(x).unwrap();
-    p.write_short(y).unwrap();
-    p.write_bytes(&[0; 6]).unwrap();
-    p.write_byte(4).unwrap();
-    p.write_short(100).unwrap();
-    p
-}
 
 /// TAKE_DAMAGE as a v83 client sends it from a mist (FUN_00431783): source
 /// -4, then the skill and level in place of a mob.

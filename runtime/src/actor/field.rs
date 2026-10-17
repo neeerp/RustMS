@@ -1102,32 +1102,67 @@ impl FieldActor {
                 else {
                     return;
                 };
-                // Everyone in its area, or without one its controller
-                // (Cosmic's MobSkill.applyEffect).
-                let Some(caster) = self.mobs.get(cast.object_id) else {
+                let map_id = self.key.map_id;
+                self.tell_reached(cast, |_| Some(ServerMessage::Diseased { disease, map_id }));
+            }
+            Some(MobSkillEffect::Dispel) => {
+                if rand::random::<f64>() * 100.0 >= f64::from(effect.prop) {
+                    return;
+                }
+                let map_id = self.key.map_id;
+                self.tell_reached(cast, |_| Some(ServerMessage::Dispelled { map_id }));
+            }
+            Some(MobSkillEffect::Banish) => {
+                if rand::random::<f64>() * 100.0 >= f64::from(effect.prop) {
+                    return;
+                }
+                let Some(to) = self
+                    .mobs
+                    .get(cast.object_id)
+                    .and_then(|mob| mob.info.banish.clone())
+                else {
                     return;
                 };
-                let reached: Vec<ClientId> = match self.mobs.area(cast) {
-                    Some(area) => self
-                        .occupants
-                        .iter()
-                        .filter(|(_, occupant)| {
-                            area.contains((occupant.avatar.x, occupant.avatar.y))
-                        })
-                        .map(|(&client_id, _)| client_id)
-                        .collect(),
-                    None => caster.controller.into_iter().collect(),
-                };
-                for client_id in reached {
-                    if let Some(occupant) = self.occupants.get(&client_id) {
-                        occupant.handle.send(ServerMessage::Diseased {
-                            disease,
-                            map_id: self.key.map_id,
-                        });
-                    }
-                }
+                // Up to `count` of them (inferred from the data: Cosmic
+                // sends everyone in reach).
+                let most = usize::try_from(effect.count)
+                    .ok()
+                    .filter(|&most| most > 0)
+                    .unwrap_or(usize::MAX);
+                let map_id = self.key.map_id;
+                self.tell_reached(cast, |nth| {
+                    (nth < most).then(|| ServerMessage::Banished {
+                        to: to.clone(),
+                        map_id,
+                    })
+                });
             }
             None => {}
+        }
+    }
+
+    /// Send what `message` gives for the `nth` player a mob's cast
+    /// reaches: everyone in its area, or without one its controller
+    /// (Cosmic's MobSkill.applyEffect).
+    fn tell_reached(&self, cast: &Cast, message: impl Fn(usize) -> Option<ServerMessage>) {
+        let Some(caster) = self.mobs.get(cast.object_id) else {
+            return;
+        };
+        let reached: Vec<ClientId> = match self.mobs.area(cast) {
+            Some(area) => self
+                .occupants
+                .iter()
+                .filter(|(_, occupant)| area.contains((occupant.avatar.x, occupant.avatar.y)))
+                .map(|(&client_id, _)| client_id)
+                .collect(),
+            None => caster.controller.into_iter().collect(),
+        };
+        for (nth, client_id) in reached.into_iter().enumerate() {
+            let (Some(occupant), Some(message)) = (self.occupants.get(&client_id), message(nth))
+            else {
+                continue;
+            };
+            occupant.handle.send(message);
         }
     }
 

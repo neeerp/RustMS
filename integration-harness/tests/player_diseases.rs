@@ -4,13 +4,10 @@
 //! one standing far away; the server ends it when it runs out.
 
 use integration_harness::connection::MapleTestConnection;
-use integration_harness::hunting::walk_to;
+use integration_harness::hunting::{move_mob, walk_to};
 use integration_harness::login_to_world_session;
 use integration_harness::preconditions::load_harness_config_or_fail;
 use integration_harness::trace::{read_for, send, until, warp, Trace};
-use net::packet::op::RecvOpcode;
-use packet::io::write::PktWrite;
-use packet::Packet;
 use tokio::time::{sleep, Duration};
 
 const FOLK_TOWN_MAP: i32 = 222_010_201;
@@ -19,35 +16,6 @@ const SLOW: u8 = 126;
 /// Slow is flag 32, the low bit of the mask's second long, whose ints go
 /// high half first.
 const SLOW_STAT: i64 = 1;
-
-/// MOVE_LIFE for `object_id` at (x, y): wanting to attack, or playing
-/// `action` with `skill_data` (skill | level << 8 | delay << 16).
-fn move_mob(
-    object_id: i32,
-    (x, y): (i16, i16),
-    want_attack: bool,
-    action: u8,
-    skill_data: i32,
-) -> Packet {
-    let mut p = Packet::new_empty();
-    p.write_short(RecvOpcode::MoveLife as i16).unwrap();
-    p.write_int(object_id).unwrap();
-    p.write_short(1).unwrap();
-    p.write_byte(u8::from(want_attack)).unwrap();
-    p.write_byte(action).unwrap();
-    p.write_int(skill_data).unwrap();
-    p.write_bytes(&[0; 13]).unwrap();
-    p.write_short(x).unwrap();
-    p.write_short(y).unwrap();
-    p.write_byte(1).unwrap();
-    p.write_byte(0).unwrap();
-    p.write_short(x).unwrap();
-    p.write_short(y).unwrap();
-    p.write_bytes(&[0; 6]).unwrap();
-    p.write_byte(4).unwrap();
-    p.write_short(100).unwrap();
-    p
-}
 
 /// Grant the mob its one skill, then cast it from its first skill
 /// animation.

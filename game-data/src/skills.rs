@@ -94,6 +94,8 @@ pub struct MobSkillLevel {
     pub prop: i32,
     /// The most of its summons alive at once, or 0.
     pub limit: i32,
+    /// The most players it reaches (`count`), or 0 for no limit.
+    pub count: i32,
     /// The area it covers around the mob facing left (`lt`, `rb`), (0, 0)
     /// for just the mob.
     pub lt: (i32, i32),
@@ -222,6 +224,7 @@ impl SkillData {
             hp: nx.int_child(node, "hp")?.unwrap_or(100),
             prop: nx.int_child(node, "prop")?.unwrap_or(100),
             limit: int("limit")?,
+            count: int("count")?,
             lt: nx.vector_child(node, "lt")?.unwrap_or_default(),
             rb: nx.vector_child(node, "rb")?.unwrap_or_default(),
             summon_effect: int("summonEffect")?,

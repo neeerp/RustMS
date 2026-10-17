@@ -330,6 +330,20 @@ impl Buffs {
         ended
     }
 
+    /// End every buff but the diseases, as a mob's Dispel does. Cooldowns
+    /// keep running.
+    pub fn dispel(&mut self) -> Vec<BuffStat> {
+        let mut ended = Vec::new();
+        self.active.retain(|buff| {
+            if buff.stat.disease() {
+                return true;
+            }
+            ended.push(buff.stat);
+            false
+        });
+        ended
+    }
+
     /// End every buff and disease, e.g. on death. Cooldowns keep running.
     pub fn clear(&mut self) -> Vec<BuffStat> {
         self.active.drain(..).map(|buff| buff.stat).collect()
@@ -368,6 +382,17 @@ mod tests {
         assert_eq!(buffs.next_deadline(), Some(start + 5 * SECOND));
         assert!(buffs.advance(start + 4 * SECOND).expired.is_empty());
         assert_eq!(buffs.clear(), vec![BuffStat::Recovery, BuffStat::Speed]);
+    }
+
+    #[test]
+    fn dispel_leaves_the_diseases() {
+        let start = Instant::now();
+        let mut buffs = Buffs::default();
+        buffs.give(Buff::new(1001, BuffStat::Recovery, 4, start, 30 * SECOND));
+        buffs.give(Buff::new(126, BuffStat::Slow, 80, start, 30 * SECOND));
+        buffs.give(Buff::new(1002, BuffStat::Speed, 20, start, 30 * SECOND));
+        assert_eq!(buffs.dispel(), [BuffStat::Recovery, BuffStat::Speed]);
+        assert!(buffs.has(BuffStat::Slow));
     }
 
     #[test]
