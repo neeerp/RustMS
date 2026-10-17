@@ -68,6 +68,8 @@ namespace ms
 
 		Animation get_ball(size_t kind) const override;
 
+		bool has_ball() const override;
+
 		bool is_attack() const override;
 
 		bool is_skill() const override;

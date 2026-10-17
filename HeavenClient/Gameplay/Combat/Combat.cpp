@@ -22,6 +22,7 @@
 #include "HitTiming.h"
 #include "PointBlank.h"
 #include "Prepare.h"
+#include "RemoteSpell.h"
 #include "ShotPath.h"
 
 #include "../../Constants.h"
@@ -819,7 +820,11 @@ namespace ms
 			int16_t shot_range = spell ? shot_path::SPELL_RANGE
 				: shot_path::range(attack.skill, skill_range, user.get_weapontype(), 0);
 			Point<int16_t> shot_end = shot_path::origin(user.get_position(), shot_range, attack.toleft);
-			extract_effects(user, move, attack, range, reach, shot_end);
+
+			if (attack.type == Attack::Type::MAGIC)
+				show_remote_spell(user, move, attack, range);
+			else
+				extract_effects(user, move, attack, range, reach, shot_end);
 		} else
 		{
 			expect_hits(attack, -1);
@@ -865,7 +870,7 @@ namespace ms
 		bool chain = chain_lightning::chains(result.skill);
 
 		if (chain)
-			draw_chain(user, move, result);
+			draw_chain(user, move, result, true);
 
 		if (result.bullet && !chain)
 		{
@@ -963,7 +968,114 @@ namespace ms
 		}
 	}
 
-	void Combat::draw_chain(const Char &user, const SpecialMove &move, const AttackResult &result)
+	void Combat::show_remote_spell(const Char &user, const SpecialMove &move, const AttackResult &result,
+								   Rectangle<int16_t> range)
+	{
+		AttackUser attackuser = {
+				user.get_skilllevel(move.get_id()),
+				user.get_level(),
+				user.is_twohanded(),
+				!result.toleft,
+				user.get_look().get_equips().get_weapon(),
+				result.stance,
+				range
+		};
+
+		int32_t skill = result.skill;
+		bool ball = move.has_ball();
+		bool balls = ball && !remote_spell::one_ball(skill) && !remote_spell::bolts(skill);
+		Animation animation = ball ? move.get_bullet(user, skill) : Animation();
+		Point<int16_t> position = user.get_position();
+		uint16_t delay = user.get_attackdelay(0);
+		uint16_t hits_delay = remote_spell::attack_delay(skill, delay);
+
+		if (chain_lightning::chains(skill))
+			draw_chain(user, move, result, false);
+
+		for (size_t target = 0; target < result.damagelines.size(); target++)
+		{
+			auto &line = result.damagelines[target];
+			int32_t oid = line.first;
+
+			if (!mobs.contains(oid))
+				continue;
+
+			Rectangle<int16_t> body = mobs.get_mob_body(oid);
+			bool left = mobs.get_mob_position(oid).x() < position.x();
+			Point<int16_t> start = remote_spell::start(position, left);
+
+			// A mob that reaches back past where the balls start ends the
+			// spell there: neither it nor the mobs after it show their hits.
+			if (remote_spell::needs_ahead(skill) && !remote_spell::ahead(start.x(), body, left))
+			{
+				for (size_t rest = target; rest < result.damagelines.size(); rest++)
+				{
+					auto &skipped = result.damagelines[rest];
+					mobs.expect_hits(skipped.first, -static_cast<int32_t>(skipped.second.size()));
+				}
+
+				break;
+			}
+
+			Point<int16_t> aim = remote_spell::aim(start, body, left);
+			uint16_t flight = remote_spell::hit_delay(skill, target, ball, start, aim);
+			std::vector<DamageNumber> numbers = place_numbers(line.second, move.get_id());
+			size_t shown = remote_spell::shown_hits(skill, numbers.size());
+
+			for (size_t i = 0; i < shown; i++)
+				damageeffects.emplace(
+						hits_delay + flight,
+						attackuser,
+						numbers[i],
+						line.second[i].first,
+						result.toleft,
+						oid,
+						move.get_id()
+				);
+
+			if (shown < numbers.size())
+				mobs.expect_hits(oid, -static_cast<int32_t>(numbers.size() - shown));
+
+			if (balls)
+				bulleteffects.push(delay, Bullet(animation, start, remote_spell::end(start, aim), flight));
+		}
+
+		if (!ball || remote_spell::bolts(skill))
+			return;
+
+		Point<int16_t> start = remote_spell::start(position, result.toleft);
+
+		if (result.damagelines.empty())
+		{
+			// A spell that hit nothing flies out to 200 px in front of them.
+			int16_t miss = result.toleft ? -remote_spell::MISS_RANGE : remote_spell::MISS_RANGE;
+			Point<int16_t> end(static_cast<int16_t>(position.x() + miss), start.y());
+			bulleteffects.push(delay, Bullet(animation, start, end, remote_spell::across_time(start.x(), end.x())));
+		} else if (remote_spell::one_ball(skill))
+		{
+			// Its one ball flies straight across to the furthest mob it hit.
+			std::optional<int16_t> furthest;
+
+			for (auto &line : result.damagelines)
+			{
+				if (!mobs.contains(line.first))
+					continue;
+
+				int16_t x = mobs.get_mob_position(line.first).x();
+
+				if (!furthest || (result.toleft ? x < *furthest : *furthest < x))
+					furthest = x;
+			}
+
+			if (furthest && (result.toleft ? *furthest < start.x() : start.x() < *furthest))
+			{
+				Point<int16_t> end(*furthest, start.y());
+				bulleteffects.push(delay, Bullet(animation, start, end, remote_spell::across_time(start.x(), end.x())));
+			}
+		}
+	}
+
+	void Combat::draw_chain(const Char &user, const SpecialMove &move, const AttackResult &result, bool staggered)
 	{
 		// The bolt jumps from the user to each mob in turn as it is hit,
 		// one ball after another along each jump, every one of the three
@@ -980,7 +1092,10 @@ namespace ms
 				continue;
 
 			Point<int16_t> to = chain_lightning::middle(mobs.get_mob_body(oid));
-			uint16_t start = delay + hit_timing::target_delay(result.type, result.skill, target);
+			uint16_t start = delay;
+
+			if (staggered)
+				start += hit_timing::target_delay(result.type, result.skill, target);
 
 			for (chain_lightning::Ball ball : chain_lightning::bolt(from, to))
 			{
