@@ -35,11 +35,14 @@
 
 #include <nlnx/nx.hpp>
 
+#include <algorithm>
+#include <cmath>
+
 namespace ms
 {
 	Combat::Combat(Player &in_player, MapChars &in_chars, MapMobs &in_mobs, MapReactors &in_reactors,
-				   const Physics &in_physics) : player(
-			in_player), chars(in_chars), mobs(in_mobs), reactors(in_reactors), physics(in_physics),
+				   const Physics &in_physics, const MapInfo &in_mapinfo) : player(
+			in_player), chars(in_chars), mobs(in_mobs), reactors(in_reactors), physics(in_physics), mapinfo(in_mapinfo),
 																										attackresults(
 																												[&](const AttackResult &attack)
 																												{
@@ -57,6 +60,17 @@ namespace ms
 																												{
 																													apply_damage_effect(
 																															effect);
+																												}),
+																										magnetcatches(
+																												[&](const MagnetCatch &caught)
+																												{
+																													// Its hit lands: the mob shows
+																													// whether it was caught, and is
+																													// pulled in if so (0x668e14).
+																													show_catch(caught.oid, caught.success);
+
+																													if (caught.success)
+																														mobs.catch_mob(caught.oid, caught.user);
 																												})
 	{
 	}
@@ -73,11 +87,19 @@ namespace ms
 			// KeyDownBar1's graduation only links to KeyDownBar's.
 			gauge_graduation[i] = bars[0]["graduation"];
 		}
+
+		// Monster Magnet's catch, and its miss: shown, then faded out, 200 ms
+		// each (0x438eb6).
+		nl::node catcheffect = nl::nx::effect["BasicEff.img"]["Catch"];
+		catch_success = catcheffect["Success"];
+		catch_fail = std::vector<Frame>{ Frame(catcheffect["Fail"], 200, 255, 255), Frame(catcheffect["Fail"], 200, 255, 0) };
 	}
 
 	Texture Combat::gauge_bar[2];
 	Texture Combat::gauge_fill[2];
 	Texture Combat::gauge_graduation[2];
+	Animation Combat::catch_success;
+	Animation Combat::catch_fail;
 
 	void Combat::draw(double viewx, double viewy, float alpha) const
 	{
@@ -86,6 +108,8 @@ namespace ms
 
 		for (auto &dn : damagenumbers)
 			dn.draw(viewx, viewy, alpha);
+
+		catcheffects.drawabove(Point<int16_t>(static_cast<int16_t>(viewx), static_cast<int16_t>(viewy)), alpha);
 
 		draw_gauge(viewx, viewy, alpha);
 	}
@@ -119,6 +143,8 @@ namespace ms
 		attackresults.update();
 		bulleteffects.update();
 		damageeffects.update();
+		magnetcatches.update();
+		catcheffects.update();
 
 		bullets.remove_if(
 				[](Bullet &bullet)
@@ -1268,6 +1294,14 @@ namespace ms
 			return;
 		}
 
+		if (magnet::is_magnet(held.skill))
+		{
+			if (!use_magnet(skill, held.level, prepare::release_charge(held.skill, held.held)))
+				CancelBuffPacket(held.skill).dispatch();
+
+			return;
+		}
+
 		// Piercing Arrow whacks a mob right in front of the player instead
 		// (0x95c090).
 		int16_t reach = 0;
@@ -1283,6 +1317,100 @@ namespace ms
 			apply_move(skill, prepare::release_charge(held.skill, held.held));
 		else if (held.skill != prepare::CORKSCREW_BLOW && held.skill != prepare::CORKSCREW_BLOW_TB)
 			CancelBuffPacket(held.skill).dispatch();
+	}
+
+	bool Combat::use_magnet(const Skill &skill, int32_t level, int32_t charge)
+	{
+		// It isn't used where the map forbids movement skills, nor without
+		// leave to ask the server (0x94be52).
+		if (!mapinfo.can_use_movement_skills() || !player.can_request(ExclRequest::SKILL_WAIT) || !can_use_move(skill))
+			return false;
+
+		int32_t id = skill.get_id();
+		const SkillData::Stats &stats = SkillData::get(id).get_stats(level);
+		int32_t count = magnet::count(stats.mobcount, charge, prepare::charge_cap(id));
+
+		if (count > magnet::MAX_COUNT)
+			return false;
+
+		// It looks for mobs from 50 px in front of the player to its range,
+		// taking them in the order they entered the map (0x678aec).
+		bool toleft = !player.getflip();
+		Point<int16_t> position = player.get_position();
+		Point<int16_t> origin = shot_path::origin(position, magnet::START, toleft);
+		int16_t end_x = position.x() + (toleft ? -stats.shotrange : stats.shotrange);
+		std::vector<Rectangle<int16_t>> steps = shot_path::search_steps(position.x(), origin, end_x);
+
+		MapObjects *objs = mobs.get_mobs();
+		std::vector<std::pair<uint32_t, const Mob *>> reached;
+
+		for (auto &mmo : *objs)
+		{
+			const Mob *mob = static_cast<const Mob *>(mmo.second.get());
+
+			if (!mob || !mob->is_alive())
+				continue;
+
+			Rectangle<int16_t> body = mob->get_body();
+
+			for (Rectangle<int16_t> step : steps)
+			{
+				if (shot_path::in_step(step, body))
+				{
+					reached.emplace_back(objs->entry_order(mob->get_oid()), mob);
+					break;
+				}
+			}
+		}
+
+		std::sort(reached.begin(), reached.end(), [](auto &a, auto &b) { return a.first < b.first; });
+
+		if (reached.size() > static_cast<size_t>(count))
+			reached.resize(count);
+
+		// A mob out of the player's sight is sent as 0. The rest are caught
+		// at the skill's prop (0x96c3c0).
+		Point<int16_t> sight = { position.x(), origin.y() };
+		uint16_t group = player.get_phobj().fhgroup;
+		int32_t prop = static_cast<int32_t>(std::lround(stats.chance * 100));
+		Randomizer random;
+
+		std::vector<std::pair<int32_t, bool>> found;
+		std::vector<MagnetCatch> caught;
+
+		for (auto &[entry, mob] : reached)
+		{
+			Point<int16_t> hit = shot_path::hit_point(origin, end_x, mob->get_body());
+
+			if (shot_path::blocked(sight, hit, find_platforms(sight, hit), group))
+			{
+				found.emplace_back(0, false);
+				continue;
+			}
+
+			bool success = magnet::catches(mob->is_boss(), mob->can_move(), prop, random.next_int(100));
+
+			found.emplace_back(mob->get_oid(), success);
+			caught.push_back({ mob->get_oid(), success, position });
+		}
+
+		player.request(MonsterMagnetPacket(id, level, found, toleft), ExclRequest::SKILL_WAIT);
+		skill.apply_useeffects(player);
+
+		for (const MagnetCatch &mob : caught)
+			magnetcatches.push(magnet::HIT_DELAY, mob);
+
+		return true;
+	}
+
+	void Combat::show_catch(int32_t oid, bool success)
+	{
+		if (!mobs.contains(oid))
+			return;
+
+		Point<int16_t> position = mobs.get_mob_position(oid) + Point<int16_t>(0, -15);
+
+		catcheffects.add(success ? catch_success : catch_fail, DrawArgument(position), 0);
 	}
 
 	const Skill &Combat::get_skill(int32_t skill_id)

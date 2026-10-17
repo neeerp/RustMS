@@ -85,15 +85,12 @@ namespace ms
 			}
 		}
 
-		// Whether the skill is held here: Monster Magnet and the throws let go
-		// their own way, and aren't yet.
+		// Whether the skill is held here: the throws let go their own way, and
+		// aren't yet.
 		inline bool held(int32_t skill)
 		{
 			switch (skill)
 			{
-			case 1121001:
-			case 1221001:
-			case 1321001:
 			case 5201002:
 			case 14111006:
 				return false;

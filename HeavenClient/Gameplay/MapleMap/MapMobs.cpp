@@ -90,6 +90,12 @@ namespace ms
 			mob->show_hp(percent, playerlevel);
 	}
 
+	void MapMobs::catch_mob(int32_t oid, Point<int16_t> user)
+	{
+		if (Optional<Mob> mob = mobs.get(oid))
+			mob->catch_by(user);
+	}
+
 	void MapMobs::send_movement(int32_t oid, Point<int16_t> start, std::vector<Movement> &&movements)
 	{
 		if (Optional<Mob> mob = mobs.get(oid))

@@ -69,6 +69,9 @@ namespace ms
 		// Applies damage to a mob.
 		void apply_damage(int32_t oid, int32_t damage, bool toleft, const AttackUser &user, const SpecialMove &move);
 
+		// Monster Magnet caught a mob for the user at `user`.
+		void catch_mob(int32_t oid, Point<int16_t> user);
+
 		// Check if the mob with the specified oid exists.
 		bool contains(int32_t oid) const;
 

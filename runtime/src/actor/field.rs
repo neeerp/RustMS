@@ -9,7 +9,7 @@ use net::packet::build::world::field::{
 };
 use net::packet::build::world::mob::{
     build_control_mob, build_kill_mob, build_mob_hp, build_move_mob, build_move_mob_response,
-    build_spawn_mob, build_stop_controlling_mob,
+    build_show_magnet, build_spawn_mob, build_stop_controlling_mob,
 };
 use net::packet::build::world::npc::{build_spawn_npc, ForeignNpc};
 use net::packet::build::world::reactor::{
@@ -238,6 +238,7 @@ impl FieldActor {
                     self.handle_attack(from, broadcast, hits)
                 }
                 FieldRequest::Broadcast(packet) => self.broadcast(Some(from), packet),
+                FieldRequest::Magnet { effect, caught } => self.handle_magnet(from, effect, caught),
                 FieldRequest::Chair(item_id) => self.handle_chair(from, item_id),
                 FieldRequest::Pickup { object_id, x, y } => {
                     self.handle_pickup(from, object_id, x, y)
@@ -438,6 +439,30 @@ impl FieldActor {
                 None => {}
             }
         }
+    }
+
+    /// `from` used Monster Magnet. The others see it catch each live mob,
+    /// or fail to; a mob caught (never a boss) chases `from`, whose client
+    /// pulls it in.
+    fn handle_magnet(&mut self, from: ClientId, effect: Packet, caught: Vec<(i32, bool)>) {
+        let Some(user) = self.occupants.get(&from) else {
+            return;
+        };
+        let user = user.handle.clone();
+        let now = Instant::now();
+        for (object_id, success) in caught {
+            let Some(mob) = self.mobs.get(object_id) else {
+                continue;
+            };
+            let success = success && !mob.info.boss;
+            if let Ok(packet) = build_show_magnet(object_id, success) {
+                self.broadcast(Some(from), packet);
+            }
+            if success {
+                self.provoke(from, &user, object_id, now);
+            }
+        }
+        self.broadcast(Some(from), effect);
     }
 
     /// Give the mob `from` hit to its client with aggro, taking it from
@@ -767,6 +792,87 @@ mod tests {
         let stood = next_packet(&mut second_rx).await;
         assert_eq!(stood.opcode(), SendOpcode::ShowChair as i16);
         assert_eq!(&stood.bytes[2..], &[1, 0, 0, 0, 0, 0, 0, 0]);
+    }
+
+    fn mob(x: i16, boss: bool) -> (game_data::MapMobTemplate, game_data::mobs::MobInfo) {
+        (
+            game_data::MapMobTemplate {
+                mob_id: 100100,
+                x,
+                y: -25,
+                foothold: 45,
+                flip: false,
+                mob_time: 0,
+                hide: false,
+            },
+            game_data::mobs::MobInfo {
+                mob_id: 100100,
+                max_hp: 8,
+                boss,
+                ..Default::default()
+            },
+        )
+    }
+
+    /// The opcodes `rx` gets until it goes quiet.
+    async fn opcodes(rx: &mut mpsc::Receiver<ServerMessage>) -> Vec<i16> {
+        let mut opcodes = Vec::new();
+        while let Ok(Some(message)) = timeout(Duration::from_millis(100), rx.recv()).await {
+            if let ServerMessage::SendPacket(packet) = message {
+                opcodes.push(packet.opcode());
+            }
+        }
+        opcodes
+    }
+
+    #[tokio::test]
+    async fn monster_magnet_shows_its_catches_and_the_caught_chase_the_user() {
+        let mut mobs = MobSet::new([mob(100, false), mob(200, true)]);
+        let spawned = mobs.respawn(Instant::now());
+        let (tx, rx) = mpsc::channel(16);
+        let actor = FieldActor::new(
+            FieldKey::new(0, 100000000),
+            rx,
+            Vec::new(),
+            mobs,
+            DropSet::default(),
+            ReactorSet::default(),
+            Duration::from_secs(60),
+        );
+        tokio::spawn(actor.run());
+        let (first, mut first_rx) = client(1);
+        let (second, mut second_rx) = client(2);
+        for (handle, id) in [(first, 1), (second, 2)] {
+            tx.send(FieldMessage::Join {
+                handle,
+                avatar: avatar(id, 0, 0),
+                party: None,
+            })
+            .await
+            .unwrap();
+        }
+        opcodes(&mut first_rx).await;
+        opcodes(&mut second_rx).await;
+
+        let effect = Packet::new_empty();
+        tx.send(FieldMessage::FromClient {
+            from: 2,
+            request: FieldRequest::Magnet {
+                effect,
+                caught: vec![(spawned[0], true), (spawned[1], true), (999, true)],
+            },
+        })
+        .await
+        .unwrap();
+
+        // The others see the snail caught and the boss not, then the skill;
+        // the snail now chases the user, whose client moves it.
+        let magnet = SendOpcode::ShowMagnet as i16;
+        let control = SendOpcode::SpawnMonsterControl as i16;
+        let seen = opcodes(&mut first_rx).await;
+        assert_eq!(seen.iter().filter(|&&op| op == magnet).count(), 2);
+        assert_eq!(seen.iter().filter(|&&op| op == control).count(), 1);
+        assert_eq!(opcodes(&mut second_rx).await, [control]);
     }
 
     #[tokio::test]

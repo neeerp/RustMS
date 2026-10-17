@@ -76,6 +76,20 @@ pub fn build_skill_effect(
     Ok(p)
 }
 
+/// The skill effect of a Monster Magnet, which also says which way the
+/// player faced (0x937b42).
+pub fn build_magnet_effect(
+    character_id: i32,
+    skill_id: i32,
+    character_level: u8,
+    skill_level: u8,
+    toleft: bool,
+) -> Result<Packet, NetworkError> {
+    let mut p = build_skill_effect(character_id, skill_id, character_level, skill_level)?;
+    p.write_byte(u8::from(toleft))?;
+    Ok(p)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

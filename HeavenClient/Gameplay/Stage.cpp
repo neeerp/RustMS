@@ -44,7 +44,7 @@ namespace ms
 		constexpr int16_t TELEPORT_COOLDOWN = 600;
 	}
 
-	Stage::Stage() : combat(player, chars, mobs, reactors, physics)
+	Stage::Stage() : combat(player, chars, mobs, reactors, physics, mapinfo)
 	{
 		state = State::INACTIVE;
 	}

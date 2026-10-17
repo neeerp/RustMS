@@ -34,6 +34,9 @@ namespace ms
 	public:
 		Frame(nl::node src);
 
+		// A frame of `src` shown for `delay` ms, fading from `a0` to `a1`.
+		Frame(nl::node src, uint16_t delay, uint8_t a0, uint8_t a1);
+
 		Frame();
 
 		void draw(const DrawArgument &args) const;
@@ -70,6 +73,9 @@ namespace ms
 	{
 	public:
 		Animation(nl::node source);
+
+		// An animation of these frames, which mustn't be empty.
+		Animation(std::vector<Frame> frames);
 
 		Animation();
 

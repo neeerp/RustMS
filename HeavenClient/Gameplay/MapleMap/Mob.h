@@ -17,6 +17,7 @@
 //////////////////////////////////////////////////////////////////////////////////
 #pragma once
 
+#include <optional>
 #include <string>
 
 #include <cstddef>
@@ -119,6 +120,11 @@ namespace ms
 		// Apply damage to the mob.
 		void apply_damage(int32_t damage, bool toleft);
 
+		// Monster Magnet caught the mob for the user at `user`: if this
+		// client moves it, it flinches toward them, is pulled in, and
+		// chases them (0x66b6fc, 0x66b562).
+		void catch_by(Point<int16_t> user);
+
 		// Create a touch damage attack to the player
 		MobAttack create_touch_attack() const;
 
@@ -133,6 +139,12 @@ namespace ms
 
 		// Whether a Teleport can't take the player past this mob.
 		bool blocks_teleport() const;
+
+		// Whether Monster Magnet can't catch the mob.
+		bool is_boss() const;
+
+		// Whether the mob walks or flies.
+		bool can_move() const;
 
 		// Return the head position.
 		Point<int16_t> get_head_position() const;
@@ -236,6 +248,10 @@ namespace ms
 		bool canjump;
 		bool canfly;
 		bool canchase;
+		bool boss;
+		// How wide the mob first stands, for how near Monster Magnet pulls
+		// it (0x66486e).
+		int16_t standwidth;
 
 		EffectLayer effects;
 		Text namelabel;
@@ -296,5 +312,17 @@ namespace ms
 		bool fading;
 		bool fadein;
 		Linear<float> opacity;
+
+		// Monster Magnet's pull: toward where the user stood, how near it
+		// stops, how fast it goes in px/s, and how far into its step it is.
+		struct Pull
+		{
+			Point<int16_t> user;
+			int16_t reach;
+			double speed;
+			int16_t elapsed;
+		};
+
+		std::optional<Pull> pull;
 	};
 }

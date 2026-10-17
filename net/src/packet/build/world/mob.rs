@@ -126,6 +126,16 @@ pub fn build_mob_hp(object_id: i32, percent: u8) -> Result<Packet, NetworkError>
     Ok(p)
 }
 
+/// SHOW_MAGNET: another player's Monster Magnet caught the mob, or failed
+/// to; the client shows the catch over it (0x66d6b9).
+pub fn build_show_magnet(object_id: i32, success: bool) -> Result<Packet, NetworkError> {
+    let mut p = Packet::new_empty();
+    p.write_short(SendOpcode::ShowMagnet as i16)?;
+    p.write_int(object_id)?;
+    p.write_byte(u8::from(success))?;
+    Ok(p)
+}
+
 /// Touch damage, the `TAKE_DAMAGE` source (`TakeDamagePacket::TOUCH`).
 pub const FROM_TOUCH: i8 = -1;
 

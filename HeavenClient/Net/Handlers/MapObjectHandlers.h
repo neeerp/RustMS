@@ -120,6 +120,14 @@ namespace ms
 		void handle(InPacket& recv) const override;
 	};
 
+	// Show another user's Monster Magnet catching a mob, or failing to
+	// (0x66d6b9).
+	// Opcode: SHOW_MAGNET(251)
+	class ShowMagnetHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
 	// Spawn an NPC on the current stage
 	// Opcode: SPAWN_NPC(257)
 	class SpawnNpcHandler : public PacketHandler

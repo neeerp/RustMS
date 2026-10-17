@@ -48,6 +48,7 @@ pub enum SendOpcode {
     MoveMonster = 0xEF,
     MoveMonsterResponse = 0xF0,
     ShowMonsterHp = 0xFA,
+    ShowMagnet = 0xFB,
     PlayerHint = 0xD6,
     MovePlayer = 0xB9,
     CloseRangeAttack = 0xBA,

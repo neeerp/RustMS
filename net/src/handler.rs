@@ -335,6 +335,12 @@ pub enum FieldRequest {
     },
     /// Show everyone else on the map this packet.
     Broadcast(Packet),
+    /// The player used Monster Magnet: show the others `effect`, and each
+    /// mob it reached, caught or not; the caught ones chase the player.
+    Magnet {
+        effect: Packet,
+        caught: Vec<(i32, bool)>,
+    },
     /// Sit on the portable chair `item_id`, or stand up with 0.
     Chair(i32),
     /// Pick up the drop `object_id`, answered with `ServerMessage::PickedUp`;

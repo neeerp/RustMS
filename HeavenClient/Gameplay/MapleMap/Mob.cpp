@@ -18,6 +18,7 @@
 #include "Mob.h"
 #include "Layer.h"
 
+#include "../Combat/MonsterMagnet.h"
 #include "../Combat/Prepare.h"
 #include "../../Character/TouchDamage.h"
 #include "../../Constants.h"
@@ -68,6 +69,7 @@ namespace ms
 		canfly = src["fly"].size() > 0;
 		canmove = src["move"].size() > 0 || canfly;
 		canchase = src["chase"].size() > 0;
+		boss = info["boss"].get_bool();
 
 		if (canfly)
 		{
@@ -85,6 +87,8 @@ namespace ms
 		animations[Stance::JUMP] = src["jump"];
 		animations[Stance::HIT] = src["hit1"];
 		animations[Stance::DIE] = src["die1"];
+
+		standwidth = animations[Stance::STAND].get_dimensions().x();
 
 		name = std::string(nl::nx::string["Mob.img"][std::to_string(mid)]["name"]);
 
@@ -194,7 +198,17 @@ namespace ms
 	void Mob::set_stance(Stance newstance)
 	{
 		if (newstance != Stance::HIT)
+		{
 			phobj.clear_flag(PhysicsObject::Flag::NOFRICTION);
+
+			// Monster Magnet's pull ends with the flinch.
+			if (pull)
+			{
+				pull.reset();
+				phobj.hspeed = 0.0;
+				phobj.vspeed = 0.0;
+			}
+		}
 
 		if (stance != newstance)
 		{
@@ -302,7 +316,26 @@ namespace ms
 
 					break;
 				case Stance::HIT:
-					if (phobj.is_flag_set(PhysicsObject::Flag::NOFRICTION) && phobj.onground)
+					if (pull)
+					{
+						// Monster Magnet's pull (0x9bbdfd) slows each 30 ms
+						// step once the mob nears the user, and a flier rises
+						// or sinks toward them too.
+						Point<int16_t> position = get_position();
+
+						pull->elapsed += Constants::TIMESTEP;
+
+						while (pull->elapsed >= magnet::STEP)
+						{
+							pull->elapsed -= magnet::STEP;
+							pull->speed = magnet::step_speed(pull->speed, position.x(), pull->user.x(), pull->reach);
+						}
+
+						phobj.hspeed = pull->speed * Constants::TIMESTEP / 1000.0;
+
+						if (canfly)
+							phobj.vspeed = magnet::fly_speed(position.y(), pull->user.y()) * Constants::TIMESTEP / 1000.0;
+					} else if (phobj.is_flag_set(PhysicsObject::Flag::NOFRICTION) && phobj.onground)
 					{
 						// v83 slows the push by 40000 / mass (100) px/s^2
 						// along the ground; walls and edges zero it.
@@ -1161,6 +1194,30 @@ namespace ms
 		}
 	}
 
+	void Mob::catch_by(Point<int16_t> user)
+	{
+		if (!control || !is_alive() || stance == Stance::HIT || !canmove)
+			return;
+
+		Point<int16_t> position = get_position();
+
+		// It turns to the user and flinches (0x66b6fc).
+		flip = user.x() > position.x();
+		set_stance(Stance::HIT);
+
+		flyx = 0;
+		flyy = 0;
+
+		int16_t reach = standwidth + magnet::REACH;
+
+		pull = Pull{ user, reach, magnet::start_speed(position.x(), user.x(), reach), 0 };
+		phobj.set_flag(PhysicsObject::Flag::NOFRICTION);
+
+		// Then it chases them (0x66b562).
+		chase();
+		update_movement();
+	}
+
 	MobAttack Mob::create_touch_attack() const
 	{
 		if (!deals_touch_damage())
@@ -1188,6 +1245,16 @@ namespace ms
 	bool Mob::blocks_teleport() const
 	{
 		return blocksteleport;
+	}
+
+	bool Mob::is_boss() const
+	{
+		return boss;
+	}
+
+	bool Mob::can_move() const
+	{
+		return canmove;
 	}
 
 	bool Mob::deals_touch_damage() const
