@@ -253,6 +253,22 @@ namespace ms
 		}
 	}
 
+	void LastConnectedWorldHandler::handle(InPacket& recv) const
+	{
+		static int32_t last = 254;
+
+		int32_t world = recv.read_int();
+
+		if (world != 253)
+			last = world;
+
+		if (last == 254 || last == 255)
+			return;
+
+		if (auto worldselect = UI::get().get_element<UIWorldSelect>())
+			worldselect->focus_world(last);
+	}
+
 	void RecommendedWorldsHandler::handle(InPacket& recv) const
 	{
 		if (auto worldselect = UI::get().get_element<UIWorldSelect>())

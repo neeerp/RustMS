@@ -420,6 +420,18 @@ namespace ms
 		recommended_worlds.emplace_back(std::move(world));
 	}
 
+	void UIWorldSelect::focus_world(int32_t worldid)
+	{
+		for (size_t i = 0; i < worlds.size() && i < PLANK_SLOTS; i++)
+		{
+			if (worlds[i].wid == worldid)
+			{
+				focused = static_cast<int16_t>(i);
+				return;
+			}
+		}
+	}
+
 	void UIWorldSelect::remove_selected()
 	{
 		deactivate();

@@ -52,6 +52,7 @@ namespace ms
 		PING = 17,
 
 		/// Login 2
+		LAST_CONNECTED_WORLD = 26,
 		RECOMMENDED_WORLDS = 27,
 		CHECK_SPW_RESULT = 28,
 
@@ -173,6 +174,7 @@ namespace ms
 		emplace<CHARNAME_RESPONSE, CharnameResponseHandler>();
 		emplace<ADD_NEWCHAR_ENTRY, AddNewCharEntryHandler>();
 		emplace<DELCHAR_RESPONSE, DeleteCharResponseHandler>();
+		emplace<LAST_CONNECTED_WORLD, LastConnectedWorldHandler>();
 		emplace<RECOMMENDED_WORLDS, RecommendedWorldsHandler>();
 
 		// SetField handlers
