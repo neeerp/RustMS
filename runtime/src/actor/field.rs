@@ -14,7 +14,7 @@ use net::packet::build::world::mist::{build_remove_mist, build_spawn_mist, MistK
 use net::packet::build::world::mob::{
     build_control_mob, build_kill_mob, build_mob_hp, build_mob_stat_reset, build_mob_stat_set,
     build_move_mob, build_move_mob_response, build_show_magnet, build_spawn_mob,
-    build_stop_controlling_mob,
+    build_stop_controlling_mob, MobMoveView,
 };
 use net::packet::build::world::npc::{
     build_control_npc, build_npc_action, build_spawn_npc, ForeignNpc,
@@ -310,9 +310,19 @@ impl FieldActor {
                 FieldRequest::MobMove {
                     object_id,
                     move_id,
+                    want_attack,
+                    action,
+                    skill_data,
                     start,
                     movement,
-                } => self.handle_mob_move(from, object_id, move_id, start, &movement),
+                } => self.handle_mob_move(
+                    from,
+                    object_id,
+                    move_id,
+                    (want_attack, action, skill_data),
+                    start,
+                    &movement,
+                ),
                 FieldRequest::MobDistance {
                     object_id,
                     distance,
@@ -542,18 +552,31 @@ impl FieldActor {
         from: ClientId,
         object_id: i32,
         move_id: i16,
+        (want_attack, action, skill_data): (bool, u8, i32),
         start: (i16, i16),
         movement: &[u8],
     ) {
         if !self.mobs.move_mob(from, object_id, start, movement) {
             return;
         }
+        let Some(act) = self.mobs.act(object_id, action, want_attack) else {
+            return;
+        };
         if let Some(occupant) = self.occupants.get(&from) {
-            if let Ok(packet) = build_move_mob_response(object_id, move_id, 0) {
+            if let Ok(packet) = build_move_mob_response(object_id, move_id, act.next_attack, act.mp)
+            {
                 occupant.handle.send_packet(packet);
             }
         }
-        if let Ok(packet) = build_move_mob(object_id, start, movement) {
+        let skill_data = if act.action == action { skill_data } else { 0 };
+        let moved = MobMoveView {
+            object_id,
+            next_attack: act.next_attack,
+            action: act.action,
+            skill_data,
+            start,
+        };
+        if let Ok(packet) = build_move_mob(&moved, movement) {
             self.broadcast(Some(from), packet);
         }
     }

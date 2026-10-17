@@ -41,7 +41,7 @@ templates from `Mob.nx` (`maxHP`, `exp`, `PADamage`, `bodyAttack`,
   comes within |dx| / 10 + |dy| / 3 <= 40 of it (v83's FUN_005ce8c6). Only
   its controller's client checks this, and the server is not told. v83 also
   starts the chase when one of the mob's attacks could reach the player;
-  HeavenClient has no mob attacks.
+  HeavenClient does not yet.
 - **Distance reports:** so that the player a firstAttack mob goes for is the
   one whose client checks, every client, controller or not, sends MOB_DISTANCE
   (`0xBD`: object id, distance) once a second for each such mob, as v83's
@@ -594,21 +594,73 @@ Reactor drops come from the content pack's table, keyed by reactor id, plus
 `[reactors]` in `reward_overrides.toml`; see `server-content.md`. Reactor
 `action` scripts (`mBoxItem0` and others) are not run.
 
+## Mob attacks
+
+`Mob.nx` lists a mob's attacks as `attack1`, `attack2`, ... with an `info`
+each (`game_data::mobs::MobAttack`; HeavenClient's `Mob::AttackInfo`). The
+`type` says how an attack reaches: 0 hits a box, 1 shoots the player it
+aims at, 2 throws a ball, and 3 and 4 strike a row of cells (3 only cells
+with ground under them). The geometry is in
+`Gameplay/MapleMap/MobAttackRules.h`, from v83's FUN_0066a517 (the pick)
+and FUN_0066d9c0 (DoAttack); details are in the v83 notes for L173.
+
+- **The pick:** a controlled mob that is chasing the local player, not
+  acting, standing or flying, and not held picks an attack on its 90 ms
+  step (`Mob::pick_attack`). Each attack whose MP cost (`conMP`) the mob
+  can pay and whose range covers the player, facing either way, is a
+  candidate. Physical attacks skip a player in Dark Sight, and row attacks
+  wait 2.5 s after the last. One candidate is taken at random.
+- **Playing it:** the mob stops, turns, and plays `attackN` for its length.
+  Its movement goes out with action 12 + the attack's index (shifted left
+  one, plus 1 facing left) and the attack's data: the target's id << 2 for
+  a shot, the ball's aim point as two shorts, or the row's cells as a
+  bitmask. The server (`MobSet::act`) takes the MP, or shows the move
+  without the attack if the mob lacks it. Its MOVE_MONSTER_RESPONSE carries
+  the mob's MP and whether it may attack next: whenever the client asked
+  (70% of chasing moves) and the mob has attacks. Only then does the client
+  pick one. The server relays the action and data to the others in
+  MOVE_MONSTER, and their clients play the same attack from the path's
+  start. Mob skills (actions 21 on) aren't granted yet.
+- **Hits:** every client checks the attack against its own player, after
+  `attackAfter` ms: the box or cell against the player's body (a
+  `jumpAttack` box misses an airborne player), the shot if it was aimed at
+  this player and in reach, and the ball's point every frame of its flight
+  (`r` px at `bulletSpeed`). The `effect` plays after `effectAfter`, the
+  `hit` animation plays on a player who takes damage, and a row attack
+  shows its `areaWarning` on each cell.
+
+HeavenClient leaves out `tremble` (the screen shake), `doFirst`, element
+resistance, hits on summons and other mobs, and attacks on a Puppet.
+
 ## Getting hurt
 
-TAKE_DAMAGE from a touch (-1) is accepted up to the touching mob's
-`PADamage`, only for mobs with `bodyAttack` and without `notAttack`
+TAKE_DAMAGE names the mob attack that hit (its index, or -1 for a touch).
+A touch counts only for mobs with `bodyAttack` and without `notAttack`
 (HeavenClient's `Mob::deals_touch_damage` applies the same rule, so other
-mobs neither hurt nor knock back on touch). The client works out the
-damage (`Character/TouchDamage.h`) by a pre-Big Bang procedure
-([ayumilove](https://ayumilove.net/maplestory-formula/)). The mob's base
-damage is a roll from 85% of `PADamage` up to it. The player's defense is
-`1.2 STR + 0.5 DEX + 0.4 INT + 0.5 LUK` plus W.DEF from equipment, and 75%
-of it, rounded down, comes off the base. The minimum is 1. The stat part is
-hidden: the stat window shows only the equipment W.DEF. Period footage agrees.
-Snails hit level 2–4 beginners for 1, and Shrooms and Blue Snails hit a
-level 5 beginner for 1–2 (#125). The procedure has no level-difference
-term and no avoid check. HP drops, others see DAMAGE_PLAYER, and at 0 HP the player is dead:
+mobs neither hurt nor knock back on touch); an index must name one of the
+mob's attacks.
+
+The client works out the damage as v83 does (`Character/MobDamage.h`, from
+FUN_0079309f and FUN_0079345e):
+
+- **Physical:** the attack's `PADamage` (the mob's, for a touch or an
+  attack without one), P, rolls P² × 0.8–0.85 / 100. W.DEF and a stat
+  factor take some off. Below the W.DEF expected of the player's job and
+  level (Base.wz `StandardPDD`, baked into the client) the shortfall adds
+  some back, more against a higher level mob. A miss roll weighs the
+  player's avoid against the mob's accuracy first.
+- **Magic:** the mob's `MADamage`, M, rolls M² × 0.75–0.8 / 100, less a
+  share of M.DEF and stats (more for magicians); a separate miss roll.
+- **Afterward:** the damage is at least 1 unless missed. A `deadlyAttack`
+  takes all but 1 HP, and an `mpBurn` attack does 1. Achilles keeps its `x`
+  per mille.
+
+Period footage agrees: snails hit level 2–4 beginners for 1, and Shrooms
+and Blue Snails hit a level 5 beginner for 1–2 (#125). The server
+(`game::mob_damage`) refuses more than the best roll with no W.DEF, plus
+the most a shortfall can add with doubled base stats. It takes the HP, and
+for a `deadlyAttack` all but 1 MP or the attack's `mpBurn` in MP. Others see
+DAMAGE_PLAYER. At 0 HP the player is dead:
 non-beginners lose 10% of their level's EXP; the client's respawn
 (CHANGE_MAP with a target while dead) returns them to the map's return map
 with 50 HP.
@@ -639,10 +691,14 @@ Setting restores the same table.
 ## Tests
 
 `field_mobs` unit tests cover spawning, control hand-off (including by
-distance report), movement, damage, EXP sharing, and respawn; `net::combat` covers parsing, the damage cap, and
-the broadcast; `mob_combat` (integration) runs two players in Dangerous
+distance report), movement, attacks' MP, damage, EXP sharing, and respawn;
+`net::combat` covers parsing, the damage cap, and the broadcast, and the
+TAKE_DAMAGE handler's bounds by attack index; `game::mob_damage` covers the
+StandardPDD table and the bound. HeavenClient's `mob_damage_tests` and
+`mob_attack_tests` cover the damage and miss formulas and the attacks'
+ranges, aim, balls, and rows. `mob_combat` (integration) runs two players in Dangerous
 Forest through control, relayed movement, hits, kills, EXP, refused damage,
-touch damage, a level-up seen by the other player, and a respawn, then has
+touch damage, damage by attack index, a level-up seen by the other player, and a respawn, then has
 two players report their distance from a firstAttack mob in Crimsonwood Keep
 (610030011) and checks control follows the closer one until a hit;
 `reactors` (integration) breaks two of Amherst's boxes, before and during
@@ -652,8 +708,7 @@ persistence, and that the tutorial sentinel's quest drop needs its quest;
 `spend_points` levels a beginner and checks AP, the beginner pool, refusals,
 and that both survive logging out; `monster_book` fills a card's page from
 six snails, checks the effect another player sees and the cover, and that
-both survive logging out.
-and that both survive logging out; `beginner_skills` has three players learn
+both survive logging out; `beginner_skills` has three players learn
 Three Snails, Nimble Feet, and Recovery and checks their damage caps, MP,
 buffs, cooldowns, Recovery's heal, what the others see, and that the buffs
 end on time and on death. `poison_mist` casts Poison Mist on a snail and

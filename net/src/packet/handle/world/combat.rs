@@ -12,8 +12,10 @@ use packet::{io::read::PktRead, Packet};
 use std::io::Cursor;
 use tracing::debug;
 
-/// `MOVE_LIFE`: the controller moved a mob. Object id, move id, six bytes of
-/// skill data, 13 more bytes, the start position, then the movement list.
+/// `MOVE_LIFE`: the controller moved a mob (FUN_0066b6fc). Object id, move
+/// id, flags (bit 0: it wants to attack next), the action (action << 1 |
+/// facing left, 0xFF for none), skill data, 13 more bytes, the start
+/// position, then the movement list.
 pub struct MoveLifeHandler;
 
 impl WorldHandler for MoveLifeHandler {
@@ -22,7 +24,10 @@ impl WorldHandler for MoveLifeHandler {
         r.read_short()?;
         let object_id = r.read_int()?;
         let move_id = r.read_short()?;
-        r.read_bytes(6 + 13)?;
+        let flags = r.read_byte()?;
+        let action = r.read_byte()?;
+        let skill_data = r.read_int()?;
+        r.read_bytes(13)?;
         let start = (r.read_short()?, r.read_short()?);
         let movement = packet.bytes[r.position() as usize..].to_vec();
         if movement.first().copied().unwrap_or(0) == 0 {
@@ -32,6 +37,9 @@ impl WorldHandler for MoveLifeHandler {
             HandlerResult::empty().with(WorldAction::Field(FieldRequest::MobMove {
                 object_id,
                 move_id,
+                want_attack: flags & 1 != 0,
+                action,
+                skill_data,
                 start,
                 movement,
             })),
@@ -145,7 +153,8 @@ impl WorldHandler for AttackHandler {
     }
 }
 
-/// `TAKE_DAMAGE`: the player was hurt (here: by touching a mob).
+/// `TAKE_DAMAGE`: the player was hurt by touching a mob or by one of its
+/// attacks (FUN_009581a9).
 pub struct TakeDamageHandler;
 
 impl WorldHandler for TakeDamageHandler {
@@ -157,7 +166,7 @@ impl WorldHandler for TakeDamageHandler {
         r.read_byte()?; // element
         let damage = r.read_int()?;
         let player = &mut *ctx.player;
-        if from != FROM_TOUCH || player.stats.hp <= 0 {
+        if from < FROM_TOUCH || player.stats.hp <= 0 {
             return Ok(HandlerResult::empty());
         }
         let mob_id = r.read_int()?;
@@ -165,24 +174,80 @@ impl WorldHandler for TakeDamageHandler {
             r.read_int()?; // object id
             r.read_byte()?
         };
-        // A mob can hurt at most its attack; the client applies defense.
-        let Some(mob) = crate::mobs::info(mob_id).filter(|m| m.body_attack && !m.not_attack) else {
-            debug!(mob_id, "Damage from a mob that can't touch");
+        let Some(mob) = crate::mobs::info(mob_id).filter(|m| !m.not_attack) else {
+            debug!(mob_id, "Damage from a mob that can't attack");
             return Ok(HandlerResult::empty());
         };
-        if !(0..=mob.attack).contains(&damage) {
-            debug!(mob_id, damage, "Touch damage out of range");
+        let attack = match usize::try_from(from) {
+            Ok(index) => match mob.attacks.get(index) {
+                Some(attack) => Some(attack),
+                None => {
+                    debug!(mob_id, from, "Damage from an attack the mob lacks");
+                    return Ok(HandlerResult::empty());
+                }
+            },
+            Err(_) if mob.body_attack => None,
+            Err(_) => {
+                debug!(mob_id, "Damage from a mob that can't touch");
+                return Ok(HandlerResult::empty());
+            }
+        };
+        // The client works out the damage; it can be at most the attack's
+        // own, or all but 1 HP for a deadly attack.
+        let deadly = attack.is_some_and(|a| a.deadly);
+        let most = if deadly {
+            i32::from(player.stats.hp) - 1
+        } else {
+            most_damage(&player.stats, &mob, attack)
+        };
+        if !(0..=most.max(1)).contains(&damage) {
+            debug!(mob_id, from, damage, "Mob damage out of range");
             return Ok(HandlerResult::empty());
         }
         let hp = player.add_hp(-damage);
-        let mut actions =
-            HandlerResult::reply(stat::build_stat_update(false, &[StatUpdate::Hp(hp)])?);
-        let shown = mob::build_damage_player(player.id(), mob_id, damage, direction)?;
+        let mut updates = vec![StatUpdate::Hp(hp)];
+        // As Cosmic does: a deadly attack leaves 1 MP too, and mpBurn burns
+        // MP.
+        let mp_loss = match attack {
+            Some(_) if deadly && damage > 0 => i32::from(player.stats.mp) - 1,
+            Some(a) if damage > 0 => a.mp_burn,
+            _ => 0,
+        };
+        if mp_loss > 0 {
+            updates.push(StatUpdate::Mp(player.add_mp(-mp_loss)));
+        }
+        let mut actions = HandlerResult::reply(stat::build_stat_update(false, &updates)?);
+        let shown = mob::build_damage_player(player.id(), from, mob_id, damage, direction)?;
         actions = actions.with(WorldAction::Field(FieldRequest::Broadcast(shown)));
         if hp == 0 {
             actions = actions.with(WorldAction::Died);
         }
         Ok(actions)
+    }
+}
+
+/// The most a mob's touch (`attack` None) or attack can hurt `stats`'
+/// owner. A v83 client rolls up to 85% of attack squared over 100, plus a
+/// share of any W.DEF shortfall (FUN_0079309f), or 80% for magic
+/// (FUN_0079345e).
+fn most_damage(
+    stats: &game::CharacterStats,
+    mob: &game_data::mobs::MobInfo,
+    attack: Option<&game_data::mobs::MobAttack>,
+) -> i32 {
+    use game::mob_damage::{most_magic, most_physical, Defender};
+    let defender = Defender {
+        level: i32::from(stats.level),
+        job: i32::from(stats.job),
+        str: i32::from(stats.str),
+        dex: i32::from(stats.dex),
+        int: i32::from(stats.int),
+        luk: i32::from(stats.luk),
+    };
+    match attack {
+        Some(a) if a.magic => most_magic(mob.magic_attack),
+        Some(a) if a.attack > 0 => most_physical(&defender, a.attack),
+        _ => most_physical(&defender, mob.attack),
     }
 }
 
@@ -193,10 +258,14 @@ mod tests {
     use packet::io::write::PktWrite;
 
     fn touch(damage: i32, mob_id: i32) -> Packet {
+        hit(FROM_TOUCH, damage, mob_id)
+    }
+
+    fn hit(from: i8, damage: i32, mob_id: i32) -> Packet {
         let mut p = Packet::new_empty();
         p.write_short(RecvOpcode::TakeDamage as i16).unwrap();
         p.write_int(0).unwrap();
-        p.write_byte(FROM_TOUCH as u8).unwrap();
+        p.write_byte(from as u8).unwrap();
         p.write_byte(0).unwrap();
         p.write_int(damage).unwrap();
         p.write_int(mob_id).unwrap();
@@ -218,28 +287,68 @@ mod tests {
             .actions
     }
 
+    fn sample_defender() -> game::mob_damage::Defender {
+        // `sample_stats`: a level 10 warrior.
+        game::mob_damage::Defender {
+            level: 10,
+            job: 100,
+            str: 35,
+            dex: 4,
+            int: 4,
+            luk: 4,
+        }
+    }
+
     #[test]
-    fn snails_hurt_up_to_their_attack() {
+    fn snails_hurt_up_to_their_bound() {
         if crate::mobs::data().is_err() {
             return;
         }
         let mut player = crate::codec::stats::sample_player();
-        player.stats.hp = 20;
-        let actions = handle(&mut player, touch(12, 100100));
-        assert_eq!(player.stats.hp, 8);
+        // A snail's 12 rolls 2 at most, but a level 10 warrior below the
+        // expected 54 W.DEF can take more.
+        let most = game::mob_damage::most_physical(&sample_defender(), 12);
+        assert!(most > 2);
+        player.stats.hp = (2 * most) as i16;
+        handle(&mut player, touch(most, 100100));
+        assert_eq!(i32::from(player.stats.hp), most);
+        // More than the bound is refused.
+        assert!(handle(&mut player, touch(most + 1, 100100)).is_empty());
+        // The tutorial sentinel never attacks.
+        assert!(handle(&mut player, touch(1, 9300018)).is_empty());
+        let actions = handle(&mut player, touch(most, 100100));
+        assert_eq!(player.stats.hp, 0);
         assert!(matches!(
             actions.as_slice(),
             [
                 WorldAction::Reply(_),
-                WorldAction::Field(FieldRequest::Broadcast(_))
+                WorldAction::Field(FieldRequest::Broadcast(_)),
+                WorldAction::Died
             ]
         ));
-        // More than a snail's attack is refused.
-        assert!(handle(&mut player, touch(13, 100100)).is_empty());
-        // The tutorial sentinel never attacks.
-        assert!(handle(&mut player, touch(1, 9300018)).is_empty());
-        let actions = handle(&mut player, touch(12, 100100));
-        assert_eq!(player.stats.hp, 0);
-        assert!(matches!(actions.last(), Some(WorldAction::Died)));
+    }
+
+    #[test]
+    fn attacks_hurt_by_their_index() {
+        if crate::mobs::data().is_err() {
+            return;
+        }
+        let mut player = crate::codec::stats::sample_player();
+        player.stats.hp = 1000;
+        player.stats.max_hp = 1000;
+        // Stumpy (3220000): PADamage 125 for its body, 135 for attack2.
+        let defender = sample_defender();
+        let body = game::mob_damage::most_physical(&defender, 125);
+        let attack2 = game::mob_damage::most_physical(&defender, 135);
+        assert!(handle(&mut player, hit(1, attack2 + 1, 3220000)).is_empty());
+        handle(&mut player, hit(1, attack2, 3220000));
+        assert_eq!(i32::from(player.stats.hp), 1000 - attack2);
+        assert!(handle(&mut player, touch(body + 1, 3220000)).is_empty());
+        handle(&mut player, touch(body, 3220000));
+        assert_eq!(i32::from(player.stats.hp), 1000 - attack2 - body);
+        // It has no attack3.
+        assert!(handle(&mut player, hit(2, 1, 3220000)).is_empty());
+        // A snail has no attacks.
+        assert!(handle(&mut player, hit(0, 1, 100100)).is_empty());
     }
 }
