@@ -167,6 +167,20 @@ impl Buffs {
         self.cooldowns.push((skill_id, now + length));
     }
 
+    /// End every cooldown but `kept`'s, as Time Leap does: the skills that
+    /// were cooling down.
+    pub fn end_cooldowns_except(&mut self, kept: i32) -> Vec<i32> {
+        let mut ended = Vec::new();
+        self.cooldowns.retain(|&(id, _)| {
+            if id == kept {
+                return true;
+            }
+            ended.push(id);
+            false
+        });
+        ended
+    }
+
     /// When `advance` next has something to do.
     pub fn next_deadline(&self) -> Option<Instant> {
         let buffs = self.active.iter().map(Buff::next_deadline);
@@ -294,5 +308,17 @@ mod tests {
         // Death ends buffs but not cooldowns.
         assert!(buffs.clear().is_empty());
         assert_eq!(buffs.next_deadline(), Some(start + 91 * SECOND));
+    }
+
+    #[test]
+    fn time_leap_ends_every_other_cooldown() {
+        let start = Instant::now();
+        let mut buffs = Buffs::default();
+        buffs.start_cooldown(1002, start, 60 * SECOND);
+        buffs.start_cooldown(5121010, start, 600 * SECOND);
+        buffs.start_cooldown(1001003, start, 30 * SECOND);
+        assert_eq!(buffs.end_cooldowns_except(5121010), vec![1002, 1001003]);
+        assert!(!buffs.cooling_down(1002, start));
+        assert!(buffs.cooling_down(5121010, start));
     }
 }
