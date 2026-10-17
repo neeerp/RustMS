@@ -546,6 +546,9 @@ namespace ms
 			expect_hits(result, 1);
 			extract_effects(player, move, result, range, reach, shot_area, shot_end);
 
+			if (attack.type == Attack::Type::MAGIC)
+				cast_area(attack.skill, attack.range, attack.charge, player.get_position(), attack.toleft);
+
 			apply_use_movement(move);
 			apply_result_movement(move, result);
 
@@ -870,7 +873,10 @@ namespace ms
 														   shot_end.x(), skill_area, attack.toleft);
 
 			if (attack.type == Attack::Type::MAGIC)
+			{
 				show_remote_spell(user, move, attack, range);
+				cast_area(attack.skill, skill_area, attack.charge, user.get_position(), attack.toleft);
+			}
 			else if (attack.type == Attack::Type::RANGED && !prepare::throws(attack.skill))
 				show_remote_shot(user, move, attack, range);
 			else
@@ -1290,7 +1296,7 @@ namespace ms
 				Rectangle<int16_t> area = shot_rain::around(lt_rb, first);
 
 				if (shot_rain::burns(skill))
-					burn(get_skill(skill), area, hit);
+					burn(get_skill(skill), area, hit, shot_rain::BURN);
 
 				start_rain(get_skill(skill), shot_rain::raised(area), toleft, hit);
 				break;
@@ -1313,7 +1319,7 @@ namespace ms
 		rains.push_back({ skill.get_id(), area, toleft, shot_rain::Schedule(skill.get_rain().params, now + hit) });
 	}
 
-	void Combat::burn(const Skill &skill, Rectangle<int16_t> area, int64_t hit)
+	void Combat::burn(const Skill &skill, Rectangle<int16_t> area, int64_t hit, int32_t length)
 	{
 		const SkillRain &rain = skill.get_rain();
 
@@ -1341,16 +1347,71 @@ namespace ms
 							{ x, shot_rain::flame_y(*ground, randomizer.next_int(5)) },
 							now + hit,
 							shot_rain::flame_fade(randomizer.next_int(5)),
-							(128 + randomizer.next_int(128)) / 255.0f
+							(128 + randomizer.next_int(128)) / 255.0f,
+							length
 					});
 				}
 			}
 		}
 	}
 
+	void Combat::cast_area(int32_t skill, Rectangle<int16_t> lt_rb, int32_t charge, Point<int16_t> user, bool toleft)
+	{
+		spell_area::Kind kind = spell_area::kind(skill);
+
+		if (kind == spell_area::Kind::NONE)
+			return;
+
+		const Skill &area_skill = get_skill(skill);
+
+		if (kind == spell_area::Kind::TILES)
+		{
+			burn(area_skill, spell_area::tiles(lt_rb, user, toleft), spell_area::TILE_DELAY, spell_area::burn_time(skill));
+
+			return;
+		}
+
+		if (area_skill.get_rain().drops.empty())
+			return;
+
+		Rectangle<int16_t> area = kind == spell_area::Kind::BIG_BANG
+			? spell_area::big_bang(charge, user)
+			: spell_area::explosion(lt_rb, user);
+
+		blasts.push_back({ skill, shot_rain::Schedule(area_skill.get_rain().params, now), spell_area::Spread(area) });
+	}
+
 	void Combat::update_rains()
 	{
 		Randomizer randomizer;
+
+		// Each wave of a blast plays once where it lands (0x441f45).
+		for (Blast &blast : blasts)
+		{
+			if (!blast.schedule.drop(now))
+				continue;
+
+			const SkillRain &skillrain = get_skill(blast.skill).get_rain();
+			Rectangle<int16_t> band = blast.spread.widen();
+
+			for (int32_t i = 0; i < skillrain.params.count; i++)
+			{
+				Point<int16_t> position(
+						randomizer.next_int(band.left(), band.right()),
+						randomizer.next_int(band.top(), band.bottom())
+				);
+
+				fieldeffects.add(skillrain.drops[randomizer.next_int<size_t>(skillrain.drops.size())],
+								 DrawArgument(position), 0);
+			}
+		}
+
+		blasts.remove_if(
+				[&](const Blast &blast)
+				{
+					return blast.schedule.over(now);
+				}
+		);
 
 		for (Rain &rain : rains)
 		{
@@ -1405,7 +1466,7 @@ namespace ms
 					if (now > flame.start)
 						flame.animation.update();
 
-					return now > flame.start + 2 * shot_rain::BURN;
+					return now > flame.start + flame.length + shot_rain::BURN;
 				}
 		);
 	}
@@ -1417,7 +1478,7 @@ namespace ms
 		// The fire fades in once lit, burns, then fades out (0x442887).
 		for (const Flame &flame : flames)
 		{
-			int64_t out = flame.start + shot_rain::BURN;
+			int64_t out = flame.start + flame.length;
 			float opacity = now <= out
 				? shot_rain::fade(0.0f, flame.opacity, flame.start, flame.start + flame.fade, now)
 				: shot_rain::fade(flame.opacity, 0.0f, out, out + shot_rain::BURN, now);

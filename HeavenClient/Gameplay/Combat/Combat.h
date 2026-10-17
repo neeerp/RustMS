@@ -23,6 +23,7 @@
 #include "RegularAttack.h"
 #include "ShotPath.h"
 #include "ShotRain.h"
+#include "SpellArea.h"
 #include "Teleport.h"
 
 #include "../MapleMap/MapChars.h"
@@ -176,9 +177,14 @@ namespace ms
 		// (FUN_0043612f).
 		void start_rain(const Skill &skill, Rectangle<int16_t> area, bool toleft, int64_t hit);
 
-		// Set the ground across an area on fire `hit` ms from now
-		// (FUN_00436ce9).
-		void burn(const Skill &skill, Rectangle<int16_t> area, int64_t hit);
+		// Set the ground across an area on fire `hit` ms from now, for
+		// `length` ms (FUN_00436ce9).
+		void burn(const Skill &skill, Rectangle<int16_t> area, int64_t hit, int32_t length);
+
+		// Leave what an area spell leaves over the field as it's cast, with
+		// its lt/rb, how long it was charged, and where its user stands and
+		// faces (0x956b4e, 0x982b33).
+		void cast_area(int32_t skill, Rectangle<int16_t> lt_rb, int32_t charge, Point<int16_t> user, bool toleft);
 
 		void update_rains();
 
@@ -323,7 +329,15 @@ namespace ms
 			float opacity;
 		};
 
-		// One of Inferno's flames on the ground.
+		// A blast's sprites, landing a wave at a time further out.
+		struct Blast
+		{
+			int32_t skill;
+			shot_rain::Schedule schedule;
+			spell_area::Spread spread;
+		};
+
+		// One of the flames, or tiles, on the ground.
 		struct Flame
 		{
 			Animation animation;
@@ -331,10 +345,12 @@ namespace ms
 			int64_t start;
 			int32_t fade;
 			float opacity;
+			int32_t length;
 		};
 
 		std::list<Rain> rains;
 		std::list<RainDrop> raindrops;
+		std::list<Blast> blasts;
 		std::list<Flame> flames;
 
 		// A skill held down: how long, in ms, and whether its effect has
