@@ -34,6 +34,9 @@ impl AttackKind {
     }
 }
 
+/// Arrow Bomb, whose hits take their percent from its `x`.
+const ARROW_BOMB: i32 = 3101005;
+
 /// Rapid Fire's targets end without the usual 4 bytes.
 const RAPID_FIRE: i32 = 5221004;
 
@@ -302,8 +305,8 @@ pub fn validate(attack: &Attack, player: &Player) -> Result<Uses, AttackRejectio
             // again for a monster weak to the spell's element (FUN_00790782).
             let max = max_magic_damage(player, effect.magic) * skills::amplification(player) / 100;
             (max * 3).max(10)
-        } else if effect.damage != 0 {
-            (base_cap * effect.damage / 100).max(10)
+        } else if let Some(percent) = damage_percent(&skill) {
+            (base_cap * percent / 100).max(10)
         } else {
             return Err(AttackRejection::Skill);
         };
@@ -333,6 +336,18 @@ pub fn validate(attack: &Attack, player: &Player) -> Result<Uses, AttackRejectio
     }
     let ammo = shot_ammo(attack, player, skill.as_ref())?;
     Ok(Uses { skill, ammo })
+}
+
+/// How much of the base damage a skill's hits deal, in percent, or `None`
+/// for a skill that doesn't attack that way. Arrow Bomb has no `damage`,
+/// which the client takes as 100%, and scales its hits by its `x`
+/// (FUN_0078df87, FUN_0075bf50).
+fn damage_percent(skill: &Learned) -> Option<i32> {
+    match skill.effect.damage {
+        0 if skill.skill_id == ARROW_BOMB => Some(skill.effect.x),
+        0 => None,
+        damage => Some(damage),
+    }
 }
 
 /// The attack as other players see it (`addAttackBody`), under the opcode
@@ -704,6 +719,45 @@ mod tests {
         assert_eq!(
             validate(&seven(&[1, 1, 1]), &player).unwrap_err(),
             AttackRejection::TooManyTargets
+        );
+    }
+
+    #[test]
+    fn arrow_bomb_hits_for_its_x_percent() {
+        if skills::data().is_err() {
+            return;
+        }
+        let bomb = |damage: &[i32]| {
+            parse_attack(
+                &kind_attack_packet(AttackKind::Ranged, ARROW_BOMB, 1, damage),
+                AttackKind::Ranged,
+            )
+            .unwrap()
+        };
+        let mut player = beginner_with_sword();
+        player.inventory.insert(
+            InventoryType::Equipped,
+            equip_slot::WEAPON,
+            Item::equipment(
+                1452002,
+                EquipStats {
+                    watk: 50,
+                    ..EquipStats::default()
+                },
+            ),
+        );
+        player
+            .inventory
+            .insert(InventoryType::Use, 1, Item::stack(2060000, 100));
+        player.stats.dex = 200;
+        player.stats.mp = 100;
+        learn(&mut player, ARROW_BOMB, 30);
+        // No `damage` at any level; level 30's x is 130.
+        let cap = (max_base_damage(&player) * 2).max(10) * 130 / 100;
+        assert!(validate(&bomb(&[cap]), &player).is_ok());
+        assert_eq!(
+            validate(&bomb(&[cap + 1]), &player).unwrap_err(),
+            AttackRejection::Damage
         );
     }
 
