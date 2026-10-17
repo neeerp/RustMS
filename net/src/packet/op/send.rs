@@ -47,6 +47,7 @@ pub enum SendOpcode {
     RemoveSummon = 0xB0,
     MoveSummon = 0xB1,
     SummonAttack = 0xB2,
+    SummonSkill = 0xB3,
     DamageSummon = 0xB4,
     ShowItemGainInChat = 0xCE,
     UpdateQuestInfo = 0xD3,

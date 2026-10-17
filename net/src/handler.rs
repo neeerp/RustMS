@@ -444,6 +444,13 @@ pub enum FieldRequest {
     },
     /// A mob hurt the player's Puppet.
     SummonDamage(crate::summons::SummonDamage),
+    /// The player's Beholder heals or buffs them, if it is theirs and not
+    /// too soon; the others see it play `action`.
+    Beholder {
+        object_id: i32,
+        action: u8,
+        support: crate::summons::Support,
+    },
 }
 
 impl ReplyAction for WorldAction {
@@ -554,6 +561,7 @@ fn world_routes() -> &'static HashMap<i16, WorldRoute> {
             (Op::MoveSummon, InGame(&world::MoveSummonHandler)),
             (Op::SummonAttack, InGame(&world::SummonAttackHandler)),
             (Op::DamageSummon, InGame(&world::DamageSummonHandler)),
+            (Op::Beholder, InGame(&world::BeholderHandler)),
         ];
         table
             .into_iter()
@@ -584,7 +592,7 @@ mod tests {
     fn every_registered_opcode_is_unique_per_server() {
         // The maps would silently drop duplicates; check the table sizes match.
         assert_eq!(login_routes().len(), 13);
-        assert_eq!(world_routes().len(), 52);
+        assert_eq!(world_routes().len(), 53);
     }
 
     #[test]

@@ -82,6 +82,10 @@ namespace ms
 		Rectangle<int16_t> get_body() const;
 		// When it last attacked, in the combat's ms.
 		int64_t last_attack = 0;
+		// When a Beholder may next heal, and buff, its owner, in the
+		// combat's ms; -1 until its first update.
+		int64_t next_heal = -1;
+		int64_t next_hex = -1;
 
 		void set_left(bool left);
 

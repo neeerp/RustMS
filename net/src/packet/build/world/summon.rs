@@ -126,6 +126,21 @@ pub fn build_damage_summon(
     Ok(p)
 }
 
+/// SUMMON_SKILL (0xB3, FUN_007a6e5a): a Beholder heals or buffs its
+/// owner, playing `action` (its facing bit is ignored).
+pub fn build_summon_skill(
+    owner_id: i32,
+    object_id: i32,
+    action: u8,
+) -> Result<Packet, NetworkError> {
+    let mut p = Packet::new_empty();
+    p.write_short(SendOpcode::SummonSkill as i16)?;
+    p.write_int(owner_id)?;
+    p.write_int(object_id)?;
+    p.write_byte(action)?;
+    Ok(p)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -212,6 +227,15 @@ mod tests {
         want.push(0xFF);
         want.extend(ints(&[30, 100100]));
         want.push(0);
+        assert_eq!(p.bytes, want);
+    }
+
+    #[test]
+    fn a_beholder_acts_for_the_others() {
+        let p = build_summon_skill(7, 900_000_000, 0x86).unwrap();
+        let mut want = vec![0xB3, 0x00];
+        want.extend(ints(&[7, 900_000_000]));
+        want.push(0x86);
         assert_eq!(p.bytes, want);
     }
 }

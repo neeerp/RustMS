@@ -744,6 +744,11 @@ namespace ms
 		return buffs[stat].value > 0;
 	}
 
+	int16_t Player::get_buff_value(Buffstat::Id stat) const
+	{
+		return buffs[stat].value;
+	}
+
 	void Player::change_skill(int32_t skill_id, int32_t skill_level, int32_t masterlevel, int64_t expiration)
 	{
 		int32_t old_level = skillbook.get_level(skill_id);
