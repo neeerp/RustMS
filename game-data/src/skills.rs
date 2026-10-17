@@ -78,6 +78,32 @@ pub struct SkillLevel {
     pub rb: (i32, i32),
 }
 
+/// One level of a mob skill (`MobSkill.img/<id>/level/<n>`).
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct MobSkillLevel {
+    pub mp_cost: i32,
+    /// Seconds before the mob can cast it again.
+    pub interval: i32,
+    /// Seconds what it casts lasts (`time`).
+    pub duration: i32,
+    pub x: i32,
+    pub y: i32,
+    /// Cast only at or below this percent of its HP, 100 without.
+    pub hp: i32,
+    /// The chance in percent it takes hold, 100 without.
+    pub prop: i32,
+    /// The most of its summons alive at once, or 0.
+    pub limit: i32,
+    /// The area it covers around the mob facing left (`lt`, `rb`), (0, 0)
+    /// for just the mob.
+    pub lt: (i32, i32),
+    pub rb: (i32, i32),
+    /// The `Effect/Summon.img` entry its summons appear with.
+    pub summon_effect: i32,
+    /// The mobs it summons (`0`, `1`, ...).
+    pub summons: Vec<i32>,
+}
+
 pub struct SkillData {
     nx: NxDataFile,
 }
@@ -160,6 +186,45 @@ impl SkillData {
             levels,
         }))
     }
+
+    pub fn mob_skill(
+        &self,
+        skill: i32,
+        level: i32,
+    ) -> Result<Option<MobSkillLevel>, GameDataError> {
+        let nx = &self.nx;
+        let mut node = 0;
+        for name in [
+            "MobSkill.img",
+            &skill.to_string(),
+            "level",
+            &level.to_string(),
+        ] {
+            match nx.child_by_name(node, name)? {
+                Some(child) => node = child,
+                None => return Ok(None),
+            }
+        }
+        let int = |key| -> Result<i32, GameDataError> { Ok(nx.int_child(node, key)?.unwrap_or(0)) };
+        let mut summons = Vec::new();
+        while let Some(mob) = nx.int_child(node, &summons.len().to_string())? {
+            summons.push(mob);
+        }
+        Ok(Some(MobSkillLevel {
+            mp_cost: int("mpCon")?,
+            interval: int("interval")?,
+            duration: int("time")?,
+            x: int("x")?,
+            y: int("y")?,
+            hp: nx.int_child(node, "hp")?.unwrap_or(100),
+            prop: nx.int_child(node, "prop")?.unwrap_or(100),
+            limit: int("limit")?,
+            lt: nx.vector_child(node, "lt")?.unwrap_or_default(),
+            rb: nx.vector_child(node, "rb")?.unwrap_or_default(),
+            summon_effect: int("summonEffect")?,
+            summons,
+        }))
+    }
 }
 
 #[cfg(test)]
@@ -218,5 +283,31 @@ mod tests {
 
         assert!(data.info(1009999).unwrap().is_none());
         assert!(data.info(9_990_000).unwrap().is_none());
+    }
+
+    #[test]
+    fn reads_mob_skills() {
+        let Some(path) = crate::test_assets::path("Skill.nx") else {
+            return;
+        };
+        let data = SkillData::load(path).unwrap();
+        let power_up = data.mob_skill(100, 1).unwrap().unwrap();
+        assert_eq!(
+            (
+                power_up.x,
+                power_up.duration,
+                power_up.mp_cost,
+                power_up.interval
+            ),
+            (115, 30, 5, 40)
+        );
+        assert_eq!((power_up.hp, power_up.prop), (100, 100));
+        let heal = data.mob_skill(114, 15).unwrap().unwrap();
+        assert_eq!((heal.x, heal.y, heal.hp), (700, 200, 80));
+        assert_eq!((heal.lt, heal.rb), ((-400, -350), (400, 250)));
+        let summon = data.mob_skill(200, 1).unwrap().unwrap();
+        assert_eq!(summon.summons, [7130200]);
+        assert_eq!((summon.limit, summon.summon_effect, summon.hp), (5, 2, 75));
+        assert!(data.mob_skill(100, 99).unwrap().is_none());
     }
 }

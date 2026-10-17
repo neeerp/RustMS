@@ -155,9 +155,10 @@ namespace ms
 		}
 
 		// A physical hit, for a monster with `attack` and a `roll` uniform in
-		// [0, 1). `reduce` is the percent that skills like Achilles take off.
+		// [0, 1). `reduce` is the percent that skills like Achilles take off,
+		// and a Power Up puts the rest at `percent` (0 for none).
 		inline int32_t physical(const Defender &player, const Attacker &mob, int32_t attack, double roll,
-								int32_t reduce)
+								int32_t reduce, int32_t percent = 0)
 		{
 			attack = std::clamp(attack, 0, 1999);
 
@@ -185,12 +186,17 @@ namespace ms
 			base -= soak;
 			base -= reduce * base * 0.01;
 
+			if (percent != 0)
+				base = base * percent * 0.01;
+
 			return finish(base);
 		}
 
 		// A magic hit, for a monster with `attack` and a `roll` uniform in
-		// [0, 1). `resist` is the percent the player resists of its element.
-		inline int32_t magic(const Defender &player, int32_t attack, double roll, int32_t resist)
+		// [0, 1). `resist` is the percent the player resists of its element,
+		// after a Magic Up puts it at `percent` (0 for none).
+		inline int32_t magic(const Defender &player, int32_t attack, double roll, int32_t resist,
+							 int32_t percent = 0)
 		{
 			attack = std::clamp(attack, 0, 1999);
 
@@ -198,6 +204,9 @@ namespace ms
 			double weight = job_category(player.job) == 2 ? 0.3 : 0.25;
 
 			base -= (player.str / 7.0 + player.dex / 6.0 + player.luk / 5.0 + player.mdef) * weight;
+
+			if (percent != 0)
+				base = base * percent * 0.01;
 
 			int32_t damage = finish(base);
 			damage = (100 - resist) * damage / 100;

@@ -44,6 +44,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdlib>
 
 namespace ms
 {
@@ -187,10 +188,12 @@ namespace ms
 				}
 		);
 
-		// Poison and the like show as a plain first hit (0x6691d3).
+		// Poison and the like show as a plain first hit, a heal in blue
+		// (0x6691d3).
 		for (const auto &[head, number] : mobs.take_hurts())
 		{
-			damagenumbers.emplace_back(DamageNumber::Type::NORMAL, number, damage_layout::mob_offset(0, false));
+			DamageNumber::Type type = number < 0 ? DamageNumber::Type::HEAL : DamageNumber::Type::NORMAL;
+			damagenumbers.emplace_back(type, std::abs(number), damage_layout::mob_offset(0, false));
 			damagenumbers.back().set_anchor(head);
 		}
 	}

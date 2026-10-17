@@ -134,6 +134,14 @@ namespace ms
 		void handle(InPacket& recv) const override;
 	};
 
+	// Show a number on a mob that no player's attack made: damage, or a
+	// heal as a negative one (FUN_0066c6c2).
+	// Opcode: DAMAGE_MOB(246)
+	class DamageMobHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
 	// Updates a mob's hp with the client
 	// Opcode: SHOW_MOB_HP(250)
 	class ShowMobHpHandler : public PacketHandler

@@ -249,5 +249,33 @@ namespace ms
 
 			return box.shift(x, y);
 		}
+
+		// The action a skill's animation skill<n> is sent as: the skills'
+		// actions follow the nine attacks' (FUN_0066e7af).
+		inline int8_t skill_action(uint8_t n)
+		{
+			return static_cast<int8_t>(n - 1 + 21);
+		}
+
+		// What a cast sends: the skill, its level, and how long its
+		// animation plays.
+		inline int32_t skill_data(uint8_t skill, uint8_t level, int32_t duration)
+		{
+			return skill | level << 8 | duration << 16;
+		}
+
+		// The skill and level a cast sent.
+		inline std::pair<uint8_t, uint8_t> cast_skill(int32_t skilldata)
+		{
+			return { static_cast<uint8_t>(skilldata & 0xFF), static_cast<uint8_t>((skilldata >> 8) & 0xFF) };
+		}
+
+		// An ack keeps the skill the mob was let cast unless it lets it
+		// cast another (FUN_0066c23b).
+		inline std::pair<uint8_t, uint8_t> granted_skill(std::pair<uint8_t, uint8_t> pending,
+														 std::pair<uint8_t, uint8_t> granted)
+		{
+			return pending.first == 0 || granted.first != 0 ? granted : pending;
+		}
 	}
 }

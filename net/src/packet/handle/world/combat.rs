@@ -244,11 +244,45 @@ fn most_damage(
         int: i32::from(stats.int),
         luk: i32::from(stats.luk),
     };
-    match attack {
-        Some(a) if a.magic => most_magic(mob.magic_attack),
-        Some(a) if a.attack > 0 => most_physical(&defender, a.attack),
-        _ => most_physical(&defender, mob.attack),
+    let magic = attack.is_some_and(|a| a.magic);
+    let (added, percent) = own_buffs(mob, magic);
+    let most = match attack {
+        Some(_) if magic => most_magic(mob.magic_attack + added),
+        Some(a) if a.attack > 0 => most_physical(&defender, a.attack + added),
+        _ => most_physical(&defender, mob.attack + added),
+    };
+    ((i64::from(most) * i64::from(percent) + 99) / 100) as i32
+}
+
+/// The most the mob's own skills can raise its attacks: what Pad (Mad for
+/// `magic`) adds to its attack, and the percent PowerUp (MagicUp) makes of
+/// the damage, 100 without. The field doesn't tell sessions which statuses
+/// a mob has, so a buff from a mob nearby isn't allowed for.
+fn own_buffs(mob: &game_data::mobs::MobInfo, magic: bool) -> (i32, i32) {
+    use game::mob_skill::{effect, MobSkillEffect};
+    use game::MobStat;
+    let (add_stat, percent_stat) = if magic {
+        (MobStat::Mad, MobStat::MagicUp)
+    } else {
+        (MobStat::Pad, MobStat::PowerUp)
+    };
+    let (mut added, mut percent) = (0, 100);
+    for entry in &mob.skills {
+        let Some(level) = crate::mobs::skill_level(entry.skill, entry.level) else {
+            continue;
+        };
+        let Some(MobSkillEffect::Statuses(statuses)) = effect(entry.skill, level.x) else {
+            continue;
+        };
+        for (stat, value) in statuses {
+            if stat == add_stat {
+                added = added.max(i32::from(value));
+            } else if stat == percent_stat {
+                percent = percent.max(i32::from(value));
+            }
+        }
     }
+    (added, percent)
 }
 
 #[cfg(test)]
@@ -350,5 +384,23 @@ mod tests {
         assert!(handle(&mut player, hit(2, 1, 3220000)).is_empty());
         // A snail has no attacks.
         assert!(handle(&mut player, hit(0, 1, 100100)).is_empty());
+    }
+
+    #[test]
+    fn a_mob_that_powers_up_may_hurt_more() {
+        if crate::mobs::data().is_err() || crate::skills::data().is_err() {
+            return;
+        }
+        let mut player = crate::codec::stats::sample_player();
+        player.stats.hp = 10_000;
+        player.stats.max_hp = 10_000;
+        // 4230103 casts Power Up (100), 115% damage.
+        let mob = crate::mobs::info(4230103).unwrap();
+        let plain = game::mob_damage::most_physical(&sample_defender(), mob.attack);
+        let most = (plain * 115 + 99) / 100;
+        assert!(most > plain);
+        assert!(handle(&mut player, touch(most + 1, 4230103)).is_empty());
+        handle(&mut player, touch(most, 4230103));
+        assert_eq!(i32::from(player.stats.hp), 10_000 - most);
     }
 }

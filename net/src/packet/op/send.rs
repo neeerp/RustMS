@@ -60,6 +60,7 @@ pub enum SendOpcode {
     MoveMonsterResponse = 0xF0,
     MobStatSet = 0xF2,
     MobStatReset = 0xF3,
+    DamageMonster = 0xF6,
     ShowMonsterHp = 0xFA,
     ShowMagnet = 0xFB,
     PlayerHint = 0xD6,

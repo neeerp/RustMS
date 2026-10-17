@@ -73,6 +73,17 @@ int main()
 		require(cell_x(area, 1000, 7, false) == 960, "and right to left facing right");
 		require(same(cell_box(area, -520, 10, true), { -560, -190, -480, 10 }), "a cell's hit sits on its middle");
 
+		// Skills.
+		require(skill_action(1) == 21 && skill_action(3) == 23, "skill1 is action 21");
+		require(skill_data(114, 12, 1260) == (114 | 12 << 8 | 1260 << 16), "skill, level, then duration");
+		require(cast_skill(skill_data(200, 27, 900)) == std::make_pair<uint8_t, uint8_t>(200, 27),
+				"a cast reads back its skill and level");
+		require(granted_skill({ 0, 0 }, { 100, 1 }) == std::make_pair<uint8_t, uint8_t>(100, 1), "a grant is kept");
+		require(granted_skill({ 100, 1 }, { 0, 0 }) == std::make_pair<uint8_t, uint8_t>(100, 1),
+				"until another ack grants something");
+		require(granted_skill({ 100, 1 }, { 114, 12 }) == std::make_pair<uint8_t, uint8_t>(114, 12),
+				"a new grant replaces it");
+
 		std::cout << "Mob attack passed\n";
 		return 0;
 	}

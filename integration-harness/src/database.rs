@@ -123,6 +123,17 @@ pub async fn set_hp(character_id: i32, hp: i16, max_hp: i16) -> Result<(), Harne
     .await
 }
 
+/// Set the logged-out character `character_id`'s STR, e.g. to hit hard.
+pub async fn set_str(character_id: i32, str: i16) -> Result<(), HarnessError> {
+    change_one_row("set str", move |conn| {
+        diesel::sql_query("UPDATE characters SET stre = $2 WHERE id = $1")
+            .bind::<Integer, _>(character_id)
+            .bind::<SmallInt, _>(str)
+            .execute(conn)
+    })
+    .await
+}
+
 /// Give the logged-out character `character_id` `meso` mesos.
 pub async fn set_meso(character_id: i32, meso: i32) -> Result<(), HarnessError> {
     change_one_row("set meso", move |conn| {

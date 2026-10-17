@@ -128,8 +128,13 @@ namespace ms
 		int32_t roll_puppet_damage(int32_t level) const;
 
 		// The server got the move with this id (FUN_0066c23b), saying whether
-		// the mob may attack or cast next and how much MP it has.
-		void acknowledge(int16_t moveid, bool nextattack, int16_t mp);
+		// the mob may attack or cast next, how much MP it has, and which
+		// skill at which level it may cast (0 for none).
+		void acknowledge(int16_t moveid, bool nextattack, int16_t mp, uint8_t skill = 0, uint8_t skilllevel = 0);
+
+		// Show a summoned mob's appearance, Effect/Summon.img/<type>, once
+		// `delay` ms have passed.
+		void show_summon(int8_t type, int32_t delay);
 
 		// Queue the controller's path to play (0xEF), and what it did where
 		// the path starts: `action` (-1 for nothing), facing left if `left`.
@@ -218,6 +223,10 @@ namespace ms
 		// The numbers Poison, Venom and Ambush showed since last asked.
 		std::vector<int32_t> take_hurts();
 
+		// Show a number no attack made: damage, a heal if negative, or a
+		// miss (FUN_006691d3).
+		void show_damage(int32_t damage);
+
 		// Return the body's bounds on the map, turned the way the mob faces.
 		Rectangle<int16_t> get_body() const;
 
@@ -267,6 +276,14 @@ namespace ms
 		// Land the attacks that are due on the local player, and fly the
 		// balls on (FUN_00666362).
 		void update_attacks();
+
+		// Cast the skill the server let it, if it has it, from where the
+		// shown path is, and send it (FUN_0066e7af).
+		bool cast(const Physics &physics);
+
+		// Play a skill animation and queue the skill's effect at its level
+		// (FUN_0066e7af, FUN_0066be61). Whether the mob has the skill.
+		bool do_cast(uint8_t skill, uint8_t skilllevel, bool left);
 
 		// What one of the mob's attacks does to the player.
 		MobAttack make_attack(uint8_t index, bool left) const;
@@ -396,6 +413,25 @@ namespace ms
 		};
 
 		std::vector<AttackInfo> attacks;
+
+		// One of the mob's skills (info/skill): it plays animation
+		// skill<action> and shows the skill's effect `effectafter` ms in.
+		struct SkillInfo
+		{
+			uint8_t skill;
+			uint8_t level;
+			uint8_t action;
+			int32_t effectafter;
+		};
+
+		std::vector<SkillInfo> skills;
+		// The skill<n> animations, by n.
+		std::map<uint8_t, Animation> skillanimations;
+		// The skill animation the mob shows, if any.
+		std::optional<uint8_t> casting;
+		// The skill the server last let it cast, and at what level.
+		uint8_t pendingskill = 0;
+		uint8_t pendingskilllevel = 0;
 		// The attack the mob shows, if any, facing left if `attackleft`.
 		std::optional<uint8_t> attacking;
 		bool attackleft = false;
@@ -441,6 +477,8 @@ namespace ms
 			int32_t due;
 			Animation animation;
 			bool left;
+			// Where the effect's `pos` puts it, if it has one.
+			std::optional<int8_t> pos = std::nullopt;
 		};
 
 		std::vector<PendingEffect> pendingeffects;

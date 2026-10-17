@@ -269,23 +269,17 @@ namespace ms
 		// spawned on.
 		uint16_t fh = recv.read_short();
 		uint16_t homefh = recv.read_short();
+		// How it appears (FUN_00662884): -2 fading in, -1 just there, -3
+		// when the mob an int names dies, or a summon effect to play an
+		// int's ms later.
 		int8_t effect = recv.read_byte();
-
-		if (effect > 0)
-		{
-			recv.read_byte();
-			recv.read_short();
-
-			if (effect == 15)
-				recv.read_byte();
-		}
-
+		int32_t option = effect >= 0 || effect == -3 ? recv.read_int() : 0;
 		int8_t team = recv.read_byte();
 
 		recv.skip(4);
 
 		Stage::get().get_mobs().spawn(
-			{ oid, id, 0, stance, fh, homefh, effect == -2, team, position, std::move(statuses) }
+			{ oid, id, 0, stance, fh, homefh, effect == -2, team, position, std::move(statuses), effect, option }
 		);
 	}
 
@@ -322,23 +316,18 @@ namespace ms
 
 				uint16_t fh = recv.read_short();
 				uint16_t homefh = recv.read_short();
+				// How it appears (FUN_00662884): -2 fading in, -1 just there,
+				// -3 when the mob an int names dies, or a summon effect to
+				// play an int's ms later.
 				int8_t effect = recv.read_byte();
-
-				if (effect > 0)
-				{
-					recv.read_byte();
-					recv.read_short();
-
-					if (effect == 15)
-						recv.read_byte();
-				}
-
+				int32_t option = effect >= 0 || effect == -3 ? recv.read_int() : 0;
 				int8_t team = recv.read_byte();
 
 				recv.skip(4);
 
 				Stage::get().get_mobs().spawn(
-					{ oid, id, mode, stance, fh, homefh, effect == -2, team, position, std::move(statuses) }
+					{ oid, id, mode, stance, fh, homefh, effect == -2, team, position, std::move(statuses),
+					  effect, option }
 				);
 			}
 			else
@@ -375,12 +364,22 @@ namespace ms
 		int16_t moveid = recv.read_short();
 		bool nextattack = recv.read_bool();
 
-		// Its MP, and a skill to cast next: mob skills aren't modeled yet.
+		// Its MP, and a skill it may cast next, at what level.
 		int16_t mp = recv.read_short();
-		recv.read_byte();
-		recv.read_byte();
+		uint8_t skill = recv.read_byte();
+		uint8_t skilllevel = recv.read_byte();
 
-		Stage::get().get_mobs().acknowledge(oid, moveid, nextattack, mp);
+		Stage::get().get_mobs().acknowledge(oid, moveid, nextattack, mp, skill, skilllevel);
+	}
+
+	void DamageMobHandler::handle(InPacket& recv) const
+	{
+		int32_t oid = recv.read_int();
+		recv.read_byte();
+		int32_t damage = recv.read_int();
+
+		// An HP indicator may follow; SHOW_MOB_HP shows HP here.
+		Stage::get().get_mobs().show_damage(oid, damage);
 	}
 
 	void ShowMobHpHandler::handle(InPacket& recv) const

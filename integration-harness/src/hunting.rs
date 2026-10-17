@@ -263,6 +263,13 @@ pub struct Field {
     pub moved: Vec<i32>,
     /// Answers to this client's own mob movements.
     pub move_responses: Vec<i32>,
+    /// Skills those answers let a mob cast: (object id, skill, level).
+    pub grants: Vec<(i32, u8, u8)>,
+    /// Mobs healed: (object id, HP regained).
+    pub heals: Vec<(i32, i32)>,
+    /// How each mob appeared: a summon effect, -2 fading in, or -1 just
+    /// there.
+    pub appearances: BTreeMap<i32, i8>,
     /// (object id, HP percentage)
     pub hp_bars: Vec<(i32, u8)>,
     pub killed: Vec<i32>,
@@ -358,6 +365,10 @@ impl Field {
             r.read_bytes(8 * stats.count_ones() as usize).unwrap();
             let position = (r.read_short().unwrap(), r.read_short().unwrap());
             self.mob_positions.insert(oid, position);
+            r.read_byte().unwrap();
+            r.read_short().unwrap();
+            r.read_short().unwrap();
+            self.appearances.insert(oid, r.read_byte().unwrap() as i8);
         } else if op == SendOpcode::MobStatSet as i16 {
             let oid = r.read_int().unwrap();
             let stats = read_mob_stats(&mut r);
@@ -452,7 +463,19 @@ impl Field {
         } else if op == SendOpcode::MoveMonster as i16 {
             self.moved.push(r.read_int().unwrap());
         } else if op == SendOpcode::MoveMonsterResponse as i16 {
-            self.move_responses.push(r.read_int().unwrap());
+            let oid = r.read_int().unwrap();
+            self.move_responses.push(oid);
+            r.read_short().unwrap();
+            r.read_byte().unwrap();
+            r.read_short().unwrap();
+            let (skill, level) = (r.read_byte().unwrap(), r.read_byte().unwrap());
+            if skill != 0 {
+                self.grants.push((oid, skill, level));
+            }
+        } else if op == SendOpcode::DamageMonster as i16 {
+            let oid = r.read_int().unwrap();
+            r.read_byte().unwrap();
+            self.heals.push((oid, -r.read_int().unwrap()));
         } else if op == SendOpcode::ShowMonsterHp as i16 {
             self.hp_bars
                 .push((r.read_int().unwrap(), r.read_byte().unwrap()));

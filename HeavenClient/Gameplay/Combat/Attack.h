@@ -99,6 +99,10 @@ namespace ms
 		// against.
 		int32_t level = 0;
 		int32_t accuracy = 0;
+		// The percent a Power Up or Magic Up puts its physical or magic
+		// hits at, or 0 without one.
+		int32_t powerup = 0;
+		int32_t magicup = 0;
 		Point<int16_t> origin;
 		// Which of the mob's attacks (attack1 is 0) hit, or -1 for its body.
 		int8_t index = -1;
