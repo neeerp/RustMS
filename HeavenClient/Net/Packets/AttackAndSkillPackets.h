@@ -259,6 +259,22 @@ namespace ms
 		}
 	};
 
+	// A mob touched the player's Puppet for `damage` (0x7a627a): attack -1
+	// is its body, and `left` whether it came from the left.
+	// Opcode: DAMAGE_SUMMON(177)
+	class DamageSummonPacket : public OutPacket
+	{
+	public:
+		DamageSummonPacket(int32_t oid, int32_t damage, int32_t mobid, bool left) : OutPacket(OutPacket::Opcode::DAMAGE_SUMMON)
+		{
+			write_int(oid);
+			write_byte(-1);
+			write_int(damage);
+			write_int(mobid);
+			write_byte(left);
+		}
+	};
+
 	// Tells the server which mobs Monster Magnet reached: each one's oid, 0
 	// for one out of sight, and whether it was caught (0x96c62a). It may
 	// reach none.

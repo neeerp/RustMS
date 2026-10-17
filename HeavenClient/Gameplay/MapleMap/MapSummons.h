@@ -75,6 +75,11 @@ namespace ms
 		int8_t get_layer() const;
 		// Whether it may attack: it can act, and plays nothing.
 		bool is_idle() const;
+		// Whether a mob's touch hurts it: a Puppet, not blinking from the
+		// last hit (FUN_007a6040).
+		bool can_be_hit() const;
+		// What it covers on the map, for touches (FUN_007a38d6).
+		Rectangle<int16_t> get_body() const;
 		// When it last attacked, in the combat's ms.
 		int64_t last_attack = 0;
 

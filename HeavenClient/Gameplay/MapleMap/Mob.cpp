@@ -17,6 +17,7 @@
 //////////////////////////////////////////////////////////////////////////////////
 #include "Mob.h"
 #include "Layer.h"
+#include "SummonRules.h"
 
 #include "../Combat/Heal.h"
 #include "../Combat/HitPoint.h"
@@ -588,6 +589,9 @@ namespace ms
 				hastarget = false;
 		}
 
+		if (!hastarget)
+			puppet = 0;
+
 		// v83 (FUN_005cc410) picks a walking mob's action as it goes:
 		// its chase animation for as long as it has a target.
 		if (!canfly && (bodystance == Stance::MOVE || bodystance == Stance::CHASE))
@@ -1089,8 +1093,41 @@ namespace ms
 
 	void Mob::set_target(Point<int16_t> position, bool dead)
 	{
+		targetpos = puppet ? puppetpos : position;
+		targetdead = puppet ? false : dead;
+	}
+
+	void Mob::aggro_puppet(int32_t oid, Point<int16_t> position)
+	{
+		if (!control || !hastarget)
+			return;
+
+		targettime = 180000 + randomizer.next_int(60000);
+
+		if (puppet)
+			return;
+
+		puppet = oid;
+		puppetpos = position;
 		targetpos = position;
-		targetdead = dead;
+		targetdead = false;
+	}
+
+	void Mob::release_puppet(int32_t oid)
+	{
+		if (puppet != oid)
+			return;
+
+		puppet = 0;
+		hastarget = false;
+	}
+
+	int32_t Mob::roll_puppet_damage(int32_t level) const
+	{
+		auto found = statuses.find(MobStatParser::PAD);
+		int32_t attack = watk + (found != statuses.end() ? static_cast<int32_t>(found->second.value) : 0);
+
+		return summon_rules::touch_damage(attack, level, randomizer.next_real(1.0));
 	}
 
 	void Mob::send_movement(Point<int16_t>, std::vector<Movement> &&in_movements)

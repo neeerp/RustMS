@@ -98,6 +98,17 @@ namespace ms
 		// Tell the mob where the local player is, whom it chases with aggro.
 		void set_target(Point<int16_t> position, bool dead);
 
+		// The player's Puppet `oid` came at `position`: a mob this client
+		// moves that chases someone turns on it, and keeps to it until it
+		// goes (FUN_00679847, 0x9bbd88).
+		void aggro_puppet(int32_t oid, Point<int16_t> position);
+
+		// Puppet `oid` went: a mob that chased it chases no one.
+		void release_puppet(int32_t oid);
+
+		// Roll what its touch does to a Puppet of skill level `level`.
+		int32_t roll_puppet_damage(int32_t level) const;
+
 		// The server got the move with this id (FUN_0066c23b), saying whether
 		// the mob may attack or cast next.
 		void acknowledge(int16_t moveid, bool nextattack);
@@ -397,6 +408,9 @@ namespace ms
 		int32_t targettime;
 		Point<int16_t> targetpos;
 		bool targetdead;
+		// The Puppet it chases instead, if any, and where it stands.
+		int32_t puppet = 0;
+		Point<int16_t> puppetpos;
 		// Ms until a firstAttack mob next reports the local player's distance.
 		int16_t reporttime;
 		// Ms towards the next AI step, and AI steps until the next decision.

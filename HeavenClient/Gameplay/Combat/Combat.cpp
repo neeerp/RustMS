@@ -396,6 +396,24 @@ namespace ms
 
 	void Combat::update_summons()
 	{
+		// A mob that touches the player's Puppet hurts it; the server breaks
+		// it at 0 HP (FUN_007a3f4d, FUN_007a6040).
+		for (auto &[oid, summon] : summons.get_local())
+		{
+			if (!summon->can_be_hit())
+				continue;
+
+			int32_t mob = mobs.find_touching(summon->get_body());
+
+			if (!mob)
+				continue;
+
+			int32_t damage = mobs.roll_puppet_damage(mob, summon->get_level());
+			bool left = mobs.get_mob_position(mob).x() < summon->get_position().x();
+			summons.hurt(oid, damage);
+			DamageSummonPacket(oid, damage, mobs.get_mob_id(mob), left).dispatch();
+		}
+
 		if (player.is_dead())
 			return;
 
