@@ -343,6 +343,11 @@ namespace ms
 		std::string action = move.apply_actions(player, Attack::Type::MAGIC);
 		player.fix_action_speed(6);
 
+		// Resurrection with no one to raise plays out but isn't sent
+		// (0x96d567).
+		if (!skill_use::sends(moveid, reach->party))
+			return true;
+
 		uint16_t lock = action.empty() ? 0 : player.get_action_lock(action);
 		player.request(UseSkillPacket(moveid, level, lock, *reach), ExclRequest::SKILL_WAIT);
 
@@ -731,12 +736,7 @@ namespace ms
 		int32_t members = 0;
 
 		if (kinds & skill_use::PARTY)
-		{
 			members = find_party(skill, range, reach.party);
-
-			if (!skill_use::sends(skill, reach.party))
-				return std::nullopt;
-		}
 
 		if (kinds & skill_use::MOBS)
 			reach.mobs = find_targets(mobs.get_mobs(), range, position, skill_use::mob_limit(stats.mobcount, members),

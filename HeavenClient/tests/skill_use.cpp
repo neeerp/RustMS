@@ -35,6 +35,7 @@ int main()
 				"but never the user, nor the living");
 		require(!sends(RESURRECTION, 0) && sends(RESURRECTION, 0x10) && sends(2301004, 0),
 				"Resurrection with no one to raise isn't sent");
+		require(sends(RESURRECTION, ALONE), "but alone it is");
 
 		require(mob_limit(6, 2) == 4 && mob_limit(1, 1) == 0 && mob_limit(1, 3) == 0,
 				"the party reached takes from the mob count");

@@ -259,6 +259,23 @@ Heal the caster's per-member share of HP, and SHOW_ITEM_GAIN_INCHAT /
 SHOW_FOREIGN_EFFECT type 2 (`skill, level`), which plays the skill's
 `affected` animation on them.
 
+A few skills do more than buff:
+
+- **Resurrection** reaches only dead members, raising them with full HP; the
+  living, the caster included, are left alone. HeavenClient, like v83, plays
+  the action and effect but sends nothing when a party member casts it with
+  no dead member in range (`skill_use::sends`); alone it is sent with 0x80.
+- **Time Leap** ends every cooldown but its own (COOLDOWN with 0 for each),
+  for the caster and the members it reaches.
+- **Chakra** heals only the caster, by a random amount between
+  `luk * 2.3 * y / 100` and `luk * 3.5 * y / 100`, using LUK with equips
+  (`skills::chakra_heal`). The client only lets it be cast below half HP;
+  the server doesn't check, since its max HP leaves out equips.
+
+These and Mystic Door have neither buff stats nor a mob debuff, so
+`skills::acts_alone` lets them past the check that refuses such skills as
+unsupported.
+
 ## Spending AP and SP
 
 The client locks its UI after SPEND_AP or SPEND_SP until the server answers,
@@ -650,3 +667,5 @@ level doesn't give, and an Arch Mage's Elquines freeze a mob for 3 s.
 `mystic_door` has a Priest open a door, refused in town, use it to town
 and back, keep a stranger out until they join the party, and close it on
 logout.
+`party_skills` has a Bishop resurrect a dead party member, and a Chief
+Bandit heal themselves with Chakra.

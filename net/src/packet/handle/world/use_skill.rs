@@ -113,13 +113,15 @@ impl WorldHandler for UseSkillHandler {
         let extras = read_extras(&mut r, skill_id);
         match use_skill(ctx.player, skill_id, level, Instant::now()) {
             Ok(used) => {
-                let result = with_party(
-                    announce(ctx.player, &used)?,
-                    skill_id,
-                    level,
-                    extras.party,
-                    0,
-                );
+                if skill_id == skills::CHAKRA {
+                    let heal = skills::chakra_heal(ctx.player, used.skill.effect.y, rand::random());
+                    ctx.player.add_hp(heal);
+                }
+                let mut result = announce(ctx.player, &used)?;
+                if skill_id == skills::TIME_LEAP {
+                    result = leap(ctx.player, result)?;
+                }
+                let result = with_party(result, skill_id, level, extras.party, 0);
                 let Some(inflict) = used.debuffs.clone() else {
                     return Ok(result);
                 };
@@ -413,7 +415,8 @@ fn heal(player: &mut Player, level: i32, party: u8, roll: f64) -> Result<(i16, i
 #[derive(Debug)]
 struct Used {
     skill: Learned,
-    /// Whether the skill buffs: Mystic Door neither buffs nor debuffs.
+    /// Whether the skill buffs: those that act alone neither buff nor
+    /// debuff.
     buffs: bool,
     stats: Vec<(BuffStat, i16)>,
     items: Vec<InventoryChange>,
@@ -438,7 +441,7 @@ fn use_skill(
     let buffs = stats.is_some();
     let debuffs = match stats {
         Some(_) => None,
-        None if skill_id == skills::MYSTIC_DOOR => None,
+        None if skills::acts_alone(skill_id) => None,
         None => Some(skills::mob_debuffs(&skill, player).ok_or(Refusal::Unsupported)?),
     };
     if player.buffs.cooling_down(skill_id, now) {
@@ -526,12 +529,24 @@ pub fn party_skill_reached(
     let Some(skill) = skills::at_level(used.skill_id, used.level) else {
         return Ok(HandlerResult::empty());
     };
-    if player.stats.hp <= 0 || !skills::in_area(&skill.effect, origin, at) {
+    // Resurrection reaches only the dead, the rest only the living.
+    let dead = player.stats.hp <= 0;
+    if dead != (used.skill_id == skills::RESURRECTION)
+        || !skills::in_area(&skill.effect, origin, at)
+    {
         return Ok(HandlerResult::empty());
     }
-    let mut result = if used.skill_id == skills::HEAL {
-        let hp = player.add_hp(used.heal.max(0));
+    let mut result = if used.skill_id == skills::HEAL || used.skill_id == skills::RESURRECTION {
+        // Resurrection raises them with full HP (OdinMS-family servers).
+        let heal = if dead {
+            i32::from(player.stats.max_hp)
+        } else {
+            used.heal.max(0)
+        };
+        let hp = player.add_hp(heal);
         HandlerResult::reply(stat::build_stat_update(false, &[StatUpdate::Hp(hp)])?)
+    } else if used.skill_id == skills::TIME_LEAP {
+        leap(player, HandlerResult::empty())?
     } else {
         let Some(stats) = skills::buffs(&skill) else {
             return Ok(HandlerResult::empty());
@@ -553,6 +568,14 @@ pub fn party_skill_reached(
     Ok(result.with(WorldAction::Field(FieldRequest::Broadcast(shown))))
 }
 
+/// Time Leap ends the player's cooldowns but its own, and tells their client.
+fn leap(player: &mut Player, mut result: HandlerResult<WorldAction>) -> WorldResult {
+    for skill_id in player.buffs.end_cooldowns_except(skills::TIME_LEAP) {
+        result = result.with_reply(buff::build_cooldown(skill_id, 0)?);
+    }
+    Ok(result)
+}
+
 /// The new MP, the items spent, the buff, and the cooldown for the player;
 /// the skill's effect and the buffs they show for everyone else on the map.
 fn announce(player: &Player, used: &Used) -> WorldResult {
@@ -564,10 +587,12 @@ fn announce(player: &Player, used: &Used) -> WorldResult {
         ..
     } = used;
     let effect = &skill.effect;
-    let mut result = HandlerResult::reply(stat::build_stat_update(
-        true,
-        &[StatUpdate::Mp(player.stats.mp)],
-    )?);
+    let mut updates = vec![StatUpdate::Mp(player.stats.mp)];
+    // Chakra's heal comes with its MP.
+    if skill.skill_id == skills::CHAKRA {
+        updates.push(StatUpdate::Hp(player.stats.hp));
+    }
+    let mut result = HandlerResult::reply(stat::build_stat_update(true, &updates)?);
     if !items.is_empty() {
         result = result.with_reply(inventory::build_inventory_operation(false, items)?);
     }
@@ -787,6 +812,19 @@ mod tests {
                 SendOpcode::GiveForeignBuff as i16,
             ]
         );
+    }
+
+    #[test]
+    fn teleport_spends_its_mp() {
+        if skills::data().is_err() {
+            return;
+        }
+        let mut player = beginner_with(2301001, 1);
+        player.stats.max_mp = 100;
+        player.stats.mp = 100;
+        let used = use_skill(&mut player, 2301001, 1, Instant::now()).unwrap();
+        assert!(used.skill.effect.mp_cost > 0);
+        assert_eq!(i32::from(player.stats.mp), 100 - used.skill.effect.mp_cost);
     }
 
     #[test]
@@ -1086,6 +1124,123 @@ mod tests {
             ]
         );
         assert_eq!(player.stats.hp, 550);
+    }
+
+    #[test]
+    fn chakra_heals_by_the_users_luk_with_its_mp() {
+        if skills::data().is_err() {
+            return;
+        }
+        let mut player = beginner_with(skills::CHAKRA, 30);
+        player.stats.luk = 100;
+        player.stats.mp = 100;
+        player.stats.max_mp = 100;
+        player.stats.max_hp = 5_000;
+        // y 300: from 2.3 x 3 x 100 to 3.5 x 3 x 100, with the low end
+        // truncated from 689.99..., as OdinMS-family servers' doubles do.
+        assert_eq!(skills::chakra_heal(&player, 300, 0.0), 689);
+        assert_eq!(skills::chakra_heal(&player, 300, 0.999_999), 1050);
+
+        let actions = handle(&mut player, skills::CHAKRA, 30);
+        assert!(unlocks(&actions[0]));
+        assert!((50 + 689..=50 + 1050).contains(&player.stats.hp));
+        assert_eq!(player.stats.mp, 100 - 27);
+    }
+
+    #[test]
+    fn time_leap_ends_the_cooldowns_but_its_own() {
+        if skills::data().is_err() {
+            return;
+        }
+        let now = Instant::now();
+        let mut player = beginner_with(skills::TIME_LEAP, 1);
+        player.stats.mp = 200;
+        player.stats.max_mp = 200;
+        player
+            .buffs
+            .start_cooldown(5121003, now, Duration::from_secs(60));
+        let actions = handle(&mut player, skills::TIME_LEAP, 1);
+        let cooldowns: Vec<_> = actions
+            .iter()
+            .filter_map(|action| match action {
+                WorldAction::Reply(p) if p.opcode() == SendOpcode::Cooldown as i16 => {
+                    Some(p.bytes[2..].to_vec())
+                }
+                _ => None,
+            })
+            .collect();
+        let mut ended = 5121003i32.to_le_bytes().to_vec();
+        ended.extend(0i16.to_le_bytes());
+        let mut own = skills::TIME_LEAP.to_le_bytes().to_vec();
+        own.extend(2940i16.to_le_bytes());
+        assert_eq!(cooldowns, [own, ended]);
+        assert!(!player.buffs.cooling_down(5121003, now));
+        assert!(player.buffs.cooling_down(skills::TIME_LEAP, now));
+
+        // It does the same for the party members it reaches.
+        let mut member = beginner_with(1000, 1);
+        member
+            .buffs
+            .start_cooldown(1002, now, Duration::from_secs(60));
+        let leap = PartySkill {
+            skill_id: skills::TIME_LEAP,
+            level: 1,
+            slots: 0x30,
+            heal: 0,
+        };
+        let sent = opcodes(party_skill_reached(&mut member, &leap, (0, 0), (0, 0), now));
+        assert_eq!(
+            sent,
+            [
+                SendOpcode::Cooldown as i16,
+                SendOpcode::ShowItemGainInChat as i16,
+                SendOpcode::ShowForeignEffect as i16,
+            ]
+        );
+        assert!(!member.buffs.cooling_down(1002, now));
+    }
+
+    #[test]
+    fn resurrection_raises_only_the_dead() {
+        if skills::data().is_err() {
+            return;
+        }
+        let now = Instant::now();
+        let raise = PartySkill {
+            skill_id: skills::RESURRECTION,
+            level: 1,
+            slots: 0x10,
+            heal: 0,
+        };
+        let mut player = beginner_with(1000, 1);
+        assert!(opcodes(party_skill_reached(
+            &mut player,
+            &raise,
+            (0, 0),
+            (0, 0),
+            now
+        ))
+        .is_empty());
+        assert_eq!(player.stats.hp, 50);
+
+        player.stats.hp = 0;
+        assert!(opcodes(party_skill_reached(
+            &mut player,
+            &raise,
+            (0, 0),
+            (501, 0),
+            now
+        ))
+        .is_empty());
+        let sent = opcodes(party_skill_reached(
+            &mut player,
+            &raise,
+            (0, 0),
+            (0, 0),
+            now,
+        ));
+        assert_eq!(sent[0], SendOpcode::StatChange as i16);
+        assert_eq!(player.stats.hp, player.stats.max_hp);
     }
 
     #[test]
