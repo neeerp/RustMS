@@ -37,7 +37,7 @@ namespace ms
 			JUMPDOWN
 		};
 
-		Movement(Type t, uint8_t c, int16_t x, int16_t y, int16_t vx, int16_t vy, uint16_t f, uint8_t s, int16_t d)
+		Movement(Type t, uint8_t c, int16_t x, int16_t y, int16_t vx, int16_t vy, int16_t f, uint8_t s, int16_t d)
 				: type(t), command(c), xpos(x), ypos(y), vx(vx), vy(vy), fh(f), newstate(s), duration(d)
 		{}
 
@@ -73,7 +73,9 @@ namespace ms
 		// Velocity, in pixels per second.
 		int16_t vx;
 		int16_t vy;
-		uint16_t fh;
+		// The foothold, minus the ladder or rope's number on one, or 0 in
+		// the air.
+		int16_t fh;
 		uint8_t newstate;
 		int16_t duration;
 	};

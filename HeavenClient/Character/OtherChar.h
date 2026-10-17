@@ -25,9 +25,8 @@
 
 #include "Look/CharLook.h"
 
-#include "../Gameplay/Movement.h"
+#include "../Gameplay/MovePath.h"
 
-#include <queue>
 #include <vector>
 
 namespace ms
@@ -42,7 +41,7 @@ namespace ms
 		// Update the character.
 		int8_t update(const Physics &physics) override;
 
-		// Add the movements which this character will go through next.
+		// Queue a path for the character to play.
 		void send_movement(const std::vector<Movement> &movements);
 
 		// Update a skill level.
@@ -66,9 +65,7 @@ namespace ms
 	private:
 		uint16_t level;
 		int16_t job;
-		std::queue<Movement> movements;
-		Movement lastmove;
-		uint16_t timer;
+		move_path::Player path;
 
 		std::unordered_map<int32_t, uint8_t> skilllevels;
 		uint8_t attackspeed;

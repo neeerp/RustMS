@@ -22,16 +22,13 @@
 namespace ms
 {
 	OtherChar::OtherChar(int32_t id, const CharLook &lk, uint8_t lvl, int16_t jb, const std::string &nm, int8_t st,
-						 Point<int16_t> pos) : Char(id, lk, nm)
+						 Point<int16_t> pos) : Char(id, lk, nm),
+											   path({ static_cast<double>(pos.x()), static_cast<double>(pos.y()), 0.0, 0.0, 0,
+													  static_cast<uint8_t>(st) })
 	{
 		level = lvl;
 		job = jb;
 		set_position(pos);
-
-		lastmove.xpos = pos.x();
-		lastmove.ypos = pos.y();
-		lastmove.newstate = st;
-		timer = 0;
 
 		attackspeed = 6;
 		attacking = false;
@@ -39,29 +36,15 @@ namespace ms
 
 	int8_t OtherChar::update(const Physics &physics)
 	{
-		if (timer > 1)
-		{
-			timer--;
-		} else if (timer == 1)
-		{
-			if (!movements.empty())
-			{
-				lastmove = movements.front();
-				movements.pop();
-			} else
-			{
-				timer = 0;
-			}
-		}
+		path.step(Constants::TIMESTEP);
+
+		const move_path::Player::State &now = path.get_state();
 
 		if (!attacking)
-		{
-			uint8_t laststate = lastmove.newstate;
-			set_state(laststate);
-		}
+			set_state(now.stance);
 
-		phobj.hspeed = lastmove.xpos - phobj.crnt_x();
-		phobj.vspeed = lastmove.ypos - phobj.crnt_y();
+		phobj.hspeed = now.x - phobj.crnt_x();
+		phobj.vspeed = now.y - phobj.crnt_y();
 		phobj.move();
 
 		physics.get_fht().update_fh(phobj);
@@ -76,16 +59,7 @@ namespace ms
 
 	void OtherChar::send_movement(const std::vector<Movement> &newmoves)
 	{
-		if (newmoves.empty())
-			return;
-
-		movements.push(newmoves.back());
-
-		if (timer == 0)
-		{
-			constexpr uint16_t DELAY = 50;
-			timer = DELAY;
-		}
+		path.receive(newmoves);
 	}
 
 	void OtherChar::update_skill(int32_t skillid, uint8_t skilllevel)
@@ -102,8 +76,7 @@ namespace ms
 	{
 		look = newlook;
 
-		uint8_t laststate = lastmove.newstate;
-		set_state(laststate);
+		set_state(path.get_state().stance);
 	}
 
 	int8_t OtherChar::get_integer_attackspeed() const
