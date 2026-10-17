@@ -116,6 +116,8 @@ pub struct Trace {
     pub cancelled_buffs: Vec<i64>,
     /// COOLDOWN: (skill id, seconds).
     pub cooldowns: Vec<(i32, i16)>,
+    /// BLOCKED_MAP and BLOCKED_SERVER: (opcode, reason).
+    pub blocked: Vec<(i16, u8)>,
     /// SKILL_LEARN_ITEM_RESULT: (reader, skill, master level, used, success).
     pub books: Vec<(i32, i32, i32, bool, bool)>,
     /// Mobs and drops on the current field.
@@ -182,6 +184,8 @@ impl Trace {
                 values.insert(bit, value);
             }
             self.stat_updates.push(values);
+        } else if op == SendOpcode::BlockedMap as i16 || op == SendOpcode::BlockedServer as i16 {
+            self.blocked.push((op, r.read_byte().unwrap()));
         } else if op == SendOpcode::SkillBookResult as i16 {
             let reader = r.read_int().unwrap();
             r.read_byte().unwrap();
