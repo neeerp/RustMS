@@ -206,6 +206,20 @@ namespace ms
 		void handle(InPacket& recv) const override;
 	};
 
+	// Cover an area with a skill's clouds
+	// Opcode: SPAWN_MIST(273)
+	class SpawnMistHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
+	// Fade a mist out
+	// Opcode: REMOVE_MIST(274)
+	class RemoveMistHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
 	// Change state of reactor
 	// Opcode: HIT_REACTOR(277)
 	class HitReactorHandler : public PacketHandler

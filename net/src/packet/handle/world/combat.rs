@@ -99,6 +99,14 @@ impl WorldHandler for AttackHandler {
         let mut skill_level = 0;
         let ranged = attack.kind == AttackKind::Ranged;
         let inflicts = skills::on_hit(ctx.player, uses.skill.as_ref(), ranged, rand::random());
+        let mist = uses.skill.as_ref().and_then(|skill| {
+            Some(FieldRequest::Mist {
+                skill_id: skill.skill_id,
+                level: skill.level,
+                left: attack.action & 0x8000 != 0,
+                inflict: skills::mist(skill)?,
+            })
+        });
         if let Some(skill) = uses.skill {
             let mp = ctx.player.add_mp(-combat::attack_mp_cost(&skill));
             result = HandlerResult::reply(stat::build_stat_update(false, &[StatUpdate::Mp(mp)])?);
@@ -125,11 +133,15 @@ impl WorldHandler for AttackHandler {
                 )
             })
             .collect();
-        Ok(result.with(WorldAction::Field(FieldRequest::Attack {
+        result = result.with(WorldAction::Field(FieldRequest::Attack {
             broadcast,
             hits,
             inflicts,
-        })))
+        }));
+        if let Some(mist) = mist {
+            result = result.with(WorldAction::Field(mist));
+        }
+        Ok(result)
     }
 }
 

@@ -30,6 +30,7 @@
 #include "MapleMap/MapPortals.h"
 #include "MapleMap/MapChars.h"
 #include "MapleMap/MapMobs.h"
+#include "MapleMap/MapMists.h"
 #include "MapleMap/MapReactors.h"
 #include "MapleMap/MapNpcs.h"
 #include "MapleMap/MapDrops.h"
@@ -100,6 +101,9 @@ namespace ms
 
 		// Returns a reference to the reactors on the current map.
 		MapReactors &get_reactors();
+
+		// Returns a reference to the mists on the current map.
+		MapMists &get_mists();
 
 		// Returns a reference to the drops on the current map.
 		MapDrops &get_drops();
@@ -203,6 +207,7 @@ namespace ms
 		MapChars chars;
 		MapMobs mobs;
 		MapDrops drops;
+		MapMists mists;
 		MapEffect effect;
 		// Effects left where they started, such as a jump pad's burst.
 		EffectLayer ground_effects;
