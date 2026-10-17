@@ -41,12 +41,15 @@ namespace ms
 			{
 				animation = src;
 				pos = src["pos"];
-				z = src["z"];
+				// As in the MapleRoyals client, above the mob unless the
+				// node says otherwise (0x669773).
+				z = src["z"].data_type() == nl::node::type::integer ? static_cast<int8_t>(src["z"]) : 1;
 			}
 
-			void apply(Mob &target, bool flip) const
+			// Flipped when the attacker faces right.
+			void apply(Mob &target, const AttackUser &user) const
 			{
-				target.show_effect(animation, pos, z, flip);
+				target.show_effect(animation, pos, z, user.flip, user.range);
 			}
 
 		private:

@@ -112,8 +112,10 @@ namespace ms
 		// Use the playerlevel to determine color of nametag.
 		void show_hp(int8_t percentage, uint16_t playerlevel);
 
-		// Show an effect at the mob's position.
-		void show_effect(const Animation &animation, int8_t pos, int8_t z, bool flip);
+		// Show a skill's hit effect where its `pos` puts it, given where the
+		// attack reached.
+		void show_effect(const Animation &animation, int8_t pos, int8_t z, bool flip,
+						 const Rectangle<int16_t> &range);
 
 		// Show a weapon's hit spark where the attack meets the mob's body.
 		void show_hit(const Animation &animation, const Rectangle<int16_t> &range, bool flip);
@@ -258,6 +260,10 @@ namespace ms
 		int16_t standwidth;
 
 		EffectLayer effects;
+		// Hit effects on the current frame's head, and those left at a point
+		// in the field.
+		EffectLayer headeffects;
+		EffectLayer fieldeffects;
 		Text namelabel;
 		// "Lv. N", drawn left of the name tag (Basic.img/ShowLevel).
 		std::vector<Texture> leveltag;
