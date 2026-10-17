@@ -239,7 +239,7 @@ namespace ms
 			if (mob_damage::magic_misses(player, mob, missroll))
 				return 0;
 
-			return mob_damage::magic(player, attack.matk, roll, 0);
+			return mob_damage::magic(player, attack.matk, roll, 0, attack.magicup);
 		}
 
 		if (missroll * 100.0 < mob_damage::physical_miss_chance(player, mob))
@@ -249,7 +249,7 @@ namespace ms
 		// percent there, but its source wasn't traced).
 		int32_t reduce = static_cast<int32_t>(std::lround(reducedamage * 100.0f));
 
-		return mob_damage::physical(player, mob, attack.watk, roll, reduce);
+		return mob_damage::physical(player, mob, attack.watk, roll, reduce, attack.powerup);
 	}
 
 	bool CharStats::is_damage_buffed() const

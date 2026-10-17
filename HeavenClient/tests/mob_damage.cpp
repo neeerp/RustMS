@@ -41,6 +41,7 @@ int main()
 		require(physical(warrior, stumpy, 125, 0.0, 0) == 74, "the lowest Stumpy hit on a warrior");
 		require(physical(warrior, stumpy, 125, 1.0, 0) == 82, "the highest Stumpy hit on a warrior");
 		require(physical(warrior, stumpy, 125, 1.0, 50) == 41, "Achilles-like reductions come last");
+		require(physical(warrior, stumpy, 125, 1.0, 50, 200) == 82, "then a Power Up scales what is left");
 
 		// A level 30 magician short of the expected W.DEF takes more than
 		// the raw attack.
@@ -67,6 +68,8 @@ int main()
 		require(magic(magician, 200, 0.0, 0) == 268, "magicians soak 30% of their magic defense");
 		require(magic(warrior, 200, 0.0, 0) == 294, "everyone else soaks 25%");
 		require(magic(magician, 200, 0.0, 50) == 134, "element resistance comes after");
+		require(magic(magician, 200, 0.0, 0, 50) == 134, "a Magic Up scales the hit");
+		require(magic(magician, 200, 0.0, 50, 200) == 268, "before element resistance");
 		require(magic(magician, 10, 0.0, 0) == 1, "magic takes at least 1");
 
 		Defender evasive{ 30, 210, 4, 25, 150, 4, 30, 100, 20 };

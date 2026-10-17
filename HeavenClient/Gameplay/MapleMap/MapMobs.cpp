@@ -100,10 +100,17 @@ namespace ms
 			mob->set_control(mode);
 	}
 
-	void MapMobs::acknowledge(int32_t oid, int16_t moveid, bool nextattack, int16_t mp)
+	void MapMobs::acknowledge(int32_t oid, int16_t moveid, bool nextattack, int16_t mp, uint8_t skill,
+							  uint8_t skilllevel)
 	{
 		if (Optional<Mob> mob = mobs.get(oid))
-			mob->acknowledge(moveid, nextattack, mp);
+			mob->acknowledge(moveid, nextattack, mp, skill, skilllevel);
+	}
+
+	void MapMobs::show_damage(int32_t oid, int32_t damage)
+	{
+		if (Optional<Mob> mob = mobs.get(oid))
+			mob->show_damage(damage);
 	}
 
 	void MapMobs::send_mobhp(int32_t oid, int8_t percent, uint16_t playerlevel)

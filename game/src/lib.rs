@@ -10,6 +10,7 @@ pub mod exp;
 pub mod inventory;
 pub mod keymap;
 pub mod mob_damage;
+pub mod mob_skill;
 pub mod mob_stat;
 pub mod monster_book;
 pub mod quest;

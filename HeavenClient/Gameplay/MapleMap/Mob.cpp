@@ -36,7 +36,9 @@
 #include <cmath>
 #include <cstdint>
 #include <cstdlib>
+#include <climits>
 #include <numeric>
+#include <tuple>
 #include <utility>
 
 namespace ms
@@ -166,6 +168,24 @@ namespace ms
 				attack.warning = Animation(attackinfo["areaWarning"]);
 
 			attacks.push_back(std::move(attack));
+		}
+
+		// Its skills, and the skill<n> animations they play.
+		for (nl::node skillsrc : info["skill"])
+		{
+			SkillInfo skill;
+			skill.skill = static_cast<uint8_t>(skillsrc["skill"].get_integer());
+			skill.level = static_cast<uint8_t>(skillsrc["level"].get_integer());
+			skill.action = static_cast<uint8_t>(skillsrc["action"].get_integer());
+			skill.effectafter = skillsrc["effectAfter"];
+
+			if (skill.skill == 0 || skill.action == 0)
+				continue;
+
+			if (skillanimations.count(skill.action) == 0)
+				skillanimations[skill.action] = src["skill" + std::to_string(skill.action)];
+
+			skills.push_back(skill);
 		}
 
 		standwidth = animations[Stance::STAND].get_dimensions().x();
@@ -374,6 +394,9 @@ namespace ms
 		if (attacking && attacks[*attacking].animation.update())
 			attacking.reset();
 
+		if (casting && skillanimations.at(*casting).update())
+			casting.reset();
+
 		update_attacks();
 
 		for (StatusEffect &effect : statuseffects)
@@ -432,9 +455,11 @@ namespace ms
 
 				// Once a move is acked with leave to attack, it tries every
 				// update for an attack that reaches (FUN_006675a8).
+				// A skill it was let cast goes first (FUN_0066e7af); a cast
+				// sends its own path.
 				std::optional<Pick> pick;
 
-				if (!flinch && ctrlstate == 4)
+				if (!flinch && ctrlstate == 4 && !cast(physics))
 					pick = pick_attack(physics);
 
 				if (flinch)
@@ -575,7 +600,7 @@ namespace ms
 	{
 		// It attacks the player it chases, not a Puppet, from the ground or
 		// in the air, while not hit, attacking or held (FUN_006675a8).
-		if (attacks.empty() || acting || attacking || !hastarget || puppet || targetdead || held())
+		if (attacks.empty() || acting || attacking || casting || !hastarget || puppet || targetdead || held())
 			return std::nullopt;
 
 		if (!phobj.onground && !canfly)
@@ -806,6 +831,81 @@ namespace ms
 		}
 	}
 
+	bool Mob::cast(const Physics &physics)
+	{
+		if (pendingskill == 0 || acting || attacking || casting || held())
+			return false;
+
+		auto info = std::find_if(skills.begin(), skills.end(),
+								 [this](const SkillInfo &skill) { return skill.skill == pendingskill; });
+
+		// One it doesn't have stays pending.
+		if (info == skills.end())
+			return false;
+
+		bool left = noflip || !flip;
+		uint8_t skill = pendingskill;
+		uint8_t skilllevel = pendingskilllevel;
+
+		if (!do_cast(skill, skilllevel, left))
+			return false;
+
+		pendingskill = 0;
+		pendingskilllevel = 0;
+
+		// Like an attack, it stands still while the skill plays.
+		shown.land(canfly || !canmove);
+		seat_body(physics);
+
+		bodyflip = !left;
+		set_body_stance(Stance::STAND);
+
+		int32_t duration = skillanimations.at(info->action).get_duration();
+		attackhold = static_cast<int16_t>(std::min<int32_t>(duration, INT16_MAX));
+		flyx = 0;
+		flyy = 0;
+
+		plan(physics, mob_attack::skill_action(info->action), left,
+			 mob_attack::skill_data(skill, skilllevel, duration));
+
+		return true;
+	}
+
+	bool Mob::do_cast(uint8_t skill, uint8_t skilllevel, bool left)
+	{
+		auto info = std::find_if(skills.begin(), skills.end(),
+								 [skill](const SkillInfo &other) { return other.skill == skill; });
+
+		if (info == skills.end())
+			return false;
+
+		nl::node level = nl::nx::skill["MobSkill.img"][std::to_string(skill)]["level"][std::to_string(skilllevel)];
+
+		if (!level)
+			return false;
+
+		Animation &animation = skillanimations.at(info->action);
+		animation.reset();
+		casting = info->action;
+		attackleft = left;
+
+		nl::node effect = level["effect"];
+
+		if (effect.size() > 0)
+			pendingeffects.push_back({ clock + std::max(info->effectafter, 1), effect, left,
+									   static_cast<int8_t>(effect["pos"].get_integer()) });
+
+		return true;
+	}
+
+	void Mob::show_summon(int8_t type, int32_t delay)
+	{
+		nl::node effect = nl::nx::effect["Summon.img"][std::to_string(type)];
+
+		if (effect.size() > 0)
+			pendingeffects.push_back({ clock + std::max(delay, 1), effect, noflip || !flip });
+	}
+
 	void Mob::update_attacks()
 	{
 		for (auto iter = pendingeffects.begin(); iter != pendingeffects.end();)
@@ -816,7 +916,11 @@ namespace ms
 				continue;
 			}
 
-			effects.add(iter->animation, DrawArgument(Point<int16_t>(0, 0), !iter->left), 0);
+			if (iter->pos)
+				show_effect(iter->animation, *iter->pos, 0, !iter->left, get_body());
+			else
+				effects.add(iter->animation, DrawArgument(Point<int16_t>(0, 0), !iter->left), 0);
+
 			iter = pendingeffects.erase(iter);
 		}
 
@@ -1349,12 +1453,14 @@ namespace ms
 		}
 	}
 
-	void Mob::acknowledge(int16_t ackid, bool nextattack, int16_t newmp)
+	void Mob::acknowledge(int16_t ackid, bool nextattack, int16_t newmp, uint8_t skill, uint8_t skilllevel)
 	{
 		if (!control)
 			set_control(1);
 
 		mp = newmp;
+		std::tie(pendingskill, pendingskilllevel) =
+				mob_attack::granted_skill({ pendingskill, pendingskilllevel }, { skill, skilllevel });
 
 		if (ackid < moveid)
 			ctrlstate = 2;
@@ -1379,6 +1485,8 @@ namespace ms
 
 			if (attacking)
 				attacks[*attacking].animation.draw(DrawArgument(absp, !attackleft, interopc), alpha);
+			else if (casting)
+				skillanimations.at(*casting).draw(DrawArgument(absp, !attackleft, interopc), alpha);
 			else
 				animations.at(stance).draw(DrawArgument(absp, flip && !noflip, interopc), alpha);
 
@@ -1601,6 +1709,13 @@ namespace ms
 
 		if (index >= 0 && index < static_cast<int32_t>(attacks.size()))
 			remoteattack = std::make_pair(Pick{ static_cast<uint8_t>(index), left, skilldata }, start);
+
+		// Another client's mob casts a skill it has (FUN_0066be61).
+		if (action >= mob_attack::skill_action(1))
+		{
+			auto [skill, skilllevel] = mob_attack::cast_skill(skilldata);
+			do_cast(skill, skilllevel, left);
+		}
 	}
 
 	std::vector<Mob::Landed> Mob::take_attacks()
@@ -1773,6 +1888,12 @@ namespace ms
 		// And its own look again (FUN_00789dc7).
 		if (flags.has(MobStatParser::DOOM))
 			show_look(0);
+	}
+
+	void Mob::show_damage(int32_t damage)
+	{
+		if (active)
+			hurtnumbers.push_back(damage);
 	}
 
 	std::vector<int32_t> Mob::take_hurts()
@@ -2012,6 +2133,7 @@ namespace ms
 			// It shows the hit at once; the AI flinches next update.
 			show_stance(Stance::HIT, toleft);
 			attacking.reset();
+			casting.reset();
 			acting = true;
 			flinch = Flinch{ toleft, std::nullopt };
 		}
@@ -2025,6 +2147,7 @@ namespace ms
 		// It turns to the user and flinches (0x66b6fc).
 		show_stance(Stance::HIT, user.x() > get_position().x());
 		attacking.reset();
+		casting.reset();
 		acting = true;
 		flinch = Flinch{ false, user };
 	}
@@ -2044,6 +2167,8 @@ namespace ms
 		attack.matk = matk + status_value(MobStatParser::MAD);
 		attack.level = level;
 		attack.accuracy = accuracy + status_value(MobStatParser::ACC);
+		attack.powerup = status_value(MobStatParser::POWER_UP);
+		attack.magicup = status_value(MobStatParser::MAGIC_UP);
 
 		return attack;
 	}
