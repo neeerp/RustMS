@@ -225,6 +225,21 @@ pub struct Field {
     pub stat_sets: Vec<(i32, u128, i16, i32)>,
     /// Statuses taken off mobs: (object id, stats).
     pub stat_resets: Vec<(i32, u128)>,
+    pub mists: Vec<MapMist>,
+    /// Object ids of the mists removed.
+    pub mists_removed: Vec<i32>,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct MapMist {
+    pub object_id: i32,
+    pub kind: i32,
+    pub owner_id: i32,
+    pub skill_id: i32,
+    pub level: u8,
+    pub delay: i16,
+    /// Left, top, right, bottom.
+    pub area: (i32, i32, i32, i32),
 }
 
 /// A mob's 16 status flag bytes as bits by stat: the second long holds
@@ -259,6 +274,23 @@ impl Field {
         } else if op == SendOpcode::MobStatReset as i16 {
             let oid = r.read_int().unwrap();
             self.stat_resets.push((oid, read_mob_stats(&mut r)));
+        } else if op == SendOpcode::SpawnMist as i16 {
+            self.mists.push(MapMist {
+                object_id: r.read_int().unwrap(),
+                kind: r.read_int().unwrap(),
+                owner_id: r.read_int().unwrap(),
+                skill_id: r.read_int().unwrap(),
+                level: r.read_byte().unwrap(),
+                delay: r.read_short().unwrap(),
+                area: (
+                    r.read_int().unwrap(),
+                    r.read_int().unwrap(),
+                    r.read_int().unwrap(),
+                    r.read_int().unwrap(),
+                ),
+            });
+        } else if op == SendOpcode::RemoveMist as i16 {
+            self.mists_removed.push(r.read_int().unwrap());
         } else if op == SendOpcode::SpawnMonsterControl as i16 {
             let mode = r.read_byte().unwrap();
             let oid = r.read_int().unwrap();

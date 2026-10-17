@@ -2,6 +2,7 @@ pub mod client;
 pub mod directory;
 pub mod field;
 pub mod field_drops;
+pub mod field_mists;
 pub mod field_mobs;
 pub mod field_reactors;
 pub mod login;

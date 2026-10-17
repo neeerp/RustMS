@@ -357,6 +357,14 @@ pub enum FieldRequest {
         hits: Vec<(i32, i64)>,
         inflicts: Vec<crate::skills::Inflict>,
     },
+    /// The player's spell left a mist where they stand, facing left or
+    /// not, that puts `inflict` on the mobs in it.
+    Mist {
+        skill_id: i32,
+        level: i32,
+        left: bool,
+        inflict: crate::skills::Inflict,
+    },
     /// Show everyone else on the map this packet.
     Broadcast(Packet),
     /// The player used Monster Magnet: show the others `effect`, and each

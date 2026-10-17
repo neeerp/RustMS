@@ -1,4 +1,5 @@
 use crate::actor::field_drops::{Drop, DropSet};
+use crate::actor::field_mists::MistSet;
 use crate::actor::field_mobs::{split_exp, MobSet, Sharer};
 use crate::actor::field_reactors::{Hit, ReactorSet};
 use crate::message::{ClientHandle, FieldKey, FieldMessage, ServerMessage};
@@ -7,6 +8,7 @@ use net::packet::build::world::drop::{build_drop, build_remove_drop, DropAppeara
 use net::packet::build::world::field::{
     build_player_enter_field, build_player_leave_field, build_show_chair, parse_movement_state,
 };
+use net::packet::build::world::mist::{build_remove_mist, build_spawn_mist, MistKind, MistView};
 use net::packet::build::world::mob::{
     build_control_mob, build_kill_mob, build_mob_hp, build_mob_stat_reset, build_mob_stat_set,
     build_move_mob, build_move_mob_response, build_show_magnet, build_spawn_mob,
@@ -50,6 +52,10 @@ pub struct FieldMapEntityNpc {
 const QUEST_NPC_REACH_X: i32 = 1200;
 const QUEST_NPC_REACH_Y: i32 = 800;
 
+/// How long after a cast its mist starts, in 100 ms (OdinMS-family
+/// servers; v83's client starts the mist's time then).
+const MIST_DELAY: i16 = 8;
+
 /// One live copy of a map. It owns everything local to that map: who is on
 /// it and where, its NPCs, mobs, drops, and reactors, which advance on
 /// `tick`.
@@ -63,6 +69,7 @@ pub struct FieldActor {
     mobs: MobSet,
     drops: DropSet,
     reactors: ReactorSet,
+    mists: MistSet,
     tick: Duration,
 }
 
@@ -87,6 +94,7 @@ impl FieldActor {
             mobs,
             drops,
             reactors,
+            mists: MistSet::default(),
             tick,
         }
     }
@@ -122,6 +130,12 @@ impl FieldActor {
                 }
             }
         }
+        for object_id in self.mists.expire(now) {
+            if let Ok(packet) = build_remove_mist(object_id) {
+                self.broadcast(None, packet);
+            }
+        }
+        self.reach_from_mists(now);
         for hurt in self.mobs.hurt_by_statuses(now) {
             if let (Some(occupant), Ok(packet)) = (
                 self.occupants.get(&hurt.from),
@@ -288,6 +302,12 @@ impl FieldActor {
                     hits,
                     inflicts,
                 } => self.handle_attack(from, broadcast, hits, &inflicts),
+                FieldRequest::Mist {
+                    skill_id,
+                    level,
+                    left,
+                    inflict,
+                } => self.handle_mist(from, skill_id, level, left, inflict),
                 FieldRequest::Broadcast(packet) => self.broadcast(Some(from), packet),
                 FieldRequest::Magnet { effect, caught } => self.handle_magnet(from, effect, caught),
                 FieldRequest::MobDebuff {
@@ -583,6 +603,60 @@ impl FieldActor {
         }
     }
 
+    /// `from`'s spell left a mist around them, which everyone sees.
+    fn handle_mist(
+        &mut self,
+        from: ClientId,
+        skill_id: i32,
+        level: i32,
+        left: bool,
+        inflict: Inflict,
+    ) {
+        let Some(user) = self.occupants.get(&from) else {
+            return;
+        };
+        let Some(skill) = skills::at_level(skill_id, level) else {
+            return;
+        };
+        let view = MistView {
+            object_id: 0,
+            kind: MistKind::Poison,
+            owner_id: user.avatar.id,
+            skill_id,
+            level: level as u8,
+            delay: MIST_DELAY,
+            area: skills::area_box(&skill.effect, (user.avatar.x, user.avatar.y), left),
+        };
+        let lasts = inflict.duration;
+        let view = self.mists.add(view, from, inflict, lasts, Instant::now());
+        if let Ok(packet) = build_spawn_mist(&view) {
+            self.broadcast(None, packet);
+        }
+    }
+
+    /// Each mist due puts its statuses, with its chance, on the live mobs
+    /// in it that lack them (OdinMS-family servers).
+    fn reach_from_mists(&mut self, now: Instant) {
+        let mut reached = Vec::new();
+        for mist in self.mists.reaching(now) {
+            for mob in self.mobs.live() {
+                let lacks = mist
+                    .inflict
+                    .statuses
+                    .iter()
+                    .any(|(stat, _)| !mob.statuses.contains_key(stat));
+                if mob.hp > 0 && lacks && mist.covers((mob.x, mob.y)) {
+                    reached.push((mist.owner, mob.object_id, mist.inflict.clone()));
+                }
+            }
+        }
+        for (owner, object_id, inflict) in reached {
+            if inflict.takes(rand::random()) {
+                self.put_on(owner, object_id, &inflict, now);
+            }
+        }
+    }
+
     /// Put `inflict`'s statuses on a mob for `from`, and show everyone the
     /// ones it got.
     fn put_on(&mut self, from: ClientId, object_id: i32, inflict: &Inflict, now: Instant) {
@@ -738,6 +812,12 @@ impl FieldActor {
 
         for reactor in self.reactors.live() {
             if let Ok(packet) = build_spawn_reactor(&reactor.view()) {
+                handle.send_packet(packet);
+            }
+        }
+
+        for mist in self.mists.views() {
+            if let Ok(packet) = build_spawn_mist(mist) {
                 handle.send_packet(packet);
             }
         }

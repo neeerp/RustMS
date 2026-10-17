@@ -568,6 +568,31 @@ namespace ms
 		);
 	}
 
+	void SpawnMistHandler::handle(InPacket& recv) const
+	{
+		// v83 FUN_00431a63. The delay (in 100 ms) only starts the mist's own
+		// clock; the clouds show at once. The last int is unused here.
+		int32_t oid = recv.read_int();
+		int32_t type = recv.read_int();
+		recv.skip_int();
+		int32_t skillid = recv.read_int();
+		uint8_t level = recv.read_byte();
+		recv.skip_short();
+		int32_t left = recv.read_int();
+		int32_t top = recv.read_int();
+		int32_t right = recv.read_int();
+		int32_t bottom = recv.read_int();
+
+		Stage::get().get_mists().spawn(oid, type, skillid, level, left, top, right, bottom);
+	}
+
+	void RemoveMistHandler::handle(InPacket& recv) const
+	{
+		int32_t oid = recv.read_int();
+
+		Stage::get().get_mists().remove(oid);
+	}
+
 	void RemoveReactorHandler::handle(InPacket& recv) const
 	{
 		int32_t oid = recv.read_int();
