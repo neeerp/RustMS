@@ -58,6 +58,8 @@ namespace ms
 
 		void apply_actions(Char &user, Attack::Type type) const override;
 
+		std::string get_action(const Char &user) const override;
+
 		void apply_stats(const Char &user, Attack &attack) const override;
 
 		void apply_hiteffects(const AttackUser &user, Mob &target) const override;

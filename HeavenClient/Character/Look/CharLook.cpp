@@ -612,6 +612,11 @@ namespace ms
 		return drawinfo.get_action_delays(action);
 	}
 
+	uint16_t CharLook::get_action_lock(const std::string &action) const
+	{
+		return drawinfo.get_action_lock(action);
+	}
+
 	uint8_t CharLook::get_frame() const
 	{
 		return stframe.get();

@@ -35,6 +35,12 @@ namespace ms
 		{}
 
 		virtual void apply(Char &target, Attack::Type atype) const = 0;
+
+		// The body action the skill takes up, or "" for none of its own.
+		virtual std::string get_action(const Char &) const
+		{
+			return "";
+		}
 	};
 
 	class NoAction : public SkillAction
@@ -57,6 +63,8 @@ namespace ms
 
 		void apply(Char &target, Attack::Type atype) const override;
 
+		std::string get_action(const Char &target) const override;
+
 	private:
 		std::string action;
 	};
@@ -68,6 +76,8 @@ namespace ms
 
 		void apply(Char &target, Attack::Type atype) const override;
 
+		std::string get_action(const Char &target) const override;
+
 	private:
 		BoolPair<std::string> actions;
 	};
@@ -78,6 +88,8 @@ namespace ms
 		ByLevelAction(nl::node src, int32_t skillid);
 
 		void apply(Char &target, Attack::Type atype) const override;
+
+		std::string get_action(const Char &target) const override;
 
 	private:
 		std::map<int32_t, std::string> actions;

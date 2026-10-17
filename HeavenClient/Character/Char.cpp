@@ -245,6 +245,11 @@ namespace ms
 		return duration;
 	}
 
+	uint16_t Char::get_action_lock(const std::string &action) const
+	{
+		return look.get_action_lock(action);
+	}
+
 	int8_t Char::update(const Physics &physics)
 	{
 		update(physics, 1.0f);

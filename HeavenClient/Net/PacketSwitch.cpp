@@ -107,6 +107,8 @@ namespace ms
 		ATTACKED_CLOSE = 186,
 		ATTACKED_RANGED = 187,
 		ATTACKED_MAGIC = 188,
+		SKILL_EFFECT = 190,
+		CANCEL_SKILL_EFFECT = 191,
 
 		FACIAL_EXPRESSION = 193,
 		SHOW_CHAIR = 196,
@@ -199,6 +201,8 @@ namespace ms
 		emplace<ATTACKED_CLOSE, CloseAttackHandler>();
 		emplace<ATTACKED_RANGED, RangedAttackHandler>();
 		emplace<ATTACKED_MAGIC, MagicAttackHandler>();
+		emplace<SKILL_EFFECT, SkillEffectHandler>();
+		emplace<CANCEL_SKILL_EFFECT, CancelSkillEffectHandler>();
 
 		// Player handlers
 		emplace<CHANGE_CHANNEL, ChangeChannelHandler>();

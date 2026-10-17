@@ -103,6 +103,9 @@ namespace ms
 		// How long a body action plays at the character's speed.
 		int32_t get_action_duration(const std::string &action) const;
 
+		// How long a skill's body action keeps the character from acting.
+		uint16_t get_action_lock(const std::string &action) const;
+
 		// Set if the character sprite is mirrored (true = facing right)
 		virtual void set_direction(bool flipped);
 

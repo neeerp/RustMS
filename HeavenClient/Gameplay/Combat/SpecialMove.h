@@ -48,6 +48,12 @@ namespace ms
 
 		virtual void apply_actions(Char &user, Attack::Type type) const = 0;
 
+		// The body action the move takes up, or "" for none of its own.
+		virtual std::string get_action(const Char &) const
+		{
+			return "";
+		}
+
 		virtual void apply_stats(const Char &user, Attack &attack) const = 0;
 
 		virtual void apply_hiteffects(const AttackUser &user, Mob &target) const = 0;

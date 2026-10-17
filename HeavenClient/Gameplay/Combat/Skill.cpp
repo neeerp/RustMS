@@ -179,6 +179,11 @@ namespace ms
 		action->apply(user, type);
 	}
 
+	std::string Skill::get_action(const Char &user) const
+	{
+		return action->get_action(user);
+	}
+
 	void Skill::apply_stats(const Char &user, Attack &attack) const
 	{
 		attack.skill = skillid;

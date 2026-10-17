@@ -75,6 +75,12 @@ namespace ms
 		// Show a buff effect.
 		void show_buff(int32_t cid, int32_t skillid, int8_t level);
 
+		// Show another user starting to prepare a skill (0x980a81).
+		void show_prepare(int32_t cid, int32_t skillid, uint8_t level, uint16_t action_and_facing, uint8_t speed);
+
+		// Show another user letting go of a held skill (0x980bf5).
+		void cancel_prepare(int32_t cid, int32_t skillid);
+
 		// Show a buff effect.
 		void show_player_buff(int32_t skillid);
 
@@ -112,6 +118,13 @@ namespace ms
 
 		// Fire a skill that keeps firing, if it can, or let it go.
 		void shoot_prepare(const Skill &skill);
+
+		// Hold the skills other users hold another step: their effects turn
+		// to the keydown ones in time (0x980328).
+		void update_remote_prepares();
+
+		// Stop showing another user's prepare: its action and its effect.
+		void end_remote_prepare(OtherChar &user);
 
 		void draw_gauge(double viewx, double viewy, float alpha) const;
 
@@ -205,6 +218,19 @@ namespace ms
 		};
 
 		std::optional<Preparing> preparing;
+
+		// A skill another user holds down, by their id: how long, in ms,
+		// whether its effect has turned to the keydown one, and whether it
+		// took up their action.
+		struct RemotePrepare
+		{
+			int32_t skill;
+			int32_t held = 0;
+			bool keydown = false;
+			bool forced = false;
+		};
+
+		std::unordered_map<int32_t, RemotePrepare> remote_prepares;
 
 		// Game time in ms, for the shots of the skills that keep firing.
 		int64_t now = 0;
