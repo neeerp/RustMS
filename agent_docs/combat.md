@@ -378,6 +378,23 @@ Doom shows it as a Blue Snail, Stun, Freeze and Web hold it, and the
 reason skill's `mob` effect plays. The formulas for poison, Venom and Ambush
 come from OdinMS-family servers; `v83ref` report 157 has the detail.
 
+### Mists
+
+Poison Mist (2111003) leaves a cloud (an affected area) as well as
+attacking. `skills::mist` says what a skill's cloud puts on, and the attack
+asks the field for one (`FieldRequest::Mist`). The field keeps them
+(`field_mists::MistSet`): a mist covers the skill's `lt`/`rb` box around the
+caster, mirrored when they face right. It starts 800 ms after the cast,
+reaches every 2.5 seconds for the live mobs in it that lack the status,
+rolling `prop`, and lasts the skill's `time`. AFFECTED_AREA_CREATED (0x111)
+shows it to the map and to players who join; AFFECTED_AREA_REMOVED (0x112)
+lifts it. The reach interval and the 800 ms come from OdinMS-family servers.
+
+HeavenClient's `MapMists` lays the skill's `tile` clouds over the area as
+v83 does (`MistLayout.h`, a diamond of random tiles), draws them above the
+map's objects, and fades them out over a second when the mist lifts.
+`v83ref` report 160 has the client's detail.
+
 ## Reactors
 
 A map's `reactor` nodes (`game_data::MapReactorTemplate`) place reactors such
@@ -467,4 +484,6 @@ both survive logging out.
 and that both survive logging out; `beginner_skills` has three players learn
 Three Snails, Nimble Feet, and Recovery and checks their damage caps, MP,
 buffs, cooldowns, Recovery's heal, what the others see, and that the buffs
-end on time and on death.
+end on time and on death. `poison_mist` casts Poison Mist on a snail and
+checks the cloud's packet, that it lifts on time, and that it poisons only
+the snails in its box.

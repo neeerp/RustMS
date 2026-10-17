@@ -414,6 +414,22 @@ pub fn on_hit(player: &Player, skill: Option<&Learned>, ranged: bool, roll: f64)
     inflicts
 }
 
+/// Poison Mist: a cloud where it's cast that poisons the mobs in it.
+pub const POISON_MIST: i32 = 2111003;
+
+/// What the mist a spell leaves puts on the mobs in it, each with the
+/// skill's chance, for as long as the mist's `time`; None for a spell that
+/// leaves none. v83's client draws the mist (0x431a63); what it does is the
+/// server's (OdinMS-family: Poison Mist poisons).
+pub fn mist(skill: &Learned) -> Option<Inflict> {
+    (skill.skill_id == POISON_MIST).then(|| {
+        Inflict::new(
+            skill,
+            vec![(MobStat::Poison, Amount::Poison { level: skill.level })],
+        )
+    })
+}
+
 /// The mob buffs a skill that reaches mobs takes away: the Crashes, and
 /// Dispel the lot.
 pub fn mob_cancels(skill_id: i32) -> &'static [MobStat] {
@@ -457,6 +473,18 @@ pub fn in_area(effect: &SkillLevel, origin: (i16, i16), at: (i16, i16)) -> bool 
     let dx = i32::from(at.0) - i32::from(origin.0);
     let dy = i32::from(at.1) - i32::from(origin.1);
     dx.abs() <= reach_x && effect.lt.1 - AREA_SLACK <= dy && dy <= effect.rb.1 + AREA_SLACK
+}
+
+/// A skill's area used at `origin`, as left, top, right, bottom: `lt` and
+/// `rb` as they are facing left, mirrored facing right.
+pub fn area_box(effect: &SkillLevel, origin: (i16, i16), left: bool) -> (i32, i32, i32, i32) {
+    let (x, y) = (i32::from(origin.0), i32::from(origin.1));
+    let (l, r) = if left {
+        (effect.lt.0, effect.rb.0)
+    } else {
+        (-effect.rb.0, -effect.lt.0)
+    };
+    (x + l, y + effect.lt.1, x + r, y + effect.rb.1)
 }
 
 /// Heal: it heals the party around the cleric and hurts the undead.
@@ -685,5 +713,24 @@ mod tests {
         assert_eq!(venom(0.0).duration, Duration::from_secs(4));
         assert_eq!(venom(0.0).statuses, [(MobStat::Venom, Amount::Value(192))]);
         assert_eq!(venom(1.0).statuses, [(MobStat::Venom, Amount::Value(437))]);
+    }
+
+    #[test]
+    fn poison_mist_poisons_what_is_in_its_box() {
+        let mist = mist(&at_level(POISON_MIST, 30).unwrap()).unwrap();
+        assert_eq!(mist.prop, 70);
+        assert_eq!(mist.duration, Duration::from_secs(40));
+        assert_eq!(
+            mist.statuses,
+            vec![(MobStat::Poison, Amount::Poison { level: 30 })]
+        );
+        assert!(super::mist(&at_level(2111006, 30).unwrap()).is_none());
+
+        let mut effect = at_level(POISON_MIST, 30).unwrap().effect;
+        assert_eq!(area_box(&effect, (10, 20), true), (-190, -130, 210, 170));
+        effect.lt = (-300, -50);
+        effect.rb = (100, 0);
+        assert_eq!(area_box(&effect, (0, 0), true), (-300, -50, 100, 0));
+        assert_eq!(area_box(&effect, (0, 0), false), (-100, -50, 300, 0));
     }
 }

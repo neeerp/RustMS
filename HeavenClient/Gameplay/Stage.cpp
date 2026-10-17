@@ -94,6 +94,7 @@ namespace ms
 		mobs.clear();
 		drops.clear();
 		reactors.clear();
+		mists.clear();
 	}
 
 	void Stage::load_map(int32_t mapid)
@@ -159,6 +160,9 @@ namespace ms
 		if (party.shows_hp_marks())
 			chars.draw_party_hp(party, player.get_oid(), mapid, viewx, viewy, alpha);
 
+		// v83 puts a mist's clouds on the effect layer, above the map's
+		// objects (z 0xc00614a4).
+		mists.draw(viewx, viewy, alpha);
 		combat.draw(viewx, viewy, alpha);
 		ground_effects.drawabove(viewpos, alpha);
 		portals.draw(viewpos, alpha);
@@ -178,6 +182,7 @@ namespace ms
 		tilesobjs.update();
 
 		reactors.update(physics);
+		mists.update();
 		npcs.update(physics);
 		mobs.update(physics, player.get_position(), player.is_dead());
 		chars.update(physics);
@@ -624,6 +629,11 @@ namespace ms
 	MapReactors &Stage::get_reactors()
 	{
 		return reactors;
+	}
+
+	MapMists &Stage::get_mists()
+	{
+		return mists;
 	}
 
 	MapDrops &Stage::get_drops()

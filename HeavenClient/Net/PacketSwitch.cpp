@@ -141,6 +141,8 @@ namespace ms
 		NPC_ACTION = 260,
 		DROP_LOOT = 268,
 		REMOVE_LOOT = 269,
+		SPAWN_MIST = 273,
+		REMOVE_MIST = 274,
 		HIT_REACTOR = 277,
 		SPAWN_REACTOR = 279,
 		REMOVE_REACTOR = 280,
@@ -213,6 +215,8 @@ namespace ms
 		emplace<KILL_MOB, KillMobHandler>();
 		emplace<DROP_LOOT, DropLootHandler>();
 		emplace<REMOVE_LOOT, RemoveLootHandler>();
+		emplace<SPAWN_MIST, SpawnMistHandler>();
+		emplace<REMOVE_MIST, RemoveMistHandler>();
 		emplace<HIT_REACTOR, HitReactorHandler>();
 		emplace<SPAWN_REACTOR, SpawnReactorHandler>();
 		emplace<REMOVE_REACTOR, RemoveReactorHandler>();
