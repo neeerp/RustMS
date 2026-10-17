@@ -965,6 +965,7 @@ impl ClientActor {
             ServerMessage::FameMissed { target } => self.fame_missed(target).await?,
             ServerMessage::SummonBroken { skill_id } => self.summon_broken(skill_id).await?,
             ServerMessage::Beholder(support) => self.beholder_support(support).await?,
+            ServerMessage::Diseased { disease, map_id } => self.diseased(disease, map_id).await?,
             ServerMessage::DoorWarp {
                 from_map,
                 map_id,

@@ -124,6 +124,16 @@ pub fn at_level(skill_id: i32, level: i32) -> Option<Learned> {
 
 pub const SHADOW_STARS: i32 = 4121006;
 pub const DISPEL: i32 = 2311001;
+/// The diseases Dispel cures, as Cosmic has them: not Stun, Seduce, or
+/// Confuse.
+pub const DISPELLED: [BuffStat; 6] = [
+    BuffStat::Poison,
+    BuffStat::Seal,
+    BuffStat::Darkness,
+    BuffStat::Weakness,
+    BuffStat::Curse,
+    BuffStat::Slow,
+];
 pub const RESURRECTION: i32 = 2321006;
 pub const CHAKRA: i32 = 4211001;
 pub const TIME_LEAP: i32 = 5121010;

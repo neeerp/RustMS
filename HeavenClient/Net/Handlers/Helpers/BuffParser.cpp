@@ -128,8 +128,10 @@ namespace ms
 				value = recv.read_int();
 				break;
 			case SHORT_INT:
-				value = recv.read_short();
-				recv.skip_int();
+				// Poison's n, then its reason, the mob skill whose
+				// `affected` the character shows.
+				recv.skip_short();
+				value = recv.read_int();
 				break;
 			case INT_BYTE_BYTE:
 				value = recv.read_int();

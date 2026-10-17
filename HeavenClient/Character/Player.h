@@ -20,6 +20,7 @@
 #include <cstdint>
 
 #include "ActiveBuffs.h"
+#include "Diseases.h"
 #include "BuddyList.h"
 #include "ExclRequest.h"
 #include "MonsterBook.h"
@@ -138,6 +139,9 @@ namespace ms
 		// What a buff adds, 0 without it.
 		int16_t get_buff_value(Buffstat::Id stat) const;
 
+		// The diseases on the player.
+		disease::State get_diseases() const;
+
 		// Change a skill
 		void change_skill(int32_t skill_id, int32_t level, int32_t masterlevel, int64_t expiration);
 
@@ -177,7 +181,9 @@ namespace ms
 		// Return whether the player is underwater
 		bool is_underwater() const;
 
-		// Returns if a Keyaction is currently active.
+		// Returns if a Keyaction is currently active. The arrows are the
+		// way the player is steered, whatever their diseases make of the
+		// keys held.
 		bool is_key_down(KeyAction::Id action) const;
 
 		// Return a pointer to the ladder the player is on.
@@ -240,6 +246,12 @@ namespace ms
 		const BuddyList &get_buddies() const;
 
 	private:
+		// Whether the key for an action is held.
+		bool is_held(KeyAction::Id action) const;
+
+		// Show the animations of the diseases on the player.
+		void show_diseases();
+
 		// Natural recovery as v83 runs it (FUN_0083007f). MP heals every 10
 		// seconds while alive. HP heals every 10 seconds, or 5 for a warrior
 		// with Improved HP Recovery, while the player stands or sits without

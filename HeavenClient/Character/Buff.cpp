@@ -57,12 +57,15 @@ namespace ms
 			case 27: return PICKPOCKET;
 			case 28: return MESOGUARD;
 			case 30: return WEAKEN;
+			case 31: return CURSE;
+			case 32: return SLOW;
 			case 33: return MORPH;
 			case 34: return RECOVERY;
 			case 35: return MAPLE_WARRIOR;
 			case 36: return STANCE;
 			case 37: return SHARP_EYES;
 			case 38: return MANA_REFLECTION;
+			case 39: return SEDUCE;
 			case 40: return SHADOW_CLAW;
 			case 41: return INFINITY_;
 			case 42: return HOLY_SHIELD;
@@ -72,6 +75,7 @@ namespace ms
 			case 46: return PUPPET;
 			case 47: return ECHO_OF_HERO;
 			case 49: return GHOST_MORPH;
+			case 51: return CONFUSE;
 			case 82: return ENERGY_CHARGE;
 			case 83: return DASH2;
 			case 84: return DASH;

@@ -3,11 +3,11 @@ use crate::error::NetworkError;
 use crate::handler::{
     FieldRequest, HandlerResult, WorldAction, WorldContext, WorldHandler, WorldResult,
 };
-use crate::packet::build::world::inventory;
 use crate::packet::build::world::mob::{self, FROM_TOUCH};
 use crate::packet::build::world::stat::{self, StatUpdate};
+use crate::packet::build::world::{buff, inventory};
 use crate::skills;
-use game::InventoryType;
+use game::{Buff, Disease, InventoryType, Player};
 use packet::{io::read::PktRead, Packet};
 use std::io::Cursor;
 use tracing::debug;
@@ -220,10 +220,65 @@ impl WorldHandler for TakeDamageHandler {
         let shown = mob::build_damage_player(player.id(), from, mob_id, damage, direction)?;
         actions = actions.with(WorldAction::Field(FieldRequest::Broadcast(shown)));
         if hp == 0 {
-            actions = actions.with(WorldAction::Died);
+            return Ok(actions.with(WorldAction::Died));
+        }
+        // Some attacks bring a disease (`disease`, `level`), taking hold
+        // by its `prop` (Cosmic's TakeDamageHandler).
+        let disease = attack.filter(|_| damage > 0).and_then(|attack| {
+            let level = crate::mobs::skill_level(attack.disease, attack.disease_level)?;
+            let disease = game::mob_skill::inflicted(
+                attack.disease,
+                attack.disease_level,
+                level.x,
+                level.duration,
+            )?;
+            (rand::random::<f64>() * 100.0 < f64::from(level.prop)).then_some(disease)
+        });
+        if let Some(disease) = disease {
+            let caught = catch_disease(player, disease, std::time::Instant::now())?;
+            actions.actions.extend(caught.actions);
         }
         Ok(actions)
     }
+}
+
+/// A mob gave the player a disease: unless they're dead or already have it,
+/// it starts, and the others see it if it shows.
+pub fn catch_disease(
+    player: &mut Player,
+    disease: Disease,
+    now: std::time::Instant,
+) -> WorldResult {
+    let stat = disease.stat;
+    if player.stats.hp <= 0 || player.buffs.has(stat) {
+        return Ok(HandlerResult::empty());
+    }
+    player.buffs.give(Buff::new(
+        disease.skill_id,
+        stat,
+        disease.value,
+        now,
+        disease.lasts,
+    ));
+    let lasts = i32::try_from(disease.lasts.as_millis()).unwrap_or(i32::MAX);
+    let mut result = HandlerResult::reply(buff::build_give_buff(
+        disease.skill_id,
+        lasts,
+        &[(stat, disease.value)],
+    )?);
+    let shown: Vec<_> = player
+        .buffs
+        .shown()
+        .into_iter()
+        .filter(|shown| shown.stat == stat)
+        .collect();
+    if !shown.is_empty() {
+        result = result.with(WorldAction::BuffsChanged(buff::build_give_foreign_buff(
+            player.id(),
+            &shown,
+        )?));
+    }
+    Ok(result)
 }
 
 /// The most a mob's touch (`attack` None) or attack can hurt `stats`'

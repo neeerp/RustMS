@@ -20,6 +20,7 @@
 #include "Helpers/BuffParser.h"
 #include "Helpers/LoginParser.h"
 #include "../../Audio/Audio.h"
+#include "../../Character/Diseases.h"
 
 #include "../Packets/LoginPackets.h"
 
@@ -212,6 +213,19 @@ namespace ms
 			return;
 
 		Stage::get().get_player().give_buff({ bs, value, skillid, duration });
+
+		// A disease has no icon, only a notice of what it does
+		// (FUN_00932da6).
+		if (disease::is_disease(bs))
+		{
+			std::string notice = disease::notice(disease::skill(skillid));
+
+			if (!notice.empty())
+				if (auto chatbar = UI::get().get_element<UIChatBar>())
+					chatbar->send_chatline(notice, UIChatBar::LineType::GREY);
+
+			return;
+		}
 
 		if (auto bufflist = UI::get().get_element<UIBuffList>())
 			bufflist->add_buff(skillid, bs, duration);

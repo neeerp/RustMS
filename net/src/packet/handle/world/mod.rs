@@ -41,7 +41,8 @@ pub use self::change_map::{door_warp, warp, ChangeMapHandler, DoorExit};
 pub use self::char_info::CharInfoRequestHandler;
 pub use self::chat::AllChatHandler;
 pub use self::combat::{
-    AttackHandler, MobDistanceHandler, MoveLifeHandler, NpcActionHandler, TakeDamageHandler,
+    catch_disease, AttackHandler, MobDistanceHandler, MoveLifeHandler, NpcActionHandler,
+    TakeDamageHandler,
 };
 pub use self::door::UseDoorHandler;
 pub use self::emote::FaceExpressionHandler;
