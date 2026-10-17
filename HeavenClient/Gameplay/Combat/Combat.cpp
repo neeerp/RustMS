@@ -22,6 +22,7 @@
 #include "HitTiming.h"
 #include "PointBlank.h"
 #include "Prepare.h"
+#include "RemoteShot.h"
 #include "RemoteSpell.h"
 #include "ShotPath.h"
 
@@ -834,16 +835,9 @@ namespace ms
 
 			Rectangle<int16_t> range = place_range(user.get_position(), user.get_afterimage().get_range(), 1.0f,
 												   attack.toleft);
-			// Other players' shots start where a whack would reach, as the
-			// player's own do.
+			// Their shots and spells have their own paths; anything else that
+			// flies starts right at them.
 			int16_t reach = 0;
-
-			bool spell = attack.type == Attack::Type::MAGIC && shot_path::aimed_spell(attack.skill);
-
-			if (attack.type == Attack::Type::RANGED && attack.skill == 0)
-				reach = get_whack_reach(user, user.get_look().get_attackstance(true));
-			else if (spell)
-				reach = shot_path::SPELL_REACH;
 
 			// Their range skills' levels are unknown, so their shots reach
 			// only as far as the weapon or skill alone does.
@@ -857,8 +851,7 @@ namespace ms
 				skill_range = stats.shotrange;
 			}
 
-			int16_t shot_range = spell ? shot_path::SPELL_RANGE
-				: shot_path::range(attack.skill, skill_range, user.get_weapontype(), 0);
+			int16_t shot_range = shot_path::range(attack.skill, skill_range, user.get_weapontype(), 0);
 			Point<int16_t> shot_end = shot_path::origin(user.get_position(), shot_range, attack.toleft);
 			Rectangle<int16_t> shot_area = shot_path::area(attack.skill, user.get_position(),
 														   shot_path::origin(user.get_position(), reach, attack.toleft),
@@ -866,6 +859,8 @@ namespace ms
 
 			if (attack.type == Attack::Type::MAGIC)
 				show_remote_spell(user, move, attack, range);
+			else if (attack.type == Attack::Type::RANGED && !prepare::throws(attack.skill))
+				show_remote_shot(user, move, attack, range);
 			else
 				extract_effects(user, move, attack, range, reach, shot_area, shot_end);
 		} else
@@ -1131,6 +1126,119 @@ namespace ms
 				Point<int16_t> end(*furthest, start.y());
 				bulleteffects.push(delay, Bullet(animation, start, end, remote_spell::across_time(start.x(), end.x())));
 			}
+		}
+	}
+
+	void Combat::show_remote_shot(const Char &user, const SpecialMove &move, const AttackResult &result,
+								  Rectangle<int16_t> range)
+	{
+		AttackUser attackuser = {
+				user.get_skilllevel(move.get_id()),
+				user.get_level(),
+				user.is_twohanded(),
+				!result.toleft,
+				user.get_look().get_equips().get_weapon(),
+				result.stance,
+				range
+		};
+
+		int32_t skill = result.skill;
+		uint8_t bullets = 1;
+		uint8_t attacks = 1;
+		Rectangle<int16_t> lt_rb;
+
+		if (skill)
+		{
+			const SkillData::Stats &stats = SkillData::get(skill).get_stats(result.level);
+			bullets = std::max<uint8_t>(stats.bulletcount, 1);
+			attacks = stats.attackcount;
+			lt_rb = stats.range;
+		}
+
+		Animation animation = move.get_bullet(user, result.bullet);
+		Point<int16_t> position = user.get_position();
+		uint16_t delay = remote_shot::attack_delay(skill, user.get_attackdelay(0));
+		uint16_t first = 0;
+
+		for (size_t target = 0; target < result.damagelines.size(); target++)
+		{
+			auto &line = result.damagelines[target];
+			int32_t oid = line.first;
+
+			if (!mobs.contains(oid))
+				continue;
+
+			Rectangle<int16_t> body = mobs.get_mob_body(oid);
+
+			// A mob with no bounds ends the shot there: neither it nor the
+			// mobs after it show their hits.
+			if (body.left() >= body.right() || body.top() >= body.bottom())
+			{
+				for (size_t rest = target; rest < result.damagelines.size(); rest++)
+				{
+					auto &skipped = result.damagelines[rest];
+					mobs.expect_hits(skipped.first, -static_cast<int32_t>(skipped.second.size()));
+				}
+
+				break;
+			}
+
+			bool left = mobs.get_mob_position(oid).x() < position.x();
+			Point<int16_t> start = remote_shot::start(skill, position, left, result.toleft);
+			Point<int16_t> aim = remote_spell::aim(start, body, left);
+			uint16_t hit = remote_shot::hit_delay(skill, target, first, delay, start, aim);
+
+			if (target == 0)
+				first = hit;
+
+			std::vector<DamageNumber> numbers = place_numbers(line.second, move.get_id());
+			size_t shown = remote_shot::shown_hits(numbers.size(), bullets, attacks);
+
+			for (size_t i = 0; i < shown; i++)
+				damageeffects.emplace(
+						delay + hit,
+						attackuser,
+						numbers[i],
+						line.second[i].first,
+						result.toleft,
+						oid,
+						move.get_id()
+				);
+
+			if (shown < numbers.size())
+				mobs.expect_hits(oid, -static_cast<int32_t>(numbers.size() - shown));
+
+			if (!remote_shot::shoots(skill, target, lt_rb, start.x(), body, left))
+				continue;
+
+			// Each bullet flies as long as the hits take to land, to at most
+			// 400 px along the way, each a few px below the last.
+			Point<int16_t> end = remote_shot::end(start, aim);
+
+			for (uint8_t i = 0; i < bullets; i++)
+			{
+				Point<int16_t> to = end + Point<int16_t>(0, shot_path::spread(i, bullets));
+				uint16_t time = delay + shot_path::bullet_delay(result.bullet, skill, i);
+				bulleteffects.push(time, Bullet(animation, start, to, hit));
+			}
+		}
+
+		if (!result.damagelines.empty() || remote_shot::hides_miss(skill))
+			return;
+
+		// A shot that hit nothing flies out in front of them.
+		Weapon::Type weapon = user.get_weapontype();
+		int16_t reach = remote_shot::miss_range(weapon == Weapon::Type::BOW || weapon == Weapon::Type::CROSSBOW);
+		int16_t y = position.y() - shot_path::HEIGHT;
+		Point<int16_t> start(remote_shot::miss_start(skill, position.x(), result.toleft), y);
+		int16_t end_x = position.x() + (result.toleft ? -reach : reach);
+		uint16_t flight = remote_shot::miss_flight(skill, start.x(), end_x);
+
+		for (uint8_t i = 0; i < bullets; i++)
+		{
+			Point<int16_t> end(end_x, static_cast<int16_t>(y + remote_shot::miss_spread(i, bullets)));
+			uint16_t time = delay + shot_path::bullet_delay(result.bullet, skill, i);
+			bulleteffects.push(time, Bullet(animation, start, end, flight));
 		}
 	}
 

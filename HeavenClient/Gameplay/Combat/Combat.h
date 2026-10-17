@@ -219,6 +219,11 @@ namespace ms
 		void show_remote_spell(const Char &user, const SpecialMove &move, const AttackResult &result,
 							   Rectangle<int16_t> range);
 
+		// Show another user's shot: its bullets, and its hits as they would
+		// get there (FUN_00981211).
+		void show_remote_shot(const Char &user, const SpecialMove &move, const AttackResult &result,
+							  Rectangle<int16_t> range);
+
 		// Draw Chain Lightning's bolt from the user through its targets, each
 		// part as its target is hit (`staggered`) or all at once.
 		void draw_chain(const Char &user, const SpecialMove &move, const AttackResult &result, bool staggered);
