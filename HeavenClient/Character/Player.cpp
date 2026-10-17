@@ -262,8 +262,13 @@ namespace ms
 
 		path.step(current_move(0), Constants::TIMESTEP);
 
-		if (auto sent = path.flush())
-			MovePlayerPacket(*sent).dispatch();
+		if (path.ready())
+		{
+			move_path::Path sent = path.flush();
+
+			if (!sent.idle)
+				MovePlayerPacket(sent).dispatch();
+		}
 
 		return get_layer();
 	}

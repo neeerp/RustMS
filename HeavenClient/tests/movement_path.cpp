@@ -3,6 +3,7 @@
 #include <cmath>
 #include <cstring>
 #include <iostream>
+#include <optional>
 #include <stdexcept>
 #include <vector>
 
@@ -28,6 +29,20 @@ int16_t walk(ms::move_path::Recorder& path, int16_t x, int16_t vx, int16_t fh, i
 	return x;
 }
 
+// What the user sends after a step.
+std::optional<ms::move_path::Path> send(ms::move_path::Recorder& path)
+{
+	if (!path.ready())
+		return std::nullopt;
+
+	ms::move_path::Path sent = path.flush();
+
+	if (sent.idle)
+		return std::nullopt;
+
+	return sent;
+}
+
 void recorder()
 {
 	using namespace ms::move_path;
@@ -36,33 +51,33 @@ void recorder()
 	path.reset(at(0, 0, 0, 0, 7));
 
 	int16_t x = walk(path, 0, 125, 7, 124);
-	require(!path.flush(), "nothing goes out before a second");
+	require(!send(path), "nothing goes out before a second");
 
 	x = walk(path, x, 125, 7, 1);
-	auto sent = path.flush();
+	auto sent = send(path);
 	require(sent && sent->start == ms::Point<int16_t>(0, 0), "a second of walking goes out from where it began");
 	require(sent->elements.size() == 1 && sent->elements[0].duration == 1000 && sent->elements[0].xpos == x,
 			"a walk in one direction is one element");
 
 	walk(path, x, 0, 7, 125);
-	sent = path.flush();
+	sent = send(path);
 	require(sent && sent->start == ms::Point<int16_t>(x, 0) && sent->elements.size() == 1,
 			"the next path starts where the last one ended");
 	walk(path, x, 0, 7, 125);
-	require(!path.flush(), "standing still sends nothing");
+	require(!send(path), "standing still sends nothing");
 
 	x = walk(path, x, 125, 7, 60);
 	x = walk(path, x, -125, 7, 10);
 	x = walk(path, x, 125, 0, 40, -500);
 	x = walk(path, x, 125, 0, 40, 500);
-	sent = path.flush();
+	sent = send(path);
 	require(sent && sent->elements.size() == 2 && sent->elements[1].vx < 0,
 			"turning around starts an element, and a jump waits");
-	require(!path.flush(), "the jump stays for the next path");
+	require(!send(path), "the jump stays for the next path");
 
 	int16_t before = sent->elements[1].xpos;
 	x = walk(path, x, 125, 7, 45);
-	sent = path.flush();
+	sent = send(path);
 	require(sent && sent->start == ms::Point<int16_t>(before, 0) && sent->elements.size() == 3,
 			"the jump goes out once the player lands");
 	require(sent->elements[0].fh == 0 && sent->elements[0].vy < 0 && sent->elements[1].vy > 0,
@@ -70,13 +85,59 @@ void recorder()
 
 	path.add(ms::Movement(ms::Movement::ABSOLUTE, 4, x, 0, 0, 0, 7, 2, 5));
 	walk(path, 200, 0, 7, 125);
-	sent = path.flush();
+	sent = send(path);
 	require(sent && sent->elements.size() == 2 && sent->elements[0].command == 4 &&
 			sent->elements[0].duration == 0 && sent->elements[0].xpos == x && sent->elements[1].xpos == 200,
 			"a teleport marks where it left from");
 
 	walk(path, 200, 0, -3, 200);
-	require(!path.flush(), "a climb waits for a foothold");
+	require(!send(path), "a climb waits for a foothold");
+}
+
+void mob()
+{
+	using namespace ms::move_path;
+
+	Recorder path;
+	path.reset(at(0, 0, 0, 0, 7));
+
+	// A walker in the air the whole time sends it all.
+	walk(path, 0, 125, 0, 125, 500);
+	require(path.ready(true) && !path.ready(), "a walker waits for a foothold, a flier doesn't");
+	Path sent = path.flush();
+	require(sent.elements.size() == 1 && !path.ready(true), "with nothing on a foothold everything goes");
+
+	// A flier sends what is in the air after its last foothold.
+	int16_t x = walk(path, 0, 125, 7, 60);
+	walk(path, x, 125, 0, 65);
+	sent = path.flush(true);
+	require(sent.elements.size() == 2 && sent.elements[1].fh == 0, "a flier holds nothing back");
+
+	// Standing still still goes out, marked idle.
+	walk(path, 0, 0, 7, 125);
+	path.flush();
+	walk(path, 0, 0, 7, 125);
+	require(path.ready() && path.flush().idle, "a path the same as the last is idle");
+
+	Player shown({ 0, 0, 0, 0, 7, 2 });
+	ms::Movement rise = at(100, -50, 100, -500, 0, 6);
+	rise.duration = 500;
+	ms::Movement land = at(150, 0, 100, 0, 7, 2);
+	land.duration = 500;
+	ms::Movement on = at(250, 0, 100, 0, 7, 2);
+	on.duration = 1000;
+	shown.receive({ rise, land, on });
+	shown.step(100);
+	shown.land(false);
+	require(shown.end().x == 150 && shown.end().fh == 7, "landing stops at the first foothold ahead");
+	shown.step(900);
+	require(!shown.playing() && shown.get_state().x == 150, "and plays only up to it");
+
+	shown.receive({ rise });
+	shown.step(100);
+	ms::move_path::Player::State now = shown.get_state();
+	shown.land(false);
+	require(!shown.playing() && shown.end().x == now.x, "with no foothold ahead it stops where it is");
 }
 
 void player()
@@ -180,6 +241,7 @@ int main()
 
 		recorder();
 		player();
+		mob();
 
 		std::cout << "Movement path passed\n";
 		return 0;
