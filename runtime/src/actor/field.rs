@@ -343,9 +343,10 @@ impl FieldActor {
                 }
                 FieldRequest::Attack {
                     broadcast,
+                    counter,
                     hits,
                     inflicts,
-                } => self.handle_attack(from, broadcast, hits, &inflicts),
+                } => self.handle_attack(from, broadcast, Some(counter), hits, &inflicts),
                 FieldRequest::Mist {
                     skill_id,
                     level,
@@ -601,10 +602,14 @@ impl FieldActor {
         }
     }
 
+    /// `from` attacked the mobs in `hits`; each one with the `counter`
+    /// status hurts them back, once (v83 FUN_007937e3, rolled again here:
+    /// its client only shows its own roll).
     fn handle_attack(
         &mut self,
         from: ClientId,
         broadcast: Packet,
+        counter: Option<MobStat>,
         hits: Vec<(i32, i64)>,
         inflicts: &[Inflict],
     ) {
@@ -614,6 +619,18 @@ impl FieldActor {
         let attacker = attacker.handle.clone();
         self.broadcast(Some(from), broadcast);
         let now = Instant::now();
+        let countered: i32 = counter.map_or(0, |stat| {
+            hits.iter()
+                .map(|&(object_id, _)| self.mobs.counter(object_id, stat, rand::random()))
+                .filter(|&damage| damage > 0)
+                .sum()
+        });
+        if countered > 0 {
+            attacker.send(ServerMessage::Countered {
+                damage: countered,
+                map_id: self.key.map_id,
+            });
+        }
         for (object_id, damage) in hits {
             match self.mobs.damage(from, object_id, damage, now) {
                 Some(Ok(percent)) => {
@@ -881,7 +898,8 @@ impl FieldActor {
             .iter()
             .map(|hit| (hit.object_id, i64::from(hit.damage)))
             .collect();
-        self.handle_attack(from, broadcast, hits, limit.inflict.as_slice());
+        // A v83 client counters only its own attacks.
+        self.handle_attack(from, broadcast, None, hits, limit.inflict.as_slice());
     }
 
     /// A mob hurt `from`'s Puppet: the others see it, and it breaks at
@@ -952,40 +970,53 @@ impl FieldActor {
         }
     }
 
+    /// A mob's buff takes hold with its chance on each mob it reaches,
+    /// counters with `spread`.
+    fn buff_mobs(&mut self, cast: &Cast, statuses: &[(MobStat, i16)], spread: i32, now: Instant) {
+        let effect = &cast.effect;
+        if rand::random::<f64>() * 100.0 >= f64::from(effect.prop) {
+            return;
+        }
+        let until = now + Duration::from_secs(effect.duration.max(0) as u64);
+        let skill_id = cast.skill | cast.level << 16;
+        for object_id in self.mobs.reached_by(cast) {
+            // Physical and magic immunity don't go together.
+            let blocked = |stat| match stat {
+                MobStat::PImmune => Some(MobStat::MImmune),
+                MobStat::MImmune => Some(MobStat::PImmune),
+                _ => None,
+            };
+            let Some(mob) = self.mobs.get(object_id) else {
+                continue;
+            };
+            let statuses: Vec<_> = statuses
+                .iter()
+                .filter(|(stat, _)| {
+                    blocked(*stat).is_none_or(|other| !mob.statuses.contains_key(&other))
+                })
+                .copied()
+                .collect();
+            let controller = mob.controller.unwrap_or_default();
+            let given = self
+                .mobs
+                .add_statuses(object_id, &statuses, skill_id, controller, now, until);
+            self.mobs.spread_counters(object_id, &given, spread);
+            self.show_statuses(object_id, &given, now);
+        }
+    }
+
     /// A mob skill's animation ended: buff or heal the mobs it reaches, or
     /// call up its summons.
     fn apply_cast(&mut self, cast: &Cast, now: Instant) {
         let effect = &cast.effect;
         match mob_skill::effect(cast.skill, effect.x) {
             Some(MobSkillEffect::Statuses(statuses)) => {
-                if rand::random::<f64>() * 100.0 >= f64::from(effect.prop) {
-                    return;
-                }
-                let until = now + Duration::from_secs(effect.duration.max(0) as u64);
-                let skill_id = cast.skill | cast.level << 16;
-                for object_id in self.mobs.reached_by(cast) {
-                    // Physical and magic immunity don't go together.
-                    let blocked = |stat| match stat {
-                        MobStat::PImmune => Some(MobStat::MImmune),
-                        MobStat::MImmune => Some(MobStat::PImmune),
-                        _ => None,
-                    };
-                    let Some(mob) = self.mobs.get(object_id) else {
-                        continue;
-                    };
-                    let statuses: Vec<_> = statuses
-                        .iter()
-                        .filter(|(stat, _)| {
-                            blocked(*stat).is_none_or(|other| !mob.statuses.contains_key(&other))
-                        })
-                        .copied()
-                        .collect();
-                    let controller = mob.controller.unwrap_or_default();
-                    let given = self
-                        .mobs
-                        .add_statuses(object_id, &statuses, skill_id, controller, now, until);
-                    self.show_statuses(object_id, &given, now);
-                }
+                self.buff_mobs(cast, &statuses, 0, now);
+            }
+            Some(MobSkillEffect::Counters(stats)) => {
+                let value = i16::try_from(effect.x).unwrap_or(i16::MAX);
+                let statuses: Vec<_> = stats.iter().map(|&stat| (stat, value)).collect();
+                self.buff_mobs(cast, &statuses, effect.y, now);
             }
             Some(MobSkillEffect::Heal) => {
                 for object_id in self.mobs.reached_by(cast) {

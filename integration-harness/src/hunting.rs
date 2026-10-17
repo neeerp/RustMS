@@ -360,9 +360,12 @@ impl Field {
             r.read_byte().unwrap();
             self.mobs.push((oid, r.read_int().unwrap()));
             // Each status the server sends is a value, a skill, and a
-            // duration.
+            // duration; the counters' spreads and their chance follow.
             let stats = read_mob_stats(&mut r);
-            r.read_bytes(8 * stats.count_ones() as usize).unwrap();
+            let counters = (stats >> 29 & 0b11).count_ones() as usize;
+            let extras = 4 * (counters + usize::from(counters > 0));
+            r.read_bytes(8 * stats.count_ones() as usize + extras)
+                .unwrap();
             let position = (r.read_short().unwrap(), r.read_short().unwrap());
             self.mob_positions.insert(oid, position);
             r.read_byte().unwrap();

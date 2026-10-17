@@ -68,15 +68,37 @@ namespace ms
 			int32_t reason;
 			// How long it lasts, in 500 ms.
 			int16_t duration;
+			// A counter's spread, and the chance in percent shared by both
+			// counters that one hurts (0 always).
+			int32_t spread = 0;
+			int32_t chance = 0;
 		};
 
 		// The statuses whose flags are set (FUN_0078b0b1), as MOB_STAT_SET
-		// and the spawn packets carry them. The burns and counters are read
-		// past; Disable is kept with its first byte as its value.
+		// and the spawn packets carry them. The burns are read past; the
+		// counters keep their spreads and chance; Disable is kept with its
+		// first byte as its value.
 		std::vector<Status> parse(InPacket& recv, const BuffParser::Flags& flags);
 
 		// Read past the burns MOB_STAT_RESET ends (FUN_0078c70a).
 		void skip_reset(InPacket& recv, const BuffParser::Flags& flags);
+
+		// What a counter hurts an attacker with for one attack, or 0
+		// (FUN_007937e3): with a chance, only when the first roll modulo
+		// 100 is under it; its value, give or take half its spread by the
+		// second roll.
+		inline int32_t counter(const Status& status, uint32_t chance_roll, uint32_t spread_roll)
+		{
+			if (status.chance != 0 && chance_roll % 100 >= static_cast<uint32_t>(status.chance))
+				return 0;
+
+			if (status.spread == 0)
+				return status.value;
+
+			int32_t spread = static_cast<int32_t>(spread_roll % static_cast<uint32_t>(status.spread));
+
+			return status.value + spread - status.spread / 2;
+		}
 
 		// Whether a byte follows for the mob's next action: Stun, Freeze,
 		// Doom or bit 32 changed (FUN_0068ad7f).

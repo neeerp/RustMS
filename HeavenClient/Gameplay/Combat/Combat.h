@@ -321,6 +321,11 @@ namespace ms
 		// part as its target is hit (`staggered`) or all at once.
 		void draw_chain(const Char &user, const SpecialMove &move, const AttackResult &result, bool staggered);
 
+		// Each target with a counter hurts the player back; v83 shows its
+		// own roll over the head and sends nothing (FUN_00953595): the
+		// server takes the HP.
+		void show_counters(const AttackResult &result);
+
 		// Tell the targets how many hits are coming (sign 1) or cancel them (sign -1),
 		// so a mob the server kills waits for the hits before dying.
 		void expect_hits(const AttackResult &result, int32_t sign);

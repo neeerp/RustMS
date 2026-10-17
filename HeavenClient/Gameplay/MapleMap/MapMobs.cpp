@@ -113,6 +113,14 @@ namespace ms
 			mob->show_damage(damage);
 	}
 
+	int32_t MapMobs::counter(int32_t oid, bool magic) const
+	{
+		if (Optional<const Mob> mob = mobs.get(oid))
+			return mob->counter(magic);
+
+		return 0;
+	}
+
 	void MapMobs::send_mobhp(int32_t oid, int8_t percent, uint16_t playerlevel)
 	{
 		if (Optional<Mob> mob = mobs.get(oid))

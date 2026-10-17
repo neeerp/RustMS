@@ -124,6 +124,11 @@ pub enum ServerMessage {
         disease: game::Disease,
         map_id: i32,
     },
+    /// Mobs on `map_id` this player attacked countered it for `damage`.
+    Countered {
+        damage: i32,
+        map_id: i32,
+    },
     /// The Mystic Door this player entered on `from_map` leads to `map_id`.
     DoorWarp {
         from_map: i32,

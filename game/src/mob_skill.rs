@@ -19,13 +19,16 @@ pub enum MobSkillEffect {
     Summon,
     /// A mist over its area; a v83 client in it loses `x` HP a second.
     Mist,
+    /// Counters on the caster, or on every mob in its area: each attack on
+    /// one hurts the attacker `x`, give or take half of `y`.
+    Counters(Vec<MobStat>),
     /// A disease on every player in its area.
     Disease(BuffStat),
 }
 
 /// What `skill` does with its value `x`, or `None` for the ones not cast
 /// yet: the other diseases (127, 129, 130, 133-136: dispel, banish, area
-/// fire, ...) and the damage counters (143-145).
+/// fire, ...).
 ///
 /// The v83 client multiplies a mob's attack by its PowerUp and MagicUp as
 /// percents, and adds Pad and Mad, so Power Up (100, 115%) is PowerUp, not
@@ -51,6 +54,14 @@ pub fn effect(skill: i32, x: i32) -> Option<MobSkillEffect> {
         HEAL => return Some(MobSkillEffect::Heal),
         SUMMON => return Some(MobSkillEffect::Summon),
         POISON_MIST => return Some(MobSkillEffect::Mist),
+        143 => return Some(MobSkillEffect::Counters(vec![MobStat::PCounter])),
+        144 => return Some(MobSkillEffect::Counters(vec![MobStat::MCounter])),
+        145 => {
+            return Some(MobSkillEffect::Counters(vec![
+                MobStat::PCounter,
+                MobStat::MCounter,
+            ]))
+        }
         _ => return disease(skill).map(MobSkillEffect::Disease),
     };
     Some(MobSkillEffect::Statuses(vec![(stat, x)]))
@@ -109,6 +120,12 @@ mod tests {
         );
         assert_eq!(inflicted(123, 1, 0, 5).unwrap().value, 1);
         assert_eq!(inflicted(100, 1, 0, 5), None);
-        assert_eq!(effect(145, 1), None);
+        assert_eq!(
+            effect(145, 220),
+            Some(MobSkillEffect::Counters(vec![
+                MobStat::PCounter,
+                MobStat::MCounter
+            ]))
+        );
     }
 }

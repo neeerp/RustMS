@@ -123,6 +123,22 @@ pub async fn set_hp(character_id: i32, hp: i16, max_hp: i16) -> Result<(), Harne
     .await
 }
 
+/// Set the weapon attack of the logged-out character `character_id`'s
+/// weapon, e.g. to hit very hard.
+pub async fn set_weapon_attack(character_id: i32, watk: i16) -> Result<(), HarnessError> {
+    change_one_row("set weapon attack", move |conn| {
+        diesel::sql_query(
+            "UPDATE equipment_stats SET watk = $2 WHERE item_row_id = \
+             (SELECT id FROM inventory_items \
+              WHERE character_id = $1 AND inventory_type = -1 AND slot = -11)",
+        )
+        .bind::<Integer, _>(character_id)
+        .bind::<SmallInt, _>(watk)
+        .execute(conn)
+    })
+    .await
+}
+
 /// Set the logged-out character `character_id`'s STR, e.g. to hit hard.
 pub async fn set_str(character_id: i32, str: i16) -> Result<(), HarnessError> {
     change_one_row("set str", move |conn| {

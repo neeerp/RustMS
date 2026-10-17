@@ -7,7 +7,7 @@ use crate::packet::build::world::mob::{self, FROM_MIST, FROM_TOUCH};
 use crate::packet::build::world::stat::{self, StatUpdate};
 use crate::packet::build::world::{buff, inventory};
 use crate::skills;
-use game::{Buff, Disease, InventoryType, Player};
+use game::{Buff, Disease, InventoryType, MobStat, Player};
 use packet::{io::read::PktRead, Packet};
 use std::io::Cursor;
 use tracing::debug;
@@ -141,8 +141,14 @@ impl WorldHandler for AttackHandler {
                 )
             })
             .collect();
+        let counter = if attack.kind == AttackKind::Magic {
+            MobStat::MCounter
+        } else {
+            MobStat::PCounter
+        };
         result = result.with(WorldAction::Field(FieldRequest::Attack {
             broadcast,
+            counter,
             hits,
             inflicts,
         }));
@@ -272,6 +278,22 @@ fn mist_damage(player: &mut Player, skill: i32, level: i32, damage: i32) -> Worl
     })
 }
 
+/// Mobs the player attacked countered them for `damage`: a v83 client
+/// shows its own roll and sends nothing (FUN_00953595), and nobody else
+/// sees it.
+pub fn countered(player: &mut Player, damage: i32) -> WorldResult {
+    if player.stats.hp <= 0 {
+        return Ok(HandlerResult::empty());
+    }
+    let hp = player.add_hp(-damage);
+    let actions = HandlerResult::reply(stat::build_stat_update(false, &[StatUpdate::Hp(hp)])?);
+    Ok(if hp == 0 {
+        actions.with(WorldAction::Died)
+    } else {
+        actions
+    })
+}
+
 /// A mob gave the player a disease: unless they're dead or already have it,
 /// it starts, and the others see it if it shows.
 pub fn catch_disease(
@@ -345,7 +367,6 @@ fn most_damage(
 /// a mob has, so a buff from a mob nearby isn't allowed for.
 fn own_buffs(mob: &game_data::mobs::MobInfo, magic: bool) -> (i32, i32) {
     use game::mob_skill::{effect, MobSkillEffect};
-    use game::MobStat;
     let (add_stat, percent_stat) = if magic {
         (MobStat::Mad, MobStat::MagicUp)
     } else {
