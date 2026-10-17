@@ -31,6 +31,9 @@ pub struct Account {
     /// Slots in the account's storage; only the Cash Shop changes them.
     #[diesel(skip_update)]
     pub storage_slots: i16,
+    /// Mesos in the account's storage; only `crate::storage` changes them.
+    #[diesel(skip_update)]
+    pub storage_meso: i32,
 }
 
 impl Debug for Account {

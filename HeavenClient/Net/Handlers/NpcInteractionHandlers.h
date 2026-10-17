@@ -48,4 +48,12 @@ namespace ms
 	{
 		void handle(InPacket& recv) const override;
 	};
+
+	// Opens an NPC's storage, or answers a request to it: what changed, or
+	// why nothing did
+	// Opcode: TRUNK_RESULT(309)
+	class TrunkResultHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
 }

@@ -49,6 +49,7 @@ pub enum RecvOpcode {
     TalkToNpc = 0x3A,
     NpcTalkMore = 0x3C,
     NpcShopAction = 0x3D,
+    TrunkRequest = 0x3E,
     GatherItems = 0x45,
     SortItems = 0x46,
     ItemMove = 0x47,

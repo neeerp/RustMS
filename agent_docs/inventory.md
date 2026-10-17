@@ -154,6 +154,52 @@ gets only an enable-actions stat update.
   set, refilled for `unitPrice` per missing one, rounded up. The client
   sends it from the Rech. button on the stack's row in the shop window.
 
+## Storage
+
+An account's storage (`game::Storage`) holds mesos and up to its slot count
+of items (4 for a new account), shared by all of the account's characters.
+The items keep the order they were stored or sorted in. The client lists each
+bag's items in that order and takes one out by its index in the list. Any NPC
+with `info/trunkPut` in Npc.nx keeps one (Mr. Lee, 1012009, in Henesys Park);
+`trunkPut` and `trunkGet` are its fees. Clicking such an NPC opens the storage
+instead of its speech. `ClientActor` loads it (`db::storage::load`) and holds
+a `net::storage::OpenStorage` until the player closes it, talks to another
+NPC, or changes maps.
+
+TRUNK_RESULT (`0x135`) starts with a mode byte. Open (`0x16`) adds the NPC
+id. Open and the change modes then carry the contents: slot count, a u64 of
+flags, the mesos if flag 2 is set, then for each bag whose `2 << type` flag
+is set, a count byte and the items (`GW_ItemSlotBase` without a position).
+The client keeps the bags and mesos that a result leaves out.
+
+TRUNK_REQUEST (`0x3E`) is answered by mode:
+
+- **Take out** (4: tab, index): costs `trunkGet`. The item goes into a bag
+  the same way a pickup does. Stars, bullets and equips get a slot of their
+  own. Answers TAKEN_OUT (`0x09`) with that bag. Errors: no mesos `0x0c`, a
+  one-of-a-kind item the player already has `0x0b`, full bag `0x0a`.
+- **Store** (5: slot, item, quantity): costs `trunkPut`. The quantity can be
+  part of a stack. A set of stars or bullets and an equip go whole. Cash,
+  quest and untradable items can't be stored. Answers STORED (`0x0d`) with
+  that bag. Errors: storage full `0x11`, no mesos `0x10`.
+- **Sort** (6): orders items by id. Answers SORTED (`0x0f`) with everything.
+- **Mesos** (7: amount): a positive amount takes mesos out and a negative one
+  puts them in. Answers MESO (`0x13`) with only the mesos.
+- **Close** (8).
+
+Any other bad request (wrong slot or item, too many, mesos the storage lacks)
+gets `0x12`, which the client shows as "Due to an error, the trade did not
+happen." Every change sends the inventory operation and a meso stat update
+first. The storage and the player are then saved in one transaction
+(`db::storage::save`), so an item is never in both places or neither. If
+saving fails, both are restored.
+
+The client's window is `UIStorage`, from v83's CTrunkDlg (layout in
+`v83ref` report 163). Stored items are on the left and the player's storable
+items on the right; one tab picks the bag for both. Clicking a selected row
+again takes it out or stores it, like the shop. The v83 prompts are reproduced
+except karma. Stored equips show their name and icon but not their stats.
+
 ## Tests
 
 `game` unit tests cover stacking, full bags, removal order, merging,
@@ -167,3 +213,8 @@ to pick up and drops mesos earned from snails, checking both losses are saved;
 grocer, is refused for want of mesos, sells a sword, buys an arrow with it,
 and checks both are saved. `skill_books` (integration) refuses a mastery
 book for another job and teaches Fire Demon to an Arch Mage.
+`net::storage` covers each request and its refusals. `storage` (integration)
+opens Mr. Lee's storage, stores part of a stack and a whole one for the fee,
+is refused too many and too many mesos, moves mesos in, sorts, takes items
+out, and after a relogin finds both sides saved. The client's
+`storage_contents` test reads the contents of each kind of result.

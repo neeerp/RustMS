@@ -3,7 +3,7 @@
 
 use crate::connection::MapleTestConnection;
 use crate::hunting::Field;
-use crate::packets::{build_all_chat, build_change_map, decode_set_field_warp};
+use crate::packets::{build_all_chat, build_change_map, decode_item_stack, decode_set_field_warp};
 use net::packet::op::SendOpcode;
 use packet::io::read::PktRead;
 use packet::Packet;
@@ -110,6 +110,8 @@ pub struct Trace {
     pub shops: Vec<(i32, Vec<(i32, i32)>)>,
     /// CONFIRM_SHOP_TRANSACTION codes.
     pub shop_results: Vec<u8>,
+    /// Every TRUNK_RESULT, in order.
+    pub storage: Vec<StorageResult>,
     /// GIVE_BUFF: (skill id, value, duration in ms).
     pub buffs: Vec<(i32, i16, i32)>,
     /// CANCEL_BUFF: the second mask of each.
@@ -125,6 +127,49 @@ pub struct Trace {
     pub fame: Vec<(u8, String, bool, i32)>,
     /// Mobs and drops on the current field.
     pub field: Field,
+}
+
+/// One TRUNK_RESULT: its mode, and what of the storage it carries.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct StorageResult {
+    pub mode: u8,
+    /// The storage keeper, when it opens.
+    pub npc: Option<i32>,
+    pub slots: Option<u8>,
+    pub meso: Option<i32>,
+    /// (item id, quantity) per bag carried, by inventory type.
+    pub bags: BTreeMap<u8, Vec<(i32, i16)>>,
+}
+
+impl StorageResult {
+    fn read(mode: u8, body: &[u8]) -> Self {
+        let mut r = Cursor::new(body);
+        let mut result = Self {
+            mode,
+            ..Self::default()
+        };
+        // Only these modes carry contents; the rest are a bare notice.
+        if !matches!(mode, 0x09 | 0x0d | 0x0f | 0x13 | 0x16) {
+            return result;
+        }
+        if mode == 0x16 {
+            result.npc = Some(r.read_int().unwrap());
+        }
+        result.slots = Some(r.read_byte().unwrap());
+        let flags = r.read_long().unwrap();
+        if flags & 2 != 0 {
+            result.meso = Some(r.read_int().unwrap());
+        }
+        for kind in 1..=5u8 {
+            if flags & 2 << kind != 0 {
+                let items = (0..r.read_byte().unwrap())
+                    .map(|_| decode_item_stack(&mut r).unwrap())
+                    .collect();
+                result.bags.insert(kind, items);
+            }
+        }
+        result
+    }
 }
 
 impl Trace {
@@ -332,6 +377,9 @@ impl Trace {
                 })
                 .collect();
             self.shops.push((npc, rows));
+        } else if op == SendOpcode::TrunkResult as i16 {
+            let mode = r.read_byte().unwrap();
+            self.storage.push(StorageResult::read(mode, &p.bytes[3..]));
         } else if op == SendOpcode::ConfirmShopTransaction as i16 {
             self.shop_results.push(r.read_byte().unwrap());
         } else if op == SendOpcode::GiveBuff as i16 {

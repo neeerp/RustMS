@@ -646,6 +646,13 @@ namespace ms
 		{}
 	};
 
+	// The default position of UIStorage: centred, like the v83 dialog
+	struct PosSTORAGE : public Configuration::PointEntry
+	{
+		PosSTORAGE() : PointEntry("PosSTORAGE", "(168, 141)")
+		{}
+	};
+
 	// The default position of UINotice
 	struct PosNOTICE : public Configuration::PointEntry
 	{

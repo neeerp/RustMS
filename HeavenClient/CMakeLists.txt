@@ -136,6 +136,9 @@ if(HEAVENCLIENT_BUILD_TESTS)
     add_executable(shop_list_tests tests/shop_list.cpp Net/InPacket.cpp)
     target_include_directories(shop_list_tests PRIVATE ${PROJECT_SOURCE_DIR}/libs/NoLifeNx)
     add_test(NAME shop_list COMMAND shop_list_tests)
+    add_executable(storage_contents_tests tests/storage_contents.cpp Net/InPacket.cpp)
+    target_include_directories(storage_contents_tests PRIVATE ${PROJECT_SOURCE_DIR}/libs/NoLifeNx)
+    add_test(NAME storage_contents COMMAND storage_contents_tests)
     add_executable(movement_path_tests tests/movement_path.cpp Net/InPacket.cpp Net/Handlers/Helpers/MovementParser.cpp)
     target_include_directories(movement_path_tests PRIVATE ${PROJECT_SOURCE_DIR}/libs/NoLifeNx)
     add_test(NAME movement_path COMMAND movement_path_tests)
@@ -529,6 +532,8 @@ add_executable(HeavenClient
     IO/UITypes/UIRevive.h
     IO/UITypes/UIShop.cpp
     IO/UITypes/UIShop.h
+    IO/UITypes/UIStorage.cpp
+    IO/UITypes/UIStorage.h
     IO/UITypes/UIMonsterBook.cpp
     IO/UITypes/UIMonsterBook.h
     IO/UITypes/UISkillBook.cpp

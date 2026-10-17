@@ -282,6 +282,8 @@ pub enum WorldAction {
     Quest(crate::quests::QuestRequest),
     /// Buy, sell, recharge at, or leave the shop the player has open.
     Shop(crate::shop::ShopRequest),
+    /// Take out of, store in, sort, or close the storage the player has open.
+    Storage(crate::storage::StorageRequest),
     /// The player touched the named script portal on their map.
     ScriptPortal {
         portal: String,
@@ -521,6 +523,7 @@ fn world_routes() -> &'static HashMap<i16, WorldRoute> {
             (Op::NpcTalkMore, InGame(&world::NpcTalkMoreHandler)),
             (Op::QuestAction, InGame(&world::QuestActionHandler)),
             (Op::NpcShopAction, InGame(&world::NpcShopActionHandler)),
+            (Op::TrunkRequest, InGame(&world::TrunkRequestHandler)),
             (
                 Op::ChangeMapSpecial,
                 InGame(&world::ChangeMapSpecialHandler),
@@ -592,7 +595,7 @@ mod tests {
     fn every_registered_opcode_is_unique_per_server() {
         // The maps would silently drop duplicates; check the table sizes match.
         assert_eq!(login_routes().len(), 13);
-        assert_eq!(world_routes().len(), 53);
+        assert_eq!(world_routes().len(), 54);
     }
 
     #[test]
