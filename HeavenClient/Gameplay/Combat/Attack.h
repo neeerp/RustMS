@@ -66,6 +66,8 @@ namespace ms
 		int32_t healed = 0;
 
 		uint8_t hitcount = 0;
+		// Shadow Partner's second set of bullets makes 2.
+		uint8_t sets = 1;
 		uint8_t mobcount = 0;
 		uint8_t speed = 0;
 		uint8_t stance = 0;
@@ -130,6 +132,7 @@ namespace ms
 		{
 			type = attack.type;
 			hitcount = attack.hitcount;
+			sets = attack.sets;
 			skill = attack.skill;
 			charge = attack.charge;
 			speed = attack.speed;
@@ -146,6 +149,7 @@ namespace ms
 		int32_t attacker = 0;
 		uint8_t mobcount = 0;
 		uint8_t hitcount = 1;
+		uint8_t sets = 1;
 		int32_t skill = 0;
 		int32_t charge = 0;
 		int32_t bullet = 0;
