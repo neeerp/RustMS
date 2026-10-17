@@ -297,6 +297,12 @@ namespace ms
 		effects.add(effect);
 	}
 
+	void Char::show_skill_book(bool success)
+	{
+		effects.add(skill_book[success][0], DrawArgument(), 3);
+		effects.add(skill_book[success][1], DrawArgument(), -1);
+	}
+
 	void Char::show_iron_body()
 	{
 		ironbody.set_for(500);
@@ -612,6 +618,10 @@ namespace ms
 		for (auto iter : CharEffect::PATHS)
 			chareffects.emplace(iter.first, src.resolve(iter.second));
 
+		for (int success = 0; success < 2; success++)
+			for (int layer = 0; layer < 2; layer++)
+				skill_book[success][layer] = src["SkillBook"][success ? "Success" : "Failure"][std::to_string(layer)];
+
 		nl::node tomb = nl::nx::effect["Tomb.img"];
 		tomb_fall = tomb["fall"];
 		tomb_land = tomb["land"];
@@ -620,4 +630,5 @@ namespace ms
 	EnumMap<CharEffect::Id, Animation> Char::chareffects;
 	Animation Char::tomb_fall;
 	Animation Char::tomb_land;
+	Animation Char::skill_book[2][2];
 }

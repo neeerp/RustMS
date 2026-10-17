@@ -58,6 +58,7 @@ namespace ms
 
 		/// Inventory 1
 		MODIFY_INVENTORY = 29,
+		INVENTORY_GROW = 30,
 
 		/// Player 2
 		CHANGE_CHANNEL = 16,
@@ -66,6 +67,8 @@ namespace ms
 		CANCEL_BUFF = 33,
 		RECALCULATE_STATS = 35,
 		UPDATE_SKILL = 36,
+		SKILL_USE_RESULT = 37,
+		SKILL_LEARN_ITEM_RESULT = 51,
 
 		/// Messaging 1
 		SHOW_STATUS_INFO = 39,
@@ -239,6 +242,8 @@ namespace ms
 		emplace<CANCEL_BUFF, CancelBuffHandler>();
 		emplace<RECALCULATE_STATS, RecalculateStatsHandler>();
 		emplace<UPDATE_SKILL, UpdateSkillHandler>();
+		emplace<SKILL_USE_RESULT, SkillUseResultHandler>();
+		emplace<SKILL_LEARN_ITEM_RESULT, SkillLearnItemResultHandler>();
 		emplace<ADD_COOLDOWN, AddCooldownHandler>();
 		emplace<MONSTER_BOOK_SET_CARD, MonsterBookSetCardHandler>();
 		emplace<MONSTER_BOOK_SET_COVER, MonsterBookSetCoverHandler>();
@@ -257,6 +262,7 @@ namespace ms
 
 		// Inventory Handlers
 		emplace<MODIFY_INVENTORY, ModifyInventoryHandler>();
+		emplace<INVENTORY_GROW, InventoryGrowHandler>();
 		emplace<GATHER_RESULT, GatherResultHandler>();
 		emplace<SORT_RESULT, SortResultHandler>();
 

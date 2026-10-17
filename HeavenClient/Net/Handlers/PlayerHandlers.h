@@ -84,6 +84,20 @@ namespace ms
 		void handle(InPacket& recv) const override;
 	};
 
+	// Handler for a packet which answers the player's skill use (v83
+	// FUN_00a209b2): it lets the player send the next request.
+	class SkillUseResultHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
+	// Handler for a packet which tells how someone's skill or mastery book
+	// went (v83 FUN_00a1e5af).
+	class SkillLearnItemResultHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
 	// Parses skill macros
 	// Opcode: SKILL_MACROS(124)
 	class SkillMacrosHandler : public PacketHandler

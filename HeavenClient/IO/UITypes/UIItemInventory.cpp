@@ -235,6 +235,12 @@ namespace ms
 			update_slot(slot);
 	}
 
+	void UIItemInventory::refresh_slots()
+	{
+		load_icons();
+		update_slider();
+	}
+
 	void UIItemInventory::update_slider()
 	{
 		int16_t total = (inventory.get_slotmax(tab) + COLUMNS - 1) / COLUMNS;
