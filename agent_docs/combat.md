@@ -425,6 +425,14 @@ the rest:
     formula for a magic one, times the level's `pad` or `mad` percent.
 
   Otherwise the hits go through the field's usual damage and kill path.
+  A hit that does damage can also put a status on its mob
+  (`summons::inflict`):
+  - Silver Hawk and Golden Eagle stun at the level's `prop`.
+  - Elquines and Frostprey always freeze; their data has no `prop`.
+
+  Each status lasts the level's `x` seconds. That is inferred: the client
+  only shows what it's sent, and OdinMS-family servers hold every summon's
+  status for 4 s.
 - **DAMAGE_SUMMON** (`0xB1` in, `0xB4` out) hurts a Puppet. Puppets are the
   only summons that can be hurt, and their HP is the level's `x`. At 0 HP
   the Puppet breaks: REMOVE_SUMMON reason 2, and the owner's buff ends.
@@ -590,4 +598,4 @@ Puppet, and checks what a watcher sees: the spawns, a refused and an accepted
 Hawk attack, the Puppet breaking, and the Hawk following its owner to the
 next map with no entrance. It also has a Dark Knight's Beholder heal them
 and buff their weapon defense, refusing both too soon and a stat Hex's
-level doesn't give.
+level doesn't give, and an Arch Mage's Elquines freeze a mob for 3 s.

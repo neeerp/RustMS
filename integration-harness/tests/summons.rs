@@ -2,7 +2,8 @@
 //! and Puppet appear for the map, the Hawk's attacks reach the others
 //! within its damage cap, a Puppet breaks when hurt past its HP, and the
 //! Hawk follows its owner to the next map. A Dark Knight's Beholder heals
-//! and buffs them, no sooner than its skills allow.
+//! and buffs them, no sooner than its skills allow, and a Fire/Poison Arch
+//! Mage's Elquines freezes what it hits.
 
 use integration_harness::database::{grant_skill, grant_stack, set_job};
 use integration_harness::hunting::{
@@ -30,6 +31,9 @@ const DARK_KNIGHT: i16 = 132;
 const BEHOLDER: i32 = 1321007;
 const AURA: i32 = 1320008;
 const HEX: i32 = 1320009;
+const FP_ARCH_MAGE: i16 = 212;
+const ELQUINES: i32 = 2121005;
+const FREEZE: u128 = 1 << 8;
 
 #[tokio::test]
 async fn a_rangers_hawk_attacks_and_follows_and_their_puppet_breaks() {
@@ -180,9 +184,17 @@ async fn a_dark_knights_beholder_heals_and_hexes_them_in_its_own_time() {
     assert_eq!(warp(w, map, "", &mut wt).await, map);
     assert_eq!(warp(k, map, "", &mut kt).await, map);
     send(k, summon(BEHOLDER, 1, 0, 0, false)).await;
-    until(w, &mut wt, |t| !t.field.summons.is_empty()).await;
+    // The arch mage's test shares the map.
+    let mine = |t: &Trace| {
+        t.field
+            .summons
+            .iter()
+            .find(|s| s.owner_id == knight_id)
+            .copied()
+    };
+    until(w, &mut wt, |t| mine(t).is_some()).await;
     let summoned = std::time::Instant::now();
-    let eye = wt.field.summons[0];
+    let eye = mine(&wt).unwrap();
     assert_eq!(
         (eye.owner_id, eye.skill_id, eye.moves, eye.assist),
         (knight_id, BEHOLDER, 1, 2)
@@ -218,4 +230,65 @@ async fn a_dark_knights_beholder_heals_and_hexes_them_in_its_own_time() {
         vec![(eye.object_id, 6), (eye.object_id, 7)]
     );
     assert_eq!(kt.buffs.len(), 2);
+}
+
+#[tokio::test]
+async fn an_arch_mages_elquines_freezes_what_it_hits() {
+    let config = load_harness_config_or_fail().await;
+    let mage_id = login_to_world_session(&config)
+        .await
+        .expect("first login failed")
+        .character_id;
+    drop(relogin(&config).await);
+    tokio::time::sleep(Duration::from_millis(500)).await;
+    set_job(mage_id, FP_ARCH_MAGE, 120, 2000)
+        .await
+        .expect("make an arch mage");
+    // Level 30: a freeze each hit, for 3 seconds.
+    grant_skill(mage_id, ELQUINES, 30)
+        .await
+        .expect("teach Elquines");
+
+    let mut mage = relogin(&config).await;
+    let watcher_config = load_harness_config_or_fail().await;
+    let mut watcher = login_to_world_session(&watcher_config).await.unwrap();
+    let (m, w) = (&mut mage.connection, &mut watcher.connection);
+    let (mut mt, mut wt) = (Trace::default(), Trace::default());
+    let map = HENESYS_HUNTING_GROUND;
+    assert_eq!(warp(w, map, "", &mut wt).await, map);
+    assert_eq!(warp(m, map, "", &mut mt).await, map);
+    until(m, &mut mt, |t| !t.field.mobs.is_empty()).await;
+    let (mob, mob_id) = mt.field.mobs[0];
+    let (x, y) = mt.field.mob_positions[&mob];
+    send(m, walk_to(x, y)).await;
+    send(m, summon(ELQUINES, 30, x, y, false)).await;
+    let mine = |t: &Trace| {
+        t.field
+            .summons
+            .iter()
+            .find(|s| s.owner_id == mage_id)
+            .copied()
+    };
+    until(w, &mut wt, |t| mine(t).is_some()).await;
+    let elquines = mine(&wt).unwrap();
+
+    // Others' freezes on the map aren't this one's.
+    let frozen = |t: &Trace| {
+        t.field
+            .stat_sets
+            .iter()
+            .filter(|&&(oid, ..)| oid == mob)
+            .copied()
+            .collect::<Vec<_>>()
+    };
+    send(m, summon_attack(elquines.object_id, mob, mob_id, 1)).await;
+    until(w, &mut wt, |t| !frozen(t).is_empty()).await;
+    let at = std::time::Instant::now();
+    assert_eq!(frozen(&wt), [(mob, FREEZE, 1, ELQUINES)]);
+    until(w, &mut wt, |t| t.field.stat_resets.contains(&(mob, FREEZE))).await;
+    let thawed = at.elapsed();
+    assert!(
+        (Duration::from_millis(2_500)..Duration::from_millis(4_500)).contains(&thawed),
+        "thawed after {thawed:?}"
+    );
 }
