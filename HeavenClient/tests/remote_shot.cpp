@@ -65,6 +65,13 @@ int main()
 		require(miss_spread(0, 1) == 0 && miss_spread(0, 2) == -4 && miss_spread(1, 2) == 4,
 				"its bullets 8 px apart around the row");
 
+		require(!partner_starts(0, 5, 1, 1), "without Shadow Partner every shot is the user's");
+		require(partner_starts(0, 0, 1, 2) && partner_starts(0, 3, 1, 2), "one bullet: all from behind");
+		require(!partner_starts(0, 0, 2, 2) && partner_starts(0, 1, 2, 2) && !partner_starts(0, 0, 3, 2),
+				"more: the first mob's from in front, the rest's from behind");
+		require(!partner_starts(5221008, 4, 2, 2) && partner_starts(5221008, 0, 1, 2),
+				"a torpedo's only by its bullets");
+
 		std::cout << "Remote shot passed\n";
 	}
 	catch (const std::exception &error)

@@ -512,6 +512,25 @@ namespace ms
 			return static_cast<int16_t>(7 + 14 * bullet - 7 * count);
 		}
 
+		// Whether Shadow Partner throws a shot's bullets again: not for
+		// Taunt, and never with Vampire (0x953b2a).
+		inline bool partner_shoots(int32_t skill)
+		{
+			return skill != 4121003 && skill != 14101006;
+		}
+
+		// A shot's hits with Shadow Partner: twice as many, at most 15.
+		inline uint8_t partner_hits(uint8_t hitcount)
+		{
+			return static_cast<uint8_t>(std::min(hitcount * 2, 15));
+		}
+
+		// Where Shadow Partner's bullets start: 30 px behind the user's.
+		inline Point<int16_t> partner_start(Point<int16_t> start, bool toleft)
+		{
+			return start + Point<int16_t>(toleft ? 30 : -30, 0);
+		}
+
 		// How long after the first bullet the `bullet`th one is thrown or
 		// fired (FUN_00942831).
 		inline uint16_t bullet_delay(int32_t bullet_id, int32_t skill, uint8_t bullet)
