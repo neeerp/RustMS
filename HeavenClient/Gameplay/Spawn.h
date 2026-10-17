@@ -26,6 +26,7 @@
 #include "../Character/Buff.h"
 #include "../Graphics/Animation.h"
 #include "../Net/Login.h"
+#include "../Net/Handlers/Helpers/MobStatParser.h"
 
 #include <memory>
 #include <utility>
@@ -54,7 +55,7 @@ namespace ms
 	{
 	public:
 		MobSpawn(int32_t oid, int32_t id, int8_t mode, int8_t stance, uint16_t fh, uint16_t homefh, bool newspawn,
-				 int8_t team, Point<int16_t> position);
+				 int8_t team, Point<int16_t> position, std::vector<MobStatParser::Status> statuses);
 
 		int8_t get_mode() const;
 
@@ -72,6 +73,7 @@ namespace ms
 		bool newspawn;
 		int8_t team;
 		Point<int16_t> position;
+		std::vector<MobStatParser::Status> statuses;
 	};
 
 	class ReactorSpawn

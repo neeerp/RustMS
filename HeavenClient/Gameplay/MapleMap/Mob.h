@@ -17,8 +17,10 @@
 //////////////////////////////////////////////////////////////////////////////////
 #pragma once
 
+#include <map>
 #include <optional>
 #include <string>
+#include <vector>
 
 #include <cstddef>
 
@@ -34,6 +36,7 @@
 #include "../Combat/MagicDamage.h"
 
 #include "../../Audio/Audio.h"
+#include "../../Net/Handlers/Helpers/MobStatParser.h"
 #include "../../Graphics/EffectLayer.h"
 #include "../../Graphics/Geometry.h"
 #include "../../Graphics/Texture.h"
@@ -78,7 +81,8 @@ namespace ms
 
 		// Construct a mob by combining data from game files with data sent by the server.
 		Mob(int32_t oid, int32_t mobid, int8_t mode, int8_t stance, uint16_t fhid, uint16_t homefh, bool newspawn,
-			int8_t team, Point<int16_t> position, const Physics &physics);
+			int8_t team, Point<int16_t> position, const std::vector<MobStatParser::Status> &statuses,
+			const Physics &physics);
 
 		// Draw the mob
 		void draw(double viewx, double viewy, float alpha) const override;
@@ -117,6 +121,13 @@ namespace ms
 		// attack reached.
 		void show_effect(const Animation &animation, int8_t pos, int8_t z, bool flip,
 						 const Rectangle<int16_t> &range);
+
+		// Take on the statuses a spawn or MOB_STAT_SET gives (FUN_0078b0b1).
+		// With `effects`, each new one's skill plays its effect on the mob.
+		void set_statuses(const std::vector<MobStatParser::Status> &statuses, bool effects);
+
+		// Lose the statuses MOB_STAT_RESET names.
+		void reset_statuses(const BuffParser::Flags &flags);
 
 		// Show a weapon's hit spark where the attack meets the mob's body.
 		void show_hit(const Animation &animation, const Rectangle<int16_t> &range, bool flip);
@@ -204,6 +215,18 @@ namespace ms
 		// Set the walking and flying speeds, at chaseSpeed if chasing.
 		void update_shoe(bool chasing);
 
+		// Whether a status holds the mob where it stands.
+		bool held() const;
+
+		// Show a status's skill on the mob: its `mob` effect once, or for
+		// as long as the status lasts if it repeats, and its `mob0` for as
+		// long as the status lasts.
+		void show_status(int32_t reason, bool effects);
+
+		// Show mob `mobid`'s look in place of its own, or its own again
+		// with 0.
+		void show_look(int32_t mobid);
+
 		// Take one 90 ms step of a flying mob's AI.
 		void think_fly(const Physics &physics);
 
@@ -252,6 +275,8 @@ namespace ms
 		void set_level_tag(uint8_t set);
 
 		std::map<Stance, Animation> animations;
+		// Its own look, while Doom shows another.
+		std::optional<std::map<Stance, Animation>> ownlook;
 		std::string name;
 		Sound hitsound;
 		Sound diesound;
@@ -259,6 +284,8 @@ namespace ms
 		float speed;
 		float flyspeed;
 		float chasespeed;
+		// Whether the shoe was last set for a chase.
+		bool chaseshoe = false;
 		uint16_t watk;
 		uint16_t matk;
 		uint16_t wdef;
@@ -281,6 +308,20 @@ namespace ms
 		// How wide the mob first stands, for how near Monster Magnet pulls
 		// it (0x66486e).
 		int16_t standwidth;
+
+		// The statuses on the mob, by stat.
+		std::map<uint8_t, MobStatParser::Status> statuses;
+
+		// The effects that last as long as their status, at their `pos`.
+		struct StatusEffect
+		{
+			int32_t reason;
+			uint8_t part;
+			Animation animation;
+			int8_t pos;
+		};
+
+		std::vector<StatusEffect> statuseffects;
 
 		EffectLayer effects;
 		// Hit effects on the current frame's head, and those left at a point

@@ -19,6 +19,7 @@
 
 #include "Helpers/BuffParser.h"
 #include "Helpers/LoginParser.h"
+#include "Helpers/MobStatParser.h"
 #include "Helpers/MovementParser.h"
 
 #include "../../Gameplay/Stage.h"
@@ -254,7 +255,8 @@ namespace ms
 		recv.read_byte(); // 5 if controller == null
 		int32_t id = recv.read_int();
 
-		recv.skip(16); // temporary status mask
+		BuffParser::Flags flags = BuffParser::read_flags(recv);
+		std::vector<MobStatParser::Status> statuses = MobStatParser::parse(recv, flags);
 
 		Point<int16_t> position = recv.read_point();
 		int8_t stance = recv.read_byte();
@@ -279,7 +281,7 @@ namespace ms
 		recv.skip(4);
 
 		Stage::get().get_mobs().spawn(
-			{ oid, id, 0, stance, fh, homefh, effect == -2, team, position }
+			{ oid, id, 0, stance, fh, homefh, effect == -2, team, position, std::move(statuses) }
 		);
 	}
 
@@ -308,7 +310,8 @@ namespace ms
 
 				int32_t id = recv.read_int();
 
-				recv.skip(16); // temporary status mask
+				BuffParser::Flags flags = BuffParser::read_flags(recv);
+				std::vector<MobStatParser::Status> statuses = MobStatParser::parse(recv, flags);
 
 				Point<int16_t> position = recv.read_point();
 				int8_t stance = recv.read_byte();
@@ -331,7 +334,7 @@ namespace ms
 				recv.skip(4);
 
 				Stage::get().get_mobs().spawn(
-					{ oid, id, mode, stance, fh, homefh, effect == -2, team, position }
+					{ oid, id, mode, stance, fh, homefh, effect == -2, team, position, std::move(statuses) }
 				);
 			}
 			else
@@ -380,6 +383,34 @@ namespace ms
 		uint16_t playerlevel = Stage::get().get_player().get_stats().get_stat(MapleStat::Id::LEVEL);
 
 		Stage::get().get_mobs().send_mobhp(oid, hppercent, playerlevel);
+	}
+
+	void MobStatSetHandler::handle(InPacket& recv) const
+	{
+		int32_t oid = recv.read_int();
+		BuffParser::Flags flags = BuffParser::read_flags(recv);
+		std::vector<MobStatParser::Status> statuses = MobStatParser::parse(recv, flags);
+
+		// The delay before its damage stats change, the stat they're
+		// calculated from, and with Stun, Freeze or Doom the mob's next
+		// action (FUN_00671b71).
+		recv.read_short();
+		recv.read_byte();
+
+		if (MobStatParser::stops(flags))
+			recv.read_byte();
+
+		Stage::get().get_mobs().set_statuses(oid, statuses);
+	}
+
+	void MobStatResetHandler::handle(InPacket& recv) const
+	{
+		int32_t oid = recv.read_int();
+		BuffParser::Flags flags = BuffParser::read_flags(recv);
+
+		MobStatParser::skip_reset(recv, flags);
+
+		Stage::get().get_mobs().reset_statuses(oid, flags);
 	}
 
 	void ShowMagnetHandler::handle(InPacket& recv) const

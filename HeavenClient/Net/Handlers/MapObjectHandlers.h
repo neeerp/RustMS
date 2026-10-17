@@ -141,6 +141,20 @@ namespace ms
 		void handle(InPacket& recv) const override;
 	};
 
+	// Put temporary statuses on a mob (FUN_0066c301).
+	// Opcode: MOB_STAT_SET(242)
+	class MobStatSetHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
+	// Take temporary statuses off a mob (FUN_0066c424).
+	// Opcode: MOB_STAT_RESET(243)
+	class MobStatResetHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
 	// Show another user's Monster Magnet catching a mob, or failing to
 	// (0x66d6b9).
 	// Opcode: SHOW_MAGNET(251)

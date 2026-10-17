@@ -1,8 +1,22 @@
+use super::buff::write_mask;
 use crate::{error::NetworkError, packet::op::SendOpcode};
+use game::MobStat;
 use packet::{io::write::PktWrite, Packet};
+use std::time::Duration;
+
+/// A status on a mob, as the client is told of it.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct MobStatusView {
+    pub stat: MobStat,
+    pub value: i16,
+    /// The skill that caused it.
+    pub skill_id: i32,
+    /// How long it has left.
+    pub left: Duration,
+}
 
 /// A mob as other players see it.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct MobView {
     pub object_id: i32,
     pub mob_id: i32,
@@ -16,6 +30,24 @@ pub struct MobView {
     /// Fade in (a fresh spawn) rather than just appear.
     pub fade_in: bool,
     pub controlled: bool,
+    pub statuses: Vec<MobStatusView>,
+}
+
+/// The statuses as the client reads them (FUN_0078b0b1): their flags, then
+/// each one's value, skill, and time left in half seconds, in the client's
+/// order.
+fn write_statuses(p: &mut Packet, statuses: &[MobStatusView]) -> Result<(), NetworkError> {
+    write_mask(p, statuses.iter().map(|status| status.stat.bit()))?;
+    for stat in MobStat::DECODE_ORDER {
+        let Some(status) = statuses.iter().find(|status| status.stat == stat) else {
+            continue;
+        };
+        p.write_short(status.value)?;
+        p.write_int(status.skill_id)?;
+        let halves = status.left.as_millis().div_ceil(500);
+        p.write_short(halves.min(i16::MAX as u128) as i16)?;
+    }
+    Ok(())
 }
 
 /// The shared mob body of SPAWN_MONSTER and SPAWN_MONSTER_CONTROL.
@@ -23,8 +55,7 @@ fn write_mob(p: &mut Packet, mob: &MobView) -> Result<(), NetworkError> {
     p.write_int(mob.object_id)?;
     p.write_byte(if mob.controlled { 1 } else { 5 })?;
     p.write_int(mob.mob_id)?;
-    // Temporary status mask (four ints); no statuses yet.
-    p.write_bytes(&[0; 16])?;
+    write_statuses(p, &mob.statuses)?;
     p.write_short(mob.x)?;
     p.write_short(mob.y)?;
     p.write_byte(mob.stance)?;
@@ -54,7 +85,7 @@ pub fn build_control_mob(mob: &MobView, aggro: bool) -> Result<Packet, NetworkEr
         &mut p,
         &MobView {
             controlled: true,
-            ..*mob
+            ..mob.clone()
         },
     )?;
     Ok(p)
@@ -136,6 +167,38 @@ pub fn build_show_magnet(object_id: i32, success: bool) -> Result<Packet, Networ
     Ok(p)
 }
 
+/// MOB_STAT_SET: statuses put on a mob (0x66c301). The client has them
+/// take hold at once, and for one that stops the mob reads a byte more.
+pub fn build_mob_stat_set(
+    object_id: i32,
+    statuses: &[MobStatusView],
+) -> Result<Packet, NetworkError> {
+    let mut p = Packet::new_empty();
+    p.write_short(SendOpcode::MobStatSet as i16)?;
+    p.write_int(object_id)?;
+    write_statuses(&mut p, statuses)?;
+    p.write_short(0)?; // delay
+    p.write_byte(0)?;
+    if statuses.iter().any(|status| status.stat.stops()) {
+        p.write_byte(0)?;
+    }
+    Ok(p)
+}
+
+/// MOB_STAT_RESET: statuses a mob lost (0x66c424). For one that stopped
+/// it, a mob some templates mark reads a byte more; the rest ignore it.
+pub fn build_mob_stat_reset(object_id: i32, stats: &[MobStat]) -> Result<Packet, NetworkError> {
+    let mut p = Packet::new_empty();
+    p.write_short(SendOpcode::MobStatReset as i16)?;
+    p.write_int(object_id)?;
+    write_mask(&mut p, stats.iter().map(|stat| stat.bit()))?;
+    p.write_byte(0)?;
+    if stats.iter().any(|stat| stat.stops()) {
+        p.write_byte(0)?;
+    }
+    Ok(p)
+}
+
 /// Touch damage, the `TAKE_DAMAGE` source (`TakeDamagePacket::TOUCH`).
 pub const FROM_TOUCH: i8 = -1;
 
@@ -174,7 +237,68 @@ mod tests {
             home_foothold: 44,
             fade_in: true,
             controlled: false,
+            statuses: Vec::new(),
         }
+    }
+
+    #[test]
+    fn spawn_carries_the_mob_statuses() {
+        let mut mob = snail();
+        mob.statuses = vec![MobStatusView {
+            stat: MobStat::Speed,
+            value: -40,
+            skill_id: 2101003,
+            left: Duration::from_millis(39_800),
+        }];
+        let packet = build_spawn_mob(&mob).unwrap();
+        let mut expect = Expect::new(&packet.bytes);
+        expect.short(SendOpcode::SpawnMonster as i16);
+        expect.int(2_000_000_001).byte(5).int(100100);
+        expect.long(0).long(1 << (32 + 6));
+        expect.short(-40).int(2101003).short(80);
+        expect.short(147);
+    }
+
+    #[test]
+    fn stat_set_follows_the_client_order_and_stops_with_a_byte() {
+        let status = |stat, value, skill_id| MobStatusView {
+            stat,
+            value,
+            skill_id,
+            left: Duration::from_secs(10),
+        };
+        let statuses = [
+            status(MobStat::Doom, 1, 2311005),
+            status(MobStat::PImmune, 1, 140 | 1 << 16),
+            status(MobStat::Pad, -20, 1201006),
+        ];
+        let packet = build_mob_stat_set(5, &statuses).unwrap();
+        let mut expect = Expect::new(&packet.bytes);
+        expect.short(SendOpcode::MobStatSet as i16).int(5);
+        expect
+            .long(0)
+            .long(1 << 32 | 1 << (32 + 16) | 1 << (32 + 18));
+        expect.short(-20).int(1201006).short(20);
+        expect.short(1).int(140 | 1 << 16).short(20);
+        expect.short(1).int(2311005).short(20);
+        expect.short(0).byte(0).byte(0);
+        expect.end();
+    }
+
+    #[test]
+    fn stat_reset_names_the_lost_statuses() {
+        let packet = build_mob_stat_reset(5, &[MobStat::Seal]).unwrap();
+        let mut expect = Expect::new(&packet.bytes);
+        expect.short(SendOpcode::MobStatReset as i16).int(5);
+        expect.long(0).long(1 << (32 + 10));
+        expect.byte(0);
+        expect.end();
+        let packet = build_mob_stat_reset(5, &[MobStat::Doom]).unwrap();
+        let mut expect = Expect::new(&packet.bytes);
+        expect.short(SendOpcode::MobStatReset as i16).int(5);
+        expect.long(0).long(1 << (32 + 16));
+        expect.byte(0).byte(0);
+        expect.end();
     }
 
     #[test]
