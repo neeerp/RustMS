@@ -350,20 +350,23 @@ namespace ms
 
 	void MobMovedHandler::handle(InPacket& recv) const
 	{
+		// FUN_0066be61: whether it may skip landing, whether it may attack
+		// next, what it did (action << 1 | left, 0xFF for nothing), and the
+		// attack's target or the skill's id and level.
 		int32_t oid = recv.read_int();
 
-		recv.read_byte();
-		recv.read_byte(); // useskill
-		recv.read_byte(); // skill
-		recv.read_byte(); // skill 1
-		recv.read_byte(); // skill 2
-		recv.read_byte(); // skill 3
-		recv.read_byte(); // skill 4
+		recv.read_bool(); // not forced to land
+		recv.read_bool(); // may attack next
+		auto actionbyte = static_cast<uint8_t>(recv.read_byte());
+		int32_t skilldata = recv.read_int();
+
+		int8_t action = actionbyte == 0xFF ? -1 : static_cast<int8_t>(actionbyte >> 1);
+		bool left = (actionbyte & 1) != 0;
 
 		Point<int16_t> position = recv.read_point();
 		std::vector<Movement> movements = MovementParser::parse_movements(recv, position);
 
-		Stage::get().get_mobs().send_movement(oid, position, std::move(movements));
+		Stage::get().get_mobs().send_movement(oid, position, std::move(movements), action, left, skilldata);
 	}
 
 	void MoveMobResponseHandler::handle(InPacket& recv) const
@@ -372,12 +375,12 @@ namespace ms
 		int16_t moveid = recv.read_short();
 		bool nextattack = recv.read_bool();
 
-		// Its MP and a skill to cast next: mob skills aren't modeled yet.
-		recv.read_short();
+		// Its MP, and a skill to cast next: mob skills aren't modeled yet.
+		int16_t mp = recv.read_short();
 		recv.read_byte();
 		recv.read_byte();
 
-		Stage::get().get_mobs().acknowledge(oid, moveid, nextattack);
+		Stage::get().get_mobs().acknowledge(oid, moveid, nextattack, mp);
 	}
 
 	void ShowMobHpHandler::handle(InPacket& recv) const

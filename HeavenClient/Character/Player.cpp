@@ -694,11 +694,19 @@ namespace ms
 
 	MobAttackResult Player::damage(const MobAttack &attack)
 	{
-		int32_t damage = stats.calculate_damage(attack.watk);
+		int32_t damage = stats.calculate_damage(attack, randomizer.next_real(1.0), randomizer.next_real(1.0));
+
+		// A deadly attack that hits leaves 1 HP, and an MP burn takes 1
+		// (FUN_009581a9).
+		if (damage > 0 && attack.deadly)
+			damage = std::max(stats.get_stat(MapleStat::Id::HP) - 1, 1);
+		else if (damage > 0 && attack.mpburn)
+			damage = 1;
+
 		show_damage(damage);
 		become_invincible(damage > 0);
 
-		bool fromleft = attack.origin.x() > phobj.get_x();
+		bool fromleft = attack.pushleft ? *attack.pushleft : attack.origin.x() > phobj.get_x();
 
 		bool missed = damage <= 0;
 

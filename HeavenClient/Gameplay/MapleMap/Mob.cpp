@@ -23,7 +23,6 @@
 #include "../Combat/HitPoint.h"
 #include "../Combat/MonsterMagnet.h"
 #include "../Combat/Prepare.h"
-#include "../../Character/TouchDamage.h"
 #include "../../Constants.h"
 #include "../../Util/Misc.h"
 #include "../../Util/NxFiles.h"
@@ -33,9 +32,11 @@
 #include <nlnx/nx.hpp>
 
 #include <algorithm>
+#include <cctype>
 #include <cmath>
 #include <cstdint>
 #include <cstdlib>
+#include <numeric>
 #include <utility>
 
 namespace ms
@@ -93,6 +94,79 @@ namespace ms
 		animations[Stance::JUMP] = src["jump"];
 		animations[Stance::HIT] = src["hit1"];
 		animations[Stance::DIE] = src["die1"];
+
+		mp = info["maxMP"];
+
+		// attack1, attack2 and on, as long as each has its info
+		// (FUN_0067fd81).
+		for (int32_t n = 1;; n++)
+		{
+			nl::node attacksrc = src["attack" + std::to_string(n)];
+			nl::node attackinfo = attacksrc["info"];
+
+			if (attackinfo.size() == 0)
+				break;
+
+			nl::node range = attackinfo["range"];
+			Point<int16_t> lt = range["lt"];
+			Point<int16_t> rb = range["rb"];
+			mob_attack::Box box{ lt.x(), lt.y(), rb.x(), rb.y() };
+
+			AttackInfo attack;
+			attack.type = attackinfo["type"];
+			attack.magic = attackinfo["magic"].get_bool();
+			attack.element = 0;
+
+			// Only a magic attack has an element (FUN_006811a7).
+			if (attack.magic)
+			{
+				std::string element = attackinfo["elemAttr"];
+
+				switch (element.empty() ? 0 : std::tolower(static_cast<unsigned char>(element[0])))
+				{
+					case 'i':
+						attack.element = 1;
+						break;
+					case 'f':
+						attack.element = 2;
+						break;
+					case 'l':
+						attack.element = 3;
+						break;
+					case 's':
+						attack.element = 4;
+						break;
+				}
+			}
+
+			attack.watk = attackinfo["PADamage"].get_integer(watk);
+			attack.conmp = attackinfo["conMP"];
+			attack.after = attackinfo["attackAfter"];
+			attack.effectafter = attackinfo["effectAfter"];
+			attack.jump = attackinfo["jumpAttack"].get_bool();
+			attack.tremble = attackinfo["tremble"].get_bool();
+			attack.deadly = attackinfo["deadlyAttack"].get_bool();
+			attack.mpburn = attackinfo["mpBurn"].get_bool();
+			attack.range = box;
+			attack.sp = range["sp"];
+			attack.r = range["r"];
+			attack.area = { box, range["start"], range["areaCount"] };
+			attack.attackcount = range["attackCount"];
+			attack.bulletspeed = attackinfo["bulletSpeed"];
+			attack.animation = attacksrc;
+			attack.hit = attackinfo["hit"];
+
+			if (attackinfo["effect"].size() > 0)
+				attack.effect = Animation(attackinfo["effect"]);
+
+			if (attackinfo["ball"].size() > 0)
+				attack.ball = Animation(attackinfo["ball"]);
+
+			if (attackinfo["areaWarning"].size() > 0)
+				attack.warning = Animation(attackinfo["areaWarning"]);
+
+			attacks.push_back(std::move(attack));
+		}
 
 		standwidth = animations[Stance::STAND].get_dimensions().x();
 
@@ -295,6 +369,13 @@ namespace ms
 		headeffects.update();
 		fieldeffects.update();
 
+		clock += Constants::TIMESTEP;
+
+		if (attacking && attacks[*attacking].animation.update())
+			attacking.reset();
+
+		update_attacks();
+
 		for (StatusEffect &effect : statuseffects)
 			effect.animation.update();
 		showhp.update();
@@ -326,6 +407,14 @@ namespace ms
 
 		if (!dying)
 		{
+			// Another client's mob attacks where its path starts (FUN_0066be61).
+			if (remoteattack)
+			{
+				do_attack(physics, remoteattack->first.index, remoteattack->first.left,
+						  remoteattack->first.skilldata, remoteattack->second);
+				remoteattack.reset();
+			}
+
 			if (control)
 			{
 				// A firstAttack mob that can attack (FUN_005ce8c6) starts
@@ -341,9 +430,19 @@ namespace ms
 						chase();
 				}
 
+				// Once a move is acked with leave to attack, it tries every
+				// update for an attack that reaches (FUN_006675a8).
+				std::optional<Pick> pick;
+
+				if (!flinch && ctrlstate == 4)
+					pick = pick_attack(physics);
+
 				if (flinch)
 				{
 					flinch_body(physics);
+				} else if (pick)
+				{
+					attack(physics, *pick);
 				} else if (!shown.playing() && ctrlstate >= 3)
 				{
 					// The next path goes once the last has played and been
@@ -402,13 +501,14 @@ namespace ms
 		set_body_stance(endstance == Stance::HIT ? Stance::STAND : endstance);
 		bodyflip = right;
 		hittime = 0;
+		attackhold = 0;
 
 		recorder.reset(Movement(Movement::ABSOLUTE, 0, body.get_x(), body.get_y(), Movement::velocity(body.hspeed),
 								Movement::velocity(body.vspeed), end.fh, value_of(bodystance, bodyflip), 0));
 		seated = true;
 	}
 
-	void Mob::plan(const Physics &physics)
+	void Mob::plan(const Physics &physics, int8_t action, bool left, int32_t skilldata)
 	{
 		if (!seated)
 			seat_body(physics);
@@ -424,7 +524,7 @@ namespace ms
 		bool wantattack = hastarget && (ctrlstate < 0 || randomizer.next_int(100) < 70);
 		int8_t flags = (ctrlstate < 0 ? 0x10 : 0) | (wantattack ? 1 : 0);
 
-		MoveMobPacket(oid, ++moveid, flags, -1, false, 0, canfly, path).dispatch();
+		MoveMobPacket(oid, ++moveid, flags, action, left, skilldata, canfly, path).dispatch();
 
 		// It plays what it sends, as others will (FUN_0068a88d).
 		shown.receive(path.elements);
@@ -471,11 +571,343 @@ namespace ms
 		plan(physics);
 	}
 
+	std::optional<Mob::Pick> Mob::pick_attack(const Physics &physics)
+	{
+		// It attacks the player it chases, not a Puppet, from the ground or
+		// in the air, while not hit, attacking or held (FUN_006675a8).
+		if (attacks.empty() || acting || attacking || !hastarget || puppet || targetdead || held())
+			return std::nullopt;
+
+		if (!phobj.onground && !canfly)
+			return std::nullopt;
+
+		Point<int16_t> position = get_position();
+		int32_t x = position.x();
+		int32_t y = position.y();
+		bool facingleft = noflip || !flip;
+		std::vector<Pick> candidates;
+
+		for (size_t i = 0; i < attacks.size(); i++)
+		{
+			const AttackInfo &info = attacks[i];
+
+			// Dark Sight keeps physical attacks off.
+			if (mp < info.conmp || (!info.magic && targetdarksight))
+				continue;
+
+			std::optional<bool> left;
+			int32_t skilldata = 0;
+
+			switch (info.type)
+			{
+				case 0:
+				{
+					bool leftward = mob_attack::intersects(info.range.shift(x, y), targetbody);
+					bool rightward = mob_attack::intersects(info.range.mirror().shift(x, y), targetbody);
+
+					left = mob_attack::choose_facing(facingleft, !noflip, leftward, rightward);
+
+					break;
+				}
+				case 1:
+				case 2:
+				{
+					// A cone from `sp` out to the range r (FUN_0066afb7).
+					int32_t oy = y + info.sp.y();
+					int32_t lx = mob_attack::origin_x(x, info.sp.x(), true);
+					int32_t rx = mob_attack::origin_x(x, info.sp.x(), false);
+					bool leftward = mob_attack::cone_reaches(lx, lx - info.r, oy, targetbody);
+					bool rightward = mob_attack::cone_reaches(rx, rx + info.r, oy, targetbody);
+
+					left = mob_attack::choose_facing(facingleft, !noflip, leftward, rightward);
+
+					if (!left)
+						break;
+
+					// A shot names its target; a ball aims at a point.
+					if (info.type == 1)
+					{
+						skilldata = targetid << 2;
+					} else
+					{
+						auto [ax, ay] = mob_attack::aim(targetbody, oy, *left);
+
+						skilldata = (ax & 0xFFFF) | (ay << 16);
+					}
+
+					break;
+				}
+				case 3:
+				case 4:
+				{
+					// At most one area attack in 2.5 s, only the way it
+					// faces, on attackCount cells at random; ground cells
+					// need ground under them (FUN_0066aebf).
+					if (clock - lastarea <= 2499)
+						break;
+
+					if (!mob_attack::intersects(mob_attack::area_box(info.area, x, y, facingleft), targetbody))
+						break;
+
+					std::vector<int32_t> cells(std::max(info.area.count, 0));
+					std::iota(cells.begin(), cells.end(), 0);
+
+					for (size_t c = cells.size(); c > 1; c--)
+						std::swap(cells[c - 1], cells[randomizer.next_int(c)]);
+
+					cells.resize(std::min<size_t>(cells.size(), std::max(info.attackcount, 0)));
+
+					for (int32_t cell : cells)
+					{
+						int32_t cx = mob_attack::cell_x(info.area, x, cell, facingleft);
+
+						if (info.type == 3 && !ground_below(physics, static_cast<int16_t>(cx), position.y()))
+							continue;
+
+						if (cell < 32)
+							skilldata |= 1 << cell;
+					}
+
+					if (skilldata != 0)
+						left = facingleft;
+
+					break;
+				}
+			}
+
+			if (left)
+				candidates.push_back({ static_cast<uint8_t>(i), *left, skilldata });
+		}
+
+		if (candidates.empty())
+			return std::nullopt;
+
+		return candidates[randomizer.next_int(candidates.size())];
+	}
+
+	void Mob::attack(const Physics &physics, const Pick &pick)
+	{
+		do_attack(physics, pick.index, pick.left, pick.skilldata, get_position());
+
+		// It stops what it shows, turns, and stands for its attack before
+		// the AI goes on (FUN_0066b6fc).
+		shown.land(canfly || !canmove);
+		seat_body(physics);
+
+		bodyflip = !pick.left;
+		set_body_stance(Stance::STAND);
+		attackhold = attacks[pick.index].animation.get_duration();
+		flyx = 0;
+		flyy = 0;
+
+		plan(physics, static_cast<int8_t>(ATTACK1 + pick.index), pick.left, pick.skilldata);
+	}
+
+	void Mob::do_attack(const Physics &physics, uint8_t index, bool left, int32_t skilldata, Point<int16_t> at)
+	{
+		if (held())
+			return;
+
+		AttackInfo &info = attacks[index];
+		int32_t x = at.x();
+		int32_t y = at.y();
+
+		attacking = index;
+		attackleft = left;
+		info.animation.reset();
+
+		if (info.effect)
+			pendingeffects.push_back({ clock + std::max(info.effectafter, 1), *info.effect, left });
+
+		int32_t due = clock + info.after;
+
+		switch (info.type)
+		{
+			case 0:
+				// The box is where the mob attacked, wherever it goes after.
+				pendinghits.push_back({ due, index, left, (left ? info.range : info.range.mirror()).shift(x, y) });
+				break;
+			case 1:
+			{
+				// A shot at the local player hits once it lands, if they
+				// were in reach when it went.
+				if ((skilldata & 3) != 0 || (skilldata >> 2) != targetid)
+					break;
+
+				int32_t ox = mob_attack::origin_x(x, info.sp.x(), left);
+				int32_t oy = y + info.sp.y();
+
+				if (mob_attack::shot_reaches(targetbody, ox, oy, info.r, left))
+					pendinghits.push_back({ due, index, left, std::nullopt });
+
+				break;
+			}
+			case 2:
+			{
+				if (!info.ball)
+					break;
+
+				int32_t ox = mob_attack::origin_x(x, info.sp.x(), left);
+				int32_t oy = y + info.sp.y();
+				int16_t tx = static_cast<int16_t>(skilldata & 0xFFFF);
+				int16_t ty = static_cast<int16_t>((skilldata >> 16) & 0xFFFF);
+				auto [ex, ey] = mob_attack::ball_end(ox, oy, tx, ty, info.r, left);
+				int32_t flight = mob_attack::ball_time(info.r, info.bulletspeed);
+
+				balls.push_back({ due, due + std::max(flight, 1),
+								  Point<int16_t>(static_cast<int16_t>(ox), static_cast<int16_t>(oy)),
+								  Point<int16_t>(static_cast<int16_t>(ex), static_cast<int16_t>(ey)),
+								  index, left, *info.ball });
+
+				break;
+			}
+			case 3:
+			case 4:
+			{
+				int32_t width = info.area.width();
+				int32_t count = 0;
+
+				for (int32_t cell = 0; cell < 32 && count < info.attackcount; cell++)
+				{
+					if (((skilldata >> cell) & 1) == 0)
+						continue;
+
+					count++;
+
+					int32_t cx = mob_attack::cell_x(info.area, x, cell, left);
+					int32_t cy = y;
+
+					if (info.type == 3)
+					{
+						std::optional<int16_t> ground = ground_below(physics, static_cast<int16_t>(cx), at.y());
+
+						if (!ground)
+							continue;
+
+						cy = *ground;
+					}
+
+					mob_attack::Box box = mob_attack::cell_box(info.area, cx, cy, left);
+					pendinghits.push_back({ due, index, left, box });
+
+					if (info.warning)
+					{
+						Point<int16_t> warning(static_cast<int16_t>(box.left + width / 2),
+											   static_cast<int16_t>(box.bottom));
+
+						fieldeffects.add(*info.warning, DrawArgument(warning), 0);
+					}
+				}
+
+				lastarea = clock;
+
+				break;
+			}
+		}
+	}
+
+	void Mob::update_attacks()
+	{
+		for (auto iter = pendingeffects.begin(); iter != pendingeffects.end();)
+		{
+			if (clock < iter->due)
+			{
+				++iter;
+				continue;
+			}
+
+			effects.add(iter->animation, DrawArgument(Point<int16_t>(0, 0), !iter->left), 0);
+			iter = pendingeffects.erase(iter);
+		}
+
+		// A box hits the player where they are once due; a jump attack only
+		// one standing on a foothold. A direct shot hits regardless.
+		for (auto iter = pendinghits.begin(); iter != pendinghits.end();)
+		{
+			if (clock < iter->due)
+			{
+				++iter;
+				continue;
+			}
+
+			const AttackInfo &info = attacks[iter->index];
+			bool hit = !iter->box || (mob_attack::intersects(*iter->box, targetbody) &&
+									  (info.type != 0 || !info.jump || targetonground));
+
+			if (hit && !targetdead)
+				landed.push_back({ make_attack(iter->index, iter->left), attacks[iter->index].hit });
+
+			iter = pendinghits.erase(iter);
+		}
+
+		// A ball hits the player once its point is in them; the player's
+		// invincibility takes the rest.
+		for (auto iter = balls.begin(); iter != balls.end();)
+		{
+			if (clock >= iter->end)
+			{
+				iter = balls.erase(iter);
+				continue;
+			}
+
+			if (clock >= iter->start)
+			{
+				iter->animation.update();
+
+				double progress = static_cast<double>(clock - iter->start) / (iter->end - iter->start);
+				int32_t bx = static_cast<int32_t>(iter->from.x() + (iter->to.x() - iter->from.x()) * progress);
+				int32_t by = static_cast<int32_t>(iter->from.y() + (iter->to.y() - iter->from.y()) * progress);
+
+				if (mob_attack::contains(targetbody, bx, by) && !targetdead)
+					landed.push_back({ make_attack(iter->index, iter->left), attacks[iter->index].hit });
+			}
+
+			++iter;
+		}
+	}
+
+	MobAttack Mob::make_attack(uint8_t index, bool left) const
+	{
+		const AttackInfo &info = attacks[index];
+
+		MobAttack attack = create_touch_attack_base();
+		attack.watk = info.watk + status_value(MobStatParser::PAD);
+		attack.index = static_cast<int8_t>(index);
+		attack.magic = info.magic;
+		attack.element = info.element;
+		attack.deadly = info.deadly;
+		attack.mpburn = info.mpburn;
+		attack.pushleft = left;
+
+		return attack;
+	}
+
+	std::optional<int16_t> Mob::ground_below(const Physics &physics, int16_t x, int16_t y) const
+	{
+		// The highest ground from 100 px above to 100 px below (FUN_00a456f9).
+		const FootholdTree &fht = physics.get_fht();
+		uint16_t fhid = fht.get_fhid_below(Point<int16_t>(x, static_cast<int16_t>(y - 100)));
+
+		if (fhid == 0)
+			return std::nullopt;
+
+		double ground = fht.get_fh(fhid).ground_below(x);
+
+		if (ground > y + 100.0)
+			return std::nullopt;
+
+		return static_cast<int16_t>(ground);
+	}
+
 	void Mob::step_body(const Physics &physics)
 	{
 		// A stunned, frozen or webbed mob stands where it is, and its AI
 		// waits (inferred: the hold itself wasn't traced in v83).
-		bool hold = held() && bodystance != Stance::HIT && bodystance != Stance::JUMP;
+		// It stands still for its attack too (FUN_009bbdfd).
+		bool hold = (held() || attackhold > 0) && bodystance != Stance::HIT && bodystance != Stance::JUMP;
+
+		if (attackhold > 0)
+			attackhold -= Constants::TIMESTEP;
 
 		if (hold)
 		{
@@ -917,10 +1349,12 @@ namespace ms
 		}
 	}
 
-	void Mob::acknowledge(int16_t ackid, bool nextattack)
+	void Mob::acknowledge(int16_t ackid, bool nextattack, int16_t newmp)
 	{
 		if (!control)
 			set_control(1);
+
+		mp = newmp;
 
 		if (ackid < moveid)
 			ctrlstate = 2;
@@ -943,7 +1377,10 @@ namespace ms
 		{
 			float interopc = opacity.get(alpha);
 
-			animations.at(stance).draw(DrawArgument(absp, flip && !noflip, interopc), alpha);
+			if (attacking)
+				attacks[*attacking].animation.draw(DrawArgument(absp, !attackleft, interopc), alpha);
+			else
+				animations.at(stance).draw(DrawArgument(absp, flip && !noflip, interopc), alpha);
 
 			if (showhp)
 			{
@@ -1002,6 +1439,22 @@ namespace ms
 
 				effect.animation.draw(DrawArgument(at, flip && !noflip), alpha);
 			}
+		}
+
+		// A ball turns to its flight, drawn for a mob facing left.
+		for (const Ball &ball : balls)
+		{
+			if (clock < ball.start)
+				continue;
+
+			double progress = static_cast<double>(clock - ball.start) / (ball.end - ball.start);
+			double dx = ball.to.x() - ball.from.x();
+			double dy = ball.to.y() - ball.from.y();
+			Point<int16_t> at(static_cast<int16_t>(ball.from.x() + dx * progress),
+							  static_cast<int16_t>(ball.from.y() + dy * progress));
+			float angle = static_cast<float>(ball.left ? std::atan2(-dy, -dx) : std::atan2(dy, dx));
+
+			ball.animation.draw(DrawArgument(angle, viewp + at, !ball.left, 1.0f), alpha);
 		}
 
 		effects.drawabove(absp, alpha);
@@ -1091,10 +1544,14 @@ namespace ms
 			body.flyspeed = shoespeed(base);
 	}
 
-	void Mob::set_target(Point<int16_t> position, bool dead)
+	void Mob::set_target(const Target &target)
 	{
-		targetpos = puppet ? puppetpos : position;
-		targetdead = puppet ? false : dead;
+		targetpos = puppet ? puppetpos : target.position;
+		targetdead = puppet ? false : target.dead;
+		targetid = target.id;
+		targetbody = target.body;
+		targetonground = target.onground;
+		targetdarksight = target.darksight;
 	}
 
 	void Mob::aggro_puppet(int32_t oid, Point<int16_t> position)
@@ -1130,14 +1587,25 @@ namespace ms
 		return summon_rules::touch_damage(attack, level, randomizer.next_real(1.0));
 	}
 
-	void Mob::send_movement(Point<int16_t>, std::vector<Movement> &&in_movements)
+	void Mob::send_movement(Point<int16_t> start, std::vector<Movement> &&in_movements, int8_t action, bool left,
+							int32_t skilldata)
 	{
 		// v83 plays the path on from where the mob is shown; its start is
-		// not used (FUN_0068b371).
+		// not used (FUN_0068b371), except that an attack is made there.
 		if (control)
 			return;
 
 		shown.receive(in_movements);
+
+		int32_t index = action - ATTACK1;
+
+		if (index >= 0 && index < static_cast<int32_t>(attacks.size()))
+			remoteattack = std::make_pair(Pick{ static_cast<uint8_t>(index), left, skilldata }, start);
+	}
+
+	std::vector<Mob::Landed> Mob::take_attacks()
+	{
+		return std::exchange(landed, {});
 	}
 
 	Point<int16_t> Mob::get_head_position(Point<int16_t> position) const
@@ -1543,6 +2011,7 @@ namespace ms
 		{
 			// It shows the hit at once; the AI flinches next update.
 			show_stance(Stance::HIT, toleft);
+			attacking.reset();
 			acting = true;
 			flinch = Flinch{ toleft, std::nullopt };
 		}
@@ -1555,6 +2024,7 @@ namespace ms
 
 		// It turns to the user and flinches (0x66b6fc).
 		show_stance(Stance::HIT, user.x() > get_position().x());
+		attacking.reset();
 		acting = true;
 		flinch = Flinch{ false, user };
 	}
@@ -1564,11 +2034,25 @@ namespace ms
 		if (!deals_touch_damage())
 			return MobAttack();
 
-		// The base damage of the hit, a roll between 85% of the attack and all
-		// of it, rounded down.
-		int32_t attack = randomizer.next_int<int32_t>(touch_damage::min_base(watk), watk);
+		return create_touch_attack_base();
+	}
 
-		return MobAttack(attack, get_position(), id, oid);
+	MobAttack Mob::create_touch_attack_base() const
+	{
+		// A touch hits with the mob's own attack (FUN_009581a9).
+		MobAttack attack(watk + status_value(MobStatParser::PAD), get_position(), id, oid);
+		attack.matk = matk + status_value(MobStatParser::MAD);
+		attack.level = level;
+		attack.accuracy = accuracy + status_value(MobStatParser::ACC);
+
+		return attack;
+	}
+
+	int32_t Mob::status_value(uint8_t stat) const
+	{
+		auto found = statuses.find(stat);
+
+		return found != statuses.end() ? static_cast<int32_t>(found->second.value) : 0;
 	}
 
 	void Mob::apply_death()

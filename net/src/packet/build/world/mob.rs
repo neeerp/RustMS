@@ -101,37 +101,45 @@ pub fn build_stop_controlling_mob(object_id: i32) -> Result<Packet, NetworkError
 }
 
 /// MOVE_MONSTER: relay the controller's movement to the others.
-pub fn build_move_mob(
-    object_id: i32,
-    start: (i16, i16),
-    movement_bytes: &[u8],
-) -> Result<Packet, NetworkError> {
+pub fn build_move_mob(moved: &MobMoveView, movement_bytes: &[u8]) -> Result<Packet, NetworkError> {
     let mut p = Packet::new_empty();
     p.write_short(SendOpcode::MoveMonster as i16)?;
-    p.write_int(object_id)?;
-    p.write_byte(0)?;
-    p.write_byte(0)?; // skill possible
-    p.write_byte(0)?; // skill
-    p.write_byte(0)?; // skill id
-    p.write_byte(0)?; // skill level
-    p.write_short(0)?; // option
-    p.write_short(start.0)?;
-    p.write_short(start.1)?;
+    p.write_int(moved.object_id)?;
+    p.write_byte(0)?; // not forced to land
+    p.write_byte(u8::from(moved.next_attack))?;
+    p.write_byte(moved.action)?;
+    p.write_int(moved.skill_data)?;
+    p.write_short(moved.start.0)?;
+    p.write_short(moved.start.1)?;
     p.write_bytes(movement_bytes)?;
     Ok(p)
 }
 
-/// MOVE_MONSTER_RESPONSE: acknowledge the controller's movement.
+/// A controller's mob move as the others see it (FUN_0066be61).
+pub struct MobMoveView {
+    pub object_id: i32,
+    /// Whether its controller may attack with it next.
+    pub next_attack: bool,
+    /// What it did: action << 1 | facing left, or 0xFF for nothing.
+    pub action: u8,
+    /// The attack's target, or the skill's id and level.
+    pub skill_data: i32,
+    pub start: (i16, i16),
+}
+
+/// MOVE_MONSTER_RESPONSE: acknowledge the controller's movement, saying
+/// whether it may attack next and the mob's MP (FUN_0066c23b).
 pub fn build_move_mob_response(
     object_id: i32,
     move_id: i16,
+    next_attack: bool,
     mp: i16,
 ) -> Result<Packet, NetworkError> {
     let mut p = Packet::new_empty();
     p.write_short(SendOpcode::MoveMonsterResponse as i16)?;
     p.write_int(object_id)?;
     p.write_short(move_id)?;
-    p.write_byte(0)?; // use skills
+    p.write_byte(u8::from(next_attack))?;
     p.write_short(mp)?;
     p.write_byte(0)?; // skill id
     p.write_byte(0)?; // skill level
@@ -202,9 +210,11 @@ pub fn build_mob_stat_reset(object_id: i32, stats: &[MobStat]) -> Result<Packet,
 /// Touch damage, the `TAKE_DAMAGE` source (`TakeDamagePacket::TOUCH`).
 pub const FROM_TOUCH: i8 = -1;
 
-/// DAMAGE_PLAYER: show others that a player was hurt by a mob's touch.
+/// DAMAGE_PLAYER: show others that a player was hurt by a mob's touch
+/// ([`FROM_TOUCH`]) or attack `from` (FUN_009832e3).
 pub fn build_damage_player(
     character_id: i32,
+    from: i8,
     mob_id: i32,
     damage: i32,
     direction: u8,
@@ -212,7 +222,7 @@ pub fn build_damage_player(
     let mut p = Packet::new_empty();
     p.write_short(SendOpcode::DamagePlayer as i16)?;
     p.write_int(character_id)?;
-    p.write_byte(FROM_TOUCH as u8)?;
+    p.write_byte(from as u8)?;
     p.write_int(damage)?;
     p.write_int(mob_id)?;
     p.write_byte(direction)?;
@@ -334,20 +344,27 @@ mod tests {
 
     #[test]
     fn movement_kill_and_hp() {
-        let moved = build_move_mob(7, (10, 20), &[1, 2]).unwrap();
+        let view = MobMoveView {
+            object_id: 7,
+            next_attack: true,
+            action: 12 << 1 | 1,
+            skill_data: 0x0050_0040,
+            start: (10, 20),
+        };
+        let moved = build_move_mob(&view, &[1, 2]).unwrap();
         let mut expect = Expect::new(&moved.bytes);
         expect.short(SendOpcode::MoveMonster as i16).int(7);
-        expect.byte(0).byte(0).byte(0).byte(0).byte(0).short(0);
+        expect.byte(0).byte(1).byte(25).int(0x0050_0040);
         expect.short(10).short(20).byte(1).byte(2);
         expect.end();
-        let response = build_move_mob_response(7, 3, 0).unwrap();
+        let response = build_move_mob_response(7, 3, true, 40).unwrap();
         let mut expect = Expect::new(&response.bytes);
         expect
             .short(SendOpcode::MoveMonsterResponse as i16)
             .int(7)
             .short(3)
-            .byte(0)
-            .short(0)
+            .byte(1)
+            .short(40)
             .byte(0)
             .byte(0);
         expect.end();

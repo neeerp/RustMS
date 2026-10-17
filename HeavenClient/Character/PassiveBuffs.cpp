@@ -66,7 +66,8 @@ namespace ms
 
 	void AchillesBuff::apply_to(CharStats &stats, nl::node level) const
 	{
-		float reducedamage = static_cast<float>(level["x"]) / 1000;
+		// Achilles leaves x per mille of a hit.
+		float reducedamage = 1.0f - static_cast<float>(level["x"]) / 1000;
 		stats.set_reducedamage(reducedamage);
 	}
 

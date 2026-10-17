@@ -358,10 +358,15 @@ pub struct PartySkill {
 /// A request a player makes of their field, which owns its mobs.
 #[derive(Debug)]
 pub enum FieldRequest {
-    /// The controller moved a mob.
+    /// The controller moved a mob, maybe as it acted (`action` << 1 |
+    /// facing left, 0xFF for none) with `skill_data`, and wants it to
+    /// attack next (`want_attack`).
     MobMove {
         object_id: i32,
         move_id: i16,
+        want_attack: bool,
+        action: u8,
+        skill_data: i32,
         start: (i16, i16),
         movement: Vec<u8>,
     },

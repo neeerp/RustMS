@@ -38,6 +38,9 @@ pub struct LiveMob {
     pub foothold: i16,
     pub home_foothold: i16,
     pub hp: i64,
+    /// Its MP, which its attacks cost. It doesn't come back: a v83 client
+    /// never regains it either, and when the server should is unknown.
+    pub mp: i32,
     pub controller: Option<ClientId>,
     /// Until when the controller's client is chasing its player with it.
     pub aggro_until: Option<Instant>,
@@ -58,6 +61,23 @@ pub struct MobStatus {
     pub until: Instant,
     /// When a status that hurts the mob next does.
     pub next_hurt: Instant,
+}
+
+/// A mob's attackN is action 12 + N - 1, sent as action << 1 | facing left
+/// (FUN_0066a517); its skills follow at 21.
+pub const FIRST_ATTACK_ACTION: u8 = 12;
+pub const FIRST_SKILL_ACTION: u8 = 21;
+/// No action.
+pub const NO_ACTION: u8 = 0xFF;
+
+/// What a controller's move of a mob let it do.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct MobAct {
+    /// The action to show the others.
+    pub action: u8,
+    /// Whether it may attack on its next move.
+    pub next_attack: bool,
+    pub mp: i16,
 }
 
 /// How often a status that hurts a mob does: every client shows it once a
@@ -184,6 +204,7 @@ impl MobSet {
                     foothold: spawn.template.foothold,
                     home_foothold: spawn.template.foothold,
                     hp: i64::from(spawn.info.max_hp),
+                    mp: spawn.info.max_mp,
                     controller: None,
                     aggro_until: None,
                     controller_distance: None,
@@ -304,6 +325,30 @@ impl MobSet {
             }
         }
         true
+    }
+
+    /// The controller's mob used `action` (action << 1 | facing left, or
+    /// [`NO_ACTION`]) as it moved, and its client wants it to attack next
+    /// (`want_attack`). An attack costs the mob its MP; one it lacks or
+    /// can't pay for is shown as no action, as are skills, which the server
+    /// hasn't granted.
+    pub fn act(&mut self, object_id: i32, action: u8, want_attack: bool) -> Option<MobAct> {
+        let mob = self.live.get_mut(&object_id)?;
+        let mut shown = action;
+        if action != NO_ACTION && action >> 1 >= FIRST_SKILL_ACTION {
+            shown = NO_ACTION;
+        } else if action != NO_ACTION && action >> 1 >= FIRST_ATTACK_ACTION {
+            let index = usize::from((action >> 1) - FIRST_ATTACK_ACTION);
+            match mob.info.attacks.get(index) {
+                Some(attack) if attack.mp_cost <= mob.mp => mob.mp -= attack.mp_cost,
+                _ => shown = NO_ACTION,
+            }
+        }
+        Some(MobAct {
+            action: shown,
+            next_attack: want_attack && !mob.info.not_attack && !mob.info.attacks.is_empty(),
+            mp: i16::try_from(mob.mp).unwrap_or(i16::MAX),
+        })
     }
 
     /// Put statuses caused by `skill_id` on a mob from `now` until `until`,
@@ -590,6 +635,49 @@ mod tests {
                 ..MobInfo::default()
             },
         )
+    }
+
+    #[test]
+    fn attacks_cost_mp() {
+        let now = Instant::now();
+        let (template, mut info) = snail_spawn(100);
+        info.max_mp = 3;
+        info.attacks = vec![game_data::mobs::MobAttack {
+            mp_cost: 2,
+            ..Default::default()
+        }];
+        let mut mobs = MobSet::new([(template, info)]);
+        let mob = mobs.respawn(now)[0];
+        let attack1_left = FIRST_ATTACK_ACTION << 1 | 1;
+        let walk = mobs.act(mob, NO_ACTION, true).unwrap();
+        assert_eq!(
+            (walk.action, walk.next_attack, walk.mp),
+            (NO_ACTION, true, 3)
+        );
+        let first = mobs.act(mob, attack1_left, false).unwrap();
+        assert_eq!(
+            (first.action, first.next_attack, first.mp),
+            (attack1_left, false, 1)
+        );
+        // Out of MP, and with no attack2: shown as no action.
+        assert_eq!(mobs.act(mob, attack1_left, true).unwrap().action, NO_ACTION);
+        assert_eq!(
+            mobs.act(mob, (FIRST_ATTACK_ACTION + 1) << 1, true)
+                .unwrap()
+                .action,
+            NO_ACTION
+        );
+        // Skills await the server's grant.
+        assert_eq!(
+            mobs.act(mob, FIRST_SKILL_ACTION << 1, true).unwrap().action,
+            NO_ACTION
+        );
+        // A hit (action 6) is shown as it is.
+        assert_eq!(mobs.act(mob, 6 << 1, true).unwrap().action, 6 << 1);
+        // A mob without attacks never may.
+        let mut snails = MobSet::new([snail_spawn(100)]);
+        let snail = snails.respawn(now)[0];
+        assert!(!snails.act(snail, NO_ACTION, true).unwrap().next_attack);
     }
 
     #[test]

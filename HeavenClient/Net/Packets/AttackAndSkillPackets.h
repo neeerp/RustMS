@@ -137,8 +137,8 @@ namespace ms
 			write_byte(direction);
 		}
 
-		// From mob attack result.
-		TakeDamagePacket(const MobAttackResult& result, From from) : TakeDamagePacket(from, 0, result.damage, result.mobid, result.oid, result.direction) {}
+		// From a mob's touch or attack.
+		TakeDamagePacket(const MobAttackResult& result) : TakeDamagePacket(result.index, result.element, result.damage, result.mobid, result.oid, result.direction) {}
 	};
 
 	// Packet which notifies the server of a skill usage.

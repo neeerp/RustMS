@@ -12,6 +12,7 @@ use packet::Packet;
 
 const HUNTING_GROUND: i32 = 40_000;
 const SNAIL: i32 = 100100;
+const STUMPY: i32 = 3_220_000;
 /// A Crimsonwood Keep room whose mobs go for players unprovoked.
 const KEEP_ROOM: i32 = 610_030_011;
 
@@ -43,10 +44,15 @@ fn report_distance(object_id: i32, distance: i32) -> Packet {
 }
 
 fn touched(damage: i32, mob_id: i32) -> Packet {
+    hurt(-1, damage, mob_id)
+}
+
+/// `from` is the mob's attack index, or -1 for its body.
+fn hurt(from: i8, damage: i32, mob_id: i32) -> Packet {
     let mut p = Packet::new_empty();
     p.write_short(RecvOpcode::TakeDamage as i16).unwrap();
     p.write_int(0).unwrap();
-    p.write_byte(-1i8 as u8).unwrap();
+    p.write_byte(from as u8).unwrap();
     p.write_byte(0).unwrap();
     p.write_int(damage).unwrap();
     p.write_int(mob_id).unwrap();
@@ -140,16 +146,29 @@ async fn snails_spawn_move_fight_back_die_and_respawn() {
     })
     .await;
 
-    // Touching a snail hurts up to its attack (12), no more.
-    send(&mut hunter.connection, touched(12, SNAIL)).await;
+    // Touching a snail hurts a level 1 beginner (stats totalling 25) up to
+    // ceil(12^2 * 0.0085 + 7 * (1/550 + 50 * 0.00125 + 0.28) * 1.3) = 5,
+    // no more.
+    send(&mut hunter.connection, touched(5, SNAIL)).await;
     until(&mut hunter.connection, &mut h, |t| {
         t.stat(stat::HP).is_some()
     })
     .await;
     let after_touch = h.stat_values(stat::HP);
-    send(&mut hunter.connection, touched(13, SNAIL)).await;
+    send(&mut hunter.connection, touched(6, SNAIL)).await;
     read_for(&mut hunter.connection, &mut h, 400).await;
     assert_eq!(h.stat_values(stat::HP), after_touch);
+
+    // A mob's attack hurts by its index: Stumpy has an attack2 but no
+    // attack3.
+    send(&mut hunter.connection, hurt(2, 1, STUMPY)).await;
+    read_for(&mut hunter.connection, &mut h, 400).await;
+    assert_eq!(h.stat_values(stat::HP), after_touch);
+    send(&mut hunter.connection, hurt(1, 1, STUMPY)).await;
+    until(&mut hunter.connection, &mut h, |t| {
+        t.stat_values(stat::HP).len() > after_touch.len()
+    })
+    .await;
 
     // Four more snails (15 EXP total) reach level 2, which others see.
     for &snail in &snails[1..5] {

@@ -20,6 +20,7 @@
 #include "../Template/Rectangle.h"
 
 #include <cstdint>
+#include <optional>
 #include <vector>
 #include <unordered_map>
 
@@ -94,7 +95,23 @@ namespace ms
 		int32_t matk = 0;
 		int32_t mobid = 0;
 		int32_t oid = 0;
+		// The mob's level and accuracy, which the player's avoid is weighed
+		// against.
+		int32_t level = 0;
+		int32_t accuracy = 0;
 		Point<int16_t> origin;
+		// Which of the mob's attacks (attack1 is 0) hit, or -1 for its body.
+		int8_t index = -1;
+		bool magic = false;
+		// A magic attack's element: 0 none, 1 ice, 2 fire, 3 lightning,
+		// 4 poison (FUN_006811a7).
+		uint8_t element = 0;
+		// A deadly attack leaves 1 HP, and an MP burn takes 1.
+		bool deadly = false;
+		bool mpburn = false;
+		// An attack knocks the player the way the mob faced; a touch, away
+		// from its body.
+		std::optional<bool> pushleft;
 		bool valid = false;
 
 		// Create a mob attack for touch damage.
@@ -118,11 +135,15 @@ namespace ms
 		int32_t mobid;
 		int32_t oid;
 		uint8_t direction;
+		int8_t index;
+		uint8_t element;
 
 		MobAttackResult(const MobAttack &attack, int32_t damage, uint8_t direction) : damage(damage),
-																					  direction(direction),
 																					  mobid(attack.mobid),
-																					  oid(attack.oid)
+																					  oid(attack.oid),
+																					  direction(direction),
+																					  index(attack.index),
+																					  element(attack.magic ? attack.element : 0)
 		{}
 	};
 

@@ -28,6 +28,8 @@
 
 namespace ms
 {
+	struct MobAttack;
+
 	class CharStats
 	{
 	public:
@@ -63,7 +65,9 @@ namespace ms
 
 		void change_job(uint16_t id);
 
-		int32_t calculate_damage(int32_t mobatk) const;
+		// What a mob's touch or attack takes from the player, or 0 when it
+		// misses. `missroll` and `roll` are uniform in [0, 1).
+		int32_t calculate_damage(const MobAttack &attack, double missroll, double roll) const;
 
 		bool is_damage_buffed() const;
 
