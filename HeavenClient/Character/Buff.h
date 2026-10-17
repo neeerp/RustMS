@@ -18,7 +18,6 @@
 #pragma once
 
 #include <cstdint>
-#include <unordered_map>
 
 namespace ms
 {
@@ -97,8 +96,9 @@ namespace ms
 			LENGTH
 		};
 
-		extern const std::unordered_map<Id, uint64_t> first_codes;
-		extern const std::unordered_map<Id, uint64_t> second_codes;
+		// The stat with flag bit `bit` of the 128 a buff packet carries
+		// (CFlag<128>), or NONE for one HeavenClient doesn't keep.
+		Id by_bit(uint8_t bit);
 	}
 
 	struct Buff

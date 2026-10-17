@@ -3,7 +3,7 @@
 use crate::skills::{self, Learned};
 use crate::{error::NetworkError, packet::op::SendOpcode};
 use game::inventory::equip_slot;
-use game::{InventoryType, Player};
+use game::{BuffStat, InventoryType, Player};
 use packet::{io::read::PktRead, io::write::PktWrite, Packet};
 use std::io::Cursor;
 
@@ -161,6 +161,11 @@ fn weapon_formula(weapon_id: i32) -> (f64, bool) {
     }
 }
 
+/// What a running buff adds to a stat, or 0.
+fn buff(player: &Player, stat: BuffStat) -> i32 {
+    player.buffs.value(stat).map_or(0, i32::from)
+}
+
 /// The most one basic hit can do (`calculateMaxBaseDamage`).
 pub fn max_base_damage(player: &Player) -> i32 {
     let stats = &player.stats;
@@ -170,7 +175,8 @@ pub fn max_base_damage(player: &Player) -> i32 {
         .items(InventoryType::Equipped)
         .filter_map(|(_, item)| item.equip.as_ref())
         .map(|equip| i32::from(equip.watk))
-        .sum();
+        .sum::<i32>()
+        + buff(player, BuffStat::Pad);
     let weapon = worn(equip_slot::WEAPON).map_or(0, |item| item.item_id);
     let (multiplier, luck_based) = weapon_formula(weapon);
     let (main, secondary) = match weapon / 10_000 {
@@ -194,7 +200,7 @@ pub fn max_magic_damage(player: &Player, spell: i32) -> i32 {
         .fold((i32::from(player.stats.int), 0), |(int, matk), equip| {
             (int + i32::from(equip.int), matk + i32::from(equip.matk))
         });
-    let magic = f64::from(int + matk);
+    let magic = f64::from(int + matk + buff(player, BuffStat::Mad));
     let max = ((magic * magic / 1000.0 + magic) / 30.0 + f64::from(int) / 200.0) * f64::from(spell);
     max.ceil() as i32
 }
@@ -246,6 +252,10 @@ fn shot_ammo(
         .get(InventoryType::Equipped, equip_slot::WEAPON)
         .ok_or(AttackRejection::Ammo)?
         .item_id;
+    // Soul Arrow shoots a bow or crossbow without arrows.
+    if matches!(weapon / 10_000, 145 | 146) && player.buffs.value(BuffStat::SoulArrow).is_some() {
+        return Ok(None);
+    }
     let quantity = skill.map_or(1, |skill| {
         let effect = &skill.effect;
         if effect.bullet_consume != 0 {
@@ -334,6 +344,16 @@ pub fn validate(attack: &Attack, player: &Player) -> Result<Uses, AttackRejectio
         };
         let mob_count = effect.mob_count;
         (Some(skill), mob_count, hit_count, cap)
+    };
+    // Shadow Partner throws every star again, up to 15 lines in all, but
+    // not for Taunt or Vampire (0x953b2a).
+    let hit_count = if attack.kind == AttackKind::Ranged
+        && player.buffs.value(BuffStat::ShadowPartner).is_some()
+        && !matches!(attack.skill, 4121003 | 14101006)
+    {
+        (hit_count * 2).min(15)
+    } else {
+        hit_count
     };
     if i32::from(attack.mob_count) > mob_count
         || i32::from(attack.hit_count) > hit_count
@@ -727,6 +747,55 @@ mod tests {
             validate(&seven(&[1, 1, 1]), &player).unwrap_err(),
             AttackRejection::TooManyTargets
         );
+    }
+
+    #[test]
+    fn shadow_partner_doubles_a_shot_and_soul_arrow_needs_no_arrows() {
+        let now = std::time::Instant::now();
+        let long = std::time::Duration::from_secs(60);
+        let shot = |damage: &[i32], slot| {
+            parse_attack(
+                &kind_attack_packet(AttackKind::Ranged, 0, slot, damage),
+                AttackKind::Ranged,
+            )
+            .unwrap()
+        };
+        let mut player = rogue_with_stars(100);
+        assert_eq!(
+            validate(&shot(&[1, 1], 1), &player).unwrap_err(),
+            AttackRejection::TooManyTargets
+        );
+        let partner = game::Buff::new(4111002, BuffStat::ShadowPartner, 80, now, long);
+        player.buffs.give(partner);
+        assert!(validate(&shot(&[1, 1], 1), &player).is_ok());
+
+        player.inventory.insert(
+            InventoryType::Equipped,
+            equip_slot::WEAPON,
+            Item::equipment(1452002, EquipStats::default()),
+        );
+        assert_eq!(
+            validate(&shot(&[1], 0), &player).unwrap_err(),
+            AttackRejection::Ammo
+        );
+        let soul_arrow = game::Buff::new(3101004, BuffStat::SoulArrow, 1, now, long);
+        player.buffs.give(soul_arrow);
+        assert_eq!(validate(&shot(&[1], 0), &player).unwrap().ammo, None);
+    }
+
+    #[test]
+    fn attack_buffs_raise_the_damage_cap() {
+        let player = beginner_with_sword();
+        let mut buffed = player.clone();
+        let rage = game::Buff::new(
+            1101006,
+            BuffStat::Pad,
+            12,
+            std::time::Instant::now(),
+            std::time::Duration::from_secs(60),
+        );
+        buffed.buffs.give(rage);
+        assert!(max_base_damage(&buffed) > max_base_damage(&player));
     }
 
     #[test]

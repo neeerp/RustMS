@@ -57,6 +57,21 @@ pub struct SkillLevel {
     /// Endure do (`hp`, `mp`).
     pub hp: i32,
     pub mp: i32,
+    /// What a buff adds to attack, defense, accuracy, avoidability, and jump
+    /// (`pad`, `pdd`, `mdd`, `acc`, `eva`, `jump`); magic attack is `magic`
+    /// and speed `speed`.
+    pub pad: i32,
+    pub pdd: i32,
+    pub mdd: i32,
+    pub acc: i32,
+    pub eva: i32,
+    pub jump: i32,
+    /// A chance in percent, e.g. Power Stance's (`prop`).
+    pub prop: i32,
+    /// An item each use costs, and how many (`itemCon`, `itemConNo`), as
+    /// Shadow Partner's Summoning Rock.
+    pub item_cost: i32,
+    pub item_cost_count: i32,
 }
 
 pub struct SkillData {
@@ -109,6 +124,15 @@ impl SkillData {
                     y: int("y")?,
                     hp: int("hp")?,
                     mp: int("mp")?,
+                    pad: int("pad")?,
+                    pdd: int("pdd")?,
+                    mdd: int("mdd")?,
+                    acc: int("acc")?,
+                    eva: int("eva")?,
+                    jump: int("jump")?,
+                    prop: int("prop")?,
+                    item_cost: int("itemCon")?,
+                    item_cost_count: int("itemConNo")?,
                 });
             }
         }

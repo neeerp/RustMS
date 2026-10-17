@@ -342,6 +342,7 @@ impl ClientActor {
                 })
                 .await?
             }
+            WorldAction::BuffsChanged(announce) => self.show_buffs(announce).await?,
             WorldAction::Whisper(delivery) => {
                 self.send_to_directory(DirectoryMessage::Whisper {
                     from: self.client_id,

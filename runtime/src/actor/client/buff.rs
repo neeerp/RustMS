@@ -1,7 +1,10 @@
 use super::ClientActor;
 use crate::error::RuntimeError;
+use crate::message::FieldMessage;
+use game::BuffStat;
 use net::packet::build::world::buff;
 use net::packet::build::world::stat::{self, StatUpdate};
+use packet::Packet;
 
 impl ClientActor {
     /// When the player's buffs next need `update_buffs`.
@@ -26,7 +29,31 @@ impl ClientActor {
         for skill_id in tick.cooled {
             packets.push(buff::build_cooldown(skill_id, 0)?);
         }
-        self.send_all(&mut packets).await
+        self.send_all(&mut packets).await?;
+        self.hide_buffs(&tick.expired).await
+    }
+
+    /// Show the others on the map a change to the buffs they see, and keep
+    /// the player's field avatar up to date for those who arrive later.
+    pub(super) async fn show_buffs(&mut self, announce: Packet) -> Result<(), RuntimeError> {
+        let avatar = self.in_game()?.player.field_avatar(0, 0, 0);
+        self.send_to_field(FieldMessage::UpdateAvatar {
+            client_id: self.client_id,
+            avatar,
+            announce: Some(announce),
+        })
+        .await
+    }
+
+    /// Tell the others which of the buffs they saw ended.
+    async fn hide_buffs(&mut self, ended: &[BuffStat]) -> Result<(), RuntimeError> {
+        let unseen: Vec<_> = ended.iter().copied().filter(|stat| stat.shown()).collect();
+        if unseen.is_empty() {
+            return Ok(());
+        }
+        let id = self.in_game()?.player.id();
+        let announce = buff::build_cancel_foreign_buff(id, &unseen)?;
+        self.show_buffs(announce).await
     }
 
     /// End every buff now, e.g. on death. Buffs don't follow the player to
@@ -37,6 +64,7 @@ impl ClientActor {
             return Ok(());
         }
         let mut packet = buff::build_cancel_buff(&ended)?;
-        self.send(&mut packet).await
+        self.send(&mut packet).await?;
+        self.hide_buffs(&ended).await
     }
 }

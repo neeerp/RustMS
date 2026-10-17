@@ -17,6 +17,7 @@
 //////////////////////////////////////////////////////////////////////////////////
 #include "MapObjectHandlers.h"
 
+#include "Helpers/BuffParser.h"
 #include "Helpers/LoginParser.h"
 #include "Helpers/MovementParser.h"
 
@@ -41,22 +42,8 @@ namespace ms
 		recv.read_short();	// guildlogo
 		recv.read_byte();	// guildlogocolor
 
-		recv.skip(8);
-
-		bool morphed = recv.read_int() == 2;
-		int32_t buffmask1 = recv.read_int();
-		int16_t buffvalue = 0;
-
-		if (buffmask1 != 0)
-			buffvalue = morphed ? recv.read_short() : recv.read_byte();
-
-		recv.read_int(); // buffmask 2
-
-		recv.skip(43);
-
-		recv.read_int(); // 'mount'
-
-		recv.skip(61);
+		BuffParser::Flags flags = BuffParser::read_flags(recv);
+		auto buffs = BuffParser::parse_shown(recv, flags);
 
 		int16_t job = recv.read_short();
 		LookEntry look = LoginParser::parse_look(recv);
@@ -106,8 +93,27 @@ namespace ms
 		recv.read_byte(); // team
 
 		Stage::get().get_chars().spawn(
-			{ cid, look, level, job, name, stance, position, chair }
+			{ cid, look, level, job, name, stance, position, chair, std::move(buffs) }
 		);
+	}
+
+	void GiveForeignBuffHandler::handle(InPacket& recv) const
+	{
+		int32_t cid = recv.read_int();
+		BuffParser::Flags flags = BuffParser::read_flags(recv);
+		auto buffs = BuffParser::parse_shown(recv, flags);
+
+		if (Optional<OtherChar> otherchar = Stage::get().get_chars().get_char(cid))
+			otherchar->show_buffs(buffs);
+	}
+
+	void CancelForeignBuffHandler::handle(InPacket& recv) const
+	{
+		int32_t cid = recv.read_int();
+		BuffParser::Flags flags = BuffParser::read_flags(recv);
+
+		if (Optional<OtherChar> otherchar = Stage::get().get_chars().get_char(cid))
+			otherchar->hide_buffs(BuffParser::stats(flags));
 	}
 
 	void RemoveCharHandler::handle(InPacket& recv) const

@@ -1,3 +1,4 @@
+use super::buff;
 use crate::codec::encode_avatar_look;
 use crate::{error::NetworkError, packet::op::SendOpcode};
 use game::FieldAvatar;
@@ -18,7 +19,7 @@ pub fn build_player_enter_field(avatar: &FieldAvatar) -> Result<Packet, NetworkE
     packet.write_str_with_length("")?;
     packet.write_bytes(&[0; 6])?;
 
-    write_foreign_buffs(&mut packet)?;
+    write_foreign_buffs(&mut packet, &avatar.buffs)?;
 
     packet.write_short(avatar.job)?;
     encode_avatar_look(&mut packet, &avatar.look, false)?;
@@ -46,20 +47,18 @@ pub fn build_player_enter_field(avatar: &FieldAvatar) -> Result<Packet, NetworkE
     Ok(packet)
 }
 
-/// The foreign buff block with no active buffs. Its size is fixed by the
-/// client (8 + 4 + 4 + 4 + 43 + 65 bytes); the 0xFC/0x01 and the repeated
-/// spawn constant mirror what the reference server sends.
-fn write_foreign_buffs(packet: &mut Packet) -> Result<(), NetworkError> {
+/// The buffs others see, then the two-state stats' fixed blocks, which
+/// are always empty here; the repeated spawn constant mirrors what the
+/// reference server sends.
+fn write_foreign_buffs(
+    packet: &mut Packet,
+    shown: &[(game::BuffStat, i32)],
+) -> Result<(), NetworkError> {
     const CHAR_MAGIC_SPAWN: i32 = 0x2D0F_5E1A;
-    packet.write_int(0)?;
-    packet.write_short(0)?;
-    packet.write_byte(0xFC)?;
-    packet.write_byte(1)?;
-    packet.write_int(0)?; // morph
-    packet.write_int(0)?; // buff mask (high)
-    packet.write_int(0)?; // buff mask (low)
+    buff::write_shown(packet, shown, true)?;
 
-    packet.write_int(0)?; // energy charge
+    packet.write_short(0)?; // energy charge
+    packet.write_int(0)?;
     packet.write_short(0)?;
     packet.write_bytes(&[0; 4])?;
     packet.write_int(0)?; // dash speed
@@ -228,7 +227,7 @@ pub fn parse_movement(
 mod tests {
     use super::*;
     use crate::codec::testing::Expect;
-    use game::AvatarLook;
+    use game::{AvatarLook, BuffStat};
     use std::collections::BTreeMap;
 
     fn avatar() -> FieldAvatar {
@@ -250,6 +249,7 @@ mod tests {
             y: 275,
             stance: 4,
             chair: 3010000,
+            buffs: Vec::new(),
         }
     }
 
@@ -259,7 +259,11 @@ mod tests {
         expect.int(0).short(0).byte(0xFC).byte(1);
         expect.int(0); // morph
         expect.int(0); // buff mask (high)
-        expect.int(0); // buff mask (low)
+        empty_two_state(expect);
+    }
+
+    fn empty_two_state(expect: &mut Expect<'_>) {
+        expect.int(0); // defense attack and state, then two-state data
         expect.int(0).short(0).bytes(&[0; 4]); // energy charge
         expect.int(0).bytes(&[0; 11]).short(0); // dash speed
         expect.bytes(&[0; 9]).int(0).short(0).byte(0); // dash jump
@@ -300,6 +304,24 @@ mod tests {
         expect.byte(0).byte(0).byte(0); // new year cards, two zero bytes
         expect.byte(0); // team
         expect.end();
+    }
+
+    #[test]
+    fn spawn_player_carries_the_buffs_others_see() {
+        let mut avatar = avatar();
+        avatar.buffs = vec![(BuffStat::Speed, 40), (BuffStat::DarkSight, 1)];
+        let packet = build_player_enter_field(&avatar).unwrap();
+
+        let mut expect = Expect::new(&packet.bytes);
+        expect.short(SendOpcode::SpawnPlayer as i16);
+        expect.int(0x0102_0304).byte(10).string("Tester");
+        expect.string("").bytes(&[0; 6]);
+        expect
+            .long(0x01FC_0000_0000_0000)
+            .long((1 << 39) | (1 << 42));
+        expect.byte(40); // speed; Dark Sight has no data
+        empty_two_state(&mut expect);
+        expect.short(100);
     }
 
     #[test]

@@ -1,4 +1,4 @@
-use crate::buff::Buffs;
+use crate::buff::{BuffStat, Buffs};
 use crate::inventory::{equip_slot, Inventory};
 use crate::keymap::Keymap;
 use crate::monster_book::MonsterBook;
@@ -122,6 +122,8 @@ pub struct FieldAvatar {
     pub stance: u8,
     /// The portable chair (a 301xxxx setup item) the player sits on, or 0.
     pub chair: i32,
+    /// The buffs others see, as `Buffs::shown`.
+    pub buffs: Vec<(BuffStat, i32)>,
 }
 
 /// A character that is logged in. The owning client actor holds the only
@@ -200,6 +202,7 @@ impl Player {
             y,
             stance,
             chair: 0,
+            buffs: self.buffs.shown(),
         }
     }
 

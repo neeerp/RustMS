@@ -160,7 +160,7 @@ async fn read_next_set_field_warp(
     connection: &mut MapleTestConnection,
     phase: &'static str,
 ) -> SetFieldWarpPacket {
-    for _ in 0..32 {
+    for _ in 0..128 {
         let envelope = timeout(Duration::from_secs(5), connection.read_packet(phase))
             .await
             .expect("timed out waiting for map-transfer packet")
@@ -173,6 +173,7 @@ async fn read_next_set_field_warp(
             }
             x if x == SendOpcode::StatChange as i16 => continue,
             x if x == SendOpcode::SpawnNpc as i16 => continue,
+            x if x == SendOpcode::SpawnNpcRequestController as i16 => continue,
             x if x == SendOpcode::FieldEffect as i16 => continue,
             x if x == SendOpcode::SpawnMonster as i16
                 || x == SendOpcode::SpawnMonsterControl as i16

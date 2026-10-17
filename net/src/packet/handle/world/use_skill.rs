@@ -3,17 +3,16 @@ use crate::handler::{
     FieldRequest, HandlerResult, WorldAction, WorldContext, WorldHandler, WorldResult,
 };
 use crate::packet::build::world::stat::{self, StatUpdate};
-use crate::packet::build::world::{buff, skill};
+use crate::packet::build::world::{buff, inventory, skill};
 use crate::skills::{self, Learned};
-use game::{Buff, BuffStat, Player};
+use game::{Buff, BuffStat, InventoryChange, Player};
 use packet::{io::read::PktRead, Packet};
 use std::io::Cursor;
 use std::time::{Duration, Instant};
 use tracing::debug;
 
-/// `USE_SKILL`: a skill that doesn't attack. Only the beginner buffs
-/// (Recovery and Nimble Feet, for every beginner job) and Monster Magnet
-/// do anything yet. Every answer unlocks the client, which waits on it
+/// `USE_SKILL`: a skill that doesn't attack: the buffs (see
+/// `skills::buffs`), Heal, and Monster Magnet. Every answer unlocks the client, which waits on it
 /// before using another skill or item.
 pub struct UseSkillHandler;
 
@@ -137,7 +136,13 @@ impl WorldHandler for CancelBuffHandler {
         if ended.is_empty() {
             return Ok(HandlerResult::empty());
         }
-        Ok(HandlerResult::reply(buff::build_cancel_buff(&ended)?))
+        let result = HandlerResult::reply(buff::build_cancel_buff(&ended)?);
+        let unseen: Vec<_> = ended.into_iter().filter(|stat| stat.shown()).collect();
+        if unseen.is_empty() {
+            return Ok(result);
+        }
+        let foreign = buff::build_cancel_foreign_buff(ctx.player.id(), &unseen)?;
+        Ok(result.with(WorldAction::BuffsChanged(foreign)))
     }
 }
 
@@ -151,6 +156,8 @@ enum Refusal {
     Unsupported,
     CoolingDown,
     NotEnoughMp,
+    /// Without the item the skill costs.
+    NoItem,
 }
 
 /// Monster Magnet reaches at most this many mobs (0x96c215).
@@ -241,25 +248,16 @@ fn heal(player: &mut Player, level: i32, party: u8, roll: f64) -> Result<i16, Re
     Ok(player.add_hp(amount as i32))
 }
 
-/// The buff a skill gives, and its value at this level.
-fn buff_of(skill: &Learned) -> Option<(BuffStat, i32)> {
-    match skill.skill_id % 10_000_000 {
-        1001 => Some((BuffStat::Recovery, skill.effect.x)),
-        1002 => Some((BuffStat::Speed, skill.effect.speed)),
-        _ => None,
-    }
-}
-
-/// A buff skill that was used.
+/// A buff skill that was used: the stats it gave, and the items it cost.
 #[derive(Debug)]
 struct Used {
     skill: Learned,
-    stat: BuffStat,
-    value: i16,
+    stats: Vec<(BuffStat, i16)>,
+    items: Vec<InventoryChange>,
 }
 
-/// Check the skill can be used now, then spend its MP and start its buff
-/// and cooldown.
+/// Check the skill can be used now, then spend its MP and items and start
+/// its buffs and cooldown.
 fn use_skill(
     player: &mut Player,
     skill_id: i32,
@@ -272,7 +270,7 @@ fn use_skill(
     let skill = skills::learned(player, skill_id)
         .filter(|skill| skill.level == level)
         .ok_or(Refusal::NotLearned)?;
-    let (stat, value) = buff_of(&skill).ok_or(Refusal::Unsupported)?;
+    let stats = skills::buffs(&skill).ok_or(Refusal::Unsupported)?;
     if player.buffs.cooling_down(skill_id, now) {
         return Err(Refusal::CoolingDown);
     }
@@ -280,34 +278,61 @@ fn use_skill(
     if i32::from(player.stats.mp) < effect.mp_cost {
         return Err(Refusal::NotEnoughMp);
     }
+    let cost = effect.item_cost_count.max(1);
+    if effect.item_cost != 0 && player.inventory.count(effect.item_cost) < cost {
+        return Err(Refusal::NoItem);
+    }
 
     player.add_mp(-effect.mp_cost);
-    let value = value as i16;
+    let items = if effect.item_cost != 0 {
+        player
+            .inventory_mut()
+            .remove(effect.item_cost, cost as i16)
+            .map_err(|_| Refusal::NoItem)?
+    } else {
+        Vec::new()
+    };
     let duration = Duration::from_secs(effect.duration.max(0) as u64);
-    player
-        .buffs
-        .give(Buff::new(skill_id, stat, value, now, duration));
+    let stats: Vec<_> = stats
+        .into_iter()
+        .map(|(stat, value)| (stat, value as i16))
+        .collect();
+    for &(stat, value) in &stats {
+        player
+            .buffs
+            .give(Buff::new(skill_id, stat, value, now, duration));
+    }
     if effect.cooldown > 0 {
         let length = Duration::from_secs(effect.cooldown as u64);
         player.buffs.start_cooldown(skill_id, now, length);
     }
-    Ok(Used { skill, stat, value })
+    Ok(Used {
+        skill,
+        stats,
+        items,
+    })
 }
 
-/// The new MP, the buff, and the cooldown for the player; the skill's
-/// effect for everyone else on the map.
+/// The new MP, the items spent, the buff, and the cooldown for the player;
+/// the skill's effect and the buffs they show for everyone else on the map.
 fn announce(player: &Player, used: &Used) -> WorldResult {
-    let Used { skill, stat, value } = used;
+    let Used {
+        skill,
+        stats,
+        items,
+    } = used;
     let effect = &skill.effect;
     let mut result = HandlerResult::reply(stat::build_stat_update(
         true,
         &[StatUpdate::Mp(player.stats.mp)],
-    )?)
-    .with_reply(buff::build_give_buff(
+    )?);
+    if !items.is_empty() {
+        result = result.with_reply(inventory::build_inventory_operation(false, items)?);
+    }
+    result = result.with_reply(buff::build_give_buff(
         skill.skill_id,
         effect.duration * 1000,
-        *stat,
-        *value,
+        stats,
     )?);
     if effect.cooldown > 0 {
         result = result.with_reply(buff::build_cooldown(
@@ -321,7 +346,18 @@ fn announce(player: &Player, used: &Used) -> WorldResult {
         player.stats.level,
         skill.level as u8,
     )?;
-    Ok(result.with(WorldAction::Field(FieldRequest::Broadcast(shown))))
+    result = result.with(WorldAction::Field(FieldRequest::Broadcast(shown)));
+    let given: Vec<_> = player
+        .buffs
+        .shown()
+        .into_iter()
+        .filter(|(stat, _)| stats.iter().any(|(given, _)| given == stat))
+        .collect();
+    if !given.is_empty() {
+        let foreign = buff::build_give_foreign_buff(player.id(), &given)?;
+        result = result.with(WorldAction::BuffsChanged(foreign));
+    }
+    Ok(result)
 }
 
 #[cfg(test)]
@@ -376,6 +412,7 @@ mod tests {
             .map(|action| match action {
                 WorldAction::Reply(p) => p.opcode(),
                 WorldAction::Field(FieldRequest::Broadcast(p)) => p.opcode(),
+                WorldAction::BuffsChanged(p) => p.opcode(),
                 other => panic!("unexpected {other:?}"),
             })
             .collect()
@@ -401,6 +438,7 @@ mod tests {
                 SendOpcode::GiveBuff as i16,
                 SendOpcode::Cooldown as i16,
                 SendOpcode::ShowForeignEffect as i16,
+                SendOpcode::GiveForeignBuff as i16,
             ]
         );
         assert_eq!(player.stats.mp, 13);
@@ -444,9 +482,73 @@ mod tests {
             opcodes(CancelBuffHandler.handle(&mut packet, &mut ctx))
         };
         assert_eq!(cancel(1001), Vec::<i16>::new());
-        assert_eq!(cancel(1002), [SendOpcode::CancelBuff as i16]);
+        assert_eq!(
+            cancel(1002),
+            [
+                SendOpcode::CancelBuff as i16,
+                SendOpcode::CancelForeignBuff as i16
+            ]
+        );
         assert_eq!(cancel(1002), Vec::<i16>::new());
         assert!(player.buffs.active().is_empty());
+    }
+
+    #[test]
+    fn job_buffs_give_every_stat_of_their_level() {
+        if skills::data().is_err() {
+            return;
+        }
+        let now = Instant::now();
+        let mut player = beginner_with(4101004, 20);
+        (player.stats.mp, player.stats.max_mp) = (200, 200);
+        let used = use_skill(&mut player, 4101004, 20, now).unwrap();
+        assert_eq!(used.stats, [(BuffStat::Speed, 40), (BuffStat::Jump, 20)]);
+        assert_eq!(player.buffs.shown(), [(BuffStat::Speed, 40)]);
+
+        // Hyper Body's own stats; nothing others see.
+        player.skills.set(SkillRecord {
+            skill_id: 1301007,
+            level: 30,
+            master_level: 0,
+            expiration: None,
+        });
+        let used = use_skill(&mut player, 1301007, 30, now).unwrap();
+        assert_eq!(used.stats, [(BuffStat::MaxHp, 60), (BuffStat::MaxMp, 60)]);
+        let sent = opcodes(announce(&player, &used));
+        assert!(!sent.contains(&(SendOpcode::GiveForeignBuff as i16)));
+    }
+
+    #[test]
+    fn shadow_partner_costs_a_summoning_rock() {
+        if skills::data().is_err() {
+            return;
+        }
+        let now = Instant::now();
+        let mut player = beginner_with(4111002, 30);
+        (player.stats.mp, player.stats.max_mp) = (200, 200);
+        assert_eq!(
+            use_skill(&mut player, 4111002, 30, now).unwrap_err(),
+            Refusal::NoItem
+        );
+        assert_eq!(player.stats.mp, 200);
+        player
+            .inventory_mut()
+            .add(game::Item::stack(4006001, 2), 100)
+            .unwrap();
+        let used = use_skill(&mut player, 4111002, 30, now).unwrap();
+        assert_eq!(used.stats, [(BuffStat::ShadowPartner, 80)]);
+        assert_eq!(player.inventory.count(4006001), 1);
+        let sent = opcodes(announce(&player, &used));
+        assert_eq!(
+            sent,
+            [
+                SendOpcode::StatChange as i16,
+                SendOpcode::InventoryOperation as i16,
+                SendOpcode::GiveBuff as i16,
+                SendOpcode::ShowForeignEffect as i16,
+                SendOpcode::GiveForeignBuff as i16,
+            ]
+        );
     }
 
     #[test]
