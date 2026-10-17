@@ -49,6 +49,14 @@ namespace ms
 		// Changes stance and resets animation.
 		void set_stance(const std::string &stance);
 
+		// Pick idle actions for everyone, or stop (FUN_006d2024).
+		void set_control(bool control);
+
+		// Play an idle action, which the controller chose (FUN_006d2e07):
+		// `action` is an index into the actions from 2, or -1 for `line`
+		// of the info/speak lines alone; `line` is -1 for none.
+		void act(int8_t action, int8_t line);
+
 		// Check whether this is a server-sided NPC
 		bool isscripted() const;
 
@@ -98,6 +106,8 @@ namespace ms
 		bool flip;
 		std::string stance;
 		bool control;
+		// The controller waits for its last choice to come back.
+		bool pending = false;
 
 		Randomizer random;
 		Text namelabel;

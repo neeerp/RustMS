@@ -65,6 +65,8 @@ pub enum SendOpcode {
     ThrowGrenade = 0xCC,
     CancelChair = 0xCD,
     SpawnNpc = 0x101,
+    SpawnNpcRequestController = 0x103,
+    NpcAction = 0x104,
     DropItemFromMapObject = 0x10C,
     RemoveItemFromMap = 0x10D,
     HitReactor = 0x115,

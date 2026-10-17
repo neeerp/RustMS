@@ -45,6 +45,14 @@ namespace ms
 				npcs.add(spawn.instantiate(physics));
 		}
 
+		for (; !controls.empty(); controls.pop())
+		{
+			auto [oid, control] = controls.front();
+
+			if (auto npc = npcs.get(oid))
+				static_cast<Npc *>(npc.get())->set_control(control);
+		}
+
 		npcs.update(physics);
 	}
 
@@ -57,6 +65,17 @@ namespace ms
 	{
 		if (auto npc = npcs.get(oid))
 			npc->deactivate();
+	}
+
+	void MapNpcs::control(int32_t oid, bool control)
+	{
+		controls.emplace(oid, control);
+	}
+
+	void MapNpcs::act(int32_t oid, int8_t action, int8_t line)
+	{
+		if (auto npc = npcs.get(oid))
+			static_cast<Npc *>(npc.get())->act(action, line);
 	}
 
 	void MapNpcs::clear()

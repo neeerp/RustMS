@@ -36,6 +36,21 @@ namespace ms
 		}
 	};
 
+	// The idle action the NPCs' controller chose for one (FUN_006d3273): the
+	// action as an animation index from 2, or -1 for a line alone, then the
+	// line, -1 for none. The server shows it to everyone.
+	// Opcode: NPC_ACTION(197)
+	class NpcActionPacket : public OutPacket
+	{
+	public:
+		NpcActionPacket(int32_t oid, int8_t action, int8_t line) : OutPacket(OutPacket::Opcode::NPC_ACTION)
+		{
+			write_int(oid);
+			write_byte(action);
+			write_byte(line);
+		}
+	};
+
 	// Packet which sends a response to an NPC dialog to the server
 	// Opcode: NPC_TALK_MORE(60)
 	class NpcTalkMorePacket : public OutPacket

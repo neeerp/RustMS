@@ -142,9 +142,24 @@ namespace ms
 		void handle(InPacket& recv) const override;
 	};
 
-	// Spawn an NPC on the current stage and take control of it
+	// Remove an NPC from the stage (FUN_006d9a25)
+	// Opcode: REMOVE_NPC(258)
+	class RemoveNpcHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
+	// Take control of an NPC, spawning it if need be, or give it up
+	// (FUN_006d9a83). The controller picks the NPC's idle actions.
 	// Opcode: SPAWN_NPC_C(259)
 	class SpawnNpcControllerHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
+	// Play the idle action the NPC's controller chose (FUN_006d2e07)
+	// Opcode: NPC_ACTION(260)
+	class NpcActionHandler : public PacketHandler
 	{
 		void handle(InPacket& recv) const override;
 	};
