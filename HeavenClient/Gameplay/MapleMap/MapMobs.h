@@ -55,6 +55,12 @@ namespace ms
 		// Update a mob's hp display.
 		void send_mobhp(int32_t oid, int8_t percent, uint16_t playerlevel);
 
+		// Put temporary statuses on a mob, showing their effects.
+		void set_statuses(int32_t oid, const std::vector<MobStatParser::Status> &statuses);
+
+		// Take temporary statuses off a mob.
+		void reset_statuses(int32_t oid, const BuffParser::Flags &flags);
+
 		// The server got a mob's move.
 		void acknowledge(int32_t oid, int16_t moveid, bool nextattack);
 

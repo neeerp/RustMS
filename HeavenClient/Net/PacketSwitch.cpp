@@ -131,6 +131,8 @@ namespace ms
 		SPAWN_MOB_C = 238,
 		MOB_MOVED = 239,
 		MOVE_MOB_RESPONSE = 240,
+		MOB_STAT_SET = 242,
+		MOB_STAT_RESET = 243,
 		SHOW_MOB_HP = 250,
 		SHOW_MAGNET = 251,
 		SPAWN_NPC = 257,
@@ -204,6 +206,8 @@ namespace ms
 		emplace<SPAWN_MOB_C, SpawnMobControllerHandler>();
 		emplace<MOB_MOVED, MobMovedHandler>();
 		emplace<MOVE_MOB_RESPONSE, MoveMobResponseHandler>();
+		emplace<MOB_STAT_SET, MobStatSetHandler>();
+		emplace<MOB_STAT_RESET, MobStatResetHandler>();
 		emplace<SHOW_MOB_HP, ShowMobHpHandler>();
 		emplace<SHOW_MAGNET, ShowMagnetHandler>();
 		emplace<KILL_MOB, KillMobHandler>();

@@ -94,6 +94,37 @@ pub async fn replace_item(
     .await
 }
 
+/// Make the logged-out character `character_id` a level `level` `job`
+/// with `mp` MP of `mp`.
+pub async fn set_job(character_id: i32, job: i16, level: i16, mp: i16) -> Result<(), HarnessError> {
+    change_one_row("set job", move |conn| {
+        diesel::sql_query(
+            "UPDATE characters SET job = $2, level = $3, mp = $4, maxmp = $4 WHERE id = $1",
+        )
+        .bind::<Integer, _>(character_id)
+        .bind::<SmallInt, _>(job)
+        .bind::<SmallInt, _>(level)
+        .bind::<SmallInt, _>(mp)
+        .execute(conn)
+    })
+    .await
+}
+
+/// Teach the logged-out character `character_id` skill `skill_id` at
+/// `level`.
+pub async fn grant_skill(character_id: i32, skill_id: i32, level: i32) -> Result<(), HarnessError> {
+    change_one_row("grant skill", move |conn| {
+        diesel::sql_query(
+            "INSERT INTO skills (character_id, skill_id, level, master_level) VALUES ($1, $2, $3, 0)",
+        )
+        .bind::<Integer, _>(character_id)
+        .bind::<Integer, _>(skill_id)
+        .bind::<Integer, _>(level)
+        .execute(conn)
+    })
+    .await
+}
+
 async fn change_one_row(
     phase: &'static str,
     query: impl FnOnce(&mut PgConnection) -> QueryResult<usize> + Send + 'static,

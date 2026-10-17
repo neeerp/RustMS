@@ -142,6 +142,9 @@ if(HEAVENCLIENT_BUILD_TESTS)
     add_executable(buff_parser_tests tests/buff_parser.cpp Net/InPacket.cpp Net/Handlers/Helpers/BuffParser.cpp Character/Buff.cpp)
     target_include_directories(buff_parser_tests PRIVATE ${PROJECT_SOURCE_DIR}/libs/NoLifeNx)
     add_test(NAME buff_parser COMMAND buff_parser_tests)
+    add_executable(mob_stat_parser_tests tests/mob_stat_parser.cpp Net/InPacket.cpp Net/Handlers/Helpers/MobStatParser.cpp Net/Handlers/Helpers/BuffParser.cpp Character/Buff.cpp)
+    target_include_directories(mob_stat_parser_tests PRIVATE ${PROJECT_SOURCE_DIR}/libs/NoLifeNx)
+    add_test(NAME mob_stat_parser COMMAND mob_stat_parser_tests)
     add_executable(status_messages_tests tests/status_messages.cpp Net/InPacket.cpp)
     target_include_directories(status_messages_tests PRIVATE ${PROJECT_SOURCE_DIR}/libs/NoLifeNx)
     add_test(NAME status_messages COMMAND status_messages_tests)
@@ -572,6 +575,8 @@ add_executable(HeavenClient
     Net/Handlers/Helpers/MovementParser.h
     Net/Handlers/Helpers/BuffParser.cpp
     Net/Handlers/Helpers/BuffParser.h
+    Net/Handlers/Helpers/MobStatParser.cpp
+    Net/Handlers/Helpers/MobStatParser.h
     Net/Handlers/AttackHandlers.cpp
     Net/Handlers/AttackHandlers.h
     Net/Handlers/BuddyHandlers.cpp

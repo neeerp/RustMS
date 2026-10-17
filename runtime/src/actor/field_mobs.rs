@@ -2,10 +2,11 @@
 //! the damage dealt to them. Pure state; `FieldActor` sends the packets.
 
 use crate::actor::object_ids::{self, ObjectIds};
+use game::MobStat;
 use game_data::mobs::MobInfo;
 use game_data::MapMobTemplate;
 use net::packet::build::world::field::parse_movement;
-use net::packet::build::world::mob::MobView;
+use net::packet::build::world::mob::{MobStatusView, MobView};
 use net::ClientId;
 use std::cmp::Reverse;
 use std::collections::{BTreeMap, HashMap};
@@ -44,6 +45,16 @@ pub struct LiveMob {
     pub controller_distance: Option<i32>,
     /// Damage per player, for sharing EXP.
     pub damage_by: HashMap<ClientId, i64>,
+    pub statuses: BTreeMap<MobStat, MobStatus>,
+}
+
+/// A status on a mob: its value, the skill that caused it, and when it
+/// wears off.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct MobStatus {
+    pub value: i16,
+    pub skill_id: i32,
+    pub until: Instant,
 }
 
 impl LiveMob {
@@ -58,7 +69,21 @@ impl LiveMob {
             home_foothold: self.home_foothold,
             fade_in,
             controlled: self.controller.is_some(),
+            statuses: self.status_views(Instant::now()),
         }
+    }
+
+    /// The statuses on the mob, with the time each has left.
+    pub fn status_views(&self, now: Instant) -> Vec<MobStatusView> {
+        self.statuses
+            .iter()
+            .map(|(&stat, status)| MobStatusView {
+                stat,
+                value: status.value,
+                skill_id: status.skill_id,
+                left: status.until.saturating_duration_since(now),
+            })
+            .collect()
     }
 
     pub fn hp_percent(&self) -> u8 {
@@ -147,6 +172,7 @@ impl MobSet {
                     aggro_until: None,
                     controller_distance: None,
                     damage_by: HashMap::new(),
+                    statuses: BTreeMap::new(),
                 },
             );
             spawned.push(object_id);
@@ -262,6 +288,68 @@ impl MobSet {
             }
         }
         true
+    }
+
+    /// Put statuses caused by `skill_id` on a mob until `until`, replacing
+    /// any it has, save the ones a boss shrugs off. Returns those it got.
+    pub fn add_statuses(
+        &mut self,
+        object_id: i32,
+        statuses: &[(MobStat, i16)],
+        skill_id: i32,
+        until: Instant,
+    ) -> Vec<MobStat> {
+        let Some(mob) = self.live.get_mut(&object_id) else {
+            return Vec::new();
+        };
+        let boss = mob.info.boss;
+        statuses
+            .iter()
+            .filter(|(stat, _)| !(boss && stat.spares_bosses()))
+            .map(|&(stat, value)| {
+                let status = MobStatus {
+                    value,
+                    skill_id,
+                    until,
+                };
+                mob.statuses.insert(stat, status);
+                stat
+            })
+            .collect()
+    }
+
+    /// Take these statuses off a mob; returns the ones it had.
+    pub fn remove_statuses(&mut self, object_id: i32, stats: &[MobStat]) -> Vec<MobStat> {
+        let Some(mob) = self.live.get_mut(&object_id) else {
+            return Vec::new();
+        };
+        stats
+            .iter()
+            .copied()
+            .filter(|stat| mob.statuses.remove(stat).is_some())
+            .collect()
+    }
+
+    /// Take off every status that has worn off by `now`: each mob's lost
+    /// statuses.
+    pub fn expire_statuses(&mut self, now: Instant) -> Vec<(i32, Vec<MobStat>)> {
+        let mut expired = Vec::new();
+        for mob in self.live.values_mut() {
+            let lost: Vec<_> = mob
+                .statuses
+                .iter()
+                .filter(|(_, status)| status.until <= now)
+                .map(|(&stat, _)| stat)
+                .collect();
+            if lost.is_empty() {
+                continue;
+            }
+            for stat in &lost {
+                mob.statuses.remove(stat);
+            }
+            expired.push((mob.object_id, lost));
+        }
+        expired
     }
 
     /// Damage a mob. Returns its HP percent, or the kill if it died.
@@ -436,6 +524,35 @@ mod tests {
                 ..MobInfo::default()
             },
         )
+    }
+
+    #[test]
+    fn statuses_wear_off_and_spare_bosses() {
+        let now = Instant::now();
+        let mut mobs = MobSet::new([snail_spawn(100)]);
+        let snail = mobs.respawn(now)[0];
+        let until = now + Duration::from_secs(10);
+        let seal = [(MobStat::Seal, 1), (MobStat::Speed, -20)];
+        assert_eq!(
+            mobs.add_statuses(snail, &seal, 2111004, until),
+            [MobStat::Seal, MobStat::Speed]
+        );
+        let views = mobs.get(snail).unwrap().status_views(now);
+        assert_eq!(views.len(), 2);
+        assert_eq!(views[0].left, Duration::from_secs(10));
+        assert_eq!(
+            mobs.remove_statuses(snail, &[MobStat::Speed, MobStat::Doom]),
+            [MobStat::Speed]
+        );
+        assert!(mobs.expire_statuses(now).is_empty());
+        assert_eq!(mobs.expire_statuses(until), [(snail, vec![MobStat::Seal])]);
+        assert!(mobs.get(snail).unwrap().statuses.is_empty());
+
+        mobs.live.get_mut(&snail).unwrap().info.boss = true;
+        assert_eq!(
+            mobs.add_statuses(snail, &seal, 2111004, until),
+            [MobStat::Speed]
+        );
     }
 
     #[test]

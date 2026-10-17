@@ -363,6 +363,15 @@ pub enum FieldRequest {
         effect: Packet,
         caught: Vec<(i32, bool)>,
     },
+    /// The player used a skill that puts statuses on the mobs it reaches,
+    /// or takes their buffs away, from `origin` (where the player stands
+    /// if None): these mobs, as their client saw them.
+    MobDebuff {
+        skill_id: i32,
+        level: i32,
+        origin: Option<(i16, i16)>,
+        mobs: Vec<i32>,
+    },
     /// Sit on the portable chair `item_id`, or stand up with 0.
     Chair(i32),
     /// Pick up the drop `object_id`, answered with `ServerMessage::PickedUp`;

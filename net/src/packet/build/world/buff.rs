@@ -20,7 +20,10 @@ fn mask(bit: u8) -> (u64, u64) {
 /// A player always carries them; their data has a fixed size.
 pub(crate) const TWO_STATE: [u8; 7] = [82, 83, 84, 85, 86, 87, 88];
 
-fn write_mask(p: &mut Packet, bits: impl IntoIterator<Item = u8>) -> Result<(), NetworkError> {
+pub(crate) fn write_mask(
+    p: &mut Packet,
+    bits: impl IntoIterator<Item = u8>,
+) -> Result<(), NetworkError> {
     let (first, second) = bits.into_iter().fold((0, 0), |(first, second), bit| {
         let (f, s) = mask(bit);
         (first | f, second | s)
