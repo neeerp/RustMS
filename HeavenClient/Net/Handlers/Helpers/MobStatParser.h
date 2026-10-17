@@ -50,6 +50,8 @@ namespace ms
 			WEB = 17,
 			PIMMUNE = 18,
 			MIMMUNE = 19,
+			AMBUSH = 22,
+			VENOM = 24,
 			BURNED = 27,
 			PCOUNTER = 29,
 			MCOUNTER = 30,

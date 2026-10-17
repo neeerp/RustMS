@@ -18,7 +18,8 @@ use net::packet::build::world::npc::{
 use net::packet::build::world::reactor::{
     build_hit_reactor, build_remove_reactor, build_spawn_reactor,
 };
-use net::{skills, ClientId, FieldRequest};
+use net::skills::{self, Inflict};
+use net::{ClientId, FieldRequest};
 use packet::Packet;
 use std::collections::HashMap;
 use std::time::Duration;
@@ -119,6 +120,14 @@ impl FieldActor {
                 if let Ok(packet) = build_spawn_reactor(&reactor.view()) {
                     self.broadcast(None, packet);
                 }
+            }
+        }
+        for hurt in self.mobs.hurt_by_statuses(now) {
+            if let (Some(occupant), Ok(packet)) = (
+                self.occupants.get(&hurt.from),
+                build_mob_hp(hurt.object_id, hurt.percent),
+            ) {
+                occupant.handle.send_packet(packet);
             }
         }
         for (object_id, lost) in self.mobs.expire_statuses(now) {
@@ -274,9 +283,11 @@ impl FieldActor {
                 FieldRequest::NpcAction { object_id, action } => {
                     self.handle_npc_action(from, object_id, &action)
                 }
-                FieldRequest::Attack { broadcast, hits } => {
-                    self.handle_attack(from, broadcast, hits)
-                }
+                FieldRequest::Attack {
+                    broadcast,
+                    hits,
+                    inflicts,
+                } => self.handle_attack(from, broadcast, hits, &inflicts),
                 FieldRequest::Broadcast(packet) => self.broadcast(Some(from), packet),
                 FieldRequest::Magnet { effect, caught } => self.handle_magnet(from, effect, caught),
                 FieldRequest::MobDebuff {
@@ -284,7 +295,8 @@ impl FieldActor {
                     level,
                     origin,
                     mobs,
-                } => self.handle_mob_debuff(from, skill_id, level, origin, &mobs),
+                    inflict,
+                } => self.handle_mob_debuff(from, skill_id, level, origin, &mobs, &inflict),
                 FieldRequest::Chair(item_id) => self.handle_chair(from, item_id),
                 FieldRequest::Pickup { object_id, x, y } => {
                     self.handle_pickup(from, object_id, x, y)
@@ -440,7 +452,13 @@ impl FieldActor {
         }
     }
 
-    fn handle_attack(&mut self, from: ClientId, broadcast: Packet, hits: Vec<(i32, i64)>) {
+    fn handle_attack(
+        &mut self,
+        from: ClientId,
+        broadcast: Packet,
+        hits: Vec<(i32, i64)>,
+        inflicts: &[Inflict],
+    ) {
         let Some(attacker) = self.occupants.get(&from) else {
             return;
         };
@@ -454,6 +472,12 @@ impl FieldActor {
                         attacker.send_packet(packet);
                     }
                     self.provoke(from, &attacker, object_id, now);
+                    // A miss puts nothing on it.
+                    for inflict in inflicts.iter().filter(|_| damage > 0) {
+                        if inflict.takes(rand::random()) {
+                            self.put_on(from, object_id, inflict, now);
+                        }
+                    }
                 }
                 Some(Err(kill)) => {
                     if let Ok(packet) = build_kill_mob(kill.object_id, 1) {
@@ -512,7 +536,7 @@ impl FieldActor {
     }
 
     /// `from` used a skill that reaches mobs on these, as their client saw
-    /// them. Each in its area takes its statuses, or loses the buffs it
+    /// them. Each in its area takes `inflict`, or loses the buffs the skill
     /// takes away, with the skill's chance (`prop`), and everyone sees.
     fn handle_mob_debuff(
         &mut self,
@@ -521,6 +545,7 @@ impl FieldActor {
         level: i32,
         origin: Option<(i16, i16)>,
         mobs: &[i32],
+        inflict: &Inflict,
     ) {
         let Some(user) = self.occupants.get(&from) else {
             return;
@@ -529,13 +554,9 @@ impl FieldActor {
         let Some(skill) = skills::at_level(skill_id, level) else {
             return;
         };
-        let Some(debuffs) = skills::mob_debuffs(&skill) else {
-            return;
-        };
         let cancels = skills::mob_cancels(skill_id);
         let effect = &skill.effect;
         let now = Instant::now();
-        let until = now + Duration::from_secs(effect.duration.max(0) as u64);
         let mut reached: Vec<i32> = Vec::new();
         for &object_id in mobs {
             if reached.len() >= effect.mob_count.max(1) as usize || reached.contains(&object_id) {
@@ -549,7 +570,7 @@ impl FieldActor {
             }
         }
         for object_id in reached {
-            if effect.prop > 0 && rand::random::<f64>() * 100.0 >= f64::from(effect.prop) {
+            if !inflict.takes(rand::random()) {
                 continue;
             }
             let lost = self.mobs.remove_statuses(object_id, cancels);
@@ -558,21 +579,41 @@ impl FieldActor {
                     self.broadcast(None, packet);
                 }
             }
-            let given = self.mobs.add_statuses(object_id, &debuffs, skill_id, until);
-            let Some(mob) = self.mobs.get(object_id) else {
-                continue;
-            };
-            let views: Vec<_> = mob
-                .status_views(now)
-                .into_iter()
-                .filter(|view| given.contains(&view.stat))
-                .collect();
-            if views.is_empty() {
-                continue;
-            }
-            if let Ok(packet) = build_mob_stat_set(object_id, &views) {
-                self.broadcast(None, packet);
-            }
+            self.put_on(from, object_id, inflict, now);
+        }
+    }
+
+    /// Put `inflict`'s statuses on a mob for `from`, and show everyone the
+    /// ones it got.
+    fn put_on(&mut self, from: ClientId, object_id: i32, inflict: &Inflict, now: Instant) {
+        let Some(mob) = self.mobs.get(object_id) else {
+            return;
+        };
+        let statuses: Vec<_> = inflict
+            .statuses
+            .iter()
+            .map(|&(stat, amount)| (stat, amount.against(mob.info.max_hp)))
+            .collect();
+        if statuses.is_empty() {
+            return;
+        }
+        let until = now + inflict.duration;
+        let given =
+            self.mobs
+                .add_statuses(object_id, &statuses, inflict.skill_id, from, now, until);
+        let Some(mob) = self.mobs.get(object_id) else {
+            return;
+        };
+        let views: Vec<_> = mob
+            .status_views(now)
+            .into_iter()
+            .filter(|view| given.contains(&view.stat))
+            .collect();
+        if views.is_empty() {
+            return;
+        }
+        if let Ok(packet) = build_mob_stat_set(object_id, &views) {
+            self.broadcast(None, packet);
         }
     }
 

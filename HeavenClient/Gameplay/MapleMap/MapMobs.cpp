@@ -215,6 +215,22 @@ namespace ms
 			return Point<int16_t>(0, 0);
 	}
 
+	std::vector<std::pair<Point<int16_t>, int32_t>> MapMobs::take_hurts()
+	{
+		std::vector<std::pair<Point<int16_t>, int32_t>> hurts;
+
+		for (auto &mmo : mobs)
+		{
+			if (Optional<Mob> mob = mmo.second.get())
+			{
+				for (int32_t number : mob->take_hurts())
+					hurts.emplace_back(mob->get_head_position(), number);
+			}
+		}
+
+		return hurts;
+	}
+
 	Rectangle<int16_t> MapMobs::get_mob_body(int32_t oid) const
 	{
 		if (Optional<const Mob> mob = mobs.get(oid))

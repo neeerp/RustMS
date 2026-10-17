@@ -35,6 +35,7 @@
 #include <cmath>
 #include <cstdint>
 #include <cstdlib>
+#include <utility>
 
 namespace ms
 {
@@ -73,6 +74,7 @@ namespace ms
 		canmove = src["move"].size() > 0 || canfly;
 		canchase = src["chase"].size() > 0;
 		boss = info["boss"].get_bool();
+		fixeddamage = info["fixedDamage"];
 
 		if (canfly)
 		{
@@ -295,6 +297,12 @@ namespace ms
 		for (StatusEffect &effect : statuseffects)
 			effect.animation.update();
 		showhp.update();
+
+		if (!dying)
+		{
+			for (int32_t number : hurts.update(statuses, fixeddamage, Constants::TIMESTEP))
+				hurtnumbers.push_back(number);
+		}
 
 		// Every client, controller or not, tells the server once a second how
 		// far the local player is from each firstAttack mob (FUN_005ce6dc).
@@ -1215,6 +1223,7 @@ namespace ms
 		for (const MobStatParser::Status &status : given)
 		{
 			statuses[status.stat] = status;
+			hurts.start(status.stat);
 
 			if (std::find(reasons.begin(), reasons.end(), status.reason) == reasons.end())
 				reasons.push_back(status.reason);
@@ -1259,6 +1268,11 @@ namespace ms
 		// And its own look again (FUN_00789dc7).
 		if (flags.has(MobStatParser::DOOM))
 			show_look(0);
+	}
+
+	std::vector<int32_t> Mob::take_hurts()
+	{
+		return std::exchange(hurtnumbers, {});
 	}
 
 	bool Mob::held() const

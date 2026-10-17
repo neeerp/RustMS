@@ -88,6 +88,24 @@ impl MobStat {
         )
     }
 
+    /// Whether the mob loses its value in HP every second it has this
+    /// status. Every client shows that damage over the mob's head by itself
+    /// (CMob::Update, 0x6675a8): the mob's `fixedDamage` instead, if it
+    /// has one.
+    pub fn hurts(self) -> bool {
+        matches!(self, MobStat::Poison | MobStat::Ambush | MobStat::Venom)
+    }
+
+    /// The element whose immunity (`elemAttr` degree 1) also wards off
+    /// this status: poison against Poison, ice against Freeze.
+    pub fn element(self) -> Option<char> {
+        match self {
+            MobStat::Poison => Some('S'),
+            MobStat::Freeze => Some('I'),
+            _ => None,
+        }
+    }
+
     /// Whether a boss shrugs this status off.
     pub fn spares_bosses(self) -> bool {
         matches!(

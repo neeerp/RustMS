@@ -4,7 +4,7 @@ use crate::handler::{
 };
 use crate::packet::build::world::stat::{self, StatUpdate};
 use crate::packet::build::world::{buff, inventory, skill};
-use crate::skills::{self, Learned};
+use crate::skills::{self, Inflict, Learned};
 use game::{Buff, BuffStat, InventoryChange, Player};
 use packet::{io::read::PktRead, Packet};
 use std::io::Cursor;
@@ -65,14 +65,15 @@ impl WorldHandler for UseSkillHandler {
                     extras.party,
                     0,
                 );
-                if !used.debuffs {
+                let Some(inflict) = used.debuffs.clone() else {
                     return Ok(result);
-                }
+                };
                 Ok(result.with(WorldAction::Field(FieldRequest::MobDebuff {
                     skill_id,
                     level,
                     origin: extras.position,
                     mobs: extras.mobs,
+                    inflict,
                 })))
             }
             Err(refusal) => {
@@ -351,7 +352,7 @@ struct Used {
     skill: Learned,
     stats: Vec<(BuffStat, i16)>,
     items: Vec<InventoryChange>,
-    debuffs: bool,
+    debuffs: Option<Inflict>,
 }
 
 /// Check the skill can be used now, then spend its MP and items and start
@@ -369,10 +370,10 @@ fn use_skill(
         .filter(|skill| skill.level == level)
         .ok_or(Refusal::NotLearned)?;
     let stats = skills::buffs(&skill);
-    let debuffs = stats.is_none();
-    if debuffs && skills::mob_debuffs(&skill).is_none() {
-        return Err(Refusal::Unsupported);
-    }
+    let debuffs = match stats {
+        Some(_) => None,
+        None => Some(skills::mob_debuffs(&skill, player).ok_or(Refusal::Unsupported)?),
+    };
     if player.buffs.cooling_down(skill_id, now) {
         return Err(Refusal::CoolingDown);
     }
@@ -501,7 +502,7 @@ fn announce(player: &Player, used: &Used) -> WorldResult {
     if !items.is_empty() {
         result = result.with_reply(inventory::build_inventory_operation(false, items)?);
     }
-    if !debuffs {
+    if debuffs.is_none() {
         result = result.with_reply(buff::build_give_buff(
             skill.skill_id,
             effect.duration * 1000,
@@ -531,7 +532,8 @@ fn announce(player: &Player, used: &Used) -> WorldResult {
 mod tests {
     use super::*;
     use crate::packet::op::{RecvOpcode, SendOpcode};
-    use game::SkillRecord;
+    use crate::skills::Amount;
+    use game::{MobStat, SkillRecord};
     use packet::io::write::PktWrite;
 
     fn beginner_with(skill_id: i32, level: i32) -> Player {
@@ -883,7 +885,18 @@ mod tests {
                 level,
                 origin,
                 mobs,
-            }) => Some((*skill_id, *level, *origin, mobs.clone())),
+                inflict,
+            }) => {
+                assert_eq!(
+                    inflict.statuses,
+                    [
+                        (MobStat::Pad, Amount::Value(-20)),
+                        (MobStat::Pdr, Amount::Value(-20))
+                    ]
+                );
+                assert_eq!(inflict.duration, Duration::from_secs(120));
+                Some((*skill_id, *level, *origin, mobs.clone()))
+            }
             _ => None,
         });
         assert_eq!(
