@@ -80,13 +80,13 @@ int main()
 		for (uint8_t bit : { 18, 21, 22, 26 })
 			remote.set(bit);
 		Writer c;
-		c.flags(remote).put<uint8_t>(3).put<int32_t>(1211004).put<int16_t>(5).put<int32_t>(2111003).zeros(2).put<int16_t>(0);
+		c.flags(remote).put<uint8_t>(3).put<int32_t>(1211004).put<int16_t>(5).put<int32_t>(125 | 3 << 16).zeros(2).put<int16_t>(0);
 		InPacket buff(c.bytes.data(), c.bytes.size());
 		shown = BuffParser::parse_shown(buff, BuffParser::read_flags(buff));
 		require(shown.size() == 4 && shown[0].first == Buffstat::COMBO && shown[0].second == 3 &&
 				shown[1].first == Buffstat::WK_CHARGE && shown[1].second == 1211004 &&
-				shown[2].first == Buffstat::POISON && shown[2].second == 5 &&
-				shown[3].first == Buffstat::SHADOWPARTNER, "combo, charge, poison and shadow partner");
+				shown[2].first == Buffstat::POISON && shown[2].second == (125 | 3 << 16) &&
+				shown[3].first == Buffstat::SHADOWPARTNER, "combo, charge, poison (by its reason) and shadow partner");
 		require(buff.read_short() == 0 && !buff.available(), "the delay follows");
 
 		std::cout << "Buff parser passed\n";

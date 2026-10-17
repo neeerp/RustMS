@@ -1,4 +1,4 @@
-use crate::buff::{BuffStat, Buffs};
+use crate::buff::{Buffs, ShownBuff};
 use crate::inventory::{equip_slot, Inventory};
 use crate::keymap::Keymap;
 use crate::monster_book::MonsterBook;
@@ -123,7 +123,7 @@ pub struct FieldAvatar {
     /// The portable chair (a 301xxxx setup item) the player sits on, or 0.
     pub chair: i32,
     /// The buffs others see, as `Buffs::shown`.
-    pub buffs: Vec<(BuffStat, i32)>,
+    pub buffs: Vec<ShownBuff>,
 }
 
 /// A character that is logged in. The owning client actor holds the only

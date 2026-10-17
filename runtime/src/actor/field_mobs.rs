@@ -85,6 +85,22 @@ pub struct Cast {
     pub at: Instant,
 }
 
+/// The box a mob skill covers, edges included.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct CastArea {
+    pub left: i32,
+    pub top: i32,
+    pub right: i32,
+    pub bottom: i32,
+}
+
+impl CastArea {
+    pub fn contains(&self, (x, y): (i16, i16)) -> bool {
+        let (x, y) = (i32::from(x), i32::from(y));
+        self.left <= x && x <= self.right && self.top <= y && y <= self.bottom
+    }
+}
+
 /// A status on a mob: its value, the skill that caused it, who put it on,
 /// and when it wears off.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -160,6 +176,13 @@ impl LiveMob {
         self.stance & 1 == 1
     }
 
+    /// Whether the mob can't use its skills: a player's Seal or its own
+    /// SealSkill.
+    fn sealed(&self) -> bool {
+        self.statuses.contains_key(&MobStat::Seal)
+            || self.statuses.contains_key(&MobStat::SealSkill)
+    }
+
     /// Validate a cast of the skill in `skill_data` (id, level << 8, the
     /// animation's length << 16) with `action`: it must be the one granted,
     /// listed with that action. Pays for it and starts its cooldown.
@@ -171,6 +194,9 @@ impl LiveMob {
         levels: &dyn Fn(i32, i32) -> Option<MobSkillLevel>,
     ) -> Option<Cast> {
         let grant = self.granted?;
+        if self.sealed() {
+            return None;
+        }
         let (skill, level) = (skill_data as u8, (skill_data >> 8) as u8);
         if (skill, level) != (grant.skill, grant.level) {
             return None;
@@ -220,7 +246,7 @@ impl LiveMob {
             return None;
         }
         self.granted = None;
-        if self.statuses.contains_key(&MobStat::SealSkill) {
+        if self.sealed() {
             return None;
         }
         let max_hp = i64::from(self.info.max_hp.max(1));
@@ -541,14 +567,28 @@ impl MobSet {
     }
 
     /// The mobs a cast reaches: its caster, or, with an area, every mob in
-    /// it, `lt` and `rb` as the caster faces left, mirrored facing right.
+    /// it.
     pub fn reached_by(&self, cast: &Cast) -> Vec<i32> {
-        let Some(caster) = self.live.get(&cast.object_id) else {
+        if !self.live.contains_key(&cast.object_id) {
             return Vec::new();
+        }
+        let Some(area) = self.area(cast) else {
+            return vec![cast.object_id];
         };
+        self.live
+            .values()
+            .filter(|mob| mob.object_id == cast.object_id || area.contains((mob.x, mob.y)))
+            .map(|mob| mob.object_id)
+            .collect()
+    }
+
+    /// A cast's area around its caster, `lt` and `rb` as it faces left,
+    /// mirrored facing right; None without one, or once the caster is gone.
+    pub fn area(&self, cast: &Cast) -> Option<CastArea> {
+        let caster = self.live.get(&cast.object_id)?;
         let effect = &cast.effect;
         if effect.lt == (0, 0) && effect.rb == (0, 0) {
-            return vec![cast.object_id];
+            return None;
         }
         let (x, y) = (i32::from(caster.x), i32::from(caster.y));
         let (left, right) = if caster.facing_left() {
@@ -556,16 +596,12 @@ impl MobSet {
         } else {
             (x - effect.rb.0, x - effect.lt.0)
         };
-        let (top, bottom) = (y + effect.lt.1, y + effect.rb.1);
-        self.live
-            .values()
-            .filter(|mob| {
-                let (mx, my) = (i32::from(mob.x), i32::from(mob.y));
-                mob.object_id == cast.object_id
-                    || (left <= mx && mx <= right && top <= my && my <= bottom)
-            })
-            .map(|mob| mob.object_id)
-            .collect()
+        Some(CastArea {
+            left,
+            top: y + effect.lt.1,
+            right,
+            bottom: y + effect.rb.1,
+        })
     }
 
     /// A mob regains `hp` and `mp`, up to its maxima. Returns the HP it
@@ -1086,6 +1122,17 @@ mod tests {
             &[(MobStat::SealSkill, 1)],
             157,
             1,
+            broke,
+            broke + GRANT_TIMEOUT,
+        );
+        assert_eq!(act(&mut mobs, NO_ACTION, 0, true, broke, 0.0).grant, None);
+        // So does one under a player's Seal.
+        mobs.live.get_mut(&mob).unwrap().statuses.clear();
+        mobs.add_statuses(
+            mob,
+            &[(MobStat::Seal, 1)],
+            2111004,
+            30,
             broke,
             broke + GRANT_TIMEOUT,
         );

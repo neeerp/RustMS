@@ -50,10 +50,7 @@ pub fn build_player_enter_field(avatar: &FieldAvatar) -> Result<Packet, NetworkE
 /// The buffs others see, then the two-state stats' fixed blocks, which
 /// are always empty here; the repeated spawn constant mirrors what the
 /// reference server sends.
-fn write_foreign_buffs(
-    packet: &mut Packet,
-    shown: &[(game::BuffStat, i32)],
-) -> Result<(), NetworkError> {
+fn write_foreign_buffs(packet: &mut Packet, shown: &[game::ShownBuff]) -> Result<(), NetworkError> {
     const CHAR_MAGIC_SPAWN: i32 = 0x2D0F_5E1A;
     buff::write_shown(packet, shown, true)?;
 
@@ -227,7 +224,7 @@ pub fn parse_movement(
 mod tests {
     use super::*;
     use crate::codec::testing::Expect;
-    use game::{AvatarLook, BuffStat};
+    use game::{AvatarLook, BuffStat, ShownBuff};
     use std::collections::BTreeMap;
 
     fn avatar() -> FieldAvatar {
@@ -309,7 +306,15 @@ mod tests {
     #[test]
     fn spawn_player_carries_the_buffs_others_see() {
         let mut avatar = avatar();
-        avatar.buffs = vec![(BuffStat::Speed, 40), (BuffStat::DarkSight, 1)];
+        let shown = |stat, value, skill_id| ShownBuff {
+            stat,
+            value,
+            skill_id,
+        };
+        avatar.buffs = vec![
+            shown(BuffStat::Speed, 40, 4101004),
+            shown(BuffStat::DarkSight, 1, 4001003),
+        ];
         let packet = build_player_enter_field(&avatar).unwrap();
 
         let mut expect = Expect::new(&packet.bytes);

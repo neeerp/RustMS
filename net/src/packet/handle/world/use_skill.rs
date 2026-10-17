@@ -121,6 +121,9 @@ impl WorldHandler for UseSkillHandler {
                 if skill_id == skills::TIME_LEAP {
                     result = leap(ctx.player, result)?;
                 }
+                if skill_id == skills::DISPEL {
+                    result = dispel(ctx.player, &used.skill, result, rand::random())?;
+                }
                 let result = with_party(result, skill_id, level, extras.party, 0);
                 let Some(inflict) = used.debuffs.clone() else {
                     return Ok(result);
@@ -234,6 +237,9 @@ impl WorldHandler for CancelBuffHandler {
 #[derive(Debug, PartialEq, Eq)]
 enum Refusal {
     Dead,
+    /// Stunned, or sealed and not casting Dispel, which the client allows
+    /// (0x96758f).
+    Diseased,
     /// Not learned, or not at the level the client named.
     NotLearned,
     /// Monster Magnet reaching more mobs than it can.
@@ -345,6 +351,38 @@ fn read_magnet(r: &mut Cursor<&Vec<u8>>) -> Result<Option<(Vec<(i32, bool)>, boo
     Ok(Some((caught, toleft)))
 }
 
+/// Dispel reached the player: by its chance (`prop`, a roll in 0..1), it
+/// cures their diseases but Stun, Seduce, and Confuse (Cosmic's
+/// StatEffect.applyTo).
+fn dispel(
+    player: &mut Player,
+    skill: &Learned,
+    result: HandlerResult<WorldAction>,
+    roll: f64,
+) -> Result<HandlerResult<WorldAction>, NetworkError> {
+    if roll * 100.0 >= f64::from(skill.effect.prop) {
+        return Ok(result);
+    }
+    let ended = player.buffs.cure(&skills::DISPELLED);
+    if ended.is_empty() {
+        return Ok(result);
+    }
+    let mut result = result.with_reply(buff::build_cancel_buff(&ended)?);
+    let unseen: Vec<_> = ended.into_iter().filter(|stat| stat.shown()).collect();
+    if !unseen.is_empty() {
+        let foreign = buff::build_cancel_foreign_buff(player.id(), &unseen)?;
+        result = result.with(WorldAction::BuffsChanged(foreign));
+    }
+    Ok(result)
+}
+
+/// Whether a disease keeps the player from using the skill: Stun, or Seal
+/// but for Dispel.
+fn kept_from(player: &Player, skill_id: i32) -> bool {
+    let buffs = &player.buffs;
+    buffs.has(BuffStat::Stun) || (buffs.has(BuffStat::Seal) && skill_id != skills::DISPEL)
+}
+
 /// Check Monster Magnet can be used, then spend its MP.
 fn use_magnet(
     player: &mut Player,
@@ -354,6 +392,9 @@ fn use_magnet(
 ) -> Result<Learned, Refusal> {
     if player.stats.hp <= 0 {
         return Err(Refusal::Dead);
+    }
+    if kept_from(player, skill_id) {
+        return Err(Refusal::Diseased);
     }
     let skill = skills::learned(player, skill_id)
         .filter(|skill| skill.level == level && level > 0)
@@ -398,6 +439,9 @@ fn heal(player: &mut Player, level: i32, party: u8, roll: f64) -> Result<(i16, i
     if player.stats.hp <= 0 {
         return Err(Refusal::Dead);
     }
+    if kept_from(player, skills::HEAL) {
+        return Err(Refusal::Diseased);
+    }
     let skill = skills::learned(player, skills::HEAL)
         .filter(|skill| skill.level == level)
         .ok_or(Refusal::NotLearned)?;
@@ -433,6 +477,9 @@ fn use_skill(
 ) -> Result<Used, Refusal> {
     if player.stats.hp <= 0 {
         return Err(Refusal::Dead);
+    }
+    if kept_from(player, skill_id) {
+        return Err(Refusal::Diseased);
     }
     let skill = skills::learned(player, skill_id)
         .filter(|skill| skill.level == level)
@@ -507,7 +554,7 @@ fn show_given(player: &Player, stats: &[(BuffStat, i16)]) -> Result<Option<Packe
         .buffs
         .shown()
         .into_iter()
-        .filter(|(stat, _)| stats.iter().any(|(given, _)| given == stat))
+        .filter(|shown| stats.iter().any(|(given, _)| *given == shown.stat))
         .collect();
     if given.is_empty() {
         return Ok(None);
@@ -547,6 +594,8 @@ pub fn party_skill_reached(
         HandlerResult::reply(stat::build_stat_update(false, &[StatUpdate::Hp(hp)])?)
     } else if used.skill_id == skills::TIME_LEAP {
         leap(player, HandlerResult::empty())?
+    } else if used.skill_id == skills::DISPEL {
+        dispel(player, &skill, HandlerResult::empty(), rand::random())?
     } else {
         let Some(stats) = skills::buffs(&skill) else {
             return Ok(HandlerResult::empty());
@@ -766,7 +815,14 @@ mod tests {
         (player.stats.mp, player.stats.max_mp) = (200, 200);
         let used = use_skill(&mut player, 4101004, 20, now).unwrap();
         assert_eq!(used.stats, [(BuffStat::Speed, 40), (BuffStat::Jump, 20)]);
-        assert_eq!(player.buffs.shown(), [(BuffStat::Speed, 40)]);
+        assert_eq!(
+            player.buffs.shown(),
+            [game::ShownBuff {
+                stat: BuffStat::Speed,
+                value: 40,
+                skill_id: 4101004,
+            }]
+        );
 
         // Hyper Body's own stats; nothing others see.
         player.skills.set(SkillRecord {
@@ -1198,6 +1254,87 @@ mod tests {
             ]
         );
         assert!(!member.buffs.cooling_down(1002, now));
+    }
+
+    fn diseased(player: &mut Player, stats: &[BuffStat], now: Instant) {
+        for &stat in stats {
+            let disease = game::Disease {
+                stat,
+                value: 1,
+                skill_id: 120 | 1 << 16,
+                lasts: Duration::from_secs(30),
+            };
+            crate::packet::handle::world::catch_disease(player, disease, now).unwrap();
+        }
+    }
+
+    #[test]
+    fn stun_stops_every_skill_and_seal_all_but_dispel() {
+        let now = Instant::now();
+        let mut player = beginner_with(skills::DISPEL, 1);
+        assert!(!kept_from(&player, 1002));
+        diseased(&mut player, &[BuffStat::Seal], now);
+        assert!(kept_from(&player, 1002));
+        assert!(!kept_from(&player, skills::DISPEL));
+        diseased(&mut player, &[BuffStat::Stun], now);
+        assert!(kept_from(&player, skills::DISPEL));
+    }
+
+    #[test]
+    fn dispel_cures_by_its_chance_but_not_stun() {
+        if skills::data().is_err() {
+            return;
+        }
+        let now = Instant::now();
+        let mut player = beginner_with(1000, 1);
+        diseased(
+            &mut player,
+            &[BuffStat::Stun, BuffStat::Poison, BuffStat::Slow],
+            now,
+        );
+        // Level 1 cures one time in three.
+        let weak = skills::at_level(skills::DISPEL, 1).unwrap();
+        assert_eq!(weak.effect.prop, 34);
+        let missed = dispel(&mut player, &weak, HandlerResult::empty(), 0.34).unwrap();
+        assert!(missed.actions.is_empty());
+
+        let cured = opcodes(dispel(&mut player, &weak, HandlerResult::empty(), 0.33));
+        // Slow isn't shown to others, so only Poison's end is.
+        assert_eq!(
+            cured,
+            [
+                SendOpcode::CancelBuff as i16,
+                SendOpcode::CancelForeignBuff as i16
+            ]
+        );
+        assert!(player.buffs.has(BuffStat::Stun));
+        assert!(!player.buffs.has(BuffStat::Poison) && !player.buffs.has(BuffStat::Slow));
+
+        // A party member's Dispel cures too.
+        diseased(&mut player, &[BuffStat::Darkness], now);
+        let reached = PartySkill {
+            skill_id: skills::DISPEL,
+            level: 20,
+            slots: 0x30,
+            heal: 0,
+        };
+        let sent = opcodes(party_skill_reached(
+            &mut player,
+            &reached,
+            (0, 0),
+            (0, 0),
+            now,
+        ));
+        assert_eq!(
+            sent,
+            [
+                SendOpcode::CancelBuff as i16,
+                SendOpcode::CancelForeignBuff as i16,
+                SendOpcode::ShowItemGainInChat as i16,
+                SendOpcode::ShowForeignEffect as i16,
+            ]
+        );
+        assert!(!player.buffs.has(BuffStat::Darkness));
     }
 
     #[test]

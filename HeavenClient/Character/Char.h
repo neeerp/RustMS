@@ -17,7 +17,9 @@
 //////////////////////////////////////////////////////////////////////////////////
 #pragma once
 
+#include <map>
 #include <string>
+#include <vector>
 
 #include <cstddef>
 
@@ -154,6 +156,12 @@ namespace ms
 
 		void clear_held_effects();
 
+		// Show the `affected` animation of each mob skill (by its reason,
+		// skill | level << 16) that gave the character a disease, for as
+		// long as it lasts (FUN_0093e344 keeps the list, FUN_00932da6
+		// shows the new ones).
+		void show_afflictions(const std::vector<int32_t> &reasons);
+
 		// Display an animation as an effect on top of the character.
 		void show_effect_id(CharEffect::Id toshow);
 
@@ -279,6 +287,17 @@ namespace ms
 		Animation chair_effect;
 		bool chair_at_face = false;
 		bool chair_in_front = false;
+
+		// A disease's animation, on the face when its pos is 1 like the
+		// chair's.
+		struct Affliction
+		{
+			Animation animation;
+			bool at_face;
+		};
+
+		std::map<int32_t, Affliction> afflictions;
+
 		TimedBool invincible;
 		bool blinking = false;
 		TimedBool ironbody;

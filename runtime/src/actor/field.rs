@@ -1027,6 +1027,40 @@ impl FieldActor {
                     }
                 }
             }
+            Some(MobSkillEffect::Disease(_)) => {
+                if rand::random::<f64>() * 100.0 >= f64::from(effect.prop) {
+                    return;
+                }
+                let Some(disease) =
+                    mob_skill::inflicted(cast.skill, cast.level, effect.x, effect.duration)
+                else {
+                    return;
+                };
+                // Everyone in its area, or without one its controller
+                // (Cosmic's MobSkill.applyEffect).
+                let Some(caster) = self.mobs.get(cast.object_id) else {
+                    return;
+                };
+                let reached: Vec<ClientId> = match self.mobs.area(cast) {
+                    Some(area) => self
+                        .occupants
+                        .iter()
+                        .filter(|(_, occupant)| {
+                            area.contains((occupant.avatar.x, occupant.avatar.y))
+                        })
+                        .map(|(&client_id, _)| client_id)
+                        .collect(),
+                    None => caster.controller.into_iter().collect(),
+                };
+                for client_id in reached {
+                    if let Some(occupant) = self.occupants.get(&client_id) {
+                        occupant.handle.send(ServerMessage::Diseased {
+                            disease,
+                            map_id: self.key.map_id,
+                        });
+                    }
+                }
+            }
             None => {}
         }
     }

@@ -5,17 +5,22 @@ use net::packet::build::world::stat::{self, StatUpdate};
 
 impl ClientActor {
     /// This player helped kill a mob, or shares in a party member's kill:
-    /// credit their share of its EXP.
+    /// credit their share of its EXP, half of it while cursed (Cosmic).
     pub(super) async fn mob_killed(
         &mut self,
         _mob_id: i32,
         exp: i32,
         party_bonus: i32,
     ) -> Result<(), RuntimeError> {
+        let mut next = self.in_game()?.player.clone();
+        let (exp, party_bonus) = if next.buffs.has(game::BuffStat::Curse) {
+            (exp / 2, party_bonus / 2)
+        } else {
+            (exp, party_bonus)
+        };
         if exp <= 0 {
             return Ok(());
         }
-        let mut next = self.in_game()?.player.clone();
         let mut packets = Vec::new();
         gain_exp_with_bonus(&mut next, exp, party_bonus, &mut packets)?;
         self.commit_player(next, None, &mut packets).await?;
