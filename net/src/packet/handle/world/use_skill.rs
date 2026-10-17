@@ -200,7 +200,8 @@ impl WorldHandler for ThrowGrenadeHandler {
 /// `CANCEL_BUFF`: the player right-clicked a skill's buff icon, or let go
 /// of a held skill without using it. End the buffs and tell the client,
 /// which then drops the icon; or show the rest of the map the skill was
-/// let go.
+/// let go. Also `CANCEL_ITEM_EFFECT` (0x49, v83 FUN_00a096af), whose int
+/// is an item buff's id, `-item_id`.
 pub struct CancelBuffHandler;
 
 impl WorldHandler for CancelBuffHandler {
@@ -549,7 +550,10 @@ fn give(
 
 /// The GIVE_FOREIGN_BUFF showing the others the buffs among `stats` they
 /// see, if any.
-fn show_given(player: &Player, stats: &[(BuffStat, i16)]) -> Result<Option<Packet>, NetworkError> {
+pub(super) fn show_given(
+    player: &Player,
+    stats: &[(BuffStat, i16)],
+) -> Result<Option<Packet>, NetworkError> {
     let given: Vec<_> = player
         .buffs
         .shown()

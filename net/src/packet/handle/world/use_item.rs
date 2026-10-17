@@ -1,22 +1,26 @@
+use super::use_skill::show_given;
 use crate::handler::{
     FieldRequest, HandlerResult, WorldAction, WorldContext, WorldHandler, WorldResult,
 };
 use crate::items;
 use crate::packet::build::world::skill::{self, BookResult};
 use crate::packet::build::world::stat::StatUpdate;
-use crate::packet::build::world::{inventory, stat};
+use crate::packet::build::world::{buff, inventory, stat};
 use crate::skills;
 use game::buff::BuffStat;
 use game::inventory::equip_slot;
-use game::{InventoryChange, InventoryType, Player, SkillRecord};
+use game::{Buff, InventoryChange, InventoryType, Player, SkillRecord};
 use packet::{io::read::PktRead, Packet};
 use rand::Rng;
 use std::io::Cursor;
+use std::time::{Duration, Instant};
 use tracing::debug;
 
 /// `USE_ITEM`: tick, slot in the USE bag, item id. Applies the item's `spec`
-/// (HP/MP, flat and percent) and consumes one. A v83 client sends none
-/// while Stop Potion or Seduce holds (FUN_00a092fb).
+/// and consumes one: HP/MP (flat and percent), then the diseases it cures,
+/// then the stats it raises for `time` ms as a buff of id `-item_id`, which
+/// the client lists with the item's icon. A v83 client sends none while
+/// Stop Potion or Seduce holds (FUN_00a092fb).
 pub struct UseItemHandler;
 
 impl WorldHandler for UseItemHandler {
@@ -26,26 +30,46 @@ impl WorldHandler for UseItemHandler {
         reader.read_int()?; // client tick
         let slot = reader.read_short()?;
         let item_id = reader.read_int()?;
-        match use_item(ctx.player, slot, item_id) {
-            Some(changes) => {
-                let stats = &ctx.player.stats;
-                Ok(
-                    HandlerResult::reply(inventory::build_inventory_operation(true, &changes)?)
-                        .with_reply(stat::build_stat_update(
-                            true,
-                            &[StatUpdate::Hp(stats.hp), StatUpdate::Mp(stats.mp)],
-                        )?),
-                )
-            }
-            None => {
-                debug!(slot, item_id, "Item use refused");
-                Ok(HandlerResult::reply(stat::build_stat_update(true, &[])?))
+        let Some(used) = use_item(ctx.player, slot, item_id, Instant::now()) else {
+            debug!(slot, item_id, "Item use refused");
+            return Ok(HandlerResult::reply(stat::build_stat_update(true, &[])?));
+        };
+        let stats = &ctx.player.stats;
+        let mut result =
+            HandlerResult::reply(inventory::build_inventory_operation(true, &used.changes)?)
+                .with_reply(stat::build_stat_update(
+                    true,
+                    &[StatUpdate::Hp(stats.hp), StatUpdate::Mp(stats.mp)],
+                )?);
+        if !used.cured.is_empty() {
+            result = result.with_reply(buff::build_cancel_buff(&used.cured)?);
+            let unseen: Vec<_> = used.cured.into_iter().filter(|s| s.shown()).collect();
+            if !unseen.is_empty() {
+                let foreign = buff::build_cancel_foreign_buff(ctx.player.id(), &unseen)?;
+                result = result.with(WorldAction::BuffsChanged(foreign));
             }
         }
+        if !used.given.is_empty() {
+            result = result.with_reply(buff::build_give_buff(-item_id, used.time, &used.given)?);
+            if let Some(foreign) = show_given(ctx.player, &used.given)? {
+                result = result.with(WorldAction::BuffsChanged(foreign));
+            }
+        }
+        Ok(result)
     }
 }
 
-fn use_item(player: &mut Player, slot: i16, item_id: i32) -> Option<Vec<game::InventoryChange>> {
+/// What using an item did.
+struct Used {
+    changes: Vec<InventoryChange>,
+    /// The diseases it cured.
+    cured: Vec<BuffStat>,
+    /// The stats it raised, for `time` ms.
+    given: Vec<(BuffStat, i16)>,
+    time: i32,
+}
+
+fn use_item(player: &mut Player, slot: i16, item_id: i32, now: Instant) -> Option<Used> {
     if player.stats.hp <= 0 || player.buffs.has(BuffStat::StopPotion) {
         return None;
     }
@@ -61,7 +85,24 @@ fn use_item(player: &mut Player, slot: i16, item_id: i32) -> Option<Vec<game::In
     let max_mp = i32::from(player.stats.max_mp);
     player.recover_hp(spec.hp + max_hp * spec.hp_r / 100);
     player.add_mp(spec.mp + max_mp * spec.mp_r / 100);
-    Some(changes)
+    let cured = player.buffs.cure(&spec.cures);
+    let given = if spec.time > 0 {
+        spec.stats
+    } else {
+        Vec::new()
+    };
+    let lasts = Duration::from_millis(spec.time.max(0) as u64);
+    for &(stat, value) in &given {
+        player
+            .buffs
+            .give(Buff::new(-item_id, stat, value, now, lasts));
+    }
+    Some(Used {
+        changes,
+        cured,
+        given,
+        time: spec.time,
+    })
 }
 
 /// `USE_SKILL_BOOK` (0x52, v83 FUN_00a0a1b2): tick, slot in the USE bag,
@@ -288,7 +329,7 @@ mod tests {
             now,
             lasts,
         ));
-        assert!(use_item(&mut player, 3, 2000000).is_none());
+        assert!(use_item(&mut player, 3, 2000000, now).is_none());
         assert_eq!(player.stats.hp, 100);
 
         // A Red Potion heals 50; undead, 25.
@@ -300,8 +341,75 @@ mod tests {
             now,
             lasts,
         ));
-        assert!(use_item(&mut player, 3, 2000000).is_some());
+        assert!(use_item(&mut player, 3, 2000000, now).is_some());
         assert_eq!(player.stats.hp, 125);
+    }
+
+    #[test]
+    fn a_pill_buffs_for_its_time_and_all_cure_cures() {
+        if items::data().is_err() {
+            return;
+        }
+        let mut player = crate::codec::stats::sample_player();
+        player
+            .inventory
+            .insert(InventoryType::Use, 1, Item::stack(2002004, 1));
+        player
+            .inventory
+            .insert(InventoryType::Use, 2, Item::stack(2050004, 1));
+        let now = std::time::Instant::now();
+        // Warrior Pill: +5 weapon attack for three minutes.
+        let used = use_item(&mut player, 1, 2002004, now).unwrap();
+        assert_eq!((used.given, used.time), (vec![(BuffStat::Pad, 5)], 180_000));
+        let buff = &player.buffs.active()[0];
+        assert_eq!(
+            (buff.skill_id, buff.stat, buff.value),
+            (-2002004, BuffStat::Pad, 5)
+        );
+        let ended = player.buffs.cancel(-2002004);
+        assert_eq!(ended, [BuffStat::Pad]);
+
+        // All Cure ends Poison and Seal but not Stun.
+        for (n, stat) in [BuffStat::Poison, BuffStat::Seal, BuffStat::Stun]
+            .into_iter()
+            .enumerate()
+        {
+            player.buffs.give(game::Buff::new(
+                (120 + n as i32) | 1 << 16,
+                stat,
+                1,
+                now,
+                std::time::Duration::from_secs(10),
+            ));
+        }
+        let mut packet = request(2, 2050004);
+        let mut ctx = WorldContext {
+            client_id: 1,
+            channel_id: 0,
+            player: &mut player,
+        };
+        let actions = UseItemHandler
+            .handle(&mut packet, &mut ctx)
+            .unwrap()
+            .actions;
+        let opcodes: Vec<_> = actions
+            .iter()
+            .map(|action| match action {
+                WorldAction::Reply(p) | WorldAction::BuffsChanged(p) => p.opcode(),
+                _ => 0,
+            })
+            .collect();
+        assert_eq!(
+            opcodes,
+            [
+                SendOpcode::InventoryOperation as i16,
+                SendOpcode::StatChange as i16,
+                SendOpcode::CancelBuff as i16,
+                SendOpcode::CancelForeignBuff as i16,
+            ]
+        );
+        assert!(player.buffs.has(BuffStat::Stun));
+        assert!(!player.buffs.has(BuffStat::Poison) && !player.buffs.has(BuffStat::Seal));
     }
 
     fn hero_with_book(slot: i16, item_id: i32) -> Player {

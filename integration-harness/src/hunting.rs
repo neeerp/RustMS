@@ -218,6 +218,15 @@ pub fn cancel_buff(skill_id: i32) -> Packet {
     p
 }
 
+/// CANCEL_ITEM_EFFECT: right-clicking an item buff's icon (its id is the
+/// buff's, `-item_id`).
+pub fn cancel_item_effect(buff_id: i32) -> Packet {
+    let mut p = Packet::new_empty();
+    p.write_short(RecvOpcode::CancelItemEffect as i16).unwrap();
+    p.write_int(buff_id).unwrap();
+    p
+}
+
 /// MOVE_PLAYER: one absolute movement to (x, y), standing.
 pub fn walk_to(x: i16, y: i16) -> Packet {
     let mut movement = vec![1u8, 0];

@@ -97,6 +97,7 @@ namespace ms
 			SORT_ITEMS = 70,
 			MOVE_ITEM = 71,
 			USE_ITEM = 72,
+			CANCEL_ITEM_EFFECT = 73,
 			USE_SKILL_BOOK = 82,
 			MESO_DROP = 94,
 			HEAL_OVER_TIME = 89,

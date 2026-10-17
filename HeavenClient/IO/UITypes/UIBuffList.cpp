@@ -125,13 +125,18 @@ namespace ms
 	void UIBuffList::rightclick(Point<int16_t> cursorpos)
 	{
 		// FUN_0045b9fc. The icon goes when the server cancels the buff.
-		// Dragon Roar's can't be cancelled. Item buffs would send
-		// CANCEL_ITEM_EFFECT, which the server doesn't handle.
+		// Dragon Roar's can't be cancelled. An item buff (negative id) sends
+		// CANCEL_ITEM_EFFECT; v83 instead refuses a morph item's while
+		// morphed (notice 0x10fc), which this client doesn't track.
 		constexpr int32_t DRAGON_ROAR = 1311006;
 
 		if (auto entry = entry_at(cursorpos))
-			if (entry->id >= 0 && entry->id != DRAGON_ROAR)
+		{
+			if (entry->id < 0)
+				CancelItemEffectPacket(entry->id).dispatch();
+			else if (entry->id != DRAGON_ROAR)
 				CancelBuffPacket(entry->id).dispatch();
+		}
 	}
 
 	UIElement::Type UIBuffList::get_type() const
