@@ -85,6 +85,8 @@ async fn page(connection: &mut MapleTestConnection) -> DialoguePage {
                 continue
             }
             op if op == SendOpcode::ChatText as i16 => continue,
+            // NPC control passes on as other tests' players leave.
+            op if op == SendOpcode::SpawnNpcRequestController as i16 => continue,
             op => assert_eq!(op, SendOpcode::NpcDialogue as i16),
         }
         let mut r = Cursor::new(&packet.bytes);

@@ -6,11 +6,66 @@ use std::time::{Duration, Instant};
 /// How often Recovery heals.
 pub const RECOVERY_INTERVAL: Duration = Duration::from_secs(5);
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+/// A temporary stat, numbered by its bit in the v83 client's 128-bit
+/// temporary-stat flags (built as `1 << n` at startup, e.g. 0x78d9ad).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[repr(u8)]
 pub enum BuffStat {
+    /// Weapon attack, weapon defense, magic attack, magic defense,
+    /// accuracy, and avoidability.
+    Pad = 0,
+    Pdd = 1,
+    Mad = 2,
+    Mdd = 3,
+    Acc = 4,
+    Eva = 5,
+    Speed = 7,
+    Jump = 8,
+    MagicGuard = 9,
+    DarkSight = 10,
+    Booster = 11,
+    PowerGuard = 12,
+    MaxHp = 13,
+    MaxMp = 14,
+    Invincible = 15,
+    SoulArrow = 16,
+    Combo = 21,
+    WeaponCharge = 22,
+    DragonBlood = 23,
+    HolySymbol = 24,
+    MesoUp = 25,
+    ShadowPartner = 26,
+    PickPocket = 27,
+    MesoGuard = 28,
     /// Heals `value` HP every `RECOVERY_INTERVAL`.
-    Recovery,
-    Speed,
+    Recovery = 34,
+    MapleWarrior = 35,
+    Stance = 36,
+    SharpEyes = 37,
+    Infinity = 41,
+    Concentrate = 45,
+}
+
+impl BuffStat {
+    /// Its bit in the client's flags.
+    pub fn bit(self) -> u8 {
+        self as u8
+    }
+
+    /// Stats the rest of the map is told about, in the order the client
+    /// reads them (FUN_00788156); the others only matter to the player.
+    pub const SHOWN: [BuffStat; 6] = [
+        BuffStat::Speed,
+        BuffStat::Combo,
+        BuffStat::WeaponCharge,
+        BuffStat::ShadowPartner,
+        BuffStat::DarkSight,
+        BuffStat::SoulArrow,
+    ];
+
+    pub fn shown(self) -> bool {
+        Self::SHOWN.contains(&self)
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -72,6 +127,30 @@ impl Buffs {
 
     pub fn active(&self) -> &[Buff] {
         &self.active
+    }
+
+    /// The running buffs the rest of the map sees, with what they're told:
+    /// the value, or for a weapon charge the skill (its element).
+    pub fn shown(&self) -> Vec<(BuffStat, i32)> {
+        BuffStat::SHOWN
+            .iter()
+            .filter_map(|&stat| {
+                let buff = self.active.iter().find(|buff| buff.stat == stat)?;
+                let value = match stat {
+                    BuffStat::WeaponCharge => buff.skill_id,
+                    _ => i32::from(buff.value),
+                };
+                Some((stat, value))
+            })
+            .collect()
+    }
+
+    /// The value of a running buff on this stat.
+    pub fn value(&self, stat: BuffStat) -> Option<i16> {
+        self.active
+            .iter()
+            .find(|buff| buff.stat == stat)
+            .map(|buff| buff.value)
     }
 
     pub fn cooling_down(&self, skill_id: i32, now: Instant) -> bool {

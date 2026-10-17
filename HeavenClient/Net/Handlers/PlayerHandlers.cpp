@@ -17,6 +17,7 @@
 //////////////////////////////////////////////////////////////////////////////////
 #include "PlayerHandlers.h"
 
+#include "Helpers/BuffParser.h"
 #include "Helpers/LoginParser.h"
 
 #include "../Packets/LoginPackets.h"
@@ -192,23 +193,10 @@ namespace ms
 
 	void BuffHandler::handle(InPacket& recv) const
 	{
-		uint64_t firstmask = recv.read_long();
-		uint64_t secondmask = recv.read_long();
+		BuffParser::Flags flags = BuffParser::read_flags(recv);
 
-		switch (secondmask)
-		{
-		case Buffstat::BATTLESHIP:
-			handle_buff(recv, Buffstat::BATTLESHIP);
-			return;
-		}
-
-		for (auto& iter : Buffstat::first_codes)
-			if (firstmask & iter.second)
-				handle_buff(recv, iter.first);
-
-		for (auto& iter : Buffstat::second_codes)
-			if (secondmask & iter.second)
-				handle_buff(recv, iter.first);
+		for (uint8_t bit : BuffParser::given(flags))
+			handle_buff(recv, Buffstat::by_bit(bit));
 
 		Stage::get().get_player().recalc_stats(false);
 	}
@@ -219,6 +207,9 @@ namespace ms
 		int32_t skillid = recv.read_int();
 		int32_t duration = recv.read_int();
 
+		if (bs == Buffstat::NONE)
+			return;
+
 		Stage::get().get_player().give_buff({ bs, value, skillid, duration });
 
 		if (auto bufflist = UI::get().get_element<UIBuffList>())
@@ -227,6 +218,9 @@ namespace ms
 
 	void CancelBuffHandler::handle_buff(InPacket&, Buffstat::Id bs) const
 	{
+		if (bs == Buffstat::NONE)
+			return;
+
 		Stage::get().get_player().cancel_buff(bs);
 
 		if (auto bufflist = UI::get().get_element<UIBuffList>())

@@ -79,6 +79,28 @@ namespace ms
 		set_state(path.get_state().stance);
 	}
 
+	void OtherChar::show_buffs(const std::vector<std::pair<Buffstat::Id, int32_t>> &shown)
+	{
+		for (auto [stat, value] : shown)
+			buffs[stat] = value;
+	}
+
+	void OtherChar::hide_buffs(const std::vector<Buffstat::Id> &ended)
+	{
+		for (Buffstat::Id stat : ended)
+			buffs.erase(stat);
+	}
+
+	std::optional<int32_t> OtherChar::get_buff(Buffstat::Id stat) const
+	{
+		auto iter = buffs.find(stat);
+
+		if (iter == buffs.end())
+			return std::nullopt;
+
+		return iter->second;
+	}
+
 	int8_t OtherChar::get_integer_attackspeed() const
 	{
 		return attackspeed;

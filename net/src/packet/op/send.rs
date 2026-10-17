@@ -59,6 +59,8 @@ pub enum SendOpcode {
     DamagePlayer = 0xC0,
     FacialExpression = 0xC1,
     ShowForeignEffect = 0xC6,
+    GiveForeignBuff = 0xC7,
+    CancelForeignBuff = 0xC8,
     UpdateCharLook = 0xC5,
     UpdatePartyMemberHp = 0xC9,
     ShowChair = 0xC4,

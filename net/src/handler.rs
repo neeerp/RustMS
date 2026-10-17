@@ -289,6 +289,9 @@ pub enum WorldAction {
     /// The player's worn equipment changed; refresh their field avatar and
     /// show the others this UPDATE_CHAR_LOOK.
     LookChanged(Packet),
+    /// The buffs others see changed; refresh the player's field avatar and
+    /// show the others this GIVE_FOREIGN_BUFF or CANCEL_FOREIGN_BUFF.
+    BuffsChanged(Packet),
     /// Natural HP/MP recovery the client reports; the runtime checks timing.
     NaturalHeal {
         hp: i16,
