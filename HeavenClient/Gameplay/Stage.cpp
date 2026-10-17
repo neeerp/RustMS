@@ -79,6 +79,7 @@ namespace ms
 
 		start = ContinuousTimer::get().start();
 		emote_cooldown = {};
+		fame_cooldown = {};
 
 		CharStats stats = player.get_stats();
 		levelBefore = stats.get_stat(MapleStat::Id::LEVEL);
@@ -677,6 +678,11 @@ namespace ms
 	void Stage::add_effect(std::string path)
 	{
 		effect = MapEffect(path);
+	}
+
+	bool Stage::try_give_fame()
+	{
+		return fame_cooldown.try_give(get_uptime() / 1000);
 	}
 
 	int64_t Stage::get_uptime()

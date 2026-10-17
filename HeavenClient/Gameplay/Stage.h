@@ -24,6 +24,7 @@
 
 #include "Combat/Combat.h"
 #include "EmoteCooldown.h"
+#include "FameCooldown.h"
 #include "MapleMap/MapInfo.h"
 #include "MapleMap/MapTilesObjs.h"
 #include "MapleMap/MapBackgrounds.h"
@@ -128,6 +129,9 @@ namespace ms
 		// Set a map effect
 		void add_effect(std::string path);
 
+		// Whether the player may give fame now (once every 5 minutes); if
+		// so, the wait starts.
+		bool try_give_fame();
 		// Get the total up time of the client
 		int64_t get_uptime();
 		// Get the level at the start of the client
@@ -215,6 +219,7 @@ namespace ms
 
 		Combat combat;
 		EmoteCooldown emote_cooldown;
+		FameCooldown fame_cooldown;
 
 		std::chrono::time_point<std::chrono::steady_clock> start;
 		uint16_t levelBefore;

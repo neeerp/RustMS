@@ -306,6 +306,11 @@ pub enum WorldAction {
     /// A skill the player used reached party members; see `PartySkill`.
     PartySkill(PartySkill),
     Buddy(BuddyRequest),
+    /// Raise (or drop) the fame of `target`, who must be on the player's map.
+    GiveFame {
+        target: i32,
+        up: bool,
+    },
     /// Tell the player where a character is (`/find`).
     Find {
         target_name: String,
@@ -403,6 +408,12 @@ pub enum FieldRequest {
     /// Show the player the info window for `character_id`, who must be on
     /// their map (and may be themselves).
     CharInfo { character_id: i32 },
+    /// Have `target`, if they are here, take `giver_name`'s fame.
+    Fame {
+        target: i32,
+        giver_name: String,
+        up: bool,
+    },
 }
 
 impl ReplyAction for WorldAction {
@@ -509,6 +520,7 @@ fn world_routes() -> &'static HashMap<i16, WorldRoute> {
             (Op::ThrowGrenade, InGame(&world::ThrowGrenadeHandler)),
             (Op::MesoDrop, InGame(&world::MesoDropHandler)),
             (Op::CharInfoRequest, InGame(&world::CharInfoRequestHandler)),
+            (Op::GiveFame, InGame(&world::GiveFameHandler)),
         ];
         table
             .into_iter()
@@ -539,7 +551,7 @@ mod tests {
     fn every_registered_opcode_is_unique_per_server() {
         // The maps would silently drop duplicates; check the table sizes match.
         assert_eq!(login_routes().len(), 13);
-        assert_eq!(world_routes().len(), 48);
+        assert_eq!(world_routes().len(), 49);
     }
 
     #[test]

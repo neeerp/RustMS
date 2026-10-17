@@ -89,6 +89,7 @@ namespace ms
 
 			/// Player Interaction
 			CHAR_INFO_REQUEST = 97,
+			GIVE_FAME = 95,
 
 			/// Inventory
 			GATHER_ITEMS = 69,

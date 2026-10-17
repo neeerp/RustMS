@@ -48,8 +48,12 @@ namespace ms
 		UIElement::Type get_type() const override;
 
 		void update_stats(int32_t character_id, int16_t job_id, int8_t level, int16_t fame, std::string guild, std::string alliance);
+		// Show the fame the player just raised or dropped (FAME_RESPONSE).
+		void change_fame(int16_t fame);
 
 	private:
+		void give_fame(bool up) const;
+
 		// The main window alone, or lengthened to show pets, the mount, or
 		// the monster book collection.
 		enum Mode : uint8_t

@@ -100,6 +100,18 @@ pub enum ServerMessage {
     CharInfoRequested {
         requester: ClientHandle,
     },
+    /// `giver_name` raised (or dropped) this player's fame; tell `giver` how
+    /// it went.
+    Famed {
+        giver: ClientHandle,
+        giver_name: String,
+        up: bool,
+    },
+    /// The fame this player gave `target` found nobody: they aren't on its
+    /// map.
+    FameMissed {
+        target: i32,
+    },
     SendPacket(Packet),
 }
 

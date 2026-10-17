@@ -330,6 +330,11 @@ impl FieldActor {
                 FieldRequest::CharInfo { character_id } => {
                     self.handle_char_info(from, character_id)
                 }
+                FieldRequest::Fame {
+                    target,
+                    giver_name,
+                    up,
+                } => self.handle_fame(from, target, giver_name, up),
             },
             FieldMessage::SpawnLoot {
                 owner,
@@ -389,6 +394,26 @@ impl FieldActor {
         } else if let Ok(packet) = net::packet::build::world::stat::build_stat_update(true, &[]) {
             // Unlock the client, which waits on CHAR_INFO otherwise.
             requester.handle.send_packet(packet);
+        }
+    }
+
+    /// Hand `from`'s fame to `target`, if they are here.
+    fn handle_fame(&self, from: ClientId, target: i32, giver_name: String, up: bool) {
+        let Some(giver) = self.occupants.get(&from) else {
+            return;
+        };
+        if let Some(occupant) = self
+            .occupants
+            .values()
+            .find(|occupant| occupant.avatar.id == target)
+        {
+            occupant.handle.send(ServerMessage::Famed {
+                giver: giver.handle.clone(),
+                giver_name,
+                up,
+            });
+        } else {
+            giver.handle.send(ServerMessage::FameMissed { target });
         }
     }
 
@@ -1389,6 +1414,62 @@ mod tests {
             next_opcode(&mut first_rx).await,
             SendOpcode::StatChange as i16
         );
+        assert!(first_rx.try_recv().is_err());
+    }
+
+    #[tokio::test]
+    async fn fame_reaches_its_target_only_on_the_givers_map() {
+        let field = spawn_field();
+        let (first, mut first_rx) = client(1);
+        let (second, mut second_rx) = client(2);
+        for (handle, id) in [(first, 1), (second, 2)] {
+            field
+                .send(FieldMessage::Join {
+                    handle,
+                    avatar: avatar(id, 0, 0),
+                    party: None,
+                })
+                .await
+                .unwrap();
+        }
+        next_opcode(&mut first_rx).await;
+        next_opcode(&mut second_rx).await;
+
+        for target in [3, 2] {
+            field
+                .send(FieldMessage::FromClient {
+                    from: 1,
+                    request: FieldRequest::Fame {
+                        target,
+                        giver_name: "Al".into(),
+                        up: true,
+                    },
+                })
+                .await
+                .unwrap();
+        }
+        match timeout(Duration::from_secs(1), second_rx.recv())
+            .await
+            .unwrap()
+            .unwrap()
+        {
+            ServerMessage::Famed {
+                giver,
+                giver_name,
+                up,
+            } => {
+                assert_eq!((giver.client_id, giver_name.as_str(), up), (1, "Al", true))
+            }
+            other => panic!("expected fame, got {other:?}"),
+        }
+        match timeout(Duration::from_secs(1), first_rx.recv())
+            .await
+            .unwrap()
+            .unwrap()
+        {
+            ServerMessage::FameMissed { target } => assert_eq!(target, 3),
+            other => panic!("expected a miss, got {other:?}"),
+        }
         assert!(first_rx.try_recv().is_err());
     }
 }
