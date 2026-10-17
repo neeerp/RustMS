@@ -146,3 +146,11 @@ pub const CHARGED_SPELLS: [i32; 5] = [2121001, 2221001, 2321001, 22121000, 22151
 pub fn keydown(skill_id: i32) -> bool {
     KEYDOWN.contains(&skill_id)
 }
+
+/// Explosion and Chakra prepare too, but by a timer rather than a held key.
+pub const TIMED: [i32; 2] = [2111002, 4211001];
+
+/// Whether the client prepares the skill first, with SKILL_EFFECT.
+pub fn prepares(skill_id: i32) -> bool {
+    keydown(skill_id) || TIMED.contains(&skill_id)
+}

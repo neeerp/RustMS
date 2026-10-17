@@ -1,8 +1,8 @@
 use crate::handler::{
     FieldRequest, HandlerResult, WorldAction, WorldContext, WorldHandler, WorldResult,
 };
-use crate::packet::build::world::buff;
 use crate::packet::build::world::stat::{self, StatUpdate};
+use crate::packet::build::world::{buff, skill};
 use crate::skills::{self, Learned};
 use game::{Buff, BuffStat, Player};
 use packet::{io::read::PktRead, Packet};
@@ -33,8 +33,33 @@ impl WorldHandler for UseSkillHandler {
     }
 }
 
-/// `CANCEL_BUFF`: the player right-clicked a skill's buff icon. End its
-/// buffs and tell the client, which then drops the icon.
+/// `SKILL_EFFECT`: the player started preparing a skill, held down or
+/// timed. Show it to the rest of the map.
+pub struct SkillEffectHandler;
+
+impl WorldHandler for SkillEffectHandler {
+    fn handle(&self, packet: &mut Packet, ctx: &mut WorldContext) -> WorldResult {
+        let mut r = Cursor::new(&packet.bytes);
+        r.read_short()?;
+        let skill_id = r.read_int()?;
+        let level = r.read_byte()?;
+        let action_and_facing = r.read_short()? as u16;
+        let speed = r.read_byte()?;
+        let learned = skills::learned(ctx.player, skill_id)
+            .is_some_and(|skill| skill.level == i32::from(level));
+        if ctx.player.stats.hp <= 0 || !skills::prepares(skill_id) || !learned {
+            return Ok(HandlerResult::empty());
+        }
+        let shown =
+            skill::build_skill_prepare(ctx.player.id(), skill_id, level, action_and_facing, speed)?;
+        Ok(HandlerResult::empty().with(WorldAction::Field(FieldRequest::Broadcast(shown))))
+    }
+}
+
+/// `CANCEL_BUFF`: the player right-clicked a skill's buff icon, or let go
+/// of a held skill without using it. End the buffs and tell the client,
+/// which then drops the icon; or show the rest of the map the skill was
+/// let go.
 pub struct CancelBuffHandler;
 
 impl WorldHandler for CancelBuffHandler {
@@ -42,6 +67,12 @@ impl WorldHandler for CancelBuffHandler {
         let mut r = Cursor::new(&packet.bytes);
         r.read_short()?;
         let skill_id = r.read_int()?;
+        if skills::keydown(skill_id) {
+            let shown = skill::build_cancel_skill_prepare(ctx.player.id(), skill_id)?;
+            return Ok(
+                HandlerResult::empty().with(WorldAction::Field(FieldRequest::Broadcast(shown)))
+            );
+        }
         let ended = ctx.player.buffs.cancel(skill_id);
         if ended.is_empty() {
             return Ok(HandlerResult::empty());
@@ -296,5 +327,78 @@ mod tests {
         }
         let mut player = beginner_with(1002, 2);
         assert!(unlocks(&handle(&mut player, 1002, 2)[0]));
+    }
+
+    fn prepare(player: &mut Player, skill_id: i32, level: u8) -> Vec<WorldAction> {
+        let mut packet = Packet::new_empty();
+        packet.write_short(RecvOpcode::SkillEffect as i16).unwrap();
+        packet.write_int(skill_id).unwrap();
+        packet.write_byte(level).unwrap();
+        packet.write_short(0x8016_u16 as i16).unwrap();
+        packet.write_byte(4).unwrap();
+        let mut ctx = WorldContext {
+            client_id: 1,
+            channel_id: 0,
+            player,
+        };
+        SkillEffectHandler
+            .handle(&mut packet, &mut ctx)
+            .unwrap()
+            .actions
+    }
+
+    fn cancel(player: &mut Player, skill_id: i32) -> Vec<WorldAction> {
+        let mut packet = Packet::new_empty();
+        packet.write_short(RecvOpcode::CancelBuff as i16).unwrap();
+        packet.write_int(skill_id).unwrap();
+        let mut ctx = WorldContext {
+            client_id: 1,
+            channel_id: 0,
+            player,
+        };
+        CancelBuffHandler
+            .handle(&mut packet, &mut ctx)
+            .unwrap()
+            .actions
+    }
+
+    fn broadcast_opcodes(actions: &[WorldAction]) -> Vec<i16> {
+        actions
+            .iter()
+            .map(|action| match action {
+                WorldAction::Field(FieldRequest::Broadcast(p)) => p.opcode(),
+                other => panic!("unexpected {other:?}"),
+            })
+            .collect()
+    }
+
+    #[test]
+    fn a_prepared_skill_is_shown_to_the_map() {
+        if skills::data().is_err() {
+            return;
+        }
+        let mut player = beginner_with(3121004, 20);
+        player.stats.job = 312;
+        assert_eq!(
+            broadcast_opcodes(&prepare(&mut player, 3121004, 20)),
+            [SendOpcode::SkillEffect as i16]
+        );
+        assert!(prepare(&mut player, 3121004, 19).is_empty());
+    }
+
+    #[test]
+    fn only_skills_that_prepare_are_shown() {
+        let mut player = beginner_with(1002, 2);
+        assert!(prepare(&mut player, 1002, 2).is_empty());
+    }
+
+    #[test]
+    fn letting_go_of_a_held_skill_is_shown_to_the_map() {
+        let mut player = beginner_with(1002, 2);
+        assert_eq!(
+            broadcast_opcodes(&cancel(&mut player, 5221004)),
+            [SendOpcode::CancelSkillEffect as i16]
+        );
+        assert!(cancel(&mut player, 1002).is_empty());
     }
 }

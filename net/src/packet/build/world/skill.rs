@@ -17,6 +17,37 @@ pub fn build_update_skill(skill: &SkillRecord) -> Result<Packet, NetworkError> {
     Ok(packet)
 }
 
+/// SKILL_EFFECT: another player started preparing a skill. The client
+/// takes `action_and_facing` and `speed` as that player sent them.
+pub fn build_skill_prepare(
+    character_id: i32,
+    skill_id: i32,
+    level: u8,
+    action_and_facing: u16,
+    speed: u8,
+) -> Result<Packet, NetworkError> {
+    let mut packet = Packet::new_empty();
+    packet.write_short(SendOpcode::SkillEffect as i16)?;
+    packet.write_int(character_id)?;
+    packet.write_int(skill_id)?;
+    packet.write_byte(level)?;
+    packet.write_short(action_and_facing as i16)?;
+    packet.write_byte(speed)?;
+    Ok(packet)
+}
+
+/// CANCEL_SKILL_EFFECT: another player let go of a held skill.
+pub fn build_cancel_skill_prepare(
+    character_id: i32,
+    skill_id: i32,
+) -> Result<Packet, NetworkError> {
+    let mut packet = Packet::new_empty();
+    packet.write_short(SendOpcode::CancelSkillEffect as i16)?;
+    packet.write_int(character_id)?;
+    packet.write_int(skill_id)?;
+    Ok(packet)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -38,6 +69,29 @@ mod tests {
             .byte(1)
             .short(1);
         expect.int(2001002).int(3).int(0).long(DEFAULT_TIME).byte(4);
+        expect.end();
+    }
+
+    #[test]
+    fn a_prepare_passes_on_the_action_and_facing_and_speed() {
+        let packet = build_skill_prepare(7, 3121004, 20, 0x8016, 4).unwrap();
+        let mut expect = Expect::new(&packet.bytes);
+        expect.short(SendOpcode::SkillEffect as i16);
+        expect
+            .int(7)
+            .int(3121004)
+            .byte(20)
+            .short(0x8016_u16 as i16)
+            .byte(4);
+        expect.end();
+    }
+
+    #[test]
+    fn a_cancel_names_the_player_and_skill() {
+        let packet = build_cancel_skill_prepare(7, 5221004).unwrap();
+        let mut expect = Expect::new(&packet.bytes);
+        expect.short(SendOpcode::CancelSkillEffect as i16);
+        expect.int(7).int(5221004);
         expect.end();
     }
 }
