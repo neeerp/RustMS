@@ -224,6 +224,9 @@ namespace ms
 	{
 		// v83 stretches each frame of an action to delay * (speed + 10) / 16,
 		// holding the speed to 2..10 (FUN_00453ad1).
+		if (fixed_action_speed > 0)
+			return fixed_action_speed;
+
 		return std::clamp<int8_t>(get_integer_attackspeed(), 2, 10);
 	}
 
@@ -386,6 +389,7 @@ namespace ms
 		look.set_action(action);
 
 		attacking = true;
+		fixed_action_speed = 0;
 		look.set_alerted(5000);
 	}
 
@@ -394,6 +398,7 @@ namespace ms
 		look.attack(stance);
 
 		attacking = true;
+		fixed_action_speed = 0;
 		look.set_alerted(5000);
 	}
 
@@ -402,6 +407,7 @@ namespace ms
 		look.attack(degenerate);
 
 		attacking = true;
+		fixed_action_speed = 0;
 		look.set_alerted(5000);
 	}
 
@@ -410,12 +416,18 @@ namespace ms
 		look.attack(degenerate, stance);
 
 		attacking = true;
+		fixed_action_speed = 0;
 		look.set_alerted(5000);
 	}
 
 	void Char::hold_attack(uint8_t frame)
 	{
 		look.hold(frame);
+	}
+
+	void Char::fix_action_speed(int8_t speed)
+	{
+		fixed_action_speed = speed;
 	}
 
 	void Char::end_attack()

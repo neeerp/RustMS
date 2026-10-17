@@ -43,20 +43,12 @@ namespace ms
 			frame = src["frame"];
 			move = src["move"];
 
-			int16_t sgndelay = src["delay"];
+			// v83 takes 150 for a missing delay, but keeps a 0 (FUN_00414d40).
+			int16_t sgndelay = src["delay"].data_type() == nl::node::type::integer
+							   ? static_cast<int16_t>(src["delay"]) : static_cast<int16_t>(150);
 
-			if (sgndelay == 0)
-				sgndelay = 100;
-
-			if (sgndelay > 0)
-			{
-				delay = sgndelay;
-				attackframe = true;
-			} else if (sgndelay < 0)
-			{
-				delay = -sgndelay;
-				attackframe = false;
-			}
+			delay = sgndelay < 0 ? -sgndelay : sgndelay;
+			attackframe = sgndelay >= 0;
 		}
 
 		BodyAction()
