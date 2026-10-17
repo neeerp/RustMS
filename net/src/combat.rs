@@ -287,6 +287,8 @@ pub enum AttackRejection {
     Damage,
     /// A shot without enough of an ammo its weapon fires.
     Ammo,
+    /// Stun or Seduce stops every attack, Seal every skill.
+    Diseased,
 }
 
 /// The MP a skill's attack spends: none for Heal, whose USE_SKILL paid.
@@ -306,6 +308,15 @@ pub fn attack_mp_cost(skill: &Learned) -> i32 {
 pub fn validate(attack: &Attack, player: &Player) -> Result<Uses, AttackRejection> {
     if player.stats.hp <= 0 {
         return Err(AttackRejection::Dead);
+    }
+    // v83 attacks only without Stun or Seduce, and skills fail under Seal
+    // (FUN_0094be52, FUN_00966f7a).
+    let buffs = &player.buffs;
+    if buffs.has(BuffStat::Stun)
+        || buffs.has(BuffStat::Seduce)
+        || (attack.skill != 0 && buffs.has(BuffStat::Seal))
+    {
+        return Err(AttackRejection::Diseased);
     }
     let base_cap = (max_base_damage(player) * 2).max(10);
     let (skill, mob_count, hit_count, cap) = if attack.skill == 0 {
@@ -514,6 +525,27 @@ mod tests {
             validate(&parse_close_attack(&attack_packet(1, 1)).unwrap(), &dead),
             Err(AttackRejection::Dead)
         );
+    }
+
+    #[test]
+    fn stun_and_seduce_stop_attacks_and_seal_stops_skills() {
+        let now = std::time::Instant::now();
+        let long = std::time::Duration::from_secs(60);
+        let basic = parse_close_attack(&attack_packet(1, 1)).unwrap();
+        let snails = parse_close_attack(&skill_attack_packet(1000, 1, 1)).unwrap();
+        for (stat, skill_only) in [
+            (BuffStat::Stun, false),
+            (BuffStat::Seduce, false),
+            (BuffStat::Seal, true),
+        ] {
+            let mut player = beginner_with_sword();
+            player.buffs.give(game::Buff::new(-123, stat, 1, now, long));
+            assert_eq!(validate(&basic, &player).is_ok(), skill_only, "{stat:?}");
+            assert_eq!(
+                validate(&snails, &player).unwrap_err(),
+                AttackRejection::Diseased
+            );
+        }
     }
 
     #[test]

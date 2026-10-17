@@ -17,7 +17,7 @@ pub mod quest;
 pub mod skill;
 pub mod storage;
 
-pub use buff::{Buff, BuffStat, Buffs};
+pub use buff::{Buff, BuffStat, Buffs, Disease, ShownBuff};
 pub use character::{ApStat, AvatarLook, CharacterStats, FieldAvatar, Player};
 pub use inventory::{EquipStats, Inventory, InventoryChange, InventoryError, InventoryType, Item};
 pub use keymap::{KeyBinding, Keymap};

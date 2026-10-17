@@ -93,6 +93,9 @@ namespace ms
 			MONSTER_RIDING,
 			HOMING_BEACON,
 			SPEED_INFUSION,
+			CURSE,
+			SLOW,
+			SEDUCE,
 			LENGTH
 		};
 

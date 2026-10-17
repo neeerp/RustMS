@@ -243,8 +243,8 @@ namespace ms
 		if (!can_use_move(move) || !allowed)
 			return std::nullopt;
 
-		// v83 teleports only from a platform, the way the arrow keys point,
-		// reversed while confused (FUN_00957b74).
+		// v83 teleports only from a platform, the way the player is steered,
+		// so reversed while confused (FUN_00957b74).
 		const PhysicsObject &phobj = player.get_phobj();
 
 		if (!phobj.onground || player.get_ladder())
@@ -252,12 +252,6 @@ namespace ms
 
 		int32_t dx = player.is_key_down(KeyAction::Id::RIGHT) - player.is_key_down(KeyAction::Id::LEFT);
 		int32_t dy = player.is_key_down(KeyAction::Id::DOWN) - player.is_key_down(KeyAction::Id::UP);
-
-		if (player.has_buff(Buffstat::Id::CONFUSE))
-		{
-			dx = -dx;
-			dy = -dy;
-		}
 
 		int32_t level = player.get_skills().get_level(move_id);
 		int32_t range = SkillData::get(move_id).get_stats(level).shotrange;

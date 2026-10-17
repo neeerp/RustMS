@@ -117,8 +117,9 @@ namespace ms
 	void Player::send_action(KeyAction::Id action, bool down)
 	{
 		const PlayerState *pst = get_state(state);
+		bool refused = action == KeyAction::Id::JUMP && !disease::can_jump(get_diseases());
 
-		if (pst)
+		if (pst && !refused)
 			pst->send_action(*this, action, down);
 
 		keysdown[action] = down;
@@ -126,7 +127,7 @@ namespace ms
 
 	void Player::release_key(KeyAction::Id action)
 	{
-		if (is_key_down(action))
+		if (is_held(action))
 			send_action(action, false);
 	}
 
@@ -240,6 +241,12 @@ namespace ms
 
 		if (pst)
 		{
+			// A seduction that jumps keeps the player jumping.
+			disease::State diseases = get_diseases();
+
+			if (diseases.seduced && disease::seduced(*diseases.seduced).jump && phobj.onground)
+				pst->send_action(*this, KeyAction::Id::JUMP, true);
+
 			phobj.walkspeed = get_walkspeed();
 			pst->update(*this);
 			physics.move_object(phobj);
@@ -561,7 +568,7 @@ namespace ms
 
 	bool Player::can_attack() const
 	{
-		return !attacking && !is_dead() && !is_climbing() && !is_sitting();
+		return !attacking && !is_dead() && !is_climbing() && !is_sitting() && disease::can_attack(get_diseases());
 	}
 
 	SpecialMove::ForbidReason Player::can_use(const SpecialMove &move) const
@@ -574,6 +581,9 @@ namespace ms
 			return SpecialMove::ForbidReason::FBR_OTHER;
 
 		if (move.is_attack() && (state == Char::State::LADDER || state == Char::State::ROPE))
+			return SpecialMove::ForbidReason::FBR_OTHER;
+
+		if (move.is_skill() && !disease::can_use_skill(move.get_id(), get_diseases()))
 			return SpecialMove::ForbidReason::FBR_OTHER;
 
 		if (has_cooldown(move.get_id()))
@@ -740,11 +750,39 @@ namespace ms
 	void Player::give_buff(Buff buff)
 	{
 		buffs[buff.stat] = buff;
+		show_diseases();
 	}
 
 	void Player::cancel_buff(Buffstat::Id stat)
 	{
 		buffs[stat] = {};
+		show_diseases();
+	}
+
+	// A disease's reason is the mob skill that gave it.
+	void Player::show_diseases()
+	{
+		std::vector<int32_t> reasons;
+
+		for (Buffstat::Id stat : disease::STATS)
+			if (has_buff(stat))
+				reasons.push_back(buffs[stat].skillid);
+
+		show_afflictions(reasons);
+	}
+
+	disease::State Player::get_diseases() const
+	{
+		disease::State diseases;
+		diseases.stunned = has_buff(Buffstat::Id::STUN);
+		diseases.sealed = has_buff(Buffstat::Id::SEAL);
+		diseases.weakened = has_buff(Buffstat::Id::WEAKEN);
+		diseases.confused = has_buff(Buffstat::Id::CONFUSE);
+
+		if (has_buff(Buffstat::Id::SEDUCE))
+			diseases.seduced = get_buff_value(Buffstat::Id::SEDUCE);
+
+		return diseases;
 	}
 
 	bool Player::has_buff(Buffstat::Id stat) const
@@ -919,7 +957,14 @@ namespace ms
 	// them into shoe multipliers (FUN_007a4dec).
 	double Player::get_walkspeed() const
 	{
-		return std::clamp<int32_t>(stats.get_total(EquipStat::Id::SPEED), 80, 140) / 100.0;
+		std::optional<int32_t> slow;
+
+		if (has_buff(Buffstat::Id::SLOW))
+			slow = get_buff_value(Buffstat::Id::SLOW);
+
+		int32_t speed = disease::walk_speed(stats.get_total(EquipStat::Id::SPEED), slow);
+
+		return std::clamp<int32_t>(speed, 80, 140) / 100.0;
 	}
 
 	double Player::get_jumpforce() const
@@ -938,6 +983,36 @@ namespace ms
 	}
 
 	bool Player::is_key_down(KeyAction::Id action) const
+	{
+		switch (action)
+		{
+		case KeyAction::Id::LEFT:
+		case KeyAction::Id::RIGHT:
+		case KeyAction::Id::UP:
+		case KeyAction::Id::DOWN:
+			break;
+		default:
+			return is_held(action);
+		}
+
+		int8_t x = is_held(KeyAction::Id::RIGHT) - is_held(KeyAction::Id::LEFT);
+		int8_t y = is_held(KeyAction::Id::DOWN) - is_held(KeyAction::Id::UP);
+		disease::Input input = disease::steer(x, y, get_diseases());
+
+		switch (action)
+		{
+		case KeyAction::Id::LEFT:
+			return input.x < 0;
+		case KeyAction::Id::RIGHT:
+			return input.x > 0;
+		case KeyAction::Id::UP:
+			return input.y < 0;
+		default:
+			return input.y > 0;
+		}
+	}
+
+	bool Player::is_held(KeyAction::Id action) const
 	{
 		return keysdown.count(action) ? keysdown.at(action) : false;
 	}

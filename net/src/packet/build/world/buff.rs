@@ -1,7 +1,7 @@
 //! Buffs, skill cooldowns, and skill effects.
 
 use crate::{error::NetworkError, packet::op::SendOpcode};
-use game::BuffStat;
+use game::{BuffStat, ShownBuff};
 use packet::{io::write::PktWrite, Packet};
 
 /// A temporary stat's bit in the client's 128-bit flags, as the two longs
@@ -34,17 +34,26 @@ pub(crate) fn write_mask(
 }
 
 /// Stats the client reads one more byte for at the end of GIVE_BUFF
-/// (FUN_0077dc78): the ones that change how the player moves.
+/// (FUN_0077dc78): the ones that change how the player moves. Morph (33),
+/// 49, and the two-state dash and riding stats (83..85) are among them
+/// too.
 fn moves(stat: BuffStat) -> bool {
     matches!(
         stat,
-        BuffStat::Speed | BuffStat::Jump | BuffStat::MapleWarrior
+        BuffStat::Speed
+            | BuffStat::Jump
+            | BuffStat::Stun
+            | BuffStat::Weakness
+            | BuffStat::Slow
+            | BuffStat::MapleWarrior
+            | BuffStat::Seduce
     )
 }
 
 /// GIVE_BUFF: the stats a skill gives, lasting `duration_ms`
 /// (FUN_00a202be). Each stat's value, skill, and duration come in the
-/// order of their bits.
+/// order of their bits. A disease's skill is its mob skill and level,
+/// `skill | level << 16`.
 pub fn build_give_buff(
     skill_id: i32,
     duration_ms: i32,
@@ -84,21 +93,32 @@ pub fn build_cancel_buff(stats: &[BuffStat]) -> Result<Packet, NetworkError> {
 /// also sets the two-state stats, whose data the caller writes next.
 pub(crate) fn write_shown(
     p: &mut Packet,
-    shown: &[(BuffStat, i32)],
+    shown: &[ShownBuff],
     two_state: bool,
 ) -> Result<(), NetworkError> {
     let two_state = two_state.then_some(TWO_STATE).into_iter().flatten();
-    write_mask(p, shown.iter().map(|(stat, _)| stat.bit()).chain(two_state))?;
+    write_mask(p, shown.iter().map(|buff| buff.stat.bit()).chain(two_state))?;
     for stat in BuffStat::SHOWN {
-        let Some(&(_, value)) = shown.iter().find(|(s, _)| *s == stat) else {
+        let Some(buff) = shown.iter().find(|buff| buff.stat == stat) else {
             continue;
         };
         match stat {
             BuffStat::Speed | BuffStat::Combo => {
-                p.write_byte(value as u8)?;
+                p.write_byte(buff.value as u8)?;
             }
-            BuffStat::WeaponCharge => {
-                p.write_int(value)?;
+            BuffStat::Poison => {
+                p.write_short(buff.value)?;
+                p.write_int(buff.skill_id)?;
+            }
+            BuffStat::WeaponCharge
+            | BuffStat::Stun
+            | BuffStat::Darkness
+            | BuffStat::Seal
+            | BuffStat::Weakness
+            | BuffStat::Curse
+            | BuffStat::Seduce
+            | BuffStat::Confuse => {
+                p.write_int(buff.skill_id)?;
             }
             _ => {}
         }
@@ -112,7 +132,7 @@ pub(crate) fn write_shown(
 /// (0x98385d); the client leaves the others as they were.
 pub fn build_give_foreign_buff(
     character_id: i32,
-    shown: &[(BuffStat, i32)],
+    shown: &[ShownBuff],
 ) -> Result<Packet, NetworkError> {
     let mut p = Packet::new_empty();
     p.write_short(SendOpcode::GiveForeignBuff as i16)?;
@@ -232,6 +252,27 @@ mod tests {
     }
 
     #[test]
+    fn diseases_that_stop_movement_carry_the_movement_byte() {
+        let seduce = 128 | 3 << 16;
+        let packet = build_give_buff(seduce, 5_000, &[(BuffStat::Seduce, 3)]).unwrap();
+        let mut expect = Expect::new(&packet.bytes);
+        expect.short(SendOpcode::GiveBuff as i16);
+        expect.long(0).long(1 << 7);
+        expect.short(3).int(seduce).int(5_000);
+        expect.byte(0).byte(0).short(0).byte(0);
+        expect.end();
+
+        let seal = 120 | 1 << 16;
+        let packet = build_give_buff(seal, 5_000, &[(BuffStat::Seal, 1)]).unwrap();
+        let mut expect = Expect::new(&packet.bytes);
+        expect.short(SendOpcode::GiveBuff as i16);
+        expect.long(0).long(1 << 51);
+        expect.short(1).int(seal).int(5_000);
+        expect.byte(0).byte(0).short(0);
+        expect.end();
+    }
+
+    #[test]
     fn masks_cover_all_four_dwords() {
         assert_eq!(mask(0), (0, 1 << 32));
         assert_eq!(mask(34), (0, 4));
@@ -241,16 +282,43 @@ mod tests {
 
     #[test]
     fn foreign_buffs_carry_shown_data_in_the_client_order() {
+        let shown = |stat, value, skill_id| ShownBuff {
+            stat,
+            value,
+            skill_id,
+        };
         let shown = [
-            (BuffStat::SoulArrow, 1),
-            (BuffStat::WeaponCharge, 1211004),
-            (BuffStat::Speed, 40),
+            shown(BuffStat::SoulArrow, 1, 4101000),
+            shown(BuffStat::WeaponCharge, 1, 1211004),
+            shown(BuffStat::Speed, 40, 1002),
         ];
         let packet = build_give_foreign_buff(7, &shown).unwrap();
         let mut expect = Expect::new(&packet.bytes);
         expect.short(SendOpcode::GiveForeignBuff as i16).int(7);
         expect.long(0).long((1 << 39) | (1 << 54) | (1 << 48));
         expect.byte(40).int(1211004);
+        expect.byte(0).byte(0).short(0);
+        expect.end();
+
+        // Diseases carry their mob skill; Poison its value first.
+        let (stun, poison) = (123 | 1 << 16, 125 | 2 << 16);
+        let diseases = [
+            ShownBuff {
+                stat: BuffStat::Poison,
+                value: 15,
+                skill_id: poison,
+            },
+            ShownBuff {
+                stat: BuffStat::Stun,
+                value: 1,
+                skill_id: stun,
+            },
+        ];
+        let packet = build_give_foreign_buff(7, &diseases).unwrap();
+        let mut expect = Expect::new(&packet.bytes);
+        expect.short(SendOpcode::GiveForeignBuff as i16).int(7);
+        expect.long(0).long((1 << 49) | (1 << 50));
+        expect.int(stun).short(15).int(poison);
         expect.byte(0).byte(0).short(0);
         expect.end();
 

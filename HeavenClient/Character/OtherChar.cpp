@@ -17,6 +17,8 @@
 //////////////////////////////////////////////////////////////////////////////////
 #include "OtherChar.h"
 
+#include "Diseases.h"
+
 #include "../Constants.h"
 
 namespace ms
@@ -83,12 +85,28 @@ namespace ms
 	{
 		for (auto [stat, value] : shown)
 			buffs[stat] = value;
+
+		show_diseases();
 	}
 
 	void OtherChar::hide_buffs(const std::vector<Buffstat::Id> &ended)
 	{
 		for (Buffstat::Id stat : ended)
 			buffs.erase(stat);
+
+		show_diseases();
+	}
+
+	// A disease another character shows has its reason for value.
+	void OtherChar::show_diseases()
+	{
+		std::vector<int32_t> reasons;
+
+		for (auto [stat, value] : buffs)
+			if (disease::is_disease(stat))
+				reasons.push_back(value);
+
+		show_afflictions(reasons);
 	}
 
 	std::optional<int32_t> OtherChar::get_buff(Buffstat::Id stat) const

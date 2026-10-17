@@ -84,5 +84,7 @@ namespace ms
 		std::unordered_map<int32_t, uint8_t> skilllevels;
 		uint8_t attackspeed;
 		std::map<Buffstat::Id, int32_t> buffs;
+
+		void show_diseases();
 	};
 }

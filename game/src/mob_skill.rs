@@ -1,7 +1,8 @@
 //! What a mob skill (`MobSkill.img/<id>`) does, for the skills the server
 //! lets mobs cast.
 
-use crate::MobStat;
+use crate::{BuffStat, Disease, MobStat};
+use std::time::Duration;
 
 /// Heal: the mob and those around it regain HP and MP.
 pub const HEAL: i32 = 114;
@@ -14,11 +15,13 @@ pub enum MobSkillEffect {
     Statuses(Vec<(MobStat, i16)>),
     Heal,
     Summon,
+    /// A disease on every player in its area.
+    Disease(BuffStat),
 }
 
 /// What `skill` does with its value `x`, or `None` for the ones not cast
-/// yet: the diseases (120-136), dispel, banish, poison mist, and the damage
-/// counters (143-145).
+/// yet: the other diseases (127, 129-131, 133-136: dispel, banish, poison
+/// mist, ...) and the damage counters (143-145).
 ///
 /// The v83 client multiplies a mob's attack by its PowerUp and MagicUp as
 /// percents, and adds Pad and Mad, so Power Up (100, 115%) is PowerUp, not
@@ -43,9 +46,37 @@ pub fn effect(skill: i32, x: i32) -> Option<MobSkillEffect> {
         157 => MobStat::SealSkill,
         HEAL => return Some(MobSkillEffect::Heal),
         SUMMON => return Some(MobSkillEffect::Summon),
-        _ => return None,
+        _ => return disease(skill).map(MobSkillEffect::Disease),
     };
     Some(MobSkillEffect::Statuses(vec![(stat, x)]))
+}
+
+/// The disease a mob skill inflicts, cast or with an attack (`disease`).
+pub fn disease(skill: i32) -> Option<BuffStat> {
+    Some(match skill {
+        120 => BuffStat::Seal,
+        121 => BuffStat::Darkness,
+        122 => BuffStat::Weakness,
+        123 => BuffStat::Stun,
+        124 => BuffStat::Curse,
+        125 => BuffStat::Poison,
+        126 => BuffStat::Slow,
+        128 => BuffStat::Seduce,
+        132 => BuffStat::Confuse,
+        _ => return None,
+    })
+}
+
+/// The disease mob skill `skill` at `level` inflicts, with its `x` and
+/// `time` in seconds. A stat the client sees as set only when its value
+/// isn't 0, so one without `x` gets 1.
+pub fn inflicted(skill: i32, level: i32, x: i32, seconds: i32) -> Option<Disease> {
+    Some(Disease {
+        stat: disease(skill)?,
+        value: i16::try_from(x.max(1)).unwrap_or(i16::MAX),
+        skill_id: skill | level << 16,
+        lasts: Duration::from_secs(seconds.max(0) as u64),
+    })
 }
 
 #[cfg(test)]
@@ -60,7 +91,18 @@ mod tests {
         );
         assert_eq!(effect(HEAL, 700), Some(MobSkillEffect::Heal));
         assert_eq!(effect(SUMMON, 0), Some(MobSkillEffect::Summon));
-        assert_eq!(effect(123, 1), None);
+        assert_eq!(
+            effect(123, 1),
+            Some(MobSkillEffect::Disease(BuffStat::Stun))
+        );
+        assert_eq!(effect(127, 1), None);
+        let slow = inflicted(126, 2, 80, 10).unwrap();
+        assert_eq!(
+            (slow.stat, slow.value, slow.skill_id, slow.lasts),
+            (BuffStat::Slow, 80, 126 | 2 << 16, Duration::from_secs(10))
+        );
+        assert_eq!(inflicted(123, 1, 0, 5).unwrap().value, 1);
+        assert_eq!(inflicted(100, 1, 0, 5), None);
         assert_eq!(effect(145, 1), None);
     }
 }

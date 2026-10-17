@@ -119,6 +119,11 @@ pub enum ServerMessage {
     },
     /// This player's Beholder heals or buffs them.
     Beholder(net::summons::Support),
+    /// A mob's skill on `map_id` gave this player a disease.
+    Diseased {
+        disease: game::Disease,
+        map_id: i32,
+    },
     /// The Mystic Door this player entered on `from_map` leads to `map_id`.
     DoorWarp {
         from_map: i32,

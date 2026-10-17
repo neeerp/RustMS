@@ -6,7 +6,7 @@ use game::BuffStat;
 use net::packet::build::world::buff;
 use net::packet::build::world::stat::{self, StatUpdate};
 use net::packet::build::world::summon::Gone;
-use net::packet::handle::world::party_skill_reached;
+use net::packet::handle::world::{catch_disease, party_skill_reached};
 use net::summons::Support;
 use net::{summons, FieldRequest, PartySkill, SpawnPosition};
 use packet::Packet;
@@ -44,20 +44,48 @@ impl ClientActor {
         Ok(())
     }
 
+    /// A mob's skill gave the player a disease, if they are still on its
+    /// map and out of the Cash Shop.
+    pub(super) async fn diseased(
+        &mut self,
+        disease: game::Disease,
+        map_id: i32,
+    ) -> Result<(), RuntimeError> {
+        if self.in_cash_shop {
+            return Ok(());
+        }
+        let Some(game) = self.game.as_mut() else {
+            return Ok(());
+        };
+        if game.player.stats.map_id != map_id {
+            return Ok(());
+        }
+        let result = catch_disease(&mut game.player, disease, std::time::Instant::now())
+            .map_err(|e| RuntimeError::Handler(e.to_string()))?;
+        for action in result.actions {
+            self.apply(action).await?;
+        }
+        Ok(())
+    }
+
     /// When the player's buffs next need `update_buffs`.
     pub(super) fn buffs_due(&self) -> Option<tokio::time::Instant> {
         let deadline = self.game.as_ref()?.player.buffs.next_deadline()?;
         Some(tokio::time::Instant::from_std(deadline))
     }
 
-    /// Heal from Recovery and end the buffs and cooldowns that ran out.
+    /// Heal from Recovery, hurt from Poison, and end the buffs and
+    /// cooldowns that ran out.
     pub(super) async fn update_buffs(&mut self) -> Result<(), RuntimeError> {
         let player = &mut self.in_game_mut()?.player;
         let tick = player.buffs.advance(std::time::Instant::now());
         let mut packets = Vec::new();
         let stats = &player.stats;
-        if tick.heal > 0 && stats.hp > 0 && stats.hp < stats.max_hp {
-            let hp = player.add_hp(tick.heal);
+        // Poison never takes the last HP.
+        let poison = tick.poison.min(i32::from(stats.hp) - 1).max(0);
+        let change = tick.heal - poison;
+        if stats.hp > 0 && (change < 0 || (change > 0 && stats.hp < stats.max_hp)) {
+            let hp = player.add_hp(change);
             packets.push(stat::build_stat_update(false, &[StatUpdate::Hp(hp)])?);
         }
         if !tick.expired.is_empty() {

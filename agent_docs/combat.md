@@ -667,8 +667,45 @@ controller's client plays the cast and the server applies it
   alive, with SPAWN_MONSTER's appearance set to `summonEffect`; clients
   play `Effect.nx` `Summon.img/<summonEffect>` on them. Summoned mobs don't
   respawn.
-- Not cast yet: the diseases on players (120-129), dispel, banish, poison
-  mist, and the damage counters (143-145).
+- **Diseases** (120-126, 128, 132) reach the players in the area; see
+  below.
+- Not cast yet: dispel (127), banish, poison mist, and the damage counters
+  (143-145).
+
+### Diseases
+
+A disease is a buff stat the server puts on a player, whose skill (the
+reason) is the mob skill | level << 16 and whose value is the level's `x`
+(1 without one): Seal (120) 19, Darkness (121) 20, Weakness (122) 30, Stun
+(123) 17, Curse (124) 31, Poison (125) 18, Slow (126) 32, Seduce (128) 39
+and Confuse (132) 51 (`game::mob_skill::inflicted`).
+
+- **Catching one:** a cast lands by its `prop`, rolled once, on every
+  player in the caster's `lt`/`rb` box (mirrored when it faces right), or
+  without a box on its controller. A mob attack with `disease` and `level`
+  brings one by that level's `prop` when it does damage. A dead player, or
+  one who has the stat already, catches nothing (`catch_disease`). The
+  player gets GIVE_BUFF for `time` seconds; the map sees the shown ones
+  (all but Slow) in GIVE_FOREIGN_BUFF with the reason as the value (Poison
+  sends its `x` then the reason). The server ends it on time or on death,
+  and the player can't cancel it.
+- **Effects on the server:** Poison takes `x` HP each second, never the
+  last one. Curse halves the EXP from kills (as Cosmic does). Darkness's
+  lower accuracy isn't applied.
+- **Dispel (2311001):** for each party member reached it rolls its `prop`,
+  then cures Poison, Seal, Darkness, Weakness, Curse and Slow (not Stun,
+  Seduce or Confuse) with CANCEL_BUFF and CANCEL_FOREIGN_BUFF. A sealed
+  player can still cast it.
+- **What the client does** (HeavenClient `Character/Diseases.h`, from v83
+  CUserLocal): Stun stops all input, attacks and skills; Seduce moves the
+  player by its `x` (1 left, 2 right, 3 jump, 4 down, 6 and 7 jump left and
+  right) and stops jumps, attacks and skills; Confuse reverses the arrows
+  (teleport too); Weakness stops jumping; Seal stops every skill but
+  Dispel; Slow sets the walking speed to its `x` before the 80-140 clamp.
+  Each disease shows `MobSkill.img/<skill>/level/<lvl>/affected` on the
+  character, over the face when its `pos` is 1, otherwise at the feet; the
+  player also gets a grey chat notice (none for Slow or Confuse) but no
+  buff-bar icon.
 
 ## Getting hurt
 
@@ -762,3 +799,7 @@ and back, keep a stranger out until they join the party, and close it on
 logout.
 `party_skills` has a Bishop resurrect a dead party member, and a Chief
 Bandit heal themselves with Chakra.
+`player_diseases` has a Hogul in Korean Folk Town cast Slow from far away
+(it misses) and then on the player (it lands for 10 s, then ends).
+HeavenClient's `diseases_tests` cover the input, jump, attack and skill
+gates and the notices.
