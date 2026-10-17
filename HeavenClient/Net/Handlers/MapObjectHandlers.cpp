@@ -355,6 +355,14 @@ namespace ms
 		Stage::get().get_mobs().send_mobhp(oid, hppercent, playerlevel);
 	}
 
+	void ShowMagnetHandler::handle(InPacket& recv) const
+	{
+		int32_t oid = recv.read_int();
+		bool success = recv.read_bool();
+
+		Stage::get().get_combat().show_catch(oid, success);
+	}
+
 	void SpawnNpcHandler::handle(InPacket& recv) const
 	{
 		int32_t oid = recv.read_int();

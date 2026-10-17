@@ -126,6 +126,7 @@ namespace ms
 		SPAWN_MOB_C = 238,
 		MOB_MOVED = 239,
 		SHOW_MOB_HP = 250,
+		SHOW_MAGNET = 251,
 		SPAWN_NPC = 257,
 		SPAWN_NPC_C = 259,
 		DROP_LOOT = 268,
@@ -190,6 +191,7 @@ namespace ms
 		emplace<SPAWN_MOB_C, SpawnMobControllerHandler>();
 		emplace<MOB_MOVED, MobMovedHandler>();
 		emplace<SHOW_MOB_HP, ShowMobHpHandler>();
+		emplace<SHOW_MAGNET, ShowMagnetHandler>();
 		emplace<KILL_MOB, KillMobHandler>();
 		emplace<DROP_LOOT, DropLootHandler>();
 		emplace<REMOVE_LOOT, RemoveLootHandler>();

@@ -183,6 +183,30 @@ namespace ms
 		}
 	};
 
+	// Tells the server which mobs Monster Magnet reached: each one's oid, 0
+	// for one out of sight, and whether it was caught (0x96c62a). It may
+	// reach none.
+	// Opcode: USE_SKILL(91)
+	class MonsterMagnetPacket : public OutPacket
+	{
+	public:
+		MonsterMagnetPacket(int32_t skillid, int32_t level, const std::vector<std::pair<int32_t, bool>>& mobs, bool toleft) : OutPacket(OutPacket::Opcode::USE_SKILL)
+		{
+			write_time();
+			write_int(skillid);
+			write_byte(static_cast<uint8_t>(level));
+			write_int(static_cast<int32_t>(mobs.size()));
+
+			for (auto& [oid, caught] : mobs)
+			{
+				write_int(oid);
+				write_byte(caught);
+			}
+
+			write_byte(toleft);
+		}
+	};
+
 	// Tells the server the player started holding down a skill, or timing
 	// one, so others see it (FUN_0096a86e).
 	// Opcode: SKILL_EFFECT(93)

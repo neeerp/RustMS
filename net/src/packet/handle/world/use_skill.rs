@@ -1,3 +1,4 @@
+use crate::error::NetworkError;
 use crate::handler::{
     FieldRequest, HandlerResult, WorldAction, WorldContext, WorldHandler, WorldResult,
 };
@@ -11,9 +12,9 @@ use std::time::{Duration, Instant};
 use tracing::debug;
 
 /// `USE_SKILL`: a skill that doesn't attack. Only the beginner buffs
-/// (Recovery and Nimble Feet, for every beginner job) do anything yet.
-/// Every answer unlocks the client, which waits on it before using
-/// another skill or item.
+/// (Recovery and Nimble Feet, for every beginner job) and Monster Magnet
+/// do anything yet. Every answer unlocks the client, which waits on it
+/// before using another skill or item.
 pub struct UseSkillHandler;
 
 impl WorldHandler for UseSkillHandler {
@@ -23,6 +24,19 @@ impl WorldHandler for UseSkillHandler {
         r.read_int()?; // tick
         let skill_id = r.read_int()?;
         let level = i32::from(r.read_byte()?);
+        if skills::is_magnet(skill_id) {
+            let caught = read_magnet(&mut r)?;
+            return match use_magnet(ctx.player, skill_id, level, caught.as_ref()) {
+                Ok(skill) => {
+                    let (caught, toleft) = caught.unwrap_or_default();
+                    announce_magnet(ctx.player, &skill, caught, toleft)
+                }
+                Err(refusal) => {
+                    debug!(skill_id, level, ?refusal, "Monster Magnet refused");
+                    Ok(HandlerResult::reply(stat::build_stat_update(true, &[])?))
+                }
+            };
+        }
         match use_skill(ctx.player, skill_id, level, Instant::now()) {
             Ok(used) => announce(ctx.player, &used),
             Err(refusal) => {
@@ -86,9 +100,79 @@ enum Refusal {
     Dead,
     /// Not learned, or not at the level the client named.
     NotLearned,
+    /// Monster Magnet reaching more mobs than it can.
+    TooManyMobs,
     Unsupported,
     CoolingDown,
     NotEnoughMp,
+}
+
+/// Monster Magnet reaches at most this many mobs (0x96c215).
+const MAGNET_MOBS: i32 = 15;
+
+/// What Monster Magnet sends after its level (0x96c62a): each mob it
+/// reached, 0 for one out of sight, and whether it was caught; then which
+/// way the player faced. None if it claims more mobs than it can reach.
+fn read_magnet(r: &mut Cursor<&Vec<u8>>) -> Result<Option<(Vec<(i32, bool)>, bool)>, NetworkError> {
+    let found = r.read_int()?;
+    if !(0..=MAGNET_MOBS).contains(&found) {
+        return Ok(None);
+    }
+    let mut caught = Vec::with_capacity(found as usize);
+    for _ in 0..found {
+        let object_id = r.read_int()?;
+        let success = r.read_byte()? != 0;
+        if object_id != 0 {
+            caught.push((object_id, success));
+        }
+    }
+    let toleft = r.read_byte()? != 0;
+    Ok(Some((caught, toleft)))
+}
+
+/// Check Monster Magnet can be used, then spend its MP.
+fn use_magnet(
+    player: &mut Player,
+    skill_id: i32,
+    level: i32,
+    caught: Option<&(Vec<(i32, bool)>, bool)>,
+) -> Result<Learned, Refusal> {
+    if player.stats.hp <= 0 {
+        return Err(Refusal::Dead);
+    }
+    let skill = skills::learned(player, skill_id)
+        .filter(|skill| skill.level == level && level > 0)
+        .ok_or(Refusal::NotLearned)?;
+    if caught.is_none() {
+        return Err(Refusal::TooManyMobs);
+    }
+    if i32::from(player.stats.mp) < skill.effect.mp_cost {
+        return Err(Refusal::NotEnoughMp);
+    }
+    player.add_mp(-skill.effect.mp_cost);
+    Ok(skill)
+}
+
+/// The new MP for the player; for everyone else on the map, the skill's
+/// effect and each mob it caught or failed to.
+fn announce_magnet(
+    player: &Player,
+    skill: &Learned,
+    caught: Vec<(i32, bool)>,
+    toleft: bool,
+) -> WorldResult {
+    let effect = buff::build_magnet_effect(
+        player.id(),
+        skill.skill_id,
+        player.stats.level,
+        skill.level as u8,
+        toleft,
+    )?;
+    Ok(HandlerResult::reply(stat::build_stat_update(
+        true,
+        &[StatUpdate::Mp(player.stats.mp)],
+    )?)
+    .with(WorldAction::Field(FieldRequest::Magnet { effect, caught })))
 }
 
 /// The buff a skill gives, and its value at this level.
@@ -327,6 +411,75 @@ mod tests {
         }
         let mut player = beginner_with(1002, 2);
         assert!(unlocks(&handle(&mut player, 1002, 2)[0]));
+    }
+
+    fn magnet(
+        player: &mut Player,
+        level: u8,
+        found: i32,
+        mobs: &[(i32, bool)],
+    ) -> Vec<WorldAction> {
+        let mut packet = Packet::new_empty();
+        packet.write_short(RecvOpcode::UseSkill as i16).unwrap();
+        packet.write_int(0).unwrap();
+        packet.write_int(1121001).unwrap();
+        packet.write_byte(level).unwrap();
+        packet.write_int(found).unwrap();
+        for &(object_id, success) in mobs {
+            packet.write_int(object_id).unwrap();
+            packet.write_byte(u8::from(success)).unwrap();
+        }
+        packet.write_byte(1).unwrap();
+        let mut ctx = WorldContext {
+            client_id: 1,
+            channel_id: 0,
+            player,
+        };
+        UseSkillHandler
+            .handle(&mut packet, &mut ctx)
+            .unwrap()
+            .actions
+    }
+
+    fn hero_with_magnet() -> Player {
+        let mut player = beginner_with(1121001, 30);
+        player.stats.job = 112;
+        player.stats.mp = 100;
+        player.stats.max_mp = 100;
+        player
+    }
+
+    #[test]
+    fn monster_magnet_spends_mp_and_shows_the_mobs_it_reached() {
+        if skills::data().is_err() {
+            return;
+        }
+        let mut player = hero_with_magnet();
+        let actions = magnet(&mut player, 30, 3, &[(101, true), (0, false), (102, false)]);
+        let [unlock, WorldAction::Field(FieldRequest::Magnet { effect, caught })] =
+            actions.as_slice()
+        else {
+            panic!("unexpected {actions:?}");
+        };
+        assert!(unlocks(unlock));
+        assert_eq!(player.stats.mp, 79);
+        assert_eq!(caught, &[(101, true), (102, false)]);
+        assert_eq!(effect.opcode(), SendOpcode::ShowForeignEffect as i16);
+        assert_eq!(effect.bytes.last(), Some(&1), "it ends with the facing");
+    }
+
+    #[test]
+    fn monster_magnet_is_refused_at_another_level_or_past_15_mobs() {
+        if skills::data().is_err() {
+            return;
+        }
+        let mut player = hero_with_magnet();
+        let actions = magnet(&mut player, 29, 0, &[]);
+        assert!(matches!(actions.as_slice(), [only] if unlocks(only)));
+        let mobs: Vec<(i32, bool)> = (1..=16).map(|oid| (oid, false)).collect();
+        let actions = magnet(&mut player, 30, 16, &mobs);
+        assert!(matches!(actions.as_slice(), [only] if unlocks(only)));
+        assert_eq!(player.stats.mp, 100);
     }
 
     fn prepare(player: &mut Player, skill_id: i32, level: u8) -> Vec<WorldAction> {

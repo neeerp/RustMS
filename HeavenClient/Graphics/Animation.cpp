@@ -67,6 +67,12 @@ namespace ms
 			scales = {100, 100};
 	}
 
+	Frame::Frame(nl::node src, uint16_t d, uint8_t a0, uint8_t a1) : Frame(src)
+	{
+		delay = d;
+		opacities = {a0, a1};
+	}
+
 	Frame::Frame()
 	{
 		delay = 0;
@@ -158,6 +164,14 @@ namespace ms
 
 		animated = frames.size() > 1;
 		zigzag = src["zigzag"].get_bool();
+
+		reset();
+	}
+
+	Animation::Animation(std::vector<Frame> f) : frames(std::move(f))
+	{
+		animated = frames.size() > 1;
+		zigzag = false;
 
 		reset();
 	}

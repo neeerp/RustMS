@@ -147,6 +147,14 @@ pub fn keydown(skill_id: i32) -> bool {
     KEYDOWN.contains(&skill_id)
 }
 
+/// Monster Magnet, for each warrior branch: held, then let go with the mobs
+/// it caught.
+pub const MONSTER_MAGNETS: [i32; 3] = [1121001, 1221001, 1321001];
+
+pub fn is_magnet(skill_id: i32) -> bool {
+    MONSTER_MAGNETS.contains(&skill_id)
+}
+
 /// Explosion and Chakra prepare too, but by a timer rather than a held key.
 pub const TIMED: [i32; 2] = [2111002, 4211001];
 

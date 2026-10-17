@@ -19,16 +19,19 @@
 
 #include <cstdint>
 
+#include "MonsterMagnet.h"
 #include "RegularAttack.h"
 #include "ShotPath.h"
 #include "Teleport.h"
 
 #include "../MapleMap/MapChars.h"
+#include "../MapleMap/MapInfo.h"
 #include "../MapleMap/MapMobs.h"
 #include "../MapleMap/MapReactors.h"
 #include "../Physics/Physics.h"
 
 #include "../../Character/Player.h"
+#include "../../Graphics/EffectLayer.h"
 #include "../../Net/Packets/AttackAndSkillPackets.h"
 #include "../../Template/TimedQueue.h"
 
@@ -37,7 +40,8 @@ namespace ms
 	class Combat
 	{
 	public:
-		Combat(Player &player, MapChars &chars, MapMobs &mobs, MapReactors &reactors, const Physics &physics);
+		Combat(Player &player, MapChars &chars, MapMobs &mobs, MapReactors &reactors, const Physics &physics,
+			   const MapInfo &mapinfo);
 
 		// Load the charge gauge, once the NX files are open.
 		static void init();
@@ -85,6 +89,10 @@ namespace ms
 		// Show a buff effect.
 		void show_player_buff(int32_t skillid);
 
+		// Show Monster Magnet catching a mob, or failing to, over it
+		// (0x66d6b9, 0x438eb6).
+		void show_catch(int32_t oid, bool success);
+
 	private:
 		struct DamageEffect
 		{
@@ -112,6 +120,10 @@ namespace ms
 		// Use the move. A held skill hits with its `charge`, and its shots
 		// while held keep the body's action (`held`).
 		void apply_move(const SpecialMove &move, int32_t charge = 0, bool held = false);
+
+		// Let go of Monster Magnet, held for `charge` ms: it catches the mobs
+		// in front of the player (0x96c215). Whether it was used.
+		bool use_magnet(const Skill &skill, int32_t level, int32_t charge);
 
 		// Start holding a skill down (FUN_0096a86e).
 		void start_prepare(const Skill &skill);
@@ -199,6 +211,7 @@ namespace ms
 		MapMobs &mobs;
 		MapReactors &reactors;
 		const Physics &physics;
+		const MapInfo &mapinfo;
 
 		std::unordered_map<int32_t, Skill> skills;
 		RegularAttack regularattack;
@@ -206,6 +219,18 @@ namespace ms
 		TimedQueue<AttackResult> attackresults;
 		TimedQueue<Bullet> bulleteffects;
 		TimedQueue<DamageEffect> damageeffects;
+
+		// A mob Monster Magnet reached, caught or not, for the user where
+		// they stood.
+		struct MagnetCatch
+		{
+			int32_t oid;
+			bool success;
+			Point<int16_t> user;
+		};
+
+		TimedQueue<MagnetCatch> magnetcatches;
+		EffectLayer catcheffects;
 
 		std::list<Bullet> bullets;
 		std::list<DamageNumber> damagenumbers;
@@ -248,5 +273,7 @@ namespace ms
 		static Texture gauge_bar[2];
 		static Texture gauge_fill[2];
 		static Texture gauge_graduation[2];
+		static Animation catch_success;
+		static Animation catch_fail;
 	};
 }

@@ -46,7 +46,8 @@ int main()
 		require(!shows_gauge(5221004) && !shows_gauge(22121000), "Rapid Fire and Evan's don't");
 
 		require(held(2121001) && held(3121004) && held(5221004), "Big Bang and the shooters are held here");
-		require(!held(1121001) && !held(5201002) && !held(14111006), "Monster Magnet and the throws aren't yet");
+		require(held(1121001) && held(1221001) && held(1321001), "Monster Magnet is held here");
+		require(!held(5201002) && !held(14111006), "the throws aren't yet");
 		require(!held(2111002), "nor is Explosion");
 
 		require(action_id("shoot1") == 0x16 && action_id("rapidfire") == 0x63 && action_id("alert5") == 0x2c,
