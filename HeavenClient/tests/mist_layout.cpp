@@ -40,6 +40,36 @@ int main()
 		require(clouds.front().x == -200 && clouds.front().y == -75, "the first cloud at the left edge's top");
 		require(clouds[1].y == 1, "-75 + 76 is the next");
 		require(layout_mist(0, 0, 0, 100, { 50 }, lowest).empty(), "an empty area has no clouds");
+
+		// A Commander Skeleton's Poison Mist (131 level 5) hurts its x, as
+		// poison, once started; the code is the skill's byte, then the level.
+		mist::Area poison{ mist::MOB, 2000001, 131, 5, -135, -80, 135, 40, 4, 200, true };
+		std::vector<mist::Area> areas{ poison };
+		mist::Hurt hurt{};
+		require(mist::hurt_at(areas, 0, 0, hurt), "standing in it hurts");
+		require(hurt.damage == 200 && hurt.element == 4 && hurt.code == (131 << 8 | 5), "its x, element and code");
+		require(mist::hurt_at(areas, -135, -80, hurt), "its top left is in");
+		require(!mist::hurt_at(areas, 135, 0, hurt) && !mist::hurt_at(areas, 0, 40, hurt),
+				"its right and bottom edges are out (PtInRect)");
+		areas[0].started = false;
+		require(!mist::hurt_at(areas, 0, 0, hurt), "nor before its delay is over");
+		areas[0] = poison;
+		areas[0].type = 1;
+		require(!mist::hurt_at(areas, 0, 0, hurt), "only a mob's mist hurts");
+		areas[0] = poison;
+		areas[0].damage = 0;
+		require(!mist::hurt_at(areas, 0, 0, hurt), "one that does nothing doesn't");
+		require(mist::hurts(130) && mist::hurts(131) && !mist::hurts(2111003), "the hurting mob skills");
+
+		// A smoke screen shelters its owner and their party, not others.
+		mist::Area smoke{ mist::SMOKE, 7, 4221006, 20, -100, -100, 100, 100, 0, 0, true };
+		std::vector<mist::Area> smokes{ smoke };
+		auto ally = [](int32_t owner) { return owner == 7; };
+		auto stranger = [](int32_t) { return false; };
+		require(mist::shelters(smokes, 0, 0, ally), "an ally's smoke shelters");
+		require(!mist::shelters(smokes, 0, 0, stranger), "a stranger's doesn't");
+		require(!mist::shelters(smokes, 200, 0, ally), "nor outside it");
+		require(!mist::shelters(areas, 0, 0, ally), "a poison mist doesn't");
 	}
 	catch (const std::exception& e)
 	{

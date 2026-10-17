@@ -6,6 +6,8 @@ use std::time::Duration;
 
 /// Heal: the mob and those around it regain HP and MP.
 pub const HEAL: i32 = 114;
+/// Poison Mist: the mob leaves a mist that hurts the players in it.
+pub const POISON_MIST: i32 = 131;
 /// Summon: the mob calls up more mobs.
 pub const SUMMON: i32 = 200;
 
@@ -15,13 +17,15 @@ pub enum MobSkillEffect {
     Statuses(Vec<(MobStat, i16)>),
     Heal,
     Summon,
+    /// A mist over its area; a v83 client in it loses `x` HP a second.
+    Mist,
     /// A disease on every player in its area.
     Disease(BuffStat),
 }
 
 /// What `skill` does with its value `x`, or `None` for the ones not cast
-/// yet: the other diseases (127, 129-131, 133-136: dispel, banish, poison
-/// mist, ...) and the damage counters (143-145).
+/// yet: the other diseases (127, 129, 130, 133-136: dispel, banish, area
+/// fire, ...) and the damage counters (143-145).
 ///
 /// The v83 client multiplies a mob's attack by its PowerUp and MagicUp as
 /// percents, and adds Pad and Mad, so Power Up (100, 115%) is PowerUp, not
@@ -46,6 +50,7 @@ pub fn effect(skill: i32, x: i32) -> Option<MobSkillEffect> {
         157 => MobStat::SealSkill,
         HEAL => return Some(MobSkillEffect::Heal),
         SUMMON => return Some(MobSkillEffect::Summon),
+        POISON_MIST => return Some(MobSkillEffect::Mist),
         _ => return disease(skill).map(MobSkillEffect::Disease),
     };
     Some(MobSkillEffect::Statuses(vec![(stat, x)]))
@@ -91,6 +96,7 @@ mod tests {
         );
         assert_eq!(effect(HEAL, 700), Some(MobSkillEffect::Heal));
         assert_eq!(effect(SUMMON, 0), Some(MobSkillEffect::Summon));
+        assert_eq!(effect(POISON_MIST, 30), Some(MobSkillEffect::Mist));
         assert_eq!(
             effect(123, 1),
             Some(MobSkillEffect::Disease(BuffStat::Stun))

@@ -126,6 +126,7 @@ mod tests {
             level: 30,
             delay: 8,
             area: (-200, -150, 200, 150),
+            element: 0,
         };
         set.add(view, 1, inflict, Duration::from_secs(40), now)
     }

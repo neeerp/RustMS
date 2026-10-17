@@ -123,7 +123,8 @@ namespace ms
 	public:
 		enum From : int8_t
 		{
-			TOUCH = -1
+			TOUCH = -1,
+			MIST = -4
 		};
 
 		TakeDamagePacket(int8_t from, uint8_t element, int32_t damage, int32_t mobid, int32_t oid, uint8_t direction) : OutPacket(OutPacket::Opcode::TAKE_DAMAGE)
@@ -139,6 +140,18 @@ namespace ms
 
 		// From a mob's touch or attack.
 		TakeDamagePacket(const MobAttackResult& result) : TakeDamagePacket(result.index, result.element, result.damage, result.mobid, result.oid, result.direction) {}
+
+		// From a mob's mist, named by its skill and level (`code`) in place
+		// of a mob (FUN_00431783). The last byte is always 2.
+		TakeDamagePacket(uint8_t element, int32_t damage, uint16_t code) : OutPacket(OutPacket::Opcode::TAKE_DAMAGE)
+		{
+			write_time();
+			write_byte(MIST);
+			write_byte(element);
+			write_int(damage);
+			write_short(static_cast<int16_t>(code));
+			write_byte(2);
+		}
 	};
 
 	// Packet which notifies the server of a skill usage.
