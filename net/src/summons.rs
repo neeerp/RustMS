@@ -4,8 +4,8 @@
 //! the server shows the others and deals the damage.
 
 use crate::error::NetworkError;
-use crate::skills::{self, Learned};
-use game::{BuffStat, InventoryType, Player};
+use crate::skills::{self, Amount, Inflict, Learned};
+use game::{BuffStat, InventoryType, MobStat, Player};
 use packet::{io::read::PktRead, Packet};
 use std::io::Cursor;
 use std::time::Duration;
@@ -144,21 +144,36 @@ pub fn max_damage(player: &Player, skill: &Learned) -> i32 {
     ((roll / 100.0 * 2.0).ceil() as i32).max(10)
 }
 
-/// How often a summon may attack (FUN_00765047).
-pub fn attack_interval(skill_id: i32) -> std::time::Duration {
-    std::time::Duration::from_millis(match skill_id {
-        WRATH_OF_THE_OCTOPI | GAVIOTA => 1500,
-        _ => 3000,
+/// What a summon's hits put on the mobs: Silver Hawk's and Golden Eagle's
+/// stun, at their `prop` (50% to 99%), and Elquines' and Frostprey's
+/// freeze, always (their data has no `prop`). The client shows only what
+/// it's sent and v83's server isn't available, so each lasts the skill's
+/// `x` seconds, the value that grows from 1 to 3 on the freezes
+/// (inferred; OdinMS-family servers hold every summon's status 4 s).
+pub fn inflict(skill: &Learned) -> Option<Inflict> {
+    let stat = match skill.skill_id {
+        3111005 | 3211005 => MobStat::Stun,
+        2121005 | 3221005 => MobStat::Freeze,
+        _ => return None,
+    };
+    let effect = &skill.effect;
+    Some(Inflict {
+        skill_id: skill.skill_id,
+        prop: if effect.prop > 0 { effect.prop } else { 100 },
+        duration: Duration::from_secs(effect.x.max(1) as u64),
+        statuses: vec![(stat, Amount::Value(1))],
     })
 }
 
 /// What the owner's summons may do in one attack, for each summon skill
 /// they have running: the field checks the attack against its summon's.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct Limit {
     pub skill_id: i32,
     pub mob_count: i32,
     pub max_damage: i32,
+    /// What its hits put on the mobs.
+    pub inflict: Option<Inflict>,
 }
 
 /// The limits for each summon the player has up.
@@ -173,6 +188,7 @@ pub fn limits(player: &Player) -> Vec<Limit> {
             skill_id: skill.skill_id,
             mob_count: mob_count(&skill),
             max_damage: max_damage(player, &skill),
+            inflict: inflict(&skill),
         })
         .collect()
 }
@@ -418,6 +434,39 @@ mod tests {
         assert_eq!(limits.len(), 1);
         assert_eq!(limits[0].skill_id, 3111005);
         assert_eq!(limits[0].mob_count, 1);
+    }
+
+    #[test]
+    fn hawks_stun_and_the_ice_summons_freeze() {
+        let player = knowing(&[
+            (3111005, 1),
+            (3211005, 30),
+            (2121005, 30),
+            (3221005, 1),
+            (3121006, 30),
+        ]);
+        let inflict = |skill_id| inflict(&skills::learned(&player, skill_id).unwrap());
+        let hawk = inflict(3111005).unwrap();
+        assert_eq!(
+            (hawk.prop, hawk.duration, hawk.statuses),
+            (
+                50,
+                Duration::from_secs(1),
+                vec![(MobStat::Stun, Amount::Value(1))]
+            )
+        );
+        assert_eq!(inflict(3211005).unwrap().prop, 99);
+        let elquines = inflict(2121005).unwrap();
+        assert_eq!(
+            (elquines.prop, elquines.duration, elquines.statuses),
+            (
+                100,
+                Duration::from_secs(3),
+                vec![(MobStat::Freeze, Amount::Value(1))]
+            )
+        );
+        assert_eq!(inflict(3221005).unwrap().duration, Duration::from_secs(1));
+        assert_eq!(inflict(3121006), None);
     }
 
     #[test]
