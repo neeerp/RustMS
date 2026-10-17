@@ -188,6 +188,26 @@ namespace ms
 			return skill == 3101005 || skill == 3111003 || skill == 3211003;
 		}
 
+		// Whether a shot hits only its first mob after all, because it missed
+		// it (`first_damage` 0): Arrow Bomb does (FUN_0075bf50).
+		inline bool drops_splash(int32_t skill, int32_t first_damage)
+		{
+			return skill == 3101005 && first_damage == 0;
+		}
+
+		// How much of the weapon's damage a skill's hits deal: its `damage`
+		// percent, all of it with none, and Arrow Bomb's `x` percent of that
+		// (FUN_0078df87, FUN_0075bf50).
+		inline float damage_scale(int32_t skill, int32_t damage, int32_t x)
+		{
+			float scale = damage > 0 ? damage / 100.0f : 1.0f;
+
+			if (skill == 3101005)
+				scale *= x / 100.0f;
+
+			return scale;
+		}
+
 		// The area a shot covers: its row from `origin` to `end_x`, widened
 		// for some skills, or the skill's own `lt_rb` around the `user`,
 		// turned the way they face.

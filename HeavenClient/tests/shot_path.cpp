@@ -117,6 +117,12 @@ int main()
 		require(!blocked({ 50, 50 }, to, { { low, 1, std::nullopt, ledge } }, 1), "one grazing it goes on");
 
 		require(area_shot(4111005) && area_shot(3111004) && area_shot(5221008), "Avenger and Arrow Rain hit an area");
+		require(drops_splash(3101005, 0) && !drops_splash(3101005, 1) && !drops_splash(3111003, 0),
+				"Arrow Bomb hits nothing more after missing its first mob");
+		require(damage_scale(3001004, 150, 0) == 1.5f && damage_scale(0, 0, 0) == 1.0f,
+				"a skill hits for its damage percent, all of it with none");
+		require(damage_scale(3101005, 0, 130) == 1.3f, "Arrow Bomb for its x percent");
+
 		require(!area_shot(15111006) && !area_shot(3101005) && !area_shot(0), "Spark, Arrow Bomb and plain shots don't");
 		require(hides_bullet(3111004) && !hides_bullet(5221008) && !hides_bullet(4111005), "Arrow Rain shows no arrow");
 
