@@ -51,6 +51,24 @@ namespace ms
 		prepare.keydownend = { src["keydownend"], src["keydownend"]["z"] };
 		special = src["special"];
 
+		if (shot_rain::kind(skillid) != shot_rain::Kind::NONE)
+		{
+			nl::node specialsrc = src["special"];
+			rain.params = {
+				specialsrc["x"], specialsrc["y"], specialsrc["count"], specialsrc["fall"],
+				specialsrc["interval"], specialsrc["start"], specialsrc["duration"]
+			};
+
+			for (nl::node drop = specialsrc["0"]; drop.size() > 0; drop = specialsrc[std::to_string(rain.drops.size())])
+				rain.drops.emplace_back(drop);
+
+			nl::node tilesrc = src["tile"];
+			rain.distance = tilesrc["effectDistance"];
+
+			for (nl::node flame = tilesrc["0"]; flame.size() > 0; flame = tilesrc[std::to_string(rain.flames.size())])
+				rain.flames.emplace_back(flame);
+		}
+
 		sound = std::make_unique<SingleSkillSound>(strid);
 
 		bool byleveleffect = src["CharLevel"]["10"]["effect"].size() > 0;
@@ -315,6 +333,11 @@ namespace ms
 	Animation Skill::get_special() const
 	{
 		return special;
+	}
+
+	const SkillRain &Skill::get_rain() const
+	{
+		return rain;
 	}
 
 	const SkillPrepare &Skill::get_prepare() const

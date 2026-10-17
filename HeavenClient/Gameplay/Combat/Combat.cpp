@@ -109,6 +109,8 @@ namespace ms
 
 	void Combat::draw(double viewx, double viewy, float alpha) const
 	{
+		draw_rains(viewx, viewy, alpha);
+
 		for (auto &bullet : bullets)
 			bullet.draw(viewx, viewy, alpha);
 
@@ -149,6 +151,7 @@ namespace ms
 		update_prepare();
 		update_remote_prepares();
 		update_grenades();
+		update_rains();
 
 		attackresults.update();
 		bulleteffects.update();
@@ -951,6 +954,8 @@ namespace ms
 			};
 
 			uint16_t first = 0;
+			std::optional<Point<int16_t>> first_hit;
+			std::vector<Rectangle<int16_t>> bodies;
 
 			for (size_t target = 0; target < result.damagelines.size(); target++)
 			{
@@ -960,12 +965,18 @@ namespace ms
 				if (mobs.contains(oid))
 				{
 					std::vector<DamageNumber> numbers = place_numbers(line.second, move.get_id());
-					Point<int16_t> hit = shot_path::hit_point(shot_area, mobs.get_mob_body(oid));
+					Rectangle<int16_t> body = mobs.get_mob_body(oid);
+					Point<int16_t> hit = shot_path::hit_point(shot_area, body);
 					uint16_t hit_delay = spell ? shot_path::flight_time(origin, hit)
 						: shot_path::target_delay(result.skill, target, first, origin, hit);
 
 					if (target == 0)
 						first = hit_delay;
+
+					if (!first_hit)
+						first_hit = hit;
+
+					bodies.push_back(body);
 
 					if (spell)
 						shoot(hit, 1);
@@ -993,6 +1004,10 @@ namespace ms
 
 			if (result.damagelines.empty() || (!spell && shot_path::area_shot(result.skill)))
 				shoot(shot_end, result.hitcount);
+
+			if (!spell && first_hit && shot_rain::kind(result.skill) != shot_rain::Kind::NONE)
+				rain_shot(result.skill, SkillData::get(result.skill).get_stats(attackuser.skilllevel).range,
+						  user.get_position(), result.toleft, delay + first, *first_hit, bodies);
 		} else
 		{
 			// As in v83, every hit on a mob lands at once, at the frame the
@@ -1168,6 +1183,8 @@ namespace ms
 		Point<int16_t> position = user.get_position();
 		uint16_t delay = remote_shot::attack_delay(skill, user.get_attackdelay(0));
 		uint16_t first = 0;
+		std::optional<Point<int16_t>> first_hit;
+		std::vector<Rectangle<int16_t>> bodies;
 
 		for (size_t target = 0; target < result.damagelines.size(); target++)
 		{
@@ -1199,6 +1216,11 @@ namespace ms
 
 			if (target == 0)
 				first = hit;
+
+			if (!first_hit)
+				first_hit = remote_shot::end(start, aim);
+
+			bodies.push_back(body);
 
 			std::vector<DamageNumber> numbers = place_numbers(line.second, move.get_id());
 			size_t shown = remote_shot::shown_hits(numbers.size(), bullets, attacks);
@@ -1232,6 +1254,10 @@ namespace ms
 			}
 		}
 
+		if (first_hit)
+		if (first_hit)
+			rain_shot(skill, lt_rb, position, result.toleft, delay + first, *first_hit, bodies);
+
 		if (!result.damagelines.empty() || remote_shot::hides_miss(skill))
 			return;
 
@@ -1248,6 +1274,169 @@ namespace ms
 			Point<int16_t> end(end_x, static_cast<int16_t>(y + remote_shot::miss_spread(i, bullets)));
 			uint16_t time = delay + shot_path::bullet_delay(result.bullet, skill, i);
 			bulleteffects.push(time, Bullet(animation, start, end, flight));
+		}
+	}
+
+	void Combat::rain_shot(int32_t skill, Rectangle<int16_t> lt_rb, Point<int16_t> user, bool toleft, int64_t hit,
+						   Point<int16_t> first, const std::vector<Rectangle<int16_t>> &bodies)
+	{
+		switch (shot_rain::kind(skill))
+		{
+			case shot_rain::Kind::OVER_USER:
+				start_rain(get_skill(skill), shot_rain::over_user(lt_rb, user, toleft), toleft, hit);
+				break;
+			case shot_rain::Kind::OVER_HIT:
+			{
+				Rectangle<int16_t> area = shot_rain::around(lt_rb, first);
+
+				if (shot_rain::burns(skill))
+					burn(get_skill(skill), area, hit);
+
+				start_rain(get_skill(skill), shot_rain::raised(area), toleft, hit);
+				break;
+			}
+			case shot_rain::Kind::OVER_MOBS:
+				for (Rectangle<int16_t> body : bodies)
+					start_rain(get_skill(skill), shot_rain::over_mob(body), toleft, hit);
+
+				break;
+			default:
+				break;
+		}
+	}
+
+	void Combat::start_rain(const Skill &skill, Rectangle<int16_t> area, bool toleft, int64_t hit)
+	{
+		if (skill.get_rain().drops.empty())
+			return;
+
+		rains.push_back({ skill.get_id(), area, toleft, shot_rain::Schedule(skill.get_rain().params, now + hit) });
+	}
+
+	void Combat::burn(const Skill &skill, Rectangle<int16_t> area, int64_t hit)
+	{
+		const SkillRain &rain = skill.get_rain();
+
+		if (rain.flames.empty())
+			return;
+
+		Randomizer randomizer;
+		const FootholdTree &fht = physics.get_fht();
+
+		for (int16_t x : shot_rain::columns(area, rain.distance))
+		{
+			for (uint16_t group : fht.get_groups())
+			{
+				for (uint16_t id : fht.get_group_footholds(group))
+				{
+					const Foothold &fh = fht.get_fh(id);
+					shot_path::Line platform{ fh.x1(), fh.y1(), fh.x2(), fh.y2() };
+					std::optional<int16_t> ground = shot_rain::ground(platform, x, area);
+
+					if (!ground)
+						continue;
+
+					flames.push_back({
+							rain.flames[randomizer.next_int<size_t>(rain.flames.size())],
+							{ x, shot_rain::flame_y(*ground, randomizer.next_int(5)) },
+							now + hit,
+							shot_rain::flame_fade(randomizer.next_int(5)),
+							(128 + randomizer.next_int(128)) / 255.0f
+					});
+				}
+			}
+		}
+	}
+
+	void Combat::update_rains()
+	{
+		Randomizer randomizer;
+
+		for (Rain &rain : rains)
+		{
+			if (!rain.schedule.drop(now))
+				continue;
+
+			const SkillRain &skillrain = get_skill(rain.skill).get_rain();
+			const shot_rain::Params &params = skillrain.params;
+
+			for (int32_t i = 0; i < params.count; i++)
+			{
+				Point<int16_t> start(
+						randomizer.next_int(rain.area.left(), rain.area.right()),
+						randomizer.next_int(rain.area.top(), rain.area.bottom())
+				);
+				int32_t flight = shot_rain::flight(params, randomizer.next_int(300));
+
+				if (flight <= 0)
+					continue;
+
+				raindrops.push_back({
+						skillrain.drops[randomizer.next_int<size_t>(skillrain.drops.size())],
+						start,
+						shot_rain::fall(params, rain.toleft, randomizer.next_int(41)),
+						!rain.toleft,
+						now,
+						flight,
+						shot_rain::opacity(randomizer.next_int(64))
+				});
+			}
+		}
+
+		rains.remove_if(
+				[&](const Rain &rain)
+				{
+					return rain.schedule.over(now);
+				}
+		);
+
+		raindrops.remove_if(
+				[&](RainDrop &drop)
+				{
+					drop.animation.update();
+
+					return now >= drop.launch + drop.flight;
+				}
+		);
+
+		flames.remove_if(
+				[&](Flame &flame)
+				{
+					if (now > flame.start)
+						flame.animation.update();
+
+					return now > flame.start + 2 * shot_rain::BURN;
+				}
+		);
+	}
+
+	void Combat::draw_rains(double viewx, double viewy, float alpha) const
+	{
+		Point<int16_t> view(static_cast<int16_t>(viewx), static_cast<int16_t>(viewy));
+
+		// The fire fades in once lit, burns, then fades out (0x442887).
+		for (const Flame &flame : flames)
+		{
+			int64_t out = flame.start + shot_rain::BURN;
+			float opacity = now <= out
+				? shot_rain::fade(0.0f, flame.opacity, flame.start, flame.start + flame.fade, now)
+				: shot_rain::fade(flame.opacity, 0.0f, out, out + shot_rain::BURN, now);
+
+			if (opacity > 0.0f)
+				flame.animation.draw(DrawArgument(flame.position + view, opacity), alpha);
+		}
+
+		// A drop moves evenly along its fall, fading from opaque (0x441b30).
+		for (const RainDrop &drop : raindrops)
+		{
+			float progress = static_cast<float>(now - drop.launch) / drop.flight;
+			Point<int16_t> position = drop.start + Point<int16_t>(
+					static_cast<int16_t>(drop.fall.x() * progress),
+					static_cast<int16_t>(drop.fall.y() * progress)
+			);
+			float opacity = shot_rain::fade(1.0f, drop.opacity, drop.launch, drop.launch + shot_rain::FADE, now);
+
+			drop.animation.draw(DrawArgument(position + view, drop.flip, opacity), alpha);
 		}
 	}
 
