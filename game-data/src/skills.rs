@@ -102,6 +102,9 @@ pub struct MobSkillLevel {
     pub summon_effect: i32,
     /// The mobs it summons (`0`, `1`, ...).
     pub summons: Vec<i32>,
+    /// Its element (`elemAttr`), as v83 clients number them for a mist's
+    /// damage (FUN_0095fa8b): 1 ice, 2 fire, 3 lightning, 4 poison, else 0.
+    pub element: i32,
 }
 
 pub struct SkillData {
@@ -223,6 +226,13 @@ impl SkillData {
             rb: nx.vector_child(node, "rb")?.unwrap_or_default(),
             summon_effect: int("summonEffect")?,
             summons,
+            element: match nx.string_child(node, "elemAttr")?.as_deref() {
+                Some("I") => 1,
+                Some("F") => 2,
+                Some("L") => 3,
+                Some("S") => 4,
+                _ => 0,
+            },
         }))
     }
 }
@@ -309,5 +319,8 @@ mod tests {
         assert_eq!(summon.summons, [7130200]);
         assert_eq!((summon.limit, summon.summon_effect, summon.hp), (5, 2, 75));
         assert!(data.mob_skill(100, 99).unwrap().is_none());
+        let mist = data.mob_skill(131, 5).unwrap().unwrap();
+        assert_eq!((mist.x, mist.duration, mist.element), (200, 15, 4));
+        assert_eq!(power_up.element, 0);
     }
 }

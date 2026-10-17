@@ -1,8 +1,10 @@
 use crate::{error::NetworkError, packet::op::SendOpcode};
 use packet::{io::write::PktWrite, Packet};
 
-/// What made a mist, its second field (OdinMS-family values; v83's client
-/// only tells type 3 apart, and draws by the skill).
+/// What made a mist, its second field (OdinMS-family values). A v83 client
+/// draws by the skill; it hurts itself in a type 0 mist (FUN_00431783), is
+/// spared mob attacks in its party's type 2 (FUN_0043193a), and reads type 3
+/// as a cash item's.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum MistKind {
     Mob = 0,
@@ -22,6 +24,9 @@ pub struct MistView {
     pub delay: i16,
     /// Left, top, right, bottom.
     pub area: (i32, i32, i32, i32),
+    /// The element the damage a mob's mist does is resisted as (1 ice, 2
+    /// fire, 3 lightning, 4 poison), or 0.
+    pub element: i32,
 }
 
 /// AFFECTED_AREA_CREATED (0x111, v83 FUN_00431a63): the client draws the
@@ -41,7 +46,7 @@ pub fn build_spawn_mist(mist: &MistView) -> Result<Packet, NetworkError> {
     p.write_int(top)?;
     p.write_int(right)?;
     p.write_int(bottom)?;
-    p.write_int(0)?;
+    p.write_int(mist.element)?;
     Ok(p)
 }
 
@@ -67,6 +72,7 @@ mod tests {
             level: 30,
             delay: 8,
             area: (-200, -150, 200, 150),
+            element: 0,
         };
         let p = build_spawn_mist(&mist).unwrap();
         let mut want = vec![0x11, 0x01];

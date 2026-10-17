@@ -3,7 +3,7 @@ use crate::error::NetworkError;
 use crate::handler::{
     FieldRequest, HandlerResult, WorldAction, WorldContext, WorldHandler, WorldResult,
 };
-use crate::packet::build::world::mob::{self, FROM_TOUCH};
+use crate::packet::build::world::mob::{self, FROM_MIST, FROM_TOUCH};
 use crate::packet::build::world::stat::{self, StatUpdate};
 use crate::packet::build::world::{buff, inventory};
 use crate::skills;
@@ -154,7 +154,7 @@ impl WorldHandler for AttackHandler {
 }
 
 /// `TAKE_DAMAGE`: the player was hurt by touching a mob or by one of its
-/// attacks (FUN_009581a9).
+/// attacks (FUN_009581a9), or by a mob's mist.
 pub struct TakeDamageHandler;
 
 impl WorldHandler for TakeDamageHandler {
@@ -166,6 +166,10 @@ impl WorldHandler for TakeDamageHandler {
         r.read_byte()?; // element
         let damage = r.read_int()?;
         let player = &mut *ctx.player;
+        if from == FROM_MIST && player.stats.hp > 0 {
+            let code = r.read_short()? as u16;
+            return mist_damage(player, i32::from(code >> 8), i32::from(code & 0xff), damage);
+        }
         if from < FROM_TOUCH || player.stats.hp <= 0 {
             return Ok(HandlerResult::empty());
         }
@@ -240,6 +244,32 @@ impl WorldHandler for TakeDamageHandler {
         }
         Ok(actions)
     }
+}
+
+/// The player stood in mob skill `skill`'s mist at `level`: a v83 client
+/// takes its `x` a second (FUN_00431783), less any resistance, and says so
+/// with the skill and level. Only HP goes; no mob is named.
+fn mist_damage(player: &mut Player, skill: i32, level: i32, damage: i32) -> WorldResult {
+    let most = match crate::mobs::skill_level(skill, level) {
+        Some(level) if skill == game::mob_skill::POISON_MIST => level.x,
+        _ => {
+            debug!(skill, level, "Mist damage from a skill that leaves none");
+            return Ok(HandlerResult::empty());
+        }
+    };
+    if !(0..=most).contains(&damage) {
+        debug!(skill, level, damage, "Mist damage out of range");
+        return Ok(HandlerResult::empty());
+    }
+    let hp = player.add_hp(-damage);
+    let shown = mob::build_damage_player(player.id(), FROM_MIST, 0, damage, 0)?;
+    let actions = HandlerResult::reply(stat::build_stat_update(false, &[StatUpdate::Hp(hp)])?)
+        .with(WorldAction::Field(FieldRequest::Broadcast(shown)));
+    Ok(if hp == 0 {
+        actions.with(WorldAction::Died)
+    } else {
+        actions
+    })
 }
 
 /// A mob gave the player a disease: unless they're dead or already have it,
@@ -363,6 +393,20 @@ mod tests {
         p
     }
 
+    /// A v83 client hurt by mob skill `skill` at `level`'s mist.
+    fn mist(damage: i32, skill: u8, level: u8) -> Packet {
+        let mut p = Packet::new_empty();
+        p.write_short(RecvOpcode::TakeDamage as i16).unwrap();
+        p.write_int(0).unwrap();
+        p.write_byte(FROM_MIST as u8).unwrap();
+        p.write_byte(0).unwrap();
+        p.write_int(damage).unwrap();
+        p.write_short(i16::from(skill) << 8 | i16::from(level))
+            .unwrap();
+        p.write_byte(2).unwrap();
+        p
+    }
+
     fn handle(player: &mut game::Player, packet: Packet) -> Vec<WorldAction> {
         let mut packet = packet;
         let mut ctx = WorldContext {
@@ -386,6 +430,30 @@ mod tests {
             int: 4,
             luk: 4,
         }
+    }
+
+    #[test]
+    fn a_poison_mist_hurts_up_to_its_x() {
+        let Some(level) = crate::mobs::skill_level(131, 2) else {
+            return;
+        };
+        let mut player = crate::codec::stats::sample_player();
+        player.stats.hp = (2 * level.x) as i16;
+        let actions = handle(&mut player, mist(level.x, 131, 2));
+        assert_eq!(i32::from(player.stats.hp), level.x);
+        assert!(matches!(
+            actions.as_slice(),
+            [
+                WorldAction::Reply(_),
+                WorldAction::Field(FieldRequest::Broadcast(_))
+            ]
+        ));
+        // More than its x, or a skill that leaves no mist, is refused.
+        assert!(handle(&mut player, mist(level.x + 1, 131, 2)).is_empty());
+        assert!(handle(&mut player, mist(1, 125, 1)).is_empty());
+        let actions = handle(&mut player, mist(level.x, 131, 2));
+        assert_eq!(player.stats.hp, 0);
+        assert!(matches!(actions.last(), Some(WorldAction::Died)));
     }
 
     #[test]

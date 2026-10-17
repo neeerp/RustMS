@@ -78,4 +78,92 @@ namespace ms
 
 		return clouds;
 	}
+
+	// What a mist does to the player standing in it.
+	namespace mist
+	{
+		// Its type, AFFECTED_AREA_CREATED's second int: a mob's mist hurts,
+		// a smoke screen shelters, and type 3 is a cash item's.
+		enum Type : int32_t
+		{
+			MOB = 0,
+			SMOKE = 2,
+			ITEM = 3
+		};
+
+		// The mob skills whose mist hurts by their level's `x`: 130 and
+		// Poison Mist (FUN_00431a63).
+		constexpr bool hurts(int32_t skillid)
+		{
+			return skillid == 130 || skillid == 131;
+		}
+
+		struct Area
+		{
+			int32_t type;
+			int32_t owner;
+			int32_t skillid;
+			int32_t level;
+			int32_t left;
+			int32_t top;
+			int32_t right;
+			int32_t bottom;
+			// The element its damage is resisted as, the packet's last int.
+			int32_t element;
+			// What it does a second, its level's `x`, if it hurts.
+			int32_t damage;
+			// Whether its delay is over.
+			bool started;
+
+			// The client asks PtInRect, so the right and bottom edges are out.
+			constexpr bool contains(int32_t x, int32_t y) const
+			{
+				return left <= x && x < right && top <= y && y < bottom;
+			}
+		};
+
+		// The hurt a mist does, and the code TAKE_DAMAGE names it by: its
+		// skill's low byte, then its level.
+		struct Hurt
+		{
+			int32_t damage;
+			uint8_t element;
+			uint16_t code;
+		};
+
+		// The first started mob mist the player at (x, y) is in hurts them
+		// its damage (FUN_00431783). Nothing comes of one that does none.
+		template<class Areas>
+		bool hurt_at(const Areas &areas, int32_t x, int32_t y, Hurt &hurt)
+		{
+			for (const Area &area : areas)
+			{
+				if (area.type != MOB || !area.started || !area.contains(x, y))
+					continue;
+
+				hurt = { area.damage, static_cast<uint8_t>(area.element),
+						 static_cast<uint16_t>((area.skillid & 0xFF) << 8 | (area.level & 0xFF)) };
+
+				return area.damage > 0;
+			}
+
+			return false;
+		}
+
+		// A started smoke screen of the player's own or a party member's
+		// keeps mobs off them (FUN_0043193a); `ally(owner)` says whose.
+		template<class Areas, class Ally>
+		bool shelters(const Areas &areas, int32_t x, int32_t y, Ally ally)
+		{
+			for (const Area &area : areas)
+				if (area.type == SMOKE && area.started && area.contains(x, y) && ally(area.owner))
+					return true;
+
+			return false;
+		}
+
+		// How long apart a mist hurts the player, in ms: more than this
+		// since the last time (0x94b7a2).
+		constexpr int32_t HURT_INTERVAL = 1000;
+	}
 }

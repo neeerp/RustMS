@@ -229,11 +229,20 @@ namespace ms
 		check_touch_portals(drawn);
 		camera.update(player.get_position());
 
+		// The player's or a party member's smoke screen keeps mobs' attacks,
+		// touch and mists off them (FUN_0043193a).
+		bool sheltered = mists.shelters(player.get_position(), [&](int32_t owner) {
+			return owner == player.get_oid() || player.get_party().find(owner);
+		});
+
+		if (since_mist_hurt <= mist::HURT_INTERVAL)
+			since_mist_hurt += Constants::TIMESTEP;
+
 		// Mob attacks land on the player where the mob's update found them,
 		// Dark Sight or not; the first takes the player's invincibility.
 		for (Mob::Landed &landed : mobs.take_attacks())
 		{
-			if (player.is_dead() || player.Char::is_invincible())
+			if (player.is_dead() || player.Char::is_invincible() || sheltered)
 				break;
 
 			MobAttackResult result = player.damage(landed.attack);
@@ -244,16 +253,32 @@ namespace ms
 				player.show_attack_effect(landed.hit, 1);
 		}
 
-		if (player.is_invincible())
+		if (player.is_dead() || player.Char::is_invincible() || sheltered)
 			return;
 
-		if (int32_t oid_id = mobs.find_colliding(player.get_phobj()))
+		int32_t touching = player.is_invincible() ? 0 : mobs.find_colliding(player.get_phobj());
+
+		if (touching)
 		{
-			if (MobAttack attack = mobs.create_attack(oid_id))
+			if (MobAttack attack = mobs.create_attack(touching))
 			{
 				MobAttackResult result = player.damage(attack);
 				TakeDamagePacket(result).dispatch();
 				combat.interrupt_prepare(result.damage);
+			}
+		}
+		else if (since_mist_hurt > mist::HURT_INTERVAL)
+		{
+			// Not touching a mob, the player in a mob's mist hurts
+			// themselves its x, without a knockback or invincibility
+			// (FUN_00431783 at 0x94b7ba).
+			mist::Hurt hurt;
+
+			if (mists.hurt_at(player.get_position(), hurt))
+			{
+				player.show_damage(hurt.damage);
+				TakeDamagePacket(hurt.element, hurt.damage, hurt.code).dispatch();
+				since_mist_hurt = 0;
 			}
 		}
 	}
