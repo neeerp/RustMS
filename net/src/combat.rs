@@ -66,8 +66,9 @@ pub struct Attack {
     pub mob_count: u8,
     pub hit_count: u8,
     pub display: u8,
-    pub direction: u8,
-    pub stance: u8,
+    /// The action, with the facing in the top bit (v83 0x952974: `action &
+    /// 0x7fff | left << 15`).
+    pub action: u16,
     pub speed: u8,
     /// How long a held skill was charged, in ms; 0 for the rest.
     pub charge: i32,
@@ -101,8 +102,7 @@ pub fn parse_attack(packet: &Packet, kind: AttackKind) -> Result<Attack, Network
     };
     let charge = if sends_charge { r.read_int()? } else { 0 };
     let display = r.read_byte()?;
-    let direction = r.read_byte()?;
-    let stance = r.read_byte()?;
+    let action = r.read_short()? as u16;
     r.read_byte()?;
     let speed = r.read_byte()?;
     let mut ammo_slot = 0;
@@ -133,8 +133,7 @@ pub fn parse_attack(packet: &Packet, kind: AttackKind) -> Result<Attack, Network
         mob_count,
         hit_count,
         display,
-        direction,
-        stance,
+        action,
         speed,
         charge,
         ammo_slot,
@@ -384,8 +383,7 @@ pub fn build_attack(
         p.write_int(attack.skill)?;
     }
     p.write_byte(attack.display)?;
-    p.write_byte(attack.direction)?;
-    p.write_byte(attack.stance)?;
+    p.write_short(attack.action as i16)?;
     p.write_byte(attack.speed)?;
     p.write_byte(0x0A)?;
     p.write_int(projectile)?;
@@ -424,8 +422,7 @@ mod tests {
         p.write_int(skill).unwrap();
         p.write_bytes(&[0; 8]).unwrap();
         p.write_byte(3).unwrap(); // display
-        p.write_byte(0x80).unwrap(); // direction
-        p.write_byte(5).unwrap(); // stance
+        p.write_short(0x8005u16 as i16).unwrap(); // action 5, facing left
         p.write_byte(0).unwrap();
         p.write_byte(4).unwrap(); // speed
         p.write_bytes(&[0; 4]).unwrap();
@@ -470,13 +467,8 @@ mod tests {
             }]
         );
         assert_eq!(
-            (
-                attack.display,
-                attack.direction,
-                attack.stance,
-                attack.speed
-            ),
-            (3, 0x80, 5, 4)
+            (attack.display, attack.action, attack.speed),
+            (3, 0x8005, 4)
         );
     }
 
@@ -595,8 +587,7 @@ mod tests {
             p.write_int(charge).unwrap();
         }
         p.write_byte(3).unwrap(); // display
-        p.write_byte(0x80).unwrap(); // direction
-        p.write_byte(5).unwrap(); // stance
+        p.write_short(0x8005u16 as i16).unwrap(); // action 5, facing left
         p.write_byte(0).unwrap();
         p.write_byte(4).unwrap(); // speed
         if kind == AttackKind::Ranged {
@@ -866,8 +857,7 @@ mod tests {
             .byte(0);
         expect
             .byte(3)
-            .byte(0x80)
-            .byte(5)
+            .short(0x8005u16 as i16)
             .byte(4)
             .byte(0x0A)
             .int(2070000);
@@ -887,7 +877,12 @@ mod tests {
             .byte(0x5B)
             .byte(2)
             .int(1000);
-        expect.byte(3).byte(0x80).byte(5).byte(4).byte(0x0A).int(0);
+        expect
+            .byte(3)
+            .short(0x8005u16 as i16)
+            .byte(4)
+            .byte(0x0A)
+            .int(0);
         expect.int(77).byte(0).int(25);
         expect.end();
     }
@@ -908,7 +903,12 @@ mod tests {
             .byte(0x5B)
             .byte(30)
             .int(2121001);
-        expect.byte(3).byte(0x80).byte(5).byte(4).byte(0x0A).int(0);
+        expect
+            .byte(3)
+            .short(0x8005u16 as i16)
+            .byte(4)
+            .byte(0x0A)
+            .int(0);
         expect.int(77).byte(0).int(12).int(640);
         expect.end();
     }
@@ -924,7 +924,12 @@ mod tests {
             .byte(0x11)
             .byte(0x5B)
             .byte(0);
-        expect.byte(3).byte(0x80).byte(5).byte(4).byte(0x0A).int(0);
+        expect
+            .byte(3)
+            .short(0x8005u16 as i16)
+            .byte(4)
+            .byte(0x0A)
+            .int(0);
         expect.int(77).byte(0).int(9);
         expect.end();
     }

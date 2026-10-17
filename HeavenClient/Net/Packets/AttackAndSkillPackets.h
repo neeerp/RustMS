@@ -53,8 +53,8 @@ namespace ms
 				write_int(attack.charge);
 
 			write_byte(attack.display);
-			write_byte(attack.toleft);
-			write_byte(attack.stance);
+			// The action, with the facing in the top bit (0x952974).
+			write_short(static_cast<int16_t>((attack.stance & 0x7FFF) | (attack.toleft ? 0x8000 : 0)));
 
 			skip(1);
 
