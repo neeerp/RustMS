@@ -46,6 +46,15 @@ namespace ms
 	const double FLYACC = 120000.0 / 100.0;
 	const double FLYSPEED = 200.0;
 	const double FLYDRAG = 100000.0 / 100.0;
+	// Swimming (r25 0x9b2c3c) is flying with swimForce and swimSpeed, and
+	// in a swim map walking pushes and tops out at swimSpeedDec of normal.
+	// A ground jump there rises at 0.7 of jumpSpeed, and a kick in the
+	// water at 5 times swimSpeed (FUN_009b1d3d).
+	const double SWIMACC = 120000.0 / 100.0;
+	const double SWIMSPEED = 140.0;
+	const double SWIMWALK = 0.9;
+	const double SWIMJUMP = 0.7;
+	const double SWIMKICK = 5.0 * SWIMSPEED;
 	const double TICK = Constants::TIMESTEP / 1000.0;
 
 	// CVecCtrl's accelerate (FUN_007f29ab): speeds up towards +-limit and
@@ -221,6 +230,12 @@ namespace ms
 			double acc = WALKACC * phobj.walkforce;
 			double drag = WALKDRAG * ground_drag(phobj.walkdrag);
 
+			if (phobj.swim)
+			{
+				limit *= SWIMWALK;
+				acc *= SWIMWALK;
+			}
+
 			if (slant == 0.0)
 			{
 				decelerate(speed, limit, drag);
@@ -268,34 +283,39 @@ namespace ms
 
 			hspeed = speed * ux;
 			vspeed = 0.0;
-		} else if (phobj.flyspeed > 0.0)
+		} else if (phobj.swim || phobj.flyspeed > 0.0)
 		{
-			// CVecCtrl's flying (FUN_007f2a1c) slows anything faster than
-			// flySpeed, then pushes the way the object steers.
-			double limit = FLYSPEED * phobj.flyspeed;
+			// CVecCtrl's flying (FUN_007f2a1c) and swimming slow anything
+			// faster than the top speed, then push the way the object steers.
+			double limit = phobj.swim ? SWIMSPEED : FLYSPEED * phobj.flyspeed;
+			double acc = phobj.swim ? SWIMACC : FLYACC;
 
 			decelerate(hspeed, limit, FLYDRAG);
 
 			if (dir == 0)
 				decelerate(hspeed, 0.0, FLYDRAG);
 			else
-				accelerate(hspeed, dir * FLYACC, limit);
+				accelerate(hspeed, dir * acc, limit);
 
 			decelerate(vspeed, limit, FLYDRAG);
 
 			if (phobj.flydir < 0)
 			{
-				// Gliding settles on sinking at 0.3 of flySpeed, slowing a
-				// faster fall at the full push and picking up at half.
+				// Gliding settles on sinking at 0.3 of the top speed, slowing
+				// a faster fall at the full push and picking up at half.
 				double glide = 0.3 * limit;
 
 				if (vspeed > glide)
-					vspeed = std::max(vspeed - FLYACC * TICK, glide);
+					vspeed = std::max(vspeed - acc * TICK, glide);
 				else
-					vspeed = std::min(vspeed + 0.5 * FLYACC * TICK, glide);
+					vspeed = std::min(vspeed + 0.5 * acc * TICK, glide);
+			} else if (phobj.flydir > 0)
+			{
+				// Steering down drops at once at 1.5 times the top speed.
+				vspeed = 1.5 * limit;
 			} else
 			{
-				accelerate(vspeed, FLYACC, limit);
+				accelerate(vspeed, acc, limit);
 			}
 		} else
 		{
@@ -353,7 +373,7 @@ namespace ms
 
 	void Physics::jump(PhysicsObject &phobj, double jumpspeed, int8_t dir)
 	{
-		phobj.vforce = -jumpspeed;
+		phobj.vforce = -jumpspeed * (phobj.swim ? SWIMJUMP : 1.0);
 
 		if (dir == 0)
 			return;
@@ -379,6 +399,13 @@ namespace ms
 	void Physics::fly_jump(PhysicsObject &phobj)
 	{
 		phobj.vspeed = -FLYSPEED * phobj.flyspeed * TICK;
+	}
+
+	// CVecCtrl::Jump (FUN_009b1d3d) for a swimmer in the water: it kicks
+	// up at 5 times swimSpeed, keeping its sideways speed.
+	void Physics::swim_jump(PhysicsObject &phobj)
+	{
+		phobj.vspeed = -SWIMKICK * TICK;
 	}
 
 	// CVecCtrl's down-jump (FUN_007f1ac6) rises at jumpSpeed / sqrt(8)

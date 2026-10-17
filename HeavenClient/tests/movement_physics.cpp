@@ -571,6 +571,92 @@ void flying(const ms::Physics& physics)
 	require(std::abs(speed(mob.vspeed) + 200.0) < 1e-9 && std::abs(speed(mob.hspeed) - 50.0) < 1e-9, "a flier's beat was wrong");
 }
 
+// r25's swim step (0x9b2c3c): swimSpeed 140 px/s, pushed at 1200 px/s^2
+// and slowed at 1000.
+void swimming(const ms::Physics& physics)
+{
+	auto speed = [](double perTick) { return perTick * TICKS_PER_SECOND; };
+	auto swimmer = [&]()
+	{
+		ms::PhysicsObject player;
+		player.shoe = true;
+		player.swim = true;
+		player.onground = false;
+		player.set_x(0); player.set_y(-150);
+		return player;
+	};
+
+	// Not steering, it sinks at up to 140 px/s and lands on the floor.
+	ms::PhysicsObject player = swimmer();
+	physics.move_object(player);
+	require(std::abs(speed(player.vspeed) - 9.6) < 1e-9, "a swimmer did not sink at 1200 px/s^2");
+	double fastest = 0.0;
+	for (int tick = 0; tick < 500 && !player.onground; ++tick)
+	{
+		physics.move_object(player);
+		fastest = std::max(fastest, speed(player.vspeed));
+	}
+	require(player.onground && player.crnt_y() == 100, "a sinking swimmer did not land");
+	require(std::abs(fastest - 140.0) < 1e-9, "a swimmer did not sink at swimSpeed");
+
+	// Sideways it tops out at 140 px/s.
+	player = swimmer();
+	for (int tick = 0; tick < 30; ++tick)
+	{
+		player.walkdir = 1;
+		physics.move_object(player);
+	}
+	require(std::abs(speed(player.hspeed) - 140.0) < 1e-9, "a swimmer did not top out at swimSpeed");
+
+	// Up settles on sinking at 0.3 of swimSpeed, picking up at half the push.
+	player = swimmer();
+	player.flydir = -1;
+	physics.move_object(player);
+	require(std::abs(speed(player.vspeed) - 4.8) < 1e-9, "swimming up did not pick up at 600 px/s^2");
+	for (int tick = 0; tick < 20; ++tick)
+		physics.move_object(player);
+	require(std::abs(speed(player.vspeed) - 42.0) < 1e-9, "swimming up did not sink at 42 px/s");
+
+	// Down drops at 1.5 times swimSpeed at once.
+	player = swimmer();
+	player.flydir = 1;
+	physics.move_object(player);
+	require(std::abs(speed(player.vspeed) - 210.0) < 1e-9, "swimming down did not drop at 210 px/s");
+
+	// A kick rises at 700 px/s, keeping the sideways speed, then slows at
+	// the drag and the sinking push together.
+	player = swimmer();
+	player.set_y(80);
+	player.hspeed = 50.0 / TICKS_PER_SECOND;
+	ms::Physics::swim_jump(player);
+	require(std::abs(speed(player.vspeed) + 700.0) < 1e-9 && std::abs(speed(player.hspeed) - 50.0) < 1e-9, "a kick was wrong");
+	physics.move_object(player);
+	require(std::abs(speed(player.vspeed) + 682.4) < 1e-9, "a kick did not slow at 2200 px/s^2");
+	double start = player.crnt_y();
+	while (player.vspeed < 0.0)
+		physics.move_object(player);
+	double rise = start - player.crnt_y();
+	require(rise > 105.0 && rise < 113.0, "a kick did not rise about 109 px more");
+
+	// On the floor of a swim map it walks at 0.9 of the push and speed,
+	// and jumps at 0.7 of jumpSpeed.
+	player = grounded_shoe(physics);
+	player.swim = true;
+	player.walkdir = 1;
+	physics.move_object(player);
+	require(std::abs(speed(player.hspeed) - 10.08) < 1e-9, "walking in water did not push at 0.9");
+	for (int tick = 0; tick < 50; ++tick)
+	{
+		player.walkdir = 1;
+		physics.move_object(player);
+	}
+	require(std::abs(speed(player.hspeed) - 112.5) < 1e-9, "walking in water did not top out at 0.9 of walkSpeed");
+	player = grounded_shoe(physics);
+	player.swim = true;
+	ms::Physics::jump(player, ms::Physics::jump_speed(1.0), 0);
+	require(std::abs(speed(-player.vforce) - 388.5) < 1e-9, "a jump in water did not rise at 0.7 of jumpSpeed");
+}
+
 // A 100 px wall stops a walking player whichever way the map draws it:
 // going up along the chain (y1 > y2) or going down (y1 < y2).
 void walls(const ms::Physics& physics)
@@ -724,6 +810,7 @@ int main()
 			running_jump(physics);
 			falling(physics);
 			flying(physics);
+			swimming(physics);
 			jumping_down(physics);
 			knockback(physics);
 			// A knocked back mob sets its own ground speed; friction must not

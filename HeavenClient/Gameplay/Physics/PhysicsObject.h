@@ -242,9 +242,13 @@ namespace ms
 		double impacty = 0.0;
 
 		// A shoe with a flyspeed flies through platforms, steered by walkdir
-		// and by flydir: -1 to glide down slowly, 0 to dive.
+		// and by flydir: -1 to glide down slowly, 0 to dive, 1 to drop.
 		double flyspeed = 0.0;
 		int8_t flydir = 0;
+		// A shoe in a swim map swims through the water when off a platform,
+		// steered by walkdir and flydir as a flier is, but still lands on
+		// platforms. It walks and jumps more slowly too.
+		bool swim = false;
 
 		// A JUMPER's home group, whether it jumps or carries on at the end of
 		// its foothold, and whether it walks down a step there rather than

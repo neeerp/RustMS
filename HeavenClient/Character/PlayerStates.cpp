@@ -23,6 +23,8 @@ namespace ms
 	// the walking speed sideways and half the takeoff speed upwards.
 	const double ROPEJUMPH = 1.3;
 	const double ROPEJUMPV = 0.5;
+	// FUN_009b1d3d: off a rope in a swim map.
+	const double ROPEJUMPSWIM = 0.3;
 
 	// Climbing in CUserLocal (FUN_009cfdb1): 3 px each 30 ms update,
 	// whatever the speed.
@@ -268,7 +270,8 @@ namespace ms
 	// Flying
 	void PlayerFlyState::initialize(Player &player) const
 	{
-		player.get_phobj().type = player.is_underwater() ? PhysicsObject::Type::SWIMMING : PhysicsObject::Type::FLYING;
+		// Swimming is the shoe's swim step (r25 0x9b2c3c).
+		player.get_phobj().type = player.is_underwater() ? PhysicsObject::Type::NORMAL : PhysicsObject::Type::FLYING;
 	}
 
 	void PlayerFlyState::send_action(Player &player, KeyAction::Id ka, bool down) const
@@ -283,14 +286,43 @@ namespace ms
 				case KeyAction::Id::RIGHT:
 					player.set_direction(true);
 					break;
+				case KeyAction::Id::JUMP:
+					if (player.is_underwater() && !player.is_attacking())
+					{
+						play_jumpsound();
+						Physics::swim_jump(player.get_phobj());
+					}
+
+					break;
 			}
 		}
 	}
 
 	void PlayerFlyState::update(Player &player) const
 	{
+		if (player.is_underwater())
+			player.get_phobj().flydir = 0;
+
 		if (player.is_attacking())
 			return;
+
+		if (player.is_underwater())
+		{
+			// The arrows steer the swim: up glides, down drops, neither sinks.
+			PhysicsObject &phobj = player.get_phobj();
+
+			if (player.is_key_down(KeyAction::Id::LEFT))
+				phobj.walkdir = -1;
+			else if (player.is_key_down(KeyAction::Id::RIGHT))
+				phobj.walkdir = 1;
+
+			if (player.is_key_down(KeyAction::Id::UP))
+				phobj.flydir = -1;
+			else if (player.is_key_down(KeyAction::Id::DOWN))
+				phobj.flydir = 1;
+
+			return;
+		}
 
 		if (player.is_key_down(KeyAction::Id::LEFT))
 			player.get_phobj().hforce = -player.get_flyforce();
@@ -347,14 +379,14 @@ namespace ms
 						play_jumpsound();
 						player.set_direction(false);
 						player.get_phobj().hspeed = -ROPEJUMPH * Physics::walk_speed(player.get_walkspeed());
-						player.get_phobj().vspeed = -ROPEJUMPV * player.get_jumpforce();
+						player.get_phobj().vspeed = -(player.is_underwater() ? ROPEJUMPSWIM : ROPEJUMPV) * player.get_jumpforce();
 						cancel_ladder(player);
 					} else if (player.is_key_down(KeyAction::Id::RIGHT))
 					{
 						play_jumpsound();
 						player.set_direction(true);
 						player.get_phobj().hspeed = ROPEJUMPH * Physics::walk_speed(player.get_walkspeed());
-						player.get_phobj().vspeed = -ROPEJUMPV * player.get_jumpforce();
+						player.get_phobj().vspeed = -(player.is_underwater() ? ROPEJUMPSWIM : ROPEJUMPV) * player.get_jumpforce();
 						cancel_ladder(player);
 					}
 

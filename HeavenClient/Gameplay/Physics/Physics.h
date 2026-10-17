@@ -54,6 +54,9 @@ namespace ms
 		// Beat upwards with a flying shoe.
 		static void fly_jump(PhysicsObject &phobj);
 
+		// Kick upwards while swimming.
+		static void swim_jump(PhysicsObject &phobj);
+
 		// Hop off the current platform and fall through it.
 		static void jump_down(PhysicsObject &phobj);
 

@@ -104,6 +104,8 @@ namespace ms
 	{
 		set_position(pos.x(), pos.y());
 		underwater = uw;
+		phobj.swim = uw;
+		phobj.flydir = 0;
 		keysdown.clear();
 		attacking = false;
 		ladder = nullptr;
