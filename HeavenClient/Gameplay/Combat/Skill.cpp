@@ -51,7 +51,7 @@ namespace ms
 		prepare.keydownend = { src["keydownend"], src["keydownend"]["z"] };
 		special = src["special"];
 
-		if (shot_rain::kind(skillid) != shot_rain::Kind::NONE)
+		if (shot_rain::kind(skillid) != shot_rain::Kind::NONE || spell_area::kind(skillid) != spell_area::Kind::NONE)
 		{
 			nl::node specialsrc = src["special"];
 			rain.params = {

@@ -20,6 +20,7 @@
 #include <cstdint>
 
 #include "ShotRain.h"
+#include "SpellArea.h"
 #include "SkillAction.h"
 #include "SkillBullet.h"
 #include "SkillHitEffect.h"
@@ -49,8 +50,9 @@ namespace ms
 		Effect keydownend;
 	};
 
-	// What a raining shot drops (its `special` node), and the fire Inferno
-	// leaves on the ground (its `tile` node).
+	// What a raining shot or a blasting spell drops (its `special` node),
+	// and what Inferno and the area spells leave on the ground (its `tile`
+	// node).
 	struct SkillRain
 	{
 		shot_rain::Params params;
