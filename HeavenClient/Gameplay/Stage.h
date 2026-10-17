@@ -191,6 +191,9 @@ namespace ms
 
 		void check_drops();
 
+		// Fear's darkness, all but the player's narrowed sight (FUN_0053868d).
+		void draw_fear(double viewx, double viewy, float alpha) const;
+
 		enum State
 		{
 			INACTIVE,
@@ -236,6 +239,8 @@ namespace ms
 		// Effects left where they started, such as a jump pad's burst.
 		EffectLayer ground_effects;
 		Animation jump_effect;
+		// What Fear leaves the player to see (Effect/MapEff.img/Viewrange/3).
+		Texture fear_sight;
 
 		Combat combat;
 		EmoteCooldown emote_cooldown;

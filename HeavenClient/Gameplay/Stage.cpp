@@ -28,6 +28,7 @@
 #include "../Util/Misc.h"
 #include "../Util/NxFiles.h"
 
+#include "../IO/UITypes/UIChatBar.h"
 #include "../IO/UITypes/UINotice.h"
 #include "../IO/UITypes/UINpcTalk.h"
 #include "../IO/UITypes/UIStatusBar.h"
@@ -55,6 +56,7 @@ namespace ms
 		drops.init();
 
 		jump_effect = nl::nx::effect["BasicEff.img"]["VerticalJump"];
+		fear_sight = nl::nx::effect["MapEff.img"]["Viewrange"]["3"];
 	}
 
 	void Stage::load(int32_t mapid, int8_t portalid, std::optional<Point<int16_t>> chase)
@@ -182,7 +184,32 @@ namespace ms
 		ground_effects.drawabove(viewpos, alpha);
 		portals.draw(viewpos, alpha);
 		backgrounds.drawforegrounds(viewx, viewy, alpha);
+		draw_fear(viewx, viewy, alpha);
 		effect.draw();
+	}
+
+	void Stage::draw_fear(double viewx, double viewy, float alpha) const
+	{
+		if (!player.has_buff(Buffstat::Id::FEAR))
+			return;
+
+		// v83 copies the sight onto a black layer with its top left this
+		// far from the player's feet, ignoring its origin.
+		Point<int16_t> sight = player.get_phobj().get_absolute(viewx, viewy, alpha) + Point<int16_t>(-80, -120);
+		Point<int16_t> size = fear_sight.get_dimensions();
+		int16_t width = Constants::Constants::get().get_viewwidth();
+		int16_t height = Constants::Constants::get().get_viewheight();
+		int16_t left = sight.x();
+		int16_t top = sight.y();
+		int16_t right = left + size.x();
+		int16_t bottom = top + size.y();
+
+		GraphicsGL &gl = GraphicsGL::get();
+		gl.drawrectangle(0, 0, width, top, 0.0f, 0.0f, 0.0f, 1.0f);
+		gl.drawrectangle(0, bottom, width, height - bottom, 0.0f, 0.0f, 0.0f, 1.0f);
+		gl.drawrectangle(0, top, left, size.y(), 0.0f, 0.0f, 0.0f, 1.0f);
+		gl.drawrectangle(right, top, width - right, size.y(), 0.0f, 0.0f, 0.0f, 1.0f);
+		fear_sight.draw(DrawArgument(sight + fear_sight.get_origin(), Color::cutout(1.0f)));
 	}
 
 	void Stage::update()
@@ -280,6 +307,17 @@ namespace ms
 				TakeDamagePacket(hurt.element, hurt.damage, hurt.code).dispatch();
 				since_mist_hurt = 0;
 			}
+		}
+
+		// Stop Motion hurts a player who stood still two seconds.
+		if (int32_t damage = player.take_stop_motion())
+		{
+			player.show_damage(damage);
+
+			if (auto chatbar = UI::get().get_element<UIChatBar>())
+				chatbar->send_chatline(disease::STOP_MOTION_HURT, UIChatBar::LineType::GREY);
+
+			TakeDamagePacket(4, damage, 0, 3).dispatch();
 		}
 	}
 

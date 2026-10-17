@@ -96,6 +96,12 @@ namespace ms
 			CURSE,
 			SLOW,
 			SEDUCE,
+			// A mob's Undead shares Puppet's bit (46); its reason tells them
+			// apart.
+			UNDEAD,
+			STOP_POTION,
+			STOP_MOTION,
+			FEAR,
 			LENGTH
 		};
 

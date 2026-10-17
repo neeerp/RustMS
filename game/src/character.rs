@@ -350,6 +350,16 @@ impl Player {
         self.stats.hp
     }
 
+    /// Recover `hp` from a potion or a skill, halved while Undead holds, as
+    /// its notice says (and Cosmic's ZOMBIFY does). Returns the new HP.
+    pub fn recover_hp(&mut self, hp: i32) -> i16 {
+        if self.buffs.has(crate::buff::BuffStat::Undead) {
+            self.add_hp(hp / 2)
+        } else {
+            self.add_hp(hp)
+        }
+    }
+
     /// Change MP by `delta`, clamped to `0..=max_mp`. Returns the new MP.
     pub fn add_mp(&mut self, delta: i32) -> i16 {
         let mp = (i32::from(self.stats.mp) + delta).clamp(0, i32::from(self.stats.max_mp));

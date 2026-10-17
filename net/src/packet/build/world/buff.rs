@@ -117,7 +117,11 @@ pub(crate) fn write_shown(
             | BuffStat::Weakness
             | BuffStat::Curse
             | BuffStat::Seduce
-            | BuffStat::Confuse => {
+            | BuffStat::Undead
+            | BuffStat::Confuse
+            | BuffStat::StopPotion
+            | BuffStat::StopMotion
+            | BuffStat::Fear => {
                 p.write_int(buff.skill_id)?;
             }
             _ => {}

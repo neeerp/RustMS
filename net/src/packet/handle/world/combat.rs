@@ -7,6 +7,7 @@ use crate::packet::build::world::mob::{self, FROM_MIST, FROM_TOUCH};
 use crate::packet::build::world::stat::{self, StatUpdate};
 use crate::packet::build::world::{buff, inventory};
 use crate::skills;
+use game::buff::BuffStat;
 use game::{Buff, Disease, InventoryType, MobStat, Player};
 use packet::{io::read::PktRead, Packet};
 use std::io::Cursor;
@@ -255,9 +256,17 @@ impl WorldHandler for TakeDamageHandler {
 /// The player stood in mob skill `skill`'s mist at `level`: a v83 client
 /// takes its `x` a second (FUN_00431783), less any resistance, and says so
 /// with the skill and level. Only HP goes; no mob is named.
+///
+/// Skill 0 is Stop Motion's: standing still two seconds under it, a v83
+/// client takes its value but never the last HP (0x94b1d7) and sends the
+/// same report with no skill.
 fn mist_damage(player: &mut Player, skill: i32, level: i32, damage: i32) -> WorldResult {
-    let most = match crate::mobs::skill_level(skill, level) {
-        Some(level) if skill == game::mob_skill::POISON_MIST => level.x,
+    let stop_motion = player.buffs.value(BuffStat::StopMotion);
+    let most = match (crate::mobs::skill_level(skill, level), stop_motion) {
+        (_, Some(x)) if skill == 0 && level == 0 => {
+            i32::from(x).min(i32::from(player.stats.hp) - 1)
+        }
+        (Some(level), _) if skill == game::mob_skill::POISON_MIST => level.x,
         _ => {
             debug!(skill, level, "Mist damage from a skill that leaves none");
             return Ok(HandlerResult::empty());
@@ -475,6 +484,31 @@ mod tests {
         let actions = handle(&mut player, mist(level.x, 131, 2));
         assert_eq!(player.stats.hp, 0);
         assert!(matches!(actions.last(), Some(WorldAction::Died)));
+    }
+
+    #[test]
+    fn stop_motion_hurts_up_to_its_value_but_never_kills() {
+        let mut player = crate::codec::stats::sample_player();
+        player.stats.hp = 500;
+        // Without it, a report with no skill is refused.
+        assert!(handle(&mut player, mist(330, 0, 0)).is_empty());
+
+        let now = std::time::Instant::now();
+        let lasts = std::time::Duration::from_secs(20);
+        let stop_motion = 135 | 1 << 16;
+        player.buffs.give(Buff::new(
+            stop_motion,
+            BuffStat::StopMotion,
+            330,
+            now,
+            lasts,
+        ));
+        assert!(handle(&mut player, mist(331, 0, 0)).is_empty());
+        assert_eq!(handle(&mut player, mist(330, 0, 0)).len(), 2);
+        assert_eq!(player.stats.hp, 170);
+        assert!(handle(&mut player, mist(170, 0, 0)).is_empty());
+        assert_eq!(handle(&mut player, mist(169, 0, 0)).len(), 2);
+        assert_eq!(player.stats.hp, 1);
     }
 
     #[test]

@@ -30,8 +30,8 @@ pub enum MobSkillEffect {
     Banish,
 }
 
-/// What `skill` does with its value `x`, or `None` for the ones not cast
-/// yet (130, 133-136).
+/// What `skill` does with its value `x`, or `None` for one no mob has
+/// (130).
 ///
 /// The v83 client multiplies a mob's attack by its PowerUp and MagicUp as
 /// percents, and adds Pad and Mad, so Power Up (100, 115%) is PowerUp, not
@@ -84,6 +84,10 @@ pub fn disease(skill: i32) -> Option<BuffStat> {
         126 => BuffStat::Slow,
         128 => BuffStat::Seduce,
         132 => BuffStat::Confuse,
+        133 => BuffStat::Undead,
+        134 => BuffStat::StopPotion,
+        135 => BuffStat::StopMotion,
+        136 => BuffStat::Fear,
         _ => return None,
     })
 }
@@ -119,7 +123,11 @@ mod tests {
         );
         assert_eq!(effect(127, 0), Some(MobSkillEffect::Dispel));
         assert_eq!(effect(129, 0), Some(MobSkillEffect::Banish));
-        assert_eq!(effect(133, 1), None);
+        assert_eq!(
+            effect(136, 1),
+            Some(MobSkillEffect::Disease(BuffStat::Fear))
+        );
+        assert_eq!(effect(130, 1), None);
         let slow = inflicted(126, 2, 80, 10).unwrap();
         assert_eq!(
             (slow.stat, slow.value, slow.skill_id, slow.lasts),
