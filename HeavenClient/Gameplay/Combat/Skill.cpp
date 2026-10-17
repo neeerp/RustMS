@@ -132,7 +132,6 @@ namespace ms
 		}
 
 		bool hasaction0 = src["action"]["0"].data_type() == nl::node::type::string;
-		bool hasaction1 = src["action"]["1"].data_type() == nl::node::type::string;
 
 		// A thrown grenade hits with no action, and flies as no bullet: it
 		// shows its own effect where it lands (0x950921, 0x936528).
@@ -141,12 +140,9 @@ namespace ms
 		if (thrown)
 		{
 			action = std::make_unique<NoAction>();
-		} else if (hasaction0 && hasaction1)
-		{
-			action = std::make_unique<TwoHandedAction>(src);
 		} else if (hasaction0)
 		{
-			action = std::make_unique<SingleAction>(src);
+			action = std::make_unique<RandomAction>(src);
 		} else if (data.is_attack())
 		{
 			bool bylevel = src["level"]["1"]["action"].data_type() == nl::node::type::string;
@@ -211,14 +207,9 @@ namespace ms
 		sound->stop_loop();
 	}
 
-	void Skill::apply_actions(Char &user, Attack::Type type) const
+	std::string Skill::apply_actions(Char &user, Attack::Type type) const
 	{
-		action->apply(user, type);
-	}
-
-	std::string Skill::get_action(const Char &user) const
-	{
-		return action->get_action(user);
+		return action->apply(user, type);
 	}
 
 	void Skill::apply_stats(const Char &user, Attack &attack) const

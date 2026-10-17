@@ -128,6 +128,11 @@ namespace ms
 		// Hold the attack on this frame until end_attack.
 		void hold_attack(uint8_t frame);
 
+		// Play the action just started at this speed rather than the
+		// character's own, until the next one. v83 plays the action of a
+		// skill used without attacking at 6 (0x96d4a6).
+		void fix_action_speed(int8_t speed);
+
 		// End the attack now, held or not.
 		void end_attack();
 
@@ -250,6 +255,8 @@ namespace ms
 
 		State state = State::STAND;
 		bool attacking;
+		// The speed fixed for the current action, or 0 for the character's own.
+		int8_t fixed_action_speed = 0;
 		// The milliseconds of animation time a speed left over from its last
 		// whole step.
 		float stance_carry = 0.0f;

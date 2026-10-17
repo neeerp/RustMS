@@ -312,9 +312,9 @@ namespace ms
 			return false;
 
 		move.apply_useeffects(player);
-		move.apply_actions(player, Attack::Type::MAGIC);
+		std::string action = move.apply_actions(player, Attack::Type::MAGIC);
+		player.fix_action_speed(6);
 
-		std::string action = move.get_action(player);
 		uint16_t lock = action.empty() ? 0 : player.get_action_lock(action);
 		player.request(UseSkillPacket(moveid, level, lock, *reach), ExclRequest::SKILL_WAIT);
 

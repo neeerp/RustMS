@@ -26,9 +26,9 @@ namespace ms
 	void RegularAttack::apply_useeffects(Char &) const
 	{}
 
-	void RegularAttack::apply_actions(Char &user, Attack::Type type) const
+	std::string RegularAttack::apply_actions(Char &user, Attack::Type type) const
 	{
-		action.apply(user, type);
+		return action.apply(user, type);
 	}
 
 	void RegularAttack::apply_stats(const Char &user, Attack &attack) const

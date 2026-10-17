@@ -46,13 +46,9 @@ namespace ms
 
 		virtual void apply_useeffects(Char &user) const = 0;
 
-		virtual void apply_actions(Char &user, Attack::Type type) const = 0;
-
-		// The body action the move takes up, or "" for none of its own.
-		virtual std::string get_action(const Char &) const
-		{
-			return "";
-		}
+		// Plays the move's body action, and returns it, or "" if it has
+		// none of its own.
+		virtual std::string apply_actions(Char &user, Attack::Type type) const = 0;
 
 		virtual void apply_stats(const Char &user, Attack &attack) const = 0;
 

@@ -18,10 +18,11 @@
 #include "SkillAction.h"
 
 #include "../../Util/Misc.h"
+#include "../../Util/Randomizer.h"
 
 namespace ms
 {
-	void RegularAction::apply(Char &target, Attack::Type atype) const
+	std::string RegularAction::apply(Char &target, Attack::Type atype) const
 	{
 		Weapon::Type weapontype = target.get_weapontype();
 		bool degenerate;
@@ -40,37 +41,30 @@ namespace ms
 		}
 
 		target.attack(degenerate);
+
+		return "";
 	}
 
-	SingleAction::SingleAction(nl::node src)
+	RandomAction::RandomAction(nl::node src)
 	{
-		action = std::string(src["action"]["0"]);
+		for (size_t i = 0; ; i++)
+		{
+			nl::node sub = src["action"][std::to_string(i)];
+
+			if (sub.data_type() != nl::node::type::string)
+				break;
+
+			actions.push_back(std::string(sub));
+		}
 	}
 
-	void SingleAction::apply(Char &target, Attack::Type) const
+	std::string RandomAction::apply(Char &target, Attack::Type) const
 	{
+		Randomizer randomizer;
+		const std::string &action = actions[randomizer.next_int(actions.size())];
 		target.attack(action);
-	}
 
-	std::string SingleAction::get_action(const Char &) const
-	{
 		return action;
-	}
-
-	TwoHandedAction::TwoHandedAction(nl::node src)
-	{
-		actions[false] = std::string(src["action"]["0"]);
-		actions[true] = std::string(src["action"]["1"]);
-	}
-
-	void TwoHandedAction::apply(Char& target, Attack::Type) const
-	{
-		target.attack(get_action(target));
-	}
-
-	std::string TwoHandedAction::get_action(const Char &target) const
-	{
-		return actions[target.is_twohanded()];
 	}
 
 	ByLevelAction::ByLevelAction(nl::node src, int32_t id)
@@ -84,18 +78,15 @@ namespace ms
 		skillid = id;
 	}
 
-	void ByLevelAction::apply(Char &target, Attack::Type) const
-	{
-		std::string action = get_action(target);
-
-		if (!action.empty())
-			target.attack(action);
-	}
-
-	std::string ByLevelAction::get_action(const Char &target) const
+	std::string ByLevelAction::apply(Char &target, Attack::Type) const
 	{
 		auto iter = actions.find(target.get_skilllevel(skillid));
 
-		return iter != actions.end() ? iter->second : "";
+		if (iter == actions.end())
+			return "";
+
+		target.attack(iter->second);
+
+		return iter->second;
 	}
 }

@@ -18,13 +18,13 @@
 #pragma once
 
 #include <string>
+#include <vector>
 
 #include <cstdint>
 
 #include "Attack.h"
 
 #include "../../Character/Char.h"
-#include "../../Template/BoolPair.h"
 
 namespace ms
 {
@@ -34,52 +34,37 @@ namespace ms
 		virtual ~SkillAction()
 		{}
 
-		virtual void apply(Char &target, Attack::Type atype) const = 0;
-
-		// The body action the skill takes up, or "" for none of its own.
-		virtual std::string get_action(const Char &) const
-		{
-			return "";
-		}
+		// Plays the skill's body action, and returns it, or "" if it has
+		// none of its own.
+		virtual std::string apply(Char &target, Attack::Type atype) const = 0;
 	};
 
 	class NoAction : public SkillAction
 	{
 	public:
-		void apply(Char &, Attack::Type) const override
-		{}
+		std::string apply(Char &, Attack::Type) const override
+		{
+			return "";
+		}
 	};
 
 	class RegularAction : public SkillAction
 	{
 	public:
-		void apply(Char &target, Attack::Type atype) const override;
+		std::string apply(Char &target, Attack::Type atype) const override;
 	};
 
-	class SingleAction : public SkillAction
+	// v83 takes one of a skill's actions at random each time
+	// (FUN_007660b6), so most skills, having one, always take it.
+	class RandomAction : public SkillAction
 	{
 	public:
-		SingleAction(nl::node src);
+		RandomAction(nl::node src);
 
-		void apply(Char &target, Attack::Type atype) const override;
-
-		std::string get_action(const Char &target) const override;
+		std::string apply(Char &target, Attack::Type atype) const override;
 
 	private:
-		std::string action;
-	};
-
-	class TwoHandedAction : public SkillAction
-	{
-	public:
-		TwoHandedAction(nl::node src);
-
-		void apply(Char &target, Attack::Type atype) const override;
-
-		std::string get_action(const Char &target) const override;
-
-	private:
-		BoolPair<std::string> actions;
+		std::vector<std::string> actions;
 	};
 
 	class ByLevelAction : public SkillAction
@@ -87,9 +72,7 @@ namespace ms
 	public:
 		ByLevelAction(nl::node src, int32_t skillid);
 
-		void apply(Char &target, Attack::Type atype) const override;
-
-		std::string get_action(const Char &target) const override;
+		std::string apply(Char &target, Attack::Type atype) const override;
 
 	private:
 		std::map<int32_t, std::string> actions;

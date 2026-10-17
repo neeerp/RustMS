@@ -51,10 +51,11 @@ namespace ms
 				} else
 				{
 					Stance::Id stance = Stance::by_string(ststr);
-					int16_t delay = framenode["delay"];
+					int16_t delay = framenode["delay"].data_type() == nl::node::type::integer
+										 ? static_cast<int16_t>(framenode["delay"]) : static_cast<int16_t>(150);
 
 					if (delay <= 0)
-						delay = 100;
+						delay = 150;
 
 					stance_delays[stance][frame] = delay;
 

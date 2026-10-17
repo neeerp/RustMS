@@ -294,8 +294,9 @@ namespace ms
 			}
 		} else
 		{
+			// A frame of no delay passes at once.
 			uint16_t delay = action->get_delay();
-			uint16_t delta = delay - stelapsed;
+			uint16_t delta = delay > stelapsed ? delay - stelapsed : 0;
 
 			if (timestep >= delta)
 			{

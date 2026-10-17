@@ -33,7 +33,7 @@ namespace ms
 	public:
 		void apply_useeffects(Char &user) const override;
 
-		void apply_actions(Char &user, Attack::Type type) const override;
+		std::string apply_actions(Char &user, Attack::Type type) const override;
 
 		void apply_stats(const Char &user, Attack &attack) const override;
 
