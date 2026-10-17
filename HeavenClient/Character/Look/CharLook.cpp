@@ -330,6 +330,14 @@ namespace ms
 
 	void CharLook::update_expression(uint16_t timestep)
 	{
+		if (exphold > 0)
+		{
+			exphold -= timestep;
+
+			if (exphold <= 0)
+				set_expression(Expression::Id::DEFAULT);
+		}
+
 		uint16_t expdelay = face->get_delay(expression.get(), expframe.get());
 		uint16_t expdelta = expdelay - expelapsed;
 
@@ -341,7 +349,7 @@ namespace ms
 			float fcthreshold = static_cast<float>(expdelta) / timestep;
 			expframe.next(nextexpframe, fcthreshold);
 
-			if (expframe == 0)
+			if (expframe == 0 && exphold <= 0)
 			{
 				if (expression == Expression::Id::DEFAULT)
 					expression.next(Expression::Id::BLINK, fcthreshold);
@@ -526,8 +534,10 @@ namespace ms
 		return drawinfo.nextframe(st, fr);
 	}
 
-	void CharLook::set_expression(Expression::Id newexpression)
+	void CharLook::set_expression(Expression::Id newexpression, int32_t hold)
 	{
+		exphold = hold;
+
 		if (expression != newexpression)
 		{
 			expression.set(newexpression);

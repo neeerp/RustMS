@@ -78,7 +78,9 @@ namespace ms
 		// Stop the attack, held or not, where it is.
 		void end_attack();
 
-		void set_expression(Expression::Id expression);
+		// Show a face, held for this many ms if hold is above 0, looping
+		// its animation, as v83 holds the hit face (FUN_00451cf6).
+		void set_expression(Expression::Id expression, int32_t hold = 0);
 
 		void set_action(const std::string &action);
 
@@ -139,6 +141,7 @@ namespace ms
 		Nominal<Expression::Id> expression;
 		Nominal<uint8_t> expframe;
 		uint16_t expelapsed;
+		int32_t exphold = 0;
 
 		bool flip;
 

@@ -669,6 +669,7 @@ namespace ms
 	{
 		int32_t damage = stats.calculate_damage(attack.watk);
 		show_damage(damage);
+		become_invincible(damage > 0);
 
 		bool fromleft = attack.origin.x() > phobj.get_x();
 
