@@ -48,13 +48,29 @@ pub struct LiveMob {
     pub statuses: BTreeMap<MobStat, MobStatus>,
 }
 
-/// A status on a mob: its value, the skill that caused it, and when it
-/// wears off.
+/// A status on a mob: its value, the skill that caused it, who put it on,
+/// and when it wears off.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct MobStatus {
     pub value: i16,
     pub skill_id: i32,
+    pub from: ClientId,
     pub until: Instant,
+    /// When a status that hurts the mob next does.
+    pub next_hurt: Instant,
+}
+
+/// How often a status that hurts a mob does: every client shows it once a
+/// second from when it was put on (0x6675a8).
+pub const HURT_INTERVAL: Duration = Duration::from_secs(1);
+
+/// A mob hurt by a status, the player who put it on, and the mob's HP
+/// percent after.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Hurt {
+    pub object_id: i32,
+    pub from: ClientId,
+    pub percent: u8,
 }
 
 impl LiveMob {
@@ -290,27 +306,40 @@ impl MobSet {
         true
     }
 
-    /// Put statuses caused by `skill_id` on a mob until `until`, replacing
-    /// any it has, save the ones a boss shrugs off. Returns those it got.
+    /// Put statuses caused by `skill_id` on a mob from `now` until `until`,
+    /// replacing any it has, save the ones a boss shrugs off and those its
+    /// element wards off. Returns those it got.
     pub fn add_statuses(
         &mut self,
         object_id: i32,
         statuses: &[(MobStat, i16)],
         skill_id: i32,
+        from: ClientId,
+        now: Instant,
         until: Instant,
     ) -> Vec<MobStat> {
         let Some(mob) = self.live.get_mut(&object_id) else {
             return Vec::new();
         };
-        let boss = mob.info.boss;
-        statuses
+        let info = &mob.info;
+        let wards = |stat: MobStat| {
+            (info.boss && stat.spares_bosses())
+                || stat.element().is_some_and(|letter| info.immune_to(letter))
+        };
+        let statuses: Vec<_> = statuses
             .iter()
-            .filter(|(stat, _)| !(boss && stat.spares_bosses()))
-            .map(|&(stat, value)| {
+            .filter(|(stat, _)| !wards(*stat))
+            .copied()
+            .collect();
+        statuses
+            .into_iter()
+            .map(|(stat, value)| {
                 let status = MobStatus {
                     value,
                     skill_id,
+                    from,
                     until,
+                    next_hurt: now + HURT_INTERVAL,
                 };
                 mob.statuses.insert(stat, status);
                 stat
@@ -350,6 +379,43 @@ impl MobSet {
             expired.push((mob.object_id, lost));
         }
         expired
+    }
+
+    /// Each second a mob has a status that hurts it, it loses the status's
+    /// value in HP (its `fixedDamage` instead, if it has one), as its
+    /// clients show, but never its last HP (inferred, as OdinMS-family
+    /// servers do). The damage counts as the player's who put it on.
+    pub fn hurt_by_statuses(&mut self, now: Instant) -> Vec<Hurt> {
+        let mut hurt = Vec::new();
+        for mob in self.live.values_mut() {
+            for (_, status) in mob.statuses.iter_mut().filter(|(stat, _)| stat.hurts()) {
+                if status.next_hurt > now {
+                    continue;
+                }
+                status.next_hurt += HURT_INTERVAL;
+                let damage = if mob.info.fixed_damage > 0 {
+                    i64::from(mob.info.fixed_damage)
+                } else {
+                    i64::from(status.value)
+                };
+                let dealt = damage.clamp(0, (mob.hp - 1).max(0));
+                if dealt == 0 {
+                    continue;
+                }
+                mob.hp -= dealt;
+                *mob.damage_by.entry(status.from).or_default() += dealt;
+                hurt.push(Hurt {
+                    object_id: mob.object_id,
+                    from: status.from,
+                    percent: 0,
+                });
+            }
+            let percent = mob.hp_percent();
+            for entry in hurt.iter_mut().filter(|h| h.object_id == mob.object_id) {
+                entry.percent = percent;
+            }
+        }
+        hurt
     }
 
     /// Damage a mob. Returns its HP percent, or the kill if it died.
@@ -534,7 +600,7 @@ mod tests {
         let until = now + Duration::from_secs(10);
         let seal = [(MobStat::Seal, 1), (MobStat::Speed, -20)];
         assert_eq!(
-            mobs.add_statuses(snail, &seal, 2111004, until),
+            mobs.add_statuses(snail, &seal, 2111004, 1, now, until),
             [MobStat::Seal, MobStat::Speed]
         );
         let views = mobs.get(snail).unwrap().status_views(now);
@@ -550,9 +616,57 @@ mod tests {
 
         mobs.live.get_mut(&snail).unwrap().info.boss = true;
         assert_eq!(
-            mobs.add_statuses(snail, &seal, 2111004, until),
+            mobs.add_statuses(snail, &seal, 2111004, 1, now, until),
             [MobStat::Speed]
         );
+    }
+
+    #[test]
+    fn poison_hurts_each_second_but_never_kills() {
+        let now = Instant::now();
+        let mut mobs = MobSet::new([snail_spawn(100)]);
+        let snail = mobs.respawn(now)[0];
+        let until = now + Duration::from_secs(10);
+        let poison = [(MobStat::Poison, 3), (MobStat::Freeze, 1)];
+
+        // A mob immune to poison and ice gets neither.
+        mobs.live.get_mut(&snail).unwrap().info.element = "S1I1".into();
+        assert!(mobs
+            .add_statuses(snail, &poison, 2101005, 7, now, until)
+            .is_empty());
+        mobs.live.get_mut(&snail).unwrap().info.element = "S2".into();
+        assert_eq!(
+            mobs.add_statuses(snail, &poison, 2101005, 7, now, until),
+            [MobStat::Poison, MobStat::Freeze]
+        );
+
+        assert!(mobs
+            .hurt_by_statuses(now + Duration::from_millis(999))
+            .is_empty());
+        let second = now + HURT_INTERVAL;
+        assert_eq!(
+            mobs.hurt_by_statuses(second),
+            [Hurt {
+                object_id: snail,
+                from: 7,
+                percent: 63,
+            }]
+        );
+        assert!(mobs.hurt_by_statuses(second).is_empty());
+        // 8 HP: 3, then 3, then only down to 1.
+        mobs.hurt_by_statuses(second + HURT_INTERVAL);
+        mobs.hurt_by_statuses(second + HURT_INTERVAL * 2);
+        let snail_mob = mobs.get(snail).unwrap();
+        assert_eq!(snail_mob.hp, 1);
+        assert_eq!(snail_mob.damage_by[&7], 7);
+        // At 1 there's nothing to show.
+        assert!(mobs.hurt_by_statuses(second + HURT_INTERVAL * 3).is_empty());
+
+        // A mob with fixedDamage loses that instead.
+        mobs.live.get_mut(&snail).unwrap().hp = 8;
+        mobs.live.get_mut(&snail).unwrap().info.fixed_damage = 1;
+        mobs.hurt_by_statuses(second + HURT_INTERVAL * 4);
+        assert_eq!(mobs.get(snail).unwrap().hp, 7);
     }
 
     #[test]

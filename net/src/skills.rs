@@ -4,6 +4,7 @@ use crate::load::{self, asset_path};
 use game::{BuffStat, InventoryType, MobStat, Player};
 use game_data::skills::{SkillData, SkillInfo, SkillLevel};
 use std::sync::OnceLock;
+use std::time::Duration;
 
 pub fn data() -> Result<&'static SkillData, &'static str> {
     static SKILLS: OnceLock<Result<SkillData, String>> = OnceLock::new();
@@ -241,28 +242,176 @@ pub fn reaches_mobs(skill_id: i32) -> bool {
     )
 }
 
-/// What a skill that reaches mobs puts on each it takes hold of: the
-/// statuses and their values. None for one that doesn't (yet).
-pub fn mob_debuffs(skill: &Learned) -> Option<Vec<(MobStat, i16)>> {
+/// What a skill puts on the mobs it reaches or hits: statuses, with the
+/// skill's chance for each mob, for its time.
+#[derive(Clone, Debug, PartialEq)]
+pub struct Inflict {
+    /// The skill behind it, the statuses' reason.
+    pub skill_id: i32,
+    /// The chance in percent; 100 for always.
+    pub prop: i32,
+    pub duration: Duration,
+    pub statuses: Vec<(MobStat, Amount)>,
+}
+
+impl Inflict {
+    fn new(skill: &Learned, statuses: Vec<(MobStat, Amount)>) -> Self {
+        let effect = &skill.effect;
+        Self {
+            skill_id: skill.skill_id,
+            prop: if effect.prop > 0 { effect.prop } else { 100 },
+            duration: Duration::from_secs(effect.duration.max(0) as u64),
+            statuses,
+        }
+    }
+
+    /// Whether it takes hold this time.
+    pub fn takes(&self, roll: f64) -> bool {
+        self.prop >= 100 || roll * 100.0 < f64::from(self.prop)
+    }
+}
+
+/// A status's value.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Amount {
+    Value(i16),
+    /// Poison from a skill at `level`: each second the mob's max HP over
+    /// 70 less the level, rounded up (OdinMS-family servers; v83's server
+    /// isn't available, and the client only shows the value it's sent).
+    Poison {
+        level: i32,
+    },
+}
+
+impl Amount {
+    /// The value on a mob with `max_hp`.
+    pub fn against(self, max_hp: i32) -> i16 {
+        match self {
+            Amount::Value(value) => value,
+            Amount::Poison { level } => {
+                let per = (70 - level).max(1);
+                (max_hp.max(0) as u32)
+                    .div_ceil(per as u32)
+                    .clamp(1, i16::MAX as u32) as i16
+            }
+        }
+    }
+}
+
+/// A player's STR, DEX, and LUK with what they wear.
+fn total_stats(player: &Player) -> (i32, i32, i32) {
+    let stats = &player.stats;
+    player
+        .inventory
+        .items(InventoryType::Equipped)
+        .filter_map(|(_, item)| item.equip.as_ref())
+        .fold(
+            (
+                i32::from(stats.str),
+                i32::from(stats.dex),
+                i32::from(stats.luk),
+            ),
+            |(str, dex, luk), equip| {
+                (
+                    str + i32::from(equip.str),
+                    dex + i32::from(equip.dex),
+                    luk + i32::from(equip.luk),
+                )
+            },
+        )
+}
+
+/// What a skill that reaches mobs puts on each it takes hold of. None for
+/// one that doesn't (yet); no statuses for one that only takes buffs away.
+pub fn mob_debuffs(skill: &Learned, player: &Player) -> Option<Inflict> {
     let effect = &skill.effect;
+    let value = |stat, value: i32| (stat, Amount::Value(value as i16));
     let statuses = match skill.skill_id {
         // Threaten.
-        1201006 => vec![
-            (MobStat::Pad, effect.x as i16),
-            (MobStat::Pdr, effect.y as i16),
-        ],
+        1201006 => vec![value(MobStat::Pad, effect.x), value(MobStat::Pdr, effect.y)],
         // Slow.
-        2101003 | 2201003 | 12101001 => vec![(MobStat::Speed, effect.x as i16)],
+        2101003 | 2201003 | 12101001 => vec![value(MobStat::Speed, effect.x)],
         // Seal.
-        2111004 | 2211004 | 12111002 => vec![(MobStat::Seal, 1)],
+        2111004 | 2211004 | 12111002 => vec![value(MobStat::Seal, 1)],
         // Doom.
-        2311005 => vec![(MobStat::Doom, 1)],
+        2311005 => vec![value(MobStat::Doom, 1)],
         // Shadow Web.
-        4111003 | 14111001 => vec![(MobStat::Web, 1)],
+        4111003 | 14111001 => vec![value(MobStat::Web, 1)],
+        // Ninja Ambush: each second (STR + LUK) x (1.5 + level / 20) x
+        // its damage percent (OdinMS-family servers).
+        4121004 | 4221004 => {
+            let (str, _, luk) = total_stats(player);
+            let damage = f64::from(str + luk)
+                * (1.5 + f64::from(skill.level) * 0.05)
+                * f64::from(effect.damage)
+                / 100.0;
+            vec![value(
+                MobStat::Ambush,
+                (damage as i32).clamp(1, i16::MAX.into()),
+            )]
+        }
         _ if !mob_cancels(skill.skill_id).is_empty() => vec![],
         _ => return None,
     };
+    Some(Inflict::new(skill, statuses))
+}
+
+/// What an attack with `skill` puts on the mobs it hits, as the skill
+/// descriptions say: stuns, Panic's darkness, freezes, and poisons.
+fn hit_statuses(skill: &Learned) -> Option<Vec<(MobStat, Amount)>> {
+    let one = |stat| vec![(stat, Amount::Value(1))];
+    let statuses = match skill.skill_id {
+        // Coma, Shout, Charged Blow, Arrow Bomb, Assaulter, Boomerang Step,
+        // Backspin Blow, Double Uppercut, Demolition, Snatch, Blank Shot,
+        // Dawn Warrior Coma, Rolling Spin.
+        1111005 | 1111006 | 1111008 | 1211002 | 3101005 | 4211002 | 4221007 | 5101002 | 5101003
+        | 5121004 | 5121005 | 5201004 | 11111003 | 21110006 => one(MobStat::Stun),
+        // Panic's "dark powers" (inferred: darkness).
+        1111003 | 1111004 | 11111002 => one(MobStat::Darkness),
+        // Cold Beam, Ice Strike, Element Composition (I/L), Blizzard,
+        // Blizzard (crossbow), Ice Splitter, Paralyze.
+        2201004 | 2211002 | 2211006 | 2221007 | 3211003 | 5211005 | 2121006 => one(MobStat::Freeze),
+        // Poison Breath, Element Composition (F/P), Fire Demon, Ice Demon,
+        // Flamethrower. The demons' reason also turns the mob's element
+        // weakness on the client (0x78c7ab).
+        2101005 | 2111006 | 2121003 | 2221003 | 5211004 => {
+            vec![(MobStat::Poison, Amount::Poison { level: skill.level })]
+        }
+        _ => return None,
+    };
     Some(statuses)
+}
+
+/// Venomous Star (a claw's shots), Venomous Stab (a dagger's swings), and
+/// the Night Walker's Venom.
+const VENOMS: [(i32, bool); 3] = [(4120005, true), (4220005, false), (14110004, true)];
+
+/// What an attack puts on each mob it hits, besides its damage: its
+/// skill's status, and the poison of a thief's Venom, each second a roll
+/// between (8 (STR + LUK) + 2 DEX) / 100 and (18.5 (STR + LUK) + 2 DEX) /
+/// 100 times the Venom's `mad` (the old community damage formulas).
+pub fn on_hit(player: &Player, skill: Option<&Learned>, ranged: bool, roll: f64) -> Vec<Inflict> {
+    let mut inflicts = Vec::new();
+    if let Some(skill) = skill {
+        if let Some(statuses) = hit_statuses(skill) {
+            inflicts.push(Inflict::new(skill, statuses));
+        }
+    }
+    let venom = VENOMS
+        .iter()
+        .filter(|&&(_, shot)| shot == ranged)
+        .find_map(|&(skill_id, _)| learned(player, skill_id).filter(|venom| venom.level > 0));
+    if let Some(venom) = venom {
+        let (str, dex, luk) = total_stats(player);
+        let at = |rate: f64| (rate * f64::from(str + luk) + 2.0 * f64::from(dex)) / 100.0;
+        let damage = (at(8.0) + (at(18.5) - at(8.0)) * roll) * f64::from(venom.effect.magic);
+        let damage = (damage as i32).clamp(1, i16::MAX.into()) as i16;
+        inflicts.push(Inflict::new(
+            &venom,
+            vec![(MobStat::Venom, Amount::Value(damage))],
+        ));
+    }
+    inflicts
 }
 
 /// The mob buffs a skill that reaches mobs takes away: the Crashes, and
@@ -472,4 +621,69 @@ pub fn buffs(skill: &Learned) -> Option<Vec<(BuffStat, i32)>> {
         .collect();
     stats.extend(own);
     Some(stats)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use game::SkillRecord;
+
+    fn knowing(skills: &[(i32, i32)]) -> Player {
+        let mut player = crate::codec::stats::sample_player();
+        for &(skill_id, level) in skills {
+            player.skills.set(SkillRecord {
+                skill_id,
+                level,
+                master_level: 0,
+                expiration: None,
+            });
+        }
+        player
+    }
+
+    #[test]
+    fn poison_takes_a_share_of_max_hp_each_second() {
+        let poison = Amount::Poison { level: 30 };
+        assert_eq!(poison.against(1000), 25);
+        assert_eq!(poison.against(1001), 26);
+        assert_eq!(poison.against(0), 1);
+        assert_eq!(poison.against(i32::MAX), i16::MAX);
+        assert_eq!(Amount::Value(-20).against(1000), -20);
+    }
+
+    #[test]
+    fn attacks_put_their_skills_statuses_and_venom_on_what_they_hit() {
+        // Shout at 30: a stun with a 95% chance, for 10 seconds.
+        let shout = at_level(1111008, 30).unwrap();
+        let player = knowing(&[]);
+        let inflicts = on_hit(&player, Some(&shout), false, 0.5);
+        assert_eq!(
+            inflicts,
+            [Inflict {
+                skill_id: 1111008,
+                prop: 95,
+                duration: Duration::from_secs(10),
+                statuses: vec![(MobStat::Stun, Amount::Value(1))],
+            }]
+        );
+        assert!(inflicts[0].takes(0.94) && !inflicts[0].takes(0.95));
+        let breath = at_level(2101005, 30).unwrap();
+        assert_eq!(
+            on_hit(&player, Some(&breath), false, 0.5)[0].statuses,
+            [(MobStat::Poison, Amount::Poison { level: 30 })]
+        );
+        assert!(on_hit(&player, None, true, 0.5).is_empty());
+
+        // Venomous Star at 30 (mad 60, 30% for 4 seconds) poisons a
+        // claw's shots only. STR 35, DEX 4, LUK 4: between 3.2 and 7.295
+        // times 60.
+        let hermit = knowing(&[(4120005, 30)]);
+        assert!(on_hit(&hermit, None, false, 0.5).is_empty());
+        let venom = |roll| on_hit(&hermit, None, true, roll).remove(0);
+        assert_eq!(venom(0.0).skill_id, 4120005);
+        assert_eq!(venom(0.0).prop, 30);
+        assert_eq!(venom(0.0).duration, Duration::from_secs(4));
+        assert_eq!(venom(0.0).statuses, [(MobStat::Venom, Amount::Value(192))]);
+        assert_eq!(venom(1.0).statuses, [(MobStat::Venom, Amount::Value(437))]);
+    }
 }

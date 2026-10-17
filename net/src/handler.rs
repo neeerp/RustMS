@@ -350,10 +350,12 @@ pub enum FieldRequest {
     /// The NPCs' controller chose an idle action for one: what followed the
     /// object id (action, line, and a path for an NPC that walks).
     NpcAction { object_id: i32, action: Vec<u8> },
-    /// A validated attack: `broadcast` for the others, total damage per mob.
+    /// A validated attack: `broadcast` for the others, total damage per mob,
+    /// and what it may put on each mob it hits and leaves alive.
     Attack {
         broadcast: Packet,
         hits: Vec<(i32, i64)>,
+        inflicts: Vec<crate::skills::Inflict>,
     },
     /// Show everyone else on the map this packet.
     Broadcast(Packet),
@@ -363,14 +365,15 @@ pub enum FieldRequest {
         effect: Packet,
         caught: Vec<(i32, bool)>,
     },
-    /// The player used a skill that puts statuses on the mobs it reaches,
-    /// or takes their buffs away, from `origin` (where the player stands
-    /// if None): these mobs, as their client saw them.
+    /// The player used a skill that puts statuses on the mobs it reaches
+    /// (`inflict`), or takes their buffs away, from `origin` (where the
+    /// player stands if None): these mobs, as their client saw them.
     MobDebuff {
         skill_id: i32,
         level: i32,
         origin: Option<(i16, i16)>,
         mobs: Vec<i32>,
+        inflict: crate::skills::Inflict,
     },
     /// Sit on the portable chair `item_id`, or stand up with 0.
     Chair(i32),

@@ -96,6 +96,10 @@ namespace ms
 		// Return the head position of a mob.
 		Point<int16_t> get_mob_head_position(int32_t oid) const;
 
+		// The numbers Poison, Venom and Ambush showed on each mob since last
+		// asked, with where its head is.
+		std::vector<std::pair<Point<int16_t>, int32_t>> take_hurts();
+
 		// Return a mob's body bounds on the map.
 		Rectangle<int16_t> get_mob_body(int32_t oid) const;
 

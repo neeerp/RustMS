@@ -24,6 +24,23 @@ pub struct MobInfo {
     pub first_attack: bool,
     pub boss: bool,
     pub undead: bool,
+    /// What every hit does to it, whatever the attack (`fixedDamage`), or
+    /// 0.
+    pub fixed_damage: i32,
+    /// How each element hurts it (`elemAttr`): pairs of an element letter
+    /// and a degree, `1` for immune, as "I1S2".
+    pub element: String,
+}
+
+impl MobInfo {
+    /// Whether the element `letter` (F fire, I ice, L lightning, S poison,
+    /// H holy) can't hurt it.
+    pub fn immune_to(&self, letter: char) -> bool {
+        let bytes = self.element.as_bytes();
+        bytes
+            .chunks(2)
+            .any(|pair| pair.len() == 2 && pair[0] == letter as u8 && pair[1] == b'1')
+    }
 }
 
 pub struct MobData {
@@ -71,6 +88,8 @@ impl MobData {
             first_attack: int("firstAttack")? != 0,
             boss: int("boss")? != 0,
             undead: int("undead")? != 0,
+            fixed_damage: int("fixedDamage")?,
+            element: nx.string_child(info, "elemAttr")?.unwrap_or_default(),
         }))
     }
 }
@@ -94,6 +113,22 @@ mod tests {
         let sentinel = data.info(9300018).unwrap().unwrap();
         assert!(sentinel.not_attack);
         assert!(data.info(9999998).unwrap().is_none());
+    }
+
+    #[test]
+    fn reads_elements_and_fixed_damage() {
+        let Some(path) = crate::test_assets::path("Mob.nx") else {
+            return;
+        };
+        let data = MobData::load(path).unwrap();
+        let mob = |id| data.info(id).unwrap().unwrap();
+        // Green Mushroom: poison can't hurt it. Red Snail only fears fire.
+        let green_mushroom = mob(1110100);
+        assert_eq!(green_mushroom.element, "S1");
+        assert!(green_mushroom.immune_to('S'));
+        assert!(!mob(130100).immune_to('F'));
+        assert_eq!(mob(9300295).fixed_damage, 1);
+        assert_eq!(mob(100100).fixed_damage, 0);
     }
 
     #[test]

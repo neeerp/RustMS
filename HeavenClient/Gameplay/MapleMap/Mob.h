@@ -27,6 +27,7 @@
 #include <cstdint>
 
 #include "MapObject.h"
+#include "MobHurts.h"
 
 #include "../Movement.h"
 #include "../MovePath.h"
@@ -170,6 +171,9 @@ namespace ms
 		// Return the head position.
 		Point<int16_t> get_head_position() const;
 
+		// The numbers Poison, Venom and Ambush showed since last asked.
+		std::vector<int32_t> take_hurts();
+
 		// Return the body's bounds on the map, turned the way the mob faces.
 		Rectangle<int16_t> get_body() const;
 
@@ -305,12 +309,16 @@ namespace ms
 		bool canfly;
 		bool canchase;
 		bool boss;
+		// What Poison, Venom and Ambush show instead of their value.
+		int32_t fixeddamage;
 		// How wide the mob first stands, for how near Monster Magnet pulls
 		// it (0x66486e).
 		int16_t standwidth;
 
 		// The statuses on the mob, by stat.
 		std::map<uint8_t, MobStatParser::Status> statuses;
+		MobHurts hurts;
+		std::vector<int32_t> hurtnumbers;
 
 		// The effects that last as long as their status, at their `pos`.
 		struct StatusEffect
