@@ -158,7 +158,8 @@ namespace ms
 		// Display the iron body skill animation.
 		void show_iron_body();
 
-		// Display damage over the characters head.
+		// Display damage over the characters head, with the hit face for
+		// 1.5 s if it hurt, as v83 does for every user (0x9832e3).
 		void show_damage(int32_t damage);
 
 		// Display a heal over the characters head in blue.
@@ -178,6 +179,9 @@ namespace ms
 
 		// Change the character's face expression by id.
 		void set_expression(int32_t expression);
+
+		// Show a face for this many ms.
+		void set_expression(Expression::Id expression, int32_t hold);
 
 		// Add a pet with the specified stats.
 		void add_pet(uint8_t index, int32_t iid, const std::string &name, int32_t uniqueid, Point<int16_t> pos,
@@ -235,6 +239,10 @@ namespace ms
 
 		// Get a speed modifier for the current stance.
 		float get_stancespeed() const;
+
+		// CUserLocal is invincible for 1500 ms after a hit, and blinks
+		// only if the hit did damage (FUN_009581a9). Others never are.
+		void become_invincible(bool blink);
 
 		CharLook look;
 		CharLook look_preview;

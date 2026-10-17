@@ -105,6 +105,46 @@ namespace ms
 		Stage::get().get_combat().cancel_prepare(cid, skillid);
 	}
 
+	void DamagePlayerHandler::handle(InPacket& recv) const
+	{
+		int32_t cid = recv.read_int();
+		// -1 is a touch, 0 and up a mob's attack.
+		int8_t type = recv.read_byte();
+		recv.read_int(); // the damage taken
+
+		if (type >= -1)
+		{
+			recv.read_int(); // the mob's id
+			recv.read_byte(); // whether it hit from the left
+
+			// What Power Guard reflected back at the mob, and whether Power
+			// Stance kept the user standing: neither is shown yet.
+			if (recv.read_byte())
+				recv.skip(10);
+
+			recv.read_byte();
+		}
+
+		int32_t shown = recv.read_int();
+		Optional<OtherChar> otherchar = Stage::get().get_chars().get_char(cid);
+
+		if (!otherchar)
+			return;
+
+		if (shown >= 0)
+		{
+			otherchar->show_damage(shown);
+		}
+		else if (shown == -1)
+		{
+			// Shadow Shifter dodged it, smiling (its effect isn't shown).
+			int32_t skillid = recv.read_int();
+
+			if (skillid == 4120002 || skillid == 4220002)
+				otherchar->set_expression(Expression::Id::SMILE, 1500);
+		}
+	}
+
 	void ThrowGrenadeHandler::handle(InPacket& recv) const
 	{
 		int32_t cid = recv.read_int();

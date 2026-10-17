@@ -307,10 +307,15 @@ namespace ms
 		damagenumbers.back().set_anchor(Point<int16_t>(phobj.get_x(), phobj.get_y() - 64));
 
 		look.set_alerted(5000);
-		// CUserLocal is invincible for 1500 ms after a hit, and blinks
-		// only if the hit did damage (FUN_009581a9).
+
+		if (damage > 0)
+			set_expression(Expression::Id::HIT, 1500);
+	}
+
+	void Char::become_invincible(bool blink)
+	{
 		invincible.set_for(1500);
-		blinking = damage > 0;
+		blinking = blink;
 	}
 
 	void Char::show_heal(int32_t amount)
@@ -369,6 +374,11 @@ namespace ms
 	{
 		Expression::Id expression = Expression::byaction(expid);
 		look.set_expression(expression);
+	}
+
+	void Char::set_expression(Expression::Id expression, int32_t hold)
+	{
+		look.set_expression(expression, hold);
 	}
 
 	void Char::attack(const std::string &action)

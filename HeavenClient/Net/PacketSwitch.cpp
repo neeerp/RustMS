@@ -109,6 +109,7 @@ namespace ms
 		ATTACKED_MAGIC = 188,
 		SKILL_EFFECT = 190,
 		CANCEL_SKILL_EFFECT = 191,
+		DAMAGE_PLAYER = 192,
 		THROW_GRENADE = 204,
 
 		FACIAL_EXPRESSION = 193,
@@ -206,6 +207,7 @@ namespace ms
 		emplace<ATTACKED_MAGIC, MagicAttackHandler>();
 		emplace<SKILL_EFFECT, SkillEffectHandler>();
 		emplace<CANCEL_SKILL_EFFECT, CancelSkillEffectHandler>();
+		emplace<DAMAGE_PLAYER, DamagePlayerHandler>();
 		emplace<THROW_GRENADE, ThrowGrenadeHandler>();
 
 		// Player handlers
