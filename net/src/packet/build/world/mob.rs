@@ -244,9 +244,12 @@ pub fn build_mob_stat_reset(object_id: i32, stats: &[MobStat]) -> Result<Packet,
 
 /// Touch damage, the `TAKE_DAMAGE` source (`TakeDamagePacket::TOUCH`).
 pub const FROM_TOUCH: i8 = -1;
+/// A mob's mist, the source the v83 client sends from FUN_00431783.
+pub const FROM_MIST: i8 = -4;
 
 /// DAMAGE_PLAYER: show others that a player was hurt by a mob's touch
-/// ([`FROM_TOUCH`]) or attack `from` (FUN_009832e3).
+/// ([`FROM_TOUCH`]) or attack `from`, or by something else such as a mist
+/// (FUN_009832e3: below touch it reads no mob).
 pub fn build_damage_player(
     character_id: i32,
     from: i8,
@@ -259,9 +262,11 @@ pub fn build_damage_player(
     p.write_int(character_id)?;
     p.write_byte(from as u8)?;
     p.write_int(damage)?;
-    p.write_int(mob_id)?;
-    p.write_byte(direction)?;
-    p.write_short(0)?;
+    if from >= FROM_TOUCH {
+        p.write_int(mob_id)?;
+        p.write_byte(direction)?;
+        p.write_short(0)?;
+    }
     p.write_int(damage)?;
     Ok(p)
 }
@@ -371,6 +376,17 @@ mod tests {
         expect.short(147).short(-25).byte(5).short(45).short(44);
         expect.byte(2).int(0).byte(-1i8 as u8).int(0);
         expect.end();
+    }
+
+    #[test]
+    fn mist_damage_names_no_mob() {
+        let p = build_damage_player(7, FROM_MIST, 0, 30, 0).unwrap();
+        let mut want = (SendOpcode::DamagePlayer as i16).to_le_bytes().to_vec();
+        want.extend_from_slice(&7i32.to_le_bytes());
+        want.push(FROM_MIST as u8);
+        want.extend_from_slice(&30i32.to_le_bytes());
+        want.extend_from_slice(&30i32.to_le_bytes());
+        assert_eq!(p.bytes, want);
     }
 
     #[test]

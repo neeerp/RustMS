@@ -228,6 +228,8 @@ namespace ms
 		MapMobs mobs;
 		MapDrops drops;
 		MapMists mists;
+		// The ms since a mob's mist last hurt the player.
+		int32_t since_mist_hurt = mist::HURT_INTERVAL + 1;
 		MapDoors doors;
 		MapSummons summons;
 		MapEffect effect;

@@ -755,6 +755,7 @@ impl FieldActor {
             level: level as u8,
             delay: MIST_DELAY,
             area: skills::area_box(&skill.effect, (user.avatar.x, user.avatar.y), left),
+            element: 0,
         };
         let lasts = inflict.duration;
         let view = self.mists.add(view, from, inflict, lasts, Instant::now());
@@ -1025,6 +1026,40 @@ impl FieldActor {
                     {
                         occupant.handle.send_packet(packet);
                     }
+                }
+            }
+            Some(MobSkillEffect::Mist) => {
+                if rand::random::<f64>() * 100.0 >= f64::from(effect.prop) {
+                    return;
+                }
+                // It lays its mist over its area; each client in it hurts
+                // itself (v83 FUN_00431783), so it puts nothing on mobs.
+                let (Some(caster), Some(area)) =
+                    (self.mobs.get(cast.object_id), self.mobs.area(cast))
+                else {
+                    return;
+                };
+                let view = MistView {
+                    object_id: 0,
+                    kind: MistKind::Mob,
+                    owner_id: cast.object_id,
+                    skill_id: cast.skill,
+                    level: cast.level as u8,
+                    delay: 0,
+                    area: (area.left, area.top, area.right, area.bottom),
+                    element: effect.element,
+                };
+                let inflict = Inflict {
+                    skill_id: cast.skill,
+                    prop: 100,
+                    duration: Duration::from_secs(effect.duration.max(0) as u64),
+                    statuses: Vec::new(),
+                };
+                let owner = caster.controller.unwrap_or_default();
+                let lasts = inflict.duration;
+                let view = self.mists.add(view, owner, inflict, lasts, now);
+                if let Ok(packet) = build_spawn_mist(&view) {
+                    self.broadcast(None, packet);
                 }
             }
             Some(MobSkillEffect::Disease(_)) => {
