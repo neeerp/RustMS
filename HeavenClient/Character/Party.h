@@ -9,6 +9,9 @@ namespace ms
 	struct PartyMember
 	{
 		int32_t id = 0;
+		// Where the party list puts them, from 0 to 5; a slot stays empty
+		// when its member leaves.
+		size_t slot = 0;
 		std::string name;
 		int16_t job = 0;
 		int16_t level = 0;

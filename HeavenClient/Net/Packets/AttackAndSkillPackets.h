@@ -18,11 +18,14 @@
 #pragma once
 
 #include <cstdint>
+#include <optional>
+#include <vector>
 
 #include "../OutPacket.h"
 
 #include "../Gameplay/Combat/Attack.h"
 #include "../Gameplay/Combat/Prepare.h"
+#include "../Gameplay/Combat/SkillUse.h"
 
 namespace ms
 {
@@ -129,16 +132,52 @@ namespace ms
 	class UseSkillPacket : public OutPacket
 	{
 	public:
+		// What some skills add (0x96d5e5).
+		struct Reach
+		{
+			// Where the player stands, for the skills that send it.
+			std::optional<Point<int16_t>> position;
+			// The stars Shadow Stars spends.
+			int32_t star = 0;
+			// The party members reached, if any.
+			uint8_t party = 0;
+			// The mobs reached, for the skills that reach them.
+			std::optional<std::vector<int32_t>> mobs;
+		};
+
 		// It ends with how long the skill's action keeps the player from
 		// acting (0x96d67a).
-		UseSkillPacket(int32_t skillid, int32_t level, uint16_t lock) : OutPacket(OutPacket::Opcode::USE_SKILL)
+		UseSkillPacket(int32_t skillid, int32_t level, uint16_t lock, const Reach& reach) : OutPacket(OutPacket::Opcode::USE_SKILL)
 		{
 			write_time();
 			write_int(skillid);
 			write_byte(static_cast<uint8_t>(level));
 
-			// TODO: The party skills' position, and the other optional
-			// fields (0x96d5e5).
+			if (reach.position)
+			{
+				write_short(reach.position->x());
+				write_short(reach.position->y());
+			}
+
+			if (skillid == skill_use::SHADOW_STARS)
+				write_int(reach.star);
+
+			if (reach.party != 0)
+			{
+				write_byte(reach.party);
+
+				// Dispel sends the lock here too.
+				if (skillid == skill_use::DISPEL)
+					write_short(static_cast<int16_t>(lock));
+			}
+
+			if (reach.mobs)
+			{
+				write_byte(static_cast<uint8_t>(reach.mobs->size()));
+
+				for (int32_t oid : *reach.mobs)
+					write_int(oid);
+			}
 
 			write_short(static_cast<int16_t>(lock));
 		}

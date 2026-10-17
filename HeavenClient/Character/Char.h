@@ -197,6 +197,9 @@ namespace ms
 		// Return if the char is in the Char::State::PRONE state
 		bool is_prone() const;
 
+		// Return whether the char is lying dead under a tombstone.
+		bool is_dead() const;
+
 		// Sit on the portable chair itemid, or get up from it with 0.
 		virtual void set_chair(int32_t itemid);
 
