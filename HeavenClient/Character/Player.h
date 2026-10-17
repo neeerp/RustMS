@@ -231,6 +231,10 @@ namespace ms
 		Party &get_party();
 		const Party &get_party() const;
 
+		// The player's own Mystic Door, as SPAWN_PORTAL last told.
+		MysticDoor &get_door();
+		const MysticDoor &get_door() const;
+
 		// Obtain a reference to the player's buddy list.
 		BuddyList &get_buddies();
 		const BuddyList &get_buddies() const;
@@ -299,6 +303,7 @@ namespace ms
 		TeleportRock teleportrock;
 		MonsterBook monsterbook;
 		Party party;
+		MysticDoor door;
 		BuddyList buddies;
 
 		EnumMap<Buffstat::Id, Buff> buffs;

@@ -26,11 +26,12 @@ namespace ms
 			LEAVE = 0x0C,
 			JOIN = 0x0F,
 			CHANGE_LEADER = 0x1B,
-			// No message; doors and the like, which the client lacks.
+			// A member's Mystic Door (FUN_00a3e31c).
+			DOOR = 0x25,
+			// No message; ops this client doesn't act on.
 			QUIET = 0x12,
 			DOOR_TOWN = 0x22,
 			DOOR_FIELD = 0x23,
-			DOOR_REMOVE = 0x25,
 			// Messages, some carrying text.
 			ALREADY_JOINED = 0x09,
 			BEGINNER = 0x0A,
@@ -62,6 +63,20 @@ namespace ms
 				chatbar->send_chatline(line, type);
 		}
 
+		// A Mystic Door: its town, its field, and where in the field, each an
+		// int.
+		MysticDoor read_door(InPacket& recv)
+		{
+			MysticDoor door;
+			door.town = recv.read_int();
+			door.field = recv.read_int();
+			int16_t x = static_cast<int16_t>(recv.read_int());
+			int16_t y = static_cast<int16_t>(recv.read_int());
+			door.position = Point<int16_t>(x, y);
+
+			return door;
+		}
+
 		// The member block: six slots of each column, empty slots zeroed.
 		// Returns the leader.
 		int32_t read_members(InPacket& recv, std::vector<PartyMember>& members)
@@ -91,8 +106,8 @@ namespace ms
 			for (auto& slot : slots)
 				slot.map_id = recv.read_int();
 
-			// Mystic doors
-			recv.skip(CAPACITY * 16);
+			for (auto& slot : slots)
+				slot.door = read_door(recv);
 
 			for (auto& slot : slots)
 				if (slot.id != 0)
@@ -152,6 +167,7 @@ namespace ms
 			leader.level = player.get_level();
 			leader.channel = Configuration::get().get_channelid();
 			leader.map_id = Stage::get().get_mapid();
+			leader.door = read_door(recv);
 			party.update(party_id, self, { leader });
 
 			party_line("You have created a new party.");
@@ -267,10 +283,19 @@ namespace ms
 
 			break;
 		}
+		case Operation::DOOR:
+		{
+			size_t slot = recv.read_byte();
+			MysticDoor door;
+			door.town = recv.read_int();
+			door.field = recv.read_int();
+			door.position = recv.read_point();
+			party.set_door(slot, door);
+			break;
+		}
 		case Operation::QUIET:
 		case Operation::DOOR_TOWN:
 		case Operation::DOOR_FIELD:
-		case Operation::DOOR_REMOVE:
 			break;
 		default:
 			party_line(UNEXPECTED);

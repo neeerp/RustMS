@@ -41,6 +41,7 @@ pub enum RecvOpcode {
     MultiChat = 0x77,
     PartyOperation = 0x7C,
     BuddyListModify = 0x82,
+    UseDoor = 0x85,
     DenyPartyRequest = 0x7D,
     FaceExpression = 0x33,
     Whisper = 0x78,

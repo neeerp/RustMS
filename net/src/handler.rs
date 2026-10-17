@@ -308,6 +308,19 @@ pub enum WorldAction {
     /// A skill the player used reached party members; see `PartySkill`.
     PartySkill(PartySkill),
     Buddy(BuddyRequest),
+    /// The player cast Mystic Door at `at` on their map, leading to `town`,
+    /// for `lasts`. It replaces any door they had open.
+    OpenDoor {
+        town: i32,
+        at: (i16, i16),
+        lasts: std::time::Duration,
+    },
+    /// The player pressed up in `owner`'s Mystic Door, in its town or in its
+    /// field.
+    UseDoor {
+        owner: i32,
+        from_town: bool,
+    },
     /// Raise (or drop) the fame of `target`, who must be on the player's map.
     GiveFame {
         target: i32,
@@ -565,6 +578,7 @@ fn world_routes() -> &'static HashMap<i16, WorldRoute> {
             (Op::SummonAttack, InGame(&world::SummonAttackHandler)),
             (Op::DamageSummon, InGame(&world::DamageSummonHandler)),
             (Op::Beholder, InGame(&world::BeholderHandler)),
+            (Op::UseDoor, InGame(&world::UseDoorHandler)),
         ];
         table
             .into_iter()
@@ -595,7 +609,7 @@ mod tests {
     fn every_registered_opcode_is_unique_per_server() {
         // The maps would silently drop duplicates; check the table sizes match.
         assert_eq!(login_routes().len(), 13);
-        assert_eq!(world_routes().len(), 54);
+        assert_eq!(world_routes().len(), 55);
     }
 
     #[test]

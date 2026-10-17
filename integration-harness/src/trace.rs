@@ -88,6 +88,14 @@ pub struct Trace {
     pub prompts: Vec<(i32, u8)>,
     /// Maps warped to.
     pub warps: Vec<i32>,
+    /// Each map change: (map, spawn point, where the player appears
+    /// instead).
+    pub arrivals: Vec<(i32, u8, Option<(i32, i32)>)>,
+    /// SPAWN_PORTAL: the player's own Mystic Door (town, field, x, y), or
+    /// None.
+    pub own_doors: Vec<Option<(i32, i32, i16, i16)>>,
+    /// Party Mystic Doors (op 0x25): (slot, town, field, x, y).
+    pub party_doors: Vec<(u8, i32, i32, i16, i16)>,
     /// PARTY_OPERATION sub-operations, in order.
     pub party_ops: Vec<u8>,
     /// Party invitations: (party id, inviter).
@@ -312,6 +320,14 @@ impl Trace {
                 let party_id = r.read_int().unwrap();
                 self.party_invites
                     .push((party_id, r.read_str_with_length().unwrap()));
+            } else if party_op == 0x25 {
+                self.party_doors.push((
+                    r.read_byte().unwrap(),
+                    r.read_int().unwrap(),
+                    r.read_int().unwrap(),
+                    r.read_short().unwrap(),
+                    r.read_short().unwrap(),
+                ));
             }
         } else if op == SendOpcode::UpdatePartyMemberHp as i16 {
             self.party_hp.push((
@@ -396,7 +412,20 @@ impl Trace {
                 .push((r.read_int().unwrap(), r.read_short().unwrap()));
         } else if op == SendOpcode::SetField as i16 && p.bytes.get(6) == Some(&0) {
             // A map change rather than entering the world.
-            self.warps.push(decode_set_field_warp(p).unwrap().map_id);
+            let warp = decode_set_field_warp(p).unwrap();
+            self.warps.push(warp.map_id);
+            self.arrivals
+                .push((warp.map_id, warp.spawn_point, warp.chase));
+        } else if op == SendOpcode::SpawnPortal as i16 {
+            let (town, field) = (r.read_int().unwrap(), r.read_int().unwrap());
+            self.own_doors.push((town != 999_999_999).then(|| {
+                (
+                    town,
+                    field,
+                    r.read_short().unwrap(),
+                    r.read_short().unwrap(),
+                )
+            }));
         }
     }
 

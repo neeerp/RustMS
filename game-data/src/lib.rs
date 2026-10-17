@@ -18,6 +18,10 @@ pub mod skills;
 const NODE_SIZE_BYTES: u64 = 20;
 pub const NO_DESTINATION_MAP: i32 = 999_999_999;
 pub const PORTAL_TYPE_START_POINT: i32 = 0;
+/// `pt` of a town's door portals (`tp`), where Mystic Doors stand.
+pub const PORTAL_TYPE_TOWN_DOOR: i32 = 6;
+/// `info/fieldLimit` bit forbidding Mystic Door (v83 FUN_00969bf9).
+pub const FIELD_LIMIT_MYSTIC_DOOR: i32 = 0x8;
 
 #[derive(Debug, Error)]
 pub enum GameDataError {
@@ -190,6 +194,10 @@ pub struct FieldTemplate {
     /// `info/recovery`: how much faster players recover HP and MP at rest,
     /// e.g. 2 in the Sleepywood sauna.
     pub recovery: f64,
+    /// `info/town`.
+    pub town: bool,
+    /// `info/fieldLimit`: what the map forbids (see `FIELD_LIMIT_*`).
+    pub field_limit: i32,
     pub footholds: footholds::Footholds,
     portals_by_id: BTreeMap<u32, PortalTemplate>,
     portal_ids_by_name: HashMap<String, Vec<u32>>,
@@ -222,6 +230,15 @@ impl FieldTemplate {
                 let (dx, dy) = (i64::from(portal.x - x), i64::from(portal.y - y));
                 dx * dx + dy * dy
             })
+    }
+
+    /// The town's door portals, in the order the client numbers them: the
+    /// door of the party member in slot `i` (or of a player alone, 0) stands
+    /// at the `i`th.
+    pub fn door_portals(&self) -> impl Iterator<Item = &PortalTemplate> {
+        self.portals_by_id
+            .values()
+            .filter(|portal| portal.portal_type == PORTAL_TYPE_TOWN_DOOR)
     }
 
     pub fn resolve_spawn_portal(&self, preferred_name: &str) -> Option<&PortalTemplate> {
@@ -320,6 +337,13 @@ fn build_field_template(
         .transpose()?
         .flatten()
         .unwrap_or(1.0);
+    let (town, field_limit) = match nx.child_by_name(map_node_idx, "info")? {
+        Some(info) => (
+            nx.int_child(info, "town")?.unwrap_or(0) != 0,
+            nx.int_child(info, "fieldLimit")?.unwrap_or(0),
+        ),
+        None => (false, 0),
+    };
 
     let mut portals_by_id = BTreeMap::new();
 
@@ -378,6 +402,8 @@ fn build_field_template(
         reactors,
         mob_rate,
         recovery,
+        town,
+        field_limit,
         footholds,
         portals_by_id,
         portal_ids_by_name,
@@ -845,6 +871,8 @@ mod tests {
             reactors: Vec::new(),
             mob_rate: 1.0,
             recovery: 1.0,
+            town: false,
+            field_limit: 0,
             footholds: footholds::Footholds::default(),
             portals_by_id: BTreeMap::from([
                 (
@@ -909,6 +937,8 @@ mod tests {
             mob_spawns: Vec::new(),
             mob_rate: 1.0,
             recovery: 1.0,
+            town: false,
+            field_limit: 0,
             reactors: Vec::new(),
             footholds: footholds::Footholds::default(),
             portals_by_id: BTreeMap::from([
@@ -961,5 +991,25 @@ mod tests {
                 "{spawn:?}"
             );
         }
+    }
+
+    #[test]
+    fn towns_list_their_door_portals_in_id_order() {
+        let Some(path) = test_assets::path("Map.nx") else {
+            return;
+        };
+        let game_data = GameData::load_from_nx_map(&path).expect("load map nx");
+        let henesys = game_data.field(100_000_000).expect("Henesys");
+        let doors: Vec<_> = henesys.door_portals().map(|portal| portal.id).collect();
+
+        assert!(henesys.town);
+        assert_eq!(doors, (28..=33).collect::<Vec<_>>());
+        assert_eq!(
+            henesys.door_portals().next().map(|p| (p.x, p.y)),
+            Some((2786, 333))
+        );
+        let field = game_data.field(101_010_000).expect("a field near Ellinia");
+        assert!(!field.town);
+        assert_eq!(field.return_map, Some(101_000_000));
     }
 }

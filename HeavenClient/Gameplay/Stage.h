@@ -32,6 +32,7 @@
 #include "MapleMap/MapChars.h"
 #include "MapleMap/MapMobs.h"
 #include "MapleMap/MapMists.h"
+#include "MapleMap/MapDoors.h"
 #include "MapleMap/MapSummons.h"
 #include "MapleMap/MapReactors.h"
 #include "MapleMap/MapNpcs.h"
@@ -52,8 +53,9 @@ namespace ms
 
 		void init();
 
-		// Loads the map to display
-		void load(int32_t mapid, int8_t portalid);
+		// Loads the map to display, with the player at a portal or, when the
+		// server chases them there, at a point.
+		void load(int32_t mapid, int8_t portalid, std::optional<Point<int16_t>> chase = std::nullopt);
 
 		// Remove all map objects and graphics.
 		void clear();
@@ -110,6 +112,9 @@ namespace ms
 		// Returns a reference to the summons on the current map.
 		MapSummons &get_summons();
 
+		// Returns a reference to the Mystic Doors in the current field.
+		MapDoors &get_doors();
+
 		// Returns a reference to the drops on the current map.
 		MapDrops &get_drops();
 
@@ -158,9 +163,16 @@ namespace ms
 	private:
 		void load_map(int32_t mapid);
 
-		void respawn(int8_t portalid);
+		void respawn(int8_t portalid, std::optional<Point<int16_t>> chase);
 
 		void check_portals();
+
+		// Go through the Mystic Door the player stands in, if any
+		// (FUN_005375ed in a town, FUN_007bd594 elsewhere).
+		void check_doors(Point<int16_t> playerpos);
+
+		// The Mystic Doors standing at the town's door portals.
+		std::vector<MapDoors::Spot> get_town_doors() const;
 
 		void check_touch_portals(Point<int16_t> drawn);
 
@@ -216,6 +228,7 @@ namespace ms
 		MapMobs mobs;
 		MapDrops drops;
 		MapMists mists;
+		MapDoors doors;
 		MapSummons summons;
 		MapEffect effect;
 		// Effects left where they started, such as a jump pad's burst.

@@ -597,6 +597,38 @@ namespace ms
 		Stage::get().get_mists().remove(oid);
 	}
 
+	void SpawnDoorHandler::handle(InPacket& recv) const
+	{
+		// v83 FUN_007bd6c6: one just cast (0) opens, one cast before stands.
+		bool just_cast = recv.read_byte() == 0;
+		int32_t owner = recv.read_int();
+		Point<int16_t> position = recv.read_point();
+
+		Stage::get().get_doors().spawn(owner, position, just_cast);
+	}
+
+	void RemoveDoorHandler::handle(InPacket& recv) const
+	{
+		// v83 FUN_007be064 fades the door out unless the byte is set.
+		bool fade = recv.read_byte() == 0;
+		int32_t owner = recv.read_int();
+
+		Stage::get().get_doors().remove(owner, fade);
+	}
+
+	void SpawnPortalHandler::handle(InPacket& recv) const
+	{
+		// v83 FUN_00a226a6. The town doors are drawn from this each frame.
+		MysticDoor door;
+		door.town = recv.read_int();
+		door.field = recv.read_int();
+
+		if (door.town != MysticDoor::NONE && door.field != MysticDoor::NONE)
+			door.position = recv.read_point();
+
+		Stage::get().get_player().get_door() = door;
+	}
+
 	void SpawnSummonHandler::handle(InPacket& recv) const
 	{
 		// v83 FUN_0095adec (the player's) and FUN_00938f61 (another

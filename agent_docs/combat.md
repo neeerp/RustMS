@@ -395,6 +395,54 @@ v83 does (`MistLayout.h`, a diamond of random tiles), draws them above the
 map's objects, and fades them out over a second when the mist lifts.
 `v83ref` report 160 has the client's detail.
 
+### Mystic Door
+
+A Priest's Mystic Door (2311002) opens a door in the field leading to the
+field's return map. USE_SKILL carries where it stands. `skills::door_town`
+refuses it in towns, in maps whose `fieldLimit` has bit 8 or whose id has 9
+as its millions digit, within 50 px of a portal other than a start point,
+and where there is no return map, as the v83 client does. The refusal
+unlocks the client like any other.
+
+The client actor keeps its one door (`runtime/src/actor/client/door.rs`)
+and closes it after the skill's `time`, on a new cast, a channel change,
+and logout. The field shows the door to everyone on the map
+(SPAWN_DOOR 0x113, opening when just cast; REMOVE_DOOR 0x114). The
+directory tells the owner (SPAWN_PORTAL 0x43, which v83 uses for a door
+when alone) and the party members on the owner's channel (party op 0x25,
+and the door section of the party block) where it leads.
+
+USE_DOOR (0x85) names the door's owner and whether the player stands in
+the town. The directory lets through the owner and members of the owner's
+party on its channel, standing in the door's town or its field, and refuses
+others with `BLOCKED_MAP` 6. From the field a player goes to the town's
+door portal for the owner's party slot (`pt` 6, in id order); from town
+they go back to the door, which SET_FIELD's chase position (`net::door_warp`)
+puts them at.
+
+In HeavenClient, `DoorRules.h` holds v83's rules without the map:
+
+- Where a door may open (`door_rules::may_cast`).
+- The box a player must stand in to use one: 20 px to either side, 50 px
+  above and below.
+- Which door stands at which of a town's door portals: alone, the
+  player's at the first; in a party, each member's at the portal of their
+  slot.
+
+`Combat::request_door` refuses a cast with v83's messages.
+`MapDoors` (`Gameplay/MapleMap`) draws the doors. A field door opens
+(`cDoor`) and stands 1.8 s later (`mDoor` in its `Frame`); a removed one
+fades over a second. A door is placed on the ground at the next update,
+not when SPAWN_DOOR arrives, which can be before the map's footholds have
+loaded. The town's doors are drawn at their portals. Up first tries the
+map's portals. A door portal has no warp, so Up falls through to the doors
+(`Stage::check_doors`): the town's if the map is a town, else the
+field's. The chase position SET_FIELD carries lands on the ground. The
+client looks for the ground from 5 px above it, since the rounded position
+can sit just below a slope.
+
+`v83ref` report 161 has the client's detail.
+
 ## Summons
 
 Puppet, Silver Hawk, the Octopus, Elquines, the Knights' souls and the like
@@ -599,3 +647,6 @@ Hawk attack, the Puppet breaking, and the Hawk following its owner to the
 next map with no entrance. It also has a Dark Knight's Beholder heal them
 and buff their weapon defense, refusing both too soon and a stat Hex's
 level doesn't give, and an Arch Mage's Elquines freeze a mob for 3 s.
+`mystic_door` has a Priest open a door, refused in town, use it to town
+and back, keep a stranger out until they join the party, and close it on
+logout.

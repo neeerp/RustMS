@@ -36,6 +36,10 @@ namespace ms
 			SKILL_NOSTARS,
 			SKILL_COOLDOWN,
 			SKILL_ONEHANDED,
+			// The map forbids the skill (fieldLimit)
+			SKILL_FIELD,
+			// A Mystic Door may not open by a portal
+			DOOR_PORTAL,
 			// Attacking without a weapon
 			ATTACK_NOWEAPON,
 

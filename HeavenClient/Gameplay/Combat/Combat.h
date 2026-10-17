@@ -29,6 +29,7 @@
 #include "../MapleMap/MapChars.h"
 #include "../MapleMap/MapInfo.h"
 #include "../MapleMap/MapMobs.h"
+#include "../MapleMap/MapPortals.h"
 #include "../MapleMap/MapReactors.h"
 #include "../MapleMap/MapSummons.h"
 #include "../Physics/Physics.h"
@@ -44,7 +45,7 @@ namespace ms
 	{
 	public:
 		Combat(Player &player, MapChars &chars, MapMobs &mobs, MapReactors &reactors, MapSummons &summons,
-			   const Physics &physics, const MapInfo &mapinfo);
+			   const Physics &physics, const MapInfo &mapinfo, const MapPortals &portals);
 
 		// Load the charge gauge, once the NX files are open.
 		static void init();
@@ -135,6 +136,10 @@ namespace ms
 		// Summon in front of the player, if there is room (FUN_0096b140).
 		// Whether it could ask the server.
 		bool request_summon(const SpecialMove &move, int32_t level);
+
+		// Open a Mystic Door where the player stands, unless the map or a
+		// portal forbids it (FUN_00969bf9).
+		bool request_door(const SpecialMove &move, int32_t level);
 
 		// What one of a summon's attacks is like: its
 		// `summon/attack1/info`.
@@ -333,6 +338,7 @@ namespace ms
 		MapSummons &summons;
 		const Physics &physics;
 		const MapInfo &mapinfo;
+		const MapPortals &portals;
 
 		std::unordered_map<int32_t, Skill> skills;
 		RegularAttack regularattack;

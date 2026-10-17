@@ -74,7 +74,8 @@ impl WorldHandler for ChangeMapHandler {
         };
 
         player.move_to(map_id, spawn_point);
-        let warp_packet = build::world::map::build_warp_to_map(&player.stats, ctx.channel_id)?;
+        let warp_packet =
+            build::world::map::build_warp_to_map(&player.stats, ctx.channel_id, None)?;
         let enable_actions = build::world::stat::build_stat_update(true, &[])?;
         Ok(HandlerResult::reply(warp_packet)
             .with(WorldAction::ChangeField { map_id, spawn })
@@ -96,12 +97,61 @@ pub fn warp(
         WorldAction::Reply(build::world::map::build_warp_to_map(
             &player.stats,
             channel_id,
+            None,
         )?),
         WorldAction::ChangeField {
             map_id,
             spawn: crate::spawn_position(map_id, 0),
         },
     ])
+}
+
+/// Send the player through a Mystic Door to `map_id`: into town at the door
+/// portal of the owner's party slot, or back to the door in its field.
+pub fn door_warp(
+    player: &mut Player,
+    map_id: i32,
+    to: DoorExit,
+    channel_id: u8,
+) -> Result<Vec<WorldAction>, NetworkError> {
+    let (spawn_point, chase, spawn) = match to {
+        DoorExit::Town { slot } => {
+            // The client draws the door at its town's `slot`th door portal
+            // (0x5377fa), any portal if the town has too few.
+            let field = crate::game_data::get()?
+                .field(map_id)
+                .ok_or(NetworkError::PacketHandlerError("Door town not found"))?;
+            let portal = field
+                .door_portals()
+                .nth(slot)
+                .or_else(|| field.door_portals().next())
+                .map_or(0, |portal| u8::try_from(portal.id).unwrap_or(0));
+            (portal, None, crate::spawn_position(map_id, portal))
+        }
+        DoorExit::Field { x, y } => (
+            crate::game_data::closest_spawn_point(map_id, x, y).unwrap_or(0),
+            Some((x, y)),
+            Some(SpawnPosition { x, y, stance: 2 }),
+        ),
+    };
+    player.move_to(map_id, spawn_point);
+    Ok(vec![
+        WorldAction::Reply(build::world::map::build_warp_to_map(
+            &player.stats,
+            channel_id,
+            chase,
+        )?),
+        WorldAction::ChangeField { map_id, spawn },
+    ])
+}
+
+/// Where a Mystic Door lets the player out.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum DoorExit {
+    /// In town, at the door of the owner's party slot (0 alone).
+    Town { slot: usize },
+    /// In the field, at the door.
+    Field { x: i16, y: i16 },
 }
 
 /// Where a direct (map id) warp may take the player.

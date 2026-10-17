@@ -1,5 +1,7 @@
 #pragma once
 
+#include "MysticDoor.h"
+
 #include <cstdint>
 #include <string>
 #include <vector>
@@ -22,6 +24,8 @@ namespace ms
 		// Last HP the server reported, while they share the player's map.
 		int32_t hp = 0;
 		int32_t maxhp = 0;
+		// Their Mystic Door, while on the player's channel.
+		MysticDoor door;
 
 		bool online() const;
 	};
@@ -48,6 +52,8 @@ namespace ms
 		void update(int32_t id, int32_t leader, std::vector<PartyMember> members);
 		void set_leader(int32_t cid);
 		void set_hp(int32_t cid, int32_t hp, int32_t maxhp);
+		// The door of the member in `slot` (party op 0x25).
+		void set_door(size_t slot, const MysticDoor &door);
 		void clear();
 
 		// Whether HP bars show over members' heads (the HP MARK button).

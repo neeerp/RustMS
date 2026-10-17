@@ -21,6 +21,7 @@
 #include "QuestConversation.h"
 #include "Timer.h"
 #include "MapleMap/CharClick.h"
+#include "MapleMap/DoorRules.h"
 #include "MapleMap/Npc.h"
 
 #include "../IO/UI.h"
@@ -44,7 +45,7 @@ namespace ms
 		constexpr int16_t TELEPORT_COOLDOWN = 600;
 	}
 
-	Stage::Stage() : combat(player, chars, mobs, reactors, summons, physics, mapinfo)
+	Stage::Stage() : combat(player, chars, mobs, reactors, summons, physics, mapinfo, portals)
 	{
 		state = State::INACTIVE;
 	}
@@ -56,16 +57,16 @@ namespace ms
 		jump_effect = nl::nx::effect["BasicEff.img"]["VerticalJump"];
 	}
 
-	void Stage::load(int32_t mapid, int8_t portalid)
+	void Stage::load(int32_t mapid, int8_t portalid, std::optional<Point<int16_t>> chase)
 	{
 		switch (state)
 		{
 			case State::INACTIVE:
 				load_map(mapid);
-				respawn(portalid);
+				respawn(portalid, chase);
 				break;
 			case State::TRANSITION:
-				respawn(portalid);
+				respawn(portalid, chase);
 				break;
 		}
 
@@ -96,6 +97,7 @@ namespace ms
 		drops.clear();
 		reactors.clear();
 		mists.clear();
+		doors.clear();
 		summons.clear();
 	}
 
@@ -114,15 +116,20 @@ namespace ms
 		mapinfo = MapInfo(src, physics.get_fht().get_walls(), physics.get_fht().get_borders());
 		portals = MapPortals(src["portal"], mapid);
 		ground_effects = EffectLayer();
+
+		if (mapid != -1)
+			player.get_stats().set_mapid(mapid);
 	}
 
-	void Stage::respawn(int8_t portalid)
+	void Stage::respawn(int8_t portalid, std::optional<Point<int16_t>> chase)
 	{
 		// v83's Cash Shop stage has no music of its own; the Cash Shop plays
 		// its theme.
 		Music(mapid == -1 ? "BgmUI.img/ShopBgm" : mapinfo.get_bgm()).play();
 
-		Point<int16_t> spawnpoint = portals.get_portal_by_id(portalid);
+		// A chased point is on the ground already, as a door is; look from
+		// just above it, since its rounded y may sit below a slope.
+		Point<int16_t> spawnpoint = chase ? *chase - Point<int16_t>(0, 5) : portals.get_portal_by_id(portalid);
 		Point<int16_t> startpos = physics.get_y_below(spawnpoint);
 		combat.clear_prepare();
 		combat.clear_grenades();
@@ -146,9 +153,12 @@ namespace ms
 
 		backgrounds.drawbackgrounds(viewx, viewy, alpha);
 
+		std::vector<MapDoors::Spot> town_doors = get_town_doors();
+
 		for (auto id : Layer::IDs)
 		{
 			tilesobjs.draw(id, viewpos, alpha);
+			doors.draw(id, town_doors, viewpos, alpha);
 			reactors.draw(id, viewx, viewy, alpha);
 			npcs.draw(id, viewx, viewy, alpha);
 			mobs.draw(id, viewx, viewy, alpha);
@@ -188,6 +198,7 @@ namespace ms
 
 		reactors.update(physics);
 		mists.update();
+		doors.update(physics);
 		npcs.update(physics);
 		mobs.update(physics, player.get_position(), player.is_dead());
 		chars.update(physics);
@@ -244,30 +255,70 @@ namespace ms
 		Point<int16_t> playerpos = player.get_position();
 		const Portal *portal = portals.find_up_portal(playerpos);
 
-		if (!portal)
-			return;
-
-		Portal::WarpInfo warpinfo = portal->getwarpinfo();
-
-		if (warpinfo.valid)
+		if (portal)
 		{
-			enter_portal(warpinfo);
+			Portal::WarpInfo warpinfo = portal->getwarpinfo();
+
+			if (warpinfo.valid)
+			{
+				enter_portal(warpinfo);
+
+				return;
+			}
+
+			// A script portal with nowhere to lead runs its script on the
+			// server (v83 FUN_0094df9b).
+			switch (portal->get_type())
+			{
+				case Portal::SCRIPTED:
+				case Portal::SCRIPTED_INVISIBLE:
+				case Portal::SCRIPTED_HIDDEN:
+					player.request(ChangeMapSpecialPacket(field_key, portal->get_name(), playerpos), ExclRequest::WAIT);
+					return;
+				default:
+					break;
+			}
+		}
+
+		// A town's door portals lead nowhere themselves; a Mystic Door
+		// stands on them.
+		check_doors(playerpos);
+	}
+
+	void Stage::check_doors(Point<int16_t> playerpos)
+	{
+		if (!mapinfo.is_town())
+		{
+			if (int32_t owner = doors.find(playerpos))
+				player.request(UseDoorPacket(owner, false), ExclRequest::WAIT);
 
 			return;
 		}
 
-		// A script portal with nowhere to lead runs its script on the server
-		// (v83 FUN_0094df9b).
-		switch (portal->get_type())
+		for (const door_rules::TownDoor &door : door_rules::town_doors(mapid, player.get_oid(), player.get_door(),
+																	   player.get_party()))
 		{
-			case Portal::SCRIPTED:
-			case Portal::SCRIPTED_INVISIBLE:
-			case Portal::SCRIPTED_HIDDEN:
-				player.request(ChangeMapSpecialPacket(field_key, portal->get_name(), playerpos), ExclRequest::WAIT);
-				break;
-			default:
-				break;
+			std::optional<Point<int16_t>> point = portals.get_door_portal(door.portal);
+
+			if (point && door_rules::reaches(MapDoors::place(physics, *point).position, playerpos))
+			{
+				player.request(UseDoorPacket(door.owner, true), ExclRequest::WAIT);
+
+				return;
+			}
 		}
+	}
+
+	std::vector<MapDoors::Spot> Stage::get_town_doors() const
+	{
+		std::vector<MapDoors::Spot> spots;
+
+		for (const door_rules::TownDoor &door : door_rules::town_doors(mapid, player.get_oid(), player.get_door(),
+																	   player.get_party()))
+			if (std::optional<Point<int16_t>> point = portals.get_door_portal(door.portal))
+				spots.push_back(MapDoors::place(physics, *point));
+
+		return spots;
 	}
 
 	// v83 checks touch portals every update, whatever the player is doing
@@ -647,6 +698,11 @@ namespace ms
 	MapSummons &Stage::get_summons()
 	{
 		return summons;
+	}
+
+	MapDoors &Stage::get_doors()
+	{
+		return doors;
 	}
 
 	MapDrops &Stage::get_drops()

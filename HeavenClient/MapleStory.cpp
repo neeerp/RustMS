@@ -54,6 +54,7 @@ namespace ms
 		DamageNumber::init();
 		Combat::init();
 		MapPortals::init();
+		MapDoors::init();
 		Stage::get().init();
 		UI::get().init();
 
