@@ -146,6 +146,7 @@ namespace ms
 		MOVE_MOB_RESPONSE = 240,
 		MOB_STAT_SET = 242,
 		MOB_STAT_RESET = 243,
+		DAMAGE_MOB = 246,
 		SHOW_MOB_HP = 250,
 		SHOW_MAGNET = 251,
 		SPAWN_NPC = 257,
@@ -228,6 +229,7 @@ namespace ms
 		emplace<MOVE_MOB_RESPONSE, MoveMobResponseHandler>();
 		emplace<MOB_STAT_SET, MobStatSetHandler>();
 		emplace<MOB_STAT_RESET, MobStatResetHandler>();
+		emplace<DAMAGE_MOB, DamageMobHandler>();
 		emplace<SHOW_MOB_HP, ShowMobHpHandler>();
 		emplace<SHOW_MAGNET, ShowMagnetHandler>();
 		emplace<KILL_MOB, KillMobHandler>();

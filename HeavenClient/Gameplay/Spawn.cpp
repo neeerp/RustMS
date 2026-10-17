@@ -43,9 +43,9 @@ namespace ms
 	}
 
 	MobSpawn::MobSpawn(int32_t o, int32_t i, int8_t m, int8_t st, uint16_t f, uint16_t hf, bool ns, int8_t t,
-					   Point<int16_t> p, std::vector<MobStatParser::Status> s) : oid(o), id(i), mode(m), stance(st), fh(f),
-																					 homefh(hf), newspawn(ns), team(t),
-																					 position(p), statuses(std::move(s))
+					   Point<int16_t> p, std::vector<MobStatParser::Status> s, int8_t sm, int32_t sd) :
+			oid(o), id(i), mode(m), stance(st), fh(f), homefh(hf), newspawn(ns), team(t), position(p),
+			statuses(std::move(s)), summon(sm), summondelay(sd)
 	{}
 
 	int8_t MobSpawn::get_mode() const
@@ -60,7 +60,12 @@ namespace ms
 
 	std::unique_ptr<MapObject> MobSpawn::instantiate(const Physics &physics) const
 	{
-		return std::make_unique<Mob>(oid, id, mode, stance, fh, homefh, newspawn, team, position, statuses, physics);
+		auto mob = std::make_unique<Mob>(oid, id, mode, stance, fh, homefh, newspawn, team, position, statuses, physics);
+
+		if (summon >= 0)
+			mob->show_summon(summon, summondelay);
+
+		return mob;
 	}
 
 	ReactorSpawn::ReactorSpawn(int32_t o, int32_t r, int8_t s, Point<int16_t> p) : oid(o), rid(r), state(s), position(p)

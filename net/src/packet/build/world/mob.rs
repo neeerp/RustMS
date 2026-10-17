@@ -31,6 +31,9 @@ pub struct MobView {
     pub fade_in: bool,
     pub controlled: bool,
     pub statuses: Vec<MobStatusView>,
+    /// A mob just summoned by another appears with this
+    /// `Effect/Summon.img` entry rather than fading in.
+    pub summon_effect: Option<u8>,
 }
 
 /// The statuses as the client reads them (FUN_0078b0b1): their flags, then
@@ -61,7 +64,18 @@ fn write_mob(p: &mut Packet, mob: &MobView) -> Result<(), NetworkError> {
     p.write_byte(mob.stance)?;
     p.write_short(mob.foothold)?;
     p.write_short(mob.home_foothold)?;
-    p.write_byte(if mob.fade_in { -2i8 as u8 } else { -1i8 as u8 })?;
+    // How it appears (FUN_00662884): a summon effect of its own, with an
+    // int the client waits in ms before playing it, -2 fading in, or -1
+    // just there.
+    match mob.summon_effect {
+        Some(effect) => {
+            p.write_byte(effect)?;
+            p.write_int(0)?;
+        }
+        None => {
+            p.write_byte(if mob.fade_in { -2i8 as u8 } else { -1i8 as u8 })?;
+        }
+    }
     p.write_byte(-1i8 as u8)?; // team
     p.write_int(0)?; // item effect
     Ok(())
@@ -128,12 +142,15 @@ pub struct MobMoveView {
 }
 
 /// MOVE_MONSTER_RESPONSE: acknowledge the controller's movement, saying
-/// whether it may attack next and the mob's MP (FUN_0066c23b).
+/// whether it may attack next, the mob's MP, and the mob skill and level it
+/// may cast next, or 0 (FUN_0066c23b). The client keeps a skill it was
+/// given until it casts it, whatever later responses say.
 pub fn build_move_mob_response(
     object_id: i32,
     move_id: i16,
     next_attack: bool,
     mp: i16,
+    (skill, level): (u8, u8),
 ) -> Result<Packet, NetworkError> {
     let mut p = Packet::new_empty();
     p.write_short(SendOpcode::MoveMonsterResponse as i16)?;
@@ -141,8 +158,26 @@ pub fn build_move_mob_response(
     p.write_short(move_id)?;
     p.write_byte(u8::from(next_attack))?;
     p.write_short(mp)?;
-    p.write_byte(0)?; // skill id
-    p.write_byte(0)?; // skill level
+    p.write_byte(skill)?;
+    p.write_byte(level)?;
+    Ok(p)
+}
+
+/// DAMAGE_MONSTER: a number over a mob (0x66c6c2), here only the HP a mob
+/// skill healed, sent negative, then its HP and max HP for its HP tag.
+pub fn build_heal_mob(
+    object_id: i32,
+    healed: i32,
+    hp: i32,
+    max_hp: i32,
+) -> Result<Packet, NetworkError> {
+    let mut p = Packet::new_empty();
+    p.write_short(SendOpcode::DamageMonster as i16)?;
+    p.write_int(object_id)?;
+    p.write_byte(0)?;
+    p.write_int(-healed)?;
+    p.write_int(hp)?;
+    p.write_int(max_hp)?;
     Ok(p)
 }
 
@@ -248,6 +283,7 @@ mod tests {
             fade_in: true,
             controlled: false,
             statuses: Vec::new(),
+            summon_effect: None,
         }
     }
 
@@ -324,6 +360,32 @@ mod tests {
     }
 
     #[test]
+    fn a_summon_names_its_effect_and_a_delay() {
+        let mut mob = snail();
+        mob.summon_effect = Some(2);
+        let packet = build_spawn_mob(&mob).unwrap();
+        let mut expect = Expect::new(&packet.bytes);
+        expect.short(SendOpcode::SpawnMonster as i16);
+        expect.int(2_000_000_001).byte(5).int(100100);
+        expect.bytes(&[0; 16]);
+        expect.short(147).short(-25).byte(5).short(45).short(44);
+        expect.byte(2).int(0).byte(-1i8 as u8).int(0);
+        expect.end();
+    }
+
+    #[test]
+    fn a_heal_is_negative_damage() {
+        let packet = build_heal_mob(7, 700, 900, 1000).unwrap();
+        let mut expect = Expect::new(&packet.bytes);
+        expect
+            .short(SendOpcode::DamageMonster as i16)
+            .int(7)
+            .byte(0);
+        expect.int(-700).int(900).int(1000);
+        expect.end();
+    }
+
+    #[test]
     fn control_has_a_mode_and_marks_the_mob_controlled() {
         let packet = build_control_mob(&snail(), false).unwrap();
         let mut expect = Expect::new(&packet.bytes);
@@ -357,7 +419,7 @@ mod tests {
         expect.byte(0).byte(1).byte(25).int(0x0050_0040);
         expect.short(10).short(20).byte(1).byte(2);
         expect.end();
-        let response = build_move_mob_response(7, 3, true, 40).unwrap();
+        let response = build_move_mob_response(7, 3, true, 40, (114, 15)).unwrap();
         let mut expect = Expect::new(&response.bytes);
         expect
             .short(SendOpcode::MoveMonsterResponse as i16)
@@ -365,8 +427,8 @@ mod tests {
             .short(3)
             .byte(1)
             .short(40)
-            .byte(0)
-            .byte(0);
+            .byte(114)
+            .byte(15);
         expect.end();
         let kill = build_kill_mob(7, 1).unwrap();
         let mut expect = Expect::new(&kill.bytes);

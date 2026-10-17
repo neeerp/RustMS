@@ -60,6 +60,9 @@ namespace ms
 		// Update a mob's hp display.
 		void send_mobhp(int32_t oid, int8_t percent, uint16_t playerlevel);
 
+		// Show a number on a mob: damage, a heal if negative, or a miss.
+		void show_damage(int32_t oid, int32_t damage);
+
 		// Put temporary statuses on a mob, showing their effects.
 		void set_statuses(int32_t oid, const std::vector<MobStatParser::Status> &statuses);
 
@@ -67,7 +70,7 @@ namespace ms
 		void reset_statuses(int32_t oid, const BuffParser::Flags &flags);
 
 		// The server got a mob's move.
-		void acknowledge(int32_t oid, int16_t moveid, bool nextattack, int16_t mp);
+		void acknowledge(int32_t oid, int16_t moveid, bool nextattack, int16_t mp, uint8_t skill, uint8_t skilllevel);
 
 		// Update a mob's movements, and what it did where they start.
 		void send_movement(int32_t oid, Point<int16_t> start, std::vector<Movement> &&movements, int8_t action,

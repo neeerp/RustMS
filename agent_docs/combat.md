@@ -620,7 +620,7 @@ and FUN_0066d9c0 (DoAttack); details are in the v83 notes for L173.
   (70% of chasing moves) and the mob has attacks. Only then does the client
   pick one. The server relays the action and data to the others in
   MOVE_MONSTER, and their clients play the same attack from the path's
-  start. Mob skills (actions 21 on) aren't granted yet.
+  start.
 - **Hits:** every client checks the attack against its own player, after
   `attackAfter` ms: the box or cell against the player's body (a
   `jumpAttack` box misses an airborne player), the shot if it was aimed at
@@ -631,6 +631,44 @@ and FUN_0066d9c0 (DoAttack); details are in the v83 notes for L173.
 
 HeavenClient leaves out `tremble` (the screen shake), `doFirst`, element
 resistance, hits on summons and other mobs, and attacks on a Puppet.
+
+### Mob skills
+
+A mob's `info/skill` entries list the `MobSkill.img` skills it has, each with
+a level, the animation it plays (`action` n means `skilln`) and when its
+effect shows (`effectAfter`). The server decides when a mob casts; the
+controller's client plays the cast and the server applies it
+(`game::mob_skill` says what each skill does).
+
+- **The grant:** when a controller's move asks to attack, the server
+  (`MobSet::act`) may also let the mob cast one skill, picked at random
+  from those it can pay for, that are off cooldown (`interval` seconds),
+  whose `hp` limit the mob is at or under, and, for a summon, whose
+  `limit` of live summons isn't reached. A sealed mob casts nothing. The
+  skill and level end MOVE_MONSTER_RESPONSE; the client keeps a grant until
+  another ack grants something else (FUN_0066c23b). An unused grant lapses
+  on the server after 10 s.
+- **The cast:** a mob let attack casts a granted skill it has before it
+  picks an attack (FUN_0066e7af): it stops, plays `skilln`, queues the
+  level's `effect` after `effectAfter`, and sends action 21 + n - 1 with
+  data skill | level << 8 | the animation's length << 16. The server checks
+  the skill and level against the grant, the action against the entry,
+  and the MP, and applies the skill once the animation has played (3 s at
+  most). Other clients replay the animation and effect from MOVE_MONSTER.
+- **What's cast:** the buffs (100-103 and the area versions 110-113, Haste
+  115 and 156, the immunities 140-142, and 150-157) give MOB_STAT_SET
+  statuses whose reason is skill | level << 16, on the caster or on every
+  mob in its `lt`/`rb` area, with chance `prop`, for `time` seconds. Power
+  Up and Magic Up set the PowerUp and MagicUp stats to `x`, a percent the
+  client scales the mob's physical or magic hits by. Heal (114) gives the
+  mobs in its area `x` HP and `y` MP, up to their maxima, shown to everyone as a blue
+  number (DAMAGE_MONSTER with a negative amount). Summon (200) spawns its
+  listed mobs at the caster under the caster's controller, up to `limit`
+  alive, with SPAWN_MONSTER's appearance set to `summonEffect`; clients
+  play `Effect.nx` `Summon.img/<summonEffect>` on them. Summoned mobs don't
+  respawn.
+- Not cast yet: the diseases on players (120-129), dispel, banish, poison
+  mist, and the damage counters (143-145).
 
 ## Getting hurt
 

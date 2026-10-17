@@ -1,10 +1,11 @@
 use crate::actor::field_drops::{Drop, DropSet};
 use crate::actor::field_mists::MistSet;
-use crate::actor::field_mobs::{split_exp, MobSet, Sharer};
+use crate::actor::field_mobs::{split_exp, Cast, MobSet, Sharer};
 use crate::actor::field_reactors::{Hit, ReactorSet};
 use crate::actor::field_summons::SummonSet;
 use crate::message::{ClientHandle, FieldKey, FieldMessage, ServerMessage};
-use game::FieldAvatar;
+use game::mob_skill::{self, MobSkillEffect};
+use game::{FieldAvatar, MobStat};
 use net::packet::build::world::door::{build_remove_door, build_spawn_door};
 use net::packet::build::world::drop::{build_drop, build_remove_drop, DropAppearance};
 use net::packet::build::world::field::{
@@ -12,9 +13,9 @@ use net::packet::build::world::field::{
 };
 use net::packet::build::world::mist::{build_remove_mist, build_spawn_mist, MistKind, MistView};
 use net::packet::build::world::mob::{
-    build_control_mob, build_kill_mob, build_mob_hp, build_mob_stat_reset, build_mob_stat_set,
-    build_move_mob, build_move_mob_response, build_show_magnet, build_spawn_mob,
-    build_stop_controlling_mob, MobMoveView,
+    build_control_mob, build_heal_mob, build_kill_mob, build_mob_hp, build_mob_stat_reset,
+    build_mob_stat_set, build_move_mob, build_move_mob_response, build_show_magnet,
+    build_spawn_mob, build_stop_controlling_mob, MobMoveView, MobView,
 };
 use net::packet::build::world::npc::{
     build_control_npc, build_npc_action, build_spawn_npc, ForeignNpc,
@@ -79,6 +80,8 @@ pub struct FieldActor {
     /// Who picks the NPCs' idle actions; without one they only stand.
     npc_controller: Option<ClientId>,
     mobs: MobSet,
+    /// Mob skills cast and waiting for their animations to end.
+    casts: Vec<Cast>,
     drops: DropSet,
     reactors: ReactorSet,
     mists: MistSet,
@@ -107,6 +110,7 @@ impl FieldActor {
             map_npcs,
             npc_controller: None,
             mobs,
+            casts: Vec::new(),
             drops,
             reactors,
             mists: MistSet::default(),
@@ -158,6 +162,13 @@ impl FieldActor {
             if let Ok(packet) = build_remove_summon(view.owner_id, view.object_id, Gone::Expired) {
                 self.broadcast(None, packet);
             }
+        }
+        let (due, waiting) = std::mem::take(&mut self.casts)
+            .into_iter()
+            .partition(|cast| cast.at <= now);
+        self.casts = waiting;
+        for cast in due {
+            self.apply_cast(&cast, now);
         }
         for hurt in self.mobs.hurt_by_statuses(now) {
             if let (Some(occupant), Ok(packet)) = (
@@ -559,15 +570,24 @@ impl FieldActor {
         if !self.mobs.move_mob(from, object_id, start, movement) {
             return;
         }
-        let Some(act) = self.mobs.act(object_id, action, want_attack) else {
+        let Some(act) = self.mobs.act(
+            object_id,
+            (want_attack, action, skill_data),
+            Instant::now(),
+            &net::mobs::skill_level,
+            rand::random(),
+        ) else {
             return;
         };
         if let Some(occupant) = self.occupants.get(&from) {
-            if let Ok(packet) = build_move_mob_response(object_id, move_id, act.next_attack, act.mp)
+            let grant = act.grant.unwrap_or_default();
+            if let Ok(packet) =
+                build_move_mob_response(object_id, move_id, act.next_attack, act.mp, grant)
             {
                 occupant.handle.send_packet(packet);
             }
         }
+        self.casts.extend(act.cast);
         let skill_data = if act.action == action { skill_data } else { 0 };
         let moved = MobMoveView {
             object_id,
@@ -931,6 +951,104 @@ impl FieldActor {
         }
     }
 
+    /// A mob skill's animation ended: buff or heal the mobs it reaches, or
+    /// call up its summons.
+    fn apply_cast(&mut self, cast: &Cast, now: Instant) {
+        let effect = &cast.effect;
+        match mob_skill::effect(cast.skill, effect.x) {
+            Some(MobSkillEffect::Statuses(statuses)) => {
+                if rand::random::<f64>() * 100.0 >= f64::from(effect.prop) {
+                    return;
+                }
+                let until = now + Duration::from_secs(effect.duration.max(0) as u64);
+                let skill_id = cast.skill | cast.level << 16;
+                for object_id in self.mobs.reached_by(cast) {
+                    // Physical and magic immunity don't go together.
+                    let blocked = |stat| match stat {
+                        MobStat::PImmune => Some(MobStat::MImmune),
+                        MobStat::MImmune => Some(MobStat::PImmune),
+                        _ => None,
+                    };
+                    let Some(mob) = self.mobs.get(object_id) else {
+                        continue;
+                    };
+                    let statuses: Vec<_> = statuses
+                        .iter()
+                        .filter(|(stat, _)| {
+                            blocked(*stat).is_none_or(|other| !mob.statuses.contains_key(&other))
+                        })
+                        .copied()
+                        .collect();
+                    let controller = mob.controller.unwrap_or_default();
+                    let given = self
+                        .mobs
+                        .add_statuses(object_id, &statuses, skill_id, controller, now, until);
+                    self.show_statuses(object_id, &given, now);
+                }
+            }
+            Some(MobSkillEffect::Heal) => {
+                for object_id in self.mobs.reached_by(cast) {
+                    let Some((healed, hp, max_hp)) = self.mobs.heal(object_id, effect.x, effect.y)
+                    else {
+                        continue;
+                    };
+                    if healed <= 0 {
+                        continue;
+                    }
+                    if let Ok(packet) = build_heal_mob(object_id, healed, hp, max_hp) {
+                        self.broadcast(None, packet);
+                    }
+                }
+            }
+            Some(MobSkillEffect::Summon) => {
+                let summoned: Vec<_> = effect
+                    .summons
+                    .iter()
+                    .filter_map(|&mob_id| net::mobs::info(mob_id))
+                    .collect();
+                let spawned = self.mobs.summon(cast.object_id, &summoned, effect.limit);
+                let summon_effect = u8::try_from(effect.summon_effect).ok();
+                for object_id in spawned {
+                    let Some(mob) = self.mobs.get(object_id) else {
+                        continue;
+                    };
+                    let view = MobView {
+                        summon_effect,
+                        ..mob.view(false)
+                    };
+                    let controller = mob.controller.and_then(|c| self.occupants.get(&c));
+                    if let Ok(packet) = build_spawn_mob(&view) {
+                        self.broadcast(None, packet);
+                    }
+                    if let (Some(occupant), Ok(packet)) =
+                        (controller, build_control_mob(&view, false))
+                    {
+                        occupant.handle.send_packet(packet);
+                    }
+                }
+            }
+            None => {}
+        }
+    }
+
+    /// Show everyone the statuses a mob was just given.
+    fn show_statuses(&self, object_id: i32, given: &[MobStat], now: Instant) {
+        let Some(mob) = self.mobs.get(object_id) else {
+            return;
+        };
+        let views: Vec<_> = mob
+            .status_views(now)
+            .into_iter()
+            .filter(|view| given.contains(&view.stat))
+            .collect();
+        if views.is_empty() {
+            return;
+        }
+        if let Ok(packet) = build_mob_stat_set(object_id, &views) {
+            self.broadcast(None, packet);
+        }
+    }
+
     /// Put `inflict`'s statuses on a mob for `from`, and show everyone the
     /// ones it got.
     fn put_on(&mut self, from: ClientId, object_id: i32, inflict: &Inflict, now: Instant) {
@@ -949,20 +1067,7 @@ impl FieldActor {
         let given =
             self.mobs
                 .add_statuses(object_id, &statuses, inflict.skill_id, from, now, until);
-        let Some(mob) = self.mobs.get(object_id) else {
-            return;
-        };
-        let views: Vec<_> = mob
-            .status_views(now)
-            .into_iter()
-            .filter(|view| given.contains(&view.stat))
-            .collect();
-        if views.is_empty() {
-            return;
-        }
-        if let Ok(packet) = build_mob_stat_set(object_id, &views) {
-            self.broadcast(None, packet);
-        }
+        self.show_statuses(object_id, &given, now);
     }
 
     /// Give the mob `from` hit to its client with aggro, taking it from

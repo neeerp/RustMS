@@ -2,6 +2,7 @@
 
 use crate::load::{self, asset_path};
 use game_data::mobs::{MobData, MobInfo};
+use game_data::skills::MobSkillLevel;
 use std::sync::OnceLock;
 
 pub fn data() -> Result<&'static MobData, &'static str> {
@@ -13,4 +14,13 @@ pub fn data() -> Result<&'static MobData, &'static str> {
 
 pub fn info(mob_id: i32) -> Option<MobInfo> {
     data().ok()?.info(mob_id).ok().flatten()
+}
+
+/// A mob skill's level (`Skill.nx` `MobSkill.img/<skill>/level/<level>`).
+pub fn skill_level(skill: i32, level: i32) -> Option<MobSkillLevel> {
+    crate::skills::data()
+        .ok()?
+        .mob_skill(skill, level)
+        .ok()
+        .flatten()
 }

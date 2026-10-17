@@ -35,6 +35,21 @@ pub struct MobInfo {
     /// Its attacks (`attack1/info`, `attack2/info`, ...), in order: the
     /// client names attack `i` by `i`.
     pub attacks: Vec<MobAttack>,
+    /// The mob skills it may cast (`skill/<n>`), in order.
+    pub skills: Vec<MobSkillEntry>,
+}
+
+/// One of a mob's skills (`skill/<n>`).
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct MobSkillEntry {
+    /// The `MobSkill.img` id and level.
+    pub skill: i32,
+    pub level: i32,
+    /// Its animation, `skill<action>`.
+    pub action: i32,
+    /// Milliseconds into the animation before the skill's effect shows
+    /// (`effectAfter`).
+    pub effect_after: i32,
 }
 
 /// One of a mob's attacks (`attackN/info`), as far as the server cares.
@@ -119,7 +134,28 @@ impl MobData {
             fixed_damage: int("fixedDamage")?,
             element: nx.string_child(info, "elemAttr")?.unwrap_or_default(),
             attacks: self.attacks(image)?,
+            skills: self.skills(info)?,
         }))
+    }
+
+    fn skills(&self, info: u32) -> Result<Vec<MobSkillEntry>, GameDataError> {
+        let nx = &self.nx;
+        let mut skills = Vec::new();
+        let Some(list) = nx.child_by_name(info, "skill")? else {
+            return Ok(skills);
+        };
+        while let Some(entry) = nx.child_by_name(list, &skills.len().to_string())? {
+            let int = |key: &str| -> Result<i32, GameDataError> {
+                Ok(nx.int_child(entry, key)?.unwrap_or(0))
+            };
+            skills.push(MobSkillEntry {
+                skill: int("skill")?,
+                level: int("level")?,
+                action: int("action")?,
+                effect_after: int("effectAfter")?,
+            });
+        }
+        Ok(skills)
     }
 
     fn attacks(&self, image: u32) -> Result<Vec<MobAttack>, GameDataError> {
@@ -201,6 +237,28 @@ mod tests {
         // Stumpy's second attack hits harder than its body (125).
         let second = &mob(3220000).attacks[1];
         assert_eq!((second.kind, second.magic, second.attack), (2, false, 135));
+    }
+
+    #[test]
+    fn reads_skills() {
+        let Some(path) = crate::test_assets::path("Mob.nx") else {
+            return;
+        };
+        let data = MobData::load(path).unwrap();
+        let mob = |id| data.info(id).unwrap().unwrap();
+        assert!(mob(100100).skills.is_empty());
+        // Stumpy: area power up after 1.5 seconds, then a level 15 heal.
+        let stumpy = mob(3220000).skills;
+        assert_eq!(
+            stumpy[0],
+            MobSkillEntry {
+                skill: 112,
+                level: 1,
+                action: 1,
+                effect_after: 1500
+            }
+        );
+        assert_eq!((stumpy[1].skill, stumpy[1].level), (114, 15));
     }
 
     #[test]
