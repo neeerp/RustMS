@@ -17,16 +17,22 @@
 //////////////////////////////////////////////////////////////////////////////////
 #include "MapPortals.h"
 
+#include "DoorRules.h"
+
 #include "../../Constants.h"
 
 #include "../../Util/Misc.h"
 
 #include <nlnx/nx.hpp>
 
+#include <algorithm>
+
 namespace ms
 {
 	MapPortals::MapPortals(nl::node src, int32_t mapid)
 	{
+		std::vector<int8_t> door_ids;
+
 		for (auto sub : src)
 		{
 			int8_t portal_id = string_conversion::or_default<int8_t>(sub.name(), -1);
@@ -60,6 +66,9 @@ namespace ms
 
 			portal_ids_by_name.emplace(name, portal_id);
 
+			if (type == Portal::WARP)
+				door_ids.push_back(portal_id);
+
 			if (type == Portal::HIDDEN || type == Portal::SCRIPTED_HIDDEN)
 			{
 				std::string image = sub["image"];
@@ -71,9 +80,32 @@ namespace ms
 				hidden_images.emplace(portal_id, game[type == Portal::HIDDEN ? "ph" : "psh"][image]);
 			}
 		}
+
+		// The NX file lists the portals by name, "10" before "2".
+		std::sort(door_ids.begin(), door_ids.end());
+
+		for (int8_t id : door_ids)
+			door_portals.push_back(portals_by_id.at(id).get_position());
 	}
 
 	MapPortals::MapPortals() = default;
+
+	std::optional<Point<int16_t>> MapPortals::get_door_portal(size_t i) const
+	{
+		if (door_portals.empty())
+			return std::nullopt;
+
+		return door_portals[i < door_portals.size() ? i : 0];
+	}
+
+	bool MapPortals::blocks_door(Point<int16_t> playerpos) const
+	{
+		for (const auto &iter : portals_by_id)
+			if (door_rules::blocks(iter.second.get_type(), iter.second.get_position(), playerpos))
+				return true;
+
+		return false;
+	}
 
 	void MapPortals::update(Point<int16_t> playerpos)
 	{

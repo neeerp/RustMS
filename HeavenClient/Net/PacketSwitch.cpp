@@ -83,6 +83,7 @@ namespace ms
 		/// Player 3
 
 		/// Messaging 2
+		SPAWN_PORTAL = 67,
 		SERVER_MESSAGE = 68,
 		WEEK_EVENT_MESSAGE = 77,
 
@@ -155,6 +156,8 @@ namespace ms
 		REMOVE_LOOT = 269,
 		SPAWN_MIST = 273,
 		REMOVE_MIST = 274,
+		SPAWN_DOOR = 275,
+		REMOVE_DOOR = 276,
 		HIT_REACTOR = 277,
 		SPAWN_REACTOR = 279,
 		REMOVE_REACTOR = 280,
@@ -232,6 +235,9 @@ namespace ms
 		emplace<REMOVE_LOOT, RemoveLootHandler>();
 		emplace<SPAWN_MIST, SpawnMistHandler>();
 		emplace<REMOVE_MIST, RemoveMistHandler>();
+		emplace<SPAWN_DOOR, SpawnDoorHandler>();
+		emplace<REMOVE_DOOR, RemoveDoorHandler>();
+		emplace<SPAWN_PORTAL, SpawnPortalHandler>();
 		emplace<SPAWN_SUMMON, SpawnSummonHandler>();
 		emplace<REMOVE_SUMMON, RemoveSummonHandler>();
 		emplace<MOVE_SUMMON, MoveSummonHandler>();

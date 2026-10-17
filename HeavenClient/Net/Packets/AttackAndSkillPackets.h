@@ -213,6 +213,21 @@ namespace ms
 		}
 	};
 
+	// Opcode: USE_SKILL(91)
+	class DoorSkillPacket : public OutPacket
+	{
+	public:
+		// Open a Mystic Door where the player stands (FUN_00969bf9), with no
+		// lock after.
+		DoorSkillPacket(int32_t skillid, int32_t level, Point<int16_t> position) : OutPacket(OutPacket::Opcode::USE_SKILL)
+		{
+			write_time();
+			write_int(skillid);
+			write_byte(static_cast<uint8_t>(level));
+			write_point(position);
+		}
+	};
+
 	// Opcode: SUMMON_ATTACK(176)
 	class SummonAttackPacket : public OutPacket
 	{

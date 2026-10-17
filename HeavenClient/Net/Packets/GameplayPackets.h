@@ -56,6 +56,19 @@ namespace ms
 		}
 	};
 
+	// Go through a Mystic Door: in a field, to town; in town, back to its
+	// field (FUN_007bd594, FUN_005375ed).
+	// Opcode: USE_DOOR(133)
+	class UseDoorPacket : public OutPacket
+	{
+	public:
+		UseDoorPacket(int32_t owner, bool from_town) : OutPacket(OutPacket::Opcode::USE_DOOR)
+		{
+			write_int(owner);
+			write_byte(from_town);
+		}
+	};
+
 	// Opcode: CHANGE_MAP(38)
 	class ChangeMapPacket : public OutPacket
 	{

@@ -27,6 +27,7 @@ pub enum SendOpcode {
     SortItemResult = 0x35,
 
     PartyOperation = 0x3E,
+    SpawnPortal = 0x43,
     CharInfo = 0x3D,
     BuddyList = 0x3F,
     MonsterBookSetCard = 0x53,
@@ -85,6 +86,8 @@ pub enum SendOpcode {
     RemoveItemFromMap = 0x10D,
     SpawnMist = 0x111,
     RemoveMist = 0x112,
+    SpawnDoor = 0x113,
+    RemoveDoor = 0x114,
     HitReactor = 0x115,
     SpawnReactor = 0x117,
     RemoveReactor = 0x118,

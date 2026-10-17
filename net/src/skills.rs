@@ -3,6 +3,7 @@
 use crate::load::{self, asset_path};
 use game::{BuffStat, InventoryType, MobStat, Player};
 use game_data::skills::{SkillData, SkillInfo, SkillLevel};
+use game_data::{FieldTemplate, FIELD_LIMIT_MYSTIC_DOOR, PORTAL_TYPE_START_POINT};
 use std::sync::OnceLock;
 use std::time::Duration;
 
@@ -124,6 +125,37 @@ pub fn at_level(skill_id: i32, level: i32) -> Option<Learned> {
 pub const SHADOW_STARS: i32 = 4121006;
 pub const DISPEL: i32 = 2311001;
 pub const RESURRECTION: i32 = 2321006;
+
+pub const MYSTIC_DOOR: i32 = 2311002;
+
+/// How close to a portal Mystic Door may not open (v83 FUN_00712ab1).
+const DOOR_PORTAL_REACH: i32 = 50;
+
+/// The town a Mystic Door cast at `at` leads to, if one may open there
+/// (v83 FUN_00969bf9): not where the map forbids it, nor in a town or an
+/// event map (`1x9xxxxxx`), nor within 50 of a portal that is not a spawn
+/// point; and the map must have a town to return to.
+pub fn door_town(field: &FieldTemplate, at: (i16, i16)) -> Option<i32> {
+    if field.field_limit & FIELD_LIMIT_MYSTIC_DOOR != 0
+        || field.town
+        || (field.map_id / 1_000_000) % 100 == 9
+    {
+        return None;
+    }
+    let (x, y) = (i32::from(at.0), i32::from(at.1));
+    // The client's PtInRect takes the box's left and top edges, not its
+    // right and bottom.
+    let reach = -DOOR_PORTAL_REACH..DOOR_PORTAL_REACH;
+    let near_portal = field.portals().any(|portal| {
+        portal.portal_type != PORTAL_TYPE_START_POINT
+            && reach.contains(&(x - portal.x))
+            && reach.contains(&(y - portal.y))
+    });
+    if near_portal {
+        return None;
+    }
+    field.return_map.filter(|&town| town != field.map_id)
+}
 
 /// Whether USE_SKILL carries where the player stands (0x96d6ca): the skills
 /// that place something, or reach the party around them.
@@ -659,6 +691,23 @@ pub fn buffs(skill: &Learned) -> Option<Vec<(BuffStat, i32)>> {
 mod tests {
     use super::*;
     use game::SkillRecord;
+
+    #[test]
+    fn mystic_door_opens_away_from_towns_and_portals_and_leads_to_town() {
+        let path =
+            std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../assets/game-data/Map.nx");
+        let data = game_data::GameData::load_from_nx_map(&path).unwrap();
+        let henesys = data.field(100_000_000).unwrap();
+        assert_eq!(door_town(henesys, (2786, 333)), None);
+        let hunting = data.field(101_010_000).unwrap();
+        assert_eq!(door_town(hunting, (-1000, 1900)), Some(101_000_000));
+        // Not by its west portal, though a spawn point is no matter.
+        assert_eq!(door_town(hunting, (-1600, 1561)), None);
+        // Its box (-1642, 1561 ± 50) holds its left edge but not its right.
+        assert_eq!(door_town(hunting, (-1692, 1561)), None);
+        assert_eq!(door_town(hunting, (-1592, 1561)), Some(101_000_000));
+        assert_eq!(door_town(hunting, (-1711, 1914)), Some(101_000_000));
+    }
 
     fn knowing(skills: &[(i32, i32)]) -> Player {
         let mut player = crate::codec::stats::sample_player();

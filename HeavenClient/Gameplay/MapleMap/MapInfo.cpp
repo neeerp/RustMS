@@ -85,6 +85,16 @@ namespace ms
 		return swim;
 	}
 
+	bool MapInfo::is_town() const
+	{
+		return town;
+	}
+
+	int32_t MapInfo::get_fieldlimit() const
+	{
+		return fieldlimit;
+	}
+
 	bool MapInfo::can_migrate() const
 	{
 		return (fieldlimit & 0x10) == 0;

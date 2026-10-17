@@ -5,6 +5,7 @@ use crate::actor::field_reactors::{Hit, ReactorSet};
 use crate::actor::field_summons::SummonSet;
 use crate::message::{ClientHandle, FieldKey, FieldMessage, ServerMessage};
 use game::FieldAvatar;
+use net::packet::build::world::door::{build_remove_door, build_spawn_door};
 use net::packet::build::world::drop::{build_drop, build_remove_drop, DropAppearance};
 use net::packet::build::world::field::{
     build_player_enter_field, build_player_leave_field, build_show_chair, parse_movement_state,
@@ -82,6 +83,8 @@ pub struct FieldActor {
     reactors: ReactorSet,
     mists: MistSet,
     summons: SummonSet,
+    /// Players' Mystic Doors here, by owner.
+    doors: HashMap<ClientId, (i16, i16)>,
     tick: Duration,
 }
 
@@ -108,6 +111,7 @@ impl FieldActor {
             reactors,
             mists: MistSet::default(),
             summons: SummonSet::default(),
+            doors: HashMap::new(),
             tick,
         }
     }
@@ -393,6 +397,19 @@ impl FieldActor {
                     self.send_drop_packet(&drop, packet);
                 }
                 self.drops.restore(drop);
+            }
+            FieldMessage::OpenDoor { owner, at } => {
+                self.doors.insert(owner, at);
+                if let Ok(packet) = build_spawn_door(owner, at, true) {
+                    self.broadcast(None, packet);
+                }
+            }
+            FieldMessage::CloseDoor { owner } => {
+                if self.doors.remove(&owner).is_some() {
+                    if let Ok(packet) = build_remove_door(owner) {
+                        self.broadcast(None, packet);
+                    }
+                }
             }
         }
     }
@@ -1056,6 +1073,12 @@ impl FieldActor {
 
         for mist in self.mists.views() {
             if let Ok(packet) = build_spawn_mist(mist) {
+                handle.send_packet(packet);
+            }
+        }
+
+        for (&owner, &at) in &self.doors {
+            if let Ok(packet) = build_spawn_door(owner, at, false) {
                 handle.send_packet(packet);
             }
         }

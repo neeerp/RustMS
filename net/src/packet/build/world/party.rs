@@ -2,14 +2,12 @@
 //! mode of `MULTICHAT`.
 
 use crate::codec::stats::write_padded_name;
+use crate::packet::build::world::door::{DoorView, NO_DOOR};
 use crate::{error::NetworkError, packet::op::SendOpcode};
 use packet::{io::write::PktWrite, Packet};
 
 /// Most members a party can hold; the status block always has this many.
 pub const PARTY_CAPACITY: usize = 6;
-
-/// The map id written where a party member has no mystic door.
-const NO_DOOR: i32 = 999_999_999;
 
 const OP_INVITE: u8 = 0x04;
 const OP_SILENT_UPDATE: u8 = 0x07;
@@ -17,6 +15,7 @@ const OP_CREATED: u8 = 0x08;
 const OP_LEAVE: u8 = 0x0C;
 const OP_JOIN: u8 = 0x0F;
 const OP_CHANGE_LEADER: u8 = 0x1B;
+const OP_DOOR: u8 = 0x25;
 
 /// `MULTICHAT` mode for party chat (0 is buddies, 2 the guild).
 pub const MULTICHAT_PARTY: u8 = 1;
@@ -53,6 +52,8 @@ pub struct PartyMemberView {
     pub channel: Option<u8>,
     /// Their map, or 0 when they aren't on the receiver's channel.
     pub map_id: i32,
+    /// Their Mystic Door, if it is on the receiver's channel.
+    pub door: Option<DoorView>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -76,11 +77,22 @@ fn party_operation(op: u8) -> Result<Packet, NetworkError> {
     Ok(packet)
 }
 
-fn write_no_door(packet: &mut Packet) -> Result<(), NetworkError> {
-    packet.write_int(NO_DOOR)?;
-    packet.write_int(NO_DOOR)?;
-    packet.write_int(0)?;
-    packet.write_int(0)?;
+/// A member's door: its town, its field, and where in the field.
+fn write_door(packet: &mut Packet, door: Option<&DoorView>) -> Result<(), NetworkError> {
+    match door {
+        Some(door) => {
+            packet.write_int(door.town)?;
+            packet.write_int(door.field)?;
+            packet.write_int(i32::from(door.x))?;
+            packet.write_int(i32::from(door.y))?;
+        }
+        None => {
+            packet.write_int(NO_DOOR)?;
+            packet.write_int(NO_DOOR)?;
+            packet.write_int(0)?;
+            packet.write_int(0)?;
+        }
+    }
     Ok(())
 }
 
@@ -114,17 +126,33 @@ fn write_party_status(packet: &mut Packet, party: &PartyView) -> Result<(), Netw
     for i in 0..PARTY_CAPACITY {
         packet.write_int(slot(i).map_or(0, |m| m.map_id))?;
     }
-    for _ in 0..PARTY_CAPACITY {
-        write_no_door(packet)?;
+    for i in 0..PARTY_CAPACITY {
+        write_door(packet, slot(i).and_then(|m| m.door.as_ref()))?;
     }
     Ok(())
 }
 
-/// The requester's new party.
-pub fn build_party_created(party_id: i32) -> Result<Packet, NetworkError> {
+/// The requester's new party, and their door, now its first.
+pub fn build_party_created(party_id: i32, door: Option<&DoorView>) -> Result<Packet, NetworkError> {
     let mut packet = party_operation(OP_CREATED)?;
     packet.write_int(party_id)?;
-    write_no_door(&mut packet)?;
+    write_door(&mut packet, door)?;
+    Ok(packet)
+}
+
+/// The member in `slot` opened a Mystic Door, or theirs closed (v83
+/// FUN_00a3e31c 0x25): the client draws it at the town's door portal of
+/// that slot.
+pub fn build_party_door(slot: u8, door: Option<&DoorView>) -> Result<Packet, NetworkError> {
+    let mut packet = party_operation(OP_DOOR)?;
+    packet.write_byte(slot)?;
+    let (town, field, x, y) = door.map_or((NO_DOOR, NO_DOOR, 0, 0), |door| {
+        (door.town, door.field, door.x, door.y)
+    });
+    packet.write_int(town)?;
+    packet.write_int(field)?;
+    packet.write_short(x)?;
+    packet.write_short(y)?;
     Ok(packet)
 }
 
@@ -221,6 +249,13 @@ mod tests {
     use super::*;
     use crate::codec::testing::Expect;
 
+    const DOOR: DoorView = DoorView {
+        town: 101_000_000,
+        field: 101_010_000,
+        x: -120,
+        y: 275,
+    };
+
     fn view() -> PartyView {
         PartyView {
             id: 7,
@@ -233,6 +268,7 @@ mod tests {
                     level: 8,
                     channel: Some(1),
                     map_id: 10000,
+                    door: Some(DOOR),
                 },
                 PartyMemberView {
                     id: 3,
@@ -241,6 +277,7 @@ mod tests {
                     level: 12,
                     channel: None,
                     map_id: 0,
+                    door: None,
                 },
             ],
         }
@@ -267,7 +304,8 @@ mod tests {
         expect.int(1).int(-2).int(-2).int(-2).int(-2).int(-2);
         expect.int(2);
         expect.int(10000).int(0).int(0).int(0).int(0).int(0);
-        for _ in 0..6 {
+        expect.int(101_000_000).int(101_010_000).int(-120).int(275);
+        for _ in 0..5 {
             expect.int(NO_DOOR).int(NO_DOOR).int(0).int(0);
         }
     }
@@ -300,13 +338,44 @@ mod tests {
         expect.int(7).int(2).byte(0).int(7);
         expect.end();
 
-        let packet = build_party_created(7).unwrap();
+        let packet = build_party_created(7, None).unwrap();
         let mut expect = Expect::new(&packet.bytes);
         expect
             .short(SendOpcode::PartyOperation as i16)
             .byte(8)
             .int(7);
         expect.int(NO_DOOR).int(NO_DOOR).int(0).int(0);
+        expect.end();
+
+        let packet = build_party_created(7, Some(&DOOR)).unwrap();
+        let mut expect = Expect::new(&packet.bytes);
+        expect
+            .short(SendOpcode::PartyOperation as i16)
+            .byte(8)
+            .int(7);
+        expect.int(101_000_000).int(101_010_000).int(-120).int(275);
+        expect.end();
+
+        let packet = build_party_door(3, Some(&DOOR)).unwrap();
+        let mut expect = Expect::new(&packet.bytes);
+        expect
+            .short(SendOpcode::PartyOperation as i16)
+            .byte(0x25)
+            .byte(3);
+        expect
+            .int(101_000_000)
+            .int(101_010_000)
+            .short(-120)
+            .short(275);
+        expect.end();
+
+        let packet = build_party_door(0, None).unwrap();
+        let mut expect = Expect::new(&packet.bytes);
+        expect
+            .short(SendOpcode::PartyOperation as i16)
+            .byte(0x25)
+            .byte(0);
+        expect.int(NO_DOOR).int(NO_DOOR).short(0).short(0);
         expect.end();
 
         let packet = build_party_invite(7, "Alice").unwrap();

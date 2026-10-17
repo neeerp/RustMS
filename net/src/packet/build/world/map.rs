@@ -5,8 +5,13 @@ use packet::{io::write::PktWrite, Packet};
 use std::time::SystemTime;
 
 /// SET_FIELD for a map change: the client warps to `stats.map_id` at portal
-/// `stats.spawn_point`.
-pub fn build_warp_to_map(stats: &CharacterStats, channel_id: u8) -> Result<Packet, NetworkError> {
+/// `stats.spawn_point`, or at `chase` if given (v83 FUN_00776020 reads it
+/// after the HP).
+pub fn build_warp_to_map(
+    stats: &CharacterStats,
+    channel_id: u8,
+    chase: Option<(i16, i16)>,
+) -> Result<Packet, NetworkError> {
     let mut packet = Packet::new_empty();
     packet.write_short(SendOpcode::SetField as i16)?;
     packet.write_int(i32::from(channel_id))?;
@@ -15,7 +20,16 @@ pub fn build_warp_to_map(stats: &CharacterStats, channel_id: u8) -> Result<Packe
     packet.write_int(stats.map_id)?;
     packet.write_byte(stats.spawn_point)?;
     packet.write_short(stats.hp)?;
-    packet.write_byte(0)?; // no explicit spawn position follows
+    match chase {
+        Some((x, y)) => {
+            packet.write_byte(1)?;
+            packet.write_int(i32::from(x))?;
+            packet.write_int(i32::from(y))?;
+        }
+        None => {
+            packet.write_byte(0)?;
+        }
+    }
     packet.write_long(filetime(SystemTime::now()))?;
     Ok(packet)
 }
@@ -90,7 +104,7 @@ mod tests {
 
     #[test]
     fn warp_to_map_matches_reference() {
-        let packet = build_warp_to_map(&sample_stats(), 1).unwrap();
+        let packet = build_warp_to_map(&sample_stats(), 1, None).unwrap();
 
         let mut expect = Expect::new(&packet.bytes);
         expect.short(SendOpcode::SetField as i16);
@@ -99,6 +113,22 @@ mod tests {
         expect.int(100000000).byte(2).short(300);
         expect.byte(0); // no explicit spawn position
         expect.skip(8); // FILETIME now
+        expect.end();
+    }
+
+    #[test]
+    fn a_warp_may_place_the_player_anywhere() {
+        let packet = build_warp_to_map(&sample_stats(), 1, Some((-120, 275))).unwrap();
+
+        let mut expect = Expect::new(&packet.bytes);
+        expect
+            .short(SendOpcode::SetField as i16)
+            .int(1)
+            .int(0)
+            .byte(0);
+        expect.int(100000000).byte(2).short(300);
+        expect.byte(1).int(-120).int(275);
+        expect.skip(8);
         expect.end();
     }
 }

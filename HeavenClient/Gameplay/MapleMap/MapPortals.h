@@ -23,7 +23,9 @@
 
 #include "Portal.h"
 
+#include <optional>
 #include <unordered_map>
+#include <vector>
 
 namespace ms
 {
@@ -57,6 +59,14 @@ namespace ms
 
 		Point<int16_t> get_portal_by_id(uint8_t id) const;
 
+		// Where the `i`th of the town's door portals (type 6) stands, in id
+		// order, or the first if there are fewer (FUN_005377fa).
+		std::optional<Point<int16_t>> get_door_portal(size_t i) const;
+
+		// Whether a portal keeps a Mystic Door from opening where the player
+		// stands (FUN_00712ab1).
+		bool blocks_door(Point<int16_t> playerpos) const;
+
 		Point<int16_t> get_portal_by_name(const std::string &name) const;
 
 	private:
@@ -77,6 +87,8 @@ namespace ms
 
 		std::unordered_map<uint8_t, Portal> portals_by_id;
 		std::unordered_map<std::string, uint8_t> portal_ids_by_name;
+		// The door portals, in id order.
+		std::vector<Point<int16_t>> door_portals;
 
 		// The touch script that ran last in this field.
 		const Portal *last_script = nullptr;

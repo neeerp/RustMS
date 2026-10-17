@@ -303,6 +303,10 @@ pub struct Field {
     pub summon_attacks: Vec<(i32, u8, Vec<(i32, i32)>)>,
     /// SUMMON_SKILL: (object id, action).
     pub summon_skills: Vec<(i32, u8)>,
+    /// SPAWN_DOOR: (owner, where, just cast).
+    pub doors: Vec<(i32, (i16, i16), bool)>,
+    /// REMOVE_DOOR: owners.
+    pub doors_removed: Vec<i32>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -380,6 +384,14 @@ impl Field {
             });
         } else if op == SendOpcode::RemoveMist as i16 {
             self.mists_removed.push(r.read_int().unwrap());
+        } else if op == SendOpcode::SpawnDoor as i16 {
+            let just_cast = r.read_byte().unwrap() == 0;
+            let owner = r.read_int().unwrap();
+            let at = (r.read_short().unwrap(), r.read_short().unwrap());
+            self.doors.push((owner, at, just_cast));
+        } else if op == SendOpcode::RemoveDoor as i16 {
+            r.read_byte().unwrap();
+            self.doors_removed.push(r.read_int().unwrap());
         } else if op == SendOpcode::SpawnSummon as i16 {
             let owner_id = r.read_int().unwrap();
             let object_id = r.read_int().unwrap();

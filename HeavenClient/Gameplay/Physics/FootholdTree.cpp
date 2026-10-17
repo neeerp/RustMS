@@ -656,6 +656,11 @@ namespace ms
 		return lowest && std::abs(lowesty - fy) >= 5.0;
 	}
 
+	uint16_t FootholdTree::get_fhid_below(Point<int16_t> position) const
+	{
+		return get_fhid_below(position.x(), position.y());
+	}
+
 	int16_t FootholdTree::get_y_below(Point<int16_t> position) const
 	{
 		if (uint16_t fhid = get_fhid_below(position.x(), position.y()))
