@@ -111,6 +111,8 @@ pub struct MobStatus {
     pub until: Instant,
     /// When a status that hurts the mob next does.
     pub next_hurt: Instant,
+    /// A counter's spread (`MobStatusView::spread`), 0 for the rest.
+    pub spread: i32,
 }
 
 /// A mob's attackN is action 12 + N - 1, sent as action << 1 | facing left
@@ -310,6 +312,7 @@ impl LiveMob {
                 value: status.value,
                 skill_id: status.skill_id,
                 left: status.until.saturating_duration_since(now),
+                spread: status.spread,
             })
             .collect()
     }
@@ -684,11 +687,43 @@ impl MobSet {
                     from,
                     until,
                     next_hurt: now + HURT_INTERVAL,
+                    spread: 0,
                 };
                 mob.statuses.insert(stat, status);
                 stat
             })
             .collect()
+    }
+
+    /// Give the counters a mob has among `stats` their spread.
+    pub fn spread_counters(&mut self, object_id: i32, stats: &[MobStat], spread: i32) {
+        let Some(mob) = self.live.get_mut(&object_id) else {
+            return;
+        };
+        for stat in stats {
+            if let Some(status) = mob.statuses.get_mut(stat) {
+                status.spread = spread;
+            }
+        }
+    }
+
+    /// What a mob's counter (`stat`: MCounter for a spell, PCounter for
+    /// the rest) hurts its attacker with for one attack, or 0: like the v83
+    /// client (FUN_007937e3), its value, then with a spread, plus `roll`
+    /// modulo the spread less half of it.
+    pub fn counter(&self, object_id: i32, stat: MobStat, roll: u32) -> i32 {
+        let Some(status) = self
+            .live
+            .get(&object_id)
+            .and_then(|mob| mob.statuses.get(&stat))
+        else {
+            return 0;
+        };
+        let value = i32::from(status.value);
+        match u32::try_from(status.spread) {
+            Ok(spread) if spread > 0 => value + (roll % spread) as i32 - status.spread / 2,
+            _ => value,
+        }
     }
 
     /// Take these statuses off a mob; returns the ones it had.
@@ -1194,6 +1229,28 @@ mod tests {
         assert_eq!(
             mobs.add_statuses(snail, &seal, 2111004, 1, now, until),
             [MobStat::Speed]
+        );
+    }
+
+    #[test]
+    fn counters_hurt_their_value_give_or_take_half_the_spread() {
+        let now = Instant::now();
+        let mut mobs = MobSet::new([snail_spawn(100)]);
+        let snail = mobs.respawn(now)[0];
+        let until = now + Duration::from_secs(10);
+        assert_eq!(mobs.counter(snail, MobStat::PCounter, 7), 0);
+        let counters = [(MobStat::PCounter, 220), (MobStat::MCounter, 220)];
+        mobs.add_statuses(snail, &counters, 145 | 5 << 16, 1, now, until);
+        assert_eq!(mobs.counter(snail, MobStat::MCounter, 7), 220);
+        mobs.spread_counters(snail, &[MobStat::PCounter], 98);
+        assert_eq!(mobs.counter(snail, MobStat::PCounter, 0), 220 - 49);
+        assert_eq!(mobs.counter(snail, MobStat::PCounter, 97 + 98), 220 + 48);
+        assert_eq!(mobs.counter(snail, MobStat::MCounter, 97), 220);
+        let view = mobs.get(snail).unwrap().status_views(now);
+        let spread = |stat| view.iter().find(|v| v.stat == stat).unwrap().spread;
+        assert_eq!(
+            (spread(MobStat::PCounter), spread(MobStat::MCounter)),
+            (98, 0)
         );
     }
 

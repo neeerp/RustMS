@@ -988,6 +988,7 @@ namespace ms
 
 			result.attacker = player.get_oid();
 			expect_hits(result, 1);
+			show_counters(result);
 			extract_effects(player, move, result, range, reach, shot_area, shot_end);
 
 			if (attack.type == Attack::Type::MAGIC)
@@ -2579,9 +2580,23 @@ namespace ms
 		mobs.send_attack(result, attack, targets, attack.mobcount);
 		result.attacker = player.get_oid();
 		expect_hits(result, 1);
+		show_counters(result);
 		extract_effects(player, skill, result, range, 0, range, position);
 
 		AttackPacket(result, player.get_position(), position).dispatch();
+	}
+
+	void Combat::show_counters(const AttackResult &result)
+	{
+		bool magic = result.type == Attack::Type::MAGIC;
+
+		for (const auto &line : result.damagelines)
+		{
+			int32_t damage = mobs.counter(line.first, magic);
+
+			if (damage > 0)
+				player.show_damage(damage);
+		}
 	}
 
 	void Combat::clear_grenades()

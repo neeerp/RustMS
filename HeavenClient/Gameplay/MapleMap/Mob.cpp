@@ -2225,6 +2225,17 @@ namespace ms
 		return found != statuses.end() ? static_cast<int32_t>(found->second.value) : 0;
 	}
 
+	int32_t Mob::counter(bool magic) const
+	{
+		auto found = statuses.find(magic ? MobStatParser::MCOUNTER : MobStatParser::PCOUNTER);
+
+		if (found == statuses.end())
+			return 0;
+
+		return MobStatParser::counter(found->second, randomizer.next_int<uint32_t>(UINT32_MAX),
+									  randomizer.next_int<uint32_t>(UINT32_MAX));
+	}
+
 	void Mob::apply_death()
 	{
 		show_stance(Stance::DIE, flip);

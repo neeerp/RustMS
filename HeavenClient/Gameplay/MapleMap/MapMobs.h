@@ -63,6 +63,10 @@ namespace ms
 		// Show a number on a mob: damage, a heal if negative, or a miss.
 		void show_damage(int32_t oid, int32_t damage);
 
+		// What a mob's counter hurts the player with for one of their
+		// attacks, or 0.
+		int32_t counter(int32_t oid, bool magic) const;
+
 		// Put temporary statuses on a mob, showing their effects.
 		void set_statuses(int32_t oid, const std::vector<MobStatParser::Status> &statuses);
 

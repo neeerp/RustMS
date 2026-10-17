@@ -4,8 +4,9 @@
 /// A temporary status, by its bit in the v83 client's 128-bit mob flags
 /// (the initializers from 0x78973c). The names follow later clients; the
 /// bits are the v83 ones. Each carries a value, the skill that caused it,
-/// and how long it lasts. Burned (27), the counters (29, 30), and
-/// Disable (31) carry more, and aren't here.
+/// and how long it lasts. The counters (29, 30) also carry a spread
+/// (`MobStatusView::spread`); Burned (27) and Disable (31) carry more, and
+/// aren't here.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub enum MobStat {
     Pad = 0,
@@ -34,6 +35,11 @@ pub enum MobStat {
     Blind = 25,
     SealSkill = 26,
     Dazzle = 28,
+    /// A weapon attack on the mob hurts the attacker back (v83
+    /// FUN_007937e3): the value, give or take half the spread.
+    PCounter = 29,
+    /// The same for spells.
+    MCounter = 30,
     RiseByToss = 32,
     BodyPressure = 33,
     Weakness = 34,
@@ -46,7 +52,7 @@ impl MobStat {
 
     /// The order the client reads the statuses in (FUN_0078b0b1), which
     /// isn't quite that of their bits.
-    pub const DECODE_ORDER: [MobStat; 29] = [
+    pub const DECODE_ORDER: [MobStat; 31] = [
         MobStat::Pad,
         MobStat::Pdr,
         MobStat::Mad,
@@ -73,6 +79,8 @@ impl MobStat {
         MobStat::Blind,
         MobStat::SealSkill,
         MobStat::Dazzle,
+        MobStat::PCounter,
+        MobStat::MCounter,
         MobStat::RiseByToss,
         MobStat::BodyPressure,
         MobStat::Weakness,

@@ -13,6 +13,9 @@ pub struct MobStatusView {
     pub skill_id: i32,
     /// How long it has left.
     pub left: Duration,
+    /// A counter's spread: it hurts the attacker its value, give or take
+    /// half this. 0 for the rest.
+    pub spread: i32,
 }
 
 /// A mob as other players see it.
@@ -38,17 +41,26 @@ pub struct MobView {
 
 /// The statuses as the client reads them (FUN_0078b0b1): their flags, then
 /// each one's value, skill, and time left in half seconds, in the client's
-/// order.
+/// order; then each counter's spread, and with either the chance in
+/// percent that they hurt (0 always).
 fn write_statuses(p: &mut Packet, statuses: &[MobStatusView]) -> Result<(), NetworkError> {
     write_mask(p, statuses.iter().map(|status| status.stat.bit()))?;
+    let find = |stat| statuses.iter().find(|status| status.stat == stat);
     for stat in MobStat::DECODE_ORDER {
-        let Some(status) = statuses.iter().find(|status| status.stat == stat) else {
+        let Some(status) = find(stat) else {
             continue;
         };
         p.write_short(status.value)?;
         p.write_int(status.skill_id)?;
         let halves = status.left.as_millis().div_ceil(500);
         p.write_short(halves.min(i16::MAX as u128) as i16)?;
+    }
+    let counters = [find(MobStat::PCounter), find(MobStat::MCounter)];
+    for counter in counters.iter().flatten() {
+        p.write_int(counter.spread)?;
+    }
+    if counters.iter().any(Option::is_some) {
+        p.write_int(0)?;
     }
     Ok(())
 }
@@ -300,6 +312,7 @@ mod tests {
             value: -40,
             skill_id: 2101003,
             left: Duration::from_millis(39_800),
+            spread: 0,
         }];
         let packet = build_spawn_mob(&mob).unwrap();
         let mut expect = Expect::new(&packet.bytes);
@@ -317,6 +330,7 @@ mod tests {
             value,
             skill_id,
             left: Duration::from_secs(10),
+            spread: 0,
         };
         let statuses = [
             status(MobStat::Doom, 1, 2311005),
@@ -333,6 +347,30 @@ mod tests {
         expect.short(1).int(140 | 1 << 16).short(20);
         expect.short(1).int(2311005).short(20);
         expect.short(0).byte(0).byte(0);
+        expect.end();
+    }
+
+    #[test]
+    fn counters_follow_with_their_spreads_and_a_chance() {
+        let counter = |stat, value, spread| MobStatusView {
+            stat,
+            value,
+            skill_id: 145 | 3 << 16,
+            left: Duration::from_secs(10),
+            spread,
+        };
+        let statuses = [
+            counter(MobStat::MCounter, 5000, 8000),
+            counter(MobStat::PCounter, 5000, 5000),
+        ];
+        let packet = build_mob_stat_set(5, &statuses).unwrap();
+        let mut expect = Expect::new(&packet.bytes);
+        expect.short(SendOpcode::MobStatSet as i16).int(5);
+        expect.long(0).long(1 << (32 + 29) | 1 << (32 + 30));
+        expect.short(5000).int(145 | 3 << 16).short(20);
+        expect.short(5000).int(145 | 3 << 16).short(20);
+        expect.int(5000).int(8000).int(0);
+        expect.short(0).byte(0);
         expect.end();
     }
 
