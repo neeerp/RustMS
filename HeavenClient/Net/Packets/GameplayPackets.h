@@ -24,6 +24,8 @@
 
 #include "MovementPacket.h"
 
+#include "../../Gameplay/MovePath.h"
+
 #include "../../Character/Inventory/InventoryType.h"
 
 namespace ms
@@ -215,14 +217,12 @@ namespace ms
 	class MovePlayerPacket : public MovementPacket
 	{
 	public:
-		// Updates the player's position with the server: a path of one
-		// element from `start`
-		MovePlayerPacket(Point<int16_t> start, const Movement& movement) : MovementPacket(OutPacket::Opcode::MOVE_PLAYER)
+		// Updates the player's position with the server: the field key and
+		// crc (left 0), then the path.
+		MovePlayerPacket(const move_path::Path& path) : MovementPacket(OutPacket::Opcode::MOVE_PLAYER)
 		{
 			skip(5);
-			write_point(start);
-			write_byte(1);
-			writemovement(movement);
+			writepath(path.start, path.elements);
 		}
 	};
 

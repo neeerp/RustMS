@@ -31,6 +31,7 @@
 
 #include "Inventory/Inventory.h"
 
+#include "../Gameplay/MovePath.h"
 #include "../Gameplay/Playable.h"
 
 #include "../Gameplay/Combat/Skill.h"
@@ -64,8 +65,8 @@ namespace ms
 		// Respawn the player at the given position
 		void respawn(Point<int16_t> position, bool underwater);
 
-		// Tell the server, as path element `command` of no duration, where
-		// the player is now (v83 FUN_0052ef17).
+		// Mark where the player is now in the path to the server, as
+		// element `command` of no duration (v83 FUN_0052ef17).
 		void record_move(uint8_t command);
 
 		// Sends a Keyaction to the player's state, to apply forces, change the state and other behaviour.
@@ -308,9 +309,12 @@ namespace ms
 
 		std::map<KeyAction::Id, bool> keysdown;
 
-		Movement lastmove;
+		move_path::Recorder path;
 
 		uint8_t get_stancebyte() const;
+
+		// Where the player is and how it moves, as path element `command`.
+		Movement current_move(uint8_t command) const;
 
 		Randomizer randomizer;
 

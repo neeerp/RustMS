@@ -21,6 +21,9 @@
 
 #include "../Gameplay/Movement.h"
 
+#include <algorithm>
+#include <vector>
+
 namespace ms
 {
 	// Base class for packets which update object movements with the server.
@@ -30,6 +33,59 @@ namespace ms
 		MovementPacket(OutPacket::Opcode opc) : OutPacket(opc) {}
 
 	protected:
+		// A path as v83 writes it (FUN_0068a563): where it starts, its
+		// elements, the keys held (none here), and the rectangle around the
+		// start and every element with a position.
+		void writepath(Point<int16_t> start, const std::vector<Movement>& elements)
+		{
+			write_point(start);
+			write_byte(static_cast<int8_t>(elements.size()));
+
+			int16_t left = start.x();
+			int16_t top = start.y();
+			int16_t right = start.x();
+			int16_t bottom = start.y();
+
+			for (const Movement& element : elements)
+			{
+				writemovement(element);
+
+				if (positioned(element.command))
+				{
+					left = std::min(left, element.xpos);
+					top = std::min(top, element.ypos);
+					right = std::max(right, element.xpos);
+					bottom = std::max(bottom, element.ypos);
+				}
+			}
+
+			write_byte(0);
+			write_short(left);
+			write_short(top);
+			write_short(right);
+			write_short(bottom);
+		}
+
+		static bool positioned(uint8_t command)
+		{
+			switch (command)
+			{
+				case 0:
+				case 3:
+				case 4:
+				case 5:
+				case 7:
+				case 8:
+				case 9:
+				case 11:
+				case 15:
+				case 17:
+					return true;
+				default:
+					return false;
+			}
+		}
+
 		// One path element, laid out by its type as v83 writes it
 		// (FUN_0068a563).
 		void writemovement(const Movement& movement)

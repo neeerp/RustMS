@@ -49,6 +49,9 @@ namespace ms
 
 		bool is_ladder() const;
 
+		// Its number in the map.
+		int16_t get_id() const;
+
 		// Whether climbing past the top steps onto a platform (uf).
 		bool leads_up() const;
 
@@ -57,6 +60,7 @@ namespace ms
 		int16_t get_bottom() const;
 
 	private:
+		int16_t id;
 		int16_t x;
 		int16_t y1;
 		int16_t y2;

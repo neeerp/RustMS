@@ -1,4 +1,6 @@
+#include "../Gameplay/MovePath.h"
 #include "../Net/Handlers/Helpers/MovementParser.h"
+#include <cmath>
 #include <cstring>
 #include <iostream>
 #include <stdexcept>
@@ -7,6 +9,109 @@
 void require(bool condition, const char* message)
 {
 	if (!condition) throw std::runtime_error(message);
+}
+
+ms::Movement at(int16_t x, int16_t y, int16_t vx, int16_t vy, int16_t fh, uint8_t stance = 2)
+{
+	return ms::Movement(ms::Movement::ABSOLUTE, 0, x, y, vx, vy, fh, stance, 0);
+}
+
+// Steps of 8 ms, as HC records them, moving `vx` px/s from `x` each step.
+int16_t walk(ms::move_path::Recorder& path, int16_t x, int16_t vx, int16_t fh, int steps, int16_t vy = 0)
+{
+	for (int i = 0; i < steps; i++)
+	{
+		x += vx / 125;
+		path.step(at(x, 0, vx, vy, fh), 8);
+	}
+
+	return x;
+}
+
+void recorder()
+{
+	using namespace ms::move_path;
+
+	Recorder path;
+	path.reset(at(0, 0, 0, 0, 7));
+
+	int16_t x = walk(path, 0, 125, 7, 124);
+	require(!path.flush(), "nothing goes out before a second");
+
+	x = walk(path, x, 125, 7, 1);
+	auto sent = path.flush();
+	require(sent && sent->start == ms::Point<int16_t>(0, 0), "a second of walking goes out from where it began");
+	require(sent->elements.size() == 1 && sent->elements[0].duration == 1000 && sent->elements[0].xpos == x,
+			"a walk in one direction is one element");
+
+	walk(path, x, 0, 7, 125);
+	sent = path.flush();
+	require(sent && sent->start == ms::Point<int16_t>(x, 0) && sent->elements.size() == 1,
+			"the next path starts where the last one ended");
+	walk(path, x, 0, 7, 125);
+	require(!path.flush(), "standing still sends nothing");
+
+	x = walk(path, x, 125, 7, 60);
+	x = walk(path, x, -125, 7, 10);
+	x = walk(path, x, 125, 0, 40, -500);
+	x = walk(path, x, 125, 0, 40, 500);
+	sent = path.flush();
+	require(sent && sent->elements.size() == 2 && sent->elements[1].vx < 0,
+			"turning around starts an element, and a jump waits");
+	require(!path.flush(), "the jump stays for the next path");
+
+	int16_t before = sent->elements[1].xpos;
+	x = walk(path, x, 125, 7, 45);
+	sent = path.flush();
+	require(sent && sent->start == ms::Point<int16_t>(before, 0) && sent->elements.size() == 3,
+			"the jump goes out once the player lands");
+	require(sent->elements[0].fh == 0 && sent->elements[0].vy < 0 && sent->elements[1].vy > 0,
+			"rising and falling are separate elements");
+
+	path.add(ms::Movement(ms::Movement::ABSOLUTE, 4, x, 0, 0, 0, 7, 2, 5));
+	walk(path, 200, 0, 7, 125);
+	sent = path.flush();
+	require(sent && sent->elements.size() == 2 && sent->elements[0].command == 4 &&
+			sent->elements[0].duration == 0 && sent->elements[0].xpos == x && sent->elements[1].xpos == 200,
+			"a teleport marks where it left from");
+
+	walk(path, 200, 0, -3, 200);
+	require(!path.flush(), "a climb waits for a foothold");
+}
+
+void player()
+{
+	using namespace ms::move_path;
+
+	Player path({ 0, 0, 0, 0, 7, 2 });
+	ms::Movement first = at(100, 0, 100, 0, 7, 3);
+	first.duration = 1000;
+	path.receive({ first });
+	path.receive({});
+	require(path.playing(), "a path plays at once");
+
+	path.step(500);
+	require(std::abs(path.get_state().x - 37.5) < 1e-9 && path.get_state().stance == 3,
+			"it follows a curve between the two speeds");
+
+	path.step(500);
+	require(!path.playing() && path.get_state().x == 100 && path.get_state().vx == 100,
+			"it ends where the path does");
+
+	ms::Movement skip = at(0, 0, 0, 0, 0);
+	skip.command = 10;
+	ms::Movement walk = at(300, 0, 0, 0, 7, 4);
+	walk.duration = 1200;
+	path.receive({ skip, walk });
+	path.step(100);
+	// 110 ms into 1200, leaving 100 at 100 px/s for 300.
+	require(std::abs(path.get_state().x - 113.8093287) < 1e-6, "a path of 1.1 seconds or more plays a tenth faster");
+
+	walk.duration = 7000;
+	walk.xpos = -50;
+	path.receive({ walk });
+	path.step(8);
+	require(!path.playing() && path.get_state().x == -50, "one too far behind jumps to its end");
 }
 
 struct Writer
@@ -72,6 +177,9 @@ int main()
 		require(MovementParser::parse_movements(none, {}).empty(), "a path may have no elements");
 
 		require(Movement::velocity(1.0) == 125 && Movement::velocity(-4.44) == -555, "speeds are per second");
+
+		recorder();
+		player();
 
 		std::cout << "Movement path passed\n";
 		return 0;
