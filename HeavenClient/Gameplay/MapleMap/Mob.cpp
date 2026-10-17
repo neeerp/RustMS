@@ -39,7 +39,7 @@
 namespace ms
 {
 	Mob::Mob(int32_t oi, int32_t mid, int8_t mode, int8_t st, uint16_t fh, uint16_t homefh, bool newspawn, int8_t tm,
-			 Point<int16_t> position, const Physics &physics) : MapObject(oi)
+			 Point<int16_t> position, const Physics &physics) : MapObject(oi), shown(move_path::Player::State{})
 	{
 		std::string strid = string_format::extend_id(mid, 7);
 		nl::node src = nl::nx::mob[strid + ".img"];
@@ -103,7 +103,6 @@ namespace ms
 		phobj.shoe = true;
 		phobj.walkforce = info["fs"].get_real(1.0);
 		phobj.walkdrag = phobj.walkforce;
-		update_shoe(false);
 
 		id = mid;
 		team = tm;
@@ -116,7 +115,6 @@ namespace ms
 		jumpdir = 0;
 		checkjump = false;
 		jumpy = 0;
-		set_control(mode);
 		phobj.fhid = fh;
 
 		// v83 stands a new mob on the foothold it enters on (FUN_007f115f),
@@ -154,15 +152,25 @@ namespace ms
 		dying = false;
 		dead = false;
 		fading = false;
-		set_stance(st);
+		stance = Stance::STAND;
+		show_stance(st);
 		haswaypoint = false;
 		flygroup = -1;
 		flycount = 0;
 		flyx = 0;
 		flyy = 0;
-		flysteps = 0;
 		pending_hits = 0;
 		death_timeout = 0;
+
+		// It shows where it enters until a path comes, and the AI starts
+		// from there.
+		shown = move_path::Player({ phobj.crnt_x(), phobj.crnt_y(), 0.0, 0.0,
+									static_cast<int16_t>(phobj.onground ? phobj.fhid : 0), value_of(stance, flip) });
+		body = phobj;
+		bodystance = stance;
+		bodyflip = flip;
+		update_shoe(false);
+		set_control(mode);
 
 		namelabel = Text(Text::Font::A13M, Text::Alignment::CENTER, Color::Name::WHITE, Text::Background::NAMETAG,
 						 name);
@@ -179,11 +187,11 @@ namespace ms
 		}
 	}
 
-	void Mob::set_stance(uint8_t stancebyte)
+	Mob::Stance Mob::stance_of(uint8_t stancebyte, bool &right) const
 	{
-		flip = (stancebyte % 2) == 0;
+		right = (stancebyte % 2) == 0;
 
-		if (!flip)
+		if (!right)
 			stancebyte -= 1;
 
 		if (stancebyte < Stance::MOVE)
@@ -194,23 +202,20 @@ namespace ms
 		if (animations.count(newstance) == 0)
 			newstance = Stance::MOVE;
 
-		set_stance(newstance);
+		return newstance;
 	}
 
-	void Mob::set_stance(Stance newstance)
+	void Mob::show_stance(uint8_t stancebyte)
 	{
-		if (newstance != Stance::HIT)
-		{
-			phobj.clear_flag(PhysicsObject::Flag::NOFRICTION);
+		bool right;
+		Stance newstance = stance_of(stancebyte, right);
 
-			// Monster Magnet's pull ends with the flinch.
-			if (pull)
-			{
-				pull.reset();
-				phobj.hspeed = 0.0;
-				phobj.vspeed = 0.0;
-			}
-		}
+		show_stance(newstance, right);
+	}
+
+	void Mob::show_stance(Stance newstance, bool right)
+	{
+		flip = right;
 
 		if (stance != newstance)
 		{
@@ -218,6 +223,29 @@ namespace ms
 
 			animations.at(stance).reset();
 		}
+	}
+
+	void Mob::set_body_stance(Stance newstance)
+	{
+		if (newstance != Stance::HIT)
+		{
+			body.clear_flag(PhysicsObject::Flag::NOFRICTION);
+
+			// Monster Magnet's pull ends with the flinch.
+			if (pull)
+			{
+				pull.reset();
+				body.hspeed = 0.0;
+				body.vspeed = 0.0;
+			}
+		}
+
+		bodystance = newstance;
+	}
+
+	Point<int16_t> Mob::body_position() const
+	{
+		return { body.get_x(), body.get_y() };
 	}
 
 	int8_t Mob::update(const Physics &physics)
@@ -284,119 +312,8 @@ namespace ms
 
 		if (!dying)
 		{
-			if (!canfly)
-			{
-				if (phobj.is_flag_not_set(PhysicsObject::Flag::TURNATEDGES))
-				{
-					// A knocked back mob stops at the edge, still facing its
-					// attacker.
-					if (stance != Stance::HIT)
-						flip = !flip;
-
-					phobj.set_flag(PhysicsObject::Flag::TURNATEDGES);
-				}
-			}
-
-			if (canfly)
-			{
-				// Another client's flier glides the way it faces between the
-				// controller's updates.
-				if (!control)
-				{
-					flyx = stance == Stance::MOVE ? (flip ? 1 : -1) : 0;
-					flyy = stance == Stance::HIT ? 0 : -1;
-				}
-
-				phobj.walkdir = flyx;
-				phobj.flydir = flyy;
-			}
-
-			switch (stance)
-			{
-				case Stance::MOVE:
-				case Stance::CHASE:
-					if (!canfly)
-						phobj.walkdir = flip ? 1 : -1;
-
-					break;
-				case Stance::HIT:
-					if (pull)
-					{
-						// Monster Magnet's pull (0x9bbdfd) slows each 30 ms
-						// step once the mob nears the user, and a flier rises
-						// or sinks toward them too.
-						Point<int16_t> position = get_position();
-
-						pull->elapsed += Constants::TIMESTEP;
-
-						while (pull->elapsed >= magnet::STEP)
-						{
-							pull->elapsed -= magnet::STEP;
-							pull->speed = magnet::step_speed(pull->speed, position.x(), pull->user.x(), pull->reach);
-						}
-
-						phobj.hspeed = pull->speed * Constants::TIMESTEP / 1000.0;
-
-						if (canfly)
-							phobj.vspeed = magnet::fly_speed(position.y(), pull->user.y()) * Constants::TIMESTEP / 1000.0;
-					} else if (phobj.is_flag_set(PhysicsObject::Flag::NOFRICTION) && phobj.onground)
-					{
-						// v83 slows the push by 40000 / mass (100) px/s^2
-						// along the ground; walls and edges zero it.
-						constexpr double KBDECEL = 400.0 * Constants::TIMESTEP * Constants::TIMESTEP / 1000000.0;
-
-						double kbspeed = std::abs(phobj.hspeed) - KBDECEL;
-
-						if (kbspeed > 0.0)
-						{
-							phobj.hspeed = phobj.hspeed < 0.0 ? -kbspeed : kbspeed;
-						} else
-						{
-							phobj.hspeed = 0.0;
-							phobj.clear_flag(PhysicsObject::Flag::NOFRICTION);
-						}
-					}
-
-					break;
-				case Stance::JUMP:
-					// CVecCtrl::Jump (FUN_007f1bb0) speeds the mob up in the
-					// direction it holds, and it keeps steering in the air.
-					if (phobj.onground)
-						Physics::jump(phobj, Physics::jump_speed(1.0), jumpdir);
-
-					phobj.walkdir = jumpdir;
-
-					break;
-			}
-
-			if (phobj.is_flag_set(PhysicsObject::Flag::JUMPER))
-			{
-				// At a loose end or a wall (FUN_007f8d64), a jumper jumps unless
-				// it is chasing a target below it, and then only half the time.
-				// Toward a target on its own group it walks down a step instead.
-				const FootholdTree &fht = physics.get_fht();
-				bool chasing = control && hastarget && stance != Stance::HIT;
-
-				phobj.edgejump = !chasing || targetpos.y() <= phobj.get_y() || randomizer.next_bool();
-				phobj.stepdown = !chasing || fht.get_group_below(targetpos) == fht.get_group(phobj.fhid);
-			}
-
-			physics.move_object(phobj);
-
-			bool jumprequest = phobj.jumprequest;
-			phobj.jumprequest = false;
-
 			if (control)
 			{
-				// v83 gives up a chase 3 to 4 minutes after aggro (FUN_007f7f02).
-				if (hastarget)
-				{
-					targettime -= Constants::TIMESTEP;
-
-					if (targettime < 0)
-						hastarget = false;
-				}
-
 				// A firstAttack mob that can attack (FUN_005ce8c6) starts
 				// chasing the local player once they come within
 				// |dx| / 10 + |dy| / 3 <= 40 of it.
@@ -410,54 +327,34 @@ namespace ms
 						chase();
 				}
 
-				// v83 (FUN_005cc410) picks a walking mob's action as it goes:
-				// its chase animation for as long as it has a target.
-				if (!canfly && (stance == Stance::MOVE || stance == Stance::CHASE))
-					walk(input());
-
-				switch (stance)
+				if (flinch)
 				{
-					case Stance::HIT:
-						// v83 holds a hit mob still, then leaves it standing
-						// until its AI next decides.
-						if (aniend)
-						{
-							set_stance(Stance::STAND);
-							update_movement();
-						}
-
-						break;
-					case Stance::JUMP:
-						// It lands still holding the direction it jumped in,
-						// and its AI only counts down in the air.
-						if (phobj.onground)
-						{
-							walk(jumpdir);
-						} else
-						{
-							for (aitime += Constants::TIMESTEP; aitime >= 90; aitime -= 90)
-								thinktimer--;
-						}
-
-						break;
-					default:
-						// The mob vecctrl steps its AI in 90 ms steps (FUN_007f72d9).
-						for (aitime += Constants::TIMESTEP; aitime >= 90; aitime -= 90)
-						{
-							if (canfly)
-								think_fly(physics);
-							else
-								think(physics);
-						}
-
-						break;
+					flinch_body(physics);
+				} else if (!shown.playing() && ctrlstate >= 3)
+				{
+					// The next path goes once the last has played and been
+					// acked (FUN_006675a8).
+					plan(physics);
 				}
-
-				// A jumper that stopped at the end of its foothold jumps on the
-				// next tick (FUN_007f1fec).
-				if (jumprequest && (stance == Stance::MOVE || stance == Stance::CHASE || stance == Stance::STAND))
-					jump(input(), false);
 			}
+
+			shown.step(Constants::TIMESTEP);
+
+			const move_path::Player::State &now = shown.get_state();
+
+			// A hit shows at once, over the path, until it has played.
+			if (acting && aniend)
+				acting = false;
+
+			if (!acting)
+				show_stance(now.stance);
+
+			phobj.hspeed = now.x - phobj.crnt_x();
+			phobj.vspeed = now.y - phobj.crnt_y();
+			phobj.move();
+
+			if (!canfly)
+				physics.get_fht().update_fh(phobj);
 		} else
 		{
 			phobj.normalize();
@@ -470,6 +367,257 @@ namespace ms
 		return phobj.fhlayer;
 	}
 
+	void Mob::seat_body(const Physics &physics)
+	{
+		move_path::Player::State end = shown.end();
+
+		body.set_x(end.x);
+		body.set_y(end.y);
+		body.hspeed = end.vx * Constants::TIMESTEP / 1000.0;
+		body.vspeed = end.vy * Constants::TIMESTEP / 1000.0;
+
+		if (end.fh > 0 && !canfly)
+			physics.get_fht().place_on_fh(body, end.fh);
+		else
+			body.onground = false;
+
+		bool right;
+		Stance endstance = stance_of(end.stance, right);
+
+		// It may stop mid-flinch, but only a flinch it takes holds it.
+		set_body_stance(endstance == Stance::HIT ? Stance::STAND : endstance);
+		bodyflip = right;
+		hittime = 0;
+
+		recorder.reset(Movement(Movement::ABSOLUTE, 0, body.get_x(), body.get_y(), Movement::velocity(body.hspeed),
+								Movement::velocity(body.vspeed), end.fh, value_of(bodystance, bodyflip), 0));
+		seated = true;
+	}
+
+	void Mob::plan(const Physics &physics)
+	{
+		if (!seated)
+			seat_body(physics);
+
+		// Up to 55 of v83's 90 ms steps (66bbb8).
+		for (int32_t ms = 0; ms < 55 * 90 && !recorder.ready(canfly); ms += Constants::TIMESTEP)
+			step_body(physics);
+
+		move_path::Path path = recorder.flush(canfly);
+
+		// It asks to attack when chasing, unless controlling, then 70% of
+		// the time.
+		bool wantattack = hastarget && (ctrlstate < 0 || randomizer.next_int(100) < 70);
+		int8_t flags = (ctrlstate < 0 ? 0x10 : 0) | (wantattack ? 1 : 0);
+
+		MoveMobPacket(oid, ++moveid, flags, -1, false, 0, canfly, path).dispatch();
+
+		// It plays what it sends, as others will (FUN_0068a88d).
+		shown.receive(path.elements);
+
+		ctrlstate = ctrlstate == -2 || ctrlstate == 1 ? 1 : 2;
+	}
+
+	void Mob::flinch_body(const Physics &physics)
+	{
+		// v83 stops what it shows at the next foothold and starts the AI
+		// again from there (FUN_0068b16f, FUN_009bbd3d). Only walkers and
+		// jumpers go on to one.
+		shown.land(canfly || !canmove);
+		seat_body(physics);
+
+		Point<int16_t> position = body_position();
+
+		bodyflip = flinch->user ? flinch->user->x() > position.x() : flinch->left;
+		set_body_stance(Stance::HIT);
+		hittime = animations.at(Stance::HIT).get_duration();
+
+		// It stops steering while hit, so a flier dives (FUN_007f7f02).
+		flyx = 0;
+		flyy = 0;
+
+		if (flinch->user)
+		{
+			// Monster Magnet pulls it in, then it chases the user (0x66b562).
+			int16_t reach = standwidth + magnet::REACH;
+
+			pull = Pull{ *flinch->user, reach, magnet::start_speed(position.x(), flinch->user->x(), reach), 0 };
+			body.set_flag(PhysicsObject::Flag::NOFRICTION);
+			chase();
+		} else if (canmove)
+		{
+			// v83 pushes a flinching mob away from its attacker at 130 px/s.
+			constexpr double KBSPEED = 130.0 * Constants::TIMESTEP / 1000.0;
+
+			body.hspeed = bodyflip ? -KBSPEED : KBSPEED;
+			body.set_flag(PhysicsObject::Flag::NOFRICTION);
+		}
+
+		flinch.reset();
+		plan(physics);
+	}
+
+	void Mob::step_body(const Physics &physics)
+	{
+		if (!canfly)
+		{
+			if (body.is_flag_not_set(PhysicsObject::Flag::TURNATEDGES))
+			{
+				// A knocked back mob stops at the edge, still facing its
+				// attacker.
+				if (bodystance != Stance::HIT)
+					bodyflip = !bodyflip;
+
+				body.set_flag(PhysicsObject::Flag::TURNATEDGES);
+			}
+		}
+
+		if (canfly)
+		{
+			body.walkdir = flyx;
+			body.flydir = flyy;
+		}
+
+		switch (bodystance)
+		{
+			case Stance::MOVE:
+			case Stance::CHASE:
+				if (!canfly)
+					body.walkdir = bodyflip ? 1 : -1;
+
+				break;
+			case Stance::HIT:
+				if (pull)
+				{
+					// Monster Magnet's pull (0x9bbdfd) slows each 30 ms
+					// step once the mob nears the user, and a flier rises
+					// or sinks toward them too.
+					Point<int16_t> position = body_position();
+
+					pull->elapsed += Constants::TIMESTEP;
+
+					while (pull->elapsed >= magnet::STEP)
+					{
+						pull->elapsed -= magnet::STEP;
+						pull->speed = magnet::step_speed(pull->speed, position.x(), pull->user.x(), pull->reach);
+					}
+
+					body.hspeed = pull->speed * Constants::TIMESTEP / 1000.0;
+
+					if (canfly)
+						body.vspeed = magnet::fly_speed(position.y(), pull->user.y()) * Constants::TIMESTEP / 1000.0;
+				} else if (body.is_flag_set(PhysicsObject::Flag::NOFRICTION) && body.onground)
+				{
+					// v83 slows the push by 40000 / mass (100) px/s^2
+					// along the ground; walls and edges zero it.
+					constexpr double KBDECEL = 400.0 * Constants::TIMESTEP * Constants::TIMESTEP / 1000000.0;
+
+					double kbspeed = std::abs(body.hspeed) - KBDECEL;
+
+					if (kbspeed > 0.0)
+					{
+						body.hspeed = body.hspeed < 0.0 ? -kbspeed : kbspeed;
+					} else
+					{
+						body.hspeed = 0.0;
+						body.clear_flag(PhysicsObject::Flag::NOFRICTION);
+					}
+				}
+
+				break;
+			case Stance::JUMP:
+				// CVecCtrl::Jump (FUN_007f1bb0) speeds the mob up in the
+				// direction it holds, and it keeps steering in the air.
+				if (body.onground)
+					Physics::jump(body, Physics::jump_speed(1.0), jumpdir);
+
+				body.walkdir = jumpdir;
+
+				break;
+		}
+
+		if (body.is_flag_set(PhysicsObject::Flag::JUMPER))
+		{
+			// At a loose end or a wall (FUN_007f8d64), a jumper jumps unless
+			// it is chasing a target below it, and then only half the time.
+			// Toward a target on its own group it walks down a step instead.
+			const FootholdTree &fht = physics.get_fht();
+			bool chasing = hastarget && bodystance != Stance::HIT;
+
+			body.edgejump = !chasing || targetpos.y() <= body.get_y() || randomizer.next_bool();
+			body.stepdown = !chasing || fht.get_group_below(targetpos) == fht.get_group(body.fhid);
+		}
+
+		physics.move_object(body);
+
+		bool jumprequest = body.jumprequest;
+		body.jumprequest = false;
+
+		// v83 gives up a chase 3 to 4 minutes after aggro (FUN_007f7f02).
+		if (hastarget)
+		{
+			targettime -= Constants::TIMESTEP;
+
+			if (targettime < 0)
+				hastarget = false;
+		}
+
+		// v83 (FUN_005cc410) picks a walking mob's action as it goes:
+		// its chase animation for as long as it has a target.
+		if (!canfly && (bodystance == Stance::MOVE || bodystance == Stance::CHASE))
+			walk(input());
+
+		switch (bodystance)
+		{
+			case Stance::HIT:
+				// v83 holds a hit mob still for its hit, then leaves it
+				// standing until its AI next decides.
+				hittime -= Constants::TIMESTEP;
+
+				if (hittime <= 0)
+					set_body_stance(Stance::STAND);
+
+				break;
+			case Stance::JUMP:
+				// It lands still holding the direction it jumped in,
+				// and its AI only counts down in the air.
+				if (body.onground)
+				{
+					walk(jumpdir);
+				} else
+				{
+					for (aitime += Constants::TIMESTEP; aitime >= 90; aitime -= 90)
+						thinktimer--;
+				}
+
+				break;
+			default:
+				// The mob vecctrl steps its AI in 90 ms steps (FUN_007f72d9).
+				for (aitime += Constants::TIMESTEP; aitime >= 90; aitime -= 90)
+				{
+					if (canfly)
+						think_fly(physics);
+					else
+						think(physics);
+				}
+
+				break;
+		}
+
+		// A jumper that stopped at the end of its foothold jumps on the
+		// next tick (FUN_007f1fec).
+		if (jumprequest &&
+			(bodystance == Stance::MOVE || bodystance == Stance::CHASE || bodystance == Stance::STAND))
+			jump(input(), false);
+
+		// Footholds are recorded only while on them (FUN_009b108a).
+		int16_t fh = body.onground ? static_cast<int16_t>(body.fhid) : 0;
+
+		recorder.step(Movement(Movement::ABSOLUTE, 0, body.get_x(), body.get_y(), Movement::velocity(body.hspeed),
+							   Movement::velocity(body.vspeed), fh, value_of(bodystance, bodyflip), 0),
+					  Constants::TIMESTEP);
+	}
+
 	void Mob::think_fly(const Physics &physics)
 	{
 		// FUN_007f8875 steers for the waypoint unless within 10 px of it
@@ -477,8 +625,8 @@ namespace ms
 		// it is higher.
 		if (haswaypoint)
 		{
-			double x = phobj.crnt_x();
-			double y = phobj.crnt_y();
+			double x = body.crnt_x();
+			double y = body.crnt_y();
 			int8_t xdir = 0;
 			int8_t ydir = 0;
 
@@ -488,7 +636,7 @@ namespace ms
 			if (std::abs(static_cast<int32_t>(y - waypoint.y())) < 10)
 				ydir = -1;
 			else if (waypoint.y() < y)
-				Physics::fly_jump(phobj);
+				Physics::fly_jump(body);
 
 			fly(xdir, ydir);
 
@@ -506,15 +654,8 @@ namespace ms
 				haswaypoint = false;
 		}
 
-		// It tells the server where it is at each new waypoint, and at
-		// least once a second.
 		if (!haswaypoint)
 			pick_waypoint(physics);
-		else if (++flysteps < 11)
-			return;
-
-		update_movement();
-		flysteps = 0;
 	}
 
 	void Mob::pick_waypoint(const Physics &physics)
@@ -576,17 +717,17 @@ namespace ms
 
 		if (x == 0)
 		{
-			set_stance(Stance::STAND);
+			set_body_stance(Stance::STAND);
 		} else
 		{
-			set_stance(Stance::MOVE);
-			flip = x > 0;
+			set_body_stance(Stance::MOVE);
+			bodyflip = x > 0;
 		}
 	}
 
 	void Mob::think(const Physics &physics)
 	{
-		if (phobj.is_flag_set(PhysicsObject::Flag::JUMPER) && think_jump(physics))
+		if (body.is_flag_set(PhysicsObject::Flag::JUMPER) && think_jump(physics))
 			return;
 
 		// FUN_007f8025 (standing mobs), FUN_007f81c8 (walking) and
@@ -598,7 +739,7 @@ namespace ms
 			return;
 		}
 
-		Point<int16_t> position = get_position();
+		Point<int16_t> position = body_position();
 		int16_t dx = targetpos.x() - position.x();
 
 		if (!canmove)
@@ -607,11 +748,7 @@ namespace ms
 			{
 				thinktimer = (randomizer.next_int(400) + 800) / 90;
 
-				if (flip != (dx >= 0))
-				{
-					flip = dx >= 0;
-					update_movement();
-				}
+				bodyflip = dx >= 0;
 
 				// It forgets a target that leaves the 2000 x 1200 box around it.
 				int16_t dy = targetpos.y() - position.y();
@@ -629,7 +766,7 @@ namespace ms
 				movedir = dx >= 0 ? 1 : -1;
 
 			walk(movedir);
-		} else if (canjump && phobj.onground && randomizer.next_int(5) == 0)
+		} else if (canjump && body.onground && randomizer.next_int(5) == 0)
 		{
 			// A fifth of a jumping mob's idle decisions are jumps, after
 			// which it decides again.
@@ -648,7 +785,7 @@ namespace ms
 	bool Mob::think_jump(const Physics &physics)
 	{
 		// FUN_007f835e only looks around on the ground.
-		if (!phobj.onground)
+		if (!body.onground)
 		{
 			thinktimer--;
 			return true;
@@ -662,7 +799,7 @@ namespace ms
 		{
 			checkjump = false;
 
-			if (dir != 0 && phobj.get_y() == jumpy)
+			if (dir != 0 && body.get_y() == jumpy)
 			{
 				dir = -dir;
 				walk(dir);
@@ -673,7 +810,7 @@ namespace ms
 		// lasts, or turns back once pressed against it.
 		const FootholdTree &fht = physics.get_fht();
 
-		switch (fht.get_wall_ahead(phobj, dir))
+		switch (fht.get_wall_ahead(body, dir))
 		{
 			case FootholdTree::WallAhead::AGAINST:
 				dir = -dir;
@@ -698,9 +835,9 @@ namespace ms
 		{
 			uint16_t group = fht.get_group_below(targetpos);
 			Range<int16_t> reach = fht.get_group_reach(group);
-			int16_t x = phobj.get_x();
+			int16_t x = body.get_x();
 
-			if (group != fht.get_group(phobj.fhid) && targetpos.y() < phobj.get_y() &&
+			if (group != fht.get_group(body.fhid) && targetpos.y() < body.get_y() &&
 				x > reach.first() && x < reach.second() && randomizer.next_int(3) == 0)
 			{
 				movedir = 0;
@@ -717,18 +854,17 @@ namespace ms
 	{
 		jumpdir = dir;
 		checkjump = check;
-		jumpy = phobj.get_y();
-		set_stance(Stance::JUMP);
-		update_movement();
+		jumpy = body.get_y();
+		set_body_stance(Stance::JUMP);
 	}
 
 	int8_t Mob::input() const
 	{
-		switch (stance)
+		switch (bodystance)
 		{
 			case Stance::MOVE:
 			case Stance::CHASE:
-				return flip ? 1 : -1;
+				return bodyflip ? 1 : -1;
 			case Stance::JUMP:
 				return jumpdir;
 			default:
@@ -738,45 +874,14 @@ namespace ms
 
 	void Mob::walk(int8_t direction)
 	{
-		Stance before = stance;
-		bool faced = flip;
-
 		if (direction == 0)
 		{
-			set_stance(Stance::STAND);
+			set_body_stance(Stance::STAND);
 		} else
 		{
-			set_stance(hastarget && canchase ? Stance::CHASE : Stance::MOVE);
-			flip = direction > 0;
+			set_body_stance(hastarget && canchase ? Stance::CHASE : Stance::MOVE);
+			bodyflip = direction > 0;
 		}
-
-		if (stance != before || flip != faced)
-			update_movement();
-	}
-
-	void Mob::update_movement()
-	{
-		// The controller sends nothing new until its last move is acked,
-		// then its latest (0x6685ac).
-		if (control && ctrlstate == 2)
-		{
-			movepending = true;
-			return;
-		}
-
-		movepending = false;
-
-		// It asks to attack when chasing, unless controlling, then 70% of
-		// the time.
-		bool wantattack = hastarget && (ctrlstate < 0 || randomizer.next_int(100) < 70);
-		int8_t flags = (ctrlstate < 0 ? 0x10 : 0) | (wantattack ? 1 : 0);
-
-		MoveMobPacket(
-				oid, ++moveid, flags, -1, false, 0, canfly, get_position(),
-				Movement(phobj, value_of(stance, flip))
-		).dispatch();
-
-		ctrlstate = ctrlstate == -2 || ctrlstate == 1 ? 1 : 2;
 	}
 
 	void Mob::acknowledge(int16_t ackid, bool nextattack)
@@ -788,9 +893,6 @@ namespace ms
 			ctrlstate = 2;
 		else
 			ctrlstate = nextattack ? 4 : 3;
-
-		if (ctrlstate != 2 && movepending)
-			update_movement();
 	}
 
 	void Mob::draw(double viewx, double viewy, float alpha) const
@@ -863,9 +965,12 @@ namespace ms
 	{
 		// Taking control lets it move at once; it may attack only once a
 		// move is acked. Letting go remembers whether it could have.
+		// The AI starts where the mob is shown going (FUN_006637ec).
 		if (mode > 0 && !control)
+		{
 			ctrlstate = 3;
-		else if (mode == 0 && control)
+			seated = false;
+		} else if (mode == 0 && control)
 			ctrlstate = ctrlstate == 3 ? -2 : ctrlstate == 4 ? -3 : -1;
 
 		control = mode > 0;
@@ -878,6 +983,7 @@ namespace ms
 		} else if (mode == 0)
 		{
 			hastarget = false;
+			flinch.reset();
 			update_shoe(false);
 		}
 	}
@@ -907,10 +1013,10 @@ namespace ms
 
 		float base = canfly ? flyspeed : speed;
 
-		phobj.walkspeed = canmove ? shoespeed(chasing && canchase ? chasespeed : base) : 0.0;
+		body.walkspeed = canmove ? shoespeed(chasing && canchase ? chasespeed : base) : 0.0;
 
 		if (canfly)
-			phobj.flyspeed = shoespeed(base);
+			body.flyspeed = shoespeed(base);
 	}
 
 	void Mob::set_target(Point<int16_t> position, bool dead)
@@ -919,26 +1025,14 @@ namespace ms
 		targetdead = dead;
 	}
 
-	void Mob::send_movement(Point<int16_t> start, std::vector<Movement> &&in_movements)
+	void Mob::send_movement(Point<int16_t>, std::vector<Movement> &&in_movements)
 	{
+		// v83 plays the path on from where the mob is shown; its start is
+		// not used (FUN_0068b371).
 		if (control)
 			return;
 
-		set_position(start);
-
-		movements = std::forward<decltype(in_movements)>(in_movements);
-
-		if (movements.empty())
-			return;
-
-		const Movement &lastmove = movements.front();
-
-		uint8_t laststance = lastmove.newstate;
-		set_stance(laststance);
-		update_shoe(stance == Stance::CHASE);
-		jumpdir = 0;
-
-		phobj.fhid = lastmove.fh;
+		shown.receive(in_movements);
 	}
 
 	Point<int16_t> Mob::get_head_position(Point<int16_t> position) const
@@ -1108,8 +1202,6 @@ namespace ms
 			for (auto &hit : result)
 				hit = {next_magic_damage(attack), false};
 
-			update_movement();
-
 			return result;
 		}
 
@@ -1137,8 +1229,6 @@ namespace ms
 					return next_damage(mindamage, maxdamage, hitchance, critical, attack);
 				}
 		);
-
-		update_movement();
 
 		return result;
 	}
@@ -1205,50 +1295,24 @@ namespace ms
 		{
 			if (pending_hits == 0)
 				apply_death();
-		} else if (control && is_alive() && damage >= knockback && stance != Stance::HIT)
+		} else if (control && is_alive() && damage >= knockback && !acting)
 		{
-			flip = toleft;
-			set_stance(Stance::HIT);
-
-			// It stops steering while hit, so a flier dives (FUN_007f7f02).
-			flyx = 0;
-			flyy = 0;
-
-			// v83 pushes a flinching mob away from its attacker at 130 px/s.
-			if (canmove)
-			{
-				constexpr double KBSPEED = 130.0 * Constants::TIMESTEP / 1000.0;
-
-				phobj.hspeed = flip ? -KBSPEED : KBSPEED;
-				phobj.set_flag(PhysicsObject::Flag::NOFRICTION);
-			}
-
-			update_movement();
+			// It shows the hit at once; the AI flinches next update.
+			show_stance(Stance::HIT, toleft);
+			acting = true;
+			flinch = Flinch{ toleft, std::nullopt };
 		}
 	}
 
 	void Mob::catch_by(Point<int16_t> user)
 	{
-		if (!control || !is_alive() || stance == Stance::HIT || !canmove)
+		if (!control || !is_alive() || acting || !canmove)
 			return;
 
-		Point<int16_t> position = get_position();
-
 		// It turns to the user and flinches (0x66b6fc).
-		flip = user.x() > position.x();
-		set_stance(Stance::HIT);
-
-		flyx = 0;
-		flyy = 0;
-
-		int16_t reach = standwidth + magnet::REACH;
-
-		pull = Pull{ user, reach, magnet::start_speed(position.x(), user.x(), reach), 0 };
-		phobj.set_flag(PhysicsObject::Flag::NOFRICTION);
-
-		// Then it chases them (0x66b562).
-		chase();
-		update_movement();
+		show_stance(Stance::HIT, user.x() > get_position().x());
+		acting = true;
+		flinch = Flinch{ false, user };
 	}
 
 	MobAttack Mob::create_touch_attack() const
@@ -1265,7 +1329,7 @@ namespace ms
 
 	void Mob::apply_death()
 	{
-		set_stance(Stance::DIE);
+		show_stance(Stance::DIE, flip);
 		diesound.play();
 		dying = true;
 	}

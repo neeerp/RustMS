@@ -303,10 +303,15 @@ namespace ms
 			if (i >= frames.size())
 				break;
 
-			total += frames[frame_id].get_delay();
+			total += frames[i].get_delay();
 		}
 
 		return total;
+	}
+
+	uint16_t Animation::get_duration() const
+	{
+		return getdelayuntil(static_cast<int16_t>(frames.size()));
 	}
 
 	Point<int16_t> Animation::get_origin() const

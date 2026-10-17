@@ -418,8 +418,8 @@ namespace ms
 		// Updates a mob's position with the server, as v83 does
 		// (FUN_0066b6fc): its move id, flags, its action (-1 for none) and
 		// facing, skill data, an anti-cheat byte and reason, and two ints a
-		// flyer fills in but others leave at 0xFFDDCC.
-		MoveMobPacket(int32_t oid, int16_t moveid, int8_t flags, int8_t action, bool left, int32_t skilldata, bool flying, Point<int16_t> startpos, const Movement& movement) : MovementPacket(OutPacket::Opcode::MOVE_MONSTER)
+		// flyer fills in but others leave at 0xFFDDCC, then the path.
+		MoveMobPacket(int32_t oid, int16_t moveid, int8_t flags, int8_t action, bool left, int32_t skilldata, bool flying, const move_path::Path& path) : MovementPacket(OutPacket::Opcode::MOVE_MONSTER)
 		{
 			write_int(oid);
 			write_short(moveid);
@@ -433,10 +433,7 @@ namespace ms
 			write_int(unknown);
 			write_int(unknown);
 
-			write_point(startpos);
-
-			write_byte(1);
-			writemovement(movement);
+			writepath(path.start, path.elements);
 		}
 	};
 
