@@ -26,14 +26,14 @@ namespace ms
 
 	void SingleHitEffect::apply(const AttackUser &user, Mob &target) const
 	{
-		effect.apply(target, user.flip);
+		effect.apply(target, user);
 	}
 
 	TwoHandedHitEffect::TwoHandedHitEffect(nl::node src) : effects(src["hit"]["0"], src["hit"]["1"]) {}
 
 	void TwoHandedHitEffect::apply(const AttackUser& user, Mob& target) const
 	{
-		effects[user.secondweapon].apply(target, user.flip);
+		effects[user.secondweapon].apply(target, user);
 	}
 
 	ByLevelHitEffect::ByLevelHitEffect(nl::node src)
@@ -57,7 +57,7 @@ namespace ms
 		if (iter != effects.begin())
 			iter--;
 
-		iter->second.apply(target, user.flip);
+		iter->second.apply(target, user);
 	}
 
 	ByLevelTwoHandedHitEffect::ByLevelTwoHandedHitEffect(nl::node src)
@@ -85,7 +85,7 @@ namespace ms
 		if (iter != effects.begin())
 			iter--;
 
-		iter->second[user.secondweapon].apply(target, user.flip);
+		iter->second[user.secondweapon].apply(target, user);
 	}
 
 	BySkillLevelHitEffect::BySkillLevelHitEffect(nl::node src)
@@ -102,6 +102,6 @@ namespace ms
 		auto iter = effects.find(user.skilllevel);
 
 		if (iter != effects.end())
-			iter->second.apply(target, user.flip);
+			iter->second.apply(target, user);
 	}
 }

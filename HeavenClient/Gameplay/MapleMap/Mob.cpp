@@ -18,6 +18,7 @@
 #include "Mob.h"
 #include "Layer.h"
 
+#include "../Combat/HitPoint.h"
 #include "../Combat/MonsterMagnet.h"
 #include "../Combat/Prepare.h"
 #include "../../Character/TouchDamage.h"
@@ -257,6 +258,8 @@ namespace ms
 		}
 
 		effects.update();
+		headeffects.update();
+		fieldeffects.update();
 		showhp.update();
 
 		// Every client, controller or not, tells the server once a second how
@@ -793,7 +796,12 @@ namespace ms
 	{
 		Point<int16_t> absp = phobj.get_absolute(viewx, viewy, alpha);
 
+		Point<int16_t> headp = get_head_position(absp);
+		Point<int16_t> viewp = Point<int16_t>(static_cast<int16_t>(viewx), static_cast<int16_t>(viewy));
+
 		effects.drawbelow(absp, alpha);
+		headeffects.drawbelow(headp, alpha);
+		fieldeffects.drawbelow(viewp, alpha);
 
 		if (!dead)
 		{
@@ -829,6 +837,8 @@ namespace ms
 		}
 
 		effects.drawabove(absp, alpha);
+		headeffects.drawabove(headp, alpha);
+		fieldeffects.drawabove(viewp, alpha);
 	}
 
 	void Mob::draw_hp_bar(Point<int16_t> position) const
@@ -1014,29 +1024,33 @@ namespace ms
 		showhp.set_for(5000);
 	}
 
-	void Mob::show_effect(const Animation &animation, int8_t pos, int8_t z, bool f)
+	void Mob::show_effect(const Animation &animation, int8_t pos, int8_t z, bool f, const Rectangle<int16_t> &range)
 	{
 		if (!active)
 			return;
 
-		Point<int16_t> shift;
+		Rectangle<int16_t> body = get_body();
+		Point<int16_t> position = get_position();
+		std::optional<hit_point::Placement> placement =
+				hit_point::place(pos, body, position, hit_point::centre(range, body));
 
-		switch (pos)
+		if (!placement)
+			return;
+
+		DrawArgument args(placement->offset, f);
+
+		switch (placement->anchor)
 		{
-			case 0:
-				shift = get_head_position(Point<int16_t>());
+			case hit_point::Anchor::FEET:
+				effects.add(animation, args, z);
 				break;
-			case 1:
+			case hit_point::Anchor::HEAD:
+				headeffects.add(animation, args, z);
 				break;
-			case 2:
-				break;
-			case 3:
-				break;
-			case 4:
+			case hit_point::Anchor::FIELD:
+				fieldeffects.add(animation, args, z);
 				break;
 		}
-
-		effects.add(animation, DrawArgument(shift, f), z);
 	}
 
 	void Mob::show_hit(const Animation &animation, const Rectangle<int16_t> &range, bool f)
@@ -1044,30 +1058,7 @@ namespace ms
 		if (!active)
 			return;
 
-		Rectangle<int16_t> body = animations.at(stance).get_bounds();
-		body.shift(get_position());
-
-		// As v83 does, centre the spark on the overlap of the attack and the
-		// body, first stretching an attack that falls short to touch it.
-		int16_t left = range.left();
-		int16_t right = range.right();
-		int16_t top = range.top();
-		int16_t bottom = range.bottom();
-
-		if (left >= body.right())
-			left = body.right() - 1;
-		else if (right <= body.left())
-			right = body.left() + 1;
-
-		if (top >= body.bottom())
-			top = body.bottom() - 1;
-		else if (bottom <= body.top())
-			bottom = body.top() + 1;
-
-		int16_t x = (std::max(left, body.left()) + std::min(right, body.right())) / 2;
-		int16_t y = (std::max(top, body.top()) + std::min(bottom, body.bottom())) / 2;
-
-		effects.add(animation, DrawArgument(Point<int16_t>(x, y) - get_position(), f), 0);
+		effects.add(animation, DrawArgument(hit_point::centre(range, get_body()) - get_position(), f), 0);
 	}
 
 	float Mob::calculate_hitchance(int16_t leveldelta, int32_t player_accuracy) const
