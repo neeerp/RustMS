@@ -125,6 +125,20 @@ pub async fn grant_skill(character_id: i32, skill_id: i32, level: i32) -> Result
     .await
 }
 
+/// Make the fame `giver_id` gave look `days` days older, as though that
+/// many days had passed since.
+pub async fn backdate_fame(giver_id: i32, days: i32) -> Result<(), HarnessError> {
+    change_one_row("backdate fame", move |conn| {
+        diesel::sql_query(
+            "UPDATE fame_log SET given_at = given_at - make_interval(days => $2) WHERE giver_id = $1",
+        )
+        .bind::<Integer, _>(giver_id)
+        .bind::<Integer, _>(days)
+        .execute(conn)
+    })
+    .await
+}
+
 async fn change_one_row(
     phase: &'static str,
     query: impl FnOnce(&mut PgConnection) -> QueryResult<usize> + Send + 'static,

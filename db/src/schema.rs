@@ -231,6 +231,14 @@ diesel::table! {
     }
 }
 diesel::joinable!(monster_book_cards -> characters (character_id));
+diesel::table! {
+    fame_log (id) {
+        id -> Int4,
+        giver_id -> Int4,
+        target_id -> Int4,
+        given_at -> Timestamp,
+    }
+}
 diesel::allow_tables_to_appear_in_same_query!(
     accounts,
     buddies,
@@ -245,4 +253,5 @@ diesel::allow_tables_to_appear_in_same_query!(
     cash_sales,
     wish_lists,
     monster_book_cards,
+    fame_log,
 );

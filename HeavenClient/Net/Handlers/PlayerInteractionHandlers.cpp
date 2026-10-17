@@ -21,6 +21,7 @@
 
 #include "../../Gameplay/Stage.h"
 #include "../../IO/UITypes/UICharInfo.h"
+#include "../../IO/UITypes/UIChatBar.h"
 
 namespace ms
 {
@@ -86,5 +87,66 @@ namespace ms
 		// Update the character information window
 		if (auto charinfo = UI::get().get_element<UICharInfo>())
 			charinfo->update_stats(character_id, character_job_id, character_level, character_fame, guild_name, alliance_name);
+	}
+
+	namespace
+	{
+		void fame_line(const std::string &message)
+		{
+			if (auto chatbar = UI::get().get_element<UIChatBar>())
+				chatbar->send_chatline(message, UIChatBar::LineType::SKILL);
+		}
+
+		// v83's lines put the name in '%s''s, quotes and all.
+		std::string fame_named(const std::string &format, const std::string &name)
+		{
+			std::string line = format;
+			line.replace(line.find("%s"), 2, name);
+
+			return line;
+		}
+	}
+
+	void FameResponseHandler::handle(InPacket& recv) const
+	{
+		switch (recv.read_byte())
+		{
+			case 0:
+			{
+				std::string target = recv.read_string();
+				bool up = recv.read_bool();
+				int32_t fame = recv.read_int();
+
+				if (auto charinfo = UI::get().get_element<UICharInfo>())
+					charinfo->change_fame(static_cast<int16_t>(fame));
+
+				fame_line(fame_named(up ? "You have raised '%s''s level of fame." : "You have dropped '%s''s level of fame.", target));
+				break;
+			}
+			case 1:
+				fame_line("The user name is incorrectly entered.");
+				break;
+			case 2:
+				fame_line("Users under level 15 are unable to toggle with fame.");
+				break;
+			case 3:
+				fame_line("You can't raise or drop a level of fame anymore for today.");
+				break;
+			case 4:
+				fame_line("You can't raise or drop a level of fame of that character anymore for this month.");
+				break;
+			case 5:
+			{
+				std::string giver = recv.read_string();
+				bool up = recv.read_bool();
+				std::string line = fame_named(up ? "'%s' have raised '%s''s level of fame." : "'%s' have dropped '%s''s level of fame.", giver);
+
+				fame_line(fame_named(line, Stage::get().get_player().get_name()));
+				break;
+			}
+			default:
+				fame_line("The level of fame has neither been raised or dropped due to an unexpected error.");
+				break;
+		}
 	}
 }

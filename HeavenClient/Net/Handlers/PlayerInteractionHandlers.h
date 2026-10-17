@@ -26,4 +26,11 @@ namespace ms
 	{
 		void handle(InPacket& recv) const override;
 	};
+
+	// What giving fame came to (v83 FUN_00a223dc): a line in chat, and for
+	// the giver, the new fame in the open info window.
+	class FameResponseHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
 }

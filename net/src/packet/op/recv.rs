@@ -61,6 +61,7 @@ pub enum RecvOpcode {
     CancelBuff = 0x5C,
     SkillEffect = 0x5D,
     MesoDrop = 0x5E,
+    GiveFame = 0x5F,
     CharInfoRequest = 0x61,
     ChangeMapSpecial = 0x64,
     QuestAction = 0x6B,

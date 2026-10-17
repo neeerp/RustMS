@@ -62,6 +62,22 @@ the field's projection. Guild, alliance, pets, mount, wish list, and monster
 book are empty; the medal is the item worn in the medal slot. A request for
 someone not on the map gets no answer.
 
+## Fame
+
+The fame buttons in someone else's character info send GIVE_FAME (0x5F:
+character id, `u8` up). `GiveFameHandler` ignores fame for yourself and tells a
+giver below level 15 they can't (FAME_RESPONSE 0x26 mode 2); otherwise it
+returns `WorldAction::GiveFame`. The giver's client actor records the gift in
+`fame_log` (`db::fame::give`), refusing an unknown character (mode 1), a second
+gift within a day (mode 3), or a gift to the same character within 30 days
+(mode 4). Then it passes `FieldRequest::Fame` to its field. If the target is
+on the map, the field sends their actor `ServerMessage::Famed`. The target
+changes its own fame by one, within ±30000, and sends the stat update and
+mode 5 (giver, up) to its player and mode 0 (target, up, new fame) to the
+giver. A target not on the map sends the giver `ServerMessage::FameMissed`,
+which deletes the log row (`db::fame::forget`) and answers mode 1, so the miss
+doesn't spend the day.
+
 ## Map changes
 
 `ChangeMapHandler` resolves the destination (portal link or permitted map-id

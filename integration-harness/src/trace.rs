@@ -120,6 +120,9 @@ pub struct Trace {
     pub blocked: Vec<(i16, u8)>,
     /// SKILL_LEARN_ITEM_RESULT: (reader, skill, master level, used, success).
     pub books: Vec<(i32, i32, i32, bool, bool)>,
+    /// FAME_RESPONSE: (mode, name, up, new fame); the name, up and fame are
+    /// empty, false and 0 where the mode has none.
+    pub fame: Vec<(u8, String, bool, i32)>,
     /// Mobs and drops on the current field.
     pub field: Field,
 }
@@ -186,6 +189,22 @@ impl Trace {
             self.stat_updates.push(values);
         } else if op == SendOpcode::BlockedMap as i16 || op == SendOpcode::BlockedServer as i16 {
             self.blocked.push((op, r.read_byte().unwrap()));
+        } else if op == SendOpcode::FameResponse as i16 {
+            let mode = r.read_byte().unwrap();
+            let (name, up, fame) = match mode {
+                0 => (
+                    r.read_str_with_length().unwrap(),
+                    r.read_byte().unwrap() != 0,
+                    r.read_int().unwrap(),
+                ),
+                5 => (
+                    r.read_str_with_length().unwrap(),
+                    r.read_byte().unwrap() != 0,
+                    0,
+                ),
+                _ => (String::new(), false, 0),
+            };
+            self.fame.push((mode, name, up, fame));
         } else if op == SendOpcode::SkillBookResult as i16 {
             let reader = r.read_int().unwrap();
             r.read_byte().unwrap();

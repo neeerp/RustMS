@@ -21,6 +21,9 @@
 
 #include "../../Character/Job.h"
 #include "../../Gameplay/Stage.h"
+#include "../../IO/UI.h"
+#include "../../IO/UITypes/UIChatBar.h"
+#include "../../Net/Packets/PlayerInteractionPackets.h"
 #include "../../Util/NxFiles.h"
 
 #include <nlnx/nx.hpp>
@@ -93,9 +96,17 @@ namespace ms
 		buttons[Buttons::BT_EXCEPTION] = std::make_unique<MapleButton>(UserInfo["BtExceptionShow"]);
 		buttons[Buttons::BT_PANEL_HIDE] = std::make_unique<MapleButton>(Basic["BtHide"], PANEL + PANEL_HIDE);
 
-		// There are no families, parties, trades, fame, or pets yet.
-		for (auto button : { Buttons::BT_FAMILY, Buttons::BT_PARTY, Buttons::BT_TRADE, Buttons::BT_FAME_UP, Buttons::BT_FAME_DOWN, Buttons::BT_EXCEPTION })
+		// There are no families, parties, trades, or pets yet.
+		for (auto button : { Buttons::BT_FAMILY, Buttons::BT_PARTY, Buttons::BT_TRADE, Buttons::BT_EXCEPTION })
 			buttons[button]->set_state(Button::State::DISABLED);
+
+		// v83 offers fame only from level 15 (FUN_009007a0), and never for
+		// oneself (FUN_00903b86).
+		auto &player = Stage::get().get_player();
+
+		if (cid == player.get_oid() || player.get_stats().get_stat(MapleStat::Id::LEVEL) < 15)
+			for (auto button : { Buttons::BT_FAME_UP, Buttons::BT_FAME_DOWN })
+				buttons[button]->set_state(Button::State::DISABLED);
 
 		name = Text(Text::Font::A12M, Text::Alignment::CENTER, Color::Name::WHITE);
 		level = Text(Text::Font::A12M, Text::Alignment::LEFT, Color::Name::BLACK);
@@ -155,6 +166,12 @@ namespace ms
 		case Buttons::BT_PANEL_HIDE:
 			set_panel(Panel::NO_PANEL);
 			break;
+		case Buttons::BT_FAME_UP:
+			give_fame(true);
+			break;
+		case Buttons::BT_FAME_DOWN:
+			give_fame(false);
+			break;
 		case Buttons::BT_PET_SHOW:
 			set_mode(Mode::PET);
 			break;
@@ -207,6 +224,31 @@ namespace ms
 		fame.change_text(std::to_string(f));
 		guild.change_text(g.empty() ? "-" : g);
 		alliance.change_text(a.empty() ? "-" : a);
+	}
+
+	void UICharInfo::change_fame(int16_t f)
+	{
+		fame.change_text(std::to_string(f));
+	}
+
+	void UICharInfo::give_fame(bool up) const
+	{
+		const char *refusal = nullptr;
+
+		if (!Stage::get().get_character(cid))
+			refusal = "Unable to find the character.";
+		else if (!Stage::get().try_give_fame())
+			refusal = "Please try it again later.";
+
+		if (refusal)
+		{
+			if (auto chatbar = UI::get().get_element<UIChatBar>())
+				chatbar->send_chatline(refusal, UIChatBar::LineType::SKILL);
+
+			return;
+		}
+
+		GiveFamePacket(cid, up).dispatch();
 	}
 
 	void UICharInfo::set_mode(Mode m)
