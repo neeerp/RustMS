@@ -55,6 +55,9 @@ namespace ms
 
 		void add_recommended_world(RecommendedWorld world);
 
+		// Put the key focus on the world the account last played in.
+		void focus_world(int32_t worldid);
+
 		void remove_selected();
 
 		// The v83 art for a world is keyed by the world id itself.

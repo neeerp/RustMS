@@ -69,6 +69,14 @@ namespace ms
 		void handle(InPacket& recv) const override;
 	};
 
+	// The world the account last played in, as MapleRoyals does (0x5f82f4):
+	// its plank gets the key focus. 253 keeps the last one; 254 and 255
+	// name none.
+	class LastConnectedWorldHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
 	// Handles the packet that contains information on recommended worlds
 	class RecommendedWorldsHandler : public PacketHandler
 	{
