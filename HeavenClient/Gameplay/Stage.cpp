@@ -399,6 +399,10 @@ namespace ms
 		{
 			pending_teleport = Teleport{ spot->position, spot->foothold };
 			player.show_effect_id(CharEffect::Id::TELEPORT);
+
+			// Element 4 marks the jump in the path, from where the player
+			// stands until the move lands on the next update.
+			player.record_move(4);
 		}
 	}
 

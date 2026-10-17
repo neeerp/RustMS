@@ -273,6 +273,8 @@ pub enum WorldAction {
     FieldChat(Packet),
     FieldMove {
         packet: Packet,
+        /// Where the path starts.
+        start: (i16, i16),
         movement_bytes: Vec<u8>,
     },
     NpcInteraction(NpcInteraction),

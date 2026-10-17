@@ -94,11 +94,17 @@ pub fn build_player_leave_field(character_id: i32) -> Result<Packet, NetworkErro
     Ok(packet)
 }
 
-pub fn build_player_move(character_id: i32, movement_bytes: &[u8]) -> Result<Packet, NetworkError> {
+/// MOVE_PLAYER: relay a player's movement path, which starts at `start`.
+pub fn build_player_move(
+    character_id: i32,
+    start: (i16, i16),
+    movement_bytes: &[u8],
+) -> Result<Packet, NetworkError> {
     let mut packet = Packet::new_empty();
     packet.write_short(SendOpcode::MovePlayer as i16)?;
     packet.write_int(character_id)?;
-    packet.write_int(0)?;
+    packet.write_short(start.0)?;
+    packet.write_short(start.1)?;
     packet.write_bytes(movement_bytes)?;
     Ok(packet)
 }
@@ -154,8 +160,12 @@ pub fn parse_movement_state(
 }
 
 /// Like `parse_movement_state`, plus the foothold the mover ended up on:
-/// that of the last absolute or jump-down fragment (0 means airborne), if
-/// any fragment had one.
+/// that of the last element with a position (0 means airborne), if any.
+///
+/// The elements follow a path's start position (`current`'s x and y), as
+/// v83 reads them (FUN_0068a33c): each is a type byte and its fields, then a
+/// stance byte and a duration short, except type 10, which has neither.
+/// Elements that carry only a velocity keep the position before them.
 pub fn parse_movement(
     movement_bytes: &[u8],
     current: (i16, i16, u8),
@@ -172,41 +182,43 @@ pub fn parse_movement(
     for _ in 0..count {
         let command = cursor.read_byte().ok()?;
         match command {
-            0 | 5 | 17 => {
+            // Position, velocity, foothold (and for 15, the foothold it
+            // fell from).
+            0 | 5 | 15 | 17 => {
                 x = cursor.read_short().ok()?;
                 y = cursor.read_short().ok()?;
-                let _ = cursor.read_short().ok()?;
-                let _ = cursor.read_short().ok()?;
+                cursor.read_short().ok()?;
+                cursor.read_short().ok()?;
                 foothold = Some(cursor.read_short().ok()?);
-                stance = cursor.read_byte().ok()?;
-                let _ = cursor.read_short().ok()?;
+                if command == 15 {
+                    cursor.read_short().ok()?;
+                }
             }
-            1 | 2 | 6 | 12 | 13 | 16 => {
+            // Velocity.
+            1 | 2 | 6 | 12 | 13 | 16 | 18 | 19 | 20 | 22 => {
+                cursor.read_short().ok()?;
+                cursor.read_short().ok()?;
+            }
+            // Position and foothold.
+            3 | 4 | 7 | 8 | 9 | 11 => {
                 x = cursor.read_short().ok()?;
                 y = cursor.read_short().ok()?;
-                stance = cursor.read_byte().ok()?;
-                let _ = cursor.read_short().ok()?;
-            }
-            11 => {
-                x = cursor.read_short().ok()?;
-                y = cursor.read_short().ok()?;
-                let _ = cursor.read_short().ok()?;
-                stance = cursor.read_byte().ok()?;
-                let _ = cursor.read_short().ok()?;
-            }
-            15 => {
-                x = cursor.read_short().ok()?;
-                y = cursor.read_short().ok()?;
-                let _ = cursor.read_short().ok()?;
-                let _ = cursor.read_short().ok()?;
-                let _ = cursor.read_short().ok()?;
                 foothold = Some(cursor.read_short().ok()?);
-                stance = cursor.read_byte().ok()?;
-                let _ = cursor.read_short().ok()?;
             }
-            3 | 4 | 7 | 8 | 9 | 10 | 14 => {}
-            _ => return None,
+            // Velocity and the foothold fallen from.
+            14 => {
+                cursor.read_short().ok()?;
+                cursor.read_short().ok()?;
+                cursor.read_short().ok()?;
+            }
+            10 => {
+                cursor.read_byte().ok()?;
+                continue;
+            }
+            _ => {}
         }
+        stance = cursor.read_byte().ok()?;
+        cursor.read_short().ok()?;
     }
 
     Some((x, y, stance, foothold))
@@ -317,13 +329,46 @@ mod tests {
     #[test]
     fn player_move_rebroadcasts_the_movement_bytes() {
         let movement = [1u8, 0, 0x10, 0, 0x20, 0, 0, 0, 0, 0, 0, 0, 4, 0, 0x64, 0];
-        let packet = build_player_move(0x0102_0304, &movement).unwrap();
+        let packet = build_player_move(0x0102_0304, (-40, 300), &movement).unwrap();
 
         let mut expect = Expect::new(&packet.bytes);
         expect.short(SendOpcode::MovePlayer as i16);
-        expect.int(0x0102_0304).int(0);
+        expect.int(0x0102_0304).short(-40).short(300);
         expect.bytes(&movement);
         expect.end();
+    }
+
+    #[test]
+    fn movement_reads_each_element_type() {
+        let movement = [
+            6u8, //
+            // A walk: position (16, 32), velocity, foothold 7.
+            0, 0x10, 0, 0x20, 0, 0x05, 0, 0, 0, 7, 0, 4, 0x64, 0, //
+            // A jump: velocity only, so the position stays.
+            1, 0xF0, 0xFF, 0x9C, 0xFF, 6, 0x5A, 0, //
+            // Type 10: one byte, no stance or duration.
+            10, 3, //
+            // A down jump: foothold 9, fallen from 8.
+            15, 0x30, 0, 0x40, 0, 0, 0, 0, 0, 9, 0, 8, 0, 7, 0x10, 0, //
+            // A teleport: position and foothold 11.
+            4, 0x50, 0, 0x60, 0, 11, 0, 2, 0, 0, //
+            // An unknown type: stance and duration only.
+            21, 5, 0x10, 0,
+        ];
+        assert_eq!(
+            parse_movement(&movement, (1, 2, 3)),
+            Some((0x50, 0x60, 5, Some(11)))
+        );
+
+        // Velocity-only elements keep the start and its stance until theirs.
+        let jump = [
+            2u8, 1, 0, 0, 0, 0, 6, 0x5A, 0, 14, 0, 0, 0, 0, 3, 0, 7, 0x10, 0,
+        ];
+        assert_eq!(
+            parse_movement(&jump, (100, -50, 2)),
+            Some((100, -50, 7, None))
+        );
+        assert_eq!(parse_movement(&jump[..jump.len() - 1], (100, -50, 2)), None);
     }
 
     #[test]

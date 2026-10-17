@@ -259,17 +259,26 @@ namespace ms
 
 		update_recovery();
 
-		uint8_t stancebyte = facing_right ? state : state + 1;
-		Movement newmove(phobj, stancebyte);
+		Movement newmove(phobj, get_stancebyte());
 		bool needupdate = lastmove.hasmoved(newmove);
 
 		if (needupdate)
 		{
-			MovePlayerPacket(newmove).dispatch();
+			MovePlayerPacket({ phobj.get_last_x(), phobj.get_last_y() }, newmove).dispatch();
 			lastmove = newmove;
 		}
 
 		return get_layer();
+	}
+
+	uint8_t Player::get_stancebyte() const
+	{
+		return facing_right ? state : state + 1;
+	}
+
+	void Player::record_move(uint8_t command)
+	{
+		MovePlayerPacket(phobj.get_position(), Movement(phobj, get_stancebyte(), command, 0)).dispatch();
 	}
 
 	void Player::update_death()

@@ -76,6 +76,9 @@ namespace ms
 
 	void OtherChar::send_movement(const std::vector<Movement> &newmoves)
 	{
+		if (newmoves.empty())
+			return;
+
 		movements.push(newmoves.back());
 
 		if (timer == 0)
