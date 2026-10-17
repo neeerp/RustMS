@@ -111,6 +111,7 @@ namespace ms
 		ladder = nullptr;
 		set_chair(0);
 		nullstate.update_state(*this);
+		path.reset(current_move(0));
 	}
 
 	void Player::send_action(KeyAction::Id action, bool down)
@@ -259,14 +260,10 @@ namespace ms
 
 		update_recovery();
 
-		Movement newmove(phobj, get_stancebyte());
-		bool needupdate = lastmove.hasmoved(newmove);
+		path.step(current_move(0), Constants::TIMESTEP);
 
-		if (needupdate)
-		{
-			MovePlayerPacket({ phobj.get_last_x(), phobj.get_last_y() }, newmove).dispatch();
-			lastmove = newmove;
-		}
+		if (auto sent = path.flush())
+			MovePlayerPacket(*sent).dispatch();
 
 		return get_layer();
 	}
@@ -278,7 +275,21 @@ namespace ms
 
 	void Player::record_move(uint8_t command)
 	{
-		MovePlayerPacket(phobj.get_position(), Movement(phobj, get_stancebyte(), command, 0)).dispatch();
+		path.add(current_move(command));
+	}
+
+	Movement Player::current_move(uint8_t command) const
+	{
+		Movement move(phobj, get_stancebyte(), command, 0);
+
+		if (is_dead())
+			move.fh = 0;
+		else if (ladder)
+			move.fh = -ladder->get_id();
+		else if (!phobj.onground)
+			move.fh = 0;
+
+		return move;
 	}
 
 	void Player::update_death()
