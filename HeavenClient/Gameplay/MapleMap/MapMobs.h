@@ -90,6 +90,17 @@ namespace ms
 		// Return the id of the first mob who collides with the object.
 		int32_t find_colliding(const MovingObject &moveobj) const;
 
+		// The first mob whose touch hurts that overlaps `area`, or 0.
+		int32_t find_touching(const Rectangle<int16_t> &area) const;
+
+		// The player's Puppet came, or went: the mobs this client moves turn
+		// on it, or give it up.
+		void aggro_puppet(int32_t oid, Point<int16_t> position);
+		void release_puppet(int32_t oid);
+
+		// Roll what mob `oid`'s touch does to a Puppet of skill level `level`.
+		int32_t roll_puppet_damage(int32_t oid, int32_t level) const;
+
 		// Create an attack by the specified mob.
 		MobAttack create_attack(int32_t oid) const;
 

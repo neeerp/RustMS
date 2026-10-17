@@ -91,6 +91,8 @@ int main()
 		require(physical_damage(100, 40, 100, 0.0) == 215 && physical_damage(100, 40, 100, 0.999999) == 289,
 				"a hit is 70-100% of the main stat times 2.5, plus the others");
 		require(physical_damage(100, 40, 50, 0.0) == 107, "times the summon's pad percent");
+		require(touch_damage(300, 20, 0.5) == 189 && touch_damage(300, 20, 0.999999) == 339 &&
+				touch_damage(12, 20, 0.5) == 0, "a Puppet takes the square of the mob's attack, scaled down");
 		require(main_stat(311) == DEX && main_stat(412) == LUK && main_stat(212) == INT && main_stat(1100) == STR &&
 				main_stat(520) == DEX, "each job has its main stat");
 

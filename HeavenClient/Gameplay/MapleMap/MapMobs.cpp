@@ -183,14 +183,18 @@ namespace ms
 					vertical.greater()
 			};
 
+		return find_touching(player_rect);
+	}
+
+	int32_t MapMobs::find_touching(const Rectangle<int16_t> &area) const
+	{
 		auto iter = std::find_if(
 				mobs.begin(),
 				mobs.end(),
-				[&player_rect](auto &mmo)
+				[&area](auto &mmo)
 				{
 					Optional<Mob> mob = mmo.second.get();
-					return mob && mob->is_alive() && mob->deals_touch_damage() &&
-						   mob->is_in_range(player_rect);
+					return mob && mob->is_alive() && mob->deals_touch_damage() && mob->is_in_range(area);
 				}
 		);
 
@@ -198,6 +202,28 @@ namespace ms
 			return 0;
 
 		return iter->second->get_oid();
+	}
+
+	void MapMobs::aggro_puppet(int32_t oid, Point<int16_t> position)
+	{
+		for (auto &mmo : mobs)
+			if (Optional<Mob> mob = mmo.second.get())
+				mob->aggro_puppet(oid, position);
+	}
+
+	void MapMobs::release_puppet(int32_t oid)
+	{
+		for (auto &mmo : mobs)
+			if (Optional<Mob> mob = mmo.second.get())
+				mob->release_puppet(oid);
+	}
+
+	int32_t MapMobs::roll_puppet_damage(int32_t oid, int32_t level) const
+	{
+		if (Optional<const Mob> mob = mobs.get(oid))
+			return mob->roll_puppet_damage(level);
+
+		return 0;
 	}
 
 	MobAttack MapMobs::create_attack(int32_t oid) const
