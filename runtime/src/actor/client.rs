@@ -8,6 +8,7 @@ mod npc_script;
 mod quest;
 mod script;
 mod shop;
+mod storage;
 
 use crate::actor::registry::FieldRegistry;
 use crate::db::spawn_db;
@@ -89,6 +90,8 @@ pub struct ClientActor {
     script: Option<npc_script::ActiveScript>,
     /// The NPC shop the player has open.
     shop: Option<net::shop::Shop>,
+    /// The account's storage, while the player has it open.
+    storage: Option<net::storage::OpenStorage>,
     /// When natural recovery of HP and of MP was last accepted; the client
     /// times them separately.
     last_heal: (Option<tokio::time::Instant>, Option<tokio::time::Instant>),
@@ -147,6 +150,7 @@ impl ClientActor {
             conversation: None,
             script: None,
             shop: None,
+            storage: None,
             last_heal: (None, None),
             last_moved: None,
             pending_quest: None,
@@ -295,6 +299,7 @@ impl ClientActor {
                 self.conversation = None;
                 self.script = None;
                 self.shop = None;
+                self.storage = None;
                 self.npc_request_id = self.npc_request_id.wrapping_add(1);
                 self.send_to_field(FieldMessage::NpcInteraction {
                     from: self.client_id,
@@ -326,6 +331,7 @@ impl ClientActor {
             WorldAction::Died => self.died().await?,
             WorldAction::Quest(request) => self.request_quest_action(request).await?,
             WorldAction::Shop(request) => self.shop_action(request).await?,
+            WorldAction::Storage(request) => self.storage_request(request).await?,
             WorldAction::ScriptPortal { portal } => self.touch_script_portal(&portal).await?,
             WorldAction::LookChanged(announce) => {
                 let player = &self.in_game()?.player;
@@ -477,6 +483,7 @@ impl ClientActor {
         self.conversation = None;
         self.script = None;
         self.shop = None;
+        self.storage = None;
         self.pending_quest = None;
         self.npc_request_id = self.npc_request_id.wrapping_add(1);
         self.in_game_mut()?.player.chair = 0;

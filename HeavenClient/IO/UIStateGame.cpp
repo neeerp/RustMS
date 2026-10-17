@@ -38,6 +38,7 @@
 #include "UITypes/UIMonsterBook.h"
 #include "UITypes/UISkillBook.h"
 #include "UITypes/UIStatsInfo.h"
+#include "UITypes/UIStorage.h"
 #include "UITypes/UIStatusBar.h"
 #include "UITypes/UIStatusMessenger.h"
 #include "UITypes/UIUserList.h"
@@ -62,6 +63,8 @@ namespace ms
 					return Tooltip::Parent::SKILLBOOK;
 				case UIElement::Type::SHOP:
 					return Tooltip::Parent::SHOP;
+				case UIElement::Type::STORAGE:
+					return Tooltip::Parent::STORAGE;
 				case UIElement::Type::EVENT:
 					return Tooltip::Parent::EVENT;
 				case UIElement::Type::KEYCONFIG:
@@ -97,6 +100,7 @@ namespace ms
 		emplace<UIQuestComplete>(Stage::get().get_player().get_quests(), inventory);
 		emplace<UIPartyHP>(Stage::get().get_player().get_party(), stats);
 		emplace<UIShop>(look, inventory);
+		emplace<UIStorage>(inventory);
 
 		VWIDTH = Constants::Constants::get().get_viewwidth();
 		VHEIGHT = Constants::Constants::get().get_viewheight();
@@ -593,6 +597,7 @@ namespace ms
 					UIElement::Type::PARTYHP,
 					UIElement::Type::NPCTALK,
 					UIElement::Type::SHOP,
+					UIElement::Type::STORAGE,
 					UIElement::Type::REVIVE
 			};
 

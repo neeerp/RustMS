@@ -28,6 +28,7 @@
 #include "../IO/UITypes/UIItemInventory.h"
 #include "../IO/UITypes/UIKeyConfig.h"
 #include "../IO/UITypes/UIShop.h"
+#include "../IO/UITypes/UIStorage.h"
 
 namespace ms
 {
@@ -158,6 +159,9 @@ namespace ms
 
 			if (auto shop = UI::get().get_element<UIShop>())
 				shop->modify(mod.type);
+
+			if (auto storage = UI::get().get_element<UIStorage>())
+				storage->modify(mod.type);
 
 			auto eqinvent = UI::get().get_element<UIEquipInventory>();
 			auto itinvent = UI::get().get_element<UIItemInventory>();

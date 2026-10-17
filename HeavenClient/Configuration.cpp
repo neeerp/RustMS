@@ -72,6 +72,7 @@ namespace ms
 		settings.emplace<PosCHAT>();
 		settings.emplace<PosMINIMAP>();
 		settings.emplace<PosSHOP>();
+		settings.emplace<PosSTORAGE>();
 		settings.emplace<PosNOTICE>();
 		settings.emplace<PosMESSENGER>();
 		settings.emplace<PosCHANNEL>();

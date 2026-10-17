@@ -55,6 +55,7 @@ namespace ms
 			NOTICE,
 			NPCTALK,
 			SHOP,
+			STORAGE,
 			STATSINFO,
 			ITEMINVENTORY,
 			EQUIPINVENTORY,

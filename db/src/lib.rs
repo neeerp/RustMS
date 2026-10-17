@@ -27,6 +27,7 @@ pub mod keybinding;
 pub mod player;
 pub mod quest;
 pub mod session;
+pub mod storage;
 
 pub type DbPool = Pool<ConnectionManager<PgConnection>>;
 pub type DbConnection = PooledConnection<ConnectionManager<PgConnection>>;

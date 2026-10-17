@@ -163,6 +163,7 @@ namespace ms
 		NPC_DIALOGUE = 304,
 		OPEN_NPC_SHOP = 305,
 		CONFIRM_SHOP_TRANSACTION = 306,
+		TRUNK_RESULT = 309,
 		KEYMAP = 335,
 
 		/// Player Interaction
@@ -287,6 +288,7 @@ namespace ms
 		emplace<NPC_DIALOGUE, NpcDialogueHandler>();
 		emplace<OPEN_NPC_SHOP, OpenNpcShopHandler>();
 		emplace<CONFIRM_SHOP_TRANSACTION, ConfirmShopTransactionHandler>();
+		emplace<TRUNK_RESULT, TrunkResultHandler>();
 
 		// Player Interaction
 		emplace<CHAR_INFO, CharInfoHandler>();

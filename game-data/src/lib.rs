@@ -90,9 +90,19 @@ pub struct NpcDialogueTemplate {
     pub pages: Vec<String>,
 }
 
+/// What a storage NPC (one with `info/trunkPut`) charges, in mesos.
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub struct StorageFees {
+    /// To store an item (`trunkPut`).
+    pub put: i32,
+    /// To take one out (`trunkGet`).
+    pub get: i32,
+}
+
 #[derive(Debug, Default)]
 pub struct NpcDialogueData {
     dialogues: BTreeMap<i32, NpcDialogueTemplate>,
+    storages: BTreeMap<i32, StorageFees>,
 }
 
 impl NpcDialogueData {
@@ -106,6 +116,7 @@ impl NpcDialogueData {
             GameDataError::InvalidData("missing root child 'Npc.img'".to_string())
         })?;
         let mut dialogues = BTreeMap::new();
+        let mut storages = BTreeMap::new();
 
         for npc_index in npcs.child_indices(0)? {
             let name = npcs.node_name(npc_index)?;
@@ -118,6 +129,10 @@ impl NpcDialogueData {
             let Some(info) = npcs.child_by_name(npc_index, "info")? else {
                 continue;
             };
+            if let Some(put) = npcs.int_child(info, "trunkPut")? {
+                let get = npcs.int_child(info, "trunkGet")?.unwrap_or(0);
+                storages.insert(npc_id, StorageFees { put, get });
+            }
             let Some(speak) = npcs.child_by_name(info, "speak")? else {
                 continue;
             };
@@ -145,11 +160,19 @@ impl NpcDialogueData {
                 dialogues.insert(npc_id, NpcDialogueTemplate { npc_id, pages });
             }
         }
-        Ok(Self { dialogues })
+        Ok(Self {
+            dialogues,
+            storages,
+        })
     }
 
     pub fn dialogue(&self, npc_id: i32) -> Option<&NpcDialogueTemplate> {
         self.dialogues.get(&npc_id)
+    }
+
+    /// The fees if `npc_id` keeps a storage.
+    pub fn storage_fees(&self, npc_id: i32) -> Option<StorageFees> {
+        self.storages.get(&npc_id).copied()
     }
 }
 
@@ -793,6 +816,21 @@ mod tests {
         assert!(rain.pages[1].contains("Alt"));
         assert!(rain.pages[2].contains("arrow keys"));
         assert!(data.dialogue(-1).is_none());
+    }
+
+    #[test]
+    fn storage_npcs_charge_their_trunk_fees() {
+        let (Some(npc), Some(string)) =
+            (test_assets::path("Npc.nx"), test_assets::path("String.nx"))
+        else {
+            return;
+        };
+        let data = NpcDialogueData::load_from_nx(npc, string).expect("load NPC assets");
+        let fees = |put, get| Some(StorageFees { put, get });
+        assert_eq!(data.storage_fees(1012009), fees(100, 0), "Mr. Lee");
+        assert_eq!(data.storage_fees(2020004), fees(150, 0), "Mr. Mohammed");
+        assert_eq!(data.storage_fees(9030100), fees(500, 1000), "Scrooge");
+        assert_eq!(data.storage_fees(12101), None, "Rain keeps no storage");
     }
 
     #[test]

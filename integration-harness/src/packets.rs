@@ -1256,7 +1256,7 @@ fn decode_item(cursor: &mut Cursor<&[u8]>) -> Result<i32, String> {
 }
 
 /// An item's id and quantity (1 for equipment).
-fn decode_item_stack(cursor: &mut Cursor<&[u8]>) -> Result<(i32, i16), String> {
+pub fn decode_item_stack(cursor: &mut Cursor<&[u8]>) -> Result<(i32, i16), String> {
     let item_type = cursor.read_byte().map_err(|e| e.to_string())?;
     let item_id = cursor.read_int().map_err(|e| e.to_string())?;
     let is_cash = cursor.read_byte().map_err(|e| e.to_string())? != 0;

@@ -22,6 +22,7 @@
 #include "../IO/UITypes/UINotice.h"
 #include "../IO/UITypes/UINpcTalk.h"
 #include "../IO/UITypes/UIShop.h"
+#include "../IO/UITypes/UIStorage.h"
 #include "../Gameplay/QuestConversation.h"
 
 namespace ms
@@ -94,6 +95,76 @@ namespace ms
 			return;
 		}
 
+		UI::get().emplace<UIOk>(message, [](bool) {});
+	}
+
+	void TrunkResultHandler::handle(InPacket& recv) const
+	{
+		enum Mode : int8_t
+		{
+			TAKEN_OUT = 0x09,
+			INVENTORY_FULL = 0x0a,
+			ONLY_ONCE = 0x0b,
+			NO_MESOS_TO_TAKE = 0x0c,
+			STORED = 0x0d,
+			SORTED = 0x0f,
+			NO_MESOS_TO_STORE = 0x10,
+			STORAGE_FULL = 0x11,
+			MESO = 0x13,
+			OPEN = 0x16,
+			MESSAGE = 0x17
+		};
+
+		int8_t mode = recv.read_byte();
+		auto ostorage = UI::get().get_element<UIStorage>();
+
+		if (!ostorage)
+			return;
+
+		UIStorage& storage = *ostorage;
+
+		if (mode == Mode::OPEN)
+		{
+			int32_t npcid = recv.read_int();
+			storage.open(npcid, storage_contents::read(recv));
+
+			return;
+		}
+
+		if (!storage.is_active())
+			return;
+
+		std::string message = "Due to an error, the trade did not happen.";
+
+		switch (mode)
+		{
+		case Mode::TAKEN_OUT:
+		case Mode::STORED:
+		case Mode::SORTED:
+		case Mode::MESO:
+			storage.change(storage_contents::read(recv));
+			return;
+		case Mode::INVENTORY_FULL:
+			message = "Please check if your inventory is full or not.";
+			break;
+		case Mode::ONLY_ONCE:
+			message = "Item could not be retrieved\\nbecause there was an item that\\ncould only be acquired once.";
+			break;
+		case Mode::NO_MESOS_TO_TAKE:
+		case Mode::NO_MESOS_TO_STORE:
+			message = "You do not have enough mesos.";
+			break;
+		case Mode::STORAGE_FULL:
+			message = "The storage is full.";
+			break;
+		case Mode::MESSAGE:
+			if (recv.read_bool())
+				message = recv.read_string();
+
+			break;
+		}
+
+		storage.answered();
 		UI::get().emplace<UIOk>(message, [](bool) {});
 	}
 }

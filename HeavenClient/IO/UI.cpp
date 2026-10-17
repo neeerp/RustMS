@@ -31,6 +31,7 @@
 #include "UITypes/UIGameOption.h"
 #include "UITypes/UINpcTalk.h"
 #include "UITypes/UIShop.h"
+#include "UITypes/UIStorage.h"
 #include "UITypes/UIStatusBar.h"
 #include "UITypes/UISystemOption.h"
 #include "UITypes/UIWorldMap.h"
@@ -248,6 +249,7 @@ namespace ms
 			auto gameoption = UI::get().get_element<UIGameOption>();
 			auto systemoption = UI::get().get_element<UISystemOption>();
 			auto shop = UI::get().get_element<UIShop>();
+			auto storage = UI::get().get_element<UIStorage>();
 			auto npctalk = UI::get().get_element<UINpcTalk>();
 			//auto report = UI::get().get_element<UIReport>();
 			//auto whisper = UI::get().get_element<UIWhisper>();
@@ -279,6 +281,10 @@ namespace ms
 			} else if (shop && shop->is_active())
 			{
 				shop->send_key(mapping.action, pressed, escape);
+				sent = true;
+			} else if (storage && storage->is_active())
+			{
+				storage->send_key(mapping.action, pressed, escape);
 				sent = true;
 			} else
 			{

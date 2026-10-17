@@ -107,6 +107,9 @@ session.
 - Quest transitions (`db::quest::transition`) lock the character row and
   commit progress and rewards together; the actor then adopts the committed
   level, EXP, and AP and updates the in-memory quest log.
+- An account's storage (`db::storage`) is loaded when a storage NPC opens it.
+  Every change is saved together with the player (`db::storage::save`) in one
+  transaction, outside the dirty-flag cycle (`agent_docs/inventory.md`).
 
 ## Handlers
 
