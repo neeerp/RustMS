@@ -51,6 +51,7 @@ namespace ms
 		prepare.keydown = { src["keydown"], src["keydown"]["z"] };
 		prepare.keydownend = { src["keydownend"], src["keydownend"]["z"] };
 		special = src["special"];
+		affected = { src["affected"], src["affected"]["z"] };
 
 		if (shot_rain::kind(skillid) != shot_rain::Kind::NONE || spell_area::kind(skillid) != spell_area::Kind::NONE)
 		{
@@ -330,6 +331,11 @@ namespace ms
 	Animation Skill::get_special() const
 	{
 		return special;
+	}
+
+	const SkillPrepare::Effect &Skill::get_affected() const
+	{
+		return affected;
 	}
 
 	const SkillRain &Skill::get_rain() const

@@ -91,6 +91,11 @@ namespace ms
 		// Show a buff effect.
 		void show_player_buff(int32_t skillid);
 
+		// Show a party member's skill reaching another user, or the player
+		// (user effect 2, 0x937b83).
+		void show_affected(int32_t cid, int32_t skillid);
+		void show_player_affected(int32_t skillid);
+
 		// Show Monster Magnet catching a mob, or failing to, over it
 		// (0x66d6b9, 0x438eb6).
 		void show_catch(int32_t oid, bool success);

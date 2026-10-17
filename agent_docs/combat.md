@@ -230,9 +230,9 @@ once past beginner.
 ## Buff skills
 
 USE_SKILL (`0x5B`, `handle::world::use_skill`) casts a skill that doesn't
-attack. Only the beginner buffs do anything yet (Recovery and Nimble Feet, by
-`skill_id % 10_000_000`, so Noblesse and Legend copies work too); others are
-ignored. The level the client names must be the learned one, the skill must
+attack. `net::skills::buffs` maps each buff skill to the stats it gives (the
+level's attack, defense, accuracy, avoidability, speed and jump, plus the
+skill's own stat); a skill missing from it is ignored. The level the client names must be the learned one, the skill must
 be off cooldown, and the player alive with enough MP. The caster gets the MP
 left, GIVE_BUFF (the temporary-stat masks match HeavenMS: Speed and Recovery
 are both second-mask bits), and COOLDOWN when the level has a `cooltime`;
@@ -246,6 +246,18 @@ CANCEL_BUFF, since the client never ends buffs itself. Right-clicking a buff
 icon sends CANCEL_BUFF (`0x5C`, the skill id), which ends that skill's buffs
 and answers with CANCEL_BUFF. Dying and changing channel end every buff;
 cooldowns keep running.
+
+A skill that reaches the party (`skills::reaches_party`) carries a slot mask
+after the level: 0x80 alone, else bit `1 << (5 - slot)` for each member the
+client found in the skill's area, the caster included, with slots in joining
+order. The handler passes the skill on as `WorldAction::PartySkill`; the
+directory sends it to the members in those slots on the caster's map, and
+each member's client actor applies it when they are alive, out of the Cash
+Shop, and within the level's `lt`/`rb` around the caster plus 100 px
+(`skills::in_area`). Members get the buffs without MP or cooldown, or for
+Heal the caster's per-member share of HP, and SHOW_ITEM_GAIN_INCHAT /
+SHOW_FOREIGN_EFFECT type 2 (`skill, level`), which plays the skill's
+`affected` animation on them.
 
 ## Spending AP and SP
 

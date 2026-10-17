@@ -109,6 +109,164 @@ pub fn amplification(player: &Player) -> i32 {
         .map_or(100, |skill| skill.effect.y)
 }
 
+/// The skill at `level`, whoever has it: what a party member gets from
+/// another's skill.
+pub fn at_level(skill_id: i32, level: i32) -> Option<Learned> {
+    let effect = info(skill_id)?.level(level)?.clone();
+    Some(Learned {
+        skill_id,
+        level,
+        effect,
+    })
+}
+
+pub const SHADOW_STARS: i32 = 4121006;
+pub const DISPEL: i32 = 2311001;
+pub const RESURRECTION: i32 = 2321006;
+
+/// Whether USE_SKILL carries where the player stands (0x96d6ca): the skills
+/// that place something, or reach the party around them.
+pub fn sends_position(skill_id: i32) -> bool {
+    matches!(
+        skill_id,
+        1001003
+            | 1101006
+            | 1111007
+            | 1121000
+            | 1201006
+            | 1211009
+            | 1221000
+            | 1301006
+            | 1301007
+            | 1311007
+            | 1321000
+            | 2101001
+            | 2101003
+            | 2121000
+            | 2201001
+            | 2201003
+            | 2221000
+            | 2301004
+            | 2311001
+            | 2311003
+            | 2321000
+            | 2321005
+            | 3121000
+            | 3121002
+            | 3221000
+            | 4101004
+            | 4111001
+            | 4121000
+            | 4201003
+            | 4221000
+            | 5121000
+            | 5121009
+            | 5221000
+            | 11001001
+            | 11101003
+            | 12101000
+            | 12101001
+            | 14101003
+            | 15111005
+            | 21121000
+            | 22171000
+            | 22181000
+    )
+}
+
+/// Whether a skill reaches the party members around the player (0x966f7a),
+/// so that USE_SKILL carries a bit for each one it reached.
+pub fn reaches_party(skill_id: i32) -> bool {
+    matches!(
+        skill_id,
+        1101006
+            | 1121000
+            | 1221000
+            | 1301006
+            | 1301007
+            | 1321000
+            | 2101001
+            | 2121000
+            | 2201001
+            | 2221000
+            | 2301004
+            | 2311003
+            | 2321000
+            | 2321005
+            | RESURRECTION
+            | 3121000
+            | 3121002
+            | 3221000
+            | 3221002
+            | 4101004
+            | 4111001
+            | 4121000
+            | 4201003
+            | 4221000
+            | 5121000
+            | 5121009
+            | 5121010
+            | 5221000
+            | 11101003
+            | 12101000
+            | 14101003
+            | 15111005
+            | 21120007
+            | 21121000
+            | DISPEL
+    )
+}
+
+/// Whether a skill reaches the mobs around the player, so that USE_SKILL
+/// carries the ones it reached.
+pub fn reaches_mobs(skill_id: i32) -> bool {
+    matches!(
+        skill_id,
+        1111007
+            | 1201006
+            | 1211009
+            | 1311007
+            | 2101003
+            | 2111004
+            | 2201003
+            | 2211004
+            | 2311005
+            | 4111003
+            | 4121004
+            | 4221004
+            | 12101001
+            | 12111002
+            | 14111001
+            | DISPEL
+    )
+}
+
+/// The party a skill reached without one: the player alone.
+pub const ALONE: u8 = 0x80;
+
+/// The bit USE_SKILL sets for the party slot `slot`, the first highest
+/// (0x96db3f).
+pub fn party_bit(slot: usize) -> u8 {
+    if slot < 6 {
+        1 << (5 - slot)
+    } else {
+        0
+    }
+}
+
+/// How far past a skill's area a party member may stand and still be
+/// reached: the user's client sees them where they were a moment ago.
+pub const AREA_SLACK: i32 = 100;
+
+/// Whether someone at `at` stands in the area of a skill used at `origin`,
+/// whichever way the user faced, give or take `AREA_SLACK`.
+pub fn in_area(effect: &SkillLevel, origin: (i16, i16), at: (i16, i16)) -> bool {
+    let reach_x = effect.lt.0.abs().max(effect.rb.0.abs()) + AREA_SLACK;
+    let dx = i32::from(at.0) - i32::from(origin.0);
+    let dy = i32::from(at.1) - i32::from(origin.1);
+    dx.abs() <= reach_x && effect.lt.1 - AREA_SLACK <= dy && dy <= effect.rb.1 + AREA_SLACK
+}
+
 /// Heal: it heals the party around the cleric and hurts the undead.
 pub const HEAL: i32 = 2301002;
 

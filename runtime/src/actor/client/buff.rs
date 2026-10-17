@@ -4,9 +4,43 @@ use crate::message::FieldMessage;
 use game::BuffStat;
 use net::packet::build::world::buff;
 use net::packet::build::world::stat::{self, StatUpdate};
+use net::packet::handle::world::party_skill_reached;
+use net::PartySkill;
 use packet::Packet;
 
 impl ClientActor {
+    /// A party member's skill reached the player: if they are still on its
+    /// map, out of the Cash Shop, take its buffs or HP.
+    pub(super) async fn party_skill_reached(
+        &mut self,
+        used: PartySkill,
+        origin: (i16, i16),
+        map_id: i32,
+    ) -> Result<(), RuntimeError> {
+        if self.in_cash_shop {
+            return Ok(());
+        }
+        let Some(game) = self.game.as_mut() else {
+            return Ok(());
+        };
+        if game.player.stats.map_id != map_id {
+            return Ok(());
+        }
+        let at = game.position;
+        let result = party_skill_reached(
+            &mut game.player,
+            &used,
+            origin,
+            at,
+            std::time::Instant::now(),
+        )
+        .map_err(|e| RuntimeError::Handler(e.to_string()))?;
+        for action in result.actions {
+            self.apply(action).await?;
+        }
+        Ok(())
+    }
+
     /// When the player's buffs next need `update_buffs`.
     pub(super) fn buffs_due(&self) -> Option<tokio::time::Instant> {
         let deadline = self.game.as_ref()?.player.buffs.next_deadline()?;
