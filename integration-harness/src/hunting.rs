@@ -229,6 +229,36 @@ pub fn walk_to(x: i16, y: i16) -> Packet {
     build_player_move(&movement).unwrap()
 }
 
+/// MOVE_LIFE for `object_id` at (x, y): wanting to attack, or playing
+/// `action` (its first skill animation is 21, doubled with the facing)
+/// with `skill_data` (skill | level << 8 | delay << 16).
+pub fn move_mob(
+    object_id: i32,
+    (x, y): (i16, i16),
+    want_attack: bool,
+    action: u8,
+    skill_data: i32,
+) -> Packet {
+    let mut p = Packet::new_empty();
+    p.write_short(RecvOpcode::MoveLife as i16).unwrap();
+    p.write_int(object_id).unwrap();
+    p.write_short(1).unwrap();
+    p.write_byte(u8::from(want_attack)).unwrap();
+    p.write_byte(action).unwrap();
+    p.write_int(skill_data).unwrap();
+    p.write_bytes(&[0; 13]).unwrap();
+    p.write_short(x).unwrap();
+    p.write_short(y).unwrap();
+    p.write_byte(1).unwrap();
+    p.write_byte(0).unwrap();
+    p.write_short(x).unwrap();
+    p.write_short(y).unwrap();
+    p.write_bytes(&[0; 6]).unwrap();
+    p.write_byte(4).unwrap();
+    p.write_short(100).unwrap();
+    p
+}
+
 /// An item or mesos dropped on the field.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct MapDrop {

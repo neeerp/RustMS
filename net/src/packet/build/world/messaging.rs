@@ -21,6 +21,28 @@ pub enum FindLocation {
     Channel(u8),
 }
 
+/// How a v83 client shows a BROADCAST_MSG (FUN_00a22785), for the kinds
+/// that carry only their message.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Broadcast {
+    /// "[Notice] " and the message in blue chat, or a dialog outside a
+    /// field.
+    Notice = 0,
+    /// A dialog.
+    Popup = 1,
+    /// Pink chat, as for a mob's Banish.
+    Pink = 5,
+}
+
+/// A message from the server, shown as `kind` says.
+pub fn build_broadcast(kind: Broadcast, message: &str) -> Result<Packet, NetworkError> {
+    let mut packet = Packet::new_empty();
+    packet.write_short(SendOpcode::BroadcastMsg as i16)?;
+    packet.write_byte(kind as u8)?;
+    packet.write_str_with_length(message)?;
+    Ok(packet)
+}
+
 /// An incoming whisper. `channel` is the sender's zero-based channel.
 pub fn build_whisper_receive(
     sender_name: &str,
@@ -77,6 +99,16 @@ pub fn build_find_result(
 mod tests {
     use super::*;
     use crate::codec::testing::Expect;
+
+    #[test]
+    fn a_broadcast_is_its_kind_and_message() {
+        let packet = build_broadcast(Broadcast::Pink, "Begone").unwrap();
+        Expect::new(&packet.bytes)
+            .short(0x44)
+            .byte(5)
+            .string("Begone")
+            .end();
+    }
 
     #[test]
     fn whisper_receive_matches_reference() {

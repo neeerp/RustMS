@@ -24,11 +24,14 @@ pub enum MobSkillEffect {
     Counters(Vec<MobStat>),
     /// A disease on every player in its area.
     Disease(BuffStat),
+    /// Ends the skills' buffs of every player in its area.
+    Dispel,
+    /// Sends players in its area to the mob's `ban` map.
+    Banish,
 }
 
 /// What `skill` does with its value `x`, or `None` for the ones not cast
-/// yet: the other diseases (127, 129, 130, 133-136: dispel, banish, area
-/// fire, ...).
+/// yet (130, 133-136).
 ///
 /// The v83 client multiplies a mob's attack by its PowerUp and MagicUp as
 /// percents, and adds Pad and Mad, so Power Up (100, 115%) is PowerUp, not
@@ -62,6 +65,8 @@ pub fn effect(skill: i32, x: i32) -> Option<MobSkillEffect> {
                 MobStat::MCounter,
             ]))
         }
+        127 => return Some(MobSkillEffect::Dispel),
+        129 => return Some(MobSkillEffect::Banish),
         _ => return disease(skill).map(MobSkillEffect::Disease),
     };
     Some(MobSkillEffect::Statuses(vec![(stat, x)]))
@@ -112,7 +117,9 @@ mod tests {
             effect(123, 1),
             Some(MobSkillEffect::Disease(BuffStat::Stun))
         );
-        assert_eq!(effect(127, 1), None);
+        assert_eq!(effect(127, 0), Some(MobSkillEffect::Dispel));
+        assert_eq!(effect(129, 0), Some(MobSkillEffect::Banish));
+        assert_eq!(effect(133, 1), None);
         let slow = inflicted(126, 2, 80, 10).unwrap();
         assert_eq!(
             (slow.stat, slow.value, slow.skill_id, slow.lasts),

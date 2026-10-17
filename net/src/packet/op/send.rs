@@ -28,6 +28,7 @@ pub enum SendOpcode {
 
     PartyOperation = 0x3E,
     SpawnPortal = 0x43,
+    BroadcastMsg = 0x44,
     CharInfo = 0x3D,
     BuddyList = 0x3F,
     MonsterBookSetCard = 0x53,
