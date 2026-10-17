@@ -20,7 +20,9 @@
 #include "Heal.h"
 #include "Prepare.h"
 
+#include "../../Character/Char.h"
 #include "../../Character/SkillId.h"
+#include "../../Data/EquipData.h"
 #include "../../Data/SkillData.h"
 #include "../../Util/Misc.h"
 
@@ -28,6 +30,17 @@
 
 namespace ms
 {
+	namespace
+	{
+		// The percent the user's weapon gives a spell of `element`.
+		int32_t elemboost(const Char &user, uint8_t element)
+		{
+			int32_t weapon = user.get_look().get_equips().get_weapon();
+
+			return weapon > 0 ? EquipData::get(weapon).get_elemboost(element) : 100;
+		}
+	}
+
 	Skill::Skill(int32_t id) : skillid(id)
 	{
 		const SkillData &data = SkillData::get(skillid);
@@ -229,12 +242,14 @@ namespace ms
 		{
 			attack.heal = stats.hp;
 			attack.element = SkillData::get(skillid).get_element();
+			attack.elemboost = elemboost(user, attack.element);
 			attack.damagetype = Attack::DMG_MAGIC;
 		} else if (stats.matk)
 		{
 			attack.matk += stats.matk;
 			attack.mastery = stats.mastery;
 			attack.element = SkillData::get(skillid).get_element();
+			attack.elemboost = elemboost(user, attack.element);
 			attack.damagetype = Attack::DMG_MAGIC;
 		} else
 		{

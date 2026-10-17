@@ -2099,10 +2099,18 @@ namespace ms
 	{
 		using namespace magic_damage;
 
+		// Disable turns every hit away, and Magic Immunity all but 1 in
+		// 100 to 1 damage (FUN_00791617).
+		if (status_value(MobStatParser::DISABLE))
+			return 0;
+
+		if (status_value(MobStatParser::MIMMUNE) && !pierces(randomizer.next_int(100), 0))
+			return 1;
+
 		double hitroll = randomizer.next_real(1.0);
 		double accuracy = magic_damage::accuracy(attack.intelligence, attack.luck, attack.playerlevel, level);
 
-		if (!hits(accuracy, avoid, hitroll))
+		if (!hits(accuracy, avoid + status_value(MobStatParser::EVA), hitroll))
 			return 0;
 
 		double roll = randomizer.next_real(1.0);
@@ -2111,8 +2119,16 @@ namespace ms
 				: base(attack.magic, attack.intelligence, attack.mastery, attack.matk, roll);
 		damage = damage * attack.amplify * 0.01;
 		damage = elemental(damage, attack.skill, attack.element, elements);
-		damage = defend(damage, mdef, randomizer.next_real(1.0));
+		damage = defend(damage, mdef + status_value(MobStatParser::MDR), randomizer.next_real(1.0));
+		damage = guarded(damage, status_value(MobStatParser::MGUARD_UP));
 		damage = prepare::charge_percent(attack.skill, attack.charge) * damage * 0.01;
+
+		// Hard Skin stops all but critical spells, and only an Evan's are.
+		if (status_value(MobStatParser::HARD_SKIN))
+			return 0;
+
+		damage = percent(damage, attack.elemboost);
+		damage = weakened(damage, status_value(MobStatParser::WEAKNESS));
 
 		return finish(damage);
 	}

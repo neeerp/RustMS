@@ -50,12 +50,14 @@ namespace ms
 			WEB = 17,
 			PIMMUNE = 18,
 			MIMMUNE = 19,
+			HARD_SKIN = 21,
 			AMBUSH = 22,
 			VENOM = 24,
 			BURNED = 27,
 			PCOUNTER = 29,
 			MCOUNTER = 30,
-			DISABLE = 31
+			DISABLE = 31,
+			WEAKNESS = 34
 		};
 
 		struct Status
@@ -69,8 +71,8 @@ namespace ms
 		};
 
 		// The statuses whose flags are set (FUN_0078b0b1), as MOB_STAT_SET
-		// and the spawn packets carry them. The burns, counters and
-		// Disable's data are read past.
+		// and the spawn packets carry them. The burns and counters are read
+		// past; Disable is kept with its first byte as its value.
 		std::vector<Status> parse(InPacket& recv, const BuffParser::Flags& flags);
 
 		// Read past the burns MOB_STAT_RESET ends (FUN_0078c70a).
