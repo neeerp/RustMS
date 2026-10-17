@@ -178,6 +178,7 @@ pub enum FieldMessage {
     Move {
         from: ClientId,
         packet: Packet,
+        start: (i16, i16),
         movement_bytes: Vec<u8>,
     },
     NpcInteraction {

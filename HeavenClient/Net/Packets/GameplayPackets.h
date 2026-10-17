@@ -215,10 +215,12 @@ namespace ms
 	class MovePlayerPacket : public MovementPacket
 	{
 	public:
-		// Updates the player's position with the server
-		MovePlayerPacket(const Movement& movement) : MovementPacket(OutPacket::Opcode::MOVE_PLAYER)
+		// Updates the player's position with the server: a path of one
+		// element from `start`
+		MovePlayerPacket(Point<int16_t> start, const Movement& movement) : MovementPacket(OutPacket::Opcode::MOVE_PLAYER)
 		{
-			skip(9);
+			skip(5);
+			write_point(start);
 			write_byte(1);
 			writemovement(movement);
 		}
