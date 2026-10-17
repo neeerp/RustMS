@@ -8,7 +8,7 @@ use net::packet::build::world::party::{
     build_party_joined, build_party_leader_changed, build_party_left, build_party_member_hp,
     build_party_status, build_party_update, Departure, PartyMemberView, PartyStatus, PartyView,
 };
-use net::{BroadcastScope, ClientId, MessengerRequest, PartyRequest, WhisperDelivery};
+use net::{BroadcastScope, ClientId, MessengerRequest, PartyRequest, PartySkill, WhisperDelivery};
 use packet::Packet;
 use std::collections::HashMap;
 use std::time::{Duration, Instant};
@@ -103,6 +103,9 @@ impl WorldDirectory {
             } => self.broadcast(from, scope, packet),
             DirectoryMessage::Party { from, request } => {
                 self.party_request(from, request, Instant::now())
+            }
+            DirectoryMessage::PartySkill { from, used, origin } => {
+                self.party_skill(from, used, origin)
             }
             DirectoryMessage::BuddyList { owner, buddies } => self.send_buddy_list(owner, buddies),
             DirectoryMessage::Deliver { to, packet } => {
@@ -490,6 +493,29 @@ impl WorldDirectory {
         }
     }
 
+    /// Pass a party skill on to the members in its slots, the party's
+    /// joining order, who are on the user's map.
+    fn party_skill(&self, from: ClientId, used: PartySkill, origin: (i16, i16)) {
+        let (Some(entry), Some(party)) = (self.clients.get(&from), self.parties.of(from)) else {
+            return;
+        };
+        for (slot, member) in party.members.iter().enumerate() {
+            if member.id == from || used.slots & net::skills::party_bit(slot) == 0 {
+                continue;
+            }
+            let Some(other) = self.clients.get(&member.id) else {
+                continue;
+            };
+            if other.shares_map_with(entry) {
+                other.handle.send(ServerMessage::PartySkill {
+                    used: used.clone(),
+                    origin,
+                    map_id: entry.presence.map_id,
+                });
+            }
+        }
+    }
+
     /// Online party members on the same map as `client`.
     fn party_neighbours<'a>(
         &'a self,
@@ -595,6 +621,53 @@ mod tests {
             });
         }
         seen
+    }
+
+    #[test]
+    fn a_party_skill_reaches_the_members_in_its_slots_on_the_map() {
+        let (_tx, rx) = mpsc::channel(1);
+        let mut directory = WorldDirectory::new(rx);
+        let mut alice = online(&mut directory, 1, "Alice", 10000);
+        let mut bobby = online(&mut directory, 2, "Bobby", 10000);
+        let mut carol = online(&mut directory, 3, "Carol", 20000);
+        let mut dave = online(&mut directory, 4, "Dave", 10000);
+        let now = Instant::now();
+        for (id, name) in [(2, "Bobby"), (3, "Carol"), (4, "Dave")] {
+            let invite = PartyRequest::Invite { name: name.into() };
+            directory.party_request(1, invite, now);
+            directory.party_request(id, PartyRequest::Accept { party_id: 1 }, now);
+        }
+        for rx in [&mut alice, &mut bobby, &mut carol, &mut dave] {
+            received(rx);
+        }
+
+        // Bobby, in slot 1, reached Alice (0), himself (1), and Carol (2) on
+        // another map, but not Dave (3).
+        let used = PartySkill {
+            skill_id: 2301004,
+            level: 20,
+            slots: 0x38,
+            heal: 0,
+        };
+        directory.party_skill(2, used.clone(), (5, 6));
+        let reached = |rx: &mut mpsc::Receiver<ServerMessage>| {
+            let mut seen = Vec::new();
+            while let Ok(message) = rx.try_recv() {
+                if let ServerMessage::PartySkill {
+                    used,
+                    origin,
+                    map_id,
+                } = message
+                {
+                    seen.push((used, origin, map_id));
+                }
+            }
+            seen
+        };
+        assert_eq!(reached(&mut alice), [(used, (5, 6), 10000)]);
+        assert!(reached(&mut bobby).is_empty());
+        assert!(reached(&mut carol).is_empty());
+        assert!(reached(&mut dave).is_empty());
     }
 
     #[test]

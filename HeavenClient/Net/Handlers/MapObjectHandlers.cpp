@@ -227,6 +227,13 @@ namespace ms
 		{
 			Stage::get().show_character_effect(cid, CharEffect::MONSTER_CARD);
 		}
+		else if (effect == 2) // a party member's skill reached them
+		{
+			int32_t skillid = recv.read_int();
+			recv.read_byte(); // level
+
+			Stage::get().get_combat().show_affected(cid, skillid);
+		}
 		else if (recv.available()) // skill
 		{
 			int32_t skillid = recv.read_int();

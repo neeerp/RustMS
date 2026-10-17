@@ -72,6 +72,10 @@ pub struct SkillLevel {
     /// Shadow Partner's Summoning Rock.
     pub item_cost: i32,
     pub item_cost_count: i32,
+    /// The skill's area around the user facing left (`lt`, `rb`), (0, 0)
+    /// for one without.
+    pub lt: (i32, i32),
+    pub rb: (i32, i32),
 }
 
 pub struct SkillData {
@@ -133,6 +137,8 @@ impl SkillData {
                     prop: int("prop")?,
                     item_cost: int("itemCon")?,
                     item_cost_count: int("itemConNo")?,
+                    lt: nx.vector_child(level, "lt")?.unwrap_or_default(),
+                    rb: nx.vector_child(level, "rb")?.unwrap_or_default(),
                 });
             }
         }
@@ -201,6 +207,10 @@ mod tests {
         assert_eq!((lucky_seven.bullet_count, lucky_seven.damage), (2, 150));
         let avenger = data.info(4111005).unwrap().unwrap().levels[29].clone();
         assert_eq!((avenger.bullet_count, avenger.bullet_consume), (1, 3));
+
+        let bless = data.info(2301004).unwrap().unwrap().levels[19].clone();
+        assert_eq!((bless.lt, bless.rb), ((-300, -200), (300, 200)));
+        assert_eq!(three_snails.levels[0].lt, (0, 0));
 
         let maple_warrior = data.info(2121000).unwrap().unwrap();
         assert!(maple_warrior.invisible);

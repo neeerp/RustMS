@@ -14,7 +14,8 @@
 
 use game::{AvatarLook, FieldAvatar, Player};
 use net::{
-    BroadcastScope, ClientId, FieldRequest, MessengerRequest, PartyRequest, WhisperDelivery,
+    BroadcastScope, ClientId, FieldRequest, MessengerRequest, PartyRequest, PartySkill,
+    WhisperDelivery,
 };
 use packet::Packet;
 use tokio::sync::mpsc;
@@ -66,6 +67,13 @@ pub enum ServerMessage {
     /// The player joined or left a party.
     PartyChanged {
         party_id: Option<i32>,
+    },
+    /// A party member on `map_id` used a skill that reached this player,
+    /// standing at `origin`.
+    PartySkill {
+        used: PartySkill,
+        origin: (i16, i16),
+        map_id: i32,
     },
     /// This player broke a reactor; its loot drops for them.
     ReactorBroken {
@@ -271,6 +279,12 @@ pub enum DirectoryMessage {
     Party {
         from: ClientId,
         request: PartyRequest,
+    },
+    /// `from` used a skill at `origin` on the party members in its slots.
+    PartySkill {
+        from: ClientId,
+        used: PartySkill,
+        origin: (i16, i16),
     },
     Unregister {
         client_id: ClientId,

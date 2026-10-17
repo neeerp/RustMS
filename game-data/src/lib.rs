@@ -660,6 +660,24 @@ impl NxDataFile {
         })
     }
 
+    /// A vector child's x and y.
+    fn vector_child(
+        &self,
+        parent_index: u32,
+        key: &str,
+    ) -> Result<Option<(i32, i32)>, GameDataError> {
+        let Some(child_index) = self.child_by_name(parent_index, key)? else {
+            return Ok(None);
+        };
+        let node = self.node_at(child_index)?;
+        if node.data_type != 4 {
+            return Ok(None);
+        }
+        let x = node.data as u32 as i32;
+        let y = (node.data >> 32) as u32 as i32;
+        Ok(Some((x, y)))
+    }
+
     /// A real (or integer) child as `f64`.
     fn real_child(&self, parent_index: u32, key: &str) -> Result<Option<f64>, GameDataError> {
         let Some(child_index) = self.child_by_name(parent_index, key)? else {
