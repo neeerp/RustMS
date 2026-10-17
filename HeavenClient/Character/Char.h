@@ -244,6 +244,7 @@ namespace ms
 
 		// Return a reference to this characters's physics.
 		PhysicsObject &get_phobj();
+		const PhysicsObject &get_phobj() const;
 
 		// Initialize character effects
 		static void init();

@@ -212,6 +212,7 @@ namespace ms
 		if (bs == Buffstat::NONE)
 			return;
 
+		bs = disease::given(bs, skillid);
 		Stage::get().get_player().give_buff({ bs, value, skillid, duration });
 
 		// A disease has no icon, only a notice of what it does
@@ -237,6 +238,10 @@ namespace ms
 			return;
 
 		Stage::get().get_player().cancel_buff(bs);
+
+		// Undead ends with Puppet's bit.
+		if (bs == Buffstat::PUPPET)
+			Stage::get().get_player().cancel_buff(Buffstat::UNDEAD);
 
 		if (auto bufflist = UI::get().get_element<UIBuffList>())
 			bufflist->cancel_buff(bs);

@@ -16,6 +16,8 @@
 //	along with this program.  If not, see <https://www.gnu.org/licenses/>.		//
 #include "BuffParser.h"
 
+#include "../Character/Diseases.h"
+
 namespace ms
 {
 	namespace
@@ -40,8 +42,7 @@ namespace ms
 			BYTE,
 			SHORT,
 			INT,
-			SHORT_INT,
-			INT_BYTE_BYTE
+			SHORT_INT
 		};
 
 		// What another character's client reads for each stat it shows,
@@ -51,7 +52,7 @@ namespace ms
 			{ 31, INT }, { 18, SHORT_INT }, { 26, NOTHING }, { 10, NOTHING }, { 16, NOTHING }, { 33, SHORT },
 			{ 49, SHORT }, { 39, INT }, { 40, INT }, { 46, INT }, { 50, INT }, { 62, INT }, { 51, INT },
 			{ 53, INT }, { 54, INT }, { 55, INT }, { 56, INT }, { 59, NOTHING }, { 60, NOTHING },
-			{ 66, NOTHING }, { 73, INT }, { 75, INT }, { 76, INT }, { 77, INT_BYTE_BYTE }
+			{ 66, NOTHING }, { 73, INT }, { 75, INT }, { 76, INT }, { 77, INT }
 		};
 
 		// GIVE_BUFF reads in ascending order, except for these.
@@ -100,6 +101,10 @@ namespace ms
 			if (flags.has(bit) && Buffstat::by_bit(bit) != Buffstat::NONE)
 				ids.push_back(Buffstat::by_bit(bit));
 
+		// Undead ends with Puppet's bit.
+		if (flags.has(46))
+			ids.push_back(Buffstat::UNDEAD);
+
 		return ids;
 	}
 
@@ -133,13 +138,9 @@ namespace ms
 				recv.skip_short();
 				value = recv.read_int();
 				break;
-			case INT_BYTE_BYTE:
-				value = recv.read_int();
-				recv.skip(2);
-				break;
 			}
 
-			Buffstat::Id stat = Buffstat::by_bit(bit);
+			Buffstat::Id stat = disease::given(Buffstat::by_bit(bit), value);
 
 			if (stat != Buffstat::NONE)
 				shown.emplace_back(stat, value);

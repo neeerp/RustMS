@@ -141,6 +141,9 @@ namespace ms
 
 		// The diseases on the player.
 		disease::State get_diseases() const;
+		// What Stop Motion takes now from a player who stood still too
+		// long, 0 if nothing (0x94b1d7).
+		int32_t take_stop_motion();
 
 		// Change a skill
 		void change_skill(int32_t skill_id, int32_t level, int32_t masterlevel, int64_t expiration);
@@ -327,6 +330,9 @@ namespace ms
 		ExclRequest excl;
 
 		std::map<KeyAction::Id, bool> keysdown;
+		// When the player last moved under Stop Motion, or entered the map
+		// (+0x311c).
+		int64_t stirred = 0;
 
 		move_path::Recorder path;
 

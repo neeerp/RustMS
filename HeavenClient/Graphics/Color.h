@@ -222,6 +222,14 @@ namespace ms
 			return Color(-1.0f, 1.0f, 1.0f, opacity);
 		}
 
+		// Draw black where a texture is clear and nothing where it is opaque,
+		// as v83 cuts Fear's sight from its darkness. The shader reads a
+		// negative green as this.
+		static constexpr Color cutout(float opacity)
+		{
+			return Color(1.0f, -1.0f, 1.0f, opacity);
+		}
+
 		// Check whether the color is completely invisible
 		constexpr bool invisible() const
 		{

@@ -115,7 +115,7 @@ impl WorldHandler for UseSkillHandler {
             Ok(used) => {
                 if skill_id == skills::CHAKRA {
                     let heal = skills::chakra_heal(ctx.player, used.skill.effect.y, rand::random());
-                    ctx.player.add_hp(heal);
+                    ctx.player.recover_hp(heal);
                 }
                 let mut result = announce(ctx.player, &used)?;
                 if skill_id == skills::TIME_LEAP {
@@ -451,7 +451,7 @@ fn heal(player: &mut Player, level: i32, party: u8, roll: f64) -> Result<(i16, i
     player.add_mp(-skill.effect.mp_cost);
     let reached = party.count_ones() as i32;
     let amount = skills::heal_amount(player, skill.effect.hp, reached, roll) as i32;
-    Ok((player.add_hp(amount), amount))
+    Ok((player.recover_hp(amount), amount))
 }
 
 /// A skill that was used: the buffs it gave, and the items it cost. A
@@ -585,12 +585,11 @@ pub fn party_skill_reached(
     }
     let mut result = if used.skill_id == skills::HEAL || used.skill_id == skills::RESURRECTION {
         // Resurrection raises them with full HP (OdinMS-family servers).
-        let heal = if dead {
-            i32::from(player.stats.max_hp)
+        let hp = if dead {
+            player.add_hp(i32::from(player.stats.max_hp))
         } else {
-            used.heal.max(0)
+            player.recover_hp(used.heal.max(0))
         };
-        let hp = player.add_hp(heal);
         HandlerResult::reply(stat::build_stat_update(false, &[StatUpdate::Hp(hp)])?)
     } else if used.skill_id == skills::TIME_LEAP {
         leap(player, HandlerResult::empty())?

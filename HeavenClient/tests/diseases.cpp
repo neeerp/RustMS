@@ -49,9 +49,25 @@ int main()
 		require(can_attack(sealed), "a seal leaves attacks");
 		require(!can_use_skill(2001002, sealed) && can_use_skill(DISPEL, sealed), "and Dispel, but no other skill");
 
+		State potionless;
+		potionless.stop_potion = true;
+		require(!can_use_item(potionless) && !can_use_item(attracted) && can_use_item(State{}),
+				"Stop Potion and Seduce refuse items");
+
+		require(stop_motion_damage(30, 500) == 30 && stop_motion_damage(30, 31) == 30, "Stop Motion takes its n");
+		require(stop_motion_damage(30, 30) == 29 && stop_motion_damage(30, 1) == 0, "but never the last HP");
+
+		require(given(ms::Buffstat::PUPPET, 133 | 1 << 16) == ms::Buffstat::UNDEAD, "bit 46 from mob skill 133 is Undead");
+		require(given(ms::Buffstat::PUPPET, 3111002) == ms::Buffstat::PUPPET && given(ms::Buffstat::POISON, 133 | 1 << 16) == ms::Buffstat::POISON,
+				"else it is what it was");
+
 		require(walk_speed(140, 80) == 80 && walk_speed(140, std::nullopt) == 140, "Slow sets the speed");
 
 		require(notice(123) == "You've been stunned, making you unable to move.", "a stun says so");
+		require(notice(133) == "You will become an Undead and the effects of your Recovery will diminish by 50%.",
+				"Undead says so");
+		require(notice(136) == "The fear of darkness has overtaken you! Your range of vision has been narrowed.",
+				"and Fear");
 		require(notice(126).empty() && notice(132).empty(), "Slow and Confuse say nothing");
 
 		std::cout << "Diseases passed\n";

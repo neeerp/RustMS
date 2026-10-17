@@ -6,6 +6,7 @@ use crate::packet::build::world::skill::{self, BookResult};
 use crate::packet::build::world::stat::StatUpdate;
 use crate::packet::build::world::{inventory, stat};
 use crate::skills;
+use game::buff::BuffStat;
 use game::inventory::equip_slot;
 use game::{InventoryChange, InventoryType, Player, SkillRecord};
 use packet::{io::read::PktRead, Packet};
@@ -14,7 +15,8 @@ use std::io::Cursor;
 use tracing::debug;
 
 /// `USE_ITEM`: tick, slot in the USE bag, item id. Applies the item's `spec`
-/// (HP/MP, flat and percent) and consumes one.
+/// (HP/MP, flat and percent) and consumes one. A v83 client sends none
+/// while Stop Potion or Seduce holds (FUN_00a092fb).
 pub struct UseItemHandler;
 
 impl WorldHandler for UseItemHandler {
@@ -44,7 +46,7 @@ impl WorldHandler for UseItemHandler {
 }
 
 fn use_item(player: &mut Player, slot: i16, item_id: i32) -> Option<Vec<game::InventoryChange>> {
-    if player.stats.hp <= 0 {
+    if player.stats.hp <= 0 || player.buffs.has(BuffStat::StopPotion) {
         return None;
     }
     if player.inventory.get(InventoryType::Use, slot)?.item_id != item_id {
@@ -57,7 +59,7 @@ fn use_item(player: &mut Player, slot: i16, item_id: i32) -> Option<Vec<game::In
         .ok()?;
     let max_hp = i32::from(player.stats.max_hp);
     let max_mp = i32::from(player.stats.max_mp);
-    player.add_hp(spec.hp + max_hp * spec.hp_r / 100);
+    player.recover_hp(spec.hp + max_hp * spec.hp_r / 100);
     player.add_mp(spec.mp + max_mp * spec.mp_r / 100);
     Some(changes)
 }
@@ -264,6 +266,42 @@ mod tests {
         );
         assert_eq!(player.stats.hp, 50);
         assert!(player.inventory.get(InventoryType::Use, 3).is_none());
+    }
+
+    #[test]
+    fn stop_potion_refuses_items_and_undead_halves_their_hp() {
+        if items::data().is_err() {
+            return;
+        }
+        let mut player = crate::codec::stats::sample_player();
+        player.stats.max_hp = 500;
+        player.stats.hp = 100;
+        player
+            .inventory
+            .insert(InventoryType::Use, 3, Item::stack(2000000, 2));
+        let now = std::time::Instant::now();
+        let lasts = std::time::Duration::from_secs(10);
+        player.buffs.give(game::Buff::new(
+            134 | 1 << 16,
+            BuffStat::StopPotion,
+            1,
+            now,
+            lasts,
+        ));
+        assert!(use_item(&mut player, 3, 2000000).is_none());
+        assert_eq!(player.stats.hp, 100);
+
+        // A Red Potion heals 50; undead, 25.
+        player.buffs.clear();
+        player.buffs.give(game::Buff::new(
+            133 | 1 << 16,
+            BuffStat::Undead,
+            70,
+            now,
+            lasts,
+        ));
+        assert!(use_item(&mut player, 3, 2000000).is_some());
+        assert_eq!(player.stats.hp, 125);
     }
 
     fn hero_with_book(slot: i16, item_id: i32) -> Player {

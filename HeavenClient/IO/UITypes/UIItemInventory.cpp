@@ -332,7 +332,9 @@ namespace ms
 
 						break;
 					case InventoryType::Id::USE:
-						Stage::get().get_player().request(UseItemPacket(slot, item_id), ExclRequest::USE_WAIT);
+						if (disease::can_use_item(Stage::get().get_player().get_diseases()))
+							Stage::get().get_player().request(UseItemPacket(slot, item_id), ExclRequest::USE_WAIT);
+
 						break;
 					case InventoryType::Id::SETUP:
 						Stage::get().get_player().use_item(item_id);

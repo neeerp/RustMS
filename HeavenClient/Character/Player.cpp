@@ -112,6 +112,7 @@ namespace ms
 		set_chair(0);
 		nullstate.update_state(*this);
 		path.reset(current_move(0));
+		stirred = now_ms();
 	}
 
 	void Player::send_action(KeyAction::Id action, bool down)
@@ -121,6 +122,16 @@ namespace ms
 
 		if (pst && !refused)
 			pst->send_action(*this, action, down);
+
+		// Under Stop Motion, a walking key going down, repeating or up
+		// (FUN_0094c856, after Confuse swaps them), or a jump, is moving.
+		bool confused = has_buff(Buffstat::Id::CONFUSE);
+		bool walks = action == KeyAction::Id::LEFT || action == KeyAction::Id::RIGHT ||
+					 action == (confused ? KeyAction::Id::UP : KeyAction::Id::DOWN);
+
+		if (has_buff(Buffstat::Id::STOP_MOTION) && !is_dead() &&
+			(walks || (action == KeyAction::Id::JUMP && down && !refused)))
+			stirred = now_ms();
 
 		keysdown[action] = down;
 	}
@@ -194,7 +205,7 @@ namespace ms
 		{
 			if (type == InventoryType::Id::USE && (itemid / 10000 == 228 || itemid / 10000 == 229))
 				request(SkillBookPacket(slot, itemid), ExclRequest::USE_WAIT);
-			else if (type == InventoryType::Id::USE)
+			else if (type == InventoryType::Id::USE && disease::can_use_item(get_diseases()))
 				request(UseItemPacket(slot, itemid), ExclRequest::USE_WAIT);
 			else if (type == InventoryType::Id::SETUP && itemid / 10000 == 301)
 				sit_on_chair(itemid);
@@ -779,10 +790,42 @@ namespace ms
 		diseases.weakened = has_buff(Buffstat::Id::WEAKEN);
 		diseases.confused = has_buff(Buffstat::Id::CONFUSE);
 
+		diseases.stop_potion = has_buff(Buffstat::Id::STOP_POTION);
+
 		if (has_buff(Buffstat::Id::SEDUCE))
 			diseases.seduced = get_buff_value(Buffstat::Id::SEDUCE);
 
+		if (has_buff(Buffstat::Id::STOP_MOTION))
+			diseases.stop_motion = get_buff_value(Buffstat::Id::STOP_MOTION);
+
 		return diseases;
+	}
+
+	int32_t Player::take_stop_motion()
+	{
+		std::optional<int32_t> n = get_diseases().stop_motion;
+
+		if (!n || is_dead())
+			return 0;
+
+		int64_t now = now_ms();
+
+		// A held walking key repeats, as Windows repeats it.
+		bool confused = has_buff(Buffstat::Id::CONFUSE);
+
+		if (is_held(KeyAction::Id::LEFT) || is_held(KeyAction::Id::RIGHT) ||
+			is_held(confused ? KeyAction::Id::UP : KeyAction::Id::DOWN))
+			stirred = now;
+
+		if (now - stirred <= disease::STILL_TIME)
+			return 0;
+
+		int32_t damage = disease::stop_motion_damage(*n, stats.get_stat(MapleStat::Id::HP));
+
+		if (damage > 0)
+			stirred = now;
+
+		return damage;
 	}
 
 	bool Player::has_buff(Buffstat::Id stat) const
