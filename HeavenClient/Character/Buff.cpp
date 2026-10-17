@@ -76,6 +76,9 @@ namespace ms
 			case 47: return ECHO_OF_HERO;
 			case 49: return GHOST_MORPH;
 			case 51: return CONFUSE;
+			case 75: return STOP_POTION;
+			case 76: return STOP_MOTION;
+			case 77: return FEAR;
 			case 82: return ENERGY_CHARGE;
 			case 83: return DASH2;
 			case 84: return DASH;

@@ -89,6 +89,21 @@ int main()
 				shown[3].first == Buffstat::SHADOWPARTNER, "combo, charge, poison (by its reason) and shadow partner");
 		require(buff.read_short() == 0 && !buff.available(), "the delay follows");
 
+		// Undead shares Puppet's bit 46, told apart by its mob skill; Stop
+		// Potion, Stop Motion and Fear each read an int.
+		BuffParser::Flags cursed{ 0, 0 };
+		for (uint8_t bit : { 46, 75, 76, 77 })
+			cursed.set(bit);
+		Writer d;
+		d.flags(cursed).put<int32_t>(133 | 1 << 16).put<int32_t>(134 | 1 << 16).put<int32_t>(135 | 1 << 16)
+			.put<int32_t>(136 | 1 << 16).zeros(2).put<int16_t>(0);
+		InPacket curse(d.bytes.data(), d.bytes.size());
+		shown = BuffParser::parse_shown(curse, BuffParser::read_flags(curse));
+		require(shown.size() == 4 && shown[0].first == Buffstat::UNDEAD && shown[1].first == Buffstat::STOP_POTION &&
+				shown[2].first == Buffstat::STOP_MOTION && shown[3].first == Buffstat::FEAR,
+				"Undead, Stop Potion, Stop Motion and Fear");
+		require(curse.read_short() == 0 && !curse.available(), "and the delay follows");
+
 		std::cout << "Buff parser passed\n";
 		return 0;
 	}

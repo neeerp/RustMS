@@ -69,17 +69,27 @@ pub enum BuffStat {
     Puppet = 46,
     /// The arrow keys are swapped (the client's ReverseInput).
     Confuse = 51,
+    /// No potions or other use items.
+    StopPotion = 75,
+    /// Standing still for two seconds costs `value` HP, never the last
+    /// (the client takes it and reports it).
+    StopMotion = 76,
+    /// Darkness all around but a ring about the player.
+    Fear = 77,
+    /// Items heal half as much HP. It shares Puppet's bit 46 in the client
+    /// (as Cosmic's ZOMBIFY and PUPPET do); 128 + 46 keeps it apart here.
+    Undead = 174,
 }
 
 impl BuffStat {
     /// Its bit in the client's flags.
     pub fn bit(self) -> u8 {
-        self as u8
+        self as u8 % 128
     }
 
     /// Stats the rest of the map is told about, in the order the client
     /// reads them (FUN_00788156); the others only matter to the player.
-    pub const SHOWN: [BuffStat; 14] = [
+    pub const SHOWN: [BuffStat; 18] = [
         BuffStat::Speed,
         BuffStat::Combo,
         BuffStat::WeaponCharge,
@@ -93,10 +103,14 @@ impl BuffStat {
         BuffStat::DarkSight,
         BuffStat::SoulArrow,
         BuffStat::Seduce,
+        BuffStat::Undead,
         BuffStat::Confuse,
+        BuffStat::StopPotion,
+        BuffStat::StopMotion,
+        BuffStat::Fear,
     ];
 
-    pub const DISEASES: [BuffStat; 9] = [
+    pub const DISEASES: [BuffStat; 13] = [
         BuffStat::Stun,
         BuffStat::Poison,
         BuffStat::Seal,
@@ -106,6 +120,10 @@ impl BuffStat {
         BuffStat::Slow,
         BuffStat::Seduce,
         BuffStat::Confuse,
+        BuffStat::Undead,
+        BuffStat::StopPotion,
+        BuffStat::StopMotion,
+        BuffStat::Fear,
     ];
 
     pub fn disease(self) -> bool {

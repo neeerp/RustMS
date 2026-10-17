@@ -13,6 +13,11 @@ namespace ms
 	namespace disease
 	{
 		constexpr int32_t DISPEL = 2311001;
+		constexpr int32_t UNDEAD = 133;
+
+		// Under Stop Motion, the ms the player may stand still between hurts
+		// (0x94b1d7).
+		constexpr int64_t STILL_TIME = 2000;
 
 		// The mob skill a disease's reason names, and its level.
 		constexpr int32_t skill(int32_t reason)
@@ -28,7 +33,8 @@ namespace ms
 		// The stats a mob skill's disease sets.
 		constexpr Buffstat::Id STATS[] = {
 			Buffstat::STUN, Buffstat::POISON, Buffstat::SEAL, Buffstat::DARKNESS, Buffstat::WEAKEN,
-			Buffstat::CURSE, Buffstat::SLOW, Buffstat::SEDUCE, Buffstat::CONFUSE
+			Buffstat::CURSE, Buffstat::SLOW, Buffstat::SEDUCE, Buffstat::CONFUSE, Buffstat::UNDEAD,
+			Buffstat::STOP_POTION, Buffstat::STOP_MOTION, Buffstat::FEAR
 		};
 
 		constexpr bool is_disease(Buffstat::Id stat)
@@ -40,6 +46,16 @@ namespace ms
 			return false;
 		}
 
+		// The stat a buff's bit gives for `reason`: bit 46 is Puppet's, or
+		// Undead's when a mob skill gave it (CTS 46 in both).
+		constexpr Buffstat::Id given(Buffstat::Id stat, int32_t reason)
+		{
+			if (stat == Buffstat::PUPPET && skill(reason) == UNDEAD && level(reason) > 0)
+				return Buffstat::UNDEAD;
+
+			return stat;
+		}
+
 		// Which diseases are on the player, with the n of the ones it
 		// matters for.
 		struct State
@@ -48,7 +64,10 @@ namespace ms
 			bool sealed = false;
 			bool weakened = false;
 			bool confused = false;
+			bool stop_potion = false;
 			std::optional<int32_t> seduced;
+			// Stop Motion's n: the HP standing still costs.
+			std::optional<int32_t> stop_motion;
 		};
 
 		// One frame's arrow input: x is -1 left or 1 right, y -1 up or 1
@@ -117,6 +136,21 @@ namespace ms
 			return can_attack(state) && (!state.sealed || skillid == DISPEL);
 		}
 
+		// Items are refused, without a word, under Stop Potion or a
+		// seduction (FUN_0094fa45, from the quickslots at 0x94f86c and the
+		// USE_ITEM sender FUN_00a092fb).
+		constexpr bool can_use_item(const State &state)
+		{
+			return !state.stop_potion && !state.seduced;
+		}
+
+		// What Stop Motion takes from a player with `hp` who stood still:
+		// its n, but never the last HP (0x94b1d7).
+		constexpr int32_t stop_motion_damage(int32_t n, int32_t hp)
+		{
+			return n < hp - 1 ? n : (hp > 1 ? hp - 1 : 0);
+		}
+
 		// The speed the player walks at: Slow's n in place of their own
 		// (0x92ef56).
 		constexpr int32_t walk_speed(int32_t speed, std::optional<int32_t> slow)
@@ -125,8 +159,8 @@ namespace ms
 		}
 
 		// What the player is told when a mob skill gives them a disease
-		// (FUN_00932da6, StringPool 0xb5a-0xb5f and 0xec2). Slow and Confuse
-		// say nothing.
+		// (FUN_00932da6, StringPool 0xb5a-0xb5f, 0xec2, 0xec3 and
+		// 0x1558-0x155a). Slow and Confuse say nothing.
 		inline std::string notice(int32_t mobskill)
 		{
 			switch (mobskill)
@@ -138,8 +172,16 @@ namespace ms
 			case 124: return "You've been cursed, so the amount of EXP you'll receive will decrease.";
 			case 125: return "You have been poisoned, so your HP will slowly decrease.";
 			case 128: return "You have been seduced, which disables you from moving.";
+			case 133: return "You will become an Undead and the effects of your Recovery will diminish by 50%.";
+			case 134: return "Your current condition will not permit you to use a potion.";
+			case 135: return "You will receive damage if you become covered with the Shadow of Darkness and cannot move.";
+			case 136: return "The fear of darkness has overtaken you! Your range of vision has been narrowed.";
 			default: return "";
 			}
 		}
+
+		// What the player is told when Stop Motion hurts them (StringPool
+		// 0x1561, chat type 7).
+		constexpr const char *STOP_MOTION_HURT = "You receive damage having been covered by the Shadow of Darkness.";
 	}
 }
