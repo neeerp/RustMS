@@ -18,6 +18,7 @@
 #include "SkillData.h"
 
 #include "../Gameplay/Combat/MagicDamage.h"
+#include "../Gameplay/Combat/ShotPath.h"
 #include "../Util/Misc.h"
 
 #include <nlnx/nx.hpp>
@@ -48,7 +49,7 @@ namespace ms
 
 		for (auto sub : levelsrc)
 		{
-			float damage = (float) sub["damage"] / 100;
+			float damage = shot_path::damage_scale(id, (int32_t) sub["damage"], (int32_t) sub["x"]);
 			int32_t matk = sub["mad"];
 			int32_t fixdamage = sub["fixdamage"];
 			int32_t mastery = sub["mastery"];

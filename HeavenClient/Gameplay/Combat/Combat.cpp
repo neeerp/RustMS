@@ -530,6 +530,15 @@ namespace ms
 			}
 
 			mobs.send_attack(result, attack, mob_targets, mobcount);
+
+			if (!result.damagelines.empty() && !result.damagelines[0].second.empty()
+				&& shot_path::drops_splash(attack.skill, result.damagelines[0].second[0].first))
+			{
+				result.damagelines.resize(1);
+				result.mobcount = 1;
+				result.last_oid = result.first_oid;
+			}
+
 			result.attacker = player.get_oid();
 			expect_hits(result, 1);
 			extract_effects(player, move, result, range, reach, shot_area, shot_end);
