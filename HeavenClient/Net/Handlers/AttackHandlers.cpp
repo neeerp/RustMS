@@ -46,8 +46,10 @@ namespace ms
 		attack.skill = (attack.level > 0) ? recv.read_int() : 0;
 
 		attack.display = recv.read_byte();
-		attack.toleft = recv.read_bool();
-		attack.stance = recv.read_byte();
+		// The action, with the facing in the top bit (0x9803ab).
+		uint16_t action = static_cast<uint16_t>(recv.read_short());
+		attack.toleft = (action >> 15) != 0;
+		attack.stance = static_cast<uint8_t>(action & 0x7FFF);
 		attack.speed = recv.read_byte();
 
 		recv.skip(1);
