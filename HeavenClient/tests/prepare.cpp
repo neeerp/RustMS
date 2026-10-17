@@ -1,3 +1,4 @@
+#include "../Character/Look/ActionLock.h"
 #include "../Gameplay/Combat/Prepare.h"
 #include <iostream>
 #include <stdexcept>
@@ -66,8 +67,25 @@ int main()
 		require(chakra_allowed(199, 400) && !chakra_allowed(200, 400) && !chakra_allowed(1, 0), "in whole percent");
 		require(action_id("alert3") == 0x2a, "Chakra prepares with alert3");
 
+		require(action_name(0x16) == "shoot1" && action_name(0x2c) == "alert5" && action_name(0x63) == "rapidfire",
+				"another user's prepare action is read back from its number");
+		require(action_name(0x7fff) == "" && action_name(0x04) == "", "as no action, or none of these");
+		require(prepared_action(0x8016) == 0x16 && prepared_toleft(0x8016) && !prepared_toleft(0x002a),
+				"the top bit is the facing");
+		require(prepared_action(0xffff) == 0x7fff, "all ones is no action");
+		require(outlasts_attacks(3121004) && outlasts_attacks(14111006) && !outlasts_attacks(2121001),
+				"the shooters' attacks keep their prepare; others end it");
+
 		require(gauge_kind(1121001) == 1 && gauge_kind(15101003) == 1, "Monster Magnet and Corkscrew Blow have their own gauge");
 		require(gauge_kind(2121001) == 0 && gauge_kind(3221001) == 0, "the others share one");
+
+		require(ms::action_lock::alias({ -500, -500, 500 }) == 1000 && ms::action_lock::alias({ -300, 300, 300 }) == 300,
+				"an alias locks for its negative delays");
+		require(ms::action_lock::alias({ 200, 200, 200 }) == 0, "alert2 locks for none");
+		require(ms::action_lock::direct("swingO1", { 300, 150, 350 }) == 450, "an action played once, all but its last frame");
+		require(ms::action_lock::direct("alert", { 500, 500, 500 }) == 0 && ms::action_lock::direct("stand1", { 500 }) == 0,
+				"one played back and forth, none");
+		require(ms::action_lock::direct("swingO1", {}) == 0, "nor one with no frames");
 
 		std::cout << "Prepare passed\n";
 		return 0;

@@ -95,6 +95,9 @@ namespace ms
 		// The delay of each frame of a body action, in order.
 		std::vector<uint16_t> get_action_delays(const std::string &action) const;
 
+		// How long a skill's body action keeps the user from acting.
+		uint16_t get_action_lock(const std::string &action) const;
+
 		uint8_t get_frame() const;
 
 		Stance::Id get_stance() const;

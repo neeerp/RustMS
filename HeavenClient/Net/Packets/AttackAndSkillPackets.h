@@ -129,18 +129,18 @@ namespace ms
 	class UseSkillPacket : public OutPacket
 	{
 	public:
-		UseSkillPacket(int32_t skillid, int32_t level) : OutPacket(OutPacket::Opcode::USE_SKILL)
+		// It ends with how long the skill's action keeps the player from
+		// acting (0x96d67a).
+		UseSkillPacket(int32_t skillid, int32_t level, uint16_t lock) : OutPacket(OutPacket::Opcode::USE_SKILL)
 		{
 			write_time();
 			write_int(skillid);
 			write_byte(static_cast<uint8_t>(level));
 
-			// If monster magnet : some more bytes
+			// TODO: The party skills' position, and the other optional
+			// fields (0x96d5e5).
 
-			if (skillid % 10000000 == 1004)
-				skip(2); // TODO: No idea what this could be
-
-			// TODO: A point (4 bytes) could be added at the end
+			write_short(static_cast<int16_t>(lock));
 		}
 	};
 

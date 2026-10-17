@@ -135,6 +135,17 @@ namespace ms
 			return -1;
 		}
 
+		// The prepare action a v83 number names, or "" for no action or one
+		// these skills don't use.
+		inline std::string action_name(int16_t action)
+		{
+			for (const char *name : { "shoot1", "alert3", "alert5", "rapidfire" })
+				if (action_id(name) == action)
+					return name;
+
+			return "";
+		}
+
 		// The frame a held action stays on: Rapid Fire's first, the others'
 		// third (0x4547eb).
 		inline uint8_t held_frame(const std::string &action)
@@ -147,6 +158,25 @@ namespace ms
 		inline uint16_t action_and_facing(int16_t action, bool toleft)
 		{
 			return static_cast<uint16_t>((action & 0x7fff) | (toleft ? 0x8000 : 0));
+		}
+
+		// The action in a prepare packet's action and facing, and whether it
+		// faces left.
+		inline int16_t prepared_action(uint16_t action_and_facing)
+		{
+			return static_cast<int16_t>(action_and_facing & 0x7fff);
+		}
+
+		inline bool prepared_toleft(uint16_t action_and_facing)
+		{
+			return (action_and_facing & 0x8000) != 0;
+		}
+
+		// Whether another user's attack leaves the skill they hold as it is:
+		// the shooters keep firing with it (0x98044f).
+		inline bool outlasts_attacks(int32_t skill)
+		{
+			return repeats(skill) || skill == 14111006;
 		}
 
 		// A skill that keeps firing shoots once more than 100 ms have passed

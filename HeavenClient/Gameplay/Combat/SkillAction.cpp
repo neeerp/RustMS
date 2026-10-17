@@ -52,6 +52,11 @@ namespace ms
 		target.attack(action);
 	}
 
+	std::string SingleAction::get_action(const Char &) const
+	{
+		return action;
+	}
+
 	TwoHandedAction::TwoHandedAction(nl::node src)
 	{
 		actions[false] = std::string(src["action"]["0"]);
@@ -60,10 +65,12 @@ namespace ms
 
 	void TwoHandedAction::apply(Char& target, Attack::Type) const
 	{
-		bool twohanded = target.is_twohanded();
-		std::string action = actions[twohanded];
+		target.attack(get_action(target));
+	}
 
-		target.attack(action);
+	std::string TwoHandedAction::get_action(const Char &target) const
+	{
+		return actions[target.is_twohanded()];
 	}
 
 	ByLevelAction::ByLevelAction(nl::node src, int32_t id)
@@ -79,10 +86,16 @@ namespace ms
 
 	void ByLevelAction::apply(Char &target, Attack::Type) const
 	{
-		int32_t level = target.get_skilllevel(skillid);
-		auto iter = actions.find(level);
+		std::string action = get_action(target);
 
-		if (iter != actions.end())
-			target.attack(iter->second);
+		if (!action.empty())
+			target.attack(action);
+	}
+
+	std::string ByLevelAction::get_action(const Char &target) const
+	{
+		auto iter = actions.find(target.get_skilllevel(skillid));
+
+		return iter != actions.end() ? iter->second : "";
 	}
 }

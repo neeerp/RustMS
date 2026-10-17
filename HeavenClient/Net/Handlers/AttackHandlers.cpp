@@ -85,4 +85,23 @@ namespace ms
 
 		Stage::get().get_combat().push_attack(attack);
 	}
+
+	void SkillEffectHandler::handle(InPacket& recv) const
+	{
+		int32_t cid = recv.read_int();
+		int32_t skillid = recv.read_int();
+		uint8_t level = recv.read_byte();
+		uint16_t action_and_facing = static_cast<uint16_t>(recv.read_short());
+		uint8_t speed = recv.read_byte();
+
+		Stage::get().get_combat().show_prepare(cid, skillid, level, action_and_facing, speed);
+	}
+
+	void CancelSkillEffectHandler::handle(InPacket& recv) const
+	{
+		int32_t cid = recv.read_int();
+		int32_t skillid = recv.read_int();
+
+		Stage::get().get_combat().cancel_prepare(cid, skillid);
+	}
 }

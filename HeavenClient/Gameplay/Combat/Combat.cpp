@@ -114,6 +114,7 @@ namespace ms
 	{
 		now += Constants::TIMESTEP;
 		update_prepare();
+		update_remote_prepares();
 
 		attackresults.update();
 		bulleteffects.update();
@@ -269,7 +270,9 @@ namespace ms
 
 		int32_t moveid = move.get_id();
 		int32_t level = player.get_skills().get_level(moveid);
-		player.request(UseSkillPacket(moveid, level), ExclRequest::SKILL_WAIT);
+		std::string action = move.get_action(player);
+		uint16_t lock = action.empty() ? 0 : player.get_action_lock(action);
+		player.request(UseSkillPacket(moveid, level, lock), ExclRequest::SKILL_WAIT);
 
 		return true;
 	}
@@ -654,6 +657,11 @@ namespace ms
 			user.update_skill(attack.skill, attack.level);
 			user.update_speed(attack.speed);
 
+			// An attack ends the skill the user was preparing, unless it
+			// is one of its shots (0x98044f).
+			if (!prepare::outlasts_attacks(attack.skill))
+				end_remote_prepare(user);
+
 			const SpecialMove &move = get_move(attack.skill);
 			move.apply_useeffects(user);
 
@@ -891,6 +899,109 @@ namespace ms
 	void Combat::show_player_buff(int32_t skillid)
 	{
 		get_move(skillid).apply_useeffects(player);
+	}
+
+	void Combat::show_prepare(int32_t cid, int32_t skillid, uint8_t level, uint16_t action_and_facing, uint8_t speed)
+	{
+		Optional<OtherChar> ouser = chars.get_char(cid);
+
+		if (!ouser || skillid <= 0)
+			return;
+
+		OtherChar &user = *ouser;
+		end_remote_prepare(user);
+
+		const Skill &skill = get_skill(skillid);
+		const SkillPrepare &data = skill.get_prepare();
+		bool keydown = prepare::keydown(skillid);
+		int16_t action = prepare::prepared_action(action_and_facing);
+		std::string name = prepare::action_name(action);
+
+		user.update_skill(skillid, std::max<uint8_t>(level, 1));
+		user.update_speed(speed);
+
+		// They face the way they prepare it, and take up its action: held
+		// on one frame for a held skill, played once for a timed one. No
+		// action leaves them as they are.
+		if (action != 0x7fff)
+			user.set_direction(!prepare::prepared_toleft(action_and_facing));
+
+		if (!name.empty())
+		{
+			user.attack(name);
+
+			if (keydown)
+				user.hold_attack(prepare::held_frame(name));
+		}
+
+		user.clear_held_effects();
+		user.show_held_effect(data.prepare.animation, data.prepare.z, false);
+
+		// Only a held skill is followed until it's let go.
+		if (keydown)
+			remote_prepares[cid] = RemotePrepare{ skillid, 0, false, !name.empty() };
+	}
+
+	void Combat::cancel_prepare(int32_t cid, int32_t skillid)
+	{
+		Optional<OtherChar> ouser = chars.get_char(cid);
+
+		if (!ouser)
+			return;
+
+		OtherChar &user = *ouser;
+		end_remote_prepare(user);
+
+		// The skills that keep firing wind down; the effect of any other
+		// just goes.
+		if (prepare::repeats(skillid))
+		{
+			const SkillPrepare &data = get_skill(skillid).get_prepare();
+			user.show_held_effect(data.keydownend.animation, data.keydownend.z, false);
+		}
+	}
+
+	void Combat::update_remote_prepares()
+	{
+		for (auto iter = remote_prepares.begin(); iter != remote_prepares.end();)
+		{
+			Optional<OtherChar> ouser = chars.get_char(iter->first);
+
+			if (!ouser)
+			{
+				iter = remote_prepares.erase(iter);
+				continue;
+			}
+
+			RemotePrepare &held = iter->second;
+			held.held += Constants::TIMESTEP;
+
+			const SkillPrepare &data = get_skill(held.skill).get_prepare();
+
+			if (!held.keydown && held.held >= data.time)
+			{
+				held.keydown = true;
+				ouser->clear_held_effects();
+				ouser->show_held_effect(data.keydown.animation, data.keydown.z, true);
+			}
+
+			++iter;
+		}
+	}
+
+	void Combat::end_remote_prepare(OtherChar &user)
+	{
+		user.clear_held_effects();
+
+		auto iter = remote_prepares.find(user.get_oid());
+
+		if (iter == remote_prepares.end())
+			return;
+
+		if (iter->second.forced)
+			user.end_attack();
+
+		remote_prepares.erase(iter);
 	}
 
 	void Combat::start_prepare(const Skill &skill)

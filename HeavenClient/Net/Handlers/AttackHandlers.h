@@ -52,4 +52,19 @@ namespace ms
 	public:
 		MagicAttackHandler() : AttackHandler(Attack::Type::MAGIC) {}
 	};
+
+	// Another user started preparing a skill, held down or timed
+	// (0x980a81).
+	// Opcode: SKILL_EFFECT(190)
+	class SkillEffectHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
+	// Another user let go of a held skill without using it (0x980bf5).
+	// Opcode: CANCEL_SKILL_EFFECT(191)
+	class CancelSkillEffectHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
 }

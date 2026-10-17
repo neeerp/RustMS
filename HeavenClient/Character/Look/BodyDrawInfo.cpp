@@ -17,6 +17,7 @@
 //////////////////////////////////////////////////////////////////////////////////
 #include "BodyDrawInfo.h"
 
+#include "ActionLock.h"
 #include "Body.h"
 
 #include <nlnx/nx.hpp>
@@ -207,6 +208,34 @@ namespace ms
 				delays.push_back(action_iter->second.at(frame).get_delay());
 
 		return delays;
+	}
+
+	uint16_t BodyDrawInfo::get_action_lock(const std::string &action) const
+	{
+		auto action_iter = body_actions.find(action);
+
+		if (action_iter != body_actions.end())
+		{
+			// A negative delay is kept as a frame that doesn't attack.
+			std::vector<int16_t> delays;
+
+			for (uint8_t frame = 0; action_iter->second.count(frame); frame++)
+			{
+				const BodyAction &body = action_iter->second.at(frame);
+				int16_t delay = static_cast<int16_t>(body.get_delay());
+				delays.push_back(body.isattackframe() ? delay : static_cast<int16_t>(-delay));
+			}
+
+			return action_lock::alias(delays);
+		}
+
+		Stance::Id stance = Stance::by_string(action);
+		std::vector<uint16_t> delays;
+
+		for (uint8_t frame = 0; stance_delays[stance].count(frame); frame++)
+			delays.push_back(stance_delays[stance].at(frame));
+
+		return action_lock::direct(action, delays);
 	}
 
 	uint8_t BodyDrawInfo::next_actionframe(std::string action, uint8_t frame) const
