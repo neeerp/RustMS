@@ -1381,7 +1381,9 @@ namespace ms
 			// nothing. A spell flies one ball to each mob it hits. A mob's
 			// hits all land 1.5 ms per pixel it is away across, or along a
 			// spell's path, after the attack's hit frame, but for a few
-			// skills (0x954867).
+			// skills (0x954867). Energy Orb's ball instead jumps from 25 px
+			// ahead to the middle of each mob in turn, each hit when it gets
+			// there (FUN_0094289f).
 			Animation animation = move.get_bullet(user, result.bullet);
 			Point<int16_t> origin = shot_path::origin(user.get_position(), reach, result.toleft);
 			Point<int16_t> start = shot_path::bullet_start(result.skill, origin, result.toleft);
@@ -1396,7 +1398,7 @@ namespace ms
 
 				if (spell)
 					count = sets = 1;
-				else if (shot_path::hides_bullet(result.skill))
+				else if (shot_path::hides_bullet(result.skill) || shot_path::hops(result.skill))
 					return;
 
 				uint8_t per_set = std::max(count / sets, 1);
@@ -1413,6 +1415,9 @@ namespace ms
 			uint16_t first = 0;
 			std::optional<Point<int16_t>> first_hit;
 			std::vector<Rectangle<int16_t>> bodies;
+			bool hops = !spell && shot_path::hops(result.skill);
+			Point<int16_t> hop_from = shot_path::hop_start(origin, result.toleft);
+			uint16_t hopped = 0;
 
 			for (size_t target = 0; target < result.damagelines.size(); target++)
 			{
@@ -1426,6 +1431,16 @@ namespace ms
 					Point<int16_t> hit = shot_path::hit_point(shot_area, body);
 					uint16_t hit_delay = spell ? shot_path::flight_time(origin, hit)
 						: shot_path::target_delay(result.skill, target, first, origin, hit);
+
+					if (hops)
+					{
+						Point<int16_t> hop_to = shot_path::hop_point(body);
+						uint16_t hop = shot_path::hop_time(result.skill, hop_from, hop_to);
+						bulleteffects.push(delay + hopped, Bullet(animation, hop_from, hop_to, hop));
+						hopped += hop;
+						hit_delay = hopped;
+						hop_from = hop_to;
+					}
 
 					if (target == 0)
 						first = hit_delay;
@@ -1644,6 +1659,8 @@ namespace ms
 		uint16_t first = 0;
 		std::optional<Point<int16_t>> first_hit;
 		std::vector<Rectangle<int16_t>> bodies;
+		std::optional<Point<int16_t>> hop_from;
+		uint16_t hopped = 0;
 
 		for (size_t target = 0; target < result.damagelines.size(); target++)
 		{
@@ -1672,6 +1689,20 @@ namespace ms
 			Point<int16_t> start = remote_shot::start(skill, position, left, result.toleft);
 			Point<int16_t> aim = remote_spell::aim(start, body, left);
 			uint16_t hit = remote_shot::hit_delay(skill, target, first, delay, start, aim);
+
+			// Energy Orb's ball jumps from 25 px ahead of where it starts
+			// to the middle of each mob in turn, as the user's own does
+			// (0x981ba6).
+			if (shot_path::hops(skill))
+			{
+				Point<int16_t> from = hop_from ? *hop_from : shot_path::hop_start(start, result.toleft);
+				Point<int16_t> to = shot_path::hop_point(body);
+				uint16_t hop = shot_path::hop_time(skill, from, to);
+				bulleteffects.push(delay + hopped, Bullet(animation, from, to, hop));
+				hopped += hop;
+				hit = hopped;
+				hop_from = to;
+			}
 
 			if (target == 0)
 				first = hit;
