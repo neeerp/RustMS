@@ -191,7 +191,9 @@ namespace ms
 
 		if (int16_t slot = inventory.find_item(type, itemid))
 		{
-			if (type == InventoryType::Id::USE)
+			if (type == InventoryType::Id::USE && (itemid / 10000 == 228 || itemid / 10000 == 229))
+				request(SkillBookPacket(slot, itemid), ExclRequest::USE_WAIT);
+			else if (type == InventoryType::Id::USE)
 				request(UseItemPacket(slot, itemid), ExclRequest::USE_WAIT);
 			else if (type == InventoryType::Id::SETUP && itemid / 10000 == 301)
 				sit_on_chair(itemid);
