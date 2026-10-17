@@ -30,6 +30,7 @@
 #include "../MapleMap/MapInfo.h"
 #include "../MapleMap/MapMobs.h"
 #include "../MapleMap/MapReactors.h"
+#include "../MapleMap/MapSummons.h"
 #include "../Physics/Physics.h"
 
 #include "../../Character/Player.h"
@@ -42,8 +43,8 @@ namespace ms
 	class Combat
 	{
 	public:
-		Combat(Player &player, MapChars &chars, MapMobs &mobs, MapReactors &reactors, const Physics &physics,
-			   const MapInfo &mapinfo);
+		Combat(Player &player, MapChars &chars, MapMobs &mobs, MapReactors &reactors, MapSummons &summons,
+			   const Physics &physics, const MapInfo &mapinfo);
 
 		// Load the charge gauge, once the NX files are open.
 		static void init();
@@ -107,6 +108,11 @@ namespace ms
 		// Drop the grenades in flight, as on leaving the map.
 		void clear_grenades();
 
+		// Show another user's summon attacking: its animation, then each
+		// mob's hit as it gets there (FUN_007a6882). `hits` are the mobs
+		// and their damage.
+		void show_summon_attack(int32_t oid, uint8_t action, const std::vector<std::pair<int32_t, int32_t>> &hits);
+
 	private:
 		struct DamageEffect
 		{
@@ -125,6 +131,41 @@ namespace ms
 
 		// Use a skill that doesn't attack. Whether it could ask the server.
 		bool request_skill(const SpecialMove &move);
+
+		// Summon in front of the player, if there is room (FUN_0096b140).
+		// Whether it could ask the server.
+		bool request_summon(const SpecialMove &move, int32_t level);
+
+		// What one of a summon's attacks is like: its
+		// `summon/attack1/info`.
+		struct SummonInfo
+		{
+			uint8_t mobcount;
+			// How far it reaches to either side.
+			int16_t reach;
+			// Its box, from where it is, facing left; empty if none.
+			Rectangle<int16_t> area;
+			int16_t attackafter;
+			// How fast its ball flies, in px a second; 0 if it has none.
+			int16_t bulletspeed;
+			Animation hit;
+		};
+
+		const SummonInfo &get_summon_info(int32_t skill);
+
+		// The player's summons attack when they may (FUN_00765047).
+		void update_summons();
+
+		// A summon's hit landing on a mob.
+		struct SummonHit
+		{
+			int32_t oid;
+			int32_t damage;
+			bool toleft;
+			int32_t skill;
+		};
+
+		void apply_summon_hit(const SummonHit &hit);
 
 		// What the skill's packet carries besides it, or nothing if it isn't
 		// sent: Shadow Stars without its stars, or Resurrection with no one
@@ -284,6 +325,7 @@ namespace ms
 		MapChars &chars;
 		MapMobs &mobs;
 		MapReactors &reactors;
+		MapSummons &summons;
 		const Physics &physics;
 		const MapInfo &mapinfo;
 
@@ -293,6 +335,8 @@ namespace ms
 		TimedQueue<AttackResult> attackresults;
 		TimedQueue<Bullet> bulleteffects;
 		TimedQueue<DamageEffect> damageeffects;
+		TimedQueue<SummonHit> summonhits;
+		std::unordered_map<int32_t, SummonInfo> summoninfos;
 
 		// A mob Monster Magnet reached, caught or not, for the user where
 		// they stood.

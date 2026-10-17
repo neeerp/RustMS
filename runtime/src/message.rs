@@ -112,6 +112,10 @@ pub enum ServerMessage {
     FameMissed {
         target: i32,
     },
+    /// A mob broke this player's Puppet: its buff ends.
+    SummonBroken {
+        skill_id: i32,
+    },
     SendPacket(Packet),
 }
 

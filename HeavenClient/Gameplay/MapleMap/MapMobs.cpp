@@ -151,6 +151,15 @@ namespace ms
 		}
 	}
 
+	void MapMobs::apply_summon_damage(int32_t oid, int32_t damage, bool toleft, const Animation &hit)
+	{
+		if (Optional<Mob> mob = mobs.get(oid))
+		{
+			mob->apply_damage(damage, toleft);
+			mob->show_hit(hit, mob->get_body(), toleft);
+		}
+	}
+
 	void MapMobs::expect_hits(int32_t oid, int32_t count)
 	{
 		if (Optional<Mob> mob = mobs.get(oid))
@@ -213,6 +222,14 @@ namespace ms
 			return mob->get_head_position();
 		else
 			return Point<int16_t>(0, 0);
+	}
+
+	int32_t MapMobs::get_mob_id(int32_t oid) const
+	{
+		if (Optional<const Mob> mob = mobs.get(oid))
+			return mob->get_id();
+
+		return 0;
 	}
 
 	std::vector<std::pair<Point<int16_t>, int32_t>> MapMobs::take_hurts()

@@ -592,10 +592,14 @@ pub fn prepares(skill_id: i32) -> bool {
 }
 
 /// The stats a buff skill gives at its level, or `None` for a skill that
-/// isn't one. Every buff gives the stats its level names (attack, defense,
+/// isn't one. A summon's buff is its icon (`summons::stat`). Every buff gives the stats its level names (attack, defense,
 /// accuracy, avoidability, speed, jump), and some a stat of their own. A
 /// weapon charge's own `mad` is the strength of its element, not a buff.
 pub fn buffs(skill: &Learned) -> Option<Vec<(BuffStat, i32)>> {
+    // A summon's `pad` is its own attack, not the player's.
+    if crate::summons::kind(skill.skill_id).is_some() {
+        return Some(vec![(crate::summons::stat(skill.skill_id), 1)]);
+    }
     let effect = &skill.effect;
     let own = match skill.skill_id {
         1001 | 10001001 | 20001001 => vec![(BuffStat::Recovery, effect.x)],

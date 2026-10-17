@@ -78,6 +78,9 @@ namespace ms
 		// Applies damage to a mob.
 		void apply_damage(int32_t oid, int32_t damage, bool toleft, const AttackUser &user, const SpecialMove &move);
 
+		// A summon's hit lands on a mob, with the summon's spark.
+		void apply_summon_damage(int32_t oid, int32_t damage, bool toleft, const Animation &hit);
+
 		// Monster Magnet caught a mob for the user at `user`.
 		void catch_mob(int32_t oid, Point<int16_t> user);
 
@@ -95,6 +98,9 @@ namespace ms
 
 		// Return the head position of a mob.
 		Point<int16_t> get_mob_head_position(int32_t oid) const;
+
+		// A mob's template id, or 0 if there is no such mob.
+		int32_t get_mob_id(int32_t oid) const;
 
 		// The numbers Poison, Venom and Ambush showed on each mob since last
 		// asked, with where its head is.

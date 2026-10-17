@@ -32,6 +32,7 @@
 #include "MapleMap/MapChars.h"
 #include "MapleMap/MapMobs.h"
 #include "MapleMap/MapMists.h"
+#include "MapleMap/MapSummons.h"
 #include "MapleMap/MapReactors.h"
 #include "MapleMap/MapNpcs.h"
 #include "MapleMap/MapDrops.h"
@@ -105,6 +106,9 @@ namespace ms
 
 		// Returns a reference to the mists on the current map.
 		MapMists &get_mists();
+
+		// Returns a reference to the summons on the current map.
+		MapSummons &get_summons();
 
 		// Returns a reference to the drops on the current map.
 		MapDrops &get_drops();
@@ -212,6 +216,7 @@ namespace ms
 		MapMobs mobs;
 		MapDrops drops;
 		MapMists mists;
+		MapSummons summons;
 		MapEffect effect;
 		// Effects left where they started, such as a jump pad's burst.
 		EffectLayer ground_effects;

@@ -395,6 +395,81 @@ v83 does (`MistLayout.h`, a diamond of random tiles), draws them above the
 map's objects, and fades them out over a second when the mist lifts.
 `v83ref` report 160 has the client's detail.
 
+## Summons
+
+Puppet, Silver Hawk, the Octopus, Elquines, the Knights' souls and the like
+call up a summon (`net::summons`, the field's `field_summons::SummonSet`).
+USE_SKILL for a skill in `summons::kind` carries where the caster's client
+put it and which way it faces after the level. The client puts Puppets 200
+px ahead on a foothold within 80 px, the Octopi 45 px ahead, and the rest at
+the owner (v83 `FUN_0096b140`). The cast costs MP and any `itemCon`, for
+example a Summoning Rock for Silver Hawk. It also gives a buff that shows
+the summon's icon and lasts its `time`: Puppet's own stat for summons that
+stay put, the combo counter for the rest. The field then takes the summon
+(`FieldRequest::Summon`). If the spot is more than 250×150 px from the
+owner, it uses the owner's position. The owner's earlier summon of that
+kind is dismissed. SPAWN_SUMMON (`0xAF`) shows it to the map and to players
+who join.
+
+The owner's client moves it and decides when it attacks. The server checks
+the rest:
+
+- **MOVE_SUMMON** (`0xAF` in, `0xB1` out) is relayed to the others.
+- **SUMMON_ATTACK** (`0xB0` in, `0xB2` out) is refused when any of these
+  holds:
+  - it hits more mobs than the skill's `mobCount`;
+  - it hits one mob twice;
+  - a hit exceeds `summons::max_damage`, which is twice what the owner's
+    client can roll before multipliers, so it is the owner's main stat ×
+    2.5 plus their other stats for a physical summon, or the v83 spell
+    formula for a magic one, times the level's `pad` or `mad` percent.
+
+  Otherwise the hits go through the field's usual damage and kill path.
+- **DAMAGE_SUMMON** (`0xB1` in, `0xB4` out) hurts a Puppet. Puppets are the
+  only summons that can be hurt, and their HP is the level's `x`. At 0 HP
+  the Puppet breaks: REMOVE_SUMMON reason 2, and the owner's buff ends.
+
+REMOVE_SUMMON (`0xB0`) reasons:
+
+- 0: the summon expired when its buff did.
+- 1: silently, for example when the owner rejoins the same map.
+- 2: a Puppet broke.
+- 4: it was replaced.
+
+When the owner changes maps, a summon that follows comes along: it spawns
+again with no entrance. Stationary summons end there. The others drop a
+player's summons when the player leaves, with no packet.
+
+HeavenClient's `MapSummons` (`Gameplay/MapleMap`) draws them and plays their
+`summon` animations. `SummonRules.h` holds v83's rules without the map:
+
+- Followers glide 7 px a step to 70 px from the owner (42 for the souls).
+- Fliers circle a random spot near the owner, or near their spawn if they
+  stay put.
+- Any summon jumps to an owner more than 300×200 px away.
+
+`Combat::update_summons` makes the owner's summons attack every 3 s
+(Gaviota and Wrath every 1.5 s):
+
+- The mage summons hit the side of their `lt`/`rb` box with more mobs.
+- The others hit the nearest mobs within their `range/r`.
+- The spreading kinds hit one mob and then up to `mobCount`−1 more around
+  it, 120 ms apart.
+- Each hit lands `attackAfter` plus the projectile's flight time after the
+  attack starts.
+
+Where HeavenClient differs from v83:
+
+- Ball sprites aren't drawn.
+- Followers send their paths the way fliers do.
+- The fly speed (0.2 px/ms) is inferred.
+- Range targeting is a ±`r` × ±100 px box.
+- Puppets don't draw mobs to them yet, and mobs don't hurt summons
+  client-side yet.
+- Beholder's buffs and heals (`0xB3`) are missing.
+
+`v83ref` report 158 has the client's detail.
+
 ## Reactors
 
 A map's `reactor` nodes (`game_data::MapReactorTemplate`) place reactors such
@@ -486,4 +561,7 @@ Three Snails, Nimble Feet, and Recovery and checks their damage caps, MP,
 buffs, cooldowns, Recovery's heal, what the others see, and that the buffs
 end on time and on death. `poison_mist` casts Poison Mist on a snail and
 checks the cloud's packet, that it lifts on time, and that it poisons only
-the snails in its box.
+the snails in its box. `summons` has a ranger call up a Silver Hawk and a
+Puppet, and checks what a watcher sees: the spawns, a refused and an accepted
+Hawk attack, the Puppet breaking, and the Hawk following its owner to the
+next map with no entrance.

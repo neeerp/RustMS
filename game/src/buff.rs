@@ -44,6 +44,9 @@ pub enum BuffStat {
     SharpEyes = 37,
     Infinity = 41,
     Concentrate = 45,
+    /// A summon that stays where it was put: a Puppet or an Octopus. The
+    /// client only shows its icon (Cosmic's PUPPET).
+    Puppet = 46,
 }
 
 impl BuffStat {
