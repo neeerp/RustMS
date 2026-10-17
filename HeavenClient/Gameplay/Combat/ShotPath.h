@@ -108,6 +108,158 @@ namespace ms
 			}
 		}
 
+		// How far above and below its row a shot that hits every mob along it
+		// reaches (FUN_0076664d), or 0.
+		inline int16_t area_height(int32_t skill)
+		{
+			switch (skill)
+			{
+			case 3201005: // Iron Arrow
+			case 4121003: // Taunt
+			case 4221003:
+			case 13111006: // Wind Piercing
+				return 10;
+			case 3121003: // Dragon's Breath
+			case 3221001: // Piercing Arrow
+			case 3221003: // Dragon's Breath
+				return 20;
+			case 4111005: // Avenger
+			case 14111002:
+				return 36;
+			case 11101004: // Soul Blade
+			case 15111007: // Shark Wave
+			case 21100004: // Combo Smash
+			case 21110004: // Combo Penril
+				return 60;
+			case 15111006: // Spark
+				return 150;
+			default:
+				return 0;
+			}
+		}
+
+		// Whether a shot hits every mob in the skill's own area around the
+		// user, its lt and rb, rather than along its row (FUN_007666cb).
+		inline bool skill_area(int32_t skill)
+		{
+			switch (skill)
+			{
+			case 3111004: // Arrow Rain
+			case 3211004: // Arrow Eruption
+			case 5201001: // Invisible Shot
+			case 5211004: // Flamethrower
+			case 5211005: // Ice Splitter
+			case 5221008: // Battleship Torpedo
+			case 13101005: // Storm Break
+			case 13111000: // Arrow Rain
+			case 14101006: // Vampire
+			case 21120006: // Combo Tempest
+				return true;
+			default:
+				return false;
+			}
+		}
+
+		// Whether a shot hits the first mobs in its area, as many as it may
+		// and in the order they entered the map, rather than the first mob in
+		// its path (FUN_00766722).
+		inline bool area_shot(int32_t skill)
+		{
+			return skill != 15111006 && (area_height(skill) > 0 || skill_area(skill));
+		}
+
+		// Whether a shot draws no bullet (FUN_00766867).
+		inline bool hides_bullet(int32_t skill)
+		{
+			return skill_area(skill) && skill != 5221008;
+		}
+
+		// Whether a shot jumps on from the first mob it hits, as Chain
+		// Lightning does: Energy Orb.
+		inline bool chains(int32_t skill)
+		{
+			return skill == 5121002;
+		}
+
+		// Whether a shot also hits the mobs in the skill's area around the
+		// first mob it hits: Arrow Bomb, Inferno and Blizzard.
+		inline bool splashes(int32_t skill)
+		{
+			return skill == 3101005 || skill == 3111003 || skill == 3211003;
+		}
+
+		// The area a shot covers: its row from `origin` to `end_x`, widened
+		// for some skills, or the skill's own `lt_rb` around the `user`,
+		// turned the way they face.
+		inline Rectangle<int16_t> area(int32_t skill, Point<int16_t> user, Point<int16_t> origin, int16_t end_x,
+									   Rectangle<int16_t> lt_rb, bool toleft)
+		{
+			if (skill_area(skill))
+			{
+				if (toleft)
+					return {
+						static_cast<int16_t>(user.x() + lt_rb.left()),
+						static_cast<int16_t>(user.x() + lt_rb.right()),
+						static_cast<int16_t>(user.y() + lt_rb.top()),
+						static_cast<int16_t>(user.y() + lt_rb.bottom())
+					};
+
+				return {
+					static_cast<int16_t>(user.x() - lt_rb.right()),
+					static_cast<int16_t>(user.x() - lt_rb.left()),
+					static_cast<int16_t>(user.y() + lt_rb.top()),
+					static_cast<int16_t>(user.y() + lt_rb.bottom())
+				};
+			}
+
+			int16_t height = area_shot(skill) ? area_height(skill) : 0;
+
+			return {
+				std::min(origin.x(), end_x),
+				std::max(origin.x(), end_x),
+				static_cast<int16_t>(origin.y() - height),
+				static_cast<int16_t>(origin.y() + 1 + height)
+			};
+		}
+
+		// The area around the mob a splashing shot hits at `hit`: the skill's
+		// lt and rb, whichever way the user faces.
+		inline Rectangle<int16_t> splash_area(Point<int16_t> hit, Rectangle<int16_t> lt_rb)
+		{
+			return {
+				static_cast<int16_t>(hit.x() + lt_rb.left()),
+				static_cast<int16_t>(hit.x() + lt_rb.right()),
+				static_cast<int16_t>(hit.y() + lt_rb.top()),
+				static_cast<int16_t>(hit.y() + lt_rb.bottom())
+			};
+		}
+
+		// Where the bullets of a shot from `origin` start: a few skills fire
+		// from further ahead or behind.
+		inline Point<int16_t> bullet_start(int32_t skill, Point<int16_t> origin, bool toleft)
+		{
+			int16_t ahead;
+
+			switch (skill)
+			{
+			case 5221007: // Battleship Cannon
+			case 5221008: // Battleship Torpedo
+				ahead = 30;
+				break;
+			case 11101004: // Soul Blade
+				ahead = 70;
+				break;
+			case 15111007: // Shark Wave
+				ahead = 150;
+				break;
+			default:
+				ahead = 0;
+				break;
+			}
+
+			return { static_cast<int16_t>(origin.x() + (toleft ? -ahead : ahead)), origin.y() };
+		}
+
 		// Where a shot from `origin` toward `end_x` looks for its target, step
 		// by step from the nearest. Each step is 20 px wide and reaches 1 px
 		// above and below the shot per 4 px it starts from the user
@@ -257,15 +409,15 @@ namespace ms
 			return { x, static_cast<int16_t>(user.y() - HEIGHT) };
 		}
 
-		// Where a shot from `origin` to `end_x` hits a mob with these bounds:
-		// the centre of where the shot's 1 px tall row crosses them, moved
-		// onto the bounds if they miss each other (FUN_00664603).
-		inline Point<int16_t> hit_point(Point<int16_t> origin, int16_t end_x, Rectangle<int16_t> body)
+		// Where a shot covering `area` hits a mob with these bounds: the
+		// centre of where they cross, moved onto the bounds if they miss
+		// each other (FUN_00664603).
+		inline Point<int16_t> hit_point(Rectangle<int16_t> area, Rectangle<int16_t> body)
 		{
-			int32_t left = std::min(origin.x(), end_x);
-			int32_t right = std::max(origin.x(), end_x);
-			int32_t top = origin.y();
-			int32_t bottom = origin.y() + 1;
+			int32_t left = area.left();
+			int32_t right = area.right();
+			int32_t top = area.top();
+			int32_t bottom = area.bottom();
 
 			if (left >= body.right())
 				left = body.right() - 1;
@@ -285,6 +437,13 @@ namespace ms
 			return { static_cast<int16_t>((left + right) / 2), static_cast<int16_t>((top + bottom) / 2) };
 		}
 
+		// Where a shot from `origin` to `end_x` hits a mob with these bounds,
+		// its row 1 px tall.
+		inline Point<int16_t> hit_point(Point<int16_t> origin, int16_t end_x, Rectangle<int16_t> body)
+		{
+			return hit_point(area(0, origin, origin, end_x, {}, false), body);
+		}
+
 		// How long a bullet flies from `from` to `to`.
 		inline uint16_t flight_time(Point<int16_t> from, Point<int16_t> to)
 		{
@@ -299,6 +458,31 @@ namespace ms
 		inline uint16_t hit_delay(Point<int16_t> origin, Point<int16_t> hit)
 		{
 			return static_cast<uint16_t>(MS_PER_PIXEL * std::abs(hit.x() - origin.x()));
+		}
+
+		// How long after the attack's hit frame the damage to its `target`th
+		// mob lands, at `hit`, the first mob's after `first` (0x954867).
+		inline uint16_t target_delay(int32_t skill, size_t target, uint16_t first, Point<int16_t> origin,
+									 Point<int16_t> hit)
+		{
+			switch (skill)
+			{
+			case 3101005: // Arrow Bomb
+				if (target > 0)
+					return first + 200;
+				break;
+			case 3111003: // Inferno
+			case 3211003: // Blizzard
+				if (target > 0)
+					return static_cast<uint16_t>(first + 120 + 30 * target);
+				break;
+			case 3111004: // Arrow Rain
+			case 3211004: // Arrow Eruption
+			case 13111000: // Arrow Rain
+				return 400;
+			}
+
+			return hit_delay(origin, hit);
 		}
 
 		// How far below its target the `bullet`th of `count` bullets flies, so

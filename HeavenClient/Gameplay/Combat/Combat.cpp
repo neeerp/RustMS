@@ -454,7 +454,7 @@ namespace ms
 			bool closest_first = attack.type == Attack::Type::RANGED;
 			std::vector<int32_t> mob_targets;
 			std::vector<int32_t> reactor_targets = find_targets(reactor_objs, range, origin, mobcount, false, true);
-			bool shot = attack.type == Attack::Type::RANGED && whack == Stance::Id::NONE && mobcount == 1;
+			bool shot = attack.type == Attack::Type::RANGED && whack == Stance::Id::NONE;
 			bool spell = attack.type == Attack::Type::MAGIC && shot_path::aimed_spell(attack.skill);
 
 			if (spell)
@@ -462,34 +462,65 @@ namespace ms
 
 			Point<int16_t> shot_start = shot_path::origin(origin, reach, attack.toleft);
 			Point<int16_t> shot_end(attack.toleft ? range.left() : range.right(), shot_start.y());
+			Rectangle<int16_t> shot_area;
 
-			// A shot at one mob, or an aimed spell, hits the first in its path
-			// instead. A platform between the player and it stops a shot, or a
-			// spell that flies.
+			// As in v83, a shot or an aimed spell hits the first mob in its
+			// path, and a platform between the player and it stops it, or a
+			// spell that flies. Some shots hit the first mobs to enter the
+			// map in an area instead: their row widened, or the skill's own
+			// area (FUN_009537d5).
 			if (shot || spell)
 			{
 				int16_t shot_range = spell ? shot_path::SPELL_RANGE : get_shot_range(attack);
 				shot_end.set_x(origin.x() + (attack.toleft ? -shot_range : shot_range));
-				mob_targets = find_shot_target(shot_start, shot_end.x());
+				shot_area = shot_path::area(attack.skill, origin, shot_start, shot_end.x(), attack.range, attack.toleft);
 
-				Point<int16_t> sight = shot_path::origin(origin, 0, attack.toleft);
-				Point<int16_t> stop = shot_end;
-
-				// Chain Lightning strikes its first mob without flying there,
-				// and jumps on from it.
-				if (chain_lightning::chains(attack.skill))
+				if (shot && shot_path::area_shot(attack.skill))
 				{
-					if (!mob_targets.empty())
-						mob_targets = find_chain(mob_targets[0], mobcount, attack.toleft);
+					mob_targets = find_targets(mob_objs, shot_area, origin, mobcount, true, false);
 				} else
 				{
-					if (!mob_targets.empty())
-						stop = shot_path::hit_point(shot_start, shot_end.x(), mobs.get_mob_body(mob_targets[0]));
+					mob_targets = find_shot_target(shot_start, shot_end.x());
 
-					if (attack.bullet && shot_path::blocked(sight, stop, find_platforms(sight, stop), player.get_phobj().fhgroup))
+					Point<int16_t> sight = shot_path::origin(origin, 0, attack.toleft);
+					Point<int16_t> stop = shot_end;
+
+					// Chain Lightning strikes its first mob without flying
+					// there, and jumps on from it.
+					if (chain_lightning::chains(attack.skill))
 					{
-						mob_targets.clear();
-						shot_end = stop;
+						if (!mob_targets.empty())
+							mob_targets = find_chain(mob_targets[0], mobcount, attack.toleft);
+					} else
+					{
+						if (!mob_targets.empty())
+							stop = shot_path::hit_point(shot_area, mobs.get_mob_body(mob_targets[0]));
+
+						if (attack.bullet && shot_path::blocked(sight, stop, find_platforms(sight, stop), player.get_phobj().fhgroup))
+						{
+							mob_targets.clear();
+							shot_end = stop;
+						}
+					}
+
+					if (!mob_targets.empty() && mobcount > 1)
+					{
+						// Energy Orb jumps on from the first mob as Chain
+						// Lightning does, and Arrow Bomb, Inferno and Blizzard
+						// hit the mobs around it too.
+						if (shot_path::chains(attack.skill))
+						{
+							mob_targets = find_chain(mob_targets[0], mobcount, attack.toleft);
+						} else if (shot_path::splashes(attack.skill))
+						{
+							int32_t first = mob_targets[0];
+							Point<int16_t> hit = shot_path::hit_point(shot_area, mobs.get_mob_body(first));
+							Rectangle<int16_t> splash = shot_path::splash_area(hit, attack.range);
+
+							for (int32_t oid : find_targets(mob_objs, splash, origin, mobcount, true, false))
+								if (oid != first && mob_targets.size() < mobcount)
+									mob_targets.push_back(oid);
+						}
 					}
 				}
 			} else
@@ -500,7 +531,7 @@ namespace ms
 			mobs.send_attack(result, attack, mob_targets, mobcount);
 			result.attacker = player.get_oid();
 			expect_hits(result, 1);
-			extract_effects(player, move, result, range, reach, shot_end);
+			extract_effects(player, move, result, range, reach, shot_area, shot_end);
 
 			apply_use_movement(move);
 			apply_result_movement(move, result);
@@ -816,15 +847,27 @@ namespace ms
 
 			// Their range skills' levels are unknown, so their shots reach
 			// only as far as the weapon or skill alone does.
-			int16_t skill_range = attack.skill ? SkillData::get(attack.skill).get_stats(attack.level).shotrange : 0;
+			Rectangle<int16_t> skill_area;
+			int16_t skill_range = 0;
+
+			if (attack.skill)
+			{
+				const SkillData::Stats &stats = SkillData::get(attack.skill).get_stats(attack.level);
+				skill_area = stats.range;
+				skill_range = stats.shotrange;
+			}
+
 			int16_t shot_range = spell ? shot_path::SPELL_RANGE
 				: shot_path::range(attack.skill, skill_range, user.get_weapontype(), 0);
 			Point<int16_t> shot_end = shot_path::origin(user.get_position(), shot_range, attack.toleft);
+			Rectangle<int16_t> shot_area = shot_path::area(attack.skill, user.get_position(),
+														   shot_path::origin(user.get_position(), reach, attack.toleft),
+														   shot_end.x(), skill_area, attack.toleft);
 
 			if (attack.type == Attack::Type::MAGIC)
 				show_remote_spell(user, move, attack, range);
 			else
-				extract_effects(user, move, attack, range, reach, shot_end);
+				extract_effects(user, move, attack, range, reach, shot_area, shot_end);
 		} else
 		{
 			expect_hits(attack, -1);
@@ -855,7 +898,8 @@ namespace ms
 	}
 
 	void Combat::extract_effects(const Char &user, const SpecialMove &move, const AttackResult &result,
-								 Rectangle<int16_t> range, int16_t reach, Point<int16_t> shot_end)
+								 Rectangle<int16_t> range, int16_t reach, Rectangle<int16_t> shot_area,
+								 Point<int16_t> shot_end)
 	{
 		AttackUser attackuser = {
 				user.get_skilllevel(move.get_id()),
@@ -874,13 +918,16 @@ namespace ms
 
 		if (result.bullet && !chain)
 		{
-			// As in v83, the bullets fly straight from in front of the user to
-			// where the shot crosses each target, or as far as the shot goes.
-			// A target's hits all land 1.5 ms per pixel it is away across, or
-			// along a spell's path, after the attack's hit frame. A spell
-			// flies as one ball however many times it hits.
+			// As in v83, a shot's bullets fly once, straight from in front of
+			// the user to where it crosses the first mob it hits in its path,
+			// or as far as it goes for a shot at an area or one that hit
+			// nothing. A spell flies one ball to each mob it hits. A mob's
+			// hits all land 1.5 ms per pixel it is away across, or along a
+			// spell's path, after the attack's hit frame, but for a few
+			// skills (0x954867).
 			Animation animation = move.get_bullet(user, result.bullet);
 			Point<int16_t> origin = shot_path::origin(user.get_position(), reach, result.toleft);
+			Point<int16_t> start = shot_path::bullet_start(result.skill, origin, result.toleft);
 			uint16_t delay = user.get_attackdelay(0);
 			bool spell = result.type == Attack::Type::MAGIC;
 
@@ -888,33 +935,45 @@ namespace ms
 			{
 				if (spell)
 					count = 1;
+				else if (shot_path::hides_bullet(result.skill))
+					return;
 
 				for (uint8_t i = 0; i < count; i++)
 				{
 					Point<int16_t> end = target + Point<int16_t>(0, shot_path::spread(i, count));
-					uint16_t start = delay + shot_path::bullet_delay(result.bullet, result.skill, i);
-					bulleteffects.push(start, Bullet(animation, origin, end, shot_path::flight_time(origin, end)));
+					uint16_t time = delay + shot_path::bullet_delay(result.bullet, result.skill, i);
+					bulleteffects.push(time, Bullet(animation, start, end, shot_path::flight_time(start, end)));
 				}
 			};
 
-			for (auto &line : result.damagelines)
+			uint16_t first = 0;
+
+			for (size_t target = 0; target < result.damagelines.size(); target++)
 			{
+				auto &line = result.damagelines[target];
 				int32_t oid = line.first;
 
 				if (mobs.contains(oid))
 				{
 					std::vector<DamageNumber> numbers = place_numbers(line.second, move.get_id());
-					Point<int16_t> hit = shot_path::hit_point(origin, shot_end.x(), mobs.get_mob_body(oid));
-					uint16_t hit_delay = delay + (spell ? shot_path::flight_time(origin, hit) : shot_path::hit_delay(origin, hit));
+					Point<int16_t> hit = shot_path::hit_point(shot_area, mobs.get_mob_body(oid));
+					uint16_t hit_delay = spell ? shot_path::flight_time(origin, hit)
+						: shot_path::target_delay(result.skill, target, first, origin, hit);
 
-					shoot(hit, static_cast<uint8_t>(numbers.size()));
+					if (target == 0)
+						first = hit_delay;
+
+					if (spell)
+						shoot(hit, 1);
+					else if (target == 0 && !shot_path::area_shot(result.skill))
+						shoot(hit, result.hitcount);
 
 					size_t i = 0;
 
 					for (auto &number : numbers)
 					{
 						damageeffects.emplace(
-								hit_delay,
+								delay + hit_delay,
 								attackuser,
 								number,
 								line.second[i].first,
@@ -928,7 +987,7 @@ namespace ms
 				}
 			}
 
-			if (result.damagelines.empty())
+			if (result.damagelines.empty() || (!spell && shot_path::area_shot(result.skill)))
 				shoot(shot_end, result.hitcount);
 		} else
 		{
@@ -1649,7 +1708,7 @@ namespace ms
 		mobs.send_attack(result, attack, targets, attack.mobcount);
 		result.attacker = player.get_oid();
 		expect_hits(result, 1);
-		extract_effects(player, skill, result, range, 0, position);
+		extract_effects(player, skill, result, range, 0, range, position);
 
 		AttackPacket(result, player.get_position(), position).dispatch();
 	}

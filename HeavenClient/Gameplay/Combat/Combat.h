@@ -207,10 +207,12 @@ namespace ms
 		static Rectangle<int16_t> place_range(Point<int16_t> origin, Rectangle<int16_t> range, float hrange,
 											  bool toleft);
 
-		// A shot starts `reach` px in front of the user and flies to `shot_end`,
-		// as far as it reaches or where a platform stops it.
+		// A shot starts `reach` px in front of the user, covers `shot_area`
+		// and flies to `shot_end`, as far as it reaches or where a platform
+		// stops it.
 		void extract_effects(const Char &user, const SpecialMove &move, const AttackResult &result,
-							 Rectangle<int16_t> range, int16_t reach, Point<int16_t> shot_end);
+							 Rectangle<int16_t> range, int16_t reach, Rectangle<int16_t> shot_area,
+							 Point<int16_t> shot_end);
 
 		// Show another user's spell: its balls, and its hits as they get
 		// there (FUN_0098250d).
