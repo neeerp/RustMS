@@ -17,6 +17,7 @@
 //////////////////////////////////////////////////////////////////////////////////
 #include "Skill.h"
 
+#include "Heal.h"
 #include "Prepare.h"
 
 #include "../../Character/SkillId.h"
@@ -223,6 +224,11 @@ namespace ms
 		{
 			attack.fixdamage = stats.fixdamage;
 			attack.damagetype = Attack::DMG_FIXED;
+		} else if (skillid == heal::ID)
+		{
+			attack.heal = stats.hp;
+			attack.element = SkillData::get(skillid).get_element();
+			attack.damagetype = Attack::DMG_MAGIC;
 		} else if (stats.matk)
 		{
 			attack.matk += stats.matk;

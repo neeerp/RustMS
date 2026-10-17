@@ -1,7 +1,7 @@
 //! Skill templates (`Skill.nx`), loaded once.
 
 use crate::load::{self, asset_path};
-use game::Player;
+use game::{InventoryType, Player};
 use game_data::skills::{SkillData, SkillInfo, SkillLevel};
 use std::sync::OnceLock;
 
@@ -107,6 +107,48 @@ pub fn amplification(player: &Player) -> i32 {
         .find(|&(line, _)| in_line(job, line))
         .and_then(|(_, skill_id)| learned(player, skill_id))
         .map_or(100, |skill| skill.effect.y)
+}
+
+/// Heal: it heals the party around the cleric and hurts the undead.
+pub const HEAL: i32 = 2301002;
+
+/// What a spell's damage comes from, with the player's equipment: their INT,
+/// their LUK, and their magic, INT plus magic attack, at most 1999.
+pub fn spell_stats(player: &Player) -> (i32, i32, i32) {
+    let (int, luk, matk) = player
+        .inventory
+        .items(InventoryType::Equipped)
+        .filter_map(|(_, item)| item.equip.as_ref())
+        .fold(
+            (i32::from(player.stats.int), i32::from(player.stats.luk), 0),
+            |(int, luk, matk), equip| {
+                (
+                    int + i32::from(equip.int),
+                    luk + i32::from(equip.luk),
+                    matk + i32::from(equip.matk),
+                )
+            },
+        );
+    (int, luk, (int + matk).clamp(0, 1999))
+}
+
+/// What Heal does to each of the `reached` it reaches, party members and
+/// undead together, before the undead's defense: the v83 client's formula
+/// for its hurt (FUN_00791617, 0x791aa8), from the skill's `hp` percent.
+/// `roll`, from 0 to 1, picks between 20% and 80% of the INT. The more it
+/// reaches, the less each gets.
+pub fn heal_amount(player: &Player, hp: i32, reached: i32, roll: f64) -> f64 {
+    let (int, luk, magic) = spell_stats(player);
+    let reached = f64::from(reached.max(1));
+    let int = f64::from(int);
+    let rolled = int * 0.2 + (int * 0.8 - int * 0.2) * roll;
+    (reached * 0.3 + 1.0)
+        * f64::from(hp)
+        * 0.01
+        * (rolled * 1.5 + f64::from(luk))
+        * f64::from(magic)
+        * 0.005
+        / reached
 }
 
 /// Whether `job` is `base` or advanced from it, as the v83 client checks:

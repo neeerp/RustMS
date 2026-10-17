@@ -60,6 +60,10 @@ namespace ms
 		int32_t mastery = 0;
 		int32_t amplify = 100;
 		uint8_t element = 0;
+		// Heal's `hp` percent, which it hurts the undead with in place of a
+		// magic attack, and how many it reaches, mobs and party members.
+		int32_t heal = 0;
+		int32_t healed = 0;
 
 		uint8_t hitcount = 0;
 		uint8_t mobcount = 0;

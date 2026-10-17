@@ -74,7 +74,7 @@ impl WorldHandler for AttackHandler {
         let mut result = HandlerResult::empty();
         let mut skill_level = 0;
         if let Some(skill) = uses.skill {
-            let mp = ctx.player.add_mp(-skill.effect.mp_cost);
+            let mp = ctx.player.add_mp(-combat::attack_mp_cost(&skill));
             result = HandlerResult::reply(stat::build_stat_update(false, &[StatUpdate::Mp(mp)])?);
             skill_level = skill.level as u8;
         }
