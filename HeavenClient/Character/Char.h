@@ -163,6 +163,10 @@ namespace ms
 		// Display the iron body skill animation.
 		void show_iron_body();
 
+		// Display a skill or mastery book's glow: its first layer over the
+		// character, its second behind (v83 FUN_0043cba9, z 3 and -1).
+		void show_skill_book(bool success);
+
 		// Display damage over the characters head, with the hit face for
 		// 1.5 s if it hurt, as v83 does for every user (0x9832e3).
 		void show_damage(int32_t damage);
@@ -298,5 +302,7 @@ namespace ms
 		static EnumMap<CharEffect::Id, Animation> chareffects;
 		static Animation tomb_fall;
 		static Animation tomb_land;
+		// BasicEff.img/SkillBook: [failure, success][front, back]
+		static Animation skill_book[2][2];
 	};
 }
