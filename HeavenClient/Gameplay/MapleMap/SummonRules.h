@@ -18,6 +18,7 @@
 #pragma once
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <cstdint>
 #include <functional>
@@ -31,6 +32,8 @@ namespace ms::summon_rules
 	constexpr int32_t OCTOPUS = 5211001;
 	constexpr int32_t GAVIOTA = 5211002;
 	constexpr int32_t WRATH_OF_THE_OCTOPI = 5220002;
+	constexpr int32_t AURA_OF_THE_BEHOLDER = 1320008;
+	constexpr int32_t HEX_OF_THE_BEHOLDER = 1320009;
 
 	// How a summon moves: its spawn's moveAbility.
 	enum MoveAbility : uint8_t
@@ -347,6 +350,77 @@ namespace ms::summon_rules
 		double rolled = low + (high - low) * roll;
 
 		return static_cast<int32_t>(40.0 / (level + 70) * attack * rolled * 0.01);
+	}
+
+	// How long a Beholder waits after it comes before it first heals or
+	// buffs (FUN_007a373a).
+	constexpr int64_t SUPPORT_DELAY = 10000;
+
+	// Whether the Beholder's Aura heals its owner by `heal` (FUN_007a5ab4):
+	// they are hurt, and if they know Berserk (`berserk` its x %, else 0)
+	// and are in it (I: at or under that % of their HP), it wouldn't take
+	// them out of it.
+	inline bool aura_heals(int32_t hp, int32_t maxhp, int32_t heal, int32_t berserk)
+	{
+		if (hp >= maxhp)
+			return false;
+
+		if (berserk <= 0)
+			return true;
+
+		int32_t threshold = maxhp * berserk / 100;
+
+		return hp > threshold || hp + heal <= threshold;
+	}
+
+	// Hex of the Beholder's stats, in the order its levels add them.
+	enum HexStat : uint8_t
+	{
+		HEX_PDD,
+		HEX_MDD,
+		HEX_ACC,
+		HEX_EVA,
+		HEX_PAD
+	};
+
+	// Which stat Hex buffs (FUN_007a5c99), of those its level gives
+	// (`hex`, 0 for none): one picked with `roll`, the later ones likelier,
+	// unless a lower one is short among the owner's buffs (`have`); -1 with
+	// none.
+	inline int8_t hex_pick(const std::array<int32_t, 5> &hex, const std::array<int32_t, 5> &have, uint32_t roll)
+	{
+		int32_t count = 0;
+		uint32_t weight = 0;
+
+		for (int32_t i = 0; i < 5; i++)
+		{
+			if (hex[i] != 0)
+			{
+				count++;
+				weight += i + 1;
+			}
+		}
+
+		if (count == 0)
+			return -1;
+
+		uint32_t r = roll % weight + 1;
+		uint32_t reach = 0;
+		int32_t picked = 0;
+
+		for (; picked < count; picked++)
+		{
+			reach += picked + 1;
+
+			if (r <= reach)
+				break;
+		}
+
+		for (int32_t i = HEX_PAD; i >= HEX_PDD; i--)
+			if (hex[i] != 0 && have[i] < hex[i] && picked >= i)
+				return static_cast<int8_t>(i);
+
+		return static_cast<int8_t>(picked);
 	}
 
 	// The main stat of a summoner's job: STR for warriors, LUK for

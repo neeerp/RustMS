@@ -155,6 +155,11 @@ namespace ms
 
 		// The player's summons attack when they may (FUN_00765047).
 		void update_summons();
+		// The player's Beholder heals them if it may (FUN_007a5ab4), and
+		// whether it did.
+		bool beholder_heal(int32_t oid, Summon &beholder);
+		// The player's Beholder buffs a stat of theirs (FUN_007a5c99).
+		void beholder_hex(int32_t oid, Summon &beholder);
 
 		// A summon's hit landing on a mob.
 		struct SummonHit

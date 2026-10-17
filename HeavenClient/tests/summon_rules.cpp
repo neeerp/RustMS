@@ -96,6 +96,24 @@ int main()
 		require(main_stat(311) == DEX && main_stat(412) == LUK && main_stat(212) == INT && main_stat(1100) == STR &&
 				main_stat(520) == DEX, "each job has its main stat");
 
+		// A Beholder heals a hurt owner, but not out of Berserk.
+		require(!aura_heals(50, 50, 40, 0) && aura_heals(10, 50, 40, 0), "the Aura heals a hurt owner");
+		require(aura_heals(400, 1000, 40, 50) && !aura_heals(480, 1000, 40, 50) && aura_heals(600, 1000, 40, 50),
+				"it keeps a berserk owner berserk");
+
+		// Hex picks among its stats, the later ones likelier.
+		std::array<int32_t, 5> none{};
+		require(hex_pick({ 20, 0, 0, 0, 0 }, none, 12345) == HEX_PDD, "level 1 raises weapon defense");
+		std::array<int32_t, 5> all{ 100, 100, 25, 50, 15 };
+		require(hex_pick(all, none, 0) == HEX_PDD && hex_pick(all, none, 1) == HEX_MDD &&
+				hex_pick(all, none, 5) == HEX_ACC && hex_pick(all, none, 6) == HEX_EVA &&
+				hex_pick(all, none, 14) == HEX_PAD && hex_pick(all, none, 15) == HEX_PDD,
+				"one in 15 weapon defense, five in 15 weapon attack");
+		require(hex_pick(all, { 0, 0, 0, 0, 15 }, 14) == HEX_EVA, "a stat the owner has is passed over for a lower one");
+		require(hex_pick(all, { 0, 100, 25, 50, 15 }, 3) == HEX_PDD, "down to the lowest they lack");
+		require(hex_pick(all, { 100, 100, 25, 50, 15 }, 3) == HEX_ACC, "or the one picked, with all");
+		require(hex_pick(none, none, 3) == -1, "no Hex, no buff");
+
 		std::cout << "Summon rules passed\n";
 		return 0;
 	}

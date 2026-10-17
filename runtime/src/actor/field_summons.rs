@@ -3,7 +3,7 @@
 
 use crate::actor::object_ids::{self, ObjectIds};
 use net::packet::build::world::summon::SummonView;
-use net::summons;
+use net::summons::{self, Support};
 use net::ClientId;
 use std::collections::BTreeMap;
 use tokio::time::{Duration, Instant};
@@ -14,6 +14,32 @@ pub struct Summon {
     /// A Puppet's HP; the others can't be hurt.
     pub hp: Option<i32>,
     until: Instant,
+    /// When a Beholder may next heal, and next buff, its owner: 10 s after
+    /// it comes, then each skill's `x` s after the last (FUN_007a373a).
+    next_heal: Instant,
+    next_hex: Instant,
+}
+
+/// How much sooner than due a Beholder's owner may ask, for their clock.
+const SUPPORT_SLACK: Duration = Duration::from_millis(500);
+
+impl Summon {
+    /// Whether this Beholder may give `support` at `now`; if so, it next
+    /// may in that skill's time.
+    pub fn may_support(&mut self, support: &Support, now: Instant) -> bool {
+        if self.view.skill_id != summons::BEHOLDER {
+            return false;
+        }
+        let next = match support {
+            Support::Heal { .. } => &mut self.next_heal,
+            Support::Hex { .. } => &mut self.next_hex,
+        };
+        if now + SUPPORT_SLACK < *next {
+            return false;
+        }
+        *next = now + support.every();
+        true
+    }
 }
 
 pub struct SummonSet {
@@ -57,6 +83,8 @@ impl SummonSet {
                 owner,
                 hp,
                 until: now + lasts,
+                next_heal: now + Duration::from_secs(10),
+                next_hex: now + Duration::from_secs(10),
             },
         );
         (view, replaced)
@@ -173,5 +201,41 @@ mod tests {
         assert_eq!(gone[0].view.skill_id, PUPPET);
         assert_eq!(set.remove_owned(1, None).len(), 1);
         assert_eq!(set.views().count(), 1);
+    }
+
+    #[test]
+    fn a_beholder_heals_and_buffs_at_its_skills_pace() {
+        let mut set = SummonSet::default();
+        let now = Instant::now();
+        let lasts = Duration::from_secs(600);
+        let (beholder, _) = set.add(view(7, summons::BEHOLDER), 1, None, lasts, now);
+        let (puppet, _) = set.add(view(7, PUPPET), 1, Some(4000), lasts, now);
+        let heal = Support::Heal {
+            hp: 40,
+            every: Duration::from_secs(10),
+        };
+        let hex = Support::Hex {
+            stat: game::buff::BuffStat::Pdd,
+            value: 20,
+            lasts: Duration::from_secs(20),
+            every: Duration::from_secs(48),
+        };
+        let at = |secs: f64| now + Duration::from_secs_f64(secs);
+
+        assert!(!set
+            .owned(1, puppet.object_id)
+            .unwrap()
+            .may_support(&heal, at(20.0)));
+        let summon = set.owned(1, beholder.object_id).unwrap();
+        assert!(!summon.may_support(&heal, at(9.0)), "not in its first 10 s");
+        assert!(
+            summon.may_support(&heal, at(9.6)),
+            "a little early is the owner's clock"
+        );
+        assert!(!summon.may_support(&heal, at(15.0)));
+        assert!(summon.may_support(&hex, at(15.0)), "each has its own time");
+        assert!(summon.may_support(&heal, at(19.6)));
+        assert!(!summon.may_support(&hex, at(60.0)));
+        assert!(summon.may_support(&hex, at(63.0)));
     }
 }

@@ -61,6 +61,27 @@ impl WorldHandler for SummonAttackHandler {
     }
 }
 
+/// BEHOLDER (0xB2): the player's Beholder heals or buffs them. The field
+/// checks it is theirs and holds it to its skill's pace.
+pub struct BeholderHandler;
+
+impl WorldHandler for BeholderHandler {
+    fn handle(&self, packet: &mut Packet, ctx: &mut WorldContext) -> WorldResult {
+        let act = summons::parse_beholder(packet)?;
+        let Some(support) = summons::support(ctx.player, &act) else {
+            debug!(?act, "Beholder refused");
+            return Ok(HandlerResult::empty());
+        };
+        Ok(
+            HandlerResult::empty().with(WorldAction::Field(FieldRequest::Beholder {
+                object_id: act.object_id,
+                action: act.action,
+                support,
+            })),
+        )
+    }
+}
+
 /// DAMAGE_SUMMON (0xB1): a mob hurt the player's Puppet.
 pub struct DamageSummonHandler;
 

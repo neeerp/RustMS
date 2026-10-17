@@ -116,6 +116,8 @@ pub enum ServerMessage {
     SummonBroken {
         skill_id: i32,
     },
+    /// This player's Beholder heals or buffs them.
+    Beholder(net::summons::Support),
     SendPacket(Packet),
 }
 

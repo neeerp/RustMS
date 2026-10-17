@@ -8,12 +8,15 @@ use crate::skills::{self, Learned};
 use game::{BuffStat, InventoryType, Player};
 use packet::{io::read::PktRead, Packet};
 use std::io::Cursor;
+use std::time::Duration;
 
 pub const PUPPETS: [i32; 3] = [3111002, 3211002, 13111004];
 pub const OCTOPUS: i32 = 5211001;
 pub const GAVIOTA: i32 = 5211002;
 pub const WRATH_OF_THE_OCTOPI: i32 = 5220002;
 pub const BEHOLDER: i32 = 1321007;
+pub const AURA_OF_THE_BEHOLDER: i32 = 1320008;
+pub const HEX_OF_THE_BEHOLDER: i32 = 1320009;
 
 /// How a summon moves (its spawn's moveAbility, v83 CVecCtrlSummoned).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -252,6 +255,111 @@ pub fn parse_damage(packet: &Packet) -> Result<SummonDamage, NetworkError> {
     })
 }
 
+/// BEHOLDER (recv 0xB2, FUN_007a5ab4 / FUN_007a5c99): the player's
+/// Beholder heals them (Aura) or buffs them (Hex, one of its stats).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct BeholderAct {
+    pub object_id: i32,
+    pub skill_id: i32,
+    /// `left << 7 | animation`: 6 for the heal, 7 + the stat for the buff.
+    pub action: u8,
+    /// Hex's stat, 0 to 4.
+    pub buff: Option<u8>,
+}
+
+pub fn parse_beholder(packet: &Packet) -> Result<BeholderAct, NetworkError> {
+    let mut r = Cursor::new(&packet.bytes);
+    r.read_short()?;
+    let object_id = r.read_int()?;
+    let skill_id = r.read_int()?;
+    let action = r.read_byte()?;
+    let buff = if skill_id == HEX_OF_THE_BEHOLDER {
+        Some(r.read_byte()?)
+    } else {
+        None
+    };
+    Ok(BeholderAct {
+        object_id,
+        skill_id,
+        action,
+        buff,
+    })
+}
+
+/// What a Beholder does for its owner, at most once every `every`.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Support {
+    /// Aura of the Beholder: heal `hp`.
+    Heal { hp: i32, every: Duration },
+    /// Hex of the Beholder: one stat for `lasts`.
+    Hex {
+        stat: BuffStat,
+        value: i16,
+        lasts: Duration,
+        every: Duration,
+    },
+}
+
+impl Support {
+    pub fn skill_id(&self) -> i32 {
+        match self {
+            Support::Heal { .. } => AURA_OF_THE_BEHOLDER,
+            Support::Hex { .. } => HEX_OF_THE_BEHOLDER,
+        }
+    }
+
+    pub fn every(&self) -> Duration {
+        match *self {
+            Support::Heal { every, .. } | Support::Hex { every, .. } => every,
+        }
+    }
+}
+
+/// Hex's stats in the order its levels add them, which is how the client
+/// numbers them (FUN_007a5c99, level data +0x28, +0x40, +0x4c, +0x58,
+/// +0x1c).
+const HEX_STATS: [BuffStat; 5] = [
+    BuffStat::Pdd,
+    BuffStat::Mdd,
+    BuffStat::Acc,
+    BuffStat::Eva,
+    BuffStat::Pad,
+];
+
+/// What the player's Beholder may do for them: an Aura or Hex they know,
+/// and for Hex a stat its level gives. Nothing while they are dead.
+pub fn support(player: &Player, act: &BeholderAct) -> Option<Support> {
+    if player.stats.hp <= 0 || player.skills.level(BEHOLDER) <= 0 {
+        return None;
+    }
+    let skill = skills::learned(player, act.skill_id).filter(|skill| skill.level > 0)?;
+    let effect = &skill.effect;
+    let every = Duration::from_secs(effect.x.max(0) as u64);
+    match act.skill_id {
+        AURA_OF_THE_BEHOLDER => Some(Support::Heal {
+            hp: effect.hp,
+            every,
+        }),
+        HEX_OF_THE_BEHOLDER => {
+            let stat = *HEX_STATS.get(usize::from(act.buff?))?;
+            let value = match stat {
+                BuffStat::Pdd => effect.pdd,
+                BuffStat::Mdd => effect.mdd,
+                BuffStat::Acc => effect.acc,
+                BuffStat::Eva => effect.eva,
+                _ => effect.pad,
+            };
+            (value > 0).then(|| Support::Hex {
+                stat,
+                value: value as i16,
+                lasts: Duration::from_secs(effect.duration.max(0) as u64),
+                every,
+            })
+        }
+        _ => None,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -351,5 +459,88 @@ mod tests {
         assert_eq!(damage.attack, -1);
         assert_eq!(damage.damage, 55);
         assert_eq!(damage.mob, Some((100100, true)));
+    }
+
+    fn beholder(skill_id: i32, action: u8, buff: Option<u8>) -> Packet {
+        let mut p = Packet::new_empty();
+        p.write_short(0xB2).unwrap();
+        p.write_int(900).unwrap();
+        p.write_int(skill_id).unwrap();
+        p.write_byte(action).unwrap();
+        if let Some(buff) = buff {
+            p.write_byte(buff).unwrap();
+        }
+        p
+    }
+
+    #[test]
+    fn a_beholder_names_its_skill_and_hex_its_stat() {
+        assert_eq!(
+            parse_beholder(&beholder(AURA_OF_THE_BEHOLDER, 0x86, None)).unwrap(),
+            BeholderAct {
+                object_id: 900,
+                skill_id: AURA_OF_THE_BEHOLDER,
+                action: 0x86,
+                buff: None,
+            }
+        );
+        let hex = parse_beholder(&beholder(HEX_OF_THE_BEHOLDER, 11, Some(4))).unwrap();
+        assert_eq!((hex.action, hex.buff), (11, Some(4)));
+    }
+
+    #[test]
+    fn a_beholder_heals_and_hexes_by_what_its_owner_knows() {
+        let aura = parse_beholder(&beholder(AURA_OF_THE_BEHOLDER, 6, None)).unwrap();
+        let hex =
+            |stat| parse_beholder(&beholder(HEX_OF_THE_BEHOLDER, 7 + stat, Some(stat))).unwrap();
+        assert_eq!(support(&knowing(&[(AURA_OF_THE_BEHOLDER, 1)]), &aura), None);
+
+        let player = knowing(&[
+            (BEHOLDER, 1),
+            (AURA_OF_THE_BEHOLDER, 1),
+            (HEX_OF_THE_BEHOLDER, 1),
+        ]);
+        assert_eq!(
+            support(&player, &aura),
+            Some(Support::Heal {
+                hp: 40,
+                every: Duration::from_secs(10),
+            })
+        );
+        // Level 1 Hex raises only weapon defense.
+        assert_eq!(
+            support(&player, &hex(0)),
+            Some(Support::Hex {
+                stat: BuffStat::Pdd,
+                value: 20,
+                lasts: Duration::from_secs(20),
+                every: Duration::from_secs(48),
+            })
+        );
+        assert_eq!(support(&player, &hex(4)), None);
+        assert_eq!(support(&player, &hex(5)), None);
+
+        let player = knowing(&[(BEHOLDER, 1), (HEX_OF_THE_BEHOLDER, 25)]);
+        assert_eq!(support(&player, &aura), None);
+        let stats: Vec<_> = (0..5)
+            .map(|stat| match support(&player, &hex(stat)) {
+                Some(Support::Hex { stat, value, .. }) => (stat, value),
+                other => panic!("{other:?}"),
+            })
+            .collect();
+        assert_eq!(
+            stats,
+            vec![
+                (BuffStat::Pdd, 100),
+                (BuffStat::Mdd, 100),
+                (BuffStat::Acc, 25),
+                (BuffStat::Eva, 50),
+                (BuffStat::Pad, 15),
+            ]
+        );
+
+        let mut dead = player;
+        dead.stats.hp = 0;
+        assert_eq!(support(&dead, &hex(0)), None);
     }
 }

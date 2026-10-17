@@ -428,6 +428,16 @@ the rest:
 - **DAMAGE_SUMMON** (`0xB1` in, `0xB4` out) hurts a Puppet. Puppets are the
   only summons that can be hurt, and their HP is the level's `x`. At 0 HP
   the Puppet breaks: REMOVE_SUMMON reason 2, and the owner's buff ends.
+- **BEHOLDER** (`0xB2` in, SUMMON_SKILL `0xB3` out) is a Dark Knight's
+  Beholder healing its owner with Aura of the Beholder (the level's `hp`)
+  or buffing one stat with Hex of the Beholder (`summons::support`). Hex's
+  stats are numbered in the order its levels add them: weapon defense,
+  magic defense, accuracy, avoidability, weapon attack. Its buff lasts the
+  level's `time`. The owner must know the skill, and Hex's level must give
+  the stat. The field allows each no sooner than 10 s after the Beholder
+  comes, then the level's `x` seconds apart, with 0.5 s of slack for the
+  client's clock. The others see the Beholder play the action the owner
+  sent.
 
 REMOVE_SUMMON (`0xB0`) reasons:
 
@@ -458,15 +468,29 @@ HeavenClient's `MapSummons` (`Gameplay/MapleMap`) draws them and plays their
 - Each hit lands `attackAfter` plus the projectile's flight time after the
   attack starts.
 
+A Puppet draws the mobs already chasing the owner to it for 180–240 s.
+A mob touching it hurts it by its attack squared, scaled by the Puppet's
+level (`summon_rules::touch_damage`), and the owner sends DAMAGE_SUMMON.
+
+A Beholder heals its owner when it may and they are hurt, else buffs
+them:
+
+- It first does so 10 s after it comes, then every Aura's or Hex's `x`
+  seconds.
+- In Berserk, it doesn't heal the owner out of it.
+- Hex picks one of the stats its level gives. Later stats are likelier:
+  the n-th of k is picked with weight n out of k(k+1)/2. If the owner's
+  buffs already give at least that stat, Hex tries the lower stats from
+  the top for one they lack (`summon_rules::hex_pick`).
+
 Where HeavenClient differs from v83:
 
 - Ball sprites aren't drawn.
 - Followers send their paths the way fliers do.
 - The fly speed (0.2 px/ms) is inferred.
 - Range targeting is a ±`r` × ±100 px box.
-- Puppets don't draw mobs to them yet, and mobs don't hurt summons
-  client-side yet.
-- Beholder's buffs and heals (`0xB3`) are missing.
+- Whether the owner is in Berserk is inferred to be their HP at or under
+  its `x` percent.
 
 `v83ref` report 158 has the client's detail.
 
@@ -564,4 +588,6 @@ checks the cloud's packet, that it lifts on time, and that it poisons only
 the snails in its box. `summons` has a ranger call up a Silver Hawk and a
 Puppet, and checks what a watcher sees: the spawns, a refused and an accepted
 Hawk attack, the Puppet breaking, and the Hawk following its owner to the
-next map with no entrance.
+next map with no entrance. It also has a Dark Knight's Beholder heal them
+and buff their weapon defense, refusing both too soon and a stat Hex's
+level doesn't give.
