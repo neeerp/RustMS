@@ -1,6 +1,7 @@
 use crate::handler::{HandlerResult, WorldAction, WorldContext, WorldHandler, WorldResult};
 use crate::login_world::resolve_login_channel;
 use crate::packet::build;
+use crate::packet::build::world::map::BlockedServer;
 use packet::{io::read::PktRead, Packet};
 use std::io::Cursor;
 
@@ -18,8 +19,9 @@ impl WorldHandler for ChangeChannelHandler {
         if target_channel_id == ctx.channel_id
             || resolve_login_channel(ctx.player.world_id, target_channel_id).is_err()
         {
-            let enable_actions = build::world::stat::build_stat_update(true, &[])?;
-            return Ok(HandlerResult::reply(enable_actions));
+            return Ok(HandlerResult::reply(
+                build::world::map::build_blocked_server(BlockedServer::Channel)?,
+            ));
         }
 
         Ok(HandlerResult::empty().with(WorldAction::ChangeChannel {

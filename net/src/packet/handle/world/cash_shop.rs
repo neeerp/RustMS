@@ -2,6 +2,7 @@ use crate::cash_shop::{self, CashShopRequest, Expansion};
 use crate::handler::{HandlerResult, WorldAction, WorldContext, WorldHandler, WorldResult};
 use crate::packet::build;
 use crate::packet::build::world::cash_shop::{CashShopFailure, GIFT_MESSAGE_LEN, WISH_LIST_SLOTS};
+use crate::packet::build::world::map::BlockedServer;
 use game::InventoryType;
 use packet::{io::read::PktRead, Packet};
 use std::io::Cursor;
@@ -14,8 +15,9 @@ pub struct EnterCashShopHandler;
 impl WorldHandler for EnterCashShopHandler {
     fn handle(&self, _packet: &mut Packet, ctx: &mut WorldContext) -> WorldResult {
         if ctx.player.stats.hp <= 0 {
-            let enable_actions = build::world::stat::build_stat_update(true, &[])?;
-            return Ok(HandlerResult::reply(enable_actions));
+            return Ok(HandlerResult::reply(
+                build::world::map::build_blocked_server(BlockedServer::CashShop)?,
+            ));
         }
         Ok(HandlerResult::empty().with(WorldAction::EnterCashShop))
     }
@@ -192,6 +194,26 @@ mod tests {
         CashShopOperationHandler
             .handle(&mut packet, &mut ctx)
             .unwrap()
+    }
+
+    #[test]
+    fn the_dead_are_kept_out_of_the_cash_shop() {
+        let mut player = crate::codec::stats::sample_player();
+        player.stats.hp = 0;
+        let mut ctx = WorldContext {
+            client_id: 1,
+            channel_id: 0,
+            player: &mut player,
+        };
+        let mut packet = Packet::new_empty();
+        packet
+            .write_short(RecvOpcode::EnterCashShop as i16)
+            .unwrap();
+        let result = EnterCashShopHandler.handle(&mut packet, &mut ctx).unwrap();
+        assert!(matches!(
+            result.actions.as_slice(),
+            [WorldAction::Reply(p)] if p.bytes == [0x84, 0, 2]
+        ));
     }
 
     #[test]

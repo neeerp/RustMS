@@ -91,6 +91,8 @@ namespace ms
 
 		SKILL_MACROS = 124,
 		SET_FIELD = 125,
+		BLOCKED_MAP = 131,
+		BLOCKED_SERVER = 132,
 		WHISPER = 135,
 		MESSENGER = 313,
 		FIELD_EFFECT = 138,
@@ -190,6 +192,8 @@ namespace ms
 
 		// SetField handlers
 		emplace<SET_FIELD, SetFieldHandler>();
+		emplace<BLOCKED_MAP, BlockedMapHandler>();
+		emplace<BLOCKED_SERVER, BlockedServerHandler>();
 
 		// MapObject handlers
 		emplace<SPAWN_CHAR, SpawnCharHandler>();

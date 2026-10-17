@@ -72,6 +72,16 @@ joins the new one at the spawn portal's position.
 World entry uses the same spawn-portal lookup (`net::spawn_position`) instead
 of a hard-coded position.
 
+The client waits for an answer to each move it asks for, so a refusal
+answers too. v83 has two refusal packets, each a reason byte
+(`net::packet::build::world::map`): `BLOCKED_MAP` (0x83) for map changes and
+`BLOCKED_SERVER` (0x84) for channel, cash shop and trade shop moves.
+HeavenClient shows the reason in chat or as a notice. The server sends
+`BLOCKED_MAP` 1 ("The portal is closed for now.") for a portal to a map or spawn
+portal it doesn't have. It sends `BLOCKED_SERVER` 1 for a change to the
+player's own channel or to a missing channel, and 2 when a dead player tries
+to enter the Cash Shop.
+
 ### The Cash Shop
 
 `ENTER_CASHSHOP` (0x28) takes the player off their field, saves them, and
