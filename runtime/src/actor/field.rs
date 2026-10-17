@@ -651,6 +651,11 @@ impl FieldActor {
         if self.occupants.remove(&client_id).is_none() {
             return;
         }
+        // Everyone sees the player go before control passes on.
+        match build_player_leave_field(client_id) {
+            Ok(packet) => self.broadcast(None, packet),
+            Err(error) => warn!(client_id, %error, "Failed to build leave packet"),
+        }
         let next = self.occupants.keys().next().copied();
         let handed = self.mobs.release(client_id, next);
         if let Some(next) = next {
@@ -661,10 +666,6 @@ impl FieldActor {
             if let Some(next) = next {
                 self.send_npc_control(next);
             }
-        }
-        match build_player_leave_field(client_id) {
-            Ok(packet) => self.broadcast(None, packet),
-            Err(error) => warn!(client_id, %error, "Failed to build leave packet"),
         }
     }
 
@@ -750,6 +751,7 @@ mod tests {
             y,
             stance: 2,
             chair: 0,
+            buffs: Vec::new(),
         }
     }
 

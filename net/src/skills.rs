@@ -1,7 +1,7 @@
 //! Skill templates (`Skill.nx`), loaded once.
 
 use crate::load::{self, asset_path};
-use game::{InventoryType, Player};
+use game::{BuffStat, InventoryType, Player};
 use game_data::skills::{SkillData, SkillInfo, SkillLevel};
 use std::sync::OnceLock;
 
@@ -211,4 +211,64 @@ pub const TIMED: [i32; 2] = [2111002, 4211001];
 /// Whether the client prepares the skill first, with SKILL_EFFECT.
 pub fn prepares(skill_id: i32) -> bool {
     keydown(skill_id) || TIMED.contains(&skill_id)
+}
+
+/// The stats a buff skill gives at its level, or `None` for a skill that
+/// isn't one. Every buff gives the stats its level names (attack, defense,
+/// accuracy, avoidability, speed, jump), and some a stat of their own. A
+/// weapon charge's own `mad` is the strength of its element, not a buff.
+pub fn buffs(skill: &Learned) -> Option<Vec<(BuffStat, i32)>> {
+    let effect = &skill.effect;
+    let own = match skill.skill_id {
+        1001 | 10001001 | 20001001 => vec![(BuffStat::Recovery, effect.x)],
+        1002 | 10001002 | 20001002 => vec![],
+        // Iron Body, Rage, Iron Will, Magic Armor, Meditation, Bless,
+        // Focus, Haste.
+        1001003 | 1101006 | 1301006 | 2001003 | 2101001 | 2201001 | 2301004 | 3001003 | 4101004
+        | 4201003 => vec![],
+        1101004 | 1101005 | 1201004 | 1201005 | 1301004 | 1301005 | 2111005 | 2211005 | 3101002
+        | 3201002 | 4101003 | 4201002 | 5101006 | 5201003 => {
+            vec![(BuffStat::Booster, effect.x)]
+        }
+        1101007 | 1201007 => vec![(BuffStat::PowerGuard, effect.x)],
+        // The orbs start at none, which the client counts from 1.
+        1111002 => vec![(BuffStat::Combo, 1)],
+        1211003..=1211008 | 1221003 | 1221004 => {
+            return Some(vec![(BuffStat::WeaponCharge, effect.x)]);
+        }
+        1301007 => vec![(BuffStat::MaxHp, effect.x), (BuffStat::MaxMp, effect.y)],
+        1311008 => vec![(BuffStat::DragonBlood, effect.x)],
+        1121000 | 1221000 | 1321000 | 2121000 | 2221000 | 2321000 | 3121000 | 3221000 | 4121000
+        | 4221000 | 5121000 | 5221000 => vec![(BuffStat::MapleWarrior, effect.x)],
+        1121002 | 1221002 | 1321002 => vec![(BuffStat::Stance, effect.prop)],
+        2001002 => vec![(BuffStat::MagicGuard, effect.x)],
+        2301003 => vec![(BuffStat::Invincible, effect.x)],
+        2311003 => vec![(BuffStat::HolySymbol, effect.x)],
+        2121004 | 2221004 | 2321004 => vec![(BuffStat::Infinity, effect.x)],
+        3101004 | 3201004 => vec![(BuffStat::SoulArrow, effect.x)],
+        3121008 => vec![(BuffStat::Concentrate, effect.x)],
+        3121002 | 3221002 => vec![(BuffStat::SharpEyes, effect.x << 8 | effect.y)],
+        4001003 => vec![(BuffStat::DarkSight, effect.x)],
+        4111001 => vec![(BuffStat::MesoUp, effect.x)],
+        4111002 => vec![(BuffStat::ShadowPartner, effect.x)],
+        4211003 => vec![(BuffStat::PickPocket, effect.x)],
+        4211005 => vec![(BuffStat::MesoGuard, effect.x)],
+        _ => return None,
+    };
+    let leveled = [
+        (BuffStat::Pad, effect.pad),
+        (BuffStat::Pdd, effect.pdd),
+        (BuffStat::Mad, effect.magic),
+        (BuffStat::Mdd, effect.mdd),
+        (BuffStat::Acc, effect.acc),
+        (BuffStat::Eva, effect.eva),
+        (BuffStat::Speed, effect.speed),
+        (BuffStat::Jump, effect.jump),
+    ];
+    let mut stats: Vec<_> = leveled
+        .into_iter()
+        .filter(|&(_, value)| value != 0)
+        .collect();
+    stats.extend(own);
+    Some(stats)
 }

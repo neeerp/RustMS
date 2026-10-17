@@ -23,10 +23,13 @@
 
 #include "MapleMap/MapObject.h"
 
+#include "../Character/Buff.h"
 #include "../Graphics/Animation.h"
 #include "../Net/Login.h"
 
 #include <memory>
+#include <utility>
+#include <vector>
 
 namespace ms
 {
@@ -120,7 +123,8 @@ namespace ms
 	{
 	public:
 		CharSpawn(int32_t cid, const LookEntry &look, uint8_t level, int16_t job, const std::string &name,
-				  int8_t stance, Point<int16_t> position, int32_t chair);
+				  int8_t stance, Point<int16_t> position, int32_t chair,
+				  std::vector<std::pair<Buffstat::Id, int32_t>> buffs);
 
 		int32_t get_cid() const;
 
@@ -135,5 +139,6 @@ namespace ms
 		Point<int16_t> position;
 		int32_t chair;
 		LookEntry look;
+		std::vector<std::pair<Buffstat::Id, int32_t>> buffs;
 	};
 }
