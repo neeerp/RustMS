@@ -19,6 +19,7 @@
 #include "NpcIdle.h"
 #include "../Stage.h"
 #include "../../Constants.h"
+#include "../../Net/Packets/NpcInteractionPackets.h"
 #include "../../Util/NxFiles.h"
 
 #include <nlnx/nx.hpp>
@@ -81,8 +82,6 @@ namespace ms
 			idle_lines = lines["info"];
 
 		speech = ChatBalloon("npc", true);
-		// v83 starts the wait when the client takes control of the NPC.
-		wait_idle();
 
 		name = std::string(strsrc["name"]);
 		func = std::string(strsrc["func"]);
@@ -94,8 +93,8 @@ namespace ms
 
 		npcid = id;
 		flip = !fl;
-		control = cnt;
 		stance = "stand";
+		set_control(cnt);
 
 		phobj.fhid = f;
 		set_position(position);
@@ -233,13 +232,53 @@ namespace ms
 		return Point<int16_t>(20, -head_height() - 15);
 	}
 
+	void Npc::set_control(bool cnt)
+	{
+		control = cnt;
+
+		// The first choice also waits.
+		if (control)
+		{
+			wait_idle();
+			pending = false;
+		}
+	}
+
+	void Npc::act(int8_t action, int8_t line)
+	{
+		pending = false;
+
+		if (action == -1)
+		{
+			if (line >= 0 && line < static_cast<int32_t>(idle_lines.size()))
+				speech.change_text(idle_lines[line]);
+
+			return;
+		}
+
+		int32_t index = action - 2;
+
+		if (index < 0 || index >= static_cast<int32_t>(actions.size()))
+			return;
+
+		const std::string &name = actions[index];
+		set_stance(name);
+
+		if (line >= 0 && line < static_cast<int32_t>(lines[name].size()))
+			speech.change_text(lines[name][line]);
+	}
+
 	void Npc::update_idle()
 	{
+		// Only the controller chooses, and everyone plays what comes back.
+		if (!control)
+			return;
+
 		if (idle_cooldown > 0)
 			idle_cooldown -= Constants::TIMESTEP;
 
 		// An action plays out before the next choice.
-		if (idle_cooldown > 0 || stance != "stand")
+		if (pending || idle_cooldown > 0 || stance != "stand")
 			return;
 
 		wait_idle();
@@ -252,17 +291,9 @@ namespace ms
 			choice))
 			return;
 
-		if (choice.action < 0)
-		{
-			speech.change_text(idle_lines[choice.line]);
-			return;
-		}
-
-		const std::string& action = actions[choice.action];
-		set_stance(action);
-
-		if (choice.line >= 0)
-			speech.change_text(lines[action][choice.line]);
+		int8_t action = choice.action < 0 ? -1 : static_cast<int8_t>(choice.action + 2);
+		NpcActionPacket(oid, action, static_cast<int8_t>(choice.line)).dispatch();
+		pending = true;
 	}
 
 	void Npc::wait_idle()

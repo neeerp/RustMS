@@ -393,6 +393,11 @@ namespace ms
 		);
 	}
 
+	void RemoveNpcHandler::handle(InPacket& recv) const
+	{
+		Stage::get().get_npcs().remove(recv.read_int());
+	}
+
 	void SpawnNpcControllerHandler::handle(InPacket& recv) const
 	{
 		int8_t mode = recv.read_byte();
@@ -400,7 +405,7 @@ namespace ms
 
 		if (mode == 0)
 		{
-			Stage::get().get_npcs().remove(oid);
+			Stage::get().get_npcs().control(oid, false);
 		}
 		else
 		{
@@ -413,10 +418,22 @@ namespace ms
 			recv.read_short();	// 'rx1'
 			recv.read_bool();	// 'minimap'
 
+			// Spawned already, the NPC only changes hands.
 			Stage::get().get_npcs().spawn(
 				{ oid, id, position, flip, fh }
 			);
+			Stage::get().get_npcs().control(oid, true);
 		}
+	}
+
+	void NpcActionHandler::handle(InPacket& recv) const
+	{
+		int32_t oid = recv.read_int();
+		int8_t action = recv.read_byte();
+		int8_t line = recv.read_byte();
+
+		// A path follows for an NPC that walks; none does in v83.
+		Stage::get().get_npcs().act(oid, action, line);
 	}
 
 	void DropLootHandler::handle(InPacket& recv) const

@@ -36,7 +36,9 @@ pub use self::change_channel::ChangeChannelHandler;
 pub use self::change_map::{warp, ChangeMapHandler};
 pub use self::char_info::CharInfoRequestHandler;
 pub use self::chat::AllChatHandler;
-pub use self::combat::{AttackHandler, MobDistanceHandler, MoveLifeHandler, TakeDamageHandler};
+pub use self::combat::{
+    AttackHandler, MobDistanceHandler, MoveLifeHandler, NpcActionHandler, TakeDamageHandler,
+};
 pub use self::emote::FaceExpressionHandler;
 pub use self::item_move::ItemMoveHandler;
 pub use self::keybinds::ChangeKeybindsHandler;

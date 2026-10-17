@@ -46,6 +46,12 @@ namespace ms
 		// Remove the npc with the specified oid;
 		void remove(int32_t oid);
 
+		// Take control of an NPC, or give it up, once it has spawned.
+		void control(int32_t oid, bool control);
+
+		// Play the action the NPC's controller chose.
+		void act(int32_t oid, int8_t action, int8_t line);
+
 		// Remove all NPCs.
 		void clear();
 
@@ -62,5 +68,6 @@ namespace ms
 		MapObjects npcs;
 
 		std::queue<NpcSpawn> spawns;
+		std::queue<std::pair<int32_t, bool>> controls;
 	};
 }

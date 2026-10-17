@@ -132,7 +132,9 @@ namespace ms
 		SHOW_MOB_HP = 250,
 		SHOW_MAGNET = 251,
 		SPAWN_NPC = 257,
+		REMOVE_NPC = 258,
 		SPAWN_NPC_C = 259,
+		NPC_ACTION = 260,
 		DROP_LOOT = 268,
 		REMOVE_LOOT = 269,
 		HIT_REACTOR = 277,
@@ -191,7 +193,9 @@ namespace ms
 		emplace<REMOVE_CHAR, RemoveCharHandler>();
 		emplace<SPAWN_PET, SpawnPetHandler>();
 		emplace<SPAWN_NPC, SpawnNpcHandler>();
+		emplace<REMOVE_NPC, RemoveNpcHandler>();
 		emplace<SPAWN_NPC_C, SpawnNpcControllerHandler>();
+		emplace<NPC_ACTION, NpcActionHandler>();
 		emplace<SPAWN_MOB, SpawnMobHandler>();
 		emplace<SPAWN_MOB_C, SpawnMobControllerHandler>();
 		emplace<MOB_MOVED, MobMovedHandler>();

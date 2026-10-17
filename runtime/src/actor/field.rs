@@ -11,7 +11,9 @@ use net::packet::build::world::mob::{
     build_control_mob, build_kill_mob, build_mob_hp, build_move_mob, build_move_mob_response,
     build_show_magnet, build_spawn_mob, build_stop_controlling_mob,
 };
-use net::packet::build::world::npc::{build_spawn_npc, ForeignNpc};
+use net::packet::build::world::npc::{
+    build_control_npc, build_npc_action, build_spawn_npc, ForeignNpc,
+};
 use net::packet::build::world::reactor::{
     build_hit_reactor, build_remove_reactor, build_spawn_reactor,
 };
@@ -54,6 +56,8 @@ pub struct FieldActor {
     rx: mpsc::Receiver<FieldMessage>,
     occupants: HashMap<ClientId, Occupant>,
     map_npcs: Vec<FieldMapEntityNpc>,
+    /// Who picks the NPCs' idle actions; without one they only stand.
+    npc_controller: Option<ClientId>,
     mobs: MobSet,
     drops: DropSet,
     reactors: ReactorSet,
@@ -77,6 +81,7 @@ impl FieldActor {
             rx,
             occupants: HashMap::new(),
             map_npcs,
+            npc_controller: None,
             mobs,
             drops,
             reactors,
@@ -145,6 +150,31 @@ impl FieldActor {
                     occupant.handle.send_packet(packet);
                 }
             }
+        }
+    }
+
+    /// Tell `client` it now picks every NPC's idle actions.
+    fn send_npc_control(&mut self, client: ClientId) {
+        let Some(occupant) = self.occupants.get(&client) else {
+            return;
+        };
+        self.npc_controller = Some(client);
+        for map_npc in &self.map_npcs {
+            if let Ok(packet) = build_control_npc(&to_foreign_npc(map_npc)) {
+                occupant.handle.send_packet(packet);
+            }
+        }
+    }
+
+    /// Show everyone the action the NPCs' controller chose.
+    fn handle_npc_action(&self, from: ClientId, object_id: i32, action: &[u8]) {
+        if self.npc_controller != Some(from)
+            || !self.map_npcs.iter().any(|npc| npc.object_id == object_id)
+        {
+            return;
+        }
+        if let Ok(packet) = build_npc_action(object_id, action) {
+            self.broadcast(None, packet);
         }
     }
 
@@ -235,6 +265,9 @@ impl FieldActor {
                     object_id,
                     distance,
                 } => self.handle_mob_distance(from, object_id, distance),
+                FieldRequest::NpcAction { object_id, action } => {
+                    self.handle_npc_action(from, object_id, &action)
+                }
                 FieldRequest::Attack { broadcast, hits } => {
                     self.handle_attack(from, broadcast, hits)
                 }
@@ -608,6 +641,10 @@ impl FieldActor {
         );
         let controlled = self.mobs.assign_uncontrolled(client_id);
         self.send_control(client_id, &controlled);
+        // A rejoining controller has forgotten it controls them.
+        if self.npc_controller.is_none() || self.npc_controller == Some(client_id) {
+            self.send_npc_control(client_id);
+        }
     }
 
     fn handle_leave(&mut self, client_id: ClientId) {
@@ -618,6 +655,12 @@ impl FieldActor {
         let handed = self.mobs.release(client_id, next);
         if let Some(next) = next {
             self.send_control(next, &handed);
+        }
+        if self.npc_controller == Some(client_id) {
+            self.npc_controller = None;
+            if let Some(next) = next {
+                self.send_npc_control(next);
+            }
         }
         match build_player_leave_field(client_id) {
             Ok(packet) => self.broadcast(None, packet),
@@ -1045,6 +1088,64 @@ mod tests {
         .await
         .unwrap();
         assert_eq!(checked(&mut far_rx).await, (9, false));
+    }
+
+    #[tokio::test]
+    async fn one_player_picks_the_npcs_actions_for_everyone() {
+        let (tx, rx) = mpsc::channel(16);
+        let maria = FieldMapEntityNpc {
+            object_id: 1_000_000_000,
+            npc_id: 2100,
+            x: 130,
+            y: 185,
+            flip: false,
+            foothold: 0,
+            rx0: 80,
+            rx1: 180,
+        };
+        let actor = FieldActor::new(
+            FieldKey::new(0, 50000),
+            rx,
+            vec![maria],
+            MobSet::default(),
+            DropSet::default(),
+            ReactorSet::default(),
+            Duration::from_millis(50),
+        );
+        tokio::spawn(actor.run());
+        let (first, mut first_rx) = client(1);
+        let (second, mut second_rx) = client(2);
+        for (handle, id) in [(first, 1), (second, 2)] {
+            tx.send(FieldMessage::Join {
+                handle,
+                avatar: avatar(id, 100, 185),
+                party: None,
+            })
+            .await
+            .unwrap();
+        }
+        let control = SendOpcode::SpawnNpcRequestController as i16;
+        assert!(opcodes(&mut first_rx).await.contains(&control));
+        assert!(!opcodes(&mut second_rx).await.contains(&control));
+
+        let action = |from| FieldMessage::FromClient {
+            from,
+            request: FieldRequest::NpcAction {
+                object_id: 1_000_000_000,
+                action: vec![2, 0xff],
+            },
+        };
+        tx.send(action(2)).await.unwrap();
+        assert!(opcodes(&mut first_rx).await.is_empty());
+        tx.send(action(1)).await.unwrap();
+        for rx in [&mut first_rx, &mut second_rx] {
+            let packet = next_packet(rx).await;
+            assert_eq!(packet.opcode(), SendOpcode::NpcAction as i16);
+            assert_eq!(&packet.bytes[2..], &[0x00, 0xca, 0x9a, 0x3b, 2, 0xff]);
+        }
+
+        tx.send(FieldMessage::Leave { client_id: 1 }).await.unwrap();
+        assert!(opcodes(&mut second_rx).await.contains(&control));
     }
 
     #[tokio::test]

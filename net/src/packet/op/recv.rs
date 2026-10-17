@@ -68,6 +68,7 @@ pub enum RecvOpcode {
     ChangeKeybinds = 0x87,
     MoveLife = 0xBC,
     MobDistance = 0xBD,
+    NpcAction = 0xC5,
     ItemPickup = 0xCA,
     DamageReactor = 0xCD,
 
