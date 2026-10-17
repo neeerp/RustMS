@@ -52,9 +52,12 @@ fn kind_attack(
     p.write_byte(0x11).unwrap();
     p.write_int(skill_id).unwrap();
     p.write_bytes(&[0; 8]).unwrap();
-    for b in [0u8, 0x80, 5, 0, 4] {
-        p.write_byte(b).unwrap();
-    }
+    // Flags, then action 5 facing left (v83 `action | left << 15`), then
+    // a byte and the attack speed.
+    p.write_byte(0).unwrap();
+    p.write_short(0x8005u16 as i16).unwrap();
+    p.write_byte(0).unwrap();
+    p.write_byte(4).unwrap();
     if ranged {
         p.write_int(0).unwrap();
         p.write_short(ammo_slot).unwrap();
