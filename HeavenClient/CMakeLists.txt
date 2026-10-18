@@ -46,6 +46,8 @@ if(HEAVENCLIENT_BUILD_TESTS)
     add_test(NAME chat_wrap COMMAND chat_wrap_tests)
     add_executable(curse_words_tests tests/curse_words.cpp)
     add_test(NAME curse_words COMMAND curse_words_tests)
+    add_executable(character_name_tests tests/character_name.cpp)
+    add_test(NAME character_name COMMAND character_name_tests)
     add_executable(map_tooltip_tests tests/map_tooltip.cpp)
     add_test(NAME map_tooltip COMMAND map_tooltip_tests)
     add_executable(cash_catalog_tests tests/cash_catalog.cpp)
@@ -710,6 +712,7 @@ add_executable(HeavenClient
     Template/Singleton.h
     Template/TimedQueue.h
     Template/TypeMap.h
+    Util/CharacterName.h
     Util/ChatWrap.h
     Util/CurseWords.h
     Util/HardwareInfo.h

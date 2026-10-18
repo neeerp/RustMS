@@ -427,7 +427,7 @@ side yet.
 | Skills, stat/AP/SP allocation, buffs, keymap | Implemented |
 | NPC dialogue and NPC shop | Implemented (`UINpcTalk`, `UIShop`) |
 | Quest log and markers | Implemented (`UIQuestLog`); progress arrives via SHOW_STATUS_INFO, quest start/complete is driven by NPC dialogue |
-| Chat, whisper, `/find`, `/?`, `/party`, `/buddy`, `/all`, server messages | Implemented; buddy whisper/find modes ignored; other commands are dropped, as v83 does for non-GMs |
+| Chat, whisper, `/find`, `/?`, `/party`, `/buddy`, `/all`, server messages | Implemented; buddy whisper/find modes ignored; `/w NAME` alone fills in a whisper to NAME, or says "Incorrect ID." for a name no character could have, as v83's `/whisper NAME` does; other commands are dropped, as v83 does for non-GMs |
 | Character info, minimap, world map | Implemented |
 | Party (`UIUserList` Party tab, `UIPartyHP`, party chat) | Implemented; see `parties.md` |
 | Buddy list (`UIUserList` Friend tab, buddy chat) | Implemented without groups; see `buddies.md` |
