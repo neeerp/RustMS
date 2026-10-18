@@ -68,6 +68,9 @@ if(HEAVENCLIENT_BUILD_TESTS)
     add_test(NAME door_rules COMMAND door_rules_tests)
     add_executable(buddy_list_tests tests/buddy_list.cpp Character/BuddyList.cpp)
     add_test(NAME buddy_list COMMAND buddy_list_tests)
+    add_executable(guild_tests tests/guild.cpp Character/Guild.cpp Net/InPacket.cpp Net/Handlers/Helpers/GuildParser.cpp)
+    target_include_directories(guild_tests PRIVATE ${PROJECT_SOURCE_DIR}/libs/NoLifeNx)
+    add_test(NAME guild COMMAND guild_tests)
     add_executable(npc_reach_tests tests/npc_reach.cpp)
     target_include_directories(npc_reach_tests PRIVATE ${PROJECT_SOURCE_DIR}/libs/NoLifeNx)
     add_test(NAME npc_reach COMMAND npc_reach_tests)
@@ -90,6 +93,8 @@ if(HEAVENCLIENT_BUILD_TESTS)
     add_test(NAME buff_row COMMAND buff_row_tests)
     add_executable(item_drop_tests tests/item_drop.cpp)
     add_test(NAME item_drop COMMAND item_drop_tests)
+    add_executable(scroll_rules_tests tests/scroll_rules.cpp)
+    add_test(NAME scroll_rules COMMAND scroll_rules_tests)
     add_executable(pickup_tests tests/pickup.cpp)
     target_include_directories(pickup_tests PRIVATE ${PROJECT_SOURCE_DIR}/libs/NoLifeNx)
     add_test(NAME pickup COMMAND pickup_tests)
@@ -146,6 +151,9 @@ if(HEAVENCLIENT_BUILD_TESTS)
     add_executable(storage_contents_tests tests/storage_contents.cpp Net/InPacket.cpp)
     target_include_directories(storage_contents_tests PRIVATE ${PROJECT_SOURCE_DIR}/libs/NoLifeNx)
     add_test(NAME storage_contents COMMAND storage_contents_tests)
+    add_executable(mini_room_tests tests/mini_room.cpp Net/InPacket.cpp)
+    target_include_directories(mini_room_tests PRIVATE ${PROJECT_SOURCE_DIR}/libs/NoLifeNx)
+    add_test(NAME mini_room COMMAND mini_room_tests)
     add_executable(movement_path_tests tests/movement_path.cpp Net/InPacket.cpp Net/Handlers/Helpers/MovementParser.cpp)
     target_include_directories(movement_path_tests PRIVATE ${PROJECT_SOURCE_DIR}/libs/NoLifeNx)
     add_test(NAME movement_path COMMAND movement_path_tests)
@@ -163,6 +171,10 @@ if(HEAVENCLIENT_BUILD_TESTS)
     add_test(NAME mob_hurts COMMAND mob_hurts_tests)
     add_executable(mist_layout_tests tests/mist_layout.cpp)
     add_test(NAME mist_layout COMMAND mist_layout_tests)
+    add_executable(ships_tests tests/ships.cpp)
+    add_test(NAME ships COMMAND ships_tests)
+    add_executable(reactor_rules_tests tests/reactor_rules.cpp)
+    add_test(NAME reactor_rules COMMAND reactor_rules_tests)
     add_executable(status_messages_tests tests/status_messages.cpp Net/InPacket.cpp)
     target_include_directories(status_messages_tests PRIVATE ${PROJECT_SOURCE_DIR}/libs/NoLifeNx)
     add_test(NAME status_messages COMMAND status_messages_tests)
@@ -274,6 +286,10 @@ add_executable(HeavenClient
     Character/EquipStat.h
     Character/ExpTable.cpp
     Character/ExpTable.h
+    Character/Guild.cpp
+    Character/Guild.h
+    Character/GuildMark.cpp
+    Character/GuildMark.h
     Character/Job.cpp
     Character/Job.h
     Character/MapleStat.cpp
@@ -351,6 +367,9 @@ add_executable(HeavenClient
     Gameplay/MapleMap/MapBackgrounds.h
     Gameplay/MapleMap/MapChars.cpp
     Gameplay/MapleMap/MapChars.h
+    Gameplay/MapleMap/MapClock.cpp
+    Gameplay/MapleMap/MapClock.h
+    Gameplay/MapleMap/ClockRules.h
     Gameplay/MapleMap/MapDrops.cpp
     Gameplay/MapleMap/MapDrops.h
     Gameplay/MapleMap/MapEffect.cpp
@@ -375,6 +394,9 @@ add_executable(HeavenClient
     Gameplay/MapleMap/MapPortals.h
     Gameplay/MapleMap/MapReactors.cpp
     Gameplay/MapleMap/MapReactors.h
+    Gameplay/MapleMap/MapShip.cpp
+    Gameplay/MapleMap/MapShip.h
+    Gameplay/MapleMap/ShipRules.h
     Gameplay/MapleMap/MapTilesObjs.cpp
     Gameplay/MapleMap/MapTilesObjs.h
     Gameplay/MapleMap/MesoDrop.cpp
@@ -545,6 +567,10 @@ add_executable(HeavenClient
     IO/UITypes/UIShop.h
     IO/UITypes/UIStorage.cpp
     IO/UITypes/UIStorage.h
+    IO/UITypes/UITradeInvite.cpp
+    IO/UITypes/UITradeInvite.h
+    IO/UITypes/UITradingRoom.cpp
+    IO/UITypes/UITradingRoom.h
     IO/UITypes/UIMonsterBook.cpp
     IO/UITypes/UIMonsterBook.h
     IO/UITypes/UISkillBook.cpp
@@ -608,6 +634,8 @@ add_executable(HeavenClient
     Net/Handlers/Helpers/BuffParser.h
     Net/Handlers/Helpers/MobStatParser.cpp
     Net/Handlers/Helpers/MobStatParser.h
+    Net/Handlers/Helpers/GuildParser.cpp
+    Net/Handlers/Helpers/GuildParser.h
     Net/Handlers/AttackHandlers.cpp
     Net/Handlers/AttackHandlers.h
     Net/Handlers/BuddyHandlers.cpp
@@ -616,6 +644,8 @@ add_executable(HeavenClient
     Net/Handlers/CashShopHandlers.h
     Net/Handlers/CommonHandlers.cpp
     Net/Handlers/CommonHandlers.h
+    Net/Handlers/GuildHandlers.cpp
+    Net/Handlers/GuildHandlers.h
     Net/Handlers/InventoryHandlers.cpp
     Net/Handlers/InventoryHandlers.h
     Net/Handlers/LoginHandlers.cpp
@@ -643,6 +673,7 @@ add_executable(HeavenClient
     Net/Packets/InventoryPackets.h
     Net/Packets/LoginPackets.h
     Net/Packets/MessagingPackets.h
+    Net/Packets/MiniRoomPackets.h
     Net/Packets/MovementPacket.h
     Net/Packets/NpcInteractionPackets.h
     Net/Packets/QuestPackets.h

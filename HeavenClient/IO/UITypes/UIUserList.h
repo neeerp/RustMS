@@ -24,14 +24,18 @@
 #include "../UIDragElement.h"
 
 #include "../Components/ClassicTabs.h"
+#include "../Components/Slider.h"
 
 #include "../../Character/BuddyList.h"
+#include "../../Character/Guild.h"
+#include "../../Character/GuildMark.h"
 #include "../../Character/Party.h"
 
 namespace ms
 {
-	// The v83 Maple User List & Guild window (UIWindow.img/UserList). Only
-	// the Friend and Party tabs work so far; the others show an empty window.
+	// The v83 Maple User List & Guild window (UIWindow.img/UserList). The
+	// Friend, Party and Guild tabs work so far; the others show an empty
+	// window.
 	class UIUserList : public UIDragElement<PosUSERLIST>
 	{
 	public:
@@ -58,6 +62,8 @@ namespace ms
 		Cursor::State send_cursor(bool clicked, Point<int16_t> cursorpos) override;
 
 		void send_key(int32_t keycode, bool pressed, bool escape) override;
+
+		void send_scroll(double yoffset) override;
 
 		UIElement::Type get_type() const override;
 
@@ -89,7 +95,22 @@ namespace ms
 			BT_INVITE_BUDDY,
 			BT_SHOW_ONLINE,
 			BT_SHOW_ALL,
-			BT_TAB0
+			BT_GUILD_INVITE,
+			BT_GUILD_WITHDRAW,
+			BT_GUILD_KICK,
+			BT_GUILD_UP,
+			BT_GUILD_DOWN,
+			BT_GUILD_WHERE,
+			BT_GUILD_CHAT,
+			BT_GUILD_INFO,
+			BT_GUILD_WHISPER,
+			BT_GUILD_NOTICE,
+			BT_GUILD_PARTY_INVITE,
+			BT_GUILD_BBS,
+			// Each guild section's fold, unfold, previous and next page
+			// buttons: the online section's, then the offline one's.
+			BT_GUILD_SECTION,
+			BT_TAB0 = BT_GUILD_SECTION + 8
 		};
 
 		// One member's row; y is relative to the window.
@@ -141,6 +162,30 @@ namespace ms
 			std::vector<Cell> cells;
 		};
 
+		// One guild member's row; y is in the member list's own space.
+		struct GuildRow
+		{
+			int32_t id;
+			int16_t y;
+			Text name, job, level, title;
+		};
+
+		// The online or offline part of the guild's member list, a page at
+		// a time; y is in the member list's own space.
+		struct GuildSection
+		{
+			Texture header;
+			Text count, page_text;
+			bool expanded = true;
+			int16_t page = 1;
+			int16_t pages = 1;
+			int16_t top = 0;
+			std::vector<GuildRow> rows;
+			// The page's first row, or "none" in its place, and the end line.
+			int16_t first = 0;
+			int16_t end = 0;
+		};
+
 		std::vector<Shown> currently_shown() const;
 		void rebuild();
 		// Lays out one section from y and returns where the next may start.
@@ -154,10 +199,24 @@ namespace ms
 		void draw_buddies(const BuddySection& section, const Texture& section_row, bool legend) const;
 		const Buddy* selected_buddy() const;
 
+		void rebuild_guild();
+		// Lays out one guild section from y and returns where the next may
+		// start.
+		int16_t lay_out(GuildSection& section, const std::vector<const GuildMember*>& members, int16_t y);
+		void draw_guild() const;
+		// Moves the guild sections' buttons to their headers, or hides them
+		// out of view.
+		void place_section_buttons();
+		void scroll_guild(int16_t steps);
+		// The member picked on the page shown, if online and not the player.
+		const GuildMember* picked_online_member() const;
+
 		uint16_t tab;
 		Party& party;
 		BuddyList& buddies;
+		Guild& guild;
 		ClassicTabs tabs;
+		Texture background, guild_background;
 
 		Texture columns, row, bottom, highlight, star;
 		Text none;
@@ -173,5 +232,19 @@ namespace ms
 		int32_t picked_buddy = 0;
 		bool show_all = true;
 		bool filter_clicked = false;
+
+		Texture guild_frame, notice_box, guild_columns, guild_row, guild_end;
+		Text guild_name, no_guild, notice_label, notice;
+		GuildMark emblem;
+		bool emblem_marked = false;
+		GuildSection guild_online, guild_offline;
+		GuildData shown_guild;
+		int32_t guild_picked = 0;
+		// Where the notice has scrolled to, and the time toward its next step.
+		int16_t ticker_x = 0;
+		uint16_t ticker_time = 0;
+		Slider guild_slider;
+		int16_t guild_scroll = 0;
+		int16_t guild_height = 0;
 	};
 }

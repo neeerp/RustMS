@@ -47,7 +47,8 @@ namespace ms
 		enum Mode : int8_t
 		{
 			BUDDY = 0,
-			PARTY = 1
+			PARTY = 1,
+			GUILD = 2
 		};
 
 		MultiChatPacket(Mode mode, const std::vector<int32_t>& recipients, const std::string& message) : OutPacket(OutPacket::Opcode::MULTICHAT)

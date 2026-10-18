@@ -49,9 +49,10 @@ impl LiveReactor {
 /// What a hit did.
 #[derive(Debug, PartialEq, Eq)]
 pub enum Hit {
-    /// The reactor moved to the view's state.
-    Moved(ReactorView),
-    /// It broke: it is gone (the view has the state it broke from) and drops
+    /// The reactor moved to the view's state through `event` of the state
+    /// it left.
+    Moved { view: ReactorView, event: u8 },
+    /// It broke: it is gone (the view has the state it reached) and drops
     /// its loot.
     Broke(ReactorView),
 }
@@ -123,12 +124,13 @@ impl ReactorSet {
         spawned
     }
 
-    /// A player at `from` hit `object_id` with `skill_id` (0 for a plain
-    /// attack). `None` if it is gone, out of reach, or can't be hit now.
+    /// A player at `from` swung at `object_id`; `flags` are the client's
+    /// (bit 0 facing left, bit 1 on a foothold). `None` if it is gone, out
+    /// of reach, or no event fits.
     pub fn hit(
         &mut self,
         object_id: i32,
-        skill_id: i32,
+        flags: i32,
         from: (i16, i16),
         now: Instant,
     ) -> Option<Hit> {
@@ -139,10 +141,13 @@ impl ReactorSet {
             return None;
         }
         let spot = &mut self.spots[reactor.spot];
-        let next = spot.data.hit(reactor.state, skill_id)?;
+        let (event, next) = spot.data.swing(reactor.state, flags)?;
+        reactor.state = next;
         if !spot.data.is_last(next) {
-            reactor.state = next;
-            return Some(Hit::Moved(reactor.view()));
+            return Some(Hit::Moved {
+                view: reactor.view(),
+                event,
+            });
         }
         let broken = self.live.remove(&object_id)?;
         spot.live = None;
@@ -157,13 +162,17 @@ impl ReactorSet {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use game_data::reactors::ReactorState;
+    use game_data::reactors::{ReactorEvent, ReactorState};
+
+    /// Facing right on a foothold.
+    const SWING: i32 = 2;
 
     fn scrap_box(x: i16, reactor_time: i32) -> (MapReactorTemplate, ReactorTemplate) {
         let hit = |next| ReactorState {
-            hit: Some(next),
-            skills: Vec::new(),
-            last: false,
+            events: vec![ReactorEvent {
+                kind: 0,
+                next: Some(next),
+            }],
         };
         (
             MapReactorTemplate {
@@ -176,16 +185,7 @@ mod tests {
             },
             ReactorTemplate {
                 reactor_id: 2001,
-                states: vec![
-                    hit(1),
-                    hit(2),
-                    hit(3),
-                    hit(4),
-                    ReactorState {
-                        last: true,
-                        ..ReactorState::default()
-                    },
-                ],
+                states: vec![hit(1), hit(2), hit(3), hit(4), ReactorState::default()],
                 action: Some("mBoxItem0".into()),
             },
         )
@@ -199,17 +199,17 @@ mod tests {
             panic!("one reactor");
         };
         for state in 1..=3 {
-            match reactors.hit(id, 0, (600, 254), start) {
-                Some(Hit::Moved(view)) => assert_eq!(view.state, state),
+            match reactors.hit(id, SWING, (600, 254), start) {
+                Some(Hit::Moved { view, event: 0 }) => assert_eq!(view.state, state),
                 other => panic!("hit {state}: {other:?}"),
             }
         }
-        match reactors.hit(id, 0, (600, 254), start) {
-            Some(Hit::Broke(view)) => assert_eq!((view.object_id, view.state), (id, 3)),
+        match reactors.hit(id, SWING, (600, 254), start) {
+            Some(Hit::Broke(view)) => assert_eq!((view.object_id, view.state), (id, 4)),
             other => panic!("last hit: {other:?}"),
         }
         assert!(reactors.get(id).is_none());
-        assert!(reactors.hit(id, 0, (600, 254), start).is_none());
+        assert!(reactors.hit(id, SWING, (600, 254), start).is_none());
 
         assert!(reactors.respawn(start + Duration::from_secs(89)).is_empty());
         let respawned = reactors.respawn(start + Duration::from_secs(90));
@@ -223,8 +223,8 @@ mod tests {
         let mut reactors = ReactorSet::new([scrap_box(610, 90)]);
         let now = Instant::now();
         let id = reactors.respawn(now)[0];
-        assert!(reactors.hit(id, 0, (1200, 254), now).is_none());
-        assert!(reactors.hit(id, 0, (610, -100), now).is_none());
+        assert!(reactors.hit(id, SWING, (1200, 254), now).is_none());
+        assert!(reactors.hit(id, SWING, (610, -100), now).is_none());
         assert_eq!(reactors.get(id).unwrap().state, 0);
     }
 
@@ -234,7 +234,7 @@ mod tests {
         let now = Instant::now();
         let id = reactors.respawn(now)[0];
         for _ in 0..4 {
-            reactors.hit(id, 0, (610, 254), now).unwrap();
+            reactors.hit(id, SWING, (610, 254), now).unwrap();
         }
         assert!(reactors.respawn(now + Duration::from_secs(3600)).is_empty());
     }

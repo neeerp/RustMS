@@ -36,10 +36,7 @@ namespace ms
 					"You may only use this skill with a one-handed weapon equipped.",
 					"You cannot use that skill on this map.",
 					"You cannot use the Mystic Door Skill near the portal.",
-					"Since you are not using a weapon, you are unable to attack.",
-					"The scroll lights up and it's mysterious powers have been transferred to the item.",
-					"The scroll lights up but the item remains as if nothing happened.",
-					"The item has been destroyed due to the overwhelming power of the scroll."
+					"Since you are not using a weapon, you are unable to attack."
 			};
 
 	InChatMessage::InChatMessage(Messages::Type t)

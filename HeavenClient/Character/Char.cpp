@@ -26,8 +26,18 @@
 
 namespace ms
 {
+	namespace
+	{
+		// The guild tag hangs 1 pixel under the name tag. The emblem sits to
+		// its left, 1 pixel clear of the box, with their tops level
+		// (FUN_005f0334). Not yet checked against period footage.
+		constexpr int16_t GUILD_TAG_GAP = 1;
+		constexpr Point<int16_t> EMBLEM_OFFSET = Point<int16_t>(-GuildMark::SIZE - 3, 6);
+	}
+
 	Char::Char(int32_t o, const CharLook &lk, const std::string &name) : MapObject(o), look(lk), look_preview(lk), namelabel(
-			Text(Text::Font::A13M, Text::Alignment::CENTER, Color::Name::WHITE, Text::Background::NAMETAG, name))
+			Text(Text::Font::A13M, Text::Alignment::CENTER, Color::Name::WHITE, Text::Background::NAMETAG, name)),
+			guildlabel(Text(Text::Font::A13M, Text::Alignment::CENTER, Color::Name::WHITE, Text::Background::NAMETAG))
 	{}
 
 	void Char::draw(double viewx, double viewy, float alpha) const
@@ -93,6 +103,15 @@ namespace ms
 
 		// If ever changing code for namelabel confirm placements with map 10000
 		namelabel.draw(absp + Point<int16_t>(0, -4));
+
+		if (!guildlabel.empty())
+		{
+			Point<int16_t> guildpos = absp + Point<int16_t>(0, -4 + namelabel.height() - 2 + GUILD_TAG_GAP);
+
+			guildlabel.draw(guildpos);
+			guildmark.draw(guildpos + Point<int16_t>(-guildlabel.width() / 2, 0) + EMBLEM_OFFSET);
+		}
+
 		chatballoon.draw(absp - Point<int16_t>(0, 85));
 		hintballoon.draw(absp - Point<int16_t>(0, 85));
 
@@ -617,6 +636,16 @@ namespace ms
 	std::string Char::get_name() const
 	{
 		return namelabel.get_text();
+	}
+
+	void Char::set_guild_name(const std::string &name)
+	{
+		guildlabel.change_text(name);
+	}
+
+	void Char::set_guild_emblem(const GuildEmblem &emblem)
+	{
+		guildmark = GuildMark(emblem);
 	}
 
 	CharLook &Char::get_look()

@@ -53,6 +53,8 @@ Containerized servers use env overrides so they are decoupled from local static 
   (`net/src/login_world.rs`), read by both servers. The world binds each
   channel on its advertised port, so the compose file maps those ports 1:1.
 - debug map-id warps: `RUSTMS_ALLOW_DEBUG_WARPS=1` (`net/src/policy.rs`)
+- ship route clock speed: `RUSTMS_CONTI_SCALE=60`, so a ship's 15-minute
+  cycle takes 15 seconds (`net/src/conti.rs`)
 - Monster Book card drop chance: `RUSTMS_CARD_DROP_RATE=1` so every kill
   drops its card (`net/src/monster_book.rs`)
 

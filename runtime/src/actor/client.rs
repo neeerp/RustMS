@@ -4,12 +4,15 @@ mod combat;
 mod dialogue;
 mod door;
 mod fame;
+mod guilds;
 mod loot;
 mod npc_script;
 mod quest;
 mod script;
+mod ships;
 mod shop;
 mod storage;
+mod trade;
 
 use crate::actor::registry::FieldRegistry;
 use crate::db::spawn_db;
@@ -113,6 +116,10 @@ pub struct ClientActor {
     presence: Option<Presence>,
     /// The player's open Mystic Door.
     door: Option<door::OpenDoor>,
+    /// The player's side of a trade they are in.
+    trade: Option<trade::Trade>,
+    /// Heracle asked for a new guild's name; only then is one founded.
+    naming_guild: bool,
 }
 
 impl ClientActor {
@@ -164,6 +171,8 @@ impl ClientActor {
             party_id: None,
             presence: None,
             door: None,
+            trade: None,
+            naming_guild: false,
         })
     }
 
@@ -239,6 +248,7 @@ impl ClientActor {
         if self.in_cash_shop
             && opcode != RecvOpcode::ChangeMap as i16
             && opcode != RecvOpcode::CashShopOperation as i16
+            && opcode != RecvOpcode::CheckCash as i16
         {
             debug!(opcode, "Ignoring opcode in the Cash Shop");
             return Ok(());
@@ -340,6 +350,11 @@ impl ClientActor {
             WorldAction::Quest(request) => self.request_quest_action(request).await?,
             WorldAction::Shop(request) => self.shop_action(request).await?,
             WorldAction::Storage(request) => self.storage_request(request).await?,
+            WorldAction::Trade(request) => {
+                if !self.in_cash_shop {
+                    self.trade_request(request).await?
+                }
+            }
             WorldAction::ScriptPortal { portal } => self.touch_script_portal(&portal).await?,
             WorldAction::LookChanged(announce) => {
                 let player = &self.in_game()?.player;
@@ -348,7 +363,7 @@ impl ClientActor {
                 self.send_to_field(FieldMessage::UpdateAvatar {
                     client_id: self.client_id,
                     avatar,
-                    announce: Some(announce),
+                    announce: vec![announce],
                 })
                 .await?;
                 self.send_to_directory(DirectoryMessage::LookChanged {
@@ -382,6 +397,7 @@ impl ClientActor {
                 .await?
             }
             WorldAction::Buddy(request) => self.buddy_request(request).await?,
+            WorldAction::Guild(request) => self.guild_request(request).await?,
             WorldAction::GiveFame { target, up } => self.give_fame(target, up).await?,
             WorldAction::OpenDoor { town, at, lasts } => self.open_door(town, at, lasts).await?,
             WorldAction::UseDoor { owner, from_town } => self.use_door(owner, from_town).await?,
@@ -443,10 +459,11 @@ impl ClientActor {
             };
         self.session_id = Some(session.id);
 
-        let player = spawn_db(move || db::player::load_player(character_id)).await?;
+        let mut player = spawn_db(move || db::player::load_player(character_id)).await?;
         if player.account_id != session.account_id {
             return Err(RuntimeError::NotLoggedIn);
         }
+        ships::leave_forced_return_map(&mut player);
         self.client_id = character_id;
 
         let mut keymap = build::world::keymap::build_keymap(&player.keymap)
@@ -476,6 +493,7 @@ impl ClientActor {
         });
         self.join_current_field(spawn).await?;
         self.load_buddies().await?;
+        self.load_guild().await?;
         info!(
             character_id,
             channel_id = self.channel_id,
@@ -495,9 +513,11 @@ impl ClientActor {
         self.shop = None;
         self.storage = None;
         self.pending_quest = None;
+        self.naming_guild = false;
         self.npc_request_id = self.npc_request_id.wrapping_add(1);
         self.in_game_mut()?.player.chair = 0;
 
+        self.leave_trade().await?;
         self.send_to_field(FieldMessage::Leave {
             client_id: self.client_id,
         })
@@ -524,6 +544,7 @@ impl ClientActor {
             party,
         })
         .await?;
+        self.set_wall_clock().await?;
         self.bring_summons(spawn).await?;
         self.run_map_enter_script().await
     }
@@ -539,6 +560,7 @@ impl ClientActor {
         self.remember_spawn_point();
         self.cancel_buffs().await?;
         self.close_door().await?;
+        self.leave_trade().await?;
         self.flush().await?;
         spawn_db(move || db::session::begin_channel_transition(session_id, i16::from(channel_id)))
             .await?;
@@ -559,7 +581,9 @@ impl ClientActor {
         self.conversation = None;
         self.script = None;
         self.pending_quest = None;
+        self.naming_guild = false;
         self.npc_request_id = self.npc_request_id.wrapping_add(1);
+        self.leave_trade().await?;
         self.send_to_field(FieldMessage::Leave {
             client_id: self.client_id,
         })
@@ -685,6 +709,14 @@ impl ClientActor {
             } => {
                 self.expand_storage(account_id, cash_type, slots, price)
                     .await?
+            }
+            CashShopRequest::Balance => {
+                let balance = spawn_db(move || db::cash_shop::balance(account_id)).await?;
+                vec![cs::build_cash_balance(
+                    balance.credit,
+                    balance.points,
+                    balance.prepaid,
+                )?]
             }
         };
         self.send_all(&mut packets).await
@@ -974,6 +1006,12 @@ impl ClientActor {
                 map_id,
                 exit,
             } => self.door_warp(from_map, map_id, exit).await?,
+            ServerMessage::ShipWarp {
+                from_map,
+                map_id,
+                portal,
+            } => self.ship_warp(from_map, map_id, portal).await?,
+            ServerMessage::Trade { room, event } => self.trade_event(room, event).await?,
             ServerMessage::SendPacket(mut packet) => self.send(&mut packet).await?,
         }
         Ok(())
@@ -1020,7 +1058,9 @@ impl ClientActor {
                     .map_err(|_| RuntimeError::ChannelSend)?;
                 if !matches!(
                     message,
-                    FieldMessage::Join { .. } | FieldMessage::Leave { .. }
+                    FieldMessage::Join { .. }
+                        | FieldMessage::Leave { .. }
+                        | FieldMessage::Trade { .. }
                 ) {
                     field
                         .tx
@@ -1028,7 +1068,8 @@ impl ClientActor {
                         .await
                         .map_err(|_| RuntimeError::ChannelSend)?;
                 }
-                Ok(())
+                // The trading room died with the field.
+                self.abandon_trade().await
             }
         }
     }
@@ -1078,7 +1119,11 @@ impl ClientActor {
         if !game.player.is_dirty() {
             return Ok(());
         }
-        let snapshot = game.player.clone();
+        let mut snapshot = game.player.clone();
+        // What the player put up in a trade is still theirs.
+        if let Some(trade) = &self.trade {
+            trade.add_back(&mut snapshot);
+        }
         spawn_db(move || db::player::save_player(&snapshot)).await?;
         game.player.mark_saved();
         Ok(())
@@ -1107,6 +1152,11 @@ impl ClientActor {
 
     async fn cleanup(&mut self) {
         if self.game.is_some() {
+            // Before the save: the player gets their offer back, or the
+            // partner's.
+            if let Err(error) = self.leave_trade().await {
+                warn!(self.client_id, %error, "Failed to finish trade");
+            }
             if !self.in_cash_shop {
                 let _ = self
                     .send_to_field(FieldMessage::Leave {

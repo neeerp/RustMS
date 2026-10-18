@@ -52,4 +52,26 @@ namespace ms
 	public:
 		void handle(InPacket& recv) const override;
 	};
+
+	// The time on a station's wall clock (v83 0x5361bd kind 1). The other
+	// kinds, countdowns, aren't shown yet.
+	class ClockHandler : public PacketHandler
+	{
+	public:
+		void handle(InPacket& recv) const override;
+	};
+
+	// A ship field's ship comes or goes (v83 FUN_0054dca3).
+	class ContiMoveHandler : public PacketHandler
+	{
+	public:
+		void handle(InPacket& recv) const override;
+	};
+
+	// Where a ship field's ship is, as the client asked (v83 FUN_0054dd08).
+	class ContiStateHandler : public PacketHandler
+	{
+	public:
+		void handle(InPacket& recv) const override;
+	};
 }

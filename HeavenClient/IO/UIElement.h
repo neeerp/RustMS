@@ -79,6 +79,8 @@ namespace ms
 			PARTYHP,
 			MONSTERBOOK,
 			REVIVE,
+			TRADINGROOM,
+			TRADEINVITE,
 			NUM_TYPES
 		};
 

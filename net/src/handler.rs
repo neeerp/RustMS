@@ -227,6 +227,17 @@ pub enum BuddyRequest {
     Chat { recipients: Vec<i32>, text: String },
 }
 
+/// A guild operation, carried out by the client's actor.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum GuildRequest {
+    /// Send the player's guild again (`GUILD_OPERATION` mode 0).
+    Reload,
+    /// Found a guild with this name, answering the name prompt.
+    Create { name: String },
+    /// Say something to the guild members online.
+    Chat { text: String },
+}
+
 /// Something a player asks of their Maple Messenger, which the world
 /// directory owns.
 #[derive(Debug)]
@@ -284,6 +295,8 @@ pub enum WorldAction {
     Shop(crate::shop::ShopRequest),
     /// Take out of, store in, sort, or close the storage the player has open.
     Storage(crate::storage::StorageRequest),
+    /// Open, join, or act in a trading room.
+    Trade(crate::trade::TradeRequest),
     /// The player touched the named script portal on their map.
     ScriptPortal {
         portal: String,
@@ -308,6 +321,7 @@ pub enum WorldAction {
     /// A skill the player used reached party members; see `PartySkill`.
     PartySkill(PartySkill),
     Buddy(BuddyRequest),
+    Guild(GuildRequest),
     /// The player cast Mystic Door at `at` on their map, leading to `town`,
     /// for `lasts`. It replaces any door they had open.
     OpenDoor {
@@ -422,11 +436,12 @@ pub enum FieldRequest {
         loot: crate::loot::Loot,
         vanish: bool,
     },
-    /// Hit the reactor `object_id` with `skill_id` (0 for a plain attack).
+    /// Swing at the reactor `object_id`. The `flags` are bit 0 facing left
+    /// and bit 1 on a foothold; others see the hit `delay` ms later.
     HitReactor {
         object_id: i32,
-        skill_id: i32,
-        stance: i16,
+        flags: i32,
+        delay: u16,
     },
     /// Show the player the info window for `character_id`, who must be on
     /// their map (and may be themselves).
@@ -510,6 +525,7 @@ fn world_routes() -> &'static HashMap<i16, WorldRoute> {
             (Op::ChangeChannel, InGame(&world::ChangeChannelHandler)),
             (Op::ChangeMap, InGame(&world::ChangeMapHandler)),
             (Op::EnterCashShop, InGame(&world::EnterCashShopHandler)),
+            (Op::CheckCash, InGame(&world::CheckCashHandler)),
             (
                 Op::CashShopOperation,
                 InGame(&world::CashShopOperationHandler),
@@ -521,6 +537,10 @@ fn world_routes() -> &'static HashMap<i16, WorldRoute> {
             (
                 Op::PartySearchUpdate,
                 InGame(&world::PartySearchUpdateHandler),
+            ),
+            (
+                Op::ContiStateRequest,
+                InGame(&world::ContiStateRequestHandler),
             ),
             (Op::ChangeKeybinds, InGame(&world::ChangeKeybindsHandler)),
             (
@@ -539,7 +559,12 @@ fn world_routes() -> &'static HashMap<i16, WorldRoute> {
             ),
             (Op::MultiChat, InGame(&world::MultiChatHandler)),
             (Op::BuddyListModify, InGame(&world::BuddyListModifyHandler)),
+            (Op::GuildOperation, InGame(&world::GuildOperationHandler)),
             (Op::Messenger, InGame(&world::MessengerHandler)),
+            (
+                Op::PlayerInteraction,
+                InGame(&world::PlayerInteractionHandler),
+            ),
             (Op::TalkToNpc, InGame(&world::NpcTalkHandler)),
             (Op::NpcTalkMore, InGame(&world::NpcTalkMoreHandler)),
             (Op::QuestAction, InGame(&world::QuestActionHandler)),
@@ -554,6 +579,10 @@ fn world_routes() -> &'static HashMap<i16, WorldRoute> {
             (Op::ItemMove, InGame(&world::ItemMoveHandler)),
             (Op::UseItem, InGame(&world::UseItemHandler)),
             (Op::UseSkillBook, InGame(&world::UseSkillBookHandler)),
+            (
+                Op::UseUpgradeScroll,
+                InGame(&world::UseUpgradeScrollHandler),
+            ),
             (Op::MoveLife, InGame(&world::MoveLifeHandler)),
             (Op::MobDistance, InGame(&world::MobDistanceHandler)),
             (Op::NpcAction, InGame(&world::NpcActionHandler)),
@@ -618,7 +647,7 @@ mod tests {
     fn every_registered_opcode_is_unique_per_server() {
         // The maps would silently drop duplicates; check the table sizes match.
         assert_eq!(login_routes().len(), 13);
-        assert_eq!(world_routes().len(), 56);
+        assert_eq!(world_routes().len(), 61);
     }
 
     #[test]

@@ -23,9 +23,11 @@
 #include "Window.h"
 
 #include "../Gameplay/Stage.h"
+#include "../Net/Packets/GameplayPackets.h"
 
 #include "Components/Slider.h"
 
+#include "UITypes/UICashShop.h"
 #include "UITypes/UIChannel.h"
 #include "UITypes/UIChatBar.h"
 #include "UITypes/UIGameOption.h"
@@ -120,6 +122,10 @@ namespace ms
 			// The window gained input focus
 			Sound::set_sfxvolume(Sound::configured_volume());
 			Music::set_bgmvolume(Music::configured_volume());
+
+			// v83 checks the balances on coming back to the Cash Shop.
+			if (get_element<UICashShop>())
+				CheckCashPacket().dispatch();
 		} else
 		{
 			// The window lost input focus, and won't see the releases of the
@@ -324,6 +330,7 @@ namespace ms
 					types.emplace_back(UIElement::Type::USERLIST);
 					types.emplace_back(UIElement::Type::NPCTALK);
 					types.emplace_back(UIElement::Type::CHARINFO);
+					types.emplace_back(UIElement::Type::TRADINGROOM);
 				}
 				else if (enter)
 				{

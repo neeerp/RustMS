@@ -38,6 +38,8 @@
 #include "MapleMap/MapNpcs.h"
 #include "MapleMap/MapDrops.h"
 #include "MapleMap/MapEffect.h"
+#include "MapleMap/MapClock.h"
+#include "MapleMap/MapShip.h"
 #include "Physics/Physics.h"
 
 #include "../Character/Player.h"
@@ -138,6 +140,17 @@ namespace ms
 		// Set a map effect
 		void add_effect(std::string path);
 
+		// CONTI_MOVE: the map's ship comes or goes.
+		void move_ship(uint8_t target, uint8_t event);
+
+		// CONTI_STATE: where the map's ship is, which the client asks on
+		// entering the map.
+		void show_ship_state(uint8_t state, uint8_t flag);
+
+		// CLOCK kind 1: the time of day on the map's wall clock. A time sent
+		// while the map loads waits for it.
+		void set_clock(uint8_t hour, uint8_t minute, uint8_t second);
+
 		// Whether the player may give fame now (once every 5 minutes); if
 		// so, the wait starts.
 		bool try_give_fame();
@@ -236,6 +249,17 @@ namespace ms
 		MapDoors doors;
 		MapSummons summons;
 		MapEffect effect;
+		MapShip ship;
+		MapClock clock;
+		// A wall clock time that came before its map loaded.
+		struct ClockTime
+		{
+			uint8_t hour;
+			uint8_t minute;
+			uint8_t second;
+		};
+
+		std::optional<ClockTime> pending_clock;
 		// Effects left where they started, such as a jump pad's burst.
 		EffectLayer ground_effects;
 		Animation jump_effect;

@@ -499,8 +499,8 @@ namespace ms
 				Rectangle<int16_t> facing_left(position + area.get_left_top(), position + area.get_right_bottom());
 				Rectangle<int16_t> facing_right(position.x() - area.right(), position.x() - area.left(),
 												position.y() + area.top(), position.y() + area.bottom());
-				std::vector<int32_t> lefts = find_targets(objs, facing_left, position, info.mobcount, true, false);
-				std::vector<int32_t> rights = find_targets(objs, facing_right, position, info.mobcount, true, false);
+				std::vector<int32_t> lefts = find_targets(objs, facing_left, position, info.mobcount, false);
+				std::vector<int32_t> rights = find_targets(objs, facing_right, position, info.mobcount, false);
 				left = lefts.size() >= rights.size();
 				targets = left ? lefts : rights;
 			} else
@@ -511,14 +511,14 @@ namespace ms
 				Rectangle<int16_t> around(position.x() - reach, position.x() + reach, position.y() - 100,
 										  position.y() + 100);
 				uint8_t count = summon_rules::spreads(skill) ? 1 : info.mobcount;
-				targets = find_targets(objs, around, position, count, true, true);
+				targets = find_targets(objs, around, position, count, true);
 
 				if (!targets.empty() && summon_rules::spreads(skill))
 				{
 					Point<int16_t> first = mobs.get_mob_position(targets[0]);
 					Rectangle<int16_t> spread(first + info.area.get_left_top(), first + info.area.get_right_bottom());
 
-					for (int32_t other : find_targets(objs, spread, first, info.mobcount, true, true))
+					for (int32_t other : find_targets(objs, spread, first, info.mobcount, true))
 						if (other != targets[0] && targets.size() < info.mobcount)
 							targets.push_back(other);
 				}
@@ -737,7 +737,7 @@ namespace ms
 
 		if (kinds & skill_use::MOBS)
 			reach.mobs = find_targets(mobs.get_mobs(), range, position, skill_use::mob_limit(stats.mobcount, members),
-									  true, false);
+									  false);
 
 		return reach;
 	}
@@ -837,6 +837,9 @@ namespace ms
 				healed = request_heal();
 			}
 
+			if (!move.is_skill() && swing_at_reactor())
+				return;
+
 			Attack attack = player.prepare_attack(move.is_skill() ? move.get_id() : 0);
 			attack.charge = charge;
 			Stance::Id whack = Stance::Id::NONE;
@@ -888,13 +891,11 @@ namespace ms
 			AttackResult result = attack;
 
 			MapObjects *mob_objs = mobs.get_mobs();
-			MapObjects *reactor_objs = reactors.get_reactors();
 
 			// As in v83, ranged attacks hit the mobs closest to the player, while
 			// melee and magic attacks hit them in the order they entered the map.
 			bool closest_first = attack.type == Attack::Type::RANGED;
 			std::vector<int32_t> mob_targets;
-			std::vector<int32_t> reactor_targets = find_targets(reactor_objs, range, origin, mobcount, false, true);
 			bool shot = attack.type == Attack::Type::RANGED && whack == Stance::Id::NONE;
 			bool spell = attack.type == Attack::Type::MAGIC && shot_path::aimed_spell(attack.skill);
 
@@ -918,7 +919,7 @@ namespace ms
 
 				if (shot && shot_path::area_shot(attack.skill))
 				{
-					mob_targets = find_targets(mob_objs, shot_area, origin, mobcount, true, false);
+					mob_targets = find_targets(mob_objs, shot_area, origin, mobcount, false);
 				} else
 				{
 					mob_targets = find_shot_target(shot_start, shot_end.x());
@@ -958,7 +959,7 @@ namespace ms
 							Point<int16_t> hit = shot_path::hit_point(shot_area, mobs.get_mob_body(first));
 							Rectangle<int16_t> splash = shot_path::splash_area(hit, attack.range);
 
-							for (int32_t oid : find_targets(mob_objs, splash, origin, mobcount, true, false))
+							for (int32_t oid : find_targets(mob_objs, splash, origin, mobcount, false))
 								if (oid != first && mob_targets.size() < mobcount)
 									mob_targets.push_back(oid);
 						}
@@ -973,7 +974,7 @@ namespace ms
 				attack.healed = healed + static_cast<int32_t>(mob_targets.size());
 			} else
 			{
-				mob_targets = find_targets(mob_objs, range, origin, mobcount, true, closest_first);
+				mob_targets = find_targets(mob_objs, range, origin, mobcount, closest_first);
 			}
 
 			mobs.send_attack(result, attack, mob_targets, mobcount);
@@ -998,14 +999,75 @@ namespace ms
 			apply_result_movement(move, result);
 
 			AttackPacket(result, player.get_position()).dispatch();
-
-			if (reactor_targets.size())
-				if (Optional<Reactor> reactor = reactor_objs->get(reactor_targets.at(0)))
-					DamageReactorPacket(reactor->get_oid(), player.get_position(), 0, 0).dispatch();
 		} else
 		{
 			request_skill(move);
 		}
+	}
+
+	bool Combat::swing_at_reactor()
+	{
+		// v83 swings a basic attack at a reactor in reach instead of the
+		// mobs, at one reactor at most, and sends the swing with no mobs
+		// (FUN_007356c7, FUN_0095719b). It waits as an item use does; here
+		// only the reactor swing waits, not the whole attack.
+		if (!player.can_request(ExclRequest::USE_WAIT))
+			return false;
+
+		Weapon::Type weapon = player.get_stats().get_weapontype();
+		bool degenerate =
+				weapon == Weapon::BOW || weapon == Weapon::CROSSBOW || weapon == Weapon::CLAW || weapon == Weapon::GUN;
+		Stance::Id stance = player.get_look().get_attackstance(degenerate);
+
+		if (stance == Stance::Id::NONE)
+			return false;
+
+		Rectangle<int16_t> reach = player.get_afterimage_range(stance);
+
+		if (degenerate)
+			reach = point_blank::range(reach);
+
+		Attack attack = player.prepare_attack(0, degenerate);
+		Rectangle<int16_t> range = place_range(attack.origin, reach, 1.0f, attack.toleft);
+
+		// The reactors in the order they entered the map.
+		MapObjects *objs = reactors.get_reactors();
+		std::vector<std::pair<uint32_t, Reactor *>> order;
+
+		for (auto &mmo : *objs)
+			if (mmo.second)
+				order.emplace_back(objs->entry_order(mmo.first), static_cast<Reactor *>(mmo.second.get()));
+
+		std::sort(order.begin(), order.end(), [](const auto &a, const auto &b) { return a.first < b.first; });
+
+		std::vector<reactor_rules::Box> boxes;
+
+		for (auto &entry : order)
+			boxes.push_back(entry.second->get_swing_box());
+
+		reactor_rules::Box area{ range.left(), range.top(), range.right(), range.bottom() };
+		int32_t index = reactor_rules::pick_target(boxes, area, player.get_position().x(), attack.toleft);
+
+		if (index < 0)
+			return false;
+
+		player.attack(degenerate, stance);
+		player.set_afterimage(0);
+		regularattack.apply_stats(player, attack);
+
+		AttackResult result = attack;
+		result.attacker = player.get_oid();
+		AttackPacket(result, player.get_position()).dispatch();
+
+		// The hit lands as the swing does.
+		int32_t flags = reactor_rules::flags(attack.toleft, player.get_phobj().onground);
+		uint16_t delay = player.get_attackdelay(0);
+		Reactor *reactor = order[index].second;
+
+		reactor->swing(flags, delay);
+		DamageReactorPacket(reactor->get_oid(), 0, flags, static_cast<int16_t>(delay), 0).dispatch();
+
+		return true;
 	}
 
 	Stance::Id Combat::find_whack(const Attack &attack, int16_t &reach) const
@@ -1015,7 +1077,7 @@ namespace ms
 		reach = -range.left();
 		range = place_range(attack.origin, range, 1.0f, attack.toleft);
 
-		if (find_targets(mobs.get_mobs(), range, attack.origin, 1, true, true).empty())
+		if (find_targets(mobs.get_mobs(), range, attack.origin, 1, true).empty())
 			return Stance::Id::NONE;
 
 		return stance;
@@ -1156,33 +1218,19 @@ namespace ms
 
 	std::vector<int32_t>
 	Combat::find_targets(MapObjects *objs, Rectangle<int16_t> range, Point<int16_t> origin, uint8_t objcount,
-						 bool use_mobs, bool closest_first) const
+						 bool closest_first) const
 	{
 		std::multimap<uint32_t, int32_t> candidates;
 
 		for (auto &mmo : *objs)
 		{
-			if (use_mobs)
-			{
-				const Mob *mob = static_cast<const Mob *>(mmo.second.get());
+			const Mob *mob = static_cast<const Mob *>(mmo.second.get());
 
-				if (mob && mob->is_alive() && mob->is_in_range(range))
-				{
-					int32_t oid = mob->get_oid();
-					uint32_t key = closest_first ? mob->get_position().distance(origin) : objs->entry_order(oid);
-					candidates.emplace(key, oid);
-				}
-			} else
+			if (mob && mob->is_alive() && mob->is_in_range(range))
 			{
-				// Assume Reactor
-				const Reactor *reactor = static_cast<const Reactor *>(mmo.second.get());
-
-				if (reactor && reactor->is_hittable() && reactor->is_in_range(range))
-				{
-					int32_t oid = reactor->get_oid();
-					uint32_t key = closest_first ? reactor->get_position().distance(origin) : objs->entry_order(oid);
-					candidates.emplace(key, oid);
-				}
+				int32_t oid = mob->get_oid();
+				uint32_t key = closest_first ? mob->get_position().distance(origin) : objs->entry_order(oid);
+				candidates.emplace(key, oid);
 			}
 		}
 
@@ -2574,7 +2622,7 @@ namespace ms
 		attack.origin = position;
 
 		Rectangle<int16_t> range = place_range(position, attack.range, 1.0f, attack.toleft);
-		std::vector<int32_t> targets = find_targets(mobs.get_mobs(), range, position, attack.mobcount, true, false);
+		std::vector<int32_t> targets = find_targets(mobs.get_mobs(), range, position, attack.mobcount, false);
 
 		AttackResult result = attack;
 		mobs.send_attack(result, attack, targets, attack.mobcount);

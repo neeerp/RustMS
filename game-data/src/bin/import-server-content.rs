@@ -18,6 +18,9 @@ const MAPPING: &str = include_str!("../../server_content.toml");
 
 #[derive(Deserialize)]
 struct Mapping {
+    /// Keys with no source, which keep their placeholders.
+    #[serde(default)]
+    unsourced: Vec<String>,
     text: BTreeMap<String, TextSource>,
     rewards: DirectorySource,
     shops: DirectorySource,
@@ -58,7 +61,7 @@ fn main() -> ExitCode {
 fn run(sources: &Path, pack: &Path) -> Result<(), String> {
     let mapping: Mapping = toml::from_str(MAPPING).map_err(|e| e.to_string())?;
     for key in keys::all() {
-        if !mapping.text.contains_key(&key) {
+        if !mapping.text.contains_key(&key) && !mapping.unsourced.contains(&key) {
             return Err(format!("server_content.toml has no source for {key}"));
         }
     }

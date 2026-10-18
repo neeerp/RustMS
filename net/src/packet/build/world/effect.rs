@@ -47,6 +47,28 @@ pub fn build_foreign_effect(character_id: i32, effect: CharEffect) -> Result<Pac
     Ok(p)
 }
 
+/// SHOW_SCROLL_EFFECT (0xA7, v83 FUN_0093354d): the glow, sound and (for
+/// the scroller) chat line of a scroll on `character_id`. `success` is 1 or
+/// 0, or -1 to refuse a Legendary Spirit request; `cursed` means the item was
+/// destroyed; `legendary` answers a Legendary Spirit request, which only the
+/// skill's open dialog can show; `white` means a White Scroll was used.
+pub fn build_scroll_effect(
+    character_id: i32,
+    success: i8,
+    cursed: bool,
+    legendary: bool,
+    white: bool,
+) -> Result<Packet, NetworkError> {
+    let mut p = Packet::new_empty();
+    p.write_short(SendOpcode::ShowScrollEffect as i16)?;
+    p.write_int(character_id)?;
+    p.write_byte(success as u8)?;
+    p.write_byte(u8::from(cursed))?;
+    p.write_byte(u8::from(legendary))?;
+    p.write_byte(u8::from(white))?;
+    Ok(p)
+}
+
 /// PLAYER_HINT: an instruction balloon above the player.
 pub fn build_hint(text: &str, width: i16, height: i16) -> Result<Packet, NetworkError> {
     let mut p = Packet::new_empty();
@@ -100,6 +122,17 @@ mod tests {
             .int(7)
             .byte(0);
         expect.end();
+    }
+
+    #[test]
+    fn scroll_effect_has_the_outcome_bytes() {
+        let packet = build_scroll_effect(7, 1, false, false, true).unwrap();
+        let mut expect = Expect::new(&packet.bytes);
+        expect.short(SendOpcode::ShowScrollEffect as i16).int(7);
+        expect.byte(1).byte(0).byte(0).byte(1);
+        expect.end();
+        let refusal = build_scroll_effect(7, -1, false, true, false).unwrap();
+        assert_eq!(&refusal.bytes[6..], &[0xFF, 0, 1, 0]);
     }
 
     #[test]

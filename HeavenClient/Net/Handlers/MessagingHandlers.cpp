@@ -21,6 +21,7 @@
 
 #include "../../Configuration.h"
 #include "../../Audio/Audio.h"
+#include "../../Character/Inventory/ScrollRules.h"
 #include "../../Data/CurseData.h"
 #include "../../Data/ItemData.h"
 #include "../../Data/SwindleData.h"
@@ -507,41 +508,28 @@ namespace ms
 		}
 	}
 
+	// v83 FUN_0093354d. Everyone sees the glow and hears the sound; the
+	// scroller also reads the outcome in the chat log. The Legendary Spirit's
+	// result (legendary = 1) belongs to its dialog, which HeavenClient lacks.
+	// The inventory operation, not this, answers the scroller's request.
 	void ScrollResultHandler::handle(InPacket& recv) const
 	{
 		int32_t cid = recv.read_int();
-		bool success = recv.read_bool();
-		bool destroyed = recv.read_bool();
+		bool success = recv.read_byte() != 0;
+		bool cursed = recv.read_bool();
+		bool legendary = recv.read_bool();
+		bool whitescroll = recv.read_bool();
+		bool own = Stage::get().is_player(cid);
 
-		recv.read_short(); // Legendary spirit if 1
+		if (own && legendary)
+			return;
 
-		CharEffect::Id effect;
-		Messages::Type message;
+		Sound(success ? Sound::Name::ENCHANTSUCCESS : Sound::Name::ENCHANTFAILURE).play();
+		Stage::get().show_character_effect(cid, success ? CharEffect::Id::SCROLL_SUCCESS : CharEffect::Id::SCROLL_FAILURE);
 
-		if (success)
-		{
-			effect = CharEffect::Id::SCROLL_SUCCESS;
-			message = Messages::Type::SCROLL_SUCCESS;
-		}
-		else
-		{
-			effect = CharEffect::Id::SCROLL_FAILURE;
-
-			if (destroyed)
-				message = Messages::Type::SCROLL_DESTROYED;
-			else
-				message = Messages::Type::SCROLL_FAILURE;
-		}
-
-		Stage::get().show_character_effect(cid, effect);
-
-		if (Stage::get().is_player(cid))
-		{
+		if (own)
 			if (auto chatbar = UI::get().get_element<UIChatBar>())
-				chatbar->display_message(message, UIChatBar::LineType::RED);
-
-			UI::get().enable();
-		}
+				chatbar->send_chatline(scroll_rules::result_text(success, cursed, whitescroll), UIChatBar::LineType::SKILL);
 	}
 
 	void PlayerHintHandler::handle(InPacket& recv) const

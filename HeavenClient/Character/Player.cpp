@@ -1130,6 +1130,24 @@ namespace ms
 		return buddies;
 	}
 
+	Guild &Player::get_guild()
+	{
+		return guild;
+	}
+
+	const Guild &Player::get_guild() const
+	{
+		return guild;
+	}
+
+	void Player::show_guild()
+	{
+		const GuildData &data = guild.get_data();
+
+		set_guild_name(guild.exists() ? data.name : "");
+		set_guild_emblem(data.emblem);
+	}
+
 	Optional<const Ladder> Player::get_ladder() const
 	{
 		return ladder;

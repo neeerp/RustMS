@@ -69,10 +69,12 @@ namespace ms
 								  bool formatted, int16_t line_adj, const std::vector<Point<int16_t>> &boxes);
 
 		// Draw a text with the given parameters, up to character `reveal`,
-		// and the [first, last) ranges in `shown` whatever `reveal` is.
+		// and the [first, last) ranges in `shown` whatever `reveal` is. A
+		// non-empty `horizontal` cuts the glyphs to those screen columns.
 		void drawtext(const DrawArgument &args, const Range<int16_t> &vertical, const std::string &text,
 					  const Text::Layout &layout, Text::Font font, Color::Name color, Text::Background back,
-					  size_t reveal, const std::vector<std::pair<size_t, size_t>> &shown = {});
+					  size_t reveal, const std::vector<std::pair<size_t, size_t>> &shown = {},
+					  const Range<int16_t> &horizontal = {});
 
 		// Draw a rectangle filled with the specified color.
 		void drawrectangle(int16_t x, int16_t y, int16_t width, int16_t height, float red, float green, float blue,

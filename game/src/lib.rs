@@ -7,6 +7,7 @@
 pub mod buff;
 pub mod character;
 pub mod exp;
+pub mod guild;
 pub mod inventory;
 pub mod keymap;
 pub mod mob_damage;
@@ -14,11 +15,13 @@ pub mod mob_skill;
 pub mod mob_stat;
 pub mod monster_book;
 pub mod quest;
+pub mod scroll;
 pub mod skill;
 pub mod storage;
 
 pub use buff::{Buff, BuffStat, Buffs, Disease, ShownBuff};
 pub use character::{ApStat, AvatarLook, CharacterStats, FieldAvatar, Player};
+pub use guild::{Guild, GuildMember, GuildTag};
 pub use inventory::{EquipStats, Inventory, InventoryChange, InventoryError, InventoryType, Item};
 pub use keymap::{KeyBinding, Keymap};
 pub use mob_stat::MobStat;

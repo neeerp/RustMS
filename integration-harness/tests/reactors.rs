@@ -19,7 +19,7 @@ const MATERIALS: [i32; 2] = [4031161, 4031162];
 async fn break_box(c: &mut MapleTestConnection, trace: &mut Trace, target: MapReactor) {
     send(c, walk_to(target.x, target.y)).await;
     for hit in 1..=4u8 {
-        send(c, hit_reactor(target.object_id, target.x, target.y)).await;
+        send(c, hit_reactor(target.object_id)).await;
         if hit < 4 {
             until(c, trace, |t| {
                 t.field.reactor_hits.contains(&(target.object_id, hit))
@@ -28,7 +28,7 @@ async fn break_box(c: &mut MapleTestConnection, trace: &mut Trace, target: MapRe
         }
     }
     until(c, trace, |t| {
-        t.field.reactors_removed.contains(&(target.object_id, 3))
+        t.field.reactors_removed.contains(&(target.object_id, 4))
     })
     .await;
     // Give the loot time to fall.
@@ -64,7 +64,7 @@ async fn amherst_boxes_break_and_drop_pios_materials_during_his_quest() {
 
     // A box can't be hit from across the map.
     send(c, walk_to(first.x + 1000, first.y)).await;
-    send(c, hit_reactor(first.object_id, first.x, first.y)).await;
+    send(c, hit_reactor(first.object_id)).await;
     read_for(c, &mut trace, 400).await;
     assert!(trace.field.reactor_hits.is_empty());
 
@@ -75,7 +75,7 @@ async fn amherst_boxes_break_and_drop_pios_materials_during_his_quest() {
     }
     // A broken box takes no more hits.
     let hits = trace.field.reactor_hits.len();
-    send(c, hit_reactor(first.object_id, first.x, first.y)).await;
+    send(c, hit_reactor(first.object_id)).await;
     read_for(c, &mut trace, 400).await;
     assert_eq!(trace.field.reactor_hits.len(), hits);
 

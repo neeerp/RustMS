@@ -42,11 +42,6 @@ namespace ms
 			DOOR_PORTAL,
 			// Attacking without a weapon
 			ATTACK_NOWEAPON,
-
-			// Scrolling result
-					SCROLL_SUCCESS,
-			SCROLL_FAILURE,
-			SCROLL_DESTROYED,
 			LENGTH
 		};
 

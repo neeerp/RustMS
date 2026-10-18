@@ -27,9 +27,11 @@
 #include "../Components/MapleButton.h"
 
 #include "../../Configuration.h"
+#include "../../Constants.h"
 
 #include "../../Character/Job.h"
 #include "../../Gameplay/Stage.h"
+#include "../../Graphics/GraphicsGL.h"
 #include "../../Util/NxFiles.h"
 
 #include "../../Net/Packets/GameplayPackets.h"
@@ -80,6 +82,107 @@ namespace ms
 		constexpr int16_t BUDDY_BUTTON_GAP = 7;
 		constexpr int16_t BUTTONS_RIGHT = 299;
 		const char* DEFAULT_GROUP = "Default Group";
+
+		// The guild tab, as the client lays it out (FUN_0090f17c). The
+		// client places text by its top; HeavenClient's 5 pixels lower.
+		constexpr int16_t CLIENT_TEXT = -5;
+		// The header: the guild's emblem and name, centred, then the notice.
+		constexpr Point<int16_t> GUILD_HEADER = Point<int16_t>(5, 55);
+		constexpr int16_t GUILD_HEADER_WIDTH = 306;
+		constexpr int16_t EMBLEM_SPACE = 26;
+		constexpr int16_t GUILD_NAME_Y = 3;
+		constexpr Point<int16_t> NOTICE_BOX = Point<int16_t>(5, 80);
+		constexpr Point<int16_t> NOTICE_LABEL = Point<int16_t>(13, 85);
+		// A notice scrolls left through its strip a pixel each 30 ms update,
+		// and starts over once it has left (FUN_00910dde).
+		constexpr Point<int16_t> TICKER = Point<int16_t>(10, 85);
+		constexpr int16_t TICKER_WIDTH = 270;
+		constexpr int16_t TICKER_START = 250;
+		constexpr uint16_t TICKER_STEP = 30;
+		// The member list scrolls through its view 33 pixels a step.
+		constexpr Point<int16_t> GUILD_LIST = Point<int16_t>(6, 113);
+		constexpr int16_t GUILD_VIEW = 192;
+		constexpr int16_t GUILD_STEP = 33;
+		constexpr Range<int16_t> GUILD_SLIDER = Range<int16_t>(113, 292);
+		constexpr int16_t GUILD_SLIDER_X = 290;
+		// Each section: a header, then, unless folded, column headings, a
+		// page of rows (or "none") and an end line.
+		constexpr int16_t GUILD_SECTION_HEADER = 27;
+		constexpr int16_t GUILD_COLUMNS_GAP = 4;
+		constexpr int16_t GUILD_END = 1;
+		constexpr int16_t GUILD_SECTION_GAP = 10;
+		constexpr int16_t MEMBERS_PER_PAGE = 20;
+		// In a section's header.
+		constexpr Point<int16_t> GUILD_COUNT = Point<int16_t>(185, 6);
+		constexpr Point<int16_t> GUILD_PAGE = Point<int16_t>(261, 6);
+		constexpr Point<int16_t> GUILD_FOLD = Point<int16_t>(172, 8);
+		constexpr int16_t PAGE_BUTTON = 13;
+		// In a member's row.
+		constexpr int16_t MEMBER_NAME_X = 10;
+		constexpr int16_t MEMBER_JOB_X = 100;
+		constexpr int16_t MEMBER_LEVEL_X = 170;
+		constexpr int16_t MEMBER_TITLE_X = 210;
+		constexpr int16_t MEMBER_TEXT_Y = 4;
+		constexpr int16_t MEMBER_JOB_WIDTH = 67;
+		constexpr int16_t GUILD_ROW_WIDTH = 281;
+		// A picked row is filled from its second column (0xFF244768).
+		constexpr int16_t PICKED_LEFT = 1;
+		constexpr int16_t PICKED_WIDTH = GUILD_ROW_WIDTH - PICKED_LEFT;
+		constexpr float PICKED_RED = 0x24 / 255.0f;
+		constexpr float PICKED_GREEN = 0x47 / 255.0f;
+		constexpr float PICKED_BLUE = 0x68 / 255.0f;
+		// Every guild button shows on the tab; ranks only grey them out.
+		// In the order of the guild buttons in Buttons.
+		const std::pair<const char*, Point<int16_t>> GUILD_BUTTONS[] = {
+				{ "BtInvite", Point<int16_t>(9, 316) },
+				{ "BtWithdraw", Point<int16_t>(80, 316) },
+				{ "BtKick", Point<int16_t>(159, 336) },
+				{ "BtUp", Point<int16_t>(9, 336) },
+				{ "BtDown", Point<int16_t>(80, 336) },
+				{ "BtWhere", Point<int16_t>(159, 316) },
+				{ "BtChat", Point<int16_t>(238, 336) },
+				{ "BtInfo", Point<int16_t>(238, 363) },
+				{ "BtWhisper", Point<int16_t>(238, 316) },
+				{ "Btnotice", Point<int16_t>(287, 80) },
+				{ "BtPartyInvite", Point<int16_t>(159, 363) },
+				{ "BtGuildBBS", Point<int16_t>(80, 363) }
+		};
+		// A guild section's buttons, from BT_GUILD_SECTION.
+		enum SectionButton : uint16_t
+		{
+			FOLD,
+			UNFOLD,
+			PREVIOUS_PAGE,
+			NEXT_PAGE,
+			SECTION_BUTTONS
+		};
+
+		// `text` cut to `width`, with `tail` after it if cut.
+		std::string fit(Text::Font font, const std::string& text, int16_t width, const std::string& tail)
+		{
+			Text measure(font, Text::Alignment::LEFT, Color::Name::BLACK, text, 0, false);
+
+			if (measure.width() <= width)
+				return text;
+
+			std::string cut = text;
+
+			while (!cut.empty())
+			{
+				cut.pop_back();
+				measure.change_text(cut + tail);
+
+				if (measure.width() <= width)
+					break;
+			}
+
+			return cut + tail;
+		}
+
+		std::string fraction(size_t part, size_t whole)
+		{
+			return "[" + std::to_string(part) + "/" + std::to_string(whole) + "]";
+		}
 	}
 
 	bool UIUserList::Shown::operator==(const Shown& other) const
@@ -90,14 +193,16 @@ namespace ms
 
 	UIUserList::UIUserList(uint16_t t)
 			: UIDragElement<PosUSERLIST>(), tab(t), party(Stage::get().get_player().get_party()),
-			  buddies(Stage::get().get_player().get_buddies())
+			  buddies(Stage::get().get_player().get_buddies()), guild(Stage::get().get_player().get_guild())
 	{
 		nl::node UserList = NxFiles::ui_classic["UIWindow.img"]["UserList"];
 		nl::node Party = UserList["Party"];
 		nl::node Friend = UserList["Friend"];
+		nl::node GuildInfo = UserList["Guild"]["GuildInfo"];
 		nl::node backgrnd = UserList["backgrnd"];
 
-		sprites.emplace_back(backgrnd);
+		background = backgrnd;
+		guild_background = UserList["backgrnd2"];
 
 		tabs = ClassicTabs(ClassicTabs::TAB5, UserList["Tab"]["enabled"], UserList["Tab"]["disabled"], TAB_FILL);
 
@@ -165,17 +270,64 @@ namespace ms
 		offline.count = Text(Text::Font::A11M, Text::Alignment::RIGHT, Color::Name::WHITE);
 		none = Text(Text::Font::A12M, Text::Alignment::LEFT, Color::Name::BLACK, "none");
 
+		for (uint16_t i = 0; i < std::size(GUILD_BUTTONS); i++)
+		{
+			// The client places these by their top left, whatever the art's
+			// origin, which only BtGuildBBS and BtInfo set.
+			auto [name, pos] = GUILD_BUTTONS[i];
+			nl::node button = GuildInfo[name];
+			buttons[Buttons::BT_GUILD_INVITE + i] = std::make_unique<MapleButton>(button,
+																				   pos + Texture(button["normal"]["0"]).get_origin());
+		}
+
+		nl::node Basic = NxFiles::ui_classic["Basic.img"];
+		nl::node itemSearch = NxFiles::ui_classic["UIWindow.img"]["itemSearch"];
+
+		for (uint16_t s = 0; s < 2; s++)
+		{
+			uint16_t first = Buttons::BT_GUILD_SECTION + s * SectionButton::SECTION_BUTTONS;
+
+			buttons[first + SectionButton::FOLD] = std::make_unique<MapleButton>(Basic["BtMin"]);
+			buttons[first + SectionButton::UNFOLD] = std::make_unique<MapleButton>(Basic["BtMax"]);
+			buttons[first + SectionButton::PREVIOUS_PAGE] = std::make_unique<MapleButton>(itemSearch["BtLeft"]);
+			buttons[first + SectionButton::NEXT_PAGE] = std::make_unique<MapleButton>(itemSearch["BtRight"]);
+		}
+
+		guild_online.header = GuildInfo["guildinfo0"];
+		guild_offline.header = GuildInfo["guildinfo1"];
+		guild_columns = GuildInfo["guildinfo2"];
+		guild_row = GuildInfo["guildinfo3"];
+		guild_end = GuildInfo["guildinfo4"];
+		notice_box = GuildInfo["guildinfo6"];
+		guild_frame = GuildInfo["guildmark"];
+
+		for (GuildSection* section : { &guild_online, &guild_offline })
+		{
+			section->count = Text(Text::Font::A12M, Text::Alignment::LEFT, Color::Name::WHITE);
+			section->page_text = Text(Text::Font::A12M, Text::Alignment::RIGHT, Color::Name::WHITE);
+		}
+
+		guild_name = Text(Text::Font::A12M, Text::Alignment::LEFT, Color::Name::BLACK);
+		no_guild = Text(Text::Font::A12M, Text::Alignment::LEFT, Color::Name::BLACK, "You are not in the guild.");
+		notice_label = Text(Text::Font::A12M, Text::Alignment::LEFT, Color::Name::BLACK, "* Guild Notice");
+		notice = Text(Text::Font::A12M, Text::Alignment::LEFT, Color::Name::BLACK, "", 0, false);
+
+		guild_slider = Slider(Slider::Type::CLASSIC, GUILD_SLIDER, GUILD_SLIDER_X, 1, 0,
+							  [&](bool up) { scroll_guild(guild_scroll + (up ? -1 : 1)); });
+
 		dimension = Texture(backgrnd).get_dimensions();
 		dragarea = Point<int16_t>(dimension.x(), 20);
 
 		rebuild();
 		rebuild_buddies();
+		rebuild_guild();
 		change_tab(tab);
 	}
 
 	void UIUserList::draw(float alpha) const
 	{
-		UIElement::draw_sprites(alpha);
+		bool guild_art = tab == Tab::GUILD || tab == Tab::ALLIANCE;
+		(guild_art ? guild_background : background).draw(position);
 
 		tabs.draw(position + TAB_STRIP, Tab::NUM_TABS, tab);
 
@@ -191,8 +343,115 @@ namespace ms
 			if (show_all)
 				draw_buddies(buddies_offline, offline_row, false);
 		}
+		else if (tab == Tab::GUILD)
+		{
+			draw_guild();
+		}
 
 		UIElement::draw_buttons(alpha);
+	}
+
+	void UIUserList::draw_guild() const
+	{
+		Point<int16_t> header = position + GUILD_HEADER;
+
+		if (guild.exists())
+		{
+			int16_t x = (GUILD_HEADER_WIDTH - guild_name.width() - EMBLEM_SPACE) / 2;
+
+			if (emblem_marked)
+				emblem.draw(header + Point<int16_t>(x, 1));
+			else
+				guild_frame.draw(header + Point<int16_t>(x, 0));
+
+			guild_name.draw(header + Point<int16_t>(x + EMBLEM_SPACE, GUILD_NAME_Y + CLIENT_TEXT));
+		}
+		else
+		{
+			int16_t x = (GUILD_HEADER_WIDTH - no_guild.width()) / 2;
+			no_guild.draw(header + Point<int16_t>(x, GUILD_NAME_Y + CLIENT_TEXT));
+		}
+
+		notice_box.draw(position + NOTICE_BOX);
+
+		if (guild.exists())
+		{
+			if (shown_guild.notice.empty())
+			{
+				notice_label.draw(position + NOTICE_LABEL + Point<int16_t>(0, CLIENT_TEXT));
+			}
+			else
+			{
+				Point<int16_t> strip = position + TICKER;
+				notice.draw_between(strip + Point<int16_t>(ticker_x, CLIENT_TEXT),
+									Range<int16_t>(strip.x(), strip.x() + TICKER_WIDTH));
+			}
+		}
+
+		// The list is laid out in its own space, from 0 down, and shows
+		// through a view the slider moves.
+		int16_t view_top = guild_scroll * GUILD_STEP;
+		int16_t view_bottom = view_top + GUILD_VIEW;
+		Point<int16_t> list = position + GUILD_LIST - Point<int16_t>(0, view_top);
+		Range<int16_t> screen_rows = Range<int16_t>(position.y() + GUILD_LIST.y(),
+													position.y() + GUILD_LIST.y() + GUILD_VIEW);
+
+		auto art = [&](const Texture& texture, int16_t y)
+		{
+			int16_t from = std::max<int16_t>(0, view_top - y);
+			int16_t to = std::min<int16_t>(texture.height(), view_bottom - y);
+
+			if (from < to)
+				texture.draw(list + Point<int16_t>(0, y), Rectangle<int16_t>(0, texture.width(), from, to));
+		};
+
+		auto words = [&](const Text& text, int16_t x, int16_t y)
+		{
+			if (y + text.height() > view_top && y < view_bottom)
+				text.draw(list + Point<int16_t>(x, y + CLIENT_TEXT), screen_rows);
+		};
+
+		for (const GuildSection* section : { &guild_online, &guild_offline })
+		{
+			art(section->header, section->top);
+			words(section->count, GUILD_COUNT.x(), section->top + GUILD_COUNT.y());
+			words(section->page_text, GUILD_PAGE.x(), section->top + GUILD_PAGE.y());
+
+			if (!section->expanded)
+				continue;
+
+			art(guild_columns, section->first - COLUMNS);
+
+			if (section->rows.empty())
+			{
+				art(guild_row, section->first);
+				words(none, MEMBER_NAME_X, section->first + MEMBER_TEXT_Y);
+			}
+
+			for (const GuildRow& row : section->rows)
+			{
+				art(guild_row, row.y);
+
+				if (row.id == guild_picked)
+				{
+					int16_t top = std::max(row.y, view_top);
+					int16_t bottom = std::min<int16_t>(row.y + ROW, view_bottom);
+
+					if (top < bottom)
+						GraphicsGL::get().drawrectangle(list.x() + PICKED_LEFT, list.y() + top, PICKED_WIDTH,
+														bottom - top, PICKED_RED, PICKED_GREEN, PICKED_BLUE, 1.0f);
+				}
+
+				words(row.name, MEMBER_NAME_X, row.y + MEMBER_TEXT_Y);
+				words(row.job, MEMBER_JOB_X, row.y + MEMBER_TEXT_Y);
+				words(row.level, MEMBER_LEVEL_X, row.y + MEMBER_TEXT_Y);
+				words(row.title, MEMBER_TITLE_X, row.y + MEMBER_TEXT_Y);
+			}
+
+			art(guild_end, section->end);
+		}
+
+		guild_slider.draw(position);
 	}
 
 	void UIUserList::draw_section(const Section& section) const
@@ -279,6 +538,18 @@ namespace ms
 		if (buddies.get_buddies() != shown_buddies)
 			rebuild_buddies();
 
+		if (!(guild.get_data() == shown_guild))
+			rebuild_guild();
+
+		if (guild.exists() && !shown_guild.notice.empty())
+		{
+			ticker_time += Constants::TIMESTEP;
+
+			for (; ticker_time >= TICKER_STEP; ticker_time -= TICKER_STEP)
+				if (--ticker_x + notice.width() < 0)
+					ticker_x = TICKER_START;
+		}
+
 		update_buttons();
 	}
 
@@ -293,6 +564,35 @@ namespace ms
 			filter_clicked = false;
 
 		Point<int16_t> cursor_relative = cursorpos - position;
+
+		if (tab == Tab::GUILD)
+		{
+			if (Cursor::State state = guild_slider.send_cursor(cursor_relative, clicked))
+				return state;
+
+			Point<int16_t> in_view = cursor_relative - GUILD_LIST;
+
+			if (clicked && in_view.x() >= 0 && in_view.x() < GUILD_ROW_WIDTH && in_view.y() >= 0 &&
+				in_view.y() < GUILD_VIEW)
+			{
+				int16_t y = in_view.y() + guild_scroll * GUILD_STEP;
+
+				for (const GuildSection* section : { &guild_online, &guild_offline })
+				{
+					for (const GuildRow& row : section->rows)
+					{
+						if (y >= row.y && y < row.y + ROW)
+						{
+							guild_picked = row.id;
+							rebuild_guild();
+							update_buttons();
+
+							return Cursor::State::IDLE;
+						}
+					}
+				}
+			}
+		}
 
 		if (clicked && tab == Tab::PARTY)
 		{
@@ -350,6 +650,12 @@ namespace ms
 		}
 	}
 
+	void UIUserList::send_scroll(double yoffset)
+	{
+		if (tab == Tab::GUILD)
+			guild_slider.send_scroll(yoffset);
+	}
+
 	UIElement::Type UIUserList::get_type() const
 	{
 		return TYPE;
@@ -359,6 +665,10 @@ namespace ms
 	{
 		buttons[Buttons::BT_TAB0 + tab]->set_state(Button::State::NORMAL);
 		buttons[Buttons::BT_TAB0 + tabid]->set_state(Button::State::PRESSED);
+
+		if (tabid != tab)
+			guild_picked = 0;
+
 		tab = tabid;
 
 		for (uint16_t i = Buttons::BT_HP; i <= Buttons::BT_INVITE; i++)
@@ -371,6 +681,11 @@ namespace ms
 		buttons[Buttons::BT_SHOW_ONLINE]->set_active(tab == Tab::FRIEND && show_all);
 		buttons[Buttons::BT_SHOW_ALL]->set_active(tab == Tab::FRIEND && !show_all);
 
+		for (uint16_t i = Buttons::BT_GUILD_INVITE; i <= Buttons::BT_GUILD_BBS; i++)
+			buttons[i]->set_active(tab == Tab::GUILD);
+
+		// Also shows or hides the section buttons.
+		rebuild_guild();
 		update_buttons();
 	}
 
@@ -483,8 +798,49 @@ namespace ms
 				}
 
 				break;
+			case Buttons::BT_GUILD_WHISPER:
+				if (const GuildMember* picked = picked_online_member())
+					if (auto chatbar = UI::get().get_element<UIChatBar>())
+						chatbar->start_whisper(picked->name);
+
+				break;
+			case Buttons::BT_GUILD_CHAT:
+				if (auto chatbar = UI::get().get_element<UIChatBar>())
+					chatbar->set_target(UIChatBar::Target::GUILD);
+
+				break;
+			case Buttons::BT_GUILD_PARTY_INVITE:
+				if (const GuildMember* picked = picked_online_member())
+					PartyCommands::invite(picked->name);
+
+				break;
 			default:
-				if (buttonid >= Buttons::BT_TAB0 && buttonid < Buttons::BT_TAB0 + Tab::NUM_TABS)
+				if (buttonid >= Buttons::BT_GUILD_SECTION && buttonid < Buttons::BT_TAB0)
+				{
+					uint16_t index = buttonid - Buttons::BT_GUILD_SECTION;
+					GuildSection& section = index < SectionButton::SECTION_BUTTONS ? guild_online : guild_offline;
+
+					switch (index % SectionButton::SECTION_BUTTONS)
+					{
+						case SectionButton::FOLD:
+						case SectionButton::UNFOLD:
+							section.expanded = !section.expanded;
+							break;
+						case SectionButton::PREVIOUS_PAGE:
+							section.page--;
+							break;
+						case SectionButton::NEXT_PAGE:
+							section.page++;
+							break;
+					}
+
+					rebuild_guild();
+
+					// The last page disables its own arrow.
+					if (buttons[buttonid]->get_state() == Button::State::DISABLED)
+						return Button::State::DISABLED;
+				}
+				else if (buttonid >= Buttons::BT_TAB0 && buttonid < Buttons::BT_TAB0 + Tab::NUM_TABS)
 				{
 					change_tab(buttonid - Buttons::BT_TAB0);
 
@@ -679,6 +1035,19 @@ namespace ms
 		enable(Buttons::BT_BUDDY_MAP, false);
 		// Inviting someone makes a party first if the player has none.
 		enable(Buttons::BT_INVITE_BUDDY, buddy && buddy->online() && party_has_room);
+
+		// The client's rules for the rest (FUN_0090f17c) need guild
+		// operations the server doesn't have yet.
+		const GuildMember* guild_member = picked_online_member();
+
+		for (uint16_t id : { Buttons::BT_GUILD_INVITE, Buttons::BT_GUILD_WITHDRAW, Buttons::BT_GUILD_KICK,
+							 Buttons::BT_GUILD_UP, Buttons::BT_GUILD_DOWN, Buttons::BT_GUILD_WHERE,
+							 Buttons::BT_GUILD_INFO, Buttons::BT_GUILD_NOTICE, Buttons::BT_GUILD_BBS })
+			enable(id, false);
+
+		enable(Buttons::BT_GUILD_CHAT, guild_member);
+		enable(Buttons::BT_GUILD_WHISPER, guild_member);
+		enable(Buttons::BT_GUILD_PARTY_INVITE, guild_member && leader);
 	}
 
 	const PartyMember* UIUserList::selected_member() const
@@ -687,5 +1056,159 @@ namespace ms
 			return nullptr;
 
 		return party.find(selected);
+	}
+
+	void UIUserList::rebuild_guild()
+	{
+		const GuildData& data = guild.get_data();
+
+		if (data.notice != shown_guild.notice)
+		{
+			ticker_x = TICKER_START;
+			ticker_time = 0;
+		}
+
+		shown_guild = data;
+
+		if (!guild.find(guild_picked))
+			guild_picked = 0;
+
+		guild_name.change_text(shown_guild.name);
+		emblem = GuildMark(shown_guild.emblem);
+		// The client draws the emblem only with a mark, and the empty frame
+		// otherwise.
+		emblem_marked = shown_guild.emblem.mark != 0;
+		notice.change_text(shown_guild.notice);
+
+		std::vector<const GuildMember*> online_members, offline_members;
+
+		for (const GuildMember& member : shown_guild.members)
+			(member.online ? online_members : offline_members).push_back(&member);
+
+		size_t total = shown_guild.members.size();
+		guild_online.count.change_text(fraction(online_members.size(), total));
+		guild_offline.count.change_text(fraction(offline_members.size(), total));
+
+		int16_t next = lay_out(guild_online, online_members, 0);
+		guild_height = lay_out(guild_offline, offline_members, next + GUILD_SECTION_GAP);
+
+		scroll_guild(guild_scroll);
+	}
+
+	int16_t UIUserList::lay_out(GuildSection& section, const std::vector<const GuildMember*>& members, int16_t y)
+	{
+		int16_t count = static_cast<int16_t>(members.size());
+
+		section.top = y;
+		section.pages = std::max<int16_t>(1, (count + MEMBERS_PER_PAGE - 1) / MEMBERS_PER_PAGE);
+		section.page = std::clamp<int16_t>(section.page, 1, section.pages);
+		section.page_text.change_text(fraction(section.page, section.pages));
+		section.rows.clear();
+
+		y += GUILD_SECTION_HEADER;
+
+		if (!section.expanded)
+			return y;
+
+		y += GUILD_COLUMNS_GAP + COLUMNS;
+		section.first = y;
+
+		int16_t last = std::min<int16_t>(count, section.page * MEMBERS_PER_PAGE);
+
+		for (int16_t i = (section.page - 1) * MEMBERS_PER_PAGE; i < last; i++)
+		{
+			const GuildMember& member = *members[i];
+			Color::Name color = member.id == guild_picked ? Color::Name::WHITE : Color::Name::BLACK;
+			std::string job = member.job < 0
+							  ? "??"
+							  : fit(Text::Font::A12M, Job(static_cast<uint16_t>(member.job)).get_name(),
+									MEMBER_JOB_WIDTH, "..");
+			std::string level = member.level < 0 ? "??" : std::to_string(member.level);
+
+			section.rows.push_back({
+					member.id,
+					y,
+					Text(Text::Font::A12M, Text::Alignment::LEFT, color, member.name),
+					Text(Text::Font::A12M, Text::Alignment::LEFT, color, job),
+					Text(Text::Font::A12M, Text::Alignment::LEFT, color, level),
+					Text(Text::Font::A12M, Text::Alignment::LEFT, color, guild.title(member.rank))
+			});
+
+			y += ROW;
+		}
+
+		if (count == 0)
+			y += ROW;
+
+		section.end = y;
+
+		return y + GUILD_END;
+	}
+
+	void UIUserList::place_section_buttons()
+	{
+		int16_t view_top = guild_scroll * GUILD_STEP;
+		Point<int16_t> list = GUILD_LIST - Point<int16_t>(0, view_top);
+		const GuildSection* sections[] = { &guild_online, &guild_offline };
+
+		for (uint16_t s = 0; s < 2; s++)
+		{
+			const GuildSection& section = *sections[s];
+			uint16_t first = Buttons::BT_GUILD_SECTION + s * SectionButton::SECTION_BUTTONS;
+			// The client makes them while the section's header is in view
+			// (FUN_0091e88e). The page buttons flank the page number.
+			bool shown = tab == Tab::GUILD && section.top >= view_top &&
+						 section.top + GUILD_SECTION_HEADER <= view_top + GUILD_VIEW;
+			Point<int16_t> top = list + Point<int16_t>(0, section.top);
+			int16_t page_left = GUILD_PAGE.x() - section.page_text.width() - PAGE_BUTTON;
+
+			buttons[first + SectionButton::FOLD]->set_position(top + GUILD_FOLD);
+			buttons[first + SectionButton::UNFOLD]->set_position(top + GUILD_FOLD);
+			buttons[first + SectionButton::PREVIOUS_PAGE]->set_position(top + Point<int16_t>(page_left, GUILD_PAGE.y()));
+			buttons[first + SectionButton::NEXT_PAGE]->set_position(top + GUILD_PAGE);
+
+			buttons[first + SectionButton::FOLD]->set_active(shown && section.expanded);
+			buttons[first + SectionButton::UNFOLD]->set_active(shown && !section.expanded);
+			buttons[first + SectionButton::PREVIOUS_PAGE]->set_active(shown);
+			buttons[first + SectionButton::NEXT_PAGE]->set_active(shown);
+
+			enable(first + SectionButton::PREVIOUS_PAGE, section.page > 1);
+			enable(first + SectionButton::NEXT_PAGE, section.page < section.pages);
+		}
+	}
+
+	void UIUserList::scroll_guild(int16_t scroll)
+	{
+		// The client gives the slider t / 33 + 2 positions for t pixels too
+		// many (FUN_0091e1eb), enough to bring the list's end into view.
+		int16_t overflow = guild_height - GUILD_VIEW;
+		int16_t last = overflow > 0 ? overflow / GUILD_STEP + 1 : 0;
+
+		guild_scroll = std::clamp<int16_t>(scroll, 0, last);
+		guild_slider.setrows(guild_scroll, 1, last + 1);
+		place_section_buttons();
+	}
+
+	const GuildMember* UIUserList::picked_online_member() const
+	{
+		if (guild_picked == 0 || guild_picked == Stage::get().get_player().get_oid())
+			return nullptr;
+
+		// A row counts only while the list shows it: not on another page or
+		// in a folded section.
+		for (const GuildSection* section : { &guild_online, &guild_offline })
+		{
+			for (const GuildRow& row : section->rows)
+			{
+				if (row.id == guild_picked)
+				{
+					const GuildMember* member = guild.find(row.id);
+
+					return member && member->online ? member : nullptr;
+				}
+			}
+		}
+
+		return nullptr;
 	}
 }

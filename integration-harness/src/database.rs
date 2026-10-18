@@ -176,6 +176,22 @@ pub async fn grant_skill(character_id: i32, skill_id: i32, level: i32) -> Result
     .await
 }
 
+/// Put the logged-out character `character_id` in the guild named `guild`
+/// as a plain member (rank 3), as an accepted invitation would.
+pub async fn join_guild(character_id: i32, guild: &str) -> Result<(), HarnessError> {
+    let guild = guild.to_owned();
+    change_one_row("join guild", move |conn| {
+        diesel::sql_query(
+            "INSERT INTO guild_members (character_id, guild_id, rank) \
+             SELECT $1, id, 3 FROM guilds WHERE name = $2",
+        )
+        .bind::<Integer, _>(character_id)
+        .bind::<Text, _>(guild)
+        .execute(conn)
+    })
+    .await
+}
+
 /// Make the fame `giver_id` gave look `days` days older, as though that
 /// many days had passed since.
 pub async fn backdate_fame(giver_id: i32, days: i32) -> Result<(), HarnessError> {

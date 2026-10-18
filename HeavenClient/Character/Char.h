@@ -26,6 +26,7 @@
 #include <cstdint>
 
 #include "CharEffect.h"
+#include "GuildMark.h"
 
 #include "Inventory/Weapon.h"
 #include "Look/Afterimage.h"
@@ -211,6 +212,10 @@ namespace ms
 		bool getflip() const;
 		// Return the name of this character
 		std::string get_name() const;
+		// The guild tag under the character's name: the guild's name, or ""
+		// for no tag, and its emblem.
+		void set_guild_name(const std::string &name);
+		void set_guild_emblem(const GuildEmblem &emblem);
 
 		// Return if the char is in the Char::State::SIT state
 		bool is_sitting() const;
@@ -278,6 +283,8 @@ namespace ms
 
 	private:
 		Text namelabel;
+		Text guildlabel;
+		GuildMark guildmark;
 		ChatBalloon chatballoon;
 		ChatBalloon hintballoon;
 		EffectLayer effects;

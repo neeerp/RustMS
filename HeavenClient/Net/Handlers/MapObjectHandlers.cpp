@@ -18,6 +18,7 @@
 #include "MapObjectHandlers.h"
 
 #include "Helpers/BuffParser.h"
+#include "Helpers/GuildParser.h"
 #include "Helpers/LoginParser.h"
 #include "Helpers/MobStatParser.h"
 #include "Helpers/MovementParser.h"
@@ -40,11 +41,8 @@ namespace ms
 		uint8_t level = recv.read_byte();
 		std::string name = recv.read_string();
 
-		recv.read_string();	// guildname
-		recv.read_short();	// guildlogobg
-		recv.read_byte();	// guildlogobgcolor
-		recv.read_short();	// guildlogo
-		recv.read_byte();	// guildlogocolor
+		std::string guild = recv.read_string();
+		GuildEmblem emblem = GuildParser::parse_emblem(recv);
 
 		BuffParser::Flags flags = BuffParser::read_flags(recv);
 		auto buffs = BuffParser::parse_shown(recv, flags);
@@ -97,7 +95,7 @@ namespace ms
 		recv.read_byte(); // team
 
 		Stage::get().get_chars().spawn(
-			{ cid, look, level, job, name, stance, position, chair, std::move(buffs) }
+			{ cid, look, level, job, name, stance, position, chair, std::move(buffs), guild, emblem }
 		);
 	}
 
@@ -548,14 +546,17 @@ namespace ms
 
 	void HitReactorHandler::handle(InPacket& recv) const
 	{
+		// v83 FUN_0073502d. The reactor moved on to `state`; the hit, the
+		// state before's event `event` (or its own hit for -1), plays after
+		// `delay` ms, and it takes no swing for `cooldown` hundred ms.
 		int32_t oid = recv.read_int();
 		int8_t state = recv.read_byte();
-		Point<int16_t> point = recv.read_point();
-		int8_t stance = recv.read_byte(); // TODO: When is this different than state?
-		recv.skip(2); // TODO: Unused
-		recv.skip(1); // "frame" delay but this is in the WZ file?
+		recv.read_point();
+		uint16_t delay = recv.read_short();
+		int8_t event = recv.read_byte();
+		int8_t cooldown = recv.read_byte();
 
-		Stage::get().get_reactors().trigger(oid, state);
+		Stage::get().get_reactors().hit(oid, state, delay, event, cooldown * 100);
 	}
 
 	void SpawnReactorHandler::handle(InPacket& recv) const
@@ -736,10 +737,11 @@ namespace ms
 
 	void RemoveReactorHandler::handle(InPacket& recv) const
 	{
+		// v83 FUN_0073551f. The state is the last one the reactor reached.
 		int32_t oid = recv.read_int();
 		int8_t state = recv.read_byte();
-		Point<int16_t> point = recv.read_point();
+		recv.read_point();
 
-		Stage::get().get_reactors().remove(oid, state, point);
+		Stage::get().get_reactors().remove(oid, state);
 	}
 }

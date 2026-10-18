@@ -50,6 +50,36 @@ pub mod keys {
     pub const SHANKS_NO_MESOS: &str = "shanks.no_mesos";
     pub const SHANKS_PAID: &str = "shanks.paid";
 
+    /// Heracle, who founds guilds in Orbis. No licensed script has his
+    /// text, so these keep their placeholders.
+    pub const HERACLE_ASK: &str = "heracle.ask";
+    pub const HERACLE_DECLINE: &str = "heracle.decline";
+    pub const HERACLE_IN_GUILD: &str = "heracle.in_guild";
+    pub const HERACLE_TOO_WEAK: &str = "heracle.too_weak";
+    pub const HERACLE_NO_MESOS: &str = "heracle.no_mesos";
+
+    /// The continent ships' station staff: the booths that sell tickets
+    /// (Joel, Agatha), the ushers that take them aboard (Cherry, Rini), and
+    /// the crew that lets passengers off before take-off (Purin, Erin). No
+    /// licensed script sells tickets or takes them, so those keep their
+    /// placeholders.
+    pub const SHIPS_SELL_ASK: &str = "ships.sell.ask";
+    pub const SHIPS_SELL_DECLINE: &str = "ships.sell.decline";
+    pub const SHIPS_SELL_SHORT: &str = "ships.sell.short";
+    pub const SHIPS_BOARD_ASK: &str = "ships.board.ask";
+    pub const SHIPS_BOARD_DECLINE: &str = "ships.board.decline";
+    pub const SHIPS_BOARD_NO_TICKET: &str = "ships.board.no_ticket";
+    pub const SHIPS_BOARD_CLOSING: &str = "ships.board.closing";
+    pub const SHIPS_BOARD_FULL: &str = "ships.board.full";
+    pub const SHIPS_LEAVE_ASK: &str = "ships.leave.ask";
+    pub const SHIPS_LEAVE_DECLINE: &str = "ships.leave.decline";
+
+    /// Isa, who shows the way to Orbis Station's platforms.
+    pub const ISA_MENU: &str = "isa.menu";
+    pub const ISA_PLATFORM: &str = "isa.platform";
+    pub const ISA_ASK: &str = "isa.ask";
+    pub const ISA_DECLINE: &str = "isa.decline";
+
     /// Robin's beginner Q&A (`begin5`): a menu, then each topic's pages.
     /// The placeholders decide how many topics and pages there are.
     pub const ROBIN_MENU: &str = "robin.menu";
@@ -348,6 +378,25 @@ mod tests {
             keys::SHANKS_TOO_WEAK,
             keys::SHANKS_NO_MESOS,
             keys::SHANKS_PAID,
+            keys::HERACLE_ASK,
+            keys::HERACLE_DECLINE,
+            keys::HERACLE_IN_GUILD,
+            keys::HERACLE_TOO_WEAK,
+            keys::HERACLE_NO_MESOS,
+            keys::SHIPS_SELL_ASK,
+            keys::SHIPS_SELL_DECLINE,
+            keys::SHIPS_SELL_SHORT,
+            keys::SHIPS_BOARD_ASK,
+            keys::SHIPS_BOARD_DECLINE,
+            keys::SHIPS_BOARD_NO_TICKET,
+            keys::SHIPS_BOARD_CLOSING,
+            keys::SHIPS_BOARD_FULL,
+            keys::SHIPS_LEAVE_ASK,
+            keys::SHIPS_LEAVE_DECLINE,
+            keys::ISA_MENU,
+            keys::ISA_PLATFORM,
+            keys::ISA_ASK,
+            keys::ISA_DECLINE,
             keys::ROBIN_MENU,
         ];
         for key in named

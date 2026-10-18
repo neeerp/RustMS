@@ -7,6 +7,8 @@ A nonempty `tn` must match an actual destination portal. Only an empty `tn`
 may use the map's default spawn point. The client skips portals without a
 travel destination when selecting an exit, including overlapping spawn points.
 
+The ships between continents run on a timetable instead; see `ships.md`.
+
 ## Maple Island
 
 The island is the original one, as in 2009 footage. v83 GMS already ships the

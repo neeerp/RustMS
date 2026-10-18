@@ -4,20 +4,21 @@
 use crate::{GameDataError, NxDataFile};
 use std::path::Path;
 
-/// Event types an attack can trigger: a plain hit, and hits that only count
-/// from one side.
-const HIT_EVENT_TYPES: [i32; 3] = [0, 1, 2];
+/// One way a reactor can leave a state (`<state>/event/<n>`).
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct ReactorEvent {
+    /// 0 is any hit, 1 and 2 a hit facing right or left, 3 and 4 the same
+    /// in the air, and 5 a skill. 100 and up are other triggers, such as an
+    /// item dropped on it.
+    pub kind: i32,
+    /// The state it moves to.
+    pub next: Option<u8>,
+}
 
-/// What hitting a reactor in one state does.
+/// What can happen to a reactor in one state.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct ReactorState {
-    /// The state a hit moves it to, if an attack can hit it in this state.
-    pub hit: Option<u8>,
-    /// Only these skills trigger the hit (`activeSkillID`); empty means any
-    /// attack.
-    pub skills: Vec<i32>,
-    /// The state has no events at all: the reactor is used up.
-    pub last: bool,
+    pub events: Vec<ReactorEvent>,
 }
 
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
@@ -29,22 +30,50 @@ pub struct ReactorTemplate {
     pub action: Option<String>,
 }
 
+/// How well an event of `kind` fits a swing with `flags` (bit 0 facing
+/// left, bit 1 on a foothold): 0 is best, `None` doesn't fit (v83
+/// 0x736091). A hit from the side or in the air beats a plain one.
+pub fn swing_rank(flags: i32, kind: i32) -> Option<u8> {
+    let left = flags & 1 != 0;
+    let grounded = flags & 2 != 0;
+    match (kind, grounded) {
+        (0, true) => Some(1),
+        (0, false) => Some(2),
+        (1, _) if !left => Some(u8::from(!grounded)),
+        (2, _) if left => Some(u8::from(!grounded)),
+        (3, false) if !left => Some(0),
+        (4, false) if left => Some(0),
+        _ => None,
+    }
+}
+
 impl ReactorTemplate {
-    /// The state a hit with `skill_id` (0 for a plain attack) moves `state`
-    /// to.
-    pub fn hit(&self, state: u8, skill_id: i32) -> Option<u8> {
-        let current = self.states.get(usize::from(state))?;
-        if !current.skills.is_empty() && !current.skills.contains(&skill_id) {
-            return None;
+    /// The event a swing with `flags` triggers in `state`, as its index, and
+    /// the state it moves to. As in v83, the first event of the best rank
+    /// wins (0x7348a0).
+    pub fn swing(&self, state: u8, flags: i32) -> Option<(u8, u8)> {
+        let events = &self.states.get(usize::from(state))?.events;
+        let mut best: Option<(u8, usize)> = None;
+        for (index, event) in events.iter().enumerate() {
+            let Some(rank) = swing_rank(flags, event.kind) else {
+                continue;
+            };
+            if best.map_or(true, |(best, _)| rank < best) {
+                best = Some((rank, index));
+            }
+            if rank == 0 {
+                break;
+            }
         }
-        current.hit
+        let (_, index) = best?;
+        Some((u8::try_from(index).ok()?, events[index].next?))
     }
 
     /// Whether `state` ends the reactor (it breaks on reaching it).
     pub fn is_last(&self, state: u8) -> bool {
         self.states
             .get(usize::from(state))
-            .map_or(true, |state| state.last)
+            .map_or(true, |state| state.events.is_empty())
     }
 }
 
@@ -75,29 +104,15 @@ impl ReactorData {
         let action = nx.string_child(image, "action")?;
         let mut states = Vec::new();
         while let Some(node) = nx.child_by_name(image, &states.len().to_string())? {
-            let mut state = ReactorState {
-                last: true,
-                ..ReactorState::default()
-            };
+            let mut state = ReactorState::default();
             if let Some(events) = nx.child_by_name(node, "event")? {
-                for event in nx.child_indices(events)? {
-                    let Some(kind) = nx.int_child(event, "type")? else {
-                        continue;
-                    };
-                    state.last = false;
-                    if state.hit.is_some() || !HIT_EVENT_TYPES.contains(&kind) {
-                        continue;
-                    }
-                    let next = nx.int_child(event, "state")?.unwrap_or(0);
-                    state.hit = u8::try_from(next).ok();
-                    if let Some(skills) = nx.child_by_name(event, "activeSkillID")? {
-                        for skill in nx.child_indices(skills)? {
-                            let name = nx.node_name(skill)?;
-                            if let Some(id) = nx.int_child(skills, &name)? {
-                                state.skills.push(id);
-                            }
-                        }
-                    }
+                while let Some(event) = nx.child_by_name(events, &state.events.len().to_string())? {
+                    state.events.push(ReactorEvent {
+                        kind: nx.int_child(event, "type")?.unwrap_or(0),
+                        next: nx
+                            .int_child(event, "state")?
+                            .and_then(|next| u8::try_from(next).ok()),
+                    });
                 }
             }
             states.push(state);
@@ -125,11 +140,47 @@ mod tests {
         let mut state = 0;
         let mut hits = 0;
         while !reactor.is_last(state) {
-            state = reactor.hit(state, 0).unwrap();
+            state = reactor.swing(state, 2).unwrap().1;
             hits += 1;
         }
         assert_eq!((hits, state), (4, 4));
         assert!(data.template(9999998).unwrap().is_none());
+    }
+
+    #[test]
+    fn swing_ranks_follow_v83() {
+        // Facing right and left, on a foothold and in the air.
+        let ranks = |kind| [2, 3, 0, 1].map(|flags| swing_rank(flags, kind));
+        assert_eq!(ranks(0), [Some(1), Some(1), Some(2), Some(2)]);
+        assert_eq!(ranks(1), [Some(0), None, Some(1), None]);
+        assert_eq!(ranks(2), [None, Some(0), None, Some(1)]);
+        assert_eq!(ranks(3), [None, None, Some(0), None]);
+        assert_eq!(ranks(4), [None, None, None, Some(0)]);
+        assert_eq!(ranks(5), [None; 4]);
+        assert_eq!(ranks(100), [None; 4]);
+    }
+
+    #[test]
+    fn a_swing_takes_the_event_for_its_side() {
+        let event = |kind, next| ReactorEvent {
+            kind,
+            next: Some(next),
+        };
+        let reactor = ReactorTemplate {
+            states: vec![
+                ReactorState {
+                    events: vec![event(101, 9), event(0, 1), event(2, 2)],
+                },
+                ReactorState {
+                    events: vec![event(1, 3)],
+                },
+            ],
+            ..ReactorTemplate::default()
+        };
+        assert_eq!(reactor.swing(0, 2), Some((1, 1)));
+        assert_eq!(reactor.swing(0, 3), Some((2, 2)));
+        assert_eq!(reactor.swing(1, 3), None);
+        assert_eq!(reactor.swing(2, 2), None);
     }
 
     #[test]

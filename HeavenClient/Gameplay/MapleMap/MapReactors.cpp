@@ -42,10 +42,10 @@ namespace ms
 		reactors.update(physics);
 	}
 
-	void MapReactors::trigger(int32_t oid, int8_t state)
+	void MapReactors::hit(int32_t oid, int8_t state, uint16_t delay, int8_t event, int32_t cooldown)
 	{
 		if (Optional<Reactor> reactor = reactors.get(oid))
-			reactor->set_state(state);
+			reactor->hit(state, delay, event, cooldown);
 	}
 
 	void MapReactors::spawn(ReactorSpawn &&spawn)
@@ -53,10 +53,10 @@ namespace ms
 		spawns.emplace(std::move(spawn));
 	}
 
-	void MapReactors::remove(int32_t oid, int8_t state, Point<int16_t> position)
+	void MapReactors::remove(int32_t oid, int8_t state)
 	{
 		if (Optional<Reactor> reactor = reactors.get(oid))
-			reactor->destroy(state, position);
+			reactor->destroy(state);
 	}
 
 	void MapReactors::clear()

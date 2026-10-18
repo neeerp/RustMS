@@ -98,6 +98,12 @@ namespace ms
 		GraphicsGL::get().drawtext(args, vertical, text, layout, font, color, background, reveal, shown);
 	}
 
+	void Text::draw_between(const DrawArgument &args, const Range<int16_t> &horizontal) const
+	{
+		GraphicsGL::get().drawtext(args, Range<int16_t>(0, 0), text, layout, font, color, background, text.size(), {},
+								   horizontal);
+	}
+
 	uint16_t Text::advance(size_t pos) const
 	{
 		return layout.advance(pos);

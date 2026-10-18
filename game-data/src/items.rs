@@ -4,6 +4,8 @@
 
 use crate::{GameDataError, NxDataFile};
 use game::buff::BuffStat;
+use game::scroll::{ScrollInfo, ScrollKind};
+use game::EquipStats;
 use std::path::Path;
 
 /// Stack size when `info/slotMax` is absent (v83: 1 for equipment, else 100).
@@ -29,6 +31,8 @@ pub struct ItemInfo {
     pub spec: Option<ConsumeSpec>,
     /// What a skill or mastery book teaches (`info/skill`).
     pub book: Option<BookInfo>,
+    /// What an equipment scroll (204xxxx) does.
+    pub scroll: Option<ScrollInfo>,
     pub equip: Option<EquipInfo>,
 }
 
@@ -224,6 +228,9 @@ impl ItemData {
                 }
                 info.book = Some(book);
             }
+            if item_id / 10_000 == 204 {
+                info.scroll = scroll_info(nx, node, meta)?;
+            }
         }
         if let Some(spec) = nx.child_by_name(node, "spec")? {
             info.spec = Some(ConsumeSpec {
@@ -312,9 +319,66 @@ impl ItemData {
             recovery_mp: 0,
             spec: None,
             book: None,
+            scroll: None,
             equip: Some(equip),
         }))
     }
+}
+
+/// An equipment scroll's `info` and its `req` list of the only equipment it
+/// accepts; `None` without `info/success`.
+fn scroll_info(nx: &NxDataFile, node: u32, meta: u32) -> Result<Option<ScrollInfo>, GameDataError> {
+    let Some(success) = nx.int_child(meta, "success")? else {
+        return Ok(None);
+    };
+    let flag =
+        |key: &str| -> Result<bool, GameDataError> { Ok(nx.int_child(meta, key)? == Some(1)) };
+    let stat = |key: &str| -> Result<i16, GameDataError> {
+        Ok(nx
+            .int_child(meta, key)?
+            .map_or(0, |v| i16::try_from(v).unwrap_or(0)))
+    };
+    let kind = if flag("preventslip")? {
+        ScrollKind::Spikes
+    } else if flag("warmsupport")? {
+        ScrollKind::Cold
+    } else if flag("recover")? {
+        ScrollKind::CleanSlate
+    } else if flag("randstat")? {
+        ScrollKind::Chaos
+    } else {
+        ScrollKind::Normal
+    };
+    let mut req = Vec::new();
+    if let Some(list) = nx.child_by_name(node, "req")? {
+        while let Some(id) = nx.int_child(list, &req.len().to_string())? {
+            req.push(id);
+        }
+    }
+    Ok(Some(ScrollInfo {
+        kind,
+        success,
+        cursed: nx.int_child(meta, "cursed")?.unwrap_or(0),
+        stats: EquipStats {
+            str: stat("incSTR")?,
+            dex: stat("incDEX")?,
+            int: stat("incINT")?,
+            luk: stat("incLUK")?,
+            hp: stat("incMHP")?,
+            mp: stat("incMMP")?,
+            watk: stat("incPAD")?,
+            matk: stat("incMAD")?,
+            wdef: stat("incPDD")?,
+            mdef: stat("incMDD")?,
+            acc: stat("incACC")?,
+            avoid: stat("incEVA")?,
+            hands: stat("incCraft")?,
+            speed: stat("incSpeed")?,
+            jump: stat("incJump")?,
+            ..EquipStats::default()
+        },
+        req,
+    }))
 }
 
 fn path_index(nx: &NxDataFile, path: &str) -> Result<Option<u32>, GameDataError> {
@@ -391,6 +455,37 @@ mod tests {
             (vec![2121003], 10, 0)
         );
         assert!(data.info(2010007).unwrap().unwrap().book.is_none());
+    }
+
+    #[test]
+    fn reads_equipment_scrolls() {
+        let Some(data) = data() else {
+            return;
+        };
+        let dark = data.info(2043004).unwrap().unwrap().scroll.unwrap();
+        assert_eq!(
+            (dark.kind, dark.success, dark.cursed),
+            (ScrollKind::Normal, 70, 50)
+        );
+        assert_eq!((dark.stats.watk, dark.stats.str, dark.stats.dex), (2, 1, 0));
+        assert!(dark.req.is_empty());
+        let chaos = data.info(2049100).unwrap().unwrap().scroll.unwrap();
+        assert_eq!(
+            (chaos.kind, chaos.success, chaos.cursed),
+            (ScrollKind::Chaos, 60, 0)
+        );
+        let clean_slate = data.info(2049003).unwrap().unwrap().scroll.unwrap();
+        assert_eq!(
+            (clean_slate.kind, clean_slate.success, clean_slate.cursed),
+            (ScrollKind::CleanSlate, 20, 50)
+        );
+        let dragon_stone = data.info(2041200).unwrap().unwrap().scroll.unwrap();
+        assert_eq!(dragon_stone.req, vec![1122000]);
+        let spikes = data.info(2040727).unwrap().unwrap().scroll.unwrap();
+        assert_eq!(spikes.kind, ScrollKind::Spikes);
+        let cold = data.info(2041058).unwrap().unwrap().scroll.unwrap();
+        assert_eq!(cold.kind, ScrollKind::Cold);
+        assert!(data.info(2010007).unwrap().unwrap().scroll.is_none());
     }
 
     #[test]

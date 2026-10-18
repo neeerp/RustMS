@@ -222,7 +222,8 @@ from `UI.nx`. Moved so far:
   COLLECTION lengthen it to `backgrnd5`, `backgrnd2`, and `backgrnd7`, and ITEM
   and WISHLIST open `backgrnd4` and `backgrnd3` beside it; all are empty, as
   RustMS has no mounts, pets, monster book, or cash shop wish list. Family,
-  party, trade, and excluded items are disabled. The fame buttons send
+  party, and excluded items are disabled; TRADE invites the character to a
+  trade. The fame buttons send
   GIVE_FAME (`GiveFamePacket`) unless the window is the player's own or the
   player is below level 15. As in v83 (FUN_00a23eb5), the client refuses a
   character who isn't on the map ("Unable to find the character.") and a
@@ -426,15 +427,20 @@ side yet.
 | Character info, minimap, world map | Implemented |
 | Party (`UIUserList` Party tab, `UIPartyHP`, party chat) | Implemented; see `parties.md` |
 | Buddy list (`UIUserList` Friend tab, buddy chat) | Implemented without groups; see `buddies.md` |
-| Guild / alliance / blacklist tabs (`UIUserList`) | Tab strip only |
+| Guild (`UIUserList` Guild tab, name tags, guild chat) | Founding and viewing only; see `guilds.md` |
+| Alliance / blacklist tabs (`UIUserList`) | Tab strip only |
 | Monster Book (`UIMonsterBook`) | Implemented: cards, summary, monster pages, search, cover; see `combat.md` |
 | Cash shop (`UICashShop`) | Enter/exit, catalog, buying, gifts, Cash Inventory, wish list, and moving items to and from the bags |
 | Maple Messenger (`UIMessenger`) | Implemented |
-| Storage, trade, player shops, mini-games, memo/mail | No UI, no handlers |
-| Pets, mounts, summons, reactors beyond hit/spawn | Partial or absent (`Reactor` TODOs) |
+| Trade (`UITradingRoom`, `UITradeInvite`) | Implemented, without cash trades |
+| Storage (`UIStorage`) | Implemented; see `inventory.md` |
+| Continent ships, station wall clocks | Docking ships and the Balrog's ship, CONTI_MOVE/CONTI_STATE, CLOCK kind 1; see `ships.md` |
+| Player shops, mini-games, memo/mail | No UI, no handlers |
+| Reactors | Spawning, swings, hits and breaking; no skill hits, touch or quest gates; see `combat.md` |
+| Pets, mounts, summons | Partial or absent |
 | Party/guild/boss quests, events, MTS | Absent |
 
-51 outbound opcodes are defined (`Net/OutPacket.h`) and 63 inbound handlers
+75 outbound opcodes are defined (`Net/OutPacket.h`) and 111 inbound handlers
 are registered (`Net/PacketSwitch.cpp`). Anything not listed there is silently ignored by the client.
 
 ## Movement physics
@@ -562,8 +568,12 @@ the screen size.
   that covers the price, trying NX Prepaid, NX Credit, then Maple Points. OK
   sends CASHSHOP_OPERATION (229) 0x03 with the cash type (1 Credit, 2 Maple
   Points, 4 Prepaid) and SN, or 0x1E for a package (items 910xxxx) and
-  0x06/0x07 mode 1 for an expansion commodity (911x000). The result is a
-  "successful purchase" or a failure notice.
+  0x06/0x07 mode 1 for an expansion commodity (911x000). As in v83, each
+  mode is followed by a byte that is 1 for Maple Points, and 0x03 ends with
+  a zero (no free trial). The result is a "successful purchase" or a failure
+  notice.
+- **Check:** CHECK CASH sends CHECK_CASH (228), as does the game window
+  getting the focus back while the shop is open; QUERY_CASH_RESULT answers.
 - **Slot buttons:** Equip Slot through Stor. Slot open `UICashBuy` for the
   matching expansion item at 4,000 NX, and OK sends 0x06 mode 0 with the bag,
   or 0x07 mode 0. On 0x60 the bag's slot count changes at once.
@@ -587,15 +597,15 @@ the screen size.
   The receiver gets one notice listing each gift's sender, item and message
   when 0x4D arrives. The buddy and guild buttons that open the wider
   `backgrnd1` aren't drawn, and only one name is sent.
-- **Not served yet:** CHARGE, CHECK CASH and COUPON do nothing.
+- **Not served yet:** CHARGE and COUPON do nothing.
 
 ## Estimated client work for a complete game
 
 | System | Client status | Effort |
 | --- | --- | --- |
 | Buddy groups | Default group only | S |
-| Guild | Skeleton only, plus guild emblem/BBS UIs missing | L |
-| Trade / storage / player shops | Nothing | L |
+| Guild | Window and founding only; member management, emblem and BBS UIs missing | M |
+| Player shops | Nothing | L |
 | Cash shop | No coupons, charging, or storage window | S |
 | Quest accept/complete UI flow | Partial | S |
 | Pets and mounts | Partial rendering, no interaction | M |
@@ -667,3 +677,11 @@ These were corrected:
     byte and keeps the key (`Stage::get_field_key`). As in v83, every
     CHANGE_MAP and CHANGE_MAP_SPECIAL starts with that key. Before, they
     started with 0, or with 1 for "died" on the death respawn.
+12. DAMAGE_REACTOR (`0xCD`) wrote the player's position, stance and four
+    zero bytes after the object id. v83 writes the kind of hit (0 a swing,
+    1 a skill), the swing's flags (bit 0 facing left, bit 1 on a foothold)
+    and the delay before the hit lands. HIT_REACTOR (`0x115`) was read as
+    a stance and frame delay; it carries the delay, the event of the old
+    state, and a cooldown. An attack also sent `0xCD` for the nearest reactor
+    it reached, as well as hitting mobs; it now swings at a reactor instead
+    of the mobs. See `combat.md`.

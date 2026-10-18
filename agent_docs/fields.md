@@ -26,6 +26,9 @@ Fields are created on demand by `FieldRegistry` and kept alive afterwards.
 - **Reactors** (`field_reactors::ReactorSet`): boxes and the like placed
   by the map's `reactor` nodes; see "Reactors" in [Mobs and
   combat](./combat.md).
+- **Trading rooms** (`field_trades::Trades`): who is in which room, and
+  their turns and answers. The offers stay with the client actors; see
+  "Trading" in [Inventory](./inventory.md).
 - **Time**: a 100 ms tick (`on_tick`) respawns mobs and reactors and expires
   drops.
 
@@ -44,6 +47,7 @@ in the client's `Player`.
 | `Chat { from, packet }` | Broadcast to everyone, sender included |
 | `Move { from, packet, movement_bytes }` | Update the mover's position from the movement fragment, broadcast to everyone else |
 | `NpcInteraction { from, object_id, request_id }` | Validate the NPC is on this map, then tell the client which NPC id to talk to |
+| `Trade { from, request }` | A `RoomRequest` for the sender's trading room; answers come back as `ServerMessage::Trade` |
 | `FromClient { from, request }` | A `net::FieldRequest` from a handler: move a mob it controls, apply an attack, show the others a packet, pick up or throw down a drop, or pass a character info request on |
 
 All sends to clients use `ClientHandle::send` (`try_send`); a client whose
@@ -109,7 +113,7 @@ sends `SET_CASH_SHOP` (character data plus the shop's lists) followed by the
 cash inventory, gifts, wish list and NX balance
 (`net/src/packet/build/world/cash_shop.rs`). The session stays on the channel
 and in the world directory, so whispers still arrive, but the client actor
-ignores every other opcode until the player leaves. Leaving sends a
+ignores every other opcode but `CHECK_CASH` until the player leaves. Leaving sends a
 `CHANGE_MAP` with no body; the actor answers it like a channel change to its
 own channel, and the client reconnects and enters the map it left.
 
@@ -122,6 +126,13 @@ client gets the item (0x57) and its new balance, or a failure code (0x5C): 0xA5
 not enough cash, 0xAA gender, 0xC0 sold out, 0x00 anything else. The wish list
 keeps up to ten commodities that are on sale and answers with 0x55. Balances
 are only granted through SQL for now.
+
+`CHECK_CASH` (0xE4) sends the balances again. v83 sends it from the Check
+button and whenever its window is activated in the shop. v83 locks the shop
+after each request until an answer comes, so an operation the server doesn't
+serve gets failure 0x00. The queries v83 sends on its own (0x28 for each
+commodity it hasn't cached, and 0x21) get no answer, which would show a
+notice for each.
 
 A package (0x1E, items 910xxxx) is bought the same way, but
 `Etc.nx` `CashPackage.img` lists the commodities it holds, and each joins the

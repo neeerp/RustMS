@@ -1,0 +1,19 @@
+#pragma once
+
+#include "../../InPacket.h"
+
+#include "../../../Character/Guild.h"
+
+namespace ms
+{
+	namespace GuildParser
+	{
+		// GUILDDATA (FUN_004e4553): the guild, its titles, and its members,
+		// each as a fixed 37-byte record.
+		GuildData parse_guild(InPacket& recv);
+
+		// The emblem as GUILDDATA, SPAWN_PLAYER, and GUILD_MARK_CHANGED
+		// carry it.
+		GuildEmblem parse_emblem(InPacket& recv);
+	}
+}

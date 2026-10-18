@@ -19,6 +19,7 @@
 
 #include "Handlers/AttackHandlers.h"
 #include "Handlers/BuddyHandlers.h"
+#include "Handlers/GuildHandlers.h"
 #include "Handlers/MapObjectHandlers.h"
 #include "Handlers/CashShopHandlers.h"
 #include "Handlers/CommonHandlers.h"
@@ -97,7 +98,11 @@ namespace ms
 		BLOCKED_SERVER = 132,
 		WHISPER = 135,
 		MESSENGER = 313,
+		PLAYER_INTERACTION = 314,
 		FIELD_EFFECT = 138,
+		CLOCK = 147,
+		CONTI_MOVE = 148,
+		CONTI_STATE = 149,
 
 		/// MapObject
 		SPAWN_CHAR = 160,
@@ -179,6 +184,11 @@ namespace ms
 		MULTICHAT = 134,
 		UPDATE_PARTYMEMBER_HP = 201,
 
+		/// Guild
+		GUILD_OPERATION = 65,
+		GUILD_NAME_CHANGED = 202,
+		GUILD_MARK_CHANGED = 203,
+
 		/// Cash Shop
 		SET_CASH_SHOP = 127,
 		QUERY_CASH_RESULT = 324,
@@ -206,6 +216,9 @@ namespace ms
 		emplace<SET_FIELD, SetFieldHandler>();
 		emplace<BLOCKED_MAP, BlockedMapHandler>();
 		emplace<BLOCKED_SERVER, BlockedServerHandler>();
+		emplace<CLOCK, ClockHandler>();
+		emplace<CONTI_MOVE, ContiMoveHandler>();
+		emplace<CONTI_STATE, ContiStateHandler>();
 
 		// MapObject handlers
 		emplace<SPAWN_CHAR, SpawnCharHandler>();
@@ -301,6 +314,7 @@ namespace ms
 		// Player Interaction
 		emplace<CHAR_INFO, CharInfoHandler>();
 		emplace<FAME_RESPONSE, FameResponseHandler>();
+		emplace<PLAYER_INTERACTION, PlayerInteractionHandler>();
 
 		// Party handlers
 		emplace<PARTY_OPERATION, PartyOperationHandler>();
@@ -309,6 +323,11 @@ namespace ms
 
 		// Buddy list
 		emplace<BUDDYLIST, BuddyListHandler>();
+
+		// Guilds
+		emplace<GUILD_OPERATION, GuildOperationHandler>();
+		emplace<GUILD_NAME_CHANGED, GuildNameChangedHandler>();
+		emplace<GUILD_MARK_CHANGED, GuildMarkChangedHandler>();
 
 		// Cash Shop
 		emplace<SET_CASH_SHOP, SetCashShopHandler>();

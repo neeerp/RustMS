@@ -324,6 +324,8 @@ namespace ms
 			party_line(name + " : " + text, UIChatBar::LineType::PARTY);
 		else if (mode == MultiChatPacket::Mode::BUDDY)
 			party_line(name + " : " + text, UIChatBar::LineType::BUDDY);
+		else if (mode == MultiChatPacket::Mode::GUILD)
+			party_line(name + " : " + text, UIChatBar::LineType::GUILD);
 		else
 			return;
 

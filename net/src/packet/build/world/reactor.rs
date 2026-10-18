@@ -26,22 +26,32 @@ pub fn build_spawn_reactor(reactor: &ReactorView) -> Result<Packet, NetworkError
     Ok(p)
 }
 
-/// HIT_REACTOR: a hit moved the reactor to its current state.
-pub fn build_hit_reactor(reactor: &ReactorView, stance: i16) -> Result<Packet, NetworkError> {
+/// How long after a hit a client waits before it swings at the reactor
+/// again, in 100 ms.
+const HIT_COOLDOWN: u8 = 5;
+
+/// HIT_REACTOR: `event` of the state it left moved the reactor to its
+/// current state. Clients play that event's hit animation `delay` ms later,
+/// unless they are already playing one.
+pub fn build_hit_reactor(
+    reactor: &ReactorView,
+    delay: u16,
+    event: u8,
+) -> Result<Packet, NetworkError> {
     let mut p = Packet::new_empty();
     p.write_short(SendOpcode::HitReactor as i16)?;
     p.write_int(reactor.object_id)?;
     p.write_byte(reactor.state)?;
     p.write_short(reactor.x)?;
     p.write_short(reactor.y)?;
-    p.write_short(stance)?;
-    p.write_byte(0)?;
-    p.write_byte(5)?; // frame delay
+    p.write_short(delay as i16)?;
+    p.write_byte(event)?;
+    p.write_byte(HIT_COOLDOWN)?;
     Ok(p)
 }
 
-/// REMOVE_REACTOR: the reactor broke (the client plays its last hit
-/// animation) or leaves the map.
+/// REMOVE_REACTOR: the reactor broke, reaching the view's state (the client
+/// plays the previous state's hit animation), or leaves the map.
 pub fn build_remove_reactor(reactor: &ReactorView) -> Result<Packet, NetworkError> {
     let mut p = Packet::new_empty();
     p.write_short(SendOpcode::RemoveReactor as i16)?;
@@ -81,8 +91,20 @@ mod tests {
             ]
             .concat()
         );
-        let hit = build_hit_reactor(&BOX, 0).unwrap();
-        assert_eq!(hit.bytes.len(), 2 + 4 + 1 + 4 + 4);
+        let hit = build_hit_reactor(&BOX, 450, 1).unwrap();
+        assert_eq!(
+            hit.bytes,
+            [
+                &(SendOpcode::HitReactor as i16).to_le_bytes()[..],
+                &1_200_000_000i32.to_le_bytes(),
+                &[1],
+                &610i16.to_le_bytes(),
+                &254i16.to_le_bytes(),
+                &450u16.to_le_bytes(),
+                &[1, 5],
+            ]
+            .concat()
+        );
         let remove = build_remove_reactor(&BOX).unwrap();
         assert_eq!(remove.bytes.len(), 2 + 4 + 1 + 4);
     }

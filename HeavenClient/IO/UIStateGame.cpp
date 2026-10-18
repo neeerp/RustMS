@@ -41,6 +41,7 @@
 #include "UITypes/UIStorage.h"
 #include "UITypes/UIStatusBar.h"
 #include "UITypes/UIStatusMessenger.h"
+#include "UITypes/UITradeInvite.h"
 #include "UITypes/UIUserList.h"
 #include "UITypes/UIWorldMap.h"
 
@@ -65,6 +66,8 @@ namespace ms
 					return Tooltip::Parent::SHOP;
 				case UIElement::Type::STORAGE:
 					return Tooltip::Parent::STORAGE;
+				case UIElement::Type::TRADINGROOM:
+					return Tooltip::Parent::TRADINGROOM;
 				case UIElement::Type::EVENT:
 					return Tooltip::Parent::EVENT;
 				case UIElement::Type::KEYCONFIG:
@@ -101,6 +104,7 @@ namespace ms
 		emplace<UIPartyHP>(Stage::get().get_player().get_party(), stats);
 		emplace<UIShop>(look, inventory);
 		emplace<UIStorage>(inventory);
+		emplace<UITradeInvite>();
 
 		VWIDTH = Constants::Constants::get().get_viewwidth();
 		VHEIGHT = Constants::Constants::get().get_viewheight();
@@ -267,6 +271,7 @@ namespace ms
 							case KeyAction::Id::FRIENDS:
 							case KeyAction::Id::PARTY:
 							case KeyAction::Id::BOSSPARTY:
+							case KeyAction::Id::GUILD:
 							{
 								UIUserList::Tab tab;
 
@@ -278,6 +283,9 @@ namespace ms
 									case KeyAction::Id::PARTY:
 									case KeyAction::Id::BOSSPARTY:
 										tab = UIUserList::Tab::PARTY;
+										break;
+									case KeyAction::Id::GUILD:
+										tab = UIUserList::Tab::GUILD;
 										break;
 								}
 
@@ -344,6 +352,11 @@ namespace ms
 							case KeyAction::Id::FRIENDSCHAT:
 								if (auto chatbar = UI::get().get_element<UIChatBar>())
 									chatbar->set_target(UIChatBar::Target::BUDDY);
+
+								break;
+							case KeyAction::Id::GUILDCHAT:
+								if (auto chatbar = UI::get().get_element<UIChatBar>())
+									chatbar->set_target(UIChatBar::Target::GUILD);
 
 								break;
 							case KeyAction::Id::TOGGLECHAT:
@@ -598,6 +611,7 @@ namespace ms
 					UIElement::Type::NPCTALK,
 					UIElement::Type::SHOP,
 					UIElement::Type::STORAGE,
+					UIElement::Type::TRADEINVITE,
 					UIElement::Type::REVIVE
 			};
 

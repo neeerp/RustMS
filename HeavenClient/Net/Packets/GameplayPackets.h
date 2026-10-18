@@ -109,18 +109,29 @@ namespace ms
 		EnterCashShopPacket() : OutPacket(OutPacket::Opcode::ENTER_CASHSHOP) {}
 	};
 
+	// Opcode: CHECK_CASH(228)
+	class CheckCashPacket : public OutPacket
+	{
+	public:
+		// Ask for the balances again: the Check button, and v83 whenever the
+		// game window is activated in the Cash Shop
+		CheckCashPacket() : OutPacket(OutPacket::Opcode::CHECK_CASH) {}
+	};
+
 	// Opcode: CASHSHOP_OPERATION(229)
 	class BuyCashItemPacket : public OutPacket
 	{
 	public:
 		// Pay for the commodity sn: cash type 1 is NX Credit, 2 Maple Points,
-		// 4 NX Prepaid
+		// 4 NX Prepaid. v83 flags a Maple Points purchase before the type,
+		// and ends with 1 for the free one-day trial, which isn't offered.
 		BuyCashItemPacket(int32_t cash_type, int32_t sn) : OutPacket(OutPacket::Opcode::CASHSHOP_OPERATION)
 		{
 			write_byte(3);
-			write_byte(0);
+			write_byte(cash_type == 2);
 			write_int(cash_type);
 			write_int(sn);
+			write_int(0);
 		}
 	};
 
@@ -132,7 +143,7 @@ namespace ms
 		BuyCashPackagePacket(int32_t cash_type, int32_t sn) : OutPacket(OutPacket::Opcode::CASHSHOP_OPERATION)
 		{
 			write_byte(0x1E);
-			write_byte(0);
+			write_byte(cash_type == 2);
 			write_int(cash_type);
 			write_int(sn);
 		}
@@ -163,7 +174,7 @@ namespace ms
 		void write_header(int32_t cash_type, InventoryType::Id type, int8_t mode)
 		{
 			write_byte(type == InventoryType::Id::NONE ? 7 : 6);
-			write_byte(0);
+			write_byte(cash_type == 2);
 			write_int(cash_type);
 			write_byte(mode);
 		}
@@ -356,6 +367,31 @@ namespace ms
 		}
 	};
 
+	// Opcode: GUILD_OPERATION(126)
+	class GuildOperationPacket : public OutPacket
+	{
+	public:
+		enum Operation : int8_t
+		{
+			CREATE = 2
+		};
+
+		GuildOperationPacket(Operation op) : OutPacket(OutPacket::Opcode::GUILD_OPERATION)
+		{
+			write_byte(op);
+		}
+	};
+
+	// Names the guild being founded, in answer to the name prompt
+	class CreateGuildPacket : public GuildOperationPacket
+	{
+	public:
+		CreateGuildPacket(const std::string& name) : GuildOperationPacket(GuildOperationPacket::Operation::CREATE)
+		{
+			write_string(name);
+		}
+	};
+
 	// Opcode: BUDDYLIST_MODIFY(130)
 	class BuddyListModifyPacket : public OutPacket
 	{
@@ -489,17 +525,20 @@ namespace ms
 		}
 	};
 
+	// Hits a reactor (v83 FUN_007356c7). The kind is 0 for a swing and 1 for
+	// a skill, the flags bit 0 for facing left and bit 1 for standing, and
+	// the delay the ms until the hit lands, for others to see it then.
 	// Opcode: DAMAGE_REACTOR(205)
 	class DamageReactorPacket : public OutPacket
 	{
 	public:
-		// Requests damaging a reactor
-		DamageReactorPacket(int32_t oid, Point<int16_t> position, int16_t stance, int skillid) : OutPacket(OutPacket::Opcode::DAMAGE_REACTOR)
+		DamageReactorPacket(int32_t oid, int32_t kind, int32_t flags, int16_t delay, int32_t skillid)
+			: OutPacket(OutPacket::Opcode::DAMAGE_REACTOR)
 		{
 			write_int(oid);
-			write_point(position);
-			write_short(stance);
-			skip(4);
+			write_int(kind);
+			write_int(flags);
+			write_short(delay);
 			write_int(skillid);
 		};
 	};
@@ -510,6 +549,19 @@ namespace ms
 	public:
 		// Requests the server to set map transition complete
 		PlayerMapTransferPacket() : OutPacket(OutPacket::Opcode::PLAYER_MAP_TRANSFER) {}
+	};
+
+	// Asks where the map's ship is, on entering a ship field (v83
+	// FUN_0054db7a). The answer is CONTI_STATE.
+	// Opcode: CONTI_STATE_REQUEST(220)
+	class ContiStateRequestPacket : public OutPacket
+	{
+	public:
+		ContiStateRequestPacket(int32_t mapid, uint8_t kind) : OutPacket(OutPacket::Opcode::CONTI_STATE_REQUEST)
+		{
+			write_int(mapid);
+			write_byte(kind);
+		}
 	};
 
 	// Opcode: PLAYER_UPDATE(223)

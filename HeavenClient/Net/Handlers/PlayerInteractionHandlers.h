@@ -33,4 +33,12 @@ namespace ms
 	{
 		void handle(InPacket& recv) const override;
 	};
+
+	// The mini rooms (v83 FUN_0065df4c): invites, entering and leaving a
+	// room, its chat, and the room's own modes. Only the trading room is
+	// supported; other rooms are dropped.
+	class PlayerInteractionHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
 }

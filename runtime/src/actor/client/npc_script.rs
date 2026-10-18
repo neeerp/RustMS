@@ -2,10 +2,11 @@ use super::quest::{gain_exp, QuestChange};
 use super::ClientActor;
 use crate::db::spawn_db;
 use crate::error::RuntimeError;
+use net::conti::{self, State};
 use net::dialogue::Prompt;
 use net::npc_scripts::{self, NpcScript, Step};
 use net::packet::build::world::stat::StatUpdate;
-use net::packet::build::world::{drop, effect, inventory, npc, stat};
+use net::packet::build::world::{drop, effect, guild, inventory, npc, stat};
 use net::quests::{self, QuestTemplate};
 use net::scripts::Effect;
 use tracing::{debug, warn};
@@ -91,6 +92,7 @@ impl ClientActor {
         let mut afterwards = Vec::new();
         let mut offer_skip = false;
         let mut warp = None;
+        let mut name_guild = false;
         for effect in effects {
             match effect {
                 Effect::FieldEffect(path) => afterwards.push(effect::build_field_effect(path)?),
@@ -101,6 +103,10 @@ impl ClientActor {
                     height,
                 } => afterwards.push(effect::build_hint(text, *width, *height)?),
                 Effect::OfferTutorialSkip => offer_skip = true,
+                Effect::OpenGuildNamePrompt => {
+                    name_guild = true;
+                    afterwards.push(guild::build_name_prompt()?);
+                }
                 Effect::SetHp(hp) => {
                     next.stats.hp = (*hp).clamp(0, next.stats.max_hp);
                     changed = true;
@@ -156,12 +162,21 @@ impl ClientActor {
                 Effect::StartQuest(id) => change = Some(QuestChange::Start(template(*id)?)),
                 Effect::CompleteQuest(id) => change = Some(QuestChange::Complete(template(*id)?)),
                 Effect::Warp(map_id) => warp = Some(*map_id),
+                Effect::RequireBoarding(platform) => {
+                    let boarding = conti::departing_from(*platform)
+                        .is_some_and(|route| route.timetable.state(conti::now()) == State::Wait);
+                    if !boarding {
+                        debug!(platform, "Boarding closed; nothing applied");
+                        return Ok(Applied::Refused);
+                    }
+                }
             }
         }
         if (changed || change.is_some()) && !self.commit_player(next, change, &mut packets).await? {
             return Ok(Applied::Refused);
         }
         packets.append(&mut afterwards);
+        self.naming_guild |= name_guild;
         self.send_all(&mut packets).await?;
 
         if offer_skip {

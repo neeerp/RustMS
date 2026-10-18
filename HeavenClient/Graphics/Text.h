@@ -133,6 +133,10 @@ namespace ms
 		void draw(const DrawArgument &args, const Range<int16_t> &vertical, size_t reveal,
 				  const std::vector<std::pair<size_t, size_t>> &shown = {}) const;
 
+		// Draw only the part between two screen columns, as text scrolling
+		// through a window.
+		void draw_between(const DrawArgument &args, const Range<int16_t> &horizontal) const;
+
 		void change_text(const std::string &text);
 
 		void change_color(Color::Name color);

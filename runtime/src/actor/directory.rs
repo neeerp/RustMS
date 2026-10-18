@@ -1,8 +1,10 @@
 use crate::actor::messenger::{Messengers, Outbox};
 use crate::actor::parties::{self, Member, Parties, Party};
 use crate::message::{ClientHandle, DirectoryMessage, ListedBuddy, Presence, ServerMessage};
+use game::Guild;
 use net::packet::build::world::buddy::{build_buddy_list, BuddyView};
 use net::packet::build::world::door::{build_spawn_portal, DoorView};
+use net::packet::build::world::guild::build_guild_info;
 use net::packet::build::world::map::{build_blocked_map, BlockedMap};
 use net::packet::build::world::messaging::{build_find_result, build_whisper_result, FindLocation};
 use net::packet::build::world::party::{
@@ -121,6 +123,7 @@ impl WorldDirectory {
                 self.party_skill(from, used, origin)
             }
             DirectoryMessage::BuddyList { owner, buddies } => self.send_buddy_list(owner, buddies),
+            DirectoryMessage::GuildInfo { owner, guild } => self.send_guild_info(owner, guild),
             DirectoryMessage::Deliver { to, packet } => {
                 for client in to {
                     if let Some(entry) = self.clients.get(&client) {
@@ -340,6 +343,13 @@ impl WorldDirectory {
             })
             .collect();
         self.send_packet(owner, build_buddy_list(&views));
+    }
+
+    fn send_guild_info(&self, owner: ClientId, mut guild: Guild) {
+        for member in &mut guild.members {
+            member.online = self.clients.contains_key(&member.id);
+        }
+        self.send_packet(owner, build_guild_info(Some(&guild)));
     }
 
     fn party_request(&mut self, from: ClientId, request: PartyRequest, now: Instant) {
@@ -893,6 +903,47 @@ mod tests {
         });
         let buddy_list = format!("opcode {:#x}", SendOpcode::BuddyList as i16);
         assert_eq!(received(&mut alice), [buddy_list]);
+    }
+
+    #[test]
+    fn guild_info_marks_members_online_on_any_channel() {
+        let (_tx, rx) = mpsc::channel(1);
+        let mut directory = WorldDirectory::new(rx);
+        let mut alice = online(&mut directory, 1, "Alice", 10000);
+        let (bobby, _bobby_rx, _) = handle(2, 2);
+        directory.register(bobby, presence("Bobby", 20000), 2);
+        let member = |id, name: &str, online| game::GuildMember {
+            id,
+            name: name.into(),
+            job: 0,
+            level: 10,
+            rank: 3,
+            online,
+        };
+        let guild = |online: [bool; 3]| Guild {
+            id: 1,
+            name: "Testers".into(),
+            titles: game::guild::DEFAULT_TITLES.map(String::from),
+            capacity: 10,
+            emblem: Default::default(),
+            notice: String::new(),
+            points: 0,
+            alliance_id: 0,
+            members: vec![
+                member(1, "Alice", online[0]),
+                member(2, "Bobby", online[1]),
+                member(3, "Carol", online[2]),
+            ],
+        };
+        directory.handle(DirectoryMessage::GuildInfo {
+            owner: 1,
+            guild: guild([false; 3]),
+        });
+        let Ok(ServerMessage::SendPacket(packet)) = alice.try_recv() else {
+            panic!("no guild info");
+        };
+        let expected = build_guild_info(Some(&guild([true, true, false]))).unwrap();
+        assert_eq!(packet.bytes, expected.bytes);
     }
 
     #[test]

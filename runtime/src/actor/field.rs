@@ -3,9 +3,12 @@ use crate::actor::field_mists::MistSet;
 use crate::actor::field_mobs::{split_exp, Cast, MobSet, Sharer};
 use crate::actor::field_reactors::{Hit, ReactorSet};
 use crate::actor::field_summons::SummonSet;
+use crate::actor::field_trades::{Outbox, RoomRequest, Trades};
 use crate::message::{ClientHandle, FieldKey, FieldMessage, ServerMessage};
 use game::mob_skill::{self, MobSkillEffect};
 use game::{FieldAvatar, MobStat};
+use net::conti::{self, Happening};
+use net::packet::build::world::conti::build_conti_move;
 use net::packet::build::world::door::{build_remove_door, build_spawn_door};
 use net::packet::build::world::drop::{build_drop, build_remove_drop, DropAppearance};
 use net::packet::build::world::field::{
@@ -88,6 +91,9 @@ pub struct FieldActor {
     summons: SummonSet,
     /// Players' Mystic Doors here, by owner.
     doors: HashMap<ClientId, (i16, i16)>,
+    trades: Trades,
+    /// On a ship route's maps, the route time trips were last checked at.
+    trips: Option<i64>,
     tick: Duration,
 }
 
@@ -116,6 +122,8 @@ impl FieldActor {
             mists: MistSet::default(),
             summons: SummonSet::default(),
             doors: HashMap::new(),
+            trades: Trades::default(),
+            trips: conti::has_trips(key.map_id).then(conti::now),
             tick,
         }
     }
@@ -139,6 +147,7 @@ impl FieldActor {
     /// Advance time-driven field state: drop expiry and mob and reactor
     /// respawns.
     fn on_tick(&mut self, now: Instant) {
+        self.run_trips();
         for object_id in self.drops.expire(now) {
             if let Ok(packet) = build_remove_drop(object_id, None) {
                 self.broadcast(None, packet);
@@ -273,7 +282,7 @@ impl FieldActor {
                 avatar,
                 announce,
             } => {
-                if let Some(packet) = announce {
+                for packet in announce {
                     self.broadcast(Some(client_id), packet);
                 }
                 if let Some(occupant) = self.occupants.get_mut(&client_id) {
@@ -369,9 +378,9 @@ impl FieldActor {
                 FieldRequest::Throw { loot, vanish } => self.handle_throw(from, loot, vanish),
                 FieldRequest::HitReactor {
                     object_id,
-                    skill_id,
-                    stance,
-                } => self.handle_hit_reactor(from, object_id, skill_id, stance),
+                    flags,
+                    delay,
+                } => self.handle_hit_reactor(from, object_id, flags, delay),
                 FieldRequest::CharInfo { character_id } => {
                     self.handle_char_info(from, character_id)
                 }
@@ -432,6 +441,40 @@ impl FieldActor {
                         self.broadcast(None, packet);
                     }
                 }
+            }
+            FieldMessage::Trade { from, request } => self.handle_trade(from, request),
+        }
+    }
+
+    /// A trading room request from an occupant; anyone else's is dropped,
+    /// with any decision it carries.
+    fn handle_trade(&mut self, from: ClientId, request: RoomRequest) {
+        let Some(occupant) = self.occupants.get(&from) else {
+            return;
+        };
+        let (name, look) = (&occupant.avatar.name, &occupant.avatar.look);
+        let out = match request {
+            RoomRequest::Create { room } => self.trades.create(room, from, name, look),
+            RoomRequest::Invite { target } => {
+                let target_name = self.occupants.get(&target).map(|o| o.avatar.name.as_str());
+                self.trades.invite(from, target, target_name)
+            }
+            RoomRequest::Decline { room, reason } => self.trades.decline(from, room, reason, name),
+            RoomRequest::Visit { room } => self.trades.visit(from, room, name, look),
+            RoomRequest::Chat { text } => self.trades.chat(from, &text),
+            RoomRequest::PutItem { slot, item } => self.trades.put_item(from, slot, item),
+            RoomRequest::Meso { total } => self.trades.meso(from, total),
+            RoomRequest::Confirm => self.trades.confirm(from),
+            RoomRequest::Answer { result, decision } => self.trades.answer(from, result, decision),
+            RoomRequest::Leave => self.trades.leave(from),
+        };
+        self.deliver_trade(out);
+    }
+
+    fn deliver_trade(&self, out: Outbox) {
+        for (to, message) in out {
+            if let Some(occupant) = self.occupants.get(&to) {
+                occupant.handle.send(message);
             }
         }
     }
@@ -1141,6 +1184,34 @@ impl FieldActor {
         }
     }
 
+    /// Show the ships leaving and docking, and move their passengers, as
+    /// the trips through this map change (`net::conti`).
+    fn run_trips(&mut self) {
+        let Some(last) = self.trips else {
+            return;
+        };
+        let now = conti::now();
+        self.trips = Some(now);
+        for happening in conti::happenings(self.key.map_id, last, now) {
+            match happening {
+                Happening::Show(target, state) => {
+                    if let Ok(packet) = build_conti_move(target, state) {
+                        self.broadcast(None, packet);
+                    }
+                }
+                Happening::MoveAll { map_id, portal } => {
+                    for occupant in self.occupants.values() {
+                        occupant.handle.send(ServerMessage::ShipWarp {
+                            from_map: self.key.map_id,
+                            map_id,
+                            portal,
+                        });
+                    }
+                }
+            }
+        }
+    }
+
     /// Send what `message` gives for the `nth` player a mob's cast
     /// reaches: everyone in its area, or without one its controller
     /// (Cosmic's MobSkill.applyEffect).
@@ -1256,7 +1327,7 @@ impl FieldActor {
 
     /// A player hit a reactor: show its new state, or break it and have the
     /// player's client actor roll its drops.
-    fn handle_hit_reactor(&mut self, from: ClientId, object_id: i32, skill_id: i32, stance: i16) {
+    fn handle_hit_reactor(&mut self, from: ClientId, object_id: i32, flags: i32, delay: u16) {
         let Some(occupant) = self.occupants.get(&from) else {
             return;
         };
@@ -1264,16 +1335,16 @@ impl FieldActor {
         let position = (occupant.avatar.x, occupant.avatar.y);
         match self
             .reactors
-            .hit(object_id, skill_id, position, Instant::now())
+            .hit(object_id, flags, position, Instant::now())
         {
-            Some(Hit::Moved(view)) => {
-                if let Ok(packet) = build_hit_reactor(&view, stance) {
+            Some(Hit::Moved { view, event }) => {
+                if let Ok(packet) = build_hit_reactor(&view, delay, event) {
                     self.broadcast(None, packet);
                 }
             }
             Some(Hit::Broke(view)) => {
-                // The client plays the state's last hit animation as it
-                // removes the reactor.
+                // The client plays the hit animation of the state it
+                // broke from as it removes the reactor.
                 if let Ok(packet) = build_remove_reactor(&view) {
                     self.broadcast(None, packet);
                 }
@@ -1292,6 +1363,9 @@ impl FieldActor {
         let client_id = handle.client_id;
         // A rejoin replaces the previous entry without announcing a leave.
         self.occupants.remove(&client_id);
+        // It also ends any trade the player had here.
+        let out = self.trades.leave(client_id);
+        self.deliver_trade(out);
         // Its summons come back with it.
         for summon in self.summons.remove_owned(client_id, None) {
             self.remove_summon(&summon.view, Gone::Silently);
@@ -1380,6 +1454,8 @@ impl FieldActor {
         if self.occupants.remove(&client_id).is_none() {
             return;
         }
+        let out = self.trades.leave(client_id);
+        self.deliver_trade(out);
         // The others drop a player's summons with the player.
         self.summons.remove_owned(client_id, None);
         // Everyone sees the player go before control passes on.
@@ -1482,6 +1558,7 @@ mod tests {
             y,
             stance: 2,
             chair: 0,
+            guild: None,
             buffs: Vec::new(),
         }
     }

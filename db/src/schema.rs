@@ -281,6 +281,42 @@ diesel::table! {
 }
 diesel::joinable!(storage_items -> accounts (account_id));
 diesel::joinable!(storage_equipment_stats -> storage_items (storage_item_id));
+diesel::table! {
+    guilds (id) {
+        id -> Int4,
+        world_id -> Int2,
+        #[max_length = 12]
+        name -> Varchar,
+        #[max_length = 12]
+        title1 -> Varchar,
+        #[max_length = 12]
+        title2 -> Varchar,
+        #[max_length = 12]
+        title3 -> Varchar,
+        #[max_length = 12]
+        title4 -> Varchar,
+        #[max_length = 12]
+        title5 -> Varchar,
+        capacity -> Int2,
+        mark_bg -> Int2,
+        mark_bg_color -> Int2,
+        mark -> Int2,
+        mark_color -> Int2,
+        notice -> Text,
+        points -> Int4,
+        alliance_id -> Int4,
+    }
+}
+diesel::table! {
+    guild_members (character_id) {
+        character_id -> Int4,
+        guild_id -> Int4,
+        rank -> Int2,
+        joined_at -> Timestamp,
+    }
+}
+diesel::joinable!(guild_members -> characters (character_id));
+diesel::joinable!(guild_members -> guilds (guild_id));
 diesel::allow_tables_to_appear_in_same_query!(
     accounts,
     buddies,
@@ -298,4 +334,6 @@ diesel::allow_tables_to_appear_in_same_query!(
     fame_log,
     storage_items,
     storage_equipment_stats,
+    guilds,
+    guild_members,
 );

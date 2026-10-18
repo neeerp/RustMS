@@ -3,7 +3,10 @@
 
 use crate::connection::MapleTestConnection;
 use crate::hunting::Field;
-use crate::packets::{build_all_chat, build_change_map, decode_item_stack, decode_set_field_warp};
+use crate::packets::{
+    build_all_chat, build_change_map, decode_item_stack, decode_set_field_warp,
+    decode_spawn_player, SpawnPlayerPacket,
+};
 use net::packet::op::SendOpcode;
 use packet::io::read::PktRead;
 use packet::Packet;
@@ -114,12 +117,22 @@ pub struct Trace {
     pub buddy_errors: Vec<u8>,
     /// Buddy chat lines: (sender, text).
     pub buddy_chat: Vec<(String, String)>,
+    /// Guild chat lines: (sender, text).
+    pub guild_chat: Vec<(String, String)>,
+    /// Every GUILD_OPERATION body (mode first), in order.
+    pub guild_ops: Vec<Vec<u8>>,
+    /// GUILD_NAME_CHANGED: (character, guild name).
+    pub guild_names: Vec<(i32, String)>,
+    /// Other players appearing on the field.
+    pub players: Vec<SpawnPlayerPacket>,
     /// NPC shops opened: the NPC and (item id, price) per row.
     pub shops: Vec<(i32, Vec<(i32, i32)>)>,
     /// CONFIRM_SHOP_TRANSACTION codes.
     pub shop_results: Vec<u8>,
     /// Every TRUNK_RESULT, in order.
     pub storage: Vec<StorageResult>,
+    /// Every PLAYER_INTERACTION body (mode first), in order.
+    pub rooms: Vec<Vec<u8>>,
     /// GIVE_BUFF: (skill id, value, duration in ms).
     pub buffs: Vec<(i32, i16, i32)>,
     /// CANCEL_BUFF: the second mask of each.
@@ -136,6 +149,12 @@ pub struct Trace {
     /// BROADCAST_MSG: (kind, message) of each whose kind carries only its
     /// message (0, 1, 5).
     pub broadcasts: Vec<(u8, String)>,
+    /// CLOCK kind 1, a wall clock's time of day: (hour, minute, second).
+    pub clocks: Vec<(u8, u8, u8)>,
+    /// CONTI_MOVE: (target, state) of each ship shown leaving or docking.
+    pub ship_moves: Vec<(u8, u8)>,
+    /// CONTI_STATE: the ship's state, as answered.
+    pub ship_states: Vec<u8>,
     /// Mobs and drops on the current field.
     pub field: Field,
 }
@@ -353,6 +372,7 @@ impl Trace {
             match mode {
                 0 => self.buddy_chat.push(line),
                 1 => self.party_chat.push(line),
+                2 => self.guild_chat.push(line),
                 _ => {}
             }
         } else if op == SendOpcode::BuddyList as i16 {
@@ -405,6 +425,15 @@ impl Trace {
         } else if op == SendOpcode::TrunkResult as i16 {
             let mode = r.read_byte().unwrap();
             self.storage.push(StorageResult::read(mode, &p.bytes[3..]));
+        } else if op == SendOpcode::PlayerInteraction as i16 {
+            self.rooms.push(p.bytes[2..].to_vec());
+        } else if op == SendOpcode::GuildOperation as i16 {
+            self.guild_ops.push(p.bytes[2..].to_vec());
+        } else if op == SendOpcode::GuildNameChanged as i16 {
+            self.guild_names
+                .push((r.read_int().unwrap(), r.read_str_with_length().unwrap()));
+        } else if op == SendOpcode::SpawnPlayer as i16 {
+            self.players.extend(decode_spawn_player(p));
         } else if op == SendOpcode::ConfirmShopTransaction as i16 {
             self.shop_results.push(r.read_byte().unwrap());
         } else if op == SendOpcode::GiveBuff as i16 {
@@ -425,6 +454,17 @@ impl Trace {
             self.warps.push(warp.map_id);
             self.arrivals
                 .push((warp.map_id, warp.spawn_point, warp.chase));
+        } else if op == SendOpcode::Clock as i16 && r.read_byte().unwrap() == 1 {
+            self.clocks.push((
+                r.read_byte().unwrap(),
+                r.read_byte().unwrap(),
+                r.read_byte().unwrap(),
+            ));
+        } else if op == SendOpcode::ContiMove as i16 {
+            self.ship_moves
+                .push((r.read_byte().unwrap(), r.read_byte().unwrap()));
+        } else if op == SendOpcode::ContiState as i16 {
+            self.ship_states.push(r.read_byte().unwrap());
         } else if op == SendOpcode::SpawnPortal as i16 {
             let (town, field) = (r.read_int().unwrap(), r.read_int().unwrap());
             self.own_doors.push((town != 999_999_999).then(|| {

@@ -3,7 +3,7 @@ use integration_harness::database::set_nx_credit;
 use integration_harness::packets::{
     build_cash_shop_buy, build_cash_shop_buy_package, build_cash_shop_expand, build_cash_shop_gift,
     build_cash_shop_put_back, build_cash_shop_take_out, build_cash_shop_wish_list,
-    build_enter_cash_shop, opcode_name,
+    build_check_cash, build_enter_cash_shop, opcode_name,
 };
 use integration_harness::preconditions::load_harness_config_or_fail;
 use integration_harness::{login_to_world_session, relogin};
@@ -283,6 +283,16 @@ async fn nx_buys_items_packages_gifts_and_slots() {
     let expand = build_cash_shop_expand(1, Some(3)).unwrap();
     let failed = request(connection, expand, "expand without NX").await;
     assert_eq!(failed, [0x5C, 0xA5]);
+
+    // NX charged outside the game shows on Check.
+    set_nx_credit(&config.username, 9_000)
+        .await
+        .expect("charge NX");
+    connection
+        .send_packet(build_check_cash(), "check")
+        .await
+        .expect("send check");
+    assert_eq!(credit(connection, "check").await, 9_000);
     drop(session);
 
     // The bag keeps its slots, and the Cash Inventory its four items and the

@@ -429,6 +429,10 @@ namespace ms
 
 			return Button::State::NORMAL;
 		}
+		case Buttons::BT_CHECK:
+			CheckCashPacket().dispatch();
+
+			return Button::State::NORMAL;
 		default:
 			break;
 		}

@@ -6,6 +6,7 @@ pub mod field_mists;
 pub mod field_mobs;
 pub mod field_reactors;
 pub mod field_summons;
+pub mod field_trades;
 pub mod login;
 pub mod messenger;
 pub mod object_ids;

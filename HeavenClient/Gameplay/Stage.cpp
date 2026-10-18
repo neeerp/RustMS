@@ -66,6 +66,16 @@ namespace ms
 			case State::INACTIVE:
 				load_map(mapid);
 				respawn(portalid, chase);
+
+				if (pending_clock && clock.is_present())
+					clock.set(pending_clock->hour, pending_clock->minute, pending_clock->second);
+
+				pending_clock.reset();
+
+				// A ship field asks where its ship is (FUN_0054db7a).
+				if (ship.get_kind() >= 0)
+					ContiStateRequestPacket(mapid, static_cast<uint8_t>(ship.get_kind())).dispatch();
+
 				break;
 			case State::TRANSITION:
 				respawn(portalid, chase);
@@ -101,6 +111,7 @@ namespace ms
 		mists.clear();
 		doors.clear();
 		summons.clear();
+		pending_clock.reset();
 	}
 
 	void Stage::load_map(int32_t mapid)
@@ -117,6 +128,8 @@ namespace ms
 		physics = Physics(src["foothold"], src["info"]);
 		mapinfo = MapInfo(src, physics.get_fht().get_walls(), physics.get_fht().get_borders());
 		portals = MapPortals(src["portal"], mapid);
+		ship = MapShip(src);
+		clock = MapClock(src);
 		ground_effects = EffectLayer();
 
 		if (mapid != -1)
@@ -154,6 +167,7 @@ namespace ms
 		double viewy = viewrpos.y();
 
 		backgrounds.drawbackgrounds(viewx, viewy, alpha);
+		ship.draw_behind(viewx, viewy, alpha);
 
 		std::vector<MapDoors::Spot> town_doors = get_town_doors();
 
@@ -171,6 +185,8 @@ namespace ms
 		}
 
 		summons.draw(-1, viewx, viewy, alpha);
+		clock.draw(viewx, viewy);
+		ship.draw_above(viewx, viewy, alpha);
 
 		const Party &party = player.get_party();
 
@@ -219,6 +235,8 @@ namespace ms
 
 		combat.update();
 		backgrounds.update();
+		ship.update();
+		clock.update();
 		effect.update();
 		ground_effects.update();
 		tilesobjs.update();
@@ -829,6 +847,27 @@ namespace ms
 	void Stage::add_effect(std::string path)
 	{
 		effect = MapEffect(path);
+	}
+
+	void Stage::move_ship(uint8_t target, uint8_t event)
+	{
+		// One for the map being left is no longer news.
+		if (state == State::ACTIVE)
+			ship.move(target, event);
+	}
+
+	void Stage::show_ship_state(uint8_t state, uint8_t flag)
+	{
+		if (Stage::state == State::ACTIVE)
+			ship.show_state(state, flag);
+	}
+
+	void Stage::set_clock(uint8_t hour, uint8_t minute, uint8_t second)
+	{
+		if (state != State::ACTIVE)
+			pending_clock = ClockTime{ hour, minute, second };
+		else if (clock.is_present())
+			clock.set(hour, minute, second);
 	}
 
 	bool Stage::try_give_fame()

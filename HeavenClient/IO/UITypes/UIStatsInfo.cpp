@@ -178,7 +178,8 @@ namespace ms
 
 		statlabels[StatLabel::NAME].change_text(stats.get_name());
 		statlabels[StatLabel::LEVEL].change_text(std::to_string(level));
-		statlabels[StatLabel::GUILD].change_text("-");
+		const Guild& guild = Stage::get().get_player().get_guild();
+		statlabels[StatLabel::GUILD].change_text(guild.exists() ? guild.get_data().name : "-");
 		statlabels[StatLabel::HP].change_text(std::to_string(stats.get_stat(MapleStat::Id::HP)) + " / " + std::to_string(stats.get_total(EquipStat::Id::HP)));
 		statlabels[StatLabel::MP].change_text(std::to_string(stats.get_stat(MapleStat::Id::MP)) + " / " + std::to_string(stats.get_total(EquipStat::Id::MP)));
 		statlabels[StatLabel::EXP].change_text(std::to_string(exp) + " (" + std::to_string(percent) + "%)");
