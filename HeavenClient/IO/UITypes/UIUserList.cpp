@@ -709,7 +709,18 @@ namespace ms
 				break;
 			case Buttons::BT_CHANGE_LEADER:
 				if (member)
-					ChangePartyLeaderPacket(member->id).dispatch();
+				{
+					int32_t id = member->id;
+
+					UI::get().emplace<UIYesNo>(
+							"Do you wish to pass the leader position to \\n" + member->name + "?",
+							[id](bool yes)
+							{
+								if (yes)
+									ChangePartyLeaderPacket(id).dispatch();
+							}
+					);
+				}
 
 				break;
 			case Buttons::BT_WHISPER:

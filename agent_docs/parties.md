@@ -64,6 +64,8 @@ reconstruction of v83:
   - Members are listed under online and offline. The leader has a star.
     Members off the player's map are greyed.
   - Clicking a row selects that member, for Party Leader, Whisper, and Expel.
+    Party Leader asks "Do you wish to pass the leader position to NAME?"
+    first, as v83 does (`FUN_0090e41a`).
   - Invite opens `UIEnterText` to ask for a name.
 - `UIPartyHP` is the translucent HP list at the top right
   (`UserList/Party/PartyHP`). `UIQuestHelper` moves down below it.
