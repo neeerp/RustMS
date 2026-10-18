@@ -531,25 +531,27 @@ namespace ms
 
 				break;
 			}
+			// v83 writes both results into an open messenger's log and drops
+			// them otherwise (FUN_00851293, FUN_00851387).
 			case Mode::INVITE_RESULT:
 			{
 				std::string target = recv.read_string();
 				bool sent = recv.read_bool();
 
-				if (messenger)
-					messenger->add_note(sent ? "You have sent an invite to " + target + "."
-											 : "Unable to find '" + target + "'.");
+				if (messenger && messenger->is_active())
+					messenger->add_note(sent ? "- You have sent the invite to '" + target + "'."
+											 : "- '" + target + "' can't be found.");
 
 				break;
 			}
 			case Mode::DECLINED:
 			{
-				std::string note = recv.read_string() + " has declined your invitation.";
+				std::string target = recv.read_string();
+				bool blocking = recv.read_bool();
 
 				if (messenger && messenger->is_active())
-					messenger->add_note(note);
-				else if (auto chatbar = UI::get().get_element<UIChatBar>())
-					chatbar->send_chatline(note, UIChatBar::LineType::RED);
+					messenger->add_note(blocking ? "'" + target + "' is currently not accepting chat."
+												 : "'" + target + "' denied the request.");
 
 				break;
 			}
