@@ -9,6 +9,7 @@ mod loot;
 mod npc_script;
 mod quest;
 mod script;
+mod ships;
 mod shop;
 mod storage;
 mod trade;
@@ -457,10 +458,11 @@ impl ClientActor {
             };
         self.session_id = Some(session.id);
 
-        let player = spawn_db(move || db::player::load_player(character_id)).await?;
+        let mut player = spawn_db(move || db::player::load_player(character_id)).await?;
         if player.account_id != session.account_id {
             return Err(RuntimeError::NotLoggedIn);
         }
+        ships::leave_forced_return_map(&mut player);
         self.client_id = character_id;
 
         let mut keymap = build::world::keymap::build_keymap(&player.keymap)
@@ -541,6 +543,7 @@ impl ClientActor {
             party,
         })
         .await?;
+        self.set_wall_clock().await?;
         self.bring_summons(spawn).await?;
         self.run_map_enter_script().await
     }
@@ -994,6 +997,11 @@ impl ClientActor {
                 map_id,
                 exit,
             } => self.door_warp(from_map, map_id, exit).await?,
+            ServerMessage::ShipWarp {
+                from_map,
+                map_id,
+                portal,
+            } => self.ship_warp(from_map, map_id, portal).await?,
             ServerMessage::Trade { room, event } => self.trade_event(room, event).await?,
             ServerMessage::SendPacket(mut packet) => self.send(&mut packet).await?,
         }

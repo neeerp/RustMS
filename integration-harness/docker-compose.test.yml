@@ -48,6 +48,9 @@ services:
       RUSTMS_ALLOW_DEBUG_WARPS: "1"
       # Every kill drops its Monster Book card (see tests/monster_book.rs).
       RUSTMS_CARD_DROP_RATE: "1"
+      # Ships sail 60 times as fast: a trip takes 15 seconds (see
+      # tests/ships.rs).
+      RUSTMS_CONTI_SCALE: "60"
       RUSTMS_LOGIN_CHANNELS: Scania-1@127.0.0.1:${HARNESS_WORLD_PORT:-18485}@700;Scania-2@127.0.0.1:${HARNESS_WORLD_PORT_2:-18486}@700;Scania-3@127.0.0.1:${HARNESS_WORLD_PORT_3:-18487}@700
     volumes:
       - ${HARNESS_ASSETS_DIR:-../assets}:/app/assets:ro

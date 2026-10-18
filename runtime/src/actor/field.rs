@@ -7,6 +7,8 @@ use crate::actor::field_trades::{Outbox, RoomRequest, Trades};
 use crate::message::{ClientHandle, FieldKey, FieldMessage, ServerMessage};
 use game::mob_skill::{self, MobSkillEffect};
 use game::{FieldAvatar, MobStat};
+use net::conti::{self, Happening};
+use net::packet::build::world::conti::build_conti_move;
 use net::packet::build::world::door::{build_remove_door, build_spawn_door};
 use net::packet::build::world::drop::{build_drop, build_remove_drop, DropAppearance};
 use net::packet::build::world::field::{
@@ -90,6 +92,8 @@ pub struct FieldActor {
     /// Players' Mystic Doors here, by owner.
     doors: HashMap<ClientId, (i16, i16)>,
     trades: Trades,
+    /// On a ship route's maps, the route time trips were last checked at.
+    trips: Option<i64>,
     tick: Duration,
 }
 
@@ -119,6 +123,7 @@ impl FieldActor {
             summons: SummonSet::default(),
             doors: HashMap::new(),
             trades: Trades::default(),
+            trips: conti::has_trips(key.map_id).then(conti::now),
             tick,
         }
     }
@@ -142,6 +147,7 @@ impl FieldActor {
     /// Advance time-driven field state: drop expiry and mob and reactor
     /// respawns.
     fn on_tick(&mut self, now: Instant) {
+        self.run_trips();
         for object_id in self.drops.expire(now) {
             if let Ok(packet) = build_remove_drop(object_id, None) {
                 self.broadcast(None, packet);
@@ -1175,6 +1181,34 @@ impl FieldActor {
                 });
             }
             None => {}
+        }
+    }
+
+    /// Show the ships leaving and docking, and move their passengers, as
+    /// the trips through this map change (`net::conti`).
+    fn run_trips(&mut self) {
+        let Some(last) = self.trips else {
+            return;
+        };
+        let now = conti::now();
+        self.trips = Some(now);
+        for happening in conti::happenings(self.key.map_id, last, now) {
+            match happening {
+                Happening::Show(target, state) => {
+                    if let Ok(packet) = build_conti_move(target, state) {
+                        self.broadcast(None, packet);
+                    }
+                }
+                Happening::MoveAll { map_id, portal } => {
+                    for occupant in self.occupants.values() {
+                        occupant.handle.send(ServerMessage::ShipWarp {
+                            from_map: self.key.map_id,
+                            map_id,
+                            portal,
+                        });
+                    }
+                }
+            }
         }
     }
 

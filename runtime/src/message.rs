@@ -144,6 +144,12 @@ pub enum ServerMessage {
         map_id: i32,
         exit: net::packet::handle::world::DoorExit,
     },
+    /// A ship's trip moves everyone on `from_map` to `map_id`, at `portal`.
+    ShipWarp {
+        from_map: i32,
+        map_id: i32,
+        portal: &'static str,
+    },
     /// News from trading room `room` on this player's field.
     Trade {
         room: i32,

@@ -149,6 +149,12 @@ pub struct Trace {
     /// BROADCAST_MSG: (kind, message) of each whose kind carries only its
     /// message (0, 1, 5).
     pub broadcasts: Vec<(u8, String)>,
+    /// CLOCK kind 1, a wall clock's time of day: (hour, minute, second).
+    pub clocks: Vec<(u8, u8, u8)>,
+    /// CONTI_MOVE: (target, state) of each ship shown leaving or docking.
+    pub ship_moves: Vec<(u8, u8)>,
+    /// CONTI_STATE: the ship's state, as answered.
+    pub ship_states: Vec<u8>,
     /// Mobs and drops on the current field.
     pub field: Field,
 }
@@ -448,6 +454,17 @@ impl Trace {
             self.warps.push(warp.map_id);
             self.arrivals
                 .push((warp.map_id, warp.spawn_point, warp.chase));
+        } else if op == SendOpcode::Clock as i16 && r.read_byte().unwrap() == 1 {
+            self.clocks.push((
+                r.read_byte().unwrap(),
+                r.read_byte().unwrap(),
+                r.read_byte().unwrap(),
+            ));
+        } else if op == SendOpcode::ContiMove as i16 {
+            self.ship_moves
+                .push((r.read_byte().unwrap(), r.read_byte().unwrap()));
+        } else if op == SendOpcode::ContiState as i16 {
+            self.ship_states.push(r.read_byte().unwrap());
         } else if op == SendOpcode::SpawnPortal as i16 {
             let (town, field) = (r.read_int().unwrap(), r.read_int().unwrap());
             self.own_doors.push((town != 999_999_999).then(|| {

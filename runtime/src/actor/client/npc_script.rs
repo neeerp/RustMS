@@ -2,6 +2,7 @@ use super::quest::{gain_exp, QuestChange};
 use super::ClientActor;
 use crate::db::spawn_db;
 use crate::error::RuntimeError;
+use net::conti::{self, State};
 use net::dialogue::Prompt;
 use net::npc_scripts::{self, NpcScript, Step};
 use net::packet::build::world::stat::StatUpdate;
@@ -161,6 +162,14 @@ impl ClientActor {
                 Effect::StartQuest(id) => change = Some(QuestChange::Start(template(*id)?)),
                 Effect::CompleteQuest(id) => change = Some(QuestChange::Complete(template(*id)?)),
                 Effect::Warp(map_id) => warp = Some(*map_id),
+                Effect::RequireBoarding(platform) => {
+                    let boarding = conti::departing_from(*platform)
+                        .is_some_and(|route| route.timetable.state(conti::now()) == State::Wait);
+                    if !boarding {
+                        debug!(platform, "Boarding closed; nothing applied");
+                        return Ok(Applied::Refused);
+                    }
+                }
             }
         }
         if (changed || change.is_some()) && !self.commit_player(next, change, &mut packets).await? {

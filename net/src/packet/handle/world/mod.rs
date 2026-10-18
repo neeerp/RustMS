@@ -6,6 +6,7 @@ mod change_map;
 mod char_info;
 mod chat;
 mod combat;
+mod conti;
 mod door;
 mod emote;
 mod fame;
@@ -47,6 +48,7 @@ pub use self::combat::{
     catch_disease, countered, AttackHandler, MobDistanceHandler, MoveLifeHandler, NpcActionHandler,
     TakeDamageHandler,
 };
+pub use self::conti::ContiStateRequestHandler;
 pub use self::door::UseDoorHandler;
 pub use self::emote::FaceExpressionHandler;
 pub use self::fame::{GiveFameHandler, MIN_FAME_LEVEL};

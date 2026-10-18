@@ -198,6 +198,9 @@ pub struct FieldTemplate {
     pub town: bool,
     /// `info/fieldLimit`: what the map forbids (see `FIELD_LIMIT_*`).
     pub field_limit: i32,
+    /// Whether the map has a wall clock (a `clock` node with a position and
+    /// size, as stations do), which the server sets to the time of day.
+    pub clock: bool,
     pub footholds: footholds::Footholds,
     portals_by_id: BTreeMap<u32, PortalTemplate>,
     portal_ids_by_name: HashMap<String, Vec<u32>>,
@@ -344,6 +347,17 @@ fn build_field_template(
         ),
         None => (false, 0),
     };
+    // v83 FUN_0052bc72 makes the clock only if all four are non-zero.
+    let clock = match nx.child_by_name(map_node_idx, "clock")? {
+        Some(clock) => {
+            let mut all_set = true;
+            for key in ["x", "y", "width", "height"] {
+                all_set &= nx.int_child(clock, key)?.unwrap_or(0) != 0;
+            }
+            all_set
+        }
+        None => false,
+    };
 
     let mut portals_by_id = BTreeMap::new();
 
@@ -404,6 +418,7 @@ fn build_field_template(
         recovery,
         town,
         field_limit,
+        clock,
         footholds,
         portals_by_id,
         portal_ids_by_name,
@@ -873,6 +888,7 @@ mod tests {
             recovery: 1.0,
             town: false,
             field_limit: 0,
+            clock: false,
             footholds: footholds::Footholds::default(),
             portals_by_id: BTreeMap::from([
                 (
@@ -939,6 +955,7 @@ mod tests {
             recovery: 1.0,
             town: false,
             field_limit: 0,
+            clock: false,
             reactors: Vec::new(),
             footholds: footholds::Footholds::default(),
             portals_by_id: BTreeMap::from([
@@ -1011,5 +1028,18 @@ mod tests {
         let field = game_data.field(101_010_000).expect("a field near Ellinia");
         assert!(!field.town);
         assert_eq!(field.return_map, Some(101_000_000));
+    }
+
+    #[test]
+    fn stations_have_a_wall_clock() {
+        let Some(path) = test_assets::path("Map.nx") else {
+            return;
+        };
+        let game_data = GameData::load_from_nx_map(&path).expect("load map nx");
+        let clock = |map_id| game_data.field(map_id).expect("map").clock;
+        assert!(clock(101_000_300));
+        assert!(clock(200_000_111));
+        assert!(!clock(101_000_301));
+        assert!(!clock(100_000_000));
     }
 }

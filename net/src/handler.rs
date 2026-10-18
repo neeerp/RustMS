@@ -536,6 +536,10 @@ fn world_routes() -> &'static HashMap<i16, WorldRoute> {
                 Op::PartySearchUpdate,
                 InGame(&world::PartySearchUpdateHandler),
             ),
+            (
+                Op::ContiStateRequest,
+                InGame(&world::ContiStateRequestHandler),
+            ),
             (Op::ChangeKeybinds, InGame(&world::ChangeKeybindsHandler)),
             (
                 Op::MonsterBookCover,
@@ -641,7 +645,7 @@ mod tests {
     fn every_registered_opcode_is_unique_per_server() {
         // The maps would silently drop duplicates; check the table sizes match.
         assert_eq!(login_routes().len(), 13);
-        assert_eq!(world_routes().len(), 59);
+        assert_eq!(world_routes().len(), 60);
     }
 
     #[test]

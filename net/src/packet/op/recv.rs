@@ -85,6 +85,7 @@ pub enum RecvOpcode {
     DamageReactor = 0xCD,
 
     PlayerMapTransfer = 0xCF,
+    ContiStateRequest = 0xDC,
     PartySearchUpdate = 0xDF,
     CashShopOperation = 0xE5,
 

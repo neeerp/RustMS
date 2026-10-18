@@ -8,6 +8,7 @@ pub mod cash_shop;
 pub mod codec;
 pub mod combat;
 pub mod content;
+pub mod conti;
 pub mod dialogue;
 mod game_data;
 pub mod handler;

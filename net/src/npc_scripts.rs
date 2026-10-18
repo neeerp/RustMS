@@ -5,6 +5,7 @@
 //! these keep the effect-returning shape a scripting runtime would have.
 
 use crate::content;
+use crate::conti::{self, Route, State};
 use crate::dialogue::{DialoguePage, Prompt};
 use crate::scripts::Effect;
 use game::{guild, Player};
@@ -25,6 +26,17 @@ const LITH_HARBOR: i32 = 104_000_000;
 const RECOMMENDATION_LETTER: i32 = 4031801;
 const SHIP_FARE: i32 = 150;
 const SHIP_LEVEL: u8 = 7;
+/// The Ellinia and Orbis stations' crews: ticket sellers, ushers, and the
+/// crew who let passengers off before departure.
+const JOEL: i32 = 1032007;
+const CHERRY: i32 = 1032008;
+const PURIN: i32 = 1032009;
+const AGATHA: i32 = 2012000;
+const RINI: i32 = 2012001;
+const ERIN: i32 = 2012002;
+/// Orbis Station's guide, and the passage to the platform for Ellinia.
+const ISA: i32 = 2012006;
+const ORBIS_TUNNEL: i32 = 200000110;
 
 /// The player's answer to the current prompt.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -90,6 +102,13 @@ impl NpcScript {
             ROBIN => Some(robin()),
             SHANKS => Some(shanks(player)),
             HERACLE => Some(heracle(player)),
+            JOEL => Some(ticket_seller(JOEL, &conti::TO_ORBIS, player)),
+            AGATHA => Some(ticket_seller(AGATHA, &conti::TO_ELLINIA, player)),
+            CHERRY => Some(usher(CHERRY, &conti::TO_ORBIS, player, conti::now())),
+            RINI => Some(usher(RINI, &conti::TO_ELLINIA, player, conti::now())),
+            PURIN => Some(leave_ship(PURIN, &conti::TO_ORBIS)),
+            ERIN => Some(leave_ship(ERIN, &conti::TO_ELLINIA)),
+            ISA => Some(isa()),
             MAPLE_ADMINISTRATOR => Some(Self::new(
                 MAPLE_ADMINISTRATOR,
                 vec![Page::Ask {
@@ -321,6 +340,91 @@ fn heracle(player: &Player) -> NpcScript {
         }
     };
     NpcScript::new(HERACLE, vec![page])
+}
+
+/// A station's ticket booth: one ticket for the route's price. Like the
+/// original, it asks first and only then says the player can't pay.
+fn ticket_seller(npc_id: i32, route: &Route, player: &Player) -> NpcScript {
+    let short = text(keys::SHIPS_SELL_SHORT);
+    let can_pay = player.meso >= route.price;
+    let on_yes = if can_pay {
+        vec![
+            Effect::SpendMeso(route.price),
+            Effect::GiveItem {
+                item_id: route.ticket,
+                quantity: 1,
+            },
+        ]
+    } else {
+        Vec::new()
+    };
+    let mut pages = vec![Page::Ask {
+        text: text(keys::SHIPS_SELL_ASK),
+        on_yes,
+        on_no: Some(text(keys::SHIPS_SELL_DECLINE)),
+    }];
+    if !can_pay {
+        pages.push(Page::Say(short.clone()));
+    }
+    let mut script = NpcScript::new(npc_id, pages);
+    script.inventory_full = Some(short);
+    script
+}
+
+/// `get_ticket`: the platform's usher takes a ticket and shows the player
+/// to the waiting room while the ship boards, as of route time `t`.
+fn usher(npc_id: i32, route: &Route, player: &Player, t: i64) -> NpcScript {
+    let page = match route.timetable.state(t) {
+        State::Wait if player.inventory.count(route.ticket) == 0 => {
+            Page::Say(text(keys::SHIPS_BOARD_NO_TICKET))
+        }
+        State::Wait => Page::Ask {
+            text: text(keys::SHIPS_BOARD_ASK),
+            on_yes: vec![
+                Effect::RequireBoarding(route.platform),
+                Effect::TakeItem {
+                    item_id: route.ticket,
+                    quantity: 1,
+                },
+                Effect::Warp(route.waiting_room),
+            ],
+            on_no: Some(text(keys::SHIPS_BOARD_DECLINE)),
+        },
+        State::Start => Page::Say(text(keys::SHIPS_BOARD_CLOSING)),
+        _ => Page::Say(text(keys::SHIPS_BOARD_FULL)),
+    };
+    NpcScript::new(npc_id, vec![page])
+}
+
+/// `goOutWaitingRoom`: back to the platform, without the ticket.
+fn leave_ship(npc_id: i32, route: &Route) -> NpcScript {
+    NpcScript::new(
+        npc_id,
+        vec![Page::Ask {
+            text: text(keys::SHIPS_LEAVE_ASK),
+            on_yes: vec![Effect::Warp(route.platform)],
+            on_no: Some(text(keys::SHIPS_LEAVE_DECLINE)),
+        }],
+    )
+}
+
+/// `station_in`: Isa shows the way to Orbis Station's platforms; only the
+/// one for Ellinia's ship so far.
+fn isa() -> NpcScript {
+    NpcScript::new(
+        ISA,
+        vec![Page::Menu {
+            text: text(keys::ISA_MENU),
+            choices: vec![(
+                text(keys::ISA_PLATFORM),
+                vec![Page::Ask {
+                    text: text(keys::ISA_ASK),
+                    on_yes: vec![Effect::Warp(ORBIS_TUNNEL)],
+                    on_no: Some(text(keys::ISA_DECLINE)),
+                }],
+            )],
+        }],
+    )
 }
 
 /// `begin5`: Robin's questions and answers, as many topics and pages as the
@@ -616,6 +720,94 @@ mod tests {
             assert_eq!(buttons(&heracle.begin()), (false, false));
             assert_eq!(heracle.respond(ScriptInput::Next), Some(Step::default()));
         }
+    }
+
+    #[test]
+    fn the_booths_sell_a_ticket_for_5000_mesos() {
+        let buyer = traveller(10, 5000, false);
+        let mut joel = NpcScript::for_npc(JOEL, &buyer).unwrap();
+        assert_eq!(kind(&joel.begin()), Some(1));
+        assert_eq!(
+            joel.respond(ScriptInput::Yes).unwrap(),
+            Step {
+                prompt: None,
+                effects: vec![
+                    Effect::SpendMeso(5000),
+                    Effect::GiveItem {
+                        item_id: conti::TO_ORBIS.ticket,
+                        quantity: 1
+                    }
+                ]
+            }
+        );
+        let mut agatha = NpcScript::for_npc(AGATHA, &buyer).unwrap();
+        agatha.respond(ScriptInput::Yes).unwrap();
+        assert!(agatha.inventory_full().is_some(), "a full Etc tab is told");
+
+        // Short of mesos: yes is answered with why not.
+        let mut joel = NpcScript::for_npc(JOEL, &traveller(10, 4999, false)).unwrap();
+        let short = joel.respond(ScriptInput::Yes).unwrap();
+        assert!(short.effects.is_empty());
+        assert_eq!(buttons(&short), (false, false));
+    }
+
+    #[test]
+    fn the_usher_boards_ticket_holders_only_while_the_ship_boards() {
+        const HOUR: i64 = 3_600_000;
+        let minute = |m: i64| 7 * HOUR + m * 60_000;
+        let mut holder = traveller(10, 0, false);
+        holder.inventory.insert(
+            game::InventoryType::Etc,
+            1,
+            game::Item::stack(conti::TO_ORBIS.ticket, 1),
+        );
+        let mut cherry = usher(CHERRY, &conti::TO_ORBIS, &holder, minute(12));
+        assert_eq!(kind(&cherry.begin()), Some(1));
+        assert_eq!(
+            cherry.respond(ScriptInput::Yes).unwrap().effects,
+            [
+                Effect::RequireBoarding(101000300),
+                Effect::TakeItem {
+                    item_id: conti::TO_ORBIS.ticket,
+                    quantity: 1
+                },
+                Effect::Warp(101000301),
+            ]
+        );
+        // No ticket, boarding closed, or the ship gone: she says so.
+        for cherry in [
+            usher(
+                CHERRY,
+                &conti::TO_ORBIS,
+                &traveller(10, 0, false),
+                minute(12),
+            ),
+            usher(CHERRY, &conti::TO_ORBIS, &holder, minute(14)),
+            usher(CHERRY, &conti::TO_ORBIS, &holder, minute(5)),
+        ] {
+            assert_eq!(buttons(&cherry.begin()), (false, false));
+        }
+    }
+
+    #[test]
+    fn the_crew_let_passengers_off_and_isa_shows_the_way() {
+        let mut purin = NpcScript::for_npc(PURIN, &player(50)).unwrap();
+        assert_eq!(
+            purin.respond(ScriptInput::Yes).unwrap().effects,
+            [Effect::Warp(101000300)]
+        );
+        let mut erin = NpcScript::for_npc(ERIN, &player(50)).unwrap();
+        assert_eq!(
+            erin.respond(ScriptInput::Yes).unwrap().effects,
+            [Effect::Warp(200000111)]
+        );
+        let mut isa = NpcScript::for_npc(ISA, &player(50)).unwrap();
+        assert_eq!(kind(&isa.begin()), Some(4));
+        assert_eq!(kind(&isa.respond(ScriptInput::Select(0)).unwrap()), Some(1));
+        assert_eq!(
+            isa.respond(ScriptInput::Yes).unwrap().effects,
+            [Effect::Warp(ORBIS_TUNNEL)]
+        );
     }
 
     #[test]
