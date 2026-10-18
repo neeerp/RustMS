@@ -44,6 +44,7 @@ pub enum RecvOpcode {
     UseDoor = 0x85,
     DenyPartyRequest = 0x7D,
     GuildOperation = 0x7E,
+    DenyGuildRequest = 0x7F,
     FaceExpression = 0x33,
     Whisper = 0x78,
     Messenger = 0x7A,

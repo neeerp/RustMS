@@ -52,7 +52,7 @@ pub use self::conti::ContiStateRequestHandler;
 pub use self::door::UseDoorHandler;
 pub use self::emote::FaceExpressionHandler;
 pub use self::fame::{GiveFameHandler, MIN_FAME_LEVEL};
-pub use self::guild::GuildOperationHandler;
+pub use self::guild::{DenyGuildRequestHandler, GuildOperationHandler};
 pub use self::item_move::ItemMoveHandler;
 pub use self::keybinds::ChangeKeybindsHandler;
 pub use self::logged_in::PlayerLoggedInHandler;

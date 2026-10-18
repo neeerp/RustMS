@@ -25,11 +25,13 @@
 
 #include "../Character/Buff.h"
 #include "../Character/Guild.h"
+#include "../Character/MiniRoomBox.h"
 #include "../Graphics/Animation.h"
 #include "../Net/Login.h"
 #include "../Net/Handlers/Helpers/MobStatParser.h"
 
 #include <memory>
+#include <optional>
 #include <utility>
 #include <vector>
 
@@ -133,7 +135,7 @@ namespace ms
 		CharSpawn(int32_t cid, const LookEntry &look, uint8_t level, int16_t job, const std::string &name,
 				  int8_t stance, Point<int16_t> position, int32_t chair,
 				  std::vector<std::pair<Buffstat::Id, int32_t>> buffs, const std::string &guild,
-				  const GuildEmblem &emblem);
+				  const GuildEmblem &emblem, std::optional<MiniRoomBox> room = std::nullopt);
 
 		int32_t get_cid() const;
 
@@ -151,5 +153,6 @@ namespace ms
 		std::vector<std::pair<Buffstat::Id, int32_t>> buffs;
 		std::string guild;
 		GuildEmblem emblem;
+		std::optional<MiniRoomBox> room;
 	};
 }

@@ -378,8 +378,12 @@ namespace ms
 	public:
 		enum Operation : int8_t
 		{
+			RELOAD = 0,
 			CREATE = 2,
-			INVITE = 5
+			INVITE = 5,
+			JOIN = 6,
+			LEAVE = 7,
+			EXPEL = 8
 		};
 
 		GuildOperationPacket(Operation op) : OutPacket(OutPacket::Opcode::GUILD_OPERATION)
@@ -405,6 +409,65 @@ namespace ms
 		InviteToGuildPacket(const std::string& name) : GuildOperationPacket(GuildOperationPacket::Operation::INVITE)
 		{
 			write_string(name);
+		}
+	};
+
+	// Asks for the player's guild again, after joining one
+	class ReloadGuildPacket : public GuildOperationPacket
+	{
+	public:
+		ReloadGuildPacket() : GuildOperationPacket(GuildOperationPacket::Operation::RELOAD) {}
+	};
+
+	// Takes up an invitation to a guild
+	class JoinGuildPacket : public GuildOperationPacket
+	{
+	public:
+		JoinGuildPacket(int32_t guild_id, int32_t cid) : GuildOperationPacket(GuildOperationPacket::Operation::JOIN)
+		{
+			write_int(guild_id);
+			write_int(cid);
+		}
+	};
+
+	// Quits the player's guild
+	class LeaveGuildPacket : public GuildOperationPacket
+	{
+	public:
+		LeaveGuildPacket(int32_t cid, const std::string& name) :
+			GuildOperationPacket(GuildOperationPacket::Operation::LEAVE)
+		{
+			write_int(cid);
+			write_string(name);
+		}
+	};
+
+	// Expels a member from the player's guild
+	class ExpelFromGuildPacket : public GuildOperationPacket
+	{
+	public:
+		ExpelFromGuildPacket(int32_t cid, const std::string& name) :
+			GuildOperationPacket(GuildOperationPacket::Operation::EXPEL)
+		{
+			write_int(cid);
+			write_string(name);
+		}
+	};
+
+	// Turns down an invitation to a guild; the inviter hears the reason
+	// Opcode: DENY_GUILD_REQUEST(127)
+	class DenyGuildRequestPacket : public OutPacket
+	{
+	public:
+		// Not taking invitations, already considering another, or declined.
+		static constexpr int8_t BUSY = 0x35, ANOTHER = 0x36, DECLINED = 0x37;
+
+		DenyGuildRequestPacket(int8_t reason, const std::string& inviter, const std::string& self) :
+			OutPacket(OutPacket::Opcode::DENY_GUILD_REQUEST)
+		{
+			write_byte(reason);
+			write_string(inviter);
+			write_string(self);
 		}
 	};
 

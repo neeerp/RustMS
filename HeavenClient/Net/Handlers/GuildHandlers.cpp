@@ -8,6 +8,7 @@
 #include "../../IO/UI.h"
 #include "../../IO/UITypes/UIChatBar.h"
 #include "../../IO/UITypes/UIEnterText.h"
+#include "../../IO/UITypes/UIInviteCard.h"
 #include "../../IO/UITypes/UINpcTalk.h"
 #include "../../IO/UITypes/UIStatsInfo.h"
 
@@ -20,6 +21,7 @@ namespace ms
 		enum Operation : uint8_t
 		{
 			NAME_PROMPT = 0x01,
+			INVITE = 0x05,
 			INFO = 0x1A,
 			// 0xcce
 			NAME_TAKEN = 0x1C,
@@ -29,6 +31,28 @@ namespace ms
 			ALREADY_IN_GUILD = 0x21,
 			// 0x15d
 			LEVEL_TOO_LOW = 0x23,
+			// 0x15a for the player, 0x15b for the others
+			JOINED = 0x27,
+			// 0x15c
+			ALREADY_JOINED = 0x28,
+			// 0x160
+			GUILD_FULL = 0x29,
+			// 0x16a
+			NOT_IN_CHANNEL = 0x2A,
+			// 0x152 for the player, 0x155 for the others
+			LEFT = 0x2C,
+			// 0x15e
+			LEAVE_NOT_IN_GUILD = 0x2D,
+			// 0x15e0 for the player, 0x153 for the others
+			EXPELLED = 0x2F,
+			// 0x15e
+			EXPEL_NOT_IN_GUILD = 0x30,
+			// 0x14e
+			NOT_ACCEPTING = 0x35,
+			// 0xaa3
+			ANOTHER_INVITATION = 0x36,
+			// 0x14f
+			DECLINED = 0x37,
 			// 0x167
 			ADMIN = 0x38
 		};
@@ -100,6 +124,50 @@ namespace ms
 			if (auto stats = UI::get().get_element<UIStatsInfo>())
 				stats->update_all_stats();
 		}
+
+		// An invitation (FUN_00a37490): a card, unless one is up already or
+		// the player is busy with a window, when the client turns it down
+		// itself. The card's X declines; letting it fade says nothing.
+		void invited(int32_t guild_id, const std::string& inviter)
+		{
+			std::string self = Stage::get().get_player().get_stats().get_name();
+			auto cards = UI::get().get_element<UIInviteCard>();
+
+			if (cards && cards->showing(UIInviteCard::GUILD))
+				return DenyGuildRequestPacket(DenyGuildRequestPacket::ANOTHER, inviter, self).dispatch();
+
+			if (!cards || UI::get().modal_open())
+				return DenyGuildRequestPacket(DenyGuildRequestPacket::BUSY, inviter, self).dispatch();
+
+			cards->add(UIInviteCard::GUILD, inviter, [guild_id, inviter, self](bool yes)
+			{
+				if (yes)
+					JoinGuildPacket(guild_id, Stage::get().get_player().get_oid()).dispatch();
+				else
+					DenyGuildRequestPacket(DenyGuildRequestPacket::DECLINED, inviter, self).dispatch();
+			});
+		}
+
+		// A member left (LEFT) or was expelled; the player, if it was them.
+		void departed(Guild& guild, int32_t cid, const std::string& name, bool expelled)
+		{
+			if (cid == Stage::get().get_player().get_oid())
+			{
+				guild.clear();
+				chat_line(expelled ? "You have been expelled from the guild." : "You have quit the guild.");
+			}
+			else
+			{
+				guild.remove(cid);
+
+				if (name.empty())
+					chat_line("Deleted Chracters have been expelled.");
+				else
+					chat_line("'" + name + (expelled ? "' has been expelled from the guild." : "' quitted the guild."));
+			}
+
+			refresh();
+		}
 	}
 
 	void GuildOperationHandler::handle(InPacket& recv) const
@@ -113,6 +181,12 @@ namespace ms
 		case Operation::NAME_PROMPT:
 			prompt_name();
 			break;
+		case Operation::INVITE:
+		{
+			int32_t guild_id = recv.read_int();
+			invited(guild_id, recv.read_string());
+			break;
+		}
 		case Operation::INFO:
 			guild.clear();
 
@@ -144,6 +218,63 @@ namespace ms
 			break;
 		case Operation::LEVEL_TOO_LOW:
 			chat_line("You cannot make a guild, due to the limitation of minimum level requirement.");
+			break;
+		case Operation::JOINED:
+		{
+			int32_t guild_id = recv.read_int();
+			int32_t cid = recv.read_int();
+
+			if (cid == player.get_oid())
+			{
+				// The server sends the guild when asked.
+				chat_line("You have entered the guild.");
+				ReloadGuildPacket().dispatch();
+				break;
+			}
+
+			if (!guild.exists() || guild_id != guild.get_data().id)
+				break;
+
+			GuildMember member = GuildParser::parse_member(recv);
+			member.id = cid;
+			chat_line("'" + member.name + "' has joined the guild.");
+			guild.add(std::move(member));
+			refresh();
+			break;
+		}
+		case Operation::ALREADY_JOINED:
+			chat_line("Already joined the guild.");
+			break;
+		case Operation::GUILD_FULL:
+			chat_line("The guild, you are trying to join, has already reached the max number of users.");
+			break;
+		case Operation::NOT_IN_CHANNEL:
+			chat_line("The character cannot be found in the current channel.");
+			break;
+		case Operation::LEFT:
+		case Operation::EXPELLED:
+		{
+			int32_t guild_id = recv.read_int();
+			int32_t cid = recv.read_int();
+			std::string name = recv.read_string();
+
+			if (guild.exists() && guild_id == guild.get_data().id)
+				departed(guild, cid, name, mode == Operation::EXPELLED);
+
+			break;
+		}
+		case Operation::LEAVE_NOT_IN_GUILD:
+		case Operation::EXPEL_NOT_IN_GUILD:
+			chat_line("You are not in the guild.");
+			break;
+		case Operation::NOT_ACCEPTING:
+			chat_line(recv.read_string() + " is currently not accepting guild invite message.");
+			break;
+		case Operation::ANOTHER_INVITATION:
+			chat_line("'" + recv.read_string() + "' is taking care of another invitation.");
+			break;
+		case Operation::DECLINED:
+			chat_line(recv.read_string() + " has denied your guild invitation.");
 			break;
 		case Operation::ADMIN:
 			chat_line("Admin cannot make a guild.");

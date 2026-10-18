@@ -96,6 +96,33 @@ namespace ms
 		return exists() && !data.members.empty() && data.members.front().id == cid;
 	}
 
+	int32_t Guild::rank(int32_t cid) const
+	{
+		const GuildMember* member = find(cid);
+
+		return member ? member->rank : 0;
+	}
+
+	bool Guild::full() const
+	{
+		return data.members.size() >= static_cast<size_t>(data.capacity);
+	}
+
+	bool Guild::may_kick(int32_t self, int32_t picked)
+	{
+		switch (picked)
+		{
+		case 2:
+			return self == 1;
+		case 3:
+		case 4:
+		case 5:
+			return self == 1 || self == 2;
+		default:
+			return false;
+		}
+	}
+
 	const std::string& Guild::title(int32_t rank) const
 	{
 		static const std::string none;
@@ -133,5 +160,20 @@ namespace ms
 	void Guild::clear()
 	{
 		data = GuildData();
+	}
+
+	void Guild::add(GuildMember member)
+	{
+		remove(member.id);
+		data.members.push_back(std::move(member));
+	}
+
+	void Guild::remove(int32_t cid)
+	{
+		auto& members = data.members;
+		members.erase(std::remove_if(members.begin(), members.end(), [cid](const GuildMember& member)
+		{
+			return member.id == cid;
+		}), members.end());
 	}
 }

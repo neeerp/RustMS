@@ -7,6 +7,7 @@ mod fame;
 mod guilds;
 mod loot;
 mod npc_script;
+mod personal_shop;
 mod quest;
 mod script;
 mod ships;
@@ -118,6 +119,8 @@ pub struct ClientActor {
     door: Option<door::OpenDoor>,
     /// The player's side of a trade they are in.
     trade: Option<trade::Trade>,
+    /// The player's own shop, or the one they visit.
+    personal_shop: Option<personal_shop::PersonalShop>,
     /// Heracle asked for a new guild's name; only then is one founded.
     naming_guild: bool,
 }
@@ -172,6 +175,7 @@ impl ClientActor {
             presence: None,
             door: None,
             trade: None,
+            personal_shop: None,
             naming_guild: false,
         })
     }
@@ -350,9 +354,14 @@ impl ClientActor {
             WorldAction::Quest(request) => self.request_quest_action(request).await?,
             WorldAction::Shop(request) => self.shop_action(request).await?,
             WorldAction::Storage(request) => self.storage_request(request).await?,
-            WorldAction::Trade(request) => {
+            WorldAction::Trade(_) if self.in_cash_shop => {}
+            WorldAction::Trade(request) if self.personal_shop.is_some() => {
+                self.shop_room_request(request).await?
+            }
+            WorldAction::Trade(request) => self.trade_request(request).await?,
+            WorldAction::PersonalShop(request) => {
                 if !self.in_cash_shop {
-                    self.trade_request(request).await?
+                    self.personal_shop_request(request).await?
                 }
             }
             WorldAction::ScriptPortal { portal } => self.touch_script_portal(&portal).await?,
@@ -518,6 +527,7 @@ impl ClientActor {
         self.in_game_mut()?.player.chair = 0;
 
         self.leave_trade().await?;
+        self.leave_personal_shop().await?;
         self.send_to_field(FieldMessage::Leave {
             client_id: self.client_id,
         })
@@ -561,6 +571,7 @@ impl ClientActor {
         self.cancel_buffs().await?;
         self.close_door().await?;
         self.leave_trade().await?;
+        self.leave_personal_shop().await?;
         self.flush().await?;
         spawn_db(move || db::session::begin_channel_transition(session_id, i16::from(channel_id)))
             .await?;
@@ -584,6 +595,7 @@ impl ClientActor {
         self.naming_guild = false;
         self.npc_request_id = self.npc_request_id.wrapping_add(1);
         self.leave_trade().await?;
+        self.leave_personal_shop().await?;
         self.send_to_field(FieldMessage::Leave {
             client_id: self.client_id,
         })
@@ -971,6 +983,8 @@ impl ClientActor {
                 })
                 .await?
             }
+            ServerMessage::JoinGuild { guild_id } => self.join_guild(guild_id).await?,
+            ServerMessage::GuildChanged => self.guild_changed().await?,
             ServerMessage::PartySkill {
                 used,
                 origin,
@@ -1012,6 +1026,7 @@ impl ClientActor {
                 portal,
             } => self.ship_warp(from_map, map_id, portal).await?,
             ServerMessage::Trade { room, event } => self.trade_event(room, event).await?,
+            ServerMessage::PersonalShop { room, event } => self.shop_event(room, event).await?,
             ServerMessage::SendPacket(mut packet) => self.send(&mut packet).await?,
         }
         Ok(())
@@ -1061,6 +1076,7 @@ impl ClientActor {
                     FieldMessage::Join { .. }
                         | FieldMessage::Leave { .. }
                         | FieldMessage::Trade { .. }
+                        | FieldMessage::PersonalShop { .. }
                 ) {
                     field
                         .tx
@@ -1068,8 +1084,9 @@ impl ClientActor {
                         .await
                         .map_err(|_| RuntimeError::ChannelSend)?;
                 }
-                // The trading room died with the field.
-                self.abandon_trade().await
+                // The trading room or shop died with the field.
+                self.abandon_trade().await?;
+                self.abandon_personal_shop().await
             }
         }
     }
@@ -1120,9 +1137,12 @@ impl ClientActor {
             return Ok(());
         }
         let mut snapshot = game.player.clone();
-        // What the player put up in a trade is still theirs.
+        // What the player put up in a trade or shop is still theirs.
         if let Some(trade) = &self.trade {
             trade.add_back(&mut snapshot);
+        }
+        if let Some(shop) = &self.personal_shop {
+            shop.add_back(&mut snapshot);
         }
         spawn_db(move || db::player::save_player(&snapshot)).await?;
         game.player.mark_saved();
@@ -1153,9 +1173,12 @@ impl ClientActor {
     async fn cleanup(&mut self) {
         if self.game.is_some() {
             // Before the save: the player gets their offer back, or the
-            // partner's.
+            // partner's, and their unsold stock.
             if let Err(error) = self.leave_trade().await {
                 warn!(self.client_id, %error, "Failed to finish trade");
+            }
+            if let Err(error) = self.leave_personal_shop().await {
+                warn!(self.client_id, %error, "Failed to close personal shop");
             }
             if !self.in_cash_shop {
                 let _ = self

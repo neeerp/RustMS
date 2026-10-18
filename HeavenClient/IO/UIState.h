@@ -87,6 +87,10 @@ namespace ms
 		virtual UIElement* get_front(std::list<UIElement::Type> types) = 0;
 
 		virtual UIElement* get_front(Point<int16_t> pos) = 0;
+
+		// Whether a window that holds the cursor, such as a notice or an
+		// NPC's talk, is open.
+		virtual bool modal_open() const { return false; }
 	};
 
 	class UIStateNull : public UIState

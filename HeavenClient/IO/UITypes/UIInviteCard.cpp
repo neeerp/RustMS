@@ -32,6 +32,8 @@ namespace ms
 			const char* heading;
 			// v83's text position (FUN_0052065d), moved up to HC's text tops.
 			Point<int16_t> text;
+			// The guild's has "from '<name>'" first.
+			bool from_first = false;
 		};
 
 		// The invitations'.
@@ -39,7 +41,8 @@ namespace ms
 			{ "icon0", "An invitation", Point<int16_t>(24, 2) },
 			{ "icon1", "Buddy request", Point<int16_t>(24, 2) },
 			{ "icon2", "Trade request", Point<int16_t>(24, 2) },
-			{ "icon5", "Party invite", Point<int16_t>(26, 4) }
+			{ "icon5", "Party invite", Point<int16_t>(26, 4) },
+			{ "icon5", "Guild invite", Point<int16_t>(26, 4), true }
 		};
 
 		// v83 writes the arrivals at (25, 7), in Arial 11.
@@ -112,12 +115,13 @@ namespace ms
 	{
 		const Look& look = LOOKS[kind];
 		nl::node fade = NxFiles::ui_classic["UIWindow.img"]["FadeYesNo"];
+		std::string from = "from '" + inviter + "'";
 
 		push({
 			kind,
 			fade[look.icon],
-			Text(Text::A12M, Text::LEFT, Color::Name::WHITE, look.heading),
-			Text(Text::A12M, Text::LEFT, Color::Name::WHITE, "from '" + inviter + "'"),
+			Text(Text::A12M, Text::LEFT, Color::Name::WHITE, look.from_first ? from : look.heading),
+			Text(Text::A12M, Text::LEFT, Color::Name::WHITE, look.from_first ? look.heading : from),
 			look.text,
 			std::move(answer),
 			FadeNotice(LIFETIME)

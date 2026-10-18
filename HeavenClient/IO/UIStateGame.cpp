@@ -47,6 +47,7 @@
 #include "UITypes/UIWorldMap.h"
 
 #include "../Net/Packets/GameplayPackets.h"
+#include "../Net/Packets/MiniRoomPackets.h"
 #include "../Net/Packets/PlayerInteractionPackets.h"
 
 namespace ms
@@ -69,6 +70,8 @@ namespace ms
 					return Tooltip::Parent::STORAGE;
 				case UIElement::Type::TRADINGROOM:
 					return Tooltip::Parent::TRADINGROOM;
+				case UIElement::Type::PERSONALSHOP:
+					return Tooltip::Parent::PERSONALSHOP;
 				case UIElement::Type::EVENT:
 					return Tooltip::Parent::EVENT;
 				case UIElement::Type::KEYCONFIG:
@@ -216,6 +219,9 @@ namespace ms
 	{
 		if (UIElement *front = get_front(pos))
 			front->doubleclick(pos);
+		// Someone's shop balloon comes before them (FUN_0094fbbf).
+		else if (int32_t serial = Stage::get().mini_room_at(pos))
+			MiniRoomVisitPacket(serial).dispatch();
 		else if (int32_t cid = Stage::get().character_at(pos))
 		{
 			// v83 asks only when it may ask the server, as for an item
@@ -712,6 +718,13 @@ namespace ms
 	UIElement *UIStateGame::get(UIElement::Type type)
 	{
 		return elements[type].get();
+	}
+
+	bool UIStateGame::modal_open() const
+	{
+		const UIElement::UPtr& element = elements[focused];
+
+		return focused != UIElement::Type::NONE && element && element->is_active();
 	}
 
 	UIElement *UIStateGame::get_front(std::list<UIElement::Type> types)

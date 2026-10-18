@@ -25,7 +25,8 @@
 
 namespace ms
 {
-	// Mini room (trading room) requests. Every one starts with a mode byte.
+	// Mini room (trading room and personal shop) requests. Every one starts
+	// with a mode byte.
 	// Opcode: PLAYER_INTERACTION(123)
 	class MiniRoomPacket : public OutPacket
 	{
@@ -46,10 +47,16 @@ namespace ms
 			VISIT = 0x04,
 			CHAT = 0x06,
 			LEAVE = 0x0A,
+			OPEN = 0x0B,
 			PUT_ITEM = 0x0F,
 			PUT_MESO = 0x10,
 			TRADE = 0x11,
-			TRADE_REPLY = 0x14
+			TRADE_REPLY = 0x14,
+			SHOP_PUT_ITEM = 0x16,
+			SHOP_BUY = 0x17,
+			SHOP_TAKE_BACK = 0x1B,
+			SHOP_BAN = 0x1C,
+			SHOP_BLACKLIST = 0x1E
 		};
 
 		MiniRoomPacket(Mode mode) : OutPacket(OutPacket::Opcode::PLAYER_INTERACTION)
@@ -171,6 +178,96 @@ namespace ms
 		TradeConfirmReplyPacket(const std::vector<int32_t>& itemids) : MiniRoomPacket(Mode::TRADE_REPLY)
 		{
 			write_items(itemids);
+		}
+	};
+
+	// Opens a personal shop (type 4) with a permit from the cash tab (v83
+	// FUN_00a1dd99). The shop stays closed to visitors until it opens.
+	class ShopCreatePacket : public MiniRoomPacket
+	{
+	public:
+		static constexpr int8_t PERSONAL_SHOP = 4;
+
+		ShopCreatePacket(const std::string &title, int16_t permit_slot, int32_t permit_id) : MiniRoomPacket(Mode::CREATE)
+		{
+			write_byte(PERSONAL_SHOP);
+			write_string(title);
+			write_byte(0);
+			write_short(permit_slot);
+			write_int(permit_id);
+		}
+	};
+
+	// Lists bundles of an inventory item in my shop, at a price a bundle.
+	class ShopPutItemPacket : public MiniRoomPacket
+	{
+	public:
+		ShopPutItemPacket(int8_t tab, int16_t slot, int16_t bundles, int16_t per_bundle, int32_t price)
+			: MiniRoomPacket(Mode::SHOP_PUT_ITEM)
+		{
+			write_byte(tab);
+			write_short(slot);
+			write_short(bundles);
+			write_short(per_bundle);
+			write_int(price);
+		}
+	};
+
+	// Buys bundles of a shop's row. Like the trade, HC sends 0 for the
+	// item's CRC.
+	class ShopBuyPacket : public MiniRoomPacket
+	{
+	public:
+		ShopBuyPacket(uint8_t index, int16_t bundles) : MiniRoomPacket(Mode::SHOP_BUY)
+		{
+			write_byte(static_cast<int8_t>(index));
+			write_short(bundles);
+			write_int(0);
+		}
+	};
+
+	// Takes a row of my shop back into the inventory, before it opens.
+	class ShopTakeBackPacket : public MiniRoomPacket
+	{
+	public:
+		ShopTakeBackPacket(int16_t index) : MiniRoomPacket(Mode::SHOP_TAKE_BACK)
+		{
+			write_short(index);
+		}
+	};
+
+	// The names my shop turns away. v83 sends its blacklist right before
+	// opening; HC has no blacklist yet and sends none.
+	class ShopBlacklistPacket : public MiniRoomPacket
+	{
+	public:
+		ShopBlacklistPacket(const std::vector<std::string> &names) : MiniRoomPacket(Mode::SHOP_BLACKLIST)
+		{
+			write_short(static_cast<int16_t>(names.size()));
+
+			for (const std::string &name : names)
+				write_string(name);
+		}
+	};
+
+	// Opens my shop to visitors.
+	class ShopOpenPacket : public MiniRoomPacket
+	{
+	public:
+		ShopOpenPacket() : MiniRoomPacket(Mode::OPEN)
+		{
+			write_byte(1);
+		}
+	};
+
+	// Sends the visitor in a seat away, for good.
+	class ShopBanPacket : public MiniRoomPacket
+	{
+	public:
+		ShopBanPacket(uint8_t slot, const std::string &name) : MiniRoomPacket(Mode::SHOP_BAN)
+		{
+			write_byte(static_cast<int8_t>(slot));
+			write_string(name);
 		}
 	};
 }

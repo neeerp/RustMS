@@ -58,6 +58,19 @@ namespace ms
 			// Offers the icon's item in one of my trade slots (1 to 9).
 			virtual void drop_on_trade(int8_t slot) const {}
 
+			// Puts the icon's item up for sale in my personal shop.
+			virtual void drop_on_shop() const {}
+
+			// The inventory tab an icon from another window goes back to,
+			// or NONE if the inventory doesn't take it.
+			virtual InventoryType::Id get_return_tab() const
+			{
+				return InventoryType::Id::NONE;
+			}
+
+			// Hands the icon back to the inventory, as a shop row taken back.
+			virtual void drop_on_inventory() const {}
+
 			// What a key bound to this icon would do; NONE if it cannot be
 			// bound.
 			virtual Keyboard::Mapping get_mapping() const
@@ -89,6 +102,9 @@ namespace ms
 		bool drop_on_items(InventoryType::Id tab, EquipSlot::Id eqslot, int16_t slot, bool equip) const;
 		void drop_on_bindings(Point<int16_t> cursorposition, bool remove) const;
 		void drop_on_trade(int8_t slot) const;
+		void drop_on_shop() const;
+		InventoryType::Id get_return_tab() const;
+		void drop_on_inventory() const;
 		Keyboard::Mapping get_mapping() const;
 
 		void set_count(int16_t count);

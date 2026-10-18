@@ -23,6 +23,7 @@ pub mod monster_book;
 mod npc_data;
 pub mod npc_scripts;
 pub mod packet;
+pub mod personal_shop;
 pub mod policy;
 pub mod quests;
 pub mod reactors;

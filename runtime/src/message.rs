@@ -14,6 +14,7 @@
 
 use game::{AvatarLook, FieldAvatar, Guild, Player};
 use net::packet::build::world::door::DoorView;
+use net::packet::build::world::guild::InviteRefusal;
 use net::{
     BroadcastScope, ClientId, FieldRequest, MessengerRequest, PartyRequest, PartySkill,
     WhisperDelivery,
@@ -69,6 +70,13 @@ pub enum ServerMessage {
     PartyChanged {
         party_id: Option<i32>,
     },
+    /// The player's invitation to `guild_id` stands; join it.
+    JoinGuild {
+        guild_id: i32,
+    },
+    /// Someone else changed the player's guild (expelled them); read it
+    /// again.
+    GuildChanged,
     /// A party member on `map_id` used a skill that reached this player,
     /// standing at `origin`.
     PartySkill {
@@ -154,6 +162,11 @@ pub enum ServerMessage {
     Trade {
         room: i32,
         event: crate::actor::field_trades::TradeEvent,
+    },
+    /// News from personal shop `room` on this player's field.
+    PersonalShop {
+        room: i32,
+        event: crate::actor::field_shops::ShopEvent,
     },
     SendPacket(Packet),
 }
@@ -288,6 +301,11 @@ pub enum FieldMessage {
         from: ClientId,
         request: crate::actor::field_trades::RoomRequest,
     },
+    /// A player's request of a personal shop; purchases carry oneshots.
+    PersonalShop {
+        from: ClientId,
+        request: crate::actor::field_shops::ShopRoomRequest,
+    },
 }
 
 /// A way to reach one field actor.
@@ -298,7 +316,7 @@ pub struct FieldHandle {
 }
 
 /// What the world directory knows of an online character: enough for party
-/// windows and HP bars.
+/// windows, HP bars, and guild invitations.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Presence {
     pub name: String,
@@ -307,6 +325,7 @@ pub struct Presence {
     pub map_id: i32,
     pub hp: i16,
     pub max_hp: i16,
+    pub guild_id: Option<i32>,
 }
 
 impl Presence {
@@ -319,6 +338,7 @@ impl Presence {
             map_id: stats.map_id,
             hp: stats.hp,
             max_hp: stats.max_hp,
+            guild_id: player.guild.as_ref().map(|guild| guild.id),
         }
     }
 }
@@ -391,6 +411,29 @@ pub enum DirectoryMessage {
     Deliver {
         to: Vec<ClientId>,
         packet: Packet,
+    },
+    /// `from`, a master or jr. master of `guild_id`, invites the character
+    /// called `name`.
+    GuildInvite {
+        from: ClientId,
+        guild_id: i32,
+        name: String,
+    },
+    /// `from` accepts the invitation to `guild_id`; if it stands, they are
+    /// told to join (`ServerMessage::JoinGuild`).
+    GuildAccept {
+        from: ClientId,
+        guild_id: i32,
+    },
+    /// `from` turns down `inviter`'s invitation.
+    GuildDeny {
+        from: ClientId,
+        inviter: String,
+        refusal: InviteRefusal,
+    },
+    /// `client_id` was put in or out of a guild by someone else.
+    GuildChanged {
+        client_id: ClientId,
     },
     Messenger {
         from: ClientId,

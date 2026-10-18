@@ -1,23 +1,38 @@
 use crate::handler::{HandlerResult, WorldAction, WorldContext, WorldHandler, WorldResult};
-use crate::packet::build::world::mini_room::TRADE_ROOM;
+use crate::packet::build::world::mini_room::{PERSONAL_SHOP, TRADE_ROOM};
+use crate::personal_shop::PersonalShopRequest;
 use crate::trade::TradeRequest;
 use packet::{io::read::PktRead, Packet};
 use std::io::Cursor;
 use tracing::debug;
 
-/// `PLAYER_INTERACTION`, for the trading room only: mode 0 creates a room of
-/// a type, 2 invites, 3 declines, 4 accepts (visits), 6 chats, 0xa leaves,
-/// 0xf puts up an item, 0x10 mesos, and 0x11 presses Trade. The runtime holds
-/// the offers and the field the room.
+/// `PLAYER_INTERACTION`, for trading rooms and personal shops. Mode 0
+/// creates a room of a type; 4 visits (accepting a trade invitation or
+/// entering a shop), 6 chats and 0xa leaves either. For trades, 2 invites, 3
+/// declines, 0xf puts up an item, 0x10 mesos, and 0x11 presses Trade. For
+/// shops, 0x16 lists an item, 0x1e sends the blacklist and 0x1f/0x20 change
+/// it, 0xb opens the shop, 0x17 buys, 0x1b takes a listing back, and
+/// 0x1c/0x1d ban a visitor. The runtime holds the goods and the field the
+/// room.
 pub struct PlayerInteractionHandler;
 
 impl WorldHandler for PlayerInteractionHandler {
     fn handle(&self, packet: &mut Packet, _ctx: &mut WorldContext) -> WorldResult {
         let mut reader = Cursor::new(&packet.bytes);
         reader.read_short()?;
+        let shop = |request| Ok(HandlerResult::empty().with(WorldAction::PersonalShop(request)));
         let request = match reader.read_byte()? {
             0x00 => match reader.read_byte()? {
                 TRADE_ROOM => TradeRequest::Create,
+                PERSONAL_SHOP => {
+                    let title = reader.read_str_with_length()?;
+                    reader.read_byte()?;
+                    return shop(PersonalShopRequest::Create {
+                        title,
+                        permit_slot: reader.read_short()?,
+                        permit_id: reader.read_int()?,
+                    });
+                }
                 kind => {
                     debug!(kind, "Ignoring mini room of another type");
                     return Ok(HandlerResult::empty());
@@ -45,6 +60,52 @@ impl WorldHandler for PlayerInteractionHandler {
             },
             0x10 => TradeRequest::Meso(reader.read_int()?),
             0x11 => TradeRequest::Confirm,
+            0x0b => return shop(PersonalShopRequest::Open),
+            0x16 => {
+                return shop(PersonalShopRequest::PutItem {
+                    kind: i16::from(reader.read_byte()?),
+                    slot: reader.read_short()?,
+                    bundles: reader.read_short()?,
+                    per_bundle: reader.read_short()?,
+                    price: reader.read_int()?,
+                })
+            }
+            // The item's data checksum follows.
+            0x17 => {
+                return shop(PersonalShopRequest::Buy {
+                    index: reader.read_byte()?,
+                    bundles: reader.read_short()?,
+                })
+            }
+            0x1b => {
+                return shop(PersonalShopRequest::TakeBack {
+                    index: reader.read_short()?,
+                })
+            }
+            mode @ (0x1c | 0x1d) => {
+                return shop(PersonalShopRequest::Ban {
+                    slot: reader.read_byte()?,
+                    name: reader.read_str_with_length()?,
+                    overstayed: mode == 0x1d,
+                })
+            }
+            0x1e => {
+                let count = reader.read_short()?;
+                let names = (0..count)
+                    .map(|_| reader.read_str_with_length())
+                    .collect::<Result<_, _>>()?;
+                return shop(PersonalShopRequest::Blacklist(names));
+            }
+            0x1f => {
+                return shop(PersonalShopRequest::BlacklistAdd(
+                    reader.read_str_with_length()?,
+                ))
+            }
+            0x20 => {
+                return shop(PersonalShopRequest::BlacklistRemove(
+                    reader.read_str_with_length()?,
+                ))
+            }
             other => {
                 // 0x14 answers the partner's Trade press with item CRCs.
                 debug!(mode = other, "Ignoring player interaction");
@@ -62,6 +123,22 @@ mod tests {
     use packet::io::write::PktWrite;
 
     fn parse<T>(build: impl FnOnce(&mut Packet) -> T) -> Option<TradeRequest> {
+        match action(build) {
+            Some(WorldAction::Trade(request)) => Some(request),
+            None => None,
+            Some(other) => panic!("unexpected {other:?}"),
+        }
+    }
+
+    fn parse_shop<T>(build: impl FnOnce(&mut Packet) -> T) -> Option<PersonalShopRequest> {
+        match action(build) {
+            Some(WorldAction::PersonalShop(request)) => Some(request),
+            None => None,
+            Some(other) => panic!("unexpected {other:?}"),
+        }
+    }
+
+    fn action<T>(build: impl FnOnce(&mut Packet) -> T) -> Option<WorldAction> {
         let mut packet = Packet::new_empty();
         packet
             .write_short(RecvOpcode::PlayerInteraction as i16)
@@ -76,11 +153,7 @@ mod tests {
         let result = PlayerInteractionHandler
             .handle(&mut packet, &mut ctx)
             .unwrap();
-        match result.actions.into_iter().next() {
-            Some(WorldAction::Trade(request)) => Some(request),
-            None => None,
-            Some(other) => panic!("unexpected {other:?}"),
-        }
+        result.actions.into_iter().next()
     }
 
     #[test]
@@ -148,8 +221,105 @@ mod tests {
     }
 
     #[test]
+    fn reads_the_shop_modes() {
+        let create = parse_shop(|p| {
+            p.write_bytes(&[0, 4]).unwrap();
+            p.write_str_with_length("Pots!").unwrap();
+            p.write_byte(0).unwrap();
+            p.write_short(3).unwrap();
+            p.write_int(5140000).unwrap();
+        });
+        assert_eq!(
+            create,
+            Some(PersonalShopRequest::Create {
+                title: "Pots!".into(),
+                permit_slot: 3,
+                permit_id: 5140000
+            })
+        );
+        let put = parse_shop(|p| {
+            p.write_bytes(&[0x16, 2]).unwrap();
+            p.write_short(4).unwrap();
+            p.write_short(3).unwrap();
+            p.write_short(10).unwrap();
+            p.write_int(500).unwrap();
+        });
+        assert_eq!(
+            put,
+            Some(PersonalShopRequest::PutItem {
+                kind: 2,
+                slot: 4,
+                bundles: 3,
+                per_bundle: 10,
+                price: 500
+            })
+        );
+        let blacklist = parse_shop(|p| {
+            p.write_byte(0x1e).unwrap();
+            p.write_short(2).unwrap();
+            p.write_str_with_length("Alice").unwrap();
+            p.write_str_with_length("Bobby").unwrap();
+        });
+        assert_eq!(
+            blacklist,
+            Some(PersonalShopRequest::Blacklist(vec![
+                "Alice".into(),
+                "Bobby".into()
+            ]))
+        );
+        let add = parse_shop(|p| {
+            p.write_byte(0x1f).unwrap();
+            p.write_str_with_length("Carol").unwrap();
+        });
+        assert_eq!(add, Some(PersonalShopRequest::BlacklistAdd("Carol".into())));
+        let remove = parse_shop(|p| {
+            p.write_byte(0x20).unwrap();
+            p.write_str_with_length("Carol").unwrap();
+        });
+        assert_eq!(
+            remove,
+            Some(PersonalShopRequest::BlacklistRemove("Carol".into()))
+        );
+        assert_eq!(
+            parse_shop(|p| p.write_bytes(&[0x0b, 1])),
+            Some(PersonalShopRequest::Open)
+        );
+        let buy = parse_shop(|p| {
+            p.write_bytes(&[0x17, 2]).unwrap();
+            p.write_short(5).unwrap();
+            p.write_int(0x1234).unwrap();
+        });
+        assert_eq!(
+            buy,
+            Some(PersonalShopRequest::Buy {
+                index: 2,
+                bundles: 5
+            })
+        );
+        let take = parse_shop(|p| {
+            p.write_byte(0x1b).unwrap();
+            p.write_short(1).unwrap();
+        });
+        assert_eq!(take, Some(PersonalShopRequest::TakeBack { index: 1 }));
+        for (mode, overstayed) in [(0x1c, false), (0x1d, true)] {
+            let ban = parse_shop(|p| {
+                p.write_bytes(&[mode, 2]).unwrap();
+                p.write_str_with_length("Bobby").unwrap();
+            });
+            assert_eq!(
+                ban,
+                Some(PersonalShopRequest::Ban {
+                    slot: 2,
+                    name: "Bobby".into(),
+                    overstayed
+                })
+            );
+        }
+    }
+
+    #[test]
     fn ignores_other_rooms_and_the_crc_answer() {
-        assert_eq!(parse(|p| p.write_bytes(&[0, 4, 0])), None);
+        assert_eq!(parse(|p| p.write_bytes(&[0, 1, 0])), None);
         assert_eq!(parse(|p| p.write_bytes(&[0x14, 0])), None);
     }
 }

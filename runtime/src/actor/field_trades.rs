@@ -138,15 +138,21 @@ impl Trades {
         Some((id, room, slot))
     }
 
+    pub fn is_member(&self, client_id: ClientId) -> bool {
+        self.member_of.contains_key(&client_id)
+    }
+
+    /// `busy`: the creator is in another kind of room.
     pub fn create(
         &mut self,
         room: i32,
         client_id: ClientId,
         name: &str,
         look: &AvatarLook,
+        busy: bool,
     ) -> Outbox {
         let mut out = Outbox::new();
-        if self.member_of.contains_key(&client_id) || self.rooms.contains_key(&room) {
+        if busy || self.member_of.contains_key(&client_id) || self.rooms.contains_key(&room) {
             event(&mut out, client_id, room, TradeEvent::Ended(None));
             return out;
         }
@@ -224,9 +230,18 @@ impl Trades {
     }
 
     /// `from` accepts `room`'s invitation; the room must still wait for them.
-    pub fn visit(&mut self, from: ClientId, room: i32, name: &str, look: &AvatarLook) -> Outbox {
+    /// `busy`: they are in another kind of room.
+    pub fn visit(
+        &mut self,
+        from: ClientId,
+        room: i32,
+        name: &str,
+        look: &AvatarLook,
+        busy: bool,
+    ) -> Outbox {
         let mut out = Outbox::new();
-        let waiting = !self.member_of.contains_key(&from)
+        let waiting = !busy
+            && !self.member_of.contains_key(&from)
             && self
                 .rooms
                 .get(&room)
@@ -458,25 +473,25 @@ mod tests {
 
     fn open_room() -> Trades {
         let mut trades = Trades::default();
-        trades.create(ROOM, ALICE, "Alice", &look());
+        trades.create(ROOM, ALICE, "Alice", &look(), false);
         trades.invite(ALICE, BOB, Some("Bob"));
-        trades.visit(BOB, ROOM, "Bob", &look());
+        trades.visit(BOB, ROOM, "Bob", &look(), false);
         trades
     }
 
     #[test]
     fn invite_and_visit_fill_the_room() {
         let mut trades = Trades::default();
-        let out = trades.create(ROOM, ALICE, "Alice", &look());
+        let out = trades.create(ROOM, ALICE, "Alice", &look(), false);
         assert_eq!(summary(&out), vec![s(ALICE, "0x5")]);
         let out = trades.invite(ALICE, CAROL, None);
         assert_eq!(summary(&out), vec![s(ALICE, "0x3")]);
         let out = trades.invite(ALICE, BOB, Some("Bob"));
         assert_eq!(summary(&out), vec![s(BOB, "0x2")]);
         // Someone not invited finds it closed.
-        let out = trades.visit(CAROL, ROOM, "Carol", &look());
+        let out = trades.visit(CAROL, ROOM, "Carol", &look(), false);
         assert_eq!(summary(&out), vec![s(CAROL, "0x5"), s(CAROL, "ended")]);
-        let out = trades.visit(BOB, ROOM, "Bob", &look());
+        let out = trades.visit(BOB, ROOM, "Bob", &look(), false);
         assert_eq!(
             summary(&out),
             vec![
@@ -487,7 +502,7 @@ mod tests {
             ]
         );
         // Bob is busy now.
-        trades.create(ROOM + 1, CAROL, "Carol", &look());
+        trades.create(ROOM + 1, CAROL, "Carol", &look(), false);
         let out = trades.invite(CAROL, BOB, Some("Bob"));
         assert_eq!(summary(&out), vec![s(CAROL, "0x3")]);
         assert_eq!(out_bytes(&out)[3], 2);
@@ -503,13 +518,13 @@ mod tests {
     #[test]
     fn a_decline_reaches_the_inviter_and_keeps_the_room() {
         let mut trades = Trades::default();
-        trades.create(ROOM, ALICE, "Alice", &look());
+        trades.create(ROOM, ALICE, "Alice", &look(), false);
         trades.invite(ALICE, BOB, Some("Bob"));
         let out = trades.decline(BOB, ROOM, 3, "Bob");
         assert_eq!(summary(&out), vec![s(ALICE, "0x3")]);
         assert_eq!(out_bytes(&out)[3], 3);
         // The invitation is spent.
-        let out = trades.visit(BOB, ROOM, "Bob", &look());
+        let out = trades.visit(BOB, ROOM, "Bob", &look(), false);
         assert_eq!(summary(&out), vec![s(BOB, "0x5"), s(BOB, "ended")]);
         let out = trades.invite(ALICE, BOB, Some("Bob"));
         assert_eq!(summary(&out), vec![s(BOB, "0x2")]);
@@ -595,10 +610,10 @@ mod tests {
     #[test]
     fn a_room_alone_just_closes_and_its_invitation_goes_stale() {
         let mut trades = Trades::default();
-        trades.create(ROOM, ALICE, "Alice", &look());
+        trades.create(ROOM, ALICE, "Alice", &look(), false);
         trades.invite(ALICE, BOB, Some("Bob"));
         assert!(trades.leave(ALICE).is_empty());
-        let out = trades.visit(BOB, ROOM, "Bob", &look());
+        let out = trades.visit(BOB, ROOM, "Bob", &look(), false);
         assert_eq!(summary(&out), vec![s(BOB, "0x5"), s(BOB, "ended")]);
     }
 }

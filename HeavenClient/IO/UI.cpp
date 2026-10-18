@@ -108,6 +108,11 @@ namespace ms
 		return !quitted;
 	}
 
+	bool UI::modal_open() const
+	{
+		return state->modal_open();
+	}
+
 	void UI::send_cursor(Point<int16_t> cursorpos, Cursor::State cursorstate)
 	{
 		Cursor::State nextstate = state->send_cursor(cursorstate, cursorpos);
@@ -331,6 +336,9 @@ namespace ms
 					types.emplace_back(UIElement::Type::NPCTALK);
 					types.emplace_back(UIElement::Type::CHARINFO);
 					types.emplace_back(UIElement::Type::TRADINGROOM);
+					types.emplace_back(UIElement::Type::PERSONALSHOP);
+					types.emplace_back(UIElement::Type::SHOPSELL);
+					types.emplace_back(UIElement::Type::SHOPSALES);
 				}
 				else if (enter)
 				{

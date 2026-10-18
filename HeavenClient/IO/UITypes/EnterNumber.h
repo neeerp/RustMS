@@ -48,5 +48,21 @@ namespace ms
 
 			return { Problem::NONE, static_cast<int32_t>(number) };
 		}
+
+		// The notice v83 shows for a problem (StringPool 0x331..0x333), or nothing.
+		inline std::string problem_text(Problem problem, int32_t max, int32_t min = 1)
+		{
+			switch (problem)
+			{
+				case Problem::NOT_A_NUMBER:
+					return "Only numbers are allowed.";
+				case Problem::TOO_LOW:
+					return "You may only enter a number \\nequal to or higher than " + std::to_string(min) + ".";
+				case Problem::TOO_HIGH:
+					return "You may only enter a number \\nequal to or lower than " + std::to_string(max) + ".";
+				default:
+					return "";
+			}
+		}
 	}
 }

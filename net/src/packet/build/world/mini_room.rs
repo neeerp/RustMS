@@ -1,10 +1,12 @@
-//! Mini rooms (v83 `PLAYER_INTERACTION`): for now only the trading room.
-//! Every packet starts with a mode byte.
+//! Mini rooms (v83 `PLAYER_INTERACTION`): the trading room and personal
+//! shops. Every packet starts with a mode byte. Also the balloon over a
+//! player who keeps a room open (UPDATE_CHAR_BOX).
 
 use crate::codec::encode_avatar_look;
 use crate::codec::item::{encode_item, SlotPrefix};
+use crate::personal_shop::Listing;
 use crate::{error::NetworkError, packet::op::SendOpcode};
-use game::{AvatarLook, Item};
+use game::{AvatarLook, Item, MiniRoomBox};
 use packet::{io::write::PktWrite, Packet};
 
 /// Server → client modes.
@@ -18,10 +20,19 @@ const PUT_ITEM_MODE: u8 = 0x0f;
 const PUT_MESO_MODE: u8 = 0x10;
 const CONFIRMED_MODE: u8 = 0x11;
 const MESO_LIMIT_MODE: u8 = 0x15;
+const BUY_RESULT_MODE: u8 = 0x18;
+const SHOP_ITEMS_MODE: u8 = 0x19;
+const SOLD_MODE: u8 = 0x1a;
 
 /// The trading room's type and size.
 pub const TRADE_ROOM: u8 = 3;
 const TRADE_USERS: u8 = 2;
+
+/// The personal shop's type and size: the owner and three visitors.
+pub const PERSONAL_SHOP: u8 = 4;
+pub const SHOP_USERS: u8 = 4;
+/// How many items a personal shop lists at most.
+pub const SHOP_ITEMS: u8 = 16;
 
 /// A chat line from a member (7 would be a game notice).
 const CHAT_LINE: u8 = 8;
@@ -42,6 +53,13 @@ pub mod invite_result {
 pub mod enter_error {
     /// "The room is already closed."
     pub const CLOSED: u8 = 1;
+    /// "You can't enter the room due to full capacity."
+    pub const FULL: u8 = 2;
+    /// "The personal store can only be built at the free market available
+    /// at main towns."
+    pub const NOT_FREE_MARKET: u8 = 0x0f;
+    /// "You may not enter this store."
+    pub const BANNED: u8 = 0x11;
 }
 
 /// How a trade ended, shown to the member who stays (LEAVE).
@@ -54,6 +72,30 @@ pub mod leave_reason {
     pub const FAILED: u8 = 8;
     /// One of the items is one-of-a-kind and the receiver has one.
     pub const ONE_OF_A_KIND: u8 = 9;
+    /// "The shop is closed."
+    pub const SHOP_CLOSED: u8 = 3;
+    /// "The user has been banned."
+    pub const BANNED: u8 = 5;
+    /// "The items are out of stock."
+    pub const OUT_OF_STOCK: u8 = 0x0e;
+    /// Banned for staying an hour; may not come back.
+    pub const OVERSTAYED: u8 = 0x0f;
+}
+
+/// Why a purchase in a personal shop failed (BUY_RESULT).
+pub mod buy_result {
+    /// "You don't have enough in stock."
+    pub const NO_STOCK: u8 = 1;
+    /// "You do not have enough mesos."
+    pub const NO_MESOS: u8 = 2;
+    /// "The price of the item is too high for the trade."
+    pub const TOO_PRICEY: u8 = 3;
+    /// "Please check if your inventory is full or not."
+    pub const INVENTORY_FULL: u8 = 5;
+    /// "You cannot carry more than one for this item."
+    pub const ONLY_ONE: u8 = 6;
+    /// "Level 15 and below may only trade 1 million mesos per day..."
+    pub const LOW_LEVEL_LIMIT: u8 = 0x0e;
 }
 
 fn room_packet(mode: u8) -> Result<Packet, NetworkError> {
@@ -87,15 +129,17 @@ pub fn build_invite_result(result: u8, target: &str) -> Result<Packet, NetworkEr
     Ok(packet)
 }
 
-/// The receiving client enters a trading room in `my_slot`, with the
-/// members already in it as `(slot, look, name)`.
-pub fn build_trade_room(
+/// The receiving client enters a room of `kind` and size `users` in
+/// `my_slot`, with the members in it as `(slot, look, name)`.
+fn enter_room(
+    kind: u8,
+    users: u8,
     my_slot: u8,
     members: &[(u8, &AvatarLook, &str)],
 ) -> Result<Packet, NetworkError> {
     let mut packet = room_packet(ENTER_MODE)?;
-    packet.write_byte(TRADE_ROOM)?;
-    packet.write_byte(TRADE_USERS)?;
+    packet.write_byte(kind)?;
+    packet.write_byte(users)?;
     packet.write_byte(my_slot)?;
     for &(slot, look, name) in members {
         packet.write_byte(slot)?;
@@ -103,6 +147,97 @@ pub fn build_trade_room(
         packet.write_str_with_length(name)?;
     }
     packet.write_byte(0xFF)?;
+    Ok(packet)
+}
+
+/// The receiving client enters a trading room in `my_slot`, with the
+/// members already in it as `(slot, look, name)`.
+pub fn build_trade_room(
+    my_slot: u8,
+    members: &[(u8, &AvatarLook, &str)],
+) -> Result<Packet, NetworkError> {
+    enter_room(TRADE_ROOM, TRADE_USERS, my_slot, members)
+}
+
+/// The receiving client enters personal shop `title` in `my_slot` (0 for
+/// the owner), with its members and what it lists.
+pub fn build_shop_room(
+    my_slot: u8,
+    members: &[(u8, &AvatarLook, &str)],
+    title: &str,
+    listings: &[Listing],
+) -> Result<Packet, NetworkError> {
+    let mut packet = enter_room(PERSONAL_SHOP, SHOP_USERS, my_slot, members)?;
+    packet.write_str_with_length(title)?;
+    packet.write_byte(SHOP_ITEMS)?;
+    write_listings(&mut packet, listings)?;
+    Ok(packet)
+}
+
+/// Each listing: bundles left (0 when sold out), items per bundle, the
+/// price of a bundle, then one bundle as an item.
+fn write_listings(packet: &mut Packet, listings: &[Listing]) -> Result<(), NetworkError> {
+    packet.write_byte(listings.len() as u8)?;
+    for listing in listings {
+        packet.write_short(listing.bundles)?;
+        packet.write_short(listing.item.quantity)?;
+        packet.write_int(listing.price)?;
+        encode_item(packet, SlotPrefix::None, &listing.item)?;
+    }
+    Ok(())
+}
+
+/// What a personal shop lists now.
+pub fn build_shop_items(listings: &[Listing]) -> Result<Packet, NetworkError> {
+    let mut packet = room_packet(SHOP_ITEMS_MODE)?;
+    write_listings(&mut packet, listings)?;
+    Ok(packet)
+}
+
+/// Tells the owner `buyer` bought `bundles` of listing `index`; the client
+/// keeps a record for the sold-items window.
+pub fn build_shop_sold(index: u8, bundles: i16, buyer: &str) -> Result<Packet, NetworkError> {
+    let mut packet = room_packet(SOLD_MODE)?;
+    packet.write_byte(index)?;
+    packet.write_short(bundles)?;
+    packet.write_str_with_length(buyer)?;
+    Ok(packet)
+}
+
+/// Why the receiving client's purchase failed (`buy_result`).
+pub fn build_buy_result(result: u8) -> Result<Packet, NetworkError> {
+    let mut packet = room_packet(BUY_RESULT_MODE)?;
+    packet.write_byte(result)?;
+    Ok(packet)
+}
+
+/// The balloon block of UPDATE_CHAR_BOX and the player spawn: the room
+/// type, 0 for none, then the room.
+pub fn write_mini_room_box(
+    packet: &mut Packet,
+    room: Option<&MiniRoomBox>,
+) -> Result<(), NetworkError> {
+    let Some(room) = room else {
+        packet.write_byte(0)?;
+        return Ok(());
+    };
+    packet.write_byte(room.kind)?;
+    packet.write_int(room.sn)?;
+    packet.write_str_with_length(&room.title)?;
+    packet.write_byte(0)?; // no password
+    packet.write_byte(room.skin)?;
+    packet.write_byte(room.users)?;
+    packet.write_byte(room.max_users)?;
+    packet.write_byte(0)?; // no game in progress
+    Ok(())
+}
+
+/// UPDATE_CHAR_BOX: the balloon over `char_id` changed, or went (`None`).
+pub fn build_char_box(char_id: i32, room: Option<&MiniRoomBox>) -> Result<Packet, NetworkError> {
+    let mut packet = Packet::new_empty();
+    packet.write_short(SendOpcode::UpdateCharBox as i16)?;
+    packet.write_int(char_id)?;
+    write_mini_room_box(&mut packet, room)?;
     Ok(packet)
 }
 
@@ -138,6 +273,13 @@ pub fn build_room_leave(slot: u8, reason: u8) -> Result<Packet, NetworkError> {
     let mut packet = room_packet(LEAVE_MODE)?;
     packet.write_byte(slot)?;
     packet.write_byte(reason)?;
+    Ok(packet)
+}
+
+/// The member in `slot` left; for the others in the room.
+pub fn build_seat_left(slot: u8) -> Result<Packet, NetworkError> {
+    let mut packet = room_packet(LEAVE_MODE)?;
+    packet.write_byte(slot)?;
     Ok(packet)
 }
 
@@ -288,6 +430,85 @@ mod tests {
             .byte(0x10)
             .byte(0)
             .int(5000)
+            .end();
+    }
+
+    #[test]
+    fn a_shop_enter_adds_the_title_and_listings() {
+        let alice = look(30000);
+        let potions = Listing {
+            item: Item::stack(2000000, 10),
+            bundles: 3,
+            price: 500,
+        };
+        let mut encoded = Packet::new_empty();
+        encode_item(&mut encoded, SlotPrefix::None, &potions.item).unwrap();
+        let packet = build_shop_room(0, &[(0, &alice, "Alice")], "Cheap!", &[potions]).unwrap();
+        let mut expect = Expect::new(&packet.bytes);
+        expect.short(OP).byte(0x05).byte(4).byte(4).byte(0);
+        expect
+            .byte(0)
+            .look(&alice, false)
+            .string("Alice")
+            .byte(0xFF);
+        expect.string("Cheap!").byte(16).byte(1);
+        expect
+            .short(3)
+            .short(10)
+            .int(500)
+            .bytes(&encoded.bytes)
+            .end();
+
+        let items = build_shop_items(&[]).unwrap();
+        Expect::new(&items.bytes).short(OP).byte(0x19).byte(0).end();
+    }
+
+    #[test]
+    fn sales_and_failed_purchases() {
+        let sold = build_shop_sold(2, 5, "Bob").unwrap();
+        Expect::new(&sold.bytes)
+            .short(OP)
+            .byte(0x1a)
+            .byte(2)
+            .short(5)
+            .string("Bob")
+            .end();
+        let failed = build_buy_result(buy_result::NO_MESOS).unwrap();
+        Expect::new(&failed.bytes)
+            .short(OP)
+            .byte(0x18)
+            .byte(2)
+            .end();
+    }
+
+    #[test]
+    fn the_balloon_names_the_room_and_its_seats() {
+        let shop = MiniRoomBox {
+            kind: PERSONAL_SHOP,
+            sn: 77,
+            title: "Cheap!".into(),
+            skin: 2,
+            users: 1,
+            max_users: 4,
+        };
+        let packet = build_char_box(9, Some(&shop)).unwrap();
+        Expect::new(&packet.bytes)
+            .short(SendOpcode::UpdateCharBox as i16)
+            .int(9)
+            .byte(4)
+            .int(77)
+            .string("Cheap!")
+            .byte(0)
+            .byte(2)
+            .byte(1)
+            .byte(4)
+            .byte(0)
+            .end();
+        let gone = build_char_box(9, None).unwrap();
+        Expect::new(&gone.bytes)
+            .short(SendOpcode::UpdateCharBox as i16)
+            .int(9)
+            .byte(0)
             .end();
     }
 

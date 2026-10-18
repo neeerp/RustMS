@@ -4,13 +4,21 @@
 use crate::schema::{characters, guild_members, guilds};
 use diesel::prelude::*;
 use diesel::result::{DatabaseErrorKind, Error as DieselError};
-use game::guild::{Emblem, Guild, GuildMember, GuildTag, MASTER_RANK};
+use game::guild::{Emblem, Guild, GuildMember, GuildTag, MASTER_RANK, MEMBER_RANK};
 
 /// Why founding a guild failed.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum CreateError {
     /// Another guild in the world has the name, ignoring case.
     NameTaken,
+    AlreadyInGuild,
+}
+
+/// Why joining a guild failed.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum JoinError {
+    /// The guild has as many members as it may.
+    Full,
     AlreadyInGuild,
 }
 
@@ -81,6 +89,56 @@ pub fn create(world_id: u8, name: &str, master: i32) -> crate::Result<Result<i32
     }
 }
 
+/// Add `cid` to the guild at the lowest rank, if there is room.
+pub fn add_member(guild_id: i32, cid: i32) -> crate::Result<Result<(), JoinError>> {
+    let mut conn = crate::connection()?;
+    Ok(conn.transaction(|conn| -> QueryResult<_> {
+        // Lock the guild so members joining at once can't pass its capacity.
+        let capacity = guilds::table
+            .find(guild_id)
+            .select(guilds::capacity)
+            .for_update()
+            .first::<i16>(conn)?;
+        let member = guild_members::table
+            .find(cid)
+            .select(guild_members::guild_id)
+            .first::<i32>(conn)
+            .optional()?;
+        if member.is_some() {
+            return Ok(Err(JoinError::AlreadyInGuild));
+        }
+        let count: i64 = guild_members::table
+            .filter(guild_members::guild_id.eq(guild_id))
+            .count()
+            .get_result(conn)?;
+        if count >= i64::from(capacity) {
+            return Ok(Err(JoinError::Full));
+        }
+        diesel::insert_into(guild_members::table)
+            .values((
+                guild_members::character_id.eq(cid),
+                guild_members::guild_id.eq(guild_id),
+                guild_members::rank.eq(i16::from(MEMBER_RANK)),
+            ))
+            .execute(conn)?;
+        Ok(Ok(()))
+    })?)
+}
+
+/// Take `cid` out of the guild unless they are its master. Returns whether
+/// they were a member it could lose.
+pub fn remove_member(guild_id: i32, cid: i32) -> crate::Result<bool> {
+    let mut conn = crate::connection()?;
+    let removed = diesel::delete(
+        guild_members::table
+            .filter(guild_members::character_id.eq(cid))
+            .filter(guild_members::guild_id.eq(guild_id))
+            .filter(guild_members::rank.ne(i16::from(MASTER_RANK))),
+    )
+    .execute(&mut conn)?;
+    Ok(removed == 1)
+}
+
 /// The guild with its members, the master first. Members are not marked
 /// online; the world directory knows who is.
 pub fn load(guild_id: i32) -> crate::Result<Guild> {
@@ -141,6 +199,13 @@ pub fn tag_of(conn: &mut PgConnection, cid: i32) -> QueryResult<Option<GuildTag>
             name,
             emblem: emblem(bg, bg_color, mark, mark_color),
         }))
+}
+
+/// What others see of `cid`'s guild, read again after someone else changed
+/// it.
+pub fn tag(cid: i32) -> crate::Result<Option<GuildTag>> {
+    let mut conn = crate::connection()?;
+    Ok(tag_of(&mut conn, cid)?)
 }
 
 /// Every member of the guild, online or not.

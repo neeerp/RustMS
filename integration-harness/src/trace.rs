@@ -138,6 +138,8 @@ pub struct Trace {
     pub storage: Vec<StorageResult>,
     /// Every PLAYER_INTERACTION body (mode first), in order.
     pub rooms: Vec<Vec<u8>>,
+    /// Every UPDATE_CHAR_BOX body (character id first), in order.
+    pub char_boxes: Vec<Vec<u8>>,
     /// GIVE_BUFF: (skill id, value, duration in ms).
     pub buffs: Vec<(i32, i16, i32)>,
     /// CANCEL_BUFF: the second mask of each.
@@ -440,6 +442,8 @@ impl Trace {
             self.storage.push(StorageResult::read(mode, &p.bytes[3..]));
         } else if op == SendOpcode::PlayerInteraction as i16 {
             self.rooms.push(p.bytes[2..].to_vec());
+        } else if op == SendOpcode::UpdateCharBox as i16 {
+            self.char_boxes.push(p.bytes[2..].to_vec());
         } else if op == SendOpcode::GuildOperation as i16 {
             self.guild_ops.push(p.bytes[2..].to_vec());
         } else if op == SendOpcode::GuildNameChanged as i16 {

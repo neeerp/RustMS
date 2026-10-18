@@ -160,6 +160,9 @@ if(HEAVENCLIENT_BUILD_TESTS)
     add_executable(mini_room_tests tests/mini_room.cpp Net/InPacket.cpp)
     target_include_directories(mini_room_tests PRIVATE ${PROJECT_SOURCE_DIR}/libs/NoLifeNx)
     add_test(NAME mini_room COMMAND mini_room_tests)
+    add_executable(personal_shop_tests tests/personal_shop.cpp Net/InPacket.cpp)
+    target_include_directories(personal_shop_tests PRIVATE ${PROJECT_SOURCE_DIR}/libs/NoLifeNx)
+    add_test(NAME personal_shop COMMAND personal_shop_tests)
     add_executable(movement_path_tests tests/movement_path.cpp Net/InPacket.cpp Net/Handlers/Helpers/MovementParser.cpp)
     target_include_directories(movement_path_tests PRIVATE ${PROJECT_SOURCE_DIR}/libs/NoLifeNx)
     add_test(NAME movement_path COMMAND movement_path_tests)
@@ -309,6 +312,9 @@ add_executable(HeavenClient
     Character/MonsterBook.h
     Character/Party.cpp
     Character/Party.h
+    Character/MiniRoomBalloon.cpp
+    Character/MiniRoomBalloon.h
+    Character/MiniRoomBox.h
     Character/OtherChar.cpp
     Character/OtherChar.h
     Character/PassiveBuffs.cpp
@@ -586,6 +592,8 @@ add_executable(HeavenClient
     IO/UITypes/UIInviteCard.h
     IO/UITypes/UITradingRoom.cpp
     IO/UITypes/UITradingRoom.h
+    IO/UITypes/UIPersonalShop.cpp
+    IO/UITypes/UIPersonalShop.h
     IO/UITypes/UIMonsterBook.cpp
     IO/UITypes/UIMonsterBook.h
     IO/UITypes/UISkillBook.cpp
@@ -621,6 +629,9 @@ add_executable(HeavenClient
     IO/BuddyCommands.h
     IO/PartyCommands.cpp
     IO/PartyCommands.h
+    IO/GuildCommands.cpp
+    IO/GuildCommands.h
+    IO/ChatCommand.h
     IO/UI.cpp
     IO/UI.h
     IO/UIDragElement.h

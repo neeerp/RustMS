@@ -315,6 +315,88 @@ and the partner gets theirs back with LEAVE reason 2. If the field dies,
 the trade fails with reason 8. Anything that no longer fits when an offer
 comes back drops at the player's feet.
 
+## Personal shops
+
+A player with a store permit (`514xxxx`, in the cash bag) opens a personal
+shop (mini room type 4) on a Free Market map and sells items in bundles to
+up to three visitors at a time. Shops use the same PLAYER_INTERACTION
+packets as trading. `PlayerInteractionHandler` turns the shop modes into a
+`net::personal_shop::PersonalShopRequest`. Visiting, chatting and leaving
+stay `TradeRequest`s, shared with trading rooms. Maps allow shops where
+Map.nx sets `info/personalShop` (the Free Market rooms).
+
+The work is split three ways, as for trading:
+
+- The room lives in the field (`runtime::actor::field_shops::Shops`). It
+  holds the members, title, balloon skin, whether the shop is open, the
+  blacklist, the banned names, and a display copy of the listings. It also
+  collects balloon changes, which the field shows by setting the owner's
+  `FieldAvatar::mini_room` and broadcasting UPDATE_CHAR_BOX (`0xA5`). The
+  same box goes into the owner's spawn packet.
+- The stock lives in the owner's `ClientActor` (`client/personal_shop.rs`).
+  Listing an item takes it out of the inventory, and the actor holds it as
+  `net::personal_shop::Listing`s until it sells or the shop closes. `flush`
+  adds the unsold stock back into the saved copy, as for a trade offer.
+- `net::personal_shop` holds the rules: tax, permit, list item, check
+  purchase, check sale, sell, unsold.
+
+A visit names only a room id, so the field sends it to the shops if one has
+that id and to the trades otherwise. Room ids come from one counter for
+both kinds. A player in one kind of room counts as busy for the other. The
+visitor's actor makes no state until the room says it is in: a trading
+room's `TradeEvent::Started`, or a shop's `ShopEvent::Entered`.
+
+The flow:
+
+1. **Create** (mode 0, type 4: title, a byte, permit slot, permit id). A
+   permit not in that slot is refused silently. Off a Free Market map the
+   owner gets ENTER_RESULT `{5, 0, 0xf}`. Otherwise the owner gets the empty
+   shop.
+2. **Put item** (`0x16`: bag, slot, bundles, per bundle, price) and **take
+   back** (`0x1b`: index) work only before the shop opens. Stars, bullets
+   and equipment go whole, as one bundle. The storage rules decide what may
+   be sold. Each change sends the inventory operation, then the listings
+   (`0x19`) to everyone in the shop. Taking back an item with no room for it
+   gets the inventory-full notice.
+3. **Open**: the client sends its blacklist (`0x1e`), then `{0xb, 1}`.
+   Opening needs at least one listing. The balloon shows, and visitors may
+   enter. Names on the blacklist (`0x1f` adds, `0x20` removes) stay out.
+4. **Visit** (4: room id). A closed shop answers ENTER_RESULT 1, a full one
+   2, and a banned name `0x11`. The visitor gets ENTER (5) with the members
+   and listings, and the others get VISIT (4).
+5. **Buy** (`0x17`: index, bundles). See below. The buyer gets the items
+   and the new listings, or BUY_RESULT (`0x18`) with a reason: 1 out of
+   stock, 2 not enough mesos, 3 too expensive, 5 inventory full, 6
+   one-of-a-kind, `0xe` over the low-level meso limit. The owner gets SOLD
+   (`0x1a`: index, bundles, buyer) and the mesos less tax.
+6. **Ban** (`0x1c`: slot, name; `0x1d` when the visitor's client turns
+   itself out after an hour) sends that visitor LEAVE reason 5 (`0xf` for
+   overstaying). They can't come back while the shop is open.
+
+A purchase crosses two client actors, so it runs in steps that never lose
+or copy an item:
+
+1. The buyer asks the room for the listing (`Quote`) and checks it can pay
+   and carry it (`check_purchase`).
+2. It takes the mesos and sends the room a `Sale` with a oneshot for the
+   answer. The room passes it to the owner, or drops it if the buyer is no
+   longer a visitor.
+3. The owner checks the sale against its stock (`check_sale`) and answers.
+   Only if the buyer is still waiting does it take the bundles off the
+   listing and add the mesos less tax.
+4. The buyer takes the items on yes. On no, a dropped sale, or no answer
+   within 5 seconds, it gets its mesos back and BUY_RESULT.
+
+The tax is 3% from 100,000,000 mesos, 2.5% from 25,000,000, 2% from
+10,000,000, 1.5% from 5,000,000, 0.9% from 1,000,000, 0.4% from 100,000,
+and nothing below that. It is worked out in doubles and rounded down, as
+the client does.
+
+When the last bundle sells, the shop closes: the visitors get LEAVE reason
+`0xe` and the owner `{0xa, 0, 0xe}`. The owner leaving (`0xa`), changing
+maps or channels, entering the Cash Shop, or logging out also closes it.
+The owner gets the unsold stock back, and the visitors get LEAVE reason 3.
+
 ## Tests
 
 `game` unit tests cover stacking, full bags, removal order, merging,
@@ -353,3 +435,16 @@ Trading is tested at three levels:
     meso limit. It finds both sides saved after a relogin.
   - The second cancels a trade, then fails one against a full bag. Both
     times everything goes back.
+
+Personal shops are tested the same way: `net::personal_shop` covers the
+tax, listing, purchase and sale checks, and the sale; `player_interaction`
+covers parsing; `runtime::actor::field_shops` covers opening, seats, chat,
+purchases, bans, the blacklist, and closing. `personal_shop` (integration)
+has two tests:
+
+- The first is refused a shop off the Free Market. It lists items and takes
+  one back, opens, and sells to a visitor less tax. It refuses a purchase
+  of more than is left, then sells out, which closes the shop. Both sides
+  are saved after a relogin.
+- The second bans a visitor, who can't come back. The owner gets the stock
+  back on leaving and on logging out.

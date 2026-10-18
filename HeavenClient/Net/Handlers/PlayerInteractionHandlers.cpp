@@ -27,6 +27,7 @@
 #include "../../IO/UITypes/UIChatBar.h"
 #include "../../IO/UITypes/UINotice.h"
 #include "../../IO/UITypes/UIInviteCard.h"
+#include "../../IO/UITypes/UIPersonalShop.h"
 #include "../../IO/UITypes/UITradingRoom.h"
 #include "../Packets/MiniRoomPackets.h"
 
@@ -174,7 +175,11 @@ namespace ms
 			PUT_ITEM = 0x0F,
 			PUT_MESO = 0x10,
 			CONFIRMED = 0x11,
-			MESO_LIMIT = 0x15
+			MESO_LIMIT = 0x15,
+			// The personal shop's own
+			BUY_RESULT = 0x18,
+			LISTINGS = 0x19,
+			SOLD = 0x1A
 		};
 
 		// The chat line of a notice by code rather than a member
@@ -182,7 +187,9 @@ namespace ms
 
 		int8_t mode = recv.read_byte();
 		auto room = UI::get().get_element<UITradingRoom>();
-		bool open = room && room->is_active();
+		auto shop = UI::get().get_element<UIPersonalShop>();
+		bool trading = room && room->is_active();
+		bool shopping = shop && shop->is_active();
 
 		if (mode == Mode::INVITE_RESULT)
 		{
@@ -197,7 +204,7 @@ namespace ms
 			return;
 		}
 
-		if (!open)
+		if (!trading && !shopping)
 		{
 			switch (mode)
 			{
@@ -232,6 +239,10 @@ namespace ms
 					{
 						UI::get().emplace<UITradingRoom>(enter);
 					}
+					else if (enter.type == mini_room::PERSONAL_SHOP)
+					{
+						UI::get().emplace<UIPersonalShop>(enter);
+					}
 					else if (enter.type == 0)
 					{
 						std::string text = mini_room::enter_error_text(enter.error);
@@ -253,18 +264,77 @@ namespace ms
 			return;
 		}
 
+		if (mode == Mode::INVITE)
+		{
+			recv.skip_byte();
+			recv.skip_string();
+
+			// v83 drops invites while a room is open; turn them down so the
+			// inviter hears back.
+			MiniRoomDeclinePacket(recv.read_int(), MiniRoomPacket::Decline::NOT_ACCEPTING).dispatch();
+
+			return;
+		}
+
+		if (shopping)
+		{
+			switch (mode)
+			{
+				case Mode::VISIT:
+				{
+					uint8_t slot = recv.read_byte();
+
+					shop->visit(mini_room::read_member(recv, slot, LoginParser::parse_look));
+					break;
+				}
+				case Mode::CHAT:
+				{
+					if (recv.read_byte() == CHAT_NOTICE)
+						break;
+
+					uint8_t slot = recv.read_byte();
+					std::string line = recv.read_string();
+
+					shop->add_chat(slot, line);
+					break;
+				}
+				case Mode::AVATAR:
+				{
+					uint8_t slot = recv.read_byte();
+
+					shop->change_look(slot, LoginParser::parse_look(recv));
+					break;
+				}
+				case Mode::LEAVE:
+				{
+					uint8_t slot = recv.read_byte();
+
+					// Only our own leaving says why (FUN_006fc731).
+					if (slot == shop->get_own_slot())
+						shop->leave(recv.read_byte());
+					else
+						shop->seat_left(slot);
+
+					break;
+				}
+				case Mode::BUY_RESULT:
+					shop->buy_result(recv.read_byte());
+					break;
+				case Mode::LISTINGS:
+					shop->set_listings(mini_room::read_listings(recv));
+					break;
+				case Mode::SOLD:
+					shop->sold(personal_shop::read_sold(recv));
+					break;
+				default:
+					break;
+			}
+
+			return;
+		}
+
 		switch (mode)
 		{
-			case Mode::INVITE:
-			{
-				recv.skip_byte();
-				recv.skip_string();
-
-				// v83 drops invites while a room is open; turn them down so the
-				// inviter hears back.
-				MiniRoomDeclinePacket(recv.read_int(), MiniRoomPacket::Decline::NOT_ACCEPTING).dispatch();
-				break;
-			}
 			case Mode::VISIT:
 			{
 				uint8_t slot = recv.read_byte();

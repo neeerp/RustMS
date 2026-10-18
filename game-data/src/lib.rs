@@ -206,6 +206,9 @@ pub struct FieldTemplate {
     pub field_limit: i32,
     /// `info/allowedItem`: the items `FIELD_LIMIT_CONSUMABLES` still allows.
     pub allowed_items: Vec<i32>,
+    /// `info/personalShop`: players may open personal shops here (the Free
+    /// Market rooms).
+    pub personal_shop: bool,
     /// Whether the map has a wall clock (a `clock` node with a position and
     /// size, as stations do), which the server sets to the time of day.
     pub clock: bool,
@@ -364,14 +367,16 @@ fn build_field_template(
         .transpose()?
         .flatten()
         .unwrap_or(1.0);
-    let (town, field_limit, allowed_items) = match nx.child_by_name(map_node_idx, "info")? {
-        Some(info) => (
-            nx.int_child(info, "town")?.unwrap_or(0) != 0,
-            nx.int_child(info, "fieldLimit")?.unwrap_or(0),
-            allowed_items(nx, info)?,
-        ),
-        None => (false, 0, Vec::new()),
-    };
+    let (town, field_limit, allowed_items, personal_shop) =
+        match nx.child_by_name(map_node_idx, "info")? {
+            Some(info) => (
+                nx.int_child(info, "town")?.unwrap_or(0) != 0,
+                nx.int_child(info, "fieldLimit")?.unwrap_or(0),
+                allowed_items(nx, info)?,
+                nx.int_child(info, "personalShop")?.unwrap_or(0) != 0,
+            ),
+            None => (false, 0, Vec::new(), false),
+        };
     // v83 FUN_0052bc72 makes the clock only if all four are non-zero.
     let clock = match nx.child_by_name(map_node_idx, "clock")? {
         Some(clock) => {
@@ -444,6 +449,7 @@ fn build_field_template(
         town,
         field_limit,
         allowed_items,
+        personal_shop,
         clock,
         footholds,
         portals_by_id,
@@ -929,6 +935,7 @@ mod tests {
             town: false,
             field_limit: 0,
             allowed_items: Vec::new(),
+            personal_shop: false,
             clock: false,
             footholds: footholds::Footholds::default(),
             portals_by_id: BTreeMap::from([
@@ -997,6 +1004,7 @@ mod tests {
             town: false,
             field_limit: 0,
             allowed_items: Vec::new(),
+            personal_shop: false,
             clock: false,
             reactors: Vec::new(),
             footholds: footholds::Footholds::default(),

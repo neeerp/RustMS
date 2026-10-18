@@ -2,6 +2,7 @@ use crate::actor::field_drops::{Drop, DropSet};
 use crate::actor::field_mists::MistSet;
 use crate::actor::field_mobs::{split_exp, Cast, MobSet, Sharer};
 use crate::actor::field_reactors::{Hit, ReactorSet};
+use crate::actor::field_shops::{ShopRoomRequest, Shops};
 use crate::actor::field_summons::SummonSet;
 use crate::actor::field_trades::{Outbox, RoomRequest, Trades};
 use crate::message::{ClientHandle, FieldKey, FieldMessage, ServerMessage};
@@ -14,6 +15,7 @@ use net::packet::build::world::drop::{build_drop, build_remove_drop, DropAppeara
 use net::packet::build::world::field::{
     build_player_enter_field, build_player_leave_field, build_show_chair, parse_movement_state,
 };
+use net::packet::build::world::mini_room::build_char_box;
 use net::packet::build::world::mist::{build_remove_mist, build_spawn_mist, MistKind, MistView};
 use net::packet::build::world::mob::{
     build_control_mob, build_heal_mob, build_kill_mob, build_mob_hp, build_mob_stat_reset,
@@ -92,6 +94,7 @@ pub struct FieldActor {
     /// Players' Mystic Doors here, by owner.
     doors: HashMap<ClientId, (i16, i16)>,
     trades: Trades,
+    shops: Shops,
     /// On a ship route's maps, the route time trips were last checked at.
     trips: Option<i64>,
     tick: Duration,
@@ -123,6 +126,7 @@ impl FieldActor {
             summons: SummonSet::default(),
             doors: HashMap::new(),
             trades: Trades::default(),
+            shops: Shops::default(),
             trips: conti::has_trips(key.map_id).then(conti::now),
             tick,
         }
@@ -286,13 +290,15 @@ impl FieldActor {
                     self.broadcast(Some(client_id), packet);
                 }
                 if let Some(occupant) = self.occupants.get_mut(&client_id) {
-                    // Keep the live position and chair; take everything else.
-                    let live = &occupant.avatar;
+                    // Keep the live position, chair and balloon; take
+                    // everything else.
+                    let live = &mut occupant.avatar;
                     occupant.avatar = FieldAvatar {
                         x: live.x,
                         y: live.y,
                         stance: live.stance,
                         chair: live.chair,
+                        mini_room: live.mini_room.take(),
                         ..avatar
                     };
                 }
@@ -443,6 +449,7 @@ impl FieldActor {
                 }
             }
             FieldMessage::Trade { from, request } => self.handle_trade(from, request),
+            FieldMessage::PersonalShop { from, request } => self.handle_shop(from, request),
         }
     }
 
@@ -454,13 +461,24 @@ impl FieldActor {
         };
         let (name, look) = (&occupant.avatar.name, &occupant.avatar.look);
         let out = match request {
-            RoomRequest::Create { room } => self.trades.create(room, from, name, look),
+            RoomRequest::Create { room } => {
+                self.trades
+                    .create(room, from, name, look, self.shops.is_member(from))
+            }
             RoomRequest::Invite { target } => {
                 let target_name = self.occupants.get(&target).map(|o| o.avatar.name.as_str());
                 self.trades.invite(from, target, target_name)
             }
             RoomRequest::Decline { room, reason } => self.trades.decline(from, room, reason, name),
-            RoomRequest::Visit { room } => self.trades.visit(from, room, name, look),
+            // Shops and trading rooms share the visit.
+            RoomRequest::Visit { room } if self.shops.contains(room) => {
+                self.shops
+                    .visit(from, room, name, look, self.trades.is_member(from))
+            }
+            RoomRequest::Visit { room } => {
+                self.trades
+                    .visit(from, room, name, look, self.shops.is_member(from))
+            }
             RoomRequest::Chat { text } => self.trades.chat(from, &text),
             RoomRequest::PutItem { slot, item } => self.trades.put_item(from, slot, item),
             RoomRequest::Meso { total } => self.trades.meso(from, total),
@@ -469,6 +487,69 @@ impl FieldActor {
             RoomRequest::Leave => self.trades.leave(from),
         };
         self.deliver_trade(out);
+        self.show_balloons();
+    }
+
+    /// A personal shop request from an occupant; anyone else's is dropped,
+    /// with any oneshot it carries.
+    fn handle_shop(&mut self, from: ClientId, request: ShopRoomRequest) {
+        let Some(occupant) = self.occupants.get(&from) else {
+            return;
+        };
+        let (name, look) = (&occupant.avatar.name, &occupant.avatar.look);
+        let shops = &mut self.shops;
+        let out = match request {
+            ShopRoomRequest::Create { room, title, skin } => {
+                let busy = self.trades.is_member(from);
+                shops.create(room, from, name, look, title, skin, busy)
+            }
+            ShopRoomRequest::Listings(listings) => shops.listings(from, listings),
+            ShopRoomRequest::Open => {
+                shops.open(from);
+                Outbox::new()
+            }
+            ShopRoomRequest::Chat { text } => shops.chat(from, &text),
+            ShopRoomRequest::Quote { index, reply } => {
+                shops.quote(from, index, reply);
+                Outbox::new()
+            }
+            ShopRoomRequest::Purchase(sale) => shops.purchase(from, sale),
+            ShopRoomRequest::Ban {
+                slot,
+                name,
+                overstayed,
+            } => shops.ban(from, slot, &name, overstayed),
+            ShopRoomRequest::Blacklist(names) => {
+                shops.blacklist(from, names);
+                Outbox::new()
+            }
+            ShopRoomRequest::BlacklistAdd(name) => {
+                shops.blacklist_add(from, name);
+                Outbox::new()
+            }
+            ShopRoomRequest::BlacklistRemove(name) => {
+                shops.blacklist_remove(from, &name);
+                Outbox::new()
+            }
+            ShopRoomRequest::SoldOut => shops.sold_out(from),
+            ShopRoomRequest::Leave => shops.leave(from),
+        };
+        self.deliver_trade(out);
+        self.show_balloons();
+    }
+
+    /// Put up, change, or take down the balloons over shop owners.
+    fn show_balloons(&mut self) {
+        for (owner, balloon) in self.shops.take_balloons() {
+            let Some(occupant) = self.occupants.get_mut(&owner) else {
+                continue;
+            };
+            occupant.avatar.mini_room = balloon;
+            match build_char_box(owner, occupant.avatar.mini_room.as_ref()) {
+                Ok(packet) => self.broadcast(None, packet),
+                Err(error) => warn!(owner, %error, "Failed to build a shop balloon"),
+            }
+        }
     }
 
     fn deliver_trade(&self, out: Outbox) {
@@ -1363,9 +1444,12 @@ impl FieldActor {
         let client_id = handle.client_id;
         // A rejoin replaces the previous entry without announcing a leave.
         self.occupants.remove(&client_id);
-        // It also ends any trade the player had here.
+        // It also ends any trade or shop the player had here.
         let out = self.trades.leave(client_id);
         self.deliver_trade(out);
+        let out = self.shops.leave(client_id);
+        self.deliver_trade(out);
+        self.show_balloons();
         // Its summons come back with it.
         for summon in self.summons.remove_owned(client_id, None) {
             self.remove_summon(&summon.view, Gone::Silently);
@@ -1456,6 +1540,9 @@ impl FieldActor {
         }
         let out = self.trades.leave(client_id);
         self.deliver_trade(out);
+        let out = self.shops.leave(client_id);
+        self.deliver_trade(out);
+        self.show_balloons();
         // The others drop a player's summons with the player.
         self.summons.remove_owned(client_id, None);
         // Everyone sees the player go before control passes on.
@@ -1560,6 +1647,7 @@ mod tests {
             chair: 0,
             guild: None,
             buffs: Vec::new(),
+            mini_room: None,
         }
     }
 

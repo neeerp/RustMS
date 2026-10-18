@@ -115,6 +115,14 @@ namespace ms
 			MAYABLUE,
 			MAUVE,
 			SCRIPTPURPLE,
+			PRICEBLUE,
+			PRICETEAL,
+			PRICEGREEN,
+			PRICEORANGE,
+			PRICEPINK,
+			PRICEPLUM,
+			SEATBLUE,
+			SEATPINK,
 			NUM_COLORS
 		};
 
@@ -179,7 +187,15 @@ namespace ms
 						{0.39f, 0.71f, 0.94f}, // Picton blue (#64B4F0, v83 font 5: quest messages in the status lines)
 						{0.38f, 0.81f, 1.00f}, // Maya blue (#60CEFF, v83 chat font 10: server notices)
 						{0.88f, 0.67f, 1.00f}, // Mauve (#E1ACFE, v83 chat font 4: guild chat)
-						{0.32f, 0.22f, 0.55f}  // Script purple (#51378C, #d in v83 NPC dialog text)
+						{0.32f, 0.22f, 0.55f}, // Script purple (#51378C, #d in v83 NPC dialog text)
+						{0.00f, 0.48f, 0.96f}, // Price blue (#007AF4, v83 font 0x32: personal shop prices under 100,000)
+						{0.00f, 0.74f, 0.77f}, // Price teal (#00BDC4, v83 font 0x33: prices under 1,000,000)
+						{0.38f, 0.60f, 0.00f}, // Price green (#629A00, v83 font 0x34: prices under 10,000,000)
+						{1.00f, 0.33f, 0.00f}, // Price orange (#FF5400, v83 font 0x35: prices under 100,000,000)
+						{0.82f, 0.13f, 0.76f}, // Price pink (#D022C2, v83 font 0x36: prices under 1,000,000,000)
+						{0.65f, 0.00f, 0.43f}, // Price plum (#A6006E, v83 font 0x37: higher prices)
+						{0.00f, 0.40f, 0.60f}, // Seat blue (#006699, v83 font 11: a personal shop's first visitor's chat)
+						{0.80f, 0.00f, 0.40f}  // Seat pink (#CC0066, v83 font 12: the second visitor's chat)
 				};
 
 		// Create a color by an array of real numbers [0.0f, 1.0f]

@@ -126,6 +126,23 @@ pub struct FieldAvatar {
     /// The buffs others see, as `Buffs::shown`.
     pub buffs: Vec<ShownBuff>,
     pub guild: Option<GuildTag>,
+    /// The balloon of the mini room the player keeps open, if any. The
+    /// field sets it.
+    pub mini_room: Option<MiniRoomBox>,
+}
+
+/// The balloon over a player who keeps a mini room open, which others
+/// double-click to visit it (v83 UPDATE_CHAR_BOX).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct MiniRoomBox {
+    /// The room type; 4 is a personal shop.
+    pub kind: u8,
+    pub sn: i32,
+    pub title: String,
+    /// The art: for a shop, its permit's skin.
+    pub skin: u8,
+    pub users: u8,
+    pub max_users: u8,
 }
 
 /// A character that is logged in. The owning client actor holds the only
@@ -210,6 +227,7 @@ impl Player {
             chair: 0,
             buffs: self.buffs.shown(),
             guild: self.guild.clone(),
+            mini_room: None,
         }
     }
 

@@ -208,7 +208,9 @@ namespace ms
 		// out of view.
 		void place_section_buttons();
 		void scroll_guild(int16_t steps);
-		// The member picked on the page shown, if online and not the player.
+		// The member picked on the page shown, but never the player.
+		const GuildMember* picked_member() const;
+		// The same, if online.
 		const GuildMember* picked_online_member() const;
 
 		uint16_t tab;

@@ -11,6 +11,10 @@ pub const CREATE_COST: i32 = 1_500_000;
 pub const DEFAULT_TITLES: [&str; 5] = ["Master", "Jr. Master", "Member", "", ""];
 /// The master's rank; members range from 1 to 5.
 pub const MASTER_RANK: u8 = 1;
+/// A jr. master, who may invite and expel too.
+pub const JR_MASTER_RANK: u8 = 2;
+/// The rank new members join at.
+pub const MEMBER_RANK: u8 = 5;
 
 /// The emblem shown beside the guild name. All zeros means none.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -64,6 +68,31 @@ impl Guild {
             emblem: self.emblem,
         }
     }
+
+    pub fn member(&self, id: i32) -> Option<&GuildMember> {
+        self.members.iter().find(|member| member.id == id)
+    }
+
+    /// Whether member `by` may invite someone: a master or jr. master, while
+    /// there is room.
+    pub fn may_invite(&self, by: i32) -> bool {
+        self.member(by)
+            .is_some_and(|member| member.rank <= JR_MASTER_RANK)
+            && self.members.len() < usize::from(self.capacity)
+    }
+
+    /// Whether member `by` may put `member_id` out. Masters and jr. masters
+    /// may, but nobody expels the master, and only the master expels a
+    /// jr. master.
+    pub fn may_expel(&self, by: i32, member_id: i32) -> bool {
+        let (Some(by), Some(member)) = (self.member(by), self.member(member_id)) else {
+            return false;
+        };
+        by.id != member.id
+            && by.rank <= JR_MASTER_RANK
+            && member.rank != MASTER_RANK
+            && (member.rank != JR_MASTER_RANK || by.rank == MASTER_RANK)
+    }
 }
 
 /// Guild names follow the character name rules: 4 to 12 ASCII letters or
@@ -75,6 +104,54 @@ pub fn name_is_valid(name: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn guild(ranks: &[u8]) -> Guild {
+        Guild {
+            id: 4,
+            name: "Testers".into(),
+            titles: DEFAULT_TITLES.map(String::from),
+            capacity: 4,
+            emblem: Emblem::default(),
+            notice: String::new(),
+            points: 0,
+            alliance_id: 0,
+            members: ranks
+                .iter()
+                .enumerate()
+                .map(|(i, &rank)| GuildMember {
+                    id: i as i32 + 1,
+                    name: format!("Member{i}"),
+                    job: 0,
+                    level: 10,
+                    rank,
+                    online: true,
+                })
+                .collect(),
+        }
+    }
+
+    #[test]
+    fn masters_and_jr_masters_invite_while_there_is_room() {
+        let testers = guild(&[1, 2, 5]);
+        assert!(testers.may_invite(1));
+        assert!(testers.may_invite(2));
+        assert!(!testers.may_invite(3));
+        assert!(!testers.may_invite(9));
+        assert!(!guild(&[1, 2, 5, 5]).may_invite(1));
+    }
+
+    #[test]
+    fn only_the_master_expels_jr_masters_and_nobody_the_master() {
+        let testers = guild(&[1, 2, 2, 5, 3]);
+        assert!(testers.may_expel(1, 2));
+        assert!(testers.may_expel(1, 4));
+        assert!(testers.may_expel(2, 4));
+        assert!(!testers.may_expel(2, 3));
+        assert!(!testers.may_expel(2, 1));
+        assert!(!testers.may_expel(4, 5));
+        assert!(!testers.may_expel(1, 1));
+        assert!(!testers.may_expel(1, 9));
+    }
 
     #[test]
     fn names_are_four_to_twelve_letters_or_digits() {

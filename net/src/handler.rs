@@ -236,9 +236,31 @@ pub enum GuildRequest {
     /// Send the player's guild again (`GUILD_OPERATION` mode 0).
     Reload,
     /// Found a guild with this name, answering the name prompt.
-    Create { name: String },
+    Create {
+        name: String,
+    },
     /// Say something to the guild members online.
-    Chat { text: String },
+    Chat {
+        text: String,
+    },
+    /// Ask the character with this name to join the guild.
+    Invite {
+        name: String,
+    },
+    /// Join the guild that invited the player.
+    Accept {
+        guild_id: i32,
+    },
+    /// Turn down the invitation `inviter` sent.
+    Deny {
+        inviter: String,
+        refusal: crate::packet::build::world::guild::InviteRefusal,
+    },
+    Leave,
+    /// Put a member out of the guild.
+    Expel {
+        member_id: i32,
+    },
 }
 
 /// Something a player asks of their Maple Messenger, which the world
@@ -300,6 +322,8 @@ pub enum WorldAction {
     Storage(crate::storage::StorageRequest),
     /// Open, join, or act in a trading room.
     Trade(crate::trade::TradeRequest),
+    /// Open, stock, visit, or buy from a personal shop.
+    PersonalShop(crate::personal_shop::PersonalShopRequest),
     /// The player touched the named script portal on their map.
     ScriptPortal {
         portal: String,
@@ -563,6 +587,10 @@ fn world_routes() -> &'static HashMap<i16, WorldRoute> {
             (Op::MultiChat, InGame(&world::MultiChatHandler)),
             (Op::BuddyListModify, InGame(&world::BuddyListModifyHandler)),
             (Op::GuildOperation, InGame(&world::GuildOperationHandler)),
+            (
+                Op::DenyGuildRequest,
+                InGame(&world::DenyGuildRequestHandler),
+            ),
             (Op::Messenger, InGame(&world::MessengerHandler)),
             (
                 Op::PlayerInteraction,
@@ -650,7 +678,7 @@ mod tests {
     fn every_registered_opcode_is_unique_per_server() {
         // The maps would silently drop duplicates; check the table sizes match.
         assert_eq!(login_routes().len(), 13);
-        assert_eq!(world_routes().len(), 61);
+        assert_eq!(world_routes().len(), 62);
     }
 
     #[test]
