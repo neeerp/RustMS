@@ -31,7 +31,9 @@
 #include "../IO/UITypes/UIChatBar.h"
 #include "../IO/UITypes/UINotice.h"
 #include "../IO/UITypes/UINpcTalk.h"
+#include "../IO/UITypes/UIPersonalShop.h"
 #include "../IO/UITypes/UIStatusBar.h"
+#include "../IO/UITypes/UITradingRoom.h"
 #include "../Net/Packets/AttackAndSkillPackets.h"
 #include "../Net/Packets/GameplayPackets.h"
 
@@ -71,6 +73,16 @@ namespace ms
 					clock.set(pending_clock->hour, pending_clock->minute, pending_clock->second);
 
 				pending_clock.reset();
+
+				// The player's chalkboard follows them, but not to a map where
+				// shops open (FUN_00949513).
+				if (player.get_chalkboard() && mapinfo.allows_personal_shop())
+				{
+					player.set_chalkboard(std::nullopt, true);
+
+					if (auto chatbar = UI::get().get_element<UIChatBar>())
+						chatbar->send_chatline("You cannot use the chalkboard here.", UIChatBar::LineType::SKILL);
+				}
 
 				// A ship field asks where its ship is (FUN_0054db7a).
 				if (ship.get_kind() >= 0)
@@ -793,6 +805,11 @@ namespace ms
 		combat.finish_prepare();
 	}
 
+	void Stage::release_cursor()
+	{
+		player.release_chalkboard_cursor();
+	}
+
 	Cursor::State Stage::send_cursor(bool pressed, Point<int16_t> position)
 	{
 		auto statusbar = UI::get().get_element<UIStatusBar>();
@@ -805,6 +822,27 @@ namespace ms
 			if (statusbar->is_in_range(position))
 				return statusbar->send_cursor(pressed, position);
 		}
+
+		// The close button on the player's own chalkboard, which needs both
+		// the press and the release on it (FUN_0094fa8e). The board stays up
+		// until the server takes it down. An open mini room blocks it.
+		auto shop = UI::get().get_element<UIPersonalShop>();
+		auto trade = UI::get().get_element<UITradingRoom>();
+		bool mini_room = (shop && shop->is_active()) || (trade && trade->is_active());
+		Point<int16_t> feet = player.get_position() + camera.position();
+
+		if (!mini_room && player.send_chalkboard_cursor(feet, position, pressed, UI::get().is_cursor_pressed()))
+		{
+			CloseChalkboardPacket().dispatch();
+
+			if (auto chatbar = UI::get().get_element<UIChatBar>())
+				chatbar->send_chatline("The chalkboard has closed.", UIChatBar::LineType::SKILL);
+
+			return Cursor::State::CANCLICK;
+		}
+
+		if (!mini_room && player.on_chalkboard_close(feet, position))
+			return Cursor::State::CANCLICK;
 
 		Cursor::State npcstate = npcs.send_cursor(pressed, position, camera.position());
 

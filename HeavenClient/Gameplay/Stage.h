@@ -97,6 +97,9 @@ namespace ms
 		// Lets go of every held key.
 		void release_keys();
 
+		// Lets go of a mouse press, wherever its release went.
+		void release_cursor();
+
 		// Send mouse input to the stage.
 		Cursor::State send_cursor(bool pressed, Point<int16_t> position);
 

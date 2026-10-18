@@ -120,6 +120,7 @@ namespace ms
 			guildmark.draw(guildpos + Point<int16_t>(-guildlabel.width() / 2, 0) + EMBLEM_OFFSET);
 		}
 
+		chalkboard.draw(absp, AVATAR_HEIGHT);
 		chatballoon.draw(absp - Point<int16_t>(0, 85));
 		hintballoon.draw(absp - Point<int16_t>(0, 85));
 		// v83 puts a room's balloon in front of the chat balloon.
@@ -691,6 +692,34 @@ namespace ms
 	int32_t Char::mini_room_at(Point<int16_t> feet, Point<int16_t> cursor) const
 	{
 		return miniroom.serial_at(feet, AVATAR_HEIGHT, cursor);
+	}
+
+	void Char::set_chalkboard(const std::optional<std::string> &text, bool closable)
+	{
+		chalkboard.change(text, closable);
+	}
+
+	std::optional<std::string> Char::get_chalkboard() const
+	{
+		if (!chalkboard.is_shown())
+			return std::nullopt;
+
+		return chalkboard.get_text();
+	}
+
+	bool Char::send_chalkboard_cursor(Point<int16_t> feet, Point<int16_t> cursor, bool pressed, bool held)
+	{
+		return chalkboard.send_cursor(feet, AVATAR_HEIGHT, cursor, pressed, held);
+	}
+
+	void Char::release_chalkboard_cursor()
+	{
+		chalkboard.release_cursor();
+	}
+
+	bool Char::on_chalkboard_close(Point<int16_t> feet, Point<int16_t> cursor) const
+	{
+		return chalkboard.on_close(feet, AVATAR_HEIGHT, cursor);
 	}
 
 	CharLook &Char::get_look()

@@ -46,6 +46,8 @@ if(HEAVENCLIENT_BUILD_TESTS)
     add_test(NAME chat_wrap COMMAND chat_wrap_tests)
     add_executable(megaphones_tests tests/megaphones.cpp)
     add_test(NAME megaphones COMMAND megaphones_tests)
+    add_executable(chalkboard_tests tests/chalkboard.cpp)
+    add_test(NAME chalkboard COMMAND chalkboard_tests)
     add_executable(curse_words_tests tests/curse_words.cpp)
     add_test(NAME curse_words COMMAND curse_words_tests)
     add_executable(character_name_tests tests/character_name.cpp)
@@ -295,6 +297,8 @@ add_executable(HeavenClient
     Character/BuddyList.h
     Character/Buff.cpp
     Character/Buff.h
+    Character/ChalkboardBalloon.cpp
+    Character/ChalkboardBalloon.h
     Character/Char.cpp
     Character/Char.h
     Character/CharEffect.cpp
@@ -748,6 +752,7 @@ add_executable(HeavenClient
     Template/TimedQueue.h
     Template/TypeMap.h
     Util/CharacterName.h
+    Util/Chalkboard.h
     Util/ChatWrap.h
     Util/CurseWords.h
     Util/HardwareInfo.h

@@ -20,6 +20,7 @@
 #include "UIChatBar.h"
 #include "UINotice.h"
 #include "UIPersonalShop.h"
+#include "UITradingRoom.h"
 
 #include "../Messages.h"
 #include "../UI.h"
@@ -34,6 +35,7 @@
 #include "../../Data/CurseData.h"
 #include "../../Data/EquipData.h"
 #include "../../Gameplay/Stage.h"
+#include "../../Util/Chalkboard.h"
 #include "../../Util/NxFiles.h"
 
 #include "../../Net/Handlers/MiniRoom.h"
@@ -203,6 +205,34 @@ namespace ms
 					if (yes)
 						ask_pet_name(slot, item_id, species, current);
 				});
+		}
+
+		// v83 FUN_00a0a63f, type 0x20: a chalkboard asks for a note, which
+		// goes up once the server sends it back. A blank note isn't sent.
+		void use_chalkboard(int16_t slot, int32_t item_id)
+		{
+			if (!Stage::get().get_player().can_request(ExclRequest::WAIT))
+				return;
+
+			auto shop = UI::get().get_element<UIPersonalShop>();
+			auto trade = UI::get().get_element<UITradingRoom>();
+
+			if ((shop && shop->is_active()) || (trade && trade->is_active()))
+			{
+				if (auto chatbar = UI::get().get_element<UIChatBar>())
+					chatbar->send_chatline("Not available", UIChatBar::LineType::SKILL);
+			} else if (Stage::get().get_mapinfo().allows_personal_shop())
+			{
+				UI::get().emplace<UIOk>("You can't use it here in this map.", [](bool)
+				{});
+			} else
+			{
+				UI::get().emplace<UIEnterText>("Enter a note.", [=](const std::string &text)
+				{
+					if (!Chalkboard::trim(text).empty())
+						Stage::get().get_player().request(UseCashItemPacket(slot, item_id, text), ExclRequest::WAIT);
+				}, Chalkboard::MAX_TEXT);
+			}
 		}
 
 		// v83 FUN_00a0900a: a map may keep items off the ground, which it
@@ -529,6 +559,8 @@ namespace ms
 							feed_cash_food(slot, item_id);
 						else if (pets::is_name_tag(item_id))
 							name_pet(slot, item_id);
+						else if (item_id / 10000 == 537)
+							use_chalkboard(slot, item_id);
 
 						break;
 				}

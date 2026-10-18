@@ -110,6 +110,7 @@ namespace ms
 
 		/// Messaging
 		CHAT_RECEIVED = 162,
+		CHALKBOARD = 164,
 		UPDATE_CHAR_BOX = 165,
 		SCROLL_RESULT = 167,
 
@@ -228,6 +229,7 @@ namespace ms
 
 		// MapObject handlers
 		emplace<SPAWN_CHAR, SpawnCharHandler>();
+		emplace<CHALKBOARD, ChalkboardHandler>();
 		emplace<UPDATE_CHAR_BOX, UpdateCharBoxHandler>();
 		emplace<CHAR_MOVED, CharMovedHandler>();
 		emplace<FACIAL_EXPRESSION, FacialExpressionHandler>();

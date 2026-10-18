@@ -74,6 +74,7 @@ namespace ms
 
 			/// Messaging
 			GENERAL_CHAT = 49,
+			CLOSE_CHALKBOARD = 50,
 			MULTICHAT = 119,
 			FACE_EXPRESSION = 51,
 			WHISPER = 120,

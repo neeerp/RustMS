@@ -476,6 +476,7 @@ side yet.
 | Cash shop (`UICashShop`) | Enter/exit, catalog, buying, gifts, Cash Inventory, wish list, and moving items to and from the bags |
 | Maple Messenger (`UIMessenger`) | Implemented |
 | Trade (`UITradingRoom`, `UIInviteCard`) | Implemented, without cash trades |
+| Chalkboards (`ChalkboardBalloon`) | Implemented: the board, the note prompt and the close button; see `inventory.md` |
 | Storage (`UIStorage`) | Implemented; see `inventory.md` |
 | Continent ships, station wall clocks | Docking ships and the Balrog's ship, CONTI_MOVE/CONTI_STATE, CLOCK kind 1; see `ships.md` |
 | Player shops, mini-games, memo/mail | No UI, no handlers |
@@ -484,7 +485,7 @@ side yet.
 | Mounts, summons | Partial or absent |
 | Party/guild/boss quests, events, MTS | Absent |
 
-81 outbound opcodes are defined (`Net/OutPacket.h`) and 116 inbound handlers
+83 outbound opcodes are defined (`Net/OutPacket.h`) and 118 inbound handlers
 are registered (`Net/PacketSwitch.cpp`). Anything not listed there is silently ignored by the client.
 
 ## Movement physics

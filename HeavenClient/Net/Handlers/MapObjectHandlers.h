@@ -28,6 +28,13 @@ namespace ms
 		void handle(InPacket& recv) const override;
 	};
 
+	// Put up or take down someone's chalkboard (FUN_00937607)
+	// Opcode: CHALKBOARD(164)
+	class ChalkboardHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
 	// Put up, change or take down the balloon over someone keeping a room
 	// open (FUN_00938ba5)
 	// Opcode: UPDATE_CHAR_BOX(165)

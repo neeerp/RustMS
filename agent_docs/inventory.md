@@ -213,10 +213,28 @@ later arrivals see it. CLOSE_CHALKBOARD (`0x32`, empty) puts it away with
 CHALKBOARD `id, 0` to the holder and the map.
 
 The board comes along to the next map, where the client actor tells the
-holder's client again, as it forgets it on a map change. Entering a map
-where shops open (`info/personalShop`, the Free Market rooms) puts it away,
-as the v83 client does there; the server refuses a board in those maps too.
-Losing the last chalkboard doesn't put the board away yet.
+holder's client again (v83 keeps its own board across the change anyway).
+Entering a map where shops open (`info/personalShop`, the Free Market rooms)
+puts it away, as the v83 client does there; the server refuses a board in
+those maps too. Losing the last chalkboard doesn't put the board away yet.
+The server doesn't mask curse words in the note: v83 clients star them out of
+other players' boards themselves.
+
+HeavenClient draws the board (`Character/ChalkboardBalloon`, layout in
+`Util/Chalkboard.h`) from `ChatBalloon.img/adboard/0` as v83 does: white
+text wrapped by character at 196 px, one line on an odd number of 14 px
+tiles so the arrow is centred, a longer note on 14 tiles, 5 px over the
+head. Another player's note, from CHALKBOARD or SPAWN_PLAYER, is trimmed,
+has its curse words starred out and is cut to 40 bytes; the player's own is
+only trimmed. The player's own board has the `Basic.img/BtClose` button,
+which takes a press and a release on it and does nothing while a mini room
+is open. It sends CLOSE_CHALKBOARD and logs "The chalkboard has closed.";
+the board stays until CHALKBOARD `id, 0`. The board follows the player to
+the next map, except to one where shops open, where it goes away with "You
+cannot use the chalkboard here.". Double-clicking a chalkboard in the Cash
+tab asks "Enter a note." (40 bytes; a blank note sends nothing), unless a
+mini room is open ("Not available") or shops open on the map ("You can't use
+it here in this map.").
 
 ### Teleport rocks
 
