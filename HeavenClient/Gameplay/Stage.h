@@ -129,6 +129,9 @@ namespace ms
 		// Returns the current map ID.
 		int32_t get_mapid();
 
+		// Returns the current map's info.
+		const MapInfo &get_mapinfo() const;
+
 		// Keeps the key the server gave the field, which map change and
 		// portal script requests repeat.
 		void set_field_key(uint8_t key);

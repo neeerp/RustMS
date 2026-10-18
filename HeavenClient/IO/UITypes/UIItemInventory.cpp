@@ -19,6 +19,7 @@
 
 #include "UINotice.h"
 
+#include "../Messages.h"
 #include "../UI.h"
 
 #include "../Components/AreaButton.h"
@@ -62,6 +63,20 @@ namespace ms
 		// The right end of the meso amount, which sits in a field ending at 137.
 		constexpr Point<int16_t> MESO = Point<int16_t>(131, 260);
 		constexpr Point<int16_t> FULL_MESO = Point<int16_t>(135, 260);
+
+		// v83's notices 0x10a and 0x42 (FUN_004f5697).
+		constexpr const char *CATCH_BREATH = "You can't do it right now.\\nCatch your breath and then try again.";
+		constexpr const char *DEAD = "You can't do it once you're dead.";
+
+		// v83 FUN_00a0900a: a map may keep items off the ground, which it
+		// says only once the player has answered every question.
+		void send_drop(InventoryType::Id tab, int16_t slot, int16_t qty)
+		{
+			if (Stage::get().get_mapinfo().can_drop())
+				Stage::get().get_player().request(MoveItemPacket(tab, slot, 0, qty), ExclRequest::WAIT);
+			else
+				InChatMessage(Messages::DROP_FIELD).drop();
+		}
 	}
 
 	UIItemInventory::UIItemInventory(const Inventory &invent)
@@ -304,7 +319,10 @@ namespace ms
 				{
 					auto onenter = [](int32_t amount)
 					{
-						Stage::get().get_player().request(MesoDropPacket(amount), ExclRequest::USE_WAIT);
+						if (Stage::get().get_mapinfo().can_drop())
+							Stage::get().get_player().request(MesoDropPacket(amount), ExclRequest::USE_WAIT);
+						else
+							InChatMessage(Messages::DROP_FIELD).drop();
 					};
 
 					UI::get().emplace<UIEnterNumber>(
@@ -329,6 +347,14 @@ namespace ms
 		{
 			if (int32_t item_id = inventory.get_item_id(tab, slot))
 			{
+				// v83 FUN_004efd25 refuses everything once the player is dead.
+				if (Stage::get().get_player().is_dead())
+				{
+					UI::get().emplace<UIOk>(DEAD, [](bool)
+					{});
+					return;
+				}
+
 				switch (tab)
 				{
 					case InventoryType::Id::EQUIP:
@@ -337,7 +363,9 @@ namespace ms
 
 						break;
 					case InventoryType::Id::USE:
-						if (disease::can_use_item(Stage::get().get_player().get_diseases()))
+						if (!Stage::get().get_mapinfo().can_use_item(item_id))
+							InChatMessage(Messages::ITEM_FIELD).drop();
+						else if (disease::can_use_item(Stage::get().get_player().get_diseases()))
 							Stage::get().get_player().request(UseItemPacket(slot, item_id), ExclRequest::USE_WAIT);
 
 						break;
@@ -589,13 +617,18 @@ namespace ms
 		const Player &player = Stage::get().get_player();
 		const CharStats &stats = player.get_stats();
 		const CharLook &look = player.get_look();
-		const bool alerted = look.get_alerted();
 
-		if (alerted)
+		if (look.get_alerted())
 		{
-			UI::get().emplace<UIOk>("You cannot complete this action right now.\\nEvade the attack and try again.",
-									[](bool)
-									{});
+			UI::get().emplace<UIOk>(CATCH_BREATH, [](bool)
+			{});
+			return false;
+		}
+
+		if (player.is_dead())
+		{
+			UI::get().emplace<UIOk>(DEAD, [](bool)
+			{});
 			return false;
 		}
 
@@ -798,6 +831,24 @@ namespace ms
 		constexpr const char *untradablemessage = "This item can't be taken back once\\nthrown away. Will you still drop it?";
 		constexpr const char *cashmessage = "You can't drop this item.";
 
+		const Player &player = Stage::get().get_player();
+
+		if (player.get_look().get_alerted())
+		{
+			UI::get().emplace<UIOk>(CATCH_BREATH, [](bool)
+			{});
+
+			return;
+		}
+
+		if (player.is_dead())
+		{
+			UI::get().emplace<UIOk>(DEAD, [](bool)
+			{});
+
+			return;
+		}
+
 		if (item_drop::refused(item_id, cashitem))
 		{
 			UI::get().emplace<UIOk>(cashmessage, [](bool)
@@ -812,13 +863,13 @@ namespace ms
 			{
 				auto onenter = [tab, slot](int32_t qty)
 				{
-					Stage::get().get_player().request(MoveItemPacket(tab, slot, 0, qty), ExclRequest::WAIT);
+					send_drop(tab, slot, qty);
 				};
 
 				UI::get().emplace<UIEnterNumber>(dropmessage, onenter, max, max);
 			} else
 			{
-				Stage::get().get_player().request(MoveItemPacket(tab, slot, 0, 1), ExclRequest::WAIT);
+				send_drop(tab, slot, 1);
 			}
 		};
 
@@ -858,15 +909,14 @@ namespace ms
 
 				if (player.get_look().get_alerted())
 				{
-					UI::get().emplace<UIOk>("You can't do it right now.\\nCatch your breath and then try again.",
-											[](bool)
-											{});
+					UI::get().emplace<UIOk>(CATCH_BREATH, [](bool)
+					{});
 					break;
 				}
 
 				if (player.is_dead())
 				{
-					UI::get().emplace<UIOk>("You can't do it once you're dead.", [](bool)
+					UI::get().emplace<UIOk>(DEAD, [](bool)
 					{});
 					break;
 				}

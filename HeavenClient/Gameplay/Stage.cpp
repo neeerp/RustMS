@@ -834,6 +834,11 @@ namespace ms
 		return mapid;
 	}
 
+	const MapInfo &Stage::get_mapinfo() const
+	{
+		return mapinfo;
+	}
+
 	void Stage::set_field_key(uint8_t key)
 	{
 		field_key = key;

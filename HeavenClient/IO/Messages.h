@@ -50,6 +50,9 @@ namespace ms
 			DOOR_PORTAL,
 			// Attacking without a weapon
 			ATTACK_NOWEAPON,
+			// The map forbids the item (fieldLimit)
+			ITEM_FIELD,
+			DROP_FIELD,
 			LENGTH
 		};
 

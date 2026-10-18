@@ -26,6 +26,7 @@
 #include "../Data/WeaponData.h"
 #include "../Gameplay/Combat/MagicDamage.h"
 #include "../Gameplay/Stage.h"
+#include "../IO/Messages.h"
 #include "../IO/UI.h"
 
 #include "../IO/UITypes/UIRevive.h"
@@ -206,6 +207,8 @@ namespace ms
 		{
 			if (type == InventoryType::Id::USE && (itemid / 10000 == 228 || itemid / 10000 == 229))
 				request(SkillBookPacket(slot, itemid), ExclRequest::USE_WAIT);
+			else if (type == InventoryType::Id::USE && !Stage::get().get_mapinfo().can_use_item(itemid))
+				InChatMessage(Messages::ITEM_FIELD).drop();
 			else if (type == InventoryType::Id::USE && disease::can_use_item(get_diseases()))
 				request(UseItemPacket(slot, itemid), ExclRequest::USE_WAIT);
 			else if (type == InventoryType::Id::SETUP && itemid / 10000 == 301)

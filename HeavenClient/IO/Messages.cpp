@@ -42,7 +42,9 @@ namespace ms
 					"You may only use this skill with a one-handed weapon equipped.",
 					"You cannot use that skill on this map.",
 					"You cannot use the Mystic Door Skill near the portal.",
-					"Since you are not using a weapon, you are unable to attack."
+					"Since you are not using a weapon, you are unable to attack.",
+					"This item cannot be used here.",
+					"You cannot drop the item here."
 			};
 
 	bool Messages::is_cost(Type type)
