@@ -114,6 +114,12 @@ namespace ms
 
 		int64_t get_serial() const;
 
+		Point<int16_t> get_position() const;
+
+		bool is_on_ground() const;
+
+		const PhysicsObject &get_phobj() const;
+
 		// PET_NAMECHANGE (172): the pet answers to its new name.
 		void set_name(const std::string &name);
 

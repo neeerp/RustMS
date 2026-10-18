@@ -488,6 +488,21 @@ namespace ms
 		return serial;
 	}
 
+	Point<int16_t> PetLook::get_position() const
+	{
+		return phobj.get_position();
+	}
+
+	bool PetLook::is_on_ground() const
+	{
+		return phobj.onground;
+	}
+
+	const PhysicsObject &PetLook::get_phobj() const
+	{
+		return phobj;
+	}
+
 	void PetLook::set_name(const std::string &n)
 	{
 		name = n;

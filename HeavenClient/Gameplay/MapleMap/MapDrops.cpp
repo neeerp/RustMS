@@ -121,4 +121,22 @@ namespace ms
 
 		return {0, {}};
 	}
+
+	int32_t MapDrops::find_pet_loot_at(Point<int16_t> petpos, int32_t self, int32_t party, bool mesos, bool items,
+									   bool others)
+	{
+		for (auto &mmo : drops)
+		{
+			Optional<Drop> drop = mmo.second.get();
+
+			if (drop && drop->pet_lootable(petpos, self, party, mesos, items, others))
+			{
+				drop->try_pet_loot();
+
+				return mmo.first;
+			}
+		}
+
+		return 0;
+	}
 }

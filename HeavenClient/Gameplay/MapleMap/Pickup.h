@@ -34,5 +34,17 @@ namespace ms
 
 			return (type == 0 && owner != self) || (type == 1 && owner != party);
 		}
+
+		// Whether a pet leaves a drop to someone else (FUN_0050483a). Unlike
+		// its owner it never takes another's drop, unless it wears Magic
+		// Scales (`others`), and then only once 15 s have passed.
+		inline bool pet_owned_by_other(int8_t type, int32_t owner, int32_t self, int32_t party, int32_t age,
+									   bool others)
+		{
+			if (others && age > OWNERSHIP)
+				return false;
+
+			return (type == 0 && owner != self) || (type == 1 && owner != party);
+		}
 	}
 }

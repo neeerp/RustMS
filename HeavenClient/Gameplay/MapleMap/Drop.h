@@ -40,6 +40,17 @@ namespace ms
 		// Note a pickup request, so the drop isn't tried again for a while.
 		void try_loot();
 
+		// Whether a pet at `feet` could take the drop now, if it takes mesos,
+		// items and others' drops as given (FUN_0050483a).
+		bool pet_lootable(Point<int16_t> feet, int32_t self, int32_t party, bool mesos, bool items,
+						  bool others) const;
+
+		// Note a pet's request, so no pet tries the drop again for a while.
+		void try_pet_loot();
+
+		// The item, or 0 for mesos.
+		virtual int32_t get_itemid() const;
+
 	protected:
 		Drop(int32_t oid, int32_t owner, Point<int16_t> start, Point<int16_t> dest,
 			 int8_t type, int8_t mode, int16_t delay, bool playerdrop, bool spins);
@@ -74,6 +85,8 @@ namespace ms
 		bool spins;
 
 		const PhysicsObject *looter;
+		// It flies to a pet's feet rather than to a character's middle.
+		bool topet;
 		State state;
 
 		Point<int16_t> start;
@@ -86,6 +99,7 @@ namespace ms
 		// request for it.
 		int32_t age;
 		int32_t sincetry;
+		int32_t sincepet;
 		int32_t delay;
 		int32_t flighttime;
 		double phase;

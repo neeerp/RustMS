@@ -661,24 +661,33 @@ namespace ms
 		int8_t mode = recv.read_byte();
 		int32_t oid = recv.read_int();
 
-		Optional<PhysicsObject> looter;
+		const PhysicsObject *looter = nullptr;
 
 		if (mode > 1)
 		{
 			int32_t cid = recv.read_int();
 
-			// A pet's loot flies to its owner.
-			if (recv.length() > 0)
-				recv.read_byte(); // pet
-
 			if (auto character = Stage::get().get_character(cid))
-				looter = character->get_phobj();
+			{
+				// Mode 5 names the pet in its owner's list that took it, and
+				// it flies to that pet, or vanishes if the pet isn't out
+				// (FUN_004416db).
+				if (mode == 5)
+				{
+					if (auto pet = character->get_pet(recv.read_byte()))
+						looter = &pet->get_phobj();
+				}
+				else
+				{
+					looter = &character->get_phobj();
+				}
+			}
 
 			if (Stage::get().is_player(cid))
 				Sound(Sound::Name::PICKUP).play();
 		}
 
-		Stage::get().get_drops().remove(oid, mode, looter.get());
+		Stage::get().get_drops().remove(oid, mode, looter);
 	}
 
 	void HitReactorHandler::handle(InPacket& recv) const

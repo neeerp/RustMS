@@ -397,6 +397,13 @@ namespace ms
 		// The parts pet equipment `itemid` goes on for each pet in the list
 		// (FUN_00460358), the same for all three for the HP and MP pouches.
 		// None for an item that isn't pet equipment.
+		// The ability items that change what a pet picks up (FUN_00705e2c).
+		constexpr int32_t MESO_MAGNET = 1812000;
+		constexpr int32_t ITEM_POUCH = 1812001;
+		constexpr int32_t SWEEPER = 1812004;
+		constexpr int32_t LONG_RANGE = 1812005;
+		constexpr int32_t MAGIC_SCALES = 1812006;
+
 		inline std::optional<std::array<int16_t, 3>> equip_parts(int32_t itemid)
 		{
 			switch (itemid)
