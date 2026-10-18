@@ -191,11 +191,13 @@ namespace ms
 		return true;
 	}
 
-	UIEnterNumber::UIEnterNumber(std::string message, std::function<void(int32_t)> nh, int32_t m, int32_t quantity)
+	UIEnterNumber::UIEnterNumber(std::string message, std::function<void(int32_t)> nh, int32_t m, int32_t quantity,
+								 int32_t least)
 			: UINotice(message, NoticeType::ENTERNUMBER)
 	{
 		numhandler = nh;
 		max = m;
+		min = least;
 
 		nl::node src = NxFiles::ui_classic["Basic.img"];
 
@@ -301,7 +303,7 @@ namespace ms
 			buttons[Buttons::OK]->set_state(Button::State::NORMAL);
 		};
 
-		enter_number::Checked checked = enter_number::check(numstr, max);
+		enter_number::Checked checked = enter_number::check(numstr, max, min);
 		std::string problem;
 
 		switch (checked.problem)
@@ -315,10 +317,10 @@ namespace ms
 				problem = "Only numbers are allowed.";
 				break;
 			case enter_number::Problem::TOO_LOW:
-				problem = "You may only enter a number equal to or higher than 1.";
+				problem = "You may only enter a number \\nequal to or higher than " + std::to_string(min) + ".";
 				break;
 			case enter_number::Problem::TOO_HIGH:
-				problem = "You may only enter a number equal to or lower than " + std::to_string(max) + ".";
+				problem = "You may only enter a number \\nequal to or lower than " + std::to_string(max) + ".";
 				break;
 		}
 

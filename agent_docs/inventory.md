@@ -49,7 +49,8 @@ whole stack; anything else drops the asked quantity, keeping equipment's
 stats (`Loot::Dropped`). Quest and `tradeBlock` items leave the bag but don't
 reach the floor: everyone sees them vanish (DROP_ITEM_FROM_MAPOBJECT 3).
 MESO_DROP (`0x5E`: tick, amount) drops 10 to 50,000 mesos the player holds;
-HeavenClient's meso button asks how many with `UIEnterNumber`. The field
+HeavenClient's meso button asks how many with `UIEnterNumber`, which, as in
+v83, starts at 10 and takes no less. The field
 places either kind where it last saw the player, and anyone may pick it up
 at once (ownership 2). Dead players can't drop.
 

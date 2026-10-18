@@ -204,7 +204,8 @@ from `UI.nx`. Moved so far:
   `BtOK`/`BtCancel` for number entry). Number entry draws a white field under
   the message. The click that opens it no longer takes the focus from its
   field, so typed amounts count. `UIEnterNumber` has its own element type, so the notice about a
-  bad number opens over it, and OK goes back to the field.
+  bad number opens over it, and OK goes back to the field. As in v83, the notice names the box's real
+  minimum, which is 10 for dropping mesos. Prompts use v83's words.
 - **Quit** (`ask_to_quit`): MENU's QUIT GAME and closing the window ask
   "Are you sure you want to quit?" in a `UIYesNo`; yes goes back to the login
   screen. The later playtime and EXP summary (`UIWindow6.img/askReward`) is

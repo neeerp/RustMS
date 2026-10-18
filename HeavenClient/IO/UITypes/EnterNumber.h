@@ -5,7 +5,7 @@
 
 namespace ms
 {
-	// Checks what was typed into a number entry box against 1 to `max`.
+	// Checks what was typed into a number entry box against `min` to `max`.
 	namespace enter_number
 	{
 		enum class Problem
@@ -22,7 +22,7 @@ namespace ms
 			int32_t number;
 		};
 
-		inline Checked check(const std::string &text, int32_t max)
+		inline Checked check(const std::string &text, int32_t max, int32_t min = 1)
 		{
 			if (text.find_first_not_of("0123456789") != std::string::npos)
 				return { Problem::NOT_A_NUMBER, 0 };
@@ -39,6 +39,9 @@ namespace ms
 				return { Problem::TOO_HIGH, 0 };
 
 			int64_t number = std::stoll(digits);
+
+			if (number < min)
+				return { Problem::TOO_LOW, 0 };
 
 			if (number > max)
 				return { Problem::TOO_HIGH, 0 };

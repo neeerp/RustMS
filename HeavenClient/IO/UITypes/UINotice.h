@@ -106,7 +106,7 @@ namespace ms
 		static constexpr Type TYPE = UIElement::Type::ENTERNUMBER;
 
 		UIEnterNumber(std::string message, std::function<void(int32_t number)> numhandler, int32_t max,
-					  int32_t quantity);
+					  int32_t quantity, int32_t min = 1);
 
 		void draw(float alpha) const override;
 
@@ -137,6 +137,7 @@ namespace ms
 		ColorBox fieldfill;
 		Textfield numfield;
 		int32_t max;
+		int32_t min;
 	};
 
 	// Asks for a line of text, such as a character name.

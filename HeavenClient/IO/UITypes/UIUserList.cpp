@@ -747,7 +747,7 @@ namespace ms
 				break;
 			case Buttons::BT_INVITE:
 				UI::get().emplace<UIEnterText>(
-						"Who do you want to invite?",
+						"Please enter the name of the character\\nyou'll invite to your party.",
 						[](const std::string& name)
 						{
 							PartyCommands::invite(name);
@@ -757,7 +757,7 @@ namespace ms
 				break;
 			case Buttons::BT_ADD_BUDDY:
 				UI::get().emplace<UIEnterText>(
-						"Enter the character name you'd like to add as a buddy.",
+						"Please enter the name of the character\\nyou'll add as a buddy.",
 						[](const std::string& name)
 						{
 							AddBuddyPacket(name, DEFAULT_GROUP).dispatch();
@@ -771,7 +771,7 @@ namespace ms
 					int32_t id = buddy->id;
 
 					UI::get().emplace<UIYesNo>(
-							"Are you sure you want to delete '" + buddy->name + "'\\nfrom your buddy list?",
+							"Are you sure you want to delete\\n'" + buddy->name + "' from the list?",
 							[id](bool yes)
 							{
 								if (yes)

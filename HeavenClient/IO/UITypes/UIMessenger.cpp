@@ -338,7 +338,7 @@ namespace ms
 				break;
 			case Buttons::CLOSE:
 				UI::get().emplace<UIYesNo>(
-						"Will you exit the chat room?",
+						"Will you exit this chat room?",
 						[](bool yes)
 						{
 							if (!yes)
@@ -431,7 +431,7 @@ namespace ms
 	void UIMessenger::ask_invite()
 	{
 		UI::get().emplace<UIEnterText>(
-				"Whom would you like to invite?",
+				"Please type the name of the character, you want to invite.",
 				[](const std::string &name)
 				{
 					if (auto messenger = UI::get().get_element<UIMessenger>())

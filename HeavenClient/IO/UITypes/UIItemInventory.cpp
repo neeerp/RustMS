@@ -294,7 +294,7 @@ namespace ms
 				break;
 			case Buttons::BT_COIN:
 			{
-				// One drop holds 10 to 50,000 mesos.
+				// One drop holds 10 to 50,000 mesos, and the box starts at 10.
 				constexpr int32_t MESO_DROP_MIN = 10;
 				constexpr int32_t MESO_DROP_MAX = 50000;
 
@@ -307,7 +307,9 @@ namespace ms
 						Stage::get().get_player().request(MesoDropPacket(amount), ExclRequest::USE_WAIT);
 					};
 
-					UI::get().emplace<UIEnterNumber>("How many mesos will you drop?", onenter, most, MESO_DROP_MIN);
+					UI::get().emplace<UIEnterNumber>(
+							"How many will you drop? (A portion of the amount may be lost if picked up by another user.)",
+							onenter, most, MESO_DROP_MIN, MESO_DROP_MIN);
 				}
 
 				break;
