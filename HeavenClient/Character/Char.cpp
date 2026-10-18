@@ -33,6 +33,11 @@ namespace ms
 		// (FUN_005f0334). Not yet checked against period footage.
 		constexpr int16_t GUILD_TAG_GAP = 1;
 		constexpr Point<int16_t> EMBLEM_OFFSET = Point<int16_t>(-GuildMark::SIZE - 3, 6);
+
+		// v83 hangs a room's bubble over the avatar's drawn height, hat and
+		// all (FUN_0048e85a); this client doesn't measure it, so it takes a
+		// bare head's.
+		constexpr int16_t AVATAR_HEIGHT = 70;
 	}
 
 	Char::Char(int32_t o, const CharLook &lk, const std::string &name) : MapObject(o), look(lk), look_preview(lk), namelabel(
@@ -114,6 +119,8 @@ namespace ms
 
 		chatballoon.draw(absp - Point<int16_t>(0, 85));
 		hintballoon.draw(absp - Point<int16_t>(0, 85));
+		// v83 puts a room's balloon in front of the chat balloon.
+		miniroom.draw(absp, AVATAR_HEIGHT);
 
 		effects.drawabove(absp, alpha);
 		held_effects.drawabove(absp, alpha);
@@ -646,6 +653,16 @@ namespace ms
 	void Char::set_guild_emblem(const GuildEmblem &emblem)
 	{
 		guildmark = GuildMark(emblem);
+	}
+
+	void Char::set_mini_room(const std::optional<MiniRoomBox> &box)
+	{
+		miniroom.change(box);
+	}
+
+	int32_t Char::mini_room_at(Point<int16_t> feet, Point<int16_t> cursor) const
+	{
+		return miniroom.serial_at(feet, AVATAR_HEIGHT, cursor);
 	}
 
 	CharLook &Char::get_look()

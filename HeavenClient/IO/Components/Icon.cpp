@@ -87,6 +87,21 @@ namespace ms
 		type->drop_on_trade(slot);
 	}
 
+	void Icon::drop_on_shop() const
+	{
+		type->drop_on_shop();
+	}
+
+	InventoryType::Id Icon::get_return_tab() const
+	{
+		return type->get_return_tab();
+	}
+
+	void Icon::drop_on_inventory() const
+	{
+		type->drop_on_inventory();
+	}
+
 	Keyboard::Mapping Icon::get_mapping() const
 	{
 		return type->get_mapping();

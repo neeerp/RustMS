@@ -44,7 +44,8 @@ namespace ms
 			MINIMAP,
 			MONSTERBOOK,
 			BUFFLIST,
-			TRADINGROOM
+			TRADINGROOM,
+			PERSONALSHOP
 		};
 
 		virtual ~Tooltip()

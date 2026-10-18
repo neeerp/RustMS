@@ -304,28 +304,17 @@ namespace ms
 		};
 
 		enter_number::Checked checked = enter_number::check(numstr, max, min);
-		std::string problem;
 
-		switch (checked.problem)
+		if (checked.problem == enter_number::Problem::NONE)
 		{
-			case enter_number::Problem::NONE:
-				numhandler(checked.number);
-				close();
-				buttons[Buttons::OK]->set_state(Button::State::NORMAL);
-				return;
-			case enter_number::Problem::NOT_A_NUMBER:
-				problem = "Only numbers are allowed.";
-				break;
-			case enter_number::Problem::TOO_LOW:
-				problem = "You may only enter a number \\nequal to or higher than " + std::to_string(min) + ".";
-				break;
-			case enter_number::Problem::TOO_HIGH:
-				problem = "You may only enter a number \\nequal to or lower than " + std::to_string(max) + ".";
-				break;
+			numhandler(checked.number);
+			close();
+			buttons[Buttons::OK]->set_state(Button::State::NORMAL);
+			return;
 		}
 
 		numfield.set_state(Textfield::State::DISABLED);
-		UI::get().emplace<UIOk>(problem, okhandler);
+		UI::get().emplace<UIOk>(enter_number::problem_text(checked.problem, max, min), okhandler);
 	}
 
 	void UIEnterNumber::close()

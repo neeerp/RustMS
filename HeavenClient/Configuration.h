@@ -660,6 +660,13 @@ namespace ms
 		{}
 	};
 
+	// The default position of UIPersonalShop: centred, like the v83 dialog
+	struct PosPERSONALSHOP : public Configuration::PointEntry
+	{
+		PosPERSONALSHOP() : PointEntry("PosPERSONALSHOP", "(137, 23)")
+		{}
+	};
+
 	// The default position of UINotice
 	struct PosNOTICE : public Configuration::PointEntry
 	{

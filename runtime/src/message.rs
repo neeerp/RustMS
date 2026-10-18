@@ -163,6 +163,11 @@ pub enum ServerMessage {
         room: i32,
         event: crate::actor::field_trades::TradeEvent,
     },
+    /// News from personal shop `room` on this player's field.
+    PersonalShop {
+        room: i32,
+        event: crate::actor::field_shops::ShopEvent,
+    },
     SendPacket(Packet),
 }
 
@@ -295,6 +300,11 @@ pub enum FieldMessage {
     Trade {
         from: ClientId,
         request: crate::actor::field_trades::RoomRequest,
+    },
+    /// A player's request of a personal shop; purchases carry oneshots.
+    PersonalShop {
+        from: ClientId,
+        request: crate::actor::field_shops::ShopRoomRequest,
     },
 }
 

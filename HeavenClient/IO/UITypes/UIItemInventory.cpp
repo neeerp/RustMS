@@ -18,6 +18,7 @@
 #include "UIItemInventory.h"
 
 #include "UINotice.h"
+#include "UIPersonalShop.h"
 
 #include "../Messages.h"
 #include "../UI.h"
@@ -378,6 +379,8 @@ namespace ms
 						// used up.
 						if (item_id / 10000 == 516)
 							Stage::get().send_key(KeyType::Id::FACE, 99 + item_id % 100 + 8, true);
+						else if (personal_shop::is_permit(item_id))
+							UIPersonalShop::create(slot, item_id);
 
 						break;
 				}
@@ -387,6 +390,22 @@ namespace ms
 
 	bool UIItemInventory::send_icon(const Icon &icon, Point<int16_t> cursorpos)
 	{
+		// A row of my shop goes back anywhere on the window, once it shows
+		// the row's tab (FUN_004f4b49).
+		if (InventoryType::Id back = icon.get_return_tab(); back != InventoryType::Id::NONE)
+		{
+			if (back != tab)
+			{
+				change_tab(back);
+
+				return false;
+			}
+
+			icon.drop_on_inventory();
+
+			return true;
+		}
+
 		int16_t slot = slot_by_position(cursorpos - position);
 
 		if (slot > 0)
@@ -800,6 +819,20 @@ namespace ms
 		{
 			player.request(TradePutItemPacket(tab, source, 1, slot), ExclRequest::WAIT);
 		}
+	}
+
+	void UIItemInventory::ItemIcon::drop_on_shop() const
+	{
+		// v83 refuses these before asking anything (FUN_004f41b9).
+		if (questitem || untradable || cashitem)
+		{
+			UI::get().emplace<UIOk>("This item is unavailable to trade with others.", [](bool) {});
+
+			return;
+		}
+
+		if (auto shop = UI::get().get_element<UIPersonalShop>())
+			shop->sell(sourcetab, source, item_id, count);
 	}
 
 	void UIItemInventory::ItemIcon::set_count(int16_t c)

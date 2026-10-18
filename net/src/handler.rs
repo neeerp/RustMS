@@ -322,6 +322,8 @@ pub enum WorldAction {
     Storage(crate::storage::StorageRequest),
     /// Open, join, or act in a trading room.
     Trade(crate::trade::TradeRequest),
+    /// Open, stock, visit, or buy from a personal shop.
+    PersonalShop(crate::personal_shop::PersonalShopRequest),
     /// The player touched the named script portal on their map.
     ScriptPortal {
         portal: String,

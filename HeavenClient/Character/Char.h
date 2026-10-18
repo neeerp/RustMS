@@ -27,6 +27,7 @@
 
 #include "CharEffect.h"
 #include "GuildMark.h"
+#include "MiniRoomBalloon.h"
 
 #include "Inventory/Weapon.h"
 #include "Look/Afterimage.h"
@@ -217,6 +218,14 @@ namespace ms
 		void set_guild_name(const std::string &name);
 		void set_guild_emblem(const GuildEmblem &emblem);
 
+		// Shows the balloon of the room the character keeps open, or takes
+		// it down.
+		void set_mini_room(const std::optional<MiniRoomBox> &box);
+
+		// The room whose balloon is at `cursor`, or 0, with the feet at `feet`
+		// on the screen.
+		int32_t mini_room_at(Point<int16_t> feet, Point<int16_t> cursor) const;
+
 		// Return if the char is in the Char::State::SIT state
 		bool is_sitting() const;
 
@@ -287,6 +296,7 @@ namespace ms
 		GuildMark guildmark;
 		ChatBalloon chatballoon;
 		ChatBalloon hintballoon;
+		MiniRoomBalloon miniroom;
 		EffectLayer effects;
 		EffectLayer held_effects;
 		Afterimage afterimage;

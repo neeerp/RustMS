@@ -114,8 +114,9 @@ namespace ms
 
 	CharSpawn::CharSpawn(int32_t c, const LookEntry &lk, uint8_t l, int16_t j, const std::string &nm, int8_t st,
 						 Point<int16_t> p, int32_t ch, std::vector<std::pair<Buffstat::Id, int32_t>> bf,
-						 const std::string &gd, const GuildEmblem &em) : cid(c), look(lk), level(l), job(j), name(nm),
-						 stance(st), position(p), chair(ch), buffs(std::move(bf)), guild(gd), emblem(em)
+						 const std::string &gd, const GuildEmblem &em, std::optional<MiniRoomBox> rm) : cid(c), look(lk),
+						 level(l), job(j), name(nm), stance(st), position(p), chair(ch), buffs(std::move(bf)), guild(gd),
+						 emblem(em), room(std::move(rm))
 	{}
 
 	int32_t CharSpawn::get_cid() const
@@ -130,6 +131,7 @@ namespace ms
 		otherchar->show_buffs(buffs);
 		otherchar->set_guild_name(guild);
 		otherchar->set_guild_emblem(emblem);
+		otherchar->set_mini_room(room);
 
 		return otherchar;
 	}

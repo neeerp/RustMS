@@ -4,6 +4,7 @@
 #include "StorageContents.h"
 
 #include "../InPacket.h"
+#include "../../Character/MiniRoomBox.h"
 #include "../Login.h"
 
 #include <array>
@@ -21,6 +22,7 @@ namespace ms
 	{
 		// The room types of FUN_0065de20 that HC opens.
 		constexpr int8_t TRADING_ROOM = 3;
+		constexpr int8_t PERSONAL_SHOP = 4;
 
 		// Each side of a trade has nine slots, numbered from 1.
 		constexpr int8_t TRADE_SLOTS = 9;
@@ -48,8 +50,37 @@ namespace ms
 			std::string name;
 		};
 
+		// A row of a personal shop (FUN_007a0a3a): bundles left of
+		// per_bundle items each, at a price per bundle. Sold-out rows stay
+		// with no bundles.
+		struct Listing
+		{
+			int16_t bundles = 0;
+			int16_t per_bundle = 0;
+			int32_t price = 0;
+			storage_contents::Stored item;
+		};
+
+		inline std::vector<Listing> read_listings(InPacket& recv)
+		{
+			std::vector<Listing> listings;
+
+			for (auto count = static_cast<uint8_t>(recv.read_byte()); count > 0; count--)
+			{
+				Listing listing;
+				listing.bundles = recv.read_short();
+				listing.per_bundle = recv.read_short();
+				listing.price = recv.read_int();
+				listing.item = storage_contents::read_item(recv);
+				listings.push_back(listing);
+			}
+
+			return listings;
+		}
+
 		// An enter (FUN_0065dff3): the room's type, or 0 and why we can't
-		// come in. Rooms other than the trading room are left unread.
+		// come in. Rooms other than the trading room and the personal shop
+		// are left unread.
 		struct Enter
 		{
 			int8_t type = 0;
@@ -57,6 +88,10 @@ namespace ms
 			uint8_t max_users = 0;
 			uint8_t own_slot = 0;
 			std::vector<Member> members;
+			// A personal shop's title, its room for rows, and its rows.
+			std::string title;
+			uint8_t max_items = 0;
+			std::vector<Listing> listings;
 		};
 
 		using LookReader = LookEntry(*)(InPacket&);
@@ -70,8 +105,31 @@ namespace ms
 			return { slot, look, name };
 		}
 
+		// The balloon block of UPDATE_CHAR_BOX and the player spawn
+		// (FUN_00938ba5): the room's type, 0 for none, then the room.
+		inline std::optional<MiniRoomBox> read_box(InPacket& recv)
+		{
+			int8_t type = recv.read_byte();
+
+			if (type == 0)
+				return std::nullopt;
+
+			MiniRoomBox box;
+			box.type = type;
+			box.serial = recv.read_int();
+			box.title = recv.read_string();
+			recv.skip_byte(); // private
+			box.skin = static_cast<uint8_t>(recv.read_byte());
+			box.users = static_cast<uint8_t>(recv.read_byte());
+			box.max_users = static_cast<uint8_t>(recv.read_byte());
+			recv.skip_byte(); // a game in progress
+
+			return box;
+		}
+
 		// The members follow the room's size and our seat, up to slot 0xFF
-		// (FUN_0065ec3d); the trading room reads nothing more.
+		// (FUN_0065ec3d); the trading room reads nothing more, and a
+		// personal shop its title, size and rows (FUN_007a0a3a).
 		inline Enter read_enter(InPacket& recv, LookReader read_look)
 		{
 			Enter enter;
@@ -81,13 +139,20 @@ namespace ms
 			{
 				enter.error = recv.read_byte();
 			}
-			else if (enter.type == TRADING_ROOM)
+			else if (enter.type == TRADING_ROOM || enter.type == PERSONAL_SHOP)
 			{
 				enter.max_users = static_cast<uint8_t>(recv.read_byte());
 				enter.own_slot = static_cast<uint8_t>(recv.read_byte());
 
 				for (auto slot = static_cast<uint8_t>(recv.read_byte()); slot != 0xFF; slot = static_cast<uint8_t>(recv.read_byte()))
 					enter.members.push_back(read_member(recv, slot, read_look));
+
+				if (enter.type == PERSONAL_SHOP)
+				{
+					enter.title = recv.read_string();
+					enter.max_items = static_cast<uint8_t>(recv.read_byte());
+					enter.listings = read_listings(recv);
+				}
 			}
 
 			return enter;
@@ -190,7 +255,7 @@ namespace ms
 
 		// A number with commas between the thousands, as v83 shows the
 		// offers (FUN_00988690).
-		inline std::string meso_text(int32_t meso)
+		inline std::string meso_text(int64_t meso)
 		{
 			std::string text = std::to_string(meso);
 			size_t digits = meso < 0 ? 1 : 0;

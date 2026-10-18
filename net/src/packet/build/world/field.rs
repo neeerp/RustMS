@@ -1,5 +1,6 @@
 use super::buff;
 use super::guild::write_emblem;
+use super::mini_room::write_mini_room_box;
 use crate::codec::encode_avatar_look;
 use crate::{error::NetworkError, packet::op::SendOpcode};
 use game::FieldAvatar;
@@ -40,7 +41,7 @@ pub fn build_player_enter_field(avatar: &FieldAvatar) -> Result<Packet, NetworkE
     packet.write_byte(0)?; // end of pets
     packet.write_int(1)?; // mount level
     packet.write_long(0)?; // mount exp and tiredness
-    packet.write_byte(0)?; // no player shop or minigame box
+    write_mini_room_box(&mut packet, avatar.mini_room.as_ref())?;
     packet.write_byte(0)?; // no chalkboard
     packet.write_byte(0)?; // crush ring
     packet.write_byte(0)?; // friendship ring
@@ -254,6 +255,7 @@ mod tests {
             chair: 3010000,
             buffs: Vec::new(),
             guild: None,
+            mini_room: None,
         }
     }
 

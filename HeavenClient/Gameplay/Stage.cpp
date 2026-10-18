@@ -748,6 +748,27 @@ namespace ms
 		return 0;
 	}
 
+	int32_t Stage::mini_room_at(Point<int16_t> cursorpos)
+	{
+		if (state != State::ACTIVE)
+			return 0;
+
+		Point<int16_t> viewpos = camera.position();
+
+		for (auto &mmo : *chars.get_chars())
+		{
+			Optional<OtherChar> other = chars.get_char(mmo.first);
+
+			if (!other || !other->is_active())
+				continue;
+
+			if (int32_t serial = other->mini_room_at(other->get_position() + viewpos, cursorpos))
+				return serial;
+		}
+
+		return 0;
+	}
+
 	void Stage::release_key(KeyType::Id type, int32_t action)
 	{
 		if (state != State::ACTIVE)
@@ -783,7 +804,13 @@ namespace ms
 				return statusbar->send_cursor(pressed, position);
 		}
 
-		return npcs.send_cursor(pressed, position, camera.position());
+		Cursor::State npcstate = npcs.send_cursor(pressed, position, camera.position());
+
+		// A shop's balloon shows the house cursor (FUN_00531cc7).
+		if (npcstate == Cursor::State::IDLE && mini_room_at(position))
+			return Cursor::State::HOUSE;
+
+		return npcstate;
 	}
 
 	bool Stage::is_player(int32_t cid) const

@@ -80,6 +80,10 @@ namespace ms
 		// Whether the map is a town (info/town).
 		bool is_town() const;
 
+		// Whether players may open a personal shop here (info/personalShop,
+		// the Free Market rooms).
+		bool allows_personal_shop() const;
+
 		// The map's fieldLimit bits.
 		int32_t get_fieldlimit() const;
 
@@ -124,6 +128,7 @@ namespace ms
 		std::string mapmark;
 		bool swim;
 		bool town;
+		bool personal_shop = false;
 		double recovery = 1.0;
 		bool hideminimap;
 		Range<int16_t> mapwalls;

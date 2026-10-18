@@ -86,6 +86,10 @@ namespace ms
 		// menu on them, or 0. The player can't be picked.
 		int32_t other_character_at(Point<int16_t> cursorpos);
 
+		// The room whose balloon over someone else is under the cursor, or
+		// 0; our own isn't (FUN_00972853).
+		int32_t mini_room_at(Point<int16_t> cursorpos);
+
 		// Lets go of a held key whose release went elsewhere, such as to a
 		// dialog or a text field, so the player doesn't keep walking.
 		void release_key(KeyType::Id keytype, int32_t keycode);

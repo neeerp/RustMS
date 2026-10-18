@@ -2,7 +2,7 @@ use super::ClientActor;
 use crate::actor::field_trades::{RoomRequest, TradeEvent};
 use crate::error::RuntimeError;
 use crate::message::FieldMessage;
-use game::Player;
+use game::{InventoryChange, Player};
 use net::packet::build::world::mini_room::{
     build_room_leave, build_trade_meso_limit, leave_reason,
 };
@@ -14,9 +14,9 @@ use std::sync::atomic::{AtomicI32, Ordering};
 use tokio::sync::oneshot;
 use tracing::{debug, error, info};
 
-/// Trading room ids, unique across fields so a stale invitation can't
-/// reach a newer room.
-static NEXT_ROOM: AtomicI32 = AtomicI32::new(1);
+/// Trading room and personal shop ids, unique across fields so a stale
+/// invitation can't reach a newer room.
+pub(super) static NEXT_ROOM: AtomicI32 = AtomicI32::new(1);
 
 /// The player's side of a trade: what they put up, held out of their
 /// inventory until the trade ends. Every way it ends goes through
@@ -78,11 +78,12 @@ impl ClientActor {
                 self.to_room(RoomRequest::Decline { room: sn, reason })
                     .await
             }
+            // The room may be a trading room or a personal shop: it says
+            // which by starting a trade or seating the player.
             TradeRequest::Visit { sn } => {
-                if trading.is_some() {
+                if trading.is_some() || self.personal_shop.is_some() {
                     return Ok(());
                 }
-                self.trade = Some(Trade::new(sn, 1));
                 self.to_room(RoomRequest::Visit { room: sn }).await
             }
             TradeRequest::Chat { text } => {
@@ -167,7 +168,7 @@ impl ClientActor {
     }
 
     /// The client waits for an answer before it lets the player act again.
-    async fn unlock(&mut self) -> Result<(), RuntimeError> {
+    pub(super) async fn unlock(&mut self) -> Result<(), RuntimeError> {
         self.send(&mut stat::build_stat_update(true, &[])?).await
     }
 
@@ -177,6 +178,10 @@ impl ClientActor {
         room: i32,
         event: TradeEvent,
     ) -> Result<(), RuntimeError> {
+        // A visitor's trade starts once the room lets them in.
+        if self.trade.is_none() && matches!(event, TradeEvent::Started) {
+            self.trade = Some(Trade::new(room, 1));
+        }
         let Some(trade) = self.trade.as_mut().filter(|t| t.room == room) else {
             return Ok(());
         };
@@ -215,11 +220,8 @@ impl ClientActor {
         let Some(trade) = self.trade.as_ref() else {
             return Ok(());
         };
-        // A visitor not yet let in has no room open to close.
-        let leave = (trade.started || trade.slot == 0)
-            .then(|| build_room_leave(trade.slot, leave_reason::FAILED))
-            .transpose()?;
-        self.finish_trade(leave).await
+        let leave = build_room_leave(trade.slot, leave_reason::FAILED)?;
+        self.finish_trade(Some(leave)).await
     }
 
     /// End the trade: the player gets the partner's offer if the room
@@ -242,30 +244,13 @@ impl ClientActor {
         let done = traded.is_some();
         let back = traded.unwrap_or(trade.offer);
         let meso = back.meso;
-        let game = self.game.as_mut().ok_or(RuntimeError::NotLoggedIn)?;
-        let given = trade::give(&mut game.player, back);
-        if !given.overflow.is_empty() {
-            let (x, y) = game.position;
-            let spill = FieldMessage::SpawnLoot {
-                owner: self.client_id,
-                loot: given.overflow,
-                x,
-                y,
-                dropper: 0,
-            };
-            if game.field.tx.send(spill).await.is_err() {
-                error!(self.client_id, "Field gone; trade overflow lost");
-            }
-        }
-        let player_meso = game.player.meso;
+        let changes = self.receive(back).await?;
+        let player_meso = self.in_game()?.player.meso;
         info!(self.client_id, room = trade.room, done, "Trade ended");
 
-        if !given.changes.is_empty() {
-            self.send(&mut inventory::build_inventory_operation(
-                false,
-                &given.changes,
-            )?)
-            .await?;
+        if !changes.is_empty() {
+            self.send(&mut inventory::build_inventory_operation(false, &changes)?)
+                .await?;
         }
         if meso > 0 {
             self.send(&mut stat::build_stat_update(
@@ -278,6 +263,30 @@ impl ClientActor {
             self.send(&mut packet).await?;
         }
         Ok(())
+    }
+
+    /// Give the player `offer`; whatever no longer fits drops at their
+    /// feet. Returns the inventory changes, for the caller to send.
+    pub(super) async fn receive(
+        &mut self,
+        offer: Offer,
+    ) -> Result<Vec<InventoryChange>, RuntimeError> {
+        let game = self.game.as_mut().ok_or(RuntimeError::NotLoggedIn)?;
+        let given = trade::give(&mut game.player, offer);
+        if !given.overflow.is_empty() {
+            let (x, y) = game.position;
+            let spill = FieldMessage::SpawnLoot {
+                owner: self.client_id,
+                loot: given.overflow,
+                x,
+                y,
+                dropper: 0,
+            };
+            if game.field.tx.send(spill).await.is_err() {
+                error!(self.client_id, "Field gone; overflow lost");
+            }
+        }
+        Ok(given.changes)
     }
 
     async fn to_room(&mut self, request: RoomRequest) -> Result<(), RuntimeError> {

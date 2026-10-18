@@ -336,6 +336,9 @@ namespace ms
 					types.emplace_back(UIElement::Type::NPCTALK);
 					types.emplace_back(UIElement::Type::CHARINFO);
 					types.emplace_back(UIElement::Type::TRADINGROOM);
+					types.emplace_back(UIElement::Type::PERSONALSHOP);
+					types.emplace_back(UIElement::Type::SHOPSELL);
+					types.emplace_back(UIElement::Type::SHOPSALES);
 				}
 				else if (enter)
 				{

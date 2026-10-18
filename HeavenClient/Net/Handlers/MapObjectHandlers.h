@@ -28,6 +28,14 @@ namespace ms
 		void handle(InPacket& recv) const override;
 	};
 
+	// Put up, change or take down the balloon over someone keeping a room
+	// open (FUN_00938ba5)
+	// Opcode: UPDATE_CHAR_BOX(165)
+	class UpdateCharBoxHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
 	// Remove a character from the stage
 	// Opcode: REMOVE_CHAR(161)
 	class RemoveCharHandler : public PacketHandler

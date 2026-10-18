@@ -22,6 +22,7 @@
 #include "Helpers/LoginParser.h"
 #include "Helpers/MobStatParser.h"
 #include "Helpers/MovementParser.h"
+#include "MiniRoom.h"
 
 #include "../../Data/SkillData.h"
 #include "../../Gameplay/Stage.h"
@@ -84,9 +85,7 @@ namespace ms
 		recv.read_int(); // mountexp
 		recv.read_int(); // mounttiredness
 
-		// TODO: Shop stuff
-		recv.read_byte();
-		// TODO: Shop stuff end
+		std::optional<MiniRoomBox> room = mini_room::read_box(recv);
 
 		bool chalkboard = recv.read_bool();
 		std::string chalktext = chalkboard ? recv.read_string() : "";
@@ -95,8 +94,20 @@ namespace ms
 		recv.read_byte(); // team
 
 		Stage::get().get_chars().spawn(
-			{ cid, look, level, job, name, stance, position, chair, std::move(buffs), guild, emblem }
+			{ cid, look, level, job, name, stance, position, chair, std::move(buffs), guild, emblem, room }
 		);
+	}
+
+	void UpdateCharBoxHandler::handle(InPacket& recv) const
+	{
+		int32_t cid = recv.read_int();
+		std::optional<MiniRoomBox> room = mini_room::read_box(recv);
+
+		// The owner sees their own balloon too.
+		if (Stage::get().is_player(cid))
+			Stage::get().get_player().set_mini_room(room);
+		else if (Optional<OtherChar> other = Stage::get().get_chars().get_char(cid))
+			other->set_mini_room(room);
 	}
 
 	void GiveForeignBuffHandler::handle(InPacket& recv) const
