@@ -11,6 +11,7 @@
 #include "../../Gameplay/Stage.h"
 #include "../../IO/UI.h"
 #include "../../IO/UITypes/UIChatBar.h"
+#include "../../IO/UITypes/UIInviteCard.h"
 #include "../../IO/UITypes/UINotice.h"
 #include "../../Util/CurseWords.h"
 
@@ -137,17 +138,35 @@ namespace ms
 		{
 			int32_t party_id = recv.read_int();
 			std::string inviter = recv.read_string();
+			// Nonzero for a party search's invitation, which v83 accepts
+			// unseen (FUN_00a3e31c).
+			int8_t search = recv.read_byte();
+			const std::string& self = player.get_stats().get_name();
 
-			UI::get().emplace<UIYesNo>(
-				"'" + inviter + "' has invited you to a party.\\nWould you like to join?",
-				[party_id, inviter](bool yes)
-				{
-					if (yes)
-						JoinPartyPacket(party_id).dispatch();
-					else
-						DenyPartyRequestPacket(inviter).dispatch();
-				}
-			);
+			if (search)
+			{
+				JoinPartyPacket(party_id, search).dispatch();
+				break;
+			}
+
+			auto cards = UI::get().get_element<UIInviteCard>();
+
+			if (!cards)
+				break;
+
+			if (cards->showing(UIInviteCard::PARTY))
+			{
+				DenyPartyRequestPacket(DenyPartyRequestPacket::BUSY, inviter, self).dispatch();
+				break;
+			}
+
+			cards->add(UIInviteCard::PARTY, inviter, [party_id, inviter, self](bool yes)
+			{
+				if (yes)
+					JoinPartyPacket(party_id).dispatch();
+				else
+					DenyPartyRequestPacket(DenyPartyRequestPacket::DENIED, inviter, self).dispatch();
+			});
 			break;
 		}
 		case Operation::SILENT_UPDATE:

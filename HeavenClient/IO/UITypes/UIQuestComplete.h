@@ -18,7 +18,7 @@ namespace ms
 	// above the status bar, shown when a quest's last objective is met. O
 	// opens the quest in the quest log and X dismisses it. Each notice stays
 	// until then, or until the quest is no longer in progress; newer notices
-	// stack above older ones.
+	// stack above older ones, invitations included.
 	class UIQuestComplete : public UIElement
 	{
 	public:
@@ -50,16 +50,18 @@ namespace ms
 		};
 
 		void rebuild();
-		// From the first notice to the one at `index`.
-		Point<int16_t> offset(size_t index) const;
+		// From the bottom of the stack to `notice`.
+		Point<int16_t> offset(const Notice& notice) const;
 
 		QuestLog& quests;
 		const Inventory& inventory;
 		QuestCompletion completion;
 		Texture background, icon;
 		Text heading;
-		// Oldest first; the newest is drawn lowest.
+		// Oldest first; the newest is drawn last, over the others.
 		std::vector<Notice> notices;
+		// How high the buttons sit, to move them when the stack shifts.
+		int16_t buttons_raised = -1;
 
 		static constexpr int16_t WIDTH = 155, HEIGHT = 44;
 	};

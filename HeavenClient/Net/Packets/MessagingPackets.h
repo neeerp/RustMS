@@ -136,12 +136,16 @@ namespace ms
 		}
 	};
 
+	// X on an invitation (FUN_0051fff5); v83 ends with 1 instead when its
+	// options turn invitations away unseen (FUN_00851478).
 	class MessengerDeclinePacket : public MessengerPacket
 	{
 	public:
-		MessengerDeclinePacket(const std::string& inviter) : MessengerPacket(Mode::DECLINE)
+		MessengerDeclinePacket(const std::string& inviter, const std::string& self) : MessengerPacket(Mode::DECLINE)
 		{
 			write_string(inviter);
+			write_string(self);
+			write_byte(0);
 		}
 	};
 

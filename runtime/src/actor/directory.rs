@@ -366,11 +366,15 @@ impl WorldDirectory {
                     self.exchange_hp(from);
                 }
             }
-            PartyRequest::Decline { inviter } => {
+            PartyRequest::Decline { inviter, busy } => {
                 let Some(&inviter) = self.names.get(&inviter) else {
                     return;
                 };
-                if self.parties.decline(from, inviter) {
+                if busy {
+                    if self.parties.is_invited(from, inviter) {
+                        self.send_status(inviter, PartyStatus::BusyWithInvite, &member.name);
+                    }
+                } else if self.parties.decline(from, inviter) {
                     self.send_status(inviter, PartyStatus::Declined, &member.name);
                 }
             }
@@ -842,11 +846,23 @@ mod tests {
             },
         );
         assert_eq!(received(&mut carol), ["op 0x4"]);
+        // Busy with another invitation: the inviter hears so, and the
+        // invitation still waits.
         request(
             &mut directory,
             3,
             PartyRequest::Decline {
                 inviter: "Bobby".into(),
+                busy: true,
+            },
+        );
+        assert_eq!(received(&mut bobby), ["op 0x16"]);
+        request(
+            &mut directory,
+            3,
+            PartyRequest::Decline {
+                inviter: "Bobby".into(),
+                busy: false,
             },
         );
         assert_eq!(received(&mut bobby), ["op 0x17"]);

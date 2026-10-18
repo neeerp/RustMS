@@ -200,8 +200,11 @@ pub enum PartyRequest {
     Invite {
         name: String,
     },
+    /// Turn down `inviter`'s invitation. `busy` says another was still
+    /// showing, which leaves the invitation waiting for that one's answer.
     Decline {
         inviter: String,
+        busy: bool,
     },
     Expel {
         member_id: i32,

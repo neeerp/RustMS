@@ -32,6 +32,7 @@
 #include "StatusMessages.h"
 
 #include "../../IO/UITypes/UIChatBar.h"
+#include "../../IO/UITypes/UIInviteCard.h"
 #include "../../IO/UITypes/UIMessenger.h"
 #include "../../IO/UITypes/UINotice.h"
 #include "../../IO/UITypes/UIStatusMessenger.h"
@@ -517,17 +518,19 @@ namespace ms
 				std::string from = recv.read_string();
 				recv.skip_byte();
 				int32_t messenger_id = recv.read_int();
+				std::string self = Stage::get().get_player().get_stats().get_name();
 
-				UI::get().emplace<UIYesNo>(
-						from + " has invited you to Maple Messenger. Would you like to join?",
-						[from, messenger_id](bool yes)
-						{
-							if (yes)
-								MessengerOpenPacket(messenger_id).dispatch();
-							else
-								MessengerDeclinePacket(from).dispatch();
-						}
-				);
+				// O does nothing while a messenger is already open (FUN_0084dd25).
+				if (auto cards = UI::get().get_element<UIInviteCard>())
+					cards->add(UIInviteCard::MESSENGER, from, [from, self, messenger_id](bool yes)
+					{
+						auto open = UI::get().get_element<UIMessenger>();
+
+						if (!yes)
+							MessengerDeclinePacket(from, self).dispatch();
+						else if (!open || !open->is_active())
+							MessengerOpenPacket(messenger_id).dispatch();
+					});
 
 				break;
 			}

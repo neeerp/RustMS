@@ -41,7 +41,7 @@
 #include "UITypes/UIStorage.h"
 #include "UITypes/UIStatusBar.h"
 #include "UITypes/UIStatusMessenger.h"
-#include "UITypes/UITradeInvite.h"
+#include "UITypes/UIInviteCard.h"
 #include "UITypes/UIUserList.h"
 #include "UITypes/UIWorldMap.h"
 
@@ -104,7 +104,7 @@ namespace ms
 		emplace<UIPartyHP>(Stage::get().get_player().get_party(), stats);
 		emplace<UIShop>(look, inventory);
 		emplace<UIStorage>(inventory);
-		emplace<UITradeInvite>();
+		emplace<UIInviteCard>();
 
 		VWIDTH = Constants::Constants::get().get_viewwidth();
 		VHEIGHT = Constants::Constants::get().get_viewheight();
@@ -611,7 +611,7 @@ namespace ms
 					UIElement::Type::NPCTALK,
 					UIElement::Type::SHOP,
 					UIElement::Type::STORAGE,
-					UIElement::Type::TRADEINVITE,
+					UIElement::Type::INVITECARD,
 					UIElement::Type::REVIVE
 			};
 

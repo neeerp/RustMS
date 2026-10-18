@@ -101,6 +101,16 @@ from `UI.nx`. Moved so far:
   [quests.md](quests.md).
 - **Quest Complete! notice** (`UIQuestComplete`, `UIWindow.img/FadeYesNo`).
   See [quests.md](quests.md).
+- **Invitation notices** (`UIInviteCard`, `UIWindow.img/FadeYesNo`): v83's
+  fading cards above the status bar for Maple Messenger invitations, buddy
+  requests, trade requests, and party invites, each "from '<name>'" beside
+  its kind's icon (FUN_0052065d). O accepts and X declines; a card left
+  alone fades out after three minutes and sends nothing. A new invitation
+  replaces a card of its kind, except buddy requests, which pile up. Each
+  card, quest completions included, sits 5 px above the one before it
+  (`FadeNotice::raised`), and only the newest can be clicked. Not done: the
+  cash trade card, holding cards back while the UI is locked, and the Game
+  Option and blacklist refusals.
 - **Minimap** (`UIMiniMap`, `UIWindow.img/MiniMap`): folded to its title bar,
   the map alone (`MinMap`), or the map under the map's mark, street, and name
   (`MaxMap`), laid out from period footage. M or the `Basic.img` minus and
@@ -183,7 +193,8 @@ from `UI.nx`. Moved so far:
   opens a room, or minimises the open one to its title bar (which blinks on
   unread lines). Clicking an empty seat or typing `/invite name` invites; `/q`
   or the close button leaves. A speaker shows the `chatBalloon` dots for a
-  few seconds. Invitations arrive as a yes/no notice.
+  few seconds. Invitations arrive as an invitation notice, whose O does
+  nothing while a room is open.
 - **Game Option** (`UIGameOption`, `UIWindow.img/GameOpt`), from MENU: a
   `Basic.img/CheckBox` right of each row's ALLOW, laid out from the
   background. OK saves the boxes as the `Allow*` settings; the client doesn't
@@ -442,7 +453,7 @@ side yet.
 | Monster Book (`UIMonsterBook`) | Implemented: cards, summary, monster pages, search, cover; see `combat.md` |
 | Cash shop (`UICashShop`) | Enter/exit, catalog, buying, gifts, Cash Inventory, wish list, and moving items to and from the bags |
 | Maple Messenger (`UIMessenger`) | Implemented |
-| Trade (`UITradingRoom`, `UITradeInvite`) | Implemented, without cash trades |
+| Trade (`UITradingRoom`, `UIInviteCard`) | Implemented, without cash trades |
 | Storage (`UIStorage`) | Implemented; see `inventory.md` |
 | Continent ships, station wall clocks | Docking ships and the Balrog's ship, CONTI_MOVE/CONTI_STATE, CLOCK kind 1; see `ships.md` |
 | Player shops, mini-games, memo/mail | No UI, no handlers |

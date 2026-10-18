@@ -15,7 +15,10 @@ server restart.
   the client actor forwards to the directory.
 - Inviting someone without a party creates one first. An invitation keeps
   its receiver busy for `INVITE_TIMEOUT` (60 s); meanwhile, other parties'
-  invitations are refused with "taking care of another invitation".
+  invitations are refused with "taking care of another invitation". A
+  receiver whose client is still showing an invitation answers a second one
+  with `DENY_PARTY_REQUEST` reason 0x16 instead of 0x17; that refuses it the
+  same way and leaves the first one pending.
 - When the leader leaves, the party disbands. When anyone else leaves or is
   expelled, the party goes on.
 - The directory tracks each online character's `Presence`: name, job,
@@ -58,7 +61,10 @@ reconstruction of v83:
   player's map.
 - `Net/Handlers/PartyHandlers` applies `PARTY_OPERATION`,
   `UPDATE_PARTYMEMBER_HP`, and party `MULTICHAT`. It prints the v83 chat-log
-  messages and shows invitations as a `UIYesNo`.
+  messages and shows invitations as a fading notice (`UIInviteCard`, see
+  [client.md](client.md)). As in v83, an invitation arriving while one is
+  shown is answered busy, and one with a nonzero party-search flag is
+  accepted without asking.
 - `UIUserList` is the v83 "Maple User List & Guild" window
   (`UIWindow.img/UserList`). Only the Party tab works so far.
   - Members are listed under online and offline. The leader has a star.
@@ -90,9 +96,7 @@ reconstruction of v83:
 ## Unverified against period footage
 
 - The party chat colour (#FF99CC).
-- The invite prompt's wording, and whether the leading tab in v83's
-  "has become the leader" line shows.
+- Whether the leading tab in v83's "has become the leader" line shows.
 - The bottom button grid's exact pitch.
-- v83 used a fading notice for invitations; this uses a plain yes/no box.
 - Whisper fills in `/w name` in the chat bar. In footage, v83 asked for the
   name in a dialog first.

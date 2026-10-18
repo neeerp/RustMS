@@ -50,7 +50,8 @@ entry is the 39-byte `GW_Friend` record. Its channel is zero-based, or -1.
   - the list;
   - channel changes;
   - capacity;
-  - requests, shown as a `UIYesNo` (yes accepts, no declines);
+  - requests, shown as a fading notice (`UIInviteCard`, see
+    [client.md](client.md)); O accepts and X declines;
   - errors, shown as a `UIOk`.
 - `MultiChatHandler` prints buddy chat in orange.
 - The Friend tab of `UIUserList` is built from `UserList/Friend` art:
@@ -75,6 +76,8 @@ entry is the 39-byte `GW_Friend` record. Its channel is zero-based, or -1.
 - Raising the capacity (packet 0x15 is parsed but never sent), and the
   Cash Shop flags.
 - The MAP button, notes, and the blacklist.
+- v83 also records a request as a pending entry in the list, says so in the
+  chat log, and shows its notices again after a map change.
 
 ## Unverified against period footage
 
@@ -84,5 +87,5 @@ from the art:
 - the two columns;
 - where names and channels sit in a row;
 - the button order;
-- the request and delete wording;
+- the delete wording;
 - the buddy chat colour (orange).

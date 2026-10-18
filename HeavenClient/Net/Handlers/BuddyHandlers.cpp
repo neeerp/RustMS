@@ -4,6 +4,7 @@
 
 #include "../../Gameplay/Stage.h"
 #include "../../IO/UI.h"
+#include "../../IO/UITypes/UIInviteCard.h"
 #include "../../IO/UITypes/UINotice.h"
 
 namespace ms
@@ -71,16 +72,14 @@ namespace ms
 			int32_t id = recv.read_int();
 			std::string name = recv.read_string();
 
-			UI::get().emplace<UIYesNo>(
-				"'" + name + "' wants to add you as a buddy.\\nWould you like to accept?",
-				[id](bool yes)
+			if (auto cards = UI::get().get_element<UIInviteCard>())
+				cards->add(UIInviteCard::BUDDY, name, [id](bool yes)
 				{
 					if (yes)
 						AcceptBuddyPacket(id).dispatch();
 					else
 						DeleteBuddyPacket(id).dispatch();
-				}
-			);
+				});
 			break;
 		}
 		case Operation::OWN_LIST_FULL:

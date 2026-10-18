@@ -8,6 +8,10 @@ use crate::packet::build::world::party::MULTICHAT_PARTY;
 use packet::{io::read::PktRead, Packet};
 use std::io::Cursor;
 
+/// The `DENY_PARTY_REQUEST` reason for an invitation that came while
+/// another was showing.
+const DENY_BUSY: u8 = 0x16;
+
 /// `PARTY_OPERATION`: create, leave, accept, invite, expel, or pass the lead.
 /// The world directory owns parties, so every operation goes there.
 pub struct PartyOperationHandler;
@@ -37,18 +41,23 @@ impl WorldHandler for PartyOperationHandler {
     }
 }
 
-/// `DENY_PARTY_REQUEST`: the receiver turned down an invitation.
+/// `DENY_PARTY_REQUEST`: reason, inviter, receiver. The receiver turned
+/// down an invitation (`0x17`), or v83 did for them because another was
+/// still showing (`0x16`, FUN_00a3e31c).
 pub struct DenyPartyRequestHandler;
 
 impl WorldHandler for DenyPartyRequestHandler {
     fn handle(&self, packet: &mut Packet, _ctx: &mut WorldContext) -> WorldResult {
         let mut reader = Cursor::new(&packet.bytes);
         reader.read_short()?;
-        reader.read_byte()?;
+        let busy = reader.read_byte()? == DENY_BUSY;
         let inviter = reader.read_str_with_length()?;
         // Party search invitations name the inviter as "PS: name".
         let inviter = inviter.strip_prefix("PS: ").unwrap_or(&inviter).to_string();
-        Ok(HandlerResult::empty().with(WorldAction::Party(PartyRequest::Decline { inviter })))
+        Ok(
+            HandlerResult::empty()
+                .with(WorldAction::Party(PartyRequest::Decline { inviter, busy })),
+        )
     }
 }
 
@@ -138,10 +147,20 @@ mod tests {
             .unwrap();
         packet.write_byte(0x17).unwrap();
         packet.write_str_with_length("PS: Alice").unwrap();
+        packet.write_str_with_length("Bobby").unwrap();
         assert_eq!(
             request(&DenyPartyRequestHandler, &packet.bytes),
             Some(PartyRequest::Decline {
-                inviter: "Alice".into()
+                inviter: "Alice".into(),
+                busy: false,
+            })
+        );
+        packet.bytes[2] = 0x16;
+        assert_eq!(
+            request(&DenyPartyRequestHandler, &packet.bytes),
+            Some(PartyRequest::Decline {
+                inviter: "Alice".into(),
+                busy: true,
             })
         );
     }

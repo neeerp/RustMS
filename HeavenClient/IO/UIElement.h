@@ -80,7 +80,7 @@ namespace ms
 			MONSTERBOOK,
 			REVIVE,
 			TRADINGROOM,
-			TRADEINVITE,
+			INVITECARD,
 			NUM_TYPES
 		};
 

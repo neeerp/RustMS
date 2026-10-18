@@ -576,8 +576,8 @@ add_executable(HeavenClient
     IO/UITypes/UIShop.h
     IO/UITypes/UIStorage.cpp
     IO/UITypes/UIStorage.h
-    IO/UITypes/UITradeInvite.cpp
-    IO/UITypes/UITradeInvite.h
+    IO/UITypes/UIInviteCard.cpp
+    IO/UITypes/UIInviteCard.h
     IO/UITypes/UITradingRoom.cpp
     IO/UITypes/UITradingRoom.h
     IO/UITypes/UIMonsterBook.cpp

@@ -26,7 +26,7 @@
 #include "../../IO/UITypes/UICharInfo.h"
 #include "../../IO/UITypes/UIChatBar.h"
 #include "../../IO/UITypes/UINotice.h"
-#include "../../IO/UITypes/UITradeInvite.h"
+#include "../../IO/UITypes/UIInviteCard.h"
 #include "../../IO/UITypes/UITradingRoom.h"
 #include "../Packets/MiniRoomPackets.h"
 
@@ -213,8 +213,14 @@ namespace ms
 						break;
 					}
 
-					if (auto invite = UI::get().get_element<UITradeInvite>())
-						invite->add(inviter, serial);
+					if (auto cards = UI::get().get_element<UIInviteCard>())
+						cards->add(UIInviteCard::TRADE, inviter, [serial](bool yes)
+						{
+							if (yes)
+								MiniRoomVisitPacket(serial).dispatch();
+							else
+								MiniRoomDeclinePacket(serial, MiniRoomPacket::Decline::DECLINED).dispatch();
+						});
 
 					break;
 				}
