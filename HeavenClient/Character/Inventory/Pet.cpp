@@ -28,4 +28,14 @@ namespace ms
 	{
 		return petlevel;
 	}
+
+	uint16_t Pet::get_closeness() const
+	{
+		return closeness;
+	}
+
+	uint8_t Pet::get_fullness() const
+	{
+		return fullness;
+	}
 }

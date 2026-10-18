@@ -67,6 +67,17 @@ namespace ms
 								 reactions(command["success"], dialog), reactions(command["fail"], dialog) });
 		}
 
+		nl::node foods = src["food"];
+
+		for (int i = 0; foods[std::to_string(i)]; i++)
+		{
+			nl::node entry = foods[std::to_string(i)];
+
+			food.push_back({ static_cast<int16_t>(entry["l0"].get_integer()),
+							 static_cast<int16_t>(entry["l1"].get_integer()), {}, reactions(entry["success"], dialog),
+							 reactions(entry["fail"], dialog) });
+		}
+
 		idle = reactions(src["randAction"], dialog);
 
 		for (nl::node child : src)
@@ -87,6 +98,11 @@ namespace ms
 	const std::vector<pets::Command> &PetData::get_commands() const
 	{
 		return commands;
+	}
+
+	const std::vector<pets::Command> &PetData::get_food() const
+	{
+		return food;
 	}
 
 	const std::vector<pets::Reaction> &PetData::get_idle() const

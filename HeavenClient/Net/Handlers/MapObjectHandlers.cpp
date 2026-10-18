@@ -29,6 +29,7 @@
 #include "../../Gameplay/Stage.h"
 #include "../../IO/UI.h"
 #include "../../IO/UITypes/UIChatBar.h"
+#include "../../IO/UITypes/UINotice.h"
 #include "../Packets/GameplayPackets.h"
 
 namespace ms
@@ -198,6 +199,23 @@ namespace ms
 				pet->act({ type, action, text }, styled);
 	}
 
+	void CashPetFoodResultHandler::handle(InPacket& recv) const
+	{
+		switch (recv.read_byte())
+		{
+			case 0:
+				if (Optional<PetLook> pet = Stage::get().get_player().get_pet(recv.read_byte()))
+					pet->play_eat_sound();
+
+				break;
+			case 1:
+				// StringPool 0xed1.
+				UI::get().emplace<UIOk>("Your pet cannot consume this food. Please check again.", [](bool)
+				{});
+				break;
+		}
+	}
+
 	void PetCommandHandler::handle(InPacket& recv) const
 	{
 		int32_t cid = recv.read_int();
@@ -209,11 +227,13 @@ namespace ms
 
 		uint8_t index = recv.read_byte();
 
-		// 1 answers food, which HC doesn't feed yet.
-		if (recv.read_byte() != 0)
+		// 0 answers a command, 1 food.
+		uint8_t mode = recv.read_byte();
+
+		if (mode > 1)
 			return;
 
-		uint8_t command = recv.read_byte();
+		uint8_t command = mode == 0 ? recv.read_byte() : 0;
 		bool obeyed = recv.read_bool();
 		bool styled = recv.read_bool();
 
@@ -225,8 +245,11 @@ namespace ms
 
 		int16_t level = player.get_inventory().get_pet_level(pet->get_serial());
 
+		std::optional<PetLook::Said> said =
+			mode == 0 ? pet->answer(command, obeyed, styled, level) : pet->eat(obeyed, styled, level);
+
 		// The others see what it did when the server passes this on.
-		if (std::optional<PetLook::Said> said = pet->answer(command, obeyed, styled, level))
+		if (said)
 			PetChatPacket(pet->get_serial(), said->type, said->action, said->text).dispatch();
 	}
 

@@ -209,7 +209,11 @@ namespace ms
 				request(SkillBookPacket(slot, itemid), ExclRequest::USE_WAIT);
 			else if (type == InventoryType::Id::USE && !Stage::get().get_mapinfo().can_use_item(itemid))
 				InChatMessage(Messages::ITEM_FIELD).drop();
-			else if (type == InventoryType::Id::USE && disease::can_use_item(get_diseases()))
+			else if (type == InventoryType::Id::USE && !disease::can_use_item(get_diseases()))
+				return;
+			else if (type == InventoryType::Id::USE && pets::is_food(itemid))
+				feed_pets(slot, itemid);
+			else if (type == InventoryType::Id::USE)
 				request(UseItemPacket(slot, itemid), ExclRequest::USE_WAIT);
 			else if (type == InventoryType::Id::SETUP && itemid / 10000 == 301)
 				sit_on_chair(itemid);
@@ -1118,6 +1122,40 @@ namespace ms
 			if (std::optional<pets::Heard> heard = pet.hear(line, inventory.get_pet_level(pet.get_serial())))
 				PetCommandPacket(pet.get_serial(), heard->named, heard->command).dispatch();
 		}
+	}
+
+	void Player::feed_pets(int16_t slot, int32_t itemid)
+	{
+		// Whether a pet is out is the server's to check.
+		if (!request(PetFoodPacket(slot, itemid), ExclRequest::USE_WAIT))
+			return;
+
+		std::array<int16_t, 3> fullness;
+
+		for (size_t i = 0; i < pets.size(); i++)
+		{
+			Optional<const Pet> pet = pets[i].get_itemid() ? inventory.get_pet(pets[i].get_serial()) : nullptr;
+			fullness[i] = pet ? pet->get_fullness() : -1;
+		}
+
+		// The one the server will feed plays its eat sound, if it has one.
+		int index = pets::hungriest(fullness);
+
+		if (index >= 0)
+			pets[index].play_eat_sound();
+	}
+
+	std::array<int32_t, 3> Player::get_pet_closeness() const
+	{
+		std::array<int32_t, 3> closeness;
+
+		for (size_t i = 0; i < pets.size(); i++)
+		{
+			Optional<const Pet> pet = pets[i].get_itemid() ? inventory.get_pet(pets[i].get_serial()) : nullptr;
+			closeness[i] = pet ? pet->get_closeness() : -1;
+		}
+
+		return closeness;
 	}
 
 	SkillBook &Player::get_skills()

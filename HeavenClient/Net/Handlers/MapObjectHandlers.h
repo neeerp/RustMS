@@ -64,6 +64,15 @@ namespace ms
 		void handle(InPacket& recv) const override;
 	};
 
+	// Whether a pet ate the cash food the player used: it plays its eat
+	// sound, or the food suits none of the pets out (FUN_00a29049). It
+	// doesn't unlock the client; the inventory operation after it does.
+	// Opcode: CASH_PET_FOOD_RESULT(76)
+	class CashPetFoodResultHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
 	// Whether the player's pet obeyed a command, or liked its food
 	// Opcode: PET_COMMAND(174)
 	class PetCommandHandler : public PacketHandler

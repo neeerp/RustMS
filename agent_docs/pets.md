@@ -3,9 +3,10 @@
 A pet is a cash item (`500xxxx`) bought in the Cash Shop. Taken out to the
 Cash tab, it can be summoned to follow its owner, and everyone on the map
 sees it. Up to three can be out with Follow the Lead, one without. It answers
-commands said in chat and grows closer when it obeys. Food, hunger, name tags,
-pet equipment, looting and auto potions are not done yet; `v83ref` report 159
-has the v83 client's side of each.
+commands said in chat and grows closer when it obeys. It grows hungry, eats pet
+food and cash food, and goes home when it starves. Name tags, pet equipment,
+looting and auto potions are not done yet; `v83ref` report 159 has the v83
+client's side of each.
 
 ## Server
 
@@ -55,6 +56,31 @@ has the v83 client's side of each.
   adds `inc` closeness (capped at 30000, levels from Cosmic's table): the
   pet's item is re-sent, and a level up shows effect 4 `0, index` to the
   owner (`0xCE`) and the map (`0xC6`).
+- **Food.** PET_FOOD (`0x4C` in) is the tick, the USE slot and the item id
+  of a pet food (`212xxxx`). The pet out that is least full eats (the first
+  of equals). A pet not yet full gains the food's `spec/inc` fullness (capped
+  at 100) and, if its fullness was 75 or less, one closeness. A full pet
+  refuses and loses one closeness, which can lower its level. The server
+  answers the owner with 174 `cid, index, 1, enjoyed, 0`, then an exclusive
+  inventory operation that takes one food and re-sends the pet's item, then
+  the level-up effect if it levelled. With no pet out or the wrong item in
+  the slot, it sends only an empty stat change to unlock the client. The
+  food's list of pets it suits isn't checked; the v83 client doesn't check
+  it either.
+- **Cash food.** USE_CASH_ITEM (`0x4F` in, `world/cash_item.rs`) is the Cash
+  slot, the item id, the item's own fields and the tick. Only cash pet food
+  (`524xxxx`) is used so far; any other item, or one not in that slot, gets
+  an empty stat change to unlock the client. The first pet out, in list
+  order, whose id is in the food's `spec/0..n` eats: fullness 100 and `spec/inc`
+  closeness (100), and it always enjoys it. The server answers with 76
+  `0, index`, then the 174, inventory operation and level-up effect that
+  PET_FOOD sends. When no pet out suits the food it sends 76 `1` and an empty
+  stat change. These are Cosmic's rules.
+- **Hunger.** Every 3 minutes (`client/pets.rs`) each pet out loses its
+  `info/hungry` fullness (1 if unset; the Baby Tiger loses 3) and its item is
+  re-sent. One left at 5 or less is set to 15 and goes home with 168 reason
+  1, followed by the stat change with the remaining serials. These are
+  Cosmic's rules, as there is no v83 server code.
 - **Chat.** PET_CHAT (`0xA8` in) is what the owner's client showed the pet
   do and say. The server relays it as 171 `cid, index, kind, action, text,
   styled` to the others. 0xA8 doesn't carry the balloon style, so the
@@ -104,21 +130,41 @@ has the v83 client's side of each.
   the pet's `info/chatBalloon` when the packet's flag is set, else 0.
 - **Idle.** Every 5 s a still pet with `randAction` entries has an even
   chance of playing one.
+- **Food.** Double-clicking pet food in the USE tab, or its hotkey, sends
+  PET_FOOD under the USE_WAIT lock after the usual field and ailment checks.
+  As in v83, the client doesn't check that a pet is out. The pet out that is
+  least full plays `Sound.nx Pet.img/<id>/eat` if it has one. 174 with mode
+  1 picks a success or fail reaction from the first `food/N` entry whose
+  levels hold the pet's level, and sends it as PET_CHAT.
+- **Cash food.** Double-clicking cash pet food in the Cash tab sends
+  USE_CASH_ITEM under the WAIT lock and plays `Sound.nx Game.img/UseShopItem`.
+  With no pet out it shows the chat line "This item can only be used with a
+  pet." instead. 76 plays the eating pet's eat sound, or shows "Your pet
+  cannot consume this food. Please check again." The inventory operation
+  after it unlocks the client.
+- **Closeness.** After every inventory operation, a pet out whose item now
+  shows different closeness gets the yellow status line "The closeness
+  increased (+N)" or "The closeness decreased (-N)".
 - **Level up.** Effect 4 (`0xCE` for the player, `0xC6` for others) plays
   `Effect/PetEff.img/Basic/LevelUp` on the pet, with the level-up sound
   for kind 0; kinds 1 to 3 are Teleport, the pet's warp and Evolution.
-- `PetData` reads the pet's commands, idle actions, own animations and
-  balloon from Item.nx and String.nx.
+- `PetData` reads the pet's commands, food answers, idle actions, own
+  animations and balloon from Item.nx and String.nx.
 
 ## Tests
 
-- `game::pet` unit tests cover the list; `net` tests cover the codecs.
+- `game::pet` unit tests cover the list, feeding, cash food, closeness lost
+  and starving; `net` tests cover the codecs, which pet eats (cash food
+  included), and hunger.
 - `integration-harness/tests/pets.rs` buys the Baby Tiger Package, takes the
   pet out, summons it, moves it, sends it back, and checks that it is still
   out after a relog and that a watcher sees it. It also commands the pet by
   name until it obeys, checks the closeness update and the level-up effect
-  for the owner and the watcher, and the relayed PET_CHAT.
+  for the owner and the watcher, and the relayed PET_CHAT. It then feeds the
+  pet and checks the answer, the food taken and the pet's new fullness and
+  closeness, then gives it a cash food that suits it and one that doesn't.
 - `HeavenClient/tests/pets.cpp` covers the closing-up list, the summon
   rules, Follow the Lead's skill ids, the stance mapping, the SPAWN_PLAYER
-  list, splitting command words, hearing a command, the action mapping and
-  the idle timer.
+  list, splitting command words, hearing a command, the action mapping, the
+  idle timer, which pet eats, the food answer for a level, the closeness
+  lines and the food item ranges.

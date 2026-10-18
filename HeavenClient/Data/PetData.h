@@ -40,6 +40,9 @@ namespace ms
 		// Its commands, by the index sent for them.
 		const std::vector<pets::Command> &get_commands() const;
 
+		// How it answers food by level (food/N), with no words.
+		const std::vector<pets::Command> &get_food() const;
+
 		// What it may do when left standing (randAction).
 		const std::vector<pets::Reaction> &get_idle() const;
 
@@ -55,6 +58,7 @@ namespace ms
 		std::string kind;
 		int8_t balloon;
 		std::vector<pets::Command> commands;
+		std::vector<pets::Command> food;
 		std::vector<pets::Reaction> idle;
 		std::vector<std::string> customs;
 	};

@@ -17,6 +17,7 @@
 //////////////////////////////////////////////////////////////////////////////////
 #include "UIItemInventory.h"
 
+#include "UIChatBar.h"
 #include "UINotice.h"
 #include "UIPersonalShop.h"
 
@@ -72,6 +73,8 @@ namespace ms
 		constexpr const char *DEAD = "You can't do it once you're dead.";
 		// StringPool 0x180 and 0x181.
 		constexpr const char *TOO_MANY_PETS = "You have exceeded the maximum number\\n of pets that can accompany you.\\nPlease try again after \\nyou change the living pet back into a doll.";
+		// StringPool 0xed8.
+		constexpr const char *CASH_FOOD_NO_PET = "This item can only be used with a pet.";
 		constexpr const char *BOSS_PET = "Would you like to change your Boss Pet?\\n (The \"Item Ignore\" skill, as well as \\nthe stats for speed and jump will \\nfollow that of the Lead Pet)";
 
 		// v83 FUN_00a240a2: double-clicking a pet asks the server to bring it
@@ -109,6 +112,28 @@ namespace ms
 					});
 					break;
 			}
+		}
+
+		// v83 FUN_00a0a63f, type 0x1e: cash pet food needs a pet out, and the
+		// server picks the pet it suits. Using it plays the shop sound; the
+		// pet's eat sound waits for CASH_PET_FOOD_RESULT.
+		void feed_cash_food(int16_t slot, int32_t item_id)
+		{
+			Player &player = Stage::get().get_player();
+
+			if (!player.can_request(ExclRequest::WAIT))
+				return;
+
+			if (!player.get_pet_serials()[0])
+			{
+				if (auto chatbar = UI::get().get_element<UIChatBar>())
+					chatbar->send_chatline(CASH_FOOD_NO_PET, UIChatBar::LineType::SKILL);
+
+				return;
+			}
+
+			if (player.request(UseCashItemPacket(slot, item_id), ExclRequest::WAIT))
+				Sound(nl::nx::sound["Game.img"]["UseShopItem"]).play();
 		}
 
 		// v83 FUN_00a0900a: a map may keep items off the ground, which it
@@ -408,7 +433,11 @@ namespace ms
 					case InventoryType::Id::USE:
 						if (!Stage::get().get_mapinfo().can_use_item(item_id))
 							InChatMessage(Messages::ITEM_FIELD).drop();
-						else if (disease::can_use_item(Stage::get().get_player().get_diseases()))
+						else if (!disease::can_use_item(Stage::get().get_player().get_diseases()))
+							break;
+						else if (pets::is_food(item_id))
+							Stage::get().get_player().feed_pets(slot, item_id);
+						else
 							Stage::get().get_player().request(UseItemPacket(slot, item_id), ExclRequest::USE_WAIT);
 
 						break;
@@ -425,6 +454,8 @@ namespace ms
 							UIPersonalShop::create(slot, item_id);
 						else if (item_id / 10000 == 500)
 							summon_pet(slot, inventory.get_cash_id(tab, slot));
+						else if (pets::is_cash_food(item_id))
+							feed_cash_food(slot, item_id);
 
 						break;
 				}

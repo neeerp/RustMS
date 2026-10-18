@@ -29,6 +29,8 @@ namespace ms
 			uint8_t fullness);
 
 		uint8_t get_level() const;
+		uint16_t get_closeness() const;
+		uint8_t get_fullness() const;
 
 	private:
 		int32_t item_id;

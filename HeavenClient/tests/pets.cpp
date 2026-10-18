@@ -187,6 +187,40 @@ void actions()
 	require(ms::pets::idle_due(10000, 8), "and every 5 s after");
 }
 
+void food()
+{
+	using ms::pets::closeness_change;
+	using ms::pets::Command;
+	using ms::pets::food_for;
+	using ms::pets::hungriest;
+
+	require(ms::pets::is_food(2120000) && !ms::pets::is_food(2000000) && !ms::pets::is_food(5240000),
+			"pet food is 212xxxx");
+	require(ms::pets::is_cash_food(5240027) && !ms::pets::is_cash_food(2120000) && !ms::pets::is_cash_food(5000066),
+			"cash pet food is 524xxxx");
+
+	require(hungriest({ 60, 40, 80 }) == 1, "the least full eats");
+	require(hungriest({ 40, 80, 40 }) == 0, "the first of equals");
+	require(hungriest({ -1, 90, -1 }) == 1, "an empty slot is skipped");
+	require(hungriest({ 100, -1, -1 }) == 0, "a full pet is still the one fed");
+	require(hungriest({ -1, -1, -1 }) == -1, "no pet out, none");
+
+	std::vector<Command> table = {
+		{ 1, 9, {}, { { "eat", { "Chomp" } } }, { { "cry", {} } } },
+		{ 10, 19, {}, {}, {} },
+		{ 1, 30, {}, {}, {} },
+	};
+
+	require(food_for(table, 5) == &table[0] && food_for(table, 9) == &table[0], "the entry for its level");
+	require(food_for(table, 12) == &table[1], "the next levels' entry");
+	require(food_for(table, 25) == &table[2], "the first that holds it");
+	require(!food_for(table, 31) && !food_for(table, -1), "none past its levels, or for another's pet");
+
+	require(closeness_change(3, 4) == "The closeness increased (+1)", "closer");
+	require(closeness_change(4, 3) == "The closeness decreased (-1)", "further");
+	require(closeness_change(4, 4).empty(), "no change, no line");
+}
+
 int main()
 {
 	try
@@ -198,6 +232,7 @@ int main()
 		words();
 		hearing();
 		actions();
+		food();
 
 		std::cout << "Pets passed\n";
 		return 0;

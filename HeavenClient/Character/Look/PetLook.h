@@ -93,6 +93,13 @@ namespace ms
 		// shows it, returning it to send (FUN_007048ab).
 		std::optional<Said> answer(uint8_t command, bool obeyed, bool styled, int16_t level);
 
+		// PET_COMMAND (174) for food: whether it enjoyed it. Picks the food
+		// answer for its level, shows it and returns it to send.
+		std::optional<Said> eat(bool enjoyed, bool styled, int16_t level);
+
+		// Plays `Sound.nx Pet.img/<id>/eat`, if it has one.
+		void play_eat_sound() const;
+
 		// User effect 4 on it (FUN_0070537d): 0 it levelled up, 1 teleport,
 		// 2 its warp, 3 evolution.
 		void show_effect(uint8_t kind);

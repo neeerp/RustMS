@@ -480,11 +480,11 @@ side yet.
 | Continent ships, station wall clocks | Docking ships and the Balrog's ship, CONTI_MOVE/CONTI_STATE, CLOCK kind 1; see `ships.md` |
 | Player shops, mini-games, memo/mail | No UI, no handlers |
 | Reactors | Spawning, swings, hits and breaking; no skill hits, touch or quest gates; see `combat.md` |
-| Pets | Summoning, following, others' pets, map changes, chat commands, idle actions, level-up effect; see `pets.md` |
+| Pets | Summoning, following, others' pets, map changes, chat commands, idle actions, level-up effect, food, cash food and hunger; see `pets.md` |
 | Mounts, summons | Partial or absent |
 | Party/guild/boss quests, events, MTS | Absent |
 
-79 outbound opcodes are defined (`Net/OutPacket.h`) and 115 inbound handlers
+81 outbound opcodes are defined (`Net/OutPacket.h`) and 116 inbound handlers
 are registered (`Net/PacketSwitch.cpp`). Anything not listed there is silently ignored by the client.
 
 ## Movement physics
@@ -656,7 +656,7 @@ the screen size.
 | Player shops | Nothing | L |
 | Cash shop | No coupons, charging, or storage window | S |
 | Quest accept/complete UI flow | Partial | S |
-| Pets | Summon, follow and chat commands only: no food, name tags, equipment or looting | M |
+| Pets | Summon, follow, chat commands, food and cash food only: no name tags, equipment or looting | M |
 | Mounts | Partial rendering, no interaction | M |
 | Memo, mail, MTS | Nothing | M each |
 | Buddy whisper/find modes | Ignored | S |

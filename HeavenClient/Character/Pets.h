@@ -276,5 +276,55 @@ namespace ms
 		{
 			return still >= 5000 && still % 5000 < step;
 		}
+
+		// Pet food (212xxxx) is fed with PET_FOOD rather than used.
+		inline bool is_food(int32_t itemid)
+		{
+			return itemid / 10000 == 212;
+		}
+
+		// Cash pet food (524xxxx) is used with USE_CASH_ITEM; the server
+		// picks the pet it suits.
+		inline bool is_cash_food(int32_t itemid)
+		{
+			return itemid / 10000 == 524;
+		}
+
+		// The pet out that eats: the one least full, the first of equals
+		// (FUN_00a09905). -1 marks a slot without a pet; none gives -1.
+		inline int hungriest(const std::array<int16_t, 3> &fullness)
+		{
+			int index = -1;
+
+			for (int i = 0; i < static_cast<int>(fullness.size()); i++)
+				if (fullness[i] >= 0 && (index < 0 || fullness[i] < fullness[index]))
+					index = i;
+
+			return index;
+		}
+
+		// The food answers (`food/N`) for a pet at `level`: the first entry
+		// whose levels hold it (FUN_007048ab).
+		inline const Command *food_for(const std::vector<Command> &food, int16_t level)
+		{
+			for (const Command &entry : food)
+				if (level >= entry.min && level <= entry.max)
+					return &entry;
+
+			return nullptr;
+		}
+
+		// The status line for a pet whose closeness went from `before` to
+		// `now`, empty if it didn't change (FUN_00704c18).
+		inline std::string closeness_change(int32_t before, int32_t now)
+		{
+			if (now > before)
+				return "The closeness increased (+" + std::to_string(now - before) + ")";
+
+			if (now < before)
+				return "The closeness decreased (" + std::to_string(now - before) + ")";
+
+			return {};
+		}
 	}
 }

@@ -229,6 +229,12 @@ namespace ms
 		// the server whether it obeys (FUN_00704d5d).
 		void command_pets(const std::string &line);
 
+		// Give the pet food in USE slot `slot` to the pets (FUN_00a09905).
+		void feed_pets(int16_t slot, int32_t itemid);
+
+		// The closeness of each pet out, -1 where there is none.
+		std::array<int32_t, 3> get_pet_closeness() const;
+
 		// Obtain a reference to the player's skills.
 		SkillBook &get_skills();
 

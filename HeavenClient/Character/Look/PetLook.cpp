@@ -341,6 +341,27 @@ namespace ms
 		return said;
 	}
 
+	std::optional<PetLook::Said> PetLook::eat(bool enjoyed, bool styled, int16_t level)
+	{
+		const PetData &data = PetData::get(itemid);
+		const pets::Command *food = pets::food_for(data.get_food(), level);
+
+		if (!food)
+			return std::nullopt;
+
+		const std::vector<pets::Reaction> &list = enjoyed ? food->success : food->fail;
+
+		if (list.empty())
+			return std::nullopt;
+
+		Said said = pick(1, list, data.get_customs());
+
+		if (!act(said, styled))
+			return std::nullopt;
+
+		return said;
+	}
+
 	void PetLook::show_effect(uint8_t kind)
 	{
 		nl::node src = nl::nx::effect["PetEff.img"];
@@ -412,6 +433,11 @@ namespace ms
 		}
 
 		return static_cast<uint8_t>(action << 1 | (flip ? 0 : 1));
+	}
+
+	void PetLook::play_eat_sound() const
+	{
+		Sound(nl::nx::sound["Pet.img"][std::to_string(itemid)]["eat"]).play();
 	}
 
 	int32_t PetLook::get_itemid() const

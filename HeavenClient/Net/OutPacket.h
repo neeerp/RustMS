@@ -100,6 +100,8 @@ namespace ms
 			MOVE_ITEM = 71,
 			USE_ITEM = 72,
 			CANCEL_ITEM_EFFECT = 73,
+			PET_FOOD = 76,
+			USE_CASH_ITEM = 79,
 			USE_SKILL_BOOK = 82,
 			MESO_DROP = 94,
 			HEAL_OVER_TIME = 89,
