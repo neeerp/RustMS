@@ -101,7 +101,7 @@ namespace ms
 		buffs[SkillId::Id::ACHILLES_HERO] = std::make_unique<AchillesBuff>();
 
 		// Page
-		buffs[SkillId::Id::SWORD_MASTERY_FIGHTER] = std::make_unique<WeaponMasteryBuff<Weapon::Type::SWORD_1H, Weapon::Type::SWORD_2H>>();
+		buffs[SkillId::Id::SWORD_MASTERY_PAGE] = std::make_unique<WeaponMasteryBuff<Weapon::Type::SWORD_1H, Weapon::Type::SWORD_2H>>();
 		buffs[SkillId::Id::BW_MASTERY] = std::make_unique<WeaponMasteryBuff<Weapon::Type::MACE_1H, Weapon::Type::MACE_2H>>();
 
 		// White Knight

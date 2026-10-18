@@ -59,7 +59,7 @@ namespace ms
 			SWORD_PANIC = 1111003,
 			AXE_PANIC = 1111004,
 			SWORD_COMA = 1111005,
-			AXE_COMA = 1111005,
+			AXE_COMA = 1111006,
 			SHOUT = 1111008,
 
 			// Hero
