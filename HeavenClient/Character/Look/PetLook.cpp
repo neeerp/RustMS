@@ -20,11 +20,29 @@
 #include "../Pets.h"
 
 #include "../../Constants.h"
+#include "../../Audio/Audio.h"
+#include "../../Data/PetData.h"
+#include "../../Util/Randomizer.h"
 
 #include <nlnx/nx.hpp>
 
 namespace ms
 {
+	namespace
+	{
+		// One of the answers in `list` and one of its lines, if it has any
+		// (FUN_007048ab, FUN_00704a92).
+		PetLook::Said pick(uint8_t type, const std::vector<pets::Reaction> &list,
+						   const std::vector<std::string> &customs)
+		{
+			Randomizer random;
+			const pets::Reaction &reaction = list[random.next_int(list.size())];
+			std::string text = reaction.lines.empty() ? "" : reaction.lines[random.next_int(reaction.lines.size())];
+
+			return { type, pets::action(reaction.act, customs), text };
+		}
+	}
+
 	PetLook::Stance PetLook::stancebyvalue(uint8_t value)
 	{
 		switch (pets::shown(value))
@@ -47,7 +65,8 @@ namespace ms
 													   local(lc), stance(Stance::STAND), flip(false),
 													   shown({ static_cast<double>(entry.position.x()),
 															   static_cast<double>(entry.position.y()), 0.0, 0.0,
-															   entry.fh, entry.stance })
+															   entry.fh, entry.stance }),
+													   action(-1), effecting(false), pending(false), still(0)
 	{
 		set_position(entry.position.x(), entry.position.y());
 		set_stance(entry.stance);
@@ -73,21 +92,32 @@ namespace ms
 	}
 
 	PetLook::PetLook() : itemid(0), serial(0), local(false), stance(Stance::STAND), flip(false),
-						 shown({ 0.0, 0.0, 0.0, 0.0, 0, 0 })
+						 shown({ 0.0, 0.0, 0.0, 0.0, 0, 0 }), action(-1), effecting(false), pending(false),
+						 still(0)
 	{}
 
 	void PetLook::draw(double viewx, double viewy, float alpha) const
 	{
 		Point<int16_t> absp = phobj.get_absolute(viewx, viewy, alpha);
 
-		animations[stance].draw(DrawArgument(absp, flip), alpha);
+		if (action >= 0)
+			acting.draw(DrawArgument(absp, flip), alpha);
+		else
+			animations[stance].draw(DrawArgument(absp, flip), alpha);
+
+		if (effecting)
+			effect.draw(DrawArgument(absp), alpha);
+
 		namelabel.draw(absp);
+		balloon.draw(absp - Point<int16_t>(0, animations[Stance::STAND].get_origin().y()));
 	}
 
 	std::optional<move_path::Path> PetLook::update(const Physics &physics, Point<int16_t> charpos)
 	{
 		static const double PETWALKFORCE = 0.35;
 		static const double PETFLYFORCE = 0.2;
+
+		Point<int16_t> before = phobj.get_position();
 
 		if (!local)
 		{
@@ -100,6 +130,7 @@ namespace ms
 			phobj.move();
 
 			animations[stance].update();
+			update_acting(before);
 
 			return std::nullopt;
 		}
@@ -180,6 +211,7 @@ namespace ms
 		physics.move_object(phobj);
 
 		animations[stance].update();
+		update_acting(before);
 
 		// A pet left behind comes back by teleport (4), as a summon does.
 		if (teleported)
@@ -200,9 +232,139 @@ namespace ms
 		return std::nullopt;
 	}
 
+	void PetLook::update_acting(Point<int16_t> before)
+	{
+		balloon.update();
+
+		if (effecting && effect.update())
+			effecting = false;
+
+		if (phobj.get_position() != before)
+		{
+			still = 0;
+			action = -1;
+
+			return;
+		}
+
+		still += Constants::TIMESTEP;
+
+		if (action >= 0)
+		{
+			// Its own animations play once; a base one holds until it moves.
+			if (acting.update() && action >= static_cast<int16_t>(pets::BASE_ACTIONS.size()))
+				action = -1;
+		}
+		else if (pets::idle_due(still, Constants::TIMESTEP) && Randomizer().next_bool())
+		{
+			const PetData &data = PetData::get(itemid);
+
+			if (!data.get_idle().empty())
+				act(pick(3, data.get_idle(), data.get_customs()), false);
+		}
+	}
+
 	void PetLook::send_movement(const std::vector<Movement> &movements)
 	{
 		shown.receive(movements);
+	}
+
+	bool PetLook::act(const Said &said, bool styled)
+	{
+		if (said.action < 0)
+			return false;
+
+		const PetData &data = PetData::get(itemid);
+
+		// A hanging pet keeps hanging (any action becomes 8). HC shows no
+		// walking (0) on a pet standing still.
+		if (stance != Stance::HANG && said.action > 0)
+		{
+			std::string strid = std::to_string(itemid);
+			std::string actname = pets::action_name(said.action, data.get_customs());
+			nl::node src = nl::nx::item["Pet"][strid + ".img"][actname];
+
+			if (src.size() > 0)
+			{
+				acting = src;
+				action = said.action;
+			}
+
+			// A command's answer plays the pet's sound for its own actions.
+			if (said.type == 0 && said.action >= static_cast<int16_t>(pets::BASE_ACTIONS.size()))
+				Sound(nl::nx::sound["Pet.img"][strid][actname]).play();
+		}
+
+		if (!said.text.empty())
+		{
+			balloon = ChatBalloon("pet/" + std::to_string(styled ? data.get_balloon() : 0), false);
+			balloon.change_text(said.text);
+		}
+
+		return true;
+	}
+
+	std::optional<pets::Heard> PetLook::hear(const std::string &line, int16_t level)
+	{
+		if (!local || pending || still < 500 || action >= static_cast<int16_t>(pets::BASE_ACTIONS.size()))
+			return std::nullopt;
+
+		const PetData &data = PetData::get(itemid);
+		std::optional<pets::Heard> heard = pets::hear(line, name, data.get_kind(), level, data.get_commands());
+
+		if (heard)
+			pending = true;
+
+		return heard;
+	}
+
+	std::optional<PetLook::Said> PetLook::answer(uint8_t command, bool obeyed, bool styled, int16_t level)
+	{
+		pending = false;
+
+		const PetData &data = PetData::get(itemid);
+		const std::vector<pets::Command> &commands = data.get_commands();
+
+		if (command >= commands.size() || level < commands[command].min || level > commands[command].max)
+			return std::nullopt;
+
+		const std::vector<pets::Reaction> &list = obeyed ? commands[command].success : commands[command].fail;
+
+		if (list.empty())
+			return std::nullopt;
+
+		Said said = pick(0, list, data.get_customs());
+
+		if (!act(said, styled))
+			return std::nullopt;
+
+		return said;
+	}
+
+	void PetLook::show_effect(uint8_t kind)
+	{
+		nl::node src = nl::nx::effect["PetEff.img"];
+
+		switch (kind)
+		{
+			case 0:
+				effect = src["Basic"]["LevelUp"];
+				Sound(Sound::Name::LEVELUP).play();
+				break;
+			case 1:
+				effect = src["Basic"]["Teleport"];
+				break;
+			case 2:
+				effect = src[std::to_string(itemid)]["warp"];
+				break;
+			case 3:
+				effect = src["Basic"]["Evolution"];
+				break;
+			default:
+				return;
+		}
+
+		effecting = true;
 	}
 
 	void PetLook::set_position(int16_t x, int16_t y)

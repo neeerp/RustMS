@@ -57,6 +57,20 @@ namespace ms
 		void handle(InPacket& recv) const override;
 	};
 
+	// A pet's action and line, as its owner's client showed them
+	// Opcode: PET_CHAT(171)
+	class PetChatHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
+	// Whether the player's pet obeyed a command, or liked its food
+	// Opcode: PET_COMMAND(174)
+	class PetCommandHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
 	// Move a character
 	// Opcode: CHAR_MOVED(185)
 	class CharMovedHandler : public PacketHandler

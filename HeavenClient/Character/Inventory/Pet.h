@@ -28,6 +28,8 @@ namespace ms
 		Pet(int32_t item_id, int64_t expiration, const std::string &name, uint8_t level, uint16_t closeness,
 			uint8_t fullness);
 
+		uint8_t get_level() const;
+
 	private:
 		int32_t item_id;
 		int64_t expiration;

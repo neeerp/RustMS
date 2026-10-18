@@ -225,6 +225,10 @@ namespace ms
 		// Obtain a reference to the player's inventory.
 		const Inventory &get_inventory() const;
 
+		// The player's pets hear a chat line, and each one it commands asks
+		// the server whether it obeys (FUN_00704d5d).
+		void command_pets(const std::string &line);
+
 		// Obtain a reference to the player's skills.
 		SkillBook &get_skills();
 

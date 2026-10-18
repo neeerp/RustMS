@@ -120,6 +120,73 @@ void spawn_player_pets()
 	require(ms::PetParser::parse_pets(empty).empty() && empty.read_int() == 5, "no pets is a lone 0");
 }
 
+void words()
+{
+	using ms::pets::split_words;
+	using Words = std::vector<std::string>;
+
+	require(split_words("Sleep|Sleepy|Doze|Tired") == Words{ "Sleep", "Sleepy", "Doze", "Tired" }, "split on bars");
+	require(split_words(" Hungry? | Food? ") == Words{ "Hungry? ", "Food?" },
+			"trimmed in front, and the last at the back too");
+	require(split_words("Poo") == Words{ "Poo" }, "a single word");
+	require(split_words("a||b") == Words{ "a", "", "b" }, "an empty word is kept between bars");
+	require(split_words("  ").empty() && split_words("a|").size() == 1, "nothing after the last bar adds nothing");
+	require(ms::pets::trim("\t Tom! \r\n") == "Tom!", "trim strips spaces, tabs and line breaks");
+}
+
+void hearing()
+{
+	using ms::pets::Command;
+	using ms::pets::hear;
+
+	std::vector<Command> commands = {
+		{ 1, 9, { "Hungry?", "Food?" }, {}, {} },
+		{ 10, 30, { "Hungry?", "Food?" }, {}, {} },
+		{ 1, 30, { "Sleep", "Doze" }, {}, {} },
+	};
+
+	auto heard = hear("  Sleep ", "Baby Tiger", "Baby Tiger", 1, commands);
+	require(heard && heard->command == 2 && !heard->named, "a word anywhere in the list, trimmed");
+	require(!hear("sleep", "Baby Tiger", "Baby Tiger", 1, commands), "case counts");
+	require(!hear("Sleep now", "Baby Tiger", "Baby Tiger", 1, commands), "the whole line must be the word");
+
+	heard = hear("Food?", "Baby Tiger", "Baby Tiger", 12, commands);
+	require(heard && heard->command == 1, "the entry for the pet's level");
+	require(!hear("Food?", "Baby Tiger", "Baby Tiger", 31, commands), "no entry past its levels");
+
+	heard = hear("Tom! ,~ Doze", "Tom", "Baby Tiger", 5, commands);
+	require(heard && heard->command == 2 && heard->named, "a renamed pet called by name");
+	heard = hear("TomDoze", "Tom", "Baby Tiger", 5, commands);
+	require(heard && heard->named, "no space needed after the name");
+	require(!hear("Baby Tiger Doze", "Baby Tiger", "Baby Tiger", 5, commands), "a kind's own name doesn't call it");
+	require(!hear("Tom", "Tom", "Baby Tiger", 5, commands), "the name alone isn't a command");
+}
+
+void actions()
+{
+	using ms::pets::action;
+	using ms::pets::action_name;
+	using ms::pets::reserved;
+
+	std::vector<std::string> customs = { "angry", "chat", "fly", "love" };
+
+	require(action("move", customs) == 0 && action("rest0", customs) == 6 && action("hang", customs) == 8,
+			"the base actions");
+	require(action("fly", customs) == 4, "a base name wins over the pet's own");
+	require(action("angry", customs) == 9 && action("love", customs) == 12, "the pet's own follow");
+	require(action("say", customs) == -1 && action("stand", customs) == -1, "one it lacks is -1");
+	require(action_name(6, customs) == "rest0" && action_name(10, customs) == "chat", "and back");
+	require(action_name(-1, customs).empty() && action_name(13, customs).empty(), "none for none");
+
+	require(reserved("info") && reserved("Interact") && reserved("stand1") && reserved("autoSpeaking"),
+			"the image's other children");
+	require(!reserved("move") && !reserved("fly") && !reserved("love"), "animations are not");
+
+	require(!ms::pets::idle_due(4992, 8) && ms::pets::idle_due(5000, 8) && !ms::pets::idle_due(5008, 8),
+			"once at 5 s");
+	require(ms::pets::idle_due(10000, 8), "and every 5 s after");
+}
+
 int main()
 {
 	try
@@ -128,6 +195,9 @@ int main()
 		summoning();
 		stances();
 		spawn_player_pets();
+		words();
+		hearing();
+		actions();
 
 		std::cout << "Pets passed\n";
 		return 0;

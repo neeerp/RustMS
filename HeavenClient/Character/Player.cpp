@@ -1108,6 +1108,18 @@ namespace ms
 		return inventory;
 	}
 
+	void Player::command_pets(const std::string &line)
+	{
+		for (PetLook &pet : pets)
+		{
+			if (!pet.get_itemid())
+				continue;
+
+			if (std::optional<pets::Heard> heard = pet.hear(line, inventory.get_pet_level(pet.get_serial())))
+				PetCommandPacket(pet.get_serial(), heard->named, heard->command).dispatch();
+		}
+	}
+
 	SkillBook &Player::get_skills()
 	{
 		return skillbook;

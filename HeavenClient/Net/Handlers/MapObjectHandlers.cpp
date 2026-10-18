@@ -29,6 +29,7 @@
 #include "../../Gameplay/Stage.h"
 #include "../../IO/UI.h"
 #include "../../IO/UITypes/UIChatBar.h"
+#include "../Packets/GameplayPackets.h"
 
 namespace ms
 {
@@ -183,6 +184,52 @@ namespace ms
 			otherchar->send_pet_movement(index, movements);
 	}
 
+	void PetChatHandler::handle(InPacket& recv) const
+	{
+		int32_t cid = recv.read_int();
+		uint8_t index = recv.read_byte();
+		uint8_t type = recv.read_byte();
+		int8_t action = recv.read_byte();
+		std::string text = recv.read_string();
+		bool styled = recv.read_bool();
+
+		if (Optional<Char> character = Stage::get().get_character(cid))
+			if (Optional<PetLook> pet = character->get_pet(index))
+				pet->act({ type, action, text }, styled);
+	}
+
+	void PetCommandHandler::handle(InPacket& recv) const
+	{
+		int32_t cid = recv.read_int();
+
+		// Another's pet isn't in this player's Cash tab, so it has no level
+		// and answers nothing (FUN_00703b69).
+		if (!Stage::get().is_player(cid))
+			return;
+
+		uint8_t index = recv.read_byte();
+
+		// 1 answers food, which HC doesn't feed yet.
+		if (recv.read_byte() != 0)
+			return;
+
+		uint8_t command = recv.read_byte();
+		bool obeyed = recv.read_bool();
+		bool styled = recv.read_bool();
+
+		Player& player = Stage::get().get_player();
+		Optional<PetLook> pet = player.get_pet(index);
+
+		if (!pet)
+			return;
+
+		int16_t level = player.get_inventory().get_pet_level(pet->get_serial());
+
+		// The others see what it did when the server passes this on.
+		if (std::optional<PetLook::Said> said = pet->answer(command, obeyed, styled, level))
+			PetChatPacket(pet->get_serial(), said->type, said->action, said->text).dispatch();
+	}
+
 	void CharMovedHandler::handle(InPacket& recv) const
 	{
 		int32_t cid = recv.read_int();
@@ -251,6 +298,15 @@ namespace ms
 		else if (effect == 13) // card effect
 		{
 			Stage::get().show_character_effect(cid, CharEffect::MONSTER_CARD);
+		}
+		else if (effect == 4) // a pet effect
+		{
+			uint8_t kind = recv.read_byte();
+			uint8_t index = recv.read_byte();
+
+			if (Optional<Char> character = Stage::get().get_character(cid))
+				if (Optional<PetLook> pet = character->get_pet(index))
+					pet->show_effect(kind);
 		}
 		else if (effect == 2) // a party member's skill reached them
 		{

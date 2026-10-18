@@ -290,6 +290,36 @@ namespace ms
 		}
 	};
 
+	// Opcode: PET_CHAT(168)
+	class PetChatPacket : public OutPacket
+	{
+	public:
+		// What the player's pet did and said, for the others to see
+		// (FUN_007055e2). Its base actions go as 0.
+		PetChatPacket(int64_t serial, uint8_t type, int16_t action, const std::string& text)
+			: OutPacket(OutPacket::Opcode::PET_CHAT)
+		{
+			write_long(serial);
+			write_byte(type);
+			write_byte(static_cast<int8_t>(action < 9 ? 0 : action));
+			write_string(text);
+		}
+	};
+
+	// Opcode: PET_COMMAND(169)
+	class PetCommandPacket : public OutPacket
+	{
+	public:
+		// The player gave their pet a command in chat (FUN_00704d5d),
+		// `named` when they called it by name.
+		PetCommandPacket(int64_t serial, bool named, uint8_t command) : OutPacket(OutPacket::Opcode::PET_COMMAND)
+		{
+			write_long(serial);
+			write_byte(named);
+			write_byte(command);
+		}
+	};
+
 	// Shows the player's emote to the rest of the map
 	// Opcode: FACE_EXPRESSION(51)
 	class FaceExpressionPacket : public OutPacket

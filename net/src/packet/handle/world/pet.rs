@@ -85,7 +85,7 @@ impl WorldHandler for PetCommandHandler {
         let mut r = Cursor::new(&packet.bytes);
         r.read_short()?;
         let serial = r.read_long()?;
-        r.read_byte()?;
+        let named = r.read_byte()? != 0;
         let command = r.read_byte()?;
         let roll = rand::thread_rng().gen_range(0, 100);
         let known = |item_id| {
@@ -95,11 +95,20 @@ impl WorldHandler for PetCommandHandler {
         let Some(done) = command_pet(ctx.player, serial, known, roll) else {
             return Ok(HandlerResult::empty());
         };
+        ctx.player.pets_named.retain(|&pet| pet != serial);
+        if named {
+            ctx.player.pets_named.push(serial);
+        }
         let owner = ctx.player.id();
         // The answer goes first: the client checks the command's levels
         // against the pet's level before the item update raises it.
-        let mut result =
-            HandlerResult::reply(build_pet_command(owner, done.index, command, done.obeyed)?);
+        let mut result = HandlerResult::reply(build_pet_command(
+            owner,
+            done.index,
+            command,
+            done.obeyed,
+            named,
+        )?);
         if !done.changes.is_empty() {
             result = result.with_reply(build_inventory_operation(false, &done.changes)?);
         }
@@ -183,7 +192,10 @@ impl WorldHandler for PetChatHandler {
         let Some(index) = index.filter(|_| text.len() <= PET_CHAT_MAX) else {
             return Ok(HandlerResult::empty());
         };
-        let shown = build_pet_chat(ctx.player.id(), index as u8, kind, action, &text)?;
+        // 0xA8 doesn't say how the owner's client showed the line; a
+        // command's answer (kind 0) takes the style its 174 had.
+        let styled = kind == 0 && ctx.player.pets_named.contains(&serial);
+        let shown = build_pet_chat(ctx.player.id(), index as u8, kind, action, &text, styled)?;
         Ok(HandlerResult::empty().with(WorldAction::Field(FieldRequest::Broadcast(shown))))
     }
 }

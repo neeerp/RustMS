@@ -172,7 +172,7 @@ async fn a_pet_comes_out_follows_its_owner_and_stays_out() {
         assert_eq!(r.read_int().unwrap(), owner_id);
         assert_eq!(r.read_bytes(3).unwrap(), [0, 0, CUTE], "pet 0, command");
         let obeyed = r.read_byte().unwrap() == 1;
-        assert_eq!(r.read_byte().unwrap(), 0);
+        assert_eq!(r.read_byte().unwrap(), 1, "called by name");
         if !obeyed {
             continue;
         }
@@ -199,14 +199,15 @@ async fn a_pet_comes_out_follows_its_owner_and_stays_out() {
     assert_eq!(seen[..4], owner_id.to_le_bytes());
     assert_eq!(seen[4..], [4, 0, 0]);
 
-    // What its owner's client showed it say, the others see.
+    // What its owner's client showed it say, the others see, in the pet's
+    // own balloon since the command called it by name.
     send(o, pet_chat(cash_id, 12, "Ahh")).await;
     let said = next(w, &mut wt, SendOpcode::PetChat).await;
     let mut r = Cursor::new(&said[..]);
     assert_eq!(r.read_int().unwrap(), owner_id);
     assert_eq!(r.read_bytes(3).unwrap(), [0, 0, 12], "pet 0, kind, action");
     assert_eq!(r.read_str_with_length().unwrap(), "Ahh");
-    assert_eq!(r.read_byte().unwrap(), 0);
+    assert_eq!(r.read_byte().unwrap(), 1, "its own balloon");
 
     // Summoned again, it goes back.
     send(o, spawn_pet(1)).await;

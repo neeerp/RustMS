@@ -352,6 +352,8 @@ add_executable(HeavenClient
     Data/CashCatalog.h
     Data/JobData.cpp
     Data/JobData.h
+    Data/PetData.cpp
+    Data/PetData.h
     Data/SkillData.cpp
     Data/SkillData.h
     Data/SwindleData.cpp

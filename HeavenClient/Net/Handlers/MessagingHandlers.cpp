@@ -608,7 +608,15 @@ namespace ms
 	{
 		int8_t mode1 = recv.read_byte();
 
-		if (mode1 == 3)
+		if (mode1 == 4)
+		{
+			// A pet effect on one of the player's pets, such as its level-up.
+			uint8_t kind = recv.read_byte();
+
+			if (Optional<PetLook> pet = Stage::get().get_player().get_pet(recv.read_byte()))
+				pet->show_effect(kind);
+		}
+		else if (mode1 == 3)
 		{
 			// Quest item gains and losses: a count, then an item id and quantity for each,
 			// shown as one grey chat line per item (chat type 7).

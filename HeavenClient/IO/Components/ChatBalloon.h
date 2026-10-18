@@ -36,8 +36,8 @@ namespace ms
 		// Player balloon in a numbered UI.nx/ChatBalloon.img style (0 is the default).
 		ChatBalloon(int8_t type);
 
-		// Balloon in a named style such as "npc"; NPC lines keep their #b/#k
-		// markup. Lines wrap at `wrap_width` pixels.
+		// Balloon in a named style such as "npc", or a path such as "pet/40";
+		// NPC lines keep their #b/#k markup. Lines wrap at `wrap_width` pixels.
 		ChatBalloon(const std::string &style, bool formatted, uint16_t wrap_width = WRAP_WIDTH);
 
 		ChatBalloon();

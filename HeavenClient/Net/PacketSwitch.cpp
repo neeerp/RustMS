@@ -116,6 +116,8 @@ namespace ms
 		/// MapObject
 		SPAWN_PET = 168,
 		MOVE_PET = 170,
+		PET_CHAT = 171,
+		PET_COMMAND = 174,
 		CHAR_MOVED = 185,
 		SPAWN_SUMMON = 175,
 		REMOVE_SUMMON = 176,
@@ -236,6 +238,8 @@ namespace ms
 		emplace<REMOVE_CHAR, RemoveCharHandler>();
 		emplace<SPAWN_PET, SpawnPetHandler>();
 		emplace<MOVE_PET, MovePetHandler>();
+		emplace<PET_CHAT, PetChatHandler>();
+		emplace<PET_COMMAND, PetCommandHandler>();
 		emplace<SPAWN_NPC, SpawnNpcHandler>();
 		emplace<REMOVE_NPC, RemoveNpcHandler>();
 		emplace<SPAWN_NPC_C, SpawnNpcControllerHandler>();

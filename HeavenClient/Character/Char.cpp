@@ -590,8 +590,16 @@ namespace ms
 
 	void Char::send_pet_movement(uint8_t index, const std::vector<Movement> &movements)
 	{
+		if (Optional<PetLook> pet = get_pet(index))
+			pet->send_movement(movements);
+	}
+
+	Optional<PetLook> Char::get_pet(uint8_t index)
+	{
 		if (index < pets.size() && pets[index].get_itemid())
-			pets[index].send_movement(movements);
+			return pets[index];
+
+		return {};
 	}
 
 	bool Char::is_invincible() const

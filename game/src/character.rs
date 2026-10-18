@@ -177,6 +177,9 @@ pub struct Player {
     /// The cash serials of the summoned pets, in the client's list order;
     /// saved with the pets.
     pub pets: Vec<i64>,
+    /// The pets whose last command called them by name; their answer shows
+    /// in their own chat balloon. Not saved.
+    pub pets_named: Vec<i64>,
     dirty: bool,
 }
 
@@ -207,6 +210,7 @@ impl Player {
             chair: 0,
             guild: None,
             pets: Vec::new(),
+            pets_named: Vec::new(),
             dirty: false,
         }
     }

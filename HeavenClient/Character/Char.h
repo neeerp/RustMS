@@ -35,6 +35,8 @@
 #include "Look/CharLook.h"
 #include "Look/PetLook.h"
 
+#include "../Template/Optional.h"
+
 #include "../Graphics/EffectLayer.h"
 
 #include "../Gameplay/Combat/DamageNumber.h"
@@ -219,6 +221,9 @@ namespace ms
 
 		// MOVE_PET (170): where the pet at `index` went.
 		void send_pet_movement(uint8_t index, const std::vector<Movement> &movements);
+
+		// The pet at `index`, if there is one.
+		Optional<PetLook> get_pet(uint8_t index);
 
 		// Return if the character is facing left
 		bool getflip() const;

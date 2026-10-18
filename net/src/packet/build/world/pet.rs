@@ -76,12 +76,14 @@ pub fn build_move_pet(
 
 /// PET_CHAT (171, FUN_0070476e): the pet at `index` acts and speaks as its
 /// owner's client showed it. `action` 9 and up are the pet's own actions.
+/// A `styled` line shows in the pet's own chat balloon.
 pub fn build_pet_chat(
     owner_id: i32,
     index: u8,
     kind: u8,
     action: u8,
     text: &str,
+    styled: bool,
 ) -> Result<Packet, NetworkError> {
     let mut p = Packet::new_empty();
     p.write_short(SendOpcode::PetChat as i16)?;
@@ -90,18 +92,20 @@ pub fn build_pet_chat(
     p.write_byte(kind)?;
     p.write_byte(action)?;
     p.write_str_with_length(text)?;
-    p.write_byte(0)?; // chat balloon
+    p.write_byte(u8::from(styled))?;
     Ok(p)
 }
 
 /// PET_COMMAND (174, FUN_007048ab) mode 0: whether the pet at `index`
 /// obeyed `command`. Only its owner's client reacts: it picks the action
-/// and line and sends them back as PET_CHAT for the others.
+/// and line and sends them back as PET_CHAT for the others. A pet `named`
+/// in the command answers in its own chat balloon.
 pub fn build_pet_command(
     owner_id: i32,
     index: u8,
     command: u8,
     obeyed: bool,
+    named: bool,
 ) -> Result<Packet, NetworkError> {
     let mut p = Packet::new_empty();
     p.write_short(SendOpcode::PetCommand as i16)?;
@@ -110,7 +114,7 @@ pub fn build_pet_command(
     p.write_byte(0)?;
     p.write_byte(command)?;
     p.write_byte(u8::from(obeyed))?;
-    p.write_byte(0)?; // chat balloon
+    p.write_byte(u8::from(named))?;
     Ok(p)
 }
 
@@ -222,16 +226,16 @@ mod tests {
 
     #[test]
     fn a_pet_obeys_and_speaks() {
-        let packet = build_pet_command(9, 1, 28, true).unwrap();
+        let packet = build_pet_command(9, 1, 28, true, true).unwrap();
         let mut expect = Expect::new(&packet.bytes);
         expect.short(SendOpcode::PetCommand as i16).int(9).byte(1);
-        expect.byte(0).byte(28).byte(1).byte(0);
+        expect.byte(0).byte(28).byte(1).byte(1);
         expect.end();
 
-        let packet = build_pet_chat(9, 1, 0, 12, "Ahh").unwrap();
+        let packet = build_pet_chat(9, 1, 0, 12, "Ahh", true).unwrap();
         let mut expect = Expect::new(&packet.bytes);
         expect.short(SendOpcode::PetChat as i16).int(9).byte(1);
-        expect.byte(0).byte(12).string("Ahh").byte(0);
+        expect.byte(0).byte(12).string("Ahh").byte(1);
         expect.end();
     }
 
