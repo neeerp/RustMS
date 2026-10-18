@@ -69,7 +69,11 @@ namespace ms
 			// What a GM says nearby
 			GM,
 			// Guild chat
-			GUILD
+			GUILD,
+			// Megaphones (v83 chat types 0xd to 0xf)
+			MEGAPHONE,
+			SUPER_MEGAPHONE,
+			ITEM_MEGAPHONE
 		};
 
 		// Who a typed line goes to
@@ -102,6 +106,10 @@ namespace ms
 		UIElement::Type get_type() const override;
 
 		void send_chatline(const std::string &line, LineType type);
+
+		// A megaphone's line, tagged with the speaker's zero-based channel
+		// and whether they can be whispered back.
+		void send_megaphone(const std::string &line, LineType type, int8_t channel, bool ear);
 
 		// item: the name the line gives in place of %s
 		void display_message(Messages::Type line, UIChatBar::LineType type, const std::string &item = "");
@@ -258,9 +266,18 @@ namespace ms
 		struct ChatRow
 		{
 			Text text;
-			bool highlighted;
+			// The strip drawn behind the row, if any
+			Color strip;
+			// A megaphone's first row is tagged with the channel, or -1
+			int8_t channel;
+			bool ear;
 		};
-		// Oldest first; a wrapped GM row keeps its background when old rows leave.
+		// Oldest first; a wrapped row keeps its strip when old rows leave.
 		std::deque<ChatRow> rowtexts;
+		// The channel tags, with and without the ear, and their digits
+		Texture channel_tags[2];
+		Texture channel_digits[10];
+
+		void add_line(const std::string &line, LineType type, int8_t channel, bool ear);
 	};
 }

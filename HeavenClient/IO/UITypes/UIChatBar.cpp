@@ -144,8 +144,19 @@ namespace ms
 
 		// The original fills the whole log with black at half opacity.
 		constexpr float LOG_ALPHA = 0.5f;
-		// It puts GM chat on a white strip of opacity 0xB0 (FUN_008db070).
-		constexpr float GM_ROW_ALPHA = 0xB0 / 255.0f;
+		// It puts GM chat on a white strip of opacity 0xB0, and megaphones on
+		// strips of their own (FUN_008db070).
+		constexpr Color GM_STRIP = Color(0xFFFFFFB0);
+		constexpr Color MEGAPHONE_STRIP = Color(0xCAE7FFB0);
+		constexpr Color SUPER_MEGAPHONE_STRIP = Color(0xFFBFDDCC);
+		constexpr Color ITEM_MEGAPHONE_STRIP = Color(0xFFC600DD);
+
+		// A megaphone's channel tag is drawn this far into its first row,
+		// whose text starts after it (FUN_008dbb93).
+		constexpr Point<int16_t> TAG_POS = Point<int16_t>(4, 2);
+		constexpr Point<int16_t> TENS_POS = Point<int16_t>(15, 4);
+		constexpr Point<int16_t> ONES_POS = Point<int16_t>(20, 4);
+		constexpr int16_t TAG_WIDTH = 38;
 
 		// The input field, from the status bar's top left
 		constexpr Rectangle<int16_t> CHATFIELD = Rectangle<int16_t>(87, 530, 5, 25);
@@ -186,6 +197,14 @@ namespace ms
 			saved_height = LOG_HEIGHT;
 
 		set_log_height(saved_height);
+
+		nl::node megaphone = NxFiles::ui_classic["UIWindow.img"]["Megaphone"];
+
+		for (size_t i = 0; i < 2; i++)
+			channel_tags[i] = megaphone["ch" + std::to_string(i)];
+
+		for (size_t i = 0; i < 10; i++)
+			channel_digits[i] = megaphone["Num"][std::to_string(i)];
 
 		nl::node base = NxFiles::ui_classic["StatusBar.img"]["base"];
 		nl::node basic = NxFiles::ui_classic["Basic.img"];
@@ -409,11 +428,28 @@ namespace ms
 
 			int16_t top = logbottom - CHATROWHEIGHT * (i + 1);
 
-			if (rowtexts[row].highlighted)
-				graphics.drawrectangle(position.x(), position.y() + top, LOG_WIDTH - sbwidth, CHATROWHEIGHT, 1.0f,
-									   1.0f, 1.0f, GM_ROW_ALPHA);
+			const ChatRow& shown = rowtexts[row];
+			const Color& strip = shown.strip;
 
-			rowtexts[row].text.draw(position + Point<int16_t>(3, top - TEXT_RAISE));
+			if (!strip.invisible())
+				graphics.drawrectangle(position.x(), position.y() + top, LOG_WIDTH - sbwidth, CHATROWHEIGHT, strip.r(),
+									   strip.g(), strip.b(), strip.a());
+
+			int16_t indent = 0;
+
+			if (shown.channel >= 0)
+			{
+				// The channel counts from one, always in two digits.
+				Point<int16_t> origin = position + Point<int16_t>(0, top);
+				int16_t number = shown.channel + 1;
+
+				channel_tags[shown.ear ? 0 : 1].draw(origin + TAG_POS);
+				channel_digits[number / 10 % 10].draw(origin + TENS_POS);
+				channel_digits[number % 10].draw(origin + ONES_POS);
+				indent = TAG_WIDTH;
+			}
+
+			shown.text.draw(position + Point<int16_t>(3 + indent, top - TEXT_RAISE));
 		}
 
 		Point<int16_t> bar = position + get_scrollbar_pos();
@@ -625,7 +661,18 @@ namespace ms
 
 	void UIChatBar::send_chatline(const std::string &line, LineType type)
 	{
+		add_line(line, type, -1, false);
+	}
+
+	void UIChatBar::send_megaphone(const std::string &line, LineType type, int8_t channel, bool ear)
+	{
+		add_line(line, type, channel, ear);
+	}
+
+	void UIChatBar::add_line(const std::string &line, LineType type, int8_t channel, bool ear)
+	{
 		Color::Name color;
+		Color strip;
 
 		switch (type)
 		{
@@ -658,9 +705,22 @@ namespace ms
 				break;
 			case LineType::GM:
 				color = Color::Name::BLACK;
+				strip = GM_STRIP;
 				break;
 			case LineType::GUILD:
 				color = Color::Name::MAUVE;
+				break;
+			case LineType::MEGAPHONE:
+				color = Color::Name::MEGAPHONE;
+				strip = MEGAPHONE_STRIP;
+				break;
+			case LineType::SUPER_MEGAPHONE:
+				color = Color::Name::SUPERMEGAPHONE;
+				strip = SUPER_MEGAPHONE_STRIP;
+				break;
+			case LineType::ITEM_MEGAPHONE:
+				color = Color::Name::ITEMMEGAPHONE;
+				strip = ITEM_MEGAPHONE_STRIP;
 				break;
 			default:
 				color = Color::Name::WHITE;
@@ -670,22 +730,30 @@ namespace ms
 		// The original indents the rows after the first, except for its
 		// notice and error colours.
 		bool indent = type == LineType::UNK0 || type == LineType::WHITE || type == LineType::PARTY ||
-					  type == LineType::BUDDY || type == LineType::WHISPER || type == LineType::GM || type == LineType::GUILD;
+					  type == LineType::BUDDY || type == LineType::WHISPER || type == LineType::GM ||
+					  type == LineType::GUILD || type >= LineType::MEGAPHONE;
 		int16_t width = WRAP_WIDTH - arrows[Arrow::PREV][0].width();
+		// The first row makes room for a channel tag.
+		int16_t room = channel >= 0 ? width - TAG_WIDTH : width;
 
 		auto fit = [&](const std::string& text)
 		{
 			Text measured(Text::Font::A12M, Text::Alignment::LEFT, color, text, MEASURE_WIDTH);
 			size_t count = 0;
 
-			while (count < text.size() && measured.advance(count + 1) <= width)
+			while (count < text.size() && measured.advance(count + 1) <= room)
 				count++;
+
+			room = width;
 
 			return count;
 		};
 
 		for (const auto& row : ChatWrap::wrap(line, indent, fit))
-			rowtexts.push_back({ Text(Text::Font::A12M, Text::Alignment::LEFT, color, row), type == LineType::GM });
+		{
+			rowtexts.push_back({ Text(Text::Font::A12M, Text::Alignment::LEFT, color, row), strip, channel, ear });
+			channel = -1;
+		}
 
 		while (rowtexts.size() > MAX_ROWS)
 			rowtexts.pop_front();

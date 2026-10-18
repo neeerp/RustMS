@@ -189,6 +189,17 @@ knows every client's channel. One exclusive INVENTORY_OPERATION takes the
 megaphone first. Anything refused (too long, too low, an item that isn't
 there, Maple TV) gets only an empty stat change to unlock the client.
 
+HeavenClient shows each line in the chat log (`ServerMessageHandler`,
+`UIChatBar::send_megaphone`) as v83 draws it: plain megaphones in blue on a
+pale blue strip, super and triple ones in purple on pink, item megaphones in
+brown on yellow with `[item name]` after the speaker's name. Every row but
+the plain megaphone's starts with the `UIWindow.img/Megaphone` channel tag
+(`ch0` with the ear, `ch1` without) and the two-digit channel. A triple
+megaphone's later lines take the first line's name. Lines are dropped on
+event maps (`Util/Megaphones.h`); v83 shows them there to GMs, but
+HeavenClient doesn't know who is a GM. It has no megaphone dialogs yet: the
+items can't be used from the Cash tab.
+
 ### Chalkboard
 
 A chalkboard (537xxxx, `world/chalkboard.rs`) is used through USE_CASH_ITEM
