@@ -635,15 +635,36 @@ namespace ms
 		quads.emplace_back(rect.left(), rect.right(), rect.top(), rect.bottom(), offset, color, angle);
 	}
 
+	namespace
+	{
+		// The font #e switches to; v83 picks a dialog font by colour and
+		// boldness. Fonts without a bold keep their own.
+		Text::Font bold_font(Text::Font id)
+		{
+			switch (id)
+			{
+				case Text::Font::A11M:
+					return Text::Font::A11B;
+				case Text::Font::A12M:
+					return Text::Font::A12B;
+				case Text::Font::A13M:
+					return Text::Font::A13B;
+				default:
+					return id;
+			}
+		}
+	}
+
 	Text::Layout
 	GraphicsGL::createlayout(const std::string &text, Text::Font id, Text::Alignment alignment, int16_t maxwidth,
 							 bool formatted, int16_t line_adj, const std::vector<Point<int16_t>> &boxes)
 	{
 		const Font &font = fonts[id];
+		const Font &bold = fonts[bold_font(id)];
 
-		return layout_text(text, font.linespace(), [&font](char32_t c)
+		return layout_text(text, font.linespace(), [&font, &bold](char32_t c, bool is_bold)
 		{
-			return font.glyph(c).ax;
+			return (is_bold ? bold : font).glyph(c).ax;
 		}, alignment, maxwidth, formatted, line_adj, boxes);
 	}
 
@@ -706,6 +727,7 @@ namespace ms
 					wordcolor = Color::colors[colorid];
 
 				Color abscolor = color * Color(wordcolor[0], wordcolor[1], wordcolor[2], 1.0f);
+				const Font &wordfont = fonts[word.bold ? bold_font(id) : id];
 
 				for (size_t pos = word.first; pos < word.last; ++pos)
 				{
@@ -728,7 +750,7 @@ namespace ms
 					if (Utf8::decode(text, pos, c) == 0)
 						continue;
 
-					const Font::Char &ch = font.glyph(c);
+					const Font::Char &ch = wordfont.glyph(c);
 
 					// The layout already places every character, including giving a
 					// wrapped line's leading space no width, so use its advances

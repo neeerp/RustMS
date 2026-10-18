@@ -62,7 +62,9 @@ applied, and apply nothing if the player no longer has them. Answers are matched
 
 Text comes from the [server content pack](./server-content.md) with
 placeholders. HeavenClient expands NPC text markup (`Util/NpcTextMarkup.h`:
-`#h`, `#p`, `#t`/`#z`, `#o`, `#m`).
+`#h`, `#p`, `#t`/`#z`, `#o`, `#m`). The text layout (`Graphics/TextLayout.cpp`)
+handles the colours (`#k`, `#b`, `#g`, `#r`, `#c`, `#d`) and bold: `#e` switches
+to the bold of the text's font and `#n` back.
 
 The dialog (`UINpcTalk`) is the v83 `UtilDlgEx` window from `UIClassic.nx`,
 laid out from period footage. It is centred on the screen, and its middle

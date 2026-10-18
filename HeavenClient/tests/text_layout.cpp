@@ -10,13 +10,13 @@ void require(bool condition, const char* message)
 
 namespace
 {
-	// 6 px per character, the ellipsis 12, anything else 7.
-	int16_t advance(char32_t c)
+	// 6 px per character, the ellipsis 12, anything else 7; bold adds 1.
+	int16_t advance(char32_t c, bool bold)
 	{
 		if (c == 0x2026)
-			return 12;
+			return 12 + bold;
 
-		return c < 128 ? 6 : 7;
+		return (c < 128 ? 6 : 7) + bold;
 	}
 
 	ms::Text::Layout layout(const std::string &text, int16_t maxwidth, const std::vector<ms::Point<int16_t>> &boxes = {})
@@ -62,6 +62,20 @@ int main()
 		auto box = layout("\x01" "ab", 12, {{40, 10}});
 		require(line_count(box) == 2 && box.box(0).x() == 0, "a box wider than the line sits alone");
 		require(layout("a", 3).advance(1) == 6, "a lone character wider than the line is still placed");
+
+		// #e makes text bold until #n: wider, and drawn in the bold font.
+		auto bold = layout("#ea b#nc", 100);
+		auto bold_at = [&bold](size_t pos)
+		{
+			for (const auto &line : bold)
+				for (const auto &word : line.words)
+					if (word.first <= pos && pos < word.last)
+						return word.bold;
+
+			throw std::runtime_error("no word holds the character");
+		};
+		require(bold.advance(4) == 14 && bold.advance(7) == 21 && bold.width() == 27, "bold characters are wider");
+		require(bold_at(2) && bold_at(4) && !bold_at(7), "words between #e and #n are bold");
 
 		std::cout << "text layout tests passed\n";
 		return 0;

@@ -27,7 +27,7 @@ namespace ms
 		{
 		public:
 			LayoutBuilder(const std::string &text, int16_t linespace,
-						  const std::function<int16_t(char32_t)> &advance, Text::Alignment alignment,
+						  const std::function<int16_t(char32_t, bool)> &advance, Text::Alignment alignment,
 						  int16_t maxwidth, bool formatted, int16_t line_adj,
 						  const std::vector<Point<int16_t>> &boxes);
 
@@ -36,7 +36,7 @@ namespace ms
 			Text::Layout finish(size_t first, size_t last);
 
 		private:
-			void add_word(size_t first, size_t last, Text::Font font, Color::Name color);
+			void add_word(size_t first, size_t last, Text::Font font, Color::Name color, bool bold);
 
 			void add_line();
 
@@ -46,11 +46,12 @@ namespace ms
 
 			const std::string &text;
 			int16_t linespace;
-			const std::function<int16_t(char32_t)> &advance;
+			const std::function<int16_t(char32_t, bool)> &advance;
 
 			Text::Alignment alignment;
 			Text::Font fontid;
 			Color::Name color;
+			bool bold;
 			int16_t maxwidth;
 			bool formatted;
 
@@ -72,7 +73,7 @@ namespace ms
 			int16_t line_top;
 		};
 
-		LayoutBuilder::LayoutBuilder(const std::string &t, int16_t ls, const std::function<int16_t(char32_t)> &adv,
+		LayoutBuilder::LayoutBuilder(const std::string &t, int16_t ls, const std::function<int16_t(char32_t, bool)> &adv,
 									 Text::Alignment a, int16_t mw, bool fm, int16_t la,
 									 const std::vector<Point<int16_t>> &b) : text(t), linespace(ls), advance(adv),
 																			 alignment(a), maxwidth(mw), formatted(fm),
@@ -80,6 +81,7 @@ namespace ms
 		{
 			fontid = Text::Font::NUM_FONTS;
 			color = Color::Name::NUM_COLORS;
+			bold = false;
 			ax = 0;
 			ay = linespace;
 			width = 0;
@@ -103,6 +105,7 @@ namespace ms
 
 			Text::Font last_font = fontid;
 			Color::Name last_color = color;
+			bool last_bold = bold;
 			size_t skip = 0;
 			bool linebreak = false;
 
@@ -153,6 +156,12 @@ namespace ms
 								case 'd':
 									color = Color::Name::SCRIPTPURPLE;
 									break;
+								case 'e':
+									bold = true;
+									break;
+								case 'n':
+									bold = false;
+									break;
 								case 'w':
 									// v83's "show at once" toggle (FUN_0099dd54);
 									// the NPC dialog acts on it.
@@ -198,7 +207,7 @@ namespace ms
 			bool newline = linebreak || ax > 0 && ax + wordwidth > maxwidth;
 
 			if (newword || newline)
-				add_word(prev, first, last_font, last_color);
+				add_word(prev, first, last_font, last_color, last_bold);
 
 			if (newline)
 			{
@@ -246,7 +255,7 @@ namespace ms
 
 		Text::Layout LayoutBuilder::finish(size_t first, size_t last)
 		{
-			add_word(first, last, fontid, color);
+			add_word(first, last, fontid, color, bold);
 			add_line();
 
 			advances.push_back(ax);
@@ -274,13 +283,13 @@ namespace ms
 			if (Utf8::decode(text, pos, codepoint) == 0)
 				return 0;
 
-			return advance(codepoint);
+			return advance(codepoint, bold);
 		}
 
 		void LayoutBuilder::add_word(size_t word_first, size_t word_last, Text::Font word_font,
-									 Color::Name word_color)
+									 Color::Name word_color, bool word_bold)
 		{
-			words.push_back({word_first, word_last, word_font, word_color});
+			words.push_back({word_first, word_last, word_font, word_color, word_bold});
 		}
 
 		void LayoutBuilder::add_line()
@@ -308,7 +317,7 @@ namespace ms
 	}
 
 	Text::Layout layout_text(const std::string &text, int16_t linespace,
-							 const std::function<int16_t(char32_t)> &advance, Text::Alignment alignment,
+							 const std::function<int16_t(char32_t, bool)> &advance, Text::Alignment alignment,
 							 int16_t maxwidth, bool formatted, int16_t line_adj,
 							 const std::vector<Point<int16_t>> &boxes)
 	{
