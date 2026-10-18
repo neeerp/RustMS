@@ -20,8 +20,8 @@ collision code. It also checks that releasing an arrow in midair preserves
 speed and that takeoff and landing update the grounded flag immediately. Its
 shoe cases check the player's v83 numbers: walking acceleration and stopping
 distance, standing-jump height and airtime, the running-jump kick, air
-steering, the 670 px/s fall cap, the down-jump hop and range, and the
-knockback arc and how queued pushes add to a walking speed.
+steering, the 670 px/s fall cap, the down-jump hop and range, a
+`forbidFallDown` platform refusing the down-jump, and the knockback arc and how queued pushes add to a walking speed.
 
 `frame_assembler_tests` covers the network receive loop (`Net/FrameAssembler.h`,
 used by `Session`): every split point of a multi-frame stream, a partial

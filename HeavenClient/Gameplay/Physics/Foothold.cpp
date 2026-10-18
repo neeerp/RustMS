@@ -24,11 +24,17 @@ namespace ms
 	Foothold::Foothold(nl::node src, uint16_t id, uint8_t ly, uint16_t gr) : m_prev(src["prev"]), m_next(src["next"]),
 																m_horizontal(src["x1"], src["x2"]),
 																m_vertical(src["y1"], src["y2"]), m_id(id), m_layer(ly),
-																m_group(gr)
+																m_group(gr),
+																m_forbid_fall_down(src["forbidFallDown"].get_integer() != 0)
 	{}
 
 	Foothold::Foothold() : m_id(0), m_layer(0), m_group(0), m_next(0), m_prev(0)
 	{}
+
+	bool Foothold::forbid_fall_down() const
+	{
+		return m_forbid_fall_down;
+	}
 
 	uint16_t Foothold::id() const
 	{

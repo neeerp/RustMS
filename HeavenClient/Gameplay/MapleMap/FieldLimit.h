@@ -7,12 +7,14 @@
 
 namespace ms
 {
-	// What a map's fieldLimit stops the v83 client doing with items.
+	// What a map's fieldLimit stops the v83 client doing.
 	namespace field_limit
 	{
+		constexpr int32_t JUMP = 0x1;
 		constexpr int32_t RETURN_SCROLLS = 0x20;
 		constexpr int32_t MAP_SCROLLS = 0x100;
 		constexpr int32_t CONSUMABLES = 0x400;
+		constexpr int32_t DOWN_JUMP = 0x20000;
 		constexpr int32_t DROPS = 0x400000;
 
 		// A return scroll's moveTo for "the nearest town": the map's return map.
@@ -101,6 +103,14 @@ namespace ms
 		inline bool may_drop(int32_t fieldlimit)
 		{
 			return !(fieldlimit & DROPS);
+		}
+
+		// v83 FUN_0094c383 and FUN_0094c4f8: bit 0x1 stops jumping, and bit
+		// 0x20000 the down-jump (Down + Jump), for all but GMs. Down + Jump
+		// never falls back to a plain jump.
+		inline bool may_jump(int32_t fieldlimit, bool down)
+		{
+			return !(fieldlimit & (down ? DOWN_JUMP : JUMP));
 		}
 	}
 }

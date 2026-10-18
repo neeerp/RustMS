@@ -27,6 +27,10 @@ int main()
 		require(may_drop(0x400), "consumable limits leave drops alone");
 		require(!may_drop(0x400000), "bit 0x400000 keeps items on the player");
 
+		require(may_jump(0, false) && may_jump(0, true), "an open map allows both jumps");
+		require(!may_jump(0x1, false) && may_jump(0x1, true), "bit 0x1 stops only the plain jump");
+		require(may_jump(0x20000, false) && !may_jump(0x20000, true), "bit 0x20000 stops only the down-jump");
+
 		require(is_use_item(2000000) && is_use_item(2450000), "potions and the like go as USE_ITEM");
 		require(!is_use_item(2030000) && !is_use_item(2280000) && !is_use_item(2100000),
 				"return scrolls, skill books and summon sacks don't");

@@ -549,7 +549,12 @@ force-and-friction model (`move_normal`).
   else the highest one 300 to 600 px below, is at least 5 px under the feet
   (`FootholdTree::can_jump_down`). `Physics::jump_down` hops up at 196 px/s
   and stores the platform in `phobj.fallstart`. Until the player lands
-  elsewhere or grabs a rope, `update_fh` skips that platform.
+  elsewhere or grabs a rope, `update_fh` skips that platform. As in v83
+  (`FUN_0094c4f8`), a platform with `forbidFallDown` refuses the down-jump
+  from it, though not onto it, and Down + Jump then does nothing at all.
+  A map whose `fieldLimit` has bit 0x20000 refuses the down-jump, and bit
+  0x1 the plain jump (`field_limit::may_jump`). v83 lets GMs past both
+  bits; HeavenClient doesn't know who is a GM.
 - **Knockback.** A hit that does damage, and that the stance roll doesn't
   block, knocks the player away from the mob and up at 270 px/s, or 200 px/s
   under Power Guard. It also knocks the player off ladders and ropes.

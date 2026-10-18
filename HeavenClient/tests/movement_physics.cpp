@@ -19,6 +19,7 @@ void require(bool condition, const char* message)
 struct TestFoothold
 {
 	int64_t group, id, x1, y1, x2, y2, prev, next;
+	int64_t forbid_fall_down = 0;
 };
 
 // A tiny NX fixture holding the given footholds in layer 0. It exercises
@@ -33,7 +34,7 @@ std::filesystem::path foothold_map(std::vector<TestFoothold> footholds)
 			std::make_pair(std::to_string(b.group), std::to_string(b.id));
 	};
 	std::sort(footholds.begin(), footholds.end(), sorted);
-	std::vector<std::string> names {"", "0", "next", "prev", "x1", "x2", "y1", "y2"};
+	std::vector<std::string> names {"", "0", "forbidFallDown", "next", "prev", "x1", "x2", "y1", "y2"};
 	auto name = [&](const std::string& text)
 	{
 		auto found = std::find(names.begin(), names.end(), text);
@@ -47,7 +48,7 @@ std::filesystem::path foothold_map(std::vector<TestFoothold> footholds)
 		if (groups.empty() || groups.back() != fh.group) groups.push_back(fh.group);
 		name(std::to_string(fh.group)); name(std::to_string(fh.id));
 	}
-	size_t count = 2 + groups.size() + 7 * footholds.size();
+	size_t count = 2 + groups.size() + 8 * footholds.size();
 	size_t strings = 64 + count * 20;
 	std::vector<uint8_t> bytes(strings + names.size() * 8);
 	auto put = [&](size_t offset, uint64_t value, size_t count)
@@ -75,10 +76,10 @@ std::filesystem::path foothold_map(std::vector<TestFoothold> footholds)
 	for (size_t i = 0; i < footholds.size(); ++i)
 	{
 		const TestFoothold& fh = footholds[i];
-		size_t leaves = first + footholds.size() + 6 * i;
-		node(first + i, name(std::to_string(fh.id)), leaves, 6, 0, 0);
-		const int64_t values[] = {fh.next, fh.prev, fh.x1, fh.x2, fh.y1, fh.y2};
-		for (size_t j = 0; j < 6; ++j) node(leaves + j, 2 + j, 0, 0, 1, values[j]);
+		size_t leaves = first + footholds.size() + 7 * i;
+		node(first + i, name(std::to_string(fh.id)), leaves, 7, 0, 0);
+		const int64_t values[] = {fh.forbid_fall_down, fh.next, fh.prev, fh.x1, fh.x2, fh.y1, fh.y2};
+		for (size_t j = 0; j < 7; ++j) node(leaves + j, 2 + j, 0, 0, 1, values[j]);
 	}
 	for (size_t i = 0; i < names.size(); ++i)
 	{
@@ -905,6 +906,26 @@ int main()
 				}
 				require(player.hspeed == 0.0, "the walker did not stop");
 			}
+		}
+		std::filesystem::remove(path);
+		// A forbidFallDown floor refuses the down-jump, though a floor above
+		// it can still drop onto it.
+		path = foothold_map({{0, 1, -1000, 100, 1000, 100, 0, 0}, {0, 2, -1000, 250, 1000, 250, 0, 0, 1},
+			{0, 3, -2000, 400, 2000, 400, 0, 0}});
+		{
+			nl::file map(path.string());
+			ms::Physics physics(map.root());
+			ms::PhysicsObject player = grounded_shoe(physics);
+			player.set_flag(ms::PhysicsObject::Flag::CHECKBELOW);
+			physics.move_object(player);
+			require(player.enablejd, "a floor above a forbidFallDown floor refused a down-jump");
+			ms::Physics::jump_down(player);
+			for (int tick = 0; tick < 200 && !player.onground; ++tick)
+				physics.move_object(player);
+			require(player.onground && player.crnt_y() == 250, "the down-jump did not land on the forbidFallDown floor");
+			player.set_flag(ms::PhysicsObject::Flag::CHECKBELOW);
+			physics.move_object(player);
+			require(!player.enablejd, "a forbidFallDown floor allowed a down-jump");
 		}
 		std::filesystem::remove(path);
 		path = foothold_map({
