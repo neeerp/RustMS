@@ -436,7 +436,8 @@ side yet.
 | Storage (`UIStorage`) | Implemented; see `inventory.md` |
 | Continent ships, station wall clocks | Docking ships and the Balrog's ship, CONTI_MOVE/CONTI_STATE, CLOCK kind 1; see `ships.md` |
 | Player shops, mini-games, memo/mail | No UI, no handlers |
-| Pets, mounts, summons, reactors beyond hit/spawn | Partial or absent (`Reactor` TODOs) |
+| Reactors | Spawning, swings, hits and breaking; no skill hits, touch or quest gates; see `combat.md` |
+| Pets, mounts, summons | Partial or absent |
 | Party/guild/boss quests, events, MTS | Absent |
 
 75 outbound opcodes are defined (`Net/OutPacket.h`) and 111 inbound handlers
@@ -676,3 +677,11 @@ These were corrected:
     byte and keeps the key (`Stage::get_field_key`). As in v83, every
     CHANGE_MAP and CHANGE_MAP_SPECIAL starts with that key. Before, they
     started with 0, or with 1 for "died" on the death respawn.
+12. DAMAGE_REACTOR (`0xCD`) wrote the player's position, stance and four
+    zero bytes after the object id. v83 writes the kind of hit (0 a swing,
+    1 a skill), the swing's flags (bit 0 facing left, bit 1 on a foothold)
+    and the delay before the hit lands. HIT_REACTOR (`0x115`) was read as
+    a stance and frame delay; it carries the delay, the event of the old
+    state, and a cooldown. An attack also sent `0xCD` for the nearest reactor
+    it reached, as well as hitting mobs; it now swings at a reactor instead
+    of the mobs. See `combat.md`.

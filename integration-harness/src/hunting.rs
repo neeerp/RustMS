@@ -73,15 +73,15 @@ fn kind_attack(
     p
 }
 
-/// DAMAGE_REACTOR: a plain attack on a reactor, standing at (x, y).
-pub fn hit_reactor(object_id: i32, x: i16, y: i16) -> Packet {
+/// DAMAGE_REACTOR: a swing at a reactor, facing right on a foothold, that
+/// lands after 300 ms.
+pub fn hit_reactor(object_id: i32) -> Packet {
     let mut p = Packet::new_empty();
     p.write_short(RecvOpcode::DamageReactor as i16).unwrap();
     p.write_int(object_id).unwrap();
-    p.write_short(x).unwrap();
-    p.write_short(y).unwrap();
-    p.write_short(0).unwrap();
     p.write_int(0).unwrap();
+    p.write_int(2).unwrap();
+    p.write_short(300).unwrap();
     p.write_int(0).unwrap();
     p
 }

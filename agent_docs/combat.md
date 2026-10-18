@@ -571,28 +571,79 @@ Where HeavenClient differs from v83:
 
 A map's `reactor` nodes (`game_data::MapReactorTemplate`) place reactors such
 as Amherst's scrap boxes; their states come from `Reactor.nx`
-(`game_data::reactors`, following `info/link`). In each state, the first
-event of type 0–2 is what an attack does: it moves the reactor to that
-event's `state`, optionally only for the skills in `activeSkillID`. A state
-without events is the end.
+(`game_data::reactors`, following `info/link`). Each state lists events
+(`<state>/event/<n>`), each with a `type` and the `state` it moves to. A
+state without events is the end.
+
+A basic attack can swing at a reactor instead of attacking mobs. Event
+types 0 to 4 take a swing: 0 any, 1 and 2 only facing right or left, and 3
+and 4 the same but in the air. Of a state's events, a swing sets off the
+first of the best rank (`reactors::swing_rank`, v83 0x736091): a side or
+air event beats a plain one, and a plain one is better on the ground.
 
 The field's `field_reactors::ReactorSet` spawns every reactor on load
 (SPAWN_REACTOR `0x117`, also sent to players entering). DAMAGE_REACTOR
-(`0xCD`) hits one if the player is within 250×200 of it, by the field's idea
-of where they are. A hit that leaves it short of its last state is shown to
-everyone (HIT_REACTOR `0x115`); the hit into the last state removes it
-(REMOVE_REACTOR `0x118` with the state it broke from, which HeavenClient uses
-to play the breaking animation) and the hitter rolls its drops
+(`0xCD`) swings at one if the player is within 250×200 of it, by the
+field's idea of where they are. A hit that leaves it short of its last
+state is shown to everyone (HIT_REACTOR `0x115`, with the event and the
+client's delay); the hit into the last state removes it (REMOVE_REACTOR
+`0x118` with the state it reached) and the hitter rolls its drops
 (`net::loot::roll_reactor`) where it stood. A broken reactor comes back after
 the map's `reactorTime` seconds, under a new object id since HeavenClient
 keeps a broken reactor under its old one; one without a `reactorTime` stays
-broken. With each state's hit animation, including the break, HeavenClient
-plays `Sound/Reactor.img/<id>/<state>/Hit`, with the id unpadded as v83
-formats it.
+broken.
+
+| Op | Direction | Body |
+| --- | --- | --- |
+| 0xCD DAMAGE_REACTOR | client to server | `i32` object id, `i32` kind (0 a swing, 1 a skill), `i32` flags (bit 0 facing left, bit 1 on a foothold), `i16` delay in ms, `i32` skill |
+| 0x115 HIT_REACTOR | server to client | `i32` object id, `u8` new state, `i16` x, y, `u16` delay, `i8` event of the old state (-1 its own hit), `i8` cooldown in 100 ms |
+| 0x118 REMOVE_REACTOR | server to client | `i32` object id, `u8` state reached, `i16` x, y |
+
+The server ignores skill swings (kind 1); only guild quest reactors take
+them.
 
 Reactor drops come from the content pack's table, keyed by reactor id, plus
 `[reactors]` in `reward_overrides.toml`; see `server-content.md`. Reactor
 `action` scripts (`mBoxItem0` and others) are not run.
+
+### Client
+
+HeavenClient's `Reactor` follows v83's FUN_00734688. A swing or a
+HIT_REACTOR waits out its delay, then plays the hit animation of the state
+the reactor left: `<old>/event/<n>/hit`, or `<old>/hit` without one. Then it
+shows the new state. A swing whose event the server hasn't said yet (the
+swinger's own, before HIT_REACTOR) picks it from the old state with the
+swing's flags. REMOVE_REACTOR into a last state waits 400 ms, does the
+same pick with the last swing's flags, plays the animation, and removes
+the reactor when it ends; if no event fits, the reactor just goes. Removed
+in a state it could still leave, a reactor plays no hit and goes when its
+current animation ends. With each hit animation it plays
+`Sound/Reactor.img/<id>/<state>/Hit`, with the id unpadded as v83 formats
+it.
+
+A basic attack swings at a reactor first (`Combat::swing_at_reactor`,
+v83's FUN_0095719b): over the attack's range, it takes at most one reactor
+that is idle, out of its cooldown, and in a state with a swing event. The
+reactors are tried in the order they entered the map. The first whose
+middle passes v83's "in front" test wins, else the last the range reaches.
+Facing left, v83 negates the middle rather than the difference, so the
+test there asks whether the middle is at or left of minus the user's x.
+HeavenClient keeps that.
+A swing sends the attack (`0x2C`, no mobs) and then `0xCD`, and the attack
+hits no mobs. The rules are in `Gameplay/MapleMap/ReactorRules.h` and
+tested in `tests/reactor_rules.cpp`.
+
+One deviation: before every basic attack, v83 checks that no item, stat
+or skill request is waiting on the server and 200 ms have passed since the
+last (`ExclRequest::USE_WAIT`). HeavenClient checks this only before
+swinging at a reactor, so a request the server leaves unanswered can't stop
+a player attacking.
+
+Not yet: skill hits (event type 5 and `0xCD` kind 1) and touching a
+reactor (`0xCE`), which only the Guild Quest's reactors (`6109xxx`) and
+`9222000` use, and events of types 100 and up (an item dropped on a
+reactor, a timeout). v83 also skips a swing at a reactor whose
+`info/quest` isn't in progress, but no v83 reactor has one.
 
 ## Mob attacks
 

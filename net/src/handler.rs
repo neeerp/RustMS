@@ -436,11 +436,12 @@ pub enum FieldRequest {
         loot: crate::loot::Loot,
         vanish: bool,
     },
-    /// Hit the reactor `object_id` with `skill_id` (0 for a plain attack).
+    /// Swing at the reactor `object_id`. The `flags` are bit 0 facing left
+    /// and bit 1 on a foothold; others see the hit `delay` ms later.
     HitReactor {
         object_id: i32,
-        skill_id: i32,
-        stance: i16,
+        flags: i32,
+        delay: u16,
     },
     /// Show the player the info window for `character_id`, who must be on
     /// their map (and may be themselves).

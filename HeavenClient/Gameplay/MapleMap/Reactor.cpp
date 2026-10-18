@@ -17,26 +17,28 @@
 //////////////////////////////////////////////////////////////////////////////////
 #include "Reactor.h"
 
+#include "../../Constants.h"
+
 #include "../Util/Misc.h"
 
 #include <nlnx/nx.hpp>
 
 namespace ms
 {
-	Reactor::Reactor(int32_t o, int32_t r, int8_t s, Point<int16_t> p) : MapObject(o, p), rid(r), state(s)
+	Reactor::Reactor(int32_t o, int32_t r, int8_t s, Point<int16_t> p) : MapObject(o, p), rid(r), state(s), previous(s),
+		phase(Phase::IDLE), deadline(0), cooldown(800), event(UNKNOWN_EVENT), flags(0)
 	{
 		std::string strid = string_format::extend_id(rid, 7);
 		src = nl::nx::reactor[strid + ".img"];
 
-		normal = src[0];
-		animation_ended = true;
-		dead = false;
-		hittable = false;
+		// Some reactors take their states from another.
+		nl::node link = src["info"]["link"];
 
-		for (auto sub : src[0])
-			if (sub.name() == "event")
-				if (sub["0"]["type"].get_integer() == 0)
-					hittable = true;
+		if (link.data_type() == nl::node::type::string)
+			src = nl::nx::reactor[link.get_string() + ".img"];
+
+		animation = src[std::to_string(state)];
+		shift = Animation(src["0"]).get_origin().y();
 
 		// v83 formats the path with "%d/%d", so the id has no leading zeros
 		// (0x6345e0).
@@ -51,9 +53,20 @@ namespace ms
 		}
 	}
 
-	void Reactor::play_hit(int8_t state)
+	std::vector<int32_t> Reactor::event_types(int8_t s) const
 	{
-		auto sound = hitsounds.find(state);
+		std::vector<int32_t> types;
+		nl::node events = src[std::to_string(s)]["event"];
+
+		for (size_t i = 0; events[std::to_string(i)]; i++)
+			types.push_back(events[std::to_string(i)]["type"].get_integer());
+
+		return types;
+	}
+
+	void Reactor::play_hit(int8_t s)
+	{
+		auto sound = hitsounds.find(s);
 
 		if (sound != hitsounds.end())
 			sound->second.play();
@@ -62,67 +75,128 @@ namespace ms
 	void Reactor::draw(double viewx, double viewy, float alpha) const
 	{
 		Point<int16_t> absp = phobj.get_absolute(viewx, viewy, alpha);
-		Point<int16_t> shift = Point<int16_t>(0, normal.get_origin().y());
 
-		if (animation_ended)
-		{
-			// TODO: Handle 'default' animations (horntail reactor floating)
-			normal.draw(absp - shift, alpha);
-		} else
-		{
-			animations.at(state - 1).draw(DrawArgument(absp - shift), 1.0);
-		}
+		// TODO: Handle 'default' animations (horntail reactor floating)
+		animation.draw(absp - Point<int16_t>(0, shift), alpha);
 	}
 
 	int8_t Reactor::update(const Physics &physics)
 	{
+		// A broken reactor is gone; one spawned again comes anew.
+		if (!active)
+			return -1;
+
 		physics.move_object(phobj);
 
-		if (!animation_ended)
-			animation_ended = animations.at(state - 1).update();
+		cooldown = std::max(cooldown - Constants::TIMESTEP, 0);
+		bool ended = animation.update();
 
-		if (animation_ended && dead)
-			deactivate();
+		switch (phase)
+		{
+			case Phase::DELAY:
+			case Phase::DESTROY:
+				if (deadline > 0)
+				{
+					deadline -= Constants::TIMESTEP;
+
+					if (deadline <= 0 && !start_hit())
+					{
+						if (phase == Phase::DESTROY)
+							deactivate();
+
+						phase = Phase::IDLE;
+					} else if (deadline <= 0 && phase == Phase::DELAY)
+					{
+						phase = Phase::HIT;
+					}
+				} else if (phase == Phase::DESTROY && ended)
+				{
+					deactivate();
+				}
+
+				break;
+			case Phase::HIT:
+				if (ended)
+				{
+					animation = src[std::to_string(state)];
+					phase = Phase::IDLE;
+				}
+
+				break;
+			default:
+				break;
+		}
 
 		return phobj.fhlayer;
 	}
 
-	void Reactor::set_state(int8_t state)
+	bool Reactor::start_hit()
 	{
-		if (hittable)
+		// Without the server's word, the swing's own flags pick the event,
+		// from the state it was in before its last hit. Event -1 from the
+		// server is the state's own hit.
+		if (event == UNKNOWN_EVENT)
 		{
-			animations[this->state] = src[this->state]["hit"];
-			animation_ended = false;
-			play_hit(this->state);
+			event = static_cast<int8_t>(reactor_rules::pick_event(event_types(previous), flags));
+
+			if (event < 0)
+				return false;
 		}
 
-		this->state = state;
+		nl::node from = src[std::to_string(previous)];
+		nl::node hit = from["event"][std::to_string(event)]["hit"];
+
+		if (!hit)
+			hit = from["hit"];
+
+		animation = hit;
+		play_hit(previous);
+
+		return true;
 	}
 
-	void Reactor::destroy(int8_t, Point<int16_t>)
+	void Reactor::hit(int8_t s, uint16_t delay, int8_t e, int32_t cool)
 	{
-		animations[this->state] = src[this->state]["hit"];
-		play_hit(this->state);
-		state++;
-		dead = true;
-		animation_ended = false;
+		previous = state;
+		state = s;
+
+		if (phase == Phase::IDLE)
+		{
+			phase = Phase::DELAY;
+			deadline = std::max<int32_t>(delay, 1);
+		}
+
+		event = e;
+		cooldown = cool;
 	}
 
-	bool Reactor::is_hittable() const
+	void Reactor::destroy(int8_t s)
 	{
-		return hittable;
+		previous = state;
+		state = s;
+		phase = Phase::DESTROY;
+		event = UNKNOWN_EVENT;
+		// Breaking plays a hit after 400 ms. Removed in a state it could
+		// still leave, it plays none and goes when its animation ends.
+		deadline = event_types(state).empty() ? 400 : 0;
 	}
 
-	bool Reactor::is_in_range(const Rectangle<int16_t> &range) const
+	void Reactor::swing(int32_t f, uint16_t delay)
 	{
-		if (!active)
-			return false;
+		phase = Phase::DELAY;
+		flags = f;
+		deadline = std::max<int32_t>(delay, 1);
+		event = UNKNOWN_EVENT;
+	}
 
-		Rectangle<int16_t> bounds(Point<int16_t>(-30, -normal.get_dimensions().y()),
-								  Point<int16_t>(normal.get_dimensions().x() - 10,
-												 0)); //normal.get_bounds(); //animations.at(stance).get_bounds();
-		bounds.shift(get_position());
+	reactor_rules::Box Reactor::get_swing_box() const
+	{
+		if (!active || phase != Phase::IDLE || cooldown > 0 || !reactor_rules::swingable(event_types(state)))
+			return {};
 
-		return range.overlaps(bounds);
+		Point<int16_t> corner = get_position() - Point<int16_t>(0, shift) - animation.get_origin();
+		Point<int16_t> size = animation.get_dimensions();
+
+		return { corner.x(), corner.y(), corner.x() + size.x(), corner.y() + size.y() };
 	}
 }

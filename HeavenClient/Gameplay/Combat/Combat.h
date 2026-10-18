@@ -258,6 +258,10 @@ namespace ms
 
 		void draw_rains(double viewx, double viewy, float alpha) const;
 
+		// Swing a basic attack at a reactor in reach instead, if there is
+		// one. Returns whether it did.
+		bool swing_at_reactor();
+
 		// The melee stance a regular ranged attack whacks a mob right in
 		// front of the player with, or NONE to shoot. Either way, `reach` is
 		// how far in front of the player the whack reaches.
@@ -284,7 +288,7 @@ namespace ms
 
 		std::vector<int32_t>
 		find_targets(MapObjects *objs, Rectangle<int16_t> range, Point<int16_t> origin, uint8_t objcount,
-					 bool use_mobs, bool closest_first) const;
+					 bool closest_first) const;
 
 		void apply_use_movement(const SpecialMove &move);
 

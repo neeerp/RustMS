@@ -525,17 +525,20 @@ namespace ms
 		}
 	};
 
+	// Hits a reactor (v83 FUN_007356c7). The kind is 0 for a swing and 1 for
+	// a skill, the flags bit 0 for facing left and bit 1 for standing, and
+	// the delay the ms until the hit lands, for others to see it then.
 	// Opcode: DAMAGE_REACTOR(205)
 	class DamageReactorPacket : public OutPacket
 	{
 	public:
-		// Requests damaging a reactor
-		DamageReactorPacket(int32_t oid, Point<int16_t> position, int16_t stance, int skillid) : OutPacket(OutPacket::Opcode::DAMAGE_REACTOR)
+		DamageReactorPacket(int32_t oid, int32_t kind, int32_t flags, int16_t delay, int32_t skillid)
+			: OutPacket(OutPacket::Opcode::DAMAGE_REACTOR)
 		{
 			write_int(oid);
-			write_point(position);
-			write_short(stance);
-			skip(4);
+			write_int(kind);
+			write_int(flags);
+			write_short(delay);
 			write_int(skillid);
 		};
 	};

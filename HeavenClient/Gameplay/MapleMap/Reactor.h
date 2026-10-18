@@ -20,6 +20,7 @@
 #include <cstdint>
 
 #include "MapObject.h"
+#include "ReactorRules.h"
 
 #include "../Audio/Audio.h"
 #include "../Graphics/Animation.h"
@@ -31,6 +32,10 @@
 
 namespace ms
 {
+	// A reactor plays a hit some time after it is hit, as v83 does
+	// (FUN_00734688): the event it plays is the one the server names, or, if
+	// the hit is the local player's own and the server hasn't answered yet,
+	// one picked here.
 	class Reactor : public MapObject
 	{
 	public:
@@ -38,40 +43,59 @@ namespace ms
 
 		void draw(double viewx, double viewy, float alpha) const override;
 
-		int8_t update(const Physics &physics);
+		int8_t update(const Physics &physics) override;
 
-		void set_state(int8_t state);
+		// The server moved it on to `state` by `event` of the state before,
+		// to play after `delay` ms, and it takes no swing for `cooldown` ms
+		// (0x115).
+		void hit(int8_t state, uint16_t delay, int8_t event, int32_t cooldown);
 
-		void destroy(int8_t state, Point<int16_t> position);
+		// The server removed it in `state` (0x118). If that is its last
+		// state it plays the hit first.
+		void destroy(int8_t state);
 
-		bool is_hittable() const;
+		// The local player swung at it with these flags, to hit it after
+		// `delay` ms.
+		void swing(int32_t flags, uint16_t delay);
 
-		// Check if this mob collides with the specified rectangle.
-		bool is_in_range(const Rectangle<int16_t> &range) const;
+		// Where a swing hits it, or an empty box if it takes none now.
+		reactor_rules::Box get_swing_box() const;
 
 	private:
-		int32_t oid;
-		int32_t rid;
-		int8_t state;
-		//int8_t stance; // TODO: ??
-		// TODO: These are in the GMS client
-		//bool movable; // TODO: Snowball?
-		//int32_t questid;
-		//bool activates_by_touch;
+		enum class Phase
+		{
+			IDLE,
+			// A hit plays when the deadline passes.
+			DELAY,
+			HIT,
+			// Any hit plays when the deadline passes, then it goes.
+			DESTROY
+		};
 
+		// An event not yet named by the server.
+		static constexpr int8_t UNKNOWN_EVENT = -2;
+
+		int32_t rid;
 		nl::node src;
-		std::map<int8_t, Animation> animations;
-		bool animation_ended;
+
+		int8_t state;
+		int8_t previous;
+		Phase phase;
+		int32_t deadline;
+		int32_t cooldown;
+		int8_t event;
+		int32_t flags;
+
+		Animation animation;
+		// The reactor is drawn this far up from its foothold.
+		int16_t shift;
 
 		// Sound/Reactor.img/<id>/<state>/Hit, played with that state's hit
 		// animation.
 		std::map<int8_t, Sound> hitsounds;
 
+		std::vector<int32_t> event_types(int8_t state) const;
+		bool start_hit();
 		void play_hit(int8_t state);
-
-		bool hittable;
-		bool dead;
-
-		Animation normal;
 	};
 }

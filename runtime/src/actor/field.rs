@@ -378,9 +378,9 @@ impl FieldActor {
                 FieldRequest::Throw { loot, vanish } => self.handle_throw(from, loot, vanish),
                 FieldRequest::HitReactor {
                     object_id,
-                    skill_id,
-                    stance,
-                } => self.handle_hit_reactor(from, object_id, skill_id, stance),
+                    flags,
+                    delay,
+                } => self.handle_hit_reactor(from, object_id, flags, delay),
                 FieldRequest::CharInfo { character_id } => {
                     self.handle_char_info(from, character_id)
                 }
@@ -1327,7 +1327,7 @@ impl FieldActor {
 
     /// A player hit a reactor: show its new state, or break it and have the
     /// player's client actor roll its drops.
-    fn handle_hit_reactor(&mut self, from: ClientId, object_id: i32, skill_id: i32, stance: i16) {
+    fn handle_hit_reactor(&mut self, from: ClientId, object_id: i32, flags: i32, delay: u16) {
         let Some(occupant) = self.occupants.get(&from) else {
             return;
         };
@@ -1335,16 +1335,16 @@ impl FieldActor {
         let position = (occupant.avatar.x, occupant.avatar.y);
         match self
             .reactors
-            .hit(object_id, skill_id, position, Instant::now())
+            .hit(object_id, flags, position, Instant::now())
         {
-            Some(Hit::Moved(view)) => {
-                if let Ok(packet) = build_hit_reactor(&view, stance) {
+            Some(Hit::Moved { view, event }) => {
+                if let Ok(packet) = build_hit_reactor(&view, delay, event) {
                     self.broadcast(None, packet);
                 }
             }
             Some(Hit::Broke(view)) => {
-                // The client plays the state's last hit animation as it
-                // removes the reactor.
+                // The client plays the hit animation of the state it
+                // broke from as it removes the reactor.
                 if let Ok(packet) = build_remove_reactor(&view) {
                     self.broadcast(None, packet);
                 }
