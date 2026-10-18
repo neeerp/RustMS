@@ -4,7 +4,9 @@ use crate::handler::{
 use crate::items;
 use crate::loot::Loot;
 use crate::packet::build::world::{inventory, stat};
+use game::inventory::equip_slot;
 use game::{InventoryType, Item, Player};
+use game_data::items::EquipInfo;
 use packet::{io::read::PktRead, Packet};
 use std::io::Cursor;
 use tracing::debug;
@@ -144,7 +146,12 @@ fn move_item(
         let template = items::info(item_id)
             .and_then(|info| info.equip)
             .ok_or("unknown equipment")?;
-        if !items::can_wear(&template, player) {
+        let allowed = match equip_slot::pet_slots(item_id) {
+            // Cash items are worn 100 below their slot.
+            Some(_) => pet_can_wear(player, &template, to % 100),
+            None => items::can_wear(&template, player),
+        };
+        if !allowed {
             return Err("requirements not met".into());
         }
         let changes = player
@@ -163,6 +170,29 @@ fn move_item(
         .move_in_bag(kind, from, to, items::slot_max(item_id))
         .map_err(|e| e.to_string())?;
     Ok((changes, false))
+}
+
+/// Whether a pet equip may go in pet equip `slot`, as the client checks
+/// (v83 FUN_004f1c2d). Wear, label and quote rings, item pouches, meso
+/// magnets and ignore pendants need the pet they are for out. Wear must
+/// suit that pet's kind and level, a label ring its name tag style and a
+/// quote ring its chat balloon style. The rest need no pet.
+fn pet_can_wear(player: &Player, equip: &EquipInfo, slot: i16) -> bool {
+    let pet = equip_slot::pet_index(slot).and_then(|index| player.summoned_pet(index));
+    let kind = |pet: &Item| items::info(pet.item_id).unwrap_or_default();
+    match -slot {
+        14 | 30 | 38 => pet.is_some_and(|pet| {
+            equip.pets.contains(&pet.item_id)
+                && pet
+                    .pet
+                    .as_ref()
+                    .is_some_and(|data| i16::from(data.level) >= equip.req_level)
+        }),
+        21 | 31 | 39 => pet.is_some_and(|pet| kind(pet).pet_name_tag),
+        29 | 32 | 40 => pet.is_some_and(|pet| kind(pet).pet_chat_balloon),
+        22 | 23 | 46 | 33 | 34 | 47 | 41 | 42 | 48 => pet.is_some(),
+        _ => true,
+    }
 }
 
 #[cfg(test)]
@@ -330,6 +360,58 @@ mod tests {
         let actions = handle(&mut player, request(1, 1, 5));
         assert!(matches!(actions.as_slice(), [WorldAction::Reply(_)]));
         assert!(player.inventory.get(InventoryType::Equip, 5).is_some());
+    }
+
+    /// A player with a Brown Kitty out first and a Baby Tiger second, and
+    /// `equips` in the Equip bag from slot 1, bought in the Cash Shop.
+    fn pet_owner(equips: &[i32]) -> Player {
+        let mut player = crate::codec::stats::sample_player();
+        for (slot, (serial, item_id)) in (1..).zip([(76, 5000000), (77, 5000066)]) {
+            let mut pet = Item::stack(item_id, 1);
+            pet.cash_serial = Some(serial);
+            pet.pet = Some(game::PetData::new("Pet"));
+            player.inventory.insert(InventoryType::Cash, slot, pet);
+            player.pets.push(serial);
+        }
+        for (slot, &item_id) in (1..).zip(equips) {
+            let mut equip = Item::equipment(item_id, EquipStats::default());
+            equip.cash_serial = Some(100 + i64::from(slot));
+            player.inventory.insert(InventoryType::Equip, slot, equip);
+        }
+        player
+    }
+
+    fn worn(actions: &[WorldAction]) -> bool {
+        matches!(actions, [WorldAction::Reply(p), WorldAction::LookChanged(_)]
+            if p.opcode() == SendOpcode::InventoryOperation as i16)
+    }
+
+    #[test]
+    fn pet_equips_need_the_pet_they_are_for() {
+        if items::data().is_err() {
+            return;
+        }
+        // Tiger wings, a label ring, a meso magnet, an HP pouch and a sweeper.
+        let mut player = pet_owner(&[1802063, 1822000, 1812000, 1812002, 1812004]);
+        // The kitty can't wear the tiger's wings, nor show a label.
+        assert!(!worn(&handle(&mut player, request(1, 1, -114))));
+        assert!(!worn(&handle(&mut player, request(1, 2, -121))));
+        assert!(worn(&handle(&mut player, request(1, 1, -130))));
+        assert!(worn(&handle(&mut player, request(1, 2, -131))));
+        // There is no third pet for the magnet, but the pouch and the
+        // sweeper need none.
+        assert!(!worn(&handle(&mut player, request(1, 3, -142))));
+        assert!(worn(&handle(&mut player, request(1, 4, -124))));
+        assert!(worn(&handle(&mut player, request(1, 5, -143))));
+        let worn_ids: Vec<i32> = [-130, -131, -124, -143]
+            .map(|position| {
+                let item = player.inventory.get(InventoryType::Equipped, position);
+                item.map_or(0, |item| item.item_id)
+            })
+            .into();
+        assert_eq!(worn_ids, [1802063, 1822000, 1812002, 1812004]);
+        let look = player.look();
+        assert_eq!(look.visible.get(&30), Some(&1802063));
     }
 
     #[test]

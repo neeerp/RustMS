@@ -39,6 +39,12 @@ pub struct ItemInfo {
     pub pet_commands: Vec<PetCommand>,
     /// The fullness a pet loses each time it grows hungry (`info/hungry`).
     pub pet_hunger: i32,
+    /// Whether a pet has a name tag style (`info/nameTag`), which lets it
+    /// wear a label ring.
+    pub pet_name_tag: bool,
+    /// Whether a pet has a chat balloon style (`info/chatBalloon`), which
+    /// lets it wear a quote ring.
+    pub pet_chat_balloon: bool,
 }
 
 /// A skill book (228xxxx) or mastery book (229xxxx).
@@ -129,6 +135,9 @@ pub struct EquipInfo {
     /// `info/recovery`: how much faster the wearer recovers on a map whose
     /// own recovery is above 1 (the sauna robes, 1.5).
     pub recovery: Option<f64>,
+    /// The pets that pet wear (180xxxx) suits: the image's children named
+    /// for pet item ids.
+    pub pets: Vec<i32>,
 }
 
 /// Top-level `Item.nx` directory for a non-equipment item id.
@@ -234,6 +243,8 @@ impl ItemData {
             info.recovery_mp = nx.int_child(meta, "recoveryMP")?.unwrap_or(0);
             if pet {
                 info.pet_hunger = nx.int_child(meta, "hungry")?.unwrap_or(1);
+                info.pet_name_tag = nx.int_child(meta, "nameTag")?.unwrap_or(0) != 0;
+                info.pet_chat_balloon = nx.int_child(meta, "chatBalloon")?.unwrap_or(0) != 0;
             }
             if let Some(skills) = nx.child_by_name(meta, "skill")? {
                 let mut book = BookInfo {
@@ -321,6 +332,14 @@ impl ItemData {
         let Some(meta) = nx.child_by_name(node, "info")? else {
             return Ok(None);
         };
+        let mut pets = Vec::new();
+        if item_id / 10_000 == 180 {
+            for child in nx.child_indices(node)? {
+                if let Ok(pet) = nx.node_name(child)?.parse::<i32>() {
+                    pets.push(pet);
+                }
+            }
+        }
         let stat = |key: &str| -> Result<i16, GameDataError> {
             Ok(nx
                 .int_child(meta, key)?
@@ -351,6 +370,7 @@ impl ItemData {
             req_luk: stat("reqLUK")?,
             cash: nx.int_child(meta, "cash")? == Some(1),
             recovery: nx.real_child(meta, "recovery")?,
+            pets,
         };
         Ok(Some(ItemInfo {
             item_id,
@@ -368,6 +388,8 @@ impl ItemData {
             equip: Some(equip),
             pet_commands: Vec::new(),
             pet_hunger: 0,
+            pet_name_tag: false,
+            pet_chat_balloon: false,
         }))
     }
 }
@@ -511,6 +533,9 @@ mod tests {
         let tiger = data.info(5000066).unwrap().unwrap();
         assert_eq!(tiger.slot_max, 1);
         assert_eq!(tiger.pet_hunger, 3);
+        assert!(tiger.pet_name_tag && tiger.pet_chat_balloon);
+        let kitty = data.info(5000000).unwrap().unwrap();
+        assert!(!kitty.pet_name_tag && !kitty.pet_chat_balloon);
         assert_eq!(data.info(5000000).unwrap().unwrap().pet_hunger, 2);
         let food = data.info(2120000).unwrap().unwrap().spec.unwrap();
         assert_eq!(food.inc, 30);
@@ -616,5 +641,18 @@ mod tests {
         assert_eq!(sword.recovery, None);
         let robe = data.info(1050018).unwrap().unwrap().equip.unwrap();
         assert_eq!(robe.recovery, Some(1.5));
+    }
+
+    #[test]
+    fn reads_which_pets_pet_wear_suits() {
+        let Some(data) = data() else {
+            return;
+        };
+        let wings = data.info(1802063).unwrap().unwrap().equip.unwrap();
+        assert_eq!((wings.pets, wings.cash), (vec![5000066], true));
+        let hat = data.info(1802000).unwrap().unwrap().equip.unwrap();
+        assert!(hat.pets.contains(&5000000) && !hat.pets.contains(&5000066));
+        let magnet = data.info(1812000).unwrap().unwrap().equip.unwrap();
+        assert!(magnet.pets.is_empty());
     }
 }
