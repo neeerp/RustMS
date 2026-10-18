@@ -34,6 +34,7 @@
 
 #include "../../IO/UITypes/UICharSelect.h"
 #include "../../IO/UITypes/UIStatsInfo.h"
+#include "../../IO/UITypes/UITradingRoom.h"
 
 #include <optional>
 
@@ -113,6 +114,10 @@ namespace ms
 
 		// A request still waiting is forgotten in the new field.
 		Stage::get().get_player().clear_request();
+
+		// The server ends a trade when we leave the field.
+		if (auto room = UI::get().get_element<UITradingRoom>())
+			room->close();
 
 		transition(mapid, portalid, chase);
 	}

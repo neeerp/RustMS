@@ -653,6 +653,13 @@ namespace ms
 		{}
 	};
 
+	// The default position of UITradingRoom: centred, like the v83 dialog
+	struct PosTRADE : public Configuration::PointEntry
+	{
+		PosTRADE() : PointEntry("PosTRADE", "(117, 63)")
+		{}
+	};
+
 	// The default position of UINotice
 	struct PosNOTICE : public Configuration::PointEntry
 	{

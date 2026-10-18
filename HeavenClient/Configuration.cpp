@@ -73,6 +73,7 @@ namespace ms
 		settings.emplace<PosMINIMAP>();
 		settings.emplace<PosSHOP>();
 		settings.emplace<PosSTORAGE>();
+		settings.emplace<PosTRADE>();
 		settings.emplace<PosNOTICE>();
 		settings.emplace<PosMESSENGER>();
 		settings.emplace<PosCHANNEL>();

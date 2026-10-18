@@ -324,6 +324,7 @@ namespace ms
 					types.emplace_back(UIElement::Type::USERLIST);
 					types.emplace_back(UIElement::Type::NPCTALK);
 					types.emplace_back(UIElement::Type::CHARINFO);
+					types.emplace_back(UIElement::Type::TRADINGROOM);
 				}
 				else if (enter)
 				{

@@ -55,6 +55,9 @@ namespace ms
 
 			virtual void drop_on_bindings(Point<int16_t> cursorposition, bool remove) const = 0;
 
+			// Offers the icon's item in one of my trade slots (1 to 9).
+			virtual void drop_on_trade(int8_t slot) const {}
+
 			// What a key bound to this icon would do; NONE if it cannot be
 			// bound.
 			virtual Keyboard::Mapping get_mapping() const
@@ -85,6 +88,7 @@ namespace ms
 		void drop_on_equips(EquipSlot::Id eqslot) const;
 		bool drop_on_items(InventoryType::Id tab, EquipSlot::Id eqslot, int16_t slot, bool equip) const;
 		void drop_on_bindings(Point<int16_t> cursorposition, bool remove) const;
+		void drop_on_trade(int8_t slot) const;
 		Keyboard::Mapping get_mapping() const;
 
 		void set_count(int16_t count);

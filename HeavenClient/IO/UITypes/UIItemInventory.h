@@ -110,6 +110,8 @@ namespace ms
 			void drop_on_bindings(Point<int16_t> cursorposition, bool remove) const override;
 			Keyboard::Mapping get_mapping() const override;
 
+			void drop_on_trade(int8_t slot) const override;
+
 			void set_count(int16_t count) override;
 
 			Icon::IconType get_type() override;

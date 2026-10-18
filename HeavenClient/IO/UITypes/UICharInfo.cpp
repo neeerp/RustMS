@@ -23,6 +23,8 @@
 #include "../../Gameplay/Stage.h"
 #include "../../IO/UI.h"
 #include "../../IO/UITypes/UIChatBar.h"
+#include "../../IO/UITypes/UITradingRoom.h"
+#include "../../Net/Packets/MiniRoomPackets.h"
 #include "../../Net/Packets/PlayerInteractionPackets.h"
 #include "../../Util/NxFiles.h"
 
@@ -96,8 +98,8 @@ namespace ms
 		buttons[Buttons::BT_EXCEPTION] = std::make_unique<MapleButton>(UserInfo["BtExceptionShow"]);
 		buttons[Buttons::BT_PANEL_HIDE] = std::make_unique<MapleButton>(Basic["BtHide"], PANEL + PANEL_HIDE);
 
-		// There are no families, parties, trades, or pets yet.
-		for (auto button : { Buttons::BT_FAMILY, Buttons::BT_PARTY, Buttons::BT_TRADE, Buttons::BT_EXCEPTION })
+		// There are no families, parties, or pets yet.
+		for (auto button : { Buttons::BT_FAMILY, Buttons::BT_PARTY, Buttons::BT_EXCEPTION })
 			buttons[button]->set_state(Button::State::DISABLED);
 
 		// v83 offers fame only from level 15 (FUN_009007a0), and never for
@@ -171,6 +173,9 @@ namespace ms
 			break;
 		case Buttons::BT_FAME_DOWN:
 			give_fame(false);
+			break;
+		case Buttons::BT_TRADE:
+			start_trade();
 			break;
 		case Buttons::BT_PET_SHOW:
 			set_mode(Mode::PET);
@@ -249,6 +254,30 @@ namespace ms
 		}
 
 		GiveFamePacket(cid, up).dispatch();
+	}
+
+	void UICharInfo::start_trade() const
+	{
+		auto room = UI::get().get_element<UITradingRoom>();
+		const char *refusal = nullptr;
+
+		// As v83 (FUN_0052fad4): one room at a time, with someone else on
+		// the map.
+		if (room && room->is_active())
+			refusal = "Not available";
+		else if (Stage::get().is_player(cid) || !Stage::get().get_character(cid))
+			refusal = "Unable to find the character.";
+
+		if (refusal)
+		{
+			if (auto chatbar = UI::get().get_element<UIChatBar>())
+				chatbar->send_chatline(refusal, UIChatBar::LineType::SKILL);
+
+			return;
+		}
+
+		TradeCreatePacket().dispatch();
+		MiniRoomInvitePacket(cid).dispatch();
 	}
 
 	void UICharInfo::set_mode(Mode m)

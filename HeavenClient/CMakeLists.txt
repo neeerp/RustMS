@@ -146,6 +146,9 @@ if(HEAVENCLIENT_BUILD_TESTS)
     add_executable(storage_contents_tests tests/storage_contents.cpp Net/InPacket.cpp)
     target_include_directories(storage_contents_tests PRIVATE ${PROJECT_SOURCE_DIR}/libs/NoLifeNx)
     add_test(NAME storage_contents COMMAND storage_contents_tests)
+    add_executable(mini_room_tests tests/mini_room.cpp Net/InPacket.cpp)
+    target_include_directories(mini_room_tests PRIVATE ${PROJECT_SOURCE_DIR}/libs/NoLifeNx)
+    add_test(NAME mini_room COMMAND mini_room_tests)
     add_executable(movement_path_tests tests/movement_path.cpp Net/InPacket.cpp Net/Handlers/Helpers/MovementParser.cpp)
     target_include_directories(movement_path_tests PRIVATE ${PROJECT_SOURCE_DIR}/libs/NoLifeNx)
     add_test(NAME movement_path COMMAND movement_path_tests)
@@ -545,6 +548,10 @@ add_executable(HeavenClient
     IO/UITypes/UIShop.h
     IO/UITypes/UIStorage.cpp
     IO/UITypes/UIStorage.h
+    IO/UITypes/UITradeInvite.cpp
+    IO/UITypes/UITradeInvite.h
+    IO/UITypes/UITradingRoom.cpp
+    IO/UITypes/UITradingRoom.h
     IO/UITypes/UIMonsterBook.cpp
     IO/UITypes/UIMonsterBook.h
     IO/UITypes/UISkillBook.cpp
@@ -643,6 +650,7 @@ add_executable(HeavenClient
     Net/Packets/InventoryPackets.h
     Net/Packets/LoginPackets.h
     Net/Packets/MessagingPackets.h
+    Net/Packets/MiniRoomPackets.h
     Net/Packets/MovementPacket.h
     Net/Packets/NpcInteractionPackets.h
     Net/Packets/QuestPackets.h

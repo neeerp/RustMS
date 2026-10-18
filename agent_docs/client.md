@@ -222,7 +222,8 @@ from `UI.nx`. Moved so far:
   COLLECTION lengthen it to `backgrnd5`, `backgrnd2`, and `backgrnd7`, and ITEM
   and WISHLIST open `backgrnd4` and `backgrnd3` beside it; all are empty, as
   RustMS has no mounts, pets, monster book, or cash shop wish list. Family,
-  party, trade, and excluded items are disabled. The fame buttons send
+  party, and excluded items are disabled; TRADE invites the character to a
+  trade. The fame buttons send
   GIVE_FAME (`GiveFamePacket`) unless the window is the player's own or the
   player is below level 15. As in v83 (FUN_00a23eb5), the client refuses a
   character who isn't on the map ("Unable to find the character.") and a
@@ -430,7 +431,9 @@ side yet.
 | Monster Book (`UIMonsterBook`) | Implemented: cards, summary, monster pages, search, cover; see `combat.md` |
 | Cash shop (`UICashShop`) | Enter/exit, catalog, buying, gifts, Cash Inventory, wish list, and moving items to and from the bags |
 | Maple Messenger (`UIMessenger`) | Implemented |
-| Storage, trade, player shops, mini-games, memo/mail | No UI, no handlers |
+| Trade (`UITradingRoom`, `UITradeInvite`) | Implemented, without cash trades |
+| Storage (`UIStorage`) | Implemented; see `inventory.md` |
+| Player shops, mini-games, memo/mail | No UI, no handlers |
 | Pets, mounts, summons, reactors beyond hit/spawn | Partial or absent (`Reactor` TODOs) |
 | Party/guild/boss quests, events, MTS | Absent |
 
@@ -595,7 +598,7 @@ the screen size.
 | --- | --- | --- |
 | Buddy groups | Default group only | S |
 | Guild | Skeleton only, plus guild emblem/BBS UIs missing | L |
-| Trade / storage / player shops | Nothing | L |
+| Player shops | Nothing | L |
 | Cash shop | No coupons, charging, or storage window | S |
 | Quest accept/complete UI flow | Partial | S |
 | Pets and mounts | Partial rendering, no interaction | M |

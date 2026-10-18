@@ -16,12 +16,21 @@
 //	along with this program.  If not, see <https://www.gnu.org/licenses/>.		//
 //////////////////////////////////////////////////////////////////////////////////
 #include "PlayerInteractionHandlers.h"
+#include "MiniRoom.h"
+
+#include "Helpers/LoginParser.h"
 
 #include "../../IO/UI.h"
 
 #include "../../Gameplay/Stage.h"
 #include "../../IO/UITypes/UICharInfo.h"
 #include "../../IO/UITypes/UIChatBar.h"
+#include "../../IO/UITypes/UINotice.h"
+#include "../../IO/UITypes/UITradeInvite.h"
+#include "../../IO/UITypes/UITradingRoom.h"
+#include "../Packets/MiniRoomPackets.h"
+
+#include <iostream>
 
 namespace ms
 {
@@ -146,6 +155,159 @@ namespace ms
 			}
 			default:
 				fame_line("The level of fame has neither been raised or dropped due to an unexpected error.");
+				break;
+		}
+	}
+
+	void PlayerInteractionHandler::handle(InPacket& recv) const
+	{
+		enum Mode : int8_t
+		{
+			INVITE = 2,
+			INVITE_RESULT = 3,
+			VISIT = 4,
+			ENTER = 5,
+			CHAT = 6,
+			AVATAR = 9,
+			LEAVE = 10,
+			// The trading room's own
+			PUT_ITEM = 0x0F,
+			PUT_MESO = 0x10,
+			CONFIRMED = 0x11,
+			MESO_LIMIT = 0x15
+		};
+
+		// The chat line of a notice by code rather than a member
+		constexpr int8_t CHAT_NOTICE = 7;
+
+		int8_t mode = recv.read_byte();
+		auto room = UI::get().get_element<UITradingRoom>();
+		bool open = room && room->is_active();
+
+		if (mode == Mode::INVITE_RESULT)
+		{
+			int8_t result = recv.read_byte();
+			std::string name = mini_room::invite_result_named(result) ? recv.read_string() : "";
+			std::string text = mini_room::invite_result_text(result, name);
+
+			if (!text.empty())
+				if (auto chatbar = UI::get().get_element<UIChatBar>())
+					chatbar->send_chatline(text, UIChatBar::LineType::SKILL);
+
+			return;
+		}
+
+		if (!open)
+		{
+			switch (mode)
+			{
+				case Mode::INVITE:
+				{
+					int8_t type = recv.read_byte();
+					std::string inviter = recv.read_string();
+					int32_t serial = recv.read_int();
+
+					if (type != mini_room::TRADING_ROOM)
+					{
+						std::cout << "[PlayerInteractionHandler]: Unsupported invite to room type " << static_cast<int32_t>(type) << std::endl;
+						break;
+					}
+
+					if (auto invite = UI::get().get_element<UITradeInvite>())
+						invite->add(inviter, serial);
+
+					break;
+				}
+				case Mode::ENTER:
+				{
+					mini_room::Enter enter = mini_room::read_enter(recv, LoginParser::parse_look);
+
+					if (enter.type == mini_room::TRADING_ROOM)
+					{
+						UI::get().emplace<UITradingRoom>(enter);
+					}
+					else if (enter.type == 0)
+					{
+						std::string text = mini_room::enter_error_text(enter.error);
+
+						if (!text.empty())
+							UI::get().emplace<UIOk>(text, [](bool) {});
+					}
+					else
+					{
+						std::cout << "[PlayerInteractionHandler]: Unsupported room type " << static_cast<int32_t>(enter.type) << std::endl;
+					}
+
+					break;
+				}
+				default:
+					break;
+			}
+
+			return;
+		}
+
+		switch (mode)
+		{
+			case Mode::INVITE:
+			{
+				recv.skip_byte();
+				recv.skip_string();
+
+				// v83 drops invites while a room is open; turn them down so the
+				// inviter hears back.
+				MiniRoomDeclinePacket(recv.read_int(), MiniRoomPacket::Decline::NOT_ACCEPTING).dispatch();
+				break;
+			}
+			case Mode::VISIT:
+			{
+				uint8_t slot = recv.read_byte();
+
+				room->visit(mini_room::read_member(recv, slot, LoginParser::parse_look));
+				break;
+			}
+			case Mode::CHAT:
+			{
+				if (recv.read_byte() == CHAT_NOTICE)
+					break;
+
+				uint8_t slot = recv.read_byte();
+				std::string line = recv.read_string();
+
+				room->add_chat(slot, line);
+				break;
+			}
+			case Mode::AVATAR:
+			{
+				uint8_t slot = recv.read_byte();
+
+				room->change_look(slot, LoginParser::parse_look(recv));
+				break;
+			}
+			case Mode::LEAVE:
+			{
+				recv.skip_byte(); // slot
+
+				room->leave(recv.read_byte());
+				break;
+			}
+			case Mode::PUT_ITEM:
+				if (auto put = mini_room::read_put_item(recv))
+					room->put_item(*put);
+
+				break;
+			case Mode::PUT_MESO:
+				if (auto put = mini_room::read_put_meso(recv))
+					room->put_meso(*put);
+
+				break;
+			case Mode::CONFIRMED:
+				room->partner_confirmed();
+				break;
+			case Mode::MESO_LIMIT:
+				room->meso_limit();
+				break;
+			default:
 				break;
 		}
 	}

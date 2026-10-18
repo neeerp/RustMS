@@ -30,7 +30,9 @@
 #include "../../Gameplay/Stage.h"
 #include "../../Util/NxFiles.h"
 
+#include "../../Net/Handlers/MiniRoom.h"
 #include "../../Net/Packets/InventoryPackets.h"
+#include "../../Net/Packets/MiniRoomPackets.h"
 
 #include <nlnx/nx.hpp>
 
@@ -735,6 +737,33 @@ namespace ms
 
 		set_sort(sort_enabled);
 		load_icons();
+	}
+
+	void UIItemInventory::ItemIcon::drop_on_trade(int8_t slot) const
+	{
+		constexpr const char *trademessage = "How many will you trade?";
+
+		Player &player = Stage::get().get_player();
+
+		if (!player.can_request(ExclRequest::WAIT))
+			return;
+
+		auto tab = static_cast<int8_t>(sourcetab);
+
+		// v83 puts up one of anything that doesn't ask; the server takes
+		// equipment and whole stacks of stars and bullets.
+		if (mini_room::asks_count(item_id, count))
+		{
+			auto onenter = [tab, source = source, slot](int32_t qty)
+			{
+				Stage::get().get_player().request(TradePutItemPacket(tab, source, qty, slot), ExclRequest::WAIT);
+			};
+
+			UI::get().emplace<UIEnterNumber>(trademessage, onenter, count, count);
+		} else
+		{
+			player.request(TradePutItemPacket(tab, source, 1, slot), ExclRequest::WAIT);
+		}
 	}
 
 	void UIItemInventory::ItemIcon::set_count(int16_t c)

@@ -97,6 +97,7 @@ namespace ms
 		BLOCKED_SERVER = 132,
 		WHISPER = 135,
 		MESSENGER = 313,
+		PLAYER_INTERACTION = 314,
 		FIELD_EFFECT = 138,
 
 		/// MapObject
@@ -301,6 +302,7 @@ namespace ms
 		// Player Interaction
 		emplace<CHAR_INFO, CharInfoHandler>();
 		emplace<FAME_RESPONSE, FameResponseHandler>();
+		emplace<PLAYER_INTERACTION, PlayerInteractionHandler>();
 
 		// Party handlers
 		emplace<PARTY_OPERATION, PartyOperationHandler>();

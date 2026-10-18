@@ -43,7 +43,8 @@ namespace ms
 			WORLDMAP,
 			MINIMAP,
 			MONSTERBOOK,
-			BUFFLIST
+			BUFFLIST,
+			TRADINGROOM
 		};
 
 		virtual ~Tooltip()

@@ -82,6 +82,11 @@ namespace ms
 		type->drop_on_bindings(cursorposition, remove);
 	}
 
+	void Icon::drop_on_trade(int8_t slot) const
+	{
+		type->drop_on_trade(slot);
+	}
+
 	Keyboard::Mapping Icon::get_mapping() const
 	{
 		return type->get_mapping();
