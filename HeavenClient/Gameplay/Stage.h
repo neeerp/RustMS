@@ -82,6 +82,9 @@ namespace ms
 
 		// The character under a cursor position, or 0 if there is none.
 		int32_t character_at(Point<int16_t> cursorpos);
+		// Someone else under a cursor position, by v83's box for opening the
+		// menu on them, or 0. The player can't be picked.
+		int32_t other_character_at(Point<int16_t> cursorpos);
 
 		// Lets go of a held key whose release went elsewhere, such as to a
 		// dialog or a text field, so the player doesn't keep walking.

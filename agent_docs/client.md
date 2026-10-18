@@ -246,6 +246,25 @@ from `UI.nx`. Moved so far:
   second try within 5 minutes ("Please try it again later.",
   `Gameplay/FameCooldown.h`). FAME_RESPONSE (`FameResponseHandler`) prints its
   v83 lines in the skill chat colour and updates the open window's fame.
+- **Menu on someone** (`UIContextMenu`, `UIWindow.img/ContextMenu`): opened
+  by releasing the right button over another character (`Stage::other_character_at`,
+  v83's 44 by 65 box above the feet, or 46 by 31 toward the head when prone,
+  `char_click::menu_hits`). It opens at the cursor, pushed back inside the
+  view, with their name in the top cap. The rows are PERSONAL INFO, SAVE NAME,
+  TRADE REQUEST, WHISPER, PARTY INVITE (party leaders, or players in no
+  party), GUILD INVITE (guild masters and Jr. Masters), and ALERT GM; rows left
+  out move up (`IO/Components/ContextMenuLayout.h`). It holds the mouse and
+  keys: a press or right release outside, ESC, or Enter closes it, and it
+  closes before a row acts. Info opens the character info window, SAVE NAME
+  copies the name and opens the chat field, WHISPER fills in "/w name ",
+  TRADE and PARTY INVITE do what the info window's trade and `/party invite`
+  do, GUILD INVITE sends GUILD_OPERATION 5 after v83's guild checks (the
+  server ignores it until it has guild invites), and ALERT GM shows v83's
+  notice that reports are down. Approximations: v83 also hits
+  the character's second position and a morph's own box; it puts the chat
+  into whisper mode rather than filling in a command; and it offers Add
+  Junior to family members, which HC doesn't have. The right button acts when
+  it comes up, everywhere, as in v83.
 - **Quest log** (`UIQuestLog`, `UIWindow.img/Quest`): Available, In Progress,
   and Complete tabs (`Basic.img/Tab2`), quests folded by area, and a detail
   panel with the quest's text and FIND NPC or QUEST HELPER, laid out from

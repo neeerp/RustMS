@@ -378,7 +378,8 @@ namespace ms
 	public:
 		enum Operation : int8_t
 		{
-			CREATE = 2
+			CREATE = 2,
+			INVITE = 5
 		};
 
 		GuildOperationPacket(Operation op) : OutPacket(OutPacket::Opcode::GUILD_OPERATION)
@@ -392,6 +393,16 @@ namespace ms
 	{
 	public:
 		CreateGuildPacket(const std::string& name) : GuildOperationPacket(GuildOperationPacket::Operation::CREATE)
+		{
+			write_string(name);
+		}
+	};
+
+	// Invites a character to the player's guild
+	class InviteToGuildPacket : public GuildOperationPacket
+	{
+	public:
+		InviteToGuildPacket(const std::string& name) : GuildOperationPacket(GuildOperationPacket::Operation::INVITE)
 		{
 			write_string(name);
 		}

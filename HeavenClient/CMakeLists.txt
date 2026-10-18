@@ -197,6 +197,9 @@ if(HEAVENCLIENT_BUILD_TESTS)
     add_executable(char_click_tests tests/char_click.cpp)
     target_include_directories(char_click_tests PRIVATE ${PROJECT_SOURCE_DIR}/libs/NoLifeNx)
     add_test(NAME char_click COMMAND char_click_tests)
+    add_executable(context_menu_tests tests/context_menu.cpp)
+    target_include_directories(context_menu_tests PRIVATE ${PROJECT_SOURCE_DIR}/libs/NoLifeNx)
+    add_test(NAME context_menu COMMAND context_menu_tests)
     add_executable(excl_request_tests tests/excl_request.cpp)
     add_test(NAME excl_request COMMAND excl_request_tests)
     add_executable(portal_touch_tests tests/portal_touch.cpp Gameplay/MapleMap/Portal.cpp)
@@ -477,6 +480,7 @@ add_executable(HeavenClient
     IO/Components/SliderSteps.h
     IO/Components/EquipTooltip.cpp
     IO/Components/EquipTooltip.h
+    IO/Components/ContextMenuLayout.h
     IO/Components/FadeNotice.h
     IO/Components/Gauge.cpp
     IO/Components/Gauge.h
@@ -532,6 +536,8 @@ add_executable(HeavenClient
     IO/UITypes/UIGameOption.h
     IO/UITypes/UICharInfo.cpp
     IO/UITypes/UICharInfo.h
+    IO/UITypes/UIContextMenu.cpp
+    IO/UITypes/UIContextMenu.h
     IO/UITypes/UICharCreation.cpp
     IO/UITypes/UICharCreation.h
     IO/UITypes/UICharSelect.cpp

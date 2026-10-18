@@ -81,6 +81,7 @@ namespace ms
 			REVIVE,
 			TRADINGROOM,
 			INVITECARD,
+			CONTEXTMENU,
 			NUM_TYPES
 		};
 

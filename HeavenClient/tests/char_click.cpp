@@ -23,6 +23,20 @@ int main()
 		require(!hits(feet, Point<int16_t>(400, 301)), "below the feet is a miss");
 		require(!hits(feet, Point<int16_t>(400, 229)), "above the head is a miss");
 
+		using char_click::menu_hits;
+
+		require(menu_hits(feet, false, false, Point<int16_t>(378, 235)), "the menu box's top-left corner is in");
+		require(!menu_hits(feet, false, false, Point<int16_t>(422, 270)), "the menu box's right edge is out");
+		require(!menu_hits(feet, false, false, Point<int16_t>(400, 300)), "the menu box's bottom edge is out");
+		require(!menu_hits(feet, false, false, Point<int16_t>(400, 234)), "above the menu box is a miss");
+		require(menu_hits(feet, false, true, Point<int16_t>(421, 299)), "facing right, standing, the box is the same");
+		require(menu_hits(feet, true, false, Point<int16_t>(354, 269)), "prone facing left, the box reaches left");
+		require(!menu_hits(feet, true, false, Point<int16_t>(400, 280)), "prone facing left, the box stops at the feet");
+		require(!menu_hits(feet, true, false, Point<int16_t>(380, 268)), "prone, above the body is a miss");
+		require(menu_hits(feet, true, true, Point<int16_t>(400, 280)), "prone facing right, the box starts at the feet");
+		require(menu_hits(feet, true, true, Point<int16_t>(445, 280)), "prone facing right, the box reaches right");
+		require(!menu_hits(feet, true, true, Point<int16_t>(399, 280)), "prone facing right, behind the feet is a miss");
+
 		std::cout << "Character click passed\n";
 		return 0;
 	}

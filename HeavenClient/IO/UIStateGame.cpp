@@ -25,6 +25,7 @@
 #include "UITypes/UIQuestHelper.h"
 #include "UITypes/UIChannel.h"
 #include "UITypes/UICharInfo.h"
+#include "UITypes/UIContextMenu.h"
 #include "UITypes/UIChatBar.h"
 #include "UITypes/UIEquipInventory.h"
 #include "UITypes/UIItemInventory.h"
@@ -226,8 +227,18 @@ namespace ms
 
 	void UIStateGame::rightclick(Point<int16_t> pos)
 	{
-		if (UIElement *front = get_front(pos))
+		// A window holding the mouse, such as the menu, hears it alone.
+		if (UIElement *focusedelement = get(focused); focusedelement && focusedelement->is_active())
+			focusedelement->rightclick(pos);
+		else if (UIElement *front = get_front(pos))
 			front->rightclick(pos);
+		// Releasing the button over someone else opens the menu on them
+		// (FUN_0095009a).
+		else if (int32_t cid = Stage::get().other_character_at(pos))
+		{
+			if (Optional<OtherChar> other = Stage::get().get_chars().get_char(cid))
+				emplace<UIContextMenu>(cid, other->get_name(), pos);
+		}
 	}
 
 	void UIStateGame::send_key(KeyType::Id type, int32_t action, bool pressed, bool escape)
@@ -612,6 +623,7 @@ namespace ms
 					UIElement::Type::SHOP,
 					UIElement::Type::STORAGE,
 					UIElement::Type::INVITECARD,
+					UIElement::Type::CONTEXTMENU,
 					UIElement::Type::REVIVE
 			};
 

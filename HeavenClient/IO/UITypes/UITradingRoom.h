@@ -71,6 +71,11 @@ namespace ms
 		// itself when we leave the field.
 		void close();
 
+		// Asks cid to trade, as the character info window and the menu on
+		// someone do (FUN_0052fad4): one room at a time, with someone else
+		// on the map.
+		static void request(int32_t cid);
+
 	protected:
 		Button::State button_pressed(uint16_t buttonid) override;
 

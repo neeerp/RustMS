@@ -1,5 +1,6 @@
 #include "UITradingRoom.h"
 
+#include "UIChatBar.h"
 #include "UINotice.h"
 
 #include "../UI.h"
@@ -378,6 +379,28 @@ namespace ms
 		input.change_text("");
 
 		deactivate();
+	}
+
+	void UITradingRoom::request(int32_t cid)
+	{
+		auto room = UI::get().get_element<UITradingRoom>();
+		const char *refusal = nullptr;
+
+		if (room && room->is_active())
+			refusal = "Not available";
+		else if (Stage::get().is_player(cid) || !Stage::get().get_character(cid))
+			refusal = "Unable to find the character.";
+
+		if (refusal)
+		{
+			if (auto chatbar = UI::get().get_element<UIChatBar>())
+				chatbar->send_chatline(refusal, UIChatBar::LineType::SKILL);
+
+			return;
+		}
+
+		TradeCreatePacket().dispatch();
+		MiniRoomInvitePacket(cid).dispatch();
 	}
 
 	void UITradingRoom::ask_meso()

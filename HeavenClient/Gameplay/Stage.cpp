@@ -728,6 +728,26 @@ namespace ms
 		return 0;
 	}
 
+	int32_t Stage::other_character_at(Point<int16_t> cursorpos)
+	{
+		if (state != State::ACTIVE)
+			return 0;
+
+		Point<int16_t> viewpos = camera.position();
+
+		// v83 hit-tests only the others (FUN_009726ea).
+		for (auto &mmo : *chars.get_chars())
+		{
+			Optional<OtherChar> other = chars.get_char(mmo.first);
+
+			if (other && other->is_active()
+				&& char_click::menu_hits(other->get_position() + viewpos, other->is_prone(), other->getflip(), cursorpos))
+				return other->get_oid();
+		}
+
+		return 0;
+	}
+
 	void Stage::release_key(KeyType::Id type, int32_t action)
 	{
 		if (state != State::ACTIVE)
