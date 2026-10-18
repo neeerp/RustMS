@@ -89,6 +89,9 @@ namespace ms
 
 		uint16_t get_delay(int16_t frame) const;
 
+		// The frame drawn at `alpha` between updates.
+		int16_t get_frame_index(float alpha) const;
+
 		uint16_t getdelayuntil(int16_t frame) const;
 
 		// How long one play through every frame takes.

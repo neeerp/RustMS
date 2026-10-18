@@ -24,6 +24,8 @@
 #include "../Components/ClassicTabs.h"
 #include "../Components/Slider.h"
 
+#include "../../Character/Pets.h"
+
 namespace ms
 {
 	// The Item inventory
@@ -81,7 +83,21 @@ namespace ms
 
 		bool is_visible(int16_t slot) const;
 
+		// Whether the player may change equipment now, with a notice if not.
+		bool can_change_equips() const;
+
 		bool can_wear_equip(int16_t slot) const;
+
+		// Whether the pet equipment in `slot` may go on `part`, with a
+		// notice if not (FUN_004f1c2d).
+		bool can_wear_pet_equip(int16_t slot, int16_t part) const;
+
+		// The pet at `index` in the list, as putting `item_id` on it goes.
+		pets::Wearer pet_wearer(uint8_t index, int32_t item_id) const;
+
+		// Put the pet equipment `item_id` in `slot` on a pet it can go on,
+		// asking which when there are several (FUN_004efd25).
+		void wear_pet_equip(int16_t slot, int32_t item_id) const;
 
 		int16_t first_slot() const;
 

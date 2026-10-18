@@ -515,6 +515,17 @@ pub enum FieldRequest {
         skill_id: Option<i32>,
         why: crate::packet::build::world::summon::Gone,
     },
+    /// The player's pet at `index` in their pet list, standing at (x, y),
+    /// would pick up the drop `object_id`. It may take mesos with `mesos`
+    /// and items with `items`. Answered with `ServerMessage::PetPickedUp`.
+    PetPickup {
+        index: u8,
+        object_id: i32,
+        x: i16,
+        y: i16,
+        mesos: bool,
+        items: bool,
+    },
     /// The player's client moved their pet at `index` in their pet list.
     PetMove {
         index: u8,
@@ -672,6 +683,7 @@ fn world_routes() -> &'static HashMap<i16, WorldRoute> {
             (Op::PetChat, InGame(&world::PetChatHandler)),
             (Op::PetCommand, InGame(&world::PetCommandHandler)),
             (Op::PetFood, InGame(&world::PetFoodHandler)),
+            (Op::PetLoot, InGame(&world::PetLootHandler)),
             (Op::UseCashItem, InGame(&world::UseCashItemHandler)),
             (Op::CloseChalkboard, InGame(&world::CloseChalkboardHandler)),
             (

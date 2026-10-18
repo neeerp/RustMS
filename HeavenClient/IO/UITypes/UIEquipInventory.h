@@ -37,6 +37,8 @@ namespace ms
 
 		void draw(float inter) const override;
 
+		void update() override;
+
 		void toggle_active() override;
 		bool send_icon(const Icon& icon, Point<int16_t> position) override;
 
@@ -63,6 +65,9 @@ namespace ms
 		bool is_unavailable(EquipSlot::Id slot) const;
 		EquipSlot::Id slot_by_position(Point<int16_t> position) const;
 		void show_pet(bool show);
+		// Whether the pet at `index` in the list is out.
+		bool has_pet(uint8_t index) const;
+		bool is_worn(int16_t part) const;
 
 		class EquipIcon : public Icon::Type
 		{
@@ -101,5 +106,7 @@ namespace ms
 		ColorBox unavailable;
 
 		bool pet_enabled;
+		// The pet whose equipment the panel shows.
+		uint8_t pet_tab;
 	};
 }

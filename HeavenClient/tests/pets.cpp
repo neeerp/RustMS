@@ -257,6 +257,61 @@ void naming()
 	require(check("tigger", "Tigger").first == Naming::OK, "its name in another case");
 }
 
+void equipment()
+{
+	using namespace ms::pets;
+
+	require(equip_parts(1802063) == std::array<int16_t, 3>{ 14, 30, 38 }, "clothes");
+	require(equip_parts(1802100) == std::array<int16_t, 3>{ 21, 31, 39 }, "the collar goes with the labels");
+	require(equip_parts(1822000) == std::array<int16_t, 3>{ 21, 31, 39 }, "label ring");
+	require(equip_parts(1832000) == std::array<int16_t, 3>{ 29, 32, 40 }, "quote ring");
+	require(equip_parts(1812000) == std::array<int16_t, 3>{ 23, 34, 42 }, "meso magnet");
+	require(equip_parts(1812002) == std::array<int16_t, 3>{ 24, 24, 24 }, "the HP pouch is shared");
+	require(equip_parts(1812007) == std::array<int16_t, 3>{ 46, 47, 48 }, "ignore pendant");
+	require(!equip_parts(1812008), "an unknown ability item");
+	require(!equip_parts(1002008), "a cap");
+
+	require(equip_owner(14) == 0 && equip_owner(29) == 0 && equip_owner(46) == 0, "the first pet's parts");
+	require(equip_owner(30) == 1 && equip_owner(37) == 1 && equip_owner(47) == 1, "the second pet's parts");
+	require(equip_owner(38) == 2 && equip_owner(45) == 2 && equip_owner(48) == 2, "the third pet's parts");
+	require(equip_owner(24) == -1 && equip_owner(25) == -1, "the pouches are no one's");
+	require(wear_owner(30) == 1 && wear_owner(31) == -1, "clothes by pet");
+	require(is_equip_part(14) && is_equip_part(48) && !is_equip_part(15) && !is_equip_part(49), "pet parts");
+
+	Wearer none;
+	Wearer tiger{ true, true, true, true, 5 };
+	Wearer kitty{ true, false, false, false, 5 };
+
+	require(refuse_equip(14, 0, none) == CANNOT_WEAR, "clothes need a pet");
+	require(refuse_equip(30, 0, kitty) == CANNOT_WEAR, "clothes made for another kind");
+	require(refuse_equip(38, 0, tiger) == nullptr, "clothes for its kind");
+	require(refuse_equip(14, 10, tiger) == STATS_TOO_LOW, "clothes above the pet's level");
+	require(refuse_equip(21, 0, none) == NO_PET, "a label needs a pet");
+	require(refuse_equip(31, 0, kitty) == CANNOT_WEAR, "a kind without a name tag");
+	require(refuse_equip(39, 0, tiger) == nullptr, "a label on a kind with one");
+	require(refuse_equip(32, 0, kitty) == CANNOT_WEAR, "a kind without a balloon");
+	require(refuse_equip(40, 0, none) == NO_PET, "a quote ring needs a pet");
+	require(refuse_equip(47, 0, none) == NO_PET, "the pendant needs a pet");
+	require(refuse_equip(23, 0, kitty) == nullptr, "a magnet on any pet");
+	require(refuse_equip(35, 0, none) == nullptr, "boots need none");
+	require(refuse_equip(24, 0, none) == nullptr, "nor do the pouches");
+
+	using Choices = std::vector<EquipChoice>;
+	std::array<Wearer, 3> alone{ kitty, none, none };
+	std::array<Wearer, 3> pair{ kitty, tiger, none };
+	std::array<Wearer, 3> three{ tiger, kitty, tiger };
+
+	require(equip_choices(1802063, alone) == Choices{ { 0, 14 } }, "one pet out: its part, suited or not");
+	require(equip_choices(1822000, { none, none, none }) == Choices{ { 0, 21 } }, "none out: the first pet's part");
+	require(equip_choices(1812002, three) == Choices{ { 0, 24 } }, "the pouches don't choose");
+	require(equip_choices(1802063, pair) == Choices{ { 1, 30 } }, "clothes for the one pet of their kind");
+	require(equip_choices(1802063, three) == Choices{ { 0, 14 }, { 2, 38 } }, "clothes for the pets of their kind");
+	require(equip_choices(1812000, three) == Choices{ { 0, 23 }, { 1, 34 }, { 2, 42 } }, "a magnet for any");
+	require(equip_choices(1832000, pair) == Choices{ { 0, 29 }, { 1, 32 } }, "the quote ring for any");
+	require(equip_choices(1822001, three).empty(), "other rings don't choose");
+	require(equip_choices(1002008, three).empty(), "not pet equipment");
+}
+
 int main()
 {
 	try
@@ -270,6 +325,7 @@ int main()
 		actions();
 		food();
 		naming();
+		equipment();
 
 		std::cout << "Pets passed\n";
 		return 0;

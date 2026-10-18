@@ -58,9 +58,34 @@ impl ClientActor {
     /// The field handed over a drop: put it in the inventory, or give it back
     /// if it doesn't fit.
     pub(super) async fn picked_up(&mut self, drop: Drop) -> Result<(), RuntimeError> {
+        if !self.take_loot(&drop).await? {
+            return self.send_to_field(FieldMessage::ReturnDrop { drop }).await;
+        }
+        Ok(())
+    }
+
+    /// The field handed this player's pet at `pet` a drop it still shows:
+    /// put it in the inventory, and have the field show the pet taking it or
+    /// leave it lying.
+    pub(super) async fn pet_picked_up(&mut self, drop: Drop, pet: u8) -> Result<(), RuntimeError> {
+        let taken = self.take_loot(&drop).await?;
+        let looter = self.in_game()?.player.id();
+        self.send_to_field(FieldMessage::PetLooted {
+            looter,
+            pet,
+            drop,
+            taken,
+        })
+        .await
+    }
+
+    /// Put a drop in the inventory. Returns false, having told the player,
+    /// when it doesn't fit.
+    async fn take_loot(&mut self, drop: &Drop) -> Result<bool, RuntimeError> {
         if let Loot::Item { item_id, .. } = drop.loot {
             if monster_book::is_card(item_id) {
-                return self.collect_card(item_id).await;
+                self.collect_card(item_id).await?;
+                return Ok(true);
             }
         }
         let mut packets = Vec::new();
@@ -72,7 +97,8 @@ impl ClientActor {
                 let meso = player.meso;
                 packets.push(stat::build_stat_update(true, &[StatUpdate::Meso(meso)])?);
                 packets.push(drop::build_meso_gain(*amount)?);
-                return self.send_all(&mut packets).await;
+                self.send_all(&mut packets).await?;
+                return Ok(true);
             }
             Loot::Item {
                 item_id, quantity, ..
@@ -100,10 +126,11 @@ impl ClientActor {
                 packets.push(inventory::build_inventory_full()?);
                 packets.push(stat::build_stat_update(true, &[])?);
                 self.send_all(&mut packets).await?;
-                return self.send_to_field(FieldMessage::ReturnDrop { drop }).await;
+                return Ok(false);
             }
         }
-        self.send_all(&mut packets).await
+        self.send_all(&mut packets).await?;
+        Ok(true)
     }
 
     /// A picked-up card goes straight into the Monster Book; once its page

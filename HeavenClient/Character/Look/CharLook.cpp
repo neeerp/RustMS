@@ -19,6 +19,8 @@
 
 #include "AttackStances.h"
 
+#include "../Pets.h"
+
 #include "../../Data/WeaponData.h"
 
 namespace ms
@@ -32,7 +34,18 @@ namespace ms
 		set_face(entry.faceid);
 
 		for (auto &equip : entry.equips)
+		{
+			// Pet equipment is the pets', not the character's.
+			if (pets::is_equip_part(equip.first))
+			{
+				if (int8_t index = pets::wear_owner(equip.first); index >= 0)
+					pet_wear[index] = equip.second;
+
+				continue;
+			}
+
 			add_equip(equip.second);
+		}
 	}
 
 	CharLook::CharLook()
@@ -656,6 +669,17 @@ namespace ms
 	const Face *CharLook::get_face() const
 	{
 		return face;
+	}
+
+	int32_t CharLook::get_pet_wear(size_t index) const
+	{
+		return index < pet_wear.size() ? pet_wear[index] : 0;
+	}
+
+	void CharLook::set_pet_wear(size_t index, int32_t itemid)
+	{
+		if (index < pet_wear.size())
+			pet_wear[index] = itemid;
 	}
 
 	const CharEquips &CharLook::get_equips() const

@@ -242,12 +242,16 @@ impl Player {
 
     /// The summoned pets' items, in list order.
     pub fn summoned_pets(&self) -> impl Iterator<Item = &Item> + '_ {
-        self.pets.iter().filter_map(|&serial| {
-            self.inventory
-                .items(InventoryType::Cash)
-                .map(|(_, item)| item)
-                .find(|item| item.cash_serial == Some(serial) && item.pet.is_some())
-        })
+        (0..self.pets.len()).filter_map(|index| self.summoned_pet(index))
+    }
+
+    /// The item of the pet at `index` in the list, if one is out there.
+    pub fn summoned_pet(&self, index: usize) -> Option<&Item> {
+        let serial = *self.pets.get(index)?;
+        self.inventory
+            .items(InventoryType::Cash)
+            .map(|(_, item)| item)
+            .find(|item| item.cash_serial == Some(serial) && item.pet.is_some())
     }
 
     /// The summoned pets' cash serials, 0 past the last.

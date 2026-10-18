@@ -17,6 +17,7 @@
 //////////////////////////////////////////////////////////////////////////////////
 #pragma once
 
+#include <array>
 #include <string>
 
 #include <cstddef>
@@ -58,6 +59,12 @@ namespace ms
 
 		void add_equip(int32_t equipid);
 		void remove_equip(EquipSlot::Id slot);
+
+		// The clothes the pet at `index` in the list wears (body parts 14,
+		// 30 and 38), 0 for none.
+		int32_t get_pet_wear(size_t index) const;
+
+		void set_pet_wear(size_t index, int32_t itemid);
 
 		void attack(bool degenerate);
 
@@ -154,6 +161,7 @@ namespace ms
 		const Hair *hair;
 		const Face *face;
 		CharEquips equips;
+		std::array<int32_t, 3> pet_wear = {};
 
 		Randomizer randomizer;
 		TimedBool alerted;

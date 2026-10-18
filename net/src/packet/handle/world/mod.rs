@@ -74,7 +74,7 @@ pub use self::party::{DenyPartyRequestHandler, MultiChatHandler, PartyOperationH
 pub use self::party_search_update::PartySearchUpdateHandler;
 pub use self::pet::{
     pets_grow_hungry, Hungry, MovePetHandler, PetChatHandler, PetCommandHandler, PetFoodHandler,
-    SpawnPetHandler,
+    PetLootHandler, SpawnPetHandler,
 };
 pub use self::pickup::ItemPickupHandler;
 pub use self::player_interaction::PlayerInteractionHandler;

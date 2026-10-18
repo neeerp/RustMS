@@ -22,6 +22,7 @@
 #include "../../Constants.h"
 #include "../../Audio/Audio.h"
 #include "../../Data/PetData.h"
+#include "../../Util/Misc.h"
 #include "../../Util/Randomizer.h"
 
 #include <nlnx/nx.hpp>
@@ -40,6 +41,40 @@ namespace ms
 			std::string text = reaction.lines.empty() ? "" : reaction.lines[random.next_int(reaction.lines.size())];
 
 			return { type, pets::action(reaction.act, customs), text };
+		}
+
+		// The animations of the stances, as Item.nx Pet/<id>.img names them.
+		const char *STANCE_NAMES[PetLook::Stance::LENGTH] = {
+				"move", "stand0", "jump", "alert", "prone", "fly", "hang", ""
+		};
+
+		// The frames of `src`, by their number.
+		std::vector<Texture> frames(nl::node src)
+		{
+			std::vector<Texture> textures;
+
+			for (nl::node sub : src)
+			{
+				if (sub.data_type() != nl::node::type::bitmap)
+					continue;
+
+				int16_t index = string_conversion::or_default<int16_t>(sub.name(), -1);
+
+				if (index < 0 || index >= 64)
+					continue;
+
+				if (static_cast<size_t>(index) >= textures.size())
+					textures.resize(index + 1);
+
+				textures[index] = sub;
+			}
+
+			return textures;
+		}
+
+		nl::node clothes(int32_t wear, int32_t itemid)
+		{
+			return nl::nx::character["PetEquip"]["0" + std::to_string(wear) + ".img"][std::to_string(itemid)];
 		}
 	}
 
@@ -66,7 +101,7 @@ namespace ms
 													   shown({ static_cast<double>(entry.position.x()),
 															   static_cast<double>(entry.position.y()), 0.0, 0.0,
 															   entry.fh, entry.stance }),
-													   action(-1), effecting(false), pending(false), still(0)
+													   action(-1), wear(0), effecting(false), pending(false), still(0)
 	{
 		set_position(entry.position.x(), entry.position.y());
 		set_stance(entry.stance);
@@ -78,13 +113,8 @@ namespace ms
 		std::string strid = std::to_string(itemid);
 		nl::node src = nl::nx::item["Pet"][strid + ".img"];
 
-		animations[Stance::MOVE] = src["move"];
-		animations[Stance::STAND] = src["stand0"];
-		animations[Stance::JUMP] = src["jump"];
-		animations[Stance::ALERT] = src["alert"];
-		animations[Stance::PRONE] = src["prone"];
-		animations[Stance::FLY] = src["fly"];
-		animations[Stance::HANG] = src["hang"];
+		for (size_t i = 0; i < Stance::WARP; i++)
+			animations[static_cast<Stance>(i)] = src[STANCE_NAMES[i]];
 
 		nl::node effsrc = nl::nx::effect["PetEff.img"][strid];
 
@@ -92,18 +122,24 @@ namespace ms
 	}
 
 	PetLook::PetLook() : itemid(0), serial(0), local(false), stance(Stance::STAND), flip(false),
-						 shown({ 0.0, 0.0, 0.0, 0.0, 0, 0 }), action(-1), effecting(false), pending(false),
+						 shown({ 0.0, 0.0, 0.0, 0.0, 0, 0 }), action(-1), wear(0), effecting(false), pending(false),
 						 still(0)
 	{}
 
 	void PetLook::draw(double viewx, double viewy, float alpha) const
 	{
 		Point<int16_t> absp = phobj.get_absolute(viewx, viewy, alpha);
+		DrawArgument args = DrawArgument(absp, flip);
 
 		if (action >= 0)
-			acting.draw(DrawArgument(absp, flip), alpha);
-		else
-			animations[stance].draw(DrawArgument(absp, flip), alpha);
+		{
+			acting.draw(args, alpha);
+			draw_dressing(acting_dressing, acting, args, alpha);
+		} else
+		{
+			animations[stance].draw(args, alpha);
+			draw_dressing(dressing[stance], animations[stance], args, alpha);
+		}
 
 		if (effecting)
 			effect.draw(DrawArgument(absp), alpha);
@@ -288,6 +324,8 @@ namespace ms
 			{
 				acting = src;
 				action = said.action;
+				acting_name = actname;
+				acting_dressing = wear ? frames(clothes(wear, itemid)[actname]) : std::vector<Texture>();
 			}
 
 			// A command's answer plays the pet's sound for its own actions.
@@ -450,10 +488,49 @@ namespace ms
 		return serial;
 	}
 
+	Point<int16_t> PetLook::get_position() const
+	{
+		return phobj.get_position();
+	}
+
+	bool PetLook::is_on_ground() const
+	{
+		return phobj.onground;
+	}
+
+	const PhysicsObject &PetLook::get_phobj() const
+	{
+		return phobj;
+	}
+
 	void PetLook::set_name(const std::string &n)
 	{
 		name = n;
 		namelabel.change_text(name);
+	}
+
+	void PetLook::set_wear(int32_t w)
+	{
+		if (wear == w)
+			return;
+
+		wear = w;
+
+		nl::node src = wear ? clothes(wear, itemid) : nl::node();
+
+		for (size_t i = 0; i < Stance::WARP; i++)
+			dressing[static_cast<Stance>(i)] = frames(src[STANCE_NAMES[i]]);
+
+		acting_dressing = action >= 0 ? frames(src[acting_name]) : std::vector<Texture>();
+	}
+
+	void PetLook::draw_dressing(const std::vector<Texture> &textures, const Animation &animation,
+								const DrawArgument &args, float alpha) const
+	{
+		size_t index = animation.get_frame_index(alpha);
+
+		if (index < textures.size())
+			textures[index].draw(args);
 	}
 
 	bool PetLook::is_local() const

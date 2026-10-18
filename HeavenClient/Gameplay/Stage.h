@@ -217,6 +217,10 @@ namespace ms
 
 		void check_drops();
 
+		// Each pet out with a Meso Magnet or an Item Pouch reaches for a
+		// drop at its feet (FUN_00705c5d).
+		void check_pet_loot();
+
 		// Fear's darkness, all but the player's narrowed sight (FUN_0053868d).
 		void draw_fear(double viewx, double viewy, float alpha) const;
 

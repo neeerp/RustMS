@@ -106,10 +106,12 @@ namespace ms
 		elapsed = 0;
 		age = 0;
 		sincetry = pickup::RETRY;
+		sincepet = pickup::RETRY;
 		delay = std::max<int32_t>(dly, 0);
 		flighttime = flight_time(start.y(), dest.y(), pickuptype == EXPLOSIVE);
 		phase = 0.0;
 		looter = nullptr;
+		topet = false;
 
 		if (mode == 2)
 		{
@@ -129,6 +131,7 @@ namespace ms
 		elapsed += Constants::TIMESTEP;
 		age += Constants::TIMESTEP;
 		sincetry = std::min(sincetry + Constants::TIMESTEP, pickup::RETRY);
+		sincepet = std::min(sincepet + Constants::TIMESTEP, pickup::RETRY);
 
 		if (state == Drop::State::WAITING)
 		{
@@ -222,7 +225,7 @@ namespace ms
 
 			double t = elapsed;
 			double targetx = looter->get_x();
-			double targety = looter->get_y() - 4 - LOOTERHALFHEIGHT;
+			double targety = topet ? looter->get_y() : looter->get_y() - 4 - LOOTERHALFHEIGHT;
 			double x = ((PICKUPTIME - t) * pickupstart.x() + t * targetx) / PICKUPTIME;
 			double y = ((PICKUPTIME - t) * pickupstart.y() + t * targety) / PICKUPTIME
 				- PICKUPARC + PICKUPARC * (t - PICKUPTIME / 2) * (t - PICKUPTIME / 2) / (PICKUPTIME * PICKUPTIME / 4);
@@ -268,6 +271,7 @@ namespace ms
 				break;
 			default:
 				looter = lt;
+				topet = type == 5;
 				pick_up();
 				break;
 		}
@@ -302,5 +306,32 @@ namespace ms
 	void Drop::try_loot()
 	{
 		sincetry = 0;
+	}
+
+	bool Drop::pet_lootable(Point<int16_t> feet, int32_t self, int32_t party, bool mesos, bool items,
+							bool others) const
+	{
+		// Pets leave what players dropped, and whatever their equipment
+		// doesn't pick up.
+		if (playerdrop || !(get_itemid() ? items : mesos))
+			return false;
+
+		if (pickup::pet_owned_by_other(pickuptype, owner, self, party, age - delay, others))
+			return false;
+
+		if (state != Drop::State::FLOATING || sincepet < pickup::RETRY)
+			return false;
+
+		return pickup::in_reach(feet, spot);
+	}
+
+	void Drop::try_pet_loot()
+	{
+		sincepet = 0;
+	}
+
+	int32_t Drop::get_itemid() const
+	{
+		return 0;
 	}
 }

@@ -352,6 +352,7 @@ namespace ms
 					types.emplace_back(UIElement::Type::TELEPORTROCK);
 					types.emplace_back(UIElement::Type::MEGAPHONE);
 					types.emplace_back(UIElement::Type::ITEMMEGAPHONE);
+					types.emplace_back(UIElement::Type::PETCHOOSER);
 				}
 				else if (enter)
 				{
@@ -363,6 +364,7 @@ namespace ms
 					types.emplace_back(UIElement::Type::ENTERNUMBER);
 					types.emplace_back(UIElement::Type::TELEPORTROCK);
 					types.emplace_back(UIElement::Type::MEGAPHONE);
+					types.emplace_back(UIElement::Type::PETCHOOSER);
 				} else if (tab)
 				{
 					// Game

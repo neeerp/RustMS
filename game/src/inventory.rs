@@ -109,6 +109,42 @@ pub mod equip_slot {
         }
     }
 
+    /// The slots a pet equip may be worn in, one for each summoned pet in
+    /// list order (v83 FUN_00460358). The HP and MP pouches serve every pet
+    /// from one slot.
+    pub fn pet_slots(item_id: i32) -> Option<[i16; 3]> {
+        let parts = match item_id {
+            // The Pet Collar goes where a label ring does.
+            1_802_100 => [21, 31, 39],
+            1_812_000 => [23, 34, 42],
+            1_812_001 => [22, 33, 41],
+            1_812_002 => [24; 3],
+            1_812_003 => [25; 3],
+            1_812_004 => [26, 35, 43],
+            1_812_005 => [27, 36, 44],
+            1_812_006 => [28, 37, 45],
+            1_812_007 => [46, 47, 48],
+            _ => match item_id / 10_000 {
+                180 => [14, 30, 38],
+                182 => [21, 31, 39],
+                183 => [29, 32, 40],
+                _ => return None,
+            },
+        };
+        Some(parts.map(|part| -part))
+    }
+
+    /// The list index of the pet a pet equip slot serves, or `None` for the
+    /// pouches every pet shares (v83 FUN_00705e2c).
+    pub fn pet_index(slot: i16) -> Option<usize> {
+        match -slot {
+            14 | 21..=23 | 26..=29 | 46 => Some(0),
+            30..=37 | 47 => Some(1),
+            38..=45 | 48 => Some(2),
+            _ => None,
+        }
+    }
+
     /// Whether `item_id` may be worn at `position`. As in v83, an item with
     /// a cash serial is worn at its slot less 100, and any other at its slot.
     pub fn fits(item_id: i32, cash: bool, position: i16) -> bool {
@@ -117,6 +153,9 @@ pub mod equip_slot {
             (false, -99..=-1) => position,
             _ => return false,
         };
+        if let Some(slots) = pet_slots(item_id) {
+            return slots.contains(&position);
+        }
         match for_item(item_id) {
             Some(slot) if RINGS.contains(&slot) => RINGS.contains(&position),
             Some(slot) => slot == position,
@@ -1006,6 +1045,29 @@ mod tests {
         inventory.equip(2, equip_slot::CAP).unwrap();
         assert_eq!(inventory.equipped_regular().count(), 1);
         assert_eq!(inventory.equipped_cash().count(), 1);
+    }
+
+    #[test]
+    fn pet_equips_go_in_their_pets_slots() {
+        // Wings for the second pet, a meso magnet for the third, and an HP
+        // pouch, which every pet shares.
+        for (item_id, position, index) in [
+            (1802063, -130, Some(1)),
+            (1812000, -142, Some(2)),
+            (1812002, -124, None),
+        ] {
+            assert!(equip_slot::fits(item_id, true, position), "{item_id}");
+            assert_eq!(equip_slot::pet_index(position + 100), index);
+        }
+        assert!(!equip_slot::fits(1802063, true, -129), "a quote ring's");
+        assert!(!equip_slot::fits(1812002, true, -133));
+        assert!(!equip_slot::fits(1812008, true, -128), "no such ability");
+        assert!(!equip_slot::fits(1832000, true, equip_slot::CAP - 100));
+        assert!(equip_slot::fits(1832000, true, -132));
+        assert!(
+            equip_slot::fits(1802100, true, -139),
+            "the collar's a label"
+        );
     }
 
     #[test]

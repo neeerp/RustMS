@@ -114,8 +114,18 @@ namespace ms
 
 		int64_t get_serial() const;
 
+		Point<int16_t> get_position() const;
+
+		bool is_on_ground() const;
+
+		const PhysicsObject &get_phobj() const;
+
 		// PET_NAMECHANGE (172): the pet answers to its new name.
 		void set_name(const std::string &name);
+
+		// Dress it in the clothes `wear` (180xxxx) its owner's look gives
+		// its place in the list, or none for 0 (FUN_00703d15).
+		void set_wear(int32_t wear);
 
 		bool is_local() const;
 
@@ -129,6 +139,10 @@ namespace ms
 		// Count how long it has stood at `before`, end what it was showing
 		// once it moves, and now and then act on its own.
 		void update_acting(Point<int16_t> before);
+
+		// Draw the clothes' frame for the one `animation` shows.
+		void draw_dressing(const std::vector<Texture> &textures, const Animation &animation, const DrawArgument &args,
+						   float alpha) const;
 
 		int32_t itemid;
 		std::string name;
@@ -151,6 +165,13 @@ namespace ms
 		// pet moves.
 		int16_t action;
 		Animation acting;
+		std::string acting_name;
+
+		// The clothes it wears, and their frames over each of its own
+		// (Character/PetEquip/<wear>.img/<itemid>/<animation>).
+		int32_t wear;
+		EnumMap<Stance, std::vector<Texture>> dressing;
+		std::vector<Texture> acting_dressing;
 		ChatBalloon balloon;
 		Animation effect;
 		bool effecting;

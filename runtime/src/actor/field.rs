@@ -11,7 +11,9 @@ use game::{FieldAvatar, MobStat};
 use net::conti::{self, Happening};
 use net::packet::build::world::conti::build_conti_move;
 use net::packet::build::world::door::{build_remove_door, build_spawn_door};
-use net::packet::build::world::drop::{build_drop, build_remove_drop, DropAppearance};
+use net::packet::build::world::drop::{
+    build_drop, build_pet_loot_drop, build_remove_drop, DropAppearance,
+};
 use net::packet::build::world::field::{
     build_player_enter_field, build_player_leave_field, build_show_chair, parse_movement,
     parse_movement_state,
@@ -426,6 +428,24 @@ impl FieldActor {
                     start,
                     movement,
                 } => self.handle_pet_move(from, index, start, movement),
+                FieldRequest::PetPickup {
+                    index,
+                    object_id,
+                    x,
+                    y,
+                    mesos,
+                    items,
+                } => {
+                    let now = Instant::now();
+                    let taken = self
+                        .drops
+                        .take_for_pet(from, object_id, (x, y), now, mesos, items);
+                    if let (Ok(drop), Some(occupant)) = (taken, self.occupants.get(&from)) {
+                        occupant
+                            .handle
+                            .send(ServerMessage::PetPickedUp { drop, pet: index });
+                    }
+                }
                 FieldRequest::SummonAttack { attack, limits } => {
                     self.handle_summon_attack(from, attack, &limits)
                 }
@@ -443,6 +463,20 @@ impl FieldActor {
                 y,
                 dropper,
             } => self.spawn_loot(owner, loot, x, y, dropper),
+            FieldMessage::PetLooted {
+                looter,
+                pet,
+                drop,
+                taken,
+            } => {
+                // The pet's drop was never taken off the field, so it only
+                // goes back in the set when it didn't fit.
+                if !taken {
+                    self.drops.restore(drop);
+                } else if let Ok(packet) = build_pet_loot_drop(drop.object_id, looter, pet) {
+                    self.send_drop_packet(&drop, packet);
+                }
+            }
             FieldMessage::ReturnDrop { drop } => {
                 let now = Instant::now();
                 if let Ok(packet) = build_drop(&drop.view(now), DropAppearance::Lying) {

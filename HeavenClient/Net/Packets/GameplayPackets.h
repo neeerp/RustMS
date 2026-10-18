@@ -669,6 +669,29 @@ namespace ms
 		}
 	};
 
+	// A pet standing at `position` reaches for a drop (v83 FUN_00705c7c).
+	// The flags say whether its equipment lets it take others' drops, sweep
+	// for drops and reach far. We send no checksum for an item; the server
+	// doesn't read it.
+	// Opcode: PET_LOOT(170)
+	class PetLootPacket : public OutPacket
+	{
+	public:
+		PetLootPacket(int64_t serial, Point<int16_t> position, int32_t oid, bool others, bool sweep, bool longrange)
+			: OutPacket(OutPacket::Opcode::PET_LOOT)
+		{
+			write_long(serial);
+			write_byte(0);
+			write_time();
+			write_point(position);
+			write_int(oid);
+			write_int(0);
+			write_byte(others);
+			write_byte(sweep);
+			write_byte(longrange);
+		}
+	};
+
 	// Hits a reactor (v83 FUN_007356c7). The kind is 0 for a swing and 1 for
 	// a skill, the flags bit 0 for facing left and bit 1 for standing, and
 	// the delay the ms until the hit lands, for others to see it then.

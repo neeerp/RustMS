@@ -33,6 +33,8 @@ namespace ms
 
 		void draw(double viewx, double viewy, float alpha) const override;
 
+		int32_t get_itemid() const override;
+
 	private:
 		const Texture &icon;
 		int32_t itemid;

@@ -133,6 +133,7 @@ namespace ms
 			MOVE_PET = 167,
 			PET_CHAT = 168,
 			PET_COMMAND = 169,
+			PET_LOOT = 170,
 			MOVE_SUMMON = 175,
 			SUMMON_ATTACK = 176,
 			DAMAGE_SUMMON = 177,

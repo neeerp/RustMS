@@ -18,6 +18,7 @@
 #include "Stage.h"
 
 #include "../Configuration.h"
+#include "../Character/Pets.h"
 #include "QuestConversation.h"
 #include "Timer.h"
 #include "MapleMap/CharClick.h"
@@ -283,6 +284,7 @@ namespace ms
 
 		// The player's summons follow where the player now is.
 		summons.update(physics, player.get_position(), player.is_climbing());
+		check_pet_loot();
 
 		portals.update(player.get_position());
 		check_touch_portals(drawn);
@@ -648,6 +650,45 @@ namespace ms
 
 		if (loot.first)
 			player.request(PickupItemPacket(loot.first, loot.second), ExclRequest::PICKUP_WAIT);
+	}
+
+	void Stage::check_pet_loot()
+	{
+		// Pets don't loot for a dead owner, or in the Extra Frosty Snow Zone
+		// (FUN_0070403d).
+		if (player.is_dead() || mapid == 209080000)
+			return;
+
+		const Inventory &inventory = player.get_inventory();
+		// Whether the pet `index` wears `itemid` (FUN_00705e2c).
+		auto wears = [&](uint8_t index, int32_t itemid) {
+			auto part = static_cast<EquipSlot::Id>((*pets::equip_parts(itemid))[index]);
+
+			return inventory.get_item_id(InventoryType::Id::EQUIPPED, inventory.shown_equip(part)) == itemid;
+		};
+
+		for (uint8_t index = 0; index < 3; index++)
+		{
+			Optional<PetLook> pet = player.get_pet(index);
+
+			if (!pet || !pet->is_on_ground())
+				continue;
+
+			bool mesos = wears(index, pets::MESO_MAGNET);
+			bool items = wears(index, pets::ITEM_POUCH);
+
+			if (!mesos && !items)
+				continue;
+
+			bool others = wears(index, pets::MAGIC_SCALES);
+			Point<int16_t> position = pet->get_position();
+
+			if (int32_t oid = drops.find_pet_loot_at(position, player.get_oid(), player.get_party().get_id(), mesos,
+													 items, others))
+				PetLootPacket(pet->get_serial(), position, oid, others, wears(index, pets::SWEEPER),
+							  wears(index, pets::LONG_RANGE))
+					.dispatch();
+		}
 	}
 
 	void Stage::send_key(KeyType::Id type, int32_t action, bool down)

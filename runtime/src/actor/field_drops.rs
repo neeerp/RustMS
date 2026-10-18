@@ -66,6 +66,8 @@ pub enum PickupError {
     Gone,
     TooFar,
     NotYours,
+    /// A pet without the item for it, or a drop a player threw away.
+    NotForPets,
 }
 
 pub struct DropSet {
@@ -174,6 +176,29 @@ impl DropSet {
         self.drops.remove(&object_id).ok_or(PickupError::Gone)
     }
 
+    /// Take a drop for the pet of `client` standing at (x, y), which takes
+    /// mesos with `mesos` and items with `items`. As in v83 (FUN_0050483a),
+    /// pets leave what players threw away.
+    pub fn take_for_pet(
+        &mut self,
+        client: ClientId,
+        object_id: i32,
+        (x, y): (i16, i16),
+        now: Instant,
+        mesos: bool,
+        items: bool,
+    ) -> Result<Drop, PickupError> {
+        let drop = self.drops.get(&object_id).ok_or(PickupError::Gone)?;
+        let wanted = match drop.loot {
+            Loot::Mesos(_) => mesos,
+            _ => items,
+        };
+        if drop.player_drop || !wanted {
+            return Err(PickupError::NotForPets);
+        }
+        self.take(client, object_id, x, y, now)
+    }
+
     /// Put back a drop that couldn't be picked up (a full inventory).
     pub fn restore(&mut self, drop: Drop) {
         self.drops.insert(drop.object_id, drop);
@@ -240,6 +265,55 @@ mod tests {
             PickupError::Gone
         );
         assert!(drops.take(2, ids[1], 100, 0, now + OWNERSHIP).is_ok());
+    }
+
+    #[test]
+    fn pets_take_what_their_items_allow_but_not_what_players_threw() {
+        let now = Instant::now();
+        let mut drops = DropSet::default();
+        let ids: Vec<i32> = drops
+            .spawn(
+                vec![
+                    Loot::Mesos(5),
+                    Loot::Item {
+                        item_id: 4000019,
+                        quantity: 1,
+                        quest: None,
+                    },
+                ],
+                1,
+                100,
+                0,
+                9,
+                now,
+            )
+            .iter()
+            .map(|d| d.object_id)
+            .collect();
+        let thrown = drops.throw(Loot::Mesos(7), 1, 100, 0, now).object_id;
+        let at = (100, 0);
+        // A meso magnet alone leaves items, and no pet takes what was thrown.
+        assert_eq!(
+            drops
+                .take_for_pet(1, ids[1], at, now, true, false)
+                .unwrap_err(),
+            PickupError::NotForPets
+        );
+        assert_eq!(
+            drops
+                .take_for_pet(1, thrown, at, now, true, true)
+                .unwrap_err(),
+            PickupError::NotForPets
+        );
+        // Someone else's pet waits for the owner's time to pass.
+        assert_eq!(
+            drops
+                .take_for_pet(2, ids[0], at, now, true, true)
+                .unwrap_err(),
+            PickupError::NotYours
+        );
+        let drop = drops.take_for_pet(1, ids[0], at, now, true, false).unwrap();
+        assert_eq!(drop.loot, Loot::Mesos(5));
     }
 
     #[test]

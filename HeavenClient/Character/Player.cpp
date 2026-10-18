@@ -198,6 +198,16 @@ namespace ms
 		if (part == EquipSlot::Id::NONE)
 			return;
 
+		// The pets wear their own equipment, and the look carries only
+		// their clothes.
+		if (pets::is_equip_part(part))
+		{
+			if (int8_t index = pets::wear_owner(part); index >= 0)
+				look.set_pet_wear(index, inventory.get_item_id(InventoryType::Id::EQUIPPED, inventory.shown_equip(part)));
+
+			return;
+		}
+
 		// The look wears a cash item over the regular one, but has no cash
 		// weapons (v83 draws them over the regular weapon's stances).
 		int16_t shown = part == EquipSlot::Id::WEAPON ? part : inventory.shown_equip(part);

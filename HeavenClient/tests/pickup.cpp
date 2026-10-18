@@ -33,6 +33,13 @@ int main()
 		require(!owned_by_other(2, 7, 8, 0, 0), "a free-for-all drop is anyone's");
 		require(!owned_by_other(3, 7, 8, 0, 0), "an explosive drop is anyone's");
 
+		require(pet_owned_by_other(0, 7, 8, 0, 60000, false), "a pet never takes another's drop");
+		require(!pet_owned_by_other(0, 8, 8, 0, 0, false), "a pet takes its owner's drop at once");
+		require(!pet_owned_by_other(1, 4, 8, 4, 0, false), "and its owner's party's");
+		require(!pet_owned_by_other(2, 7, 8, 0, 0, false), "and a free-for-all drop");
+		require(pet_owned_by_other(0, 7, 8, 0, OWNERSHIP, true), "Magic Scales wait out the 15 s");
+		require(!pet_owned_by_other(0, 7, 8, 0, OWNERSHIP + 1, true), "then take another's drop");
+
 		std::cout << "Pickup passed\n";
 		return 0;
 	}

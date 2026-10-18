@@ -88,6 +88,7 @@ namespace ms
 			TELEPORTROCK,
 			MEGAPHONE,
 			ITEMMEGAPHONE,
+			PETCHOOSER,
 			NUM_TYPES
 		};
 

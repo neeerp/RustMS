@@ -59,6 +59,12 @@ namespace ms
 
 		Loot find_loot_at(Point<int16_t> playerpos, int32_t self, int32_t party);
 
+		// The first drop a pet at `petpos` would reach for, if it takes
+		// mesos, items and others' drops as given, or 0 for none
+		// (FUN_0050483a).
+		int32_t find_pet_loot_at(Point<int16_t> petpos, int32_t self, int32_t party, bool mesos, bool items,
+								 bool others);
+
 	private:
 		MapObjects drops;
 
