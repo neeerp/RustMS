@@ -1,10 +1,14 @@
+use crate::actor::guild_invites::GuildInvites;
 use crate::actor::messenger::{Messengers, Outbox};
 use crate::actor::parties::{self, Member, Parties, Party};
 use crate::message::{ClientHandle, DirectoryMessage, ListedBuddy, Presence, ServerMessage};
 use game::Guild;
 use net::packet::build::world::buddy::{build_buddy_list, BuddyView};
 use net::packet::build::world::door::{build_spawn_portal, DoorView};
-use net::packet::build::world::guild::build_guild_info;
+use net::packet::build::world::guild::{
+    build_guild_error, build_guild_info, build_guild_invite, build_invite_refused, GuildError,
+    InviteRefusal,
+};
 use net::packet::build::world::map::{build_blocked_map, BlockedMap};
 use net::packet::build::world::messaging::{build_find_result, build_whisper_result, FindLocation};
 use net::packet::build::world::party::{
@@ -60,6 +64,7 @@ pub struct WorldDirectory {
     clients: HashMap<ClientId, Entry>,
     names: HashMap<String, ClientId>,
     parties: Parties,
+    guild_invites: GuildInvites,
     messengers: Messengers,
     /// Each player's Mystic Door, which their party may use too.
     doors: HashMap<ClientId, Door>,
@@ -72,6 +77,7 @@ impl WorldDirectory {
             clients: HashMap::new(),
             names: HashMap::new(),
             parties: Parties::default(),
+            guild_invites: GuildInvites::default(),
             messengers: Messengers::default(),
             doors: HashMap::new(),
         }
@@ -130,6 +136,24 @@ impl WorldDirectory {
                         entry.handle.send_packet(packet.clone());
                     }
                 }
+            }
+            DirectoryMessage::GuildInvite {
+                from,
+                guild_id,
+                name,
+            } => self.guild_invite(from, guild_id, &name, Instant::now()),
+            DirectoryMessage::GuildAccept { from, guild_id } => {
+                if self.guild_invites.accept(from, guild_id, Instant::now()) {
+                    self.tell(from, ServerMessage::JoinGuild { guild_id });
+                }
+            }
+            DirectoryMessage::GuildDeny {
+                from,
+                inviter,
+                refusal,
+            } => self.guild_deny(from, &inviter, refusal),
+            DirectoryMessage::GuildChanged { client_id } => {
+                self.tell(client_id, ServerMessage::GuildChanged)
             }
             DirectoryMessage::Messenger { from, request } => self.messenger(from, request),
             DirectoryMessage::LookChanged { client_id, look } => {
@@ -204,6 +228,7 @@ impl WorldDirectory {
                 self.deliver(out);
             }
             self.parties.forget_invites(client_id);
+            self.guild_invites.forget(client_id);
             if let Some(party) = self.parties.of(client_id) {
                 self.send_party_update(party);
             }
@@ -351,6 +376,48 @@ impl WorldDirectory {
             member.online = self.clients.contains_key(&member.id);
         }
         self.send_packet(owner, build_guild_info(Some(&guild)));
+    }
+
+    /// Pass on an invitation to someone on the inviter's channel who is not
+    /// in a guild.
+    fn guild_invite(&mut self, from: ClientId, guild_id: i32, name: &str, now: Instant) {
+        let Some(inviter) = self.clients.get(&from) else {
+            return;
+        };
+        let invitee = self.names.get(name).and_then(|id| self.clients.get(id));
+        let Some(invitee) = invitee.filter(|invitee| {
+            invitee.handle.client_id != from && invitee.channel_id == inviter.channel_id
+        }) else {
+            return self.send_packet(from, build_guild_error(GuildError::NotInChannel));
+        };
+        if invitee.presence.guild_id.is_some() {
+            return self.send_packet(from, build_guild_error(GuildError::InviteeInGuild));
+        }
+        let (id, name) = (invitee.handle.client_id, invitee.presence.name.clone());
+        let packet = build_guild_invite(guild_id, &inviter.presence.name);
+        if self.guild_invites.invite(guild_id, from, id, now) {
+            self.send_packet(id, packet);
+        } else {
+            let refused = build_invite_refused(InviteRefusal::AnotherInvitation, &name);
+            self.send_packet(from, refused);
+        }
+    }
+
+    /// Tell `inviter` that `from` turned their invitation down. One still
+    /// shown, from the same guild, is kept: the client refuses a second.
+    fn guild_deny(&mut self, from: ClientId, inviter: &str, refusal: InviteRefusal) {
+        let (Some(&inviter), Some(entry)) = (self.names.get(inviter), self.clients.get(&from))
+        else {
+            return;
+        };
+        let pending = if refusal == InviteRefusal::AnotherInvitation {
+            self.guild_invites.is_invited(from, inviter)
+        } else {
+            self.guild_invites.decline(from, inviter)
+        };
+        if pending {
+            self.send_packet(inviter, build_invite_refused(refusal, &entry.presence.name));
+        }
     }
 
     fn party_request(&mut self, from: ClientId, request: PartyRequest, now: Instant) {
@@ -654,6 +721,13 @@ impl WorldDirectory {
             .filter(move |(_, other)| other.shares_map_with(entry))
     }
 
+    /// Pass a message to `client`'s actor, if they are online.
+    fn tell(&self, client: ClientId, message: ServerMessage) {
+        if let Some(entry) = self.clients.get(&client) {
+            entry.handle.send(message);
+        }
+    }
+
     fn tell_party_changed(&self, client: ClientId, party_id: Option<i32>) {
         if let Some(entry) = self.clients.get(&client) {
             entry.handle.send(ServerMessage::PartyChanged { party_id });
@@ -709,6 +783,7 @@ mod tests {
             map_id,
             hp: 50,
             max_hp: 50,
+            guild_id: None,
         }
     }
 
@@ -962,6 +1037,101 @@ mod tests {
         };
         let expected = build_guild_info(Some(&guild([true, true, false]))).unwrap();
         assert_eq!(packet.bytes, expected.bytes);
+    }
+
+    #[test]
+    fn guild_invitations_stay_on_the_channel_and_answers_reach_the_inviter() {
+        let (_tx, rx) = mpsc::channel(1);
+        let mut directory = WorldDirectory::new(rx);
+        let mut alice = online(&mut directory, 1, "Alice", 10000);
+        let mut bobby = online(&mut directory, 2, "Bobby", 20000);
+        let (carol, _carol_rx, _) = handle(3, 3);
+        directory.register(carol, presence("Carol", 10000), 1);
+        let (dave, _dave_rx, _) = handle(4, 4);
+        let mut guilded = presence("Dave", 10000);
+        guilded.guild_id = Some(5);
+        directory.register(dave, guilded, 0);
+        let packets = |rx: &mut mpsc::Receiver<ServerMessage>| {
+            let mut seen = Vec::new();
+            while let Ok(message) = rx.try_recv() {
+                match message {
+                    ServerMessage::SendPacket(packet) => seen.push(packet.bytes),
+                    other => panic!("unexpected {other:?}"),
+                }
+            }
+            seen
+        };
+        let invite = |directory: &mut WorldDirectory, name: &str| {
+            directory.handle(DirectoryMessage::GuildInvite {
+                from: 1,
+                guild_id: 4,
+                name: name.into(),
+            })
+        };
+        let deny = |directory: &mut WorldDirectory, refusal| {
+            directory.handle(DirectoryMessage::GuildDeny {
+                from: 2,
+                inviter: "Alice".into(),
+                refusal,
+            })
+        };
+        let error = |error| build_guild_error(error).unwrap().bytes;
+        let refused = |refusal| build_invite_refused(refusal, "Bobby").unwrap().bytes;
+
+        // Carol is on another channel, Dave in a guild.
+        for name in ["Carol", "Nobody", "Alice"] {
+            invite(&mut directory, name);
+        }
+        invite(&mut directory, "Dave");
+        assert_eq!(
+            packets(&mut alice),
+            [
+                error(GuildError::NotInChannel),
+                error(GuildError::NotInChannel),
+                error(GuildError::NotInChannel),
+                error(GuildError::InviteeInGuild),
+            ]
+        );
+
+        invite(&mut directory, "Bobby");
+        assert_eq!(
+            packets(&mut bobby),
+            [build_guild_invite(4, "Alice").unwrap().bytes]
+        );
+        // Shown another invitation from the guild, the client refuses it and
+        // keeps the first.
+        deny(&mut directory, InviteRefusal::AnotherInvitation);
+        assert_eq!(
+            packets(&mut alice),
+            [refused(InviteRefusal::AnotherInvitation)]
+        );
+        directory.handle(DirectoryMessage::GuildAccept {
+            from: 2,
+            guild_id: 4,
+        });
+        directory.handle(DirectoryMessage::GuildAccept {
+            from: 2,
+            guild_id: 4,
+        });
+        assert!(matches!(
+            bobby.try_recv(),
+            Ok(ServerMessage::JoinGuild { guild_id: 4 })
+        ));
+        assert!(bobby.try_recv().is_err());
+
+        invite(&mut directory, "Bobby");
+        packets(&mut bobby);
+        deny(&mut directory, InviteRefusal::Declined);
+        deny(&mut directory, InviteRefusal::Declined);
+        assert_eq!(packets(&mut alice), [refused(InviteRefusal::Declined)]);
+        directory.handle(DirectoryMessage::GuildAccept {
+            from: 2,
+            guild_id: 4,
+        });
+        assert!(bobby.try_recv().is_err());
+
+        directory.handle(DirectoryMessage::GuildChanged { client_id: 2 });
+        assert!(matches!(bobby.try_recv(), Ok(ServerMessage::GuildChanged)));
     }
 
     #[test]

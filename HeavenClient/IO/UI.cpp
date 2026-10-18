@@ -108,6 +108,11 @@ namespace ms
 		return !quitted;
 	}
 
+	bool UI::modal_open() const
+	{
+		return state->modal_open();
+	}
+
 	void UI::send_cursor(Point<int16_t> cursorpos, Cursor::State cursorstate)
 	{
 		Cursor::State nextstate = state->send_cursor(cursorstate, cursorpos);

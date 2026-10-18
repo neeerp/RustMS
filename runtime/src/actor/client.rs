@@ -971,6 +971,8 @@ impl ClientActor {
                 })
                 .await?
             }
+            ServerMessage::JoinGuild { guild_id } => self.join_guild(guild_id).await?,
+            ServerMessage::GuildChanged => self.guild_changed().await?,
             ServerMessage::PartySkill {
                 used,
                 origin,

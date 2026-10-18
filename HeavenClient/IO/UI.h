@@ -56,6 +56,9 @@ namespace ms
 
 		bool not_quitted() const;
 
+		// Whether a window that holds the cursor is open.
+		bool modal_open() const;
+
 		void send_cursor(Point<int16_t> pos);
 
 		void send_cursor(bool pressed);

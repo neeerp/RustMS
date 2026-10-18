@@ -20,6 +20,20 @@ namespace ms
 			return emblem;
 		}
 
+		GuildMember parse_member(InPacket& recv)
+		{
+			GuildMember member;
+			member.name = recv.read_padded_string(NAME_LENGTH);
+			member.job = recv.read_int();
+			member.level = recv.read_int();
+			member.rank = recv.read_int();
+			member.online = recv.read_int() != 0;
+			recv.skip_int(); // contribution
+			recv.skip_int(); // alliance rank
+
+			return member;
+		}
+
 		GuildData parse_guild(InPacket& recv)
 		{
 			GuildData guild;
@@ -37,13 +51,9 @@ namespace ms
 
 			for (auto& member : guild.members)
 			{
-				member.name = recv.read_padded_string(NAME_LENGTH);
-				member.job = recv.read_int();
-				member.level = recv.read_int();
-				member.rank = recv.read_int();
-				member.online = recv.read_int() != 0;
-				recv.skip_int(); // contribution
-				recv.skip_int(); // alliance rank
+				int32_t id = member.id;
+				member = parse_member(recv);
+				member.id = id;
 			}
 
 			guild.capacity = recv.read_int();

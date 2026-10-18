@@ -4,11 +4,12 @@ use crate::{
     error::RuntimeError,
     message::{DirectoryMessage, FieldMessage},
 };
-use db::guild::CreateError;
-use game::guild;
+use db::guild::{CreateError, JoinError};
+use game::guild::{self, Emblem, GuildMember, GuildTag};
 use net::packet::build::world::guild::{
     build_guild_chat, build_guild_created, build_guild_error, build_guild_info,
-    build_guild_mark_changed, build_guild_name_changed, GuildError,
+    build_guild_mark_changed, build_guild_name_changed, build_member_expelled, build_member_joined,
+    build_member_left, GuildError,
 };
 use net::packet::build::world::stat::StatUpdate;
 use net::packet::build::world::{drop, stat};
@@ -52,7 +53,162 @@ impl ClientActor {
                 self.send_to_directory(DirectoryMessage::Deliver { to, packet })
                     .await
             }
+            GuildRequest::Invite { name } => match guild_id {
+                Some(guild_id) => self.invite_to_guild(guild_id, name).await,
+                None => Ok(()),
+            },
+            GuildRequest::Accept { guild_id } => {
+                self.send_to_directory(DirectoryMessage::GuildAccept {
+                    from: self.client_id,
+                    guild_id,
+                })
+                .await
+            }
+            GuildRequest::Deny { inviter, refusal } => {
+                self.send_to_directory(DirectoryMessage::GuildDeny {
+                    from: self.client_id,
+                    inviter,
+                    refusal,
+                })
+                .await
+            }
+            GuildRequest::Leave => match guild_id {
+                Some(guild_id) => self.leave_guild(guild_id).await,
+                None => Ok(()),
+            },
+            GuildRequest::Expel { member_id } => match guild_id {
+                Some(guild_id) => self.expel_from_guild(guild_id, member_id).await,
+                None => Ok(()),
+            },
         }
+    }
+
+    /// The client checks the inviter's rank and the guild's room first.
+    async fn invite_to_guild(&mut self, guild_id: i32, name: String) -> Result<(), RuntimeError> {
+        let guild = spawn_db(move || db::guild::load(guild_id)).await?;
+        if !guild.may_invite(self.client_id) {
+            warn!(
+                self.client_id,
+                "Guild invitation the client should not send; ignored"
+            );
+            return Ok(());
+        }
+        self.send_to_directory(DirectoryMessage::GuildInvite {
+            from: self.client_id,
+            guild_id,
+            name,
+        })
+        .await
+    }
+
+    /// The directory confirmed the invitation: join at the lowest rank.
+    /// Every member online hears it; the newcomer's client then asks for the
+    /// whole guild.
+    pub(super) async fn join_guild(&mut self, guild_id: i32) -> Result<(), RuntimeError> {
+        let cid = self.client_id;
+        let refusal = match spawn_db(move || db::guild::add_member(guild_id, cid)).await? {
+            Ok(()) => None,
+            Err(JoinError::Full) => Some(GuildError::Full),
+            Err(JoinError::AlreadyInGuild) => Some(GuildError::InviteeInGuild),
+        };
+        if let Some(error) = refusal {
+            return self.send(&mut build_guild_error(error)?).await;
+        }
+        let guild = spawn_db(move || db::guild::load(guild_id)).await?;
+        let stats = &self.in_game()?.player.stats;
+        let member = GuildMember {
+            id: cid,
+            name: stats.name.clone(),
+            job: stats.job,
+            level: stats.level,
+            rank: guild::MEMBER_RANK,
+            online: true,
+        };
+        self.send_to_directory(DirectoryMessage::Deliver {
+            to: guild.members.iter().map(|member| member.id).collect(),
+            packet: build_member_joined(guild_id, &member)?,
+        })
+        .await?;
+        self.set_guild(Some(guild.tag())).await
+    }
+
+    /// The master can't leave; the client doesn't offer it.
+    async fn leave_guild(&mut self, guild_id: i32) -> Result<(), RuntimeError> {
+        let cid = self.client_id;
+        if !spawn_db(move || db::guild::remove_member(guild_id, cid)).await? {
+            warn!(cid, "The guild master can't leave the guild; ignored");
+            return Ok(());
+        }
+        let mut to = spawn_db(move || db::guild::member_ids(guild_id)).await?;
+        to.push(cid);
+        let name = self.in_game()?.player.stats.name.clone();
+        self.send_to_directory(DirectoryMessage::Deliver {
+            to,
+            packet: build_member_left(guild_id, cid, &name)?,
+        })
+        .await?;
+        self.set_guild(None).await
+    }
+
+    /// Put a member out, if the player's rank allows it (`Guild::may_expel`).
+    async fn expel_from_guild(
+        &mut self,
+        guild_id: i32,
+        member_id: i32,
+    ) -> Result<(), RuntimeError> {
+        let guild = spawn_db(move || db::guild::load(guild_id)).await?;
+        let name = match guild.member(member_id) {
+            Some(member) if guild.may_expel(self.client_id, member_id) => member.name.clone(),
+            _ => {
+                warn!(
+                    self.client_id,
+                    member_id, "Guild expulsion not allowed; ignored"
+                );
+                return Ok(());
+            }
+        };
+        if !spawn_db(move || db::guild::remove_member(guild_id, member_id)).await? {
+            return Ok(());
+        }
+        self.send_to_directory(DirectoryMessage::Deliver {
+            to: guild.members.iter().map(|member| member.id).collect(),
+            packet: build_member_expelled(guild_id, member_id, &name)?,
+        })
+        .await?;
+        self.send_to_directory(DirectoryMessage::GuildChanged {
+            client_id: member_id,
+        })
+        .await
+    }
+
+    /// Someone else changed the player's guild: read it again.
+    pub(super) async fn guild_changed(&mut self) -> Result<(), RuntimeError> {
+        let cid = self.client_id;
+        let tag = spawn_db(move || db::guild::tag(cid)).await?;
+        self.set_guild(tag).await
+    }
+
+    /// Others on the map see the guild's name and emblem under the player's,
+    /// or none.
+    async fn set_guild(&mut self, tag: Option<GuildTag>) -> Result<(), RuntimeError> {
+        let cid = self.client_id;
+        let (name, emblem) = tag
+            .as_ref()
+            .map_or((String::new(), Emblem::default()), |tag| {
+                (tag.name.clone(), tag.emblem)
+            });
+        let player = &mut self.in_game_mut()?.player;
+        player.guild = tag;
+        let avatar = player.field_avatar(0, 0, 0);
+        self.send_to_field(FieldMessage::UpdateAvatar {
+            client_id: cid,
+            avatar,
+            announce: vec![
+                build_guild_name_changed(cid, &name)?,
+                build_guild_mark_changed(cid, &emblem)?,
+            ],
+        })
+        .await
     }
 
     /// The directory, which knows who is online, sends the guild.
@@ -122,9 +278,8 @@ impl ClientActor {
         }
         let player = &mut self.in_game_mut()?.player;
         player.meso -= guild::CREATE_COST;
-        player.guild = Some(guild.tag());
         player.mark_dirty();
-        let (meso, avatar) = (player.meso, player.field_avatar(0, 0, 0));
+        let meso = player.meso;
         self.flush().await?;
         let mut packets = vec![
             stat::build_stat_update(false, &[StatUpdate::Meso(meso)])?,
@@ -132,15 +287,6 @@ impl ClientActor {
             build_guild_created(&guild)?,
         ];
         self.send_all(&mut packets).await?;
-        // Others on the map see the name and emblem under the master's.
-        self.send_to_field(FieldMessage::UpdateAvatar {
-            client_id: cid,
-            avatar,
-            announce: vec![
-                build_guild_name_changed(cid, &guild.name)?,
-                build_guild_mark_changed(cid, &guild.emblem)?,
-            ],
-        })
-        .await
+        self.set_guild(Some(guild.tag())).await
     }
 }

@@ -3,8 +3,9 @@
 A guild is a named group of up to its capacity of characters, founded at
 Heracle in the Orbis guild headquarters. Members see the guild's name and
 emblem under each other's names, the stat window and character info show it,
-and guild chat reaches the members online. So far a guild can only be
-founded; nobody can join, leave, or change it in game.
+and guild chat reaches the members online. The master and the Jr. Masters
+invite players on their channel; members leave, and are expelled. Nothing
+else about a guild changes in game yet.
 
 ## Server
 
@@ -28,8 +29,10 @@ case (a unique index on `lower(name)`).
   licensed script has his text, so they stay placeholders (`unsourced` in
   `game-data/server_content.toml`).
 - `GUILD_OPERATION` (`net/src/packet/handle/world/guild.rs`) becomes a
-  `GuildRequest`: reload (mode 0) or create with a name (mode 2). Other
-  modes are ignored.
+  `GuildRequest`: reload (mode 0), create with a name (2), invite by name
+  (5), accept an invitation (6), leave (7), or expel (8). Other modes are
+  ignored. `DENY_GUILD_REQUEST` (127) turns an invitation down: 0x35 when
+  the client was busy, 0x36 when it already shows one, 0x37 when declined.
 - The client actor (`runtime/src/actor/client/guilds.rs`) founds the guild
   only while `naming_guild` is set, so a forged create does nothing. It
   checks everything again: a GM gets 0x38, a member 0x21, a low level 0x23,
@@ -42,6 +45,25 @@ case (a unique index on `lower(name)`).
   guild and the world directory sends it (0x1A), marking members online on
   any channel (`DirectoryMessage::GuildInfo`). The client starts with no
   guild, so nothing is sent for none.
+- Invitations: the actor checks that the inviter is the master or a Jr.
+  Master and that the guild has room (`Guild::may_invite`), then the world
+  directory finds the invitee by name, matching case, on the inviter's
+  channel. Nobody there gets 0x2A; someone in a guild gets 0x28. The
+  directory remembers the invitation for 3 minutes, one guild at a time
+  (`runtime/src/actor/guild_invites.rs`): another guild's invitation is
+  refused with 0x36 while one is waiting. A refusal reaches the inviter
+  once, as 0x35, 0x36 or 0x37 with the invitee's name.
+- Accepting an invitation that is still waiting tells the invitee's actor
+  to join. `db::guild::add_member` adds them at rank 5, locking the guild so
+  it can't pass its capacity (0x29 when full). Every member online gets
+  0x27 with the newcomer's record, the newcomer included; their client asks
+  for the whole guild again (mode 0).
+- Leaving (anyone but the master) sends 0x2C to the members and the leaver.
+  Expelling follows the client's rule (`Guild::may_expel`): the master and
+  Jr. Masters expel, but nobody the master, and only the master a Jr.
+  Master. 0x2F goes to every member, the expelled one included, and their
+  actor, if online, reads their guild again (`DirectoryMessage::GuildChanged`).
+  Either way the map sees the name and emblem go.
 - Guild chat is the guild mode (2) of `MULTICHAT`. The server ignores the
   client's recipient list and sends the line to every other member online
   (`DirectoryMessage::Deliver`). The speaker's client prints its own line.
@@ -64,6 +86,26 @@ ints. The client takes the first member for the master.
     master while other members get a chat line.
   - 0x1C has Heracle say the name is taken, then asks again. 0x21, 0x23,
     0x38 and unknown modes are chat lines.
+  - 0x05, an invitation, shows a card above the status bar
+    (`UIInviteCard::GUILD`): "from '<name>'" over "Guild invite". O sends
+    mode 6 and X sends 0x37; letting it fade sends nothing. As in v83, the
+    client refuses by itself with 0x36 while a guild card is up, or 0x35
+    while a window that holds the cursor is open (`UI::modal_open`).
+  - 0x27 says "You have entered the guild." and asks for the guild (mode
+    0), or adds someone else's record. 0x2C and 0x2F take a member out, or
+    clear the guild if it is the player. These three only count for the
+    player's guild. 0x28, 0x29, 0x2A, 0x2D, 0x30 and the refusals 0x35 to
+    0x37 are chat lines.
+- `IO/GuildCommands` has v83's checks before asking the server:
+  - `/guildinfo` lists every member, online or not, and says if the player
+    is the master.
+  - `/leaveguild` asks "Would you like to quit the guild?"; the master can't.
+  - `/guildinvite <name>` needs the master or a Jr. Master and room.
+  - `/guildexpel <name>` needs the name of a member (matching case) who
+    isn't the master, and only the master names a Jr. Master. It asks
+    first, and leaves the player's own rank to the server.
+  - Commands match without regard to case, as the party commands do; the
+    context menu's GUILD INVITE uses `invite` too.
   - `GUILD_NAME_CHANGED` (202) and `GUILD_MARK_CHANGED` (203) change what
     another character shows.
 - `Char` draws the guild name under the character's name, with the emblem
@@ -82,14 +124,20 @@ ints. The client takes the first member for the master.
     its header is wholly in view.
   - Clicking a row picks the member. WHISPER and TALK work for a picked
     member online who isn't the player; PARTY INVITE also needs the player
-    to lead a party. The other nine buttons are always disabled for now.
+    to lead a party.
+  - INVITE (the master and Jr. Masters) asks for a name, LEAVE (anyone but
+    the master) and EXPEL run the commands. EXPEL needs a picked member
+    the player may expel (`Guild::may_kick`), online or not. The other six
+    buttons are always disabled for now.
   - The client places the guild buttons by their top left, ignoring the
     origin that BtGuildBBS and BtInfo have (inferred from the button grid),
     so the tab adds the origin back.
 
 ## Not implemented
 
-- Invitations, joining, leaving, expelling, rank changes, and disbanding.
+- Rank changes and disbanding.
+- The card's option to refuse all invitations, and the blacklist, which
+  v83 also checks before showing one.
 - Editing the notice, titles, or emblem; raising the capacity.
 - Telling members when someone logs in or out, levels up, or changes job:
   the window shows who was online when the player entered the game.
@@ -103,3 +151,5 @@ ints. The client takes the first member for the master.
   192 px view).
 - How text is clipped at the list's and the notice strip's edges.
 - The name tag's exact placement, which no footage has confirmed.
+- `UI::modal_open` stands in for v83's FUN_0049ed00; which windows count
+  as modal there hasn't been checked.

@@ -621,6 +621,9 @@ add_executable(HeavenClient
     IO/BuddyCommands.h
     IO/PartyCommands.cpp
     IO/PartyCommands.h
+    IO/GuildCommands.cpp
+    IO/GuildCommands.h
+    IO/ChatCommand.h
     IO/UI.cpp
     IO/UI.h
     IO/UIDragElement.h

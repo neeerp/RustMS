@@ -87,6 +87,25 @@ int main()
 		require(guild.online_ids(9) == std::vector<int32_t>{ 1 }, "guild chat goes to online members");
 		require(guild.find(2) && guild.find(2)->name == "Bobby" && !guild.find(3), "find by id");
 
+		require(guild.rank(2) == 3 && guild.rank(9) == 0, "ranks, and none for outsiders");
+		require(!guild.full(), "two of ten");
+
+		Writer joined;
+		joined.member("Carol", 5, 1);
+		InPacket record(joined.bytes.data(), joined.bytes.size());
+		GuildMember carol = GuildParser::parse_member(record);
+		require(!record.available() && carol.name == "Carol" && carol.rank == 5, "one member's record");
+		carol.id = 3;
+		guild.add(carol);
+		guild.add(carol);
+		require(guild.get_data().members.size() == 3 && guild.find(3)->online, "a member joins once");
+		guild.remove(2);
+		require(!guild.find(2) && guild.is_master(1) && guild.get_data().members.size() == 2, "a member leaves");
+
+		require(Guild::may_kick(1, 2) && Guild::may_kick(1, 5) && !Guild::may_kick(1, 1), "the master expels the rest");
+		require(!Guild::may_kick(2, 2) && Guild::may_kick(2, 3), "a Jr. Master expels the ranks below");
+		require(!Guild::may_kick(3, 4) && !Guild::may_kick(1, 0), "members don't, and not without a pick");
+
 		guild.clear();
 		require(!guild.exists() && guild.get_data().members.empty(), "clearing forgets the guild");
 

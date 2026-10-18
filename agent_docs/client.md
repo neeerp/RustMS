@@ -261,13 +261,12 @@ from `UI.nx`. Moved so far:
   closes before a row acts. Info opens the character info window, SAVE NAME
   copies the name and opens the chat field, WHISPER fills in "/w name ",
   TRADE and PARTY INVITE do what the info window's trade and `/party invite`
-  do, GUILD INVITE sends GUILD_OPERATION 5 after v83's guild checks (the
-  server ignores it until it has guild invites), and ALERT GM shows v83's
-  notice that reports are down. Approximations: v83 also hits
-  the character's second position and a morph's own box; it puts the chat
-  into whisper mode rather than filling in a command; and it offers Add
-  Junior to family members, which HC doesn't have. The right button acts when
-  it comes up, everywhere, as in v83.
+  do, GUILD INVITE sends GUILD_OPERATION 5 after v83's guild checks, and
+  ALERT GM shows v83's notice that reports are down. Approximations: v83
+  also hits the character's second position and a morph's own box; it puts
+  the chat into whisper mode rather than filling in a command; and it offers
+  Add Junior to family members, which HC doesn't have. The right button
+  acts when it comes up, everywhere, as in v83.
 - **Quest log** (`UIQuestLog`, `UIWindow.img/Quest`): Available, In Progress,
   and Complete tabs (`Basic.img/Tab2`), quests folded by area, and a detail
   panel with the quest's text and FIND NPC or QUEST HELPER, laid out from
@@ -470,7 +469,7 @@ side yet.
 | Character info, minimap, world map | Implemented |
 | Party (`UIUserList` Party tab, `UIPartyHP`, party chat) | Implemented; see `parties.md` |
 | Buddy list (`UIUserList` Friend tab, buddy chat) | Implemented without groups; see `buddies.md` |
-| Guild (`UIUserList` Guild tab, name tags, guild chat) | Founding and viewing only; see `guilds.md` |
+| Guild (`UIUserList` Guild tab, name tags, guild chat) | Founding, invitations, leaving and expelling; see `guilds.md` |
 | Alliance / blacklist tabs (`UIUserList`) | Tab strip only |
 | Monster Book (`UIMonsterBook`) | Implemented: cards, summary, monster pages, search, cover; see `combat.md` |
 | Cash shop (`UICashShop`) | Enter/exit, catalog, buying, gifts, Cash Inventory, wish list, and moving items to and from the bags |
@@ -651,7 +650,7 @@ the screen size.
 | System | Client status | Effort |
 | --- | --- | --- |
 | Buddy groups | Default group only | S |
-| Guild | Window and founding only; member management, emblem and BBS UIs missing | M |
+| Guild | Window, founding, invitations, leaving and expelling; ranks, emblem and BBS UIs missing | M |
 | Player shops | Nothing | L |
 | Cash shop | No coupons, charging, or storage window | S |
 | Quest accept/complete UI flow | Partial | S |

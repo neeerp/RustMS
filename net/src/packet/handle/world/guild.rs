@@ -1,11 +1,13 @@
 use crate::handler::{
     GuildRequest, HandlerResult, WorldAction, WorldContext, WorldHandler, WorldResult,
 };
+use crate::packet::build::world::guild::InviteRefusal;
 use packet::{io::read::PktRead, Packet};
 use std::io::Cursor;
 
-/// `GUILD_OPERATION`: ask for the guild again, or name a new guild in
-/// answer to the name prompt. Other modes aren't supported yet.
+/// `GUILD_OPERATION`: ask for the guild again, name a new guild in answer
+/// to the name prompt, invite, join, leave, or expel. Other modes aren't
+/// supported yet.
 pub struct GuildOperationHandler;
 
 impl WorldHandler for GuildOperationHandler {
@@ -17,9 +19,42 @@ impl WorldHandler for GuildOperationHandler {
             0x02 => GuildRequest::Create {
                 name: reader.read_str_with_length()?,
             },
+            0x05 => GuildRequest::Invite {
+                name: reader.read_str_with_length()?,
+            },
+            // The player's id follows; the server knows it.
+            0x06 => GuildRequest::Accept {
+                guild_id: reader.read_int()?,
+            },
+            // The player's id and name follow.
+            0x07 => GuildRequest::Leave,
+            // The member's name follows.
+            0x08 => GuildRequest::Expel {
+                member_id: reader.read_int()?,
+            },
             _ => return Ok(HandlerResult::empty()),
         };
         Ok(HandlerResult::empty().with(WorldAction::Guild(request)))
+    }
+}
+
+/// `DENY_GUILD_REQUEST`: the invitee turned an invitation down, or their
+/// client did because they were busy.
+pub struct DenyGuildRequestHandler;
+
+impl WorldHandler for DenyGuildRequestHandler {
+    fn handle(&self, packet: &mut Packet, _ctx: &mut WorldContext) -> WorldResult {
+        let mut reader = Cursor::new(&packet.bytes);
+        reader.read_short()?;
+        let Some(refusal) = InviteRefusal::from_code(reader.read_byte()?) else {
+            return Ok(HandlerResult::empty());
+        };
+        // The invitee's own name follows.
+        let inviter = reader.read_str_with_length()?;
+        Ok(
+            HandlerResult::empty()
+                .with(WorldAction::Guild(GuildRequest::Deny { inviter, refusal })),
+        )
     }
 }
 
@@ -29,7 +64,7 @@ mod tests {
     use crate::packet::op::RecvOpcode;
     use packet::io::write::PktWrite;
 
-    fn request(bytes: &[u8]) -> Option<GuildRequest> {
+    fn request(handler: &dyn WorldHandler, bytes: &[u8]) -> Option<GuildRequest> {
         let mut packet = Packet::new(bytes);
         let mut player = crate::codec::stats::sample_player();
         let mut ctx = WorldContext {
@@ -37,7 +72,7 @@ mod tests {
             channel_id: 0,
             player: &mut player,
         };
-        let result = GuildOperationHandler.handle(&mut packet, &mut ctx);
+        let result = handler.handle(&mut packet, &mut ctx);
         match result.unwrap().actions.pop() {
             Some(WorldAction::Guild(request)) => Some(request),
             None => None,
@@ -54,22 +89,88 @@ mod tests {
         packet
     }
 
+    fn guild_request(packet: &Packet) -> Option<GuildRequest> {
+        request(&GuildOperationHandler, &packet.bytes)
+    }
+
     #[test]
     fn reads_reload_and_create() {
-        assert_eq!(request(&operation(0).bytes), Some(GuildRequest::Reload));
+        assert_eq!(guild_request(&operation(0)), Some(GuildRequest::Reload));
 
         let mut packet = operation(2);
         packet.write_str_with_length("Testers").unwrap();
         assert_eq!(
-            request(&packet.bytes),
+            guild_request(&packet),
             Some(GuildRequest::Create {
                 name: "Testers".into()
             })
         );
 
-        // Invitations and the rest come later.
+        // Rank changes and the rest come later.
+        let mut packet = operation(0x0E);
+        packet.write_int(7).unwrap();
+        packet.write_byte(3).unwrap();
+        assert_eq!(guild_request(&packet), None);
+    }
+
+    #[test]
+    fn reads_invite_accept_leave_and_expel() {
         let mut packet = operation(5);
         packet.write_str_with_length("Bobby").unwrap();
-        assert_eq!(request(&packet.bytes), None);
+        assert_eq!(
+            guild_request(&packet),
+            Some(GuildRequest::Invite {
+                name: "Bobby".into()
+            })
+        );
+
+        let mut packet = operation(6);
+        packet.write_int(4).unwrap();
+        packet.write_int(9).unwrap();
+        assert_eq!(
+            guild_request(&packet),
+            Some(GuildRequest::Accept { guild_id: 4 })
+        );
+
+        let mut packet = operation(7);
+        packet.write_int(9).unwrap();
+        packet.write_str_with_length("Bobby").unwrap();
+        assert_eq!(guild_request(&packet), Some(GuildRequest::Leave));
+
+        let mut packet = operation(8);
+        packet.write_int(9).unwrap();
+        packet.write_str_with_length("Bobby").unwrap();
+        assert_eq!(
+            guild_request(&packet),
+            Some(GuildRequest::Expel { member_id: 9 })
+        );
+    }
+
+    #[test]
+    fn reads_refusals() {
+        let deny = |reason: u8| {
+            let mut packet = Packet::new_empty();
+            packet
+                .write_short(RecvOpcode::DenyGuildRequest as i16)
+                .unwrap();
+            packet.write_byte(reason).unwrap();
+            packet.write_str_with_length("Alice").unwrap();
+            packet.write_str_with_length("Bobby").unwrap();
+            request(&DenyGuildRequestHandler, &packet.bytes)
+        };
+        for (reason, refusal) in [
+            (0x35, InviteRefusal::Busy),
+            (0x36, InviteRefusal::AnotherInvitation),
+            (0x37, InviteRefusal::Declined),
+        ] {
+            assert_eq!(
+                deny(reason),
+                Some(GuildRequest::Deny {
+                    inviter: "Alice".into(),
+                    refusal
+                })
+            );
+        }
+        assert_eq!(deny(0x2A), None);
     }
 }

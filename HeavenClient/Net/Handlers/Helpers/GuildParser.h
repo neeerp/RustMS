@@ -12,6 +12,9 @@ namespace ms
 		// each as a fixed 37-byte record.
 		GuildData parse_guild(InPacket& recv);
 
+		// One GUILDMEMBER record, which leaves out the id.
+		GuildMember parse_member(InPacket& recv);
+
 		// The emblem as GUILDDATA, SPAWN_PLAYER, and GUILD_MARK_CHANGED
 		// carry it.
 		GuildEmblem parse_emblem(InPacket& recv);

@@ -5,6 +5,7 @@
 #include "UINotice.h"
 #include "UITradingRoom.h"
 
+#include "../GuildCommands.h"
 #include "../PartyCommands.h"
 #include "../UI.h"
 #include "../Window.h"
@@ -39,45 +40,12 @@ namespace ms
 		const Point<int16_t> TITLE_AT(11, -3);
 		constexpr size_t TITLE_WIDTH = 78;
 
-		void notice(const std::string& line)
-		{
-			if (auto chatbar = UI::get().get_element<UIChatBar>())
-				chatbar->send_chatline(line, UIChatBar::LineType::SKILL);
-		}
-
 		// Juniors come from the family, which HC doesn't have.
 		bool can_add_junior()
 		{
 			return false;
 		}
 
-		// The guild master and the Jr. Masters (rank 2) invite (FUN_0053088f).
-		bool can_invite_to_guild(const Player& player)
-		{
-			const Guild& guild = player.get_guild();
-			int32_t self = player.get_oid();
-			const GuildMember* member = guild.find(self);
-
-			return guild.exists() && (guild.is_master(self) || (member && member->rank == 2));
-		}
-
-		// /guildinvite's checks (FUN_005306d5).
-		void invite_to_guild(const std::string& name)
-		{
-			const Player& player = Stage::get().get_player();
-			const Guild& guild = player.get_guild();
-
-			if (name == player.get_stats().get_name())
-				notice("You cannot invite yourself to the guild.");
-			else if (!guild.exists())
-				notice("You are not in the guild.");
-			else if (!can_invite_to_guild(player))
-				notice("You are not the master of the guild.");
-			else if (guild.get_data().members.size() >= static_cast<size_t>(guild.get_data().capacity))
-				notice("You cannot invite more people to the guild.");
-			else
-				InviteToGuildPacket(name).dispatch();
-		}
 	}
 
 	UIContextMenu::UIContextMenu(int32_t c, const std::string& n, Point<int16_t> cursor) :
@@ -95,7 +63,7 @@ namespace ms
 		bool party_invite = !party.exists() || party.is_leader(player.get_oid());
 
 		std::vector<context_menu::Entry> entries =
-			context_menu::entries(party_invite, can_invite_to_guild(player), can_add_junior());
+			context_menu::entries(party_invite, GuildCommands::can_invite(player), can_add_junior());
 		rows = entries.size();
 
 		for (size_t row = 0; row < rows; row++)
@@ -190,7 +158,7 @@ namespace ms
 				PartyCommands::invite(name);
 				break;
 			case context_menu::GUILD:
-				invite_to_guild(name);
+				GuildCommands::invite(name);
 				break;
 			case context_menu::CLAIM:
 				// The server never opens reports, so v83 says they're down

@@ -1,14 +1,12 @@
 #include "PartyCommands.h"
 
+#include "ChatCommand.h"
 #include "UI.h"
 
 #include "UITypes/UIChatBar.h"
 
 #include "../Gameplay/Stage.h"
 #include "../Net/Packets/GameplayPackets.h"
-
-#include <algorithm>
-#include <cctype>
 
 namespace ms
 {
@@ -21,25 +19,6 @@ namespace ms
 			constexpr char TOO_LOW[] = "Characters whose level is below Lv. 10, such as Beginners, Noblesses, and Legends cannot form a party.";
 			// The party holds six.
 			constexpr size_t CAPACITY = 6;
-
-			bool same_text(const std::string& a, const std::string& b)
-			{
-				return a.size() == b.size() && std::equal(a.begin(), a.end(), b.begin(),
-					[](unsigned char x, unsigned char y) { return std::tolower(x) == std::tolower(y); });
-			}
-
-			// Whether input is command followed by a space and something
-			// more, which becomes rest (FUN_004a8e3d).
-			bool with_argument(const std::string& input, const std::string& command, std::string& rest)
-			{
-				std::string prefix = command + " ";
-
-				if (input.size() <= prefix.size() || !same_text(input.substr(0, prefix.size()), prefix))
-					return false;
-
-				rest = input.substr(prefix.size());
-				return true;
-			}
 
 			void notice(const std::string& line)
 			{
@@ -61,6 +40,9 @@ namespace ms
 
 		bool run(const std::string& input)
 		{
+			using ChatCommand::same_text;
+			using ChatCommand::with_argument;
+
 			std::string name;
 
 			if (same_text(input, "/partyinfo"))

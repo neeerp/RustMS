@@ -86,6 +86,7 @@ namespace ms
 
 		UIElement *get_front(Point<int16_t> pos) override;
 
+		bool modal_open() const override;
 
 	private:
 		const CharStats &stats;

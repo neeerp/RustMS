@@ -21,6 +21,7 @@
 #include "UIEnterText.h"
 
 #include "../BuddyCommands.h"
+#include "../GuildCommands.h"
 #include "../PartyCommands.h"
 #include "../UI.h"
 
@@ -810,6 +811,24 @@ namespace ms
 				}
 
 				break;
+			case Buttons::BT_GUILD_INVITE:
+				UI::get().emplace<UIEnterText>(
+						"Please type the name of the character, you want to invite.",
+						[](const std::string& name)
+						{
+							GuildCommands::invite(name);
+						},
+						NAME_LIMIT
+				);
+				break;
+			case Buttons::BT_GUILD_WITHDRAW:
+				GuildCommands::leave();
+				break;
+			case Buttons::BT_GUILD_KICK:
+				if (const GuildMember* picked = picked_member())
+					GuildCommands::expel(picked->name);
+
+				break;
 			case Buttons::BT_GUILD_WHISPER:
 				if (const GuildMember* picked = picked_online_member())
 					if (auto chatbar = UI::get().get_element<UIChatBar>())
@@ -1052,12 +1071,18 @@ namespace ms
 		// Inviting someone makes a party first if the player has none.
 		enable(Buttons::BT_INVITE_BUDDY, buddy && buddy->online() && party_has_room);
 
-		// The client's rules for the rest (FUN_0090f17c) need guild
+		// The client's rules (FUN_0090f17c). Without a guild the player's
+		// rank is 0, which greys out all of them. The rest need guild
 		// operations the server doesn't have yet.
+		int32_t rank = guild.rank(Stage::get().get_player().get_oid());
+		const GuildMember* picked = picked_member();
 		const GuildMember* guild_member = picked_online_member();
 
-		for (uint16_t id : { Buttons::BT_GUILD_INVITE, Buttons::BT_GUILD_WITHDRAW, Buttons::BT_GUILD_KICK,
-							 Buttons::BT_GUILD_UP, Buttons::BT_GUILD_DOWN, Buttons::BT_GUILD_WHERE,
+		enable(Buttons::BT_GUILD_INVITE, rank == 1 || rank == 2);
+		enable(Buttons::BT_GUILD_WITHDRAW, rank > 1);
+		enable(Buttons::BT_GUILD_KICK, Guild::may_kick(rank, picked ? picked->rank : 0));
+
+		for (uint16_t id : { Buttons::BT_GUILD_UP, Buttons::BT_GUILD_DOWN, Buttons::BT_GUILD_WHERE,
 							 Buttons::BT_GUILD_INFO, Buttons::BT_GUILD_NOTICE, Buttons::BT_GUILD_BBS })
 			enable(id, false);
 
@@ -1205,7 +1230,7 @@ namespace ms
 		place_section_buttons();
 	}
 
-	const GuildMember* UIUserList::picked_online_member() const
+	const GuildMember* UIUserList::picked_member() const
 	{
 		if (guild_picked == 0 || guild_picked == Stage::get().get_player().get_oid())
 			return nullptr;
@@ -1213,18 +1238,17 @@ namespace ms
 		// A row counts only while the list shows it: not on another page or
 		// in a folded section.
 		for (const GuildSection* section : { &guild_online, &guild_offline })
-		{
 			for (const GuildRow& row : section->rows)
-			{
 				if (row.id == guild_picked)
-				{
-					const GuildMember* member = guild.find(row.id);
-
-					return member && member->online ? member : nullptr;
-				}
-			}
-		}
+					return guild.find(row.id);
 
 		return nullptr;
+	}
+
+	const GuildMember* UIUserList::picked_online_member() const
+	{
+		const GuildMember* member = picked_member();
+
+		return member && member->online ? member : nullptr;
 	}
 }

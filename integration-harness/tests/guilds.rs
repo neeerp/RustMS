@@ -1,13 +1,15 @@
 //! Guilds (GUILD_OPERATION): Heracle founds one for a level 10 with the
 //! fee once the client names it; a bad or taken name asks again. Members
 //! get their guild on entering the game, others see the guild name under
-//! a member's, and guild chat reaches the members online.
+//! a member's, and guild chat reaches the members online. The master
+//! invites players on the channel, who may decline (DENY_GUILD_REQUEST) or
+//! join; members leave, and are expelled.
 
 use game_data::GameData;
 use integration_harness::database::{join_guild, set_job, set_meso};
 use integration_harness::preconditions::load_harness_config_or_fail;
 use integration_harness::quests::answer;
-use integration_harness::trace::{read_for, stat, step, until, warp, Trace};
+use integration_harness::trace::{read_for, send, stat, step, until, warp, Trace};
 use integration_harness::{login_to_world_session, relogin, HarnessConfig, WorldSession};
 use net::packet::op::RecvOpcode;
 use packet::io::read::PktRead;
@@ -19,6 +21,8 @@ use std::sync::OnceLock;
 use tokio::time::Duration;
 
 const GUILD_HQ: i32 = 200_000_301;
+/// Orbis Park, away from the other test's founding.
+const PARK: i32 = 200_000_200;
 const HERACLE: i32 = 2010007;
 const FEE: i32 = 1_500_000;
 
@@ -26,6 +30,12 @@ const NAME_PROMPT: u8 = 0x01;
 const INFO: u8 = 0x1a;
 const NAME_TAKEN: u8 = 0x1c;
 const CREATED: u8 = 0x20;
+const INVITE: u8 = 0x05;
+const JOINED: u8 = 0x27;
+const NOT_IN_CHANNEL: u8 = 0x2a;
+const LEFT: u8 = 0x2c;
+const EXPELLED: u8 = 0x2f;
+const DECLINED: u8 = 0x37;
 
 fn maps() -> &'static GameData {
     static MAPS: OnceLock<GameData> = OnceLock::new();
@@ -57,6 +67,45 @@ fn create(name: &str) -> Packet {
     p.write_byte(2).unwrap();
     p.write_str_with_length(name).unwrap();
     p
+}
+
+fn operation(mode: u8, ids: &[i32], name: Option<&str>) -> Packet {
+    let mut p = Packet::new_empty();
+    p.write_short(RecvOpcode::GuildOperation as i16).unwrap();
+    p.write_byte(mode).unwrap();
+    for &id in ids {
+        p.write_int(id).unwrap();
+    }
+    if let Some(name) = name {
+        p.write_str_with_length(name).unwrap();
+    }
+    p
+}
+
+fn decline(inviter: &str, me: &str) -> Packet {
+    let mut p = Packet::new_empty();
+    p.write_short(RecvOpcode::DenyGuildRequest as i16).unwrap();
+    p.write_byte(DECLINED).unwrap();
+    p.write_str_with_length(inviter).unwrap();
+    p.write_str_with_length(me).unwrap();
+    p
+}
+
+/// The guild operation in `mode` `session` gets next.
+async fn next_op(session: &mut WorldSession, mode: u8) -> Vec<u8> {
+    let mut t = Trace::default();
+    until(&mut session.connection, &mut t, |t| {
+        t.guild_ops.iter().any(|op| op[0] == mode)
+    })
+    .await;
+    t.guild_ops.into_iter().find(|op| op[0] == mode).unwrap()
+}
+
+/// A mode's body: an id, another id, then a name.
+fn ids_and_name(op: &[u8]) -> (i32, i32, String) {
+    let mut r = Cursor::new(&op[1..]);
+    let ids = (r.read_int().unwrap(), r.read_int().unwrap());
+    (ids.0, ids.1, r.read_str_with_length().unwrap())
 }
 
 fn guild_chat(to: &[i32], text: &str) -> Packet {
@@ -171,10 +220,14 @@ async fn heracle_founds_a_guild_that_members_see_and_chat_in() {
         (name.clone(), vec![(a_id, true)])
     );
 
-    // B, on the map, sees the name under A's.
+    // B, on the map, sees the name under A's. The other test may found a
+    // guild here meanwhile.
     let mut bt = Trace::default();
-    until(&mut b.connection, &mut bt, |t| !t.guild_names.is_empty()).await;
-    assert_eq!(bt.guild_names, [(a_id, name.clone())]);
+    until(&mut b.connection, &mut bt, |t| {
+        t.guild_names.iter().any(|(id, _)| *id == a_id)
+    })
+    .await;
+    assert!(bt.guild_names.contains(&(a_id, name.clone())));
 
     // The name is taken, whatever the case.
     let mut c = founder(&c_config, FEE).await;
@@ -184,8 +237,8 @@ async fn heracle_founds_a_guild_that_members_see_and_chat_in() {
     assert_eq!(t.stat(stat::MESO), None);
     drop(c);
 
-    // B joins (there are no invitations yet) and gets the guild on entering
-    // the game, with A online.
+    // B, put in the guild while away, gets it on entering the game, with A
+    // online.
     drop(b);
     tokio::time::sleep(Duration::from_millis(500)).await;
     join_guild(b_id, &name).await.expect("B joins");
@@ -235,4 +288,142 @@ async fn heracle_founds_a_guild_that_members_see_and_chat_in() {
     until(&mut a.connection, &mut at, |t| !t.guild_ops.is_empty()).await;
     assert_eq!(at.guild_ops[0][..2], [INFO, 1]);
     assert_eq!(guild_data(&at.guild_ops[0][2..]).0, name);
+}
+
+/// A level 1 in the park, seen by `seer`.
+async fn visitor(config: &HarnessConfig, seer: &mut WorldSession) -> WorldSession {
+    let id = new_character(config).await;
+    let mut session = relogin(config).await;
+    let mut t = Trace::default();
+    assert_eq!(warp(&mut session.connection, PARK, "", &mut t).await, PARK);
+    let mut seen = Trace::default();
+    until(&mut seer.connection, &mut seen, |t| {
+        t.players.iter().any(|p| p.character_id == id)
+    })
+    .await;
+    session
+}
+
+#[tokio::test]
+async fn members_are_invited_and_leave_or_are_expelled() {
+    let (a_config, b_config, c_config) = (
+        load_harness_config_or_fail().await,
+        load_harness_config_or_fail().await,
+        load_harness_config_or_fail().await,
+    );
+    let name = a_config.character_name.clone();
+    let mut a = founder(&a_config, FEE).await;
+    ask_heracle(&mut a).await;
+    send(&mut a.connection, create(&name)).await;
+    let created = next_op(&mut a, CREATED).await;
+    let mut r = Cursor::new(&created[1..]);
+    let guild_id = r.read_int().unwrap();
+    let mut t = Trace::default();
+    assert_eq!(warp(&mut a.connection, PARK, "", &mut t).await, PARK);
+    let mut b = visitor(&b_config, &mut a).await;
+    let mut c = visitor(&c_config, &mut a).await;
+    let (a_id, b_id, c_id) = (a.character_id, b.character_id, c.character_id);
+    let (a_name, b_name, c_name) = (
+        a.character_name.clone(),
+        b.character_name.clone(),
+        c.character_name.clone(),
+    );
+
+    // Nobody by that name is on the channel.
+    send(&mut a.connection, operation(INVITE, &[], Some("Nobody"))).await;
+    assert_eq!(next_op(&mut a, NOT_IN_CHANNEL).await, [NOT_IN_CHANNEL]);
+
+    // B turns the invitation down, and A hears so.
+    send(&mut a.connection, operation(INVITE, &[], Some(&b_name))).await;
+    let invite = next_op(&mut b, INVITE).await;
+    let mut r = Cursor::new(&invite[1..]);
+    assert_eq!(r.read_int().unwrap(), guild_id);
+    assert_eq!(r.read_str_with_length().unwrap(), a_name);
+    send(&mut b.connection, decline(&a_name, &b_name)).await;
+    let declined = next_op(&mut a, DECLINED).await;
+    assert_eq!(
+        Cursor::new(&declined[1..]).read_str_with_length().unwrap(),
+        b_name
+    );
+
+    // Accepting a declined invitation does nothing; a new one is taken up.
+    let accept = |id| operation(0x06, &[guild_id, id], None);
+    step(&mut b.connection, "b stale", accept(b_id)).await;
+    send(&mut a.connection, operation(INVITE, &[], Some(&b_name))).await;
+    next_op(&mut b, INVITE).await;
+    send(&mut b.connection, accept(b_id)).await;
+    let joined = next_op(&mut b, JOINED).await;
+    assert_eq!(
+        joined[1..9],
+        [guild_id.to_le_bytes(), b_id.to_le_bytes()].concat()
+    );
+    // A hears it, and sees the name under B's, in either order.
+    let mut at = Trace::default();
+    until(&mut a.connection, &mut at, |t| {
+        t.guild_ops.iter().any(|op| op[0] == JOINED) && !t.guild_names.is_empty()
+    })
+    .await;
+    assert_eq!(at.guild_names, [(b_id, name.clone())]);
+
+    // B, a plain member, may not invite; A invites C, who joins.
+    step(
+        &mut b.connection,
+        "b invites",
+        operation(INVITE, &[], Some(&c_name)),
+    )
+    .await;
+    let mut ct = Trace::default();
+    read_for(&mut c.connection, &mut ct, 500).await;
+    assert!(ct.guild_ops.is_empty());
+    send(&mut a.connection, operation(INVITE, &[], Some(&c_name))).await;
+    next_op(&mut c, INVITE).await;
+    send(&mut c.connection, accept(c_id)).await;
+    next_op(&mut c, JOINED).await;
+
+    // B may not expel C; A may, and everyone hears it.
+    step(
+        &mut b.connection,
+        "b expels",
+        operation(0x08, &[c_id], Some(&c_name)),
+    )
+    .await;
+    let mut ct = Trace::default();
+    read_for(&mut c.connection, &mut ct, 500).await;
+    assert!(!ct.guild_ops.iter().any(|op| op[0] == EXPELLED));
+    send(&mut a.connection, operation(0x08, &[c_id], Some(&c_name))).await;
+    for session in [&mut b, &mut c] {
+        let expelled = next_op(session, EXPELLED).await;
+        assert_eq!(ids_and_name(&expelled), (guild_id, c_id, c_name.clone()));
+    }
+    let mut at = Trace::default();
+    until(&mut a.connection, &mut at, |t| {
+        t.guild_ops.iter().any(|op| op[0] == EXPELLED)
+            && t.guild_names.contains(&(c_id, String::new()))
+    })
+    .await;
+
+    // B leaves; the master can't.
+    send(&mut b.connection, operation(0x07, &[b_id], Some(&b_name))).await;
+    for session in [&mut a, &mut b] {
+        let left = next_op(session, LEFT).await;
+        assert_eq!(ids_and_name(&left), (guild_id, b_id, b_name.clone()));
+    }
+    let t = step(
+        &mut a.connection,
+        "a leaves",
+        operation(0x07, &[a_id], Some(&a_name)),
+    )
+    .await;
+    assert!(t.guild_ops.is_empty());
+    drop((a, b, c));
+    tokio::time::sleep(Duration::from_millis(500)).await;
+
+    // Only A is left, and B enters the game without a guild.
+    let mut a = relogin(&a_config).await;
+    let info = next_op(&mut a, INFO).await;
+    assert_eq!(guild_data(&info[2..]), (name, vec![(a_id, true)]));
+    let mut b = relogin(&b_config).await;
+    let mut bt = Trace::default();
+    read_for(&mut b.connection, &mut bt, 1000).await;
+    assert!(bt.guild_ops.is_empty());
 }

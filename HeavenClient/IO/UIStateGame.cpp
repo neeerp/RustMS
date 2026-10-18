@@ -714,6 +714,13 @@ namespace ms
 		return elements[type].get();
 	}
 
+	bool UIStateGame::modal_open() const
+	{
+		const UIElement::UPtr& element = elements[focused];
+
+		return focused != UIElement::Type::NONE && element && element->is_active();
+	}
+
 	UIElement *UIStateGame::get_front(std::list<UIElement::Type> types)
 	{
 		auto begin = elementorder.rbegin();

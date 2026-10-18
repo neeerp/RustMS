@@ -81,14 +81,25 @@ namespace ms
 		const GuildMember* find_by_name(const std::string& name) const;
 		// The client takes the first member for the master.
 		bool is_master(int32_t cid) const;
+		// A member's rank, or 0 for someone outside the guild.
+		int32_t rank(int32_t cid) const;
+		bool full() const;
 		// A rank's title, or "" for none.
 		const std::string& title(int32_t rank) const;
 		size_t online_count() const;
 		// Members who would hear guild chat: those online but the player.
 		std::vector<int32_t> online_ids(int32_t self) const;
 
+		// Whether a member of rank `self` may expel one of rank `picked`,
+		// 0 for none, by the guild window's rule (FUN_0090f17c): the master
+		// expels anyone else, a Jr. Master only those ranked below.
+		static bool may_kick(int32_t self, int32_t picked);
+
 		void update(GuildData data);
 		void clear();
+		// Someone joined, or left or was expelled.
+		void add(GuildMember member);
+		void remove(int32_t cid);
 
 	private:
 		GuildData data;

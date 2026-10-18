@@ -28,6 +28,7 @@
 
 #include "../Components/MapleButton.h"
 
+#include "../GuildCommands.h"
 #include "../PartyCommands.h"
 
 #include "../../Configuration.h"
@@ -287,6 +288,9 @@ namespace ms
 								send_whisper(target, "");
 							}
 							else if (PartyCommands::run(msg))
+							{
+							}
+							else if (GuildCommands::run(msg))
 							{
 							}
 							// Commands the client doesn't know aren't chat, whatever
