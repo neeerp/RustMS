@@ -166,6 +166,29 @@ it has no Legendary Spirit window. HeavenClient plays the Enchant sound and
 the scroll glow, and gives the scroller the v83 chat line. It has no sealed
 items, so the v83 sealed-item prompts are skipped.
 
+### Megaphones
+
+A megaphone (507xxxx) is used through USE_CASH_ITEM (`0x4F`: Cash slot, item
+id, the megaphone's fields, tick), in `world/megaphone.rs`. The kind is the
+item id's thousands digit, as the v83 client reads it: 1 and 8 are plain
+megaphones, 2 super, 6 (and 5 with a last digit of 6 or more) item
+megaphones, 7 triple; 5 up to 5 is Maple TV, which isn't done. The fields
+are the text and, but for the plain megaphone, the ear byte; the item
+megaphone adds whether an item is shown and then its inventory kind and
+slot, and the triple megaphone starts with its line count (1 to 3). Every
+line is at most 60 bytes and goes out as `<name> : <text>`, which the client
+splits on " : ". The plain megaphone needs a level above 10.
+
+BROADCAST_MSG (`0x44`) carries the line: type 2 to every player on the
+speaker's channel (`BroadcastScope::Channel`), and type 3 (super, with the
+zero-based channel and ear), 8 (item, then whether an item follows and the
+item as the inventory encodes it) and 10 (triple: the first line, the count,
+the rest, channel, ear) to the whole world, the speaker included. The client
+actor hands the line to the world directory (`WorldAction::Broadcast`), which
+knows every client's channel. One exclusive INVENTORY_OPERATION takes the
+megaphone first. Anything refused (too long, too low, an item that isn't
+there, Maple TV) gets only an empty stat change to unlock the client.
+
 ## NPC shops
 
 Clicking an NPC that keeps a shop (`content::shops()`, from the pack's
@@ -417,6 +440,10 @@ refusals; `scrolls` (integration) scrolls the starting sword with and
 without a White Scroll, is refused a helmet scroll, watches the glow from a
 second player, and checks the upgrade is saved. The client's `scroll_rules`
 test covers the fit, the White Scroll prompt and the chat lines.
+`net`'s megaphone handler covers each kind's line, scope and refusals;
+`megaphones` (integration) hears a plain megaphone on the speaker's channel
+and the super, item and triple ones on another, then finds the used slot
+empty.
 `net::storage` covers each request and its refusals. `storage` (integration)
 opens Mr. Lee's storage, stores part of a stack and a whole one for the fee,
 is refused too many and too many mesos, moves mesos in, sorts, takes items

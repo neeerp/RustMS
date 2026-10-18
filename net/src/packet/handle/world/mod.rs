@@ -16,6 +16,7 @@ mod item_move;
 mod keybinds;
 mod logged_in;
 mod map_transfer;
+mod megaphone;
 mod meso_drop;
 mod messenger;
 mod monster_book_cover;

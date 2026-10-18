@@ -374,6 +374,12 @@ pub enum WorldAction {
     Find {
         target_name: String,
     },
+    /// Send `packet` to every player `scope` covers, such as a megaphone's
+    /// line.
+    Broadcast {
+        scope: BroadcastScope,
+        packet: Packet,
+    },
     Messenger(MessengerRequest),
     ChangeChannel {
         channel_id: u8,
@@ -677,12 +683,14 @@ pub fn world_route(opcode: i16) -> Option<&'static WorldRoute> {
 }
 
 /// Defines who should receive a world-wide broadcast.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum BroadcastScope {
     /// All players in the world.
     World,
     /// All players in the world except the sender.
     WorldExcludeSelf,
+    /// All players on this zero-based channel.
+    Channel(u8),
 }
 
 #[cfg(test)]

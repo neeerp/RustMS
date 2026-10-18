@@ -345,10 +345,14 @@ impl WorldDirectory {
 
     fn broadcast(&self, from: ClientId, scope: BroadcastScope, packet: Packet) {
         for (&client_id, entry) in &self.clients {
-            if matches!(scope, BroadcastScope::WorldExcludeSelf) && client_id == from {
-                continue;
+            let reached = match scope {
+                BroadcastScope::World => true,
+                BroadcastScope::WorldExcludeSelf => client_id != from,
+                BroadcastScope::Channel(channel_id) => entry.channel_id == channel_id,
+            };
+            if reached {
+                entry.handle.send_packet(packet.clone());
             }
-            entry.handle.send_packet(packet.clone());
         }
     }
 

@@ -1,4 +1,9 @@
-use crate::{error::NetworkError, packet::op::SendOpcode};
+use crate::{
+    codec::item::{encode_item, SlotPrefix},
+    error::NetworkError,
+    packet::op::SendOpcode,
+};
+use game::Item;
 use packet::{io::write::PktWrite, Packet};
 
 /// Client → server: send a whisper.
@@ -30,9 +35,16 @@ pub enum Broadcast {
     Notice = 0,
     /// A dialog.
     Popup = 1,
+    /// A megaphone's line, to the sender's channel.
+    Megaphone = 2,
     /// Pink chat, as for a mob's Banish.
     Pink = 5,
 }
+
+/// BROADCAST_MSG kinds that carry the sender's channel and ear.
+const SUPER_MEGAPHONE: u8 = 3;
+const ITEM_MEGAPHONE: u8 = 8;
+const TRIPLE_MEGAPHONE: u8 = 10;
 
 /// A message from the server, shown as `kind` says.
 pub fn build_broadcast(kind: Broadcast, message: &str) -> Result<Packet, NetworkError> {
@@ -40,6 +52,61 @@ pub fn build_broadcast(kind: Broadcast, message: &str) -> Result<Packet, Network
     packet.write_short(SendOpcode::BroadcastMsg as i16)?;
     packet.write_byte(kind as u8)?;
     packet.write_str_with_length(message)?;
+    Ok(packet)
+}
+
+/// A super megaphone's line, to every channel. `channel` is the sender's
+/// zero-based channel; `ear` shows the ear that lets readers whisper back.
+pub fn build_super_megaphone(line: &str, channel: u8, ear: bool) -> Result<Packet, NetworkError> {
+    let mut packet = Packet::new_empty();
+    packet.write_short(SendOpcode::BroadcastMsg as i16)?;
+    packet.write_byte(SUPER_MEGAPHONE)?;
+    packet.write_str_with_length(line)?;
+    packet.write_byte(channel)?;
+    packet.write_byte(ear as u8)?;
+    Ok(packet)
+}
+
+/// An item megaphone's line, with the item it shows, if any.
+pub fn build_item_megaphone(
+    line: &str,
+    channel: u8,
+    ear: bool,
+    item: Option<&Item>,
+) -> Result<Packet, NetworkError> {
+    let mut packet = Packet::new_empty();
+    packet.write_short(SendOpcode::BroadcastMsg as i16)?;
+    packet.write_byte(ITEM_MEGAPHONE)?;
+    packet.write_str_with_length(line)?;
+    packet.write_byte(channel)?;
+    packet.write_byte(ear as u8)?;
+    packet.write_byte(item.is_some() as u8)?;
+    if let Some(item) = item {
+        encode_item(&mut packet, SlotPrefix::None, item)?;
+    }
+    Ok(packet)
+}
+
+/// A triple megaphone's one to three lines. v83 reads the count after the
+/// first line, then the others.
+pub fn build_triple_megaphone(
+    lines: &[String],
+    channel: u8,
+    ear: bool,
+) -> Result<Packet, NetworkError> {
+    let mut packet = Packet::new_empty();
+    packet.write_short(SendOpcode::BroadcastMsg as i16)?;
+    packet.write_byte(TRIPLE_MEGAPHONE)?;
+    let (first, rest) = lines.split_first().ok_or(NetworkError::PacketHandlerError(
+        "a triple megaphone needs a line",
+    ))?;
+    packet.write_str_with_length(first)?;
+    packet.write_byte(lines.len() as u8)?;
+    for line in rest {
+        packet.write_str_with_length(line)?;
+    }
+    packet.write_byte(channel)?;
+    packet.write_byte(ear as u8)?;
     Ok(packet)
 }
 

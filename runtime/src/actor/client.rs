@@ -426,6 +426,14 @@ impl ClientActor {
                 })
                 .await?
             }
+            WorldAction::Broadcast { scope, packet } => {
+                self.send_to_directory(DirectoryMessage::Broadcast {
+                    from: self.client_id,
+                    scope,
+                    packet,
+                })
+                .await?
+            }
             WorldAction::Messenger(request) => {
                 self.send_to_directory(DirectoryMessage::Messenger {
                     from: self.client_id,
