@@ -76,6 +76,13 @@ namespace ms
 		void remove_cash_item(int64_t cash_id);
 		void set_wish_list(const std::vector<int32_t>& sns);
 
+		// v83 (CCashShop+0x18) has one request out at a time and ignores the
+		// buttons until its answer. Returns whether one may be sent, counting
+		// it as sent.
+		bool request();
+		// A balance or an operation result came.
+		void answered();
+
 	private:
 		void change_tab(cash_catalog::Tab tab);
 		void change_subtab(size_t subtab);
@@ -165,6 +172,7 @@ namespace ms
 		int32_t credit;
 		int32_t points;
 		int32_t prepaid;
+		bool pending;
 
 		std::vector<CashItem> cash_items;
 		Slider cash_slider;
