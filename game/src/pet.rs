@@ -155,13 +155,15 @@ pub struct FieldPet {
     pub foothold: i16,
 }
 
-/// One change to a player's pet list, at its position in the list.
+/// One change to a player's pets out, at its position in the list.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum PetChange {
     /// The pet now at `index`; those after it moved up one.
     Summoned { index: u8, serial: i64 },
     /// The pet that was at `index`; those after it moved down one.
     Dismissed { index: u8 },
+    /// The pet at `index` has a new name.
+    Renamed { index: u8 },
 }
 
 /// Summon the pet `serial` into `pets`, the summoned serials in list order,

@@ -6,6 +6,7 @@ use crate::monster_book::MonsterBook;
 use crate::pet::{FieldPet, FOLLOW_THE_LEAD};
 use crate::quest::QuestLog;
 use crate::skill::{self, SkillBook, SkillRecord};
+use crate::teleport_rock::TeleportRocks;
 use std::collections::BTreeMap;
 
 /// The most STR, DEX, INT, or LUK AP can raise a stat to.
@@ -135,6 +136,8 @@ pub struct FieldAvatar {
     pub mini_room: Option<MiniRoomBox>,
     /// The summoned pets, in list order. The field moves them.
     pub pets: Vec<FieldPet>,
+    /// The note on the chalkboard the player holds up, if any.
+    pub chalkboard: Option<String>,
 }
 
 /// The balloon over a player who keeps a mini room open, which others
@@ -180,6 +183,10 @@ pub struct Player {
     /// The pets whose last command called them by name; their answer shows
     /// in their own chat balloon. Not saved.
     pub pets_named: Vec<i64>,
+    /// The note on the chalkboard the player holds up, if any; not saved.
+    pub chalkboard: Option<String>,
+    /// The maps kept for the teleport rocks.
+    pub teleport_rocks: TeleportRocks,
     dirty: bool,
 }
 
@@ -211,6 +218,8 @@ impl Player {
             guild: None,
             pets: Vec::new(),
             pets_named: Vec::new(),
+            chalkboard: None,
+            teleport_rocks: TeleportRocks::default(),
             dirty: false,
         }
     }
@@ -294,6 +303,7 @@ impl Player {
                     foothold: 0,
                 })
                 .collect(),
+            chalkboard: self.chalkboard.clone(),
         }
     }
 

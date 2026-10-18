@@ -129,7 +129,8 @@ intervals are never shorter than 10 s, so climbing needs no separate check.
 
 USE_SKILL_BOOK (`0x52`: tick, slot, item id) reads a skill book (228xxxx)
 or a mastery book (229xxxx). v83 sends it from the item-use path with the
-usual exclusive-request gate and checks nothing itself. The book's
+usual exclusive-request gate and checks nothing itself; HeavenClient sends
+it from both the USE tab double-click and a hotkey. The book's
 `info/skill` lists skills; the server takes the one whose job
 (skill / 10000) is the reader's own job, and refuses the book (kept, `used`
 0) when there is none, when the reader's level in it is below
@@ -164,6 +165,147 @@ SHOW_SCROLL_EFFECT -1 to the scroller alone; HeavenClient ignores that, as
 it has no Legendary Spirit window. HeavenClient plays the Enchant sound and
 the scroll glow, and gives the scroller the v83 chat line. It has no sealed
 items, so the v83 sealed-item prompts are skipped.
+
+### Megaphones
+
+A megaphone (507xxxx) is used through USE_CASH_ITEM (`0x4F`: Cash slot, item
+id, the megaphone's fields, tick), in `world/megaphone.rs`. The kind is the
+item id's thousands digit, as the v83 client reads it: 1 and 8 are plain
+megaphones, 2 super, 6 (and 5 with a last digit of 6 or more) item
+megaphones, 7 triple; 5 up to 5 is Maple TV, which isn't done. The fields
+are the text and, but for the plain megaphone, the ear byte; the item
+megaphone adds whether an item is shown and then its inventory kind and
+slot, and the triple megaphone starts with its line count (1 to 3). Every
+line is at most 60 bytes and goes out as `<name> : <text>`, which the client
+splits on " : ". The plain megaphone needs a level above 10.
+
+BROADCAST_MSG (`0x44`) carries the line: type 2 to every player on the
+speaker's channel (`BroadcastScope::Channel`), and type 3 (super, with the
+zero-based channel and ear), 8 (item, then whether an item follows and the
+item as the inventory encodes it) and 10 (triple: the first line, the count,
+the rest, channel, ear) to the whole world, the speaker included. The client
+actor hands the line to the world directory (`WorldAction::Broadcast`), which
+knows every client's channel. One exclusive INVENTORY_OPERATION takes the
+megaphone first. Anything refused (too long, too low, an item that isn't
+there, Maple TV) gets only an empty stat change to unlock the client.
+
+HeavenClient shows each line in the chat log (`ServerMessageHandler`,
+`UIChatBar::send_megaphone`) as v83 draws it: plain megaphones in blue on a
+pale blue strip, super and triple ones in purple on pink, item megaphones in
+brown on yellow with `[item name]` after the speaker's name. Every row but
+the plain megaphone's starts with the `UIWindow.img/Megaphone` channel tag
+(`ch0` with the ear, `ch1` without) and the two-digit channel. A triple
+megaphone's later lines take the first line's name. Lines are dropped on
+event maps (`Util/Megaphones.h`); v83 shows them there to GMs, but
+HeavenClient doesn't know who is a GM.
+
+Double-clicking a megaphone in the Cash tab opens its dialog
+(`UIItemInventory::use_megaphone`), as v83 does:
+
+- Plain: a text prompt ("Enter your comments through the megaphone.", 60
+  characters). After OK, an empty line is dropped, then cursing, a level of
+  10 or below, and a line over 60 bytes are refused with v83's notices.
+- Super and triple: `UIMegaphone`, a modal window on
+  `UIWindow.img/Megaphone` (one line) or `ArtMegaphone` (three), with the
+  "Display whisper icon" checkbox (on at first). It closes before the lines
+  are checked as above; the triple megaphone asks "One of the lines has not
+  been applied." before sending with an empty line, and sends the lines up
+  to the last one typed. Tab moves to the next line. Preview writes "This is
+  a preview option for the Triple Megaphone." and the lines up to the last
+  one typed to the own chat log only, and nothing when all are empty.
+  "Special character" opens the item's samples (`Item.nx`
+  `Cash/0507.img/<id>/ui` and `sample`) in a modal popup: a sample replaces
+  all three lines, "CREATE NEW" empties them, and Escape or a click outside
+  closes it.
+- Item: `UIItemMegaphone` on `ItemMegaphone`, which leaves the game playable.
+  An item dropped on it from the inventory shows in its well with its name
+  and tooltip; clicking the well takes it back. OK with nothing typed does
+  nothing, and with no item asks first. It sends the line itself, refusing
+  with "Other requests are in process." while a request is waiting.
+
+The item megaphone can't be opened in a shop or trade ("Not available").
+The gates are in `Util/Megaphones.h`.
+
+### Chalkboard
+
+A chalkboard (537xxxx, `world/chalkboard.rs`) is used through USE_CASH_ITEM
+with its note, 1 to 40 bytes, and isn't used up. The note goes in
+`Player.chalkboard` (not saved) and the field avatar. CHALKBOARD (`0xA4`:
+character id, 1, note) goes to the holder and the map, then an empty stat
+change unlocks the holder's client; the holder's client needs the 164 too,
+since it only lets the player click the board away once told. SPAWN_PLAYER
+writes the board (1 and the note, or 0) after the mini room balloon, so
+later arrivals see it. CLOSE_CHALKBOARD (`0x32`, empty) puts it away with
+CHALKBOARD `id, 0` to the holder and the map.
+
+The board comes along to the next map, where the client actor tells the
+holder's client again (v83 keeps its own board across the change anyway).
+Entering a map where shops open (`info/personalShop`, the Free Market rooms)
+puts it away, as the v83 client does there; the server refuses a board in
+those maps too. Losing the last chalkboard doesn't put the board away yet.
+The server doesn't mask curse words in the note: v83 clients star them out of
+other players' boards themselves.
+
+HeavenClient draws the board (`Character/ChalkboardBalloon`, layout in
+`Util/Chalkboard.h`) from `ChatBalloon.img/adboard/0` as v83 does: white
+text wrapped by character at 196 px, one line on an odd number of 14 px
+tiles so the arrow is centred, a longer note on 14 tiles, 5 px over the
+head. Another player's note, from CHALKBOARD or SPAWN_PLAYER, is trimmed,
+has its curse words starred out and is cut to 40 bytes; the player's own is
+only trimmed. The player's own board has the `Basic.img/BtClose` button,
+which takes a press and a release on it and does nothing while a mini room
+is open. It sends CLOSE_CHALKBOARD and logs "The chalkboard has closed.";
+the board stays until CHALKBOARD `id, 0`. The board follows the player to
+the next map, except to one where shops open, where it goes away with "You
+cannot use the chalkboard here.". Double-clicking a chalkboard in the Cash
+tab asks "Enter a note." (40 bytes; a blank note sends nothing), unless a
+mini room is open ("Not available") or shops open on the map ("You can't use
+it here in this map.").
+
+### Teleport rocks
+
+A character keeps maps for the teleport rocks (504xxxx): five for the
+regular rock, ten for the VIP one (any 504 id outside 5040xxx). The lists
+are `Player.teleport_rocks` (`game::teleport_rock`), saved in the
+`teleport_rocks` table by place, and SET_FIELD's character data writes
+every slot, an empty one as 999999999. TROCK_ADD_MAP (`0x66`: 1 to keep
+the player's map or 0 to drop one, the VIP flag, and the map id when
+dropping) answers with MAP_TRANSFER_RESULT (`0x2A`: 3 kept or 2 dropped,
+the VIP flag, the list's slots). The client offers to keep only maps off
+Maple Island and outside the event maps (`(id / 1000000) % 100 == 9`);
+the server refuses those, maps whose `fieldLimit` forbids rocks (`0x40`),
+a full list and a map already kept with result 10.
+
+The rock is used through USE_CASH_ITEM with 0 and a kept map id, or 1 and
+a character's name (`world/teleport_rock.rs`). A name goes to the world
+directory (`WorldAction::RockToCharacter`), which asks the character's
+client actor on the same channel where they stand; the answer comes back to
+the user's actor, which finishes with `to_character` and lands on the spawn
+point nearest them. Either way the rock is refused with MAP_TRANSFER_RESULT
+`result, vip` and an empty stat change, since 42 doesn't unlock the client:
+6 for a name not found (or the user's own), 9 for the map they are on, 11
+on Maple Island under level 7, and 8 for the rest: a map not kept, a dead
+user, a map with `fieldLimit` `0x40` or `0x2` on either end, another
+continent (`id / 100000000`) for the regular rock, or a map that sends
+players elsewhere on login (`forcedReturn`) but on Maple Island, as Cosmic
+does. Otherwise one exclusive INVENTORY_OPERATION takes one rock and the
+user is warped.
+
+HeavenClient reads both lists from the character data
+(`Character/TeleportRock`) and keeps them from MAP_TRANSFER_RESULT 2 and 3.
+Double-clicking a rock in the Cash tab opens `UITeleportRock`
+(`UIWindow.img/Teleport`), centred and modal, unless a request is still
+waiting ("Other requests are in process.", which the chalkboard checks too)
+or the map's `fieldLimit` has `0x40` or `0x2` ("You cannot teleport to this
+map."). It lists the kept maps by name (a map with `info/link` under the
+linked map's), five at a time with a scroll bar on the VIP rock, and counts
+them as `[used/size]`. ADD MAP asks before sending TROCK_ADD_MAP for the
+current map, unless the list is full, already has it, or the map can't be
+kept; DEL. MAP asks before dropping the selected map. MOVE asks before using
+the rock on the selected map, or uses it at once on the typed name once the
+name is valid and isn't the player's own. Enter is MOVE and Escape closes
+the window, which closes before the rock is used. A refused rock shows the
+result as a notice, naming the character for result 6.
 
 ## NPC shops
 
@@ -416,6 +558,18 @@ refusals; `scrolls` (integration) scrolls the starting sword with and
 without a White Scroll, is refused a helmet scroll, watches the glow from a
 second player, and checks the upgrade is saved. The client's `scroll_rules`
 test covers the fit, the White Scroll prompt and the chat lines.
+`net`'s megaphone handler covers each kind's line, scope and refusals;
+`megaphones` (integration) hears a plain megaphone on the speaker's channel
+and the super, item and triple ones on another, then finds the used slot
+empty. `net`'s chalkboard handler covers the board, the refused notes and
+closing it; `chalkboard` (integration) holds one up for a watcher, takes it
+to another map and back, closes it, and has a Free Market room put it away.
+`game::teleport_rock` covers the lists; `net`'s teleport rock handler covers
+keeping and dropping maps, each refusal, the trips by map and to a character,
+and the rock used; `teleport_rocks` (integration) keeps Henesys, rocks back to
+it, is refused the same map and a missing name, rocks to a watcher, and rocks
+to Henesys again after a relog. The client's `teleport_rock` test covers the
+lists, the checks on the current map and a typed name, and the refusals.
 `net::storage` covers each request and its refusals. `storage` (integration)
 opens Mr. Lee's storage, stores part of a stack and a whole one for the fee,
 is refused too many and too many mesos, moves mesos in, sorts, takes items

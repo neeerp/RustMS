@@ -4,9 +4,9 @@ A pet is a cash item (`500xxxx`) bought in the Cash Shop. Taken out to the
 Cash tab, it can be summoned to follow its owner, and everyone on the map
 sees it. Up to three can be out with Follow the Lead, one without. It answers
 commands said in chat and grows closer when it obeys. It grows hungry, eats pet
-food and cash food, and goes home when it starves. Name tags, pet equipment,
-looting and auto potions are not done yet; `v83ref` report 159 has the v83
-client's side of each.
+food and cash food, goes home when it starves, and can be renamed with a name
+tag. Pet equipment, looting and auto potions are not done yet; `v83ref` report
+159 has the v83 client's side of each.
 
 ## Server
 
@@ -68,14 +68,23 @@ client's side of each.
   food's list of pets it suits isn't checked; the v83 client doesn't check
   it either.
 - **Cash food.** USE_CASH_ITEM (`0x4F` in, `world/cash_item.rs`) is the Cash
-  slot, the item id, the item's own fields and the tick. Only cash pet food
-  (`524xxxx`) is used so far; any other item, or one not in that slot, gets
-  an empty stat change to unlock the client. The first pet out, in list
-  order, whose id is in the food's `spec/0..n` eats: fullness 100 and `spec/inc`
-  closeness (100), and it always enjoys it. The server answers with 76
+  slot, the item id, the item's own fields and the tick. Cash pet food
+  (`524xxxx`), the pet name tag, megaphones, the chalkboard and teleport
+  rocks (`inventory.md`) are used so far; any other item, or one not in that slot,
+  gets an empty stat change to unlock the client. The first pet out, in list order, whose id is in the
+  food's `spec/0..n` eats: fullness 100 and `spec/inc` closeness (100), and
+  it always enjoys it. The server answers with 76
   `0, index`, then the 174, inventory operation and level-up effect that
   PET_FOOD sends. When no pet out suits the food it sends 76 `1` and an empty
   stat change. These are Cosmic's rules.
+- **Name tag.** The pet name tag (5170000) carries the new name and renames
+  the first pet out. The name must be 4 to 12 bytes with no control
+  characters or spaces at either end, as the client sends it. The server
+  answers with an exclusive inventory operation that takes the tag and
+  re-sends the pet's item, then 172 `cid, index, name, 0` to the owner and the
+  map; the owner needs it too, since the client hears commands by the pet's
+  name. Without a pet out, or with a name the client wouldn't send, it sends
+  only an empty stat change. The trailing 0 is the name tag style, as in 168.
 - **Hunger.** Every 3 minutes (`client/pets.rs`) each pet out loses its
   `info/hungry` fullness (1 if unset; the Baby Tiger loses 3) and its item is
   re-sent. One left at 5 or less is set to 15 and goes home with 168 reason
@@ -142,6 +151,16 @@ client's side of each.
   pet." instead. 76 plays the eating pet's eat sound, or shows "Your pet
   cannot consume this food. Please check again." The inventory operation
   after it unlocks the client.
+- **Name tag.** Double-clicking a name tag in the Cash tab renames the first
+  pet out, following v83; with no pet out it does nothing. A pet with a name
+  of its own first asks "The pet already has a name. Will you change it?".
+  The name prompt takes up to 12 bytes; `pets::check_name` trims it, asks
+  again under 4 ("Please enter at least 4 characters."), refuses control
+  characters ("Cursing is not allowed."), stars out curse words, and refuses
+  the kind's name in any case or the pet's own ("That name is not
+  available."). "Do you want to name your pet 'X'?" then sends USE_CASH_ITEM
+  under the WAIT lock and plays `UseShopItem`. 172 sets the pet's name and
+  label; the packet's name tag style is ignored, so the label stays plain.
 - **Closeness.** After every inventory operation, a pet out whose item now
   shows different closeness gets the yellow status line "The closeness
   increased (+N)" or "The closeness decreased (-N)".
@@ -155,7 +174,7 @@ client's side of each.
 
 - `game::pet` unit tests cover the list, feeding, cash food, closeness lost
   and starving; `net` tests cover the codecs, which pet eats (cash food
-  included), and hunger.
+  included), hunger, and the name tag.
 - `integration-harness/tests/pets.rs` buys the Baby Tiger Package, takes the
   pet out, summons it, moves it, sends it back, and checks that it is still
   out after a relog and that a watcher sees it. It also commands the pet by
@@ -163,8 +182,10 @@ client's side of each.
   for the owner and the watcher, and the relayed PET_CHAT. It then feeds the
   pet and checks the answer, the food taken and the pet's new fullness and
   closeness, then gives it a cash food that suits it and one that doesn't.
+  It renames the pet with a name tag, checks the 172 for the owner and the
+  watcher, and that the watcher sees the new name after the relog.
 - `HeavenClient/tests/pets.cpp` covers the closing-up list, the summon
   rules, Follow the Lead's skill ids, the stance mapping, the SPAWN_PLAYER
   list, splitting command words, hearing a command, the action mapping, the
   idle timer, which pet eats, the food answer for a level, the closeness
-  lines and the food item ranges.
+  lines, the food item ranges and the name checks.

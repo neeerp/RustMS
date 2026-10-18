@@ -114,6 +114,8 @@ pub struct SpawnPlayerPacket {
     pub stance: u8,
     /// The pets out: (item id, name, serial), in list order.
     pub pets: Vec<(i32, String, i64)>,
+    /// The note on the chalkboard they hold up, if any.
+    pub chalkboard: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -1052,6 +1054,8 @@ pub fn decode_spawn_player(packet: &Packet) -> Result<SpawnPlayerPacket, String>
         .map_err(|e| format!("failed to read spawn-player stance: {e}"))?;
     let pets = decode_spawn_player_pets(&mut cursor)
         .map_err(|e| format!("failed to read spawn-player pets: {e}"))?;
+    let chalkboard = decode_spawn_player_chalkboard(&mut cursor)
+        .map_err(|e| format!("failed to read spawn-player chalkboard: {e}"))?;
 
     Ok(SpawnPlayerPacket {
         character_id,
@@ -1063,6 +1067,7 @@ pub fn decode_spawn_player(packet: &Packet) -> Result<SpawnPlayerPacket, String>
         y,
         stance,
         pets,
+        chalkboard,
     })
 }
 
@@ -1084,6 +1089,23 @@ fn decode_spawn_player_pets(
         pets.push(pet);
     }
     Ok(pets)
+}
+
+/// After the mount and any mini room balloon, whether a chalkboard is up
+/// and its note.
+fn decode_spawn_player_chalkboard(
+    cursor: &mut Cursor<&[u8]>,
+) -> Result<Option<String>, std::io::Error> {
+    cursor.read_bytes(4 + 8)?;
+    if cursor.read_byte()? != 0 {
+        cursor.read_int()?;
+        cursor.read_str_with_length()?;
+        cursor.read_bytes(5)?;
+    }
+    if cursor.read_byte()? == 0 {
+        return Ok(None);
+    }
+    cursor.read_str_with_length().map(Some)
 }
 
 pub fn decode_spawn_npc(packet: &Packet) -> Result<SpawnNpcPacket, String> {

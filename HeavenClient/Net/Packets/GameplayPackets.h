@@ -331,6 +331,14 @@ namespace ms
 		}
 	};
 
+	// Asks to take the player's chalkboard down
+	// Opcode: CLOSE_CHALKBOARD(50)
+	class CloseChalkboardPacket : public OutPacket
+	{
+	public:
+		CloseChalkboardPacket() : OutPacket(OutPacket::Opcode::CLOSE_CHALKBOARD) {}
+	};
+
 	// Opcode: PARTY_OPERATION(124)
 	class PartyOperationPacket : public OutPacket
 	{

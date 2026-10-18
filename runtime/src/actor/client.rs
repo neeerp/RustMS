@@ -31,9 +31,10 @@ use net::cash_shop::{CashShopRequest, Expansion};
 use net::dialogue::{Conversation, NpcInteraction};
 use net::login_world::resolve_login_channel;
 use net::packet::build;
-use net::packet::build::world::field::parse_movement_state;
+use net::packet::build::world::field::{build_chalkboard, parse_movement_state};
 use net::packet::build::world::messaging::{build_find_result, FindLocation};
 use net::packet::build::world::pet::PetGone;
+use net::packet::handle::world::{to_character, Rock, Whereabouts};
 use net::packet::op::RecvOpcode;
 use net::quests::QuestRequest;
 use net::{ClientId, SpawnPosition, WorldAction, WorldContext, WorldRoute};
@@ -388,6 +389,15 @@ impl ClientActor {
                 .await?
             }
             WorldAction::BuffsChanged(announce) => self.show_buffs(announce).await?,
+            WorldAction::ChalkboardChanged(announce) => {
+                let avatar = self.in_game()?.player.field_avatar(0, 0, 0);
+                self.send_to_field(FieldMessage::UpdateAvatar {
+                    client_id: self.client_id,
+                    avatar,
+                    announce: vec![announce],
+                })
+                .await?
+            }
             WorldAction::PetsChanged(changes) => {
                 self.pets_changed(changes, PetGone::Dismissed).await?
             }
@@ -419,10 +429,26 @@ impl ClientActor {
             WorldAction::GiveFame { target, up } => self.give_fame(target, up).await?,
             WorldAction::OpenDoor { town, at, lasts } => self.open_door(town, at, lasts).await?,
             WorldAction::UseDoor { owner, from_town } => self.use_door(owner, from_town).await?,
+            WorldAction::RockToCharacter { name, rock } => {
+                self.send_to_directory(DirectoryMessage::RockLocate {
+                    from: self.client_id,
+                    name,
+                    rock,
+                })
+                .await?
+            }
             WorldAction::Find { target_name } => {
                 self.send_to_directory(DirectoryMessage::Find {
                     from: self.client_id,
                     target_name,
+                })
+                .await?
+            }
+            WorldAction::Broadcast { scope, packet } => {
+                self.send_to_directory(DirectoryMessage::Broadcast {
+                    from: self.client_id,
+                    scope,
+                    packet,
                 })
                 .await?
             }
@@ -555,6 +581,10 @@ impl ClientActor {
         let handle = self.handle();
         let game = self.in_game_mut()?;
         game.position = (spawn.x, spawn.y);
+        // The client puts a chalkboard away in the Free Market rooms.
+        if net::personal_shop::allowed_on(game.player.stats.map_id) {
+            game.player.chalkboard = None;
+        }
         let avatar = game.player.field_avatar(spawn.x, spawn.y, spawn.stance);
         let party = self.party_id;
         self.send_to_field(FieldMessage::Join {
@@ -566,6 +596,11 @@ impl ClientActor {
         self.set_wall_clock().await?;
         self.bring_summons(spawn).await?;
         self.bring_pets(&avatar).await?;
+        if let Some(note) = &avatar.chalkboard {
+            // The player's client shows its own board only when told.
+            self.send(&mut build_chalkboard(avatar.id, Some(note))?)
+                .await?;
+        }
         self.run_map_enter_script().await
     }
 
@@ -1016,6 +1051,19 @@ impl ClientActor {
             } => self.drop_reactor_loot(reactor_id, object_id, x, y).await?,
             ServerMessage::PickedUp { drop } => self.picked_up(drop).await?,
             ServerMessage::Locate { reply_to } => self.locate(&reply_to),
+            ServerMessage::RockLocate { reply_to, rock } => {
+                let found = self
+                    .game
+                    .as_ref()
+                    .filter(|_| !self.in_cash_shop)
+                    .map(|game| Whereabouts {
+                        map_id: game.player.stats.map_id,
+                        x: game.position.0,
+                        y: game.position.1,
+                    });
+                reply_to.send(ServerMessage::RockLocated { rock, found });
+            }
+            ServerMessage::RockLocated { rock, found } => self.rock_located(rock, found).await?,
             ServerMessage::CharInfoRequested { requester } => {
                 let packet = build::world::info::build_character_info(&self.in_game()?.player)
                     .map_err(|e| RuntimeError::Handler(e.to_string()))?;
@@ -1051,6 +1099,23 @@ impl ClientActor {
     }
 
     /// Tell someone who looked for this player which map they are on.
+    /// Take the player to the character their teleport rock looked for.
+    async fn rock_located(
+        &mut self,
+        rock: Rock,
+        found: Option<Whereabouts>,
+    ) -> Result<(), RuntimeError> {
+        let channel_id = self.channel_id;
+        let Some(game) = self.game.as_mut() else {
+            return Ok(());
+        };
+        let result = to_character(&mut game.player, rock, found, channel_id)?;
+        for action in result.actions {
+            self.apply(action).await?;
+        }
+        Ok(())
+    }
+
     fn locate(&self, reply_to: &ClientHandle) {
         let Some(game) = self.game.as_ref() else {
             return;

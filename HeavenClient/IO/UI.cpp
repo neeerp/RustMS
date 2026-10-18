@@ -140,6 +140,7 @@ namespace ms
 
 			is_key_down.clear();
 			Stage::get().release_keys();
+			Stage::get().release_cursor();
 			cursor.set_pressed(false);
 		}
 	}
@@ -165,6 +166,10 @@ namespace ms
 		Textfield *focused_before = focusedtextfield.get();
 		send_cursor(cursorpos, cursorstate);
 
+		// A release over a window never reaches the stage.
+		if (!pressed)
+			Stage::get().release_cursor();
+
 		if (focusedtextfield && pressed && focusedtextfield.get() == focused_before)
 		{
 			Cursor::State tstate = focusedtextfield->send_cursor(cursorpos, pressed);
@@ -181,6 +186,11 @@ namespace ms
 	void UI::send_cursor(Point<int16_t> pos)
 	{
 		send_cursor(pos, cursor.get_state());
+	}
+
+	bool UI::is_cursor_pressed() const
+	{
+		return cursor.is_pressed();
 	}
 
 	void UI::rightclick()
@@ -339,6 +349,9 @@ namespace ms
 					types.emplace_back(UIElement::Type::PERSONALSHOP);
 					types.emplace_back(UIElement::Type::SHOPSELL);
 					types.emplace_back(UIElement::Type::SHOPSALES);
+					types.emplace_back(UIElement::Type::TELEPORTROCK);
+					types.emplace_back(UIElement::Type::MEGAPHONE);
+					types.emplace_back(UIElement::Type::ITEMMEGAPHONE);
 				}
 				else if (enter)
 				{
@@ -348,6 +361,8 @@ namespace ms
 					// Game
 					types.emplace_back(UIElement::Type::NOTICE);
 					types.emplace_back(UIElement::Type::ENTERNUMBER);
+					types.emplace_back(UIElement::Type::TELEPORTROCK);
+					types.emplace_back(UIElement::Type::MEGAPHONE);
 				} else if (tab)
 				{
 					// Game

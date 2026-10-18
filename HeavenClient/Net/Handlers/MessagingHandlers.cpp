@@ -37,6 +37,7 @@
 #include "../../IO/UITypes/UINotice.h"
 #include "../../IO/UITypes/UIStatusMessenger.h"
 #include "../../Util/CurseWords.h"
+#include "../../Util/Megaphones.h"
 #include "../../Util/Misc.h"
 
 #include <nlnx/nx.hpp>
@@ -336,6 +337,13 @@ namespace ms
 		std::string message = recv.read_string();
 		auto chatbar = UI::get().get_element<UIChatBar>();
 
+		// Megaphones go unheard on event maps. HeavenClient doesn't know
+		// whether its player is a GM, who would hear them.
+		bool megaphone = type == 2 || type == 3 || (type >= 8 && type <= 10);
+
+		if (megaphone && !Megaphones::heard_on(Stage::get().get_mapid()))
+			return;
+
 		switch (type)
 		{
 			case 0:
@@ -346,10 +354,19 @@ namespace ms
 			case 1:
 				UI::get().emplace<UIOk>(message, [](bool) {});
 				break;
-			case 3:
-				recv.read_byte(); // channel
-				recv.read_bool(); // megaphone
+			case 2:
+				if (chatbar)
+					chatbar->send_megaphone(message, UIChatBar::LineType::MEGAPHONE, -1, false);
 				break;
+			case 3:
+			{
+				int8_t channel = recv.read_byte();
+				bool ear = recv.read_bool();
+
+				if (chatbar)
+					chatbar->send_megaphone(message, UIChatBar::LineType::SUPER_MEGAPHONE, channel, ear);
+				break;
+			}
 			case 4:
 				UI::get().set_scrollnotice(message);
 				break;
@@ -367,6 +384,38 @@ namespace ms
 			case 7:
 				recv.read_int(); // npcid
 				break;
+			case 8:
+			case 9:
+			{
+				int8_t channel = recv.read_byte();
+				bool ear = type == 9 || recv.read_bool();
+
+				// The item comes last, after its kind; only its name is shown.
+				if (type == 8 && recv.read_bool())
+				{
+					recv.read_byte();
+					message = Megaphones::with_item(message, ItemData::get(recv.read_int()).get_name());
+				}
+
+				if (chatbar)
+					chatbar->send_megaphone(message, UIChatBar::LineType::ITEM_MEGAPHONE, channel, ear);
+				break;
+			}
+			case 10:
+			{
+				std::vector<std::string> lines = { message };
+
+				for (auto count = recv.read_byte(); count > 1; count--)
+					lines.push_back(Megaphones::under_name(message, recv.read_string()));
+
+				int8_t channel = recv.read_byte();
+				bool ear = recv.read_bool();
+
+				if (chatbar)
+					for (const auto& line : lines)
+						chatbar->send_megaphone(line, UIChatBar::LineType::SUPER_MEGAPHONE, channel, ear);
+				break;
+			}
 		}
 	}
 

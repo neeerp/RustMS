@@ -337,6 +337,16 @@ pub enum WorldAction {
     /// The player summoned or sent back pets (`player.pets` already
     /// changed); show everyone on the map.
     PetsChanged(Vec<game::pet::PetChange>),
+    /// The player held up or put away a chalkboard (`player.chalkboard`
+    /// already changed); refresh their field avatar and show the others
+    /// this CHALKBOARD.
+    ChalkboardChanged(Packet),
+    /// Look on the channel for the character named `name`, to take the
+    /// player to them with `rock`.
+    RockToCharacter {
+        name: String,
+        rock: crate::packet::handle::world::Rock,
+    },
     /// Natural HP/MP recovery the client reports; the runtime checks timing.
     NaturalHeal {
         hp: i16,
@@ -373,6 +383,12 @@ pub enum WorldAction {
     /// Tell the player where a character is (`/find`).
     Find {
         target_name: String,
+    },
+    /// Send `packet` to every player `scope` covers, such as a megaphone's
+    /// line.
+    Broadcast {
+        scope: BroadcastScope,
+        packet: Packet,
     },
     Messenger(MessengerRequest),
     ChangeChannel {
@@ -657,6 +673,11 @@ fn world_routes() -> &'static HashMap<i16, WorldRoute> {
             (Op::PetCommand, InGame(&world::PetCommandHandler)),
             (Op::PetFood, InGame(&world::PetFoodHandler)),
             (Op::UseCashItem, InGame(&world::UseCashItemHandler)),
+            (Op::CloseChalkboard, InGame(&world::CloseChalkboardHandler)),
+            (
+                Op::TeleportRockList,
+                InGame(&world::TeleportRockListHandler),
+            ),
             (Op::GiveFame, InGame(&world::GiveFameHandler)),
             (Op::MoveSummon, InGame(&world::MoveSummonHandler)),
             (Op::SummonAttack, InGame(&world::SummonAttackHandler)),
@@ -677,12 +698,14 @@ pub fn world_route(opcode: i16) -> Option<&'static WorldRoute> {
 }
 
 /// Defines who should receive a world-wide broadcast.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum BroadcastScope {
     /// All players in the world.
     World,
     /// All players in the world except the sender.
     WorldExcludeSelf,
+    /// All players on this zero-based channel.
+    Channel(u8),
 }
 
 #[cfg(test)]
@@ -693,7 +716,7 @@ mod tests {
     fn every_registered_opcode_is_unique_per_server() {
         // The maps would silently drop duplicates; check the table sizes match.
         assert_eq!(login_routes().len(), 13);
-        assert_eq!(world_routes().len(), 68);
+        assert_eq!(world_routes().len(), 70);
     }
 
     #[test]

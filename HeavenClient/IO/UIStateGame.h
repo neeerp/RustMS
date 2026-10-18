@@ -20,6 +20,7 @@
 #include <string>
 
 #include <cstdint>
+#include <vector>
 
 #include "UIState.h"
 
@@ -99,12 +100,19 @@ namespace ms
 
 		void remove_cursor(UIElement::Type type);
 
+		// The window holding the focus. Once it closes, the focus goes back
+		// to the one it opened over, such as a dialog under its notice.
+		UIElement *get_focused();
+
 		template<class T, typename...Args>
 		void emplace(Args &&...args);
 
 		EnumMap<UIElement::Type, UIElement::UPtr, UIElement::Type::NUM_TYPES> elements;
 		std::list<UIElement::Type> elementorder;
 		UIElement::Type focused;
+		// The windows that held the focus before one opened over them, the
+		// latest last.
+		std::vector<UIElement::Type> focus_below;
 		UIElement *dragged;
 
 		EquipTooltip eqtooltip;

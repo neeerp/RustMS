@@ -310,6 +310,41 @@ fn feed_cash_pet(player: &mut Player, slot: i16, spec: &ConsumeSpec) -> Option<F
     })
 }
 
+/// The Pet Name Tag (5170000) in Cash `slot`, used through USE_CASH_ITEM
+/// (0x4F type 0x11, report 159c): `r` holds a new name for the first pet
+/// out. One exclusive inventory operation takes the tag and re-sends the
+/// pet's item, which is all that unlocks the client (172 doesn't), then 172
+/// tells the owner and the map. A refusal is only an empty stat change.
+pub fn pet_name_tag(ctx: &mut WorldContext, r: &mut Cursor<&Vec<u8>>, slot: i16) -> WorldResult {
+    let name = r.read_str_with_length()?;
+    let Some(changes) = rename_pet(ctx.player, slot, &name) else {
+        return Ok(HandlerResult::reply(build_stat_update(true, &[])?));
+    };
+    Ok(
+        HandlerResult::reply(build_inventory_operation(true, &changes)?).with(
+            WorldAction::PetsChanged(vec![PetChange::Renamed { index: 0 }]),
+        ),
+    )
+}
+
+/// Call the first pet out `name`, using up the tag in Cash `slot`. `None`
+/// if no pet is out or the name isn't one the client sends: 4 to 12 bytes,
+/// trimmed, without control characters.
+fn rename_pet(player: &mut Player, slot: i16, name: &str) -> Option<Vec<InventoryChange>> {
+    let fits = (4..=12).contains(&name.len()) && name.trim() == name;
+    if !fits || name.chars().any(char::is_control) {
+        return None;
+    }
+    let (pet_slot, mut item) = pet_item(player, *player.pets.first()?)?;
+    item.pet.as_mut()?.name = name.to_owned();
+    let mut changes = player
+        .inventory_mut()
+        .take(InventoryType::Cash, slot, 1)
+        .ok()?;
+    changes.extend(put_back(player, pet_slot, item));
+    Some(changes)
+}
+
 /// What growing hungry did to a player's pets.
 #[derive(Debug, Default)]
 pub struct Hungry {
@@ -377,7 +412,9 @@ impl WorldHandler for PetChatHandler {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::packet::handle::world::UseCashItemHandler;
     use game::{Item, PetData};
+    use packet::io::write::PktWrite;
 
     const TIGER: i32 = 5000066;
 
@@ -557,6 +594,59 @@ mod tests {
         assert!(feed_cash_pet(&mut player, 5, &spec).is_none());
         let food = player.inventory.get(InventoryType::Cash, 5).unwrap();
         assert_eq!(food.quantity, 2);
+    }
+
+    const NAME_TAG: i32 = 5170000;
+
+    fn name(player: &Player, slot: i16) -> &str {
+        let item = player.inventory.get(InventoryType::Cash, slot).unwrap();
+        &item.pet.as_ref().unwrap().name
+    }
+
+    #[test]
+    fn a_name_tag_renames_the_first_pet_out() {
+        let mut player = two_pets(50, 50);
+        player
+            .inventory
+            .insert(InventoryType::Cash, 5, Item::stack(NAME_TAG, 1));
+        let mut p = Packet::new_empty();
+        p.write_short(0x4F).unwrap();
+        p.write_short(5).unwrap();
+        p.write_int(NAME_TAG).unwrap();
+        p.write_str_with_length("Tigger").unwrap();
+        p.write_int(1234).unwrap();
+        let mut ctx = WorldContext {
+            client_id: 1,
+            channel_id: 0,
+            player: &mut player,
+        };
+        let done = UseCashItemHandler.handle(&mut p, &mut ctx).unwrap();
+        let [WorldAction::Reply(update), WorldAction::PetsChanged(renamed)] = &done.actions[..]
+        else {
+            panic!("expected an update and a rename: {:?}", done.actions);
+        };
+        assert_eq!(update.bytes[..4], [0x1D, 0, 1, 3], "unlocked, 3 changes");
+        assert_eq!(renamed[..], [PetChange::Renamed { index: 0 }]);
+        assert_eq!(
+            (name(&player, 3), name(&player, 4)),
+            ("Tigger", "Brown Kitty")
+        );
+        assert!(player.inventory.get(InventoryType::Cash, 5).is_none());
+    }
+
+    #[test]
+    fn a_name_tag_needs_a_pet_out_and_a_name_the_client_sends() {
+        let mut player = owner();
+        player
+            .inventory
+            .insert(InventoryType::Cash, 5, Item::stack(NAME_TAG, 1));
+        for refused in ["Tig", "ThirteenBytes", " Tigger", "Tig\tger"] {
+            assert!(rename_pet(&mut player, 5, refused).is_none(), "{refused}");
+        }
+        player.pets.clear();
+        assert!(rename_pet(&mut player, 5, "Tigger").is_none());
+        assert_eq!(name(&player, 3), "Baby Tiger");
+        assert!(player.inventory.get(InventoryType::Cash, 5).is_some());
     }
 
     #[test]

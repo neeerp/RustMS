@@ -1,6 +1,6 @@
 use crate::codec::time::filetime;
 use crate::{error::NetworkError, packet::op::SendOpcode};
-use game::CharacterStats;
+use game::{CharacterStats, TeleportRocks};
 use packet::{io::write::PktWrite, Packet};
 use std::time::SystemTime;
 
@@ -31,6 +31,48 @@ pub fn build_warp_to_map(
         }
     }
     packet.write_long(filetime(SystemTime::now()))?;
+    Ok(packet)
+}
+
+/// MAP_TRANSFER_RESULT (0x2A, v83 FUN_00a25268) after a teleport rock list
+/// changed: the whole list, empty slots and all, which the client keeps and
+/// shows in an open rock window.
+pub fn build_rock_list(
+    deleted: bool,
+    vip: bool,
+    rocks: &TeleportRocks,
+) -> Result<Packet, NetworkError> {
+    let mut packet = Packet::new_empty();
+    packet.write_short(SendOpcode::MapTransferResult as i16)?;
+    packet.write_byte(if deleted { 2 } else { 3 })?;
+    packet.write_byte(u8::from(vip))?;
+    for map_id in rocks.slots(vip) {
+        packet.write_int(map_id)?;
+    }
+    Ok(packet)
+}
+
+/// Why a teleport rock request was refused: MAP_TRANSFER_RESULT's notices.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum RockRefusal {
+    /// "%s is currently difficult to locate, so the teleport will not take
+    /// place.", with the name the player typed.
+    NotFound = 6,
+    /// "You cannot go to that place."
+    CannotGo = 8,
+    /// "It's the map you're currently on."
+    SameMap = 9,
+    /// "This map is not available to enter for the list."
+    NotForList = 10,
+    /// "Users below level 7 are not allowed to go out from Maple Island."
+    MapleIsland = 11,
+}
+
+pub fn build_rock_refusal(why: RockRefusal, vip: bool) -> Result<Packet, NetworkError> {
+    let mut packet = Packet::new_empty();
+    packet.write_short(SendOpcode::MapTransferResult as i16)?;
+    packet.write_byte(why as u8)?;
+    packet.write_byte(u8::from(vip))?;
     Ok(packet)
 }
 
@@ -89,6 +131,28 @@ mod tests {
     use super::*;
     use crate::codec::stats::sample_stats;
     use crate::codec::testing::Expect;
+
+    #[test]
+    fn a_rock_list_fills_every_slot() {
+        let mut rocks = TeleportRocks::default();
+        rocks.keep(false, 100_000_000);
+        let packet = build_rock_list(false, false, &rocks).unwrap();
+        let mut expected = vec![0x2A, 0, 3, 0];
+        expected.extend(100_000_000i32.to_le_bytes());
+        for _ in 0..4 {
+            expected.extend(999_999_999i32.to_le_bytes());
+        }
+        assert_eq!(packet.bytes, expected);
+        let packet = build_rock_list(true, true, &rocks).unwrap();
+        assert_eq!(packet.bytes[..4], [0x2A, 0, 2, 1]);
+        assert_eq!(packet.bytes.len(), 4 + 10 * 4);
+        assert_eq!(
+            build_rock_refusal(RockRefusal::SameMap, true)
+                .unwrap()
+                .bytes,
+            [0x2A, 0, 9, 1]
+        );
+    }
 
     #[test]
     fn a_refusal_names_its_reason() {

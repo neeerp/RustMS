@@ -30,6 +30,8 @@
 #include "../IO/UITypes/UIShop.h"
 #include "../IO/UITypes/UIStatusMessenger.h"
 #include "../IO/UITypes/UIStorage.h"
+#include "../IO/UITypes/UITeleportRock.h"
+#include "../IO/UITypes/UINotice.h"
 #include "../Character/Pets.h"
 
 namespace ms
@@ -58,6 +60,32 @@ namespace ms
 
 		if (auto iteminventory = UI::get().get_element<UIItemInventory>())
 			iteminventory->refresh_slots();
+	}
+
+	void MapTransferResultHandler::handle(InPacket& recv) const
+	{
+		int8_t result = recv.read_byte();
+		bool vip = recv.read_bool();
+		TeleportRock &rock = Stage::get().get_player().get_teleport_rock();
+
+		if (result == TeleportRock::DROPPED || result == TeleportRock::KEPT)
+		{
+			std::vector<int32_t> maps;
+
+			for (size_t i = 0; i < TeleportRock::slots(vip); i++)
+				maps.push_back(recv.read_int());
+
+			rock.set_maps(vip, maps);
+
+			if (auto window = UI::get().get_element<UITeleportRock>(); window && window->is_active())
+				window->refresh();
+		} else if (std::string notice = TeleportRock::refusal(result, rock.get_target()); !notice.empty())
+		{
+			UI::get().emplace<UIOk>(notice, [](bool)
+			{});
+		}
+
+		rock.set_target("");
 	}
 
 	void ModifyInventoryHandler::handle(InPacket& recv) const

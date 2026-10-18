@@ -2,6 +2,7 @@ mod buddy;
 mod cash_item;
 mod cash_shop;
 mod chair;
+mod chalkboard;
 mod change_channel;
 mod change_map;
 mod char_info;
@@ -16,6 +17,7 @@ mod item_move;
 mod keybinds;
 mod logged_in;
 mod map_transfer;
+mod megaphone;
 mod meso_drop;
 mod messenger;
 mod monster_book_cover;
@@ -35,6 +37,7 @@ mod scroll;
 mod spend_points;
 mod storage;
 mod summon;
+mod teleport_rock;
 mod use_item;
 mod use_skill;
 mod whisper;
@@ -43,6 +46,7 @@ pub use self::buddy::BuddyListModifyHandler;
 pub use self::cash_item::UseCashItemHandler;
 pub use self::cash_shop::{CashShopOperationHandler, CheckCashHandler, EnterCashShopHandler};
 pub use self::chair::{CancelChairHandler, UseChairHandler};
+pub use self::chalkboard::CloseChalkboardHandler;
 pub use self::change_channel::ChangeChannelHandler;
 pub use self::change_map::{door_warp, warp, ChangeMapHandler, DoorExit};
 pub use self::char_info::CharInfoRequestHandler;
@@ -84,6 +88,7 @@ pub use self::storage::TrunkRequestHandler;
 pub use self::summon::{
     BeholderHandler, DamageSummonHandler, MoveSummonHandler, SummonAttackHandler,
 };
+pub use self::teleport_rock::{to_character, Rock, TeleportRockListHandler, Whereabouts};
 pub use self::use_item::{HealOverTimeHandler, UseItemHandler, UseSkillBookHandler};
 pub use self::use_skill::{
     party_skill_reached, CancelBuffHandler, SkillEffectHandler, ThrowGrenadeHandler,

@@ -20,8 +20,14 @@ pub const NO_DESTINATION_MAP: i32 = 999_999_999;
 pub const PORTAL_TYPE_START_POINT: i32 = 0;
 /// `pt` of a town's door portals (`tp`), where Mystic Doors stand.
 pub const PORTAL_TYPE_TOWN_DOOR: i32 = 6;
+/// `info/fieldLimit` bit forbidding movement skills; teleport rocks can't
+/// be used there either (v83 FUN_00a0a4aa).
+pub const FIELD_LIMIT_MOVEMENT_SKILLS: i32 = 0x2;
 /// `info/fieldLimit` bit forbidding Mystic Door (v83 FUN_00969bf9).
 pub const FIELD_LIMIT_MYSTIC_DOOR: i32 = 0x8;
+/// `info/fieldLimit` bit keeping teleport rocks from the map, to or from it
+/// (v83 FUN_00a0a4aa).
+pub const FIELD_LIMIT_TELEPORT_ROCK: i32 = 0x40;
 /// `info/fieldLimit` bit leaving only the map's `info/allowedItem` usable
 /// (v83 FUN_00a092fb).
 pub const FIELD_LIMIT_CONSUMABLES: i32 = 0x400;

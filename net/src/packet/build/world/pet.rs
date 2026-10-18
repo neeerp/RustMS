@@ -96,6 +96,19 @@ pub fn build_pet_chat(
     Ok(p)
 }
 
+/// PET_NAMECHANGE (172, FUN_00704801): the pet at `index` is now called
+/// `name`. Its owner's client needs it too, as pet commands may start with
+/// the name. The name tag style byte matches the spawn's (none).
+pub fn build_pet_name(owner_id: i32, index: u8, name: &str) -> Result<Packet, NetworkError> {
+    let mut p = Packet::new_empty();
+    p.write_short(SendOpcode::PetNameChange as i16)?;
+    p.write_int(owner_id)?;
+    p.write_byte(index)?;
+    p.write_str_with_length(name)?;
+    p.write_byte(0)?; // name tag
+    Ok(p)
+}
+
 /// PET_COMMAND (174, FUN_007048ab) mode 0: whether the pet at `index`
 /// obeyed `command`. Only its owner's client reacts: it picks the action
 /// and line and sends them back as PET_CHAT for the others. A pet `named`
@@ -284,6 +297,18 @@ mod tests {
         let mut expect = Expect::new(&packet.bytes);
         expect.short(SendOpcode::ShowForeignEffect as i16).int(9);
         expect.byte(4).byte(0).byte(2);
+        expect.end();
+    }
+
+    #[test]
+    fn a_pet_is_renamed() {
+        let packet = build_pet_name(9, 0, "Tigger").unwrap();
+        let mut expect = Expect::new(&packet.bytes);
+        expect
+            .short(SendOpcode::PetNameChange as i16)
+            .int(9)
+            .byte(0);
+        expect.string("Tigger").byte(0);
         expect.end();
     }
 }

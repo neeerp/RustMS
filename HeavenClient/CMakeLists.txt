@@ -44,6 +44,12 @@ if(HEAVENCLIENT_BUILD_TESTS)
     add_test(NAME text_layout COMMAND text_layout_tests)
     add_executable(chat_wrap_tests tests/chat_wrap.cpp)
     add_test(NAME chat_wrap COMMAND chat_wrap_tests)
+    add_executable(megaphones_tests tests/megaphones.cpp)
+    add_test(NAME megaphones COMMAND megaphones_tests)
+    add_executable(chalkboard_tests tests/chalkboard.cpp)
+    add_test(NAME chalkboard COMMAND chalkboard_tests)
+    add_executable(teleport_rock_tests tests/teleport_rock.cpp Character/TeleportRock.cpp)
+    add_test(NAME teleport_rock COMMAND teleport_rock_tests)
     add_executable(curse_words_tests tests/curse_words.cpp)
     add_test(NAME curse_words COMMAND curse_words_tests)
     add_executable(character_name_tests tests/character_name.cpp)
@@ -293,6 +299,8 @@ add_executable(HeavenClient
     Character/BuddyList.h
     Character/Buff.cpp
     Character/Buff.h
+    Character/ChalkboardBalloon.cpp
+    Character/ChalkboardBalloon.h
     Character/Char.cpp
     Character/Char.h
     Character/CharEffect.cpp
@@ -594,6 +602,12 @@ add_executable(HeavenClient
     IO/UITypes/UIShop.h
     IO/UITypes/UIStorage.cpp
     IO/UITypes/UIStorage.h
+    IO/UITypes/UITeleportRock.cpp
+    IO/UITypes/UITeleportRock.h
+    IO/UITypes/UIMegaphone.cpp
+    IO/UITypes/UIMegaphone.h
+    IO/UITypes/UIItemMegaphone.cpp
+    IO/UITypes/UIItemMegaphone.h
     IO/UITypes/UIInviteCard.cpp
     IO/UITypes/UIInviteCard.h
     IO/UITypes/UITradingRoom.cpp
@@ -746,6 +760,7 @@ add_executable(HeavenClient
     Template/TimedQueue.h
     Template/TypeMap.h
     Util/CharacterName.h
+    Util/Chalkboard.h
     Util/ChatWrap.h
     Util/CurseWords.h
     Util/HardwareInfo.h

@@ -221,6 +221,42 @@ void food()
 	require(closeness_change(4, 4).empty(), "no change, no line");
 }
 
+void naming()
+{
+	using ms::pets::check_name;
+	using ms::pets::Naming;
+
+	require(ms::pets::is_name_tag(5170000) && !ms::pets::is_name_tag(5170001) && !ms::pets::is_name_tag(5240000),
+			"the name tag is 5170000");
+	require(ms::pets::same_name("Baby Tiger", "baby TIGER") && !ms::pets::same_name("Baby Tiger", "Baby Tige"),
+			"names match in any case");
+
+	auto censor = [](const std::string& text)
+	{
+		std::string starred = text;
+		size_t at = starred.find("darn");
+
+		if (at != std::string::npos)
+			starred.replace(at, 4, "****");
+
+		return starred;
+	};
+	auto check = [&](std::string typed, const std::string& current)
+	{
+		Naming naming = check_name(typed, "Baby Tiger", current, censor);
+		return std::make_pair(naming, typed);
+	};
+
+	require(check("  Tigger ", "Baby Tiger") == std::make_pair(Naming::OK, std::string("Tigger")), "trimmed");
+	require(check(" Tig ", "Baby Tiger").first == Naming::SHORT, "under 4 bytes once trimmed");
+	require(check("Tig\x01ger", "Baby Tiger").first == Naming::CURSING, "a control character");
+	require(check("darn cat", "Baby Tiger") == std::make_pair(Naming::OK, std::string("**** cat")),
+			"curse words starred out");
+	require(check("BABY TIGER", "Tigger").first == Naming::TAKEN, "the kind's own name");
+	require(check("Tigger", "Tigger").first == Naming::TAKEN, "the name it has");
+	require(check("tigger", "Tigger").first == Naming::OK, "its name in another case");
+}
+
 int main()
 {
 	try
@@ -233,6 +269,7 @@ int main()
 		hearing();
 		actions();
 		food();
+		naming();
 
 		std::cout << "Pets passed\n";
 		return 0;

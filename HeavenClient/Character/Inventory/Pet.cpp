@@ -24,6 +24,16 @@ namespace ms
 								 closeness(closeness), fullness(fullness)
 	{}
 
+	int32_t Pet::get_item_id() const
+	{
+		return item_id;
+	}
+
+	const std::string &Pet::get_name() const
+	{
+		return petname;
+	}
+
 	uint8_t Pet::get_level() const
 	{
 		return petlevel;

@@ -466,7 +466,7 @@ side yet.
 | Skills, stat/AP/SP allocation, buffs, keymap | Implemented |
 | NPC dialogue and NPC shop | Implemented (`UINpcTalk`, `UIShop`) |
 | Quest log and markers | Implemented (`UIQuestLog`); progress arrives via SHOW_STATUS_INFO, quest start/complete is driven by NPC dialogue; UPDATE_QUEST_INFO refusals 9–11, 13 and 14 show v83's notices (10 names the full inventories from `Act.img`), 15 the expiry chat line, and the timer modes are ignored |
-| Chat, whisper, `/find`, `/?`, `/party`, `/buddy`, `/all`, server messages | Implemented; buddy whisper/find modes ignored; `/w NAME` alone fills in a whisper to NAME, or says "Incorrect ID." for a name no character could have, as v83's `/whisper NAME` does; other commands are dropped, as v83 does for non-GMs |
+| Chat, whisper, `/find`, `/?`, `/party`, `/buddy`, `/all`, server messages, megaphones | Implemented; the megaphone dialogs are in `inventory.md`; buddy whisper/find modes ignored; `/w NAME` alone fills in a whisper to NAME, or says "Incorrect ID." for a name no character could have, as v83's `/whisper NAME` does; other commands are dropped, as v83 does for non-GMs |
 | Character info, minimap, world map | Implemented |
 | Party (`UIUserList` Party tab, `UIPartyHP`, party chat) | Implemented; see `parties.md` |
 | Buddy list (`UIUserList` Friend tab, buddy chat) | Implemented without groups; see `buddies.md` |
@@ -476,7 +476,9 @@ side yet.
 | Cash shop (`UICashShop`) | Enter/exit, catalog, buying, gifts, Cash Inventory, wish list, and moving items to and from the bags |
 | Maple Messenger (`UIMessenger`) | Implemented |
 | Trade (`UITradingRoom`, `UIInviteCard`) | Implemented, without cash trades |
+| Chalkboards (`ChalkboardBalloon`) | Implemented: the board, the note prompt and the close button; see `inventory.md` |
 | Storage (`UIStorage`) | Implemented; see `inventory.md` |
+| Teleport rocks (`UITeleportRock`) | Implemented: the map list, keeping and dropping maps, and moving to a map or a character; see `inventory.md` |
 | Continent ships, station wall clocks | Docking ships and the Balrog's ship, CONTI_MOVE/CONTI_STATE, CLOCK kind 1; see `ships.md` |
 | Player shops, mini-games, memo/mail | No UI, no handlers |
 | Reactors | Spawning, swings, hits and breaking; no skill hits, touch or quest gates; see `combat.md` |
@@ -484,7 +486,7 @@ side yet.
 | Mounts, summons | Partial or absent |
 | Party/guild/boss quests, events, MTS | Absent |
 
-81 outbound opcodes are defined (`Net/OutPacket.h`) and 116 inbound handlers
+84 outbound opcodes are defined (`Net/OutPacket.h`) and 119 inbound handlers
 are registered (`Net/PacketSwitch.cpp`). Anything not listed there is silently ignored by the client.
 
 ## Movement physics

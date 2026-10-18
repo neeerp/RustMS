@@ -70,6 +70,7 @@ namespace ms
 		UPDATE_SKILL = 36,
 		SKILL_USE_RESULT = 37,
 		FAME_RESPONSE = 38,
+		MAP_TRANSFER_RESULT = 42,
 		SKILL_LEARN_ITEM_RESULT = 51,
 
 		/// Messaging 1
@@ -110,6 +111,7 @@ namespace ms
 
 		/// Messaging
 		CHAT_RECEIVED = 162,
+		CHALKBOARD = 164,
 		UPDATE_CHAR_BOX = 165,
 		SCROLL_RESULT = 167,
 
@@ -117,6 +119,7 @@ namespace ms
 		SPAWN_PET = 168,
 		MOVE_PET = 170,
 		PET_CHAT = 171,
+		PET_NAMECHANGE = 172,
 		PET_COMMAND = 174,
 		CASH_PET_FOOD_RESULT = 76,
 		CHAR_MOVED = 185,
@@ -227,6 +230,7 @@ namespace ms
 
 		// MapObject handlers
 		emplace<SPAWN_CHAR, SpawnCharHandler>();
+		emplace<CHALKBOARD, ChalkboardHandler>();
 		emplace<UPDATE_CHAR_BOX, UpdateCharBoxHandler>();
 		emplace<CHAR_MOVED, CharMovedHandler>();
 		emplace<FACIAL_EXPRESSION, FacialExpressionHandler>();
@@ -240,6 +244,7 @@ namespace ms
 		emplace<SPAWN_PET, SpawnPetHandler>();
 		emplace<MOVE_PET, MovePetHandler>();
 		emplace<PET_CHAT, PetChatHandler>();
+		emplace<PET_NAMECHANGE, PetNameChangeHandler>();
 		emplace<PET_COMMAND, PetCommandHandler>();
 		emplace<CASH_PET_FOOD_RESULT, CashPetFoodResultHandler>();
 		emplace<SPAWN_NPC, SpawnNpcHandler>();
@@ -314,6 +319,7 @@ namespace ms
 		emplace<INVENTORY_GROW, InventoryGrowHandler>();
 		emplace<GATHER_RESULT, GatherResultHandler>();
 		emplace<SORT_RESULT, SortResultHandler>();
+		emplace<MAP_TRANSFER_RESULT, MapTransferResultHandler>();
 
 		// NPC Interaction Handlers
 		emplace<NPC_DIALOGUE, NpcDialogueHandler>();

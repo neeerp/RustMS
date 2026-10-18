@@ -97,6 +97,16 @@ pub fn warp(
     let spawn_point = field
         .portal_by_name(portal)
         .map_or(0, |portal| u8::try_from(portal.id).unwrap_or(0));
+    warp_to_spawn_point(player, map_id, spawn_point, channel_id)
+}
+
+/// Send the player to `map_id`'s portal `spawn_point`.
+pub fn warp_to_spawn_point(
+    player: &mut Player,
+    map_id: i32,
+    spawn_point: u8,
+    channel_id: u8,
+) -> Result<Vec<WorldAction>, NetworkError> {
     player.move_to(map_id, spawn_point);
     Ok(vec![
         WorldAction::Reply(build::world::map::build_warp_to_map(

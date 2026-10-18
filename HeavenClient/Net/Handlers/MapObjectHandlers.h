@@ -28,6 +28,13 @@ namespace ms
 		void handle(InPacket& recv) const override;
 	};
 
+	// Put up or take down someone's chalkboard (FUN_00937607)
+	// Opcode: CHALKBOARD(164)
+	class ChalkboardHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
 	// Put up, change or take down the balloon over someone keeping a room
 	// open (FUN_00938ba5)
 	// Opcode: UPDATE_CHAR_BOX(165)
@@ -60,6 +67,15 @@ namespace ms
 	// A pet's action and line, as its owner's client showed them
 	// Opcode: PET_CHAT(171)
 	class PetChatHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
+	// A pet's new name, which a Pet Name Tag gave it (FUN_00704801). The
+	// owner's pet answers commands to it. It doesn't unlock the client;
+	// the inventory operation before it does.
+	// Opcode: PET_NAMECHANGE(172)
+	class PetNameChangeHandler : public PacketHandler
 	{
 		void handle(InPacket& recv) const override;
 	};

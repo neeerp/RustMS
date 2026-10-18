@@ -18,8 +18,12 @@
 #include "UIItemInventory.h"
 
 #include "UIChatBar.h"
+#include "UIItemMegaphone.h"
+#include "UIMegaphone.h"
 #include "UINotice.h"
 #include "UIPersonalShop.h"
+#include "UITeleportRock.h"
+#include "UITradingRoom.h"
 
 #include "../Messages.h"
 #include "../UI.h"
@@ -31,8 +35,11 @@
 #include "../../Character/Pets.h"
 #include "../../Character/Inventory/ItemDrop.h"
 #include "../../Character/Inventory/ScrollRules.h"
+#include "../../Data/CurseData.h"
 #include "../../Data/EquipData.h"
 #include "../../Gameplay/Stage.h"
+#include "../../Util/Chalkboard.h"
+#include "../../Util/Megaphones.h"
 #include "../../Util/NxFiles.h"
 
 #include "../../Net/Handlers/MiniRoom.h"
@@ -71,10 +78,21 @@ namespace ms
 		// v83's notices 0x10a and 0x42 (FUN_004f5697).
 		constexpr const char *CATCH_BREATH = "You can't do it right now.\\nCatch your breath and then try again.";
 		constexpr const char *DEAD = "You can't do it once you're dead.";
+		// StringPool 0x129.
+		constexpr const char *REQUEST_BUSY = "Other requests are in process.\\nPlease try again in a little bit.";
 		// StringPool 0x180 and 0x181.
 		constexpr const char *TOO_MANY_PETS = "You have exceeded the maximum number\\n of pets that can accompany you.\\nPlease try again after \\nyou change the living pet back into a doll.";
 		// StringPool 0xed8.
 		constexpr const char *CASH_FOOD_NO_PET = "This item can only be used with a pet.";
+		// StringPool 0x319 to 0x31c, 0x110 and 0x335.
+		constexpr const char *PET_HAS_NAME = "The pet already has a name.\\nWill you change it?";
+		constexpr const char *NAME_PET = "Please name your pet.";
+		constexpr const char *NAME_TAKEN = "That name is not available.";
+		constexpr const char *NO_CURSING = "Cursing is not allowed.";
+		// StringPool 0x10f, 0xea1 and 0x111.
+		constexpr const char *MEGAPHONE_PROMPT = "Enter your comments through the megaphone.";
+		constexpr const char *MEGAPHONE_LEVEL = "This megaphone is only available for \\ncharacters that are over Level 10.";
+		constexpr const char *MEGAPHONE_LONG = "Use the megaphone to text up to 60 characters.";
 		constexpr const char *BOSS_PET = "Would you like to change your Boss Pet?\\n (The \"Item Ignore\" skill, as well as \\nthe stats for speed and jump will \\nfollow that of the Lead Pet)";
 
 		// v83 FUN_00a240a2: double-clicking a pet asks the server to bring it
@@ -134,6 +152,237 @@ namespace ms
 
 			if (player.request(UseCashItemPacket(slot, item_id), ExclRequest::WAIT))
 				Sound(nl::nx::sound["Game.img"]["UseShopItem"]).play();
+		}
+
+		// v83 FUN_00a0a63f, type 0x11, after asking whether to rename a pet
+		// that has a name: the name, then whether to use it. A name too
+		// short asks again; anything else refused ends it.
+		void ask_pet_name(int16_t slot, int32_t item_id, const std::string &species, const std::string &current)
+		{
+			UI::get().emplace<UIEnterText>(NAME_PET, [=](const std::string &typed)
+			{
+				std::string name = typed;
+
+				switch (pets::check_name(name, species, current, CurseData::filter))
+				{
+					case pets::Naming::OK:
+						UI::get().emplace<UIYesNo>("Do you want to name your pet\\n'" + name + "'?", [=](bool yes)
+						{
+							if (yes && Stage::get().get_player().request(UseCashItemPacket(slot, item_id, name), ExclRequest::WAIT))
+								Sound(nl::nx::sound["Game.img"]["UseShopItem"]).play();
+						});
+						break;
+					case pets::Naming::SHORT:
+						UI::get().emplace<UIOk>("Please enter at least " + std::to_string(pets::MIN_NAME) + " characters.", [=](bool)
+						{
+							ask_pet_name(slot, item_id, species, current);
+						});
+						break;
+					case pets::Naming::CURSING:
+						UI::get().emplace<UIOk>(NO_CURSING, [](bool)
+						{});
+						break;
+					case pets::Naming::TAKEN:
+						UI::get().emplace<UIOk>(NAME_TAKEN, [](bool)
+						{});
+						break;
+				}
+			}, pets::MAX_NAME);
+		}
+
+		// v83 FUN_00a0a63f, type 0x11: the Pet Name Tag names the first pet
+		// out. Without one it does nothing. A pet already renamed asks first.
+		void name_pet(int16_t slot, int32_t item_id)
+		{
+			Player &player = Stage::get().get_player();
+
+			if (!player.can_request(ExclRequest::WAIT))
+				return;
+
+			Optional<const Pet> pet = player.get_inventory().get_pet(player.get_pet_serials()[0]);
+
+			if (!pet)
+				return;
+
+			std::string species = nl::nx::string["Pet.img"][std::to_string(pet->get_item_id())]["name"];
+			std::string current = pet->get_name();
+
+			if (pets::same_name(species, current))
+				ask_pet_name(slot, item_id, species, current);
+			else
+				UI::get().emplace<UIYesNo>(PET_HAS_NAME, [=](bool yes)
+				{
+					if (yes)
+						ask_pet_name(slot, item_id, species, current);
+				});
+		}
+
+		// v83 FUN_00a0a63f waits for the last request before a cash item
+		// opens its window, and again before it is used, saying so.
+		bool may_use_cash_item()
+		{
+			if (Stage::get().get_player().can_request(ExclRequest::WAIT))
+				return true;
+
+			UI::get().emplace<UIOk>(REQUEST_BUSY, [](bool)
+			{});
+
+			return false;
+		}
+
+		// Some cash items say so in the chat log while a shop or trade is open.
+		bool in_mini_room()
+		{
+			auto shop = UI::get().get_element<UIPersonalShop>();
+			auto trade = UI::get().get_element<UITradingRoom>();
+
+			if ((!shop || !shop->is_active()) && (!trade || !trade->is_active()))
+				return false;
+
+			if (auto chatbar = UI::get().get_element<UIChatBar>())
+				chatbar->send_chatline("Not available", UIChatBar::LineType::SKILL);
+
+			return true;
+		}
+
+		// v83 FUN_00a0a63f, type 0x20: a chalkboard asks for a note, which
+		// goes up once the server sends it back. A blank note isn't sent.
+		void use_chalkboard(int16_t slot, int32_t item_id)
+		{
+			if (!may_use_cash_item() || in_mini_room())
+				return;
+
+			if (Stage::get().get_mapinfo().allows_personal_shop())
+			{
+				UI::get().emplace<UIOk>("You can't use it here in this map.", [](bool)
+				{});
+				return;
+			}
+
+			UI::get().emplace<UIEnterText>("Enter a note.", [=](const std::string &text)
+			{
+				if (!Chalkboard::trim(text).empty() && may_use_cash_item())
+					Stage::get().get_player().request(UseCashItemPacket(slot, item_id, text), ExclRequest::WAIT);
+			}, Chalkboard::MAX_TEXT);
+		}
+
+		// Whether a megaphone's line is refused, saying why if v83 does.
+		bool megaphone_refused(Megaphones::Refusal refusal)
+		{
+			const char *reason = nullptr;
+
+			switch (refusal)
+			{
+				case Megaphones::Refusal::NONE:
+					return false;
+				case Megaphones::Refusal::CURSING:
+					reason = NO_CURSING;
+					break;
+				case Megaphones::Refusal::LEVEL:
+					reason = MEGAPHONE_LEVEL;
+					break;
+				case Megaphones::Refusal::LONG:
+					reason = MEGAPHONE_LONG;
+					break;
+				case Megaphones::Refusal::QUIET:
+					break;
+			}
+
+			if (reason)
+				UI::get().emplace<UIOk>(reason, [](bool)
+				{});
+
+			return true;
+		}
+
+		// Checks a plain or super megaphone's line with the level I have now.
+		bool line_refused(const std::string &text)
+		{
+			uint16_t level = Stage::get().get_player().get_stats().get_stat(MapleStat::Id::LEVEL);
+
+			return megaphone_refused(Megaphones::check_line(text, level, CurseData::filter));
+		}
+
+		void send_megaphone(OutPacket &&packet)
+		{
+			if (may_use_cash_item() && Stage::get().get_player().request(std::move(packet), ExclRequest::WAIT))
+				Sound(nl::nx::sound["Game.img"]["UseShopItem"]).play();
+		}
+
+		// v83 FUN_00a0a63f, types 0xc to 0xf and 0x3c: a megaphone asks for
+		// its line, and checks it once the prompt has closed. The item
+		// megaphone's window stays open beside the game and sends by itself.
+		void use_megaphone(int16_t slot, int32_t item_id)
+		{
+			if (!may_use_cash_item())
+				return;
+
+			switch (Megaphones::kind(item_id))
+			{
+				case Megaphones::Kind::PLAIN:
+					UI::get().emplace<UIEnterText>(MEGAPHONE_PROMPT, [=](const std::string &text)
+					{
+						if (!line_refused(text))
+							send_megaphone(UseCashItemPacket(slot, item_id, text));
+					}, Megaphones::MAX_LINE);
+					break;
+				case Megaphones::Kind::SUPER:
+					UI::get().emplace<UIMegaphone>(item_id, [=](const std::vector<std::string> &lines, bool ear)
+					{
+						if (!line_refused(lines[0]))
+							send_megaphone(UseSuperMegaphonePacket(slot, item_id, lines[0], ear));
+					});
+					break;
+				case Megaphones::Kind::TRIPLE:
+					UI::get().emplace<UIMegaphone>(item_id, [=](const std::vector<std::string> &lines, bool ear)
+					{
+						if (!megaphone_refused(Megaphones::check_lines(lines)))
+							send_megaphone(UseTripleMegaphonePacket(slot, item_id, Megaphones::lines_sent(lines), ear));
+					});
+					break;
+				case Megaphones::Kind::ITEM:
+					if (!in_mini_room())
+						UI::get().emplace<UIItemMegaphone>(slot, item_id);
+
+					break;
+				case Megaphones::Kind::NONE:
+					break;
+			}
+		}
+
+		// v83 FUN_00a0a4aa: a teleport rock goes to the map or the
+		// character chosen in its list. Maps that don't allow teleports
+		// refuse it before the list opens.
+		void use_teleport_rock(int16_t slot, int32_t item_id)
+		{
+			if (!may_use_cash_item())
+				return;
+
+			if (Stage::get().get_mapinfo().get_fieldlimit() & (0x40 | 0x2))
+			{
+				UI::get().emplace<UIOk>("You cannot teleport to this map.", [](bool)
+				{});
+				return;
+			}
+
+			UI::get().emplace<UITeleportRock>(TeleportRock::is_vip(item_id), [slot, item_id](const std::string &name, int32_t map_id)
+			{
+				Player &player = Stage::get().get_player();
+				player.get_teleport_rock().set_target(name);
+
+				if (name.empty() && (map_id == TeleportRock::EMPTY || map_id == 0))
+					return;
+
+				if (!may_use_cash_item())
+					return;
+
+				bool sent = name.empty()
+						? player.request(UseTeleportRockPacket(slot, item_id, map_id), ExclRequest::WAIT)
+						: player.request(UseTeleportRockPacket(slot, item_id, name), ExclRequest::WAIT);
+
+				if (sent)
+					Sound(nl::nx::sound["Game.img"]["UseShopItem"]).play();
+			});
 		}
 
 		// v83 FUN_00a0900a: a map may keep items off the ground, which it
@@ -437,6 +686,8 @@ namespace ms
 							break;
 						else if (pets::is_food(item_id))
 							Stage::get().get_player().feed_pets(slot, item_id);
+						else if (item_id / 10000 == 228 || item_id / 10000 == 229)
+							Stage::get().get_player().request(SkillBookPacket(slot, item_id), ExclRequest::USE_WAIT);
 						else
 							Stage::get().get_player().request(UseItemPacket(slot, item_id), ExclRequest::USE_WAIT);
 
@@ -456,6 +707,14 @@ namespace ms
 							summon_pet(slot, inventory.get_cash_id(tab, slot));
 						else if (pets::is_cash_food(item_id))
 							feed_cash_food(slot, item_id);
+						else if (pets::is_name_tag(item_id))
+							name_pet(slot, item_id);
+						else if (item_id / 10000 == 537)
+							use_chalkboard(slot, item_id);
+						else if (item_id / 10000 == 504)
+							use_teleport_rock(slot, item_id);
+						else if (item_id / 10000 == 507)
+							use_megaphone(slot, item_id);
 
 						break;
 				}
@@ -908,6 +1167,13 @@ namespace ms
 
 		if (auto shop = UI::get().get_element<UIPersonalShop>())
 			shop->sell(sourcetab, source, item_id, count);
+	}
+
+	void UIItemInventory::ItemIcon::drop_on_megaphone() const
+	{
+		// v83 takes any item here; the server decides (FUN_004f49b3).
+		if (auto megaphone = UI::get().get_element<UIItemMegaphone>())
+			megaphone->set_item(sourcetab, source);
 	}
 
 	void UIItemInventory::ItemIcon::set_count(int16_t c)

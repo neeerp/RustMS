@@ -25,11 +25,13 @@
 #include "Helpers/PetParser.h"
 #include "MiniRoom.h"
 
+#include "../../Data/CurseData.h"
 #include "../../Data/SkillData.h"
 #include "../../Gameplay/Stage.h"
 #include "../../IO/UI.h"
 #include "../../IO/UITypes/UIChatBar.h"
 #include "../../IO/UITypes/UINotice.h"
+#include "../../Util/Chalkboard.h"
 #include "../Packets/GameplayPackets.h"
 
 namespace ms
@@ -71,15 +73,34 @@ namespace ms
 
 		std::optional<MiniRoomBox> room = mini_room::read_box(recv);
 
-		bool chalkboard = recv.read_bool();
-		std::string chalktext = chalkboard ? recv.read_string() : "";
+		std::optional<std::string> chalkboard;
+
+		if (recv.read_bool())
+			chalkboard = Chalkboard::remote_text(recv.read_string(), CurseData::filter);
 
 		recv.skip(3);
 		recv.read_byte(); // team
 
 		Stage::get().get_chars().spawn(
-			{ cid, look, level, job, name, stance, position, chair, std::move(buffs), guild, emblem, room, std::move(pets) }
+			{ cid, look, level, job, name, stance, position, chair, std::move(buffs), guild, emblem, room, std::move(pets),
+			  chalkboard }
 		);
+	}
+
+	void ChalkboardHandler::handle(InPacket& recv) const
+	{
+		int32_t cid = recv.read_int();
+		std::optional<std::string> text;
+
+		if (recv.read_bool())
+			text = recv.read_string();
+
+		// Only the player's own board can be closed, and only someone else's
+		// note is filtered and cut.
+		if (Stage::get().is_player(cid))
+			Stage::get().get_player().set_chalkboard(text ? Chalkboard::trim(*text) : text, true);
+		else if (Optional<OtherChar> other = Stage::get().get_chars().get_char(cid))
+			other->set_chalkboard(text ? Chalkboard::remote_text(*text, CurseData::filter) : text, false);
 	}
 
 	void UpdateCharBoxHandler::handle(InPacket& recv) const
@@ -197,6 +218,21 @@ namespace ms
 		if (Optional<Char> character = Stage::get().get_character(cid))
 			if (Optional<PetLook> pet = character->get_pet(index))
 				pet->act({ type, action, text }, styled);
+	}
+
+	void PetNameChangeHandler::handle(InPacket& recv) const
+	{
+		int32_t cid = recv.read_int();
+		uint8_t index = recv.read_byte();
+		std::string name = recv.read_string();
+
+		// The name tag's style (`info/nameTag`) when set; HeavenClient
+		// draws one plain tag for every pet.
+		recv.read_bool();
+
+		if (Optional<Char> character = Stage::get().get_character(cid))
+			if (Optional<PetLook> pet = character->get_pet(index))
+				pet->set_name(name);
 	}
 
 	void CashPetFoodResultHandler::handle(InPacket& recv) const

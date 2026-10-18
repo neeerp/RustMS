@@ -17,7 +17,7 @@ use net::packet::build::world::party::{
     build_party_member_hp, build_party_status, build_party_update, Departure, PartyMemberView,
     PartyStatus, PartyView,
 };
-use net::packet::handle::world::DoorExit;
+use net::packet::handle::world::{DoorExit, Rock};
 use net::{BroadcastScope, ClientId, MessengerRequest, PartyRequest, PartySkill, WhisperDelivery};
 use packet::Packet;
 use std::collections::HashMap;
@@ -117,6 +117,9 @@ impl WorldDirectory {
             } => self.update_presence(client_id, presence),
             DirectoryMessage::Whisper { from, delivery } => self.whisper(from, delivery),
             DirectoryMessage::Find { from, target_name } => self.find(from, &target_name),
+            DirectoryMessage::RockLocate { from, name, rock } => {
+                self.rock_locate(from, &name, rock)
+            }
             DirectoryMessage::Broadcast {
                 from,
                 scope,
@@ -307,6 +310,28 @@ impl WorldDirectory {
         }
     }
 
+    /// Ask the character named `name` where they stand, if they are on the
+    /// asker's channel; otherwise tell the asker they weren't found.
+    fn rock_locate(&self, from: ClientId, name: &str, rock: Rock) {
+        let Some(asker) = self.clients.get(&from) else {
+            return;
+        };
+        let target = self
+            .names
+            .get(name)
+            .and_then(|id| self.clients.get(id))
+            .filter(|target| target.channel_id == asker.channel_id);
+        match target {
+            Some(target) => target.handle.send(ServerMessage::RockLocate {
+                reply_to: asker.handle.clone(),
+                rock,
+            }),
+            None => asker
+                .handle
+                .send(ServerMessage::RockLocated { rock, found: None }),
+        };
+    }
+
     fn messenger(&mut self, from: ClientId, request: MessengerRequest) {
         let Some(sender) = self.clients.get(&from) else {
             return;
@@ -345,10 +370,14 @@ impl WorldDirectory {
 
     fn broadcast(&self, from: ClientId, scope: BroadcastScope, packet: Packet) {
         for (&client_id, entry) in &self.clients {
-            if matches!(scope, BroadcastScope::WorldExcludeSelf) && client_id == from {
-                continue;
+            let reached = match scope {
+                BroadcastScope::World => true,
+                BroadcastScope::WorldExcludeSelf => client_id != from,
+                BroadcastScope::Channel(channel_id) => entry.channel_id == channel_id,
+            };
+            if reached {
+                entry.handle.send_packet(packet.clone());
             }
-            entry.handle.send_packet(packet.clone());
         }
     }
 

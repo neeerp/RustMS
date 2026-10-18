@@ -38,6 +38,7 @@ pub enum RecvOpcode {
     MagicAttack = 0x2E,
     TakeDamage = 0x30,
     AllChat = 0x31,
+    CloseChalkboard = 0x32,
     MultiChat = 0x77,
     PartyOperation = 0x7C,
     BuddyListModify = 0x82,
@@ -74,6 +75,7 @@ pub enum RecvOpcode {
     CharInfoRequest = 0x61,
     SpawnPet = 0x62,
     ChangeMapSpecial = 0x64,
+    TeleportRockList = 0x66,
     QuestAction = 0x6B,
     ThrowGrenade = 0x6D,
 

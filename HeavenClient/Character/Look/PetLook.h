@@ -114,6 +114,9 @@ namespace ms
 
 		int64_t get_serial() const;
 
+		// PET_NAMECHANGE (172): the pet answers to its new name.
+		void set_name(const std::string &name);
+
 		bool is_local() const;
 
 		Stance get_stance() const;

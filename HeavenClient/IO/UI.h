@@ -65,6 +65,9 @@ namespace ms
 
 		void send_cursor(Point<int16_t> cursorpos, Cursor::State cursorstate);
 
+		// Whether the left button is held down.
+		bool is_cursor_pressed() const;
+
 		void send_focus(int focused);
 
 		void send_scroll(double yoffset);

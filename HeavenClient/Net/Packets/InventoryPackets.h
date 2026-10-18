@@ -133,6 +133,126 @@ namespace ms
 			write_int(itemid);
 			write_time();
 		}
+
+		// The Pet Name Tag (5170000) sends the pet's new name.
+		UseCashItemPacket(int16_t slot, int32_t itemid, const std::string &text)
+				: OutPacket(OutPacket::Opcode::USE_CASH_ITEM)
+		{
+			write_short(slot);
+			write_int(itemid);
+			write_string(text);
+			write_time();
+		}
+	};
+
+	// Uses a super megaphone (FUN_00a0a63f type 0xd): the line, and
+	// whether it shows an ear to whisper back by.
+	// Opcode: USE_CASH_ITEM(79)
+	class UseSuperMegaphonePacket : public OutPacket
+	{
+	public:
+		UseSuperMegaphonePacket(int16_t slot, int32_t itemid, const std::string &text, bool ear)
+				: OutPacket(OutPacket::Opcode::USE_CASH_ITEM)
+		{
+			write_short(slot);
+			write_int(itemid);
+			write_string(text);
+			write_byte(ear);
+			write_time();
+		}
+	};
+
+	// Uses an item megaphone (FUN_005ec4b7): a super megaphone's line that
+	// may show the item in `item_slot` of `tab`, or none for NONE.
+	// Opcode: USE_CASH_ITEM(79)
+	class UseItemMegaphonePacket : public OutPacket
+	{
+	public:
+		UseItemMegaphonePacket(int16_t slot, int32_t itemid, const std::string &text, bool ear, InventoryType::Id tab,
+							   int16_t item_slot) : OutPacket(OutPacket::Opcode::USE_CASH_ITEM)
+		{
+			write_short(slot);
+			write_int(itemid);
+			write_string(text);
+			write_byte(ear);
+			write_byte(tab != InventoryType::Id::NONE);
+
+			if (tab != InventoryType::Id::NONE)
+			{
+				write_int(tab);
+				write_int(item_slot);
+			}
+
+			write_time();
+		}
+	};
+
+	// Uses a triple megaphone (FUN_00a0a63f type 0x3c): one to three lines.
+	// Opcode: USE_CASH_ITEM(79)
+	class UseTripleMegaphonePacket : public OutPacket
+	{
+	public:
+		UseTripleMegaphonePacket(int16_t slot, int32_t itemid, const std::vector<std::string> &lines, bool ear)
+				: OutPacket(OutPacket::Opcode::USE_CASH_ITEM)
+		{
+			write_short(slot);
+			write_int(itemid);
+			write_byte(static_cast<int8_t>(lines.size()));
+
+			for (const std::string &line : lines)
+				write_string(line);
+
+			write_byte(ear);
+			write_time();
+		}
+	};
+
+	// Uses the teleport rock (504xxxx) in Cash slot `slot` to go to a
+	// character, or to a kept map (FUN_00a0a4aa).
+	// Opcode: USE_CASH_ITEM(79)
+	class UseTeleportRockPacket : public OutPacket
+	{
+	public:
+		UseTeleportRockPacket(int16_t slot, int32_t itemid, const std::string &name)
+				: OutPacket(OutPacket::Opcode::USE_CASH_ITEM)
+		{
+			write_short(slot);
+			write_int(itemid);
+			write_byte(1);
+			write_string(name);
+			write_time();
+		}
+
+		UseTeleportRockPacket(int16_t slot, int32_t itemid, int32_t mapid) : OutPacket(OutPacket::Opcode::USE_CASH_ITEM)
+		{
+			write_short(slot);
+			write_int(itemid);
+			write_byte(0);
+			write_int(mapid);
+			write_time();
+		}
+	};
+
+	// Keeps the player's map for a teleport rock, or drops a kept one
+	// (FUN_00a261bc). The server answers with the list.
+	// Opcode: TELEPORT_ROCK_LIST(102)
+	class TeleportRockListPacket : public OutPacket
+	{
+	public:
+		// Keeps the map the player is on.
+		TeleportRockListPacket(bool vip) : OutPacket(OutPacket::Opcode::TELEPORT_ROCK_LIST)
+		{
+			write_byte(1);
+			write_byte(vip);
+		}
+
+		// Drops `mapid`.
+		TeleportRockListPacket(bool vip, int32_t mapid) : OutPacket(OutPacket::Opcode::TELEPORT_ROCK_LIST)
+		{
+			write_byte(0);
+			write_byte(vip);
+			write_int(mapid);
+		}
 	};
 
 	// Requests reading a skill or mastery book (v83 FUN_00a0a1b2)

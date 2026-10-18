@@ -137,7 +137,7 @@ namespace ms
 				  int8_t stance, Point<int16_t> position, int32_t chair,
 				  std::vector<std::pair<Buffstat::Id, int32_t>> buffs, const std::string &guild,
 				  const GuildEmblem &emblem, std::optional<MiniRoomBox> room = std::nullopt,
-				  std::vector<PetEntry> pets = {});
+				  std::vector<PetEntry> pets = {}, std::optional<std::string> chalkboard = std::nullopt);
 
 		int32_t get_cid() const;
 
@@ -157,5 +157,6 @@ namespace ms
 		GuildEmblem emblem;
 		std::optional<MiniRoomBox> room;
 		std::vector<PetEntry> pets;
+		std::optional<std::string> chalkboard;
 	};
 }

@@ -26,6 +26,7 @@
 
 #include <cstdint>
 
+#include "ChalkboardBalloon.h"
 #include "CharEffect.h"
 #include "GuildMark.h"
 #include "MiniRoomBalloon.h"
@@ -242,6 +243,17 @@ namespace ms
 		// on the screen.
 		int32_t mini_room_at(Point<int16_t> feet, Point<int16_t> cursor) const;
 
+		// Puts up the character's chalkboard with `text`, or takes it down.
+		// Only the player's own board can be closed.
+		void set_chalkboard(const std::optional<std::string> &text, bool closable);
+		// The note on the character's chalkboard, if one is up.
+		std::optional<std::string> get_chalkboard() const;
+		// Tracks the chalkboard's close button, with the feet at `feet` on the
+		// screen. True when it was clicked.
+		bool send_chalkboard_cursor(Point<int16_t> feet, Point<int16_t> cursor, bool pressed, bool held);
+		void release_chalkboard_cursor();
+		bool on_chalkboard_close(Point<int16_t> feet, Point<int16_t> cursor) const;
+
 		// Return if the char is in the Char::State::SIT state
 		bool is_sitting() const;
 
@@ -310,6 +322,7 @@ namespace ms
 		Text namelabel;
 		Text guildlabel;
 		GuildMark guildmark;
+		ChalkboardBalloon chalkboard;
 		ChatBalloon chatballoon;
 		ChatBalloon hintballoon;
 		MiniRoomBalloon miniroom;
