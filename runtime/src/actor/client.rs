@@ -248,6 +248,7 @@ impl ClientActor {
         if self.in_cash_shop
             && opcode != RecvOpcode::ChangeMap as i16
             && opcode != RecvOpcode::CashShopOperation as i16
+            && opcode != RecvOpcode::CheckCash as i16
         {
             debug!(opcode, "Ignoring opcode in the Cash Shop");
             return Ok(());
@@ -708,6 +709,14 @@ impl ClientActor {
             } => {
                 self.expand_storage(account_id, cash_type, slots, price)
                     .await?
+            }
+            CashShopRequest::Balance => {
+                let balance = spawn_db(move || db::cash_shop::balance(account_id)).await?;
+                vec![cs::build_cash_balance(
+                    balance.credit,
+                    balance.points,
+                    balance.prepaid,
+                )?]
             }
         };
         self.send_all(&mut packets).await

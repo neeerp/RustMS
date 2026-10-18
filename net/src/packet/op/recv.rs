@@ -87,6 +87,7 @@ pub enum RecvOpcode {
     PlayerMapTransfer = 0xCF,
     ContiStateRequest = 0xDC,
     PartySearchUpdate = 0xDF,
+    CheckCash = 0xE4,
     CashShopOperation = 0xE5,
 
     UnusedOpcode = 0xFF,

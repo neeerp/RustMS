@@ -439,7 +439,7 @@ side yet.
 | Pets, mounts, summons, reactors beyond hit/spawn | Partial or absent (`Reactor` TODOs) |
 | Party/guild/boss quests, events, MTS | Absent |
 
-74 outbound opcodes are defined (`Net/OutPacket.h`) and 111 inbound handlers
+75 outbound opcodes are defined (`Net/OutPacket.h`) and 111 inbound handlers
 are registered (`Net/PacketSwitch.cpp`). Anything not listed there is silently ignored by the client.
 
 ## Movement physics
@@ -567,8 +567,12 @@ the screen size.
   that covers the price, trying NX Prepaid, NX Credit, then Maple Points. OK
   sends CASHSHOP_OPERATION (229) 0x03 with the cash type (1 Credit, 2 Maple
   Points, 4 Prepaid) and SN, or 0x1E for a package (items 910xxxx) and
-  0x06/0x07 mode 1 for an expansion commodity (911x000). The result is a
-  "successful purchase" or a failure notice.
+  0x06/0x07 mode 1 for an expansion commodity (911x000). As in v83, each
+  mode is followed by a byte that is 1 for Maple Points, and 0x03 ends with
+  a zero (no free trial). The result is a "successful purchase" or a failure
+  notice.
+- **Check:** CHECK CASH sends CHECK_CASH (228), as does the game window
+  getting the focus back while the shop is open; QUERY_CASH_RESULT answers.
 - **Slot buttons:** Equip Slot through Stor. Slot open `UICashBuy` for the
   matching expansion item at 4,000 NX, and OK sends 0x06 mode 0 with the bag,
   or 0x07 mode 0. On 0x60 the bag's slot count changes at once.
@@ -592,7 +596,7 @@ the screen size.
   The receiver gets one notice listing each gift's sender, item and message
   when 0x4D arrives. The buddy and guild buttons that open the wider
   `backgrnd1` aren't drawn, and only one name is sent.
-- **Not served yet:** CHARGE, CHECK CASH and COUPON do nothing.
+- **Not served yet:** CHARGE and COUPON do nothing.
 
 ## Estimated client work for a complete game
 

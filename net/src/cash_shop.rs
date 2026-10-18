@@ -70,6 +70,9 @@ pub enum CashShopRequest {
         slots: u8,
         price: i32,
     },
+    /// Send the account's balances again: the Check button, and v83 on every
+    /// activation of the game window.
+    Balance,
 }
 
 /// The balance a purchase names: 1 NX Credit, 2 Maple Points, 4 NX Prepaid.

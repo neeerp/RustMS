@@ -109,18 +109,29 @@ namespace ms
 		EnterCashShopPacket() : OutPacket(OutPacket::Opcode::ENTER_CASHSHOP) {}
 	};
 
+	// Opcode: CHECK_CASH(228)
+	class CheckCashPacket : public OutPacket
+	{
+	public:
+		// Ask for the balances again: the Check button, and v83 whenever the
+		// game window is activated in the Cash Shop
+		CheckCashPacket() : OutPacket(OutPacket::Opcode::CHECK_CASH) {}
+	};
+
 	// Opcode: CASHSHOP_OPERATION(229)
 	class BuyCashItemPacket : public OutPacket
 	{
 	public:
 		// Pay for the commodity sn: cash type 1 is NX Credit, 2 Maple Points,
-		// 4 NX Prepaid
+		// 4 NX Prepaid. v83 flags a Maple Points purchase before the type,
+		// and ends with 1 for the free one-day trial, which isn't offered.
 		BuyCashItemPacket(int32_t cash_type, int32_t sn) : OutPacket(OutPacket::Opcode::CASHSHOP_OPERATION)
 		{
 			write_byte(3);
-			write_byte(0);
+			write_byte(cash_type == 2);
 			write_int(cash_type);
 			write_int(sn);
+			write_int(0);
 		}
 	};
 
@@ -132,7 +143,7 @@ namespace ms
 		BuyCashPackagePacket(int32_t cash_type, int32_t sn) : OutPacket(OutPacket::Opcode::CASHSHOP_OPERATION)
 		{
 			write_byte(0x1E);
-			write_byte(0);
+			write_byte(cash_type == 2);
 			write_int(cash_type);
 			write_int(sn);
 		}
@@ -163,7 +174,7 @@ namespace ms
 		void write_header(int32_t cash_type, InventoryType::Id type, int8_t mode)
 		{
 			write_byte(type == InventoryType::Id::NONE ? 7 : 6);
-			write_byte(0);
+			write_byte(cash_type == 2);
 			write_int(cash_type);
 			write_byte(mode);
 		}

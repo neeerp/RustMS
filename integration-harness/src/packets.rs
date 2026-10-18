@@ -475,6 +475,11 @@ pub fn build_cash_shop_buy(cash_type: i32, sn: i32) -> Result<Packet, String> {
     cash_shop_purchase(0x03, cash_type, sn)
 }
 
+/// CHECK_CASH (0xE4): the Cash Shop's Check button asks for the balances.
+pub fn build_check_cash() -> Packet {
+    packet_with_opcode(RecvOpcode::CheckCash as i16)
+}
+
 /// CASHSHOP_OPERATION 0x1E: buy package `sn`, paying with `cash_type`.
 pub fn build_cash_shop_buy_package(cash_type: i32, sn: i32) -> Result<Packet, String> {
     cash_shop_purchase(0x1E, cash_type, sn)

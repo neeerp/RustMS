@@ -44,6 +44,19 @@ const PUT_BACK: u8 = 0x0E;
 const EXPAND_BAG: u8 = 0x06;
 const EXPAND_STORAGE: u8 = 0x07;
 const BUY_PACKAGE: u8 = 0x1E;
+/// Sent unasked by v83: a query for each commodity it has not cached, and
+/// 0x21, whose purpose is unknown. A failure would show a notice for each.
+const UNRESOLVED: u8 = 0x21;
+const QUERY: u8 = 0x28;
+
+/// 0xE4, `CHECK_CASH`: the Check button asks for the balances again.
+pub struct CheckCashHandler;
+
+impl WorldHandler for CheckCashHandler {
+    fn handle(&self, _packet: &mut Packet, _ctx: &mut WorldContext) -> WorldResult {
+        Ok(HandlerResult::empty().with(WorldAction::CashShop(CashShopRequest::Balance)))
+    }
+}
 
 impl WorldHandler for CashShopOperationHandler {
     fn handle(&self, packet: &mut Packet, ctx: &mut WorldContext) -> WorldResult {
@@ -156,10 +169,15 @@ impl WorldHandler for CashShopOperationHandler {
                     _ => return fail(CashShopFailure::Unknown),
                 }
             }
-            other => {
-                // Coupons and the rest aren't supported yet.
-                debug!(action = other, "Ignoring Cash Shop operation");
+            QUERY | UNRESOLVED => {
+                debug!("Ignoring Cash Shop query");
                 return Ok(HandlerResult::empty());
+            }
+            other => {
+                // v83 locks the shop until an answer comes (CCashShop+0x18),
+                // and a failure clears the lock.
+                debug!(action = other, "Refusing unsupported Cash Shop operation");
+                return fail(CashShopFailure::Unknown);
             }
         };
         Ok(HandlerResult::empty().with(WorldAction::CashShop(request)))
@@ -228,6 +246,25 @@ mod tests {
             panic!("expected a failure reply: {:?}", result.actions);
         };
         assert_eq!(reply.bytes[2..], [0x5C, CashShopFailure::Unknown as u8]);
+    }
+
+    #[test]
+    fn unsupported_requests_fail_so_the_shop_unlocks() {
+        // Buying with mesos: v83 waits for an answer before the next request.
+        let result = handle(|p| {
+            p.write_byte(0x20).unwrap();
+            p.write_int(20000000).unwrap();
+        });
+        let [WorldAction::Reply(reply)] = result.actions.as_slice() else {
+            panic!("expected a failure reply: {:?}", result.actions);
+        };
+        assert_eq!(reply.bytes[2..], [0x5C, CashShopFailure::Unknown as u8]);
+        // A commodity query is not the player's doing; it gets no notice.
+        let query = handle(|p| {
+            p.write_byte(QUERY).unwrap();
+            p.write_int(20000000).unwrap();
+        });
+        assert!(query.actions.is_empty());
     }
 
     #[test]
