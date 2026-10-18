@@ -136,6 +136,7 @@ int main()
 		require(listed.completable == std::vector<int16_t>({1021}), "a started quest he can take is completable");
 		require(listed.available == std::vector<int16_t>({1020}), "an unstarted quest he gives is available");
 		require(listed.in_progress == std::vector<int16_t>({1008, 1022}), "the rest of his started quests are in progress");
+		require(listed.quests == 6 && listed.finished == 1, "all his quests count, the party quest too, and one is done");
 		items = true;
 		require(menu().completable == std::vector<int16_t>({1008, 1021}), "the hand-in moves up once the items are in");
 		pio_states = {};

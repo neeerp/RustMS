@@ -149,6 +149,10 @@ namespace ms
 		std::vector<int16_t> completable;
 		std::vector<int16_t> available;
 		std::vector<int16_t> in_progress;
+		// All of the NPC's quests, and those completed for good. Party
+		// quests count only in the first.
+		size_t quests = 0;
+		size_t finished = 0;
 
 		bool empty() const
 		{
@@ -169,6 +173,8 @@ namespace ms
 			if (quest.start_npc != npc_id && quest.end_npc != npc_id)
 				continue;
 
+			menu.quests++;
+
 			if (quest.id >= 1200 && quest.id < 1400)
 				continue;
 
@@ -178,6 +184,8 @@ namespace ms
 				(can_complete(quest) ? menu.completable : menu.in_progress).push_back(quest.id);
 			else if (state == 0 && quest.start_npc == npc_id && can_start(quest))
 				menu.available.push_back(quest.id);
+			else if (state == 2)
+				menu.finished++;
 		}
 
 		return menu;

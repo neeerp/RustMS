@@ -16,6 +16,7 @@
 #include <nlnx/nx.hpp>
 
 #include <algorithm>
+#include <ctime>
 #include <map>
 #include <optional>
 #include <string>
@@ -38,7 +39,7 @@ namespace ms
 
 			std::optional<Active> active;
 
-			// Menu choice for the NPC's normal speech; quest ids are positive.
+			// Menu choice for the NPC's script; quest ids are positive.
 			constexpr int32_t TALK_CHOICE = 0;
 
 			Player& player()
@@ -105,10 +106,34 @@ namespace ms
 				return pages;
 			}
 
-			// Whether the server has normal speech for this NPC (info/speak).
-			bool has_speech(int32_t npc_id)
+			// The NPC's script (Npc/<id>.img/info/script/<n>/script): the
+			// last whose start and end dates include today (FUN_006de2d3).
+			// The server runs it when the NPC is talked to.
+			std::string npc_script(int32_t npc_id)
 			{
-				return NxHelper::Npc::get_npc_node(npc_id)["info"]["speak"].size() > 0;
+				std::time_t now = std::time(nullptr);
+				std::tm local = *std::localtime(&now);
+				int64_t today = ((local.tm_year + 1900) * 100 + local.tm_mon + 1) * 100 + local.tm_mday;
+				nl::node scripts = nl::nx::npc[string_format::extend_id(npc_id, 7) + ".img"]["info"]["script"];
+				std::string script;
+
+				for (int n = 0; nl::node entry = scripts[std::to_string(n)]; n++)
+				{
+					std::string name = entry["script"];
+
+					if (!name.empty() && entry["start"].get_integer(19000101) <= today &&
+						today <= entry["end"].get_integer(20790101))
+						script = name;
+				}
+
+				return script;
+			}
+
+			// The NPC's own line, from String/Npc.img: d0 greets, d1 is for
+			// when all of its quests are done.
+			std::string npc_line(int32_t npc_id, const char* line)
+			{
+				return nl::nx::string["Npc.img"][std::to_string(npc_id)][line];
 			}
 
 			Texture list_header(int index)
@@ -140,6 +165,14 @@ namespace ms
 				active = std::move(conversation);
 				send(active->dialogue.take_initial_effect(), active->quest_id, active->npc_id);
 				show();
+			}
+
+			// A page the NPC says without the server, as v83 does when
+			// there is nothing to list (FUN_006d3392). OK and END CHAT
+			// both just close it.
+			void say(int32_t npc_id, const std::string& text)
+			{
+				begin({ QuestDialogue::reading({ text }), 0, npc_id });
 			}
 
 			void show()
@@ -265,17 +298,38 @@ namespace ms
 				[](int16_t id) { return state(id); }, can_start,
 				[npc_id](const QuestInfo& quest) { return completion_stop(quest, npc_id) == QuestStop::NONE; });
 
-			if (menu.empty())
+			// As v83 decides (FUN_0095fe9e, FUN_006d3392): the server runs an
+			// NPC without quests, or one with a script and nothing to list;
+			// otherwise the NPC says its own line here.
+			std::string script = npc_script(npc_id);
+
+			if (menu.quests == 0 || (menu.empty() && !script.empty()))
 			{
 				TalkToNPCPacket(object_id).dispatch();
 				return;
 			}
 
-			// In v83's order (FUN_006d3392), under UtilDlgEx/list3 "QUEST THAT
-			// CAN BE COMPLETED", list1 "QUEST AVAILABLE", list0 "QUEST IN
-			// PROGRESS" and list2 "ETC" (normal speech, worded as in period
-			// footage).
-			std::string text;
+			if (menu.quests == menu.finished)
+			{
+				say(npc_id, npc_line(npc_id, "d1"));
+				return;
+			}
+
+			std::string greeting = npc_line(npc_id, "d0");
+
+			if (menu.empty())
+			{
+				if (!greeting.empty())
+					say(npc_id, greeting);
+
+				return;
+			}
+
+			// The greeting, then the quests in v83's order, under
+			// UtilDlgEx/list3 "QUEST THAT CAN BE COMPLETED", list1 "QUEST
+			// AVAILABLE" and list0 "QUEST IN PROGRESS", then the script under
+			// list2 "ETC", named by Etc/ScriptInfo.img or else by itself.
+			std::string text = greeting;
 			std::map<int32_t, Texture> headers;
 
 			for (auto [group, header] : { std::pair<const std::vector<int16_t>*, int>{ &menu.completable, 3 },
@@ -292,10 +346,12 @@ namespace ms
 				}
 			}
 
-			if (has_speech(npc_id))
+			if (!script.empty())
 			{
+				std::string name = nl::nx::etc["ScriptInfo.img"][script].get_string(script);
+
 				headers[TALK_CHOICE] = list_header(2);
-				text += "#d#L" + std::to_string(TALK_CHOICE) + "# I have something to tell you.#l#k\r\n";
+				text += "#d#L" + std::to_string(TALK_CHOICE) + "# " + name + "#l#k\r\n";
 			}
 
 			active.reset();

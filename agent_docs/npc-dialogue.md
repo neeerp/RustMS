@@ -3,8 +3,9 @@
 Clicking an NPC opens asset-backed dialogue. Pio and other NPCs with normal
 speech use Next, Back, and OK. Close and Escape cancel. When the NPC has
 quests for the player, HeavenClient shows its quest menu first and renders
-quest conversations itself; picking "Misc." asks the server for normal speech.
-See [Quests](./quests.md).
+quest conversations itself; picking the "ETC" line (the NPC's script) asks
+the server to talk. See [Quests](./quests.md) for when the client talks
+instead of the server.
 
 The NPC chat key (Space by default, action 55) talks to the nearest NPC
 within 150 px horizontally and 50 px vertically of the player's feet

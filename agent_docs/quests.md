@@ -4,16 +4,22 @@
 
 Quests run the way the original client ran them:
 
-1. **HeavenClient** reads `Quest.nx` itself. Clicking an NPC lists its quests
-   in the NPC chat window, grouped as v83 groups them (`select_quest_menu`):
+1. **HeavenClient** reads `Quest.nx` itself. Clicking an NPC that has quests
+   lists them in the NPC chat window under its `String/Npc.img` `d0`
+   greeting, grouped as v83 groups them (`select_quest_menu`):
    "QUEST THAT CAN BE COMPLETED" (started, and `Check.img/<id>/1` passes
    with this NPC), "QUEST AVAILABLE", then "QUEST IN PROGRESS" (its other
    started quests, such as a hand-in still missing its items), under the
    `UtilDlgEx/list*` headers. Each line is v83's `quest_menu_line`: the
    QuestInfo `type` in red, the name, and "(Pre-completion enabled)" or
-   "(In Progress)". "ETC: I have something to tell you." stands for the
-   NPC's normal speech, as in period footage. Party quests (1200-1399) are
-   never listed. Picking a quest plays its `Say.img` pages locally
+   "(In Progress)". If the NPC has a script (`Npc/<id>.img/info/script`,
+   the last entry dated for today), an "ETC" line named by
+   `Etc/ScriptInfo.img/<script>` (or the script itself) asks the server to
+   talk. Party quests (1200-1399) are never listed. With nothing to list,
+   an NPC with a script goes straight to the server; one without says `d1`
+   if all its quests are done for good, and `d0` otherwise, without the
+   server. NPCs without quests always go to the server. Picking a quest
+   plays its `Say.img` pages locally
    (`Gameplay/QuestConversation.cpp`); an offer's yes/no page shows ACCEPT
    and DECLINE.
 2. When the player accepts or finishes, the client sends `QUEST_ACTION`
