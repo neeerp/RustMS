@@ -48,6 +48,8 @@ if(HEAVENCLIENT_BUILD_TESTS)
     add_test(NAME curse_words COMMAND curse_words_tests)
     add_executable(character_name_tests tests/character_name.cpp)
     add_test(NAME character_name COMMAND character_name_tests)
+    add_executable(quest_result_tests tests/quest_result.cpp)
+    add_test(NAME quest_result COMMAND quest_result_tests)
     add_executable(map_tooltip_tests tests/map_tooltip.cpp)
     add_test(NAME map_tooltip COMMAND map_tooltip_tests)
     add_executable(cash_catalog_tests tests/cash_catalog.cpp)
@@ -315,6 +317,7 @@ add_executable(HeavenClient
     Character/QuestInfo.h
     Character/QuestLog.cpp
     Character/QuestLog.h
+    Character/QuestResult.h
     Character/SkillBook.cpp
     Character/SkillBook.h
     Character/SkillId.h

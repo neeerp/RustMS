@@ -27,7 +27,8 @@ Quests run the way the original client ran them:
 
 The server sends no quest dialogue and keeps no quest conversation state.
 Rejected actions (unsupported quest, wrong NPC or state, unmet job, level, or
-prerequisite, NPC not nearby, replays) are logged at debug level and ignored.
+prerequisite, NPC not nearby, replays) are logged at debug level and ignored;
+only missing mesos and a full inventory get an answer (below).
 
 ## Supported quests
 
@@ -61,13 +62,15 @@ magician, 0x8 bowman, 0x10 thief, 0x20 pirate, 0x400+ Cygnus) and `gender`
 a positive `prop`, one is picked at random by weight (Todd's beginner hats).
 `prop` -1 is a reward the player chooses, which needs UI and stays
 unsupported, as do `period`, `dateExpire`, `var`, and `name`. If the gifts
-don't fit, nothing changes and the client gets "You can't get anymore
-items." `startscript`/
+don't fit, nothing changes and the client gets UPDATE_QUEST_INFO mode 10
+with the quest id; it names the full inventories itself ("Etc item
+inventory is full."). `startscript`/
 `endscript` are allowed only for scripts the server implements
 (`game_data::quests::SCRIPTS`: `q1021s`, `q1021e`); those steps go through
 QUEST_ACTION 4/5 and the server drives the dialogue (see
 [NPC dialogue](./npc-dialogue.md)). `money` pays (or, if negative, takes)
-mesos on completion; a quest that takes mesos needs them held. A quest with
+mesos on completion; a quest that takes mesos needs them held, or the
+client gets mode 11 ("You do not have enough mesos."). A quest with
 any other key (`pop`, `skill`, `infoex`,
 `pet`, ...) is **unsupported**: it is
 never offered, and actions for it are refused. A prerequisite without a

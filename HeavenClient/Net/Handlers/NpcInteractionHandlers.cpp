@@ -18,12 +18,17 @@
 #include "NpcInteractionHandlers.h"
 #include "ShopList.h"
 
+#include "../Character/QuestResult.h"
+#include "../Gameplay/Stage.h"
 #include "../IO/UI.h"
+#include "../IO/UITypes/UIChatBar.h"
 #include "../IO/UITypes/UINotice.h"
 #include "../IO/UITypes/UINpcTalk.h"
 #include "../IO/UITypes/UIShop.h"
 #include "../IO/UITypes/UIStorage.h"
 #include "../Gameplay/QuestConversation.h"
+
+#include <nlnx/nx.hpp>
 
 namespace ms
 {
@@ -48,19 +53,83 @@ namespace ms
 			npctalk->change_text(npcid, msgtype, style, speaker, text);
 	}
 
+	namespace
+	{
+		// The notice for a quest step whose items don't fit: the step the
+		// quest is at, taken from Act.img for this character.
+		std::string inventory_full(int16_t quest_id)
+		{
+			Player& player = Stage::get().get_player();
+			std::string name = std::to_string(quest_id);
+			nl::node act = nl::nx::quest["Act.img"][name][player.get_quests().is_started(quest_id) ? "1" : "0"];
+			std::vector<quest_result::ActItem> items;
+
+			for (size_t i = 0; act["item"][std::to_string(i)]; i++)
+			{
+				nl::node item = act["item"][std::to_string(i)];
+				items.push_back({ static_cast<int32_t>(item["id"].get_integer()),
+					static_cast<int32_t>(item["count"].get_integer()),
+					static_cast<int32_t>(item["job"].get_integer(-1)),
+					static_cast<int32_t>(item["gender"].get_integer(2)) });
+			}
+
+			const CharStats& stats = player.get_stats();
+
+			return quest_result::inventory_full(items, static_cast<int32_t>(act["money"].get_integer()),
+				static_cast<int16_t>(stats.get_job().get_id()), stats.get_female());
+		}
+	}
+
 	void UpdateQuestInfoHandler::handle(InPacket& recv) const
 	{
-		int8_t mode = recv.read_byte();
+		std::string notice;
 
-		if (mode != 8)
+		switch (recv.read_byte())
+		{
+		case 8:
+		{
+			int16_t quest_id = recv.read_short();
+			int32_t npc_id = recv.read_int();
+			int16_t next_quest = recv.length() >= 2 ? recv.read_short() : 0;
+
+			if (next_quest != 0)
+				QuestConversation::continue_with(next_quest, npc_id);
+
 			return;
+		}
+		case 9:
+			notice = "The quest has ended\\ndue to an unknown error.";
+			break;
+		case 10:
+			notice = inventory_full(recv.read_short());
+			break;
+		case 11:
+			notice = "You do not have enough mesos.";
+			break;
+		case 13:
+			notice = "Unable to retrieve it due to the equipment\\n currently being worn by the character.";
+			break;
+		case 14:
+			notice = "You may not possess more than \\none of this item.";
+			break;
+		case 15:
+		{
+			std::string quest_id = std::to_string(recv.read_short());
+			std::string name = nl::nx::quest["QuestInfo.img"][quest_id]["name"].get_string();
 
-		int16_t quest_id = recv.read_short();
-		int32_t npc_id = recv.read_int();
-		int16_t next_quest = recv.length() >= 2 ? recv.read_short() : 0;
+			if (auto chatbar = UI::get().get_element<UIChatBar>())
+				chatbar->send_chatline("The [" + name + "] quest expired because the time limit ended",
+					UIChatBar::LineType::GREY);
 
-		if (next_quest != 0)
-			QuestConversation::continue_with(next_quest, npc_id);
+			return;
+		}
+		default:
+			// 6, 7, 12 and 16 keep quest timers, which the server doesn't
+			// have.
+			return;
+		}
+
+		UI::get().emplace<UIOk>(notice, [](bool) {});
 	}
 
 	void OpenNpcShopHandler::handle(InPacket& recv) const

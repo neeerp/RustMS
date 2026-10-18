@@ -59,6 +59,9 @@ pub struct Trace {
     pub progress: Vec<(i16, u8)>,
     /// UPDATE_QUEST_INFO successes: quest, NPC, next quest.
     pub results: Vec<(i16, i32, i16)>,
+    /// Other UPDATE_QUEST_INFO results: mode, and the quest for those
+    /// that name one (else 0).
+    pub quest_refusals: Vec<(u8, i16)>,
     /// Latest progress string (kill counts) per started quest.
     pub kills: BTreeMap<i16, String>,
     /// EXP gains from SHOW_STATUS_INFO mode 3.
@@ -331,12 +334,16 @@ impl Trace {
                 }
             }
         } else if op == SendOpcode::UpdateQuestInfo as i16 {
-            assert_eq!(r.read_byte().unwrap(), 8, "only success results are sent");
-            self.results.push((
-                r.read_short().unwrap(),
-                r.read_int().unwrap(),
-                r.read_short().unwrap(),
-            ));
+            match r.read_byte().unwrap() {
+                8 => self.results.push((
+                    r.read_short().unwrap(),
+                    r.read_int().unwrap(),
+                    r.read_short().unwrap(),
+                )),
+                mode => self
+                    .quest_refusals
+                    .push((mode, r.read_short().unwrap_or(0))),
+            }
         } else if op == SendOpcode::NpcDialogue as i16 {
             r.read_byte().unwrap();
             let npc = r.read_int().unwrap();
