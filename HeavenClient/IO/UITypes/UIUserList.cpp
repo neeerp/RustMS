@@ -20,6 +20,7 @@
 #include "UIChatBar.h"
 #include "UIEnterText.h"
 
+#include "../BuddyCommands.h"
 #include "../PartyCommands.h"
 #include "../UI.h"
 
@@ -760,7 +761,7 @@ namespace ms
 						"Please enter the name of the character\\nyou'll add as a buddy.",
 						[](const std::string& name)
 						{
-							AddBuddyPacket(name, DEFAULT_GROUP).dispatch();
+							BuddyCommands::add(name, DEFAULT_GROUP);
 						},
 						NAME_LIMIT
 				);
@@ -775,7 +776,7 @@ namespace ms
 							[id](bool yes)
 							{
 								if (yes)
-									DeleteBuddyPacket(id).dispatch();
+									BuddyCommands::remove(id);
 							}
 					);
 				}
@@ -951,6 +952,10 @@ namespace ms
 
 		for (const Buddy& buddy : shown_buddies)
 		{
+			// Requests wait on their cards instead.
+			if (buddy.pending())
+				continue;
+
 			if (!buddy.online())
 				away.push_back(&buddy);
 			else if (buddy.channel == channel)
@@ -959,7 +964,7 @@ namespace ms
 				other.push_back(&buddy);
 		}
 
-		std::string total = "/" + std::to_string(shown_buddies.size());
+		std::string total = "/" + std::to_string(buddies.listed());
 		buddies_online.count.change_text(std::to_string(same.size() + other.size()) + total);
 		buddies_offline.count.change_text(std::to_string(away.size()) + total);
 
@@ -1042,7 +1047,7 @@ namespace ms
 		enable(Buttons::BT_ADD_BUDDY, !buddies.is_full());
 		enable(Buttons::BT_DELETE_BUDDY, buddy);
 		enable(Buttons::BT_WHISPER_BUDDY, buddy && buddy->online());
-		enable(Buttons::BT_BUDDY_CHAT, !buddies.get_buddies().empty());
+		enable(Buttons::BT_BUDDY_CHAT, buddies.listed() > 0);
 		enable(Buttons::BT_BUDDY_MAP, false);
 		// Inviting someone makes a party first if the player has none.
 		enable(Buttons::BT_INVITE_BUDDY, buddy && buddy->online() && party_has_room);

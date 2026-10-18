@@ -20,9 +20,10 @@ fn built(packet: Result<Packet, NetworkError>) -> Result<Packet, RuntimeError> {
 }
 
 impl ClientActor {
-    /// On entering the game: show the list, tell mutual buddies we're on
-    /// this channel, and ask about the first unanswered request. The client
-    /// starts with an empty list, so nothing is sent for one.
+    /// On entering the game: show the list, unanswered requests included,
+    /// and tell mutual buddies we're on this channel. The client asks about
+    /// each request once the map has loaded. It starts with an empty list,
+    /// so nothing is sent for one.
     pub(super) async fn load_buddies(&mut self) -> Result<(), RuntimeError> {
         let rows = self.buddy_rows().await?;
         if rows.is_empty() {
@@ -30,7 +31,7 @@ impl ClientActor {
         }
         let mutual = rows.iter().filter(|b| b.mutual).map(|b| b.id).collect();
         self.announce_channel(mutual, Some(self.channel_id)).await?;
-        self.show_buddies(rows, true).await
+        self.show_buddies(rows).await
     }
 
     /// On leaving the game (not a channel change, which announces the new
@@ -55,7 +56,7 @@ impl ClientActor {
                         .await?;
                 }
                 let rows = self.buddy_rows().await?;
-                self.show_buddies(rows, true).await?;
+                self.show_buddies(rows).await?;
             }
             BuddyRequest::Remove { id } => {
                 let removed = spawn_db(move || db::buddy::remove(cid, id)).await?;
@@ -63,9 +64,8 @@ impl ClientActor {
                     // Whether or not they still list us, they no longer see us.
                     self.announce_channel(vec![id], None).await?;
                 }
-                // Declining a request moves on to the next one.
                 let rows = self.buddy_rows().await?;
-                self.show_buddies(rows, removed == Some(true)).await?;
+                self.show_buddies(rows).await?;
             }
             BuddyRequest::Chat { recipients, text } => {
                 let mutual = spawn_db(move || db::buddy::mutual_ids(cid)).await?;
@@ -117,7 +117,7 @@ impl ClientActor {
         })
         .await?;
         let rows = self.buddy_rows().await?;
-        self.show_buddies(rows, false).await
+        self.show_buddies(rows).await
     }
 
     async fn buddy_rows(&self) -> Result<Vec<Buddy>, RuntimeError> {
@@ -125,29 +125,24 @@ impl ClientActor {
         spawn_db(move || db::buddy::list(cid)).await
     }
 
-    /// Send the accepted rows through the directory, which knows channels,
-    /// and if `ask`, the first unanswered request.
-    async fn show_buddies(&mut self, rows: Vec<Buddy>, ask: bool) -> Result<(), RuntimeError> {
-        let (requests, listed): (Vec<_>, Vec<_>) = rows.into_iter().partition(|b| b.pending);
-        let buddies = listed
+    /// Send the rows through the directory, which knows channels. v83 keeps
+    /// the requests in the list too, hidden, so that answering one finds it.
+    async fn show_buddies(&mut self, rows: Vec<Buddy>) -> Result<(), RuntimeError> {
+        let buddies = rows
             .into_iter()
             .map(|buddy| ListedBuddy {
                 id: buddy.id,
                 name: buddy.name,
                 group: buddy.group,
                 mutual: buddy.mutual,
+                pending: buddy.pending,
             })
             .collect();
         self.send_to_directory(DirectoryMessage::BuddyList {
             owner: self.client_id,
             buddies,
         })
-        .await?;
-        if let Some(request) = requests.first().filter(|_| ask) {
-            let mut packet = built(build_buddy_request(request.id, &request.name, None))?;
-            self.send(&mut packet).await?;
-        }
-        Ok(())
+        .await
     }
 
     async fn announce_channel(

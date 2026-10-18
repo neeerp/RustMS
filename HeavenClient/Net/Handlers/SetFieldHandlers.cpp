@@ -27,6 +27,7 @@
 #include "../../Configuration.h"
 
 #include "../../Gameplay/Stage.h"
+#include "../../IO/BuddyCommands.h"
 #include "../../IO/UI.h"
 #include "../../IO/UITypes/UIChatBar.h"
 #include "../../IO/UITypes/UINotice.h"
@@ -59,6 +60,9 @@ namespace ms
 				GraphicsGL::get().unlock();
 
 				Stage::get().transfer_player();
+
+				// Requests left unanswered come back (FUN_00a3fecf).
+				BuddyCommands::show_requests();
 			});
 
 		GraphicsGL::get().lock();

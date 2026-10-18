@@ -617,6 +617,8 @@ add_executable(HeavenClient
     IO/KeyType.h
     IO/Messages.cpp
     IO/Messages.h
+    IO/BuddyCommands.cpp
+    IO/BuddyCommands.h
     IO/PartyCommands.cpp
     IO/PartyCommands.h
     IO/UI.cpp

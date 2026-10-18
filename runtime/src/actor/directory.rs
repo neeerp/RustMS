@@ -340,6 +340,7 @@ impl WorldDirectory {
                 id: buddy.id,
                 name: buddy.name,
                 group: buddy.group,
+                requesting: buddy.pending,
             })
             .collect();
         self.send_packet(owner, build_buddy_list(&views));
@@ -893,6 +894,7 @@ mod tests {
             name: name.into(),
             group: "Default Group".into(),
             mutual,
+            pending: false,
         };
         directory.handle(DirectoryMessage::BuddyList {
             owner: 1,

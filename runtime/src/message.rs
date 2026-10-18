@@ -331,6 +331,8 @@ pub struct ListedBuddy {
     pub group: String,
     /// They list the owner too, so the owner may see their channel.
     pub mutual: bool,
+    /// They asked to be added and the owner hasn't answered.
+    pub pending: bool,
 }
 
 /// Messages to the world directory.

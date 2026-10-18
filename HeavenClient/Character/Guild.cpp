@@ -79,6 +79,18 @@ namespace ms
 		return nullptr;
 	}
 
+	const GuildMember* Guild::find_by_name(const std::string& name) const
+	{
+		if (!exists())
+			return nullptr;
+
+		for (auto& member : data.members)
+			if (member.name == name)
+				return &member;
+
+		return nullptr;
+	}
+
 	bool Guild::is_master(int32_t cid) const
 	{
 		return exists() && !data.members.empty() && data.members.front().id == cid;

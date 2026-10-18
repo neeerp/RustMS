@@ -6,7 +6,6 @@
 #include "../../Graphics/Text.h"
 #include "../../Graphics/Texture.h"
 
-#include <array>
 #include <cstdint>
 #include <functional>
 #include <string>
@@ -18,9 +17,11 @@ namespace ms
 	// FUN_0052065d): an invitation to Maple Messenger, a buddy request, a
 	// trade request or a party invite, each "from '<name>'". O accepts and X
 	// turns it down; one left alone fades out after three minutes and sends
-	// nothing. A new one replaces any of its kind still there, except buddy
-	// requests, which pile up (FUN_00a247cf). Newer notices stack above older
-	// ones, quest completions included.
+	// nothing. Smaller pink ones say a buddy logged in or came to the
+	// player's channel, for six seconds, with only an X. A new one replaces
+	// any of its kind still there, except buddy requests, which pile up
+	// (FUN_00a247cf). Newer notices stack above older ones, quest
+	// completions included.
 	class UIInviteCard : public UIElement
 	{
 	public:
@@ -28,8 +29,8 @@ namespace ms
 		static constexpr bool FOCUSED = false;
 		static constexpr bool TOGGLED = false;
 
-		// v83's notice types 0, 1, 2 and 5.
-		enum Kind : uint8_t { MESSENGER, BUDDY, TRADE, PARTY, NUM_KINDS };
+		// v83's notice types 0, 1, 2, 5 and 9.
+		enum Kind : uint8_t { MESSENGER, BUDDY, TRADE, PARTY, ARRIVAL, NUM_KINDS };
 
 		UIInviteCard();
 
@@ -42,6 +43,8 @@ namespace ms
 
 		// `answer` hears true for O and false for X.
 		void add(Kind kind, const std::string& inviter, std::function<void(bool)> answer);
+		// A buddy logged in, or came to the player's channel (FUN_00523a2c).
+		void notify(const std::string& name, bool same_channel);
 		// Whether a notice of `kind` is still there, even fading out.
 		bool showing(Kind kind) const;
 
@@ -54,18 +57,22 @@ namespace ms
 		struct Notice
 		{
 			Kind kind;
-			Text from;
+			Texture icon;
+			Text first, second;
+			// Where the first line sits.
+			Point<int16_t> text;
+			// Empty for the arrivals, which ask nothing.
 			std::function<void(bool)> answer;
 			FadeNotice life;
 		};
+
+		void push(Notice notice);
 
 		void rebuild();
 		// From the bottom of the stack to `notice`.
 		Point<int16_t> offset(const Notice& notice) const;
 
-		Texture background;
-		std::array<Texture, NUM_KINDS> icons;
-		std::array<Text, NUM_KINDS> headings;
+		Texture background, arrival_background;
 		// Oldest first; the newest is drawn last, over the others.
 		std::vector<Notice> notices;
 		// How high the buttons sit, to move them when the stack shifts.
@@ -73,6 +80,6 @@ namespace ms
 
 		// The window v83 makes for each (FUN_0051f9ad), on the same layer as
 		// dialogs, so a dialog opened later covers it.
-		static constexpr int16_t WIDTH = 196, HEIGHT = 44;
+		static constexpr int16_t WIDTH = 196, ARRIVAL_WIDTH = 155, HEIGHT = 44;
 	};
 }

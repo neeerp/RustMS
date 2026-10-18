@@ -106,7 +106,10 @@ from `UI.nx`. Moved so far:
   requests, trade requests, and party invites, each "from '<name>'" beside
   its kind's icon (FUN_0052065d). O accepts and X declines; a card left
   alone fades out after three minutes and sends nothing. A new invitation
-  replaces a card of its kind, except buddy requests, which pile up. Each
+  replaces a card of its kind, except buddy requests, which pile up. The
+  smaller pink cards (`backgrnd2`, FUN_00523a2c) say "<name> is logged
+  in." or "You're on the same ch. with <name>." for six seconds, with only
+  an X. Each
   card, quest completions included, sits 5 px above the one before it
   (`FadeNotice::raised`), and only the newest can be clicked. Not done: the
   cash trade card, holding cards back while the UI is locked, and the Game
