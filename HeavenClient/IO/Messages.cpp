@@ -21,28 +21,37 @@
 
 #include "UITypes/UIChatBar.h"
 
+#include "../Data/ItemData.h"
+
 namespace ms
 {
 	const EnumMap<Messages::Type, const char *> Messages::messages =
 			{
 					"",
 					"You cannot use this skill with the weapon you're equipped with.",
+					"This skill cannot be used with the equipped item.",
 					"You don't have enough HP to use this skill.",
 					"You don't have enough MP to use this skill.",
+					"You don't have enough mesos to use this skill.",
+					"You don't have enough %s to use this skill.",
 					"You have used up all of your arrows.",
-					"You do not have enough bullets to use this skill",
+					"You do not have enough bullets to use this skill.",
+					"You have used up all of your throwing-stars.",
 					"You do not have enough throwing stars to use this skill.",
-					"You cannot use this skill as it is on cooldown.",
+					"You may not use the skill yet.",
 					"You may only use this skill with a one-handed weapon equipped.",
 					"You cannot use that skill on this map.",
 					"You cannot use the Mystic Door Skill near the portal.",
 					"Since you are not using a weapon, you are unable to attack."
 			};
 
-	InChatMessage::InChatMessage(Messages::Type t)
+	bool Messages::is_cost(Type type)
 	{
-		type = t;
+		return type == SKILL_HPCOST || type == SKILL_MPCOST || type == SKILL_MESOCOST || type == SKILL_ITEMCOST;
 	}
+
+	InChatMessage::InChatMessage(Messages::Type t, std::string i) : type(t), item(std::move(i))
+	{}
 
 	void InChatMessage::drop() const
 	{
@@ -50,12 +59,12 @@ namespace ms
 			return;
 
 		if (auto chatbar = UI::get().get_element<UIChatBar>())
-			chatbar->display_message(type, UIChatBar::SKILL);
+			chatbar->display_message(type, UIChatBar::SKILL, item);
 	}
 
 
-	ForbidSkillMessage::ForbidSkillMessage(SpecialMove::ForbidReason reason, Weapon::Type weapon) : InChatMessage(
-			message_by_reason(reason, weapon))
+	ForbidSkillMessage::ForbidSkillMessage(SpecialMove::ForbidReason reason, Weapon::Type weapon, int32_t item)
+			: InChatMessage(message_by_reason(reason, weapon), item ? ItemData::get(item).get_name() : "")
 	{}
 
 	Messages::Type ForbidSkillMessage::message_by_reason(SpecialMove::ForbidReason reason, Weapon::Type weapon)
@@ -64,10 +73,16 @@ namespace ms
 		{
 			case SpecialMove::FBR_WEAPONTYPE:
 				return Messages::SKILL_WEAPONTYPE;
+			case SpecialMove::FBR_EQUIPPED:
+				return Messages::SKILL_EQUIPPED;
 			case SpecialMove::FBR_HPCOST:
 				return Messages::SKILL_HPCOST;
 			case SpecialMove::FBR_MPCOST:
 				return Messages::SKILL_MPCOST;
+			case SpecialMove::FBR_MESOCOST:
+				return Messages::SKILL_MESOCOST;
+			case SpecialMove::FBR_ITEMCOST:
+				return Messages::SKILL_ITEMCOST;
 			case SpecialMove::FBR_COOLDOWN:
 				return Messages::SKILL_COOLDOWN;
 			case SpecialMove::FBR_ONEHANDED:

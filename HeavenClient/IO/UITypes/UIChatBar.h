@@ -103,7 +103,8 @@ namespace ms
 
 		void send_chatline(const std::string &line, LineType type);
 
-		void display_message(Messages::Type line, UIChatBar::LineType type);
+		// item: the name the line gives in place of %s
+		void display_message(Messages::Type line, UIChatBar::LineType type, const std::string &item = "");
 
 		// Expand or collapse the log above the status bar.
 		void toggle_chat();
@@ -196,8 +197,9 @@ namespace ms
 		static constexpr int16_t EDGE_OFFSET = 5;
 		static constexpr int16_t LINE_LOG_HEIGHT = 24;
 		static constexpr time_t MESSAGE_COOLDOWN = 1'000;
-		// The original repeats a missing HP or MP notice, or the missing weapon
-		// one, at most every two seconds.
+		// The original repeats the missing weapon notice at most every two
+		// seconds, and a missing HP, MP, mesos or item one only after two
+		// seconds without one of them, said or not (user+0x3108).
 		static constexpr time_t COST_MESSAGE_COOLDOWN = 2'000;
 
 		enum Buttons : uint16_t
@@ -246,6 +248,7 @@ namespace ms
 		std::string whisper_message;
 
 		EnumMap<Messages::Type, time_t> message_cooldowns;
+		time_t cost_cooldown = 0;
 		ChatFloodGuard flood_guard;
 		std::vector<std::string> lastentered;
 		size_t lastpos;

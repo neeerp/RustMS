@@ -19,6 +19,7 @@
 
 #include "Heal.h"
 #include "Prepare.h"
+#include "SkillWeapon.h"
 
 #include "../../Character/Char.h"
 #include "../../Character/SkillId.h"
@@ -401,12 +402,21 @@ namespace ms
 			}
 		}
 
-		Weapon::Type reqweapon = SkillData::get(skillid).get_required_weapon();
+		const SkillData &data = SkillData::get(skillid);
 
-		if (weapon != reqweapon && reqweapon != Weapon::NONE)
-			return FBR_WEAPONTYPE;
+		switch (skill_weapon::check(skillid, data.is_shot(), weapon, data.get_required_weapon()))
+		{
+			case skill_weapon::WEAPON:
+				return FBR_WEAPONTYPE;
+			case skill_weapon::EQUIPPED:
+				return FBR_EQUIPPED;
+			case skill_weapon::QUIET:
+				return FBR_OTHER;
+			default:
+				break;
+		}
 
-		if (!SkillData::get(skillid).uses_ammo())
+		if (!data.uses_ammo())
 			return FBR_NONE;
 
 		switch (weapon)

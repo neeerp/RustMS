@@ -448,6 +448,8 @@ namespace ms
 		for (auto iter : message_cooldowns)
 			iter.second -= Constants::TIMESTEP;
 
+		cost_cooldown -= Constants::TIMESTEP;
+
 		if (whisper_waiting && std::chrono::steady_clock::now() - whisper_sent > WHISPER_WAIT)
 			whisper_waiting = false;
 
@@ -689,17 +691,30 @@ namespace ms
 		rowpos = rowmax;
 	}
 
-	void UIChatBar::display_message(Messages::Type line, UIChatBar::LineType type)
+	void UIChatBar::display_message(Messages::Type line, UIChatBar::LineType type, const std::string &item)
 	{
-		if (message_cooldowns[line] > 0)
-			return;
+		if (Messages::is_cost(line))
+		{
+			bool quiet = cost_cooldown > 0;
+			cost_cooldown = COST_MESSAGE_COOLDOWN;
+
+			if (quiet)
+				return;
+		} else
+		{
+			if (message_cooldowns[line] > 0)
+				return;
+
+			message_cooldowns[line] = line == Messages::ATTACK_NOWEAPON ? COST_MESSAGE_COOLDOWN : MESSAGE_COOLDOWN;
+		}
 
 		std::string message = Messages::messages[line];
-		send_chatline(message, type);
+		size_t name = message.find("%s");
 
-		bool slow = line == Messages::SKILL_HPCOST || line == Messages::SKILL_MPCOST ||
-			line == Messages::ATTACK_NOWEAPON;
-		message_cooldowns[line] = slow ? COST_MESSAGE_COOLDOWN : MESSAGE_COOLDOWN;
+		if (name != std::string::npos)
+			message.replace(name, 2, item);
+
+		send_chatline(message, type);
 	}
 
 	void UIChatBar::toggle_chat()

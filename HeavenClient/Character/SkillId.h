@@ -154,7 +154,9 @@ namespace ms
 					PRIEST_TELEPORT = 2301001,
 
 			// Hermit
-					AVENGER = 4111005,
+					SHADOW_PARTNER = 4111002,
+			SHADOW_MESO = 4111004,
+			AVENGER = 4111005,
 			FLASH_JUMP = 4111006,
 
 			// Night Lord

@@ -120,6 +120,25 @@ server tracks neither Shadow Partner, which doubles the cost, nor Soul
 Arrow's buff, nor the cash ammo slot. HeavenClient, like v83, fires from the
 first fitting stack that covers the cost (`Inventory::find_bulletslot`).
 
+HeavenClient refuses a skill before sending it, with v83's lines in the skill
+chat colour (`Player::can_use`, `Skill::can_use`, `Combat::can_use_move`). The
+checks run in v83's order. A skill cooling down comes first. Then come the
+costs: HP, MP, mesos (`moneyCon`; Shadow Meso's grows by Shadow Partner's `y`
+percent while that buff is on), and the item (`itemCon`, named in the line).
+The four cost lines share one two-second throttle, so a second refusal within
+two seconds prints nothing. An attack with no weapon says so next. Then the
+weapon (`skill_weapon::check`). A shot needs its job's weapon whatever
+`Skill.img` says: a bow or crossbow for archers, a claw for thieves, a gun for
+pirates, nothing for anyone else, with eight exceptions such as Taunt and
+Energy Orb. Brandish needs a sword or an axe, Corkscrew Blow a knuckle,
+Grenade a gun, and Poison Bomb a claw. These say "You cannot use this skill
+with the weapon you're equipped with." The held shots (Hurricane, Piercing
+Arrow, Rapid Fire) refuse anything but a bow, crossbow, or gun without a word.
+Any other mismatch with the weapon `Skill.img` names, or the knuckle, sword,
+or wand rules a few pirate and Cygnus skills have instead, says "This skill
+cannot be used with the equipped item." Ammo comes last. RustMS charges a
+special move's `itemCon` but never Shadow Meso's mesos.
+
 HeavenClient picks targets as v83 does (`Combat::find_targets`). Melee and
 magic attacks take the mobs whose body overlaps the attack range in the order
 they entered the map (`MapObjects::entry_order`), not the closest ones, so a

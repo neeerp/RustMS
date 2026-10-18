@@ -60,6 +60,10 @@ namespace ms
 			int16_t shotrange;
 			// The skill's own value, as Element Amplification's damage percent.
 			int32_t y;
+			// The mesos the skill takes, and the item and how many of it.
+			int32_t mesocost = 0;
+			int32_t itemcost = 0;
+			int32_t itemcount = 0;
 
 			constexpr Stats(float damage, int32_t matk, int32_t fixdamage, int32_t mastery, uint8_t attackcount,
 							uint8_t mobcount, uint8_t bulletcount, int16_t bulletcost, int32_t hpcost, int32_t mpcost,

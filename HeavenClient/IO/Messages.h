@@ -20,6 +20,8 @@
 #include "../Character/Inventory/Weapon.h"
 #include "../Gameplay/Combat/SpecialMove.h"
 
+#include <string>
+
 namespace ms
 {
 	namespace Messages
@@ -29,11 +31,17 @@ namespace ms
 			NONE,
 			// Cannot use a skill
 					SKILL_WEAPONTYPE,
+			SKILL_EQUIPPED,
 			SKILL_HPCOST,
 			SKILL_MPCOST,
+			SKILL_MESOCOST,
+			// Names the item in place of %s
+			SKILL_ITEMCOST,
 			SKILL_NOARROWS,
 			SKILL_NOBULLETS,
 			SKILL_NOSTARS,
+			// Shadow Stars finds no stack of stars
+			SKILL_SHADOWSTARS,
 			SKILL_COOLDOWN,
 			SKILL_ONEHANDED,
 			// The map forbids the skill (fieldLimit)
@@ -46,23 +54,29 @@ namespace ms
 		};
 
 		extern const EnumMap<Type, const char *> messages;
+
+		// Whether the line says what a skill costs. v83 says these at most
+		// every two seconds between them.
+		bool is_cost(Type type);
 	};
 
 	class InChatMessage
 	{
 	public:
-		InChatMessage(Messages::Type type);
+		InChatMessage(Messages::Type type, std::string item = "");
 
 		void drop() const;
 
 	private:
 		Messages::Type type;
+		std::string item;
 	};
 
 	class ForbidSkillMessage : public InChatMessage
 	{
 	public:
-		ForbidSkillMessage(SpecialMove::ForbidReason reason, Weapon::Type weapon);
+		// item: the item the skill takes, for FBR_ITEMCOST
+		ForbidSkillMessage(SpecialMove::ForbidReason reason, Weapon::Type weapon, int32_t item = 0);
 
 	private:
 		Messages::Type message_by_reason(SpecialMove::ForbidReason reason, Weapon::Type weapon);
