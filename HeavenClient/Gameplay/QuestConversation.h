@@ -17,8 +17,9 @@ namespace ms
 		// reminder, depending on the quest's state.
 		void open(int16_t quest_id, int32_t npc_id);
 
-		// The server completed a quest whose Act/nextQuest names another one;
-		// continue into it once the current conversation is over.
-		void continue_with(int16_t quest_id, int32_t npc_id);
+		// The server started or completed a quest (0xD3 mode 8): the NPC
+		// says its yes pages, then `next_quest`, if any, opens once they
+		// have all been read (FUN_00959a73).
+		void confirmed(int16_t quest_id, int32_t npc_id, int16_t next_quest);
 	}
 }

@@ -105,6 +105,23 @@ int main()
 		progress = "001";
 		require(hunt_marker() == QuestMarker::READY, "kills and item complete the hunt");
 		require(ms::decode_kills("003012") == std::vector<int16_t>({3, 12}), "progress decodes three digits per mob");
+		// v83 checks the NPC, items, quests, then kills (FUN_00721d2c).
+		hunt.end_prerequisites = {{1034, 2}};
+		int16_t before = 1;
+		auto stop = [&](int32_t npc) {
+			return ms::completion_stop(hunt, npc, [&](int16_t id) { return id == 1034 ? before : 1; },
+				[&](int32_t) { return shells; }, progress);
+		};
+		shells = 0;
+		progress = "000";
+		require(stop(2004) == ms::QuestStop::NPC, "the wrong NPC is told first");
+		require(stop(2002) == ms::QuestStop::ITEM, "then missing items");
+		shells = 1;
+		require(stop(2002) == ms::QuestStop::QUEST, "then quests in the wrong state");
+		before = 2;
+		require(stop(2002) == ms::QuestStop::MOB, "then kills");
+		progress = "001";
+		require(stop(2002) == ms::QuestStop::NONE, "and then it can be completed");
 		std::cout << "Quest marker transitions and priority passed\n";
 		return 0;
 	}

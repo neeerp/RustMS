@@ -191,7 +191,7 @@ namespace ms
 				image.texture.draw(box + image.anchor);
 		}
 
-		text.draw(origin, clip, revealed(), choice_text);
+		text.draw(origin, clip, revealed(), instant_text);
 
 		for (size_t i = 0; i < choices.size(); i++)
 		{
@@ -289,7 +289,14 @@ namespace ms
 			timestep += Constants::TIMESTEP;
 
 			for (; timestep >= TYPE_MS && formatted_text_pos < formatted_text.size(); timestep -= TYPE_MS)
+			{
 				formatted_text_pos++;
+
+				// What already shows is not typed again.
+				for (const auto &range : instant_text)
+					if (formatted_text_pos >= range.first && formatted_text_pos < range.second)
+						formatted_text_pos = range.second;
+			}
 
 			if (formatted_text_pos >= formatted_text.size())
 				draw_text = false;
@@ -661,7 +668,7 @@ namespace ms
 		menu_kind = menu;
 		images.clear();
 		choices.clear();
-		choice_text.clear();
+		instant_text.clear();
 		formatted_text = format_text(tx, npcid, images);
 
 		std::vector<int32_t> inline_ids;
@@ -731,13 +738,26 @@ namespace ms
 				c = Text::BOX;
 			} else if (c == NpcTextMarkup::CHOICE_END)
 			{
-				if (choice_text.size() < marks.size())
-					choice_text.emplace_back(marks.back().second, i + 1);
+				if (instant_text.size() < marks.size())
+					instant_text.emplace_back(marks.back().second, i + 1);
 
 				boxes.emplace_back(0, 0);
 				c = Text::BOX;
 			}
 		}
+
+		// Each #w turns showing at once on or off (FUN_0099dd54), as for the
+		// rewards under a quest's last page.
+		for (size_t on = formatted_text.find("#w"); on != std::string::npos;)
+		{
+			size_t off = formatted_text.find("#w", on + 2);
+			size_t end = off == std::string::npos ? formatted_text.size() : off + 2;
+
+			instant_text.emplace_back(on, end);
+			on = off == std::string::npos ? off : formatted_text.find("#w", end);
+		}
+
+		std::sort(instant_text.begin(), instant_text.end());
 
 		text = Text(Text::Font::A12M, Text::Alignment::LEFT, Color::Name::DARKGREY, formatted_text, TEXT_WIDTH);
 		text.set_boxes(boxes);

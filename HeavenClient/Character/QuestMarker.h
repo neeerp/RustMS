@@ -50,6 +50,44 @@ namespace ms
 		});
 	}
 
+	// Why a started quest can't be completed with an NPC, by v83's first
+	// failed check (FUN_00721d2c), or NONE. The names are the stop/<reason>
+	// pages they show.
+	enum class QuestStop { NONE, NPC, ITEM, QUEST, MOB };
+
+	inline const char* stop_reason(QuestStop stop)
+	{
+		switch (stop)
+		{
+			case QuestStop::NPC: return "npc";
+			case QuestStop::ITEM: return "item";
+			case QuestStop::QUEST: return "quest";
+			case QuestStop::MOB: return "mob";
+			default: return "default";
+		}
+	}
+
+	// `progress` is the quest's progress string (its kill counts).
+	template<class Status, class Count>
+	QuestStop completion_stop(const QuestInfo& quest, int32_t npc_id, Status status, Count count,
+		const std::string& progress)
+	{
+		if (quest.end_npc != npc_id)
+			return QuestStop::NPC;
+
+		if (!end_items_met(quest, count))
+			return QuestStop::ITEM;
+
+		for (const auto& requirement : quest.end_prerequisites)
+			if (status(requirement.first) != requirement.second)
+				return QuestStop::QUEST;
+
+		if (!end_mobs_met(quest, progress))
+			return QuestStop::MOB;
+
+		return QuestStop::NONE;
+	}
+
 	template<class Status>
 	bool quest_available(const QuestInfo& quest, int16_t job, int16_t level,
 		Status status, bool all_levels = false)

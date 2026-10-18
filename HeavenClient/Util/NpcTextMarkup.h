@@ -81,8 +81,10 @@ namespace ms
 				size_t close = text.find('#', i + 2);
 				std::string arg = close == std::string::npos ? std::string() : text.substr(i + 2, close - i - 2);
 
-				auto id = [&]() { return static_cast<int32_t>(std::stol(arg)); };
-				bool numeric = is_digits(arg);
+				// v83 writes ids as "#v2000002:#" as well as "#v2000002#".
+				std::string number = !arg.empty() && arg.back() == ':' ? arg.substr(0, arg.size() - 1) : arg;
+				auto id = [&]() { return static_cast<int32_t>(std::stol(number)); };
+				bool numeric = is_digits(number);
 
 				switch (tag)
 				{
@@ -112,7 +114,7 @@ namespace ms
 					case 'i':
 					case 's':
 						// Item and skill icons.
-						if (numeric) { out += image(tag, arg); i = close + 1; continue; }
+						if (numeric) { out += image(tag, number); i = close + 1; continue; }
 						break;
 					case 'f':
 					case 'F':

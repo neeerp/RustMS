@@ -92,8 +92,7 @@ namespace ms
 			int32_t npc_id = recv.read_int();
 			int16_t next_quest = recv.length() >= 2 ? recv.read_short() : 0;
 
-			if (next_quest != 0)
-				QuestConversation::continue_with(next_quest, npc_id);
+			QuestConversation::confirmed(quest_id, npc_id, next_quest);
 
 			return;
 		}

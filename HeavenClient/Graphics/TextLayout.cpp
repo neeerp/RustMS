@@ -151,7 +151,8 @@ namespace ms
 									color = Color::Name::ORANGE;
 									break;
 								case 'w':
-									color = Color::Name::WHITE;
+									// v83's "show at once" toggle (FUN_0099dd54);
+									// the NPC dialog acts on it.
 									break;
 							}
 

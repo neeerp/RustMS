@@ -193,9 +193,9 @@ namespace ms
 		};
 
 		std::vector<Choice> choices;
-		// Inline choices' text, which shows at once while the rest types
-		// out, as in footage.
-		std::vector<std::pair<size_t, size_t>> choice_text;
+		// Text that shows at once while the rest types out, in order: inline
+		// choices, as in footage, and what v83 puts between #w marks.
+		std::vector<std::pair<size_t, size_t>> instant_text;
 		size_t selected;
 		answer_focus::Focus focus;
 		std::vector<InlineImage> images;

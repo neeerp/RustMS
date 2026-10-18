@@ -68,11 +68,36 @@ int main()
 		return 1;
 	}
 
+	// Pio takes back his two items and pays meso and EXP; only those are listed.
+	if (pio->rewards.summary(0, false, false) !=
+		"#w\r\n\r\n#fUI/UIWindow.img/QuestIcon/4/0#\r\n\r\n"
+		"#fUI/UIWindow.img/QuestIcon/7/0# 200 Meso\r\n#fUI/UIWindow.img/QuestIcon/8/0# 100 exp\r\n\r\n#w")
+	{
+		std::cerr << "Quest 1008's rewards are not listed as expected\n";
+		return 1;
+	}
+
+	// Todd gives beginners one of five hats.
+	if (todd->rewards.summary(0, false, false).find("QuestIcon/5/0") == std::string::npos ||
+		todd->rewards.summary(100, false, false).find("QuestIcon/5/0") != std::string::npos)
+	{
+		std::cerr << "Quest 1035's random hats are not listed as expected\n";
+		return 1;
+	}
+
 	ms::QuestScript rain = catalog.script(1009, true);
 
-	if (rain.answers.at(0) != 0 || rain.wrong.at(0).count(1) != 1)
+	if (!rain.ask || rain.questions.at(0).wrong.count(1) != 1 || rain.questions.at(0).wrong.count(0) != 0)
 	{
-		std::cerr << "Rain's first quiz answer did not parse as expected\n";
+		std::cerr << "Rain's quiz did not parse as expected\n";
+		return 1;
+	}
+
+	ms::QuestScript lana = catalog.script(2270, true);
+
+	if (!lana.questions.at(0).flip || lana.stop("npc").empty())
+	{
+		std::cerr << "Lana's questions did not parse as expected\n";
 		return 1;
 	}
 
