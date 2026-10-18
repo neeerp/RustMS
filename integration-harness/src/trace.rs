@@ -81,6 +81,8 @@ pub struct Trace {
     pub quantities: Vec<(u8, i16, i16)>,
     /// Slots emptied: (inventory type, slot).
     pub removed: Vec<(u8, i16)>,
+    /// INVENTORY_GROW: (inventory type, new slot count).
+    pub bag_slots: Vec<(u8, u8)>,
     /// "Quest Clear" effects (SHOW_ITEM_GAIN_INCHAT 9).
     pub cleared: usize,
     /// "Card get" effects (SHOW_ITEM_GAIN_INCHAT 0x0D).
@@ -354,6 +356,9 @@ impl Trace {
                     _ => {}
                 }
             }
+        } else if op == SendOpcode::InventoryGrow as i16 {
+            self.bag_slots
+                .push((r.read_byte().unwrap(), r.read_byte().unwrap()));
         } else if op == SendOpcode::UpdateQuestInfo as i16 {
             match r.read_byte().unwrap() {
                 8 => self.results.push((

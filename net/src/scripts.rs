@@ -4,7 +4,7 @@
 //! runtime would have. Unknown names do nothing.
 
 use crate::content;
-use game::{Player, QuestState};
+use game::{InventoryType, Player, QuestState};
 use game_data::server_content::keys;
 
 /// What a map, portal, or NPC script does. Scripts only return effects; the
@@ -46,6 +46,11 @@ pub enum Effect {
     /// Ask for a new guild's name (Heracle); the guild is founded, and paid
     /// for, when the client answers.
     OpenGuildNamePrompt,
+    /// Make a beginner a first-job Explorer (`Player::take_first_job`).
+    /// Nothing is applied unless the player still qualifies.
+    TakeFirstJob(i16),
+    /// Add a row of four slots to a bag, up to 96.
+    AddSlotRow(InventoryType),
 }
 
 #[derive(Debug, Default, PartialEq, Eq)]

@@ -20,6 +20,8 @@ changes into INVENTORY_OPERATION (`0x1D`); worn positions travel as the EQUIP
 type with a negative slot, and equipment moves add the movement byte that
 makes the client refresh the look. `build_item_gain` (SHOW_STATUS_INFO mode 0)
 and `build_item_gain_in_chat` (SHOW_ITEM_GAIN_INCHAT mode 3) show gains.
+`build_inventory_grow` (INVENTORY_GROW `0x1E`: bag type, new slot count)
+widens a bag outside the Cash Shop, as the first job advancement does.
 
 ## Item data
 

@@ -20,6 +20,7 @@ unsourced = [
     "ships.sell.decline",
     "ships.sell.short",
     "ships.board.no_ticket",
+    "first_job.inventory_full",
 ]
 
 [text."glTutoMsg0.message"]
@@ -426,6 +427,186 @@ sha256 = "88fb683304248bf13f8e143b38d74f35e85d0e5a473468545942679e3beaf021"
 source = "Server.Scripts/src/begin5.lua"
 template = "{s46}"
 sha256 = "fc1ce77d58f6bb05021d7da1ebe4cb509c620b32c368f5780dc8df7abc6cc422"
+
+[text."first_job.warrior.intro"]
+source = "Server.Scripts/src/fighter.lua"
+template = "{s4}"
+sha256 = "c5ddf11131f137a6cc3930462d2a914cee2c0d12d96cb668c12fd5003374b51d"
+
+[text."first_job.warrior.ask"]
+source = "Server.Scripts/src/fighter.lua"
+template = "{s6}"
+sha256 = "2ac5dd5551dd724ccde33b2a2f17f22c9af7fbebb407f30c1a8a4347d85885c2"
+
+[text."first_job.warrior.accept"]
+source = "Server.Scripts/src/fighter.lua"
+template = "{s7}"
+sha256 = "007137a6d52326eb14b561cdfbb79c38773b3f383e52e876ed266ee34eac9fbd"
+
+[text."first_job.warrior.after.0"]
+source = "Server.Scripts/src/fighter.lua"
+template = "{s9}"
+sha256 = "bfc6fcbe48fff88fe4cb57967d93a2ba8bb9ec98fef334fe6d79a8d42a030492"
+
+[text."first_job.warrior.too_weak"]
+source = "Server.Scripts/src/fighter.lua"
+template = "{s10}"
+sha256 = "7efd30eb7d4b434eded1f487733ec788a0fbb670eceb24e5649b581d5fc353c5"
+
+[text."first_job.warrior.other"]
+source = "Server.Scripts/src/fighter.lua"
+template = "{s11}"
+sha256 = "8c09478ebf03724143bf766dea8b6913f7fc2fe628a2c1c847378f1bd004177e"
+
+[text."first_job.magician.intro"]
+source = "Server.Scripts/src/magician.lua"
+template = "{s4}"
+sha256 = "e32e2f9df1a3d0a40ebd702ec2ce39b5e8be7d50297daecc91aeb5b5c9ab87c4"
+
+[text."first_job.magician.ask"]
+source = "Server.Scripts/src/magician.lua"
+template = "{s6}"
+sha256 = "d8bbb24982c65a3c41c2f0cce180aa74132e6c77964bdcf54ef8afee42ea3d05"
+
+[text."first_job.magician.accept"]
+source = "Server.Scripts/src/magician.lua"
+template = "{s7}"
+sha256 = "858ead4069b52fc916ba2bfc7f53ebcd48a3a6ee48a6fa981369c188de22dfdd"
+
+[text."first_job.magician.after.0"]
+source = "Server.Scripts/src/magician.lua"
+template = "{s9}"
+sha256 = "b36653d19e992b15172b466aef52e884b8732b76c601560d40a8b4821d1d3126"
+
+[text."first_job.magician.after.1"]
+source = "Server.Scripts/src/magician.lua"
+template = "{s10}"
+sha256 = "3ade1c9ba1acf49360a874053dfaf552b0baf532dabd00167c4b5d9ee76f7486"
+
+[text."first_job.magician.after.2"]
+source = "Server.Scripts/src/magician.lua"
+template = "{s11}"
+sha256 = "7335eed84241781f6e58dfd4855c8dc678a3af03139c281ecf8246e2e1ab4215"
+
+[text."first_job.magician.after.3"]
+source = "Server.Scripts/src/magician.lua"
+template = "{s12}"
+sha256 = "31a162beb02863cd427eee87ec8b19c11ad4ae72c51714c4ca3d004ef282ab02"
+
+[text."first_job.magician.after.4"]
+source = "Server.Scripts/src/magician.lua"
+template = "{s13}"
+sha256 = "61ec43dbcd6f2f95f2e40605c698c7cb4acbf6adad6076fa9444a34850de3de4"
+
+[text."first_job.magician.too_weak"]
+source = "Server.Scripts/src/magician.lua"
+template = "{s14}"
+sha256 = "6e79ae93040680d9ac19f2795dc74fd7b5949a1b40c75d226794f6d0d5baceae"
+
+[text."first_job.magician.other"]
+source = "Server.Scripts/src/magician.lua"
+template = "{s15}"
+sha256 = "63c9691965f1532cc57579055249133d84c905674925fdd1bbf3b35aa2b3e54b"
+
+[text."first_job.bowman.intro"]
+source = "Server.Scripts/src/bowman.lua"
+template = "{s4}"
+sha256 = "3ebffeb09ce9cea0282e484bf596ef109a996a9379058b93147bad6c253b06f4"
+
+[text."first_job.bowman.ask"]
+source = "Server.Scripts/src/bowman.lua"
+template = "{s6}"
+sha256 = "2f007b8ce732513ea7b60452dfb55153190d93cbfe04bcdbefc095c512f182d6"
+
+[text."first_job.bowman.accept"]
+source = "Server.Scripts/src/bowman.lua"
+template = "{s7}"
+sha256 = "cbe0bbad647cda1230b83fd1b20a31fea5134532e178a379aa2dfafc9384c2f1"
+
+[text."first_job.bowman.after.0"]
+source = "Server.Scripts/src/bowman.lua"
+template = "{s9}"
+sha256 = "a7a75a51751d53a7db1d7be9512c497913eea8ed4e4c649a5731d6b9aee50383"
+
+[text."first_job.bowman.after.1"]
+source = "Server.Scripts/src/bowman.lua"
+template = "{s10}"
+sha256 = "3ade1c9ba1acf49360a874053dfaf552b0baf532dabd00167c4b5d9ee76f7486"
+
+[text."first_job.bowman.after.2"]
+source = "Server.Scripts/src/bowman.lua"
+template = "{s11}"
+sha256 = "7335eed84241781f6e58dfd4855c8dc678a3af03139c281ecf8246e2e1ab4215"
+
+[text."first_job.bowman.after.3"]
+source = "Server.Scripts/src/bowman.lua"
+template = "{s12}"
+sha256 = "ae13b29542466ebd472d95119d719eb142bc6df38cde7afe61c8709d86525dbd"
+
+[text."first_job.bowman.after.4"]
+source = "Server.Scripts/src/bowman.lua"
+template = "{s13}"
+sha256 = "130cb9c5a692b5cedc95b7d3ed7fe1214ebbeca21b2977b12dede41096fd9b19"
+
+[text."first_job.bowman.too_weak"]
+source = "Server.Scripts/src/bowman.lua"
+template = "{s14}"
+sha256 = "5c3c1b47ab78848effd057e11fa7527ea3b70c26d31e690a16e802ca9f4e4cd0"
+
+[text."first_job.bowman.other"]
+source = "Server.Scripts/src/bowman.lua"
+template = "{s15}"
+sha256 = "608ad0c9f8585a7dbec98c63f523afd522f85aa862c7a88da3e3fe93615e5dee"
+
+[text."first_job.thief.intro"]
+source = "Server.Scripts/src/rogue.lua"
+template = "{s6}"
+sha256 = "4b37b75e0347e09113bebc2ca4a9451d025d9abdb46609f4d3a04f40cf44c3e8"
+
+[text."first_job.thief.ask"]
+source = "Server.Scripts/src/rogue.lua"
+template = "{s8}"
+sha256 = "14f4a8da59279d2031e8b37e4ec13ab5aa1154d345e8936083657b8abeb2c8b0"
+
+[text."first_job.thief.accept"]
+source = "Server.Scripts/src/rogue.lua"
+template = "{s9}"
+sha256 = "44db31754352167f70db969b9c3b77a34adc2950e95ad8412bf8d64b3ef44fd9"
+
+[text."first_job.thief.after.0"]
+source = "Server.Scripts/src/rogue.lua"
+template = "{s12}"
+sha256 = "17a0913bfb167abfdee27a62b672c0e651d019a946b54c7c42ddb41443f95fde"
+
+[text."first_job.thief.after.1"]
+source = "Server.Scripts/src/rogue.lua"
+template = "{s13}"
+sha256 = "3ade1c9ba1acf49360a874053dfaf552b0baf532dabd00167c4b5d9ee76f7486"
+
+[text."first_job.thief.after.2"]
+source = "Server.Scripts/src/rogue.lua"
+template = "{s14}"
+sha256 = "7335eed84241781f6e58dfd4855c8dc678a3af03139c281ecf8246e2e1ab4215"
+
+[text."first_job.thief.after.3"]
+source = "Server.Scripts/src/rogue.lua"
+template = "{s15}"
+sha256 = "70658dad212c48948b0dcaaf57606d28ec1c4e0c817205d6809f3acc5eb6b23a"
+
+[text."first_job.thief.after.4"]
+source = "Server.Scripts/src/rogue.lua"
+template = "{s16}"
+sha256 = "6f1ab8373026fda9dfa356a5f9494e625ec633dc21389c5c2668fab067027d29"
+
+[text."first_job.thief.too_weak"]
+source = "Server.Scripts/src/rogue.lua"
+template = "{s17}"
+sha256 = "2104ce0372f1939e69d8759f9512b0d3873772c87b97c72924241c0159d192aa"
+
+[text."first_job.thief.other"]
+source = "Server.Scripts/src/rogue.lua"
+template = "{s18}"
+sha256 = "f297f382dfa17832de10856ed5911b2e006efe8077ee8818a40d92263cb65e6e"
 
 [rewards]
 source = "Server.NX/src/Reward.img"

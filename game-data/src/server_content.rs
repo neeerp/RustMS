@@ -92,6 +92,16 @@ pub mod keys {
         format!("robin.answer.{topic}.{page}")
     }
 
+    /// A first-job instructor's lines, by job (`warrior`, `magician`,
+    /// `bowman`, `thief`): `intro`, `ask`, `accept`, `after.0`, ... (the
+    /// placeholders decide how many), `too_weak`, and `other` for everyone
+    /// past beginner.
+    pub fn first_job(job: &str, line: &str) -> String {
+        format!("first_job.{job}.{line}")
+    }
+
+    pub const FIRST_JOB_INVENTORY_FULL: &str = "first_job.inventory_full";
+
     /// Every key: one per placeholder.
     pub fn all() -> Vec<String> {
         super::parse_text(super::PLACEHOLDER_TEXT, "placeholder_text.toml")
@@ -398,6 +408,7 @@ mod tests {
             keys::ISA_ASK,
             keys::ISA_DECLINE,
             keys::ROBIN_MENU,
+            keys::FIRST_JOB_INVENTORY_FULL,
         ];
         for key in named
             .iter()
@@ -408,6 +419,7 @@ mod tests {
             assert!(text.contains(key), "{key} has no placeholder");
         }
         assert!(text.contains(&keys::robin_answer(0, 0)));
+        assert!(text.contains(&keys::first_job("thief", "after.4")));
         assert!(text
             .get(keys::LEAVE_AREA_WARNING, &[])
             .starts_with("[placeholder]"));

@@ -379,6 +379,39 @@ impl Player {
         gained
     }
 
+    /// Whether this beginner may take the first job `job` (100, 200, 300,
+    /// 400 or 500): level 10, or 8 for magicians, and 35 STR, 20 INT,
+    /// 25 DEX, 25 DEX or 20 DEX.
+    pub fn can_take_first_job(&self, job: i16) -> bool {
+        let stats = &self.stats;
+        let Some((level, _, _)) = first_job_rules(job) else {
+            return false;
+        };
+        let (stat, needed) = match job {
+            100 => (stats.str, 35),
+            200 => (stats.int, 20),
+            500 => (stats.dex, 20),
+            _ => (stats.dex, 25),
+        };
+        stats.job == 0 && stats.level >= level && stat >= needed
+    }
+
+    /// Become a first-job `job`: 3 SP for each level past the job's
+    /// minimum, plus 1, and the job's max HP/MP bonus. Base stats and
+    /// current HP/MP stay as they are.
+    pub fn take_first_job(&mut self, job: i16) {
+        let Some((level, hp, mp)) = first_job_rules(job) else {
+            return;
+        };
+        let stats = &mut self.stats;
+        let sp = (i16::from(stats.level) - i16::from(level)).max(0) * 3 + 1;
+        stats.job = job;
+        stats.sp = stats.sp.saturating_add(sp);
+        stats.max_hp = stats.max_hp.saturating_add(hp).min(MAX_HP_MP);
+        stats.max_mp = stats.max_mp.saturating_add(mp).min(MAX_HP_MP);
+        self.dirty = true;
+    }
+
     /// Spend one AP on `stat`. Returns false, changing nothing, without AP
     /// or once the stat is at its cap.
     pub fn spend_ap(&mut self, stat: ApStat) -> bool {
@@ -499,6 +532,18 @@ fn level_up_growth(job: i16) -> (i16, i16) {
         3 | 4 | 13 | 14 => (22, 15),
         5 | 15 => (25, 20),
         _ => (14, 11),
+    }
+}
+
+/// A first job's minimum level and the max HP/MP it adds: the middle of
+/// the random ranges community servers use (e.g. warriors 201-250 HP).
+fn first_job_rules(job: i16) -> Option<(u8, i16, i16)> {
+    match job {
+        100 => Some((10, 225, 0)),
+        200 => Some((8, 0, 125)),
+        300 | 400 => Some((10, 125, 38)),
+        500 => Some((10, 175, 63)),
+        _ => None,
     }
 }
 
@@ -646,6 +691,28 @@ mod tests {
         assert_eq!((player.stats.max_hp, player.stats.ap), (MAX_HP_MP, 0));
         assert!(!player.spend_ap(ApStat::Dex));
         assert_eq!(player.stats.dex, 5);
+    }
+
+    #[test]
+    fn beginners_take_a_first_job_with_its_level_and_stat() {
+        let mut player = player();
+        player.stats.level = 9;
+        player.stats.int = 20;
+        assert!(player.can_take_first_job(200));
+        player.stats.str = 35;
+        assert!(!player.can_take_first_job(100), "warriors need level 10");
+        player.stats.level = 10;
+        assert!(player.can_take_first_job(100));
+        assert!(!player.can_take_first_job(300), "bowmen need 25 DEX");
+        assert!(!player.can_take_first_job(110), "not a first job");
+
+        player.take_first_job(200);
+        assert_eq!(player.stats.job, 200);
+        assert_eq!(player.stats.sp, 7, "1 SP and 3 for each level past 8");
+        assert_eq!((player.stats.max_hp, player.stats.max_mp), (50, 130));
+        assert_eq!((player.stats.hp, player.stats.mp), (50, 5));
+        assert!(player.is_dirty());
+        assert!(!player.can_take_first_job(100), "only beginners advance");
     }
 
     #[test]

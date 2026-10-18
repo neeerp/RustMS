@@ -26,6 +26,7 @@ pub fn build_avatar_effect(path: &str) -> Result<Packet, NetworkError> {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum CharEffect {
     LevelUp = 0,
+    JobChange = 8,
     QuestClear = 9,
     MonsterCard = 13,
 }

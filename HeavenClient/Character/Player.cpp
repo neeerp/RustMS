@@ -954,8 +954,23 @@ namespace ms
 
 	void Player::change_job(uint16_t jobid)
 	{
+		uint16_t oldjob = stats.get_stat(MapleStat::Id::JOB);
+
 		show_effect_id(CharEffect::Id::JOBCHANGE);
+		Sound(Sound::Name::JOBCHANGED).play();
 		stats.change_job(jobid);
+
+		// A beginner's first advancement opens the stat window, without a sound (FUN_00a1fb52).
+		if (oldjob == 0 || oldjob == 1000 || oldjob == 2000 || oldjob == 2001)
+		{
+			auto window = UI::get().get_element<UIStatsInfo>();
+
+			if (!window || !window->is_active())
+			{
+				UI::get().remove(UIStatsInfo::TYPE);
+				UI::get().emplace<UIStatsInfo>(stats);
+			}
+		}
 	}
 
 	void Player::set_seat(Optional<const Seat> seat)

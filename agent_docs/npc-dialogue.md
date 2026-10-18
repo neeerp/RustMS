@@ -59,6 +59,23 @@ applied, and apply nothing if the player no longer has them. Answers are matched
 | `begin5` | Clicking Robin (2003) | 18-topic Q&A menu |
 | `tutorialSkip` | Clicking the Maple Administrator (2007), or the `tutoChatNPC` portal for accounts with a level-30 character | Yes warps to Lith Harbor (104000000). Neither is on the original island, so this is unused |
 | `begin7` | Clicking Shanks (22000) in Southperry | Yes sails to Lith Harbor (104000000) for Lucas's recommendation letter (4031801), at any level, or for 150 mesos from level 7; otherwise he says why not |
+| `fighter`, `magician`, `bowman`, `rogue` | Clicking Dances with Balrog (1022000), Grendel the Really Old (1032001), Athena Pierce (1012100), or the Dark Lord (1052001) | First job advancement: see below |
+
+The four Explorer instructors (`INSTRUCTORS` in `npc_scripts.rs`) make a
+beginner a Warrior, Magician, Bowman, or Thief. The beginner needs level 10
+(a Magician 8) and 35 STR, 20 INT, or 25 DEX; a weaker one hears why not, and
+anyone else gets one page. Yes applies `Effect::TakeFirstJob`
+(`Player::take_first_job`: 3 SP for each level past the minimum plus 1, and
+the job's extra max HP and MP, without a stat reset or heal), then
+`Effect::AddSlotRow` for the bags the job widens, then the job's weapon and
+ammunition. The rules and grants follow Cosmic, not yet checked against GMS
+footage. The player gets STAT_CHANGED (job, max HP, max MP, SP) and
+INVENTORY_GROW (`0x1E`: bag type, new slot count) per bag; others on the
+field see the job-change effect (SHOW_FOREIGN_EFFECT 8). The player's own
+client plays it, and the job-change sound, from the job bit of STAT_CHANGED.
+As in v83 (`FUN_00a1fb52`), HeavenClient also opens the Stat window after a
+beginner's first advancement if it isn't open. Pirates (Kyrin) and later
+advancements are not scripted yet.
 
 Text comes from the [server content pack](./server-content.md) with
 placeholders. HeavenClient expands NPC text markup (`Util/NpcTextMarkup.h`:
@@ -136,4 +153,6 @@ harness, files or symlink targets must live within its mounted `assets/` tree.
 Validate with `cargo run -p integration-harness --bin harnessctl -- test`.
 `npc_dialogue` integration tests cover asset text, progression, cancellation,
 restarting, invalid requests, stale replies across warps, and player isolation.
+`first_job` covers Dances with Balrog refusing a weak beginner, then making a
+strong one a Warrior, and what is saved.
 Unit tests cover the conversation transitions and asset-key resolution.

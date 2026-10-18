@@ -16,6 +16,7 @@ pub enum SendOpcode {
     RecommendedWorlds = 0x1B,
 
     InventoryOperation = 0x1D,
+    InventoryGrow = 0x1E,
     GiveBuff = 0x20,
     CancelBuff = 0x21,
     StatChange = 0x1F,
