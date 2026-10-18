@@ -180,10 +180,14 @@ namespace ms
 			}
 		}
 
-		for (auto &pet : pets)
+		for (size_t i = 0; i < pets.size(); i++)
 		{
+			PetLook &pet = pets[i];
+
 			if (!pet.get_itemid())
 				continue;
+
+			pet.set_wear(look.get_pet_wear(i));
 
 			// Another's pet goes where its owner's client says.
 			if (pet.is_local())

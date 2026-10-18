@@ -37,6 +37,10 @@ namespace ms
 		// The style of its chat balloon when called by name (info/chatBalloon).
 		int8_t get_balloon() const;
 
+		// The style of its name tag with a label ring on (info/nameTag), 0
+		// for a kind that shows none.
+		int8_t get_name_tag() const;
+
 		// Its commands, by the index sent for them.
 		const std::vector<pets::Command> &get_commands() const;
 
@@ -57,6 +61,7 @@ namespace ms
 
 		std::string kind;
 		int8_t balloon;
+		int8_t name_tag;
 		std::vector<pets::Command> commands;
 		std::vector<pets::Command> food;
 		std::vector<pets::Reaction> idle;

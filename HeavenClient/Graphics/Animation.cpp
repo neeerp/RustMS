@@ -334,6 +334,11 @@ namespace ms
 		return get_frame().get_bounds();
 	}
 
+	int16_t Animation::get_frame_index(float alpha) const
+	{
+		return frame.get(alpha);
+	}
+
 	const Frame &Animation::get_frame() const
 	{
 		return frames[frame.get()];

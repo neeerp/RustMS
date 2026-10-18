@@ -131,7 +131,7 @@ namespace ms
 			return categorynames[index];
 		else if (index >= 30 && index <= 70)
 			return "Weapon";
-		else if (index == 80)
+		else if (index >= 80 && index <= 83)
 			return "PetEquip";
 		else
 			return "";

@@ -31,6 +31,8 @@
 
 #include <nlnx/nx.hpp>
 
+#include <array>
+
 namespace ms
 {
 	namespace
@@ -43,12 +45,13 @@ namespace ms
 		constexpr int16_t SLOT_SIZE = 32;
 		// Where an icon is drawn from, relative to its cell.
 		constexpr Point<int16_t> ICON = Point<int16_t>(0, 0);
-		constexpr Point<int16_t> PET_SHOW = Point<int16_t>(115, 279);
-		// The pet panel hangs off the right edge, flush with the bottom.
-		constexpr Point<int16_t> PET_PANEL = Point<int16_t>(173, 123);
-		constexpr Point<int16_t> PET_TAB = Point<int16_t>(9, 151);
+		constexpr Point<int16_t> PET_SHOW = Point<int16_t>(102, 280);
+		// The pet panel hangs off the right edge, flush with the bottom
+		// (FUN_007fe02e), with a tab for each pet (FUN_007ffe73).
+		constexpr Point<int16_t> PET_PANEL = Point<int16_t>(172, 123);
+		constexpr Point<int16_t> PET_TAB = Point<int16_t>(10, 151);
 		constexpr int16_t PET_TAB_PITCH = 34;
-		constexpr Point<int16_t> PET_HIDE = Point<int16_t>(154, 159);
+		constexpr Point<int16_t> PET_HIDE = Point<int16_t>(155, 159);
 
 		struct Cell
 		{
@@ -84,6 +87,43 @@ namespace ms
 
 		constexpr Point<int16_t> MOB_EQUIP = Point<int16_t>(2, 6);
 
+		struct PetCell
+		{
+			// The part it holds on each pet's tab.
+			std::array<int16_t, 3> parts;
+			Point<int16_t> position;
+		};
+
+		// The pet panel's cells (0x00be2260), from its top left.
+		constexpr PetCell PET_CELLS[] = {
+				{ { 24, 24, 24 }, { 13, 11 } },
+				{ { 25, 25, 25 }, { 79, 11 } },
+				{ { 22, 33, 41 }, { 13, 44 } },
+				{ { 23, 34, 42 }, { 46, 44 } },
+				{ { 46, 47, 48 }, { 13, 77 } },
+				{ { 28, 37, 45 }, { 46, 77 } },
+				{ { 26, 35, 43 }, { 79, 77 } },
+				{ { 14, 30, 38 }, { 112, 77 } },
+				{ { 27, 36, 44 }, { 13, 110 } },
+				{ { 21, 31, 39 }, { 79, 110 } },
+				{ { 29, 32, 40 }, { 112, 110 } }
+		};
+
+		// The first pet's clothes, label and quote ring cells, and the auto
+		// potions' slots beside the HP and MP pouches.
+		constexpr Point<int16_t> PET_WEAR = Point<int16_t>(112, 77);
+		constexpr Point<int16_t> PET_LABEL = Point<int16_t>(79, 110);
+		constexpr Point<int16_t> PET_QUOTE = Point<int16_t>(112, 110);
+		constexpr Point<int16_t> HP_POTION = Point<int16_t>(46, 11);
+		constexpr Point<int16_t> MP_POTION = Point<int16_t>(112, 11);
+		constexpr int16_t HP_POUCH = 24;
+		constexpr int16_t MP_POUCH = 25;
+
+		EquipSlot::Id part_slot(int16_t part)
+		{
+			return static_cast<EquipSlot::Id>(part);
+		}
+
 		constexpr Point<int16_t> cell_position(int16_t column, int16_t row)
 		{
 			return SLOT + Point<int16_t>(column * SLOT_PITCH, row * SLOT_PITCH);
@@ -94,10 +134,14 @@ namespace ms
 	}
 
 	UIEquipInventory::UIEquipInventory(const Inventory &invent)
-			: UIDragElement<PosEQINV>(), inventory(invent), pet_enabled(false)
+			: UIDragElement<PosEQINV>(), inventory(invent), pet_enabled(false), pet_tab(0)
 	{
 		for (auto cell : CELLS)
 			iconpositions[cell.slot] = cell_position(cell.column, cell.row);
+
+		for (const PetCell &cell : PET_CELLS)
+			for (int16_t part : cell.parts)
+				iconpositions[part_slot(part)] = PET_PANEL + cell.position;
 
 		nl::node Equip = NxFiles::ui_classic["UIWindow.img"]["Equip"];
 
@@ -114,15 +158,13 @@ namespace ms
 		buttons[Buttons::BT_PET_HIDE] = std::make_unique<MapleButton>(hide,
 																	  PET_PANEL + PET_HIDE + Texture(hide["normal"]["0"]).get_origin());
 
-		// Each tab shows a pet's equipment, which RustMS doesn't have yet, so they
-		// stay disabled.
+		// Each tab shows a pet's equipment, and is there while the pet is out.
 		for (uint16_t i = 0; i < 3; i++)
 		{
-			nl::node tab = Equip["BtPet" + std::to_string(i + 1)];
+			nl::node tab = NxFiles::ui_classic["UIWindow.img"]["UserInfo"]["BtPet" + std::to_string(i + 1)];
 			Point<int16_t> pos = PET_PANEL + PET_TAB + Point<int16_t>(PET_TAB_PITCH * i, 0);
 
 			buttons[Buttons::BT_PET1 + i] = std::make_unique<MapleButton>(tab, pos + Texture(tab["normal"]["0"]).get_origin());
-			buttons[Buttons::BT_PET1 + i]->set_state(Button::State::DISABLED);
 		}
 
 		Point<int16_t> bg_dimensions = backgrnd.get_dimensions();
@@ -137,10 +179,33 @@ namespace ms
 	{
 		UIElement::draw_sprites(alpha);
 
-		backgrnd.draw(position);
-
+		// The panel slides out from under the window (FUN_00801474).
 		if (pet_enabled)
-			pet.draw(position + PET_PANEL);
+		{
+			Point<int16_t> panel = position + PET_PANEL;
+
+			pet.draw(panel);
+
+			if (!has_pet(0))
+			{
+				unavailable.draw(panel + PET_WEAR);
+				unavailable.draw(panel + PET_LABEL);
+				unavailable.draw(panel + PET_QUOTE);
+			}
+
+			// No pouch, no auto potion.
+			if (!has_pet(0) || !is_worn(HP_POUCH))
+				unavailable.draw(panel + HP_POTION);
+
+			if (!has_pet(0) || !is_worn(MP_POUCH))
+				unavailable.draw(panel + MP_POTION);
+
+			for (const PetCell &cell : PET_CELLS)
+				if (auto &icon = icons[part_slot(cell.parts[pet_tab])])
+					icon->draw(panel + cell.position + ICON);
+		}
+
+		backgrnd.draw(position);
 
 		for (auto cell : CELLS)
 			if (is_unavailable(cell.slot))
@@ -169,11 +234,43 @@ namespace ms
 			case Buttons::BT_PET_HIDE:
 				show_pet(false);
 				break;
+			case Buttons::BT_PET1:
+			case Buttons::BT_PET2:
+			case Buttons::BT_PET3:
+				pet_tab = id - Buttons::BT_PET1;
+				clear_tooltip();
+				break;
 			default:
 				break;
 		}
 
 		return Button::State::NORMAL;
+	}
+
+	void UIEquipInventory::update()
+	{
+		UIElement::update();
+
+		for (uint8_t i = 0; i < 3; i++)
+		{
+			Button &tab = *buttons[Buttons::BT_PET1 + i];
+			bool out = has_pet(i);
+
+			if (!out)
+				tab.set_state(Button::State::DISABLED);
+			else if (tab.get_state() == Button::State::DISABLED)
+				tab.set_state(Button::State::NORMAL);
+		}
+	}
+
+	bool UIEquipInventory::has_pet(uint8_t index) const
+	{
+		return static_cast<bool>(Stage::get().get_player().get_pet(index));
+	}
+
+	bool UIEquipInventory::is_worn(int16_t part) const
+	{
+		return inventory.get_item_id(InventoryType::Id::EQUIPPED, inventory.shown_equip(part_slot(part))) != 0;
 	}
 
 	void UIEquipInventory::show_pet(bool show)
@@ -244,6 +341,10 @@ namespace ms
 
 		for (auto cell : CELLS)
 			update_slot(cell.slot);
+
+		for (const PetCell &cell : PET_CELLS)
+			for (int16_t part : cell.parts)
+				update_slot(part_slot(part));
 	}
 
 	Cursor::State UIEquipInventory::send_cursor(bool pressed, Point<int16_t> cursorpos)
@@ -372,6 +473,18 @@ namespace ms
 
 			if (cellrect.contains(cursorpos))
 				return cell.slot;
+		}
+
+		if (!pet_enabled)
+			return EquipSlot::Id::NONE;
+
+		for (const PetCell &cell : PET_CELLS)
+		{
+			Point<int16_t> cellpos = position + PET_PANEL + cell.position;
+			Rectangle<int16_t> cellrect = Rectangle<int16_t>(cellpos, cellpos + Point<int16_t>(SLOT_SIZE, SLOT_SIZE));
+
+			if (cellrect.contains(cursorpos))
+				return part_slot(cell.parts[pet_tab]);
 		}
 
 		return EquipSlot::Id::NONE;

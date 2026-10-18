@@ -386,5 +386,199 @@ namespace ms
 
 			return {};
 		}
+
+		// Pet equipment goes on body parts 14 and 21 to 48, which the
+		// three pets in the list share out between them.
+		inline bool is_equip_part(int16_t part)
+		{
+			return part == 14 || (part >= 21 && part <= 48);
+		}
+
+		// The parts pet equipment `itemid` goes on for each pet in the list
+		// (FUN_00460358), the same for all three for the HP and MP pouches.
+		// None for an item that isn't pet equipment.
+		inline std::optional<std::array<int16_t, 3>> equip_parts(int32_t itemid)
+		{
+			switch (itemid)
+			{
+				case 1802100:
+					return std::array<int16_t, 3>{ 21, 31, 39 };
+				case 1812000:
+					return std::array<int16_t, 3>{ 23, 34, 42 };
+				case 1812001:
+					return std::array<int16_t, 3>{ 22, 33, 41 };
+				case 1812002:
+					return std::array<int16_t, 3>{ 24, 24, 24 };
+				case 1812003:
+					return std::array<int16_t, 3>{ 25, 25, 25 };
+				case 1812004:
+					return std::array<int16_t, 3>{ 26, 35, 43 };
+				case 1812005:
+					return std::array<int16_t, 3>{ 27, 36, 44 };
+				case 1812006:
+					return std::array<int16_t, 3>{ 28, 37, 45 };
+				case 1812007:
+					return std::array<int16_t, 3>{ 46, 47, 48 };
+				default:
+					break;
+			}
+
+			switch (itemid / 10000)
+			{
+				case 180:
+					return std::array<int16_t, 3>{ 14, 30, 38 };
+				case 182:
+					return std::array<int16_t, 3>{ 21, 31, 39 };
+				case 183:
+					return std::array<int16_t, 3>{ 29, 32, 40 };
+				default:
+					return std::nullopt;
+			}
+		}
+
+		// The pet in the list wearing what is on `part`, -1 for the shared
+		// pouches (FUN_00705e2c).
+		inline int8_t equip_owner(int16_t part)
+		{
+			if (part == 14 || (part >= 21 && part <= 29 && part != 24 && part != 25) || part == 46)
+				return 0;
+
+			if ((part >= 30 && part <= 37) || part == 47)
+				return 1;
+
+			if ((part >= 38 && part <= 45) || part == 48)
+				return 2;
+
+			return -1;
+		}
+
+		// The pet whose clothes are on `part` (14, 30 and 38), or -1.
+		inline int8_t wear_owner(int16_t part)
+		{
+			switch (part)
+			{
+				case 14:
+					return 0;
+				case 30:
+					return 1;
+				case 38:
+					return 2;
+				default:
+					return -1;
+			}
+		}
+
+		// A pet in the list, as far as putting equipment on it goes.
+		struct Wearer
+		{
+			bool out = false;
+			// The item is clothing made for its kind
+			// (Character/PetEquip/<item>.img/<kind>).
+			bool suits = false;
+			// Its kind shows a label ring's name tag, and a quote ring's
+			// balloon (Item.nx Pet/<kind>.img/info/nameTag, chatBalloon).
+			bool name_tag = false;
+			bool chat_balloon = false;
+			int16_t level = 0;
+		};
+
+		// StringPool 0x36f, 0x370 and 0x364.
+		constexpr const char *NO_PET = "You do not currently have a pet that is alive.";
+		constexpr const char *CANNOT_WEAR = "The pet is unable to wear the equipment.";
+		constexpr const char *STATS_TOO_LOW = "Your stats are too low to equip this item.";
+
+		// Why equipment needing level `req_level` can't go on `part` of
+		// `pet`, or null if it can (FUN_004f1c2d). Clothes need a pet of
+		// the kind they were made for, at the level, and the rings a kind
+		// that shows them. The potion pouches, the Wing Boots, the Binocular
+		// and the Magic Scales need no pet at all.
+		inline const char *refuse_equip(int16_t part, int16_t req_level, const Wearer &pet)
+		{
+			switch (part)
+			{
+				case 14:
+				case 30:
+				case 38:
+					if (!pet.out || !pet.suits)
+						return CANNOT_WEAR;
+
+					// FUN_004f2cee compares the pet's level, not the owner's.
+					if (pet.level < req_level)
+						return STATS_TOO_LOW;
+
+					return nullptr;
+				case 21:
+				case 31:
+				case 39:
+					if (!pet.out)
+						return NO_PET;
+
+					return pet.name_tag ? nullptr : CANNOT_WEAR;
+				case 29:
+				case 32:
+				case 40:
+					if (!pet.out)
+						return NO_PET;
+
+					return pet.chat_balloon ? nullptr : CANNOT_WEAR;
+				case 22:
+				case 23:
+				case 46:
+				case 33:
+				case 34:
+				case 47:
+				case 41:
+				case 42:
+				case 48:
+					return pet.out ? nullptr : NO_PET;
+				default:
+					return nullptr;
+			}
+		}
+
+		// A pet that pet equipment can go on: its place in the list, and
+		// the part.
+		struct EquipChoice
+		{
+			uint8_t pet;
+			int16_t part;
+
+			bool operator==(const EquipChoice &other) const
+			{
+				return pet == other.pet && part == other.part;
+			}
+		};
+
+		// The pets a double-click in the item window can put pet equipment
+		// `itemid` on (FUN_004efd25), given the three places in the list.
+		// With one pet out or none, and for the potion pouches, it is the
+		// first pet's part whether it can wear it or not. Otherwise clothes
+		// go on the pets of their kind, ability items on any, and only the
+		// Pet Label Ring and the Pet Quote Ring of the rings may choose.
+		inline std::vector<EquipChoice> equip_choices(int32_t itemid, const std::array<Wearer, 3> &pets)
+		{
+			std::optional<std::array<int16_t, 3>> parts = equip_parts(itemid);
+
+			if (!parts)
+				return {};
+
+			int16_t first = (*parts)[0];
+
+			if (first == 24 || first == 25 || !pets[1].out)
+				return { { 0, first } };
+
+			std::vector<EquipChoice> choices;
+
+			for (uint8_t i = 0; i < pets.size(); i++)
+			{
+				bool fits = itemid / 10000 == 180 ? pets[i].suits
+							: itemid / 10000 == 181 || itemid == 1822000 || itemid == 1832000;
+
+				if (pets[i].out && fits)
+					choices.push_back({ i, (*parts)[i] });
+			}
+
+			return choices;
+		}
 	}
 }

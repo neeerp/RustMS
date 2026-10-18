@@ -606,6 +606,8 @@ add_executable(HeavenClient
     IO/UITypes/UITeleportRock.h
     IO/UITypes/UIMegaphone.cpp
     IO/UITypes/UIMegaphone.h
+    IO/UITypes/UIPetChooser.cpp
+    IO/UITypes/UIPetChooser.h
     IO/UITypes/UIItemMegaphone.cpp
     IO/UITypes/UIItemMegaphone.h
     IO/UITypes/UIInviteCard.cpp

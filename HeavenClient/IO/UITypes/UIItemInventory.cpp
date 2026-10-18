@@ -22,6 +22,7 @@
 #include "UIMegaphone.h"
 #include "UINotice.h"
 #include "UIPersonalShop.h"
+#include "UIPetChooser.h"
 #include "UITeleportRock.h"
 #include "UITradingRoom.h"
 
@@ -37,6 +38,7 @@
 #include "../../Character/Inventory/ScrollRules.h"
 #include "../../Data/CurseData.h"
 #include "../../Data/EquipData.h"
+#include "../../Data/PetData.h"
 #include "../../Gameplay/Stage.h"
 #include "../../Util/Chalkboard.h"
 #include "../../Util/Megaphones.h"
@@ -48,6 +50,8 @@
 #include "../../Net/Packets/MiniRoomPackets.h"
 
 #include <nlnx/nx.hpp>
+
+#include <algorithm>
 
 namespace ms
 {
@@ -675,11 +679,15 @@ namespace ms
 				switch (tab)
 				{
 					case InventoryType::Id::EQUIP:
-						if (can_wear_equip(slot))
+						if (pets::equip_parts(item_id))
+						{
+							wear_pet_equip(slot, item_id);
+						} else if (can_wear_equip(slot))
 						{
 							int16_t worn = inventory.equip_position(slot, inventory.find_equipslot(item_id));
 
 							Stage::get().get_player().request(EquipItemPacket(slot, worn), ExclRequest::WAIT);
+							Sound(Sound::Name::DRAGEND).play();
 						}
 
 						break;
@@ -969,13 +977,11 @@ namespace ms
 		return first_slot() + (full_enabled ? MAXFULLSLOTS : MAXSLOTS) - 1;
 	}
 
-	bool UIItemInventory::can_wear_equip(int16_t slot) const
+	bool UIItemInventory::can_change_equips() const
 	{
 		const Player &player = Stage::get().get_player();
-		const CharStats &stats = player.get_stats();
-		const CharLook &look = player.get_look();
 
-		if (look.get_alerted())
+		if (player.get_look().get_alerted())
 		{
 			UI::get().emplace<UIOk>(CATCH_BREATH, [](bool)
 			{});
@@ -988,6 +994,17 @@ namespace ms
 			{});
 			return false;
 		}
+
+		return true;
+	}
+
+	bool UIItemInventory::can_wear_equip(int16_t slot) const
+	{
+		const Player &player = Stage::get().get_player();
+		const CharStats &stats = player.get_stats();
+
+		if (!can_change_equips())
+			return false;
 
 		const int32_t item_id = inventory.get_item_id(InventoryType::Id::EQUIP, slot);
 		const EquipData &equipdata = EquipData::get(item_id);
@@ -1058,6 +1075,99 @@ namespace ms
 		}
 
 		return true;
+	}
+
+	bool UIItemInventory::can_wear_pet_equip(int16_t slot, int16_t part) const
+	{
+		if (!can_change_equips())
+			return false;
+
+		int32_t item_id = inventory.get_item_id(InventoryType::Id::EQUIP, slot);
+		int8_t owner = pets::equip_owner(part);
+		pets::Wearer wearer = owner >= 0 ? pet_wearer(owner, item_id) : pets::Wearer();
+		int16_t req_level = EquipData::get(item_id).get_reqstat(MapleStat::Id::LEVEL);
+
+		if (const char *refusal = pets::refuse_equip(part, req_level, wearer))
+		{
+			UI::get().emplace<UIOk>(refusal, [](bool)
+			{});
+			return false;
+		}
+
+		return true;
+	}
+
+	pets::Wearer UIItemInventory::pet_wearer(uint8_t index, int32_t item_id) const
+	{
+		pets::Wearer wearer;
+		Optional<PetLook> pet = Stage::get().get_player().get_pet(index);
+
+		if (!pet)
+			return wearer;
+
+		int32_t kind = pet->get_itemid();
+		const PetData &data = PetData::get(kind);
+
+		wearer.out = true;
+		// Clothes are drawn for the kinds they were made for.
+		wearer.suits = item_id / 10000 == 180
+					   && nl::nx::character["PetEquip"]["0" + std::to_string(item_id) + ".img"][std::to_string(kind)];
+		wearer.name_tag = data.get_name_tag() != 0;
+		wearer.chat_balloon = data.get_balloon() != 0;
+		wearer.level = inventory.get_pet_level(pet->get_serial());
+
+		return wearer;
+	}
+
+	void UIItemInventory::wear_pet_equip(int16_t slot, int32_t item_id) const
+	{
+		Player &player = Stage::get().get_player();
+		std::array<pets::Wearer, 3> wearers;
+
+		for (uint8_t i = 0; i < wearers.size(); i++)
+			wearers[i] = pet_wearer(i, item_id);
+
+		std::vector<pets::EquipChoice> choices = pets::equip_choices(item_id, wearers);
+
+		auto wear = [slot, item_id](int16_t part)
+		{
+			auto window = UI::get().get_element<UIItemInventory>();
+
+			// The item may have moved while the pet was chosen.
+			if (!window || window->inventory.get_item_id(InventoryType::Id::EQUIP, slot) != item_id
+				|| !window->can_wear_pet_equip(slot, part))
+				return;
+
+			int16_t worn = window->inventory.equip_position(slot, static_cast<EquipSlot::Id>(part));
+
+			Stage::get().get_player().request(EquipItemPacket(slot, worn), ExclRequest::WAIT);
+			Sound(Sound::Name::DRAGEND).play();
+		};
+
+		if (choices.size() == 1)
+		{
+			wear(choices[0].part);
+		} else if (choices.size() > 1)
+		{
+			std::vector<UIPetChooser::Pet> shown;
+
+			for (const pets::EquipChoice &choice : choices)
+			{
+				Optional<PetLook> look = player.get_pet(choice.pet);
+				Optional<const Pet> pet = inventory.get_pet(look->get_serial());
+
+				if (pet)
+					shown.push_back({ look->get_itemid(), pet->get_name(), pet->get_level(),
+									  static_cast<int16_t>(pet->get_closeness()) });
+				else
+					shown.push_back({ look->get_itemid(), "", 0, 0 });
+			}
+
+			UI::get().emplace<UIPetChooser>(std::move(shown), [wear, choices](size_t index)
+			{
+				wear(choices[index].part);
+			});
+		}
 	}
 
 	int16_t UIItemInventory::slot_by_position(Point<int16_t> cursorpos) const
@@ -1272,7 +1382,18 @@ namespace ms
 		switch (sourcetab)
 		{
 			case InventoryType::Id::EQUIP:
-				if (eqsource == eqslot)
+				if (std::optional<std::array<int16_t, 3>> parts = pets::equip_parts(item_id))
+				{
+					// Pet equipment goes on the cell it was dropped on, of
+					// the pet whose tab is open (FUN_004f1b67).
+					if (std::find(parts->begin(), parts->end(), eqslot) != parts->end()
+						&& parent.can_wear_pet_equip(source, eqslot))
+					{
+						int16_t worn = Stage::get().get_player().get_inventory().equip_position(source, eqslot);
+
+						Stage::get().get_player().request(EquipItemPacket(source, worn), ExclRequest::WAIT);
+					}
+				} else if (eqsource == eqslot)
 				{
 					int16_t worn = Stage::get().get_player().get_inventory().equip_position(source, eqslot);
 

@@ -54,6 +54,7 @@ namespace ms
 
 		kind = nl::nx::string["Pet.img"][strid]["name"].get_string();
 		balloon = static_cast<int8_t>(src["info"]["chatBalloon"].get_integer());
+		name_tag = static_cast<int8_t>(src["info"]["nameTag"].get_integer());
 
 		nl::node interact = src["interact"];
 
@@ -93,6 +94,11 @@ namespace ms
 	int8_t PetData::get_balloon() const
 	{
 		return balloon;
+	}
+
+	int8_t PetData::get_name_tag() const
+	{
+		return name_tag;
 	}
 
 	const std::vector<pets::Command> &PetData::get_commands() const
