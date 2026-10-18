@@ -365,8 +365,10 @@ the v83 book from `UIClassic.nx`, laid out from 2008 footage:
   three, four and five. These come from `String.nx/MonsterBook.img`.
 - Right-clicking a collected card offers SET AS COVER / REMOVE COVER.
 
-A new card also prints "[Card name] has been successfully registered in the
-Monster Book." in the chat log in pink (`#FFA194`, from footage).
+A new card also prints "[Card name] has been successfully recorded on the
+Monster Book." in the chat log, and a card for a full page prints "This card
+is already full in the Monster Book. This card will disappear.". Both use
+chat type 0xc, as in v83 (`#FFAFAF`).
 ## Mob statuses
 
 Players' skills put temporary statuses on mobs (`game::MobStat`, by their
