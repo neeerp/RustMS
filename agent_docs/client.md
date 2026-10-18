@@ -434,11 +434,12 @@ side yet.
 | Maple Messenger (`UIMessenger`) | Implemented |
 | Trade (`UITradingRoom`, `UITradeInvite`) | Implemented, without cash trades |
 | Storage (`UIStorage`) | Implemented; see `inventory.md` |
+| Continent ships, station wall clocks | Docking ships and the Balrog's ship, CONTI_MOVE/CONTI_STATE, CLOCK kind 1; see `ships.md` |
 | Player shops, mini-games, memo/mail | No UI, no handlers |
 | Pets, mounts, summons, reactors beyond hit/spawn | Partial or absent (`Reactor` TODOs) |
 | Party/guild/boss quests, events, MTS | Absent |
 
-51 outbound opcodes are defined (`Net/OutPacket.h`) and 63 inbound handlers
+74 outbound opcodes are defined (`Net/OutPacket.h`) and 111 inbound handlers
 are registered (`Net/PacketSwitch.cpp`). Anything not listed there is silently ignored by the client.
 
 ## Movement physics

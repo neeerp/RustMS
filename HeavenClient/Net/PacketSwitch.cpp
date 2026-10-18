@@ -100,6 +100,9 @@ namespace ms
 		MESSENGER = 313,
 		PLAYER_INTERACTION = 314,
 		FIELD_EFFECT = 138,
+		CLOCK = 147,
+		CONTI_MOVE = 148,
+		CONTI_STATE = 149,
 
 		/// MapObject
 		SPAWN_CHAR = 160,
@@ -213,6 +216,9 @@ namespace ms
 		emplace<SET_FIELD, SetFieldHandler>();
 		emplace<BLOCKED_MAP, BlockedMapHandler>();
 		emplace<BLOCKED_SERVER, BlockedServerHandler>();
+		emplace<CLOCK, ClockHandler>();
+		emplace<CONTI_MOVE, ContiMoveHandler>();
+		emplace<CONTI_STATE, ContiStateHandler>();
 
 		// MapObject handlers
 		emplace<SPAWN_CHAR, SpawnCharHandler>();

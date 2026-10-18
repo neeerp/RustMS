@@ -537,6 +537,19 @@ namespace ms
 		PlayerMapTransferPacket() : OutPacket(OutPacket::Opcode::PLAYER_MAP_TRANSFER) {}
 	};
 
+	// Asks where the map's ship is, on entering a ship field (v83
+	// FUN_0054db7a). The answer is CONTI_STATE.
+	// Opcode: CONTI_STATE_REQUEST(220)
+	class ContiStateRequestPacket : public OutPacket
+	{
+	public:
+		ContiStateRequestPacket(int32_t mapid, uint8_t kind) : OutPacket(OutPacket::Opcode::CONTI_STATE_REQUEST)
+		{
+			write_int(mapid);
+			write_byte(kind);
+		}
+	};
+
 	// Opcode: PLAYER_UPDATE(223)
 	class PlayerUpdatePacket : public OutPacket
 	{

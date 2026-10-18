@@ -263,4 +263,29 @@ namespace ms
 				break;
 		}
 	}
+
+	void ClockHandler::handle(InPacket& recv) const
+	{
+		if (recv.read_byte() != 1)
+			return;
+
+		uint8_t hour = recv.read_byte();
+		uint8_t minute = recv.read_byte();
+		uint8_t second = recv.read_byte();
+		Stage::get().set_clock(hour, minute, second);
+	}
+
+	void ContiMoveHandler::handle(InPacket& recv) const
+	{
+		uint8_t target = recv.read_byte();
+		uint8_t event = recv.read_byte();
+		Stage::get().move_ship(target, event);
+	}
+
+	void ContiStateHandler::handle(InPacket& recv) const
+	{
+		uint8_t state = recv.read_byte();
+		uint8_t flag = recv.read_byte();
+		Stage::get().show_ship_state(state, flag);
+	}
 }

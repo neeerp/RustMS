@@ -171,6 +171,8 @@ if(HEAVENCLIENT_BUILD_TESTS)
     add_test(NAME mob_hurts COMMAND mob_hurts_tests)
     add_executable(mist_layout_tests tests/mist_layout.cpp)
     add_test(NAME mist_layout COMMAND mist_layout_tests)
+    add_executable(ships_tests tests/ships.cpp)
+    add_test(NAME ships COMMAND ships_tests)
     add_executable(status_messages_tests tests/status_messages.cpp Net/InPacket.cpp)
     target_include_directories(status_messages_tests PRIVATE ${PROJECT_SOURCE_DIR}/libs/NoLifeNx)
     add_test(NAME status_messages COMMAND status_messages_tests)
@@ -363,6 +365,9 @@ add_executable(HeavenClient
     Gameplay/MapleMap/MapBackgrounds.h
     Gameplay/MapleMap/MapChars.cpp
     Gameplay/MapleMap/MapChars.h
+    Gameplay/MapleMap/MapClock.cpp
+    Gameplay/MapleMap/MapClock.h
+    Gameplay/MapleMap/ClockRules.h
     Gameplay/MapleMap/MapDrops.cpp
     Gameplay/MapleMap/MapDrops.h
     Gameplay/MapleMap/MapEffect.cpp
@@ -387,6 +392,9 @@ add_executable(HeavenClient
     Gameplay/MapleMap/MapPortals.h
     Gameplay/MapleMap/MapReactors.cpp
     Gameplay/MapleMap/MapReactors.h
+    Gameplay/MapleMap/MapShip.cpp
+    Gameplay/MapleMap/MapShip.h
+    Gameplay/MapleMap/ShipRules.h
     Gameplay/MapleMap/MapTilesObjs.cpp
     Gameplay/MapleMap/MapTilesObjs.h
     Gameplay/MapleMap/MesoDrop.cpp
