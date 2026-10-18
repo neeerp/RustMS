@@ -337,6 +337,10 @@ pub enum WorldAction {
     /// The player summoned or sent back pets (`player.pets` already
     /// changed); show everyone on the map.
     PetsChanged(Vec<game::pet::PetChange>),
+    /// The player held up or put away a chalkboard (`player.chalkboard`
+    /// already changed); refresh their field avatar and show the others
+    /// this CHALKBOARD.
+    ChalkboardChanged(Packet),
     /// Natural HP/MP recovery the client reports; the runtime checks timing.
     NaturalHeal {
         hp: i16,
@@ -663,6 +667,7 @@ fn world_routes() -> &'static HashMap<i16, WorldRoute> {
             (Op::PetCommand, InGame(&world::PetCommandHandler)),
             (Op::PetFood, InGame(&world::PetFoodHandler)),
             (Op::UseCashItem, InGame(&world::UseCashItemHandler)),
+            (Op::CloseChalkboard, InGame(&world::CloseChalkboardHandler)),
             (Op::GiveFame, InGame(&world::GiveFameHandler)),
             (Op::MoveSummon, InGame(&world::MoveSummonHandler)),
             (Op::SummonAttack, InGame(&world::SummonAttackHandler)),
@@ -701,7 +706,7 @@ mod tests {
     fn every_registered_opcode_is_unique_per_server() {
         // The maps would silently drop duplicates; check the table sizes match.
         assert_eq!(login_routes().len(), 13);
-        assert_eq!(world_routes().len(), 68);
+        assert_eq!(world_routes().len(), 69);
     }
 
     #[test]

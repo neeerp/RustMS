@@ -46,7 +46,7 @@ pub fn build_player_enter_field(avatar: &FieldAvatar) -> Result<Packet, NetworkE
     packet.write_int(1)?; // mount level
     packet.write_long(0)?; // mount exp and tiredness
     write_mini_room_box(&mut packet, avatar.mini_room.as_ref())?;
-    packet.write_byte(0)?; // no chalkboard
+    write_chalkboard(&mut packet, avatar.chalkboard.as_deref())?;
     packet.write_byte(0)?; // crush ring
     packet.write_byte(0)?; // friendship ring
     packet.write_byte(0)?; // marriage ring
@@ -158,6 +158,26 @@ pub fn build_cancel_chair() -> Result<Packet, NetworkError> {
     Ok(packet)
 }
 
+/// CHALKBOARD (recv 164): the player holds up a chalkboard with `note`, or
+/// puts it away. The player's own client needs it too: it lets them close
+/// the board by clicking it.
+pub fn build_chalkboard(character_id: i32, note: Option<&str>) -> Result<Packet, NetworkError> {
+    let mut packet = Packet::new_empty();
+    packet.write_short(SendOpcode::Chalkboard as i16)?;
+    packet.write_int(character_id)?;
+    write_chalkboard(&mut packet, note)?;
+    Ok(packet)
+}
+
+/// Whether a chalkboard is up, then its note if it is.
+fn write_chalkboard(packet: &mut Packet, note: Option<&str>) -> Result<(), NetworkError> {
+    packet.write_byte(u8::from(note.is_some()))?;
+    if let Some(note) = note {
+        packet.write_str_with_length(note)?;
+    }
+    Ok(())
+}
+
 pub fn parse_movement_state(
     movement_bytes: &[u8],
     current: (i16, i16, u8),
@@ -262,6 +282,7 @@ mod tests {
             guild: None,
             mini_room: None,
             pets: Vec::new(),
+            chalkboard: None,
         }
     }
 
@@ -360,6 +381,34 @@ mod tests {
     }
 
     #[test]
+    fn spawn_player_carries_the_chalkboard() {
+        let mut avatar = avatar();
+        avatar.chalkboard = Some("selling".into());
+        let packet = build_player_enter_field(&avatar).unwrap();
+
+        let mut expect = Expect::new(&packet.bytes);
+        expect.short(SendOpcode::SpawnPlayer as i16);
+        expect.int(0x0102_0304).byte(10).string("Tester");
+        expect.string("").bytes(&[0; 6]);
+        foreign_buffs(&mut expect);
+        expect.short(100);
+        expect.look(&avatar.look, false);
+        expect.int(0).int(0).int(3010000);
+        expect.short(-120).short(275).byte(4).short(0).byte(0);
+        expect.byte(0).int(1).long(0).byte(0); // pets, mount, no box
+        expect.byte(1).string("selling");
+        expect
+            .byte(0)
+            .byte(0)
+            .byte(0)
+            .byte(0)
+            .byte(0)
+            .byte(0)
+            .byte(0);
+        expect.end();
+    }
+
+    #[test]
     fn spawn_player_carries_the_buffs_others_see() {
         let mut avatar = avatar();
         let shown = |stat, value, skill_id| ShownBuff {
@@ -424,6 +473,23 @@ mod tests {
         let cancel = build_cancel_chair().unwrap();
         Expect::new(&cancel.bytes)
             .short(SendOpcode::CancelChair as i16)
+            .byte(0)
+            .end();
+    }
+
+    #[test]
+    fn a_chalkboard_goes_up_and_away() {
+        let up = build_chalkboard(0x0102_0304, Some("selling")).unwrap();
+        Expect::new(&up.bytes)
+            .short(SendOpcode::Chalkboard as i16)
+            .int(0x0102_0304)
+            .byte(1)
+            .string("selling")
+            .end();
+        let away = build_chalkboard(0x0102_0304, None).unwrap();
+        Expect::new(&away.bytes)
+            .short(SendOpcode::Chalkboard as i16)
+            .int(0x0102_0304)
             .byte(0)
             .end();
     }

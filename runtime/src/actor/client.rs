@@ -31,7 +31,7 @@ use net::cash_shop::{CashShopRequest, Expansion};
 use net::dialogue::{Conversation, NpcInteraction};
 use net::login_world::resolve_login_channel;
 use net::packet::build;
-use net::packet::build::world::field::parse_movement_state;
+use net::packet::build::world::field::{build_chalkboard, parse_movement_state};
 use net::packet::build::world::messaging::{build_find_result, FindLocation};
 use net::packet::build::world::pet::PetGone;
 use net::packet::op::RecvOpcode;
@@ -388,6 +388,15 @@ impl ClientActor {
                 .await?
             }
             WorldAction::BuffsChanged(announce) => self.show_buffs(announce).await?,
+            WorldAction::ChalkboardChanged(announce) => {
+                let avatar = self.in_game()?.player.field_avatar(0, 0, 0);
+                self.send_to_field(FieldMessage::UpdateAvatar {
+                    client_id: self.client_id,
+                    avatar,
+                    announce: vec![announce],
+                })
+                .await?
+            }
             WorldAction::PetsChanged(changes) => {
                 self.pets_changed(changes, PetGone::Dismissed).await?
             }
@@ -563,6 +572,10 @@ impl ClientActor {
         let handle = self.handle();
         let game = self.in_game_mut()?;
         game.position = (spawn.x, spawn.y);
+        // The client puts a chalkboard away in the Free Market rooms.
+        if net::personal_shop::allowed_on(game.player.stats.map_id) {
+            game.player.chalkboard = None;
+        }
         let avatar = game.player.field_avatar(spawn.x, spawn.y, spawn.stance);
         let party = self.party_id;
         self.send_to_field(FieldMessage::Join {
@@ -574,6 +587,11 @@ impl ClientActor {
         self.set_wall_clock().await?;
         self.bring_summons(spawn).await?;
         self.bring_pets(&avatar).await?;
+        if let Some(note) = &avatar.chalkboard {
+            // The player's client shows its own board only when told.
+            self.send(&mut build_chalkboard(avatar.id, Some(note))?)
+                .await?;
+        }
         self.run_map_enter_script().await
     }
 

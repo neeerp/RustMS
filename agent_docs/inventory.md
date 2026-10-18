@@ -189,6 +189,24 @@ knows every client's channel. One exclusive INVENTORY_OPERATION takes the
 megaphone first. Anything refused (too long, too low, an item that isn't
 there, Maple TV) gets only an empty stat change to unlock the client.
 
+### Chalkboard
+
+A chalkboard (537xxxx, `world/chalkboard.rs`) is used through USE_CASH_ITEM
+with its note, 1 to 40 bytes, and isn't used up. The note goes in
+`Player.chalkboard` (not saved) and the field avatar. CHALKBOARD (`0xA4`:
+character id, 1, note) goes to the holder and the map, then an empty stat
+change unlocks the holder's client; the holder's client needs the 164 too,
+since it only lets the player click the board away once told. SPAWN_PLAYER
+writes the board (1 and the note, or 0) after the mini room balloon, so
+later arrivals see it. CLOSE_CHALKBOARD (`0x32`, empty) puts it away with
+CHALKBOARD `id, 0` to the holder and the map.
+
+The board comes along to the next map, where the client actor tells the
+holder's client again, as it forgets it on a map change. Entering a map
+where shops open (`info/personalShop`, the Free Market rooms) puts it away,
+as the v83 client does there; the server refuses a board in those maps too.
+Losing the last chalkboard doesn't put the board away yet.
+
 ## NPC shops
 
 Clicking an NPC that keeps a shop (`content::shops()`, from the pack's
@@ -443,7 +461,9 @@ test covers the fit, the White Scroll prompt and the chat lines.
 `net`'s megaphone handler covers each kind's line, scope and refusals;
 `megaphones` (integration) hears a plain megaphone on the speaker's channel
 and the super, item and triple ones on another, then finds the used slot
-empty.
+empty. `net`'s chalkboard handler covers the board, the refused notes and
+closing it; `chalkboard` (integration) holds one up for a watcher, takes it
+to another map and back, closes it, and has a Free Market room put it away.
 `net::storage` covers each request and its refusals. `storage` (integration)
 opens Mr. Lee's storage, stores part of a stack and a whole one for the fee,
 is refused too many and too many mesos, moves mesos in, sorts, takes items

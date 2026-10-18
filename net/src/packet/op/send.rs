@@ -50,6 +50,7 @@ pub enum SendOpcode {
     SpawnPlayer = 0xA0,
     RemovePlayerFromMap = 0xA1,
     ChatText = 0xA2,
+    Chalkboard = 0xA4,
     UpdateCharBox = 0xA5,
     ShowScrollEffect = 0xA7,
     SpawnPet = 0xA8,

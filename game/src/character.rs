@@ -135,6 +135,8 @@ pub struct FieldAvatar {
     pub mini_room: Option<MiniRoomBox>,
     /// The summoned pets, in list order. The field moves them.
     pub pets: Vec<FieldPet>,
+    /// The note on the chalkboard the player holds up, if any.
+    pub chalkboard: Option<String>,
 }
 
 /// The balloon over a player who keeps a mini room open, which others
@@ -180,6 +182,8 @@ pub struct Player {
     /// The pets whose last command called them by name; their answer shows
     /// in their own chat balloon. Not saved.
     pub pets_named: Vec<i64>,
+    /// The note on the chalkboard the player holds up, if any; not saved.
+    pub chalkboard: Option<String>,
     dirty: bool,
 }
 
@@ -211,6 +215,7 @@ impl Player {
             guild: None,
             pets: Vec::new(),
             pets_named: Vec::new(),
+            chalkboard: None,
             dirty: false,
         }
     }
@@ -294,6 +299,7 @@ impl Player {
                     foothold: 0,
                 })
                 .collect(),
+            chalkboard: self.chalkboard.clone(),
         }
     }
 

@@ -69,9 +69,9 @@ tag. Pet equipment, looting and auto potions are not done yet; `v83ref` report
   it either.
 - **Cash food.** USE_CASH_ITEM (`0x4F` in, `world/cash_item.rs`) is the Cash
   slot, the item id, the item's own fields and the tick. Cash pet food
-  (`524xxxx`), the pet name tag and megaphones (`inventory.md`) are used so
-  far; any other item, or one not in that slot, gets an empty stat change to
-  unlock the client. The first pet out, in list order, whose id is in the
+  (`524xxxx`), the pet name tag, megaphones and the chalkboard
+  (`inventory.md`) are used so far; any other item, or one not in that slot,
+  gets an empty stat change to unlock the client. The first pet out, in list order, whose id is in the
   food's `spec/0..n` eats: fullness 100 and `spec/inc` closeness (100), and
   it always enjoys it. The server answers with 76
   `0, index`, then the 174, inventory operation and level-up effect that

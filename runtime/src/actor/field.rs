@@ -1684,6 +1684,7 @@ mod tests {
             buffs: Vec::new(),
             mini_room: None,
             pets: Vec::new(),
+            chalkboard: None,
         }
     }
 
