@@ -78,6 +78,17 @@ async fn buddies_see_each_others_channel_once_both_agree() {
     until(&mut alice.connection, &mut a, |t| t.buddy_errors.len() == 2).await;
     assert_eq!(a.buddy_errors[1], ALREADY_ADDED);
 
+    // Logging in again carries the request in the list, for the client to
+    // ask about once the map has loaded, rather than asking again.
+    drop(bobby);
+    let mut bobby = relogin(&bobby_config).await;
+    let mut b = Trace::default();
+    until(&mut bobby.connection, &mut b, |t| !t.buddy_lists.is_empty()).await;
+    assert!(b.buddy_lists[0].is_empty());
+    assert_eq!(b.buddy_list_requests[0], [alice_id]);
+    read_for(&mut bobby.connection, &mut b, 300).await;
+    assert!(b.buddy_requests.is_empty());
+
     // Accepting shows both of them the other's channel.
     send(&mut bobby.connection, with_id(2, alice_id)).await;
     until(&mut bobby.connection, &mut b, |t| {

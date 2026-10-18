@@ -34,6 +34,7 @@
 #include "../../Gameplay/Stage.h"
 #include "../../Graphics/GraphicsGL.h"
 #include "../../Net/Packets/MessagingPackets.h"
+#include "../../Util/CharacterName.h"
 #include "../../Util/ChatWrap.h"
 #include "../../Util/NxFiles.h"
 
@@ -44,7 +45,8 @@ namespace ms
 		enum class WhisperParseResult
 		{
 			NotWhisper,
-			InvalidWhisper,
+			NoTarget,
+			TargetOnly,
 			ValidWhisper
 		};
 
@@ -68,19 +70,19 @@ namespace ms
 
 			size_t target_start = input.find_first_not_of(' ', command_length);
 			if (target_start == std::string::npos)
-				return WhisperParseResult::InvalidWhisper;
+				return WhisperParseResult::NoTarget;
 
 			size_t target_end = input.find(' ', target_start);
 			target = input.substr(target_start, target_end - target_start);
-			if (target.empty() || target_end == std::string::npos)
-				return WhisperParseResult::InvalidWhisper;
+			if (target_end == std::string::npos)
+				return WhisperParseResult::TargetOnly;
 
 			size_t message_start = input.find_first_not_of(' ', target_end);
 			if (message_start == std::string::npos)
-				return WhisperParseResult::InvalidWhisper;
+				return WhisperParseResult::TargetOnly;
 
 			message = input.substr(message_start);
-			return message.empty() ? WhisperParseResult::InvalidWhisper : WhisperParseResult::ValidWhisper;
+			return WhisperParseResult::ValidWhisper;
 		}
 
 		// v83 compares whisper targets without regard to case (_stricmp).
@@ -221,6 +223,7 @@ namespace ms
 				{
 					if (msg.size() > 0)
 					{
+						std::string whisper_to;
 						size_t last = msg.find_last_not_of(' ');
 
 						if (last != std::string::npos)
@@ -230,7 +233,8 @@ namespace ms
 							std::string message;
 							WhisperParseResult whisper_result = parse_whisper_command(msg, target, message);
 
-							if (whisper_result == WhisperParseResult::ValidWhisper
+							if ((whisper_result == WhisperParseResult::ValidWhisper
+								|| whisper_result == WhisperParseResult::TargetOnly)
 								&& same_name(target, Stage::get().get_player().get_stats().get_name()))
 							{
 								// v83 refuses before sending anything (FUN_0052c40c).
@@ -240,9 +244,21 @@ namespace ms
 							{
 								send_whisper(target, message);
 							}
-							else if (whisper_result == WhisperParseResult::InvalidWhisper)
+							// A name alone switches to whispering to it, if it could
+							// be a character's (0x52e4b5).
+							else if (whisper_result == WhisperParseResult::TargetOnly
+								&& !character_name_valid(target))
 							{
-								send_chatline("Usage: /w <name> <message>", LineType::RED);
+								send_chatline("Incorrect ID.", LineType::SKILL);
+							}
+							else if (whisper_result == WhisperParseResult::TargetOnly)
+							{
+								whisper_to = target;
+							}
+							// v83 goes back to the last name whispered to. HC keeps
+							// no list of them, so nothing happens.
+							else if (whisper_result == WhisperParseResult::NoTarget)
+							{
 							}
 							else if (is_command(msg, "/?") || is_command(msg, "/Help"))
 							{
@@ -307,6 +323,9 @@ namespace ms
 						}
 
 						chatfield.change_text("");
+
+						if (!whisper_to.empty())
+							start_whisper(whisper_to);
 					} else
 					{
 						toggle_chatfield();
@@ -428,6 +447,8 @@ namespace ms
 
 		for (auto iter : message_cooldowns)
 			iter.second -= Constants::TIMESTEP;
+
+		cost_cooldown -= Constants::TIMESTEP;
 
 		if (whisper_waiting && std::chrono::steady_clock::now() - whisper_sent > WHISPER_WAIT)
 			whisper_waiting = false;
@@ -670,17 +691,30 @@ namespace ms
 		rowpos = rowmax;
 	}
 
-	void UIChatBar::display_message(Messages::Type line, UIChatBar::LineType type)
+	void UIChatBar::display_message(Messages::Type line, UIChatBar::LineType type, const std::string &item)
 	{
-		if (message_cooldowns[line] > 0)
-			return;
+		if (Messages::is_cost(line))
+		{
+			bool quiet = cost_cooldown > 0;
+			cost_cooldown = COST_MESSAGE_COOLDOWN;
+
+			if (quiet)
+				return;
+		} else
+		{
+			if (message_cooldowns[line] > 0)
+				return;
+
+			message_cooldowns[line] = line == Messages::ATTACK_NOWEAPON ? COST_MESSAGE_COOLDOWN : MESSAGE_COOLDOWN;
+		}
 
 		std::string message = Messages::messages[line];
-		send_chatline(message, type);
+		size_t name = message.find("%s");
 
-		bool slow = line == Messages::SKILL_HPCOST || line == Messages::SKILL_MPCOST ||
-			line == Messages::ATTACK_NOWEAPON;
-		message_cooldowns[line] = slow ? COST_MESSAGE_COOLDOWN : MESSAGE_COOLDOWN;
+		if (name != std::string::npos)
+			message.replace(name, 2, item);
+
+		send_chatline(message, type);
 	}
 
 	void UIChatBar::toggle_chat()

@@ -23,6 +23,7 @@
 #include "../Combat/HitPoint.h"
 #include "../Combat/MonsterMagnet.h"
 #include "../Combat/Prepare.h"
+#include "../Combat/ShotPath.h"
 #include "../../Character/SkillId.h"
 #include "../../Constants.h"
 #include "../../Util/Misc.h"
@@ -2062,6 +2063,13 @@ namespace ms
 				hitchance = 1.0f;
 				critical = 0.0f;
 				break;
+			// Shadow Meso misses as a blow does, but goes through defense.
+			case Attack::DamageType::DMG_MESO:
+				mindamage = attack.mindamage;
+				maxdamage = attack.maxdamage;
+				hitchance = calculate_hitchance(leveldelta, attack.accuracy);
+				critical = attack.critical;
+				break;
 		}
 
 		std::generate(
@@ -2080,9 +2088,10 @@ namespace ms
 	{
 		using namespace magic_damage;
 
-		// A blow meets the same statuses a spell does (FUN_0078df87), but
-		// fixed damage skips them.
-		bool weapon = attack.damagetype == Attack::DamageType::DMG_WEAPON;
+		// A blow or Shadow Meso meets the same statuses a spell does
+		// (FUN_0078df87), but fixed damage skips them.
+		bool weapon = attack.damagetype == Attack::DamageType::DMG_WEAPON ||
+			attack.damagetype == Attack::DamageType::DMG_MESO;
 
 		if (weapon && status_value(MobStatParser::DISABLE))
 			return std::pair<int32_t, bool>(0, false);
@@ -2100,7 +2109,10 @@ namespace ms
 		double damage = randomizer.next_real(mindamage, maxdamage);
 		bool iscritical = randomizer.below(critical);
 
-		if (iscritical)
+		if (attack.damagetype == Attack::DamageType::DMG_MESO)
+			damage = shot_path::meso_damage(damage, iscritical, attack.mesocritical,
+				static_cast<int16_t>(std::max(level - attack.playerlevel, 0)));
+		else if (iscritical)
 			damage *= 1.5;
 
 		// Sacrifice goes through a Power Guard Up.

@@ -81,8 +81,10 @@ namespace ms
 				size_t close = text.find('#', i + 2);
 				std::string arg = close == std::string::npos ? std::string() : text.substr(i + 2, close - i - 2);
 
-				auto id = [&]() { return static_cast<int32_t>(std::stol(arg)); };
-				bool numeric = is_digits(arg);
+				// v83 writes ids as "#v2000002:#" as well as "#v2000002#".
+				std::string number = !arg.empty() && arg.back() == ':' ? arg.substr(0, arg.size() - 1) : arg;
+				auto id = [&]() { return static_cast<int32_t>(std::stol(number)); };
+				bool numeric = is_digits(number);
 
 				switch (tag)
 				{
@@ -112,7 +114,7 @@ namespace ms
 					case 'i':
 					case 's':
 						// Item and skill icons.
-						if (numeric) { out += image(tag, arg); i = close + 1; continue; }
+						if (numeric) { out += image(tag, number); i = close + 1; continue; }
 						break;
 					case 'f':
 					case 'F':
@@ -174,6 +176,39 @@ namespace ms
 			}
 
 			return result;
+		}
+
+		// The colour code (#k, #r, #g, #b or #d) in effect at `pos`, or
+		// nothing, as for "#d" before each line of an NPC's quest menu.
+		inline std::string colour_at(const std::string& text, size_t pos)
+		{
+			std::string colour;
+
+			for (size_t i = 0; i + 1 < std::min(pos, text.size()); i++)
+			{
+				if (text[i] != '#')
+					continue;
+
+				char tag = text[i + 1];
+
+				if (tag == 'L')
+				{
+					// Skip a choice's id: "#L1#bananas" is not blue.
+					i = text.find('#', i + 2);
+
+					if (i == std::string::npos)
+						break;
+
+					continue;
+				}
+
+				if (std::string("krgbd").find(tag) != std::string::npos)
+					colour = text.substr(i, 2);
+
+				i++;
+			}
+
+			return colour;
 		}
 
 		// Where a choice starts and where its label ends, in text marked by

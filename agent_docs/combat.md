@@ -95,8 +95,12 @@ shot's `bulletCount`, otherwise `attackCount`), the MP spent, and the cap: a
 `fixdamage` skill (Three Snails: 10/25/40) hits for at most that, a `mad`
 spell for twice v83's magic maximum (`max_magic_damage`: ((M² / 1000 + M) / 30
 + INT / 200) × `mad`, where M is INT plus equipment magic attack), a `damage`
-skill for that percentage of the basic cap, and a skill with none is not an
-attack. A spell must name a skill. Too little MP refuses the attack.
+skill for that percentage of the basic cap, Shadow Meso for v83's highest
+roll (ten times one and a half its `moneyCon`, raised by its `x` percent on a
+critical), and a skill with none is not an attack. A spell must name a skill.
+Too little MP refuses the attack, as do too few mesos for the skill's
+`moneyCon` (Shadow Meso's, raised by Shadow Partner's `y` percent while that
+buff is on, as the v83 client checks).
 HeavenClient sends a skill as the attack v83's `CUserLocal::DoActiveSkill`
 makes it, whatever the weapon: a swing, a shot, or a spell
 (`SkillData::flags_of`). Any other skill goes out as SPECIAL_MOVE. Skills
@@ -106,7 +110,8 @@ The field shows
 the attack under its own opcode (with the skill id and level, so others see
 the skill's effect, and for a shot the star, arrow, or bullet it fired) to the
 others, applies the damage, sends the attacker SHOW_MONSTER_HP, and on death
-KILL_MONSTER to everyone; the attacker gets the MP left as STAT_CHANGED.
+KILL_MONSTER to everyone; the attacker gets the MP and mesos left as
+STAT_CHANGED.
 
 A shot fires from the USE slot the client names, as in v83 (`shot_ammo`). The
 item there must fit the weapon (stars for claws, arrows for bows and the
@@ -119,6 +124,33 @@ Energy Orb, and some Cygnus and Aran skills; `AMMO_FREE`) use none. The
 server tracks neither Shadow Partner, which doubles the cost, nor Soul
 Arrow's buff, nor the cash ammo slot. HeavenClient, like v83, fires from the
 first fitting stack that covers the cost (`Inventory::find_bulletslot`).
+
+HeavenClient refuses a skill before sending it, with v83's lines in the skill
+chat colour (`Player::can_use`, `Skill::can_use`, `Combat::can_use_move`). The
+checks run in v83's order. A skill cooling down comes first. Then come the
+costs: HP, MP, mesos (`moneyCon`; Shadow Meso's grows by Shadow Partner's `y`
+percent while that buff is on), and the item (`itemCon`, named in the line).
+The four cost lines share one two-second throttle, so a second refusal within
+two seconds prints nothing. An attack with no weapon says so next. Then the
+weapon (`skill_weapon::check`). A shot needs its job's weapon whatever
+`Skill.img` says: a bow or crossbow for archers, a claw for thieves, a gun for
+pirates, nothing for anyone else, with eight exceptions such as Taunt and
+Energy Orb. Brandish needs a sword or an axe, Corkscrew Blow a knuckle,
+Grenade a gun, and Poison Bomb a claw. These say "You cannot use this skill
+with the weapon you're equipped with." The held shots (Hurricane, Piercing
+Arrow, Rapid Fire) refuse anything but a bow, crossbow, or gun without a word.
+Any other mismatch with the weapon `Skill.img` names, or the knuckle, sword,
+or wand rules a few pirate and Cygnus skills have instead, says "This skill
+cannot be used with the equipped item." Ammo comes last. RustMS charges a
+special move's `itemCon`, and Shadow Meso exactly the mesos the client checks
+for. The skill's description gives each level a range around its
+`moneyCon`, so v83's server may have charged a varying amount.
+
+HeavenClient rolls Shadow Meso's hits as v83 does (`shot_path::meso_damage`,
+FUN_0078df87): ten times a whole number of mesos between half and one and a
+half its `moneyCon`, with its own `prop` and `x` for a critical in place of
+the user's, then a percent less for each level the mob is above the user. It
+misses as a blow does but ignores the mob's defense.
 
 HeavenClient picks targets as v83 does (`Combat::find_targets`). Melee and
 magic attacks take the mobs whose body overlaps the attack range in the order
@@ -284,7 +316,9 @@ so every request is answered, refusals with an empty STAT_CHANGED.
 - **AP** (`Player::spend_ap`): SPEND_AP names the stat by its STAT_CHANGED
   bit: STR, DEX, INT, LUK, MaxHP (0x800), or MaxMP (0x2000). Base stats stop
   at 999 and max HP/MP at 30,000. One AP adds the middle of v83's per-job
-  HP/MP range (`ap_growth`; a beginner gets +10/+7).
+  HP/MP range (`ap_growth`; a beginner gets +10/+7). As in v83, the client
+  only asks for MaxHP or MaxMP from level 20, and then only after the player
+  confirms a warning that it may leave the character weaker.
 - **SP** (`Player::raise_skill`): the skill must belong to the character's
   job or one it advanced through (`game::skill::in_job_tree`). Its `Skill.nx`
   template (`game_data::skills`) gives the max level and the `req` skills it
@@ -363,8 +397,10 @@ the v83 book from `UIClassic.nx`, laid out from 2008 footage:
   three, four and five. These come from `String.nx/MonsterBook.img`.
 - Right-clicking a collected card offers SET AS COVER / REMOVE COVER.
 
-A new card also prints "[Card name] has been successfully registered in the
-Monster Book." in the chat log in pink (`#FFA194`, from footage).
+A new card also prints "[Card name] has been successfully recorded on the
+Monster Book." in the chat log, and a card for a full page prints "This card
+is already full in the Monster Book. This card will disappear.". Both use
+chat type 0xc, as in v83 (`#FFAFAF`).
 ## Mob statuses
 
 Players' skills put temporary statuses on mobs (`game::MobStat`, by their
@@ -818,7 +854,8 @@ Setting restores the same table.
 
 `field_mobs` unit tests cover spawning, control hand-off (including by
 distance report), movement, attacks' MP, damage, EXP sharing, and respawn;
-`net::combat` covers parsing, the damage cap, and the broadcast, and the
+`net::combat` covers parsing, the damage cap, Shadow Meso's mesos, and the
+broadcast, and the
 TAKE_DAMAGE handler's bounds by attack index; `game::mob_damage` covers the
 StandardPDD table and the bound. HeavenClient's `mob_damage_tests` and
 `mob_attack_tests` cover the damage and miss formulas and the attacks'

@@ -356,20 +356,29 @@ namespace ms
 
 	void MonsterBookSetCardHandler::handle(InPacket& recv) const
 	{
-		bool added = recv.read_bool();
+		// v83 writes both lines in chat type 0xc and reads nothing more for a full card (FUN_00a081b8).
+		auto chatbar = UI::get().get_element<UIChatBar>();
+
+		if (!recv.read_bool())
+		{
+			if (chatbar)
+				chatbar->send_chatline("This card is already full in the Monster Book. This card will disappear.",
+									   UIChatBar::LineType::SKILL);
+
+			return;
+		}
+
 		int32_t card = recv.read_int();
 		int32_t level = recv.read_int();
 
-		if (!added)
-			return;
-
 		Stage::get().get_player().get_monsterbook().set_card(card, level);
 
-		if (auto chatbar = UI::get().get_element<UIChatBar>())
+		if (chatbar)
 		{
 			const std::string &name = ItemData::get(card).get_name();
 
-			chatbar->send_chatline("[" + name + "] has been successfully registered in the Monster Book.", UIChatBar::LineType::PINK);
+			chatbar->send_chatline("[" + name + "] has been successfully recorded on the Monster Book.",
+								   UIChatBar::LineType::SKILL);
 		}
 
 		if (auto monsterbook = UI::get().get_element<UIMonsterBook>())

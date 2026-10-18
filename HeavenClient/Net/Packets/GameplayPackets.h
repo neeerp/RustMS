@@ -313,13 +313,15 @@ namespace ms
 		}
 	};
 
-	// Joins a party
+	// Joins a party. v83 follows the id with the invitation's party-search
+	// byte (FUN_00a3e31c, FUN_00522585).
 	class JoinPartyPacket : public PartyOperationPacket
 	{
 	public:
-		JoinPartyPacket(int32_t party_id) : PartyOperationPacket(PartyOperationPacket::Operation::JOIN)
+		JoinPartyPacket(int32_t party_id, int8_t search = 0) : PartyOperationPacket(PartyOperationPacket::Operation::JOIN)
 		{
 			write_int(party_id);
+			write_byte(search);
 		}
 	};
 
@@ -353,17 +355,20 @@ namespace ms
 		}
 	};
 
-	// Turns down a party invitation
+	// Turns down a party invitation: X on the invite (DENIED), or one that
+	// came while another was still showing (BUSY) (FUN_00a3e31c, FUN_0051fff5).
 	// Opcode: DENY_PARTY_REQUEST(125)
 	class DenyPartyRequestPacket : public OutPacket
 	{
 	public:
-		static constexpr int8_t DENIED = 0x17;
+		static constexpr int8_t BUSY = 0x16, DENIED = 0x17;
 
-		DenyPartyRequestPacket(const std::string& inviter) : OutPacket(OutPacket::Opcode::DENY_PARTY_REQUEST)
+		DenyPartyRequestPacket(int8_t reason, const std::string& inviter, const std::string& self) :
+			OutPacket(OutPacket::Opcode::DENY_PARTY_REQUEST)
 		{
-			write_byte(DENIED);
+			write_byte(reason);
 			write_string(inviter);
+			write_string(self);
 		}
 	};
 
@@ -373,7 +378,8 @@ namespace ms
 	public:
 		enum Operation : int8_t
 		{
-			CREATE = 2
+			CREATE = 2,
+			INVITE = 5
 		};
 
 		GuildOperationPacket(Operation op) : OutPacket(OutPacket::Opcode::GUILD_OPERATION)
@@ -387,6 +393,16 @@ namespace ms
 	{
 	public:
 		CreateGuildPacket(const std::string& name) : GuildOperationPacket(GuildOperationPacket::Operation::CREATE)
+		{
+			write_string(name);
+		}
+	};
+
+	// Invites a character to the player's guild
+	class InviteToGuildPacket : public GuildOperationPacket
+	{
+	public:
+		InviteToGuildPacket(const std::string& name) : GuildOperationPacket(GuildOperationPacket::Operation::INVITE)
 		{
 			write_string(name);
 		}

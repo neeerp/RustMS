@@ -4,11 +4,22 @@
 
 Quests run the way the original client ran them:
 
-1. **HeavenClient** reads `Quest.nx` itself. Clicking an NPC lists its quests
-   in the NPC chat window under the v83 `UtilDlgEx/list*` headers ("QUEST
-   THAT CAN BE COMPLETED", "QUEST IN PROGRESS", "QUEST AVAILABLE"), with
-   "ETC: I have something to tell you." for the NPC's normal speech, as in
-   period footage. Picking a quest plays its `Say.img` pages locally
+1. **HeavenClient** reads `Quest.nx` itself. Clicking an NPC that has quests
+   lists them in the NPC chat window under its `String/Npc.img` `d0`
+   greeting, grouped as v83 groups them (`select_quest_menu`):
+   "QUEST THAT CAN BE COMPLETED" (started, and `Check.img/<id>/1` passes
+   with this NPC), "QUEST AVAILABLE", then "QUEST IN PROGRESS" (its other
+   started quests, such as a hand-in still missing its items), under the
+   `UtilDlgEx/list*` headers. Each line is v83's `quest_menu_line`: the
+   QuestInfo `type` in red, the name, and "(Pre-completion enabled)" or
+   "(In Progress)". If the NPC has a script (`Npc/<id>.img/info/script`,
+   the last entry dated for today), an "ETC" line named by
+   `Etc/ScriptInfo.img/<script>` (or the script itself) asks the server to
+   talk. Party quests (1200-1399) are never listed. With nothing to list,
+   an NPC with a script goes straight to the server; one without says `d1`
+   if all its quests are done for good, and `d0` otherwise, without the
+   server. NPCs without quests always go to the server. Picking a quest
+   plays its `Say.img` pages locally
    (`Gameplay/QuestConversation.cpp`); an offer's yes/no page shows ACCEPT
    and DECLINE.
 2. When the player accepts or finishes, the client sends `QUEST_ACTION`
@@ -21,13 +32,15 @@ Quests run the way the original client ran them:
    atomically (`db::quest::start`/`complete`/`forfeit`).
 4. It answers with the quest record (`SHOW_STATUS_INFO` mode 1), EXP and
    mesos with their stats if any (both shown in the chat log, as mode 3 with
-   its in-chat flag and mode 5), and `UPDATE_QUEST_INFO` mode 8 (quest, NPC, next quest). A
-   nonzero next quest (`Act/1/nextQuest`) makes the client continue straight
-   into that quest's offer once the current conversation ends.
+   its in-chat flag and mode 5), and `UPDATE_QUEST_INFO` mode 8 (quest, NPC, next quest).
+   Mode 8 is what makes the client show the step's `yes` pages; a nonzero
+   next quest (`Act/1/nextQuest`) opens once they have been read to the end
+   (straight away when there are none).
 
 The server sends no quest dialogue and keeps no quest conversation state.
 Rejected actions (unsupported quest, wrong NPC or state, unmet job, level, or
-prerequisite, NPC not nearby, replays) are logged at debug level and ignored.
+prerequisite, NPC not nearby, replays) are logged at debug level and ignored;
+only missing mesos and a full inventory get an answer (below).
 
 ## Supported quests
 
@@ -61,13 +74,15 @@ magician, 0x8 bowman, 0x10 thief, 0x20 pirate, 0x400+ Cygnus) and `gender`
 a positive `prop`, one is picked at random by weight (Todd's beginner hats).
 `prop` -1 is a reward the player chooses, which needs UI and stays
 unsupported, as do `period`, `dateExpire`, `var`, and `name`. If the gifts
-don't fit, nothing changes and the client gets "You can't get anymore
-items." `startscript`/
+don't fit, nothing changes and the client gets UPDATE_QUEST_INFO mode 10
+with the quest id; it names the full inventories itself ("Etc item
+inventory is full."). `startscript`/
 `endscript` are allowed only for scripts the server implements
 (`game_data::quests::SCRIPTS`: `q1021s`, `q1021e`); those steps go through
 QUEST_ACTION 4/5 and the server drives the dialogue (see
 [NPC dialogue](./npc-dialogue.md)). `money` pays (or, if negative, takes)
-mesos on completion; a quest that takes mesos needs them held. A quest with
+mesos on completion; a quest that takes mesos needs them held, or the
+client gets mode 11 ("You do not have enough mesos."). A quest with
 any other key (`pop`, `skill`, `infoex`,
 `pet`, ...) is **unsupported**: it is
 never offered, and actions for it are refused. A prerequisite without a
@@ -113,20 +128,31 @@ Completing a quest also plays the v83 "Quest Clear" effect
 ## Conversations in the client
 
 `Character/QuestDialogue.h` is a pure state machine over one side of
-`Say.img/<id>`:
+`Say.img/<id>`, following v83's `FUN_00716fe1` (reports/182-11 and 182-11b in
+the v83ref notes):
 
-- **Offer** (`/0`): numbered pages, the last one asking yes/no; `yes` pages
-  follow acceptance and `no` pages a decline. Accepting sends start. An offer
-  ending in a question starts when answered correctly.
-- **Completion** (`/1`): numbered pages, then `yes` pages. Quiz pages contain
-  `#L` choices and `stop/<page>/answer` (one-based); a wrong choice shows
-  `stop/<page>/<choice>` and asks again. Passing the last question, or leaving
-  the last page of a talk-only completion, sends complete. There is no going
-  back to an answered question.
-- **Reminder**: `stop/npc` pages when the start NPC is clicked while the
-  quest is open; at the finishing NPC, `stop/mob` while kills are missing and
-  `stop/item` while items are.
-- No pages at all: the action is sent immediately (Sen's completion of 1032).
+- **Offer** (`/0`): numbered pages with Prev/Next, the last one asking
+  yes/no. Yes sends start and closes; No shows the `no` pages. No pages at
+  all sends start at once.
+- **Completion** (`/1`): before anything is said, `Check/1` is checked in
+  v83's order (NPC, items, quests, kills; `completion_stop` in
+  `QuestMarker.h`). A failure shows `stop/<npc|item|quest|mob>`, else
+  `stop/default`, else the NPC's own `String/Npc.img/<npc>/d0`, and sends
+  nothing. At the wrong NPC, `lost` replaces `stop/npc` when a quest item
+  given at the start (`Act/0/item`) is no longer held or worn. Otherwise
+  the pages play with Prev/Next; the last one has only OK, which sends
+  complete (closing it sends nothing).
+- **Questions** (`ask` 1): every page but the last is a selection without
+  Prev. A choice with a `stop/<page>/<choice>` text is wrong: that text shows
+  with OK and the conversation ends, so the player talks to the NPC again.
+  Any other choice is right; `answer` means nothing to v83. With
+  `stop/<page>/flip`, the text before `#L0#` is a page of its own first.
+- **Rewards**: the last completion page gets v83's list (`QuestRewards`,
+  `Character/QuestRewards.h`): "REWARD!!" with the fixed items for the
+  player's job and gender, meso, EXP, and the "?" box when one random item
+  is given, unless another quest follows. It sits between `#w` marks, which
+  `UINpcTalk` shows at once while the page above types out.
+- **Yes pages** come only with the server's mode 8, as above.
 
 Markers use the same catalog (`QuestLog::supported_rules`) and v83's rules
 (`FUN_006d1779`). An NPC's quests are those it starts or finishes, less party

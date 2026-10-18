@@ -77,6 +77,8 @@ namespace ms
 		bool exists() const;
 		const GuildData& get_data() const;
 		const GuildMember* find(int32_t cid) const;
+		// A member by name, matching case (FUN_00a39282).
+		const GuildMember* find_by_name(const std::string& name) const;
 		// The client takes the first member for the master.
 		bool is_master(int32_t cid) const;
 		// A rank's title, or "" for none.

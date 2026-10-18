@@ -24,6 +24,8 @@ int main()
 		require(check("2147483647", 2147483647).number == 2147483647, "the largest maximum is accepted");
 		require(check("1a", 50).problem == Problem::NOT_A_NUMBER, "letters are not a number");
 		require(check("-5", 50).problem == Problem::NOT_A_NUMBER, "a sign is not a number");
+		require(check("9", 50000, 10).problem == Problem::TOO_LOW, "below a higher minimum is too low");
+		require(check("10", 50000, 10).number == 10, "the minimum itself is accepted");
 
 		std::cout << "Enter number passed\n";
 		return 0;

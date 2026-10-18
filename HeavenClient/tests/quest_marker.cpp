@@ -105,6 +105,52 @@ int main()
 		progress = "001";
 		require(hunt_marker() == QuestMarker::READY, "kills and item complete the hunt");
 		require(ms::decode_kills("003012") == std::vector<int16_t>({3, 12}), "progress decodes three digits per mob");
+		// v83 checks the NPC, items, quests, then kills (FUN_00721d2c).
+		hunt.end_prerequisites = {{1034, 2}};
+		int16_t before = 1;
+		auto stop = [&](int32_t npc) {
+			return ms::completion_stop(hunt, npc, [&](int16_t id) { return id == 1034 ? before : 1; },
+				[&](int32_t) { return shells; }, progress);
+		};
+		shells = 0;
+		progress = "000";
+		require(stop(2004) == ms::QuestStop::NPC, "the wrong NPC is told first");
+		require(stop(2002) == ms::QuestStop::ITEM, "then missing items");
+		shells = 1;
+		require(stop(2002) == ms::QuestStop::QUEST, "then quests in the wrong state");
+		before = 2;
+		require(stop(2002) == ms::QuestStop::MOB, "then kills");
+		progress = "001";
+		require(stop(2002) == ms::QuestStop::NONE, "and then it can be completed");
+		// Pio (10000) lists a hand-in he can't take yet as in progress.
+		std::vector<ms::QuestInfo> pio { quest(1008, 10000, 10000), quest(1020, 10000, 10000),
+			quest(1021, 999, 10000), quest(1022, 10000, 999), quest(1023, 10000, 10000), quest(1250, 10000, 10000) };
+		std::map<int16_t, int16_t> pio_states { {1008, 1}, {1021, 1}, {1022, 1}, {1023, 2}, {1250, 1} };
+		bool items = false;
+		auto menu = [&]() {
+			return ms::select_quest_menu(10000, pio, [&](int16_t id) { return pio_states[id]; },
+				[&](const ms::QuestInfo& info) { return ms::quest_available(info, 0, 1, [&](int16_t id) { return pio_states[id]; }); },
+				[&](const ms::QuestInfo& info) { return info.end_npc == 10000 && (info.id != 1008 || items); });
+		};
+		ms::QuestMenu listed = menu();
+		require(listed.completable == std::vector<int16_t>({1021}), "a started quest he can take is completable");
+		require(listed.available == std::vector<int16_t>({1020}), "an unstarted quest he gives is available");
+		require(listed.in_progress == std::vector<int16_t>({1008, 1022}), "the rest of his started quests are in progress");
+		require(listed.quests == 6 && listed.finished == 1, "all his quests count, the party quest too, and one is done");
+		items = true;
+		require(menu().completable == std::vector<int16_t>({1008, 1021}), "the hand-in moves up once the items are in");
+		pio_states = {};
+		pio.resize(1);
+		require(!menu().empty() && ms::select_quest_menu(10000, {}, [](int16_t) { return 0; },
+			[](const ms::QuestInfo&) { return true; }, [](const ms::QuestInfo&) { return true; }).empty(), "no quests, no menu");
+		ms::QuestInfo job = quest(1400, 1012100, 1012100);
+		job.name = "The Path of a Bowman";
+		require(ms::quest_menu_line(3, job, false, false) == "#d#L3# The Path of a Bowman#l#k\r\n", "a line names the quest");
+		job.type = "[Job Adv.]";
+		require(ms::quest_menu_line(3, job, true, false) ==
+			"#d#L3# #r#e[Job Adv.]#d#nThe Path of a Bowman (In Progress)#l#k\r\n", "after its type, in red");
+		require(ms::quest_menu_line(3, job, true, true).find(" (Pre-completion enabled)#l") != std::string::npos,
+			"and says when it can be completed");
 		std::cout << "Quest marker transitions and priority passed\n";
 		return 0;
 	}

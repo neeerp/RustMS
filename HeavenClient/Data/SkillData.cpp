@@ -71,13 +71,18 @@ namespace ms
 			int32_t y = sub["y"];
 			int32_t level = string_conversion::or_default<int32_t>(sub.name(), -1);
 
-			stats.emplace(
+			Stats &added = stats.emplace(
 					std::piecewise_construct,
 					std::forward_as_tuple(level),
 					std::forward_as_tuple(damage, matk, fixdamage, mastery, attackcount, mobcount, bulletcount,
 										  bulletcost, hpcost, mpcost, chance, critical, ignoredef, hrange, range, hp, mp,
 										  time, shotrange, y)
-			);
+			).first->second;
+
+			added.x = sub["x"];
+			added.mesocost = sub["moneyCon"];
+			added.itemcost = sub["itemCon"];
+			added.itemcount = sub["itemConNo"];
 		}
 
 		element = std::string(src["elemAttr"]);
@@ -88,10 +93,6 @@ namespace ms
 			reqweapon = Weapon::Type::NONE;
 		else
 			reqweapon = Weapon::by_value(100 + (int32_t) src["weapon"]);
-
-		// Grenade says nothing of its gun, but needs one (0x96a86e).
-		if (id == 5201002)
-			reqweapon = Weapon::Type::GUN;
 
 		masterlevel = static_cast<int32_t>(stats.size());
 		passive = (id % 10000) / 1000 == 0;

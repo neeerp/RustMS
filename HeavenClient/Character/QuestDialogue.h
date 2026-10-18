@@ -11,24 +11,47 @@ namespace ms
 	// One side of a quest conversation from Quest.nx Say.img/<id>/<0|1>.
 	struct QuestScript
 	{
+		// A question's stop/<page>.
+		struct Question
+		{
+			// stop/<page>/<choice>: why a choice is wrong. A choice without
+			// one is right; `answer` means nothing to v83.
+			std::map<int32_t, std::string> wrong;
+			// stop/<page>/flip: the text before the choices is a page of
+			// its own.
+			bool flip = false;
+		};
+
 		// Numbered pages, in order.
 		std::vector<std::string> pages;
-		// Shown after the quest was accepted (offer) or completed (completion).
+		// Shown once the server says the quest was started (offer side) or
+		// completed (completion side).
 		std::vector<std::string> yes;
 		// Shown after the offer was declined.
 		std::vector<std::string> no;
-		// stop/<page>/answer: the right choice for a question page (choice id).
-		std::map<size_t, int32_t> answers;
-		// stop/<page>/<choice>: why a wrong choice is wrong.
-		std::map<size_t, std::map<int32_t, std::string>> wrong;
-		// stop/npc on the completion side: directions while the quest is open.
-		std::vector<std::string> reminder;
-		// stop/item on the completion side: what to say while the required
-		// items are missing (or, for Roger's apples, not yet used up).
-		std::vector<std::string> item_reminder;
-		// stop/mob on the completion side: what to say while the required
-		// mobs have not all been hunted.
-		std::vector<std::string> mob_reminder;
+		// `ask`: every page but the last is a question.
+		bool ask = false;
+		std::map<size_t, Question> questions;
+		// stop/<reason> (npc, item, quest, mob, default) on the completion
+		// side: why the quest can't be completed here, or yet.
+		std::map<std::string, std::vector<std::string>> stops;
+		// Said instead of stop/npc when a quest item given at the start was
+		// lost.
+		std::vector<std::string> lost;
+
+		// stop/<reason>, else stop/default, as v83 picks them (FUN_00718b58).
+		std::vector<std::string> stop(const std::string& reason) const
+		{
+			for (const std::string& key : { reason, std::string("default") })
+			{
+				auto pages = stops.find(key);
+
+				if (pages != stops.end() && !pages->second.empty())
+					return pages->second;
+			}
+
+			return {};
+		}
 	};
 
 	struct QuestPage
@@ -39,29 +62,52 @@ namespace ms
 		std::string text;
 		bool previous;
 		bool next;
+		// The dialog's speaker byte: 2 has the player answer a flipped
+		// question (FUN_00716fe1).
+		int8_t speaker = 0;
 	};
 
 	// The client side of the v83 quest flow, independent of UI and assets:
-	// it pages through the conversation and says when to send QUEST_ACTION.
+	// it pages through the conversation and says when to send QUEST_ACTION
+	// (FUN_00716fe1). Nothing is said after the action; the server's answer
+	// brings the yes pages.
 	class QuestDialogue
 	{
 	public:
-		enum class Mode { OFFER, COMPLETION, REMINDER };
+		enum class Mode { OFFER, COMPLETION, PAGES };
 		enum class Effect { NONE, START, COMPLETE };
 
-		QuestDialogue(Mode mode, QuestScript script) : mode(mode), script(std::move(script))
+		// `rewards` goes after the last completion page (FUN_0071808a).
+		QuestDialogue(Mode mode, QuestScript script, std::string rewards = {})
+			: mode(mode), script(std::move(script)), rewards(std::move(rewards))
 		{
-			if (mode == Mode::REMINDER)
-				enter(Branch::REMINDER);
-			else if (pages().empty())
+			bool silent = mode == Mode::OFFER ? this->script.pages.empty()
+				: mode == Mode::COMPLETION && this->script.pages.size() <= 1 && last_page().empty();
+
+			if (silent)
 			{
 				// Nothing to say: the quest action happens right away.
 				initial = mode == Mode::OFFER ? Effect::START : Effect::COMPLETE;
-				acted = true;
-				enter(Branch::YES);
+				step = Step::DONE;
 			}
 			else
-				enter(Branch::MAIN);
+			{
+				// Rewards with no pages make a last page of their own.
+				if (mode == Mode::COMPLETION && this->script.pages.empty())
+					this->script.pages.emplace_back();
+
+				enter_page(0);
+			}
+		}
+
+		// Just pages to read: stop pages, or what the NPC says once a quest
+		// is started or completed.
+		static QuestDialogue reading(std::vector<std::string> pages)
+		{
+			QuestScript script;
+			script.pages = std::move(pages);
+
+			return QuestDialogue(Mode::PAGES, std::move(script));
 		}
 
 		// An action to send as soon as the dialogue opens.
@@ -75,228 +121,200 @@ namespace ms
 		// The page to show, or nothing once the dialogue is over.
 		std::optional<QuestPage> page() const
 		{
-			if (branch == Branch::DONE)
-				return std::nullopt;
+			const auto& pages = script.pages;
 
-			if (branch == Branch::WRONG)
-				return QuestPage { QuestPage::TEXT, wrong_text, false, true };
-
-			const auto& list = current();
-			const std::string& text = list[index];
-
-			if (branch == Branch::MAIN)
+			switch (step)
 			{
-				if (is_question(index))
-					return QuestPage { QuestPage::SELECTION, text, false, false };
-				if (mode == Mode::OFFER && index + 1 == list.size())
-					return QuestPage { QuestPage::YESNO, text, false, false };
+				case Step::DONE:
+					return std::nullopt;
+				case Step::WRONG:
+					return QuestPage { QuestPage::TEXT, wrong_text, false, false };
+				case Step::DECLINED:
+					return QuestPage { QuestPage::TEXT, script.no[index], index > 0, index + 1 < script.no.size() };
+				case Step::FLIP:
+					return QuestPage { QuestPage::TEXT, pages[index].substr(0, pages[index].find(CHOICES)), index > 0, true };
+				case Step::QUESTION:
+				{
+					std::string text = pages[index];
+
+					if (!flipped())
+						return QuestPage { QuestPage::SELECTION, text, false, false };
+
+					return QuestPage { QuestPage::SELECTION, "\r\n" + text.substr(text.find(CHOICES)), false, false, 2 };
+				}
+				case Step::PAGE:
+					break;
 			}
 
-			bool has_next = index + 1 < list.size() ||
-				(branch == Branch::MAIN && mode == Mode::COMPLETION && !script.yes.empty());
+			if (mode == Mode::PAGES || index + 1 < pages.size())
+				return QuestPage { QuestPage::TEXT, pages[index], index > 0, index + 1 < pages.size() };
 
-			// Prev never returns to (or past) an answered question.
-			bool has_previous = index > 0 && !(branch == Branch::MAIN && index <= first_after_question());
+			if (mode == Mode::OFFER)
+				return QuestPage { QuestPage::YESNO, pages[index], false, false };
 
-			return QuestPage { QuestPage::TEXT, text, has_previous, has_next };
+			return QuestPage { QuestPage::TEXT, last_page(), false, false };
 		}
 
 		// response: 1 next/yes/select, 0 previous/no, -1 close. `selection` is
 		// the chosen #L id on a question page.
 		Effect respond(int8_t response, int32_t selection = -1)
 		{
-			if (branch == Branch::DONE)
-				return Effect::NONE;
-
-			if (response < 0)
-			{
-				branch = Branch::DONE;
-				return Effect::NONE;
-			}
-
-			if (branch == Branch::WRONG)
-			{
-				// Back to the same question.
-				branch = Branch::MAIN;
-				return Effect::NONE;
-			}
-
-			if (branch != Branch::MAIN)
-			{
-				page_through(response);
-				return Effect::NONE;
-			}
-
 			auto shown = page();
+
+			if (!shown)
+				return Effect::NONE;
+
+			if (response < 0 || step == Step::WRONG)
+			{
+				step = Step::DONE;
+				return Effect::NONE;
+			}
+
+			if (step == Step::FLIP)
+			{
+				// Prev from the flipped page ends the conversation.
+				if (response == 1)
+					step = Step::QUESTION;
+				else
+					step = Step::DONE;
+
+				return Effect::NONE;
+			}
+
+			if (step == Step::QUESTION)
+			{
+				auto question = script.questions.find(index);
+
+				if (response != 1 || selection < 0 || question == script.questions.end())
+				{
+					step = Step::DONE;
+					return Effect::NONE;
+				}
+
+				auto wrong = question->second.wrong.find(selection);
+
+				if (wrong != question->second.wrong.end() && !wrong->second.empty())
+				{
+					// The quest is not started or completed; the player can
+					// talk to the NPC again.
+					wrong_text = wrong->second;
+					step = Step::WRONG;
+				}
+				else
+				{
+					enter_page(index + 1);
+				}
+
+				return Effect::NONE;
+			}
+
+			if (step == Step::DECLINED)
+			{
+				if (response == 0 && shown->previous)
+					index--;
+				else if (response == 1 && shown->next)
+					index++;
+				else
+					step = Step::DONE;
+
+				return Effect::NONE;
+			}
 
 			if (shown->kind == QuestPage::YESNO)
 			{
 				if (response == 1)
 				{
-					acted = true;
-					enter(Branch::YES);
+					step = Step::DONE;
 					return Effect::START;
 				}
 
-				enter(Branch::NO);
+				step = Step::DECLINED;
+				index = 0;
+
+				if (script.no.empty())
+					step = Step::DONE;
+
 				return Effect::NONE;
-			}
-
-			if (shown->kind == QuestPage::SELECTION)
-			{
-				if (response != 1)
-					return Effect::NONE;
-
-				auto answer = script.answers.find(index);
-
-				if (answer != script.answers.end() && answer->second != selection)
-				{
-					auto reasons = script.wrong.find(index);
-
-					if (reasons != script.wrong.end() && reasons->second.count(selection))
-					{
-						wrong_text = reasons->second.at(selection);
-						branch = Branch::WRONG;
-					}
-
-					return Effect::NONE;
-				}
-
-				// Passing the last question completes the quest; what follows
-				// is the NPC congratulating the player.
-				Effect effect = Effect::NONE;
-
-				if (mode == Mode::COMPLETION && !acted && index == last_question())
-				{
-					acted = true;
-					effect = Effect::COMPLETE;
-				}
-				else if (mode == Mode::OFFER && !acted && index + 1 == script.pages.size())
-				{
-					// An offer that ends in a question is accepted by answering it.
-					acted = true;
-					effect = Effect::START;
-				}
-
-				advance();
-
-				return effect;
 			}
 
 			if (response == 0)
 			{
 				if (shown->previous)
-					index--;
+					enter_page(index - 1);
+				else
+					step = Step::DONE;
 
 				return Effect::NONE;
 			}
 
-			if (index + 1 < script.pages.size())
+			if (shown->next)
 			{
-				index++;
+				enter_page(index + 1);
 				return Effect::NONE;
 			}
 
-			// Leaving the last completion page.
-			Effect effect = Effect::NONE;
+			// OK on the last page.
+			step = Step::DONE;
+			read_to_end = true;
 
-			if (mode == Mode::COMPLETION && !acted)
-			{
-				acted = true;
-				effect = Effect::COMPLETE;
-			}
-
-			enter(Branch::YES);
-
-			return effect;
+			return mode == Mode::COMPLETION ? Effect::COMPLETE : Effect::NONE;
 		}
 
 		bool finished() const
 		{
-			return branch == Branch::DONE;
+			return step == Step::DONE;
+		}
+
+		// Whether the player read every page and left with OK.
+		bool read() const
+		{
+			return read_to_end;
 		}
 
 	private:
-		enum class Branch { MAIN, YES, NO, WRONG, REMINDER, DONE };
+		enum class Step { PAGE, FLIP, QUESTION, WRONG, DECLINED, DONE };
 
-		const std::vector<std::string>& pages() const
+		static constexpr const char* CHOICES = "#L0#";
+
+		// The last page as shown: on the completion side, with the rewards.
+		std::string last_page() const
 		{
-			return script.pages;
+			std::string text = script.pages.empty() ? std::string() : script.pages.back();
+
+			return mode == Mode::COMPLETION ? text + rewards : text;
 		}
 
-		const std::vector<std::string>& current() const
+		bool question(size_t page) const
 		{
-			switch (branch)
-			{
-				case Branch::YES: return script.yes;
-				case Branch::NO: return script.no;
-				case Branch::REMINDER: return script.reminder;
-				default: return script.pages;
-			}
+			return mode != Mode::PAGES && script.ask && page + 1 < script.pages.size();
 		}
 
-		void enter(Branch next)
+		bool flipped() const
 		{
-			branch = next;
-			index = 0;
+			auto question = script.questions.find(index);
 
-			if (branch != Branch::DONE && current().empty())
-				branch = Branch::DONE;
+			return question != script.questions.end() && question->second.flip &&
+				script.pages[index].find(CHOICES) != std::string::npos;
 		}
 
-		void advance()
+		void enter_page(size_t page)
 		{
-			if (index + 1 < script.pages.size())
-				index++;
+			index = page;
+
+			if (page >= script.pages.size())
+				step = Step::DONE;
+			else if (!question(page))
+				step = Step::PAGE;
 			else
-				enter(Branch::YES);
-		}
-
-		void page_through(int8_t response)
-		{
-			if (response == 0)
-			{
-				if (index > 0)
-					index--;
-			}
-			else if (index + 1 < current().size())
-				index++;
-			else
-				branch = Branch::DONE;
-		}
-
-		bool is_question(size_t page) const
-		{
-			return script.answers.count(page) ||
-				(page < script.pages.size() && script.pages[page].find("#L") != std::string::npos);
-		}
-
-		// The first page after the last question, or 0 if there is none.
-		size_t first_after_question() const
-		{
-			for (size_t i = script.pages.size(); i > 0; i--)
-				if (is_question(i - 1))
-					return i;
-
-			return 0;
-		}
-
-		size_t last_question() const
-		{
-			size_t last = 0;
-
-			for (size_t i = 0; i < script.pages.size(); i++)
-				if (is_question(i))
-					last = i;
-
-			return last;
+				step = flipped() ? Step::FLIP : Step::QUESTION;
 		}
 
 		Mode mode;
 		QuestScript script;
-		Branch branch = Branch::MAIN;
+		std::string rewards;
+		Step step = Step::PAGE;
 		size_t index = 0;
-		bool acted = false;
+		bool read_to_end = false;
 		Effect initial = Effect::NONE;
 		std::string wrong_text;
 	};

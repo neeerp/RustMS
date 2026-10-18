@@ -77,7 +77,11 @@ from `UI.nx`. Moved so far:
   120 px, or 96 px when a count follows), mesos, and kill EXP with a yellow
   line per bonus ("Bonus EXP for PARTY (+N)") show here; quest EXP (mode 3
   with its in-chat flag), mode 4 fame and mode 5 mesos go to the chat log as
-  grey lines.
+  grey lines. So do mode 6 guild points and mode 7 (an item's description).
+  Expired cash items, items, seals and skills (modes 2, 8, 11, 13) and
+  server lines (9, 12) go to the chat log in the colour v83 uses for chat
+  type 0xc. Mode 10, a quest's extra record, shows nothing, and other modes
+  are ignored, as in v83.
 - **Chat** (`UIChatBar`): the input strip in the bar's top-left and the log
   above it. The status bar cuts that strip out of its background, so the two
   can overlap in either draw order. As in the original, the log has three
@@ -97,6 +101,19 @@ from `UI.nx`. Moved so far:
   [quests.md](quests.md).
 - **Quest Complete! notice** (`UIQuestComplete`, `UIWindow.img/FadeYesNo`).
   See [quests.md](quests.md).
+- **Invitation notices** (`UIInviteCard`, `UIWindow.img/FadeYesNo`): v83's
+  fading cards above the status bar for Maple Messenger invitations, buddy
+  requests, trade requests, and party invites, each "from '<name>'" beside
+  its kind's icon (FUN_0052065d). O accepts and X declines; a card left
+  alone fades out after three minutes and sends nothing. A new invitation
+  replaces a card of its kind, except buddy requests, which pile up. The
+  smaller pink cards (`backgrnd2`, FUN_00523a2c) say "<name> is logged
+  in." or "You're on the same ch. with <name>." for six seconds, with only
+  an X. Each
+  card, quest completions included, sits 5 px above the one before it
+  (`FadeNotice::raised`), and only the newest can be clicked. Not done: the
+  cash trade card, holding cards back while the UI is locked, and the Game
+  Option and blacklist refusals.
 - **Minimap** (`UIMiniMap`, `UIWindow.img/MiniMap`): folded to its title bar,
   the map alone (`MinMap`), or the map under the map's mark, street, and name
   (`MaxMap`), laid out from period footage. M or the `Basic.img` minus and
@@ -179,7 +196,8 @@ from `UI.nx`. Moved so far:
   opens a room, or minimises the open one to its title bar (which blinks on
   unread lines). Clicking an empty seat or typing `/invite name` invites; `/q`
   or the close button leaves. A speaker shows the `chatBalloon` dots for a
-  few seconds. Invitations arrive as a yes/no notice.
+  few seconds. Invitations arrive as an invitation notice, whose O does
+  nothing while a room is open.
 - **Game Option** (`UIGameOption`, `UIWindow.img/GameOpt`), from MENU: a
   `Basic.img/CheckBox` right of each row's ALLOW, laid out from the
   background. OK saves the boxes as the `Allow*` settings; the client doesn't
@@ -200,7 +218,8 @@ from `UI.nx`. Moved so far:
   `BtOK`/`BtCancel` for number entry). Number entry draws a white field under
   the message. The click that opens it no longer takes the focus from its
   field, so typed amounts count. `UIEnterNumber` has its own element type, so the notice about a
-  bad number opens over it, and OK goes back to the field.
+  bad number opens over it, and OK goes back to the field. As in v83, the notice names the box's real
+  minimum, which is 10 for dropping mesos. Prompts use v83's words.
 - **Quit** (`ask_to_quit`): MENU's QUIT GAME and closing the window ask
   "Are you sure you want to quit?" in a `UIYesNo`; yes goes back to the login
   screen. The later playtime and EXP summary (`UIWindow6.img/askReward`) is
@@ -230,6 +249,25 @@ from `UI.nx`. Moved so far:
   second try within 5 minutes ("Please try it again later.",
   `Gameplay/FameCooldown.h`). FAME_RESPONSE (`FameResponseHandler`) prints its
   v83 lines in the skill chat colour and updates the open window's fame.
+- **Menu on someone** (`UIContextMenu`, `UIWindow.img/ContextMenu`): opened
+  by releasing the right button over another character (`Stage::other_character_at`,
+  v83's 44 by 65 box above the feet, or 46 by 31 toward the head when prone,
+  `char_click::menu_hits`). It opens at the cursor, pushed back inside the
+  view, with their name in the top cap. The rows are PERSONAL INFO, SAVE NAME,
+  TRADE REQUEST, WHISPER, PARTY INVITE (party leaders, or players in no
+  party), GUILD INVITE (guild masters and Jr. Masters), and ALERT GM; rows left
+  out move up (`IO/Components/ContextMenuLayout.h`). It holds the mouse and
+  keys: a press or right release outside, ESC, or Enter closes it, and it
+  closes before a row acts. Info opens the character info window, SAVE NAME
+  copies the name and opens the chat field, WHISPER fills in "/w name ",
+  TRADE and PARTY INVITE do what the info window's trade and `/party invite`
+  do, GUILD INVITE sends GUILD_OPERATION 5 after v83's guild checks (the
+  server ignores it until it has guild invites), and ALERT GM shows v83's
+  notice that reports are down. Approximations: v83 also hits
+  the character's second position and a morph's own box; it puts the chat
+  into whisper mode rather than filling in a command; and it offers Add
+  Junior to family members, which HC doesn't have. The right button acts when
+  it comes up, everywhere, as in v83.
 - **Quest log** (`UIQuestLog`, `UIWindow.img/Quest`): Available, In Progress,
   and Complete tabs (`Basic.img/Tab2`), quests folded by area, and a detail
   panel with the quest's text and FIND NPC or QUEST HELPER, laid out from
@@ -265,8 +303,13 @@ from `UI.nx`. Moved so far:
 - **World select** (`UIWorldSelect`, `Login.img/WorldSelect`): the worlds
   hang in packet order as planks (`BtWorld/<world id>`) from the scene's rope
   bar. Fifteen slots start at x 232, 27 apart, and blank planks fill the
-  unused ones. Picking a world plays `scroll/0` over the scene's closed
-  scroll. When it opens, it shows the world's name and its channels in four
+  unused ones. Picking a world asks the server for its status
+  (SERVERSTATUS_REQUEST), and no world or channel takes clicks until the
+  answer comes. Status 0 plays `scroll/0` over the scene's closed scroll; 1
+  does too, under a notice that the world is busy; 2 says the world is full
+  and leaves the list as it was. RustMS answers 2 only when no world has a
+  channel. The banner byte after the status is read but not drawn. When the
+  scroll opens, it shows the world's name and its channels in four
   columns, each with a load gauge. The gauge treats a load of 1000 as full,
   and RustMS sends each channel's configured capacity (700 by default) as its
   load. The red `chSelect` circle marks the chosen channel. Clicking it again,
@@ -422,8 +465,8 @@ side yet.
 | Inventory, equip, item use, scroll, sort/gather | Implemented |
 | Skills, stat/AP/SP allocation, buffs, keymap | Implemented |
 | NPC dialogue and NPC shop | Implemented (`UINpcTalk`, `UIShop`) |
-| Quest log and markers | Implemented (`UIQuestLog`); progress arrives via SHOW_STATUS_INFO, quest start/complete is driven by NPC dialogue |
-| Chat, whisper, `/find`, `/?`, `/party`, `/buddy`, `/all`, server messages | Implemented; buddy whisper/find modes ignored; other commands are dropped, as v83 does for non-GMs |
+| Quest log and markers | Implemented (`UIQuestLog`); progress arrives via SHOW_STATUS_INFO, quest start/complete is driven by NPC dialogue; UPDATE_QUEST_INFO refusals 9–11, 13 and 14 show v83's notices (10 names the full inventories from `Act.img`), 15 the expiry chat line, and the timer modes are ignored |
+| Chat, whisper, `/find`, `/?`, `/party`, `/buddy`, `/all`, server messages | Implemented; buddy whisper/find modes ignored; `/w NAME` alone fills in a whisper to NAME, or says "Incorrect ID." for a name no character could have, as v83's `/whisper NAME` does; other commands are dropped, as v83 does for non-GMs |
 | Character info, minimap, world map | Implemented |
 | Party (`UIUserList` Party tab, `UIPartyHP`, party chat) | Implemented; see `parties.md` |
 | Buddy list (`UIUserList` Friend tab, buddy chat) | Implemented without groups; see `buddies.md` |
@@ -432,7 +475,7 @@ side yet.
 | Monster Book (`UIMonsterBook`) | Implemented: cards, summary, monster pages, search, cover; see `combat.md` |
 | Cash shop (`UICashShop`) | Enter/exit, catalog, buying, gifts, Cash Inventory, wish list, and moving items to and from the bags |
 | Maple Messenger (`UIMessenger`) | Implemented |
-| Trade (`UITradingRoom`, `UITradeInvite`) | Implemented, without cash trades |
+| Trade (`UITradingRoom`, `UIInviteCard`) | Implemented, without cash trades |
 | Storage (`UIStorage`) | Implemented; see `inventory.md` |
 | Continent ships, station wall clocks | Docking ships and the Balrog's ship, CONTI_MOVE/CONTI_STATE, CLOCK kind 1; see `ships.md` |
 | Player shops, mini-games, memo/mail | No UI, no handlers |
@@ -571,12 +614,16 @@ the screen size.
   0x06/0x07 mode 1 for an expansion commodity (911x000). As in v83, each
   mode is followed by a byte that is 1 for Maple Points, and 0x03 ends with
   a zero (no free trial). The result is a "successful purchase" or a failure
-  notice.
+  notice. Failure notices use v83's text for each code (`FUN_0047c17a`),
+  except coupon, gift-token and character-transfer codes, which get the
+  default.
 - **Check:** CHECK CASH sends CHECK_CASH (228), as does the game window
   getting the focus back while the shop is open; QUERY_CASH_RESULT answers.
 - **Slot buttons:** Equip Slot through Stor. Slot open `UICashBuy` for the
   matching expansion item at 4,000 NX, and OK sends 0x06 mode 0 with the bag,
-  or 0x07 mode 0. On 0x60 the bag's slot count changes at once.
+  or 0x07 mode 0. On 0x60 the bag's slot count changes at once. For 0x60 and
+  0x62 the notice says "You have added slots to your item inventory.", as in
+  v83.
 - **Item data:** packages and expansions take their name and icon from
   `Item.nx` `Special`, pets from `Item.nx` `Pet`, and pet equipment from
   `Character.nx` `PetEquip`.
@@ -592,8 +639,8 @@ the screen size.
   a To field and a message box that wraps over its two ruled rows (73
   characters). OK, once both are filled, swaps the art for `CSNotice/1` and asks
   for the birthday code (YYYYMMDD). Its OK sends 0x04 with the code, SN, name
-  and message. The sender sees "You have sent ITEM to NAME." on 0x5E, or a
-  failure notice (0xA8 own account, 0xA9 unknown name, 0xC4 birthday code).
+  and message. On 0x5E the sender sees v83's "COUNT [ ITEM ] was sent to
+  NAME. PRICE NX Prepaid were spent in the process.", or a failure notice (0xA8 own account, 0xA9 unknown name, 0xC4 birthday code).
   The receiver gets one notice listing each gift's sender, item and message
   when 0x4D arrives. The buddy and guild buttons that open the wider
   `backgrnd1` aren't drawn, and only one name is sent.
@@ -660,9 +707,11 @@ These were corrected:
    for the Rech. button, and buying sends the row's index in the server's
    list rather than its place on screen. Stars are bought one
    set at a time and sold as a whole set, both after a yes/no. The new
-   CONFIRM_SHOP_TRANSACTION handler shows "You do not have enough mesos." and
-   "Please check if your inventory is full or not."; codes 0 and 8 need no
-   notice.
+   CONFIRM_SHOP_TRANSACTION handler shows v83's notice for each code: codes
+   0, 4 and 8 need none, and a code v83 doesn't know is "Due to an error, the
+   trade did not happen.". TRUNK_RESULT had swapped `0x0b`, which is out of
+   mesos to take an item out, and `0x0c`, which is a one-of-a-kind item the
+   player already has.
 10. v83 keeps one binding each for Ctrl, Alt, and Shift: the game reads a
     key's scan code without the extended bit, so Right Ctrl and Right Alt
     arrive as the left keys, and it folds Right Shift (54) onto Left Shift

@@ -46,6 +46,10 @@ if(HEAVENCLIENT_BUILD_TESTS)
     add_test(NAME chat_wrap COMMAND chat_wrap_tests)
     add_executable(curse_words_tests tests/curse_words.cpp)
     add_test(NAME curse_words COMMAND curse_words_tests)
+    add_executable(character_name_tests tests/character_name.cpp)
+    add_test(NAME character_name COMMAND character_name_tests)
+    add_executable(quest_result_tests tests/quest_result.cpp)
+    add_test(NAME quest_result COMMAND quest_result_tests)
     add_executable(map_tooltip_tests tests/map_tooltip.cpp)
     add_test(NAME map_tooltip COMMAND map_tooltip_tests)
     add_executable(cash_catalog_tests tests/cash_catalog.cpp)
@@ -93,6 +97,8 @@ if(HEAVENCLIENT_BUILD_TESTS)
     add_test(NAME buff_row COMMAND buff_row_tests)
     add_executable(item_drop_tests tests/item_drop.cpp)
     add_test(NAME item_drop COMMAND item_drop_tests)
+    add_executable(field_limit_tests tests/field_limit.cpp)
+    add_test(NAME field_limit COMMAND field_limit_tests)
     add_executable(scroll_rules_tests tests/scroll_rules.cpp)
     add_test(NAME scroll_rules COMMAND scroll_rules_tests)
     add_executable(pickup_tests tests/pickup.cpp)
@@ -191,6 +197,9 @@ if(HEAVENCLIENT_BUILD_TESTS)
     add_executable(char_click_tests tests/char_click.cpp)
     target_include_directories(char_click_tests PRIVATE ${PROJECT_SOURCE_DIR}/libs/NoLifeNx)
     add_test(NAME char_click COMMAND char_click_tests)
+    add_executable(context_menu_tests tests/context_menu.cpp)
+    target_include_directories(context_menu_tests PRIVATE ${PROJECT_SOURCE_DIR}/libs/NoLifeNx)
+    add_test(NAME context_menu COMMAND context_menu_tests)
     add_executable(excl_request_tests tests/excl_request.cpp)
     add_test(NAME excl_request COMMAND excl_request_tests)
     add_executable(portal_touch_tests tests/portal_touch.cpp Gameplay/MapleMap/Portal.cpp)
@@ -208,6 +217,8 @@ if(HEAVENCLIENT_BUILD_TESTS)
         SUPPORTED_QUESTS="${PROJECT_SOURCE_DIR}/../game-data/supported_quests.txt"
         DEFAULT_QUEST_NX="${PROJECT_SOURCE_DIR}/../assets/game-data/Quest.nx")
     add_test(NAME quest_catalog COMMAND quest_catalog_tests)
+    add_executable(skill_weapon_tests tests/skill_weapon.cpp)
+    add_test(NAME skill_weapon COMMAND skill_weapon_tests)
 endif()
 
 include_directories(.)
@@ -313,6 +324,7 @@ add_executable(HeavenClient
     Character/QuestInfo.h
     Character/QuestLog.cpp
     Character/QuestLog.h
+    Character/QuestResult.h
     Character/SkillBook.cpp
     Character/SkillBook.h
     Character/SkillId.h
@@ -468,6 +480,7 @@ add_executable(HeavenClient
     IO/Components/SliderSteps.h
     IO/Components/EquipTooltip.cpp
     IO/Components/EquipTooltip.h
+    IO/Components/ContextMenuLayout.h
     IO/Components/FadeNotice.h
     IO/Components/Gauge.cpp
     IO/Components/Gauge.h
@@ -523,6 +536,8 @@ add_executable(HeavenClient
     IO/UITypes/UIGameOption.h
     IO/UITypes/UICharInfo.cpp
     IO/UITypes/UICharInfo.h
+    IO/UITypes/UIContextMenu.cpp
+    IO/UITypes/UIContextMenu.h
     IO/UITypes/UICharCreation.cpp
     IO/UITypes/UICharCreation.h
     IO/UITypes/UICharSelect.cpp
@@ -567,8 +582,8 @@ add_executable(HeavenClient
     IO/UITypes/UIShop.h
     IO/UITypes/UIStorage.cpp
     IO/UITypes/UIStorage.h
-    IO/UITypes/UITradeInvite.cpp
-    IO/UITypes/UITradeInvite.h
+    IO/UITypes/UIInviteCard.cpp
+    IO/UITypes/UIInviteCard.h
     IO/UITypes/UITradingRoom.cpp
     IO/UITypes/UITradingRoom.h
     IO/UITypes/UIMonsterBook.cpp
@@ -602,6 +617,8 @@ add_executable(HeavenClient
     IO/KeyType.h
     IO/Messages.cpp
     IO/Messages.h
+    IO/BuddyCommands.cpp
+    IO/BuddyCommands.h
     IO/PartyCommands.cpp
     IO/PartyCommands.h
     IO/UI.cpp
@@ -710,6 +727,7 @@ add_executable(HeavenClient
     Template/Singleton.h
     Template/TimedQueue.h
     Template/TypeMap.h
+    Util/CharacterName.h
     Util/ChatWrap.h
     Util/CurseWords.h
     Util/HardwareInfo.h

@@ -298,17 +298,37 @@ namespace ms
 		SpecialMove::ForbidReason reason = player.can_use(move);
 		Weapon::Type weapontype = player.get_stats().get_weapontype();
 
-		if (reason != SpecialMove::ForbidReason::FBR_NONE)
+		// v83 says why it won't attack bare-handed (FUN_0095b85a) once
+		// DoActiveSkill has let the skill's cost through, before it looks at
+		// the weapon or the ammo. Buffs need no weapon.
+		switch (reason)
 		{
-			ForbidSkillMessage(reason, weapontype).drop();
-			return false;
+			case SpecialMove::ForbidReason::FBR_NONE:
+			case SpecialMove::ForbidReason::FBR_WEAPONTYPE:
+			case SpecialMove::ForbidReason::FBR_EQUIPPED:
+			case SpecialMove::ForbidReason::FBR_BULLETCOST:
+				if (move.is_attack() && !player.get_look().get_equips().has_weapon())
+				{
+					InChatMessage(Messages::ATTACK_NOWEAPON).drop();
+					return false;
+				}
+
+				break;
+			default:
+				break;
 		}
 
-		// v83 says why it won't attack bare-handed (FUN_0095b85a), once
-		// DoActiveSkill has let the skill through. Buffs need no weapon.
-		if (move.is_attack() && !player.get_look().get_equips().has_weapon())
+		if (reason != SpecialMove::ForbidReason::FBR_NONE)
 		{
-			InChatMessage(Messages::ATTACK_NOWEAPON).drop();
+			int32_t item = 0;
+
+			if (reason == SpecialMove::ForbidReason::FBR_ITEMCOST)
+			{
+				int32_t level = player.get_skills().get_level(move.get_id());
+				item = SkillData::get(move.get_id()).get_stats(level).itemcost;
+			}
+
+			ForbidSkillMessage(reason, weapontype, item).drop();
 			return false;
 		}
 
@@ -721,7 +741,7 @@ namespace ms
 
 			if (reach.star == 0)
 			{
-				InChatMessage(Messages::SKILL_NOSTARS).drop();
+				InChatMessage(Messages::SKILL_SHADOWSTARS).drop();
 				return std::nullopt;
 			}
 		}

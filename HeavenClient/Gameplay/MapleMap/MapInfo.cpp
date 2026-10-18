@@ -17,6 +17,8 @@
 //////////////////////////////////////////////////////////////////////////////////
 #include "MapInfo.h"
 
+#include "FieldLimit.h"
+
 #include "../Constants.h"
 
 #include <algorithm>
@@ -49,6 +51,10 @@ namespace ms
 
 		cloud = info["cloud"].get_bool();
 		fieldlimit = info["fieldLimit"];
+
+		for (auto item : info["allowedItem"])
+			allowed_items.push_back(item);
+
 		hideminimap = info["hideMinimap"].get_bool();
 		mapmark = std::string(info["mapMark"]);
 		swim = info["swim"].get_bool();
@@ -103,6 +109,16 @@ namespace ms
 	bool MapInfo::can_use_movement_skills() const
 	{
 		return (fieldlimit & 0x2) == 0;
+	}
+
+	bool MapInfo::can_use_item(int32_t item_id) const
+	{
+		return field_limit::may_use(fieldlimit, allowed_items, item_id);
+	}
+
+	bool MapInfo::can_drop() const
+	{
+		return field_limit::may_drop(fieldlimit);
 	}
 
 	std::string MapInfo::get_bgm() const

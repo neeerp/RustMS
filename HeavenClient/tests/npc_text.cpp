@@ -21,6 +21,7 @@ int main()
 			[](int32_t id) { return id == 10000 ? std::string("Mushroom Town") : std::string("?"); }
 		};
 		auto expand = [&](const std::string& s) { return ms::NpcTextMarkup::expand(s, lookups); };
+		using Images = std::vector<ms::NpcTextMarkup::InlineImage>;
 
 		require(expand("#fUI/UIWindow.img/QuestIcon/4/0#\\n#v2010000# 3 #t2010000#\\n#v2010009# 3 #t2010009#") ==
 			"\\n 3 Apple\\n 3 Green Apple", "every item tag expands and images are dropped");
@@ -28,7 +29,10 @@ int main()
 		require(expand("Hunt #o100100# in #m10000#, #z2010000#.") == "Hunt Snail in Mushroom Town, Apple.", "mob, map, item names");
 		require(expand("#bBlue#k and #L0#a choice#l") == "#bBlue#k and #L0#a choice#l", "colours and choices are left alone");
 		require(expand("a # sign") == "a # sign", "a lone # survives");
-		using Images = std::vector<ms::NpcTextMarkup::InlineImage>;
+		Images reward;
+		require(ms::NpcTextMarkup::expand("#v2010000:# #t2010000:# 3 #z2010009:#", lookups, &reward) == "\x01 Apple 3 Green Apple",
+			"ids may end in a colon");
+		require(reward == Images{{'v', "2010000"}}, "the colon is not part of the id");
 		Images images;
 		require(ms::NpcTextMarkup::expand("#fUI/UIWindow.img/QuestIcon/4/0#\\n#v2010000# 3 #t2010000#\\n#s1001# and #i2010009##fnot an image#",
 			lookups, &images) == "\x01\\n\x01 3 Apple\\n\x01 and \x01#fnot an image#", "captured images leave placeholders");
@@ -43,6 +47,10 @@ int main()
 			"unclosed choices end at the next #L or the end");
 		require(choices("no menu here").empty(), "text without choices");
 		require(choices("#Lx# broken").empty(), "a non-numeric id is not a choice");
+		std::string menu = "#d#L1# Pio#l#k\r\n#d#L2# #r#e[Job Adv.]#d#nGrendel#l#k\r\n";
+		require(ms::NpcTextMarkup::colour_at(menu, menu.find("#L1")) == "#d", "a choice takes the colour before it");
+		require(ms::NpcTextMarkup::colour_at(menu, menu.find("#L2")) == "#d", "after the last one's #k");
+		require(ms::NpcTextMarkup::colour_at("#L1#bananas#l#L2#", 12) == "", "a choice's id is not a colour");
 		auto mark = [](const std::string& s, std::vector<int32_t> expected)
 		{
 			std::vector<int32_t> ids;

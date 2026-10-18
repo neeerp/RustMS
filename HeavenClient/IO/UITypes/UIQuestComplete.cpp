@@ -19,9 +19,9 @@ namespace ms
 	namespace
 	{
 		// The first notice's left edge and how far its top sits above the
-		// bottom of the screen; each later one sits 5 px higher, over the last
-		// (FUN_00523408). The text is laid out from footage (FRS4wNJWWIE, 2:00).
-		constexpr int16_t LEFT = 464, ABOVE_BOTTOM = 97, CASCADE = 5;
+		// bottom of the screen; later ones sit higher, over it (FUN_00523408,
+		// FadePlace). The text is laid out from footage (FRS4wNJWWIE, 2:00).
+		constexpr int16_t LEFT = 464, ABOVE_BOTTOM = 97;
 		constexpr int16_t TEXT_X = 24, NAME_WIDTH = 104;
 		const Point<int16_t> ICON(6, 12), HEADING(TEXT_X, 2), NAME(TEXT_X, 15);
 		const Point<int16_t> OK_AT(133, 5), CANCEL_AT(133, 19);
@@ -43,15 +43,15 @@ namespace ms
 
 	void UIQuestComplete::draw(float alpha) const
 	{
-		for (size_t i = 0; i < notices.size(); i++)
+		for (const Notice& notice : notices)
 		{
-			Point<int16_t> at = position + offset(i);
-			float opacity = notices[i].life.opacity();
+			Point<int16_t> at = position + offset(notice);
+			float opacity = notice.life.opacity();
 
 			background.draw(DrawArgument(at, opacity));
 			icon.draw(DrawArgument(at + ICON, opacity));
 			heading.draw(DrawArgument(at + HEADING, opacity));
-			notices[i].name.draw(DrawArgument(at + NAME, opacity));
+			notice.name.draw(DrawArgument(at + NAME, opacity));
 		}
 
 		// Only the top notice can be reached; the others' buttons lie under it.
@@ -108,7 +108,8 @@ namespace ms
 			changed = true;
 		}
 
-		if (changed)
+		// Notices of other kinds coming and going move these too.
+		if (changed || (!notices.empty() && notices.back().life.raised() != buttons_raised))
 			rebuild();
 
 		UIElement::update();
@@ -123,15 +124,16 @@ namespace ms
 		if (notices.empty())
 			return;
 
-		Point<int16_t> at = offset(notices.size() - 1);
+		buttons_raised = notices.back().life.raised();
+		Point<int16_t> at = offset(notices.back());
 
 		buttons[OK] = std::make_unique<MapleButton>(fade["BtOK"], at + OK_AT);
 		buttons[CANCEL] = std::make_unique<MapleButton>(fade["BtCancel"], at + CANCEL_AT);
 	}
 
-	Point<int16_t> UIQuestComplete::offset(size_t index) const
+	Point<int16_t> UIQuestComplete::offset(const Notice& notice) const
 	{
-		return Point<int16_t>(0, -static_cast<int16_t>(index * CASCADE));
+		return Point<int16_t>(0, -notice.life.raised());
 	}
 
 	void UIQuestComplete::update_screen(int16_t, int16_t new_height)
@@ -144,9 +146,10 @@ namespace ms
 		if (notices.empty())
 			return false;
 
-		Point<int16_t> top = position + offset(notices.size() - 1);
+		Point<int16_t> top = position + offset(notices.back());
+		Point<int16_t> bottom = position + offset(notices.front()) + Point<int16_t>(WIDTH, HEIGHT);
 
-		return Rectangle<int16_t>(top, position + Point<int16_t>(WIDTH, HEIGHT)).contains(cursorpos);
+		return Rectangle<int16_t>(top, bottom).contains(cursorpos);
 	}
 
 	Button::State UIQuestComplete::button_pressed(uint16_t buttonid)

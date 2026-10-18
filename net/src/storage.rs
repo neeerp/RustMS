@@ -20,9 +20,9 @@ pub mod result {
     pub const TAKEN_OUT: u8 = 0x09;
     /// "Please check if your inventory is full or not."
     pub const INVENTORY_FULL: u8 = 0x0a;
+    pub const TAKE_OUT_NO_MESOS: u8 = 0x0b;
     /// The player already has the one-of-a-kind item.
-    pub const ONLY_ONE: u8 = 0x0b;
-    pub const TAKE_OUT_NO_MESOS: u8 = 0x0c;
+    pub const ONLY_ONE: u8 = 0x0c;
     pub const STORED: u8 = 0x0d;
     pub const SORTED: u8 = 0x0f;
     pub const STORE_NO_MESOS: u8 = 0x10;

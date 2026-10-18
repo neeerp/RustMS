@@ -40,6 +40,11 @@ const ARROW_BOMB: i32 = 3101005;
 /// Rapid Fire's targets end without the usual 4 bytes.
 const RAPID_FIRE: i32 = 5221004;
 
+/// Shadow Meso, which throws mesos, and the Shadow Partner that raises
+/// what it costs.
+const SHADOW_MESO: i32 = 4111004;
+const SHADOW_PARTNER: i32 = 4111002;
+
 /// Skills sent as shots that fire no ammo (the v83 client's FUN_007667ee).
 const AMMO_FREE: [i32; 12] = [
     4111004,  // Shadow Meso
@@ -228,12 +233,13 @@ pub struct Ammo {
     pub quantity: i16,
 }
 
-/// What a valid attack uses: its skill, whose MP the caller spends, and a
-/// shot's ammo, which the caller takes.
+/// What a valid attack uses: its skill, whose MP the caller spends, a
+/// shot's ammo, which the caller takes, and the mesos it throws.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Uses {
     pub skill: Option<Learned>,
     pub ammo: Option<Ammo>,
+    pub mesos: i32,
 }
 
 /// A shot fires the stack in the slot the client names, which the weapon
@@ -283,6 +289,7 @@ pub enum AttackRejection {
     /// A skill the player hasn't learned, or one that doesn't attack.
     Skill,
     NotEnoughMp,
+    NotEnoughMesos,
     TooManyTargets,
     Damage,
     /// A shot without enough of an ammo its weapon fires.
@@ -300,11 +307,24 @@ pub fn attack_mp_cost(skill: &Learned) -> i32 {
     }
 }
 
+/// The mesos a skill's attack throws: its `moneyCon`, raised by Shadow
+/// Partner's `y` percent while Shadow Partner is up (the v83 client's
+/// FUN_00764256).
+fn meso_cost(skill: &Learned, player: &Player) -> i32 {
+    let cost = skill.effect.money_cost;
+    if player.buffs.value(BuffStat::ShadowPartner).is_none() {
+        return cost;
+    }
+    let raise = skills::learned(player, SHADOW_PARTNER).map_or(0, |partner| partner.effect.y);
+    cost + raise * cost / 100
+}
+
 /// Basic attacks hit one mob once; each hit must stay under twice the base
 /// maximum (room for the client's own rolls, never a multiple of it). A
 /// skill attack takes its limits from the skill's level: its mob and hit
-/// counts (a shot's bullets), and its fixed damage, its magic attack, or its
-/// damage percent. A spell must be a skill, and a shot needs ammo.
+/// counts (a shot's bullets), and its fixed damage, its magic attack, its
+/// damage percent, or the mesos it throws. A spell must be a skill, and a
+/// shot needs ammo.
 pub fn validate(attack: &Attack, player: &Player) -> Result<Uses, AttackRejection> {
     if player.stats.hp <= 0 {
         return Err(AttackRejection::Dead);
@@ -319,6 +339,7 @@ pub fn validate(attack: &Attack, player: &Player) -> Result<Uses, AttackRejectio
         return Err(AttackRejection::Diseased);
     }
     let base_cap = (max_base_damage(player) * 2).max(10);
+    let mut mesos = 0;
     let (skill, mob_count, hit_count, cap) = if attack.skill == 0 {
         if attack.kind == AttackKind::Magic {
             return Err(AttackRejection::Skill);
@@ -341,6 +362,10 @@ pub fn validate(attack: &Attack, player: &Player) -> Result<Uses, AttackRejectio
                 * f64::from(skills::amplification(player))
                 / 100.0;
             ((max * 1.5).ceil() as i32).max(10)
+        } else if skill.skill_id == SHADOW_MESO {
+            // Ten times between half and one and a half its `moneyCon`,
+            // raised by its `x` percent on a critical (FUN_0078df87).
+            effect.money_cost * 3 / 2 * 10 * (100 + effect.x) / 100
         } else if let Some(percent) = damage_percent(&skill) {
             (base_cap * percent / 100).max(10)
         } else {
@@ -348,6 +373,10 @@ pub fn validate(attack: &Attack, player: &Player) -> Result<Uses, AttackRejectio
         };
         if i32::from(player.stats.mp) < attack_mp_cost(&skill) {
             return Err(AttackRejection::NotEnoughMp);
+        }
+        mesos = meso_cost(&skill, player);
+        if player.meso < mesos {
+            return Err(AttackRejection::NotEnoughMesos);
         }
         let hit_count = match attack.kind {
             AttackKind::Ranged => effect.bullet_count,
@@ -381,7 +410,7 @@ pub fn validate(attack: &Attack, player: &Player) -> Result<Uses, AttackRejectio
         return Err(AttackRejection::Damage);
     }
     let ammo = shot_ammo(attack, player, skill.as_ref())?;
-    Ok(Uses { skill, ammo })
+    Ok(Uses { skill, ammo, mesos })
 }
 
 /// How much of the base damage a skill's hits deal, in percent, or `None`
@@ -512,7 +541,8 @@ mod tests {
             validate(&parse_close_attack(&attack_packet(1, 20)).unwrap(), &player),
             Ok(Uses {
                 skill: None,
-                ammo: None
+                ammo: None,
+                mesos: 0
             })
         );
         assert_eq!(
@@ -870,6 +900,48 @@ mod tests {
     }
 
     /// A claw, with `stars` Subis in USE slot 1.
+    #[test]
+    fn shadow_meso_costs_mesos_and_hits_by_them() {
+        if skills::data().is_err() {
+            return;
+        }
+        let now = std::time::Instant::now();
+        let long = std::time::Duration::from_secs(60);
+        let toss = |damage: &[i32]| {
+            parse_attack(
+                &kind_attack_packet(AttackKind::Ranged, SHADOW_MESO, 0, damage),
+                AttackKind::Ranged,
+            )
+            .unwrap()
+        };
+        let mut player = rogue_with_stars(100);
+        learn(&mut player, SHADOW_MESO, 30);
+        // Level 30 throws 570 mesos and hits for at most 855 * 10, half
+        // again on a critical.
+        player.meso = 569;
+        assert_eq!(
+            validate(&toss(&[1]), &player).unwrap_err(),
+            AttackRejection::NotEnoughMesos
+        );
+        player.meso = 570;
+        let uses = validate(&toss(&[12825]), &player).unwrap();
+        assert_eq!((uses.mesos, uses.ammo), (570, None));
+        assert_eq!(
+            validate(&toss(&[12826]), &player).unwrap_err(),
+            AttackRejection::Damage
+        );
+        // Shadow Partner's level 30 raises the cost by its y, 50 percent.
+        learn(&mut player, SHADOW_PARTNER, 30);
+        let partner = game::Buff::new(SHADOW_PARTNER, BuffStat::ShadowPartner, 80, now, long);
+        player.buffs.give(partner);
+        assert_eq!(
+            validate(&toss(&[1, 1]), &player).unwrap_err(),
+            AttackRejection::NotEnoughMesos
+        );
+        player.meso = 855;
+        assert_eq!(validate(&toss(&[1, 1]), &player).unwrap().mesos, 855);
+    }
+
     fn rogue_with_stars(stars: i16) -> Player {
         let mut player = beginner_with_sword();
         player.inventory.insert(
@@ -904,7 +976,8 @@ mod tests {
                     slot: 1,
                     item_id: 2070000,
                     quantity: 1
-                })
+                }),
+                mesos: 0
             }
         );
         // Arrows don't fit a claw, and an empty slot holds nothing.

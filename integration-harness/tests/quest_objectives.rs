@@ -3,6 +3,7 @@
 //! 1037/1038 (Sam's snails, Maria, and Lucas).
 
 use integration_harness::connection::MapleTestConnection;
+use integration_harness::database::grant_item;
 use integration_harness::hunting::{attack, pickup, walk_to};
 use integration_harness::preconditions::load_harness_config_or_fail;
 use integration_harness::quests::{act, COMPLETE, START};
@@ -25,6 +26,8 @@ const CANDY: i32 = 4031792;
 const SHELLPIECE: i32 = 4031802;
 const LETTER: i32 = 4031800;
 const BEGINNER_HATS: [i32; 5] = [1002053, 1002008, 1002014, 1002068, 1002069];
+const SNAIL_SHELL: i32 = 4000000;
+const ETC: i16 = 4;
 
 /// Warp somewhere and wait for `count` of `mob_id` to show up.
 async fn enter_hunting_ground(
@@ -83,6 +86,41 @@ async fn nina_gives_candy_that_sen_shares_with_beginners() {
     assert_eq!(restored.quests.get(&1034), Some(&2));
     assert_eq!(restored.items.get(&CANDY), None);
     assert_eq!(restored.items.get(&2022253), Some(&2));
+}
+
+#[tokio::test]
+async fn nina_keeps_her_candy_from_a_full_etc_inventory() {
+    let config = load_harness_config_or_fail().await;
+    let m = config.character_name.clone();
+    let id = login_to_world_session(&config)
+        .await
+        .expect("first login failed")
+        .character_id;
+    drop(relogin(&config).await);
+    tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+    for slot in 1..=24 {
+        grant_item(id, ETC, slot, SNAIL_SHELL)
+            .await
+            .expect("fill the Etc inventory");
+    }
+
+    let mut trace = Trace::default();
+    let mut session = relogin(&config).await;
+    let c = &mut session.connection;
+    assert_eq!(warp(c, 20_000, "", &mut trace).await, 20_000);
+    act(c, &mut trace, &m, START, 1032, NINA).await;
+    assert_eq!(warp(c, 20_001, "", &mut trace).await, 20_001);
+    act(c, &mut trace, &m, COMPLETE, 1032, SEN).await;
+    act(c, &mut trace, &m, START, 1033, SEN).await;
+    assert_eq!(warp(c, 20_000, "", &mut trace).await, 20_000);
+    act(c, &mut trace, &m, COMPLETE, 1033, NINA).await;
+
+    // The ten candies don't fit, so 1034 doesn't start. v83's quest result
+    // 10 names the quest; the client says which inventory is full.
+    act(c, &mut trace, &m, START, 1034, NINA).await;
+    assert_eq!(trace.quest_refusals, [(10, 1034)]);
+    assert_eq!(trace.states.get(&1034), None);
+    assert!(trace.items.is_empty(), "{:?}", trace.items);
 }
 
 #[tokio::test]

@@ -49,6 +49,24 @@ pub fn build_quest_action_result(
     Ok(p)
 }
 
+/// `UPDATE_QUEST_INFO` mode 10: the items of the quest's step don't fit.
+/// The client names the inventories from the step's own items.
+pub fn build_quest_items_full(quest_id: i16) -> Result<Packet, NetworkError> {
+    let mut p = Packet::new_empty();
+    p.write_short(SendOpcode::UpdateQuestInfo as i16)?;
+    p.write_byte(10)?;
+    p.write_short(quest_id)?;
+    Ok(p)
+}
+
+/// `UPDATE_QUEST_INFO` mode 11: "You do not have enough mesos."
+pub fn build_quest_short_of_mesos() -> Result<Packet, NetworkError> {
+    let mut p = Packet::new_empty();
+    p.write_short(SendOpcode::UpdateQuestInfo as i16)?;
+    p.write_byte(11)?;
+    Ok(p)
+}
+
 /// The white "You have gained experience" line on the right; `party_bonus`
 /// is the extra EXP from sharing the kill with a party, shown on its own
 /// line under it.
@@ -139,6 +157,22 @@ mod tests {
         let mut expect = Expect::new(&packet.bytes);
         expect.short(SendOpcode::UpdateQuestInfo as i16).byte(8);
         expect.short(1032).int(2001).short(1033);
+        expect.end();
+    }
+
+    #[test]
+    fn quest_refusals_carry_only_what_the_client_reads() {
+        let packet = build_quest_items_full(1032).unwrap();
+        let mut expect = Expect::new(&packet.bytes);
+        expect
+            .short(SendOpcode::UpdateQuestInfo as i16)
+            .byte(10)
+            .short(1032);
+        expect.end();
+
+        let packet = build_quest_short_of_mesos().unwrap();
+        let mut expect = Expect::new(&packet.bytes);
+        expect.short(SendOpcode::UpdateQuestInfo as i16).byte(11);
         expect.end();
     }
 

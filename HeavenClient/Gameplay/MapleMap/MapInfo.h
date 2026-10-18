@@ -95,6 +95,13 @@ namespace ms
 		// Whether the map lets the player use Teleport (fieldLimit bit 0x2).
 		bool can_use_movement_skills() const;
 
+		// Whether the map lets the player use a potion or the like
+		// (field_limit::may_use).
+		bool can_use_item(int32_t item_id) const;
+
+		// Whether the map lets the player drop items and mesos.
+		bool can_drop() const;
+
 		Range<int16_t> get_walls() const;
 
 		Range<int16_t> get_borders() const;
@@ -106,7 +113,9 @@ namespace ms
 		Optional<const Ladder> findladder(Point<int16_t> a, Point<int16_t> b) const;
 
 	private:
-		int32_t fieldlimit;
+		int32_t fieldlimit = 0;
+		// The items a map with fieldLimit bit 0x400 still allows.
+		std::vector<int32_t> allowed_items;
 		bool cloud;
 		std::string bgm;
 		std::string mapdesc;

@@ -33,8 +33,12 @@ namespace ms
 		{
 			FBR_NONE,
 			FBR_WEAPONTYPE,
+			// The weapon doesn't suit the skill (skill_weapon::EQUIPPED).
+			FBR_EQUIPPED,
 			FBR_HPCOST,
 			FBR_MPCOST,
+			FBR_MESOCOST,
+			FBR_ITEMCOST,
 			FBR_BULLETCOST,
 			FBR_COOLDOWN,
 			FBR_ONEHANDED,

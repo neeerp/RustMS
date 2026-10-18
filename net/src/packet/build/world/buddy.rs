@@ -36,6 +36,9 @@ pub struct BuddyView {
     pub group: String,
     /// Zero-based channel, or `None` while offline or not mutual.
     pub channel: Option<u8>,
+    /// They asked to be added and haven't been answered. The client keeps
+    /// the entry, hidden, and asks about it again after each map change.
+    pub requesting: bool,
 }
 
 fn buddy_list(op: u8) -> Result<Packet, NetworkError> {
@@ -50,14 +53,10 @@ fn channel_int(channel: Option<u8>) -> i32 {
 }
 
 /// The 39-byte `GW_Friend` record.
-fn write_entry(
-    packet: &mut Packet,
-    buddy: &BuddyView,
-    requesting: bool,
-) -> Result<(), NetworkError> {
+fn write_entry(packet: &mut Packet, buddy: &BuddyView) -> Result<(), NetworkError> {
     packet.write_int(buddy.id)?;
     write_padded_name(packet, &buddy.name)?;
-    packet.write_byte(u8::from(requesting))?;
+    packet.write_byte(u8::from(buddy.requesting))?;
     packet.write_int(channel_int(buddy.channel))?;
     let group = buddy.group.as_bytes();
     let group = &group[..group.len().min(GROUP_FIELD_LEN - 1)];
@@ -71,7 +70,7 @@ pub fn build_buddy_list(buddies: &[BuddyView]) -> Result<Packet, NetworkError> {
     let mut packet = buddy_list(OP_LIST)?;
     packet.write_byte(buddies.len() as u8)?;
     for buddy in buddies {
-        write_entry(&mut packet, buddy, false)?;
+        write_entry(&mut packet, buddy)?;
     }
     // Whether each buddy is in the Cash Shop.
     for _ in buddies {
@@ -94,8 +93,9 @@ pub fn build_buddy_request(
         name: from_name.into(),
         group: "Default Group".into(),
         channel,
+        requesting: true,
     };
-    write_entry(&mut packet, &entry, true)?;
+    write_entry(&mut packet, &entry)?;
     packet.write_byte(0)?; // in the Cash Shop
     Ok(packet)
 }
@@ -147,12 +147,14 @@ mod tests {
                 name: "Bobby".into(),
                 group: "Default Group".into(),
                 channel: Some(2),
+                requesting: false,
             },
             BuddyView {
                 id: 9,
                 name: "Carol".into(),
                 group: "A group name that is far too long".into(),
                 channel: None,
+                requesting: true,
             },
         ];
         let packet = build_buddy_list(&buddies).unwrap();
@@ -167,7 +169,7 @@ mod tests {
         expect
             .int(9)
             .bytes(&padded("Carol", 13))
-            .byte(0)
+            .byte(1)
             .int(-1)
             .bytes(&padded("A group name tha", 17));
         expect.int(0).int(0).end();

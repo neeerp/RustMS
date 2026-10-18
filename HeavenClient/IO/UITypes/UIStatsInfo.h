@@ -101,6 +101,8 @@ namespace ms
 		void update_buffed(StatLabel label, EquipStat::Id stat, int32_t extra);
 
 		void send_apup(MapleStat::Id stat) const;
+		// Ask before spending AP on MaxHP or MaxMP, as v83 does.
+		void confirm_apup(MapleStat::Id stat) const;
 
 		void set_detail(bool enabled);
 

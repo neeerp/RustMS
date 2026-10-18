@@ -19,6 +19,7 @@
 
 #include "Heal.h"
 #include "Prepare.h"
+#include "SkillWeapon.h"
 
 #include "../../Character/Char.h"
 #include "../../Character/SkillId.h"
@@ -244,6 +245,15 @@ namespace ms
 			attack.element = SkillData::get(skillid).get_element();
 			attack.elemboost = elemboost(user, attack.element);
 			attack.damagetype = Attack::DMG_MAGIC;
+		} else if (skillid == SkillId::SHADOW_MESO)
+		{
+			// The mesos it throws, with its own critical in place of the
+			// user's (FUN_0078df87).
+			attack.mindamage = stats.mesocost * 0.5;
+			attack.maxdamage = stats.mesocost * 1.5;
+			attack.critical = stats.chance;
+			attack.mesocritical = stats.x;
+			attack.damagetype = Attack::DMG_MESO;
 		} else if (stats.matk)
 		{
 			attack.matk += stats.matk;
@@ -401,12 +411,21 @@ namespace ms
 			}
 		}
 
-		Weapon::Type reqweapon = SkillData::get(skillid).get_required_weapon();
+		const SkillData &data = SkillData::get(skillid);
 
-		if (weapon != reqweapon && reqweapon != Weapon::NONE)
-			return FBR_WEAPONTYPE;
+		switch (skill_weapon::check(skillid, data.is_shot(), weapon, data.get_required_weapon()))
+		{
+			case skill_weapon::WEAPON:
+				return FBR_WEAPONTYPE;
+			case skill_weapon::EQUIPPED:
+				return FBR_EQUIPPED;
+			case skill_weapon::QUIET:
+				return FBR_OTHER;
+			default:
+				break;
+		}
 
-		if (!SkillData::get(skillid).uses_ammo())
+		if (!data.uses_ammo())
 			return FBR_NONE;
 
 		switch (weapon)

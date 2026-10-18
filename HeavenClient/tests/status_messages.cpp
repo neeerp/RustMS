@@ -48,6 +48,8 @@ int main()
 		require(meso_line(-150) == "You have lost mesos. (-150)", "losing mesos");
 		require(fame_line(1) == "You have gained fame. (+1)", "gaining fame");
 		require(fame_line(-1) == "You have lost fame (-1)", "losing fame");
+		require(guild_points_line(5) == "You have earned Guild Points (+5)", "earning guild points");
+		require(guild_points_line(0) == "You have lost Guild Points (0)", "losing none");
 
 		Writer kill;
 		kill.exp(true, 25, false, 3);

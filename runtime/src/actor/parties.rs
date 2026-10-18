@@ -128,12 +128,16 @@ impl Parties {
         Some(party)
     }
 
+    /// Whether `inviter`'s invitation to `invitee` is waiting.
+    pub fn is_invited(&self, invitee: ClientId, inviter: ClientId) -> bool {
+        self.invites
+            .get(&invitee)
+            .is_some_and(|invite| invite.inviter == inviter)
+    }
+
     /// Turn down `inviter`'s invitation. Returns whether there was one.
     pub fn decline(&mut self, invitee: ClientId, inviter: ClientId) -> bool {
-        let pending = self
-            .invites
-            .get(&invitee)
-            .is_some_and(|invite| invite.inviter == inviter);
+        let pending = self.is_invited(invitee, inviter);
         if pending {
             self.invites.remove(&invitee);
         }

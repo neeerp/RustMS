@@ -22,9 +22,13 @@ impl WorldHandler for MesoDropHandler {
         let amount = reader.read_int()?;
 
         let player = &mut *ctx.player;
+        let field = crate::get_game_data()
+            .ok()
+            .and_then(|data| data.field(player.stats.map_id));
         if player.stats.hp <= 0
             || !(MESO_DROP_MIN..=MESO_DROP_MAX).contains(&amount)
             || amount > player.meso
+            || !field.is_none_or(|field| field.may_drop())
         {
             debug!(amount, meso = player.meso, "Meso drop refused");
             // Unlock the client's item actions.
@@ -100,5 +104,20 @@ mod tests {
             [WorldAction::Reply(_)]
         ));
         assert_eq!(player.meso, 30);
+    }
+
+    #[test]
+    fn refuses_drops_where_the_map_forbids_them() {
+        if crate::get_game_data().is_err() {
+            return;
+        }
+        let mut player = crate::codec::stats::sample_player();
+        player.meso = 100;
+        player.stats.map_id = 910_000_001;
+        assert!(matches!(
+            drop_mesos(&mut player, 10).as_slice(),
+            [WorldAction::Reply(_)]
+        ));
+        assert_eq!(player.meso, 100);
     }
 }

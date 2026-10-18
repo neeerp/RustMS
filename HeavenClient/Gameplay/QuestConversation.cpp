@@ -5,6 +5,7 @@
 #include "../Character/QuestCatalog.h"
 #include "../Character/QuestDialogue.h"
 #include "../Character/QuestMarker.h"
+#include "../Data/ItemData.h"
 #include "../IO/UI.h"
 #include "../IO/UITypes/UINpcTalk.h"
 #include "../Net/Packets/NpcInteractionPackets.h"
@@ -15,6 +16,7 @@
 #include <nlnx/nx.hpp>
 
 #include <algorithm>
+#include <ctime>
 #include <map>
 #include <optional>
 #include <string>
@@ -31,13 +33,13 @@ namespace ms
 				QuestDialogue dialogue;
 				int16_t quest_id;
 				int32_t npc_id;
+				// Opens once the dialogue has been read to the end.
+				int16_t next_quest = 0;
 			};
 
 			std::optional<Active> active;
-			// A follow-up quest to open once the current conversation ends.
-			std::optional<std::pair<int16_t, int32_t>> next;
 
-			// Menu choice for the NPC's normal speech; quest ids are positive.
+			// Menu choice for the NPC's script; quest ids are positive.
 			constexpr int32_t TALK_CHOICE = 0;
 
 			Player& player()
@@ -58,25 +60,80 @@ namespace ms
 					[](int16_t id) { return state(id); });
 			}
 
-			bool items_met(const QuestInfo& quest)
+			QuestStop completion_stop(const QuestInfo& quest, int32_t npc_id)
+			{
+				const Inventory& inventory = player().get_inventory();
+				const auto& started = player().get_quests().started_quests();
+				auto progress = started.find(quest.id);
+
+				return ms::completion_stop(quest, npc_id, [](int16_t id) { return state(id); },
+					[&](int32_t id) { return inventory.get_total_item_count(id); },
+					progress == started.end() ? std::string() : progress->second);
+			}
+
+			// Whether a quest item given at the start is no longer held, worn
+			// or not (FUN_00718b58).
+			bool lost_start_items(const QuestInfo& quest)
 			{
 				const Inventory& inventory = player().get_inventory();
 
-				return end_items_met(quest, [&](int32_t id) { return inventory.get_total_item_count(id); });
+				return std::any_of(quest.start_items.begin(), quest.start_items.end(), [&](const auto& item)
+				{
+					int32_t held = inventory.get_total_item_count(item.first) +
+						inventory.count_slots(InventoryType::Id::EQUIPPED, item.first);
+
+					return ItemData::get(item.first).is_questitem() && held < item.second;
+				});
 			}
 
-			bool mobs_met(const QuestInfo& quest)
+			// What the NPC says when a quest can't be completed with it, or
+			// yet: the NPC's own d0 line when the quest has nothing to say.
+			std::vector<std::string> stop_pages(const QuestScript& script, QuestStop stop, bool lost, int32_t npc_id)
 			{
-				const auto& started = player().get_quests().started_quests();
-				auto iter = started.find(quest.id);
+				if (lost && !script.lost.empty())
+					return script.lost;
 
-				return end_mobs_met(quest, iter == started.end() ? std::string() : iter->second);
+				std::vector<std::string> pages = script.stop(stop_reason(stop));
+
+				if (pages.empty())
+				{
+					std::string line = nl::nx::string["Npc.img"][std::to_string(npc_id)]["d0"];
+
+					if (!line.empty())
+						pages.push_back(line);
+				}
+
+				return pages;
 			}
 
-			// Whether the server has normal speech for this NPC (info/speak).
-			bool has_speech(int32_t npc_id)
+			// The NPC's script (Npc/<id>.img/info/script/<n>/script): the
+			// last whose start and end dates include today (FUN_006de2d3).
+			// The server runs it when the NPC is talked to.
+			std::string npc_script(int32_t npc_id)
 			{
-				return NxHelper::Npc::get_npc_node(npc_id)["info"]["speak"].size() > 0;
+				std::time_t now = std::time(nullptr);
+				std::tm local = *std::localtime(&now);
+				int64_t today = ((local.tm_year + 1900) * 100 + local.tm_mon + 1) * 100 + local.tm_mday;
+				nl::node scripts = nl::nx::npc[string_format::extend_id(npc_id, 7) + ".img"]["info"]["script"];
+				std::string script;
+
+				for (int n = 0; nl::node entry = scripts[std::to_string(n)]; n++)
+				{
+					std::string name = entry["script"];
+
+					if (!name.empty() && entry["start"].get_integer(19000101) <= today &&
+						today <= entry["end"].get_integer(20790101))
+						script = name;
+				}
+
+				return script;
+			}
+
+			// The NPC's own line, from String/Npc.img: d0 greets, d1 is for
+			// when all of its quests are done.
+			std::string npc_line(int32_t npc_id, const char* line)
+			{
+				return nl::nx::string["Npc.img"][std::to_string(npc_id)][line];
 			}
 
 			Texture list_header(int index)
@@ -103,18 +160,37 @@ namespace ms
 				show();
 			}
 
+			void begin(Active conversation)
+			{
+				active = std::move(conversation);
+				send(active->dialogue.take_initial_effect(), active->quest_id, active->npc_id);
+				show();
+			}
+
+			// A page the NPC says without the server, as v83 does when
+			// there is nothing to list (FUN_006d3392). OK and END CHAT
+			// both just close it.
+			void say(int32_t npc_id, const std::string& text)
+			{
+				begin({ QuestDialogue::reading({ text }), 0, npc_id });
+			}
+
 			void show()
 			{
 				auto page = active ? active->dialogue.page() : std::nullopt;
 
 				if (!page)
 				{
-					active.reset();
-
-					if (auto followup = next)
+					if (active && active->dialogue.read() && active->next_quest != 0)
 					{
-						next.reset();
-						open(followup->first, followup->second);
+						int16_t next_quest = active->next_quest;
+						int32_t npc_id = active->npc_id;
+						active.reset();
+						open(next_quest, npc_id);
+					}
+					else
+					{
+						active.reset();
 					}
 
 					return;
@@ -142,7 +218,7 @@ namespace ms
 
 				if (auto talk = UI::get().get_element<UINpcTalk>())
 				{
-					talk->change_text(active->npc_id, type, style, 0, page->text, {}, UINpcTalk::Menu::LIST);
+					talk->change_text(active->npc_id, type, style, page->speaker, page->text, {}, UINpcTalk::Menu::LIST);
 					talk->set_local_responder(respond);
 				}
 			}
@@ -155,86 +231,109 @@ namespace ms
 			if (!quest)
 				return;
 
-			std::optional<QuestDialogue::Mode> mode;
-
-			if (state(quest_id) == 0 && quest->start_npc == npc_id && can_start(*quest))
-				mode = QuestDialogue::Mode::OFFER;
-			else if (state(quest_id) == 1 && quest->end_npc == npc_id)
-				mode = QuestDialogue::Mode::COMPLETION;
-			else if (state(quest_id) == 1 && quest->start_npc == npc_id)
-				mode = QuestDialogue::Mode::REMINDER;
-
-			if (!mode)
-				return;
-
-			bool completion_side = *mode != QuestDialogue::Mode::OFFER;
-			QuestScript script = QuestCatalog::get().script(quest_id, completion_side);
-
-			if (*mode == QuestDialogue::Mode::COMPLETION && !mobs_met(*quest))
+			if (state(quest_id) == 0)
 			{
-				// Say why it can't be finished yet (stop/mob, else stop/item).
-				script.reminder = script.mob_reminder.empty() ? script.item_reminder : script.mob_reminder;
-				mode = QuestDialogue::Mode::REMINDER;
-			}
-			else if (*mode == QuestDialogue::Mode::COMPLETION && !items_met(*quest))
-			{
-				// Say why it can't be finished yet (stop/item).
-				script.reminder = script.item_reminder;
-				mode = QuestDialogue::Mode::REMINDER;
-			}
-			else if ((*mode == QuestDialogue::Mode::OFFER && quest->start_script) ||
-				(*mode == QuestDialogue::Mode::COMPLETION && quest->end_script))
-			{
-				// The server runs this step as a script and sends its dialogue.
-				auto action = *mode == QuestDialogue::Mode::OFFER
-					? QuestActionPacket::SCRIPT_START : QuestActionPacket::SCRIPT_END;
-				QuestActionPacket(action, quest_id, npc_id, player().get_position()).dispatch();
+				if (quest->start_npc != npc_id || !can_start(*quest))
+					return;
+
+				if (quest->start_script)
+				{
+					// The server runs this step as a script and sends its dialogue.
+					QuestActionPacket(QuestActionPacket::SCRIPT_START, quest_id, npc_id, player().get_position()).dispatch();
+					return;
+				}
+
+				begin({ QuestDialogue(QuestDialogue::Mode::OFFER, QuestCatalog::get().script(quest_id, false)), quest_id, npc_id });
 				return;
 			}
 
-			active = Active { QuestDialogue(*mode, std::move(script)), quest_id, npc_id };
-			send(active->dialogue.take_initial_effect(), quest_id, npc_id);
-			show();
+			if (state(quest_id) != 1)
+				return;
+
+			// v83 checks Check.img/<id>/1 before saying anything (FUN_00716fe1).
+			QuestScript script = QuestCatalog::get().script(quest_id, true);
+			QuestStop stop = completion_stop(*quest, npc_id);
+
+			if (stop != QuestStop::NONE)
+			{
+				bool lost = stop == QuestStop::NPC && lost_start_items(*quest);
+				begin({ QuestDialogue::reading(stop_pages(script, stop, lost, npc_id)), quest_id, npc_id });
+				return;
+			}
+
+			if (quest->end_script)
+			{
+				QuestActionPacket(QuestActionPacket::SCRIPT_END, quest_id, npc_id, player().get_position()).dispatch();
+				return;
+			}
+
+			auto& stats = player().get_stats();
+			std::string rewards = quest->rewards.summary(stats.get_stat(MapleStat::Id::JOB), stats.get_female(),
+				quest->next_quest != 0);
+
+			begin({ QuestDialogue(QuestDialogue::Mode::COMPLETION, std::move(script), std::move(rewards)), quest_id, npc_id });
 		}
 
-		void continue_with(int16_t quest_id, int32_t npc_id)
+		void confirmed(int16_t quest_id, int32_t npc_id, int16_t next_quest)
 		{
-			if (active)
-				next = std::make_pair(quest_id, npc_id);
-			else
-				open(quest_id, npc_id);
+			// The quest's record arrives first, so a started quest is in
+			// progress and a completed one is not.
+			bool completed = state(quest_id) != 1;
+			QuestScript script = QuestCatalog::get().script(quest_id, completed);
+
+			if (script.yes.empty())
+			{
+				if (next_quest != 0)
+					open(next_quest, npc_id);
+
+				return;
+			}
+
+			begin({ QuestDialogue::reading(std::move(script.yes)), quest_id, npc_id, next_quest });
 		}
 
 		void talk_to_npc(int32_t npc_id, int32_t object_id)
 		{
-			// Same order as the original list: turn-ins, open quests, new quests.
-			std::vector<int16_t> turn_in, in_progress, available;
+			QuestMenu menu = select_quest_menu(npc_id, QuestCatalog::get().quests(),
+				[](int16_t id) { return state(id); }, can_start,
+				[npc_id](const QuestInfo& quest) { return completion_stop(quest, npc_id) == QuestStop::NONE; });
 
-			for (const auto& quest : QuestCatalog::get().quests())
-			{
-				int16_t current = state(quest.id);
+			// As v83 decides (FUN_0095fe9e, FUN_006d3392): the server runs an
+			// NPC without quests, or one with a script and nothing to list;
+			// otherwise the NPC says its own line here.
+			std::string script = npc_script(npc_id);
 
-				if (current == 1 && quest.end_npc == npc_id)
-					turn_in.push_back(quest.id);
-				else if (current == 1 && quest.start_npc == npc_id)
-					in_progress.push_back(quest.id);
-				else if (current == 0 && quest.start_npc == npc_id && can_start(quest))
-					available.push_back(quest.id);
-			}
-
-			if (turn_in.empty() && in_progress.empty() && available.empty())
+			if (menu.quests == 0 || (menu.empty() && !script.empty()))
 			{
 				TalkToNPCPacket(object_id).dispatch();
 				return;
 			}
 
-			// UtilDlgEx/list3 "QUEST THAT CAN BE COMPLETED", list0 "QUEST IN
-			// PROGRESS", list1 "QUEST AVAILABLE", list2 "ETC" (normal speech,
-			// worded as in period footage).
-			std::string text;
+			if (menu.quests == menu.finished)
+			{
+				say(npc_id, npc_line(npc_id, "d1"));
+				return;
+			}
+
+			std::string greeting = npc_line(npc_id, "d0");
+
+			if (menu.empty())
+			{
+				if (!greeting.empty())
+					say(npc_id, greeting);
+
+				return;
+			}
+
+			// The greeting, then the quests in v83's order, under
+			// UtilDlgEx/list3 "QUEST THAT CAN BE COMPLETED", list1 "QUEST
+			// AVAILABLE" and list0 "QUEST IN PROGRESS", then the script under
+			// list2 "ETC", named by Etc/ScriptInfo.img or else by itself.
+			std::string text = greeting;
 			std::map<int32_t, Texture> headers;
 
-			for (auto [group, header] : { std::pair<const std::vector<int16_t>*, int>{ &turn_in, 3 }, { &in_progress, 0 }, { &available, 1 } })
+			for (auto [group, header] : { std::pair<const std::vector<int16_t>*, int>{ &menu.completable, 3 },
+					{ &menu.available, 1 }, { &menu.in_progress, 0 } })
 			{
 				for (size_t i = 0; i < group->size(); i++)
 				{
@@ -243,18 +342,19 @@ namespace ms
 					if (i == 0)
 						headers[id] = list_header(header);
 
-					text += " #L" + std::to_string(id) + "# " + QuestCatalog::get().find(id)->name + "#l";
+					text += quest_menu_line(id, *QuestCatalog::get().find(id), header != 1, header == 3);
 				}
 			}
 
-			if (has_speech(npc_id))
+			if (!script.empty())
 			{
+				std::string name = nl::nx::etc["ScriptInfo.img"][script].get_string(script);
+
 				headers[TALK_CHOICE] = list_header(2);
-				text += " #L" + std::to_string(TALK_CHOICE) + "# I have something to tell you.#l";
+				text += "#d#L" + std::to_string(TALK_CHOICE) + "# " + name + "#l#k\r\n";
 			}
 
 			active.reset();
-			next.reset();
 
 			UI::get().emplace<UINpcTalk>();
 			UI::get().enable();

@@ -53,7 +53,6 @@ namespace ms
 
 	private:
 		void give_fame(bool up) const;
-		void start_trade() const;
 
 		// The main window alone, or lengthened to show pets, the mount, or
 		// the monster book collection.

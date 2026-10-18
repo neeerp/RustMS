@@ -18,6 +18,7 @@
 #include "Player.h"
 
 #include "PlayerStates.h"
+#include "SkillId.h"
 
 #include "../Audio/Audio.h"
 #include "../Data/EquipData.h"
@@ -25,6 +26,7 @@
 #include "../Data/WeaponData.h"
 #include "../Gameplay/Combat/MagicDamage.h"
 #include "../Gameplay/Stage.h"
+#include "../IO/Messages.h"
 #include "../IO/UI.h"
 
 #include "../IO/UITypes/UIRevive.h"
@@ -205,6 +207,8 @@ namespace ms
 		{
 			if (type == InventoryType::Id::USE && (itemid / 10000 == 228 || itemid / 10000 == 229))
 				request(SkillBookPacket(slot, itemid), ExclRequest::USE_WAIT);
+			else if (type == InventoryType::Id::USE && !Stage::get().get_mapinfo().can_use_item(itemid))
+				InChatMessage(Messages::ITEM_FIELD).drop();
 			else if (type == InventoryType::Id::USE && disease::can_use_item(get_diseases()))
 				request(UseItemPacket(slot, itemid), ExclRequest::USE_WAIT);
 			else if (type == InventoryType::Id::SETUP && itemid / 10000 == 301)
@@ -607,7 +611,31 @@ namespace ms
 		uint16_t mp = stats.get_stat(MapleStat::Id::MP);
 		uint16_t bullets = inventory.get_most_bullets();
 
-		return move.can_use(level, weapon, job, hp, mp, bullets);
+		SpecialMove::ForbidReason reason = move.can_use(level, weapon, job, hp, mp, bullets);
+
+		// v83 checks the skill's mesos and item right after its HP and MP,
+		// before the weapon (FUN_00764256).
+		if (!move.is_skill() || reason == SpecialMove::ForbidReason::FBR_OTHER ||
+			reason == SpecialMove::ForbidReason::FBR_HPCOST || reason == SpecialMove::ForbidReason::FBR_MPCOST)
+			return reason;
+
+		const SkillData::Stats &cost = SkillData::get(move.get_id()).get_stats(level);
+		int32_t mesos = cost.mesocost;
+
+		// Shadow Meso costs more while Shadow Partner is on.
+		if (move.get_id() == SkillId::SHADOW_MESO && has_buff(Buffstat::Id::SHADOWPARTNER))
+		{
+			int32_t partner = skillbook.get_level(SkillId::SHADOW_PARTNER);
+			mesos += SkillData::get(SkillId::SHADOW_PARTNER).get_stats(partner).y * mesos / 100;
+		}
+
+		if (mesos > 0 && inventory.get_meso() < mesos)
+			return SpecialMove::ForbidReason::FBR_MESOCOST;
+
+		if (cost.itemcost > 0 && cost.itemcount > 0 && inventory.get_total_item_count(cost.itemcost) < cost.itemcount)
+			return SpecialMove::ForbidReason::FBR_ITEMCOST;
+
+		return reason;
 	}
 
 	Attack Player::prepare_attack(int32_t skill, bool whack) const

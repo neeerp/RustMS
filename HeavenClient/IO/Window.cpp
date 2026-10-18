@@ -86,9 +86,11 @@ namespace ms
 
 				break;
 			case GLFW_MOUSE_BUTTON_RIGHT:
+				// v83 acts on the right button coming up, in the field, the
+				// buff list and the Monster Book (WM_RBUTTONUP).
 				switch (action)
 				{
-					case GLFW_PRESS:
+					case GLFW_RELEASE:
 						UI::get().rightclick();
 						break;
 				}

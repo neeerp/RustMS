@@ -20,6 +20,7 @@
 #include "UILogin.h"
 #include "UILoginNotice.h"
 #include "UILoginWait.h"
+#include "UINotice.h"
 
 #include "../LoginScene.h"
 #include "../UI.h"
@@ -178,6 +179,8 @@ namespace ms
 			break;
 		}
 
+		int16_t pressed = status_pending ? requested : selected;
+
 		for (size_t i = 0; i < PLANK_SLOTS; i++)
 		{
 			Point<int16_t> pos = position + plank_pos(i);
@@ -190,7 +193,7 @@ namespace ms
 
 			const Plank &plank = planks[i];
 
-			if (static_cast<int16_t>(i) == selected)
+			if (static_cast<int16_t>(i) == pressed)
 				plank.pressed.draw(pos);
 			else if (plank.hovered && plank.hover_done)
 				plank.mouseover_end.draw(pos);
@@ -479,20 +482,32 @@ namespace ms
 		return Button::State::NORMAL;
 	}
 
-	void UIWorldSelect::select_world(uint8_t index)
+	void UIWorldSelect::server_status(uint8_t status)
 	{
-		if (index >= worlds.size() || index == selected)
+		// v83 stops waiting before it looks at the status.
+		status_pending = false;
+
+		if (requested < 0 || status > 2)
 			return;
 
-		Sound(Sound::Name::WORLDSELECT).play();
+		int16_t index = requested;
+		requested = -1;
+
+		if (status == 1)
+			UI::get().emplace<UIOk>("Since There Are Many\\nConcurrent Users in This World,\\nYou May Encounter Some "
+				"Difficulties During the Game Play.", [](bool) {});
+
+		if (status == 2)
+		{
+			UI::get().emplace<UIOk>("The Concurrent Users in This World\\nHave Reached the Max.\\nPlease Try Again Later.",
+				[](bool) {});
+			return;
+		}
 
 		selected = index;
-		focused = index;
 
 		const World &world = worlds[selected];
 		world_name = NxFiles::ui_classic["Login.img"]["WorldSelect"]["world"][std::to_string(world.wid)];
-
-		ServerStatusRequestPacket(world.wid).dispatch();
 
 		if (channelid >= world.channelcount)
 			channelid = 0;
@@ -507,8 +522,25 @@ namespace ms
 		}
 	}
 
+	void UIWorldSelect::select_world(uint8_t index)
+	{
+		if (status_pending || index >= worlds.size() || index == selected)
+			return;
+
+		Sound(Sound::Name::WORLDSELECT).play();
+
+		requested = index;
+		focused = index;
+		status_pending = true;
+
+		ServerStatusRequestPacket(worlds[index].wid).dispatch();
+	}
+
 	void UIWorldSelect::select_channel(uint8_t channel)
 	{
+		if (status_pending)
+			return;
+
 		channelid = channel;
 		channel_select.reset();
 		channel_select_done = false;
@@ -529,7 +561,7 @@ namespace ms
 
 	void UIWorldSelect::enter_world()
 	{
-		if (scroll != Scroll::OPEN)
+		if (scroll != Scroll::OPEN || status_pending)
 			return;
 
 		auto worldid = static_cast<uint8_t>(worlds[selected].wid);

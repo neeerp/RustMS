@@ -3,8 +3,9 @@
 Clicking an NPC opens asset-backed dialogue. Pio and other NPCs with normal
 speech use Next, Back, and OK. Close and Escape cancel. When the NPC has
 quests for the player, HeavenClient shows its quest menu first and renders
-quest conversations itself; picking "Misc." asks the server for normal speech.
-See [Quests](./quests.md).
+quest conversations itself; picking the "ETC" line (the NPC's script) asks
+the server to talk. See [Quests](./quests.md) for when the client talks
+instead of the server.
 
 The NPC chat key (Space by default, action 55) talks to the nearest NPC
 within 150 px horizontally and 50 px vertically of the player's feet
@@ -61,7 +62,9 @@ applied, and apply nothing if the player no longer has them. Answers are matched
 
 Text comes from the [server content pack](./server-content.md) with
 placeholders. HeavenClient expands NPC text markup (`Util/NpcTextMarkup.h`:
-`#h`, `#p`, `#t`/`#z`, `#o`, `#m`).
+`#h`, `#p`, `#t`/`#z`, `#o`, `#m`). The text layout (`Graphics/TextLayout.cpp`)
+handles the colours (`#k`, `#b`, `#g`, `#r`, `#c`, `#d`) and bold: `#e` switches
+to the bold of the text's font and `#n` back.
 
 The dialog (`UINpcTalk`) is the v83 `UtilDlgEx` window from `UIClassic.nx`,
 laid out from period footage. It is centred on the screen, and its middle
@@ -108,8 +111,14 @@ clear transient state. Responses without an active conversation are ignored.
 ## Wire format and client
 
 NpcDialogue (0x130) carries speaker category, NPC template ID, message type,
-speaker portrait flag, text, and separate Back/Next bytes. Normal text uses
-message type 0. Response 1 advances or finishes, 0 goes back, and -1 cancels.
+speaker byte, text, and separate Back/Next bytes. Normal text uses message
+type 0. Response 1 advances or finishes, 0 goes back, and -1 cancels. The
+speaker byte's bits, as v83 reads them: 0x1 leaves out END CHAT, 0x2 shows
+the player instead of the NPC, 0x6 (either bit) puts the speaker on the
+right with the `UtilDlgEx/it`, `ic` and `is` frame and the text on the left,
+and 0x8 mirrors the NPC. The server always sends 0. HeavenClient's quest
+dialogs use 2 when the player answers a flipped question
+(`Say.img/<id>/<n>/stop/<page>/flip`).
 
 HeavenClient uses the Back/Next bytes to choose buttons while retaining the
 wire message type for responses. Escape sends cancellation rather than Back.

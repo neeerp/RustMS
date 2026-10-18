@@ -76,6 +76,8 @@ namespace ms
 				size_t last;
 				Font font;
 				Color::Name color;
+				// Between #e and #n: the bold of the text's font.
+				bool bold = false;
 			};
 
 			struct Line

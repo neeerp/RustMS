@@ -208,6 +208,23 @@ namespace ms
 			return scale;
 		}
 
+		// A Shadow Meso hit (FUN_0078df87): ten times the whole mesos of a
+		// throw, `roll` between half and one and a half its `moneyCon`, with
+		// its `x` percent more on a critical, then a percent less for each
+		// level the mob is above the user.
+		inline double meso_damage(double roll, bool critical, int32_t x, int16_t leveldelta)
+		{
+			double damage = std::floor(roll) * 10;
+
+			if (critical)
+				damage = (100 + x) * damage * 0.01;
+
+			if (leveldelta > 0)
+				damage = (100 - leveldelta) * damage * 0.01;
+
+			return damage;
+		}
+
 		// The area a shot covers: its row from `origin` to `end_x`, widened
 		// for some skills, or the skill's own `lt_rb` around the `user`,
 		// turned the way they face.

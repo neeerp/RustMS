@@ -59,6 +59,10 @@ impl ClientActor {
                 ?rejection,
                 "Quest action rejected"
             );
+            if rejection == QuestRejection::Mesos {
+                let mut packets = vec![quest::build_quest_short_of_mesos()?];
+                return self.send_all(&mut packets).await;
+            }
             return Ok(());
         }
         self.npc_request_id = self.npc_request_id.wrapping_add(1);
@@ -125,7 +129,7 @@ impl ClientActor {
         }
         let mut next = self.in_game()?.player.clone();
         let mut packets = Vec::new();
-        if !self.quest_items(&template.start_items, &mut next, &mut packets)? {
+        if !self.quest_items(template.id, &template.start_items, &mut next, &mut packets)? {
             return self.send_all(&mut packets).await;
         }
         if self
@@ -147,7 +151,7 @@ impl ClientActor {
         }
         let mut next = self.in_game()?.player.clone();
         let mut packets = Vec::new();
-        if !self.quest_items(&template.end_rewards, &mut next, &mut packets)? {
+        if !self.quest_items(template.id, &template.end_rewards, &mut next, &mut packets)? {
             return self.send_all(&mut packets).await;
         }
         if template.money != 0 {
@@ -192,6 +196,7 @@ impl ClientActor {
     /// "inventory full" notice queued, if the gifts don't fit.
     fn quest_items(
         &self,
+        quest_id: i16,
         items: &[QuestItem],
         next: &mut Player,
         packets: &mut Vec<Packet>,
@@ -202,7 +207,7 @@ impl ClientActor {
             Err(rejection) => {
                 debug!(?rejection, "Quest items refused");
                 if rejection == QuestRejection::InventoryFull {
-                    packets.push(inventory::build_inventory_full()?);
+                    packets.push(quest::build_quest_items_full(quest_id)?);
                 }
                 return Ok(false);
             }

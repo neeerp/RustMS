@@ -29,11 +29,13 @@ characters list each other without `pending`.
   are both mutual and online; everyone else gets -1.
 - `DirectoryMessage::Deliver` sends a packet to whichever of a set of
   characters is online. Requests, channel updates, and buddy chat use it.
+- Every list carries the unanswered requests too, flagged (`GW_Friend` flag
+  1), as v83 expects: the client hides them, and asks about them itself
+  once a map has loaded. A request made while the player is online is also
+  sent on its own (mode 9).
 - On entering the game, the client actor:
   - sends the list (or nothing, if it is empty);
-  - tells mutual buddies its channel;
-  - asks about the first unanswered request.
-- Answering a request asks about the next one.
+  - tells mutual buddies its channel.
 - On logout, mutual buddies see channel -1. A channel change skips that,
   since the new channel announces itself.
 - Buddy chat only reaches the listed recipients who are mutual buddies. The
@@ -44,14 +46,26 @@ entry is the 39-byte `GW_Friend` record. Its channel is zero-based, or -1.
 
 ## Client
 
-- `Character/BuddyList` holds the list as the server last described it. The
-  player owns it. `SET_FIELD` sets its capacity.
+- `Character/BuddyList` holds the list as the server last described it,
+  requests included. The player owns it. `SET_FIELD` sets its capacity.
+  Each entry keeps v83's flag: 1 is a request, hidden and not counted; 2 is
+  always offline; 0, 3 and 4 go by the channel; higher ones are always
+  online. Buddy chat goes to flags 0, 3 and 4 on a channel.
 - `Net/Handlers/BuddyHandlers` applies `BUDDYLIST` (63):
-  - the list;
-  - channel changes;
+  - the list (modes 7, 10 and 0x12), or one entry (8);
+  - channel changes (0x14). A buddy coming online shows a pink "<name> is
+    logged in." card, unless they are in the player's guild; one moving to
+    the player's channel shows "You're on the same ch. with <name>.";
   - capacity;
-  - requests, shown as a `UIYesNo` (yes accepts, no declines);
-  - errors, shown as a `UIOk`.
+  - requests (9), added to the list and shown as a fading notice
+    (`UIInviteCard`, see [client.md](client.md)); O accepts and X declines;
+  - errors, shown as a `UIOk`, and modes 0x10, 0x11, 0x13 and 0x16, whose
+    text the server supplies.
+- `IO/BuddyCommands` makes v83's checks before asking the server, each
+  refusal a `UIOk`: adding an invalid name, a buddy already in that group,
+  or yourself; accepting someone who didn't ask; removing someone not on
+  the list. After each map loads it shows the unanswered requests again,
+  unless a request card is still up.
 - `MultiChatHandler` prints buddy chat in orange.
 - The Friend tab of `UIUserList` is built from `UserList/Friend` art:
   - **ONLINE** (`friend0`), over a `SAME CH.` / `OTHER CH.` legend
@@ -84,5 +98,5 @@ from the art:
 - the two columns;
 - where names and channels sit in a row;
 - the button order;
-- the request and delete wording;
+- the delete wording;
 - the buddy chat colour (orange).

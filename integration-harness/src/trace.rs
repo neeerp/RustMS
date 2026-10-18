@@ -59,6 +59,9 @@ pub struct Trace {
     pub progress: Vec<(i16, u8)>,
     /// UPDATE_QUEST_INFO successes: quest, NPC, next quest.
     pub results: Vec<(i16, i32, i16)>,
+    /// Other UPDATE_QUEST_INFO results: mode, and the quest for those
+    /// that name one (else 0).
+    pub quest_refusals: Vec<(u8, i16)>,
     /// Latest progress string (kill counts) per started quest.
     pub kills: BTreeMap<i16, String>,
     /// EXP gains from SHOW_STATUS_INFO mode 3.
@@ -109,6 +112,8 @@ pub struct Trace {
     pub party_chat: Vec<(String, String)>,
     /// Every full BUDDYLIST: (id, name, channel) per buddy.
     pub buddy_lists: Vec<Vec<(i32, String, i32)>>,
+    /// The unanswered requests each full BUDDYLIST carries, by requester.
+    pub buddy_list_requests: Vec<Vec<i32>>,
     /// Buddy requests: (requester id, name).
     pub buddy_requests: Vec<(i32, String)>,
     /// Buddy channel changes: (buddy, channel or -1).
@@ -331,12 +336,16 @@ impl Trace {
                 }
             }
         } else if op == SendOpcode::UpdateQuestInfo as i16 {
-            assert_eq!(r.read_byte().unwrap(), 8, "only success results are sent");
-            self.results.push((
-                r.read_short().unwrap(),
-                r.read_int().unwrap(),
-                r.read_short().unwrap(),
-            ));
+            match r.read_byte().unwrap() {
+                8 => self.results.push((
+                    r.read_short().unwrap(),
+                    r.read_int().unwrap(),
+                    r.read_short().unwrap(),
+                )),
+                mode => self
+                    .quest_refusals
+                    .push((mode, r.read_short().unwrap_or(0))),
+            }
         } else if op == SendOpcode::NpcDialogue as i16 {
             r.read_byte().unwrap();
             let npc = r.read_int().unwrap();
@@ -379,17 +388,21 @@ impl Trace {
             match r.read_byte().unwrap() {
                 7 => {
                     let count = r.read_byte().unwrap();
-                    let list = (0..count)
-                        .map(|_| {
-                            let id = r.read_int().unwrap();
-                            let name = read_padded(&mut r, 13);
-                            r.read_byte().unwrap();
-                            let channel = r.read_int().unwrap();
-                            read_padded(&mut r, 17);
-                            (id, name, channel)
-                        })
-                        .collect();
+                    let (mut list, mut requests) = (Vec::new(), Vec::new());
+                    for _ in 0..count {
+                        let id = r.read_int().unwrap();
+                        let name = read_padded(&mut r, 13);
+                        let requesting = r.read_byte().unwrap() == 1;
+                        let channel = r.read_int().unwrap();
+                        read_padded(&mut r, 17);
+                        if requesting {
+                            requests.push(id);
+                        } else {
+                            list.push((id, name, channel));
+                        }
+                    }
                     self.buddy_lists.push(list);
+                    self.buddy_list_requests.push(requests);
                 }
                 9 => {
                     let id = r.read_int().unwrap();

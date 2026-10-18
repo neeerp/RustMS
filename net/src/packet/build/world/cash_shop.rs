@@ -75,21 +75,23 @@ const BOUGHT_PACKAGE: u8 = 0xA4;
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[repr(u8)]
 pub enum CashShopFailure {
-    /// "Due to an unknown error, failed."
+    /// "Due to an unknown error, the request for Cash Shop has failed."
     Unknown = 0x00,
     /// "You don't have enough cash."
     NotEnoughCash = 0xA5,
-    /// "You cannot send a gift to your own account."
+    /// "You cannot send a gift to your own account. Please purchase it
+    /// after logging in with the related character."
     OwnAccount = 0xA8,
     /// "Please confirm whether the character's name is correct."
     NoSuchCharacter = 0xA9,
-    /// The item is for the other gender.
+    /// "This item has a gender restriction. Please confirm the gender of
+    /// the recipient."
     Gender = 0xAA,
     /// "Please check if your inventory is full or not."
     InventoryFull = 0xBB,
-    /// The item isn't on sale.
+    /// "The item is out of stock, and therefore not available for sale."
     SoldOut = 0xC0,
-    /// The birthday code isn't a date.
+    /// "Check your birthday code and please try again."
     BirthdayCode = 0xC4,
 }
 

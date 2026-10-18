@@ -49,9 +49,19 @@ whole stack; anything else drops the asked quantity, keeping equipment's
 stats (`Loot::Dropped`). Quest and `tradeBlock` items leave the bag but don't
 reach the floor: everyone sees them vanish (DROP_ITEM_FROM_MAPOBJECT 3).
 MESO_DROP (`0x5E`: tick, amount) drops 10 to 50,000 mesos the player holds;
-HeavenClient's meso button asks how many with `UIEnterNumber`. The field
+HeavenClient's meso button asks how many with `UIEnterNumber`, which, as in
+v83, starts at 10 and takes no less. The field
 places either kind where it last saw the player, and anyone may pick it up
 at once (ownership 2). Dead players can't drop.
+
+A map whose `fieldLimit` has bit 0x400000 keeps items and mesos off the
+ground. As in v83, HeavenClient asks its usual questions first and then says
+"You cannot drop the item here." in the skill chat colour instead of sending
+the drop. It also refuses an item drop while the player is alert from a hit
+or an attack ("You can't do it right now. Catch your breath and then try
+again.") or dead ("You can't do it once you're dead."). The server refuses
+item and meso drops on such a map too (`FieldTemplate::may_drop`) with an
+enable-actions stat update.
 
 GATHER_ITEMS (`0x45`) and SORT_ITEMS (`0x46`) (tick, type) are the item
 window's Gather and Sort buttons. The rearrangement goes out as one
@@ -71,6 +81,16 @@ USE_ITEM (`0x48`: tick, slot, item id) checks the slot holds that item,
 applies its `spec` (`hp`, `mp`, and percent `hpR`/`mpR`, capped at the
 maximums), consumes one, and answers with the inventory change and an HP/MP
 stat update. Dead players can't use items.
+
+A map whose `fieldLimit` has bit 0x400 allows only the items its
+`info/allowedItem` lists (eleven event maps list ten items). HeavenClient
+says "This item cannot be used here." in the skill chat colour when the
+player double-clicks or presses a quick slot for anything else of the kinds
+v83 checks there: potions, food, cures and transformations
+(`field_limit::may_use`). Return scrolls and the rest aren't checked. The
+server applies the same rule (`FieldTemplate::may_use`) and answers a refused
+USE_ITEM with an enable-actions stat update. Double-clicking any item while
+dead says "You can't do it once you're dead."
 
 HEAL_OVER_TIME (`0x59`) is HeavenClient's natural recovery, which follows the
 v83 (MapleLegends) client's 30 ms recovery check. HP and MP keep separate
@@ -200,8 +220,8 @@ TRUNK_REQUEST (`0x3E`) is answered by mode:
 
 - **Take out** (4: tab, index): costs `trunkGet`. The item goes into a bag
   the same way a pickup does. Stars, bullets and equips get a slot of their
-  own. Answers TAKEN_OUT (`0x09`) with that bag. Errors: no mesos `0x0c`, a
-  one-of-a-kind item the player already has `0x0b`, full bag `0x0a`.
+  own. Answers TAKEN_OUT (`0x09`) with that bag. Errors: no mesos `0x0b`, a
+  one-of-a-kind item the player already has `0x0c`, full bag `0x0a`.
 - **Store** (5: slot, item, quantity): costs `trunkPut`. The quantity can be
   part of a stack. A set of stars or bullets and an equip go whole. Cash,
   quest and untradable items can't be stored. Answers STORED (`0x0d`) with

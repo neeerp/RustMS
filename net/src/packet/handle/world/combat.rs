@@ -117,8 +117,15 @@ impl WorldHandler for AttackHandler {
             })
         });
         if let Some(skill) = uses.skill {
-            let mp = ctx.player.add_mp(-combat::attack_mp_cost(&skill));
-            result = HandlerResult::reply(stat::build_stat_update(false, &[StatUpdate::Mp(mp)])?);
+            let mut updates = vec![StatUpdate::Mp(
+                ctx.player.add_mp(-combat::attack_mp_cost(&skill)),
+            )];
+            if uses.mesos > 0 {
+                ctx.player.meso -= uses.mesos;
+                ctx.player.mark_dirty();
+                updates.push(StatUpdate::Meso(ctx.player.meso));
+            }
+            result = HandlerResult::reply(stat::build_stat_update(false, &updates)?);
             skill_level = skill.level as u8;
         }
         let mut projectile = 0;
