@@ -109,8 +109,14 @@ clear transient state. Responses without an active conversation are ignored.
 ## Wire format and client
 
 NpcDialogue (0x130) carries speaker category, NPC template ID, message type,
-speaker portrait flag, text, and separate Back/Next bytes. Normal text uses
-message type 0. Response 1 advances or finishes, 0 goes back, and -1 cancels.
+speaker byte, text, and separate Back/Next bytes. Normal text uses message
+type 0. Response 1 advances or finishes, 0 goes back, and -1 cancels. The
+speaker byte's bits, as v83 reads them: 0x1 leaves out END CHAT, 0x2 shows
+the player instead of the NPC, 0x6 (either bit) puts the speaker on the
+right with the `UtilDlgEx/it`, `ic` and `is` frame and the text on the left,
+and 0x8 mirrors the NPC. The server always sends 0. HeavenClient's quest
+dialogs use 2 when the player answers a flipped question
+(`Say.img/<id>/<n>/stop/<page>/flip`).
 
 HeavenClient uses the Back/Next bytes to choose buttons while retaining the
 wire message type for responses. Escape sends cancellation rather than Back.

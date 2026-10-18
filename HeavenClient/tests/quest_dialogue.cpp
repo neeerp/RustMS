@@ -94,9 +94,11 @@ void flipped_questions_say_their_lead_first()
 	QuestPage lead = *offer.page();
 	require(lead.kind == QuestPage::TEXT && lead.text == "Are you here to be a star?\r\n", "the lead comes first");
 	require(lead.next && !lead.previous, "the first lead has only Next");
+	require(lead.speaker == 0, "Lana says the lead");
 	offer.respond(1);
 	require(offer.page()->kind == QuestPage::SELECTION && offer.page()->text == "\r\n#L0#No, for Blake.#l",
 		"then the choices on their own");
+	require(offer.page()->speaker == 2, "which the player says");
 	offer.respond(1, 0);
 	require(offer.page()->text == "Blake?\r\n" && offer.page()->previous, "the next lead has Prev");
 	require(offer.respond(0) == Effect::NONE && offer.finished(), "Prev from a lead ends the conversation");

@@ -62,6 +62,9 @@ namespace ms
 		std::string text;
 		bool previous;
 		bool next;
+		// The dialog's speaker byte: 2 has the player answer a flipped
+		// question (FUN_00716fe1).
+		int8_t speaker = 0;
 	};
 
 	// The client side of the v83 quest flow, independent of UI and assets:
@@ -134,10 +137,10 @@ namespace ms
 				{
 					std::string text = pages[index];
 
-					if (flipped())
-						text = "\r\n" + text.substr(text.find(CHOICES));
+					if (!flipped())
+						return QuestPage { QuestPage::SELECTION, text, false, false };
 
-					return QuestPage { QuestPage::SELECTION, text, false, false };
+					return QuestPage { QuestPage::SELECTION, "\r\n" + text.substr(text.find(CHOICES)), false, false, 2 };
 				}
 				case Step::PAGE:
 					break;

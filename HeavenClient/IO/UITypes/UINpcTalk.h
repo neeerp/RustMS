@@ -99,6 +99,9 @@ namespace ms
 		// Where the text starts, relative to the window, after scrolling.
 		Point<int16_t> text_origin() const;
 
+		// The text's left edge, relative to the window.
+		int16_t text_x() const;
+
 		// The text area's rows, relative to the window.
 		Range<int16_t> visible_rows() const;
 
@@ -173,6 +176,11 @@ namespace ms
 
 		bool show_slider;
 		bool draw_text;
+		// From the speaker byte: who speaks, on which side, and whether the
+		// NPC is mirrored.
+		bool player_speaks = false;
+		bool right_side = false;
+		bool flip_speaker = false;
 		Slider slider;
 		TalkType type;
 		Menu menu_kind;

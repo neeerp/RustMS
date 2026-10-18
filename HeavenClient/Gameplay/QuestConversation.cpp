@@ -218,7 +218,7 @@ namespace ms
 
 				if (auto talk = UI::get().get_element<UINpcTalk>())
 				{
-					talk->change_text(active->npc_id, type, style, 0, page->text, {}, UINpcTalk::Menu::LIST);
+					talk->change_text(active->npc_id, type, style, page->speaker, page->text, {}, UINpcTalk::Menu::LIST);
 					talk->set_local_responder(respond);
 				}
 			}

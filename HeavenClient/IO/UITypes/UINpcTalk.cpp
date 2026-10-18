@@ -46,6 +46,15 @@ namespace ms
 		// fit the text plus 34 px, and the window is centred on the screen.
 		constexpr int16_t TOP = 28;
 		constexpr int16_t TEXT_X = 165;
+		// The speaker's centre. With the speaker on the right (v83 9a7736)
+		// the text, NEXT and BACK move left (9accd2, 9a7d5e); the scroll bar
+		// moves with the right-side art's text panel, as v83's own place for
+		// it is unknown.
+		constexpr int16_t SPEAKER_X = 80;
+		constexpr int16_t RIGHT_SPEAKER_X = 450;
+		constexpr int16_t RIGHT_TEXT_SHIFT = 132;
+		constexpr int16_t RIGHT_BUTTON_SHIFT = 130;
+		constexpr int16_t RIGHT_SLIDER_SHIFT = 131;
 		constexpr int16_t TEXT_WIDTH = 312;
 		constexpr int16_t LINE = 18;
 		constexpr int16_t PADDING = 34;
@@ -123,9 +132,6 @@ namespace ms
 	{
 		nl::node UtilDlgEx = NxFiles::ui_classic["UIWindow.img"]["UtilDlgEx"];
 
-		top = UtilDlgEx["t"];
-		fill = UtilDlgEx["c"];
-		bottom = UtilDlgEx["s"];
 		nametag = UtilDlgEx["bar"];
 		dot_selected = UtilDlgEx["dot1"];
 		dot = UtilDlgEx["dot0"];
@@ -166,10 +172,14 @@ namespace ms
 		UIElement::draw(inter);
 
 		int16_t total = TOP + height + bottom.height();
-		Point<int16_t> speaker_pos = position + Point<int16_t>(20, total / 2 + 11);
-		Point<int16_t> center_pos = speaker_pos + Point<int16_t>(nametag.width() / 2, 0);
+		Point<int16_t> center_pos = position + Point<int16_t>(right_side ? RIGHT_SPEAKER_X : SPEAKER_X, total / 2 + 11);
+		Point<int16_t> speaker_pos = center_pos - Point<int16_t>(nametag.width() / 2, 0);
 
-		speaker.draw(DrawArgument(center_pos, true));
+		if (player_speaks)
+			Stage::get().get_player().get_look().draw(center_pos, false, Stance::Id::STAND1, Expression::Id::DEFAULT);
+		else
+			speaker.draw(DrawArgument(center_pos, flip_speaker));
+
 		nametag.draw(speaker_pos);
 		name.draw(center_pos + Point<int16_t>(0, -4));
 
@@ -240,7 +250,12 @@ namespace ms
 
 	Point<int16_t> UINpcTalk::text_origin() const
 	{
-		return Point<int16_t>(TEXT_X, text_y - offset * LINE);
+		return Point<int16_t>(text_x(), text_y - offset * LINE);
+	}
+
+	int16_t UINpcTalk::text_x() const
+	{
+		return right_side ? TEXT_X - RIGHT_TEXT_SHIFT : TEXT_X;
 	}
 
 	Range<int16_t> UINpcTalk::visible_rows() const
@@ -460,7 +475,7 @@ namespace ms
 			return Cursor::State::CANCLICK;
 		}
 
-		if (clicked && draw_text && Rectangle<int16_t>(TEXT_X, TEXT_X + TEXT_WIDTH, TOP, TOP + height).contains(cursor_relative))
+		if (clicked && draw_text && Rectangle<int16_t>(text_x(), text_x() + TEXT_WIDTH, TOP, TOP + height).contains(cursor_relative))
 		{
 			draw_text = false;
 			return Cursor::State::IDLE;
@@ -797,16 +812,30 @@ namespace ms
 			block = y;
 		}
 
-		if (speakerbyte == 0)
+		// The speaker byte (dlg+0x6e0): 0x1 leaves out END CHAT, 0x2 has the
+		// player speak, 0x6 puts the speaker on the right, 0x8 mirrors the
+		// NPC.
+		player_speaks = speakerbyte & 0x2;
+		right_side = speakerbyte & 0x6;
+		flip_speaker = speakerbyte & 0x8;
+
+		nl::node UtilDlgEx = NxFiles::ui_classic["UIWindow.img"]["UtilDlgEx"];
+		std::string art = right_side ? "i" : "";
+
+		top = UtilDlgEx[art + "t"];
+		fill = UtilDlgEx[art + "c"];
+		bottom = UtilDlgEx[art + "s"];
+
+		if (player_speaks)
+		{
+			speaker = Texture();
+			name.change_text(Stage::get().get_player().get_stats().get_name());
+		} else
 		{
 			speaker = NxHelper::Npc::get_npc_node(npcid)["stand"]["0"];
 
 			std::string namestr = nl::nx::string["Npc.img"][std::to_string(npcid)]["name"];
 			name.change_text(namestr);
-		} else
-		{
-			speaker = Texture();
-			name.change_text("");
 		}
 
 		show_slider = block + PADDING > MAX_HEIGHT;
@@ -816,7 +845,8 @@ namespace ms
 			height = MAX_HEIGHT;
 			text_y = SCROLL_TEXT_Y;
 			rowmax = (block + LINE - 1) / LINE;
-			slider = Slider(Slider::Type::CLASSIC, Range<int16_t>(24, height + 14), 493, SCROLL_LINES, rowmax, onmoved);
+			slider = Slider(Slider::Type::CLASSIC, Range<int16_t>(24, height + 14), right_side ? 493 - RIGHT_SLIDER_SHIFT : 493,
+							SCROLL_LINES, rowmax, onmoved);
 		} else
 		{
 			height = std::max<int16_t>(block + PADDING, MIN_HEIGHT);
@@ -837,7 +867,7 @@ namespace ms
 		// and BACK sit in the text area, clear of the scroll bar.
 		int16_t bar_y = TOP + height + 32;
 		int16_t text_button_y = TOP + height - 19;
-		int16_t text_button_x = show_slider ? -8 : 0;
+		int16_t text_button_x = (show_slider ? -8 : 0) - (right_side ? RIGHT_BUTTON_SHIFT : 0);
 
 		auto place = [&](Buttons button, int16_t x, int16_t y)
 		{
@@ -845,7 +875,8 @@ namespace ms
 			buttons[button]->set_active(true);
 		};
 
-		place(Buttons::CLOSE, 9, bar_y);
+		if (!(speakerbyte & 0x1))
+			place(Buttons::CLOSE, 9, bar_y);
 
 		switch (type)
 		{
