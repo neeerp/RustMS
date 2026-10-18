@@ -25,7 +25,11 @@
 #include "../../Graphics/Text.h"
 #include "../../Template/EnumMap.h"
 
+#include "../../Gameplay/MovePath.h"
 #include "../../Gameplay/Physics/Physics.h"
+#include "../../Net/Handlers/Helpers/PetParser.h"
+
+#include <optional>
 
 namespace ms
 {
@@ -45,20 +49,23 @@ namespace ms
 			LENGTH
 		};
 
-		static Stance stancebyvalue(uint8_t value)
-		{
-			uint8_t valueh = value / 2;
+		// The animation a v83 move action shows, of those HC loads.
+		static Stance stancebyvalue(uint8_t value);
 
-			return valueh >= LENGTH ? STAND : static_cast<Stance>(valueh);
-		}
-
-		PetLook(int32_t iid, std::string name, int32_t uniqueid, Point<int16_t> pos, uint8_t stance, int32_t fhid);
+		// The player's own pet (`local`) follows them and says where it
+		// went; another's goes where its owner's client says.
+		PetLook(const PetEntry &entry, bool local);
 
 		PetLook();
 
 		void draw(double viewx, double viewy, float alpha) const;
 
-		void update(const Physics &physics, Point<int16_t> charpos);
+		// Follow the owner at `charpos`, returning a path to send once
+		// there is one, or play the paths received.
+		std::optional<move_path::Path> update(const Physics &physics, Point<int16_t> charpos);
+
+		// MOVE_PET (170): where another's pet went.
+		void send_movement(const std::vector<Movement> &movements);
 
 		void set_position(int16_t xpos, int16_t ypos);
 
@@ -68,17 +75,32 @@ namespace ms
 
 		int32_t get_itemid() const;
 
+		int64_t get_serial() const;
+
+		bool is_local() const;
+
 		Stance get_stance() const;
 
 	private:
+		// Its stance as v83 sends it: the move action times two, plus one
+		// facing left.
+		uint8_t get_stancebyte() const;
+
 		int32_t itemid;
 		std::string name;
-		int32_t uniqueid;
+		int64_t serial;
+		bool local;
 		Stance stance;
+		// Facing right.
 		bool flip;
 
 		EnumMap<Stance, Animation> animations;
 		PhysicsObject phobj;
 		Text namelabel;
+
+		// The owner's: the path not yet sent.
+		move_path::Recorder recorder;
+		// The others': the paths to play.
+		move_path::Player shown;
 	};
 }

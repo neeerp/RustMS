@@ -338,6 +338,7 @@ mod tests {
             visible: BTreeMap::new(),
             masked: BTreeMap::new(),
             cash_weapon: None,
+            pets: [0; 3],
         }
     }
 

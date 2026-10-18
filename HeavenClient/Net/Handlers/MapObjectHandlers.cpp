@@ -22,6 +22,7 @@
 #include "Helpers/LoginParser.h"
 #include "Helpers/MobStatParser.h"
 #include "Helpers/MovementParser.h"
+#include "Helpers/PetParser.h"
 #include "MiniRoom.h"
 
 #include "../../Data/SkillData.h"
@@ -60,26 +61,7 @@ namespace ms
 
 		recv.skip(3);
 
-		for (size_t i = 0; i < 3; i++)
-		{
-			int8_t available = recv.read_byte();
-
-			if (available == 1)
-			{
-				recv.read_byte();	// 'byte2'
-				recv.read_int();	// petid
-				recv.read_string();	// name
-				recv.read_int();	// unique id
-				recv.read_int();
-				recv.read_point();	// pos
-				recv.read_byte();	// stance
-				recv.read_int();	// fhid
-			}
-			else
-			{
-				break;
-			}
-		}
+		std::vector<PetEntry> pets = PetParser::parse_pets(recv);
 
 		recv.read_int(); // mountlevel
 		recv.read_int(); // mountexp
@@ -94,7 +76,7 @@ namespace ms
 		recv.read_byte(); // team
 
 		Stage::get().get_chars().spawn(
-			{ cid, look, level, job, name, stance, position, chair, std::move(buffs), guild, emblem, room }
+			{ cid, look, level, job, name, stance, position, chair, std::move(buffs), guild, emblem, room, std::move(pets) }
 		);
 	}
 
@@ -145,31 +127,60 @@ namespace ms
 		if (!character)
 			return;
 
-		uint8_t petindex = recv.read_byte();
-		int8_t mode = recv.read_byte();
+		// Index 3 asks the owner which pet the Water of Life revives.
+		uint8_t index = recv.read_byte();
 
-		if (mode == 1)
+		if (index > 2)
+			return;
+
+		bool local = Stage::get().is_player(cid);
+
+		if (recv.read_bool())
 		{
-			recv.skip(1);
+			// A nonzero byte replaces the pet at the index.
+			bool replace = recv.read_bool();
 
-			int32_t itemid = recv.read_int();
-			std::string name = recv.read_string();
-			int32_t uniqueid = recv.read_int();
-
-			recv.skip(4);
-
-			Point<int16_t> pos = recv.read_point();
-			uint8_t stance = recv.read_byte();
-			int32_t fhid = recv.read_int();
-
-			character->add_pet(petindex, itemid, name, uniqueid, pos, stance, fhid);
+			character->add_pet(index, replace, PetParser::parse_pet(recv), local);
 		}
-		else if (mode == 0)
+		else
 		{
-			bool hunger = recv.read_bool();
+			character->remove_pet(index);
 
-			character->remove_pet(petindex, hunger);
+			if (!local)
+				return;
+
+			// Why the pet went back, which only the owner reads (95a947).
+			const char *reason = nullptr;
+
+			switch (recv.read_byte())
+			{
+				case 1:
+					reason = "The pet went back home because it's hungry.";
+					break;
+				case 2:
+					reason = "The pet's magical time has run out, and so it has turned back into a doll.";
+					break;
+				case 3:
+					reason = "You cannot use pet here.";
+					break;
+			}
+
+			if (reason)
+				if (auto chatbar = UI::get().get_element<UIChatBar>())
+					chatbar->send_chatline(reason, UIChatBar::LineType::SKILL);
 		}
+	}
+
+	void MovePetHandler::handle(InPacket& recv) const
+	{
+		int32_t cid = recv.read_int();
+		uint8_t index = recv.read_byte();
+		Point<int16_t> start = recv.read_point();
+		std::vector<Movement> movements = MovementParser::parse_movements(recv, start);
+
+		// The player's pets move themselves.
+		if (Optional<OtherChar> otherchar = Stage::get().get_chars().get_char(cid))
+			otherchar->send_pet_movement(index, movements);
 	}
 
 	void CharMovedHandler::handle(InPacket& recv) const

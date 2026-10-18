@@ -70,11 +70,13 @@ pub enum RecvOpcode {
     MesoDrop = 0x5E,
     GiveFame = 0x5F,
     CharInfoRequest = 0x61,
+    SpawnPet = 0x62,
     ChangeMapSpecial = 0x64,
     QuestAction = 0x6B,
     ThrowGrenade = 0x6D,
 
     ChangeKeybinds = 0x87,
+    MovePet = 0xA7,
     MoveSummon = 0xAF,
     SummonAttack = 0xB0,
     DamageSummon = 0xB1,

@@ -196,13 +196,19 @@ impl ItemData {
             return Ok(None);
         };
         let nx = &self.items;
-        let path = format!("{directory}/{:04}.img/{:08}", item_id / 10_000, item_id);
+        // Each pet has an image of its own.
+        let pet = game::pet::is_pet(item_id);
+        let path = if pet {
+            format!("Pet/{item_id:07}.img")
+        } else {
+            format!("{directory}/{:04}.img/{:08}", item_id / 10_000, item_id)
+        };
         let Some(node) = path_index(nx, &path)? else {
             return Ok(None);
         };
         let mut info = ItemInfo {
             item_id,
-            slot_max: DEFAULT_SLOT_MAX,
+            slot_max: if pet { 1 } else { DEFAULT_SLOT_MAX },
             ..ItemInfo::default()
         };
         if let Some(meta) = nx.child_by_name(node, "info")? {
@@ -325,6 +331,28 @@ impl ItemData {
     }
 }
 
+/// Item names (`String.nx`); only pets' so far.
+pub struct ItemNames {
+    strings: NxDataFile,
+}
+
+impl ItemNames {
+    pub fn load(strings: impl AsRef<Path>) -> Result<Self, GameDataError> {
+        Ok(Self {
+            strings: NxDataFile::open(strings.as_ref())?,
+        })
+    }
+
+    /// A pet's species name (`Pet.img/<id>/name`), which new pets take.
+    pub fn pet(&self, item_id: i32) -> Result<Option<String>, GameDataError> {
+        let nx = &self.strings;
+        let Some(node) = path_index(nx, &format!("Pet.img/{item_id}"))? else {
+            return Ok(None);
+        };
+        nx.string_child(node, "name")
+    }
+}
+
 /// An equipment scroll's `info` and its `req` list of the only equipment it
 /// accepts; `None` without `info/success`.
 fn scroll_info(nx: &NxDataFile, node: u32, meta: u32) -> Result<Option<ScrollInfo>, GameDataError> {
@@ -432,6 +460,22 @@ mod tests {
         );
         let relaxer = data.info(3010000).unwrap().unwrap();
         assert_eq!((relaxer.recovery_hp, relaxer.recovery_mp), (50, 0));
+    }
+
+    #[test]
+    fn reads_pets_and_their_names() {
+        let Some(data) = data() else {
+            return;
+        };
+        let tiger = data.info(5000066).unwrap().unwrap();
+        assert_eq!(tiger.slot_max, 1);
+        let Some(strings) = crate::test_assets::path("String.nx") else {
+            return;
+        };
+        let names = ItemNames::load(strings).unwrap();
+        assert_eq!(names.pet(5000066).unwrap().as_deref(), Some("Baby Tiger"));
+        assert_eq!(names.pet(5000000).unwrap().as_deref(), Some("Brown Kitty"));
+        assert_eq!(names.pet(5009999).unwrap(), None);
     }
 
     #[test]

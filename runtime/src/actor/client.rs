@@ -8,6 +8,7 @@ mod guilds;
 mod loot;
 mod npc_script;
 mod personal_shop;
+mod pets;
 mod quest;
 mod script;
 mod ships;
@@ -382,6 +383,7 @@ impl ClientActor {
                 .await?
             }
             WorldAction::BuffsChanged(announce) => self.show_buffs(announce).await?,
+            WorldAction::PetsChanged(changes) => self.pets_changed(changes).await?,
             WorldAction::Whisper(delivery) => {
                 self.send_to_directory(DirectoryMessage::Whisper {
                     from: self.client_id,
@@ -550,12 +552,13 @@ impl ClientActor {
         let party = self.party_id;
         self.send_to_field(FieldMessage::Join {
             handle,
-            avatar,
+            avatar: avatar.clone(),
             party,
         })
         .await?;
         self.set_wall_clock().await?;
         self.bring_summons(spawn).await?;
+        self.bring_pets(&avatar).await?;
         self.run_map_enter_script().await
     }
 
@@ -865,11 +868,16 @@ impl ClientActor {
     ) -> Result<Vec<Packet>, RuntimeError> {
         use build::world::cash_shop as cs;
         let cash_item = spawn_db(move || db::cash_shop::cash_item(account_id, cash_id)).await?;
-        let Some(item) = cash_item.as_ref().and_then(net::cash_shop::inventory_item) else {
+        let Some(mut item) = cash_item.as_ref().and_then(net::cash_shop::inventory_item) else {
             return Ok(vec![cs::build_cash_shop_failure(
                 cs::CashShopFailure::Unknown,
             )?]);
         };
+        if item.pet.is_some() {
+            if let Some(pet) = spawn_db(move || db::pet::find(cash_id)).await? {
+                item.pet = Some(pet);
+            }
+        }
         let player = &mut self.in_game_mut()?.player;
         let before = player.inventory.clone();
         let slot = match player.inventory_mut().place(item.clone(), slot) {
@@ -923,6 +931,8 @@ impl ClientActor {
                 cs::CashShopFailure::Unknown,
             )?]);
         };
+        let pets_before = player.pets.clone();
+        player.pets_mut().retain(|&serial| serial != cash_id);
         let cash_item = net::cash_shop::cash_item(account_id, cash_id, &item);
         let snapshot = player.clone();
         let saved = cash_item.clone();
@@ -941,6 +951,7 @@ impl ClientActor {
             }
             Err(error) => {
                 *player.inventory_mut() = before;
+                player.pets = pets_before;
                 Err(error)
             }
         }

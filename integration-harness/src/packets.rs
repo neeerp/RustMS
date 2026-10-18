@@ -112,6 +112,8 @@ pub struct SpawnPlayerPacket {
     pub x: i16,
     pub y: i16,
     pub stance: u8,
+    /// The pets out: (item id, name, serial), in list order.
+    pub pets: Vec<(i32, String, i64)>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -1048,6 +1050,8 @@ pub fn decode_spawn_player(packet: &Packet) -> Result<SpawnPlayerPacket, String>
     let stance = cursor
         .read_byte()
         .map_err(|e| format!("failed to read spawn-player stance: {e}"))?;
+    let pets = decode_spawn_player_pets(&mut cursor)
+        .map_err(|e| format!("failed to read spawn-player pets: {e}"))?;
 
     Ok(SpawnPlayerPacket {
         character_id,
@@ -1058,7 +1062,28 @@ pub fn decode_spawn_player(packet: &Packet) -> Result<SpawnPlayerPacket, String>
         x,
         y,
         stance,
+        pets,
     })
+}
+
+/// After the foothold and a byte, each pet behind a 1, then a 0.
+fn decode_spawn_player_pets(
+    cursor: &mut Cursor<&[u8]>,
+) -> Result<Vec<(i32, String, i64)>, std::io::Error> {
+    cursor.read_short()?;
+    cursor.read_byte()?;
+    let mut pets = Vec::new();
+    while cursor.read_byte()? == 1 {
+        let pet = (
+            cursor.read_int()?,
+            cursor.read_str_with_length()?,
+            cursor.read_long()?,
+        );
+        // Position, stance, foothold, name tag and chat balloon.
+        cursor.read_bytes(2 + 2 + 1 + 2 + 1 + 1)?;
+        pets.push(pet);
+    }
+    Ok(pets)
 }
 
 pub fn decode_spawn_npc(packet: &Packet) -> Result<SpawnNpcPacket, String> {
@@ -1304,6 +1329,9 @@ pub fn decode_item_stack(cursor: &mut Cursor<&[u8]>) -> Result<(i32, i16), Strin
             }
             return Ok((item_id, quantity));
         }
+        // A pet: name, level, closeness, fullness, date dead, attribute,
+        // skill, remaining life and a short.
+        3 => skip(cursor, 13 + 1 + 2 + 1 + 8 + 2 + 2 + 4 + 2)?,
         other => return Err(format!("unsupported item type {other} for item {item_id}")),
     }
     Ok((item_id, 1))

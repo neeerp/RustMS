@@ -27,6 +27,7 @@
 #include "../Components/MapleButton.h"
 #include "../UITypes/UIKeyConfig.h"
 
+#include "../../Character/Pets.h"
 #include "../../Character/Inventory/ItemDrop.h"
 #include "../../Character/Inventory/ScrollRules.h"
 #include "../../Data/EquipData.h"
@@ -34,6 +35,7 @@
 #include "../../Util/NxFiles.h"
 
 #include "../../Net/Handlers/MiniRoom.h"
+#include "../../Net/Packets/GameplayPackets.h"
 #include "../../Net/Packets/InventoryPackets.h"
 #include "../../Net/Packets/MiniRoomPackets.h"
 
@@ -68,6 +70,46 @@ namespace ms
 		// v83's notices 0x10a and 0x42 (FUN_004f5697).
 		constexpr const char *CATCH_BREATH = "You can't do it right now.\\nCatch your breath and then try again.";
 		constexpr const char *DEAD = "You can't do it once you're dead.";
+		// StringPool 0x180 and 0x181.
+		constexpr const char *TOO_MANY_PETS = "You have exceeded the maximum number\\n of pets that can accompany you.\\nPlease try again after \\nyou change the living pet back into a doll.";
+		constexpr const char *BOSS_PET = "Would you like to change your Boss Pet?\\n (The \"Item Ignore\" skill, as well as \\nthe stats for speed and jump will \\nfollow that of the Lead Pet)";
+
+		// v83 FUN_00a240a2: double-clicking a pet asks the server to bring it
+		// out, or back if it is out.
+		void summon_pet(int16_t slot, int64_t serial)
+		{
+			Player &player = Stage::get().get_player();
+
+			if (!player.can_request(ExclRequest::USE_WAIT))
+				return;
+
+			if (player.get_look().get_alerted())
+			{
+				UI::get().emplace<UIOk>(CATCH_BREATH, [](bool)
+				{});
+				return;
+			}
+
+			int32_t lead = pets::follow_the_lead(player.get_stats().get_job().get_id());
+
+			switch (pets::summon(player.get_skilllevel(lead) > 0, player.get_pet_serials(), serial))
+			{
+				case pets::Summon::SEND:
+					player.request(SpawnPetPacket(slot, false), ExclRequest::USE_WAIT);
+					break;
+				case pets::Summon::FULL:
+					UI::get().emplace<UIOk>(TOO_MANY_PETS, [](bool)
+					{});
+					break;
+				case pets::Summon::ASK_BOSS:
+					// Any answer but Yes brings it out behind the others.
+					UI::get().emplace<UIYesNo>(BOSS_PET, [slot](bool yes)
+					{
+						Stage::get().get_player().request(SpawnPetPacket(slot, yes), ExclRequest::USE_WAIT);
+					});
+					break;
+			}
+		}
 
 		// v83 FUN_00a0900a: a map may keep items off the ground, which it
 		// says only once the player has answered every question.
@@ -381,6 +423,8 @@ namespace ms
 							Stage::get().send_key(KeyType::Id::FACE, 99 + item_id % 100 + 8, true);
 						else if (personal_shop::is_permit(item_id))
 							UIPersonalShop::create(slot, item_id);
+						else if (item_id / 10000 == 500)
+							summon_pet(slot, inventory.get_cash_id(tab, slot));
 
 						break;
 				}

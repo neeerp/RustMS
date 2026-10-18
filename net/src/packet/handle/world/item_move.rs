@@ -91,6 +91,12 @@ fn drop_item(
         .get(kind, from)
         .ok_or("empty slot")?
         .clone();
+    if item
+        .cash_serial
+        .is_some_and(|serial| player.pets.contains(&serial))
+    {
+        return Err("a pet that is out");
+    }
     // Throwing stars and bullets always go as a whole set.
     let quantity = if matches!(item.item_id / 10_000, 207 | 233) {
         item.quantity

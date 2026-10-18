@@ -17,7 +17,10 @@
 //////////////////////////////////////////////////////////////////////////////////
 #include "Char.h"
 
+#include "Pets.h"
+
 #include "../Data/WeaponData.h"
+#include "../Net/Packets/GameplayPackets.h"
 #include "../Util/Misc.h"
 
 #include <nlnx/nx.hpp>
@@ -178,7 +181,11 @@ namespace ms
 
 		for (auto &pet : pets)
 		{
-			if (pet.get_itemid())
+			if (!pet.get_itemid())
+				continue;
+
+			// Another's pet goes where its owner's client says.
+			if (pet.is_local())
 			{
 				switch (state)
 				{
@@ -195,9 +202,10 @@ namespace ms
 
 						break;
 				}
-
-				pet.update(physics, get_position());
 			}
+
+			if (std::optional<move_path::Path> path = pet.update(physics, get_position()))
+				MovePetPacket(pet.get_serial(), *path).dispatch();
 		}
 
 		uint16_t stancespeed = 0;
@@ -552,26 +560,38 @@ namespace ms
 		look.set_stance(stance);
 	}
 
-	void Char::add_pet(uint8_t index, int32_t iid, const std::string &name, int32_t uniqueid, Point<int16_t> pos,
-					   uint8_t stance, int32_t fhid)
+	void Char::add_pet(uint8_t index, bool replace, const PetEntry &pet, bool local)
 	{
-		if (index > 2)
-			return;
+		if (replace)
+			pets::remove(pets, index);
 
-		pets[index] = PetLook(iid, name, uniqueid, pos, stance, fhid);
+		pets::insert(pets, index, PetLook(pet, local));
 	}
 
-	void Char::remove_pet(uint8_t index, bool hunger)
+	void Char::remove_pet(uint8_t index)
 	{
-		if (index > 2)
-			return;
+		pets::remove(pets, index);
+	}
 
-		pets[index] = PetLook();
+	void Char::clear_pets()
+	{
+		pets = {};
+	}
 
-		if (hunger)
-		{
-			// TODO: Empty
-		}
+	std::array<int64_t, 3> Char::get_pet_serials() const
+	{
+		std::array<int64_t, 3> serials{};
+
+		for (size_t i = 0; i < pets.size(); i++)
+			serials[i] = pets[i].get_itemid() ? pets[i].get_serial() : 0;
+
+		return serials;
+	}
+
+	void Char::send_pet_movement(uint8_t index, const std::vector<Movement> &movements)
+	{
+		if (index < pets.size() && pets[index].get_itemid())
+			pets[index].send_movement(movements);
 	}
 
 	bool Char::is_invincible() const

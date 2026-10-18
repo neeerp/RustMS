@@ -97,7 +97,7 @@ impl<'a> Expect<'a> {
         }
         self.byte(0xFF);
         self.int(l.cash_weapon.unwrap_or(0));
-        self.int(0).int(0).int(0) // pet item ids
+        self.int(l.pets[0]).int(l.pets[1]).int(l.pets[2])
     }
 
     /// Skip a field whose value is not under test (e.g. a timestamp).

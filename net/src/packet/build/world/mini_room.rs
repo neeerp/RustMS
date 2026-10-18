@@ -329,6 +329,7 @@ mod tests {
             visible: BTreeMap::from([(5, 1040002), (6, 1060002)]),
             masked: BTreeMap::new(),
             cash_weapon: None,
+            pets: [0; 3],
         }
     }
 

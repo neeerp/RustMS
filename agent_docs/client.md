@@ -174,8 +174,8 @@ from `UI.nx`. Moved so far:
   `pet` panel that PET EQUIP opens beside it, laid out from period footage.
   Cells that cannot be used are tinted red as in the footage: PANTS under an
   overall, SHIELD beside a two-handed weapon, and the riding cells without
-  Monster Riding. RustMS has no pets, so the pet tabs are disabled and the pet
-  and MOB EQUIP cells hold nothing.
+  Monster Riding. Pets wear nothing yet, so the pet tabs are disabled and the
+  pet and MOB EQUIP cells hold nothing.
 - **Channel window** (`UIChannel`, `UIWindow.img/Channel`): the `t`, tiled
   `c` and `s` pieces around a six-column grid of 68×20 cells (70×21 apart from
   (9,67)), with a row per six channels, laid out from period footage. Every
@@ -240,7 +240,8 @@ from `UI.nx`. Moved so far:
   Double-clicking someone else replaces the window. TAMING MOB, PET INFO, and
   COLLECTION lengthen it to `backgrnd5`, `backgrnd2`, and `backgrnd7`, and ITEM
   and WISHLIST open `backgrnd4` and `backgrnd3` beside it; all are empty, as
-  RustMS has no mounts, pets, monster book, or cash shop wish list. Family,
+  RustMS has no mounts or monster book, and the pet and wish list pages are
+  not read. Family,
   party, and excluded items are disabled; TRADE invites the character to a
   trade. The fame buttons send
   GIVE_FAME (`GiveFamePacket`) unless the window is the player's own or the
@@ -479,10 +480,11 @@ side yet.
 | Continent ships, station wall clocks | Docking ships and the Balrog's ship, CONTI_MOVE/CONTI_STATE, CLOCK kind 1; see `ships.md` |
 | Player shops, mini-games, memo/mail | No UI, no handlers |
 | Reactors | Spawning, swings, hits and breaking; no skill hits, touch or quest gates; see `combat.md` |
-| Pets, mounts, summons | Partial or absent |
+| Pets | Summoning, following, others' pets, map changes; see `pets.md` |
+| Mounts, summons | Partial or absent |
 | Party/guild/boss quests, events, MTS | Absent |
 
-75 outbound opcodes are defined (`Net/OutPacket.h`) and 111 inbound handlers
+77 outbound opcodes are defined (`Net/OutPacket.h`) and 113 inbound handlers
 are registered (`Net/PacketSwitch.cpp`). Anything not listed there is silently ignored by the client.
 
 ## Movement physics
@@ -654,7 +656,8 @@ the screen size.
 | Player shops | Nothing | L |
 | Cash shop | No coupons, charging, or storage window | S |
 | Quest accept/complete UI flow | Partial | S |
-| Pets and mounts | Partial rendering, no interaction | M |
+| Pets | Summon and follow only: no commands, chat, food, name tags, equipment or looting | M |
+| Mounts | Partial rendering, no interaction | M |
 | Memo, mail, MTS | Nothing | M each |
 | Buddy whisper/find modes | Ignored | S |
 | Mini-dungeons, boss/event UI | Nothing | M |
@@ -733,3 +736,10 @@ These were corrected:
     state, and a cooldown. An attack also sent `0xCD` for the nearest reactor
     it reached, as well as hitting mobs; it now swings at a reactor instead
     of the mobs. See `combat.md`.
+13. Pets: SPAWN_PLAYER read a byte before each pet that v83 doesn't send, and
+    dropped the pets it read. The stat change read the three pet bits as one
+    short after MESO; v83 sends 8 bytes for each bit set, right after HAIR.
+    Items were taken for pets by their id range rather than item type 3. A
+    pet's stance byte is `action << 1 | left`, but HeavenClient read the
+    action as its own animation index and odd as facing right. 168 put pets
+    at a fixed index; v83's list closes up. See `pets.md`.

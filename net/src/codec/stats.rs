@@ -5,10 +5,12 @@ use packet::{io::write::PktWrite, Packet};
 /// Fixed width of the name field in the stat block.
 const NAME_FIELD_LEN: usize = 13;
 
-/// Write the stat block (`addCharStats` in HeavenMS).
+/// Write the stat block (`addCharStats` in HeavenMS), with the cash serials
+/// of the summoned pets.
 pub fn encode_character_stats(
     packet: &mut Packet,
     stats: &CharacterStats,
+    pets: [i64; 3],
 ) -> Result<(), NetworkError> {
     packet.write_int(stats.id)?;
     write_padded_name(packet, &stats.name)?;
@@ -17,9 +19,8 @@ pub fn encode_character_stats(
     packet.write_int(stats.face)?;
     packet.write_int(stats.hair)?;
 
-    // Pet unique ids for the three pet slots.
-    for _ in 0..3 {
-        packet.write_long(0)?;
+    for pet in pets {
+        packet.write_long(pet)?;
     }
 
     packet.write_byte(stats.level)?;
@@ -109,7 +110,7 @@ mod tests {
     fn stat_block_matches_reference_layout() {
         let stats = sample_stats();
         let mut packet = Packet::new_empty();
-        encode_character_stats(&mut packet, &stats).unwrap();
+        encode_character_stats(&mut packet, &stats, [0; 3]).unwrap();
 
         let mut expect = Expect::new(&packet.bytes);
         expect.int(stats.id);
@@ -128,6 +129,6 @@ mod tests {
     fn overlong_names_are_rejected() {
         let mut stats = sample_stats();
         stats.name = "ABCDEFGHIJKLMN".to_string();
-        assert!(encode_character_stats(&mut Packet::new_empty(), &stats).is_err());
+        assert!(encode_character_stats(&mut Packet::new_empty(), &stats, [0; 3]).is_err());
     }
 }

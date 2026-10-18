@@ -263,6 +263,33 @@ namespace ms
 		}
 	};
 
+	// Opcode: MOVE_PET(167)
+	class MovePetPacket : public MovementPacket
+	{
+	public:
+		// The player's pet moved (FUN_009c4e41): its cash serial, then a
+		// path as the player's.
+		MovePetPacket(int64_t serial, const move_path::Path& path) : MovementPacket(OutPacket::Opcode::MOVE_PET)
+		{
+			write_long(serial);
+			writepath(path.start, path.elements);
+		}
+	};
+
+	// Opcode: SPAWN_PET(98)
+	class SpawnPetPacket : public OutPacket
+	{
+	public:
+		// Bring out the pet in Cash slot `slot`, or send it back if it is
+		// out (FUN_00a240a2); `boss` makes a new pet lead the others.
+		SpawnPetPacket(int16_t slot, bool boss) : OutPacket(OutPacket::Opcode::SPAWN_PET)
+		{
+			write_time();
+			write_short(slot);
+			write_byte(boss);
+		}
+	};
+
 	// Shows the player's emote to the rest of the map
 	// Opcode: FACE_EXPRESSION(51)
 	class FaceExpressionPacket : public OutPacket

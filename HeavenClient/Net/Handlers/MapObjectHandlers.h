@@ -50,6 +50,13 @@ namespace ms
 		void handle(InPacket& recv) const override;
 	};
 
+	// Move another character's pet
+	// Opcode: MOVE_PET(170)
+	class MovePetHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
 	// Move a character
 	// Opcode: CHAR_MOVED(185)
 	class CharMovedHandler : public PacketHandler

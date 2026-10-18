@@ -27,9 +27,8 @@ pub fn encode_avatar_look(
     packet.write_byte(0xFF)?;
 
     packet.write_int(look.cash_weapon.unwrap_or(0))?;
-    // Pet item ids for the three pet slots.
-    for _ in 0..3 {
-        packet.write_int(0)?;
+    for pet in look.pets {
+        packet.write_int(pet)?;
     }
     Ok(())
 }
@@ -50,6 +49,7 @@ mod tests {
             visible: BTreeMap::from([(5, 1042003), (7, 1072001)]),
             masked: BTreeMap::from([(5, 1040002)]),
             cash_weapon: Some(1702000),
+            pets: [0; 3],
         };
         let mut packet = Packet::new_empty();
         encode_avatar_look(&mut packet, &look, false).unwrap();
