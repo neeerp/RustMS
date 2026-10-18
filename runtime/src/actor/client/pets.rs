@@ -8,7 +8,7 @@ use game::pet::PetChange;
 use game::FieldAvatar;
 use net::packet::build::world::inventory::build_inventory_operation;
 use net::packet::build::world::pet::{
-    build_pet_exception_list, build_remove_pet, build_spawn_pet, PetGone,
+    build_pet_exception_list, build_pet_name, build_remove_pet, build_spawn_pet, PetGone,
 };
 use net::packet::build::world::stat::{build_stat_update, StatUpdate};
 use net::packet::handle::world::pets_grow_hungry;
@@ -20,9 +20,9 @@ use std::time::Duration;
 pub(super) const PET_HUNGER_INTERVAL: Duration = Duration::from_secs(180);
 
 impl ClientActor {
-    /// The player summoned or sent back pets: show everyone on the map, and
-    /// keep the field avatar for those who arrive later. The owner reads
-    /// why those sent back went.
+    /// The player summoned, sent back or renamed pets: show everyone on the
+    /// map, and keep the field avatar for those who arrive later. The owner
+    /// reads why those sent back went.
     pub(super) async fn pets_changed(
         &mut self,
         changes: Vec<PetChange>,
@@ -46,6 +46,14 @@ impl ClientActor {
                 }
                 PetChange::Dismissed { index } => {
                     let packet = build_remove_pet(avatar.id, index, why)?;
+                    own.push(packet.clone());
+                    announce.push(packet);
+                }
+                PetChange::Renamed { index } => {
+                    let Some(pet) = avatar.pets.get(usize::from(index)) else {
+                        continue;
+                    };
+                    let packet = build_pet_name(avatar.id, index, &pet.name)?;
                     own.push(packet.clone());
                     announce.push(packet);
                 }

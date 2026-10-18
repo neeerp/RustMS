@@ -55,6 +55,7 @@ pub enum SendOpcode {
     SpawnPet = 0xA8,
     MovePet = 0xAA,
     PetChat = 0xAB,
+    PetNameChange = 0xAC,
     PetExceptionList = 0xAD,
     PetCommand = 0xAE,
     SpawnSummon = 0xAF,

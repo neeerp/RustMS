@@ -1,8 +1,8 @@
 //! Pets: a Baby Tiger bought in the Cash Shop comes out of the Cash
 //! Inventory named after its kind. Summoned, it follows its owner and the
 //! map sees it come, move, obey, speak and go back; it eats food and cash
-//! food; it is out again after a relog, and a player arriving later sees it
-//! beside its owner.
+//! food and is renamed; it is out again after a relog, and a player
+//! arriving later sees it beside its owner.
 
 use integration_harness::connection::MapleTestConnection;
 use integration_harness::database::{grant_stack, set_nx_credit, set_pet_fullness};
@@ -29,6 +29,7 @@ const PET_FOOD: i32 = 2_120_000;
 /// Cash food for the Baby Tiger alone, and food for monkeys.
 const GOLDEN_DRUMSTICK: i32 = 5_240_027;
 const MONKEY_BANANA: i32 = 5_240_000;
+const NAME_TAG: i32 = 5_170_000;
 
 /// Read until a packet with `op`, and return its body.
 async fn next(c: &mut MapleTestConnection, t: &mut Trace, op: SendOpcode) -> Vec<u8> {
@@ -97,6 +98,17 @@ fn cash_food(slot: i16, item_id: i32) -> Packet {
     p
 }
 
+/// USE_CASH_ITEM: the name tag in Cash `slot` names the first pet out.
+fn name_tag(slot: i16, name: &str) -> Packet {
+    let mut p = Packet::new_empty();
+    p.write_short(RecvOpcode::UseCashItem as i16).unwrap();
+    p.write_short(slot).unwrap();
+    p.write_int(NAME_TAG).unwrap();
+    p.write_str_with_length(name).unwrap();
+    p.write_int(0).unwrap(); // time
+    p
+}
+
 /// PET_CHAT: the owner's client showed pet `serial` saying `text`.
 fn pet_chat(serial: i64, action: u8, text: &str) -> Packet {
     let mut p = Packet::new_empty();
@@ -158,10 +170,10 @@ async fn a_pet_comes_out_follows_its_owner_and_stays_out() {
     grant_stack(owner_id, USE.into(), 1, PET_FOOD, 2)
         .await
         .expect("grant pet food");
-    for (slot, food) in [(2, GOLDEN_DRUMSTICK), (3, MONKEY_BANANA)] {
-        grant_stack(owner_id, CASH.into(), slot, food, 2)
+    for (slot, item) in [(2, GOLDEN_DRUMSTICK), (3, MONKEY_BANANA), (4, NAME_TAG)] {
+        grant_stack(owner_id, CASH.into(), slot, item, 2)
             .await
-            .expect("grant cash pet food");
+            .expect("grant cash pet food and a name tag");
     }
     set_pet_fullness(cash_id, 60).await.expect("a hungry tiger");
     let mut owner = relogin(&config).await;
@@ -290,6 +302,19 @@ async fn a_pet_comes_out_follows_its_owner_and_stays_out() {
     assert_eq!(ate, [1], "no pet out eats it");
     next(o, &mut ot, SendOpcode::StatChange).await;
 
+    // A name tag renames it: one update takes the tag and re-sends the pet,
+    // then the owner and the watcher learn its name.
+    send(o, name_tag(4, "Tigger")).await;
+    let update = next(o, &mut ot, SendOpcode::InventoryOperation).await;
+    assert_eq!(update[..2], [1, 3], "a reply; three changes");
+    let mut renamed = owner_id.to_le_bytes().to_vec();
+    renamed.extend([0, 6, 0]); // pet 0, then the name's length
+    renamed.extend(b"Tigger");
+    renamed.push(0); // no name tag
+    assert_eq!(next(o, &mut ot, SendOpcode::PetNameChange).await, renamed);
+    assert_eq!(next(w, &mut wt, SendOpcode::PetNameChange).await, renamed);
+    let summoned = (owner_id, 0, BABY_TIGER, "Tigger".to_string(), cash_id);
+
     // Summoned again, it goes back.
     send(o, spawn_pet(1)).await;
     until(o, &mut ot, |t| !t.pets_gone.is_empty()).await;
@@ -318,5 +343,5 @@ async fn a_pet_comes_out_follows_its_owner_and_stays_out() {
         .iter()
         .find(|p| p.character_id == owner_id)
         .unwrap();
-    assert_eq!(seen.pets, [(BABY_TIGER, "Baby Tiger".to_string(), cash_id)]);
+    assert_eq!(seen.pets, [(BABY_TIGER, "Tigger".to_string(), cash_id)]);
 }
