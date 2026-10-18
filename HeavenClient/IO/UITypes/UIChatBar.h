@@ -67,7 +67,9 @@ namespace ms
 			// Whispers sent and received
 			WHISPER,
 			// What a GM says nearby
-			GM
+			GM,
+			// Guild chat
+			GUILD
 		};
 
 		// Who a typed line goes to
@@ -75,7 +77,8 @@ namespace ms
 		{
 			ALL,
 			PARTY,
-			BUDDY
+			BUDDY,
+			GUILD
 		};
 
 		UIChatBar();
@@ -116,8 +119,8 @@ namespace ms
 
 		bool is_chatfieldopen();
 
-		// Send typed lines to everyone nearby, the party, or online buddies,
-		// and open the input field.
+		// Send typed lines to everyone nearby, the party, online buddies, or the
+		// guild, and open the input field.
 		void set_target(Target new_target);
 		// Open the chat field with "/w name " typed, ready for the message.
 		void start_whisper(const std::string& name);
@@ -182,6 +185,7 @@ namespace ms
 		bool flood_guard_allows(const std::string& line);
 		void send_party_chat(const std::string& message);
 		void send_buddy_chat(const std::string& message);
+		void send_guild_chat(const std::string& message);
 
 		static constexpr int16_t CHATROWHEIGHT = 13;
 		static constexpr int16_t LOG_WIDTH = 580;

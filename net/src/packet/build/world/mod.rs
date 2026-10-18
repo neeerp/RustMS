@@ -8,6 +8,7 @@ pub mod drop;
 pub mod effect;
 pub mod fame;
 pub mod field;
+pub mod guild;
 pub mod info;
 pub mod inventory;
 pub mod keymap;

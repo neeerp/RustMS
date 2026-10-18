@@ -3,7 +3,10 @@
 
 use crate::connection::MapleTestConnection;
 use crate::hunting::Field;
-use crate::packets::{build_all_chat, build_change_map, decode_item_stack, decode_set_field_warp};
+use crate::packets::{
+    build_all_chat, build_change_map, decode_item_stack, decode_set_field_warp,
+    decode_spawn_player, SpawnPlayerPacket,
+};
 use net::packet::op::SendOpcode;
 use packet::io::read::PktRead;
 use packet::Packet;
@@ -114,6 +117,14 @@ pub struct Trace {
     pub buddy_errors: Vec<u8>,
     /// Buddy chat lines: (sender, text).
     pub buddy_chat: Vec<(String, String)>,
+    /// Guild chat lines: (sender, text).
+    pub guild_chat: Vec<(String, String)>,
+    /// Every GUILD_OPERATION body (mode first), in order.
+    pub guild_ops: Vec<Vec<u8>>,
+    /// GUILD_NAME_CHANGED: (character, guild name).
+    pub guild_names: Vec<(i32, String)>,
+    /// Other players appearing on the field.
+    pub players: Vec<SpawnPlayerPacket>,
     /// NPC shops opened: the NPC and (item id, price) per row.
     pub shops: Vec<(i32, Vec<(i32, i32)>)>,
     /// CONFIRM_SHOP_TRANSACTION codes.
@@ -355,6 +366,7 @@ impl Trace {
             match mode {
                 0 => self.buddy_chat.push(line),
                 1 => self.party_chat.push(line),
+                2 => self.guild_chat.push(line),
                 _ => {}
             }
         } else if op == SendOpcode::BuddyList as i16 {
@@ -409,6 +421,13 @@ impl Trace {
             self.storage.push(StorageResult::read(mode, &p.bytes[3..]));
         } else if op == SendOpcode::PlayerInteraction as i16 {
             self.rooms.push(p.bytes[2..].to_vec());
+        } else if op == SendOpcode::GuildOperation as i16 {
+            self.guild_ops.push(p.bytes[2..].to_vec());
+        } else if op == SendOpcode::GuildNameChanged as i16 {
+            self.guild_names
+                .push((r.read_int().unwrap(), r.read_str_with_length().unwrap()));
+        } else if op == SendOpcode::SpawnPlayer as i16 {
+            self.players.extend(decode_spawn_player(p));
         } else if op == SendOpcode::ConfirmShopTransaction as i16 {
             self.shop_results.push(r.read_byte().unwrap());
         } else if op == SendOpcode::GiveBuff as i16 {

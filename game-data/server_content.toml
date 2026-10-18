@@ -9,6 +9,15 @@
 #   https://github.com/Kaioru/Server.Scripts  (MIT, Copyright (c) 2018 Kaioru)
 #   https://github.com/Kaioru/Server.NX       (MIT, Copyright (c) 2018 Kaioru)
 
+# Keys no licensed script has text for; they keep their placeholders.
+unsourced = [
+    "heracle.ask",
+    "heracle.decline",
+    "heracle.in_guild",
+    "heracle.too_weak",
+    "heracle.no_mesos",
+]
+
 [text."glTutoMsg0.message"]
 source = "Edelstein.lua/src/mapleisland/glTutoMsg0.lua"
 template = "{s0}"

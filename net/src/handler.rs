@@ -227,6 +227,17 @@ pub enum BuddyRequest {
     Chat { recipients: Vec<i32>, text: String },
 }
 
+/// A guild operation, carried out by the client's actor.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum GuildRequest {
+    /// Send the player's guild again (`GUILD_OPERATION` mode 0).
+    Reload,
+    /// Found a guild with this name, answering the name prompt.
+    Create { name: String },
+    /// Say something to the guild members online.
+    Chat { text: String },
+}
+
 /// Something a player asks of their Maple Messenger, which the world
 /// directory owns.
 #[derive(Debug)]
@@ -310,6 +321,7 @@ pub enum WorldAction {
     /// A skill the player used reached party members; see `PartySkill`.
     PartySkill(PartySkill),
     Buddy(BuddyRequest),
+    Guild(GuildRequest),
     /// The player cast Mystic Door at `at` on their map, leading to `town`,
     /// for `lasts`. It replaces any door they had open.
     OpenDoor {
@@ -541,6 +553,7 @@ fn world_routes() -> &'static HashMap<i16, WorldRoute> {
             ),
             (Op::MultiChat, InGame(&world::MultiChatHandler)),
             (Op::BuddyListModify, InGame(&world::BuddyListModifyHandler)),
+            (Op::GuildOperation, InGame(&world::GuildOperationHandler)),
             (Op::Messenger, InGame(&world::MessengerHandler)),
             (
                 Op::PlayerInteraction,
@@ -628,7 +641,7 @@ mod tests {
     fn every_registered_opcode_is_unique_per_server() {
         // The maps would silently drop duplicates; check the table sizes match.
         assert_eq!(login_routes().len(), 13);
-        assert_eq!(world_routes().len(), 58);
+        assert_eq!(world_routes().len(), 59);
     }
 
     #[test]

@@ -4,7 +4,7 @@ use game::Player;
 use packet::{io::write::PktWrite, Packet};
 
 /// CHAR_INFO: what the character info window shows about `player`. There are
-/// no guilds, pets, mounts, wish lists, or monster books yet, so those are
+/// no alliances, pets, mounts, wish lists, or monster books yet, so those are
 /// empty.
 pub fn build_character_info(player: &Player) -> Result<Packet, NetworkError> {
     let stats = &player.stats;
@@ -15,7 +15,8 @@ pub fn build_character_info(player: &Player) -> Result<Packet, NetworkError> {
     packet.write_short(stats.job)?;
     packet.write_short(stats.fame)?;
     packet.write_byte(0)?; // married
-    packet.write_str_with_length("")?; // guild
+    let guild = player.guild.as_ref();
+    packet.write_str_with_length(guild.map_or("", |guild| &guild.name))?;
     packet.write_str_with_length("")?; // alliance
     packet.write_byte(0)?; // medal info
     packet.write_byte(0)?; // end of pets
@@ -39,6 +40,7 @@ pub fn build_character_info(player: &Player) -> Result<Packet, NetworkError> {
 mod tests {
     use super::*;
     use crate::codec::testing::Expect;
+    use game::guild::{Emblem, GuildTag};
     use game::{EquipStats, InventoryType, Item};
 
     #[test]
@@ -68,5 +70,26 @@ mod tests {
             expect.int(0);
         }
         expect.int(1142000).short(0).end();
+    }
+
+    #[test]
+    fn shows_the_guild_name() {
+        let mut player = crate::codec::stats::sample_player();
+        player.guild = Some(GuildTag {
+            id: 4,
+            name: "Testers".into(),
+            emblem: Emblem::default(),
+        });
+        let packet = build_character_info(&player).unwrap();
+        let mut expect = Expect::new(&packet.bytes);
+        expect
+            .short(SendOpcode::CharInfo as i16)
+            .int(0x0102_0304)
+            .byte(10)
+            .short(100)
+            .short(7)
+            .byte(0)
+            .string("Testers")
+            .string("");
     }
 }

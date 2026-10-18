@@ -1,4 +1,5 @@
 use super::buff;
+use super::guild::write_emblem;
 use crate::codec::encode_avatar_look;
 use crate::{error::NetworkError, packet::op::SendOpcode};
 use game::FieldAvatar;
@@ -7,7 +8,7 @@ use packet::{io::write::PktWrite, Packet};
 use std::io::Cursor;
 
 /// SPAWN_PLAYER: show `avatar` to the other players on the field
-/// (`spawnPlayerMapObject` in HeavenMS, with no guild, buffs, pets, or shops).
+/// (`spawnPlayerMapObject` in HeavenMS, with no pets or shops).
 pub fn build_player_enter_field(avatar: &FieldAvatar) -> Result<Packet, NetworkError> {
     let mut packet = Packet::new_empty();
     packet.write_short(SendOpcode::SpawnPlayer as i16)?;
@@ -16,8 +17,12 @@ pub fn build_player_enter_field(avatar: &FieldAvatar) -> Result<Packet, NetworkE
     packet.write_str_with_length(&avatar.name)?;
 
     // Guild name and emblem.
-    packet.write_str_with_length("")?;
-    packet.write_bytes(&[0; 6])?;
+    let guild = avatar.guild.as_ref();
+    packet.write_str_with_length(guild.map_or("", |guild| &guild.name))?;
+    write_emblem(
+        &mut packet,
+        &guild.map(|guild| guild.emblem).unwrap_or_default(),
+    )?;
 
     write_foreign_buffs(&mut packet, &avatar.buffs)?;
 
@@ -224,6 +229,7 @@ pub fn parse_movement(
 mod tests {
     use super::*;
     use crate::codec::testing::Expect;
+    use game::guild::{Emblem, GuildTag};
     use game::{AvatarLook, BuffStat, ShownBuff};
     use std::collections::BTreeMap;
 
@@ -247,6 +253,7 @@ mod tests {
             stance: 4,
             chair: 3010000,
             buffs: Vec::new(),
+            guild: None,
         }
     }
 
@@ -326,6 +333,34 @@ mod tests {
             .long((1 << 39) | (1 << 42));
         expect.byte(40); // speed; Dark Sight has no data
         empty_two_state(&mut expect);
+        expect.short(100);
+    }
+
+    #[test]
+    fn spawn_player_carries_the_guild_name_and_emblem() {
+        let mut avatar = avatar();
+        avatar.guild = Some(GuildTag {
+            id: 4,
+            name: "Testers".into(),
+            emblem: Emblem {
+                background: 1001,
+                background_color: 2,
+                mark: 2003,
+                mark_color: 4,
+            },
+        });
+        let packet = build_player_enter_field(&avatar).unwrap();
+
+        let mut expect = Expect::new(&packet.bytes);
+        expect.short(SendOpcode::SpawnPlayer as i16);
+        expect.int(0x0102_0304).byte(10).string("Tester");
+        expect
+            .string("Testers")
+            .short(1001)
+            .byte(2)
+            .short(2003)
+            .byte(4);
+        foreign_buffs(&mut expect);
         expect.short(100);
     }
 

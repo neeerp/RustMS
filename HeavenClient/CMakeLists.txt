@@ -68,6 +68,9 @@ if(HEAVENCLIENT_BUILD_TESTS)
     add_test(NAME door_rules COMMAND door_rules_tests)
     add_executable(buddy_list_tests tests/buddy_list.cpp Character/BuddyList.cpp)
     add_test(NAME buddy_list COMMAND buddy_list_tests)
+    add_executable(guild_tests tests/guild.cpp Character/Guild.cpp Net/InPacket.cpp Net/Handlers/Helpers/GuildParser.cpp)
+    target_include_directories(guild_tests PRIVATE ${PROJECT_SOURCE_DIR}/libs/NoLifeNx)
+    add_test(NAME guild COMMAND guild_tests)
     add_executable(npc_reach_tests tests/npc_reach.cpp)
     target_include_directories(npc_reach_tests PRIVATE ${PROJECT_SOURCE_DIR}/libs/NoLifeNx)
     add_test(NAME npc_reach COMMAND npc_reach_tests)
@@ -279,6 +282,10 @@ add_executable(HeavenClient
     Character/EquipStat.h
     Character/ExpTable.cpp
     Character/ExpTable.h
+    Character/Guild.cpp
+    Character/Guild.h
+    Character/GuildMark.cpp
+    Character/GuildMark.h
     Character/Job.cpp
     Character/Job.h
     Character/MapleStat.cpp
@@ -617,6 +624,8 @@ add_executable(HeavenClient
     Net/Handlers/Helpers/BuffParser.h
     Net/Handlers/Helpers/MobStatParser.cpp
     Net/Handlers/Helpers/MobStatParser.h
+    Net/Handlers/Helpers/GuildParser.cpp
+    Net/Handlers/Helpers/GuildParser.h
     Net/Handlers/AttackHandlers.cpp
     Net/Handlers/AttackHandlers.h
     Net/Handlers/BuddyHandlers.cpp
@@ -625,6 +634,8 @@ add_executable(HeavenClient
     Net/Handlers/CashShopHandlers.h
     Net/Handlers/CommonHandlers.cpp
     Net/Handlers/CommonHandlers.h
+    Net/Handlers/GuildHandlers.cpp
+    Net/Handlers/GuildHandlers.h
     Net/Handlers/InventoryHandlers.cpp
     Net/Handlers/InventoryHandlers.h
     Net/Handlers/LoginHandlers.cpp

@@ -298,10 +298,10 @@ impl ClientActor {
             self.send_to_field(FieldMessage::UpdateAvatar {
                 client_id,
                 avatar,
-                announce: Some(effect::build_foreign_effect(
+                announce: vec![effect::build_foreign_effect(
                     client_id,
                     CharEffect::LevelUp,
-                )?),
+                )?],
             })
             .await?;
         }

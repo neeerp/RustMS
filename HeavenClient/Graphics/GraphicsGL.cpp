@@ -650,7 +650,8 @@ namespace ms
 	void GraphicsGL::drawtext(const DrawArgument &args, const Range<int16_t> &vertical, const std::string &text,
 							  const Text::Layout &layout, Text::Font id, Color::Name colorid,
 							  Text::Background background, size_t reveal,
-							  const std::vector<std::pair<size_t, size_t>> &shown)
+							  const std::vector<std::pair<size_t, size_t>> &shown,
+							  const Range<int16_t> &horizontal)
 	{
 		if (locked)
 			return;
@@ -757,6 +758,18 @@ namespace ms
 
 					if (char_y < minheight)
 						continue;
+
+					if (horizontal.second() > horizontal.first())
+					{
+						GLshort char_right = char_x + char_width;
+						GLshort cut_left = std::max<GLshort>(0, horizontal.first() - char_x);
+						GLshort cut_right = std::max<GLshort>(0, char_right - horizontal.second());
+
+						offset.left += cut_left;
+						offset.right -= cut_right;
+						char_x += cut_left;
+						char_width -= cut_left + cut_right;
+					}
 
 					if (char_width <= 0 || char_height <= 0)
 						continue;

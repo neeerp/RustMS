@@ -12,7 +12,7 @@
 //! backpressure), but fields and the directory never await a client: a client
 //! whose queue is full is kicked instead. That makes wait cycles impossible.
 
-use game::{AvatarLook, FieldAvatar, Player};
+use game::{AvatarLook, FieldAvatar, Guild, Player};
 use net::packet::build::world::door::DoorView;
 use net::{
     BroadcastScope, ClientId, FieldRequest, MessengerRequest, PartyRequest, PartySkill,
@@ -226,7 +226,7 @@ pub enum FieldMessage {
         client_id: ClientId,
         avatar: FieldAvatar,
         /// Sent to everyone else on the map (e.g. UPDATE_CHAR_LOOK).
-        announce: Option<Packet>,
+        announce: Vec<Packet>,
     },
     Chat {
         from: ClientId,
@@ -373,6 +373,11 @@ pub enum DirectoryMessage {
     BuddyList {
         owner: ClientId,
         buddies: Vec<ListedBuddy>,
+    },
+    /// Send `owner` their guild with who is online.
+    GuildInfo {
+        owner: ClientId,
+        guild: Guild,
     },
     /// Send a packet to whichever of these characters are online.
     Deliver {

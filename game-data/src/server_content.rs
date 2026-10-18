@@ -50,6 +50,14 @@ pub mod keys {
     pub const SHANKS_NO_MESOS: &str = "shanks.no_mesos";
     pub const SHANKS_PAID: &str = "shanks.paid";
 
+    /// Heracle, who founds guilds in Orbis. No licensed script has his
+    /// text, so these keep their placeholders.
+    pub const HERACLE_ASK: &str = "heracle.ask";
+    pub const HERACLE_DECLINE: &str = "heracle.decline";
+    pub const HERACLE_IN_GUILD: &str = "heracle.in_guild";
+    pub const HERACLE_TOO_WEAK: &str = "heracle.too_weak";
+    pub const HERACLE_NO_MESOS: &str = "heracle.no_mesos";
+
     /// Robin's beginner Q&A (`begin5`): a menu, then each topic's pages.
     /// The placeholders decide how many topics and pages there are.
     pub const ROBIN_MENU: &str = "robin.menu";
@@ -348,6 +356,11 @@ mod tests {
             keys::SHANKS_TOO_WEAK,
             keys::SHANKS_NO_MESOS,
             keys::SHANKS_PAID,
+            keys::HERACLE_ASK,
+            keys::HERACLE_DECLINE,
+            keys::HERACLE_IN_GUILD,
+            keys::HERACLE_TOO_WEAK,
+            keys::HERACLE_NO_MESOS,
             keys::ROBIN_MENU,
         ];
         for key in named

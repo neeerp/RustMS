@@ -271,6 +271,7 @@ namespace ms
 							case KeyAction::Id::FRIENDS:
 							case KeyAction::Id::PARTY:
 							case KeyAction::Id::BOSSPARTY:
+							case KeyAction::Id::GUILD:
 							{
 								UIUserList::Tab tab;
 
@@ -282,6 +283,9 @@ namespace ms
 									case KeyAction::Id::PARTY:
 									case KeyAction::Id::BOSSPARTY:
 										tab = UIUserList::Tab::PARTY;
+										break;
+									case KeyAction::Id::GUILD:
+										tab = UIUserList::Tab::GUILD;
 										break;
 								}
 
@@ -348,6 +352,11 @@ namespace ms
 							case KeyAction::Id::FRIENDSCHAT:
 								if (auto chatbar = UI::get().get_element<UIChatBar>())
 									chatbar->set_target(UIChatBar::Target::BUDDY);
+
+								break;
+							case KeyAction::Id::GUILDCHAT:
+								if (auto chatbar = UI::get().get_element<UIChatBar>())
+									chatbar->set_target(UIChatBar::Target::GUILD);
 
 								break;
 							case KeyAction::Id::TOGGLECHAT:

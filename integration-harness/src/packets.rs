@@ -106,6 +106,8 @@ pub struct SpawnPlayerPacket {
     pub character_id: i32,
     pub level: u8,
     pub character_name: String,
+    /// The guild name under theirs, or "" for none.
+    pub guild: String,
     pub visible_equips: BTreeMap<u8, i32>,
     pub x: i16,
     pub y: i16,
@@ -1024,8 +1026,11 @@ pub fn decode_spawn_player(packet: &Packet) -> Result<SpawnPlayerPacket, String>
     let character_name = cursor
         .read_str_with_length()
         .map_err(|e| format!("failed to read spawn-player name: {e}"))?;
-    // Guild (empty name + emblem), the fixed foreign-buff block, then job.
-    skip(&mut cursor, 2 + 6 + 8 + 4 + 4 + 4 + 43 + 65 + 2)?;
+    let guild = cursor
+        .read_str_with_length()
+        .map_err(|e| format!("failed to read spawn-player guild: {e}"))?;
+    // The emblem, the fixed foreign-buff block, then job.
+    skip(&mut cursor, 6 + 8 + 4 + 4 + 4 + 43 + 65 + 2)?;
     let visible_equips = decode_look(&mut cursor)?;
     // Item 5110000 count, item effect, chair.
     skip(&mut cursor, 4 + 4 + 4)?;
@@ -1043,6 +1048,7 @@ pub fn decode_spawn_player(packet: &Packet) -> Result<SpawnPlayerPacket, String>
         character_id,
         level,
         character_name,
+        guild,
         visible_equips,
         x,
         y,

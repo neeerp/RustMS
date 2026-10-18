@@ -4,6 +4,7 @@ mod combat;
 mod dialogue;
 mod door;
 mod fame;
+mod guilds;
 mod loot;
 mod npc_script;
 mod quest;
@@ -116,6 +117,8 @@ pub struct ClientActor {
     door: Option<door::OpenDoor>,
     /// The player's side of a trade they are in.
     trade: Option<trade::Trade>,
+    /// Heracle asked for a new guild's name; only then is one founded.
+    naming_guild: bool,
 }
 
 impl ClientActor {
@@ -168,6 +171,7 @@ impl ClientActor {
             presence: None,
             door: None,
             trade: None,
+            naming_guild: false,
         })
     }
 
@@ -357,7 +361,7 @@ impl ClientActor {
                 self.send_to_field(FieldMessage::UpdateAvatar {
                     client_id: self.client_id,
                     avatar,
-                    announce: Some(announce),
+                    announce: vec![announce],
                 })
                 .await?;
                 self.send_to_directory(DirectoryMessage::LookChanged {
@@ -391,6 +395,7 @@ impl ClientActor {
                 .await?
             }
             WorldAction::Buddy(request) => self.buddy_request(request).await?,
+            WorldAction::Guild(request) => self.guild_request(request).await?,
             WorldAction::GiveFame { target, up } => self.give_fame(target, up).await?,
             WorldAction::OpenDoor { town, at, lasts } => self.open_door(town, at, lasts).await?,
             WorldAction::UseDoor { owner, from_town } => self.use_door(owner, from_town).await?,
@@ -485,6 +490,7 @@ impl ClientActor {
         });
         self.join_current_field(spawn).await?;
         self.load_buddies().await?;
+        self.load_guild().await?;
         info!(
             character_id,
             channel_id = self.channel_id,
@@ -504,6 +510,7 @@ impl ClientActor {
         self.shop = None;
         self.storage = None;
         self.pending_quest = None;
+        self.naming_guild = false;
         self.npc_request_id = self.npc_request_id.wrapping_add(1);
         self.in_game_mut()?.player.chair = 0;
 
@@ -570,6 +577,7 @@ impl ClientActor {
         self.conversation = None;
         self.script = None;
         self.pending_quest = None;
+        self.naming_guild = false;
         self.npc_request_id = self.npc_request_id.wrapping_add(1);
         self.leave_trade().await?;
         self.send_to_field(FieldMessage::Leave {

@@ -1,4 +1,5 @@
 use crate::buff::{Buffs, ShownBuff};
+use crate::guild::GuildTag;
 use crate::inventory::{equip_slot, Inventory};
 use crate::keymap::Keymap;
 use crate::monster_book::MonsterBook;
@@ -124,6 +125,7 @@ pub struct FieldAvatar {
     pub chair: i32,
     /// The buffs others see, as `Buffs::shown`.
     pub buffs: Vec<ShownBuff>,
+    pub guild: Option<GuildTag>,
 }
 
 /// A character that is logged in. The owning client actor holds the only
@@ -146,6 +148,9 @@ pub struct Player {
     pub buffs: Buffs,
     /// The portable chair the player sits on, or 0; not saved.
     pub chair: i32,
+    /// The guild the character belongs to; saved by `db::guild`, not with
+    /// the player.
+    pub guild: Option<GuildTag>,
     dirty: bool,
 }
 
@@ -174,6 +179,7 @@ impl Player {
             gm_level: 0,
             buffs: Buffs::default(),
             chair: 0,
+            guild: None,
             dirty: false,
         }
     }
@@ -203,6 +209,7 @@ impl Player {
             stance,
             chair: 0,
             buffs: self.buffs.shown(),
+            guild: self.guild.clone(),
         }
     }
 

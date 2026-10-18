@@ -5,7 +5,7 @@ use crate::error::RuntimeError;
 use net::dialogue::Prompt;
 use net::npc_scripts::{self, NpcScript, Step};
 use net::packet::build::world::stat::StatUpdate;
-use net::packet::build::world::{drop, effect, inventory, npc, stat};
+use net::packet::build::world::{drop, effect, guild, inventory, npc, stat};
 use net::quests::{self, QuestTemplate};
 use net::scripts::Effect;
 use tracing::{debug, warn};
@@ -91,6 +91,7 @@ impl ClientActor {
         let mut afterwards = Vec::new();
         let mut offer_skip = false;
         let mut warp = None;
+        let mut name_guild = false;
         for effect in effects {
             match effect {
                 Effect::FieldEffect(path) => afterwards.push(effect::build_field_effect(path)?),
@@ -101,6 +102,10 @@ impl ClientActor {
                     height,
                 } => afterwards.push(effect::build_hint(text, *width, *height)?),
                 Effect::OfferTutorialSkip => offer_skip = true,
+                Effect::OpenGuildNamePrompt => {
+                    name_guild = true;
+                    afterwards.push(guild::build_name_prompt()?);
+                }
                 Effect::SetHp(hp) => {
                     next.stats.hp = (*hp).clamp(0, next.stats.max_hp);
                     changed = true;
@@ -162,6 +167,7 @@ impl ClientActor {
             return Ok(Applied::Refused);
         }
         packets.append(&mut afterwards);
+        self.naming_guild |= name_guild;
         self.send_all(&mut packets).await?;
 
         if offer_skip {

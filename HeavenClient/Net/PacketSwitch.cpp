@@ -19,6 +19,7 @@
 
 #include "Handlers/AttackHandlers.h"
 #include "Handlers/BuddyHandlers.h"
+#include "Handlers/GuildHandlers.h"
 #include "Handlers/MapObjectHandlers.h"
 #include "Handlers/CashShopHandlers.h"
 #include "Handlers/CommonHandlers.h"
@@ -180,6 +181,11 @@ namespace ms
 		MULTICHAT = 134,
 		UPDATE_PARTYMEMBER_HP = 201,
 
+		/// Guild
+		GUILD_OPERATION = 65,
+		GUILD_NAME_CHANGED = 202,
+		GUILD_MARK_CHANGED = 203,
+
 		/// Cash Shop
 		SET_CASH_SHOP = 127,
 		QUERY_CASH_RESULT = 324,
@@ -311,6 +317,11 @@ namespace ms
 
 		// Buddy list
 		emplace<BUDDYLIST, BuddyListHandler>();
+
+		// Guilds
+		emplace<GUILD_OPERATION, GuildOperationHandler>();
+		emplace<GUILD_NAME_CHANGED, GuildNameChangedHandler>();
+		emplace<GUILD_MARK_CHANGED, GuildMarkChangedHandler>();
 
 		// Cash Shop
 		emplace<SET_CASH_SHOP, SetCashShopHandler>();

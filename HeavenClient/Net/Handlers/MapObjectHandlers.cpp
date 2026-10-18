@@ -18,6 +18,7 @@
 #include "MapObjectHandlers.h"
 
 #include "Helpers/BuffParser.h"
+#include "Helpers/GuildParser.h"
 #include "Helpers/LoginParser.h"
 #include "Helpers/MobStatParser.h"
 #include "Helpers/MovementParser.h"
@@ -40,11 +41,8 @@ namespace ms
 		uint8_t level = recv.read_byte();
 		std::string name = recv.read_string();
 
-		recv.read_string();	// guildname
-		recv.read_short();	// guildlogobg
-		recv.read_byte();	// guildlogobgcolor
-		recv.read_short();	// guildlogo
-		recv.read_byte();	// guildlogocolor
+		std::string guild = recv.read_string();
+		GuildEmblem emblem = GuildParser::parse_emblem(recv);
 
 		BuffParser::Flags flags = BuffParser::read_flags(recv);
 		auto buffs = BuffParser::parse_shown(recv, flags);
@@ -97,7 +95,7 @@ namespace ms
 		recv.read_byte(); // team
 
 		Stage::get().get_chars().spawn(
-			{ cid, look, level, job, name, stance, position, chair, std::move(buffs) }
+			{ cid, look, level, job, name, stance, position, chair, std::move(buffs), guild, emblem }
 		);
 	}
 

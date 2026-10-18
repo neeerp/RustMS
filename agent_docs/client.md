@@ -427,7 +427,8 @@ side yet.
 | Character info, minimap, world map | Implemented |
 | Party (`UIUserList` Party tab, `UIPartyHP`, party chat) | Implemented; see `parties.md` |
 | Buddy list (`UIUserList` Friend tab, buddy chat) | Implemented without groups; see `buddies.md` |
-| Guild / alliance / blacklist tabs (`UIUserList`) | Tab strip only |
+| Guild (`UIUserList` Guild tab, name tags, guild chat) | Founding and viewing only; see `guilds.md` |
+| Alliance / blacklist tabs (`UIUserList`) | Tab strip only |
 | Monster Book (`UIMonsterBook`) | Implemented: cards, summary, monster pages, search, cover; see `combat.md` |
 | Cash shop (`UICashShop`) | Enter/exit, catalog, buying, gifts, Cash Inventory, wish list, and moving items to and from the bags |
 | Maple Messenger (`UIMessenger`) | Implemented |
@@ -597,7 +598,7 @@ the screen size.
 | System | Client status | Effort |
 | --- | --- | --- |
 | Buddy groups | Default group only | S |
-| Guild | Skeleton only, plus guild emblem/BBS UIs missing | L |
+| Guild | Window and founding only; member management, emblem and BBS UIs missing | M |
 | Player shops | Nothing | L |
 | Cash shop | No coupons, charging, or storage window | S |
 | Quest accept/complete UI flow | Partial | S |

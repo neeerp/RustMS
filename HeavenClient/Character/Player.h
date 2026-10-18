@@ -22,6 +22,7 @@
 #include "ActiveBuffs.h"
 #include "Diseases.h"
 #include "BuddyList.h"
+#include "Guild.h"
 #include "ExclRequest.h"
 #include "MonsterBook.h"
 #include "Party.h"
@@ -248,6 +249,12 @@ namespace ms
 		BuddyList &get_buddies();
 		const BuddyList &get_buddies() const;
 
+		// The player's guild, as the server last described it.
+		Guild &get_guild();
+		const Guild &get_guild() const;
+		// Show the guild's name and emblem under the player's name.
+		void show_guild();
+
 	private:
 		// Whether the key for an action is held.
 		bool is_held(KeyAction::Id action) const;
@@ -320,6 +327,7 @@ namespace ms
 		Party party;
 		MysticDoor door;
 		BuddyList buddies;
+		Guild guild;
 
 		EnumMap<Buffstat::Id, Buff> buffs;
 		ActiveBuffs active_buffs;

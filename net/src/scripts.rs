@@ -40,6 +40,9 @@ pub enum Effect {
     StartQuest(i16),
     CompleteQuest(i16),
     Warp(i32),
+    /// Ask for a new guild's name (Heracle); the guild is founded, and paid
+    /// for, when the client answers.
+    OpenGuildNamePrompt,
 }
 
 #[derive(Debug, Default, PartialEq, Eq)]

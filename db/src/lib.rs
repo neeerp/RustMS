@@ -23,6 +23,7 @@ pub mod buddy;
 pub mod cash_shop;
 pub mod character;
 pub mod fame;
+pub mod guild;
 pub mod keybinding;
 pub mod player;
 pub mod quest;

@@ -276,7 +276,7 @@ impl FieldActor {
                 avatar,
                 announce,
             } => {
-                if let Some(packet) = announce {
+                for packet in announce {
                     self.broadcast(Some(client_id), packet);
                 }
                 if let Some(occupant) = self.occupants.get_mut(&client_id) {
@@ -1524,6 +1524,7 @@ mod tests {
             y,
             stance: 2,
             chair: 0,
+            guild: None,
             buffs: Vec::new(),
         }
     }

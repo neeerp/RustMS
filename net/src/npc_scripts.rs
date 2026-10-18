@@ -7,7 +7,7 @@
 use crate::content;
 use crate::dialogue::{DialoguePage, Prompt};
 use crate::scripts::Effect;
-use game::Player;
+use game::{guild, Player};
 use game_data::server_content::keys;
 
 /// Roger's Apple, the tutorial's lesson on items.
@@ -19,6 +19,7 @@ const ROGER: i32 = 2000;
 const ROBIN: i32 = 2003;
 const MAPLE_ADMINISTRATOR: i32 = 2007;
 const SHANKS: i32 = 22000;
+const HERACLE: i32 = 2010007;
 const LITH_HARBOR: i32 = 104_000_000;
 /// Lucas's recommendation letter, which pays for Shanks's ship.
 const RECOMMENDATION_LETTER: i32 = 4031801;
@@ -88,6 +89,7 @@ impl NpcScript {
         match npc_id {
             ROBIN => Some(robin()),
             SHANKS => Some(shanks(player)),
+            HERACLE => Some(heracle(player)),
             MAPLE_ADMINISTRATOR => Some(Self::new(
                 MAPLE_ADMINISTRATOR,
                 vec![Page::Ask {
@@ -300,6 +302,25 @@ fn shanks(player: &Player) -> NpcScript {
     let mut script = NpcScript::new(SHANKS, pages);
     script.on_end = on_end;
     script
+}
+
+/// Heracle founds guilds; the client then asks for the name. Founding is
+/// all he offers so far.
+fn heracle(player: &Player) -> NpcScript {
+    let page = if player.guild.is_some() {
+        Page::Say(text(keys::HERACLE_IN_GUILD))
+    } else if player.stats.level < guild::MIN_LEVEL {
+        Page::Say(text(keys::HERACLE_TOO_WEAK))
+    } else if player.meso < guild::CREATE_COST {
+        Page::Say(text(keys::HERACLE_NO_MESOS))
+    } else {
+        Page::Ask {
+            text: text(keys::HERACLE_ASK),
+            on_yes: vec![Effect::OpenGuildNamePrompt],
+            on_no: Some(text(keys::HERACLE_DECLINE)),
+        }
+    };
+    NpcScript::new(HERACLE, vec![page])
 }
 
 /// `begin5`: Robin's questions and answers, as many topics and pages as the
@@ -563,6 +584,38 @@ mod tests {
             (false, false)
         );
         assert_eq!(shanks.respond(ScriptInput::Next), Some(Step::default()));
+    }
+
+    #[test]
+    fn heracle_asks_for_a_guild_name_from_level_10_with_the_fee() {
+        let founder = |level, meso, guilded| {
+            let mut player = crate::codec::stats::sample_player();
+            player.stats.level = level;
+            player.meso = meso;
+            if guilded {
+                player.guild = Some(guild::GuildTag {
+                    id: 1,
+                    name: "Testers".into(),
+                    emblem: guild::Emblem::default(),
+                });
+            }
+            NpcScript::for_npc(HERACLE, &player).unwrap()
+        };
+        let mut heracle = founder(10, guild::CREATE_COST, false);
+        assert_eq!(kind(&heracle.begin()), Some(1));
+        let yes = heracle.respond(ScriptInput::Yes).unwrap();
+        assert_eq!(yes.prompt, None);
+        assert_eq!(yes.effects, [Effect::OpenGuildNamePrompt]);
+
+        // Too weak, too poor, or already in a guild: he says so.
+        for mut heracle in [
+            founder(9, guild::CREATE_COST, false),
+            founder(10, guild::CREATE_COST - 1, false),
+            founder(10, guild::CREATE_COST, true),
+        ] {
+            assert_eq!(buttons(&heracle.begin()), (false, false));
+            assert_eq!(heracle.respond(ScriptInput::Next), Some(Step::default()));
+        }
     }
 
     #[test]

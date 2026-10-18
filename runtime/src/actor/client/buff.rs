@@ -125,7 +125,7 @@ impl ClientActor {
         self.send_to_field(FieldMessage::UpdateAvatar {
             client_id: self.client_id,
             avatar,
-            announce: Some(announce),
+            announce: vec![announce],
         })
         .await
     }

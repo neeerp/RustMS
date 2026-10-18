@@ -258,6 +258,10 @@ namespace ms
 							{
 								set_target(Target::BUDDY);
 							}
+							else if (is_command(msg, "/guild"))
+							{
+								set_target(Target::GUILD);
+							}
 							else if (is_command(msg, "/all"))
 							{
 								set_target(Target::ALL);
@@ -285,6 +289,10 @@ namespace ms
 							else if (chat_target == Target::BUDDY)
 							{
 								send_buddy_chat(msg);
+							}
+							else if (chat_target == Target::GUILD)
+							{
+								send_guild_chat(msg);
 							}
 							else
 							{
@@ -627,6 +635,9 @@ namespace ms
 			case LineType::GM:
 				color = Color::Name::BLACK;
 				break;
+			case LineType::GUILD:
+				color = Color::Name::MAUVE;
+				break;
 			default:
 				color = Color::Name::WHITE;
 				break;
@@ -635,7 +646,7 @@ namespace ms
 		// The original indents the rows after the first, except for its
 		// notice and error colours.
 		bool indent = type == LineType::UNK0 || type == LineType::WHITE || type == LineType::PARTY ||
-					  type == LineType::BUDDY || type == LineType::WHISPER || type == LineType::GM;
+					  type == LineType::BUDDY || type == LineType::WHISPER || type == LineType::GM || type == LineType::GUILD;
 		int16_t width = WRAP_WIDTH - arrows[Arrow::PREV][0].width();
 
 		auto fit = [&](const std::string& text)
@@ -736,6 +747,9 @@ namespace ms
 			case Target::BUDDY:
 				chattarget_label.change_text("To a buddy");
 				break;
+			case Target::GUILD:
+				chattarget_label.change_text("To the Guild");
+				break;
 			default:
 				chattarget_label.change_text("To All");
 				break;
@@ -835,6 +849,22 @@ namespace ms
 
 		// As with party chat, the server sends the line to the others only.
 		send_chatline(player.get_stats().get_name() + " : " + message, LineType::BUDDY);
+	}
+
+	void UIChatBar::send_guild_chat(const std::string& message)
+	{
+		Player& player = Stage::get().get_player();
+		std::vector<int32_t> recipients = player.get_guild().online_ids(player.get_oid());
+
+		// FUN_00a39209
+		if (recipients.empty())
+		{
+			send_chatline("You are not in a guild yet or none of your guild member is online.", LineType::SKILL);
+			return;
+		}
+
+		MultiChatPacket(MultiChatPacket::Mode::GUILD, recipients, message).dispatch();
+		send_chatline(player.get_stats().get_name() + " : " + message, LineType::GUILD);
 	}
 
 	Button::State UIChatBar::button_pressed(uint16_t buttonid)

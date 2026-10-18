@@ -356,6 +356,31 @@ namespace ms
 		}
 	};
 
+	// Opcode: GUILD_OPERATION(126)
+	class GuildOperationPacket : public OutPacket
+	{
+	public:
+		enum Operation : int8_t
+		{
+			CREATE = 2
+		};
+
+		GuildOperationPacket(Operation op) : OutPacket(OutPacket::Opcode::GUILD_OPERATION)
+		{
+			write_byte(op);
+		}
+	};
+
+	// Names the guild being founded, in answer to the name prompt
+	class CreateGuildPacket : public GuildOperationPacket
+	{
+	public:
+		CreateGuildPacket(const std::string& name) : GuildOperationPacket(GuildOperationPacket::Operation::CREATE)
+		{
+			write_string(name);
+		}
+	};
+
 	// Opcode: BUDDYLIST_MODIFY(130)
 	class BuddyListModifyPacket : public OutPacket
 	{
