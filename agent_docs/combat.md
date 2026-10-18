@@ -284,7 +284,9 @@ so every request is answered, refusals with an empty STAT_CHANGED.
 - **AP** (`Player::spend_ap`): SPEND_AP names the stat by its STAT_CHANGED
   bit: STR, DEX, INT, LUK, MaxHP (0x800), or MaxMP (0x2000). Base stats stop
   at 999 and max HP/MP at 30,000. One AP adds the middle of v83's per-job
-  HP/MP range (`ap_growth`; a beginner gets +10/+7).
+  HP/MP range (`ap_growth`; a beginner gets +10/+7). As in v83, the client
+  only asks for MaxHP or MaxMP from level 20, and then only after the player
+  confirms a warning that it may leave the character weaker.
 - **SP** (`Player::raise_skill`): the skill must belong to the character's
   job or one it advanced through (`game::skill::in_job_tree`). Its `Skill.nx`
   template (`game_data::skills`) gives the max level and the `req` skills it

@@ -16,6 +16,7 @@
 //	along with this program.  If not, see <https://www.gnu.org/licenses/>.		//
 //////////////////////////////////////////////////////////////////////////////////
 #include "UIStatsInfo.h"
+#include "UINotice.h"
 
 #include "../UI.h"
 
@@ -225,10 +226,10 @@ namespace ms
 				deactivate();
 				break;
 			case Buttons::BT_HP:
-				send_apup(MapleStat::Id::MAXHP);
+				confirm_apup(MapleStat::Id::MAXHP);
 				break;
 			case Buttons::BT_MP:
-				send_apup(MapleStat::Id::MAXMP);
+				confirm_apup(MapleStat::Id::MAXMP);
 				break;
 			case Buttons::BT_STR:
 				send_apup(MapleStat::Id::STR);
@@ -258,6 +259,23 @@ namespace ms
 	void UIStatsInfo::send_apup(MapleStat::Id stat) const
 	{
 		Stage::get().get_player().request(SpendApPacket(stat), ExclRequest::WAIT);
+	}
+
+	void UIStatsInfo::confirm_apup(MapleStat::Id stat) const
+	{
+		// v83 ignores AP for MaxHP and MaxMP below level 20, and asks first
+		// from then on (FUN_00a239b7).
+		if (stats.get_stat(MapleStat::Id::LEVEL) < 20)
+			return;
+
+		UI::get().emplace<UIYesNo>(
+			"If you invest your AP in HP or MP, your character may have\\ninsufficient stats to become as strong "
+			"as it could be.\\nDo you still wish to raise this skill?",
+			[stat](bool yes)
+			{
+				if (yes)
+					Stage::get().get_player().request(SpendApPacket(stat), ExclRequest::WAIT);
+			});
 	}
 
 	void UIStatsInfo::set_detail(bool enabled)
