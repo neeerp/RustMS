@@ -35,6 +35,10 @@ namespace ms
 		constexpr Point<int16_t> BT_ENTER = Point<int16_t>(520, 244);
 		constexpr Point<int16_t> BT_CLAIM = Point<int16_t>(494, 241);
 
+		// v83 draws a line's cap top about 3 below where it is drawn, we 9,
+		// so all text here goes up by the difference.
+		constexpr Point<int16_t> TEXT_Y = Point<int16_t>(0, -6);
+
 		constexpr Point<int16_t> FEET[2] = { Point<int16_t>(227, 101), Point<int16_t>(66, 101) };
 		constexpr Point<int16_t> NAME[2] = { Point<int16_t>(229, 107), Point<int16_t>(64, 107) };
 		constexpr Point<int16_t> MESO[2] = { Point<int16_t>(281, 243), Point<int16_t>(119, 243) };
@@ -49,13 +53,16 @@ namespace ms
 		constexpr int16_t COUNT_Y = 149;
 		constexpr Point<int16_t> SLOT_PITCH = Point<int16_t>(39, 37);
 
-		// The chat log and its scroll bar.
-		constexpr int16_t LOG_LEFT = 295;
-		constexpr int16_t LOG_TOP = 25;
-		constexpr int16_t LOG_BOTTOM = 217;
-		constexpr int16_t LOG_WIDTH = 237;
-		constexpr int16_t LOG_ROW = 13;
+		// The chat log (FUN_0065f381, FUN_0065fab9): eleven rows of 16 inside
+		// its box, wrapped to the box less 14.
+		constexpr int16_t LOG_LEFT = 297;
+		constexpr int16_t LOG_TOP = 27;
+		constexpr int16_t LOG_ROW = 16;
+		constexpr int16_t LOG_ROWS = 11;
+		constexpr int16_t LOG_WIDTH = 223;
 		constexpr size_t LOG_LIMIT = 200;
+		constexpr int16_t LOG_CLIP_TOP = 25;
+		constexpr int16_t LOG_CLIP_BOTTOM = 217;
 		constexpr int16_t SLIDER_X = 542;
 		const Range<int16_t> SLIDER_RANGE = Range<int16_t>(23, 215);
 
@@ -77,7 +84,7 @@ namespace ms
 	}
 
 	UITradingRoom::UITradingRoom(const mini_room::Enter &enter) : UIDragElement<PosTRADE>(),
-			own_slot(enter.own_slot < 2 ? enter.own_slot : 0), log_height(0), log_row(0)
+			own_slot(enter.own_slot < 2 ? enter.own_slot : 0), log_rows(0), log_row(0)
 	{
 		nl::node TradingRoom = NxFiles::ui_classic["UIWindow.img"]["TradingRoom"];
 		nl::node Basic = NxFiles::ui_classic["Basic.img"];
@@ -90,8 +97,9 @@ namespace ms
 		buttons[Buttons::ENTER] = std::make_unique<MapleButton>(NxFiles::ui_classic["UIWindow.img"]["Messenger"]["BtEnter"], BT_ENTER);
 		buttons[Buttons::CLAIM] = std::make_unique<MapleButton>(Basic["BtClaim"], BT_CLAIM);
 
+		// The names sit on dark tags, in white (FUN_007c27a0).
 		for (Member &member : members)
-			member.name = Text(Text::Font::A12M, Text::Alignment::CENTER, Color::Name::BLACK);
+			member.name = Text(Text::Font::A12M, Text::Alignment::CENTER, Color::Name::WHITE);
 
 		for (const mini_room::Member &member : enter.members)
 			visit(member);
@@ -102,18 +110,17 @@ namespace ms
 		meso_at_open = Stage::get().get_player().get_inventory().get_meso();
 
 		slider = Slider(
-				Slider::Type::CLASSIC, SLIDER_RANGE, SLIDER_X, log_rows(), 0,
+				Slider::Type::CLASSIC, SLIDER_RANGE, SLIDER_X, LOG_ROWS, 0,
 				[&](bool upwards)
 				{
-					int16_t total = (log_height + LOG_ROW - 1) / LOG_ROW;
 					int16_t shift = upwards ? -1 : 1;
 
-					if (log_row + shift >= 0 && log_row + shift + log_rows() <= total)
+					if (log_row + shift >= 0 && log_row + shift + LOG_ROWS <= log_rows)
 						log_row += shift;
 				}
 		);
 
-		input = Textfield(Text::Font::A11M, Text::Alignment::LEFT, Color::Name::BLACK, INPUT, INPUT_LIMIT);
+		input = Textfield(Text::Font::A12M, Text::Alignment::LEFT, Color::Name::BLACK, INPUT, INPUT_LIMIT);
 
 		input.set_enter_callback(
 				[&](std::string text)
@@ -153,11 +160,12 @@ namespace ms
 				// Our own avatar follows our equipment as it changes.
 				const CharLook &look = side == Side::MINE ? Stage::get().get_player().get_look() : member.look;
 
-				look.draw(position + FEET[side], false, Stance::Id::STAND1, Expression::Id::DEFAULT);
-				member.name.draw(position + NAME[side]);
+				// The partner on the left faces right, towards me (FUN_007c1f37).
+				look.draw(position + FEET[side], side == Side::PARTNER, Stance::Id::STAND1, Expression::Id::DEFAULT);
+				member.name.draw(position + NAME[side] + TEXT_Y);
 			}
 
-			meso_labels[side].draw(position + MESO[side]);
+			meso_labels[side].draw(position + MESO[side] + TEXT_Y);
 
 			const mini_room::Offer &offer = offers[side];
 
@@ -180,19 +188,19 @@ namespace ms
 				ColorBox(SHADE_SIZE.x(), SHADE_SIZE.y(), Color::Name::WHITE, 0.5f).draw(position + SHADE[side]);
 		}
 
-		Range<int16_t> clip = Range<int16_t>(position.y() + LOG_TOP, position.y() + LOG_BOTTOM);
+		Range<int16_t> clip = Range<int16_t>(position.y() + LOG_CLIP_TOP, position.y() + LOG_CLIP_BOTTOM);
 		int16_t y = LOG_TOP - log_row * LOG_ROW;
 
-		for (const Text &line : log)
+		for (const Line &line : log)
 		{
-			if (y + line.height() > LOG_TOP && y < LOG_BOTTOM)
-				line.draw(DrawArgument(position + Point<int16_t>(LOG_LEFT, y)), clip);
+			if (y + line.rows * LOG_ROW > LOG_TOP && y < LOG_TOP + LOG_ROWS * LOG_ROW)
+				line.text.draw(DrawArgument(position + Point<int16_t>(LOG_LEFT, y) + TEXT_Y), clip);
 
-			y += line.height();
+			y += line.rows * LOG_ROW;
 		}
 
 		slider.draw(position);
-		input.draw(position);
+		input.draw(position + TEXT_Y);
 
 		UIElement::draw_buttons(inter);
 	}
@@ -289,7 +297,11 @@ namespace ms
 
 	void UITradingRoom::add_chat(uint8_t slot, const std::string &line)
 	{
-		add_line(slot == own_slot ? line : mini_room::filter_chat(line, CurseData::filter));
+		// My lines are blue, my partner's black.
+		if (slot == own_slot)
+			add_line(line, Color::Name::SEATBLUE);
+		else
+			add_line(mini_room::filter_chat(line, CurseData::filter), Color::Name::BLACK);
 	}
 
 	void UITradingRoom::put_item(const mini_room::PutItem &put)
@@ -465,37 +477,33 @@ namespace ms
 			MiniRoomChatPacket(text).dispatch();
 	}
 
-	void UITradingRoom::add_line(const std::string &line)
+	void UITradingRoom::add_line(const std::string &line, Color::Name color)
 	{
-		int16_t total = (log_height + LOG_ROW - 1) / LOG_ROW;
-		bool at_bottom = log_row + log_rows() >= total;
+		bool at_bottom = log_row + LOG_ROWS >= log_rows;
 
-		log.emplace_back(Text::Font::A11M, Text::Alignment::LEFT, Color::Name::BLACK, line, LOG_WIDTH);
-		log_height += log.back().height();
+		Text text = Text(Text::Font::A12M, Text::Alignment::LEFT, color, line, LOG_WIDTH, true, 2);
+		auto rows = static_cast<int16_t>(std::max(1, (text.height() + LOG_ROW - 3) / LOG_ROW));
+
+		log.push_back({ text, rows });
+		log_rows += rows;
 
 		if (log.size() > LOG_LIMIT)
 		{
-			log_height -= log.front().height();
+			log_rows -= log.front().rows;
+			log_row = std::max<int16_t>(0, log_row - log.front().rows);
 			log.erase(log.begin());
 		}
 
 		if (at_bottom)
 			scroll_to_bottom();
 		else
-			slider.setrows(log_row, log_rows(), (log_height + LOG_ROW - 1) / LOG_ROW);
+			slider.setrows(log_row, LOG_ROWS, log_rows);
 	}
 
 	void UITradingRoom::scroll_to_bottom()
 	{
-		int16_t total = (log_height + LOG_ROW - 1) / LOG_ROW;
-
-		log_row = std::max<int16_t>(0, total - log_rows());
-		slider.setrows(log_row, log_rows(), total);
-	}
-
-	int16_t UITradingRoom::log_rows() const
-	{
-		return (LOG_BOTTOM - LOG_TOP) / LOG_ROW;
+		log_row = std::max<int16_t>(0, log_rows - LOG_ROWS);
+		slider.setrows(log_row, LOG_ROWS, log_rows);
 	}
 
 	void UITradingRoom::show_item(Point<int16_t> cursor)

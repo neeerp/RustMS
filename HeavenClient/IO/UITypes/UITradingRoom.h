@@ -90,11 +90,9 @@ namespace ms
 
 		void submit(const std::string &text);
 
-		void add_line(const std::string &line);
+		void add_line(const std::string &line, Color::Name color);
 
 		void scroll_to_bottom();
-
-		int16_t log_rows() const;
 
 		void show_item(Point<int16_t> cursor);
 
@@ -130,8 +128,14 @@ namespace ms
 		// For the mesos received after fees, as v83 counts them.
 		int64_t meso_at_open;
 
-		std::vector<Text> log;
-		int16_t log_height;
+		struct Line
+		{
+			Text text;
+			int16_t rows;
+		};
+
+		std::vector<Line> log;
+		int16_t log_rows;
 		int16_t log_row;
 		Slider slider;
 		Textfield input;
