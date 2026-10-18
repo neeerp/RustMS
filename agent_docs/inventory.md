@@ -200,8 +200,8 @@ TRUNK_REQUEST (`0x3E`) is answered by mode:
 
 - **Take out** (4: tab, index): costs `trunkGet`. The item goes into a bag
   the same way a pickup does. Stars, bullets and equips get a slot of their
-  own. Answers TAKEN_OUT (`0x09`) with that bag. Errors: no mesos `0x0c`, a
-  one-of-a-kind item the player already has `0x0b`, full bag `0x0a`.
+  own. Answers TAKEN_OUT (`0x09`) with that bag. Errors: no mesos `0x0b`, a
+  one-of-a-kind item the player already has `0x0c`, full bag `0x0a`.
 - **Store** (5: slot, item, quantity): costs `trunkPut`. The quantity can be
   part of a stack. A set of stars or bullets and an equip go whole. Cash,
   quest and untradable items can't be stored. Answers STORED (`0x0d`) with

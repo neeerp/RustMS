@@ -673,9 +673,11 @@ These were corrected:
    for the Rech. button, and buying sends the row's index in the server's
    list rather than its place on screen. Stars are bought one
    set at a time and sold as a whole set, both after a yes/no. The new
-   CONFIRM_SHOP_TRANSACTION handler shows "You do not have enough mesos." and
-   "Please check if your inventory is full or not."; codes 0 and 8 need no
-   notice.
+   CONFIRM_SHOP_TRANSACTION handler shows v83's notice for each code: codes
+   0, 4 and 8 need none, and a code v83 doesn't know is "Due to an error, the
+   trade did not happen.". TRUNK_RESULT had swapped `0x0b`, which is out of
+   mesos to take an item out, and `0x0c`, which is a one-of-a-kind item the
+   player already has.
 10. v83 keeps one binding each for Ctrl, Alt, and Shift: the game reads a
     key's scan code without the extended bit, so Right Ctrl and Right Alt
     arrive as the left keys, and it folds Right Shift (54) onto Left Shift

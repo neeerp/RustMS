@@ -150,18 +150,47 @@ namespace ms
 
 	void ConfirmShopTransactionHandler::handle(InPacket& recv) const
 	{
-		const char* message = nullptr;
+		// The notice v83 shows for each code (FUN_00756da7). 0, 4 and 8 went through, and a code it doesn't know is an
+		// error.
+		std::string message = "Due to an error, the trade did not happen.";
 
 		switch (recv.read_byte())
 		{
+		case 0:
+		case 4:
+		case 8:
+			return;
+		case 1:
+		case 5:
+		case 9:
+			message = "You don't have enough in stock.";
+			break;
 		case 2:
+		case 10:
 			message = "You do not have enough mesos.";
 			break;
 		case 3:
 			message = "Please check if your inventory is full or not.";
 			break;
-		default:
-			return;
+		case 13:
+			message = "You need more items";
+			break;
+		case 14:
+			// v83 shows the level negated.
+			message = "You must be under lv." + std::to_string(-recv.read_int()) + " to purchase this item";
+			break;
+		case 15:
+			message = "You must be over lv." + std::to_string(recv.read_int()) + " to purchase this item";
+			break;
+		case 16:
+			message = "Players that are Level 15 and below \\nmay only trade 1 million mesos per day. \\nYou have reached the "
+					"limit today,\\nplease try again tomorrow.";
+			break;
+		case 17:
+			if (recv.read_bool())
+				message = recv.read_string();
+
+			break;
 		}
 
 		UI::get().emplace<UIOk>(message, [](bool) {});
@@ -173,8 +202,8 @@ namespace ms
 		{
 			TAKEN_OUT = 0x09,
 			INVENTORY_FULL = 0x0a,
-			ONLY_ONCE = 0x0b,
-			NO_MESOS_TO_TAKE = 0x0c,
+			NO_MESOS_TO_TAKE = 0x0b,
+			ONLY_ONCE = 0x0c,
 			STORED = 0x0d,
 			SORTED = 0x0f,
 			NO_MESOS_TO_STORE = 0x10,
