@@ -79,6 +79,7 @@ namespace ms
 										  time, shotrange, y)
 			).first->second;
 
+			added.x = sub["x"];
 			added.mesocost = sub["moneyCon"];
 			added.itemcost = sub["itemCon"];
 			added.itemcount = sub["itemConNo"];

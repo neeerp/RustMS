@@ -72,6 +72,8 @@ pub struct SkillLevel {
     /// Shadow Partner's Summoning Rock.
     pub item_cost: i32,
     pub item_cost_count: i32,
+    /// Mesos each use costs (`moneyCon`), as Shadow Meso.
+    pub money_cost: i32,
     /// The skill's area around the user facing left (`lt`, `rb`), (0, 0)
     /// for one without.
     pub lt: (i32, i32),
@@ -168,6 +170,7 @@ impl SkillData {
                     prop: int("prop")?,
                     item_cost: int("itemCon")?,
                     item_cost_count: int("itemConNo")?,
+                    money_cost: int("moneyCon")?,
                     lt: nx.vector_child(level, "lt")?.unwrap_or_default(),
                     rb: nx.vector_child(level, "rb")?.unwrap_or_default(),
                 });

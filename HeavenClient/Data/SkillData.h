@@ -60,6 +60,8 @@ namespace ms
 			int16_t shotrange;
 			// The skill's own value, as Element Amplification's damage percent.
 			int32_t y;
+			// A second value of the skill's own, as Shadow Meso's critical.
+			int32_t x = 0;
 			// The mesos the skill takes, and the item and how many of it.
 			int32_t mesocost = 0;
 			int32_t itemcost = 0;

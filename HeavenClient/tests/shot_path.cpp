@@ -138,6 +138,9 @@ int main()
 		require(damage_scale(3001004, 150, 0) == 1.5f && damage_scale(0, 0, 0) == 1.0f,
 				"a skill hits for its damage percent, all of it with none");
 		require(damage_scale(3101005, 0, 130) == 1.3f, "Arrow Bomb for its x percent");
+		require(meso_damage(855.9, false, 50, 0) == 8550.0, "Shadow Meso hits for ten times the whole mesos");
+		require(meso_damage(855.9, true, 50, 0) == 12825.0, "and its x percent more on a critical");
+		require(meso_damage(855.9, false, 50, 10) == 7695.0, "and a percent less per level the mob is above");
 
 		require(!area_shot(15111006) && !area_shot(3101005) && !area_shot(0), "Spark, Arrow Bomb and plain shots don't");
 		require(hides_bullet(3111004) && !hides_bullet(5221008) && !hides_bullet(4111005), "Arrow Rain shows no arrow");

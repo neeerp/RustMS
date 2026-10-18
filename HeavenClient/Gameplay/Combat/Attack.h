@@ -39,7 +39,9 @@ namespace ms
 		{
 			DMG_WEAPON,
 			DMG_MAGIC,
-			DMG_FIXED
+			DMG_FIXED,
+			// Shadow Meso's, from the mesos it throws.
+			DMG_MESO
 		};
 
 		Type type = Type::CLOSE;
@@ -52,6 +54,8 @@ namespace ms
 		int32_t matk = 0;
 		int32_t accuracy = 0;
 		int32_t fixdamage = 0;
+		// Shadow Meso's `x`, what a critical adds in percent.
+		int32_t mesocritical = 0;
 		int16_t playerlevel = 1;
 		// What a spell's damage comes from: the player's magic, INT and LUK,
 		// the spell's mastery and element, and Element Amplification's percent.

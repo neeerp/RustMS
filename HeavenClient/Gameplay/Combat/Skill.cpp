@@ -245,6 +245,15 @@ namespace ms
 			attack.element = SkillData::get(skillid).get_element();
 			attack.elemboost = elemboost(user, attack.element);
 			attack.damagetype = Attack::DMG_MAGIC;
+		} else if (skillid == SkillId::SHADOW_MESO)
+		{
+			// The mesos it throws, with its own critical in place of the
+			// user's (FUN_0078df87).
+			attack.mindamage = stats.mesocost * 0.5;
+			attack.maxdamage = stats.mesocost * 1.5;
+			attack.critical = stats.chance;
+			attack.mesocritical = stats.x;
+			attack.damagetype = Attack::DMG_MESO;
 		} else if (stats.matk)
 		{
 			attack.matk += stats.matk;

@@ -95,8 +95,12 @@ shot's `bulletCount`, otherwise `attackCount`), the MP spent, and the cap: a
 `fixdamage` skill (Three Snails: 10/25/40) hits for at most that, a `mad`
 spell for twice v83's magic maximum (`max_magic_damage`: ((M² / 1000 + M) / 30
 + INT / 200) × `mad`, where M is INT plus equipment magic attack), a `damage`
-skill for that percentage of the basic cap, and a skill with none is not an
-attack. A spell must name a skill. Too little MP refuses the attack.
+skill for that percentage of the basic cap, Shadow Meso for v83's highest
+roll (ten times one and a half its `moneyCon`, raised by its `x` percent on a
+critical), and a skill with none is not an attack. A spell must name a skill.
+Too little MP refuses the attack, as do too few mesos for the skill's
+`moneyCon` (Shadow Meso's, raised by Shadow Partner's `y` percent while that
+buff is on, as the v83 client checks).
 HeavenClient sends a skill as the attack v83's `CUserLocal::DoActiveSkill`
 makes it, whatever the weapon: a swing, a shot, or a spell
 (`SkillData::flags_of`). Any other skill goes out as SPECIAL_MOVE. Skills
@@ -106,7 +110,8 @@ The field shows
 the attack under its own opcode (with the skill id and level, so others see
 the skill's effect, and for a shot the star, arrow, or bullet it fired) to the
 others, applies the damage, sends the attacker SHOW_MONSTER_HP, and on death
-KILL_MONSTER to everyone; the attacker gets the MP left as STAT_CHANGED.
+KILL_MONSTER to everyone; the attacker gets the MP and mesos left as
+STAT_CHANGED.
 
 A shot fires from the USE slot the client names, as in v83 (`shot_ammo`). The
 item there must fit the weapon (stars for claws, arrows for bows and the
@@ -137,7 +142,15 @@ Arrow, Rapid Fire) refuse anything but a bow, crossbow, or gun without a word.
 Any other mismatch with the weapon `Skill.img` names, or the knuckle, sword,
 or wand rules a few pirate and Cygnus skills have instead, says "This skill
 cannot be used with the equipped item." Ammo comes last. RustMS charges a
-special move's `itemCon` but never Shadow Meso's mesos.
+special move's `itemCon`, and Shadow Meso exactly the mesos the client checks
+for. The skill's description gives each level a range around its
+`moneyCon`, so v83's server may have charged a varying amount.
+
+HeavenClient rolls Shadow Meso's hits as v83 does (`shot_path::meso_damage`,
+FUN_0078df87): ten times a whole number of mesos between half and one and a
+half its `moneyCon`, with its own `prop` and `x` for a critical in place of
+the user's, then a percent less for each level the mob is above the user. It
+misses as a blow does but ignores the mob's defense.
 
 HeavenClient picks targets as v83 does (`Combat::find_targets`). Melee and
 magic attacks take the mobs whose body overlaps the attack range in the order
@@ -841,7 +854,8 @@ Setting restores the same table.
 
 `field_mobs` unit tests cover spawning, control hand-off (including by
 distance report), movement, attacks' MP, damage, EXP sharing, and respawn;
-`net::combat` covers parsing, the damage cap, and the broadcast, and the
+`net::combat` covers parsing, the damage cap, Shadow Meso's mesos, and the
+broadcast, and the
 TAKE_DAMAGE handler's bounds by attack index; `game::mob_damage` covers the
 StandardPDD table and the bound. HeavenClient's `mob_damage_tests` and
 `mob_attack_tests` cover the damage and miss formulas and the attacks'
