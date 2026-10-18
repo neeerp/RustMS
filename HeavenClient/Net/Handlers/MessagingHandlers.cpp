@@ -24,6 +24,7 @@
 #include "../../Character/Inventory/ScrollRules.h"
 #include "../../Data/CurseData.h"
 #include "../../Data/ItemData.h"
+#include "../../Data/SkillData.h"
 #include "../../Data/SwindleData.h"
 #include "../../Gameplay/Stage.h"
 #include "../../IO/UI.h"
@@ -151,12 +152,22 @@ namespace ms
 		}
 	}
 
-	// Modes:
+	// Modes, as v83 numbers them (FUN_00a209d4):
 	// 0 - Picking up an item or mesos
 	// 1 - Quest progress
+	// 2 - A cash item's time is up
 	// 3 - EXP
 	// 4 - Fame, in the chat log
 	// 5 - Mesos, in the chat log
+	// 6 - Guild points
+	// 7 - An item's effect
+	// 8 - Items whose time is up
+	// 9 - A line from the server
+	// 10 - A quest's extra record, which shows nothing
+	// 11 - Items whose seal is gone
+	// 12 - Lines from the server
+	// 13 - Skills whose time is up
+	// v83 ignores any other mode.
 	void ShowStatusInfoHandler::handle(InPacket& recv) const
 	{
 		int8_t mode = recv.read_byte();
@@ -248,9 +259,55 @@ namespace ms
 		{
 			chat_line(status_messages::meso_line(recv.read_int()));
 		}
-		else
+		else if (mode == 2)
 		{
-			show_status(Color::Name::RED, "Mode: " + std::to_string(mode) + " is not handled.");
+			const std::string& name = ItemData::get(recv.read_int()).get_name();
+
+			if (!name.empty())
+				chat_line("[" + name + "] has passed its expiration date and will be removed from your inventory.", UIChatBar::LineType::SKILL);
+		}
+		else if (mode == 6)
+		{
+			chat_line(status_messages::guild_points_line(recv.read_int()));
+		}
+		else if (mode == 7)
+		{
+			chat_line(ItemData::get(recv.read_int()).get_desc());
+		}
+		else if (mode == 8 || mode == 11)
+		{
+			// v83 stops at the first item it can't name.
+			for (auto count = static_cast<uint8_t>(recv.read_byte()); count > 0; count--)
+			{
+				const std::string& name = ItemData::get(recv.read_int()).get_name();
+
+				if (name.empty())
+					break;
+
+				chat_line(mode == 8 ? "The item [" + name + "] has been expired, and therefore, deleted from your inventory." : name + "'s seal has expired.", UIChatBar::LineType::SKILL);
+			}
+		}
+		else if (mode == 9 || mode == 12)
+		{
+			auto count = static_cast<uint8_t>(mode == 9 ? 1 : recv.read_byte());
+
+			for (; count > 0; count--)
+			{
+				std::string line = recv.read_string();
+
+				if (!line.empty())
+					chat_line(line, UIChatBar::LineType::SKILL);
+			}
+		}
+		else if (mode == 13)
+		{
+			for (auto count = static_cast<uint8_t>(recv.read_byte()); count > 0; count--)
+			{
+				const std::string& name = SkillData::get(recv.read_int()).get_name();
+
+				if (!name.empty())
+					chat_line(name + " has disappeared as the time limit has passed.", UIChatBar::LineType::SKILL);
+			}
 		}
 	}
 

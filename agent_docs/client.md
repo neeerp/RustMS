@@ -77,7 +77,11 @@ from `UI.nx`. Moved so far:
   120 px, or 96 px when a count follows), mesos, and kill EXP with a yellow
   line per bonus ("Bonus EXP for PARTY (+N)") show here; quest EXP (mode 3
   with its in-chat flag), mode 4 fame and mode 5 mesos go to the chat log as
-  grey lines.
+  grey lines. So do mode 6 guild points and mode 7 (an item's description).
+  Expired cash items, items, seals and skills (modes 2, 8, 11, 13) and
+  server lines (9, 12) go to the chat log in the colour v83 uses for chat
+  type 0xc. Mode 10, a quest's extra record, shows nothing, and other modes
+  are ignored, as in v83.
 - **Chat** (`UIChatBar`): the input strip in the bar's top-left and the log
   above it. The status bar cuts that strip out of its background, so the two
   can overlap in either draw order. As in the original, the log has three

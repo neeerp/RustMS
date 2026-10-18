@@ -76,6 +76,15 @@ namespace ms
 			return "You have gained fame. (+" + std::to_string(amount) + ")";
 		}
 
+		// Mode 6. Zero counts as a loss.
+		inline std::string guild_points_line(int32_t amount)
+		{
+			if (amount > 0)
+				return "You have earned Guild Points (+" + std::to_string(amount) + ")";
+
+			return "You have lost Guild Points (" + std::to_string(amount) + ")";
+		}
+
 		// SHOW_STATUS_INFO mode 3, as FUN_00a21ac5 reads it.
 		struct ExpGain
 		{
