@@ -269,8 +269,13 @@ from `UI.nx`. Moved so far:
 - **World select** (`UIWorldSelect`, `Login.img/WorldSelect`): the worlds
   hang in packet order as planks (`BtWorld/<world id>`) from the scene's rope
   bar. Fifteen slots start at x 232, 27 apart, and blank planks fill the
-  unused ones. Picking a world plays `scroll/0` over the scene's closed
-  scroll. When it opens, it shows the world's name and its channels in four
+  unused ones. Picking a world asks the server for its status
+  (SERVERSTATUS_REQUEST), and no world or channel takes clicks until the
+  answer comes. Status 0 plays `scroll/0` over the scene's closed scroll; 1
+  does too, under a notice that the world is busy; 2 says the world is full
+  and leaves the list as it was. RustMS answers 2 only when no world has a
+  channel. The banner byte after the status is read but not drawn. When the
+  scroll opens, it shows the world's name and its channels in four
   columns, each with a load gauge. The gauge treats a load of 1000 as full,
   and RustMS sends each channel's configured capacity (700 by default) as its
   load. The red `chSelect` circle marks the chosen channel. Clicking it again,

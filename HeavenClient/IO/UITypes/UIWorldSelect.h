@@ -60,6 +60,11 @@ namespace ms
 
 		void remove_selected();
 
+		// The answer to the status request a picked world sent: 0 opens its
+		// channels, 1 also warns that it's busy, 2 says it's full and keeps
+		// the list (FUN_006283c1).
+		void server_status(uint8_t status);
+
 		// The v83 art for a world is keyed by the world id itself.
 		std::string get_world_name(uint8_t worldid) const;
 		uint8_t get_channel_count(uint8_t worldid) const;
@@ -125,6 +130,10 @@ namespace ms
 		// Slots into `worlds`; -1 when none.
 		int16_t selected = -1;
 		int16_t focused = -1;
+		// The world picked last, whose status is awaited. v83 takes no
+		// world or channel clicks until it comes (CLogin+0x170).
+		int16_t requested = -1;
+		bool status_pending = false;
 		uint8_t channelid = 0;
 	};
 }

@@ -110,13 +110,14 @@ namespace ms
 
 	void ServerStatusHandler::handle(InPacket& recv) const
 	{
-		// Possible values for status:
-		// 0 - Normal
-		// 1 - Highly populated
-		// 2 - Full
-		recv.read_short(); // status
+		// 0 normal, 1 busy, 2 full (FUN_005f92ae). The second byte picks a
+		// busy banner (WorldNotice/Populated) for the channel list, which
+		// isn't drawn here.
+		uint8_t status = recv.read_byte();
+		recv.read_byte();
 
-		// TODO: I believe it shows a warning message if it's 1 and blocks enter into the world if it's 2. Need to find those messages.
+		if (auto worldselect = UI::get().get_element<UIWorldSelect>())
+			worldselect->server_status(status);
 	}
 
 	void ServerlistHandler::handle(InPacket& recv) const
