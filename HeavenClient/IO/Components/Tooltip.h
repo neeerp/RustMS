@@ -45,7 +45,8 @@ namespace ms
 			MONSTERBOOK,
 			BUFFLIST,
 			TRADINGROOM,
-			PERSONALSHOP
+			PERSONALSHOP,
+			ITEMMEGAPHONE
 		};
 
 		virtual ~Tooltip()

@@ -74,6 +74,8 @@ namespace ms
 					return Tooltip::Parent::TRADINGROOM;
 				case UIElement::Type::PERSONALSHOP:
 					return Tooltip::Parent::PERSONALSHOP;
+				case UIElement::Type::ITEMMEGAPHONE:
+					return Tooltip::Parent::ITEMMEGAPHONE;
 				case UIElement::Type::EVENT:
 					return Tooltip::Parent::EVENT;
 				case UIElement::Type::KEYCONFIG:

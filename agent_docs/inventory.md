@@ -197,8 +197,29 @@ the plain megaphone's starts with the `UIWindow.img/Megaphone` channel tag
 (`ch0` with the ear, `ch1` without) and the two-digit channel. A triple
 megaphone's later lines take the first line's name. Lines are dropped on
 event maps (`Util/Megaphones.h`); v83 shows them there to GMs, but
-HeavenClient doesn't know who is a GM. It has no megaphone dialogs yet: the
-items can't be used from the Cash tab.
+HeavenClient doesn't know who is a GM.
+
+Double-clicking a megaphone in the Cash tab opens its dialog
+(`UIItemInventory::use_megaphone`), as v83 does:
+
+- Plain: a text prompt ("Enter your comments through the megaphone.", 60
+  characters). After OK, an empty line is dropped, then cursing, a level of
+  10 or below, and a line over 60 bytes are refused with v83's notices.
+- Super and triple: `UIMegaphone`, a modal window on
+  `UIWindow.img/Megaphone` (one line) or `ArtMegaphone` (three), with the
+  "Display whisper icon" checkbox (on at first). It closes before the lines
+  are checked as above; the triple megaphone asks "One of the lines has not
+  been applied." before sending with an empty line, and sends the lines up
+  to the last one typed. Its Preview button writes the lines to the own chat
+  log only. The "Special character" button does nothing yet.
+- Item: `UIItemMegaphone` on `ItemMegaphone`, which leaves the game playable.
+  An item dropped on it from the inventory shows in its well with its name
+  and tooltip; clicking the well takes it back. OK with nothing typed does
+  nothing, and with no item asks first. It sends the line itself, refusing
+  with "Other requests are in process." while a request is waiting.
+
+The item megaphone can't be opened in a shop or trade ("Not available").
+The gates are in `Util/Megaphones.h`.
 
 ### Chalkboard
 

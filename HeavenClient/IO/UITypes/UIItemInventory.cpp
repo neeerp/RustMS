@@ -18,6 +18,8 @@
 #include "UIItemInventory.h"
 
 #include "UIChatBar.h"
+#include "UIItemMegaphone.h"
+#include "UIMegaphone.h"
 #include "UINotice.h"
 #include "UIPersonalShop.h"
 #include "UITeleportRock.h"
@@ -37,6 +39,7 @@
 #include "../../Data/EquipData.h"
 #include "../../Gameplay/Stage.h"
 #include "../../Util/Chalkboard.h"
+#include "../../Util/Megaphones.h"
 #include "../../Util/NxFiles.h"
 
 #include "../../Net/Handlers/MiniRoom.h"
@@ -86,6 +89,10 @@ namespace ms
 		constexpr const char *NAME_PET = "Please name your pet.";
 		constexpr const char *NAME_TAKEN = "That name is not available.";
 		constexpr const char *NO_CURSING = "Cursing is not allowed.";
+		// StringPool 0x10f, 0xea1 and 0x111.
+		constexpr const char *MEGAPHONE_PROMPT = "Enter your comments through the megaphone.";
+		constexpr const char *MEGAPHONE_LEVEL = "This megaphone is only available for \\ncharacters that are over Level 10.";
+		constexpr const char *MEGAPHONE_LONG = "Use the megaphone to text up to 60 characters.";
 		constexpr const char *BOSS_PET = "Would you like to change your Boss Pet?\\n (The \"Item Ignore\" skill, as well as \\nthe stats for speed and jump will \\nfollow that of the Lead Pet)";
 
 		// v83 FUN_00a240a2: double-clicking a pet asks the server to bring it
@@ -223,31 +230,123 @@ namespace ms
 			return false;
 		}
 
+		// Some cash items say so in the chat log while a shop or trade is open.
+		bool in_mini_room()
+		{
+			auto shop = UI::get().get_element<UIPersonalShop>();
+			auto trade = UI::get().get_element<UITradingRoom>();
+
+			if ((!shop || !shop->is_active()) && (!trade || !trade->is_active()))
+				return false;
+
+			if (auto chatbar = UI::get().get_element<UIChatBar>())
+				chatbar->send_chatline("Not available", UIChatBar::LineType::SKILL);
+
+			return true;
+		}
+
 		// v83 FUN_00a0a63f, type 0x20: a chalkboard asks for a note, which
 		// goes up once the server sends it back. A blank note isn't sent.
 		void use_chalkboard(int16_t slot, int32_t item_id)
 		{
-			if (!may_use_cash_item())
+			if (!may_use_cash_item() || in_mini_room())
 				return;
 
-			auto shop = UI::get().get_element<UIPersonalShop>();
-			auto trade = UI::get().get_element<UITradingRoom>();
-
-			if ((shop && shop->is_active()) || (trade && trade->is_active()))
-			{
-				if (auto chatbar = UI::get().get_element<UIChatBar>())
-					chatbar->send_chatline("Not available", UIChatBar::LineType::SKILL);
-			} else if (Stage::get().get_mapinfo().allows_personal_shop())
+			if (Stage::get().get_mapinfo().allows_personal_shop())
 			{
 				UI::get().emplace<UIOk>("You can't use it here in this map.", [](bool)
 				{});
-			} else
+				return;
+			}
+
+			UI::get().emplace<UIEnterText>("Enter a note.", [=](const std::string &text)
 			{
-				UI::get().emplace<UIEnterText>("Enter a note.", [=](const std::string &text)
-				{
-					if (!Chalkboard::trim(text).empty() && may_use_cash_item())
-						Stage::get().get_player().request(UseCashItemPacket(slot, item_id, text), ExclRequest::WAIT);
-				}, Chalkboard::MAX_TEXT);
+				if (!Chalkboard::trim(text).empty() && may_use_cash_item())
+					Stage::get().get_player().request(UseCashItemPacket(slot, item_id, text), ExclRequest::WAIT);
+			}, Chalkboard::MAX_TEXT);
+		}
+
+		// Whether a megaphone's line is refused, saying why if v83 does.
+		bool megaphone_refused(Megaphones::Refusal refusal)
+		{
+			const char *reason = nullptr;
+
+			switch (refusal)
+			{
+				case Megaphones::Refusal::NONE:
+					return false;
+				case Megaphones::Refusal::CURSING:
+					reason = NO_CURSING;
+					break;
+				case Megaphones::Refusal::LEVEL:
+					reason = MEGAPHONE_LEVEL;
+					break;
+				case Megaphones::Refusal::LONG:
+					reason = MEGAPHONE_LONG;
+					break;
+				case Megaphones::Refusal::QUIET:
+					break;
+			}
+
+			if (reason)
+				UI::get().emplace<UIOk>(reason, [](bool)
+				{});
+
+			return true;
+		}
+
+		// Checks a plain or super megaphone's line with the level I have now.
+		bool line_refused(const std::string &text)
+		{
+			uint16_t level = Stage::get().get_player().get_stats().get_stat(MapleStat::Id::LEVEL);
+
+			return megaphone_refused(Megaphones::check_line(text, level, CurseData::filter));
+		}
+
+		void send_megaphone(OutPacket &&packet)
+		{
+			if (may_use_cash_item() && Stage::get().get_player().request(std::move(packet), ExclRequest::WAIT))
+				Sound(nl::nx::sound["Game.img"]["UseShopItem"]).play();
+		}
+
+		// v83 FUN_00a0a63f, types 0xc to 0xf and 0x3c: a megaphone asks for
+		// its line, and checks it once the prompt has closed. The item
+		// megaphone's window stays open beside the game and sends by itself.
+		void use_megaphone(int16_t slot, int32_t item_id)
+		{
+			if (!may_use_cash_item())
+				return;
+
+			switch (Megaphones::kind(item_id))
+			{
+				case Megaphones::Kind::PLAIN:
+					UI::get().emplace<UIEnterText>(MEGAPHONE_PROMPT, [=](const std::string &text)
+					{
+						if (!line_refused(text))
+							send_megaphone(UseCashItemPacket(slot, item_id, text));
+					}, Megaphones::MAX_LINE);
+					break;
+				case Megaphones::Kind::SUPER:
+					UI::get().emplace<UIMegaphone>(false, [=](const std::vector<std::string> &lines, bool ear)
+					{
+						if (!line_refused(lines[0]))
+							send_megaphone(UseSuperMegaphonePacket(slot, item_id, lines[0], ear));
+					});
+					break;
+				case Megaphones::Kind::TRIPLE:
+					UI::get().emplace<UIMegaphone>(true, [=](const std::vector<std::string> &lines, bool ear)
+					{
+						if (!megaphone_refused(Megaphones::check_lines(lines)))
+							send_megaphone(UseTripleMegaphonePacket(slot, item_id, Megaphones::lines_sent(lines), ear));
+					});
+					break;
+				case Megaphones::Kind::ITEM:
+					if (!in_mini_room())
+						UI::get().emplace<UIItemMegaphone>(slot, item_id);
+
+					break;
+				case Megaphones::Kind::NONE:
+					break;
 			}
 		}
 
@@ -614,6 +713,8 @@ namespace ms
 							use_chalkboard(slot, item_id);
 						else if (item_id / 10000 == 504)
 							use_teleport_rock(slot, item_id);
+						else if (item_id / 10000 == 507)
+							use_megaphone(slot, item_id);
 
 						break;
 				}
@@ -1066,6 +1167,13 @@ namespace ms
 
 		if (auto shop = UI::get().get_element<UIPersonalShop>())
 			shop->sell(sourcetab, source, item_id, count);
+	}
+
+	void UIItemInventory::ItemIcon::drop_on_megaphone() const
+	{
+		// v83 takes any item here; the server decides (FUN_004f49b3).
+		if (auto megaphone = UI::get().get_element<UIItemMegaphone>())
+			megaphone->set_item(sourcetab, source);
 	}
 
 	void UIItemInventory::ItemIcon::set_count(int16_t c)

@@ -165,6 +165,7 @@ namespace ms
 			case Tooltip::Parent::ITEMINVENTORY:
 			case Tooltip::Parent::SHOP:
 			case Tooltip::Parent::STORAGE:
+			case Tooltip::Parent::ITEMMEGAPHONE:
 				invtype = InventoryType::Id::EQUIP;
 				break;
 			case Tooltip::Parent::EQUIPINVENTORY:

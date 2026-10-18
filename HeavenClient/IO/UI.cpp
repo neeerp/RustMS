@@ -350,6 +350,8 @@ namespace ms
 					types.emplace_back(UIElement::Type::SHOPSELL);
 					types.emplace_back(UIElement::Type::SHOPSALES);
 					types.emplace_back(UIElement::Type::TELEPORTROCK);
+					types.emplace_back(UIElement::Type::MEGAPHONE);
+					types.emplace_back(UIElement::Type::ITEMMEGAPHONE);
 				}
 				else if (enter)
 				{
@@ -360,6 +362,7 @@ namespace ms
 					types.emplace_back(UIElement::Type::NOTICE);
 					types.emplace_back(UIElement::Type::ENTERNUMBER);
 					types.emplace_back(UIElement::Type::TELEPORTROCK);
+					types.emplace_back(UIElement::Type::MEGAPHONE);
 				} else if (tab)
 				{
 					// Game

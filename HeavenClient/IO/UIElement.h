@@ -86,6 +86,8 @@ namespace ms
 			SHOPSALES,
 			CONTEXTMENU,
 			TELEPORTROCK,
+			MEGAPHONE,
+			ITEMMEGAPHONE,
 			NUM_TYPES
 		};
 

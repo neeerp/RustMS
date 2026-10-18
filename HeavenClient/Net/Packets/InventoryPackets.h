@@ -145,6 +145,68 @@ namespace ms
 		}
 	};
 
+	// Uses a super megaphone (FUN_00a0a63f type 0xd): the line, and
+	// whether it shows an ear to whisper back by.
+	// Opcode: USE_CASH_ITEM(79)
+	class UseSuperMegaphonePacket : public OutPacket
+	{
+	public:
+		UseSuperMegaphonePacket(int16_t slot, int32_t itemid, const std::string &text, bool ear)
+				: OutPacket(OutPacket::Opcode::USE_CASH_ITEM)
+		{
+			write_short(slot);
+			write_int(itemid);
+			write_string(text);
+			write_byte(ear);
+			write_time();
+		}
+	};
+
+	// Uses an item megaphone (FUN_005ec4b7): a super megaphone's line that
+	// may show the item in `item_slot` of `tab`, or none for NONE.
+	// Opcode: USE_CASH_ITEM(79)
+	class UseItemMegaphonePacket : public OutPacket
+	{
+	public:
+		UseItemMegaphonePacket(int16_t slot, int32_t itemid, const std::string &text, bool ear, InventoryType::Id tab,
+							   int16_t item_slot) : OutPacket(OutPacket::Opcode::USE_CASH_ITEM)
+		{
+			write_short(slot);
+			write_int(itemid);
+			write_string(text);
+			write_byte(ear);
+			write_byte(tab != InventoryType::Id::NONE);
+
+			if (tab != InventoryType::Id::NONE)
+			{
+				write_int(tab);
+				write_int(item_slot);
+			}
+
+			write_time();
+		}
+	};
+
+	// Uses a triple megaphone (FUN_00a0a63f type 0x3c): one to three lines.
+	// Opcode: USE_CASH_ITEM(79)
+	class UseTripleMegaphonePacket : public OutPacket
+	{
+	public:
+		UseTripleMegaphonePacket(int16_t slot, int32_t itemid, const std::vector<std::string> &lines, bool ear)
+				: OutPacket(OutPacket::Opcode::USE_CASH_ITEM)
+		{
+			write_short(slot);
+			write_int(itemid);
+			write_byte(static_cast<int8_t>(lines.size()));
+
+			for (const std::string &line : lines)
+				write_string(line);
+
+			write_byte(ear);
+			write_time();
+		}
+	};
+
 	// Uses the teleport rock (504xxxx) in Cash slot `slot` to go to a
 	// character, or to a kept map (FUN_00a0a4aa).
 	// Opcode: USE_CASH_ITEM(79)

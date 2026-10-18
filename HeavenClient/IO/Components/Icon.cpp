@@ -92,6 +92,11 @@ namespace ms
 		type->drop_on_shop();
 	}
 
+	void Icon::drop_on_megaphone() const
+	{
+		type->drop_on_megaphone();
+	}
+
 	InventoryType::Id Icon::get_return_tab() const
 	{
 		return type->get_return_tab();
