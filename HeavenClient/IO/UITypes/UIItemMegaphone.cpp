@@ -11,6 +11,7 @@
 #include "../../Gameplay/Stage.h"
 #include "../../Net/Packets/InventoryPackets.h"
 #include "../../Util/Megaphones.h"
+#include "../../Util/Misc.h"
 #include "../../Util/NxFiles.h"
 
 #include <nlnx/nx.hpp>
@@ -24,9 +25,10 @@ namespace ms
 		// difference.
 		constexpr int16_t TEXT_RAISE = 6;
 		constexpr Rectangle<int16_t> FIELD = Rectangle<int16_t>(19, 221, 129, 145);
-		// The item's well, and the bar under it with its name.
+		// The item's well, and where its name starts in the bar under it, cut to fit.
 		constexpr Rectangle<int16_t> WELL = Rectangle<int16_t>(105, 137, 65, 97);
-		constexpr Point<int16_t> NAME = Point<int16_t>(120, 101);
+		constexpr Point<int16_t> NAME = Point<int16_t>(43, 103);
+		constexpr size_t NAME_WIDTH = 159;
 		// The checkbox control; its box is drawn 2 right and 1 down in it.
 		constexpr Rectangle<int16_t> CHECK = Rectangle<int16_t>(14, 174, 161, 175);
 		constexpr Point<int16_t> CHECK_BOX = Point<int16_t>(2, 1);
@@ -38,7 +40,7 @@ namespace ms
 
 	UIItemMegaphone::UIItemMegaphone(int16_t s, int32_t id)
 			: UIElement(Point<int16_t>(), Point<int16_t>()), slot(s), item_id(id), item_tab(InventoryType::Id::NONE),
-			  item_slot(0), shown_id(0), ear(true), held(false)
+			  item_slot(0), shown_id(0), ear(true), held(false), checking(false)
 	{
 		nl::node basic = NxFiles::ui_classic["Basic.img"];
 		nl::node src = NxFiles::ui_classic["UIWindow.img"]["ItemMegaphone"];
@@ -52,7 +54,7 @@ namespace ms
 		buttons[Buttons::OK] = std::make_unique<MapleButton>(basic["BtOK2"], Point<int16_t>(145, 186));
 		buttons[Buttons::CANCEL] = std::make_unique<MapleButton>(basic["BtCancel2"], Point<int16_t>(186, 186));
 
-		item_name = Text(Text::Font::A12M, Text::Alignment::CENTER, Color::Name::WHITE);
+		item_name = Text(Text::Font::A12M, Text::Alignment::LEFT, Color::Name::WHITE);
 
 		field = Textfield(Text::Font::A12M, Text::Alignment::LEFT, Color::Name::BLACK, FIELD, Megaphones::MAX_LINE);
 		field.set_enter_callback(
@@ -102,15 +104,30 @@ namespace ms
 	{
 		UIElement::remove_cursor();
 
+		// The button came up outside the window.
+		if (checking)
+		{
+			checking = false;
+			ear = !ear;
+		}
+
 		held = false;
 		clear_tooltip();
 	}
 
 	Cursor::State UIItemMegaphone::send_cursor(bool clicked, Point<int16_t> cursorpos)
 	{
-		// The well and the checkbox answer only to the button going down.
+		// The well answers to the button going down. The checkbox toggles when it comes up, wherever it is, after
+		// going down on it.
 		bool press = clicked && !held;
+		bool release = !clicked && held;
 		held = clicked;
+
+		if (release && checking)
+		{
+			checking = false;
+			ear = !ear;
+		}
 
 		Point<int16_t> cursor = cursorpos - position;
 
@@ -148,7 +165,7 @@ namespace ms
 		if (CHECK.contains(cursor))
 		{
 			if (press)
-				ear = !ear;
+				checking = true;
 
 			return clicked ? Cursor::State::CLICKING : Cursor::State::CANCLICK;
 		}
@@ -188,6 +205,7 @@ namespace ms
 		item_slot = id ? s : 0;
 		shown_id = id;
 		item_name.change_text(id ? ItemData::get(id).get_name() : "");
+		string_format::format_with_ellipsis(item_name, NAME_WIDTH);
 	}
 
 	Button::State UIItemMegaphone::button_pressed(uint16_t buttonid)

@@ -73,7 +73,9 @@ namespace ms
 			// Megaphones (v83 chat types 0xd to 0xf)
 			MEGAPHONE,
 			SUPER_MEGAPHONE,
-			ITEM_MEGAPHONE
+			ITEM_MEGAPHONE,
+			// A triple megaphone's preview (v83 chat type 0x15)
+			MEGAPHONE_PREVIEW
 		};
 
 		// Who a typed line goes to

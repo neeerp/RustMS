@@ -722,6 +722,9 @@ namespace ms
 				color = Color::Name::ITEMMEGAPHONE;
 				strip = ITEM_MEGAPHONE_STRIP;
 				break;
+			case LineType::MEGAPHONE_PREVIEW:
+				color = Color::Name::SILVER;
+				break;
 			default:
 				color = Color::Name::WHITE;
 				break;

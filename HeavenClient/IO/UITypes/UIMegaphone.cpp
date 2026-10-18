@@ -10,6 +10,7 @@
 #include "../../Constants.h"
 #include "../../Gameplay/Stage.h"
 #include "../../Util/Megaphones.h"
+#include "../../Util/Misc.h"
 #include "../../Util/NxFiles.h"
 
 #include <nlnx/nx.hpp>
@@ -29,15 +30,25 @@ namespace ms
 		constexpr Rectangle<int16_t> SUPER_CHECK = Rectangle<int16_t>(14, 174, 95, 109);
 		constexpr Rectangle<int16_t> TRIPLE_CHECK = Rectangle<int16_t>(18, 178, 153, 167);
 		constexpr Point<int16_t> CHECK_BOX = Point<int16_t>(2, 1);
+		// The samples' popup (FUN_00999320 and FUN_009995ae): where it opens from the window's top left, its width,
+		// its rows, the first sample button in it, and the "CREATE NEW" bar that empties the lines.
+		constexpr Point<int16_t> SAMPLES = Point<int16_t>(407, 30);
+		constexpr int16_t SAMPLES_WIDTH = 100;
+		constexpr int16_t SAMPLE_ROW = 15;
+		constexpr Point<int16_t> SAMPLES_ROWS = Point<int16_t>(3, 23);
+		constexpr Point<int16_t> SAMPLE_BUTTON = Point<int16_t>(9, 24);
+		constexpr Rectangle<int16_t> SAMPLES_CLEAR = Rectangle<int16_t>(11, 76, 10, 21);
 
 		// StringPool 0x1172 and 0x1173.
-		constexpr const char *PREVIEW_EMPTY = "This is a preview option for the Triple Megaphone.";
+		constexpr const char *PREVIEW_HEADER = "This is a preview option for the Triple Megaphone.";
 		constexpr const char *LINE_MISSING = "One of the lines has not been applied.\\nWould you still like to use it?";
 	}
 
-	UIMegaphone::UIMegaphone(bool t, std::function<void(const std::vector<std::string> &, bool)> os)
-			: UIElement(Point<int16_t>(), Point<int16_t>()), triple(t), onsend(std::move(os)), ear(true),
-			  held(false)
+	UIMegaphone::UIMegaphone(int32_t item_id, std::function<void(const std::vector<std::string> &, bool)> os)
+			: UIElement(Point<int16_t>(), Point<int16_t>()),
+			  triple(Megaphones::kind(item_id) == Megaphones::Kind::TRIPLE),
+			  item(nl::nx::item["Cash"]["0507.img"][string_format::extend_id(item_id, 8)]), onsend(std::move(os)),
+			  ear(true), held(false), checking(false), sampling(false), sample_count(0)
 	{
 		nl::node basic = NxFiles::ui_classic["Basic.img"];
 		nl::node src = NxFiles::ui_classic["UIWindow.img"][triple ? "ArtMegaphone" : "Megaphone"];
@@ -87,6 +98,16 @@ namespace ms
 						close();
 					}
 			);
+
+			// FUN_004edd21 moves through every control, buttons too; here Tab moves through the lines.
+			if (triple)
+				field.set_key_callback(
+						KeyAction::Id::TAB,
+						[&, i]()
+						{
+							focus_field(static_cast<int16_t>((i + 1) % field_count));
+						}
+				);
 		}
 
 		// Centred, with no title bar to drag it by.
@@ -94,17 +115,67 @@ namespace ms
 		position = Point<int16_t>((Constants::Constants::get().get_viewwidth() - dimension.x()) / 2,
 								  (Constants::Constants::get().get_viewheight() - dimension.y()) / 2);
 
+		if (triple)
+		{
+			// The item's `ui` holds a button for each sample, and the popup's top, rows and bottom.
+			nl::node ui = item["ui"];
+
+			samples_top = ui["t"];
+			samples_row = ui["c"];
+			samples_bottom = ui["s"];
+			sample_count = static_cast<uint16_t>(ui.size() > 3 ? ui.size() - 3 : 0);
+
+			// Kept on the screen.
+			int16_t height = (sample_count + 2) * SAMPLE_ROW;
+			Point<int16_t> screen = position + SAMPLES;
+
+			if (screen.y() + height > Constants::Constants::get().get_viewheight())
+				screen.set_y(Constants::Constants::get().get_viewheight() - height);
+
+			if (screen.x() + SAMPLES_WIDTH > Constants::Constants::get().get_viewwidth())
+				screen.set_x(Constants::Constants::get().get_viewwidth() - SAMPLES_WIDTH);
+
+			samples_pos = screen - position;
+
+			for (uint16_t i = 0; i < sample_count; i++)
+			{
+				auto button = std::make_unique<MapleButton>(
+						ui[std::to_string(i)], samples_pos + SAMPLE_BUTTON + Point<int16_t>(0, SAMPLE_ROW * i));
+				button->set_active(false);
+				buttons[Buttons::SAMPLE + i] = std::move(button);
+			}
+		}
+
 		fields[0].set_state(Textfield::State::FOCUSED);
 	}
 
 	void UIMegaphone::draw(float alpha) const
 	{
-		UIElement::draw(alpha);
+		draw_sprites(alpha);
+
+		for (auto &iter : buttons)
+			if (iter.first < Buttons::SAMPLE)
+				iter.second->draw(position);
 
 		for (size_t i = 0; i < field_count; i++)
 			fields[i].draw(position - Point<int16_t>(0, TEXT_RAISE));
 
 		checkbox[ear].draw(position + check_area.get_left_top() + CHECK_BOX);
+
+		if (!sampling)
+			return;
+
+		Point<int16_t> popup = position + samples_pos;
+
+		samples_top.draw(popup);
+
+		for (uint16_t i = 0; i < sample_count; i++)
+			samples_row.draw(popup + SAMPLES_ROWS + Point<int16_t>(0, SAMPLE_ROW * i));
+
+		samples_bottom.draw(popup + SAMPLES_ROWS + Point<int16_t>(0, SAMPLE_ROW * sample_count));
+
+		for (uint16_t i = 0; i < sample_count; i++)
+			buttons.at(Buttons::SAMPLE + i)->draw(position);
 	}
 
 	void UIMegaphone::update()
@@ -120,13 +191,24 @@ namespace ms
 		UIElement::remove_cursor();
 
 		held = false;
+		checking = false;
 	}
 
 	Cursor::State UIMegaphone::send_cursor(bool clicked, Point<int16_t> cursorpos)
 	{
-		// The checkbox answers only to the button going down.
 		bool press = clicked && !held;
+		bool release = !clicked && held;
 		held = clicked;
+
+		if (sampling)
+			return send_samples_cursor(press, release, clicked, cursorpos);
+
+		// The checkbox toggles when the button comes up, wherever it is, after going down on it.
+		if (release && checking)
+		{
+			checking = false;
+			ear = !ear;
+		}
 
 		for (size_t i = 0; i < field_count; i++)
 		{
@@ -139,9 +221,37 @@ namespace ms
 		if (check_area.contains(cursorpos - position))
 		{
 			if (press)
-				ear = !ear;
+				checking = true;
 
 			return clicked ? Cursor::State::CLICKING : Cursor::State::CANCLICK;
+		}
+
+		return UIElement::send_cursor(clicked, cursorpos);
+	}
+
+	Cursor::State UIMegaphone::send_samples_cursor(bool press, bool release, bool clicked, Point<int16_t> cursorpos)
+	{
+		// FUN_00999b5b: the popup has the mouse to itself. The button going down or up outside it closes it, and
+		// going down on the "CREATE NEW" bar empties the lines.
+		Point<int16_t> cursor = cursorpos - position - samples_pos;
+		Rectangle<int16_t> popup = Rectangle<int16_t>(0, SAMPLES_WIDTH - 1, 0, (sample_count + 2) * SAMPLE_ROW - 1);
+
+		if ((press || release) && !popup.contains(cursor))
+		{
+			UIElement::send_cursor(clicked, cursorpos);
+			use_sample(std::nullopt);
+
+			return Cursor::State::IDLE;
+		}
+
+		if (press && SAMPLES_CLEAR.contains(cursor))
+		{
+			for (size_t i = 0; i < field_count; i++)
+				fields[i].change_text("");
+
+			use_sample(std::nullopt);
+
+			return Cursor::State::IDLE;
 		}
 
 		return UIElement::send_cursor(clicked, cursorpos);
@@ -152,11 +262,19 @@ namespace ms
 		if (!pressed)
 			return;
 
-		// FUN_004edd21: Enter is OK, and Escape is Cancel.
-		if (escape)
+		// FUN_004edd21: Enter is OK, and Escape is Cancel. Over the samples, Escape closes them, and Enter picks
+		// none.
+		if (sampling)
+		{
+			if (escape || keycode == KeyAction::Id::RETURN)
+				use_sample(std::nullopt);
+		} else if (escape)
+		{
 			close();
-		else if (keycode == KeyAction::Id::RETURN)
+		} else if (keycode == KeyAction::Id::RETURN)
+		{
 			send();
+		}
 	}
 
 	UIElement::Type UIMegaphone::get_type() const
@@ -174,14 +292,25 @@ namespace ms
 			case Buttons::CANCEL:
 				close();
 				break;
+			case Buttons::EXAMPLE:
+				open_samples();
+				break;
 			case Buttons::PREVIEW:
 				preview();
 				break;
 			default:
+				if (buttonid >= Buttons::SAMPLE)
+					use_sample(static_cast<uint16_t>(buttonid - Buttons::SAMPLE));
+
 				break;
 		}
 
 		return Button::State::NORMAL;
+	}
+
+	bool UIMegaphone::button_covered(uint16_t buttonid, Point<int16_t>) const
+	{
+		return sampling && buttonid < Buttons::SAMPLE;
 	}
 
 	void UIMegaphone::send()
@@ -208,18 +337,54 @@ namespace ms
 		done(*this);
 	}
 
-	void UIMegaphone::preview()
+	void UIMegaphone::open_samples()
 	{
-		std::vector<std::string> typed = lines();
+		// FUN_007e0fbf: the samples are modal over the window. Clicking the button took the keys from the lines, and
+		// they don't get them back.
+		sampling = true;
+		checking = false;
 
-		if (Megaphones::check_lines(typed) == Megaphones::Refusal::QUIET)
+		for (uint16_t i = 0; i < sample_count; i++)
 		{
-			notice(PREVIEW_EMPTY);
+			Button &button = *buttons[Buttons::SAMPLE + i];
+			button.set_state(Button::State::NORMAL);
+			button.set_active(true);
+		}
+	}
 
-			return;
+	void UIMegaphone::use_sample(std::optional<uint16_t> index)
+	{
+		// FUN_007e1052: a sample replaces all three lines as they are, without the typed limit, and a line it
+		// lacks is left empty.
+		if (index)
+		{
+			nl::node sample = item["sample"][std::to_string(*index)];
+
+			for (size_t i = 0; i < field_count; i++)
+				fields[i].change_text(Megaphones::sample_line(sample[std::to_string(i)].get_string()));
 		}
 
-		// FUN_007e0c37: each line goes only to my own chat log, as it would be heard.
+		sampling = false;
+
+		for (uint16_t i = 0; i < sample_count; i++)
+			buttons[Buttons::SAMPLE + i]->set_active(false);
+	}
+
+	void UIMegaphone::focus_field(int16_t index)
+	{
+		if (index >= 0)
+			fields[index].set_state(Textfield::State::FOCUSED);
+	}
+
+	void UIMegaphone::preview()
+	{
+		std::vector<std::string> shown = Megaphones::lines_sent(lines());
+
+		// FUN_007e0c37: nothing written shows nothing. Otherwise a header, then the lines up to the last one
+		// written, only in my own chat log, as they would be heard.
+		if (shown.size() == 1 && shown[0].empty())
+			return;
+
 		auto chatbar = UI::get().get_element<UIChatBar>();
 
 		if (!chatbar)
@@ -227,9 +392,10 @@ namespace ms
 
 		const std::string &name = Stage::get().get_player().get_stats().get_name();
 
-		for (const std::string &line : typed)
-			if (!line.empty())
-				chatbar->send_chatline(name + Megaphones::SEPARATOR + line, UIChatBar::LineType::GREY);
+		chatbar->send_chatline(PREVIEW_HEADER, UIChatBar::LineType::GREY);
+
+		for (const std::string &line : shown)
+			chatbar->send_chatline(name + Megaphones::SEPARATOR + line, UIChatBar::LineType::MEGAPHONE_PREVIEW);
 	}
 
 	void UIMegaphone::close()

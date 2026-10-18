@@ -142,5 +142,31 @@ namespace ms
 
 			return std::vector<std::string>(lines.begin(), lines.begin() + count);
 		}
+
+		// A triple megaphone's sample line as v83 puts it in a field: through
+		// the ANSI code page, where anything past ASCII here becomes '?'
+		// (FUN_007e1052). Latin-1 letters would survive on a Western page, but
+		// the samples have none.
+		inline std::string sample_line(const std::string& utf8)
+		{
+			std::string line;
+
+			for (size_t i = 0; i < utf8.size();)
+			{
+				auto lead = static_cast<unsigned char>(utf8[i]);
+
+				if (lead < 0x80)
+				{
+					line += utf8[i];
+					i++;
+				} else
+				{
+					line += '?';
+					i += lead >= 0xf0 ? 4 : lead >= 0xe0 ? 3 : lead >= 0xc0 ? 2 : 1;
+				}
+			}
+
+			return line;
+		}
 	}
 }

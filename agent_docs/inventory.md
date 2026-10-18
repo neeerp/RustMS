@@ -210,8 +210,13 @@ Double-clicking a megaphone in the Cash tab opens its dialog
   "Display whisper icon" checkbox (on at first). It closes before the lines
   are checked as above; the triple megaphone asks "One of the lines has not
   been applied." before sending with an empty line, and sends the lines up
-  to the last one typed. Its Preview button writes the lines to the own chat
-  log only. The "Special character" button does nothing yet.
+  to the last one typed. Tab moves to the next line. Preview writes "This is
+  a preview option for the Triple Megaphone." and the lines up to the last
+  one typed to the own chat log only, and nothing when all are empty.
+  "Special character" opens the item's samples (`Item.nx`
+  `Cash/0507.img/<id>/ui` and `sample`) in a modal popup: a sample replaces
+  all three lines, "CREATE NEW" empties them, and Escape or a click outside
+  closes it.
 - Item: `UIItemMegaphone` on `ItemMegaphone`, which leaves the game playable.
   An item dropped on it from the inventory shows in its well with its name
   and tooltip; clicking the well takes it back. OK with nothing typed does

@@ -83,5 +83,7 @@ namespace ms
 		std::array<Texture, 2> checkbox;
 		bool ear;
 		bool held;
+		// The checkbox was pressed, and toggles when the button comes up.
+		bool checking;
 	};
 }

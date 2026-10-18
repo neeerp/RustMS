@@ -327,14 +327,14 @@ namespace ms
 					}, Megaphones::MAX_LINE);
 					break;
 				case Megaphones::Kind::SUPER:
-					UI::get().emplace<UIMegaphone>(false, [=](const std::vector<std::string> &lines, bool ear)
+					UI::get().emplace<UIMegaphone>(item_id, [=](const std::vector<std::string> &lines, bool ear)
 					{
 						if (!line_refused(lines[0]))
 							send_megaphone(UseSuperMegaphonePacket(slot, item_id, lines[0], ear));
 					});
 					break;
 				case Megaphones::Kind::TRIPLE:
-					UI::get().emplace<UIMegaphone>(true, [=](const std::vector<std::string> &lines, bool ear)
+					UI::get().emplace<UIMegaphone>(item_id, [=](const std::vector<std::string> &lines, bool ear)
 					{
 						if (!megaphone_refused(Megaphones::check_lines(lines)))
 							send_megaphone(UseTripleMegaphonePacket(slot, item_id, Megaphones::lines_sent(lines), ear));

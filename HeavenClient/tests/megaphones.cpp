@@ -51,6 +51,9 @@ int main()
 		require(lines_sent({ "", "b", "" }) == Lines{ "", "b" }, "blank lines before it are sent");
 		require(lines_sent({ "a", "", "c" }) == Lines{ "a", "", "c" }, "between too");
 		require(lines_sent({ "", "", "" }) == Lines{ "" }, "and one at least");
+
+		require(sample_line("[***]  M A P") == "[***]  M A P", "a sample line stays as it is");
+		require(sample_line("\xe3\x80\x80[^^^]") == "?[^^^]", "but for what the code page lacks");
 	}
 	catch (const std::exception& e)
 	{
