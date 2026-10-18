@@ -109,8 +109,14 @@ pub mod equip_slot {
         }
     }
 
-    /// Whether `item_id` may be worn at `position`.
-    pub fn fits(item_id: i32, position: i16) -> bool {
+    /// Whether `item_id` may be worn at `position`. As in v83, an item with
+    /// a cash serial is worn at its slot less 100, and any other at its slot.
+    pub fn fits(item_id: i32, cash: bool, position: i16) -> bool {
+        let position = match (cash, position) {
+            (true, -199..=-101) => position + 100,
+            (false, -99..=-1) => position,
+            _ => return false,
+        };
         match for_item(item_id) {
             Some(slot) if RINGS.contains(&slot) => RINGS.contains(&position),
             Some(slot) => slot == position,
@@ -570,7 +576,7 @@ impl Inventory {
             .get(InventoryType::Equip, from)
             .ok_or(InventoryError::InvalidSlot)?
             .clone();
-        if item.equip.is_none() || !equip_slot::fits(item.item_id, to) {
+        if item.equip.is_none() || !equip_slot::fits(item.item_id, item.cash_serial.is_some(), to) {
             return Err(InventoryError::CannotEquip);
         }
         let worn = |position: i16| self.equipped.get(&position).map(|i| i.item_id);
@@ -979,6 +985,27 @@ mod tests {
             inventory.unequip(equip_slot::CAP, 2),
             Err(InventoryError::InvalidSlot)
         );
+    }
+
+    #[test]
+    fn cash_equips_are_worn_a_hundred_below_their_slot() {
+        let mut inventory = Inventory::default();
+        let mut cash_cap = equip(1002186);
+        cash_cap.cash_serial = Some(7);
+        inventory.insert(InventoryType::Equip, 1, cash_cap);
+        inventory.insert(InventoryType::Equip, 2, equip(1002008));
+        assert_eq!(
+            inventory.equip(1, equip_slot::CAP),
+            Err(InventoryError::CannotEquip)
+        );
+        assert_eq!(
+            inventory.equip(2, equip_slot::CAP - 100),
+            Err(InventoryError::CannotEquip)
+        );
+        inventory.equip(1, equip_slot::CAP - 100).unwrap();
+        inventory.equip(2, equip_slot::CAP).unwrap();
+        assert_eq!(inventory.equipped_regular().count(), 1);
+        assert_eq!(inventory.equipped_cash().count(), 1);
     }
 
     #[test]

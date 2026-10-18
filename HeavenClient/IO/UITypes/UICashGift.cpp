@@ -16,6 +16,7 @@
 //	along with this program.  If not, see <https://www.gnu.org/licenses/>.		//
 //////////////////////////////////////////////////////////////////////////////////
 #include "UICashGift.h"
+#include "UICashShop.h"
 
 #include "../KeyAction.h"
 #include "../UI.h"
@@ -181,7 +182,9 @@ namespace ms
 		if (asking_birthday)
 		{
 			// The server answers a wrong code with its own notice.
-			GiftCashItemPacket(birthday_code(birthday.get_text()), sn, to.get_text(), message.get_text()).dispatch();
+			if (auto cashshop = UI::get().get_element<UICashShop>(); cashshop && cashshop->request())
+				GiftCashItemPacket(birthday_code(birthday.get_text()), sn, to.get_text(), message.get_text()).dispatch();
+
 			close();
 
 			return;

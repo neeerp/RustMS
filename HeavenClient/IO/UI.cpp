@@ -129,7 +129,7 @@ namespace ms
 			Music::set_bgmvolume(Music::configured_volume());
 
 			// v83 checks the balances on coming back to the Cash Shop.
-			if (get_element<UICashShop>())
+			if (auto cashshop = get_element<UICashShop>(); cashshop && cashshop->request())
 				CheckCashPacket().dispatch();
 		} else
 		{

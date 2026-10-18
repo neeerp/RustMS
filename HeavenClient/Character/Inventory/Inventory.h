@@ -57,6 +57,9 @@ namespace ms
 			ADDCOUNT
 		};
 
+		// How far above its slot a cash item is worn.
+		static constexpr int16_t CASH_EQUIP = 100;
+
 		// Return the move type by value
 		static Movement movementbyvalue(int8_t value);
 
@@ -120,6 +123,15 @@ namespace ms
 
 		// Find a free slot for the specified equip.
 		EquipSlot::Id find_equipslot(int32_t itemid) const;
+
+		// The worn position for the equip in Equip tab `slot` at `part`. Like
+		// v83 (FUN_004f2cbb), an item with a Cash Shop serial is worn 100
+		// above its slot, over whatever regular item is there.
+		int16_t equip_position(int16_t slot, EquipSlot::Id part) const;
+
+		// The worn position whose item is shown at `part`: the cash item's
+		// if there is one (FUN_007fec81), else the regular one's.
+		int16_t shown_equip(EquipSlot::Id part) const;
 
 		// Find a free slot in the specified inventory.
 		int16_t find_free_slot(InventoryType::Id type) const;

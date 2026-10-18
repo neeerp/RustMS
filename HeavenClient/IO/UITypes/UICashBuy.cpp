@@ -16,8 +16,10 @@
 //	along with this program.  If not, see <https://www.gnu.org/licenses/>.		//
 //////////////////////////////////////////////////////////////////////////////////
 #include "UICashBuy.h"
+#include "UICashShop.h"
 
 #include "../KeyAction.h"
+#include "../UI.h"
 
 #include "../Components/MapleButton.h"
 
@@ -164,15 +166,19 @@ namespace ms
 	void UICashBuy::buy()
 	{
 		CashType cash_type = PAYMENTS[payment];
+		auto cashshop = UI::get().get_element<UICashShop>();
 
-		if (is_package(item_id))
-			BuyCashPackagePacket(cash_type, sn).dispatch();
-		else if (is_expansion(item_id) && sn == 0)
-			ExpandSlotsPacket(cash_type, expanded(item_id)).dispatch();
-		else if (is_expansion(item_id))
-			ExpandSlotsPacket(cash_type, expanded(item_id), sn).dispatch();
-		else
-			BuyCashItemPacket(cash_type, sn).dispatch();
+		if (cashshop && cashshop->request())
+		{
+			if (is_package(item_id))
+				BuyCashPackagePacket(cash_type, sn).dispatch();
+			else if (is_expansion(item_id) && sn == 0)
+				ExpandSlotsPacket(cash_type, expanded(item_id)).dispatch();
+			else if (is_expansion(item_id))
+				ExpandSlotsPacket(cash_type, expanded(item_id), sn).dispatch();
+			else
+				BuyCashItemPacket(cash_type, sn).dispatch();
+		}
 
 		deactivate();
 	}

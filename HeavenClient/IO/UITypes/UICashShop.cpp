@@ -96,7 +96,7 @@ namespace ms
 		}
 	}
 
-	UICashShop::UICashShop() : tab(EVENT_TAB), subtab(0), page(0), preview_index(0), female(false), credit(0), points(0), prepaid(0), cash_row(0), item_tab(InventoryType::Id::EQUIP), item_row(0)
+	UICashShop::UICashShop() : tab(EVENT_TAB), subtab(0), page(0), preview_index(0), female(false), credit(0), points(0), prepaid(0), pending(false), cash_row(0), item_tab(InventoryType::Id::EQUIP), item_row(0)
 	{
 		nl::node CashShop = NxFiles::ui_classic["CashShop.img"];
 		nl::node Base = CashShop["Base"];
@@ -430,7 +430,8 @@ namespace ms
 			return Button::State::NORMAL;
 		}
 		case Buttons::BT_CHECK:
-			CheckCashPacket().dispatch();
+			if (request())
+				CheckCashPacket().dispatch();
 
 			return Button::State::NORMAL;
 		default:
@@ -448,18 +449,21 @@ namespace ms
 			{
 				const Commodity& commodity = listed[index];
 
-				if (remove)
+				if (pending)
+					return Button::State::NORMAL;
+
+				if (remove && request())
 					SetWishListPacket(unwish(wish_list, commodity.sn)).dispatch();
 				else if (list_button % 3 == 0)
 					UI::get().emplace<UICashBuy>(commodity, credit, points, prepaid);
 				else if (list_button % 3 == 1)
 					UI::get().emplace<UICashGift>(commodity);
-				else if (list_button % 3 == 2)
+				else if (list_button % 3 == 2 && request())
 					SetWishListPacket(wish(wish_list, commodity.sn)).dispatch();
 			}
 		}
 
-		if (buttonid >= Buttons::BT_EX_EQUIP && buttonid <= Buttons::BT_EX_TRUNK)
+		if (buttonid >= Buttons::BT_EX_EQUIP && buttonid <= Buttons::BT_EX_TRUNK && !pending)
 		{
 			// Four slots for 4,000 NX, shown as the expansion item: 9111000
 			// to 9114000 for the bags, 9110000 for the storage.
@@ -585,7 +589,8 @@ namespace ms
 			InventoryType::Id type = InventoryType::by_item_id(item.item_id);
 
 			// The server picks another slot, or refuses, if this one is taken.
-			TakeOutCashItemPacket(item.cash_id, type, inventory.find_free_slot(type)).dispatch();
+			if (request())
+				TakeOutCashItemPacket(item.cash_id, type, inventory.find_free_slot(type)).dispatch();
 			return;
 		}
 
@@ -595,9 +600,24 @@ namespace ms
 		{
 			int16_t slot = static_cast<int16_t>(item_row * ITEM_COLUMNS + item_cell + 1);
 
-			if (int64_t cash_id = inventory.get_cash_id(item_tab, slot))
+			if (int64_t cash_id = inventory.get_cash_id(item_tab, slot); cash_id && request())
 				PutBackCashItemPacket(cash_id, item_tab).dispatch();
 		}
+	}
+
+	bool UICashShop::request()
+	{
+		if (pending)
+			return false;
+
+		pending = true;
+
+		return true;
+	}
+
+	void UICashShop::answered()
+	{
+		pending = false;
 	}
 
 	int16_t UICashShop::grid_cell(Point<int16_t> cursor, Point<int16_t> grid, size_t columns, size_t rows) const

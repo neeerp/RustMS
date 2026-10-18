@@ -113,7 +113,10 @@ namespace ms
 		int32_t prepaid = recv.read_int();
 
 		if (auto cashshop = UI::get().get_element<UICashShop>())
+		{
+			cashshop->answered();
 			cashshop->set_balance(credit, points, prepaid);
+		}
 	}
 
 	namespace
@@ -221,6 +224,8 @@ namespace ms
 
 		if (!cashshop)
 			return;
+
+		cashshop->answered();
 
 		uint8_t mode = static_cast<uint8_t>(recv.read_byte());
 

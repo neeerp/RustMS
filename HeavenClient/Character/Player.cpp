@@ -193,10 +193,19 @@ namespace ms
 
 	void Player::change_equip(int16_t slot)
 	{
-		if (int32_t itemid = inventory.get_item_id(InventoryType::Id::EQUIPPED, slot))
+		EquipSlot::Id part = EquipSlot::by_id(slot % Inventory::CASH_EQUIP);
+
+		if (part == EquipSlot::Id::NONE)
+			return;
+
+		// The look wears a cash item over the regular one, but has no cash
+		// weapons (v83 draws them over the regular weapon's stances).
+		int16_t shown = part == EquipSlot::Id::WEAPON ? part : inventory.shown_equip(part);
+
+		if (int32_t itemid = inventory.get_item_id(InventoryType::Id::EQUIPPED, shown))
 			look.add_equip(itemid);
 		else
-			look.remove_equip(EquipSlot::by_id(slot));
+			look.remove_equip(part);
 	}
 
 	void Player::use_item(int32_t itemid)

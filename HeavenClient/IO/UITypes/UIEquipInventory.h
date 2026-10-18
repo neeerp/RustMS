@@ -54,7 +54,8 @@ namespace ms
 		Button::State button_pressed(uint16_t buttonid) override;
 
 	private:
-		void show_equip(EquipSlot::Id slot);
+		// Shows the tooltip for worn position `slot`.
+		void show_equip(int16_t slot);
 		void clear_tooltip();
 
 		void load_icons();
@@ -66,6 +67,7 @@ namespace ms
 		class EquipIcon : public Icon::Type
 		{
 		public:
+			// For the item at worn position `source`.
 			EquipIcon(int16_t source);
 
 			void drop_on_stage() const override;

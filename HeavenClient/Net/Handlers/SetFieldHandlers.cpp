@@ -123,6 +123,10 @@ namespace ms
 		if (auto room = UI::get().get_element<UITradingRoom>())
 			room->close();
 
+		// v83 (FUN_00a03eba, from CField::OnSetField) sends this on every
+		// field change, not only on entering the game.
+		PlayerUpdatePacket().dispatch();
+
 		transition(mapid, portalid, chase);
 	}
 
