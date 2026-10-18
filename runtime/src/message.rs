@@ -144,6 +144,11 @@ pub enum ServerMessage {
         map_id: i32,
         exit: net::packet::handle::world::DoorExit,
     },
+    /// News from trading room `room` on this player's field.
+    Trade {
+        room: i32,
+        event: crate::actor::field_trades::TradeEvent,
+    },
     SendPacket(Packet),
 }
 
@@ -270,6 +275,12 @@ pub enum FieldMessage {
     /// `owner`'s Mystic Door here closed.
     CloseDoor {
         owner: ClientId,
+    },
+    /// A player's request of their trading room. Not a `FieldRequest`: the
+    /// final answer carries a oneshot.
+    Trade {
+        from: ClientId,
+        request: crate::actor::field_trades::RoomRequest,
     },
 }
 

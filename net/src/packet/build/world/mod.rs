@@ -14,6 +14,7 @@ pub mod keymap;
 pub mod map;
 pub mod messaging;
 pub mod messenger;
+pub mod mini_room;
 pub mod mist;
 pub mod mob;
 pub mod monster_book;

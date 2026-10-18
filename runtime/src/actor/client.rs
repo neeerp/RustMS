@@ -10,6 +10,7 @@ mod quest;
 mod script;
 mod shop;
 mod storage;
+mod trade;
 
 use crate::actor::registry::FieldRegistry;
 use crate::db::spawn_db;
@@ -113,6 +114,8 @@ pub struct ClientActor {
     presence: Option<Presence>,
     /// The player's open Mystic Door.
     door: Option<door::OpenDoor>,
+    /// The player's side of a trade they are in.
+    trade: Option<trade::Trade>,
 }
 
 impl ClientActor {
@@ -164,6 +167,7 @@ impl ClientActor {
             party_id: None,
             presence: None,
             door: None,
+            trade: None,
         })
     }
 
@@ -340,6 +344,11 @@ impl ClientActor {
             WorldAction::Quest(request) => self.request_quest_action(request).await?,
             WorldAction::Shop(request) => self.shop_action(request).await?,
             WorldAction::Storage(request) => self.storage_request(request).await?,
+            WorldAction::Trade(request) => {
+                if !self.in_cash_shop {
+                    self.trade_request(request).await?
+                }
+            }
             WorldAction::ScriptPortal { portal } => self.touch_script_portal(&portal).await?,
             WorldAction::LookChanged(announce) => {
                 let player = &self.in_game()?.player;
@@ -498,6 +507,7 @@ impl ClientActor {
         self.npc_request_id = self.npc_request_id.wrapping_add(1);
         self.in_game_mut()?.player.chair = 0;
 
+        self.leave_trade().await?;
         self.send_to_field(FieldMessage::Leave {
             client_id: self.client_id,
         })
@@ -539,6 +549,7 @@ impl ClientActor {
         self.remember_spawn_point();
         self.cancel_buffs().await?;
         self.close_door().await?;
+        self.leave_trade().await?;
         self.flush().await?;
         spawn_db(move || db::session::begin_channel_transition(session_id, i16::from(channel_id)))
             .await?;
@@ -560,6 +571,7 @@ impl ClientActor {
         self.script = None;
         self.pending_quest = None;
         self.npc_request_id = self.npc_request_id.wrapping_add(1);
+        self.leave_trade().await?;
         self.send_to_field(FieldMessage::Leave {
             client_id: self.client_id,
         })
@@ -974,6 +986,7 @@ impl ClientActor {
                 map_id,
                 exit,
             } => self.door_warp(from_map, map_id, exit).await?,
+            ServerMessage::Trade { room, event } => self.trade_event(room, event).await?,
             ServerMessage::SendPacket(mut packet) => self.send(&mut packet).await?,
         }
         Ok(())
@@ -1020,7 +1033,9 @@ impl ClientActor {
                     .map_err(|_| RuntimeError::ChannelSend)?;
                 if !matches!(
                     message,
-                    FieldMessage::Join { .. } | FieldMessage::Leave { .. }
+                    FieldMessage::Join { .. }
+                        | FieldMessage::Leave { .. }
+                        | FieldMessage::Trade { .. }
                 ) {
                     field
                         .tx
@@ -1028,7 +1043,8 @@ impl ClientActor {
                         .await
                         .map_err(|_| RuntimeError::ChannelSend)?;
                 }
-                Ok(())
+                // The trading room died with the field.
+                self.abandon_trade().await
             }
         }
     }
@@ -1078,7 +1094,11 @@ impl ClientActor {
         if !game.player.is_dirty() {
             return Ok(());
         }
-        let snapshot = game.player.clone();
+        let mut snapshot = game.player.clone();
+        // What the player put up in a trade is still theirs.
+        if let Some(trade) = &self.trade {
+            trade.add_back(&mut snapshot);
+        }
         spawn_db(move || db::player::save_player(&snapshot)).await?;
         game.player.mark_saved();
         Ok(())
@@ -1107,6 +1127,11 @@ impl ClientActor {
 
     async fn cleanup(&mut self) {
         if self.game.is_some() {
+            // Before the save: the player gets their offer back, or the
+            // partner's.
+            if let Err(error) = self.leave_trade().await {
+                warn!(self.client_id, %error, "Failed to finish trade");
+            }
             if !self.in_cash_shop {
                 let _ = self
                     .send_to_field(FieldMessage::Leave {

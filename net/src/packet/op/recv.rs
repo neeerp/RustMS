@@ -46,6 +46,7 @@ pub enum RecvOpcode {
     FaceExpression = 0x33,
     Whisper = 0x78,
     Messenger = 0x7A,
+    PlayerInteraction = 0x7B,
     MonsterBookCover = 0x39,
     TalkToNpc = 0x3A,
     NpcTalkMore = 0x3C,

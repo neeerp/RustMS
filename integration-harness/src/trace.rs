@@ -120,6 +120,8 @@ pub struct Trace {
     pub shop_results: Vec<u8>,
     /// Every TRUNK_RESULT, in order.
     pub storage: Vec<StorageResult>,
+    /// Every PLAYER_INTERACTION body (mode first), in order.
+    pub rooms: Vec<Vec<u8>>,
     /// GIVE_BUFF: (skill id, value, duration in ms).
     pub buffs: Vec<(i32, i16, i32)>,
     /// CANCEL_BUFF: the second mask of each.
@@ -405,6 +407,8 @@ impl Trace {
         } else if op == SendOpcode::TrunkResult as i16 {
             let mode = r.read_byte().unwrap();
             self.storage.push(StorageResult::read(mode, &p.bytes[3..]));
+        } else if op == SendOpcode::PlayerInteraction as i16 {
+            self.rooms.push(p.bytes[2..].to_vec());
         } else if op == SendOpcode::ConfirmShopTransaction as i16 {
             self.shop_results.push(r.read_byte().unwrap());
         } else if op == SendOpcode::GiveBuff as i16 {

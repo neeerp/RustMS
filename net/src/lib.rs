@@ -31,6 +31,7 @@ pub mod shop;
 pub mod skills;
 pub mod storage;
 pub mod summons;
+pub mod trade;
 
 pub use self::game_data::{closest_spawn_point, get as get_game_data, spawn_position};
 pub use self::handler::{

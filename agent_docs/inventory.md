@@ -200,6 +200,77 @@ items on the right; one tab picks the bag for both. Clicking a selected row
 again takes it out or stores it, like the shop. The v83 prompts are reproduced
 except karma. Stored equips show their name and icon but not their stats.
 
+## Trading
+
+Two players on one map trade in a trading room (mini room type 3). The
+client sends PLAYER_INTERACTION (`0x7B`), and `PlayerInteractionHandler`
+turns each mode into a `net::trade::TradeRequest`. The server answers with
+PLAYER_INTERACTION (`0x13A`); the builders are in
+`net::packet::build::world::mini_room`. Other room types and the client's
+item CRC answer (`0x14`) are ignored.
+
+The work is split three ways:
+
+- The room lives in the field (`runtime::actor::field_trades::Trades`, one
+  per `FieldActor`). It is a plain struct that returns the packets and events
+  to send. It knows who is in which room, whose turn it is, and the two
+  members' answers. It never holds items.
+- Each side's offer lives in its `ClientActor` (`client/trade.rs`). Putting
+  up an item or mesos takes it out of the player at once, with the inventory
+  operation or meso stat update. The client actor holds it as a
+  `net::trade::Offer` until the trade ends. A save during the trade
+  (`flush`) adds the offer back into the saved copy, so a crash loses
+  nothing.
+- `net::trade` holds the rules: fee, put item, put mesos, check, give.
+
+The flow:
+
+1. **Create** (mode 0, type 3): the host gets a room id, unique across
+   fields.
+2. **Invite** (2: character id). The target must be on the map. A missing
+   target gets INVITE_RESULT 1, a busy one 2 with their name. Otherwise the
+   target gets INVITE (2: type, host name, room id).
+3. **Decline** (3: room id, reason 3 or 4) tells the host; **accept** (4:
+   room id) lets the visitor in. The visitor gets ENTER (5) with both
+   avatars, and the host gets VISIT (4). A room no longer waiting answers
+   ENTER_RESULT `{5, 0, 1}` (closed).
+4. **Chat** (6) goes to both members as "Name : text".
+5. **Put item** (`0xf`: bag, slot, count, trade slot 1-9) and **mesos**
+   (`0x10`). Each side sees the item or the new total marked with whose it
+   is. Cash, quest and untradable items are refused, as in storage, and so
+   is a bad slot or count. A refusal only unlocks the client (an empty stat
+   update). A player of level 15 or below may put up at most 1,000,000
+   mesos in a trade; asking for more gets `{0x15}` and nothing moves.
+6. **Trade** (`0x11`) locks that side and shows the partner `{0x11}`.
+
+Once both have pressed Trade, the trade settles in two phases, so no item
+is ever in both inventories or in neither:
+
+1. The room sends each client actor the partner's offer
+   (`TradeEvent::Check`).
+2. Each side works out what it would receive, which is the items plus the
+   mesos less the fee (`trade::received`). It checks that it can take all
+   of it (`trade::check`): room in every bag, no one-of-a-kind item it
+   already has, and mesos within the cap. Then it answers the room
+   (`RoomRequest::Answer`) with the result and a oneshot for the decision.
+3. When both answers are in, the room tells both sides yes or no and
+   closes. LEAVE is reason 7 on success, or the first failure's reason:
+   8 for no room, 9 for a one-of-a-kind item.
+4. Each client actor then takes the partner's offer on yes, or its own back
+   on no. It sends the inventory operation, then the meso stat update, then
+   LEAVE. The meso update must come first because the client picks its
+   success message by how its mesos changed.
+
+The fee on mesos received is 6% from 100,000,000, 5% from 25,000,000, 4%
+from 10,000,000, 3% from 5,000,000, 1.8% from 1,000,000, 0.8% from 100,000,
+and nothing below that. It is rounded down.
+
+Leaving (`0xa`), changing maps or channels, entering the Cash Shop, or
+logging out ends the trade. The leaver gets their offer back with no LEAVE,
+and the partner gets theirs back with LEAVE reason 2. If the field dies,
+the trade fails with reason 8. Anything that no longer fits when an offer
+comes back drops at the player's feet.
+
 ## Tests
 
 `game` unit tests cover stacking, full bags, removal order, merging,
@@ -218,3 +289,17 @@ opens Mr. Lee's storage, stores part of a stack and a whole one for the fee,
 is refused too many and too many mesos, moves mesos in, sorts, takes items
 out, and after a relogin finds both sides saved. The client's
 `storage_contents` test reads the contents of each kind of result.
+
+Trading is tested at three levels:
+
+- `net::trade` covers the fee, putting items and mesos up, the meso limit,
+  check, and give. `mini_room` covers the packet layouts, and
+  `player_interaction` covers parsing.
+- `runtime::actor::field_trades` covers the room's invites, visits, turns,
+  the two-phase settle, and leaving.
+- `trade` (integration) has two tests:
+  - The first invites a missing character, is declined, then trades items
+    and mesos less the fee. Along the way it is refused over the low-level
+    meso limit. It finds both sides saved after a relogin.
+  - The second cancels a trade, then fails one against a full bag. Both
+    times everything goes back.

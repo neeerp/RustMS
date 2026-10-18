@@ -97,6 +97,7 @@ pub enum SendOpcode {
     QueryCashResult = 0x144,
     CashShopOperation = 0x145,
     Messenger = 0x139,
+    PlayerInteraction = 0x13A,
     OpenNpcShop = 0x131,
     ConfirmShopTransaction = 0x132,
     TrunkResult = 0x135,

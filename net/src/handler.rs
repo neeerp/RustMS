@@ -284,6 +284,8 @@ pub enum WorldAction {
     Shop(crate::shop::ShopRequest),
     /// Take out of, store in, sort, or close the storage the player has open.
     Storage(crate::storage::StorageRequest),
+    /// Open, join, or act in a trading room.
+    Trade(crate::trade::TradeRequest),
     /// The player touched the named script portal on their map.
     ScriptPortal {
         portal: String,
@@ -540,6 +542,10 @@ fn world_routes() -> &'static HashMap<i16, WorldRoute> {
             (Op::MultiChat, InGame(&world::MultiChatHandler)),
             (Op::BuddyListModify, InGame(&world::BuddyListModifyHandler)),
             (Op::Messenger, InGame(&world::MessengerHandler)),
+            (
+                Op::PlayerInteraction,
+                InGame(&world::PlayerInteractionHandler),
+            ),
             (Op::TalkToNpc, InGame(&world::NpcTalkHandler)),
             (Op::NpcTalkMore, InGame(&world::NpcTalkMoreHandler)),
             (Op::QuestAction, InGame(&world::QuestActionHandler)),
@@ -618,7 +624,7 @@ mod tests {
     fn every_registered_opcode_is_unique_per_server() {
         // The maps would silently drop duplicates; check the table sizes match.
         assert_eq!(login_routes().len(), 13);
-        assert_eq!(world_routes().len(), 56);
+        assert_eq!(world_routes().len(), 57);
     }
 
     #[test]

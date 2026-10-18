@@ -26,6 +26,9 @@ Fields are created on demand by `FieldRegistry` and kept alive afterwards.
 - **Reactors** (`field_reactors::ReactorSet`): boxes and the like placed
   by the map's `reactor` nodes; see "Reactors" in [Mobs and
   combat](./combat.md).
+- **Trading rooms** (`field_trades::Trades`): who is in which room, and
+  their turns and answers. The offers stay with the client actors; see
+  "Trading" in [Inventory](./inventory.md).
 - **Time**: a 100 ms tick (`on_tick`) respawns mobs and reactors and expires
   drops.
 
@@ -44,6 +47,7 @@ in the client's `Player`.
 | `Chat { from, packet }` | Broadcast to everyone, sender included |
 | `Move { from, packet, movement_bytes }` | Update the mover's position from the movement fragment, broadcast to everyone else |
 | `NpcInteraction { from, object_id, request_id }` | Validate the NPC is on this map, then tell the client which NPC id to talk to |
+| `Trade { from, request }` | A `RoomRequest` for the sender's trading room; answers come back as `ServerMessage::Trade` |
 | `FromClient { from, request }` | A `net::FieldRequest` from a handler: move a mob it controls, apply an attack, show the others a packet, pick up or throw down a drop, or pass a character info request on |
 
 All sends to clients use `ClientHandle::send` (`try_send`); a client whose
