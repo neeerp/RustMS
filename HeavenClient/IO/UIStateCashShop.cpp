@@ -90,26 +90,20 @@ namespace ms
 
 				return focusedelement->send_cursor(clicked, cursorpos);
 			}
-			else
-			{
-				focused = UIElement::NONE;
 
-				return cursorstate;
-			}
+			// A closed dialog lets the window under it have the cursor at
+			// once, or the first click after it would find no button hovered.
+			focused = UIElement::NONE;
 		}
-		else
+
+		if (auto front = get_front())
 		{
-			if (auto front = get_front())
-			{
-				remove_cursor(front->get_type());
+			remove_cursor(front->get_type());
 
-				return front->send_cursor(clicked, cursorpos);
-			}
-			else
-			{
-				return Cursor::State::IDLE;
-			}
+			return front->send_cursor(clicked, cursorpos);
 		}
+
+		return Cursor::State::IDLE;
 	}
 
 	UIState::Iterator UIStateCashShop::pre_add(UIElement::Type type, bool toggled, bool is_focused)
