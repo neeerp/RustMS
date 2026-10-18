@@ -6,7 +6,7 @@ use crate::packets::build_player_move;
 use net::packet::op::{RecvOpcode, SendOpcode};
 use packet::io::{read::PktRead, write::PktWrite};
 use packet::Packet;
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 use std::io::Cursor;
 
 /// CLOSE_RANGE_ATTACK hitting one mob once for `damage`.
@@ -52,9 +52,12 @@ fn kind_attack(
     p.write_byte(0x11).unwrap();
     p.write_int(skill_id).unwrap();
     p.write_bytes(&[0; 8]).unwrap();
-    for b in [0u8, 0x80, 5, 0, 4] {
-        p.write_byte(b).unwrap();
-    }
+    // Flags, then action 5 facing left (v83 `action | left << 15`), then
+    // a byte and the attack speed.
+    p.write_byte(0).unwrap();
+    p.write_short(0x8005u16 as i16).unwrap();
+    p.write_byte(0).unwrap();
+    p.write_byte(4).unwrap();
     if ranged {
         p.write_int(0).unwrap();
         p.write_short(ammo_slot).unwrap();
@@ -113,6 +116,16 @@ pub fn use_item(slot: i16, item_id: i32) -> Packet {
     p
 }
 
+/// USE_SKILL_BOOK of the skill or mastery book in a USE slot.
+pub fn use_skill_book(slot: i16, item_id: i32) -> Packet {
+    let mut p = Packet::new_empty();
+    p.write_short(RecvOpcode::UseSkillBook as i16).unwrap();
+    p.write_int(0).unwrap();
+    p.write_short(slot).unwrap();
+    p.write_int(item_id).unwrap();
+    p
+}
+
 /// SPEND_AP on the stat with this STAT_CHANGED mask bit.
 pub fn spend_ap(stat: i32) -> Packet {
     let mut p = Packet::new_empty();
@@ -141,11 +154,76 @@ pub fn use_skill(skill_id: i32, level: u8) -> Packet {
     p
 }
 
+/// USE_SKILL of a summon skill, putting it at (x, y) facing left or not.
+pub fn summon(skill_id: i32, level: u8, x: i16, y: i16, left: bool) -> Packet {
+    let mut p = use_skill(skill_id, level);
+    p.write_short(x).unwrap();
+    p.write_short(y).unwrap();
+    p.write_byte(u8::from(left)).unwrap();
+    p
+}
+
+/// SUMMON_ATTACK: summon `object_id` hitting mob `mob` once, as HeavenClient
+/// sends it (0x7a57d4).
+pub fn summon_attack(object_id: i32, mob: i32, mob_id: i32, damage: i32) -> Packet {
+    let mut p = Packet::new_empty();
+    p.write_short(RecvOpcode::SummonAttack as i16).unwrap();
+    p.write_int(object_id).unwrap();
+    p.write_int(0).unwrap();
+    p.write_byte(0x84).unwrap();
+    p.write_byte(1).unwrap();
+    p.write_bytes(&[0; 8]).unwrap();
+    p.write_int(mob).unwrap();
+    p.write_int(mob_id).unwrap();
+    p.write_bytes(&[6, 0x80, 0, 0]).unwrap();
+    p.write_bytes(&[0; 8]).unwrap();
+    p.write_short(100).unwrap();
+    p.write_int(damage).unwrap();
+    p.write_int(0).unwrap();
+    p
+}
+
+/// DAMAGE_SUMMON: a mob's touch (attack -1) hurting summon `object_id`.
+pub fn damage_summon(object_id: i32, damage: i32, mob_id: i32) -> Packet {
+    let mut p = Packet::new_empty();
+    p.write_short(RecvOpcode::DamageSummon as i16).unwrap();
+    p.write_int(object_id).unwrap();
+    p.write_byte(0xFF).unwrap();
+    p.write_int(damage).unwrap();
+    p.write_int(mob_id).unwrap();
+    p.write_byte(0).unwrap();
+    p
+}
+
+/// BEHOLDER: Beholder `object_id` healing its owner (Aura of the
+/// Beholder), or buffing stat `buff` (Hex of the Beholder), as the client
+/// sends it (FUN_007a5ab4 / FUN_007a5c99).
+pub fn beholder(object_id: i32, skill_id: i32, buff: Option<u8>) -> Packet {
+    let mut p = Packet::new_empty();
+    p.write_short(RecvOpcode::Beholder as i16).unwrap();
+    p.write_int(object_id).unwrap();
+    p.write_int(skill_id).unwrap();
+    p.write_byte(buff.map_or(6, |buff| 7 + buff)).unwrap();
+    if let Some(buff) = buff {
+        p.write_byte(buff).unwrap();
+    }
+    p
+}
+
 /// CANCEL_BUFF: right-clicking a skill's buff icon.
 pub fn cancel_buff(skill_id: i32) -> Packet {
     let mut p = Packet::new_empty();
     p.write_short(RecvOpcode::CancelBuff as i16).unwrap();
     p.write_int(skill_id).unwrap();
+    p
+}
+
+/// CANCEL_ITEM_EFFECT: right-clicking an item buff's icon (its id is the
+/// buff's, `-item_id`).
+pub fn cancel_item_effect(buff_id: i32) -> Packet {
+    let mut p = Packet::new_empty();
+    p.write_short(RecvOpcode::CancelItemEffect as i16).unwrap();
+    p.write_int(buff_id).unwrap();
     p
 }
 
@@ -158,6 +236,36 @@ pub fn walk_to(x: i16, y: i16) -> Packet {
     movement.push(4);
     movement.extend(100i16.to_le_bytes());
     build_player_move(&movement).unwrap()
+}
+
+/// MOVE_LIFE for `object_id` at (x, y): wanting to attack, or playing
+/// `action` (its first skill animation is 21, doubled with the facing)
+/// with `skill_data` (skill | level << 8 | delay << 16).
+pub fn move_mob(
+    object_id: i32,
+    (x, y): (i16, i16),
+    want_attack: bool,
+    action: u8,
+    skill_data: i32,
+) -> Packet {
+    let mut p = Packet::new_empty();
+    p.write_short(RecvOpcode::MoveLife as i16).unwrap();
+    p.write_int(object_id).unwrap();
+    p.write_short(1).unwrap();
+    p.write_byte(u8::from(want_attack)).unwrap();
+    p.write_byte(action).unwrap();
+    p.write_int(skill_data).unwrap();
+    p.write_bytes(&[0; 13]).unwrap();
+    p.write_short(x).unwrap();
+    p.write_short(y).unwrap();
+    p.write_byte(1).unwrap();
+    p.write_byte(0).unwrap();
+    p.write_short(x).unwrap();
+    p.write_short(y).unwrap();
+    p.write_bytes(&[0; 6]).unwrap();
+    p.write_byte(4).unwrap();
+    p.write_short(100).unwrap();
+    p
 }
 
 /// An item or mesos dropped on the field.
@@ -194,6 +302,13 @@ pub struct Field {
     pub moved: Vec<i32>,
     /// Answers to this client's own mob movements.
     pub move_responses: Vec<i32>,
+    /// Skills those answers let a mob cast: (object id, skill, level).
+    pub grants: Vec<(i32, u8, u8)>,
+    /// Mobs healed: (object id, HP regained).
+    pub heals: Vec<(i32, i32)>,
+    /// How each mob appeared: a summon effect, -2 fading in, or -1 just
+    /// there.
+    pub appearances: BTreeMap<i32, i8>,
     /// (object id, HP percentage)
     pub hp_bars: Vec<(i32, u8)>,
     pub killed: Vec<i32>,
@@ -215,6 +330,63 @@ pub struct Field {
     pub reactors_removed: Vec<(i32, u8)>,
     /// (object id, NPC id)
     pub npcs: Vec<(i32, i32)>,
+    /// Where each mob spawned.
+    pub mob_positions: BTreeMap<i32, (i16, i16)>,
+    /// Statuses put on mobs: (object id, stats, first one's value, first
+    /// one's skill).
+    pub stat_sets: Vec<(i32, u128, i16, i32)>,
+    /// Statuses taken off mobs: (object id, stats).
+    pub stat_resets: Vec<(i32, u128)>,
+    pub mists: Vec<MapMist>,
+    /// Object ids of the mists removed.
+    pub mists_removed: Vec<i32>,
+    pub summons: Vec<MapSummon>,
+    /// (object id, why it went)
+    pub summons_removed: Vec<(i32, u8)>,
+    /// Summon paths relayed from their owners: object ids.
+    pub summons_moved: Vec<i32>,
+    /// (object id, action, (mob object id, damage) per hit)
+    pub summon_attacks: Vec<(i32, u8, Vec<(i32, i32)>)>,
+    /// SUMMON_SKILL: (object id, action).
+    pub summon_skills: Vec<(i32, u8)>,
+    /// SPAWN_DOOR: (owner, where, just cast).
+    pub doors: Vec<(i32, (i16, i16), bool)>,
+    /// REMOVE_DOOR: owners.
+    pub doors_removed: Vec<i32>,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct MapSummon {
+    pub owner_id: i32,
+    pub object_id: i32,
+    pub skill_id: i32,
+    pub level: u8,
+    pub x: i16,
+    pub y: i16,
+    pub moves: u8,
+    pub assist: u8,
+    /// Whether it plays its `summoned` animation.
+    pub appears: bool,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct MapMist {
+    pub object_id: i32,
+    pub kind: i32,
+    pub owner_id: i32,
+    pub skill_id: i32,
+    pub level: u8,
+    pub delay: i16,
+    /// Left, top, right, bottom.
+    pub area: (i32, i32, i32, i32),
+}
+
+/// A mob's 16 status flag bytes as bits by stat: the second long holds
+/// stats 0 to 63, the first the rest, each with its dwords swapped.
+fn read_mob_stats(r: &mut Cursor<&Vec<u8>>) -> u128 {
+    let high = r.read_long().unwrap() as u64;
+    let low = r.read_long().unwrap() as u64;
+    ((high.rotate_left(32) as u128) << 64) | low.rotate_left(32) as u128
 }
 
 impl Field {
@@ -226,6 +398,99 @@ impl Field {
             let oid = r.read_int().unwrap();
             r.read_byte().unwrap();
             self.mobs.push((oid, r.read_int().unwrap()));
+            // Each status the server sends is a value, a skill, and a
+            // duration; the counters' spreads and their chance follow.
+            let stats = read_mob_stats(&mut r);
+            let counters = (stats >> 29 & 0b11).count_ones() as usize;
+            let extras = 4 * (counters + usize::from(counters > 0));
+            r.read_bytes(8 * stats.count_ones() as usize + extras)
+                .unwrap();
+            let position = (r.read_short().unwrap(), r.read_short().unwrap());
+            self.mob_positions.insert(oid, position);
+            r.read_byte().unwrap();
+            r.read_short().unwrap();
+            r.read_short().unwrap();
+            self.appearances.insert(oid, r.read_byte().unwrap() as i8);
+        } else if op == SendOpcode::MobStatSet as i16 {
+            let oid = r.read_int().unwrap();
+            let stats = read_mob_stats(&mut r);
+            let value = r.read_short().unwrap();
+            let skill_id = r.read_int().unwrap();
+            self.stat_sets.push((oid, stats, value, skill_id));
+        } else if op == SendOpcode::MobStatReset as i16 {
+            let oid = r.read_int().unwrap();
+            self.stat_resets.push((oid, read_mob_stats(&mut r)));
+        } else if op == SendOpcode::SpawnMist as i16 {
+            self.mists.push(MapMist {
+                object_id: r.read_int().unwrap(),
+                kind: r.read_int().unwrap(),
+                owner_id: r.read_int().unwrap(),
+                skill_id: r.read_int().unwrap(),
+                level: r.read_byte().unwrap(),
+                delay: r.read_short().unwrap(),
+                area: (
+                    r.read_int().unwrap(),
+                    r.read_int().unwrap(),
+                    r.read_int().unwrap(),
+                    r.read_int().unwrap(),
+                ),
+            });
+        } else if op == SendOpcode::RemoveMist as i16 {
+            self.mists_removed.push(r.read_int().unwrap());
+        } else if op == SendOpcode::SpawnDoor as i16 {
+            let just_cast = r.read_byte().unwrap() == 0;
+            let owner = r.read_int().unwrap();
+            let at = (r.read_short().unwrap(), r.read_short().unwrap());
+            self.doors.push((owner, at, just_cast));
+        } else if op == SendOpcode::RemoveDoor as i16 {
+            r.read_byte().unwrap();
+            self.doors_removed.push(r.read_int().unwrap());
+        } else if op == SendOpcode::SpawnSummon as i16 {
+            let owner_id = r.read_int().unwrap();
+            let object_id = r.read_int().unwrap();
+            let skill_id = r.read_int().unwrap();
+            r.read_byte().unwrap();
+            let level = r.read_byte().unwrap();
+            let (x, y) = (r.read_short().unwrap(), r.read_short().unwrap());
+            r.read_byte().unwrap();
+            r.read_short().unwrap();
+            self.summons.push(MapSummon {
+                owner_id,
+                object_id,
+                skill_id,
+                level,
+                x,
+                y,
+                moves: r.read_byte().unwrap(),
+                assist: r.read_byte().unwrap(),
+                appears: r.read_byte().unwrap() == 0,
+            });
+        } else if op == SendOpcode::RemoveSummon as i16 {
+            r.read_int().unwrap();
+            let object_id = r.read_int().unwrap();
+            self.summons_removed
+                .push((object_id, r.read_byte().unwrap()));
+        } else if op == SendOpcode::MoveSummon as i16 {
+            r.read_int().unwrap();
+            self.summons_moved.push(r.read_int().unwrap());
+        } else if op == SendOpcode::SummonAttack as i16 {
+            r.read_int().unwrap();
+            let object_id = r.read_int().unwrap();
+            r.read_byte().unwrap();
+            let action = r.read_byte().unwrap();
+            let count = r.read_byte().unwrap();
+            let hits = (0..count)
+                .map(|_| {
+                    let mob = r.read_int().unwrap();
+                    r.read_byte().unwrap();
+                    (mob, r.read_int().unwrap())
+                })
+                .collect();
+            self.summon_attacks.push((object_id, action, hits));
+        } else if op == SendOpcode::SummonSkill as i16 {
+            r.read_int().unwrap();
+            let object_id = r.read_int().unwrap();
+            self.summon_skills.push((object_id, r.read_byte().unwrap()));
         } else if op == SendOpcode::SpawnMonsterControl as i16 {
             let mode = r.read_byte().unwrap();
             let oid = r.read_int().unwrap();
@@ -240,7 +505,19 @@ impl Field {
         } else if op == SendOpcode::MoveMonster as i16 {
             self.moved.push(r.read_int().unwrap());
         } else if op == SendOpcode::MoveMonsterResponse as i16 {
-            self.move_responses.push(r.read_int().unwrap());
+            let oid = r.read_int().unwrap();
+            self.move_responses.push(oid);
+            r.read_short().unwrap();
+            r.read_byte().unwrap();
+            r.read_short().unwrap();
+            let (skill, level) = (r.read_byte().unwrap(), r.read_byte().unwrap());
+            if skill != 0 {
+                self.grants.push((oid, skill, level));
+            }
+        } else if op == SendOpcode::DamageMonster as i16 {
+            let oid = r.read_int().unwrap();
+            r.read_byte().unwrap();
+            self.heals.push((oid, -r.read_int().unwrap()));
         } else if op == SendOpcode::ShowMonsterHp as i16 {
             self.hp_bars
                 .push((r.read_int().unwrap(), r.read_byte().unwrap()));

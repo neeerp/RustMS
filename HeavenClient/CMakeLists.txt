@@ -61,7 +61,11 @@ if(HEAVENCLIENT_BUILD_TESTS)
     target_include_directories(menu_cover_tests PRIVATE ${PROJECT_SOURCE_DIR}/libs/NoLifeNx)
     add_test(NAME menu_cover COMMAND menu_cover_tests)
     add_executable(party_tests tests/party.cpp Character/Party.cpp)
+    target_include_directories(party_tests PRIVATE ${PROJECT_SOURCE_DIR}/libs/NoLifeNx)
     add_test(NAME party COMMAND party_tests)
+    add_executable(door_rules_tests tests/door_rules.cpp Character/Party.cpp)
+    target_include_directories(door_rules_tests PRIVATE ${PROJECT_SOURCE_DIR}/libs/NoLifeNx)
+    add_test(NAME door_rules COMMAND door_rules_tests)
     add_executable(buddy_list_tests tests/buddy_list.cpp Character/BuddyList.cpp)
     add_test(NAME buddy_list COMMAND buddy_list_tests)
     add_executable(npc_reach_tests tests/npc_reach.cpp)
@@ -75,8 +79,11 @@ if(HEAVENCLIENT_BUILD_TESTS)
     add_test(NAME enter_number COMMAND enter_number_tests)
     add_executable(keyboard_tests tests/keyboard.cpp IO/Keyboard.cpp)
     add_test(NAME keyboard COMMAND keyboard_tests)
-    add_executable(touch_damage_tests tests/touch_damage.cpp)
-    add_test(NAME touch_damage COMMAND touch_damage_tests)
+    add_executable(mob_damage_tests tests/mob_damage.cpp)
+    add_test(NAME mob_damage COMMAND mob_damage_tests)
+    add_executable(mob_attack_tests tests/mob_attack.cpp)
+    target_include_directories(mob_attack_tests PRIVATE ${PROJECT_SOURCE_DIR}/libs/NoLifeNx)
+    add_test(NAME mob_attack COMMAND mob_attack_tests)
     add_executable(magic_damage_tests tests/magic_damage.cpp)
     add_test(NAME magic_damage COMMAND magic_damage_tests)
     add_executable(buff_row_tests tests/buff_row.cpp)
@@ -136,6 +143,26 @@ if(HEAVENCLIENT_BUILD_TESTS)
     add_executable(shop_list_tests tests/shop_list.cpp Net/InPacket.cpp)
     target_include_directories(shop_list_tests PRIVATE ${PROJECT_SOURCE_DIR}/libs/NoLifeNx)
     add_test(NAME shop_list COMMAND shop_list_tests)
+    add_executable(storage_contents_tests tests/storage_contents.cpp Net/InPacket.cpp)
+    target_include_directories(storage_contents_tests PRIVATE ${PROJECT_SOURCE_DIR}/libs/NoLifeNx)
+    add_test(NAME storage_contents COMMAND storage_contents_tests)
+    add_executable(movement_path_tests tests/movement_path.cpp Net/InPacket.cpp Net/Handlers/Helpers/MovementParser.cpp)
+    target_include_directories(movement_path_tests PRIVATE ${PROJECT_SOURCE_DIR}/libs/NoLifeNx)
+    add_test(NAME movement_path COMMAND movement_path_tests)
+    add_executable(buff_parser_tests tests/buff_parser.cpp Net/InPacket.cpp Net/Handlers/Helpers/BuffParser.cpp Character/Buff.cpp)
+    target_include_directories(buff_parser_tests PRIVATE ${PROJECT_SOURCE_DIR}/libs/NoLifeNx)
+    add_test(NAME buff_parser COMMAND buff_parser_tests)
+    add_executable(diseases_tests tests/diseases.cpp)
+    target_include_directories(diseases_tests PRIVATE ${PROJECT_SOURCE_DIR}/libs/NoLifeNx)
+    add_test(NAME diseases COMMAND diseases_tests)
+    add_executable(mob_stat_parser_tests tests/mob_stat_parser.cpp Net/InPacket.cpp Net/Handlers/Helpers/MobStatParser.cpp Net/Handlers/Helpers/BuffParser.cpp Character/Buff.cpp)
+    target_include_directories(mob_stat_parser_tests PRIVATE ${PROJECT_SOURCE_DIR}/libs/NoLifeNx)
+    add_test(NAME mob_stat_parser COMMAND mob_stat_parser_tests)
+    add_executable(mob_hurts_tests tests/mob_hurts.cpp)
+    target_include_directories(mob_hurts_tests PRIVATE ${PROJECT_SOURCE_DIR}/libs/NoLifeNx)
+    add_test(NAME mob_hurts COMMAND mob_hurts_tests)
+    add_executable(mist_layout_tests tests/mist_layout.cpp)
+    add_test(NAME mist_layout COMMAND mist_layout_tests)
     add_executable(status_messages_tests tests/status_messages.cpp Net/InPacket.cpp)
     target_include_directories(status_messages_tests PRIVATE ${PROJECT_SOURCE_DIR}/libs/NoLifeNx)
     add_test(NAME status_messages COMMAND status_messages_tests)
@@ -143,6 +170,10 @@ if(HEAVENCLIENT_BUILD_TESTS)
     add_test(NAME skill_recommendation COMMAND skill_recommendation_tests)
     add_executable(emote_cooldown_tests tests/emote_cooldown.cpp)
     add_test(NAME emote_cooldown COMMAND emote_cooldown_tests)
+    add_executable(fame_cooldown_tests tests/fame_cooldown.cpp)
+    add_test(NAME fame_cooldown COMMAND fame_cooldown_tests)
+    add_executable(summon_rules_tests tests/summon_rules.cpp)
+    add_test(NAME summon_rules COMMAND summon_rules_tests)
     add_executable(chat_flood_guard_tests tests/chat_flood_guard.cpp)
     add_test(NAME chat_flood_guard COMMAND chat_flood_guard_tests)
     add_executable(char_click_tests tests/char_click.cpp)
@@ -326,6 +357,12 @@ add_executable(HeavenClient
     Gameplay/MapleMap/MapEffect.h
     Gameplay/MapleMap/MapInfo.cpp
     Gameplay/MapleMap/MapInfo.h
+    Gameplay/MapleMap/MapMists.cpp
+    Gameplay/MapleMap/MapDoors.cpp
+    Gameplay/MapleMap/MapMists.h
+    Gameplay/MapleMap/MapSummons.cpp
+    Gameplay/MapleMap/MapSummons.h
+    Gameplay/MapleMap/SummonRules.h
     Gameplay/MapleMap/MapMobs.cpp
     Gameplay/MapleMap/MapMobs.h
     Gameplay/MapleMap/MapNpcs.cpp
@@ -342,6 +379,7 @@ add_executable(HeavenClient
     Gameplay/MapleMap/MapTilesObjs.h
     Gameplay/MapleMap/MesoDrop.cpp
     Gameplay/MapleMap/MesoDrop.h
+    Gameplay/MapleMap/MistLayout.h
     Gameplay/MapleMap/Mob.cpp
     Gameplay/MapleMap/Mob.h
     Gameplay/MapleMap/Npc.cpp
@@ -505,6 +543,8 @@ add_executable(HeavenClient
     IO/UITypes/UIRevive.h
     IO/UITypes/UIShop.cpp
     IO/UITypes/UIShop.h
+    IO/UITypes/UIStorage.cpp
+    IO/UITypes/UIStorage.h
     IO/UITypes/UIMonsterBook.cpp
     IO/UITypes/UIMonsterBook.h
     IO/UITypes/UISkillBook.cpp
@@ -564,6 +604,10 @@ add_executable(HeavenClient
     Net/Handlers/Helpers/LoginParser.h
     Net/Handlers/Helpers/MovementParser.cpp
     Net/Handlers/Helpers/MovementParser.h
+    Net/Handlers/Helpers/BuffParser.cpp
+    Net/Handlers/Helpers/BuffParser.h
+    Net/Handlers/Helpers/MobStatParser.cpp
+    Net/Handlers/Helpers/MobStatParser.h
     Net/Handlers/AttackHandlers.cpp
     Net/Handlers/AttackHandlers.h
     Net/Handlers/BuddyHandlers.cpp

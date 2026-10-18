@@ -22,10 +22,12 @@ pub mod account;
 pub mod buddy;
 pub mod cash_shop;
 pub mod character;
+pub mod fame;
 pub mod keybinding;
 pub mod player;
 pub mod quest;
 pub mod session;
+pub mod storage;
 
 pub type DbPool = Pool<ConnectionManager<PgConnection>>;
 pub type DbConnection = PooledConnection<ConnectionManager<PgConnection>>;

@@ -273,6 +273,8 @@ pub enum WorldAction {
     FieldChat(Packet),
     FieldMove {
         packet: Packet,
+        /// Where the path starts.
+        start: (i16, i16),
         movement_bytes: Vec<u8>,
     },
     NpcInteraction(NpcInteraction),
@@ -280,6 +282,8 @@ pub enum WorldAction {
     Quest(crate::quests::QuestRequest),
     /// Buy, sell, recharge at, or leave the shop the player has open.
     Shop(crate::shop::ShopRequest),
+    /// Take out of, store in, sort, or close the storage the player has open.
+    Storage(crate::storage::StorageRequest),
     /// The player touched the named script portal on their map.
     ScriptPortal {
         portal: String,
@@ -287,6 +291,9 @@ pub enum WorldAction {
     /// The player's worn equipment changed; refresh their field avatar and
     /// show the others this UPDATE_CHAR_LOOK.
     LookChanged(Packet),
+    /// The buffs others see changed; refresh the player's field avatar and
+    /// show the others this GIVE_FOREIGN_BUFF or CANCEL_FOREIGN_BUFF.
+    BuffsChanged(Packet),
     /// Natural HP/MP recovery the client reports; the runtime checks timing.
     NaturalHeal {
         hp: i16,
@@ -298,7 +305,27 @@ pub enum WorldAction {
     Died,
     Whisper(WhisperDelivery),
     Party(PartyRequest),
+    /// A skill the player used reached party members; see `PartySkill`.
+    PartySkill(PartySkill),
     Buddy(BuddyRequest),
+    /// The player cast Mystic Door at `at` on their map, leading to `town`,
+    /// for `lasts`. It replaces any door they had open.
+    OpenDoor {
+        town: i32,
+        at: (i16, i16),
+        lasts: std::time::Duration,
+    },
+    /// The player pressed up in `owner`'s Mystic Door, in its town or in its
+    /// field.
+    UseDoor {
+        owner: i32,
+        from_town: bool,
+    },
+    /// Raise (or drop) the fame of `target`, who must be on the player's map.
+    GiveFame {
+        target: i32,
+        up: bool,
+    },
     /// Tell the player where a character is (`/find`).
     Find {
         target_name: String,
@@ -316,22 +343,55 @@ pub enum WorldAction {
     Disconnect,
 }
 
+/// A skill a player used that reached their party: the members in the
+/// slots set in `slots` (a bit each, the first slot highest, as USE_SKILL
+/// has them) get its buffs, or `heal` HP from Heal, if they are alive and
+/// in its area.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct PartySkill {
+    pub skill_id: i32,
+    pub level: i32,
+    pub slots: u8,
+    pub heal: i32,
+}
+
 /// A request a player makes of their field, which owns its mobs.
 #[derive(Debug)]
 pub enum FieldRequest {
-    /// The controller moved a mob.
+    /// The controller moved a mob, maybe as it acted (`action` << 1 |
+    /// facing left, 0xFF for none) with `skill_data`, and wants it to
+    /// attack next (`want_attack`).
     MobMove {
         object_id: i32,
         move_id: i16,
+        want_attack: bool,
+        action: u8,
+        skill_data: i32,
         start: (i16, i16),
         movement: Vec<u8>,
     },
     /// How far the player is from a firstAttack mob.
     MobDistance { object_id: i32, distance: i32 },
-    /// A validated attack: `broadcast` for the others, total damage per mob.
+    /// The NPCs' controller chose an idle action for one: what followed the
+    /// object id (action, line, and a path for an NPC that walks).
+    NpcAction { object_id: i32, action: Vec<u8> },
+    /// A validated attack: `broadcast` for the others, total damage per mob,
+    /// and what it may put on each mob it hits and leaves alive. Each mob
+    /// with the counter (PCounter, or MCounter for a spell) hurts the player
+    /// back.
     Attack {
         broadcast: Packet,
+        counter: game::MobStat,
         hits: Vec<(i32, i64)>,
+        inflicts: Vec<crate::skills::Inflict>,
+    },
+    /// The player's spell left a mist where they stand, facing left or
+    /// not, that puts `inflict` on the mobs in it.
+    Mist {
+        skill_id: i32,
+        level: i32,
+        left: bool,
+        inflict: crate::skills::Inflict,
     },
     /// Show everyone else on the map this packet.
     Broadcast(Packet),
@@ -340,6 +400,16 @@ pub enum FieldRequest {
     Magnet {
         effect: Packet,
         caught: Vec<(i32, bool)>,
+    },
+    /// The player used a skill that puts statuses on the mobs it reaches
+    /// (`inflict`), or takes their buffs away, from `origin` (where the
+    /// player stands if None): these mobs, as their client saw them.
+    MobDebuff {
+        skill_id: i32,
+        level: i32,
+        origin: Option<(i16, i16)>,
+        mobs: Vec<i32>,
+        inflict: crate::skills::Inflict,
     },
     /// Sit on the portable chair `item_id`, or stand up with 0.
     Chair(i32),
@@ -361,6 +431,49 @@ pub enum FieldRequest {
     /// Show the player the info window for `character_id`, who must be on
     /// their map (and may be themselves).
     CharInfo { character_id: i32 },
+    /// Have `target`, if they are here, take `giver_name`'s fame.
+    Fame {
+        target: i32,
+        giver_name: String,
+        up: bool,
+    },
+    /// The player called up their skill's summon at `at`, facing left or
+    /// not, for `lasts`, replacing the one their buff of that kind gave.
+    /// With `appear` it plays its `summoned` animation, but not when it
+    /// follows them to a new map.
+    Summon {
+        skill_id: i32,
+        level: i32,
+        at: (i16, i16),
+        left: bool,
+        lasts: std::time::Duration,
+        appear: bool,
+    },
+    /// Send away the player's summon of this skill, or all of them.
+    Unsummon {
+        skill_id: Option<i32>,
+        why: crate::packet::build::world::summon::Gone,
+    },
+    /// The player's client moved their summon.
+    SummonMove {
+        object_id: i32,
+        start: (i16, i16),
+        movement: Vec<u8>,
+    },
+    /// The player's summon attacked; it must keep to its skill's limits.
+    SummonAttack {
+        attack: crate::summons::SummonAttack,
+        limits: Vec<crate::summons::Limit>,
+    },
+    /// A mob hurt the player's Puppet.
+    SummonDamage(crate::summons::SummonDamage),
+    /// The player's Beholder heals or buffs them, if it is theirs and not
+    /// too soon; the others see it play `action`.
+    Beholder {
+        object_id: i32,
+        action: u8,
+        support: crate::summons::Support,
+    },
 }
 
 impl ReplyAction for WorldAction {
@@ -431,6 +544,7 @@ fn world_routes() -> &'static HashMap<i16, WorldRoute> {
             (Op::NpcTalkMore, InGame(&world::NpcTalkMoreHandler)),
             (Op::QuestAction, InGame(&world::QuestActionHandler)),
             (Op::NpcShopAction, InGame(&world::NpcShopActionHandler)),
+            (Op::TrunkRequest, InGame(&world::TrunkRequestHandler)),
             (
                 Op::ChangeMapSpecial,
                 InGame(&world::ChangeMapSpecialHandler),
@@ -439,8 +553,10 @@ fn world_routes() -> &'static HashMap<i16, WorldRoute> {
             (Op::SortItems, InGame(&world::SortItemsHandler)),
             (Op::ItemMove, InGame(&world::ItemMoveHandler)),
             (Op::UseItem, InGame(&world::UseItemHandler)),
+            (Op::UseSkillBook, InGame(&world::UseSkillBookHandler)),
             (Op::MoveLife, InGame(&world::MoveLifeHandler)),
             (Op::MobDistance, InGame(&world::MobDistanceHandler)),
+            (Op::NpcAction, InGame(&world::NpcActionHandler)),
             (
                 Op::CloseRangeAttack,
                 InGame(&world::AttackHandler(AttackKind::Close)),
@@ -461,10 +577,17 @@ fn world_routes() -> &'static HashMap<i16, WorldRoute> {
             (Op::SpendSp, InGame(&world::SpendSpHandler)),
             (Op::UseSkill, InGame(&world::UseSkillHandler)),
             (Op::CancelBuff, InGame(&world::CancelBuffHandler)),
+            (Op::CancelItemEffect, InGame(&world::CancelBuffHandler)),
             (Op::SkillEffect, InGame(&world::SkillEffectHandler)),
             (Op::ThrowGrenade, InGame(&world::ThrowGrenadeHandler)),
             (Op::MesoDrop, InGame(&world::MesoDropHandler)),
             (Op::CharInfoRequest, InGame(&world::CharInfoRequestHandler)),
+            (Op::GiveFame, InGame(&world::GiveFameHandler)),
+            (Op::MoveSummon, InGame(&world::MoveSummonHandler)),
+            (Op::SummonAttack, InGame(&world::SummonAttackHandler)),
+            (Op::DamageSummon, InGame(&world::DamageSummonHandler)),
+            (Op::Beholder, InGame(&world::BeholderHandler)),
+            (Op::UseDoor, InGame(&world::UseDoorHandler)),
         ];
         table
             .into_iter()
@@ -495,7 +618,7 @@ mod tests {
     fn every_registered_opcode_is_unique_per_server() {
         // The maps would silently drop duplicates; check the table sizes match.
         assert_eq!(login_routes().len(), 13);
-        assert_eq!(world_routes().len(), 46);
+        assert_eq!(world_routes().len(), 56);
     }
 
     #[test]

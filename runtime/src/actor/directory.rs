@@ -2,13 +2,17 @@ use crate::actor::messenger::{Messengers, Outbox};
 use crate::actor::parties::{self, Member, Parties, Party};
 use crate::message::{ClientHandle, DirectoryMessage, ListedBuddy, Presence, ServerMessage};
 use net::packet::build::world::buddy::{build_buddy_list, BuddyView};
+use net::packet::build::world::door::{build_spawn_portal, DoorView};
+use net::packet::build::world::map::{build_blocked_map, BlockedMap};
 use net::packet::build::world::messaging::{build_find_result, build_whisper_result, FindLocation};
 use net::packet::build::world::party::{
-    build_party_chat, build_party_created, build_party_disbanded, build_party_invite,
-    build_party_joined, build_party_leader_changed, build_party_left, build_party_member_hp,
-    build_party_status, build_party_update, Departure, PartyMemberView, PartyStatus, PartyView,
+    build_party_chat, build_party_created, build_party_disbanded, build_party_door,
+    build_party_invite, build_party_joined, build_party_leader_changed, build_party_left,
+    build_party_member_hp, build_party_status, build_party_update, Departure, PartyMemberView,
+    PartyStatus, PartyView,
 };
-use net::{BroadcastScope, ClientId, MessengerRequest, PartyRequest, WhisperDelivery};
+use net::packet::handle::world::DoorExit;
+use net::{BroadcastScope, ClientId, MessengerRequest, PartyRequest, PartySkill, WhisperDelivery};
 use packet::Packet;
 use std::collections::HashMap;
 use std::time::{Duration, Instant};
@@ -39,6 +43,12 @@ impl Entry {
     }
 }
 
+/// A Mystic Door, open on `channel_id`.
+struct Door {
+    channel_id: u8,
+    view: DoorView,
+}
+
 /// World-wide directory of online characters: who is online, under which
 /// name, on which channel and map. It owns no character state; it exists
 /// for features that cross fields (whispers, world broadcasts, parties, and
@@ -49,6 +59,8 @@ pub struct WorldDirectory {
     names: HashMap<String, ClientId>,
     parties: Parties,
     messengers: Messengers,
+    /// Each player's Mystic Door, which their party may use too.
+    doors: HashMap<ClientId, Door>,
 }
 
 impl WorldDirectory {
@@ -59,6 +71,7 @@ impl WorldDirectory {
             names: HashMap::new(),
             parties: Parties::default(),
             messengers: Messengers::default(),
+            doors: HashMap::new(),
         }
     }
 
@@ -104,6 +117,9 @@ impl WorldDirectory {
             DirectoryMessage::Party { from, request } => {
                 self.party_request(from, request, Instant::now())
             }
+            DirectoryMessage::PartySkill { from, used, origin } => {
+                self.party_skill(from, used, origin)
+            }
             DirectoryMessage::BuddyList { owner, buddies } => self.send_buddy_list(owner, buddies),
             DirectoryMessage::Deliver { to, packet } => {
                 for client in to {
@@ -117,6 +133,17 @@ impl WorldDirectory {
                 let out = self.messengers.look_changed(client_id, look);
                 self.deliver(out);
             }
+            DirectoryMessage::DoorOpened { owner, door } => self.door_opened(owner, door),
+            DirectoryMessage::DoorClosed { owner } => {
+                if self.doors.remove(&owner).is_some() {
+                    self.tell_door(owner, None);
+                }
+            }
+            DirectoryMessage::UseDoor {
+                from,
+                owner,
+                from_town,
+            } => self.use_door(from, owner, from_town),
         }
     }
 
@@ -164,6 +191,7 @@ impl WorldDirectory {
             .get(&client_id)
             .is_some_and(|entry| entry.handle.connection_id == connection_id);
         if is_current {
+            self.doors.remove(&client_id);
             if let Some(entry) = self.clients.remove(&client_id) {
                 self.names.remove(&entry.presence.name);
                 info!(client_id, "Character offline");
@@ -381,7 +409,8 @@ impl WorldDirectory {
         let id = leader.id;
         match self.parties.create(leader).cloned() {
             Ok(party) => {
-                self.send_packet(id, build_party_created(party.id));
+                let door = self.doors.get(&id).map(|door| &door.view);
+                self.send_packet(id, build_party_created(party.id, door));
                 self.tell_party_changed(id, Some(party.id));
                 self.send_party_update(&party);
             }
@@ -436,6 +465,11 @@ impl WorldDirectory {
                     map_id: entry
                         .filter(|e| e.channel_id == channel_id)
                         .map_or(0, |e| e.presence.map_id),
+                    door: self
+                        .doors
+                        .get(&member.id)
+                        .filter(|door| door.channel_id == channel_id)
+                        .map(|door| door.view),
                 }
             })
             .collect();
@@ -487,6 +521,106 @@ impl WorldDirectory {
         let (hp, max_hp) = (entry.presence.hp.into(), entry.presence.max_hp.into());
         for (other, _) in self.party_neighbours(client, entry) {
             self.send_packet(other, build_party_member_hp(client, hp, max_hp));
+        }
+    }
+
+    /// Pass a party skill on to the members in its slots, the party's
+    /// joining order, who are on the user's map.
+    fn party_skill(&self, from: ClientId, used: PartySkill, origin: (i16, i16)) {
+        let (Some(entry), Some(party)) = (self.clients.get(&from), self.parties.of(from)) else {
+            return;
+        };
+        for (slot, member) in party.members.iter().enumerate() {
+            if member.id == from || used.slots & net::skills::party_bit(slot) == 0 {
+                continue;
+            }
+            let Some(other) = self.clients.get(&member.id) else {
+                continue;
+            };
+            if other.shares_map_with(entry) {
+                other.handle.send(ServerMessage::PartySkill {
+                    used: used.clone(),
+                    origin,
+                    map_id: entry.presence.map_id,
+                });
+            }
+        }
+    }
+
+    fn door_opened(&mut self, owner: ClientId, view: DoorView) {
+        let Some(entry) = self.clients.get(&owner) else {
+            return;
+        };
+        let channel_id = entry.channel_id;
+        self.doors.insert(owner, Door { channel_id, view });
+        self.tell_door(owner, Some(&view));
+    }
+
+    /// Tell `owner`, and their party on their channel, of their door or its
+    /// end: the owner keeps it for when they are alone (SPAWN_PORTAL), the
+    /// party in the owner's slot.
+    fn tell_door(&self, owner: ClientId, door: Option<&DoorView>) {
+        let Some(entry) = self.clients.get(&owner) else {
+            return;
+        };
+        self.send_packet(owner, build_spawn_portal(door));
+        let Some(party) = self.parties.of(owner) else {
+            return;
+        };
+        let Some(slot) = party.members.iter().position(|m| m.id == owner) else {
+            return;
+        };
+        for member in &party.members {
+            let on_channel = self
+                .clients
+                .get(&member.id)
+                .is_some_and(|other| other.channel_id == entry.channel_id);
+            if on_channel {
+                self.send_packet(member.id, build_party_door(slot as u8, door));
+            }
+        }
+    }
+
+    /// `from` entered `owner`'s door: theirs or a party member's, on their
+    /// channel, standing in its town or its field. Send them through, or
+    /// tell them it is for the party only.
+    fn use_door(&self, from: ClientId, owner: ClientId, from_town: bool) {
+        let Some(entry) = self.clients.get(&from) else {
+            return;
+        };
+        let party = self.parties.of(from);
+        let slot = match party {
+            Some(party) => party.members.iter().position(|m| m.id == owner),
+            None => (owner == from).then_some(0),
+        };
+        let door = self
+            .doors
+            .get(&owner)
+            .filter(|door| door.channel_id == entry.channel_id);
+        let warp = slot.zip(door).and_then(|(slot, door)| {
+            let door = &door.view;
+            let map_id = entry.presence.map_id;
+            if from_town && map_id == door.town {
+                let exit = DoorExit::Field {
+                    x: door.x,
+                    y: door.y,
+                };
+                Some((door.field, exit))
+            } else if !from_town && map_id == door.field {
+                Some((door.town, DoorExit::Town { slot }))
+            } else {
+                None
+            }
+        });
+        match warp {
+            Some((map_id, exit)) => {
+                entry.handle.send(ServerMessage::DoorWarp {
+                    from_map: entry.presence.map_id,
+                    map_id,
+                    exit,
+                });
+            }
+            None => self.send_packet(from, build_blocked_map(BlockedMap::PartyOnly)),
         }
     }
 
@@ -595,6 +729,53 @@ mod tests {
             });
         }
         seen
+    }
+
+    #[test]
+    fn a_party_skill_reaches_the_members_in_its_slots_on_the_map() {
+        let (_tx, rx) = mpsc::channel(1);
+        let mut directory = WorldDirectory::new(rx);
+        let mut alice = online(&mut directory, 1, "Alice", 10000);
+        let mut bobby = online(&mut directory, 2, "Bobby", 10000);
+        let mut carol = online(&mut directory, 3, "Carol", 20000);
+        let mut dave = online(&mut directory, 4, "Dave", 10000);
+        let now = Instant::now();
+        for (id, name) in [(2, "Bobby"), (3, "Carol"), (4, "Dave")] {
+            let invite = PartyRequest::Invite { name: name.into() };
+            directory.party_request(1, invite, now);
+            directory.party_request(id, PartyRequest::Accept { party_id: 1 }, now);
+        }
+        for rx in [&mut alice, &mut bobby, &mut carol, &mut dave] {
+            received(rx);
+        }
+
+        // Bobby, in slot 1, reached Alice (0), himself (1), and Carol (2) on
+        // another map, but not Dave (3).
+        let used = PartySkill {
+            skill_id: 2301004,
+            level: 20,
+            slots: 0x38,
+            heal: 0,
+        };
+        directory.party_skill(2, used.clone(), (5, 6));
+        let reached = |rx: &mut mpsc::Receiver<ServerMessage>| {
+            let mut seen = Vec::new();
+            while let Ok(message) = rx.try_recv() {
+                if let ServerMessage::PartySkill {
+                    used,
+                    origin,
+                    map_id,
+                } = message
+                {
+                    seen.push((used, origin, map_id));
+                }
+            }
+            seen
+        };
+        assert_eq!(reached(&mut alice), [(used, (5, 6), 10000)]);
+        assert!(reached(&mut bobby).is_empty());
+        assert!(reached(&mut carol).is_empty());
+        assert!(reached(&mut dave).is_empty());
     }
 
     #[test]

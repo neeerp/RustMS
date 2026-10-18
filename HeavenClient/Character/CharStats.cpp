@@ -17,8 +17,12 @@
 //////////////////////////////////////////////////////////////////////////////////
 #include "CharStats.h"
 
+#include "MobDamage.h"
 #include "StatCaps.h"
-#include "TouchDamage.h"
+
+#include "../Gameplay/Combat/Attack.h"
+
+#include <cmath>
 
 namespace ms
 {
@@ -215,17 +219,37 @@ namespace ms
 		job.change_job(id);
 	}
 
-	int32_t CharStats::calculate_damage(int32_t mobatk) const
+	int32_t CharStats::calculate_damage(const MobAttack &attack, double missroll, double roll) const
 	{
-		int32_t defense = touch_damage::defense(
+		mob_damage::Defender player{
+				get_stat(MapleStat::Id::LEVEL),
+				get_stat(MapleStat::Id::JOB),
 				get_total(EquipStat::Id::STR),
 				get_total(EquipStat::Id::DEX),
 				get_total(EquipStat::Id::INT),
 				get_total(EquipStat::Id::LUK),
-				get_total(EquipStat::Id::WDEF)
-		);
+				get_total(EquipStat::Id::WDEF),
+				get_total(EquipStat::Id::MDEF),
+				get_total(EquipStat::Id::AVOID)
+		};
+		mob_damage::Attacker mob{ attack.level, attack.accuracy };
 
-		return touch_damage::damage(mobatk, defense, reducedamage);
+		if (attack.magic)
+		{
+			if (mob_damage::magic_misses(player, mob, missroll))
+				return 0;
+
+			return mob_damage::magic(player, attack.matk, roll, 0, attack.magicup);
+		}
+
+		if (missroll * 100.0 < mob_damage::physical_miss_chance(player, mob))
+			return 0;
+
+		// Achilles takes its share off last (inferred: v83 takes a
+		// percent there, but its source wasn't traced).
+		int32_t reduce = static_cast<int32_t>(std::lround(reducedamage * 100.0f));
+
+		return mob_damage::physical(player, mob, attack.watk, roll, reduce, attack.powerup);
 	}
 
 	bool CharStats::is_damage_buffed() const

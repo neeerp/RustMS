@@ -24,12 +24,16 @@
 
 #include "Combat/Combat.h"
 #include "EmoteCooldown.h"
+#include "FameCooldown.h"
 #include "MapleMap/MapInfo.h"
 #include "MapleMap/MapTilesObjs.h"
 #include "MapleMap/MapBackgrounds.h"
 #include "MapleMap/MapPortals.h"
 #include "MapleMap/MapChars.h"
 #include "MapleMap/MapMobs.h"
+#include "MapleMap/MapMists.h"
+#include "MapleMap/MapDoors.h"
+#include "MapleMap/MapSummons.h"
 #include "MapleMap/MapReactors.h"
 #include "MapleMap/MapNpcs.h"
 #include "MapleMap/MapDrops.h"
@@ -49,8 +53,9 @@ namespace ms
 
 		void init();
 
-		// Loads the map to display
-		void load(int32_t mapid, int8_t portalid);
+		// Loads the map to display, with the player at a portal or, when the
+		// server chases them there, at a point.
+		void load(int32_t mapid, int8_t portalid, std::optional<Point<int16_t>> chase = std::nullopt);
 
 		// Remove all map objects and graphics.
 		void clear();
@@ -101,6 +106,15 @@ namespace ms
 		// Returns a reference to the reactors on the current map.
 		MapReactors &get_reactors();
 
+		// Returns a reference to the mists on the current map.
+		MapMists &get_mists();
+
+		// Returns a reference to the summons on the current map.
+		MapSummons &get_summons();
+
+		// Returns a reference to the Mystic Doors in the current field.
+		MapDoors &get_doors();
+
 		// Returns a reference to the drops on the current map.
 		MapDrops &get_drops();
 
@@ -124,6 +138,9 @@ namespace ms
 		// Set a map effect
 		void add_effect(std::string path);
 
+		// Whether the player may give fame now (once every 5 minutes); if
+		// so, the wait starts.
+		bool try_give_fame();
 		// Get the total up time of the client
 		int64_t get_uptime();
 		// Get the level at the start of the client
@@ -146,9 +163,16 @@ namespace ms
 	private:
 		void load_map(int32_t mapid);
 
-		void respawn(int8_t portalid);
+		void respawn(int8_t portalid, std::optional<Point<int16_t>> chase);
 
 		void check_portals();
+
+		// Go through the Mystic Door the player stands in, if any
+		// (FUN_005375ed in a town, FUN_007bd594 elsewhere).
+		void check_doors(Point<int16_t> playerpos);
+
+		// The Mystic Doors standing at the town's door portals.
+		std::vector<MapDoors::Spot> get_town_doors() const;
 
 		void check_touch_portals(Point<int16_t> drawn);
 
@@ -166,6 +190,9 @@ namespace ms
 		void catch_ladders(Point<int16_t> before);
 
 		void check_drops();
+
+		// Fear's darkness, all but the player's narrowed sight (FUN_0053868d).
+		void draw_fear(double viewx, double viewy, float alpha) const;
 
 		enum State
 		{
@@ -203,13 +230,21 @@ namespace ms
 		MapChars chars;
 		MapMobs mobs;
 		MapDrops drops;
+		MapMists mists;
+		// The ms since a mob's mist last hurt the player.
+		int32_t since_mist_hurt = mist::HURT_INTERVAL + 1;
+		MapDoors doors;
+		MapSummons summons;
 		MapEffect effect;
 		// Effects left where they started, such as a jump pad's burst.
 		EffectLayer ground_effects;
 		Animation jump_effect;
+		// What Fear leaves the player to see (Effect/MapEff.img/Viewrange/3).
+		Texture fear_sight;
 
 		Combat combat;
 		EmoteCooldown emote_cooldown;
+		FameCooldown fame_cooldown;
 
 		std::chrono::time_point<std::chrono::steady_clock> start;
 		uint16_t levelBefore;

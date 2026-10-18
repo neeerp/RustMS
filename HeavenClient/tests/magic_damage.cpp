@@ -59,6 +59,17 @@ int main()
 		// Magic defense takes 50% to 60% of itself off.
 		require(near(defend(186.18138, 30, 0.0), 171.18138), "the low defense roll takes 15");
 		require(near(defend(294.71838, 30, 1.0), 276.71838), "the high one takes 18");
+		// A monster's statuses: Magic Guard Up leaves n%, Weakness adds n%,
+		// and an Elemental Staff's percent scales the hit.
+		require(near(guarded(200.0, 30), 60.0), "Magic Guard Up 30 leaves 30%");
+		require(near(guarded(200.0, 0), 200.0), "no guard leaves it whole");
+		require(near(weakened(200.0, 20), 240.0), "Weakness 20 adds 20%");
+		require(near(weakened(200.0, 0), 200.0), "no weakness adds nothing");
+		require(near(percent(200.0, 125), 250.0) && near(percent(200.0, 75), 150.0),
+				"a staff's element percent");
+		require(pierces(0, 0) && !pierces(1, 0), "only a roll of 0 pierces immunity with no chance");
+		require(pierces(30, 30) && !pierces(31, 30), "a chance of n lets rolls up to n through");
+
 		require(finish(171.18138) == 171, "the number shown rounds down");
 		require(finish(0.0) == 1 && finish(-40.0) == 1, "a hit shows at least 1");
 		require(finish(250000.0) == 199999, "and at most 199999");

@@ -41,7 +41,7 @@ templates from `Mob.nx` (`maxHP`, `exp`, `PADamage`, `bodyAttack`,
   comes within |dx| / 10 + |dy| / 3 <= 40 of it (v83's FUN_005ce8c6). Only
   its controller's client checks this, and the server is not told. v83 also
   starts the chase when one of the mob's attacks could reach the player;
-  HeavenClient has no mob attacks.
+  HeavenClient does not yet.
 - **Distance reports:** so that the player a firstAttack mob goes for is the
   one whose client checks, every client, controller or not, sends MOB_DISTANCE
   (`0xBD`: object id, distance) once a second for each such mob, as v83's
@@ -72,8 +72,8 @@ templates from `Mob.nx` (`maxHP`, `exp`, `PADamage`, `bodyAttack`,
   reach covers it, walks down steps toward a target on its own group, and
   jumps off an end toward a lower target only half the time.
 
-Packets follow the v83 layout (16-byte temporary status mask after the mob
-id); HeavenClient used to skip 22 bytes there and now skips 16. After the
+Packets follow the v83 layout (the mob's statuses, a 16-byte mask and its
+entries, after the mob id; see "Mob statuses"). After the
 stance come two footholds: the one the mob stands on, then its spawn point's.
 v83 puts the mob on the first, at the point along it nearest its x, so a mob
 whose `cy` is a pixel off a slope does not fall; with 0 it falls from its
@@ -230,9 +230,9 @@ once past beginner.
 ## Buff skills
 
 USE_SKILL (`0x5B`, `handle::world::use_skill`) casts a skill that doesn't
-attack. Only the beginner buffs do anything yet (Recovery and Nimble Feet, by
-`skill_id % 10_000_000`, so Noblesse and Legend copies work too); others are
-ignored. The level the client names must be the learned one, the skill must
+attack. `net::skills::buffs` maps each buff skill to the stats it gives (the
+level's attack, defense, accuracy, avoidability, speed and jump, plus the
+skill's own stat); a skill missing from it is ignored. The level the client names must be the learned one, the skill must
 be off cooldown, and the player alive with enough MP. The caster gets the MP
 left, GIVE_BUFF (the temporary-stat masks match HeavenMS: Speed and Recovery
 are both second-mask bits), and COOLDOWN when the level has a `cooltime`;
@@ -246,6 +246,35 @@ CANCEL_BUFF, since the client never ends buffs itself. Right-clicking a buff
 icon sends CANCEL_BUFF (`0x5C`, the skill id), which ends that skill's buffs
 and answers with CANCEL_BUFF. Dying and changing channel end every buff;
 cooldowns keep running.
+
+A skill that reaches the party (`skills::reaches_party`) carries a slot mask
+after the level: 0x80 alone, else bit `1 << (5 - slot)` for each member the
+client found in the skill's area, the caster included, with slots in joining
+order. The handler passes the skill on as `WorldAction::PartySkill`; the
+directory sends it to the members in those slots on the caster's map, and
+each member's client actor applies it when they are alive, out of the Cash
+Shop, and within the level's `lt`/`rb` around the caster plus 100 px
+(`skills::in_area`). Members get the buffs without MP or cooldown, or for
+Heal the caster's per-member share of HP, and SHOW_ITEM_GAIN_INCHAT /
+SHOW_FOREIGN_EFFECT type 2 (`skill, level`), which plays the skill's
+`affected` animation on them.
+
+A few skills do more than buff:
+
+- **Resurrection** reaches only dead members, raising them with full HP; the
+  living, the caster included, are left alone. HeavenClient, like v83, plays
+  the action and effect but sends nothing when a party member casts it with
+  no dead member in range (`skill_use::sends`); alone it is sent with 0x80.
+- **Time Leap** ends every cooldown but its own (COOLDOWN with 0 for each),
+  for the caster and the members it reaches.
+- **Chakra** heals only the caster, by a random amount between
+  `luk * 2.3 * y / 100` and `luk * 3.5 * y / 100`, using LUK with equips
+  (`skills::chakra_heal`). The client only lets it be cast below half HP;
+  the server doesn't check, since its max HP leaves out equips.
+
+These and Mystic Door have neither buff stats nor a mob debuff, so
+`skills::acts_alone` lets them past the check that refuses such skills as
+unsupported.
 
 ## Spending AP and SP
 
@@ -336,6 +365,208 @@ the v83 book from `UIClassic.nx`, laid out from 2008 footage:
 
 A new card also prints "[Card name] has been successfully registered in the
 Monster Book." in the chat log in pink (`#FFA194`, from footage).
+## Mob statuses
+
+Players' skills put temporary statuses on mobs (`game::MobStat`, by their
+bit in v83's 128-bit mask). MOB_STAT_SET (0xF2) shows one put on to the
+whole map and MOB_STAT_RESET (0xF3) shows it wear off; both spawn packets
+carry the statuses a mob has. Entries come in the client's decode order
+(`MobStat::DECODE_ORDER`), not bit order.
+
+- USE_SKILL carries the mobs the client found in the skill's area.
+  `skills::mob_debuffs` says what such a skill puts on (Threaten, Slow,
+  Seal, Doom, Shadow Web, Ninja Ambush), and the field rolls its `prop` for
+  each mob still in the area (`FieldRequest::MobDebuff`). The Crashes and
+  Dispel take mob buffs off instead.
+- An attack's hits carry `skills::on_hit`: the attack skill's own status
+  (stuns, Panic's darkness, freezes, poisons) and a learned Venom's poison.
+  Each mob hit for more than 0 rolls each.
+- Bosses shrug off Stun, Freeze, Seal, Doom and Web. A mob immune to poison
+  (`elemAttr` S1) or ice (I1) shrugs off Poison or Freeze.
+- Poison, Venom and Ambush take HP each second on the field tick
+  (`MobSet::hurt_by_statuses`), the mob's `fixedDamage` instead if it has
+  one, never below 1 HP. The damage counts toward the inflicter's EXP share,
+  and they see the HP bar. Every client shows the numbers itself
+  (HeavenClient `MobHurts`).
+- Statuses wear off on the field tick.
+
+HeavenClient keeps a mob's statuses (`MobStatParser`): Slow feeds its speed,
+Doom shows it as a Blue Snail, Stun, Freeze and Web hold it, and the
+reason skill's `mob` effect plays. The formulas for poison, Venom and Ambush
+come from OdinMS-family servers; `v83ref` report 157 has the detail.
+
+### Mists
+
+Poison Mist (2111003) leaves a cloud (an affected area) as well as
+attacking. `skills::mist` says what a skill's cloud puts on, and the attack
+asks the field for one (`FieldRequest::Mist`). The field keeps them
+(`field_mists::MistSet`): a mist covers the skill's `lt`/`rb` box around the
+caster, mirrored when they face right. It starts 800 ms after the cast,
+reaches every 2.5 seconds for the live mobs in it that lack the status,
+rolling `prop`, and lasts the skill's `time`. AFFECTED_AREA_CREATED (0x111)
+shows it to the map and to players who join; AFFECTED_AREA_REMOVED (0x112)
+lifts it. The reach interval and the 800 ms come from OdinMS-family servers.
+
+HeavenClient's `MapMists` lays the skill's `tile` clouds over the area as
+v83 does (`MistLayout.h`, a diamond of random tiles), draws them above the
+map's objects, and fades them out over a second when the mist lifts.
+`v83ref` report 160 has the client's detail.
+
+### Mystic Door
+
+A Priest's Mystic Door (2311002) opens a door in the field leading to the
+field's return map. USE_SKILL carries where it stands. `skills::door_town`
+refuses it in towns, in maps whose `fieldLimit` has bit 8 or whose id has 9
+as its millions digit, within 50 px of a portal other than a start point,
+and where there is no return map, as the v83 client does. The refusal
+unlocks the client like any other.
+
+The client actor keeps its one door (`runtime/src/actor/client/door.rs`)
+and closes it after the skill's `time`, on a new cast, a channel change,
+and logout. The field shows the door to everyone on the map
+(SPAWN_DOOR 0x113, opening when just cast; REMOVE_DOOR 0x114). The
+directory tells the owner (SPAWN_PORTAL 0x43, which v83 uses for a door
+when alone) and the party members on the owner's channel (party op 0x25,
+and the door section of the party block) where it leads.
+
+USE_DOOR (0x85) names the door's owner and whether the player stands in
+the town. The directory lets through the owner and members of the owner's
+party on its channel, standing in the door's town or its field, and refuses
+others with `BLOCKED_MAP` 6. From the field a player goes to the town's
+door portal for the owner's party slot (`pt` 6, in id order); from town
+they go back to the door, which SET_FIELD's chase position (`net::door_warp`)
+puts them at.
+
+In HeavenClient, `DoorRules.h` holds v83's rules without the map:
+
+- Where a door may open (`door_rules::may_cast`).
+- The box a player must stand in to use one: 20 px to either side, 50 px
+  above and below.
+- Which door stands at which of a town's door portals: alone, the
+  player's at the first; in a party, each member's at the portal of their
+  slot.
+
+`Combat::request_door` refuses a cast with v83's messages.
+`MapDoors` (`Gameplay/MapleMap`) draws the doors. A field door opens
+(`cDoor`) and stands 1.8 s later (`mDoor` in its `Frame`); a removed one
+fades over a second. A door is placed on the ground at the next update,
+not when SPAWN_DOOR arrives, which can be before the map's footholds have
+loaded. The town's doors are drawn at their portals. Up first tries the
+map's portals. A door portal has no warp, so Up falls through to the doors
+(`Stage::check_doors`): the town's if the map is a town, else the
+field's. The chase position SET_FIELD carries lands on the ground. The
+client looks for the ground from 5 px above it, since the rounded position
+can sit just below a slope.
+
+`v83ref` report 161 has the client's detail.
+
+## Summons
+
+Puppet, Silver Hawk, the Octopus, Elquines, the Knights' souls and the like
+call up a summon (`net::summons`, the field's `field_summons::SummonSet`).
+USE_SKILL for a skill in `summons::kind` carries where the caster's client
+put it and which way it faces after the level. The client puts Puppets 200
+px ahead on a foothold within 80 px, the Octopi 45 px ahead, and the rest at
+the owner (v83 `FUN_0096b140`). The cast costs MP and any `itemCon`, for
+example a Summoning Rock for Silver Hawk. It also gives a buff that shows
+the summon's icon and lasts its `time`: Puppet's own stat for summons that
+stay put, the combo counter for the rest. The field then takes the summon
+(`FieldRequest::Summon`). If the spot is more than 250×150 px from the
+owner, it uses the owner's position. The owner's earlier summon of that
+kind is dismissed. SPAWN_SUMMON (`0xAF`) shows it to the map and to players
+who join.
+
+The owner's client moves it and decides when it attacks. The server checks
+the rest:
+
+- **MOVE_SUMMON** (`0xAF` in, `0xB1` out) is relayed to the others.
+- **SUMMON_ATTACK** (`0xB0` in, `0xB2` out) is refused when any of these
+  holds:
+  - it hits more mobs than the skill's `mobCount`;
+  - it hits one mob twice;
+  - a hit exceeds `summons::max_damage`, which is twice what the owner's
+    client can roll before multipliers, so it is the owner's main stat ×
+    2.5 plus their other stats for a physical summon, or the v83 spell
+    formula for a magic one, times the level's `pad` or `mad` percent.
+
+  Otherwise the hits go through the field's usual damage and kill path.
+  A hit that does damage can also put a status on its mob
+  (`summons::inflict`):
+  - Silver Hawk and Golden Eagle stun at the level's `prop`.
+  - Elquines and Frostprey always freeze; their data has no `prop`.
+
+  Each status lasts the level's `x` seconds. That is inferred: the client
+  only shows what it's sent, and OdinMS-family servers hold every summon's
+  status for 4 s.
+- **DAMAGE_SUMMON** (`0xB1` in, `0xB4` out) hurts a Puppet. Puppets are the
+  only summons that can be hurt, and their HP is the level's `x`. At 0 HP
+  the Puppet breaks: REMOVE_SUMMON reason 2, and the owner's buff ends.
+- **BEHOLDER** (`0xB2` in, SUMMON_SKILL `0xB3` out) is a Dark Knight's
+  Beholder healing its owner with Aura of the Beholder (the level's `hp`)
+  or buffing one stat with Hex of the Beholder (`summons::support`). Hex's
+  stats are numbered in the order its levels add them: weapon defense,
+  magic defense, accuracy, avoidability, weapon attack. Its buff lasts the
+  level's `time`. The owner must know the skill, and Hex's level must give
+  the stat. The field allows each no sooner than 10 s after the Beholder
+  comes, then the level's `x` seconds apart, with 0.5 s of slack for the
+  client's clock. The others see the Beholder play the action the owner
+  sent.
+
+REMOVE_SUMMON (`0xB0`) reasons:
+
+- 0: the summon expired when its buff did.
+- 1: silently, for example when the owner rejoins the same map.
+- 2: a Puppet broke.
+- 4: it was replaced.
+
+When the owner changes maps, a summon that follows comes along: it spawns
+again with no entrance. Stationary summons end there. The others drop a
+player's summons when the player leaves, with no packet.
+
+HeavenClient's `MapSummons` (`Gameplay/MapleMap`) draws them and plays their
+`summon` animations. `SummonRules.h` holds v83's rules without the map:
+
+- Followers glide 7 px a step to 70 px from the owner (42 for the souls).
+- Fliers circle a random spot near the owner, or near their spawn if they
+  stay put.
+- Any summon jumps to an owner more than 300×200 px away.
+
+`Combat::update_summons` makes the owner's summons attack every 3 s
+(Gaviota and Wrath every 1.5 s):
+
+- The mage summons hit the side of their `lt`/`rb` box with more mobs.
+- The others hit the nearest mobs within their `range/r`.
+- The spreading kinds hit one mob and then up to `mobCount`−1 more around
+  it, 120 ms apart.
+- Each hit lands `attackAfter` plus the projectile's flight time after the
+  attack starts.
+
+A Puppet draws the mobs already chasing the owner to it for 180–240 s.
+A mob touching it hurts it by its attack squared, scaled by the Puppet's
+level (`summon_rules::touch_damage`), and the owner sends DAMAGE_SUMMON.
+
+A Beholder heals its owner when it may and they are hurt, else buffs
+them:
+
+- It first does so 10 s after it comes, then every Aura's or Hex's `x`
+  seconds.
+- In Berserk, it doesn't heal the owner out of it.
+- Hex picks one of the stats its level gives. Later stats are likelier:
+  the n-th of k is picked with weight n out of k(k+1)/2. If the owner's
+  buffs already give at least that stat, Hex tries the lower stats from
+  the top for one they lack (`summon_rules::hex_pick`).
+
+Where HeavenClient differs from v83:
+
+- Ball sprites aren't drawn.
+- Followers send their paths the way fliers do.
+- The fly speed (0.2 px/ms) is inferred.
+- Range targeting is a ±`r` × ±100 px box.
+- Whether the owner is in Berserk is inferred to be their HP at or under
+  its `x` percent.
+
+`v83ref` report 158 has the client's detail.
+
 ## Reactors
 
 A map's `reactor` nodes (`game_data::MapReactorTemplate`) place reactors such
@@ -363,21 +594,148 @@ Reactor drops come from the content pack's table, keyed by reactor id, plus
 `[reactors]` in `reward_overrides.toml`; see `server-content.md`. Reactor
 `action` scripts (`mBoxItem0` and others) are not run.
 
+## Mob attacks
+
+`Mob.nx` lists a mob's attacks as `attack1`, `attack2`, ... with an `info`
+each (`game_data::mobs::MobAttack`; HeavenClient's `Mob::AttackInfo`). The
+`type` says how an attack reaches: 0 hits a box, 1 shoots the player it
+aims at, 2 throws a ball, and 3 and 4 strike a row of cells (3 only cells
+with ground under them). The geometry is in
+`Gameplay/MapleMap/MobAttackRules.h`, from v83's FUN_0066a517 (the pick)
+and FUN_0066d9c0 (DoAttack); details are in the v83 notes for L173.
+
+- **The pick:** a controlled mob that is chasing the local player, not
+  acting, standing or flying, and not held picks an attack on its 90 ms
+  step (`Mob::pick_attack`). Each attack whose MP cost (`conMP`) the mob
+  can pay and whose range covers the player, facing either way, is a
+  candidate. Physical attacks skip a player in Dark Sight, and row attacks
+  wait 2.5 s after the last. One candidate is taken at random.
+- **Playing it:** the mob stops, turns, and plays `attackN` for its length.
+  Its movement goes out with action 12 + the attack's index (shifted left
+  one, plus 1 facing left) and the attack's data: the target's id << 2 for
+  a shot, the ball's aim point as two shorts, or the row's cells as a
+  bitmask. The server (`MobSet::act`) takes the MP, or shows the move
+  without the attack if the mob lacks it. Its MOVE_MONSTER_RESPONSE carries
+  the mob's MP and whether it may attack next: whenever the client asked
+  (70% of chasing moves) and the mob has attacks. Only then does the client
+  pick one. The server relays the action and data to the others in
+  MOVE_MONSTER, and their clients play the same attack from the path's
+  start.
+- **Hits:** every client checks the attack against its own player, after
+  `attackAfter` ms: the box or cell against the player's body (a
+  `jumpAttack` box misses an airborne player), the shot if it was aimed at
+  this player and in reach, and the ball's point every frame of its flight
+  (`r` px at `bulletSpeed`). The `effect` plays after `effectAfter`, the
+  `hit` animation plays on a player who takes damage, and a row attack
+  shows its `areaWarning` on each cell.
+
+HeavenClient leaves out `tremble` (the screen shake), `doFirst`, element
+resistance, hits on summons and other mobs, and attacks on a Puppet.
+
+### Mob skills
+
+A mob's `info/skill` entries list the `MobSkill.img` skills it has, each with
+a level, the animation it plays (`action` n means `skilln`) and when its
+effect shows (`effectAfter`). The server decides when a mob casts; the
+controller's client plays the cast and the server applies it
+(`game::mob_skill` says what each skill does).
+
+- **The grant:** when a controller's move asks to attack, the server
+  (`MobSet::act`) may also let the mob cast one skill, picked at random
+  from those it can pay for, that are off cooldown (`interval` seconds),
+  whose `hp` limit the mob is at or under, and, for a summon, whose
+  `limit` of live summons isn't reached. A sealed mob casts nothing. The
+  skill and level end MOVE_MONSTER_RESPONSE; the client keeps a grant until
+  another ack grants something else (FUN_0066c23b). An unused grant lapses
+  on the server after 10 s.
+- **The cast:** a mob let attack casts a granted skill it has before it
+  picks an attack (FUN_0066e7af): it stops, plays `skilln`, queues the
+  level's `effect` after `effectAfter`, and sends action 21 + n - 1 with
+  data skill | level << 8 | the animation's length << 16. The server checks
+  the skill and level against the grant, the action against the entry,
+  and the MP, and applies the skill once the animation has played (3 s at
+  most). Other clients replay the animation and effect from MOVE_MONSTER.
+- **What's cast:** the buffs (100-103 and the area versions 110-113, Haste
+  115 and 156, the immunities 140-142, and 150-157) give MOB_STAT_SET
+  statuses whose reason is skill | level << 16, on the caster or on every
+  mob in its `lt`/`rb` area, with chance `prop`, for `time` seconds. Power
+  Up and Magic Up set the PowerUp and MagicUp stats to `x`, a percent the
+  client scales the mob's physical or magic hits by. Heal (114) gives the
+  mobs in its area `x` HP and `y` MP, up to their maxima, shown to everyone as a blue
+  number (DAMAGE_MONSTER with a negative amount). Summon (200) spawns its
+  listed mobs at the caster under the caster's controller, up to `limit`
+  alive, with SPAWN_MONSTER's appearance set to `summonEffect`; clients
+  play `Effect.nx` `Summon.img/<summonEffect>` on them. Summoned mobs don't
+  respawn.
+- **Diseases** (120-126, 128, 132) reach the players in the area; see
+  below.
+- Not cast yet: dispel (127), banish, poison mist, and the damage counters
+  (143-145).
+
+### Diseases
+
+A disease is a buff stat the server puts on a player, whose skill (the
+reason) is the mob skill | level << 16 and whose value is the level's `x`
+(1 without one): Seal (120) 19, Darkness (121) 20, Weakness (122) 30, Stun
+(123) 17, Curse (124) 31, Poison (125) 18, Slow (126) 32, Seduce (128) 39
+and Confuse (132) 51 (`game::mob_skill::inflicted`).
+
+- **Catching one:** a cast lands by its `prop`, rolled once, on every
+  player in the caster's `lt`/`rb` box (mirrored when it faces right), or
+  without a box on its controller. A mob attack with `disease` and `level`
+  brings one by that level's `prop` when it does damage. A dead player, or
+  one who has the stat already, catches nothing (`catch_disease`). The
+  player gets GIVE_BUFF for `time` seconds; the map sees the shown ones
+  (all but Slow) in GIVE_FOREIGN_BUFF with the reason as the value (Poison
+  sends its `x` then the reason). The server ends it on time or on death,
+  and the player can't cancel it.
+- **Effects on the server:** Poison takes `x` HP each second, never the
+  last one. Curse halves the EXP from kills (as Cosmic does). Darkness's
+  lower accuracy isn't applied.
+- **Dispel (2311001):** for each party member reached it rolls its `prop`,
+  then cures Poison, Seal, Darkness, Weakness, Curse and Slow (not Stun,
+  Seduce or Confuse) with CANCEL_BUFF and CANCEL_FOREIGN_BUFF. A sealed
+  player can still cast it.
+- **What the client does** (HeavenClient `Character/Diseases.h`, from v83
+  CUserLocal): Stun stops all input, attacks and skills; Seduce moves the
+  player by its `x` (1 left, 2 right, 3 jump, 4 down, 6 and 7 jump left and
+  right) and stops jumps, attacks and skills; Confuse reverses the arrows
+  (teleport too); Weakness stops jumping; Seal stops every skill but
+  Dispel; Slow sets the walking speed to its `x` before the 80-140 clamp.
+  Each disease shows `MobSkill.img/<skill>/level/<lvl>/affected` on the
+  character, over the face when its `pos` is 1, otherwise at the feet; the
+  player also gets a grey chat notice (none for Slow or Confuse) but no
+  buff-bar icon.
+
 ## Getting hurt
 
-TAKE_DAMAGE from a touch (-1) is accepted up to the touching mob's
-`PADamage`, only for mobs with `bodyAttack` and without `notAttack`
+TAKE_DAMAGE names the mob attack that hit (its index, or -1 for a touch).
+A touch counts only for mobs with `bodyAttack` and without `notAttack`
 (HeavenClient's `Mob::deals_touch_damage` applies the same rule, so other
-mobs neither hurt nor knock back on touch). The client works out the
-damage (`Character/TouchDamage.h`) by a pre-Big Bang procedure
-([ayumilove](https://ayumilove.net/maplestory-formula/)). The mob's base
-damage is a roll from 85% of `PADamage` up to it. The player's defense is
-`1.2 STR + 0.5 DEX + 0.4 INT + 0.5 LUK` plus W.DEF from equipment, and 75%
-of it, rounded down, comes off the base. The minimum is 1. The stat part is
-hidden: the stat window shows only the equipment W.DEF. Period footage agrees.
-Snails hit level 2–4 beginners for 1, and Shrooms and Blue Snails hit a
-level 5 beginner for 1–2 (#125). The procedure has no level-difference
-term and no avoid check. HP drops, others see DAMAGE_PLAYER, and at 0 HP the player is dead:
+mobs neither hurt nor knock back on touch); an index must name one of the
+mob's attacks.
+
+The client works out the damage as v83 does (`Character/MobDamage.h`, from
+FUN_0079309f and FUN_0079345e):
+
+- **Physical:** the attack's `PADamage` (the mob's, for a touch or an
+  attack without one), P, rolls P² × 0.8–0.85 / 100. W.DEF and a stat
+  factor take some off. Below the W.DEF expected of the player's job and
+  level (Base.wz `StandardPDD`, baked into the client) the shortfall adds
+  some back, more against a higher level mob. A miss roll weighs the
+  player's avoid against the mob's accuracy first.
+- **Magic:** the mob's `MADamage`, M, rolls M² × 0.75–0.8 / 100, less a
+  share of M.DEF and stats (more for magicians); a separate miss roll.
+- **Afterward:** the damage is at least 1 unless missed. A `deadlyAttack`
+  takes all but 1 HP, and an `mpBurn` attack does 1. Achilles keeps its `x`
+  per mille.
+
+Period footage agrees: snails hit level 2–4 beginners for 1, and Shrooms
+and Blue Snails hit a level 5 beginner for 1–2 (#125). The server
+(`game::mob_damage`) refuses more than the best roll with no W.DEF, plus
+the most a shortfall can add with doubled base stats. It takes the HP, and
+for a `deadlyAttack` all but 1 MP or the attack's `mpBurn` in MP. Others see
+DAMAGE_PLAYER. At 0 HP the player is dead:
 non-beginners lose 10% of their level's EXP; the client's respawn
 (CHANGE_MAP with a target while dead) returns them to the map's return map
 with 50 HP.
@@ -408,10 +766,14 @@ Setting restores the same table.
 ## Tests
 
 `field_mobs` unit tests cover spawning, control hand-off (including by
-distance report), movement, damage, EXP sharing, and respawn; `net::combat` covers parsing, the damage cap, and
-the broadcast; `mob_combat` (integration) runs two players in Dangerous
+distance report), movement, attacks' MP, damage, EXP sharing, and respawn;
+`net::combat` covers parsing, the damage cap, and the broadcast, and the
+TAKE_DAMAGE handler's bounds by attack index; `game::mob_damage` covers the
+StandardPDD table and the bound. HeavenClient's `mob_damage_tests` and
+`mob_attack_tests` cover the damage and miss formulas and the attacks'
+ranges, aim, balls, and rows. `mob_combat` (integration) runs two players in Dangerous
 Forest through control, relayed movement, hits, kills, EXP, refused damage,
-touch damage, a level-up seen by the other player, and a respawn, then has
+touch damage, damage by attack index, a level-up seen by the other player, and a respawn, then has
 two players report their distance from a firstAttack mob in Crimsonwood Keep
 (610030011) and checks control follows the closer one until a hit;
 `reactors` (integration) breaks two of Amherst's boxes, before and during
@@ -421,8 +783,23 @@ persistence, and that the tutorial sentinel's quest drop needs its quest;
 `spend_points` levels a beginner and checks AP, the beginner pool, refusals,
 and that both survive logging out; `monster_book` fills a card's page from
 six snails, checks the effect another player sees and the cover, and that
-both survive logging out.
-and that both survive logging out; `beginner_skills` has three players learn
+both survive logging out; `beginner_skills` has three players learn
 Three Snails, Nimble Feet, and Recovery and checks their damage caps, MP,
 buffs, cooldowns, Recovery's heal, what the others see, and that the buffs
-end on time and on death.
+end on time and on death. `poison_mist` casts Poison Mist on a snail and
+checks the cloud's packet, that it lifts on time, and that it poisons only
+the snails in its box. `summons` has a ranger call up a Silver Hawk and a
+Puppet, and checks what a watcher sees: the spawns, a refused and an accepted
+Hawk attack, the Puppet breaking, and the Hawk following its owner to the
+next map with no entrance. It also has a Dark Knight's Beholder heal them
+and buff their weapon defense, refusing both too soon and a stat Hex's
+level doesn't give, and an Arch Mage's Elquines freeze a mob for 3 s.
+`mystic_door` has a Priest open a door, refused in town, use it to town
+and back, keep a stranger out until they join the party, and close it on
+logout.
+`party_skills` has a Bishop resurrect a dead party member, and a Chief
+Bandit heal themselves with Chakra.
+`player_diseases` has a Hogul in Korean Folk Town cast Slow from far away
+(it misses) and then on the player (it lands for 10 s, then ends).
+HeavenClient's `diseases_tests` cover the input, jump, attack and skill
+gates and the notices.

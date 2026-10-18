@@ -21,13 +21,16 @@
 
 #include <cstdint>
 
+#include "Buff.h"
 #include "Char.h"
 
 #include "Look/CharLook.h"
 
-#include "../Gameplay/Movement.h"
+#include "../Gameplay/MovePath.h"
 
-#include <queue>
+#include <map>
+#include <optional>
+#include <utility>
 #include <vector>
 
 namespace ms
@@ -42,7 +45,7 @@ namespace ms
 		// Update the character.
 		int8_t update(const Physics &physics) override;
 
-		// Add the movements which this character will go through next.
+		// Queue a path for the character to play.
 		void send_movement(const std::vector<Movement> &movements);
 
 		// Update a skill level.
@@ -53,6 +56,16 @@ namespace ms
 
 		// Update the character look.
 		void update_look(const LookEntry &look);
+
+		// Show these buffs, each with its value, as well as those shown
+		// already.
+		void show_buffs(const std::vector<std::pair<Buffstat::Id, int32_t>> &shown);
+
+		// Stop showing these buffs.
+		void hide_buffs(const std::vector<Buffstat::Id> &ended);
+
+		// The value of a buff the character shows.
+		std::optional<int32_t> get_buff(Buffstat::Id stat) const;
 
 		// Return the character's attacking speed.
 		int8_t get_integer_attackspeed() const override;
@@ -66,11 +79,12 @@ namespace ms
 	private:
 		uint16_t level;
 		int16_t job;
-		std::queue<Movement> movements;
-		Movement lastmove;
-		uint16_t timer;
+		move_path::Player path;
 
 		std::unordered_map<int32_t, uint8_t> skilllevels;
 		uint8_t attackspeed;
+		std::map<Buffstat::Id, int32_t> buffs;
+
+		void show_diseases();
 	};
 }

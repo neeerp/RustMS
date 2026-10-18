@@ -1,4 +1,4 @@
-use crate::buff::Buffs;
+use crate::buff::{Buffs, ShownBuff};
 use crate::inventory::{equip_slot, Inventory};
 use crate::keymap::Keymap;
 use crate::monster_book::MonsterBook;
@@ -122,6 +122,8 @@ pub struct FieldAvatar {
     pub stance: u8,
     /// The portable chair (a 301xxxx setup item) the player sits on, or 0.
     pub chair: i32,
+    /// The buffs others see, as `Buffs::shown`.
+    pub buffs: Vec<ShownBuff>,
 }
 
 /// A character that is logged in. The owning client actor holds the only
@@ -200,6 +202,7 @@ impl Player {
             y,
             stance,
             chair: 0,
+            buffs: self.buffs.shown(),
         }
     }
 
@@ -345,6 +348,16 @@ impl Player {
         self.stats.hp = hp as i16;
         self.dirty = true;
         self.stats.hp
+    }
+
+    /// Recover `hp` from a potion or a skill, halved while Undead holds, as
+    /// its notice says (and Cosmic's ZOMBIFY does). Returns the new HP.
+    pub fn recover_hp(&mut self, hp: i32) -> i16 {
+        if self.buffs.has(crate::buff::BuffStat::Undead) {
+            self.add_hp(hp / 2)
+        } else {
+            self.add_hp(hp)
+        }
     }
 
     /// Change MP by `delta`, clamped to `0..=max_mp`. Returns the new MP.

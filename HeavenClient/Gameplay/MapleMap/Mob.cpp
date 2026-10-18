@@ -17,12 +17,13 @@
 //////////////////////////////////////////////////////////////////////////////////
 #include "Mob.h"
 #include "Layer.h"
+#include "SummonRules.h"
 
 #include "../Combat/Heal.h"
 #include "../Combat/HitPoint.h"
 #include "../Combat/MonsterMagnet.h"
 #include "../Combat/Prepare.h"
-#include "../../Character/TouchDamage.h"
+#include "../../Character/SkillId.h"
 #include "../../Constants.h"
 #include "../../Util/Misc.h"
 #include "../../Util/NxFiles.h"
@@ -32,14 +33,20 @@
 #include <nlnx/nx.hpp>
 
 #include <algorithm>
+#include <cctype>
 #include <cmath>
 #include <cstdint>
 #include <cstdlib>
+#include <climits>
+#include <numeric>
+#include <tuple>
+#include <utility>
 
 namespace ms
 {
 	Mob::Mob(int32_t oi, int32_t mid, int8_t mode, int8_t st, uint16_t fh, uint16_t homefh, bool newspawn, int8_t tm,
-			 Point<int16_t> position, const Physics &physics) : MapObject(oi)
+			 Point<int16_t> position, const std::vector<MobStatParser::Status> &spawnstatuses,
+			 const Physics &physics) : MapObject(oi), shown(move_path::Player::State{})
 	{
 		std::string strid = string_format::extend_id(mid, 7);
 		nl::node src = nl::nx::mob[strid + ".img"];
@@ -72,6 +79,7 @@ namespace ms
 		canmove = src["move"].size() > 0 || canfly;
 		canchase = src["chase"].size() > 0;
 		boss = info["boss"].get_bool();
+		fixeddamage = info["fixedDamage"];
 
 		if (canfly)
 		{
@@ -90,6 +98,97 @@ namespace ms
 		animations[Stance::HIT] = src["hit1"];
 		animations[Stance::DIE] = src["die1"];
 
+		mp = info["maxMP"];
+
+		// attack1, attack2 and on, as long as each has its info
+		// (FUN_0067fd81).
+		for (int32_t n = 1;; n++)
+		{
+			nl::node attacksrc = src["attack" + std::to_string(n)];
+			nl::node attackinfo = attacksrc["info"];
+
+			if (attackinfo.size() == 0)
+				break;
+
+			nl::node range = attackinfo["range"];
+			Point<int16_t> lt = range["lt"];
+			Point<int16_t> rb = range["rb"];
+			mob_attack::Box box{ lt.x(), lt.y(), rb.x(), rb.y() };
+
+			AttackInfo attack;
+			attack.type = attackinfo["type"];
+			attack.magic = attackinfo["magic"].get_bool();
+			attack.element = 0;
+
+			// Only a magic attack has an element (FUN_006811a7).
+			if (attack.magic)
+			{
+				std::string element = attackinfo["elemAttr"];
+
+				switch (element.empty() ? 0 : std::tolower(static_cast<unsigned char>(element[0])))
+				{
+					case 'i':
+						attack.element = 1;
+						break;
+					case 'f':
+						attack.element = 2;
+						break;
+					case 'l':
+						attack.element = 3;
+						break;
+					case 's':
+						attack.element = 4;
+						break;
+				}
+			}
+
+			attack.watk = attackinfo["PADamage"].get_integer(watk);
+			attack.conmp = attackinfo["conMP"];
+			attack.after = attackinfo["attackAfter"];
+			attack.effectafter = attackinfo["effectAfter"];
+			attack.jump = attackinfo["jumpAttack"].get_bool();
+			attack.tremble = attackinfo["tremble"].get_bool();
+			attack.deadly = attackinfo["deadlyAttack"].get_bool();
+			attack.mpburn = attackinfo["mpBurn"].get_bool();
+			attack.range = box;
+			attack.sp = range["sp"];
+			attack.r = range["r"];
+			attack.area = { box, range["start"], range["areaCount"] };
+			attack.attackcount = range["attackCount"];
+			attack.bulletspeed = attackinfo["bulletSpeed"];
+			attack.animation = attacksrc;
+			attack.hit = attackinfo["hit"];
+
+			if (attackinfo["effect"].size() > 0)
+				attack.effect = Animation(attackinfo["effect"]);
+
+			if (attackinfo["ball"].size() > 0)
+				attack.ball = Animation(attackinfo["ball"]);
+
+			if (attackinfo["areaWarning"].size() > 0)
+				attack.warning = Animation(attackinfo["areaWarning"]);
+
+			attacks.push_back(std::move(attack));
+		}
+
+		// Its skills, and the skill<n> animations they play.
+		for (nl::node skillsrc : info["skill"])
+		{
+			SkillInfo skill;
+			skill.skill = static_cast<uint8_t>(skillsrc["skill"].get_integer());
+			skill.level = static_cast<uint8_t>(skillsrc["level"].get_integer());
+			skill.action = static_cast<uint8_t>(skillsrc["action"].get_integer());
+			skill.effectafter = skillsrc["effectAfter"];
+
+			if (skill.skill == 0 || skill.action == 0)
+				continue;
+
+			if (skillanimations.count(skill.action) == 0)
+				skillanimations[skill.action] = src["skill" + std::to_string(skill.action)];
+
+			skills.push_back(skill);
+		}
+
 		standwidth = animations[Stance::STAND].get_dimensions().x();
 
 		name = std::string(nl::nx::string["Mob.img"][std::to_string(mid)]["name"]);
@@ -103,7 +202,6 @@ namespace ms
 		phobj.shoe = true;
 		phobj.walkforce = info["fs"].get_real(1.0);
 		phobj.walkdrag = phobj.walkforce;
-		update_shoe(false);
 
 		id = mid;
 		team = tm;
@@ -116,7 +214,6 @@ namespace ms
 		jumpdir = 0;
 		checkjump = false;
 		jumpy = 0;
-		set_control(mode);
 		phobj.fhid = fh;
 
 		// v83 stands a new mob on the foothold it enters on (FUN_007f115f),
@@ -154,15 +251,26 @@ namespace ms
 		dying = false;
 		dead = false;
 		fading = false;
-		set_stance(st);
+		stance = Stance::STAND;
+		show_stance(st);
 		haswaypoint = false;
 		flygroup = -1;
 		flycount = 0;
 		flyx = 0;
 		flyy = 0;
-		flysteps = 0;
 		pending_hits = 0;
 		death_timeout = 0;
+
+		// It shows where it enters until a path comes, and the AI starts
+		// from there.
+		shown = move_path::Player({ phobj.crnt_x(), phobj.crnt_y(), 0.0, 0.0,
+									static_cast<int16_t>(phobj.onground ? phobj.fhid : 0), value_of(stance, flip) });
+		body = phobj;
+		bodystance = stance;
+		bodyflip = flip;
+		update_shoe(false);
+		set_statuses(spawnstatuses, false);
+		set_control(mode);
 
 		namelabel = Text(Text::Font::A13M, Text::Alignment::CENTER, Color::Name::WHITE, Text::Background::NAMETAG,
 						 name);
@@ -179,11 +287,11 @@ namespace ms
 		}
 	}
 
-	void Mob::set_stance(uint8_t stancebyte)
+	Mob::Stance Mob::stance_of(uint8_t stancebyte, bool &right) const
 	{
-		flip = (stancebyte % 2) == 0;
+		right = (stancebyte % 2) == 0;
 
-		if (!flip)
+		if (!right)
 			stancebyte -= 1;
 
 		if (stancebyte < Stance::MOVE)
@@ -194,23 +302,20 @@ namespace ms
 		if (animations.count(newstance) == 0)
 			newstance = Stance::MOVE;
 
-		set_stance(newstance);
+		return newstance;
 	}
 
-	void Mob::set_stance(Stance newstance)
+	void Mob::show_stance(uint8_t stancebyte)
 	{
-		if (newstance != Stance::HIT)
-		{
-			phobj.clear_flag(PhysicsObject::Flag::NOFRICTION);
+		bool right;
+		Stance newstance = stance_of(stancebyte, right);
 
-			// Monster Magnet's pull ends with the flinch.
-			if (pull)
-			{
-				pull.reset();
-				phobj.hspeed = 0.0;
-				phobj.vspeed = 0.0;
-			}
-		}
+		show_stance(newstance, right);
+	}
+
+	void Mob::show_stance(Stance newstance, bool right)
+	{
+		flip = right;
 
 		if (stance != newstance)
 		{
@@ -218,6 +323,29 @@ namespace ms
 
 			animations.at(stance).reset();
 		}
+	}
+
+	void Mob::set_body_stance(Stance newstance)
+	{
+		if (newstance != Stance::HIT)
+		{
+			body.clear_flag(PhysicsObject::Flag::NOFRICTION);
+
+			// Monster Magnet's pull ends with the flinch.
+			if (pull)
+			{
+				pull.reset();
+				body.hspeed = 0.0;
+				body.vspeed = 0.0;
+			}
+		}
+
+		bodystance = newstance;
+	}
+
+	Point<int16_t> Mob::body_position() const
+	{
+		return { body.get_x(), body.get_y() };
 	}
 
 	int8_t Mob::update(const Physics &physics)
@@ -261,7 +389,26 @@ namespace ms
 		effects.update();
 		headeffects.update();
 		fieldeffects.update();
+
+		clock += Constants::TIMESTEP;
+
+		if (attacking && attacks[*attacking].animation.update())
+			attacking.reset();
+
+		if (casting && skillanimations.at(*casting).update())
+			casting.reset();
+
+		update_attacks();
+
+		for (StatusEffect &effect : statuseffects)
+			effect.animation.update();
 		showhp.update();
+
+		if (!dying)
+		{
+			for (int32_t number : hurts.update(statuses, fixeddamage, Constants::TIMESTEP))
+				hurtnumbers.push_back(number);
+		}
 
 		// Every client, controller or not, tells the server once a second how
 		// far the local player is from each firstAttack mob (FUN_005ce6dc).
@@ -284,119 +431,16 @@ namespace ms
 
 		if (!dying)
 		{
-			if (!canfly)
+			// Another client's mob attacks where its path starts (FUN_0066be61).
+			if (remoteattack)
 			{
-				if (phobj.is_flag_not_set(PhysicsObject::Flag::TURNATEDGES))
-				{
-					// A knocked back mob stops at the edge, still facing its
-					// attacker.
-					if (stance != Stance::HIT)
-						flip = !flip;
-
-					phobj.set_flag(PhysicsObject::Flag::TURNATEDGES);
-				}
+				do_attack(physics, remoteattack->first.index, remoteattack->first.left,
+						  remoteattack->first.skilldata, remoteattack->second);
+				remoteattack.reset();
 			}
-
-			if (canfly)
-			{
-				// Another client's flier glides the way it faces between the
-				// controller's updates.
-				if (!control)
-				{
-					flyx = stance == Stance::MOVE ? (flip ? 1 : -1) : 0;
-					flyy = stance == Stance::HIT ? 0 : -1;
-				}
-
-				phobj.walkdir = flyx;
-				phobj.flydir = flyy;
-			}
-
-			switch (stance)
-			{
-				case Stance::MOVE:
-				case Stance::CHASE:
-					if (!canfly)
-						phobj.walkdir = flip ? 1 : -1;
-
-					break;
-				case Stance::HIT:
-					if (pull)
-					{
-						// Monster Magnet's pull (0x9bbdfd) slows each 30 ms
-						// step once the mob nears the user, and a flier rises
-						// or sinks toward them too.
-						Point<int16_t> position = get_position();
-
-						pull->elapsed += Constants::TIMESTEP;
-
-						while (pull->elapsed >= magnet::STEP)
-						{
-							pull->elapsed -= magnet::STEP;
-							pull->speed = magnet::step_speed(pull->speed, position.x(), pull->user.x(), pull->reach);
-						}
-
-						phobj.hspeed = pull->speed * Constants::TIMESTEP / 1000.0;
-
-						if (canfly)
-							phobj.vspeed = magnet::fly_speed(position.y(), pull->user.y()) * Constants::TIMESTEP / 1000.0;
-					} else if (phobj.is_flag_set(PhysicsObject::Flag::NOFRICTION) && phobj.onground)
-					{
-						// v83 slows the push by 40000 / mass (100) px/s^2
-						// along the ground; walls and edges zero it.
-						constexpr double KBDECEL = 400.0 * Constants::TIMESTEP * Constants::TIMESTEP / 1000000.0;
-
-						double kbspeed = std::abs(phobj.hspeed) - KBDECEL;
-
-						if (kbspeed > 0.0)
-						{
-							phobj.hspeed = phobj.hspeed < 0.0 ? -kbspeed : kbspeed;
-						} else
-						{
-							phobj.hspeed = 0.0;
-							phobj.clear_flag(PhysicsObject::Flag::NOFRICTION);
-						}
-					}
-
-					break;
-				case Stance::JUMP:
-					// CVecCtrl::Jump (FUN_007f1bb0) speeds the mob up in the
-					// direction it holds, and it keeps steering in the air.
-					if (phobj.onground)
-						Physics::jump(phobj, Physics::jump_speed(1.0), jumpdir);
-
-					phobj.walkdir = jumpdir;
-
-					break;
-			}
-
-			if (phobj.is_flag_set(PhysicsObject::Flag::JUMPER))
-			{
-				// At a loose end or a wall (FUN_007f8d64), a jumper jumps unless
-				// it is chasing a target below it, and then only half the time.
-				// Toward a target on its own group it walks down a step instead.
-				const FootholdTree &fht = physics.get_fht();
-				bool chasing = control && hastarget && stance != Stance::HIT;
-
-				phobj.edgejump = !chasing || targetpos.y() <= phobj.get_y() || randomizer.next_bool();
-				phobj.stepdown = !chasing || fht.get_group_below(targetpos) == fht.get_group(phobj.fhid);
-			}
-
-			physics.move_object(phobj);
-
-			bool jumprequest = phobj.jumprequest;
-			phobj.jumprequest = false;
 
 			if (control)
 			{
-				// v83 gives up a chase 3 to 4 minutes after aggro (FUN_007f7f02).
-				if (hastarget)
-				{
-					targettime -= Constants::TIMESTEP;
-
-					if (targettime < 0)
-						hastarget = false;
-				}
-
 				// A firstAttack mob that can attack (FUN_005ce8c6) starts
 				// chasing the local player once they come within
 				// |dx| / 10 + |dy| / 3 <= 40 of it.
@@ -410,54 +454,46 @@ namespace ms
 						chase();
 				}
 
-				// v83 (FUN_005cc410) picks a walking mob's action as it goes:
-				// its chase animation for as long as it has a target.
-				if (!canfly && (stance == Stance::MOVE || stance == Stance::CHASE))
-					walk(input());
+				// Once a move is acked with leave to attack, it tries every
+				// update for an attack that reaches (FUN_006675a8).
+				// A skill it was let cast goes first (FUN_0066e7af); a cast
+				// sends its own path.
+				std::optional<Pick> pick;
 
-				switch (stance)
+				if (!flinch && ctrlstate == 4 && !cast(physics))
+					pick = pick_attack(physics);
+
+				if (flinch)
 				{
-					case Stance::HIT:
-						// v83 holds a hit mob still, then leaves it standing
-						// until its AI next decides.
-						if (aniend)
-						{
-							set_stance(Stance::STAND);
-							update_movement();
-						}
-
-						break;
-					case Stance::JUMP:
-						// It lands still holding the direction it jumped in,
-						// and its AI only counts down in the air.
-						if (phobj.onground)
-						{
-							walk(jumpdir);
-						} else
-						{
-							for (aitime += Constants::TIMESTEP; aitime >= 90; aitime -= 90)
-								thinktimer--;
-						}
-
-						break;
-					default:
-						// The mob vecctrl steps its AI in 90 ms steps (FUN_007f72d9).
-						for (aitime += Constants::TIMESTEP; aitime >= 90; aitime -= 90)
-						{
-							if (canfly)
-								think_fly(physics);
-							else
-								think(physics);
-						}
-
-						break;
+					flinch_body(physics);
+				} else if (pick)
+				{
+					attack(physics, *pick);
+				} else if (!shown.playing() && ctrlstate >= 3)
+				{
+					// The next path goes once the last has played and been
+					// acked (FUN_006675a8).
+					plan(physics);
 				}
-
-				// A jumper that stopped at the end of its foothold jumps on the
-				// next tick (FUN_007f1fec).
-				if (jumprequest && (stance == Stance::MOVE || stance == Stance::CHASE || stance == Stance::STAND))
-					jump(input(), false);
 			}
+
+			shown.step(Constants::TIMESTEP);
+
+			const move_path::Player::State &now = shown.get_state();
+
+			// A hit shows at once, over the path, until it has played.
+			if (acting && aniend)
+				acting = false;
+
+			if (!acting)
+				show_stance(now.stance);
+
+			phobj.hspeed = now.x - phobj.crnt_x();
+			phobj.vspeed = now.y - phobj.crnt_y();
+			phobj.move();
+
+			if (!canfly)
+				physics.get_fht().update_fh(phobj);
 		} else
 		{
 			phobj.normalize();
@@ -470,6 +506,688 @@ namespace ms
 		return phobj.fhlayer;
 	}
 
+	void Mob::seat_body(const Physics &physics)
+	{
+		move_path::Player::State end = shown.end();
+
+		body.set_x(end.x);
+		body.set_y(end.y);
+		body.hspeed = end.vx * Constants::TIMESTEP / 1000.0;
+		body.vspeed = end.vy * Constants::TIMESTEP / 1000.0;
+
+		if (end.fh > 0 && !canfly)
+			physics.get_fht().place_on_fh(body, end.fh);
+		else
+			body.onground = false;
+
+		bool right;
+		Stance endstance = stance_of(end.stance, right);
+
+		// It may stop mid-flinch, but only a flinch it takes holds it.
+		set_body_stance(endstance == Stance::HIT ? Stance::STAND : endstance);
+		bodyflip = right;
+		hittime = 0;
+		attackhold = 0;
+
+		recorder.reset(Movement(Movement::ABSOLUTE, 0, body.get_x(), body.get_y(), Movement::velocity(body.hspeed),
+								Movement::velocity(body.vspeed), end.fh, value_of(bodystance, bodyflip), 0));
+		seated = true;
+	}
+
+	void Mob::plan(const Physics &physics, int8_t action, bool left, int32_t skilldata)
+	{
+		if (!seated)
+			seat_body(physics);
+
+		// Up to 55 of v83's 90 ms steps (66bbb8).
+		for (int32_t ms = 0; ms < 55 * 90 && !recorder.ready(canfly); ms += Constants::TIMESTEP)
+			step_body(physics);
+
+		move_path::Path path = recorder.flush(canfly);
+
+		// It asks to attack when chasing, unless controlling, then 70% of
+		// the time.
+		bool wantattack = hastarget && (ctrlstate < 0 || randomizer.next_int(100) < 70);
+		int8_t flags = (ctrlstate < 0 ? 0x10 : 0) | (wantattack ? 1 : 0);
+
+		MoveMobPacket(oid, ++moveid, flags, action, left, skilldata, canfly, path).dispatch();
+
+		// It plays what it sends, as others will (FUN_0068a88d).
+		shown.receive(path.elements);
+
+		ctrlstate = ctrlstate == -2 || ctrlstate == 1 ? 1 : 2;
+	}
+
+	void Mob::flinch_body(const Physics &physics)
+	{
+		// v83 stops what it shows at the next foothold and starts the AI
+		// again from there (FUN_0068b16f, FUN_009bbd3d). Only walkers and
+		// jumpers go on to one.
+		shown.land(canfly || !canmove);
+		seat_body(physics);
+
+		Point<int16_t> position = body_position();
+
+		bodyflip = flinch->user ? flinch->user->x() > position.x() : flinch->left;
+		set_body_stance(Stance::HIT);
+		hittime = animations.at(Stance::HIT).get_duration();
+
+		// It stops steering while hit, so a flier dives (FUN_007f7f02).
+		flyx = 0;
+		flyy = 0;
+
+		if (flinch->user)
+		{
+			// Monster Magnet pulls it in, then it chases the user (0x66b562).
+			int16_t reach = standwidth + magnet::REACH;
+
+			pull = Pull{ *flinch->user, reach, magnet::start_speed(position.x(), flinch->user->x(), reach), 0 };
+			body.set_flag(PhysicsObject::Flag::NOFRICTION);
+			chase();
+		} else if (canmove)
+		{
+			// v83 pushes a flinching mob away from its attacker at 130 px/s.
+			constexpr double KBSPEED = 130.0 * Constants::TIMESTEP / 1000.0;
+
+			body.hspeed = bodyflip ? -KBSPEED : KBSPEED;
+			body.set_flag(PhysicsObject::Flag::NOFRICTION);
+		}
+
+		flinch.reset();
+		plan(physics);
+	}
+
+	std::optional<Mob::Pick> Mob::pick_attack(const Physics &physics)
+	{
+		// It attacks the player it chases, not a Puppet, from the ground or
+		// in the air, while not hit, attacking or held (FUN_006675a8).
+		if (attacks.empty() || acting || attacking || casting || !hastarget || puppet || targetdead || held())
+			return std::nullopt;
+
+		if (!phobj.onground && !canfly)
+			return std::nullopt;
+
+		Point<int16_t> position = get_position();
+		int32_t x = position.x();
+		int32_t y = position.y();
+		bool facingleft = noflip || !flip;
+		std::vector<Pick> candidates;
+
+		for (size_t i = 0; i < attacks.size(); i++)
+		{
+			const AttackInfo &info = attacks[i];
+
+			// Dark Sight keeps physical attacks off.
+			if (mp < info.conmp || (!info.magic && targetdarksight))
+				continue;
+
+			std::optional<bool> left;
+			int32_t skilldata = 0;
+
+			switch (info.type)
+			{
+				case 0:
+				{
+					bool leftward = mob_attack::intersects(info.range.shift(x, y), targetbody);
+					bool rightward = mob_attack::intersects(info.range.mirror().shift(x, y), targetbody);
+
+					left = mob_attack::choose_facing(facingleft, !noflip, leftward, rightward);
+
+					break;
+				}
+				case 1:
+				case 2:
+				{
+					// A cone from `sp` out to the range r (FUN_0066afb7).
+					int32_t oy = y + info.sp.y();
+					int32_t lx = mob_attack::origin_x(x, info.sp.x(), true);
+					int32_t rx = mob_attack::origin_x(x, info.sp.x(), false);
+					bool leftward = mob_attack::cone_reaches(lx, lx - info.r, oy, targetbody);
+					bool rightward = mob_attack::cone_reaches(rx, rx + info.r, oy, targetbody);
+
+					left = mob_attack::choose_facing(facingleft, !noflip, leftward, rightward);
+
+					if (!left)
+						break;
+
+					// A shot names its target; a ball aims at a point.
+					if (info.type == 1)
+					{
+						skilldata = targetid << 2;
+					} else
+					{
+						auto [ax, ay] = mob_attack::aim(targetbody, oy, *left);
+
+						skilldata = (ax & 0xFFFF) | (ay << 16);
+					}
+
+					break;
+				}
+				case 3:
+				case 4:
+				{
+					// At most one area attack in 2.5 s, only the way it
+					// faces, on attackCount cells at random; ground cells
+					// need ground under them (FUN_0066aebf).
+					if (clock - lastarea <= 2499)
+						break;
+
+					if (!mob_attack::intersects(mob_attack::area_box(info.area, x, y, facingleft), targetbody))
+						break;
+
+					std::vector<int32_t> cells(std::max(info.area.count, 0));
+					std::iota(cells.begin(), cells.end(), 0);
+
+					for (size_t c = cells.size(); c > 1; c--)
+						std::swap(cells[c - 1], cells[randomizer.next_int(c)]);
+
+					cells.resize(std::min<size_t>(cells.size(), std::max(info.attackcount, 0)));
+
+					for (int32_t cell : cells)
+					{
+						int32_t cx = mob_attack::cell_x(info.area, x, cell, facingleft);
+
+						if (info.type == 3 && !ground_below(physics, static_cast<int16_t>(cx), position.y()))
+							continue;
+
+						if (cell < 32)
+							skilldata |= 1 << cell;
+					}
+
+					if (skilldata != 0)
+						left = facingleft;
+
+					break;
+				}
+			}
+
+			if (left)
+				candidates.push_back({ static_cast<uint8_t>(i), *left, skilldata });
+		}
+
+		if (candidates.empty())
+			return std::nullopt;
+
+		return candidates[randomizer.next_int(candidates.size())];
+	}
+
+	void Mob::attack(const Physics &physics, const Pick &pick)
+	{
+		do_attack(physics, pick.index, pick.left, pick.skilldata, get_position());
+
+		// It stops what it shows, turns, and stands for its attack before
+		// the AI goes on (FUN_0066b6fc).
+		shown.land(canfly || !canmove);
+		seat_body(physics);
+
+		bodyflip = !pick.left;
+		set_body_stance(Stance::STAND);
+		attackhold = attacks[pick.index].animation.get_duration();
+		flyx = 0;
+		flyy = 0;
+
+		plan(physics, static_cast<int8_t>(ATTACK1 + pick.index), pick.left, pick.skilldata);
+	}
+
+	void Mob::do_attack(const Physics &physics, uint8_t index, bool left, int32_t skilldata, Point<int16_t> at)
+	{
+		if (held())
+			return;
+
+		AttackInfo &info = attacks[index];
+		int32_t x = at.x();
+		int32_t y = at.y();
+
+		attacking = index;
+		attackleft = left;
+		info.animation.reset();
+
+		if (info.effect)
+			pendingeffects.push_back({ clock + std::max(info.effectafter, 1), *info.effect, left });
+
+		int32_t due = clock + info.after;
+
+		switch (info.type)
+		{
+			case 0:
+				// The box is where the mob attacked, wherever it goes after.
+				pendinghits.push_back({ due, index, left, (left ? info.range : info.range.mirror()).shift(x, y) });
+				break;
+			case 1:
+			{
+				// A shot at the local player hits once it lands, if they
+				// were in reach when it went.
+				if ((skilldata & 3) != 0 || (skilldata >> 2) != targetid)
+					break;
+
+				int32_t ox = mob_attack::origin_x(x, info.sp.x(), left);
+				int32_t oy = y + info.sp.y();
+
+				if (mob_attack::shot_reaches(targetbody, ox, oy, info.r, left))
+					pendinghits.push_back({ due, index, left, std::nullopt });
+
+				break;
+			}
+			case 2:
+			{
+				if (!info.ball)
+					break;
+
+				int32_t ox = mob_attack::origin_x(x, info.sp.x(), left);
+				int32_t oy = y + info.sp.y();
+				int16_t tx = static_cast<int16_t>(skilldata & 0xFFFF);
+				int16_t ty = static_cast<int16_t>((skilldata >> 16) & 0xFFFF);
+				auto [ex, ey] = mob_attack::ball_end(ox, oy, tx, ty, info.r, left);
+				int32_t flight = mob_attack::ball_time(info.r, info.bulletspeed);
+
+				balls.push_back({ due, due + std::max(flight, 1),
+								  Point<int16_t>(static_cast<int16_t>(ox), static_cast<int16_t>(oy)),
+								  Point<int16_t>(static_cast<int16_t>(ex), static_cast<int16_t>(ey)),
+								  index, left, *info.ball });
+
+				break;
+			}
+			case 3:
+			case 4:
+			{
+				int32_t width = info.area.width();
+				int32_t count = 0;
+
+				for (int32_t cell = 0; cell < 32 && count < info.attackcount; cell++)
+				{
+					if (((skilldata >> cell) & 1) == 0)
+						continue;
+
+					count++;
+
+					int32_t cx = mob_attack::cell_x(info.area, x, cell, left);
+					int32_t cy = y;
+
+					if (info.type == 3)
+					{
+						std::optional<int16_t> ground = ground_below(physics, static_cast<int16_t>(cx), at.y());
+
+						if (!ground)
+							continue;
+
+						cy = *ground;
+					}
+
+					mob_attack::Box box = mob_attack::cell_box(info.area, cx, cy, left);
+					pendinghits.push_back({ due, index, left, box });
+
+					if (info.warning)
+					{
+						Point<int16_t> warning(static_cast<int16_t>(box.left + width / 2),
+											   static_cast<int16_t>(box.bottom));
+
+						fieldeffects.add(*info.warning, DrawArgument(warning), 0);
+					}
+				}
+
+				lastarea = clock;
+
+				break;
+			}
+		}
+	}
+
+	bool Mob::cast(const Physics &physics)
+	{
+		if (pendingskill == 0 || acting || attacking || casting || held())
+			return false;
+
+		auto info = std::find_if(skills.begin(), skills.end(),
+								 [this](const SkillInfo &skill) { return skill.skill == pendingskill; });
+
+		// One it doesn't have stays pending.
+		if (info == skills.end())
+			return false;
+
+		bool left = noflip || !flip;
+		uint8_t skill = pendingskill;
+		uint8_t skilllevel = pendingskilllevel;
+
+		if (!do_cast(skill, skilllevel, left))
+			return false;
+
+		pendingskill = 0;
+		pendingskilllevel = 0;
+
+		// Like an attack, it stands still while the skill plays.
+		shown.land(canfly || !canmove);
+		seat_body(physics);
+
+		bodyflip = !left;
+		set_body_stance(Stance::STAND);
+
+		int32_t duration = skillanimations.at(info->action).get_duration();
+		attackhold = static_cast<int16_t>(std::min<int32_t>(duration, INT16_MAX));
+		flyx = 0;
+		flyy = 0;
+
+		plan(physics, mob_attack::skill_action(info->action), left,
+			 mob_attack::skill_data(skill, skilllevel, duration));
+
+		return true;
+	}
+
+	bool Mob::do_cast(uint8_t skill, uint8_t skilllevel, bool left)
+	{
+		auto info = std::find_if(skills.begin(), skills.end(),
+								 [skill](const SkillInfo &other) { return other.skill == skill; });
+
+		if (info == skills.end())
+			return false;
+
+		nl::node level = nl::nx::skill["MobSkill.img"][std::to_string(skill)]["level"][std::to_string(skilllevel)];
+
+		if (!level)
+			return false;
+
+		Animation &animation = skillanimations.at(info->action);
+		animation.reset();
+		casting = info->action;
+		attackleft = left;
+
+		nl::node effect = level["effect"];
+
+		if (effect.size() > 0)
+			pendingeffects.push_back({ clock + std::max(info->effectafter, 1), effect, left,
+									   static_cast<int8_t>(effect["pos"].get_integer()) });
+
+		return true;
+	}
+
+	void Mob::show_summon(int8_t type, int32_t delay)
+	{
+		nl::node effect = nl::nx::effect["Summon.img"][std::to_string(type)];
+
+		if (effect.size() > 0)
+			pendingeffects.push_back({ clock + std::max(delay, 1), effect, noflip || !flip });
+	}
+
+	void Mob::update_attacks()
+	{
+		for (auto iter = pendingeffects.begin(); iter != pendingeffects.end();)
+		{
+			if (clock < iter->due)
+			{
+				++iter;
+				continue;
+			}
+
+			if (iter->pos)
+				show_effect(iter->animation, *iter->pos, 0, !iter->left, get_body());
+			else
+				effects.add(iter->animation, DrawArgument(Point<int16_t>(0, 0), !iter->left), 0);
+
+			iter = pendingeffects.erase(iter);
+		}
+
+		// A box hits the player where they are once due; a jump attack only
+		// one standing on a foothold. A direct shot hits regardless.
+		for (auto iter = pendinghits.begin(); iter != pendinghits.end();)
+		{
+			if (clock < iter->due)
+			{
+				++iter;
+				continue;
+			}
+
+			const AttackInfo &info = attacks[iter->index];
+			bool hit = !iter->box || (mob_attack::intersects(*iter->box, targetbody) &&
+									  (info.type != 0 || !info.jump || targetonground));
+
+			if (hit && !targetdead)
+				landed.push_back({ make_attack(iter->index, iter->left), attacks[iter->index].hit });
+
+			iter = pendinghits.erase(iter);
+		}
+
+		// A ball hits the player once its point is in them; the player's
+		// invincibility takes the rest.
+		for (auto iter = balls.begin(); iter != balls.end();)
+		{
+			if (clock >= iter->end)
+			{
+				iter = balls.erase(iter);
+				continue;
+			}
+
+			if (clock >= iter->start)
+			{
+				iter->animation.update();
+
+				double progress = static_cast<double>(clock - iter->start) / (iter->end - iter->start);
+				int32_t bx = static_cast<int32_t>(iter->from.x() + (iter->to.x() - iter->from.x()) * progress);
+				int32_t by = static_cast<int32_t>(iter->from.y() + (iter->to.y() - iter->from.y()) * progress);
+
+				if (mob_attack::contains(targetbody, bx, by) && !targetdead)
+					landed.push_back({ make_attack(iter->index, iter->left), attacks[iter->index].hit });
+			}
+
+			++iter;
+		}
+	}
+
+	MobAttack Mob::make_attack(uint8_t index, bool left) const
+	{
+		const AttackInfo &info = attacks[index];
+
+		MobAttack attack = create_touch_attack_base();
+		attack.watk = info.watk + status_value(MobStatParser::PAD);
+		attack.index = static_cast<int8_t>(index);
+		attack.magic = info.magic;
+		attack.element = info.element;
+		attack.deadly = info.deadly;
+		attack.mpburn = info.mpburn;
+		attack.pushleft = left;
+
+		return attack;
+	}
+
+	std::optional<int16_t> Mob::ground_below(const Physics &physics, int16_t x, int16_t y) const
+	{
+		// The highest ground from 100 px above to 100 px below (FUN_00a456f9).
+		const FootholdTree &fht = physics.get_fht();
+		uint16_t fhid = fht.get_fhid_below(Point<int16_t>(x, static_cast<int16_t>(y - 100)));
+
+		if (fhid == 0)
+			return std::nullopt;
+
+		double ground = fht.get_fh(fhid).ground_below(x);
+
+		if (ground > y + 100.0)
+			return std::nullopt;
+
+		return static_cast<int16_t>(ground);
+	}
+
+	void Mob::step_body(const Physics &physics)
+	{
+		// A stunned, frozen or webbed mob stands where it is, and its AI
+		// waits (inferred: the hold itself wasn't traced in v83).
+		// It stands still for its attack too (FUN_009bbdfd).
+		bool hold = (held() || attackhold > 0) && bodystance != Stance::HIT && bodystance != Stance::JUMP;
+
+		if (attackhold > 0)
+			attackhold -= Constants::TIMESTEP;
+
+		if (hold)
+		{
+			if (bodystance != Stance::STAND)
+				set_body_stance(Stance::STAND);
+
+			flyx = 0;
+			flyy = -1;
+		}
+
+		if (!canfly)
+		{
+			if (body.is_flag_not_set(PhysicsObject::Flag::TURNATEDGES))
+			{
+				// A knocked back mob stops at the edge, still facing its
+				// attacker.
+				if (bodystance != Stance::HIT)
+					bodyflip = !bodyflip;
+
+				body.set_flag(PhysicsObject::Flag::TURNATEDGES);
+			}
+		}
+
+		if (canfly)
+		{
+			body.walkdir = flyx;
+			body.flydir = flyy;
+		}
+
+		switch (bodystance)
+		{
+			case Stance::MOVE:
+			case Stance::CHASE:
+				if (!canfly)
+					body.walkdir = bodyflip ? 1 : -1;
+
+				break;
+			case Stance::HIT:
+				if (pull)
+				{
+					// Monster Magnet's pull (0x9bbdfd) slows each 30 ms
+					// step once the mob nears the user, and a flier rises
+					// or sinks toward them too.
+					Point<int16_t> position = body_position();
+
+					pull->elapsed += Constants::TIMESTEP;
+
+					while (pull->elapsed >= magnet::STEP)
+					{
+						pull->elapsed -= magnet::STEP;
+						pull->speed = magnet::step_speed(pull->speed, position.x(), pull->user.x(), pull->reach);
+					}
+
+					body.hspeed = pull->speed * Constants::TIMESTEP / 1000.0;
+
+					if (canfly)
+						body.vspeed = magnet::fly_speed(position.y(), pull->user.y()) * Constants::TIMESTEP / 1000.0;
+				} else if (body.is_flag_set(PhysicsObject::Flag::NOFRICTION) && body.onground)
+				{
+					// v83 slows the push by 40000 / mass (100) px/s^2
+					// along the ground; walls and edges zero it.
+					constexpr double KBDECEL = 400.0 * Constants::TIMESTEP * Constants::TIMESTEP / 1000000.0;
+
+					double kbspeed = std::abs(body.hspeed) - KBDECEL;
+
+					if (kbspeed > 0.0)
+					{
+						body.hspeed = body.hspeed < 0.0 ? -kbspeed : kbspeed;
+					} else
+					{
+						body.hspeed = 0.0;
+						body.clear_flag(PhysicsObject::Flag::NOFRICTION);
+					}
+				}
+
+				break;
+			case Stance::JUMP:
+				// CVecCtrl::Jump (FUN_007f1bb0) speeds the mob up in the
+				// direction it holds, and it keeps steering in the air.
+				if (body.onground)
+					Physics::jump(body, Physics::jump_speed(1.0), jumpdir);
+
+				body.walkdir = jumpdir;
+
+				break;
+		}
+
+		if (body.is_flag_set(PhysicsObject::Flag::JUMPER))
+		{
+			// At a loose end or a wall (FUN_007f8d64), a jumper jumps unless
+			// it is chasing a target below it, and then only half the time.
+			// Toward a target on its own group it walks down a step instead.
+			const FootholdTree &fht = physics.get_fht();
+			bool chasing = hastarget && bodystance != Stance::HIT;
+
+			body.edgejump = !chasing || targetpos.y() <= body.get_y() || randomizer.next_bool();
+			body.stepdown = !chasing || fht.get_group_below(targetpos) == fht.get_group(body.fhid);
+		}
+
+		physics.move_object(body);
+
+		bool jumprequest = body.jumprequest;
+		body.jumprequest = false;
+
+		// v83 gives up a chase 3 to 4 minutes after aggro (FUN_007f7f02).
+		if (hastarget)
+		{
+			targettime -= Constants::TIMESTEP;
+
+			if (targettime < 0)
+				hastarget = false;
+		}
+
+		if (!hastarget)
+			puppet = 0;
+
+		// v83 (FUN_005cc410) picks a walking mob's action as it goes:
+		// its chase animation for as long as it has a target.
+		if (!canfly && (bodystance == Stance::MOVE || bodystance == Stance::CHASE))
+			walk(input());
+
+		switch (bodystance)
+		{
+			case Stance::HIT:
+				// v83 holds a hit mob still for its hit, then leaves it
+				// standing until its AI next decides.
+				hittime -= Constants::TIMESTEP;
+
+				if (hittime <= 0)
+					set_body_stance(Stance::STAND);
+
+				break;
+			case Stance::JUMP:
+				// It lands still holding the direction it jumped in,
+				// and its AI only counts down in the air.
+				if (body.onground)
+				{
+					walk(jumpdir);
+				} else
+				{
+					for (aitime += Constants::TIMESTEP; aitime >= 90; aitime -= 90)
+						thinktimer--;
+				}
+
+				break;
+			default:
+				if (hold)
+					break;
+
+				// The mob vecctrl steps its AI in 90 ms steps (FUN_007f72d9).
+				for (aitime += Constants::TIMESTEP; aitime >= 90; aitime -= 90)
+				{
+					if (canfly)
+						think_fly(physics);
+					else
+						think(physics);
+				}
+
+				break;
+		}
+
+		// A jumper that stopped at the end of its foothold jumps on the
+		// next tick (FUN_007f1fec).
+		if (jumprequest && !hold &&
+			(bodystance == Stance::MOVE || bodystance == Stance::CHASE || bodystance == Stance::STAND))
+			jump(input(), false);
+
+		// Footholds are recorded only while on them (FUN_009b108a).
+		int16_t fh = body.onground ? static_cast<int16_t>(body.fhid) : 0;
+
+		recorder.step(Movement(Movement::ABSOLUTE, 0, body.get_x(), body.get_y(), Movement::velocity(body.hspeed),
+							   Movement::velocity(body.vspeed), fh, value_of(bodystance, bodyflip), 0),
+					  Constants::TIMESTEP);
+	}
+
 	void Mob::think_fly(const Physics &physics)
 	{
 		// FUN_007f8875 steers for the waypoint unless within 10 px of it
@@ -477,8 +1195,8 @@ namespace ms
 		// it is higher.
 		if (haswaypoint)
 		{
-			double x = phobj.crnt_x();
-			double y = phobj.crnt_y();
+			double x = body.crnt_x();
+			double y = body.crnt_y();
 			int8_t xdir = 0;
 			int8_t ydir = 0;
 
@@ -488,7 +1206,7 @@ namespace ms
 			if (std::abs(static_cast<int32_t>(y - waypoint.y())) < 10)
 				ydir = -1;
 			else if (waypoint.y() < y)
-				Physics::fly_jump(phobj);
+				Physics::fly_jump(body);
 
 			fly(xdir, ydir);
 
@@ -506,15 +1224,8 @@ namespace ms
 				haswaypoint = false;
 		}
 
-		// It tells the server where it is at each new waypoint, and at
-		// least once a second.
 		if (!haswaypoint)
 			pick_waypoint(physics);
-		else if (++flysteps < 11)
-			return;
-
-		update_movement();
-		flysteps = 0;
 	}
 
 	void Mob::pick_waypoint(const Physics &physics)
@@ -576,17 +1287,17 @@ namespace ms
 
 		if (x == 0)
 		{
-			set_stance(Stance::STAND);
+			set_body_stance(Stance::STAND);
 		} else
 		{
-			set_stance(Stance::MOVE);
-			flip = x > 0;
+			set_body_stance(Stance::MOVE);
+			bodyflip = x > 0;
 		}
 	}
 
 	void Mob::think(const Physics &physics)
 	{
-		if (phobj.is_flag_set(PhysicsObject::Flag::JUMPER) && think_jump(physics))
+		if (body.is_flag_set(PhysicsObject::Flag::JUMPER) && think_jump(physics))
 			return;
 
 		// FUN_007f8025 (standing mobs), FUN_007f81c8 (walking) and
@@ -598,7 +1309,7 @@ namespace ms
 			return;
 		}
 
-		Point<int16_t> position = get_position();
+		Point<int16_t> position = body_position();
 		int16_t dx = targetpos.x() - position.x();
 
 		if (!canmove)
@@ -607,11 +1318,7 @@ namespace ms
 			{
 				thinktimer = (randomizer.next_int(400) + 800) / 90;
 
-				if (flip != (dx >= 0))
-				{
-					flip = dx >= 0;
-					update_movement();
-				}
+				bodyflip = dx >= 0;
 
 				// It forgets a target that leaves the 2000 x 1200 box around it.
 				int16_t dy = targetpos.y() - position.y();
@@ -629,7 +1336,7 @@ namespace ms
 				movedir = dx >= 0 ? 1 : -1;
 
 			walk(movedir);
-		} else if (canjump && phobj.onground && randomizer.next_int(5) == 0)
+		} else if (canjump && body.onground && randomizer.next_int(5) == 0)
 		{
 			// A fifth of a jumping mob's idle decisions are jumps, after
 			// which it decides again.
@@ -648,7 +1355,7 @@ namespace ms
 	bool Mob::think_jump(const Physics &physics)
 	{
 		// FUN_007f835e only looks around on the ground.
-		if (!phobj.onground)
+		if (!body.onground)
 		{
 			thinktimer--;
 			return true;
@@ -662,7 +1369,7 @@ namespace ms
 		{
 			checkjump = false;
 
-			if (dir != 0 && phobj.get_y() == jumpy)
+			if (dir != 0 && body.get_y() == jumpy)
 			{
 				dir = -dir;
 				walk(dir);
@@ -673,7 +1380,7 @@ namespace ms
 		// lasts, or turns back once pressed against it.
 		const FootholdTree &fht = physics.get_fht();
 
-		switch (fht.get_wall_ahead(phobj, dir))
+		switch (fht.get_wall_ahead(body, dir))
 		{
 			case FootholdTree::WallAhead::AGAINST:
 				dir = -dir;
@@ -698,9 +1405,9 @@ namespace ms
 		{
 			uint16_t group = fht.get_group_below(targetpos);
 			Range<int16_t> reach = fht.get_group_reach(group);
-			int16_t x = phobj.get_x();
+			int16_t x = body.get_x();
 
-			if (group != fht.get_group(phobj.fhid) && targetpos.y() < phobj.get_y() &&
+			if (group != fht.get_group(body.fhid) && targetpos.y() < body.get_y() &&
 				x > reach.first() && x < reach.second() && randomizer.next_int(3) == 0)
 			{
 				movedir = 0;
@@ -717,18 +1424,17 @@ namespace ms
 	{
 		jumpdir = dir;
 		checkjump = check;
-		jumpy = phobj.get_y();
-		set_stance(Stance::JUMP);
-		update_movement();
+		jumpy = body.get_y();
+		set_body_stance(Stance::JUMP);
 	}
 
 	int8_t Mob::input() const
 	{
-		switch (stance)
+		switch (bodystance)
 		{
 			case Stance::MOVE:
 			case Stance::CHASE:
-				return flip ? 1 : -1;
+				return bodyflip ? 1 : -1;
 			case Stance::JUMP:
 				return jumpdir;
 			default:
@@ -738,59 +1444,29 @@ namespace ms
 
 	void Mob::walk(int8_t direction)
 	{
-		Stance before = stance;
-		bool faced = flip;
-
 		if (direction == 0)
 		{
-			set_stance(Stance::STAND);
+			set_body_stance(Stance::STAND);
 		} else
 		{
-			set_stance(hastarget && canchase ? Stance::CHASE : Stance::MOVE);
-			flip = direction > 0;
+			set_body_stance(hastarget && canchase ? Stance::CHASE : Stance::MOVE);
+			bodyflip = direction > 0;
 		}
-
-		if (stance != before || flip != faced)
-			update_movement();
 	}
 
-	void Mob::update_movement()
-	{
-		// The controller sends nothing new until its last move is acked,
-		// then its latest (0x6685ac).
-		if (control && ctrlstate == 2)
-		{
-			movepending = true;
-			return;
-		}
-
-		movepending = false;
-
-		// It asks to attack when chasing, unless controlling, then 70% of
-		// the time.
-		bool wantattack = hastarget && (ctrlstate < 0 || randomizer.next_int(100) < 70);
-		int8_t flags = (ctrlstate < 0 ? 0x10 : 0) | (wantattack ? 1 : 0);
-
-		MoveMobPacket(
-				oid, ++moveid, flags, -1, false, 0, canfly, get_position(),
-				Movement(phobj, value_of(stance, flip))
-		).dispatch();
-
-		ctrlstate = ctrlstate == -2 || ctrlstate == 1 ? 1 : 2;
-	}
-
-	void Mob::acknowledge(int16_t ackid, bool nextattack)
+	void Mob::acknowledge(int16_t ackid, bool nextattack, int16_t newmp, uint8_t skill, uint8_t skilllevel)
 	{
 		if (!control)
 			set_control(1);
+
+		mp = newmp;
+		std::tie(pendingskill, pendingskilllevel) =
+				mob_attack::granted_skill({ pendingskill, pendingskilllevel }, { skill, skilllevel });
 
 		if (ackid < moveid)
 			ctrlstate = 2;
 		else
 			ctrlstate = nextattack ? 4 : 3;
-
-		if (ctrlstate != 2 && movepending)
-			update_movement();
 	}
 
 	void Mob::draw(double viewx, double viewy, float alpha) const
@@ -808,7 +1484,12 @@ namespace ms
 		{
 			float interopc = opacity.get(alpha);
 
-			animations.at(stance).draw(DrawArgument(absp, flip && !noflip, interopc), alpha);
+			if (attacking)
+				attacks[*attacking].animation.draw(DrawArgument(absp, !attackleft, interopc), alpha);
+			else if (casting)
+				skillanimations.at(*casting).draw(DrawArgument(absp, !attackleft, interopc), alpha);
+			else
+				animations.at(stance).draw(DrawArgument(absp, flip && !noflip, interopc), alpha);
 
 			if (showhp)
 			{
@@ -837,6 +1518,54 @@ namespace ms
 			}
 		}
 
+		if (!dead)
+		{
+			Rectangle<int16_t> body = get_body();
+			Point<int16_t> position = get_position();
+
+			for (const StatusEffect &effect : statuseffects)
+			{
+				std::optional<hit_point::Placement> placement =
+						hit_point::place(effect.pos, body, position, hit_point::centre(body, body));
+
+				if (!placement)
+					continue;
+
+				Point<int16_t> at = placement->offset;
+
+				switch (placement->anchor)
+				{
+					case hit_point::Anchor::FEET:
+						at += absp;
+						break;
+					case hit_point::Anchor::HEAD:
+						at += headp;
+						break;
+					case hit_point::Anchor::FIELD:
+						at += viewp;
+						break;
+				}
+
+				effect.animation.draw(DrawArgument(at, flip && !noflip), alpha);
+			}
+		}
+
+		// A ball turns to its flight, drawn for a mob facing left.
+		for (const Ball &ball : balls)
+		{
+			if (clock < ball.start)
+				continue;
+
+			double progress = static_cast<double>(clock - ball.start) / (ball.end - ball.start);
+			double dx = ball.to.x() - ball.from.x();
+			double dy = ball.to.y() - ball.from.y();
+			Point<int16_t> at(static_cast<int16_t>(ball.from.x() + dx * progress),
+							  static_cast<int16_t>(ball.from.y() + dy * progress));
+			float angle = static_cast<float>(ball.left ? std::atan2(-dy, -dx) : std::atan2(dy, dx));
+
+			ball.animation.draw(DrawArgument(angle, viewp + at, !ball.left, 1.0f), alpha);
+		}
+
 		effects.drawabove(absp, alpha);
 		headeffects.drawabove(headp, alpha);
 		fieldeffects.drawabove(viewp, alpha);
@@ -863,9 +1592,12 @@ namespace ms
 	{
 		// Taking control lets it move at once; it may attack only once a
 		// move is acked. Letting go remembers whether it could have.
+		// The AI starts where the mob is shown going (FUN_006637ec).
 		if (mode > 0 && !control)
+		{
 			ctrlstate = 3;
-		else if (mode == 0 && control)
+			seated = false;
+		} else if (mode == 0 && control)
 			ctrlstate = ctrlstate == 3 ? -2 : ctrlstate == 4 ? -3 : -1;
 
 		control = mode > 0;
@@ -878,6 +1610,7 @@ namespace ms
 		} else if (mode == 0)
 		{
 			hastarget = false;
+			flinch.reset();
 			update_shoe(false);
 		}
 	}
@@ -900,45 +1633,95 @@ namespace ms
 		// have. A mob with a chase animation walks at info/chaseSpeed while
 		// chasing. v83 sets the shoe when a chase starts, not when one runs
 		// out, so the mob keeps that speed until something else resets it.
-		auto shoespeed = [](float base)
+		// A Speed status (Slow) adds its value to the percentage
+		// (FUN_006642b0).
+		auto found = statuses.find(MobStatParser::SPEED);
+		float change = found != statuses.end() ? found->second.value : 0.0f;
+
+		auto shoespeed = [change](float base)
 		{
-			return std::clamp(base + 100.0f, 10.0f, 140.0f) * 0.01;
+			return std::clamp(base + 100.0f + change, 10.0f, 140.0f) * 0.01;
 		};
+
+		chaseshoe = chasing;
 
 		float base = canfly ? flyspeed : speed;
 
-		phobj.walkspeed = canmove ? shoespeed(chasing && canchase ? chasespeed : base) : 0.0;
+		body.walkspeed = canmove ? shoespeed(chasing && canchase ? chasespeed : base) : 0.0;
 
 		if (canfly)
-			phobj.flyspeed = shoespeed(base);
+			body.flyspeed = shoespeed(base);
 	}
 
-	void Mob::set_target(Point<int16_t> position, bool dead)
+	void Mob::set_target(const Target &target)
 	{
+		targetpos = puppet ? puppetpos : target.position;
+		targetdead = puppet ? false : target.dead;
+		targetid = target.id;
+		targetbody = target.body;
+		targetonground = target.onground;
+		targetdarksight = target.darksight;
+	}
+
+	void Mob::aggro_puppet(int32_t oid, Point<int16_t> position)
+	{
+		if (!control || !hastarget)
+			return;
+
+		targettime = 180000 + randomizer.next_int(60000);
+
+		if (puppet)
+			return;
+
+		puppet = oid;
+		puppetpos = position;
 		targetpos = position;
-		targetdead = dead;
+		targetdead = false;
 	}
 
-	void Mob::send_movement(Point<int16_t> start, std::vector<Movement> &&in_movements)
+	void Mob::release_puppet(int32_t oid)
 	{
+		if (puppet != oid)
+			return;
+
+		puppet = 0;
+		hastarget = false;
+	}
+
+	int32_t Mob::roll_puppet_damage(int32_t level) const
+	{
+		auto found = statuses.find(MobStatParser::PAD);
+		int32_t attack = watk + (found != statuses.end() ? static_cast<int32_t>(found->second.value) : 0);
+
+		return summon_rules::touch_damage(attack, level, randomizer.next_real(1.0));
+	}
+
+	void Mob::send_movement(Point<int16_t> start, std::vector<Movement> &&in_movements, int8_t action, bool left,
+							int32_t skilldata)
+	{
+		// v83 plays the path on from where the mob is shown; its start is
+		// not used (FUN_0068b371), except that an attack is made there.
 		if (control)
 			return;
 
-		set_position(start);
+		shown.receive(in_movements);
 
-		movements = std::forward<decltype(in_movements)>(in_movements);
+		int32_t index = action - ATTACK1;
 
-		if (movements.empty())
-			return;
+		if (index >= 0 && index < static_cast<int32_t>(attacks.size()))
+			remoteattack = std::make_pair(Pick{ static_cast<uint8_t>(index), left, skilldata }, start);
 
-		const Movement &lastmove = movements.front();
+		// Another client's mob casts a skill it has (FUN_0066be61).
+		if (action >= mob_attack::skill_action(1))
+		{
+			auto [skill, skilllevel] = mob_attack::cast_skill(skilldata);
+			do_cast(skill, skilllevel, left);
+		}
+	}
 
-		uint8_t laststance = lastmove.newstate;
-		set_stance(laststance);
-		update_shoe(stance == Stance::CHASE);
-		jumpdir = 0;
-
-		phobj.fhid = lastmove.fh;
+	std::vector<Mob::Landed> Mob::take_attacks()
+	{
+		return std::exchange(landed, {});
 	}
 
 	Point<int16_t> Mob::get_head_position(Point<int16_t> position) const
@@ -1054,6 +1837,151 @@ namespace ms
 		}
 	}
 
+	void Mob::set_statuses(const std::vector<MobStatParser::Status> &given, bool effects)
+	{
+		std::vector<int32_t> reasons;
+
+		for (const MobStatParser::Status &status : given)
+		{
+			statuses[status.stat] = status;
+			hurts.start(status.stat);
+
+			if (std::find(reasons.begin(), reasons.end(), status.reason) == reasons.end())
+				reasons.push_back(status.reason);
+
+			if (status.stat == MobStatParser::SPEED)
+				update_shoe(chaseshoe);
+
+			// Doom shows the mob as a Blue Snail (FUN_00789efd with 100101).
+			if (status.stat == MobStatParser::DOOM)
+				show_look(100101);
+		}
+
+		for (int32_t reason : reasons)
+			show_status(reason, effects);
+	}
+
+	void Mob::reset_statuses(const BuffParser::Flags &flags)
+	{
+		for (auto iter = statuses.begin(); iter != statuses.end();)
+		{
+			if (flags.has(iter->first))
+				iter = statuses.erase(iter);
+			else
+				++iter;
+		}
+
+		statuseffects.erase(
+				std::remove_if(statuseffects.begin(), statuseffects.end(),
+							   [this](const StatusEffect &effect)
+							   {
+								   return std::none_of(statuses.begin(), statuses.end(),
+													   [&effect](const auto &status)
+													   {
+														   return status.second.reason == effect.reason;
+													   });
+							   }),
+				statuseffects.end());
+
+		if (flags.has(MobStatParser::SPEED))
+			update_shoe(chaseshoe);
+
+		// And its own look again (FUN_00789dc7).
+		if (flags.has(MobStatParser::DOOM))
+			show_look(0);
+	}
+
+	void Mob::show_damage(int32_t damage)
+	{
+		if (active)
+			hurtnumbers.push_back(damage);
+	}
+
+	std::vector<int32_t> Mob::take_hurts()
+	{
+		return std::exchange(hurtnumbers, {});
+	}
+
+	bool Mob::held() const
+	{
+		return statuses.count(MobStatParser::STUN) || statuses.count(MobStatParser::FREEZE) ||
+			   statuses.count(MobStatParser::WEB);
+	}
+
+	void Mob::show_status(int32_t reason, bool effects)
+	{
+		// A player's skill, or a mob skill's id and level (0x5d3d02).
+		nl::node src = nl::nx::skill[string_format::extend_id(reason / 10000, 3) + ".img"]["skill"]
+		[string_format::extend_id(reason, 7)];
+
+		if (!src)
+			src = nl::nx::skill["MobSkill.img"][string_format::extend_id(reason & 0xFFFF, 3)]["level"]
+			[std::to_string(reason >> 16)];
+
+		// Which of the `mob` effects repeat comes from the data (the draw
+		// code wasn't traced).
+		for (uint8_t part = 0; part < 2; part++)
+		{
+			nl::node effect = src[part == 0 ? "mob" : "mob0"];
+
+			if (effect.size() == 0)
+				continue;
+
+			auto pos = static_cast<int8_t>(effect["pos"].get_integer());
+			bool lasts = part == 1 || effect["repeat"].get_bool();
+
+			if (!lasts)
+			{
+				if (effects)
+					show_effect(effect, pos, 0, flip, get_body());
+
+				continue;
+			}
+
+			bool shown = std::any_of(statuseffects.begin(), statuseffects.end(),
+									 [reason, part](const StatusEffect &other)
+									 {
+										 return other.reason == reason && other.part == part;
+									 });
+
+			if (!shown)
+				statuseffects.push_back({ reason, part, effect, pos });
+		}
+	}
+
+	void Mob::show_look(int32_t mobid)
+	{
+		if (mobid == 0)
+		{
+			if (ownlook)
+			{
+				animations = std::move(*ownlook);
+				ownlook.reset();
+				animations.at(stance).reset();
+			}
+
+			return;
+		}
+
+		if (ownlook)
+			return;
+
+		nl::node src = nl::nx::mob[string_format::extend_id(mobid, 7) + ".img"];
+		std::map<Stance, Animation> look;
+
+		// Every stance the mob takes needs a frame; what the other lacks it
+		// stands for.
+		for (const auto &own : animations)
+		{
+			nl::node stancesrc = src[own.first == Stance::CHASE ? "move" : nameof(own.first)];
+
+			look[own.first] = stancesrc.size() > 0 ? stancesrc : src["stand"];
+		}
+
+		ownlook = std::move(animations);
+		animations = std::move(look);
+	}
+
 	void Mob::show_hit(const Animation &animation, const Rectangle<int16_t> &range, bool f)
 	{
 		if (!active)
@@ -1065,7 +1993,9 @@ namespace ms
 	float Mob::calculate_hitchance(int16_t leveldelta, int32_t player_accuracy) const
 	{
 		float faccuracy = static_cast<float>(player_accuracy);
-		float hitchance = faccuracy / (((1.84f + 0.07f * leveldelta) * avoid) + 1.0f);
+		// A monster's EVA status adds to its avoid (FUN_0078df87).
+		int32_t evasion = avoid + status_value(MobStatParser::EVA);
+		float hitchance = faccuracy / (((1.84f + 0.07f * leveldelta) * evasion) + 1.0f);
 
 		if (hitchance < 0.01f)
 			hitchance = 0.01f;
@@ -1073,16 +2003,22 @@ namespace ms
 		return hitchance;
 	}
 
+	// A monster's PDR status adds to its weapon defense.
+	int32_t Mob::defense() const
+	{
+		return wdef + status_value(MobStatParser::PDR);
+	}
+
 	double Mob::calculate_mindamage(int16_t leveldelta, double damage) const
 	{
-		double mindamage = damage * (1 - 0.01 * leveldelta) - wdef * 0.6;
+		double mindamage = damage * (1 - 0.01 * leveldelta) - defense() * 0.6;
 
 		return mindamage < 1.0 ? 1.0 : mindamage;
 	}
 
 	double Mob::calculate_maxdamage(int16_t leveldelta, double damage) const
 	{
-		double maxdamage = damage * (1 - 0.01 * leveldelta) - wdef * 0.5;
+		double maxdamage = damage * (1 - 0.01 * leveldelta) - defense() * 0.5;
 
 		return maxdamage < 1.0 ? 1.0 : maxdamage;
 	}
@@ -1107,8 +2043,6 @@ namespace ms
 		{
 			for (auto &hit : result)
 				hit = {next_magic_damage(attack), false};
-
-			update_movement();
 
 			return result;
 		}
@@ -1138,14 +2072,24 @@ namespace ms
 				}
 		);
 
-		update_movement();
-
 		return result;
 	}
 
 	std::pair<int32_t, bool> Mob::next_damage(double mindamage, double maxdamage, float hitchance, float critical,
 											  const Attack &attack) const
 	{
+		using namespace magic_damage;
+
+		// A blow meets the same statuses a spell does (FUN_0078df87), but
+		// fixed damage skips them.
+		bool weapon = attack.damagetype == Attack::DamageType::DMG_WEAPON;
+
+		if (weapon && status_value(MobStatParser::DISABLE))
+			return std::pair<int32_t, bool>(0, false);
+
+		if (weapon && status_value(MobStatParser::PIMMUNE) && !pierces(randomizer.next_int(100), 0))
+			return std::pair<int32_t, bool>(1, false);
+
 		bool hit = randomizer.below(hitchance);
 
 		if (!hit)
@@ -1159,8 +2103,16 @@ namespace ms
 		if (iscritical)
 			damage *= 1.5;
 
+		// Sacrifice goes through a Power Guard Up.
+		if (weapon && attack.skill != static_cast<int32_t>(SkillId::SACRIFICE))
+			damage = guarded(damage, status_value(MobStatParser::PGUARD_UP));
+
 		// A held skill hits harder the longer it was charged (0x79048c).
 		damage = prepare::charge_percent(attack.skill, attack.charge) * damage * 0.01;
+
+		// Only a critical hit gets through Hard Skin (0x7904ba).
+		if (weapon && status_value(MobStatParser::HARD_SKIN) && !iscritical)
+			return std::pair<int32_t, bool>(0, false);
 
 		if (damage < 1)
 			damage = 1;
@@ -1176,10 +2128,18 @@ namespace ms
 	{
 		using namespace magic_damage;
 
+		// Disable turns every hit away, and Magic Immunity all but 1 in
+		// 100 to 1 damage (FUN_00791617).
+		if (status_value(MobStatParser::DISABLE))
+			return 0;
+
+		if (status_value(MobStatParser::MIMMUNE) && !pierces(randomizer.next_int(100), 0))
+			return 1;
+
 		double hitroll = randomizer.next_real(1.0);
 		double accuracy = magic_damage::accuracy(attack.intelligence, attack.luck, attack.playerlevel, level);
 
-		if (!hits(accuracy, avoid, hitroll))
+		if (!hits(accuracy, avoid + status_value(MobStatParser::EVA), hitroll))
 			return 0;
 
 		double roll = randomizer.next_real(1.0);
@@ -1188,8 +2148,16 @@ namespace ms
 				: base(attack.magic, attack.intelligence, attack.mastery, attack.matk, roll);
 		damage = damage * attack.amplify * 0.01;
 		damage = elemental(damage, attack.skill, attack.element, elements);
-		damage = defend(damage, mdef, randomizer.next_real(1.0));
+		damage = defend(damage, mdef + status_value(MobStatParser::MDR), randomizer.next_real(1.0));
+		damage = guarded(damage, status_value(MobStatParser::MGUARD_UP));
 		damage = prepare::charge_percent(attack.skill, attack.charge) * damage * 0.01;
+
+		// Hard Skin stops all but critical spells, and only an Evan's are.
+		if (status_value(MobStatParser::HARD_SKIN))
+			return 0;
+
+		damage = percent(damage, attack.elemboost);
+		damage = weakened(damage, status_value(MobStatParser::WEAKNESS));
 
 		return finish(damage);
 	}
@@ -1205,50 +2173,28 @@ namespace ms
 		{
 			if (pending_hits == 0)
 				apply_death();
-		} else if (control && is_alive() && damage >= knockback && stance != Stance::HIT)
+		} else if (control && is_alive() && damage >= knockback && !acting)
 		{
-			flip = toleft;
-			set_stance(Stance::HIT);
-
-			// It stops steering while hit, so a flier dives (FUN_007f7f02).
-			flyx = 0;
-			flyy = 0;
-
-			// v83 pushes a flinching mob away from its attacker at 130 px/s.
-			if (canmove)
-			{
-				constexpr double KBSPEED = 130.0 * Constants::TIMESTEP / 1000.0;
-
-				phobj.hspeed = flip ? -KBSPEED : KBSPEED;
-				phobj.set_flag(PhysicsObject::Flag::NOFRICTION);
-			}
-
-			update_movement();
+			// It shows the hit at once; the AI flinches next update.
+			show_stance(Stance::HIT, toleft);
+			attacking.reset();
+			casting.reset();
+			acting = true;
+			flinch = Flinch{ toleft, std::nullopt };
 		}
 	}
 
 	void Mob::catch_by(Point<int16_t> user)
 	{
-		if (!control || !is_alive() || stance == Stance::HIT || !canmove)
+		if (!control || !is_alive() || acting || !canmove)
 			return;
 
-		Point<int16_t> position = get_position();
-
 		// It turns to the user and flinches (0x66b6fc).
-		flip = user.x() > position.x();
-		set_stance(Stance::HIT);
-
-		flyx = 0;
-		flyy = 0;
-
-		int16_t reach = standwidth + magnet::REACH;
-
-		pull = Pull{ user, reach, magnet::start_speed(position.x(), user.x(), reach), 0 };
-		phobj.set_flag(PhysicsObject::Flag::NOFRICTION);
-
-		// Then it chases them (0x66b562).
-		chase();
-		update_movement();
+		show_stance(Stance::HIT, user.x() > get_position().x());
+		attacking.reset();
+		casting.reset();
+		acting = true;
+		flinch = Flinch{ false, user };
 	}
 
 	MobAttack Mob::create_touch_attack() const
@@ -1256,16 +2202,43 @@ namespace ms
 		if (!deals_touch_damage())
 			return MobAttack();
 
-		// The base damage of the hit, a roll between 85% of the attack and all
-		// of it, rounded down.
-		int32_t attack = randomizer.next_int<int32_t>(touch_damage::min_base(watk), watk);
+		return create_touch_attack_base();
+	}
 
-		return MobAttack(attack, get_position(), id, oid);
+	MobAttack Mob::create_touch_attack_base() const
+	{
+		// A touch hits with the mob's own attack (FUN_009581a9).
+		MobAttack attack(watk + status_value(MobStatParser::PAD), get_position(), id, oid);
+		attack.matk = matk + status_value(MobStatParser::MAD);
+		attack.level = level;
+		attack.accuracy = accuracy + status_value(MobStatParser::ACC);
+		attack.powerup = status_value(MobStatParser::POWER_UP);
+		attack.magicup = status_value(MobStatParser::MAGIC_UP);
+
+		return attack;
+	}
+
+	int32_t Mob::status_value(uint8_t stat) const
+	{
+		auto found = statuses.find(stat);
+
+		return found != statuses.end() ? static_cast<int32_t>(found->second.value) : 0;
+	}
+
+	int32_t Mob::counter(bool magic) const
+	{
+		auto found = statuses.find(magic ? MobStatParser::MCOUNTER : MobStatParser::PCOUNTER);
+
+		if (found == statuses.end())
+			return 0;
+
+		return MobStatParser::counter(found->second, randomizer.next_int<uint32_t>(UINT32_MAX),
+									  randomizer.next_int<uint32_t>(UINT32_MAX));
 	}
 
 	void Mob::apply_death()
 	{
-		set_stance(Stance::DIE);
+		show_stance(Stance::DIE, flip);
 		diesound.play();
 		dying = true;
 	}
@@ -1273,6 +2246,11 @@ namespace ms
 	bool Mob::is_alive() const
 	{
 		return active && !dying;
+	}
+
+	int32_t Mob::get_id() const
+	{
+		return id;
 	}
 
 	bool Mob::blocks_teleport() const

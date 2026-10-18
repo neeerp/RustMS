@@ -28,6 +28,7 @@
 #include "../IO/UITypes/UIItemInventory.h"
 #include "../IO/UITypes/UIKeyConfig.h"
 #include "../IO/UITypes/UIShop.h"
+#include "../IO/UITypes/UIStorage.h"
 
 namespace ms
 {
@@ -44,6 +45,17 @@ namespace ms
 			iteminventory->set_sort(false);
 			iteminventory->clear_new();
 		}
+	}
+
+	void InventoryGrowHandler::handle(InPacket& recv) const
+	{
+		InventoryType::Id type = InventoryType::by_value(recv.read_byte());
+		uint8_t slots = recv.read_byte();
+
+		Stage::get().get_player().get_inventory().set_slotmax(type, slots);
+
+		if (auto iteminventory = UI::get().get_element<UIItemInventory>())
+			iteminventory->refresh_slots();
 	}
 
 	void ModifyInventoryHandler::handle(InPacket& recv) const
@@ -147,6 +159,9 @@ namespace ms
 
 			if (auto shop = UI::get().get_element<UIShop>())
 				shop->modify(mod.type);
+
+			if (auto storage = UI::get().get_element<UIStorage>())
+				storage->modify(mod.type);
 
 			auto eqinvent = UI::get().get_element<UIEquipInventory>();
 			auto itinvent = UI::get().get_element<UIItemInventory>();

@@ -107,6 +107,19 @@ namespace ms
 		}
 	};
 
+	// Requests reading a skill or mastery book (v83 FUN_00a0a1b2)
+	// Opcode: USE_SKILL_BOOK(82)
+	class SkillBookPacket : public OutPacket
+	{
+	public:
+		SkillBookPacket(int16_t slot, int32_t itemid) : OutPacket(OutPacket::Opcode::USE_SKILL_BOOK)
+		{
+			write_time();
+			write_short(slot);
+			write_int(itemid);
+		}
+	};
+
 	// Requests using a scroll on an equip 
 	// Opcode: SCROLL_EQUIP(86)
 	class ScrollEquipPacket : public OutPacket

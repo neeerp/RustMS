@@ -17,7 +17,9 @@
 //////////////////////////////////////////////////////////////////////////////////
 #pragma once
 
+#include <map>
 #include <string>
+#include <vector>
 
 #include <cstddef>
 
@@ -154,6 +156,12 @@ namespace ms
 
 		void clear_held_effects();
 
+		// Show the `affected` animation of each mob skill (by its reason,
+		// skill | level << 16) that gave the character a disease, for as
+		// long as it lasts (FUN_0093e344 keeps the list, FUN_00932da6
+		// shows the new ones).
+		void show_afflictions(const std::vector<int32_t> &reasons);
+
 		// Display an animation as an effect on top of the character.
 		void show_effect_id(CharEffect::Id toshow);
 
@@ -162,6 +170,10 @@ namespace ms
 
 		// Display the iron body skill animation.
 		void show_iron_body();
+
+		// Display a skill or mastery book's glow: its first layer over the
+		// character, its second behind (v83 FUN_0043cba9, z 3 and -1).
+		void show_skill_book(bool success);
 
 		// Display damage over the characters head, with the hit face for
 		// 1.5 s if it hurt, as v83 does for every user (0x9832e3).
@@ -232,6 +244,7 @@ namespace ms
 
 		// Return a reference to this characters's physics.
 		PhysicsObject &get_phobj();
+		const PhysicsObject &get_phobj() const;
 
 		// Initialize character effects
 		static void init();
@@ -275,6 +288,17 @@ namespace ms
 		Animation chair_effect;
 		bool chair_at_face = false;
 		bool chair_in_front = false;
+
+		// A disease's animation, on the face when its pos is 1 like the
+		// chair's.
+		struct Affliction
+		{
+			Animation animation;
+			bool at_face;
+		};
+
+		std::map<int32_t, Affliction> afflictions;
+
 		TimedBool invincible;
 		bool blinking = false;
 		TimedBool ironbody;
@@ -298,5 +322,7 @@ namespace ms
 		static EnumMap<CharEffect::Id, Animation> chareffects;
 		static Animation tomb_fall;
 		static Animation tomb_land;
+		// BasicEff.img/SkillBook: [failure, success][front, back]
+		static Animation skill_book[2][2];
 	};
 }

@@ -3,7 +3,7 @@
 use crate::skills::{self, Learned};
 use crate::{error::NetworkError, packet::op::SendOpcode};
 use game::inventory::equip_slot;
-use game::{InventoryType, Player};
+use game::{BuffStat, InventoryType, Player};
 use packet::{io::read::PktRead, io::write::PktWrite, Packet};
 use std::io::Cursor;
 
@@ -66,8 +66,9 @@ pub struct Attack {
     pub mob_count: u8,
     pub hit_count: u8,
     pub display: u8,
-    pub direction: u8,
-    pub stance: u8,
+    /// The action, with the facing in the top bit (v83 0x952974: `action &
+    /// 0x7fff | left << 15`).
+    pub action: u16,
     pub speed: u8,
     /// How long a held skill was charged, in ms; 0 for the rest.
     pub charge: i32,
@@ -101,8 +102,7 @@ pub fn parse_attack(packet: &Packet, kind: AttackKind) -> Result<Attack, Network
     };
     let charge = if sends_charge { r.read_int()? } else { 0 };
     let display = r.read_byte()?;
-    let direction = r.read_byte()?;
-    let stance = r.read_byte()?;
+    let action = r.read_short()? as u16;
     r.read_byte()?;
     let speed = r.read_byte()?;
     let mut ammo_slot = 0;
@@ -133,8 +133,7 @@ pub fn parse_attack(packet: &Packet, kind: AttackKind) -> Result<Attack, Network
         mob_count,
         hit_count,
         display,
-        direction,
-        stance,
+        action,
         speed,
         charge,
         ammo_slot,
@@ -162,6 +161,11 @@ fn weapon_formula(weapon_id: i32) -> (f64, bool) {
     }
 }
 
+/// What a running buff adds to a stat, or 0.
+fn buff(player: &Player, stat: BuffStat) -> i32 {
+    player.buffs.value(stat).map_or(0, i32::from)
+}
+
 /// The most one basic hit can do (`calculateMaxBaseDamage`).
 pub fn max_base_damage(player: &Player) -> i32 {
     let stats = &player.stats;
@@ -171,7 +175,8 @@ pub fn max_base_damage(player: &Player) -> i32 {
         .items(InventoryType::Equipped)
         .filter_map(|(_, item)| item.equip.as_ref())
         .map(|equip| i32::from(equip.watk))
-        .sum();
+        .sum::<i32>()
+        + buff(player, BuffStat::Pad);
     let weapon = worn(equip_slot::WEAPON).map_or(0, |item| item.item_id);
     let (multiplier, luck_based) = weapon_formula(weapon);
     let (main, secondary) = match weapon / 10_000 {
@@ -195,7 +200,7 @@ pub fn max_magic_damage(player: &Player, spell: i32) -> i32 {
         .fold((i32::from(player.stats.int), 0), |(int, matk), equip| {
             (int + i32::from(equip.int), matk + i32::from(equip.matk))
         });
-    let magic = f64::from(int + matk);
+    let magic = f64::from(int + matk + buff(player, BuffStat::Mad));
     let max = ((magic * magic / 1000.0 + magic) / 30.0 + f64::from(int) / 200.0) * f64::from(spell);
     max.ceil() as i32
 }
@@ -247,6 +252,10 @@ fn shot_ammo(
         .get(InventoryType::Equipped, equip_slot::WEAPON)
         .ok_or(AttackRejection::Ammo)?
         .item_id;
+    // Soul Arrow shoots a bow or crossbow without arrows.
+    if matches!(weapon / 10_000, 145 | 146) && player.buffs.value(BuffStat::SoulArrow).is_some() {
+        return Ok(None);
+    }
     let quantity = skill.map_or(1, |skill| {
         let effect = &skill.effect;
         if effect.bullet_consume != 0 {
@@ -278,6 +287,8 @@ pub enum AttackRejection {
     Damage,
     /// A shot without enough of an ammo its weapon fires.
     Ammo,
+    /// Stun or Seduce stops every attack, Seal every skill.
+    Diseased,
 }
 
 /// The MP a skill's attack spends: none for Heal, whose USE_SKILL paid.
@@ -297,6 +308,15 @@ pub fn attack_mp_cost(skill: &Learned) -> i32 {
 pub fn validate(attack: &Attack, player: &Player) -> Result<Uses, AttackRejection> {
     if player.stats.hp <= 0 {
         return Err(AttackRejection::Dead);
+    }
+    // v83 attacks only without Stun or Seduce, and skills fail under Seal
+    // (FUN_0094be52, FUN_00966f7a).
+    let buffs = &player.buffs;
+    if buffs.has(BuffStat::Stun)
+        || buffs.has(BuffStat::Seduce)
+        || (attack.skill != 0 && buffs.has(BuffStat::Seal))
+    {
+        return Err(AttackRejection::Diseased);
     }
     let base_cap = (max_base_damage(player) * 2).max(10);
     let (skill, mob_count, hit_count, cap) = if attack.skill == 0 {
@@ -335,6 +355,16 @@ pub fn validate(attack: &Attack, player: &Player) -> Result<Uses, AttackRejectio
         };
         let mob_count = effect.mob_count;
         (Some(skill), mob_count, hit_count, cap)
+    };
+    // Shadow Partner throws every star again, up to 15 lines in all, but
+    // not for Taunt or Vampire (0x953b2a).
+    let hit_count = if attack.kind == AttackKind::Ranged
+        && player.buffs.value(BuffStat::ShadowPartner).is_some()
+        && !matches!(attack.skill, 4121003 | 14101006)
+    {
+        (hit_count * 2).min(15)
+    } else {
+        hit_count
     };
     if i32::from(attack.mob_count) > mob_count
         || i32::from(attack.hit_count) > hit_count
@@ -384,8 +414,7 @@ pub fn build_attack(
         p.write_int(attack.skill)?;
     }
     p.write_byte(attack.display)?;
-    p.write_byte(attack.direction)?;
-    p.write_byte(attack.stance)?;
+    p.write_short(attack.action as i16)?;
     p.write_byte(attack.speed)?;
     p.write_byte(0x0A)?;
     p.write_int(projectile)?;
@@ -424,8 +453,7 @@ mod tests {
         p.write_int(skill).unwrap();
         p.write_bytes(&[0; 8]).unwrap();
         p.write_byte(3).unwrap(); // display
-        p.write_byte(0x80).unwrap(); // direction
-        p.write_byte(5).unwrap(); // stance
+        p.write_short(0x8005u16 as i16).unwrap(); // action 5, facing left
         p.write_byte(0).unwrap();
         p.write_byte(4).unwrap(); // speed
         p.write_bytes(&[0; 4]).unwrap();
@@ -470,13 +498,8 @@ mod tests {
             }]
         );
         assert_eq!(
-            (
-                attack.display,
-                attack.direction,
-                attack.stance,
-                attack.speed
-            ),
-            (3, 0x80, 5, 4)
+            (attack.display, attack.action, attack.speed),
+            (3, 0x8005, 4)
         );
     }
 
@@ -502,6 +525,27 @@ mod tests {
             validate(&parse_close_attack(&attack_packet(1, 1)).unwrap(), &dead),
             Err(AttackRejection::Dead)
         );
+    }
+
+    #[test]
+    fn stun_and_seduce_stop_attacks_and_seal_stops_skills() {
+        let now = std::time::Instant::now();
+        let long = std::time::Duration::from_secs(60);
+        let basic = parse_close_attack(&attack_packet(1, 1)).unwrap();
+        let snails = parse_close_attack(&skill_attack_packet(1000, 1, 1)).unwrap();
+        for (stat, skill_only) in [
+            (BuffStat::Stun, false),
+            (BuffStat::Seduce, false),
+            (BuffStat::Seal, true),
+        ] {
+            let mut player = beginner_with_sword();
+            player.buffs.give(game::Buff::new(-123, stat, 1, now, long));
+            assert_eq!(validate(&basic, &player).is_ok(), skill_only, "{stat:?}");
+            assert_eq!(
+                validate(&snails, &player).unwrap_err(),
+                AttackRejection::Diseased
+            );
+        }
     }
 
     #[test]
@@ -595,8 +639,7 @@ mod tests {
             p.write_int(charge).unwrap();
         }
         p.write_byte(3).unwrap(); // display
-        p.write_byte(0x80).unwrap(); // direction
-        p.write_byte(5).unwrap(); // stance
+        p.write_short(0x8005u16 as i16).unwrap(); // action 5, facing left
         p.write_byte(0).unwrap();
         p.write_byte(4).unwrap(); // speed
         if kind == AttackKind::Ranged {
@@ -739,6 +782,55 @@ mod tests {
     }
 
     #[test]
+    fn shadow_partner_doubles_a_shot_and_soul_arrow_needs_no_arrows() {
+        let now = std::time::Instant::now();
+        let long = std::time::Duration::from_secs(60);
+        let shot = |damage: &[i32], slot| {
+            parse_attack(
+                &kind_attack_packet(AttackKind::Ranged, 0, slot, damage),
+                AttackKind::Ranged,
+            )
+            .unwrap()
+        };
+        let mut player = rogue_with_stars(100);
+        assert_eq!(
+            validate(&shot(&[1, 1], 1), &player).unwrap_err(),
+            AttackRejection::TooManyTargets
+        );
+        let partner = game::Buff::new(4111002, BuffStat::ShadowPartner, 80, now, long);
+        player.buffs.give(partner);
+        assert!(validate(&shot(&[1, 1], 1), &player).is_ok());
+
+        player.inventory.insert(
+            InventoryType::Equipped,
+            equip_slot::WEAPON,
+            Item::equipment(1452002, EquipStats::default()),
+        );
+        assert_eq!(
+            validate(&shot(&[1], 0), &player).unwrap_err(),
+            AttackRejection::Ammo
+        );
+        let soul_arrow = game::Buff::new(3101004, BuffStat::SoulArrow, 1, now, long);
+        player.buffs.give(soul_arrow);
+        assert_eq!(validate(&shot(&[1], 0), &player).unwrap().ammo, None);
+    }
+
+    #[test]
+    fn attack_buffs_raise_the_damage_cap() {
+        let player = beginner_with_sword();
+        let mut buffed = player.clone();
+        let rage = game::Buff::new(
+            1101006,
+            BuffStat::Pad,
+            12,
+            std::time::Instant::now(),
+            std::time::Duration::from_secs(60),
+        );
+        buffed.buffs.give(rage);
+        assert!(max_base_damage(&buffed) > max_base_damage(&player));
+    }
+
+    #[test]
     fn arrow_bomb_hits_for_its_x_percent() {
         if skills::data().is_err() {
             return;
@@ -866,8 +958,7 @@ mod tests {
             .byte(0);
         expect
             .byte(3)
-            .byte(0x80)
-            .byte(5)
+            .short(0x8005u16 as i16)
             .byte(4)
             .byte(0x0A)
             .int(2070000);
@@ -887,7 +978,12 @@ mod tests {
             .byte(0x5B)
             .byte(2)
             .int(1000);
-        expect.byte(3).byte(0x80).byte(5).byte(4).byte(0x0A).int(0);
+        expect
+            .byte(3)
+            .short(0x8005u16 as i16)
+            .byte(4)
+            .byte(0x0A)
+            .int(0);
         expect.int(77).byte(0).int(25);
         expect.end();
     }
@@ -908,7 +1004,12 @@ mod tests {
             .byte(0x5B)
             .byte(30)
             .int(2121001);
-        expect.byte(3).byte(0x80).byte(5).byte(4).byte(0x0A).int(0);
+        expect
+            .byte(3)
+            .short(0x8005u16 as i16)
+            .byte(4)
+            .byte(0x0A)
+            .int(0);
         expect.int(77).byte(0).int(12).int(640);
         expect.end();
     }
@@ -924,7 +1025,12 @@ mod tests {
             .byte(0x11)
             .byte(0x5B)
             .byte(0);
-        expect.byte(3).byte(0x80).byte(5).byte(4).byte(0x0A).int(0);
+        expect
+            .byte(3)
+            .short(0x8005u16 as i16)
+            .byte(4)
+            .byte(0x0A)
+            .int(0);
         expect.int(77).byte(0).int(9);
         expect.end();
     }

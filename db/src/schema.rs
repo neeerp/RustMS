@@ -36,6 +36,7 @@ diesel::table! {
         maple_points -> Int4,
         nx_prepaid -> Int4,
         storage_slots -> Int2,
+        storage_meso -> Int4,
     }
 }
 
@@ -231,6 +232,55 @@ diesel::table! {
     }
 }
 diesel::joinable!(monster_book_cards -> characters (character_id));
+diesel::table! {
+    fame_log (id) {
+        id -> Int4,
+        giver_id -> Int4,
+        target_id -> Int4,
+        given_at -> Timestamp,
+    }
+}
+diesel::table! {
+    storage_items (id) {
+        id -> Int8,
+        account_id -> Int4,
+        position -> Int2,
+        item_id -> Int4,
+        quantity -> Int2,
+        #[max_length = 13]
+        owner -> Varchar,
+        flags -> Int2,
+        expires_at -> Nullable<Timestamp>,
+        cash_serial -> Nullable<Int8>,
+    }
+}
+diesel::table! {
+    storage_equipment_stats (storage_item_id) {
+        storage_item_id -> Int8,
+        upgrade_slots -> Int2,
+        level -> Int2,
+        stre -> Int2,
+        dex -> Int2,
+        int -> Int2,
+        luk -> Int2,
+        hp -> Int2,
+        mp -> Int2,
+        watk -> Int2,
+        matk -> Int2,
+        wdef -> Int2,
+        mdef -> Int2,
+        acc -> Int2,
+        avoid -> Int2,
+        hands -> Int2,
+        speed -> Int2,
+        jump -> Int2,
+        vicious -> Int4,
+        item_level -> Int2,
+        item_exp -> Int4,
+    }
+}
+diesel::joinable!(storage_items -> accounts (account_id));
+diesel::joinable!(storage_equipment_stats -> storage_items (storage_item_id));
 diesel::allow_tables_to_appear_in_same_query!(
     accounts,
     buddies,
@@ -245,4 +295,7 @@ diesel::allow_tables_to_appear_in_same_query!(
     cash_sales,
     wish_lists,
     monster_book_cards,
+    fame_log,
+    storage_items,
+    storage_equipment_stats,
 );

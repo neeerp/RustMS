@@ -267,26 +267,47 @@ namespace ms
 
 	void ServerMessageHandler::handle(InPacket& recv) const
 	{
+		// v83 reads a flag first only for the scrolling notice, which has no
+		// message when it is off (FUN_00a22785).
 		int8_t type = recv.read_byte();
-		bool servermessage = recv.inspect_bool();
 
-		if (servermessage)
-			recv.skip(1);
+		if (type == 4 && !recv.read_bool())
+			return;
 
 		std::string message = recv.read_string();
+		auto chatbar = UI::get().get_element<UIChatBar>();
 
-		if (type == 3)
+		switch (type)
 		{
-			recv.read_byte(); // channel
-			recv.read_bool(); // megaphone
-		}
-		else if (type == 4)
-		{
-			UI::get().set_scrollnotice(message);
-		}
-		else if (type == 7)
-		{
-			recv.read_int(); // npcid
+			case 0:
+				// StringPool 0x37a
+				if (chatbar)
+					chatbar->send_chatline("[Notice] " + message, UIChatBar::LineType::BLUE);
+				break;
+			case 1:
+				UI::get().emplace<UIOk>(message, [](bool) {});
+				break;
+			case 3:
+				recv.read_byte(); // channel
+				recv.read_bool(); // megaphone
+				break;
+			case 4:
+				UI::get().set_scrollnotice(message);
+				break;
+			case 5:
+				if (chatbar)
+					chatbar->send_chatline(message, UIChatBar::LineType::SKILL);
+				break;
+			case 6:
+				// An item id, linking the item to the line when not 0
+				recv.read_int();
+
+				if (chatbar)
+					chatbar->send_chatline(message, UIChatBar::LineType::BLUE);
+				break;
+			case 7:
+				recv.read_int(); // npcid
+				break;
 		}
 	}
 
@@ -591,6 +612,13 @@ namespace ms
 		else if (mode1 == 13) // card effect
 		{
 			Stage::get().get_player().show_effect_id(CharEffect::Id::MONSTER_CARD);
+		}
+		else if (mode1 == 2) // a party member's skill reached the player
+		{
+			int32_t skillid = recv.read_int();
+			recv.read_byte(); // level
+
+			Stage::get().get_combat().show_player_affected(skillid);
 		}
 		else if (mode1 == 18) // intro effect
 		{

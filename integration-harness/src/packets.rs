@@ -97,6 +97,8 @@ pub struct SetFieldPacket {
 pub struct SetFieldWarpPacket {
     pub map_id: i32,
     pub spawn_point: u8,
+    /// Where the player appears instead of at the spawn point.
+    pub chase: Option<(i32, i32)>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -953,10 +955,20 @@ pub fn decode_set_field_warp(packet: &Packet) -> Result<SetFieldWarpPacket, Stri
     let spawn_point = cursor
         .read_byte()
         .map_err(|e| format!("failed to read set-field warp spawn point: {e}"))?;
+    let read = |cursor: &mut Cursor<&[u8]>| -> Result<Option<(i32, i32)>, std::io::Error> {
+        cursor.read_short()?; // HP
+        if cursor.read_byte()? == 0 {
+            return Ok(None);
+        }
+        Ok(Some((cursor.read_int()?, cursor.read_int()?)))
+    };
+    let chase =
+        read(&mut cursor).map_err(|e| format!("failed to read set-field warp chase: {e}"))?;
 
     Ok(SetFieldWarpPacket {
         map_id,
         spawn_point,
+        chase,
     })
 }
 
@@ -1256,7 +1268,7 @@ fn decode_item(cursor: &mut Cursor<&[u8]>) -> Result<i32, String> {
 }
 
 /// An item's id and quantity (1 for equipment).
-fn decode_item_stack(cursor: &mut Cursor<&[u8]>) -> Result<(i32, i16), String> {
+pub fn decode_item_stack(cursor: &mut Cursor<&[u8]>) -> Result<(i32, i16), String> {
     let item_type = cursor.read_byte().map_err(|e| e.to_string())?;
     let item_id = cursor.read_int().map_err(|e| e.to_string())?;
     let is_cash = cursor.read_byte().map_err(|e| e.to_string())? != 0;

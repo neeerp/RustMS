@@ -6,7 +6,9 @@ mod change_map;
 mod char_info;
 mod chat;
 mod combat;
+mod door;
 mod emote;
+mod fame;
 mod item_move;
 mod keybinds;
 mod logged_in;
@@ -25,6 +27,8 @@ mod reactor;
 mod rearrange;
 mod script_portal;
 mod spend_points;
+mod storage;
+mod summon;
 mod use_item;
 mod use_skill;
 mod whisper;
@@ -33,11 +37,16 @@ pub use self::buddy::BuddyListModifyHandler;
 pub use self::cash_shop::{CashShopOperationHandler, EnterCashShopHandler};
 pub use self::chair::{CancelChairHandler, UseChairHandler};
 pub use self::change_channel::ChangeChannelHandler;
-pub use self::change_map::{warp, ChangeMapHandler};
+pub use self::change_map::{door_warp, warp, ChangeMapHandler, DoorExit};
 pub use self::char_info::CharInfoRequestHandler;
 pub use self::chat::AllChatHandler;
-pub use self::combat::{AttackHandler, MobDistanceHandler, MoveLifeHandler, TakeDamageHandler};
+pub use self::combat::{
+    catch_disease, countered, AttackHandler, MobDistanceHandler, MoveLifeHandler, NpcActionHandler,
+    TakeDamageHandler,
+};
+pub use self::door::UseDoorHandler;
 pub use self::emote::FaceExpressionHandler;
+pub use self::fame::{GiveFameHandler, MIN_FAME_LEVEL};
 pub use self::item_move::ItemMoveHandler;
 pub use self::keybinds::ChangeKeybindsHandler;
 pub use self::logged_in::PlayerLoggedInHandler;
@@ -56,8 +65,13 @@ pub use self::reactor::DamageReactorHandler;
 pub use self::rearrange::{GatherItemsHandler, SortItemsHandler};
 pub use self::script_portal::ChangeMapSpecialHandler;
 pub use self::spend_points::{SpendApHandler, SpendSpHandler};
-pub use self::use_item::{HealOverTimeHandler, UseItemHandler};
+pub use self::storage::TrunkRequestHandler;
+pub use self::summon::{
+    BeholderHandler, DamageSummonHandler, MoveSummonHandler, SummonAttackHandler,
+};
+pub use self::use_item::{HealOverTimeHandler, UseItemHandler, UseSkillBookHandler};
 pub use self::use_skill::{
-    CancelBuffHandler, SkillEffectHandler, ThrowGrenadeHandler, UseSkillHandler,
+    party_skill_reached, CancelBuffHandler, SkillEffectHandler, ThrowGrenadeHandler,
+    UseSkillHandler,
 };
 pub use self::whisper::WhisperHandler;

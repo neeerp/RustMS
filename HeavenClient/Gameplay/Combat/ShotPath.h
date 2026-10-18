@@ -473,6 +473,40 @@ namespace ms
 			return static_cast<uint16_t>(MS_PER_PIXEL * std::sqrt(dx * dx + dy * dy));
 		}
 
+		// Whether a shot's ball jumps from mob to mob instead, each hit when
+		// it gets there: Energy Orb and Spark (FUN_0094289f).
+		inline bool hops(int32_t skill)
+		{
+			return skill == 5121002 || skill == 15111006;
+		}
+
+		// Where the ball's first jump starts: 25 px ahead of `origin`.
+		inline Point<int16_t> hop_start(Point<int16_t> origin, bool toleft)
+		{
+			return { static_cast<int16_t>(origin.x() + (toleft ? -25 : 25)), origin.y() };
+		}
+
+		// Where the ball jumps to on a mob with these bounds: their middle.
+		inline Point<int16_t> hop_point(Rectangle<int16_t> body)
+		{
+			return {
+				static_cast<int16_t>((body.left() + body.right()) / 2),
+				static_cast<int16_t>((body.top() + body.bottom()) / 2)
+			};
+		}
+
+		// How long the ball's jump from `from` to `to` takes: 1.25 ms per
+		// pixel, Spark's 2. Each mob is hit when the ball gets there, a jump
+		// after the last.
+		inline uint16_t hop_time(int32_t skill, Point<int16_t> from, Point<int16_t> to)
+		{
+			double dx = to.x() - from.x();
+			double dy = to.y() - from.y();
+			double per_pixel = skill == 15111006 ? 2.0 : 1.25;
+
+			return static_cast<uint16_t>(per_pixel * std::sqrt(dx * dx + dy * dy));
+		}
+
 		// How long after the attack's hit frame the damage at `hit` lands.
 		// It only counts the horizontal distance.
 		inline uint16_t hit_delay(Point<int16_t> origin, Point<int16_t> hit)
@@ -510,6 +544,25 @@ namespace ms
 		inline int16_t spread(uint8_t bullet, uint8_t count)
 		{
 			return static_cast<int16_t>(7 + 14 * bullet - 7 * count);
+		}
+
+		// Whether Shadow Partner throws a shot's bullets again: not for
+		// Taunt, and never with Vampire (0x953b2a).
+		inline bool partner_shoots(int32_t skill)
+		{
+			return skill != 4121003 && skill != 14101006;
+		}
+
+		// A shot's hits with Shadow Partner: twice as many, at most 15.
+		inline uint8_t partner_hits(uint8_t hitcount)
+		{
+			return static_cast<uint8_t>(std::min(hitcount * 2, 15));
+		}
+
+		// Where Shadow Partner's bullets start: 30 px behind the user's.
+		inline Point<int16_t> partner_start(Point<int16_t> start, bool toleft)
+		{
+			return start + Point<int16_t>(toleft ? 30 : -30, 0);
 		}
 
 		// How long after the first bullet the `bullet`th one is thrown or

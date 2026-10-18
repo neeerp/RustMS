@@ -181,6 +181,7 @@ impl ClientActor {
             let actions = net::packet::handle::world::warp(
                 &mut self.in_game_mut()?.player,
                 map_id,
+                "",
                 channel_id,
             )?;
             for action in actions {

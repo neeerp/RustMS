@@ -151,6 +151,7 @@ async fn read_next_set_field_warp(
             }
             x if x == SendOpcode::StatChange as i16 => continue,
             x if x == SendOpcode::SpawnNpc as i16 => continue,
+            x if x == SendOpcode::SpawnNpcRequestController as i16 => continue,
             x if x == SendOpcode::FieldEffect as i16 => continue,
             x if x == SendOpcode::SpawnMonster as i16
                 || x == SendOpcode::SpawnMonsterControl as i16

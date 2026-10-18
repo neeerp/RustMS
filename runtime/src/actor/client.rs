@@ -2,11 +2,14 @@ mod buddies;
 mod buff;
 mod combat;
 mod dialogue;
+mod door;
+mod fame;
 mod loot;
 mod npc_script;
 mod quest;
 mod script;
 mod shop;
+mod storage;
 
 use crate::actor::registry::FieldRegistry;
 use crate::db::spawn_db;
@@ -88,6 +91,8 @@ pub struct ClientActor {
     script: Option<npc_script::ActiveScript>,
     /// The NPC shop the player has open.
     shop: Option<net::shop::Shop>,
+    /// The account's storage, while the player has it open.
+    storage: Option<net::storage::OpenStorage>,
     /// When natural recovery of HP and of MP was last accepted; the client
     /// times them separately.
     last_heal: (Option<tokio::time::Instant>, Option<tokio::time::Instant>),
@@ -106,6 +111,8 @@ pub struct ClientActor {
     party_id: Option<i32>,
     /// What the directory last heard of the player.
     presence: Option<Presence>,
+    /// The player's open Mystic Door.
+    door: Option<door::OpenDoor>,
 }
 
 impl ClientActor {
@@ -146,6 +153,7 @@ impl ClientActor {
             conversation: None,
             script: None,
             shop: None,
+            storage: None,
             last_heal: (None, None),
             last_moved: None,
             pending_quest: None,
@@ -155,6 +163,7 @@ impl ClientActor {
             in_cash_shop: false,
             party_id: None,
             presence: None,
+            door: None,
         })
     }
 
@@ -166,6 +175,7 @@ impl ClientActor {
 
         let outcome = loop {
             let buffs_due = self.buffs_due();
+            let door_due = self.door_due();
             let step = tokio::select! {
                 biased;
                 _ = kill.cancelled() => Err(RuntimeError::ClientDisconnected),
@@ -177,6 +187,9 @@ impl ClientActor {
                 _ = autosave.tick() => self.save_if_dirty().await,
                 _ = sleep_until(buffs_due.unwrap_or_else(Instant::now)), if buffs_due.is_some() => {
                     self.update_buffs().await
+                }
+                _ = sleep_until(door_due.unwrap_or_else(Instant::now)), if door_due.is_some() => {
+                    self.close_door().await
                 }
             };
             if let Err(error) = step {
@@ -271,18 +284,21 @@ impl ClientActor {
             }
             WorldAction::FieldMove {
                 packet,
+                start,
                 movement_bytes,
             } => {
                 self.last_moved = Some(tokio::time::Instant::now());
                 if let Some(game) = self.game.as_mut() {
-                    let (x, y) = game.position;
-                    if let Some((x, y, _)) = parse_movement_state(&movement_bytes, (x, y, 0)) {
+                    if let Some((x, y, _)) =
+                        parse_movement_state(&movement_bytes, (start.0, start.1, 0))
+                    {
                         game.position = (x, y);
                     }
                 }
                 self.send_to_field(FieldMessage::Move {
                     from: self.client_id,
                     packet,
+                    start,
                     movement_bytes,
                 })
                 .await?
@@ -291,6 +307,7 @@ impl ClientActor {
                 self.conversation = None;
                 self.script = None;
                 self.shop = None;
+                self.storage = None;
                 self.npc_request_id = self.npc_request_id.wrapping_add(1);
                 self.send_to_field(FieldMessage::NpcInteraction {
                     from: self.client_id,
@@ -322,6 +339,7 @@ impl ClientActor {
             WorldAction::Died => self.died().await?,
             WorldAction::Quest(request) => self.request_quest_action(request).await?,
             WorldAction::Shop(request) => self.shop_action(request).await?,
+            WorldAction::Storage(request) => self.storage_request(request).await?,
             WorldAction::ScriptPortal { portal } => self.touch_script_portal(&portal).await?,
             WorldAction::LookChanged(announce) => {
                 let player = &self.in_game()?.player;
@@ -339,6 +357,7 @@ impl ClientActor {
                 })
                 .await?
             }
+            WorldAction::BuffsChanged(announce) => self.show_buffs(announce).await?,
             WorldAction::Whisper(delivery) => {
                 self.send_to_directory(DirectoryMessage::Whisper {
                     from: self.client_id,
@@ -353,7 +372,19 @@ impl ClientActor {
                 })
                 .await?
             }
+            WorldAction::PartySkill(used) => {
+                let origin = self.in_game()?.position;
+                self.send_to_directory(DirectoryMessage::PartySkill {
+                    from: self.client_id,
+                    used,
+                    origin,
+                })
+                .await?
+            }
             WorldAction::Buddy(request) => self.buddy_request(request).await?,
+            WorldAction::GiveFame { target, up } => self.give_fame(target, up).await?,
+            WorldAction::OpenDoor { town, at, lasts } => self.open_door(town, at, lasts).await?,
+            WorldAction::UseDoor { owner, from_town } => self.use_door(owner, from_town).await?,
             WorldAction::Find { target_name } => {
                 self.send_to_directory(DirectoryMessage::Find {
                     from: self.client_id,
@@ -462,6 +493,7 @@ impl ClientActor {
         self.conversation = None;
         self.script = None;
         self.shop = None;
+        self.storage = None;
         self.pending_quest = None;
         self.npc_request_id = self.npc_request_id.wrapping_add(1);
         self.in_game_mut()?.player.chair = 0;
@@ -492,6 +524,7 @@ impl ClientActor {
             party,
         })
         .await?;
+        self.bring_summons(spawn).await?;
         self.run_map_enter_script().await
     }
 
@@ -505,6 +538,7 @@ impl ClientActor {
 
         self.remember_spawn_point();
         self.cancel_buffs().await?;
+        self.close_door().await?;
         self.flush().await?;
         spawn_db(move || db::session::begin_channel_transition(session_id, i16::from(channel_id)))
             .await?;
@@ -905,6 +939,11 @@ impl ClientActor {
                 })
                 .await?
             }
+            ServerMessage::PartySkill {
+                used,
+                origin,
+                map_id,
+            } => self.party_skill_reached(used, origin, map_id).await?,
             ServerMessage::ReactorBroken {
                 reactor_id,
                 object_id,
@@ -918,6 +957,23 @@ impl ClientActor {
                     .map_err(|e| RuntimeError::Handler(e.to_string()))?;
                 requester.send_packet(packet);
             }
+            ServerMessage::Famed {
+                giver,
+                giver_name,
+                up,
+            } => self.take_fame(giver, giver_name, up).await?,
+            ServerMessage::FameMissed { target } => self.fame_missed(target).await?,
+            ServerMessage::SummonBroken { skill_id } => self.summon_broken(skill_id).await?,
+            ServerMessage::Beholder(support) => self.beholder_support(support).await?,
+            ServerMessage::Diseased { disease, map_id } => self.diseased(disease, map_id).await?,
+            ServerMessage::Countered { damage, map_id } => self.countered(damage, map_id).await?,
+            ServerMessage::Dispelled { map_id } => self.dispelled(map_id).await?,
+            ServerMessage::Banished { to, map_id } => self.banished(to, map_id).await?,
+            ServerMessage::DoorWarp {
+                from_map,
+                map_id,
+                exit,
+            } => self.door_warp(from_map, map_id, exit).await?,
             ServerMessage::SendPacket(mut packet) => self.send(&mut packet).await?,
         }
         Ok(())
@@ -1057,6 +1113,9 @@ impl ClientActor {
                         client_id: self.client_id,
                     })
                     .await;
+            }
+            if let Err(error) = self.close_door().await {
+                warn!(self.client_id, %error, "Failed to close Mystic Door");
             }
             if !self.changing_channel {
                 if let Err(error) = self.announce_offline().await {

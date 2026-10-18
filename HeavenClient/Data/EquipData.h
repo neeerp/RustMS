@@ -17,6 +17,7 @@
 //////////////////////////////////////////////////////////////////////////////////
 #pragma once
 
+#include <array>
 #include <string>
 
 #include <cstdint>
@@ -62,6 +63,12 @@ namespace ms
 		// recover faster (info/recovery, 1 when absent).
 		double get_recovery() const;
 
+		// The percent of a spell's damage a weapon gives for its element
+		// (FUN_005d284f): incRMAI, F, L, S or H for ice, fire, lightning,
+		// poison and holy, else elemDefault, else 100. Other elements get
+		// 100.
+		int16_t get_elemboost(uint8_t element) const;
+
 	private:
 		// Allow the cache to use the constructor
 		friend Cache<EquipData>;
@@ -79,5 +86,6 @@ namespace ms
 		bool cash;
 		bool tradeblock;
 		double recovery;
+		std::array<int16_t, 8> elemboost;
 	};
 }

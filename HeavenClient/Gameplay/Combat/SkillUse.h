@@ -86,7 +86,8 @@ namespace ms
 			return self || !dead;
 		}
 
-		// Resurrection with no one to raise isn't sent at all.
+		// Resurrection in a party with no one to raise isn't sent at all,
+		// though its action and effect still play. Alone it is sent.
 		inline bool sends(int32_t skill, uint8_t party)
 		{
 			return skill != RESURRECTION || party != 0;

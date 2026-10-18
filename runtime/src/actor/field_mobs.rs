@@ -2,10 +2,13 @@
 //! the damage dealt to them. Pure state; `FieldActor` sends the packets.
 
 use crate::actor::object_ids::{self, ObjectIds};
+use game::mob_skill::{self, MobSkillEffect};
+use game::MobStat;
 use game_data::mobs::MobInfo;
+use game_data::skills::MobSkillLevel;
 use game_data::MapMobTemplate;
 use net::packet::build::world::field::parse_movement;
-use net::packet::build::world::mob::MobView;
+use net::packet::build::world::mob::{MobStatusView, MobView};
 use net::ClientId;
 use std::cmp::Reverse;
 use std::collections::{BTreeMap, HashMap};
@@ -29,7 +32,10 @@ pub struct SpawnPoint {
 
 pub struct LiveMob {
     pub object_id: i32,
-    pub spawn: usize,
+    /// Its spawn point, or none for a summoned mob, which never comes back.
+    pub spawn: Option<usize>,
+    /// The mob that summoned it.
+    pub summoner: Option<i32>,
     pub info: MobInfo,
     pub x: i16,
     pub y: i16,
@@ -37,6 +43,9 @@ pub struct LiveMob {
     pub foothold: i16,
     pub home_foothold: i16,
     pub hp: i64,
+    /// Its MP, which its attacks cost. It doesn't come back: a v83 client
+    /// never regains it either, and when the server should is unknown.
+    pub mp: i32,
     pub controller: Option<ClientId>,
     /// Until when the controller's client is chasing its player with it.
     pub aggro_until: Option<Instant>,
@@ -44,9 +53,240 @@ pub struct LiveMob {
     pub controller_distance: Option<i32>,
     /// Damage per player, for sharing EXP.
     pub damage_by: HashMap<ClientId, i64>,
+    pub statuses: BTreeMap<MobStat, MobStatus>,
+    /// The skill its controller may cast with it next.
+    pub granted: Option<Grant>,
+    /// When each skill it cast may be cast again.
+    pub cooldowns: HashMap<i32, Instant>,
+}
+
+/// A mob skill and level the server let a mob cast, and when.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Grant {
+    pub skill: u8,
+    pub level: u8,
+    pub at: Instant,
+}
+
+/// How long a grant waits for its cast before the server may grant another
+/// in its place: the client may never cast it, being stunned, say.
+pub const GRANT_TIMEOUT: Duration = Duration::from_secs(10);
+
+/// The longest a cast's animation may hold off what it does.
+pub const MOST_CAST_DELAY: Duration = Duration::from_secs(3);
+
+/// A skill a mob cast, to take effect at `at`, once its animation is done.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Cast {
+    pub object_id: i32,
+    pub skill: i32,
+    pub level: i32,
+    pub effect: MobSkillLevel,
+    pub at: Instant,
+}
+
+/// The box a mob skill covers, edges included.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct CastArea {
+    pub left: i32,
+    pub top: i32,
+    pub right: i32,
+    pub bottom: i32,
+}
+
+impl CastArea {
+    pub fn contains(&self, (x, y): (i16, i16)) -> bool {
+        let (x, y) = (i32::from(x), i32::from(y));
+        self.left <= x && x <= self.right && self.top <= y && y <= self.bottom
+    }
+}
+
+/// A status on a mob: its value, the skill that caused it, who put it on,
+/// and when it wears off.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct MobStatus {
+    pub value: i16,
+    pub skill_id: i32,
+    pub from: ClientId,
+    pub until: Instant,
+    /// When a status that hurts the mob next does.
+    pub next_hurt: Instant,
+    /// A counter's spread (`MobStatusView::spread`), 0 for the rest.
+    pub spread: i32,
+}
+
+/// A mob's attackN is action 12 + N - 1, sent as action << 1 | facing left
+/// (FUN_0066a517); its skills follow at 21.
+pub const FIRST_ATTACK_ACTION: u8 = 12;
+pub const FIRST_SKILL_ACTION: u8 = 21;
+/// No action.
+pub const NO_ACTION: u8 = 0xFF;
+
+/// What a controller's move of a mob let it do.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct MobAct {
+    /// The action to show the others.
+    pub action: u8,
+    /// Whether it may attack on its next move.
+    pub next_attack: bool,
+    pub mp: i16,
+    /// The skill granted with this move, if any.
+    pub grant: Option<(u8, u8)>,
+    /// The skill it cast, if the server allowed it.
+    pub cast: Option<Cast>,
+}
+
+/// How often a status that hurts a mob does: every client shows it once a
+/// second from when it was put on (0x6675a8).
+pub const HURT_INTERVAL: Duration = Duration::from_secs(1);
+
+/// A mob hurt by a status, the player who put it on, and the mob's HP
+/// percent after.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Hurt {
+    pub object_id: i32,
+    pub from: ClientId,
+    pub percent: u8,
 }
 
 impl LiveMob {
+    fn new(object_id: i32, info: MobInfo, at: (i16, i16), stance: u8, foothold: i16) -> Self {
+        Self {
+            object_id,
+            spawn: None,
+            summoner: None,
+            x: at.0,
+            y: at.1,
+            stance,
+            foothold,
+            home_foothold: foothold,
+            hp: i64::from(info.max_hp),
+            mp: info.max_mp,
+            info,
+            controller: None,
+            aggro_until: None,
+            controller_distance: None,
+            damage_by: HashMap::new(),
+            statuses: BTreeMap::new(),
+            granted: None,
+            cooldowns: HashMap::new(),
+        }
+    }
+
+    /// Mob stances are even facing right, odd facing left.
+    pub fn facing_left(&self) -> bool {
+        self.stance & 1 == 1
+    }
+
+    /// Whether the mob can't use its skills: a player's Seal or its own
+    /// SealSkill.
+    fn sealed(&self) -> bool {
+        self.statuses.contains_key(&MobStat::Seal)
+            || self.statuses.contains_key(&MobStat::SealSkill)
+    }
+
+    /// Validate a cast of the skill in `skill_data` (id, level << 8, the
+    /// animation's length << 16) with `action`: it must be the one granted,
+    /// listed with that action. Pays for it and starts its cooldown.
+    fn cast(
+        &mut self,
+        action: u8,
+        skill_data: i32,
+        now: Instant,
+        levels: &dyn Fn(i32, i32) -> Option<MobSkillLevel>,
+    ) -> Option<Cast> {
+        let grant = self.granted?;
+        if self.sealed() {
+            return None;
+        }
+        let (skill, level) = (skill_data as u8, (skill_data >> 8) as u8);
+        if (skill, level) != (grant.skill, grant.level) {
+            return None;
+        }
+        let (skill, level) = (i32::from(skill), i32::from(level));
+        self.info.skills.iter().find(|entry| {
+            entry.skill == skill
+                && entry.level == level
+                && entry.action - 1 + i32::from(FIRST_SKILL_ACTION) == i32::from(action >> 1)
+        })?;
+        let effect = levels(skill, level)?;
+        if effect.mp_cost > self.mp {
+            return None;
+        }
+        self.mp -= effect.mp_cost;
+        self.granted = None;
+        self.cooldowns.insert(
+            skill,
+            now + Duration::from_secs(effect.interval.max(0) as u64),
+        );
+        let animation = Duration::from_millis(u64::from((skill_data >> 16) as u16));
+        Some(Cast {
+            object_id: self.object_id,
+            skill,
+            level,
+            effect,
+            at: now + animation.min(MOST_CAST_DELAY),
+        })
+    }
+
+    /// Pick a skill for its controller to cast next, by `roll` in 0..1,
+    /// from those it may: ones the server casts, that it can pay for, that
+    /// are off cooldown, whose HP limit it is at or under, and, to summon,
+    /// that have fewer than their limit of its `summons` alive. None while
+    /// sealed or waiting on a grant.
+    fn grant(
+        &mut self,
+        now: Instant,
+        summons: usize,
+        levels: &dyn Fn(i32, i32) -> Option<MobSkillLevel>,
+        roll: f64,
+    ) -> Option<(u8, u8)> {
+        if self
+            .granted
+            .is_some_and(|grant| now < grant.at + GRANT_TIMEOUT)
+        {
+            return None;
+        }
+        self.granted = None;
+        if self.sealed() {
+            return None;
+        }
+        let max_hp = i64::from(self.info.max_hp.max(1));
+        let hp_percent = self.hp * 100 / max_hp;
+        let usable: Vec<(u8, u8)> = self
+            .info
+            .skills
+            .iter()
+            .filter(|entry| {
+                let (Ok(_), Ok(_), Some(effect)) = (
+                    u8::try_from(entry.skill),
+                    u8::try_from(entry.level),
+                    mob_skill::effect(entry.skill, 0),
+                ) else {
+                    return false;
+                };
+                let Some(level) = levels(entry.skill, entry.level) else {
+                    return false;
+                };
+                level.mp_cost <= self.mp
+                    && hp_percent <= i64::from(level.hp)
+                    && self.cooldowns.get(&entry.skill).is_none_or(|&at| at <= now)
+                    && (effect != MobSkillEffect::Summon
+                        || (!level.summons.is_empty()
+                            && (level.limit <= 0 || summons < level.limit as usize)))
+            })
+            .map(|entry| (entry.skill as u8, entry.level as u8))
+            .collect();
+        let index = ((roll * usable.len() as f64) as usize).min(usable.len().checked_sub(1)?);
+        let (skill, level) = usable[index];
+        self.granted = Some(Grant {
+            skill,
+            level,
+            at: now,
+        });
+        Some((skill, level))
+    }
+
     pub fn view(&self, fade_in: bool) -> MobView {
         MobView {
             object_id: self.object_id,
@@ -58,7 +298,23 @@ impl LiveMob {
             home_foothold: self.home_foothold,
             fade_in,
             controlled: self.controller.is_some(),
+            statuses: self.status_views(Instant::now()),
+            summon_effect: None,
         }
+    }
+
+    /// The statuses on the mob, with the time each has left.
+    pub fn status_views(&self, now: Instant) -> Vec<MobStatusView> {
+        self.statuses
+            .iter()
+            .map(|(&stat, status)| MobStatusView {
+                stat,
+                value: status.value,
+                skill_id: status.skill_id,
+                left: status.until.saturating_duration_since(now),
+                spread: status.spread,
+            })
+            .collect()
     }
 
     pub fn hp_percent(&self) -> u8 {
@@ -130,25 +386,18 @@ impl MobSet {
             let object_id = self.object_ids.next();
             spawn.alive = Some(object_id);
             spawn.next_spawn = None;
-            self.live.insert(
+            let template = &spawn.template;
+            let mut mob = LiveMob::new(
                 object_id,
-                LiveMob {
-                    object_id,
-                    spawn: index,
-                    info: spawn.info.clone(),
-                    x: spawn.template.x,
-                    y: spawn.template.y,
-                    // Mob stances are 2 (moving) or 5 (standing), +1 facing left.
-                    stance: if spawn.template.flip { 4 } else { 5 },
-                    foothold: spawn.template.foothold,
-                    home_foothold: spawn.template.foothold,
-                    hp: i64::from(spawn.info.max_hp),
-                    controller: None,
-                    aggro_until: None,
-                    controller_distance: None,
-                    damage_by: HashMap::new(),
-                },
+                spawn.info.clone(),
+                (template.x, template.y),
+                // Mob stances are 2 (moving) or 4 (standing), +1 facing left;
+                // `flip` faces right.
+                if template.flip { 4 } else { 5 },
+                template.foothold,
             );
+            mob.spawn = Some(index);
+            self.live.insert(object_id, mob);
             spawned.push(object_id);
         }
         spawned
@@ -162,6 +411,7 @@ impl MobSet {
             .map(|mob| {
                 mob.controller = Some(candidate);
                 mob.controller_distance = None;
+                mob.granted = None;
                 mob.object_id
             })
             .collect()
@@ -175,6 +425,7 @@ impl MobSet {
             .filter(|mob| mob.controller == Some(leaving))
             .map(|mob| {
                 mob.controller = next;
+                mob.granted = None;
                 mob.aggro_until = None;
                 mob.controller_distance = None;
                 mob.damage_by.remove(&leaving);
@@ -198,6 +449,9 @@ impl MobSet {
             return None;
         }
         let previous = mob.controller.replace(attacker);
+        if previous != Some(attacker) {
+            mob.granted = None;
+        }
         mob.aggro_until = Some(now + AGGRO_DURATION);
         mob.controller_distance = None;
         Some(previous)
@@ -229,20 +483,29 @@ impl MobSet {
             return None;
         }
         let previous = mob.controller.replace(from);
+        mob.granted = None;
         mob.aggro_until = None;
         mob.controller_distance = Some(distance);
         Some(previous)
     }
 
-    /// Apply the controller's movement. `false` if `from` doesn't control it.
-    pub fn move_mob(&mut self, from: ClientId, object_id: i32, movement: &[u8]) -> bool {
+    /// Apply the controller's movement, a path from `start`. `false` if
+    /// `from` doesn't control it.
+    pub fn move_mob(
+        &mut self,
+        from: ClientId,
+        object_id: i32,
+        start: (i16, i16),
+        movement: &[u8],
+    ) -> bool {
         let Some(mob) = self.live.get_mut(&object_id) else {
             return false;
         };
         if mob.controller != Some(from) {
             return false;
         }
-        if let Some((x, y, stance, foothold)) = parse_movement(movement, (mob.x, mob.y, mob.stance))
+        if let Some((x, y, stance, foothold)) =
+            parse_movement(movement, (start.0, start.1, mob.stance))
         {
             mob.x = x;
             mob.y = y;
@@ -254,6 +517,284 @@ impl MobSet {
             }
         }
         true
+    }
+
+    /// The controller's mob used `action` (action << 1 | facing left, or
+    /// [`NO_ACTION`]) as it moved, with `skill_data`, and its client wants
+    /// it to attack next (`want_attack`). An attack costs the mob its MP;
+    /// one it lacks or can't pay for is shown as no action, as is a skill
+    /// cast without the server's grant (see [`LiveMob::cast`]). Wanting to
+    /// attack may get the mob a skill to cast next, picked by `roll` in
+    /// 0..1; `levels` looks up mob skill levels.
+    pub fn act(
+        &mut self,
+        object_id: i32,
+        (want_attack, action, skill_data): (bool, u8, i32),
+        now: Instant,
+        levels: &dyn Fn(i32, i32) -> Option<MobSkillLevel>,
+        roll: f64,
+    ) -> Option<MobAct> {
+        let summons = self
+            .live
+            .values()
+            .filter(|mob| mob.summoner == Some(object_id))
+            .count();
+        let mob = self.live.get_mut(&object_id)?;
+        let mut shown = action;
+        let mut cast = None;
+        if action != NO_ACTION && action >> 1 >= FIRST_SKILL_ACTION {
+            cast = mob.cast(action, skill_data, now, levels);
+            if cast.is_none() {
+                shown = NO_ACTION;
+            }
+        } else if action != NO_ACTION && action >> 1 >= FIRST_ATTACK_ACTION {
+            let index = usize::from((action >> 1) - FIRST_ATTACK_ACTION);
+            match mob.info.attacks.get(index) {
+                Some(attack) if attack.mp_cost <= mob.mp => mob.mp -= attack.mp_cost,
+                _ => shown = NO_ACTION,
+            }
+        }
+        let grant = if want_attack {
+            mob.grant(now, summons, levels, roll)
+        } else {
+            None
+        };
+        let attacks = !mob.info.not_attack && !mob.info.attacks.is_empty();
+        Some(MobAct {
+            action: shown,
+            next_attack: want_attack && (attacks || mob.granted.is_some()),
+            mp: i16::try_from(mob.mp).unwrap_or(i16::MAX),
+            grant,
+            cast,
+        })
+    }
+
+    /// The mobs a cast reaches: its caster, or, with an area, every mob in
+    /// it.
+    pub fn reached_by(&self, cast: &Cast) -> Vec<i32> {
+        if !self.live.contains_key(&cast.object_id) {
+            return Vec::new();
+        }
+        let Some(area) = self.area(cast) else {
+            return vec![cast.object_id];
+        };
+        self.live
+            .values()
+            .filter(|mob| mob.object_id == cast.object_id || area.contains((mob.x, mob.y)))
+            .map(|mob| mob.object_id)
+            .collect()
+    }
+
+    /// A cast's area around its caster, `lt` and `rb` as it faces left,
+    /// mirrored facing right; None without one, or once the caster is gone.
+    pub fn area(&self, cast: &Cast) -> Option<CastArea> {
+        let caster = self.live.get(&cast.object_id)?;
+        let effect = &cast.effect;
+        if effect.lt == (0, 0) && effect.rb == (0, 0) {
+            return None;
+        }
+        let (x, y) = (i32::from(caster.x), i32::from(caster.y));
+        let (left, right) = if caster.facing_left() {
+            (x + effect.lt.0, x + effect.rb.0)
+        } else {
+            (x - effect.rb.0, x - effect.lt.0)
+        };
+        Some(CastArea {
+            left,
+            top: y + effect.lt.1,
+            right,
+            bottom: y + effect.rb.1,
+        })
+    }
+
+    /// A mob regains `hp` and `mp`, up to its maxima. Returns the HP it
+    /// gained, its HP, and its max HP.
+    pub fn heal(&mut self, object_id: i32, hp: i32, mp: i32) -> Option<(i32, i32, i32)> {
+        let mob = self.live.get_mut(&object_id)?;
+        let max_hp = i64::from(mob.info.max_hp);
+        let healed = i64::from(hp.max(0)).min((max_hp - mob.hp).max(0));
+        mob.hp += healed;
+        mob.mp = (mob.mp + mp.max(0)).min(mob.info.max_mp.max(mob.mp));
+        Some((healed as i32, mob.hp as i32, mob.info.max_hp))
+    }
+
+    /// The mobs `summoner` calls up: as many of `summoned` as its `limit`
+    /// (0 for none) leaves room for, where it stands, facing its way, and
+    /// under its controller. They never respawn.
+    pub fn summon(&mut self, summoner: i32, summoned: &[MobInfo], limit: i32) -> Vec<i32> {
+        let Some(caster) = self.live.get(&summoner) else {
+            return Vec::new();
+        };
+        let (at, stance, foothold, controller) = (
+            (caster.x, caster.y),
+            caster.stance,
+            caster.foothold,
+            caster.controller,
+        );
+        let alive = self
+            .live
+            .values()
+            .filter(|mob| mob.summoner == Some(summoner))
+            .count();
+        let room = if limit > 0 {
+            (limit as usize).saturating_sub(alive)
+        } else {
+            summoned.len()
+        };
+        let mut spawned = Vec::new();
+        for info in summoned.iter().take(room) {
+            let object_id = self.object_ids.next();
+            let mut mob = LiveMob::new(object_id, info.clone(), at, stance, foothold);
+            mob.summoner = Some(summoner);
+            mob.controller = controller;
+            self.live.insert(object_id, mob);
+            spawned.push(object_id);
+        }
+        spawned
+    }
+
+    /// Put statuses caused by `skill_id` on a mob from `now` until `until`,
+    /// replacing any it has, save the ones a boss shrugs off and those its
+    /// element wards off. Returns those it got.
+    pub fn add_statuses(
+        &mut self,
+        object_id: i32,
+        statuses: &[(MobStat, i16)],
+        skill_id: i32,
+        from: ClientId,
+        now: Instant,
+        until: Instant,
+    ) -> Vec<MobStat> {
+        let Some(mob) = self.live.get_mut(&object_id) else {
+            return Vec::new();
+        };
+        let info = &mob.info;
+        let wards = |stat: MobStat| {
+            (info.boss && stat.spares_bosses())
+                || stat.element().is_some_and(|letter| info.immune_to(letter))
+        };
+        let statuses: Vec<_> = statuses
+            .iter()
+            .filter(|(stat, _)| !wards(*stat))
+            .copied()
+            .collect();
+        statuses
+            .into_iter()
+            .map(|(stat, value)| {
+                let status = MobStatus {
+                    value,
+                    skill_id,
+                    from,
+                    until,
+                    next_hurt: now + HURT_INTERVAL,
+                    spread: 0,
+                };
+                mob.statuses.insert(stat, status);
+                stat
+            })
+            .collect()
+    }
+
+    /// Give the counters a mob has among `stats` their spread.
+    pub fn spread_counters(&mut self, object_id: i32, stats: &[MobStat], spread: i32) {
+        let Some(mob) = self.live.get_mut(&object_id) else {
+            return;
+        };
+        for stat in stats {
+            if let Some(status) = mob.statuses.get_mut(stat) {
+                status.spread = spread;
+            }
+        }
+    }
+
+    /// What a mob's counter (`stat`: MCounter for a spell, PCounter for
+    /// the rest) hurts its attacker with for one attack, or 0: like the v83
+    /// client (FUN_007937e3), its value, then with a spread, plus `roll`
+    /// modulo the spread less half of it.
+    pub fn counter(&self, object_id: i32, stat: MobStat, roll: u32) -> i32 {
+        let Some(status) = self
+            .live
+            .get(&object_id)
+            .and_then(|mob| mob.statuses.get(&stat))
+        else {
+            return 0;
+        };
+        let value = i32::from(status.value);
+        match u32::try_from(status.spread) {
+            Ok(spread) if spread > 0 => value + (roll % spread) as i32 - status.spread / 2,
+            _ => value,
+        }
+    }
+
+    /// Take these statuses off a mob; returns the ones it had.
+    pub fn remove_statuses(&mut self, object_id: i32, stats: &[MobStat]) -> Vec<MobStat> {
+        let Some(mob) = self.live.get_mut(&object_id) else {
+            return Vec::new();
+        };
+        stats
+            .iter()
+            .copied()
+            .filter(|stat| mob.statuses.remove(stat).is_some())
+            .collect()
+    }
+
+    /// Take off every status that has worn off by `now`: each mob's lost
+    /// statuses.
+    pub fn expire_statuses(&mut self, now: Instant) -> Vec<(i32, Vec<MobStat>)> {
+        let mut expired = Vec::new();
+        for mob in self.live.values_mut() {
+            let lost: Vec<_> = mob
+                .statuses
+                .iter()
+                .filter(|(_, status)| status.until <= now)
+                .map(|(&stat, _)| stat)
+                .collect();
+            if lost.is_empty() {
+                continue;
+            }
+            for stat in &lost {
+                mob.statuses.remove(stat);
+            }
+            expired.push((mob.object_id, lost));
+        }
+        expired
+    }
+
+    /// Each second a mob has a status that hurts it, it loses the status's
+    /// value in HP (its `fixedDamage` instead, if it has one), as its
+    /// clients show, but never its last HP (inferred, as OdinMS-family
+    /// servers do). The damage counts as the player's who put it on.
+    pub fn hurt_by_statuses(&mut self, now: Instant) -> Vec<Hurt> {
+        let mut hurt = Vec::new();
+        for mob in self.live.values_mut() {
+            for (_, status) in mob.statuses.iter_mut().filter(|(stat, _)| stat.hurts()) {
+                if status.next_hurt > now {
+                    continue;
+                }
+                status.next_hurt += HURT_INTERVAL;
+                let damage = if mob.info.fixed_damage > 0 {
+                    i64::from(mob.info.fixed_damage)
+                } else {
+                    i64::from(status.value)
+                };
+                let dealt = damage.clamp(0, (mob.hp - 1).max(0));
+                if dealt == 0 {
+                    continue;
+                }
+                mob.hp -= dealt;
+                *mob.damage_by.entry(status.from).or_default() += dealt;
+                hurt.push(Hurt {
+                    object_id: mob.object_id,
+                    from: status.from,
+                    percent: 0,
+                });
+            }
+            let percent = mob.hp_percent();
+            for entry in hurt.iter_mut().filter(|h| h.object_id == mob.object_id) {
+                entry.percent = percent;
+            }
+        }
+        hurt
     }
 
     /// Damage a mob. Returns its HP percent, or the kill if it died.
@@ -272,14 +813,15 @@ impl MobSet {
             return Some(Ok(mob.hp_percent()));
         }
         let mob = self.live.remove(&object_id)?;
-        let spawn = &mut self.spawns[mob.spawn];
-        spawn.alive = None;
-        let delay = if spawn.template.mob_time > 0 {
-            Duration::from_secs(spawn.template.mob_time as u64).max(RESPAWN_DELAY)
-        } else {
-            RESPAWN_DELAY
-        };
-        spawn.next_spawn = Some(now + delay);
+        if let Some(spawn) = mob.spawn.map(|index| &mut self.spawns[index]) {
+            spawn.alive = None;
+            let delay = if spawn.template.mob_time > 0 {
+                Duration::from_secs(spawn.template.mob_time as u64).max(RESPAWN_DELAY)
+            } else {
+                RESPAWN_DELAY
+            };
+            spawn.next_spawn = Some(now + delay);
+        }
         Some(Err(Kill {
             object_id,
             mob_id: mob.info.mob_id,
@@ -407,6 +949,18 @@ pub fn split_exp(
 mod tests {
     use super::*;
 
+    /// A move with `action`, in a world without mob skills.
+    fn act(mobs: &mut MobSet, object_id: i32, action: u8, want_attack: bool) -> MobAct {
+        mobs.act(
+            object_id,
+            (want_attack, action, 0),
+            Instant::now(),
+            &|_, _| None,
+            0.0,
+        )
+        .unwrap()
+    }
+
     fn snail_spawn(x: i16) -> (MapMobTemplate, MobInfo) {
         (
             MapMobTemplate {
@@ -431,6 +985,324 @@ mod tests {
     }
 
     #[test]
+    fn attacks_cost_mp() {
+        let now = Instant::now();
+        let (template, mut info) = snail_spawn(100);
+        info.max_mp = 3;
+        info.attacks = vec![game_data::mobs::MobAttack {
+            mp_cost: 2,
+            ..Default::default()
+        }];
+        let mut mobs = MobSet::new([(template, info)]);
+        let mob = mobs.respawn(now)[0];
+        let attack1_left = FIRST_ATTACK_ACTION << 1 | 1;
+        let walk = act(&mut mobs, mob, NO_ACTION, true);
+        assert_eq!(
+            (walk.action, walk.next_attack, walk.mp),
+            (NO_ACTION, true, 3)
+        );
+        let first = act(&mut mobs, mob, attack1_left, false);
+        assert_eq!(
+            (first.action, first.next_attack, first.mp),
+            (attack1_left, false, 1)
+        );
+        // Out of MP, and with no attack2: shown as no action.
+        assert_eq!(act(&mut mobs, mob, attack1_left, true).action, NO_ACTION);
+        assert_eq!(
+            act(&mut mobs, mob, (FIRST_ATTACK_ACTION + 1) << 1, true).action,
+            NO_ACTION
+        );
+        // Skills await the server's grant.
+        assert_eq!(
+            act(&mut mobs, mob, FIRST_SKILL_ACTION << 1, true).action,
+            NO_ACTION
+        );
+        // A hit (action 6) is shown as it is.
+        assert_eq!(act(&mut mobs, mob, 6 << 1, true).action, 6 << 1);
+        // A mob without attacks never may.
+        let mut snails = MobSet::new([snail_spawn(100)]);
+        let snail = snails.respawn(now)[0];
+        assert!(!act(&mut snails, snail, NO_ACTION, true).next_attack);
+    }
+
+    /// Stumpy's skills: Power Up, Heal, and a summon.
+    fn stumpy() -> (MapMobTemplate, MobInfo) {
+        let (template, mut info) = snail_spawn(100);
+        info.max_hp = 1000;
+        info.max_mp = 12;
+        let entry = |skill, level, action| game_data::mobs::MobSkillEntry {
+            skill,
+            level,
+            action,
+            effect_after: 0,
+        };
+        info.skills = vec![entry(100, 1, 1), entry(114, 1, 2), entry(200, 1, 1)];
+        (template, info)
+    }
+
+    fn stumpy_levels(skill: i32, level: i32) -> Option<MobSkillLevel> {
+        let base = MobSkillLevel {
+            mp_cost: 5,
+            interval: 40,
+            hp: 100,
+            prop: 100,
+            ..MobSkillLevel::default()
+        };
+        match (skill, level) {
+            (100, 1) => Some(MobSkillLevel {
+                x: 115,
+                duration: 30,
+                ..base
+            }),
+            (114, 1) => Some(MobSkillLevel {
+                x: 700,
+                hp: 50,
+                lt: (-100, -100),
+                rb: (50, 10),
+                ..base
+            }),
+            (200, 1) => Some(MobSkillLevel {
+                limit: 2,
+                summons: vec![100100, 100100, 100100],
+                ..base
+            }),
+            _ => None,
+        }
+    }
+
+    #[test]
+    fn skills_are_granted_then_cast() {
+        let now = Instant::now();
+        let mut mobs = MobSet::new([stumpy()]);
+        let mob = mobs.respawn(now)[0];
+        mobs.assign_uncontrolled(1);
+        let act = |mobs: &mut MobSet, action, skill_data, want_attack, at, roll| {
+            mobs.act(
+                mob,
+                (want_attack, action, skill_data),
+                at,
+                &stumpy_levels,
+                roll,
+            )
+            .unwrap()
+        };
+        let power_up = FIRST_SKILL_ACTION << 1;
+        // An ungranted cast is shown as nothing.
+        let early = act(&mut mobs, power_up, 100 | 1 << 8, false, now, 0.0);
+        assert_eq!((early.action, early.cast), (NO_ACTION, None));
+        // At full HP Heal (under 50%) can't be granted: Power Up or the summon.
+        let granted = act(&mut mobs, NO_ACTION, 0, true, now, 0.0);
+        assert_eq!((granted.grant, granted.next_attack), (Some((100, 1)), true));
+        // While it waits, nothing more is granted, but it may still attack.
+        let waiting = act(&mut mobs, NO_ACTION, 0, true, now, 0.0);
+        assert_eq!((waiting.grant, waiting.next_attack), (None, true));
+        // Cast with the wrong action, or another skill: refused.
+        let wrong = act(&mut mobs, power_up + 2, 100 | 1 << 8, false, now, 0.0);
+        assert_eq!(wrong.action, NO_ACTION);
+        let other = act(&mut mobs, power_up, 200 | 1 << 8, false, now, 0.0);
+        assert_eq!(other.action, NO_ACTION);
+        // The real cast pays 5 MP and acts once its 900 ms animation ends.
+        let cast = act(
+            &mut mobs,
+            power_up | 1,
+            100 | 1 << 8 | 900 << 16,
+            false,
+            now,
+            0.0,
+        );
+        assert_eq!((cast.action, cast.mp), (power_up | 1, 7));
+        let cast = cast.cast.unwrap();
+        assert_eq!((cast.skill, cast.level, cast.effect.x), (100, 1, 115));
+        assert_eq!(cast.at, now + Duration::from_millis(900));
+        assert_eq!(mobs.reached_by(&cast), [mob]);
+        // Power Up cools down for 40 s; the summon is next.
+        let next = act(&mut mobs, NO_ACTION, 0, true, now, 0.0);
+        assert_eq!(next.grant, Some((200, 1)));
+        // A new controller starts afresh.
+        mobs.release(1, Some(2));
+        assert!(mobs.get(mob).unwrap().granted.is_none());
+        // Summon twice: its limit is 2 alive.
+        assert_eq!(
+            act(&mut mobs, NO_ACTION, 0, true, now, 0.0).grant,
+            Some((200, 1))
+        );
+        let summoned = mobs.summon(
+            mob,
+            &[snail_spawn(0).1, snail_spawn(0).1, snail_spawn(0).1],
+            2,
+        );
+        assert_eq!(summoned.len(), 2);
+        let summon = mobs.get(summoned[0]).unwrap();
+        assert_eq!(
+            (summon.summoner, summon.spawn, summon.controller),
+            (Some(mob), None, Some(2))
+        );
+        assert_eq!((summon.x, summon.y), (100, -25));
+        assert!(mobs.summon(mob, &[snail_spawn(0).1], 2).is_empty());
+        // Hurt below half, only Heal remains while the summons live, and
+        // only with MP for it.
+        let later = now + GRANT_TIMEOUT;
+        mobs.damage(1, mob, 600, later);
+        assert_eq!(
+            act(&mut mobs, NO_ACTION, 0, true, later, 0.99).grant,
+            Some((114, 1))
+        );
+        mobs.live.get_mut(&mob).unwrap().mp = 4;
+        let broke = later + GRANT_TIMEOUT;
+        assert_eq!(act(&mut mobs, NO_ACTION, 0, true, broke, 0.0).grant, None);
+        // A sealed mob casts nothing.
+        mobs.live.get_mut(&mob).unwrap().mp = 12;
+        mobs.add_statuses(
+            mob,
+            &[(MobStat::SealSkill, 1)],
+            157,
+            1,
+            broke,
+            broke + GRANT_TIMEOUT,
+        );
+        assert_eq!(act(&mut mobs, NO_ACTION, 0, true, broke, 0.0).grant, None);
+        // So does one under a player's Seal.
+        mobs.live.get_mut(&mob).unwrap().statuses.clear();
+        mobs.add_statuses(
+            mob,
+            &[(MobStat::Seal, 1)],
+            2111004,
+            30,
+            broke,
+            broke + GRANT_TIMEOUT,
+        );
+        assert_eq!(act(&mut mobs, NO_ACTION, 0, true, broke, 0.0).grant, None);
+        // Summons die for good.
+        let Some(Err(_)) = mobs.damage(1, summoned[0], 100, later) else {
+            panic!("the summon should die");
+        };
+        assert!(mobs.respawn(later + RESPAWN_DELAY * 10).is_empty());
+    }
+
+    #[test]
+    fn area_skills_reach_mobs_the_way_the_caster_faces() {
+        let now = Instant::now();
+        let mut mobs = MobSet::new([stumpy(), snail_spawn(140), snail_spawn(40)]);
+        let spawned = mobs.respawn(now);
+        let (caster, ahead, behind) = (spawned[0], spawned[1], spawned[2]);
+        let heal = Cast {
+            object_id: caster,
+            skill: 114,
+            level: 1,
+            effect: stumpy_levels(114, 1).unwrap(),
+            at: now,
+        };
+        // Facing left (stance 5), lt.x -100 to rb.x 50 covers 0..150.
+        assert_eq!(mobs.reached_by(&heal), [caster, ahead, behind]);
+        // Facing right it is mirrored to 50..200.
+        mobs.live.get_mut(&caster).unwrap().stance = 4;
+        assert_eq!(mobs.reached_by(&heal), [caster, ahead]);
+
+        mobs.live.get_mut(&caster).unwrap().hp = 600;
+        assert_eq!(mobs.heal(caster, 700, 3), Some((400, 1000, 1000)));
+        assert_eq!(mobs.get(caster).unwrap().mp, 12);
+    }
+
+    #[test]
+    fn statuses_wear_off_and_spare_bosses() {
+        let now = Instant::now();
+        let mut mobs = MobSet::new([snail_spawn(100)]);
+        let snail = mobs.respawn(now)[0];
+        let until = now + Duration::from_secs(10);
+        let seal = [(MobStat::Seal, 1), (MobStat::Speed, -20)];
+        assert_eq!(
+            mobs.add_statuses(snail, &seal, 2111004, 1, now, until),
+            [MobStat::Seal, MobStat::Speed]
+        );
+        let views = mobs.get(snail).unwrap().status_views(now);
+        assert_eq!(views.len(), 2);
+        assert_eq!(views[0].left, Duration::from_secs(10));
+        assert_eq!(
+            mobs.remove_statuses(snail, &[MobStat::Speed, MobStat::Doom]),
+            [MobStat::Speed]
+        );
+        assert!(mobs.expire_statuses(now).is_empty());
+        assert_eq!(mobs.expire_statuses(until), [(snail, vec![MobStat::Seal])]);
+        assert!(mobs.get(snail).unwrap().statuses.is_empty());
+
+        mobs.live.get_mut(&snail).unwrap().info.boss = true;
+        assert_eq!(
+            mobs.add_statuses(snail, &seal, 2111004, 1, now, until),
+            [MobStat::Speed]
+        );
+    }
+
+    #[test]
+    fn counters_hurt_their_value_give_or_take_half_the_spread() {
+        let now = Instant::now();
+        let mut mobs = MobSet::new([snail_spawn(100)]);
+        let snail = mobs.respawn(now)[0];
+        let until = now + Duration::from_secs(10);
+        assert_eq!(mobs.counter(snail, MobStat::PCounter, 7), 0);
+        let counters = [(MobStat::PCounter, 220), (MobStat::MCounter, 220)];
+        mobs.add_statuses(snail, &counters, 145 | 5 << 16, 1, now, until);
+        assert_eq!(mobs.counter(snail, MobStat::MCounter, 7), 220);
+        mobs.spread_counters(snail, &[MobStat::PCounter], 98);
+        assert_eq!(mobs.counter(snail, MobStat::PCounter, 0), 220 - 49);
+        assert_eq!(mobs.counter(snail, MobStat::PCounter, 97 + 98), 220 + 48);
+        assert_eq!(mobs.counter(snail, MobStat::MCounter, 97), 220);
+        let view = mobs.get(snail).unwrap().status_views(now);
+        let spread = |stat| view.iter().find(|v| v.stat == stat).unwrap().spread;
+        assert_eq!(
+            (spread(MobStat::PCounter), spread(MobStat::MCounter)),
+            (98, 0)
+        );
+    }
+
+    #[test]
+    fn poison_hurts_each_second_but_never_kills() {
+        let now = Instant::now();
+        let mut mobs = MobSet::new([snail_spawn(100)]);
+        let snail = mobs.respawn(now)[0];
+        let until = now + Duration::from_secs(10);
+        let poison = [(MobStat::Poison, 3), (MobStat::Freeze, 1)];
+
+        // A mob immune to poison and ice gets neither.
+        mobs.live.get_mut(&snail).unwrap().info.element = "S1I1".into();
+        assert!(mobs
+            .add_statuses(snail, &poison, 2101005, 7, now, until)
+            .is_empty());
+        mobs.live.get_mut(&snail).unwrap().info.element = "S2".into();
+        assert_eq!(
+            mobs.add_statuses(snail, &poison, 2101005, 7, now, until),
+            [MobStat::Poison, MobStat::Freeze]
+        );
+
+        assert!(mobs
+            .hurt_by_statuses(now + Duration::from_millis(999))
+            .is_empty());
+        let second = now + HURT_INTERVAL;
+        assert_eq!(
+            mobs.hurt_by_statuses(second),
+            [Hurt {
+                object_id: snail,
+                from: 7,
+                percent: 63,
+            }]
+        );
+        assert!(mobs.hurt_by_statuses(second).is_empty());
+        // 8 HP: 3, then 3, then only down to 1.
+        mobs.hurt_by_statuses(second + HURT_INTERVAL);
+        mobs.hurt_by_statuses(second + HURT_INTERVAL * 2);
+        let snail_mob = mobs.get(snail).unwrap();
+        assert_eq!(snail_mob.hp, 1);
+        assert_eq!(snail_mob.damage_by[&7], 7);
+        // At 1 there's nothing to show.
+        assert!(mobs.hurt_by_statuses(second + HURT_INTERVAL * 3).is_empty());
+
+        // A mob with fixedDamage loses that instead.
+        mobs.live.get_mut(&snail).unwrap().hp = 8;
+        mobs.live.get_mut(&snail).unwrap().info.fixed_damage = 1;
+        mobs.hurt_by_statuses(second + HURT_INTERVAL * 4);
+        assert_eq!(mobs.get(snail).unwrap().hp, 7);
+    }
+
+    #[test]
     fn spawn_control_kill_and_respawn() {
         let now = Instant::now();
         let mut mobs = MobSet::new([snail_spawn(100), snail_spawn(200)]);
@@ -442,8 +1314,8 @@ mod tests {
 
         // Only the controller may move it.
         let movement = [1, 0, 0x96, 0, 0xE7, 0xFF, 0, 0, 0, 0, 0, 0, 2, 0, 0];
-        assert!(!mobs.move_mob(2, snail, &movement));
-        assert!(mobs.move_mob(1, snail, &movement));
+        assert!(!mobs.move_mob(2, snail, (150, -25), &movement));
+        assert!(mobs.move_mob(1, snail, (150, -25), &movement));
         assert_eq!(
             (mobs.get(snail).unwrap().x, mobs.get(snail).unwrap().y),
             (150, -25)
@@ -454,12 +1326,12 @@ mod tests {
             2, 0, 0x96, 0, 0x2D, 0, 0, 0, 0, 0, 52, 0, 2, 100, 0, //
             1, 0x0A, 0, 0, 0, 2, 100, 0,
         ];
-        assert!(mobs.move_mob(1, snail, &walk));
+        assert!(mobs.move_mob(1, snail, (150, -25), &walk));
         let view = mobs.get(snail).unwrap().view(false);
         assert_eq!((view.foothold, view.home_foothold), (52, 45));
         // An absolute fragment without a foothold leaves it airborne.
         let fall = [1, 0, 0x96, 0, 0x30, 0, 0, 0, 0, 0, 0, 0, 2, 100, 0];
-        assert!(mobs.move_mob(1, snail, &fall));
+        assert!(mobs.move_mob(1, snail, (150, 45), &fall));
         assert_eq!(mobs.get(snail).unwrap().view(false).foothold, 0);
 
         assert_eq!(mobs.damage(1, snail, 3, now), Some(Ok(63)));

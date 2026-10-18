@@ -138,13 +138,6 @@ namespace ms
 			}
 		}
 
-		// Whether the shot's bullets jump from mob to mob instead: Energy Orb
-		// and Spark.
-		inline bool hops(int32_t skill)
-		{
-			return skill == 5121002 || skill == 15111006;
-		}
-
 		// Whether the shot flies its bullets to every mob it hits, rather
 		// than to the first alone.
 		inline bool shoots_all(int32_t skill)
@@ -171,7 +164,7 @@ namespace ms
 		inline bool shoots(int32_t skill, size_t target, Rectangle<int16_t> lt_rb, int16_t start_x,
 						   Rectangle<int16_t> body, bool left)
 		{
-			if (hides_bullet(skill) || hops(skill))
+			if (hides_bullet(skill) || shot_path::hops(skill))
 				return false;
 
 			if (target > 0 && !shoots_all(skill))
@@ -196,7 +189,7 @@ namespace ms
 		// than hide them otherwise.
 		inline bool hides_miss(int32_t skill)
 		{
-			return shot_path::hides_bullet(skill) || hops(skill);
+			return shot_path::hides_bullet(skill) || shot_path::hops(skill);
 		}
 
 		// Where the bullets of a shot that hit nothing start, in front of
@@ -226,6 +219,22 @@ namespace ms
 		inline int16_t miss_spread(uint8_t bullet, uint8_t count)
 		{
 			return static_cast<int16_t>(8 * bullet - 4 * count + 4);
+		}
+
+		// Whether the bullets at the `target`th mob fly from behind the user,
+		// with Shadow Partner (`sets` 2). The client compares the mob's
+		// index, not the bullet's, with the bullets in a set, so with one
+		// bullet all of them do, and with more none at the first mob
+		// (0x981ae3). Battleship Torpedo's only check the bullets in a set
+		// (0x9819fd).
+		inline bool partner_starts(int32_t skill, size_t target, uint8_t bullets, uint8_t sets)
+		{
+			if (sets < 2)
+				return false;
+
+			size_t per_set = bullets / sets;
+
+			return skill == 5221008 ? per_set == 0 : target >= per_set;
 		}
 	}
 }

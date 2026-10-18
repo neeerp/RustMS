@@ -85,6 +85,16 @@ namespace ms
 		return swim;
 	}
 
+	bool MapInfo::is_town() const
+	{
+		return town;
+	}
+
+	int32_t MapInfo::get_fieldlimit() const
+	{
+		return fieldlimit;
+	}
+
 	bool MapInfo::can_migrate() const
 	{
 		return (fieldlimit & 0x10) == 0;
@@ -156,11 +166,19 @@ namespace ms
 
 	Ladder::Ladder(nl::node src)
 	{
+		std::string name = src.name();
+		id = 0;
+		std::from_chars(name.data(), name.data() + name.size(), id);
 		x = src["x"];
 		y1 = src["y1"];
 		y2 = src["y2"];
 		ladder = src["l"].get_bool();
 		uf = src["uf"].get_bool();
+	}
+
+	int16_t Ladder::get_id() const
+	{
+		return id;
 	}
 
 	bool Ladder::is_ladder() const

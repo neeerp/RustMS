@@ -21,80 +21,72 @@ namespace ms
 {
 	namespace Buffstat
 	{
-		const std::unordered_map<Id, uint64_t> first_codes =
-				{
-						{Id::DASH2,           0x8000000000000L},
-						{Id::DASH,            0x10000000000000L},
-						{Id::ELEMENTAL_RESET, 0x200000000L},
-						{Id::ARAN_COMBO,      0x1000000000L},
-						{Id::COMBO_DRAIN,     0x2000000000L},
-						{Id::COMBO_BARRIER,   0x4000000000L},
-						{Id::BODY_PRESSURE,   0x8000000000L},
-						{Id::SMART_KNOCKBACK, 0x10000000000L},
-						{Id::PYRAMID_PQ,      0x20000000000L},
-						{Id::ENERGY_CHARGE,   0x4000000000000L},
-						{Id::MONSTER_RIDING,  0x20000000000000L},
-						{Id::HOMING_BEACON,   0x80000000000000L},
-						{Id::SPEED_INFUSION,  0x100000000000000L}
-				};
-
-		const std::unordered_map<Id, uint64_t> second_codes =
-				{
-						{Id::NONE,            0x0},
-						{Id::MORPH,           0x2},
-						{Id::RECOVERY,        0x4},
-						{Id::MAPLE_WARRIOR,   0x8},
-						{Id::STANCE,          0x10},
-						{Id::SHARP_EYES,      0x20},
-						{Id::MANA_REFLECTION, 0x40},
-						{Id::SHADOW_CLAW,     0x100},
-						{Id::INFINITY_,       0x200},
-						{Id::HOLY_SHIELD,     0x400},
-						{Id::HAMSTRING,       0x800},
-						{Id::BLIND,           0x1000},
-						{Id::CONCENTRATE,     0x2000},
-						{Id::ECHO_OF_HERO,    0x8000},
-						{Id::GHOST_MORPH,     0x20000},
-						{Id::AURA,            0x40000},
-						{Id::CONFUSE,         0x80000},
-						{Id::BERSERK_FURY,    0x8000000},
-						{Id::DIVINE_BODY,     0x10000000},
-						{Id::SPARK,           0x20000000L},
-						{Id::FINALATTACK,     0x80000000L},
-						{Id::BATTLESHIP,      0xA00000040L},
-						{Id::WATK,            0x100000000L},
-						{Id::WDEF,            0x200000000L},
-						{Id::MATK,            0x400000000L},
-						{Id::MDEF,            0x800000000L},
-						{Id::ACC,             0x1000000000L},
-						{Id::AVOID,           0x2000000000L},
-						{Id::HANDS,           0x4000000000L},
-						{Id::SHOWDASH,        0x4000000000L},
-						{Id::SPEED,           0x8000000000L},
-						{Id::JUMP,            0x10000000000L},
-						{Id::MAGIC_GUARD,     0x20000000000L},
-						{Id::DARKSIGHT,       0x40000000000L},
-						{Id::BOOSTER,         0x80000000000L},
-						{Id::POWERGUARD,      0x100000000000L},
-						{Id::HYPERBODYHP,     0x200000000000L},
-						{Id::HYPERBODYMP,     0x400000000000L},
-						{Id::INVINCIBLE,      0x800000000000L},
-						{Id::SOULARROW,       0x1000000000000L},
-						{Id::STUN,            0x2000000000000L},
-						{Id::POISON,          0x4000000000000L},
-						{Id::SEAL,            0x8000000000000L},
-						{Id::DARKNESS,        0x10000000000000L},
-						{Id::COMBO,           0x20000000000000L},
-						{Id::SUMMON,          0x20000000000000L},
-						{Id::WK_CHARGE,       0x40000000000000L},
-						{Id::DRAGONBLOOD,     0x80000000000000L},
-						{Id::HOLY_SYMBOL,     0x100000000000000L},
-						{Id::MESOUP,          0x200000000000000L},
-						{Id::SHADOWPARTNER,   0x400000000000000L},
-						{Id::PICKPOCKET,      0x800000000000000L},
-						{Id::PUPPET,          0x800000000000000L},
-						{Id::MESOGUARD,       0x1000000000000000L},
-						{Id::WEAKEN,          0x4000000000000000L}
-				};
+		// The flag bits as v83 numbers them (1 << bit of a CFlag<128>). Bits
+		// 82 and up are the two-state stats.
+		Id by_bit(uint8_t bit)
+		{
+			switch (bit)
+			{
+			case 0: return WATK;
+			case 1: return WDEF;
+			case 2: return MATK;
+			case 3: return MDEF;
+			case 4: return ACC;
+			case 5: return AVOID;
+			case 6: return HANDS;
+			case 7: return SPEED;
+			case 8: return JUMP;
+			case 9: return MAGIC_GUARD;
+			case 10: return DARKSIGHT;
+			case 11: return BOOSTER;
+			case 12: return POWERGUARD;
+			case 13: return HYPERBODYHP;
+			case 14: return HYPERBODYMP;
+			case 15: return INVINCIBLE;
+			case 16: return SOULARROW;
+			case 17: return STUN;
+			case 18: return POISON;
+			case 19: return SEAL;
+			case 20: return DARKNESS;
+			case 21: return COMBO;
+			case 22: return WK_CHARGE;
+			case 23: return DRAGONBLOOD;
+			case 24: return HOLY_SYMBOL;
+			case 25: return MESOUP;
+			case 26: return SHADOWPARTNER;
+			case 27: return PICKPOCKET;
+			case 28: return MESOGUARD;
+			case 30: return WEAKEN;
+			case 31: return CURSE;
+			case 32: return SLOW;
+			case 33: return MORPH;
+			case 34: return RECOVERY;
+			case 35: return MAPLE_WARRIOR;
+			case 36: return STANCE;
+			case 37: return SHARP_EYES;
+			case 38: return MANA_REFLECTION;
+			case 39: return SEDUCE;
+			case 40: return SHADOW_CLAW;
+			case 41: return INFINITY_;
+			case 42: return HOLY_SHIELD;
+			case 43: return HAMSTRING;
+			case 44: return BLIND;
+			case 45: return CONCENTRATE;
+			case 46: return PUPPET;
+			case 47: return ECHO_OF_HERO;
+			case 49: return GHOST_MORPH;
+			case 51: return CONFUSE;
+			case 75: return STOP_POTION;
+			case 76: return STOP_MOTION;
+			case 77: return FEAR;
+			case 82: return ENERGY_CHARGE;
+			case 83: return DASH2;
+			case 84: return DASH;
+			case 85: return MONSTER_RIDING;
+			case 87: return HOMING_BEACON;
+			case 88: return SPEED_INFUSION;
+			default: return NONE;
+			}
+		}
 	}
 }

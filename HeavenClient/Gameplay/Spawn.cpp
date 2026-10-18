@@ -43,8 +43,9 @@ namespace ms
 	}
 
 	MobSpawn::MobSpawn(int32_t o, int32_t i, int8_t m, int8_t st, uint16_t f, uint16_t hf, bool ns, int8_t t,
-					   Point<int16_t> p) : oid(o), id(i), mode(m), stance(st), fh(f), homefh(hf), newspawn(ns), team(t),
-										   position(p)
+					   Point<int16_t> p, std::vector<MobStatParser::Status> s, int8_t sm, int32_t sd) :
+			oid(o), id(i), mode(m), stance(st), fh(f), homefh(hf), newspawn(ns), team(t), position(p),
+			statuses(std::move(s)), summon(sm), summondelay(sd)
 	{}
 
 	int8_t MobSpawn::get_mode() const
@@ -59,7 +60,12 @@ namespace ms
 
 	std::unique_ptr<MapObject> MobSpawn::instantiate(const Physics &physics) const
 	{
-		return std::make_unique<Mob>(oid, id, mode, stance, fh, homefh, newspawn, team, position, physics);
+		auto mob = std::make_unique<Mob>(oid, id, mode, stance, fh, homefh, newspawn, team, position, statuses, physics);
+
+		if (summon >= 0)
+			mob->show_summon(summon, summondelay);
+
+		return mob;
 	}
 
 	ReactorSpawn::ReactorSpawn(int32_t o, int32_t r, int8_t s, Point<int16_t> p) : oid(o), rid(r), state(s), position(p)
@@ -107,8 +113,8 @@ namespace ms
 	}
 
 	CharSpawn::CharSpawn(int32_t c, const LookEntry &lk, uint8_t l, int16_t j, const std::string &nm, int8_t st,
-						 Point<int16_t> p, int32_t ch) : cid(c), look(lk), level(l), job(j), name(nm), stance(st),
-						 position(p), chair(ch)
+						 Point<int16_t> p, int32_t ch, std::vector<std::pair<Buffstat::Id, int32_t>> bf) : cid(c),
+						 look(lk), level(l), job(j), name(nm), stance(st), position(p), chair(ch), buffs(std::move(bf))
 	{}
 
 	int32_t CharSpawn::get_cid() const
@@ -120,6 +126,7 @@ namespace ms
 	{
 		auto otherchar = std::make_unique<OtherChar>(cid, look, level, job, name, stance, position);
 		otherchar->set_chair(chair);
+		otherchar->show_buffs(buffs);
 
 		return otherchar;
 	}

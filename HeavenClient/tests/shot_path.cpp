@@ -35,9 +35,25 @@ int main()
 		require(hit_delay(left, { -150, 172 }) == 277, "a hit lands 1.5 ms per pixel across");
 		require(hit_delay(left, { -150, 100 }) == 277, "only the horizontal distance times the hit");
 
+		require(hops(5121002) && hops(15111006) && !hops(5001003), "Energy Orb's and Spark's balls jump");
+		require(hop_start({ 100, 50 }, false) == ms::Point<int16_t>(125, 50) &&
+					hop_start({ 100, 50 }, true) == ms::Point<int16_t>(75, 50),
+				"from 25 px ahead");
+		require(hop_point({ -50, 50, 0, 101 }) == ms::Point<int16_t>(0, 50), "to the middle of a body");
+		require(hop_time(5121002, { 0, 0 }, { 300, 400 }) == 625, "an orb jumps 1.25 ms per pixel");
+		require(hop_time(15111006, { 0, 0 }, { 300, 400 }) == 1000, "a spark 2 ms");
+
 		require(spread(0, 1) == 0, "a single bullet flies at its target");
 		require(spread(0, 2) == -7 && spread(1, 2) == 7, "two bullets fly 7 px either side");
 		require(spread(0, 3) == -14 && spread(2, 3) == 14, "three bullets fly 14 px apart");
+		require(spread(2, 1) == 28 && spread(3, 2) == 35, "Shadow Partner's set goes on below the user's");
+
+		require(partner_shoots(4001344) && !partner_shoots(4121003) && !partner_shoots(14101006),
+				"Shadow Partner throws again, but not for Taunt or Vampire");
+		require(partner_hits(1) == 2 && partner_hits(3) == 6 && partner_hits(8) == 15, "twice the hits, at most 15");
+		require(partner_start({ 100, 50 }, false) == ms::Point<int16_t>(70, 50) &&
+					partner_start({ 100, 50 }, true) == ms::Point<int16_t>(130, 50),
+				"from 30 px behind the user");
 
 		require(bullet_delay(2070000, 0, 1) == 120, "throwing stars leave 120 ms apart");
 		require(bullet_delay(5021000, 0, 2) == 240, "cash shop stars do too");

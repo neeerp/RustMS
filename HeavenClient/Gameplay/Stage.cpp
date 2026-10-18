@@ -21,12 +21,14 @@
 #include "QuestConversation.h"
 #include "Timer.h"
 #include "MapleMap/CharClick.h"
+#include "MapleMap/DoorRules.h"
 #include "MapleMap/Npc.h"
 
 #include "../IO/UI.h"
 #include "../Util/Misc.h"
 #include "../Util/NxFiles.h"
 
+#include "../IO/UITypes/UIChatBar.h"
 #include "../IO/UITypes/UINotice.h"
 #include "../IO/UITypes/UINpcTalk.h"
 #include "../IO/UITypes/UIStatusBar.h"
@@ -44,7 +46,7 @@ namespace ms
 		constexpr int16_t TELEPORT_COOLDOWN = 600;
 	}
 
-	Stage::Stage() : combat(player, chars, mobs, reactors, physics, mapinfo)
+	Stage::Stage() : combat(player, chars, mobs, reactors, summons, physics, mapinfo, portals)
 	{
 		state = State::INACTIVE;
 	}
@@ -54,18 +56,19 @@ namespace ms
 		drops.init();
 
 		jump_effect = nl::nx::effect["BasicEff.img"]["VerticalJump"];
+		fear_sight = nl::nx::effect["MapEff.img"]["Viewrange"]["3"];
 	}
 
-	void Stage::load(int32_t mapid, int8_t portalid)
+	void Stage::load(int32_t mapid, int8_t portalid, std::optional<Point<int16_t>> chase)
 	{
 		switch (state)
 		{
 			case State::INACTIVE:
 				load_map(mapid);
-				respawn(portalid);
+				respawn(portalid, chase);
 				break;
 			case State::TRANSITION:
-				respawn(portalid);
+				respawn(portalid, chase);
 				break;
 		}
 
@@ -79,6 +82,7 @@ namespace ms
 
 		start = ContinuousTimer::get().start();
 		emote_cooldown = {};
+		fame_cooldown = {};
 
 		CharStats stats = player.get_stats();
 		levelBefore = stats.get_stat(MapleStat::Id::LEVEL);
@@ -94,6 +98,9 @@ namespace ms
 		mobs.clear();
 		drops.clear();
 		reactors.clear();
+		mists.clear();
+		doors.clear();
+		summons.clear();
 	}
 
 	void Stage::load_map(int32_t mapid)
@@ -111,15 +118,20 @@ namespace ms
 		mapinfo = MapInfo(src, physics.get_fht().get_walls(), physics.get_fht().get_borders());
 		portals = MapPortals(src["portal"], mapid);
 		ground_effects = EffectLayer();
+
+		if (mapid != -1)
+			player.get_stats().set_mapid(mapid);
 	}
 
-	void Stage::respawn(int8_t portalid)
+	void Stage::respawn(int8_t portalid, std::optional<Point<int16_t>> chase)
 	{
 		// v83's Cash Shop stage has no music of its own; the Cash Shop plays
 		// its theme.
 		Music(mapid == -1 ? "BgmUI.img/ShopBgm" : mapinfo.get_bgm()).play();
 
-		Point<int16_t> spawnpoint = portals.get_portal_by_id(portalid);
+		// A chased point is on the ground already, as a door is; look from
+		// just above it, since its rounded y may sit below a slope.
+		Point<int16_t> spawnpoint = chase ? *chase - Point<int16_t>(0, 5) : portals.get_portal_by_id(portalid);
 		Point<int16_t> startpos = physics.get_y_below(spawnpoint);
 		combat.clear_prepare();
 		combat.clear_grenades();
@@ -143,27 +155,61 @@ namespace ms
 
 		backgrounds.drawbackgrounds(viewx, viewy, alpha);
 
+		std::vector<MapDoors::Spot> town_doors = get_town_doors();
+
 		for (auto id : Layer::IDs)
 		{
 			tilesobjs.draw(id, viewpos, alpha);
+			doors.draw(id, town_doors, viewpos, alpha);
 			reactors.draw(id, viewx, viewy, alpha);
 			npcs.draw(id, viewx, viewy, alpha);
 			mobs.draw(id, viewx, viewy, alpha);
 			chars.draw(id, viewx, viewy, alpha);
 			player.draw(id, viewx, viewy, alpha);
 			drops.draw(id, viewx, viewy, alpha);
+			summons.draw(id, viewx, viewy, alpha);
 		}
+
+		summons.draw(-1, viewx, viewy, alpha);
 
 		const Party &party = player.get_party();
 
 		if (party.shows_hp_marks())
 			chars.draw_party_hp(party, player.get_oid(), mapid, viewx, viewy, alpha);
 
+		// v83 puts a mist's clouds on the effect layer, above the map's
+		// objects (z 0xc00614a4).
+		mists.draw(viewx, viewy, alpha);
 		combat.draw(viewx, viewy, alpha);
 		ground_effects.drawabove(viewpos, alpha);
 		portals.draw(viewpos, alpha);
 		backgrounds.drawforegrounds(viewx, viewy, alpha);
+		draw_fear(viewx, viewy, alpha);
 		effect.draw();
+	}
+
+	void Stage::draw_fear(double viewx, double viewy, float alpha) const
+	{
+		if (!player.has_buff(Buffstat::Id::FEAR))
+			return;
+
+		// v83 copies the sight onto a black layer with its top left this
+		// far from the player's feet, ignoring its origin.
+		Point<int16_t> sight = player.get_phobj().get_absolute(viewx, viewy, alpha) + Point<int16_t>(-80, -120);
+		Point<int16_t> size = fear_sight.get_dimensions();
+		int16_t width = Constants::Constants::get().get_viewwidth();
+		int16_t height = Constants::Constants::get().get_viewheight();
+		int16_t left = sight.x();
+		int16_t top = sight.y();
+		int16_t right = left + size.x();
+		int16_t bottom = top + size.y();
+
+		GraphicsGL &gl = GraphicsGL::get();
+		gl.drawrectangle(0, 0, width, top, 0.0f, 0.0f, 0.0f, 1.0f);
+		gl.drawrectangle(0, bottom, width, height - bottom, 0.0f, 0.0f, 0.0f, 1.0f);
+		gl.drawrectangle(0, top, left, size.y(), 0.0f, 0.0f, 0.0f, 1.0f);
+		gl.drawrectangle(right, top, width - right, size.y(), 0.0f, 0.0f, 0.0f, 1.0f);
+		fear_sight.draw(DrawArgument(sight + fear_sight.get_origin(), Color::cutout(1.0f)));
 	}
 
 	void Stage::update()
@@ -178,8 +224,15 @@ namespace ms
 		tilesobjs.update();
 
 		reactors.update(physics);
+		mists.update();
+		doors.update(physics);
 		npcs.update(physics);
-		mobs.update(physics, player.get_position(), player.is_dead());
+		Point<int16_t> playerpos = player.get_position();
+		mob_attack::Box playerbody = mob_attack::user_body(playerpos.x(), playerpos.y(), player.is_prone(),
+														   !player.getflip());
+
+		mobs.update(physics, { player.get_oid(), playerpos, playerbody, player.get_phobj().onground,
+							   player.is_dead(), player.has_buff(Buffstat::Id::DARKSIGHT) });
 		chars.update(physics);
 		drops.update(physics);
 
@@ -196,21 +249,75 @@ namespace ms
 		if (update_teleport())
 			drawn = player.get_position();
 
+		// The player's summons follow where the player now is.
+		summons.update(physics, player.get_position(), player.is_climbing());
+
 		portals.update(player.get_position());
 		check_touch_portals(drawn);
 		camera.update(player.get_position());
 
-		if (player.is_invincible())
+		// The player's or a party member's smoke screen keeps mobs' attacks,
+		// touch and mists off them (FUN_0043193a).
+		bool sheltered = mists.shelters(player.get_position(), [&](int32_t owner) {
+			return owner == player.get_oid() || player.get_party().find(owner);
+		});
+
+		if (since_mist_hurt <= mist::HURT_INTERVAL)
+			since_mist_hurt += Constants::TIMESTEP;
+
+		// Mob attacks land on the player where the mob's update found them,
+		// Dark Sight or not; the first takes the player's invincibility.
+		for (Mob::Landed &landed : mobs.take_attacks())
+		{
+			if (player.is_dead() || player.Char::is_invincible() || sheltered)
+				break;
+
+			MobAttackResult result = player.damage(landed.attack);
+			TakeDamagePacket(result).dispatch();
+			combat.interrupt_prepare(result.damage);
+
+			if (result.damage > 0)
+				player.show_attack_effect(landed.hit, 1);
+		}
+
+		if (player.is_dead() || player.Char::is_invincible() || sheltered)
 			return;
 
-		if (int32_t oid_id = mobs.find_colliding(player.get_phobj()))
+		int32_t touching = player.is_invincible() ? 0 : mobs.find_colliding(player.get_phobj());
+
+		if (touching)
 		{
-			if (MobAttack attack = mobs.create_attack(oid_id))
+			if (MobAttack attack = mobs.create_attack(touching))
 			{
 				MobAttackResult result = player.damage(attack);
-				TakeDamagePacket(result, TakeDamagePacket::From::TOUCH).dispatch();
+				TakeDamagePacket(result).dispatch();
 				combat.interrupt_prepare(result.damage);
 			}
+		}
+		else if (since_mist_hurt > mist::HURT_INTERVAL)
+		{
+			// Not touching a mob, the player in a mob's mist hurts
+			// themselves its x, without a knockback or invincibility
+			// (FUN_00431783 at 0x94b7ba).
+			mist::Hurt hurt;
+
+			if (mists.hurt_at(player.get_position(), hurt))
+			{
+				player.show_damage(hurt.damage);
+				TakeDamagePacket(hurt.element, hurt.damage, hurt.code).dispatch();
+				since_mist_hurt = 0;
+			}
+		}
+
+		// Stop Motion hurts a player who stood still two seconds.
+		if (int32_t damage = player.take_stop_motion())
+		{
+			player.show_damage(damage);
+
+			if (auto chatbar = UI::get().get_element<UIChatBar>())
+				chatbar->send_chatline(disease::STOP_MOTION_HURT, UIChatBar::LineType::GREY);
+
+			TakeDamagePacket(4, damage, 0, 3).dispatch();
 		}
 	}
 
@@ -231,30 +338,70 @@ namespace ms
 		Point<int16_t> playerpos = player.get_position();
 		const Portal *portal = portals.find_up_portal(playerpos);
 
-		if (!portal)
-			return;
-
-		Portal::WarpInfo warpinfo = portal->getwarpinfo();
-
-		if (warpinfo.valid)
+		if (portal)
 		{
-			enter_portal(warpinfo);
+			Portal::WarpInfo warpinfo = portal->getwarpinfo();
+
+			if (warpinfo.valid)
+			{
+				enter_portal(warpinfo);
+
+				return;
+			}
+
+			// A script portal with nowhere to lead runs its script on the
+			// server (v83 FUN_0094df9b).
+			switch (portal->get_type())
+			{
+				case Portal::SCRIPTED:
+				case Portal::SCRIPTED_INVISIBLE:
+				case Portal::SCRIPTED_HIDDEN:
+					player.request(ChangeMapSpecialPacket(field_key, portal->get_name(), playerpos), ExclRequest::WAIT);
+					return;
+				default:
+					break;
+			}
+		}
+
+		// A town's door portals lead nowhere themselves; a Mystic Door
+		// stands on them.
+		check_doors(playerpos);
+	}
+
+	void Stage::check_doors(Point<int16_t> playerpos)
+	{
+		if (!mapinfo.is_town())
+		{
+			if (int32_t owner = doors.find(playerpos))
+				player.request(UseDoorPacket(owner, false), ExclRequest::WAIT);
 
 			return;
 		}
 
-		// A script portal with nowhere to lead runs its script on the server
-		// (v83 FUN_0094df9b).
-		switch (portal->get_type())
+		for (const door_rules::TownDoor &door : door_rules::town_doors(mapid, player.get_oid(), player.get_door(),
+																	   player.get_party()))
 		{
-			case Portal::SCRIPTED:
-			case Portal::SCRIPTED_INVISIBLE:
-			case Portal::SCRIPTED_HIDDEN:
-				player.request(ChangeMapSpecialPacket(field_key, portal->get_name(), playerpos), ExclRequest::WAIT);
-				break;
-			default:
-				break;
+			std::optional<Point<int16_t>> point = portals.get_door_portal(door.portal);
+
+			if (point && door_rules::reaches(MapDoors::place(physics, *point).position, playerpos))
+			{
+				player.request(UseDoorPacket(door.owner, true), ExclRequest::WAIT);
+
+				return;
+			}
 		}
+	}
+
+	std::vector<MapDoors::Spot> Stage::get_town_doors() const
+	{
+		std::vector<MapDoors::Spot> spots;
+
+		for (const door_rules::TownDoor &door : door_rules::town_doors(mapid, player.get_oid(), player.get_door(),
+																	   player.get_party()))
+			if (std::optional<Point<int16_t>> point = portals.get_door_portal(door.portal))
+				spots.push_back(MapDoors::place(physics, *point));
+
+		return spots;
 	}
 
 	// v83 checks touch portals every update, whatever the player is doing
@@ -399,6 +546,10 @@ namespace ms
 		{
 			pending_teleport = Teleport{ spot->position, spot->foothold };
 			player.show_effect_id(CharEffect::Id::TELEPORT);
+
+			// Element 4 marks the jump in the path, from where the player
+			// stands until the move lands on the next update.
+			player.record_move(4);
 		}
 	}
 
@@ -622,6 +773,21 @@ namespace ms
 		return reactors;
 	}
 
+	MapMists &Stage::get_mists()
+	{
+		return mists;
+	}
+
+	MapSummons &Stage::get_summons()
+	{
+		return summons;
+	}
+
+	MapDoors &Stage::get_doors()
+	{
+		return doors;
+	}
+
 	MapDrops &Stage::get_drops()
 	{
 		return drops;
@@ -663,6 +829,11 @@ namespace ms
 	void Stage::add_effect(std::string path)
 	{
 		effect = MapEffect(path);
+	}
+
+	bool Stage::try_give_fame()
+	{
+		return fame_cooldown.try_give(get_uptime() / 1000);
 	}
 
 	int64_t Stage::get_uptime()

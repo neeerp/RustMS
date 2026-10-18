@@ -34,6 +34,8 @@ namespace ms
 					"You do not have enough throwing stars to use this skill.",
 					"You cannot use this skill as it is on cooldown.",
 					"You may only use this skill with a one-handed weapon equipped.",
+					"You cannot use that skill on this map.",
+					"You cannot use the Mystic Door Skill near the portal.",
 					"Since you are not using a weapon, you are unable to attack.",
 					"The scroll lights up and it's mysterious powers have been transferred to the item.",
 					"The scroll lights up but the item remains as if nothing happened.",

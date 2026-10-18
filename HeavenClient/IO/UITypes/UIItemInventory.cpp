@@ -235,6 +235,12 @@ namespace ms
 			update_slot(slot);
 	}
 
+	void UIItemInventory::refresh_slots()
+	{
+		load_icons();
+		update_slider();
+	}
+
 	void UIItemInventory::update_slider()
 	{
 		int16_t total = (inventory.get_slotmax(tab) + COLUMNS - 1) / COLUMNS;
@@ -326,7 +332,9 @@ namespace ms
 
 						break;
 					case InventoryType::Id::USE:
-						Stage::get().get_player().request(UseItemPacket(slot, item_id), ExclRequest::USE_WAIT);
+						if (disease::can_use_item(Stage::get().get_player().get_diseases()))
+							Stage::get().get_player().request(UseItemPacket(slot, item_id), ExclRequest::USE_WAIT);
+
 						break;
 					case InventoryType::Id::SETUP:
 						Stage::get().get_player().use_item(item_id);

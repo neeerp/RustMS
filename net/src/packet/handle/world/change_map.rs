@@ -3,6 +3,7 @@ use crate::handler::{
     HandlerResult, SpawnPosition, WorldAction, WorldContext, WorldHandler, WorldResult,
 };
 use crate::packet::build;
+use crate::packet::build::world::map::BlockedMap;
 use crate::policy;
 use game::Player;
 use packet::{io::read::PktRead, Packet};
@@ -44,22 +45,19 @@ impl WorldHandler for ChangeMapHandler {
             let source_portal = source_field
                 .portal_by_name(portal_name.as_str())
                 .ok_or(NetworkError::PacketHandlerError("Source portal not found"))?;
-            let destination_map = source_portal
-                .to_map
-                .ok_or(NetworkError::PacketHandlerError(
-                    "Portal has no destination",
-                ))?;
-            let destination_field =
-                game_data
-                    .field(destination_map)
-                    .ok_or(NetworkError::PacketHandlerError(
-                        "Destination field not found",
-                    ))?;
-            let spawn_portal = destination_field
-                .resolve_spawn_portal(source_portal.to_name.as_str())
-                .ok_or(NetworkError::PacketHandlerError(
-                    "Destination spawn portal not found",
-                ))?;
+            // A portal to a map or spawn portal this server lacks is closed,
+            // and the client may try again.
+            let Some((destination_map, spawn_portal)) = source_portal.to_map.and_then(|map_id| {
+                let field = game_data.field(map_id)?;
+                Some((
+                    map_id,
+                    field.resolve_spawn_portal(source_portal.to_name.as_str())?,
+                ))
+            }) else {
+                return Ok(HandlerResult::reply(build::world::map::build_blocked_map(
+                    BlockedMap::PortalClosed,
+                )?));
+            };
             let spawn_point = u8::try_from(spawn_portal.id).map_err(|_| {
                 NetworkError::PacketHandlerError("Destination spawn portal id out of range")
             })?;
@@ -76,7 +74,8 @@ impl WorldHandler for ChangeMapHandler {
         };
 
         player.move_to(map_id, spawn_point);
-        let warp_packet = build::world::map::build_warp_to_map(&player.stats, ctx.channel_id)?;
+        let warp_packet =
+            build::world::map::build_warp_to_map(&player.stats, ctx.channel_id, None)?;
         let enable_actions = build::world::stat::build_stat_update(true, &[])?;
         Ok(HandlerResult::reply(warp_packet)
             .with(WorldAction::ChangeField { map_id, spawn })
@@ -84,26 +83,80 @@ impl WorldHandler for ChangeMapHandler {
     }
 }
 
-/// Send the player to `map_id`'s default spawn point (script warps).
+/// Send the player to `map_id`'s portal named `portal`, or its default
+/// spawn point without one (script warps, Banish).
 pub fn warp(
     player: &mut Player,
     map_id: i32,
+    portal: &str,
     channel_id: u8,
 ) -> Result<Vec<WorldAction>, NetworkError> {
-    if !crate::game_data::get()?.field_exists(map_id) {
-        return Err(NetworkError::PacketHandlerError("Target field not found"));
-    }
-    player.move_to(map_id, 0);
+    let field = crate::game_data::get()?
+        .field(map_id)
+        .ok_or(NetworkError::PacketHandlerError("Target field not found"))?;
+    let spawn_point = field
+        .portal_by_name(portal)
+        .map_or(0, |portal| u8::try_from(portal.id).unwrap_or(0));
+    player.move_to(map_id, spawn_point);
     Ok(vec![
         WorldAction::Reply(build::world::map::build_warp_to_map(
             &player.stats,
             channel_id,
+            None,
         )?),
         WorldAction::ChangeField {
             map_id,
-            spawn: crate::spawn_position(map_id, 0),
+            spawn: crate::spawn_position(map_id, spawn_point),
         },
     ])
+}
+
+/// Send the player through a Mystic Door to `map_id`: into town at the door
+/// portal of the owner's party slot, or back to the door in its field.
+pub fn door_warp(
+    player: &mut Player,
+    map_id: i32,
+    to: DoorExit,
+    channel_id: u8,
+) -> Result<Vec<WorldAction>, NetworkError> {
+    let (spawn_point, chase, spawn) = match to {
+        DoorExit::Town { slot } => {
+            // The client draws the door at its town's `slot`th door portal
+            // (0x5377fa), any portal if the town has too few.
+            let field = crate::game_data::get()?
+                .field(map_id)
+                .ok_or(NetworkError::PacketHandlerError("Door town not found"))?;
+            let portal = field
+                .door_portals()
+                .nth(slot)
+                .or_else(|| field.door_portals().next())
+                .map_or(0, |portal| u8::try_from(portal.id).unwrap_or(0));
+            (portal, None, crate::spawn_position(map_id, portal))
+        }
+        DoorExit::Field { x, y } => (
+            crate::game_data::closest_spawn_point(map_id, x, y).unwrap_or(0),
+            Some((x, y)),
+            Some(SpawnPosition { x, y, stance: 2 }),
+        ),
+    };
+    player.move_to(map_id, spawn_point);
+    Ok(vec![
+        WorldAction::Reply(build::world::map::build_warp_to_map(
+            &player.stats,
+            channel_id,
+            chase,
+        )?),
+        WorldAction::ChangeField { map_id, spawn },
+    ])
+}
+
+/// Where a Mystic Door lets the player out.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum DoorExit {
+    /// In town, at the door of the owner's party slot (0 alone).
+    Town { slot: usize },
+    /// In the field, at the door.
+    Field { x: i16, y: i16 },
 }
 
 /// Where a direct (map id) warp may take the player.

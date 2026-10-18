@@ -58,6 +58,7 @@ namespace ms
 
 		/// Inventory 1
 		MODIFY_INVENTORY = 29,
+		INVENTORY_GROW = 30,
 
 		/// Player 2
 		CHANGE_CHANNEL = 16,
@@ -66,6 +67,9 @@ namespace ms
 		CANCEL_BUFF = 33,
 		RECALCULATE_STATS = 35,
 		UPDATE_SKILL = 36,
+		SKILL_USE_RESULT = 37,
+		FAME_RESPONSE = 38,
+		SKILL_LEARN_ITEM_RESULT = 51,
 
 		/// Messaging 1
 		SHOW_STATUS_INFO = 39,
@@ -79,6 +83,7 @@ namespace ms
 		/// Player 3
 
 		/// Messaging 2
+		SPAWN_PORTAL = 67,
 		SERVER_MESSAGE = 68,
 		WEEK_EVENT_MESSAGE = 77,
 
@@ -88,6 +93,8 @@ namespace ms
 
 		SKILL_MACROS = 124,
 		SET_FIELD = 125,
+		BLOCKED_MAP = 131,
+		BLOCKED_SERVER = 132,
 		WHISPER = 135,
 		MESSENGER = 313,
 		FIELD_EFFECT = 138,
@@ -103,6 +110,12 @@ namespace ms
 		/// MapObject
 		SPAWN_PET = 168,
 		CHAR_MOVED = 185,
+		SPAWN_SUMMON = 175,
+		REMOVE_SUMMON = 176,
+		MOVE_SUMMON = 177,
+		SUMMON_ATTACK = 178,
+		SUMMON_SKILL = 179,
+		DAMAGE_SUMMON = 180,
 
 		/// Attack
 		ATTACKED_CLOSE = 186,
@@ -118,6 +131,8 @@ namespace ms
 		CANCEL_CHAIR = 205,
 		UPDATE_CHARLOOK = 197,
 		SHOW_FOREIGN_EFFECT = 198,
+		GIVE_FOREIGN_BUFF = 199,
+		CANCEL_FOREIGN_BUFF = 200,
 		SHOW_ITEM_GAIN_INCHAT = 206, // TODO: Rename this (Terribly named)
 
 		/// Player
@@ -129,12 +144,21 @@ namespace ms
 		SPAWN_MOB_C = 238,
 		MOB_MOVED = 239,
 		MOVE_MOB_RESPONSE = 240,
+		MOB_STAT_SET = 242,
+		MOB_STAT_RESET = 243,
+		DAMAGE_MOB = 246,
 		SHOW_MOB_HP = 250,
 		SHOW_MAGNET = 251,
 		SPAWN_NPC = 257,
+		REMOVE_NPC = 258,
 		SPAWN_NPC_C = 259,
+		NPC_ACTION = 260,
 		DROP_LOOT = 268,
 		REMOVE_LOOT = 269,
+		SPAWN_MIST = 273,
+		REMOVE_MIST = 274,
+		SPAWN_DOOR = 275,
+		REMOVE_DOOR = 276,
 		HIT_REACTOR = 277,
 		SPAWN_REACTOR = 279,
 		REMOVE_REACTOR = 280,
@@ -143,6 +167,7 @@ namespace ms
 		NPC_DIALOGUE = 304,
 		OPEN_NPC_SHOP = 305,
 		CONFIRM_SHOP_TRANSACTION = 306,
+		TRUNK_RESULT = 309,
 		KEYMAP = 335,
 
 		/// Player Interaction
@@ -179,6 +204,8 @@ namespace ms
 
 		// SetField handlers
 		emplace<SET_FIELD, SetFieldHandler>();
+		emplace<BLOCKED_MAP, BlockedMapHandler>();
+		emplace<BLOCKED_SERVER, BlockedServerHandler>();
 
 		// MapObject handlers
 		emplace<SPAWN_CHAR, SpawnCharHandler>();
@@ -188,19 +215,37 @@ namespace ms
 		emplace<CANCEL_CHAIR, CancelChairHandler>();
 		emplace<UPDATE_CHARLOOK, UpdateCharLookHandler>();
 		emplace<SHOW_FOREIGN_EFFECT, ShowForeignEffectHandler>();
+		emplace<GIVE_FOREIGN_BUFF, GiveForeignBuffHandler>();
+		emplace<CANCEL_FOREIGN_BUFF, CancelForeignBuffHandler>();
 		emplace<REMOVE_CHAR, RemoveCharHandler>();
 		emplace<SPAWN_PET, SpawnPetHandler>();
 		emplace<SPAWN_NPC, SpawnNpcHandler>();
+		emplace<REMOVE_NPC, RemoveNpcHandler>();
 		emplace<SPAWN_NPC_C, SpawnNpcControllerHandler>();
+		emplace<NPC_ACTION, NpcActionHandler>();
 		emplace<SPAWN_MOB, SpawnMobHandler>();
 		emplace<SPAWN_MOB_C, SpawnMobControllerHandler>();
 		emplace<MOB_MOVED, MobMovedHandler>();
 		emplace<MOVE_MOB_RESPONSE, MoveMobResponseHandler>();
+		emplace<MOB_STAT_SET, MobStatSetHandler>();
+		emplace<MOB_STAT_RESET, MobStatResetHandler>();
+		emplace<DAMAGE_MOB, DamageMobHandler>();
 		emplace<SHOW_MOB_HP, ShowMobHpHandler>();
 		emplace<SHOW_MAGNET, ShowMagnetHandler>();
 		emplace<KILL_MOB, KillMobHandler>();
 		emplace<DROP_LOOT, DropLootHandler>();
 		emplace<REMOVE_LOOT, RemoveLootHandler>();
+		emplace<SPAWN_MIST, SpawnMistHandler>();
+		emplace<REMOVE_MIST, RemoveMistHandler>();
+		emplace<SPAWN_DOOR, SpawnDoorHandler>();
+		emplace<REMOVE_DOOR, RemoveDoorHandler>();
+		emplace<SPAWN_PORTAL, SpawnPortalHandler>();
+		emplace<SPAWN_SUMMON, SpawnSummonHandler>();
+		emplace<REMOVE_SUMMON, RemoveSummonHandler>();
+		emplace<MOVE_SUMMON, MoveSummonHandler>();
+		emplace<SUMMON_ATTACK, SummonAttackHandler>();
+		emplace<SUMMON_SKILL, SummonSkillHandler>();
+		emplace<DAMAGE_SUMMON, DamageSummonHandler>();
 		emplace<HIT_REACTOR, HitReactorHandler>();
 		emplace<SPAWN_REACTOR, SpawnReactorHandler>();
 		emplace<REMOVE_REACTOR, RemoveReactorHandler>();
@@ -223,6 +268,8 @@ namespace ms
 		emplace<CANCEL_BUFF, CancelBuffHandler>();
 		emplace<RECALCULATE_STATS, RecalculateStatsHandler>();
 		emplace<UPDATE_SKILL, UpdateSkillHandler>();
+		emplace<SKILL_USE_RESULT, SkillUseResultHandler>();
+		emplace<SKILL_LEARN_ITEM_RESULT, SkillLearnItemResultHandler>();
 		emplace<ADD_COOLDOWN, AddCooldownHandler>();
 		emplace<MONSTER_BOOK_SET_CARD, MonsterBookSetCardHandler>();
 		emplace<MONSTER_BOOK_SET_COVER, MonsterBookSetCoverHandler>();
@@ -241,6 +288,7 @@ namespace ms
 
 		// Inventory Handlers
 		emplace<MODIFY_INVENTORY, ModifyInventoryHandler>();
+		emplace<INVENTORY_GROW, InventoryGrowHandler>();
 		emplace<GATHER_RESULT, GatherResultHandler>();
 		emplace<SORT_RESULT, SortResultHandler>();
 
@@ -248,9 +296,11 @@ namespace ms
 		emplace<NPC_DIALOGUE, NpcDialogueHandler>();
 		emplace<OPEN_NPC_SHOP, OpenNpcShopHandler>();
 		emplace<CONFIRM_SHOP_TRANSACTION, ConfirmShopTransactionHandler>();
+		emplace<TRUNK_RESULT, TrunkResultHandler>();
 
 		// Player Interaction
 		emplace<CHAR_INFO, CharInfoHandler>();
+		emplace<FAME_RESPONSE, FameResponseHandler>();
 
 		// Party handlers
 		emplace<PARTY_OPERATION, PartyOperationHandler>();

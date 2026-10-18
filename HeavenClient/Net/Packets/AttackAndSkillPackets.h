@@ -53,8 +53,8 @@ namespace ms
 				write_int(attack.charge);
 
 			write_byte(attack.display);
-			write_byte(attack.toleft);
-			write_byte(attack.stance);
+			// The action, with the facing in the top bit (0x952974).
+			write_short(static_cast<int16_t>((attack.stance & 0x7FFF) | (attack.toleft ? 0x8000 : 0)));
 
 			skip(1);
 
@@ -123,7 +123,8 @@ namespace ms
 	public:
 		enum From : int8_t
 		{
-			TOUCH = -1
+			TOUCH = -1,
+			MIST = -4
 		};
 
 		TakeDamagePacket(int8_t from, uint8_t element, int32_t damage, int32_t mobid, int32_t oid, uint8_t direction) : OutPacket(OutPacket::Opcode::TAKE_DAMAGE)
@@ -137,8 +138,21 @@ namespace ms
 			write_byte(direction);
 		}
 
-		// From mob attack result.
-		TakeDamagePacket(const MobAttackResult& result, From from) : TakeDamagePacket(from, 0, result.damage, result.mobid, result.oid, result.direction) {}
+		// From a mob's touch or attack.
+		TakeDamagePacket(const MobAttackResult& result) : TakeDamagePacket(result.index, result.element, result.damage, result.mobid, result.oid, result.direction) {}
+
+		// From a mob's mist, named by its skill and level (`code`) in place
+		// of a mob (FUN_00431783), whose last byte is 2; or from Stop
+		// Motion, element 4 with no code and a last byte of 3 (0x94b1d7).
+		TakeDamagePacket(uint8_t element, int32_t damage, uint16_t code, uint8_t last = 2) : OutPacket(OutPacket::Opcode::TAKE_DAMAGE)
+		{
+			write_time();
+			write_byte(MIST);
+			write_byte(element);
+			write_int(damage);
+			write_short(static_cast<int16_t>(code));
+			write_byte(last);
+		}
 	};
 
 	// Packet which notifies the server of a skill usage.
@@ -194,6 +208,117 @@ namespace ms
 			}
 
 			write_short(static_cast<int16_t>(lock));
+		}
+	};
+
+	// Opcode: USE_SKILL(91)
+	class SummonSkillPacket : public OutPacket
+	{
+	public:
+		// Cast a summon where it should appear, facing as the player
+		// (FUN_0096b140). Unlike the other skills it ends with no lock.
+		SummonSkillPacket(int32_t skillid, int32_t level, Point<int16_t> position, bool left) : OutPacket(OutPacket::Opcode::USE_SKILL)
+		{
+			write_time();
+			write_int(skillid);
+			write_byte(static_cast<uint8_t>(level));
+			write_point(position);
+			write_byte(left);
+		}
+	};
+
+	// Opcode: USE_SKILL(91)
+	class DoorSkillPacket : public OutPacket
+	{
+	public:
+		// Open a Mystic Door where the player stands (FUN_00969bf9), with no
+		// lock after.
+		DoorSkillPacket(int32_t skillid, int32_t level, Point<int16_t> position) : OutPacket(OutPacket::Opcode::USE_SKILL)
+		{
+			write_time();
+			write_int(skillid);
+			write_byte(static_cast<uint8_t>(level));
+			write_point(position);
+		}
+	};
+
+	// Opcode: SUMMON_ATTACK(176)
+	class SummonAttackPacket : public OutPacket
+	{
+	public:
+		// One hit on a mob.
+		struct Hit
+		{
+			int32_t oid;
+			int32_t mobid;
+			Point<int16_t> position;
+			bool mobleft;
+			int16_t delay;
+			int32_t damage;
+		};
+
+		// The player's summon attacked with its `action` (0x7a57d4): where
+		// the player and it are, then each mob it hit once.
+		SummonAttackPacket(int32_t oid, uint8_t action, bool left, Point<int16_t> owner, Point<int16_t> summon, const std::vector<Hit>& hits) : OutPacket(OutPacket::Opcode::SUMMON_ATTACK)
+		{
+			write_int(oid);
+			write_time();
+			write_byte(static_cast<int8_t>((left ? 0x80 : 0) | (action & 0x7F)));
+			write_byte(static_cast<int8_t>(hits.size()));
+			write_point(owner);
+			write_point(summon);
+
+			for (const Hit& hit : hits)
+			{
+				write_int(hit.oid);
+				write_int(hit.mobid);
+				// Its hit action, facing, and the damage stat.
+				write_byte(6);
+				write_byte(static_cast<int8_t>(hit.mobleft ? 0x80 : 0));
+				write_byte(0);
+				write_byte(0);
+				write_point(hit.position);
+				write_point(hit.position);
+				write_short(hit.delay);
+				write_int(hit.damage);
+			}
+
+			// The skill data's checksum.
+			write_int(0);
+		}
+	};
+
+	// A mob touched the player's Puppet for `damage` (0x7a627a): attack -1
+	// is its body, and `left` whether it came from the left.
+	// Opcode: DAMAGE_SUMMON(177)
+	class DamageSummonPacket : public OutPacket
+	{
+	public:
+		DamageSummonPacket(int32_t oid, int32_t damage, int32_t mobid, bool left) : OutPacket(OutPacket::Opcode::DAMAGE_SUMMON)
+		{
+			write_int(oid);
+			write_byte(-1);
+			write_int(damage);
+			write_int(mobid);
+			write_byte(left);
+		}
+	};
+
+	// The player's Beholder heals them (Aura of the Beholder, `hexed` -1)
+	// or buffs Hex stat `hexed` (FUN_007a5ab4 / FUN_007a5c99), playing
+	// skill1, or skill2 on.
+	// Opcode: BEHOLDER(178)
+	class BeholderPacket : public OutPacket
+	{
+	public:
+		BeholderPacket(int32_t oid, bool left, int8_t hexed) : OutPacket(OutPacket::Opcode::BEHOLDER)
+		{
+			write_int(oid);
+			write_int(hexed < 0 ? 1320008 : 1320009);
+			write_byte(static_cast<int8_t>(left << 7 | (hexed < 0 ? 6 : 7 + hexed)));
+
+			if (hexed >= 0)
+				write_byte(hexed);
 		}
 	};
 
@@ -260,6 +385,18 @@ namespace ms
 		CancelBuffPacket(int32_t skillid) : OutPacket(OutPacket::Opcode::CANCEL_BUFF)
 		{
 			write_int(skillid);
+		}
+	};
+
+	// Ends one of the player's item buffs, as right-clicking its icon does
+	// (FUN_00a096af). The id is the buff's, minus the item id.
+	// Opcode: CANCEL_ITEM_EFFECT(73)
+	class CancelItemEffectPacket : public OutPacket
+	{
+	public:
+		CancelItemEffectPacket(int32_t buffid) : OutPacket(OutPacket::Opcode::CANCEL_ITEM_EFFECT)
+		{
+			write_int(buffid);
 		}
 	};
 }

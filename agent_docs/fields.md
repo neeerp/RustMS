@@ -62,6 +62,22 @@ the field's projection. Guild, alliance, pets, mount, wish list, and monster
 book are empty; the medal is the item worn in the medal slot. A request for
 someone not on the map gets no answer.
 
+## Fame
+
+The fame buttons in someone else's character info send GIVE_FAME (0x5F:
+character id, `u8` up). `GiveFameHandler` ignores fame for yourself and tells a
+giver below level 15 they can't (FAME_RESPONSE 0x26 mode 2); otherwise it
+returns `WorldAction::GiveFame`. The giver's client actor records the gift in
+`fame_log` (`db::fame::give`), refusing an unknown character (mode 1), a second
+gift within a day (mode 3), or a gift to the same character within 30 days
+(mode 4). Then it passes `FieldRequest::Fame` to its field. If the target is
+on the map, the field sends their actor `ServerMessage::Famed`. The target
+changes its own fame by one, within ±30000, and sends the stat update and
+mode 5 (giver, up) to its player and mode 0 (target, up, new fame) to the
+giver. A target not on the map sends the giver `ServerMessage::FameMissed`,
+which deletes the log row (`db::fame::forget`) and answers mode 1, so the miss
+doesn't spend the day.
+
 ## Map changes
 
 `ChangeMapHandler` resolves the destination (portal link or permitted map-id
@@ -69,8 +85,22 @@ warp), updates the player's map and spawn point, sends the warp, and returns
 `WorldAction::ChangeField`. The client actor then leaves the old field and
 joins the new one at the spawn portal's position.
 
+A Mystic Door warp (`net::door_warp`) lands at a town door portal, or back
+at the door through SET_FIELD's chase position
+([Mystic Door](./combat.md#mystic-door)).
+
 World entry uses the same spawn-portal lookup (`net::spawn_position`) instead
 of a hard-coded position.
+
+The client waits for an answer to each move it asks for, so a refusal
+answers too. v83 has two refusal packets, each a reason byte
+(`net::packet::build::world::map`): `BLOCKED_MAP` (0x83) for map changes and
+`BLOCKED_SERVER` (0x84) for channel, cash shop and trade shop moves.
+HeavenClient shows the reason in chat or as a notice. The server sends
+`BLOCKED_MAP` 1 ("The portal is closed for now.") for a portal to a map or spawn
+portal it doesn't have. It sends `BLOCKED_SERVER` 1 for a change to the
+player's own channel or to a missing channel, and 2 when a dead player tries
+to enter the Cash Shop.
 
 ### The Cash Shop
 

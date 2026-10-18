@@ -29,7 +29,9 @@
 #include "../MapleMap/MapChars.h"
 #include "../MapleMap/MapInfo.h"
 #include "../MapleMap/MapMobs.h"
+#include "../MapleMap/MapPortals.h"
 #include "../MapleMap/MapReactors.h"
+#include "../MapleMap/MapSummons.h"
 #include "../Physics/Physics.h"
 
 #include "../../Character/Player.h"
@@ -42,8 +44,8 @@ namespace ms
 	class Combat
 	{
 	public:
-		Combat(Player &player, MapChars &chars, MapMobs &mobs, MapReactors &reactors, const Physics &physics,
-			   const MapInfo &mapinfo);
+		Combat(Player &player, MapChars &chars, MapMobs &mobs, MapReactors &reactors, MapSummons &summons,
+			   const Physics &physics, const MapInfo &mapinfo, const MapPortals &portals);
 
 		// Load the charge gauge, once the NX files are open.
 		static void init();
@@ -91,6 +93,11 @@ namespace ms
 		// Show a buff effect.
 		void show_player_buff(int32_t skillid);
 
+		// Show a party member's skill reaching another user, or the player
+		// (user effect 2, 0x937b83).
+		void show_affected(int32_t cid, int32_t skillid);
+		void show_player_affected(int32_t skillid);
+
 		// Show Monster Magnet catching a mob, or failing to, over it
 		// (0x66d6b9, 0x438eb6).
 		void show_catch(int32_t oid, bool success);
@@ -101,6 +108,11 @@ namespace ms
 
 		// Drop the grenades in flight, as on leaving the map.
 		void clear_grenades();
+
+		// Show another user's summon attacking: its animation, then each
+		// mob's hit as it gets there (FUN_007a6882). `hits` are the mobs
+		// and their damage.
+		void show_summon_attack(int32_t oid, uint8_t action, const std::vector<std::pair<int32_t, int32_t>> &hits);
 
 	private:
 		struct DamageEffect
@@ -120,6 +132,50 @@ namespace ms
 
 		// Use a skill that doesn't attack. Whether it could ask the server.
 		bool request_skill(const SpecialMove &move);
+
+		// Summon in front of the player, if there is room (FUN_0096b140).
+		// Whether it could ask the server.
+		bool request_summon(const SpecialMove &move, int32_t level);
+
+		// Open a Mystic Door where the player stands, unless the map or a
+		// portal forbids it (FUN_00969bf9).
+		bool request_door(const SpecialMove &move, int32_t level);
+
+		// What one of a summon's attacks is like: its
+		// `summon/attack1/info`.
+		struct SummonInfo
+		{
+			uint8_t mobcount;
+			// How far it reaches to either side.
+			int16_t reach;
+			// Its box, from where it is, facing left; empty if none.
+			Rectangle<int16_t> area;
+			int16_t attackafter;
+			// How fast its ball flies, in px a second; 0 if it has none.
+			int16_t bulletspeed;
+			Animation hit;
+		};
+
+		const SummonInfo &get_summon_info(int32_t skill);
+
+		// The player's summons attack when they may (FUN_00765047).
+		void update_summons();
+		// The player's Beholder heals them if it may (FUN_007a5ab4), and
+		// whether it did.
+		bool beholder_heal(int32_t oid, Summon &beholder);
+		// The player's Beholder buffs a stat of theirs (FUN_007a5c99).
+		void beholder_hex(int32_t oid, Summon &beholder);
+
+		// A summon's hit landing on a mob.
+		struct SummonHit
+		{
+			int32_t oid;
+			int32_t damage;
+			bool toleft;
+			int32_t skill;
+		};
+
+		void apply_summon_hit(const SummonHit &hit);
 
 		// What the skill's packet carries besides it, or nothing if it isn't
 		// sent: Shadow Stars without its stars, or Resurrection with no one
@@ -258,12 +314,17 @@ namespace ms
 
 		// Show another user's shot: its bullets, and its hits as they would
 		// get there (FUN_00981211).
-		void show_remote_shot(const Char &user, const SpecialMove &move, const AttackResult &result,
+		void show_remote_shot(const OtherChar &user, const SpecialMove &move, const AttackResult &result,
 							  Rectangle<int16_t> range);
 
 		// Draw Chain Lightning's bolt from the user through its targets, each
 		// part as its target is hit (`staggered`) or all at once.
 		void draw_chain(const Char &user, const SpecialMove &move, const AttackResult &result, bool staggered);
+
+		// Each target with a counter hurts the player back; v83 shows its
+		// own roll over the head and sends nothing (FUN_00953595): the
+		// server takes the HP.
+		void show_counters(const AttackResult &result);
 
 		// Tell the targets how many hits are coming (sign 1) or cancel them (sign -1),
 		// so a mob the server kills waits for the hits before dying.
@@ -279,8 +340,10 @@ namespace ms
 		MapChars &chars;
 		MapMobs &mobs;
 		MapReactors &reactors;
+		MapSummons &summons;
 		const Physics &physics;
 		const MapInfo &mapinfo;
+		const MapPortals &portals;
 
 		std::unordered_map<int32_t, Skill> skills;
 		RegularAttack regularattack;
@@ -288,6 +351,8 @@ namespace ms
 		TimedQueue<AttackResult> attackresults;
 		TimedQueue<Bullet> bulleteffects;
 		TimedQueue<DamageEffect> damageeffects;
+		TimedQueue<SummonHit> summonhits;
+		std::unordered_map<int32_t, SummonInfo> summoninfos;
 
 		// A mob Monster Magnet reached, caught or not, for the user where
 		// they stood.

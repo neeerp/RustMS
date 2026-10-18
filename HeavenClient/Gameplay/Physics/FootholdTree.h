@@ -84,6 +84,9 @@ namespace ms
 		// Returns the platforms of a group, walls included.
 		const std::vector<uint16_t> &get_group_footholds(uint16_t group) const;
 
+		// Returns the platform at or below a position, 0 if there is none.
+		uint16_t get_fhid_below(Point<int16_t> position) const;
+
 		// Returns a platform, or an empty one for an id the map doesn't have.
 		const Foothold &get_fh(uint16_t fhid) const;
 

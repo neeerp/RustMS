@@ -163,6 +163,33 @@ namespace ms
 			return damage - between(mdef * 0.5, mdef * 0.6, roll);
 		}
 
+		// Whether a spell gets through a Magic Immunity: a roll of 0 to 99
+		// must be at most the player's chance to pierce it, so 1 in 100
+		// does with none. One that doesn't hits for 1.
+		inline bool pierces(int32_t roll, int32_t chance)
+		{
+			return roll <= chance;
+		}
+
+		// A percent of the hit: Magic Guard Up's n, or the weapon's for
+		// the element.
+		inline double percent(double damage, int32_t percent)
+		{
+			return percent * damage * 0.01;
+		}
+
+		// Magic Guard Up leaves n% of the hit after the defense.
+		inline double guarded(double damage, int32_t guard)
+		{
+			return guard ? percent(damage, guard) : damage;
+		}
+
+		// Weakness makes the hit n% harder.
+		inline double weakened(double damage, int32_t weakness)
+		{
+			return weakness ? percent(damage, weakness + 100) : damage;
+		}
+
 		// The number shown: between 1 and 199999, rounded down.
 		inline int32_t finish(double damage)
 		{

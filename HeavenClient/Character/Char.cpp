@@ -64,13 +64,9 @@ namespace ms
 		}
 
 		bool on_chair = chair && state == State::SIT;
-		Point<int16_t> chairpos = absp;
-
-		if (on_chair && chair_at_face)
-		{
-			Point<int16_t> face = look.get_facepos();
-			chairpos += Point<int16_t>(facing_right ? -face.x() : face.x(), face.y());
-		}
+		Point<int16_t> face = look.get_facepos();
+		Point<int16_t> facepos = absp + Point<int16_t>(facing_right ? -face.x() : face.x(), face.y());
+		Point<int16_t> chairpos = on_chair && chair_at_face ? facepos : absp;
 
 		if (on_chair && !chair_in_front)
 			chair_effect.draw(DrawArgument(chairpos, facing_right), alpha);
@@ -103,6 +99,9 @@ namespace ms
 		effects.drawabove(absp, alpha);
 		held_effects.drawabove(absp, alpha);
 
+		for (auto &[reason, affliction] : afflictions)
+			affliction.animation.draw(affliction.at_face ? facepos : absp, alpha);
+
 		for (auto &number : damagenumbers)
 			number.draw(viewx, viewy, alpha);
 	}
@@ -124,6 +123,10 @@ namespace ms
 		effects.update();
 		held_effects.update();
 		chair_effect.update();
+
+		for (auto &[reason, affliction] : afflictions)
+			affliction.animation.update();
+
 		chatballoon.update();
 		hintballoon.update();
 		invincible.update();
@@ -287,6 +290,28 @@ namespace ms
 		held_effects.clear();
 	}
 
+	void Char::show_afflictions(const std::vector<int32_t> &reasons)
+	{
+		for (auto iter = afflictions.begin(); iter != afflictions.end();)
+		{
+			if (std::find(reasons.begin(), reasons.end(), iter->first) == reasons.end())
+				iter = afflictions.erase(iter);
+			else
+				++iter;
+		}
+
+		for (int32_t reason : reasons)
+		{
+			if (afflictions.count(reason))
+				continue;
+
+			nl::node affected = nl::nx::skill["MobSkill.img"][std::to_string(reason & 0xFFFF)]["level"]
+			[std::to_string(reason >> 16)]["affected"];
+
+			afflictions.emplace(reason, Affliction{ affected, affected["pos"].get_integer() == 1 });
+		}
+	}
+
 	void Char::show_effect_id(CharEffect::Id toshow)
 	{
 		effects.add(chareffects[toshow]);
@@ -295,6 +320,12 @@ namespace ms
 	void Char::show_effect(const Animation &effect)
 	{
 		effects.add(effect);
+	}
+
+	void Char::show_skill_book(bool success)
+	{
+		effects.add(skill_book[success][0], DrawArgument(), 3);
+		effects.add(skill_book[success][1], DrawArgument(), -1);
 	}
 
 	void Char::show_iron_body()
@@ -603,6 +634,11 @@ namespace ms
 		return phobj;
 	}
 
+	const PhysicsObject &Char::get_phobj() const
+	{
+		return phobj;
+	}
+
 	void Char::init()
 	{
 		CharLook::init();
@@ -612,6 +648,10 @@ namespace ms
 		for (auto iter : CharEffect::PATHS)
 			chareffects.emplace(iter.first, src.resolve(iter.second));
 
+		for (int success = 0; success < 2; success++)
+			for (int layer = 0; layer < 2; layer++)
+				skill_book[success][layer] = src["SkillBook"][success ? "Success" : "Failure"][std::to_string(layer)];
+
 		nl::node tomb = nl::nx::effect["Tomb.img"];
 		tomb_fall = tomb["fall"];
 		tomb_land = tomb["land"];
@@ -620,4 +660,5 @@ namespace ms
 	EnumMap<CharEffect::Id, Animation> Char::chareffects;
 	Animation Char::tomb_fall;
 	Animation Char::tomb_land;
+	Animation Char::skill_book[2][2];
 }

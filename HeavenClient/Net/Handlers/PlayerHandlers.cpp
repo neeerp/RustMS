@@ -17,7 +17,10 @@
 //////////////////////////////////////////////////////////////////////////////////
 #include "PlayerHandlers.h"
 
+#include "Helpers/BuffParser.h"
 #include "Helpers/LoginParser.h"
+#include "../../Audio/Audio.h"
+#include "../../Character/Diseases.h"
 
 #include "../Packets/LoginPackets.h"
 
@@ -192,23 +195,10 @@ namespace ms
 
 	void BuffHandler::handle(InPacket& recv) const
 	{
-		uint64_t firstmask = recv.read_long();
-		uint64_t secondmask = recv.read_long();
+		BuffParser::Flags flags = BuffParser::read_flags(recv);
 
-		switch (secondmask)
-		{
-		case Buffstat::BATTLESHIP:
-			handle_buff(recv, Buffstat::BATTLESHIP);
-			return;
-		}
-
-		for (auto& iter : Buffstat::first_codes)
-			if (firstmask & iter.second)
-				handle_buff(recv, iter.first);
-
-		for (auto& iter : Buffstat::second_codes)
-			if (secondmask & iter.second)
-				handle_buff(recv, iter.first);
+		for (uint8_t bit : BuffParser::given(flags))
+			handle_buff(recv, Buffstat::by_bit(bit));
 
 		Stage::get().get_player().recalc_stats(false);
 	}
@@ -219,7 +209,24 @@ namespace ms
 		int32_t skillid = recv.read_int();
 		int32_t duration = recv.read_int();
 
+		if (bs == Buffstat::NONE)
+			return;
+
+		bs = disease::given(bs, skillid);
 		Stage::get().get_player().give_buff({ bs, value, skillid, duration });
+
+		// A disease has no icon, only a notice of what it does
+		// (FUN_00932da6).
+		if (disease::is_disease(bs))
+		{
+			std::string notice = disease::notice(disease::skill(skillid));
+
+			if (!notice.empty())
+				if (auto chatbar = UI::get().get_element<UIChatBar>())
+					chatbar->send_chatline(notice, UIChatBar::LineType::GREY);
+
+			return;
+		}
 
 		if (auto bufflist = UI::get().get_element<UIBuffList>())
 			bufflist->add_buff(skillid, bs, duration);
@@ -227,7 +234,14 @@ namespace ms
 
 	void CancelBuffHandler::handle_buff(InPacket&, Buffstat::Id bs) const
 	{
+		if (bs == Buffstat::NONE)
+			return;
+
 		Stage::get().get_player().cancel_buff(bs);
+
+		// Undead ends with Puppet's bit.
+		if (bs == Buffstat::PUPPET)
+			Stage::get().get_player().cancel_buff(Buffstat::UNDEAD);
 
 		if (auto bufflist = UI::get().get_element<UIBuffList>())
 			bufflist->cancel_buff(bs);
@@ -257,6 +271,52 @@ namespace ms
 			skillbook->update_skills(skillid);
 
 		UI::get().enable();
+	}
+
+	void SkillUseResultHandler::handle(InPacket& recv) const
+	{
+		recv.skip_byte();
+
+		Stage::get().get_player().request_answered();
+	}
+
+	void SkillLearnItemResultHandler::handle(InPacket& recv) const
+	{
+		int32_t cid = recv.read_int();
+		auto character = Stage::get().get_character(cid);
+
+		if (!character)
+			return;
+
+		bool mastery = recv.read_bool();
+		recv.skip_int();	// skill
+		recv.skip_int();	// master level
+		bool used = recv.read_bool();
+		bool success = recv.read_bool();
+
+		if (used)
+			character->show_skill_book(success);
+
+		if (!Stage::get().is_player(cid))
+			return;
+
+		Stage::get().get_player().request_answered();
+		Sound(success ? Sound::Name::ENCHANTSUCCESS : Sound::Name::ENCHANTFAILURE).play();
+
+		std::string book = mastery ? "Mastery Book" : "Skill Book";
+		std::string message;
+
+		if (!used)
+			message = "You cannot use " + book + ".";
+		else if (!success)
+			message = "Despite using " + book + ", the effect was nowhere to be found.";
+		else if (mastery)
+			message = "The Book of Mastery glows brightly, and the current skills have gone through an upgrade.";
+		else
+			message = "The Skill Book glows brightly, and new skills have now been added.";
+
+		if (auto chatbar = UI::get().get_element<UIChatBar>())
+			chatbar->send_chatline(message, UIChatBar::LineType::SKILL);
 	}
 
 	void SkillMacrosHandler::handle(InPacket& recv) const

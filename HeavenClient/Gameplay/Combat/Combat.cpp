@@ -21,16 +21,20 @@
 #include "DamageLayout.h"
 #include "Heal.h"
 #include "HitTiming.h"
+#include "MagicDamage.h"
 #include "PointBlank.h"
 #include "Prepare.h"
 #include "RemoteShot.h"
 #include "RemoteSpell.h"
 #include "ShotPath.h"
 
+#include "../MapleMap/DoorRules.h"
+
 #include "../../Constants.h"
 #include "../../Character/SkillId.h"
 #include "../../Data/SkillData.h"
 #include "../../IO/Messages.h"
+#include "../../Util/Misc.h"
 #include "../../Util/Randomizer.h"
 
 #include "../../Net/Packets/AttackAndSkillPackets.h"
@@ -40,12 +44,15 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdlib>
 
 namespace ms
 {
 	Combat::Combat(Player &in_player, MapChars &in_chars, MapMobs &in_mobs, MapReactors &in_reactors,
-				   const Physics &in_physics, const MapInfo &in_mapinfo) : player(
-			in_player), chars(in_chars), mobs(in_mobs), reactors(in_reactors), physics(in_physics), mapinfo(in_mapinfo),
+				   MapSummons &in_summons, const Physics &in_physics, const MapInfo &in_mapinfo,
+				   const MapPortals &in_portals) : player(
+			in_player), chars(in_chars), mobs(in_mobs), reactors(in_reactors), summons(in_summons),
+			physics(in_physics), mapinfo(in_mapinfo), portals(in_portals),
 																										attackresults(
 																												[&](const AttackResult &attack)
 																												{
@@ -63,6 +70,11 @@ namespace ms
 																												{
 																													apply_damage_effect(
 																															effect);
+																												}),
+																										summonhits(
+																												[&](const SummonHit &hit)
+																												{
+																													apply_summon_hit(hit);
 																												}),
 																										magnetcatches(
 																												[&](const MagnetCatch &caught)
@@ -153,10 +165,12 @@ namespace ms
 		update_remote_prepares();
 		update_grenades();
 		update_rains();
+		update_summons();
 
 		attackresults.update();
 		bulleteffects.update();
 		damageeffects.update();
+		summonhits.update();
 		magnetcatches.update();
 		fieldeffects.update();
 
@@ -173,6 +187,15 @@ namespace ms
 					return dn.update();
 				}
 		);
+
+		// Poison and the like show as a plain first hit, a heal in blue
+		// (0x6691d3).
+		for (const auto &[head, number] : mobs.take_hurts())
+		{
+			DamageNumber::Type type = number < 0 ? DamageNumber::Type::HEAL : DamageNumber::Type::NORMAL;
+			damagenumbers.emplace_back(type, std::abs(number), damage_layout::mob_offset(0, false));
+			damagenumbers.back().set_anchor(head);
+		}
 	}
 
 	void Combat::use_move(int32_t move_id)
@@ -220,8 +243,8 @@ namespace ms
 		if (!can_use_move(move) || !allowed)
 			return std::nullopt;
 
-		// v83 teleports only from a platform, the way the arrow keys point,
-		// reversed while confused (FUN_00957b74).
+		// v83 teleports only from a platform, the way the player is steered,
+		// so reversed while confused (FUN_00957b74).
 		const PhysicsObject &phobj = player.get_phobj();
 
 		if (!phobj.onground || player.get_ladder())
@@ -229,12 +252,6 @@ namespace ms
 
 		int32_t dx = player.is_key_down(KeyAction::Id::RIGHT) - player.is_key_down(KeyAction::Id::LEFT);
 		int32_t dy = player.is_key_down(KeyAction::Id::DOWN) - player.is_key_down(KeyAction::Id::UP);
-
-		if (player.has_buff(Buffstat::Id::CONFUSE))
-		{
-			dx = -dx;
-			dy = -dy;
-		}
 
 		int32_t level = player.get_skills().get_level(move_id);
 		int32_t range = SkillData::get(move_id).get_stats(level).shotrange;
@@ -307,6 +324,13 @@ namespace ms
 
 		int32_t moveid = move.get_id();
 		int32_t level = player.get_skills().get_level(moveid);
+
+		if (summon_rules::is_summon(moveid))
+			return request_summon(move, level);
+
+		if (moveid == door_rules::MYSTIC_DOOR)
+			return request_door(move, level);
+
 		std::optional<UseSkillPacket::Reach> reach = find_reach(moveid, level);
 
 		if (!reach)
@@ -316,10 +340,360 @@ namespace ms
 		std::string action = move.apply_actions(player, Attack::Type::MAGIC);
 		player.fix_action_speed(6);
 
+		// Resurrection with no one to raise plays out but isn't sent
+		// (0x96d567).
+		if (!skill_use::sends(moveid, reach->party))
+			return true;
+
 		uint16_t lock = action.empty() ? 0 : player.get_action_lock(action);
 		player.request(UseSkillPacket(moveid, level, lock, *reach), ExclRequest::SKILL_WAIT);
 
 		return true;
+	}
+
+	bool Combat::request_summon(const SpecialMove &move, int32_t level)
+	{
+		int32_t moveid = move.get_id();
+		bool left = !player.getflip();
+		Point<int16_t> position = player.get_position();
+		Range<int16_t> walls = mapinfo.get_walls();
+		auto ground = [&](int16_t x, int16_t top)
+		{
+			return physics.get_fht().get_y_below(Point<int16_t>(x, top));
+		};
+		auto spot = summon_rules::place(moveid, position.x(), position.y(), left, walls.first(), walls.second(),
+										 ground);
+
+		// v83 says nothing when there's no room for it.
+		if (!spot)
+			return false;
+
+		move.apply_useeffects(player);
+		move.apply_actions(player, Attack::Type::MAGIC);
+		player.fix_action_speed(6);
+		player.request(SummonSkillPacket(moveid, level, Point<int16_t>(spot->first, spot->second), left),
+					   ExclRequest::SKILL_WAIT);
+
+		return true;
+	}
+
+	bool Combat::request_door(const SpecialMove &move, int32_t level)
+	{
+		Point<int16_t> position = player.get_position();
+		door_rules::Cast cast = door_rules::may_cast(mapinfo.get_fieldlimit(), player.get_stats().get_mapid(),
+													 mapinfo.is_town(), player.get_phobj().onground,
+													 portals.blocks_door(position));
+
+		switch (cast)
+		{
+			case door_rules::Cast::FORBIDDEN:
+				InChatMessage(Messages::SKILL_FIELD).drop();
+				return false;
+			case door_rules::Cast::NEAR_PORTAL:
+				InChatMessage(Messages::DOOR_PORTAL).drop();
+				return false;
+			case door_rules::Cast::SILENT:
+				return false;
+			case door_rules::Cast::OPEN:
+				break;
+		}
+
+		move.apply_useeffects(player);
+		move.apply_actions(player, Attack::Type::MAGIC);
+		player.fix_action_speed(6);
+		player.request(DoorSkillPacket(move.get_id(), level, position), ExclRequest::SKILL_WAIT);
+
+		return true;
+	}
+
+	const Combat::SummonInfo &Combat::get_summon_info(int32_t skill)
+	{
+		auto iter = summoninfos.find(skill);
+
+		if (iter != summoninfos.end())
+			return iter->second;
+
+		nl::node src = nl::nx::skill[string_format::extend_id(skill / 10000, 3) + ".img"]["skill"]
+		[string_format::extend_id(skill, 7)];
+		nl::node info = src["summon"]["attack1"]["info"];
+		nl::node range = info["range"];
+		nl::node hit = info["hit"] ? info["hit"] : src["hit"]["0"];
+
+		SummonInfo summon{
+				static_cast<uint8_t>(info["mobCount"] ? info["mobCount"].get_integer() : 1),
+				static_cast<int16_t>(range["r"].get_integer()),
+				range["lt"] ? Rectangle<int16_t>(range["lt"], range["rb"]) : Rectangle<int16_t>(),
+				static_cast<int16_t>(info["attackAfter"].get_integer()),
+				static_cast<int16_t>(info["ball"] ? info["bulletSpeed"].get_integer() : 0),
+				Animation(hit)
+		};
+
+		return summoninfos.emplace(skill, summon).first->second;
+	}
+
+	void Combat::update_summons()
+	{
+		// A mob that touches the player's Puppet hurts it; the server breaks
+		// it at 0 HP (FUN_007a3f4d, FUN_007a6040).
+		for (auto &[oid, summon] : summons.get_local())
+		{
+			if (!summon->can_be_hit())
+				continue;
+
+			int32_t mob = mobs.find_touching(summon->get_body());
+
+			if (!mob)
+				continue;
+
+			int32_t damage = mobs.roll_puppet_damage(mob, summon->get_level());
+			bool left = mobs.get_mob_position(mob).x() < summon->get_position().x();
+			summons.hurt(oid, damage);
+			DamageSummonPacket(oid, damage, mobs.get_mob_id(mob), left).dispatch();
+		}
+
+		if (player.is_dead())
+			return;
+
+		// A Beholder heals its owner when it can, else buffs them, each in
+		// its skill's time (FUN_007a4080).
+		for (auto &[oid, summon] : summons.get_local())
+		{
+			if (summon->get_assist() != summon_rules::SUPPORT)
+				continue;
+
+			if (summon->next_heal < 0)
+			{
+				summon->next_heal = now + summon_rules::SUPPORT_DELAY;
+				summon->next_hex = now + summon_rules::SUPPORT_DELAY;
+			}
+
+			if (!summon->is_idle())
+				continue;
+
+			if (now > summon->next_heal && beholder_heal(oid, *summon))
+				continue;
+
+			if (now > summon->next_hex)
+				beholder_hex(oid, *summon);
+		}
+
+		for (auto &[oid, summon] : summons.get_local())
+		{
+			int32_t skill = summon->get_skill();
+
+			if (summon->get_assist() != summon_rules::ATTACK || !summon->is_idle() ||
+				now - summon->last_attack < summon_rules::attack_interval(skill))
+				continue;
+
+			const SummonInfo &info = get_summon_info(skill);
+			Point<int16_t> position = summon->get_position();
+			MapObjects *objs = mobs.get_mobs();
+			std::vector<int32_t> targets;
+			bool left = summon->is_left();
+
+			if (summon_rules::aims_at_box(skill))
+			{
+				// The mage summons hit the side of their box with more mobs
+				// (FUN_00765047).
+				Rectangle<int16_t> area = info.area;
+				Rectangle<int16_t> facing_left(position + area.get_left_top(), position + area.get_right_bottom());
+				Rectangle<int16_t> facing_right(position.x() - area.right(), position.x() - area.left(),
+												position.y() + area.top(), position.y() + area.bottom());
+				std::vector<int32_t> lefts = find_targets(objs, facing_left, position, info.mobcount, true, false);
+				std::vector<int32_t> rights = find_targets(objs, facing_right, position, info.mobcount, true, false);
+				left = lefts.size() >= rights.size();
+				targets = left ? lefts : rights;
+			} else
+			{
+				// The others hit the mobs nearest them, within their reach
+				// (I: within 100 px up or down).
+				int16_t reach = info.reach > 0 ? info.reach : 300;
+				Rectangle<int16_t> around(position.x() - reach, position.x() + reach, position.y() - 100,
+										  position.y() + 100);
+				uint8_t count = summon_rules::spreads(skill) ? 1 : info.mobcount;
+				targets = find_targets(objs, around, position, count, true, true);
+
+				if (!targets.empty() && summon_rules::spreads(skill))
+				{
+					Point<int16_t> first = mobs.get_mob_position(targets[0]);
+					Rectangle<int16_t> spread(first + info.area.get_left_top(), first + info.area.get_right_bottom());
+
+					for (int32_t other : find_targets(objs, spread, first, info.mobcount, true, true))
+						if (other != targets[0] && targets.size() < info.mobcount)
+							targets.push_back(other);
+				}
+
+				if (!targets.empty())
+					left = mobs.get_mob_position(targets[0]).x() < position.x();
+			}
+
+			if (targets.empty())
+				continue;
+
+			nl::node level = nl::nx::skill[string_format::extend_id(skill / 10000, 3) + ".img"]["skill"]
+			[string_format::extend_id(skill, 7)]["level"][std::to_string(summon->get_level())];
+			const CharStats &stats = player.get_stats();
+			int32_t str = stats.get_total(EquipStat::Id::STR);
+			int32_t dex = stats.get_total(EquipStat::Id::DEX);
+			int32_t intl = stats.get_total(EquipStat::Id::INT);
+			int32_t luk = stats.get_total(EquipStat::Id::LUK);
+			int32_t main = str;
+
+			switch (summon_rules::main_stat(stats.get_job().get_id()))
+			{
+			case summon_rules::DEX:
+				main = dex;
+				break;
+			case summon_rules::LUK:
+				main = luk;
+				break;
+			default:
+				break;
+			}
+
+			Randomizer random;
+			uint8_t action = skill == summon_rules::WRATH_OF_THE_OCTOPI && random.next_bool() ? summon_rules::ATTACK2
+																								  : summon_rules::ATTACK1;
+			std::vector<SummonAttackPacket::Hit> hits;
+
+			for (size_t i = 0; i < targets.size(); i++)
+			{
+				int32_t target = targets[i];
+				double roll = random.next_real(1.0);
+				int32_t damage;
+
+				if (summon_rules::is_magic(skill))
+				{
+					int32_t magic = magic_damage::magic(intl, stats.get_total(EquipStat::Id::MAGIC));
+					damage = std::max(1, static_cast<int32_t>(
+							magic_damage::base(magic, intl, 0, level["mad"].get_integer(), roll)));
+				} else
+				{
+					damage = summon_rules::physical_damage(main, str + dex + luk - main,
+														   static_cast<int32_t>(level["pad"].get_integer()), roll);
+				}
+
+				Point<int16_t> at = mobs.get_mob_position(target);
+				int16_t delay = info.attackafter;
+
+				if (info.bulletspeed > 0)
+					delay += static_cast<int16_t>(at.distance(position) * 1000 / info.bulletspeed);
+
+				if (summon_rules::spreads(skill))
+					delay += static_cast<int16_t>(120 * i);
+
+				hits.push_back({ target, mobs.get_mob_id(target), at, at.x() > position.x(), delay, damage });
+				summonhits.push(delay, { target, damage, left, skill });
+			}
+
+			summon->set_left(left);
+			summon->play(static_cast<summon_rules::Action>(action));
+			summon->last_attack = now;
+
+			SummonAttackPacket(oid, action, left, player.get_position(), position, hits).dispatch();
+		}
+	}
+
+	namespace
+	{
+		nl::node skill_level(int32_t skill, int32_t level)
+		{
+			return nl::nx::skill[string_format::extend_id(skill / 10000, 3) + ".img"]["skill"]
+			[string_format::extend_id(skill, 7)]["level"][std::to_string(level)];
+		}
+	}
+
+	bool Combat::beholder_heal(int32_t oid, Summon &beholder)
+	{
+		SkillBook &skills = player.get_skills();
+		int32_t level = skills.get_level(summon_rules::AURA_OF_THE_BEHOLDER);
+
+		if (level <= 0)
+			return false;
+
+		nl::node aura = skill_level(summon_rules::AURA_OF_THE_BEHOLDER, level);
+		int32_t berserk_level = skills.get_level(SkillId::Id::BERSERK);
+		int32_t berserk = berserk_level > 0
+						  ? static_cast<int32_t>(skill_level(SkillId::Id::BERSERK, berserk_level)["x"].get_integer())
+						  : 0;
+		const CharStats &stats = player.get_stats();
+
+		if (!summon_rules::aura_heals(stats.get_stat(MapleStat::Id::HP), stats.get_total(EquipStat::Id::HP),
+									  static_cast<int32_t>(aura["hp"].get_integer()), berserk))
+			return false;
+
+		BeholderPacket(oid, beholder.is_left(), -1).dispatch();
+		beholder.next_heal = now + aura["x"].get_integer() * 1000;
+		beholder.play(summon_rules::SKILL1);
+
+		return true;
+	}
+
+	void Combat::beholder_hex(int32_t oid, Summon &beholder)
+	{
+		int32_t level = player.get_skills().get_level(summon_rules::HEX_OF_THE_BEHOLDER);
+
+		if (level <= 0)
+			return;
+
+		nl::node hex = skill_level(summon_rules::HEX_OF_THE_BEHOLDER, level);
+		std::array<int32_t, 5> gives = {
+				static_cast<int32_t>(hex["pdd"].get_integer()), static_cast<int32_t>(hex["mdd"].get_integer()),
+				static_cast<int32_t>(hex["acc"].get_integer()), static_cast<int32_t>(hex["eva"].get_integer()),
+				static_cast<int32_t>(hex["pad"].get_integer())
+		};
+		std::array<int32_t, 5> has = {
+				player.get_buff_value(Buffstat::Id::WDEF), player.get_buff_value(Buffstat::Id::MDEF),
+				player.get_buff_value(Buffstat::Id::ACC), player.get_buff_value(Buffstat::Id::AVOID),
+				player.get_buff_value(Buffstat::Id::WATK)
+		};
+		Randomizer random;
+		int8_t hexed = summon_rules::hex_pick(gives, has, random.next_int<uint32_t>(UINT32_MAX));
+
+		if (hexed < 0)
+			return;
+
+		BeholderPacket(oid, beholder.is_left(), hexed).dispatch();
+		beholder.next_hex = now + hex["x"].get_integer() * 1000;
+		beholder.play(static_cast<summon_rules::Action>(summon_rules::SKILL1 + 1 + hexed));
+	}
+
+	void Combat::apply_summon_hit(const SummonHit &hit)
+	{
+		if (!mobs.contains(hit.oid))
+			return;
+
+		damagenumbers.emplace_back(DamageNumber::Type::NORMAL, hit.damage, damage_layout::mob_offset(0, false));
+		damagenumbers.back().set_anchor(mobs.get_mob_head_position(hit.oid));
+		mobs.apply_summon_damage(hit.oid, hit.damage, hit.toleft, get_summon_info(hit.skill).hit);
+	}
+
+	void Combat::show_summon_attack(int32_t oid, uint8_t action, const std::vector<std::pair<int32_t, int32_t>> &hits)
+	{
+		Summon *summon = summons.get(oid);
+
+		if (!summon)
+			return;
+
+		bool left = action & 0x80;
+		int32_t skill = summon->get_skill();
+		const SummonInfo &info = get_summon_info(skill);
+		Point<int16_t> position = summon->get_position();
+		summon->play(static_cast<summon_rules::Action>(action & 0x7F));
+
+		for (size_t i = 0; i < hits.size(); i++)
+		{
+			int32_t delay = info.attackafter;
+
+			if (info.bulletspeed > 0)
+				delay += static_cast<int32_t>(mobs.get_mob_position(hits[i].first).distance(position) * 1000 /
+											  info.bulletspeed);
+
+			if (summon_rules::spreads(skill))
+				delay += static_cast<int32_t>(120 * i);
+
+			summonhits.push(delay, { hits[i].first, hits[i].second, left, skill });
+		}
 	}
 
 	std::optional<UseSkillPacket::Reach> Combat::find_reach(int32_t skill, int32_t level)
@@ -359,12 +733,7 @@ namespace ms
 		int32_t members = 0;
 
 		if (kinds & skill_use::PARTY)
-		{
 			members = find_party(skill, range, reach.party);
-
-			if (!skill_use::sends(skill, reach.party))
-				return std::nullopt;
-		}
 
 		if (kinds & skill_use::MOBS)
 			reach.mobs = find_targets(mobs.get_mobs(), range, position, skill_use::mob_limit(stats.mobcount, members),
@@ -492,6 +861,14 @@ namespace ms
 
 			move.apply_stats(player, attack);
 
+			// Shadow Partner throws each bullet again, for twice the hits.
+			if (attack.type == Attack::Type::RANGED && player.has_buff(Buffstat::Id::SHADOWPARTNER) &&
+				shot_path::partner_shoots(attack.skill))
+			{
+				attack.sets = 2;
+				attack.hitcount = shot_path::partner_hits(attack.hitcount);
+			}
+
 			if (whack != Stance::Id::NONE)
 				attack.range = point_blank::range(player.get_afterimage_range(whack));
 			// Like v83, shoot from the first stack that covers the cost.
@@ -611,6 +988,7 @@ namespace ms
 
 			result.attacker = player.get_oid();
 			expect_hits(result, 1);
+			show_counters(result);
 			extract_effects(player, move, result, range, reach, shot_area, shot_end);
 
 			if (attack.type == Attack::Type::MAGIC)
@@ -1004,31 +1382,43 @@ namespace ms
 			// nothing. A spell flies one ball to each mob it hits. A mob's
 			// hits all land 1.5 ms per pixel it is away across, or along a
 			// spell's path, after the attack's hit frame, but for a few
-			// skills (0x954867).
+			// skills (0x954867). Energy Orb's ball instead jumps from 25 px
+			// ahead to the middle of each mob in turn, each hit when it gets
+			// there (FUN_0094289f).
 			Animation animation = move.get_bullet(user, result.bullet);
 			Point<int16_t> origin = shot_path::origin(user.get_position(), reach, result.toleft);
 			Point<int16_t> start = shot_path::bullet_start(result.skill, origin, result.toleft);
 			uint16_t delay = user.get_attackdelay(0);
 			bool spell = result.type == Attack::Type::MAGIC;
 
+			// Shadow Partner's set follows the user's, from behind them, each
+			// bullet further below the last.
 			auto shoot = [&](Point<int16_t> target, uint8_t count)
 			{
+				uint8_t sets = result.sets;
+
 				if (spell)
-					count = 1;
-				else if (shot_path::hides_bullet(result.skill))
+					count = sets = 1;
+				else if (shot_path::hides_bullet(result.skill) || shot_path::hops(result.skill))
 					return;
+
+				uint8_t per_set = std::max(count / sets, 1);
 
 				for (uint8_t i = 0; i < count; i++)
 				{
-					Point<int16_t> end = target + Point<int16_t>(0, shot_path::spread(i, count));
+					Point<int16_t> from = i < per_set ? start : shot_path::partner_start(start, result.toleft);
+					Point<int16_t> end = target + Point<int16_t>(0, shot_path::spread(i, per_set));
 					uint16_t time = delay + shot_path::bullet_delay(result.bullet, result.skill, i);
-					bulleteffects.push(time, Bullet(animation, start, end, shot_path::flight_time(start, end)));
+					bulleteffects.push(time, Bullet(animation, from, end, shot_path::flight_time(from, end)));
 				}
 			};
 
 			uint16_t first = 0;
 			std::optional<Point<int16_t>> first_hit;
 			std::vector<Rectangle<int16_t>> bodies;
+			bool hops = !spell && shot_path::hops(result.skill);
+			Point<int16_t> hop_from = shot_path::hop_start(origin, result.toleft);
+			uint16_t hopped = 0;
 
 			for (size_t target = 0; target < result.damagelines.size(); target++)
 			{
@@ -1042,6 +1432,16 @@ namespace ms
 					Point<int16_t> hit = shot_path::hit_point(shot_area, body);
 					uint16_t hit_delay = spell ? shot_path::flight_time(origin, hit)
 						: shot_path::target_delay(result.skill, target, first, origin, hit);
+
+					if (hops)
+					{
+						Point<int16_t> hop_to = shot_path::hop_point(body);
+						uint16_t hop = shot_path::hop_time(result.skill, hop_from, hop_to);
+						bulleteffects.push(delay + hopped, Bullet(animation, hop_from, hop_to, hop));
+						hopped += hop;
+						hit_delay = hopped;
+						hop_from = hop_to;
+					}
 
 					if (target == 0)
 						first = hit_delay;
@@ -1226,7 +1626,7 @@ namespace ms
 		}
 	}
 
-	void Combat::show_remote_shot(const Char &user, const SpecialMove &move, const AttackResult &result,
+	void Combat::show_remote_shot(const OtherChar &user, const SpecialMove &move, const AttackResult &result,
 								  Rectangle<int16_t> range)
 	{
 		AttackUser attackuser = {
@@ -1252,12 +1652,16 @@ namespace ms
 			lt_rb = stats.range;
 		}
 
+		// Shadow Partner throws every bullet twice (0x981447).
+		uint8_t sets = user.get_buff(Buffstat::Id::SHADOWPARTNER) ? 2 : 1;
 		Animation animation = move.get_bullet(user, result.bullet);
 		Point<int16_t> position = user.get_position();
 		uint16_t delay = remote_shot::attack_delay(skill, user.get_attackdelay(0));
 		uint16_t first = 0;
 		std::optional<Point<int16_t>> first_hit;
 		std::vector<Rectangle<int16_t>> bodies;
+		std::optional<Point<int16_t>> hop_from;
+		uint16_t hopped = 0;
 
 		for (size_t target = 0; target < result.damagelines.size(); target++)
 		{
@@ -1287,6 +1691,20 @@ namespace ms
 			Point<int16_t> aim = remote_spell::aim(start, body, left);
 			uint16_t hit = remote_shot::hit_delay(skill, target, first, delay, start, aim);
 
+			// Energy Orb's ball jumps from 25 px ahead of where it starts
+			// to the middle of each mob in turn, as the user's own does
+			// (0x981ba6).
+			if (shot_path::hops(skill))
+			{
+				Point<int16_t> from = hop_from ? *hop_from : shot_path::hop_start(start, result.toleft);
+				Point<int16_t> to = shot_path::hop_point(body);
+				uint16_t hop = shot_path::hop_time(skill, from, to);
+				bulleteffects.push(delay + hopped, Bullet(animation, from, to, hop));
+				hopped += hop;
+				hit = hopped;
+				hop_from = to;
+			}
+
 			if (target == 0)
 				first = hit;
 
@@ -1296,7 +1714,7 @@ namespace ms
 			bodies.push_back(body);
 
 			std::vector<DamageNumber> numbers = place_numbers(line.second, move.get_id());
-			size_t shown = remote_shot::shown_hits(numbers.size(), bullets, attacks);
+			size_t shown = remote_shot::shown_hits(numbers.size(), sets * bullets, attacks);
 
 			for (size_t i = 0; i < shown; i++)
 				damageeffects.emplace(
@@ -1318,16 +1736,17 @@ namespace ms
 			// Each bullet flies as long as the hits take to land, to at most
 			// 400 px along the way, each a few px below the last.
 			Point<int16_t> end = remote_shot::end(start, aim);
+			Point<int16_t> from = remote_shot::partner_starts(skill, target, bullets, sets)
+				? shot_path::partner_start(start, result.toleft) : start;
 
-			for (uint8_t i = 0; i < bullets; i++)
+			for (uint8_t i = 0; i < sets * bullets; i++)
 			{
 				Point<int16_t> to = end + Point<int16_t>(0, shot_path::spread(i, bullets));
 				uint16_t time = delay + shot_path::bullet_delay(result.bullet, skill, i);
-				bulleteffects.push(time, Bullet(animation, start, to, hit));
+				bulleteffects.push(time, Bullet(animation, from, to, hit));
 			}
 		}
 
-		if (first_hit)
 		if (first_hit)
 			rain_shot(skill, lt_rb, position, result.toleft, delay + first, *first_hit, bodies);
 
@@ -1342,7 +1761,11 @@ namespace ms
 		int16_t end_x = position.x() + (result.toleft ? -reach : reach);
 		uint16_t flight = remote_shot::miss_flight(skill, start.x(), end_x);
 
-		for (uint8_t i = 0; i < bullets; i++)
+		// With Shadow Partner they all stop 30 px short, as fast.
+		if (sets > 1)
+			end_x = shot_path::partner_start(Point<int16_t>(end_x, y), result.toleft).x();
+
+		for (uint8_t i = 0; i < sets * bullets; i++)
 		{
 			Point<int16_t> end(end_x, static_cast<int16_t>(y + remote_shot::miss_spread(i, bullets)));
 			uint16_t time = delay + shot_path::bullet_delay(result.bullet, skill, i);
@@ -1636,6 +2059,21 @@ namespace ms
 	void Combat::show_player_buff(int32_t skillid)
 	{
 		get_move(skillid).apply_useeffects(player);
+	}
+
+	void Combat::show_affected(int32_t cid, int32_t skillid)
+	{
+		if (Optional<OtherChar> ouser = chars.get_char(cid))
+		{
+			const SkillPrepare::Effect &affected = get_skill(skillid).get_affected();
+			ouser->show_attack_effect(affected.animation, affected.z);
+		}
+	}
+
+	void Combat::show_player_affected(int32_t skillid)
+	{
+		const SkillPrepare::Effect &affected = get_skill(skillid).get_affected();
+		player.show_attack_effect(affected.animation, affected.z);
 	}
 
 	void Combat::show_prepare(int32_t cid, int32_t skillid, uint8_t level, uint16_t action_and_facing, uint8_t speed)
@@ -2142,9 +2580,23 @@ namespace ms
 		mobs.send_attack(result, attack, targets, attack.mobcount);
 		result.attacker = player.get_oid();
 		expect_hits(result, 1);
+		show_counters(result);
 		extract_effects(player, skill, result, range, 0, range, position);
 
 		AttackPacket(result, player.get_position(), position).dispatch();
+	}
+
+	void Combat::show_counters(const AttackResult &result)
+	{
+		bool magic = result.type == Attack::Type::MAGIC;
+
+		for (const auto &line : result.damagelines)
+		{
+			int32_t damage = mobs.counter(line.first, magic);
+
+			if (damage > 0)
+				player.show_damage(damage);
+		}
 	}
 
 	void Combat::clear_grenades()

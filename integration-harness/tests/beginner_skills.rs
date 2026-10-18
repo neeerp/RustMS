@@ -114,9 +114,10 @@ async fn beginner_skills_spend_mp_and_take_effect() {
     read_for(&mut b.connection, tb, 4500).await;
     assert_eq!(tb.cancelled_buffs, [SPEED_MASK]);
 
-    // Recovery: 5 MP, then 4 HP every 5 seconds while hurt.
-    let hurt = tc.stat(stat::HP).unwrap() - 12;
-    send(&mut c.connection, touched(12)).await;
+    // Recovery: 5 MP, then 4 HP every 5 seconds while hurt. A snail hits
+    // a level 2 beginner for at most 5.
+    let hurt = tc.stat(stat::HP).unwrap() - 5;
+    send(&mut c.connection, touched(5)).await;
     until(&mut c.connection, tc, |t| t.stat(stat::HP) == Some(hurt)).await;
     send(&mut c.connection, use_skill(RECOVERY, 1)).await;
     until(&mut c.connection, tc, |t| !t.buffs.is_empty()).await;
@@ -127,8 +128,8 @@ async fn beginner_skills_spend_mp_and_take_effect() {
     })
     .await;
     // Dying ends it.
-    for _ in 0..4 {
-        send(&mut c.connection, touched(12)).await;
+    for _ in 0..(hurt + 4 + 4) / 5 {
+        send(&mut c.connection, touched(5)).await;
     }
     until(&mut c.connection, tc, |t| t.stat(stat::HP) == Some(0)).await;
     until(&mut c.connection, tc, |t| {

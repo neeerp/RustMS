@@ -20,6 +20,7 @@
 #include <cstdint>
 
 #include "ActiveBuffs.h"
+#include "Diseases.h"
 #include "BuddyList.h"
 #include "ExclRequest.h"
 #include "MonsterBook.h"
@@ -31,6 +32,7 @@
 
 #include "Inventory/Inventory.h"
 
+#include "../Gameplay/MovePath.h"
 #include "../Gameplay/Playable.h"
 
 #include "../Gameplay/Combat/Skill.h"
@@ -63,6 +65,10 @@ namespace ms
 
 		// Respawn the player at the given position
 		void respawn(Point<int16_t> position, bool underwater);
+
+		// Mark where the player is now in the path to the server, as
+		// element `command` of no duration (v83 FUN_0052ef17).
+		void record_move(uint8_t command);
 
 		// Sends a Keyaction to the player's state, to apply forces, change the state and other behaviour.
 		void send_action(KeyAction::Id action, bool pressed);
@@ -130,6 +136,14 @@ namespace ms
 
 		// Return whether the buff is active.
 		bool has_buff(Buffstat::Id stat) const;
+		// What a buff adds, 0 without it.
+		int16_t get_buff_value(Buffstat::Id stat) const;
+
+		// The diseases on the player.
+		disease::State get_diseases() const;
+		// What Stop Motion takes now from a player who stood still too
+		// long, 0 if nothing (0x94b1d7).
+		int32_t take_stop_motion();
 
 		// Change a skill
 		void change_skill(int32_t skill_id, int32_t level, int32_t masterlevel, int64_t expiration);
@@ -170,7 +184,9 @@ namespace ms
 		// Return whether the player is underwater
 		bool is_underwater() const;
 
-		// Returns if a Keyaction is currently active.
+		// Returns if a Keyaction is currently active. The arrows are the
+		// way the player is steered, whatever their diseases make of the
+		// keys held.
 		bool is_key_down(KeyAction::Id action) const;
 
 		// Return a pointer to the ladder the player is on.
@@ -224,11 +240,21 @@ namespace ms
 		Party &get_party();
 		const Party &get_party() const;
 
+		// The player's own Mystic Door, as SPAWN_PORTAL last told.
+		MysticDoor &get_door();
+		const MysticDoor &get_door() const;
+
 		// Obtain a reference to the player's buddy list.
 		BuddyList &get_buddies();
 		const BuddyList &get_buddies() const;
 
 	private:
+		// Whether the key for an action is held.
+		bool is_held(KeyAction::Id action) const;
+
+		// Show the animations of the diseases on the player.
+		void show_diseases();
+
 		// Natural recovery as v83 runs it (FUN_0083007f). MP heals every 10
 		// seconds while alive. HP heals every 10 seconds, or 5 for a warrior
 		// with Improved HP Recovery, while the player stands or sits without
@@ -292,6 +318,7 @@ namespace ms
 		TeleportRock teleportrock;
 		MonsterBook monsterbook;
 		Party party;
+		MysticDoor door;
 		BuddyList buddies;
 
 		EnumMap<Buffstat::Id, Buff> buffs;
@@ -303,8 +330,16 @@ namespace ms
 		ExclRequest excl;
 
 		std::map<KeyAction::Id, bool> keysdown;
+		// When the player last moved under Stop Motion, or entered the map
+		// (+0x311c).
+		int64_t stirred = 0;
 
-		Movement lastmove;
+		move_path::Recorder path;
+
+		uint8_t get_stancebyte() const;
+
+		// Where the player is and how it moves, as path element `command`.
+		Movement current_move(uint8_t command) const;
 
 		Randomizer randomizer;
 

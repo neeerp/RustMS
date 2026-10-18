@@ -29,7 +29,7 @@ namespace ms
 		mobs.draw(layer, viewx, viewy, alpha);
 	}
 
-	void MapMobs::update(const Physics &physics, Point<int16_t> playerpos, bool playerdead)
+	void MapMobs::update(const Physics &physics, const Mob::Target &target)
 	{
 		for (; !spawns.empty(); spawns.pop())
 		{
@@ -54,10 +54,26 @@ namespace ms
 			Optional<Mob> mob = mmo.second.get();
 
 			if (mob)
-				mob->set_target(playerpos, playerdead);
+				mob->set_target(target);
 		}
 
 		mobs.update(physics);
+	}
+
+	std::vector<Mob::Landed> MapMobs::take_attacks()
+	{
+		std::vector<Mob::Landed> landed;
+
+		for (auto &mmo : mobs)
+		{
+			if (Optional<Mob> mob = mmo.second.get())
+			{
+				for (Mob::Landed &hit : mob->take_attacks())
+					landed.push_back(std::move(hit));
+			}
+		}
+
+		return landed;
 	}
 
 	void MapMobs::spawn(MobSpawn &&spawn)
@@ -84,10 +100,25 @@ namespace ms
 			mob->set_control(mode);
 	}
 
-	void MapMobs::acknowledge(int32_t oid, int16_t moveid, bool nextattack)
+	void MapMobs::acknowledge(int32_t oid, int16_t moveid, bool nextattack, int16_t mp, uint8_t skill,
+							  uint8_t skilllevel)
 	{
 		if (Optional<Mob> mob = mobs.get(oid))
-			mob->acknowledge(moveid, nextattack);
+			mob->acknowledge(moveid, nextattack, mp, skill, skilllevel);
+	}
+
+	void MapMobs::show_damage(int32_t oid, int32_t damage)
+	{
+		if (Optional<Mob> mob = mobs.get(oid))
+			mob->show_damage(damage);
+	}
+
+	int32_t MapMobs::counter(int32_t oid, bool magic) const
+	{
+		if (Optional<const Mob> mob = mobs.get(oid))
+			return mob->counter(magic);
+
+		return 0;
 	}
 
 	void MapMobs::send_mobhp(int32_t oid, int8_t percent, uint16_t playerlevel)
@@ -96,16 +127,29 @@ namespace ms
 			mob->show_hp(percent, playerlevel);
 	}
 
+	void MapMobs::set_statuses(int32_t oid, const std::vector<MobStatParser::Status> &statuses)
+	{
+		if (Optional<Mob> mob = mobs.get(oid))
+			mob->set_statuses(statuses, true);
+	}
+
+	void MapMobs::reset_statuses(int32_t oid, const BuffParser::Flags &flags)
+	{
+		if (Optional<Mob> mob = mobs.get(oid))
+			mob->reset_statuses(flags);
+	}
+
 	void MapMobs::catch_mob(int32_t oid, Point<int16_t> user)
 	{
 		if (Optional<Mob> mob = mobs.get(oid))
 			mob->catch_by(user);
 	}
 
-	void MapMobs::send_movement(int32_t oid, Point<int16_t> start, std::vector<Movement> &&movements)
+	void MapMobs::send_movement(int32_t oid, Point<int16_t> start, std::vector<Movement> &&movements,
+								int8_t action, bool left, int32_t skilldata)
 	{
 		if (Optional<Mob> mob = mobs.get(oid))
-			mob->send_movement(start, std::move(movements));
+			mob->send_movement(start, std::move(movements), action, left, skilldata);
 	}
 
 	void MapMobs::send_attack(AttackResult &result, const Attack &attack, const std::vector<int32_t> &targets,
@@ -139,6 +183,15 @@ namespace ms
 		}
 	}
 
+	void MapMobs::apply_summon_damage(int32_t oid, int32_t damage, bool toleft, const Animation &hit)
+	{
+		if (Optional<Mob> mob = mobs.get(oid))
+		{
+			mob->apply_damage(damage, toleft);
+			mob->show_hit(hit, mob->get_body(), toleft);
+		}
+	}
+
 	void MapMobs::expect_hits(int32_t oid, int32_t count)
 	{
 		if (Optional<Mob> mob = mobs.get(oid))
@@ -162,14 +215,18 @@ namespace ms
 					vertical.greater()
 			};
 
+		return find_touching(player_rect);
+	}
+
+	int32_t MapMobs::find_touching(const Rectangle<int16_t> &area) const
+	{
 		auto iter = std::find_if(
 				mobs.begin(),
 				mobs.end(),
-				[&player_rect](auto &mmo)
+				[&area](auto &mmo)
 				{
 					Optional<Mob> mob = mmo.second.get();
-					return mob && mob->is_alive() && mob->deals_touch_damage() &&
-						   mob->is_in_range(player_rect);
+					return mob && mob->is_alive() && mob->deals_touch_damage() && mob->is_in_range(area);
 				}
 		);
 
@@ -177,6 +234,28 @@ namespace ms
 			return 0;
 
 		return iter->second->get_oid();
+	}
+
+	void MapMobs::aggro_puppet(int32_t oid, Point<int16_t> position)
+	{
+		for (auto &mmo : mobs)
+			if (Optional<Mob> mob = mmo.second.get())
+				mob->aggro_puppet(oid, position);
+	}
+
+	void MapMobs::release_puppet(int32_t oid)
+	{
+		for (auto &mmo : mobs)
+			if (Optional<Mob> mob = mmo.second.get())
+				mob->release_puppet(oid);
+	}
+
+	int32_t MapMobs::roll_puppet_damage(int32_t oid, int32_t level) const
+	{
+		if (Optional<const Mob> mob = mobs.get(oid))
+			return mob->roll_puppet_damage(level);
+
+		return 0;
 	}
 
 	MobAttack MapMobs::create_attack(int32_t oid) const
@@ -201,6 +280,30 @@ namespace ms
 			return mob->get_head_position();
 		else
 			return Point<int16_t>(0, 0);
+	}
+
+	int32_t MapMobs::get_mob_id(int32_t oid) const
+	{
+		if (Optional<const Mob> mob = mobs.get(oid))
+			return mob->get_id();
+
+		return 0;
+	}
+
+	std::vector<std::pair<Point<int16_t>, int32_t>> MapMobs::take_hurts()
+	{
+		std::vector<std::pair<Point<int16_t>, int32_t>> hurts;
+
+		for (auto &mmo : mobs)
+		{
+			if (Optional<Mob> mob = mmo.second.get())
+			{
+				for (int32_t number : mob->take_hurts())
+					hurts.emplace_back(mob->get_head_position(), number);
+			}
+		}
+
+		return hurts;
 	}
 
 	Rectangle<int16_t> MapMobs::get_mob_body(int32_t oid) const

@@ -13,8 +13,10 @@
 //! whose queue is full is kicked instead. That makes wait cycles impossible.
 
 use game::{AvatarLook, FieldAvatar, Player};
+use net::packet::build::world::door::DoorView;
 use net::{
-    BroadcastScope, ClientId, FieldRequest, MessengerRequest, PartyRequest, WhisperDelivery,
+    BroadcastScope, ClientId, FieldRequest, MessengerRequest, PartyRequest, PartySkill,
+    WhisperDelivery,
 };
 use packet::Packet;
 use tokio::sync::mpsc;
@@ -67,6 +69,13 @@ pub enum ServerMessage {
     PartyChanged {
         party_id: Option<i32>,
     },
+    /// A party member on `map_id` used a skill that reached this player,
+    /// standing at `origin`.
+    PartySkill {
+        used: PartySkill,
+        origin: (i16, i16),
+        map_id: i32,
+    },
     /// This player broke a reactor; its loot drops for them.
     ReactorBroken {
         reactor_id: i32,
@@ -91,6 +100,49 @@ pub enum ServerMessage {
     /// CHAR_INFO.
     CharInfoRequested {
         requester: ClientHandle,
+    },
+    /// `giver_name` raised (or dropped) this player's fame; tell `giver` how
+    /// it went.
+    Famed {
+        giver: ClientHandle,
+        giver_name: String,
+        up: bool,
+    },
+    /// The fame this player gave `target` found nobody: they aren't on its
+    /// map.
+    FameMissed {
+        target: i32,
+    },
+    /// A mob broke this player's Puppet: its buff ends.
+    SummonBroken {
+        skill_id: i32,
+    },
+    /// This player's Beholder heals or buffs them.
+    Beholder(net::summons::Support),
+    /// A mob's skill on `map_id` gave this player a disease.
+    Diseased {
+        disease: game::Disease,
+        map_id: i32,
+    },
+    /// A mob's Dispel on `map_id` reached this player.
+    Dispelled {
+        map_id: i32,
+    },
+    /// A mob's Banish on `map_id` sends this player away.
+    Banished {
+        to: game_data::mobs::Banish,
+        map_id: i32,
+    },
+    /// Mobs on `map_id` this player attacked countered it for `damage`.
+    Countered {
+        damage: i32,
+        map_id: i32,
+    },
+    /// The Mystic Door this player entered on `from_map` leads to `map_id`.
+    DoorWarp {
+        from_map: i32,
+        map_id: i32,
+        exit: net::packet::handle::world::DoorExit,
     },
     SendPacket(Packet),
 }
@@ -178,6 +230,7 @@ pub enum FieldMessage {
     Move {
         from: ClientId,
         packet: Packet,
+        start: (i16, i16),
         movement_bytes: Vec<u8>,
     },
     NpcInteraction {
@@ -208,6 +261,15 @@ pub enum FieldMessage {
         from: ClientId,
         npc_id: i32,
         request_id: u64,
+    },
+    /// `owner` cast Mystic Door here, at `at`.
+    OpenDoor {
+        owner: ClientId,
+        at: (i16, i16),
+    },
+    /// `owner`'s Mystic Door here closed.
+    CloseDoor {
+        owner: ClientId,
     },
 }
 
@@ -271,6 +333,12 @@ pub enum DirectoryMessage {
         from: ClientId,
         request: PartyRequest,
     },
+    /// `from` used a skill at `origin` on the party members in its slots.
+    PartySkill {
+        from: ClientId,
+        used: PartySkill,
+        origin: (i16, i16),
+    },
     Unregister {
         client_id: ClientId,
         connection_id: u64,
@@ -308,5 +376,20 @@ pub enum DirectoryMessage {
     LookChanged {
         client_id: ClientId,
         look: AvatarLook,
+    },
+    /// `owner` opened a Mystic Door, replacing any they had.
+    DoorOpened {
+        owner: ClientId,
+        door: DoorView,
+    },
+    DoorClosed {
+        owner: ClientId,
+    },
+    /// `from` entered `owner`'s Mystic Door, in its town or its field;
+    /// answered with `ServerMessage::DoorWarp` if they may.
+    UseDoor {
+        from: ClientId,
+        owner: ClientId,
+        from_town: bool,
     },
 }

@@ -3,7 +3,7 @@
 
 use crate::connection::MapleTestConnection;
 use crate::hunting::Field;
-use crate::packets::{build_all_chat, build_change_map, decode_set_field_warp};
+use crate::packets::{build_all_chat, build_change_map, decode_item_stack, decode_set_field_warp};
 use net::packet::op::SendOpcode;
 use packet::io::read::PktRead;
 use packet::Packet;
@@ -88,6 +88,14 @@ pub struct Trace {
     pub prompts: Vec<(i32, u8)>,
     /// Maps warped to.
     pub warps: Vec<i32>,
+    /// Each map change: (map, spawn point, where the player appears
+    /// instead).
+    pub arrivals: Vec<(i32, u8, Option<(i32, i32)>)>,
+    /// SPAWN_PORTAL: the player's own Mystic Door (town, field, x, y), or
+    /// None.
+    pub own_doors: Vec<Option<(i32, i32, i16, i16)>>,
+    /// Party Mystic Doors (op 0x25): (slot, town, field, x, y).
+    pub party_doors: Vec<(u8, i32, i32, i16, i16)>,
     /// PARTY_OPERATION sub-operations, in order.
     pub party_ops: Vec<u8>,
     /// Party invitations: (party id, inviter).
@@ -110,14 +118,69 @@ pub struct Trace {
     pub shops: Vec<(i32, Vec<(i32, i32)>)>,
     /// CONFIRM_SHOP_TRANSACTION codes.
     pub shop_results: Vec<u8>,
+    /// Every TRUNK_RESULT, in order.
+    pub storage: Vec<StorageResult>,
     /// GIVE_BUFF: (skill id, value, duration in ms).
     pub buffs: Vec<(i32, i16, i32)>,
     /// CANCEL_BUFF: the second mask of each.
     pub cancelled_buffs: Vec<i64>,
     /// COOLDOWN: (skill id, seconds).
     pub cooldowns: Vec<(i32, i16)>,
+    /// BLOCKED_MAP and BLOCKED_SERVER: (opcode, reason).
+    pub blocked: Vec<(i16, u8)>,
+    /// SKILL_LEARN_ITEM_RESULT: (reader, skill, master level, used, success).
+    pub books: Vec<(i32, i32, i32, bool, bool)>,
+    /// FAME_RESPONSE: (mode, name, up, new fame); the name, up and fame are
+    /// empty, false and 0 where the mode has none.
+    pub fame: Vec<(u8, String, bool, i32)>,
+    /// BROADCAST_MSG: (kind, message) of each whose kind carries only its
+    /// message (0, 1, 5).
+    pub broadcasts: Vec<(u8, String)>,
     /// Mobs and drops on the current field.
     pub field: Field,
+}
+
+/// One TRUNK_RESULT: its mode, and what of the storage it carries.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct StorageResult {
+    pub mode: u8,
+    /// The storage keeper, when it opens.
+    pub npc: Option<i32>,
+    pub slots: Option<u8>,
+    pub meso: Option<i32>,
+    /// (item id, quantity) per bag carried, by inventory type.
+    pub bags: BTreeMap<u8, Vec<(i32, i16)>>,
+}
+
+impl StorageResult {
+    fn read(mode: u8, body: &[u8]) -> Self {
+        let mut r = Cursor::new(body);
+        let mut result = Self {
+            mode,
+            ..Self::default()
+        };
+        // Only these modes carry contents; the rest are a bare notice.
+        if !matches!(mode, 0x09 | 0x0d | 0x0f | 0x13 | 0x16) {
+            return result;
+        }
+        if mode == 0x16 {
+            result.npc = Some(r.read_int().unwrap());
+        }
+        result.slots = Some(r.read_byte().unwrap());
+        let flags = r.read_long().unwrap();
+        if flags & 2 != 0 {
+            result.meso = Some(r.read_int().unwrap());
+        }
+        for kind in 1..=5u8 {
+            if flags & 2 << kind != 0 {
+                let items = (0..r.read_byte().unwrap())
+                    .map(|_| decode_item_stack(&mut r).unwrap())
+                    .collect();
+                result.bags.insert(kind, items);
+            }
+        }
+        result
+    }
 }
 
 impl Trace {
@@ -180,6 +243,43 @@ impl Trace {
                 values.insert(bit, value);
             }
             self.stat_updates.push(values);
+        } else if op == SendOpcode::BlockedMap as i16 || op == SendOpcode::BlockedServer as i16 {
+            self.blocked.push((op, r.read_byte().unwrap()));
+        } else if op == SendOpcode::BroadcastMsg as i16 {
+            let kind = r.read_byte().unwrap();
+            if matches!(kind, 0 | 1 | 5) {
+                self.broadcasts
+                    .push((kind, r.read_str_with_length().unwrap()));
+            }
+        } else if op == SendOpcode::FameResponse as i16 {
+            let mode = r.read_byte().unwrap();
+            let (name, up, fame) = match mode {
+                0 => (
+                    r.read_str_with_length().unwrap(),
+                    r.read_byte().unwrap() != 0,
+                    r.read_int().unwrap(),
+                ),
+                5 => (
+                    r.read_str_with_length().unwrap(),
+                    r.read_byte().unwrap() != 0,
+                    0,
+                ),
+                _ => (String::new(), false, 0),
+            };
+            self.fame.push((mode, name, up, fame));
+        } else if op == SendOpcode::SkillBookResult as i16 {
+            let reader = r.read_int().unwrap();
+            r.read_byte().unwrap();
+            let skill_id = r.read_int().unwrap();
+            let master_level = r.read_int().unwrap();
+            let used = r.read_byte().unwrap() != 0;
+            self.books.push((
+                reader,
+                skill_id,
+                master_level,
+                used,
+                r.read_byte().unwrap() != 0,
+            ));
         } else if op == SendOpcode::UpdateSkills as i16 {
             r.read_byte().unwrap();
             for _ in 0..r.read_short().unwrap() {
@@ -229,6 +329,14 @@ impl Trace {
                 let party_id = r.read_int().unwrap();
                 self.party_invites
                     .push((party_id, r.read_str_with_length().unwrap()));
+            } else if party_op == 0x25 {
+                self.party_doors.push((
+                    r.read_byte().unwrap(),
+                    r.read_int().unwrap(),
+                    r.read_int().unwrap(),
+                    r.read_short().unwrap(),
+                    r.read_short().unwrap(),
+                ));
             }
         } else if op == SendOpcode::UpdatePartyMemberHp as i16 {
             self.party_hp.push((
@@ -294,6 +402,9 @@ impl Trace {
                 })
                 .collect();
             self.shops.push((npc, rows));
+        } else if op == SendOpcode::TrunkResult as i16 {
+            let mode = r.read_byte().unwrap();
+            self.storage.push(StorageResult::read(mode, &p.bytes[3..]));
         } else if op == SendOpcode::ConfirmShopTransaction as i16 {
             self.shop_results.push(r.read_byte().unwrap());
         } else if op == SendOpcode::GiveBuff as i16 {
@@ -310,7 +421,20 @@ impl Trace {
                 .push((r.read_int().unwrap(), r.read_short().unwrap()));
         } else if op == SendOpcode::SetField as i16 && p.bytes.get(6) == Some(&0) {
             // A map change rather than entering the world.
-            self.warps.push(decode_set_field_warp(p).unwrap().map_id);
+            let warp = decode_set_field_warp(p).unwrap();
+            self.warps.push(warp.map_id);
+            self.arrivals
+                .push((warp.map_id, warp.spawn_point, warp.chase));
+        } else if op == SendOpcode::SpawnPortal as i16 {
+            let (town, field) = (r.read_int().unwrap(), r.read_int().unwrap());
+            self.own_doors.push((town != 999_999_999).then(|| {
+                (
+                    town,
+                    field,
+                    r.read_short().unwrap(),
+                    r.read_short().unwrap(),
+                )
+            }));
         }
     }
 

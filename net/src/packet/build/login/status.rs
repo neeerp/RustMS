@@ -114,6 +114,7 @@ mod tests {
             maple_points: 0,
             nx_prepaid: 0,
             storage_slots: 4,
+            storage_meso: 0,
         }
     }
 

@@ -18,7 +18,6 @@
 #pragma once
 
 #include <cstdint>
-#include <unordered_map>
 
 namespace ms
 {
@@ -94,11 +93,21 @@ namespace ms
 			MONSTER_RIDING,
 			HOMING_BEACON,
 			SPEED_INFUSION,
+			CURSE,
+			SLOW,
+			SEDUCE,
+			// A mob's Undead shares Puppet's bit (46); its reason tells them
+			// apart.
+			UNDEAD,
+			STOP_POTION,
+			STOP_MOTION,
+			FEAR,
 			LENGTH
 		};
 
-		extern const std::unordered_map<Id, uint64_t> first_codes;
-		extern const std::unordered_map<Id, uint64_t> second_codes;
+		// The stat with flag bit `bit` of the 128 a buff packet carries
+		// (CFlag<128>), or NONE for one HeavenClient doesn't keep.
+		Id by_bit(uint8_t bit);
 	}
 
 	struct Buff

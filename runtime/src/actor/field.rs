@@ -1,27 +1,41 @@
 use crate::actor::field_drops::{Drop, DropSet};
-use crate::actor::field_mobs::{split_exp, MobSet, Sharer};
+use crate::actor::field_mists::MistSet;
+use crate::actor::field_mobs::{split_exp, Cast, MobSet, Sharer};
 use crate::actor::field_reactors::{Hit, ReactorSet};
+use crate::actor::field_summons::SummonSet;
 use crate::message::{ClientHandle, FieldKey, FieldMessage, ServerMessage};
-use game::FieldAvatar;
+use game::mob_skill::{self, MobSkillEffect};
+use game::{FieldAvatar, MobStat};
+use net::packet::build::world::door::{build_remove_door, build_spawn_door};
 use net::packet::build::world::drop::{build_drop, build_remove_drop, DropAppearance};
 use net::packet::build::world::field::{
     build_player_enter_field, build_player_leave_field, build_show_chair, parse_movement_state,
 };
+use net::packet::build::world::mist::{build_remove_mist, build_spawn_mist, MistKind, MistView};
 use net::packet::build::world::mob::{
-    build_control_mob, build_kill_mob, build_mob_hp, build_move_mob, build_move_mob_response,
-    build_show_magnet, build_spawn_mob, build_stop_controlling_mob,
+    build_control_mob, build_heal_mob, build_kill_mob, build_mob_hp, build_mob_stat_reset,
+    build_mob_stat_set, build_move_mob, build_move_mob_response, build_show_magnet,
+    build_spawn_mob, build_stop_controlling_mob, MobMoveView, MobView,
 };
-use net::packet::build::world::npc::{build_spawn_npc, ForeignNpc};
+use net::packet::build::world::npc::{
+    build_control_npc, build_npc_action, build_spawn_npc, ForeignNpc,
+};
 use net::packet::build::world::reactor::{
     build_hit_reactor, build_remove_reactor, build_spawn_reactor,
 };
+use net::packet::build::world::summon::{
+    build_damage_summon, build_move_summon, build_remove_summon, build_spawn_summon,
+    build_summon_attack, build_summon_skill, Gone, SummonView,
+};
+use net::skills::{self, Inflict};
+use net::summons::{self, Limit, SummonAttack, SummonDamage, Support};
 use net::{ClientId, FieldRequest};
 use packet::Packet;
 use std::collections::HashMap;
 use std::time::Duration;
 use tokio::sync::mpsc;
 use tokio::time::{interval, Instant, MissedTickBehavior};
-use tracing::{info, warn};
+use tracing::{debug, info, warn};
 
 struct Occupant {
     handle: ClientHandle,
@@ -46,17 +60,34 @@ pub struct FieldMapEntityNpc {
 const QUEST_NPC_REACH_X: i32 = 1200;
 const QUEST_NPC_REACH_Y: i32 = 800;
 
+/// How long after a cast its mist starts, in 100 ms (OdinMS-family
+/// servers; v83's client starts the mist's time then).
+const MIST_DELAY: i16 = 8;
+
+/// How far from its owner a client may put a summon: a Puppet goes 200 px
+/// ahead, onto a foothold within 80 px up or down (FUN_0096b140).
+const SUMMON_REACH_X: i32 = 250;
+const SUMMON_REACH_Y: i32 = 150;
+
 /// One live copy of a map. It owns everything local to that map: who is on
 /// it and where, its NPCs, mobs, drops, and reactors, which advance on
-/// `tick`.
+/// `tick`, and its players' mists and summons.
 pub struct FieldActor {
     key: FieldKey,
     rx: mpsc::Receiver<FieldMessage>,
     occupants: HashMap<ClientId, Occupant>,
     map_npcs: Vec<FieldMapEntityNpc>,
+    /// Who picks the NPCs' idle actions; without one they only stand.
+    npc_controller: Option<ClientId>,
     mobs: MobSet,
+    /// Mob skills cast and waiting for their animations to end.
+    casts: Vec<Cast>,
     drops: DropSet,
     reactors: ReactorSet,
+    mists: MistSet,
+    summons: SummonSet,
+    /// Players' Mystic Doors here, by owner.
+    doors: HashMap<ClientId, (i16, i16)>,
     tick: Duration,
 }
 
@@ -77,9 +108,14 @@ impl FieldActor {
             rx,
             occupants: HashMap::new(),
             map_npcs,
+            npc_controller: None,
             mobs,
+            casts: Vec::new(),
             drops,
             reactors,
+            mists: MistSet::default(),
+            summons: SummonSet::default(),
+            doors: HashMap::new(),
             tick,
         }
     }
@@ -115,6 +151,38 @@ impl FieldActor {
                 }
             }
         }
+        for object_id in self.mists.expire(now) {
+            if let Ok(packet) = build_remove_mist(object_id) {
+                self.broadcast(None, packet);
+            }
+        }
+        self.reach_from_mists(now);
+        for summon in self.summons.expire(now) {
+            let view = summon.view;
+            if let Ok(packet) = build_remove_summon(view.owner_id, view.object_id, Gone::Expired) {
+                self.broadcast(None, packet);
+            }
+        }
+        let (due, waiting) = std::mem::take(&mut self.casts)
+            .into_iter()
+            .partition(|cast| cast.at <= now);
+        self.casts = waiting;
+        for cast in due {
+            self.apply_cast(&cast, now);
+        }
+        for hurt in self.mobs.hurt_by_statuses(now) {
+            if let (Some(occupant), Ok(packet)) = (
+                self.occupants.get(&hurt.from),
+                build_mob_hp(hurt.object_id, hurt.percent),
+            ) {
+                occupant.handle.send_packet(packet);
+            }
+        }
+        for (object_id, lost) in self.mobs.expire_statuses(now) {
+            if let Ok(packet) = build_mob_stat_reset(object_id, &lost) {
+                self.broadcast(None, packet);
+            }
+        }
         let spawned = self.mobs.respawn(now);
         if spawned.is_empty() {
             return;
@@ -145,6 +213,31 @@ impl FieldActor {
                     occupant.handle.send_packet(packet);
                 }
             }
+        }
+    }
+
+    /// Tell `client` it now picks every NPC's idle actions.
+    fn send_npc_control(&mut self, client: ClientId) {
+        let Some(occupant) = self.occupants.get(&client) else {
+            return;
+        };
+        self.npc_controller = Some(client);
+        for map_npc in &self.map_npcs {
+            if let Ok(packet) = build_control_npc(&to_foreign_npc(map_npc)) {
+                occupant.handle.send_packet(packet);
+            }
+        }
+    }
+
+    /// Show everyone the action the NPCs' controller chose.
+    fn handle_npc_action(&self, from: ClientId, object_id: i32, action: &[u8]) {
+        if self.npc_controller != Some(from)
+            || !self.map_npcs.iter().any(|npc| npc.object_id == object_id)
+        {
+            return;
+        }
+        if let Ok(packet) = build_npc_action(object_id, action) {
+            self.broadcast(None, packet);
         }
     }
 
@@ -199,12 +292,13 @@ impl FieldActor {
             FieldMessage::Move {
                 from,
                 packet,
+                start,
                 movement_bytes,
             } => {
                 if let Some(occupant) = self.occupants.get_mut(&from) {
                     let avatar = &mut occupant.avatar;
                     if let Some((x, y, stance)) =
-                        parse_movement_state(&movement_bytes, (avatar.x, avatar.y, avatar.stance))
+                        parse_movement_state(&movement_bytes, (start.0, start.1, avatar.stance))
                     {
                         avatar.x = x;
                         avatar.y = y;
@@ -227,18 +321,47 @@ impl FieldActor {
                 FieldRequest::MobMove {
                     object_id,
                     move_id,
+                    want_attack,
+                    action,
+                    skill_data,
                     start,
                     movement,
-                } => self.handle_mob_move(from, object_id, move_id, start, &movement),
+                } => self.handle_mob_move(
+                    from,
+                    object_id,
+                    move_id,
+                    (want_attack, action, skill_data),
+                    start,
+                    &movement,
+                ),
                 FieldRequest::MobDistance {
                     object_id,
                     distance,
                 } => self.handle_mob_distance(from, object_id, distance),
-                FieldRequest::Attack { broadcast, hits } => {
-                    self.handle_attack(from, broadcast, hits)
+                FieldRequest::NpcAction { object_id, action } => {
+                    self.handle_npc_action(from, object_id, &action)
                 }
+                FieldRequest::Attack {
+                    broadcast,
+                    counter,
+                    hits,
+                    inflicts,
+                } => self.handle_attack(from, broadcast, Some(counter), hits, &inflicts),
+                FieldRequest::Mist {
+                    skill_id,
+                    level,
+                    left,
+                    inflict,
+                } => self.handle_mist(from, skill_id, level, left, inflict),
                 FieldRequest::Broadcast(packet) => self.broadcast(Some(from), packet),
                 FieldRequest::Magnet { effect, caught } => self.handle_magnet(from, effect, caught),
+                FieldRequest::MobDebuff {
+                    skill_id,
+                    level,
+                    origin,
+                    mobs,
+                    inflict,
+                } => self.handle_mob_debuff(from, skill_id, level, origin, &mobs, &inflict),
                 FieldRequest::Chair(item_id) => self.handle_chair(from, item_id),
                 FieldRequest::Pickup { object_id, x, y } => {
                     self.handle_pickup(from, object_id, x, y)
@@ -252,6 +375,36 @@ impl FieldActor {
                 FieldRequest::CharInfo { character_id } => {
                     self.handle_char_info(from, character_id)
                 }
+                FieldRequest::Fame {
+                    target,
+                    giver_name,
+                    up,
+                } => self.handle_fame(from, target, giver_name, up),
+                FieldRequest::Summon {
+                    skill_id,
+                    level,
+                    at,
+                    left,
+                    lasts,
+                    appear,
+                } => self.handle_summon(from, skill_id, level, at, left, lasts, appear),
+                FieldRequest::Unsummon { skill_id, why } => {
+                    self.handle_unsummon(from, skill_id, why)
+                }
+                FieldRequest::SummonMove {
+                    object_id,
+                    start,
+                    movement,
+                } => self.handle_summon_move(from, object_id, start, movement),
+                FieldRequest::SummonAttack { attack, limits } => {
+                    self.handle_summon_attack(from, attack, &limits)
+                }
+                FieldRequest::SummonDamage(damage) => self.handle_summon_damage(from, damage),
+                FieldRequest::Beholder {
+                    object_id,
+                    action,
+                    support,
+                } => self.handle_beholder(from, object_id, action, support),
             },
             FieldMessage::SpawnLoot {
                 owner,
@@ -266,6 +419,19 @@ impl FieldActor {
                     self.send_drop_packet(&drop, packet);
                 }
                 self.drops.restore(drop);
+            }
+            FieldMessage::OpenDoor { owner, at } => {
+                self.doors.insert(owner, at);
+                if let Ok(packet) = build_spawn_door(owner, at, true) {
+                    self.broadcast(None, packet);
+                }
+            }
+            FieldMessage::CloseDoor { owner } => {
+                if self.doors.remove(&owner).is_some() {
+                    if let Ok(packet) = build_remove_door(owner) {
+                        self.broadcast(None, packet);
+                    }
+                }
             }
         }
     }
@@ -311,6 +477,26 @@ impl FieldActor {
         } else if let Ok(packet) = net::packet::build::world::stat::build_stat_update(true, &[]) {
             // Unlock the client, which waits on CHAR_INFO otherwise.
             requester.handle.send_packet(packet);
+        }
+    }
+
+    /// Hand `from`'s fame to `target`, if they are here.
+    fn handle_fame(&self, from: ClientId, target: i32, giver_name: String, up: bool) {
+        let Some(giver) = self.occupants.get(&from) else {
+            return;
+        };
+        if let Some(occupant) = self
+            .occupants
+            .values()
+            .find(|occupant| occupant.avatar.id == target)
+        {
+            occupant.handle.send(ServerMessage::Famed {
+                giver: giver.handle.clone(),
+                giver_name,
+                up,
+            });
+        } else {
+            giver.handle.send(ServerMessage::FameMissed { target });
         }
     }
 
@@ -378,29 +564,73 @@ impl FieldActor {
         from: ClientId,
         object_id: i32,
         move_id: i16,
+        (want_attack, action, skill_data): (bool, u8, i32),
         start: (i16, i16),
         movement: &[u8],
     ) {
-        if !self.mobs.move_mob(from, object_id, movement) {
+        if !self.mobs.move_mob(from, object_id, start, movement) {
             return;
         }
+        let Some(act) = self.mobs.act(
+            object_id,
+            (want_attack, action, skill_data),
+            Instant::now(),
+            &net::mobs::skill_level,
+            rand::random(),
+        ) else {
+            return;
+        };
         if let Some(occupant) = self.occupants.get(&from) {
-            if let Ok(packet) = build_move_mob_response(object_id, move_id, 0) {
+            let grant = act.grant.unwrap_or_default();
+            if let Ok(packet) =
+                build_move_mob_response(object_id, move_id, act.next_attack, act.mp, grant)
+            {
                 occupant.handle.send_packet(packet);
             }
         }
-        if let Ok(packet) = build_move_mob(object_id, start, movement) {
+        self.casts.extend(act.cast);
+        let skill_data = if act.action == action { skill_data } else { 0 };
+        let moved = MobMoveView {
+            object_id,
+            next_attack: act.next_attack,
+            action: act.action,
+            skill_data,
+            start,
+        };
+        if let Ok(packet) = build_move_mob(&moved, movement) {
             self.broadcast(Some(from), packet);
         }
     }
 
-    fn handle_attack(&mut self, from: ClientId, broadcast: Packet, hits: Vec<(i32, i64)>) {
+    /// `from` attacked the mobs in `hits`; each one with the `counter`
+    /// status hurts them back, once (v83 FUN_007937e3, rolled again here:
+    /// its client only shows its own roll).
+    fn handle_attack(
+        &mut self,
+        from: ClientId,
+        broadcast: Packet,
+        counter: Option<MobStat>,
+        hits: Vec<(i32, i64)>,
+        inflicts: &[Inflict],
+    ) {
         let Some(attacker) = self.occupants.get(&from) else {
             return;
         };
         let attacker = attacker.handle.clone();
         self.broadcast(Some(from), broadcast);
         let now = Instant::now();
+        let countered: i32 = counter.map_or(0, |stat| {
+            hits.iter()
+                .map(|&(object_id, _)| self.mobs.counter(object_id, stat, rand::random()))
+                .filter(|&damage| damage > 0)
+                .sum()
+        });
+        if countered > 0 {
+            attacker.send(ServerMessage::Countered {
+                damage: countered,
+                map_id: self.key.map_id,
+            });
+        }
         for (object_id, damage) in hits {
             match self.mobs.damage(from, object_id, damage, now) {
                 Some(Ok(percent)) => {
@@ -408,6 +638,12 @@ impl FieldActor {
                         attacker.send_packet(packet);
                     }
                     self.provoke(from, &attacker, object_id, now);
+                    // A miss puts nothing on it.
+                    for inflict in inflicts.iter().filter(|_| damage > 0) {
+                        if inflict.takes(rand::random()) {
+                            self.put_on(from, object_id, inflict, now);
+                        }
+                    }
                 }
                 Some(Err(kill)) => {
                     if let Ok(packet) = build_kill_mob(kill.object_id, 1) {
@@ -463,6 +699,510 @@ impl FieldActor {
             }
         }
         self.broadcast(Some(from), effect);
+    }
+
+    /// `from` used a skill that reaches mobs on these, as their client saw
+    /// them. Each in its area takes `inflict`, or loses the buffs the skill
+    /// takes away, with the skill's chance (`prop`), and everyone sees.
+    fn handle_mob_debuff(
+        &mut self,
+        from: ClientId,
+        skill_id: i32,
+        level: i32,
+        origin: Option<(i16, i16)>,
+        mobs: &[i32],
+        inflict: &Inflict,
+    ) {
+        let Some(user) = self.occupants.get(&from) else {
+            return;
+        };
+        let origin = origin.unwrap_or((user.avatar.x, user.avatar.y));
+        let Some(skill) = skills::at_level(skill_id, level) else {
+            return;
+        };
+        let cancels = skills::mob_cancels(skill_id);
+        let effect = &skill.effect;
+        let now = Instant::now();
+        let mut reached: Vec<i32> = Vec::new();
+        for &object_id in mobs {
+            if reached.len() >= effect.mob_count.max(1) as usize || reached.contains(&object_id) {
+                continue;
+            }
+            let Some(mob) = self.mobs.get(object_id) else {
+                continue;
+            };
+            if mob.hp > 0 && skills::in_area(effect, origin, (mob.x, mob.y)) {
+                reached.push(object_id);
+            }
+        }
+        for object_id in reached {
+            if !inflict.takes(rand::random()) {
+                continue;
+            }
+            let lost = self.mobs.remove_statuses(object_id, cancels);
+            if !lost.is_empty() {
+                if let Ok(packet) = build_mob_stat_reset(object_id, &lost) {
+                    self.broadcast(None, packet);
+                }
+            }
+            self.put_on(from, object_id, inflict, now);
+        }
+    }
+
+    /// `from`'s spell left a mist around them, which everyone sees.
+    fn handle_mist(
+        &mut self,
+        from: ClientId,
+        skill_id: i32,
+        level: i32,
+        left: bool,
+        inflict: Inflict,
+    ) {
+        let Some(user) = self.occupants.get(&from) else {
+            return;
+        };
+        let Some(skill) = skills::at_level(skill_id, level) else {
+            return;
+        };
+        let view = MistView {
+            object_id: 0,
+            kind: MistKind::Poison,
+            owner_id: user.avatar.id,
+            skill_id,
+            level: level as u8,
+            delay: MIST_DELAY,
+            area: skills::area_box(&skill.effect, (user.avatar.x, user.avatar.y), left),
+            element: 0,
+        };
+        let lasts = inflict.duration;
+        let view = self.mists.add(view, from, inflict, lasts, Instant::now());
+        if let Ok(packet) = build_spawn_mist(&view) {
+            self.broadcast(None, packet);
+        }
+    }
+
+    /// `from` called up a summon. It replaces their summon of that kind,
+    /// which the others see dismissed.
+    #[allow(clippy::too_many_arguments)]
+    fn handle_summon(
+        &mut self,
+        from: ClientId,
+        skill_id: i32,
+        level: i32,
+        at: (i16, i16),
+        left: bool,
+        lasts: Duration,
+        appear: bool,
+    ) {
+        let Some(owner) = self.occupants.get(&from) else {
+            return;
+        };
+        let (Some((moves, assist)), Some(skill)) =
+            (summons::kind(skill_id), skills::at_level(skill_id, level))
+        else {
+            return;
+        };
+        let avatar = &owner.avatar;
+        let near = (i32::from(at.0) - i32::from(avatar.x)).abs() <= SUMMON_REACH_X
+            && (i32::from(at.1) - i32::from(avatar.y)).abs() <= SUMMON_REACH_Y;
+        let (x, y) = if near { at } else { (avatar.x, avatar.y) };
+        let view = SummonView {
+            owner_id: avatar.id,
+            object_id: 0,
+            skill_id,
+            owner_level: avatar.level,
+            level: level as u8,
+            x,
+            y,
+            stance: u8::from(left),
+            moves,
+            assist,
+        };
+        let hp = summons::hp(&skill);
+        let (view, replaced) = self.summons.add(view, from, hp, lasts, Instant::now());
+        if let Some(old) = replaced {
+            self.remove_summon(&old.view, Gone::Dismissed);
+        }
+        if let Ok(packet) = build_spawn_summon(&view, appear) {
+            self.broadcast(None, packet);
+        }
+    }
+
+    fn handle_unsummon(&mut self, from: ClientId, skill_id: Option<i32>, why: Gone) {
+        for summon in self.summons.remove_owned(from, skill_id) {
+            self.remove_summon(&summon.view, why);
+        }
+    }
+
+    fn remove_summon(&self, view: &SummonView, why: Gone) {
+        if let Ok(packet) = build_remove_summon(view.owner_id, view.object_id, why) {
+            self.broadcast(None, packet);
+        }
+    }
+
+    fn handle_summon_move(
+        &mut self,
+        from: ClientId,
+        object_id: i32,
+        start: (i16, i16),
+        movement: Vec<u8>,
+    ) {
+        let Some(summon) = self.summons.owned(from, object_id) else {
+            return;
+        };
+        let view = &mut summon.view;
+        if let Some((x, y, stance)) =
+            parse_movement_state(&movement, (start.0, start.1, view.stance))
+        {
+            (view.x, view.y, view.stance) = (x, y, stance);
+        }
+        let owner_id = view.owner_id;
+        if let Ok(packet) = build_move_summon(owner_id, object_id, start, &movement) {
+            self.broadcast(Some(from), packet);
+        }
+    }
+
+    /// `from`'s summon attacked. An attack beyond its skill's reach or
+    /// damage cap, or one that hits a mob twice, counts for nothing.
+    fn handle_summon_attack(&mut self, from: ClientId, attack: SummonAttack, limits: &[Limit]) {
+        let Some(summon) = self.summons.owned(from, attack.object_id) else {
+            return;
+        };
+        let view = summon.view;
+        let Some(limit) = limits.iter().find(|limit| limit.skill_id == view.skill_id) else {
+            return;
+        };
+        let hits = &attack.hits;
+        let mut mobs: Vec<i32> = hits.iter().map(|hit| hit.object_id).collect();
+        mobs.sort_unstable();
+        mobs.dedup();
+        if hits.len() > limit.mob_count as usize
+            || mobs.len() != hits.len()
+            || hits
+                .iter()
+                .any(|hit| !(0..=limit.max_damage).contains(&hit.damage))
+        {
+            warn!(
+                from,
+                skill_id = view.skill_id,
+                ?attack,
+                ?limit,
+                "Summon attack refused"
+            );
+            return;
+        }
+        let Ok(broadcast) = build_summon_attack(&view, attack.action, hits) else {
+            return;
+        };
+        let hits = hits
+            .iter()
+            .map(|hit| (hit.object_id, i64::from(hit.damage)))
+            .collect();
+        // A v83 client counters only its own attacks.
+        self.handle_attack(from, broadcast, None, hits, limit.inflict.as_slice());
+    }
+
+    /// A mob hurt `from`'s Puppet: the others see it, and it breaks at
+    /// 0 HP, ending its owner's buff.
+    fn handle_summon_damage(&mut self, from: ClientId, damage: SummonDamage) {
+        let Some(summon) = self.summons.owned(from, damage.object_id) else {
+            return;
+        };
+        let Some(hp) = summon.hp.as_mut() else {
+            return;
+        };
+        *hp -= damage.damage;
+        let (broken, view) = (*hp <= 0, summon.view);
+        if let Ok(packet) = build_damage_summon(view.owner_id, &damage) {
+            self.broadcast(Some(from), packet);
+        }
+        if !broken {
+            return;
+        }
+        self.summons.remove(view.object_id);
+        self.remove_summon(&view, Gone::Broken);
+        if let Some(owner) = self.occupants.get(&from) {
+            owner.handle.send(ServerMessage::SummonBroken {
+                skill_id: view.skill_id,
+            });
+        }
+    }
+
+    /// `from`'s Beholder heals or buffs them, if it may yet: the others see
+    /// it act.
+    fn handle_beholder(&mut self, from: ClientId, object_id: i32, action: u8, support: Support) {
+        let Some(summon) = self.summons.owned(from, object_id) else {
+            return;
+        };
+        if !summon.may_support(&support, Instant::now()) {
+            debug!(object_id, ?support, "Beholder too soon");
+            return;
+        }
+        let owner_id = summon.view.owner_id;
+        if let Ok(packet) = build_summon_skill(owner_id, object_id, action) {
+            self.broadcast(Some(from), packet);
+        }
+        if let Some(owner) = self.occupants.get(&from) {
+            owner.handle.send(ServerMessage::Beholder(support));
+        }
+    }
+
+    /// Each mist due puts its statuses, with its chance, on the live mobs
+    /// in it that lack them (OdinMS-family servers).
+    fn reach_from_mists(&mut self, now: Instant) {
+        let mut reached = Vec::new();
+        for mist in self.mists.reaching(now) {
+            for mob in self.mobs.live() {
+                let lacks = mist
+                    .inflict
+                    .statuses
+                    .iter()
+                    .any(|(stat, _)| !mob.statuses.contains_key(stat));
+                if mob.hp > 0 && lacks && mist.covers((mob.x, mob.y)) {
+                    reached.push((mist.owner, mob.object_id, mist.inflict.clone()));
+                }
+            }
+        }
+        for (owner, object_id, inflict) in reached {
+            if inflict.takes(rand::random()) {
+                self.put_on(owner, object_id, &inflict, now);
+            }
+        }
+    }
+
+    /// A mob's buff takes hold with its chance on each mob it reaches,
+    /// counters with `spread`.
+    fn buff_mobs(&mut self, cast: &Cast, statuses: &[(MobStat, i16)], spread: i32, now: Instant) {
+        let effect = &cast.effect;
+        if rand::random::<f64>() * 100.0 >= f64::from(effect.prop) {
+            return;
+        }
+        let until = now + Duration::from_secs(effect.duration.max(0) as u64);
+        let skill_id = cast.skill | cast.level << 16;
+        for object_id in self.mobs.reached_by(cast) {
+            // Physical and magic immunity don't go together.
+            let blocked = |stat| match stat {
+                MobStat::PImmune => Some(MobStat::MImmune),
+                MobStat::MImmune => Some(MobStat::PImmune),
+                _ => None,
+            };
+            let Some(mob) = self.mobs.get(object_id) else {
+                continue;
+            };
+            let statuses: Vec<_> = statuses
+                .iter()
+                .filter(|(stat, _)| {
+                    blocked(*stat).is_none_or(|other| !mob.statuses.contains_key(&other))
+                })
+                .copied()
+                .collect();
+            let controller = mob.controller.unwrap_or_default();
+            let given = self
+                .mobs
+                .add_statuses(object_id, &statuses, skill_id, controller, now, until);
+            self.mobs.spread_counters(object_id, &given, spread);
+            self.show_statuses(object_id, &given, now);
+        }
+    }
+
+    /// A mob skill's animation ended: buff or heal the mobs it reaches, or
+    /// call up its summons.
+    fn apply_cast(&mut self, cast: &Cast, now: Instant) {
+        let effect = &cast.effect;
+        match mob_skill::effect(cast.skill, effect.x) {
+            Some(MobSkillEffect::Statuses(statuses)) => {
+                self.buff_mobs(cast, &statuses, 0, now);
+            }
+            Some(MobSkillEffect::Counters(stats)) => {
+                let value = i16::try_from(effect.x).unwrap_or(i16::MAX);
+                let statuses: Vec<_> = stats.iter().map(|&stat| (stat, value)).collect();
+                self.buff_mobs(cast, &statuses, effect.y, now);
+            }
+            Some(MobSkillEffect::Heal) => {
+                for object_id in self.mobs.reached_by(cast) {
+                    let Some((healed, hp, max_hp)) = self.mobs.heal(object_id, effect.x, effect.y)
+                    else {
+                        continue;
+                    };
+                    if healed <= 0 {
+                        continue;
+                    }
+                    if let Ok(packet) = build_heal_mob(object_id, healed, hp, max_hp) {
+                        self.broadcast(None, packet);
+                    }
+                }
+            }
+            Some(MobSkillEffect::Summon) => {
+                let summoned: Vec<_> = effect
+                    .summons
+                    .iter()
+                    .filter_map(|&mob_id| net::mobs::info(mob_id))
+                    .collect();
+                let spawned = self.mobs.summon(cast.object_id, &summoned, effect.limit);
+                let summon_effect = u8::try_from(effect.summon_effect).ok();
+                for object_id in spawned {
+                    let Some(mob) = self.mobs.get(object_id) else {
+                        continue;
+                    };
+                    let view = MobView {
+                        summon_effect,
+                        ..mob.view(false)
+                    };
+                    let controller = mob.controller.and_then(|c| self.occupants.get(&c));
+                    if let Ok(packet) = build_spawn_mob(&view) {
+                        self.broadcast(None, packet);
+                    }
+                    if let (Some(occupant), Ok(packet)) =
+                        (controller, build_control_mob(&view, false))
+                    {
+                        occupant.handle.send_packet(packet);
+                    }
+                }
+            }
+            Some(MobSkillEffect::Mist) => {
+                if rand::random::<f64>() * 100.0 >= f64::from(effect.prop) {
+                    return;
+                }
+                // It lays its mist over its area; each client in it hurts
+                // itself (v83 FUN_00431783), so it puts nothing on mobs.
+                let (Some(caster), Some(area)) =
+                    (self.mobs.get(cast.object_id), self.mobs.area(cast))
+                else {
+                    return;
+                };
+                let view = MistView {
+                    object_id: 0,
+                    kind: MistKind::Mob,
+                    owner_id: cast.object_id,
+                    skill_id: cast.skill,
+                    level: cast.level as u8,
+                    delay: 0,
+                    area: (area.left, area.top, area.right, area.bottom),
+                    element: effect.element,
+                };
+                let inflict = Inflict {
+                    skill_id: cast.skill,
+                    prop: 100,
+                    duration: Duration::from_secs(effect.duration.max(0) as u64),
+                    statuses: Vec::new(),
+                };
+                let owner = caster.controller.unwrap_or_default();
+                let lasts = inflict.duration;
+                let view = self.mists.add(view, owner, inflict, lasts, now);
+                if let Ok(packet) = build_spawn_mist(&view) {
+                    self.broadcast(None, packet);
+                }
+            }
+            Some(MobSkillEffect::Disease(_)) => {
+                if rand::random::<f64>() * 100.0 >= f64::from(effect.prop) {
+                    return;
+                }
+                let Some(disease) =
+                    mob_skill::inflicted(cast.skill, cast.level, effect.x, effect.duration)
+                else {
+                    return;
+                };
+                let map_id = self.key.map_id;
+                self.tell_reached(cast, |_| Some(ServerMessage::Diseased { disease, map_id }));
+            }
+            Some(MobSkillEffect::Dispel) => {
+                if rand::random::<f64>() * 100.0 >= f64::from(effect.prop) {
+                    return;
+                }
+                let map_id = self.key.map_id;
+                self.tell_reached(cast, |_| Some(ServerMessage::Dispelled { map_id }));
+            }
+            Some(MobSkillEffect::Banish) => {
+                if rand::random::<f64>() * 100.0 >= f64::from(effect.prop) {
+                    return;
+                }
+                let Some(to) = self
+                    .mobs
+                    .get(cast.object_id)
+                    .and_then(|mob| mob.info.banish.clone())
+                else {
+                    return;
+                };
+                // Up to `count` of them (inferred from the data: Cosmic
+                // sends everyone in reach).
+                let most = usize::try_from(effect.count)
+                    .ok()
+                    .filter(|&most| most > 0)
+                    .unwrap_or(usize::MAX);
+                let map_id = self.key.map_id;
+                self.tell_reached(cast, |nth| {
+                    (nth < most).then(|| ServerMessage::Banished {
+                        to: to.clone(),
+                        map_id,
+                    })
+                });
+            }
+            None => {}
+        }
+    }
+
+    /// Send what `message` gives for the `nth` player a mob's cast
+    /// reaches: everyone in its area, or without one its controller
+    /// (Cosmic's MobSkill.applyEffect).
+    fn tell_reached(&self, cast: &Cast, message: impl Fn(usize) -> Option<ServerMessage>) {
+        let Some(caster) = self.mobs.get(cast.object_id) else {
+            return;
+        };
+        let reached: Vec<ClientId> = match self.mobs.area(cast) {
+            Some(area) => self
+                .occupants
+                .iter()
+                .filter(|(_, occupant)| area.contains((occupant.avatar.x, occupant.avatar.y)))
+                .map(|(&client_id, _)| client_id)
+                .collect(),
+            None => caster.controller.into_iter().collect(),
+        };
+        for (nth, client_id) in reached.into_iter().enumerate() {
+            let (Some(occupant), Some(message)) = (self.occupants.get(&client_id), message(nth))
+            else {
+                continue;
+            };
+            occupant.handle.send(message);
+        }
+    }
+
+    /// Show everyone the statuses a mob was just given.
+    fn show_statuses(&self, object_id: i32, given: &[MobStat], now: Instant) {
+        let Some(mob) = self.mobs.get(object_id) else {
+            return;
+        };
+        let views: Vec<_> = mob
+            .status_views(now)
+            .into_iter()
+            .filter(|view| given.contains(&view.stat))
+            .collect();
+        if views.is_empty() {
+            return;
+        }
+        if let Ok(packet) = build_mob_stat_set(object_id, &views) {
+            self.broadcast(None, packet);
+        }
+    }
+
+    /// Put `inflict`'s statuses on a mob for `from`, and show everyone the
+    /// ones it got.
+    fn put_on(&mut self, from: ClientId, object_id: i32, inflict: &Inflict, now: Instant) {
+        let Some(mob) = self.mobs.get(object_id) else {
+            return;
+        };
+        let statuses: Vec<_> = inflict
+            .statuses
+            .iter()
+            .map(|&(stat, amount)| (stat, amount.against(mob.info.max_hp)))
+            .collect();
+        if statuses.is_empty() {
+            return;
+        }
+        let until = now + inflict.duration;
+        let given =
+            self.mobs
+                .add_statuses(object_id, &statuses, inflict.skill_id, from, now, until);
+        self.show_statuses(object_id, &given, now);
     }
 
     /// Give the mob `from` hit to its client with aggro, taking it from
@@ -552,6 +1292,10 @@ impl FieldActor {
         let client_id = handle.client_id;
         // A rejoin replaces the previous entry without announcing a leave.
         self.occupants.remove(&client_id);
+        // Its summons come back with it.
+        for summon in self.summons.remove_owned(client_id, None) {
+            self.remove_summon(&summon.view, Gone::Silently);
+        }
 
         for map_npc in &self.map_npcs {
             match build_spawn_npc(&to_foreign_npc(map_npc)) {
@@ -590,6 +1334,25 @@ impl FieldActor {
             }
         }
 
+        for mist in self.mists.views() {
+            if let Ok(packet) = build_spawn_mist(mist) {
+                handle.send_packet(packet);
+            }
+        }
+
+        for (&owner, &at) in &self.doors {
+            if let Ok(packet) = build_spawn_door(owner, at, false) {
+                handle.send_packet(packet);
+            }
+        }
+
+        // After their owners, whose summons they are.
+        for summon in self.summons.views() {
+            if let Ok(packet) = build_spawn_summon(summon, false) {
+                handle.send_packet(packet);
+            }
+        }
+
         let now = Instant::now();
         for drop in self.drops.all().filter(|drop| drop.visible_to(client_id)) {
             if let Ok(packet) = build_drop(&drop.view(now), DropAppearance::Lying) {
@@ -607,20 +1370,33 @@ impl FieldActor {
         );
         let controlled = self.mobs.assign_uncontrolled(client_id);
         self.send_control(client_id, &controlled);
+        // A rejoining controller has forgotten it controls them.
+        if self.npc_controller.is_none() || self.npc_controller == Some(client_id) {
+            self.send_npc_control(client_id);
+        }
     }
 
     fn handle_leave(&mut self, client_id: ClientId) {
         if self.occupants.remove(&client_id).is_none() {
             return;
         }
+        // The others drop a player's summons with the player.
+        self.summons.remove_owned(client_id, None);
+        // Everyone sees the player go before control passes on.
+        match build_player_leave_field(client_id) {
+            Ok(packet) => self.broadcast(None, packet),
+            Err(error) => warn!(client_id, %error, "Failed to build leave packet"),
+        }
         let next = self.occupants.keys().next().copied();
         let handed = self.mobs.release(client_id, next);
         if let Some(next) = next {
             self.send_control(next, &handed);
         }
-        match build_player_leave_field(client_id) {
-            Ok(packet) => self.broadcast(None, packet),
-            Err(error) => warn!(client_id, %error, "Failed to build leave packet"),
+        if self.npc_controller == Some(client_id) {
+            self.npc_controller = None;
+            if let Some(next) = next {
+                self.send_npc_control(next);
+            }
         }
     }
 
@@ -706,6 +1482,7 @@ mod tests {
             y,
             stance: 2,
             chair: 0,
+            buffs: Vec::new(),
         }
     }
 
@@ -1047,6 +1824,64 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn one_player_picks_the_npcs_actions_for_everyone() {
+        let (tx, rx) = mpsc::channel(16);
+        let maria = FieldMapEntityNpc {
+            object_id: 1_000_000_000,
+            npc_id: 2100,
+            x: 130,
+            y: 185,
+            flip: false,
+            foothold: 0,
+            rx0: 80,
+            rx1: 180,
+        };
+        let actor = FieldActor::new(
+            FieldKey::new(0, 50000),
+            rx,
+            vec![maria],
+            MobSet::default(),
+            DropSet::default(),
+            ReactorSet::default(),
+            Duration::from_millis(50),
+        );
+        tokio::spawn(actor.run());
+        let (first, mut first_rx) = client(1);
+        let (second, mut second_rx) = client(2);
+        for (handle, id) in [(first, 1), (second, 2)] {
+            tx.send(FieldMessage::Join {
+                handle,
+                avatar: avatar(id, 100, 185),
+                party: None,
+            })
+            .await
+            .unwrap();
+        }
+        let control = SendOpcode::SpawnNpcRequestController as i16;
+        assert!(opcodes(&mut first_rx).await.contains(&control));
+        assert!(!opcodes(&mut second_rx).await.contains(&control));
+
+        let action = |from| FieldMessage::FromClient {
+            from,
+            request: FieldRequest::NpcAction {
+                object_id: 1_000_000_000,
+                action: vec![2, 0xff],
+            },
+        };
+        tx.send(action(2)).await.unwrap();
+        assert!(opcodes(&mut first_rx).await.is_empty());
+        tx.send(action(1)).await.unwrap();
+        for rx in [&mut first_rx, &mut second_rx] {
+            let packet = next_packet(rx).await;
+            assert_eq!(packet.opcode(), SendOpcode::NpcAction as i16);
+            assert_eq!(&packet.bytes[2..], &[0x00, 0xca, 0x9a, 0x3b, 2, 0xff]);
+        }
+
+        tx.send(FieldMessage::Leave { client_id: 1 }).await.unwrap();
+        assert!(opcodes(&mut second_rx).await.contains(&control));
+    }
+
+    #[tokio::test]
     async fn the_target_answers_a_char_info_request() {
         let field = spawn_field();
         let (first, mut first_rx) = client(1);
@@ -1088,5 +1923,229 @@ mod tests {
             SendOpcode::StatChange as i16
         );
         assert!(first_rx.try_recv().is_err());
+    }
+
+    #[tokio::test]
+    async fn fame_reaches_its_target_only_on_the_givers_map() {
+        let field = spawn_field();
+        let (first, mut first_rx) = client(1);
+        let (second, mut second_rx) = client(2);
+        for (handle, id) in [(first, 1), (second, 2)] {
+            field
+                .send(FieldMessage::Join {
+                    handle,
+                    avatar: avatar(id, 0, 0),
+                    party: None,
+                })
+                .await
+                .unwrap();
+        }
+        next_opcode(&mut first_rx).await;
+        next_opcode(&mut second_rx).await;
+
+        for target in [3, 2] {
+            field
+                .send(FieldMessage::FromClient {
+                    from: 1,
+                    request: FieldRequest::Fame {
+                        target,
+                        giver_name: "Al".into(),
+                        up: true,
+                    },
+                })
+                .await
+                .unwrap();
+        }
+        match timeout(Duration::from_secs(1), second_rx.recv())
+            .await
+            .unwrap()
+            .unwrap()
+        {
+            ServerMessage::Famed {
+                giver,
+                giver_name,
+                up,
+            } => {
+                assert_eq!((giver.client_id, giver_name.as_str(), up), (1, "Al", true))
+            }
+            other => panic!("expected fame, got {other:?}"),
+        }
+        match timeout(Duration::from_secs(1), first_rx.recv())
+            .await
+            .unwrap()
+            .unwrap()
+        {
+            ServerMessage::FameMissed { target } => assert_eq!(target, 3),
+            other => panic!("expected a miss, got {other:?}"),
+        }
+        assert!(first_rx.try_recv().is_err());
+    }
+
+    /// Two players on a field with a long tick, everything they got so far
+    /// read.
+    async fn two_players() -> (
+        mpsc::Sender<FieldMessage>,
+        mpsc::Receiver<ServerMessage>,
+        mpsc::Receiver<ServerMessage>,
+    ) {
+        let field = spawn_field();
+        let (first, mut first_rx) = client(1);
+        let (second, mut second_rx) = client(2);
+        for (handle, id) in [(first, 1), (second, 2)] {
+            field
+                .send(FieldMessage::Join {
+                    handle,
+                    avatar: avatar(id, 0, 0),
+                    party: None,
+                })
+                .await
+                .unwrap();
+        }
+        opcodes(&mut first_rx).await;
+        opcodes(&mut second_rx).await;
+        (field, first_rx, second_rx)
+    }
+
+    fn summon(skill_id: i32, at: (i16, i16), lasts: Duration) -> FieldMessage {
+        FieldMessage::FromClient {
+            from: 1,
+            request: FieldRequest::Summon {
+                skill_id,
+                level: 20,
+                at,
+                left: true,
+                lasts,
+                appear: true,
+            },
+        }
+    }
+
+    #[tokio::test]
+    async fn a_puppet_shows_to_all_takes_its_owners_hits_and_breaks() {
+        if skills::data().is_err() {
+            return;
+        }
+        let (field, mut first_rx, mut second_rx) = two_players().await;
+        let puppet = summons::PUPPETS[0];
+        // Too far from its owner: it goes where they stand.
+        field
+            .send(summon(puppet, (900, 0), Duration::from_secs(60)))
+            .await
+            .unwrap();
+        let spawned = next_packet(&mut second_rx).await;
+        assert_eq!(spawned.opcode(), SendOpcode::SpawnSummon as i16);
+        let object_id = i32::from_le_bytes(spawned.bytes[6..10].try_into().unwrap());
+        assert_eq!(&spawned.bytes[16..20], [0, 0, 0, 0]);
+        assert_eq!(
+            next_opcode(&mut first_rx).await,
+            SendOpcode::SpawnSummon as i16
+        );
+
+        // Someone arriving sees it after its owner.
+        let (third, mut third_rx) = client(3);
+        field
+            .send(FieldMessage::Join {
+                handle: third,
+                avatar: avatar(3, 0, 0),
+                party: None,
+            })
+            .await
+            .unwrap();
+        let seen = opcodes(&mut third_rx).await;
+        let at = |op: SendOpcode| {
+            let op = op as i16;
+            seen.iter().position(|&seen| seen == op).unwrap()
+        };
+        assert!(at(SendOpcode::SpawnPlayer) < at(SendOpcode::SpawnSummon));
+        opcodes(&mut first_rx).await;
+        opcodes(&mut second_rx).await;
+
+        let hit = |from, damage| FieldMessage::FromClient {
+            from,
+            request: FieldRequest::SummonDamage(SummonDamage {
+                object_id,
+                attack: -1,
+                damage,
+                mob: Some((100100, false)),
+            }),
+        };
+        // Only its owner's client says what hurt it.
+        field.send(hit(2, 1_000_000)).await.unwrap();
+        field.send(hit(1, 10)).await.unwrap();
+        assert_eq!(
+            next_opcode(&mut second_rx).await,
+            SendOpcode::DamageSummon as i16
+        );
+        let hp = summons::hp(&skills::at_level(puppet, 20).unwrap()).unwrap();
+        field.send(hit(1, hp)).await.unwrap();
+        assert_eq!(
+            next_opcode(&mut second_rx).await,
+            SendOpcode::DamageSummon as i16
+        );
+        let removed = next_packet(&mut second_rx).await;
+        assert_eq!(removed.opcode(), SendOpcode::RemoveSummon as i16);
+        assert_eq!(removed.bytes[10], Gone::Broken as u8);
+        assert_eq!(
+            next_opcode(&mut first_rx).await,
+            SendOpcode::RemoveSummon as i16
+        );
+        match timeout(Duration::from_secs(1), first_rx.recv()).await {
+            Ok(Some(ServerMessage::SummonBroken { skill_id })) => assert_eq!(skill_id, puppet),
+            other => panic!("expected the puppet broken, got {other:?}"),
+        }
+    }
+
+    #[tokio::test]
+    async fn a_summon_attacks_within_its_limits_and_goes_when_its_time_is_up() {
+        if skills::data().is_err() {
+            return;
+        }
+        let (field, mut first_rx, mut second_rx) = two_players().await;
+        let hawk = 3111005;
+        field
+            .send(summon(hawk, (0, 0), Duration::from_millis(300)))
+            .await
+            .unwrap();
+        let spawned = next_packet(&mut second_rx).await;
+        let object_id = i32::from_le_bytes(spawned.bytes[6..10].try_into().unwrap());
+        opcodes(&mut first_rx).await;
+
+        let attack = |damage: &[i32]| FieldMessage::FromClient {
+            from: 1,
+            request: FieldRequest::SummonAttack {
+                attack: SummonAttack {
+                    object_id,
+                    action: 0x84,
+                    hits: damage
+                        .iter()
+                        .enumerate()
+                        .map(|(i, &damage)| summons::SummonHit {
+                            object_id: 2_000_000_000 + i as i32,
+                            action: 6,
+                            damage,
+                        })
+                        .collect(),
+                },
+                limits: vec![Limit {
+                    skill_id: hawk,
+                    mob_count: 1,
+                    max_damage: 100,
+                    inflict: None,
+                }],
+            },
+        };
+        field.send(attack(&[101])).await.unwrap();
+        field.send(attack(&[50, 50])).await.unwrap();
+        field.send(attack(&[100])).await.unwrap();
+        // Only the last keeps to the limits; its owner already saw it.
+        assert_eq!(
+            opcodes(&mut second_rx).await,
+            [SendOpcode::SummonAttack as i16]
+        );
+        assert!(first_rx.try_recv().is_err());
+
+        let removed = next_packet(&mut second_rx).await;
+        assert_eq!(removed.opcode(), SendOpcode::RemoveSummon as i16);
+        assert_eq!(removed.bytes[10], Gone::Expired as u8);
     }
 }

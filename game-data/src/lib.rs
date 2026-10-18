@@ -18,6 +18,10 @@ pub mod skills;
 const NODE_SIZE_BYTES: u64 = 20;
 pub const NO_DESTINATION_MAP: i32 = 999_999_999;
 pub const PORTAL_TYPE_START_POINT: i32 = 0;
+/// `pt` of a town's door portals (`tp`), where Mystic Doors stand.
+pub const PORTAL_TYPE_TOWN_DOOR: i32 = 6;
+/// `info/fieldLimit` bit forbidding Mystic Door (v83 FUN_00969bf9).
+pub const FIELD_LIMIT_MYSTIC_DOOR: i32 = 0x8;
 
 #[derive(Debug, Error)]
 pub enum GameDataError {
@@ -90,9 +94,19 @@ pub struct NpcDialogueTemplate {
     pub pages: Vec<String>,
 }
 
+/// What a storage NPC (one with `info/trunkPut`) charges, in mesos.
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub struct StorageFees {
+    /// To store an item (`trunkPut`).
+    pub put: i32,
+    /// To take one out (`trunkGet`).
+    pub get: i32,
+}
+
 #[derive(Debug, Default)]
 pub struct NpcDialogueData {
     dialogues: BTreeMap<i32, NpcDialogueTemplate>,
+    storages: BTreeMap<i32, StorageFees>,
 }
 
 impl NpcDialogueData {
@@ -106,6 +120,7 @@ impl NpcDialogueData {
             GameDataError::InvalidData("missing root child 'Npc.img'".to_string())
         })?;
         let mut dialogues = BTreeMap::new();
+        let mut storages = BTreeMap::new();
 
         for npc_index in npcs.child_indices(0)? {
             let name = npcs.node_name(npc_index)?;
@@ -118,6 +133,10 @@ impl NpcDialogueData {
             let Some(info) = npcs.child_by_name(npc_index, "info")? else {
                 continue;
             };
+            if let Some(put) = npcs.int_child(info, "trunkPut")? {
+                let get = npcs.int_child(info, "trunkGet")?.unwrap_or(0);
+                storages.insert(npc_id, StorageFees { put, get });
+            }
             let Some(speak) = npcs.child_by_name(info, "speak")? else {
                 continue;
             };
@@ -145,11 +164,19 @@ impl NpcDialogueData {
                 dialogues.insert(npc_id, NpcDialogueTemplate { npc_id, pages });
             }
         }
-        Ok(Self { dialogues })
+        Ok(Self {
+            dialogues,
+            storages,
+        })
     }
 
     pub fn dialogue(&self, npc_id: i32) -> Option<&NpcDialogueTemplate> {
         self.dialogues.get(&npc_id)
+    }
+
+    /// The fees if `npc_id` keeps a storage.
+    pub fn storage_fees(&self, npc_id: i32) -> Option<StorageFees> {
+        self.storages.get(&npc_id).copied()
     }
 }
 
@@ -167,6 +194,10 @@ pub struct FieldTemplate {
     /// `info/recovery`: how much faster players recover HP and MP at rest,
     /// e.g. 2 in the Sleepywood sauna.
     pub recovery: f64,
+    /// `info/town`.
+    pub town: bool,
+    /// `info/fieldLimit`: what the map forbids (see `FIELD_LIMIT_*`).
+    pub field_limit: i32,
     pub footholds: footholds::Footholds,
     portals_by_id: BTreeMap<u32, PortalTemplate>,
     portal_ids_by_name: HashMap<String, Vec<u32>>,
@@ -199,6 +230,15 @@ impl FieldTemplate {
                 let (dx, dy) = (i64::from(portal.x - x), i64::from(portal.y - y));
                 dx * dx + dy * dy
             })
+    }
+
+    /// The town's door portals, in the order the client numbers them: the
+    /// door of the party member in slot `i` (or of a player alone, 0) stands
+    /// at the `i`th.
+    pub fn door_portals(&self) -> impl Iterator<Item = &PortalTemplate> {
+        self.portals_by_id
+            .values()
+            .filter(|portal| portal.portal_type == PORTAL_TYPE_TOWN_DOOR)
     }
 
     pub fn resolve_spawn_portal(&self, preferred_name: &str) -> Option<&PortalTemplate> {
@@ -297,6 +337,13 @@ fn build_field_template(
         .transpose()?
         .flatten()
         .unwrap_or(1.0);
+    let (town, field_limit) = match nx.child_by_name(map_node_idx, "info")? {
+        Some(info) => (
+            nx.int_child(info, "town")?.unwrap_or(0) != 0,
+            nx.int_child(info, "fieldLimit")?.unwrap_or(0),
+        ),
+        None => (false, 0),
+    };
 
     let mut portals_by_id = BTreeMap::new();
 
@@ -355,6 +402,8 @@ fn build_field_template(
         reactors,
         mob_rate,
         recovery,
+        town,
+        field_limit,
         footholds,
         portals_by_id,
         portal_ids_by_name,
@@ -660,6 +709,24 @@ impl NxDataFile {
         })
     }
 
+    /// A vector child's x and y.
+    fn vector_child(
+        &self,
+        parent_index: u32,
+        key: &str,
+    ) -> Result<Option<(i32, i32)>, GameDataError> {
+        let Some(child_index) = self.child_by_name(parent_index, key)? else {
+            return Ok(None);
+        };
+        let node = self.node_at(child_index)?;
+        if node.data_type != 4 {
+            return Ok(None);
+        }
+        let x = node.data as u32 as i32;
+        let y = (node.data >> 32) as u32 as i32;
+        Ok(Some((x, y)))
+    }
+
     /// A real (or integer) child as `f64`.
     fn real_child(&self, parent_index: u32, key: &str) -> Result<Option<f64>, GameDataError> {
         let Some(child_index) = self.child_by_name(parent_index, key)? else {
@@ -778,6 +845,21 @@ mod tests {
     }
 
     #[test]
+    fn storage_npcs_charge_their_trunk_fees() {
+        let (Some(npc), Some(string)) =
+            (test_assets::path("Npc.nx"), test_assets::path("String.nx"))
+        else {
+            return;
+        };
+        let data = NpcDialogueData::load_from_nx(npc, string).expect("load NPC assets");
+        let fees = |put, get| Some(StorageFees { put, get });
+        assert_eq!(data.storage_fees(1012009), fees(100, 0), "Mr. Lee");
+        assert_eq!(data.storage_fees(2020004), fees(150, 0), "Mr. Mohammed");
+        assert_eq!(data.storage_fees(9030100), fees(500, 1000), "Scrooge");
+        assert_eq!(data.storage_fees(12101), None, "Rain keeps no storage");
+    }
+
+    #[test]
     fn resolve_spawn_portal_requires_named_links_and_defaults_only_when_unnamed() {
         let field = FieldTemplate {
             map_id: 1,
@@ -789,6 +871,8 @@ mod tests {
             reactors: Vec::new(),
             mob_rate: 1.0,
             recovery: 1.0,
+            town: false,
+            field_limit: 0,
             footholds: footholds::Footholds::default(),
             portals_by_id: BTreeMap::from([
                 (
@@ -853,6 +937,8 @@ mod tests {
             mob_spawns: Vec::new(),
             mob_rate: 1.0,
             recovery: 1.0,
+            town: false,
+            field_limit: 0,
             reactors: Vec::new(),
             footholds: footholds::Footholds::default(),
             portals_by_id: BTreeMap::from([
@@ -905,5 +991,25 @@ mod tests {
                 "{spawn:?}"
             );
         }
+    }
+
+    #[test]
+    fn towns_list_their_door_portals_in_id_order() {
+        let Some(path) = test_assets::path("Map.nx") else {
+            return;
+        };
+        let game_data = GameData::load_from_nx_map(&path).expect("load map nx");
+        let henesys = game_data.field(100_000_000).expect("Henesys");
+        let doors: Vec<_> = henesys.door_portals().map(|portal| portal.id).collect();
+
+        assert!(henesys.town);
+        assert_eq!(doors, (28..=33).collect::<Vec<_>>());
+        assert_eq!(
+            henesys.door_portals().next().map(|p| (p.x, p.y)),
+            Some((2786, 333))
+        );
+        let field = game_data.field(101_010_000).expect("a field near Ellinia");
+        assert!(!field.town);
+        assert_eq!(field.return_map, Some(101_000_000));
     }
 }

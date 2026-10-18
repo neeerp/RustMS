@@ -222,7 +222,13 @@ from `UI.nx`. Moved so far:
   COLLECTION lengthen it to `backgrnd5`, `backgrnd2`, and `backgrnd7`, and ITEM
   and WISHLIST open `backgrnd4` and `backgrnd3` beside it; all are empty, as
   RustMS has no mounts, pets, monster book, or cash shop wish list. Family,
-  party, trade, fame, and excluded items are disabled.
+  party, trade, and excluded items are disabled. The fame buttons send
+  GIVE_FAME (`GiveFamePacket`) unless the window is the player's own or the
+  player is below level 15. As in v83 (FUN_00a23eb5), the client refuses a
+  character who isn't on the map ("Unable to find the character.") and a
+  second try within 5 minutes ("Please try it again later.",
+  `Gameplay/FameCooldown.h`). FAME_RESPONSE (`FameResponseHandler`) prints its
+  v83 lines in the skill chat colour and updates the open window's fame.
 - **Quest log** (`UIQuestLog`, `UIWindow.img/Quest`): Available, In Progress,
   and Complete tabs (`Basic.img/Tab2`), quests folded by area, and a detail
   panel with the quest's text and FIND NPC or QUEST HELPER, laid out from
@@ -411,7 +417,7 @@ side yet.
 | --- | --- |
 | Login, world/channel select, character list/create/delete, PIC | Implemented |
 | In-map play: movement, jumping, portals, map change, channel change | Implemented |
-| Combat: melee/ranged/magic attacks, mob HP/death, drops, pickup | Implemented |
+| Combat: melee/ranged/magic attacks, mob HP/death, mob attacks and skills, drops, pickup | Implemented, with diseases; see `combat.md` |
 | Inventory, equip, item use, scroll, sort/gather | Implemented |
 | Skills, stat/AP/SP allocation, buffs, keymap | Implemented |
 | NPC dialogue and NPC shop | Implemented (`UINpcTalk`, `UIShop`) |

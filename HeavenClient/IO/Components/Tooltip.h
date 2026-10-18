@@ -36,6 +36,7 @@ namespace ms
 			ITEMINVENTORY,
 			SKILLBOOK,
 			SHOP,
+			STORAGE,
 			EVENT,
 			TEXT,
 			KEYCONFIG,

@@ -36,6 +36,21 @@ namespace ms
 		}
 	};
 
+	// The idle action the NPCs' controller chose for one (FUN_006d3273): the
+	// action as an animation index from 2, or -1 for a line alone, then the
+	// line, -1 for none. The server shows it to everyone.
+	// Opcode: NPC_ACTION(197)
+	class NpcActionPacket : public OutPacket
+	{
+	public:
+		NpcActionPacket(int32_t oid, int8_t action, int8_t line) : OutPacket(OutPacket::Opcode::NPC_ACTION)
+		{
+			write_int(oid);
+			write_byte(action);
+			write_byte(line);
+		}
+	};
+
 	// Packet which sends a response to an NPC dialog to the server
 	// Opcode: NPC_TALK_MORE(60)
 	class NpcTalkMorePacket : public OutPacket
@@ -89,6 +104,49 @@ namespace ms
 		NpcShopActionPacket(Mode mode) : OutPacket(OutPacket::Opcode::NPC_SHOP_ACTION)
 		{
 			write_byte(mode);
+		}
+	};
+
+	// Packet which asks an NPC's storage to take out, store, sort, or move
+	// mesos, or closes it
+	// Opcode: TRUNK_REQUEST(62)
+	class TrunkRequestPacket : public OutPacket
+	{
+	public:
+		enum Mode : int8_t
+		{
+			TAKE_OUT = 4,
+			STORE,
+			SORT,
+			MESO,
+			CLOSE
+		};
+
+		// Sorts or closes the storage
+		TrunkRequestPacket(Mode mode) : OutPacket(OutPacket::Opcode::TRUNK_REQUEST)
+		{
+			write_byte(mode);
+		}
+
+		// Takes out the index-th item of the storage's bag of a type
+		TrunkRequestPacket(int8_t type, int8_t index) : TrunkRequestPacket(Mode::TAKE_OUT)
+		{
+			write_byte(type);
+			write_byte(index);
+		}
+
+		// Stores count of the item in an inventory slot
+		TrunkRequestPacket(int16_t slot, int32_t itemid, int16_t count) : TrunkRequestPacket(Mode::STORE)
+		{
+			write_short(slot);
+			write_int(itemid);
+			write_short(count);
+		}
+
+		// Takes mesos out, or puts them in when negative
+		TrunkRequestPacket(int32_t meso) : TrunkRequestPacket(Mode::MESO)
+		{
+			write_int(meso);
 		}
 	};
 }

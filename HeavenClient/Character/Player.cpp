@@ -111,21 +111,34 @@ namespace ms
 		ladder = nullptr;
 		set_chair(0);
 		nullstate.update_state(*this);
+		path.reset(current_move(0));
+		stirred = now_ms();
 	}
 
 	void Player::send_action(KeyAction::Id action, bool down)
 	{
 		const PlayerState *pst = get_state(state);
+		bool refused = action == KeyAction::Id::JUMP && !disease::can_jump(get_diseases());
 
-		if (pst)
+		if (pst && !refused)
 			pst->send_action(*this, action, down);
+
+		// Under Stop Motion, a walking key going down, repeating or up
+		// (FUN_0094c856, after Confuse swaps them), or a jump, is moving.
+		bool confused = has_buff(Buffstat::Id::CONFUSE);
+		bool walks = action == KeyAction::Id::LEFT || action == KeyAction::Id::RIGHT ||
+					 action == (confused ? KeyAction::Id::UP : KeyAction::Id::DOWN);
+
+		if (has_buff(Buffstat::Id::STOP_MOTION) && !is_dead() &&
+			(walks || (action == KeyAction::Id::JUMP && down && !refused)))
+			stirred = now_ms();
 
 		keysdown[action] = down;
 	}
 
 	void Player::release_key(KeyAction::Id action)
 	{
-		if (is_key_down(action))
+		if (is_held(action))
 			send_action(action, false);
 	}
 
@@ -190,7 +203,9 @@ namespace ms
 
 		if (int16_t slot = inventory.find_item(type, itemid))
 		{
-			if (type == InventoryType::Id::USE)
+			if (type == InventoryType::Id::USE && (itemid / 10000 == 228 || itemid / 10000 == 229))
+				request(SkillBookPacket(slot, itemid), ExclRequest::USE_WAIT);
+			else if (type == InventoryType::Id::USE && disease::can_use_item(get_diseases()))
 				request(UseItemPacket(slot, itemid), ExclRequest::USE_WAIT);
 			else if (type == InventoryType::Id::SETUP && itemid / 10000 == 301)
 				sit_on_chair(itemid);
@@ -237,6 +252,12 @@ namespace ms
 
 		if (pst)
 		{
+			// A seduction that jumps keeps the player jumping.
+			disease::State diseases = get_diseases();
+
+			if (diseases.seduced && disease::seduced(*diseases.seduced).jump && phobj.onground)
+				pst->send_action(*this, KeyAction::Id::JUMP, true);
+
 			phobj.walkspeed = get_walkspeed();
 			pst->update(*this);
 			physics.move_object(phobj);
@@ -259,17 +280,41 @@ namespace ms
 
 		update_recovery();
 
-		uint8_t stancebyte = facing_right ? state : state + 1;
-		Movement newmove(phobj, stancebyte);
-		bool needupdate = lastmove.hasmoved(newmove);
+		path.step(current_move(0), Constants::TIMESTEP);
 
-		if (needupdate)
+		if (path.ready())
 		{
-			MovePlayerPacket(newmove).dispatch();
-			lastmove = newmove;
+			move_path::Path sent = path.flush();
+
+			if (!sent.idle)
+				MovePlayerPacket(sent).dispatch();
 		}
 
 		return get_layer();
+	}
+
+	uint8_t Player::get_stancebyte() const
+	{
+		return facing_right ? state : state + 1;
+	}
+
+	void Player::record_move(uint8_t command)
+	{
+		path.add(current_move(command));
+	}
+
+	Movement Player::current_move(uint8_t command) const
+	{
+		Movement move(phobj, get_stancebyte(), command, 0);
+
+		if (is_dead())
+			move.fh = 0;
+		else if (ladder)
+			move.fh = -ladder->get_id();
+		else if (!phobj.onground)
+			move.fh = 0;
+
+		return move;
 	}
 
 	void Player::update_death()
@@ -534,7 +579,7 @@ namespace ms
 
 	bool Player::can_attack() const
 	{
-		return !attacking && !is_dead() && !is_climbing() && !is_sitting();
+		return !attacking && !is_dead() && !is_climbing() && !is_sitting() && disease::can_attack(get_diseases());
 	}
 
 	SpecialMove::ForbidReason Player::can_use(const SpecialMove &move) const
@@ -547,6 +592,9 @@ namespace ms
 			return SpecialMove::ForbidReason::FBR_OTHER;
 
 		if (move.is_attack() && (state == Char::State::LADDER || state == Char::State::ROPE))
+			return SpecialMove::ForbidReason::FBR_OTHER;
+
+		if (move.is_skill() && !disease::can_use_skill(move.get_id(), get_diseases()))
 			return SpecialMove::ForbidReason::FBR_OTHER;
 
 		if (has_cooldown(move.get_id()))
@@ -667,11 +715,19 @@ namespace ms
 
 	MobAttackResult Player::damage(const MobAttack &attack)
 	{
-		int32_t damage = stats.calculate_damage(attack.watk);
+		int32_t damage = stats.calculate_damage(attack, randomizer.next_real(1.0), randomizer.next_real(1.0));
+
+		// A deadly attack that hits leaves 1 HP, and an MP burn takes 1
+		// (FUN_009581a9).
+		if (damage > 0 && attack.deadly)
+			damage = std::max(stats.get_stat(MapleStat::Id::HP) - 1, 1);
+		else if (damage > 0 && attack.mpburn)
+			damage = 1;
+
 		show_damage(damage);
 		become_invincible(damage > 0);
 
-		bool fromleft = attack.origin.x() > phobj.get_x();
+		bool fromleft = attack.pushleft ? *attack.pushleft : attack.origin.x() > phobj.get_x();
 
 		bool missed = damage <= 0;
 
@@ -705,16 +761,81 @@ namespace ms
 	void Player::give_buff(Buff buff)
 	{
 		buffs[buff.stat] = buff;
+		show_diseases();
 	}
 
 	void Player::cancel_buff(Buffstat::Id stat)
 	{
 		buffs[stat] = {};
+		show_diseases();
+	}
+
+	// A disease's reason is the mob skill that gave it.
+	void Player::show_diseases()
+	{
+		std::vector<int32_t> reasons;
+
+		for (Buffstat::Id stat : disease::STATS)
+			if (has_buff(stat))
+				reasons.push_back(buffs[stat].skillid);
+
+		show_afflictions(reasons);
+	}
+
+	disease::State Player::get_diseases() const
+	{
+		disease::State diseases;
+		diseases.stunned = has_buff(Buffstat::Id::STUN);
+		diseases.sealed = has_buff(Buffstat::Id::SEAL);
+		diseases.weakened = has_buff(Buffstat::Id::WEAKEN);
+		diseases.confused = has_buff(Buffstat::Id::CONFUSE);
+
+		diseases.stop_potion = has_buff(Buffstat::Id::STOP_POTION);
+
+		if (has_buff(Buffstat::Id::SEDUCE))
+			diseases.seduced = get_buff_value(Buffstat::Id::SEDUCE);
+
+		if (has_buff(Buffstat::Id::STOP_MOTION))
+			diseases.stop_motion = get_buff_value(Buffstat::Id::STOP_MOTION);
+
+		return diseases;
+	}
+
+	int32_t Player::take_stop_motion()
+	{
+		std::optional<int32_t> n = get_diseases().stop_motion;
+
+		if (!n || is_dead())
+			return 0;
+
+		int64_t now = now_ms();
+
+		// A held walking key repeats, as Windows repeats it.
+		bool confused = has_buff(Buffstat::Id::CONFUSE);
+
+		if (is_held(KeyAction::Id::LEFT) || is_held(KeyAction::Id::RIGHT) ||
+			is_held(confused ? KeyAction::Id::UP : KeyAction::Id::DOWN))
+			stirred = now;
+
+		if (now - stirred <= disease::STILL_TIME)
+			return 0;
+
+		int32_t damage = disease::stop_motion_damage(*n, stats.get_stat(MapleStat::Id::HP));
+
+		if (damage > 0)
+			stirred = now;
+
+		return damage;
 	}
 
 	bool Player::has_buff(Buffstat::Id stat) const
 	{
 		return buffs[stat].value > 0;
+	}
+
+	int16_t Player::get_buff_value(Buffstat::Id stat) const
+	{
+		return buffs[stat].value;
 	}
 
 	void Player::change_skill(int32_t skill_id, int32_t skill_level, int32_t masterlevel, int64_t expiration)
@@ -879,7 +1000,14 @@ namespace ms
 	// them into shoe multipliers (FUN_007a4dec).
 	double Player::get_walkspeed() const
 	{
-		return std::clamp<int32_t>(stats.get_total(EquipStat::Id::SPEED), 80, 140) / 100.0;
+		std::optional<int32_t> slow;
+
+		if (has_buff(Buffstat::Id::SLOW))
+			slow = get_buff_value(Buffstat::Id::SLOW);
+
+		int32_t speed = disease::walk_speed(stats.get_total(EquipStat::Id::SPEED), slow);
+
+		return std::clamp<int32_t>(speed, 80, 140) / 100.0;
 	}
 
 	double Player::get_jumpforce() const
@@ -898,6 +1026,36 @@ namespace ms
 	}
 
 	bool Player::is_key_down(KeyAction::Id action) const
+	{
+		switch (action)
+		{
+		case KeyAction::Id::LEFT:
+		case KeyAction::Id::RIGHT:
+		case KeyAction::Id::UP:
+		case KeyAction::Id::DOWN:
+			break;
+		default:
+			return is_held(action);
+		}
+
+		int8_t x = is_held(KeyAction::Id::RIGHT) - is_held(KeyAction::Id::LEFT);
+		int8_t y = is_held(KeyAction::Id::DOWN) - is_held(KeyAction::Id::UP);
+		disease::Input input = disease::steer(x, y, get_diseases());
+
+		switch (action)
+		{
+		case KeyAction::Id::LEFT:
+			return input.x < 0;
+		case KeyAction::Id::RIGHT:
+			return input.x > 0;
+		case KeyAction::Id::UP:
+			return input.y < 0;
+		default:
+			return input.y > 0;
+		}
+	}
+
+	bool Player::is_held(KeyAction::Id action) const
 	{
 		return keysdown.count(action) ? keysdown.at(action) : false;
 	}
@@ -950,6 +1108,16 @@ namespace ms
 	const Party &Player::get_party() const
 	{
 		return party;
+	}
+
+	MysticDoor &Player::get_door()
+	{
+		return door;
+	}
+
+	const MysticDoor &Player::get_door() const
+	{
+		return door;
 	}
 
 	BuddyList &Player::get_buddies()

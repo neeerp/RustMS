@@ -53,6 +53,7 @@ namespace ms
 			UNK0,
 			WHITE,
 			RED,
+			// Server notices
 			BLUE,
 			YELLOW,
 			GREY,

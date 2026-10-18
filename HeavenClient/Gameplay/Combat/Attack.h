@@ -20,6 +20,7 @@
 #include "../Template/Rectangle.h"
 
 #include <cstdint>
+#include <optional>
 #include <vector>
 #include <unordered_map>
 
@@ -60,12 +61,16 @@ namespace ms
 		int32_t mastery = 0;
 		int32_t amplify = 100;
 		uint8_t element = 0;
+		// The weapon's percent for that element (an Elemental Wand or Staff).
+		int32_t elemboost = 100;
 		// Heal's `hp` percent, which it hurts the undead with in place of a
 		// magic attack, and how many it reaches, mobs and party members.
 		int32_t heal = 0;
 		int32_t healed = 0;
 
 		uint8_t hitcount = 0;
+		// Shadow Partner's second set of bullets makes 2.
+		uint8_t sets = 1;
 		uint8_t mobcount = 0;
 		uint8_t speed = 0;
 		uint8_t stance = 0;
@@ -92,7 +97,27 @@ namespace ms
 		int32_t matk = 0;
 		int32_t mobid = 0;
 		int32_t oid = 0;
+		// The mob's level and accuracy, which the player's avoid is weighed
+		// against.
+		int32_t level = 0;
+		int32_t accuracy = 0;
+		// The percent a Power Up or Magic Up puts its physical or magic
+		// hits at, or 0 without one.
+		int32_t powerup = 0;
+		int32_t magicup = 0;
 		Point<int16_t> origin;
+		// Which of the mob's attacks (attack1 is 0) hit, or -1 for its body.
+		int8_t index = -1;
+		bool magic = false;
+		// A magic attack's element: 0 none, 1 ice, 2 fire, 3 lightning,
+		// 4 poison (FUN_006811a7).
+		uint8_t element = 0;
+		// A deadly attack leaves 1 HP, and an MP burn takes 1.
+		bool deadly = false;
+		bool mpburn = false;
+		// An attack knocks the player the way the mob faced; a touch, away
+		// from its body.
+		std::optional<bool> pushleft;
 		bool valid = false;
 
 		// Create a mob attack for touch damage.
@@ -116,11 +141,15 @@ namespace ms
 		int32_t mobid;
 		int32_t oid;
 		uint8_t direction;
+		int8_t index;
+		uint8_t element;
 
 		MobAttackResult(const MobAttack &attack, int32_t damage, uint8_t direction) : damage(damage),
-																					  direction(direction),
 																					  mobid(attack.mobid),
-																					  oid(attack.oid)
+																					  oid(attack.oid),
+																					  direction(direction),
+																					  index(attack.index),
+																					  element(attack.magic ? attack.element : 0)
 		{}
 	};
 
@@ -130,6 +159,7 @@ namespace ms
 		{
 			type = attack.type;
 			hitcount = attack.hitcount;
+			sets = attack.sets;
 			skill = attack.skill;
 			charge = attack.charge;
 			speed = attack.speed;
@@ -146,6 +176,7 @@ namespace ms
 		int32_t attacker = 0;
 		uint8_t mobcount = 0;
 		uint8_t hitcount = 1;
+		uint8_t sets = 1;
 		int32_t skill = 0;
 		int32_t charge = 0;
 		int32_t bullet = 0;

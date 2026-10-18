@@ -28,6 +28,7 @@ async fn read_until(
         }
         let skippable = [
             SendOpcode::SpawnNpc as i16,
+            SendOpcode::SpawnNpcRequestController as i16,
             SendOpcode::FieldEffect as i16,
             SendOpcode::SpawnPlayer as i16,
             SendOpcode::RemovePlayerFromMap as i16,

@@ -19,10 +19,13 @@
 
 namespace ms
 {
-	std::vector<Movement> MovementParser::parse_movements(InPacket& recv)
+	std::vector<Movement> MovementParser::parse_movements(InPacket& recv, Point<int16_t> start)
 	{
 		std::vector<Movement> movements;
 		uint8_t length = recv.read_byte();
+		int16_t x = start.x();
+		int16_t y = start.y();
+		uint8_t stance = 0;
 
 		for (uint8_t i = 0; i < length; ++i)
 		{
@@ -33,15 +36,20 @@ namespace ms
 			{
 			case 0:
 			case 5:
+			case 15:
 			case 17:
-				fragment.type = Movement::ABSOLUTE;
-				fragment.xpos = recv.read_short();
-				fragment.ypos = recv.read_short();
-				fragment.lastx = recv.read_short();
-				fragment.lasty = recv.read_short();
+				// A move to a point, at a speed, onto a foothold; a jump down
+				// also says the foothold it fell from.
+				fragment.type = fragment.command == 15 ? Movement::JUMPDOWN : Movement::ABSOLUTE;
+				x = recv.read_short();
+				y = recv.read_short();
+				fragment.vx = recv.read_short();
+				fragment.vy = recv.read_short();
 				fragment.fh = recv.read_short();
-				fragment.newstate = recv.read_byte();
-				fragment.duration = recv.read_short();
+
+				if (fragment.command == 15)
+					recv.skip(2);
+
 				break;
 			case 1:
 			case 2:
@@ -49,45 +57,54 @@ namespace ms
 			case 12:
 			case 13:
 			case 16:
+			case 18:
+			case 19:
+			case 20:
+			case 22:
+				// A speed from where the last element left off.
 				fragment.type = Movement::RELATIVE;
-				fragment.xpos = recv.read_short();
-				fragment.ypos = recv.read_short();
-				fragment.newstate = recv.read_byte();
-				fragment.duration = recv.read_short();
-				break;
-			case 11:
-				fragment.type = Movement::CHAIR;
-				fragment.xpos = recv.read_short();
-				fragment.ypos = recv.read_short();
-				recv.skip(2);
-				fragment.newstate = recv.read_byte();
-				fragment.duration = recv.read_short();
-				break;
-			case 15:
-				fragment.type = Movement::JUMPDOWN;
-				fragment.xpos = recv.read_short();
-				fragment.ypos = recv.read_short();
-				fragment.lastx = recv.read_short();
-				fragment.lasty = recv.read_short();
-				recv.skip(2);
-				fragment.fh = recv.read_short();
-				fragment.newstate = recv.read_byte();
-				fragment.duration = recv.read_short();
+				fragment.vx = recv.read_short();
+				fragment.vy = recv.read_short();
 				break;
 			case 3:
 			case 4:
 			case 7:
 			case 8:
 			case 9:
-			case 14:
-				fragment.type = Movement::NONE;
+			case 11:
+				// A point and a foothold with no speed: a teleport (4), a seat
+				// (11) and the like.
+				fragment.type = fragment.command == 11 ? Movement::CHAIR : Movement::ABSOLUTE;
+				x = recv.read_short();
+				y = recv.read_short();
+				fragment.fh = recv.read_short();
 				break;
 			case 10:
+				// An equip or stat change: one byte, with no stance or time.
 				fragment.type = Movement::NONE;
-				// Change equip
+				recv.skip(1);
+				break;
+			case 14:
+				fragment.type = Movement::RELATIVE;
+				fragment.vx = recv.read_short();
+				fragment.vy = recv.read_short();
+				recv.skip(2);
+				break;
+			default:
+				fragment.type = Movement::NONE;
 				break;
 			}
 
+			fragment.xpos = x;
+			fragment.ypos = y;
+
+			if (fragment.command != 10)
+			{
+				stance = recv.read_byte();
+				fragment.duration = recv.read_short();
+			}
+
+			fragment.newstate = stance;
 			movements.push_back(fragment);
 		}
 

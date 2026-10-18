@@ -24,6 +24,8 @@
 
 #include "MovementPacket.h"
 
+#include "../../Gameplay/MovePath.h"
+
 #include "../../Character/Inventory/InventoryType.h"
 
 namespace ms
@@ -51,6 +53,19 @@ namespace ms
 			write_byte(fieldkey);
 			write_string(portal);
 			write_point(position);
+		}
+	};
+
+	// Go through a Mystic Door: in a field, to town; in town, back to its
+	// field (FUN_007bd594, FUN_005375ed).
+	// Opcode: USE_DOOR(133)
+	class UseDoorPacket : public OutPacket
+	{
+	public:
+		UseDoorPacket(int32_t owner, bool from_town) : OutPacket(OutPacket::Opcode::USE_DOOR)
+		{
+			write_int(owner);
+			write_byte(from_town);
 		}
 	};
 
@@ -215,12 +230,25 @@ namespace ms
 	class MovePlayerPacket : public MovementPacket
 	{
 	public:
-		// Updates the player's position with the server
-		MovePlayerPacket(const Movement& movement) : MovementPacket(OutPacket::Opcode::MOVE_PLAYER)
+		// Updates the player's position with the server: the field key and
+		// crc (left 0), then the path.
+		MovePlayerPacket(const move_path::Path& path) : MovementPacket(OutPacket::Opcode::MOVE_PLAYER)
 		{
-			skip(9);
-			write_byte(1);
-			writemovement(movement);
+			skip(5);
+			writepath(path.start, path.elements);
+		}
+	};
+
+	// Opcode: MOVE_SUMMON(175)
+	class MoveSummonPacket : public MovementPacket
+	{
+	public:
+		// The player's summon moved (FUN_009c84e9): its object id, then a
+		// path as the player's.
+		MoveSummonPacket(int32_t oid, const move_path::Path& path) : MovementPacket(OutPacket::Opcode::MOVE_SUMMON)
+		{
+			write_int(oid);
+			writepath(path.start, path.elements);
 		}
 	};
 
@@ -416,8 +444,8 @@ namespace ms
 		// Updates a mob's position with the server, as v83 does
 		// (FUN_0066b6fc): its move id, flags, its action (-1 for none) and
 		// facing, skill data, an anti-cheat byte and reason, and two ints a
-		// flyer fills in but others leave at 0xFFDDCC.
-		MoveMobPacket(int32_t oid, int16_t moveid, int8_t flags, int8_t action, bool left, int32_t skilldata, bool flying, Point<int16_t> startpos, const Movement& movement) : MovementPacket(OutPacket::Opcode::MOVE_MONSTER)
+		// flyer fills in but others leave at 0xFFDDCC, then the path.
+		MoveMobPacket(int32_t oid, int16_t moveid, int8_t flags, int8_t action, bool left, int32_t skilldata, bool flying, const move_path::Path& path) : MovementPacket(OutPacket::Opcode::MOVE_MONSTER)
 		{
 			write_int(oid);
 			write_short(moveid);
@@ -431,10 +459,7 @@ namespace ms
 			write_int(unknown);
 			write_int(unknown);
 
-			write_point(startpos);
-
-			write_byte(1);
-			writemovement(movement);
+			writepath(path.start, path.elements);
 		}
 	};
 

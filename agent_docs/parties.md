@@ -31,6 +31,9 @@ server restart.
   field (`FieldMessage::SetParty`), because the field decides who shares a
   kill.
 
+- Members on the same channel see each other's Mystic Doors and may use
+  them ([Mystic Door](./combat.md#mystic-door)).
+
 The packets are built in `net/src/packet/build/world/party.rs`. The member
 block always has six slots.
 

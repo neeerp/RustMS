@@ -94,6 +94,102 @@ pub async fn replace_item(
     .await
 }
 
+/// Make the logged-out character `character_id` a level `level` `job`
+/// with `mp` MP of `mp`.
+pub async fn set_job(character_id: i32, job: i16, level: i16, mp: i16) -> Result<(), HarnessError> {
+    change_one_row("set job", move |conn| {
+        diesel::sql_query(
+            "UPDATE characters SET job = $2, level = $3, mp = $4, maxmp = $4 WHERE id = $1",
+        )
+        .bind::<Integer, _>(character_id)
+        .bind::<SmallInt, _>(job)
+        .bind::<SmallInt, _>(level)
+        .bind::<SmallInt, _>(mp)
+        .execute(conn)
+    })
+    .await
+}
+
+/// Set the logged-out character `character_id`'s HP and max HP; 0 HP
+/// leaves them dead.
+pub async fn set_hp(character_id: i32, hp: i16, max_hp: i16) -> Result<(), HarnessError> {
+    change_one_row("set hp", move |conn| {
+        diesel::sql_query("UPDATE characters SET hp = $2, maxhp = $3 WHERE id = $1")
+            .bind::<Integer, _>(character_id)
+            .bind::<SmallInt, _>(hp)
+            .bind::<SmallInt, _>(max_hp)
+            .execute(conn)
+    })
+    .await
+}
+
+/// Set the weapon attack of the logged-out character `character_id`'s
+/// weapon, e.g. to hit very hard.
+pub async fn set_weapon_attack(character_id: i32, watk: i16) -> Result<(), HarnessError> {
+    change_one_row("set weapon attack", move |conn| {
+        diesel::sql_query(
+            "UPDATE equipment_stats SET watk = $2 WHERE item_row_id = \
+             (SELECT id FROM inventory_items \
+              WHERE character_id = $1 AND inventory_type = -1 AND slot = -11)",
+        )
+        .bind::<Integer, _>(character_id)
+        .bind::<SmallInt, _>(watk)
+        .execute(conn)
+    })
+    .await
+}
+
+/// Set the logged-out character `character_id`'s STR, e.g. to hit hard.
+pub async fn set_str(character_id: i32, str: i16) -> Result<(), HarnessError> {
+    change_one_row("set str", move |conn| {
+        diesel::sql_query("UPDATE characters SET stre = $2 WHERE id = $1")
+            .bind::<Integer, _>(character_id)
+            .bind::<SmallInt, _>(str)
+            .execute(conn)
+    })
+    .await
+}
+
+/// Give the logged-out character `character_id` `meso` mesos.
+pub async fn set_meso(character_id: i32, meso: i32) -> Result<(), HarnessError> {
+    change_one_row("set meso", move |conn| {
+        diesel::sql_query("UPDATE characters SET meso = $2 WHERE id = $1")
+            .bind::<Integer, _>(character_id)
+            .bind::<Integer, _>(meso)
+            .execute(conn)
+    })
+    .await
+}
+
+/// Teach the logged-out character `character_id` skill `skill_id` at
+/// `level`.
+pub async fn grant_skill(character_id: i32, skill_id: i32, level: i32) -> Result<(), HarnessError> {
+    change_one_row("grant skill", move |conn| {
+        diesel::sql_query(
+            "INSERT INTO skills (character_id, skill_id, level, master_level) VALUES ($1, $2, $3, 0)",
+        )
+        .bind::<Integer, _>(character_id)
+        .bind::<Integer, _>(skill_id)
+        .bind::<Integer, _>(level)
+        .execute(conn)
+    })
+    .await
+}
+
+/// Make the fame `giver_id` gave look `days` days older, as though that
+/// many days had passed since.
+pub async fn backdate_fame(giver_id: i32, days: i32) -> Result<(), HarnessError> {
+    change_one_row("backdate fame", move |conn| {
+        diesel::sql_query(
+            "UPDATE fame_log SET given_at = given_at - make_interval(days => $2) WHERE giver_id = $1",
+        )
+        .bind::<Integer, _>(giver_id)
+        .bind::<Integer, _>(days)
+        .execute(conn)
+    })
+    .await
+}
+
 async fn change_one_row(
     phase: &'static str,
     query: impl FnOnce(&mut PgConnection) -> QueryResult<usize> + Send + 'static,

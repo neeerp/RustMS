@@ -3,6 +3,7 @@
 //! mapped and each lookup is a few binary searches.
 
 use crate::{GameDataError, NxDataFile};
+use game::buff::BuffStat;
 use std::path::Path;
 
 /// Stack size when `info/slotMax` is absent (v83: 1 for equipment, else 100).
@@ -26,7 +27,22 @@ pub struct ItemInfo {
     pub recovery_mp: i32,
     /// `spec` of consumable items.
     pub spec: Option<ConsumeSpec>,
+    /// What a skill or mastery book teaches (`info/skill`).
+    pub book: Option<BookInfo>,
     pub equip: Option<EquipInfo>,
+}
+
+/// A skill book (228xxxx) or mastery book (229xxxx).
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct BookInfo {
+    /// The skills it can raise, one per job (`info/skill`).
+    pub skills: Vec<i32>,
+    /// The master level it grants (`masterLevel`).
+    pub master_level: i32,
+    /// The skill level the reader needs first (`reqSkillLevel`).
+    pub req_skill_level: i32,
+    /// Percent chance it works (`success`).
+    pub success: i32,
 }
 
 /// What using a consumable does (`spec`).
@@ -37,7 +53,36 @@ pub struct ConsumeSpec {
     /// Percent of max HP/MP.
     pub hp_r: i32,
     pub mp_r: i32,
+    /// How long `stats` last, in ms (`time`).
+    pub time: i32,
+    /// The stats it raises for `time` (`pad`, `pdd`, `mad`, `mdd`, `acc`,
+    /// `eva`, `speed`, `jump`).
+    pub stats: Vec<(BuffStat, i16)>,
+    /// The diseases it cures (`poison`, `darkness`, `weakness`, `seal`,
+    /// `curse`).
+    pub cures: Vec<BuffStat>,
 }
+
+/// The `spec` keys of the stats a consumable raises.
+const SPEC_STATS: [(&str, BuffStat); 8] = [
+    ("pad", BuffStat::Pad),
+    ("pdd", BuffStat::Pdd),
+    ("mad", BuffStat::Mad),
+    ("mdd", BuffStat::Mdd),
+    ("acc", BuffStat::Acc),
+    ("eva", BuffStat::Eva),
+    ("speed", BuffStat::Speed),
+    ("jump", BuffStat::Jump),
+];
+
+/// The `spec` keys of the diseases a consumable cures.
+const SPEC_CURES: [(&str, BuffStat); 5] = [
+    ("poison", BuffStat::Poison),
+    ("darkness", BuffStat::Darkness),
+    ("weakness", BuffStat::Weakness),
+    ("seal", BuffStat::Seal),
+    ("curse", BuffStat::Curse),
+];
 
 /// An equipment template (`Character.nx/<category>/<id>.img/info`).
 #[derive(Clone, Debug, Default, PartialEq)]
@@ -167,6 +212,18 @@ impl ItemData {
             info.unit_price = nx.real_child(meta, "unitPrice")?.unwrap_or(0.0);
             info.recovery_hp = nx.int_child(meta, "recoveryHP")?.unwrap_or(0);
             info.recovery_mp = nx.int_child(meta, "recoveryMP")?.unwrap_or(0);
+            if let Some(skills) = nx.child_by_name(meta, "skill")? {
+                let mut book = BookInfo {
+                    master_level: nx.int_child(meta, "masterLevel")?.unwrap_or(0),
+                    req_skill_level: nx.int_child(meta, "reqSkillLevel")?.unwrap_or(0),
+                    success: nx.int_child(meta, "success")?.unwrap_or(100),
+                    ..BookInfo::default()
+                };
+                while let Some(skill) = nx.int_child(skills, &book.skills.len().to_string())? {
+                    book.skills.push(skill);
+                }
+                info.book = Some(book);
+            }
         }
         if let Some(spec) = nx.child_by_name(node, "spec")? {
             info.spec = Some(ConsumeSpec {
@@ -174,6 +231,23 @@ impl ItemData {
                 mp: nx.int_child(spec, "mp")?.unwrap_or(0),
                 hp_r: nx.int_child(spec, "hpR")?.unwrap_or(0),
                 mp_r: nx.int_child(spec, "mpR")?.unwrap_or(0),
+                time: nx.int_child(spec, "time")?.unwrap_or(0),
+                stats: SPEC_STATS
+                    .iter()
+                    .filter_map(|&(key, stat)| match nx.int_child(spec, key) {
+                        Ok(Some(0)) | Ok(None) => None,
+                        Ok(Some(value)) => Some(Ok((stat, value as i16))),
+                        Err(error) => Some(Err(error)),
+                    })
+                    .collect::<Result<_, _>>()?,
+                cures: SPEC_CURES
+                    .iter()
+                    .filter_map(|&(key, stat)| match nx.int_child(spec, key) {
+                        Ok(Some(0)) | Ok(None) => None,
+                        Ok(Some(_)) => Some(Ok(stat)),
+                        Err(error) => Some(Err(error)),
+                    })
+                    .collect::<Result<_, _>>()?,
             });
         }
         Ok(Some(info))
@@ -237,6 +311,7 @@ impl ItemData {
             recovery_hp: 0,
             recovery_mp: 0,
             spec: None,
+            book: None,
             equip: Some(equip),
         }))
     }
@@ -284,8 +359,38 @@ mod tests {
             (subi.price, subi.unit_price, subi.slot_max),
             (250, 0.3, 500)
         );
+        let all_cure = data.info(2050004).unwrap().unwrap().spec.unwrap();
+        assert_eq!(all_cure.cures.len(), 5);
+        let warrior_pill = data.info(2002004).unwrap().unwrap().spec.unwrap();
+        assert_eq!(
+            (warrior_pill.stats, warrior_pill.time),
+            (vec![(BuffStat::Pad, 5)], 180_000)
+        );
         let relaxer = data.info(3010000).unwrap().unwrap();
         assert_eq!((relaxer.recovery_hp, relaxer.recovery_mp), (50, 0));
+    }
+
+    #[test]
+    fn reads_skill_and_mastery_books() {
+        let Some(data) = data() else {
+            return;
+        };
+        let book = data.info(2290000).unwrap().unwrap().book.unwrap();
+        assert_eq!(
+            book,
+            BookInfo {
+                skills: vec![1121001, 1221001, 1321001],
+                master_level: 20,
+                req_skill_level: 5,
+                success: 70,
+            }
+        );
+        let book = data.info(2280000).unwrap().unwrap().book.unwrap();
+        assert_eq!(
+            (book.skills, book.master_level, book.req_skill_level),
+            (vec![2121003], 10, 0)
+        );
+        assert!(data.info(2010007).unwrap().unwrap().book.is_none());
     }
 
     #[test]

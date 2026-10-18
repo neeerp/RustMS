@@ -96,6 +96,13 @@ namespace ms
 		}
 	}
 
+	void Party::set_door(size_t slot, const MysticDoor &door)
+	{
+		for (auto& member : members)
+			if (member.slot == slot)
+				member.door = door;
+	}
+
 	void Party::clear()
 	{
 		id = 0;

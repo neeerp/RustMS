@@ -1,8 +1,25 @@
+use super::buff::write_mask;
 use crate::{error::NetworkError, packet::op::SendOpcode};
+use game::MobStat;
 use packet::{io::write::PktWrite, Packet};
+use std::time::Duration;
+
+/// A status on a mob, as the client is told of it.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct MobStatusView {
+    pub stat: MobStat,
+    pub value: i16,
+    /// The skill that caused it.
+    pub skill_id: i32,
+    /// How long it has left.
+    pub left: Duration,
+    /// A counter's spread: it hurts the attacker its value, give or take
+    /// half this. 0 for the rest.
+    pub spread: i32,
+}
 
 /// A mob as other players see it.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct MobView {
     pub object_id: i32,
     pub mob_id: i32,
@@ -16,6 +33,36 @@ pub struct MobView {
     /// Fade in (a fresh spawn) rather than just appear.
     pub fade_in: bool,
     pub controlled: bool,
+    pub statuses: Vec<MobStatusView>,
+    /// A mob just summoned by another appears with this
+    /// `Effect/Summon.img` entry rather than fading in.
+    pub summon_effect: Option<u8>,
+}
+
+/// The statuses as the client reads them (FUN_0078b0b1): their flags, then
+/// each one's value, skill, and time left in half seconds, in the client's
+/// order; then each counter's spread, and with either the chance in
+/// percent that they hurt (0 always).
+fn write_statuses(p: &mut Packet, statuses: &[MobStatusView]) -> Result<(), NetworkError> {
+    write_mask(p, statuses.iter().map(|status| status.stat.bit()))?;
+    let find = |stat| statuses.iter().find(|status| status.stat == stat);
+    for stat in MobStat::DECODE_ORDER {
+        let Some(status) = find(stat) else {
+            continue;
+        };
+        p.write_short(status.value)?;
+        p.write_int(status.skill_id)?;
+        let halves = status.left.as_millis().div_ceil(500);
+        p.write_short(halves.min(i16::MAX as u128) as i16)?;
+    }
+    let counters = [find(MobStat::PCounter), find(MobStat::MCounter)];
+    for counter in counters.iter().flatten() {
+        p.write_int(counter.spread)?;
+    }
+    if counters.iter().any(Option::is_some) {
+        p.write_int(0)?;
+    }
+    Ok(())
 }
 
 /// The shared mob body of SPAWN_MONSTER and SPAWN_MONSTER_CONTROL.
@@ -23,14 +70,24 @@ fn write_mob(p: &mut Packet, mob: &MobView) -> Result<(), NetworkError> {
     p.write_int(mob.object_id)?;
     p.write_byte(if mob.controlled { 1 } else { 5 })?;
     p.write_int(mob.mob_id)?;
-    // Temporary status mask (four ints); no statuses yet.
-    p.write_bytes(&[0; 16])?;
+    write_statuses(p, &mob.statuses)?;
     p.write_short(mob.x)?;
     p.write_short(mob.y)?;
     p.write_byte(mob.stance)?;
     p.write_short(mob.foothold)?;
     p.write_short(mob.home_foothold)?;
-    p.write_byte(if mob.fade_in { -2i8 as u8 } else { -1i8 as u8 })?;
+    // How it appears (FUN_00662884): a summon effect of its own, with an
+    // int the client waits in ms before playing it, -2 fading in, or -1
+    // just there.
+    match mob.summon_effect {
+        Some(effect) => {
+            p.write_byte(effect)?;
+            p.write_int(0)?;
+        }
+        None => {
+            p.write_byte(if mob.fade_in { -2i8 as u8 } else { -1i8 as u8 })?;
+        }
+    }
     p.write_byte(-1i8 as u8)?; // team
     p.write_int(0)?; // item effect
     Ok(())
@@ -54,7 +111,7 @@ pub fn build_control_mob(mob: &MobView, aggro: bool) -> Result<Packet, NetworkEr
         &mut p,
         &MobView {
             controlled: true,
-            ..*mob
+            ..mob.clone()
         },
     )?;
     Ok(p)
@@ -70,40 +127,69 @@ pub fn build_stop_controlling_mob(object_id: i32) -> Result<Packet, NetworkError
 }
 
 /// MOVE_MONSTER: relay the controller's movement to the others.
-pub fn build_move_mob(
-    object_id: i32,
-    start: (i16, i16),
-    movement_bytes: &[u8],
-) -> Result<Packet, NetworkError> {
+pub fn build_move_mob(moved: &MobMoveView, movement_bytes: &[u8]) -> Result<Packet, NetworkError> {
     let mut p = Packet::new_empty();
     p.write_short(SendOpcode::MoveMonster as i16)?;
-    p.write_int(object_id)?;
-    p.write_byte(0)?;
-    p.write_byte(0)?; // skill possible
-    p.write_byte(0)?; // skill
-    p.write_byte(0)?; // skill id
-    p.write_byte(0)?; // skill level
-    p.write_short(0)?; // option
-    p.write_short(start.0)?;
-    p.write_short(start.1)?;
+    p.write_int(moved.object_id)?;
+    p.write_byte(0)?; // not forced to land
+    p.write_byte(u8::from(moved.next_attack))?;
+    p.write_byte(moved.action)?;
+    p.write_int(moved.skill_data)?;
+    p.write_short(moved.start.0)?;
+    p.write_short(moved.start.1)?;
     p.write_bytes(movement_bytes)?;
     Ok(p)
 }
 
-/// MOVE_MONSTER_RESPONSE: acknowledge the controller's movement.
+/// A controller's mob move as the others see it (FUN_0066be61).
+pub struct MobMoveView {
+    pub object_id: i32,
+    /// Whether its controller may attack with it next.
+    pub next_attack: bool,
+    /// What it did: action << 1 | facing left, or 0xFF for nothing.
+    pub action: u8,
+    /// The attack's target, or the skill's id and level.
+    pub skill_data: i32,
+    pub start: (i16, i16),
+}
+
+/// MOVE_MONSTER_RESPONSE: acknowledge the controller's movement, saying
+/// whether it may attack next, the mob's MP, and the mob skill and level it
+/// may cast next, or 0 (FUN_0066c23b). The client keeps a skill it was
+/// given until it casts it, whatever later responses say.
 pub fn build_move_mob_response(
     object_id: i32,
     move_id: i16,
+    next_attack: bool,
     mp: i16,
+    (skill, level): (u8, u8),
 ) -> Result<Packet, NetworkError> {
     let mut p = Packet::new_empty();
     p.write_short(SendOpcode::MoveMonsterResponse as i16)?;
     p.write_int(object_id)?;
     p.write_short(move_id)?;
-    p.write_byte(0)?; // use skills
+    p.write_byte(u8::from(next_attack))?;
     p.write_short(mp)?;
-    p.write_byte(0)?; // skill id
-    p.write_byte(0)?; // skill level
+    p.write_byte(skill)?;
+    p.write_byte(level)?;
+    Ok(p)
+}
+
+/// DAMAGE_MONSTER: a number over a mob (0x66c6c2), here only the HP a mob
+/// skill healed, sent negative, then its HP and max HP for its HP tag.
+pub fn build_heal_mob(
+    object_id: i32,
+    healed: i32,
+    hp: i32,
+    max_hp: i32,
+) -> Result<Packet, NetworkError> {
+    let mut p = Packet::new_empty();
+    p.write_short(SendOpcode::DamageMonster as i16)?;
+    p.write_int(object_id)?;
+    p.write_byte(0)?;
+    p.write_int(-healed)?;
+    p.write_int(hp)?;
+    p.write_int(max_hp)?;
     Ok(p)
 }
 
@@ -136,12 +222,49 @@ pub fn build_show_magnet(object_id: i32, success: bool) -> Result<Packet, Networ
     Ok(p)
 }
 
+/// MOB_STAT_SET: statuses put on a mob (0x66c301). The client has them
+/// take hold at once, and for one that stops the mob reads a byte more.
+pub fn build_mob_stat_set(
+    object_id: i32,
+    statuses: &[MobStatusView],
+) -> Result<Packet, NetworkError> {
+    let mut p = Packet::new_empty();
+    p.write_short(SendOpcode::MobStatSet as i16)?;
+    p.write_int(object_id)?;
+    write_statuses(&mut p, statuses)?;
+    p.write_short(0)?; // delay
+    p.write_byte(0)?;
+    if statuses.iter().any(|status| status.stat.stops()) {
+        p.write_byte(0)?;
+    }
+    Ok(p)
+}
+
+/// MOB_STAT_RESET: statuses a mob lost (0x66c424). For one that stopped
+/// it, a mob some templates mark reads a byte more; the rest ignore it.
+pub fn build_mob_stat_reset(object_id: i32, stats: &[MobStat]) -> Result<Packet, NetworkError> {
+    let mut p = Packet::new_empty();
+    p.write_short(SendOpcode::MobStatReset as i16)?;
+    p.write_int(object_id)?;
+    write_mask(&mut p, stats.iter().map(|stat| stat.bit()))?;
+    p.write_byte(0)?;
+    if stats.iter().any(|stat| stat.stops()) {
+        p.write_byte(0)?;
+    }
+    Ok(p)
+}
+
 /// Touch damage, the `TAKE_DAMAGE` source (`TakeDamagePacket::TOUCH`).
 pub const FROM_TOUCH: i8 = -1;
+/// A mob's mist, the source the v83 client sends from FUN_00431783.
+pub const FROM_MIST: i8 = -4;
 
-/// DAMAGE_PLAYER: show others that a player was hurt by a mob's touch.
+/// DAMAGE_PLAYER: show others that a player was hurt by a mob's touch
+/// ([`FROM_TOUCH`]) or attack `from`, or by something else such as a mist
+/// (FUN_009832e3: below touch it reads no mob).
 pub fn build_damage_player(
     character_id: i32,
+    from: i8,
     mob_id: i32,
     damage: i32,
     direction: u8,
@@ -149,11 +272,13 @@ pub fn build_damage_player(
     let mut p = Packet::new_empty();
     p.write_short(SendOpcode::DamagePlayer as i16)?;
     p.write_int(character_id)?;
-    p.write_byte(FROM_TOUCH as u8)?;
+    p.write_byte(from as u8)?;
     p.write_int(damage)?;
-    p.write_int(mob_id)?;
-    p.write_byte(direction)?;
-    p.write_short(0)?;
+    if from >= FROM_TOUCH {
+        p.write_int(mob_id)?;
+        p.write_byte(direction)?;
+        p.write_short(0)?;
+    }
     p.write_int(damage)?;
     Ok(p)
 }
@@ -174,7 +299,95 @@ mod tests {
             home_foothold: 44,
             fade_in: true,
             controlled: false,
+            statuses: Vec::new(),
+            summon_effect: None,
         }
+    }
+
+    #[test]
+    fn spawn_carries_the_mob_statuses() {
+        let mut mob = snail();
+        mob.statuses = vec![MobStatusView {
+            stat: MobStat::Speed,
+            value: -40,
+            skill_id: 2101003,
+            left: Duration::from_millis(39_800),
+            spread: 0,
+        }];
+        let packet = build_spawn_mob(&mob).unwrap();
+        let mut expect = Expect::new(&packet.bytes);
+        expect.short(SendOpcode::SpawnMonster as i16);
+        expect.int(2_000_000_001).byte(5).int(100100);
+        expect.long(0).long(1 << (32 + 6));
+        expect.short(-40).int(2101003).short(80);
+        expect.short(147);
+    }
+
+    #[test]
+    fn stat_set_follows_the_client_order_and_stops_with_a_byte() {
+        let status = |stat, value, skill_id| MobStatusView {
+            stat,
+            value,
+            skill_id,
+            left: Duration::from_secs(10),
+            spread: 0,
+        };
+        let statuses = [
+            status(MobStat::Doom, 1, 2311005),
+            status(MobStat::PImmune, 1, 140 | 1 << 16),
+            status(MobStat::Pad, -20, 1201006),
+        ];
+        let packet = build_mob_stat_set(5, &statuses).unwrap();
+        let mut expect = Expect::new(&packet.bytes);
+        expect.short(SendOpcode::MobStatSet as i16).int(5);
+        expect
+            .long(0)
+            .long(1 << 32 | 1 << (32 + 16) | 1 << (32 + 18));
+        expect.short(-20).int(1201006).short(20);
+        expect.short(1).int(140 | 1 << 16).short(20);
+        expect.short(1).int(2311005).short(20);
+        expect.short(0).byte(0).byte(0);
+        expect.end();
+    }
+
+    #[test]
+    fn counters_follow_with_their_spreads_and_a_chance() {
+        let counter = |stat, value, spread| MobStatusView {
+            stat,
+            value,
+            skill_id: 145 | 3 << 16,
+            left: Duration::from_secs(10),
+            spread,
+        };
+        let statuses = [
+            counter(MobStat::MCounter, 5000, 8000),
+            counter(MobStat::PCounter, 5000, 5000),
+        ];
+        let packet = build_mob_stat_set(5, &statuses).unwrap();
+        let mut expect = Expect::new(&packet.bytes);
+        expect.short(SendOpcode::MobStatSet as i16).int(5);
+        expect.long(0).long(1 << (32 + 29) | 1 << (32 + 30));
+        expect.short(5000).int(145 | 3 << 16).short(20);
+        expect.short(5000).int(145 | 3 << 16).short(20);
+        expect.int(5000).int(8000).int(0);
+        expect.short(0).byte(0);
+        expect.end();
+    }
+
+    #[test]
+    fn stat_reset_names_the_lost_statuses() {
+        let packet = build_mob_stat_reset(5, &[MobStat::Seal]).unwrap();
+        let mut expect = Expect::new(&packet.bytes);
+        expect.short(SendOpcode::MobStatReset as i16).int(5);
+        expect.long(0).long(1 << (32 + 10));
+        expect.byte(0);
+        expect.end();
+        let packet = build_mob_stat_reset(5, &[MobStat::Doom]).unwrap();
+        let mut expect = Expect::new(&packet.bytes);
+        expect.short(SendOpcode::MobStatReset as i16).int(5);
+        expect.long(0).long(1 << (32 + 16));
+        expect.byte(0).byte(0);
+        expect.end();
     }
 
     #[test]
@@ -186,6 +399,43 @@ mod tests {
         expect.bytes(&[0; 16]);
         expect.short(147).short(-25).byte(5).short(45).short(44);
         expect.byte(-2i8 as u8).byte(-1i8 as u8).int(0);
+        expect.end();
+    }
+
+    #[test]
+    fn a_summon_names_its_effect_and_a_delay() {
+        let mut mob = snail();
+        mob.summon_effect = Some(2);
+        let packet = build_spawn_mob(&mob).unwrap();
+        let mut expect = Expect::new(&packet.bytes);
+        expect.short(SendOpcode::SpawnMonster as i16);
+        expect.int(2_000_000_001).byte(5).int(100100);
+        expect.bytes(&[0; 16]);
+        expect.short(147).short(-25).byte(5).short(45).short(44);
+        expect.byte(2).int(0).byte(-1i8 as u8).int(0);
+        expect.end();
+    }
+
+    #[test]
+    fn mist_damage_names_no_mob() {
+        let p = build_damage_player(7, FROM_MIST, 0, 30, 0).unwrap();
+        let mut want = (SendOpcode::DamagePlayer as i16).to_le_bytes().to_vec();
+        want.extend_from_slice(&7i32.to_le_bytes());
+        want.push(FROM_MIST as u8);
+        want.extend_from_slice(&30i32.to_le_bytes());
+        want.extend_from_slice(&30i32.to_le_bytes());
+        assert_eq!(p.bytes, want);
+    }
+
+    #[test]
+    fn a_heal_is_negative_damage() {
+        let packet = build_heal_mob(7, 700, 900, 1000).unwrap();
+        let mut expect = Expect::new(&packet.bytes);
+        expect
+            .short(SendOpcode::DamageMonster as i16)
+            .int(7)
+            .byte(0);
+        expect.int(-700).int(900).int(1000);
         expect.end();
     }
 
@@ -210,22 +460,29 @@ mod tests {
 
     #[test]
     fn movement_kill_and_hp() {
-        let moved = build_move_mob(7, (10, 20), &[1, 2]).unwrap();
+        let view = MobMoveView {
+            object_id: 7,
+            next_attack: true,
+            action: 12 << 1 | 1,
+            skill_data: 0x0050_0040,
+            start: (10, 20),
+        };
+        let moved = build_move_mob(&view, &[1, 2]).unwrap();
         let mut expect = Expect::new(&moved.bytes);
         expect.short(SendOpcode::MoveMonster as i16).int(7);
-        expect.byte(0).byte(0).byte(0).byte(0).byte(0).short(0);
+        expect.byte(0).byte(1).byte(25).int(0x0050_0040);
         expect.short(10).short(20).byte(1).byte(2);
         expect.end();
-        let response = build_move_mob_response(7, 3, 0).unwrap();
+        let response = build_move_mob_response(7, 3, true, 40, (114, 15)).unwrap();
         let mut expect = Expect::new(&response.bytes);
         expect
             .short(SendOpcode::MoveMonsterResponse as i16)
             .int(7)
             .short(3)
-            .byte(0)
-            .short(0)
-            .byte(0)
-            .byte(0);
+            .byte(1)
+            .short(40)
+            .byte(114)
+            .byte(15);
         expect.end();
         let kill = build_kill_mob(7, 1).unwrap();
         let mut expect = Expect::new(&kill.bytes);
