@@ -64,6 +64,15 @@ namespace ms
 		void handle(InPacket& recv) const override;
 	};
 
+	// A pet's new name, which a Pet Name Tag gave it (FUN_00704801). The
+	// owner's pet answers commands to it. It doesn't unlock the client;
+	// the inventory operation before it does.
+	// Opcode: PET_NAMECHANGE(172)
+	class PetNameChangeHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
 	// Whether a pet ate the cash food the player used: it plays its eat
 	// sound, or the food suits none of the pets out (FUN_00a29049). It
 	// doesn't unlock the client; the inventory operation after it does.

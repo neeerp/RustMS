@@ -199,6 +199,21 @@ namespace ms
 				pet->act({ type, action, text }, styled);
 	}
 
+	void PetNameChangeHandler::handle(InPacket& recv) const
+	{
+		int32_t cid = recv.read_int();
+		uint8_t index = recv.read_byte();
+		std::string name = recv.read_string();
+
+		// The name tag's style (`info/nameTag`) when set; HeavenClient
+		// draws one plain tag for every pet.
+		recv.read_bool();
+
+		if (Optional<Char> character = Stage::get().get_character(cid))
+			if (Optional<PetLook> pet = character->get_pet(index))
+				pet->set_name(name);
+	}
+
 	void CashPetFoodResultHandler::handle(InPacket& recv) const
 	{
 		switch (recv.read_byte())

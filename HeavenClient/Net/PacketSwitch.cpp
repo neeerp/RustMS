@@ -117,6 +117,7 @@ namespace ms
 		SPAWN_PET = 168,
 		MOVE_PET = 170,
 		PET_CHAT = 171,
+		PET_NAMECHANGE = 172,
 		PET_COMMAND = 174,
 		CASH_PET_FOOD_RESULT = 76,
 		CHAR_MOVED = 185,
@@ -240,6 +241,7 @@ namespace ms
 		emplace<SPAWN_PET, SpawnPetHandler>();
 		emplace<MOVE_PET, MovePetHandler>();
 		emplace<PET_CHAT, PetChatHandler>();
+		emplace<PET_NAMECHANGE, PetNameChangeHandler>();
 		emplace<PET_COMMAND, PetCommandHandler>();
 		emplace<CASH_PET_FOOD_RESULT, CashPetFoodResultHandler>();
 		emplace<SPAWN_NPC, SpawnNpcHandler>();

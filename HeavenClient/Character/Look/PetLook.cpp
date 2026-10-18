@@ -450,6 +450,12 @@ namespace ms
 		return serial;
 	}
 
+	void PetLook::set_name(const std::string &n)
+	{
+		name = n;
+		namelabel.change_text(name);
+	}
+
 	bool PetLook::is_local() const
 	{
 		return local;

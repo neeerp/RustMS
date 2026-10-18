@@ -1,5 +1,6 @@
 #pragma once
 
+#include <algorithm>
 #include <array>
 #include <cctype>
 #include <cstddef>
@@ -288,6 +289,65 @@ namespace ms
 		inline bool is_cash_food(int32_t itemid)
 		{
 			return itemid / 10000 == 524;
+		}
+
+		// The Pet Name Tag (5170000) names the first pet out.
+		inline bool is_name_tag(int32_t itemid)
+		{
+			return itemid / 10000 == 517 && itemid % 10000 == 0;
+		}
+
+		// A pet's name is 4 to 12 bytes (FUN_009ac7cb).
+		constexpr size_t MIN_NAME = 4;
+		constexpr size_t MAX_NAME = 12;
+
+		enum class Naming
+		{
+			OK,
+			// Under 4 bytes: the prompt asks again (FUN_009ab50a).
+			SHORT,
+			// A control character other than a line break.
+			CURSING,
+			// The kind's own name, in any case, or the pet's.
+			TAKEN
+		};
+
+		// Whether two names match, ignoring case (FUN_005392d4).
+		inline bool same_name(const std::string &a, const std::string &b)
+		{
+			if (a.size() != b.size())
+				return false;
+
+			for (size_t i = 0; i < a.size(); i++)
+				if (std::toupper(static_cast<unsigned char>(a[i])) != std::toupper(static_cast<unsigned char>(b[i])))
+					return false;
+
+			return true;
+		}
+
+		// Check the name the player typed for a pet of kind `species` now
+		// called `current` (FUN_00a0a63f type 0x11). `typed` becomes the
+		// name to send: trimmed, with curse words starred out by `censor`
+		// and tabs as spaces.
+		template <typename Censor>
+		Naming check_name(std::string &typed, const std::string &species, const std::string &current, Censor censor)
+		{
+			typed = trim(typed);
+
+			if (typed.size() < MIN_NAME)
+				return Naming::SHORT;
+
+			for (char c : typed)
+				if (static_cast<unsigned char>(c) < 0x20 && c != '\r' && c != '\n')
+					return Naming::CURSING;
+
+			typed = censor(typed);
+			std::replace(typed.begin(), typed.end(), '\t', ' ');
+
+			if (same_name(typed, species) || typed == current)
+				return Naming::TAKEN;
+
+			return Naming::OK;
 		}
 
 		// The pet out that eats: the one least full, the first of equals

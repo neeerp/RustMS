@@ -133,6 +133,16 @@ namespace ms
 			write_int(itemid);
 			write_time();
 		}
+
+		// The Pet Name Tag (5170000) sends the pet's new name.
+		UseCashItemPacket(int16_t slot, int32_t itemid, const std::string &text)
+				: OutPacket(OutPacket::Opcode::USE_CASH_ITEM)
+		{
+			write_short(slot);
+			write_int(itemid);
+			write_string(text);
+			write_time();
+		}
 	};
 
 	// Requests reading a skill or mastery book (v83 FUN_00a0a1b2)

@@ -31,6 +31,7 @@
 #include "../../Character/Pets.h"
 #include "../../Character/Inventory/ItemDrop.h"
 #include "../../Character/Inventory/ScrollRules.h"
+#include "../../Data/CurseData.h"
 #include "../../Data/EquipData.h"
 #include "../../Gameplay/Stage.h"
 #include "../../Util/NxFiles.h"
@@ -75,6 +76,11 @@ namespace ms
 		constexpr const char *TOO_MANY_PETS = "You have exceeded the maximum number\\n of pets that can accompany you.\\nPlease try again after \\nyou change the living pet back into a doll.";
 		// StringPool 0xed8.
 		constexpr const char *CASH_FOOD_NO_PET = "This item can only be used with a pet.";
+		// StringPool 0x319 to 0x31c, 0x110 and 0x335.
+		constexpr const char *PET_HAS_NAME = "The pet already has a name.\\nWill you change it?";
+		constexpr const char *NAME_PET = "Please name your pet.";
+		constexpr const char *NAME_TAKEN = "That name is not available.";
+		constexpr const char *NO_CURSING = "Cursing is not allowed.";
 		constexpr const char *BOSS_PET = "Would you like to change your Boss Pet?\\n (The \"Item Ignore\" skill, as well as \\nthe stats for speed and jump will \\nfollow that of the Lead Pet)";
 
 		// v83 FUN_00a240a2: double-clicking a pet asks the server to bring it
@@ -134,6 +140,69 @@ namespace ms
 
 			if (player.request(UseCashItemPacket(slot, item_id), ExclRequest::WAIT))
 				Sound(nl::nx::sound["Game.img"]["UseShopItem"]).play();
+		}
+
+		// v83 FUN_00a0a63f, type 0x11, after asking whether to rename a pet
+		// that has a name: the name, then whether to use it. A name too
+		// short asks again; anything else refused ends it.
+		void ask_pet_name(int16_t slot, int32_t item_id, const std::string &species, const std::string &current)
+		{
+			UI::get().emplace<UIEnterText>(NAME_PET, [=](const std::string &typed)
+			{
+				std::string name = typed;
+
+				switch (pets::check_name(name, species, current, CurseData::filter))
+				{
+					case pets::Naming::OK:
+						UI::get().emplace<UIYesNo>("Do you want to name your pet\\n'" + name + "'?", [=](bool yes)
+						{
+							if (yes && Stage::get().get_player().request(UseCashItemPacket(slot, item_id, name), ExclRequest::WAIT))
+								Sound(nl::nx::sound["Game.img"]["UseShopItem"]).play();
+						});
+						break;
+					case pets::Naming::SHORT:
+						UI::get().emplace<UIOk>("Please enter at least " + std::to_string(pets::MIN_NAME) + " characters.", [=](bool)
+						{
+							ask_pet_name(slot, item_id, species, current);
+						});
+						break;
+					case pets::Naming::CURSING:
+						UI::get().emplace<UIOk>(NO_CURSING, [](bool)
+						{});
+						break;
+					case pets::Naming::TAKEN:
+						UI::get().emplace<UIOk>(NAME_TAKEN, [](bool)
+						{});
+						break;
+				}
+			}, pets::MAX_NAME);
+		}
+
+		// v83 FUN_00a0a63f, type 0x11: the Pet Name Tag names the first pet
+		// out. Without one it does nothing. A pet already renamed asks first.
+		void name_pet(int16_t slot, int32_t item_id)
+		{
+			Player &player = Stage::get().get_player();
+
+			if (!player.can_request(ExclRequest::WAIT))
+				return;
+
+			Optional<const Pet> pet = player.get_inventory().get_pet(player.get_pet_serials()[0]);
+
+			if (!pet)
+				return;
+
+			std::string species = nl::nx::string["Pet.img"][std::to_string(pet->get_item_id())]["name"];
+			std::string current = pet->get_name();
+
+			if (pets::same_name(species, current))
+				ask_pet_name(slot, item_id, species, current);
+			else
+				UI::get().emplace<UIYesNo>(PET_HAS_NAME, [=](bool yes)
+				{
+					if (yes)
+						ask_pet_name(slot, item_id, species, current);
+				});
 		}
 
 		// v83 FUN_00a0900a: a map may keep items off the ground, which it
@@ -458,6 +527,8 @@ namespace ms
 							summon_pet(slot, inventory.get_cash_id(tab, slot));
 						else if (pets::is_cash_food(item_id))
 							feed_cash_food(slot, item_id);
+						else if (pets::is_name_tag(item_id))
+							name_pet(slot, item_id);
 
 						break;
 				}
