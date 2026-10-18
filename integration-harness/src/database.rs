@@ -110,6 +110,56 @@ pub async fn set_job(character_id: i32, job: i16, level: i16, mp: i16) -> Result
     .await
 }
 
+/// Put the pet `item_id` named `name`, with cash serial `serial`, in slot
+/// `slot` of the logged-out character `character_id`'s Cash inventory.
+pub async fn grant_pet(
+    character_id: i32,
+    slot: i16,
+    item_id: i32,
+    serial: i64,
+    name: &str,
+) -> Result<(), HarnessError> {
+    let name = name.to_string();
+    change_one_row("grant pet", move |conn| {
+        diesel::sql_query(
+            "WITH pet AS (INSERT INTO pets (serial, name) VALUES ($4, $5)) \
+             INSERT INTO inventory_items (character_id, inventory_type, slot, item_id, quantity, owner, flags, cash_serial) \
+             VALUES ($1, 5, $2, $3, 1, '', 0, $4)",
+        )
+        .bind::<Integer, _>(character_id)
+        .bind::<SmallInt, _>(slot)
+        .bind::<Integer, _>(item_id)
+        .bind::<BigInt, _>(serial)
+        .bind::<Text, _>(name)
+        .execute(conn)
+    })
+    .await
+}
+
+/// Dress the logged-out character `character_id` in the cash equip
+/// `item_id`, with cash serial `serial`, at `position` (negative), such as
+/// a pet's equipment.
+pub async fn wear_cash_equip(
+    character_id: i32,
+    position: i16,
+    item_id: i32,
+    serial: i64,
+) -> Result<(), HarnessError> {
+    change_one_row("wear cash equip", move |conn| {
+        diesel::sql_query(
+            "WITH item AS (INSERT INTO inventory_items (character_id, inventory_type, slot, item_id, quantity, owner, flags, cash_serial) \
+             VALUES ($1, -1, $2, $3, 1, '', 0, $4) RETURNING id) \
+             INSERT INTO equipment_stats (item_row_id) SELECT id FROM item",
+        )
+        .bind::<Integer, _>(character_id)
+        .bind::<SmallInt, _>(position)
+        .bind::<Integer, _>(item_id)
+        .bind::<BigInt, _>(serial)
+        .execute(conn)
+    })
+    .await
+}
+
 /// Set the fullness of the pet `serial`, whose owner is logged out.
 pub async fn set_pet_fullness(serial: i64, fullness: i16) -> Result<(), HarnessError> {
     change_one_row("set pet fullness", move |conn| {

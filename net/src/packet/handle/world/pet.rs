@@ -10,6 +10,7 @@ use crate::packet::build::world::pet::{
     build_cash_pet_food, build_pet_chat, build_pet_command, build_pet_food, build_pet_level_up,
 };
 use crate::packet::build::world::stat::{build_stat_update, StatUpdate};
+use game::inventory::equip_slot;
 use game::pet::{PetChange, PetCommand};
 use game::{InventoryChange, InventoryType, Item, Player};
 use game_data::items::ConsumeSpec;
@@ -72,6 +73,54 @@ impl WorldHandler for MovePetHandler {
                 index: index as u8,
                 start,
                 movement,
+            })),
+        )
+    }
+}
+
+/// PET_LOOT (0xAA, FUN_00705c7c): the pet's cash serial, the field key,
+/// the tick, where the pet stands, the drop, its CRC and the pet's sweep,
+/// range and pick-up-others flags. A pet takes mesos with a meso magnet
+/// and items with an item pouch worn for it (FUN_00705e2c). The client
+/// doesn't wait for an answer.
+pub struct PetLootHandler;
+
+impl WorldHandler for PetLootHandler {
+    fn handle(&self, packet: &mut Packet, ctx: &mut WorldContext) -> WorldResult {
+        let mut r = Cursor::new(&packet.bytes);
+        r.read_short()?;
+        let serial = r.read_long()?;
+        r.read_byte()?;
+        r.read_int()?;
+        let x = r.read_short()?;
+        let y = r.read_short()?;
+        let object_id = r.read_int()?;
+        let player = &*ctx.player;
+        let index = player.pets.iter().position(|&pet| pet == serial);
+        let Some(index) = index.filter(|_| player.stats.hp > 0) else {
+            return Ok(HandlerResult::empty());
+        };
+        let worn = |item_id| {
+            equip_slot::pet_slots(item_id).is_some_and(|slots| {
+                let position = slots[index] - 100;
+                player
+                    .inventory
+                    .get(InventoryType::Equipped, position)
+                    .is_some()
+            })
+        };
+        let (mesos, items) = (worn(1_812_000), worn(1_812_001));
+        if !mesos && !items {
+            return Ok(HandlerResult::empty());
+        }
+        Ok(
+            HandlerResult::empty().with(WorldAction::Field(FieldRequest::PetPickup {
+                index: index as u8,
+                object_id,
+                x,
+                y,
+                mesos,
+                items,
             })),
         )
     }

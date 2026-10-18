@@ -96,6 +96,12 @@ pub enum ServerMessage {
     PickedUp {
         drop: crate::actor::field_drops::Drop,
     },
+    /// The field gave this player's pet at `pet` a drop it still shows;
+    /// answer with `FieldMessage::PetLooted`.
+    PetPickedUp {
+        drop: crate::actor::field_drops::Drop,
+        pet: u8,
+    },
     /// Whether a quest NPC is on the player's map and within reach.
     QuestNpcChecked {
         request_id: u64,
@@ -291,6 +297,14 @@ pub enum FieldMessage {
     /// The client couldn't take the drop (full inventory); put it back.
     ReturnDrop {
         drop: crate::actor::field_drops::Drop,
+    },
+    /// The pet at `pet` of `looter` took the drop it was given, or with
+    /// `taken` false left it where it lies.
+    PetLooted {
+        looter: ClientId,
+        pet: u8,
+        drop: crate::actor::field_drops::Drop,
+        taken: bool,
     },
     /// Check that an NPC with this template id is near the player before a
     /// quest action; answered with `ServerMessage::QuestNpcChecked`.

@@ -60,6 +60,18 @@ pub fn build_drop(drop: &DropView, appearance: DropAppearance) -> Result<Packet,
     Ok(p)
 }
 
+/// REMOVE_ITEM_FROM_MAP mode 5: picked up by the pet at `pet` in the list of
+/// the player `owner`, to whom it flies (v83 FUN_00506590).
+pub fn build_pet_loot_drop(object_id: i32, owner: i32, pet: u8) -> Result<Packet, NetworkError> {
+    let mut p = Packet::new_empty();
+    p.write_short(SendOpcode::RemoveItemFromMap as i16)?;
+    p.write_byte(5)?;
+    p.write_int(object_id)?;
+    p.write_int(owner)?;
+    p.write_byte(pet)?;
+    Ok(p)
+}
+
 /// REMOVE_ITEM_FROM_MAP: 0 expired, 2 picked up by `looter`.
 pub fn build_remove_drop(object_id: i32, looter: Option<i32>) -> Result<Packet, NetworkError> {
     let mut p = Packet::new_empty();
