@@ -129,7 +129,8 @@ intervals are never shorter than 10 s, so climbing needs no separate check.
 
 USE_SKILL_BOOK (`0x52`: tick, slot, item id) reads a skill book (228xxxx)
 or a mastery book (229xxxx). v83 sends it from the item-use path with the
-usual exclusive-request gate and checks nothing itself. The book's
+usual exclusive-request gate and checks nothing itself; HeavenClient sends
+it from both the USE tab double-click and a hotkey. The book's
 `info/skill` lists skills; the server takes the one whose job
 (skill / 10000) is the reader's own job, and refuses the book (kept, `used`
 0) when there is none, when the reader's level in it is below

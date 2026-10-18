@@ -437,6 +437,8 @@ namespace ms
 							break;
 						else if (pets::is_food(item_id))
 							Stage::get().get_player().feed_pets(slot, item_id);
+						else if (item_id / 10000 == 228 || item_id / 10000 == 229)
+							Stage::get().get_player().request(SkillBookPacket(slot, item_id), ExclRequest::USE_WAIT);
 						else
 							Stage::get().get_player().request(UseItemPacket(slot, item_id), ExclRequest::USE_WAIT);
 
