@@ -6,11 +6,6 @@ use game::quest::encode_kills;
 use game::Player;
 use packet::{io::write::PktWrite, Packet};
 
-/// Teleport rock slots hold this map id when empty.
-const EMPTY_TELEPORT_ROCK: i32 = 999_999_999;
-const REGULAR_TELEPORT_ROCKS: usize = 5;
-const VIP_TELEPORT_ROCKS: usize = 10;
-
 /// Write the full character data block sent on world entry
 /// (`addCharacterInfo` in HeavenMS).
 pub fn encode_character_data(packet: &mut Packet, player: &Player) -> Result<(), NetworkError> {
@@ -51,8 +46,10 @@ pub fn encode_character_data(packet: &mut Packet, player: &Player) -> Result<(),
     packet.write_short(0)?; // crush rings
     packet.write_short(0)?; // friendship rings
     packet.write_short(0)?; // marriage
-    for _ in 0..REGULAR_TELEPORT_ROCKS + VIP_TELEPORT_ROCKS {
-        packet.write_int(EMPTY_TELEPORT_ROCK)?;
+    for vip in [false, true] {
+        for map_id in player.teleport_rocks.slots(vip) {
+            packet.write_int(map_id)?;
+        }
     }
     packet.write_int(player.monster_book.cover())?;
     packet.write_byte(0)?;

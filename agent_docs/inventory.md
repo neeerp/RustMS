@@ -207,6 +207,35 @@ where shops open (`info/personalShop`, the Free Market rooms) puts it away,
 as the v83 client does there; the server refuses a board in those maps too.
 Losing the last chalkboard doesn't put the board away yet.
 
+### Teleport rocks
+
+A character keeps maps for the teleport rocks (504xxxx): five for the
+regular rock, ten for the VIP one (any 504 id outside 5040xxx). The lists
+are `Player.teleport_rocks` (`game::teleport_rock`), saved in the
+`teleport_rocks` table by place, and SET_FIELD's character data writes
+every slot, an empty one as 999999999. TROCK_ADD_MAP (`0x66`: 1 to keep
+the player's map or 0 to drop one, the VIP flag, and the map id when
+dropping) answers with MAP_TRANSFER_RESULT (`0x2A`: 3 kept or 2 dropped,
+the VIP flag, the list's slots). The client offers to keep only maps off
+Maple Island and outside the event maps (`(id / 1000000) % 100 == 9`);
+the server refuses those, maps whose `fieldLimit` forbids rocks (`0x40`),
+a full list and a map already kept with result 10.
+
+The rock is used through USE_CASH_ITEM with 0 and a kept map id, or 1 and
+a character's name (`world/teleport_rock.rs`). A name goes to the world
+directory (`WorldAction::RockToCharacter`), which asks the character's
+client actor on the same channel where they stand; the answer comes back to
+the user's actor, which finishes with `to_character` and lands on the spawn
+point nearest them. Either way the rock is refused with MAP_TRANSFER_RESULT
+`result, vip` and an empty stat change, since 42 doesn't unlock the client:
+6 for a name not found (or the user's own), 9 for the map they are on, 11
+on Maple Island under level 7, and 8 for the rest: a map not kept, a dead
+user, a map with `fieldLimit` `0x40` or `0x2` on either end, another
+continent (`id / 100000000`) for the regular rock, or a map that sends
+players elsewhere on login (`forcedReturn`) but on Maple Island, as Cosmic
+does. Otherwise one exclusive INVENTORY_OPERATION takes one rock and the
+user is warped.
+
 ## NPC shops
 
 Clicking an NPC that keeps a shop (`content::shops()`, from the pack's
@@ -464,6 +493,11 @@ and the super, item and triple ones on another, then finds the used slot
 empty. `net`'s chalkboard handler covers the board, the refused notes and
 closing it; `chalkboard` (integration) holds one up for a watcher, takes it
 to another map and back, closes it, and has a Free Market room put it away.
+`game::teleport_rock` covers the lists; `net`'s teleport rock handler covers
+keeping and dropping maps, each refusal, the trips by map and to a character,
+and the rock used; `teleport_rocks` (integration) keeps Henesys, rocks back to
+it, is refused the same map and a missing name, rocks to a watcher, and rocks
+to Henesys again after a relog.
 `net::storage` covers each request and its refusals. `storage` (integration)
 opens Mr. Lee's storage, stores part of a stack and a whole one for the fee,
 is refused too many and too many mesos, moves mesos in, sorts, takes items

@@ -6,6 +6,7 @@ use crate::monster_book::MonsterBook;
 use crate::pet::{FieldPet, FOLLOW_THE_LEAD};
 use crate::quest::QuestLog;
 use crate::skill::{self, SkillBook, SkillRecord};
+use crate::teleport_rock::TeleportRocks;
 use std::collections::BTreeMap;
 
 /// The most STR, DEX, INT, or LUK AP can raise a stat to.
@@ -184,6 +185,8 @@ pub struct Player {
     pub pets_named: Vec<i64>,
     /// The note on the chalkboard the player holds up, if any; not saved.
     pub chalkboard: Option<String>,
+    /// The maps kept for the teleport rocks.
+    pub teleport_rocks: TeleportRocks,
     dirty: bool,
 }
 
@@ -216,6 +219,7 @@ impl Player {
             pets: Vec::new(),
             pets_named: Vec::new(),
             chalkboard: None,
+            teleport_rocks: TeleportRocks::default(),
             dirty: false,
         }
     }

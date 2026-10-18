@@ -22,6 +22,7 @@ pub enum SendOpcode {
     UpdateSkills = 0x24,
     FameResponse = 0x26,
     ShowStatusInfo = 0x27,
+    MapTransferResult = 0x2A,
     SkillBookResult = 0x33,
     GatherItemResult = 0x34,
     SortItemResult = 0x35,

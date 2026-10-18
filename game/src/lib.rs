@@ -19,6 +19,7 @@ pub mod quest;
 pub mod scroll;
 pub mod skill;
 pub mod storage;
+pub mod teleport_rock;
 
 pub use buff::{Buff, BuffStat, Buffs, Disease, ShownBuff};
 pub use character::{ApStat, AvatarLook, CharacterStats, FieldAvatar, MiniRoomBox, Player};
@@ -31,3 +32,4 @@ pub use pet::{FieldPet, PetCommand, PetData};
 pub use quest::{QuestLog, QuestRecord, QuestState, QuestStatus};
 pub use skill::{SkillBook, SkillRecord};
 pub use storage::Storage;
+pub use teleport_rock::TeleportRocks;

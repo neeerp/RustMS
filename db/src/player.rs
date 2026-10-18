@@ -9,7 +9,7 @@ use crate::keybinding::KeybindType;
 use crate::quest::QuestProgress;
 use crate::schema::{
     accounts, character_quests, characters, equipment_stats, inventory_items, keybindings,
-    monster_book_cards, skills,
+    monster_book_cards, skills, teleport_rocks,
 };
 use diesel::pg::PgConnection;
 use diesel::prelude::*;
@@ -18,7 +18,7 @@ use game::inventory::DEFAULT_SLOT_LIMIT;
 use game::quest::{decode_kills, encode_kills};
 use game::{
     AvatarLook, CharacterStats, EquipStats, Inventory, InventoryType, Item, KeyBinding, Keymap,
-    MonsterBook, Player, QuestLog, QuestRecord, QuestStatus, SkillBook, SkillRecord,
+    MonsterBook, Player, QuestLog, QuestRecord, QuestStatus, SkillBook, SkillRecord, TeleportRocks,
 };
 use std::collections::HashMap;
 use std::convert::TryFrom;
@@ -212,6 +212,7 @@ pub fn load_player(character_id: i32) -> crate::Result<Player> {
             .into_iter()
             .map(|(card, level)| (card, u8::try_from(level).unwrap_or(0))),
     );
+    player.teleport_rocks = load_teleport_rocks(&mut conn, character_id)?;
     Ok(player)
 }
 
@@ -285,6 +286,7 @@ pub(crate) fn write_player(conn: &mut PgConnection, player: &Player) -> QueryRes
         }
 
         save_keymap(conn, id, &player.keymap)?;
+        save_teleport_rocks(conn, id, &player.teleport_rocks)?;
         save_inventory(conn, id, &player.inventory)?;
         crate::pet::save(conn, &player.inventory, &player.pets)?;
         // Kill progress of started quests.
@@ -316,6 +318,51 @@ pub(crate) fn write_player(conn: &mut PgConnection, player: &Player) -> QueryRes
             .execute(conn)?;
         Ok(())
     }
+}
+
+fn load_teleport_rocks(conn: &mut PgConnection, character_id: i32) -> QueryResult<TeleportRocks> {
+    let rows: Vec<(bool, i32)> = teleport_rocks::table
+        .filter(teleport_rocks::character_id.eq(character_id))
+        .order((teleport_rocks::vip, teleport_rocks::place))
+        .select((teleport_rocks::vip, teleport_rocks::map_id))
+        .load(conn)?;
+    let list = |vip| {
+        rows.iter()
+            .filter(|&&(of, _)| of == vip)
+            .map(|&(_, map)| map)
+            .collect()
+    };
+    Ok(TeleportRocks::new(list(false), list(true)))
+}
+
+fn save_teleport_rocks(
+    conn: &mut PgConnection,
+    character_id: i32,
+    rocks: &TeleportRocks,
+) -> QueryResult<()> {
+    diesel::delete(teleport_rocks::table.filter(teleport_rocks::character_id.eq(character_id)))
+        .execute(conn)?;
+    let rows: Vec<_> = [false, true]
+        .into_iter()
+        .flat_map(|vip| {
+            rocks
+                .maps(vip)
+                .iter()
+                .enumerate()
+                .map(move |(place, &map)| {
+                    (
+                        teleport_rocks::character_id.eq(character_id),
+                        teleport_rocks::vip.eq(vip),
+                        teleport_rocks::place.eq(place as i16),
+                        teleport_rocks::map_id.eq(map),
+                    )
+                })
+        })
+        .collect();
+    diesel::insert_into(teleport_rocks::table)
+        .values(&rows)
+        .execute(conn)?;
+    Ok(())
 }
 
 /// Stats and looks for every character on an account, for the character list.

@@ -75,6 +75,7 @@ pub enum RecvOpcode {
     CharInfoRequest = 0x61,
     SpawnPet = 0x62,
     ChangeMapSpecial = 0x64,
+    TeleportRockList = 0x66,
     QuestAction = 0x6B,
     ThrowGrenade = 0x6D,
 

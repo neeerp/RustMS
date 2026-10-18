@@ -15,6 +15,7 @@
 use game::{AvatarLook, FieldAvatar, Guild, Player};
 use net::packet::build::world::door::DoorView;
 use net::packet::build::world::guild::InviteRefusal;
+use net::packet::handle::world::{Rock, Whereabouts};
 use net::{
     BroadcastScope, ClientId, FieldRequest, MessengerRequest, PartyRequest, PartySkill,
     WhisperDelivery,
@@ -103,6 +104,18 @@ pub enum ServerMessage {
     /// Someone on this channel looked for this player; answer with the map.
     Locate {
         reply_to: ClientHandle,
+    },
+    /// Someone on this channel used `rock` to reach this player; tell them
+    /// where this player stands.
+    RockLocate {
+        reply_to: ClientHandle,
+        rock: Rock,
+    },
+    /// Where the character this player used `rock` to reach stands, if they
+    /// are on the channel.
+    RockLocated {
+        rock: Rock,
+        found: Option<Whereabouts>,
     },
     /// `requester` (maybe this player) double-clicked this player; send them
     /// CHAR_INFO.
@@ -391,6 +404,13 @@ pub enum DirectoryMessage {
     Find {
         from: ClientId,
         target_name: String,
+    },
+    /// Find the character named `name` on the sender's channel, to take the
+    /// sender to them with `rock`.
+    RockLocate {
+        from: ClientId,
+        name: String,
+        rock: Rock,
     },
     Broadcast {
         from: ClientId,
