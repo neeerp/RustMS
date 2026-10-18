@@ -26,6 +26,7 @@
 #include "../UITypes/UIKeyConfig.h"
 
 #include "../../Character/Inventory/ItemDrop.h"
+#include "../../Character/Inventory/ScrollRules.h"
 #include "../../Data/EquipData.h"
 #include "../../Gameplay/Stage.h"
 #include "../../Util/NxFiles.h"
@@ -848,8 +849,49 @@ namespace ms
 
 				break;
 			case InventoryType::Id::USE:
-				ScrollEquipPacket(source, eqslot).dispatch();
+			{
+				// v83 FUN_004f4bb7: a scroll dropped on a worn equip. HeavenClient
+				// has no sealed items, so v83's notices about those don't apply.
+				Player &player = Stage::get().get_player();
+
+				if (player.get_look().get_alerted())
+				{
+					UI::get().emplace<UIOk>("You can't do it right now.\\nCatch your breath and then try again.",
+											[](bool)
+											{});
+					break;
+				}
+
+				if (player.is_dead())
+				{
+					UI::get().emplace<UIOk>("You can't do it once you're dead.", [](bool)
+					{});
+					break;
+				}
+
+				if (!scroll_rules::is_scroll(item_id) || !player.can_request(ExclRequest::WAIT))
+					break;
+
+				const Inventory &inventory = player.get_inventory();
+
+				// Also refuses an empty slot.
+				if (!scroll_rules::fits(item_id, inventory.get_item_id(InventoryType::Id::EQUIPPED, eqslot)))
+					break;
+
+				auto send = [slot = source, eqslot](bool whitescroll)
+				{
+					Stage::get().get_player().request(ScrollEquipPacket(slot, eqslot, whitescroll), ExclRequest::WAIT);
+				};
+
+				// Either answer scrolls; only Yes uses the White Scroll.
+				if (scroll_rules::takes_white_scroll(item_id) &&
+					inventory.find_item(InventoryType::Id::USE, scroll_rules::WHITE_SCROLL) != 0)
+					UI::get().emplace<UIYesNo>("Would you like to use the White Scroll?", send);
+				else
+					send(false);
+
 				break;
+			}
 		}
 	}
 

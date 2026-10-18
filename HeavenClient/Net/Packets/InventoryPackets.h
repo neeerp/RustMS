@@ -120,26 +120,18 @@ namespace ms
 		}
 	};
 
-	// Requests using a scroll on an equip 
-	// Opcode: SCROLL_EQUIP(86)
+	// Requests using the scroll in a USE slot on a worn equip
+	// Opcode: SCROLL_EQUIP(86), v83 FUN_00a09221
 	class ScrollEquipPacket : public OutPacket
 	{
 	public:
-		enum Flag : uint8_t
-		{
-			NONE = 0x00,
-			UNKNOWN = 0x01,
-			WHITESCROLL = 0x02
-		};
-
-		ScrollEquipPacket(int16_t source, EquipSlot::Id target, uint8_t flags) : OutPacket(OutPacket::Opcode::SCROLL_EQUIP)
+		ScrollEquipPacket(int16_t source, EquipSlot::Id target, bool whitescroll) : OutPacket(OutPacket::Opcode::SCROLL_EQUIP)
 		{
 			write_time();
 			write_short(source);
 			write_short(-target);
-			write_short(flags);
+			write_short(whitescroll ? 2 : 1);
+			write_byte(0); // Legendary Spirit
 		}
-
-		ScrollEquipPacket(int16_t source, EquipSlot::Id target) : ScrollEquipPacket(source, target, 0) {}
 	};
 }

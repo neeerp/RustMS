@@ -121,6 +121,30 @@ mastery, skill, master level, used, success) goes to the reader and the map.
 HeavenClient plays the `BasicEff.img/SkillBook` glow on the reader, and for
 the reader the Enchant sound and the v83 chat line.
 
+### Equipment scrolls
+
+Dropping a scroll (204xxxx) on the Equip window sends USE_UPGRADE_SCROLL
+(`0x56`: tick, scroll slot, equip slot, White Scroll 2 or 1, Legendary
+Spirit byte). The client sends it only if the scroll fits the item
+(`scroll_rules::fits`, a port of the v83 check) and asks "Would you like to
+use the White Scroll?" when the player has one and the scroll would use a
+slot. `game-data` reads a scroll's `success`, `cursed`, `inc*` stats, `req`
+list, and kind (Chaos `randstat`, Clean Slate `recover`, spikes
+`preventslip`, cold `warmsupport`) into `game::scroll::ScrollInfo`;
+`game::scroll::apply` rolls it HeavenMS-style (rolls injected, so tested
+without randomness). The server refuses, with only the unlock, a dead
+player, a scroll that doesn't fit, an equip with no slot left (Clean Slate:
+nothing to restore), and cash items. Otherwise one exclusive
+INVENTORY_OPERATION takes the scroll and the White Scroll and replaces the
+worn equip (or only removes it when the curse destroys it), then
+SHOW_SCROLL_EFFECT (`0xA7`: character, success 1/0, cursed, Legendary
+Spirit, White Scroll) goes to the scroller and the map, then the look
+refresh unless it simply failed. Legendary Spirit requests are refused with
+SHOW_SCROLL_EFFECT -1 to the scroller alone; HeavenClient ignores that, as
+it has no Legendary Spirit window. HeavenClient plays the Enchant sound and
+the scroll glow, and gives the scroller the v83 chat line. It has no sealed
+items, so the v83 sealed-item prompts are skipped.
+
 ## NPC shops
 
 Clicking an NPC that keeps a shop (`content::shops()`, from the pack's
@@ -284,6 +308,12 @@ to pick up and drops mesos earned from snails, checking both losses are saved;
 grocer, is refused for want of mesos, sells a sword, buys an arrow with it,
 and checks both are saved. `skill_books` (integration) refuses a mastery
 book for another job and teaches Fire Demon to an Arch Mage.
+`game::scroll` covers the fit, the slot checks and each kind's roll;
+`net`'s scroll handler covers the packets, the White Scroll, the curse and
+refusals; `scrolls` (integration) scrolls the starting sword with and
+without a White Scroll, is refused a helmet scroll, watches the glow from a
+second player, and checks the upgrade is saved. The client's `scroll_rules`
+test covers the fit, the White Scroll prompt and the chat lines.
 `net::storage` covers each request and its refusals. `storage` (integration)
 opens Mr. Lee's storage, stores part of a stack and a whole one for the fee,
 is refused too many and too many mesos, moves mesos in, sorts, takes items

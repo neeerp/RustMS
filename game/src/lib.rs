@@ -14,6 +14,7 @@ pub mod mob_skill;
 pub mod mob_stat;
 pub mod monster_book;
 pub mod quest;
+pub mod scroll;
 pub mod skill;
 pub mod storage;
 

@@ -154,8 +154,15 @@ namespace ms
 
 		for (const Mod& mod : mods)
 		{
+			// Like v83 (FUN_00a1ead9), the trailing byte only concerns the
+			// entries at a worn (negative) position; the others, such as the
+			// scroll used up next to a scrolled equip, are bag changes.
+			Inventory::Movement mod_move = (mod.pos < 0 || mod.arg < 0) ?
+				move :
+				Inventory::Movement::MOVE_INTERNAL;
+
 			if (mod.mode == 2)
-				inventory.modify(mod.type, mod.pos, mod.mode, mod.arg, move);
+				inventory.modify(mod.type, mod.pos, mod.mode, mod.arg, mod_move);
 
 			if (auto shop = UI::get().get_element<UIShop>())
 				shop->modify(mod.type);
@@ -166,7 +173,7 @@ namespace ms
 			auto eqinvent = UI::get().get_element<UIEquipInventory>();
 			auto itinvent = UI::get().get_element<UIItemInventory>();
 
-			switch (move)
+			switch (mod_move)
 			{
 			case Inventory::Movement::MOVE_INTERNAL:
 				switch (mod.type)

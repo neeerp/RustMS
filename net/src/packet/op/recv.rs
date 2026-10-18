@@ -58,6 +58,7 @@ pub enum RecvOpcode {
     UseItem = 0x48,
     CancelItemEffect = 0x49,
     UseSkillBook = 0x52,
+    UseUpgradeScroll = 0x56,
     SpendAp = 0x57,
     HealOverTime = 0x59,
     SpendSp = 0x5A,
