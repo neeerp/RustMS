@@ -219,12 +219,14 @@ namespace ms
 
 	void UIEquipInventory::update_slot(EquipSlot::Id slot)
 	{
-		if (int32_t item_id = inventory.get_item_id(InventoryType::Id::EQUIPPED, slot))
+		int16_t shown = inventory.shown_equip(slot);
+
+		if (int32_t item_id = inventory.get_item_id(InventoryType::Id::EQUIPPED, shown))
 		{
 			const Texture &texture = ItemData::get(item_id).get_icon(false);
 
 			icons[slot] = std::make_unique<Icon>(
-					std::make_unique<EquipIcon>(slot),
+					std::make_unique<EquipIcon>(shown),
 					texture,
 					-1
 			);
@@ -270,7 +272,7 @@ namespace ms
 				return Cursor::State::GRABBING;
 			} else
 			{
-				show_equip(slot);
+				show_equip(inventory.shown_equip(slot));
 
 				return Cursor::State::CANGRAB;
 			}
@@ -299,7 +301,8 @@ namespace ms
 
 		if (icons[slot])
 			if (int16_t freeslot = inventory.find_free_slot(InventoryType::Id::EQUIP))
-				Stage::get().get_player().request(UnequipItemPacket(slot, freeslot), ExclRequest::WAIT);
+				Stage::get().get_player().request(UnequipItemPacket(inventory.shown_equip(slot), freeslot),
+												  ExclRequest::WAIT);
 	}
 
 	bool UIEquipInventory::is_in_range(Point<int16_t> cursorpos) const
@@ -334,8 +337,8 @@ namespace ms
 
 	void UIEquipInventory::modify(int16_t pos, int8_t mode, int16_t arg)
 	{
-		EquipSlot::Id eqpos = EquipSlot::by_id(pos);
-		EquipSlot::Id eqarg = EquipSlot::by_id(arg);
+		EquipSlot::Id eqpos = EquipSlot::by_id(pos % Inventory::CASH_EQUIP);
+		EquipSlot::Id eqarg = EquipSlot::by_id(arg % Inventory::CASH_EQUIP);
 
 		switch (mode)
 		{
@@ -350,7 +353,7 @@ namespace ms
 		}
 	}
 
-	void UIEquipInventory::show_equip(EquipSlot::Id slot)
+	void UIEquipInventory::show_equip(int16_t slot)
 	{
 		UI::get().show_equip(Tooltip::Parent::EQUIPINVENTORY, slot);
 	}
@@ -386,7 +389,7 @@ namespace ms
 
 	void UIEquipInventory::EquipIcon::drop_on_equips(EquipSlot::Id slot) const
 	{
-		if (source == slot)
+		if (source % Inventory::CASH_EQUIP == slot)
 			Sound(Sound::Name::DRAGEND).play();
 	}
 
@@ -406,8 +409,11 @@ namespace ms
 
 		if (equip)
 		{
-			if (eqslot == source)
-				Stage::get().get_player().request(EquipItemPacket(slot, eqslot), ExclRequest::WAIT);
+			// Only an item worn at the same position swaps with this one.
+			int16_t worn = Stage::get().get_player().get_inventory().equip_position(slot, eqslot);
+
+			if (worn == source)
+				Stage::get().get_player().request(EquipItemPacket(slot, worn), ExclRequest::WAIT);
 		} else
 		{
 			Stage::get().get_player().request(UnequipItemPacket(source, slot), ExclRequest::WAIT);

@@ -321,6 +321,18 @@ namespace ms
 		}
 	}
 
+	int16_t Inventory::equip_position(int16_t slot, EquipSlot::Id part) const
+	{
+		return get_cash_id(InventoryType::Id::EQUIP, slot) ? part + CASH_EQUIP : part;
+	}
+
+	int16_t Inventory::shown_equip(EquipSlot::Id part) const
+	{
+		int16_t cash = part + CASH_EQUIP;
+
+		return inventories[InventoryType::Id::EQUIPPED].count(cash) ? cash : part;
+	}
+
 	int16_t Inventory::find_free_slot(InventoryType::Id type) const
 	{
 		int16_t counter = 1;

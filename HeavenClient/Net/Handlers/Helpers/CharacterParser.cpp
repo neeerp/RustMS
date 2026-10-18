@@ -32,14 +32,16 @@ namespace ms
 
 		recv.skip(8);
 
+		// Worn regular items, worn cash items, and the Equip tab. Like v83, the
+		// cash items are kept 100 above their slot.
 		for (size_t i = 0; i < 3; i++)
 		{
-			InventoryType::Id inv = (i == 0) ? InventoryType::EQUIPPED : InventoryType::EQUIP;
+			InventoryType::Id inv = (i < 2) ? InventoryType::EQUIPPED : InventoryType::EQUIP;
 			int16_t pos = recv.read_short();
 
 			while (pos != 0)
 			{
-				int16_t slot = (i == 1) ? -pos : pos;
+				int16_t slot = (i == 1) ? pos + Inventory::CASH_EQUIP : pos;
 				ItemParser::parse_item(recv, inv, slot, invent);
 				pos = recv.read_short();
 			}

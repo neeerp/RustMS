@@ -76,12 +76,13 @@ namespace ms
 		}
 	};
 
-	// Packet which requests that an item is equipped
+	// Packet which requests that an item is equipped at worn position `dest`
+	// (Inventory::equip_position).
 	// Opcode: MOVE_ITEM(71)
 	class EquipItemPacket : public MoveItemPacket
 	{
 	public:
-		EquipItemPacket(int16_t src, EquipSlot::Id dest) : MoveItemPacket(InventoryType::Id::EQUIP, src, -dest, 1) {}
+		EquipItemPacket(int16_t src, int16_t dest) : MoveItemPacket(InventoryType::Id::EQUIP, src, -dest, 1) {}
 	};
 
 	// Packet which requests that an item is unequipped
@@ -273,7 +274,7 @@ namespace ms
 	class ScrollEquipPacket : public OutPacket
 	{
 	public:
-		ScrollEquipPacket(int16_t source, EquipSlot::Id target, bool whitescroll) : OutPacket(OutPacket::Opcode::SCROLL_EQUIP)
+		ScrollEquipPacket(int16_t source, int16_t target, bool whitescroll) : OutPacket(OutPacket::Opcode::SCROLL_EQUIP)
 		{
 			write_time();
 			write_short(source);

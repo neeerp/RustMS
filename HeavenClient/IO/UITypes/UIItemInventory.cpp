@@ -676,7 +676,11 @@ namespace ms
 				{
 					case InventoryType::Id::EQUIP:
 						if (can_wear_equip(slot))
-							Stage::get().get_player().request(EquipItemPacket(slot, inventory.find_equipslot(item_id)), ExclRequest::WAIT);
+						{
+							int16_t worn = inventory.equip_position(slot, inventory.find_equipslot(item_id));
+
+							Stage::get().get_player().request(EquipItemPacket(slot, worn), ExclRequest::WAIT);
+						}
 
 						break;
 					case InventoryType::Id::USE:
@@ -1269,8 +1273,12 @@ namespace ms
 		{
 			case InventoryType::Id::EQUIP:
 				if (eqsource == eqslot)
+				{
+					int16_t worn = Stage::get().get_player().get_inventory().equip_position(source, eqslot);
+
 					if (parent.can_wear_equip(source))
-						Stage::get().get_player().request(EquipItemPacket(source, eqslot), ExclRequest::WAIT);
+						Stage::get().get_player().request(EquipItemPacket(source, worn), ExclRequest::WAIT);
+				}
 
 				Sound(Sound::Name::DRAGEND).play();
 
@@ -1300,13 +1308,15 @@ namespace ms
 
 				const Inventory &inventory = player.get_inventory();
 
-				// Also refuses an empty slot.
-				if (!scroll_rules::fits(item_id, inventory.get_item_id(InventoryType::Id::EQUIPPED, eqslot)))
+				// The scroll goes on the item shown there. Also refuses an empty slot.
+				int16_t target = inventory.shown_equip(eqslot);
+
+				if (!scroll_rules::fits(item_id, inventory.get_item_id(InventoryType::Id::EQUIPPED, target)))
 					break;
 
-				auto send = [slot = source, eqslot](bool whitescroll)
+				auto send = [slot = source, target](bool whitescroll)
 				{
-					Stage::get().get_player().request(ScrollEquipPacket(slot, eqslot, whitescroll), ExclRequest::WAIT);
+					Stage::get().get_player().request(ScrollEquipPacket(slot, target, whitescroll), ExclRequest::WAIT);
 				};
 
 				// Either answer scrolls; only Yes uses the White Scroll.
