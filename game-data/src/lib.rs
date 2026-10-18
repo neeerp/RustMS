@@ -22,6 +22,12 @@ pub const PORTAL_TYPE_START_POINT: i32 = 0;
 pub const PORTAL_TYPE_TOWN_DOOR: i32 = 6;
 /// `info/fieldLimit` bit forbidding Mystic Door (v83 FUN_00969bf9).
 pub const FIELD_LIMIT_MYSTIC_DOOR: i32 = 0x8;
+/// `info/fieldLimit` bit leaving only the map's `info/allowedItem` usable
+/// (v83 FUN_00a092fb).
+pub const FIELD_LIMIT_CONSUMABLES: i32 = 0x400;
+/// `info/fieldLimit` bit keeping items and mesos off the ground (v83
+/// FUN_00a0900a, FUN_00a23de5).
+pub const FIELD_LIMIT_DROPS: i32 = 0x400000;
 
 #[derive(Debug, Error)]
 pub enum GameDataError {
@@ -198,6 +204,8 @@ pub struct FieldTemplate {
     pub town: bool,
     /// `info/fieldLimit`: what the map forbids (see `FIELD_LIMIT_*`).
     pub field_limit: i32,
+    /// `info/allowedItem`: the items `FIELD_LIMIT_CONSUMABLES` still allows.
+    pub allowed_items: Vec<i32>,
     /// Whether the map has a wall clock (a `clock` node with a position and
     /// size, as stations do), which the server sets to the time of day.
     pub clock: bool,
@@ -207,6 +215,22 @@ pub struct FieldTemplate {
 }
 
 impl FieldTemplate {
+    /// Whether a player may use `item_id` here. With
+    /// `FIELD_LIMIT_CONSUMABLES`, the potions, food, cures and the like that
+    /// v83 sends as USE_ITEM work only if `info/allowedItem` lists them.
+    pub fn may_use(&self, item_id: i32) -> bool {
+        !matches!(
+            item_id / 10_000,
+            200 | 201 | 202 | 205 | 221 | 236 | 238 | 245
+        ) || self.field_limit & FIELD_LIMIT_CONSUMABLES == 0
+            || self.allowed_items.contains(&item_id)
+    }
+
+    /// Whether players may drop items and mesos here.
+    pub fn may_drop(&self) -> bool {
+        self.field_limit & FIELD_LIMIT_DROPS == 0
+    }
+
     pub fn portals(&self) -> impl Iterator<Item = &PortalTemplate> {
         self.portals_by_id.values()
     }
@@ -340,12 +364,13 @@ fn build_field_template(
         .transpose()?
         .flatten()
         .unwrap_or(1.0);
-    let (town, field_limit) = match nx.child_by_name(map_node_idx, "info")? {
+    let (town, field_limit, allowed_items) = match nx.child_by_name(map_node_idx, "info")? {
         Some(info) => (
             nx.int_child(info, "town")?.unwrap_or(0) != 0,
             nx.int_child(info, "fieldLimit")?.unwrap_or(0),
+            allowed_items(nx, info)?,
         ),
-        None => (false, 0),
+        None => (false, 0, Vec::new()),
     };
     // v83 FUN_0052bc72 makes the clock only if all four are non-zero.
     let clock = match nx.child_by_name(map_node_idx, "clock")? {
@@ -418,11 +443,26 @@ fn build_field_template(
         recovery,
         town,
         field_limit,
+        allowed_items,
         clock,
         footholds,
         portals_by_id,
         portal_ids_by_name,
     })
+}
+
+/// A map's `info/allowedItem` list.
+fn allowed_items(nx: &NxDataFile, info: u32) -> Result<Vec<i32>, GameDataError> {
+    let Some(list) = nx.child_by_name(info, "allowedItem")? else {
+        return Ok(Vec::new());
+    };
+    let mut items = Vec::new();
+    for child in nx.child_indices(list)? {
+        if let Some(item) = nx.int_child(list, &nx.node_name(child)?)? {
+            items.push(item);
+        }
+    }
+    Ok(items)
 }
 
 fn build_footholds(
@@ -888,6 +928,7 @@ mod tests {
             recovery: 1.0,
             town: false,
             field_limit: 0,
+            allowed_items: Vec::new(),
             clock: false,
             footholds: footholds::Footholds::default(),
             portals_by_id: BTreeMap::from([
@@ -955,6 +996,7 @@ mod tests {
             recovery: 1.0,
             town: false,
             field_limit: 0,
+            allowed_items: Vec::new(),
             clock: false,
             reactors: Vec::new(),
             footholds: footholds::Footholds::default(),
@@ -971,6 +1013,24 @@ mod tests {
         assert_eq!(closest(-400), Some(0));
         assert_eq!(closest(250), Some(1));
         assert_eq!(closest(950), Some(3));
+    }
+
+    #[test]
+    fn reads_what_maps_do_to_items() {
+        let Some(path) = test_assets::path("Map.nx") else {
+            return;
+        };
+        let game_data = GameData::load_from_nx_map(&path).expect("load map nx");
+        let field = |id| game_data.field(id).expect("field");
+
+        let event = field(109090300);
+        assert!(!event.may_use(2000000), "a Red Potion isn't listed");
+        assert!(event.may_use(2022539), "a listed item works");
+        assert!(event.may_use(2030000), "a Return Scroll isn't checked");
+        assert!(event.may_drop());
+        assert!(!field(910000001).may_drop(), "the Free Market rooms");
+        let henesys = field(100000000);
+        assert!(henesys.may_use(2000000) && henesys.may_drop());
     }
 
     #[test]

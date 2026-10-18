@@ -73,6 +73,12 @@ fn use_item(player: &mut Player, slot: i16, item_id: i32, now: Instant) -> Optio
     if player.stats.hp <= 0 || player.buffs.has(BuffStat::StopPotion) {
         return None;
     }
+    let field = crate::get_game_data()
+        .ok()
+        .and_then(|data| data.field(player.stats.map_id));
+    if !field.is_none_or(|field| field.may_use(item_id)) {
+        return None;
+    }
     if player.inventory.get(InventoryType::Use, slot)?.item_id != item_id {
         return None;
     }
@@ -343,6 +349,31 @@ mod tests {
         ));
         assert!(use_item(&mut player, 3, 2000000, now).is_some());
         assert_eq!(player.stats.hp, 125);
+    }
+
+    #[test]
+    fn maps_that_forbid_consumables_allow_only_their_list() {
+        if items::data().is_err() || crate::get_game_data().is_err() {
+            return;
+        }
+        let mut player = crate::codec::stats::sample_player();
+        player.stats.max_hp = 500;
+        player.stats.hp = 100;
+        player
+            .inventory
+            .insert(InventoryType::Use, 3, Item::stack(2000000, 2));
+        let now = std::time::Instant::now();
+        player.stats.map_id = 913_040_000;
+        assert!(use_item(&mut player, 3, 2000000, now).is_none());
+        assert_eq!(player.inventory.count(2000000), 2);
+
+        // 109090300 forbids consumables but lists 2022539.
+        player.stats.map_id = 109_090_300;
+        assert!(use_item(&mut player, 3, 2000000, now).is_none());
+        player
+            .inventory
+            .insert(InventoryType::Use, 4, Item::stack(2022539, 1));
+        assert!(use_item(&mut player, 4, 2022539, now).is_some());
     }
 
     #[test]

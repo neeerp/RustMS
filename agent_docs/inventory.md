@@ -59,8 +59,9 @@ ground. As in v83, HeavenClient asks its usual questions first and then says
 "You cannot drop the item here." in the skill chat colour instead of sending
 the drop. It also refuses an item drop while the player is alert from a hit
 or an attack ("You can't do it right now. Catch your breath and then try
-again.") or dead ("You can't do it once you're dead."). The server doesn't
-check the map.
+again.") or dead ("You can't do it once you're dead."). The server refuses
+item and meso drops on such a map too (`FieldTemplate::may_drop`) with an
+enable-actions stat update.
 
 GATHER_ITEMS (`0x45`) and SORT_ITEMS (`0x46`) (tick, type) are the item
 window's Gather and Sort buttons. The rearrangement goes out as one
@@ -86,9 +87,10 @@ A map whose `fieldLimit` has bit 0x400 allows only the items its
 says "This item cannot be used here." in the skill chat colour when the
 player double-clicks or presses a quick slot for anything else of the kinds
 v83 checks there: potions, food, cures and transformations
-(`field_limit::may_use`). Return scrolls and the rest aren't checked, and
-the server doesn't check the map. Double-clicking any item while dead says
-"You can't do it once you're dead."
+(`field_limit::may_use`). Return scrolls and the rest aren't checked. The
+server applies the same rule (`FieldTemplate::may_use`) and answers a refused
+USE_ITEM with an enable-actions stat update. Double-clicking any item while
+dead says "You can't do it once you're dead."
 
 HEAL_OVER_TIME (`0x59`) is HeavenClient's natural recovery, which follows the
 v83 (MapleLegends) client's 30 ms recovery check. HP and MP keep separate

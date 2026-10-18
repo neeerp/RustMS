@@ -77,6 +77,12 @@ fn drop_item(
     if player.stats.hp <= 0 {
         return Err("dead");
     }
+    let field = crate::get_game_data()
+        .ok()
+        .and_then(|data| data.field(player.stats.map_id));
+    if !field.is_none_or(|field| field.may_drop()) {
+        return Err("the map forbids drops");
+    }
     let kind = InventoryType::from_i16(i16::from(kind))
         .filter(|kind| *kind != InventoryType::Equipped)
         .ok_or("not a bag")?;
@@ -253,6 +259,20 @@ mod tests {
 
         player.stats.hp = 0;
         assert!(thrown(&handle(&mut player, drop_request(4, 1, 0, 1))).is_none());
+    }
+
+    #[test]
+    fn refuses_drops_where_the_map_forbids_them() {
+        if crate::get_game_data().is_err() {
+            return;
+        }
+        let mut player = crate::codec::stats::sample_player();
+        player.stats.map_id = 910_000_001;
+        player
+            .inventory
+            .insert(InventoryType::Etc, 1, Item::stack(4000019, 2));
+        assert!(thrown(&handle(&mut player, drop_request(4, 1, 0, 1))).is_none());
+        assert_eq!(player.inventory.count(4000019), 2);
     }
 
     #[test]
