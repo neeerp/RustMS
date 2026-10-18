@@ -37,6 +37,8 @@ pub struct ItemInfo {
     pub equip: Option<EquipInfo>,
     /// A pet's commands (`interact`), by the index the client sends.
     pub pet_commands: Vec<PetCommand>,
+    /// The fullness a pet loses each time it grows hungry (`info/hungry`).
+    pub pet_hunger: i32,
 }
 
 /// A skill book (228xxxx) or mastery book (229xxxx).
@@ -68,6 +70,11 @@ pub struct ConsumeSpec {
     /// The diseases it cures (`poison`, `darkness`, `weakness`, `seal`,
     /// `curse`).
     pub cures: Vec<BuffStat>,
+    /// What a pet food gives (`inc`): fullness for 212xxxx, closeness for
+    /// cash food (524xxxx), which also fills the pet up.
+    pub inc: i32,
+    /// The pets a cash food suits (`0`, `1`, ...).
+    pub pets: Vec<i32>,
 }
 
 /// The `spec` keys of the stats a consumable raises.
@@ -225,6 +232,9 @@ impl ItemData {
             info.unit_price = nx.real_child(meta, "unitPrice")?.unwrap_or(0.0);
             info.recovery_hp = nx.int_child(meta, "recoveryHP")?.unwrap_or(0);
             info.recovery_mp = nx.int_child(meta, "recoveryMP")?.unwrap_or(0);
+            if pet {
+                info.pet_hunger = nx.int_child(meta, "hungry")?.unwrap_or(1);
+            }
             if let Some(skills) = nx.child_by_name(meta, "skill")? {
                 let mut book = BookInfo {
                     master_level: nx.int_child(meta, "masterLevel")?.unwrap_or(0),
@@ -242,6 +252,12 @@ impl ItemData {
             }
         }
         if let Some(spec) = nx.child_by_name(node, "spec")? {
+            let mut pets = Vec::new();
+            if item_id / 10_000 == 524 {
+                while let Some(pet) = nx.int_child(spec, &pets.len().to_string())? {
+                    pets.push(pet);
+                }
+            }
             info.spec = Some(ConsumeSpec {
                 hp: nx.int_child(spec, "hp")?.unwrap_or(0),
                 mp: nx.int_child(spec, "mp")?.unwrap_or(0),
@@ -264,6 +280,8 @@ impl ItemData {
                         Err(error) => Some(Err(error)),
                     })
                     .collect::<Result<_, _>>()?,
+                inc: nx.int_child(spec, "inc")?.unwrap_or(0),
+                pets,
             });
         }
         if let Some(interact) = nx.child_by_name(node, "interact")? {
@@ -349,6 +367,7 @@ impl ItemData {
             scroll: None,
             equip: Some(equip),
             pet_commands: Vec::new(),
+            pet_hunger: 0,
         }))
     }
 }
@@ -491,6 +510,12 @@ mod tests {
         };
         let tiger = data.info(5000066).unwrap().unwrap();
         assert_eq!(tiger.slot_max, 1);
+        assert_eq!(tiger.pet_hunger, 3);
+        assert_eq!(data.info(5000000).unwrap().unwrap().pet_hunger, 2);
+        let food = data.info(2120000).unwrap().unwrap().spec.unwrap();
+        assert_eq!(food.inc, 30);
+        let drumstick = data.info(5240027).unwrap().unwrap().spec.unwrap();
+        assert_eq!((drumstick.inc, drumstick.pets), (100, vec![5000066]));
         assert_eq!(tiger.pet_commands.len(), 36);
         assert_eq!(
             tiger.pet_commands[28],

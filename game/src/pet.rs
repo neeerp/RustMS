@@ -19,6 +19,9 @@ const CLOSENESS: [i16; 30] = [
 
 pub const MAX_CLOSENESS: i16 = 30000;
 
+/// A pet this full won't eat, and loses closeness for being fed.
+pub const MAX_FULLNESS: u8 = 100;
+
 /// What a pet item carries besides the item itself (v83 GW_ItemSlotPet).
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct PetData {
@@ -46,8 +49,9 @@ impl PetData {
 }
 
 impl PetData {
-    /// Add `amount` closeness, up to the most a pet can have, and raise its
-    /// level to match. True if the level rose.
+    /// Add `amount` closeness, which may be negative, keeping it between
+    /// none and the most a pet can have, and move its level to match. True
+    /// if the level rose.
     pub fn add_closeness(&mut self, amount: i16) -> bool {
         let before = self.level;
         self.closeness = self
@@ -60,8 +64,59 @@ impl PetData {
             }
             self.level += 1;
         }
+        while self.level > 1 && self.closeness < CLOSENESS[usize::from(self.level) - 1] {
+            self.level -= 1;
+        }
         self.level > before
     }
+
+    /// Feed the pet food worth `fullness` (Cosmic's PetFoodHandler). A pet
+    /// that isn't full eats it, and grows closer if it was hungry (75 or
+    /// less); a full one loses a point of closeness.
+    pub fn feed(&mut self, fullness: i32) -> Fed {
+        if self.fullness >= MAX_FULLNESS {
+            self.add_closeness(-1);
+            return Fed {
+                enjoyed: false,
+                levelled: false,
+            };
+        }
+        let hungry = self.fullness <= 75;
+        let fed = i32::from(self.fullness) + fullness.max(0);
+        self.fullness = fed.min(i32::from(MAX_FULLNESS)) as u8;
+        Fed {
+            enjoyed: true,
+            levelled: hungry && self.add_closeness(1),
+        }
+    }
+
+    /// Feed the pet a cash food (524xxxx) worth `closeness` (Cosmic's
+    /// UseCashItemHandler): full or not, it eats, fills up and grows closer.
+    /// True if its level rose.
+    pub fn feed_cash(&mut self, closeness: i16) -> bool {
+        self.fullness = MAX_FULLNESS;
+        self.add_closeness(closeness)
+    }
+
+    /// The pet grows `hunger` hungrier. True if that left it at 5 or less:
+    /// it goes home, and comes back at 15.
+    pub fn grow_hungry(&mut self, hunger: i32) -> bool {
+        let left = i32::from(self.fullness) - hunger.max(0);
+        if left <= 5 {
+            self.fullness = 15;
+            return true;
+        }
+        self.fullness = left as u8;
+        false
+    }
+}
+
+/// What feeding a pet did.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Fed {
+    /// It ate; a full pet refuses.
+    pub enjoyed: bool,
+    pub levelled: bool,
 }
 
 /// One of the commands a pet knows (`Item.nx Pet/<id>.img/interact/<n>`).
@@ -197,6 +252,69 @@ mod tests {
         assert_eq!((pet.level, pet.closeness), (30, MAX_CLOSENESS));
         assert!(!pet.add_closeness(3));
         assert_eq!((pet.level, pet.closeness), (30, MAX_CLOSENESS));
+    }
+
+    #[test]
+    fn losing_closeness_lowers_the_level() {
+        let mut pet = PetData::new("Baby Tiger");
+        pet.add_closeness(14);
+        assert_eq!(pet.level, 5);
+        assert!(!pet.add_closeness(-1));
+        assert_eq!((pet.level, pet.closeness), (4, 13));
+        pet.add_closeness(-20);
+        assert_eq!((pet.level, pet.closeness), (1, 0));
+    }
+
+    #[test]
+    fn a_hungry_pet_eats_and_grows_closer() {
+        let mut pet = PetData::new("Baby Tiger");
+        pet.fullness = 75;
+        let fed = pet.feed(30);
+        assert_eq!(
+            fed,
+            Fed {
+                enjoyed: true,
+                levelled: true
+            }
+        );
+        assert_eq!((pet.fullness, pet.closeness, pet.level), (100, 1, 2));
+    }
+
+    #[test]
+    fn a_pet_that_isnt_hungry_just_eats() {
+        let mut pet = PetData::new("Baby Tiger");
+        pet.fullness = 76;
+        assert!(pet.feed(30).enjoyed);
+        assert_eq!((pet.fullness, pet.closeness), (100, 0));
+    }
+
+    #[test]
+    fn a_full_pet_refuses_and_grows_distant() {
+        let mut pet = PetData::new("Baby Tiger");
+        pet.add_closeness(1);
+        let fed = pet.feed(30);
+        assert!(!fed.enjoyed && !fed.levelled);
+        assert_eq!((pet.fullness, pet.closeness, pet.level), (100, 0, 1));
+    }
+
+    #[test]
+    fn cash_food_fills_a_pet_full_or_not() {
+        let mut pet = PetData::new("Baby Tiger");
+        assert!(pet.feed_cash(100));
+        assert_eq!((pet.fullness, pet.closeness, pet.level), (100, 100, 7));
+        pet.fullness = 20;
+        assert!(!pet.feed_cash(1));
+        assert_eq!((pet.fullness, pet.closeness), (100, 101));
+    }
+
+    #[test]
+    fn a_starving_pet_goes_home() {
+        let mut pet = PetData::new("Baby Tiger");
+        pet.fullness = 9;
+        assert!(!pet.grow_hungry(3));
+        assert_eq!(pet.fullness, 6);
+        assert!(pet.grow_hungry(3));
+        assert_eq!(pet.fullness, 15);
     }
 
     #[test]

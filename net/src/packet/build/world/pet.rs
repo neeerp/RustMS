@@ -118,6 +118,39 @@ pub fn build_pet_command(
     Ok(p)
 }
 
+/// PET_COMMAND (174) mode 1: whether the pet at `index` enjoyed its food.
+/// As with commands, its owner's client picks the reaction and sends it
+/// back as PET_CHAT.
+pub fn build_pet_food(owner_id: i32, index: u8, enjoyed: bool) -> Result<Packet, NetworkError> {
+    let mut p = Packet::new_empty();
+    p.write_short(SendOpcode::PetCommand as i16)?;
+    p.write_int(owner_id)?;
+    p.write_byte(index)?;
+    p.write_byte(1)?;
+    p.write_byte(u8::from(enjoyed))?;
+    p.write_byte(0)?;
+    Ok(p)
+}
+
+/// CASH_PET_FOOD_RESULT (76, FUN_00a29049): the pet at `index` ate a cash
+/// food, and its owner's client plays its eating sound. `None` shows "Your
+/// pet cannot consume this food. Please check again." Neither unlocks the
+/// client.
+pub fn build_cash_pet_food(index: Option<u8>) -> Result<Packet, NetworkError> {
+    let mut p = Packet::new_empty();
+    p.write_short(SendOpcode::CashPetFoodResult as i16)?;
+    match index {
+        Some(index) => {
+            p.write_byte(0)?;
+            p.write_byte(index)?;
+        }
+        None => {
+            p.write_byte(1)?;
+        }
+    }
+    Ok(p)
+}
+
 /// User effect 4 (FUN_009377d9): the pet at `index` levelled up, on its
 /// owner (`None`) or another player.
 pub fn build_pet_level_up(owner_id: Option<i32>, index: u8) -> Result<Packet, NetworkError> {

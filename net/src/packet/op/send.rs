@@ -25,6 +25,7 @@ pub enum SendOpcode {
     SkillBookResult = 0x33,
     GatherItemResult = 0x34,
     SortItemResult = 0x35,
+    CashPetFoodResult = 0x4C,
 
     PartyOperation = 0x3E,
     SpawnPortal = 0x43,

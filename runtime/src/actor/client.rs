@@ -33,6 +33,7 @@ use net::login_world::resolve_login_channel;
 use net::packet::build;
 use net::packet::build::world::field::parse_movement_state;
 use net::packet::build::world::messaging::{build_find_result, FindLocation};
+use net::packet::build::world::pet::PetGone;
 use net::packet::op::RecvOpcode;
 use net::quests::QuestRequest;
 use net::{ClientId, SpawnPosition, WorldAction, WorldContext, WorldRoute};
@@ -185,6 +186,9 @@ impl ClientActor {
         let mut autosave = interval(AUTOSAVE_INTERVAL);
         autosave.set_missed_tick_behavior(MissedTickBehavior::Delay);
         autosave.reset();
+        let mut hunger = interval(pets::PET_HUNGER_INTERVAL);
+        hunger.set_missed_tick_behavior(MissedTickBehavior::Delay);
+        hunger.reset();
         let kill = self.kill.clone();
 
         let outcome = loop {
@@ -199,6 +203,7 @@ impl ClientActor {
                 },
                 Some(message) = self.rx.recv() => self.handle_server_message(message).await,
                 _ = autosave.tick() => self.save_if_dirty().await,
+                _ = hunger.tick() => self.pets_grow_hungry().await,
                 _ = sleep_until(buffs_due.unwrap_or_else(Instant::now)), if buffs_due.is_some() => {
                     self.update_buffs().await
                 }
@@ -383,7 +388,9 @@ impl ClientActor {
                 .await?
             }
             WorldAction::BuffsChanged(announce) => self.show_buffs(announce).await?,
-            WorldAction::PetsChanged(changes) => self.pets_changed(changes).await?,
+            WorldAction::PetsChanged(changes) => {
+                self.pets_changed(changes, PetGone::Dismissed).await?
+            }
             WorldAction::Whisper(delivery) => {
                 self.send_to_directory(DirectoryMessage::Whisper {
                     from: self.client_id,

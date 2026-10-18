@@ -1,10 +1,11 @@
 //! Pets: a Baby Tiger bought in the Cash Shop comes out of the Cash
 //! Inventory named after its kind. Summoned, it follows its owner and the
-//! map sees it come, move, obey, speak and go back; it is out again after a
-//! relog, and a player arriving later sees it beside its owner.
+//! map sees it come, move, obey, speak and go back; it eats food and cash
+//! food; it is out again after a relog, and a player arriving later sees it
+//! beside its owner.
 
 use integration_harness::connection::MapleTestConnection;
-use integration_harness::database::set_nx_credit;
+use integration_harness::database::{grant_stack, set_nx_credit, set_pet_fullness};
 use integration_harness::packets::{
     build_cash_shop_buy_package, build_cash_shop_take_out, build_enter_cash_shop,
 };
@@ -23,6 +24,11 @@ const BABY_TIGER: i32 = 5_000_066;
 /// Ellinia, which no other test visits.
 const ELLINIA: i32 = 101_000_000;
 const CASH: u8 = 5;
+const USE: u8 = 2;
+const PET_FOOD: i32 = 2_120_000;
+/// Cash food for the Baby Tiger alone, and food for monkeys.
+const GOLDEN_DRUMSTICK: i32 = 5_240_027;
+const MONKEY_BANANA: i32 = 5_240_000;
 
 /// Read until a packet with `op`, and return its body.
 async fn next(c: &mut MapleTestConnection, t: &mut Trace, op: SendOpcode) -> Vec<u8> {
@@ -68,6 +74,26 @@ fn pet_command(serial: i64, command: u8) -> Packet {
     p.write_long(serial).unwrap();
     p.write_byte(1).unwrap(); // began with its name
     p.write_byte(command).unwrap();
+    p
+}
+
+/// PET_FOOD: feed the food in USE `slot`.
+fn pet_food(slot: i16) -> Packet {
+    let mut p = Packet::new_empty();
+    p.write_short(RecvOpcode::PetFood as i16).unwrap();
+    p.write_int(0).unwrap(); // time
+    p.write_short(slot).unwrap();
+    p.write_int(PET_FOOD).unwrap();
+    p
+}
+
+/// USE_CASH_ITEM: the cash food `item_id` in Cash `slot`.
+fn cash_food(slot: i16, item_id: i32) -> Packet {
+    let mut p = Packet::new_empty();
+    p.write_short(RecvOpcode::UseCashItem as i16).unwrap();
+    p.write_short(slot).unwrap();
+    p.write_int(item_id).unwrap();
+    p.write_int(0).unwrap(); // time
     p
 }
 
@@ -125,9 +151,19 @@ async fn a_pet_comes_out_follows_its_owner_and_stays_out() {
     assert_eq!(r.read_byte().unwrap(), 1, "level 1");
     assert_eq!(r.read_short().unwrap(), 0, "no closeness yet");
     assert_eq!(r.read_byte().unwrap(), 100, "full");
-    // Leaving the Cash Shop moves channels; a relog does as well.
+    // Leaving the Cash Shop moves channels; a relog does as well. Offline,
+    // the owner gets food and the tiger grows hungry.
     drop(shopper);
     tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+    grant_stack(owner_id, USE.into(), 1, PET_FOOD, 2)
+        .await
+        .expect("grant pet food");
+    for (slot, food) in [(2, GOLDEN_DRUMSTICK), (3, MONKEY_BANANA)] {
+        grant_stack(owner_id, CASH.into(), slot, food, 2)
+            .await
+            .expect("grant cash pet food");
+    }
+    set_pet_fullness(cash_id, 60).await.expect("a hungry tiger");
     let mut owner = relogin(&config).await;
     let (o, mut ot) = (&mut owner.connection, Trace::default());
 
@@ -208,6 +244,51 @@ async fn a_pet_comes_out_follows_its_owner_and_stays_out() {
     assert_eq!(r.read_bytes(3).unwrap(), [0, 0, 12], "pet 0, kind, action");
     assert_eq!(r.read_str_with_length().unwrap(), "Ahh");
     assert_eq!(r.read_byte().unwrap(), 1, "its own balloon");
+
+    // Fed, the hungry tiger eats and grows closer: one food goes, and the
+    // tiger's item comes back fuller, unlocking the owner's client.
+    send(o, pet_food(1)).await;
+    let answer = next(o, &mut ot, SendOpcode::PetCommand).await;
+    assert_eq!(answer[..4], owner_id.to_le_bytes());
+    assert_eq!(answer[4..], [0, 1, 1, 0], "pet 0 enjoyed its food");
+    let update = next(o, &mut ot, SendOpcode::InventoryOperation).await;
+    let mut r = Cursor::new(&update[..]);
+    assert_eq!(r.read_bytes(2).unwrap(), [1, 3], "a reply; three changes");
+    assert_eq!(r.read_bytes(2).unwrap(), [1, USE], "one food fewer");
+    assert_eq!((r.read_short().unwrap(), r.read_short().unwrap()), (1, 1));
+    assert_eq!(r.read_bytes(2).unwrap(), [3, CASH]);
+    assert_eq!(r.read_short().unwrap(), 1);
+    assert_eq!(r.read_bytes(2).unwrap(), [0, CASH]);
+    assert_eq!(r.read_short().unwrap(), 1);
+    r.read_bytes(1 + 4 + 1 + 8 + 8 + 13).unwrap();
+    assert_eq!(r.read_byte().unwrap(), 3, "still level 3");
+    assert_eq!(r.read_short().unwrap(), 4, "closeness 4");
+    assert_eq!(r.read_byte().unwrap(), 90, "fullness 90");
+
+    // Its own cash food fills it up and brings it 100 closer: 76 names the
+    // pet that ate, then the answer and the update as for PET_FOOD.
+    send(o, cash_food(2, GOLDEN_DRUMSTICK)).await;
+    let ate = next(o, &mut ot, SendOpcode::CashPetFoodResult).await;
+    assert_eq!(ate, [0, 0], "pet 0 ate");
+    let answer = next(o, &mut ot, SendOpcode::PetCommand).await;
+    assert_eq!(answer[4..], [0, 1, 1, 0], "and enjoyed it");
+    let update = next(o, &mut ot, SendOpcode::InventoryOperation).await;
+    let mut r = Cursor::new(&update[..]);
+    assert_eq!(r.read_bytes(2).unwrap(), [1, 3], "a reply; three changes");
+    assert_eq!(r.read_bytes(2).unwrap(), [1, CASH], "one drumstick fewer");
+    assert_eq!((r.read_short().unwrap(), r.read_short().unwrap()), (2, 1));
+    r.read_bytes(2 + 2 + 2 + 2 + 1 + 4 + 1 + 8 + 8 + 13)
+        .unwrap();
+    assert_eq!(r.read_byte().unwrap(), 7, "level 7");
+    assert_eq!(r.read_short().unwrap(), 104, "closeness 104");
+    assert_eq!(r.read_byte().unwrap(), 100, "full");
+    let effect = next(o, &mut ot, SendOpcode::ShowItemGainInChat).await;
+    assert_eq!(effect, [4, 0, 0], "its level up");
+    // A food for other pets is refused, and the client unlocked.
+    send(o, cash_food(3, MONKEY_BANANA)).await;
+    let ate = next(o, &mut ot, SendOpcode::CashPetFoodResult).await;
+    assert_eq!(ate, [1], "no pet out eats it");
+    next(o, &mut ot, SendOpcode::StatChange).await;
 
     // Summoned again, it goes back.
     send(o, spawn_pet(1)).await;
