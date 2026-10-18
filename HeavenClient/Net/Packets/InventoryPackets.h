@@ -145,6 +145,54 @@ namespace ms
 		}
 	};
 
+	// Uses the teleport rock (504xxxx) in Cash slot `slot` to go to a
+	// character, or to a kept map (FUN_00a0a4aa).
+	// Opcode: USE_CASH_ITEM(79)
+	class UseTeleportRockPacket : public OutPacket
+	{
+	public:
+		UseTeleportRockPacket(int16_t slot, int32_t itemid, const std::string &name)
+				: OutPacket(OutPacket::Opcode::USE_CASH_ITEM)
+		{
+			write_short(slot);
+			write_int(itemid);
+			write_byte(1);
+			write_string(name);
+			write_time();
+		}
+
+		UseTeleportRockPacket(int16_t slot, int32_t itemid, int32_t mapid) : OutPacket(OutPacket::Opcode::USE_CASH_ITEM)
+		{
+			write_short(slot);
+			write_int(itemid);
+			write_byte(0);
+			write_int(mapid);
+			write_time();
+		}
+	};
+
+	// Keeps the player's map for a teleport rock, or drops a kept one
+	// (FUN_00a261bc). The server answers with the list.
+	// Opcode: TELEPORT_ROCK_LIST(102)
+	class TeleportRockListPacket : public OutPacket
+	{
+	public:
+		// Keeps the map the player is on.
+		TeleportRockListPacket(bool vip) : OutPacket(OutPacket::Opcode::TELEPORT_ROCK_LIST)
+		{
+			write_byte(1);
+			write_byte(vip);
+		}
+
+		// Drops `mapid`.
+		TeleportRockListPacket(bool vip, int32_t mapid) : OutPacket(OutPacket::Opcode::TELEPORT_ROCK_LIST)
+		{
+			write_byte(0);
+			write_byte(vip);
+			write_int(mapid);
+		}
+	};
+
 	// Requests reading a skill or mastery book (v83 FUN_00a0a1b2)
 	// Opcode: USE_SKILL_BOOK(82)
 	class SkillBookPacket : public OutPacket

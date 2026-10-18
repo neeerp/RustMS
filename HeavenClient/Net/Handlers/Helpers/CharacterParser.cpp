@@ -197,11 +197,15 @@ namespace ms
 
 	void CharacterParser::parse_teleportrock(InPacket& recv, TeleportRock& teleportrock)
 	{
-		for (size_t i = 0; i < 5; i++)
-			teleportrock.addlocation(recv.read_int());
+		for (bool vip : { false, true })
+		{
+			std::vector<int32_t> maps;
 
-		for (size_t i = 0; i < 10; i++)
-			teleportrock.addviplocation(recv.read_int());
+			for (size_t i = 0; i < TeleportRock::slots(vip); i++)
+				maps.push_back(recv.read_int());
+
+			teleportrock.set_maps(vip, maps);
+		}
 	}
 
 	void CharacterParser::parse_nyinfo(InPacket& recv)

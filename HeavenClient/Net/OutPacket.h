@@ -120,6 +120,7 @@ namespace ms
 
 			/// Gameplay 2
 			CHANGE_MAP_SPECIAL = 100,
+			TELEPORT_ROCK_LIST = 102,
 			QUEST_ACTION = 107,
 			THROW_GRENADE = 109,
 			PARTY_OPERATION = 124,

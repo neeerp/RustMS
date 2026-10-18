@@ -50,6 +50,8 @@
 #include "../Net/Packets/MiniRoomPackets.h"
 #include "../Net/Packets/PlayerInteractionPackets.h"
 
+#include <algorithm>
+
 namespace ms
 {
 	namespace
@@ -234,7 +236,7 @@ namespace ms
 	void UIStateGame::rightclick(Point<int16_t> pos)
 	{
 		// A window holding the mouse, such as the menu, hears it alone.
-		if (UIElement *focusedelement = get(focused); focusedelement && focusedelement->is_active())
+		if (UIElement *focusedelement = get_focused())
 			focusedelement->rightclick(pos);
 		else if (UIElement *front = get_front(pos))
 			front->rightclick(pos);
@@ -249,9 +251,8 @@ namespace ms
 
 	void UIStateGame::send_key(KeyType::Id type, int32_t action, bool pressed, bool escape)
 	{
-		dispatch_focused_key(get(focused), action, pressed, escape, [&]
+		dispatch_focused_key(get_focused(), action, pressed, escape, [&]
 		{
-			focused = UIElement::NONE;
 			switch (type)
 			{
 				case KeyType::Id::MENU:
@@ -443,10 +444,7 @@ namespace ms
 
 			// A focused window that has closed lets go of the cursor, which
 			// then reaches whatever is under it.
-			if (auto focusedelement = get(focused); focusedelement && !focusedelement->is_active())
-				focused = UIElement::Type::NONE;
-
-			if (auto focusedelement = get(focused))
+			if (auto focusedelement = get_focused())
 			{
 				remove_cursor(focusedelement->get_type());
 
@@ -692,7 +690,12 @@ namespace ms
 			elementorder.push_back(type);
 
 			if (is_focused)
+			{
+				if (get_focused() && focused != type)
+					focus_below.push_back(focused);
+
 				focused = type;
+			}
 
 			return elements.find(type);
 		}
@@ -722,9 +725,33 @@ namespace ms
 
 	bool UIStateGame::modal_open() const
 	{
-		const UIElement::UPtr& element = elements[focused];
+		auto open = [this](UIElement::Type type)
+		{
+			const UIElement::UPtr &element = elements[type];
 
-		return focused != UIElement::Type::NONE && element && element->is_active();
+			return type != UIElement::Type::NONE && element && element->is_active();
+		};
+
+		return open(focused) || std::any_of(focus_below.begin(), focus_below.end(), open);
+	}
+
+	UIElement *UIStateGame::get_focused()
+	{
+		while (true)
+		{
+			if (UIElement *element = get(focused); element && element->is_active())
+				return element;
+
+			if (focus_below.empty())
+			{
+				focused = UIElement::Type::NONE;
+
+				return nullptr;
+			}
+
+			focused = focus_below.back();
+			focus_below.pop_back();
+		}
 	}
 
 	UIElement *UIStateGame::get_front(std::list<UIElement::Type> types)

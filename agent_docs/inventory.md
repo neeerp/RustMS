@@ -265,6 +265,22 @@ players elsewhere on login (`forcedReturn`) but on Maple Island, as Cosmic
 does. Otherwise one exclusive INVENTORY_OPERATION takes one rock and the
 user is warped.
 
+HeavenClient reads both lists from the character data
+(`Character/TeleportRock`) and keeps them from MAP_TRANSFER_RESULT 2 and 3.
+Double-clicking a rock in the Cash tab opens `UITeleportRock`
+(`UIWindow.img/Teleport`), centred and modal, unless a request is still
+waiting ("Other requests are in process.", which the chalkboard checks too)
+or the map's `fieldLimit` has `0x40` or `0x2` ("You cannot teleport to this
+map."). It lists the kept maps by name (a map with `info/link` under the
+linked map's), five at a time with a scroll bar on the VIP rock, and counts
+them as `[used/size]`. ADD MAP asks before sending TROCK_ADD_MAP for the
+current map, unless the list is full, already has it, or the map can't be
+kept; DEL. MAP asks before dropping the selected map. MOVE asks before using
+the rock on the selected map, or uses it at once on the typed name once the
+name is valid and isn't the player's own. Enter is MOVE and Escape closes
+the window, which closes before the rock is used. A refused rock shows the
+result as a notice, naming the character for result 6.
+
 ## NPC shops
 
 Clicking an NPC that keeps a shop (`content::shops()`, from the pack's
@@ -526,7 +542,8 @@ to another map and back, closes it, and has a Free Market room put it away.
 keeping and dropping maps, each refusal, the trips by map and to a character,
 and the rock used; `teleport_rocks` (integration) keeps Henesys, rocks back to
 it, is refused the same map and a missing name, rocks to a watcher, and rocks
-to Henesys again after a relog.
+to Henesys again after a relog. The client's `teleport_rock` test covers the
+lists, the checks on the current map and a typed name, and the refusals.
 `net::storage` covers each request and its refusals. `storage` (integration)
 opens Mr. Lee's storage, stores part of a stack and a whole one for the fee,
 is refused too many and too many mesos, moves mesos in, sorts, takes items

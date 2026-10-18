@@ -20,6 +20,7 @@
 #include "UIChatBar.h"
 #include "UINotice.h"
 #include "UIPersonalShop.h"
+#include "UITeleportRock.h"
 #include "UITradingRoom.h"
 
 #include "../Messages.h"
@@ -74,6 +75,8 @@ namespace ms
 		// v83's notices 0x10a and 0x42 (FUN_004f5697).
 		constexpr const char *CATCH_BREATH = "You can't do it right now.\\nCatch your breath and then try again.";
 		constexpr const char *DEAD = "You can't do it once you're dead.";
+		// StringPool 0x129.
+		constexpr const char *REQUEST_BUSY = "Other requests are in process.\\nPlease try again in a little bit.";
 		// StringPool 0x180 and 0x181.
 		constexpr const char *TOO_MANY_PETS = "You have exceeded the maximum number\\n of pets that can accompany you.\\nPlease try again after \\nyou change the living pet back into a doll.";
 		// StringPool 0xed8.
@@ -207,11 +210,24 @@ namespace ms
 				});
 		}
 
+		// v83 FUN_00a0a63f waits for the last request before a cash item
+		// opens its window, and again before it is used, saying so.
+		bool may_use_cash_item()
+		{
+			if (Stage::get().get_player().can_request(ExclRequest::WAIT))
+				return true;
+
+			UI::get().emplace<UIOk>(REQUEST_BUSY, [](bool)
+			{});
+
+			return false;
+		}
+
 		// v83 FUN_00a0a63f, type 0x20: a chalkboard asks for a note, which
 		// goes up once the server sends it back. A blank note isn't sent.
 		void use_chalkboard(int16_t slot, int32_t item_id)
 		{
-			if (!Stage::get().get_player().can_request(ExclRequest::WAIT))
+			if (!may_use_cash_item())
 				return;
 
 			auto shop = UI::get().get_element<UIPersonalShop>();
@@ -229,10 +245,45 @@ namespace ms
 			{
 				UI::get().emplace<UIEnterText>("Enter a note.", [=](const std::string &text)
 				{
-					if (!Chalkboard::trim(text).empty())
+					if (!Chalkboard::trim(text).empty() && may_use_cash_item())
 						Stage::get().get_player().request(UseCashItemPacket(slot, item_id, text), ExclRequest::WAIT);
 				}, Chalkboard::MAX_TEXT);
 			}
+		}
+
+		// v83 FUN_00a0a4aa: a teleport rock goes to the map or the
+		// character chosen in its list. Maps that don't allow teleports
+		// refuse it before the list opens.
+		void use_teleport_rock(int16_t slot, int32_t item_id)
+		{
+			if (!may_use_cash_item())
+				return;
+
+			if (Stage::get().get_mapinfo().get_fieldlimit() & (0x40 | 0x2))
+			{
+				UI::get().emplace<UIOk>("You cannot teleport to this map.", [](bool)
+				{});
+				return;
+			}
+
+			UI::get().emplace<UITeleportRock>(TeleportRock::is_vip(item_id), [slot, item_id](const std::string &name, int32_t map_id)
+			{
+				Player &player = Stage::get().get_player();
+				player.get_teleport_rock().set_target(name);
+
+				if (name.empty() && (map_id == TeleportRock::EMPTY || map_id == 0))
+					return;
+
+				if (!may_use_cash_item())
+					return;
+
+				bool sent = name.empty()
+						? player.request(UseTeleportRockPacket(slot, item_id, map_id), ExclRequest::WAIT)
+						: player.request(UseTeleportRockPacket(slot, item_id, name), ExclRequest::WAIT);
+
+				if (sent)
+					Sound(nl::nx::sound["Game.img"]["UseShopItem"]).play();
+			});
 		}
 
 		// v83 FUN_00a0900a: a map may keep items off the ground, which it
@@ -561,6 +612,8 @@ namespace ms
 							name_pet(slot, item_id);
 						else if (item_id / 10000 == 537)
 							use_chalkboard(slot, item_id);
+						else if (item_id / 10000 == 504)
+							use_teleport_rock(slot, item_id);
 
 						break;
 				}

@@ -349,6 +349,7 @@ namespace ms
 					types.emplace_back(UIElement::Type::PERSONALSHOP);
 					types.emplace_back(UIElement::Type::SHOPSELL);
 					types.emplace_back(UIElement::Type::SHOPSALES);
+					types.emplace_back(UIElement::Type::TELEPORTROCK);
 				}
 				else if (enter)
 				{
@@ -358,6 +359,7 @@ namespace ms
 					// Game
 					types.emplace_back(UIElement::Type::NOTICE);
 					types.emplace_back(UIElement::Type::ENTERNUMBER);
+					types.emplace_back(UIElement::Type::TELEPORTROCK);
 				} else if (tab)
 				{
 					// Game

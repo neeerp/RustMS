@@ -70,6 +70,7 @@ namespace ms
 		UPDATE_SKILL = 36,
 		SKILL_USE_RESULT = 37,
 		FAME_RESPONSE = 38,
+		MAP_TRANSFER_RESULT = 42,
 		SKILL_LEARN_ITEM_RESULT = 51,
 
 		/// Messaging 1
@@ -318,6 +319,7 @@ namespace ms
 		emplace<INVENTORY_GROW, InventoryGrowHandler>();
 		emplace<GATHER_RESULT, GatherResultHandler>();
 		emplace<SORT_RESULT, SortResultHandler>();
+		emplace<MAP_TRANSFER_RESULT, MapTransferResultHandler>();
 
 		// NPC Interaction Handlers
 		emplace<NPC_DIALOGUE, NpcDialogueHandler>();

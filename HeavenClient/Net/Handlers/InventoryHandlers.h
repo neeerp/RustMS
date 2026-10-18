@@ -40,6 +40,14 @@ namespace ms
 		void handle(InPacket& recv) const override;
 	};
 
+	// What came of keeping a map for a teleport rock or using one (v83
+	// FUN_00a25268): the new list, shown in the open window, or a notice
+	// for a refusal.
+	class MapTransferResultHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
 	// Handler for a packet which modifies the player's inventory.
 	class ModifyInventoryHandler : public PacketHandler
 	{

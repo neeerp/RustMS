@@ -85,6 +85,7 @@ namespace ms
 			SHOPSELL,
 			SHOPSALES,
 			CONTEXTMENU,
+			TELEPORTROCK,
 			NUM_TYPES
 		};
 
