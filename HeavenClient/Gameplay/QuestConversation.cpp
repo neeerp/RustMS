@@ -261,34 +261,25 @@ namespace ms
 
 		void talk_to_npc(int32_t npc_id, int32_t object_id)
 		{
-			// Same order as the original list: turn-ins, open quests, new quests.
-			std::vector<int16_t> turn_in, in_progress, available;
+			QuestMenu menu = select_quest_menu(npc_id, QuestCatalog::get().quests(),
+				[](int16_t id) { return state(id); }, can_start,
+				[npc_id](const QuestInfo& quest) { return completion_stop(quest, npc_id) == QuestStop::NONE; });
 
-			for (const auto& quest : QuestCatalog::get().quests())
-			{
-				int16_t current = state(quest.id);
-
-				if (current == 1 && quest.end_npc == npc_id)
-					turn_in.push_back(quest.id);
-				else if (current == 1 && quest.start_npc == npc_id)
-					in_progress.push_back(quest.id);
-				else if (current == 0 && quest.start_npc == npc_id && can_start(quest))
-					available.push_back(quest.id);
-			}
-
-			if (turn_in.empty() && in_progress.empty() && available.empty())
+			if (menu.empty())
 			{
 				TalkToNPCPacket(object_id).dispatch();
 				return;
 			}
 
-			// UtilDlgEx/list3 "QUEST THAT CAN BE COMPLETED", list0 "QUEST IN
-			// PROGRESS", list1 "QUEST AVAILABLE", list2 "ETC" (normal speech,
-			// worded as in period footage).
+			// In v83's order (FUN_006d3392), under UtilDlgEx/list3 "QUEST THAT
+			// CAN BE COMPLETED", list1 "QUEST AVAILABLE", list0 "QUEST IN
+			// PROGRESS" and list2 "ETC" (normal speech, worded as in period
+			// footage).
 			std::string text;
 			std::map<int32_t, Texture> headers;
 
-			for (auto [group, header] : { std::pair<const std::vector<int16_t>*, int>{ &turn_in, 3 }, { &in_progress, 0 }, { &available, 1 } })
+			for (auto [group, header] : { std::pair<const std::vector<int16_t>*, int>{ &menu.completable, 3 },
+					{ &menu.available, 1 }, { &menu.in_progress, 0 } })
 			{
 				for (size_t i = 0; i < group->size(); i++)
 				{
@@ -297,14 +288,14 @@ namespace ms
 					if (i == 0)
 						headers[id] = list_header(header);
 
-					text += " #L" + std::to_string(id) + "# " + QuestCatalog::get().find(id)->name + "#l";
+					text += quest_menu_line(id, *QuestCatalog::get().find(id), header != 1, header == 3);
 				}
 			}
 
 			if (has_speech(npc_id))
 			{
 				headers[TALK_CHOICE] = list_header(2);
-				text += " #L" + std::to_string(TALK_CHOICE) + "# I have something to tell you.#l";
+				text += "#d#L" + std::to_string(TALK_CHOICE) + "# I have something to tell you.#l#k\r\n";
 			}
 
 			active.reset();

@@ -140,4 +140,61 @@ namespace ms
 
 		return in_progress ? QuestMarker::IN_PROGRESS : QuestMarker::NONE;
 	}
+
+	// The quests an NPC lists when clicked, in v83's groups (FUN_006d1779):
+	// started quests it can complete now, quests it can start, and its other
+	// started quests. Party quests (1200-1399) are left out.
+	struct QuestMenu
+	{
+		std::vector<int16_t> completable;
+		std::vector<int16_t> available;
+		std::vector<int16_t> in_progress;
+
+		bool empty() const
+		{
+			return completable.empty() && available.empty() && in_progress.empty();
+		}
+	};
+
+	// `can_start` checks Check.img/<id>/0, `can_complete` Check.img/<id>/1
+	// with this NPC.
+	template<class Status, class CanStart, class CanComplete>
+	QuestMenu select_quest_menu(int32_t npc_id, const std::vector<QuestInfo>& quests, Status status,
+		CanStart can_start, CanComplete can_complete)
+	{
+		QuestMenu menu;
+
+		for (const auto& quest : quests)
+		{
+			if (quest.start_npc != npc_id && quest.end_npc != npc_id)
+				continue;
+
+			if (quest.id >= 1200 && quest.id < 1400)
+				continue;
+
+			int16_t state = status(quest.id);
+
+			if (state == 1)
+				(can_complete(quest) ? menu.completable : menu.in_progress).push_back(quest.id);
+			else if (state == 0 && quest.start_npc == npc_id && can_start(quest))
+				menu.available.push_back(quest.id);
+		}
+
+		return menu;
+	}
+
+	// A quest's line in that menu (FUN_00724bac): its type in bold red, its
+	// name, and for started quests whether it can be completed.
+	inline std::string quest_menu_line(int32_t choice, const QuestInfo& quest, bool started, bool completable)
+	{
+		std::string label = quest.name;
+
+		if (started)
+			label += completable ? " (Pre-completion enabled)" : " (In Progress)";
+
+		if (!quest.type.empty())
+			label = "#r#e" + quest.type + "#d#n" + label;
+
+		return "#d#L" + std::to_string(choice) + "# " + label + "#l#k\r\n";
+	}
 }

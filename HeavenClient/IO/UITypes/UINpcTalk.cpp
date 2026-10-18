@@ -687,10 +687,13 @@ namespace ms
 				while (link != std::string::npos && indent < link && formatted_text[link - indent - 1] == ' ')
 					indent++;
 
+				// A label starts in the colour before it.
+				std::string colour = NpcTextMarkup::colour_at(formatted_text, link);
 				link = formatted_text.find("#L", link + 2);
 
 				// Listed choices are drawn without their images for now.
 				label.erase(std::remove(label.begin(), label.end(), Text::BOX), label.end());
+				label = colour + label;
 				auto header = headers.find(id);
 				Choice choice { id, Point<int16_t>(static_cast<int16_t>(indent * space), 0), {},
 					Text(Text::Font::A12M, Text::Alignment::LEFT, Color::Name::DUSKBLUE, label, TEXT_WIDTH - LABEL_X) };

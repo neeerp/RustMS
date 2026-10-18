@@ -35,5 +35,8 @@ namespace ms
 		bool end_script = false;
 		QuestRewards rewards;
 		int16_t next_quest = 0;
+		// QuestInfo.img/<id>/type, such as "[Job Adv.]": shown before the
+		// name in an NPC's quest menu.
+		std::string type;
 	};
 }

@@ -47,6 +47,10 @@ int main()
 			"unclosed choices end at the next #L or the end");
 		require(choices("no menu here").empty(), "text without choices");
 		require(choices("#Lx# broken").empty(), "a non-numeric id is not a choice");
+		std::string menu = "#d#L1# Pio#l#k\r\n#d#L2# #r#e[Job Adv.]#d#nGrendel#l#k\r\n";
+		require(ms::NpcTextMarkup::colour_at(menu, menu.find("#L1")) == "#d", "a choice takes the colour before it");
+		require(ms::NpcTextMarkup::colour_at(menu, menu.find("#L2")) == "#d", "after the last one's #k");
+		require(ms::NpcTextMarkup::colour_at("#L1#bananas#l#L2#", 12) == "", "a choice's id is not a colour");
 		auto mark = [](const std::string& s, std::vector<int32_t> expected)
 		{
 			std::vector<int32_t> ids;

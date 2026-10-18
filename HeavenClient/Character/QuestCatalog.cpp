@@ -43,6 +43,7 @@ namespace ms
 			QuestInfo info;
 			info.id = id;
 			info.name = root["QuestInfo.img"][name]["name"].get_string();
+			info.type = root["QuestInfo.img"][name]["type"].get_string();
 			info.start_npc = static_cast<int32_t>(start["npc"].get_integer());
 			// A hand-in quest without a completion NPC goes back to the NPC
 			// that gave it (Pio's 1008), as on the server.
