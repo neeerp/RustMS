@@ -63,6 +63,7 @@ pub enum RecvOpcode {
     UseCashItem = 0x4F,
     CancelItemEffect = 0x49,
     UseSkillBook = 0x52,
+    UseReturnScroll = 0x55,
     UseUpgradeScroll = 0x56,
     SpendAp = 0x57,
     HealOverTime = 0x59,

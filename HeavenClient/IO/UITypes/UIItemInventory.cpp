@@ -40,6 +40,7 @@
 #include "../../Data/EquipData.h"
 #include "../../Data/PetData.h"
 #include "../../Gameplay/Stage.h"
+#include "../../Gameplay/MapleMap/FieldLimit.h"
 #include "../../Util/Chalkboard.h"
 #include "../../Util/Megaphones.h"
 #include "../../Util/NxFiles.h"
@@ -389,6 +390,48 @@ namespace ms
 			});
 		}
 
+		// v83 FUN_00a1e1ce: a return scroll (203xxxx) goes to its spec/moveTo,
+		// or to the map's return map, once the map and the area allow it.
+		void use_return_scroll(int16_t slot, int32_t item_id)
+		{
+			static const std::map<int32_t, int32_t> area_codes = []()
+			{
+				std::map<int32_t, int32_t> codes;
+
+				for (nl::node code : nl::nx::map["Map"]["AreaCode.img"])
+					codes[std::stoi(code.name())] = static_cast<int32_t>(code.get_integer());
+
+				return codes;
+			}();
+
+			Player &player = Stage::get().get_player();
+
+			if (!player.can_request(ExclRequest::WAIT))
+				return;
+
+			nl::node spec = nl::nx::item["Consume"]["0203.img"]["0" + std::to_string(item_id)]["spec"];
+			int32_t move_to = spec["moveTo"].get_integer(field_limit::NEAREST_TOWN);
+			bool ignore_continent = spec["ignoreContinent"].get_integer() != 0;
+
+			switch (field_limit::return_scroll_refusal(Stage::get().get_mapinfo().get_fieldlimit(), Stage::get().get_mapid(),
+					move_to, ignore_continent, area_codes))
+			{
+				case field_limit::ScrollRefusal::HERE:
+					UI::get().emplace<UIOk>("You can't use it here in this map.", [](bool)
+					{});
+					break;
+				case field_limit::ScrollRefusal::THERE:
+					UI::get().emplace<UIOk>("You cannot go to that place.", [](bool)
+					{});
+					break;
+				case field_limit::ScrollRefusal::NONE:
+					if (player.request(ReturnScrollPacket(slot, item_id), ExclRequest::WAIT))
+						Sound(item_id).play();
+
+					break;
+			}
+		}
+
 		// v83 FUN_00a0900a: a map may keep items off the ground, which it
 		// says only once the player has answered every question.
 		void send_drop(InventoryType::Id tab, int16_t slot, int16_t qty)
@@ -692,7 +735,9 @@ namespace ms
 
 						break;
 					case InventoryType::Id::USE:
-						if (!Stage::get().get_mapinfo().can_use_item(item_id))
+						if (item_id / 10000 == 203)
+							use_return_scroll(slot, item_id);
+						else if (!Stage::get().get_mapinfo().can_use_item(item_id))
 							InChatMessage(Messages::ITEM_FIELD).drop();
 						else if (!disease::can_use_item(Stage::get().get_player().get_diseases()))
 							break;
@@ -700,7 +745,7 @@ namespace ms
 							Stage::get().get_player().feed_pets(slot, item_id);
 						else if (item_id / 10000 == 228 || item_id / 10000 == 229)
 							Stage::get().get_player().request(SkillBookPacket(slot, item_id), ExclRequest::USE_WAIT);
-						else
+						else if (field_limit::is_use_item(item_id))
 							Stage::get().get_player().request(UseItemPacket(slot, item_id), ExclRequest::USE_WAIT);
 
 						break;

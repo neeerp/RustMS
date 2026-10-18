@@ -646,6 +646,7 @@ fn world_routes() -> &'static HashMap<i16, WorldRoute> {
             (Op::ItemMove, InGame(&world::ItemMoveHandler)),
             (Op::UseItem, InGame(&world::UseItemHandler)),
             (Op::UseSkillBook, InGame(&world::UseSkillBookHandler)),
+            (Op::UseReturnScroll, InGame(&world::ReturnScrollHandler)),
             (
                 Op::UseUpgradeScroll,
                 InGame(&world::UseUpgradeScrollHandler),
@@ -728,7 +729,7 @@ mod tests {
     fn every_registered_opcode_is_unique_per_server() {
         // The maps would silently drop duplicates; check the table sizes match.
         assert_eq!(login_routes().len(), 13);
-        assert_eq!(world_routes().len(), 70);
+        assert_eq!(world_routes().len(), 72);
     }
 
     #[test]

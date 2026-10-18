@@ -1,3 +1,4 @@
+use super::change_map::warp;
 use super::use_skill::show_given;
 use crate::handler::{
     FieldRequest, HandlerResult, WorldAction, WorldContext, WorldHandler, WorldResult,
@@ -10,6 +11,10 @@ use crate::skills;
 use game::buff::BuffStat;
 use game::inventory::equip_slot;
 use game::{Buff, InventoryChange, InventoryType, Player, SkillRecord};
+use game_data::items::ConsumeSpec;
+use game_data::{
+    is_use_item, FIELD_LIMIT_MAP_SCROLLS, FIELD_LIMIT_RETURN_SCROLLS, NO_DESTINATION_MAP,
+};
 use packet::{io::read::PktRead, Packet};
 use rand::Rng;
 use std::io::Cursor;
@@ -20,7 +25,9 @@ use tracing::debug;
 /// and consumes one: HP/MP (flat and percent), then the diseases it cures,
 /// then the stats it raises for `time` ms as a buff of id `-item_id`, which
 /// the client lists with the item's icon. A v83 client sends none while
-/// Stop Potion or Seduce holds (FUN_00a092fb).
+/// Stop Potion or Seduce holds (FUN_00a092fb), and sends only the kinds
+/// `is_use_item` lists. An item none of whose effects are supported is
+/// refused rather than used up.
 pub struct UseItemHandler;
 
 impl WorldHandler for UseItemHandler {
@@ -79,10 +86,10 @@ fn use_item(player: &mut Player, slot: i16, item_id: i32, now: Instant) -> Optio
     if !field.is_none_or(|field| field.may_use(item_id)) {
         return None;
     }
-    if player.inventory.get(InventoryType::Use, slot)?.item_id != item_id {
+    if !is_use_item(item_id) || player.inventory.get(InventoryType::Use, slot)?.item_id != item_id {
         return None;
     }
-    let spec = items::info(item_id)?.spec?;
+    let spec = items::info(item_id)?.spec.filter(ConsumeSpec::has_effect)?;
     let changes = player
         .inventory_mut()
         .take(InventoryType::Use, slot, 1)
@@ -109,6 +116,78 @@ fn use_item(player: &mut Player, slot: i16, item_id: i32, now: Instant) -> Optio
         given,
         time: spec.time,
     })
+}
+
+/// `USE_RETURN_SCROLL` (0x55, v83 FUN_00a1e1ce): tick, slot in the USE bag,
+/// item id. A return scroll (203xxxx) takes the player to its `moveTo` map,
+/// or to the map's return map for 999999999, and is used up. The server
+/// checks what the client does before sending: the map's field limits and,
+/// unless the scroll ignores continents, that the map it names is in the
+/// player's area.
+pub struct ReturnScrollHandler;
+
+impl WorldHandler for ReturnScrollHandler {
+    fn handle(&self, packet: &mut Packet, ctx: &mut WorldContext) -> WorldResult {
+        let mut reader = Cursor::new(&packet.bytes);
+        reader.read_short()?;
+        reader.read_int()?; // client tick
+        let slot = reader.read_short()?;
+        let item_id = reader.read_int()?;
+        let taken = return_scroll_target(ctx.player, slot, item_id).and_then(|map_id| {
+            let changes = ctx
+                .player
+                .inventory_mut()
+                .take(InventoryType::Use, slot, 1)
+                .ok()?;
+            Some((map_id, changes))
+        });
+        let Some((map_id, changes)) = taken else {
+            debug!(slot, item_id, "Return scroll refused");
+            return Ok(HandlerResult::reply(stat::build_stat_update(true, &[])?));
+        };
+        let mut result =
+            HandlerResult::reply(inventory::build_inventory_operation(true, &changes)?);
+        result
+            .actions
+            .extend(warp(ctx.player, map_id, "sp", ctx.channel_id)?);
+        Ok(result)
+    }
+}
+
+/// The map the return scroll in `slot` takes the player to, unless it may
+/// not be used.
+fn return_scroll_target(player: &Player, slot: i16, item_id: i32) -> Option<i32> {
+    if player.stats.hp <= 0
+        || item_id / 10_000 != 203
+        || player.inventory.get(InventoryType::Use, slot)?.item_id != item_id
+    {
+        return None;
+    }
+    let spec = items::info(item_id)?.spec?;
+    // Event scrolls keep the way back in a quest record (`returnMapQR`),
+    // and 2032000 moves the player within its PQ (`randomMoveInFieldSet`);
+    // neither is supported yet.
+    if spec.return_map_qr != 0 {
+        return None;
+    }
+    let move_to = spec.move_to?;
+    let data = crate::get_game_data().ok()?;
+    let here = player.stats.map_id;
+    let field = data.field(here)?;
+    if field.field_limit & FIELD_LIMIT_RETURN_SCROLLS != 0 {
+        return None;
+    }
+    let target = if move_to == NO_DESTINATION_MAP {
+        field.return_map?
+    } else if field.field_limit & FIELD_LIMIT_MAP_SCROLLS != 0
+        || (!spec.ignore_continent && !data.same_area(here, move_to))
+        || move_to == here
+    {
+        return None;
+    } else {
+        move_to
+    };
+    data.field_exists(target).then_some(target)
 }
 
 /// `USE_SKILL_BOOK` (0x52, v83 FUN_00a0a1b2): tick, slot in the USE bag,
@@ -367,13 +446,12 @@ mod tests {
         assert!(use_item(&mut player, 3, 2000000, now).is_none());
         assert_eq!(player.inventory.count(2000000), 2);
 
-        // 109090300 forbids consumables but lists 2022539.
+        // 109090300 forbids consumables but lists 2022539 (whose only
+        // effect, BFSkill, isn't supported, so it isn't used up either).
         player.stats.map_id = 109_090_300;
         assert!(use_item(&mut player, 3, 2000000, now).is_none());
-        player
-            .inventory
-            .insert(InventoryType::Use, 4, Item::stack(2022539, 1));
-        assert!(use_item(&mut player, 4, 2022539, now).is_some());
+        let field = crate::get_game_data().unwrap().field(109_090_300).unwrap();
+        assert!(field.may_use(2022539) && !field.may_use(2000000));
     }
 
     #[test]
@@ -441,6 +519,103 @@ mod tests {
         );
         assert!(player.buffs.has(BuffStat::Stun));
         assert!(!player.buffs.has(BuffStat::Poison) && !player.buffs.has(BuffStat::Seal));
+    }
+
+    #[test]
+    fn items_with_nothing_supported_are_not_used_up() {
+        if items::data().is_err() {
+            return;
+        }
+        let mut player = crate::codec::stats::sample_player();
+        // A Return Scroll is no USE_ITEM; a Warp Scroll for the Kerning PQ
+        // (2032000) has a spec but nothing USE_ITEM applies.
+        for (slot, item_id) in [(1, 2030000), (2, 2032000)] {
+            player
+                .inventory
+                .insert(InventoryType::Use, slot, Item::stack(item_id, 1));
+            assert!(use_item(&mut player, slot, item_id, Instant::now()).is_none());
+            assert_eq!(player.inventory.count(item_id), 1);
+        }
+    }
+
+    fn scroll_request(slot: i16, item_id: i32) -> Packet {
+        let mut p = Packet::new_empty();
+        p.write_short(RecvOpcode::UseReturnScroll as i16).unwrap();
+        p.write_int(0).unwrap();
+        p.write_short(slot).unwrap();
+        p.write_int(item_id).unwrap();
+        p
+    }
+
+    fn read_scroll(player: &mut Player, slot: i16, item_id: i32) -> Vec<WorldAction> {
+        let mut packet = scroll_request(slot, item_id);
+        let mut ctx = WorldContext {
+            client_id: 1,
+            channel_id: 0,
+            player,
+        };
+        ReturnScrollHandler
+            .handle(&mut packet, &mut ctx)
+            .unwrap()
+            .actions
+    }
+
+    #[test]
+    fn a_return_scroll_goes_to_its_map_or_the_return_map() {
+        if items::data().is_err() || crate::get_game_data().is_err() {
+            return;
+        }
+        // From Ellinia's Tree Dungeon (101010000), Nearest Town goes to
+        // Ellinia and Return to Henesys goes to Henesys.
+        let mut player = crate::codec::stats::sample_player();
+        player.stats.map_id = 101_010_000;
+        player
+            .inventory
+            .insert(InventoryType::Use, 1, Item::stack(2030000, 2));
+        player
+            .inventory
+            .insert(InventoryType::Use, 2, Item::stack(2030004, 1));
+        assert_eq!(return_scroll_target(&player, 1, 2030000), Some(101_000_000));
+        let actions = read_scroll(&mut player, 2, 2030004);
+        assert!(matches!(
+            actions.as_slice(),
+            [WorldAction::Reply(op), WorldAction::Reply(_), WorldAction::ChangeField { map_id: 100_000_000, .. }]
+            if op.opcode() == SendOpcode::InventoryOperation as i16
+        ));
+        assert_eq!(player.stats.map_id, 100_000_000);
+        assert_eq!(player.inventory.count(2030004), 0);
+        // Already in Henesys: not used.
+        player
+            .inventory
+            .insert(InventoryType::Use, 2, Item::stack(2030004, 1));
+        assert_eq!(return_scroll_target(&player, 2, 2030004), None);
+    }
+
+    #[test]
+    fn a_return_scroll_stays_in_its_area_and_obeys_field_limits() {
+        if items::data().is_err() || crate::get_game_data().is_err() {
+            return;
+        }
+        let mut player = crate::codec::stats::sample_player();
+        player.stats.map_id = 200_000_000;
+        player
+            .inventory
+            .insert(InventoryType::Use, 1, Item::stack(2030004, 1));
+        player
+            .inventory
+            .insert(InventoryType::Use, 2, Item::stack(2030000, 1));
+        // Return to Henesys doesn't cross from Orbis; Nearest Town does go.
+        let actions = read_scroll(&mut player, 1, 2030004);
+        assert!(matches!(actions.as_slice(), [WorldAction::Reply(p)]
+            if p.opcode() == SendOpcode::StatChange as i16));
+        assert_eq!(player.inventory.count(2030004), 1);
+        assert_eq!(return_scroll_target(&player, 2, 2030000), Some(200_000_000));
+
+        // The Kerning PQ's first stage forbids every return scroll.
+        player.stats.map_id = 103_000_800;
+        let field = crate::get_game_data().unwrap().field(103_000_800).unwrap();
+        assert_ne!(field.field_limit & FIELD_LIMIT_RETURN_SCROLLS, 0);
+        assert_eq!(return_scroll_target(&player, 2, 2030000), None);
     }
 
     fn hero_with_book(slot: i16, item_id: i32) -> Player {

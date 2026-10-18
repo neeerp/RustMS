@@ -25,6 +25,7 @@
 #include "../Data/SkillData.h"
 #include "../Data/WeaponData.h"
 #include "../Gameplay/Combat/MagicDamage.h"
+#include "../Gameplay/MapleMap/FieldLimit.h"
 #include "../Gameplay/Stage.h"
 #include "../IO/Messages.h"
 #include "../IO/UI.h"
@@ -224,15 +225,13 @@ namespace ms
 
 		if (int16_t slot = inventory.find_item(type, itemid))
 		{
-			if (type == InventoryType::Id::USE && (itemid / 10000 == 228 || itemid / 10000 == 229))
-				request(SkillBookPacket(slot, itemid), ExclRequest::USE_WAIT);
-			else if (type == InventoryType::Id::USE && !Stage::get().get_mapinfo().can_use_item(itemid))
+			if (type == InventoryType::Id::USE && !Stage::get().get_mapinfo().can_use_item(itemid))
 				InChatMessage(Messages::ITEM_FIELD).drop();
 			else if (type == InventoryType::Id::USE && !disease::can_use_item(get_diseases()))
 				return;
 			else if (type == InventoryType::Id::USE && pets::is_food(itemid))
 				feed_pets(slot, itemid);
-			else if (type == InventoryType::Id::USE)
+			else if (type == InventoryType::Id::USE && field_limit::is_use_item(itemid))
 				request(UseItemPacket(slot, itemid), ExclRequest::USE_WAIT);
 			else if (type == InventoryType::Id::SETUP && itemid / 10000 == 301)
 				sit_on_chair(itemid);

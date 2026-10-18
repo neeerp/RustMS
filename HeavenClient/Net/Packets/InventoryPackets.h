@@ -269,6 +269,19 @@ namespace ms
 		}
 	};
 
+	// Requests reading a return scroll (203xxxx), v83 FUN_00a1e1ce
+	// Opcode: USE_RETURN_SCROLL(85)
+	class ReturnScrollPacket : public OutPacket
+	{
+	public:
+		ReturnScrollPacket(int16_t slot, int32_t itemid) : OutPacket(OutPacket::Opcode::USE_RETURN_SCROLL)
+		{
+			write_time();
+			write_short(slot);
+			write_int(itemid);
+		}
+	};
+
 	// Requests using the scroll in a USE slot on a worn equip
 	// Opcode: SCROLL_EQUIP(86), v83 FUN_00a09221
 	class ScrollEquipPacket : public OutPacket
