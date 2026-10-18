@@ -1,3 +1,4 @@
+use super::stats::write_padded_name;
 use super::time::{expiration, ZERO_TIME};
 use crate::error::NetworkError;
 use game::{Inventory, InventoryType, Item};
@@ -5,6 +6,9 @@ use packet::{io::write::PktWrite, Packet};
 
 const ITEM_TYPE_EQUIP: u8 = 1;
 const ITEM_TYPE_STACK: u8 = 2;
+const ITEM_TYPE_PET: u8 = 3;
+/// A pet's `remainLife`, as the reference server sends it.
+const PET_REMAIN_LIFE: i32 = 18_000;
 
 /// Where an item is being encoded, which decides how its slot is written.
 #[derive(Clone, Copy, Debug)]
@@ -41,6 +45,8 @@ pub fn encode_item(
     let is_cash = item.is_cash();
     packet.write_byte(if item.equip.is_some() {
         ITEM_TYPE_EQUIP
+    } else if item.pet.is_some() {
+        ITEM_TYPE_PET
     } else {
         ITEM_TYPE_STACK
     })?;
@@ -50,6 +56,21 @@ pub fn encode_item(
         packet.write_long(item.cash_serial.unwrap_or(0))?;
     }
     packet.write_long(expiration(item.expiration))?;
+
+    if let Some(pet) = &item.pet {
+        // v83 GW_ItemSlotPet (FUN_004e4219). The pet lives until the item
+        // expires.
+        write_padded_name(packet, &pet.name)?;
+        packet.write_byte(pet.level)?;
+        packet.write_short(pet.closeness)?;
+        packet.write_byte(pet.fullness)?;
+        packet.write_long(expiration(item.expiration))?;
+        packet.write_short(pet.attribute)?;
+        packet.write_short(pet.skill as i16)?;
+        packet.write_int(PET_REMAIN_LIFE)?;
+        packet.write_short(0)?;
+        return Ok(());
+    }
 
     let Some(equip) = &item.equip else {
         packet.write_short(item.quantity)?;
@@ -159,6 +180,33 @@ mod tests {
             .byte(0)
             .long(DEFAULT_TIME);
         expect.short(12).string("").short(0);
+        expect.end();
+    }
+
+    #[test]
+    fn pet_layout() {
+        let pet = Item {
+            cash_serial: Some(77),
+            pet: Some(game::PetData {
+                closeness: 12,
+                fullness: 90,
+                ..game::PetData::new("Baby Tiger")
+            }),
+            ..Item::stack(5000066, 1)
+        };
+        let mut packet = Packet::new_empty();
+        encode_item(&mut packet, SlotPrefix::Bag(1), &pet).unwrap();
+
+        let mut expect = Expect::new(&packet.bytes);
+        expect.byte(1).byte(3).int(5000066).byte(1).long(77);
+        expect.long(DEFAULT_TIME);
+        expect.bytes(b"Baby Tiger\0\0\0").byte(1).short(12).byte(90);
+        expect
+            .long(DEFAULT_TIME)
+            .short(0)
+            .short(0)
+            .int(18_000)
+            .short(0);
         expect.end();
     }
 

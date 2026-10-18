@@ -3,7 +3,7 @@
 
 use crate::load::{self, asset_path};
 use game::{EquipStats, Inventory, InventoryChange, InventoryError, Item};
-use game_data::items::{EquipInfo, ItemData, ItemInfo};
+use game_data::items::{EquipInfo, ItemData, ItemInfo, ItemNames};
 use std::sync::OnceLock;
 
 pub fn data() -> Result<&'static ItemData, &'static str> {
@@ -14,6 +14,29 @@ pub fn data() -> Result<&'static ItemData, &'static str> {
             asset_path("RUSTMS_CHARACTER_NX_PATH", "assets/game-data/Character.nx"),
         )
     })
+}
+
+fn names() -> Result<&'static ItemNames, &'static str> {
+    static NAMES: OnceLock<Result<ItemNames, String>> = OnceLock::new();
+    load::once(&NAMES, || {
+        ItemNames::load(asset_path(
+            "RUSTMS_STRING_NX_PATH",
+            "assets/game-data/String.nx",
+        ))
+    })
+}
+
+/// A new pet's name: the name of its kind, cut to the 12 bytes a pet's name
+/// has room for before its terminator.
+pub fn pet_name(item_id: i32) -> String {
+    let mut name = names()
+        .ok()
+        .and_then(|names| names.pet(item_id).ok().flatten())
+        .unwrap_or_default();
+    while name.len() > 12 {
+        name.pop();
+    }
+    name
 }
 
 /// The template for `item_id`, if the data has it.

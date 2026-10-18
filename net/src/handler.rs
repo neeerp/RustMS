@@ -334,6 +334,9 @@ pub enum WorldAction {
     /// The buffs others see changed; refresh the player's field avatar and
     /// show the others this GIVE_FOREIGN_BUFF or CANCEL_FOREIGN_BUFF.
     BuffsChanged(Packet),
+    /// The player summoned or sent back pets (`player.pets` already
+    /// changed); show everyone on the map.
+    PetsChanged(Vec<game::pet::PetChange>),
     /// Natural HP/MP recovery the client reports; the runtime checks timing.
     NaturalHeal {
         hp: i16,
@@ -496,6 +499,12 @@ pub enum FieldRequest {
         skill_id: Option<i32>,
         why: crate::packet::build::world::summon::Gone,
     },
+    /// The player's client moved their pet at `index` in their pet list.
+    PetMove {
+        index: u8,
+        start: (i16, i16),
+        movement: Vec<u8>,
+    },
     /// The player's client moved their summon.
     SummonMove {
         object_id: i32,
@@ -642,6 +651,12 @@ fn world_routes() -> &'static HashMap<i16, WorldRoute> {
             (Op::ThrowGrenade, InGame(&world::ThrowGrenadeHandler)),
             (Op::MesoDrop, InGame(&world::MesoDropHandler)),
             (Op::CharInfoRequest, InGame(&world::CharInfoRequestHandler)),
+            (Op::SpawnPet, InGame(&world::SpawnPetHandler)),
+            (Op::MovePet, InGame(&world::MovePetHandler)),
+            (Op::PetChat, InGame(&world::PetChatHandler)),
+            (Op::PetCommand, InGame(&world::PetCommandHandler)),
+            (Op::PetFood, InGame(&world::PetFoodHandler)),
+            (Op::UseCashItem, InGame(&world::UseCashItemHandler)),
             (Op::GiveFame, InGame(&world::GiveFameHandler)),
             (Op::MoveSummon, InGame(&world::MoveSummonHandler)),
             (Op::SummonAttack, InGame(&world::SummonAttackHandler)),
@@ -678,7 +693,7 @@ mod tests {
     fn every_registered_opcode_is_unique_per_server() {
         // The maps would silently drop duplicates; check the table sizes match.
         assert_eq!(login_routes().len(), 13);
-        assert_eq!(world_routes().len(), 62);
+        assert_eq!(world_routes().len(), 68);
     }
 
     #[test]

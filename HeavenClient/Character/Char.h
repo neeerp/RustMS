@@ -17,6 +17,7 @@
 //////////////////////////////////////////////////////////////////////////////////
 #pragma once
 
+#include <array>
 #include <map>
 #include <string>
 #include <vector>
@@ -33,6 +34,8 @@
 #include "Look/Afterimage.h"
 #include "Look/CharLook.h"
 #include "Look/PetLook.h"
+
+#include "../Template/Optional.h"
 
 #include "../Graphics/EffectLayer.h"
 
@@ -202,12 +205,25 @@ namespace ms
 		// Show a face for this many ms.
 		void set_expression(Expression::Id expression, int32_t hold);
 
-		// Add a pet with the specified stats.
-		void add_pet(uint8_t index, int32_t iid, const std::string &name, int32_t uniqueid, Point<int16_t> pos,
-					 uint8_t stance, int32_t fhid);
+		// SPAWN_PET (168): a pet joins the list at `index`, moving those
+		// from there up, or replaces the one there. `local` is the
+		// player's own.
+		void add_pet(uint8_t index, bool replace, const PetEntry &pet, bool local);
 
-		// Remove a pet with the specified index and reason.
-		void remove_pet(uint8_t index, bool hunger);
+		// The pet at `index` leaves the list, and those after it move down.
+		void remove_pet(uint8_t index);
+
+		// Forget the pets, as on a new map, where they are sent again.
+		void clear_pets();
+
+		// The serials of the pets in list order, 0 for none.
+		std::array<int64_t, 3> get_pet_serials() const;
+
+		// MOVE_PET (170): where the pet at `index` went.
+		void send_pet_movement(uint8_t index, const std::vector<Movement> &movements);
+
+		// The pet at `index`, if there is one.
+		Optional<PetLook> get_pet(uint8_t index);
 
 		// Return if the character is facing left
 		bool getflip() const;
@@ -278,7 +294,7 @@ namespace ms
 
 		CharLook look;
 		CharLook look_preview;
-		PetLook pets[3];
+		std::array<PetLook, 3> pets;
 
 		State state = State::STAND;
 		bool attacking;

@@ -3,7 +3,7 @@
 
 use crate::HarnessError;
 use diesel::prelude::*;
-use diesel::sql_types::{Integer, SmallInt, Text};
+use diesel::sql_types::{BigInt, Integer, SmallInt, Text};
 
 const DEFAULT_DATABASE_URL: &str = "postgres://maplestory:pass@127.0.0.1:15432/maplestory_test";
 
@@ -106,6 +106,17 @@ pub async fn set_job(character_id: i32, job: i16, level: i16, mp: i16) -> Result
         .bind::<SmallInt, _>(level)
         .bind::<SmallInt, _>(mp)
         .execute(conn)
+    })
+    .await
+}
+
+/// Set the fullness of the pet `serial`, whose owner is logged out.
+pub async fn set_pet_fullness(serial: i64, fullness: i16) -> Result<(), HarnessError> {
+    change_one_row("set pet fullness", move |conn| {
+        diesel::sql_query("UPDATE pets SET fullness = $2 WHERE serial = $1")
+            .bind::<BigInt, _>(serial)
+            .bind::<SmallInt, _>(fullness)
+            .execute(conn)
     })
     .await
 }

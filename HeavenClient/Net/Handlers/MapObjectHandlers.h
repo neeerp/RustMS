@@ -50,6 +50,36 @@ namespace ms
 		void handle(InPacket& recv) const override;
 	};
 
+	// Move another character's pet
+	// Opcode: MOVE_PET(170)
+	class MovePetHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
+	// A pet's action and line, as its owner's client showed them
+	// Opcode: PET_CHAT(171)
+	class PetChatHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
+	// Whether a pet ate the cash food the player used: it plays its eat
+	// sound, or the food suits none of the pets out (FUN_00a29049). It
+	// doesn't unlock the client; the inventory operation after it does.
+	// Opcode: CASH_PET_FOOD_RESULT(76)
+	class CashPetFoodResultHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
+	// Whether the player's pet obeyed a command, or liked its food
+	// Opcode: PET_COMMAND(174)
+	class PetCommandHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
 	// Move a character
 	// Opcode: CHAR_MOVED(185)
 	class CharMovedHandler : public PacketHandler

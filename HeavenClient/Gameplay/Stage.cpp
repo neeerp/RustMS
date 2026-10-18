@@ -111,6 +111,8 @@ namespace ms
 		mists.clear();
 		doors.clear();
 		summons.clear();
+		// The server brings the player's pets out again on the new field.
+		player.clear_pets();
 		pending_clock.reset();
 	}
 

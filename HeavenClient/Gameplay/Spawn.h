@@ -29,6 +29,7 @@
 #include "../Graphics/Animation.h"
 #include "../Net/Login.h"
 #include "../Net/Handlers/Helpers/MobStatParser.h"
+#include "../Net/Handlers/Helpers/PetParser.h"
 
 #include <memory>
 #include <optional>
@@ -135,7 +136,8 @@ namespace ms
 		CharSpawn(int32_t cid, const LookEntry &look, uint8_t level, int16_t job, const std::string &name,
 				  int8_t stance, Point<int16_t> position, int32_t chair,
 				  std::vector<std::pair<Buffstat::Id, int32_t>> buffs, const std::string &guild,
-				  const GuildEmblem &emblem, std::optional<MiniRoomBox> room = std::nullopt);
+				  const GuildEmblem &emblem, std::optional<MiniRoomBox> room = std::nullopt,
+				  std::vector<PetEntry> pets = {});
 
 		int32_t get_cid() const;
 
@@ -154,5 +156,6 @@ namespace ms
 		std::string guild;
 		GuildEmblem emblem;
 		std::optional<MiniRoomBox> room;
+		std::vector<PetEntry> pets;
 	};
 }

@@ -201,6 +201,7 @@ pub fn load_player(character_id: i32) -> crate::Result<Player> {
         quests,
     );
     player.gm_level = gm_level;
+    player.pets = crate::pet::summoned(&mut conn, &player.inventory)?;
     player.guild = crate::guild::tag_of(&mut conn, character_id)?;
     player.monster_book = MonsterBook::new(
         character.monster_book_cover,
@@ -285,6 +286,7 @@ pub(crate) fn write_player(conn: &mut PgConnection, player: &Player) -> QueryRes
 
         save_keymap(conn, id, &player.keymap)?;
         save_inventory(conn, id, &player.inventory)?;
+        crate::pet::save(conn, &player.inventory, &player.pets)?;
         // Kill progress of started quests.
         for record in player.quests.started() {
             let kills = player.quests.kills(record.quest_id);
@@ -447,6 +449,12 @@ fn load_inventory(
         .left_join(equipment_stats::table)
         .filter(inventory_items::character_id.eq_any(character_ids))
         .load(conn)?;
+    let pet_serials: Vec<i64> = rows
+        .iter()
+        .filter(|(row, _)| game::pet::is_pet(row.item_id))
+        .filter_map(|(row, _)| row.cash_serial)
+        .collect();
+    let mut pets = crate::pet::load(conn, &pet_serials)?;
 
     let mut inventories: HashMap<i32, Inventory> = HashMap::new();
     for (row, equip) in rows {
@@ -461,6 +469,7 @@ fn load_inventory(
             expiration: row.expires_at,
             cash_serial: row.cash_serial,
             equip: equip.map(EquipmentStatsRow::stats),
+            pet: row.cash_serial.and_then(|serial| pets.remove(&serial)),
         };
         inventories
             .entry(row.character_id)

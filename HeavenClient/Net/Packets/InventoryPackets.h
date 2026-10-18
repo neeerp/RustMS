@@ -107,6 +107,34 @@ namespace ms
 		}
 	};
 
+	// Feeds the pet food (212xxxx) in USE slot `slot` to the pet out that
+	// is least full (FUN_00a09905)
+	// Opcode: PET_FOOD(76)
+	class PetFoodPacket : public OutPacket
+	{
+	public:
+		PetFoodPacket(int16_t slot, int32_t itemid) : OutPacket(OutPacket::Opcode::PET_FOOD)
+		{
+			write_time();
+			write_short(slot);
+			write_int(itemid);
+		}
+	};
+
+	// Uses the item in Cash slot `slot` (FUN_00a0a63f). The item's own fields
+	// go between its id and the tick; cash pet food (524xxxx) has none.
+	// Opcode: USE_CASH_ITEM(79)
+	class UseCashItemPacket : public OutPacket
+	{
+	public:
+		UseCashItemPacket(int16_t slot, int32_t itemid) : OutPacket(OutPacket::Opcode::USE_CASH_ITEM)
+		{
+			write_short(slot);
+			write_int(itemid);
+			write_time();
+		}
+	};
+
 	// Requests reading a skill or mastery book (v83 FUN_00a0a1b2)
 	// Opcode: USE_SKILL_BOOK(82)
 	class SkillBookPacket : public OutPacket

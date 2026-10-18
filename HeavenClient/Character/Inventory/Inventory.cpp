@@ -408,6 +408,25 @@ namespace ms
 		return 0;
 	}
 
+	Optional<const Pet> Inventory::get_pet(int64_t cash_id) const
+	{
+		auto slot_iter = inventories[InventoryType::Id::CASH].find(find_cash_item(InventoryType::Id::CASH, cash_id));
+
+		if (slot_iter == inventories[InventoryType::Id::CASH].end())
+			return {};
+
+		auto pet_iter = pets.find(slot_iter->second.unique_id);
+
+		return pet_iter == pets.end() ? nullptr : &pet_iter->second;
+	}
+
+	int16_t Inventory::get_pet_level(int64_t cash_id) const
+	{
+		Optional<const Pet> pet = get_pet(cash_id);
+
+		return pet ? pet->get_level() : -1;
+	}
+
 	Optional<const Equip> Inventory::get_equip(InventoryType::Id type, int16_t slot) const
 	{
 		if (type != InventoryType::Id::EQUIPPED && type != InventoryType::Id::EQUIP)

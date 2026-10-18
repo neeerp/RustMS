@@ -17,7 +17,7 @@ pub fn encode_character_data(packet: &mut Packet, player: &Player) -> Result<(),
     // Flags selecting which sections follow: all of them.
     packet.write_long(-1)?;
     packet.write_byte(0)?;
-    encode_character_stats(packet, &player.stats)?;
+    encode_character_stats(packet, &player.stats, player.pet_serials())?;
     packet.write_byte(player.buddy_capacity)?;
     packet.write_byte(0)?; // no linked (blessing of the fairy) name
     packet.write_int(player.meso)?;

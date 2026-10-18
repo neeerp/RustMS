@@ -263,6 +263,63 @@ namespace ms
 		}
 	};
 
+	// Opcode: MOVE_PET(167)
+	class MovePetPacket : public MovementPacket
+	{
+	public:
+		// The player's pet moved (FUN_009c4e41): its cash serial, then a
+		// path as the player's.
+		MovePetPacket(int64_t serial, const move_path::Path& path) : MovementPacket(OutPacket::Opcode::MOVE_PET)
+		{
+			write_long(serial);
+			writepath(path.start, path.elements);
+		}
+	};
+
+	// Opcode: SPAWN_PET(98)
+	class SpawnPetPacket : public OutPacket
+	{
+	public:
+		// Bring out the pet in Cash slot `slot`, or send it back if it is
+		// out (FUN_00a240a2); `boss` makes a new pet lead the others.
+		SpawnPetPacket(int16_t slot, bool boss) : OutPacket(OutPacket::Opcode::SPAWN_PET)
+		{
+			write_time();
+			write_short(slot);
+			write_byte(boss);
+		}
+	};
+
+	// Opcode: PET_CHAT(168)
+	class PetChatPacket : public OutPacket
+	{
+	public:
+		// What the player's pet did and said, for the others to see
+		// (FUN_007055e2). Its base actions go as 0.
+		PetChatPacket(int64_t serial, uint8_t type, int16_t action, const std::string& text)
+			: OutPacket(OutPacket::Opcode::PET_CHAT)
+		{
+			write_long(serial);
+			write_byte(type);
+			write_byte(static_cast<int8_t>(action < 9 ? 0 : action));
+			write_string(text);
+		}
+	};
+
+	// Opcode: PET_COMMAND(169)
+	class PetCommandPacket : public OutPacket
+	{
+	public:
+		// The player gave their pet a command in chat (FUN_00704d5d),
+		// `named` when they called it by name.
+		PetCommandPacket(int64_t serial, bool named, uint8_t command) : OutPacket(OutPacket::Opcode::PET_COMMAND)
+		{
+			write_long(serial);
+			write_byte(named);
+			write_byte(command);
+		}
+	};
+
 	// Shows the player's emote to the rest of the map
 	// Opcode: FACE_EXPRESSION(51)
 	class FaceExpressionPacket : public OutPacket

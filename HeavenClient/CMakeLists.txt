@@ -166,6 +166,9 @@ if(HEAVENCLIENT_BUILD_TESTS)
     add_executable(movement_path_tests tests/movement_path.cpp Net/InPacket.cpp Net/Handlers/Helpers/MovementParser.cpp)
     target_include_directories(movement_path_tests PRIVATE ${PROJECT_SOURCE_DIR}/libs/NoLifeNx)
     add_test(NAME movement_path COMMAND movement_path_tests)
+    add_executable(pets_tests tests/pets.cpp Net/InPacket.cpp)
+    target_include_directories(pets_tests PRIVATE ${PROJECT_SOURCE_DIR}/libs/NoLifeNx)
+    add_test(NAME pets COMMAND pets_tests)
     add_executable(buff_parser_tests tests/buff_parser.cpp Net/InPacket.cpp Net/Handlers/Helpers/BuffParser.cpp Character/Buff.cpp)
     target_include_directories(buff_parser_tests PRIVATE ${PROJECT_SOURCE_DIR}/libs/NoLifeNx)
     add_test(NAME buff_parser COMMAND buff_parser_tests)
@@ -312,6 +315,7 @@ add_executable(HeavenClient
     Character/MonsterBook.h
     Character/Party.cpp
     Character/Party.h
+    Character/Pets.h
     Character/MiniRoomBalloon.cpp
     Character/MiniRoomBalloon.h
     Character/MiniRoomBox.h
@@ -348,6 +352,8 @@ add_executable(HeavenClient
     Data/CashCatalog.h
     Data/JobData.cpp
     Data/JobData.h
+    Data/PetData.cpp
+    Data/PetData.h
     Data/SkillData.cpp
     Data/SkillData.h
     Data/SwindleData.cpp
@@ -658,6 +664,7 @@ add_executable(HeavenClient
     Net/Handlers/Helpers/LoginParser.h
     Net/Handlers/Helpers/MovementParser.cpp
     Net/Handlers/Helpers/MovementParser.h
+    Net/Handlers/Helpers/PetParser.h
     Net/Handlers/Helpers/BuffParser.cpp
     Net/Handlers/Helpers/BuffParser.h
     Net/Handlers/Helpers/MobStatParser.cpp

@@ -25,6 +25,9 @@ pub mod stat {
     pub const SP: i32 = 0x8000;
     pub const EXP: i32 = 0x10000;
     pub const MESO: i32 = 0x40000;
+    /// The summoned pets' serials, which come right after HAIR (0x8).
+    pub const PET_2: i32 = 0x80000;
+    pub const PET_3: i32 = 0x100000;
 }
 
 /// Wire widths of the STAT_CHANGED values, in mask order.
@@ -162,6 +165,12 @@ pub struct Trace {
     pub ship_moves: Vec<(u8, u8)>,
     /// CONTI_STATE: the ship's state, as answered.
     pub ship_states: Vec<u8>,
+    /// SPAWN_PET: (owner, index, the pet's item id, name and serial), or
+    /// for a pet going back, (owner, index, why) in `pets_gone`.
+    pub pets: Vec<(i32, u8, i32, String, i64)>,
+    pub pets_gone: Vec<(i32, u8, u8)>,
+    /// MOVE_PET: (owner, index, start x, start y).
+    pub pet_moves: Vec<(i32, u8, i16, i16)>,
     /// Mobs and drops on the current field.
     pub field: Field,
 }
@@ -267,6 +276,14 @@ impl Trace {
                     _ => r.read_long().unwrap(),
                 };
                 values.insert(bit, value);
+                if bit == 0x8 {
+                    for pet in [stat::PET_2, stat::PET_3]
+                        .into_iter()
+                        .filter(|b| mask & b != 0)
+                    {
+                        values.insert(pet, r.read_long().unwrap());
+                    }
+                }
             }
             self.stat_updates.push(values);
         } else if op == SendOpcode::BlockedMap as i16 || op == SendOpcode::BlockedServer as i16 {
@@ -449,6 +466,25 @@ impl Trace {
         } else if op == SendOpcode::GuildNameChanged as i16 {
             self.guild_names
                 .push((r.read_int().unwrap(), r.read_str_with_length().unwrap()));
+        } else if op == SendOpcode::SpawnPet as i16 {
+            let (owner, index) = (r.read_int().unwrap(), r.read_byte().unwrap());
+            if r.read_byte().unwrap() == 0 {
+                self.pets_gone.push((owner, index, r.read_byte().unwrap()));
+            } else {
+                r.read_byte().unwrap();
+                let item_id = r.read_int().unwrap();
+                let name = r.read_str_with_length().unwrap();
+                self.pets
+                    .push((owner, index, item_id, name, r.read_long().unwrap()));
+            }
+        } else if op == SendOpcode::MovePet as i16 {
+            let (owner, index) = (r.read_int().unwrap(), r.read_byte().unwrap());
+            self.pet_moves.push((
+                owner,
+                index,
+                r.read_short().unwrap(),
+                r.read_short().unwrap(),
+            ));
         } else if op == SendOpcode::SpawnPlayer as i16 {
             self.players.extend(decode_spawn_player(p));
         } else if op == SendOpcode::ConfirmShopTransaction as i16 {

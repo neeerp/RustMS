@@ -13,7 +13,8 @@ use net::packet::build::world::conti::build_conti_move;
 use net::packet::build::world::door::{build_remove_door, build_spawn_door};
 use net::packet::build::world::drop::{build_drop, build_remove_drop, DropAppearance};
 use net::packet::build::world::field::{
-    build_player_enter_field, build_player_leave_field, build_show_chair, parse_movement_state,
+    build_player_enter_field, build_player_leave_field, build_show_chair, parse_movement,
+    parse_movement_state,
 };
 use net::packet::build::world::mini_room::build_char_box;
 use net::packet::build::world::mist::{build_remove_mist, build_spawn_mist, MistKind, MistView};
@@ -25,6 +26,7 @@ use net::packet::build::world::mob::{
 use net::packet::build::world::npc::{
     build_control_npc, build_npc_action, build_spawn_npc, ForeignNpc,
 };
+use net::packet::build::world::pet::build_move_pet;
 use net::packet::build::world::reactor::{
     build_hit_reactor, build_remove_reactor, build_spawn_reactor,
 };
@@ -290,9 +292,17 @@ impl FieldActor {
                     self.broadcast(Some(client_id), packet);
                 }
                 if let Some(occupant) = self.occupants.get_mut(&client_id) {
-                    // Keep the live position, chair and balloon; take
-                    // everything else.
+                    // Keep the live position, chair and balloon, and where
+                    // the pets still out are (new ones start at the
+                    // owner); take everything else.
                     let live = &mut occupant.avatar;
+                    let mut avatar = avatar;
+                    for pet in &mut avatar.pets {
+                        match live.pets.iter().find(|old| old.serial == pet.serial) {
+                            Some(old) => *pet = old.clone(),
+                            None => (pet.x, pet.y) = (live.x, live.y),
+                        }
+                    }
                     occupant.avatar = FieldAvatar {
                         x: live.x,
                         y: live.y,
@@ -411,6 +421,11 @@ impl FieldActor {
                     start,
                     movement,
                 } => self.handle_summon_move(from, object_id, start, movement),
+                FieldRequest::PetMove {
+                    index,
+                    start,
+                    movement,
+                } => self.handle_pet_move(from, index, start, movement),
                 FieldRequest::SummonAttack { attack, limits } => {
                     self.handle_summon_attack(from, attack, &limits)
                 }
@@ -982,6 +997,25 @@ impl FieldActor {
         }
         let owner_id = view.owner_id;
         if let Ok(packet) = build_move_summon(owner_id, object_id, start, &movement) {
+            self.broadcast(Some(from), packet);
+        }
+    }
+
+    fn handle_pet_move(&mut self, from: ClientId, index: u8, start: (i16, i16), movement: Vec<u8>) {
+        let Some(occupant) = self.occupants.get_mut(&from) else {
+            return;
+        };
+        let owner_id = occupant.avatar.id;
+        let Some(pet) = occupant.avatar.pets.get_mut(usize::from(index)) else {
+            return;
+        };
+        if let Some((x, y, stance, foothold)) =
+            parse_movement(&movement, (start.0, start.1, pet.stance))
+        {
+            (pet.x, pet.y, pet.stance) = (x, y, stance);
+            pet.foothold = foothold.unwrap_or(pet.foothold);
+        }
+        if let Ok(packet) = build_move_pet(owner_id, index, start, &movement) {
             self.broadcast(Some(from), packet);
         }
     }
@@ -1640,6 +1674,7 @@ mod tests {
                 visible: BTreeMap::from([(5, 1040002)]),
                 masked: BTreeMap::new(),
                 cash_weapon: None,
+                pets: [0; 3],
             },
             x,
             y,
@@ -1648,6 +1683,7 @@ mod tests {
             guild: None,
             buffs: Vec::new(),
             mini_room: None,
+            pets: Vec::new(),
         }
     }
 

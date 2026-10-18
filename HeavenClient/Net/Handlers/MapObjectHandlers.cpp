@@ -22,12 +22,15 @@
 #include "Helpers/LoginParser.h"
 #include "Helpers/MobStatParser.h"
 #include "Helpers/MovementParser.h"
+#include "Helpers/PetParser.h"
 #include "MiniRoom.h"
 
 #include "../../Data/SkillData.h"
 #include "../../Gameplay/Stage.h"
 #include "../../IO/UI.h"
 #include "../../IO/UITypes/UIChatBar.h"
+#include "../../IO/UITypes/UINotice.h"
+#include "../Packets/GameplayPackets.h"
 
 namespace ms
 {
@@ -60,26 +63,7 @@ namespace ms
 
 		recv.skip(3);
 
-		for (size_t i = 0; i < 3; i++)
-		{
-			int8_t available = recv.read_byte();
-
-			if (available == 1)
-			{
-				recv.read_byte();	// 'byte2'
-				recv.read_int();	// petid
-				recv.read_string();	// name
-				recv.read_int();	// unique id
-				recv.read_int();
-				recv.read_point();	// pos
-				recv.read_byte();	// stance
-				recv.read_int();	// fhid
-			}
-			else
-			{
-				break;
-			}
-		}
+		std::vector<PetEntry> pets = PetParser::parse_pets(recv);
 
 		recv.read_int(); // mountlevel
 		recv.read_int(); // mountexp
@@ -94,7 +78,7 @@ namespace ms
 		recv.read_byte(); // team
 
 		Stage::get().get_chars().spawn(
-			{ cid, look, level, job, name, stance, position, chair, std::move(buffs), guild, emblem, room }
+			{ cid, look, level, job, name, stance, position, chair, std::move(buffs), guild, emblem, room, std::move(pets) }
 		);
 	}
 
@@ -145,31 +129,128 @@ namespace ms
 		if (!character)
 			return;
 
-		uint8_t petindex = recv.read_byte();
-		int8_t mode = recv.read_byte();
+		// Index 3 asks the owner which pet the Water of Life revives.
+		uint8_t index = recv.read_byte();
 
-		if (mode == 1)
+		if (index > 2)
+			return;
+
+		bool local = Stage::get().is_player(cid);
+
+		if (recv.read_bool())
 		{
-			recv.skip(1);
+			// A nonzero byte replaces the pet at the index.
+			bool replace = recv.read_bool();
 
-			int32_t itemid = recv.read_int();
-			std::string name = recv.read_string();
-			int32_t uniqueid = recv.read_int();
-
-			recv.skip(4);
-
-			Point<int16_t> pos = recv.read_point();
-			uint8_t stance = recv.read_byte();
-			int32_t fhid = recv.read_int();
-
-			character->add_pet(petindex, itemid, name, uniqueid, pos, stance, fhid);
+			character->add_pet(index, replace, PetParser::parse_pet(recv), local);
 		}
-		else if (mode == 0)
+		else
 		{
-			bool hunger = recv.read_bool();
+			character->remove_pet(index);
 
-			character->remove_pet(petindex, hunger);
+			if (!local)
+				return;
+
+			// Why the pet went back, which only the owner reads (95a947).
+			const char *reason = nullptr;
+
+			switch (recv.read_byte())
+			{
+				case 1:
+					reason = "The pet went back home because it's hungry.";
+					break;
+				case 2:
+					reason = "The pet's magical time has run out, and so it has turned back into a doll.";
+					break;
+				case 3:
+					reason = "You cannot use pet here.";
+					break;
+			}
+
+			if (reason)
+				if (auto chatbar = UI::get().get_element<UIChatBar>())
+					chatbar->send_chatline(reason, UIChatBar::LineType::SKILL);
 		}
+	}
+
+	void MovePetHandler::handle(InPacket& recv) const
+	{
+		int32_t cid = recv.read_int();
+		uint8_t index = recv.read_byte();
+		Point<int16_t> start = recv.read_point();
+		std::vector<Movement> movements = MovementParser::parse_movements(recv, start);
+
+		// The player's pets move themselves.
+		if (Optional<OtherChar> otherchar = Stage::get().get_chars().get_char(cid))
+			otherchar->send_pet_movement(index, movements);
+	}
+
+	void PetChatHandler::handle(InPacket& recv) const
+	{
+		int32_t cid = recv.read_int();
+		uint8_t index = recv.read_byte();
+		uint8_t type = recv.read_byte();
+		int8_t action = recv.read_byte();
+		std::string text = recv.read_string();
+		bool styled = recv.read_bool();
+
+		if (Optional<Char> character = Stage::get().get_character(cid))
+			if (Optional<PetLook> pet = character->get_pet(index))
+				pet->act({ type, action, text }, styled);
+	}
+
+	void CashPetFoodResultHandler::handle(InPacket& recv) const
+	{
+		switch (recv.read_byte())
+		{
+			case 0:
+				if (Optional<PetLook> pet = Stage::get().get_player().get_pet(recv.read_byte()))
+					pet->play_eat_sound();
+
+				break;
+			case 1:
+				// StringPool 0xed1.
+				UI::get().emplace<UIOk>("Your pet cannot consume this food. Please check again.", [](bool)
+				{});
+				break;
+		}
+	}
+
+	void PetCommandHandler::handle(InPacket& recv) const
+	{
+		int32_t cid = recv.read_int();
+
+		// Another's pet isn't in this player's Cash tab, so it has no level
+		// and answers nothing (FUN_00703b69).
+		if (!Stage::get().is_player(cid))
+			return;
+
+		uint8_t index = recv.read_byte();
+
+		// 0 answers a command, 1 food.
+		uint8_t mode = recv.read_byte();
+
+		if (mode > 1)
+			return;
+
+		uint8_t command = mode == 0 ? recv.read_byte() : 0;
+		bool obeyed = recv.read_bool();
+		bool styled = recv.read_bool();
+
+		Player& player = Stage::get().get_player();
+		Optional<PetLook> pet = player.get_pet(index);
+
+		if (!pet)
+			return;
+
+		int16_t level = player.get_inventory().get_pet_level(pet->get_serial());
+
+		std::optional<PetLook::Said> said =
+			mode == 0 ? pet->answer(command, obeyed, styled, level) : pet->eat(obeyed, styled, level);
+
+		// The others see what it did when the server passes this on.
+		if (said)
+			PetChatPacket(pet->get_serial(), said->type, said->action, said->text).dispatch();
 	}
 
 	void CharMovedHandler::handle(InPacket& recv) const
@@ -240,6 +321,15 @@ namespace ms
 		else if (effect == 13) // card effect
 		{
 			Stage::get().show_character_effect(cid, CharEffect::MONSTER_CARD);
+		}
+		else if (effect == 4) // a pet effect
+		{
+			uint8_t kind = recv.read_byte();
+			uint8_t index = recv.read_byte();
+
+			if (Optional<Char> character = Stage::get().get_character(cid))
+				if (Optional<PetLook> pet = character->get_pet(index))
+					pet->show_effect(kind);
 		}
 		else if (effect == 2) // a party member's skill reached them
 		{

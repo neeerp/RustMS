@@ -8,6 +8,7 @@ mod guilds;
 mod loot;
 mod npc_script;
 mod personal_shop;
+mod pets;
 mod quest;
 mod script;
 mod ships;
@@ -32,6 +33,7 @@ use net::login_world::resolve_login_channel;
 use net::packet::build;
 use net::packet::build::world::field::parse_movement_state;
 use net::packet::build::world::messaging::{build_find_result, FindLocation};
+use net::packet::build::world::pet::PetGone;
 use net::packet::op::RecvOpcode;
 use net::quests::QuestRequest;
 use net::{ClientId, SpawnPosition, WorldAction, WorldContext, WorldRoute};
@@ -184,6 +186,9 @@ impl ClientActor {
         let mut autosave = interval(AUTOSAVE_INTERVAL);
         autosave.set_missed_tick_behavior(MissedTickBehavior::Delay);
         autosave.reset();
+        let mut hunger = interval(pets::PET_HUNGER_INTERVAL);
+        hunger.set_missed_tick_behavior(MissedTickBehavior::Delay);
+        hunger.reset();
         let kill = self.kill.clone();
 
         let outcome = loop {
@@ -198,6 +203,7 @@ impl ClientActor {
                 },
                 Some(message) = self.rx.recv() => self.handle_server_message(message).await,
                 _ = autosave.tick() => self.save_if_dirty().await,
+                _ = hunger.tick() => self.pets_grow_hungry().await,
                 _ = sleep_until(buffs_due.unwrap_or_else(Instant::now)), if buffs_due.is_some() => {
                     self.update_buffs().await
                 }
@@ -382,6 +388,9 @@ impl ClientActor {
                 .await?
             }
             WorldAction::BuffsChanged(announce) => self.show_buffs(announce).await?,
+            WorldAction::PetsChanged(changes) => {
+                self.pets_changed(changes, PetGone::Dismissed).await?
+            }
             WorldAction::Whisper(delivery) => {
                 self.send_to_directory(DirectoryMessage::Whisper {
                     from: self.client_id,
@@ -550,12 +559,13 @@ impl ClientActor {
         let party = self.party_id;
         self.send_to_field(FieldMessage::Join {
             handle,
-            avatar,
+            avatar: avatar.clone(),
             party,
         })
         .await?;
         self.set_wall_clock().await?;
         self.bring_summons(spawn).await?;
+        self.bring_pets(&avatar).await?;
         self.run_map_enter_script().await
     }
 
@@ -865,11 +875,16 @@ impl ClientActor {
     ) -> Result<Vec<Packet>, RuntimeError> {
         use build::world::cash_shop as cs;
         let cash_item = spawn_db(move || db::cash_shop::cash_item(account_id, cash_id)).await?;
-        let Some(item) = cash_item.as_ref().and_then(net::cash_shop::inventory_item) else {
+        let Some(mut item) = cash_item.as_ref().and_then(net::cash_shop::inventory_item) else {
             return Ok(vec![cs::build_cash_shop_failure(
                 cs::CashShopFailure::Unknown,
             )?]);
         };
+        if item.pet.is_some() {
+            if let Some(pet) = spawn_db(move || db::pet::find(cash_id)).await? {
+                item.pet = Some(pet);
+            }
+        }
         let player = &mut self.in_game_mut()?.player;
         let before = player.inventory.clone();
         let slot = match player.inventory_mut().place(item.clone(), slot) {
@@ -923,6 +938,8 @@ impl ClientActor {
                 cs::CashShopFailure::Unknown,
             )?]);
         };
+        let pets_before = player.pets.clone();
+        player.pets_mut().retain(|&serial| serial != cash_id);
         let cash_item = net::cash_shop::cash_item(account_id, cash_id, &item);
         let snapshot = player.clone();
         let saved = cash_item.clone();
@@ -941,6 +958,7 @@ impl ClientActor {
             }
             Err(error) => {
                 *player.inventory_mut() = before;
+                player.pets = pets_before;
                 Err(error)
             }
         }

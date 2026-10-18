@@ -90,8 +90,19 @@ namespace ms
 		bool recalculate = false;
 
 		for (auto iter : MapleStat::codes)
+		{
+			// The pets' serials follow the hair, whichever changed (FUN_004e2fba).
+			if (iter.first == MapleStat::Id::PET)
+				continue;
+
 			if (updatemask & iter.second)
 				recalculate |= handle_stat(iter.first, recv);
+
+			if (iter.first == MapleStat::Id::HAIR)
+				for (int32_t bit : { 0x8, 0x80000, 0x100000 })
+					if (updatemask & bit)
+						recv.skip(8);
+		}
 
 		if (recalculate)
 			player.recalc_stats(false);

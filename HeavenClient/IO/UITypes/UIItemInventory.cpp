@@ -17,6 +17,7 @@
 //////////////////////////////////////////////////////////////////////////////////
 #include "UIItemInventory.h"
 
+#include "UIChatBar.h"
 #include "UINotice.h"
 #include "UIPersonalShop.h"
 
@@ -27,6 +28,7 @@
 #include "../Components/MapleButton.h"
 #include "../UITypes/UIKeyConfig.h"
 
+#include "../../Character/Pets.h"
 #include "../../Character/Inventory/ItemDrop.h"
 #include "../../Character/Inventory/ScrollRules.h"
 #include "../../Data/EquipData.h"
@@ -34,6 +36,7 @@
 #include "../../Util/NxFiles.h"
 
 #include "../../Net/Handlers/MiniRoom.h"
+#include "../../Net/Packets/GameplayPackets.h"
 #include "../../Net/Packets/InventoryPackets.h"
 #include "../../Net/Packets/MiniRoomPackets.h"
 
@@ -68,6 +71,70 @@ namespace ms
 		// v83's notices 0x10a and 0x42 (FUN_004f5697).
 		constexpr const char *CATCH_BREATH = "You can't do it right now.\\nCatch your breath and then try again.";
 		constexpr const char *DEAD = "You can't do it once you're dead.";
+		// StringPool 0x180 and 0x181.
+		constexpr const char *TOO_MANY_PETS = "You have exceeded the maximum number\\n of pets that can accompany you.\\nPlease try again after \\nyou change the living pet back into a doll.";
+		// StringPool 0xed8.
+		constexpr const char *CASH_FOOD_NO_PET = "This item can only be used with a pet.";
+		constexpr const char *BOSS_PET = "Would you like to change your Boss Pet?\\n (The \"Item Ignore\" skill, as well as \\nthe stats for speed and jump will \\nfollow that of the Lead Pet)";
+
+		// v83 FUN_00a240a2: double-clicking a pet asks the server to bring it
+		// out, or back if it is out.
+		void summon_pet(int16_t slot, int64_t serial)
+		{
+			Player &player = Stage::get().get_player();
+
+			if (!player.can_request(ExclRequest::USE_WAIT))
+				return;
+
+			if (player.get_look().get_alerted())
+			{
+				UI::get().emplace<UIOk>(CATCH_BREATH, [](bool)
+				{});
+				return;
+			}
+
+			int32_t lead = pets::follow_the_lead(player.get_stats().get_job().get_id());
+
+			switch (pets::summon(player.get_skilllevel(lead) > 0, player.get_pet_serials(), serial))
+			{
+				case pets::Summon::SEND:
+					player.request(SpawnPetPacket(slot, false), ExclRequest::USE_WAIT);
+					break;
+				case pets::Summon::FULL:
+					UI::get().emplace<UIOk>(TOO_MANY_PETS, [](bool)
+					{});
+					break;
+				case pets::Summon::ASK_BOSS:
+					// Any answer but Yes brings it out behind the others.
+					UI::get().emplace<UIYesNo>(BOSS_PET, [slot](bool yes)
+					{
+						Stage::get().get_player().request(SpawnPetPacket(slot, yes), ExclRequest::USE_WAIT);
+					});
+					break;
+			}
+		}
+
+		// v83 FUN_00a0a63f, type 0x1e: cash pet food needs a pet out, and the
+		// server picks the pet it suits. Using it plays the shop sound; the
+		// pet's eat sound waits for CASH_PET_FOOD_RESULT.
+		void feed_cash_food(int16_t slot, int32_t item_id)
+		{
+			Player &player = Stage::get().get_player();
+
+			if (!player.can_request(ExclRequest::WAIT))
+				return;
+
+			if (!player.get_pet_serials()[0])
+			{
+				if (auto chatbar = UI::get().get_element<UIChatBar>())
+					chatbar->send_chatline(CASH_FOOD_NO_PET, UIChatBar::LineType::SKILL);
+
+				return;
+			}
+
+			if (player.request(UseCashItemPacket(slot, item_id), ExclRequest::WAIT))
+				Sound(nl::nx::sound["Game.img"]["UseShopItem"]).play();
+		}
 
 		// v83 FUN_00a0900a: a map may keep items off the ground, which it
 		// says only once the player has answered every question.
@@ -366,7 +433,11 @@ namespace ms
 					case InventoryType::Id::USE:
 						if (!Stage::get().get_mapinfo().can_use_item(item_id))
 							InChatMessage(Messages::ITEM_FIELD).drop();
-						else if (disease::can_use_item(Stage::get().get_player().get_diseases()))
+						else if (!disease::can_use_item(Stage::get().get_player().get_diseases()))
+							break;
+						else if (pets::is_food(item_id))
+							Stage::get().get_player().feed_pets(slot, item_id);
+						else
 							Stage::get().get_player().request(UseItemPacket(slot, item_id), ExclRequest::USE_WAIT);
 
 						break;
@@ -381,6 +452,10 @@ namespace ms
 							Stage::get().send_key(KeyType::Id::FACE, 99 + item_id % 100 + 8, true);
 						else if (personal_shop::is_permit(item_id))
 							UIPersonalShop::create(slot, item_id);
+						else if (item_id / 10000 == 500)
+							summon_pet(slot, inventory.get_cash_id(tab, slot));
+						else if (pets::is_cash_food(item_id))
+							feed_cash_food(slot, item_id);
 
 						break;
 				}

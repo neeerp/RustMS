@@ -61,6 +61,7 @@ pub fn load(account_id: i32) -> crate::Result<Storage> {
             expiration: row.expires_at,
             cash_serial: row.cash_serial,
             equip: equip.map(StorageEquipmentStatsRow::stats),
+            pet: None,
         })
         .collect();
     Ok(Storage::new(

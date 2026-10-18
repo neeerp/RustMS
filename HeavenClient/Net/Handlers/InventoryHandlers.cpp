@@ -28,7 +28,9 @@
 #include "../IO/UITypes/UIItemInventory.h"
 #include "../IO/UITypes/UIKeyConfig.h"
 #include "../IO/UITypes/UIShop.h"
+#include "../IO/UITypes/UIStatusMessenger.h"
 #include "../IO/UITypes/UIStorage.h"
+#include "../Character/Pets.h"
 
 namespace ms
 {
@@ -71,6 +73,9 @@ namespace ms
 		Inventory& inventory = Stage::get()
 			.get_player()
 			.get_inventory();
+
+		// A pet's item sent again may carry new closeness (FUN_00704c18).
+		std::array<int32_t, 3> closeness = Stage::get().get_player().get_pet_closeness();
 
 		struct Mod
 		{
@@ -225,6 +230,19 @@ namespace ms
 		}
 
 		Stage::get().get_player().recalc_stats(true);
+
+		std::array<int32_t, 3> now = Stage::get().get_player().get_pet_closeness();
+
+		for (size_t i = 0; i < now.size(); i++)
+		{
+			if (closeness[i] < 0 || now[i] < 0)
+				continue;
+
+			if (std::string line = pets::closeness_change(closeness[i], now[i]); !line.empty())
+				if (auto messenger = UI::get().get_element<UIStatusMessenger>())
+					messenger->show_status(Color::Name::YELLOW, line);
+		}
+
 		UI::get().enable();
 	}
 }

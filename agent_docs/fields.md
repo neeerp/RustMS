@@ -62,9 +62,9 @@ included, the field sends their client actor
 `ServerMessage::CharInfoRequested` with the requester's handle. The target
 answers with CHAR_INFO (0x3D, `build::world::info::build_character_info`)
 built from its own `Player`, so the level and fame are current rather than
-the field's projection. Guild, alliance, pets, mount, wish list, and monster
-book are empty; the medal is the item worn in the medal slot. A request for
-someone not on the map gets no answer.
+the field's projection. It lists the pets out, without their equipment.
+Alliance, mount, wish list, and monster book are empty; the medal is the item
+worn in the medal slot. A request for someone not on the map gets no answer.
 
 ## Fame
 
@@ -167,8 +167,8 @@ transaction. Putting it back (0x0E) does the reverse with
 `db::cash_shop::put_back`, which re-inserts the row under the same serial. The
 inventory doesn't keep the commodity, so the row gets an SN that sells the
 item in that quantity, preferring one on sale. Either way, a failed write
-restores the in-memory inventory. A full bag fails with 0xBB. Pets stay in the
-Cash Inventory (0x00) until the server can encode them.
+restores the in-memory inventory. A full bag fails with 0xBB. A pet comes out
+named after its kind, or as it was if it has been out before; see `pets.md`.
 
 A gift (0x04) names the commodity, a receiving character and a message of 1 to
 73 bytes, and carries the birthday code the client asked for. Accounts don't

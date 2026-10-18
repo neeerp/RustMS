@@ -43,7 +43,7 @@ namespace ms
 		{
 			nl::node classic = NxFiles::ui_classic["ChatBalloon.img"];
 
-			return classic[style] ? classic : nl::nx::ui["ChatBalloon.img"];
+			return classic.resolve(style) ? classic : nl::nx::ui["ChatBalloon.img"];
 		}
 
 		// Some styles reuse another style's pieces through "_inlink" (a path
@@ -75,7 +75,7 @@ namespace ms
 	void ChatBalloon::load(const std::string &style, bool formatted, uint16_t wrap_width)
 	{
 		nl::node file = balloons(style);
-		nl::node src = file[style];
+		nl::node src = file.resolve(style);
 
 		constexpr const char *names[NUM_PIECES] = { "c", "n", "s", "w", "e", "nw", "ne", "sw", "se", "arrow" };
 

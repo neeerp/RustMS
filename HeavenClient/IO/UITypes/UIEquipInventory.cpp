@@ -114,7 +114,8 @@ namespace ms
 		buttons[Buttons::BT_PET_HIDE] = std::make_unique<MapleButton>(hide,
 																	  PET_PANEL + PET_HIDE + Texture(hide["normal"]["0"]).get_origin());
 
-		// RustMS has no pets yet, so their tabs stay disabled.
+		// Each tab shows a pet's equipment, which RustMS doesn't have yet, so they
+		// stay disabled.
 		for (uint16_t i = 0; i < 3; i++)
 		{
 			nl::node tab = Equip["BtPet" + std::to_string(i + 1)];

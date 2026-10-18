@@ -145,6 +145,13 @@ namespace ms
 		// Return the slot holding the item with a Cash Shop serial, or 0.
 		int16_t find_cash_item(InventoryType::Id type, int64_t cash_id) const;
 
+		// The pet whose item has the cash serial, if it is in the Cash tab.
+		Optional<const Pet> get_pet(int64_t cash_id) const;
+
+		// The level of the pet whose item has the cash serial, or -1 when it
+		// isn't in the Cash tab (FUN_00703b69).
+		int16_t get_pet_level(int64_t cash_id) const;
+
 		// Return a pointer to an equip
 		Optional<const Equip> get_equip(InventoryType::Id type, int16_t slot) const;
 

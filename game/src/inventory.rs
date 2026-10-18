@@ -1,3 +1,4 @@
+use crate::pet::PetData;
 use std::collections::BTreeMap;
 use std::time::SystemTime;
 
@@ -164,6 +165,8 @@ pub struct Item {
     pub cash_serial: Option<i64>,
     /// Present for equipment, absent for stackable items.
     pub equip: Option<EquipStats>,
+    /// Present for pets.
+    pub pet: Option<PetData>,
 }
 
 impl Item {
@@ -176,6 +179,7 @@ impl Item {
             expiration: None,
             cash_serial: None,
             equip: None,
+            pet: None,
         }
     }
 

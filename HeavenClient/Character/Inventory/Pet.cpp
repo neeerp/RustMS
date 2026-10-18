@@ -23,4 +23,19 @@ namespace ms
 			 uint8_t fullness) : item_id(item_id), expiration(expiration), petname(petname), petlevel(level),
 								 closeness(closeness), fullness(fullness)
 	{}
+
+	uint8_t Pet::get_level() const
+	{
+		return petlevel;
+	}
+
+	uint16_t Pet::get_closeness() const
+	{
+		return closeness;
+	}
+
+	uint8_t Pet::get_fullness() const
+	{
+		return fullness;
+	}
 }

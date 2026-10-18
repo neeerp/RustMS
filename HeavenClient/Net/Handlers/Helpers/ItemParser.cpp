@@ -111,8 +111,8 @@ namespace ms
 
 		void parse_item(InPacket& recv, InventoryType::Id invtype, int16_t slot, Inventory& inventory)
 		{
-			// Read type and item id
-			recv.read_byte(); // 'type' byte
+			// The item's kind, 1 equip, 2 bundle or 3 pet (FUN_004e34e1), and its id
+			int8_t type = recv.read_byte();
 			int32_t iid = recv.read_int();
 
 			if (invtype == InventoryType::Id::EQUIP || invtype == InventoryType::Id::EQUIPPED)
@@ -120,7 +120,7 @@ namespace ms
 				// Parse an equip
 				add_equip(recv, invtype, slot, iid, inventory);
 			}
-			else if (iid >= 5000000 && iid <= 5000102)
+			else if (type == 3)
 			{
 				// Parse a pet
 				add_pet(recv, invtype, slot, iid, inventory);

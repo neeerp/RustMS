@@ -90,6 +90,7 @@ namespace ms
 
 			/// Player Interaction
 			CHAR_INFO_REQUEST = 97,
+			SPAWN_PET = 98,
 			GIVE_FAME = 95,
 			PLAYER_INTERACTION = 123,
 
@@ -99,6 +100,8 @@ namespace ms
 			MOVE_ITEM = 71,
 			USE_ITEM = 72,
 			CANCEL_ITEM_EFFECT = 73,
+			PET_FOOD = 76,
+			USE_CASH_ITEM = 79,
 			USE_SKILL_BOOK = 82,
 			MESO_DROP = 94,
 			HEAL_OVER_TIME = 89,
@@ -125,6 +128,9 @@ namespace ms
 			ADMIN_COMMAND = 128,
 			BUDDYLIST_MODIFY = 130,
 			USE_DOOR = 133,
+			MOVE_PET = 167,
+			PET_CHAT = 168,
+			PET_COMMAND = 169,
 			MOVE_SUMMON = 175,
 			SUMMON_ATTACK = 176,
 			DAMAGE_SUMMON = 177,

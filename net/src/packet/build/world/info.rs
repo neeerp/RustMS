@@ -19,6 +19,17 @@ pub fn build_character_info(player: &Player) -> Result<Packet, NetworkError> {
     packet.write_str_with_length(guild.map_or("", |guild| &guild.name))?;
     packet.write_str_with_length("")?; // alliance
     packet.write_byte(0)?; // medal info
+    for item in player.summoned_pets() {
+        let Some(pet) = &item.pet else { continue };
+        packet.write_byte(1)?;
+        packet.write_int(item.item_id)?;
+        packet.write_str_with_length(&pet.name)?;
+        packet.write_byte(pet.level)?;
+        packet.write_short(pet.closeness)?;
+        packet.write_byte(pet.fullness)?;
+        packet.write_short(0)?;
+        packet.write_int(0)?; // its equipment: pets wear none yet
+    }
     packet.write_byte(0)?; // end of pets
     packet.write_byte(0)?; // mount
     packet.write_byte(0)?; // wish list size
@@ -70,6 +81,43 @@ mod tests {
             expect.int(0);
         }
         expect.int(1142000).short(0).end();
+    }
+
+    #[test]
+    fn shows_the_pets_out() {
+        let mut player = crate::codec::stats::sample_player();
+        let pet = |serial, name: &str| Item {
+            cash_serial: Some(serial),
+            pet: Some(game::PetData {
+                level: 3,
+                closeness: 40,
+                fullness: 80,
+                ..game::PetData::new(name)
+            }),
+            ..Item::stack(5000066, 1)
+        };
+        player
+            .inventory
+            .insert(InventoryType::Cash, 1, pet(77, "Tigger"));
+        player
+            .inventory
+            .insert(InventoryType::Cash, 2, pet(78, "Stays home"));
+        player.pets = vec![77];
+        let packet = build_character_info(&player).unwrap();
+        let mut expect = Expect::new(&packet.bytes);
+        expect.short(SendOpcode::CharInfo as i16).int(0x0102_0304);
+        expect.byte(10).short(100).short(7).byte(0);
+        expect.string("").string("").byte(0);
+        expect
+            .byte(1)
+            .int(5000066)
+            .string("Tigger")
+            .byte(3)
+            .short(40)
+            .byte(80);
+        expect.short(0).int(0);
+        expect.byte(0); // end of pets
+        expect.byte(0).byte(0);
     }
 
     #[test]

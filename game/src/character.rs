@@ -1,8 +1,9 @@
 use crate::buff::{Buffs, ShownBuff};
 use crate::guild::GuildTag;
-use crate::inventory::{equip_slot, Inventory};
+use crate::inventory::{equip_slot, Inventory, InventoryType, Item};
 use crate::keymap::Keymap;
 use crate::monster_book::MonsterBook;
+use crate::pet::{FieldPet, FOLLOW_THE_LEAD};
 use crate::quest::QuestLog;
 use crate::skill::{self, SkillBook, SkillRecord};
 use std::collections::BTreeMap;
@@ -69,6 +70,8 @@ pub struct AvatarLook {
     pub masked: BTreeMap<u8, i32>,
     /// The cash weapon shown over the regular weapon, if any.
     pub cash_weapon: Option<i32>,
+    /// The item ids of the summoned pets, in list order, 0 past the last.
+    pub pets: [i32; 3],
 }
 
 impl AvatarLook {
@@ -106,6 +109,7 @@ impl AvatarLook {
             visible,
             masked,
             cash_weapon,
+            pets: [0; 3],
         }
     }
 }
@@ -129,6 +133,8 @@ pub struct FieldAvatar {
     /// The balloon of the mini room the player keeps open, if any. The
     /// field sets it.
     pub mini_room: Option<MiniRoomBox>,
+    /// The summoned pets, in list order. The field moves them.
+    pub pets: Vec<FieldPet>,
 }
 
 /// The balloon over a player who keeps a mini room open, which others
@@ -168,6 +174,12 @@ pub struct Player {
     /// The guild the character belongs to; saved by `db::guild`, not with
     /// the player.
     pub guild: Option<GuildTag>,
+    /// The cash serials of the summoned pets, in the client's list order;
+    /// saved with the pets.
+    pub pets: Vec<i64>,
+    /// The pets whose last command called them by name; their answer shows
+    /// in their own chat balloon. Not saved.
+    pub pets_named: Vec<i64>,
     dirty: bool,
 }
 
@@ -197,6 +209,8 @@ impl Player {
             buffs: Buffs::default(),
             chair: 0,
             guild: None,
+            pets: Vec::new(),
+            pets_named: Vec::new(),
             dirty: false,
         }
     }
@@ -210,7 +224,44 @@ impl Player {
     }
 
     pub fn look(&self) -> AvatarLook {
-        AvatarLook::from_equipped(&self.stats, self.inventory.equipped_ids())
+        let mut look = AvatarLook::from_equipped(&self.stats, self.inventory.equipped_ids());
+        for (id, pet) in look.pets.iter_mut().zip(self.summoned_pets()) {
+            *id = pet.item_id;
+        }
+        look
+    }
+
+    /// The summoned pets' items, in list order.
+    pub fn summoned_pets(&self) -> impl Iterator<Item = &Item> + '_ {
+        self.pets.iter().filter_map(|&serial| {
+            self.inventory
+                .items(InventoryType::Cash)
+                .map(|(_, item)| item)
+                .find(|item| item.cash_serial == Some(serial) && item.pet.is_some())
+        })
+    }
+
+    /// The summoned pets' cash serials, 0 past the last.
+    pub fn pet_serials(&self) -> [i64; 3] {
+        let mut serials = [0; 3];
+        for (slot, &serial) in serials.iter_mut().zip(&self.pets) {
+            *slot = serial;
+        }
+        serials
+    }
+
+    /// Whether the player may keep more than one pet out.
+    pub fn follows_the_lead(&self) -> bool {
+        FOLLOW_THE_LEAD
+            .iter()
+            .any(|&skill| self.skills.level(skill) > 0)
+    }
+
+    /// Mutable access to the summoned pets; marks the player as needing a
+    /// save.
+    pub fn pets_mut(&mut self) -> &mut Vec<i64> {
+        self.dirty = true;
+        &mut self.pets
     }
 
     /// The projection a field broadcasts for this player at a position.
@@ -228,6 +279,21 @@ impl Player {
             buffs: self.buffs.shown(),
             guild: self.guild.clone(),
             mini_room: None,
+            pets: self
+                .summoned_pets()
+                .map(|item| FieldPet {
+                    item_id: item.item_id,
+                    name: item
+                        .pet
+                        .as_ref()
+                        .map_or_else(String::new, |pet| pet.name.clone()),
+                    serial: item.cash_serial.unwrap_or(0),
+                    x,
+                    y,
+                    stance: 0,
+                    foothold: 0,
+                })
+                .collect(),
         }
     }
 

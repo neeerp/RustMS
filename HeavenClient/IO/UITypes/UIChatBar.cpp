@@ -302,21 +302,20 @@ namespace ms
 							{
 								// Refused: nothing is sent or shown.
 							}
-							else if (chat_target == Target::PARTY)
-							{
-								send_party_chat(msg);
-							}
-							else if (chat_target == Target::BUDDY)
-							{
-								send_buddy_chat(msg);
-							}
-							else if (chat_target == Target::GUILD)
-							{
-								send_guild_chat(msg);
-							}
 							else
 							{
-								GeneralChatPacket(msg, false).dispatch();
+								// The player's pets hear the line, whoever it is
+								// for, and it is still said (FUN_008d54b3).
+								Stage::get().get_player().command_pets(msg);
+
+								if (chat_target == Target::PARTY)
+									send_party_chat(msg);
+								else if (chat_target == Target::BUDDY)
+									send_buddy_chat(msg);
+								else if (chat_target == Target::GUILD)
+									send_guild_chat(msg);
+								else
+									GeneralChatPacket(msg, false).dispatch();
 							}
 
 							lastentered.push_back(msg);

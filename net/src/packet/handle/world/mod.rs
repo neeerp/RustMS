@@ -1,4 +1,5 @@
 mod buddy;
+mod cash_item;
 mod cash_shop;
 mod chair;
 mod change_channel;
@@ -23,6 +24,7 @@ mod npc_dialogue;
 mod npc_shop;
 mod party;
 mod party_search_update;
+mod pet;
 mod pickup;
 mod player_interaction;
 mod quest_action;
@@ -38,6 +40,7 @@ mod use_skill;
 mod whisper;
 
 pub use self::buddy::BuddyListModifyHandler;
+pub use self::cash_item::UseCashItemHandler;
 pub use self::cash_shop::{CashShopOperationHandler, CheckCashHandler, EnterCashShopHandler};
 pub use self::chair::{CancelChairHandler, UseChairHandler};
 pub use self::change_channel::ChangeChannelHandler;
@@ -65,6 +68,10 @@ pub use self::npc_dialogue::{NpcTalkHandler, NpcTalkMoreHandler};
 pub use self::npc_shop::NpcShopActionHandler;
 pub use self::party::{DenyPartyRequestHandler, MultiChatHandler, PartyOperationHandler};
 pub use self::party_search_update::PartySearchUpdateHandler;
+pub use self::pet::{
+    pets_grow_hungry, Hungry, MovePetHandler, PetChatHandler, PetCommandHandler, PetFoodHandler,
+    SpawnPetHandler,
+};
 pub use self::pickup::ItemPickupHandler;
 pub use self::player_interaction::PlayerInteractionHandler;
 pub use self::quest_action::QuestActionHandler;

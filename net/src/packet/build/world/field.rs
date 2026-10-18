@@ -9,7 +9,7 @@ use packet::{io::write::PktWrite, Packet};
 use std::io::Cursor;
 
 /// SPAWN_PLAYER: show `avatar` to the other players on the field
-/// (`spawnPlayerMapObject` in HeavenMS, with no pets or shops).
+/// (`spawnPlayerMapObject` in HeavenMS).
 pub fn build_player_enter_field(avatar: &FieldAvatar) -> Result<Packet, NetworkError> {
     let mut packet = Packet::new_empty();
     packet.write_short(SendOpcode::SpawnPlayer as i16)?;
@@ -38,6 +38,10 @@ pub fn build_player_enter_field(avatar: &FieldAvatar) -> Result<Packet, NetworkE
     packet.write_byte(avatar.stance)?;
     packet.write_short(0)?; // foothold
     packet.write_byte(0)?;
+    for pet in &avatar.pets {
+        packet.write_byte(1)?;
+        super::pet::write_pet(&mut packet, pet)?;
+    }
     packet.write_byte(0)?; // end of pets
     packet.write_int(1)?; // mount level
     packet.write_long(0)?; // mount exp and tiredness
@@ -248,6 +252,7 @@ mod tests {
                 visible: BTreeMap::from([(5, 1042003), (11, 1302000)]),
                 masked: BTreeMap::from([(5, 1040002)]),
                 cash_weapon: Some(1702000),
+                pets: [0; 3],
             },
             x: -120,
             y: 275,
@@ -256,6 +261,7 @@ mod tests {
             buffs: Vec::new(),
             guild: None,
             mini_room: None,
+            pets: Vec::new(),
         }
     }
 
@@ -310,6 +316,47 @@ mod tests {
         expect.byte(0).byte(0).byte(0); // new year cards, two zero bytes
         expect.byte(0); // team
         expect.end();
+    }
+
+    #[test]
+    fn spawn_player_carries_the_pets_in_list_order() {
+        let mut avatar = avatar();
+        let pet = |item_id, name: &str, serial| game::FieldPet {
+            item_id,
+            name: name.into(),
+            serial,
+            x: -120,
+            y: 275,
+            stance: 0,
+            foothold: 0,
+        };
+        avatar.pets = vec![
+            pet(5000066, "Baby Tiger", 77),
+            pet(5000000, "Brown Kitty", 78),
+        ];
+        let packet = build_player_enter_field(&avatar).unwrap();
+
+        let mut expect = Expect::new(&packet.bytes);
+        expect.short(SendOpcode::SpawnPlayer as i16);
+        expect.int(0x0102_0304).byte(10).string("Tester");
+        expect.string("").bytes(&[0; 6]);
+        foreign_buffs(&mut expect);
+        expect.short(100);
+        expect.look(&avatar.look, false);
+        expect.int(0).int(0).int(3010000);
+        expect.short(-120).short(275).byte(4).short(0).byte(0);
+        for (item_id, name, serial) in [(5000066, "Baby Tiger", 77), (5000000, "Brown Kitty", 78)] {
+            expect.byte(1).int(item_id).string(name).long(serial);
+            expect
+                .short(-120)
+                .short(275)
+                .byte(0)
+                .short(0)
+                .byte(0)
+                .byte(0);
+        }
+        expect.byte(0); // end of pets
+        expect.int(1).long(0);
     }
 
     #[test]

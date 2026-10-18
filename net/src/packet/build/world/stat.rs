@@ -9,6 +9,8 @@ pub enum StatUpdate {
     Skin(u8),
     Face(i32),
     Hair(i32),
+    /// The cash serials of the summoned pets, 0 for an empty place.
+    Pets([i64; 3]),
     Level(u8),
     Job(i16),
     Str(i16),
@@ -32,6 +34,7 @@ impl StatUpdate {
             StatUpdate::Skin(_) => 0x1,
             StatUpdate::Face(_) => 0x2,
             StatUpdate::Hair(_) => 0x4,
+            StatUpdate::Pets(_) => 0x8 | 0x80000 | 0x100000,
             StatUpdate::Level(_) => 0x10,
             StatUpdate::Job(_) => 0x20,
             StatUpdate::Str(_) => 0x40,
@@ -71,19 +74,26 @@ impl StatUpdate {
             | StatUpdate::Ap(v)
             | StatUpdate::Sp(v)
             | StatUpdate::Fame(v) => packet.write_short(v)?,
+            StatUpdate::Pets(serials) => {
+                for serial in serials {
+                    packet.write_long(serial)?;
+                }
+            }
         }
         Ok(())
     }
 }
 
-/// STAT_CHANGED. Values are written in mask order regardless of input order.
-/// `enable_actions` unlocks the client UI (an empty update does only that).
+/// STAT_CHANGED. Values are written in mask order regardless of input order;
+/// the pets go by their lowest bit, right after the hair, as the client reads
+/// them. `enable_actions` unlocks the client UI (an empty update does only
+/// that).
 pub fn build_stat_update(
     enable_actions: bool,
     updates: &[StatUpdate],
 ) -> Result<Packet, NetworkError> {
     let mut sorted = updates.to_vec();
-    sorted.sort_by_key(|update| update.mask());
+    sorted.sort_by_key(|update| update.mask().trailing_zeros());
 
     let mut packet = Packet::new_empty();
     packet.write_short(SendOpcode::StatChange as i16)?;
@@ -131,6 +141,25 @@ mod tests {
         expect.short(SendOpcode::StatChange as i16).byte(1);
         expect.int(0x10 | 0x4000 | 0x10000);
         expect.byte(2).short(5).int(15);
+        expect.end();
+    }
+
+    #[test]
+    fn pet_serials_follow_the_hair() {
+        let packet = build_stat_update(
+            true,
+            &[
+                StatUpdate::Level(9),
+                StatUpdate::Pets([7, 0, 0]),
+                StatUpdate::Hair(30000),
+            ],
+        )
+        .unwrap();
+
+        let mut expect = Expect::new(&packet.bytes);
+        expect.short(SendOpcode::StatChange as i16).byte(1);
+        expect.int(0x4 | 0x8 | 0x10 | 0x80000 | 0x100000);
+        expect.int(30000).long(7).long(0).long(0).byte(9);
         expect.end();
     }
 

@@ -56,7 +56,7 @@ fn write_char_entry(
     stats: &CharacterStats,
     look: &AvatarLook,
 ) -> Result<(), NetworkError> {
-    encode_character_stats(packet, stats)?;
+    encode_character_stats(packet, stats, [0; 3])?;
     encode_avatar_look(packet, look, false)?;
     packet.write_byte(0)?; // not the "view all" list
     packet.write_byte(0)?; // world ranking disabled
@@ -79,6 +79,7 @@ mod tests {
             visible: BTreeMap::from([(5, 1042003), (7, 1072001)]),
             masked: BTreeMap::from([(5, 1040002)]),
             cash_weapon: Some(1702000),
+            pets: [0; 3],
         }
     }
 

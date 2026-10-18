@@ -166,16 +166,17 @@ pub fn birthday_code(code: i32) -> bool {
 }
 
 /// The inventory item a Cash Inventory item becomes: equipment gets its base
-/// stats, and the item keeps its cash serial and expiry. `None` if the item
-/// data has no such item, or for pets, whose item encoding isn't written yet.
+/// stats, a pet comes out new and named after its kind (one that was out
+/// before is looked up by the caller), and the item keeps its cash serial and
+/// expiry. `None` if the item data has no such item.
 pub fn inventory_item(cash_item: &CashItem) -> Option<Item> {
-    if cash_item.item_id / 10_000 == 500 {
-        return None;
-    }
     let item = crate::items::create(cash_item.item_id, cash_item.quantity)?;
+    let pet = game::pet::is_pet(item.item_id)
+        .then(|| game::PetData::new(&crate::items::pet_name(item.item_id)));
     Some(Item {
         cash_serial: Some(cash_item.id),
         expiration: cash_item.expires_at,
+        pet,
         ..item
     })
 }
@@ -234,18 +235,20 @@ mod tests {
     }
 
     #[test]
-    fn pets_stay_in_the_cash_inventory() {
+    fn pets_come_out_named_after_their_kind() {
         let pet = CashItem {
             id: 7,
             account_id: 3,
-            item_id: 5000000,
+            item_id: 5000066,
             sn: 60000000,
             quantity: 1,
             gift_from: String::new(),
             expires_at: None,
             gift_message: None,
         };
-        assert_eq!(inventory_item(&pet), None);
+        let item = inventory_item(&pet).unwrap();
+        assert_eq!(item.cash_serial, Some(7));
+        assert_eq!(item.pet, Some(game::PetData::new("Baby Tiger")));
     }
 
     #[test]

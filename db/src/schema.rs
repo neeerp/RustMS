@@ -317,6 +317,19 @@ diesel::table! {
 }
 diesel::joinable!(guild_members -> characters (character_id));
 diesel::joinable!(guild_members -> guilds (guild_id));
+diesel::table! {
+    pets (serial) {
+        serial -> Int8,
+        #[max_length = 13]
+        name -> Varchar,
+        level -> Int2,
+        closeness -> Int2,
+        fullness -> Int2,
+        skill -> Int4,
+        attribute -> Int2,
+        summoned -> Nullable<Int2>,
+    }
+}
 diesel::allow_tables_to_appear_in_same_query!(
     accounts,
     buddies,
@@ -336,4 +349,5 @@ diesel::allow_tables_to_appear_in_same_query!(
     storage_equipment_stats,
     guilds,
     guild_members,
+    pets,
 );
