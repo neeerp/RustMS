@@ -571,12 +571,16 @@ the screen size.
   0x06/0x07 mode 1 for an expansion commodity (911x000). As in v83, each
   mode is followed by a byte that is 1 for Maple Points, and 0x03 ends with
   a zero (no free trial). The result is a "successful purchase" or a failure
-  notice.
+  notice. Failure notices use v83's text for each code (`FUN_0047c17a`),
+  except coupon, gift-token and character-transfer codes, which get the
+  default.
 - **Check:** CHECK CASH sends CHECK_CASH (228), as does the game window
   getting the focus back while the shop is open; QUERY_CASH_RESULT answers.
 - **Slot buttons:** Equip Slot through Stor. Slot open `UICashBuy` for the
   matching expansion item at 4,000 NX, and OK sends 0x06 mode 0 with the bag,
-  or 0x07 mode 0. On 0x60 the bag's slot count changes at once.
+  or 0x07 mode 0. On 0x60 the bag's slot count changes at once. For 0x60 and
+  0x62 the notice says "You have added slots to your item inventory.", as in
+  v83.
 - **Item data:** packages and expansions take their name and icon from
   `Item.nx` `Special`, pets from `Item.nx` `Pet`, and pet equipment from
   `Character.nx` `PetEquip`.
@@ -592,8 +596,8 @@ the screen size.
   a To field and a message box that wraps over its two ruled rows (73
   characters). OK, once both are filled, swaps the art for `CSNotice/1` and asks
   for the birthday code (YYYYMMDD). Its OK sends 0x04 with the code, SN, name
-  and message. The sender sees "You have sent ITEM to NAME." on 0x5E, or a
-  failure notice (0xA8 own account, 0xA9 unknown name, 0xC4 birthday code).
+  and message. On 0x5E the sender sees v83's "COUNT [ ITEM ] was sent to
+  NAME. PRICE NX Prepaid were spent in the process.", or a failure notice (0xA8 own account, 0xA9 unknown name, 0xC4 birthday code).
   The receiver gets one notice listing each gift's sender, item and message
   when 0x4D arrives. The buddy and guild buttons that open the wider
   `backgrnd1` aren't drawn, and only one name is sent.
