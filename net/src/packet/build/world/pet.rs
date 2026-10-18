@@ -74,6 +74,63 @@ pub fn build_move_pet(
     Ok(p)
 }
 
+/// PET_CHAT (171, FUN_0070476e): the pet at `index` acts and speaks as its
+/// owner's client showed it. `action` 9 and up are the pet's own actions.
+pub fn build_pet_chat(
+    owner_id: i32,
+    index: u8,
+    kind: u8,
+    action: u8,
+    text: &str,
+) -> Result<Packet, NetworkError> {
+    let mut p = Packet::new_empty();
+    p.write_short(SendOpcode::PetChat as i16)?;
+    p.write_int(owner_id)?;
+    p.write_byte(index)?;
+    p.write_byte(kind)?;
+    p.write_byte(action)?;
+    p.write_str_with_length(text)?;
+    p.write_byte(0)?; // chat balloon
+    Ok(p)
+}
+
+/// PET_COMMAND (174, FUN_007048ab) mode 0: whether the pet at `index`
+/// obeyed `command`. Only its owner's client reacts: it picks the action
+/// and line and sends them back as PET_CHAT for the others.
+pub fn build_pet_command(
+    owner_id: i32,
+    index: u8,
+    command: u8,
+    obeyed: bool,
+) -> Result<Packet, NetworkError> {
+    let mut p = Packet::new_empty();
+    p.write_short(SendOpcode::PetCommand as i16)?;
+    p.write_int(owner_id)?;
+    p.write_byte(index)?;
+    p.write_byte(0)?;
+    p.write_byte(command)?;
+    p.write_byte(u8::from(obeyed))?;
+    p.write_byte(0)?; // chat balloon
+    Ok(p)
+}
+
+/// User effect 4 (FUN_009377d9): the pet at `index` levelled up, on its
+/// owner (`None`) or another player.
+pub fn build_pet_level_up(owner_id: Option<i32>, index: u8) -> Result<Packet, NetworkError> {
+    let mut p = Packet::new_empty();
+    match owner_id {
+        Some(id) => {
+            p.write_short(SendOpcode::ShowForeignEffect as i16)?;
+            p.write_int(id)?;
+        }
+        None => p.write_short(SendOpcode::ShowItemGainInChat as i16)?,
+    }
+    p.write_byte(4)?;
+    p.write_byte(0)?;
+    p.write_byte(index)?;
+    Ok(p)
+}
+
 /// PET_EXCEPTION_LIST (173): the items the pet `serial` will not pick up.
 pub fn build_pet_exception_list(
     owner_id: i32,
@@ -160,6 +217,36 @@ mod tests {
             .byte(0)
             .long(77)
             .byte(0);
+        expect.end();
+    }
+
+    #[test]
+    fn a_pet_obeys_and_speaks() {
+        let packet = build_pet_command(9, 1, 28, true).unwrap();
+        let mut expect = Expect::new(&packet.bytes);
+        expect.short(SendOpcode::PetCommand as i16).int(9).byte(1);
+        expect.byte(0).byte(28).byte(1).byte(0);
+        expect.end();
+
+        let packet = build_pet_chat(9, 1, 0, 12, "Ahh").unwrap();
+        let mut expect = Expect::new(&packet.bytes);
+        expect.short(SendOpcode::PetChat as i16).int(9).byte(1);
+        expect.byte(0).byte(12).string("Ahh").byte(0);
+        expect.end();
+    }
+
+    #[test]
+    fn a_pet_levels_up() {
+        let packet = build_pet_level_up(None, 2).unwrap();
+        let mut expect = Expect::new(&packet.bytes);
+        expect.short(SendOpcode::ShowItemGainInChat as i16);
+        expect.byte(4).byte(0).byte(2);
+        expect.end();
+
+        let packet = build_pet_level_up(Some(9), 2).unwrap();
+        let mut expect = Expect::new(&packet.bytes);
+        expect.short(SendOpcode::ShowForeignEffect as i16).int(9);
+        expect.byte(4).byte(0).byte(2);
         expect.end();
     }
 }

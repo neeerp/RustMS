@@ -27,7 +27,7 @@ pub use inventory::{EquipStats, Inventory, InventoryChange, InventoryError, Inve
 pub use keymap::{KeyBinding, Keymap};
 pub use mob_stat::MobStat;
 pub use monster_book::MonsterBook;
-pub use pet::{FieldPet, PetData};
+pub use pet::{FieldPet, PetCommand, PetData};
 pub use quest::{QuestLog, QuestRecord, QuestState, QuestStatus};
 pub use skill::{SkillBook, SkillRecord};
 pub use storage::Storage;

@@ -66,7 +66,7 @@ pub use self::npc_dialogue::{NpcTalkHandler, NpcTalkMoreHandler};
 pub use self::npc_shop::NpcShopActionHandler;
 pub use self::party::{DenyPartyRequestHandler, MultiChatHandler, PartyOperationHandler};
 pub use self::party_search_update::PartySearchUpdateHandler;
-pub use self::pet::{MovePetHandler, SpawnPetHandler};
+pub use self::pet::{MovePetHandler, PetChatHandler, PetCommandHandler, SpawnPetHandler};
 pub use self::pickup::ItemPickupHandler;
 pub use self::player_interaction::PlayerInteractionHandler;
 pub use self::quest_action::QuestActionHandler;

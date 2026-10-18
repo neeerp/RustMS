@@ -4,6 +4,7 @@
 
 use crate::{GameDataError, NxDataFile};
 use game::buff::BuffStat;
+use game::pet::PetCommand;
 use game::scroll::{ScrollInfo, ScrollKind};
 use game::EquipStats;
 use std::path::Path;
@@ -34,6 +35,8 @@ pub struct ItemInfo {
     /// What an equipment scroll (204xxxx) does.
     pub scroll: Option<ScrollInfo>,
     pub equip: Option<EquipInfo>,
+    /// A pet's commands (`interact`), by the index the client sends.
+    pub pet_commands: Vec<PetCommand>,
 }
 
 /// A skill book (228xxxx) or mastery book (229xxxx).
@@ -263,6 +266,24 @@ impl ItemData {
                     .collect::<Result<_, _>>()?,
             });
         }
+        if let Some(interact) = nx.child_by_name(node, "interact")? {
+            while let Some(command) =
+                nx.child_by_name(interact, &info.pet_commands.len().to_string())?
+            {
+                let level = |key: &str| -> Result<u8, GameDataError> {
+                    Ok(nx
+                        .int_child(command, key)?
+                        .map_or(0, |v| u8::try_from(v).unwrap_or(u8::MAX)))
+                };
+                info.pet_commands.push(PetCommand {
+                    levels: (level("l0")?, level("l1")?),
+                    prob: nx.int_child(command, "prob")?.unwrap_or(0),
+                    inc: nx
+                        .int_child(command, "inc")?
+                        .map_or(0, |v| i16::try_from(v).unwrap_or(0)),
+                });
+            }
+        }
         Ok(Some(info))
     }
 
@@ -327,6 +348,7 @@ impl ItemData {
             book: None,
             scroll: None,
             equip: Some(equip),
+            pet_commands: Vec::new(),
         }))
     }
 }
@@ -469,6 +491,15 @@ mod tests {
         };
         let tiger = data.info(5000066).unwrap().unwrap();
         assert_eq!(tiger.slot_max, 1);
+        assert_eq!(tiger.pet_commands.len(), 36);
+        assert_eq!(
+            tiger.pet_commands[28],
+            PetCommand {
+                levels: (1, 9),
+                prob: 85,
+                inc: 3
+            }
+        );
         let Some(strings) = crate::test_assets::path("String.nx") else {
             return;
         };

@@ -1,7 +1,7 @@
 //! Pets: a Baby Tiger bought in the Cash Shop comes out of the Cash
 //! Inventory named after its kind. Summoned, it follows its owner and the
-//! map sees it come, move and go back; it is out again after a relog, and
-//! a player arriving later sees it beside its owner.
+//! map sees it come, move, obey, speak and go back; it is out again after a
+//! relog, and a player arriving later sees it beside its owner.
 
 use integration_harness::connection::MapleTestConnection;
 use integration_harness::database::set_nx_credit;
@@ -60,6 +60,31 @@ fn move_pet(serial: i64, x: i16, y: i16) -> Packet {
     p.write_short(100).unwrap();
     p
 }
+
+/// PET_COMMAND: the words the owner said matched `command` of pet `serial`.
+fn pet_command(serial: i64, command: u8) -> Packet {
+    let mut p = Packet::new_empty();
+    p.write_short(RecvOpcode::PetCommand as i16).unwrap();
+    p.write_long(serial).unwrap();
+    p.write_byte(1).unwrap(); // began with its name
+    p.write_byte(command).unwrap();
+    p
+}
+
+/// PET_CHAT: the owner's client showed pet `serial` saying `text`.
+fn pet_chat(serial: i64, action: u8, text: &str) -> Packet {
+    let mut p = Packet::new_empty();
+    p.write_short(RecvOpcode::PetChat as i16).unwrap();
+    p.write_long(serial).unwrap();
+    p.write_byte(0).unwrap(); // a command's answer
+    p.write_byte(action).unwrap();
+    p.write_str_with_length(text).unwrap();
+    p
+}
+
+/// "Cute" at levels 1 to 9 (`interact/28`): obeyed 85% of the time, for 3
+/// closeness.
+const CUTE: u8 = 28;
 
 #[tokio::test]
 async fn a_pet_comes_out_follows_its_owner_and_stays_out() {
@@ -134,6 +159,54 @@ async fn a_pet_comes_out_follows_its_owner_and_stays_out() {
     send(o, move_pet(cash_id + 1, 0, 0)).await;
     read_for(w, &mut wt, 300).await;
     assert_eq!(wt.pet_moves.len(), 1);
+
+    // Told the same thing until it obeys, it grows closer, which levels it
+    // up: only the owner hears the answer, and everyone sees the level up.
+    let mut tries = 0;
+    loop {
+        tries += 1;
+        assert!(tries <= 20, "the tiger never obeyed");
+        send(o, pet_command(cash_id, CUTE)).await;
+        let answer = next(o, &mut ot, SendOpcode::PetCommand).await;
+        let mut r = Cursor::new(&answer[..]);
+        assert_eq!(r.read_int().unwrap(), owner_id);
+        assert_eq!(r.read_bytes(3).unwrap(), [0, 0, CUTE], "pet 0, command");
+        let obeyed = r.read_byte().unwrap() == 1;
+        assert_eq!(r.read_byte().unwrap(), 0);
+        if !obeyed {
+            continue;
+        }
+        let update = next(o, &mut ot, SendOpcode::InventoryOperation).await;
+        let mut r = Cursor::new(&update[..]);
+        assert_eq!(r.read_bytes(2).unwrap(), [0, 2], "not a reply; two changes");
+        assert_eq!(r.read_bytes(2).unwrap(), [3, CASH], "the pet's item goes");
+        assert_eq!(r.read_short().unwrap(), 1);
+        assert_eq!(r.read_bytes(2).unwrap(), [0, CASH], "and comes back");
+        assert_eq!(r.read_short().unwrap(), 1);
+        assert_eq!(r.read_byte().unwrap(), 3);
+        assert_eq!(r.read_int().unwrap(), BABY_TIGER);
+        r.read_bytes(1 + 8 + 8 + 13).unwrap();
+        assert_eq!(r.read_byte().unwrap(), 3, "level 3");
+        assert_eq!(r.read_short().unwrap(), 3, "closeness 3");
+        let effect = next(o, &mut ot, SendOpcode::ShowItemGainInChat).await;
+        assert_eq!(effect, [4, 0, 0], "its level up, on pet 0");
+        break;
+    }
+    let mut seen = next(w, &mut wt, SendOpcode::ShowForeignEffect).await;
+    while seen[4] != 4 {
+        seen = next(w, &mut wt, SendOpcode::ShowForeignEffect).await;
+    }
+    assert_eq!(seen[..4], owner_id.to_le_bytes());
+    assert_eq!(seen[4..], [4, 0, 0]);
+
+    // What its owner's client showed it say, the others see.
+    send(o, pet_chat(cash_id, 12, "Ahh")).await;
+    let said = next(w, &mut wt, SendOpcode::PetChat).await;
+    let mut r = Cursor::new(&said[..]);
+    assert_eq!(r.read_int().unwrap(), owner_id);
+    assert_eq!(r.read_bytes(3).unwrap(), [0, 0, 12], "pet 0, kind, action");
+    assert_eq!(r.read_str_with_length().unwrap(), "Ahh");
+    assert_eq!(r.read_byte().unwrap(), 0);
 
     // Summoned again, it goes back.
     send(o, spawn_pet(1)).await;

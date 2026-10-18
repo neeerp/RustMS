@@ -10,6 +10,15 @@ pub const MAX_PETS: usize = 3;
 /// keeps one pet out at a time.
 pub const FOLLOW_THE_LEAD: [i32; 3] = [8, 10000018, 20000024];
 
+/// The closeness a pet of each level needs to reach the next (Cosmic's
+/// ExpTable; the v83 client does not carry it). Level 30 is the last.
+const CLOSENESS: [i16; 30] = [
+    1, 1, 3, 6, 14, 31, 60, 108, 181, 287, 434, 632, 891, 1224, 1642, 2161, 2793, 3557, 4467, 5542,
+    6801, 8263, 9950, 11882, 14084, 16578, 19391, 22547, 26074, 30000,
+];
+
+pub const MAX_CLOSENESS: i16 = 30000;
+
 /// What a pet item carries besides the item itself (v83 GW_ItemSlotPet).
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct PetData {
@@ -33,6 +42,45 @@ impl PetData {
             skill: 0,
             attribute: 0,
         }
+    }
+}
+
+impl PetData {
+    /// Add `amount` closeness, up to the most a pet can have, and raise its
+    /// level to match. True if the level rose.
+    pub fn add_closeness(&mut self, amount: i16) -> bool {
+        let before = self.level;
+        self.closeness = self
+            .closeness
+            .saturating_add(amount)
+            .clamp(0, MAX_CLOSENESS);
+        while let Some(&needed) = CLOSENESS.get(usize::from(self.level)) {
+            if self.closeness < needed {
+                break;
+            }
+            self.level += 1;
+        }
+        self.level > before
+    }
+}
+
+/// One of the commands a pet knows (`Item.nx Pet/<id>.img/interact/<n>`).
+/// The client matches the words; the server rolls whether it obeys.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct PetCommand {
+    /// The pet levels it answers to (`l0`, `l1`).
+    pub levels: (u8, u8),
+    /// Percent chance it obeys (`prob`).
+    pub prob: i32,
+    /// The closeness obeying earns (`inc`).
+    pub inc: i16,
+}
+
+impl PetCommand {
+    /// Whether `pet` obeys, given `roll` in 0..100. A pet never obeys a
+    /// command outside its levels.
+    pub fn obeyed(&self, pet: &PetData, roll: i32) -> bool {
+        (self.levels.0..=self.levels.1).contains(&pet.level) && roll < self.prob
     }
 }
 
@@ -134,5 +182,34 @@ mod tests {
         assert_eq!(pets, [3, 1, 2]);
         assert_eq!(toggle(&mut pets, 4, true, false), []);
         assert_eq!(pets, [3, 1, 2]);
+    }
+
+    #[test]
+    fn closeness_raises_the_level() {
+        let mut pet = PetData::new("Baby Tiger");
+        assert!(pet.add_closeness(1));
+        assert_eq!((pet.level, pet.closeness), (2, 1));
+        assert!(!pet.add_closeness(1));
+        assert_eq!((pet.level, pet.closeness), (2, 2));
+        assert!(pet.add_closeness(12));
+        assert_eq!((pet.level, pet.closeness), (5, 14));
+        pet.add_closeness(i16::MAX);
+        assert_eq!((pet.level, pet.closeness), (30, MAX_CLOSENESS));
+        assert!(!pet.add_closeness(3));
+        assert_eq!((pet.level, pet.closeness), (30, MAX_CLOSENESS));
+    }
+
+    #[test]
+    fn a_pet_obeys_only_at_its_levels() {
+        let command = PetCommand {
+            levels: (1, 9),
+            prob: 30,
+            inc: 1,
+        };
+        let mut pet = PetData::new("Baby Tiger");
+        assert!(command.obeyed(&pet, 29));
+        assert!(!command.obeyed(&pet, 30));
+        pet.level = 10;
+        assert!(!command.obeyed(&pet, 0));
     }
 }

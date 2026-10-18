@@ -653,6 +653,8 @@ fn world_routes() -> &'static HashMap<i16, WorldRoute> {
             (Op::CharInfoRequest, InGame(&world::CharInfoRequestHandler)),
             (Op::SpawnPet, InGame(&world::SpawnPetHandler)),
             (Op::MovePet, InGame(&world::MovePetHandler)),
+            (Op::PetChat, InGame(&world::PetChatHandler)),
+            (Op::PetCommand, InGame(&world::PetCommandHandler)),
             (Op::GiveFame, InGame(&world::GiveFameHandler)),
             (Op::MoveSummon, InGame(&world::MoveSummonHandler)),
             (Op::SummonAttack, InGame(&world::SummonAttackHandler)),
