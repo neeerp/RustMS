@@ -97,7 +97,7 @@ namespace ms
 		}
 	}
 
-	UICashShop::UICashShop() : tab(EVENT_TAB), subtab(0), page(0), preview_index(0), female(false), credit(0), points(0), prepaid(0), pending(false), storage_slots(0), cash_row(0), item_tab(InventoryType::Id::EQUIP), item_row(0)
+	UICashShop::UICashShop() : tab(EVENT_TAB), subtab(0), page(0), preview_index(0), female(false), credit(0), points(0), prepaid(0), pending(false), wish_added(false), storage_slots(0), cash_row(0), item_tab(InventoryType::Id::EQUIP), item_row(0)
 	{
 		nl::node CashShop = NxFiles::ui_classic["CashShop.img"];
 		nl::node Base = CashShop["Base"];
@@ -454,13 +454,16 @@ namespace ms
 					return Button::State::NORMAL;
 
 				if (remove && request())
+				{
+					wish_added = false;
 					SetWishListPacket(unwish(wish_list, commodity.sn)).dispatch();
+				}
 				else if (list_button % 3 == 0)
 					UICashBuy::open(commodity, credit, points, prepaid);
 				else if (list_button % 3 == 1)
 					UI::get().emplace<UICashGift>(commodity);
-				else if (list_button % 3 == 2 && request())
-					SetWishListPacket(wish(wish_list, commodity.sn)).dispatch();
+				else if (list_button % 3 == 2)
+					reserve(commodity.sn);
 			}
 		}
 
@@ -757,6 +760,24 @@ namespace ms
 
 		if (tab == WISH_LIST)
 			update_list();
+	}
+
+	bool UICashShop::added_wish() const
+	{
+		return wish_added;
+	}
+
+	void UICashShop::reserve(int32_t sn)
+	{
+		if (const char* refusal = wish_refusal(wish_list, sn))
+		{
+			UI::get().emplace<UIOk>(refusal, [](bool) {});
+		}
+		else if (request())
+		{
+			wish_added = true;
+			SetWishListPacket(wish(wish_list, sn)).dispatch();
+		}
 	}
 
 	void UICashShop::change_tab(Tab new_tab)

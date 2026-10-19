@@ -41,6 +41,13 @@ int main()
 		hurts.start(MobStatParser::AMBUSH);
 		require(hurts.update(statuses, 0, 999).empty(), "Ambush waits a second too");
 		require(hurts.update(statuses, 0, 1) == std::vector<int32_t>{ 77 }, "then shows its value");
+
+		// A mob only some skills hurt shows MISS for the others' numbers.
+		std::vector<int32_t> flashfist{ 5001001 };
+		require(hurts.update(statuses, 0, 1000, flashfist) == std::vector<int32_t>{ 0 }, "Ambush can't hurt it");
+		require(MobHurts::hurt_by(flashfist, 5001001) && !MobHurts::hurt_by(flashfist, 0),
+				"only Flash Fist hurts it, not a basic attack");
+		require(MobHurts::hurt_by({}, 0), "any attack hurts other mobs");
 		require(!MobHurts::hurts(MobStatParser::SPEED), "Slow doesn't hurt");
 	}
 	catch (const std::exception& e)

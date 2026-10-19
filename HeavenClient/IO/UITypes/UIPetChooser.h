@@ -12,10 +12,11 @@
 
 namespace ms
 {
-	// Which pet a double-clicked piece of pet equipment goes on, when more than one can wear it (v83 CUtilDlgEx
-	// mode 6, FUN_009a9b25 on UIWindow.img/UtilDlgEx_Pet). It shows one pet at a time, standing, with its name,
-	// level and closeness, and Prev and Next go round them. It is modal: OK or Enter picks the pet shown, and
-	// Cancel, the corner button or Escape picks none.
+	// A choice of pets (v83 CUtilDlgEx mode 6, FUN_009a9b25 on UIWindow.img/UtilDlgEx_Pet): which pet a
+	// double-clicked piece of pet equipment goes on when more than one can wear it, or an NPC's question (NPC
+	// dialogue types 9 and 10). It shows one pet at a time, standing, with its name, level and closeness, and
+	// Prev and Next go round them. It is modal: OK or Enter picks the pet shown, and Cancel, the corner button
+	// or Escape picks none.
 	class UIPetChooser : public UIElement
 	{
 	public:
@@ -32,8 +33,14 @@ namespace ms
 			int16_t closeness;
 		};
 
-		// `onchoose` gets the index in `pets` of the pet picked.
-		UIPetChooser(std::vector<Pet> pets, std::function<void(size_t index)> onchoose);
+		// The question for pet equipment (StringPool 0x182).
+		static constexpr const char *EQUIP_CAPTION =
+				"Please select the pet you would like to put the pet equipment on.";
+
+		// `onchoose` gets the index in `pets` of the pet picked; `oncancel`, if any, is called when none is.
+		// `pets` must not be empty.
+		UIPetChooser(std::string caption, std::vector<Pet> pets, std::function<void(size_t index)> onchoose,
+					 std::function<void()> oncancel = {});
 
 		void draw(float alpha) const override;
 
@@ -54,6 +61,8 @@ namespace ms
 
 		void choose();
 
+		void cancel();
+
 		enum Buttons : uint16_t
 		{
 			OK,
@@ -65,6 +74,7 @@ namespace ms
 
 		std::vector<Pet> pets;
 		std::function<void(size_t index)> onchoose;
+		std::function<void()> oncancel;
 		size_t shown;
 		Animation standing;
 		Texture name_tag;

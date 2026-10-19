@@ -210,6 +210,23 @@ namespace ms
 		}
 	};
 
+	// Opcode: NOTE_ACTION(131)
+	class GiftNotePacket : public OutPacket
+	{
+	public:
+		// A note back to whoever sent the gift with cash serial cash_id, the
+		// index-th of those just received (v83 4796c6).
+		GiftNotePacket(const std::string& to, const std::string& note, int32_t index, int64_t cash_id) : OutPacket(OutPacket::Opcode::NOTE_ACTION)
+		{
+			write_byte(0);
+			write_string(to);
+			write_string(note);
+			write_byte(1);
+			write_int(index);
+			write_long(cash_id);
+		}
+	};
+
 	// Opcode: CASHSHOP_OPERATION(229)
 	class SetWishListPacket : public OutPacket
 	{

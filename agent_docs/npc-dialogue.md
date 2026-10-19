@@ -42,8 +42,9 @@ each client chooses locally and players see different actions.
 ## Scripted NPCs
 
 `net::npc_scripts::NpcScript` holds native scripts (Lua is deferred) as a
-list of pages: `Say`, `Ask` (effects on yes), and `Menu` (each choice its
-own pages), plus effects applied after the last page. The effects are
+list of pages: `Say`, `Ask` (effects on yes), `Menu` (each choice its
+own pages), and `Style` (each style its own effects), plus effects applied
+after the last page. The effects are
 `net::scripts::Effect`, shared with map and portal scripts. The client actor
 (`ClientActor::apply_effects` in `client/npc_script.rs`) applies them to a
 copy of the player and commits any quest change together with it, or
@@ -59,11 +60,15 @@ applied, and apply nothing if the player no longer has them. Answers are matched
 | `begin5` | Clicking Robin (2003) | 18-topic Q&A menu |
 | `tutorialSkip` | Clicking the Maple Administrator (2007), or the `tutoChatNPC` portal for accounts with a level-30 character | Yes warps to Lith Harbor (104000000). Neither is on the original island, so this is unused |
 | `begin7` | Clicking Shanks (22000) in Southperry | Yes sails to Lith Harbor (104000000) for Lucas's recommendation letter (4031801), at any level, or for 150 mesos from level 7; otherwise he says why not |
-| `fighter`, `magician`, `bowman`, `rogue` | Clicking Dances with Balrog (1022000), Grendel the Really Old (1032001), Athena Pierce (1012100), or the Dark Lord (1052001) | First job advancement: see below |
+| `fighter`, `magician`, `bowman`, `rogue`, `kairinT` | Clicking Dances with Balrog (1022000), Grendel the Really Old (1032001), Athena Pierce (1012100), the Dark Lord (1052001), or Kyrin (1090000) | First and second job advancement: see below |
+| Job instructors | Clicking an examiner (1072000-1072003) or, inside the test, a proctor (1072004-1072007) | The second job's test: see below |
+| `inside_pirate` | Clicking the proctor (1072008) inside Kyrin's tests | Yes warps to Kyrin; see below |
+| `hair_henesys1` | Clicking Natalie (1012103) in Henesys's hair salon (100000104) | A haircut (5150001) or a dye (5151001) coupon buys one of her styles, picked on a preview of the player; without a coupon she says so and nothing changes |
 
-The four Explorer instructors (`INSTRUCTORS` in `npc_scripts.rs`) make a
-beginner a Warrior, Magician, Bowman, or Thief. The beginner needs level 10
-(a Magician 8) and 35 STR, 20 INT, or 25 DEX; a weaker one hears why not, and
+The five Explorer instructors (`INSTRUCTORS` in `npc_scripts.rs`) make a
+beginner a Warrior, Magician, Bowman, Thief, or Pirate. The beginner needs
+level 10 (a Magician 8) and 35 STR, 20 INT, 25 DEX, or for a Pirate 20 DEX; a
+weaker one hears why not, and
 anyone else gets one page. Yes applies `Effect::TakeFirstJob`
 (`Player::take_first_job`: 3 SP for each level past the minimum plus 1, and
 the job's extra max HP and MP, without a stat reset or heal), then
@@ -74,8 +79,38 @@ INVENTORY_GROW (`0x1E`: bag type, new slot count) per bag; others on the
 field see the job-change effect (SHOW_FOREIGN_EFFECT 8). The player's own
 client plays it, and the job-change sound, from the job bit of STAT_CHANGED.
 As in v83 (`FUN_00a1fb52`), HeavenClient also opens the Stat window after a
-beginner's first advancement if it isn't open. Pirates (Kyrin) and later
-advancements are not scripted yet.
+beginner's first advancement if it isn't open.
+
+From level 30 the same instructors offer their first jobs the second job,
+following Cosmic's flow. Without the test's proof, the instructor gives a
+letter (4031008-4031011) for the line's examiner, and with the letter only
+says to go. The examiner sends a letter holder to the test map (Warriors
+108000300, Magicians 108000200, Bowmen 108000100, Thieves 108000400). Upstream
+takes the letter there and records the entry in a quest the client data lacks
+(100003 does not fit a quest id), so here the player keeps the letter until
+passing and can come back in with it. The test's proctor trades all of the
+player's Dark Marbles (4031013), once there are 30, and the letter for the
+Proof of a Hero (4031012); passing or not, yes takes the player back to the
+examiner's map at the portal upstream uses (`Effect::WarpToPortal`). With the
+proof, the instructor shows a menu of the line's second jobs; each choice
+describes the job and asks, and yes takes the proof and applies
+`Effect::TakeSecondJob` (`Player::take_second_job`: 1 SP and the job's extra
+max HP or MP) and a row more in the Etc bag. The third and fourth jobs are
+not scripted yet.
+
+Kyrin's second jobs are client-driven quests instead (see
+[quests](./quests.md)): How to become a Brawler (2191) and How to Become a
+Gunslinger (2192), for a level-30 Pirate, one at a time. The client offers them
+beside her script. With one started, her script offers its test map
+(Brawler 108000502, Gunslinger 108000501), where Octopirates (9001006,
+9001005) that only Flash Fist or Double Shot hurt (see
+[combat](./combat.md)) drop 15 crystals (4031856, 4031857; `[mobs]` in
+`reward_overrides.toml`). The proctor there sees the player back to Kyrin's
+map, after a word of praise once the test's crystals are held; the crystals
+stay for the quest's completion to take. With the quest completed, Kyrin
+describes the job and yes applies `Effect::TakeSecondJob` and the Etc row.
+Upstream turns away a player whose test map is occupied and takes the
+crystals from one who leaves early; neither is done here.
 
 Text comes from the [server content pack](./server-content.md) with
 placeholders. HeavenClient expands NPC text markup (`Util/NpcTextMarkup.h`:
@@ -152,6 +187,66 @@ i32 max`, and a box text (13) `str default, i16 cols, i16 rows`. The
 client checks a text's trimmed length and a number's range, shows v83's
 notice and stays open when they are wrong, and answers `02 01 str`,
 `03 01 i32` or `0D 01 str`. The server sends none of them yet.
+
+Types 7 and 8 are a choice of styles: after the text come `u8 count` and
+that many `i32` style ids. The client shows the v83 `UtilDlgEx_Avatar`
+window (`UIAvatarSelect`) instead of the usual dialog: the NPC, the text,
+and the player wearing one style at a time, a face if the first id / 10000
+is 2, a hairstyle if 3, otherwise a skin. BACK and NEXT go round the
+styles, TAKE OFF ALL shows the player without equipment and DEFAULT
+SETTINGS brings it back. OK or Enter answers `07 01 u8` (the style's index);
+CANCEL, LEAVE STORE or Escape answers `07 00`. The server sends type 7 for
+Natalie's hairstyles and applies the chosen one with `Effect::SetStyle`
+(a stat change and UPDATE_CHAR_LOOK for others). The window has no scroll
+bar for text taller than its 100 px box, drops the text's images, and does
+not type the text out.
+
+Types 9 and 10 are a choice of pets: after the text come `u8 count`, for
+type 10 a flag byte, then that many entries of an 8-byte pet serial and a
+byte the client ignores. Pets not in the player's Cash tab are left out.
+Type 9 needs one pet left, type 10 two when its flag is 0 and one
+otherwise; with fewer the client answers `t 02` and shows nothing.
+Otherwise it shows the pet chooser (`UIPetChooser`, as for pet equipment)
+with the text as its question. OK or Enter answers `t 01` and the pet's
+serial; CANCEL, the corner button or Escape answers `t 00`. The server
+sends neither type yet.
+
+Types 5 and 6 are quizzes. Neither has text: after the speaker byte comes
+`u8 flag`, where 1 closes an open quiz without an answer. With 0, a quiz
+(5) has `str title, str question, str clue, i32 min, i32 max, i32
+seconds`, and a speed quiz (6) `i32 subject type, i32 subject id, i32
+points, i32 number, i32 seconds`. The subject is an NPC (0), a monster (1)
+or otherwise an item, shown by its picture. While one is open, another
+show is dropped, so the server hides the last before sending the next.
+Both windows (`UIQuiz` and `UISpeedQuiz`, rules in `IO/UITypes/Quiz.h`)
+count down and stay open beside the game: they are not modal, and Escape
+does not close them. The answer has no response byte: `05 str` or `06
+str`.
+- A quiz checks the answer's bytes against twice `min` and `max`, two
+  bytes a Korean letter, and otherwise shows v83's "You must enter
+  atleast/less than %d letters. (Korean)" notice and stays open. An empty
+  answer does nothing.
+- A speed quiz answers two letters or more. NEXT answers `""`, GIVE UP
+  `"__GIVEUP__"`, and its last two minutes tick, louder as they run out.
+- When the time is up, either answers `""` and closes.
+- While one is open, the Cash Shop and the game menu's channel change
+  refuse with "You can't do this while taking the quiz."
+
+The server sends neither type yet.
+
+Type 14 is a slide menu, such as the Dimensional Mirror's. It has no text:
+after the speaker byte come an `i32` art set
+(`UIWindow.img/SlideMenu/<set>`) and a string of `#<id>#<label>` pairs;
+the last label needs no closing `#`. The client
+(`UISlideMenu`, `IO/UITypes/SlideMenu.h`) sorts the choices by id and
+shows three icons (`BtMain/<id>`) at a time, the middle one framed and
+labelled, starting from the second choice when there are two or more. The
+arrows, Left and Right slide along. MOVE, Enter or the middle icon answers
+`0E 01 i32` with its id; CANCEL or Escape answers `0E 00`. An id of -1
+means nowhere to go: alone, it shows its label with no icons and MOVE
+disabled; among other choices, it leaves nothing at all. Text not
+starting with `#` hangs v83 and gives no choices in HeavenClient. The
+server sends none yet.
 
 ## Assets and validation
 

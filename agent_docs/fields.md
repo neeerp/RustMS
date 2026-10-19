@@ -180,10 +180,11 @@ sender's NX Credit, or from their NX Prepaid if the credit is short (never Maple
 Points), and inserts the item into the receiver's account with `gift_from` and
 `gift_message` set, in one transaction. The sender gets 0x5E (receiver, item,
 count, price) and their new balance. When the receiving account next enters the
-shop, `db::cash_shop::open_cash_inventory` splits the unseen gifts (rows with a
-message) from the rest and clears their messages. The gifts go out in 0x4D
-with sender and message, and the client adds them to the Cash Inventory list
-it got in 0x4B, as HeavenMS does.
+shop, `db::cash_shop::open_cash_inventory` picks out the unseen gifts (rows
+with a message) and clears their messages. The gifts are in the Cash Inventory
+list sent in 0x4B, and 0x4D then names each with its sender and message for the
+client to announce; v83's handler adds nothing to the list. Notes sent back
+(NOTE_ACTION, 0x83) aren't handled yet.
 
 ## Packets
 

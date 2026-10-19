@@ -170,6 +170,19 @@ namespace ms
 			return sns;
 		}
 
+		// Why v83 (FUN_00470d7d) won't add sn to the wish list, or nullptr when it will: a full list
+		// first, then one that has it already.
+		inline const char* wish_refusal(const std::vector<int32_t>& sns, int32_t sn)
+		{
+			if (std::count_if(sns.begin(), sns.end(), [](int32_t w) { return w != 0; }) >= WISH_LIST_SIZE)
+				return "Your wish list is full.";
+
+			if (std::find(sns.begin(), sns.end(), sn) != sns.end())
+				return "You already have this item on your wish list.";
+
+			return nullptr;
+		}
+
 		// The wish list without sn.
 		inline std::vector<int32_t> unwish(std::vector<int32_t> sns, int32_t sn)
 		{

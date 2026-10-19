@@ -9,6 +9,7 @@ use net::packet::build::world::stat::StatUpdate;
 use net::packet::build::world::{drop, effect, guild, inventory, npc, stat};
 use net::quests::{self, QuestTemplate};
 use net::scripts::Effect;
+use net::WorldAction;
 use tracing::{debug, warn};
 
 /// The NPC that offers veterans a tutorial skip.
@@ -93,6 +94,7 @@ impl ClientActor {
         let mut offer_skip = false;
         let mut warp = None;
         let mut name_guild = false;
+        let mut restyled = false;
         for effect in effects {
             match effect {
                 Effect::FieldEffect(path) => afterwards.push(effect::build_field_effect(path)?),
@@ -159,12 +161,22 @@ impl ClientActor {
                     gain_exp(&mut next, *amount, &mut packets)?;
                     changed = true;
                 }
-                Effect::TakeFirstJob(job) => {
-                    if !next.can_take_first_job(*job) {
+                Effect::TakeFirstJob(job) | Effect::TakeSecondJob(job) => {
+                    let first = matches!(effect, Effect::TakeFirstJob(_));
+                    let qualifies = if first {
+                        next.can_take_first_job(*job)
+                    } else {
+                        next.can_take_second_job(*job)
+                    };
+                    if !qualifies {
                         warn!(job, "No longer qualifies for the job; nothing applied");
                         return Ok(Applied::Refused);
                     }
-                    next.take_first_job(*job);
+                    if first {
+                        next.take_first_job(*job);
+                    } else {
+                        next.take_second_job(*job);
+                    }
                     changed = true;
                     let stats = &next.stats;
                     packets.push(stat::build_stat_update(
@@ -187,9 +199,30 @@ impl ClientActor {
                     changed = true;
                     packets.push(inventory::build_inventory_grow(*kind, limit)?);
                 }
+                Effect::SetStyle(style) => {
+                    let stats = &mut next.stats;
+                    let update = match style / 10_000 {
+                        2 => {
+                            stats.face = *style;
+                            StatUpdate::Face(*style)
+                        }
+                        3 => {
+                            stats.hair = *style;
+                            StatUpdate::Hair(*style)
+                        }
+                        _ => {
+                            stats.skin = *style as u8;
+                            StatUpdate::Skin(stats.skin)
+                        }
+                    };
+                    changed = true;
+                    restyled = true;
+                    packets.push(stat::build_stat_update(false, &[update])?);
+                }
                 Effect::StartQuest(id) => change = Some(QuestChange::Start(template(*id)?)),
                 Effect::CompleteQuest(id) => change = Some(QuestChange::Complete(template(*id)?)),
-                Effect::Warp(map_id) => warp = Some(*map_id),
+                Effect::Warp(map_id) => warp = Some((*map_id, None)),
+                Effect::WarpToPortal(map_id, portal) => warp = Some((*map_id, Some(*portal))),
                 Effect::RequireBoarding(platform) => {
                     let boarding = conti::departing_from(*platform)
                         .is_some_and(|route| route.timetable.state(conti::now()) == State::Wait);
@@ -206,6 +239,10 @@ impl ClientActor {
         packets.append(&mut afterwards);
         self.naming_guild |= name_guild;
         self.send_all(&mut packets).await?;
+        if restyled {
+            let announce = inventory::build_char_look(&self.in_game()?.player)?;
+            Box::pin(self.apply(WorldAction::LookChanged(announce))).await?;
+        }
 
         if offer_skip {
             let account_id = self.in_game()?.player.account_id;
@@ -219,14 +256,15 @@ impl ClientActor {
                 Box::pin(self.start_script(script)).await?;
             }
         }
-        if let Some(map_id) = warp {
+        if let Some((map_id, portal)) = warp {
             let channel_id = self.channel_id;
-            let actions = net::packet::handle::world::warp(
-                &mut self.in_game_mut()?.player,
-                map_id,
-                "",
-                channel_id,
-            )?;
+            let player = &mut self.in_game_mut()?.player;
+            let actions = match portal {
+                Some(portal) => net::packet::handle::world::warp_to_spawn_point(
+                    player, map_id, portal, channel_id,
+                )?,
+                None => net::packet::handle::world::warp(player, map_id, "", channel_id)?,
+            };
             for action in actions {
                 Box::pin(self.apply(action)).await?;
             }

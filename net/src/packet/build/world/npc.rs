@@ -1,13 +1,15 @@
 use crate::{error::NetworkError, packet::op::SendOpcode};
 use packet::{io::write::PktWrite, Packet};
 
-/// Any server-driven NPC prompt: a text page, a yes/no question, or a menu.
+/// Any server-driven NPC prompt: a text page, a yes/no question, a menu, or
+/// a choice of styles.
 pub fn build_prompt(prompt: &crate::dialogue::Prompt) -> Result<Packet, NetworkError> {
     use crate::dialogue::Prompt;
     let (npc_id, message_type, text) = match prompt {
         Prompt::Text(page) => return build_npc_dialogue(page),
         Prompt::YesNo { npc_id, text } => (*npc_id, 1, text),
         Prompt::Selection { npc_id, text } => (*npc_id, 4, text),
+        Prompt::Style { npc_id, text, .. } => (*npc_id, 7, text),
     };
     let mut p = Packet::new_empty();
     p.write_short(SendOpcode::NpcDialogue as i16)?;
@@ -16,6 +18,13 @@ pub fn build_prompt(prompt: &crate::dialogue::Prompt) -> Result<Packet, NetworkE
     p.write_byte(message_type)?;
     p.write_byte(0)?;
     p.write_str_with_length(text)?;
+    if let Prompt::Style { styles, .. } = prompt {
+        // The client takes a count byte and that many ids.
+        p.write_byte(styles.len() as u8)?;
+        for &style in styles {
+            p.write_int(style)?;
+        }
+    }
     Ok(p)
 }
 
@@ -242,6 +251,23 @@ mod tests {
         expect.short(SendOpcode::NpcDialogue as i16);
         expect.byte(4).int(1012100).byte(4).byte(0);
         expect.string("#L0#Yes#l");
+        expect.end();
+    }
+
+    #[test]
+    fn prompt_style_lists_the_styles_after_the_text() {
+        let prompt = crate::dialogue::Prompt::Style {
+            npc_id: 1012103,
+            text: "Pick one".to_string(),
+            styles: vec![30060, 30140],
+        };
+        let packet = build_prompt(&prompt).unwrap();
+
+        let mut expect = Expect::new(&packet.bytes);
+        expect.short(SendOpcode::NpcDialogue as i16);
+        expect.byte(4).int(1012103).byte(7).byte(0);
+        expect.string("Pick one");
+        expect.byte(2).int(30060).int(30140);
         expect.end();
     }
 }

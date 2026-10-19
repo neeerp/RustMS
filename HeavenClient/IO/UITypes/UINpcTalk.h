@@ -30,6 +30,7 @@
 #include "../Components/AnswerFocus.h"
 #include "../Components/Slider.h"
 #include "../Components/Textfield.h"
+#include "../../Util/NpcTextMarkup.h"
 
 #include <functional>
 #include <map>
@@ -107,6 +108,9 @@ namespace ms
 		// The responder gets 1/0/-1 (next or yes / previous or no / close) and,
 		// for menus, the chosen #L id. change_text clears it.
 		void set_local_responder(std::function<void(int8_t, int32_t)> responder);
+
+		// What the text markup names: the player, NPCs, items, mobs and maps.
+		static NpcTextMarkup::Lookups markup_lookups();
 
 	protected:
 		Button::State button_pressed(uint16_t buttonid) override;

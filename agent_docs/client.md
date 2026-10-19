@@ -97,6 +97,19 @@ from `UI.nx`. Moved so far:
 - **NPC dialog** (`UINpcTalk`, `UIWindow.img/UtilDlgEx`): the frame,
   buttons, menu dots, quest list headers, and the `Basic.img/VScr4` scroll
   bar (`Slider::Type::CLASSIC`). See [npc-dialogue.md](npc-dialogue.md).
+- **Choice of styles** (`UIAvatarSelect`, `UIWindow.img/UtilDlgEx_Avatar`,
+  NPC dialogue types 7 and 8). Positions are v83's (FUN_009a92c9,
+  FUN_009aa708). See [npc-dialogue.md](npc-dialogue.md).
+- **Choice of pets** (`UIPetChooser`, `UIWindow.img/UtilDlgEx_Pet`): which
+  pet a piece of pet equipment goes on, and NPC dialogue types 9 and 10.
+  Like the NPC dialog, it opens silently. See [npc-dialogue.md](npc-dialogue.md).
+- **Quiz and speed quiz** (`UIQuiz`, `UISpeedQuiz`,
+  `UIWindow.img/InitialQuiz` and `SpeedQuiz`, NPC dialogue types 5 and 6).
+  Positions are v83's (FUN_007e9d54, FUN_007eb7d5). See
+  [npc-dialogue.md](npc-dialogue.md).
+- **Slide menu** (`UISlideMenu`, `UIWindow.img/SlideMenu`, NPC dialogue
+  type 14). Positions are v83's (FUN_0076be7a, FUN_0076c389). See
+  [npc-dialogue.md](npc-dialogue.md).
 - **Quest Helper** (`UIQuestHelper`, `UIWindow.img/QuestAlarm`). See
   [quests.md](quests.md).
 - **Quest Complete! notice** (`UIQuestComplete`, `UIWindow.img/FadeYesNo`).
@@ -357,7 +370,11 @@ from `UI.nx`. Moved so far:
   `NewChar`, and `NewCharAran`): one class for all three races, with a
   `Layout` per race for its board and button positions. The new character
   stands in the race's scene. A `charName` board asks for the name first. OK
-  checks it against `Etc.img/ForbiddenName` and the server. The `charSet`
+  checks it as v83 does (4 to 12 letters or digits, fewer than four `I` and
+  `l`, and, except for GMs, no word from `Etc.img/ForbiddenName` or
+  `Curse` anywhere in it), then asks the server. Enter on an empty name does
+  nothing. The server's answer 1 shows "currently being used", 2 "cannot use
+  this name", and anything else "unknown reason". The `charSet`
   board then has nine rows of `avatarSel` with `BtLeft` and `BtRight`
   arrows. Their choices come from `Etc.img/MakeCharInfo`: `Info/CharMale`
   and `CharFemale` for Explorers, `PremiumCharMale` and `PremiumCharFemale`
@@ -366,8 +383,13 @@ from `UI.nx`. Moved so far:
   Musashi Shoes, drop to the 10 px font. Cancel on `charSet` returns to the
   name, and Cancel on `charName` or Back returns to the race select. Once
   the server adds the character, the scene scrolls back to the character
-  select with the new character picked. Positions are checked against v0.73
-  footage.
+  select with the new character picked. If it refuses (a non-zero result in
+  `NewCharacter`), a notice says why and the window stays: 0x1E "cannot use
+  this name", 0x0A "too many connection requests", anything else "unknown
+  reason" (v83 has its own text for 0x1A, a pending transfer, which the
+  server never sends). The character select's New button stays enabled and
+  answers "No more characters can be created" when every slot is taken.
+  Positions are checked against v0.73 footage.
 - **Login dialogs** (`UILoginNotice`, `UIQuitConfirm`, `UILoginWait`,
   `UITermsOfService`, `UIGender`): notices are a 362x219 `Notice/backgrnd`
   scroll at (219, 170). Errors use `backgrnd/1`, with the "no" stamp.
@@ -654,7 +676,10 @@ the screen size.
   `Item.nx` `Special`, pets from `Item.nx` `Pet`, and pet equipment from
   `Character.nx` `PetEquip`.
 - **Wish list:** RESERVE and REMOVE send the whole list (0x05, ten SNs), and the
-  server answers with the list it kept.
+  server answers with the list it kept (0x55). As in v83 (FUN_00470d7d,
+  FUN_00479844), RESERVE says "Your wish list is full." or "You already have
+  this item on your wish list." without sending, and only an added wish is
+  announced when the list comes back.
 - **Taking out and putting back:** double-clicking a Cash Inventory item
   sends 0x0D with its serial, bag and the bag's first free slot; the server
   answers with the slot and the item (0x68), or 0xBB if the bag is full.
@@ -667,8 +692,11 @@ the screen size.
   for the birthday code (YYYYMMDD). Its OK sends 0x04 with the code, SN, name
   and message. On 0x5E the sender sees v83's "COUNT [ ITEM ] was sent to
   NAME. PRICE NX Prepaid were spent in the process.", or a failure notice (0xA8 own account, 0xA9 unknown name, 0xC4 birthday code).
-  The receiver gets one notice listing each gift's sender, item and message
-  when 0x4D arrives. The buddy and guild buttons that open the wider
+  For each gift in 0x4D the receiver gets v83's dialog (`UIGiftNotice`,
+  `CSNotice/3`, FUN_0047959e): the item's icon and name, the sender, their
+  message, and a note to send back. OK or Enter sends NOTE_ACTION (0x83) and
+  shows "The note has successfully been sent"; Esc sends nothing. The next
+  gift follows either way. The buddy and guild buttons that open the wider
   `backgrnd1` aren't drawn, and only one name is sent.
 - **Leaving:** EXIT sends CHANGE_MAP with no body at once. Esc first asks
   "Are you sure you want to leave the Cash Shop?", as v83 does
@@ -771,3 +799,5 @@ These were corrected:
     pet's stance byte is `action << 1 | left`, but HeavenClient read the
     action as its own animation index and odd as facing right. 168 put pets
     at a fixed index; v83's list closes up. See `pets.md`.
+14. The client read the stat change's SKIN as a short; v83 reads a byte
+    (FUN_004e2fba), as the server writes it.

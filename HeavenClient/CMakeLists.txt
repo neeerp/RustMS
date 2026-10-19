@@ -38,6 +38,10 @@ if(HEAVENCLIENT_BUILD_TESTS)
     add_test(NAME npc_text COMMAND npc_text_tests)
     add_executable(npc_input_tests tests/npc_input.cpp)
     add_test(NAME npc_input COMMAND npc_input_tests)
+    add_executable(slide_menu_tests tests/slide_menu.cpp)
+    add_test(NAME slide_menu COMMAND slide_menu_tests)
+    add_executable(quiz_tests tests/quiz.cpp)
+    add_test(NAME quiz COMMAND quiz_tests)
     add_executable(world_map_lookup_tests tests/world_map_lookup.cpp)
     add_test(NAME world_map_lookup COMMAND world_map_lookup_tests)
     add_executable(swindle_words_tests tests/swindle_words.cpp)
@@ -552,6 +556,8 @@ add_executable(HeavenClient
     IO/UITypes/UICashBuy.h
     IO/UITypes/UICashGift.cpp
     IO/UITypes/UICashGift.h
+    IO/UITypes/UIGiftNotice.cpp
+    IO/UITypes/UIGiftNotice.h
     IO/UITypes/UICashShop.cpp
     IO/UITypes/UICashShop.h
     IO/UITypes/UIChannel.cpp
@@ -592,10 +598,16 @@ add_executable(HeavenClient
     IO/UITypes/EnterNumber.h
     IO/UITypes/UINotice.cpp
     IO/UITypes/UINotice.h
+    IO/UITypes/UIAvatarSelect.cpp
+    IO/UITypes/UIAvatarSelect.h
+    IO/UITypes/SlideMenu.h
     IO/UITypes/UINpcTalk.cpp
     IO/UITypes/UINpcTalk.h
+    IO/UITypes/Quiz.h
     IO/UITypes/UIQuestLog.cpp
     IO/UITypes/UIQuestLog.h
+    IO/UITypes/UIQuiz.cpp
+    IO/UITypes/UIQuiz.h
     IO/UITypes/UIQuit.cpp
     IO/UITypes/UIQuit.h
     IO/UITypes/UIRaceSelect.cpp
@@ -604,6 +616,8 @@ add_executable(HeavenClient
     IO/UITypes/UIRevive.h
     IO/UITypes/UIShop.cpp
     IO/UITypes/UIShop.h
+    IO/UITypes/UISlideMenu.cpp
+    IO/UITypes/UISlideMenu.h
     IO/UITypes/UIStorage.cpp
     IO/UITypes/UIStorage.h
     IO/UITypes/UITeleportRock.cpp

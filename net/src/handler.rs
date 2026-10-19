@@ -437,12 +437,13 @@ pub enum FieldRequest {
     /// The NPCs' controller chose an idle action for one: what followed the
     /// object id (action, line, and a path for an NPC that walks).
     NpcAction { object_id: i32, action: Vec<u8> },
-    /// A validated attack: `broadcast` for the others, total damage per mob,
-    /// and what it may put on each mob it hits and leaves alive. Each mob
-    /// with the counter (PCounter, or MCounter for a spell) hurts the player
-    /// back.
+    /// A validated attack: `broadcast` for the others, its skill (0 for a
+    /// basic attack), total damage per mob, and what it may put on each mob
+    /// it hits and leaves alive. Each mob with the counter (PCounter, or
+    /// MCounter for a spell) hurts the player back.
     Attack {
         broadcast: Packet,
+        skill: i32,
         counter: game::MobStat,
         hits: Vec<(i32, i64)>,
         inflicts: Vec<crate::skills::Inflict>,

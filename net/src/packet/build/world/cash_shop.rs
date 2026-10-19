@@ -198,8 +198,8 @@ fn encode_cash_item(packet: &mut Packet, item: &CashItem) -> Result<(), NetworkE
 }
 
 /// CASHSHOP_OPERATION: the gifts received since the account last entered
-/// the shop, with who sent them and their messages. The client adds them to
-/// the Cash Inventory, so they are left out of its list.
+/// the shop, with who sent them and their messages. They are already in the
+/// Cash Inventory's list; the client only announces them, one at a time.
 pub fn build_cash_gifts(gifts: &[CashItem]) -> Result<Packet, NetworkError> {
     let mut packet = Packet::new_empty();
     packet.write_short(SendOpcode::CashShopOperation as i16)?;

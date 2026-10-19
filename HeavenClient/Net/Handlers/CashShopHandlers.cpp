@@ -24,12 +24,11 @@
 #include "../../Gameplay/Stage.h"
 #include "../../IO/UI.h"
 #include "../../IO/UITypes/UICashShop.h"
+#include "../../IO/UITypes/UIGiftNotice.h"
 #include "../../IO/UITypes/UINotice.h"
 #include "../../IO/Window.h"
 
 #include "Timer.h"
-
-#include <algorithm>
 
 namespace ms
 {
@@ -137,16 +136,6 @@ namespace ms
 			return { cash_id, item_id, quantity };
 		}
 
-		// A player's text in a notice, without the characters that would
-		// format it.
-		std::string plain(std::string text)
-		{
-			std::replace(text.begin(), text.end(), '#', ' ');
-			std::replace(text.begin(), text.end(), '\\', '/');
-
-			return text;
-		}
-
 		std::vector<int32_t> read_wish_list(InPacket& recv)
 		{
 			std::vector<int32_t> sns;
@@ -248,10 +237,10 @@ namespace ms
 		}
 		case 0x4D:
 		{
-			// Gifts received since the last visit join the Cash Inventory.
+			// Presents received since the last visit, already in the Cash Inventory. Each is announced in
+			// turn, with a note to send back (v83 FUN_0047959e).
 			int16_t count = recv.read_short();
-			std::vector<UICashShop::CashItem> items;
-			std::string notice;
+			std::vector<CashGift> gifts;
 
 			for (int16_t i = 0; i < count; i++)
 			{
@@ -260,25 +249,23 @@ namespace ms
 				std::string from = recv.read_padded_string(13);
 				std::string message = recv.read_padded_string(73);
 
-				items.push_back({ cash_id, item_id, 1 });
-
-				if (!notice.empty())
-					notice += "\\n\\n";
-
-				notice += from + " has sent you " + ItemData::get(item_id).get_name() + ".\\n\"" + plain(message) + "\"";
+				gifts.push_back({ cash_id, item_id, from, message });
 			}
 
-			cashshop->add_cash_items(items);
-
-			if (!notice.empty())
-				UI::get().emplace<UIOk>(notice, [](bool) {});
+			if (!gifts.empty())
+				UI::get().emplace<UIGiftNotice>(gifts, 0);
 
 			break;
 		}
 		case 0x4F:
 		case 0x55:
-			// The wish list, on entering and after a change.
+			// The wish list, on entering and after a change. v83 (FUN_00479844) announces an added wish,
+			// not a removed one.
 			cashshop->set_wish_list(read_wish_list(recv));
+
+			if (mode == 0x55 && cashshop->added_wish())
+				UI::get().emplace<UIOk>("The item has been added to the wish list.", [](bool) {});
+
 			break;
 		case 0x57:
 			// A purchase is in the Cash Inventory; the balance follows.

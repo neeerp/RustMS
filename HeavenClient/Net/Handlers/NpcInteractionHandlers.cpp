@@ -21,12 +21,17 @@
 #include "../Character/QuestResult.h"
 #include "../Gameplay/Stage.h"
 #include "../IO/UI.h"
+#include "../IO/UITypes/UIAvatarSelect.h"
 #include "../IO/UITypes/UIChatBar.h"
 #include "../IO/UITypes/UINotice.h"
 #include "../IO/UITypes/UINpcTalk.h"
+#include "../IO/UITypes/UIPetChooser.h"
+#include "../IO/UITypes/UIQuiz.h"
 #include "../IO/UITypes/UIShop.h"
+#include "../IO/UITypes/UISlideMenu.h"
 #include "../IO/UITypes/UIStorage.h"
 #include "../Gameplay/QuestConversation.h"
+#include "../Net/Packets/NpcInteractionPackets.h"
 
 #include <nlnx/nx.hpp>
 
@@ -39,7 +44,8 @@ namespace ms
 		recv.skip(1);
 
 		int32_t npcid = recv.read_int();
-		// 0 say, 1 yes/no, 2 text, 3 number, 4 menu, 12 accept/decline, 13 box text
+		// 0 say, 1 yes/no, 2 text, 3 number, 4 menu, 5 quiz, 6 speed quiz, 7/8 styles, 9/10 pets,
+		// 12 accept/decline, 13 box text, 14 slide menu
 		int8_t msgtype = recv.read_byte();
 		int8_t speaker = recv.read_byte();
 
@@ -47,7 +53,138 @@ namespace ms
 		if (msgtype == 0 && (speaker & 0x4))
 			npcid = recv.read_int();
 
+		// A quiz (v83 a26b09) or speed quiz (a26c66) has no text and is no part of the conversation. A flag of 0
+		// shows one, unless one is open already; 1 closes it without an answer.
+		if (msgtype == 5 || msgtype == 6)
+		{
+			int8_t flag = recv.read_byte();
+
+			if (msgtype == 5 && flag == 0)
+			{
+				std::string title = recv.read_string();
+				std::string question = recv.read_string();
+				std::string clue = recv.read_string();
+				int32_t min_letters = recv.read_int();
+				int32_t max_letters = recv.read_int();
+				int32_t seconds = recv.read_int();
+
+				auto quiz = UI::get().get_element<UIQuiz>();
+
+				if (!quiz || !quiz->is_active())
+					UI::get().emplace<UIQuiz>(title, question, clue, min_letters, max_letters, seconds);
+			} else if (msgtype == 6 && flag == 0)
+			{
+				int32_t subject_type = recv.read_int();
+				int32_t subject_id = recv.read_int();
+				int32_t points = recv.read_int();
+				int32_t number = recv.read_int();
+				int32_t seconds = recv.read_int();
+
+				auto quiz = UI::get().get_element<UISpeedQuiz>();
+
+				if (!quiz || !quiz->is_active())
+					UI::get().emplace<UISpeedQuiz>(subject_type, subject_id, points, number, seconds);
+			} else if (flag == 1)
+			{
+				if (msgtype == 5)
+				{
+					if (auto quiz = UI::get().get_element<UIQuiz>())
+						quiz->hide();
+				} else if (auto quiz = UI::get().get_element<UISpeedQuiz>())
+				{
+					quiz->hide();
+				}
+			}
+
+			UI::get().enable();
+
+			return;
+		}
+
+		// A slide menu (v83 747a46) has no text: its art's set, then its choices.
+		if (msgtype == 14)
+		{
+			int32_t menutype = recv.read_int();
+			slide_menu::Menu menu = slide_menu::parse(recv.read_string());
+
+			if (auto npctalk = UI::get().get_element<UINpcTalk>())
+				npctalk->deactivate();
+
+			UI::get().emplace<UISlideMenu>(menutype, std::move(menu));
+			UI::get().enable();
+
+			return;
+		}
+
 		std::string text = recv.read_string();
+
+		// A choice of styles: the styles, then the same reply whichever.
+		if (msgtype == 7 || msgtype == 8)
+		{
+			std::vector<int32_t> styles(static_cast<uint8_t>(recv.read_byte()));
+
+			for (int32_t &id : styles)
+				id = recv.read_int();
+
+			if (styles.empty())
+				return;
+
+			if (auto npctalk = UI::get().get_element<UINpcTalk>())
+				npctalk->deactivate();
+
+			UI::get().emplace<UIAvatarSelect>(npcid, msgtype, text, std::move(styles));
+			UI::get().enable();
+
+			return;
+		}
+
+		// A choice of pets (v83 7474a2, 74775c): their Cash Shop serials, each with a byte v83 ignores. Type 10
+		// has a byte first which, when 0, needs two pets rather than one. Pets not in the Cash tab are left
+		// out, and with too few v83 answers 2 without asking.
+		if (msgtype == 9 || msgtype == 10)
+		{
+			uint8_t count = static_cast<uint8_t>(recv.read_byte());
+			size_t least = msgtype == 10 && recv.read_byte() == 0 ? 2 : 1;
+
+			const Inventory &inventory = Stage::get().get_player().get_inventory();
+			std::vector<UIPetChooser::Pet> pets;
+			std::vector<int64_t> serials;
+
+			for (uint8_t i = 0; i < count; i++)
+			{
+				int64_t serial = recv.read_long();
+				recv.skip(1);
+
+				if (Optional<const Pet> pet = inventory.get_pet(serial))
+				{
+					pets.push_back({ pet->get_item_id(), pet->get_name(), pet->get_level(),
+									 static_cast<int16_t>(pet->get_closeness()) });
+					serials.push_back(serial);
+				}
+			}
+
+			if (pets.size() < least)
+			{
+				NpcTalkMorePacket(msgtype, 2).dispatch();
+				return;
+			}
+
+			if (auto npctalk = UI::get().get_element<UINpcTalk>())
+				npctalk->deactivate();
+
+			std::string caption = NpcTextMarkup::expand(text, UINpcTalk::markup_lookups());
+
+			UI::get().emplace<UIPetChooser>(caption, std::move(pets), [msgtype, serials](size_t index)
+			{
+				NpcTalkPetPacket(msgtype, serials[index]).dispatch();
+			}, [msgtype]()
+			{
+				NpcTalkMorePacket(msgtype, 0).dispatch();
+			});
+			UI::get().enable();
+
+			return;
+		}
 
 		int16_t style = 0;
 		UINpcTalk::Input input;

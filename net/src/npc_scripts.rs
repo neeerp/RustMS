@@ -8,7 +8,7 @@ use crate::content;
 use crate::conti::{self, Route, State};
 use crate::dialogue::{DialoguePage, Prompt};
 use crate::scripts::Effect;
-use game::{guild, InventoryType, Player};
+use game::{guild, InventoryType, Player, QuestState};
 use game_data::server_content::keys;
 
 /// Roger's Apple, the tutorial's lesson on items.
@@ -37,19 +37,50 @@ const ERIN: i32 = 2012002;
 /// Orbis Station's guide, and the passage to the platform for Ellinia.
 const ISA: i32 = 2012006;
 const ORBIS_TUNNEL: i32 = 200000110;
+/// Henesys's hair salon (`hair_henesys1`): a cut or a dye of the player's
+/// choosing, for a coupon each.
+const NATALIE: i32 = 1012103;
+const HAIRCUT_COUPON: i32 = 5150001;
+const DYE_COUPON: i32 = 5151001;
+const NATALIE_HAIRS: [[i32; 7]; 2] = [
+    [30060, 30140, 30200, 30210, 30310, 33040, 33100],
+    [31150, 31300, 31350, 31700, 31740, 34050, 34110],
+];
 
-/// A first-job instructor: the job, its text key, and the weapons, ammunition
-/// and bag rows that come with it (upstream `fighter`, `magician`, `bowman`,
-/// `rogue`).
+/// The second job's test: the examiner's proctor gives this for the marbles,
+/// and the instructor takes it for the job.
+const PROOF_OF_A_HERO: i32 = 4031012;
+const DARK_MARBLE: i32 = 4031013;
+const MARBLES_NEEDED: i32 = 30;
+
+/// A job instructor: the first job, its text key, and the weapons,
+/// ammunition and bag rows that come with it (upstream `fighter`,
+/// `magician`, `bowman`, `rogue`, `kairinT`); then the second jobs and the
+/// examiner's test that earns them.
 struct Instructor {
     npc_id: i32,
     job: i16,
     text: &'static str,
     items: &'static [(i32, i16)],
     rows: &'static [InventoryType],
+    second_jobs: &'static [i16],
+    /// `None` for Kyrin, whose quests hold the test (`PIRATE_TESTS`).
+    test: Option<Test>,
 }
 
-const INSTRUCTORS: [Instructor; 4] = [
+/// The second job's test: the instructor's letter, the examiner (and the
+/// examiner's map and the portal back to them), the test map and its
+/// proctor.
+struct Test {
+    letter: i32,
+    examiner: i32,
+    examiner_map: i32,
+    examiner_portal: u8,
+    test_map: i32,
+    proctor: i32,
+}
+
+const INSTRUCTORS: [Instructor; 5] = [
     // Dances with Balrog: a sword and a row in every bag.
     Instructor {
         npc_id: 1022000,
@@ -62,6 +93,15 @@ const INSTRUCTORS: [Instructor; 4] = [
             InventoryType::Setup,
             InventoryType::Etc,
         ],
+        second_jobs: &[110, 120, 130],
+        test: Some(Test {
+            letter: 4031008,
+            examiner: 1072000,
+            examiner_map: 102020300,
+            examiner_portal: 2,
+            test_map: 108000300,
+            proctor: 1072004,
+        }),
     },
     // Grendel the Really Old: a wand.
     Instructor {
@@ -70,6 +110,15 @@ const INSTRUCTORS: [Instructor; 4] = [
         text: "magician",
         items: &[(1372043, 1)],
         rows: &[],
+        second_jobs: &[210, 220, 230],
+        test: Some(Test {
+            letter: 4031009,
+            examiner: 1072001,
+            examiner_map: 101020000,
+            examiner_portal: 1,
+            test_map: 108000200,
+            proctor: 1072005,
+        }),
     },
     // Athena Pierce: a bow and arrows.
     Instructor {
@@ -78,6 +127,15 @@ const INSTRUCTORS: [Instructor; 4] = [
         text: "bowman",
         items: &[(1452051, 1), (2060000, 6000)],
         rows: &[InventoryType::Equip, InventoryType::Use],
+        second_jobs: &[310, 320],
+        test: Some(Test {
+            letter: 4031010,
+            examiner: 1072002,
+            examiner_map: 106010000,
+            examiner_portal: 9,
+            test_map: 108000100,
+            proctor: 1072006,
+        }),
     },
     // The Dark Lord: a claw, a dagger and two sets of throwing stars.
     Instructor {
@@ -86,6 +144,58 @@ const INSTRUCTORS: [Instructor; 4] = [
         text: "thief",
         items: &[(1472061, 1), (1332063, 1), (2070015, 1000), (2070015, 1000)],
         rows: &[InventoryType::Equip, InventoryType::Etc],
+        second_jobs: &[410, 420],
+        test: Some(Test {
+            letter: 4031011,
+            examiner: 1072003,
+            examiner_map: 102040000,
+            examiner_portal: 9,
+            test_map: 108000400,
+            proctor: 1072007,
+        }),
+    },
+    // Kyrin: a knuckle, a gun and two sets of bullets.
+    Instructor {
+        npc_id: KYRIN,
+        job: 500,
+        text: "pirate",
+        items: &[(1482014, 1), (1492014, 1), (2330006, 600), (2330006, 600)],
+        rows: &[InventoryType::Equip, InventoryType::Etc],
+        second_jobs: &[510, 520],
+        test: None,
+    },
+];
+
+const KYRIN: i32 = 1090000;
+const KYRIN_MAP: i32 = 120000101;
+/// Inside Kyrin's tests (`inside_pirate`).
+const PIRATE_PROCTOR: i32 = 1072008;
+const CRYSTALS_NEEDED: i32 = 15;
+
+/// Kyrin's second-job tests: a quest for each job, started and completed
+/// with her as the client runs quests, the test map she sends its holder
+/// to, and the crystals its Octopirates drop.
+struct PirateTest {
+    job: i16,
+    quest: i16,
+    map: i32,
+    crystal: i32,
+}
+
+const PIRATE_TESTS: [PirateTest; 2] = [
+    // Brawler: Octopirates only Flash Fist hurts.
+    PirateTest {
+        job: 510,
+        quest: 2191,
+        map: 108000502,
+        crystal: 4031856,
+    },
+    // Gunslinger: Octopirates only Double Shot hurts.
+    PirateTest {
+        job: 520,
+        quest: 2192,
+        map: 108000501,
+        crystal: 4031857,
     },
 ];
 
@@ -113,6 +223,12 @@ pub enum Page {
     Menu {
         text: String,
         choices: Vec<(String, Vec<Page>)>,
+    },
+    /// A choice of styles (`Prompt::Style`), each with the effects picking
+    /// it applies before moving on.
+    Style {
+        text: String,
+        choices: Vec<(i32, Vec<Effect>)>,
     },
 }
 
@@ -150,9 +266,28 @@ impl NpcScript {
     /// plays for `player`.
     pub fn for_npc(npc_id: i32, player: &Player) -> Option<Self> {
         if let Some(instructor) = INSTRUCTORS.iter().find(|i| i.npc_id == npc_id) {
-            return Some(first_job(instructor, player));
+            let stats = &player.stats;
+            return Some(match &instructor.test {
+                _ if stats.job != instructor.job || stats.level < 30 => {
+                    first_job(instructor, player)
+                }
+                Some(test) => second_job(instructor, test, player),
+                None => pirate_second_job(player),
+            });
+        }
+        for instructor in &INSTRUCTORS {
+            let Some(test) = &instructor.test else {
+                continue;
+            };
+            if test.examiner == npc_id {
+                return Some(examiner(instructor, test, player));
+            }
+            if test.proctor == npc_id {
+                return Some(proctor(instructor, test, player));
+            }
         }
         match npc_id {
+            PIRATE_PROCTOR => Some(pirate_proctor(player)),
             ROBIN => Some(robin()),
             SHANKS => Some(shanks(player)),
             HERACLE => Some(heracle(player)),
@@ -163,6 +298,7 @@ impl NpcScript {
             PURIN => Some(leave_ship(PURIN, &conti::TO_ORBIS)),
             ERIN => Some(leave_ship(ERIN, &conti::TO_ELLINIA)),
             ISA => Some(isa()),
+            NATALIE => Some(natalie(player)),
             MAPLE_ADMINISTRATOR => Some(Self::new(
                 MAPLE_ADMINISTRATOR,
                 vec![Page::Ask {
@@ -216,6 +352,11 @@ impl NpcScript {
                 self.pages = pages.clone();
                 self.page = 0;
                 Some(self.begin())
+            }
+            (Page::Style { choices, .. }, ScriptInput::Select(choice)) => {
+                let (_, effects) = choices.get(usize::try_from(choice).ok()?)?;
+                let effects = effects.clone();
+                Some(self.advance(effects))
             }
             _ => None,
         }
@@ -272,6 +413,11 @@ impl NpcScript {
                 }
                 Prompt::Selection { npc_id, text: menu }
             }
+            Page::Style { text, choices } => Prompt::Style {
+                npc_id,
+                text: text.clone(),
+                styles: choices.iter().map(|&(style, _)| style).collect(),
+            },
         };
         Step {
             prompt: Some(prompt),
@@ -520,6 +666,171 @@ fn first_job(instructor: &Instructor, player: &Player) -> NpcScript {
     script
 }
 
+/// A first-job Explorer of level 30 or more: a letter for the examiner,
+/// and for the proof from the examiner's test, the choice of second job.
+fn second_job(instructor: &Instructor, test: &Test, player: &Player) -> NpcScript {
+    let line = |line: &str| text(&keys::second_job(instructor.text, line));
+    if player.inventory.count(PROOF_OF_A_HERO) > 0 {
+        let choices = instructor
+            .second_jobs
+            .iter()
+            .map(|&job| {
+                let line = |line: &str| text(&keys::second_job(&job.to_string(), line));
+                let on_yes = vec![
+                    Effect::TakeItem {
+                        item_id: PROOF_OF_A_HERO,
+                        quantity: 1,
+                    },
+                    Effect::TakeSecondJob(job),
+                    Effect::AddSlotRow(InventoryType::Etc),
+                ];
+                let pages = vec![
+                    Page::Say(line("about")),
+                    Page::Ask {
+                        text: line("ask"),
+                        on_yes,
+                        on_no: None,
+                    },
+                    Page::Say(line("accept")),
+                ];
+                (line("name"), pages)
+            })
+            .collect();
+        let menu = Page::Menu {
+            text: line("choose"),
+            choices,
+        };
+        return NpcScript::new(instructor.npc_id, vec![menu]);
+    }
+    if player.inventory.count(test.letter) > 0 {
+        return NpcScript::new(instructor.npc_id, vec![Page::Say(line("go"))]);
+    }
+    let mut script = NpcScript::new(instructor.npc_id, vec![Page::Say(line("letter"))]);
+    script.on_end = vec![Effect::GiveItem {
+        item_id: test.letter,
+        quantity: 1,
+    }];
+    script.inventory_full = Some(text(keys::SECOND_JOB_INVENTORY_FULL));
+    script
+}
+
+/// The second job's examiner lets the instructor's letter into the test.
+/// The player keeps the letter until passing, so leaving and coming back
+/// needs no other record (upstream marks a quest the client doesn't have).
+fn examiner(instructor: &Instructor, test: &Test, player: &Player) -> NpcScript {
+    let line = |line: &str| text(&keys::second_job(instructor.text, line));
+    let pages = if player.inventory.count(test.letter) == 0 {
+        vec![Page::Say(line("examiner.other"))]
+    } else {
+        vec![
+            Page::Say(line("examiner")),
+            Page::Ask {
+                text: line("examiner.ask"),
+                on_yes: vec![Effect::Warp(test.test_map)],
+                on_no: Some(line("examiner.decline")),
+            },
+        ]
+    };
+    NpcScript::new(test.examiner, pages)
+}
+
+/// Inside the test, the proctor trades all of the player's Dark Marbles,
+/// once there are enough, and the letter for the proof, and sees anyone
+/// out to the examiner.
+fn proctor(instructor: &Instructor, test: &Test, player: &Player) -> NpcScript {
+    let line = |line: &str| text(&keys::second_job(instructor.text, line));
+    let out = Effect::WarpToPortal(test.examiner_map, test.examiner_portal);
+    let marbles = player.inventory.count(DARK_MARBLE);
+    if marbles < MARBLES_NEEDED {
+        let leave = Page::Ask {
+            text: line("proctor.ask"),
+            on_yes: vec![out],
+            on_no: None,
+        };
+        return NpcScript::new(test.proctor, vec![leave]);
+    }
+    let mut on_end = vec![Effect::TakeItem {
+        item_id: DARK_MARBLE,
+        quantity: i16::try_from(marbles).unwrap_or(i16::MAX),
+    }];
+    if player.inventory.count(test.letter) > 0 {
+        on_end.push(Effect::TakeItem {
+            item_id: test.letter,
+            quantity: 1,
+        });
+    }
+    on_end.push(Effect::GiveItem {
+        item_id: PROOF_OF_A_HERO,
+        quantity: 1,
+    });
+    on_end.push(out);
+    let mut script = NpcScript::new(test.proctor, vec![Page::Say(line("proctor.pass"))]);
+    script.on_end = on_end;
+    script.inventory_full = Some(text(keys::SECOND_JOB_INVENTORY_FULL));
+    script
+}
+
+/// Kyrin and a level-30 Pirate. With one of her quests completed, she
+/// offers its job; with one started, the way into its test; otherwise she
+/// points to the quests, which the client offers beside her script.
+fn pirate_second_job(player: &Player) -> NpcScript {
+    let line = |line: &str| text(&keys::second_job("pirate", line));
+    let quest = |state| {
+        PIRATE_TESTS
+            .iter()
+            .find(|test| player.quests.state(test.quest) == state)
+    };
+    let pages = if let Some(test) = quest(QuestState::Completed) {
+        let line = |line: &str| text(&keys::second_job(&test.job.to_string(), line));
+        vec![
+            Page::Say(line("about")),
+            Page::Ask {
+                text: line("ask"),
+                on_yes: vec![
+                    Effect::TakeSecondJob(test.job),
+                    Effect::AddSlotRow(InventoryType::Etc),
+                ],
+                on_no: None,
+            },
+            Page::Say(line("accept")),
+        ]
+    } else if let Some(test) = quest(QuestState::Started) {
+        vec![Page::Ask {
+            text: line("test"),
+            on_yes: vec![Effect::Warp(test.map)],
+            on_no: None,
+        }]
+    } else {
+        vec![Page::Say(line("quest"))]
+    };
+    let mut script = NpcScript::new(KYRIN, pages);
+    script.inventory_full = Some(text(keys::SECOND_JOB_INVENTORY_FULL));
+    script
+}
+
+/// `inside_pirate`: in a test map, with the test's 15 crystals, the
+/// proctor sees the player back to Kyrin; without, offers the way out. The
+/// crystals stay for Kyrin's quest to take (upstream takes them only from
+/// a player who leaves early).
+fn pirate_proctor(player: &Player) -> NpcScript {
+    let line = |line: &str| text(&keys::second_job("pirate", line));
+    let out = Effect::WarpToPortal(KYRIN_MAP, 0);
+    let passed = PIRATE_TESTS.iter().any(|test| {
+        test.map == player.stats.map_id && player.inventory.count(test.crystal) >= CRYSTALS_NEEDED
+    });
+    if !passed {
+        let leave = Page::Ask {
+            text: line("proctor.ask"),
+            on_yes: vec![out],
+            on_no: None,
+        };
+        return NpcScript::new(PIRATE_PROCTOR, vec![leave]);
+    }
+    let mut script = NpcScript::new(PIRATE_PROCTOR, vec![Page::Say(line("proctor.pass"))]);
+    script.on_end = vec![out];
+    script
+}
+
 /// `begin5`: Robin's questions and answers, as many topics and pages as the
 /// text has.
 fn robin() -> NpcScript {
@@ -546,6 +857,77 @@ fn robin() -> NpcScript {
     )
 }
 
+/// `hair_henesys1`: Natalie cuts or dyes the player's hair for a coupon.
+fn natalie(player: &Player) -> NpcScript {
+    let hair = player.stats.hair;
+    let gender = usize::from(player.stats.gender.min(1));
+    let cuts = NATALIE_HAIRS[gender].map(|style| style + hair % 10);
+    let dyes = (0..8).map(|colour| hair / 10 * 10 + colour);
+    NpcScript::new(
+        NATALIE,
+        vec![Page::Menu {
+            text: text(keys::NATALIE_MENU),
+            // The client can't show an empty choice of styles.
+            choices: [
+                (
+                    keys::NATALIE_CUT,
+                    hair_salon(
+                        player,
+                        cuts.into_iter(),
+                        HAIRCUT_COUPON,
+                        keys::NATALIE_CUT_PAGES,
+                    ),
+                ),
+                (
+                    keys::NATALIE_DYE,
+                    hair_salon(player, dyes, DYE_COUPON, keys::NATALIE_DYE_PAGES),
+                ),
+            ]
+            .into_iter()
+            .filter_map(|(label, pages)| Some((text(label), pages?)))
+            .collect(),
+        }],
+    )
+}
+
+/// A choice of the hair `styles` that exist, other than the one worn, for a
+/// `coupon`; then what the stylist says after, or to a player without one.
+/// `None` if there are no such styles.
+fn hair_salon(
+    player: &Player,
+    styles: impl Iterator<Item = i32>,
+    coupon: i32,
+    [ask, done, no_coupon]: [&str; 3],
+) -> Option<Vec<Page>> {
+    let has_coupon = player.inventory.count(coupon) > 0;
+    let choices = styles
+        .filter(|&style| style != player.stats.hair && crate::items::has_style(style))
+        .map(|style| {
+            let effects = if has_coupon {
+                vec![
+                    Effect::TakeItem {
+                        item_id: coupon,
+                        quantity: 1,
+                    },
+                    Effect::SetStyle(style),
+                ]
+            } else {
+                Vec::new()
+            };
+            (style, effects)
+        })
+        .collect::<Vec<_>>();
+    (!choices.is_empty()).then(|| {
+        vec![
+            Page::Style {
+                text: text(ask),
+                choices,
+            },
+            Page::Say(text(if has_coupon { done } else { no_coupon })),
+        ]
+    })
+}
+
 fn text(key: &str) -> String {
     content::text().get(key, &[])
 }
@@ -564,6 +946,7 @@ pub fn input(
         (Prompt::YesNo { .. }, 1, 1) => Some(ScriptInput::Yes),
         (Prompt::YesNo { .. }, 1, 0) => Some(ScriptInput::No),
         (Prompt::Selection { .. }, 4, 1) => selection.map(ScriptInput::Select),
+        (Prompt::Style { .. }, 7, 1) => selection.map(ScriptInput::Select),
         _ => None,
     }
 }
@@ -571,6 +954,7 @@ pub fn input(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use game::QuestStatus;
 
     fn player(hp: i16) -> Player {
         let mut player = crate::codec::stats::sample_player();
@@ -584,6 +968,7 @@ mod tests {
             Prompt::Text(_) => 0,
             Prompt::YesNo { .. } => 1,
             Prompt::Selection { .. } => 4,
+            Prompt::Style { .. } => 7,
         })
     }
 
@@ -949,6 +1334,170 @@ mod tests {
     }
 
     #[test]
+    fn first_jobs_pass_the_examiners_test_for_their_second_job() {
+        const LETTER: i32 = 4031010;
+        let bowman = |items: &[(i16, i32, i16)]| {
+            let mut player = player(50);
+            (player.stats.job, player.stats.level) = (300, 30);
+            for &(slot, item_id, quantity) in items {
+                let item = game::Item::stack(item_id, quantity);
+                player.inventory.insert(InventoryType::Etc, slot, item);
+            }
+            player
+        };
+        let give = |item_id| Effect::GiveItem {
+            item_id,
+            quantity: 1,
+        };
+        let take = |item_id, quantity| Effect::TakeItem { item_id, quantity };
+
+        // Athena gives a letter for the examiner, then sends the player on.
+        let mut athena = NpcScript::for_npc(1012100, &bowman(&[])).unwrap();
+        assert_eq!(buttons(&athena.begin()), (false, true));
+        assert_eq!(
+            athena.respond(ScriptInput::Next).unwrap().effects,
+            [give(LETTER)]
+        );
+        assert!(athena.inventory_full().is_some());
+        let with_letter = bowman(&[(1, LETTER, 1)]);
+        let athena = NpcScript::for_npc(1012100, &with_letter).unwrap();
+        assert_eq!(buttons(&athena.begin()), (false, false));
+
+        // The examiner lets letter holders into the test, letter and all.
+        let mut examiner = NpcScript::for_npc(1072002, &with_letter).unwrap();
+        examiner.respond(ScriptInput::Next).unwrap();
+        let entered = examiner.respond(ScriptInput::Yes).unwrap();
+        assert_eq!(entered.effects, [Effect::Warp(108000100)]);
+        let examiner = NpcScript::for_npc(1072002, &bowman(&[])).unwrap();
+        assert_eq!(buttons(&examiner.begin()), (false, false));
+
+        // The proctor sees anyone out, and trades every marble, once there
+        // are 30, and the letter for the proof.
+        let out = Effect::WarpToPortal(106010000, 9);
+        let mut proctor = NpcScript::for_npc(1072006, &with_letter).unwrap();
+        assert_eq!(kind(&proctor.begin()), Some(1));
+        assert_eq!(
+            proctor.respond(ScriptInput::Yes).unwrap().effects,
+            [out.clone()]
+        );
+        let passed = bowman(&[(1, LETTER, 1), (2, DARK_MARBLE, 25), (3, DARK_MARBLE, 6)]);
+        let mut proctor = NpcScript::for_npc(1072006, &passed).unwrap();
+        assert_eq!(
+            proctor.respond(ScriptInput::Next).unwrap().effects,
+            [
+                take(DARK_MARBLE, 31),
+                take(LETTER, 1),
+                give(PROOF_OF_A_HERO),
+                out
+            ]
+        );
+
+        // For the proof, Athena offers each path.
+        let mut athena = NpcScript::for_npc(1012100, &bowman(&[(1, PROOF_OF_A_HERO, 1)])).unwrap();
+        assert_eq!(kind(&athena.begin()), Some(4));
+        assert_eq!(athena.respond(ScriptInput::Select(2)), None, "two paths");
+        athena.respond(ScriptInput::Select(1)).unwrap();
+        assert_eq!(kind(&athena.respond(ScriptInput::Next).unwrap()), Some(1));
+        assert_eq!(
+            athena.respond(ScriptInput::Yes).unwrap().effects,
+            [
+                take(PROOF_OF_A_HERO, 1),
+                Effect::TakeSecondJob(320),
+                Effect::AddSlotRow(InventoryType::Etc),
+            ]
+        );
+
+        // Below level 30, the first job's single page.
+        let mut young = bowman(&[]);
+        young.stats.level = 29;
+        let athena = NpcScript::for_npc(1012100, &young).unwrap();
+        assert_eq!(buttons(&athena.begin()), (false, false));
+    }
+
+    #[test]
+    fn kyrin_makes_pirates_and_sends_them_to_her_quests_tests() {
+        let mut beginner = player(50);
+        (beginner.stats.job, beginner.stats.dex) = (0, 20);
+        let mut kyrin = NpcScript::for_npc(KYRIN, &beginner).unwrap();
+        kyrin.respond(ScriptInput::Next).unwrap();
+        let accepted = kyrin.respond(ScriptInput::Yes).unwrap();
+        assert_eq!(
+            accepted.effects[..3],
+            [
+                Effect::TakeFirstJob(500),
+                Effect::AddSlotRow(InventoryType::Equip),
+                Effect::AddSlotRow(InventoryType::Etc),
+            ]
+        );
+        assert_eq!(
+            accepted.effects.len(),
+            7,
+            "a knuckle, a gun, two sets of bullets"
+        );
+        for _ in 0..5 {
+            kyrin.respond(ScriptInput::Next).unwrap();
+        }
+        assert_eq!(kyrin.respond(ScriptInput::Next), Some(Step::default()));
+
+        let pirate = |quest: Option<(i16, QuestStatus)>, map, crystals| {
+            let mut player = player(50);
+            (player.stats.job, player.stats.level, player.stats.map_id) = (500, 30, map);
+            if let Some((quest_id, status)) = quest {
+                player.quests.upsert(game::QuestRecord { quest_id, status });
+            }
+            if crystals > 0 {
+                let item = game::Item::stack(4031856, crystals);
+                player.inventory.insert(InventoryType::Etc, 1, item);
+            }
+            player
+        };
+        let started = || QuestStatus::Started { kills: Vec::new() };
+
+        // Without a quest, a word about them; with Brawler's started, the
+        // way into its test.
+        let kyrin = NpcScript::for_npc(KYRIN, &pirate(None, KYRIN_MAP, 0)).unwrap();
+        assert_eq!(buttons(&kyrin.begin()), (false, false));
+        let mut kyrin =
+            NpcScript::for_npc(KYRIN, &pirate(Some((2191, started())), KYRIN_MAP, 0)).unwrap();
+        assert_eq!(kind(&kyrin.begin()), Some(1));
+        assert_eq!(
+            kyrin.respond(ScriptInput::Yes).unwrap().effects,
+            [Effect::Warp(108000502)]
+        );
+
+        // The proctor sees anyone out to Kyrin, after a word of praise for
+        // the crystals, which stay for the quest.
+        let out = Effect::WarpToPortal(KYRIN_MAP, 0);
+        let mut proctor = NpcScript::for_npc(PIRATE_PROCTOR, &pirate(None, 108000502, 14)).unwrap();
+        assert_eq!(kind(&proctor.begin()), Some(1));
+        assert_eq!(
+            proctor.respond(ScriptInput::Yes).unwrap().effects,
+            [out.clone()]
+        );
+        let elsewhere = pirate(None, 108000501, 15);
+        let proctor = NpcScript::for_npc(PIRATE_PROCTOR, &elsewhere).unwrap();
+        assert_eq!(kind(&proctor.begin()), Some(1), "the Gunslinger's test");
+        let mut proctor = NpcScript::for_npc(PIRATE_PROCTOR, &pirate(None, 108000502, 15)).unwrap();
+        assert_eq!(buttons(&proctor.begin()), (false, true));
+        assert_eq!(proctor.respond(ScriptInput::Next).unwrap().effects, [out]);
+
+        // With the quest completed, the job.
+        let done = QuestStatus::Completed {
+            at: std::time::SystemTime::UNIX_EPOCH,
+        };
+        let mut kyrin =
+            NpcScript::for_npc(KYRIN, &pirate(Some((2191, done)), KYRIN_MAP, 0)).unwrap();
+        assert_eq!(kind(&kyrin.respond(ScriptInput::Next).unwrap()), Some(1));
+        assert_eq!(
+            kyrin.respond(ScriptInput::Yes).unwrap().effects,
+            [
+                Effect::TakeSecondJob(510),
+                Effect::AddSlotRow(InventoryType::Etc),
+            ]
+        );
+    }
+
+    #[test]
     fn answers_must_fit_the_prompt() {
         let page = Prompt::Text(DialoguePage {
             npc_id: 1,
@@ -965,5 +1514,72 @@ mod tests {
         };
         assert_eq!(input(&menu, 4, 1, Some(3)), Some(ScriptInput::Select(3)));
         assert_eq!(input(&menu, 4, -1, None), None);
+        let styles = Prompt::Style {
+            npc_id: 1,
+            text: String::new(),
+            styles: vec![30000],
+        };
+        assert_eq!(input(&styles, 7, 1, Some(0)), Some(ScriptInput::Select(0)));
+        assert_eq!(input(&styles, 7, 0, None), None, "cancelled");
+        assert_eq!(input(&styles, 4, 1, Some(0)), None);
+    }
+
+    fn styles(step: &Step) -> Vec<i32> {
+        match &step.prompt {
+            Some(Prompt::Style { styles, .. }) => styles.clone(),
+            other => panic!("styles expected, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn natalie_cuts_hair_for_a_coupon() {
+        // A man with black hair (30030) and a haircut coupon.
+        let mut man = player(50);
+        man.stats.gender = 0;
+        man.inventory.insert(
+            game::InventoryType::Cash,
+            1,
+            game::Item::stack(HAIRCUT_COUPON, 1),
+        );
+        let mut natalie = NpcScript::for_npc(NATALIE, &man).unwrap();
+        assert_eq!(kind(&natalie.begin()), Some(4));
+        let cuts = natalie.respond(ScriptInput::Select(0)).unwrap();
+        assert_eq!(
+            styles(&cuts),
+            [30060, 30140, 30200, 30210, 30310, 33040, 33100]
+        );
+        let done = natalie.respond(ScriptInput::Select(1)).unwrap();
+        assert_eq!(
+            done.effects,
+            [
+                Effect::TakeItem {
+                    item_id: HAIRCUT_COUPON,
+                    quantity: 1
+                },
+                Effect::SetStyle(30140),
+            ]
+        );
+        assert_eq!(buttons(&done), (false, false));
+        assert_eq!(natalie.respond(ScriptInput::Next), Some(Step::default()));
+    }
+
+    #[test]
+    fn natalie_dyes_to_other_colours_and_needs_the_coupon() {
+        // A woman with hair 31142, and no dye coupon.
+        let mut woman = player(50);
+        woman.stats.hair = 31142;
+        let mut natalie = NpcScript::for_npc(NATALIE, &woman).unwrap();
+        let cuts = natalie.respond(ScriptInput::Select(0)).unwrap();
+        assert_eq!(styles(&cuts)[0], 31152, "her colour, the women's styles");
+        let mut natalie = NpcScript::for_npc(NATALIE, &woman).unwrap();
+        let dyes = natalie.respond(ScriptInput::Select(1)).unwrap();
+        assert_eq!(
+            styles(&dyes),
+            [31140, 31141, 31143, 31144, 31145, 31146, 31147]
+        );
+        assert_eq!(natalie.respond(ScriptInput::Select(7)), None);
+        let refused = natalie.respond(ScriptInput::Select(0)).unwrap();
+        assert!(refused.effects.is_empty());
+        assert_eq!(kind(&refused), Some(0));
     }
 }

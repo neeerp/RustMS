@@ -42,7 +42,8 @@ pub struct CharListPacket {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CharNameResponsePacket {
     pub name: String,
-    pub available: bool,
+    /// 0 available, 1 taken, 2 not allowed.
+    pub result: u8,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -75,6 +76,7 @@ pub struct SetFieldPacket {
     pub job: i16,
     pub str: i16,
     pub max_hp: i16,
+    pub hair: i32,
     pub ap: i16,
     pub sp: i16,
     /// Skill levels by skill id.
@@ -170,6 +172,7 @@ struct CharacterMeta {
     job: i16,
     str: i16,
     max_hp: i16,
+    hair: i32,
     ap: i16,
     sp: i16,
 }
@@ -716,13 +719,10 @@ pub fn decode_char_name_response(packet: &Packet) -> Result<CharNameResponsePack
     let name = cursor
         .read_str_with_length()
         .map_err(|e| format!("failed to read char-name response name: {e}"))?;
-    let unavailable_flag = cursor
+    let result = cursor
         .read_byte()
-        .map_err(|e| format!("failed to read char-name availability flag: {e}"))?;
-    Ok(CharNameResponsePacket {
-        name,
-        available: unavailable_flag == 0,
-    })
+        .map_err(|e| format!("failed to read char-name result: {e}"))?;
+    Ok(CharNameResponsePacket { name, result })
 }
 
 pub fn decode_new_character(packet: &Packet) -> Result<NewCharacterPacket, String> {
@@ -901,6 +901,7 @@ pub fn decode_set_field(packet: &Packet) -> Result<SetFieldPacket, String> {
         job: meta.job,
         str: meta.str,
         max_hp: meta.max_hp,
+        hair: meta.hair,
         ap: meta.ap,
         sp: meta.sp,
         skills,
@@ -1272,7 +1273,9 @@ fn decode_character_meta(cursor: &mut Cursor<&[u8]>) -> Result<CharacterMeta, St
     let name = String::from_utf8(name_bytes[..end].to_vec())
         .map_err(|e| format!("invalid utf-8 in character name: {e}"))?;
 
-    skip(cursor, 1 + 1 + 4 + 4 + 8 + 8 + 8)?;
+    skip(cursor, 1 + 1 + 4)?; // gender, skin, face
+    let hair = cursor.read_int().map_err(|e| e.to_string())?;
+    skip(cursor, 8 + 8 + 8)?;
     let level = cursor.read_byte().map_err(|e| e.to_string())?;
     let job = cursor.read_short().map_err(|e| e.to_string())?;
     let str = cursor.read_short().map_err(|e| e.to_string())?;
@@ -1299,6 +1302,7 @@ fn decode_character_meta(cursor: &mut Cursor<&[u8]>) -> Result<CharacterMeta, St
         job,
         str,
         max_hp,
+        hair,
         ap,
         sp,
     })

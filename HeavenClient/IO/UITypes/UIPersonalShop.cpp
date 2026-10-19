@@ -575,14 +575,9 @@ namespace ms
 					if (title.empty())
 						return;
 
-					if (CurseData::filter(title) != title)
-					{
-						notice("Cursing is not allowed.");
-
-						return;
-					}
-
-					ShopCreatePacket(title, slot, itemid).dispatch();
+					// v83 (FUN_00a1dd99) opens the store with curse words
+					// starred out rather than refusing the name.
+					ShopCreatePacket(CurseData::filter(title), slot, itemid).dispatch();
 				},
 				50
 		);

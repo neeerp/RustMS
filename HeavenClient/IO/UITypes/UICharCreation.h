@@ -60,7 +60,8 @@ namespace ms
 		UIElement::Type get_type() const override;
 
 		// The server's answer to the name check.
-		void send_naming_result(bool nameused);
+		void send_naming_result(uint8_t result);
+		void send_creation_failed(uint8_t result);
 
 		// The server added the new character: back to the character select.
 		void send_created();

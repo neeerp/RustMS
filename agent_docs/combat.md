@@ -139,6 +139,11 @@ others, applies the damage, sends the attacker SHOW_MONSTER_HP, and on death
 KILL_MONSTER to everyone; the attacker gets the MP and mesos left as
 STAT_CHANGED.
 
+A mob with an `info/damagedBySelectedSkill` list (Kyrin's test
+Octopirates, 9001005 and 9001006) is hurt only by those skills. v83 rolls 0
+(MISS) for any other attack (`FUN_0068146c`), so the field applies none of
+its damage (`MobInfo::hurt_by`), and HeavenClient rolls MISS for it as well.
+
 A shot fires from the USE slot the client names, as in v83 (`shot_ammo`). The
 item there must fit the weapon (stars for claws, arrows for bows and the
 Arrow claw 1472063, crossbow arrows, bullets for guns) and cover the cost:
@@ -473,9 +478,10 @@ carry the statuses a mob has. Entries come in the client's decode order
   (`elemAttr` S1) or ice (I1) shrugs off Poison or Freeze.
 - Poison, Venom and Ambush take HP each second on the field tick
   (`MobSet::hurt_by_statuses`), the mob's `fixedDamage` instead if it has
-  one, never below 1 HP. The damage counts toward the inflicter's EXP share,
-  and they see the HP bar. Every client shows the numbers itself
-  (HeavenClient `MobHurts`).
+  one, never below 1 HP, and nothing if the status's skill can't hurt the
+  mob (`damagedBySelectedSkill`). The damage counts toward the inflicter's
+  EXP share, and they see the HP bar. Every client shows the numbers itself
+  (HeavenClient `MobHurts`), MISS where nothing is taken.
 - Statuses wear off on the field tick.
 
 HeavenClient keeps a mob's statuses (`MobStatParser`): Slow feeds its speed,

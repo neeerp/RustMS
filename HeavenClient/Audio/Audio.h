@@ -109,6 +109,9 @@ namespace ms
 
 		void play();
 
+		// Play at `volume` percent of the sound effects' volume.
+		void play(uint8_t volume);
+
 		// Play the sound over and over until stop.
 		void play_loop();
 

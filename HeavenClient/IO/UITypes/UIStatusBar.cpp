@@ -18,12 +18,14 @@
 #include "UIStatusBar.h"
 
 #include "UIChannel.h"
+#include "UIChatBar.h"
 #include "UIEquipInventory.h"
 #include "UIGameOption.h"
 #include "UIItemInventory.h"
 #include "UIKeyConfig.h"
 #include "UIMessenger.h"
 #include "UIQuestLog.h"
+#include "UIQuiz.h"
 #include "UIQuit.h"
 #include "UIMonsterBook.h"
 #include "UISkillBook.h"
@@ -537,6 +539,15 @@ namespace ms
 				toggle_menu(Menu::SHORTCUT);
 				return Button::State::NORMAL;
 			case Buttons::BT_GAME_CHANNEL:
+				// v83 FUN_00a06735: not during a quiz.
+				if (taking_quiz())
+				{
+					if (auto chatbar = UI::get().get_element<UIChatBar>())
+						chatbar->send_chatline("You can't do this while taking the quiz.", UIChatBar::LineType::SKILL);
+
+					break;
+				}
+
 				UI::get().emplace<UIChannel>();
 				break;
 			case Buttons::BT_GAME_OPTION:

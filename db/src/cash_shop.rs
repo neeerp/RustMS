@@ -73,7 +73,7 @@ pub fn balance(account_id: i32) -> crate::Result<Balance> {
     Ok(balance_of(&mut *crate::connection()?, account_id)?)
 }
 
-/// The account's Cash Inventory, and apart from it the gifts it hasn't been
+/// The account's Cash Inventory, and the gifts in it that it hasn't been
 /// shown yet, which from now on count as shown.
 pub fn open_cash_inventory(account_id: i32) -> crate::Result<(Vec<CashItem>, Vec<CashItem>)> {
     let mut conn = crate::connection()?;
@@ -82,9 +82,11 @@ pub fn open_cash_inventory(account_id: i32) -> crate::Result<(Vec<CashItem>, Vec
             .filter(cash_items::account_id.eq(account_id))
             .order(cash_items::id)
             .load(conn)?;
-        let (gifts, items): (Vec<_>, Vec<_>) = items
-            .into_iter()
-            .partition(|item| item.gift_message.is_some());
+        let gifts: Vec<CashItem> = items
+            .iter()
+            .filter(|item| item.gift_message.is_some())
+            .cloned()
+            .collect();
         let ids: Vec<i64> = gifts.iter().map(|gift| gift.id).collect();
         diesel::update(cash_items::table.filter(cash_items::id.eq_any(&ids)))
             .set(cash_items::gift_message.eq(None::<String>))

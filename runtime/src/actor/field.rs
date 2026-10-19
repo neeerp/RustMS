@@ -387,10 +387,18 @@ impl FieldActor {
                 }
                 FieldRequest::Attack {
                     broadcast,
+                    skill,
                     counter,
                     hits,
                     inflicts,
-                } => self.handle_attack(from, Some(broadcast), Some(counter), hits, &inflicts),
+                } => self.handle_attack(
+                    from,
+                    Some(broadcast),
+                    Some(skill),
+                    Some(counter),
+                    hits,
+                    &inflicts,
+                ),
                 FieldRequest::Reflect {
                     object_id,
                     mob_id,
@@ -804,14 +812,17 @@ impl FieldActor {
         }
     }
 
-    /// `from` attacked the mobs in `hits`, showing the others `broadcast`;
-    /// each one with the `counter` status hurts them back, once (v83
-    /// FUN_007937e3, rolled again here: its client only shows its own
-    /// roll).
+    /// `from` attacked the mobs in `hits` with `skill`, showing the others
+    /// `broadcast`; each one with the `counter` status hurts them back, once
+    /// (v83 FUN_007937e3, rolled again here: its client only shows its own
+    /// roll). A mob that only some skills hurt takes nothing from the others,
+    /// as their v83 clients count it a miss (FUN_0068146c); a reflection
+    /// (no skill) isn't judged.
     fn handle_attack(
         &mut self,
         from: ClientId,
         broadcast: Option<Packet>,
+        skill: Option<i32>,
         counter: Option<MobStat>,
         hits: Vec<(i32, i64)>,
         inflicts: &[Inflict],
@@ -837,6 +848,12 @@ impl FieldActor {
             });
         }
         for (object_id, damage) in hits {
+            let hurts = skill.is_none_or(|skill| {
+                self.mobs
+                    .get(object_id)
+                    .is_none_or(|mob| mob.info.hurt_by(skill))
+            });
+            let damage = if hurts { damage } else { 0 };
             match self.mobs.damage(from, object_id, damage, now) {
                 Some(Ok(percent)) => {
                     if let Ok(packet) = build_mob_hp(object_id, percent) {
@@ -1126,7 +1143,14 @@ impl FieldActor {
             .map(|hit| (hit.object_id, i64::from(hit.damage)))
             .collect();
         // A v83 client counters only its own attacks.
-        self.handle_attack(from, Some(broadcast), None, hits, limit.inflict.as_slice());
+        self.handle_attack(
+            from,
+            Some(broadcast),
+            Some(view.skill_id),
+            None,
+            hits,
+            limit.inflict.as_slice(),
+        );
     }
 
     /// `from`'s Power Guard hurt the mob that touched them as one of their
@@ -1137,7 +1161,7 @@ impl FieldActor {
             .get(object_id)
             .is_some_and(|mob| mob.info.mob_id == mob_id)
         {
-            self.handle_attack(from, None, None, vec![(object_id, damage)], &[]);
+            self.handle_attack(from, None, None, None, vec![(object_id, damage)], &[]);
         }
     }
 

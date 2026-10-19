@@ -39,6 +39,15 @@ pub fn account_has_level(account_id: i32, min_level: i16) -> crate::Result<bool>
     .get_result(&mut connection)?)
 }
 
+/// How many characters the account has, in every world.
+pub fn count_characters(account_id: i32) -> crate::Result<i64> {
+    let mut connection = crate::connection()?;
+    Ok(characters
+        .filter(accountid.eq(account_id))
+        .count()
+        .get_result(&mut connection)?)
+}
+
 pub(crate) fn insert_character(
     connection: &mut PgConnection,
     new_character: &NewCharacter,

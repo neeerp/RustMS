@@ -165,7 +165,8 @@ pub fn count_kill<'a>(
 
 /// The item changes a quest step makes for `player`, as `(item id, count)`:
 /// every entry for their job and gender without a `prop`, plus one pick
-/// among those with one, weighted by it.
+/// among those with one, weighted by it. An entry without a count takes
+/// all the player holds, and is left out if that's none.
 pub fn pick_items(items: &[QuestItem], player: &Player, rng: &mut impl Rng) -> Vec<(i32, i32)> {
     let eligible: Vec<&QuestItem> = items
         .iter()
@@ -174,7 +175,11 @@ pub fn pick_items(items: &[QuestItem], player: &Player, rng: &mut impl Rng) -> V
     let mut picked: Vec<(i32, i32)> = eligible
         .iter()
         .filter(|item| item.prop.is_none())
-        .map(|item| (item.item_id, item.count))
+        .map(|item| match item.count {
+            0 => (item.item_id, -player.inventory.count(item.item_id)),
+            count => (item.item_id, count),
+        })
+        .filter(|&(_, count)| count != 0)
         .collect();
     let weighted: Vec<&&QuestItem> = eligible
         .iter()
@@ -436,17 +441,32 @@ mod tests {
                 count: -1,
                 ..item(4031802, 0, 2, None)
             },
+            // Without a count: all held, or nothing.
+            QuestItem {
+                count: 0,
+                ..item(4031792, 0, 2, None)
+            },
+            QuestItem {
+                count: 0,
+                ..item(4031856, 0, 2, None)
+            },
         ];
         let mut beginner = player(1, 0);
         beginner.stats.gender = 0;
+        beginner
+            .inventory
+            .add(game::Item::stack(4031792, 17), 100)
+            .unwrap();
         let mut rng = rand::rngs::StdRng::seed_from_u64(7);
         let mut hats = std::collections::BTreeSet::new();
         for _ in 0..50 {
             let picked = pick_items(&items, &beginner, &mut rng);
-            // The shellpiece is always taken; exactly one hat; no sword
-            // (warriors only) and no skirt (female only).
-            assert_eq!(picked.len(), 2);
+            // The shellpiece and every held 4031792 are always taken;
+            // exactly one hat; no sword (warriors only) and no skirt
+            // (female only).
+            assert_eq!(picked.len(), 3);
             assert!(picked.contains(&(4031802, -1)));
+            assert!(picked.contains(&(4031792, -17)));
             hats.insert(picked.iter().find(|(_, c)| *c > 0).unwrap().0);
         }
         assert_eq!(hats.len(), 2);

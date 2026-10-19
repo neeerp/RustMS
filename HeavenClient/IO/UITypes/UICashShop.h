@@ -80,6 +80,9 @@ namespace ms
 		int16_t get_storage_slots() const;
 		void remove_cash_item(int64_t cash_id);
 		void set_wish_list(const std::vector<int32_t>& sns);
+		// Whether the last change to the wish list added a wish (v83 CCashShop+0x4c8 clear), which
+		// v83 announces when the list comes back.
+		bool added_wish() const;
 
 		// v83 (CCashShop+0x18) has one request out at a time and ignores the
 		// buttons until its answer. Returns whether one may be sent, counting
@@ -90,6 +93,8 @@ namespace ms
 
 	private:
 		void change_tab(cash_catalog::Tab tab);
+		// Add a wish, or say why not.
+		void reserve(int32_t sn);
 		void change_subtab(size_t subtab);
 		void change_page(size_t page);
 		void update_list();
@@ -178,6 +183,7 @@ namespace ms
 		int32_t points;
 		int32_t prepaid;
 		bool pending;
+		bool wish_added;
 		int16_t storage_slots;
 
 		std::vector<CashItem> cash_items;
