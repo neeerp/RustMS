@@ -73,6 +73,10 @@ namespace ms
 
 		void toggle_fullscreen();
 
+		// Save the next frame as the next free MapleNNNN.jpg in the working
+		// directory.
+		void screenshot();
+
 	private:
 		void updateopc();
 
@@ -84,7 +88,10 @@ namespace ms
 		std::function<void()> fadeprocedure;
 		int16_t width;
 		int16_t height;
+		mutable bool screenshot_pending = false;
 
-		std::string GetCurrentWorkingDir(void);
+		void save_screenshot() const;
+
+		std::string GetCurrentWorkingDir(void) const;
 	};
 }

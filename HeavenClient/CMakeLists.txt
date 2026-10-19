@@ -218,6 +218,8 @@ if(HEAVENCLIENT_BUILD_TESTS)
     add_test(NAME map_clouds COMMAND map_clouds_tests)
     add_executable(map_tooltip_rules_tests tests/map_tooltip_rules.cpp)
     add_test(NAME map_tooltip_rules COMMAND map_tooltip_rules_tests)
+    add_executable(screenshot_rules_tests tests/screenshot_rules.cpp)
+    add_test(NAME screenshot_rules COMMAND screenshot_rules_tests)
     add_executable(ships_tests tests/ships.cpp)
     add_test(NAME ships COMMAND ships_tests)
     add_executable(field_clock_tests tests/field_clock.cpp)
@@ -705,6 +707,7 @@ add_executable(HeavenClient
     IO/GuildCommands.cpp
     IO/GuildCommands.h
     IO/ChatCommand.h
+    IO/ScreenshotRules.h
     IO/UI.cpp
     IO/UI.h
     IO/UIDragElement.h

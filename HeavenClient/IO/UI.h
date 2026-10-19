@@ -21,6 +21,7 @@
 
 #include <cstdint>
 
+#include "ScreenshotRules.h"
 #include "UIState.h"
 
 #include "Components/ScrollingNotice.h"
@@ -138,6 +139,7 @@ namespace ms
 		bool enabled;
 		bool quitted;
 		bool caps_lock_enabled = false;
+		Screenshot::Throttle screenshots;
 	};
 
 	template<class T, typename...Args>
