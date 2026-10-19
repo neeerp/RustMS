@@ -580,12 +580,10 @@ pub fn validate(attack: &Attack, player: &Player) -> Result<Uses, AttackRejectio
     {
         return Err(AttackRejection::TooManyTargets);
     }
-    if attack
-        .hits
-        .iter()
-        .flat_map(|hit| &hit.damage)
-        .any(|&damage| !(0..=cap).contains(&damage))
-    {
+    if attack.hits.iter().any(|hit| {
+        (hit.damage.iter().enumerate())
+            .any(|(line, &damage)| !(0..=barrage_cap(cap, attack.skill, line)).contains(&damage))
+    }) {
         return Err(AttackRejection::Damage);
     }
     if let Some(sacrifice) = skill
@@ -606,6 +604,16 @@ pub fn validate(attack: &Attack, player: &Player) -> Result<Uses, AttackRejectio
         hp,
         blast,
     })
+}
+
+/// Barrage's fifth line does twice the others and its sixth four times
+/// (FUN_0078df87, after Berserk).
+fn barrage_cap(cap: i32, skill: i32, line: usize) -> i32 {
+    match (skill, line) {
+        (5121007 | 15111004, 4) => cap.saturating_mul(2),
+        (5121007 | 15111004, 5) => cap.saturating_mul(4),
+        _ => cap,
+    }
 }
 
 /// Meso Explosion sets off as many drops as its `attackCount`, each once,
@@ -1444,6 +1452,33 @@ mod tests {
         // Bow Expert's level 30 adds 10: ceil(352 / 100 * 60) = 212.
         learn(&mut player, 3120005, 30);
         assert_eq!(max_base_damage(&player, &shot(1)), 212);
+    }
+
+    #[test]
+    fn barrage_ends_with_twice_and_four_times_the_cap() {
+        if skills::data().is_err() {
+            return;
+        }
+        let mut player = beginner_with_sword();
+        player.stats.job = 512;
+        learn(&mut player, 5121007, 30);
+        let basic = parse_close_attack(&attack_packet(1, 0)).unwrap();
+        // Level 30 does 230%.
+        let cap = 2 * max_base_damage(&player, &basic) * 230 / 100;
+        let barrage = |lines: &[i32]| {
+            let packet = kind_attack_packet(AttackKind::Close, 5121007, 0, lines);
+            validate(&parse_attack(&packet, AttackKind::Close).unwrap(), &player).map(|_| ())
+        };
+        let (c, double, quadruple) = (cap, 2 * cap, 4 * cap);
+        assert_eq!(barrage(&[c, c, c, c, double, quadruple]), Ok(()));
+        assert_eq!(
+            barrage(&[c, c, c, c, double, quadruple + 1]),
+            Err(AttackRejection::Damage)
+        );
+        assert_eq!(
+            barrage(&[c, c, c, double, c, c]),
+            Err(AttackRejection::Damage)
+        );
     }
 
     #[test]

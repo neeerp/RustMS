@@ -127,7 +127,8 @@ shot's `bulletCount`, otherwise `attackCount`), the MP spent, and the cap: a
 `fixdamage` skill (Three Snails: 10/25/40) hits for at most that, a `mad`
 spell for twice v83's magic maximum (`max_magic_damage`: ((M² / 1000 + M) / 30
 + INT / 200) × `mad`, where M is INT plus equipment magic attack), a `damage`
-skill for that percentage of the basic cap, Shadow Meso for v83's highest
+skill for that percentage of the basic cap (Barrage's fifth line twice that
+and its sixth four times), Shadow Meso for v83's highest
 roll (ten times one and a half its `moneyCon`, raised by its `x` percent on a
 critical), Snipe's shot for 199,999, and a skill with none is not an attack.
 A spell must name a skill.
