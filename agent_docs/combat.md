@@ -415,8 +415,13 @@ carry the statuses a mob has. Entries come in the client's decode order
   each mob still in the area (`FieldRequest::MobDebuff`). The Crashes and
   Dispel take mob buffs off instead.
 - An attack's hits carry `skills::on_hit`: the attack skill's own status
-  (stuns, Panic's darkness, freezes, poisons) and a learned Venom's poison.
-  Each mob hit for more than 0 rolls each.
+  (stuns, freezes, poisons, Disorder's lower attack and defence, Taunt's
+  higher defence) and a learned Venom's poison. Each mob hit for more than
+  0 rolls each.
+- Taunt also puts on Showdown (bit 11), which no v83 client reads: a mob
+  that dies with it gives its value in percent more EXP and makes each of
+  its drops that much likelier (`Kill::showdown`, `loot::roll`; the
+  OdinMS-family rule).
 - Bosses shrug off Stun, Freeze, Seal, Doom and Web. A mob immune to poison
   (`elemAttr` S1) or ice (I1) shrugs off Poison or Freeze.
 - Poison, Venom and Ambush take HP each second on the field tick

@@ -415,14 +415,15 @@ pub fn validate(attack: &Attack, player: &Player) -> Result<Uses, AttackRejectio
 }
 
 /// How much of the base damage a skill's hits deal, in percent, or `None`
-/// for a skill that doesn't attack that way. Arrow Bomb has no `damage`,
-/// which the client takes as 100%, and scales its hits by its `x`
-/// (FUN_0078df87, FUN_0075bf50).
+/// for a skill that doesn't attack that way. Arrow Bomb, Disorder and Taunt
+/// have no `damage`, which the client takes as 100%; Arrow Bomb scales its
+/// hits by its `x` (FUN_0078df87, FUN_0075bf50).
 fn damage_percent(skill: &Learned) -> Option<i32> {
-    match skill.effect.damage {
-        0 if skill.skill_id == ARROW_BOMB => Some(skill.effect.x),
-        0 => None,
-        damage => Some(damage),
+    match (skill.effect.damage, skill.skill_id) {
+        (0, ARROW_BOMB) => Some(skill.effect.x),
+        (0, 4001002 | 14001002 | 4121003 | 4221003) => Some(100),
+        (0, _) => None,
+        (damage, _) => Some(damage),
     }
 }
 
@@ -1048,6 +1049,28 @@ mod tests {
             validate(&bomb(&[cap + 1]), &player).unwrap_err(),
             AttackRejection::Damage
         );
+    }
+
+    #[test]
+    fn disorder_and_taunt_hit_for_the_base_cap() {
+        if skills::data().is_err() {
+            return;
+        }
+        let hit = |kind, skill, damage| {
+            parse_attack(&kind_attack_packet(kind, skill, 1, &[damage]), kind).unwrap()
+        };
+        let mut player = beginner_with_sword();
+        player.stats.mp = 100;
+        learn(&mut player, 4001002, 20);
+        learn(&mut player, 4121003, 30);
+        let cap = (max_base_damage(&player) * 2).max(10);
+        for (kind, skill) in [(AttackKind::Close, 4001002), (AttackKind::Ranged, 4121003)] {
+            assert!(validate(&hit(kind, skill, cap), &player).is_ok());
+            assert_eq!(
+                validate(&hit(kind, skill, cap + 1), &player).unwrap_err(),
+                AttackRejection::Damage
+            );
+        }
     }
 
     /// A claw, with `stars` Subis in USE slot 1.

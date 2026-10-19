@@ -41,7 +41,7 @@ namespace ms
 			FREEZE = 8,
 			POISON = 9,
 			SEAL = 10,
-			DARKNESS = 11,
+			SHOWDOWN = 11,
 			POWER_UP = 12,
 			MAGIC_UP = 13,
 			PGUARD_UP = 14,

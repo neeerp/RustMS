@@ -849,6 +849,7 @@ impl FieldActor {
                                 attacked: share.attacked,
                                 x: kill.x,
                                 y: kill.y,
+                                showdown: kill.showdown,
                             });
                         }
                     }

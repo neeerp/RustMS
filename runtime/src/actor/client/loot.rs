@@ -10,16 +10,19 @@ use net::packet::build::world::{drop, inventory, monster_book as book};
 use net::FieldRequest;
 
 impl ClientActor {
-    /// Roll this player's drops from a mob they helped kill and put them on
-    /// the ground where it died.
+    /// Roll this player's drops from a mob they helped kill (`showdown`
+    /// percent more often under Taunt) and put them on the ground where it
+    /// died.
     pub(super) async fn drop_loot(
         &mut self,
         mob_id: i32,
+        showdown: i32,
         object_id: i32,
         x: i16,
         y: i16,
     ) -> Result<(), RuntimeError> {
-        let loot = loot::roll(mob_id, &self.in_game()?.player, &mut rand::thread_rng());
+        let player = &self.in_game()?.player;
+        let loot = loot::roll(mob_id, showdown, player, &mut rand::thread_rng());
         self.spawn_loot(loot, object_id, x, y).await
     }
 

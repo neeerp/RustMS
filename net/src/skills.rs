@@ -428,17 +428,18 @@ pub fn mob_debuffs(skill: &Learned, player: &Player) -> Option<Inflict> {
 }
 
 /// What an attack with `skill` puts on the mobs it hits, as the skill
-/// descriptions say: stuns, Panic's darkness, freezes, and poisons.
+/// descriptions say: stuns, freezes, poisons, and Disorder's and Taunt's
+/// weakening.
 fn hit_statuses(skill: &Learned) -> Option<Vec<(MobStat, Amount)>> {
     let one = |stat| vec![(stat, Amount::Value(1))];
+    let value = |stat, value: i32| (stat, Amount::Value(value as i16));
+    let effect = &skill.effect;
     let statuses = match skill.skill_id {
         // Coma, Shout, Charged Blow, Arrow Bomb, Assaulter, Boomerang Step,
         // Backspin Blow, Double Uppercut, Demolition, Snatch, Blank Shot,
         // Dawn Warrior Coma, Rolling Spin.
         1111005 | 1111006 | 1111008 | 1211002 | 3101005 | 4211002 | 4221007 | 5101002 | 5101003
         | 5121004 | 5121005 | 5201004 | 11111003 | 21110006 => one(MobStat::Stun),
-        // Panic's "dark powers" (inferred: darkness).
-        1111003 | 1111004 | 11111002 => one(MobStat::Darkness),
         // Cold Beam, Ice Strike, Element Composition (I/L), Blizzard,
         // Blizzard (crossbow), Ice Splitter, Paralyze.
         2201004 | 2211002 | 2211006 | 2221007 | 3211003 | 5211005 | 2121006 => one(MobStat::Freeze),
@@ -448,6 +449,15 @@ fn hit_statuses(skill: &Learned) -> Option<Vec<(MobStat, Amount)>> {
         2101005 | 2111006 | 2121003 | 2221003 | 5211004 => {
             vec![(MobStat::Poison, Amount::Poison { level: skill.level })]
         }
+        // Disorder: less attack (x) and defence (y), both negative.
+        4001002 | 14001002 => vec![value(MobStat::Pad, effect.x), value(MobStat::Pdr, effect.y)],
+        // Taunt: more defence, but more EXP and drops, all by x (OdinMS
+        // family).
+        4121003 | 4221003 => vec![
+            value(MobStat::Showdown, effect.x),
+            value(MobStat::Pdr, effect.x),
+            value(MobStat::Mdr, effect.x),
+        ],
         _ => return None,
     };
     Some(statuses)
@@ -806,6 +816,38 @@ mod tests {
         assert_eq!(venom(0.0).duration, Duration::from_secs(4));
         assert_eq!(venom(0.0).statuses, [(MobStat::Venom, Amount::Value(192))]);
         assert_eq!(venom(1.0).statuses, [(MobStat::Venom, Amount::Value(437))]);
+    }
+
+    #[test]
+    fn disorder_weakens_and_taunt_raises_exp_and_drops() {
+        let player = knowing(&[]);
+        let disorder = at_level(4001002, 20).unwrap();
+        assert_eq!(
+            on_hit(&player, Some(&disorder), false, 0.5),
+            [Inflict {
+                skill_id: 4001002,
+                prop: 100,
+                duration: Duration::from_secs(60),
+                statuses: vec![
+                    (MobStat::Pad, Amount::Value(-20)),
+                    (MobStat::Pdr, Amount::Value(-20)),
+                ],
+            }]
+        );
+        let taunt = at_level(4121003, 30).unwrap();
+        assert_eq!(
+            on_hit(&player, Some(&taunt), false, 0.5),
+            [Inflict {
+                skill_id: 4121003,
+                prop: 100,
+                duration: Duration::from_secs(120),
+                statuses: vec![
+                    (MobStat::Showdown, Amount::Value(40)),
+                    (MobStat::Pdr, Amount::Value(40)),
+                    (MobStat::Mdr, Amount::Value(40)),
+                ],
+            }]
+        );
     }
 
     #[test]
