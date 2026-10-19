@@ -288,7 +288,10 @@ rounding remainder) and each share goes to that player's client actor
 gained sends the new level, AP, SP, max HP/MP (+14/+11 per beginner level,
 the middle of v83's ranges) and shows SHOW_FOREIGN_EFFECT 0 to the others. As
 in v83, current HP and MP are not refilled. Each level grants 5 AP, and 3 SP
-once past beginner.
+once past beginner. A warrior's Improving MaxHP Increase (1000001), a
+Brawler's Improve MaxHP (5100000) and a magician's Improving MaxMP Increase
+(2000001) add their `x` to each level's growth and their `y` to an AP's
+(`net::skills::growth_bonus`).
 
 ## Buff skills
 

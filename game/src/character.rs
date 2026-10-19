@@ -351,10 +351,10 @@ impl Player {
     }
 
     /// Add EXP, levelling up as many times as it covers. Each level grants
-    /// 5 AP, 3 SP past beginner, and the job family's max HP/MP growth;
-    /// current HP and MP stay as they were, as in v83. Returns the number of
-    /// levels gained.
-    pub fn gain_exp(&mut self, amount: i32) -> u8 {
+    /// 5 AP, 3 SP past beginner, and the job family's max HP/MP growth plus
+    /// `skill_bonus`, what the player's skills add to it; current HP and MP
+    /// stay as they were, as in v83. Returns the number of levels gained.
+    pub fn gain_exp(&mut self, amount: i32, skill_bonus: (i16, i16)) -> u8 {
         if amount <= 0 {
             return 0;
         }
@@ -371,8 +371,8 @@ impl Player {
                 self.stats.sp = self.stats.sp.saturating_add(3);
             }
             let (hp, mp) = level_up_growth(self.stats.job);
-            self.stats.max_hp = self.stats.max_hp.saturating_add(hp);
-            self.stats.max_mp = self.stats.max_mp.saturating_add(mp);
+            self.stats.max_hp = self.stats.max_hp.saturating_add(hp + skill_bonus.0);
+            self.stats.max_mp = self.stats.max_mp.saturating_add(mp + skill_bonus.1);
             gained += 1;
         }
         if crate::exp::to_next_level(self.stats.level).is_none() {
@@ -436,13 +436,15 @@ impl Player {
         self.dirty = true;
     }
 
-    /// Spend one AP on `stat`. Returns false, changing nothing, without AP
-    /// or once the stat is at its cap.
-    pub fn spend_ap(&mut self, stat: ApStat) -> bool {
+    /// Spend one AP on `stat`, which for max HP or MP adds the job's growth
+    /// plus `skill_bonus`, what the player's skills add to it. Returns false,
+    /// changing nothing, without AP or once the stat is at its cap.
+    pub fn spend_ap(&mut self, stat: ApStat, skill_bonus: (i16, i16)) -> bool {
         if self.stats.ap <= 0 {
             return false;
         }
         let (hp, mp) = ap_growth(self.stats.job);
+        let (hp, mp) = (hp + skill_bonus.0, mp + skill_bonus.1);
         let stats = &mut self.stats;
         let (value, gain, cap) = match stat {
             ApStat::Str => (&mut stats.str, 1, MAX_BASE_STAT),
@@ -687,7 +689,7 @@ mod tests {
         player.stats.max_hp = 50;
         player.stats.hp = 40;
         // Rain's seven quizzes pay 62 EXP: level 1 -> 3 with 13 left over.
-        assert_eq!(player.gain_exp(62), 2);
+        assert_eq!(player.gain_exp(62, (0, 0)), 2);
         assert_eq!(
             (player.stats.level, player.stats.exp, player.stats.ap),
             (3, 13, 10)
@@ -695,17 +697,17 @@ mod tests {
         // Two beginner levels: +28 max HP, +22 max MP, no refill.
         assert_eq!((player.stats.max_hp, player.stats.hp), (78, 40));
         assert_eq!((player.stats.max_mp, player.stats.mp), (27, 5));
-        assert_eq!(player.gain_exp(0), 0);
+        assert_eq!(player.gain_exp(0, (0, 0)), 0);
         assert!(player.is_dirty());
     }
 
     #[test]
     fn levels_past_beginner_grant_sp() {
         let mut player = player();
-        player.gain_exp(62);
+        player.gain_exp(62, (0, 0));
         assert_eq!(player.stats.sp, 0);
         player.stats.job = 200;
-        player.gain_exp(57 + 92 - 13);
+        player.gain_exp(57 + 92 - 13, (0, 0));
         assert_eq!((player.stats.level, player.stats.sp), (5, 6));
     }
 
@@ -713,19 +715,38 @@ mod tests {
     fn ap_raises_one_stat_until_it_runs_out_or_caps() {
         let mut player = player();
         player.stats.ap = 3;
-        assert!(player.spend_ap(ApStat::Str));
+        assert!(player.spend_ap(ApStat::Str, (0, 0)));
         assert_eq!((player.stats.str, player.stats.ap), (13, 2));
         assert!(player.is_dirty());
         player.stats.job = 200;
-        assert!(player.spend_ap(ApStat::MaxMp));
+        assert!(player.spend_ap(ApStat::MaxMp, (0, 0)));
         assert_eq!((player.stats.max_mp, player.stats.ap), (24, 1));
         player.stats.luk = MAX_BASE_STAT;
-        assert!(!player.spend_ap(ApStat::Luk));
+        assert!(!player.spend_ap(ApStat::Luk, (0, 0)));
         player.stats.max_hp = MAX_HP_MP - 1;
-        assert!(player.spend_ap(ApStat::MaxHp));
+        assert!(player.spend_ap(ApStat::MaxHp, (0, 0)));
         assert_eq!((player.stats.max_hp, player.stats.ap), (MAX_HP_MP, 0));
-        assert!(!player.spend_ap(ApStat::Dex));
+        assert!(!player.spend_ap(ApStat::Dex, (0, 0)));
         assert_eq!(player.stats.dex, 5);
+    }
+
+    #[test]
+    fn skills_add_to_max_hp_and_mp_growth() {
+        // A warrior with Improving MaxHP Increase at 10: 26 + 40 HP a level,
+        // 22 + 30 for an AP.
+        let mut player = player();
+        player.stats.job = 100;
+        player.stats.level = 10;
+        player.stats.ap = 1;
+        player.stats.max_hp = 500;
+        player.stats.max_mp = 100;
+        player.gain_exp(crate::exp::to_next_level(10).unwrap() as i32, (40, 0));
+        assert_eq!((player.stats.max_hp, player.stats.max_mp), (566, 105));
+        assert!(player.spend_ap(ApStat::MaxHp, (30, 0)));
+        assert_eq!(player.stats.max_hp, 618);
+        // Strength takes no bonus.
+        assert!(player.spend_ap(ApStat::Str, (30, 0)));
+        assert_eq!(player.stats.str, 13);
     }
 
     #[test]

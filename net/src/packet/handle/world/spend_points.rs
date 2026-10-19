@@ -17,7 +17,8 @@ impl WorldHandler for SpendApHandler {
         reader.read_short()?;
         reader.read_int()?; // client tick
         let mask = reader.read_int()?;
-        let raised = ap_stat(mask).filter(|&stat| ctx.player.spend_ap(stat));
+        let bonus = skills::growth_bonus(ctx.player, false);
+        let raised = ap_stat(mask).filter(|&stat| ctx.player.spend_ap(stat, bonus));
         let Some(stat) = raised else {
             debug!(mask, ap = ctx.player.stats.ap, "AP spend refused");
             return Ok(HandlerResult::reply(stat::build_stat_update(true, &[])?));

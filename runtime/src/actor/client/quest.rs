@@ -5,6 +5,7 @@ use net::npc_scripts::NpcScript;
 use net::packet::build::world::effect::{self, CharEffect};
 use net::packet::build::world::{drop, inventory, quest, stat};
 use net::quests::{self, QuestActionKind, QuestItem, QuestRejection, QuestRequest, QuestTemplate};
+use net::skills;
 use net::FieldRequest;
 use packet::Packet;
 use tracing::{debug, warn};
@@ -351,7 +352,7 @@ pub(super) fn gain_exp(
     amount: i32,
     packets: &mut Vec<Packet>,
 ) -> Result<(), RuntimeError> {
-    let levelled = next.gain_exp(amount) > 0;
+    let levelled = next.gain_exp(amount, skills::growth_bonus(next, true)) > 0;
     packets.push(stat::build_exp_stats(&next.stats, levelled)?);
     packets.push(quest::build_gain_exp_in_chat(amount)?);
     Ok(())
@@ -365,7 +366,8 @@ pub(super) fn gain_exp_with_bonus(
     party_bonus: i32,
     packets: &mut Vec<Packet>,
 ) -> Result<(), RuntimeError> {
-    let levelled = next.gain_exp(amount.saturating_add(party_bonus)) > 0;
+    let bonus = skills::growth_bonus(next, true);
+    let levelled = next.gain_exp(amount.saturating_add(party_bonus), bonus) > 0;
     packets.push(stat::build_exp_stats(&next.stats, levelled)?);
     packets.push(quest::build_gain_exp(amount, party_bonus)?);
     Ok(())
