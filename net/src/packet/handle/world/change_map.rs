@@ -39,8 +39,11 @@ impl WorldHandler for ChangeMapHandler {
 
         let mut revived = Vec::new();
         let (map_id, spawn_point, spawn) = if target != -1 {
+            let traps_send_to = game_data
+                .field(player.stats.map_id)
+                .map_or(&[][..], |field| field.traps.target_fields.as_slice());
             let (destination, spawn_point, replies) =
-                direct_destination(player, target, wheel, |map_id| {
+                direct_destination(player, target, wheel, traps_send_to, |map_id| {
                     game_data.field(map_id).and_then(|field| field.return_map)
                 })?;
             if !game_data.field_exists(destination) {
@@ -192,12 +195,15 @@ pub enum DoorExit {
 /// In v83 the client only sends a map id when a dead player respawns. A
 /// Wheel of Destiny, if they chose to use one, keeps them on the map they
 /// died on, at the spawn point nearest where they fell (Cosmic); otherwise
-/// they go to its return map. GMs (and debug builds, which the integration
+/// they go to its return map. A trap may send a live player to one of
+/// `traps_send_to`, as the Witch Tower's snacks send them back to its
+/// entrance (v83 0x94b767). GMs (and debug builds, which the integration
 /// harness uses as a teleport command) may warp anywhere.
 fn direct_destination(
     player: &mut Player,
     target: i32,
     wheel: bool,
+    traps_send_to: &[i32],
     return_map_of: impl Fn(i32) -> Option<i32>,
 ) -> Result<(i32, u8, Vec<Packet>), NetworkError> {
     if player.stats.hp <= 0 {
@@ -222,7 +228,7 @@ fn direct_destination(
         replies.extend(revive(player)?);
         return Ok((destination.0, destination.1, replies));
     }
-    if policy::may_warp_anywhere(player) {
+    if policy::may_warp_anywhere(player) || traps_send_to.contains(&target) {
         return Ok((target, 0, Vec::new()));
     }
     Err(NetworkError::PacketHandlerError(
@@ -296,7 +302,18 @@ mod tests {
     fn living_players_cannot_warp_by_map_id() {
         let mut p = player(50, 0);
         if !policy::debug_warps_enabled() {
-            assert!(direct_destination(&mut p, 180000000, false, |_| None).is_err());
+            assert!(direct_destination(&mut p, 180000000, false, &[], |_| None).is_err());
+        }
+    }
+
+    #[test]
+    fn traps_send_living_players_on() {
+        let mut p = player(50, 0);
+        let to =
+            |p: &mut Player, target| direct_destination(p, target, false, &[980040000], |_| None);
+        assert_eq!(to(&mut p, 980040000).unwrap().0, 980040000);
+        if !policy::debug_warps_enabled() {
+            assert!(to(&mut p, 180000000).is_err());
         }
     }
 
@@ -304,7 +321,7 @@ mod tests {
     fn gms_can_warp_by_map_id() {
         let mut p = player(50, 1);
         assert_eq!(
-            direct_destination(&mut p, 180000000, false, |_| None)
+            direct_destination(&mut p, 180000000, false, &[], |_| None)
                 .unwrap()
                 .0,
             180000000
@@ -315,7 +332,7 @@ mod tests {
     fn dead_players_respawn_in_the_return_map_regardless_of_target() {
         let mut p = player(0, 0);
         let (destination, spawn_point, replies) =
-            direct_destination(&mut p, 180000000, false, |_| Some(100000000)).unwrap();
+            direct_destination(&mut p, 180000000, false, &[], |_| Some(100000000)).unwrap();
         assert_eq!((destination, spawn_point), (100000000, 0));
         assert!(replies.is_empty());
         assert_eq!(p.stats.hp, RESPAWN_HP);
@@ -330,7 +347,7 @@ mod tests {
         p.inventory
             .insert(InventoryType::Cash, 1, Item::stack(WHEEL_OF_DESTINY, 2));
         let (map_id, spawn_point, replies) =
-            direct_destination(&mut p, 104000100, true, |_| Some(104000000)).unwrap();
+            direct_destination(&mut p, 104000100, true, &[], |_| Some(104000000)).unwrap();
         assert_eq!((map_id, spawn_point), (104000100, 3));
         assert_eq!(p.inventory.count(WHEEL_OF_DESTINY), 1);
         assert_eq!(p.stats.hp, RESPAWN_HP);
@@ -345,14 +362,14 @@ mod tests {
         p.inventory
             .insert(InventoryType::Cash, 1, Item::stack(WHEEL_OF_DESTINY, 1));
         let (map_id, _, replies) =
-            direct_destination(&mut p, 100000000, false, |_| Some(104000000)).unwrap();
+            direct_destination(&mut p, 100000000, false, &[], |_| Some(104000000)).unwrap();
         assert_eq!(map_id, 104000000);
         assert!(replies.is_empty());
         assert_eq!(p.inventory.count(WHEEL_OF_DESTINY), 1);
         // Asking for a wheel without one goes to the return map too.
         let mut p = player(0, 0);
         let (map_id, _, _) =
-            direct_destination(&mut p, 100000000, true, |_| Some(104000000)).unwrap();
+            direct_destination(&mut p, 100000000, true, &[], |_| Some(104000000)).unwrap();
         assert_eq!(map_id, 104000000);
     }
 
@@ -362,7 +379,7 @@ mod tests {
         p.stats.mp = 2;
         p.charmed = true;
         let (_, _, replies) =
-            direct_destination(&mut p, 100000000, false, |_| Some(104000000)).unwrap();
+            direct_destination(&mut p, 100000000, false, &[], |_| Some(104000000)).unwrap();
         assert_eq!((p.stats.hp, p.stats.mp), (30, 5));
         assert!(!p.charmed);
         assert_eq!(replies.len(), 1);

@@ -134,8 +134,11 @@ from `UI.nx`. Moved so far:
   (`MiniMapType`, the largest until one is made). Towns open in the largest,
   and maps without a `miniMap` stay folded. The window fits the map's `miniMap/canvas` (scaled
   by `2^mag`) and the names. Markers (`Map.nx` `MapHelper.img/minimap`) stand
-  bottom-centred on portals to other maps, NPCs, other players, and you.
-  Hovering an NPC or portal shows its name. Period canvases had the map's
+  bottom-centred on the visible portals (types 2 and 7), NPCs, other
+  players, and you. Hovering an NPC shows its name. Hovering a portal's
+  marker shows, as v83 does, its `ToolTipHelp.img/PortalTooltip` line or
+  else where it leads, in a plain navy box 20 right of and below the
+  cursor. Period canvases had the map's
   background baked in; v83 `Map.nx` canvases are transparent there, so the
   frame shows through. Its middle is white at alpha 119 over black, as in
   v83, so it comes out grey and the field doesn't show through.
@@ -510,6 +513,12 @@ side yet.
 | Teleport rocks (`UITeleportRock`) | Implemented: the map list, keeping and dropping maps, and moving to a map or a character; see `inventory.md` |
 | Writs of Solomon, gacha EXP | Implemented: using a writ, the EXP gauge's tooltip and taking the EXP by double-click; see `inventory.md` |
 | Continent ships, station wall clocks | Docking ships and the Balrog's ship, CONTI_MOVE/CONTI_STATE, CLOCK kind 1; see `ships.md` |
+| Map clouds (`info/cloud`, 223 maps such as Perion) | Implemented (`MapClouds`): as v83 does, 10 to 59 of `MapHelper.img/weather/cloud`'s canvases scattered over the field's footholds plus 200 px, at 140 to 219 of 255 opacity, drifting right at 17 to 50 px/s for good and wrapping, above the front backgrounds |
+| Map tooltips (`ToolTip`, 270 maps such as Henesys) | Implemented (`MapTooltips`, `PlainTooltip`): as v83 does, a numbered zone's `ToolTipHelp.img/Mapobject` title and description show 20 below the cursor while it is over the zone, and stay up at the zone's bottom right while the player stands in its `<N>char` zone, in a translucent navy box without UI art. v83 pairs `<N>char` with the Nth zone in WZ order, which NX loses; HC pairs it with zone N, which differs only in Ellinia and Ariant. Font metrics are assumed (Arial 12). Seven titles in our `String.nx` carry a corrupt Korean prefix from the WZ conversion |
+| Screenshot key | Implemented: as v83 does, Scroll Lock saves the frame as the next free `MapleNNNN.jpg` (quality 75) in the working directory, where v83 uses the game folder; in game, a fourth press less than a second after the last shows "You cannot take screenshots at this moment..." and later quick presses do nothing |
+| Medal name tags (`MedalTag`) | Implemented: as v83 does, a worn medal's name hangs 1 px under the name or guild tag, in the art and text colour of its `info/medalTag` style from `UI NameTag.img/medal`, or in a plain name tag box when the style has no art. v83 writes it in Dotum 12, which HC doesn't have, so the text and the number of tiles follow HC's 12 px font |
+| Boss HP bar (`UIMobGage`) | Implemented: FIELD_EFFECT mode 5 and `HPgaugeHide` mobs' hits show v83's bar right of the minimap, with the mob's name over its icon; see `combat.md` |
+| Map traps (`obstacle` objs) | Implemented: the client tests the traps' frame boxes each tick, rolls and reports the hit as TAKE_DAMAGE -3 with v83's push, and follows a `targetField`; FIELD_OBSTACLE_ONOFF and trap damage to mobs are not done; see `combat.md` |
 | Player shops, mini-games, memo/mail | No UI, no handlers |
 | Reactors | Spawning, swings, hits and breaking; no skill hits, touch or quest gates; see `combat.md` |
 | Pets | Summoning, following, others' pets, map changes, chat commands, idle actions, level-up effect, food, cash food and hunger; see `pets.md` |
@@ -558,6 +567,13 @@ force-and-friction model (`move_normal`).
 - **Air.** Gravity is 2000 px/s², capped at a fall speed of 670 px/s. A held
   direction accelerates at 200 px/s² toward about 8.9 px/s, so it barely
   steers.
+- **Ice.** A map's `info/fs` (0.2 on El Nath's 68 icy maps; missing or 0
+  means 1) multiplies, for every shoe, the walking push, the walk drag
+  factor before the clamp, the air's drag, steering and steering speed, and
+  the drag when flying or swimming (r25 0xa45cd6 into CVecCtrl's field
+  attribute). On ice the player takes 0.45 s to reach top speed and slides
+  about 1.6 s after letting go. The slide down steep slopes and the top
+  walking speed are unchanged.
 - **Stats.** `get_walkspeed` is clamp(SPEED, 80, 140)/100. `get_jumpforce`
   uses clamp(JUMP, 80, 123)/100 of the 555 px/s takeoff speed.
 - **Jumping.** `Physics::jump` sets the takeoff speed. A held direction adds

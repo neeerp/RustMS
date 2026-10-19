@@ -45,7 +45,8 @@ namespace ms
 
 	Char::Char(int32_t o, const CharLook &lk, const std::string &name) : MapObject(o), look(lk), look_preview(lk), namelabel(
 			Text(Text::Font::A13M, Text::Alignment::CENTER, Color::Name::WHITE, Text::Background::NAMETAG, name)),
-			guildlabel(Text(Text::Font::A13M, Text::Alignment::CENTER, Color::Name::WHITE, Text::Background::NAMETAG))
+			guildlabel(Text(Text::Font::A13M, Text::Alignment::CENTER, Color::Name::WHITE, Text::Background::NAMETAG)),
+			medaltag(lk.get_equips().get_equip(EquipSlot::Id::MEDAL))
 	{}
 
 	void Char::draw(double viewx, double viewy, float alpha) const
@@ -110,15 +111,22 @@ namespace ms
 				pet.draw(viewx, viewy, alpha);
 
 		// If ever changing code for namelabel confirm placements with map 10000
-		namelabel.draw(absp + Point<int16_t>(0, -4));
+		Point<int16_t> namepos = absp + Point<int16_t>(0, -4);
+		namelabel.draw(namepos);
+
+		// The medal hangs 1 px under the lowest tag above it (0x5f1979).
+		int16_t medal_top = namepos.y() + namelabel.height() + 5;
 
 		if (!guildlabel.empty())
 		{
-			Point<int16_t> guildpos = absp + Point<int16_t>(0, -4 + namelabel.height() - 2 + GUILD_TAG_GAP);
+			Point<int16_t> guildpos = namepos + Point<int16_t>(0, namelabel.height() - 2 + GUILD_TAG_GAP);
 
 			guildlabel.draw(guildpos);
 			guildmark.draw(guildpos + Point<int16_t>(-guildlabel.width() / 2, 0) + EMBLEM_OFFSET);
+			medal_top = guildpos.y() + guildlabel.height() + 5;
 		}
+
+		medaltag.draw(Point<int16_t>(absp.x(), medal_top));
 
 		// The orbs are in front of the avatar and its name tag (z 4 to the
 		// tag's 2).
@@ -179,6 +187,11 @@ namespace ms
 
 	bool Char::update(const Physics& physics, float speed)
 	{
+		int32_t medal = look.get_equips().get_equip(EquipSlot::Id::MEDAL);
+
+		if (medal != medaltag.get_itemid())
+			medaltag = MedalTag(medal);
+
 		damagenumbers.remove_if(
 				[](DamageNumber &number)
 				{

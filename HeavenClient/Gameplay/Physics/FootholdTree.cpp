@@ -685,4 +685,14 @@ namespace ms
 	{
 		return borders;
 	}
+
+	Range<int16_t> FootholdTree::get_space_x() const
+	{
+		return spacex;
+	}
+
+	Range<int16_t> FootholdTree::get_space_y() const
+	{
+		return spacey;
+	}
 }

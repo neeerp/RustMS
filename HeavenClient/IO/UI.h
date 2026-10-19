@@ -21,6 +21,7 @@
 
 #include <cstdint>
 
+#include "ScreenshotRules.h"
 #include "UIState.h"
 
 #include "Components/ScrollingNotice.h"
@@ -106,6 +107,10 @@ namespace ms
 
 		void show_map(Tooltip::Parent parent, std::string name, std::string description);
 
+		void show_zone(Tooltip::Parent parent, std::string title, std::string description);
+
+		void show_line(Tooltip::Parent parent, std::string text);
+
 		Keyboard &get_keyboard();
 
 		int64_t get_uptime();
@@ -134,6 +139,7 @@ namespace ms
 		bool enabled;
 		bool quitted;
 		bool caps_lock_enabled = false;
+		Screenshot::Throttle screenshots;
 	};
 
 	template<class T, typename...Args>

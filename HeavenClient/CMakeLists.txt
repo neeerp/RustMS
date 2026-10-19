@@ -214,6 +214,18 @@ if(HEAVENCLIENT_BUILD_TESTS)
     add_test(NAME mob_hurts COMMAND mob_hurts_tests)
     add_executable(mist_layout_tests tests/mist_layout.cpp)
     add_test(NAME mist_layout COMMAND mist_layout_tests)
+    add_executable(obstacle_rules_tests tests/obstacle_rules.cpp)
+    add_test(NAME obstacle_rules COMMAND obstacle_rules_tests)
+    add_executable(map_clouds_tests tests/map_clouds.cpp)
+    add_test(NAME map_clouds COMMAND map_clouds_tests)
+    add_executable(map_tooltip_rules_tests tests/map_tooltip_rules.cpp)
+    add_test(NAME map_tooltip_rules COMMAND map_tooltip_rules_tests)
+    add_executable(screenshot_rules_tests tests/screenshot_rules.cpp)
+    add_test(NAME screenshot_rules COMMAND screenshot_rules_tests)
+    add_executable(medal_tag_layout_tests tests/medal_tag_layout.cpp)
+    add_test(NAME medal_tag_layout COMMAND medal_tag_layout_tests)
+    add_executable(mob_gage_layout_tests tests/mob_gage_layout.cpp)
+    add_test(NAME mob_gage_layout COMMAND mob_gage_layout_tests)
     add_executable(ships_tests tests/ships.cpp)
     add_test(NAME ships COMMAND ships_tests)
     add_executable(field_clock_tests tests/field_clock.cpp)
@@ -330,6 +342,9 @@ add_executable(HeavenClient
     Character/ChalkboardBalloon.h
     Character/Char.cpp
     Character/Char.h
+    Character/MedalTag.cpp
+    Character/MedalTag.h
+    Character/MedalTagLayout.h
     Character/CharEffect.cpp
     Character/CharEffect.h
     Character/CharStats.cpp
@@ -435,6 +450,9 @@ add_executable(HeavenClient
     Gameplay/MapleMap/MapEffect.h
     Gameplay/MapleMap/MapInfo.cpp
     Gameplay/MapleMap/MapInfo.h
+    Gameplay/MapleMap/CloudLayout.h
+    Gameplay/MapleMap/MapClouds.cpp
+    Gameplay/MapleMap/MapClouds.h
     Gameplay/MapleMap/MapMists.cpp
     Gameplay/MapleMap/MapDoors.cpp
     Gameplay/MapleMap/MapMists.h
@@ -458,9 +476,13 @@ add_executable(HeavenClient
     Gameplay/MapleMap/ShipRules.h
     Gameplay/MapleMap/MapTilesObjs.cpp
     Gameplay/MapleMap/MapTilesObjs.h
+    Gameplay/MapleMap/MapTooltipRules.h
+    Gameplay/MapleMap/MapTooltips.cpp
+    Gameplay/MapleMap/MapTooltips.h
     Gameplay/MapleMap/MesoDrop.cpp
     Gameplay/MapleMap/MesoDrop.h
     Gameplay/MapleMap/MistLayout.h
+    Gameplay/MapleMap/ObstacleRules.h
     Gameplay/MapleMap/Mob.cpp
     Gameplay/MapleMap/Mob.h
     Gameplay/MapleMap/Npc.cpp
@@ -546,6 +568,8 @@ add_executable(HeavenClient
     IO/Components/NameTag.cpp
     IO/Components/NameTag.h
     IO/Components/NpcText.cpp
+    IO/Components/PlainTooltip.cpp
+    IO/Components/PlainTooltip.h
     IO/Components/ScrollingNotice.cpp
     IO/Components/ScrollingNotice.h
     IO/Components/SkillTooltip.cpp
@@ -614,6 +638,9 @@ add_executable(HeavenClient
     IO/UITypes/UIMessenger.h
     IO/UITypes/UIMiniMap.cpp
     IO/UITypes/UIMiniMap.h
+    IO/UITypes/MobGageLayout.h
+    IO/UITypes/UIMobGage.cpp
+    IO/UITypes/UIMobGage.h
     IO/UITypes/EnterNumber.h
     IO/UITypes/UINotice.cpp
     IO/UITypes/UINotice.h
@@ -693,6 +720,7 @@ add_executable(HeavenClient
     IO/GuildCommands.cpp
     IO/GuildCommands.h
     IO/ChatCommand.h
+    IO/ScreenshotRules.h
     IO/UI.cpp
     IO/UI.h
     IO/UIDragElement.h

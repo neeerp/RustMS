@@ -21,6 +21,7 @@
 #include "../../IO/UI.h"
 
 #include "../../IO/UITypes/UILoginNotice.h"
+#include "../../IO/UITypes/UIMobGage.h"
 
 namespace ms
 {
@@ -46,6 +47,20 @@ namespace ms
 			std::string path = recv.read_string();
 
 			Stage::get().add_effect(path);
+
+			return;
+		}
+
+		// A boss's HP bar, by its template id; an hp under 1 takes it down (0x5332d0).
+		if (rand == 5)
+		{
+			int32_t mobid = recv.read_int();
+			int32_t hp = recv.read_int();
+			int32_t maxhp = recv.read_int();
+			uint8_t color = recv.read_byte();
+			uint8_t bgcolor = recv.read_byte();
+
+			UIMobGage::show(mobid, hp, maxhp, color, bgcolor);
 
 			return;
 		}

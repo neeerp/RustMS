@@ -248,6 +248,8 @@ pub struct FieldTemplate {
     pub time_limit: Option<u32>,
     /// `info/decHP`: the cold, water or curse that hurts players here.
     pub hazard: Option<Hazard>,
+    /// What the map's traps may do to a player who touches one.
+    pub traps: Traps,
     pub footholds: footholds::Footholds,
     portals_by_id: BTreeMap<u32, PortalTemplate>,
     portal_ids_by_name: HashMap<String, Vec<u32>>,
@@ -275,6 +277,50 @@ pub struct Hazard {
     /// `returnMap`), as Cosmic has it, and those the cold cape (1102109)
     /// protects.
     pub cold: bool,
+}
+
+/// What a map's traps, objs marked `obstacle`, may do to a player. The client
+/// tests them and reports the hits (v83 FUN_00642710); this is what bounds
+/// its reports.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct Traps {
+    /// The most any of them hurts (`damage`), before the client's roll of a
+    /// tenth either way.
+    pub damage: i32,
+    /// Whether one leaves the player on `forceHP`, which can take all their
+    /// HP.
+    pub force_hp: bool,
+    /// Where touching one sends a player (`targetField`), such as the Witch
+    /// Tower's entrance.
+    pub target_fields: Vec<i32>,
+}
+
+impl Traps {
+    /// The most a hit the client reports may be: a trap's `damage` over 10
+    /// rolls up to a tenth more (0x6427c8), and a `forceHP` trap takes up to
+    /// all of `hp`.
+    pub fn max_hit(&self, hp: i32) -> i32 {
+        let rolled = if self.damage > 10 {
+            self.damage + self.damage / 10
+        } else {
+            self.damage
+        };
+        if self.force_hp {
+            rolled.max(hp)
+        } else {
+            rolled
+        }
+    }
+
+    fn add(&mut self, trap: &Traps) {
+        self.damage = self.damage.max(trap.damage);
+        self.force_hp |= trap.force_hp;
+        for &map_id in &trap.target_fields {
+            if !self.target_fields.contains(&map_id) {
+                self.target_fields.push(map_id);
+            }
+        }
+    }
 }
 
 impl FieldTemplate {
@@ -370,6 +416,7 @@ impl GameData {
             .ok_or_else(|| GameDataError::InvalidData("missing root child 'Map'".to_string()))?;
 
         let mut fields = BTreeMap::new();
+        let trap_objs = trap_objs(&nx)?;
 
         for map_group_idx in nx.child_indices(map_root)? {
             let group_name = nx.node_name(map_group_idx)?;
@@ -383,7 +430,7 @@ impl GameData {
                     continue;
                 };
 
-                let field = build_field_template(&nx, map_node_idx, map_id)?;
+                let field = build_field_template(&nx, map_node_idx, map_id, &trap_objs)?;
                 fields.insert(map_id, field);
             }
         }
@@ -430,6 +477,7 @@ fn build_field_template(
     nx: &NxDataFile,
     map_node_idx: u32,
     map_id: i32,
+    trap_objs: &TrapObjs,
 ) -> Result<FieldTemplate, GameDataError> {
     let (return_map, forced_return, on_user_enter) =
         if let Some(info_idx) = nx.child_by_name(map_node_idx, "info")? {
@@ -446,6 +494,7 @@ fn build_field_template(
     let mob_spawns = build_mob_spawns_from_life(nx, map_node_idx)?;
     let reactors = build_reactors(nx, map_node_idx)?;
     let footholds = build_footholds(nx, map_node_idx)?;
+    let traps = traps(nx, map_node_idx, trap_objs)?;
     let mob_rate = nx
         .child_by_name(map_node_idx, "info")?
         .map(|info| nx.real_child(info, "mobRate"))
@@ -552,10 +601,101 @@ fn build_field_template(
         clock,
         time_limit,
         hazard,
+        traps,
         footholds,
         portals_by_id,
         portal_ids_by_name,
     })
+}
+
+/// The traps among `Map/Obj`'s objs, by `oS` and then `l0`, `l1` and `l2`.
+type TrapObjs = HashMap<String, HashMap<(String, String, String), Traps>>;
+
+/// The objs marked `obstacle` (v83 FUN_0063c741), whether on the obj's own
+/// node or on one of its states (`s0`, `s1`, ...), which the server may show
+/// in turn.
+fn trap_objs(nx: &NxDataFile) -> Result<TrapObjs, GameDataError> {
+    let mut traps = TrapObjs::new();
+    let Some(obj_root) = nx.child_by_name(0, "Obj")? else {
+        return Ok(traps);
+    };
+    for set in nx.child_indices(obj_root)? {
+        let set_name = nx.node_name(set)?;
+        let Some(o_s) = set_name.strip_suffix(".img") else {
+            continue;
+        };
+        for l0 in nx.child_indices(set)? {
+            for l1 in nx.child_indices(l0)? {
+                for l2 in nx.child_indices(l1)? {
+                    let mut obj = Traps::default();
+                    let mut any = trap(nx, l2, &mut obj)?;
+                    for state in nx.child_indices(l2)? {
+                        let name = nx.node_name(state)?;
+                        if name.len() > 1
+                            && name.starts_with('s')
+                            && name[1..].bytes().all(|b| b.is_ascii_digit())
+                        {
+                            any |= trap(nx, state, &mut obj)?;
+                        }
+                    }
+                    if any {
+                        traps.entry(o_s.to_string()).or_default().insert(
+                            (nx.node_name(l0)?, nx.node_name(l1)?, nx.node_name(l2)?),
+                            obj,
+                        );
+                    }
+                }
+            }
+        }
+    }
+    Ok(traps)
+}
+
+/// Adds `node`'s trap to `traps`, if it is one.
+fn trap(nx: &NxDataFile, node: u32, traps: &mut Traps) -> Result<bool, GameDataError> {
+    if nx.int_child(node, "obstacle")?.unwrap_or(0) == 0 {
+        return Ok(false);
+    }
+    traps.add(&Traps {
+        damage: nx.int_child(node, "damage")?.unwrap_or(0),
+        force_hp: nx.int_child(node, "forceHP")?.is_some_and(|hp| hp >= 0),
+        target_fields: nx
+            .int_child(node, "targetField")?
+            .filter(|&map_id| map_id != 0)
+            .into_iter()
+            .collect(),
+    });
+    Ok(true)
+}
+
+/// The traps placed on the map's layers.
+fn traps(nx: &NxDataFile, map_node_idx: u32, trap_objs: &TrapObjs) -> Result<Traps, GameDataError> {
+    let mut traps = Traps::default();
+    for layer in 0..8 {
+        let Some(layer) = nx.child_by_name(map_node_idx, &layer.to_string())? else {
+            continue;
+        };
+        let Some(objs) = nx.child_by_name(layer, "obj")? else {
+            continue;
+        };
+        for obj in nx.child_indices(objs)? {
+            let Some(set) = nx
+                .string_child(obj, "oS")?
+                .and_then(|o_s| trap_objs.get(&o_s))
+            else {
+                continue;
+            };
+            let key = (
+                nx.string_child(obj, "l0")?.unwrap_or_default(),
+                nx.string_child(obj, "l1")?.unwrap_or_default(),
+                nx.string_child(obj, "l2")?.unwrap_or_default(),
+            );
+            if let Some(trap) = set.get(&key) {
+                traps.add(trap);
+            }
+        }
+    }
+    Ok(traps)
 }
 
 /// A map's `info/decHP`, if positive, with its interval and protection.
@@ -1072,6 +1212,7 @@ mod tests {
             clock: false,
             time_limit: None,
             hazard: None,
+            traps: Traps::default(),
             footholds: footholds::Footholds::default(),
             portals_by_id: BTreeMap::from([
                 (
@@ -1143,6 +1284,7 @@ mod tests {
             clock: false,
             time_limit: None,
             hazard: None,
+            traps: Traps::default(),
             reactors: Vec::new(),
             footholds: footholds::Footholds::default(),
             portals_by_id: BTreeMap::from([
@@ -1278,6 +1420,37 @@ mod tests {
             game_data.field(100_000_000).expect("Henesys").time_limit,
             None
         );
+    }
+
+    #[test]
+    fn maps_have_their_traps() {
+        let Some(path) = test_assets::path("Map.nx") else {
+            return;
+        };
+        let game_data = GameData::load_from_nx_map(&path).expect("load map nx");
+        let traps = |map_id| game_data.field(map_id).expect("a map").traps.clone();
+
+        // The Forest of Patience's thorns hurt for 1.
+        let patience = traps(101_000_100);
+        assert_eq!((patience.damage, patience.max_hit(500)), (1, 1));
+        assert!(!patience.force_hp && patience.target_fields.is_empty());
+
+        // Adobis's Mission I's are rolled within a tenth.
+        assert_eq!(traps(280_010_010).max_hit(500), 220);
+
+        // Test of Agility's menhirs leave the player on 100 HP.
+        let agility = traps(610_030_300);
+        assert!(agility.force_hp);
+        assert_eq!(agility.max_hit(80_000), 80_000);
+
+        // The Witch Tower's snacks send players back to its entrance.
+        let tower = traps(980_041_000);
+        assert_eq!(
+            (tower.damage, tower.target_fields.as_slice()),
+            (0, &[980_040_000][..])
+        );
+
+        assert_eq!(traps(100_000_000), Traps::default());
     }
 
     #[test]

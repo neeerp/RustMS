@@ -22,6 +22,10 @@
 #include "../Configuration.h"
 #include "../Constants.h"
 #include "../Timer.h"
+#include "ScreenshotRules.h"
+
+#include <fstream>
+#include <vector>
 
 #define STB_IMAGE_IMPLEMENTATION
 // TODO: (rich) is needed?
@@ -31,6 +35,9 @@
 #else
 #include "stb_image.h"
 #endif
+
+#define STB_IMAGE_WRITE_IMPLEMENTATION
+#include "stb_image_write.h"
 
 namespace ms
 {
@@ -266,7 +273,36 @@ namespace ms
 	void Window::end() const
 	{
 		GraphicsGL::get().flush(opacity);
+
+		if (screenshot_pending)
+			save_screenshot();
+
 		glfwSwapBuffers(glwnd);
+	}
+
+	void Window::screenshot()
+	{
+		screenshot_pending = true;
+	}
+
+	void Window::save_screenshot() const
+	{
+		screenshot_pending = false;
+
+		// v83 asks for the first free index before every shot and writes the
+		// 800x600 frame as a quality 75 JPEG (IJL jquality 0x4b, FUN_00744d77).
+		std::string folder = GetCurrentWorkingDir() + "/";
+		int32_t index = Screenshot::first_free([&](int32_t i)
+		{
+			return std::ifstream(folder + Screenshot::file_name(i)).good();
+		});
+
+		std::vector<uint8_t> pixels(static_cast<size_t>(width) * height * 3);
+		glPixelStorei(GL_PACK_ALIGNMENT, 1);
+		glReadPixels(0, 0, width, height, GL_RGB, GL_UNSIGNED_BYTE, pixels.data());
+
+		stbi_flip_vertically_on_write(1);
+		stbi_write_jpg((folder + Screenshot::file_name(index)).c_str(), width, height, 3, pixels.data(), 75);
 	}
 
 	void Window::fadeout(std::function<void()> fadeproc)
@@ -304,7 +340,7 @@ namespace ms
 		}
 	}
 
-	std::string Window::GetCurrentWorkingDir(void)
+	std::string Window::GetCurrentWorkingDir(void) const
 	{
 		char buff[FILENAME_MAX];
 		GetCurrentDir(buff, FILENAME_MAX);

@@ -51,6 +51,10 @@ services:
       # Ships sail 60 times as fast: a trip takes 15 seconds (see
       # tests/ships.rs).
       RUSTMS_CONTI_SCALE: "60"
+      # Every spawn point keeps a mob, bosses too, rather than the v83 rule
+      # of a few mobs per map and bosses after a wait (see
+      # agent_docs/combat.md). Override with 0 to try the v83 rule.
+      RUSTMS_FULL_SPAWN: ${RUSTMS_FULL_SPAWN:-1}
       RUSTMS_LOGIN_CHANNELS: Scania-1@127.0.0.1:${HARNESS_WORLD_PORT:-18485}@700;Scania-2@127.0.0.1:${HARNESS_WORLD_PORT_2:-18486}@700;Scania-3@127.0.0.1:${HARNESS_WORLD_PORT_3:-18487}@700
     volumes:
       - ${HARNESS_ASSETS_DIR:-../assets}:/app/assets:ro

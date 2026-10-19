@@ -57,6 +57,31 @@ impl Footholds {
         self.lines.is_empty()
     }
 
+    /// The map's bounds as the v83 client works them out from its footholds
+    /// (r25 0xa44889): their extent, 30 px in from each side, 300 px above
+    /// the highest and 10 px below the lowest, as (left, top, right,
+    /// bottom). None without footholds.
+    pub fn bounds(&self) -> Option<(i32, i32, i32, i32)> {
+        let xs = || {
+            self.lines
+                .iter()
+                .flat_map(|fh| [fh.x1, fh.x2])
+                .map(i32::from)
+        };
+        let ys = || {
+            self.lines
+                .iter()
+                .flat_map(|fh| [fh.y1, fh.y2])
+                .map(i32::from)
+        };
+        Some((
+            xs().min()? + 30,
+            ys().min()? - 300,
+            xs().max()? - 30,
+            ys().max()? + 10,
+        ))
+    }
+
     /// The highest ground at `x` that is at or below `y`.
     pub fn ground_below(&self, x: i16, y: i16) -> Option<i16> {
         self.lines
@@ -138,6 +163,13 @@ mod tests {
             line(0, 200, 150, 200),
             line(150, 200, 300, 180),
         ])
+    }
+
+    #[test]
+    fn bounds_take_the_client_margins_around_every_line() {
+        // The cliff spans x -300..300 and y 100..200, its wall included.
+        assert_eq!(cliff().bounds(), Some((-270, -200, 270, 210)));
+        assert_eq!(Footholds::default().bounds(), None);
     }
 
     #[test]

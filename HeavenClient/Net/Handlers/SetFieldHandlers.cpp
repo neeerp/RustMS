@@ -35,6 +35,7 @@
 
 #include "../../IO/UITypes/UICharSelect.h"
 #include "../../IO/UITypes/UIFieldClock.h"
+#include "../../IO/UITypes/UIMobGage.h"
 #include "../../IO/UITypes/UIStatsInfo.h"
 #include "../../IO/UITypes/UITradingRoom.h"
 
@@ -125,8 +126,11 @@ namespace ms
 		if (auto room = UI::get().get_element<UITradingRoom>())
 			room->close();
 
-		// The field's countdown goes with it.
+		// The field's countdown and boss HP bar go with it.
 		UI::get().remove(UIElement::Type::FIELDCLOCK);
+
+		if (auto gage = UI::get().get_element<UIMobGage>())
+			gage->hide();
 
 		// v83 (FUN_00a03eba, from CField::OnSetField) sends this on every
 		// field change, not only on entering the game.

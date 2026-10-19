@@ -32,6 +32,8 @@
 #include "MapleMap/MapChars.h"
 #include "MapleMap/MapMobs.h"
 #include "MapleMap/MapMists.h"
+#include "MapleMap/MapClouds.h"
+#include "MapleMap/MapTooltips.h"
 #include "MapleMap/MapDoors.h"
 #include "MapleMap/MapSummons.h"
 #include "MapleMap/MapReactors.h"
@@ -197,6 +199,9 @@ namespace ms
 
 		void check_portals();
 
+		// Hurts the player on a trap and takes them where it sends them.
+		void hit_obstacle();
+
 		// Go through the Mystic Door the player stands in, if any
 		// (FUN_005375ed in a town, FUN_007bd594 elsewhere).
 		void check_doors(Point<int16_t> playerpos);
@@ -273,6 +278,8 @@ namespace ms
 		MapSummons summons;
 		MapEffect effect;
 		MapShip ship;
+		MapClouds clouds;
+		MapTooltips tooltips;
 		MapClock clock;
 		// A wall clock time that came before its map loaded.
 		struct ClockTime

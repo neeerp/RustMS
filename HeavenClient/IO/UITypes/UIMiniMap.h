@@ -48,6 +48,9 @@ namespace ms
 
 		UIElement::Type get_type() const override;
 
+		// How far right the window reaches, which the boss HP bar starts from.
+		int16_t get_width() const;
+
 	protected:
 		Button::State button_pressed(uint16_t buttonid) override;
 
@@ -97,7 +100,16 @@ namespace ms
 		int16_t scale = 1;
 		Point<int16_t> center_offset;
 		int16_t width = MIN_WIDTH;
-		// Portals to other maps, by name, where they show.
-		std::vector<std::pair<std::string, Point<int16_t>>> portals;
+		// The portals the minimap marks, the visible ones (types 2 and 7).
+		struct Portal
+		{
+			Point<int16_t> position;
+			// What the cursor over its marker shows, if anything.
+			bool tip;
+			std::string name;
+			int32_t target;
+		};
+
+		std::vector<Portal> portals;
 	};
 }

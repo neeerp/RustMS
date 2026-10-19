@@ -42,6 +42,9 @@ namespace ms
 
 		void update();
 
+		// The last-loaded trap in the layer that `body` touches.
+		const Obj *find_obstacle(const obstacle::Box &body) const;
+
 	private:
 		std::multimap<uint8_t, Tile> tiles;
 		std::multimap<uint8_t, Obj> objs;
@@ -58,6 +61,9 @@ namespace ms
 		void draw(Layer::Id layer, Point<int16_t> viewpos, float alpha) const;
 
 		void update();
+
+		// The trap that `body` touches. v83 tests them in reverse load order and takes the first (FUN_00642710).
+		const Obj *find_obstacle(const obstacle::Box &body) const;
 
 	private:
 		EnumMap<Layer::Id, TilesObjs> layers;

@@ -256,6 +256,9 @@ pub fn build_mob_stat_reset(object_id: i32, stats: &[MobStat]) -> Result<Packet,
 
 /// Touch damage, the `TAKE_DAMAGE` source (`TakeDamagePacket::TOUCH`).
 pub const FROM_TOUCH: i8 = -1;
+/// One of the map's traps (an obj marked `obstacle`), the source the v83
+/// client sends from 0x9593f7 with no mob.
+pub const FROM_OBSTACLE: i8 = -3;
 /// A mob's mist, the source the v83 client sends from FUN_00431783.
 pub const FROM_MIST: i8 = -4;
 

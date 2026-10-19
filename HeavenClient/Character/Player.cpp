@@ -1041,6 +1041,26 @@ namespace ms
 		return result;
 	}
 
+	void Player::damage_by_obstacle(int32_t damage, int32_t vx, int32_t vy)
+	{
+		// Achilles leaves the number as for a mob; Meso Guard has no part.
+		int32_t achilles = 1000 - static_cast<int32_t>(std::lround(stats.get_reducedamage() * 1000.0f));
+		show_damage(mob_damage::shown(damage, achilles, 0, 0));
+		become_invincible(true);
+		leave_chair();
+
+		if ((vx != 0 || vy != 0) && state != Char::State::DIED)
+		{
+			if (ladder)
+			{
+				set_state(Char::State::FALL);
+				set_ladder(nullptr);
+			}
+
+			Physics::knockback(phobj, vx, vy);
+		}
+	}
+
 	void Player::give_buff(Buff buff)
 	{
 		buffs[buff.stat] = buff;

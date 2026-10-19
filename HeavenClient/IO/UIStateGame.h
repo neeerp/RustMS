@@ -28,6 +28,7 @@
 #include "Components/ItemTooltip.h"
 #include "Components/MapTooltip.h"
 #include "Components/SkillTooltip.h"
+#include "Components/PlainTooltip.h"
 #include "Components/TextTooltip.h"
 #include "Components/MapTooltip.h"
 
@@ -77,6 +78,10 @@ namespace ms
 
 		void show_map(Tooltip::Parent parent, std::string name, std::string description) override;
 
+		void show_zone(Tooltip::Parent parent, std::string title, std::string description) override;
+
+		void show_line(Tooltip::Parent parent, std::string text) override;
+
 		Iterator pre_add(UIElement::Type type, bool toggled, bool focused);
 
 		void remove(UIElement::Type type) override;
@@ -120,6 +125,7 @@ namespace ms
 		SkillTooltip sktooltip;
 		TextTooltip tetooltip;
 		MapTooltip matooltip;
+		PlainTooltip pltooltip;
 		Optional<Tooltip> tooltip;
 		Tooltip::Parent tooltipparent;
 

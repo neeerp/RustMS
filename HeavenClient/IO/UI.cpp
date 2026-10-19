@@ -17,6 +17,8 @@
 //////////////////////////////////////////////////////////////////////////////////
 #include "UI.h"
 
+#include <chrono>
+
 #include "UIStateCashShop.h"
 #include "UIStateGame.h"
 #include "UIStateLogin.h"
@@ -207,6 +209,34 @@ namespace ms
 
 	void UI::send_key(int32_t keycode, bool pressed)
 	{
+		// Scroll Lock takes a screenshot before anything else sees the key
+		// (FUN_009e40f1).
+		if (keycode == GLFW_KEY_SCROLL_LOCK)
+		{
+			if (pressed)
+			{
+				int64_t now = std::chrono::duration_cast<std::chrono::milliseconds>(
+					std::chrono::steady_clock::now().time_since_epoch()).count();
+				bool in_game = static_cast<bool>(get_element<UIStatusBar>());
+
+				switch (screenshots.press(now, in_game))
+				{
+					case Screenshot::Press::TAKE:
+						Window::get().screenshot();
+						break;
+					case Screenshot::Press::REFUSE:
+						if (auto chatbar = get_element<UIChatBar>())
+							chatbar->send_chatline("You cannot take screenshots at this moment. Please try again later.",
+												   UIChatBar::LineType::SKILL);
+						break;
+					default:
+						break;
+				}
+			}
+
+			return;
+		}
+
 		if ((is_key_down[GLFW_KEY_LEFT_ALT] || is_key_down[GLFW_KEY_RIGHT_ALT]) &&
 			(is_key_down[GLFW_KEY_ENTER] || is_key_down[GLFW_KEY_KP_ENTER]))
 		{
@@ -497,6 +527,16 @@ namespace ms
 	void UI::show_map(Tooltip::Parent parent, std::string name, std::string description)
 	{
 		state->show_map(parent, name, description);
+	}
+
+	void UI::show_zone(Tooltip::Parent parent, std::string title, std::string description)
+	{
+		state->show_zone(parent, title, description);
+	}
+
+	void UI::show_line(Tooltip::Parent parent, std::string text)
+	{
+		state->show_line(parent, text);
 	}
 
 	Keyboard &UI::get_keyboard()

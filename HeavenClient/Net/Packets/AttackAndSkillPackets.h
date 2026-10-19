@@ -179,7 +179,15 @@ namespace ms
 		enum From : int8_t
 		{
 			TOUCH = -1,
+			OBSTACLE = -3,
 			MIST = -4
+		};
+
+		// A trap's hit and the disease it reports, as its mob skill and level.
+		struct Obstacle
+		{
+			int32_t damage;
+			uint16_t code;
 		};
 
 		// From a mob's touch or attack (0x9593f7): then Power Guard's or
@@ -223,6 +231,17 @@ namespace ms
 			write_int(damage);
 			write_short(static_cast<int16_t>(code));
 			write_byte(last);
+		}
+
+		// From a trap (0x9593f7 with no mob): no element, mob or Power Guard.
+		TakeDamagePacket(Obstacle hit) : OutPacket(OutPacket::Opcode::TAKE_DAMAGE)
+		{
+			write_time();
+			write_byte(OBSTACLE);
+			write_byte(0);
+			write_int(hit.damage);
+			write_short(static_cast<int16_t>(hit.code));
+			write_byte(0);
 		}
 	};
 

@@ -1,6 +1,6 @@
 use crate::actor::field_drops::{Drop, DropSet, Ownership};
 use crate::actor::field_mists::MistSet;
-use crate::actor::field_mobs::{split_exp, Cast, MobSet, Sharer};
+use crate::actor::field_mobs::{split_exp, BossBar, Cast, LiveMob, MobSet, Sharer};
 use crate::actor::field_reactors::{Hit, ReactorSet};
 use crate::actor::field_shops::{ShopRoomRequest, Shops};
 use crate::actor::field_summons::SummonSet;
@@ -16,6 +16,7 @@ use net::packet::build::world::door::{build_remove_door, build_spawn_door};
 use net::packet::build::world::drop::{
     build_drop, build_explode_drop, build_pet_loot_drop, build_remove_drop, DropAppearance,
 };
+use net::packet::build::world::effect::build_boss_hp_bar;
 use net::packet::build::world::field::{
     build_player_enter_field, build_player_leave_field, build_show_chair, parse_movement,
     parse_movement_state,
@@ -116,7 +117,7 @@ impl FieldActor {
         mut reactors: ReactorSet,
         tick: Duration,
     ) -> Self {
-        mobs.respawn(Instant::now());
+        mobs.start(Instant::now());
         reactors.respawn(Instant::now());
         Self {
             key,
@@ -196,16 +197,18 @@ impl FieldActor {
             ) {
                 occupant.handle.send_packet(packet);
             }
+            self.show_boss_bar(self.mobs.get(hurt.object_id).and_then(LiveMob::boss_bar));
         }
         for (object_id, lost) in self.mobs.expire_statuses(now) {
             if let Ok(packet) = build_mob_stat_reset(object_id, &lost) {
                 self.broadcast(None, packet);
             }
         }
-        for (object_id, leave) in self.mobs.leave(now) {
+        for (object_id, leave, bar) in self.mobs.leave(now) {
             if let Ok(packet) = build_kill_mob(object_id, leave) {
                 self.broadcast(None, packet);
             }
+            self.show_boss_bar(bar);
         }
         for object_id in self.mobs.revive(now, net::mobs::info) {
             let Some(mob) = self.mobs.get(object_id) else {
@@ -218,7 +221,7 @@ impl FieldActor {
                 self.send_control(controller, &[object_id]);
             }
         }
-        let spawned = self.mobs.respawn(now);
+        let spawned = self.mobs.respawn(now, self.occupants.len());
         if spawned.is_empty() {
             return;
         }
@@ -887,6 +890,9 @@ impl FieldActor {
                     if let Ok(packet) = build_mob_hp(object_id, percent) {
                         attacker.send_packet(packet);
                     }
+                    if damage > 0 {
+                        self.show_boss_bar(self.mobs.get(object_id).and_then(LiveMob::boss_bar));
+                    }
                     let eater = takes
                         .mp
                         .filter(|eater| damage > 0 && eater.eats(rand::random()));
@@ -905,6 +911,7 @@ impl FieldActor {
                     if let Ok(packet) = build_kill_mob(kill.object_id, kill.leave) {
                         self.broadcast(None, packet);
                     }
+                    self.show_boss_bar(kill.boss_bar);
                     let sharers: Vec<Sharer> = self
                         .occupants
                         .iter()
@@ -1422,6 +1429,7 @@ impl FieldActor {
                     if let Ok(packet) = build_heal_mob(object_id, healed, hp, max_hp) {
                         self.broadcast(None, packet);
                     }
+                    self.show_boss_bar(self.mobs.get(object_id).and_then(LiveMob::boss_bar));
                 }
             }
             Some(MobSkillEffect::Summon) => {
@@ -1650,6 +1658,18 @@ impl FieldActor {
             return;
         };
         self.hand_over(object_id, previous, from, &handle, false);
+    }
+
+    /// Show the whole field a mob's boss HP bar as it now stands, as Kinoko
+    /// does on every change (FIELD_EFFECT 5). Mobs whose bar the client
+    /// draws itself (`HPgaugeHide`) have none here.
+    fn show_boss_bar(&self, bar: Option<BossBar>) {
+        let Some(bar) = bar else {
+            return;
+        };
+        if let Ok(packet) = build_boss_hp_bar(bar.mob_id, bar.hp, bar.max_hp, bar.colors) {
+            self.broadcast(None, packet);
+        }
     }
 
     /// A client says a Darkstar has a player in reach: it blows up, giving
@@ -2055,7 +2075,7 @@ mod tests {
     #[tokio::test]
     async fn monster_magnet_shows_its_catches_and_the_caught_chase_the_user() {
         let mut mobs = MobSet::new([mob(100, false), mob(200, true)]);
-        let spawned = mobs.respawn(Instant::now());
+        let spawned = mobs.spawn_all(Instant::now());
         let (tx, rx) = mpsc::channel(16);
         let actor = FieldActor::new(
             FieldKey::new(0, 100000000),
@@ -2105,7 +2125,7 @@ mod tests {
     #[tokio::test]
     async fn drain_takes_a_share_and_mortal_blow_finishes_the_weak() {
         let mut mobs = MobSet::new([mob(100, false)]);
-        let snail = mobs.respawn(Instant::now())[0];
+        let snail = mobs.spawn_all(Instant::now())[0];
         let (tx, rx) = mpsc::channel(16);
         let actor = FieldActor::new(
             FieldKey::new(0, 100000000),
@@ -2178,7 +2198,7 @@ mod tests {
         let (template, mut info) = mob(100, false);
         info.max_hp = 20_000;
         let mut mobs = MobSet::new([(template, info)]);
-        let snail = mobs.respawn(Instant::now())[0];
+        let snail = mobs.spawn_all(Instant::now())[0];
         let mut drops = DropSet::default();
         let now = Instant::now();
         let mut put = |owner, x| {

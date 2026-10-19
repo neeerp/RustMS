@@ -57,6 +57,9 @@ Containerized servers use env overrides so they are decoupled from local static 
   cycle takes 15 seconds (`net/src/conti.rs`)
 - Monster Book card drop chance: `RUSTMS_CARD_DROP_RATE=1` so every kill
   drops its card (`net/src/monster_book.rs`)
+- mob spawning: `RUSTMS_FULL_SPAWN=1` keeps a mob on every spawn point,
+  bosses included from the start, instead of the capacity-limited v83 rule
+  (`runtime/src/actor/field_mobs.rs`)
 
 ## Harness invariants
 

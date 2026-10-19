@@ -138,6 +138,10 @@ namespace ms
 		// Handle an attack to the player.
 		MobAttackResult damage(const MobAttack &attack);
 
+		// Hurts the player by a trap's `damage` and knocks them at (vx, vy) pixels per second (FUN_009581a9 with
+		// no mob): no miss, guard or Power Stance.
+		void damage_by_obstacle(int32_t damage, int32_t vx, int32_t vy);
+
 		// Apply a buff to the player
 		void give_buff(Buff buff);
 

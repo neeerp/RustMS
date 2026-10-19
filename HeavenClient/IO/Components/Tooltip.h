@@ -47,7 +47,9 @@ namespace ms
 			TRADINGROOM,
 			PERSONALSHOP,
 			ITEMMEGAPHONE,
-			STATUSBAR
+			STATUSBAR,
+			// The map under the cursor, outside every window.
+			FIELD
 		};
 
 		virtual ~Tooltip()

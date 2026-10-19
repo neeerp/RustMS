@@ -31,6 +31,7 @@
 #include "../Util/NxFiles.h"
 
 #include "../IO/UITypes/UIChatBar.h"
+#include "../IO/UITypes/UIMobGage.h"
 #include "../IO/UITypes/UINotice.h"
 #include "../IO/UITypes/UINpcTalk.h"
 #include "../IO/UITypes/UIPersonalShop.h"
@@ -41,6 +42,8 @@
 #include "../Net/Packets/GameplayPackets.h"
 
 #include <nlnx/nx.hpp>
+
+#include <cstdlib>
 
 namespace ms
 {
@@ -144,7 +147,11 @@ namespace ms
 		backgrounds = MapBackgrounds(src["back"]);
 		physics = Physics(src["foothold"], src["info"]);
 		mapinfo = MapInfo(src, physics.get_fht().get_walls(), physics.get_fht().get_borders());
+		clouds = mapinfo.has_clouds() ? MapClouds(physics.get_fht().get_space_x(), physics.get_fht().get_space_y())
+									  : MapClouds();
 		portals = MapPortals(src["portal"], mapid);
+		tooltips = mapid == -1 ? MapTooltips() : MapTooltips(mapid, src);
+		UI::get().clear_tooltip(Tooltip::Parent::FIELD);
 		ship = MapShip(src);
 		clock = MapClock(src);
 		ground_effects = EffectLayer();
@@ -221,7 +228,13 @@ namespace ms
 		ground_effects.drawabove(viewpos, alpha);
 		portals.draw(viewpos, alpha);
 		backgrounds.drawforegrounds(viewx, viewy, alpha);
+		// v83's clouds are above the front backgrounds and below the fear
+		// overlay (z 0xc0061508).
+		clouds.draw(viewx, viewy, alpha);
 		draw_fear(viewx, viewy, alpha);
+		// The tips of the zones the player stands in are at z 0, above the
+		// field's own layers (FUN_008f3141).
+		tooltips.draw(viewpos);
 		effect.draw();
 	}
 
@@ -256,6 +269,7 @@ namespace ms
 
 		combat.update();
 		backgrounds.update();
+		clouds.update();
 		ship.update();
 		clock.update();
 		effect.update();
@@ -295,6 +309,7 @@ namespace ms
 		portals.update(player.get_position());
 		check_touch_portals(drawn);
 		camera.update(player.get_position());
+		tooltips.update(player.get_position());
 
 		// The player's or a party member's smoke screen keeps mobs' attacks,
 		// touch and mists off them (FUN_0043193a).
@@ -349,7 +364,11 @@ namespace ms
 					mobs.show_damage(result.oid, result.reflected);
 			}
 		}
-		else if (since_mist_hurt > mist::HURT_INTERVAL)
+
+		// v83 tests the traps whether or not a mob hit; a hit leaves the player invincible for the trap (0x94b5e8).
+		hit_obstacle();
+
+		if (!touching && since_mist_hurt > mist::HURT_INTERVAL)
 		{
 			// Not touching a mob, the player in a mob's mist hurts
 			// themselves its x, without a knockback or invincibility
@@ -374,6 +393,40 @@ namespace ms
 
 			TakeDamagePacket(4, damage, 0, 3).dispatch();
 		}
+	}
+
+	void Stage::hit_obstacle()
+	{
+		// The body the mob touch takes (I: FUN_0045183b for both).
+		const PhysicsObject &phobj = player.get_phobj();
+		Range<int16_t> horizontal(phobj.get_last_x(), phobj.get_x());
+		Range<int16_t> vertical(phobj.get_last_y(), phobj.get_y());
+		obstacle::Box body{ horizontal.smaller(), vertical.smaller() - 50, horizontal.greater(), vertical.greater() };
+
+		const Obj *trap = tilesobjs.find_obstacle(body);
+
+		if (!trap)
+			return;
+
+		const obstacle::Trap &data = trap->get_trap();
+		int32_t damage = obstacle::roll(data.damage, static_cast<uint32_t>(std::rand()));
+		uint16_t code = obstacle::code(damage, data);
+		damage = obstacle::forced(damage, player.get_stats().get_stat(MapleStat::Id::HP), data.force_hp);
+
+		if (damage > 0 && !player.Char::is_invincible())
+		{
+			obstacle::Vec push = trap->get_push();
+
+			if (push == obstacle::Vec{ 0, 0 })
+				push = obstacle::fallback(phobj.get_last_x(), phobj.get_last_y(), phobj.get_x(), phobj.get_y());
+
+			player.damage_by_obstacle(damage, push.x, push.y);
+			TakeDamagePacket(TakeDamagePacket::Obstacle{ damage, code }).dispatch();
+		}
+
+		// Witch Tower's snacks send the player back to its entrance, hurting or not (0x94b767).
+		if (data.target_field != 0)
+			player.request(ChangeMapPacket(field_key, data.target_field, "", false), ExclRequest::WAIT, true);
 	}
 
 	void Stage::show_character_effect(int32_t cid, CharEffect::Id effect)
@@ -892,6 +945,10 @@ namespace ms
 
 	Cursor::State Stage::send_cursor(bool pressed, Point<int16_t> position)
 	{
+		// The field shows a boss's name over the icon on its HP bar (0x529a09).
+		if (auto gage = UI::get().get_element<UIMobGage>())
+			gage->hover(position);
+
 		auto statusbar = UI::get().get_element<UIStatusBar>();
 
 		if (statusbar && statusbar->is_menu_active())
@@ -900,7 +957,11 @@ namespace ms
 				statusbar->remove_menus();
 
 			if (statusbar->is_in_range(position))
+			{
+				tooltips.leave();
+
 				return statusbar->send_cursor(pressed, position);
+			}
 		}
 
 		// The close button on the player's own chalkboard, which needs both
@@ -918,17 +979,29 @@ namespace ms
 			if (auto chatbar = UI::get().get_element<UIChatBar>())
 				chatbar->send_chatline("The chalkboard has closed.", UIChatBar::LineType::SKILL);
 
+			tooltips.leave();
+
 			return Cursor::State::CANCLICK;
 		}
 
 		if (!mini_room && player.on_chalkboard_close(feet, position))
+		{
+			tooltips.leave();
+
 			return Cursor::State::CANCLICK;
+		}
 
 		Cursor::State npcstate = npcs.send_cursor(pressed, position, camera.position());
 
 		// A shop's balloon shows the house cursor (FUN_00531cc7).
 		if (npcstate == Cursor::State::IDLE && mini_room_at(position))
-			return Cursor::State::HOUSE;
+			npcstate = Cursor::State::HOUSE;
+
+		// Otherwise a map zone under the cursor shows its tip.
+		if (npcstate == Cursor::State::IDLE)
+			tooltips.hover(position - camera.position());
+		else
+			tooltips.leave();
 
 		return npcstate;
 	}

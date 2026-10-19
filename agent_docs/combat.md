@@ -7,10 +7,36 @@ height, `fh`, `f`, `mobTime`, `hide`); `game_data::mobs::MobData` reads their
 templates from `Mob.nx` (`maxHP`, `exp`, `PADamage`, `bodyAttack`,
 `notAttack`, ...). Each `FieldActor` owns a `field_mobs::MobSet`:
 
-- **Spawning:** every visible spawn point (not `hide`, `mobTime` ≥ 0) spawns
-  when the field starts. A killed mob comes back after `mobTime` seconds, at
-  least 7 s, on the field's 100 ms tick, with a new object id (mobs and drops
-  each have a range in `actor::object_ids`). Joining players get SPAWN_MONSTER for every live mob.
+- **Spawning** follows the v83 server's CField::TryCreateMob, as
+  OrionAlpha (a replica of Nexon's server) has it:
+  - A field holds a number of mobs set by its size
+    (`field_mobs::mob_capacity`): one per 128,000 square pixels of its
+    footholds' bounds (`Footholds::bounds`, the client's: 30 px in from the
+    sides, 300 px above the top, 10 px below the bottom; the server adds 10
+    px a side), counted as at least 800 wide and 600 high after taking 450
+    off the height, times `info/mobRate`, from 1 to 40. With more than half
+    that many users on the field it grows, up to twice as many at twice as
+    many users.
+  - At most every 7 s, while the field holds fewer mobs than that, a pass
+    fills spawn points picked at random from those with room, as many as
+    are missing. A pass with nothing missing doesn't count. A point without
+    a `mobTime` has room when no mob, nor a point filled in the same pass,
+    is within 100 px in both x and y. A point with a positive `mobTime`
+    holds one mob: it first fills 0.1 to 0.7 times its `mobTime` after the
+    field loads, and again 1.3 to 2 times it after its mob goes (Mushmom's
+    1800 s: 39 to 60 minutes). A point with a negative `mobTime` (party
+    quest and job maps) fills on the first pass only. `hide` points never
+    do.
+  - The first pass runs as the field loads, with no users, so a field
+    starts at its plain capacity. Fields live on once loaded and keep
+    spawning with nobody on them.
+  - New mobs get new object ids (mobs and drops each have a range in
+    `actor::object_ids`). Joining players get SPAWN_MONSTER for every live
+    mob.
+  - `RUSTMS_FULL_SPAWN=1` (set by the integration harness) gives every
+    spawn point a mob of its own instead: no capacity, no room check and no
+    first wait, and an emptied point fills again after its `mobTime`, at
+    least 7 s.
 - **Revive:** a mob with `info/revive` (the Blue Perfume bottle, Yeti and
   Pepe, ...) lets those mobs out where it died once its `die1` animation is
   over (`MobInfo::dying_ms`, 500 ms without one), as Cosmic does. They fade
@@ -343,6 +369,21 @@ the player, yellow for one 20 or more below, and white otherwise. A "Lv. N"
 tag (`Basic.img/ShowLevel`) sits left of the name, except for bosses, mobs
 whose `info` hides their level, HP or name, and 9xxxxxx mobs outside 94xxxxx
 and 96xxxxx.
+
+A mob whose `info` gives both `hpTagColor` and `hpTagBgcolor` (`MobInfo::hp_tags`)
+has a boss HP bar along the top of the screen instead: FIELD_EFFECT mode 5,
+with the mob's template id, HP, max HP and the two colours. The field sends
+it to everyone on the field each time such a mob's HP changes, and once more
+with HP 0, which takes the bar down, when the mob dies or leaves. Nothing is
+sent when it spawns or when a player enters, as in Kinoko. A mob that also
+sets `HPgaugeHide` gets no mode 5 while it lives (`MobInfo::boss_bar`): the
+client shows the bar itself from SHOW_MONSTER_HP, to the attacker alone, as
+v83 does. Bosses without `HPgaugeHide` show no small bar at all. In
+HeavenClient the bar is `UIMobGage`, laid out from `UIWindow.img/MobGage` as
+v83 does (`MobGageLayout.h`): it starts at the minimap's right edge, the
+fill truncates, and hovering the icon shows the mob's name. As in v83, a
+`HPgaugeHide` mob's bar comes down 20 s after the last hit while it lives.
+v83 delays those bars 500 ms, which HeavenClient doesn't.
 
 Some attacks take something back from the mobs they hit (`skills::takes`,
 handled in the field's `handle_attack`):
@@ -1139,6 +1180,32 @@ Two more things keep hazards off, both server-side too:
   either returns to El Nath (211000000) or the internet cafe (193000000),
   as Cosmic has it, or wants the cold cape (1102109).
 
+Traps hurt too: objs whose `Map/Obj` node has `obstacle`, such as the jump
+quests' thorns and lasers, Adobis's fire and the Leafre animals (3514
+placements on 276 maps). The client tests them itself, as v83 does
+(FUN_00642264 and FUN_00642710; `ObstacleRules.h`). Each tick a trap's box is
+its current frame's `lt`/`rb` on the obj, mirrored when the obj is flipped,
+and frames without one, or under 5 px both ways, don't hurt. The client takes
+the last-loaded trap the player's body meets, under the same gates as a mob's
+touch, and rolls its `damage` within a tenth either way when it's over 10. A
+`forceHP` trap (Test of Agility's menhirs) takes the player down to that
+much HP, or hits for all of it when they're at or below it. The hit knocks
+the player by the trap's `dir`, which v83 turns into a push with
+`90 - 30 * dir` taken as radians, so only 3 points where it says. Without a
+`dir` the push is 270 back against the player's step and up unless they're
+rising. The hit then makes the player invincible and blink as a mob's does,
+with no miss, guard or Power Stance, and goes out as TAKE_DAMAGE from -3:
+`tick, -3, 0, damage, short disease << 8 | level, 0`. The server
+(`obstacle_damage`) accepts up to the map's highest `damage` plus a tenth, or
+the player's HP on a map with a `forceHP` trap (`game_data::Traps`), takes
+Achilles' and Magic Guard's shares, and shows DAMAGE_PLAYER -3, which has no
+mob. Like Cosmic and Kinoko, it doesn't give the disease. A trap with a
+`targetField` (the Witch Tower's snacks, back to 980040000) sends a
+CHANGE_MAP there on touch, hurting or not, which the server allows a living
+player from that map. Not done: FIELD_OBSTACLE_ONOFF (139), which switches
+named traps such as the Orbis jail spears between states, and the
+`mobdamage` those spears do to mobs (0xBF).
+
 The client's respawn is a CHANGE_MAP with a target while dead. It returns the
 player to the map's return map with 50 HP. When the player chose a Wheel of
 Destiny (5510000) in the death dialog (the wheel byte after the portal name),
@@ -1228,6 +1295,11 @@ orbs by swinging at a snail (a sixth swing adds none), and spend them with
 Panic.
 `player_diseases` has a Hogul in Korean Folk Town cast Slow from far away
 (it misses) and then on the player (it lands for 10 s, then ends).
+`boss_hp_bar` has a player hit Neo City's 7220003 and checks that another
+player on the field sees its bar in its colours, and the bar's removal when
+it dies.
+`map_traps` has a player in the Forest of Patience take a thorn's 1 damage,
+which another player sees as DAMAGE_PLAYER -3, and has a hit of 2 refused.
 `map_hazards` warps to El Nath's Ice Valley in its cape, which keeps the
 cold out, then takes it off and drinks an Air Bubble, which doesn't help: it
 loses 10 HP at the next tick. After a Red Bean Porridge it loses nothing.

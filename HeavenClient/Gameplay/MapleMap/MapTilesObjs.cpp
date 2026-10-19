@@ -17,6 +17,8 @@
 //////////////////////////////////////////////////////////////////////////////////
 #include "MapTilesObjs.h"
 
+#include "../../Util/Misc.h"
+
 namespace ms
 {
 	TilesObjs::TilesObjs(nl::node src)
@@ -32,7 +34,7 @@ namespace ms
 
 		for (auto objnode : src["obj"])
 		{
-			Obj obj{objnode};
+			Obj obj{objnode, string_conversion::or_default<int32_t>(objnode.name(), 0)};
 			int8_t z = obj.getz();
 			objs.emplace(z, std::move(obj));
 		}
@@ -45,6 +47,23 @@ namespace ms
 	{
 		for (auto &iter : objs)
 			iter.second.update();
+	}
+
+	const Obj *TilesObjs::find_obstacle(const obstacle::Box &body) const
+	{
+		const Obj *found = nullptr;
+
+		for (auto &iter : objs)
+		{
+			const Obj &obj = iter.second;
+			obstacle::Box box{};
+
+			if (obj.is_obstacle() && (!found || obj.get_order() > found->get_order()) && obj.obstacle_box(box) &&
+				box.meets(body))
+				found = &obj;
+		}
+
+		return found;
 	}
 
 	void TilesObjs::draw(Point<int16_t> viewpos, float alpha) const
@@ -68,6 +87,15 @@ namespace ms
 	void MapTilesObjs::draw(Layer::Id layer, Point<int16_t> viewpos, float alpha) const
 	{
 		layers[layer].draw(viewpos, alpha);
+	}
+
+	const Obj *MapTilesObjs::find_obstacle(const obstacle::Box &body) const
+	{
+		for (size_t i = Layer::Id::LENGTH; i-- > 0;)
+			if (const Obj *obj = layers[static_cast<Layer::Id>(i)].find_obstacle(body))
+				return obj;
+
+		return nullptr;
 	}
 
 	void MapTilesObjs::update()

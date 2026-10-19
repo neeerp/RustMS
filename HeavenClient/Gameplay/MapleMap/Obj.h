@@ -19,6 +19,8 @@
 
 #include <cstdint>
 
+#include "ObstacleRules.h"
+
 #include "../Graphics/Animation.h"
 #include "../Template/Point.h"
 
@@ -28,7 +30,8 @@ namespace ms
 	class Obj
 	{
 	public:
-		Obj(nl::node source);
+		// `order` is its place among its layer's objs.
+		Obj(nl::node source, int32_t order = 0);
 
 		// Update animation.
 		void update();
@@ -39,10 +42,26 @@ namespace ms
 		// Return depth of the obj.
 		uint8_t getz() const;
 
+		int32_t get_order() const;
+
+		// Whether the obj is a trap, which hurts what touches it.
+		bool is_obstacle() const;
+
+		const obstacle::Trap &get_trap() const;
+
+		// The box of the trap's current frame on the map (v83 FUN_00642264), or false when the frame has none.
+		bool obstacle_box(obstacle::Box &out) const;
+
+		// The push of the trap, where it has a direction.
+		obstacle::Vec get_push() const;
+
 	private:
 		Animation animation;
 		Point<int16_t> pos;
 		uint8_t z;
 		bool flip;
+		int32_t order;
+		bool obstacle;
+		obstacle::Trap trap;
 	};
 }

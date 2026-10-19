@@ -30,6 +30,9 @@
 #include "../../Util/Misc.h"
 #include "../../Util/NxFiles.h"
 
+#include "../../IO/UI.h"
+#include "../../IO/UITypes/UIMobGage.h"
+
 #include "../../Net/Packets/GameplayPackets.h"
 
 #include <nlnx/nx.hpp>
@@ -85,6 +88,10 @@ namespace ms
 		canmove = src["move"].size() > 0 || canfly;
 		canchase = src["chase"].size() > 0;
 		boss = info["boss"].get_bool();
+		gaugehide = info["HPgaugeHide"].get_bool();
+		tagcolor = static_cast<uint8_t>(info["hpTagColor"].get_integer());
+		tagbgcolor = static_cast<uint8_t>(info["hpTagBgcolor"].get_integer());
+		hitbyplayer = false;
 		fixeddamage = info["fixedDamage"];
 		maxhp = info["maxHP"];
 		invincible = info["invincible"].get_bool();
@@ -426,6 +433,11 @@ namespace ms
 		for (StatusEffect &effect : statuseffects)
 			effect.animation.update();
 		showhp.update();
+		keepsgage.update();
+
+		if (gaugehide && hitbyplayer && !keepsgage)
+			if (auto gage = UI::get().get_element<UIMobGage>())
+				gage->hide();
 
 		if (!dying)
 		{
@@ -1846,6 +1858,21 @@ namespace ms
 
 	void Mob::show_hp(int8_t percent, uint16_t playerlevel)
 	{
+		// A boss shows its HP only in the bar the server sends (0x66d652).
+		if (boss && !gaugehide)
+			return;
+
+		// A mob that hides its gauge shows the boss bar instead, with v83's 32-bit arithmetic (0x66880a).
+		if (gaugehide)
+		{
+			hitbyplayer = true;
+			keepsgage.set_for(20000);
+			auto hp = static_cast<int32_t>(static_cast<uint32_t>(maxhp) * static_cast<uint8_t>(percent));
+			UIMobGage::show(id, hp / 100, maxhp, tagcolor, tagbgcolor);
+
+			return;
+		}
+
 		// v83 picks the name's font and tag set when it first builds the
 		// tag (FUN_0066c734): 20 or more levels above the player is orange,
 		// 20 or more below is yellow.

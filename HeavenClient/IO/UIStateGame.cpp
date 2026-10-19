@@ -450,6 +450,7 @@ namespace ms
 			// then reaches whatever is under it.
 			if (auto focusedelement = get_focused())
 			{
+				clear_tooltip(Tooltip::Parent::FIELD);
 				remove_cursor(focusedelement->get_type());
 
 				return focusedelement->send_cursor(clicked, cursorpos);
@@ -547,6 +548,7 @@ namespace ms
 			sktooltip.set_skill(0, 0, 0, 0, true);
 			tetooltip.set_text("");
 			matooltip.reset();
+			pltooltip.reset();
 			tooltip = {};
 			tooltipparent = Tooltip::Parent::NONE;
 		}
@@ -609,6 +611,28 @@ namespace ms
 		}
 	}
 
+	void UIStateGame::show_zone(Tooltip::Parent parent, std::string title, std::string description)
+	{
+		pltooltip.set_zone(title, description);
+
+		if (!pltooltip.empty())
+		{
+			tooltip = pltooltip;
+			tooltipparent = parent;
+		}
+	}
+
+	void UIStateGame::show_line(Tooltip::Parent parent, std::string text)
+	{
+		pltooltip.set_line(text);
+
+		if (!pltooltip.empty())
+		{
+			tooltip = pltooltip;
+			tooltipparent = parent;
+		}
+	}
+
 	template<class T, typename...Args>
 	void UIStateGame::emplace(Args &&...args)
 	{
@@ -639,7 +663,8 @@ namespace ms
 					UIElement::Type::CONTEXTMENU,
 					UIElement::Type::REVIVE,
 					UIElement::Type::FIELDCLOCK,
-					UIElement::Type::EVENTCLOCK
+					UIElement::Type::EVENTCLOCK,
+					UIElement::Type::MOBGAGE
 			};
 
 			if (std::find(silent_types.begin(), silent_types.end(), T::TYPE) == silent_types.end())
