@@ -114,8 +114,14 @@ cash ammo slot, and a byte), and 4 more for Hurricane, Piercing Arrow, and
 Rapid Fire. Each is checked before it reaches the field (`validate`): the
 attacker must be alive, and a basic attack (skill 0) hits one mob once, each
 hit at most twice the character's basic maximum (`max_base_damage`, v83's
-weapon multiplier × main stat + secondary stat, × weapon attack / 100). An
-attack naming a skill needs that skill learned at some level; its `Skill.nx`
+weapon formula on stats counting equipment, a thief's dagger and Lucky Seven
+on LUK, × weapon attack / 100, where weapon attack also counts attack buffs,
+an expert skill's `x` (Bow Expert, Marksman Boost, High Mastery), a shot's
+star, arrow or bullet `incPAD`, and a weaponless pirate's 10 + 0.7 a level, at
+most 31). Criticals raise every cap by their bonus over
+100%: the weapon's critical skill (Critical Shot and Critical Throw with
+their Cygnus twins, and Critical Punch), Sharp Eyes's low byte as sent, and
+Stun Mastery. An attack naming a skill needs that skill learned at some level; its `Skill.nx`
 level (`game_data::skills::SkillLevel`) gives the mobs allowed, the hits (a
 shot's `bulletCount`, otherwise `attackCount`), the MP spent, and the cap: a
 `fixdamage` skill (Three Snails: 10/25/40) hits for at most that, a `mad`
@@ -1196,7 +1202,9 @@ early. `poison_mist` casts Poison Mist on a snail and
 checks the cloud's packet, that it lifts on time, and that it poisons only
 the snails in its box. `snipe` has a Marksman Snipe snails: 200,000 is
 refused, 199,999 kills and starts the 4 s cooldown, which refuses another
-until it ends. `summons` has a ranger call up a Silver Hawk and a
+until it ends. `critical_shots` has an Assassin with Subis shot for 16,
+its cap, but not 17, then for 32 but not 33 once it learns Critical Throw.
+`summons` has a ranger call up a Silver Hawk and a
 Puppet, and checks what a watcher sees: the spawns, a refused and an accepted
 Hawk attack, the Puppet breaking, and the Hawk following its owner to the
 next map with no entrance. It also has a Dark Knight's Beholder heal them

@@ -28,6 +28,9 @@ pub struct ItemInfo {
     pub price: i32,
     /// What one throwing star or bullet costs to recharge (`unitPrice`).
     pub unit_price: f64,
+    /// What a star, arrow, or bullet adds to the attack of a shot that
+    /// throws it (`incPAD`).
+    pub pad: i32,
     /// What a portable chair heals every 10 seconds (`recoveryHP`/`recoveryMP`).
     pub recovery_hp: i32,
     pub recovery_mp: i32,
@@ -274,6 +277,7 @@ impl ItemData {
             info.pickup_block = nx.int_child(meta, "pickUpBlock")? == Some(1);
             info.price = nx.int_child(meta, "price")?.unwrap_or(0);
             info.unit_price = nx.real_child(meta, "unitPrice")?.unwrap_or(0.0);
+            info.pad = nx.int_child(meta, "incPAD")?.unwrap_or(0);
             info.recovery_hp = nx.int_child(meta, "recoveryHP")?.unwrap_or(0);
             info.recovery_mp = nx.int_child(meta, "recoveryMP")?.unwrap_or(0);
             if pet {
@@ -419,6 +423,7 @@ impl ItemData {
             pickup_block: nx.int_child(meta, "pickUpBlock")? == Some(1),
             price: nx.int_child(meta, "price")?.unwrap_or(0),
             unit_price: 0.0,
+            pad: 0,
             recovery_hp: 0,
             recovery_mp: 0,
             spec: None,
@@ -550,8 +555,8 @@ mod tests {
         assert!(data.info(4999999).unwrap().is_none());
         let subi = data.info(2070000).unwrap().unwrap();
         assert_eq!(
-            (subi.price, subi.unit_price, subi.slot_max),
-            (250, 0.3, 500)
+            (subi.price, subi.unit_price, subi.slot_max, subi.pad),
+            (250, 0.3, 500, 15)
         );
         let all_cure = data.info(2050004).unwrap().unwrap().spec.unwrap();
         assert_eq!(all_cure.cures.len(), 5);

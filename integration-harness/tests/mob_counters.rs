@@ -59,13 +59,14 @@ async fn a_counter_hurts_whoever_attacks_the_mob() {
     let at = t.field.mob_positions[&boss];
     until(c, &mut t, |t| t.field.controlled.contains(&boss)).await;
 
-    // Take it to half (of 7.6M) in one swing, unless an earlier run on
-    // this stack did; nothing counters yet.
+    // Take it to half (of 7.6M) in swings of v83's most, 199,999, unless
+    // an earlier run on this stack did; nothing counters yet.
     send(c, attack(boss, 1)).await;
     until(c, &mut t, |t| !t.field.hp_bars.is_empty()).await;
-    if t.field.hp_bars[0].1 > 50 {
-        send(c, attack(boss, 4_000_000)).await;
-        until(c, &mut t, |t| t.field.hp_bars.len() > 1).await;
+    while t.field.hp_bars.last().is_some_and(|&(_, percent)| percent > 50) {
+        let bars = t.field.hp_bars.len();
+        send(c, attack(boss, 199_999)).await;
+        until(c, &mut t, |t| t.field.hp_bars.len() > bars).await;
     }
     assert!(t
         .field
