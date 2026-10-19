@@ -105,6 +105,13 @@ namespace ms
 		// against.
 		int32_t level = 0;
 		int32_t accuracy = 0;
+		// What Power Guard weighs against a touch: the mob's avoid, full HP
+		// and fixedDamage, and whether it is a boss or invincible.
+		int32_t avoid = 0;
+		int32_t maxhp = 0;
+		int32_t fixeddamage = 0;
+		bool boss = false;
+		bool invincible = false;
 		// The percent a Power Up or Magic Up puts its physical or magic
 		// hits at, or 0 without one.
 		int32_t powerup = 0;
@@ -149,10 +156,17 @@ namespace ms
 		uint8_t element;
 		// Whether Power Stance kept the player in place.
 		bool stance;
+		// Power Guard's percent on a touch, or 0, and the number it shows
+		// over the mob (0 a miss).
+		uint8_t reflect = 0;
+		int32_t reflected = 0;
+		// Where the mob and the player were.
+		Point<int16_t> mobposition;
+		Point<int16_t> position;
 
 		MobAttackResult(const MobAttack &attack, int32_t damage, uint8_t direction, bool stance) :
 			damage(damage), mobid(attack.mobid), oid(attack.oid), direction(direction), index(attack.index),
-			element(attack.magic ? attack.element : 0), stance(stance)
+			element(attack.magic ? attack.element : 0), stance(stance), mobposition(attack.origin)
 		{}
 	};
 

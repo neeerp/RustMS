@@ -326,6 +326,10 @@ namespace ms
 				MobAttackResult result = player.damage(attack);
 				TakeDamagePacket(result).dispatch();
 				combat.interrupt_prepare(result.damage);
+
+				// What Power Guard sent back shows over the mob.
+				if (result.reflect)
+					mobs.show_damage(result.oid, result.reflected);
 			}
 		}
 		else if (since_mist_hurt > mist::HURT_INTERVAL)

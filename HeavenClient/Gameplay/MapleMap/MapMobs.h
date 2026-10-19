@@ -63,6 +63,10 @@ namespace ms
 		// Show a number on a mob: damage, a heal if negative, or a miss.
 		void show_damage(int32_t oid, int32_t damage);
 
+		// Show on a mob what another player's Power Guard or Mana Reflection
+		// sent back at it.
+		void show_reflect(int32_t oid, uint8_t percent, int32_t damage, bool physical);
+
 		// What a mob's counter hurts the player with for one of their
 		// attacks, or 0.
 		int32_t counter(int32_t oid, bool magic) const;

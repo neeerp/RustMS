@@ -189,7 +189,7 @@ impl WorldHandler for TakeDamageHandler {
             return Ok(HandlerResult::empty());
         }
         let mob_id = r.read_int()?;
-        r.read_int()?; // object id
+        let object_id = r.read_int()?;
         let left = r.read_byte()?;
         let tail = HitTail::read(&packet.bytes[r.position() as usize..]);
         let Some(mob) = crate::mobs::info(mob_id).filter(|m| !m.not_attack) else {
@@ -227,10 +227,18 @@ impl WorldHandler for TakeDamageHandler {
             debug!(mob_id, from, damage, "Mob damage out of range");
             return Ok(HandlerResult::empty());
         }
+        // A touch under Power Guard sends some back at the mob, if the
+        // client says so (0x9587c6).
+        let reflected = match tail.shown {
+            Some([1, ..]) if attack.is_none() && tail.reflect != 0 => {
+                combat::power_guard(player, &mob, damage)
+            }
+            _ => 0,
+        };
         // As Cosmic does, Magic Guard leaves alone an attack that leaves 1
         // MP or burns MP.
         let mp_burn = attack.map_or(0, |a| a.mp_burn);
-        let taken = combat::taken(player, damage, !deadly && mp_burn == 0, true);
+        let taken = combat::taken(player, damage, !deadly && mp_burn == 0, true).less(reflected);
         let hp = player.add_hp(-taken.hp);
         let mut updates = vec![StatUpdate::Hp(hp)];
         let mp_loss = match attack {
@@ -262,6 +270,13 @@ impl WorldHandler for TakeDamageHandler {
         };
         let shown = mob::build_damage_player(player.id(), &hurt)?;
         actions = actions.with(WorldAction::Field(FieldRequest::Broadcast(shown)));
+        if reflected > 0 {
+            actions = actions.with(WorldAction::Field(FieldRequest::Reflect {
+                object_id,
+                mob_id,
+                damage: reflected.into(),
+            }));
+        }
         if hp == 0 {
             return Ok(actions.with(WorldAction::Died));
         }
@@ -802,6 +817,43 @@ mod tests {
             (player.stats.hp, player.stats.mp, player.meso),
             (92, 88, 994)
         );
+    }
+
+    #[test]
+    fn power_guard_sends_some_of_a_touch_back() {
+        if crate::mobs::data().is_err() {
+            return;
+        }
+        let mut player = crate::codec::stats::sample_player();
+        player.stats.hp = 100;
+        // Enough accuracy to reach Stumpy's 12 avoid 25 levels up.
+        player.stats.dex = 100;
+        let now = std::time::Instant::now();
+        let lasts = std::time::Duration::from_secs(60);
+        player
+            .buffs
+            .give(Buff::new(1101007, BuffStat::PowerGuard, 30, now, lasts));
+        // The client's percent, no Guardian, then Power Guard's 14 bytes.
+        let mut tail = vec![30, 0, 1];
+        tail.extend(2_000_000_001i32.to_le_bytes());
+        tail.extend([6, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
+        // Stumpy is a boss: 30% of 40 is 12, halved.
+        let actions = handle(&mut player, touch_with(40, 3220000, &tail));
+        assert_eq!(player.stats.hp, 66);
+        assert!(actions.iter().any(|action| matches!(
+            action,
+            WorldAction::Field(FieldRequest::Reflect {
+                object_id: 2_000_000_001,
+                mob_id: 3220000,
+                damage: 6
+            })
+        )));
+        // A client that doesn't say so sends nothing back.
+        let actions = handle(&mut player, touch(40, 3220000));
+        assert_eq!(player.stats.hp, 26);
+        assert!(!actions
+            .iter()
+            .any(|action| matches!(action, WorldAction::Field(FieldRequest::Reflect { .. }))));
     }
 
     #[test]

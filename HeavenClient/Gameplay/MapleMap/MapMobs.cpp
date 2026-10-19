@@ -113,6 +113,12 @@ namespace ms
 			mob->show_damage(damage);
 	}
 
+	void MapMobs::show_reflect(int32_t oid, uint8_t percent, int32_t damage, bool physical)
+	{
+		if (Optional<Mob> mob = mobs.get(oid))
+			mob->show_reflect(percent, damage, physical);
+	}
+
 	int32_t MapMobs::counter(int32_t oid, bool magic) const
 	{
 		if (Optional<const Mob> mob = mobs.get(oid))

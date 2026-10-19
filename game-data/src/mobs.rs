@@ -29,6 +29,8 @@ pub struct MobInfo {
     /// What every hit does to it, whatever the attack (`fixedDamage`), or
     /// 0.
     pub fixed_damage: i32,
+    /// Power Guard sends nothing back at it (`invincible`).
+    pub invincible: bool,
     /// How each element hurts it (`elemAttr`): pairs of an element letter
     /// and a degree, `1` for immune, as "I1S2".
     pub element: String,
@@ -143,6 +145,7 @@ impl MobData {
             boss: int("boss")? != 0,
             undead: int("undead")? != 0,
             fixed_damage: int("fixedDamage")?,
+            invincible: int("invincible")? != 0,
             element: nx.string_child(info, "elemAttr")?.unwrap_or_default(),
             attacks: self.attacks(image)?,
             skills: self.skills(info)?,
@@ -253,7 +256,7 @@ mod tests {
     }
 
     #[test]
-    fn reads_elements_and_fixed_damage() {
+    fn reads_elements_fixed_damage_and_invincible() {
         let Some(path) = crate::test_assets::path("Mob.nx") else {
             return;
         };
@@ -266,6 +269,8 @@ mod tests {
         assert!(!mob(130100).immune_to('F'));
         assert_eq!(mob(9300295).fixed_damage, 1);
         assert_eq!(mob(100100).fixed_damage, 0);
+        assert!(mob(9300295).invincible);
+        assert!(!mob(100100).invincible);
     }
 
     #[test]

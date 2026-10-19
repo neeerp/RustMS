@@ -4,6 +4,7 @@ use crate::skills::{self, Learned};
 use crate::{error::NetworkError, packet::op::SendOpcode};
 use game::inventory::equip_slot;
 use game::{BuffStat, InventoryType, Player};
+use game_data::mobs::MobInfo;
 use packet::{io::read::PktRead, io::write::PktWrite, Packet};
 use std::io::Cursor;
 
@@ -521,6 +522,59 @@ pub fn taken(player: &Player, damage: i32, magic_guard: bool, meso_guard: bool) 
         mesos,
         shown: damage - achilles - saved,
     }
+}
+
+impl Taken {
+    /// The hit less what Power Guard sent back at the mob, which neither
+    /// takes HP nor shows (0x959595).
+    pub fn less(self, reflected: i32) -> Taken {
+        Taken {
+            hp: (self.hp - reflected).max(0),
+            shown: self.shown - reflected,
+            ..self
+        }
+    }
+}
+
+/// What Power Guard sends back at a mob that touched the player for
+/// `damage` (FUN_009581a9 at 0x9587c6): its `x` percent, at most a tenth of
+/// the mob's HP, halved for a boss, and at most a fixedDamage mob's fixed
+/// damage. Nothing goes back at an invincible mob, or at one whose avoid
+/// beats the player's accuracy, weighed down for each level the mob has on
+/// them (0x9588cd).
+pub fn power_guard(player: &Player, mob: &MobInfo, damage: i32) -> i32 {
+    let percent = buff(player, BuffStat::PowerGuard);
+    if percent <= 0 || damage <= 0 || mob.invincible {
+        return 0;
+    }
+    let mut reflected = (damage * percent / 100).min(mob.max_hp / 10);
+    if mob.boss {
+        reflected /= 2;
+    }
+    if mob.fixed_damage > 0 {
+        reflected = reflected.min(mob.fixed_damage);
+    }
+    let above = (i32::from(mob.level) - i32::from(player.stats.level)).max(0);
+    let reach =
+        f64::from(accuracy(player).clamp(0, 999)) * 100.0 / (f64::from(above) * 10.0 + 255.0);
+    if f64::from(mob.avoid.clamp(0, 999)) > reach {
+        return 0;
+    }
+    reflected
+}
+
+/// The player's accuracy: what they wear, 0.8 a point of DEX and 0.5 of
+/// LUK, and their buffs'. Power Guard's Fighters and Pages have no skill
+/// that adds to it.
+fn accuracy(player: &Player) -> i32 {
+    let (_, dex, luk) = skills::total_stats(player);
+    let worn: i32 = player
+        .inventory
+        .items(InventoryType::Equipped)
+        .filter_map(|(_, item)| item.equip.as_ref())
+        .map(|equip| i32::from(equip.acc))
+        .sum();
+    worn + (f64::from(dex) * 0.8 + f64::from(luk) * 0.5) as i32 + buff(player, BuffStat::Acc)
 }
 
 /// The per mille of a hit a Hero's, Paladin's, Dark Knight's, or Aran's
@@ -1273,6 +1327,46 @@ mod taken_tests {
                 mp: 0,
                 mesos: 20,
                 shown: 75
+            }
+        );
+    }
+
+    #[test]
+    fn power_guard_sends_back_its_share_of_a_touch() {
+        let mut player = crate::codec::stats::sample_player();
+        // 80 + 2 accuracy from DEX and LUK.
+        player.stats.dex = 100;
+        let mob = MobInfo {
+            level: 10,
+            max_hp: 1000,
+            avoid: 30,
+            ..MobInfo::default()
+        };
+        assert_eq!(power_guard(&player, &mob, 100), 0);
+        with_buff(&mut player, 1101007, BuffStat::PowerGuard, 30);
+        assert_eq!(power_guard(&player, &mob, 100), 30);
+        assert_eq!(power_guard(&player, &mob, -1), 0);
+        // At most a tenth of the mob's HP, halved for a boss.
+        let with = |change: fn(&mut MobInfo)| {
+            let mut mob = mob.clone();
+            change(&mut mob);
+            power_guard(&player, &mob, 100)
+        };
+        assert_eq!(with(|mob| mob.max_hp = 200), 20);
+        assert_eq!(with(|mob| mob.boss = true), 15);
+        assert_eq!(with(|mob| mob.fixed_damage = 1), 1);
+        assert_eq!(with(|mob| mob.invincible = true), 0);
+        // 82 accuracy reaches 32 avoid at the player's level, 23 ten
+        // levels below the mob.
+        assert_eq!(with(|mob| mob.level = 20), 0);
+        // The player is spared what went back.
+        assert_eq!(
+            taken(&player, 100, true, true).less(30),
+            Taken {
+                hp: 70,
+                mp: 0,
+                mesos: 0,
+                shown: 70
             }
         );
     }

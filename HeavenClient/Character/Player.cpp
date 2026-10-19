@@ -776,8 +776,23 @@ namespace ms
 		else if (damage > 0 && attack.mpburn)
 			damage = 1;
 
+		// A touch under Power Guard sends some back at the mob, which the
+		// player is spared (0x9587c6).
+		uint8_t reflect = 0;
+		mob_damage::Reflected reflected{ 0, 0 };
+
+		if (attack.index < 0 && damage > 0 && has_buff(Buffstat::Id::POWERGUARD))
+		{
+			reflect = static_cast<uint8_t>(get_buff_value(Buffstat::Id::POWERGUARD));
+			mob_damage::Toucher toucher{ attack.level, attack.avoid, attack.maxhp, attack.fixeddamage, attack.boss,
+										 attack.invincible };
+			reflected = mob_damage::power_guard(damage, reflect, toucher, stats.get_stat(MapleStat::Id::LEVEL),
+												stats.get_total(EquipStat::Id::ACC));
+		}
+
 		int32_t achilles = 1000 - static_cast<int32_t>(std::lround(stats.get_reducedamage() * 1000.0f));
-		show_damage(mob_damage::shown(damage, achilles, get_buff_value(Buffstat::Id::MESOGUARD), inventory.get_meso()));
+		show_damage(mob_damage::shown(damage, achilles, get_buff_value(Buffstat::Id::MESOGUARD), inventory.get_meso()) -
+					reflected.damage);
 		become_invincible(damage > 0);
 
 		bool fromleft = attack.pushleft ? *attack.pushleft : attack.origin.x() > phobj.get_x();
@@ -812,7 +827,12 @@ namespace ms
 
 		uint8_t direction = fromleft ? 0 : 1;
 
-		return {attack, damage, direction, stance};
+		MobAttackResult result(attack, damage, direction, stance);
+		result.reflect = reflect;
+		result.reflected = reflected.shown;
+		result.position = get_position();
+
+		return result;
 	}
 
 	void Player::give_buff(Buff buff)

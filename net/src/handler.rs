@@ -445,6 +445,13 @@ pub enum FieldRequest {
         hits: Vec<(i32, i64)>,
         inflicts: Vec<crate::skills::Inflict>,
     },
+    /// Power Guard sent `damage` back at the mob `object_id` that touched
+    /// the player, if it is still a `mob_id`.
+    Reflect {
+        object_id: i32,
+        mob_id: i32,
+        damage: i64,
+    },
     /// The player's spell left a mist where they stand, facing left or
     /// not, that puts `inflict` on the mobs in it.
     Mist {

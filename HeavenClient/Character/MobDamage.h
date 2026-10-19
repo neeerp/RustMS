@@ -238,5 +238,59 @@ namespace ms
 
 			return damage - kept_off - saved;
 		}
+
+		// The mob a touch under Power Guard came from.
+		struct Toucher
+		{
+			int32_t level;
+			int32_t avoid;
+			int32_t maxhp;
+			int32_t fixeddamage;
+			bool boss;
+			bool invincible;
+		};
+
+		// What Power Guard sends back: what the mob takes and the player is
+		// spared, and the number shown over the mob (0 a miss).
+		struct Reflected
+		{
+			int32_t damage;
+			int32_t shown;
+		};
+
+		// What Power Guard at `percent` sends back at a mob that touched a
+		// player of `level` and `accuracy` for `damage` (FUN_009581a9 at
+		// 0x9587c6): at most a tenth of the mob's HP, halved for a boss. A
+		// fixedDamage mob shows its fixed damage and takes no more. Nothing
+		// goes back at an invincible mob, or at one whose avoid beats the
+		// accuracy, weighed down for each level the mob has on the player
+		// (0x9588cd).
+		inline Reflected power_guard(int32_t damage, int32_t percent, const Toucher &mob, int32_t level,
+									 int32_t accuracy)
+		{
+			if (damage <= 0 || percent <= 0 || mob.invincible)
+				return { 0, 0 };
+
+			int32_t reflected = std::min(damage * percent / 100, mob.maxhp / 10);
+
+			if (mob.boss)
+				reflected /= 2;
+
+			int32_t shown = reflected;
+
+			if (mob.fixeddamage > 0)
+			{
+				shown = mob.fixeddamage;
+				reflected = std::min(reflected, mob.fixeddamage);
+			}
+
+			int32_t above = std::max(0, mob.level - level);
+			double reach = std::clamp(accuracy, 0, 999) * 100.0 / (above * 10.0 + 255.0);
+
+			if (std::clamp(mob.avoid, 0, 999) > reach)
+				return { 0, 0 };
+
+			return { reflected, shown };
+		}
 	}
 }

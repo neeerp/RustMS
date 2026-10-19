@@ -227,6 +227,11 @@ namespace ms
 		// miss (FUN_006691d3).
 		void show_damage(int32_t damage);
 
+		// Show what another player's Power Guard (`physical`) or Mana
+		// Reflection sent back at it: `percent` of their `damage`, a tenth
+		// of its HP at most for Power Guard (FUN_009832e3).
+		void show_reflect(uint8_t percent, int32_t damage, bool physical);
+
 		// What its counter hurts the player with for one of their attacks,
 		// a spell's (MCounter) or the rest (PCounter), or 0 (FUN_007937e3).
 		int32_t counter(bool magic) const;
@@ -526,6 +531,10 @@ namespace ms
 		bool boss;
 		// What Poison, Venom and Ambush show instead of their value.
 		int32_t fixeddamage;
+		// Its full HP, which caps what Power Guard sends back at it.
+		int32_t maxhp;
+		// Power Guard sends nothing back at it.
+		bool invincible;
 		// How wide the mob first stands, for how near Monster Magnet pulls
 		// it (0x66486e).
 		int16_t standwidth;

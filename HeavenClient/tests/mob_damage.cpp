@@ -83,6 +83,25 @@ int main()
 		require(magic_misses(evasive, Attacker{ 30, 11 }, 0.5) && !magic_misses(evasive, Attacker{ 30, 12 }, 0.5),
 				"the roll falls between a tenth of the avoid and all of it");
 
+		// Power Guard at 30% against a mob of level 10, 30 avoid and 1000 HP,
+		// for a level 10 player with 82 accuracy.
+		Toucher toucher{ 10, 30, 1000, 0, false, false };
+		Reflected reflected = power_guard(100, 30, toucher, 10, 82);
+		require(reflected.damage == 30 && reflected.shown == 30, "Power Guard sends back its percent");
+		require(power_guard(-1, 30, toucher, 10, 82).damage == 0, "a dodge sends nothing back");
+		require(power_guard(100, 30, Toucher{ 10, 30, 200, 0, false, false }, 10, 82).damage == 20,
+				"at most a tenth of the mob's HP");
+		require(power_guard(100, 30, Toucher{ 10, 30, 1000, 0, true, false }, 10, 82).damage == 15,
+				"half that for a boss");
+		reflected = power_guard(100, 30, Toucher{ 10, 30, 1000, 1, false, false }, 10, 82);
+		require(reflected.damage == 1 && reflected.shown == 1, "a fixedDamage mob takes no more");
+		reflected = power_guard(100, 30, Toucher{ 10, 30, 1000, 50, false, false }, 10, 82);
+		require(reflected.damage == 30 && reflected.shown == 50, "but shows its fixed damage");
+		require(power_guard(100, 30, Toucher{ 10, 30, 1000, 0, false, true }, 10, 82).shown == 0,
+				"an invincible mob takes nothing");
+		require(power_guard(100, 30, Toucher{ 20, 30, 1000, 0, false, false }, 10, 82).shown == 0,
+				"82 accuracy reaches 32 avoid at the player's level, 23 ten levels up");
+
 		std::cout << "Mob damage passed\n";
 		return 0;
 	}

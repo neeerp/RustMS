@@ -367,7 +367,7 @@ impl Amount {
 }
 
 /// A player's STR, DEX, and LUK with what they wear.
-fn total_stats(player: &Player) -> (i32, i32, i32) {
+pub(crate) fn total_stats(player: &Player) -> (i32, i32, i32) {
     let stats = &player.stats;
     player
         .inventory

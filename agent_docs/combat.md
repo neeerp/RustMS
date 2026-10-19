@@ -832,6 +832,15 @@ FUN_009581a9), and the server applies them once (`net::combat::taken`):
   attack alone, as Cosmic does.
 - **Meso Guard** (a mob's attack or touch only) saves half the hit at
   `x` percent of that in mesos. Short of mesos, it saves what they buy.
+- **Power Guard** (a touch only, `net::combat::power_guard`, 0x9587c6)
+  sends `x` percent of the hit back at the mob, at most a tenth of its
+  max HP, halved for a boss, and at most a `fixedDamage` mob's fixed
+  damage. An `invincible` mob takes none, and none goes if the mob's
+  avoid beats the player's accuracy times 100 over (255 + 10 per level
+  the mob is above them). What it sends back comes off the hit and the
+  shown number; the server deals it to the mob as one of the player's
+  hits (`FieldRequest::Reflect`). The client says it reflected with the
+  block below; the server then uses its own buff and the mob's template.
 
 The rest comes off HP; a `deadlyAttack` also takes all but 1 MP, and an
 `mpBurn` attack its `mpBurn` in MP. Poison ticks get Achilles too
@@ -849,7 +858,9 @@ the player from being knocked back. The server reads the tail by its length
 (older clients send none) and passes the reflect block and stance on in
 DAMAGE_PLAYER (`mob::Hurt`): `cid, from, damage`, then for a mob `mob_id,
 left, reflect percent (and its 10 bytes), stance`, then the shown number,
-or -1 and the dodging skill. Hits with no mob (-4) end with a byte: 1
+or -1 and the dodging skill. A receiver shows the reflect percent of the
+damage over the mob, at most a tenth of its max HP for a physical hit
+(HeavenClient's `Mob::show_reflect`). Hits with no mob (-4) end with a byte: 1
 poison (ignored, the server ticks poison itself), 2 a mist (Achilles
 applies), or 3 Stop Motion (no guards, never fatal). At 0 HP the player is
 dead:
@@ -885,16 +896,17 @@ Setting restores the same table.
 `field_mobs` unit tests cover spawning, control hand-off (including by
 distance report), movement, attacks' MP, damage, EXP sharing, and respawn;
 `net::combat` covers parsing, the damage cap, Shadow Meso's mesos, the
-broadcast, and the guards' shares of a hit, and the
+broadcast, the guards' shares of a hit, Power Guard's reflect, and the
 TAKE_DAMAGE handler's bounds by attack index, its tail, and dodges; `game::mob_damage` covers the
 StandardPDD table and the bound. HeavenClient's `mob_damage_tests` and
-`mob_attack_tests` cover the damage and miss formulas and the attacks'
+`mob_attack_tests` cover the damage and miss formulas, Power Guard, and the attacks'
 ranges, aim, balls, and rows. `mob_combat` (integration) runs two players in Dangerous
 Forest through control, relayed movement, hits, kills, EXP, refused damage,
 touch damage, damage by attack index, a level-up seen by the other player, and a respawn, then has
 two players report their distance from a firstAttack mob in Crimsonwood Keep
 (610030011) and checks control follows the closer one until a hit;
-`damage_reductions` (integration) has Magic Guard pay 80% of a touch in MP;
+`damage_reductions` (integration) has Magic Guard pay 80% of a touch in MP
+and Power Guard send back a boss's share of one;
 `reactors` (integration) breaks two of Amherst's boxes, before and during
 Pio's quest;
 `drops_and_pickup` checks ownership, reach, pickup, replays, meso

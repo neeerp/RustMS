@@ -127,10 +127,12 @@ namespace ms
 			MIST = -4
 		};
 
-		// From a mob's touch or attack (0x9593f7). The Power Guard or Mana
-		// Reflection percent and the Guardian byte are always 0 here, so
-		// nothing more is shown over the mob; the last byte says whether
-		// Power Stance kept the player in place.
+		// From a mob's touch or attack (0x9593f7): then Power Guard's
+		// percent, and the Guardian byte, always 0 here. With Power Guard
+		// come 14 bytes for the others to show it: that it was Power Guard
+		// (not Mana Reflection), the mob, its hit action (hit1), and where
+		// it and the player were. The last byte says whether Power Stance
+		// kept the player in place.
 		TakeDamagePacket(const MobAttackResult& result) : OutPacket(OutPacket::Opcode::TAKE_DAMAGE)
 		{
 			write_time();
@@ -140,8 +142,18 @@ namespace ms
 			write_int(result.mobid);
 			write_int(result.oid);
 			write_byte(result.direction);
+			write_byte(result.reflect);
 			write_byte(0);
-			write_byte(0);
+
+			if (result.reflect)
+			{
+				write_byte(1);
+				write_int(result.oid);
+				write_byte(6);
+				write_point(result.mobposition);
+				write_point(result.position);
+			}
+
 			write_byte(result.stance);
 		}
 
