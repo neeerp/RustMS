@@ -93,6 +93,7 @@ namespace ms
 			SLIDEMENU,
 			QUIZ,
 			SPEEDQUIZ,
+			GIFTNOTICE,
 			NUM_TYPES
 		};
 

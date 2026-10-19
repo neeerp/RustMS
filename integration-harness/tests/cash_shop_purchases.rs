@@ -337,10 +337,17 @@ async fn nx_buys_items_packages_gifts_and_slots() {
         men.contains(&TICKET) && men.contains(&PACKAGE),
         "Best Items {men:?}"
     );
+    // The gift is already in the Cash Inventory, and then announced.
+    let mut in_inventory = false;
     for _ in 0..2 {
         let list = read_until(connection, "receiver lists", SendOpcode::CashShopOperation).await;
         let list = &list.packet.bytes[2..];
+        if list[0] == 0x4B {
+            assert_eq!(list[1..3], [1, 0], "the gift in the Cash Inventory");
+            in_inventory = true;
+        }
         if list[0] == 0x4D {
+            assert!(in_inventory, "the gift isn't in the Cash Inventory");
             assert_eq!(list[1..3], [1, 0], "one gift");
             let item_id = Cursor::new(&list[11..]).read_int().unwrap();
             assert_eq!(item_id, 5220000);

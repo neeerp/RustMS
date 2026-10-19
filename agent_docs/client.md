@@ -683,8 +683,11 @@ the screen size.
   for the birthday code (YYYYMMDD). Its OK sends 0x04 with the code, SN, name
   and message. On 0x5E the sender sees v83's "COUNT [ ITEM ] was sent to
   NAME. PRICE NX Prepaid were spent in the process.", or a failure notice (0xA8 own account, 0xA9 unknown name, 0xC4 birthday code).
-  The receiver gets one notice listing each gift's sender, item and message
-  when 0x4D arrives. The buddy and guild buttons that open the wider
+  For each gift in 0x4D the receiver gets v83's dialog (`UIGiftNotice`,
+  `CSNotice/3`, FUN_0047959e): the item's icon and name, the sender, their
+  message, and a note to send back. OK or Enter sends NOTE_ACTION (0x83) and
+  shows "The note has successfully been sent"; Esc sends nothing. The next
+  gift follows either way. The buddy and guild buttons that open the wider
   `backgrnd1` aren't drawn, and only one name is sent.
 - **Leaving:** EXIT sends CHANGE_MAP with no body at once. Esc first asks
   "Are you sure you want to leave the Cash Shop?", as v83 does

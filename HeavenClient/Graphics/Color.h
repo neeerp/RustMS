@@ -126,6 +126,7 @@ namespace ms
 			MEGAPHONE,
 			SUPERMEGAPHONE,
 			ITEMMEGAPHONE,
+			GIFTBLUE,
 			NUM_COLORS
 		};
 
@@ -201,7 +202,8 @@ namespace ms
 						{0.80f, 0.00f, 0.40f}, // Seat pink (#CC0066, v83 font 12: the second visitor's chat)
 						{0.00f, 0.25f, 0.50f}, // Megaphone (#003F7F, v83 chat font 0xd: megaphones)
 						{0.47f, 0.00f, 0.26f}, // Super megaphone (#770042, v83 chat font 0xe: super and triple megaphones)
-						{0.27f, 0.15f, 0.02f}  // Item megaphone (#462706, v83 chat font 0xf: item megaphones)
+						{0.27f, 0.15f, 0.02f}, // Item megaphone (#462706, v83 chat font 0xf: item megaphones)
+						{0.13f, 0.00f, 1.00f}  // Gift blue (#2000FF, v83 font 4: who sent a gift)
 				};
 
 		// Create a color by an array of real numbers [0.0f, 1.0f]
