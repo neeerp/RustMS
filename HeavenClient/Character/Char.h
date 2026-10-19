@@ -344,11 +344,17 @@ namespace ms
 		EffectLayer effects;
 		EffectLayer held_effects;
 		Afterimage afterimage;
-		// The chair's effect sits on the face when its pos is 1 and on the
-		// feet otherwise; a negative z draws it behind the character.
-		Animation chair_effect;
-		bool chair_at_face = false;
-		bool chair_in_front = false;
+		// A chair's effect and effect2 (v83 0x93c7c3), each on the face when
+		// its pos is 1 and on the feet otherwise; a negative z draws it
+		// behind the character.
+		struct ChairLayer
+		{
+			Animation animation;
+			bool at_face;
+			bool in_front;
+		};
+
+		std::vector<ChairLayer> chair_layers;
 
 		// A disease's animation, on the face when its pos is 1 like the
 		// chair's.

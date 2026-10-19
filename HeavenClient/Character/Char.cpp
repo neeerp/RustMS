@@ -85,15 +85,20 @@ namespace ms
 		bool on_chair = chair && state == State::SIT;
 		Point<int16_t> face = look.get_facepos();
 		Point<int16_t> facepos = absp + Point<int16_t>(facing_right ? -face.x() : face.x(), face.y());
-		Point<int16_t> chairpos = on_chair && chair_at_face ? facepos : absp;
 
-		if (on_chair && !chair_in_front)
-			chair_effect.draw(DrawArgument(chairpos, facing_right), alpha);
+		auto draw_chair = [&](bool in_front)
+		{
+			if (!on_chair)
+				return;
 
+			for (auto &layer : chair_layers)
+				if (layer.in_front == in_front)
+					layer.animation.draw(DrawArgument(layer.at_face ? facepos : absp, facing_right), alpha);
+		};
+
+		draw_chair(false);
 		look.draw(DrawArgument(absp, color), alpha);
-
-		if (on_chair && chair_in_front)
-			chair_effect.draw(DrawArgument(chairpos, facing_right), alpha);
+		draw_chair(true);
 
 		afterimage.draw(look.get_frame(), DrawArgument(absp, facing_right), alpha);
 
@@ -201,7 +206,8 @@ namespace ms
 
 		effects.update();
 		held_effects.update();
-		chair_effect.update();
+		for (auto &layer : chair_layers)
+			layer.animation.update();
 
 		for (auto &[reason, affliction] : afflictions)
 			affliction.animation.update();
@@ -705,14 +711,21 @@ namespace ms
 			return;
 
 		chair = itemid;
+		chair_layers.clear();
 
 		if (!chair)
 			return;
 
-		nl::node src = nl::nx::item["Install"]["0301.img"][string_format::extend_id(itemid, 8)]["effect"];
-		chair_effect = src;
-		chair_at_face = src["pos"].get_integer() == 1;
-		chair_in_front = src["z"].get_integer() >= 0;
+		// v83 loads effect2 a second time, from Item/Install/%04d.img/%08d/effect2 (0x93ca9c), so it is drawn twice.
+		nl::node src = nl::nx::item["Install"]["0301.img"][string_format::extend_id(itemid, 8)];
+
+		for (const char *name : { "effect", "effect2", "effect2" })
+		{
+			nl::node effect = src[name];
+
+			if (effect)
+				chair_layers.push_back({ effect, effect["pos"].get_integer() == 1, effect["z"].get_integer() >= 0 });
+		}
 	}
 
 	int32_t Char::get_chair() const
