@@ -67,7 +67,8 @@ namespace ms
 
 		virtual void show_equip(Tooltip::Parent parent, int16_t slot) = 0;
 
-		virtual void show_item(Tooltip::Parent parent, int32_t itemid, int64_t expiration, int16_t flags) = 0;
+		virtual void show_item(Tooltip::Parent parent, int32_t itemid, int64_t expiration, int16_t flags,
+							   bool owned) = 0;
 
 		// Without levels, the tooltip leaves out the levels' effects.
 		virtual void show_skill(Tooltip::Parent parent, int32_t skill_id, int32_t level, int32_t masterlevel,
@@ -112,7 +113,7 @@ namespace ms
 		void drag_icon(Icon*) override {}
 		void clear_tooltip(Tooltip::Parent) override {}
 		void show_equip(Tooltip::Parent, int16_t) override {}
-		void show_item(Tooltip::Parent, int32_t, int64_t, int16_t) override {}
+		void show_item(Tooltip::Parent, int32_t, int64_t, int16_t, bool) override {}
 		void show_skill(Tooltip::Parent, int32_t, int32_t, int32_t, int64_t, bool) override {}
 		void show_text(Tooltip::Parent, std::string) override {}
 		void show_map(Tooltip::Parent, std::string, std::string) override {}

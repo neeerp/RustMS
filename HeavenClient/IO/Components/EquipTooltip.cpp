@@ -19,6 +19,7 @@
 
 #include "../../Character/Inventory/Equip.h"
 #include "../../Character/Inventory/ItemExpiry.h"
+#include "../../Character/Inventory/ItemProperties.h"
 #include "../../Data/WeaponData.h"
 #include "../../Gameplay/Stage.h"
 #include "../../Util/NxFiles.h"
@@ -53,6 +54,12 @@ namespace ms
 		const Point<int16_t> EXPIRY_DOT = { 10, 33 };
 		const Point<int16_t> EXPIRY_POS = { 16, 22 };
 		constexpr int16_t EXPIRY_HEIGHT = 16;
+		// The orange lines under the name, centred and 19 apart, as on other items. A first line wider than the box
+		// wraps from x 25 instead, 2 lower, and each line takes 19 for every box width of it (FUN_008e8252).
+		constexpr int16_t PROPERTY_Y = 25;
+		constexpr int16_t PROPERTY_STEP = 19;
+		const Point<int16_t> PROPERTY_WRAP_POS = { 25, 27 };
+		constexpr int16_t PROPERTY_WRAP_WIDTH = 178;
 
 		constexpr const char *JOB_NAMES[] = { "beginner", "warrior", "magician", "bowman", "thief", "pirate" };
 
@@ -154,6 +161,8 @@ namespace ms
 
 		parent = Tooltip::Parent::NONE;
 		invpos = 0;
+		wrapped = false;
+		properties_height = 0;
 	}
 
 	void EquipTooltip::set_equip(Tooltip::Parent p, int16_t ivp)
@@ -227,6 +236,31 @@ namespace ms
 		std::string expirystr = item_expiry::line(equip.get_expiration(), cash, equip.get_flags() & item_expiry::SEALED);
 		expiry = expirystr.empty() ? Text() : Text(Text::Font::A11M, Text::Alignment::LEFT, Color::Name::WHITE, expirystr);
 
+		const item_properties::Info &info = itemdata.get_properties();
+		item_properties::Lines lines = item_properties::equip(info, equip.get_flags(), !expirystr.empty());
+		properties = {};
+		wrapped = false;
+		properties_height = 0;
+
+		for (size_t i = 0; i < properties.size(); i++)
+		{
+			const std::string &line = i == 0 ? lines.first : lines.second;
+
+			if (line.empty())
+				continue;
+
+			properties[i] = Text(Text::Font::A12M, Text::Alignment::CENTER, Color::Name::TIPORANGE, line);
+			int16_t width = properties[i].width();
+			properties_height += PROPERTY_STEP * (width / WIDTH + 1);
+
+			if (i == 0 && width > WIDTH)
+			{
+				properties[i] = Text(Text::Font::A12M, Text::Alignment::LEFT, Color::Name::TIPORANGE, line,
+									 PROPERTY_WRAP_WIDTH, true, tooltip::LINE_ADJ);
+				wrapped = true;
+			}
+		}
+
 		for (MapleStat::Id ms : requirements)
 		{
 			int16_t req = equipdata.get_reqstat(ms);
@@ -282,12 +316,16 @@ namespace ms
 		if (!itemdata.is_cashitem())
 			add_line("NUMBER OF UPGRADES AVAILABLE", std::to_string(equip.get_slots()), false);
 
-		int16_t height = STATS_TOP + STAT_STEP * static_cast<int16_t>(stats.size());
+		int16_t height = properties_height + STATS_TOP + STAT_STEP * static_cast<int16_t>(stats.size());
 
 		if (!expiry.empty())
 			height += EXPIRY_HEIGHT;
 
+		// One that could trade with Scissors of Karma says so.
 		std::string descstr = itemdata.get_desc();
+
+		if (info.trade_available && !(equip.get_flags() & item_properties::EQUIP_KARMA))
+			descstr = item_properties::with_karma_hint(descstr);
 
 		if (descstr.empty())
 		{
@@ -311,6 +349,16 @@ namespace ms
 
 		icon.draw_dot(pos + tooltip::DOT_POS);
 		name.draw(pos + tooltip::NAME_POS);
+
+		if (wrapped)
+			properties[0].draw(pos + PROPERTY_WRAP_POS);
+		else if (!properties[0].empty())
+			properties[0].draw(pos + Point<int16_t>(WIDTH / 2, PROPERTY_Y));
+
+		if (!properties[1].empty())
+			properties[1].draw(pos + Point<int16_t>(WIDTH / 2, PROPERTY_Y + PROPERTY_STEP));
+
+		pos.shift_y(properties_height);
 
 		if (!expiry.empty())
 		{

@@ -17,6 +17,7 @@
 //////////////////////////////////////////////////////////////////////////////////
 #pragma once
 
+#include <array>
 #include <cstdint>
 
 #include "Tooltip.h"
@@ -35,13 +36,14 @@ namespace ms
 
 		void draw(Point<int16_t> position) const override;
 
-		// An item in the inventory also has its expiry and flags.
-		bool set_item(int32_t itemid, int64_t expiration = 0, int16_t flags = 0);
+		// An item in the inventory also has its expiry and flags, and is `owned`.
+		bool set_item(int32_t itemid, int64_t expiration = 0, int16_t flags = 0, bool owned = false);
 
 	private:
 		int32_t itemid;
 		int64_t expiration;
 		int16_t flags;
+		bool owned;
 		Point<int16_t> size;
 
 		TooltipBox box;
@@ -49,7 +51,9 @@ namespace ms
 
 		Texture itemicon;
 		Text name;
-		Text qual;
+		// The orange lines under the name.
+		std::array<Text, 2> properties;
+		int16_t properties_height;
 		Texture expiry_dot;
 		Text expiry;
 		Text desc;

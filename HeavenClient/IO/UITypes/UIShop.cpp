@@ -802,7 +802,7 @@ namespace ms
 			int32_t itemid = items[absslot].get_id();
 
 			if (auto item = inventory.get_item(tab, items[absslot].get_slot()))
-				UI::get().show_item(Tooltip::Parent::SHOP, itemid, item->get_expiration(), item->get_flags());
+				UI::get().show_item(Tooltip::Parent::SHOP, itemid, item->get_expiration(), item->get_flags(), true);
 			else
 				UI::get().show_item(Tooltip::Parent::SHOP, itemid);
 		}

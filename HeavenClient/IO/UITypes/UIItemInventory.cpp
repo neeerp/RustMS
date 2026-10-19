@@ -1172,7 +1172,8 @@ namespace ms
 			auto item = inventory.get_item(tab, slot);
 
 			if (item)
-				UI::get().show_item(Tooltip::Parent::ITEMINVENTORY, item_id, item->get_expiration(), item->get_flags());
+				UI::get().show_item(Tooltip::Parent::ITEMINVENTORY, item_id, item->get_expiration(), item->get_flags(),
+									true);
 			else
 				UI::get().show_item(Tooltip::Parent::ITEMINVENTORY, item_id);
 		}
