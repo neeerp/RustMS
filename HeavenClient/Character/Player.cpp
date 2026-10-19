@@ -17,6 +17,7 @@
 //////////////////////////////////////////////////////////////////////////////////
 #include "Player.h"
 
+#include "MobDamage.h"
 #include "PlayerStates.h"
 #include "SkillId.h"
 
@@ -765,7 +766,8 @@ namespace ms
 
 	MobAttackResult Player::damage(const MobAttack &attack)
 	{
-		int32_t damage = stats.calculate_damage(attack, randomizer.next_real(1.0), randomizer.next_real(1.0));
+		int32_t damage = stats.calculate_damage(attack, randomizer.next_real(1.0), randomizer.next_real(1.0),
+												 get_buff_value(Buffstat::Id::INVINCIBLE));
 
 		// A deadly attack that hits leaves 1 HP, and an MP burn takes 1
 		// (FUN_009581a9).
@@ -774,7 +776,8 @@ namespace ms
 		else if (damage > 0 && attack.mpburn)
 			damage = 1;
 
-		show_damage(damage);
+		int32_t achilles = 1000 - static_cast<int32_t>(std::lround(stats.get_reducedamage() * 1000.0f));
+		show_damage(mob_damage::shown(damage, achilles, get_buff_value(Buffstat::Id::MESOGUARD), inventory.get_meso()));
 		become_invincible(damage > 0);
 
 		bool fromleft = attack.pushleft ? *attack.pushleft : attack.origin.x() > phobj.get_x();
@@ -787,12 +790,16 @@ namespace ms
 
 		bool knockback = !missed && state != Char::State::DIED;
 
+		// Power Stance may keep the player in place; others see it too.
+		bool stance = knockback && !randomizer.above(stats.get_stance());
+
 		// CUserLocal knocks the player away from the mob and up at 270
-		// pixels per second, or 200 under Power Guard, and off ladders and
-		// ropes too (FUN_007ad352).
-		if (knockback && randomizer.above(stats.get_stance()))
+		// pixels per second, or 200 from a touch under Power Guard, and off
+		// ladders and ropes too (FUN_007ad352, 0x9588cd).
+		if (knockback && !stance)
 		{
-			double power = has_buff(Buffstat::Id::POWERGUARD) ? 200.0 : 270.0;
+			bool guarded = attack.index < 0 && has_buff(Buffstat::Id::POWERGUARD);
+			double power = guarded ? 200.0 : 270.0;
 
 			if (ladder)
 			{
@@ -805,7 +812,7 @@ namespace ms
 
 		uint8_t direction = fromleft ? 0 : 1;
 
-		return {attack, damage, direction};
+		return {attack, damage, direction, stance};
 	}
 
 	void Player::give_buff(Buff buff)

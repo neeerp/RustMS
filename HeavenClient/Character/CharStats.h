@@ -67,7 +67,9 @@ namespace ms
 
 		// What a mob's touch or attack takes from the player, or 0 when it
 		// misses. `missroll` and `roll` are uniform in [0, 1).
-		int32_t calculate_damage(const MobAttack &attack, double missroll, double roll) const;
+		// A mob's hit, less what Invincible (`invincible` percent) takes off
+		// a physical one.
+		int32_t calculate_damage(const MobAttack &attack, double missroll, double roll, int32_t invincible) const;
 
 		bool is_damage_buffed() const;
 

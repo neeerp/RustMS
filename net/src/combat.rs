@@ -464,6 +464,78 @@ pub fn build_attack(
     Ok(p)
 }
 
+/// What a hit costs the player once their skills have taken their share.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct Taken {
+    pub hp: i32,
+    pub mp: i32,
+    pub mesos: i32,
+    /// The number the player's own client shows: the hit less the shares
+    /// of all but Magic Guard (0x9593b8).
+    pub shown: i32,
+}
+
+/// What a hit of `damage` takes from the player. A v83 client sends the
+/// damage before these skills and leaves them to the server, working them
+/// out only to show the number and to drink a pet's potion in time
+/// (FUN_009581a9 at 0x959321 and 0x959595). Achilles always keeps its
+/// share off; with `magic_guard`, Magic Guard moves its share to MP (as
+/// much as there is, or all of it and no MP under Infinity); with
+/// `meso_guard`, Meso Guard halves the hit for mesos.
+pub fn taken(player: &Player, damage: i32, magic_guard: bool, meso_guard: bool) -> Taken {
+    if damage <= 0 {
+        return Taken {
+            shown: damage,
+            ..Taken::default()
+        };
+    }
+    let achilles = achilles(player).map_or(0, |kept| (1000 - kept) * damage / 1000);
+    let guarded = if magic_guard {
+        buff(player, BuffStat::MagicGuard) * damage / 100
+    } else {
+        0
+    };
+    let (guarded, mp) = if player.buffs.has(BuffStat::Infinity) {
+        (guarded, 0)
+    } else {
+        let guarded = guarded.min(i32::from(player.stats.mp));
+        (guarded, guarded)
+    };
+    // Mesos pay `x` per 100 HP saved; short of them, they save what
+    // they can (FUN_00792fa8).
+    let (saved, mesos) = match buff(player, BuffStat::MesoGuard) {
+        x if meso_guard && x > 0 => {
+            let saved = damage / 2;
+            let cost = saved * x / 100;
+            if player.meso < cost {
+                (player.meso * 100 / x, player.meso)
+            } else {
+                (saved, cost)
+            }
+        }
+        _ => (0, 0),
+    };
+    Taken {
+        hp: (damage - achilles - guarded - saved).max(0),
+        mp,
+        mesos,
+        shown: damage - achilles - saved,
+    }
+}
+
+/// The per mille of a hit a Hero's, Paladin's, Dark Knight's, or Aran's
+/// Achilles leaves, if they have it.
+fn achilles(player: &Player) -> Option<i32> {
+    let skill_id = match player.stats.job {
+        112 => 1120004,
+        122 => 1220005,
+        132 => 1320005,
+        2112 => 21120004,
+        _ => return None,
+    };
+    skills::learned(player, skill_id).map(|skill| skill.effect.x)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1106,5 +1178,130 @@ mod tests {
             .int(0);
         expect.int(77).byte(0).int(9);
         expect.end();
+    }
+}
+
+#[cfg(test)]
+mod taken_tests {
+    use super::*;
+    use game::{Buff, SkillRecord};
+    use std::time::{Duration, Instant};
+
+    fn with_buff(player: &mut Player, skill_id: i32, stat: BuffStat, value: i16) {
+        let lasts = Duration::from_secs(60);
+        player
+            .buffs
+            .give(Buff::new(skill_id, stat, value, Instant::now(), lasts));
+    }
+
+    #[test]
+    fn a_hit_with_no_guards_takes_it_all() {
+        let player = crate::codec::stats::sample_player();
+        assert_eq!(
+            taken(&player, 100, true, true),
+            Taken {
+                hp: 100,
+                mp: 0,
+                mesos: 0,
+                shown: 100
+            }
+        );
+        // A miss or a dodge takes nothing.
+        assert_eq!(taken(&player, -1, true, true).hp, 0);
+    }
+
+    #[test]
+    fn magic_guard_moves_its_share_to_mp_while_there_is_any() {
+        let mut player = crate::codec::stats::sample_player();
+        player.stats.mp = 50;
+        with_buff(&mut player, 2001002, BuffStat::MagicGuard, 80);
+        // 80 of 100 would go, but there are only 50 MP.
+        assert_eq!(
+            taken(&player, 100, true, true),
+            Taken {
+                hp: 50,
+                mp: 50,
+                mesos: 0,
+                shown: 100
+            }
+        );
+        assert_eq!(
+            taken(&player, 50, true, true),
+            Taken {
+                hp: 10,
+                mp: 40,
+                mesos: 0,
+                shown: 50
+            }
+        );
+        assert_eq!(taken(&player, 50, false, true).hp, 50);
+        // Under Infinity it takes all its share and no MP.
+        with_buff(&mut player, 2121004, BuffStat::Infinity, 1);
+        assert_eq!(
+            taken(&player, 100, true, true),
+            Taken {
+                hp: 20,
+                mp: 0,
+                mesos: 0,
+                shown: 100
+            }
+        );
+    }
+
+    #[test]
+    fn meso_guard_halves_a_mobs_hit_for_mesos() {
+        let mut player = crate::codec::stats::sample_player();
+        player.meso = 1000;
+        with_buff(&mut player, 4211005, BuffStat::MesoGuard, 78);
+        // 50 saved at 78 mesos per 100.
+        assert_eq!(
+            taken(&player, 101, true, true),
+            Taken {
+                hp: 51,
+                mp: 0,
+                mesos: 39,
+                shown: 51
+            }
+        );
+        assert_eq!(taken(&player, 101, true, false).hp, 101);
+        // Short of mesos it saves what they buy.
+        player.meso = 20;
+        assert_eq!(
+            taken(&player, 100, true, true),
+            Taken {
+                hp: 75,
+                mp: 0,
+                mesos: 20,
+                shown: 75
+            }
+        );
+    }
+
+    #[test]
+    fn achilles_keeps_its_share_off() {
+        if skills::data().is_err() {
+            return;
+        }
+        let mut player = crate::codec::stats::sample_player();
+        player.stats.job = 112;
+        player.skills.set(SkillRecord {
+            skill_id: 1120004,
+            level: 30,
+            master_level: 30,
+            expiration: None,
+        });
+        // A Hero at level 30 keeps 850 per mille.
+        assert_eq!(
+            taken(&player, 1000, true, true),
+            Taken {
+                hp: 850,
+                mp: 0,
+                mesos: 0,
+                shown: 850
+            }
+        );
+        // Another job's Achilles does nothing.
+        player.stats.job = 122;
+        assert_eq!(taken(&player, 1000, true, true).hp, 1000);
     }
 }

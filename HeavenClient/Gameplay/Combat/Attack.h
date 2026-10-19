@@ -147,13 +147,12 @@ namespace ms
 		uint8_t direction;
 		int8_t index;
 		uint8_t element;
+		// Whether Power Stance kept the player in place.
+		bool stance;
 
-		MobAttackResult(const MobAttack &attack, int32_t damage, uint8_t direction) : damage(damage),
-																					  mobid(attack.mobid),
-																					  oid(attack.oid),
-																					  direction(direction),
-																					  index(attack.index),
-																					  element(attack.magic ? attack.element : 0)
+		MobAttackResult(const MobAttack &attack, int32_t damage, uint8_t direction, bool stance) :
+			damage(damage), mobid(attack.mobid), oid(attack.oid), direction(direction), index(attack.index),
+			element(attack.magic ? attack.element : 0), stance(stance)
 		{}
 	};
 

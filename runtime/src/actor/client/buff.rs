@@ -101,8 +101,10 @@ impl ClientActor {
         let tick = player.buffs.advance(std::time::Instant::now());
         let mut packets = Vec::new();
         let stats = &player.stats;
-        // Poison never takes the last HP.
+        // Poison never takes the last HP, and Achilles takes its share off,
+        // as a v83 client works it out (0x94b113).
         let poison = tick.poison.min(i32::from(stats.hp) - 1).max(0);
+        let poison = net::combat::taken(player, poison, false, false).hp;
         let change = tick.heal - poison;
         if stats.hp > 0 && (change < 0 || (change > 0 && stats.hp < stats.max_hp)) {
             let hp = player.add_hp(change);

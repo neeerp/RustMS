@@ -155,7 +155,7 @@ namespace ms
 		}
 
 		// A physical hit, for a monster with `attack` and a `roll` uniform in
-		// [0, 1). `reduce` is the percent that skills like Achilles take off,
+		// [0, 1). `reduce` is the percent Invincible takes off (0x7933b2),
 		// and a Power Up puts the rest at `percent` (0 for none).
 		inline int32_t physical(const Defender &player, const Attacker &mob, int32_t attack, double roll,
 								int32_t reduce, int32_t percent = 0)
@@ -212,6 +212,31 @@ namespace ms
 			damage = (100 - resist) * damage / 100;
 
 			return std::max(damage, 1);
+		}
+
+		// The number shown over the player for a hit of `damage` (0x9593b8).
+		// The client leaves Achilles, Meso Guard and Magic Guard to the
+		// server, but the number leaves out what the first two save:
+		// Achilles keeps `achilles` per mille off (1000 without it), and Meso
+		// Guard saves half at `mesoguard` mesos per 100 (0 without it), or
+		// what `meso` buys. Magic Guard's share still shows.
+		inline int32_t shown(int32_t damage, int32_t achilles, int32_t mesoguard, int64_t meso)
+		{
+			if (damage <= 0)
+				return damage;
+
+			int32_t kept_off = (1000 - achilles) * damage / 1000;
+			int32_t saved = 0;
+
+			if (mesoguard > 0)
+			{
+				saved = damage / 2;
+
+				if (meso < static_cast<int64_t>(saved) * mesoguard / 100)
+					saved = static_cast<int32_t>(meso * 100 / mesoguard);
+			}
+
+			return damage - kept_off - saved;
 		}
 	}
 }

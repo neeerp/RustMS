@@ -814,15 +814,45 @@ FUN_0079309f and FUN_0079345e):
 - **Magic:** the mob's `MADamage`, M, rolls M² × 0.75–0.8 / 100, less a
   share of M.DEF and stats (more for magicians); a separate miss roll.
 - **Afterward:** the damage is at least 1 unless missed. A `deadlyAttack`
-  takes all but 1 HP, and an `mpBurn` attack does 1. Achilles keeps its `x`
-  per mille.
+  takes all but 1 HP, and an `mpBurn` attack does 1. Invincible takes its
+  `x` percent off a physical hit.
 
 Period footage agrees: snails hit level 2–4 beginners for 1, and Shrooms
 and Blue Snails hit a level 5 beginner for 1–2 (#125). The server
 (`game::mob_damage`) refuses more than the best roll with no W.DEF, plus
-the most a shortfall can add with doubled base stats. It takes the HP, and
-for a `deadlyAttack` all but 1 MP or the attack's `mpBurn` in MP. Others see
-DAMAGE_PLAYER. At 0 HP the player is dead:
+the most a shortfall can add with doubled base stats.
+
+v83 sends that damage before the other guards (`CUserLocal::SetDamaged`,
+FUN_009581a9), and the server applies them once (`net::combat::taken`):
+
+- **Achilles** keeps `x` per mille of the hit, for a Hero, Paladin, Dark
+  Knight, or Aran who has learned it.
+- **Magic Guard** pays its `x` percent in MP, at most the MP left; under
+  Infinity the MP isn't spent. It leaves a `deadlyAttack` or `mpBurn`
+  attack alone, as Cosmic does.
+- **Meso Guard** (a mob's attack or touch only) saves half the hit at
+  `x` percent of that in mesos. Short of mesos, it saves what they buy.
+
+The rest comes off HP; a `deadlyAttack` also takes all but 1 MP, and an
+`mpBurn` attack its `mpBurn` in MP. Poison ticks get Achilles too
+(0x94b113). The client shows over the player's head the hit less Achilles
+and Meso Guard, but not Magic Guard (0x9593b8); others see the same number
+in DAMAGE_PLAYER.
+
+A hit of -1 is a dodge, accepted only from a Shadower or Hermit with Shadow
+Shifter, or (with a shield worn and a guard byte) a Hero or Paladin with
+Guardian. After the mob's id and object id, a mob's TAKE_DAMAGE carries
+its direction, the Power Guard reflect percent, the guard byte, a 14-byte
+block when reflecting (Power Guard, object id, hit action, the mob's and
+the player's positions), and a stance byte, set when the Stance roll kept
+the player from being knocked back. The server reads the tail by its length
+(older clients send none) and passes the reflect block and stance on in
+DAMAGE_PLAYER (`mob::Hurt`): `cid, from, damage`, then for a mob `mob_id,
+left, reflect percent (and its 10 bytes), stance`, then the shown number,
+or -1 and the dodging skill. Hits with no mob (-4) end with a byte: 1
+poison (ignored, the server ticks poison itself), 2 a mist (Achilles
+applies), or 3 Stop Motion (no guards, never fatal). At 0 HP the player is
+dead:
 non-beginners lose 10% of their level's EXP; the client's respawn
 (CHANGE_MAP with a target while dead) returns them to the map's return map
 with 50 HP.
@@ -854,9 +884,9 @@ Setting restores the same table.
 
 `field_mobs` unit tests cover spawning, control hand-off (including by
 distance report), movement, attacks' MP, damage, EXP sharing, and respawn;
-`net::combat` covers parsing, the damage cap, Shadow Meso's mesos, and the
-broadcast, and the
-TAKE_DAMAGE handler's bounds by attack index; `game::mob_damage` covers the
+`net::combat` covers parsing, the damage cap, Shadow Meso's mesos, the
+broadcast, and the guards' shares of a hit, and the
+TAKE_DAMAGE handler's bounds by attack index, its tail, and dodges; `game::mob_damage` covers the
 StandardPDD table and the bound. HeavenClient's `mob_damage_tests` and
 `mob_attack_tests` cover the damage and miss formulas and the attacks'
 ranges, aim, balls, and rows. `mob_combat` (integration) runs two players in Dangerous
@@ -864,6 +894,7 @@ Forest through control, relayed movement, hits, kills, EXP, refused damage,
 touch damage, damage by attack index, a level-up seen by the other player, and a respawn, then has
 two players report their distance from a firstAttack mob in Crimsonwood Keep
 (610030011) and checks control follows the closer one until a hit;
+`damage_reductions` (integration) has Magic Guard pay 80% of a touch in MP;
 `reactors` (integration) breaks two of Amherst's boxes, before and during
 Pio's quest;
 `drops_and_pickup` checks ownership, reach, pickup, replays, meso
