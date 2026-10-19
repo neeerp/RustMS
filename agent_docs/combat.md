@@ -123,10 +123,13 @@ spell for twice v83's magic maximum (`max_magic_damage`: ((M² / 1000 + M) / 30
 + INT / 200) × `mad`, where M is INT plus equipment magic attack), a `damage`
 skill for that percentage of the basic cap, Shadow Meso for v83's highest
 roll (ten times one and a half its `moneyCon`, raised by its `x` percent on a
-critical), and a skill with none is not an attack. A spell must name a skill.
+critical), Snipe's shot for 199,999, and a skill with none is not an attack.
+A spell must name a skill.
 Too little MP refuses the attack, as do too few mesos for the skill's
 `moneyCon` (Shadow Meso's, raised by Shadow Partner's `y` percent while that
-buff is on, as the v83 client checks).
+buff is on, as the v83 client checks). An attack skill with a `cooltime`
+(Heaven's Hammer, Snipe, Aerial Strike) is refused while it cools down;
+otherwise it starts the cooldown and the attacker gets COOLDOWN.
 HeavenClient sends a skill as the attack v83's `CUserLocal::DoActiveSkill`
 makes it, whatever the weapon: a swing, a shot, or a spell
 (`SkillData::flags_of`). Any other skill goes out as SPECIAL_MOVE. Skills
@@ -181,7 +184,11 @@ HeavenClient rolls Shadow Meso's hits as v83 does (`shot_path::meso_damage`,
 FUN_0078df87): ten times a whole number of mesos between half and one and a
 half its `moneyCon`, with its own `prop` and `x` for a critical in place of
 the user's, then a percent less for each level the mob is above the user. It
-misses as a blow does but ignores the mob's defense.
+misses as a blow does but ignores the mob's defense. Snipe's shot never
+misses and meets neither defense nor guards: 199,999 less a roll from 0 to
+10,000 (`shot_path::snipe_damage`, 0x78e4d6), always shown as a critical
+(FUN_00668b83). Another player's attack shows a hit as a critical when its
+damage has the top bit set (0x980620); RustMS never sets it.
 
 HeavenClient picks targets as v83 does (`Combat::find_targets`). Melee and
 magic attacks take the mobs whose body overlaps the attack range in the order
@@ -1009,7 +1016,9 @@ Three Snails, Nimble Feet, and Recovery and checks their damage caps, MP,
 buffs, cooldowns, Recovery's heal, what the others see, and that the buffs
 end on time and on death. `poison_mist` casts Poison Mist on a snail and
 checks the cloud's packet, that it lifts on time, and that it poisons only
-the snails in its box. `summons` has a ranger call up a Silver Hawk and a
+the snails in its box. `snipe` has a Marksman Snipe snails: 200,000 is
+refused, 199,999 kills and starts the 4 s cooldown, which refuses another
+until it ends. `summons` has a ranger call up a Silver Hawk and a
 Puppet, and checks what a watcher sees: the spawns, a refused and an accepted
 Hawk attack, the Puppet breaking, and the Hawk following its owner to the
 next map with no entrance. It also has a Dark Knight's Beholder heal them

@@ -141,6 +141,7 @@ int main()
 		require(meso_damage(855.9, false, 50, 0) == 8550.0, "Shadow Meso hits for ten times the whole mesos");
 		require(meso_damage(855.9, true, 50, 0) == 12825.0, "and its x percent more on a critical");
 		require(meso_damage(855.9, false, 50, 10) == 7695.0, "and a percent less per level the mob is above");
+		require(snipe_damage(0.0) == 199999 && snipe_damage(9999.99) == 189999, "Snipe hits for 189,999 to 199,999");
 
 		require(!area_shot(15111006) && !area_shot(3101005) && !area_shot(0), "Spark, Arrow Bomb and plain shots don't");
 		require(hides_bullet(3111004) && !hides_bullet(5221008) && !hides_bullet(4111005), "Arrow Rain shows no arrow");

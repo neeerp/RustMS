@@ -46,6 +46,11 @@ const RAPID_FIRE: i32 = 5221004;
 const SHADOW_MESO: i32 = 4111004;
 const SHADOW_PARTNER: i32 = 4111002;
 
+/// Snipe, whose shot hits for 199,999 less a roll from 0 to 10,000
+/// (FUN_0078df87).
+const SNIPE: i32 = 3221007;
+const SNIPE_MOST: i32 = 199_999;
+
 /// Skills sent as shots that fire no ammo (the v83 client's FUN_007667ee).
 const AMMO_FREE: [i32; 12] = [
     4111004,  // Shadow Meso
@@ -367,6 +372,8 @@ pub fn validate(attack: &Attack, player: &Player) -> Result<Uses, AttackRejectio
             // Ten times between half and one and a half its `moneyCon`,
             // raised by its `x` percent on a critical (FUN_0078df87).
             effect.money_cost * 3 / 2 * 10 * (100 + effect.x) / 100
+        } else if skill.skill_id == SNIPE && attack.kind == AttackKind::Ranged {
+            SNIPE_MOST
         } else if let Some(percent) = damage_percent(&skill) {
             (base_cap * percent / 100).max(10)
         } else {
@@ -1114,6 +1121,36 @@ mod tests {
         );
         player.meso = 855;
         assert_eq!(validate(&toss(&[1, 1]), &player).unwrap().mesos, 855);
+    }
+
+    #[test]
+    fn snipe_hits_for_up_to_199999() {
+        if skills::data().is_err() {
+            return;
+        }
+        let mut player = beginner_with_sword();
+        player.inventory.insert(
+            InventoryType::Equipped,
+            equip_slot::WEAPON,
+            Item::equipment(1462000, EquipStats::default()),
+        );
+        player
+            .inventory
+            .insert(InventoryType::Use, 1, Item::stack(2061000, 10));
+        learn(&mut player, SNIPE, 30);
+        let snipe = |damage| {
+            parse_attack(
+                &kind_attack_packet(AttackKind::Ranged, SNIPE, 1, &[damage]),
+                AttackKind::Ranged,
+            )
+            .unwrap()
+        };
+        let uses = validate(&snipe(199_999), &player).unwrap();
+        assert_eq!(uses.ammo.map(|ammo| ammo.quantity), Some(1));
+        assert_eq!(
+            validate(&snipe(200_000), &player).unwrap_err(),
+            AttackRejection::Damage
+        );
     }
 
     fn rogue_with_stars(stars: i16) -> Player {

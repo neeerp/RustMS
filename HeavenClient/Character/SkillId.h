@@ -154,6 +154,9 @@ namespace ms
 			// Priest
 					PRIEST_TELEPORT = 2301001,
 
+			// Marksman
+					SNIPE = 3221007,
+
 			// Hermit
 					SHADOW_PARTNER = 4111002,
 			SHADOW_MESO = 4111004,

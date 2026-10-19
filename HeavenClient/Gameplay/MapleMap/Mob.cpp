@@ -2178,6 +2178,10 @@ namespace ms
 		if (weapon && status_value(MobStatParser::PIMMUNE) && !pierces(randomizer.next_int(100), 0))
 			return std::pair<int32_t, bool>(1, false);
 
+		// Snipe's shot neither misses nor meets defense or guards.
+		if (attack.skill == SkillId::SNIPE && attack.type == Attack::Type::RANGED)
+			return std::pair<int32_t, bool>(shot_path::snipe_damage(randomizer.next_real(10000.0)), true);
+
 		bool hit = randomizer.below(hitchance);
 
 		if (!hit)

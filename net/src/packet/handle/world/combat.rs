@@ -11,6 +11,7 @@ use game::buff::BuffStat;
 use game::{Buff, Disease, InventoryType, MobStat, Player};
 use packet::{io::read::PktRead, Packet};
 use std::io::Cursor;
+use std::time::{Duration, Instant};
 use tracing::debug;
 
 /// `MOVE_LIFE`: the controller moved a mob (FUN_0066b6fc). Object id, move
@@ -133,6 +134,18 @@ impl WorldHandler for AttackHandler {
                 inflict: skills::mist(skill)?,
             })
         });
+        // A skill with a cooltime, as Snipe, can't attack again until it is
+        // over, and the client hears how long.
+        let now = Instant::now();
+        let cooldown = uses.skill.as_ref().map_or(0, |skill| skill.effect.cooldown);
+        if cooldown > 0 {
+            if ctx.player.buffs.cooling_down(attack.skill, now) {
+                debug!(skill = attack.skill, "Attack refused while cooling down");
+                return Ok(HandlerResult::empty());
+            }
+            let length = Duration::from_secs(cooldown as u64);
+            ctx.player.buffs.start_cooldown(attack.skill, now, length);
+        }
         if let Some(skill) = uses.skill {
             let mut updates = vec![StatUpdate::Mp(
                 ctx.player.add_mp(-combat::attack_mp_cost(&skill)),
@@ -143,6 +156,9 @@ impl WorldHandler for AttackHandler {
                 updates.push(StatUpdate::Meso(ctx.player.meso));
             }
             result = HandlerResult::reply(stat::build_stat_update(false, &updates)?);
+            if cooldown > 0 {
+                result = result.with_reply(buff::build_cooldown(skill.skill_id, cooldown as i16)?);
+            }
             skill_level = skill.level as u8;
         }
         let mut projectile = 0;

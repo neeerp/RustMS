@@ -2102,7 +2102,8 @@ namespace ms
 		for (size_t line = 0; line < damagelines.size(); line++)
 		{
 			int32_t amount = damagelines[line].first;
-			bool critical = damagelines[line].second;
+			// Snipe's hits always show as critical (FUN_00668b83).
+			bool critical = damagelines[line].second || move_id == SkillId::SNIPE;
 			DamageNumber::Type type = critical ? DamageNumber::Type::CRITICAL : DamageNumber::Type::NORMAL;
 			int16_t lift = damage_layout::mob_offset(static_cast<int16_t>(line), close);
 			numbers.emplace_back(type, amount, lift);
