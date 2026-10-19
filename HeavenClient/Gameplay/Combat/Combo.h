@@ -25,6 +25,16 @@ namespace ms
 			}
 		}
 
+		// A Hero's Enrage, which spends the orbs.
+		constexpr int32_t ENRAGE = 1121010;
+
+		// Enrage wants a Combo value of 10, nine orbs: v83 compares the value, not the orbs
+		// (0x764379).
+		inline bool enrage_refused(int32_t skill, int32_t value)
+		{
+			return skill == ENRAGE && value < 10;
+		}
+
 		// Combo Attack and Advanced Combo for a job's line, and Combo Attack's last level.
 		struct Line
 		{

@@ -217,7 +217,7 @@ impl WorldHandler for AttackHandler {
 
 /// Combo Attack's new value, for what is left of it: the player hears it
 /// as the buff given again, and the others see the orbs.
-fn set_combo(
+pub(super) fn set_combo(
     player: &mut Player,
     value: i16,
     now: Instant,

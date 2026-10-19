@@ -12,6 +12,8 @@ const ADVANCED_COMBO: i32 = 1120003;
 const DAWN_COMBO: i32 = 11111001;
 const DAWN_ADVANCED_COMBO: i32 = 11110005;
 const SHOUT: i32 = 1111008;
+/// A Hero's Enrage, which spends the orbs.
+pub const ENRAGE: i32 = 1121010;
 
 /// Panic and Coma, a Crusader's and a Dawn Warrior's.
 const FINISHERS: [i32; 6] = [1111003, 1111004, 1111005, 1111006, 11111002, 11111003];
@@ -36,6 +38,12 @@ pub fn orbs(player: &Player) -> Option<i32> {
         .iter()
         .find(|buff| buff.stat == BuffStat::Combo)?;
     matches!(buff.skill_id, COMBO | DAWN_COMBO).then_some(i32::from(buff.value) - 1)
+}
+
+/// Enrage wants a Combo value of 10, nine orbs: the v83 client compares
+/// the value, not the orbs (0x764379).
+pub fn enrage_refused(player: &Player, skill_id: i32) -> bool {
+    skill_id == ENRAGE && player.buffs.value(BuffStat::Combo).unwrap_or(0) < 10
 }
 
 /// The percent the orbs make an attack's damage, after its skill's, or 0

@@ -783,9 +783,9 @@ pub fn buffs(skill: &Learned) -> Option<Vec<(BuffStat, i32)>> {
         1001 | 10001001 | 20001001 => vec![(BuffStat::Recovery, effect.x)],
         1002 | 10001002 | 20001002 => vec![],
         // Iron Body, Rage, Iron Will, Magic Armor, Meditation, Bless,
-        // Focus, Haste.
+        // Focus, Haste, Enrage.
         1001003 | 1101006 | 1301006 | 2001003 | 2101001 | 2201001 | 2301004 | 3001003 | 4101004
-        | 4201003 => vec![],
+        | 4201003 | 1121010 => vec![],
         1101004 | 1101005 | 1201004 | 1201005 | 1301004 | 1301005 | 2111005 | 2211005 | 3101002
         | 3201002 | 4101003 | 4201002 | 5101006 | 5201003 => {
             vec![(BuffStat::Booster, effect.x)]

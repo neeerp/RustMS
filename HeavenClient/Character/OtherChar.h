@@ -58,8 +58,9 @@ namespace ms
 		void update_look(const LookEntry &look);
 
 		// Show these buffs, each with its value, as well as those shown
-		// already.
-		void show_buffs(const std::vector<std::pair<Buffstat::Id, int32_t>> &shown);
+		// already. Those the character spawned with (`init`) show without
+		// animating.
+		void show_buffs(const std::vector<std::pair<Buffstat::Id, int32_t>> &shown, bool init = false);
 
 		// Stop showing these buffs.
 		void hide_buffs(const std::vector<Buffstat::Id> &ended);

@@ -1,3 +1,5 @@
+use super::combat::set_combo;
+use crate::combo;
 use crate::error::NetworkError;
 use crate::handler::{
     FieldRequest, HandlerResult, PartySkill, WorldAction, WorldContext, WorldHandler, WorldResult,
@@ -111,7 +113,8 @@ impl WorldHandler for UseSkillHandler {
             };
         }
         let extras = read_extras(&mut r, skill_id);
-        match use_skill(ctx.player, skill_id, level, Instant::now()) {
+        let now = Instant::now();
+        match use_skill(ctx.player, skill_id, level, now) {
             Ok(used) => {
                 if skill_id == skills::CHAKRA {
                     let heal = skills::chakra_heal(ctx.player, used.skill.effect.y, rand::random());
@@ -126,6 +129,9 @@ impl WorldHandler for UseSkillHandler {
                 }
                 if skills::HEROS_WILL.contains(&skill_id) {
                     result = cure(ctx.player, &skills::PURGED, result)?;
+                }
+                if skill_id == combo::ENRAGE {
+                    result = set_combo(ctx.player, 1, now, result)?;
                 }
                 let result = with_party(result, skill_id, level, extras.party, 0);
                 let Some(inflict) = used.debuffs.clone() else {
@@ -256,6 +262,8 @@ enum Refusal {
     NoItem,
     /// Mystic Door where no door may open.
     NoDoorHere,
+    /// Enrage without the orbs to spend.
+    TooFewOrbs,
 }
 
 /// What USE_SKILL carries after the level (0x96d399), each part only for
@@ -499,6 +507,9 @@ fn use_skill(
     let skill = skills::learned(player, skill_id)
         .filter(|skill| skill.level == level)
         .ok_or(Refusal::NotLearned)?;
+    if combo::enrage_refused(player, skill_id) {
+        return Err(Refusal::TooFewOrbs);
+    }
     let stats = skills::buffs(&skill);
     let buffs = stats.is_some();
     let debuffs = match stats {
@@ -1534,6 +1545,42 @@ mod tests {
         let actions = magnet(&mut player, 30, 16, &mobs);
         assert!(matches!(actions.as_slice(), [only] if unlocks(only)));
         assert_eq!(player.stats.mp, 100);
+    }
+
+    #[test]
+    fn enrage_wants_nine_orbs_and_spends_them() {
+        if skills::data().is_err() {
+            return;
+        }
+        let mut player = beginner_with(combo::ENRAGE, 30);
+        player.stats.job = 112;
+        player.stats.mp = 100;
+        player.stats.max_mp = 100;
+        let combo_of = |value| {
+            Buff::new(
+                1111002,
+                BuffStat::Combo,
+                value,
+                Instant::now(),
+                Duration::from_secs(100),
+            )
+        };
+        player.buffs.give(combo_of(9));
+        let actions = handle(&mut player, combo::ENRAGE, 30);
+        assert!(matches!(actions.as_slice(), [only] if unlocks(only)));
+        assert_eq!(player.stats.mp, 100);
+
+        player.buffs.give(combo_of(10));
+        let actions = handle(&mut player, combo::ENRAGE, 30);
+        assert_eq!(player.stats.mp, 60);
+        assert_eq!(player.buffs.value(BuffStat::Pad), Some(26));
+        assert_eq!(player.buffs.value(BuffStat::Combo), Some(1));
+        // The others see the orbs go; the attack is the user's alone.
+        let shown = |action: &WorldAction| {
+            matches!(action, WorldAction::BuffsChanged(p)
+                if p.opcode() == SendOpcode::GiveForeignBuff as i16)
+        };
+        assert_eq!(actions.iter().filter(|a| shown(a)).count(), 1);
     }
 
     fn prepare(player: &mut Player, skill_id: i32, level: u8) -> Vec<WorldAction> {

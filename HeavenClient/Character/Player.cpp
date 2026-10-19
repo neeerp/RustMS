@@ -630,6 +630,9 @@ namespace ms
 		if (combo::finisher(move.get_id()) && get_buff_value(Buffstat::Id::COMBO) <= 1)
 			return SpecialMove::ForbidReason::FBR_OTHER;
 
+		if (combo::enrage_refused(move.get_id(), get_buff_value(Buffstat::Id::COMBO)))
+			return SpecialMove::ForbidReason::FBR_OTHER;
+
 		if (has_cooldown(move.get_id()))
 			return SpecialMove::ForbidReason::FBR_COOLDOWN;
 
@@ -914,12 +917,20 @@ namespace ms
 	void Player::give_buff(Buff buff)
 	{
 		buffs[buff.stat] = buff;
+
+		if (buff.stat == Buffstat::Id::COMBO)
+			show_combo(buff.value - 1, false);
+
 		show_diseases();
 	}
 
 	void Player::cancel_buff(Buffstat::Id stat)
 	{
 		buffs[stat] = {};
+
+		if (stat == Buffstat::Id::COMBO)
+			show_combo(-1, false);
+
 		show_diseases();
 	}
 

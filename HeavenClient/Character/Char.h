@@ -40,6 +40,7 @@
 
 #include "../Graphics/EffectLayer.h"
 
+#include "../Gameplay/Combat/ComboOrbs.h"
 #include "../Gameplay/Combat/DamageNumber.h"
 #include "../Gameplay/MapleMap/MapObject.h"
 #include "../IO/Components/ChatBalloon.h"
@@ -173,6 +174,15 @@ namespace ms
 
 		// Display an animation as an effect on top of the character.
 		void show_effect_id(CharEffect::Id toshow);
+
+		// Show Combo Attack's orbs: the buff's value less one, or -1
+		// without it. A character coming into view (`init`) shows them
+		// without animating (FUN_0093cdbc).
+		void show_combo(int32_t orbs, bool init);
+
+		// A finisher's burst from the character's feet, by the orbs it
+		// spends, never mirrored (0x934725).
+		void show_combo_finish(int32_t skill);
 
 		// Play an animation anchored to the character (e.g. a tutorial image).
 		void show_effect(const Animation &effect);
@@ -348,6 +358,8 @@ namespace ms
 
 		std::map<int32_t, Affliction> afflictions;
 
+		combo::Orbs combo_orbs;
+
 		TimedBool invincible;
 		bool blinking = false;
 		TimedBool ironbody;
@@ -373,5 +385,10 @@ namespace ms
 		static Animation tomb_land;
 		// BasicEff.img/SkillBook: [failure, success][front, back]
 		static Animation skill_book[2][2];
+		// Combo Attack's and Advanced Combo's state/0 to 5: the center,
+		// then the orbs.
+		static Texture combo_sprites[2][6];
+
+		void draw_combo(Point<int16_t> position) const;
 	};
 }

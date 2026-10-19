@@ -165,6 +165,9 @@ namespace ms
 		combat.clear_prepare();
 		combat.clear_grenades();
 		player.respawn(startpos, mapinfo.is_underwater());
+		// v83 makes the user anew in each field, showing their orbs as they
+		// are (FUN_0092e499).
+		player.show_combo(player.get_buff_value(Buffstat::Id::COMBO) - 1, true);
 		player.set_recovery_rate(mapinfo.get_recovery());
 		pending_teleport.reset();
 		teleport_cooldown = 0;

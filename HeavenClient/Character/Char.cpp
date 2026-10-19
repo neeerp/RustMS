@@ -120,6 +120,10 @@ namespace ms
 			guildmark.draw(guildpos + Point<int16_t>(-guildlabel.width() / 2, 0) + EMBLEM_OFFSET);
 		}
 
+		// The orbs are in front of the avatar and its name tag (z 4 to the
+		// tag's 2).
+		draw_combo(absp);
+
 		chalkboard.draw(absp, AVATAR_HEIGHT);
 		chatballoon.draw(absp - Point<int16_t>(0, 85));
 		hintballoon.draw(absp - Point<int16_t>(0, 85));
@@ -134,6 +138,38 @@ namespace ms
 
 		for (auto &number : damagenumbers)
 			number.draw(viewx, viewy, alpha);
+	}
+
+	void Char::draw_combo(Point<int16_t> position) const
+	{
+		using combo::Orbs;
+
+		Point<int16_t> center = position - Point<int16_t>(0, Orbs::RISE);
+
+		for (size_t advanced = 0; advanced < 2; advanced++)
+			if (combo_orbs.shown(advanced))
+				combo_sprites[advanced][0].draw(
+					DrawArgument(combo_orbs.center_angle(), center, combo_orbs.opacity(advanced)));
+
+		float cos = std::cos(combo_orbs.ring_angle());
+		float sin = std::sin(combo_orbs.ring_angle());
+
+		for (int32_t j = 1; j <= Orbs::MOST; j++)
+		{
+			size_t layer = Orbs::orb(j);
+
+			if (!combo_orbs.shown(layer))
+				continue;
+
+			Orbs::Offset slot = Orbs::slot(j);
+			Point<int16_t> pos = center + Point<int16_t>(
+				static_cast<int16_t>(std::lround(slot.x * cos - slot.y * sin)),
+				static_cast<int16_t>(std::lround(slot.x * sin + slot.y * cos)));
+			float scale = combo_orbs.scale(layer);
+
+			combo_sprites[Orbs::advanced(j)][Orbs::state(j)].draw(
+				DrawArgument(pos, scale, scale, combo_orbs.opacity(layer)));
+		}
 	}
 
 	void Char::draw_preview(Point<int16_t> position, float alpha) const
@@ -159,6 +195,7 @@ namespace ms
 
 		chatballoon.update();
 		hintballoon.update();
+		combo_orbs.update(Constants::TIMESTEP);
 		invincible.update();
 		ironbody.update();
 
@@ -317,6 +354,23 @@ namespace ms
 		float attackspeed = get_real_attackspeed();
 
 		effects.add(toshow, DrawArgument(facing_right), z, attackspeed);
+	}
+
+	void Char::show_combo(int32_t orbs, bool init)
+	{
+		combo_orbs.set(orbs, init);
+	}
+
+	void Char::show_combo_finish(int32_t skill)
+	{
+		int32_t orbs = combo_orbs.get_count();
+
+		if (orbs < 1 || orbs > combo::Orbs::MOST)
+			return;
+
+		nl::node finish = nl::nx::skill[string_format::skill_img(skill)]["skill"][std::to_string(skill)]["finish"];
+		effects.add(finish[std::to_string(orbs)], DrawArgument(false), static_cast<int8_t>(finish["z"].get_integer()),
+			get_real_attackspeed());
 	}
 
 	void Char::show_held_effect(Animation toshow, int8_t z, bool looping)
@@ -767,10 +821,21 @@ namespace ms
 		nl::node tomb = nl::nx::effect["Tomb.img"];
 		tomb_fall = tomb["fall"];
 		tomb_land = tomb["land"];
+
+		// Dawn Warriors show these too: v83 only ever loads the Hero's.
+		nl::node combo = nl::nx::skill["111.img"]["skill"]["1111002"]["state"];
+		nl::node advanced = nl::nx::skill["112.img"]["skill"]["1120003"]["state"];
+
+		for (int state = 0; state < 6; state++)
+		{
+			combo_sprites[0][state] = combo[std::to_string(state)];
+			combo_sprites[1][state] = advanced[std::to_string(state)];
+		}
 	}
 
 	EnumMap<CharEffect::Id, Animation> Char::chareffects;
 	Animation Char::tomb_fall;
 	Animation Char::tomb_land;
 	Animation Char::skill_book[2][2];
+	Texture Char::combo_sprites[2][6];
 }

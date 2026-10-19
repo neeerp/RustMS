@@ -379,7 +379,13 @@ A few skills do more than buff:
   its skill's, by the client's table (FUN_007653fa, `combo::damage_percent`).
   The damage cap and HeavenClient's `Player::combo_percent` both use it.
   A Dawn Warrior's skills follow the same rules, with Combo Attack's last
-  level at 20.
+  level at 20. Enrage, a buff of its `pad`, wants a value of 10 (nine
+  orbs: the client compares the value, 0x764379) and resets it to 1 the
+  same way (`combo::enrage_refused`).
+  HeavenClient draws the orbs as v83 does (`combo::Orbs`, FUN_0093cdbc):
+  the newest five on a turning ring 40 pixels over the feet, the newest
+  popping in, all fading out when spent, and a finisher's
+  `finish/<orbs>` burst at the attacker's feet.
 
 These and Mystic Door have neither buff stats nor a mob debuff, so
 `skills::acts_alone` lets them past the check that refuses such skills as
@@ -1109,4 +1115,5 @@ Panic.
 cold out, then takes it off and drinks an Air Bubble, which doesn't help: it
 loses 10 HP at the next tick. After a Red Bean Porridge it loses nothing.
 HeavenClient's `diseases_tests` cover the input, jump, attack and skill
-gates and the notices; `combo_tests` cover the orbs' damage table.
+gates and the notices; `combo_tests` cover the orbs' damage table and
+`combo_orbs_tests` what they show.

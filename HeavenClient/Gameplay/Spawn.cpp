@@ -129,7 +129,7 @@ namespace ms
 	{
 		auto otherchar = std::make_unique<OtherChar>(cid, look, level, job, name, stance, position);
 		otherchar->set_chair(chair);
-		otherchar->show_buffs(buffs);
+		otherchar->show_buffs(buffs, true);
 		otherchar->set_guild_name(guild);
 		otherchar->set_guild_emblem(emblem);
 		otherchar->set_mini_room(room);

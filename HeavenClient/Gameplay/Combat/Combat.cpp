@@ -18,6 +18,7 @@
 #include "Combat.h"
 
 #include "ChainLightning.h"
+#include "Combo.h"
 #include "DamageLayout.h"
 #include "Heal.h"
 #include "HitTiming.h"
@@ -884,6 +885,10 @@ namespace ms
 			if (!held && !follow)
 				move.apply_useeffects(player);
 
+			// A finisher bursts with the orbs it spends (0x934725).
+			if (combo::finisher(move.get_id()))
+				player.show_combo_finish(move.get_id());
+
 			if (follow)
 			{
 				player.end_attack();
@@ -1496,6 +1501,9 @@ namespace ms
 			if (!prepare::throws(attack.skill))
 			{
 				move.apply_useeffects(user);
+
+				if (combo::finisher(attack.skill))
+					user.show_combo_finish(attack.skill);
 
 				if (Stance::Id stance = Stance::by_id(attack.stance))
 					user.attack(stance);

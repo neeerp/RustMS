@@ -81,10 +81,15 @@ namespace ms
 		set_state(path.get_state().stance);
 	}
 
-	void OtherChar::show_buffs(const std::vector<std::pair<Buffstat::Id, int32_t>> &shown)
+	void OtherChar::show_buffs(const std::vector<std::pair<Buffstat::Id, int32_t>> &shown, bool init)
 	{
 		for (auto [stat, value] : shown)
+		{
 			buffs[stat] = value;
+
+			if (stat == Buffstat::Id::COMBO)
+				show_combo(value - 1, init);
+		}
 
 		show_diseases();
 	}
@@ -92,7 +97,12 @@ namespace ms
 	void OtherChar::hide_buffs(const std::vector<Buffstat::Id> &ended)
 	{
 		for (Buffstat::Id stat : ended)
+		{
 			buffs.erase(stat);
+
+			if (stat == Buffstat::Id::COMBO)
+				show_combo(-1, false);
+		}
 
 		show_diseases();
 	}
