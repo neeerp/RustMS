@@ -366,6 +366,39 @@ impl LiveMob {
         let max = i64::from(self.info.max_hp.max(1));
         ((self.hp.max(0) * 100 + max - 1) / max).clamp(0, 100) as u8
     }
+
+    /// Its boss HP bar as it stands, if the field's clients are shown one.
+    pub fn boss_bar(&self) -> Option<BossBar> {
+        self.info.boss_bar().map(|colors| BossBar {
+            mob_id: self.info.mob_id,
+            hp: self.hp.clamp(0, i64::from(i32::MAX)) as i32,
+            max_hp: self.info.max_hp,
+            colors,
+        })
+    }
+
+    /// Its boss HP bar taken down, for a mob with one. That includes a bar
+    /// the client draws itself (`HPgaugeHide`), as no HP percent is sent
+    /// for a kill.
+    fn boss_bar_gone(&self) -> Option<BossBar> {
+        self.info.hp_tags().map(|colors| BossBar {
+            mob_id: self.info.mob_id,
+            hp: 0,
+            max_hp: self.info.max_hp,
+            colors,
+        })
+    }
+}
+
+/// A mob's boss HP bar across the top of the field's screens (v83
+/// FIELD_EFFECT 5).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct BossBar {
+    pub mob_id: i32,
+    /// 0 takes the bar down.
+    pub hp: i32,
+    pub max_hp: i32,
+    pub colors: (u8, u8),
 }
 
 /// A mob killed by an attack. The field splits its EXP (`split_exp`),
@@ -386,6 +419,8 @@ pub struct Kill {
     pub showdown: i32,
     /// KILL_MONSTER's leave type: 1 dies, or how it destroyed itself.
     pub leave: u8,
+    /// Its boss HP bar, taken down.
+    pub boss_bar: Option<BossBar>,
 }
 
 pub struct MobSet {
@@ -1093,21 +1128,22 @@ impl MobSet {
             damage_by: ranked_damage(&mob.damage_by),
             showdown,
             leave,
+            boss_bar: mob.boss_bar_gone(),
         }))
     }
 
     /// Take away the mobs whose time is up (`removeAfter`); returns their
-    /// object ids and leave types. As in Cosmic, they give no EXP or drops
-    /// and let nothing out, and their spawn points fill again as after a
-    /// kill.
-    pub fn leave(&mut self, now: Instant) -> Vec<(i32, u8)> {
-        let gone: Vec<(i32, u8)> = self
+    /// object ids, leave types and boss bars taken down. As in Cosmic, they
+    /// give no EXP or drops and let nothing out, and their spawn points fill
+    /// again as after a kill.
+    pub fn leave(&mut self, now: Instant) -> Vec<(i32, u8, Option<BossBar>)> {
+        let gone: Vec<_> = self
             .live
             .values()
             .filter(|mob| mob.leaves_at.is_some_and(|at| at <= now))
-            .map(|mob| (mob.object_id, mob.leave_type()))
+            .map(|mob| (mob.object_id, mob.leave_type(), mob.boss_bar_gone()))
             .collect();
-        for &(object_id, _) in &gone {
+        for &(object_id, _, _) in &gone {
             if let Some(mob) = self.live.remove(&object_id) {
                 self.emptied(mob.spawn, now);
             }
@@ -1311,6 +1347,40 @@ mod tests {
             0.0,
         )
         .unwrap()
+    }
+
+    #[test]
+    fn boss_bars() {
+        let now = Instant::now();
+        let (template, mut info) = snail_spawn(100);
+        (info.mob_id, info.max_hp) = (8800000, 100);
+        (info.hp_tag_color, info.hp_tag_bg_color) = (1, 3);
+        let mut mobs = MobSet::new([(template.clone(), info.clone())]);
+        let zakum = mobs.spawn_all(now)[0];
+        assert_eq!(mobs.damage(1, zakum, 40, now), Some(Ok(60)));
+        let bar = BossBar {
+            mob_id: 8800000,
+            hp: 60,
+            max_hp: 100,
+            colors: (1, 3),
+        };
+        assert_eq!(mobs.get(zakum).and_then(LiveMob::boss_bar), Some(bar));
+        let Some(Err(kill)) = mobs.damage(1, zakum, 60, now) else {
+            panic!("it should die");
+        };
+        assert_eq!(kill.boss_bar, Some(BossBar { hp: 0, ..bar }));
+
+        // The client draws Mushmom's bar, but the server still takes it
+        // down.
+        info.hp_gauge_hide = true;
+        let mut mobs = MobSet::new([(template, info)]);
+        let mushmom = mobs.spawn_all(now)[0];
+        assert_eq!(mobs.damage(1, mushmom, 40, now), Some(Ok(60)));
+        assert_eq!(mobs.get(mushmom).and_then(LiveMob::boss_bar), None);
+        let Some(Err(kill)) = mobs.damage(1, mushmom, 60, now) else {
+            panic!("it should die");
+        };
+        assert_eq!(kill.boss_bar, Some(BossBar { hp: 0, ..bar }));
     }
 
     fn snail_spawn(x: i16) -> (MapMobTemplate, MobInfo) {
@@ -1664,7 +1734,7 @@ mod tests {
         let mob = mobs.spawn_all(now)[0];
         let due = now + Duration::from_secs(10);
         assert!(mobs.leave(due - Duration::from_millis(1)).is_empty());
-        assert_eq!(mobs.leave(due), [(mob, 1)]);
+        assert_eq!(mobs.leave(due), [(mob, 1, None)]);
         assert!(mobs.get(mob).is_none());
         // Nothing comes out of it, and its spawn point fills again.
         assert!(mobs
@@ -1711,7 +1781,7 @@ mod tests {
         });
         let mut mobs = MobSet::new([(template, info)]);
         let bomb = mobs.spawn_all(now)[0];
-        assert_eq!(mobs.leave(now), [(bomb, 4)]);
+        assert_eq!(mobs.leave(now), [(bomb, 4, None)]);
     }
 
     #[test]

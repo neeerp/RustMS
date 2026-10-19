@@ -346,4 +346,9 @@ namespace ms
 	{
 		return TYPE;
 	}
+
+	int16_t UIMiniMap::get_width() const
+	{
+		return dimension.x();
+	}
 }

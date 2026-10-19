@@ -11,6 +11,26 @@ pub fn build_field_effect(path: &str) -> Result<Packet, NetworkError> {
     Ok(p)
 }
 
+/// FIELD_EFFECT mode 5 (v83 0x5336ca): the boss HP bar across the top of
+/// the screen for the mob template `mob_id`, in the colours of its
+/// `hpTagColor` and `hpTagBgcolor`. An `hp` below 1 takes the bar down.
+pub fn build_boss_hp_bar(
+    mob_id: i32,
+    hp: i32,
+    max_hp: i32,
+    colors: (u8, u8),
+) -> Result<Packet, NetworkError> {
+    let mut p = Packet::new_empty();
+    p.write_short(SendOpcode::FieldEffect as i16)?;
+    p.write_byte(5)?;
+    p.write_int(mob_id)?;
+    p.write_int(hp)?;
+    p.write_int(max_hp)?;
+    p.write_byte(colors.0)?;
+    p.write_byte(colors.1)?;
+    Ok(p)
+}
+
 /// SHOW_ITEM_GAIN_INCHAT mode 0x17: show a UI image (`UI/tutorial.img/25`)
 /// anchored to the player, as the tutorial hints do.
 pub fn build_avatar_effect(path: &str) -> Result<Packet, NetworkError> {
@@ -134,6 +154,16 @@ mod tests {
         let mut expect = Expect::new(&packet.bytes);
         expect.short(SendOpcode::FieldEffect as i16).byte(3);
         expect.string("maplemap/enter/10000");
+        expect.end();
+    }
+
+    #[test]
+    fn boss_hp_bar_is_mode_five() {
+        let packet = build_boss_hp_bar(8800000, 33_000_000, 66_000_000, (1, 3)).unwrap();
+        let mut expect = Expect::new(&packet.bytes);
+        expect.short(SendOpcode::FieldEffect as i16).byte(5);
+        expect.int(8800000).int(33_000_000).int(66_000_000);
+        expect.byte(1).byte(3);
         expect.end();
     }
 

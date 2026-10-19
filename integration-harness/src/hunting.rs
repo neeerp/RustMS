@@ -315,6 +315,8 @@ pub struct Field {
     pub appearances: BTreeMap<i32, i8>,
     /// (object id, HP percentage)
     pub hp_bars: Vec<(i32, u8)>,
+    /// FIELD_EFFECT 5, a boss's HP bar: (mob id, HP, max HP, colours).
+    pub boss_bars: Vec<(i32, i32, i32, (u8, u8))>,
     pub killed: Vec<i32>,
     /// How each killed mob went: KILL_MONSTER's leave type.
     pub leave_types: BTreeMap<i32, u8>,
@@ -527,6 +529,13 @@ impl Field {
         } else if op == SendOpcode::ShowMonsterHp as i16 {
             self.hp_bars
                 .push((r.read_int().unwrap(), r.read_byte().unwrap()));
+        } else if op == SendOpcode::FieldEffect as i16 {
+            if r.read_byte().unwrap() == 5 {
+                let (mob, hp, max_hp) = (r.read_int(), r.read_int(), r.read_int());
+                let colors = (r.read_byte().unwrap(), r.read_byte().unwrap());
+                self.boss_bars
+                    .push((mob.unwrap(), hp.unwrap(), max_hp.unwrap(), colors));
+            }
         } else if op == SendOpcode::KillMonster as i16 {
             let oid = r.read_int().unwrap();
             self.killed.push(oid);

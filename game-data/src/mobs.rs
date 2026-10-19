@@ -59,6 +59,14 @@ pub struct MobInfo {
     pub remove_after: i32,
     /// How it destroys itself (`selfDestruction`), if it does.
     pub self_destruct: Option<SelfDestruct>,
+    /// The colours of its boss HP bar's fill and trough (`hpTagColor`,
+    /// `hpTagBgcolor`), as `UIWindow.img/MobGage/Gage/<n>`, or 0 for a mob
+    /// without the bar.
+    pub hp_tag_color: u8,
+    pub hp_tag_bg_color: u8,
+    /// The client draws its boss bar itself from the HP percent its
+    /// attacker is sent (`HPgaugeHide`), as for Mushmom.
+    pub hp_gauge_hide: bool,
 }
 
 /// How a mob destroys itself (`selfDestruction`).
@@ -126,6 +134,19 @@ pub struct MobAttack {
 }
 
 impl MobInfo {
+    /// The colours of its boss HP bar, for a mob that has one.
+    pub fn hp_tags(&self) -> Option<(u8, u8)> {
+        (self.hp_tag_color != 0 && self.hp_tag_bg_color != 0)
+            .then_some((self.hp_tag_color, self.hp_tag_bg_color))
+    }
+
+    /// The colours of the boss HP bar the server keeps the field's
+    /// clients up to date with, for a mob that has one the client doesn't
+    /// draw itself.
+    pub fn boss_bar(&self) -> Option<(u8, u8)> {
+        self.hp_tags().filter(|_| !self.hp_gauge_hide)
+    }
+
     /// Whether the element `letter` (F fire, I ice, L lightning, S poison,
     /// H holy) can't hurt it.
     pub fn immune_to(&self, letter: char) -> bool {
@@ -207,6 +228,9 @@ impl MobData {
             dying_ms: self.dying_ms(image)?,
             remove_after: int("removeAfter")?,
             self_destruct: self.self_destruct(info)?,
+            hp_tag_color: u8::try_from(int("hpTagColor")?).unwrap_or(0),
+            hp_tag_bg_color: u8::try_from(int("hpTagBgcolor")?).unwrap_or(0),
+            hp_gauge_hide: int("HPgaugeHide")? != 0,
         }))
     }
 
@@ -495,6 +519,25 @@ mod tests {
             }
         );
         assert_eq!((stumpy[1].skill, stumpy[1].level), (114, 15));
+    }
+
+    #[test]
+    fn reads_boss_bars() {
+        let Some(path) = crate::test_assets::path("Mob.nx") else {
+            return;
+        };
+        let data = MobData::load(path).unwrap();
+        // Zakum's first body: red over blue, the colour of the next body.
+        assert_eq!(
+            data.info(8800000).unwrap().unwrap().boss_bar(),
+            Some((1, 3))
+        );
+        // Mushmom's bar is drawn by the client from its HP percent.
+        let mushmom = data.info(6130101).unwrap().unwrap();
+        assert_eq!(mushmom.hp_tags(), Some((1, 5)));
+        assert!(mushmom.hp_gauge_hide);
+        assert_eq!(mushmom.boss_bar(), None);
+        assert_eq!(data.info(100100).unwrap().unwrap().boss_bar(), None);
     }
 
     #[test]

@@ -96,6 +96,7 @@ namespace ms
 			GIFTNOTICE,
 			FIELDCLOCK,
 			EVENTCLOCK,
+			MOBGAGE,
 			NUM_TYPES
 		};
 

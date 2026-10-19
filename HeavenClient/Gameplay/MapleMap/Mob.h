@@ -541,6 +541,11 @@ namespace ms
 		bool canfly;
 		bool canchase;
 		bool boss;
+		// Its HP shows only in the boss HP bar, in these Gage colours (HPgaugeHide, hpTagColor,
+		// hpTagBgcolor).
+		bool gaugehide;
+		uint8_t tagcolor;
+		uint8_t tagbgcolor;
 		// What Poison, Venom and Ambush show instead of their value.
 		int32_t fixeddamage;
 		// Its full HP, which caps what Power Guard sends back at it.
@@ -585,6 +590,10 @@ namespace ms
 		Randomizer randomizer;
 
 		TimedBool showhp;
+		// With gaugehide, the boss HP bar comes down 20 s after the player last hit it, and keeps coming
+		// down while it lives (0x66890a).
+		bool hitbyplayer;
+		TimedBool keepsgage;
 
 		// Hits queued against this mob that haven't landed yet.
 		uint16_t pending_hits;

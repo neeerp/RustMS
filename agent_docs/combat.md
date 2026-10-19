@@ -370,6 +370,21 @@ tag (`Basic.img/ShowLevel`) sits left of the name, except for bosses, mobs
 whose `info` hides their level, HP or name, and 9xxxxxx mobs outside 94xxxxx
 and 96xxxxx.
 
+A mob whose `info` gives both `hpTagColor` and `hpTagBgcolor` (`MobInfo::hp_tags`)
+has a boss HP bar along the top of the screen instead: FIELD_EFFECT mode 5,
+with the mob's template id, HP, max HP and the two colours. The field sends
+it to everyone on the field each time such a mob's HP changes, and once more
+with HP 0, which takes the bar down, when the mob dies or leaves. Nothing is
+sent when it spawns or when a player enters, as in Kinoko. A mob that also
+sets `HPgaugeHide` gets no mode 5 while it lives (`MobInfo::boss_bar`): the
+client shows the bar itself from SHOW_MONSTER_HP, to the attacker alone, as
+v83 does. Bosses without `HPgaugeHide` show no small bar at all. In
+HeavenClient the bar is `UIMobGage`, laid out from `UIWindow.img/MobGage` as
+v83 does (`MobGageLayout.h`): it starts at the minimap's right edge, the
+fill truncates, and hovering the icon shows the mob's name. As in v83, a
+`HPgaugeHide` mob's bar comes down 20 s after the last hit while it lives.
+v83 delays those bars 500 ms, which HeavenClient doesn't.
+
 Some attacks take something back from the mobs they hit (`skills::takes`,
 handled in the field's `handle_attack`):
 
@@ -1254,6 +1269,9 @@ orbs by swinging at a snail (a sixth swing adds none), and spend them with
 Panic.
 `player_diseases` has a Hogul in Korean Folk Town cast Slow from far away
 (it misses) and then on the player (it lands for 10 s, then ends).
+`boss_hp_bar` has a player hit Neo City's 7220003 and checks that another
+player on the field sees its bar in its colours, and the bar's removal when
+it dies.
 `map_hazards` warps to El Nath's Ice Valley in its cape, which keeps the
 cold out, then takes it off and drinks an Air Bubble, which doesn't help: it
 loses 10 HP at the next tick. After a Red Bean Porridge it loses nothing.

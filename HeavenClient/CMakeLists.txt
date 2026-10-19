@@ -222,6 +222,8 @@ if(HEAVENCLIENT_BUILD_TESTS)
     add_test(NAME screenshot_rules COMMAND screenshot_rules_tests)
     add_executable(medal_tag_layout_tests tests/medal_tag_layout.cpp)
     add_test(NAME medal_tag_layout COMMAND medal_tag_layout_tests)
+    add_executable(mob_gage_layout_tests tests/mob_gage_layout.cpp)
+    add_test(NAME mob_gage_layout COMMAND mob_gage_layout_tests)
     add_executable(ships_tests tests/ships.cpp)
     add_test(NAME ships COMMAND ships_tests)
     add_executable(field_clock_tests tests/field_clock.cpp)
@@ -633,6 +635,9 @@ add_executable(HeavenClient
     IO/UITypes/UIMessenger.h
     IO/UITypes/UIMiniMap.cpp
     IO/UITypes/UIMiniMap.h
+    IO/UITypes/MobGageLayout.h
+    IO/UITypes/UIMobGage.cpp
+    IO/UITypes/UIMobGage.h
     IO/UITypes/EnterNumber.h
     IO/UITypes/UINotice.cpp
     IO/UITypes/UINotice.h

@@ -31,6 +31,7 @@
 #include "../Util/NxFiles.h"
 
 #include "../IO/UITypes/UIChatBar.h"
+#include "../IO/UITypes/UIMobGage.h"
 #include "../IO/UITypes/UINotice.h"
 #include "../IO/UITypes/UINpcTalk.h"
 #include "../IO/UITypes/UIPersonalShop.h"
@@ -904,6 +905,10 @@ namespace ms
 
 	Cursor::State Stage::send_cursor(bool pressed, Point<int16_t> position)
 	{
+		// The field shows a boss's name over the icon on its HP bar (0x529a09).
+		if (auto gage = UI::get().get_element<UIMobGage>())
+			gage->hover(position);
+
 		auto statusbar = UI::get().get_element<UIStatusBar>();
 
 		if (statusbar && statusbar->is_menu_active())

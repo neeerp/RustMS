@@ -48,6 +48,9 @@ namespace ms
 
 		UIElement::Type get_type() const override;
 
+		// How far right the window reaches, which the boss HP bar starts from.
+		int16_t get_width() const;
+
 	protected:
 		Button::State button_pressed(uint16_t buttonid) override;
 
