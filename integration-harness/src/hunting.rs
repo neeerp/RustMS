@@ -316,6 +316,8 @@ pub struct Field {
     /// (object id, HP percentage)
     pub hp_bars: Vec<(i32, u8)>,
     pub killed: Vec<i32>,
+    /// How each killed mob went: KILL_MONSTER's leave type.
+    pub leave_types: BTreeMap<i32, u8>,
     /// Characters seen attacking.
     pub attacks_by: Vec<i32>,
     /// The skill of each attack seen: (character id, skill id, level).
@@ -526,7 +528,9 @@ impl Field {
             self.hp_bars
                 .push((r.read_int().unwrap(), r.read_byte().unwrap()));
         } else if op == SendOpcode::KillMonster as i16 {
-            self.killed.push(r.read_int().unwrap());
+            let oid = r.read_int().unwrap();
+            self.killed.push(oid);
+            self.leave_types.insert(oid, r.read_byte().unwrap());
         } else if op == SendOpcode::CloseRangeAttack as i16
             || op == SendOpcode::RangedAttack as i16
             || op == SendOpcode::MagicAttack as i16

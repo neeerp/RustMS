@@ -53,6 +53,30 @@ pub struct MobInfo {
     /// How long it stays before it leaves on its own, in seconds
     /// (`removeAfter`), or 0 for as long as it lives.
     pub remove_after: i32,
+    /// How it destroys itself (`selfDestruction`), if it does.
+    pub self_destruct: Option<SelfDestruct>,
+}
+
+/// How a mob destroys itself (`selfDestruction`).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct SelfDestruct {
+    /// How it goes (`action`), the way a v83 client takes it as KILL_MONSTER's
+    /// leave type: 1 dies, 3 plays `skill1`, 2 and 4 on explode with
+    /// `attack1`, hitting whoever is in reach. The client also keeps its last
+    /// attack for this, and with bit 2 set sends MOB_BOMB when a player is in
+    /// reach of it (FUN_0067cf06).
+    pub action: u8,
+    /// It goes once it is down to this much HP (`hp`), or -1 if not.
+    pub hp: i32,
+    /// Without `hp`, how many seconds after it came it goes (`removeAfter`).
+    pub remove_after: i32,
+}
+
+impl SelfDestruct {
+    /// Whether the client sends MOB_BOMB for it.
+    pub fn bombs(&self) -> bool {
+        self.action & 2 != 0
+    }
 }
 
 /// Where a mob's Banish sends players (`ban/banMap/0`), and what it tells
@@ -171,6 +195,19 @@ impl MobData {
             revive: self.revive(info)?,
             dying_ms: self.dying_ms(image)?,
             remove_after: int("removeAfter")?,
+            self_destruct: self.self_destruct(info)?,
+        }))
+    }
+
+    fn self_destruct(&self, info: u32) -> Result<Option<SelfDestruct>, GameDataError> {
+        let nx = &self.nx;
+        let Some(node) = nx.child_by_name(info, "selfDestruction")? else {
+            return Ok(None);
+        };
+        Ok(Some(SelfDestruct {
+            action: u8::try_from(nx.int_child(node, "action")?.unwrap_or(0)).unwrap_or(0),
+            hp: nx.int_child(node, "hp")?.unwrap_or(-1),
+            remove_after: nx.int_child(node, "removeAfter")?.unwrap_or(0),
         }))
     }
 
@@ -390,6 +427,25 @@ mod tests {
         assert_eq!(mob(9300117).remove_after, 10);
         assert_eq!(mob(4300017).remove_after, 15);
         assert_eq!(mob(100100).remove_after, 0);
+    }
+
+    #[test]
+    fn reads_how_mobs_destroy_themselves() {
+        let Some(path) = crate::test_assets::path("Mob.nx") else {
+            return;
+        };
+        let data = MobData::load(path).unwrap();
+        let mob = |id| data.info(id).unwrap().unwrap();
+        let boomer = mob(9400547).self_destruct.unwrap();
+        assert_eq!(
+            (boomer.action, boomer.hp, boomer.remove_after),
+            (5, 350, 90000)
+        );
+        assert!(!boomer.bombs());
+        let bomb = mob(9300166).self_destruct.unwrap();
+        assert_eq!((bomb.action, bomb.hp, bomb.remove_after), (4, -1, 0));
+        assert!(mob(8500003).self_destruct.unwrap().bombs());
+        assert_eq!(mob(100100).self_destruct, None);
     }
 
     #[test]

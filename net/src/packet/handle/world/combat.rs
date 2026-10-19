@@ -67,6 +67,23 @@ impl WorldHandler for MobDistanceHandler {
     }
 }
 
+/// `MOB_BOMB`: a mob whose `selfDestruction` action has bit 2 (the
+/// Darkstars) has the player in reach of an attack (FUN_0066e636). The
+/// object id alone. A dead player's client sends none.
+pub struct MobBombHandler;
+
+impl WorldHandler for MobBombHandler {
+    fn handle(&self, packet: &mut Packet, ctx: &mut WorldContext) -> WorldResult {
+        let mut r = Cursor::new(&packet.bytes);
+        r.read_short()?;
+        let object_id = r.read_int()?;
+        if ctx.player.stats.hp <= 0 {
+            return Ok(HandlerResult::empty());
+        }
+        Ok(HandlerResult::empty().with(WorldAction::Field(FieldRequest::MobBomb { object_id })))
+    }
+}
+
 /// `NPC_ACTION`: the NPCs' controller chose an idle action. Object id, the
 /// action (an animation index from 2, or -1 for a line alone), the line
 /// (-1 for none), then a path for an NPC that walks.

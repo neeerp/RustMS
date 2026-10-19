@@ -669,6 +669,17 @@ namespace ms
 		}
 	};
 
+	// Opcode: MOB_BOMB(193)
+	class MobBombPacket : public OutPacket
+	{
+	public:
+		// Tells the server a mob that bombs has the player in reach
+		MobBombPacket(int32_t oid) : OutPacket(OutPacket::Opcode::MOB_BOMB)
+		{
+			write_int(oid);
+		}
+	};
+
 	// Opcode: PICKUP_ITEM(202)
 	class PickupItemPacket : public OutPacket
 	{

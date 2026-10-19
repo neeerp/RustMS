@@ -200,8 +200,8 @@ impl FieldActor {
                 self.broadcast(None, packet);
             }
         }
-        for object_id in self.mobs.leave(now) {
-            if let Ok(packet) = build_kill_mob(object_id, 1) {
+        for (object_id, leave) in self.mobs.leave(now) {
+            if let Ok(packet) = build_kill_mob(object_id, leave) {
                 self.broadcast(None, packet);
             }
         }
@@ -381,6 +381,7 @@ impl FieldActor {
                     object_id,
                     distance,
                 } => self.handle_mob_distance(from, object_id, distance),
+                FieldRequest::MobBomb { object_id } => self.handle_mob_bomb(object_id),
                 FieldRequest::NpcAction { object_id, action } => {
                     self.handle_npc_action(from, object_id, &action)
                 }
@@ -850,7 +851,7 @@ impl FieldActor {
                     }
                 }
                 Some(Err(kill)) => {
-                    if let Ok(packet) = build_kill_mob(kill.object_id, 1) {
+                    if let Ok(packet) = build_kill_mob(kill.object_id, kill.leave) {
                         self.broadcast(None, packet);
                     }
                     let sharers: Vec<Sharer> = self
@@ -1276,7 +1277,9 @@ impl FieldActor {
                     .iter()
                     .filter_map(|&mob_id| net::mobs::info(mob_id))
                     .collect();
-                let spawned = self.mobs.summon(cast.object_id, &summoned, effect.limit, now);
+                let spawned = self
+                    .mobs
+                    .summon(cast.object_id, &summoned, effect.limit, now);
                 let summon_effect = u8::try_from(effect.summon_effect).ok();
                 for object_id in spawned {
                     let Some(mob) = self.mobs.get(object_id) else {
@@ -1494,6 +1497,18 @@ impl FieldActor {
             return;
         };
         self.hand_over(object_id, previous, from, &handle, false);
+    }
+
+    /// A client says a Darkstar has a player in reach: it blows up, giving
+    /// nothing, as in Cosmic, with leave type 4 so every client plays its
+    /// explosion and the players it reaches get hit.
+    fn handle_mob_bomb(&mut self, object_id: i32) {
+        if !self.mobs.bomb(object_id, Instant::now()) {
+            return;
+        }
+        if let Ok(packet) = build_kill_mob(object_id, 4) {
+            self.broadcast(None, packet);
+        }
     }
 
     /// Tell `previous` it no longer moves the mob, and `to` that it does.

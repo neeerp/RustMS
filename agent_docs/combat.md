@@ -22,6 +22,21 @@ templates from `Mob.nx` (`maxHP`, `exp`, `PADamage`, `bodyAttack`,
   after it spawned (`LiveMob::leaves_at`), as Cosmic does: KILL_MONSTER with
   animation 1, no EXP, drops or revive mobs, and its spawn point fills again
   as after a kill. The v83 client never reads `removeAfter`.
+- **Destroying themselves:** a mob with `info/selfDestruction` goes once a
+  hit leaves it at its `hp` or less (a Boomer, 9400547, at 350 of 700),
+  counting as killed, or, without `hp`, `removeAfter` seconds after it came
+  (a Bomb, 9300166, at once), as in Cosmic. Either way KILL_MONSTER carries
+  its `action` as the leave type (`LiveMob::leave_type`), which the v83
+  client plays: 1 dies, 3 plays `skill1` (it just goes without one), and 2
+  or 4 and up blow it up with `attack1` (FUN_0067961d, FUN_00663e5b). The
+  explosion hits whoever is in reach like any attack, so its TAKE_DAMAGE
+  (attack 0) comes after the mob is gone; the server takes it, as it takes
+  any mob's damage by the mob id. The client never uses `attack1` otherwise
+  (FUN_0066a517). Darkstars (8500003, 8500004, action 3) also send MOB_BOMB
+  (0xC1, the object id) once a player is in reach of their attack's box,
+  unflipped (FUN_0066e636); the server blows them up with leave type 4 and
+  no EXP, as Cosmic does. HeavenClient does all this in `Mob::kill` and
+  `Mob::update`.
 - **Control:** one player moves each mob (SPAWN_MONSTER_CONTROL 1). New
   mobs and joiners pick up uncontrolled mobs; leaving hands them to another
   occupant. MOVE_LIFE from the controller updates the position, answers

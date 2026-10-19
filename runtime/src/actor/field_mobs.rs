@@ -58,7 +58,8 @@ pub struct LiveMob {
     pub granted: Option<Grant>,
     /// When each skill it cast may be cast again.
     pub cooldowns: HashMap<i32, Instant>,
-    /// When it leaves on its own (`removeAfter`), if it does.
+    /// When it leaves on its own (`removeAfter`, or a `selfDestruction`
+    /// without `hp`), if it does.
     pub leaves_at: Option<Instant>,
 }
 
@@ -160,8 +161,13 @@ impl LiveMob {
         foothold: i16,
         now: Instant,
     ) -> Self {
-        let leaves_at =
-            (info.remove_after > 0).then(|| now + Duration::from_secs(info.remove_after as u64));
+        // As in Cosmic, a mob that destroys itself without `hp` does so on
+        // its own clock instead.
+        let stays = match info.self_destruct {
+            Some(destruct) if destruct.hp < 0 => Some(destruct.remove_after.max(0)),
+            _ => (info.remove_after > 0).then_some(info.remove_after),
+        };
+        let leaves_at = stays.map(|secs| now + Duration::from_secs(secs as u64));
         Self {
             object_id,
             spawn: None,
@@ -183,6 +189,21 @@ impl LiveMob {
             cooldowns: HashMap::new(),
             leaves_at,
         }
+    }
+
+    /// How it goes when it destroys itself or leaves: KILL_MONSTER's leave
+    /// type, its `selfDestruction` action or else 1, dying.
+    pub fn leave_type(&self) -> u8 {
+        self.info
+            .self_destruct
+            .map_or(1, |destruct| destruct.action)
+    }
+
+    /// Whether it is down to the HP at which it destroys itself.
+    fn destructs(&self) -> bool {
+        self.info
+            .self_destruct
+            .is_some_and(|destruct| destruct.hp >= 0 && self.hp <= i64::from(destruct.hp))
     }
 
     /// Mob stances are even facing right, odd facing left.
@@ -351,6 +372,8 @@ pub struct Kill {
     /// Taunt's Showdown: the percent more EXP (already in `exp`) and drops
     /// it gives.
     pub showdown: i32,
+    /// KILL_MONSTER's leave type: 1 dies, or how it destroyed itself.
+    pub leave: u8,
 }
 
 pub struct MobSet {
@@ -873,9 +896,13 @@ impl MobSet {
         let dealt = damage.clamp(0, mob.hp);
         mob.hp -= dealt;
         *mob.damage_by.entry(from).or_default() += dealt;
-        if mob.hp > 0 {
+        // One that destroys itself does so once a hit leaves it at its `hp`,
+        // and counts as killed, as in Cosmic.
+        let destructs = mob.destructs();
+        if mob.hp > 0 && !destructs {
             return Some(Ok(mob.hp_percent()));
         }
+        let leave = if destructs { mob.leave_type() } else { 1 };
         let mob = self.live.remove(&object_id)?;
         self.emptied(mob.spawn, now);
         let showdown = mob
@@ -903,25 +930,45 @@ impl MobSet {
             level: mob.info.level,
             damage_by: ranked_damage(&mob.damage_by),
             showdown,
+            leave,
         }))
     }
 
     /// Take away the mobs whose time is up (`removeAfter`); returns their
-    /// object ids. As in Cosmic, they give no EXP or drops and let nothing
-    /// out, and their spawn points fill again as after a kill.
-    pub fn leave(&mut self, now: Instant) -> Vec<i32> {
-        let gone: Vec<i32> = self
+    /// object ids and leave types. As in Cosmic, they give no EXP or drops
+    /// and let nothing out, and their spawn points fill again as after a
+    /// kill.
+    pub fn leave(&mut self, now: Instant) -> Vec<(i32, u8)> {
+        let gone: Vec<(i32, u8)> = self
             .live
             .values()
             .filter(|mob| mob.leaves_at.is_some_and(|at| at <= now))
-            .map(|mob| mob.object_id)
+            .map(|mob| (mob.object_id, mob.leave_type()))
             .collect();
-        for object_id in &gone {
-            if let Some(mob) = self.live.remove(object_id) {
+        for &(object_id, _) in &gone {
+            if let Some(mob) = self.live.remove(&object_id) {
                 self.emptied(mob.spawn, now);
             }
         }
         gone
+    }
+
+    /// A client says a mob that bombs (`selfDestruction` action 3, the
+    /// Darkstars Papulatus calls) has a player in reach: take it away as if
+    /// it left. Returns whether it was there to take.
+    pub fn bomb(&mut self, object_id: i32, now: Instant) -> bool {
+        let bombs = self
+            .live
+            .get(&object_id)
+            .and_then(|mob| mob.info.self_destruct)
+            .is_some_and(|destruct| destruct.bombs());
+        if !bombs {
+            return false;
+        }
+        if let Some(mob) = self.live.remove(&object_id) {
+            self.emptied(mob.spawn, now);
+        }
+        true
     }
 
     /// The mob from spawn point `spawn`, if it had one, is gone: it spawns
@@ -1050,6 +1097,7 @@ pub fn split_exp(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use game_data::mobs::SelfDestruct;
 
     /// A move with `action`, in a world without mob skills.
     fn act(mobs: &mut MobSet, object_id: i32, action: u8, want_attack: bool) -> MobAct {
@@ -1399,7 +1447,7 @@ mod tests {
         let mob = mobs.respawn(now)[0];
         let due = now + Duration::from_secs(10);
         assert!(mobs.leave(due - Duration::from_millis(1)).is_empty());
-        assert_eq!(mobs.leave(due), [mob]);
+        assert_eq!(mobs.leave(due), [(mob, 1)]);
         assert!(mobs.get(mob).is_none());
         // Nothing comes out of it, and its spawn point fills again.
         assert!(mobs
@@ -1409,6 +1457,66 @@ mod tests {
             .respawn(due + RESPAWN_DELAY - Duration::from_millis(1))
             .is_empty());
         assert_eq!(mobs.respawn(due + RESPAWN_DELAY).len(), 1);
+    }
+
+    #[test]
+    fn a_mob_destroys_itself_once_down_to_its_hp() {
+        let now = Instant::now();
+        let (template, mut info) = snail_spawn(100);
+        // A Boomer: 700 HP, gone at 350 with an explosion.
+        info.max_hp = 700;
+        info.exp = 55;
+        info.self_destruct = Some(SelfDestruct {
+            action: 5,
+            hp: 350,
+            remove_after: 90000,
+        });
+        let mut mobs = MobSet::new([(template, info)]);
+        let boomer = mobs.respawn(now)[0];
+        assert_eq!(mobs.get(boomer).unwrap().leaves_at, None);
+        assert_eq!(mobs.damage(1, boomer, 349, now), Some(Ok(51)));
+        let Some(Err(kill)) = mobs.damage(1, boomer, 1, now) else {
+            panic!("the boomer should go");
+        };
+        assert_eq!(
+            (kill.leave, kill.exp, kill.damage_by),
+            (5, 55, vec![(1, 350)])
+        );
+        assert!(!mobs.bomb(boomer, now));
+    }
+
+    #[test]
+    fn a_mob_without_its_hp_destroys_itself_on_its_clock() {
+        let now = Instant::now();
+        let (template, mut info) = snail_spawn(100);
+        // A Bomb goes off as soon as it comes.
+        info.self_destruct = Some(SelfDestruct {
+            action: 4,
+            hp: -1,
+            remove_after: 0,
+        });
+        let mut mobs = MobSet::new([(template, info)]);
+        let bomb = mobs.respawn(now)[0];
+        assert_eq!(mobs.leave(now), [(bomb, 4)]);
+    }
+
+    #[test]
+    fn only_a_mob_that_bombs_goes_on_mob_bomb() {
+        let now = Instant::now();
+        let (template, mut info) = snail_spawn(100);
+        let mut snails = MobSet::new([(template.clone(), info.clone())]);
+        let snail = snails.respawn(now)[0];
+        assert!(!snails.bomb(snail, now));
+        info.self_destruct = Some(SelfDestruct {
+            action: 3,
+            hp: 5000,
+            remove_after: 0,
+        });
+        let mut darkstars = MobSet::new([(template, info)]);
+        let darkstar = darkstars.respawn(now)[0];
+        assert!(darkstars.bomb(darkstar, now));
+        assert!(darkstars.get(darkstar).is_none());
+        assert!(!darkstars.bomb(darkstar, now));
     }
 
     #[test]
