@@ -138,10 +138,20 @@ dialogs use 2 when the player answers a flipped question
 (`Say.img/<id>/<n>/stop/<page>/flip`).
 
 HeavenClient uses the Back/Next bytes to choose buttons while retaining the
-wire message type for responses. Escape sends cancellation rather than Back.
-Message type 1 shows YES and NO; type 12 shows ACCEPT and DECLINE, which the
-client's quest dialogs use for an offer. A menu (type 4) answers with
-response 1 and the chosen `#L` id.
+wire message type for responses. Escape and END CHAT send -1 on say, yes/no
+and accept/decline pages, and 0 on menus and prompts; without END CHAT,
+Escape does nothing. Message type 1 shows YES and NO; type 12 shows ACCEPT
+and DECLINE, which the client's quest dialogs use for an offer. A menu
+(type 4) answers with response 1 and the chosen `#L` id. A say page with
+speaker bit 0x4 carries an i32 before its text: the NPC it speaks for.
+
+Types 2, 3 and 13 are prompts with an input box under the text. Their
+bodies follow the text: a text prompt (2) has `str default, i16 min,
+i16 max` (bytes, 0 for no most), a number prompt (3) `i32 default, i32 min,
+i32 max`, and a box text (13) `str default, i16 cols, i16 rows`. The
+client checks a text's trimmed length and a number's range, shows v83's
+notice and stays open when they are wrong, and answers `02 01 str`,
+`03 01 i32` or `0D 01 str`. The server sends none of them yet.
 
 ## Assets and validation
 
