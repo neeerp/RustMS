@@ -41,10 +41,11 @@ namespace ms
 		static constexpr const char *NOT_FOR_LIST = "This map is not available to enter for the list.";
 
 		// 5040000 and 5040001 are regular rocks, 5041000 the VIP one
-		// (FUN_00a0a63f).
+		// (FUN_00a0a63f). The USE-tab rock 2320000 is a regular one
+		// (FUN_00a0a3bb).
 		static bool is_vip(int32_t item_id)
 		{
-			return item_id / 1000 != 5040;
+			return item_id / 1000 != 5040 && item_id / 10000 != 232;
 		}
 
 		static size_t slots(bool vip)

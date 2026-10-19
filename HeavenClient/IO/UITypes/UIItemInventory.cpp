@@ -358,10 +358,19 @@ namespace ms
 
 		// v83 FUN_00a0a4aa: a teleport rock goes to the map or the
 		// character chosen in its list. The dead, and maps that don't allow
-		// teleports, are refused before the list opens.
+		// teleports, are refused before the list opens. The USE-tab rock
+		// (232xxxx, FUN_00a0a3bb) waits as an item use does, and says nothing
+		// while another request waits.
+		bool may_use_rock(int32_t item_id)
+		{
+			return item_id / 10000 == 504
+				? may_use_cash_item()
+				: Stage::get().get_player().can_request(ExclRequest::USE_WAIT);
+		}
+
 		void use_teleport_rock(int16_t slot, int32_t item_id)
 		{
-			if (!may_use_cash_item())
+			if (!may_use_rock(item_id))
 				return;
 
 			if (Stage::get().get_player().is_dead())
@@ -386,12 +395,13 @@ namespace ms
 				if (name.empty() && (map_id == TeleportRock::EMPTY || map_id == 0))
 					return;
 
-				if (!may_use_cash_item())
+				if (!may_use_rock(item_id))
 					return;
 
+				int32_t wait = item_id / 10000 == 504 ? ExclRequest::WAIT : ExclRequest::USE_WAIT;
 				bool sent = name.empty()
-						? player.request(UseTeleportRockPacket(slot, item_id, map_id), ExclRequest::WAIT)
-						: player.request(UseTeleportRockPacket(slot, item_id, name), ExclRequest::WAIT);
+						? player.request(UseTeleportRockPacket(slot, item_id, map_id), wait)
+						: player.request(UseTeleportRockPacket(slot, item_id, name), wait);
 
 				if (sent)
 					Sound(nl::nx::sound["Game.img"]["UseShopItem"]).play();
@@ -774,6 +784,8 @@ namespace ms
 							use_return_scroll(slot, item_id);
 						else if (item_id / 10000 == 210)
 							use_summon_sack(slot, item_id);
+						else if (item_id / 10000 == 232)
+							use_teleport_rock(slot, item_id);
 						else if (!Stage::get().get_mapinfo().can_use_item(item_id))
 							InChatMessage(Messages::ITEM_FIELD).drop();
 						else if (!disease::can_use_item(Stage::get().get_player().get_diseases()))

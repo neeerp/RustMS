@@ -1,6 +1,6 @@
 //! Teleport rocks: the player keeps maps in a list, and a rock takes them to
 //! one, or to a character on the channel, one rock per trip. The list
-//! outlasts a relog.
+//! outlasts a relog, and the USE-tab rock goes by the same list.
 
 use integration_harness::connection::MapleTestConnection;
 use integration_harness::database::grant_stack;
@@ -11,8 +11,11 @@ use net::packet::op::{RecvOpcode, SendOpcode};
 use packet::io::write::PktWrite;
 use packet::Packet;
 
+const USE: i16 = 2;
 const CASH: i16 = 5;
 const ROCK: i32 = 5_040_000;
+/// The USE-tab rock, a regular one.
+const USE_ROCK: i32 = 2_320_000;
 const ROCKS: i16 = 5;
 const HENESYS: i32 = 100_000_000;
 const ELLINIA: i32 = 101_000_000;
@@ -47,10 +50,15 @@ fn keep() -> Packet {
 
 /// Use the regular rock in Cash slot 1 to go to `to`: a map or a name.
 fn use_rock(to: Result<i32, &str>) -> Packet {
+    use_a_rock(RecvOpcode::UseCashItem, ROCK, to)
+}
+
+/// Use `rock` in slot 1 of its bag, with `op`, to go to `to`.
+fn use_a_rock(op: RecvOpcode, rock: i32, to: Result<i32, &str>) -> Packet {
     let mut p = Packet::new_empty();
-    p.write_short(RecvOpcode::UseCashItem as i16).unwrap();
+    p.write_short(op as i16).unwrap();
     p.write_short(1).unwrap();
-    p.write_int(ROCK).unwrap();
+    p.write_int(rock).unwrap();
     match to {
         Ok(map_id) => {
             p.write_byte(0).unwrap();
@@ -85,6 +93,9 @@ async fn a_teleport_rock_goes_to_kept_maps_and_characters() {
     grant_stack(id, CASH, 1, ROCK, ROCKS)
         .await
         .expect("grant teleport rocks");
+    grant_stack(id, USE, 1, USE_ROCK, 1)
+        .await
+        .expect("grant a USE-tab rock");
     let mut traveller = relogin(&config).await;
     let watcher_config = load_harness_config_or_fail().await;
     let mut watcher = login_to_world_session(&watcher_config).await.unwrap();
@@ -126,4 +137,11 @@ async fn a_teleport_rock_goes_to_kept_maps_and_characters() {
     let (h, mut ht) = (&mut traveller.connection, Trace::default());
     send(h, use_rock(Ok(HENESYS))).await;
     assert_eq!(arrival(h, &mut ht).await, HENESYS);
+
+    // The USE-tab rock goes by the regular list too.
+    assert_eq!(warp(h, ELLINIA, "", &mut ht).await, ELLINIA);
+    let op = RecvOpcode::UseTeleportRock;
+    send(h, use_a_rock(op, USE_ROCK, Ok(HENESYS))).await;
+    assert_eq!(arrival(h, &mut ht).await, HENESYS);
+    assert_eq!(ht.removed.last(), Some(&(USE as u8, 1)));
 }

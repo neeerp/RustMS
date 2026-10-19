@@ -88,7 +88,9 @@ pub use self::storage::TrunkRequestHandler;
 pub use self::summon::{
     BeholderHandler, DamageSummonHandler, MoveSummonHandler, SummonAttackHandler,
 };
-pub use self::teleport_rock::{to_character, Rock, TeleportRockListHandler, Whereabouts};
+pub use self::teleport_rock::{
+    to_character, Rock, TeleportRockListHandler, UseTeleportRockHandler, Whereabouts,
+};
 pub use self::use_item::{
     HealOverTimeHandler, ReturnScrollHandler, UseItemHandler, UseSkillBookHandler,
     UseSummonSackHandler,

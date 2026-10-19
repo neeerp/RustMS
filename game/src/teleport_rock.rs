@@ -1,14 +1,16 @@
 //! The maps a character keeps for their teleport rocks: five for the
-//! regular rock (504000x) and ten for the VIP one (5041000). The v83 client
-//! holds each list as fixed slots, the empty ones `EMPTY` (report 179, 4).
+//! regular rocks (504000x and the USE-tab 2320000) and ten for the VIP one
+//! (5041000). The v83 client holds each list as fixed slots, the empty ones
+//! `EMPTY` (report 179, 4).
 
 /// The map id of an empty slot.
 pub const EMPTY: i32 = 999_999_999;
 
 /// Whether `item_id` is a VIP rock, which keeps ten maps and crosses
-/// continents (v83 FUN_00a0a63f: `item_id / 1000 != 5040`).
+/// continents (v83 FUN_00a0a63f: `item_id / 1000 != 5040`). The USE-tab
+/// rock is a regular one (FUN_00a0a3bb).
 pub fn is_vip(item_id: i32) -> bool {
-    item_id / 1000 != 5040
+    item_id / 1000 != 5040 && item_id / 10_000 != 232
 }
 
 /// How many maps a list keeps.
@@ -112,6 +114,7 @@ mod tests {
         assert!(!is_vip(5_040_000));
         assert!(!is_vip(5_040_001));
         assert!(is_vip(5_041_000));
+        assert!(!is_vip(2_320_000));
         assert!(may_keep(100_000_000));
         assert!(!may_keep(40_000), "Maple Island");
         assert!(!may_keep(109_010_000), "an event map");

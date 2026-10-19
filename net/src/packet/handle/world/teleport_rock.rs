@@ -2,7 +2,8 @@
 //! edited with TROCK_ADD_MAP (0x66), and the rock itself, used through
 //! USE_CASH_ITEM to go to a kept map or to a character on the channel. A
 //! regular rock keeps five maps and stays on its continent; the VIP rock
-//! keeps ten and crosses continents. Each use takes one rock.
+//! keeps ten and crosses continents. Each use takes one rock. The USE-tab
+//! rock (2320000) is a regular one, used through USE_TELEPORT_ROCK.
 
 use super::change_map::{warp, warp_to_spawn_point};
 use crate::handler::{HandlerResult, WorldAction, WorldContext, WorldHandler, WorldResult};
@@ -53,6 +54,28 @@ impl WorldHandler for TeleportRockListHandler {
     }
 }
 
+/// USE_TELEPORT_ROCK (0x54, v83 FUN_00a0a3bb): the USE-tab rock (232xxxx),
+/// sent as a cash rock is, from its USE slot.
+pub struct UseTeleportRockHandler;
+
+impl WorldHandler for UseTeleportRockHandler {
+    fn handle(&self, packet: &mut Packet, ctx: &mut WorldContext) -> WorldResult {
+        let mut r = Cursor::new(&packet.bytes);
+        r.read_short()?;
+        let slot = r.read_short()?;
+        let item_id = r.read_int()?;
+        let held = ctx
+            .player
+            .inventory
+            .get(InventoryType::Use, slot)
+            .is_some_and(|item| item.item_id == item_id);
+        if !held || item_id / 10_000 != 232 {
+            return Ok(HandlerResult::reply(build_stat_update(true, &[])?));
+        }
+        teleport_rock(ctx, &mut r, slot, item_id)
+    }
+}
+
 /// A teleport rock in use, while the server looks for the character it
 /// was used to reach.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -69,7 +92,8 @@ pub struct Whereabouts {
     pub y: i16,
 }
 
-/// Use the teleport rock `item_id` in Cash `slot`; `r` is past the item id.
+/// Use the teleport rock `item_id` in `slot` of its bag; `r` is past the
+/// item id.
 /// A character target is looked for first (`WorldAction::RockToCharacter`).
 pub fn teleport_rock(
     ctx: &mut WorldContext,
@@ -128,17 +152,15 @@ fn go(
     if let Some(why) = refusal(player, vip, map_id) {
         return refuse(why, vip);
     }
+    let bag = InventoryType::for_item(rock.item_id).unwrap_or(InventoryType::Cash);
     let held = player
         .inventory
-        .get(InventoryType::Cash, rock.slot)
+        .get(bag, rock.slot)
         .is_some_and(|item| item.item_id == rock.item_id);
     if !held {
         return Ok(HandlerResult::reply(build_stat_update(true, &[])?));
     }
-    let Ok(changes) = player
-        .inventory_mut()
-        .take(InventoryType::Cash, rock.slot, 1)
-    else {
+    let Ok(changes) = player.inventory_mut().take(bag, rock.slot, 1) else {
         return Ok(HandlerResult::reply(build_stat_update(true, &[])?));
     };
     let mut result = HandlerResult::reply(build_inventory_operation(true, &changes)?);
@@ -360,6 +382,43 @@ mod tests {
         use_rock(&mut player, VIP_ROCK, Ok(ORBIS));
         assert_eq!(player.stats.map_id, ORBIS, "the VIP rock crosses the sea");
         assert_eq!(player.inventory.count(VIP_ROCK), 0);
+    }
+
+    #[test]
+    fn the_use_tab_rock_is_a_regular_one_taken_from_its_use_slot() {
+        if crate::get_game_data().is_err() {
+            return;
+        }
+        const USE_ROCK: i32 = 2_320_000;
+        let mut player = traveller();
+        player
+            .inventory
+            .insert(InventoryType::Use, 1, Item::stack(USE_ROCK, 1));
+        player.teleport_rocks.keep(true, ORBIS);
+        player.teleport_rocks.keep(false, ELLINIA);
+        let use_rock = |player: &mut Player, slot: i16, map_id: i32| {
+            let mut p = Packet::new_empty();
+            p.write_short(RecvOpcode::UseTeleportRock as i16).unwrap();
+            p.write_short(slot).unwrap();
+            p.write_int(USE_ROCK).unwrap();
+            p.write_byte(0).unwrap();
+            p.write_int(map_id).unwrap();
+            p.write_int(1234).unwrap();
+            handle(&UseTeleportRockHandler, player, &mut p)
+        };
+
+        let [WorldAction::Reply(unlock)] = &use_rock(&mut player, 2, ELLINIA)[..] else {
+            panic!("expected only an unlock for an empty slot");
+        };
+        assert_eq!(opcode(unlock), SendOpcode::StatChange as i16);
+        let overseas = use_rock(&mut player, 1, ORBIS);
+        assert_refused(&overseas, RockRefusal::CannotGo, false);
+        assert_eq!(player.inventory.count(USE_ROCK), 1, "not used");
+
+        use_rock(&mut player, 1, ELLINIA);
+        assert_eq!(player.stats.map_id, ELLINIA);
+        assert_eq!(player.inventory.count(USE_ROCK), 0);
+        assert_eq!(player.inventory.count(ROCK), 3, "the cash rocks are kept");
     }
 
     #[test]

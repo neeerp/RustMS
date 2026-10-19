@@ -15,6 +15,7 @@ int main()
 
 		require(!TeleportRock::is_vip(5040000) && !TeleportRock::is_vip(5040001), "5040xxx rocks are regular");
 		require(TeleportRock::is_vip(5041000), "5041000 is the VIP rock");
+		require(!TeleportRock::is_vip(2320000), "the USE-tab rock is a regular one");
 		require(TeleportRock::slots(false) == 5 && TeleportRock::slots(true) == 10, "five and ten slots");
 
 		require(TeleportRock::may_keep(100000000), "Henesys can be kept");
