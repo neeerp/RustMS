@@ -300,6 +300,31 @@ namespace ms
 		return target;
 	}
 
+	bool Combat::use_flash_jump(int32_t move_id, bool allowed, bool airborne)
+	{
+		const SpecialMove &move = get_move(move_id);
+
+		if (!can_use_move(move))
+			return false;
+
+		// v83 says so only for the map, once the cost is let through
+		// (FUN_0096be38).
+		if (!allowed)
+		{
+			InChatMessage(Messages::SKILL_FIELD).drop();
+			return false;
+		}
+
+		if (!airborne || !player.can_request(ExclRequest::SKILL_WAIT))
+			return false;
+
+		// With no action and no position (0x96d565, FUN_0096d6ca).
+		int32_t level = player.get_skills().get_level(move_id);
+		player.request(UseSkillPacket(move_id, level, 0, UseSkillPacket::Reach{}), ExclRequest::SKILL_WAIT);
+
+		return true;
+	}
+
 	bool Combat::can_use_move(const SpecialMove &move) const
 	{
 		// v83 takes no other move while a skill is held (0x96a86e).

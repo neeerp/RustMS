@@ -79,6 +79,10 @@ namespace ms
 		// Where the player should be moved to, if the skill was used.
 		std::optional<teleport::Spot> use_teleport(int32_t move_id, bool allowed);
 
+		// Ask to use Flash Jump, which the map must have `allowed` and the
+		// player be `airborne` for. Whether it was asked.
+		bool use_flash_jump(int32_t move_id, bool allowed, bool airborne);
+
 		// Add an attack to the attack queue.
 		void push_attack(const AttackResult &attack);
 

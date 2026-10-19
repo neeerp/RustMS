@@ -411,9 +411,21 @@ A few skills do more than buff:
   popping in, all fading out when spent, and a finisher's
   `finish/<orbs>` burst at the attacker's feet.
 
-These and Mystic Door have neither buff stats nor a mob debuff, so
-`skills::acts_alone` lets them past the check that refuses such skills as
-unsupported.
+Teleport and Flash Jump move the player on the client alone; the server
+only spends the MP. HeavenClient's Flash Jump (4111006 and the Night
+Walker's 14101004, `flash_jump`) follows v83 (FUN_0096be38). It works only
+in the air, off any rope or ladder, and, out of water, not once the player
+is falling. It works once until the player lands or grabs a rope, and maps
+that bar movement skills refuse it ("You cannot use that skill on this
+map."). It throws the player 350 px/s forward and 250 up, plus 40 and 20
+for every four levels, records path element 6 before the push, and leaves
+`BasicEff.img/Flying` (`Flying1` for a Night Walker) where the jump began.
+Another player's client shows that effect, picked by the jumper's job, when
+their path arrives with element 6 (FUN_0097fdf8).
+
+These, Mystic Door, Teleport and Flash Jump have neither buff stats nor a
+mob debuff, so `skills::acts_alone` lets them past the check that refuses
+such skills as unsupported.
 
 ## Spending AP and SP
 
@@ -1143,4 +1155,5 @@ cold out, then takes it off and drinks an Air Bubble, which doesn't help: it
 loses 10 HP at the next tick. After a Red Bean Porridge it loses nothing.
 HeavenClient's `diseases_tests` cover the input, jump, attack and skill
 gates and the notices; `combo_tests` cover the orbs' damage table and
-`combo_orbs_tests` what they show.
+`combo_orbs_tests` what they show; `flash_jump_tests` cover Flash Jump's
+push, its gates and its effects.

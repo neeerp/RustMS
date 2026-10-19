@@ -71,6 +71,11 @@ namespace ms
 		// element `command` of no duration (v83 FUN_0052ef17).
 		void record_move(uint8_t command);
 
+		// Whether a Flash Jump may go now, and throw the player on through
+		// the air at its `level` (FUN_0096be38).
+		bool may_flash_jump() const;
+		void flash_jump(int32_t level);
+
 		// Sends a Keyaction to the player's state, to apply forces, change the state and other behaviour.
 		void send_action(KeyAction::Id action, bool pressed);
 
@@ -352,6 +357,9 @@ namespace ms
 		// When the player last moved under Stop Motion, or entered the map
 		// (+0x311c).
 		int64_t stirred = 0;
+		// Whether the player has Flash Jumped since last on the ground or a
+		// rope (+0x2b58).
+		bool flash_jumped = false;
 
 		move_path::Recorder path;
 

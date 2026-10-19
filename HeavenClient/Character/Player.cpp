@@ -26,6 +26,7 @@
 #include "../Data/SkillData.h"
 #include "../Data/WeaponData.h"
 #include "../Gameplay/Combat/Combo.h"
+#include "../Gameplay/Combat/FlashJump.h"
 #include "../Gameplay/Combat/MagicDamage.h"
 #include "../Gameplay/MapleMap/FieldLimit.h"
 #include "../Gameplay/Stage.h"
@@ -289,7 +290,14 @@ namespace ms
 
 			phobj.walkspeed = get_walkspeed();
 			pst->update(*this);
+
+			// v83 marks every knockback in the path as element 2 when it
+			// lands on the player (0x9b222a).
+			bool impact = phobj.impact;
 			physics.move_object(phobj);
+
+			if (impact && !phobj.impact)
+				record_move(2);
 
 			bool aniend = Char::update(physics, get_stancespeed());
 
@@ -308,6 +316,10 @@ namespace ms
 		}
 
 		update_recovery();
+
+		// Landing or grabbing a rope readies Flash Jump again (0x9506f6).
+		if (phobj.onground || is_climbing())
+			flash_jumped = false;
 
 		path.step(current_move(0), Constants::TIMESTEP);
 
@@ -330,6 +342,24 @@ namespace ms
 	void Player::record_move(uint8_t command)
 	{
 		path.add(current_move(command));
+	}
+
+	bool Player::may_flash_jump() const
+	{
+		bool swimming = phobj.type == PhysicsObject::Type::SWIMMING || phobj.type == PhysicsObject::Type::FLYING;
+
+		return flash_jump::may_jump(phobj.onground, is_climbing(), flash_jumped, swimming, phobj.vspeed);
+	}
+
+	// Element 6 marks the jump in the path, before the push lands on the
+	// next step (0x96bff3).
+	void Player::flash_jump(int32_t level)
+	{
+		flash_jump::Impulse push = flash_jump::impulse(level, !facing_right);
+
+		record_move(6);
+		Physics::knockback(phobj, push.vx, push.vy);
+		flash_jumped = true;
 	}
 
 	Movement Player::current_move(uint8_t command) const

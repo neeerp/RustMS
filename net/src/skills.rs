@@ -243,12 +243,18 @@ pub const MYSTIC_DOOR: i32 = 2311002;
 /// asks only for the MP.
 pub const TELEPORTS: [i32; 5] = [2101002, 2201002, 2301001, 12101003, 22101001];
 
+/// The Flash Jump skills (v83 FUN_0096be38): the client throws the player on
+/// through the air and asks only for the MP.
+pub const FLASH_JUMPS: [i32; 2] = [4111006, 14101004];
+
 /// Skills that neither buff nor debuff: the handler does their work.
 /// Chakra heals the user, Resurrection raises dead party members, Time Leap
-/// ends cooldowns, and Mystic Door opens a door. Teleport has no work.
+/// ends cooldowns, and Mystic Door opens a door. Teleport and Flash Jump
+/// have no work.
 pub fn acts_alone(skill_id: i32) -> bool {
     matches!(skill_id, MYSTIC_DOOR | CHAKRA | RESURRECTION | TIME_LEAP)
         || TELEPORTS.contains(&skill_id)
+        || FLASH_JUMPS.contains(&skill_id)
         || HEROS_WILL.contains(&skill_id)
 }
 

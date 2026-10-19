@@ -22,6 +22,7 @@
 #include "QuestConversation.h"
 #include "Timer.h"
 #include "MapleMap/CharClick.h"
+#include "Combat/FlashJump.h"
 #include "MapleMap/DoorRules.h"
 #include "MapleMap/Npc.h"
 
@@ -606,6 +607,22 @@ namespace ms
 		}
 	}
 
+	// v83 lets Flash Jump go only in the air, and leaves its effect where
+	// the player was (FUN_0096be38).
+	void Stage::use_flash_jump(int32_t skill)
+	{
+		if (!combat.use_flash_jump(skill, mapinfo.can_use_movement_skills(), player.may_flash_jump()))
+			return;
+
+		player.flash_jump(player.get_skills().get_level(skill));
+		show_flash_jump(flash_jump::effect(skill), player.get_position(), player.getflip());
+	}
+
+	void Stage::show_flash_jump(const char *effect, Point<int16_t> position, bool right)
+	{
+		ground_effects.add(nl::nx::effect["BasicEff.img"][effect], DrawArgument(position, right));
+	}
+
 	void Stage::check_seats()
 	{
 		if (player.is_sitting() || player.is_attacking())
@@ -747,6 +764,8 @@ namespace ms
 			case KeyType::Id::SKILL:
 				if (down && teleport::teleports(action))
 					use_teleport(action);
+				else if (down && flash_jump::jumps(action))
+					use_flash_jump(action);
 				else if (down)
 					combat.use_move(action);
 

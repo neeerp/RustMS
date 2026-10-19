@@ -941,6 +941,19 @@ mod tests {
     }
 
     #[test]
+    fn flash_jump_spends_its_mp() {
+        if skills::data().is_err() {
+            return;
+        }
+        let mut player = beginner_with(4111006, 1);
+        player.stats.max_mp = 100;
+        player.stats.mp = 100;
+        let used = use_skill(&mut player, 4111006, 1, Instant::now()).unwrap();
+        assert!(!used.buffs);
+        assert_eq!(player.stats.mp, 40);
+    }
+
+    #[test]
     fn recovery_heals_by_its_x_and_attacks_are_not_buffs() {
         if skills::data().is_err() {
             return;
