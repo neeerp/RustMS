@@ -38,30 +38,47 @@ async fn element_composition_poisons_a_snail_down_to_one_hp() {
     until(c, &mut t, |t| !t.field.alive(SNAIL).is_empty()).await;
 
     // At 30 it takes hold 70% of the time, for 40 seconds: hit snails for
-    // 1 until one is poisoned. A miss (0) never poisons.
+    // 1 until one is poisoned with at least 3 of its 8 HP left (a bar of
+    // 38%), so that it ticks twice. Earlier tests here may have left some
+    // hurt; a poisoned one too low is passed over. A miss (0) never poisons.
     let snail = t.field.alive(SNAIL)[0];
     send(c, magic_attack(ELEMENT_COMPOSITION, snail, 0)).await;
     read_for(c, &mut t, 300).await;
     assert!(t.field.stat_sets.is_empty());
     let mut poisoned = None;
     let mut hit = vec![snail];
+    let mut too_low = Vec::new();
     for _ in 0..40 {
-        let Some(&snail) = t.field.alive(SNAIL).first() else {
+        let alive = t.field.alive(SNAIL);
+        let Some(&snail) = alive.iter().find(|oid| !too_low.contains(*oid)) else {
             read_for(c, &mut t, 500).await;
             continue;
         };
         hit.push(snail);
+        let (sets, bars) = (t.field.stat_sets.len(), t.field.hp_bars.len());
         send(c, magic_attack(ELEMENT_COMPOSITION, snail, 1)).await;
         read_for(c, &mut t, 300).await;
-        if let Some(&(oid, ..)) = t.field.stat_sets.first() {
-            poisoned = Some(oid);
-            break;
+        if t.field.stat_sets[sets..]
+            .iter()
+            .any(|&(oid, ..)| oid == snail)
+        {
+            let left = t.field.hp_bars[bars..]
+                .iter()
+                .find(|&&(oid, _)| oid == snail);
+            if left.is_some_and(|&(_, percent)| percent >= 38) {
+                poisoned = Some(snail);
+                break;
+            }
+            too_low.push(snail);
         }
     }
     let snail = poisoned.expect("a snail was poisoned");
     let at = Instant::now();
     // Level 30 poison: max HP 8 over 40, rounded up, so 1 each second.
-    assert_eq!(t.field.stat_sets, [(snail, POISON, 1, ELEMENT_COMPOSITION)]);
+    assert_eq!(
+        t.field.stat_sets.last(),
+        Some(&(snail, POISON, 1, ELEMENT_COMPOSITION))
+    );
     let bars = t.field.hp_bars.len();
 
     read_for(c, &mut t, 8_500).await;
@@ -79,6 +96,7 @@ async fn element_composition_poisons_a_snail_down_to_one_hp() {
 
     // Leave no hurt snails for the tests that hunt here next: 8 HP at
     // most, 1 a hit.
+    hit.sort();
     hit.dedup();
     for oid in hit {
         for _ in 0..8 {
