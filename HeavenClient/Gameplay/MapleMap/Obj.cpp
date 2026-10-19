@@ -21,6 +21,8 @@
 
 #include "../FieldEffectRules.h"
 
+#include "../../Graphics/GraphicsGL.h"
+
 #include <cmath>
 
 #include <nlnx/nx.hpp>
@@ -65,6 +67,7 @@ namespace ms
 		pos = Point<int16_t>(src["x"], src["y"]);
 		flip = src["f"].get_bool();
 		z = src["z"];
+		additive = data["blend"].get_integer() == 1;
 
 		states.emplace_back(data);
 
@@ -101,8 +104,16 @@ namespace ms
 
 	void Obj::draw(Point<int16_t> viewpos, float inter) const
 	{
-		if (visible && shown)
-			states[current].animation.draw(DrawArgument(pos + viewpos, flip), inter);
+		if (!visible || !shown)
+			return;
+
+		if (additive)
+			GraphicsGL::get().set_additive(true);
+
+		states[current].animation.draw(DrawArgument(pos + viewpos, flip), inter);
+
+		if (additive)
+			GraphicsGL::get().set_additive(false);
 	}
 
 	const std::string &Obj::get_name() const

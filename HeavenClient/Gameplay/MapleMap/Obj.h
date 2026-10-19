@@ -100,6 +100,8 @@ namespace ms
 		Point<int16_t> pos;
 		uint8_t z;
 		bool flip;
+		// Its colour adds to what is under it (the obj node's `blend` 1, FUN_0063c212).
+		bool additive;
 		int32_t order;
 	};
 }

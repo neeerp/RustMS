@@ -74,6 +74,8 @@ namespace ms
 
 		Animation animation;
 		bool animated;
+		// Its colour adds to what is under it (the back or ani node's `blend` 1, FUN_0063cd4e).
+		bool additive;
 		int16_t cx;
 		int16_t cy;
 		double rx;

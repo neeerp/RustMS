@@ -60,6 +60,7 @@ namespace ms
 	GraphicsGL::GraphicsGL()
 	{
 		locked = false;
+		additive = false;
 
 		VWIDTH = Constants::Constants::get().get_viewwidth();
 		VHEIGHT = Constants::Constants::get().get_viewheight();
@@ -609,6 +610,7 @@ namespace ms
 			return;
 
 		quads.emplace_back(rect.left(), rect.right(), rect.top(), rect.bottom(), getoffset(bmp), color, angle);
+		mark_additive();
 	}
 
 	void GraphicsGL::draw(const nl::bitmap &bmp, const Rectangle<int16_t> &rect, const Rectangle<int16_t> &crop,
@@ -634,6 +636,25 @@ namespace ms
 		offset.top += crop.top();
 
 		quads.emplace_back(rect.left(), rect.right(), rect.top(), rect.bottom(), offset, color, angle);
+		mark_additive();
+	}
+
+	void GraphicsGL::set_additive(bool add)
+	{
+		additive = add;
+	}
+
+	void GraphicsGL::mark_additive()
+	{
+		if (!additive)
+			return;
+
+		size_t last = quads.size();
+
+		if (!additive_runs.empty() && additive_runs.back().second == last - 1)
+			additive_runs.back().second = last;
+		else
+			additive_runs.emplace_back(last - 1, last);
 	}
 
 	namespace
@@ -851,7 +872,19 @@ namespace ms
 		glBindBuffer(GL_ARRAY_BUFFER, VBO);
 		glBufferData(GL_ARRAY_BUFFER, csize, quads.data(), GL_STREAM_DRAW);
 
-		glDrawArrays(GL_QUADS, 0, fsize);
+		// Additive runs between the rest, in the order they were drawn.
+		size_t drawn = 0;
+
+		for (auto [first, last] : additive_runs)
+		{
+			glDrawArrays(GL_QUADS, drawn * Quad::LENGTH, (first - drawn) * Quad::LENGTH);
+			glBlendFunc(GL_SRC_ALPHA, GL_ONE);
+			glDrawArrays(GL_QUADS, first * Quad::LENGTH, (last - first) * Quad::LENGTH);
+			glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+			drawn = last;
+		}
+
+		glDrawArrays(GL_QUADS, drawn * Quad::LENGTH, fsize - drawn * Quad::LENGTH);
 
 		glDisableVertexAttribArray(attribute_coord);
 		glDisableVertexAttribArray(attribute_color);
@@ -864,6 +897,9 @@ namespace ms
 	void GraphicsGL::clearscene()
 	{
 		if (!locked)
+		{
 			quads.clear();
+			additive_runs.clear();
+		}
 	}
 }

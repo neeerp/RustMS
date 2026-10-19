@@ -63,6 +63,10 @@ namespace ms
 		void draw(const nl::bitmap &bmp, const Rectangle<int16_t> &rect, const Rectangle<int16_t> &crop,
 				  const Color &color, float angle);
 
+		// Whether the bitmaps drawn next add their colour to what is under them, as v83 draws a map layer
+		// with `blend` 1 (Gr2D blend flag 1: SRCALPHA, ONE).
+		void set_additive(bool additive);
+
 		// Create a layout for the text with the parameters specified. The n-th
 		// Text::BOX character takes the n-th of `boxes` (width, height).
 		Text::Layout createlayout(const std::string &text, Text::Font font, Text::Alignment alignment, int16_t maxwidth,
@@ -97,6 +101,9 @@ namespace ms
 
 	private:
 		void clearinternal();
+
+		// Puts the quad just added in an additive run, when drawing additively.
+		void mark_additive();
 
 		// A line height of the face's ascent plus descent, the way Windows lays
 		// out text in the original client.
@@ -274,6 +281,9 @@ namespace ms
 		bool locked;
 
 		std::vector<Quad> quads;
+		bool additive;
+		// The quads drawn additively, as runs [first, last).
+		std::vector<std::pair<size_t, size_t>> additive_runs;
 		GLuint VBO;
 		GLuint atlas;
 
