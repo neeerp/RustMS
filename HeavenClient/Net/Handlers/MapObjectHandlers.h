@@ -110,6 +110,13 @@ namespace ms
 		void handle(InPacket& recv) const override;
 	};
 
+	// Show another character's effect item, or stop it with 0
+	// Opcode: SHOW_ITEM_EFFECT(194)
+	class ShowItemEffectHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
 	// Show another character sitting on a portable chair, or getting up with 0
 	// Opcode: SHOW_CHAIR(196)
 	class ShowChairHandler : public PacketHandler

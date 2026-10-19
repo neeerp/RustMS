@@ -30,7 +30,7 @@ pub fn build_player_enter_field(avatar: &FieldAvatar) -> Result<Packet, NetworkE
     packet.write_short(avatar.job)?;
     encode_avatar_look(&mut packet, &avatar.look, false)?;
     packet.write_int(0)?; // count of item 5110000
-    packet.write_int(0)?; // item effect
+    packet.write_int(avatar.item_effect)?;
     packet.write_int(avatar.chair)?;
 
     packet.write_short(avatar.x)?;
@@ -136,6 +136,16 @@ pub fn build_facial_expression(character_id: i32, emote: i32) -> Result<Packet, 
     packet.write_short(SendOpcode::FacialExpression as i16)?;
     packet.write_int(character_id)?;
     packet.write_int(emote)?;
+    Ok(packet)
+}
+
+/// SHOW_ITEM_EFFECT: show the others on the map the effect item `item_id`
+/// a player turned on, or that they turned theirs off with 0.
+pub fn build_show_item_effect(character_id: i32, item_id: i32) -> Result<Packet, NetworkError> {
+    let mut packet = Packet::new_empty();
+    packet.write_short(SendOpcode::ShowItemEffect as i16)?;
+    packet.write_int(character_id)?;
+    packet.write_int(item_id)?;
     Ok(packet)
 }
 
@@ -283,6 +293,7 @@ mod tests {
             mini_room: None,
             pets: Vec::new(),
             chalkboard: None,
+            item_effect: 0,
         }
     }
 
@@ -317,7 +328,8 @@ mod tests {
 
     #[test]
     fn spawn_player_matches_reference() {
-        let avatar = avatar();
+        let mut avatar = avatar();
+        avatar.item_effect = 5010000;
         let packet = build_player_enter_field(&avatar).unwrap();
 
         let mut expect = Expect::new(&packet.bytes);
@@ -327,7 +339,7 @@ mod tests {
         foreign_buffs(&mut expect);
         expect.short(100);
         expect.look(&avatar.look, false);
-        expect.int(0).int(0).int(3010000); // 5110000 count, item effect, chair
+        expect.int(0).int(5010000).int(3010000); // 5110000 count, item effect, chair
         expect.short(-120).short(275).byte(4).short(0).byte(0);
         expect.byte(0); // end of pets
         expect.int(1).long(0); // mount level, exp and tiredness
@@ -378,6 +390,16 @@ mod tests {
         }
         expect.byte(0); // end of pets
         expect.int(1).long(0);
+    }
+
+    #[test]
+    fn an_item_effect_names_its_player() {
+        let packet = build_show_item_effect(7, 5010020).unwrap();
+        Expect::new(&packet.bytes)
+            .short(0xC2)
+            .int(7)
+            .int(5010020)
+            .end();
     }
 
     #[test]

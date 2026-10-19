@@ -29,6 +29,7 @@
 #include "ChalkboardBalloon.h"
 #include "CharEffect.h"
 #include "GuildMark.h"
+#include "ItemEffect.h"
 #include "MedalTag.h"
 #include "MiniRoomBalloon.h"
 
@@ -283,6 +284,15 @@ namespace ms
 		// Return the portable chair the character sits on, or 0.
 		int32_t get_chair() const;
 
+		// Show an effect item's effect (501xxxx or 429xxxx), or stop it with 0.
+		void set_item_effect(int32_t item_id);
+
+		// The effect item shown, or 0.
+		int32_t get_item_effect() const;
+
+		// Start the effect over, as on a new field.
+		void restart_item_effect();
+
 		// Return if the char is in the Char::LADDER or Char::ROPE state.
 		bool is_climbing() const;
 
@@ -355,6 +365,8 @@ namespace ms
 		};
 
 		std::vector<ChairLayer> chair_layers;
+
+		ItemEffect item_effect;
 
 		// A disease's animation, on the face when its pos is 1 like the
 		// chair's.

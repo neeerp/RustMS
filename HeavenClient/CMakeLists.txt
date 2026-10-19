@@ -222,6 +222,8 @@ if(HEAVENCLIENT_BUILD_TESTS)
     add_test(NAME field_effect_rules COMMAND field_effect_rules_tests)
     add_executable(weather_rules_tests tests/weather_rules.cpp)
     add_test(NAME weather_rules COMMAND weather_rules_tests)
+    add_executable(item_effect_rules_tests tests/item_effect_rules.cpp)
+    add_test(NAME item_effect_rules COMMAND item_effect_rules_tests)
     add_executable(obj_state_rules_tests tests/obj_state_rules.cpp)
     target_include_directories(obj_state_rules_tests PRIVATE
         ${PROJECT_SOURCE_DIR}/libs/NoLifeNx ${PROJECT_SOURCE_DIR}/libs/glad/build/include)
@@ -357,6 +359,9 @@ add_executable(HeavenClient
     Character/MedalTagLayout.h
     Character/CharEffect.cpp
     Character/CharEffect.h
+    Character/ItemEffect.cpp
+    Character/ItemEffect.h
+    Character/ItemEffectRules.h
     Character/CharStats.cpp
     Character/CharStats.h
     Character/EquipStat.cpp

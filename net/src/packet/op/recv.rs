@@ -47,6 +47,7 @@ pub enum RecvOpcode {
     GuildOperation = 0x7E,
     DenyGuildRequest = 0x7F,
     FaceExpression = 0x33,
+    UseItemEffect = 0x34,
     Whisper = 0x78,
     Messenger = 0x7A,
     PlayerInteraction = 0x7B,

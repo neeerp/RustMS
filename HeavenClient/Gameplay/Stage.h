@@ -217,6 +217,9 @@ namespace ms
 		// Whether the player may give fame now (once every 5 minutes); if
 		// so, the wait starts.
 		bool try_give_fame();
+
+		// Show the player's 501xxxx or 429xxxx effect item, or stop it if it is the one shown (FUN_00a24530).
+		void use_item_effect(int32_t item_id);
 		// Get the total up time of the client
 		int64_t get_uptime();
 		// Get the level at the start of the client
@@ -357,6 +360,8 @@ namespace ms
 		Combat combat;
 		EmoteCooldown emote_cooldown;
 		FameCooldown fame_cooldown;
+		// When the last effect item was shown, in ms of uptime, or -1.
+		int64_t item_effect_shown = -1;
 
 		std::chrono::time_point<std::chrono::steady_clock> start;
 		uint16_t levelBefore;

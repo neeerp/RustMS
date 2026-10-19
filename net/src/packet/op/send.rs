@@ -91,6 +91,7 @@ pub enum SendOpcode {
     CancelSkillEffect = 0xBF,
     DamagePlayer = 0xC0,
     FacialExpression = 0xC1,
+    ShowItemEffect = 0xC2,
     ShowForeignEffect = 0xC6,
     GiveForeignBuff = 0xC7,
     CancelForeignBuff = 0xC8,

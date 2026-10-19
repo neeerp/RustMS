@@ -1983,6 +1983,7 @@ mod tests {
             mini_room: None,
             pets: Vec::new(),
             chalkboard: None,
+            item_effect: 0,
         }
     }
 

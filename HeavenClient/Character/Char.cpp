@@ -26,6 +26,7 @@
 #include <nlnx/nx.hpp>
 
 #include <algorithm>
+#include <cmath>
 
 namespace ms
 {
@@ -52,7 +53,9 @@ namespace ms
 	void Char::draw(double viewx, double viewy, float alpha) const
 	{
 		Point<int16_t> absp = phobj.get_absolute(viewx, viewy, alpha);
+		Point<int16_t> view(static_cast<int16_t>(std::round(viewx)), static_cast<int16_t>(std::round(viewy)));
 
+		item_effect.draw_ghosts(view);
 		effects.drawbelow(absp, alpha);
 		held_effects.drawbelow(absp, alpha);
 
@@ -96,9 +99,11 @@ namespace ms
 					layer.animation.draw(DrawArgument(layer.at_face ? facepos : absp, facing_right), alpha);
 		};
 
+		item_effect.draw(false, absp, facepos, facing_right, view, alpha);
 		draw_chair(false);
 		look.draw(DrawArgument(absp, color), alpha);
 		draw_chair(true);
+		item_effect.draw(true, absp, facepos, facing_right, view, alpha);
 
 		afterimage.draw(look.get_frame(), DrawArgument(absp, facing_right), alpha);
 
@@ -208,6 +213,11 @@ namespace ms
 		held_effects.update();
 		for (auto &layer : chair_layers)
 			layer.animation.update();
+
+		Point<int16_t> feet = phobj.get_position();
+		Point<int16_t> face = look.get_facepos();
+		item_effect.update(look.get_action_name(), feet,
+			feet + Point<int16_t>(facing_right ? -face.x() : face.x(), face.y()), look);
 
 		for (auto &[reason, affliction] : afflictions)
 			affliction.animation.update();
@@ -731,6 +741,22 @@ namespace ms
 	int32_t Char::get_chair() const
 	{
 		return chair;
+	}
+
+	void Char::set_item_effect(int32_t item_id)
+	{
+		if (item_id != item_effect.get())
+			item_effect.set(item_id);
+	}
+
+	int32_t Char::get_item_effect() const
+	{
+		return item_effect.get();
+	}
+
+	void Char::restart_item_effect()
+	{
+		item_effect.restart();
 	}
 
 	bool Char::is_climbing() const

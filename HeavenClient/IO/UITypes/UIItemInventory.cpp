@@ -891,7 +891,16 @@ namespace ms
 							use_megaphone(slot, item_id);
 						else if (weather::is_weather(item_id))
 							use_weather(slot, item_id);
+						else if (item_id / 10000 == 501)
+							Stage::get().use_item_effect(item_id);
 
+						break;
+					case InventoryType::Id::ETC:
+						if (item_id / 10000 == 429)
+							Stage::get().use_item_effect(item_id);
+
+						break;
+					default:
 						break;
 				}
 			}

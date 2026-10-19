@@ -18,6 +18,7 @@
 #include "Stage.h"
 
 #include "../Configuration.h"
+#include "../Character/ItemEffectRules.h"
 #include "../Character/Pets.h"
 #include "QuestConversation.h"
 #include "Timer.h"
@@ -110,6 +111,9 @@ namespace ms
 
 				pending_clock.reset();
 
+				// The player's effect item goes along, starting over where they arrive.
+				player.restart_item_effect();
+
 				// The player's chalkboard follows them, but not to a map where
 				// shops open (FUN_00949513).
 				if (player.get_chalkboard() && mapinfo.allows_personal_shop())
@@ -141,6 +145,7 @@ namespace ms
 		start = ContinuousTimer::get().start();
 		emote_cooldown = {};
 		fame_cooldown = {};
+		item_effect_shown = -1;
 
 		CharStats stats = player.get_stats();
 		levelBefore = stats.get_stat(MapleStat::Id::LEVEL);
@@ -1294,6 +1299,22 @@ namespace ms
 	bool Stage::try_give_fame()
 	{
 		return fame_cooldown.try_give(get_uptime() / 1000);
+	}
+
+	void Stage::use_item_effect(int32_t item_id)
+	{
+		int32_t next = item_effect::toggled(player.get_item_effect(), item_id);
+		int64_t now = get_uptime() / 1000;
+
+		if (!item_effect::may_send(next, now, item_effect_shown))
+			return;
+
+		if (next != 0)
+			item_effect_shown = now;
+
+		// The player sees it at once; the server shows it to the others.
+		player.set_item_effect(next);
+		UseItemEffectPacket(next).dispatch();
 	}
 
 	int64_t Stage::get_uptime()
