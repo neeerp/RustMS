@@ -322,6 +322,44 @@ namespace ms
 			return Rectangle<int16_t>();
 	}
 
+	std::vector<meso_explosion::Mob> MapMobs::explosion_targets() const
+	{
+		std::vector<std::pair<uint32_t, meso_explosion::Mob>> found;
+
+		for (auto &mmo : mobs)
+		{
+			auto mob = static_cast<const Mob *>(mmo.second.get());
+
+			if (mob && mob->is_alive())
+				found.push_back({ mobs.entry_order(mmo.first), { mmo.first, mob->get_body() } });
+		}
+
+		std::sort(found.begin(), found.end(), [](auto &a, auto &b) { return a.first < b.first; });
+
+		std::vector<meso_explosion::Mob> targets;
+
+		for (auto &[entry, mob] : found)
+			targets.push_back(mob);
+
+		return targets;
+	}
+
+	std::vector<int32_t> MapMobs::explode(int32_t oid, int32_t x, const std::vector<int32_t> &mesos) const
+	{
+		if (Optional<const Mob> mob = mobs.get(oid))
+			return mob->explode(x, mesos);
+
+		return std::vector<int32_t>(mesos.size(), 0);
+	}
+
+	int32_t MapMobs::shown_explosion(int32_t oid, int32_t number) const
+	{
+		if (Optional<const Mob> mob = mobs.get(oid))
+			return mob->shown_explosion(number);
+
+		return number;
+	}
+
 	MapObjects *MapMobs::get_mobs()
 	{
 		return &mobs;

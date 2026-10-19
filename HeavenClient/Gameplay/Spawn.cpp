@@ -104,7 +104,7 @@ namespace ms
 
 	std::unique_ptr<MapObject> DropSpawn::instantiate(const Animation &icon) const
 	{
-		return std::make_unique<MesoDrop>(oid, owner, start, dest, droptype, mode, delay, playerdrop, icon);
+		return std::make_unique<MesoDrop>(oid, owner, start, dest, droptype, mode, delay, playerdrop, id, icon);
 	}
 
 	std::unique_ptr<MapObject> DropSpawn::instantiate(const Texture &icon) const

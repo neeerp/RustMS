@@ -127,7 +127,12 @@ namespace ms
 		bool hashit0 = src["hit"]["0"].size() > 0;
 		bool hashit1 = src["hit"]["1"].size() > 0;
 
-		if (bylevelhit)
+		// Meso Explosion's hits are its drops going off, where they lie
+		// (FUN_00504bff), not on the mobs.
+		if (skillid == SkillId::MESO_EXPLOSION)
+		{
+			hiteffect = std::make_unique<NoHitEffect>();
+		} else if (bylevelhit)
 		{
 			if (hashit0 && hashit1)
 				hiteffect = std::make_unique<ByLevelTwoHandedHitEffect>(src);

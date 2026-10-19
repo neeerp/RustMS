@@ -20,8 +20,13 @@
 namespace ms
 {
 	MesoDrop::MesoDrop(int32_t oid, int32_t owner, Point<int16_t> start, Point<int16_t> dest, int8_t type, int8_t mode,
-					   int16_t delay, bool pd, const Animation &icn) : Drop(oid, owner, start, dest, type, mode, delay, pd, false), icon(icn)
+					   int16_t delay, bool pd, int32_t mso, const Animation &icn) : Drop(oid, owner, start, dest, type, mode, delay, pd, false), mesos(mso), icon(icn)
 	{}
+
+	int32_t MesoDrop::get_mesos() const
+	{
+		return mesos;
+	}
 
 	void MesoDrop::draw(double viewx, double viewy, float alpha) const
 	{

@@ -28,6 +28,7 @@
 #include "Teleport.h"
 
 #include "../MapleMap/MapChars.h"
+#include "../MapleMap/MapDrops.h"
 #include "../MapleMap/MapInfo.h"
 #include "../MapleMap/MapMobs.h"
 #include "../MapleMap/MapPortals.h"
@@ -46,7 +47,7 @@ namespace ms
 	{
 	public:
 		Combat(Player &player, MapChars &chars, MapMobs &mobs, MapReactors &reactors, MapSummons &summons,
-			   const Physics &physics, const MapInfo &mapinfo, const MapPortals &portals);
+			   MapDrops &drops, const Physics &physics, const MapInfo &mapinfo, const MapPortals &portals);
 
 		// Load the charge gauge, once the NX files are open.
 		static void init();
@@ -217,6 +218,10 @@ namespace ms
 		void apply_move(const SpecialMove &move, int32_t charge = 0, bool held = false,
 						const Follow *follow = nullptr);
 
+		// Meso Explosion: set off the mesos in front of the player, each
+		// hurting the mobs around it (FUN_0096b3fb).
+		void set_off_mesos(const SpecialMove &move);
+
 		// After a skill attack, see whether one of the Final Attacks it may
 		// set off comes up, and when it follows (0x957830).
 		void roll_final_attack(int32_t trigger);
@@ -327,6 +332,11 @@ namespace ms
 
 		void apply_damage_effect(const DamageEffect &effect);
 
+		// Another user's Meso Explosion as its mobs show it: each line its
+		// own number, but their fixed damage, or 0 if it can't hurt them
+		// (FUN_009803ab).
+		AttackResult show_explosion(AttackResult attack) const;
+
 		// The area an attack covers, from the attacker's position and facing.
 		static Rectangle<int16_t> place_range(Point<int16_t> origin, Rectangle<int16_t> range, float hrange,
 											  bool toleft);
@@ -372,6 +382,7 @@ namespace ms
 		MapMobs &mobs;
 		MapReactors &reactors;
 		MapSummons &summons;
+		MapDrops &drops;
 		const Physics &physics;
 		const MapInfo &mapinfo;
 		const MapPortals &portals;

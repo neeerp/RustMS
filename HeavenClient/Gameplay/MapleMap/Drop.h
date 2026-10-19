@@ -51,6 +51,23 @@ namespace ms
 		// The item, or 0 for mesos.
 		virtual int32_t get_itemid() const;
 
+		// How many mesos it is, or 0 for an item.
+		virtual int32_t get_mesos() const;
+
+		// Where the server put it.
+		Point<int16_t> get_spot() const;
+
+		// Whether the player with this id and party could set it off with
+		// Meso Explosion from `area` (FUN_0050579e).
+		bool explodable(Rectangle<int16_t> area, int32_t self, int32_t party) const;
+
+		// Leave it where it lies, for nobody to take or set off again, until
+		// it goes off in `delay` ms (FUN_00506590).
+		void explode(int16_t delay);
+
+		// Whether it went off this update. It is gone the next.
+		bool went_off() const;
+
 	protected:
 		Drop(int32_t oid, int32_t owner, Point<int16_t> start, Point<int16_t> dest,
 			 int8_t type, int8_t mode, int16_t delay, bool playerdrop, bool spins);
@@ -70,7 +87,9 @@ namespace ms
 			FALLING,
 			FLOATING,
 			PICKEDUP,
-			EXPIRING
+			EXPIRING,
+			EXPLODING,
+			EXPLODED
 		};
 
 		// Fly toward the looter's middle.
@@ -104,6 +123,8 @@ namespace ms
 		int32_t sincetry;
 		int32_t sincepet;
 		int32_t delay;
+		// Milliseconds until it goes off, once set to.
+		int32_t fuse;
 		int32_t flighttime;
 		double phase;
 		Point<int16_t> pickupstart;

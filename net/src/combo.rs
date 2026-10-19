@@ -155,6 +155,7 @@ mod tests {
             speed: 4,
             charge: 0,
             ammo_slot: 0,
+            explosion: None,
         }
     }
 

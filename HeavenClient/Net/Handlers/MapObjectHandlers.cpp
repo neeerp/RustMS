@@ -678,6 +678,14 @@ namespace ms
 		int8_t mode = recv.read_byte();
 		int32_t oid = recv.read_int();
 
+		// Mode 4 sets the drop off for Meso Explosion, in `delay` ms
+		// (FUN_00506590).
+		if (mode == 4)
+		{
+			Stage::get().get_drops().explode(oid, recv.read_short());
+			return;
+		}
+
 		const PhysicsObject *looter = nullptr;
 
 		if (mode > 1)

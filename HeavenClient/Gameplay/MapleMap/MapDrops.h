@@ -25,8 +25,14 @@
 
 #include "../Graphics/Animation.h"
 
+#include "../Combat/MesoExplosion.h"
+
+#include "../../Audio/Audio.h"
+#include "../../Graphics/EffectLayer.h"
+
 #include <array>
 #include <queue>
+#include <vector>
 
 namespace ms
 {
@@ -41,6 +47,9 @@ namespace ms
 		// Draw all drops on a layer.
 		void draw(Layer::Id layer, double viewx, double viewy, float alpha) const;
 
+		// Draw the mesos going off, on the effect layer (z 0xc00614a4).
+		void draw_explosions(Point<int16_t> viewpos, float alpha) const;
+
 		// Update all drops.
 		void update(const Physics &physics);
 
@@ -49,6 +58,14 @@ namespace ms
 
 		// Remove a drop.
 		void remove(int32_t oid, int8_t mode, const PhysicsObject *looter);
+
+		// Set a drop to go off in `delay` ms, for Meso Explosion (mode 4).
+		void explode(int32_t oid, int16_t delay);
+
+		// The mesos in `area` the player with this id and party could set
+		// off with Meso Explosion, in the order they entered the map
+		// (FUN_0050579e).
+		std::vector<meso_explosion::Drop> find_explodable(Rectangle<int16_t> area, int32_t self, int32_t party) const;
 
 		// Remove all drops.
 		void clear();
@@ -78,6 +95,13 @@ namespace ms
 		};
 
 		std::array<Animation, MesoIcon::NUM_ICONS> mesoicons;
+
+		// What a drop going off shows, one picked at random, and sounds like
+		// (FUN_00504bff).
+		std::vector<Animation> blasts;
+		Sound blastsound;
+		int32_t sinceblast;
+		EffectLayer explosions;
 
 		std::queue<DropSpawn> spawns;
 	};

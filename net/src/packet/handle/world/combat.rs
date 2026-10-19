@@ -204,6 +204,7 @@ impl WorldHandler for AttackHandler {
             hits,
             inflicts,
             takes,
+            blast: uses.blast,
         }));
         if let Some(mist) = mist {
             result = result.with(WorldAction::Field(mist));

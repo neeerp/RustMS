@@ -9,11 +9,12 @@ use crate::message::{ClientHandle, FieldKey, FieldMessage, ServerMessage};
 use game::mob_skill::{self, MobSkillEffect};
 use game::{FieldAvatar, MobStat};
 use net::conti::{self, Happening};
+use net::meso_explosion::{self, Blast};
 use net::packet::build::world::buff::{build_own_skill_effect, build_skill_effect};
 use net::packet::build::world::conti::build_conti_move;
 use net::packet::build::world::door::{build_remove_door, build_spawn_door};
 use net::packet::build::world::drop::{
-    build_drop, build_pet_loot_drop, build_remove_drop, DropAppearance,
+    build_drop, build_explode_drop, build_pet_loot_drop, build_remove_drop, DropAppearance,
 };
 use net::packet::build::world::field::{
     build_player_enter_field, build_player_leave_field, build_show_chair, parse_movement,
@@ -393,15 +394,22 @@ impl FieldActor {
                     hits,
                     inflicts,
                     takes,
-                } => self.handle_attack(
-                    from,
-                    Some(broadcast),
-                    Some(skill),
-                    Some(counter),
-                    hits,
-                    &inflicts,
-                    takes,
-                ),
+                    blast,
+                } => {
+                    let hits = match blast {
+                        Some(blast) => self.set_off(from, &blast, hits),
+                        None => hits,
+                    };
+                    self.handle_attack(
+                        from,
+                        Some(broadcast),
+                        Some(skill),
+                        Some(counter),
+                        hits,
+                        &inflicts,
+                        takes,
+                    )
+                }
                 FieldRequest::Reflect {
                     object_id,
                     mob_id,
@@ -941,6 +949,57 @@ impl FieldActor {
                 map_id: self.key.map_id,
             });
         }
+    }
+
+    /// `from`'s Meso Explosion sets off the mesos in its box that they may
+    /// take, each going off for everyone in turn, and its targets take only
+    /// what those could deal: each line no more than its drop's worth, a
+    /// mob's `fixedDamage` for each that hits (the client sends them raw),
+    /// and nothing from a drop it couldn't set off.
+    fn set_off(&mut self, from: ClientId, blast: &Blast, hits: Vec<(i32, i64)>) -> Vec<(i32, i64)> {
+        let Some(occupant) = self.occupants.get(&from) else {
+            return Vec::new();
+        };
+        let (user, party) = ((occupant.avatar.x, occupant.avatar.y), occupant.party);
+        let reaches = |x, y| meso_explosion::reaches(blast.lt, blast.rb, blast.left, user, (x, y));
+        let now = Instant::now();
+        let mut mesos = Vec::new();
+        for (index, &object_id) in blast.drops.iter().enumerate() {
+            let drop = self.drops.explode(from, party, object_id, reaches, now);
+            if let Some(drop) = &drop {
+                let delay = meso_explosion::delay(blast.delay, index);
+                if let Ok(packet) = build_explode_drop(object_id, delay) {
+                    self.send_drop_packet(drop, packet);
+                }
+            }
+            mesos.push(drop.and_then(|drop| match drop.loot {
+                net::loot::Loot::Mesos(amount) => Some(amount),
+                _ => None,
+            }));
+        }
+        hits.into_iter()
+            .zip(&blast.lines)
+            .map(|((object_id, _), lines)| {
+                let fixed = self
+                    .mobs
+                    .get(object_id)
+                    .map_or(0, |mob| mob.info.fixed_damage);
+                let damage = lines
+                    .iter()
+                    .map(|&(source, line)| match mesos[source] {
+                        Some(amount) if line <= meso_explosion::line_cap(blast.x, amount) => {
+                            if fixed > 0 && line > 0 {
+                                i64::from(fixed)
+                            } else {
+                                i64::from(line)
+                            }
+                        }
+                        _ => 0,
+                    })
+                    .sum();
+                (object_id, damage)
+            })
+            .collect()
     }
 
     /// `from` used Monster Magnet. The others see it catch each live mob,
@@ -2049,6 +2108,7 @@ mod tests {
                 hits: vec![(snail, damage)],
                 inflicts: Vec::new(),
                 takes,
+                blast: None,
             },
         };
         // What it took back, and whether the snail died.
@@ -2084,6 +2144,104 @@ mod tests {
         tx.send(attack(1, blow)).await.unwrap();
         tokio::time::sleep(Duration::from_millis(50)).await;
         assert_eq!(outcome(&mut client_rx), (vec![(1, 0)], true));
+    }
+
+    #[tokio::test]
+    async fn meso_explosion_sets_off_only_the_mesos_it_may_and_caps_their_hits() {
+        let (template, mut info) = mob(100, false);
+        info.max_hp = 20_000;
+        let mut mobs = MobSet::new([(template, info)]);
+        let snail = mobs.respawn(Instant::now())[0];
+        let mut drops = DropSet::default();
+        let now = Instant::now();
+        let mut put = |owner, x| {
+            drops.spawn(
+                vec![net::loot::Loot::Mesos(1000)],
+                owner,
+                Ownership::Owner,
+                x,
+                0,
+                0,
+                now,
+            )[0]
+            .object_id
+        };
+        // The player's, another's, the player's out of reach, and the
+        // player's again.
+        let ids = [put(1, -100), put(2, -150), put(1, 500), put(1, -200)];
+        let (tx, rx) = mpsc::channel(16);
+        let actor = FieldActor::new(
+            FieldKey::new(0, 100000000),
+            rx,
+            Vec::new(),
+            mobs,
+            drops,
+            ReactorSet::default(),
+            Duration::from_secs(60),
+        );
+        tokio::spawn(actor.run());
+        let (handle, mut client_rx) = client(1);
+        tx.send(FieldMessage::Join {
+            handle,
+            avatar: avatar(1, 0, 0),
+            party: None,
+        })
+        .await
+        .unwrap();
+        opcodes(&mut client_rx).await;
+        // A line from a 1,000 meso drop deals 8,000 at most at level 30.
+        let explode = |lines: Vec<(usize, i32)>| FieldMessage::FromClient {
+            from: 1,
+            request: FieldRequest::Attack {
+                broadcast: Packet::new_empty(),
+                skill: meso_explosion::MESO_EXPLOSION,
+                counter: game::MobStat::PCounter,
+                hits: vec![(snail, 0)],
+                inflicts: Vec::new(),
+                takes: Takes::default(),
+                blast: Some(Blast {
+                    drops: ids.to_vec(),
+                    delay: 300,
+                    lines: vec![lines],
+                    x: 1000,
+                    lt: (-300, -120),
+                    rb: (0, 50),
+                    left: true,
+                }),
+            },
+        };
+        // What went off, when, and the snail's HP after.
+        let outcome = |rx: &mut mpsc::Receiver<ServerMessage>| {
+            use packet::io::read::PktRead;
+            let (mut exploded, mut hp) = (Vec::new(), None);
+            while let Ok(ServerMessage::SendPacket(packet)) = rx.try_recv() {
+                let mut r = std::io::Cursor::new(&packet.bytes[2..]);
+                if packet.opcode() == SendOpcode::RemoveItemFromMap as i16 {
+                    assert_eq!(r.read_byte().unwrap(), 4);
+                    exploded.push((r.read_int().unwrap(), r.read_short().unwrap()));
+                } else if packet.opcode() == SendOpcode::ShowMonsterHp as i16 {
+                    r.read_int().unwrap();
+                    hp = Some(r.read_byte().unwrap());
+                }
+            }
+            (exploded, hp)
+        };
+
+        // Only the player's two in reach go off, a tenth of a second apart
+        // by their place in the list, and the line too big for its drop
+        // counts for nothing.
+        tx.send(explode(vec![(0, 8000), (1, 8000), (2, 8000), (3, 9000)]))
+            .await
+            .unwrap();
+        tokio::time::sleep(Duration::from_millis(50)).await;
+        assert_eq!(
+            outcome(&mut client_rx),
+            (vec![(ids[0], 300), (ids[3], 600)], Some(60))
+        );
+        // Set off, they're gone.
+        tx.send(explode(vec![(0, 8000)])).await.unwrap();
+        tokio::time::sleep(Duration::from_millis(50)).await;
+        assert_eq!(outcome(&mut client_rx), (vec![], Some(60)));
     }
 
     #[tokio::test]

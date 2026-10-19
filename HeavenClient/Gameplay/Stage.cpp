@@ -51,7 +51,7 @@ namespace ms
 		constexpr int16_t TELEPORT_COOLDOWN = 600;
 	}
 
-	Stage::Stage() : combat(player, chars, mobs, reactors, summons, physics, mapinfo, portals)
+	Stage::Stage() : combat(player, chars, mobs, reactors, summons, drops, physics, mapinfo, portals)
 	{
 		state = State::INACTIVE;
 	}
@@ -216,6 +216,7 @@ namespace ms
 		// v83 puts a mist's clouds on the effect layer, above the map's
 		// objects (z 0xc00614a4).
 		mists.draw(viewx, viewy, alpha);
+		drops.draw_explosions(viewpos, alpha);
 		combat.draw(viewx, viewy, alpha);
 		ground_effects.drawabove(viewpos, alpha);
 		portals.draw(viewpos, alpha);

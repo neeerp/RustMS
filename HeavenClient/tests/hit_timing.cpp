@@ -18,6 +18,7 @@ int main()
 		require(target_delay(Attack::Type::CLOSE, 1001005, 1) == 70, "each later melee target 70 ms after the last");
 		require(target_delay(Attack::Type::CLOSE, 1001005, 3) == 210, "the fourth melee target 210 ms after the first");
 		require(target_delay(Attack::Type::CLOSE, 1001005, 5) == 280, "melee targets wait at most 280 ms");
+		require(target_delay(Attack::Type::CLOSE, 4211006, 5) == 0, "Meso Explosion hits every mob at once");
 
 		require(target_delay(Attack::Type::MAGIC, 2201005, 0) == 0, "Thunderbolt's first target is hit at once");
 		require(target_delay(Attack::Type::MAGIC, 2201005, 5) == 250, "Thunderbolt's targets are 50 ms apart, without a cap");

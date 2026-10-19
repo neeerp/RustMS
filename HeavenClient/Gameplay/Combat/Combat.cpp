@@ -23,6 +23,7 @@
 #include "Heal.h"
 #include "HitTiming.h"
 #include "MagicDamage.h"
+#include "MesoExplosion.h"
 #include "PointBlank.h"
 #include "Prepare.h"
 #include "RemoteShot.h"
@@ -47,15 +48,16 @@
 #include <nlnx/nx.hpp>
 
 #include <algorithm>
+#include <bitset>
 #include <cmath>
 #include <cstdlib>
 
 namespace ms
 {
 	Combat::Combat(Player &in_player, MapChars &in_chars, MapMobs &in_mobs, MapReactors &in_reactors,
-				   MapSummons &in_summons, const Physics &in_physics, const MapInfo &in_mapinfo,
+				   MapSummons &in_summons, MapDrops &in_drops, const Physics &in_physics, const MapInfo &in_mapinfo,
 				   const MapPortals &in_portals) : player(
-			in_player), chars(in_chars), mobs(in_mobs), reactors(in_reactors), summons(in_summons),
+			in_player), chars(in_chars), mobs(in_mobs), reactors(in_reactors), summons(in_summons), drops(in_drops),
 			physics(in_physics), mapinfo(in_mapinfo), portals(in_portals),
 																										attackresults(
 																												[&](const AttackResult &attack)
@@ -232,6 +234,12 @@ namespace ms
 
 		if (!can_use_move(move))
 			return;
+
+		if (move_id == meso_explosion::ID)
+		{
+			set_off_mesos(move);
+			return;
+		}
 
 		// v83's spell handler swings a regular attack instead when the player
 		// is prone (0x969b10), and most shots whack a mob right in front of
@@ -1166,6 +1174,72 @@ namespace ms
 		}
 	}
 
+	void Combat::set_off_mesos(const SpecialMove &move)
+	{
+		using namespace meso_explosion;
+
+		// Not from a rope or a ladder, nor in the air (0x96b4c7, 0x96b4d9).
+		if (!player.get_phobj().onground || player.get_ladder())
+			return;
+
+		Attack attack = player.prepare_attack(ID);
+		move.apply_stats(player, attack);
+
+		// The mesos in its box the player may set off, cheapest first, and
+		// the mobs around them.
+		Rectangle<int16_t> box = area(attack.range, attack.origin, attack.toleft);
+		std::vector<Drop> chosen = choose(drops.find_explodable(box, player.get_oid(), player.get_party().get_id()),
+										  attack.hitcount);
+		Targets targets = aim(chosen, mobs.explosion_targets(), attack.mobcount);
+
+		// With no mesos it still acts, and costs what it costs.
+		move.apply_useeffects(player);
+		move.apply_actions(player, attack.type);
+		player.set_afterimage(ID);
+
+		AttackResult result = attack;
+		result.attacker = player.get_oid();
+		result.hitcount = 0;
+
+		// The packet carries each line; a mob shows them added up into five
+		// numbers at most, all at once.
+		int32_t x = SkillData::get(ID).get_stats(player.get_skills().get_level(ID)).x;
+		std::vector<std::pair<int32_t, std::vector<int32_t>>> lines;
+
+		for (const auto &[oid, mask] : targets.mobs)
+		{
+			std::vector<int32_t> rolled = mobs.explode(oid, x, hurting(chosen, mask));
+			std::vector<std::pair<int32_t, bool>> shown;
+
+			for (int32_t number : fold(rolled))
+				shown.emplace_back(mobs.shown_explosion(oid, number), false);
+
+			result.hitcount = std::max(result.hitcount, static_cast<uint8_t>(std::bitset<32>(mask).count()));
+			result.damagelines.emplace_back(oid, shown);
+			lines.emplace_back(oid, rolled);
+		}
+
+		result.mobcount = static_cast<uint8_t>(lines.size());
+
+		if (!lines.empty())
+		{
+			result.first_oid = lines.front().first;
+			result.last_oid = lines.back().first;
+		}
+
+		expect_hits(result, 1);
+		show_counters(result);
+		extract_effects(player, move, result, box, 0, {}, {});
+
+		std::vector<std::pair<int32_t, uint8_t>> sent;
+
+		for (size_t i = 0; i < chosen.size(); i++)
+			sent.emplace_back(chosen[i].oid, targets.drops[i]);
+
+		auto delay = static_cast<int16_t>(player.get_attackdelay(0));
+		MesoExplosionPacket(result, lines, player.get_position(), sent, delay).dispatch();
+	}
+
 	void Combat::roll_final_attack(int32_t trigger)
 	{
 		pending_final.reset();
@@ -1600,12 +1674,23 @@ namespace ms
 			}
 			else if (attack.type == Attack::Type::RANGED && !prepare::throws(attack.skill))
 				show_remote_shot(user, move, attack, range);
+			else if (attack.skill == meso_explosion::ID)
+				extract_effects(user, move, show_explosion(attack), range, reach, shot_area, shot_end);
 			else
 				extract_effects(user, move, attack, range, reach, shot_area, shot_end);
 		} else
 		{
 			expect_hits(attack, -1);
 		}
+	}
+
+	AttackResult Combat::show_explosion(AttackResult attack) const
+	{
+		for (auto &[oid, lines] : attack.damagelines)
+			for (auto &line : lines)
+				line.first = mobs.shown_explosion(oid, line.first);
+
+		return attack;
 	}
 
 	Rectangle<int16_t> Combat::place_range(Point<int16_t> origin, Rectangle<int16_t> range, float hrange, bool toleft)

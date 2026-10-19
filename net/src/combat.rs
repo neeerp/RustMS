@@ -1,6 +1,7 @@
 //! Player attacks: parsing, damage limits, and the attack broadcast.
 
 use crate::combo;
+use crate::meso_explosion::{self, Blast, Explosion, MESO_EXPLOSION};
 use crate::skills::{self, Learned};
 use crate::{error::NetworkError, packet::op::SendOpcode};
 use game::inventory::equip_slot;
@@ -88,6 +89,8 @@ pub struct Attack {
     /// The USE slot of the star, arrow, or bullet a shot fires; 0 for none.
     pub ammo_slot: i16,
     pub hits: Vec<AttackHit>,
+    /// What Meso Explosion sends after its targets.
+    pub explosion: Option<Explosion>,
 }
 
 /// CLOSE_RANGE_ATTACK body (after the opcode), as the v83 client sends it.
@@ -128,18 +131,41 @@ pub fn parse_attack(packet: &Packet, kind: AttackKind) -> Result<Attack, Network
         r.read_bytes(4)?;
     }
     let (mob_count, hit_count) = (counts >> 4, counts & 0xF);
+    // Meso Explosion counts each target's hits where the others have a
+    // short, and names the drops it sets off after where the player
+    // stands (v83 0x96bafe).
+    let explodes = kind == AttackKind::Close && skill == MESO_EXPLOSION;
     let mut hits = Vec::new();
     for _ in 0..mob_count {
         let object_id = r.read_int()?;
-        r.read_bytes(14)?;
-        let damage = (0..hit_count)
-            .map(|_| r.read_int())
-            .collect::<Result<_, _>>()?;
+        let lines = if explodes {
+            r.read_bytes(12)?;
+            r.read_byte()?
+        } else {
+            r.read_bytes(14)?;
+            hit_count
+        };
+        let damage = (0..lines).map(|_| r.read_int()).collect::<Result<_, _>>()?;
         if skill != RAPID_FIRE {
             r.read_bytes(4)?;
         }
         hits.push(AttackHit { object_id, damage });
     }
+    let explosion = if explodes {
+        let position = (r.read_short()?, r.read_short()?);
+        let count = r.read_byte()?;
+        let drops = (0..count)
+            .map(|_| Ok((r.read_int()?, r.read_byte()?)))
+            .collect::<Result<_, NetworkError>>()?;
+        let delay = r.read_short()?;
+        Some(Explosion {
+            position,
+            drops,
+            delay,
+        })
+    } else {
+        None
+    };
     Ok(Attack {
         kind,
         skill,
@@ -151,6 +177,7 @@ pub fn parse_attack(packet: &Packet, kind: AttackKind) -> Result<Attack, Network
         charge,
         ammo_slot,
         hits,
+        explosion,
     })
 }
 
@@ -250,6 +277,8 @@ pub struct Uses {
     pub mesos: i32,
     /// The HP the skill costs, Sacrifice's share of its blow among it.
     pub hp: i32,
+    /// The drops Meso Explosion sets off, and the damage each does.
+    pub blast: Option<Blast>,
 }
 
 /// A shot fires the stack in the slot the client names, which the weapon
@@ -391,6 +420,12 @@ pub fn validate(attack: &Attack, player: &Player) -> Result<Uses, AttackRejectio
             effect.money_cost * 3 / 2 * 10 * (100 + effect.x) / 100
         } else if skill.skill_id == SNIPE && attack.kind == AttackKind::Ranged {
             SNIPE_MOST
+        } else if skill.skill_id == MESO_EXPLOSION {
+            // Each line is worth less than 50·x (FUN_00791fbc).
+            if attack.explosion.is_none() {
+                return Err(AttackRejection::Skill);
+            }
+            50 * effect.x
         } else if let Some(percent) = damage_percent(&skill) {
             (base_cap * percent / 100).max(10)
         } else {
@@ -450,11 +485,52 @@ pub fn validate(attack: &Attack, player: &Player) -> Result<Uses, AttackRejectio
         hp = sacrifice_cost(attack, sacrifice.effect.x, player.stats.hp);
     }
     let ammo = shot_ammo(attack, player, skill.as_ref())?;
+    let blast = match (&attack.explosion, &skill) {
+        (Some(explosion), Some(skill)) => Some(blast(attack, explosion, skill)?),
+        _ => None,
+    };
     Ok(Uses {
         skill,
         ammo,
         mesos,
         hp,
+        blast,
+    })
+}
+
+/// Meso Explosion sets off as many drops as its `attackCount`, each once,
+/// and each target's lines must come from the drops that hit it.
+fn blast(
+    attack: &Attack,
+    explosion: &Explosion,
+    skill: &Learned,
+) -> Result<Blast, AttackRejection> {
+    let effect = &skill.effect;
+    let drops = &explosion.drops;
+    let most = (effect.attack_count.max(1) as usize).min(meso_explosion::MOST_DROPS);
+    let mut object_ids: Vec<i32> = drops.iter().map(|&(object_id, _)| object_id).collect();
+    object_ids.sort_unstable();
+    object_ids.dedup();
+    if drops.len() > most || object_ids.len() < drops.len() {
+        return Err(AttackRejection::TooManyTargets);
+    }
+    let lines: Vec<usize> = attack.hits.iter().map(|hit| hit.damage.len()).collect();
+    let sources = meso_explosion::sources(drops, &lines).ok_or(AttackRejection::TooManyTargets)?;
+    Ok(Blast {
+        drops: drops.iter().map(|&(object_id, _)| object_id).collect(),
+        delay: explosion.delay,
+        lines: (attack.hits.iter().zip(sources))
+            .map(|(hit, sources)| {
+                sources
+                    .into_iter()
+                    .zip(hit.damage.iter().copied())
+                    .collect()
+            })
+            .collect(),
+        x: effect.x,
+        lt: effect.lt,
+        rb: effect.rb,
+        left: attack.action & 0x8000 != 0,
     })
 }
 
@@ -509,6 +585,11 @@ pub fn build_attack(
     for hit in &attack.hits {
         p.write_int(hit.object_id)?;
         p.write_byte(0)?;
+        // Meso Explosion's targets each say how many hits they take
+        // (0x980540).
+        if attack.explosion.is_some() {
+            p.write_byte(hit.damage.len() as u8)?;
+        }
         for &damage in &hit.damage {
             p.write_int(if critical && damage > 0 {
                 damage | i32::MIN
@@ -756,7 +837,8 @@ mod tests {
                 skill: None,
                 ammo: None,
                 mesos: 0,
-                hp: 0
+                hp: 0,
+                blast: None
             })
         );
         assert_eq!(
@@ -1360,7 +1442,8 @@ mod tests {
                     quantity: 1
                 }),
                 mesos: 0,
-                hp: 0
+                hp: 0,
+                blast: None
             }
         );
         // Arrows don't fit a claw, and an empty slot holds nothing.
@@ -1489,6 +1572,130 @@ mod tests {
             .int(0);
         expect.int(77).byte(0).int(9);
         expect.end();
+    }
+
+    /// Meso Explosion's CLOSE_RANGE_ATTACK: each target's lines, counted,
+    /// then where the player stands, the drops with their masks, and when
+    /// the hits land.
+    fn explosion_packet(lines: &[&[i32]], drops: &[(i32, u8)]) -> Packet {
+        let mut p = Packet::new_empty();
+        p.write_short(0x2C).unwrap();
+        p.write_byte(0).unwrap();
+        let most = lines.iter().map(|lines| lines.len()).max().unwrap_or(0) as u8;
+        p.write_byte((lines.len() as u8) << 4 | most).unwrap();
+        p.write_int(MESO_EXPLOSION).unwrap();
+        p.write_bytes(&[0; 8]).unwrap();
+        p.write_byte(0).unwrap();
+        p.write_short(0x801Fu16 as i16).unwrap();
+        p.write_byte(0).unwrap();
+        p.write_byte(4).unwrap();
+        p.write_bytes(&[0; 4]).unwrap();
+        for (target, lines) in lines.iter().enumerate() {
+            p.write_int(100 + target as i32).unwrap();
+            p.write_bytes(&[0; 12]).unwrap();
+            p.write_byte(lines.len() as u8).unwrap();
+            for &line in *lines {
+                p.write_int(line).unwrap();
+            }
+            p.write_bytes(&[0; 4]).unwrap();
+        }
+        p.write_short(-40).unwrap();
+        p.write_short(85).unwrap();
+        p.write_byte(drops.len() as u8).unwrap();
+        for &(object_id, mask) in drops {
+            p.write_int(object_id).unwrap();
+            p.write_byte(mask).unwrap();
+        }
+        p.write_short(420).unwrap();
+        p
+    }
+
+    #[test]
+    fn meso_explosion_names_its_drops_after_its_targets() {
+        let packet = explosion_packet(&[&[10, 20], &[30]], &[(7, 0b01), (8, 0b11), (9, 0)]);
+        let attack = parse_close_attack(&packet).unwrap();
+        assert_eq!((attack.mob_count, attack.hit_count), (2, 2));
+        assert_eq!(attack.hits[0].damage, [10, 20]);
+        assert_eq!(
+            (attack.hits[1].object_id, &attack.hits[1].damage[..]),
+            (101, &[30][..])
+        );
+        assert_eq!(
+            attack.explosion,
+            Some(Explosion {
+                position: (-40, 85),
+                drops: vec![(7, 0b01), (8, 0b11), (9, 0)],
+                delay: 420,
+            })
+        );
+        // The others hear how many hits each target takes.
+        let packet = build_attack(5, &attack, 30, 0).unwrap();
+        let mut expect = Expect::new(&packet.bytes);
+        expect
+            .short(SendOpcode::CloseRangeAttack as i16)
+            .int(5)
+            .byte(0x22)
+            .byte(0x5B)
+            .byte(30)
+            .int(MESO_EXPLOSION);
+        expect
+            .byte(0)
+            .short(0x801Fu16 as i16)
+            .byte(4)
+            .byte(0x0A)
+            .int(0);
+        expect.int(100).byte(0).byte(2).int(10).int(20);
+        expect.int(101).byte(0).byte(1).int(30);
+        expect.end();
+    }
+
+    #[test]
+    fn meso_explosion_sets_off_each_drop_once_and_hits_by_its_x() {
+        if skills::data().is_err() {
+            return;
+        }
+        let mut player = beginner_with_sword();
+        learn(&mut player, MESO_EXPLOSION, 30);
+        player.stats.mp = 30;
+        let check_as = |player: &Player, lines: &[&[i32]], drops: &[(i32, u8)]| {
+            validate(
+                &parse_close_attack(&explosion_packet(lines, drops)).unwrap(),
+                player,
+            )
+        };
+        let check = |lines: &[&[i32]], drops: &[(i32, u8)]| check_as(&player, lines, drops);
+        let blast = check(&[&[50_000, 1], &[2]], &[(7, 0b01), (8, 0b11)])
+            .unwrap()
+            .blast
+            .unwrap();
+        assert_eq!(blast.drops, [7, 8]);
+        assert_eq!(blast.lines, [vec![(0, 50_000), (1, 1)], vec![(1, 2)]]);
+        assert_eq!(
+            (blast.x, blast.lt, blast.rb, blast.left),
+            (1000, (-300, -120), (0, 50), true)
+        );
+        // With nothing to hit, it still sets off its drops.
+        assert!(check(&[], &[(7, 0)]).unwrap().blast.is_some());
+        // No line deals 50·x or more, each drop goes off once, as many as
+        // its attackCount, and each target's lines match its drops.
+        assert_eq!(check(&[&[50_001]], &[(7, 1)]), Err(AttackRejection::Damage));
+        assert_eq!(
+            check(&[], &[(7, 0), (7, 0)]),
+            Err(AttackRejection::TooManyTargets)
+        );
+        let many: Vec<(i32, u8)> = (0..21).map(|object_id| (object_id, 0)).collect();
+        assert_eq!(check(&[], &many), Err(AttackRejection::TooManyTargets));
+        assert!(check(&[], &many[..20]).is_ok());
+        assert_eq!(
+            check(&[&[1, 1]], &[(7, 1)]),
+            Err(AttackRejection::TooManyTargets)
+        );
+        let mut tired = player.clone();
+        tired.stats.mp = 29;
+        assert_eq!(
+            check_as(&tired, &[], &[]),
+            Err(AttackRejection::NotEnoughMp)
+        );
     }
 }
 

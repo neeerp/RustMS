@@ -21,6 +21,7 @@
 
 #include "../Combat/Heal.h"
 #include "../Combat/HitPoint.h"
+#include "../Combat/MesoExplosion.h"
 #include "../Combat/MonsterMagnet.h"
 #include "../Combat/Prepare.h"
 #include "../Combat/ShotPath.h"
@@ -2160,6 +2161,28 @@ namespace ms
 		);
 
 		return result;
+	}
+
+	std::vector<int32_t> Mob::explode(int32_t x, const std::vector<int32_t> &mesos) const
+	{
+		std::vector<int32_t> lines;
+
+		for (int32_t amount : mesos)
+		{
+			if (status_value(MobStatParser::DISABLE))
+				lines.push_back(0);
+			else if (status_value(MobStatParser::PIMMUNE) && !magic_damage::pierces(randomizer.next_int(100), 0))
+				lines.push_back(1);
+			else
+				lines.push_back(meso_explosion::line(x, amount, randomizer.next_real(0.5, 1.0)));
+		}
+
+		return lines;
+	}
+
+	int32_t Mob::shown_explosion(int32_t number) const
+	{
+		return meso_explosion::shown(number, fixeddamage, MobHurts::hurt_by(damagedby, meso_explosion::ID));
 	}
 
 	std::pair<int32_t, bool> Mob::next_damage(double mindamage, double maxdamage, float hitchance, float critical,

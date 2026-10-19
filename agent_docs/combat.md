@@ -345,6 +345,52 @@ Brawler's Improve MaxHP (5100000) and a magician's Improving MaxMP Increase
 (2000001) add their `x` to each level's growth and their `y` to an AP's
 (`net::skills::growth_bonus`).
 
+### Meso Explosion
+
+Meso Explosion (4211006) sets off mesos lying in front of a Chief Bandit,
+and each hurts the mobs around it by what it is worth (v83 FUN_0096b3fb;
+`v83ref` report 194). The client picks everything and sends it in its
+CLOSE_RANGE_ATTACK, laid out differently from other attacks (v83 0x96bafe):
+each target has 12 bytes, then a byte counting its lines, then the lines
+and the 4-byte checksum. After the targets come where the player stands,
+a byte counting the drops, each drop's object id and a byte of the targets
+it hit (bit j for the j-th), and an i16 of when the hits land, in ms.
+
+HeavenClient (`Gameplay/Combat/MesoExplosion.h`, `Combat::set_off_mesos`)
+refuses it on a rope or ladder or in the air. It looks in the skill's box
+(`lt`/`rb`, mirrored when facing right, without its right and bottom
+edges) for mesos that have landed and that the player may take by their
+ownership type. Unlike pickup, it ignores how long they have lain. It takes
+the first `attackCount` (at most 20) in the order they entered the map,
+then sorts them cheapest first. Each drop hits the live mobs whose body
+meets a box 50 px around it. That is at most `mobCount` mobs, in the order
+they entered the map, and at most 15 drops on each mob. Only the first 15
+drops hurt anything. One line is 50·`x` × a roll from 0.5 up to 1 × a ratio
+of the mesos: (0.82m + 28) / 5300 up to 1,000 mesos, then m / (m + 5250). A
+Disabled mob takes 0, and a mob under PImmune takes 1. The packet carries
+every line. A mob shows them added up into at most five numbers (the i-th
+line to number i % 5), all at the attack's hit frame. Those numbers show the
+mob's `fixedDamage` for a hit, or 0 if its `damagedBy` leaves the skill out.
+With no mesos the skill still acts and costs MP. The skill's `hit`
+animations are the drops going off, not hits on the mobs.
+
+The server (`net::meso_explosion`, `blast` in `net::combat`) refuses more
+drops than `attackCount` and a drop named twice, and checks that each
+target's lines match the drops whose bits name it. Each line is capped at
+50·`x`. The field (`set_off`) takes each drop the player may take that lies
+within the skill's box (100 px of slack), and removes it at once. It sends
+REMOVE_ITEM_FROM_MAP mode 4 (`u8 4, i32 oid, i16 delay`). The delay is the
+client's, plus 100 ms for each of the next four drops, then again from the
+start (Cosmic's spread), and never more than 1 s. A line counts only if
+its drop went off and the line is no more than that drop could do
+(`line_cap`). It counts as the mob's `fixedDamage` if it has one. On mode 4,
+HeavenClient's drop stays where it is, and can't be picked up or chosen
+again. When the delay ends, it disappears and plays one of the skill's
+`hit` animations at random on the effect layer. The skill's `Hit` sound
+plays no more than once every 90 ms (FUN_00504bff). Other players see each
+line as its own number, all at once, with the same `fixedDamage` and
+`damagedBy` rules (FUN_009803ab).
+
 ## Buff skills
 
 USE_SKILL (`0x5B`, `handle::world::use_skill`) casts a skill that doesn't
@@ -487,7 +533,8 @@ GMS footage. Its horizontal speed is set from that air time so it lands on
 its destination, and it turns about twice on the way down. A picked up drop
 (REMOVE_ITEM_FROM_MAP 2) follows the looter and rises about 50 px, slowing
 down, then disappears after about 0.37 s; it stays opaque except for the last
-six ticks. An expiring drop (mode 0) fades out where it is.
+six ticks. An expiring drop (mode 0) fades out where it is. Mode 4 sets
+mesos off for Meso Explosion (see "Meso Explosion" above).
 
 ITEM_PICKUP (`0xCA`) needs the player within 800×600 of the drop. The field
 removes it (REMOVE_ITEM_FROM_MAP 2 with the looter) and hands it to the

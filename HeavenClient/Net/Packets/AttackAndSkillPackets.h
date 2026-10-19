@@ -116,6 +116,61 @@ namespace ms
 		}
 	};
 
+	// Meso Explosion's CLOSE_ATTACK: each mob with how many lines it takes,
+	// then where the player stands, the drops it sets off, cheapest first,
+	// each with the mobs it hit (bit j for the j-th), and when its hits land
+	// (0x96bafe).
+	class MesoExplosionPacket : public OutPacket
+	{
+	public:
+		MesoExplosionPacket(const AttackResult& attack, const std::vector<std::pair<int32_t, std::vector<int32_t>>>& lines,
+							Point<int16_t> position, const std::vector<std::pair<int32_t, uint8_t>>& drops, int16_t delay)
+			: OutPacket(OutPacket::Opcode::CLOSE_ATTACK)
+		{
+			skip(1);
+
+			write_byte((attack.mobcount << 4) | attack.hitcount);
+			write_int(attack.skill);
+
+			skip(8);
+
+			write_byte(attack.display);
+			write_short(static_cast<int16_t>((attack.stance & 0x7FFF) | (attack.toleft ? 0x8000 : 0)));
+
+			skip(1);
+
+			write_byte(attack.speed);
+
+			skip(4);
+
+			for (auto& [oid, mob] : lines)
+			{
+				write_int(oid);
+
+				skip(12);
+
+				write_byte(static_cast<int8_t>(mob.size()));
+
+				for (int32_t line : mob)
+					write_int(line);
+
+				skip(4);
+			}
+
+			write_short(position.x());
+			write_short(position.y());
+			write_byte(static_cast<int8_t>(drops.size()));
+
+			for (auto& [oid, mask] : drops)
+			{
+				write_int(oid);
+				write_byte(static_cast<int8_t>(mask));
+			}
+
+			write_short(delay);
+		}
+	};
+
 	// Tells the server that the player took damage.
 	// Opcode: TAKE_DAMAGE(48)
 	class TakeDamagePacket : public OutPacket
