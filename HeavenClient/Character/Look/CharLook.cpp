@@ -631,6 +631,28 @@ namespace ms
 		}
 	}
 
+	uint16_t CharLook::get_attack_length() const
+	{
+		uint16_t length = 0;
+
+		if (action)
+		{
+			for (uint16_t delay : drawinfo.get_action_delays(actionstr))
+				length += delay;
+		} else
+		{
+			uint8_t frame = 0;
+
+			do
+			{
+				length += get_delay(stance.get(), frame);
+				frame = getnextframe(stance.get(), frame);
+			} while (frame != 0);
+		}
+
+		return length;
+	}
+
 	std::vector<uint16_t> CharLook::get_action_delays(const std::string &action) const
 	{
 		return drawinfo.get_action_delays(action);
@@ -649,6 +671,11 @@ namespace ms
 	Stance::Id CharLook::get_stance() const
 	{
 		return stance.get();
+	}
+
+	std::string CharLook::get_action_name() const
+	{
+		return action ? actionstr : Stance::names[stance.get()];
 	}
 
 	Point<int16_t> CharLook::get_facepos() const

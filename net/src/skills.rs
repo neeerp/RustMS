@@ -1,7 +1,7 @@
 //! Skill templates (`Skill.nx`), loaded once.
 
 use crate::load::{self, asset_path};
-use game::{BuffStat, InventoryType, MobStat, Player};
+use game::{BuffStat, Disease, InventoryType, MobStat, Player};
 use game_data::skills::{SkillData, SkillInfo, SkillLevel};
 use game_data::{FieldTemplate, FIELD_LIMIT_MYSTIC_DOOR, PORTAL_TYPE_START_POINT};
 use std::sync::OnceLock;
@@ -186,18 +186,75 @@ pub const CHAKRA: i32 = 4211001;
 pub const MANA_REFLECTION: i32 = 2121002;
 pub const TIME_LEAP: i32 = 5121010;
 
+pub const SACRIFICE: i32 = 1311005;
+pub const DRAGON_ROAR: i32 = 1311006;
+pub const DRAGON_BLOOD: i32 = 1311008;
+
+/// Final Attack's swings, which the client sends on its own after some of
+/// its skill attacks (their `finalAttack`), and never pays for (0x96cd3e).
+pub const FINAL_ATTACKS: [i32; 10] = [
+    1100002, 1100003, 1200002, 1200003, 1300002, 1300003, 3100001, 3200001, 11101002, 13101002,
+];
+
+/// The Slash Blast whose mobs a Final Attack after it reaches: the Dawn
+/// Warrior's for a Cygnus Knight (0x95150e).
+pub fn slash_blast(player: &Player) -> i32 {
+    if player.stats.job / 1000 == 1 {
+        11001003
+    } else {
+        1001005
+    }
+}
+
+/// The HP a skill costs, or `None` when the player hasn't enough
+/// (FUN_00764256): its `hpCon`, which must stay under their HP. Dragon
+/// Roar instead takes its `x` percent of their max HP, and needs at least
+/// half of it.
+pub fn hp_cost(player: &Player, skill: &Learned) -> Option<i32> {
+    let hp = i32::from(player.stats.hp);
+    let max_hp = i32::from(player.stats.max_hp);
+    let cost = if skill.skill_id == DRAGON_ROAR {
+        if hp < max_hp / 2 {
+            return None;
+        }
+        skill.effect.x * max_hp / 100
+    } else {
+        skill.effect.hp_cost
+    };
+    (cost == 0 || hp > cost).then_some(cost)
+}
+
+/// The stun Dragon Roar leaves its user in: `y` seconds of Stun, under the
+/// skill's own id, so the client shows Dragon Roar's icon and won't let it
+/// be cancelled (0xa203bf, 0x45ba47). The client never stuns the player
+/// itself; it only stops them while the server has.
+pub fn self_stun(skill: &Learned) -> Option<Disease> {
+    (skill.skill_id == DRAGON_ROAR && skill.effect.y > 0).then(|| Disease {
+        stat: BuffStat::Stun,
+        value: 1,
+        skill_id: DRAGON_ROAR,
+        lasts: Duration::from_secs(skill.effect.y as u64),
+    })
+}
+
 pub const MYSTIC_DOOR: i32 = 2311002;
 
 /// The Teleport skills (v83 FUN_00957b74): the client moves the player and
 /// asks only for the MP.
 pub const TELEPORTS: [i32; 5] = [2101002, 2201002, 2301001, 12101003, 22101001];
 
+/// The Flash Jump skills (v83 FUN_0096be38): the client throws the player on
+/// through the air and asks only for the MP.
+pub const FLASH_JUMPS: [i32; 2] = [4111006, 14101004];
+
 /// Skills that neither buff nor debuff: the handler does their work.
 /// Chakra heals the user, Resurrection raises dead party members, Time Leap
-/// ends cooldowns, and Mystic Door opens a door. Teleport has no work.
+/// ends cooldowns, and Mystic Door opens a door. Teleport and Flash Jump
+/// have no work.
 pub fn acts_alone(skill_id: i32) -> bool {
     matches!(skill_id, MYSTIC_DOOR | CHAKRA | RESURRECTION | TIME_LEAP)
         || TELEPORTS.contains(&skill_id)
+        || FLASH_JUMPS.contains(&skill_id)
         || HEROS_WILL.contains(&skill_id)
 }
 
@@ -415,19 +472,18 @@ impl Amount {
     }
 }
 
-/// A player's STR, DEX, and LUK with what they wear.
+/// A player's STR, DEX, and LUK with what they wear, and Maple Warrior's
+/// percent of their own (BasicStat::SetFrom, 0x77f289).
 pub(crate) fn total_stats(player: &Player) -> (i32, i32, i32) {
     let stats = &player.stats;
+    let warrior = i32::from(player.buffs.value(BuffStat::MapleWarrior).unwrap_or(0));
+    let own = |stat: i16| i32::from(stat) + i32::from(stat) * warrior / 100;
     player
         .inventory
         .items(InventoryType::Equipped)
         .filter_map(|(_, item)| item.equip.as_ref())
         .fold(
-            (
-                i32::from(stats.str),
-                i32::from(stats.dex),
-                i32::from(stats.luk),
-            ),
+            (own(stats.str), own(stats.dex), own(stats.luk)),
             |(str, dex, luk), equip| {
                 (
                     str + i32::from(equip.str),
@@ -539,6 +595,74 @@ pub fn on_hit(player: &Player, skill: Option<&Learned>, ranged: bool, roll: f64)
         ));
     }
     inflicts
+}
+
+/// Drain, the Marauder's and the Thunder Breaker's Energy Drain, and
+/// Vampire: each gives back its `x` percent of the damage as HP.
+pub const DRAINS: [i32; 4] = [4101005, 5111004, 15111001, 14101006];
+
+/// Mortal Blow, the Ranger's and the Sniper's close shot.
+pub const MORTAL_BLOWS: [i32; 2] = [3110001, 3210001];
+
+/// The wizards' and the cleric's MP Eater.
+pub const MP_EATERS: [i32; 3] = [2100000, 2200000, 2300000];
+
+/// What an attack takes from the mobs it hits besides their HP.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct Takes {
+    /// Drain and its kin: this percent of the damage comes back as HP, no
+    /// more than each mob's max HP, nor half the player's (Drain's
+    /// description).
+    pub hp: i32,
+    /// MP Eater, for a spell.
+    pub mp: Option<MpEater>,
+    /// Mortal Blow's kill came up: a mob, not a boss, at or under this
+    /// percent of its HP dies.
+    pub life: i32,
+}
+
+/// MP Eater: with its chance (`prop`), each mob a spell hits, not a boss,
+/// loses its `x` percent of its max MP to the player, as much as it has,
+/// and everyone sees the skill's effect (as Cosmic's applyPassive).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct MpEater {
+    pub skill_id: i32,
+    pub level: u8,
+    pub prop: i32,
+    pub x: i32,
+}
+
+impl MpEater {
+    /// Whether it eats this time.
+    pub fn eats(&self, roll: f64) -> bool {
+        roll * 100.0 < f64::from(self.prop)
+    }
+}
+
+/// What this attack takes. A spell has the MP Eater of the player's own
+/// branch; Mortal Blow rolls its `y` percent chance of a kill here.
+pub fn takes(player: &Player, skill: Option<&Learned>, magic: bool, roll: f64) -> Takes {
+    let mut takes = Takes::default();
+    if let Some(skill) = skill {
+        if DRAINS.contains(&skill.skill_id) {
+            takes.hp = skill.effect.x;
+        }
+        if MORTAL_BLOWS.contains(&skill.skill_id) && roll * 100.0 < f64::from(skill.effect.y) {
+            takes.life = skill.effect.x;
+        }
+    }
+    let eater = i32::from(player.stats.job) / 10 * 100_000;
+    if magic && MP_EATERS.contains(&eater) {
+        takes.mp = learned(player, eater)
+            .filter(|eater| eater.level > 0)
+            .map(|eater| MpEater {
+                skill_id: eater.skill_id,
+                level: eater.level as u8,
+                prop: eater.effect.prop,
+                x: eater.effect.x,
+            });
+    }
+    takes
 }
 
 /// Poison Mist: a cloud where it's cast that poisons the mobs in it.
@@ -732,9 +856,9 @@ pub fn buffs(skill: &Learned) -> Option<Vec<(BuffStat, i32)>> {
         1001 | 10001001 | 20001001 => vec![(BuffStat::Recovery, effect.x)],
         1002 | 10001002 | 20001002 => vec![],
         // Iron Body, Rage, Iron Will, Magic Armor, Meditation, Bless,
-        // Focus, Haste.
+        // Focus, Haste, Enrage.
         1001003 | 1101006 | 1301006 | 2001003 | 2101001 | 2201001 | 2301004 | 3001003 | 4101004
-        | 4201003 => vec![],
+        | 4201003 | 1121010 => vec![],
         1101004 | 1101005 | 1201004 | 1201005 | 1301004 | 1301005 | 2111005 | 2211005 | 3101002
         | 3201002 | 4101003 | 4201002 | 5101006 | 5201003 => {
             vec![(BuffStat::Booster, effect.x)]
@@ -746,7 +870,7 @@ pub fn buffs(skill: &Learned) -> Option<Vec<(BuffStat, i32)>> {
             return Some(vec![(BuffStat::WeaponCharge, effect.x)]);
         }
         1301007 => vec![(BuffStat::MaxHp, effect.x), (BuffStat::MaxMp, effect.y)],
-        1311008 => vec![(BuffStat::DragonBlood, effect.x)],
+        DRAGON_BLOOD => vec![(BuffStat::DragonBlood, effect.x)],
         1121000 | 1221000 | 1321000 | 2121000 | 2221000 | 2321000 | 3121000 | 3221000 | 4121000
         | 4221000 | 5121000 | 5221000 => vec![(BuffStat::MapleWarrior, effect.x)],
         1121002 | 1221002 | 1321002 => vec![(BuffStat::Stance, effect.prop)],
@@ -819,6 +943,25 @@ mod tests {
     }
 
     #[test]
+    fn maple_warrior_adds_its_percent_of_the_players_own_stats() {
+        let mut player = knowing(&[]);
+        (player.stats.str, player.stats.dex, player.stats.luk) = (99, 50, 4);
+        let ring = game::EquipStats {
+            str: 100,
+            ..Default::default()
+        };
+        let ring = game::Item::equipment(1112000, ring);
+        player.inventory.insert(InventoryType::Equipped, -12, ring);
+        assert_eq!(total_stats(&player), (199, 50, 4));
+        let now = std::time::Instant::now();
+        let long = Duration::from_secs(60);
+        let warrior = game::Buff::new(1121000, BuffStat::MapleWarrior, 10, now, long);
+        player.buffs.give(warrior);
+        // Ten percent of 99 is 9, of 4 none; the ring's 100 isn't counted.
+        assert_eq!(total_stats(&player), (208, 55, 4));
+    }
+
+    #[test]
     fn improving_max_hp_and_mp_add_to_their_jobs_growth() {
         let mut player = knowing(&[
             (IMPROVING_MAX_HP, 10),
@@ -836,6 +979,58 @@ mod tests {
         // A Gunslinger has no Improve MaxHP.
         player.stats.job = 520;
         assert_eq!(growth_bonus(&player, false), (0, 0));
+    }
+
+    #[test]
+    fn skills_cost_their_hp_and_dragon_roar_a_share_of_max_hp() {
+        let mut player = knowing(&[]);
+        player.stats.max_hp = 1000;
+        player.stats.hp = 9;
+        // Slash Blast at 1 costs 8, and needs more than that.
+        let slash_blast = at_level(1001005, 1).unwrap();
+        assert_eq!(hp_cost(&player, &slash_blast), Some(8));
+        player.stats.hp = 8;
+        assert_eq!(hp_cost(&player, &slash_blast), None);
+        assert_eq!(hp_cost(&player, &at_level(1001004, 1).unwrap()), Some(0));
+        // Dragon Roar at 30 takes 30 percent, from half of max HP up.
+        let roar = at_level(DRAGON_ROAR, 30).unwrap();
+        player.stats.hp = 500;
+        assert_eq!(hp_cost(&player, &roar), Some(300));
+        player.stats.hp = 499;
+        assert_eq!(hp_cost(&player, &roar), None);
+    }
+
+    #[test]
+    fn dragon_roar_stuns_its_user_for_its_y_seconds() {
+        let stun = |level| self_stun(&at_level(DRAGON_ROAR, level).unwrap());
+        let stun_30 = stun(30).unwrap();
+        assert_eq!((stun_30.stat, stun_30.value), (BuffStat::Stun, 1));
+        assert_eq!(stun_30.skill_id, DRAGON_ROAR);
+        assert_eq!(stun_30.lasts, Duration::from_secs(2));
+        assert_eq!(stun(1).unwrap().lasts, Duration::from_secs(4));
+        assert_eq!(self_stun(&at_level(1001005, 20).unwrap()), None);
+    }
+
+    #[test]
+    fn drains_eaters_and_mortal_blows_take_their_shares() {
+        let mut player = knowing(&[(2100000, 20), (2200000, 20)]);
+        player.stats.job = 211;
+        let drain = at_level(4101005, 30).unwrap();
+        assert_eq!(takes(&player, Some(&drain), false, 0.0).hp, 45);
+        // A fire wizard eats with the fire wizard's skill, from a spell only.
+        let eater = takes(&player, None, true, 0.0).mp.unwrap();
+        assert_eq!((eater.skill_id, eater.level), (2100000, 20));
+        assert_eq!((eater.prop, eater.x), (30, 40));
+        assert!(eater.eats(0.29) && !eater.eats(0.3));
+        assert_eq!(takes(&player, None, false, 0.0).mp, None);
+        player.stats.job = 200;
+        assert_eq!(takes(&player, None, true, 0.0).mp, None);
+        player.stats.job = 230;
+        assert_eq!(takes(&player, None, true, 0.0).mp, None);
+        // Mortal Blow at 20 kills at half HP, one time in ten.
+        let blow = at_level(3110001, 20).unwrap();
+        assert_eq!(takes(&player, Some(&blow), false, 0.09).life, 50);
+        assert_eq!(takes(&player, Some(&blow), false, 0.1).life, 0);
     }
 
     #[test]

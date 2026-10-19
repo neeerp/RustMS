@@ -25,12 +25,16 @@
 
 #include "../Data/ItemData.h"
 
+#include "../../Util/Randomizer.h"
+
+#include <algorithm>
+
 #include <nlnx/nx.hpp>
 #include <nlnx/node.hpp>
 
 namespace ms
 {
-	MapDrops::MapDrops() = default;
+	MapDrops::MapDrops() : sinceblast(meso_explosion::SOUND_GAP) {}
 
 	void MapDrops::init()
 	{
@@ -40,11 +44,23 @@ namespace ms
 		mesoicons[MesoIcon::GOLD] = src["09000001"]["iconRaw"];
 		mesoicons[MesoIcon::BUNDLE] = src["09000002"]["iconRaw"];
 		mesoicons[MesoIcon::BAG] = src["09000003"]["iconRaw"];
+
+		std::string id = std::to_string(meso_explosion::ID);
+
+		for (auto sub : nl::nx::skill[id.substr(0, 3) + ".img"]["skill"][id]["hit"])
+			blasts.emplace_back(sub);
+
+		blastsound = nl::nx::sound["Skill.img"][id]["Hit"];
 	}
 
 	void MapDrops::draw(Layer::Id layer, double viewx, double viewy, float alpha) const
 	{
 		drops.draw(layer, viewx, viewy, alpha);
+	}
+
+	void MapDrops::draw_explosions(Point<int16_t> viewpos, float alpha) const
+	{
+		explosions.drawabove(viewpos, alpha);
 	}
 
 	void MapDrops::update(const Physics &physics)
@@ -84,6 +100,29 @@ namespace ms
 			mesoicon.update();
 
 		drops.update(physics);
+
+		// A drop that went off shows one of the skill's hits where it lay,
+		// and sounds, but not again within 90 ms.
+		sinceblast = std::min(sinceblast + Constants::TIMESTEP, meso_explosion::SOUND_GAP);
+
+		for (auto &mmo : drops)
+		{
+			Optional<Drop> drop = mmo.second.get();
+
+			if (!drop || !drop->went_off())
+				continue;
+
+			if (!blasts.empty())
+				explosions.add(blasts[Randomizer().next_int(blasts.size())], DrawArgument(drop->get_spot()), 0);
+
+			if (sinceblast >= meso_explosion::SOUND_GAP)
+			{
+				blastsound.play();
+				sinceblast = 0;
+			}
+		}
+
+		explosions.update();
 	}
 
 	void MapDrops::spawn(DropSpawn &&spawn)
@@ -97,9 +136,39 @@ namespace ms
 			drop->expire(mode, looter);
 	}
 
+	void MapDrops::explode(int32_t oid, int16_t delay)
+	{
+		if (Optional<Drop> drop = drops.get(oid))
+			drop->explode(delay);
+	}
+
+	std::vector<meso_explosion::Drop> MapDrops::find_explodable(Rectangle<int16_t> area, int32_t self,
+																 int32_t party) const
+	{
+		std::vector<std::pair<uint32_t, meso_explosion::Drop>> found;
+
+		for (auto &mmo : drops)
+		{
+			auto drop = static_cast<const Drop *>(mmo.second.get());
+
+			if (drop && drop->explodable(area, self, party))
+				found.push_back({ drops.entry_order(mmo.first), { mmo.first, drop->get_mesos(), drop->get_spot() } });
+		}
+
+		std::sort(found.begin(), found.end(), [](auto &a, auto &b) { return a.first < b.first; });
+
+		std::vector<meso_explosion::Drop> explodable;
+
+		for (auto &[entry, drop] : found)
+			explodable.push_back(drop);
+
+		return explodable;
+	}
+
 	void MapDrops::clear()
 	{
 		drops.clear();
+		explosions.clear();
 	}
 
 	MapDrops::Loot MapDrops::find_loot_at(Point<int16_t> playerpos, int32_t self, int32_t party)

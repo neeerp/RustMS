@@ -32,6 +32,14 @@ int main()
 
 		require(get(1, true).empty() && get(10, false).empty(), "other weapons don't shoot");
 
+		using attack_stances::get_final;
+
+		require(get_final(1) == List{SWINGOF, STABOF}, "a one-handed Final Attack swings or stabs");
+		require(get_final(2) == List{SWINGPF, STABTF}, "so does a spear's or polearm's");
+		require(get_final(5) == List{SWINGTF, STABOF}, "and a two-handed one's");
+		require(get_final(3) == List{SHOOTF} && get_final(4) == List{SHOOT2}, "bows and crossbows shoot");
+		require(get_final(6).empty() && get_final(10).empty(), "wands have none");
+
 		std::cout << "Attack stances passed\n";
 		return 0;
 	}

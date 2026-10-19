@@ -71,6 +71,11 @@ namespace ms
 		// element `command` of no duration (v83 FUN_0052ef17).
 		void record_move(uint8_t command);
 
+		// Whether a Flash Jump may go now, and throw the player on through
+		// the air at its `level` (FUN_0096be38).
+		bool may_flash_jump() const;
+		void flash_jump(int32_t level);
+
 		// Sends a Keyaction to the player's state, to apply forces, change the state and other behaviour.
 		void send_action(KeyAction::Id action, bool pressed);
 
@@ -111,14 +116,21 @@ namespace ms
 		// Return if the player is attacking
 		bool is_attacking() const;
 
-		// Return whether the player is free to attack, weapon aside.
-		bool can_attack() const;
+		// Return whether the player is free to attack, weapon aside, or to
+		// cut short the attack under way (`interrupting`).
+		bool can_attack(bool interrupting = false) const;
 
 		// Return whether the player can use a skill or not.
 		SpecialMove::ForbidReason can_use(const SpecialMove &move) const;
 
 		// Build a skill (0 for regular) or a point-blank whack from the player's stats.
 		Attack prepare_attack(int32_t skill, bool whack = false) const;
+
+		// The percent Combo Attack's orbs make a swing's or a shot's damage, 0 for none.
+		int32_t combo_percent(int32_t skill) const;
+
+		// The percent of the first set's damage Shadow Partner's set does.
+		int32_t partner_percent(int32_t skill) const;
 
 		// Execute a rush movement
 		void rush(double targetx);
@@ -348,6 +360,9 @@ namespace ms
 		// When the player last moved under Stop Motion, or entered the map
 		// (+0x311c).
 		int64_t stirred = 0;
+		// Whether the player has Flash Jumped since last on the ground or a
+		// rope (+0x2b58).
+		bool flash_jumped = false;
 
 		move_path::Recorder path;
 

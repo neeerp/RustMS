@@ -70,10 +70,6 @@ namespace ms
 
 		const std::string& get_name() const;
 
-		EquipStat::Id get_primary(Weapon::Type weapontype) const;
-
-		EquipStat::Id get_secondary(Weapon::Type weapontype) const;
-
 	private:
 		std::string get_name(uint16_t id) const;
 

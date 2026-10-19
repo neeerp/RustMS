@@ -734,6 +734,10 @@ namespace ms
 
 			Stage::get().get_combat().show_player_affected(skillid);
 		}
+		else if (mode1 == 5) // a skill's special animation, as Dragon Blood's drink
+		{
+			Stage::get().get_combat().show_player_special(recv.read_int());
+		}
 		else if (mode1 == 18) // intro effect
 		{
 			recv.read_string(); // path

@@ -298,6 +298,16 @@ namespace ms
 				return !queue.empty();
 			}
 
+			// The types of the elements played since last asked, a bit each
+			// (FUN_0068adcc).
+			uint32_t take_arrived()
+			{
+				uint32_t types = arrived;
+				arrived = 0;
+
+				return types;
+			}
+
 		private:
 			// Times are kept in thirtieths of a millisecond, so the faster
 			// rate adds up exactly.
@@ -307,6 +317,9 @@ namespace ms
 
 			void arrive(const Movement &element)
 			{
+				if (element.command < 32)
+					arrived |= 1u << element.command;
+
 				state.x = element.xpos;
 				state.y = element.ypos;
 				state.vx = element.vx;
@@ -335,6 +348,7 @@ namespace ms
 			int32_t elapsed = 0;
 			int32_t queued = 0;
 			int32_t rate = TICK;
+			uint32_t arrived = 0;
 		};
 	}
 }

@@ -17,7 +17,9 @@
 //////////////////////////////////////////////////////////////////////////////////
 #pragma once
 
+#include <map>
 #include <string>
+#include <vector>
 
 #include <cstdint>
 
@@ -62,6 +64,8 @@ namespace ms
 			int32_t y;
 			// A second value of the skill's own, as Shadow Meso's critical.
 			int32_t x = 0;
+			// A third, as how much a charge's element counts.
+			int32_t z = 0;
 			// The mesos the skill takes, and the item and how many of it.
 			int32_t mesocost = 0;
 			int32_t itemcost = 0;
@@ -149,6 +153,10 @@ namespace ms
 		// Return id and level of all required skills.
 		const std::unordered_map<int32_t, int32_t> &get_reqskills() const;
 
+		// The Final Attacks the skill may set off, and the weapon types each
+		// comes with (`finalAttack`).
+		const std::map<int32_t, std::vector<int32_t>> &get_final_attacks() const;
+
 	private:
 		// Allow the cache to use the constructor
 		friend Cache<SkillData>;
@@ -171,6 +179,7 @@ namespace ms
 		std::string desc;
 		std::unordered_map<int32_t, std::string> levels;
 		std::unordered_map<int32_t, int32_t> reqskills;
+		std::map<int32_t, std::vector<int32_t>> final_attacks;
 
 		std::array<Texture, Icon::NUM_ICONS> icons;
 	};

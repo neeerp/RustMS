@@ -25,6 +25,7 @@
 #include "../Spawn.h"
 
 #include "../Combat/Attack.h"
+#include "../Combat/MesoExplosion.h"
 #include "../Combat/SpecialMove.h"
 
 #include <queue>
@@ -137,6 +138,16 @@ namespace ms
 
 		// Return a mob's body bounds on the map.
 		Rectangle<int16_t> get_mob_body(int32_t oid) const;
+
+		// The mobs Meso Explosion may hurt: those alive, in the order they
+		// entered the map.
+		std::vector<meso_explosion::Mob> explosion_targets() const;
+
+		// Meso Explosion's lines on a mob from drops of these `mesos`.
+		std::vector<int32_t> explode(int32_t oid, int32_t x, const std::vector<int32_t> &mesos) const;
+
+		// What a number of Meso Explosion's shows on a mob.
+		int32_t shown_explosion(int32_t oid, int32_t number) const;
 
 		// Return all mob map objects
 		MapObjects *get_mobs();

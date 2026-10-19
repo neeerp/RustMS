@@ -19,6 +19,7 @@
 
 #include <cstdint>
 
+#include "FinalAttack.h"
 #include "MonsterMagnet.h"
 #include "RegularAttack.h"
 #include "ShotPath.h"
@@ -27,6 +28,7 @@
 #include "Teleport.h"
 
 #include "../MapleMap/MapChars.h"
+#include "../MapleMap/MapDrops.h"
 #include "../MapleMap/MapInfo.h"
 #include "../MapleMap/MapMobs.h"
 #include "../MapleMap/MapPortals.h"
@@ -45,7 +47,7 @@ namespace ms
 	{
 	public:
 		Combat(Player &player, MapChars &chars, MapMobs &mobs, MapReactors &reactors, MapSummons &summons,
-			   const Physics &physics, const MapInfo &mapinfo, const MapPortals &portals);
+			   MapDrops &drops, const Physics &physics, const MapInfo &mapinfo, const MapPortals &portals);
 
 		// Load the charge gauge, once the NX files are open.
 		static void init();
@@ -78,6 +80,10 @@ namespace ms
 		// Where the player should be moved to, if the skill was used.
 		std::optional<teleport::Spot> use_teleport(int32_t move_id, bool allowed);
 
+		// Ask to use Flash Jump, which the map must have `allowed` and the
+		// player be `airborne` for. Whether it was asked.
+		bool use_flash_jump(int32_t move_id, bool allowed, bool airborne);
+
 		// Add an attack to the attack queue.
 		void push_attack(const AttackResult &attack);
 
@@ -98,10 +104,10 @@ namespace ms
 		void show_affected(int32_t cid, int32_t skillid);
 		void show_player_affected(int32_t skillid);
 
-		// Show the `special` animation of the skill that dodged a hit,
-		// Guardian or Shadow Shifter, on a user or the player (0x936528).
-		void show_dodge(int32_t cid, int32_t skillid);
-		void show_player_dodge(int32_t skillid);
+		// Show a skill's `special` animation on a user or the player (0x936528): the skill that
+		// dodged a hit, Guardian or Shadow Shifter, or Dragon Blood drinking HP (user effect 5).
+		void show_special(int32_t cid, int32_t skillid);
+		void show_player_special(int32_t skillid);
 
 		// Show Monster Magnet catching a mob, or failing to, over it
 		// (0x66d6b9, 0x438eb6).
@@ -199,9 +205,30 @@ namespace ms
 		// order they entered the map (FUN_00678760).
 		std::vector<int32_t> find_undead(Rectangle<int16_t> range, uint8_t count) const;
 
+		// A Final Attack in this stance, after the skill `trigger`.
+		struct Follow
+		{
+			Stance::Id stance;
+			int32_t trigger;
+		};
+
 		// Use the move. A held skill hits with its `charge`, and its shots
-		// while held keep the body's action (`held`).
-		void apply_move(const SpecialMove &move, int32_t charge = 0, bool held = false);
+		// while held keep the body's action (`held`). A Final Attack
+		// (`follow`) cuts short the action under way with its own.
+		void apply_move(const SpecialMove &move, int32_t charge = 0, bool held = false,
+						const Follow *follow = nullptr);
+
+		// Meso Explosion: set off the mesos in front of the player, each
+		// hurting the mobs around it (FUN_0096b3fb).
+		void set_off_mesos(const SpecialMove &move);
+
+		// After a skill attack, see whether one of the Final Attacks it may
+		// set off comes up, and when it follows (0x957830).
+		void roll_final_attack(int32_t trigger);
+
+		// Follow up with the Final Attack that came up, once it's time
+		// (0x96cd3e).
+		void update_final_attack();
 
 		// Let go of Monster Magnet, held for `charge` ms: it catches the mobs
 		// in front of the player (0x96c215). Whether it was used.
@@ -305,6 +332,11 @@ namespace ms
 
 		void apply_damage_effect(const DamageEffect &effect);
 
+		// Another user's Meso Explosion as its mobs show it: each line its
+		// own number, but their fixed damage, or 0 if it can't hurt them
+		// (FUN_009803ab).
+		AttackResult show_explosion(AttackResult attack) const;
+
 		// The area an attack covers, from the attacker's position and facing.
 		static Rectangle<int16_t> place_range(Point<int16_t> origin, Rectangle<int16_t> range, float hrange,
 											  bool toleft);
@@ -350,6 +382,7 @@ namespace ms
 		MapMobs &mobs;
 		MapReactors &reactors;
 		MapSummons &summons;
+		MapDrops &drops;
 		const Physics &physics;
 		const MapInfo &mapinfo;
 		const MapPortals &portals;
@@ -466,6 +499,18 @@ namespace ms
 		};
 
 		std::unordered_map<int32_t, RemotePrepare> remote_prepares;
+
+		// A Final Attack that came up: what set it off, with which weapon
+		// type, and when it follows.
+		struct FinalAttack
+		{
+			int32_t trigger;
+			int32_t skill;
+			int32_t weapon;
+			int64_t at;
+		};
+
+		std::optional<FinalAttack> pending_final;
 
 		// Game time in ms, for the shots of the skills that keep firing.
 		int64_t now = 0;

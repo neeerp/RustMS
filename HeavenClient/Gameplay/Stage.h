@@ -160,6 +160,10 @@ namespace ms
 		// entering the map.
 		void show_ship_state(uint8_t state, uint8_t flag);
 
+		// Leave a Flash Jump's `effect` where a player jumped, flipped when
+		// they face `right` (0x96c107, 0x97ffa4).
+		void show_flash_jump(const char *effect, Point<int16_t> position, bool right);
+
 		// CLOCK kind 1: the time of day on the map's wall clock. A time sent
 		// while the map loads waits for it.
 		void set_clock(uint8_t hour, uint8_t minute, uint8_t second);
@@ -210,6 +214,8 @@ namespace ms
 		bool update_teleport();
 
 		void use_teleport(int32_t skill);
+
+		void use_flash_jump(int32_t skill);
 
 		void check_seats();
 

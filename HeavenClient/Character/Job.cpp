@@ -206,38 +206,4 @@ namespace ms
 				return "";
 		}
 	}
-
-	EquipStat::Id Job::get_primary(Weapon::Type weapontype) const
-	{
-		switch (id / 100)
-		{
-			case 2:
-				return EquipStat::Id::INT;
-			case 3:
-				return EquipStat::Id::DEX;
-			case 4:
-				return EquipStat::Id::LUK;
-			case 5:
-				return (weapontype == Weapon::Type::GUN) ? EquipStat::Id::DEX : EquipStat::Id::STR;
-			default:
-				return EquipStat::Id::STR;
-		}
-	}
-
-	EquipStat::Id Job::get_secondary(Weapon::Type weapontype) const
-	{
-		switch (id / 100)
-		{
-			case 2:
-				return EquipStat::Id::LUK;
-			case 3:
-				return EquipStat::Id::STR;
-			case 4:
-				return EquipStat::Id::DEX;
-			case 5:
-				return (weapontype == Weapon::Type::GUN) ? EquipStat::Id::STR : EquipStat::Id::DEX;
-			default:
-				return EquipStat::Id::DEX;
-		}
-	}
 }

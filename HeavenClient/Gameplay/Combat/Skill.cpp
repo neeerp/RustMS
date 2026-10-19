@@ -127,7 +127,12 @@ namespace ms
 		bool hashit0 = src["hit"]["0"].size() > 0;
 		bool hashit1 = src["hit"]["1"].size() > 0;
 
-		if (bylevelhit)
+		// Meso Explosion's hits are its drops going off, where they lie
+		// (FUN_00504bff), not on the mobs.
+		if (skillid == SkillId::MESO_EXPLOSION)
+		{
+			hiteffect = std::make_unique<NoHitEffect>();
+		} else if (bylevelhit)
 		{
 			if (hashit0 && hashit1)
 				hiteffect = std::make_unique<ByLevelTwoHandedHitEffect>(src);
@@ -263,8 +268,13 @@ namespace ms
 			attack.damagetype = Attack::DMG_MAGIC;
 		} else
 		{
-			attack.mindamage *= stats.damage;
-			attack.maxdamage *= stats.damage;
+			attack.blow.scale = stats.damage;
+			attack.element = SkillData::get(skillid).get_element();
+
+			// Inferno's and Blizzard's element counts x percent.
+			if (skillid == 3111003 || skillid == 3211003)
+				attack.blow.amplify = stats.x;
+
 			attack.damagetype = Attack::DMG_WEAPON;
 		}
 
@@ -319,6 +329,8 @@ namespace ms
 			if (attack.type == Attack::CLOSE && !projectile)
 				attack.range = user.get_afterimage().get_range();
 		}
+
+		attack.blow.motion = physical_damage::motion(user.get_look().get_action_name(), attack.type == Attack::RANGED);
 	}
 
 	void Skill::apply_hiteffects(const AttackUser &user, Mob &target) const

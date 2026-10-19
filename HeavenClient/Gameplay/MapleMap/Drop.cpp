@@ -18,6 +18,8 @@
 #include "Drop.h"
 #include "Pickup.h"
 
+#include "../Combat/MesoExplosion.h"
+
 #include "../../Data/ItemData.h"
 
 #include "../../Audio/Audio.h"
@@ -110,6 +112,7 @@ namespace ms
 		sincetry = pickup::RETRY;
 		sincepet = pickup::RETRY;
 		delay = std::max<int32_t>(dly, 0);
+		fuse = 0;
 		flighttime = flight_time(start.y(), dest.y(), pickuptype == EXPLOSIVE);
 		phase = 0.0;
 		looter = nullptr;
@@ -249,6 +252,18 @@ namespace ms
 			}
 		}
 
+		if (state == Drop::State::EXPLODED)
+		{
+			MapObject::deactivate();
+			return -1;
+		}
+
+		if (state == Drop::State::EXPLODING && elapsed >= fuse)
+		{
+			state = Drop::State::EXPLODED;
+			opacity.set(0.0f);
+		}
+
 		return phobj.fhlayer;
 	}
 
@@ -338,6 +353,39 @@ namespace ms
 	int32_t Drop::get_itemid() const
 	{
 		return 0;
+	}
+
+	int32_t Drop::get_mesos() const
+	{
+		return 0;
+	}
+
+	Point<int16_t> Drop::get_spot() const
+	{
+		return spot;
+	}
+
+	bool Drop::explodable(Rectangle<int16_t> area, int32_t self, int32_t party) const
+	{
+		// Only mesos that have landed.
+		if (get_mesos() <= 0 || state != Drop::State::FLOATING)
+			return false;
+
+		return meso_explosion::may_set_off(pickuptype, owner, self, party) && meso_explosion::in_area(area, spot);
+	}
+
+	void Drop::explode(int16_t dly)
+	{
+		state = Drop::State::EXPLODING;
+		elapsed = 0;
+		fuse = std::max<int32_t>(dly, 0);
+		angle.set(0.0f);
+		opacity.set(1.0f);
+	}
+
+	bool Drop::went_off() const
+	{
+		return state == Drop::State::EXPLODED;
 	}
 
 	bool Drop::blocked() const

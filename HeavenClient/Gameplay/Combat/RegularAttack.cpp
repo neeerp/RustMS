@@ -41,6 +41,8 @@ namespace ms
 
 		if (attack.type == Attack::CLOSE)
 			attack.range = user.get_afterimage().get_range();
+
+		attack.blow.motion = physical_damage::motion(user.get_look().get_action_name(), attack.type == Attack::RANGED);
 	}
 
 	void RegularAttack::apply_hiteffects(const AttackUser &user, Mob &target) const

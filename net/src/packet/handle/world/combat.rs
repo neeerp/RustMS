@@ -1,4 +1,5 @@
 use crate::combat::{self, AttackKind};
+use crate::combo;
 use crate::error::NetworkError;
 use crate::handler::{
     FieldRequest, HandlerResult, WorldAction, WorldContext, WorldHandler, WorldResult,
@@ -8,7 +9,8 @@ use crate::packet::build::world::stat::{self, StatUpdate};
 use crate::packet::build::world::{buff, effect, inventory};
 use crate::skills;
 use game::buff::BuffStat;
-use game::{Buff, Disease, InventoryType, MobStat, Player};
+use game::{Buff, Disease, InventoryType, MobStat, Player, ShownBuff};
+use game_data::FIELD_LIMIT_NO_EXP_LOSS;
 use packet::{io::read::PktRead, Packet};
 use std::io::Cursor;
 use std::time::{Duration, Instant};
@@ -126,6 +128,8 @@ impl WorldHandler for AttackHandler {
         let mut skill_level = 0;
         let ranged = attack.kind == AttackKind::Ranged;
         let inflicts = skills::on_hit(ctx.player, uses.skill.as_ref(), ranged, rand::random());
+        let magic = attack.kind == AttackKind::Magic;
+        let takes = skills::takes(ctx.player, uses.skill.as_ref(), magic, rand::random());
         let mist = uses.skill.as_ref().and_then(|skill| {
             Some(FieldRequest::Mist {
                 skill_id: skill.skill_id,
@@ -138,6 +142,7 @@ impl WorldHandler for AttackHandler {
         // over, and the client hears how long.
         let now = Instant::now();
         let cooldown = uses.skill.as_ref().map_or(0, |skill| skill.effect.cooldown);
+        let stun = uses.skill.as_ref().and_then(skills::self_stun);
         if cooldown > 0 {
             if ctx.player.buffs.cooling_down(attack.skill, now) {
                 debug!(skill = attack.skill, "Attack refused while cooling down");
@@ -150,6 +155,9 @@ impl WorldHandler for AttackHandler {
             let mut updates = vec![StatUpdate::Mp(
                 ctx.player.add_mp(-combat::attack_mp_cost(&skill)),
             )];
+            if uses.hp > 0 {
+                updates.push(StatUpdate::Hp(ctx.player.add_hp(-uses.hp)));
+            }
             if uses.mesos > 0 {
                 ctx.player.meso -= uses.mesos;
                 ctx.player.mark_dirty();
@@ -172,6 +180,7 @@ impl WorldHandler for AttackHandler {
             projectile = ammo.item_id;
         }
         let broadcast = combat::build_attack(ctx.player.id(), &attack, skill_level, projectile)?;
+        let combo = combo::after_attack(ctx.player, &attack, rand::random());
         let skill = attack.skill;
         let hits = attack
             .hits
@@ -183,7 +192,7 @@ impl WorldHandler for AttackHandler {
                 )
             })
             .collect();
-        let counter = if attack.kind == AttackKind::Magic {
+        let counter = if magic {
             MobStat::MCounter
         } else {
             MobStat::PCounter
@@ -194,12 +203,53 @@ impl WorldHandler for AttackHandler {
             counter,
             hits,
             inflicts,
+            takes,
+            blast: uses.blast,
         }));
         if let Some(mist) = mist {
             result = result.with(WorldAction::Field(mist));
         }
+        if let Some(value) = combo {
+            result = set_combo(ctx.player, value, now, result)?;
+        }
+        if let Some(stun) = stun {
+            let stunned = catch_disease(ctx.player, stun, now)?;
+            result.actions.extend(stunned.actions);
+        }
         Ok(result)
     }
+}
+
+/// Combo Attack's new value, for what is left of it: the player hears it
+/// as the buff given again, and the others see the orbs.
+pub(super) fn set_combo(
+    player: &mut Player,
+    value: i16,
+    now: Instant,
+    result: HandlerResult<WorldAction>,
+) -> WorldResult {
+    let Some(buff) = (player.buffs.active())
+        .iter()
+        .find(|buff| buff.stat == BuffStat::Combo)
+        .cloned()
+    else {
+        return Ok(result);
+    };
+    let left = buff.expires.saturating_duration_since(now);
+    (player.buffs).give(Buff::new(buff.skill_id, BuffStat::Combo, value, now, left));
+    let left = i32::try_from(left.as_millis()).unwrap_or(i32::MAX);
+    let given = [(BuffStat::Combo, value)];
+    let shown = [ShownBuff {
+        stat: BuffStat::Combo,
+        value,
+        skill_id: buff.skill_id,
+    }];
+    Ok(result
+        .with_reply(buff::build_give_buff(buff.skill_id, left, &given)?)
+        .with(WorldAction::BuffsChanged(buff::build_give_foreign_buff(
+            player.id(),
+            &shown,
+        )?)))
 }
 
 /// `TAKE_DAMAGE`: the player was hurt by touching a mob or by one of its
@@ -483,6 +533,29 @@ pub fn countered(player: &mut Player, damage: i32) -> WorldResult {
     })
 }
 
+/// The player's attack took `hp` (Drain) and `mp` (MP Eater) from the mobs
+/// it hit, as one stat update; Drain gives back no more than half their max
+/// HP at once (its description).
+pub fn absorbed(player: &mut Player, hp: i32, mp: i32) -> WorldResult {
+    if player.stats.hp <= 0 {
+        return Ok(HandlerResult::empty());
+    }
+    let mut updates = Vec::new();
+    if hp > 0 {
+        let hp = hp.min(i32::from(player.stats.max_hp) / 2);
+        updates.push(StatUpdate::Hp(player.add_hp(hp)));
+    }
+    if mp > 0 {
+        updates.push(StatUpdate::Mp(player.add_mp(mp)));
+    }
+    if updates.is_empty() {
+        return Ok(HandlerResult::empty());
+    }
+    Ok(HandlerResult::reply(stat::build_stat_update(
+        false, &updates,
+    )?))
+}
+
 /// The map hurts the player every so often (its `decHP`, which the v83
 /// client leaves to the server): nothing while they're dead or wear its
 /// `protectItem`, or, in the cold, an equip scrolled against it. A thaw item
@@ -558,12 +631,18 @@ const SAFETY_CHARM: i32 = 5130000;
 /// (Cosmic): the Safety Charm, the Easter Basket and the Easter Charm.
 const CHARMS: [i32; 3] = [SAFETY_CHARM, 4031283, 4140903];
 
-/// The player died. Beginners lose nothing; others lose 10% of the EXP
-/// their level needs (v83's field death penalty), unless they hold a charm,
-/// which is used up instead and lets them revive with 30% of their max HP
-/// and MP (Cosmic).
+/// The player died. Beginners lose nothing, nor does anyone on a map whose
+/// field limit spares them. Others lose a share of the EXP their level
+/// needs: a hundredth in a town, otherwise a tenth, or a twentieth with 50
+/// LUK or more. A charm held is used up instead, and lets them revive with
+/// 30% of their max HP and MP. All of this is Cosmic's.
 pub fn death_penalty(player: &mut Player) -> Result<Vec<Packet>, NetworkError> {
-    if player.stats.job % 1000 == 0 {
+    let field = crate::game_data::get()
+        .ok()
+        .and_then(|data| data.field(player.stats.map_id));
+    if player.stats.job % 1000 == 0
+        || field.is_some_and(|field| field.field_limit & FIELD_LIMIT_NO_EXP_LOSS != 0)
+    {
         return Ok(Vec::new());
     }
     let Some(needed) = game::exp::to_next_level(player.stats.level) else {
@@ -599,7 +678,13 @@ pub fn death_penalty(player: &mut Player) -> Result<Vec<Packet>, NetworkError> {
             effect::build_charm_used(used)?,
         ]);
     }
-    let loss = (needed / 10) as i32;
+    let loss = if field.is_some_and(|field| field.town) {
+        needed / 100
+    } else if player.stats.luk < 50 {
+        needed / 10
+    } else {
+        needed / 20
+    } as i32;
     player.stats.exp = (player.stats.exp - loss).max(0);
     player.mark_dirty();
     Ok(vec![stat::build_stat_update(
@@ -737,8 +822,23 @@ mod tests {
     }
 
     #[test]
+    fn drain_gives_back_no_more_than_half_of_max_hp() {
+        let mut player = crate::codec::stats::sample_player();
+        (player.stats.hp, player.stats.max_hp) = (10, 500);
+        (player.stats.mp, player.stats.max_mp) = (10, 100);
+        assert_eq!(absorbed(&mut player, 900, 30).unwrap().actions.len(), 1);
+        assert_eq!((player.stats.hp, player.stats.mp), (260, 40));
+        assert!(absorbed(&mut player, 0, 0).unwrap().actions.is_empty());
+        player.stats.hp = 0;
+        assert!(absorbed(&mut player, 100, 0).unwrap().actions.is_empty());
+        assert_eq!(player.stats.hp, 0);
+    }
+
+    #[test]
     fn dying_costs_a_tenth_of_the_level_unless_a_charm_is_held() {
         let mut player = crate::codec::stats::sample_player();
+        // Henesys Hunting Ground I, no town.
+        player.stats.map_id = 104_040_000;
         let needed = game::exp::to_next_level(player.stats.level).unwrap() as i32;
         player.stats.exp = needed / 2;
         assert_eq!(death_penalty(&mut player).unwrap().len(), 1);
@@ -765,6 +865,26 @@ mod tests {
         assert_eq!(player.inventory.count(4140903), 0);
         assert_eq!(&packets[1].bytes[2..6], &[6, 0, 0, 0]);
         assert_eq!(player.stats.exp, exp);
+    }
+
+    #[test]
+    fn dying_costs_less_in_a_town_or_with_luck_and_nothing_in_the_dojo() {
+        if crate::game_data::get().is_err() {
+            return;
+        }
+        let mut player = crate::codec::stats::sample_player();
+        let needed = game::exp::to_next_level(player.stats.level).unwrap() as i32;
+        let mut died_on = |map_id, luk| {
+            (player.stats.map_id, player.stats.luk) = (map_id, luk);
+            player.stats.exp = needed / 2;
+            death_penalty(&mut player).unwrap();
+            needed / 2 - player.stats.exp
+        };
+        assert_eq!(died_on(100_000_000, 4), needed / 100);
+        assert_eq!(died_on(104_040_000, 49), needed / 10);
+        assert_eq!(died_on(104_040_000, 50), needed / 20);
+        // Mu Lung Dojo's first floor.
+        assert_eq!(died_on(925_020_100, 4), 0);
     }
 
     #[test]

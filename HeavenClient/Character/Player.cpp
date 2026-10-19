@@ -19,12 +19,16 @@
 
 #include "MobDamage.h"
 #include "PlayerStates.h"
+#include "SecondaryStat.h"
 #include "SkillId.h"
 
 #include "../Audio/Audio.h"
+#include "../Data/BulletData.h"
 #include "../Data/EquipData.h"
 #include "../Data/SkillData.h"
 #include "../Data/WeaponData.h"
+#include "../Gameplay/Combat/Combo.h"
+#include "../Gameplay/Combat/FlashJump.h"
 #include "../Gameplay/Combat/MagicDamage.h"
 #include "../Gameplay/MapleMap/FieldLimit.h"
 #include "../Gameplay/Stage.h"
@@ -44,6 +48,7 @@
 
 #include <algorithm>
 #include <chrono>
+#include <cmath>
 
 namespace ms
 {
@@ -56,6 +61,25 @@ namespace ms
 			using namespace std::chrono;
 
 			return duration_cast<milliseconds>(steady_clock::now().time_since_epoch()).count();
+		}
+
+		// A mastery skill as the player has learned it.
+		physical_damage::Learned learned(const SkillBook &skillbook, int32_t skill_id)
+		{
+			int32_t level = skillbook.get_level(skill_id);
+
+			if (level <= 0)
+				return {};
+
+			const SkillData::Stats &stats = SkillData::get(skill_id).get_stats(level);
+
+			return { stats.mastery, stats.x };
+		}
+
+		// A skill's damage or prop, in percent.
+		int32_t in_percent(float value)
+		{
+			return static_cast<int32_t>(std::lround(value * 100));
 		}
 	}
 
@@ -187,6 +211,35 @@ namespace ms
 		for (const Buff &buff : buffs.values())
 			active_buffs.apply_buff(stats, buff.stat, buff.value);
 
+		// The weapon's mastery adds its accuracy and an expert's attack for
+		// the reach the job counts (SetFrom, FUN_0077f4c9), and the window
+		// shows the range with the mastery of its own reach.
+		int32_t job = stats.get_job().get_id();
+		physical_damage::Weapon weapon = physical_damage::weapon(look.get_equips().get_weapon());
+		auto lookup = [&](int32_t skill_id) { return learned(skillbook, skill_id); };
+		physical_damage::Mastery counted = physical_damage::mastery(weapon, physical_damage::stat_reach(job), job, 0,
+																	 lookup);
+		stats.add_value(EquipStat::Id::ACC, counted.accuracy);
+		stats.add_value(EquipStat::Id::WATK, counted.attack);
+		stats.set_mastery(physical_damage::mastery(weapon, physical_damage::shown_reach(weapon), job, 0, lookup).mastery);
+
+		// Shield Mastery raises the shield's own defence by its x percent,
+		// and a pirate's bare hands have attack of their own.
+		if (int32_t mastery = secondary_stat::shield_mastery(job))
+		{
+			int32_t percent = learned(skillbook, mastery).x;
+
+			if (auto shield = inventory.get_equip(InventoryType::Id::EQUIPPED, EquipSlot::Id::SHIELD); shield && percent)
+			{
+				int32_t defence = shield->get_stat(EquipStat::Id::WDEF);
+				stats.add_value(EquipStat::Id::WDEF, secondary_stat::shield_defence(defence, percent) - defence);
+			}
+		}
+
+		if (look.get_equips().get_weapon() == 0)
+			stats.add_value(EquipStat::Id::WATK,
+							secondary_stat::bare_hands_attack(job, stats.get_stat(MapleStat::Id::LEVEL)));
+
 		stats.close_totalstats();
 
 		if (auto statsinfo = UI::get().get_element<UIStatsInfo>())
@@ -287,7 +340,14 @@ namespace ms
 
 			phobj.walkspeed = get_walkspeed();
 			pst->update(*this);
+
+			// v83 marks every knockback in the path as element 2 when it
+			// lands on the player (0x9b222a).
+			bool impact = phobj.impact;
 			physics.move_object(phobj);
+
+			if (impact && !phobj.impact)
+				record_move(2);
 
 			bool aniend = Char::update(physics, get_stancespeed());
 
@@ -306,6 +366,10 @@ namespace ms
 		}
 
 		update_recovery();
+
+		// Landing or grabbing a rope readies Flash Jump again (0x9506f6).
+		if (phobj.onground || is_climbing())
+			flash_jumped = false;
 
 		path.step(current_move(0), Constants::TIMESTEP);
 
@@ -328,6 +392,24 @@ namespace ms
 	void Player::record_move(uint8_t command)
 	{
 		path.add(current_move(command));
+	}
+
+	bool Player::may_flash_jump() const
+	{
+		bool swimming = phobj.type == PhysicsObject::Type::SWIMMING || phobj.type == PhysicsObject::Type::FLYING;
+
+		return flash_jump::may_jump(phobj.onground, is_climbing(), flash_jumped, swimming, phobj.vspeed);
+	}
+
+	// Element 6 marks the jump in the path, before the push lands on the
+	// next step (0x96bff3).
+	void Player::flash_jump(int32_t level)
+	{
+		flash_jump::Impulse push = flash_jump::impulse(level, !facing_right);
+
+		record_move(6);
+		Physics::knockback(phobj, push.vx, push.vy);
+		flash_jumped = true;
 	}
 
 	Movement Player::current_move(uint8_t command) const
@@ -604,9 +686,9 @@ namespace ms
 		return attacking;
 	}
 
-	bool Player::can_attack() const
+	bool Player::can_attack(bool interrupting) const
 	{
-		return !attacking && !is_dead() && !is_climbing() && !is_sitting() && disease::can_attack(get_diseases());
+		return (interrupting || !attacking) && !is_dead() && !is_climbing() && !is_sitting() && disease::can_attack(get_diseases());
 	}
 
 	SpecialMove::ForbidReason Player::can_use(const SpecialMove &move) const
@@ -624,6 +706,13 @@ namespace ms
 		if (move.is_skill() && !disease::can_use_skill(move.get_id(), get_diseases()))
 			return SpecialMove::ForbidReason::FBR_OTHER;
 
+		// A finisher needs an orb to spend (0x969623).
+		if (combo::finisher(move.get_id()) && get_buff_value(Buffstat::Id::COMBO) <= 1)
+			return SpecialMove::ForbidReason::FBR_OTHER;
+
+		if (combo::enrage_refused(move.get_id(), get_buff_value(Buffstat::Id::COMBO)))
+			return SpecialMove::ForbidReason::FBR_OTHER;
+
 		if (has_cooldown(move.get_id()))
 			return SpecialMove::ForbidReason::FBR_COOLDOWN;
 
@@ -635,6 +724,17 @@ namespace ms
 		uint16_t bullets = inventory.get_most_bullets();
 
 		SpecialMove::ForbidReason reason = move.can_use(level, weapon, job, hp, mp, bullets);
+
+		// Dragon Roar costs its x percent of max HP instead, and needs at least half of it
+		// (FUN_00764256).
+		if (move.get_id() == SkillId::DRAGONS_ROAR && reason == SpecialMove::ForbidReason::FBR_NONE)
+		{
+			int32_t maxhp = stats.get_total(EquipStat::Id::HP);
+			int32_t cost = SkillData::get(move.get_id()).get_stats(level).x * maxhp / 100;
+
+			if (hp < maxhp / 2 || (cost != 0 && hp <= cost))
+				reason = SpecialMove::ForbidReason::FBR_HPCOST;
+		}
 
 		// v83 checks the skill's mesos and item right after its HP and MP,
 		// before the weapon (FUN_00764256).
@@ -661,21 +761,42 @@ namespace ms
 		return reason;
 	}
 
+	int32_t Player::combo_percent(int32_t skill) const
+	{
+		combo::Line line = combo::line(stats.get_job().get_id());
+		int32_t level = skillbook.get_level(line.combo);
+
+		if (level == 0)
+			return 0;
+
+		int32_t base_skill = combo::base_skill(line, level, skillbook.get_level(line.advanced));
+		int32_t base_level = skillbook.get_level(base_skill);
+		auto base = static_cast<int32_t>(std::lround(SkillData::get(base_skill).get_stats(base_level).damage * 100));
+		int32_t orbs = get_buff_value(Buffstat::Id::COMBO) - 1;
+
+		return combo::percent(combo::finisher(skill), level, base, orbs);
+	}
+
+	int32_t Player::partner_percent(int32_t skill) const
+	{
+		// A skill's x, a regular shot's y (0x7902d1).
+		const SkillData::Stats &partner = skill_stats(skillbook, buffs[Buffstat::Id::SHADOWPARTNER].skillid);
+
+		return skill ? partner.y : partner.x;
+	}
+
 	Attack Player::prepare_attack(int32_t skill, bool whack) const
 	{
 		Attack::Type attacktype;
-		bool degenerate;
 		int32_t bullet = inventory.get_bulletid();
 
 		if (state == Char::State::PRONE || whack)
 		{
-			degenerate = true;
 			attacktype = Attack::Type::CLOSE;
 		} else if (skill)
 		{
 			// Like v83, a skill attacks as the skill does, whatever the weapon.
 			const SkillData &data = SkillData::get(skill);
-			degenerate = false;
 
 			if (data.is_shot())
 				attacktype = Attack::Type::RANGED;
@@ -697,32 +818,16 @@ namespace ms
 				case Weapon::Type::CROSSBOW:
 				case Weapon::Type::CLAW:
 				case Weapon::Type::GUN:
-					degenerate = !inventory.has_projectile();
-					attacktype = degenerate ? Attack::Type::CLOSE : Attack::Type::RANGED;
-					break;
-				case Weapon::Type::WAND:
-				case Weapon::Type::STAFF:
-					degenerate = true;
-					attacktype = Attack::Type::CLOSE;
+					attacktype = inventory.has_projectile() ? Attack::Type::RANGED : Attack::Type::CLOSE;
 					break;
 				default:
 					attacktype = Attack::Type::CLOSE;
-					degenerate = false;
 					break;
 			}
 		}
 
 		Attack attack;
 		attack.type = attacktype;
-		attack.mindamage = stats.get_mindamage();
-		attack.maxdamage = stats.get_maxdamage();
-
-		if (degenerate)
-		{
-			attack.mindamage /= 10;
-			attack.maxdamage /= 10;
-		}
-
 		attack.critical = stats.get_critical();
 		attack.ignoredef = stats.get_ignoredef();
 		attack.accuracy = stats.get_total(EquipStat::Id::ACC);
@@ -739,6 +844,64 @@ namespace ms
 		// A swing or stab throws or fires nothing, even with ammo.
 		if (attacktype == Attack::Type::RANGED)
 			attack.bullet = bullet;
+
+		// What a blow comes from (FUN_0078df87): the attack without the
+		// ammo the stats count, as a shot adds its own.
+		using namespace physical_damage;
+
+		Blow &blow = attack.blow;
+		int32_t job = stats.get_job().get_id();
+		Reach reach = attacktype == Attack::Type::RANGED ? SHOT : CLOSE;
+		blow.weapon = physical_damage::weapon(look.get_equips().get_weapon());
+		blow.job = job;
+		blow.stats = { stats.get_total(EquipStat::Id::STR), stats.get_total(EquipStat::Id::DEX),
+					   stats.get_total(EquipStat::Id::LUK) };
+		blow.attack = stats.get_total(EquipStat::Id::WATK);
+
+		if (int32_t counted = inventory.get_bulletid())
+			blow.attack -= BulletData::get(counted).get_watk();
+
+		blow.mastery = mastery(blow.weapon, reach, job, skill,
+							   [&](int32_t skill_id) { return learned(skillbook, skill_id); }).mastery;
+
+		int32_t critical = critical_skill(blow.weapon, reach, job);
+
+		if (skillbook.get_level(critical) > 0)
+		{
+			const SkillData::Stats &source = skill_stats(skillbook, critical);
+			blow.critical = { in_percent(source.chance), in_percent(source.damage), true };
+		}
+
+		blow.critical = sharpen(blow.critical, get_buff_value(Buffstat::Id::SHARP_EYES));
+
+		// Stun Mastery crits on a stunned monster.
+		if (skillbook.get_level(STUN_MASTERY) > 0)
+		{
+			const SkillData::Stats &source = skill_stats(skillbook, STUN_MASTERY);
+			blow.stunned = { in_percent(source.chance), in_percent(source.damage), true };
+		}
+
+		if (has_buff(Buffstat::Id::WK_CHARGE))
+		{
+			int32_t charge = buffs[Buffstat::Id::WK_CHARGE].skillid;
+
+			if (skillbook.get_level(charge) > 0)
+			{
+				const SkillData::Stats &source = skill_stats(skillbook, charge);
+				blow.charge = { charge_element(charge), in_percent(source.damage), source.z };
+			}
+		}
+
+		// Berserk, under x percent of the HP.
+		if (skillbook.get_level(SkillId::BERSERK) > 0)
+		{
+			const SkillData::Stats &source = skill_stats(skillbook, SkillId::BERSERK);
+
+			if (stats.get_stat(MapleStat::Id::HP) <= stats.get_total(EquipStat::Id::HP) * source.x / 100)
+				blow.berserk = in_percent(source.damage);
+		}
+
+		blow.blind = has_buff(Buffstat::Id::DARKNESS);
 
 		return attack;
 	}
@@ -881,12 +1044,20 @@ namespace ms
 	void Player::give_buff(Buff buff)
 	{
 		buffs[buff.stat] = buff;
+
+		if (buff.stat == Buffstat::Id::COMBO)
+			show_combo(buff.value - 1, false);
+
 		show_diseases();
 	}
 
 	void Player::cancel_buff(Buffstat::Id stat)
 	{
 		buffs[stat] = {};
+
+		if (stat == Buffstat::Id::COMBO)
+			show_combo(-1, false);
+
 		show_diseases();
 	}
 

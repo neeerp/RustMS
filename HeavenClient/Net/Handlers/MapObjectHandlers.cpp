@@ -380,6 +380,10 @@ namespace ms
 				if (Optional<PetLook> pet = character->get_pet(index))
 					pet->show_effect(kind);
 		}
+		else if (effect == 5) // a skill's special animation, as Dragon Blood's drink
+		{
+			Stage::get().get_combat().show_special(cid, recv.read_int());
+		}
 		else if (effect == 2) // a party member's skill reached them
 		{
 			int32_t skillid = recv.read_int();
@@ -673,6 +677,14 @@ namespace ms
 	{
 		int8_t mode = recv.read_byte();
 		int32_t oid = recv.read_int();
+
+		// Mode 4 sets the drop off for Meso Explosion, in `delay` ms
+		// (FUN_00506590).
+		if (mode == 4)
+		{
+			Stage::get().get_drops().explode(oid, recv.read_short());
+			return;
+		}
 
 		const PhysicsObject *looter = nullptr;
 

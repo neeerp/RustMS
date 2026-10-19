@@ -80,6 +80,7 @@ namespace ms
 			).first->second;
 
 			added.x = sub["x"];
+			added.z = sub["z"];
 			added.mesocost = sub["moneyCon"];
 			added.itemcost = sub["itemCon"];
 			added.itemcount = sub["itemConNo"];
@@ -108,6 +109,14 @@ namespace ms
 			int32_t reqlv = sub.get_integer();
 
 			reqskills.emplace(skillid, reqlv);
+		}
+
+		for (auto sub : src["finalAttack"])
+		{
+			std::vector<int32_t> &types = final_attacks[string_conversion::or_default<int32_t>(sub.name(), 0)];
+
+			for (auto type : sub)
+				types.push_back(static_cast<int32_t>(type.get_integer()));
 		}
 	}
 
@@ -154,13 +163,17 @@ namespace ms
 				21110003, 21110006,
 				21120005
 				};
+		// Mortal Blow (3110001, 3210001) is never cast, but a whack can shoot
+		// it (0x951713).
 		static const std::unordered_set<int32_t> shots =
 				{
 				3001004, 3001005,
 				3101005,
+				3110001,
 				3111003, 3111004, 3111006,
 				3121003, 3121004,
 				3201005,
+				3210001,
 				3211003, 3211004, 3211006,
 				3221001, 3221003, 3221007,
 				4001344,
@@ -325,5 +338,10 @@ namespace ms
 	const std::unordered_map<int32_t, int32_t> &SkillData::get_reqskills() const
 	{
 		return reqskills;
+	}
+
+	const std::map<int32_t, std::vector<int32_t>> &SkillData::get_final_attacks() const
+	{
+		return final_attacks;
 	}
 }

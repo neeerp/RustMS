@@ -26,6 +26,7 @@
 
 #include "../../Configuration.h"
 #include "../../Data/ItemData.h"
+#include "../../Data/SkillData.h"
 #include "../../Gameplay/Stage.h"
 #include "../../IO/UI.h"
 #include "../../IO/Window.h"
@@ -227,8 +228,9 @@ namespace ms
 		bs = disease::given(bs, skillid);
 		Stage::get().get_player().give_buff({ bs, value, skillid, duration });
 
-		// A disease has no icon, only a notice of what it does
-		// (FUN_00932da6).
+		// A mob's disease has no icon, only a notice of what it does
+		// (FUN_00932da6). The icon follows the reason alone (0xa203bf), so
+		// one a skill gave, as Dragon Roar stuns its user, has the skill's.
 		if (disease::is_disease(bs))
 		{
 			std::string notice = disease::notice(disease::skill(skillid));
@@ -237,7 +239,8 @@ namespace ms
 				if (auto chatbar = UI::get().get_element<UIChatBar>())
 					chatbar->send_chatline(notice, UIChatBar::LineType::GREY);
 
-			return;
+			if (skillid <= 0 || SkillData::get(skillid).get_name().empty())
+				return;
 		}
 
 		if (auto bufflist = UI::get().get_element<UIBuffList>())

@@ -1,5 +1,7 @@
 //! Player attacks: parsing, damage limits, and the attack broadcast.
 
+use crate::combo;
+use crate::meso_explosion::{self, Blast, Explosion, MESO_EXPLOSION};
 use crate::skills::{self, Learned};
 use crate::{error::NetworkError, packet::op::SendOpcode};
 use game::inventory::equip_slot;
@@ -51,6 +53,9 @@ const SHADOW_PARTNER: i32 = 4111002;
 const SNIPE: i32 = 3221007;
 const SNIPE_MOST: i32 = 199_999;
 
+/// Stun Mastery, which crits on a stunned monster.
+const STUN_MASTERY: i32 = 5110000;
+
 /// Skills sent as shots that fire no ammo (the v83 client's FUN_007667ee).
 const AMMO_FREE: [i32; 12] = [
     4111004,  // Shadow Meso
@@ -76,6 +81,7 @@ pub struct Attack {
     pub skill: i32,
     pub mob_count: u8,
     pub hit_count: u8,
+    /// Flags: bit 0 marks a Final Attack after Slash Blast (0x952949).
     pub display: u8,
     /// The action, with the facing in the top bit (v83 0x952974: `action &
     /// 0x7fff | left << 15`).
@@ -86,6 +92,8 @@ pub struct Attack {
     /// The USE slot of the star, arrow, or bullet a shot fires; 0 for none.
     pub ammo_slot: i16,
     pub hits: Vec<AttackHit>,
+    /// What Meso Explosion sends after its targets.
+    pub explosion: Option<Explosion>,
 }
 
 /// CLOSE_RANGE_ATTACK body (after the opcode), as the v83 client sends it.
@@ -126,18 +134,41 @@ pub fn parse_attack(packet: &Packet, kind: AttackKind) -> Result<Attack, Network
         r.read_bytes(4)?;
     }
     let (mob_count, hit_count) = (counts >> 4, counts & 0xF);
+    // Meso Explosion counts each target's hits where the others have a
+    // short, and names the drops it sets off after where the player
+    // stands (v83 0x96bafe).
+    let explodes = kind == AttackKind::Close && skill == MESO_EXPLOSION;
     let mut hits = Vec::new();
     for _ in 0..mob_count {
         let object_id = r.read_int()?;
-        r.read_bytes(14)?;
-        let damage = (0..hit_count)
-            .map(|_| r.read_int())
-            .collect::<Result<_, _>>()?;
+        let lines = if explodes {
+            r.read_bytes(12)?;
+            r.read_byte()?
+        } else {
+            r.read_bytes(14)?;
+            hit_count
+        };
+        let damage = (0..lines).map(|_| r.read_int()).collect::<Result<_, _>>()?;
         if skill != RAPID_FIRE {
             r.read_bytes(4)?;
         }
         hits.push(AttackHit { object_id, damage });
     }
+    let explosion = if explodes {
+        let position = (r.read_short()?, r.read_short()?);
+        let count = r.read_byte()?;
+        let drops = (0..count)
+            .map(|_| Ok((r.read_int()?, r.read_byte()?)))
+            .collect::<Result<_, NetworkError>>()?;
+        let delay = r.read_short()?;
+        Some(Explosion {
+            position,
+            drops,
+            delay,
+        })
+    } else {
+        None
+    };
     Ok(Attack {
         kind,
         skill,
@@ -149,26 +180,45 @@ pub fn parse_attack(packet: &Packet, kind: AttackKind) -> Result<Attack, Network
         charge,
         ammo_slot,
         hits,
+        explosion,
     })
 }
 
-/// v83 weapon multipliers (`WeaponType` in HeavenMS) and which stats count.
-fn weapon_formula(weapon_id: i32) -> (f64, bool) {
-    // (multiplier, luck-based)
-    match weapon_id / 10_000 {
-        130 => (4.0, false),
-        131 | 132 => (4.4, false),
-        133 => (4.0, false),
-        137 | 138 => (3.6, false),
-        140 => (4.6, false),
-        141 | 142 => (4.8, false),
-        143 | 144 => (5.0, false),
-        145 => (3.4, false),
-        146 => (3.6, false),
-        147 => (3.6, true),
-        148 => (4.8, false),
-        149 => (3.6, false),
-        _ => (1.0, false),
+/// Lucky Seven and Triple Throw, which roll from LUK alone.
+const LUCKY_SEVENS: [i32; 4] = [4001344, 4121007, 14001004, 14111005];
+
+/// The weapon the player holds, or 0.
+fn weapon(player: &Player) -> i32 {
+    player
+        .inventory
+        .get(InventoryType::Equipped, equip_slot::WEAPON)
+        .map_or(0, |item| item.item_id)
+}
+
+/// The most a hit's stats are worth with this weapon before its attack
+/// (v83's switch at 0x78ef9c): picked by the weapon rather than the job, the
+/// better of its swing and its stab, and LUK for a dagger only in a thief's
+/// hands. Whacks and prone stabs do less.
+fn weapon_stats(weapon: i32, job: i32, skill: i32, (str, dex, luk): (i32, i32, i32)) -> f64 {
+    let (str, dex, luk) = (f64::from(str), f64::from(dex), f64::from(luk));
+    let strong = |multiplier: f64| multiplier * str + dex;
+    let nimble = |multiplier: f64| multiplier * dex + str;
+    let lucky = |multiplier: f64| multiplier * luk + str + dex;
+    match weapon / 10_000 {
+        130 => strong(4.0),
+        133 if job % 1000 / 100 == 4 => lucky(3.6),
+        133 => strong(4.0),
+        131 | 132 | 137 | 138 => strong(4.4),
+        140 => strong(4.6),
+        141 | 142 | 148 => strong(4.8),
+        143 | 144 => strong(5.0),
+        145 => nimble(3.4),
+        146 | 149 => nimble(3.6),
+        147 if LUCKY_SEVENS.contains(&skill) => 5.0 * luk,
+        147 => lucky(3.6),
+        // Bare hands.
+        _ if job == 500 => strong(3.0),
+        _ => strong(4.2),
     }
 }
 
@@ -177,27 +227,107 @@ fn buff(player: &Player, stat: BuffStat) -> i32 {
     player.buffs.value(stat).map_or(0, i32::from)
 }
 
-/// The most one basic hit can do (`calculateMaxBaseDamage`).
-pub fn max_base_damage(player: &Player) -> i32 {
-    let stats = &player.stats;
-    let worn = |slot: i16| player.inventory.get(InventoryType::Equipped, slot);
+/// What an expert's mastery adds to attack with its weapon (SetFrom,
+/// FUN_00764795): Bow Expert's, Marksman Boost's, or High Mastery's `x`.
+fn expert_attack(player: &Player, weapon: i32) -> i32 {
+    let experts: &[i32] = match weapon / 10_000 {
+        144 => &[21120001],
+        145 => &[3120005, 13110003],
+        146 => &[3220004],
+        _ => &[],
+    };
+    experts
+        .iter()
+        .filter_map(|&skill_id| skills::learned(player, skill_id))
+        .map(|skill| skill.effect.x)
+        .max()
+        .unwrap_or(0)
+}
+
+/// What the star, arrow, or bullet a shot throws adds to its attack
+/// (FUN_0077df48); a Gunslinger's capsules add nothing.
+fn ammo_attack(attack: &Attack, player: &Player, weapon: i32) -> i32 {
+    if attack.kind != AttackKind::Ranged {
+        return 0;
+    }
+    player
+        .inventory
+        .get(InventoryType::Use, attack.ammo_slot)
+        .filter(|item| shoots(weapon, item.item_id) && !matches!(item.item_id / 1000, 2331 | 2332))
+        .and_then(|item| crate::items::info(item.item_id))
+        .map_or(0, |info| info.pad)
+}
+
+/// What a pirate's bare hands add to attack (SetFrom, 0x77f89e): 10 and
+/// 0.7 a level, at most 31.
+fn bare_hands_attack(job: i32, level: i32) -> i32 {
+    if job % 1000 / 100 != 5 {
+        0
+    } else if level > 30 {
+        31
+    } else {
+        (f64::from(level) * 0.7 + 10.0) as i32
+    }
+}
+
+/// The most one hit of an attack can do before its skill, its orbs, and a
+/// critical (FUN_0078df87): the weapon's stats with what the player wears,
+/// times the attack of their equipment, buffs, expert mastery, and the ammo
+/// a shot throws, over 100; a pirate with no weapon has its bare hands'.
+pub fn max_base_damage(player: &Player, attack: &Attack) -> i32 {
+    let weapon = weapon(player);
+    let job = i32::from(player.stats.job);
+    let bare_hands = if weapon == 0 {
+        bare_hands_attack(job, i32::from(player.stats.level))
+    } else {
+        0
+    };
     let watk: i32 = player
         .inventory
         .items(InventoryType::Equipped)
         .filter_map(|(_, item)| item.equip.as_ref())
         .map(|equip| i32::from(equip.watk))
         .sum::<i32>()
-        + buff(player, BuffStat::Pad);
-    let weapon = worn(equip_slot::WEAPON).map_or(0, |item| item.item_id);
-    let (multiplier, luck_based) = weapon_formula(weapon);
-    let (main, secondary) = match weapon / 10_000 {
-        145 | 146 | 149 => (stats.dex, stats.str),
-        _ if luck_based => (stats.luk, stats.dex + stats.str),
-        _ => (stats.str, stats.dex),
+        + buff(player, BuffStat::Pad)
+        + expert_attack(player, weapon)
+        + ammo_attack(attack, player, weapon)
+        + bare_hands;
+    let stats = weapon_stats(weapon, job, attack.skill, skills::total_stats(player));
+    (stats / 100.0 * f64::from(watk.clamp(1, 1999))).ceil() as i32
+}
+
+/// The most a critical adds to a hit, in percent of it (FUN_0078df87): the
+/// weapon's critical skill for a shot or a punch, then Sharp Eyes as the
+/// server gives it, then Stun Mastery's whole damage, as the monster may be
+/// stunned.
+fn critical_bonus(player: &Player, attack: &Attack) -> i32 {
+    let shot = attack.kind == AttackKind::Ranged;
+    let cygnus = player.stats.job / 1000 == 1;
+    let source = match weapon(player) / 10_000 {
+        145 | 146 if shot => {
+            if cygnus {
+                13000000
+            } else {
+                3000001
+            }
+        }
+        147 if shot => {
+            if cygnus {
+                14100001
+            } else {
+                4100001
+            }
+        }
+        148 => 15110000,
+        _ => 0,
     };
-    let base =
-        (multiplier * f64::from(main) + f64::from(secondary)) / 100.0 * f64::from(watk.max(1));
-    base.ceil() as i32
+    let mut damage = skills::learned(player, source).map_or(0, |skill| skill.effect.damage);
+    let sharp_eyes = buff(player, BuffStat::SharpEyes);
+    if sharp_eyes > 0 {
+        damage = if damage == 0 { 100 } else { damage } + (sharp_eyes & 0xFF);
+    }
+    damage += skills::learned(player, STUN_MASTERY).map_or(0, |skill| skill.effect.damage);
+    (damage - 100).max(0)
 }
 
 /// The most one hit of a spell with this magic attack (`mad`) can do: the
@@ -246,6 +376,10 @@ pub struct Uses {
     pub skill: Option<Learned>,
     pub ammo: Option<Ammo>,
     pub mesos: i32,
+    /// The HP the skill costs, Sacrifice's share of its blow among it.
+    pub hp: i32,
+    /// The drops Meso Explosion sets off, and the damage each does.
+    pub blast: Option<Blast>,
 }
 
 /// A shot fires the stack in the slot the client names, which the weapon
@@ -294,6 +428,7 @@ pub enum AttackRejection {
     Dead,
     /// A skill the player hasn't learned, or one that doesn't attack.
     Skill,
+    NotEnoughHp,
     NotEnoughMp,
     NotEnoughMesos,
     TooManyTargets,
@@ -302,11 +437,14 @@ pub enum AttackRejection {
     Ammo,
     /// Stun or Seduce stops every attack, Seal every skill.
     Diseased,
+    /// A finisher without an orb to spend.
+    NoOrbs,
 }
 
-/// The MP a skill's attack spends: none for Heal, whose USE_SKILL paid.
+/// The MP a skill's attack spends: none for Heal, whose USE_SKILL paid,
+/// or for Final Attack.
 pub fn attack_mp_cost(skill: &Learned) -> i32 {
-    if skill.skill_id == skills::HEAL {
+    if skill.skill_id == skills::HEAL || skills::FINAL_ATTACKS.contains(&skill.skill_id) {
         0
     } else {
         skill.effect.mp_cost
@@ -344,8 +482,26 @@ pub fn validate(attack: &Attack, player: &Player) -> Result<Uses, AttackRejectio
     {
         return Err(AttackRejection::Diseased);
     }
-    let base_cap = (max_base_damage(player) * 2).max(10);
+    // v83 won't use a finisher without an orb (0x969623).
+    if combo::finisher(attack.skill) && combo::orbs(player).unwrap_or(0) < 1 {
+        return Err(AttackRejection::NoOrbs);
+    }
+    // A hit is the base times the skill's percent and the orbs'
+    // (FUN_007653fa), plus a critical's share of the base; twice that allows
+    // for an element the monster is weak to.
+    let base = i64::from(max_base_damage(player, attack));
+    let critical = i64::from(critical_bonus(player, attack));
+    let combo = match combo::damage_percent(player, attack.skill) {
+        0 => 100,
+        percent => i64::from(percent),
+    };
+    let cap_for = |percent: i32| {
+        (2 * base * (i64::from(percent) * combo / 100 + critical) / 100)
+            .clamp(10, i64::from(i32::MAX)) as i32
+    };
+    let base_cap = cap_for(100);
     let mut mesos = 0;
+    let mut hp = 0;
     let (skill, mob_count, hit_count, cap) = if attack.skill == 0 {
         if attack.kind == AttackKind::Magic {
             return Err(AttackRejection::Skill);
@@ -374,11 +530,18 @@ pub fn validate(attack: &Attack, player: &Player) -> Result<Uses, AttackRejectio
             effect.money_cost * 3 / 2 * 10 * (100 + effect.x) / 100
         } else if skill.skill_id == SNIPE && attack.kind == AttackKind::Ranged {
             SNIPE_MOST
+        } else if skill.skill_id == MESO_EXPLOSION {
+            // Each line is worth less than 50·x (FUN_00791fbc).
+            if attack.explosion.is_none() {
+                return Err(AttackRejection::Skill);
+            }
+            50 * effect.x
         } else if let Some(percent) = damage_percent(&skill) {
-            (base_cap * percent / 100).max(10)
+            cap_for(percent)
         } else {
             return Err(AttackRejection::Skill);
         };
+        hp = skills::hp_cost(player, &skill).ok_or(AttackRejection::NotEnoughHp)?;
         if i32::from(player.stats.mp) < attack_mp_cost(&skill) {
             return Err(AttackRejection::NotEnoughMp);
         }
@@ -390,7 +553,15 @@ pub fn validate(attack: &Attack, player: &Player) -> Result<Uses, AttackRejectio
             AttackKind::Ranged => effect.bullet_count,
             _ => effect.attack_count,
         };
-        let mob_count = effect.mob_count;
+        // Final Attack hits one mob, but after Slash Blast as many as it
+        // reaches.
+        let mob_count =
+            if skills::FINAL_ATTACKS.contains(&skill.skill_id) && attack.display & 1 != 0 {
+                skills::learned(player, skills::slash_blast(player))
+                    .map_or(1, |slash_blast| slash_blast.effect.mob_count)
+            } else {
+                effect.mob_count
+            };
         (Some(skill), mob_count, hit_count, cap)
     };
     // Shadow Partner throws every star again, up to 15 lines in all, but
@@ -409,16 +580,86 @@ pub fn validate(attack: &Attack, player: &Player) -> Result<Uses, AttackRejectio
     {
         return Err(AttackRejection::TooManyTargets);
     }
-    if attack
-        .hits
-        .iter()
-        .flat_map(|hit| &hit.damage)
-        .any(|&damage| !(0..=cap).contains(&damage))
-    {
+    if attack.hits.iter().any(|hit| {
+        (hit.damage.iter().enumerate())
+            .any(|(line, &damage)| !(0..=barrage_cap(cap, attack.skill, line)).contains(&damage))
+    }) {
         return Err(AttackRejection::Damage);
     }
+    if let Some(sacrifice) = skill
+        .as_ref()
+        .filter(|skill| skill.skill_id == skills::SACRIFICE)
+    {
+        hp = sacrifice_cost(attack, sacrifice.effect.x, player.stats.hp);
+    }
     let ammo = shot_ammo(attack, player, skill.as_ref())?;
-    Ok(Uses { skill, ammo, mesos })
+    let blast = match (&attack.explosion, &skill) {
+        (Some(explosion), Some(skill)) => Some(blast(attack, explosion, skill)?),
+        _ => None,
+    };
+    Ok(Uses {
+        skill,
+        ammo,
+        mesos,
+        hp,
+        blast,
+    })
+}
+
+/// Barrage's fifth line does twice the others and its sixth four times
+/// (FUN_0078df87, after Berserk).
+fn barrage_cap(cap: i32, skill: i32, line: usize) -> i32 {
+    match (skill, line) {
+        (5121007 | 15111004, 4) => cap.saturating_mul(2),
+        (5121007 | 15111004, 5) => cap.saturating_mul(4),
+        _ => cap,
+    }
+}
+
+/// Meso Explosion sets off as many drops as its `attackCount`, each once,
+/// and each target's lines must come from the drops that hit it.
+fn blast(
+    attack: &Attack,
+    explosion: &Explosion,
+    skill: &Learned,
+) -> Result<Blast, AttackRejection> {
+    let effect = &skill.effect;
+    let drops = &explosion.drops;
+    let most = (effect.attack_count.max(1) as usize).min(meso_explosion::MOST_DROPS);
+    let mut object_ids: Vec<i32> = drops.iter().map(|&(object_id, _)| object_id).collect();
+    object_ids.sort_unstable();
+    object_ids.dedup();
+    if drops.len() > most || object_ids.len() < drops.len() {
+        return Err(AttackRejection::TooManyTargets);
+    }
+    let lines: Vec<usize> = attack.hits.iter().map(|hit| hit.damage.len()).collect();
+    let sources = meso_explosion::sources(drops, &lines).ok_or(AttackRejection::TooManyTargets)?;
+    Ok(Blast {
+        drops: drops.iter().map(|&(object_id, _)| object_id).collect(),
+        delay: explosion.delay,
+        lines: (attack.hits.iter().zip(sources))
+            .map(|(hit, sources)| {
+                sources
+                    .into_iter()
+                    .zip(hit.damage.iter().copied())
+                    .collect()
+            })
+            .collect(),
+        x: effect.x,
+        lt: effect.lt,
+        rb: effect.rb,
+        left: attack.action & 0x8000 != 0,
+    })
+}
+
+/// The HP Sacrifice costs: its `x` percent of its first blow, though never
+/// the player's last HP. The v83 client leaves it to the server (its cost
+/// check, FUN_00764256, knows only `hpCon` and Dragon Roar), so this is
+/// Cosmic's.
+fn sacrifice_cost(attack: &Attack, x: i32, hp: i16) -> i32 {
+    let blow = attack.hits.first().and_then(|hit| hit.damage.first());
+    let cost = blow.map_or(0, |&blow| i64::from(blow) * i64::from(x) / 100);
+    cost.min(i64::from(hp) - 1).max(0) as i32
 }
 
 /// How much of the base damage a skill's hits deal, in percent, or `None`
@@ -456,11 +697,23 @@ pub fn build_attack(
     p.write_byte(attack.speed)?;
     p.write_byte(0x0A)?;
     p.write_int(projectile)?;
+    // Bit 31 marks a critical (v83 0x980620). The client sends none, but
+    // Snipe always is one (0x78e4d6).
+    let critical = attack.kind == AttackKind::Ranged && attack.skill == SNIPE;
     for hit in &attack.hits {
         p.write_int(hit.object_id)?;
         p.write_byte(0)?;
-        for damage in &hit.damage {
-            p.write_int(*damage)?;
+        // Meso Explosion's targets each say how many hits they take
+        // (0x980540).
+        if attack.explosion.is_some() {
+            p.write_byte(hit.damage.len() as u8)?;
+        }
+        for &damage in &hit.damage {
+            p.write_int(if critical && damage > 0 {
+                damage | i32::MIN
+            } else {
+                damage
+            })?;
         }
     }
     if attack.kind == AttackKind::Ranged {
@@ -695,13 +948,16 @@ mod tests {
     fn damage_is_capped_by_stats_and_weapon() {
         let player = beginner_with_sword();
         // ceil((4.0 * 12 + 5) / 100 * 17) = 10
-        assert_eq!(max_base_damage(&player), 10);
+        let basic = parse_close_attack(&attack_packet(1, 0)).unwrap();
+        assert_eq!(max_base_damage(&player, &basic), 10);
         assert_eq!(
             validate(&parse_close_attack(&attack_packet(1, 20)).unwrap(), &player),
             Ok(Uses {
                 skill: None,
                 ammo: None,
-                mesos: 0
+                mesos: 0,
+                hp: 0,
+                blast: None
             })
         );
         assert_eq!(
@@ -713,6 +969,106 @@ mod tests {
         assert_eq!(
             validate(&parse_close_attack(&attack_packet(1, 1)).unwrap(), &dead),
             Err(AttackRejection::Dead)
+        );
+    }
+
+    #[test]
+    fn combo_orbs_raise_the_cap_and_a_finisher_needs_one() {
+        let mut player = beginner_with_sword();
+        player.stats.job = 111;
+        player.stats.mp = 100;
+        learn(&mut player, 1111002, 30);
+        learn(&mut player, 1111003, 30);
+        let combo = |player: &mut Player, value| {
+            let lasts = std::time::Duration::from_secs(60);
+            let now = std::time::Instant::now();
+            (player.buffs).give(game::Buff::new(1111002, BuffStat::Combo, value, now, lasts));
+        };
+        let check = |player: &Player, skill, damage| {
+            validate(
+                &parse_close_attack(&skill_attack_packet(skill, 1, damage)).unwrap(),
+                player,
+            )
+            .map(|_| ())
+        };
+        // No orbs: 20 as before, and no Panic.
+        combo(&mut player, 1);
+        assert_eq!(check(&player, 0, 20), Ok(()));
+        assert_eq!(check(&player, 0, 21), Err(AttackRejection::Damage));
+        assert_eq!(check(&player, 1111003, 1), Err(AttackRejection::NoOrbs));
+        // Five orbs: 140%, and Panic's 350% by 350%.
+        combo(&mut player, 6);
+        assert_eq!(check(&player, 0, 28), Ok(()));
+        assert_eq!(check(&player, 0, 29), Err(AttackRejection::Damage));
+        assert_eq!(check(&player, 1111003, 245), Ok(()));
+        assert_eq!(check(&player, 1111003, 246), Err(AttackRejection::Damage));
+    }
+
+    #[test]
+    fn skills_cost_hp_and_sacrifice_a_share_of_its_blow() {
+        let mut player = beginner_with_sword();
+        (player.stats.mp, player.stats.hp, player.stats.max_hp) = (100, 1000, 1000);
+        learn(&mut player, 1001005, 1);
+        learn(&mut player, skills::SACRIFICE, 30);
+        learn(&mut player, skills::DRAGON_ROAR, 30);
+        let hp = |player: &Player, skill, damage| {
+            let attack = parse_close_attack(&skill_attack_packet(skill, 1, damage)).unwrap();
+            validate(&attack, player).map(|uses| uses.hp)
+        };
+        // Slash Blast's hpCon, Dragon Roar's 30% of max HP, and Sacrifice's
+        // 5% of its blow.
+        assert_eq!(hp(&player, 1001005, 1), Ok(8));
+        assert_eq!(hp(&player, skills::DRAGON_ROAR, 1), Ok(300));
+        assert_eq!(hp(&player, skills::SACRIFICE, 60), Ok(3));
+        player.stats.hp = 499;
+        assert_eq!(
+            hp(&player, skills::DRAGON_ROAR, 1),
+            Err(AttackRejection::NotEnoughHp)
+        );
+        player.stats.hp = 8;
+        assert_eq!(hp(&player, 1001005, 1), Err(AttackRejection::NotEnoughHp));
+        player.stats.hp = 2;
+        assert_eq!(hp(&player, skills::SACRIFICE, 60), Ok(1));
+    }
+
+    #[test]
+    fn final_attack_is_free_and_follows_slash_blast_to_its_mobs() {
+        if skills::data().is_err() {
+            return;
+        }
+        let mut player = beginner_with_sword();
+        player.stats.mp = 0;
+        learn(&mut player, 11101002, 30);
+        learn(&mut player, 1100002, 30);
+        let mut attack = parse_close_attack(&skill_attack_packet(11101002, 1, 1)).unwrap();
+        attack.display = 0;
+        // The Cygnus one has an `mpCon`, for its buff.
+        assert!(validate(&attack, &player).is_ok());
+
+        attack.skill = 1100002;
+        attack.mob_count = 3;
+        attack.hits = (1..=3)
+            .map(|object_id| AttackHit {
+                object_id,
+                damage: vec![1],
+            })
+            .collect();
+        let rejection = |attack: &Attack, player: &Player| validate(attack, player).err();
+        assert_eq!(
+            rejection(&attack, &player),
+            Some(AttackRejection::TooManyTargets)
+        );
+        attack.display = 1;
+        assert_eq!(
+            rejection(&attack, &player),
+            Some(AttackRejection::TooManyTargets)
+        );
+        learn(&mut player, 1001005, 1);
+        assert_eq!(rejection(&attack, &player), None);
+        attack.display = 0;
+        assert_eq!(
+            rejection(&attack, &player),
+            Some(AttackRejection::TooManyTargets)
         );
     }
 
@@ -1016,7 +1372,148 @@ mod tests {
             std::time::Duration::from_secs(60),
         );
         buffed.buffs.give(rage);
-        assert!(max_base_damage(&buffed) > max_base_damage(&player));
+        let basic = parse_close_attack(&attack_packet(1, 0)).unwrap();
+        assert!(max_base_damage(&buffed, &basic) > max_base_damage(&player, &basic));
+    }
+
+    #[test]
+    fn a_pirate_hits_bare_handed_with_attack_of_its_own() {
+        let mut player = crate::codec::stats::sample_player();
+        (player.stats.str, player.stats.dex) = (12, 5);
+        (player.stats.job, player.stats.level) = (500, 20);
+        let basic = parse_close_attack(&attack_packet(1, 0)).unwrap();
+        // ceil((3.0 * 12 + 5) / 100 * (0.7 * 20 + 10)) = 10
+        assert_eq!(max_base_damage(&player, &basic), 10);
+        // ceil(41 / 100 * 31) = 13
+        player.stats.level = 70;
+        assert_eq!(max_base_damage(&player, &basic), 13);
+        // ceil((4.2 * 12 + 5) / 100 * 1) = 1
+        player.stats.job = 100;
+        assert_eq!(max_base_damage(&player, &basic), 1);
+    }
+
+    #[test]
+    fn a_dagger_counts_luk_for_a_thief_only() {
+        let mut player = beginner_with_sword();
+        player.inventory.insert(
+            InventoryType::Equipped,
+            equip_slot::WEAPON,
+            Item::equipment(
+                1332000,
+                EquipStats {
+                    watk: 27,
+                    ..EquipStats::default()
+                },
+            ),
+        );
+        (player.stats.str, player.stats.dex, player.stats.luk) = (30, 60, 150);
+        let basic = parse_close_attack(&attack_packet(1, 0)).unwrap();
+        // ceil((4.0 * 30 + 60) / 100 * 27) = 49
+        assert_eq!(max_base_damage(&player, &basic), 49);
+        // ceil((3.6 * 150 + 30 + 60) / 100 * 27) = 171; v83's window shows 170.
+        player.stats.job = 420;
+        assert_eq!(max_base_damage(&player, &basic), 171);
+    }
+
+    #[test]
+    fn a_shot_adds_its_ammo_and_an_expert_its_x() {
+        if skills::data().is_err() || crate::items::data().is_err() {
+            return;
+        }
+        let shot = |slot| {
+            parse_attack(
+                &kind_attack_packet(AttackKind::Ranged, 0, slot, &[1]),
+                AttackKind::Ranged,
+            )
+            .unwrap()
+        };
+        let mut player = rogue_with_stars(100);
+        player.stats.luk = 100;
+        // A claw of no attack throws Subis' 15: ceil((3.6 * 100 + 12 + 5) / 100 * 15) = 57.
+        assert_eq!(max_base_damage(&player, &shot(1)), 57);
+        // A whack throws nothing, and counts at least 1 attack.
+        let whack = parse_close_attack(&attack_packet(1, 0)).unwrap();
+        assert_eq!(max_base_damage(&player, &whack), 4);
+
+        player.inventory.insert(
+            InventoryType::Equipped,
+            equip_slot::WEAPON,
+            Item::equipment(
+                1452002,
+                EquipStats {
+                    watk: 50,
+                    ..EquipStats::default()
+                },
+            ),
+        );
+        player.stats.dex = 100;
+        // ceil((3.4 * 100 + 12) / 100 * 50) = 176
+        assert_eq!(max_base_damage(&player, &shot(1)), 176);
+        // Bow Expert's level 30 adds 10: ceil(352 / 100 * 60) = 212.
+        learn(&mut player, 3120005, 30);
+        assert_eq!(max_base_damage(&player, &shot(1)), 212);
+    }
+
+    #[test]
+    fn barrage_ends_with_twice_and_four_times_the_cap() {
+        if skills::data().is_err() {
+            return;
+        }
+        let mut player = beginner_with_sword();
+        player.stats.job = 512;
+        learn(&mut player, 5121007, 30);
+        let basic = parse_close_attack(&attack_packet(1, 0)).unwrap();
+        // Level 30 does 230%.
+        let cap = 2 * max_base_damage(&player, &basic) * 230 / 100;
+        let barrage = |lines: &[i32]| {
+            let packet = kind_attack_packet(AttackKind::Close, 5121007, 0, lines);
+            validate(&parse_attack(&packet, AttackKind::Close).unwrap(), &player).map(|_| ())
+        };
+        let (c, double, quadruple) = (cap, 2 * cap, 4 * cap);
+        assert_eq!(barrage(&[c, c, c, c, double, quadruple]), Ok(()));
+        assert_eq!(
+            barrage(&[c, c, c, c, double, quadruple + 1]),
+            Err(AttackRejection::Damage)
+        );
+        assert_eq!(
+            barrage(&[c, c, c, double, c, c]),
+            Err(AttackRejection::Damage)
+        );
+    }
+
+    #[test]
+    fn criticals_raise_the_cap_by_their_bonus() {
+        if skills::data().is_err() || crate::items::data().is_err() {
+            return;
+        }
+        let shot = |player: &Player, damage| {
+            let attack = parse_attack(
+                &kind_attack_packet(AttackKind::Ranged, 0, 1, &[damage]),
+                AttackKind::Ranged,
+            )
+            .unwrap();
+            validate(&attack, player).map(|_| ())
+        };
+        let mut player = rogue_with_stars(100);
+        player.stats.luk = 100;
+        // Twice the base of 57.
+        assert_eq!(shot(&player, 114), Ok(()));
+        assert_eq!(shot(&player, 115), Err(AttackRejection::Damage));
+        // Critical Throw's level 30 crits for 200%: twice 57 * (100 + 100) / 100.
+        learn(&mut player, 4100001, 30);
+        assert_eq!(shot(&player, 228), Ok(()));
+        assert_eq!(shot(&player, 229), Err(AttackRejection::Damage));
+        // Sharp Eyes adds its low byte as the server gives it: 57 * 2 * (100 + 240) / 100.
+        let sharp_eyes = game::Buff::new(
+            3121002,
+            BuffStat::SharpEyes,
+            (30 << 8 | 140) as i16,
+            std::time::Instant::now(),
+            std::time::Duration::from_secs(60),
+        );
+        player.buffs.give(sharp_eyes);
+        assert_eq!(shot(&player, 387), Ok(()));
+        assert_eq!(shot(&player, 388), Err(AttackRejection::Damage));
     }
 
     #[test]
@@ -1050,7 +1547,7 @@ mod tests {
         player.stats.mp = 100;
         learn(&mut player, ARROW_BOMB, 30);
         // No `damage` at any level; level 30's x is 130.
-        let cap = (max_base_damage(&player) * 2).max(10) * 130 / 100;
+        let cap = (max_base_damage(&player, &bomb(&[0])) * 2).max(10) * 130 / 100;
         assert!(validate(&bomb(&[cap]), &player).is_ok());
         assert_eq!(
             validate(&bomb(&[cap + 1]), &player).unwrap_err(),
@@ -1070,7 +1567,7 @@ mod tests {
         player.stats.mp = 100;
         learn(&mut player, 4001002, 20);
         learn(&mut player, 4121003, 30);
-        let cap = (max_base_damage(&player) * 2).max(10);
+        let cap = (max_base_damage(&player, &hit(AttackKind::Close, 4001002, 0)) * 2).max(10);
         for (kind, skill) in [(AttackKind::Close, 4001002), (AttackKind::Ranged, 4121003)] {
             assert!(validate(&hit(kind, skill, cap), &player).is_ok());
             assert_eq!(
@@ -1153,6 +1650,22 @@ mod tests {
         );
     }
 
+    #[test]
+    fn others_see_a_snipe_as_critical() {
+        let attack = parse_attack(
+            &kind_attack_packet(AttackKind::Ranged, SNIPE, 1, &[150_000]),
+            AttackKind::Ranged,
+        )
+        .unwrap();
+        let packet = build_attack(5, &attack, 30, 2060000).unwrap();
+        let damage = i32::from_le_bytes(
+            packet.bytes[packet.bytes.len() - 8..][..4]
+                .try_into()
+                .unwrap(),
+        );
+        assert_eq!(damage, 150_000 | i32::MIN);
+    }
+
     fn rogue_with_stars(stars: i16) -> Player {
         let mut player = beginner_with_sword();
         player.inventory.insert(
@@ -1188,7 +1701,9 @@ mod tests {
                     item_id: 2070000,
                     quantity: 1
                 }),
-                mesos: 0
+                mesos: 0,
+                hp: 0,
+                blast: None
             }
         );
         // Arrows don't fit a claw, and an empty slot holds nothing.
@@ -1317,6 +1832,130 @@ mod tests {
             .int(0);
         expect.int(77).byte(0).int(9);
         expect.end();
+    }
+
+    /// Meso Explosion's CLOSE_RANGE_ATTACK: each target's lines, counted,
+    /// then where the player stands, the drops with their masks, and when
+    /// the hits land.
+    fn explosion_packet(lines: &[&[i32]], drops: &[(i32, u8)]) -> Packet {
+        let mut p = Packet::new_empty();
+        p.write_short(0x2C).unwrap();
+        p.write_byte(0).unwrap();
+        let most = lines.iter().map(|lines| lines.len()).max().unwrap_or(0) as u8;
+        p.write_byte((lines.len() as u8) << 4 | most).unwrap();
+        p.write_int(MESO_EXPLOSION).unwrap();
+        p.write_bytes(&[0; 8]).unwrap();
+        p.write_byte(0).unwrap();
+        p.write_short(0x801Fu16 as i16).unwrap();
+        p.write_byte(0).unwrap();
+        p.write_byte(4).unwrap();
+        p.write_bytes(&[0; 4]).unwrap();
+        for (target, lines) in lines.iter().enumerate() {
+            p.write_int(100 + target as i32).unwrap();
+            p.write_bytes(&[0; 12]).unwrap();
+            p.write_byte(lines.len() as u8).unwrap();
+            for &line in *lines {
+                p.write_int(line).unwrap();
+            }
+            p.write_bytes(&[0; 4]).unwrap();
+        }
+        p.write_short(-40).unwrap();
+        p.write_short(85).unwrap();
+        p.write_byte(drops.len() as u8).unwrap();
+        for &(object_id, mask) in drops {
+            p.write_int(object_id).unwrap();
+            p.write_byte(mask).unwrap();
+        }
+        p.write_short(420).unwrap();
+        p
+    }
+
+    #[test]
+    fn meso_explosion_names_its_drops_after_its_targets() {
+        let packet = explosion_packet(&[&[10, 20], &[30]], &[(7, 0b01), (8, 0b11), (9, 0)]);
+        let attack = parse_close_attack(&packet).unwrap();
+        assert_eq!((attack.mob_count, attack.hit_count), (2, 2));
+        assert_eq!(attack.hits[0].damage, [10, 20]);
+        assert_eq!(
+            (attack.hits[1].object_id, &attack.hits[1].damage[..]),
+            (101, &[30][..])
+        );
+        assert_eq!(
+            attack.explosion,
+            Some(Explosion {
+                position: (-40, 85),
+                drops: vec![(7, 0b01), (8, 0b11), (9, 0)],
+                delay: 420,
+            })
+        );
+        // The others hear how many hits each target takes.
+        let packet = build_attack(5, &attack, 30, 0).unwrap();
+        let mut expect = Expect::new(&packet.bytes);
+        expect
+            .short(SendOpcode::CloseRangeAttack as i16)
+            .int(5)
+            .byte(0x22)
+            .byte(0x5B)
+            .byte(30)
+            .int(MESO_EXPLOSION);
+        expect
+            .byte(0)
+            .short(0x801Fu16 as i16)
+            .byte(4)
+            .byte(0x0A)
+            .int(0);
+        expect.int(100).byte(0).byte(2).int(10).int(20);
+        expect.int(101).byte(0).byte(1).int(30);
+        expect.end();
+    }
+
+    #[test]
+    fn meso_explosion_sets_off_each_drop_once_and_hits_by_its_x() {
+        if skills::data().is_err() {
+            return;
+        }
+        let mut player = beginner_with_sword();
+        learn(&mut player, MESO_EXPLOSION, 30);
+        player.stats.mp = 30;
+        let check_as = |player: &Player, lines: &[&[i32]], drops: &[(i32, u8)]| {
+            validate(
+                &parse_close_attack(&explosion_packet(lines, drops)).unwrap(),
+                player,
+            )
+        };
+        let check = |lines: &[&[i32]], drops: &[(i32, u8)]| check_as(&player, lines, drops);
+        let blast = check(&[&[50_000, 1], &[2]], &[(7, 0b01), (8, 0b11)])
+            .unwrap()
+            .blast
+            .unwrap();
+        assert_eq!(blast.drops, [7, 8]);
+        assert_eq!(blast.lines, [vec![(0, 50_000), (1, 1)], vec![(1, 2)]]);
+        assert_eq!(
+            (blast.x, blast.lt, blast.rb, blast.left),
+            (1000, (-300, -120), (0, 50), true)
+        );
+        // With nothing to hit, it still sets off its drops.
+        assert!(check(&[], &[(7, 0)]).unwrap().blast.is_some());
+        // No line deals 50·x or more, each drop goes off once, as many as
+        // its attackCount, and each target's lines match its drops.
+        assert_eq!(check(&[&[50_001]], &[(7, 1)]), Err(AttackRejection::Damage));
+        assert_eq!(
+            check(&[], &[(7, 0), (7, 0)]),
+            Err(AttackRejection::TooManyTargets)
+        );
+        let many: Vec<(i32, u8)> = (0..21).map(|object_id| (object_id, 0)).collect();
+        assert_eq!(check(&[], &many), Err(AttackRejection::TooManyTargets));
+        assert!(check(&[], &many[..20]).is_ok());
+        assert_eq!(
+            check(&[&[1, 1]], &[(7, 1)]),
+            Err(AttackRejection::TooManyTargets)
+        );
+        let mut tired = player.clone();
+        tired.stats.mp = 29;
+        assert_eq!(
+            check_as(&tired, &[], &[]),
+            Err(AttackRejection::NotEnoughMp)
+        );
     }
 }
 

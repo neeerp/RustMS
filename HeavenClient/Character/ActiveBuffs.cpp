@@ -33,10 +33,12 @@ namespace ms
 
 	void MapleWarriorBuff::apply_to(CharStats &stats, int16_t value) const
 	{
-		stats.add_percent(EquipStat::Id::STR, static_cast<float>(value) / 100);
-		stats.add_percent(EquipStat::Id::DEX, static_cast<float>(value) / 100);
-		stats.add_percent(EquipStat::Id::INT, static_cast<float>(value) / 100);
-		stats.add_percent(EquipStat::Id::LUK, static_cast<float>(value) / 100);
+		// The percent of the character's own stats, not its equipment's
+		// (BasicStat::SetFrom, 0x77f289).
+		stats.add_value(EquipStat::Id::STR, stats.get_stat(MapleStat::Id::STR) * value / 100);
+		stats.add_value(EquipStat::Id::DEX, stats.get_stat(MapleStat::Id::DEX) * value / 100);
+		stats.add_value(EquipStat::Id::INT, stats.get_stat(MapleStat::Id::INT) * value / 100);
+		stats.add_value(EquipStat::Id::LUK, stats.get_stat(MapleStat::Id::LUK) * value / 100);
 	}
 
 	void StanceBuff::apply_to(CharStats &stats, int16_t value) const

@@ -72,5 +72,31 @@ namespace ms
 
 			return shoot ? ranged[attack] : close[attack];
 		}
+
+		// The stances a Final Attack picks from, by the weapon's info/attack
+		// (the odd rows, FUN_00766031 and FUN_00766272).
+		inline const std::vector<Stance::Id> &get_final(uint8_t attack)
+		{
+			using namespace Stance;
+
+			static const std::array<std::vector<Id>, 10> stances = {
+					{
+							{},
+							{SWINGOF, STABOF},
+							{SWINGPF, STABTF},
+							{SHOOTF},
+							{SHOOT2},
+							{SWINGTF, STABOF},
+							{},
+							{SWINGO1, SWINGO2, SWINGO3},
+							{},
+							{SHOT}
+					}
+			};
+
+			static const std::vector<Id> none;
+
+			return attack < stances.size() ? stances[attack] : none;
+		}
 	}
 }

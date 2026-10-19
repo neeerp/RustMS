@@ -149,7 +149,7 @@ namespace ms
 		{
 			// Guardian or Shadow Shifter dodged it; Shadow Shifter smiles.
 			int32_t skillid = recv.read_int();
-			Stage::get().get_combat().show_dodge(cid, skillid);
+			Stage::get().get_combat().show_special(cid, skillid);
 
 			if (skillid == SkillId::SHADOW_SHIFTER_NIGHT_LORD || skillid == SkillId::SHADOW_SHIFTER_SHADOWER)
 				otherchar->set_expression(Expression::Id::SMILE, 1500);

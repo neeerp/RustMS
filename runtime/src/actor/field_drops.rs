@@ -255,6 +255,24 @@ impl DropSet {
         self.take(client, party, object_id, x, y, now)
     }
 
+    /// Set off mesos for `client`, in `party`, with Meso Explosion: the
+    /// mesos they may take where it `reaches`, which are gone at once.
+    pub fn explode(
+        &mut self,
+        client: ClientId,
+        party: Option<i32>,
+        object_id: i32,
+        reaches: impl Fn(i16, i16) -> bool,
+        now: Instant,
+    ) -> Option<Drop> {
+        let drop = self.drops.get(&object_id)?;
+        let mesos = matches!(drop.loot, Loot::Mesos(_));
+        if !mesos || !drop.takeable_by(client, party, now) || !reaches(drop.x, drop.y) {
+            return None;
+        }
+        self.drops.remove(&object_id)
+    }
+
     /// Put back a drop that couldn't be picked up (a full inventory).
     pub fn restore(&mut self, drop: Drop) {
         self.drops.insert(drop.object_id, drop);

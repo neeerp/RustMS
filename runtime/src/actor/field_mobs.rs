@@ -677,6 +677,17 @@ impl MobSet {
         Some((healed as i32, mob.hp as i32, mob.info.max_hp))
     }
 
+    /// MP Eater: a mob, not a boss, loses `percent` of its max MP, as much
+    /// as it has. Returns what it lost.
+    pub fn eat_mp(&mut self, object_id: i32, percent: i32) -> i32 {
+        let Some(mob) = self.live.get_mut(&object_id).filter(|mob| !mob.info.boss) else {
+            return 0;
+        };
+        let eaten = (mob.info.max_mp * percent / 100).clamp(0, mob.mp.max(0));
+        mob.mp -= eaten;
+        eaten
+    }
+
     /// The mobs `summoner` calls up: as many of `summoned` as its `limit`
     /// (0 for none) leaves room for, where it stands, facing its way, and
     /// under its controller. They never respawn.
@@ -1358,6 +1369,21 @@ mod tests {
         mobs.live.get_mut(&caster).unwrap().hp = 600;
         assert_eq!(mobs.heal(caster, 700, 3), Some((400, 1000, 1000)));
         assert_eq!(mobs.get(caster).unwrap().mp, 12);
+    }
+
+    #[test]
+    fn mp_eater_takes_a_share_of_max_mp_but_not_from_bosses() {
+        let now = Instant::now();
+        let (template, mut boss) = stumpy();
+        boss.boss = true;
+        let mut mobs = MobSet::new([stumpy(), (template, boss)]);
+        let spawned = mobs.respawn(now);
+        let (stumpy, boss) = (spawned[0], spawned[1]);
+        assert_eq!(mobs.eat_mp(stumpy, 40), 4);
+        assert_eq!(mobs.eat_mp(stumpy, 100), 8);
+        assert_eq!(mobs.eat_mp(stumpy, 40), 0);
+        assert_eq!(mobs.eat_mp(boss, 40), 0);
+        assert_eq!(mobs.get(boss).unwrap().mp, 12);
     }
 
     #[test]

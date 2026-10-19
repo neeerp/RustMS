@@ -114,22 +114,43 @@ cash ammo slot, and a byte), and 4 more for Hurricane, Piercing Arrow, and
 Rapid Fire. Each is checked before it reaches the field (`validate`): the
 attacker must be alive, and a basic attack (skill 0) hits one mob once, each
 hit at most twice the character's basic maximum (`max_base_damage`, v83's
-weapon multiplier × main stat + secondary stat, × weapon attack / 100). An
-attack naming a skill needs that skill learned at some level; its `Skill.nx`
+weapon formula on stats counting equipment, a thief's dagger and Lucky Seven
+on LUK, × weapon attack / 100, where weapon attack also counts attack buffs,
+an expert skill's `x` (Bow Expert, Marksman Boost, High Mastery), a shot's
+star, arrow or bullet `incPAD`, and a weaponless pirate's 10 + 0.7 a level, at
+most 31). Criticals raise every cap by their bonus over
+100%: the weapon's critical skill (Critical Shot and Critical Throw with
+their Cygnus twins, and Critical Punch), Sharp Eyes's low byte as sent, and
+Stun Mastery. An attack naming a skill needs that skill learned at some level; its `Skill.nx`
 level (`game_data::skills::SkillLevel`) gives the mobs allowed, the hits (a
 shot's `bulletCount`, otherwise `attackCount`), the MP spent, and the cap: a
 `fixdamage` skill (Three Snails: 10/25/40) hits for at most that, a `mad`
 spell for twice v83's magic maximum (`max_magic_damage`: ((M² / 1000 + M) / 30
 + INT / 200) × `mad`, where M is INT plus equipment magic attack), a `damage`
-skill for that percentage of the basic cap, Shadow Meso for v83's highest
+skill for that percentage of the basic cap (Barrage's fifth line twice that
+and its sixth four times), Shadow Meso for v83's highest
 roll (ten times one and a half its `moneyCon`, raised by its `x` percent on a
 critical), Snipe's shot for 199,999, and a skill with none is not an attack.
 A spell must name a skill.
-Too little MP refuses the attack, as do too few mesos for the skill's
+Too little HP or MP refuses the attack, as do too few mesos for the skill's
 `moneyCon` (Shadow Meso's, raised by Shadow Partner's `y` percent while that
 buff is on, as the v83 client checks). An attack skill with a `cooltime`
 (Heaven's Hammer, Snipe, Aerial Strike) is refused while it cools down;
 otherwise it starts the cooldown and the attacker gets COOLDOWN.
+A skill's HP cost (`skills::hp_cost`, as v83's `FUN_00764256`) is its
+`hpCon`, which must stay under the player's HP; Slash Blast and the Boosters
+have one. Dragon Roar instead takes its `x` percent of max HP and needs at
+least half of it, and then stuns its user for its `y` seconds
+(`skills::self_stun`): a Stun disease under Dragon Roar's own id, so the
+client shows the skill's icon and won't let it be cancelled. Sacrifice takes its `x` percent of its first blow, never
+the last HP, which v83 leaves wholly to the server (Cosmic's rule).
+Final Attack (`skills::FINAL_ATTACKS`) is a swing or shot the client sends
+on its own after a skill attack whose skill lists it under `finalAttack`
+(Power Strike, Slash Blast, Arrow Blow, Double Shot, …). It is an ordinary
+attack packet with the Final Attack's id and level, costs no MP (the
+Cygnus ones have an `mpCon` for their buff), and hits one mob, except that
+after Slash Blast (bit 0 of the attack's flags) it reaches as many as the
+player's Slash Blast does (`skills::slash_blast`).
 HeavenClient sends a skill as the attack v83's `CUserLocal::DoActiveSkill`
 makes it, whatever the weapon: a swing, a shot, or a spell
 (`SkillData::flags_of`). Any other skill goes out as SPECIAL_MOVE. Skills
@@ -139,7 +160,7 @@ The field shows
 the attack under its own opcode (with the skill id and level, so others see
 the skill's effect, and for a shot the star, arrow, or bullet it fired) to the
 others, applies the damage, sends the attacker SHOW_MONSTER_HP, and on death
-KILL_MONSTER to everyone; the attacker gets the MP and mesos left as
+KILL_MONSTER to everyone; the attacker gets the HP, MP and mesos left as
 STAT_CHANGED.
 
 A mob with an `info/damagedBySelectedSkill` list (Kyrin's test
@@ -162,7 +183,8 @@ first fitting stack that covers the cost (`Inventory::find_bulletslot`).
 HeavenClient refuses a skill before sending it, with v83's lines in the skill
 chat colour (`Player::can_use`, `Skill::can_use`, `Combat::can_use_move`). The
 checks run in v83's order. A skill cooling down comes first. Then come the
-costs: HP, MP, mesos (`moneyCon`; Shadow Meso's grows by Shadow Partner's `y`
+costs: HP (Dragon Roar's is its `x` percent of max HP, and needs half of
+it), MP, mesos (`moneyCon`; Shadow Meso's grows by Shadow Partner's `y`
 percent while that buff is on), and the item (`itemCon`, named in the line).
 The four cost lines share one two-second throttle, so a second refusal within
 two seconds prints nothing. An attack with no weapon says so next. Then the
@@ -194,7 +216,29 @@ misses as a blow does but ignores the mob's defense. Snipe's shot never
 misses and meets neither defense nor guards: 199,999 less a roll from 0 to
 10,000 (`shot_path::snipe_damage`, 0x78e4d6), always shown as a critical
 (FUN_00668b83). Another player's attack shows a hit as a critical when its
-damage has the top bit set (0x980620); RustMS never sets it.
+damage has the top bit set (0x980620); RustMS sets it only for Snipe.
+
+HeavenClient rolls every other blow as v83's PDamage does (`Mob::next_blow`,
+`Gameplay/Combat/PhysicalDamage.h`, FUN_0078df87). The weapon, not the job,
+picks the stats and the multiplier, and a swing and a stab differ by the
+action's name; bow, crossbow, claw and gun whacks and a prone stab have
+formulas of their own. The roll starts at the mastery's share of the main
+stat (`(5m + 10)%`, 10% unlearned), and the mastery skill counts only for the
+reach it suits. A hit lands when 70% to 130% of the accuracy (ten percent
+lower for each level the mob is above) reaches the mob's avoid. Then come the
+level penalty, the skill's element, a White Knight charge, a defense roll of
+half to 0.6 of the mob's, the skill's percent, the Combo orbs, a critical
+(the weapon's crit skill, Sharp Eyes, or Stun Mastery on a stunned mob),
+Power Guard Up, Shadow Partner's share of the first set, Hard Skin, Berserk
+and Barrage, at most 199,999. A shot adds the attack of the ammo it throws,
+and the stat window shows the same range v83 does (FUN_008c2870).
+
+The totals count what v83's SetFrom adds (`Character/SecondaryStat.h`,
+FUN_0077f4c9): accuracy and avoid from DEX and LUK by the job, the `x`
+accuracy and `y` avoid of Blessing of Amazon, Nimble Body, Bullet Time and
+Quick Motion, a Thrust's speed, Shield Mastery's `x` percent of the shield's
+own defence, and a weaponless pirate's attack. A mob's blow and the stat
+window use the same avoid.
 
 HeavenClient picks targets as v83 does (`Combat::find_targets`). Melee and
 magic attacks take the mobs whose body overlaps the attack range in the order
@@ -227,7 +271,12 @@ With ammo, a regular attack still whacks instead of shooting when a mob is
 right in front: v83 picks the melee stance first and looks for a mob in its
 afterimage range, cut to reach at most 65 px forward
 (`Gameplay/Combat/PointBlank.h`, `Combat::find_whack`). Only when there is
-none does it shoot.
+none does it shoot. Most skills that shoot do the same, and so does each tick
+of a held Hurricane or Rapid Fire, which also lets the skill go; a few shots,
+such as Arrow Rain or Arrow Eruption, never whack (`point_blank::always_shoots`).
+A Ranger's or Sniper's whack, with Mortal Blow learned, first rolls its
+`prop`: on success it shoots Mortal Blow at the mob instead, flagged 0x04;
+on failure the whack goes out flagged 0x10 (`point_blank::mortal_blow`).
 
 A shot leaves the user 28 px up and, for a regular attack, as far forward as
 the whack would reach (skills shoot from the user). Each bullet flies straight
@@ -295,6 +344,25 @@ tag (`Basic.img/ShowLevel`) sits left of the name, except for bosses, mobs
 whose `info` hides their level, HP or name, and 9xxxxxx mobs outside 94xxxxx
 and 96xxxxx.
 
+Some attacks take something back from the mobs they hit (`skills::takes`,
+handled in the field's `handle_attack`):
+
+- **Drain**, **Energy Drain** and **Vampire** give back their `x` percent of
+  each hit's damage as HP, no more than the mob's max HP per mob, and no more
+  than half the player's max HP per attack (`absorbed`).
+- **MP Eater** (2100000, 2200000, 2300000, by the mage's branch) rolls its
+  `prop` for each non-boss mob a spell hits and survives, and takes `x`
+  percent of the mob's max MP, no more than it has, as MP. The player sees
+  the skill on themselves (SHOW_ITEM_GAIN_INCHAT 1) and the map sees it on
+  them (SHOW_FOREIGN_EFFECT 1), once per attack.
+- **Mortal Blow** (3110001, 3210001) rolls its `y` percent per attack. On a
+  hit, a non-boss mob with no more than `x` percent of its max HP left dies.
+  The v83 client shoots it as a ranged attack when a whack's roll succeeds
+  (FUN_00950921), as described above.
+
+The client actor applies what came back as one STAT_CHANGED
+(`ServerMessage::Absorbed`).
+
 A dead mob's EXP is shared by damage dealt (the top damager gets any
 rounding remainder) and each share goes to that player's client actor
 (`ServerMessage::MobKilled`), which adds it with `Player::gain_exp`. A level
@@ -306,22 +374,71 @@ Brawler's Improve MaxHP (5100000) and a magician's Improving MaxMP Increase
 (2000001) add their `x` to each level's growth and their `y` to an AP's
 (`net::skills::growth_bonus`).
 
+### Meso Explosion
+
+Meso Explosion (4211006) sets off mesos lying in front of a Chief Bandit,
+and each hurts the mobs around it by what it is worth (v83 FUN_0096b3fb;
+`v83ref` report 194). The client picks everything and sends it in its
+CLOSE_RANGE_ATTACK, laid out differently from other attacks (v83 0x96bafe):
+each target has 12 bytes, then a byte counting its lines, then the lines
+and the 4-byte checksum. After the targets come where the player stands,
+a byte counting the drops, each drop's object id and a byte of the targets
+it hit (bit j for the j-th), and an i16 of when the hits land, in ms.
+
+HeavenClient (`Gameplay/Combat/MesoExplosion.h`, `Combat::set_off_mesos`)
+refuses it on a rope or ladder or in the air. It looks in the skill's box
+(`lt`/`rb`, mirrored when facing right, without its right and bottom
+edges) for mesos that have landed and that the player may take by their
+ownership type. Unlike pickup, it ignores how long they have lain. It takes
+the first `attackCount` (at most 20) in the order they entered the map,
+then sorts them cheapest first. Each drop hits the live mobs whose body
+meets a box 50 px around it. That is at most `mobCount` mobs, in the order
+they entered the map, and at most 15 drops on each mob. Only the first 15
+drops hurt anything. One line is 50·`x` × a roll from 0.5 up to 1 × a ratio
+of the mesos: (0.82m + 28) / 5300 up to 1,000 mesos, then m / (m + 5250). A
+Disabled mob takes 0, and a mob under PImmune takes 1. The packet carries
+every line. A mob shows them added up into at most five numbers (the i-th
+line to number i % 5), all at the attack's hit frame. Those numbers show the
+mob's `fixedDamage` for a hit, or 0 if its `damagedBy` leaves the skill out.
+With no mesos the skill still acts and costs MP. The skill's `hit`
+animations are the drops going off, not hits on the mobs.
+
+The server (`net::meso_explosion`, `blast` in `net::combat`) refuses more
+drops than `attackCount` and a drop named twice, and checks that each
+target's lines match the drops whose bits name it. Each line is capped at
+50·`x`. The field (`set_off`) takes each drop the player may take that lies
+within the skill's box (100 px of slack), and removes it at once. It sends
+REMOVE_ITEM_FROM_MAP mode 4 (`u8 4, i32 oid, i16 delay`). The delay is the
+client's, plus 100 ms for each of the next four drops, then again from the
+start (Cosmic's spread), and never more than 1 s. A line counts only if
+its drop went off and the line is no more than that drop could do
+(`line_cap`). It counts as the mob's `fixedDamage` if it has one. On mode 4,
+HeavenClient's drop stays where it is, and can't be picked up or chosen
+again. When the delay ends, it disappears and plays one of the skill's
+`hit` animations at random on the effect layer. The skill's `Hit` sound
+plays no more than once every 90 ms (FUN_00504bff). Other players see each
+line as its own number, all at once, with the same `fixedDamage` and
+`damagedBy` rules (FUN_009803ab).
+
 ## Buff skills
 
 USE_SKILL (`0x5B`, `handle::world::use_skill`) casts a skill that doesn't
 attack. `net::skills::buffs` maps each buff skill to the stats it gives (the
 level's attack, defense, accuracy, avoidability, speed and jump, plus the
 skill's own stat); a skill missing from it is ignored. The level the client names must be the learned one, the skill must
-be off cooldown, and the player alive with enough MP. The caster gets the MP
-left, GIVE_BUFF (the temporary-stat masks match HeavenMS: Speed and Recovery
+be off cooldown, and the player alive with enough HP and MP. The caster gets
+the MP left (and the HP, for a Booster's `hpCon`), GIVE_BUFF (the temporary-stat masks match HeavenMS: Speed and Recovery
 are both second-mask bits), and COOLDOWN when the level has a `cooltime`;
 the map sees SHOW_FOREIGN_EFFECT 1 with the skill.
 
 `game::Buffs` on the `Player` holds the active buffs and cooldowns; neither is
 saved. A new buff replaces one on the same stat. The client actor sleeps until
 the next deadline (`actor::client::buff`): Recovery heals its `x` every 5 s
-while the player is hurt (HP stat update), and an expired buff sends
-CANCEL_BUFF, since the client never ends buffs itself. Right-clicking a buff
+while the player is hurt (HP stat update). Dragon Blood drinks its `x` every
+4 s, showing its `special` animation to everyone (user effect 5, an int
+skill id); when the player has no more than that left it ends instead, as its
+description says ("until 4 seconds before the remaining HP exhausts"). An
+expired buff sends CANCEL_BUFF, since the client never ends buffs itself. Right-clicking a buff
 icon sends CANCEL_BUFF (`0x5C`, the skill id), which ends that skill's buffs
 and answers with CANCEL_BUFF. Dying and changing channel end every buff;
 cooldowns keep running.
@@ -350,10 +467,40 @@ A few skills do more than buff:
   `luk * 2.3 * y / 100` and `luk * 3.5 * y / 100`, using LUK with equips
   (`skills::chakra_heal`). The client only lets it be cast below half HP;
   the server doesn't check, since its max HP leaves out equips.
+- **Combo Attack** (`net::combo`) starts at value 1, which is one more than
+  the orbs. After an accepted swing that reaches a mob (not Shout), the
+  attack handler adds an orb up to Combo Attack's `x`, or Advanced Combo's
+  once learned, and with Advanced Combo a second one on its `prop` chance,
+  as Cosmic does. Panic and Coma reset the value to 1, and `validate`
+  refuses them without an orb, as the client does. Each change goes to
+  the player as GIVE_BUFF for the time left and to the map as
+  GIVE_FOREIGN_BUFF. The orbs multiply a swing's or a shot's damage after
+  its skill's, by the client's table (FUN_007653fa, `combo::damage_percent`).
+  The damage cap and HeavenClient's `Player::combo_percent` both use it.
+  A Dawn Warrior's skills follow the same rules, with Combo Attack's last
+  level at 20. Enrage, a buff of its `pad`, wants a value of 10 (nine
+  orbs: the client compares the value, 0x764379) and resets it to 1 the
+  same way (`combo::enrage_refused`).
+  HeavenClient draws the orbs as v83 does (`combo::Orbs`, FUN_0093cdbc):
+  the newest five on a turning ring 40 pixels over the feet, the newest
+  popping in, all fading out when spent, and a finisher's
+  `finish/<orbs>` burst at the attacker's feet.
 
-These and Mystic Door have neither buff stats nor a mob debuff, so
-`skills::acts_alone` lets them past the check that refuses such skills as
-unsupported.
+Teleport and Flash Jump move the player on the client alone; the server
+only spends the MP. HeavenClient's Flash Jump (4111006 and the Night
+Walker's 14101004, `flash_jump`) follows v83 (FUN_0096be38). It works only
+in the air, off any rope or ladder, and, out of water, not once the player
+is falling. It works once until the player lands or grabs a rope, and maps
+that bar movement skills refuse it ("You cannot use that skill on this
+map."). It throws the player 350 px/s forward and 250 up, plus 40 and 20
+for every four levels, records path element 6 before the push, and leaves
+`BasicEff.img/Flying` (`Flying1` for a Night Walker) where the jump began.
+Another player's client shows that effect, picked by the jumper's job, when
+their path arrives with element 6 (FUN_0097fdf8).
+
+These, Mystic Door, Teleport and Flash Jump have neither buff stats nor a
+mob debuff, so `skills::acts_alone` lets them past the check that refuses
+such skills as unsupported.
 
 ## Spending AP and SP
 
@@ -415,7 +562,8 @@ GMS footage. Its horizontal speed is set from that air time so it lands on
 its destination, and it turns about twice on the way down. A picked up drop
 (REMOVE_ITEM_FROM_MAP 2) follows the looter and rises about 50 px, slowing
 down, then disappears after about 0.37 s; it stays opaque except for the last
-six ticks. An expiring drop (mode 0) fades out where it is.
+six ticks. An expiring drop (mode 0) fades out where it is. Mode 4 sets
+mesos off for Meso Explosion (see "Meso Explosion" above).
 
 ITEM_PICKUP (`0xCA`) needs the player within 800×600 of the drop. The field
 removes it (REMOVE_ITEM_FROM_MAP 2 with the looter) and hands it to the
@@ -956,7 +1104,10 @@ damage over the mob, at most a tenth of its max HP for a physical hit
 (HeavenClient's `Mob::show_reflect`). Hits with no mob (-4) end with a byte: 1
 poison (ignored, the server ticks poison itself), 2 a mist (Achilles
 applies), or 3 Stop Motion (no guards, never fatal). At 0 HP the player is
-dead (`death_penalty`): non-beginners lose 10% of their level's EXP. Holding a
+dead (`death_penalty`). Non-beginners lose part of their level's EXP: 1% in a
+town (`info/town`), otherwise 10%, or 5% with 50 base LUK or more. Nobody
+loses any on a map with field limit 0x80000, which covers the Dojo and most
+event maps. These are Cosmic's rules; v83 never reads the bit. Holding a
 charm keeps the EXP instead and uses up one charm. The charms are tried in
 Cosmic's order: the Safety Charm (5130000), the Easter Basket (4031283), then
 the Easter Charm (4140903). A grey chat line confirms it (SHOW_ITEM_GAIN_INCHAT
@@ -1052,11 +1203,16 @@ six snails, checks the effect another player sees and the cover, and that
 both survive logging out; `beginner_skills` has three players learn
 Three Snails, Nimble Feet, and Recovery and checks their damage caps, MP,
 buffs, cooldowns, Recovery's heal, what the others see, and that the buffs
-end on time and on death. `poison_mist` casts Poison Mist on a snail and
+end on time and on death. `hp_costs` has a Dragon Knight spend HP on Slash
+Blast and Dragon Roar, checks Dragon Roar's stun and its end, refuses
+Dragon Roar under half HP, and has Dragon Blood drink HP until it ends
+early. `poison_mist` casts Poison Mist on a snail and
 checks the cloud's packet, that it lifts on time, and that it poisons only
 the snails in its box. `snipe` has a Marksman Snipe snails: 200,000 is
 refused, 199,999 kills and starts the 4 s cooldown, which refuses another
-until it ends. `summons` has a ranger call up a Silver Hawk and a
+until it ends. `critical_shots` has an Assassin with Subis shot for 16,
+its cap, but not 17, then for 32 but not 33 once it learns Critical Throw.
+`summons` has a ranger call up a Silver Hawk and a
 Puppet, and checks what a watcher sees: the spawns, a refused and an accepted
 Hawk attack, the Puppet breaking, and the Hawk following its owner to the
 next map with no entrance. It also has a Dark Knight's Beholder heal them
@@ -1067,10 +1223,15 @@ and back, keep a stranger out until they join the party, and close it on
 logout.
 `party_skills` has a Bishop resurrect a dead party member, and a Chief
 Bandit heal themselves with Chakra.
+`combo_attack` has a Crusader refused Panic without an orb, gather five
+orbs by swinging at a snail (a sixth swing adds none), and spend them with
+Panic.
 `player_diseases` has a Hogul in Korean Folk Town cast Slow from far away
 (it misses) and then on the player (it lands for 10 s, then ends).
 `map_hazards` warps to El Nath's Ice Valley in its cape, which keeps the
 cold out, then takes it off and drinks an Air Bubble, which doesn't help: it
 loses 10 HP at the next tick. After a Red Bean Porridge it loses nothing.
 HeavenClient's `diseases_tests` cover the input, jump, attack and skill
-gates and the notices.
+gates and the notices; `combo_tests` cover the orbs' damage table and
+`combo_orbs_tests` what they show; `flash_jump_tests` cover Flash Jump's
+push, its gates and its effects.

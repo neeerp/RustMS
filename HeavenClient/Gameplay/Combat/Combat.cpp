@@ -18,10 +18,12 @@
 #include "Combat.h"
 
 #include "ChainLightning.h"
+#include "Combo.h"
 #include "DamageLayout.h"
 #include "Heal.h"
 #include "HitTiming.h"
 #include "MagicDamage.h"
+#include "MesoExplosion.h"
 #include "PointBlank.h"
 #include "Prepare.h"
 #include "RemoteShot.h"
@@ -33,7 +35,10 @@
 
 #include "../../Constants.h"
 #include "../../Character/SkillId.h"
+#include "../../Character/Look/AttackStances.h"
+#include "../../Data/BulletData.h"
 #include "../../Data/SkillData.h"
+#include "../../Data/WeaponData.h"
 #include "../../IO/Messages.h"
 #include "../../Util/Misc.h"
 #include "../../Util/Randomizer.h"
@@ -44,15 +49,16 @@
 #include <nlnx/nx.hpp>
 
 #include <algorithm>
+#include <bitset>
 #include <cmath>
 #include <cstdlib>
 
 namespace ms
 {
 	Combat::Combat(Player &in_player, MapChars &in_chars, MapMobs &in_mobs, MapReactors &in_reactors,
-				   MapSummons &in_summons, const Physics &in_physics, const MapInfo &in_mapinfo,
+				   MapSummons &in_summons, MapDrops &in_drops, const Physics &in_physics, const MapInfo &in_mapinfo,
 				   const MapPortals &in_portals) : player(
-			in_player), chars(in_chars), mobs(in_mobs), reactors(in_reactors), summons(in_summons),
+			in_player), chars(in_chars), mobs(in_mobs), reactors(in_reactors), summons(in_summons), drops(in_drops),
 			physics(in_physics), mapinfo(in_mapinfo), portals(in_portals),
 																										attackresults(
 																												[&](const AttackResult &attack)
@@ -163,6 +169,7 @@ namespace ms
 	{
 		now += Constants::TIMESTEP;
 		update_prepare();
+		update_final_attack();
 		update_remote_prepares();
 		update_grenades();
 		update_rains();
@@ -229,9 +236,21 @@ namespace ms
 		if (!can_use_move(move))
 			return;
 
+		if (move_id == meso_explosion::ID)
+		{
+			set_off_mesos(move);
+			return;
+		}
+
 		// v83's spell handler swings a regular attack instead when the player
-		// is prone (0x969b10).
+		// is prone (0x969b10), and most shots whack a mob right in front of
+		// the player instead (0x9698ca).
+		int16_t reach = 0;
+
 		if (move.is_skill() && player.is_prone() && SkillData::get(move_id).is_spell())
+			apply_move(regularattack);
+		else if (move.is_skill() && SkillData::get(move_id).is_shot() && !point_blank::always_shoots(move_id)
+				 && find_whack(player.prepare_attack(0), reach) != Stance::Id::NONE)
 			apply_move(regularattack);
 		else
 			apply_move(move);
@@ -288,6 +307,31 @@ namespace ms
 			return std::nullopt;
 
 		return target;
+	}
+
+	bool Combat::use_flash_jump(int32_t move_id, bool allowed, bool airborne)
+	{
+		const SpecialMove &move = get_move(move_id);
+
+		if (!can_use_move(move))
+			return false;
+
+		// v83 says so only for the map, once the cost is let through
+		// (FUN_0096be38).
+		if (!allowed)
+		{
+			InChatMessage(Messages::SKILL_FIELD).drop();
+			return false;
+		}
+
+		if (!airborne || !player.can_request(ExclRequest::SKILL_WAIT))
+			return false;
+
+		// With no action and no position (0x96d565, FUN_0096d6ca).
+		int32_t level = player.get_skills().get_level(move_id);
+		player.request(UseSkillPacket(move_id, level, 0, UseSkillPacket::Reach{}), ExclRequest::SKILL_WAIT);
+
+		return true;
 	}
 
 	bool Combat::can_use_move(const SpecialMove &move) const
@@ -846,9 +890,9 @@ namespace ms
 		return targets;
 	}
 
-	void Combat::apply_move(const SpecialMove &move, int32_t charge, bool held)
+	void Combat::apply_move(const SpecialMove &move, int32_t charge, bool held, const Follow *follow)
 	{
-		if (move.is_attack())
+		if (move.is_attack() || follow)
 		{
 			// Heal asks the server first, as a skill that doesn't attack.
 			int32_t healed = 0;
@@ -864,7 +908,8 @@ namespace ms
 			if (!move.is_skill() && swing_at_reactor())
 				return;
 
-			Attack attack = player.prepare_attack(move.is_skill() ? move.get_id() : 0);
+			// A Final Attack swings or shoots as the weapon does.
+			Attack attack = player.prepare_attack(move.is_skill() && !follow ? move.get_id() : 0);
 			attack.charge = charge;
 			Stance::Id whack = Stance::Id::NONE;
 			int16_t reach = 0;
@@ -872,21 +917,75 @@ namespace ms
 			if (attack.type == Attack::Type::RANGED && !move.is_skill())
 				whack = find_whack(attack, reach);
 
-			if (whack != Stance::Id::NONE)
-				attack = player.prepare_attack(0, true);
+			// A Ranger's or a Sniper's whack shoots a Mortal Blow instead,
+			// with its prop, at the mob in front (0x9516c8).
+			uint8_t flags = 0;
 
-			// A held skill's shots keep the body as it is (0x954165).
-			if (!held)
+			if (whack != Stance::Id::NONE)
+			{
+				int32_t blow = point_blank::mortal_blow(player.get_stats().get_job().get_id());
+				int32_t level = blow ? player.get_skills().get_level(blow) : 0;
+
+				if (level > 0)
+				{
+					if (Randomizer().below(SkillData::get(blow).get_stats(level).chance))
+					{
+						apply_move(get_skill(blow));
+						return;
+					}
+
+					flags = point_blank::MISSED_BLOW_FLAG;
+				}
+
+				attack = player.prepare_attack(0, true);
+			}
+
+			// A held skill's shots keep the body as it is (0x954165). A
+			// Final Attack shows no effect of its own (0x9519ac).
+			if (!held && !follow)
 				move.apply_useeffects(player);
 
-			if (whack != Stance::Id::NONE)
+			// A finisher bursts with the orbs it spends (0x934725).
+			if (combo::finisher(move.get_id()))
+				player.show_combo_finish(move.get_id());
+
+			if (follow)
+			{
+				player.end_attack();
+				player.attack(false, follow->stance);
+			} else if (whack != Stance::Id::NONE)
+			{
 				player.attack(true, whack);
-			else if (!held)
+			} else if (!held)
+			{
 				move.apply_actions(player, attack.type);
+			}
 
 			player.set_afterimage(move.get_id());
 
 			move.apply_stats(player, attack);
+
+			if (attack.skill && attack.skill == point_blank::mortal_blow(player.get_stats().get_job().get_id()))
+				flags = point_blank::MORTAL_BLOW_FLAG;
+
+			attack.display |= flags;
+
+			// A Final Attack reaches as its stance's regular attack does, and
+			// after Slash Blast it says so (0x952949).
+			if (follow)
+			{
+				attack.stance = player.get_look().get_stance();
+
+				if (attack.type == Attack::Type::CLOSE)
+					attack.range = player.get_afterimage().get_range();
+
+				if (final_attack::slash_blast(follow->trigger))
+					attack.display |= 1;
+			}
+
+			// The orbs multiply a swing's or a shot's damage after its skill's (FUN_007653fa).
+			if (attack.type != Attack::Type::MAGIC)
+				attack.blow.combo = player.combo_percent(attack.skill);
 
 			// Shadow Partner throws each bullet again, for twice the hits.
 			if (attack.type == Attack::Type::RANGED && player.has_buff(Buffstat::Id::SHADOWPARTNER) &&
@@ -894,6 +993,7 @@ namespace ms
 			{
 				attack.sets = 2;
 				attack.hitcount = shot_path::partner_hits(attack.hitcount);
+				attack.blow.partner = player.partner_percent(attack.skill);
 			}
 
 			if (whack != Stance::Id::NONE)
@@ -906,6 +1006,10 @@ namespace ms
 				attack.bulletslot = inventory.find_bulletslot(attack.bulletcost);
 				attack.bullet = inventory.get_item_id(InventoryType::Id::USE, attack.bulletslot);
 			}
+
+			// A shot adds the attack of the ammo it throws (FUN_0077df48).
+			if (physical_damage::ammo(attack.bullet))
+				attack.blow.ammo = BulletData::get(attack.bullet).get_watk();
 
 			Point<int16_t> origin = attack.origin;
 			Rectangle<int16_t> range = place_range(origin, attack.range, attack.hrange, attack.toleft);
@@ -925,6 +1029,8 @@ namespace ms
 
 			if (spell)
 				reach = shot_path::SPELL_REACH;
+			else if (follow && shot)
+				reach = final_attack::SHOT_REACH;
 
 			Point<int16_t> shot_start = shot_path::origin(origin, reach, attack.toleft);
 			Point<int16_t> shot_end(attack.toleft ? range.left() : range.right(), shot_start.y());
@@ -998,10 +1104,44 @@ namespace ms
 				attack.healed = healed + static_cast<int32_t>(mob_targets.size());
 			} else
 			{
+				// Slash Blast, Coma and Charged Blow reach as far as their
+				// `range` once a mob is in their swing's reach, and a Final
+				// Attack after Slash Blast as far as Slash Blast does and as
+				// many mobs (0x95150e).
+				bool after_slash_blast = attack.display & 1;
+
+				if (final_attack::stretches(attack.skill) || after_slash_blast)
+				{
+					int32_t skill = after_slash_blast ? final_attack::slash_blast_of(player.get_stats().get_job().get_id())
+													  : attack.skill;
+					const SkillData::Stats &stats = SkillData::get(skill).get_stats(player.get_skills().get_level(skill));
+					Rectangle<int16_t> swing = place_range(origin, attack.range, 1.0f, attack.toleft);
+
+					if (!find_targets(mob_objs, swing, origin, 1, false).empty())
+					{
+						attack.range = Rectangle<int16_t>(std::min<int16_t>(attack.range.left(), -stats.shotrange),
+														  attack.range.right(), attack.range.top(), attack.range.bottom());
+					}
+
+					range = place_range(origin, attack.range, 1.0f, attack.toleft);
+
+					if (after_slash_blast)
+						mobcount = stats.mobcount;
+				}
+
 				mob_targets = find_targets(mob_objs, range, origin, mobcount, closest_first);
 			}
 
 			mobs.send_attack(result, attack, mob_targets, mobcount);
+
+			// After Slash Blast, each mob takes less than the one before it
+			// (0x951e63).
+			if (attack.display & 1)
+			{
+				for (size_t target = 0; target < result.damagelines.size(); target++)
+					for (auto &line : result.damagelines[target].second)
+						line.first = final_attack::fall_off(line.first, target);
+			}
 
 			if (!result.damagelines.empty() && !result.damagelines[0].second.empty()
 				&& shot_path::drops_splash(attack.skill, result.damagelines[0].second[0].first))
@@ -1023,10 +1163,143 @@ namespace ms
 			apply_result_movement(move, result);
 
 			AttackPacket(result, player.get_position()).dispatch();
+
+			if (attack.skill && attack.type != Attack::Type::MAGIC && !held && !follow)
+				roll_final_attack(attack.skill);
 		} else
 		{
 			request_skill(move);
 		}
+	}
+
+	void Combat::set_off_mesos(const SpecialMove &move)
+	{
+		using namespace meso_explosion;
+
+		// Not from a rope or a ladder, nor in the air (0x96b4c7, 0x96b4d9).
+		if (!player.get_phobj().onground || player.get_ladder())
+			return;
+
+		Attack attack = player.prepare_attack(ID);
+		move.apply_stats(player, attack);
+
+		// The mesos in its box the player may set off, cheapest first, and
+		// the mobs around them.
+		Rectangle<int16_t> box = area(attack.range, attack.origin, attack.toleft);
+		std::vector<Drop> chosen = choose(drops.find_explodable(box, player.get_oid(), player.get_party().get_id()),
+										  attack.hitcount);
+		Targets targets = aim(chosen, mobs.explosion_targets(), attack.mobcount);
+
+		// With no mesos it still acts, and costs what it costs.
+		move.apply_useeffects(player);
+		move.apply_actions(player, attack.type);
+		player.set_afterimage(ID);
+
+		AttackResult result = attack;
+		result.attacker = player.get_oid();
+		result.hitcount = 0;
+
+		// The packet carries each line; a mob shows them added up into five
+		// numbers at most, all at once.
+		int32_t x = SkillData::get(ID).get_stats(player.get_skills().get_level(ID)).x;
+		std::vector<std::pair<int32_t, std::vector<int32_t>>> lines;
+
+		for (const auto &[oid, mask] : targets.mobs)
+		{
+			std::vector<int32_t> rolled = mobs.explode(oid, x, hurting(chosen, mask));
+			std::vector<std::pair<int32_t, bool>> shown;
+
+			for (int32_t number : fold(rolled))
+				shown.emplace_back(mobs.shown_explosion(oid, number), false);
+
+			result.hitcount = std::max(result.hitcount, static_cast<uint8_t>(std::bitset<32>(mask).count()));
+			result.damagelines.emplace_back(oid, shown);
+			lines.emplace_back(oid, rolled);
+		}
+
+		result.mobcount = static_cast<uint8_t>(lines.size());
+
+		if (!lines.empty())
+		{
+			result.first_oid = lines.front().first;
+			result.last_oid = lines.back().first;
+		}
+
+		expect_hits(result, 1);
+		show_counters(result);
+		extract_effects(player, move, result, box, 0, {}, {});
+
+		std::vector<std::pair<int32_t, uint8_t>> sent;
+
+		for (size_t i = 0; i < chosen.size(); i++)
+			sent.emplace_back(chosen[i].oid, targets.drops[i]);
+
+		auto delay = static_cast<int16_t>(player.get_attackdelay(0));
+		MesoExplosionPacket(result, lines, player.get_position(), sent, delay).dispatch();
+	}
+
+	void Combat::roll_final_attack(int32_t trigger)
+	{
+		pending_final.reset();
+
+		int32_t weapon = final_attack::weapon_type(player.get_look().get_equips().get_weapon());
+		Randomizer random;
+
+		for (const auto &[skill, types] : SkillData::get(trigger).get_final_attacks())
+		{
+			int32_t level = player.get_skills().get_level(skill);
+
+			// The Cygnus Knights' come up only under their buff, which the
+			// server doesn't give yet.
+			if (level <= 0 || final_attack::needs_buff(skill))
+				continue;
+
+			if (std::find(types.begin(), types.end(), weapon) == types.end())
+				continue;
+
+			auto prop = static_cast<int32_t>(std::lround(SkillData::get(skill).get_stats(level).chance * 100));
+
+			if (random.next_int<int32_t>(101) <= prop)
+			{
+				int32_t delay = final_attack::delay(player.get_attackdelay(0), player.get_attack_length());
+				pending_final = FinalAttack{ trigger, skill, weapon, now + delay };
+
+				return;
+			}
+		}
+	}
+
+	void Combat::update_final_attack()
+	{
+		if (!pending_final || now < pending_final->at)
+			return;
+
+		FinalAttack due = *pending_final;
+		pending_final.reset();
+
+		// It's let go if the weapon changed, or the skill is gone.
+		int32_t weapon = player.get_look().get_equips().get_weapon();
+
+		if (final_attack::weapon_type(weapon) != due.weapon || player.get_skills().get_level(due.skill) <= 0)
+			return;
+
+		bool shoots = final_attack::shoots(due.weapon);
+
+		if (!final_attack::swings(due.weapon) && !shoots)
+			return;
+
+		if (!player.can_attack(true) || (shoots && !player.get_inventory().has_projectile()))
+			return;
+
+		const std::vector<Stance::Id> &stances = attack_stances::get_final(WeaponData::get(weapon).get_attack());
+
+		if (stances.empty())
+			return;
+
+		Randomizer random;
+		Follow follow = { stances[random.next_int(stances.size())], due.trigger };
+
+		apply_move(get_skill(due.skill), 0, false, &follow);
 	}
 
 	bool Combat::swing_at_reactor()
@@ -1357,6 +1630,9 @@ namespace ms
 			{
 				move.apply_useeffects(user);
 
+				if (combo::finisher(attack.skill))
+					user.show_combo_finish(attack.skill);
+
 				if (Stance::Id stance = Stance::by_id(attack.stance))
 					user.attack(stance);
 				else
@@ -1396,12 +1672,23 @@ namespace ms
 			}
 			else if (attack.type == Attack::Type::RANGED && !prepare::throws(attack.skill))
 				show_remote_shot(user, move, attack, range);
+			else if (attack.skill == meso_explosion::ID)
+				extract_effects(user, move, show_explosion(attack), range, reach, shot_area, shot_end);
 			else
 				extract_effects(user, move, attack, range, reach, shot_area, shot_end);
 		} else
 		{
 			expect_hits(attack, -1);
 		}
+	}
+
+	AttackResult Combat::show_explosion(AttackResult attack) const
+	{
+		for (auto &[oid, lines] : attack.damagelines)
+			for (auto &line : lines)
+				line.first = mobs.shown_explosion(oid, line.first);
+
+		return attack;
 	}
 
 	Rectangle<int16_t> Combat::place_range(Point<int16_t> origin, Rectangle<int16_t> range, float hrange, bool toleft)
@@ -2149,13 +2436,13 @@ namespace ms
 		player.show_attack_effect(affected.animation, affected.z);
 	}
 
-	void Combat::show_dodge(int32_t cid, int32_t skillid)
+	void Combat::show_special(int32_t cid, int32_t skillid)
 	{
 		if (Optional<OtherChar> ouser = chars.get_char(cid))
 			ouser->show_effect(get_skill(skillid).get_special());
 	}
 
-	void Combat::show_player_dodge(int32_t skillid)
+	void Combat::show_player_special(int32_t skillid)
 	{
 		player.show_effect(get_skill(skillid).get_special());
 	}
@@ -2382,6 +2669,20 @@ namespace ms
 		{
 			ForbidSkillMessage(reason, player.get_stats().get_weapontype()).drop();
 			finish_prepare();
+			return;
+		}
+
+		// A mob right in front of the player is whacked instead, and the
+		// skill let go (0x94bbd3).
+		int16_t reach = 0;
+
+		if (find_whack(player.prepare_attack(0), reach) != Stance::Id::NONE)
+		{
+			finish_prepare();
+
+			if (can_use_move(regularattack))
+				apply_move(regularattack);
+
 			return;
 		}
 

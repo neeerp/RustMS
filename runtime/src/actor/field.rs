@@ -9,10 +9,12 @@ use crate::message::{ClientHandle, FieldKey, FieldMessage, ServerMessage};
 use game::mob_skill::{self, MobSkillEffect};
 use game::{FieldAvatar, MobStat};
 use net::conti::{self, Happening};
+use net::meso_explosion::{self, Blast};
+use net::packet::build::world::buff::{build_own_skill_effect, build_skill_effect};
 use net::packet::build::world::conti::build_conti_move;
 use net::packet::build::world::door::{build_remove_door, build_spawn_door};
 use net::packet::build::world::drop::{
-    build_drop, build_pet_loot_drop, build_remove_drop, DropAppearance,
+    build_drop, build_explode_drop, build_pet_loot_drop, build_remove_drop, DropAppearance,
 };
 use net::packet::build::world::field::{
     build_player_enter_field, build_player_leave_field, build_show_chair, parse_movement,
@@ -36,7 +38,7 @@ use net::packet::build::world::summon::{
     build_damage_summon, build_move_summon, build_remove_summon, build_spawn_summon,
     build_summon_attack, build_summon_skill, Gone, SummonView,
 };
-use net::skills::{self, Inflict};
+use net::skills::{self, Inflict, Takes};
 use net::summons::{self, Limit, SummonAttack, SummonDamage, Support};
 use net::{ClientId, FieldRequest};
 use packet::Packet;
@@ -391,14 +393,23 @@ impl FieldActor {
                     counter,
                     hits,
                     inflicts,
-                } => self.handle_attack(
-                    from,
-                    Some(broadcast),
-                    Some(skill),
-                    Some(counter),
-                    hits,
-                    &inflicts,
-                ),
+                    takes,
+                    blast,
+                } => {
+                    let hits = match blast {
+                        Some(blast) => self.set_off(from, &blast, hits),
+                        None => hits,
+                    };
+                    self.handle_attack(
+                        from,
+                        Some(broadcast),
+                        Some(skill),
+                        Some(counter),
+                        hits,
+                        &inflicts,
+                        takes,
+                    )
+                }
                 FieldRequest::Reflect {
                     object_id,
                     mob_id,
@@ -817,7 +828,9 @@ impl FieldActor {
     /// (v83 FUN_007937e3, rolled again here: its client only shows its own
     /// roll). A mob that only some skills hurt takes nothing from the others,
     /// as their v83 clients count it a miss (FUN_0068146c); a reflection
-    /// (no skill) isn't judged.
+    /// (no skill) isn't judged. What it `takes` from them goes back to
+    /// `from` as one message.
+    #[allow(clippy::too_many_arguments)]
     fn handle_attack(
         &mut self,
         from: ClientId,
@@ -826,10 +839,12 @@ impl FieldActor {
         counter: Option<MobStat>,
         hits: Vec<(i32, i64)>,
         inflicts: &[Inflict],
+        takes: Takes,
     ) {
         let Some(attacker) = self.occupants.get(&from) else {
             return;
         };
+        let (id, level) = (attacker.avatar.id, attacker.avatar.level);
         let attacker = attacker.handle.clone();
         if let Some(broadcast) = broadcast {
             self.broadcast(Some(from), broadcast);
@@ -847,17 +862,35 @@ impl FieldActor {
                 map_id: self.key.map_id,
             });
         }
+        let (mut hp_taken, mut mp_taken) = (0, 0);
         for (object_id, damage) in hits {
-            let hurts = skill.is_none_or(|skill| {
-                self.mobs
-                    .get(object_id)
-                    .is_none_or(|mob| mob.info.hurt_by(skill))
-            });
-            let damage = if hurts { damage } else { 0 };
+            let Some(mob) = self.mobs.get(object_id) else {
+                continue;
+            };
+            let hurts = skill.is_none_or(|skill| mob.info.hurt_by(skill));
+            let mut damage = if hurts { damage } else { 0 };
+            let max_hp = i64::from(mob.info.max_hp);
+            // Mortal Blow's kill takes what the mob has left.
+            if takes.life > 0
+                && damage > 0
+                && !mob.info.boss
+                && mob.hp * 100 <= max_hp * i64::from(takes.life)
+            {
+                damage = damage.max(mob.hp);
+            }
+            if damage > 0 {
+                hp_taken += (damage * i64::from(takes.hp) / 100).min(max_hp);
+            }
             match self.mobs.damage(from, object_id, damage, now) {
                 Some(Ok(percent)) => {
                     if let Ok(packet) = build_mob_hp(object_id, percent) {
                         attacker.send_packet(packet);
+                    }
+                    let eater = takes
+                        .mp
+                        .filter(|eater| damage > 0 && eater.eats(rand::random()));
+                    if let Some(eater) = eater {
+                        mp_taken += self.mobs.eat_mp(object_id, eater.x);
                     }
                     self.provoke(from, &attacker, object_id, now);
                     // A miss puts nothing on it.
@@ -900,6 +933,73 @@ impl FieldActor {
                 None => {}
             }
         }
+        // MP Eater shows when it ate, once for the attack.
+        if let Some(eater) = takes.mp.filter(|_| mp_taken > 0) {
+            if let Ok(packet) = build_own_skill_effect(eater.skill_id, level, eater.level) {
+                attacker.send_packet(packet);
+            }
+            if let Ok(packet) = build_skill_effect(id, eater.skill_id, level, eater.level) {
+                self.broadcast(Some(from), packet);
+            }
+        }
+        if hp_taken > 0 || mp_taken > 0 {
+            attacker.send(ServerMessage::Absorbed {
+                hp: i32::try_from(hp_taken).unwrap_or(i32::MAX),
+                mp: mp_taken,
+                map_id: self.key.map_id,
+            });
+        }
+    }
+
+    /// `from`'s Meso Explosion sets off the mesos in its box that they may
+    /// take, each going off for everyone in turn, and its targets take only
+    /// what those could deal: each line no more than its drop's worth, a
+    /// mob's `fixedDamage` for each that hits (the client sends them raw),
+    /// and nothing from a drop it couldn't set off.
+    fn set_off(&mut self, from: ClientId, blast: &Blast, hits: Vec<(i32, i64)>) -> Vec<(i32, i64)> {
+        let Some(occupant) = self.occupants.get(&from) else {
+            return Vec::new();
+        };
+        let (user, party) = ((occupant.avatar.x, occupant.avatar.y), occupant.party);
+        let reaches = |x, y| meso_explosion::reaches(blast.lt, blast.rb, blast.left, user, (x, y));
+        let now = Instant::now();
+        let mut mesos = Vec::new();
+        for (index, &object_id) in blast.drops.iter().enumerate() {
+            let drop = self.drops.explode(from, party, object_id, reaches, now);
+            if let Some(drop) = &drop {
+                let delay = meso_explosion::delay(blast.delay, index);
+                if let Ok(packet) = build_explode_drop(object_id, delay) {
+                    self.send_drop_packet(drop, packet);
+                }
+            }
+            mesos.push(drop.and_then(|drop| match drop.loot {
+                net::loot::Loot::Mesos(amount) => Some(amount),
+                _ => None,
+            }));
+        }
+        hits.into_iter()
+            .zip(&blast.lines)
+            .map(|((object_id, _), lines)| {
+                let fixed = self
+                    .mobs
+                    .get(object_id)
+                    .map_or(0, |mob| mob.info.fixed_damage);
+                let damage = lines
+                    .iter()
+                    .map(|&(source, line)| match mesos[source] {
+                        Some(amount) if line <= meso_explosion::line_cap(blast.x, amount) => {
+                            if fixed > 0 && line > 0 {
+                                i64::from(fixed)
+                            } else {
+                                i64::from(line)
+                            }
+                        }
+                        _ => 0,
+                    })
+                    .sum();
+                (object_id, damage)
+            })
+            .collect()
     }
 
     /// `from` used Monster Magnet. The others see it catch each live mob,
@@ -1150,6 +1250,7 @@ impl FieldActor {
             None,
             hits,
             limit.inflict.as_slice(),
+            Takes::default(),
         );
     }
 
@@ -1161,7 +1262,8 @@ impl FieldActor {
             .get(object_id)
             .is_some_and(|mob| mob.info.mob_id == mob_id)
         {
-            self.handle_attack(from, None, None, None, vec![(object_id, damage)], &[]);
+            let hit = vec![(object_id, damage)];
+            self.handle_attack(from, None, None, None, hit, &[], Takes::default());
         }
     }
 
@@ -1971,6 +2073,175 @@ mod tests {
         assert_eq!(seen.iter().filter(|&&op| op == magnet).count(), 2);
         assert_eq!(seen.iter().filter(|&&op| op == control).count(), 1);
         assert_eq!(opcodes(&mut second_rx).await, [control]);
+    }
+
+    #[tokio::test]
+    async fn drain_takes_a_share_and_mortal_blow_finishes_the_weak() {
+        let mut mobs = MobSet::new([mob(100, false)]);
+        let snail = mobs.respawn(Instant::now())[0];
+        let (tx, rx) = mpsc::channel(16);
+        let actor = FieldActor::new(
+            FieldKey::new(0, 100000000),
+            rx,
+            Vec::new(),
+            mobs,
+            DropSet::default(),
+            ReactorSet::default(),
+            Duration::from_secs(60),
+        );
+        tokio::spawn(actor.run());
+        let (handle, mut client_rx) = client(1);
+        tx.send(FieldMessage::Join {
+            handle,
+            avatar: avatar(1, 0, 0),
+            party: None,
+        })
+        .await
+        .unwrap();
+        opcodes(&mut client_rx).await;
+        let attack = |damage, takes| FieldMessage::FromClient {
+            from: 1,
+            request: FieldRequest::Attack {
+                broadcast: Packet::new_empty(),
+                skill: 0,
+                counter: game::MobStat::PCounter,
+                hits: vec![(snail, damage)],
+                inflicts: Vec::new(),
+                takes,
+                blast: None,
+            },
+        };
+        // What it took back, and whether the snail died.
+        let outcome = |rx: &mut mpsc::Receiver<ServerMessage>| {
+            let (mut taken, mut killed) = (Vec::new(), false);
+            while let Ok(message) = rx.try_recv() {
+                match message {
+                    ServerMessage::Absorbed { hp, mp, .. } => taken.push((hp, mp)),
+                    ServerMessage::SendPacket(packet) => {
+                        killed |= packet.opcode() == SendOpcode::KillMonster as i16
+                    }
+                    _ => {}
+                }
+            }
+            (taken, killed)
+        };
+
+        // Half of 4 comes back, and the snail at half its HP is not yet
+        // weak enough for a blow that takes 40%.
+        let blow = Takes {
+            hp: 50,
+            mp: None,
+            life: 40,
+        };
+        tx.send(attack(4, blow)).await.unwrap();
+        tokio::time::sleep(Duration::from_millis(50)).await;
+        assert_eq!(outcome(&mut client_rx), (vec![(2, 0)], false));
+        // A hit of 1 leaves it at 3 and drains nothing; then a blow that
+        // takes 40% finishes it, and the drain counts the 3 it took.
+        tx.send(attack(1, Takes { life: 0, ..blow })).await.unwrap();
+        tokio::time::sleep(Duration::from_millis(50)).await;
+        assert_eq!(outcome(&mut client_rx), (vec![], false));
+        tx.send(attack(1, blow)).await.unwrap();
+        tokio::time::sleep(Duration::from_millis(50)).await;
+        assert_eq!(outcome(&mut client_rx), (vec![(1, 0)], true));
+    }
+
+    #[tokio::test]
+    async fn meso_explosion_sets_off_only_the_mesos_it_may_and_caps_their_hits() {
+        let (template, mut info) = mob(100, false);
+        info.max_hp = 20_000;
+        let mut mobs = MobSet::new([(template, info)]);
+        let snail = mobs.respawn(Instant::now())[0];
+        let mut drops = DropSet::default();
+        let now = Instant::now();
+        let mut put = |owner, x| {
+            drops.spawn(
+                vec![net::loot::Loot::Mesos(1000)],
+                owner,
+                Ownership::Owner,
+                x,
+                0,
+                0,
+                now,
+            )[0]
+            .object_id
+        };
+        // The player's, another's, the player's out of reach, and the
+        // player's again.
+        let ids = [put(1, -100), put(2, -150), put(1, 500), put(1, -200)];
+        let (tx, rx) = mpsc::channel(16);
+        let actor = FieldActor::new(
+            FieldKey::new(0, 100000000),
+            rx,
+            Vec::new(),
+            mobs,
+            drops,
+            ReactorSet::default(),
+            Duration::from_secs(60),
+        );
+        tokio::spawn(actor.run());
+        let (handle, mut client_rx) = client(1);
+        tx.send(FieldMessage::Join {
+            handle,
+            avatar: avatar(1, 0, 0),
+            party: None,
+        })
+        .await
+        .unwrap();
+        opcodes(&mut client_rx).await;
+        // A line from a 1,000 meso drop deals 8,000 at most at level 30.
+        let explode = |lines: Vec<(usize, i32)>| FieldMessage::FromClient {
+            from: 1,
+            request: FieldRequest::Attack {
+                broadcast: Packet::new_empty(),
+                skill: meso_explosion::MESO_EXPLOSION,
+                counter: game::MobStat::PCounter,
+                hits: vec![(snail, 0)],
+                inflicts: Vec::new(),
+                takes: Takes::default(),
+                blast: Some(Blast {
+                    drops: ids.to_vec(),
+                    delay: 300,
+                    lines: vec![lines],
+                    x: 1000,
+                    lt: (-300, -120),
+                    rb: (0, 50),
+                    left: true,
+                }),
+            },
+        };
+        // What went off, when, and the snail's HP after.
+        let outcome = |rx: &mut mpsc::Receiver<ServerMessage>| {
+            use packet::io::read::PktRead;
+            let (mut exploded, mut hp) = (Vec::new(), None);
+            while let Ok(ServerMessage::SendPacket(packet)) = rx.try_recv() {
+                let mut r = std::io::Cursor::new(&packet.bytes[2..]);
+                if packet.opcode() == SendOpcode::RemoveItemFromMap as i16 {
+                    assert_eq!(r.read_byte().unwrap(), 4);
+                    exploded.push((r.read_int().unwrap(), r.read_short().unwrap()));
+                } else if packet.opcode() == SendOpcode::ShowMonsterHp as i16 {
+                    r.read_int().unwrap();
+                    hp = Some(r.read_byte().unwrap());
+                }
+            }
+            (exploded, hp)
+        };
+
+        // Only the player's two in reach go off, a tenth of a second apart
+        // by their place in the list, and the line too big for its drop
+        // counts for nothing.
+        tx.send(explode(vec![(0, 8000), (1, 8000), (2, 8000), (3, 9000)]))
+            .await
+            .unwrap();
+        tokio::time::sleep(Duration::from_millis(50)).await;
+        assert_eq!(
+            outcome(&mut client_rx),
+            (vec![(ids[0], 300), (ids[3], 600)], Some(60))
+        );
+        // Set off, they're gone.
+        tx.send(explode(vec![(0, 8000)])).await.unwrap();
+        tokio::time::sleep(Duration::from_millis(50)).await;
+        assert_eq!(outcome(&mut client_rx), (vec![], Some(60)));
     }
 
     #[tokio::test]

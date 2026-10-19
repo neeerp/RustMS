@@ -90,6 +90,17 @@ pub fn build_remove_drop(object_id: i32, looter: Option<i32>) -> Result<Packet, 
     Ok(p)
 }
 
+/// REMOVE_ITEM_FROM_MAP mode 4: Meso Explosion set it off, and it goes
+/// off `delay` ms from now (v83 FUN_00506590, 0x5065e6).
+pub fn build_explode_drop(object_id: i32, delay: i16) -> Result<Packet, NetworkError> {
+    let mut p = Packet::new_empty();
+    p.write_short(SendOpcode::RemoveItemFromMap as i16)?;
+    p.write_byte(4)?;
+    p.write_int(object_id)?;
+    p.write_short(delay)?;
+    Ok(p)
+}
+
 /// SHOW_STATUS_INFO 0/1: "You have gained mesos (+n)".
 pub fn build_meso_gain(amount: i32) -> Result<Packet, NetworkError> {
     let mut p = Packet::new_empty();

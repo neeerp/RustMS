@@ -1,3 +1,5 @@
+use super::combat::set_combo;
+use crate::combo;
 use crate::error::NetworkError;
 use crate::handler::{
     FieldRequest, HandlerResult, PartySkill, WorldAction, WorldContext, WorldHandler, WorldResult,
@@ -111,7 +113,8 @@ impl WorldHandler for UseSkillHandler {
             };
         }
         let extras = read_extras(&mut r, skill_id);
-        match use_skill(ctx.player, skill_id, level, Instant::now()) {
+        let now = Instant::now();
+        match use_skill(ctx.player, skill_id, level, now) {
             Ok(used) => {
                 if skill_id == skills::CHAKRA {
                     let heal = skills::chakra_heal(ctx.player, used.skill.effect.y, rand::random());
@@ -126,6 +129,9 @@ impl WorldHandler for UseSkillHandler {
                 }
                 if skills::HEROS_WILL.contains(&skill_id) {
                     result = cure(ctx.player, &skills::PURGED, result)?;
+                }
+                if skill_id == combo::ENRAGE {
+                    result = set_combo(ctx.player, 1, now, result)?;
                 }
                 let result = with_party(result, skill_id, level, extras.party, 0);
                 let Some(inflict) = used.debuffs.clone() else {
@@ -250,11 +256,14 @@ enum Refusal {
     TooManyMobs,
     Unsupported,
     CoolingDown,
+    NotEnoughHp,
     NotEnoughMp,
     /// Without the item the skill costs.
     NoItem,
     /// Mystic Door where no door may open.
     NoDoorHere,
+    /// Enrage without the orbs to spend.
+    TooFewOrbs,
 }
 
 /// What USE_SKILL carries after the level (0x96d399), each part only for
@@ -481,8 +490,8 @@ struct Used {
     debuffs: Option<Inflict>,
 }
 
-/// Check the skill can be used now, then spend its MP and items and start
-/// its buffs and cooldown.
+/// Check the skill can be used now, then spend its HP, MP and items and
+/// start its buffs and cooldown.
 fn use_skill(
     player: &mut Player,
     skill_id: i32,
@@ -498,6 +507,9 @@ fn use_skill(
     let skill = skills::learned(player, skill_id)
         .filter(|skill| skill.level == level)
         .ok_or(Refusal::NotLearned)?;
+    if combo::enrage_refused(player, skill_id) {
+        return Err(Refusal::TooFewOrbs);
+    }
     let stats = skills::buffs(&skill);
     let buffs = stats.is_some();
     let debuffs = match stats {
@@ -509,6 +521,7 @@ fn use_skill(
         return Err(Refusal::CoolingDown);
     }
     let effect = &skill.effect;
+    let hp_cost = skills::hp_cost(player, &skill).ok_or(Refusal::NotEnoughHp)?;
     if i32::from(player.stats.mp) < effect.mp_cost {
         return Err(Refusal::NotEnoughMp);
     }
@@ -517,6 +530,7 @@ fn use_skill(
         return Err(Refusal::NoItem);
     }
 
+    player.add_hp(-hp_cost);
     player.add_mp(-effect.mp_cost);
     let items = if effect.item_cost != 0 {
         player
@@ -641,7 +655,7 @@ fn leap(player: &mut Player, mut result: HandlerResult<WorldAction>) -> WorldRes
     Ok(result)
 }
 
-/// The new MP, the items spent, the buff, and the cooldown for the player;
+/// The new MP (and HP), the items spent, the buff, and the cooldown for the player;
 /// the skill's effect and the buffs they show for everyone else on the map.
 fn announce(player: &Player, used: &Used) -> WorldResult {
     let Used {
@@ -653,8 +667,8 @@ fn announce(player: &Player, used: &Used) -> WorldResult {
     } = used;
     let effect = &skill.effect;
     let mut updates = vec![StatUpdate::Mp(player.stats.mp)];
-    // Chakra's heal comes with its MP.
-    if skill.skill_id == skills::CHAKRA {
+    // Chakra's heal comes with its MP, as does the HP a Booster costs.
+    if skill.skill_id == skills::CHAKRA || effect.hp_cost > 0 {
         updates.push(StatUpdate::Hp(player.stats.hp));
     }
     let mut result = HandlerResult::reply(stat::build_stat_update(true, &updates)?);
@@ -744,6 +758,33 @@ mod tests {
                 other => panic!("unexpected {other:?}"),
             })
             .collect()
+    }
+
+    #[test]
+    fn a_booster_spends_hp_too() {
+        if skills::data().is_err() {
+            return;
+        }
+        let now = Instant::now();
+        // Sword Booster at 1 costs 29 HP and 29 MP.
+        let mut player = beginner_with(1101004, 1);
+        (player.stats.mp, player.stats.max_mp) = (40, 40);
+        let used = use_skill(&mut player, 1101004, 1, now).unwrap();
+        assert_eq!((player.stats.hp, player.stats.mp), (21, 11));
+        let sent = announce(&player, &used).unwrap().actions.into_iter().next();
+        let Some(WorldAction::Reply(stats)) = sent else {
+            panic!("no stats");
+        };
+        let mut r = Cursor::new(&stats.bytes);
+        assert_eq!(r.read_short().unwrap(), SendOpcode::StatChange as i16);
+        r.read_byte().unwrap();
+        assert_eq!(r.read_int().unwrap(), 0x400 | 0x1000, "HP and MP");
+        player.buffs = Default::default();
+        (player.stats.hp, player.stats.mp) = (29, 40);
+        assert_eq!(
+            use_skill(&mut player, 1101004, 1, now).unwrap_err(),
+            Refusal::NotEnoughHp
+        );
     }
 
     #[test]
@@ -897,6 +938,19 @@ mod tests {
         let used = use_skill(&mut player, 2301001, 1, Instant::now()).unwrap();
         assert!(used.skill.effect.mp_cost > 0);
         assert_eq!(i32::from(player.stats.mp), 100 - used.skill.effect.mp_cost);
+    }
+
+    #[test]
+    fn flash_jump_spends_its_mp() {
+        if skills::data().is_err() {
+            return;
+        }
+        let mut player = beginner_with(4111006, 1);
+        player.stats.max_mp = 100;
+        player.stats.mp = 100;
+        let used = use_skill(&mut player, 4111006, 1, Instant::now()).unwrap();
+        assert!(!used.buffs);
+        assert_eq!(player.stats.mp, 40);
     }
 
     #[test]
@@ -1504,6 +1558,42 @@ mod tests {
         let actions = magnet(&mut player, 30, 16, &mobs);
         assert!(matches!(actions.as_slice(), [only] if unlocks(only)));
         assert_eq!(player.stats.mp, 100);
+    }
+
+    #[test]
+    fn enrage_wants_nine_orbs_and_spends_them() {
+        if skills::data().is_err() {
+            return;
+        }
+        let mut player = beginner_with(combo::ENRAGE, 30);
+        player.stats.job = 112;
+        player.stats.mp = 100;
+        player.stats.max_mp = 100;
+        let combo_of = |value| {
+            Buff::new(
+                1111002,
+                BuffStat::Combo,
+                value,
+                Instant::now(),
+                Duration::from_secs(100),
+            )
+        };
+        player.buffs.give(combo_of(9));
+        let actions = handle(&mut player, combo::ENRAGE, 30);
+        assert!(matches!(actions.as_slice(), [only] if unlocks(only)));
+        assert_eq!(player.stats.mp, 100);
+
+        player.buffs.give(combo_of(10));
+        let actions = handle(&mut player, combo::ENRAGE, 30);
+        assert_eq!(player.stats.mp, 60);
+        assert_eq!(player.buffs.value(BuffStat::Pad), Some(26));
+        assert_eq!(player.buffs.value(BuffStat::Combo), Some(1));
+        // The others see the orbs go; the attack is the user's alone.
+        let shown = |action: &WorldAction| {
+            matches!(action, WorldAction::BuffsChanged(p)
+                if p.opcode() == SendOpcode::GiveForeignBuff as i16)
+        };
+        assert_eq!(actions.iter().filter(|a| shown(a)).count(), 1);
     }
 
     fn prepare(player: &mut Player, skill_id: i32, level: u8) -> Vec<WorldAction> {
