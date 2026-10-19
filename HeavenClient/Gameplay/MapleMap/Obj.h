@@ -85,6 +85,8 @@ namespace ms
 			Sound sound;
 			bool obstacle;
 			obstacle::Trap trap;
+			// Each frame's `dir`, used where the trap has none.
+			std::vector<int32_t> frame_dirs;
 		};
 
 		// Start its animation as its `repeat` says (FUN_006431e3).

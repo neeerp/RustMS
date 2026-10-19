@@ -22,8 +22,10 @@
 #include "../FieldEffectRules.h"
 
 #include "../../Graphics/GraphicsGL.h"
+#include "../../Util/Misc.h"
 
 #include <cmath>
+#include <set>
 
 #include <nlnx/nx.hpp>
 
@@ -51,6 +53,17 @@ namespace ms
 
 			if (data["forceHP"])
 				trap.force_hp = data["forceHP"];
+
+			// In the order Animation keeps its frames.
+			std::set<int16_t> frameids;
+
+			for (auto sub : data)
+				if (sub.data_type() == nl::node::type::bitmap)
+					if (int16_t fid = string_conversion::or_default<int16_t>(sub.name(), -1); fid >= 0)
+						frameids.insert(fid);
+
+			for (int16_t fid : frameids)
+				frame_dirs.push_back(data[std::to_string(fid)]["dir"]);
 		}
 
 		// Nothing animates until it is played.
@@ -196,6 +209,18 @@ namespace ms
 
 	obstacle::Vec Obj::get_push() const
 	{
-		return obstacle::push(states[current].trap.dir, flip);
+		const State &state = states[current];
+		int32_t dir = state.trap.dir;
+
+		// Where the node has no dir, v83 takes the frame's (FUN_00642264), as Sleepywood's spears have.
+		if (dir == 0)
+		{
+			size_t frame = state.animation.get_frame_index(1.0f);
+
+			if (frame < state.frame_dirs.size())
+				dir = state.frame_dirs[frame];
+		}
+
+		return obstacle::push(dir, flip);
 	}
 }
