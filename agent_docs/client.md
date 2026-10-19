@@ -100,6 +100,9 @@ from `UI.nx`. Moved so far:
 - **Choice of styles** (`UIAvatarSelect`, `UIWindow.img/UtilDlgEx_Avatar`,
   NPC dialogue types 7 and 8). Positions are v83's (FUN_009a92c9,
   FUN_009aa708). See [npc-dialogue.md](npc-dialogue.md).
+- **Choice of pets** (`UIPetChooser`, `UIWindow.img/UtilDlgEx_Pet`): which
+  pet a piece of pet equipment goes on, and NPC dialogue types 9 and 10.
+  Like the NPC dialog, it opens silently. See [npc-dialogue.md](npc-dialogue.md).
 - **Quest Helper** (`UIQuestHelper`, `UIWindow.img/QuestAlarm`). See
   [quests.md](quests.md).
 - **Quest Complete! notice** (`UIQuestComplete`, `UIWindow.img/FadeYesNo`).

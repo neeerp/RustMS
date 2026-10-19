@@ -86,6 +86,17 @@ namespace ms
 		}
 	};
 
+	// Answers a choice of pets (9 or 10) with the Cash Shop serial of the one picked.
+	// Opcode: NPC_TALK_MORE(60)
+	class NpcTalkPetPacket : public NpcTalkMorePacket
+	{
+	public:
+		NpcTalkPetPacket(int8_t lastmsg, int64_t serial) : NpcTalkMorePacket(lastmsg, 1)
+		{
+			write_long(serial);
+		}
+	};
+
 	// Packet which tells the server of an interaction with an NPC shop
 	// Opcode: NPC_SHOP_ACTION(61)
 	class NpcShopActionPacket : public OutPacket

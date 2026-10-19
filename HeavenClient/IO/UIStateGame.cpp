@@ -627,6 +627,7 @@ namespace ms
 					UIElement::Type::PARTYHP,
 					UIElement::Type::NPCTALK,
 					UIElement::Type::AVATARSELECT,
+					UIElement::Type::PETCHOOSER,
 					UIElement::Type::SHOP,
 					UIElement::Type::STORAGE,
 					UIElement::Type::INVITECARD,

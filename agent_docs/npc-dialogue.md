@@ -168,6 +168,16 @@ Natalie's hairstyles and applies the chosen one with `Effect::SetStyle`
 bar for text taller than its 100 px box, drops the text's images, and does
 not type the text out.
 
+Types 9 and 10 are a choice of pets: after the text come `u8 count`, for
+type 10 a flag byte, then that many entries of an 8-byte pet serial and a
+byte the client ignores. Pets not in the player's Cash tab are left out.
+Type 9 needs one pet left, type 10 two when its flag is 0 and one
+otherwise; with fewer the client answers `t 02` and shows nothing.
+Otherwise it shows the pet chooser (`UIPetChooser`, as for pet equipment)
+with the text as its question. OK or Enter answers `t 01` and the pet's
+serial; CANCEL, the corner button or Escape answers `t 00`. The server
+sends neither type yet.
+
 ## Assets and validation
 
 Place `Map.nx`, `Npc.nx`, `String.nx`, and `Quest.nx` in `assets/game-data/`. The server's

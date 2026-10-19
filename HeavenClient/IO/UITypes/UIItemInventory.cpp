@@ -1178,7 +1178,8 @@ namespace ms
 					shown.push_back({ look->get_itemid(), "", 0, 0 });
 			}
 
-			UI::get().emplace<UIPetChooser>(std::move(shown), [wear, choices](size_t index)
+			UI::get().emplace<UIPetChooser>(UIPetChooser::EQUIP_CAPTION, std::move(shown),
+											[wear, choices](size_t index)
 			{
 				wear(choices[index].part);
 			});

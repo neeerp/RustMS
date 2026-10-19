@@ -25,9 +25,11 @@
 #include "../IO/UITypes/UIChatBar.h"
 #include "../IO/UITypes/UINotice.h"
 #include "../IO/UITypes/UINpcTalk.h"
+#include "../IO/UITypes/UIPetChooser.h"
 #include "../IO/UITypes/UIShop.h"
 #include "../IO/UITypes/UIStorage.h"
 #include "../Gameplay/QuestConversation.h"
+#include "../Net/Packets/NpcInteractionPackets.h"
 
 #include <nlnx/nx.hpp>
 
@@ -40,7 +42,7 @@ namespace ms
 		recv.skip(1);
 
 		int32_t npcid = recv.read_int();
-		// 0 say, 1 yes/no, 2 text, 3 number, 4 menu, 7/8 styles, 12 accept/decline, 13 box text
+		// 0 say, 1 yes/no, 2 text, 3 number, 4 menu, 7/8 styles, 9/10 pets, 12 accept/decline, 13 box text
 		int8_t msgtype = recv.read_byte();
 		int8_t speaker = recv.read_byte();
 
@@ -65,6 +67,54 @@ namespace ms
 				npctalk->deactivate();
 
 			UI::get().emplace<UIAvatarSelect>(npcid, msgtype, text, std::move(styles));
+			UI::get().enable();
+
+			return;
+		}
+
+		// A choice of pets (v83 7474a2, 74775c): their Cash Shop serials, each with a byte v83 ignores. Type 10
+		// has a byte first which, when 0, needs two pets rather than one. Pets not in the Cash tab are left
+		// out, and with too few v83 answers 2 without asking.
+		if (msgtype == 9 || msgtype == 10)
+		{
+			uint8_t count = static_cast<uint8_t>(recv.read_byte());
+			size_t least = msgtype == 10 && recv.read_byte() == 0 ? 2 : 1;
+
+			const Inventory &inventory = Stage::get().get_player().get_inventory();
+			std::vector<UIPetChooser::Pet> pets;
+			std::vector<int64_t> serials;
+
+			for (uint8_t i = 0; i < count; i++)
+			{
+				int64_t serial = recv.read_long();
+				recv.skip(1);
+
+				if (Optional<const Pet> pet = inventory.get_pet(serial))
+				{
+					pets.push_back({ pet->get_item_id(), pet->get_name(), pet->get_level(),
+									 static_cast<int16_t>(pet->get_closeness()) });
+					serials.push_back(serial);
+				}
+			}
+
+			if (pets.size() < least)
+			{
+				NpcTalkMorePacket(msgtype, 2).dispatch();
+				return;
+			}
+
+			if (auto npctalk = UI::get().get_element<UINpcTalk>())
+				npctalk->deactivate();
+
+			std::string caption = NpcTextMarkup::expand(text, UINpcTalk::markup_lookups());
+
+			UI::get().emplace<UIPetChooser>(caption, std::move(pets), [msgtype, serials](size_t index)
+			{
+				NpcTalkPetPacket(msgtype, serials[index]).dispatch();
+			}, [msgtype]()
+			{
+				NpcTalkMorePacket(msgtype, 0).dispatch();
+			});
 			UI::get().enable();
 
 			return;

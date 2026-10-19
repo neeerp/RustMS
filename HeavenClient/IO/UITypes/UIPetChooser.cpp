@@ -30,17 +30,16 @@ namespace ms
 		constexpr int16_t NAME_X = 210, NAME_Y = 224;
 		constexpr int16_t LEVEL_X = 194, CLOSENESS_X = 280, NUMBERS_Y = 243;
 		// The caption's box (FUN_009acc20): its text starts 120 across, and is centred on 100 rows from 28 down
-		// when it fits.
+		// when it fits. The box is 280 wide, and like the choice of styles' text it keeps 10 px clear on each
+		// side.
 		constexpr int16_t CAPTION_X = 120, CAPTION_TOP = 28, CAPTION_ROWS = 100;
-		constexpr uint16_t CAPTION_WIDTH = 280;
-
-		// StringPool 0x182.
-		constexpr const char *CAPTION = "Please select the pet you would like to put the pet equipment on.";
+		constexpr uint16_t CAPTION_WIDTH = 260;
 	}
 
-	UIPetChooser::UIPetChooser(std::vector<Pet> p, std::function<void(size_t)> oc)
+	UIPetChooser::UIPetChooser(std::string text, std::vector<Pet> p, std::function<void(size_t)> oc,
+							   std::function<void()> ocancel)
 			: UIElement(Point<int16_t>(), Point<int16_t>(WIDTH, HEIGHT)), pets(std::move(p)), onchoose(std::move(oc)),
-			  shown(0)
+			  oncancel(std::move(ocancel)), shown(0)
 	{
 		nl::node window = NxFiles::ui_classic["UIWindow.img"];
 		nl::node avatar = window["UtilDlgEx_Avatar"];
@@ -55,7 +54,7 @@ namespace ms
 		buttons[Buttons::CANCEL] = std::make_unique<MapleButton>(basic["BtCancel2"], CANCEL_AT);
 		buttons[Buttons::EXIT] = std::make_unique<MapleButton>(avatar["BtExit"], EXIT_AT);
 
-		caption = Text(Text::Font::A12M, Text::Alignment::LEFT, Color::Name::BLACK, CAPTION, CAPTION_WIDTH);
+		caption = Text(Text::Font::A12M, Text::Alignment::LEFT, Color::Name::BLACK, text, CAPTION_WIDTH);
 		name = Text(Text::Font::A12M, Text::Alignment::CENTER, Color::Name::BLACK);
 		level = Text(Text::Font::A12M, Text::Alignment::CENTER, Color::Name::BLACK);
 		closeness = Text(Text::Font::A12M, Text::Alignment::CENTER, Color::Name::BLACK);
@@ -103,7 +102,7 @@ namespace ms
 
 		// FUN_009ac0b6: Escape is Cancel, and FUN_004edd21 makes Enter OK. The arrows do nothing here.
 		if (escape)
-			deactivate();
+			cancel();
 		else if (keycode == KeyAction::Id::RETURN)
 			choose();
 	}
@@ -124,7 +123,7 @@ namespace ms
 				break;
 			case Buttons::CANCEL:
 			case Buttons::EXIT:
-				deactivate();
+				cancel();
 				break;
 			case Buttons::PREV:
 				show((shown + count - 1) % count);
@@ -155,5 +154,13 @@ namespace ms
 	{
 		deactivate();
 		onchoose(shown);
+	}
+
+	void UIPetChooser::cancel()
+	{
+		deactivate();
+
+		if (oncancel)
+			oncancel();
 	}
 }
