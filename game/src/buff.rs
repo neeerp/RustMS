@@ -48,6 +48,9 @@ pub enum BuffStat {
     ShadowPartner = 26,
     PickPocket = 27,
     MesoGuard = 28,
+    /// Keeps `value` HP of each of a map's hazard hits off (an item's
+    /// `thaw`): in the cold when positive, under water when negative.
+    Thaw = 29,
     /// No jumping.
     Weakness = 30,
     /// Less EXP.

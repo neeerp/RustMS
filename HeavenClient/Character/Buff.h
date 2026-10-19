@@ -79,6 +79,8 @@ namespace ms
 			PICKPOCKET,
 			PUPPET,
 			MESOGUARD,
+			// An item's protection from a map's hazard; the server applies it.
+			THAW,
 			WEAKEN,
 			DASH,
 			DASH2,

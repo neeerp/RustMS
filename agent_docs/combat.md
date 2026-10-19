@@ -973,9 +973,20 @@ otherwise every 10 s, the player loses `decHP` HP in a plain stat update.
 Nothing happens while they're dead, in the Cash Shop, or wearing the map's
 `protectItem` (1102109 in the cold, 1102061 under water). The 10 s comes from
 Cassandra's Magic (2022187), which protects "every 10 seconds underwater".
-Cosmic and StrategyWiki both say 5 s, so the interval is a guess. The thaw
-items (`spec/thaw`, such as 2022001 Red Bean Porridge and 2022040 Air Bubble)
-and equips that ADD PREVENT COLDNESS don't protect yet.
+Cosmic and StrategyWiki both say 5 s, so the interval is a guess.
+
+Two more things keep hazards off, both server-side too:
+
+- A thaw item (`spec/thaw`) gives the Thaw buff (temporary stat 29), which
+  takes its value off each hit of its own kind of hazard. Red Bean Porridge
+  (2022001, 10) says "10 HP will be protected" in the cold. Air Bubble
+  (2022040, -6) and Cassandra's Magic (-6) are for the water. So a negative
+  thaw counts on `swim` maps, a positive one elsewhere. That reading is
+  ours; Cosmic sends MAP_PROTECTION instead.
+- An equip scrolled with ADD PREVENT COLDNESS (2041058, `FLAG_COLD`) keeps
+  the cold off. A hazard is cold when it isn't under water and the map
+  either returns to El Nath (211000000) or the internet cafe (193000000),
+  as Cosmic has it, or wants the cold cape (1102109).
 
 The client's respawn is a CHANGE_MAP with a target while dead. It returns the
 player to the map's return map with 50 HP. When the player chose a Wheel of
@@ -1059,6 +1070,7 @@ Bandit heal themselves with Chakra.
 `player_diseases` has a Hogul in Korean Folk Town cast Slow from far away
 (it misses) and then on the player (it lands for 10 s, then ends).
 `map_hazards` warps to El Nath's Ice Valley in its cape, which keeps the
-cold out, then takes it off and loses 10 HP at the next tick.
+cold out, then takes it off and drinks an Air Bubble, which doesn't help: it
+loses 10 HP at the next tick. After a Red Bean Porridge it loses nothing.
 HeavenClient's `diseases_tests` cover the input, jump, attack and skill
 gates and the notices.

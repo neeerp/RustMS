@@ -1,8 +1,10 @@
 //! Map hazards: El Nath's Ice Valley (211040000) takes 10 HP every ten
 //! seconds (its `decHP`), unless the player wears its `protectItem`, the
-//! cape 1102109. The v83 client leaves this to the server.
+//! cape 1102109, or has eaten something warm. The v83 client leaves this
+//! to the server.
 
-use integration_harness::database::{set_hp, wear_equip};
+use integration_harness::database::{grant_item, set_hp, wear_equip};
+use integration_harness::hunting::use_item;
 use integration_harness::preconditions::load_harness_config_or_fail;
 use integration_harness::trace::{read_for, send, stat, until, warp, Trace};
 use integration_harness::{login_to_world_session, relogin};
@@ -15,6 +17,11 @@ const ICE_VALLEY: i32 = 211_040_000;
 const CAPE: i32 = 1_102_109;
 const CAPE_SLOT: i16 = -9;
 const EQUIP: u8 = 1;
+const USE: i16 = 2;
+/// Thaw -6: for the water.
+const AIR_BUBBLE: i32 = 2_022_040;
+/// Thaw 10: for the cold.
+const RED_BEAN_PORRIDGE: i32 = 2_022_001;
 
 /// Take off the cape into the Equip bag's slot `to`.
 fn take_off(to: i16) -> Packet {
@@ -41,6 +48,12 @@ async fn the_cold_hurts_unless_the_cape_is_worn() {
     wear_equip(id, CAPE_SLOT, CAPE)
         .await
         .expect("wear the cape");
+    grant_item(id, USE, 1, AIR_BUBBLE)
+        .await
+        .expect("an Air Bubble");
+    grant_item(id, USE, 2, RED_BEAN_PORRIDGE)
+        .await
+        .expect("a Red Bean Porridge");
 
     let mut session = relogin(&config).await;
     let c = &mut session.connection;
@@ -51,9 +64,24 @@ async fn the_cold_hurts_unless_the_cape_is_worn() {
     read_for(c, &mut h, 11_000).await;
     assert_eq!(h.stat(stat::HP), None);
 
-    // Without it, the next tick takes 10.
+    // Without it, the next tick takes 10: an Air Bubble is no use in the
+    // cold.
     send(c, take_off(24)).await;
+    send(c, use_item(1, AIR_BUBBLE)).await;
+    let mut h = Trace::default();
+    until(c, &mut h, |t| t.buffs.contains(&(-AIR_BUBBLE, -6, 900_000))).await;
     let mut h = Trace::default();
     until(c, &mut h, |t| t.stat(stat::HP).is_some()).await;
     assert_eq!(h.stat(stat::HP), Some(40));
+
+    // Red Bean Porridge keeps the next 10 off.
+    send(c, use_item(2, RED_BEAN_PORRIDGE)).await;
+    let mut h = Trace::default();
+    until(c, &mut h, |t| {
+        t.buffs.contains(&(-RED_BEAN_PORRIDGE, 10, 300_000))
+    })
+    .await;
+    let mut h = Trace::default();
+    read_for(c, &mut h, 11_000).await;
+    assert_eq!(h.stat(stat::HP), None);
 }

@@ -485,15 +485,26 @@ pub fn countered(player: &mut Player, damage: i32) -> WorldResult {
 
 /// The map hurts the player every so often (its `decHP`, which the v83
 /// client leaves to the server): nothing while they're dead or wear its
-/// `protectItem`.
+/// `protectItem`, or, in the cold, an equip scrolled against it. A thaw item
+/// for its kind of hazard keeps that much off each hit, as Red Bean Porridge
+/// (2022001) says.
 pub fn hurt_by_hazard(player: &mut Player, hazard: &game_data::Hazard) -> WorldResult {
     let protected = hazard
         .protect_item
-        .is_some_and(|id| player.inventory.equipped_ids().any(|(_, item)| item == id));
-    if player.stats.hp <= 0 || protected {
+        .is_some_and(|id| player.inventory.equipped_ids().any(|(_, item)| item == id))
+        || hazard.cold
+            && (player.inventory.items(InventoryType::Equipped))
+                .any(|(_, item)| item.flags & game::scroll::FLAG_COLD != 0);
+    let thaw = player.buffs.value(BuffStat::Thaw).map_or(0, i32::from);
+    let kept = if (thaw < 0) == hazard.water {
+        thaw.abs()
+    } else {
+        0
+    };
+    if player.stats.hp <= 0 || protected || hazard.hp <= kept {
         return Ok(HandlerResult::empty());
     }
-    let hp = player.add_hp(-hazard.hp);
+    let hp = player.add_hp(kept - hazard.hp);
     let actions = HandlerResult::reply(stat::build_stat_update(false, &[StatUpdate::Hp(hp)])?);
     Ok(if hp == 0 {
         actions.with(WorldAction::Died)
@@ -762,6 +773,8 @@ mod tests {
             hp: 10,
             every: game_data::HAZARD_INTERVAL,
             protect_item: Some(1102109),
+            water: false,
+            cold: true,
         };
         let mut player = crate::codec::stats::sample_player();
         player.stats.hp = 100;
@@ -784,6 +797,8 @@ mod tests {
             hp: 30000,
             every: game_data::HAZARD_INTERVAL,
             protect_item: Some(1032033),
+            water: false,
+            cold: false,
         };
         let actions = hurt_by_hazard(&mut player, &sharenian).unwrap().actions;
         assert_eq!(player.stats.hp, 0);
@@ -792,6 +807,75 @@ mod tests {
             .unwrap()
             .actions
             .is_empty());
+    }
+
+    #[test]
+    fn thaw_keeps_its_share_of_its_own_hazard_off() {
+        let seabed = game_data::Hazard {
+            hp: 6,
+            every: game_data::HAZARD_INTERVAL,
+            protect_item: Some(1102061),
+            water: true,
+            cold: false,
+        };
+        let cold = game_data::Hazard {
+            water: false,
+            cold: true,
+            hp: 10,
+            ..seabed
+        };
+        let mut player = crate::codec::stats::sample_player();
+        player.stats.hp = 100;
+        let now = Instant::now();
+        let lasts = Duration::from_secs(900);
+        // Air Bubble (-6) is for the water, not the cold.
+        player
+            .buffs
+            .give(Buff::new(-2022040, BuffStat::Thaw, -6, now, lasts));
+        assert!(hurt_by_hazard(&mut player, &seabed)
+            .unwrap()
+            .actions
+            .is_empty());
+        hurt_by_hazard(&mut player, &cold).unwrap();
+        assert_eq!(player.stats.hp, 90);
+        // Red Bean Porridge (10) is for the cold, and keeps 10 of 30 off.
+        player
+            .buffs
+            .give(Buff::new(-2022001, BuffStat::Thaw, 10, now, lasts));
+        assert!(hurt_by_hazard(&mut player, &cold)
+            .unwrap()
+            .actions
+            .is_empty());
+        hurt_by_hazard(&mut player, &seabed).unwrap();
+        assert_eq!(player.stats.hp, 84);
+        hurt_by_hazard(&mut player, &game_data::Hazard { hp: 30, ..cold }).unwrap();
+        assert_eq!(player.stats.hp, 64);
+    }
+
+    #[test]
+    fn equips_scrolled_against_the_cold_keep_only_the_cold_off() {
+        let cold = game_data::Hazard {
+            hp: 10,
+            every: game_data::HAZARD_INTERVAL,
+            protect_item: None,
+            water: false,
+            cold: true,
+        };
+        let other_dimension = game_data::Hazard {
+            cold: false,
+            ..cold
+        };
+        let mut player = crate::codec::stats::sample_player();
+        player.stats.hp = 100;
+        let mut glove = game::Item::equipment(1082002, game::EquipStats::default());
+        glove.flags = game::scroll::FLAG_COLD;
+        player.inventory.insert(InventoryType::Equipped, -8, glove);
+        assert!(hurt_by_hazard(&mut player, &cold)
+            .unwrap()
+            .actions
+            .is_empty());
+        hurt_by_hazard(&mut player, &other_dimension).unwrap();
+        assert_eq!(player.stats.hp, 90);
     }
 
     #[test]

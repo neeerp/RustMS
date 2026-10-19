@@ -262,6 +262,13 @@ pub struct Hazard {
     pub every: Duration,
     /// The equipment that keeps it off (`protectItem`).
     pub protect_item: Option<i32>,
+    /// Whether it is the water's (a `swim` map) rather than the cold's.
+    pub water: bool,
+    /// Whether it is the cold's, which an equip scrolled with ADD PREVENT
+    /// COLDNESS keeps off: El Nath's and the internet cafe's maps (by
+    /// `returnMap`), as Cosmic has it, and those the cold cape (1102109)
+    /// protects.
+    pub cold: bool,
 }
 
 impl FieldTemplate {
@@ -454,7 +461,7 @@ fn build_field_template(
                 nx.int_child(info, "fieldLimit")?.unwrap_or(0),
                 allowed_items(nx, info)?,
                 nx.int_child(info, "personalShop")?.unwrap_or(0) != 0,
-                hazard(nx, info)?,
+                hazard(nx, info, return_map)?,
             ),
             None => (false, 0, Vec::new(), false, None),
         };
@@ -541,7 +548,11 @@ fn build_field_template(
 }
 
 /// A map's `info/decHP`, if positive, with its interval and protection.
-fn hazard(nx: &NxDataFile, info: u32) -> Result<Option<Hazard>, GameDataError> {
+fn hazard(
+    nx: &NxDataFile,
+    info: u32,
+    return_map: Option<i32>,
+) -> Result<Option<Hazard>, GameDataError> {
     let hp = nx.int_child(info, "decHP")?.unwrap_or(0);
     if hp <= 0 {
         return Ok(None);
@@ -552,12 +563,21 @@ fn hazard(nx: &NxDataFile, info: u32) -> Result<Option<Hazard>, GameDataError> {
         .filter(|&ms| ms > 0)
         .map_or(HAZARD_INTERVAL, Duration::from_millis);
     let protect_item = nx.int_child(info, "protectItem")?.filter(|&id| id > 0);
+    let water = nx.int_child(info, "swim")?.unwrap_or(0) != 0;
+    let cold = !water
+        && (protect_item == Some(COLD_CAPE) || matches!(return_map, Some(EL_NATH | INTERNET_CAFE)));
     Ok(Some(Hazard {
         hp,
         every,
         protect_item,
+        water,
+        cold,
     }))
 }
+
+const COLD_CAPE: i32 = 1_102_109;
+const EL_NATH: i32 = 211_000_000;
+const INTERNET_CAFE: i32 = 193_000_000;
 
 /// A map's `info/allowedItem` list.
 fn allowed_items(nx: &NxDataFile, info: u32) -> Result<Vec<i32>, GameDataError> {
@@ -1260,14 +1280,33 @@ mod tests {
             hp: 10,
             every: HAZARD_INTERVAL,
             protect_item: Some(1_102_109),
+            water: false,
+            cold: true,
         };
         assert_eq!(hazard(211_040_000), Some(cold));
+        // Ice Valley's quest maps have no cape, but are El Nath's.
+        assert!(hazard(921_100_100).is_some_and(|h| h.cold));
+        // The Chilly Hill is the internet cafe's.
+        assert!(hazard(196_000_000).is_some_and(|h| h.cold));
+        // The Other Dimension hurts, but is not cold.
+        assert!(hazard(108_010_101).is_some_and(|h| !h.cold));
         let balrogs_tomb = Hazard {
             hp: 50,
             every: Duration::from_secs(15),
             protect_item: None,
+            water: false,
+            cold: false,
         };
         assert_eq!(hazard(105_100_300), Some(balrogs_tomb));
+        // The tower's foot is under water, though El Nath's.
+        let seabed = Hazard {
+            hp: 6,
+            every: HAZARD_INTERVAL,
+            protect_item: Some(1_102_061),
+            water: true,
+            cold: false,
+        };
+        assert_eq!(hazard(200_082_300), Some(seabed));
         assert_eq!(hazard(211_000_000), None);
     }
 }
