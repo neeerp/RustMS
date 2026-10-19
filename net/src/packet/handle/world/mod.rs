@@ -89,7 +89,9 @@ pub use self::summon::{
     BeholderHandler, DamageSummonHandler, MoveSummonHandler, SummonAttackHandler,
 };
 pub use self::teleport_rock::{to_character, Rock, TeleportRockListHandler, Whereabouts};
-pub use self::use_item::{HealOverTimeHandler, UseItemHandler, UseSkillBookHandler};
+pub use self::use_item::{
+    HealOverTimeHandler, ReturnScrollHandler, UseItemHandler, UseSkillBookHandler,
+};
 pub use self::use_skill::{
     party_skill_reached, CancelBuffHandler, SkillEffectHandler, ThrowGrenadeHandler,
     UseSkillHandler,

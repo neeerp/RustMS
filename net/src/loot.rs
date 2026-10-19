@@ -29,9 +29,12 @@ impl Loot {
     }
 }
 
-/// Roll one mob's drops for `player`, then its Monster Book card.
-pub fn roll(mob_id: i32, player: &Player, rng: &mut impl Rng) -> Vec<Loot> {
-    let mut loot = roll_entries(crate::content::rewards().drops(mob_id), player, rng);
+/// Roll one mob's drops for `player`, each `showdown` percent more likely
+/// (Taunt's), then its Monster Book card.
+pub fn roll(mob_id: i32, showdown: i32, player: &Player, rng: &mut impl Rng) -> Vec<Loot> {
+    let rate = f64::from(100 + showdown) / 100.0;
+    let entries = crate::content::rewards().drops(mob_id);
+    let mut loot = roll_at(entries, rate, player, rng);
     if let Some(card) = crate::monster_book::card_for(mob_id) {
         if rng.gen_bool(crate::monster_book::drop_rate()) {
             loot.push(Loot::Item {
@@ -54,6 +57,11 @@ pub fn roll_reactor(reactor_id: i32, player: &Player, rng: &mut impl Rng) -> Vec
 }
 
 pub fn roll_entries(entries: &[RewardEntry], player: &Player, rng: &mut impl Rng) -> Vec<Loot> {
+    roll_at(entries, 1.0, player, rng)
+}
+
+/// `roll_entries`, with every chance times `rate`.
+fn roll_at(entries: &[RewardEntry], rate: f64, player: &Player, rng: &mut impl Rng) -> Vec<Loot> {
     let mut loot = Vec::new();
     for entry in entries {
         // Quest drops only while the quest is started and the item is still
@@ -69,7 +77,7 @@ pub fn roll_entries(entries: &[RewardEntry], player: &Player, rng: &mut impl Rng
                 continue;
             }
         }
-        if !rng.gen_bool(entry.prob.clamp(0.0, 1.0)) {
+        if !rng.gen_bool((entry.prob * rate).clamp(0.0, 1.0)) {
             continue;
         }
         if let Some(amount) = entry.money {
@@ -153,5 +161,16 @@ mod tests {
         assert!(
             roll_entries(&[entry(Some(4000019), None, 0.0, None)], &player, &mut rng).is_empty()
         );
+    }
+
+    #[test]
+    fn taunt_makes_drops_likelier() {
+        let mut rng = rand::rngs::StdRng::seed_from_u64(3);
+        let player = crate::codec::stats::sample_player();
+        let half = [entry(Some(4000019), None, 0.5, None)];
+        // Twice as likely: always.
+        for _ in 0..50 {
+            assert_eq!(roll_at(&half, 2.0, &player, &mut rng).len(), 1);
+        }
     }
 }

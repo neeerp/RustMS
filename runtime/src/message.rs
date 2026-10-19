@@ -66,6 +66,8 @@ pub enum ServerMessage {
         attacked: bool,
         x: i16,
         y: i16,
+        /// Taunt's Showdown: the percent more drops it gives.
+        showdown: i32,
     },
     /// The player joined or left a party.
     PartyChanged {

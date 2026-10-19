@@ -8,7 +8,7 @@ use crate::content;
 use crate::conti::{self, Route, State};
 use crate::dialogue::{DialoguePage, Prompt};
 use crate::scripts::Effect;
-use game::{guild, Player};
+use game::{guild, InventoryType, Player};
 use game_data::server_content::keys;
 
 /// Roger's Apple, the tutorial's lesson on items.
@@ -37,6 +37,57 @@ const ERIN: i32 = 2012002;
 /// Orbis Station's guide, and the passage to the platform for Ellinia.
 const ISA: i32 = 2012006;
 const ORBIS_TUNNEL: i32 = 200000110;
+
+/// A first-job instructor: the job, its text key, and the weapons, ammunition
+/// and bag rows that come with it (upstream `fighter`, `magician`, `bowman`,
+/// `rogue`).
+struct Instructor {
+    npc_id: i32,
+    job: i16,
+    text: &'static str,
+    items: &'static [(i32, i16)],
+    rows: &'static [InventoryType],
+}
+
+const INSTRUCTORS: [Instructor; 4] = [
+    // Dances with Balrog: a sword and a row in every bag.
+    Instructor {
+        npc_id: 1022000,
+        job: 100,
+        text: "warrior",
+        items: &[(1302077, 1)],
+        rows: &[
+            InventoryType::Equip,
+            InventoryType::Use,
+            InventoryType::Setup,
+            InventoryType::Etc,
+        ],
+    },
+    // Grendel the Really Old: a wand.
+    Instructor {
+        npc_id: 1032001,
+        job: 200,
+        text: "magician",
+        items: &[(1372043, 1)],
+        rows: &[],
+    },
+    // Athena Pierce: a bow and arrows.
+    Instructor {
+        npc_id: 1012100,
+        job: 300,
+        text: "bowman",
+        items: &[(1452051, 1), (2060000, 6000)],
+        rows: &[InventoryType::Equip, InventoryType::Use],
+    },
+    // The Dark Lord: a claw, a dagger and two sets of throwing stars.
+    Instructor {
+        npc_id: 1052001,
+        job: 400,
+        text: "thief",
+        items: &[(1472061, 1), (1332063, 1), (2070015, 1000), (2070015, 1000)],
+        rows: &[InventoryType::Equip, InventoryType::Etc],
+    },
+];
 
 /// The player's answer to the current prompt.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -98,6 +149,9 @@ impl NpcScript {
     /// The script an NPC runs when clicked (`Npc.nx info/script`), as it
     /// plays for `player`.
     pub fn for_npc(npc_id: i32, player: &Player) -> Option<Self> {
+        if let Some(instructor) = INSTRUCTORS.iter().find(|i| i.npc_id == npc_id) {
+            return Some(first_job(instructor, player));
+        }
         match npc_id {
             ROBIN => Some(robin()),
             SHANKS => Some(shanks(player)),
@@ -425,6 +479,45 @@ fn isa() -> NpcScript {
             )],
         }],
     )
+}
+
+/// A first-job instructor. A beginner who qualifies may take the job, its
+/// weapons and its bag rows; one who doesn't is told to train; everyone
+/// else hears what the job is like.
+fn first_job(instructor: &Instructor, player: &Player) -> NpcScript {
+    let line = |line: &str| text(&keys::first_job(instructor.text, line));
+    if player.stats.job != 0 {
+        return NpcScript::new(instructor.npc_id, vec![Page::Say(line("other"))]);
+    }
+    let mut pages = vec![Page::Say(line("intro"))];
+    if !player.can_take_first_job(instructor.job) {
+        pages.push(Page::Say(line("too_weak")));
+        return NpcScript::new(instructor.npc_id, pages);
+    }
+    let mut on_yes = vec![Effect::TakeFirstJob(instructor.job)];
+    on_yes.extend(instructor.rows.iter().map(|&kind| Effect::AddSlotRow(kind)));
+    on_yes.extend(
+        instructor
+            .items
+            .iter()
+            .map(|&(item_id, quantity)| Effect::GiveItem { item_id, quantity }),
+    );
+    pages.push(Page::Ask {
+        text: line("ask"),
+        on_yes,
+        on_no: None,
+    });
+    pages.push(Page::Say(line("accept")));
+    let content = content::text();
+    pages.extend(
+        (0..)
+            .map(|page| keys::first_job(instructor.text, &format!("after.{page}")))
+            .take_while(|key| content.contains(key))
+            .map(|key| Page::Say(text(&key))),
+    );
+    let mut script = NpcScript::new(instructor.npc_id, pages);
+    script.inventory_full = Some(text(keys::FIRST_JOB_INVENTORY_FULL));
+    script
 }
 
 /// `begin5`: Robin's questions and answers, as many topics and pages as the
@@ -808,6 +901,51 @@ mod tests {
             isa.respond(ScriptInput::Yes).unwrap().effects,
             [Effect::Warp(ORBIS_TUNNEL)]
         );
+    }
+
+    #[test]
+    fn instructors_advance_beginners_who_qualify() {
+        let mut beginner = player(50);
+        (beginner.stats.job, beginner.stats.str) = (0, 4);
+        beginner.stats.dex = 25;
+        let mut athena = NpcScript::for_npc(1012100, &beginner).unwrap();
+        assert_eq!(buttons(&athena.begin()), (false, true));
+        assert_eq!(kind(&athena.respond(ScriptInput::Next).unwrap()), Some(1));
+        let accepted = athena.respond(ScriptInput::Yes).unwrap();
+        assert_eq!(
+            accepted.effects,
+            [
+                Effect::TakeFirstJob(300),
+                Effect::AddSlotRow(InventoryType::Equip),
+                Effect::AddSlotRow(InventoryType::Use),
+                Effect::GiveItem {
+                    item_id: 1452051,
+                    quantity: 1
+                },
+                Effect::GiveItem {
+                    item_id: 2060000,
+                    quantity: 6000
+                },
+            ]
+        );
+        assert_eq!(buttons(&accepted), (false, true));
+        for _ in 0..5 {
+            athena.respond(ScriptInput::Next).unwrap();
+        }
+        assert_eq!(athena.respond(ScriptInput::Next), Some(Step::default()));
+        assert!(athena.inventory_full().is_some());
+
+        // Too little STR: the intro, then a word about training.
+        let mut balrog = NpcScript::for_npc(1022000, &beginner).unwrap();
+        assert_eq!(
+            buttons(&balrog.respond(ScriptInput::Next).unwrap()),
+            (true, false)
+        );
+
+        // Past beginner, a single page.
+        beginner.stats.job = 300;
+        let athena = NpcScript::for_npc(1012100, &beginner).unwrap();
+        assert_eq!(buttons(&athena.begin()), (false, false));
     }
 
     #[test]

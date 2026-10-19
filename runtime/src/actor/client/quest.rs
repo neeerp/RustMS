@@ -251,6 +251,7 @@ impl ClientActor {
         packets: &mut Vec<Packet>,
     ) -> Result<bool, RuntimeError> {
         let previous_level = self.in_game()?.player.stats.level;
+        let previous_job = self.in_game()?.player.stats.job;
         if let Some(QuestChange::Start(template)) = change {
             // Hunting quests start with every kill count at 0 ("000").
             next.quests.upsert(QuestRecord {
@@ -295,18 +296,31 @@ impl ClientActor {
             next.mark_dirty();
         }
         let levelled = next.stats.level > previous_level;
+        let advanced = next.stats.job != previous_job;
         self.in_game_mut()?.player = next;
-        if levelled {
-            // Others see the level-up effect; the field avatar shows the level.
+        if levelled || advanced {
+            // Others see the level-up or job-change effect; the field avatar
+            // shows the level and job. The player's own client plays them
+            // from the stat change.
             let avatar = self.in_game()?.player.field_avatar(0, 0, 0);
             let client_id = self.client_id;
+            let mut announce = Vec::new();
+            if levelled {
+                announce.push(effect::build_foreign_effect(
+                    client_id,
+                    CharEffect::LevelUp,
+                )?);
+            }
+            if advanced {
+                announce.push(effect::build_foreign_effect(
+                    client_id,
+                    CharEffect::JobChange,
+                )?);
+            }
             self.send_to_field(FieldMessage::UpdateAvatar {
                 client_id,
                 avatar,
-                announce: vec![effect::build_foreign_effect(
-                    client_id,
-                    CharEffect::LevelUp,
-                )?],
+                announce,
             })
             .await?;
         }

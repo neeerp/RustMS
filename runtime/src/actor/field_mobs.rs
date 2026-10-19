@@ -331,10 +331,14 @@ pub struct Kill {
     pub mob_id: i32,
     pub x: i16,
     pub y: i16,
+    /// Raised by Taunt's Showdown, if it had it.
     pub exp: i32,
     pub level: i16,
     /// Damage per player still on the field, most first.
     pub damage_by: Vec<(ClientId, i64)>,
+    /// Taunt's Showdown: the percent more EXP (already in `exp`) and drops
+    /// it gives.
+    pub showdown: i32,
 }
 
 pub struct MobSet {
@@ -813,6 +817,11 @@ impl MobSet {
             return Some(Ok(mob.hp_percent()));
         }
         let mob = self.live.remove(&object_id)?;
+        let showdown = mob
+            .statuses
+            .get(&MobStat::Showdown)
+            .filter(|status| status.until > now)
+            .map_or(0, |status| i32::from(status.value).max(0));
         if let Some(spawn) = mob.spawn.map(|index| &mut self.spawns[index]) {
             spawn.alive = None;
             let delay = if spawn.template.mob_time > 0 {
@@ -827,9 +836,10 @@ impl MobSet {
             mob_id: mob.info.mob_id,
             x: mob.x,
             y: mob.y,
-            exp: mob.info.exp,
+            exp: (i64::from(mob.info.exp) * i64::from(100 + showdown) / 100) as i32,
             level: mob.info.level,
             damage_by: ranked_damage(&mob.damage_by),
+            showdown,
         }))
     }
 }
@@ -1230,6 +1240,26 @@ mod tests {
             mobs.add_statuses(snail, &seal, 2111004, 1, now, until),
             [MobStat::Speed]
         );
+    }
+
+    #[test]
+    fn a_taunted_mob_gives_more_exp_until_taunt_wears_off() {
+        let now = Instant::now();
+        let mut mobs = MobSet::new([snail_spawn(100), snail_spawn(200)]);
+        let snails = mobs.respawn(now);
+        let until = now + Duration::from_secs(120);
+        let taunt = [(MobStat::Showdown, 100), (MobStat::Pdr, 100)];
+        for &snail in &snails {
+            mobs.add_statuses(snail, &taunt, 4121003, 1, now, until);
+        }
+        let Some(Err(kill)) = mobs.damage(1, snails[0], 8, now) else {
+            panic!("the snail should die");
+        };
+        assert_eq!((kill.exp, kill.showdown), (6, 100));
+        let Some(Err(kill)) = mobs.damage(1, snails[1], 8, until) else {
+            panic!("the snail should die");
+        };
+        assert_eq!((kill.exp, kill.showdown), (3, 0));
     }
 
     #[test]

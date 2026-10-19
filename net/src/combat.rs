@@ -4,6 +4,7 @@ use crate::skills::{self, Learned};
 use crate::{error::NetworkError, packet::op::SendOpcode};
 use game::inventory::equip_slot;
 use game::{BuffStat, InventoryType, Player};
+use game_data::mobs::MobInfo;
 use packet::{io::read::PktRead, io::write::PktWrite, Packet};
 use std::io::Cursor;
 
@@ -414,14 +415,15 @@ pub fn validate(attack: &Attack, player: &Player) -> Result<Uses, AttackRejectio
 }
 
 /// How much of the base damage a skill's hits deal, in percent, or `None`
-/// for a skill that doesn't attack that way. Arrow Bomb has no `damage`,
-/// which the client takes as 100%, and scales its hits by its `x`
-/// (FUN_0078df87, FUN_0075bf50).
+/// for a skill that doesn't attack that way. Arrow Bomb, Disorder and Taunt
+/// have no `damage`, which the client takes as 100%; Arrow Bomb scales its
+/// hits by its `x` (FUN_0078df87, FUN_0075bf50).
 fn damage_percent(skill: &Learned) -> Option<i32> {
-    match skill.effect.damage {
-        0 if skill.skill_id == ARROW_BOMB => Some(skill.effect.x),
-        0 => None,
-        damage => Some(damage),
+    match (skill.effect.damage, skill.skill_id) {
+        (0, ARROW_BOMB) => Some(skill.effect.x),
+        (0, 4001002 | 14001002 | 4121003 | 4221003) => Some(100),
+        (0, _) => None,
+        (damage, _) => Some(damage),
     }
 }
 
@@ -462,6 +464,156 @@ pub fn build_attack(
         p.write_int(attack.charge)?;
     }
     Ok(p)
+}
+
+/// What a hit costs the player once their skills have taken their share.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct Taken {
+    pub hp: i32,
+    pub mp: i32,
+    pub mesos: i32,
+    /// The number the player's own client shows: the hit less the shares
+    /// of all but Magic Guard (0x9593b8).
+    pub shown: i32,
+}
+
+/// What a hit of `damage` takes from the player. A v83 client sends the
+/// damage before these skills and leaves them to the server, working them
+/// out only to show the number and to drink a pet's potion in time
+/// (FUN_009581a9 at 0x959321 and 0x959595). Achilles always keeps its
+/// share off; with `magic_guard`, Magic Guard moves its share to MP (as
+/// much as there is, or all of it and no MP under Infinity); with
+/// `meso_guard`, Meso Guard halves the hit for mesos.
+pub fn taken(player: &Player, damage: i32, magic_guard: bool, meso_guard: bool) -> Taken {
+    if damage <= 0 {
+        return Taken {
+            shown: damage,
+            ..Taken::default()
+        };
+    }
+    let achilles = achilles(player).map_or(0, |kept| (1000 - kept) * damage / 1000);
+    let guarded = if magic_guard {
+        buff(player, BuffStat::MagicGuard) * damage / 100
+    } else {
+        0
+    };
+    let (guarded, mp) = if player.buffs.has(BuffStat::Infinity) {
+        (guarded, 0)
+    } else {
+        let guarded = guarded.min(i32::from(player.stats.mp));
+        (guarded, guarded)
+    };
+    // Mesos pay `x` per 100 HP saved; short of them, they save what
+    // they can (FUN_00792fa8).
+    let (saved, mesos) = match buff(player, BuffStat::MesoGuard) {
+        x if meso_guard && x > 0 => {
+            let saved = damage / 2;
+            let cost = saved * x / 100;
+            if player.meso < cost {
+                (player.meso * 100 / x, player.meso)
+            } else {
+                (saved, cost)
+            }
+        }
+        _ => (0, 0),
+    };
+    Taken {
+        hp: (damage - achilles - guarded - saved).max(0),
+        mp,
+        mesos,
+        shown: damage - achilles - saved,
+    }
+}
+
+impl Taken {
+    /// The hit less what Power Guard sent back at the mob, which neither
+    /// takes HP nor shows (0x959595).
+    pub fn less(self, reflected: i32) -> Taken {
+        Taken {
+            hp: (self.hp - reflected).max(0),
+            shown: self.shown - reflected,
+            ..self
+        }
+    }
+}
+
+/// What Power Guard sends back at a mob that touched the player for
+/// `damage` (FUN_009581a9 at 0x9587c6): its `x` percent, at most a tenth of
+/// the mob's HP, halved for a boss, and at most a fixedDamage mob's fixed
+/// damage. Nothing goes back at an invincible mob, or at one whose avoid
+/// beats the player's accuracy, weighed down for each level the mob has on
+/// them (0x9588cd).
+pub fn power_guard(player: &Player, mob: &MobInfo, damage: i32) -> i32 {
+    let percent = buff(player, BuffStat::PowerGuard);
+    if percent <= 0 || damage <= 0 || mob.invincible {
+        return 0;
+    }
+    let mut reflected = (damage * percent / 100).min(mob.max_hp / 10);
+    if mob.boss {
+        reflected /= 2;
+    }
+    if mob.fixed_damage > 0 {
+        reflected = reflected.min(mob.fixed_damage);
+    }
+    let above = (i32::from(mob.level) - i32::from(player.stats.level)).max(0);
+    let reach =
+        f64::from(accuracy(player).clamp(0, 999)) * 100.0 / (f64::from(above) * 10.0 + 255.0);
+    if f64::from(mob.avoid.clamp(0, 999)) > reach {
+        return 0;
+    }
+    reflected
+}
+
+/// What Mana Reflection sends back at a mob whose magic attack hit the
+/// player for `damage`, once the client's roll of its chance came up
+/// (0x958d50): its `x` percent, at most a twentieth of the mob's HP.
+/// Nothing goes back at a mob whose avoid beats 5 for each 10 of the
+/// player's INT and of their LUK, weighed down for each level the mob has
+/// on them and by 0.85. Unlike Power Guard's, it spares the player nothing.
+pub fn mana_reflection(player: &Player, mob: &MobInfo, damage: i32) -> i32 {
+    let level = buff(player, BuffStat::ManaReflection);
+    if level <= 0 || damage <= 0 {
+        return 0;
+    }
+    let Some(skill) = skills::at_level(skills::MANA_REFLECTION, level) else {
+        return 0;
+    };
+    let reflected = (damage * skill.effect.x / 100).min(mob.max_hp / 20);
+    let (int, luk, _) = skills::spell_stats(player);
+    let above = (i32::from(mob.level) - i32::from(player.stats.level)).max(0);
+    let reach =
+        f64::from((int / 10 + luk / 10) * 5) * 100.0 / (f64::from(above) * 10.0 + 255.0) * 0.85;
+    if f64::from(mob.avoid.clamp(0, 999)) > reach {
+        return 0;
+    }
+    reflected
+}
+
+/// The player's accuracy: what they wear, 0.8 a point of DEX and 0.5 of
+/// LUK, and their buffs'. Power Guard's Fighters and Pages have no skill
+/// that adds to it.
+fn accuracy(player: &Player) -> i32 {
+    let (_, dex, luk) = skills::total_stats(player);
+    let worn: i32 = player
+        .inventory
+        .items(InventoryType::Equipped)
+        .filter_map(|(_, item)| item.equip.as_ref())
+        .map(|equip| i32::from(equip.acc))
+        .sum();
+    worn + (f64::from(dex) * 0.8 + f64::from(luk) * 0.5) as i32 + buff(player, BuffStat::Acc)
+}
+
+/// The per mille of a hit a Hero's, Paladin's, Dark Knight's, or Aran's
+/// Achilles leaves, if they have it.
+fn achilles(player: &Player) -> Option<i32> {
+    let skill_id = match player.stats.job {
+        112 => 1120004,
+        122 => 1220005,
+        132 => 1320005,
+        2112 => 21120004,
+        _ => return None,
+    };
+    skills::learned(player, skill_id).map(|skill| skill.effect.x)
 }
 
 #[cfg(test)]
@@ -899,6 +1051,28 @@ mod tests {
         );
     }
 
+    #[test]
+    fn disorder_and_taunt_hit_for_the_base_cap() {
+        if skills::data().is_err() {
+            return;
+        }
+        let hit = |kind, skill, damage| {
+            parse_attack(&kind_attack_packet(kind, skill, 1, &[damage]), kind).unwrap()
+        };
+        let mut player = beginner_with_sword();
+        player.stats.mp = 100;
+        learn(&mut player, 4001002, 20);
+        learn(&mut player, 4121003, 30);
+        let cap = (max_base_damage(&player) * 2).max(10);
+        for (kind, skill) in [(AttackKind::Close, 4001002), (AttackKind::Ranged, 4121003)] {
+            assert!(validate(&hit(kind, skill, cap), &player).is_ok());
+            assert_eq!(
+                validate(&hit(kind, skill, cap + 1), &player).unwrap_err(),
+                AttackRejection::Damage
+            );
+        }
+    }
+
     /// A claw, with `stars` Subis in USE slot 1.
     #[test]
     fn shadow_meso_costs_mesos_and_hits_by_them() {
@@ -1106,5 +1280,204 @@ mod tests {
             .int(0);
         expect.int(77).byte(0).int(9);
         expect.end();
+    }
+}
+
+#[cfg(test)]
+mod taken_tests {
+    use super::*;
+    use game::{Buff, SkillRecord};
+    use std::time::{Duration, Instant};
+
+    fn with_buff(player: &mut Player, skill_id: i32, stat: BuffStat, value: i16) {
+        let lasts = Duration::from_secs(60);
+        player
+            .buffs
+            .give(Buff::new(skill_id, stat, value, Instant::now(), lasts));
+    }
+
+    #[test]
+    fn a_hit_with_no_guards_takes_it_all() {
+        let player = crate::codec::stats::sample_player();
+        assert_eq!(
+            taken(&player, 100, true, true),
+            Taken {
+                hp: 100,
+                mp: 0,
+                mesos: 0,
+                shown: 100
+            }
+        );
+        // A miss or a dodge takes nothing.
+        assert_eq!(taken(&player, -1, true, true).hp, 0);
+    }
+
+    #[test]
+    fn magic_guard_moves_its_share_to_mp_while_there_is_any() {
+        let mut player = crate::codec::stats::sample_player();
+        player.stats.mp = 50;
+        with_buff(&mut player, 2001002, BuffStat::MagicGuard, 80);
+        // 80 of 100 would go, but there are only 50 MP.
+        assert_eq!(
+            taken(&player, 100, true, true),
+            Taken {
+                hp: 50,
+                mp: 50,
+                mesos: 0,
+                shown: 100
+            }
+        );
+        assert_eq!(
+            taken(&player, 50, true, true),
+            Taken {
+                hp: 10,
+                mp: 40,
+                mesos: 0,
+                shown: 50
+            }
+        );
+        assert_eq!(taken(&player, 50, false, true).hp, 50);
+        // Under Infinity it takes all its share and no MP.
+        with_buff(&mut player, 2121004, BuffStat::Infinity, 1);
+        assert_eq!(
+            taken(&player, 100, true, true),
+            Taken {
+                hp: 20,
+                mp: 0,
+                mesos: 0,
+                shown: 100
+            }
+        );
+    }
+
+    #[test]
+    fn meso_guard_halves_a_mobs_hit_for_mesos() {
+        let mut player = crate::codec::stats::sample_player();
+        player.meso = 1000;
+        with_buff(&mut player, 4211005, BuffStat::MesoGuard, 78);
+        // 50 saved at 78 mesos per 100.
+        assert_eq!(
+            taken(&player, 101, true, true),
+            Taken {
+                hp: 51,
+                mp: 0,
+                mesos: 39,
+                shown: 51
+            }
+        );
+        assert_eq!(taken(&player, 101, true, false).hp, 101);
+        // Short of mesos it saves what they buy.
+        player.meso = 20;
+        assert_eq!(
+            taken(&player, 100, true, true),
+            Taken {
+                hp: 75,
+                mp: 0,
+                mesos: 20,
+                shown: 75
+            }
+        );
+    }
+
+    #[test]
+    fn power_guard_sends_back_its_share_of_a_touch() {
+        let mut player = crate::codec::stats::sample_player();
+        // 80 + 2 accuracy from DEX and LUK.
+        player.stats.dex = 100;
+        let mob = MobInfo {
+            level: 10,
+            max_hp: 1000,
+            avoid: 30,
+            ..MobInfo::default()
+        };
+        assert_eq!(power_guard(&player, &mob, 100), 0);
+        with_buff(&mut player, 1101007, BuffStat::PowerGuard, 30);
+        assert_eq!(power_guard(&player, &mob, 100), 30);
+        assert_eq!(power_guard(&player, &mob, -1), 0);
+        // At most a tenth of the mob's HP, halved for a boss.
+        let with = |change: fn(&mut MobInfo)| {
+            let mut mob = mob.clone();
+            change(&mut mob);
+            power_guard(&player, &mob, 100)
+        };
+        assert_eq!(with(|mob| mob.max_hp = 200), 20);
+        assert_eq!(with(|mob| mob.boss = true), 15);
+        assert_eq!(with(|mob| mob.fixed_damage = 1), 1);
+        assert_eq!(with(|mob| mob.invincible = true), 0);
+        // 82 accuracy reaches 32 avoid at the player's level, 23 ten
+        // levels below the mob.
+        assert_eq!(with(|mob| mob.level = 20), 0);
+        // The player is spared what went back.
+        assert_eq!(
+            taken(&player, 100, true, true).less(30),
+            Taken {
+                hp: 70,
+                mp: 0,
+                mesos: 0,
+                shown: 70
+            }
+        );
+    }
+
+    #[test]
+    fn mana_reflection_sends_back_its_share_of_a_spell() {
+        if crate::skills::data().is_err() {
+            return;
+        }
+        let mut player = crate::codec::stats::sample_player();
+        // 5 for each 10 of INT and of LUK: 50.
+        player.stats.int = 100;
+        let mob = MobInfo {
+            level: 10,
+            max_hp: 10000,
+            avoid: 16,
+            ..MobInfo::default()
+        };
+        assert_eq!(mana_reflection(&player, &mob, 100), 0);
+        // Level 10 sends back all of it.
+        with_buff(&mut player, 2121002, BuffStat::ManaReflection, 10);
+        assert_eq!(mana_reflection(&player, &mob, 100), 100);
+        assert_eq!(mana_reflection(&player, &mob, -1), 0);
+        let with = |change: fn(&mut MobInfo)| {
+            let mut mob = mob.clone();
+            change(&mut mob);
+            mana_reflection(&player, &mob, 100)
+        };
+        // At most a twentieth of the mob's HP, bosses alike.
+        assert_eq!(with(|mob| mob.max_hp = 1000), 50);
+        assert_eq!(with(|mob| mob.boss = true), 100);
+        // 50 reaches 16 avoid at the player's level, but not 17, nor 16
+        // two levels up.
+        assert_eq!(with(|mob| mob.avoid = 17), 0);
+        assert_eq!(with(|mob| mob.level = 11), 100);
+        assert_eq!(with(|mob| mob.level = 12), 0);
+    }
+
+    #[test]
+    fn achilles_keeps_its_share_off() {
+        if skills::data().is_err() {
+            return;
+        }
+        let mut player = crate::codec::stats::sample_player();
+        player.stats.job = 112;
+        player.skills.set(SkillRecord {
+            skill_id: 1120004,
+            level: 30,
+            master_level: 30,
+            expiration: None,
+        });
+        // A Hero at level 30 keeps 850 per mille.
+        assert_eq!(
+            taken(&player, 1000, true, true),
+            Taken {
+                hp: 850,
+                mp: 0,
+                mesos: 0,
+                shown: 850
+            }
+        );
+        // Another job's Achilles does nothing.
+        player.stats.job = 122;
+        assert_eq!(taken(&player, 1000, true, true).hp, 1000);
     }
 }

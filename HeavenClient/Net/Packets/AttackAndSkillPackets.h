@@ -127,19 +127,35 @@ namespace ms
 			MIST = -4
 		};
 
-		TakeDamagePacket(int8_t from, uint8_t element, int32_t damage, int32_t mobid, int32_t oid, uint8_t direction) : OutPacket(OutPacket::Opcode::TAKE_DAMAGE)
+		// From a mob's touch or attack (0x9593f7): then Power Guard's or
+		// Mana Reflection's percent, and the Guardian byte. With a percent,
+		// or a touch Guardian blocked, come 14 bytes for the others to show
+		// it: whether it was Power Guard, the mob, its hit action (hit1), and
+		// where it and the player were. The last byte says whether Power Stance
+		// kept the player in place.
+		TakeDamagePacket(const MobAttackResult& result) : OutPacket(OutPacket::Opcode::TAKE_DAMAGE)
 		{
 			write_time();
-			write_byte(from);
-			write_byte(element);
-			write_int(damage);
-			write_int(mobid);
-			write_int(oid);
-			write_byte(direction);
-		}
+			write_byte(result.index);
+			write_byte(result.element);
+			write_int(result.damage);
+			write_int(result.mobid);
+			write_int(result.oid);
+			write_byte(result.direction);
+			write_byte(result.reflect);
+			write_byte(result.guard);
 
-		// From a mob's touch or attack.
-		TakeDamagePacket(const MobAttackResult& result) : TakeDamagePacket(result.index, result.element, result.damage, result.mobid, result.oid, result.direction) {}
+			if (result.reflect || result.guard == 2)
+			{
+				write_byte(result.index < 0 && result.reflect);
+				write_int(result.oid);
+				write_byte(6);
+				write_point(result.mobposition);
+				write_point(result.position);
+			}
+
+			write_byte(result.stance);
+		}
 
 		// From a mob's mist, named by its skill and level (`code`) in place
 		// of a mob (FUN_00431783), whose last byte is 2; or from Stop

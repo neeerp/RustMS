@@ -25,9 +25,14 @@ pub const PORTAL_TYPE_TOWN_DOOR: i32 = 6;
 pub const FIELD_LIMIT_MOVEMENT_SKILLS: i32 = 0x2;
 /// `info/fieldLimit` bit forbidding Mystic Door (v83 FUN_00969bf9).
 pub const FIELD_LIMIT_MYSTIC_DOOR: i32 = 0x8;
+/// `info/fieldLimit` bit forbidding every return scroll (v83 FUN_00a1e1ce).
+pub const FIELD_LIMIT_RETURN_SCROLLS: i32 = 0x20;
 /// `info/fieldLimit` bit keeping teleport rocks from the map, to or from it
 /// (v83 FUN_00a0a4aa).
 pub const FIELD_LIMIT_TELEPORT_ROCK: i32 = 0x40;
+/// `info/fieldLimit` bit forbidding return scrolls that name a map (v83
+/// FUN_00a1e1ce).
+pub const FIELD_LIMIT_MAP_SCROLLS: i32 = 0x100;
 /// `info/fieldLimit` bit leaving only the map's `info/allowedItem` usable
 /// (v83 FUN_00a092fb).
 pub const FIELD_LIMIT_CONSUMABLES: i32 = 0x400;
@@ -192,6 +197,16 @@ impl NpcDialogueData {
     }
 }
 
+/// Whether the v83 client sends `item_id` as USE_ITEM (FUN_004efd25):
+/// potions, food, cures, transformations and the like. Return scrolls,
+/// summon bags and the rest have opcodes of their own.
+pub fn is_use_item(item_id: i32) -> bool {
+    matches!(
+        item_id / 10_000,
+        200 | 201 | 202 | 205 | 221 | 236 | 238 | 245
+    )
+}
+
 #[derive(Clone, Debug)]
 pub struct FieldTemplate {
     pub map_id: i32,
@@ -228,10 +243,8 @@ impl FieldTemplate {
     /// `FIELD_LIMIT_CONSUMABLES`, the potions, food, cures and the like that
     /// v83 sends as USE_ITEM work only if `info/allowedItem` lists them.
     pub fn may_use(&self, item_id: i32) -> bool {
-        !matches!(
-            item_id / 10_000,
-            200 | 201 | 202 | 205 | 221 | 236 | 238 | 245
-        ) || self.field_limit & FIELD_LIMIT_CONSUMABLES == 0
+        !is_use_item(item_id)
+            || self.field_limit & FIELD_LIMIT_CONSUMABLES == 0
             || self.allowed_items.contains(&item_id)
     }
 
@@ -301,6 +314,8 @@ impl FieldTemplate {
 #[derive(Debug, Default)]
 pub struct GameData {
     fields: BTreeMap<i32, FieldTemplate>,
+    /// `Map/AreaCode.img`: the area of each `map_id / 10000000`.
+    area_codes: HashMap<i32, i32>,
 }
 
 impl GameData {
@@ -329,7 +344,33 @@ impl GameData {
             }
         }
 
-        Ok(Self { fields })
+        let mut area_codes = HashMap::new();
+        if let Some(codes) = nx.child_by_name(map_root, "AreaCode.img")? {
+            for code in nx.child_indices(codes)? {
+                let name = nx.node_name(code)?;
+                let Ok(prefix) = name.parse::<i32>() else {
+                    continue;
+                };
+                if let Some(area) = nx.int_child(codes, &name)? {
+                    area_codes.insert(prefix, area);
+                }
+            }
+        }
+
+        Ok(Self { fields, area_codes })
+    }
+
+    /// Whether a return scroll may take a player from `from` to `to` (v83
+    /// FUN_00a26227): both maps' `map_id / 10000000` fall in the same area of
+    /// `Map/AreaCode.img`. Event maps (`(id / 1000000) % 100 == 9`) and the
+    /// ships (20009xxxx) are in none.
+    pub fn same_area(&self, from: i32, to: i32) -> bool {
+        let outside = |map_id: i32| (map_id / 1_000_000) % 100 == 9 || map_id / 10_000 == 20_009;
+        if outside(from) || outside(to) {
+            return false;
+        }
+        let area = |map_id: i32| self.area_codes.get(&(map_id / 10_000_000));
+        area(from).is_some_and(|area_from| area(to) == Some(area_from))
     }
 
     pub fn field(&self, map_id: i32) -> Option<&FieldTemplate> {
@@ -1082,6 +1123,23 @@ mod tests {
                 "{spawn:?}"
             );
         }
+    }
+
+    #[test]
+    fn return_scrolls_stay_in_the_area_code_area() {
+        let Some(path) = test_assets::path("Map.nx") else {
+            return;
+        };
+        let game_data = GameData::load_from_nx_map(&path).expect("load map nx");
+        // Henesys and Lith Harbor share Victoria Island; Orbis and El Nath
+        // share Ossyria; Ludibrium is an area of its own.
+        assert!(game_data.same_area(100_000_000, 104_000_000));
+        assert!(game_data.same_area(200_000_000, 211_000_000));
+        assert!(!game_data.same_area(100_000_000, 200_000_000));
+        assert!(!game_data.same_area(200_000_000, 220_000_000));
+        // Event maps and the ships belong to none.
+        assert!(!game_data.same_area(109_010_000, 100_000_000));
+        assert!(!game_data.same_area(200_090_000, 200_000_000));
     }
 
     #[test]

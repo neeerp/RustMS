@@ -219,7 +219,7 @@ namespace ms
 		job.change_job(id);
 	}
 
-	int32_t CharStats::calculate_damage(const MobAttack &attack, double missroll, double roll) const
+	int32_t CharStats::calculate_damage(const MobAttack &attack, double missroll, double roll, int32_t invincible) const
 	{
 		mob_damage::Defender player{
 				get_stat(MapleStat::Id::LEVEL),
@@ -245,11 +245,7 @@ namespace ms
 		if (missroll * 100.0 < mob_damage::physical_miss_chance(player, mob))
 			return 0;
 
-		// Achilles takes its share off last (inferred: v83 takes a
-		// percent there, but its source wasn't traced).
-		int32_t reduce = static_cast<int32_t>(std::lround(reducedamage * 100.0f));
-
-		return mob_damage::physical(player, mob, attack.watk, roll, reduce, attack.powerup);
+		return mob_damage::physical(player, mob, attack.watk, roll, invincible, attack.powerup);
 	}
 
 	bool CharStats::is_damage_buffed() const

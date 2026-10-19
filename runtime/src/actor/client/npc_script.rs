@@ -159,6 +159,34 @@ impl ClientActor {
                     gain_exp(&mut next, *amount, &mut packets)?;
                     changed = true;
                 }
+                Effect::TakeFirstJob(job) => {
+                    if !next.can_take_first_job(*job) {
+                        warn!(job, "No longer qualifies for the job; nothing applied");
+                        return Ok(Applied::Refused);
+                    }
+                    next.take_first_job(*job);
+                    changed = true;
+                    let stats = &next.stats;
+                    packets.push(stat::build_stat_update(
+                        false,
+                        &[
+                            StatUpdate::Job(stats.job),
+                            StatUpdate::MaxHp(stats.max_hp),
+                            StatUpdate::MaxMp(stats.max_mp),
+                            StatUpdate::Sp(stats.sp),
+                        ],
+                    )?);
+                }
+                Effect::AddSlotRow(kind) => {
+                    let limit = next
+                        .inventory
+                        .slot_limit(*kind)
+                        .saturating_add(4)
+                        .min(net::cash_shop::MAX_BAG_SLOTS);
+                    next.inventory_mut().set_slot_limit(*kind, limit);
+                    changed = true;
+                    packets.push(inventory::build_inventory_grow(*kind, limit)?);
+                }
                 Effect::StartQuest(id) => change = Some(QuestChange::Start(template(*id)?)),
                 Effect::CompleteQuest(id) => change = Some(QuestChange::Complete(template(*id)?)),
                 Effect::Warp(map_id) => warp = Some(*map_id),

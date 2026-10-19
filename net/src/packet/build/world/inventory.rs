@@ -101,6 +101,15 @@ pub fn build_item_gain(item_id: i32, quantity: i32) -> Result<Packet, NetworkErr
     Ok(p)
 }
 
+/// INVENTORY_GROW: the bag of `kind` now has `slots` slots.
+pub fn build_inventory_grow(kind: InventoryType, slots: u8) -> Result<Packet, NetworkError> {
+    let mut p = Packet::new_empty();
+    p.write_short(SendOpcode::InventoryGrow as i16)?;
+    p.write_byte(wire_type(kind))?;
+    p.write_byte(slots)?;
+    Ok(p)
+}
+
 /// SHOW_STATUS_INFO 0/-1: "You can't get anymore items."
 pub fn build_inventory_full() -> Result<Packet, NetworkError> {
     let mut p = Packet::new_empty();
@@ -166,6 +175,14 @@ mod tests {
             .byte(2);
         expect.byte(1).byte(2).short(2).short(7);
         expect.byte(3).byte(4).short(1);
+        expect.end();
+    }
+
+    #[test]
+    fn a_bag_grows_to_its_new_slot_count() {
+        let packet = build_inventory_grow(InventoryType::Etc, 28).unwrap();
+        let mut expect = Expect::new(&packet.bytes);
+        expect.short(0x1E).byte(4).byte(28);
         expect.end();
     }
 

@@ -72,6 +72,7 @@ pub struct SetFieldPacket {
     pub spawn_point: u8,
     pub level: u8,
     pub exp: i32,
+    pub job: i16,
     pub str: i16,
     pub max_hp: i16,
     pub ap: i16,
@@ -166,6 +167,7 @@ struct CharacterMeta {
     spawn_point: u8,
     level: u8,
     exp: i32,
+    job: i16,
     str: i16,
     max_hp: i16,
     ap: i16,
@@ -896,6 +898,7 @@ pub fn decode_set_field(packet: &Packet) -> Result<SetFieldPacket, String> {
         spawn_point: meta.spawn_point,
         level: meta.level,
         exp: meta.exp,
+        job: meta.job,
         str: meta.str,
         max_hp: meta.max_hp,
         ap: meta.ap,
@@ -1271,7 +1274,7 @@ fn decode_character_meta(cursor: &mut Cursor<&[u8]>) -> Result<CharacterMeta, St
 
     skip(cursor, 1 + 1 + 4 + 4 + 8 + 8 + 8)?;
     let level = cursor.read_byte().map_err(|e| e.to_string())?;
-    skip(cursor, 2)?; // job
+    let job = cursor.read_short().map_err(|e| e.to_string())?;
     let str = cursor.read_short().map_err(|e| e.to_string())?;
     skip(cursor, 2 * 4)?; // dex, int, luk, hp
     let max_hp = cursor.read_short().map_err(|e| e.to_string())?;
@@ -1293,6 +1296,7 @@ fn decode_character_meta(cursor: &mut Cursor<&[u8]>) -> Result<CharacterMeta, St
         spawn_point,
         level,
         exp,
+        job,
         str,
         max_hp,
         ap,

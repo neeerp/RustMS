@@ -373,7 +373,12 @@ impl FieldActor {
                     counter,
                     hits,
                     inflicts,
-                } => self.handle_attack(from, broadcast, Some(counter), hits, &inflicts),
+                } => self.handle_attack(from, Some(broadcast), Some(counter), hits, &inflicts),
+                FieldRequest::Reflect {
+                    object_id,
+                    mob_id,
+                    damage,
+                } => self.handle_reflect(from, object_id, mob_id, damage),
                 FieldRequest::Mist {
                     skill_id,
                     level,
@@ -775,13 +780,14 @@ impl FieldActor {
         }
     }
 
-    /// `from` attacked the mobs in `hits`; each one with the `counter`
-    /// status hurts them back, once (v83 FUN_007937e3, rolled again here:
-    /// its client only shows its own roll).
+    /// `from` attacked the mobs in `hits`, showing the others `broadcast`;
+    /// each one with the `counter` status hurts them back, once (v83
+    /// FUN_007937e3, rolled again here: its client only shows its own
+    /// roll).
     fn handle_attack(
         &mut self,
         from: ClientId,
-        broadcast: Packet,
+        broadcast: Option<Packet>,
         counter: Option<MobStat>,
         hits: Vec<(i32, i64)>,
         inflicts: &[Inflict],
@@ -790,7 +796,9 @@ impl FieldActor {
             return;
         };
         let attacker = attacker.handle.clone();
-        self.broadcast(Some(from), broadcast);
+        if let Some(broadcast) = broadcast {
+            self.broadcast(Some(from), broadcast);
+        }
         let now = Instant::now();
         let countered: i32 = counter.map_or(0, |stat| {
             hits.iter()
@@ -841,6 +849,7 @@ impl FieldActor {
                                 attacked: share.attacked,
                                 x: kill.x,
                                 y: kill.y,
+                                showdown: kill.showdown,
                             });
                         }
                     }
@@ -1091,7 +1100,19 @@ impl FieldActor {
             .map(|hit| (hit.object_id, i64::from(hit.damage)))
             .collect();
         // A v83 client counters only its own attacks.
-        self.handle_attack(from, broadcast, None, hits, limit.inflict.as_slice());
+        self.handle_attack(from, Some(broadcast), None, hits, limit.inflict.as_slice());
+    }
+
+    /// `from`'s Power Guard hurt the mob that touched them as one of their
+    /// hits would; everyone saw it in their DAMAGE_PLAYER.
+    fn handle_reflect(&mut self, from: ClientId, object_id: i32, mob_id: i32, damage: i64) {
+        if self
+            .mobs
+            .get(object_id)
+            .is_some_and(|mob| mob.info.mob_id == mob_id)
+        {
+            self.handle_attack(from, None, None, vec![(object_id, damage)], &[]);
+        }
     }
 
     /// A mob hurt `from`'s Puppet: the others see it, and it breaks at

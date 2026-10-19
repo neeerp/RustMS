@@ -20,6 +20,8 @@ changes into INVENTORY_OPERATION (`0x1D`); worn positions travel as the EQUIP
 type with a negative slot, and equipment moves add the movement byte that
 makes the client refresh the look. `build_item_gain` (SHOW_STATUS_INFO mode 0)
 and `build_item_gain_in_chat` (SHOW_ITEM_GAIN_INCHAT mode 3) show gains.
+`build_inventory_grow` (INVENTORY_GROW `0x1E`: bag type, new slot count)
+widens a bag outside the Cash Shop, as the first job advancement does.
 
 ## Item data
 
@@ -82,12 +84,20 @@ applies its `spec` (`hp`, `mp`, and percent `hpR`/`mpR`, capped at the
 maximums), consumes one, and answers with the inventory change and an HP/MP
 stat update. Dead players can't use items.
 
+v83 sends USE_ITEM only for potions, food, cures, transformations and the
+like (`200`, `201`, `202`, `205`, `221`, `236`, `238` and `245`xxxx,
+`game_data::is_use_item` and HeavenClient's `field_limit::is_use_item`).
+Every other USE kind has its own request. The server refuses USE_ITEM for
+other kinds, and for items with nothing it can apply (no HP, MP, cure or
+timed stat), so they aren't used up for nothing. HeavenClient's double click
+and quick slots send nothing for kinds that have no request yet.
+
 A map whose `fieldLimit` has bit 0x400 allows only the items its
 `info/allowedItem` lists (eleven event maps list ten items). HeavenClient
 says "This item cannot be used here." in the skill chat colour when the
 player double-clicks or presses a quick slot for anything else of the kinds
 v83 checks there: potions, food, cures and transformations
-(`field_limit::may_use`). Return scrolls and the rest aren't checked. The
+(`field_limit::may_use`). Other kinds aren't checked. The
 server applies the same rule (`FieldTemplate::may_use`) and answers a refused
 USE_ITEM with an enable-actions stat update. Double-clicking any item while
 dead says "You can't do it once you're dead."
@@ -125,12 +135,31 @@ within that interval of the player's last PLAYER_MOVE, and MP at most once
 per 10 s, each with a second of slack; anything else is ignored. Endure's
 intervals are never shorter than 10 s, so climbing needs no separate check.
 
+### Return scrolls
+
+USE_RETURN_SCROLL (`0x55`: tick, slot, item id) reads a return scroll
+(203xxxx), which v83 sends after its own checks (`FUN_00a1e1ce`). The scroll's
+`spec/moveTo` is a map, or 999999999 for the nearest town (the map's
+`info/returnMap`). A map whose `fieldLimit` has bit 0x20 refuses every scroll,
+and bit 0x100 those that name a map, with "You can't use it here in this
+map.". A scroll that names a map must stay in the player's area unless its
+`spec/ignoreContinent` is set ("You cannot go to that place."). The areas
+come from `Map.nx` `Map/AreaCode.img`, keyed by a map id's first two digits;
+event maps (millions digit 9) and the ships (20009xxxx) are in none
+(`GameData::same_area`, HeavenClient's `field_limit::same_area`).
+
+The server checks the same rules, and that the target exists and isn't the
+current map, then spends the scroll and warps the player to the target's
+`sp` portal. A refusal keeps the scroll and answers with an enable-actions
+stat update. Event scrolls (`spec/returnMapQR`, 2031000-2031008) and
+2032000 (`randomMoveInFieldSet`) aren't supported and are refused.
+
 ### Skill and mastery books
 
 USE_SKILL_BOOK (`0x52`: tick, slot, item id) reads a skill book (228xxxx)
 or a mastery book (229xxxx). v83 sends it from the item-use path with the
-usual exclusive-request gate and checks nothing itself; HeavenClient sends
-it from both the USE tab double-click and a hotkey. The book's
+usual exclusive-request gate and checks nothing itself. Like v83,
+HeavenClient sends it from the USE tab double-click but not from a quick slot. The book's
 `info/skill` lists skills; the server takes the one whose job
 (skill / 10000) is the reader's own job, and refuses the book (kept, `used`
 0) when there is none, when the reader's level in it is below

@@ -20,7 +20,9 @@ pub enum MobStat {
     Freeze = 8,
     Poison = 9,
     Seal = 10,
-    Darkness = 11,
+    /// Taunt's: the mob gives more EXP and drops (server-side; no client
+    /// reader).
+    Showdown = 11,
     PowerUp = 12,
     MagicUp = 13,
     PGuardUp = 14,
@@ -64,7 +66,7 @@ impl MobStat {
         MobStat::Freeze,
         MobStat::Poison,
         MobStat::Seal,
-        MobStat::Darkness,
+        MobStat::Showdown,
         MobStat::PowerUp,
         MobStat::MagicUp,
         MobStat::PGuardUp,

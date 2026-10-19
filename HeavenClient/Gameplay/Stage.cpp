@@ -312,6 +312,13 @@ namespace ms
 
 			if (result.damage > 0)
 				player.show_attack_effect(landed.hit, 1);
+
+			if (result.dodged)
+				combat.show_player_dodge(result.dodged);
+
+			// What Mana Reflection sent back shows over the mob.
+			if (result.reflect)
+				mobs.show_damage(result.oid, result.reflected);
 		}
 
 		if (player.is_dead() || player.Char::is_invincible() || sheltered)
@@ -326,6 +333,13 @@ namespace ms
 				MobAttackResult result = player.damage(attack);
 				TakeDamagePacket(result).dispatch();
 				combat.interrupt_prepare(result.damage);
+
+				if (result.dodged)
+					combat.show_player_dodge(result.dodged);
+
+				// What Power Guard sent back shows over the mob.
+				if (result.reflect)
+					mobs.show_damage(result.oid, result.reflected);
 			}
 		}
 		else if (since_mist_hurt > mist::HURT_INTERVAL)

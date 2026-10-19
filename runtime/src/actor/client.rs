@@ -1021,11 +1021,12 @@ impl ClientActor {
                 attacked,
                 x,
                 y,
+                showdown,
             } => {
                 self.mob_killed(mob_id, exp, party_bonus).await?;
                 self.count_quest_kill(mob_id).await?;
                 if attacked {
-                    self.drop_loot(mob_id, object_id, x, y).await?
+                    self.drop_loot(mob_id, showdown, object_id, x, y).await?
                 }
             }
             ServerMessage::PartyChanged { party_id } => {

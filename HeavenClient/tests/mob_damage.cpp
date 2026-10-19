@@ -40,7 +40,12 @@ int main()
 		require(stat_factor(warrior) == 37, "warriors weigh STR, DEX and LUK differently");
 		require(physical(warrior, stumpy, 125, 0.0, 0) == 74, "the lowest Stumpy hit on a warrior");
 		require(physical(warrior, stumpy, 125, 1.0, 0) == 82, "the highest Stumpy hit on a warrior");
-		require(physical(warrior, stumpy, 125, 1.0, 50) == 41, "Achilles-like reductions come last");
+		require(physical(warrior, stumpy, 125, 1.0, 50) == 41, "Invincible takes its share off last");
+
+		require(shown(1000, 850, 0, 0) == 850, "the number leaves out Achilles' share");
+		require(shown(101, 1000, 78, 1000) == 51, "and the half Meso Guard saves");
+		require(shown(100, 1000, 78, 20) == 75, "or what the mesos buy");
+		require(shown(-1, 850, 78, 1000) == -1 && shown(0, 850, 0, 0) == 0, "a dodge or miss stays");
 		require(physical(warrior, stumpy, 125, 1.0, 50, 200) == 82, "then a Power Up scales what is left");
 
 		// A level 30 magician short of the expected W.DEF takes more than
@@ -77,6 +82,44 @@ int main()
 		require(!magic_misses(evasive, Attacker{ 30, 21 }, 0.999), "accuracy over the avoid never misses");
 		require(magic_misses(evasive, Attacker{ 30, 11 }, 0.5) && !magic_misses(evasive, Attacker{ 30, 12 }, 0.5),
 				"the roll falls between a tenth of the avoid and all of it");
+
+		// Power Guard at 30% against a mob of level 10, 30 avoid and 1000 HP,
+		// for a level 10 player with 82 accuracy.
+		Reflectee reflectee{ 10, 30, 1000, 0, false, false };
+		Reflected reflected = power_guard(100, 30, reflectee, 10, 82);
+		require(reflected.damage == 30 && reflected.shown == 30, "Power Guard sends back its percent");
+		require(power_guard(-1, 30, reflectee, 10, 82).damage == 0, "a dodge sends nothing back");
+		require(power_guard(100, 30, Reflectee{ 10, 30, 200, 0, false, false }, 10, 82).damage == 20,
+				"at most a tenth of the mob's HP");
+		require(power_guard(100, 30, Reflectee{ 10, 30, 1000, 0, true, false }, 10, 82).damage == 15,
+				"half that for a boss");
+		reflected = power_guard(100, 30, Reflectee{ 10, 30, 1000, 1, false, false }, 10, 82);
+		require(reflected.damage == 1 && reflected.shown == 1, "a fixedDamage mob takes no more");
+		reflected = power_guard(100, 30, Reflectee{ 10, 30, 1000, 50, false, false }, 10, 82);
+		require(reflected.damage == 30 && reflected.shown == 50, "but shows its fixed damage");
+		require(power_guard(100, 30, Reflectee{ 10, 30, 1000, 0, false, true }, 10, 82).shown == 0,
+				"an invincible mob takes nothing");
+		require(power_guard(100, 30, Reflectee{ 20, 30, 1000, 0, false, false }, 10, 82).shown == 0,
+				"82 accuracy reaches 32 avoid at the player's level, 23 ten levels up");
+
+		// Mana Reflection, with 100 INT and 4 LUK: 50.
+		Reflectee caster{ 10, 16, 10000, 0, true, false };
+		require(mana_reflection(100, 100, caster, 10, 100, 4) == 100, "Mana Reflection sends back its percent");
+		require(mana_reflection(100, 100, Reflectee{ 10, 16, 1000, 0, true, false }, 10, 100, 4) == 50,
+				"at most a twentieth of the mob's HP, bosses alike");
+		require(mana_reflection(100, 100, Reflectee{ 10, 17, 10000, 0, false, false }, 10, 100, 4) == 0,
+				"50 reaches 16 avoid at the player's level, not 17");
+		require(mana_reflection(100, 100, Reflectee{ 11, 16, 10000, 0, false, false }, 10, 100, 4) == 100 &&
+					mana_reflection(100, 100, Reflectee{ 12, 16, 10000, 0, false, false }, 10, 100, 4) == 0,
+				"nor 16 two levels up");
+
+		// Only fourth-job thieves shift and fourth-job knights guard.
+		require(shadow_shifter(412) == 4120002 && shadow_shifter(422) == 4220002 && shadow_shifter(411) == 0,
+				"Shadow Shifter is the Night Lord's and the Shadower's");
+		require(guardian(112) == 1120005 && guardian(122) == 1220006 && guardian(132) == 0,
+				"Guardian is the Hero's and the Paladin's");
+		require(guard(true, true) == 2 && guard(true, false) == 1 && guard(false, true) == 0,
+				"the Guardian byte tells a touch from an attack");
 
 		std::cout << "Mob damage passed\n";
 		return 0;

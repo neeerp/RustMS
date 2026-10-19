@@ -261,7 +261,7 @@ async fn nx_buys_items_packages_gifts_and_slots() {
 
     let package = build_cash_shop_buy_package(1, PACKAGE).unwrap();
     let bought = request(connection, package, "buy a package").await;
-    assert_eq!(bought[..2], [0xA4, 3], "a package's three items");
+    assert_eq!(bought[..2], [0x89, 3], "a package's three items");
     assert_eq!(credit(connection, "buy a package").await, 12_100);
 
     let gift = build_cash_shop_gift(19830113, TICKET, &receiver_config.character_name, "enjoy");

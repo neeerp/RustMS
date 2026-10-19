@@ -81,6 +81,26 @@ pub struct ConsumeSpec {
     pub inc: i32,
     /// The pets a cash food suits (`0`, `1`, ...).
     pub pets: Vec<i32>,
+    /// Where a return scroll (203xxxx) goes (`moveTo`): a map, or
+    /// `NO_DESTINATION_MAP` for the map's return map.
+    pub move_to: Option<i32>,
+    /// Whether a return scroll may leave the player's area (`ignoreContinent`).
+    pub ignore_continent: bool,
+    /// The quest record an event scroll keeps the way back in (`returnMapQR`).
+    pub return_map_qr: i32,
+}
+
+impl ConsumeSpec {
+    /// Whether USE_ITEM can apply any of it: HP or MP, a cure, or stats for
+    /// a time.
+    pub fn has_effect(&self) -> bool {
+        self.hp != 0
+            || self.mp != 0
+            || self.hp_r != 0
+            || self.mp_r != 0
+            || !self.cures.is_empty()
+            || (self.time > 0 && !self.stats.is_empty())
+    }
 }
 
 /// The `spec` keys of the stats a consumable raises.
@@ -293,6 +313,9 @@ impl ItemData {
                     .collect::<Result<_, _>>()?,
                 inc: nx.int_child(spec, "inc")?.unwrap_or(0),
                 pets,
+                move_to: nx.int_child(spec, "moveTo")?,
+                ignore_continent: nx.int_child(spec, "ignoreContinent")?.unwrap_or(0) != 0,
+                return_map_qr: nx.int_child(spec, "returnMapQR")?.unwrap_or(0),
             });
         }
         if let Some(interact) = nx.child_by_name(node, "interact")? {

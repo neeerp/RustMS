@@ -1,5 +1,7 @@
 #pragma once
 
+#include "SkillId.h"
+
 #include <algorithm>
 #include <cstdint>
 #include <utility>
@@ -155,7 +157,7 @@ namespace ms
 		}
 
 		// A physical hit, for a monster with `attack` and a `roll` uniform in
-		// [0, 1). `reduce` is the percent that skills like Achilles take off,
+		// [0, 1). `reduce` is the percent Invincible takes off (0x7933b2),
 		// and a Power Up puts the rest at `percent` (0 for none).
 		inline int32_t physical(const Defender &player, const Attacker &mob, int32_t attack, double roll,
 								int32_t reduce, int32_t percent = 0)
@@ -212,6 +214,140 @@ namespace ms
 			damage = (100 - resist) * damage / 100;
 
 			return std::max(damage, 1);
+		}
+
+		// The number shown over the player for a hit of `damage` (0x9593b8).
+		// The client leaves Achilles, Meso Guard and Magic Guard to the
+		// server, but the number leaves out what the first two save:
+		// Achilles keeps `achilles` per mille off (1000 without it), and Meso
+		// Guard saves half at `mesoguard` mesos per 100 (0 without it), or
+		// what `meso` buys. Magic Guard's share still shows.
+		inline int32_t shown(int32_t damage, int32_t achilles, int32_t mesoguard, int64_t meso)
+		{
+			if (damage <= 0)
+				return damage;
+
+			int32_t kept_off = (1000 - achilles) * damage / 1000;
+			int32_t saved = 0;
+
+			if (mesoguard > 0)
+			{
+				saved = damage / 2;
+
+				if (meso < static_cast<int64_t>(saved) * mesoguard / 100)
+					saved = static_cast<int32_t>(meso * 100 / mesoguard);
+			}
+
+			return damage - kept_off - saved;
+		}
+
+		// The Night Lord's or Shadower's Shadow Shifter, which may dodge any
+		// hit, a miss too, at its chance (0x9584f6); 0 for other jobs.
+		inline int32_t shadow_shifter(int32_t job)
+		{
+			switch (job)
+			{
+			case 412: return SkillId::SHADOW_SHIFTER_NIGHT_LORD;
+			case 422: return SkillId::SHADOW_SHIFTER_SHADOWER;
+			default: return 0;
+			}
+		}
+
+		// The Hero's or Paladin's Guardian, which may block a hit that lands
+		// while they hold a shield, at its chance per mille (0x958692); 0 for
+		// other jobs.
+		inline int32_t guardian(int32_t job)
+		{
+			switch (job)
+			{
+			case 112: return SkillId::GUARDIAN_HERO;
+			case 122: return SkillId::GUARDIAN_PALADIN;
+			default: return 0;
+			}
+		}
+
+		// The Guardian byte of TAKE_DAMAGE: 2 for a touch it blocked, 1 for
+		// an attack, 0 if it blocked nothing (0x9594d0).
+		inline uint8_t guard(bool blocked, bool touch)
+		{
+			return blocked ? (touch ? 2 : 1) : 0;
+		}
+
+		// The mob that Power Guard or Mana Reflection sends some of its hit
+		// back at.
+		struct Reflectee
+		{
+			int32_t level;
+			int32_t avoid;
+			int32_t maxhp;
+			int32_t fixeddamage;
+			bool boss;
+			bool invincible;
+		};
+
+		// What Power Guard sends back: what the mob takes and the player is
+		// spared, and the number shown over the mob (0 a miss).
+		struct Reflected
+		{
+			int32_t damage;
+			int32_t shown;
+		};
+
+		// What Power Guard at `percent` sends back at a mob that touched a
+		// player of `level` and `accuracy` for `damage` (FUN_009581a9 at
+		// 0x9587c6): at most a tenth of the mob's HP, halved for a boss. A
+		// fixedDamage mob shows its fixed damage and takes no more. Nothing
+		// goes back at an invincible mob, or at one whose avoid beats the
+		// accuracy, weighed down for each level the mob has on the player
+		// (0x9588cd).
+		inline Reflected power_guard(int32_t damage, int32_t percent, const Reflectee &mob, int32_t level,
+									 int32_t accuracy)
+		{
+			if (damage <= 0 || percent <= 0 || mob.invincible)
+				return { 0, 0 };
+
+			int32_t reflected = std::min(damage * percent / 100, mob.maxhp / 10);
+
+			if (mob.boss)
+				reflected /= 2;
+
+			int32_t shown = reflected;
+
+			if (mob.fixeddamage > 0)
+			{
+				shown = mob.fixeddamage;
+				reflected = std::min(reflected, mob.fixeddamage);
+			}
+
+			int32_t above = std::max(0, mob.level - level);
+			double reach = std::clamp(accuracy, 0, 999) * 100.0 / (above * 10.0 + 255.0);
+
+			if (std::clamp(mob.avoid, 0, 999) > reach)
+				return { 0, 0 };
+
+			return { reflected, shown };
+		}
+
+		// What Mana Reflection, its chance come up, shows sending `percent` of
+		// a spell's `damage` back at the mob (0x958d50): at most a twentieth
+		// of its HP, and nothing (a miss) if its avoid beats 5 for each 10 of
+		// the player's INT and of their LUK, weighed down for each level the
+		// mob has on them and by 0.85. Unlike Power Guard's, it spares the
+		// player nothing.
+		inline int32_t mana_reflection(int32_t damage, int32_t percent, const Reflectee &mob, int32_t level,
+									   int32_t intelligence, int32_t luck)
+		{
+			if (damage <= 0 || percent <= 0)
+				return 0;
+
+			int32_t reflected = std::min(percent * damage / 100, mob.maxhp / 20);
+			int32_t above = std::max(0, mob.level - level);
+			double reach = (intelligence / 10 + luck / 10) * 5 * 100.0 / (above * 10.0 + 255.0) * 0.85;
+
+			if (std::clamp(mob.avoid, 0, 999) > reach)
+				return 0;
+
+			return reflected;
 		}
 	}
 }

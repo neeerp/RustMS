@@ -112,18 +112,25 @@ namespace ms
 		int32_t cid = recv.read_int();
 		// -1 is a touch, 0 and up a mob's attack.
 		int8_t type = recv.read_byte();
-		recv.read_int(); // the damage taken
+		int32_t damage = recv.read_int();
 
 		if (type >= -1)
 		{
 			recv.read_int(); // the mob's id
 			recv.read_byte(); // whether it hit from the left
 
-			// What Power Guard reflected back at the mob, and whether Power
-			// Stance kept the user standing: neither is shown yet.
-			if (recv.read_byte())
-				recv.skip(10);
+			// The percent Power Guard or Mana Reflection sent back at the
+			// mob, shown over it; its hit action and position aren't used.
+			if (uint8_t percent = recv.read_byte())
+			{
+				bool physical = recv.read_bool();
+				int32_t oid = recv.read_int();
+				recv.skip(5);
 
+				Stage::get().get_mobs().show_reflect(oid, percent, damage, physical);
+			}
+
+			// Whether Power Stance kept the user standing (not shown yet).
 			recv.read_byte();
 		}
 
@@ -139,10 +146,11 @@ namespace ms
 		}
 		else if (shown == -1)
 		{
-			// Shadow Shifter dodged it, smiling (its effect isn't shown).
+			// Guardian or Shadow Shifter dodged it; Shadow Shifter smiles.
 			int32_t skillid = recv.read_int();
+			Stage::get().get_combat().show_dodge(cid, skillid);
 
-			if (skillid == 4120002 || skillid == 4220002)
+			if (skillid == SkillId::SHADOW_SHIFTER_NIGHT_LORD || skillid == SkillId::SHADOW_SHIFTER_SHADOWER)
 				otherchar->set_expression(Expression::Id::SMILE, 1500);
 		}
 	}

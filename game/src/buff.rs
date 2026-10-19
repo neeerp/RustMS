@@ -59,6 +59,9 @@ pub enum BuffStat {
     MapleWarrior = 35,
     Stance = 36,
     SharpEyes = 37,
+    /// Mana Reflection, at its skill level (the client looks up its chance
+    /// and share).
+    ManaReflection = 38,
     /// Seduce: walks the way the mob wants, pattern `value`, and can't
     /// attack (the client's Attract).
     Seduce = 39,

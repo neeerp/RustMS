@@ -259,27 +259,58 @@ pub const FROM_TOUCH: i8 = -1;
 /// A mob's mist, the source the v83 client sends from FUN_00431783.
 pub const FROM_MIST: i8 = -4;
 
-/// DAMAGE_PLAYER: show others that a player was hurt by a mob's touch
-/// ([`FROM_TOUCH`]) or attack `from`, or by something else such as a mist
-/// (FUN_009832e3: below touch it reads no mob).
-pub fn build_damage_player(
-    character_id: i32,
-    from: i8,
-    mob_id: i32,
-    damage: i32,
-    direction: u8,
-) -> Result<Packet, NetworkError> {
+/// How a player was hurt, as the others see it.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct Hurt {
+    /// A mob's attack index, [`FROM_TOUCH`], or something with no mob,
+    /// such as [`FROM_MIST`].
+    pub from: i8,
+    pub damage: i32,
+    pub mob_id: i32,
+    /// Whether the mob was to the player's left.
+    pub left: u8,
+    /// The Power Guard or Mana Reflection percent, and what the player's
+    /// client sent for the others to show over the mob: whether it was
+    /// Power Guard, the mob's object id and hit action, and its position.
+    pub reflect: Option<(u8, [u8; 10])>,
+    /// Whether Power Stance kept the player in place.
+    pub stance: bool,
+    /// The number shown over the player.
+    pub shown: i32,
+    /// The skill that dodged the hit (Guardian or Shadow Shifter), shown
+    /// in place of a number.
+    pub dodged_by: Option<i32>,
+}
+
+/// DAMAGE_PLAYER: show others that a player was hurt (FUN_009832e3: below
+/// touch it reads no mob).
+pub fn build_damage_player(character_id: i32, hurt: &Hurt) -> Result<Packet, NetworkError> {
     let mut p = Packet::new_empty();
     p.write_short(SendOpcode::DamagePlayer as i16)?;
     p.write_int(character_id)?;
-    p.write_byte(from as u8)?;
-    p.write_int(damage)?;
-    if from >= FROM_TOUCH {
-        p.write_int(mob_id)?;
-        p.write_byte(direction)?;
-        p.write_short(0)?;
+    p.write_byte(hurt.from as u8)?;
+    p.write_int(hurt.damage)?;
+    if hurt.from >= FROM_TOUCH {
+        p.write_int(hurt.mob_id)?;
+        p.write_byte(hurt.left)?;
+        match &hurt.reflect {
+            Some((percent, shown)) => {
+                p.write_byte(*percent)?;
+                p.write_bytes(shown)?;
+            }
+            None => {
+                p.write_byte(0)?;
+            }
+        }
+        p.write_byte(u8::from(hurt.stance))?;
     }
-    p.write_int(damage)?;
+    match hurt.dodged_by {
+        Some(skill_id) => {
+            p.write_int(-1)?;
+            p.write_int(skill_id)?;
+        }
+        None => p.write_int(hurt.shown)?,
+    }
     Ok(p)
 }
 
@@ -417,8 +448,49 @@ mod tests {
     }
 
     #[test]
+    fn a_mobs_hit_relays_its_reflect_stance_and_dodge() {
+        let shown = [1, 9, 0, 0, 0, 4, 10, 0, 20, 0];
+        let hurt = Hurt {
+            from: FROM_TOUCH,
+            damage: 120,
+            mob_id: 100100,
+            left: 1,
+            reflect: Some((30, shown)),
+            stance: true,
+            shown: 102,
+            dodged_by: None,
+        };
+        let packet = build_damage_player(7, &hurt).unwrap();
+        let mut expect = Expect::new(&packet.bytes);
+        expect.short(SendOpcode::DamagePlayer as i16).int(7);
+        expect.byte(FROM_TOUCH as u8).int(120).int(100100).byte(1);
+        expect.byte(30).bytes(&shown).byte(1).int(102);
+        expect.end();
+
+        let dodged = Hurt {
+            damage: -1,
+            reflect: None,
+            stance: false,
+            dodged_by: Some(4120002),
+            ..hurt
+        };
+        let packet = build_damage_player(7, &dodged).unwrap();
+        let mut expect = Expect::new(&packet.bytes);
+        expect.short(SendOpcode::DamagePlayer as i16).int(7);
+        expect.byte(FROM_TOUCH as u8).int(-1).int(100100).byte(1);
+        expect.byte(0).byte(0).int(-1).int(4120002);
+        expect.end();
+    }
+
+    #[test]
     fn mist_damage_names_no_mob() {
-        let p = build_damage_player(7, FROM_MIST, 0, 30, 0).unwrap();
+        let hurt = Hurt {
+            from: FROM_MIST,
+            damage: 30,
+            shown: 30,
+            ..Hurt::default()
+        };
+        let p = build_damage_player(7, &hurt).unwrap();
         let mut want = (SendOpcode::DamagePlayer as i16).to_le_bytes().to_vec();
         want.extend_from_slice(&7i32.to_le_bytes());
         want.push(FROM_MIST as u8);

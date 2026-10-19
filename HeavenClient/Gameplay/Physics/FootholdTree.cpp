@@ -299,7 +299,9 @@ namespace ms
 
 		if (phobj.enablejd || phobj.is_flag_set(PhysicsObject::Flag::CHECKBELOW))
 		{
-			phobj.enablejd = can_jump_down(phobj.fhid, x, ground);
+			// v83 refuses a down-jump from a forbidFallDown foothold, but
+			// not onto one (FUN_0094c4f8).
+			phobj.enablejd = !nextfh.forbid_fall_down() && can_jump_down(phobj.fhid, x, ground);
 			phobj.groundbelow = ground + 1.0;
 			phobj.clear_flag(PhysicsObject::Flag::CHECKBELOW);
 		}

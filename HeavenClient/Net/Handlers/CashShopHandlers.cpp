@@ -285,20 +285,22 @@ namespace ms
 			cashshop->add_cash_items({ read_cash_item(recv) });
 			UI::get().emplace<UIOk>("You have successfully made the purchase.", [](bool) {});
 			break;
-		case 0xA4:
+		case 0x89:
 		{
-			// A package's items are in the Cash Inventory; the balance
-			// follows.
+			// A package's items are in the Cash Inventory, then the
+			// MaplePoints it gave (v83 479a1b); the balance follows.
 			uint8_t count = static_cast<uint8_t>(recv.read_byte());
 			std::vector<UICashShop::CashItem> items;
 
 			for (uint8_t i = 0; i < count; i++)
 				items.push_back(read_cash_item(recv));
 
-			recv.skip_short();
+			int16_t points = recv.read_short();
 
 			cashshop->add_cash_items(items);
-			UI::get().emplace<UIOk>("You have successfully made the purchase.", [](bool) {});
+			UI::get().emplace<UIOk>(points ? "Purchase successful.\\n" + std::to_string(points) + " You have received MaplePoints."
+										   : "You have successfully made the purchase.",
+									[](bool) {});
 			break;
 		}
 		case 0x60:

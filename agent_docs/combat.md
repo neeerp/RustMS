@@ -415,8 +415,13 @@ carry the statuses a mob has. Entries come in the client's decode order
   each mob still in the area (`FieldRequest::MobDebuff`). The Crashes and
   Dispel take mob buffs off instead.
 - An attack's hits carry `skills::on_hit`: the attack skill's own status
-  (stuns, Panic's darkness, freezes, poisons) and a learned Venom's poison.
-  Each mob hit for more than 0 rolls each.
+  (stuns, freezes, poisons, Disorder's lower attack and defence, Taunt's
+  higher defence) and a learned Venom's poison. Each mob hit for more than
+  0 rolls each.
+- Taunt also puts on Showdown (bit 11), which no v83 client reads: a mob
+  that dies with it gives its value in percent more EXP and makes each of
+  its drops that much likelier (`Kill::showdown`, `loot::roll`; the
+  OdinMS-family rule).
 - Bosses shrug off Stun, Freeze, Seal, Doom and Web. A mob immune to poison
   (`elemAttr` S1) or ice (I1) shrugs off Poison or Freeze.
 - Poison, Venom and Ambush take HP each second on the field tick
@@ -814,15 +819,69 @@ FUN_0079309f and FUN_0079345e):
 - **Magic:** the mob's `MADamage`, M, rolls M² × 0.75–0.8 / 100, less a
   share of M.DEF and stats (more for magicians); a separate miss roll.
 - **Afterward:** the damage is at least 1 unless missed. A `deadlyAttack`
-  takes all but 1 HP, and an `mpBurn` attack does 1. Achilles keeps its `x`
-  per mille.
+  takes all but 1 HP, and an `mpBurn` attack does 1. Invincible takes its
+  `x` percent off a physical hit.
 
 Period footage agrees: snails hit level 2–4 beginners for 1, and Shrooms
 and Blue Snails hit a level 5 beginner for 1–2 (#125). The server
 (`game::mob_damage`) refuses more than the best roll with no W.DEF, plus
-the most a shortfall can add with doubled base stats. It takes the HP, and
-for a `deadlyAttack` all but 1 MP or the attack's `mpBurn` in MP. Others see
-DAMAGE_PLAYER. At 0 HP the player is dead:
+the most a shortfall can add with doubled base stats.
+
+v83 sends that damage before the other guards (`CUserLocal::SetDamaged`,
+FUN_009581a9), and the server applies them once (`net::combat::taken`):
+
+- **Achilles** keeps `x` per mille of the hit, for a Hero, Paladin, Dark
+  Knight, or Aran who has learned it.
+- **Magic Guard** pays its `x` percent in MP, at most the MP left; under
+  Infinity the MP isn't spent. It leaves a `deadlyAttack` or `mpBurn`
+  attack alone, as Cosmic does.
+- **Meso Guard** (a mob's attack or touch only) saves half the hit at
+  `x` percent of that in mesos. Short of mesos, it saves what they buy.
+- **Power Guard** (a touch only, `net::combat::power_guard`, 0x9587c6)
+  sends `x` percent of the hit back at the mob, at most a tenth of its
+  max HP, halved for a boss, and at most a `fixedDamage` mob's fixed
+  damage. An `invincible` mob takes none, and none goes if the mob's
+  avoid beats the player's accuracy times 100 over (255 + 10 per level
+  the mob is above them). What it sends back comes off the hit and the
+  shown number; the server deals it to the mob as one of the player's
+  hits (`FieldRequest::Reflect`). The client says it reflected with the
+  block below; the server then uses its own buff and the mob's template.
+- **Mana Reflection** (a mob's spell only, `net::combat::mana_reflection`,
+  0x958d50) works the same way once the client's roll of its `prop`
+  comes up, but sends back `x` percent, at most a twentieth of the mob's
+  max HP, bosses alike, and spares the player nothing. Its accuracy is 5
+  for each 10 of INT and of LUK, times 0.85. The buff's value is the
+  skill level; v83 reads all three skills' data from 2121002's.
+
+The rest comes off HP; a `deadlyAttack` also takes all but 1 MP, and an
+`mpBurn` attack its `mpBurn` in MP. Poison ticks get Achilles too
+(0x94b113). The client shows over the player's head the hit less Achilles
+and Meso Guard, but not Magic Guard (0x9593b8); others see the same number
+in DAMAGE_PLAYER.
+
+A hit of -1 is a dodge. HeavenClient rolls them as v83 does: a Night
+Lord's or Shadower's Shadow Shifter dodges any hit, a miss too, at its
+`prop` percent (0x9584f6), and a Hero's or Paladin's Guardian blocks a hit
+that lands while they wear a shield, at its `prop` per mille, after Power
+Guard has sent its share back (0x958692). A dodge shows no number, only
+the skill's `special` animation, and Shadow Shifter smiles for 1.5 s. The
+server accepts -1 only from a Night Lord or Shadower who has Shadow
+Shifter, or (with a shield worn and a guard byte) a Hero or Paladin with
+Guardian. After the mob's id and object id, a mob's TAKE_DAMAGE carries
+its direction, the reflect percent, the guard byte (1 for an attack
+Guardian blocked, 2 for a touch), a 14-byte block when reflecting or for a
+touch Guardian blocked (whether it was Power Guard, object id, hit action,
+the mob's and the player's positions), and a stance byte, set when the Stance roll kept
+the player from being knocked back. The server reads the tail by its length
+(older clients send none) and passes the reflect block and stance on in
+DAMAGE_PLAYER (`mob::Hurt`): `cid, from, damage`, then for a mob `mob_id,
+left, reflect percent (and its 10 bytes), stance`, then the shown number,
+or -1 and the dodging skill. A receiver shows the reflect percent of the
+damage over the mob, at most a tenth of its max HP for a physical hit
+(HeavenClient's `Mob::show_reflect`). Hits with no mob (-4) end with a byte: 1
+poison (ignored, the server ticks poison itself), 2 a mist (Achilles
+applies), or 3 Stop Motion (no guards, never fatal). At 0 HP the player is
+dead:
 non-beginners lose 10% of their level's EXP; the client's respawn
 (CHANGE_MAP with a target while dead) returns them to the map's return map
 with 50 HP.
@@ -854,16 +913,18 @@ Setting restores the same table.
 
 `field_mobs` unit tests cover spawning, control hand-off (including by
 distance report), movement, attacks' MP, damage, EXP sharing, and respawn;
-`net::combat` covers parsing, the damage cap, Shadow Meso's mesos, and the
-broadcast, and the
-TAKE_DAMAGE handler's bounds by attack index; `game::mob_damage` covers the
+`net::combat` covers parsing, the damage cap, Shadow Meso's mesos, the
+broadcast, the guards' shares of a hit, both reflects, and the
+TAKE_DAMAGE handler's bounds by attack index, its tail, and dodges; `game::mob_damage` covers the
 StandardPDD table and the bound. HeavenClient's `mob_damage_tests` and
-`mob_attack_tests` cover the damage and miss formulas and the attacks'
+`mob_attack_tests` cover the damage and miss formulas, both reflects, the dodging skills, and the attacks'
 ranges, aim, balls, and rows. `mob_combat` (integration) runs two players in Dangerous
 Forest through control, relayed movement, hits, kills, EXP, refused damage,
 touch damage, damage by attack index, a level-up seen by the other player, and a respawn, then has
 two players report their distance from a firstAttack mob in Crimsonwood Keep
 (610030011) and checks control follows the closer one until a hit;
+`damage_reductions` (integration) has Magic Guard pay 80% of a touch in MP
+and Power Guard send back a boss's share of one;
 `reactors` (integration) breaks two of Amherst's boxes, before and during
 Pio's quest;
 `drops_and_pickup` checks ownership, reach, pickup, replays, meso

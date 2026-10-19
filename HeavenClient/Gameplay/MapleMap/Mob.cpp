@@ -81,6 +81,8 @@ namespace ms
 		canchase = src["chase"].size() > 0;
 		boss = info["boss"].get_bool();
 		fixeddamage = info["fixedDamage"];
+		maxhp = info["maxHP"];
+		invincible = info["invincible"].get_bool();
 
 		if (canfly)
 		{
@@ -1898,6 +1900,16 @@ namespace ms
 			hurtnumbers.push_back(damage);
 	}
 
+	void Mob::show_reflect(uint8_t percent, int32_t damage, bool physical)
+	{
+		int32_t reflected = percent * damage / 100;
+
+		if (physical)
+			reflected = std::min(reflected, maxhp / 10);
+
+		show_damage(reflected);
+	}
+
 	std::vector<int32_t> Mob::take_hurts()
 	{
 		return std::exchange(hurtnumbers, {});
@@ -2224,6 +2236,11 @@ namespace ms
 		attack.matk = matk + status_value(MobStatParser::MAD);
 		attack.level = level;
 		attack.accuracy = accuracy + status_value(MobStatParser::ACC);
+		attack.avoid = avoid;
+		attack.maxhp = maxhp;
+		attack.fixeddamage = fixeddamage;
+		attack.boss = boss;
+		attack.invincible = invincible;
 		attack.powerup = status_value(MobStatParser::POWER_UP);
 		attack.magicup = status_value(MobStatParser::MAGIC_UP);
 

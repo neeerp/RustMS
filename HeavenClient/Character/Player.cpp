@@ -17,6 +17,7 @@
 //////////////////////////////////////////////////////////////////////////////////
 #include "Player.h"
 
+#include "MobDamage.h"
 #include "PlayerStates.h"
 #include "SkillId.h"
 
@@ -25,6 +26,7 @@
 #include "../Data/SkillData.h"
 #include "../Data/WeaponData.h"
 #include "../Gameplay/Combat/MagicDamage.h"
+#include "../Gameplay/MapleMap/FieldLimit.h"
 #include "../Gameplay/Stage.h"
 #include "../IO/Messages.h"
 #include "../IO/UI.h"
@@ -224,15 +226,13 @@ namespace ms
 
 		if (int16_t slot = inventory.find_item(type, itemid))
 		{
-			if (type == InventoryType::Id::USE && (itemid / 10000 == 228 || itemid / 10000 == 229))
-				request(SkillBookPacket(slot, itemid), ExclRequest::USE_WAIT);
-			else if (type == InventoryType::Id::USE && !Stage::get().get_mapinfo().can_use_item(itemid))
+			if (type == InventoryType::Id::USE && !Stage::get().get_mapinfo().can_use_item(itemid))
 				InChatMessage(Messages::ITEM_FIELD).drop();
 			else if (type == InventoryType::Id::USE && !disease::can_use_item(get_diseases()))
 				return;
 			else if (type == InventoryType::Id::USE && pets::is_food(itemid))
 				feed_pets(slot, itemid);
-			else if (type == InventoryType::Id::USE)
+			else if (type == InventoryType::Id::USE && field_limit::is_use_item(itemid))
 				request(UseItemPacket(slot, itemid), ExclRequest::USE_WAIT);
 			else if (type == InventoryType::Id::SETUP && itemid / 10000 == 301)
 				sit_on_chair(itemid);
@@ -766,7 +766,8 @@ namespace ms
 
 	MobAttackResult Player::damage(const MobAttack &attack)
 	{
-		int32_t damage = stats.calculate_damage(attack, randomizer.next_real(1.0), randomizer.next_real(1.0));
+		int32_t damage = stats.calculate_damage(attack, randomizer.next_real(1.0), randomizer.next_real(1.0),
+												 get_buff_value(Buffstat::Id::INVINCIBLE));
 
 		// A deadly attack that hits leaves 1 HP, and an MP burn takes 1
 		// (FUN_009581a9).
@@ -775,7 +776,73 @@ namespace ms
 		else if (damage > 0 && attack.mpburn)
 			damage = 1;
 
-		show_damage(damage);
+		// A Night Lord's or Shadower's Shadow Shifter may dodge any hit, a
+		// miss too (0x9584f6). A Hero's or Paladin's Guardian may block one
+		// that lands while they hold a shield, after Power Guard has sent its
+		// share back (0x958692).
+		int32_t job = stats.get_stat(MapleStat::Id::JOB);
+		int32_t dodged = 0;
+		int32_t shifter = mob_damage::shadow_shifter(job);
+
+		if (shifter && skillbook.get_level(shifter) > 0 && randomizer.below(skill_stats(skillbook, shifter).chance))
+		{
+			damage = -1;
+			dodged = shifter;
+		}
+
+		int32_t guardian = mob_damage::guardian(job);
+		bool blocked = damage > 0 && guardian && skillbook.get_level(guardian) > 0 &&
+					   inventory.has_equipped(EquipSlot::Id::SHIELD) &&
+					   randomizer.below(skill_stats(skillbook, guardian).chance / 10);
+
+		// A touch under Power Guard sends some back at the mob, which the
+		// player is spared (0x9587c6). A spell under Mana Reflection does
+		// too if its chance comes up, sparing them nothing (0x958d50).
+		uint8_t reflect = 0;
+		mob_damage::Reflected reflected{ 0, 0 };
+		mob_damage::Reflectee reflectee{ attack.level, attack.avoid, attack.maxhp, attack.fixeddamage, attack.boss,
+									   attack.invincible };
+		int32_t level = stats.get_stat(MapleStat::Id::LEVEL);
+
+		if (attack.index < 0 && damage > 0 && has_buff(Buffstat::Id::POWERGUARD))
+		{
+			reflect = static_cast<uint8_t>(get_buff_value(Buffstat::Id::POWERGUARD));
+			reflected = mob_damage::power_guard(damage, reflect, reflectee, level, stats.get_total(EquipStat::Id::ACC));
+		}
+
+		if (blocked)
+		{
+			damage = -1;
+			dodged = guardian;
+		}
+
+		if (attack.index >= 0 && attack.magic && damage > 0 && has_buff(Buffstat::Id::MANA_REFLECTION))
+		{
+			const SkillData::Stats &mana =
+					SkillData::get(SkillId::MANA_REFLECTION).get_stats(get_buff_value(Buffstat::Id::MANA_REFLECTION));
+
+			if (randomizer.below(mana.chance))
+			{
+				reflect = static_cast<uint8_t>(mana.x);
+				reflected.shown = mob_damage::mana_reflection(damage, mana.x, reflectee, level,
+															  stats.get_total(EquipStat::Id::INT),
+															  stats.get_total(EquipStat::Id::LUK));
+			}
+		}
+
+		// A dodge shows no number; Shadow Shifter smiles (0x9593b9).
+		if (dodged)
+		{
+			if (!blocked)
+				set_expression(Expression::Id::SMILE, 1500);
+		}
+		else
+		{
+			int32_t achilles = 1000 - static_cast<int32_t>(std::lround(stats.get_reducedamage() * 1000.0f));
+			show_damage(mob_damage::shown(damage, achilles, get_buff_value(Buffstat::Id::MESOGUARD),
+										  inventory.get_meso()) - reflected.damage);
+		}
+
 		become_invincible(damage > 0);
 
 		bool fromleft = attack.pushleft ? *attack.pushleft : attack.origin.x() > phobj.get_x();
@@ -788,12 +855,16 @@ namespace ms
 
 		bool knockback = !missed && state != Char::State::DIED;
 
+		// Power Stance may keep the player in place; others see it too.
+		bool stance = knockback && !randomizer.above(stats.get_stance());
+
 		// CUserLocal knocks the player away from the mob and up at 270
-		// pixels per second, or 200 under Power Guard, and off ladders and
-		// ropes too (FUN_007ad352).
-		if (knockback && randomizer.above(stats.get_stance()))
+		// pixels per second, or 200 from a touch under Power Guard, and off
+		// ladders and ropes too (FUN_007ad352, 0x9588cd).
+		if (knockback && !stance)
 		{
-			double power = has_buff(Buffstat::Id::POWERGUARD) ? 200.0 : 270.0;
+			bool guarded = attack.index < 0 && has_buff(Buffstat::Id::POWERGUARD);
+			double power = guarded ? 200.0 : 270.0;
 
 			if (ladder)
 			{
@@ -806,7 +877,14 @@ namespace ms
 
 		uint8_t direction = fromleft ? 0 : 1;
 
-		return {attack, damage, direction};
+		MobAttackResult result(attack, damage, direction, stance);
+		result.reflect = reflect;
+		result.reflected = reflected.shown;
+		result.guard = mob_damage::guard(blocked, attack.index < 0);
+		result.dodged = dodged;
+		result.position = get_position();
+
+		return result;
 	}
 
 	void Player::give_buff(Buff buff)
@@ -955,8 +1033,23 @@ namespace ms
 
 	void Player::change_job(uint16_t jobid)
 	{
+		uint16_t oldjob = stats.get_stat(MapleStat::Id::JOB);
+
 		show_effect_id(CharEffect::Id::JOBCHANGE);
+		Sound(Sound::Name::JOBCHANGED).play();
 		stats.change_job(jobid);
+
+		// A beginner's first advancement opens the stat window, without a sound (FUN_00a1fb52).
+		if (oldjob == 0 || oldjob == 1000 || oldjob == 2000 || oldjob == 2001)
+		{
+			auto window = UI::get().get_element<UIStatsInfo>();
+
+			if (!window || !window->is_active())
+			{
+				UI::get().remove(UIStatsInfo::TYPE);
+				UI::get().emplace<UIStatsInfo>(stats);
+			}
+		}
 	}
 
 	void Player::set_seat(Optional<const Seat> seat)

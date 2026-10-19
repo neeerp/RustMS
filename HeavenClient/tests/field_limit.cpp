@@ -27,6 +27,41 @@ int main()
 		require(may_drop(0x400), "consumable limits leave drops alone");
 		require(!may_drop(0x400000), "bit 0x400000 keeps items on the player");
 
+		require(may_jump(0, false) && may_jump(0, true), "an open map allows both jumps");
+		require(!may_jump(0x1, false) && may_jump(0x1, true), "bit 0x1 stops only the plain jump");
+		require(may_jump(0x20000, false) && !may_jump(0x20000, true), "bit 0x20000 stops only the down-jump");
+
+		require(is_use_item(2000000) && is_use_item(2450000), "potions and the like go as USE_ITEM");
+		require(!is_use_item(2030000) && !is_use_item(2280000) && !is_use_item(2100000),
+				"return scrolls, skill books and summon sacks don't");
+
+		// Part of Map/AreaCode.img: Victoria is 1, Ossyria (Orbis, El Nath) 3, Ludibrium 4.
+		const std::map<int32_t, int32_t> codes = { { 10, 1 }, { 11, 2 }, { 20, 3 }, { 21, 3 }, { 22, 4 } };
+		const int32_t henesys = 100000000, lith = 104000000, orbis = 200000000, el_nath = 211000000;
+
+		require(same_area(henesys, lith, codes), "Henesys and Lith Harbor share Victoria");
+		require(same_area(orbis, el_nath, codes), "Orbis and El Nath share Ossyria");
+		require(!same_area(henesys, orbis, codes), "Victoria isn't Ossyria");
+		require(!same_area(orbis, 220000000, codes), "Ludibrium is its own area");
+		require(!same_area(109010000, henesys, codes), "event maps are in no area");
+		require(!same_area(200090000, orbis, codes), "the ships are in no area");
+		require(!same_area(henesys, 300000000, codes), "an unlisted code is in no area");
+
+		require(return_scroll_refusal(0, lith, henesys, false, codes) == ScrollRefusal::NONE,
+				"a Henesys scroll works in Victoria");
+		require(return_scroll_refusal(0, orbis, henesys, false, codes) == ScrollRefusal::THERE,
+				"but not from Orbis");
+		require(return_scroll_refusal(0, orbis, henesys, true, codes) == ScrollRefusal::NONE,
+				"unless it ignores continents");
+		require(return_scroll_refusal(0, orbis, NEAREST_TOWN, false, codes) == ScrollRefusal::NONE,
+				"a nearest-town scroll works anywhere");
+		require(return_scroll_refusal(0x100, orbis, NEAREST_TOWN, false, codes) == ScrollRefusal::NONE,
+				"bit 0x100 leaves nearest-town scrolls alone");
+		require(return_scroll_refusal(0x100, lith, henesys, false, codes) == ScrollRefusal::HERE,
+				"but stops scrolls that name a map");
+		require(return_scroll_refusal(0x4207c, lith, NEAREST_TOWN, false, codes) == ScrollRefusal::HERE,
+				"bit 0x20 stops every return scroll");
+
 		std::cout << "Field limit passed\n";
 		return 0;
 	}

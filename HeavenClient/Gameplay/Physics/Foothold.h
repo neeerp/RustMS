@@ -114,6 +114,9 @@ namespace ms
 		// Returns a y-coordinate right below the given x-coordinate.
 		double ground_below(double x) const;
 
+		// Return if a down-jump from this platform is refused (forbidFallDown).
+		bool forbid_fall_down() const;
+
 	private:
 		uint16_t m_id;
 		uint16_t m_prev;
@@ -122,5 +125,6 @@ namespace ms
 		uint16_t m_group;
 		Range<int16_t> m_horizontal;
 		Range<int16_t> m_vertical;
+		bool m_forbid_fall_down = false;
 	};
 }

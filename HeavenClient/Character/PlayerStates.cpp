@@ -17,6 +17,9 @@
 //////////////////////////////////////////////////////////////////////////////////
 #include "PlayerStates.h"
 
+#include "../Gameplay/MapleMap/FieldLimit.h"
+#include "../Gameplay/Stage.h"
+
 namespace ms
 {
 	// Jumping off a rope or ladder in CVecCtrl::Jump (FUN_007f1bb0): 130% of
@@ -62,7 +65,12 @@ namespace ms
 
 	void PlayerState::ground_jump(Player &player, int8_t dir) const
 	{
-		if (player.is_key_down(KeyAction::Id::DOWN))
+		bool down = player.is_key_down(KeyAction::Id::DOWN);
+
+		if (!field_limit::may_jump(Stage::get().get_mapinfo().get_fieldlimit(), down))
+			return;
+
+		if (down)
 		{
 			if (player.get_phobj().enablejd)
 			{

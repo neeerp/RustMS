@@ -182,16 +182,16 @@ impl WorldHandler for TakeDamageHandler {
         let player = &mut *ctx.player;
         if from == FROM_MIST && player.stats.hp > 0 {
             let code = r.read_short()? as u16;
-            return mist_damage(player, i32::from(code >> 8), i32::from(code & 0xff), damage);
+            let kind = r.read_byte()?;
+            return mist_damage(player, code, kind, damage);
         }
         if from < FROM_TOUCH || player.stats.hp <= 0 {
             return Ok(HandlerResult::empty());
         }
         let mob_id = r.read_int()?;
-        let direction = {
-            r.read_int()?; // object id
-            r.read_byte()?
-        };
+        let object_id = r.read_int()?;
+        let left = r.read_byte()?;
+        let tail = HitTail::read(&packet.bytes[r.position() as usize..]);
         let Some(mob) = crate::mobs::info(mob_id).filter(|m| !m.not_attack) else {
             debug!(mob_id, "Damage from a mob that can't attack");
             return Ok(HandlerResult::empty());
@@ -211,32 +211,77 @@ impl WorldHandler for TakeDamageHandler {
             }
         };
         // The client works out the damage; it can be at most the attack's
-        // own, or all but 1 HP for a deadly attack.
+        // own, or all but 1 HP for a deadly attack. -1 is a dodge.
         let deadly = attack.is_some_and(|a| a.deadly);
         let most = if deadly {
             i32::from(player.stats.hp) - 1
         } else {
             most_damage(&player.stats, &mob, attack)
         };
-        if !(0..=most.max(1)).contains(&damage) {
+        let dodged_by = if damage == -1 {
+            dodged_by(player, tail.guard)
+        } else {
+            None
+        };
+        if dodged_by.is_none() && !(0..=most.max(1)).contains(&damage) {
             debug!(mob_id, from, damage, "Mob damage out of range");
             return Ok(HandlerResult::empty());
         }
-        let hp = player.add_hp(-damage);
+        // A touch under Power Guard, or a spell under Mana Reflection whose
+        // chance came up, sends some back at the mob, if the client says so
+        // (0x9587c6, 0x958d50). Only Power Guard's spares the player.
+        let (reflected, spared) = match (tail.shown, attack) {
+            (Some([1, ..]), None) if tail.reflect != 0 => {
+                let reflected = combat::power_guard(player, &mob, damage);
+                (reflected, reflected)
+            }
+            (Some([0, ..]), Some(attack)) if attack.magic && tail.reflect != 0 => {
+                (combat::mana_reflection(player, &mob, damage), 0)
+            }
+            _ => (0, 0),
+        };
+        // As Cosmic does, Magic Guard leaves alone an attack that leaves 1
+        // MP or burns MP.
+        let mp_burn = attack.map_or(0, |a| a.mp_burn);
+        let taken = combat::taken(player, damage, !deadly && mp_burn == 0, true).less(spared);
+        let hp = player.add_hp(-taken.hp);
         let mut updates = vec![StatUpdate::Hp(hp)];
-        // As Cosmic does: a deadly attack leaves 1 MP too, and mpBurn burns
-        // MP.
         let mp_loss = match attack {
             Some(_) if deadly && damage > 0 => i32::from(player.stats.mp) - 1,
-            Some(a) if damage > 0 => a.mp_burn,
-            _ => 0,
+            Some(_) if damage > 0 && mp_burn > 0 => mp_burn,
+            _ => taken.mp,
         };
         if mp_loss > 0 {
             updates.push(StatUpdate::Mp(player.add_mp(-mp_loss)));
         }
+        if taken.mesos > 0 {
+            player.meso -= taken.mesos;
+            player.mark_dirty();
+            updates.push(StatUpdate::Meso(player.meso));
+        }
         let mut actions = HandlerResult::reply(stat::build_stat_update(false, &updates)?);
-        let shown = mob::build_damage_player(player.id(), from, mob_id, damage, direction)?;
+        let hurt = mob::Hurt {
+            from,
+            damage,
+            mob_id,
+            left,
+            reflect: tail
+                .shown
+                .filter(|_| tail.reflect != 0)
+                .map(|shown| (tail.reflect, shown)),
+            stance: tail.stance,
+            shown: taken.shown,
+            dodged_by,
+        };
+        let shown = mob::build_damage_player(player.id(), &hurt)?;
         actions = actions.with(WorldAction::Field(FieldRequest::Broadcast(shown)));
+        if reflected > 0 {
+            actions = actions.with(WorldAction::Field(FieldRequest::Reflect {
+                object_id,
+                mob_id,
+                damage: reflected.into(),
+            }));
+        }
         if hp == 0 {
             return Ok(actions.with(WorldAction::Died));
         }
@@ -260,22 +305,95 @@ impl WorldHandler for TakeDamageHandler {
     }
 }
 
-/// The player stood in mob skill `skill`'s mist at `level`: a v83 client
-/// takes its `x` a second (FUN_00431783), less any resistance, and says so
-/// with the skill and level. Only HP goes; no mob is named.
-///
-/// Skill 0 is Stop Motion's: standing still two seconds under it, a v83
-/// client takes its value but never the last HP (0x94b1d7) and sends the
-/// same report with no skill.
-fn mist_damage(player: &mut Player, skill: i32, level: i32, damage: i32) -> WorldResult {
-    let stop_motion = player.buffs.value(BuffStat::StopMotion);
-    let most = match (crate::mobs::skill_level(skill, level), stop_motion) {
-        (_, Some(x)) if skill == 0 && level == 0 => {
-            i32::from(x).min(i32::from(player.stats.hp) - 1)
+/// What a v83 client sends after a mob's hit (0x9594d0): the Power Guard
+/// or Mana Reflection percent, the Guardian byte (1 an attack, 2 a touch
+/// blocked), then, if either is set, 14 bytes (Power Guard or not, the
+/// mob's object id and hit action, its position and the player's), and
+/// whether Power Stance kept the player in place. A ridden Guardian can
+/// send the 14 bytes with both unset, so they are told by the length.
+/// Older clients send none of it.
+#[derive(Debug, Default, PartialEq, Eq)]
+struct HitTail {
+    reflect: u8,
+    guard: u8,
+    /// The 14 bytes without the player's position, as the others read them.
+    shown: Option<[u8; 10]>,
+    stance: bool,
+}
+
+impl HitTail {
+    fn read(rest: &[u8]) -> HitTail {
+        match *rest {
+            [reflect, guard, ref block @ .., stance] if block.len() == 14 => HitTail {
+                reflect,
+                guard,
+                shown: block[..10].try_into().ok(),
+                stance: stance != 0,
+            },
+            [reflect, guard, stance] => HitTail {
+                reflect,
+                guard,
+                shown: None,
+                stance: stance != 0,
+            },
+            _ => HitTail::default(),
         }
-        (Some(level), _) if skill == game::mob_skill::POISON_MIST => level.x,
+    }
+}
+
+/// The skill a v83 client dodged a hit with when it sends -1: Guardian for
+/// a Hero or Paladin with a shield, when it sets the Guardian byte, or
+/// else Shadow Shifter for a Night Lord or Shadower (FUN_009581a9, 0x958692
+/// and 0x9584f6). None if the player has no such skill.
+fn dodged_by(player: &Player, guard: u8) -> Option<i32> {
+    let skill_id = match (player.stats.job, guard != 0) {
+        (112, true) => 1120005,
+        (122, true) => 1220006,
+        (412, false) => 4120002,
+        (422, false) => 4220002,
+        _ => return None,
+    };
+    let shield = || {
+        player
+            .inventory
+            .get(InventoryType::Equipped, game::inventory::equip_slot::SHIELD)
+            .is_some()
+    };
+    (player.skills.level(skill_id) > 0 && (guard == 0 || shield())).then_some(skill_id)
+}
+
+// What the last byte of a v83 client's report with no mob says hurt the
+// player (0x94b14a, 0x94b8d2, 0x94b28b).
+const POISONED: u8 = 1;
+const IN_MIST: u8 = 2;
+const STOPPED: u8 = 3;
+
+/// A v83 client reports hurting itself without a mob: in mob skill
+/// `skill`'s mist (`code`: skill << 8 | level) it takes the skill's `x` a
+/// second (FUN_00431783), less any resistance, and Achilles takes its share
+/// off; standing still two seconds under Stop Motion, it takes its value
+/// but never the last HP (0x94b1d7), with no code. Its own Poison ticks too,
+/// but the server ticks Poison itself, so that report is ignored.
+fn mist_damage(player: &mut Player, code: u16, kind: u8, damage: i32) -> WorldResult {
+    let (skill, level) = (i32::from(code >> 8), i32::from(code & 0xff));
+    let (most, achilles) = match kind {
+        STOPPED => match player.buffs.value(BuffStat::StopMotion) {
+            Some(x) if code == 0 => (i32::from(x).min(i32::from(player.stats.hp) - 1), false),
+            _ => {
+                debug!("Stop Motion damage without Stop Motion");
+                return Ok(HandlerResult::empty());
+            }
+        },
+        IN_MIST => match crate::mobs::skill_level(skill, level) {
+            Some(level) if skill == game::mob_skill::POISON_MIST => (level.x, true),
+            _ => {
+                debug!(skill, level, "Mist damage from a skill that leaves none");
+                return Ok(HandlerResult::empty());
+            }
+        },
+        POISONED => return Ok(HandlerResult::empty()),
         _ => {
-            debug!(skill, level, "Mist damage from a skill that leaves none");
+            debug!(kind, "Damage from something unknown");
             return Ok(HandlerResult::empty());
         }
     };
@@ -283,8 +401,23 @@ fn mist_damage(player: &mut Player, skill: i32, level: i32, damage: i32) -> Worl
         debug!(skill, level, damage, "Mist damage out of range");
         return Ok(HandlerResult::empty());
     }
-    let hp = player.add_hp(-damage);
-    let shown = mob::build_damage_player(player.id(), FROM_MIST, 0, damage, 0)?;
+    let taken = if achilles {
+        combat::taken(player, damage, false, false)
+    } else {
+        combat::Taken {
+            hp: damage,
+            shown: damage,
+            ..combat::Taken::default()
+        }
+    };
+    let hp = player.add_hp(-taken.hp);
+    let hurt = mob::Hurt {
+        from: FROM_MIST,
+        damage,
+        shown: taken.shown,
+        ..mob::Hurt::default()
+    };
+    let shown = mob::build_damage_player(player.id(), &hurt)?;
     let actions = HandlerResult::reply(stat::build_stat_update(false, &[StatUpdate::Hp(hp)])?)
         .with(WorldAction::Field(FieldRequest::Broadcast(shown)));
     Ok(if hp == 0 {
@@ -296,13 +429,18 @@ fn mist_damage(player: &mut Player, skill: i32, level: i32, damage: i32) -> Worl
 
 /// Mobs the player attacked countered them for `damage`: a v83 client
 /// shows its own roll and sends nothing (FUN_00953595), and nobody else
-/// sees it.
+/// sees it. Achilles and Magic Guard take their shares as for any hit.
 pub fn countered(player: &mut Player, damage: i32) -> WorldResult {
     if player.stats.hp <= 0 {
         return Ok(HandlerResult::empty());
     }
-    let hp = player.add_hp(-damage);
-    let actions = HandlerResult::reply(stat::build_stat_update(false, &[StatUpdate::Hp(hp)])?);
+    let taken = combat::taken(player, damage, true, false);
+    let hp = player.add_hp(-taken.hp);
+    let mut updates = vec![StatUpdate::Hp(hp)];
+    if taken.mp > 0 {
+        updates.push(StatUpdate::Mp(player.add_mp(-taken.mp)));
+    }
+    let actions = HandlerResult::reply(stat::build_stat_update(false, &updates)?);
     Ok(if hp == 0 {
         actions.with(WorldAction::Died)
     } else {
@@ -432,15 +570,23 @@ mod tests {
 
     /// A v83 client hurt by mob skill `skill` at `level`'s mist.
     fn mist(damage: i32, skill: u8, level: u8) -> Packet {
+        no_mob(damage, i16::from(skill) << 8 | i16::from(level), IN_MIST)
+    }
+
+    /// A v83 client hurt by Stop Motion.
+    fn stopped(damage: i32) -> Packet {
+        no_mob(damage, 0, STOPPED)
+    }
+
+    fn no_mob(damage: i32, code: i16, kind: u8) -> Packet {
         let mut p = Packet::new_empty();
         p.write_short(RecvOpcode::TakeDamage as i16).unwrap();
         p.write_int(0).unwrap();
         p.write_byte(FROM_MIST as u8).unwrap();
         p.write_byte(0).unwrap();
         p.write_int(damage).unwrap();
-        p.write_short(i16::from(skill) << 8 | i16::from(level))
-            .unwrap();
-        p.write_byte(2).unwrap();
+        p.write_short(code).unwrap();
+        p.write_byte(kind).unwrap();
         p
     }
 
@@ -498,7 +644,7 @@ mod tests {
         let mut player = crate::codec::stats::sample_player();
         player.stats.hp = 500;
         // Without it, a report with no skill is refused.
-        assert!(handle(&mut player, mist(330, 0, 0)).is_empty());
+        assert!(handle(&mut player, stopped(330)).is_empty());
 
         let now = std::time::Instant::now();
         let lasts = std::time::Duration::from_secs(20);
@@ -510,12 +656,18 @@ mod tests {
             now,
             lasts,
         ));
-        assert!(handle(&mut player, mist(331, 0, 0)).is_empty());
-        assert_eq!(handle(&mut player, mist(330, 0, 0)).len(), 2);
+        assert!(handle(&mut player, stopped(331)).is_empty());
+        assert_eq!(handle(&mut player, stopped(330)).len(), 2);
         assert_eq!(player.stats.hp, 170);
-        assert!(handle(&mut player, mist(170, 0, 0)).is_empty());
-        assert_eq!(handle(&mut player, mist(169, 0, 0)).len(), 2);
+        assert!(handle(&mut player, stopped(170)).is_empty());
+        assert_eq!(handle(&mut player, stopped(169)).len(), 2);
         assert_eq!(player.stats.hp, 1);
+        // A mist report with no skill isn't Stop Motion's, and the
+        // client's own Poison ticks are left to the server's.
+        player.stats.hp = 500;
+        assert!(handle(&mut player, mist(10, 0, 0)).is_empty());
+        assert!(handle(&mut player, no_mob(10, 0, POISONED)).is_empty());
+        assert_eq!(player.stats.hp, 500);
     }
 
     #[test]
@@ -569,6 +721,193 @@ mod tests {
         assert!(handle(&mut player, hit(2, 1, 3220000)).is_empty());
         // A snail has no attacks.
         assert!(handle(&mut player, hit(0, 1, 100100)).is_empty());
+    }
+
+    /// A touch as a v83 client sends it, with what follows the mob.
+    fn touch_with(damage: i32, mob_id: i32, tail: &[u8]) -> Packet {
+        let mut p = touch(damage, mob_id);
+        p.write_bytes(tail).unwrap();
+        p
+    }
+
+    #[test]
+    fn reads_what_follows_the_mob_by_its_length() {
+        assert_eq!(HitTail::read(&[]), HitTail::default());
+        assert_eq!(
+            HitTail::read(&[0, 1, 1]),
+            HitTail {
+                reflect: 0,
+                guard: 1,
+                shown: None,
+                stance: true
+            }
+        );
+        let mut rest = vec![30, 0];
+        rest.extend(1..=14);
+        rest.push(0);
+        assert_eq!(
+            HitTail::read(&rest),
+            HitTail {
+                reflect: 30,
+                guard: 0,
+                shown: Some([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]),
+                stance: false
+            }
+        );
+    }
+
+    #[test]
+    fn a_dodge_needs_the_skill_and_costs_nothing() {
+        if crate::mobs::data().is_err() {
+            return;
+        }
+        let mut player = crate::codec::stats::sample_player();
+        player.stats.hp = 100;
+        assert!(handle(&mut player, touch_with(-1, 100100, &[0, 0, 0])).is_empty());
+        let learn = |player: &mut game::Player, skill_id| {
+            player.skills.set(game::SkillRecord {
+                skill_id,
+                level: 1,
+                master_level: 30,
+                expiration: None,
+            })
+        };
+        let dodged_with = |actions: &[WorldAction]| match actions {
+            [WorldAction::Reply(_), WorldAction::Field(FieldRequest::Broadcast(shown))] => {
+                let skill = &shown.bytes[shown.bytes.len() - 4..];
+                i32::from_le_bytes(skill.try_into().unwrap())
+            }
+            _ => panic!("not a dodge: {actions:?}"),
+        };
+        player.stats.job = 412;
+        learn(&mut player, 4120002);
+        let actions = handle(&mut player, touch_with(-1, 100100, &[0, 0, 0]));
+        assert_eq!(dodged_with(&actions), 4120002);
+        assert_eq!(player.stats.hp, 100);
+        // Guardian needs a shield. A touch it blocks comes with the 14
+        // bytes, not Power Guard's.
+        player.stats.job = 112;
+        learn(&mut player, 1120005);
+        let mut blocked = vec![0, 2, 0, 0, 0, 0, 0, 6];
+        blocked.extend([0; 9]);
+        assert!(handle(&mut player, touch_with(-1, 100100, &blocked)).is_empty());
+        player.inventory.insert(
+            InventoryType::Equipped,
+            game::inventory::equip_slot::SHIELD,
+            game::Item::equipment(1092000, game::EquipStats::default()),
+        );
+        let actions = handle(&mut player, touch_with(-1, 100100, &blocked));
+        assert_eq!(dodged_with(&actions), 1120005);
+        assert_eq!(player.stats.hp, 100);
+    }
+
+    #[test]
+    fn guards_take_their_share_of_a_touch() {
+        if crate::mobs::data().is_err() {
+            return;
+        }
+        let mut player = crate::codec::stats::sample_player();
+        player.stats.hp = 100;
+        (player.stats.mp, player.stats.max_mp) = (100, 100);
+        player.meso = 1000;
+        let now = std::time::Instant::now();
+        let lasts = std::time::Duration::from_secs(60);
+        for (skill_id, stat) in [
+            (2001002, BuffStat::MagicGuard),
+            (4211005, BuffStat::MesoGuard),
+        ] {
+            player.buffs.give(Buff::new(skill_id, stat, 30, now, lasts));
+        }
+        // Stumpy's body: 40 is 12 to MP and 20 saved for 6 mesos.
+        assert!(game::mob_damage::most_physical(&sample_defender(), 125) >= 40);
+        handle(&mut player, touch(40, 3220000));
+        assert_eq!(
+            (player.stats.hp, player.stats.mp, player.meso),
+            (92, 88, 994)
+        );
+    }
+
+    #[test]
+    fn power_guard_sends_some_of_a_touch_back() {
+        if crate::mobs::data().is_err() {
+            return;
+        }
+        let mut player = crate::codec::stats::sample_player();
+        player.stats.hp = 100;
+        // Enough accuracy to reach Stumpy's 12 avoid 25 levels up.
+        player.stats.dex = 100;
+        let now = std::time::Instant::now();
+        let lasts = std::time::Duration::from_secs(60);
+        player
+            .buffs
+            .give(Buff::new(1101007, BuffStat::PowerGuard, 30, now, lasts));
+        // The client's percent, no Guardian, then Power Guard's 14 bytes.
+        let mut tail = vec![30, 0, 1];
+        tail.extend(2_000_000_001i32.to_le_bytes());
+        tail.extend([6, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
+        // Stumpy is a boss: 30% of 40 is 12, halved.
+        let actions = handle(&mut player, touch_with(40, 3220000, &tail));
+        assert_eq!(player.stats.hp, 66);
+        assert!(actions.iter().any(|action| matches!(
+            action,
+            WorldAction::Field(FieldRequest::Reflect {
+                object_id: 2_000_000_001,
+                mob_id: 3220000,
+                damage: 6
+            })
+        )));
+        // A client that doesn't say so sends nothing back.
+        let actions = handle(&mut player, touch(40, 3220000));
+        assert_eq!(player.stats.hp, 26);
+        assert!(!actions
+            .iter()
+            .any(|action| matches!(action, WorldAction::Field(FieldRequest::Reflect { .. }))));
+    }
+
+    #[test]
+    fn mana_reflection_sends_some_of_a_spell_back() {
+        if crate::mobs::data().is_err() || crate::skills::data().is_err() {
+            return;
+        }
+        let mut player = crate::codec::stats::sample_player();
+        player.stats.hp = 100;
+        // Enough INT to reach the mob's 8 avoid 10 levels up.
+        player.stats.int = 100;
+        // The buff is the skill's level.
+        let mana = crate::skills::at_level(2321002, 10).unwrap();
+        assert_eq!(
+            crate::skills::buffs(&mana),
+            Some(vec![(BuffStat::ManaReflection, 10)])
+        );
+        let now = std::time::Instant::now();
+        let lasts = std::time::Duration::from_secs(60);
+        player
+            .buffs
+            .give(Buff::new(2121002, BuffStat::ManaReflection, 10, now, lasts));
+        // Its percent, no Guardian, then the 14 bytes, not Power Guard's.
+        let mut tail = vec![100, 0, 0];
+        tail.extend(2_000_000_001i32.to_le_bytes());
+        tail.extend([6, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
+        // 9400568's spell: all 40 goes back, but at most 350 / 20, and the
+        // player still takes all of it.
+        let mut p = hit(0, 40, 9400568);
+        p.write_bytes(&tail).unwrap();
+        let actions = handle(&mut player, p);
+        assert_eq!(player.stats.hp, 60);
+        assert!(actions.iter().any(|action| matches!(
+            action,
+            WorldAction::Field(FieldRequest::Reflect {
+                object_id: 2_000_000_001,
+                mob_id: 9400568,
+                damage: 17
+            })
+        )));
+        // A touch says nothing of Mana Reflection.
+        let actions = handle(&mut player, touch_with(40, 9400568, &tail));
+        assert_eq!(player.stats.hp, 20);
+        assert!(!actions
+            .iter()
+            .any(|action| matches!(action, WorldAction::Field(FieldRequest::Reflect { .. }))));
     }
 
     #[test]
