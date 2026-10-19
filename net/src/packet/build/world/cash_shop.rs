@@ -69,7 +69,7 @@ const INVENTORY_SLOTS: u8 = 0x60;
 const STORAGE_SLOTS: u8 = 0x62;
 const TAKEN_OUT: u8 = 0x68;
 const PUT_BACK: u8 = 0x6A;
-const BOUGHT_PACKAGE: u8 = 0xA4;
+const BOUGHT_PACKAGE: u8 = 0x89;
 
 /// Why a Cash Shop request failed; the client shows the matching notice.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -416,7 +416,7 @@ mod tests {
         let mut expect = Expect::new(&packet.bytes);
         expect
             .short(SendOpcode::CashShopOperation as i16)
-            .byte(0xA4)
+            .byte(0x89)
             .byte(2);
         expect_item(&mut expect, &items[0], crate::codec::time::DEFAULT_TIME);
         expect_item(&mut expect, &items[1], 116_444_736_000_000_000);

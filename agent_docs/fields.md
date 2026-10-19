@@ -136,7 +136,8 @@ notice for each.
 
 A package (0x1E, items 910xxxx) is bought the same way, but
 `Etc.nx` `CashPackage.img` lists the commodities it holds, and each joins the
-Cash Inventory; the client gets them all in 0xA4. Packages can't be gifted,
+Cash Inventory; the client gets them all in 0x89 (v83 `0x479a1b`, whose
+trailing short is the MaplePoints received, 0 here). Packages can't be gifted,
 and every other 9xxxxxx item is refused. Slot expansions come two ways. The Cash Inventory's slot buttons
 (0x06 mode 0 with a bag, 0x07 mode 0 for the storage) add four slots for
 4,000 NX. The expansion commodities (0x06 or 0x07 mode 1 with the SN; items

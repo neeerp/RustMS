@@ -141,7 +141,7 @@ async fn a_pet_comes_out_follows_its_owner_and_stays_out() {
     next(o, &mut ot, SendOpcode::QueryCashResult).await;
     send(o, build_cash_shop_buy_package(1, PACKAGE).unwrap()).await;
     let bought = next(o, &mut ot, SendOpcode::CashShopOperation).await;
-    assert_eq!(bought[..2], [0xA4, 3], "a package's three items");
+    assert_eq!(bought[..2], [0x89, 3], "a package's three items");
     let mut r = Cursor::new(&bought[2..]);
     let cash_id = r.read_long().unwrap();
     r.read_bytes(8).unwrap();

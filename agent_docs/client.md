@@ -612,7 +612,7 @@ the screen size.
   Inventory), 0x4D (gifts received since the last visit), 0x4F and 0x55 (wish list),
   0x57 (a bought item), 0x5C (a failure), 0x5E (a gift sent), 0x60 (a bag's
   new slot count), 0x62 (the storage's), 0x68 (an item taken out), 0x6A (an
-  item put back) and 0xA4 (a bought package) are read. Inventory slots keep the item's cash serial,
+  item put back) and 0x89 (a bought package) are read. Inventory slots keep the item's cash serial,
   which the item encoding carries, so a cash item can find its way back.
 - **Buying:** BUY opens `UICashBuy` (`CashShop.img/CSNotice/0`): the item, its
   price and period, and a checkbox per balance. It checks the first balance
