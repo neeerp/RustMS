@@ -472,19 +472,18 @@ impl Amount {
     }
 }
 
-/// A player's STR, DEX, and LUK with what they wear.
+/// A player's STR, DEX, and LUK with what they wear, and Maple Warrior's
+/// percent of their own (BasicStat::SetFrom, 0x77f289).
 pub(crate) fn total_stats(player: &Player) -> (i32, i32, i32) {
     let stats = &player.stats;
+    let warrior = i32::from(player.buffs.value(BuffStat::MapleWarrior).unwrap_or(0));
+    let own = |stat: i16| i32::from(stat) + i32::from(stat) * warrior / 100;
     player
         .inventory
         .items(InventoryType::Equipped)
         .filter_map(|(_, item)| item.equip.as_ref())
         .fold(
-            (
-                i32::from(stats.str),
-                i32::from(stats.dex),
-                i32::from(stats.luk),
-            ),
+            (own(stats.str), own(stats.dex), own(stats.luk)),
             |(str, dex, luk), equip| {
                 (
                     str + i32::from(equip.str),
@@ -941,6 +940,25 @@ mod tests {
             });
         }
         player
+    }
+
+    #[test]
+    fn maple_warrior_adds_its_percent_of_the_players_own_stats() {
+        let mut player = knowing(&[]);
+        (player.stats.str, player.stats.dex, player.stats.luk) = (99, 50, 4);
+        let ring = game::EquipStats {
+            str: 100,
+            ..Default::default()
+        };
+        let ring = game::Item::equipment(1112000, ring);
+        player.inventory.insert(InventoryType::Equipped, -12, ring);
+        assert_eq!(total_stats(&player), (199, 50, 4));
+        let now = std::time::Instant::now();
+        let long = Duration::from_secs(60);
+        let warrior = game::Buff::new(1121000, BuffStat::MapleWarrior, 10, now, long);
+        player.buffs.give(warrior);
+        // Ten percent of 99 is 9, of 4 none; the ring's 100 isn't counted.
+        assert_eq!(total_stats(&player), (208, 55, 4));
     }
 
     #[test]

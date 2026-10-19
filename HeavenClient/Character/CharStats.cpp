@@ -75,13 +75,6 @@ namespace ms
 
 	void CharStats::close_totalstats()
 	{
-		// DEX and LUK add to accuracy and avoid by the job (SetFrom).
-		int32_t id = job.get_id();
-		int32_t dex = get_total(EquipStat::Id::DEX);
-		int32_t luk = get_total(EquipStat::Id::LUK);
-		totalstats[EquipStat::Id::ACC] += secondary_stat::base_accuracy(id, dex, luk);
-		totalstats[EquipStat::Id::AVOID] += secondary_stat::base_avoid(id, dex, luk);
-
 		for (auto iter : percentages)
 		{
 			EquipStat::Id stat = iter.first;
@@ -89,6 +82,13 @@ namespace ms
 			total += static_cast<int32_t>(total * iter.second);
 			set_total(stat, total);
 		}
+
+		// DEX and LUK add to accuracy and avoid by the job (SetFrom).
+		int32_t id = job.get_id();
+		int32_t dex = get_total(EquipStat::Id::DEX);
+		int32_t luk = get_total(EquipStat::Id::LUK);
+		totalstats[EquipStat::Id::ACC] += secondary_stat::base_accuracy(id, dex, luk);
+		totalstats[EquipStat::Id::AVOID] += secondary_stat::base_avoid(id, dex, luk);
 
 		// The window's range (FUN_008c2870): the least roll of a stab, and
 		// the whole of a swing, between 1 and 199999.
