@@ -81,8 +81,10 @@ namespace ms
 		lookx = follow(lookx, position.x());
 		looky = follow(looky, position.y() - LOOK_ABOVE);
 
-		x = limit(VWIDTH / 2 - lookx, hbounds, VWIDTH);
-		y = limit(VHEIGHT / 2 - looky, vbounds, VHEIGHT);
+		// A shake moves the centre before it is kept inside the map
+		// (FUN_004375b1's RelMove, then WrapClip).
+		x = limit(VWIDTH / 2 - lookx - shaken.x(), hbounds, VWIDTH);
+		y = limit(VHEIGHT / 2 - looky - shaken.y(), vbounds, VHEIGHT);
 	}
 
 	void Camera::set_position(Point<int16_t> position)
@@ -101,6 +103,11 @@ namespace ms
 	{
 		hbounds = -mapwalls;
 		vbounds = -mapborders;
+	}
+
+	void Camera::shake(Point<int16_t> offset)
+	{
+		shaken = offset;
 	}
 
 	Point<int16_t> Camera::position() const

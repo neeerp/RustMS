@@ -216,6 +216,8 @@ if(HEAVENCLIENT_BUILD_TESTS)
     add_test(NAME mist_layout COMMAND mist_layout_tests)
     add_executable(obstacle_rules_tests tests/obstacle_rules.cpp)
     add_test(NAME obstacle_rules COMMAND obstacle_rules_tests)
+    add_executable(tremble_rules_tests tests/tremble_rules.cpp)
+    add_test(NAME tremble_rules COMMAND tremble_rules_tests)
     add_executable(map_clouds_tests tests/map_clouds.cpp)
     add_test(NAME map_clouds COMMAND map_clouds_tests)
     add_executable(map_tooltip_rules_tests tests/map_tooltip_rules.cpp)
@@ -512,6 +514,7 @@ add_executable(HeavenClient
     Gameplay/QuestConversation.h
     Gameplay/Stage.cpp
     Gameplay/Stage.h
+    Gameplay/TrembleRules.h
     Graphics/Animation.cpp
     Graphics/Animation.h
     Graphics/Color.cpp

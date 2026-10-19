@@ -41,6 +41,17 @@ namespace ms
 	{
 		int rand = recv.read_byte();
 
+		// The view shakes after a delay in ms, a heavy shake fading faster (0x5333eb).
+		if (rand == 1)
+		{
+			bool heavy = recv.read_bool();
+			int32_t delay = recv.read_int();
+
+			Stage::get().tremble(30, heavy, delay, 0, false);
+
+			return;
+		}
+
 		// Effect
 		if (rand == 3)
 		{

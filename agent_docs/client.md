@@ -228,9 +228,9 @@ from `UI.nx`. Moved so far:
   mute, screen shake, and WINDOW / FULL SCREEN boxes, laid out from the
   background. The BGM and SOUND sliders change the volume as they move, in
   steps of 10, and MUTE greys the slider out; Cancel and Esc put the volume
-  back. OK saves `BGMVolume`, `SFXVolume`, `BGMMute`, `SFXMute`, and the
-  stored-only `PictureQuality`, `MouseSpeed`, `HPAlert`, `MPAlert` and
-  `ShakeScreen`, and switches to the chosen viewing mode. MONSTER INFO has
+  back. OK saves `BGMVolume`, `SFXVolume`, `BGMMute`, `SFXMute`,
+  `ShakeScreen`, and the stored-only `PictureQuality`, `MouseSpeed`,
+  `HPAlert` and `MPAlert`, and switches to the chosen viewing mode. MONSTER INFO has
   no control, and the post-Big Bang Options window's resolution picker is
   gone; set `Width` and `Height` in `Settings` instead.
 - **Notices** (`UIOk`, `UIYesNo`, `UIEnterNumber`, `Basic.img/Notice2` and
@@ -519,6 +519,7 @@ side yet.
 | Medal name tags (`MedalTag`) | Implemented: as v83 does, a worn medal's name hangs 1 px under the name or guild tag, in the art and text colour of its `info/medalTag` style from `UI NameTag.img/medal`, or in a plain name tag box when the style has no art. v83 writes it in Dotum 12, which HC doesn't have, so the text and the number of tiles follow HC's 12 px font |
 | Boss HP bar (`UIMobGage`) | Implemented: FIELD_EFFECT mode 5 and `HPgaugeHide` mobs' hits show v83's bar right of the minimap, with the mob's name over its icon; see `combat.md` |
 | Map traps (`obstacle` objs) | Implemented: the client tests the traps' frame boxes each tick, rolls and reports the hit as TAKE_DAMAGE -3 with v83's push, and follows a `targetField`; FIELD_OBSTACLE_ONOFF and trap damage to mobs are not done; see `combat.md` |
+| Field shake (`TrembleRules`) | Implemented, as v83's SetTremble does: FIELD_EFFECT mode 1, Zakum's body appearing, Zakum, Horntail and Balrog dying, mob attacks with `tremble`, and Shout, Dragon Roar, Bamboo Rain and Rage of Pharaoh shake the field's view but not the UI. Every 30 ms the view moves up to the force off the player in each direction, and the force fades by 0.92 a tick (0.85 for a heavy shake). Others' skills shake it less the further they are, to nothing at 400 px. The ShakeScreen option turns it off, except for Horntail's deaths |
 | Player shops, mini-games, memo/mail | No UI, no handlers |
 | Reactors | Spawning, swings, hits and breaking; no skill hits, touch or quest gates; see `combat.md` |
 | Pets | Summoning, following, others' pets, map changes, chat commands, idle actions, level-up effect, food, cash food and hunger; see `pets.md` |

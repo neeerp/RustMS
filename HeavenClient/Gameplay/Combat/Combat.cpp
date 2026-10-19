@@ -32,6 +32,8 @@
 
 #include "../MapleMap/DoorRules.h"
 #include "../MapleMap/FieldLimit.h"
+#include "../Stage.h"
+#include "../TrembleRules.h"
 
 #include "../../Constants.h"
 #include "../../Character/SkillId.h"
@@ -1162,6 +1164,11 @@ namespace ms
 			apply_use_movement(move);
 			apply_result_movement(move, result);
 
+			// Shout and the like shake the view after their action's delay (0x951b05).
+			if (!follow && tremble::skill_shakes(attack.skill, true))
+				Stage::get().tremble(tremble::skill_force(attack.skill, 0), tremble::skill_heavy(attack.skill),
+									 player.get_attackdelay(0), 0, false);
+
 			AttackPacket(result, player.get_position()).dispatch();
 
 			if (attack.skill && attack.type != Attack::Type::MAGIC && !held && !follow)
@@ -1640,6 +1647,17 @@ namespace ms
 			}
 
 			user.set_afterimage(attack.skill);
+
+			// Someone else's shakes it less the further they are (0x980917).
+			if (tremble::skill_shakes(attack.skill, false))
+			{
+				int32_t dx = player.get_position().x() - user.get_position().x();
+				int32_t dy = player.get_position().y() - user.get_position().y();
+				double distance = std::sqrt(static_cast<double>(dx * dx + dy * dy));
+
+				Stage::get().tremble(tremble::skill_force(attack.skill, distance), tremble::skill_heavy(attack.skill),
+									 user.get_attackdelay(0), 0, false);
+			}
 
 			Rectangle<int16_t> range = place_range(user.get_position(), user.get_afterimage().get_range(), 1.0f,
 												   attack.toleft);

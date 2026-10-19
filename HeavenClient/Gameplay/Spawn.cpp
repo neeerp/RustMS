@@ -16,6 +16,7 @@
 //	along with this program.  If not, see <https://www.gnu.org/licenses/>.		//
 //////////////////////////////////////////////////////////////////////////////////
 #include "Spawn.h"
+#include "Stage.h"
 
 #include "MapleMap/Npc.h"
 #include "MapleMap/Mob.h"
@@ -64,6 +65,10 @@ namespace ms
 
 		if (summon >= 0)
 			mob->show_summon(summon, summondelay);
+
+		// Zakum's body shakes the view as it comes (0x663391).
+		if (summon == -4 && id == 8800000)
+			Stage::get().tremble(30, false, 0, 0, false);
 
 		return mob;
 	}

@@ -58,8 +58,8 @@ namespace ms
 	class MobSpawn
 	{
 	public:
-		// `summon` is the Effect/Summon.img effect a summoned mob plays
-		// `summondelay` ms after it appears, or -1.
+		// `summon` is how the mob appears: the Effect/Summon.img effect a
+		// summoned mob plays `summondelay` ms in, or a negative type.
 		MobSpawn(int32_t oid, int32_t id, int8_t mode, int8_t stance, uint16_t fh, uint16_t homefh, bool newspawn,
 				 int8_t team, Point<int16_t> position, std::vector<MobStatParser::Status> statuses,
 				 int8_t summon = -1, int32_t summondelay = 0);

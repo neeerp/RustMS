@@ -308,6 +308,16 @@ namespace ms
 
 		portals.update(player.get_position());
 		check_touch_portals(drawn);
+
+		auto now = static_cast<int32_t>(get_uptime() / 1000);
+
+		if (now >= next_shake)
+		{
+			next_shake = now + tremble::TICK;
+			auto offset = tremble::step(shake, now, std::rand(), std::rand());
+			camera.shake({ static_cast<int16_t>(offset.x), static_cast<int16_t>(offset.y) });
+		}
+
 		camera.update(player.get_position());
 		tooltips.update(player.get_position());
 
@@ -675,6 +685,14 @@ namespace ms
 	void Stage::show_flash_jump(const char *effect, Point<int16_t> position, bool right)
 	{
 		ground_effects.add(nl::nx::effect["BasicEff.img"][effect], DrawArgument(position, right));
+	}
+
+	void Stage::tremble(double force, bool heavy, int32_t delay, int32_t additional, bool forced)
+	{
+		if (!forced && !Setting<ShakeScreen>::get().load())
+			return;
+
+		shake = tremble::set(force, heavy, delay, additional, static_cast<int32_t>(get_uptime() / 1000));
 	}
 
 	void Stage::check_seats()
