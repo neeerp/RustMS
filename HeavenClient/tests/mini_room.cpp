@@ -208,6 +208,8 @@ int main()
 		require(leave_text(7, 0) == "Trade successful.\\nPlease check the results.", "a trade without fees");
 		require(leave_text(2, 0) == "Trade cancelled.\\nby the other character.", "a cancelled trade");
 		require(leave_text(8, 0) == "Trade unsuccessful." && leave_text(0, 0).empty(), "a failed trade, and leaving quietly");
+		require(leave_text(0xa, 0) == "Trade was canceled because there was an item\\nthat disappeared because it expired."
+			&& leave_text(0xb, 0) == "A cash item trade was canceled\\ndue to a server check.", "the expired and cash item reasons");
 
 		auto stars = [](const std::string& text) { return std::string(text.size(), '*'); };
 

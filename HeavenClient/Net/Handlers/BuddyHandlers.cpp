@@ -105,7 +105,7 @@ namespace ms
 			notice("Your buddy list is full.");
 			break;
 		case Operation::THEIR_LIST_FULL:
-			notice("The user's buddy list is full.");
+			notice("The user's buddy list is full");
 			break;
 		case Operation::ALREADY_ADDED:
 			notice("That character is already registered as your buddy.");

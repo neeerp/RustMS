@@ -208,8 +208,17 @@ namespace ms
 		{
 			int16_t row = sellstate.offset + buttonid - Buttons::RECHARGE0;
 
+			// v83 (FUN_00756c28) asks first (StringPool 0x359).
 			if (row < sellstate.lastslot)
-				NpcShopActionPacket(sellstate.items[row].get_slot()).dispatch();
+			{
+				int16_t slot = sellstate.items[row].get_slot();
+
+				UI::get().emplace<UIYesNo>("Are you sure you want to recharge it?", [slot](bool yes)
+				{
+					if (yes)
+						NpcShopActionPacket(slot).dispatch();
+				});
+			}
 
 			return Button::State::NORMAL;
 		} else

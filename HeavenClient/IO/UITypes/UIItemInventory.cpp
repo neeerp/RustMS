@@ -1043,6 +1043,35 @@ namespace ms
 		return true;
 	}
 
+	// Whether `stats` meet the equipment's requirements (FUN_004f2cee).
+	static bool meets_equip_reqs(const CharStats &stats, const EquipData &equipdata)
+	{
+		// GMs wear anything (job digit 8 or 9).
+		const std::string jobname = stats.get_jobname();
+
+		if (jobname == "GM" || jobname == "SuperGM")
+			return true;
+
+		const ItemData &itemdata = equipdata.get_itemdata();
+		const int8_t reqGender = itemdata.get_gender();
+		const bool female = stats.get_female();
+
+		if ((reqGender == 0 && female) || (reqGender == 1 && !female))
+			return false;
+
+		int16_t reqJOB = equipdata.get_reqstat(MapleStat::Id::JOB);
+
+		if (!stats.get_job().is_sub_job(reqJOB))
+			return false;
+
+		return equipdata.get_reqstat(MapleStat::Id::LEVEL) <= stats.get_stat(MapleStat::Id::LEVEL)
+			&& equipdata.get_reqstat(MapleStat::Id::DEX) <= stats.get_total(EquipStat::Id::DEX)
+			&& equipdata.get_reqstat(MapleStat::Id::STR) <= stats.get_total(EquipStat::Id::STR)
+			&& equipdata.get_reqstat(MapleStat::Id::LUK) <= stats.get_total(EquipStat::Id::LUK)
+			&& equipdata.get_reqstat(MapleStat::Id::INT) <= stats.get_total(EquipStat::Id::INT)
+			&& equipdata.get_reqstat(MapleStat::Id::FAME) <= stats.get_honor();
+	}
+
 	bool UIItemInventory::can_wear_equip(int16_t slot) const
 	{
 		const Player &player = Stage::get().get_player();
@@ -1053,73 +1082,14 @@ namespace ms
 
 		const int32_t item_id = inventory.get_item_id(InventoryType::Id::EQUIP, slot);
 		const EquipData &equipdata = EquipData::get(item_id);
-		const ItemData &itemdata = equipdata.get_itemdata();
 
-		const int8_t reqGender = itemdata.get_gender();
-		const bool female = stats.get_female();
-
-		switch (reqGender)
-		{
-			case 0: // Male
-				if (female)
-					return false;
-
-				break;
-			case 1: // Female
-				if (!female)
-					return false;
-
-				break;
-			case 2: // Unisex
-			default:
-				break;
-		}
-
-		const std::string jobname = stats.get_jobname();
-
-		if (jobname == "GM" || jobname == "SuperGM")
+		if (meets_equip_reqs(stats, equipdata))
 			return true;
 
-		int16_t reqJOB = equipdata.get_reqstat(MapleStat::Id::JOB);
-
-		if (!stats.get_job().is_sub_job(reqJOB))
-		{
-			UI::get().emplace<UIOk>("Your current job\\ncannot equip the selected item.", [](bool)
-			{});
-			return false;
-		}
-
-		int16_t reqLevel = equipdata.get_reqstat(MapleStat::Id::LEVEL);
-		int16_t reqDEX = equipdata.get_reqstat(MapleStat::Id::DEX);
-		int16_t reqSTR = equipdata.get_reqstat(MapleStat::Id::STR);
-		int16_t reqLUK = equipdata.get_reqstat(MapleStat::Id::LUK);
-		int16_t reqINT = equipdata.get_reqstat(MapleStat::Id::INT);
-		int16_t reqFAME = equipdata.get_reqstat(MapleStat::Id::FAME);
-
-		int8_t i = 0;
-
-		if (reqLevel > stats.get_stat(MapleStat::Id::LEVEL))
-			i++;
-		else if (reqDEX > stats.get_total(EquipStat::Id::DEX))
-			i++;
-		else if (reqSTR > stats.get_total(EquipStat::Id::STR))
-			i++;
-		else if (reqLUK > stats.get_total(EquipStat::Id::LUK))
-			i++;
-		else if (reqINT > stats.get_total(EquipStat::Id::INT))
-			i++;
-		else if (reqFAME > stats.get_honor())
-			i++;
-
-		if (i > 0)
-		{
-			UI::get().emplace<UIOk>(
-					"Your stats are too low to equip this item\\nor you do not meet the job requirement.", [](bool)
-					{});
-			return false;
-		}
-
-		return true;
+		// v83 (FUN_004f1c2d) has one text for every unmet requirement.
+		UI::get().emplace<UIOk>("Your stats are too low to equip this item.", [](bool)
+		{});
+		return false;
 	}
 
 	bool UIItemInventory::can_wear_pet_equip(int16_t slot, int16_t part) const

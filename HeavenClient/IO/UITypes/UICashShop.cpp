@@ -19,6 +19,7 @@
 
 #include "UICashBuy.h"
 #include "UICashGift.h"
+#include "UINotice.h"
 
 #include "../UI.h"
 #include "../Window.h"
@@ -654,6 +655,15 @@ namespace ms
 		ui.enable();
 		Timer::get().start();
 		GraphicsGL::get().unlock();
+	}
+
+	void UICashShop::confirm_exit()
+	{
+		UI::get().emplace<UIYesNo>("Are you sure you want to leave the Cash Shop?", [this](bool yes)
+		{
+			if (yes)
+				button_pressed(Buttons::BT_EXIT);
+		});
 	}
 
 	void UICashShop::set_account(const std::string& account, const std::vector<int32_t>& best)

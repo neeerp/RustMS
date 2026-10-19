@@ -73,8 +73,13 @@ namespace ms
 
 	void UIStateCashShop::send_key(KeyType::Id type, int32_t action, bool pressed, bool escape)
 	{
-		// Only a dialog over the shop takes keys.
-		dispatch_focused_key(get(focused), action, pressed, escape, [] {});
+		// Only a dialog over the shop takes keys, but Esc offers to leave.
+		dispatch_focused_key(get(focused), action, pressed, escape, [&]
+		{
+			if (escape && pressed)
+				if (auto shop = static_cast<UICashShop*>(get(UIElement::Type::CASHSHOP)))
+					shop->confirm_exit();
+		});
 	}
 
 	Cursor::State UIStateCashShop::send_cursor(Cursor::State cursorstate, Point<int16_t> cursorpos)

@@ -20,7 +20,7 @@ const GROUP_FIELD_LEN: usize = 17;
 pub enum BuddyError {
     /// "Your buddy list is full."
     OwnListFull = 0x0B,
-    /// "The user's buddy list is full."
+    /// "The user's buddy list is full" (no full stop in v83, 0x2d1)
     TheirListFull = 0x0C,
     /// "That character is already registered as your buddy."
     AlreadyAdded = 0x0D,

@@ -229,7 +229,8 @@ from `UI.nx`. Moved so far:
   rows a side with a `VScr4` scroll bar each, laid out from the background
   and period footage. The sell side has the five `Basic.img/Tab5` bag tabs;
   the buy side shows only the "All" tab. A star or bullet set below its full
-  size shows `BtRecharge` on its row, which recharges it at once. The
+  size shows `BtRecharge` on its row, which asks "Are you sure you want to
+  recharge it?" before it recharges (v83 `FUN_00756c28`). The
   right-click-to-sell checkbox is gone; right-click still sells.
 - **Character info** (`UICharInfo`, `UIWindow.img/UserInfo`): opened by
   double-clicking a character on the map, the player included
@@ -652,6 +653,9 @@ the screen size.
   The receiver gets one notice listing each gift's sender, item and message
   when 0x4D arrives. The buddy and guild buttons that open the wider
   `backgrnd1` aren't drawn, and only one name is sent.
+- **Leaving:** EXIT sends CHANGE_MAP with no body at once. Esc first asks
+  "Are you sure you want to leave the Cash Shop?", as v83 does
+  (`FUN_004bcc86`).
 - **Not served yet:** CHARGE and COUPON do nothing.
 
 ## Estimated client work for a complete game
