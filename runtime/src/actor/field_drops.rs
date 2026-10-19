@@ -110,6 +110,8 @@ pub enum PickupError {
     NotYours,
     /// A pet without the item for it, or a drop a player threw away.
     NotForPets,
+    /// Nobody may pick it up (`pickUpBlock`).
+    Blocked,
 }
 
 pub struct DropSet {
@@ -215,6 +217,9 @@ impl DropSet {
         now: Instant,
     ) -> Result<Drop, PickupError> {
         let drop = self.drops.get(&object_id).ok_or(PickupError::Gone)?;
+        if drop.loot.blocked() {
+            return Err(PickupError::Blocked);
+        }
         if (i32::from(drop.x) - i32::from(x)).abs() > REACH.0
             || (i32::from(drop.y) - i32::from(y)).abs() > REACH.1
         {

@@ -77,6 +77,9 @@ namespace ms
 		void pick_up();
 		// Move to a position computed for this tick.
 		void move_to(const Physics &physics, double x, double y);
+		// An item nobody may pick up (`pickUpBlock`), which v83 leaves out
+		// of both the pickup key and pets' looting.
+		bool blocked() const;
 
 		int32_t owner;
 		int8_t pickuptype;

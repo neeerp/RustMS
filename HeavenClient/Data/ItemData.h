@@ -50,6 +50,10 @@ namespace ms
 		// Returns whether the item is marked as a quest item.
 		bool is_questitem() const;
 
+		// Returns whether nobody may pick the item up (`pickUpBlock`), as
+		// with the invisible items party quests drop (FUN_005d5224).
+		bool is_pickup_blocked() const;
+
 		// Returns whether the item was loaded correctly.
 		explicit operator bool() const;
 
@@ -103,5 +107,6 @@ namespace ms
 		bool unsellable;
 		bool cashitem;
 		bool questitem;
+		bool pickupblock;
 	};
 }

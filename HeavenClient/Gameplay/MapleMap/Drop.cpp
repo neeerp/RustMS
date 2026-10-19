@@ -18,6 +18,8 @@
 #include "Drop.h"
 #include "Pickup.h"
 
+#include "../../Data/ItemData.h"
+
 #include "../../Audio/Audio.h"
 
 #include <algorithm>
@@ -293,6 +295,9 @@ namespace ms
 
 	bool Drop::lootable(Point<int16_t> feet, int32_t self, int32_t party) const
 	{
+		if (blocked())
+			return false;
+
 		// Only a drop that has landed, and wasn't tried in the last 3 s.
 		if (state != Drop::State::FLOATING || sincetry < pickup::RETRY)
 			return false;
@@ -313,7 +318,7 @@ namespace ms
 	{
 		// Pets leave what players dropped, and whatever their equipment
 		// doesn't pick up.
-		if (playerdrop || !(get_itemid() ? items : mesos))
+		if (playerdrop || !(get_itemid() ? items : mesos) || blocked())
 			return false;
 
 		if (pickup::pet_owned_by_other(pickuptype, owner, self, party, age - delay, others))
@@ -333,5 +338,12 @@ namespace ms
 	int32_t Drop::get_itemid() const
 	{
 		return 0;
+	}
+
+	bool Drop::blocked() const
+	{
+		int32_t itemid = get_itemid();
+
+		return itemid && ItemData::get(itemid).is_pickup_blocked();
 	}
 }

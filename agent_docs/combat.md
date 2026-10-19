@@ -391,6 +391,12 @@ varied (`net::items::give_dropped`, Cosmic's `randomizeStats`): each stat it
 has moves up to a tenth of itself either way, at most 5, or 10 for defense,
 HP and MP. Equipment a player threw down keeps its stats.
 
+Nobody picks up an item with `info/pickUpBlock`, the invisible items party
+quests drop (Transparent Item 4001074, ...). The v83 client leaves them out
+of both the pickup key and pets' looting (FUN_005d5224 in FUN_0050463c and
+FUN_0050483a), and so does HeavenClient (`Drop::blocked`); the server refuses
+them too (`Loot::blocked`).
+
 ## Monster Book cards
 
 Every mob with a card (`Item.nx/Consume/0238.img`, matched by each card's

@@ -29,6 +29,17 @@ impl Loot {
             Loot::Mesos(_) | Loot::Dropped(_) => None,
         }
     }
+
+    /// Whether nobody may pick it up (`pickUpBlock`). The v83 client leaves
+    /// such items out of the pickup key and pets' looting (FUN_005d5224).
+    pub fn blocked(&self) -> bool {
+        let item_id = match self {
+            Loot::Item { item_id, .. } => *item_id,
+            Loot::Dropped(item) => item.item_id,
+            Loot::Mesos(_) => return false,
+        };
+        crate::items::info(item_id).is_some_and(|info| info.pickup_block)
+    }
 }
 
 /// Roll one mob's drops for `player`, each `showdown` percent more likely
@@ -263,5 +274,18 @@ mod tests {
         for _ in 0..50 {
             assert_eq!(roll_at(&half, 2.0, &player, &mut rng).len(), 1);
         }
+    }
+
+    #[test]
+    fn nobody_picks_up_a_pickup_block_item() {
+        let item = |item_id| Loot::Item {
+            item_id,
+            quantity: 1,
+            quest: None,
+        };
+        // A Transparent Item that a party quest drops, and a Snail Shell.
+        assert!(item(4001074).blocked());
+        assert!(!item(4000019).blocked());
+        assert!(!Loot::Mesos(10).blocked());
     }
 }

@@ -28,6 +28,7 @@ namespace ms
 		unsellable = false;
 		cashitem = false;
 		questitem = false;
+		pickupblock = false;
 		gender = 0;
 
 		nl::node src;
@@ -92,6 +93,7 @@ namespace ms
 			unsellable = src["notSale"].get_bool();
 			cashitem = src["cash"].get_bool();
 			questitem = src["quest"].get_bool();
+			pickupblock = src["pickUpBlock"].get_bool();
 			gender = get_item_gender(itemid);
 
 			name = std::string(strsrc["name"]);
@@ -187,6 +189,11 @@ namespace ms
 	bool ItemData::is_questitem() const
 	{
 		return questitem;
+	}
+
+	bool ItemData::is_pickup_blocked() const
+	{
+		return pickupblock;
 	}
 
 	ItemData::operator bool() const
