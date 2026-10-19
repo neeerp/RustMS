@@ -19,6 +19,7 @@
 
 #include <cstdint>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "ObstacleRules.h"
@@ -33,8 +34,9 @@ namespace ms
 	class Obj
 	{
 	public:
-		// `order` is its place among its layer's objs.
-		Obj(nl::node source, int32_t order = 0);
+		// `order` is its place among its layer's objs; `space` the width and height of the map's physical space,
+		// which its copies repeat over where it gives no cx or cy.
+		Obj(nl::node source, int32_t order = 0, Point<int16_t> space = {});
 
 		// Update animation.
 		void update();
@@ -92,6 +94,9 @@ namespace ms
 		// Start its animation as its `repeat` says (FUN_006431e3).
 		static void play(State &state);
 
+		// Where its (x, y) has drifted to `at` ms after its map loaded.
+		std::pair<int64_t, int64_t> drifted(int64_t at) const;
+
 		std::vector<State> states;
 		size_t current;
 		bool visible;
@@ -105,5 +110,16 @@ namespace ms
 		// Its colour adds to what is under it (the obj node's `blend` 1, FUN_0063c212).
 		bool additive;
 		int32_t order;
+		// It drifts along x for `flow` 1, along y for 2 and both for 3, at rx or ry, and repeats every cx and cy px
+		// (FUN_0063c212, FUN_0063e2c5).
+		int32_t flow;
+		int32_t rx;
+		int32_t ry;
+		int32_t cx;
+		int32_t cy;
+		// Whether it repeats, which only one without a name or a trap does.
+		bool tiled;
+		// The ms since its map loaded, while it drifts.
+		int64_t elapsed;
 	};
 }

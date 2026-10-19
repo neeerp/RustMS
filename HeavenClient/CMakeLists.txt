@@ -230,6 +230,8 @@ if(HEAVENCLIENT_BUILD_TESTS)
     add_test(NAME sp_reset_rules COMMAND sp_reset_rules_tests)
     add_executable(item_expiry_tests tests/item_expiry.cpp)
     add_test(NAME item_expiry COMMAND item_expiry_tests)
+    add_executable(obj_flow_tests tests/obj_flow.cpp)
+    add_test(NAME obj_flow COMMAND obj_flow_tests)
     add_executable(obj_state_rules_tests tests/obj_state_rules.cpp)
     target_include_directories(obj_state_rules_tests PRIVATE
         ${PROJECT_SOURCE_DIR}/libs/NoLifeNx ${PROJECT_SOURCE_DIR}/libs/glad/build/include)
@@ -473,6 +475,7 @@ add_executable(HeavenClient
     Gameplay/MapleMap/MapInfo.cpp
     Gameplay/MapleMap/MapInfo.h
     Gameplay/MapleMap/CloudLayout.h
+    Gameplay/MapleMap/ObjFlow.h
     Gameplay/MapleMap/MapClouds.cpp
     Gameplay/MapleMap/MapClouds.h
     Gameplay/MapleMap/MapWeather.cpp

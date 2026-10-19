@@ -17,14 +17,18 @@
 //////////////////////////////////////////////////////////////////////////////////
 #include "Obj.h"
 
+#include "ObjFlow.h"
 #include "ObjStateRules.h"
 
 #include "../FieldEffectRules.h"
 
+#include "../../Constants.h"
 #include "../../Graphics/GraphicsGL.h"
 #include "../../Util/Misc.h"
 
+#include <algorithm>
 #include <cmath>
+#include <cstdlib>
 #include <set>
 
 #include <nlnx/nx.hpp>
@@ -70,7 +74,7 @@ namespace ms
 		animation.stop();
 	}
 
-	Obj::Obj(nl::node src, int32_t order) : current(0), order(order)
+	Obj::Obj(nl::node src, int32_t order, Point<int16_t> space) : current(0), order(order), elapsed(0)
 	{
 		nl::node data = nl::nx::map["Obj"][src["oS"] + ".img"][src["l0"]][src["l1"]][src["l2"]];
 
@@ -99,6 +103,19 @@ namespace ms
 
 		if (visible)
 			play(states[0]);
+
+		flow = src["flow"];
+		rx = src["rx"];
+		ry = src["ry"];
+		cx = src["cx"];
+		cy = src["cy"];
+		tiled = name.empty() && !states[0].obstacle;
+
+		if (cx == 0)
+			cx = space.x();
+
+		if (cy == 0)
+			cy = space.y();
 	}
 
 	void Obj::play(State &state)
@@ -113,6 +130,16 @@ namespace ms
 	{
 		if (visible)
 			states[current].animation.update();
+
+		if (flow != 0)
+			elapsed += Constants::TIMESTEP;
+	}
+
+	std::pair<int64_t, int64_t> Obj::drifted(int64_t at) const
+	{
+		auto [dx, dy] = obj_flow::offset(flow, rx, ry, at);
+
+		return { pos.x() + dx, pos.y() + dy };
 	}
 
 	void Obj::draw(Point<int16_t> viewpos, float inter) const
@@ -123,7 +150,31 @@ namespace ms
 		if (additive)
 			GraphicsGL::get().set_additive(true);
 
-		states[current].animation.draw(DrawArgument(pos + viewpos, flip), inter);
+		if (flow == 0)
+		{
+			states[current].animation.draw(DrawArgument(pos + viewpos, flip), inter);
+		} else
+		{
+			int64_t at = std::max<int64_t>(0, elapsed - Constants::TIMESTEP + std::lround(inter * Constants::TIMESTEP));
+			auto [x, y] = drifted(at);
+			int16_t width = Constants::Constants::get().get_viewwidth();
+			int16_t height = Constants::Constants::get().get_viewheight();
+			std::vector<std::pair<int32_t, int32_t>> places;
+
+			if (tiled)
+				places = obj_flow::copies(flow, cx, cy, width, height, x, y, width / 2 - viewpos.x(), height / 2 - viewpos.y());
+
+			// v83 also leaves the obj itself drifting off for good. Its first copy covers it, except where a negative
+			// cx leaves none (I, reports/201-obj-keys.md).
+			if (places.empty() && std::abs(x + viewpos.x()) < INT16_MAX && std::abs(y + viewpos.y()) < INT16_MAX)
+				places.emplace_back(static_cast<int32_t>(x), static_cast<int32_t>(y));
+
+			for (auto [px, py] : places)
+			{
+				Point<int16_t> at_view(static_cast<int16_t>(px + viewpos.x()), static_cast<int16_t>(py + viewpos.y()));
+				states[current].animation.draw(DrawArgument(at_view, flip), inter);
+			}
+		}
 
 		if (additive)
 			GraphicsGL::get().set_additive(false);
@@ -204,7 +255,9 @@ namespace ms
 		Point<int16_t> lt = bounds.get_left_top();
 		Point<int16_t> rb = bounds.get_right_bottom();
 
-		return obstacle::box(pos.x(), pos.y(), { lt.x(), lt.y() }, { rb.x(), rb.y() }, flip, out);
+		auto [x, y] = drifted(elapsed);
+
+		return obstacle::box(static_cast<int32_t>(x), static_cast<int32_t>(y), { lt.x(), lt.y() }, { rb.x(), rb.y() }, flip, out);
 	}
 
 	obstacle::Vec Obj::get_push() const

@@ -178,9 +178,11 @@ namespace ms
 
 		nl::node src = mapid == -1 ? NxFiles::ui_classic["CashShopPreview.img"] : nl::nx::map["Map"]["Map" + prefix][strid + ".img"];
 
-		tilesobjs = MapTilesObjs(src);
-		backgrounds = MapBackgrounds(src["back"]);
 		physics = Physics(src["foothold"], src["info"]);
+		Range<int16_t> spacex = physics.get_fht().get_space_x();
+		Range<int16_t> spacey = physics.get_fht().get_space_y();
+		tilesobjs = MapTilesObjs(src, Point<int16_t>(spacex.second() - spacex.first(), spacey.second() - spacey.first()));
+		backgrounds = MapBackgrounds(src["back"]);
 		mapinfo = MapInfo(src, physics.get_fht().get_walls(), physics.get_fht().get_borders());
 		clouds = mapinfo.has_clouds() ? MapClouds(physics.get_fht().get_space_x(), physics.get_fht().get_space_y())
 									  : MapClouds();

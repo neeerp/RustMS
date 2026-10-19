@@ -21,7 +21,7 @@
 
 namespace ms
 {
-	TilesObjs::TilesObjs(nl::node src)
+	TilesObjs::TilesObjs(nl::node src, Point<int16_t> space)
 	{
 		auto tileset = src["info"]["tS"] + ".img";
 
@@ -34,7 +34,7 @@ namespace ms
 
 		for (auto objnode : src["obj"])
 		{
-			Obj obj{objnode, string_conversion::or_default<int32_t>(objnode.name(), 0)};
+			Obj obj{objnode, string_conversion::or_default<int32_t>(objnode.name(), 0), space};
 			int8_t z = obj.getz();
 			objs.emplace(z, std::move(obj));
 		}
@@ -103,10 +103,10 @@ namespace ms
 			iter.second.draw(viewpos);
 	}
 
-	MapTilesObjs::MapTilesObjs(nl::node src)
+	MapTilesObjs::MapTilesObjs(nl::node src, Point<int16_t> space)
 	{
 		for (auto iter : layers)
-			iter.second = src[iter.first];
+			iter.second = TilesObjs(src[iter.first], space);
 	}
 
 	MapTilesObjs::MapTilesObjs()
