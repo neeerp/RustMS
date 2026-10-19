@@ -4,6 +4,7 @@
 use crate::load::{self, asset_path};
 use game::{EquipStats, Inventory, InventoryChange, InventoryError, Item};
 use game_data::items::{EquipInfo, ItemData, ItemInfo, ItemNames};
+use rand::Rng;
 use std::sync::OnceLock;
 
 pub fn data() -> Result<&'static ItemData, &'static str> {
@@ -78,6 +79,57 @@ pub fn give(
     Ok(changes)
 }
 
+/// Put a mob's or reactor's drop of `item_id` into `inventory`: a piece of
+/// equipment with its stats varied ([`vary`]), or `quantity` of anything
+/// else.
+pub fn give_dropped(
+    inventory: &mut Inventory,
+    item_id: i32,
+    quantity: i16,
+    rng: &mut impl Rng,
+) -> Result<Vec<InventoryChange>, InventoryError> {
+    let mut item = create(item_id, quantity).ok_or(InventoryError::UnknownItem)?;
+    let Some(stats) = item.equip.as_mut() else {
+        return inventory.add(item, slot_max(item_id));
+    };
+    vary(stats, rng);
+    inventory.add(item, 1)
+}
+
+/// Vary each stat a piece of equipment has by up to a tenth of it either
+/// way, at most 5, or 10 for defense, HP and MP (Cosmic's
+/// `randomizeStats`).
+fn vary(stats: &mut EquipStats, rng: &mut impl Rng) {
+    let mut vary = |stat: &mut i16, most: i16| {
+        if *stat > 0 {
+            let range = ((*stat - 1) / 10 + 1).min(most);
+            *stat = stat.saturating_add(rng.gen_range(-range, range + 1));
+        }
+    };
+    for stat in [
+        &mut stats.str,
+        &mut stats.dex,
+        &mut stats.int,
+        &mut stats.luk,
+        &mut stats.watk,
+        &mut stats.matk,
+        &mut stats.acc,
+        &mut stats.avoid,
+        &mut stats.speed,
+        &mut stats.jump,
+    ] {
+        vary(stat, 5);
+    }
+    for stat in [
+        &mut stats.wdef,
+        &mut stats.mdef,
+        &mut stats.hp,
+        &mut stats.mp,
+    ] {
+        vary(stat, 10);
+    }
+}
+
 pub fn base_stats(equip: &EquipInfo) -> EquipStats {
     EquipStats {
         upgrade_slots: equip.upgrade_slots,
@@ -118,4 +170,44 @@ pub fn can_wear(equip: &EquipInfo, player: &game::Player) -> bool {
         && stats.dex >= equip.req_dex
         && stats.int >= equip.req_int
         && stats.luk >= equip.req_luk
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use rand::SeedableRng;
+
+    #[test]
+    fn dropped_equipment_varies_by_a_tenth_at_most_five_or_ten() {
+        let base = EquipStats {
+            upgrade_slots: 7,
+            str: 3,
+            watk: 80,
+            wdef: 200,
+            hp: 40,
+            hands: 4,
+            speed: -5,
+            ..EquipStats::default()
+        };
+        let mut rng = rand::rngs::StdRng::seed_from_u64(3);
+        let rolls: Vec<EquipStats> = (0..500)
+            .map(|_| {
+                let mut stats = base.clone();
+                vary(&mut stats, &mut rng);
+                stats
+            })
+            .collect();
+        let spread = |stat: fn(&EquipStats) -> i16| {
+            let values = rolls.iter().map(stat);
+            (values.clone().min().unwrap(), values.max().unwrap())
+        };
+        assert_eq!(spread(|s| s.str), (2, 4));
+        assert_eq!(spread(|s| s.watk), (75, 85));
+        assert_eq!(spread(|s| s.wdef), (190, 210));
+        assert_eq!(spread(|s| s.hp), (36, 44));
+        // Nothing to vary, or a penalty: left as they are.
+        assert_eq!(spread(|s| s.dex), (0, 0));
+        assert_eq!(spread(|s| s.speed), (-5, -5));
+        assert!(rolls.iter().all(|s| (s.upgrade_slots, s.hands) == (7, 4)));
+    }
 }

@@ -119,7 +119,12 @@ impl ClientActor {
             Loot::Item {
                 item_id, quantity, ..
             } => (
-                net::items::give(&mut player.inventory, *item_id, *quantity),
+                net::items::give_dropped(
+                    &mut player.inventory,
+                    *item_id,
+                    *quantity,
+                    &mut rand::thread_rng(),
+                ),
                 *item_id,
                 *quantity,
             ),
