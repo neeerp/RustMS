@@ -146,10 +146,11 @@ namespace ms
 		}
 		else if (shown == -1)
 		{
-			// Shadow Shifter dodged it, smiling (its effect isn't shown).
+			// Guardian or Shadow Shifter dodged it; Shadow Shifter smiles.
 			int32_t skillid = recv.read_int();
+			Stage::get().get_combat().show_dodge(cid, skillid);
 
-			if (skillid == 4120002 || skillid == 4220002)
+			if (skillid == SkillId::SHADOW_SHIFTER_NIGHT_LORD || skillid == SkillId::SHADOW_SHIFTER_SHADOWER)
 				otherchar->set_expression(Expression::Id::SMILE, 1500);
 		}
 	}

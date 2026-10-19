@@ -1,5 +1,7 @@
 #pragma once
 
+#include "SkillId.h"
+
 #include <algorithm>
 #include <cstdint>
 #include <utility>
@@ -237,6 +239,38 @@ namespace ms
 			}
 
 			return damage - kept_off - saved;
+		}
+
+		// The Night Lord's or Shadower's Shadow Shifter, which may dodge any
+		// hit, a miss too, at its chance (0x9584f6); 0 for other jobs.
+		inline int32_t shadow_shifter(int32_t job)
+		{
+			switch (job)
+			{
+			case 412: return SkillId::SHADOW_SHIFTER_NIGHT_LORD;
+			case 422: return SkillId::SHADOW_SHIFTER_SHADOWER;
+			default: return 0;
+			}
+		}
+
+		// The Hero's or Paladin's Guardian, which may block a hit that lands
+		// while they hold a shield, at its chance per mille (0x958692); 0 for
+		// other jobs.
+		inline int32_t guardian(int32_t job)
+		{
+			switch (job)
+			{
+			case 112: return SkillId::GUARDIAN_HERO;
+			case 122: return SkillId::GUARDIAN_PALADIN;
+			default: return 0;
+			}
+		}
+
+		// The Guardian byte of TAKE_DAMAGE: 2 for a touch it blocked, 1 for
+		// an attack, 0 if it blocked nothing (0x9594d0).
+		inline uint8_t guard(bool blocked, bool touch)
+		{
+			return blocked ? (touch ? 2 : 1) : 0;
 		}
 
 		// The mob that Power Guard or Mana Reflection sends some of its hit

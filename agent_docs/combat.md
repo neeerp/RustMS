@@ -854,12 +854,19 @@ The rest comes off HP; a `deadlyAttack` also takes all but 1 MP, and an
 and Meso Guard, but not Magic Guard (0x9593b8); others see the same number
 in DAMAGE_PLAYER.
 
-A hit of -1 is a dodge, accepted only from a Shadower or Hermit with Shadow
+A hit of -1 is a dodge. HeavenClient rolls them as v83 does: a Night
+Lord's or Shadower's Shadow Shifter dodges any hit, a miss too, at its
+`prop` percent (0x9584f6), and a Hero's or Paladin's Guardian blocks a hit
+that lands while they wear a shield, at its `prop` per mille, after Power
+Guard has sent its share back (0x958692). A dodge shows no number, only
+the skill's `special` animation, and Shadow Shifter smiles for 1.5 s. The
+server accepts -1 only from a Night Lord or Shadower who has Shadow
 Shifter, or (with a shield worn and a guard byte) a Hero or Paladin with
 Guardian. After the mob's id and object id, a mob's TAKE_DAMAGE carries
-its direction, the Power Guard reflect percent, the guard byte, a 14-byte
-block when reflecting (Power Guard, object id, hit action, the mob's and
-the player's positions), and a stance byte, set when the Stance roll kept
+its direction, the reflect percent, the guard byte (1 for an attack
+Guardian blocked, 2 for a touch), a 14-byte block when reflecting or for a
+touch Guardian blocked (whether it was Power Guard, object id, hit action,
+the mob's and the player's positions), and a stance byte, set when the Stance roll kept
 the player from being knocked back. The server reads the tail by its length
 (older clients send none) and passes the reflect block and stance on in
 DAMAGE_PLAYER (`mob::Hurt`): `cid, from, damage`, then for a mob `mob_id,
@@ -905,7 +912,7 @@ distance report), movement, attacks' MP, damage, EXP sharing, and respawn;
 broadcast, the guards' shares of a hit, both reflects, and the
 TAKE_DAMAGE handler's bounds by attack index, its tail, and dodges; `game::mob_damage` covers the
 StandardPDD table and the bound. HeavenClient's `mob_damage_tests` and
-`mob_attack_tests` cover the damage and miss formulas, both reflects, and the attacks'
+`mob_attack_tests` cover the damage and miss formulas, both reflects, the dodging skills, and the attacks'
 ranges, aim, balls, and rows. `mob_combat` (integration) runs two players in Dangerous
 Forest through control, relayed movement, hits, kills, EXP, refused damage,
 touch damage, damage by attack index, a level-up seen by the other player, and a respawn, then has

@@ -160,6 +160,10 @@ namespace ms
 		// or 0, and the number it shows over the mob (0 a miss).
 		uint8_t reflect = 0;
 		int32_t reflected = 0;
+		// Guardian's byte (1 an attack, 2 a touch), and the skill that
+		// dodged the hit (damage -1), Guardian or Shadow Shifter, or 0.
+		uint8_t guard = 0;
+		int32_t dodged = 0;
 		// Where the mob and the player were.
 		Point<int16_t> mobposition;
 		Point<int16_t> position;

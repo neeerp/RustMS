@@ -784,16 +784,19 @@ mod tests {
         let actions = handle(&mut player, touch_with(-1, 100100, &[0, 0, 0]));
         assert_eq!(dodged_with(&actions), 4120002);
         assert_eq!(player.stats.hp, 100);
-        // Guardian needs a shield.
+        // Guardian needs a shield. A touch it blocks comes with the 14
+        // bytes, not Power Guard's.
         player.stats.job = 112;
         learn(&mut player, 1120005);
-        assert!(handle(&mut player, touch_with(-1, 100100, &[0, 2, 0])).is_empty());
+        let mut blocked = vec![0, 2, 0, 0, 0, 0, 0, 6];
+        blocked.extend([0; 9]);
+        assert!(handle(&mut player, touch_with(-1, 100100, &blocked)).is_empty());
         player.inventory.insert(
             InventoryType::Equipped,
             game::inventory::equip_slot::SHIELD,
             game::Item::equipment(1092000, game::EquipStats::default()),
         );
-        let actions = handle(&mut player, touch_with(-1, 100100, &[0, 2, 0]));
+        let actions = handle(&mut player, touch_with(-1, 100100, &blocked));
         assert_eq!(dodged_with(&actions), 1120005);
         assert_eq!(player.stats.hp, 100);
     }

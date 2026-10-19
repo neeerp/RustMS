@@ -113,6 +113,14 @@ int main()
 					mana_reflection(100, 100, Reflectee{ 12, 16, 10000, 0, false, false }, 10, 100, 4) == 0,
 				"nor 16 two levels up");
 
+		// Only fourth-job thieves shift and fourth-job knights guard.
+		require(shadow_shifter(412) == 4120002 && shadow_shifter(422) == 4220002 && shadow_shifter(411) == 0,
+				"Shadow Shifter is the Night Lord's and the Shadower's");
+		require(guardian(112) == 1120005 && guardian(122) == 1220006 && guardian(132) == 0,
+				"Guardian is the Hero's and the Paladin's");
+		require(guard(true, true) == 2 && guard(true, false) == 1 && guard(false, true) == 0,
+				"the Guardian byte tells a touch from an attack");
+
 		std::cout << "Mob damage passed\n";
 		return 0;
 	}

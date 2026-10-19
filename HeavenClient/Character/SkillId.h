@@ -161,10 +161,14 @@ namespace ms
 			FLASH_JUMP = 4111006,
 
 			// Night Lord
-					TRIPLE_THROW = 4121007,
+					SHADOW_SHIFTER_NIGHT_LORD = 4120002,
+			TRIPLE_THROW = 4121007,
 
 			// Bandit
-					MESO_EXPLOSION = 4211006
+					MESO_EXPLOSION = 4211006,
+
+			// Shadower
+					SHADOW_SHIFTER_SHADOWER = 4220002
 		};
 	}
 }

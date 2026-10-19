@@ -776,6 +776,25 @@ namespace ms
 		else if (damage > 0 && attack.mpburn)
 			damage = 1;
 
+		// A Night Lord's or Shadower's Shadow Shifter may dodge any hit, a
+		// miss too (0x9584f6). A Hero's or Paladin's Guardian may block one
+		// that lands while they hold a shield, after Power Guard has sent its
+		// share back (0x958692).
+		int32_t job = stats.get_stat(MapleStat::Id::JOB);
+		int32_t dodged = 0;
+		int32_t shifter = mob_damage::shadow_shifter(job);
+
+		if (shifter && skillbook.get_level(shifter) > 0 && randomizer.below(skill_stats(skillbook, shifter).chance))
+		{
+			damage = -1;
+			dodged = shifter;
+		}
+
+		int32_t guardian = mob_damage::guardian(job);
+		bool blocked = damage > 0 && guardian && skillbook.get_level(guardian) > 0 &&
+					   inventory.has_equipped(EquipSlot::Id::SHIELD) &&
+					   randomizer.below(skill_stats(skillbook, guardian).chance / 10);
+
 		// A touch under Power Guard sends some back at the mob, which the
 		// player is spared (0x9587c6). A spell under Mana Reflection does
 		// too if its chance comes up, sparing them nothing (0x958d50).
@@ -790,7 +809,14 @@ namespace ms
 			reflect = static_cast<uint8_t>(get_buff_value(Buffstat::Id::POWERGUARD));
 			reflected = mob_damage::power_guard(damage, reflect, reflectee, level, stats.get_total(EquipStat::Id::ACC));
 		}
-		else if (attack.index >= 0 && attack.magic && damage > 0 && has_buff(Buffstat::Id::MANA_REFLECTION))
+
+		if (blocked)
+		{
+			damage = -1;
+			dodged = guardian;
+		}
+
+		if (attack.index >= 0 && attack.magic && damage > 0 && has_buff(Buffstat::Id::MANA_REFLECTION))
 		{
 			const SkillData::Stats &mana =
 					SkillData::get(SkillId::MANA_REFLECTION).get_stats(get_buff_value(Buffstat::Id::MANA_REFLECTION));
@@ -804,9 +830,19 @@ namespace ms
 			}
 		}
 
-		int32_t achilles = 1000 - static_cast<int32_t>(std::lround(stats.get_reducedamage() * 1000.0f));
-		show_damage(mob_damage::shown(damage, achilles, get_buff_value(Buffstat::Id::MESOGUARD), inventory.get_meso()) -
-					reflected.damage);
+		// A dodge shows no number; Shadow Shifter smiles (0x9593b9).
+		if (dodged)
+		{
+			if (!blocked)
+				set_expression(Expression::Id::SMILE, 1500);
+		}
+		else
+		{
+			int32_t achilles = 1000 - static_cast<int32_t>(std::lround(stats.get_reducedamage() * 1000.0f));
+			show_damage(mob_damage::shown(damage, achilles, get_buff_value(Buffstat::Id::MESOGUARD),
+										  inventory.get_meso()) - reflected.damage);
+		}
+
 		become_invincible(damage > 0);
 
 		bool fromleft = attack.pushleft ? *attack.pushleft : attack.origin.x() > phobj.get_x();
@@ -844,6 +880,8 @@ namespace ms
 		MobAttackResult result(attack, damage, direction, stance);
 		result.reflect = reflect;
 		result.reflected = reflected.shown;
+		result.guard = mob_damage::guard(blocked, attack.index < 0);
+		result.dodged = dodged;
 		result.position = get_position();
 
 		return result;
