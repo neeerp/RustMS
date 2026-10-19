@@ -319,7 +319,7 @@ namespace ms
 				choose_type(type + 1);
 				break;
 			case BT_MAP:
-				UI::get().emplace<UIWorldMap>();
+				UIWorldMap::open();
 				break;
 		}
 

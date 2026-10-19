@@ -129,7 +129,12 @@ from `UI.nx`. Moved so far:
 - **World Map** (`UIWorldMap`, `UIWindow.img/WorldMap`): the frame, title,
   and `Basic.img/BtClose` around the map's 640x470 `BaseImg`, laid out from
   period footage. The Big Bang search panel is gone. Esc steps up to the
-  parent map and closes the window from the top.
+  parent map and closes the window from the top. It opens on the world map
+  v83 picks for the field (`WorldMapLookup.h`): the first of `WorldMap000`,
+  `010` to `100` listing it, unless one of the ten after it or `WorldMap140`
+  to `142` does too. On a field none of them lists, such as the Free Market,
+  the world map key and the minimap's button say the world map is not
+  available there instead, and FIND NPC says the NPC can't be shown.
 - **Map tooltips** (`MapTooltip`, `TooltipBox`): the World Map's spots and the
   minimap's NPCs and portals show the name, plus the map's description for
   World Map spots, in the v83 box. `UIClassic.nx` has no bitmaps for it (the

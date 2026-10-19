@@ -16,6 +16,8 @@
 //	along with this program.  If not, see <https://www.gnu.org/licenses/>.		//
 //////////////////////////////////////////////////////////////////////////////////
 #include "UIWorldMap.h"
+#include "UINotice.h"
+#include "WorldMapLookup.h"
 
 #include "../UI.h"
 
@@ -28,6 +30,8 @@
 
 #include <nlnx/nx.hpp>
 #include <algorithm>
+#include <map>
+#include <set>
 
 namespace ms
 {
@@ -42,31 +46,35 @@ namespace ms
 		const Point<int16_t> MAP = { 14, 35 };
 		constexpr int16_t MAP_WIDTH = 640, MAP_HEIGHT = 470;
 
-		std::string world_for_map(int32_t field)
+		// StringPool 0x10b and 0x10e.
+		constexpr const char *UNAVAILABLE_HERE = "You are currently at a place where\\nthe world map is not available.";
+		constexpr const char *NPC_UNAVAILABLE = "This NPC is located at a spot not\\navailable through the World Map.";
+
+		// The world map v83 shows a field on, or "" when there is none.
+		std::string find_world(int32_t field)
 		{
-			// Map IDs are not world-map filenames. Prefer the most detailed
-			// asset whose MapList actually contains this field.
-			static const auto worlds = [] {
-				std::map<int32_t, std::pair<size_t, std::string>> result;
+			static const auto lists = [] {
+				std::map<std::string, std::set<int32_t>> result;
 				for (auto world : nl::nx::map["WorldMap"])
 				{
-					std::vector<int32_t> fields;
-					for (auto spot : world["MapList"])
-						for (auto id : spot["mapNo"]) fields.push_back(id.get_integer());
 					std::string name = world.name();
 					if (name.size() < 4) continue;
 					name.resize(name.size() - 4);
-					for (auto id : fields)
-					{
-						auto found = result.find(id);
-						if (found == result.end() || fields.size() < found->second.first)
-							result[id] = {fields.size(), name};
-					}
+					for (auto spot : world["MapList"])
+						for (auto id : spot["mapNo"]) result[name].insert(id.get_integer());
 				}
 				return result;
 			}();
-			auto found = worlds.find(field);
-			return found == worlds.end() ? "WorldMap" : found->second.second;
+			return world_map::find([&](const std::string& name) {
+				auto found = lists.find(name);
+				return found != lists.end() && found->second.count(field) > 0;
+			});
+		}
+
+		std::string world_for_map(int32_t field)
+		{
+			std::string world = find_world(field);
+			return world.empty() ? "WorldMap" : world;
 		}
 	}
 
@@ -155,6 +163,22 @@ namespace ms
 		}
 
 		UIElement::draw_buttons(alpha);
+	}
+
+	void UIWorldMap::open()
+	{
+		if (find_world(Stage::get().get_mapid()).empty())
+			UI::get().emplace<UIOk>(UNAVAILABLE_HERE, [](bool) {});
+		else
+			UI::get().emplace<UIWorldMap>();
+	}
+
+	void UIWorldMap::find(int32_t target)
+	{
+		if (find_world(target).empty())
+			UI::get().emplace<UIOk>(NPC_UNAVAILABLE, [](bool) {});
+		else if (auto map = UI::get().emplace<UIWorldMap>())
+			map->show_location(target);
 	}
 
 	void UIWorldMap::show_location(int32_t target)

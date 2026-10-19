@@ -37,6 +37,14 @@ namespace ms
 		static constexpr bool TOGGLED = true;
 
 		UIWorldMap();
+
+		// Opens on the player's field, as the world map key and the
+		// minimap's button do, or says the world map isn't available there.
+		static void open();
+		// Opens with a field marked, as FIND NPC does, or says no world map
+		// shows it.
+		static void find(int32_t target_map);
+
 		void show_location(int32_t target_map);
 
 		void draw(float inter) const override;

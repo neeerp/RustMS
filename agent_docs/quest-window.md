@@ -46,7 +46,8 @@ along the bottom depend on the tab:
 - Available has FIND NPC (`BtMarkNpc`), which opens the world map with the
   giver's map marked. NPC maps come from walking the portal graph out from
   the Explorer start (`0`) and each continent's towns, which skips the disconnected
-  legacy map variants.
+  legacy map variants. When no world map lists the NPC's map, it says so
+  instead, as v83 does.
 - In Progress has QUEST HELPER (`BtAlert`), which tracks or untracks the
   quest in the Quest Helper, and FORFEIT (`BtGiveup`). FORFEIT stays disabled
   because forfeiting isn't implemented.
