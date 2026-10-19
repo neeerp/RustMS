@@ -663,7 +663,10 @@ the screen size.
   `Item.nx` `Special`, pets from `Item.nx` `Pet`, and pet equipment from
   `Character.nx` `PetEquip`.
 - **Wish list:** RESERVE and REMOVE send the whole list (0x05, ten SNs), and the
-  server answers with the list it kept.
+  server answers with the list it kept (0x55). As in v83 (FUN_00470d7d,
+  FUN_00479844), RESERVE says "Your wish list is full." or "You already have
+  this item on your wish list." without sending, and only an added wish is
+  announced when the list comes back.
 - **Taking out and putting back:** double-clicking a Cash Inventory item
   sends 0x0D with its serial, bag and the bag's first free slot; the server
   answers with the slot and the item (0x68), or 0xBB if the bag is full.

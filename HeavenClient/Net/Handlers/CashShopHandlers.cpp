@@ -277,8 +277,13 @@ namespace ms
 		}
 		case 0x4F:
 		case 0x55:
-			// The wish list, on entering and after a change.
+			// The wish list, on entering and after a change. v83 (FUN_00479844) announces an added wish,
+			// not a removed one.
 			cashshop->set_wish_list(read_wish_list(recv));
+
+			if (mode == 0x55 && cashshop->added_wish())
+				UI::get().emplace<UIOk>("The item has been added to the wish list.", [](bool) {});
+
 			break;
 		case 0x57:
 			// A purchase is in the Cash Inventory; the balance follows.

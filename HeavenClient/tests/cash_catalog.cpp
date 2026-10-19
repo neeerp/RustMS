@@ -1,5 +1,6 @@
 #include "../Data/CashCatalog.h"
 #include <iostream>
+#include <string>
 #include <stdexcept>
 
 void require(bool condition, const char* message)
@@ -47,6 +48,11 @@ int main()
 		require(wish(wishes, 7) == wishes, "a wish is listed once");
 		require(wish({ 1, 2, 3, 4, 5, 6, 7, 8, 9, 10 }, 11).size() == WISH_LIST_SIZE, "the wish list holds ten");
 		require(unwish({ 7, 9, 0 }, 7) == std::vector<int32_t>({ 9 }), "removing a wish keeps the rest");
+		require(wish_refusal({ 7, 0, 0 }, 9) == nullptr, "a new wish is added");
+		require(std::string(wish_refusal({ 7, 9, 0 }, 9)) == "You already have this item on your wish list.",
+			"a wish already listed is refused");
+		require(std::string(wish_refusal({ 1, 2, 3, 4, 5, 6, 7, 8, 9, 10 }, 10)) == "Your wish list is full.",
+			"a full list is refused before a listed wish");
 
 		require(PAYMENTS[default_payment(1000, 5000, 5000, 5000)] == PREPAID, "NX Prepaid is checked first");
 		require(PAYMENTS[default_payment(1000, 5000, 0, 0)] == CREDIT, "then whatever covers the price");
