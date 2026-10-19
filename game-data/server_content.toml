@@ -97,6 +97,16 @@ unsourced = [
     "second_job.420.about",
     "second_job.420.ask",
     "second_job.420.accept",
+    "second_job.pirate.quest",
+    "second_job.pirate.test",
+    "second_job.pirate.proctor.pass",
+    "second_job.pirate.proctor.ask",
+    "second_job.510.about",
+    "second_job.510.ask",
+    "second_job.510.accept",
+    "second_job.520.about",
+    "second_job.520.ask",
+    "second_job.520.accept",
     "second_job.inventory_full",
     "natalie.menu",
     "natalie.cut",
@@ -693,6 +703,56 @@ sha256 = "2104ce0372f1939e69d8759f9512b0d3873772c87b97c72924241c0159d192aa"
 source = "Server.Scripts/src/rogue.lua"
 template = "{s18}"
 sha256 = "f297f382dfa17832de10856ed5911b2e006efe8077ee8818a40d92263cb65e6e"
+
+[text."first_job.pirate.intro"]
+source = "Server.Scripts/src/kairinT.lua"
+template = "{s6}"
+sha256 = "deffe3b0cd165d6edef5f018a4c24c9dbc8e9f0c65e3ab72576bd3ebb63916ff"
+
+[text."first_job.pirate.ask"]
+source = "Server.Scripts/src/kairinT.lua"
+template = "{s8}"
+sha256 = "17a2690fd32354c44fb827231b8a456ca84aff21f9eddc83b29154f4205899d8"
+
+[text."first_job.pirate.accept"]
+source = "Server.Scripts/src/kairinT.lua"
+template = "{s9}"
+sha256 = "6896b0309be6bc4cf5c461683464d3c24a09b67112bb77f9f4c8a3bbd437006d"
+
+[text."first_job.pirate.after.0"]
+source = "Server.Scripts/src/kairinT.lua"
+template = "{s11}"
+sha256 = "c2e99b61fd1c1e1fab2077b69e90a26836d8b4d593ce9c321dba57d964dd64b2"
+
+[text."first_job.pirate.after.1"]
+source = "Server.Scripts/src/kairinT.lua"
+template = "{s12}"
+sha256 = "6bb7bfe7ffe1a171a10339fda7c7bd515907b5a3efed994c645442ba800fefeb"
+
+[text."first_job.pirate.after.2"]
+source = "Server.Scripts/src/kairinT.lua"
+template = "{s13}"
+sha256 = "64d06560e0747900cc20e50cd25f63e1ed67c0c2c5ff65d3bdb5bb257e92a7b1"
+
+[text."first_job.pirate.after.3"]
+source = "Server.Scripts/src/kairinT.lua"
+template = "{s14}"
+sha256 = "18873bc6c52b83e7cb9e66abbe720c9dadc6514655ecde123bc1064397639322"
+
+[text."first_job.pirate.after.4"]
+source = "Server.Scripts/src/kairinT.lua"
+template = "{s15}"
+sha256 = "0e84a74892a72bf13ba3db9c5cf55fbee603257caf890549fc4381c0724dd1d1"
+
+[text."first_job.pirate.too_weak"]
+source = "Server.Scripts/src/kairinT.lua"
+template = "{s16}"
+sha256 = "478fc63289da4844b0784da8a164ba11ead3207fb9377acfb4786962e6bf8e14"
+
+[text."first_job.pirate.other"]
+source = "Server.Scripts/src/kairinT.lua"
+template = "{s17}"
+sha256 = "5b56550d1ea4930c9b153b4d8f9b77ac22e1a9bd8639737dadaec6b0cfeb4cf3"
 
 [rewards]
 source = "Server.NX/src/Reward.img"

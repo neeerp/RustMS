@@ -60,13 +60,15 @@ applied, and apply nothing if the player no longer has them. Answers are matched
 | `begin5` | Clicking Robin (2003) | 18-topic Q&A menu |
 | `tutorialSkip` | Clicking the Maple Administrator (2007), or the `tutoChatNPC` portal for accounts with a level-30 character | Yes warps to Lith Harbor (104000000). Neither is on the original island, so this is unused |
 | `begin7` | Clicking Shanks (22000) in Southperry | Yes sails to Lith Harbor (104000000) for Lucas's recommendation letter (4031801), at any level, or for 150 mesos from level 7; otherwise he says why not |
-| `fighter`, `magician`, `bowman`, `rogue` | Clicking Dances with Balrog (1022000), Grendel the Really Old (1032001), Athena Pierce (1012100), or the Dark Lord (1052001) | First and second job advancement: see below |
+| `fighter`, `magician`, `bowman`, `rogue`, `kairinT` | Clicking Dances with Balrog (1022000), Grendel the Really Old (1032001), Athena Pierce (1012100), the Dark Lord (1052001), or Kyrin (1090000) | First and second job advancement: see below |
 | Job instructors | Clicking an examiner (1072000-1072003) or, inside the test, a proctor (1072004-1072007) | The second job's test: see below |
+| `inside_pirate` | Clicking the proctor (1072008) inside Kyrin's tests | Yes warps to Kyrin; see below |
 | `hair_henesys1` | Clicking Natalie (1012103) in Henesys's hair salon (100000104) | A haircut (5150001) or a dye (5151001) coupon buys one of her styles, picked on a preview of the player; without a coupon she says so and nothing changes |
 
-The four Explorer instructors (`INSTRUCTORS` in `npc_scripts.rs`) make a
-beginner a Warrior, Magician, Bowman, or Thief. The beginner needs level 10
-(a Magician 8) and 35 STR, 20 INT, or 25 DEX; a weaker one hears why not, and
+The five Explorer instructors (`INSTRUCTORS` in `npc_scripts.rs`) make a
+beginner a Warrior, Magician, Bowman, Thief, or Pirate. The beginner needs
+level 10 (a Magician 8) and 35 STR, 20 INT, 25 DEX, or for a Pirate 20 DEX; a
+weaker one hears why not, and
 anyone else gets one page. Yes applies `Effect::TakeFirstJob`
 (`Player::take_first_job`: 3 SP for each level past the minimum plus 1, and
 the job's extra max HP and MP, without a stat reset or heal), then
@@ -93,8 +95,22 @@ examiner's map at the portal upstream uses (`Effect::WarpToPortal`). With the
 proof, the instructor shows a menu of the line's second jobs; each choice
 describes the job and asks, and yes takes the proof and applies
 `Effect::TakeSecondJob` (`Player::take_second_job`: 1 SP and the job's extra
-max HP or MP) and a row more in the Etc bag. Pirates (Kyrin) and the third
-and fourth jobs are not scripted yet.
+max HP or MP) and a row more in the Etc bag. The third and fourth jobs are
+not scripted yet.
+
+Kyrin's second jobs are client-driven quests instead (see
+[quests](./quests.md)): How to become a Brawler (2191) and How to Become a
+Gunslinger (2192), for a level-30 Pirate, one at a time. The client offers them
+beside her script. With one started, her script offers its test map
+(Brawler 108000502, Gunslinger 108000501), where Octopirates (9001006,
+9001005) that only Flash Fist or Double Shot hurt (see
+[combat](./combat.md)) drop 15 crystals (4031856, 4031857; `[mobs]` in
+`reward_overrides.toml`). The proctor there sees the player back to Kyrin's
+map, after a word of praise once the test's crystals are held; the crystals
+stay for the quest's completion to take. With the quest completed, Kyrin
+describes the job and yes applies `Effect::TakeSecondJob` and the Etc row.
+Upstream turns away a player whose test map is occupied and takes the
+crystals from one who leaves early; neither is done here.
 
 Text comes from the [server content pack](./server-content.md) with
 placeholders. HeavenClient expands NPC text markup (`Util/NpcTextMarkup.h`:

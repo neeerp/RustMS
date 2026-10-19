@@ -110,7 +110,7 @@ pub mod keys {
     }
 
     /// A first-job instructor's lines, by job (`warrior`, `magician`,
-    /// `bowman`, `thief`): `intro`, `ask`, `accept`, `after.0`, ... (the
+    /// `bowman`, `thief`, `pirate`): `intro`, `ask`, `accept`, `after.0`, ... (the
     /// placeholders decide how many), `too_weak`, and `other` for everyone
     /// past beginner.
     pub fn first_job(job: &str, line: &str) -> String {
@@ -124,7 +124,10 @@ pub mod keys {
     /// with the proof), the examiner's `examiner`, `examiner.ask`,
     /// `examiner.decline` and `examiner.other`, and the proctor's
     /// `proctor.pass` and `proctor.ask`. By second job (`110`, ...): its
-    /// `name`, `about`, `ask` and `accept`.
+    /// `name`, `about`, `ask` and `accept`. Kyrin has no letter or
+    /// examiner: `pirate.quest` (take a test quest first), `pirate.test`
+    /// (enter its test), the proctor's two lines, and no `name` for 510 and
+    /// 520.
     pub fn second_job(job: &str, line: &str) -> String {
         format!("second_job.{job}.{line}")
     }
@@ -457,6 +460,9 @@ mod tests {
         assert!(text.contains(&keys::first_job("thief", "after.4")));
         assert!(text.contains(&keys::second_job("thief", "proctor.ask")));
         assert!(text.contains(&keys::second_job("420", "accept")));
+        assert!(text.contains(&keys::first_job("pirate", "after.4")));
+        assert!(text.contains(&keys::second_job("pirate", "test")));
+        assert!(text.contains(&keys::second_job("520", "accept")));
         assert!(text
             .get(keys::LEAVE_AREA_WARNING, &[])
             .starts_with("[placeholder]"));
@@ -505,6 +511,13 @@ mod tests {
             }]
         );
         assert!(table.drops(100100).is_empty());
+        // Kyrin's test Octopirates drop the crystals her quests check for.
+        let crystal = |item, quest| RewardEntry {
+            prob: 0.7,
+            ..quest_item(item, quest)
+        };
+        assert_eq!(table.drops(9001006), [crystal(4031856, 2191)]);
+        assert_eq!(table.drops(9001005), [crystal(4031857, 2192)]);
     }
 
     fn quest_item(item: i32, quest: i16) -> RewardEntry {
