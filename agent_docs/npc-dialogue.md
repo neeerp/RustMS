@@ -178,6 +178,20 @@ with the text as its question. OK or Enter answers `t 01` and the pet's
 serial; CANCEL, the corner button or Escape answers `t 00`. The server
 sends neither type yet.
 
+Type 14 is a slide menu, such as the Dimensional Mirror's. It has no text:
+after the speaker byte come an `i32` art set
+(`UIWindow.img/SlideMenu/<set>`) and a string of `#<id>#<label>` pairs;
+the last label needs no closing `#`. The client
+(`UISlideMenu`, `IO/UITypes/SlideMenu.h`) sorts the choices by id and
+shows three icons (`BtMain/<id>`) at a time, the middle one framed and
+labelled, starting from the second choice when there are two or more. The
+arrows, Left and Right slide along. MOVE, Enter or the middle icon answers
+`0E 01 i32` with its id; CANCEL or Escape answers `0E 00`. An id of -1
+means nowhere to go: alone, it shows its label with no icons and MOVE
+disabled; among other choices, it leaves nothing at all. Text not
+starting with `#` hangs v83 and gives no choices in HeavenClient. The
+server sends none yet.
+
 ## Assets and validation
 
 Place `Map.nx`, `Npc.nx`, `String.nx`, and `Quest.nx` in `assets/game-data/`. The server's

@@ -103,6 +103,9 @@ from `UI.nx`. Moved so far:
 - **Choice of pets** (`UIPetChooser`, `UIWindow.img/UtilDlgEx_Pet`): which
   pet a piece of pet equipment goes on, and NPC dialogue types 9 and 10.
   Like the NPC dialog, it opens silently. See [npc-dialogue.md](npc-dialogue.md).
+- **Slide menu** (`UISlideMenu`, `UIWindow.img/SlideMenu`, NPC dialogue
+  type 14). Positions are v83's (FUN_0076be7a, FUN_0076c389). See
+  [npc-dialogue.md](npc-dialogue.md).
 - **Quest Helper** (`UIQuestHelper`, `UIWindow.img/QuestAlarm`). See
   [quests.md](quests.md).
 - **Quest Complete! notice** (`UIQuestComplete`, `UIWindow.img/FadeYesNo`).

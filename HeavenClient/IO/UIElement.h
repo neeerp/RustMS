@@ -90,6 +90,7 @@ namespace ms
 			ITEMMEGAPHONE,
 			PETCHOOSER,
 			AVATARSELECT,
+			SLIDEMENU,
 			NUM_TYPES
 		};
 

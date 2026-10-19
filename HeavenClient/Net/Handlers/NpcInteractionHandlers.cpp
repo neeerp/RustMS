@@ -27,6 +27,7 @@
 #include "../IO/UITypes/UINpcTalk.h"
 #include "../IO/UITypes/UIPetChooser.h"
 #include "../IO/UITypes/UIShop.h"
+#include "../IO/UITypes/UISlideMenu.h"
 #include "../IO/UITypes/UIStorage.h"
 #include "../Gameplay/QuestConversation.h"
 #include "../Net/Packets/NpcInteractionPackets.h"
@@ -42,13 +43,29 @@ namespace ms
 		recv.skip(1);
 
 		int32_t npcid = recv.read_int();
-		// 0 say, 1 yes/no, 2 text, 3 number, 4 menu, 7/8 styles, 9/10 pets, 12 accept/decline, 13 box text
+		// 0 say, 1 yes/no, 2 text, 3 number, 4 menu, 7/8 styles, 9/10 pets, 12 accept/decline, 13 box text,
+		// 14 slide menu
 		int8_t msgtype = recv.read_byte();
 		int8_t speaker = recv.read_byte();
 
 		// A say page with 0x4 speaks for another NPC (v83 7467b8).
 		if (msgtype == 0 && (speaker & 0x4))
 			npcid = recv.read_int();
+
+		// A slide menu (v83 747a46) has no text: its art's set, then its choices.
+		if (msgtype == 14)
+		{
+			int32_t menutype = recv.read_int();
+			slide_menu::Menu menu = slide_menu::parse(recv.read_string());
+
+			if (auto npctalk = UI::get().get_element<UINpcTalk>())
+				npctalk->deactivate();
+
+			UI::get().emplace<UISlideMenu>(menutype, std::move(menu));
+			UI::get().enable();
+
+			return;
+		}
 
 		std::string text = recv.read_string();
 
