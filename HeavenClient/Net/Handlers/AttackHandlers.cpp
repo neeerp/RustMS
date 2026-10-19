@@ -71,9 +71,10 @@ namespace ms
 
 			for (uint8_t j = 0; j < length; j++)
 			{
+				// A critical hit has the top bit set (0x980620).
 				int32_t damage = recv.read_int();
-				bool critical = false; // TODO: ?
-				lines.push_back(std::make_pair(damage, critical));
+				bool critical = damage < 0;
+				lines.push_back(std::make_pair(damage & 0x7FFFFFFF, critical));
 			}
 		}
 

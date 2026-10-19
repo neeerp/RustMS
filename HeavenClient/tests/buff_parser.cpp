@@ -61,7 +61,7 @@ int main()
 		hyperbody.set(14);
 		require(BuffParser::stats(hyperbody) == std::vector<Buffstat::Id>({ Buffstat::HYPERBODYHP, Buffstat::HYPERBODYMP }),
 				"each set bit names its stat");
-		require(Buffstat::by_bit(29) == Buffstat::NONE, "stats HeavenClient doesn't keep are NONE");
+		require(Buffstat::by_bit(48) == Buffstat::NONE, "stats HeavenClient doesn't keep are NONE");
 
 		// SPAWN_PLAYER: Speed and Dark Sight, then all seven two-state stats.
 		BuffParser::Flags spawn{ 0, 0 };

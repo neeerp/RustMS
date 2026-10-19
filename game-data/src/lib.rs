@@ -4,6 +4,7 @@ use std::cmp::Ordering;
 use std::collections::{BTreeMap, HashMap};
 use std::fs::File;
 use std::path::Path;
+use std::time::Duration;
 use thiserror::Error;
 pub mod commodities;
 pub mod footholds;
@@ -235,9 +236,39 @@ pub struct FieldTemplate {
     /// Whether the map has a wall clock (a `clock` node with a position and
     /// size, as stations do), which the server sets to the time of day.
     pub clock: bool,
+    /// `info/timeLimit`: how many seconds a player may stay before being
+    /// sent to `forced_return`. The client never reads it; the server shows
+    /// the countdown.
+    pub time_limit: Option<u32>,
+    /// `info/decHP`: the cold, water or curse that hurts players here.
+    pub hazard: Option<Hazard>,
     pub footholds: footholds::Footholds,
     portals_by_id: BTreeMap<u32, PortalTemplate>,
     portal_ids_by_name: HashMap<String, Vec<u32>>,
+}
+
+/// How often a map's hazard hurts when it has no `info/decInterval`. A
+/// v83 Aqua Road item speaks of "the constant HP damage you receive for every
+/// 10 seconds underwater" (Cassandra's Magic, 2022187).
+pub const HAZARD_INTERVAL: Duration = Duration::from_secs(10);
+
+/// A map's hazard. v83's client reads none of it; the server hurts the
+/// player.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Hazard {
+    /// The HP it takes each time (`decHP`).
+    pub hp: i32,
+    /// How often (`decInterval`, in ms, else `HAZARD_INTERVAL`).
+    pub every: Duration,
+    /// The equipment that keeps it off (`protectItem`).
+    pub protect_item: Option<i32>,
+    /// Whether it is the water's (a `swim` map) rather than the cold's.
+    pub water: bool,
+    /// Whether it is the cold's, which an equip scrolled with ADD PREVENT
+    /// COLDNESS keeps off: El Nath's and the internet cafe's maps (by
+    /// `returnMap`), as Cosmic has it, and those the cold cape (1102109)
+    /// protects.
+    pub cold: bool,
 }
 
 impl FieldTemplate {
@@ -416,15 +447,23 @@ fn build_field_template(
         .transpose()?
         .flatten()
         .unwrap_or(1.0);
-    let (town, field_limit, allowed_items, personal_shop) =
+    let time_limit = nx
+        .child_by_name(map_node_idx, "info")?
+        .map(|info| nx.int_child(info, "timeLimit"))
+        .transpose()?
+        .flatten()
+        .and_then(|seconds| u32::try_from(seconds).ok())
+        .filter(|&seconds| seconds > 0);
+    let (town, field_limit, allowed_items, personal_shop, hazard) =
         match nx.child_by_name(map_node_idx, "info")? {
             Some(info) => (
                 nx.int_child(info, "town")?.unwrap_or(0) != 0,
                 nx.int_child(info, "fieldLimit")?.unwrap_or(0),
                 allowed_items(nx, info)?,
                 nx.int_child(info, "personalShop")?.unwrap_or(0) != 0,
+                hazard(nx, info, return_map)?,
             ),
-            None => (false, 0, Vec::new(), false),
+            None => (false, 0, Vec::new(), false, None),
         };
     // v83 FUN_0052bc72 makes the clock only if all four are non-zero.
     let clock = match nx.child_by_name(map_node_idx, "clock")? {
@@ -500,11 +539,45 @@ fn build_field_template(
         allowed_items,
         personal_shop,
         clock,
+        time_limit,
+        hazard,
         footholds,
         portals_by_id,
         portal_ids_by_name,
     })
 }
+
+/// A map's `info/decHP`, if positive, with its interval and protection.
+fn hazard(
+    nx: &NxDataFile,
+    info: u32,
+    return_map: Option<i32>,
+) -> Result<Option<Hazard>, GameDataError> {
+    let hp = nx.int_child(info, "decHP")?.unwrap_or(0);
+    if hp <= 0 {
+        return Ok(None);
+    }
+    let every = nx
+        .int_child(info, "decInterval")?
+        .and_then(|ms| u64::try_from(ms).ok())
+        .filter(|&ms| ms > 0)
+        .map_or(HAZARD_INTERVAL, Duration::from_millis);
+    let protect_item = nx.int_child(info, "protectItem")?.filter(|&id| id > 0);
+    let water = nx.int_child(info, "swim")?.unwrap_or(0) != 0;
+    let cold = !water
+        && (protect_item == Some(COLD_CAPE) || matches!(return_map, Some(EL_NATH | INTERNET_CAFE)));
+    Ok(Some(Hazard {
+        hp,
+        every,
+        protect_item,
+        water,
+        cold,
+    }))
+}
+
+const COLD_CAPE: i32 = 1_102_109;
+const EL_NATH: i32 = 211_000_000;
+const INTERNET_CAFE: i32 = 193_000_000;
 
 /// A map's `info/allowedItem` list.
 fn allowed_items(nx: &NxDataFile, info: u32) -> Result<Vec<i32>, GameDataError> {
@@ -986,6 +1059,8 @@ mod tests {
             allowed_items: Vec::new(),
             personal_shop: false,
             clock: false,
+            time_limit: None,
+            hazard: None,
             footholds: footholds::Footholds::default(),
             portals_by_id: BTreeMap::from([
                 (
@@ -1055,6 +1130,8 @@ mod tests {
             allowed_items: Vec::new(),
             personal_shop: false,
             clock: false,
+            time_limit: None,
+            hazard: None,
             reactors: Vec::new(),
             footholds: footholds::Footholds::default(),
             portals_by_id: BTreeMap::from([
@@ -1175,5 +1252,61 @@ mod tests {
         assert!(clock(200_000_111));
         assert!(!clock(101_000_301));
         assert!(!clock(100_000_000));
+    }
+
+    #[test]
+    fn timed_maps_have_a_time_limit() {
+        let Some(path) = test_assets::path("Map.nx") else {
+            return;
+        };
+        let game_data = GameData::load_from_nx_map(&path).expect("load map nx");
+        let field = game_data.field(100_020_100).expect("a mini dungeon");
+        assert_eq!(field.time_limit, Some(7200));
+        assert_eq!(field.forced_return, Some(100_020_000));
+        assert_eq!(
+            game_data.field(100_000_000).expect("Henesys").time_limit,
+            None
+        );
+    }
+
+    #[test]
+    fn hazardous_maps_hurt() {
+        let Some(path) = test_assets::path("Map.nx") else {
+            return;
+        };
+        let game_data = GameData::load_from_nx_map(&path).expect("load map nx");
+        let hazard = |map_id| game_data.field(map_id).expect("a map").hazard;
+        let cold = Hazard {
+            hp: 10,
+            every: HAZARD_INTERVAL,
+            protect_item: Some(1_102_109),
+            water: false,
+            cold: true,
+        };
+        assert_eq!(hazard(211_040_000), Some(cold));
+        // Ice Valley's quest maps have no cape, but are El Nath's.
+        assert!(hazard(921_100_100).is_some_and(|h| h.cold));
+        // The Chilly Hill is the internet cafe's.
+        assert!(hazard(196_000_000).is_some_and(|h| h.cold));
+        // The Other Dimension hurts, but is not cold.
+        assert!(hazard(108_010_101).is_some_and(|h| !h.cold));
+        let balrogs_tomb = Hazard {
+            hp: 50,
+            every: Duration::from_secs(15),
+            protect_item: None,
+            water: false,
+            cold: false,
+        };
+        assert_eq!(hazard(105_100_300), Some(balrogs_tomb));
+        // The tower's foot is under water, though El Nath's.
+        let seabed = Hazard {
+            hp: 6,
+            every: HAZARD_INTERVAL,
+            protect_item: Some(1_102_061),
+            water: true,
+            cold: false,
+        };
+        assert_eq!(hazard(200_082_300), Some(seabed));
+        assert_eq!(hazard(211_000_000), None);
     }
 }

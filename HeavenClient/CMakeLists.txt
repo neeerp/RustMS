@@ -199,6 +199,8 @@ if(HEAVENCLIENT_BUILD_TESTS)
     add_test(NAME mist_layout COMMAND mist_layout_tests)
     add_executable(ships_tests tests/ships.cpp)
     add_test(NAME ships COMMAND ships_tests)
+    add_executable(field_clock_tests tests/field_clock.cpp)
+    add_test(NAME field_clock COMMAND field_clock_tests)
     add_executable(reactor_rules_tests tests/reactor_rules.cpp)
     add_test(NAME reactor_rules COMMAND reactor_rules_tests)
     add_executable(status_messages_tests tests/status_messages.cpp Net/InPacket.cpp)
@@ -608,6 +610,8 @@ add_executable(HeavenClient
     IO/UITypes/UIQuestLog.h
     IO/UITypes/UIQuiz.cpp
     IO/UITypes/UIQuiz.h
+    IO/UITypes/UIFieldClock.cpp
+    IO/UITypes/UIFieldClock.h
     IO/UITypes/UIQuit.cpp
     IO/UITypes/UIQuit.h
     IO/UITypes/UIRaceSelect.cpp

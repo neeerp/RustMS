@@ -104,6 +104,7 @@ namespace ms
 		CLOCK = 147,
 		CONTI_MOVE = 148,
 		CONTI_STATE = 149,
+		STOP_CLOCK = 154,
 
 		/// MapObject
 		SPAWN_CHAR = 160,
@@ -227,6 +228,7 @@ namespace ms
 		emplace<CLOCK, ClockHandler>();
 		emplace<CONTI_MOVE, ContiMoveHandler>();
 		emplace<CONTI_STATE, ContiStateHandler>();
+		emplace<STOP_CLOCK, StopClockHandler>();
 
 		// MapObject handlers
 		emplace<SPAWN_CHAR, SpawnCharHandler>();

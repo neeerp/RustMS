@@ -53,9 +53,17 @@ namespace ms
 		void handle(InPacket& recv) const override;
 	};
 
-	// The time on a station's wall clock (v83 0x5361bd kind 1). The other
-	// kinds, countdowns, aren't shown yet.
+	// A clock (v83 CField::OnClock 0x5361bd): kind 1 the time on a
+	// station's wall clock; kinds 0, 2 and 3 a countdown at the top of the
+	// screen, an event's or the field's.
 	class ClockHandler : public PacketHandler
+	{
+	public:
+		void handle(InPacket& recv) const override;
+	};
+
+	// Takes the field's countdown down (v83 0x53184a).
+	class StopClockHandler : public PacketHandler
 	{
 	public:
 		void handle(InPacket& recv) const override;

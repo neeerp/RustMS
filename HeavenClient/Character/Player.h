@@ -123,9 +123,6 @@ namespace ms
 		// Execute a rush movement
 		void rush(double targetx);
 
-		// Check whether the player is invincible
-		bool is_invincible() const override;
-
 		// Handle an attack to the player.
 		MobAttackResult damage(const MobAttack &attack);
 

@@ -71,7 +71,8 @@ reconstruction of v83:
     Members off the player's map are greyed.
   - Clicking a row selects that member, for Party Leader, Whisper, and Expel.
     Party Leader asks "Do you wish to pass the leader position to NAME?"
-    first, as v83 does (`FUN_0090e41a`).
+    first, as v83 does (`FUN_0090e41a`). It is greyed out on a map whose
+    `fieldLimit` has bit 0x800 (`FUN_0090bddb`).
   - Invite opens `UIEnterText` to ask for a name.
 - `UIPartyHP` is the translucent HP list at the top right
   (`UserList/Party/PartyHP`). `UIQuestHelper` moves down below it.

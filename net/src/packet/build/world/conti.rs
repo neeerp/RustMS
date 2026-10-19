@@ -1,4 +1,5 @@
-//! Continent ships and the station wall clock (`net::conti`).
+//! Continent ships, the station wall clock (`net::conti`) and the field
+//! countdown.
 
 use crate::conti::{State, Target};
 use crate::{error::NetworkError, packet::op::SendOpcode};
@@ -36,6 +37,23 @@ pub fn build_clock_time(hour: u8, minute: u8, second: u8) -> Result<Packet, Netw
     Ok(p)
 }
 
+/// CLOCK kind 2: the field's countdown from this many seconds, started
+/// (v83 FUN_005361bd).
+pub fn build_countdown(seconds: u32) -> Result<Packet, NetworkError> {
+    let mut p = Packet::new_empty();
+    p.write_short(SendOpcode::Clock as i16)?;
+    p.write_byte(2)?;
+    p.write_int(seconds as i32)?;
+    Ok(p)
+}
+
+/// STOP_CLOCK: takes the field's countdown down (v83 FUN_0053184a).
+pub fn build_stop_clock() -> Result<Packet, NetworkError> {
+    let mut p = Packet::new_empty();
+    p.write_short(SendOpcode::StopClock as i16)?;
+    Ok(p)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -70,5 +88,14 @@ mod tests {
             build_clock_time(14, 5, 9).unwrap().bytes,
             [0x93, 0, 1, 14, 5, 9]
         );
+    }
+
+    #[test]
+    fn the_countdown_is_kind_two_with_its_seconds() {
+        assert_eq!(
+            build_countdown(7200).unwrap().bytes,
+            [0x93, 0, 2, 0x20, 0x1c, 0, 0]
+        );
+        assert_eq!(build_stop_clock().unwrap().bytes, [0x9a, 0]);
     }
 }

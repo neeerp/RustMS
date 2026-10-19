@@ -16,6 +16,7 @@
 //	along with this program.  If not, see <https://www.gnu.org/licenses/>.		//
 //////////////////////////////////////////////////////////////////////////////////
 #include "MapMobs.h"
+#include "FieldLimit.h"
 #include "Mob.h"
 
 #include <algorithm>
@@ -209,7 +210,7 @@ namespace ms
 		return mobs.contains(oid);
 	}
 
-	int32_t MapMobs::find_colliding(const MovingObject &moveobj) const
+	int32_t MapMobs::find_colliding(const MovingObject &moveobj, int32_t fieldlimit, bool hidden) const
 	{
 		Range<int16_t> horizontal = Range<int16_t>(moveobj.get_last_x(), moveobj.get_x());
 		Range<int16_t> vertical = Range<int16_t>(moveobj.get_last_y(), moveobj.get_y());
@@ -221,18 +222,19 @@ namespace ms
 					vertical.greater()
 			};
 
-		return find_touching(player_rect);
+		return find_touching(player_rect, fieldlimit, hidden);
 	}
 
-	int32_t MapMobs::find_touching(const Rectangle<int16_t> &area) const
+	int32_t MapMobs::find_touching(const Rectangle<int16_t> &area, int32_t fieldlimit, bool hidden) const
 	{
 		auto iter = std::find_if(
 				mobs.begin(),
 				mobs.end(),
-				[&area](auto &mmo)
+				[&](auto &mmo)
 				{
 					Optional<Mob> mob = mmo.second.get();
-					return mob && mob->is_alive() && mob->deals_touch_damage() && mob->is_in_range(area);
+					return mob && mob->is_alive() && mob->deals_touch_damage() && mob->is_in_range(area)
+							&& field_limit::may_touch(fieldlimit, hidden, mob->get_id());
 				}
 		);
 

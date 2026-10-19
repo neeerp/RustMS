@@ -39,6 +39,8 @@ int main()
 		require(seduced(3) == Input{ 0, 0, true } && seduced(4) == Input{ 0, 1, false }, "3 jumps, 4 lies down");
 		require(seduced(7) == Input{ 1, 0, true } && seduced(5) == Input{}, "7 jumps right; 5 does nothing");
 		require(!can_jump(attracted) && !can_attack(attracted), "the player can't jump or attack by themself");
+		require(!can_use_skill(2001002, attracted) && can_use_skill(1121011, attracted), "nor use skills but Hero's Will");
+		require(!can_use_skill(1121011, stunned), "which a stun stops");
 
 		State weakened;
 		weakened.weakened = true;

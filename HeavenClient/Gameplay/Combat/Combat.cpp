@@ -29,6 +29,7 @@
 #include "ShotPath.h"
 
 #include "../MapleMap/DoorRules.h"
+#include "../MapleMap/FieldLimit.h"
 
 #include "../../Constants.h"
 #include "../../Character/SkillId.h"
@@ -293,6 +294,9 @@ namespace ms
 	{
 		// v83 takes no other move while a skill is held (0x96a86e).
 		if (preparing || !player.can_attack())
+			return false;
+
+		if (!field_limit::may_attack(mapinfo.get_fieldlimit(), move.get_id()))
 			return false;
 
 		SpecialMove::ForbidReason reason = player.can_use(move);
@@ -2102,7 +2106,8 @@ namespace ms
 		for (size_t line = 0; line < damagelines.size(); line++)
 		{
 			int32_t amount = damagelines[line].first;
-			bool critical = damagelines[line].second;
+			// Snipe's hits always show as critical (FUN_00668b83).
+			bool critical = damagelines[line].second || move_id == SkillId::SNIPE;
 			DamageNumber::Type type = critical ? DamageNumber::Type::CRITICAL : DamageNumber::Type::NORMAL;
 			int16_t lift = damage_layout::mob_offset(static_cast<int16_t>(line), close);
 			numbers.emplace_back(type, amount, lift);

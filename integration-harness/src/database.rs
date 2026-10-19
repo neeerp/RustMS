@@ -136,6 +136,27 @@ pub async fn grant_pet(
     .await
 }
 
+/// Dress the logged-out character `character_id` in `item_id` at
+/// `position` (negative), with no stats of its own.
+pub async fn wear_equip(
+    character_id: i32,
+    position: i16,
+    item_id: i32,
+) -> Result<(), HarnessError> {
+    change_one_row("wear equip", move |conn| {
+        diesel::sql_query(
+            "WITH item AS (INSERT INTO inventory_items (character_id, inventory_type, slot, item_id, quantity, owner, flags) \
+             VALUES ($1, -1, $2, $3, 1, '', 0) RETURNING id) \
+             INSERT INTO equipment_stats (item_row_id) SELECT id FROM item",
+        )
+        .bind::<Integer, _>(character_id)
+        .bind::<SmallInt, _>(position)
+        .bind::<Integer, _>(item_id)
+        .execute(conn)
+    })
+    .await
+}
+
 /// Dress the logged-out character `character_id` in the cash equip
 /// `item_id`, with cash serial `serial`, at `position` (negative), such as
 /// a pet's equipment.

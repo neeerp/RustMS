@@ -225,6 +225,13 @@ namespace ms
 			return damage;
 		}
 
+		// A Snipe hit, which never misses: 199,999 less `roll`, from 0 to 10,000
+		// (FUN_0078df87, 0x78e4d6).
+		inline int32_t snipe_damage(double roll)
+		{
+			return static_cast<int32_t>(199999.0 - roll);
+		}
+
 		// The area a shot covers: its row from `origin` to `end_x`, widened
 		// for some skills, or the skill's own `lt_rb` around the `user`,
 		// turned the way they face.

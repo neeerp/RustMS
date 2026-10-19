@@ -124,6 +124,9 @@ impl WorldHandler for UseSkillHandler {
                 if skill_id == skills::DISPEL {
                     result = dispel(ctx.player, &used.skill, result, rand::random())?;
                 }
+                if skills::HEROS_WILL.contains(&skill_id) {
+                    result = cure(ctx.player, &skills::PURGED, result)?;
+                }
                 let result = with_party(result, skill_id, level, extras.party, 0);
                 let Some(inflict) = used.debuffs.clone() else {
                     return Ok(result);
@@ -364,7 +367,17 @@ fn dispel(
     if roll * 100.0 >= f64::from(skill.effect.prop) {
         return Ok(result);
     }
-    let ended = player.buffs.cure(&skills::DISPELLED);
+    cure(player, &skills::DISPELLED, result)
+}
+
+/// End the player's diseases among `stats`, telling them and, for those it
+/// sees, the map.
+fn cure(
+    player: &mut Player,
+    stats: &[BuffStat],
+    result: HandlerResult<WorldAction>,
+) -> Result<HandlerResult<WorldAction>, NetworkError> {
+    let ended = player.buffs.cure(stats);
     if ended.is_empty() {
         return Ok(result);
     }
@@ -1338,6 +1351,34 @@ mod tests {
             ]
         );
         assert!(!player.buffs.has(BuffStat::Darkness));
+    }
+
+    #[test]
+    fn heros_will_cures_seduce_and_dispels_diseases() {
+        if skills::data().is_err() {
+            return;
+        }
+        let now = Instant::now();
+        let mut player = beginner_with(1121011, 1);
+        player.stats.max_mp = 30;
+        player.stats.mp = 30;
+        diseased(
+            &mut player,
+            &[BuffStat::Seduce, BuffStat::Poison, BuffStat::StopPotion],
+            now,
+        );
+        let sent: Vec<_> = handle(&mut player, 1121011, 1)
+            .into_iter()
+            .filter_map(|action| match action {
+                WorldAction::Reply(packet) => Some(packet.opcode()),
+                _ => None,
+            })
+            .collect();
+        assert!(sent.contains(&(SendOpcode::CancelBuff as i16)));
+        assert!(sent.contains(&(SendOpcode::Cooldown as i16)));
+        assert!(!player.buffs.has(BuffStat::Seduce) && !player.buffs.has(BuffStat::Poison));
+        assert!(player.buffs.has(BuffStat::StopPotion));
+        assert_eq!(player.stats.mp, 0);
     }
 
     #[test]

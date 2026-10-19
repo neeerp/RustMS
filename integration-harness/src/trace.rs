@@ -164,6 +164,8 @@ pub struct Trace {
     pub broadcasts: Vec<(u8, String)>,
     /// CLOCK kind 1, a wall clock's time of day: (hour, minute, second).
     pub clocks: Vec<(u8, u8, u8)>,
+    /// CLOCK kind 2, the field's countdown: its seconds.
+    pub countdowns: Vec<i32>,
     /// CONTI_MOVE: (target, state) of each ship shown leaving or docking.
     pub ship_moves: Vec<(u8, u8)>,
     /// CONTI_STATE: the ship's state, as answered.
@@ -513,12 +515,16 @@ impl Trace {
             self.warps.push(warp.map_id);
             self.arrivals
                 .push((warp.map_id, warp.spawn_point, warp.chase));
-        } else if op == SendOpcode::Clock as i16 && r.read_byte().unwrap() == 1 {
-            self.clocks.push((
-                r.read_byte().unwrap(),
-                r.read_byte().unwrap(),
-                r.read_byte().unwrap(),
-            ));
+        } else if op == SendOpcode::Clock as i16 {
+            match r.read_byte().unwrap() {
+                1 => self.clocks.push((
+                    r.read_byte().unwrap(),
+                    r.read_byte().unwrap(),
+                    r.read_byte().unwrap(),
+                )),
+                2 => self.countdowns.push(r.read_int().unwrap()),
+                _ => {}
+            }
         } else if op == SendOpcode::ContiMove as i16 {
             self.ship_moves
                 .push((r.read_byte().unwrap(), r.read_byte().unwrap()));

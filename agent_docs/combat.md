@@ -123,10 +123,13 @@ spell for twice v83's magic maximum (`max_magic_damage`: ((M² / 1000 + M) / 30
 + INT / 200) × `mad`, where M is INT plus equipment magic attack), a `damage`
 skill for that percentage of the basic cap, Shadow Meso for v83's highest
 roll (ten times one and a half its `moneyCon`, raised by its `x` percent on a
-critical), and a skill with none is not an attack. A spell must name a skill.
+critical), Snipe's shot for 199,999, and a skill with none is not an attack.
+A spell must name a skill.
 Too little MP refuses the attack, as do too few mesos for the skill's
 `moneyCon` (Shadow Meso's, raised by Shadow Partner's `y` percent while that
-buff is on, as the v83 client checks).
+buff is on, as the v83 client checks). An attack skill with a `cooltime`
+(Heaven's Hammer, Snipe, Aerial Strike) is refused while it cools down;
+otherwise it starts the cooldown and the attacker gets COOLDOWN.
 HeavenClient sends a skill as the attack v83's `CUserLocal::DoActiveSkill`
 makes it, whatever the weapon: a swing, a shot, or a spell
 (`SkillData::flags_of`). Any other skill goes out as SPECIAL_MOVE. Skills
@@ -177,11 +180,21 @@ special move's `itemCon`, and Shadow Meso exactly the mesos the client checks
 for. The skill's description gives each level a range around its
 `moneyCon`, so v83's server may have charged a varying amount.
 
+On a map whose `fieldLimit` has bit 0x2, the attacks that carry the player
+along or push them back do nothing, without a word: the Rushes, Assaulter,
+Assassinate, Ninja Storm, Backspin Blow, both Corkscrew Blows, Snatch, Final
+Charge, Final Toss, Rolling Spin, Dragon's Breath, and Recoil Shot
+(`field_limit::may_attack`, 0x950921 and 0x9537d5).
+
 HeavenClient rolls Shadow Meso's hits as v83 does (`shot_path::meso_damage`,
 FUN_0078df87): ten times a whole number of mesos between half and one and a
 half its `moneyCon`, with its own `prop` and `x` for a critical in place of
 the user's, then a percent less for each level the mob is above the user. It
-misses as a blow does but ignores the mob's defense.
+misses as a blow does but ignores the mob's defense. Snipe's shot never
+misses and meets neither defense nor guards: 199,999 less a roll from 0 to
+10,000 (`shot_path::snipe_damage`, 0x78e4d6), always shown as a critical
+(FUN_00668b83). Another player's attack shows a hit as a critical when its
+damage has the top bit set (0x980620); RustMS never sets it.
 
 HeavenClient picks targets as v83 does (`Combat::find_targets`). Melee and
 magic attacks take the mobs whose body overlaps the attack range in the order
@@ -288,7 +301,10 @@ rounding remainder) and each share goes to that player's client actor
 gained sends the new level, AP, SP, max HP/MP (+14/+11 per beginner level,
 the middle of v83's ranges) and shows SHOW_FOREIGN_EFFECT 0 to the others. As
 in v83, current HP and MP are not refilled. Each level grants 5 AP, and 3 SP
-once past beginner.
+once past beginner. A warrior's Improving MaxHP Increase (1000001), a
+Brawler's Improve MaxHP (5100000) and a magician's Improving MaxMP Increase
+(2000001) add their `x` to each level's growth and their `y` to an AP's
+(`net::skills::growth_bonus`).
 
 ## Buff skills
 
@@ -841,13 +857,17 @@ and Confuse (132) 51 (`game::mob_skill::inflicted`).
   then cures Poison, Seal, Darkness, Weakness, Curse and Slow (not Stun,
   Seduce or Confuse) with CANCEL_BUFF and CANCEL_FOREIGN_BUFF. A sealed
   player can still cast it.
+- **Hero's Will** (the 4th job's 1121011 and its kin, Pirate's Rage
+  5121008 and 5221010 among them; `skills::HEROS_WILL`, from v83
+  FUN_00765e2d): cures Dispel's diseases and Seduce, Confuse and Undead
+  (Cosmic's purgeDebuffs) the same way, then cools down for its `cooltime`.
 - **What the client does** (HeavenClient `Character/Diseases.h`, from v83
   CUserLocal): Stun stops all input, attacks and skills; Seduce moves the
   player by its `x` (1 left, 2 right, 3 jump, 4 down, 6 and 7 jump left and
-  right) and stops jumps, attacks and skills; Confuse reverses the arrows
-  (teleport too); Weakness stops jumping; Seal stops every skill but
-  Dispel; Slow sets the walking speed to its `x` before the 80-140 clamp.
-  Each disease shows `MobSkill.img/<skill>/level/<lvl>/affected` on the
+  right) and stops jumps, attacks and skills but Hero's Will; Confuse
+  reverses the arrows (teleport too); Weakness stops jumping; Seal stops
+  every skill but Dispel; Slow sets the walking speed to its `x` before the
+  80-140 clamp. Each disease shows `MobSkill.img/<skill>/level/<lvl>/affected` on the
   character, over the face when its `pos` is 1, otherwise at the feet; the
   player also gets a grey chat notice (none for Slow or Confuse) but no
   buff-bar icon.
@@ -917,7 +937,9 @@ Lord's or Shadower's Shadow Shifter dodges any hit, a miss too, at its
 `prop` percent (0x9584f6), and a Hero's or Paladin's Guardian blocks a hit
 that lands while they wear a shield, at its `prop` per mille, after Power
 Guard has sent its share back (0x958692). A dodge shows no number, only
-the skill's `special` animation, and Shadow Shifter smiles for 1.5 s. The
+the skill's `special` animation, and Shadow Shifter smiles for 1.5 s. On a
+map whose `fieldLimit` has bit 0x2, neither skill nor Power Stance takes
+effect (0x9585a5, 0x958778, 0x958af6). The
 server accepts -1 only from a Night Lord or Shadower who has Shadow
 Shifter, or (with a shield worn and a guard byte) a Hero or Paladin with
 Guardian. After the mob's id and object id, a mob's TAKE_DAMAGE carries
@@ -942,6 +964,30 @@ mode 6). For a Safety Charm it gives the charms left and the days the next one
 lasts; any other charm is named. The server also keeps the spawn point nearest
 where the player fell.
 
+Some maps hurt whoever is on them (`info/decHP`): El Nath's snowfields, the
+Aquarium's seabed, Sharenian, and others, 123 maps in all. v83 reads none of
+`decHP`, `decInterval` or `protectItem`, so the server does it
+(`runtime/src/actor/client/hazard.rs`, `net::hurt_by_hazard`). From a field
+join, every `decInterval` ms (only the Balrog's maps have one, 15 s), or
+otherwise every 10 s, the player loses `decHP` HP in a plain stat update.
+Nothing happens while they're dead, in the Cash Shop, or wearing the map's
+`protectItem` (1102109 in the cold, 1102061 under water). The 10 s comes from
+Cassandra's Magic (2022187), which protects "every 10 seconds underwater".
+Cosmic and StrategyWiki both say 5 s, so the interval is a guess.
+
+Two more things keep hazards off, both server-side too:
+
+- A thaw item (`spec/thaw`) gives the Thaw buff (temporary stat 29), which
+  takes its value off each hit of its own kind of hazard. Red Bean Porridge
+  (2022001, 10) says "10 HP will be protected" in the cold. Air Bubble
+  (2022040, -6) and Cassandra's Magic (-6) are for the water. So a negative
+  thaw counts on `swim` maps, a positive one elsewhere. That reading is
+  ours; Cosmic sends MAP_PROTECTION instead.
+- An equip scrolled with ADD PREVENT COLDNESS (2041058, `FLAG_COLD`) keeps
+  the cold off. A hazard is cold when it isn't under water and the map
+  either returns to El Nath (211000000) or the internet cafe (193000000),
+  as Cosmic has it, or wants the cold cape (1102109).
+
 The client's respawn is a CHANGE_MAP with a target while dead. It returns the
 player to the map's return map with 50 HP. When the player chose a Wheel of
 Destiny (5510000) in the death dialog (the wheel byte after the portal name),
@@ -952,7 +998,9 @@ rather than at 50 HP, as in Cosmic.
 
 After a hit, HeavenClient ignores touches for 1500 ms, as v83 does. If the hit
 did damage, the player blinks meanwhile: half brightness for 60 ms, then
-normal for 60 ms. Other players don't blink.
+normal for 60 ms. Other players don't blink. Dark Sight keeps touches off
+too, but not on a map whose `fieldLimit` has bit 0x2, and never the Master
+Guardian's (9400594; `field_limit::may_touch`, FUN_00678c77).
 
 HeavenClient's `Player::update_death` notices HP reaching 0: the player
 becomes a ghost (`Char::State::DIED`), the tombstone from `Effect.nx/Tomb.img`
@@ -1006,7 +1054,9 @@ Three Snails, Nimble Feet, and Recovery and checks their damage caps, MP,
 buffs, cooldowns, Recovery's heal, what the others see, and that the buffs
 end on time and on death. `poison_mist` casts Poison Mist on a snail and
 checks the cloud's packet, that it lifts on time, and that it poisons only
-the snails in its box. `summons` has a ranger call up a Silver Hawk and a
+the snails in its box. `snipe` has a Marksman Snipe snails: 200,000 is
+refused, 199,999 kills and starts the 4 s cooldown, which refuses another
+until it ends. `summons` has a ranger call up a Silver Hawk and a
 Puppet, and checks what a watcher sees: the spawns, a refused and an accepted
 Hawk attack, the Puppet breaking, and the Hawk following its owner to the
 next map with no entrance. It also has a Dark Knight's Beholder heal them
@@ -1019,5 +1069,8 @@ logout.
 Bandit heal themselves with Chakra.
 `player_diseases` has a Hogul in Korean Folk Town cast Slow from far away
 (it misses) and then on the player (it lands for 10 s, then ends).
+`map_hazards` warps to El Nath's Ice Valley in its cape, which keeps the
+cold out, then takes it off and drinks an Air Bubble, which doesn't help: it
+loses 10 HP at the next tick. After a Red Bean Porridge it loses nothing.
 HeavenClient's `diseases_tests` cover the input, jump, attack and skill
 gates and the notices.

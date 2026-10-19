@@ -11,14 +11,20 @@ namespace ms
 	namespace field_limit
 	{
 		constexpr int32_t JUMP = 0x1;
+		constexpr int32_t MOVEMENT_SKILLS = 0x2;
 		constexpr int32_t RETURN_SCROLLS = 0x20;
+		constexpr int32_t TELEPORT_ROCKS = 0x40;
 		constexpr int32_t MAP_SCROLLS = 0x100;
 		constexpr int32_t CONSUMABLES = 0x400;
+		constexpr int32_t PARTY_LEADER = 0x800;
 		constexpr int32_t DOWN_JUMP = 0x20000;
 		constexpr int32_t DROPS = 0x400000;
 
 		// A return scroll's moveTo for "the nearest town": the map's return map.
 		constexpr int32_t NEAREST_TOWN = 999999999;
+
+		// The Master Guardian, whom Dark Sight never hides the player from.
+		constexpr int32_t MASTER_GUARDIAN = 9400594;
 
 		// The kinds v83 sends as USE_ITEM (FUN_004efd25 and the quick slots
 		// at FUN_0094f2ed): potions, food, cures, transformations and the
@@ -133,6 +139,58 @@ namespace ms
 		inline bool may_jump(int32_t fieldlimit, bool down)
 		{
 			return !(fieldlimit & (down ? DOWN_JUMP : JUMP));
+		}
+
+		// v83 FUN_00678c77: Dark Sight keeps a mob's touch off the player,
+		// but not where bit 0x2 is set, and never the Master Guardian's.
+		inline bool may_touch(int32_t fieldlimit, bool hidden, int32_t mob_id)
+		{
+			return !hidden || (fieldlimit & MOVEMENT_SKILLS) || mob_id == MASTER_GUARDIAN;
+		}
+
+		// v83 FUN_00950921 and FUN_009537d5: bit 0x2 quietly stops the
+		// attacks that carry the player along or push them back.
+		inline bool may_attack(int32_t fieldlimit, int32_t skill_id)
+		{
+			if (!(fieldlimit & MOVEMENT_SKILLS))
+				return true;
+
+			switch (skill_id)
+			{
+				case 1121006:  // Rush
+				case 1221007:
+				case 1321003:
+				case 4121008:  // Ninja Storm
+				case 4211002:  // Assaulter
+				case 4221001:  // Assassinate
+				case 5101002:  // Backspin Blow
+				case 5101004:  // Corkscrew Blow
+				case 5121005:  // Snatch
+				case 15101003: // Corkscrew Blow
+				case 21100002: // Final Charge
+				case 21110003: // Final Toss
+				case 21110006: // Rolling Spin
+				case 3121003:  // Dragon's Breath
+				case 3221003:
+				case 5201006:  // Recoil Shot
+					return false;
+				default:
+					return true;
+			}
+		}
+
+		// v83 FUN_00a0a4aa: no teleport rock in the event maps (the
+		// millions digit 9), or where bit 0x40 or 0x2 is set.
+		inline bool may_teleport_rock(int32_t fieldlimit, int32_t map_id)
+		{
+			return (map_id / 1000000) % 100 != 9 && !(fieldlimit & (TELEPORT_ROCKS | MOVEMENT_SKILLS));
+		}
+
+		// v83 FUN_0090bddb and FUN_00530226: bit 0x800 stops a party leader
+		// passing the role on.
+		inline bool may_change_leader(int32_t fieldlimit)
+		{
+			return !(fieldlimit & PARTY_LEADER);
 		}
 	}
 }

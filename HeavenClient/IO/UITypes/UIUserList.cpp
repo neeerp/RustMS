@@ -33,6 +33,7 @@
 
 #include "../../Character/Job.h"
 #include "../../Gameplay/Stage.h"
+#include "../../Gameplay/MapleMap/FieldLimit.h"
 #include "../../Graphics/GraphicsGL.h"
 #include "../../Util/NxFiles.h"
 
@@ -710,7 +711,7 @@ namespace ms
 				party.toggle_hp_marks();
 				break;
 			case Buttons::BT_CHANGE_LEADER:
-				if (member)
+				if (member && field_limit::may_change_leader(Stage::get().get_mapinfo().get_fieldlimit()))
 				{
 					int32_t id = member->id;
 
@@ -1051,7 +1052,8 @@ namespace ms
 		const PartyMember* member = selected_member();
 
 		enable(Buttons::BT_HP, in_party);
-		enable(Buttons::BT_CHANGE_LEADER, leader && member && member->online());
+		enable(Buttons::BT_CHANGE_LEADER, leader && member && member->online()
+				&& field_limit::may_change_leader(Stage::get().get_mapinfo().get_fieldlimit()));
 		enable(Buttons::BT_WHISPER, member && member->online());
 		enable(Buttons::BT_CHAT, in_party);
 		enable(Buttons::BT_SEARCH, false);

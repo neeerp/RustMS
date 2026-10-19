@@ -100,6 +100,32 @@ pub fn natural_recovery(player: &Player) -> NaturalRecovery {
     }
 }
 
+pub const IMPROVING_MAX_HP: i32 = 1000001;
+pub const IMPROVING_MAX_MP: i32 = 2000001;
+pub const BRAWLER_IMPROVE_MAX_HP: i32 = 5100000;
+
+/// What a warrior's Improving MaxHP Increase, a Brawler's Improve MaxHP and
+/// a magician's Improving MaxMP Increase add to max HP and MP growth: `x`
+/// on a level up, or `y` for an AP, as their descriptions say.
+pub fn growth_bonus(player: &Player, level_up: bool) -> (i16, i16) {
+    let job = i32::from(player.stats.job);
+    let bonus = |line, skill_id| {
+        let skill = learned(player, skill_id).filter(|_| in_line(job, line));
+        let value = skill.map_or(0, |skill| {
+            if level_up {
+                skill.effect.x
+            } else {
+                skill.effect.y
+            }
+        });
+        i16::try_from(value).unwrap_or(0)
+    };
+    (
+        bonus(100, IMPROVING_MAX_HP) + bonus(510, BRAWLER_IMPROVE_MAX_HP),
+        bonus(200, IMPROVING_MAX_MP),
+    )
+}
+
 /// The percent Element Amplification scales the player's spells by (its
 /// `y`), or 100 without it (v83 FUN_00765771).
 pub fn amplification(player: &Player) -> i32 {
@@ -134,6 +160,25 @@ pub const DISPELLED: [BuffStat; 6] = [
     BuffStat::Curse,
     BuffStat::Slow,
 ];
+/// The Hero's Wills, Pirate's Rage and 5221010 among them (v83
+/// FUN_00765e2d), which a seduced player may still use.
+pub const HEROS_WILL: [i32; 14] = [
+    1121011, 1221012, 1321010, 2121008, 2221008, 2321009, 3121009, 3221008, 4121009, 4221008,
+    5121008, 5221010, 21121008, 22171004,
+];
+/// The diseases Hero's Will cures: Dispel's, and Seduce, Confuse, and
+/// Undead (Cosmic's purgeDebuffs).
+pub const PURGED: [BuffStat; 9] = [
+    BuffStat::Poison,
+    BuffStat::Seal,
+    BuffStat::Darkness,
+    BuffStat::Weakness,
+    BuffStat::Curse,
+    BuffStat::Slow,
+    BuffStat::Seduce,
+    BuffStat::Confuse,
+    BuffStat::Undead,
+];
 pub const RESURRECTION: i32 = 2321006;
 pub const CHAKRA: i32 = 4211001;
 /// The Arch Mages' and Bishop's Mana Reflection share their levels' data;
@@ -153,6 +198,7 @@ pub const TELEPORTS: [i32; 5] = [2101002, 2201002, 2301001, 12101003, 22101001];
 pub fn acts_alone(skill_id: i32) -> bool {
     matches!(skill_id, MYSTIC_DOOR | CHAKRA | RESURRECTION | TIME_LEAP)
         || TELEPORTS.contains(&skill_id)
+        || HEROS_WILL.contains(&skill_id)
 }
 
 /// The HP Chakra heals: from 2.3 to 3.5 times the user's LUK, with
@@ -770,6 +816,26 @@ mod tests {
             });
         }
         player
+    }
+
+    #[test]
+    fn improving_max_hp_and_mp_add_to_their_jobs_growth() {
+        let mut player = knowing(&[
+            (IMPROVING_MAX_HP, 10),
+            (IMPROVING_MAX_MP, 3),
+            (BRAWLER_IMPROVE_MAX_HP, 2),
+        ]);
+        player.stats.job = 110;
+        assert_eq!(growth_bonus(&player, true), (40, 0));
+        assert_eq!(growth_bonus(&player, false), (30, 0));
+        player.stats.job = 230;
+        assert_eq!(growth_bonus(&player, true), (0, 6));
+        assert_eq!(growth_bonus(&player, false), (0, 3));
+        player.stats.job = 510;
+        assert_eq!(growth_bonus(&player, true), (6, 0));
+        // A Gunslinger has no Improve MaxHP.
+        player.stats.job = 520;
+        assert_eq!(growth_bonus(&player, false), (0, 0));
     }
 
     #[test]

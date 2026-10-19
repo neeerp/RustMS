@@ -635,7 +635,9 @@ namespace ms
 					UIElement::Type::STORAGE,
 					UIElement::Type::INVITECARD,
 					UIElement::Type::CONTEXTMENU,
-					UIElement::Type::REVIVE
+					UIElement::Type::REVIVE,
+					UIElement::Type::FIELDCLOCK,
+					UIElement::Type::EVENTCLOCK
 			};
 
 			if (std::find(silent_types.begin(), silent_types.end(), T::TYPE) == silent_types.end())

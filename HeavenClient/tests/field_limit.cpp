@@ -69,6 +69,20 @@ int main()
 		require(!may_use_wheel(0, 910000000) && !may_use_wheel(0, 200090010) && !may_use_wheel(0, 390000000),
 				"nor in event maps, on the ships or in 390xxxxxx");
 
+		require(may_touch(0, false, 100100) && !may_touch(0, true, 100100), "Dark Sight keeps a snail's touch off");
+		require(may_touch(0x2, true, 100100), "but not where bit 0x2 is set");
+		require(may_touch(0, true, MASTER_GUARDIAN), "and never the Master Guardian's");
+
+		require(may_attack(0, 1121006) && !may_attack(0x2, 1121006), "bit 0x2 stops Rush");
+		require(!may_attack(0x2, 4211002) && !may_attack(0x2, 5201006), "Assaulter and Recoil Shot too");
+		require(may_attack(0x2, 0) && may_attack(0x2, 3221007), "but not a plain attack or Snipe");
+
+		require(may_teleport_rock(0, henesys), "a teleport rock works in Henesys");
+		require(!may_teleport_rock(0x40, henesys) && !may_teleport_rock(0x2, henesys), "but not with bit 0x40 or 0x2");
+		require(!may_teleport_rock(0, 109010000) && !may_teleport_rock(0, 209000000), "nor in the event maps");
+
+		require(may_change_leader(0x2) && !may_change_leader(0x800), "bit 0x800 keeps the party's leader");
+
 		std::cout << "Field limit passed\n";
 		return 0;
 	}

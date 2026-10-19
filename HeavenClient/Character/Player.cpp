@@ -753,17 +753,6 @@ namespace ms
 		}
 	}
 
-	bool Player::is_invincible() const
-	{
-		if (state == Char::State::DIED)
-			return true;
-
-		if (has_buff(Buffstat::Id::DARKSIGHT))
-			return true;
-
-		return Char::is_invincible();
-	}
-
 	MobAttackResult Player::damage(const MobAttack &attack)
 	{
 		int32_t damage = stats.calculate_damage(attack, randomizer.next_real(1.0), randomizer.next_real(1.0),
@@ -779,10 +768,12 @@ namespace ms
 		// A Night Lord's or Shadower's Shadow Shifter may dodge any hit, a
 		// miss too (0x9584f6). A Hero's or Paladin's Guardian may block one
 		// that lands while they hold a shield, after Power Guard has sent its
-		// share back (0x958692).
+		// share back (0x958692). Neither does, nor Power Stance, where the
+		// map stops movement skills (0x9585a5, 0x958778, 0x958af6).
+		bool procs = Stage::get().get_mapinfo().can_use_movement_skills();
 		int32_t job = stats.get_stat(MapleStat::Id::JOB);
 		int32_t dodged = 0;
-		int32_t shifter = mob_damage::shadow_shifter(job);
+		int32_t shifter = procs ? mob_damage::shadow_shifter(job) : 0;
 
 		if (shifter && skillbook.get_level(shifter) > 0 && randomizer.below(skill_stats(skillbook, shifter).chance))
 		{
@@ -790,7 +781,7 @@ namespace ms
 			dodged = shifter;
 		}
 
-		int32_t guardian = mob_damage::guardian(job);
+		int32_t guardian = procs ? mob_damage::guardian(job) : 0;
 		bool blocked = damage > 0 && guardian && skillbook.get_level(guardian) > 0 &&
 					   inventory.has_equipped(EquipSlot::Id::SHIELD) &&
 					   randomizer.below(skill_stats(skillbook, guardian).chance / 10);
@@ -856,7 +847,7 @@ namespace ms
 		bool knockback = !missed && state != Char::State::DIED;
 
 		// Power Stance may keep the player in place; others see it too.
-		bool stance = knockback && !randomizer.above(stats.get_stance());
+		bool stance = knockback && procs && !randomizer.above(stats.get_stance());
 
 		// CUserLocal knocks the player away from the mob and up at 270
 		// pixels per second, or 200 from a touch under Power Guard, and off

@@ -56,6 +56,7 @@ namespace ms
 			case 26: return SHADOWPARTNER;
 			case 27: return PICKPOCKET;
 			case 28: return MESOGUARD;
+			case 29: return THAW;
 			case 30: return WEAKEN;
 			case 31: return CURSE;
 			case 32: return SLOW;

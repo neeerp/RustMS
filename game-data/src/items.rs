@@ -74,7 +74,7 @@ pub struct ConsumeSpec {
     /// How long `stats` last, in ms (`time`).
     pub time: i32,
     /// The stats it raises for `time` (`pad`, `pdd`, `mad`, `mdd`, `acc`,
-    /// `eva`, `speed`, `jump`).
+    /// `eva`, `speed`, `jump`, `thaw`).
     pub stats: Vec<(BuffStat, i16)>,
     /// The diseases it cures (`poison`, `darkness`, `weakness`, `seal`,
     /// `curse`).
@@ -107,7 +107,7 @@ impl ConsumeSpec {
 }
 
 /// The `spec` keys of the stats a consumable raises.
-const SPEC_STATS: [(&str, BuffStat); 8] = [
+const SPEC_STATS: [(&str, BuffStat); 9] = [
     ("pad", BuffStat::Pad),
     ("pdd", BuffStat::Pdd),
     ("mad", BuffStat::Mad),
@@ -116,6 +116,7 @@ const SPEC_STATS: [(&str, BuffStat); 8] = [
     ("eva", BuffStat::Eva),
     ("speed", BuffStat::Speed),
     ("jump", BuffStat::Jump),
+    ("thaw", BuffStat::Thaw),
 ];
 
 /// The `spec` keys of the diseases a consumable cures.
@@ -558,6 +559,11 @@ mod tests {
         assert_eq!(
             (warrior_pill.stats, warrior_pill.time),
             (vec![(BuffStat::Pad, 5)], 180_000)
+        );
+        let air_bubble = data.info(2022040).unwrap().unwrap().spec.unwrap();
+        assert_eq!(
+            (air_bubble.stats, air_bubble.time),
+            (vec![(BuffStat::Thaw, -6)], 900_000)
         );
         let relaxer = data.info(3010000).unwrap().unwrap();
         assert_eq!((relaxer.recovery_hp, relaxer.recovery_mp), (50, 0));
