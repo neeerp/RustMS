@@ -40,6 +40,9 @@ pub struct ItemInfo {
     pub book: Option<BookInfo>,
     /// What an equipment scroll (204xxxx) does.
     pub scroll: Option<ScrollInfo>,
+    /// What a summoning sack (210xxxx) brings out (`mob`): each mob and its
+    /// percent chance, rolled for each.
+    pub sack: Vec<(i32, i32)>,
     pub equip: Option<EquipInfo>,
     /// A pet's commands (`interact`), by the index the client sends.
     pub pet_commands: Vec<PetCommand>,
@@ -337,6 +340,15 @@ impl ItemData {
                 return_map_qr: nx.int_child(spec, "returnMapQR")?.unwrap_or(0),
             });
         }
+        if item_id / 10_000 == 210 {
+            if let Some(mobs) = nx.child_by_name(node, "mob")? {
+                while let Some(mob) = nx.child_by_name(mobs, &info.sack.len().to_string())? {
+                    let id = nx.int_child(mob, "id")?.unwrap_or(0);
+                    let prob = nx.int_child(mob, "prob")?.unwrap_or(0);
+                    info.sack.push((id, prob));
+                }
+            }
+        }
         if let Some(interact) = nx.child_by_name(node, "interact")? {
             while let Some(command) =
                 nx.child_by_name(interact, &info.pet_commands.len().to_string())?
@@ -429,6 +441,7 @@ impl ItemData {
             spec: None,
             book: None,
             scroll: None,
+            sack: Vec::new(),
             equip: Some(equip),
             pet_commands: Vec::new(),
             pet_hunger: 0,
@@ -572,6 +585,20 @@ mod tests {
         );
         let relaxer = data.info(3010000).unwrap().unwrap();
         assert_eq!((relaxer.recovery_hp, relaxer.recovery_mp), (50, 0));
+    }
+
+    #[test]
+    fn reads_what_a_summoning_sack_brings_out() {
+        let Some(data) = data() else {
+            return;
+        };
+        assert_eq!(data.info(2100000).unwrap().unwrap().sack, [(8130100, 100)]);
+        let sack = data.info(2100001).unwrap().unwrap().sack;
+        assert_eq!(
+            (sack.len(), sack[0], sack[15]),
+            (16, (100100, 100), (1210102, 50))
+        );
+        assert!(data.info(2000000).unwrap().unwrap().sack.is_empty());
     }
 
     #[test]

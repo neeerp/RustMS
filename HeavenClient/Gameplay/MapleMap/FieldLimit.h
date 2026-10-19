@@ -12,6 +12,7 @@ namespace ms
 	{
 		constexpr int32_t JUMP = 0x1;
 		constexpr int32_t MOVEMENT_SKILLS = 0x2;
+		constexpr int32_t SUMMON_SACKS = 0x4;
 		constexpr int32_t RETURN_SCROLLS = 0x20;
 		constexpr int32_t TELEPORT_ROCKS = 0x40;
 		constexpr int32_t MAP_SCROLLS = 0x100;
@@ -124,6 +125,20 @@ namespace ms
 				return ScrollRefusal::THERE;
 
 			return ScrollRefusal::NONE;
+		}
+
+		// v83 FUN_00a0977b: bit 0x4 keeps summoning sacks shut unless the
+		// map's info/allowedItem lists them.
+		inline bool may_summon(int32_t fieldlimit, const std::vector<int32_t> &allowed, int32_t item_id)
+		{
+			return !(fieldlimit & SUMMON_SACKS) || std::find(allowed.begin(), allowed.end(), item_id) != allowed.end();
+		}
+
+		// v83 FUN_00a0977b: a summoning sack asks before it opens, unless
+		// it is an event's (2109xxx) or 2100067.
+		inline bool sack_asks(int32_t item_id)
+		{
+			return item_id / 1000 != 2109 && item_id != 2100067;
 		}
 
 		// v83 FUN_00a0900a and FUN_00a23de5: bit 0x400000 keeps items and

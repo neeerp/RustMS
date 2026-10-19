@@ -106,6 +106,10 @@ namespace ms
 		// (field_limit::may_use).
 		bool can_use_item(int32_t item_id) const;
 
+		// Whether the map lets the player open a summoning sack
+		// (field_limit::may_summon).
+		bool can_summon(int32_t item_id) const;
+
 		// Whether the map lets the player drop items and mesos.
 		bool can_drop() const;
 

@@ -190,6 +190,68 @@ fn return_scroll_target(player: &Player, slot: i16, item_id: i32) -> Option<i32>
     data.field_exists(target).then_some(target)
 }
 
+/// `USE_SUMMON_BAG` (0x4B, v83 FUN_00a0977b): tick, slot in the USE bag,
+/// item id. A summoning sack (210xxxx) is used up and brings out each of
+/// its mobs with its percent chance, on the ground below the player
+/// (Cosmic). The client opens none, unless its player is a GM, where
+/// fieldLimit 0x4 forbids it and `allowedItem` doesn't list it; nor does
+/// the server.
+pub struct UseSummonSackHandler;
+
+impl WorldHandler for UseSummonSackHandler {
+    fn handle(&self, packet: &mut Packet, ctx: &mut WorldContext) -> WorldResult {
+        let mut reader = Cursor::new(&packet.bytes);
+        reader.read_short()?;
+        reader.read_int()?; // client tick
+        let slot = reader.read_short()?;
+        let item_id = reader.read_int()?;
+        let mut rng = rand::thread_rng();
+        let opened = open_sack(ctx.player, slot, item_id, |prob| {
+            rng.gen_range(0, 100) < prob
+        });
+        let Some((changes, mobs)) = opened else {
+            debug!(slot, item_id, "Summoning sack refused");
+            return Ok(HandlerResult::reply(stat::build_stat_update(true, &[])?));
+        };
+        Ok(
+            HandlerResult::reply(inventory::build_inventory_operation(true, &changes)?)
+                .with(WorldAction::Field(FieldRequest::SummonMobs(mobs))),
+        )
+    }
+}
+
+/// Use up the summoning sack in `slot`, if the player may open it here;
+/// returns the change to their bag and the mobs that came out, each kept
+/// if `roll` of its chance says so.
+fn open_sack(
+    player: &mut Player,
+    slot: i16,
+    item_id: i32,
+    mut roll: impl FnMut(i32) -> bool,
+) -> Option<(Vec<InventoryChange>, Vec<i32>)> {
+    if player.stats.hp <= 0
+        || item_id / 10_000 != 210
+        || player.inventory.get(InventoryType::Use, slot)?.item_id != item_id
+    {
+        return None;
+    }
+    let sack = items::info(item_id)?.sack;
+    let field = crate::get_game_data().ok()?.field(player.stats.map_id)?;
+    if sack.is_empty() || (player.gm_level <= 0 && !field.may_summon(item_id)) {
+        return None;
+    }
+    let changes = player
+        .inventory_mut()
+        .take(InventoryType::Use, slot, 1)
+        .ok()?;
+    let mobs = sack
+        .into_iter()
+        .filter(|&(_, prob)| roll(prob))
+        .map(|(mob_id, _)| mob_id)
+        .collect();
+    Some((changes, mobs))
+}
+
 /// `USE_SKILL_BOOK` (0x52, v83 FUN_00a0a1b2): tick, slot in the USE bag,
 /// item id. The book raises the master level of its skill for the reader's
 /// job (OdinMS family: the job must match, the skill must be at
@@ -536,6 +598,53 @@ mod tests {
             assert!(use_item(&mut player, slot, item_id, Instant::now()).is_none());
             assert_eq!(player.inventory.count(item_id), 1);
         }
+    }
+
+    #[test]
+    fn a_summoning_sack_is_used_up_for_the_mobs_its_rolls_bring_out() {
+        if items::data().is_err() || crate::get_game_data().is_err() {
+            return;
+        }
+        let mut player = crate::codec::stats::sample_player();
+        player.stats.map_id = 100_000_000;
+        player
+            .inventory
+            .insert(InventoryType::Use, 1, Item::stack(2100001, 2));
+        // 2100001's first eight mobs come out at 100 percent, the rest at 50.
+        let (_, mobs) = open_sack(&mut player, 1, 2100001, |prob| prob == 100).unwrap();
+        assert_eq!(
+            mobs,
+            [100100, 100101, 120100, 130101, 210100, 1210100, 1210102, 100100]
+        );
+        assert_eq!(player.inventory.count(2100001), 1);
+        assert!(open_sack(&mut player, 1, 2000000, |_| true).is_none());
+        assert!(open_sack(&mut player, 2, 2100001, |_| true).is_none());
+    }
+
+    #[test]
+    fn a_summoning_sack_stays_shut_where_the_map_forbids_it() {
+        if items::data().is_err() || crate::get_game_data().is_err() {
+            return;
+        }
+        let mut player = crate::codec::stats::sample_player();
+        player
+            .inventory
+            .insert(InventoryType::Use, 1, Item::stack(2100001, 1));
+        player
+            .inventory
+            .insert(InventoryType::Use, 2, Item::stack(2109004, 1));
+        // Maple Island forbids them; the event map 109090300 forbids them
+        // too but lists 2109004 in its allowedItem.
+        player.stats.map_id = 10_000;
+        assert!(open_sack(&mut player, 1, 2100001, |_| true).is_none());
+        player.stats.map_id = 109_090_300;
+        assert!(open_sack(&mut player, 1, 2100001, |_| true).is_none());
+        let (_, mobs) = open_sack(&mut player, 2, 2109004, |_| true).unwrap();
+        assert_eq!(mobs, [9300329]);
+        // The client lets a GM open one anywhere.
+        player.gm_level = 1;
+        player.stats.map_id = 10_000;
+        assert!(open_sack(&mut player, 1, 2100001, |_| true).is_some());
     }
 
     fn scroll_request(slot: i16, item_id: i32) -> Packet {

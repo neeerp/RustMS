@@ -282,6 +282,20 @@ namespace ms
 		}
 	};
 
+	// Requests opening the summoning sack (210xxxx) in a USE slot, v83
+	// FUN_00a0977b
+	// Opcode: USE_SUMMON_BAG(75)
+	class SummonSackPacket : public OutPacket
+	{
+	public:
+		SummonSackPacket(int16_t slot, int32_t itemid) : OutPacket(OutPacket::Opcode::USE_SUMMON_BAG)
+		{
+			write_time();
+			write_short(slot);
+			write_int(itemid);
+		}
+	};
+
 	// Requests using the scroll in a USE slot on a worn equip
 	// Opcode: SCROLL_EQUIP(86), v83 FUN_00a09221
 	class ScrollEquipPacket : public OutPacket

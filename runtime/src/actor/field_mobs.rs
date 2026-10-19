@@ -729,6 +729,23 @@ impl MobSet {
         spawned
     }
 
+    /// Bring out `info` at `at`, standing as `stance`, under `controller`;
+    /// returns its object id. It never respawns.
+    pub fn place(
+        &mut self,
+        info: MobInfo,
+        at: (i16, i16),
+        stance: u8,
+        controller: ClientId,
+        now: Instant,
+    ) -> i32 {
+        let object_id = self.object_ids.next();
+        let mut mob = LiveMob::new(object_id, info, at, stance, 0, now);
+        mob.controller = Some(controller);
+        self.live.insert(object_id, mob);
+        object_id
+    }
+
     /// Bring out the mobs due to come out of ones that died, as `info`
     /// has them; returns their object ids. They never respawn.
     pub fn revive(&mut self, now: Instant, info: impl Fn(i32) -> Option<MobInfo>) -> Vec<i32> {

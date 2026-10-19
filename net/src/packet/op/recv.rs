@@ -59,6 +59,7 @@ pub enum RecvOpcode {
     SortItems = 0x46,
     ItemMove = 0x47,
     UseItem = 0x48,
+    UseSummonBag = 0x4B,
     PetFood = 0x4C,
     UseCashItem = 0x4F,
     CancelItemEffect = 0x49,

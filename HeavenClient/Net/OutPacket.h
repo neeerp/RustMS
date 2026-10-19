@@ -102,6 +102,7 @@ namespace ms
 			MOVE_ITEM = 71,
 			USE_ITEM = 72,
 			CANCEL_ITEM_EFFECT = 73,
+			USE_SUMMON_BAG = 75,
 			PET_FOOD = 76,
 			USE_CASH_ITEM = 79,
 			USE_SKILL_BOOK = 82,

@@ -98,6 +98,7 @@ namespace ms
 		constexpr const char *MEGAPHONE_PROMPT = "Enter your comments through the megaphone.";
 		constexpr const char *MEGAPHONE_LEVEL = "This megaphone is only available for \\ncharacters that are over Level 10.";
 		constexpr const char *MEGAPHONE_LONG = "Use the megaphone to text up to 60 characters.";
+		constexpr const char *SUMMON_SACK = "Too much interest can hinder your process of leveling up.\\n\\nwill you really summon the monster?";
 		constexpr const char *BOSS_PET = "Would you like to change your Boss Pet?\\n (The \"Item Ignore\" skill, as well as \\nthe stats for speed and jump will \\nfollow that of the Lead Pet)";
 
 		// v83 FUN_00a240a2: double-clicking a pet asks the server to bring it
@@ -439,6 +440,33 @@ namespace ms
 			}
 		}
 
+		// v83 FUN_00a0977b: a summoning sack (210xxxx) stays shut where the
+		// map forbids it, and asks first unless it is an event's. (The
+		// client also refuses while riding, which this one can't.)
+		void use_summon_sack(int16_t slot, int32_t item_id)
+		{
+			if (!Stage::get().get_mapinfo().can_summon(item_id))
+			{
+				UI::get().emplace<UIOk>("You can't use it here in this map.", [](bool)
+				{});
+				return;
+			}
+
+			auto open = [slot, item_id]()
+			{
+				Stage::get().get_player().request(SummonSackPacket(slot, item_id), ExclRequest::USE_WAIT);
+			};
+
+			if (!field_limit::sack_asks(item_id))
+				open();
+			else
+				UI::get().emplace<UIYesNo>(SUMMON_SACK, [open](bool yes)
+				{
+					if (yes)
+						open();
+				});
+		}
+
 		// v83 FUN_00a0900a: a map may keep items off the ground, which it
 		// says only once the player has answered every question.
 		void send_drop(InventoryType::Id tab, int16_t slot, int16_t qty)
@@ -744,6 +772,8 @@ namespace ms
 					case InventoryType::Id::USE:
 						if (item_id / 10000 == 203)
 							use_return_scroll(slot, item_id);
+						else if (item_id / 10000 == 210)
+							use_summon_sack(slot, item_id);
 						else if (!Stage::get().get_mapinfo().can_use_item(item_id))
 							InChatMessage(Messages::ITEM_FIELD).drop();
 						else if (!disease::can_use_item(Stage::get().get_player().get_diseases()))
