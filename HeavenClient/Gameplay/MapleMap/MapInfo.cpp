@@ -148,6 +148,11 @@ namespace ms
 		return recovery;
 	}
 
+	bool MapInfo::has_clouds() const
+	{
+		return cloud;
+	}
+
 	Range<int16_t> MapInfo::get_walls() const
 	{
 		return mapwalls;

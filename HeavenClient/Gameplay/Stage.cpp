@@ -144,6 +144,8 @@ namespace ms
 		backgrounds = MapBackgrounds(src["back"]);
 		physics = Physics(src["foothold"], src["info"]);
 		mapinfo = MapInfo(src, physics.get_fht().get_walls(), physics.get_fht().get_borders());
+		clouds = mapinfo.has_clouds() ? MapClouds(physics.get_fht().get_space_x(), physics.get_fht().get_space_y())
+									  : MapClouds();
 		portals = MapPortals(src["portal"], mapid);
 		ship = MapShip(src);
 		clock = MapClock(src);
@@ -221,6 +223,9 @@ namespace ms
 		ground_effects.drawabove(viewpos, alpha);
 		portals.draw(viewpos, alpha);
 		backgrounds.drawforegrounds(viewx, viewy, alpha);
+		// v83's clouds are above the front backgrounds and below the fear
+		// overlay (z 0xc0061508).
+		clouds.draw(viewx, viewy, alpha);
 		draw_fear(viewx, viewy, alpha);
 		effect.draw();
 	}
@@ -256,6 +261,7 @@ namespace ms
 
 		combat.update();
 		backgrounds.update();
+		clouds.update();
 		ship.update();
 		clock.update();
 		effect.update();

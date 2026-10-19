@@ -32,6 +32,7 @@
 #include "MapleMap/MapChars.h"
 #include "MapleMap/MapMobs.h"
 #include "MapleMap/MapMists.h"
+#include "MapleMap/MapClouds.h"
 #include "MapleMap/MapDoors.h"
 #include "MapleMap/MapSummons.h"
 #include "MapleMap/MapReactors.h"
@@ -273,6 +274,7 @@ namespace ms
 		MapSummons summons;
 		MapEffect effect;
 		MapShip ship;
+		MapClouds clouds;
 		MapClock clock;
 		// A wall clock time that came before its map loaded.
 		struct ClockTime

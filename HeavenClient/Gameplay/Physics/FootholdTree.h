@@ -67,6 +67,11 @@ namespace ms
 		// may fall to.
 		Range<int16_t> get_borders() const;
 
+		// Returns the field's physical space (v83's MBR), left to right and
+		// top to bottom.
+		Range<int16_t> get_space_x() const;
+		Range<int16_t> get_space_y() const;
+
 		// Returns the group of a platform.
 		uint16_t get_group(uint16_t fhid) const;
 

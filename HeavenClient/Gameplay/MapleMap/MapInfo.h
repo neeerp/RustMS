@@ -95,6 +95,9 @@ namespace ms
 		// How much faster players recover HP and MP at rest (info/recovery).
 		double get_recovery() const;
 
+		// Whether clouds drift over the map (info/cloud).
+		bool has_clouds() const;
+
 		// Whether players may leave the map for another channel or the Cash
 		// Shop: fieldLimit bit 0x10 is unset.
 		bool can_migrate() const;
@@ -128,7 +131,7 @@ namespace ms
 		int32_t fieldtype = 0;
 		// The items a map with fieldLimit bit 0x400 still allows.
 		std::vector<int32_t> allowed_items;
-		bool cloud;
+		bool cloud = false;
 		std::string bgm;
 		std::string mapdesc;
 		std::string mapname;

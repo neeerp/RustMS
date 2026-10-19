@@ -214,6 +214,8 @@ if(HEAVENCLIENT_BUILD_TESTS)
     add_test(NAME mob_hurts COMMAND mob_hurts_tests)
     add_executable(mist_layout_tests tests/mist_layout.cpp)
     add_test(NAME mist_layout COMMAND mist_layout_tests)
+    add_executable(map_clouds_tests tests/map_clouds.cpp)
+    add_test(NAME map_clouds COMMAND map_clouds_tests)
     add_executable(ships_tests tests/ships.cpp)
     add_test(NAME ships COMMAND ships_tests)
     add_executable(field_clock_tests tests/field_clock.cpp)
@@ -435,6 +437,9 @@ add_executable(HeavenClient
     Gameplay/MapleMap/MapEffect.h
     Gameplay/MapleMap/MapInfo.cpp
     Gameplay/MapleMap/MapInfo.h
+    Gameplay/MapleMap/CloudLayout.h
+    Gameplay/MapleMap/MapClouds.cpp
+    Gameplay/MapleMap/MapClouds.h
     Gameplay/MapleMap/MapMists.cpp
     Gameplay/MapleMap/MapDoors.cpp
     Gameplay/MapleMap/MapMists.h
