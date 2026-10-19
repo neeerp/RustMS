@@ -10,6 +10,7 @@ use crate::packet::build::world::{buff, effect, inventory};
 use crate::skills;
 use game::buff::BuffStat;
 use game::{Buff, Disease, InventoryType, MobStat, Player, ShownBuff};
+use game_data::FIELD_LIMIT_NO_EXP_LOSS;
 use packet::{io::read::PktRead, Packet};
 use std::io::Cursor;
 use std::time::{Duration, Instant};
@@ -629,12 +630,18 @@ const SAFETY_CHARM: i32 = 5130000;
 /// (Cosmic): the Safety Charm, the Easter Basket and the Easter Charm.
 const CHARMS: [i32; 3] = [SAFETY_CHARM, 4031283, 4140903];
 
-/// The player died. Beginners lose nothing; others lose 10% of the EXP
-/// their level needs (v83's field death penalty), unless they hold a charm,
-/// which is used up instead and lets them revive with 30% of their max HP
-/// and MP (Cosmic).
+/// The player died. Beginners lose nothing, nor does anyone on a map whose
+/// field limit spares them. Others lose a share of the EXP their level
+/// needs: a hundredth in a town, otherwise a tenth, or a twentieth with 50
+/// LUK or more. A charm held is used up instead, and lets them revive with
+/// 30% of their max HP and MP. All of this is Cosmic's.
 pub fn death_penalty(player: &mut Player) -> Result<Vec<Packet>, NetworkError> {
-    if player.stats.job % 1000 == 0 {
+    let field = crate::game_data::get()
+        .ok()
+        .and_then(|data| data.field(player.stats.map_id));
+    if player.stats.job % 1000 == 0
+        || field.is_some_and(|field| field.field_limit & FIELD_LIMIT_NO_EXP_LOSS != 0)
+    {
         return Ok(Vec::new());
     }
     let Some(needed) = game::exp::to_next_level(player.stats.level) else {
@@ -670,7 +677,13 @@ pub fn death_penalty(player: &mut Player) -> Result<Vec<Packet>, NetworkError> {
             effect::build_charm_used(used)?,
         ]);
     }
-    let loss = (needed / 10) as i32;
+    let loss = if field.is_some_and(|field| field.town) {
+        needed / 100
+    } else if player.stats.luk < 50 {
+        needed / 10
+    } else {
+        needed / 20
+    } as i32;
     player.stats.exp = (player.stats.exp - loss).max(0);
     player.mark_dirty();
     Ok(vec![stat::build_stat_update(
@@ -823,6 +836,8 @@ mod tests {
     #[test]
     fn dying_costs_a_tenth_of_the_level_unless_a_charm_is_held() {
         let mut player = crate::codec::stats::sample_player();
+        // Henesys Hunting Ground I, no town.
+        player.stats.map_id = 104_040_000;
         let needed = game::exp::to_next_level(player.stats.level).unwrap() as i32;
         player.stats.exp = needed / 2;
         assert_eq!(death_penalty(&mut player).unwrap().len(), 1);
@@ -849,6 +864,26 @@ mod tests {
         assert_eq!(player.inventory.count(4140903), 0);
         assert_eq!(&packets[1].bytes[2..6], &[6, 0, 0, 0]);
         assert_eq!(player.stats.exp, exp);
+    }
+
+    #[test]
+    fn dying_costs_less_in_a_town_or_with_luck_and_nothing_in_the_dojo() {
+        if crate::game_data::get().is_err() {
+            return;
+        }
+        let mut player = crate::codec::stats::sample_player();
+        let needed = game::exp::to_next_level(player.stats.level).unwrap() as i32;
+        let mut died_on = |map_id, luk| {
+            (player.stats.map_id, player.stats.luk) = (map_id, luk);
+            player.stats.exp = needed / 2;
+            death_penalty(&mut player).unwrap();
+            needed / 2 - player.stats.exp
+        };
+        assert_eq!(died_on(100_000_000, 4), needed / 100);
+        assert_eq!(died_on(104_040_000, 49), needed / 10);
+        assert_eq!(died_on(104_040_000, 50), needed / 20);
+        // Mu Lung Dojo's first floor.
+        assert_eq!(died_on(925_020_100, 4), 0);
     }
 
     #[test]

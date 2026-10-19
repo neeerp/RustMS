@@ -39,6 +39,9 @@ pub const FIELD_LIMIT_MAP_SCROLLS: i32 = 0x100;
 /// `info/fieldLimit` bit leaving only the map's `info/allowedItem` usable
 /// (v83 FUN_00a092fb).
 pub const FIELD_LIMIT_CONSUMABLES: i32 = 0x400;
+/// `info/fieldLimit` bit sparing whoever dies there their EXP (Cosmic's
+/// NO_EXP_DECREASE; v83 never reads it). The Dojo and most event maps.
+pub const FIELD_LIMIT_NO_EXP_LOSS: i32 = 0x80000;
 /// `info/fieldLimit` bit keeping items and mesos off the ground (v83
 /// FUN_00a0900a, FUN_00a23de5).
 pub const FIELD_LIMIT_DROPS: i32 = 0x400000;

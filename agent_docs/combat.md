@@ -1011,7 +1011,10 @@ damage over the mob, at most a tenth of its max HP for a physical hit
 (HeavenClient's `Mob::show_reflect`). Hits with no mob (-4) end with a byte: 1
 poison (ignored, the server ticks poison itself), 2 a mist (Achilles
 applies), or 3 Stop Motion (no guards, never fatal). At 0 HP the player is
-dead (`death_penalty`): non-beginners lose 10% of their level's EXP. Holding a
+dead (`death_penalty`). Non-beginners lose part of their level's EXP: 1% in a
+town (`info/town`), otherwise 10%, or 5% with 50 base LUK or more. Nobody
+loses any on a map with field limit 0x80000, which covers the Dojo and most
+event maps. These are Cosmic's rules; v83 never reads the bit. Holding a
 charm keeps the EXP instead and uses up one charm. The charms are tried in
 Cosmic's order: the Safety Charm (5130000), the Easter Basket (4031283), then
 the Easter Charm (4140903). A grey chat line confirms it (SHOW_ITEM_GAIN_INCHAT
