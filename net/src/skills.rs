@@ -1,7 +1,7 @@
 //! Skill templates (`Skill.nx`), loaded once.
 
 use crate::load::{self, asset_path};
-use game::{BuffStat, InventoryType, MobStat, Player};
+use game::{BuffStat, Disease, InventoryType, MobStat, Player};
 use game_data::skills::{SkillData, SkillInfo, SkillLevel};
 use game_data::{FieldTemplate, FIELD_LIMIT_MYSTIC_DOOR, PORTAL_TYPE_START_POINT};
 use std::sync::OnceLock;
@@ -222,6 +222,19 @@ pub fn hp_cost(player: &Player, skill: &Learned) -> Option<i32> {
         skill.effect.hp_cost
     };
     (cost == 0 || hp > cost).then_some(cost)
+}
+
+/// The stun Dragon Roar leaves its user in: `y` seconds of Stun, under the
+/// skill's own id, so the client shows Dragon Roar's icon and won't let it
+/// be cancelled (0xa203bf, 0x45ba47). The client never stuns the player
+/// itself; it only stops them while the server has.
+pub fn self_stun(skill: &Learned) -> Option<Disease> {
+    (skill.skill_id == DRAGON_ROAR && skill.effect.y > 0).then(|| Disease {
+        stat: BuffStat::Stun,
+        value: 1,
+        skill_id: DRAGON_ROAR,
+        lasts: Duration::from_secs(skill.effect.y as u64),
+    })
 }
 
 pub const MYSTIC_DOOR: i32 = 2311002;
@@ -893,6 +906,17 @@ mod tests {
         assert_eq!(hp_cost(&player, &roar), Some(300));
         player.stats.hp = 499;
         assert_eq!(hp_cost(&player, &roar), None);
+    }
+
+    #[test]
+    fn dragon_roar_stuns_its_user_for_its_y_seconds() {
+        let stun = |level| self_stun(&at_level(DRAGON_ROAR, level).unwrap());
+        let stun_30 = stun(30).unwrap();
+        assert_eq!((stun_30.stat, stun_30.value), (BuffStat::Stun, 1));
+        assert_eq!(stun_30.skill_id, DRAGON_ROAR);
+        assert_eq!(stun_30.lasts, Duration::from_secs(2));
+        assert_eq!(stun(1).unwrap().lasts, Duration::from_secs(4));
+        assert_eq!(self_stun(&at_level(1001005, 20).unwrap()), None);
     }
 
     #[test]

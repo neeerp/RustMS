@@ -1,7 +1,7 @@
 //! Skills that cost HP: a Dragon Knight's Slash Blast takes its `hpCon`,
 //! Dragon Roar a share of max HP but only from a player with half of it,
-//! and Dragon Blood drinks HP every four seconds until it would take the
-//! last.
+//! then stuns them for a moment, and Dragon Blood drinks HP every four
+//! seconds until it would take the last.
 
 use integration_harness::database::{grant_skill, replace_item, set_hp, set_job};
 use integration_harness::hunting::{skill_attack, use_skill};
@@ -20,6 +20,8 @@ const EQUIPPED: i16 = -1;
 const WEAPON: i16 = -11;
 /// STAT_CHANGED's HP bit.
 const HP: i32 = 0x400;
+/// CANCEL_BUFF's Stun bit.
+const STUN_MASK: i64 = 0x2_0000_0000_0000;
 
 #[tokio::test]
 async fn skills_spend_hp() {
@@ -46,8 +48,11 @@ async fn skills_spend_hp() {
     assert_eq!(warp(c, HUNTING_GROUND, "", &mut h).await, HUNTING_GROUND);
     until(c, &mut h, |t| !t.field.alive(SNAIL).is_empty()).await;
     let snail = h.field.alive(SNAIL)[0];
-    let t = step(c, "roar", skill_attack(DRAGON_ROAR, snail, 1)).await;
+    let mut t = step(c, "roar", skill_attack(DRAGON_ROAR, snail, 1)).await;
     assert_eq!(t.stat(HP), Some(700));
+    // And stuns its user for 2 seconds, under its own id.
+    assert_eq!(t.buffs, [(DRAGON_ROAR, 1, 2000)]);
+    until(c, &mut t, |t| t.cancelled_buffs.contains(&STUN_MASK)).await;
     drop(session);
     tokio::time::sleep(Duration::from_millis(500)).await;
     set_hp(id, 100, 1000).await.expect("low HP");

@@ -139,6 +139,7 @@ impl WorldHandler for AttackHandler {
         // over, and the client hears how long.
         let now = Instant::now();
         let cooldown = uses.skill.as_ref().map_or(0, |skill| skill.effect.cooldown);
+        let stun = uses.skill.as_ref().and_then(skills::self_stun);
         if cooldown > 0 {
             if ctx.player.buffs.cooling_down(attack.skill, now) {
                 debug!(skill = attack.skill, "Attack refused while cooling down");
@@ -205,6 +206,10 @@ impl WorldHandler for AttackHandler {
         }
         if let Some(value) = combo {
             result = set_combo(ctx.player, value, now, result)?;
+        }
+        if let Some(stun) = stun {
+            let stunned = catch_disease(ctx.player, stun, now)?;
+            result.actions.extend(stunned.actions);
         }
         Ok(result)
     }

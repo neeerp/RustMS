@@ -35,7 +35,8 @@ pub enum BuffStat {
     Invincible = 15,
     SoulArrow = 16,
     /// The diseases a mob skill (or attack) inflicts, from `Stun` on: their
-    /// skill is the mob skill and its level, `skill | level << 16`.
+    /// skill is the mob skill and its level, `skill | level << 16` (but
+    /// Dragon Roar's stun of its user is under Dragon Roar).
     Stun = 17,
     /// Loses `value` HP every `POISON_INTERVAL`, down to 1.
     Poison = 18,

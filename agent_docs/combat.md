@@ -133,7 +133,9 @@ otherwise it starts the cooldown and the attacker gets COOLDOWN.
 A skill's HP cost (`skills::hp_cost`, as v83's `FUN_00764256`) is its
 `hpCon`, which must stay under the player's HP; Slash Blast and the Boosters
 have one. Dragon Roar instead takes its `x` percent of max HP and needs at
-least half of it. Sacrifice takes its `x` percent of its first blow, never
+least half of it, and then stuns its user for its `y` seconds
+(`skills::self_stun`): a Stun disease under Dragon Roar's own id, so the
+client shows the skill's icon and won't let it be cancelled. Sacrifice takes its `x` percent of its first blow, never
 the last HP, which v83 leaves wholly to the server (Cosmic's rule).
 Final Attack (`skills::FINAL_ATTACKS`) is a swing or shot the client sends
 on its own after a skill attack whose skill lists it under `finalAttack`
@@ -1081,8 +1083,9 @@ both survive logging out; `beginner_skills` has three players learn
 Three Snails, Nimble Feet, and Recovery and checks their damage caps, MP,
 buffs, cooldowns, Recovery's heal, what the others see, and that the buffs
 end on time and on death. `hp_costs` has a Dragon Knight spend HP on Slash
-Blast and Dragon Roar, refuses Dragon Roar under half HP, and has Dragon
-Blood drink HP until it ends early. `poison_mist` casts Poison Mist on a snail and
+Blast and Dragon Roar, checks Dragon Roar's stun and its end, refuses
+Dragon Roar under half HP, and has Dragon Blood drink HP until it ends
+early. `poison_mist` casts Poison Mist on a snail and
 checks the cloud's packet, that it lifts on time, and that it poisons only
 the snails in its box. `snipe` has a Marksman Snipe snails: 200,000 is
 refused, 199,999 kills and starts the 4 s cooldown, which refuses another
