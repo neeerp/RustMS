@@ -17,6 +17,9 @@ namespace ms::weather
 		return item_id / 10000 == 512;
 	}
 
+	// The longest message a weather item lets the player attach.
+	constexpr int32_t MAX_MESSAGE = 35;
+
 	// The message bar stays 20 s. A map's weather, or an admin's whisper shown as one, stops itself 22 s after it
 	// starts; a packet's lasts until the server stops it.
 	constexpr int32_t BAR_TIME = 20000;

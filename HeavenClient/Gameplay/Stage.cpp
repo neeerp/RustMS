@@ -1268,6 +1268,11 @@ namespace ms
 		weather.set_packet_flag(flag);
 	}
 
+	bool Stage::weather_busy() const
+	{
+		return weather.busy();
+	}
+
 	void Stage::note_mob_left()
 	{
 		weather.mob_left();

@@ -174,6 +174,11 @@ namespace ms
 		packet_flag = flag;
 	}
 
+	bool MapWeather::busy() const
+	{
+		return !drops.empty() || !shows.empty() || !fireworks.empty();
+	}
+
 	void MapWeather::mob_left()
 	{
 		mob_has_left = true;

@@ -40,6 +40,12 @@ pub fn pet_name(item_id: i32) -> String {
     name
 }
 
+/// A cash item's message, if it has one, such as a weather item's
+/// `%s's snow : %s`.
+pub fn cash_message(item_id: i32) -> Option<String> {
+    names().ok()?.cash_message(item_id).ok().flatten()
+}
+
 /// The template for `item_id`, if the data has it.
 pub fn info(item_id: i32) -> Option<ItemInfo> {
     data().ok()?.info(item_id).ok().flatten()

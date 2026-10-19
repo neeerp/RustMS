@@ -44,6 +44,7 @@ pub enum SendOpcode {
     BlockedMap = 0x83,
     BlockedServer = 0x84,
     FieldEffect = 0x8A,
+    BlowWeather = 0x8E,
     Clock = 0x93,
     ContiMove = 0x94,
     ContiState = 0x95,

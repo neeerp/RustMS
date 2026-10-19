@@ -201,6 +201,9 @@ namespace ms
 		// BLOW_WEATHER's flag, which keeps the message bar up through a stop.
 		void set_weather_flag(uint8_t flag);
 
+		// Whether a weather item has to wait for the field's weather to end.
+		bool weather_busy() const;
+
 		// KILL_MOB: a monster left the field.
 		void note_mob_left();
 

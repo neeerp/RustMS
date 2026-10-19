@@ -44,6 +44,10 @@ namespace ms
 		// BLOW_WEATHER's flag: when set, a stop leaves the message bar up.
 		void set_packet_flag(uint8_t flag);
 
+		// Whether a weather item has to wait (FUN_00a0ec3b): while bursts or fireworks go on, or any particles are
+		// left. These stay after a stop, fading to nothing, until the next weather or another map.
+		bool busy() const;
+
 		// A monster left the field, which drops the map's weathers that wait for none to.
 		void mob_left();
 

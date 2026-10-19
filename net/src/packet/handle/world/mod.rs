@@ -41,6 +41,7 @@ mod summon;
 mod teleport_rock;
 mod use_item;
 mod use_skill;
+mod weather;
 mod whisper;
 
 pub use self::buddy::BuddyListModifyHandler;

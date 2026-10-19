@@ -42,6 +42,9 @@ pub const FIELD_LIMIT_MAP_SCROLLS: i32 = 0x100;
 /// `info/fieldLimit` bit leaving only the map's `info/allowedItem` usable
 /// (v83 FUN_00a092fb).
 pub const FIELD_LIMIT_CONSUMABLES: i32 = 0x400;
+/// `info/fieldLimit` bit forbidding weather items (v83 FUN_00a0a63f, type
+/// 0x10).
+pub const FIELD_LIMIT_WEATHER_ITEMS: i32 = 0x4000;
 /// `info/fieldLimit` bit sparing whoever dies there their EXP (Cosmic's
 /// NO_EXP_DECREASE; v83 never reads it). The Dojo and most event maps.
 pub const FIELD_LIMIT_NO_EXP_LOSS: i32 = 0x80000;
@@ -336,6 +339,12 @@ impl FieldTemplate {
     /// Whether a player may open the summoning sack `item_id` here.
     pub fn may_summon(&self, item_id: i32) -> bool {
         self.field_limit & FIELD_LIMIT_SUMMON_SACKS == 0 || self.allowed_items.contains(&item_id)
+    }
+
+    /// Whether a player may use a weather item here. The client also keeps
+    /// them out of the wedding halls (fieldType 60).
+    pub fn may_blow_weather(&self) -> bool {
+        self.field_limit & FIELD_LIMIT_WEATHER_ITEMS == 0
     }
 
     /// Whether players may drop items and mesos here.
