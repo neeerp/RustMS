@@ -4,6 +4,7 @@ use std::cmp::Ordering;
 use std::collections::{BTreeMap, HashMap};
 use std::fs::File;
 use std::path::Path;
+use std::time::Duration;
 use thiserror::Error;
 pub mod commodities;
 pub mod footholds;
@@ -239,9 +240,28 @@ pub struct FieldTemplate {
     /// sent to `forced_return`. The client never reads it; the server shows
     /// the countdown.
     pub time_limit: Option<u32>,
+    /// `info/decHP`: the cold, water or curse that hurts players here.
+    pub hazard: Option<Hazard>,
     pub footholds: footholds::Footholds,
     portals_by_id: BTreeMap<u32, PortalTemplate>,
     portal_ids_by_name: HashMap<String, Vec<u32>>,
+}
+
+/// How often a map's hazard hurts when it has no `info/decInterval`. A
+/// v83 Aqua Road item speaks of "the constant HP damage you receive for every
+/// 10 seconds underwater" (Cassandra's Magic, 2022187).
+pub const HAZARD_INTERVAL: Duration = Duration::from_secs(10);
+
+/// A map's hazard. v83's client reads none of it; the server hurts the
+/// player.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Hazard {
+    /// The HP it takes each time (`decHP`).
+    pub hp: i32,
+    /// How often (`decInterval`, in ms, else `HAZARD_INTERVAL`).
+    pub every: Duration,
+    /// The equipment that keeps it off (`protectItem`).
+    pub protect_item: Option<i32>,
 }
 
 impl FieldTemplate {
@@ -427,15 +447,16 @@ fn build_field_template(
         .flatten()
         .and_then(|seconds| u32::try_from(seconds).ok())
         .filter(|&seconds| seconds > 0);
-    let (town, field_limit, allowed_items, personal_shop) =
+    let (town, field_limit, allowed_items, personal_shop, hazard) =
         match nx.child_by_name(map_node_idx, "info")? {
             Some(info) => (
                 nx.int_child(info, "town")?.unwrap_or(0) != 0,
                 nx.int_child(info, "fieldLimit")?.unwrap_or(0),
                 allowed_items(nx, info)?,
                 nx.int_child(info, "personalShop")?.unwrap_or(0) != 0,
+                hazard(nx, info)?,
             ),
-            None => (false, 0, Vec::new(), false),
+            None => (false, 0, Vec::new(), false, None),
         };
     // v83 FUN_0052bc72 makes the clock only if all four are non-zero.
     let clock = match nx.child_by_name(map_node_idx, "clock")? {
@@ -512,10 +533,30 @@ fn build_field_template(
         personal_shop,
         clock,
         time_limit,
+        hazard,
         footholds,
         portals_by_id,
         portal_ids_by_name,
     })
+}
+
+/// A map's `info/decHP`, if positive, with its interval and protection.
+fn hazard(nx: &NxDataFile, info: u32) -> Result<Option<Hazard>, GameDataError> {
+    let hp = nx.int_child(info, "decHP")?.unwrap_or(0);
+    if hp <= 0 {
+        return Ok(None);
+    }
+    let every = nx
+        .int_child(info, "decInterval")?
+        .and_then(|ms| u64::try_from(ms).ok())
+        .filter(|&ms| ms > 0)
+        .map_or(HAZARD_INTERVAL, Duration::from_millis);
+    let protect_item = nx.int_child(info, "protectItem")?.filter(|&id| id > 0);
+    Ok(Some(Hazard {
+        hp,
+        every,
+        protect_item,
+    }))
 }
 
 /// A map's `info/allowedItem` list.
@@ -999,6 +1040,7 @@ mod tests {
             personal_shop: false,
             clock: false,
             time_limit: None,
+            hazard: None,
             footholds: footholds::Footholds::default(),
             portals_by_id: BTreeMap::from([
                 (
@@ -1069,6 +1111,7 @@ mod tests {
             personal_shop: false,
             clock: false,
             time_limit: None,
+            hazard: None,
             reactors: Vec::new(),
             footholds: footholds::Footholds::default(),
             portals_by_id: BTreeMap::from([
@@ -1204,5 +1247,27 @@ mod tests {
             game_data.field(100_000_000).expect("Henesys").time_limit,
             None
         );
+    }
+
+    #[test]
+    fn hazardous_maps_hurt() {
+        let Some(path) = test_assets::path("Map.nx") else {
+            return;
+        };
+        let game_data = GameData::load_from_nx_map(&path).expect("load map nx");
+        let hazard = |map_id| game_data.field(map_id).expect("a map").hazard;
+        let cold = Hazard {
+            hp: 10,
+            every: HAZARD_INTERVAL,
+            protect_item: Some(1_102_109),
+        };
+        assert_eq!(hazard(211_040_000), Some(cold));
+        let balrogs_tomb = Hazard {
+            hp: 50,
+            every: Duration::from_secs(15),
+            protect_item: None,
+        };
+        assert_eq!(hazard(105_100_300), Some(balrogs_tomb));
+        assert_eq!(hazard(211_000_000), None);
     }
 }

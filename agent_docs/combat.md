@@ -964,6 +964,19 @@ mode 6). For a Safety Charm it gives the charms left and the days the next one
 lasts; any other charm is named. The server also keeps the spawn point nearest
 where the player fell.
 
+Some maps hurt whoever is on them (`info/decHP`): El Nath's snowfields, the
+Aquarium's seabed, Sharenian, and others, 123 maps in all. v83 reads none of
+`decHP`, `decInterval` or `protectItem`, so the server does it
+(`runtime/src/actor/client/hazard.rs`, `net::hurt_by_hazard`). From a field
+join, every `decInterval` ms (only the Balrog's maps have one, 15 s), or
+otherwise every 10 s, the player loses `decHP` HP in a plain stat update.
+Nothing happens while they're dead, in the Cash Shop, or wearing the map's
+`protectItem` (1102109 in the cold, 1102061 under water). The 10 s comes from
+Cassandra's Magic (2022187), which protects "every 10 seconds underwater".
+Cosmic and StrategyWiki both say 5 s, so the interval is a guess. The thaw
+items (`spec/thaw`, such as 2022001 Red Bean Porridge and 2022040 Air Bubble)
+and equips that ADD PREVENT COLDNESS don't protect yet.
+
 The client's respawn is a CHANGE_MAP with a target while dead. It returns the
 player to the map's return map with 50 HP. When the player chose a Wheel of
 Destiny (5510000) in the death dialog (the wheel byte after the portal name),
@@ -1045,5 +1058,7 @@ logout.
 Bandit heal themselves with Chakra.
 `player_diseases` has a Hogul in Korean Folk Town cast Slow from far away
 (it misses) and then on the player (it lands for 10 s, then ends).
+`map_hazards` warps to El Nath's Ice Valley in its cape, which keeps the
+cold out, then takes it off and loses 10 HP at the next tick.
 HeavenClient's `diseases_tests` cover the input, jump, attack and skill
 gates and the notices.

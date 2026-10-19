@@ -483,6 +483,25 @@ pub fn countered(player: &mut Player, damage: i32) -> WorldResult {
     })
 }
 
+/// The map hurts the player every so often (its `decHP`, which the v83
+/// client leaves to the server): nothing while they're dead or wear its
+/// `protectItem`.
+pub fn hurt_by_hazard(player: &mut Player, hazard: &game_data::Hazard) -> WorldResult {
+    let protected = hazard
+        .protect_item
+        .is_some_and(|id| player.inventory.equipped_ids().any(|(_, item)| item == id));
+    if player.stats.hp <= 0 || protected {
+        return Ok(HandlerResult::empty());
+    }
+    let hp = player.add_hp(-hazard.hp);
+    let actions = HandlerResult::reply(stat::build_stat_update(false, &[StatUpdate::Hp(hp)])?);
+    Ok(if hp == 0 {
+        actions.with(WorldAction::Died)
+    } else {
+        actions
+    })
+}
+
 /// A mob gave the player a disease: unless they're dead or already have it,
 /// it starts, and the others see it if it shows.
 pub fn catch_disease(
@@ -735,6 +754,44 @@ mod tests {
         assert_eq!(player.inventory.count(4140903), 0);
         assert_eq!(&packets[1].bytes[2..6], &[6, 0, 0, 0]);
         assert_eq!(player.stats.exp, exp);
+    }
+
+    #[test]
+    fn hazards_hurt_unless_their_item_is_worn() {
+        let cold = game_data::Hazard {
+            hp: 10,
+            every: game_data::HAZARD_INTERVAL,
+            protect_item: Some(1102109),
+        };
+        let mut player = crate::codec::stats::sample_player();
+        player.stats.hp = 100;
+        let actions = hurt_by_hazard(&mut player, &cold).unwrap().actions;
+        assert!(matches!(actions.as_slice(), [WorldAction::Reply(_)]));
+        assert_eq!(player.stats.hp, 90);
+
+        player.inventory.insert(
+            InventoryType::Equipped,
+            -9,
+            game::Item::equipment(1102109, game::EquipStats::default()),
+        );
+        assert!(hurt_by_hazard(&mut player, &cold)
+            .unwrap()
+            .actions
+            .is_empty());
+        assert_eq!(player.stats.hp, 90);
+
+        let sharenian = game_data::Hazard {
+            hp: 30000,
+            every: game_data::HAZARD_INTERVAL,
+            protect_item: Some(1032033),
+        };
+        let actions = hurt_by_hazard(&mut player, &sharenian).unwrap().actions;
+        assert_eq!(player.stats.hp, 0);
+        assert!(matches!(actions.last(), Some(WorldAction::Died)));
+        assert!(hurt_by_hazard(&mut player, &sharenian)
+            .unwrap()
+            .actions
+            .is_empty());
     }
 
     #[test]
