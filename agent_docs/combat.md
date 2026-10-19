@@ -851,13 +851,17 @@ and Confuse (132) 51 (`game::mob_skill::inflicted`).
   then cures Poison, Seal, Darkness, Weakness, Curse and Slow (not Stun,
   Seduce or Confuse) with CANCEL_BUFF and CANCEL_FOREIGN_BUFF. A sealed
   player can still cast it.
+- **Hero's Will** (the 4th job's 1121011 and its kin, Pirate's Rage
+  5121008 and 5221010 among them; `skills::HEROS_WILL`, from v83
+  FUN_00765e2d): cures Dispel's diseases and Seduce, Confuse and Undead
+  (Cosmic's purgeDebuffs) the same way, then cools down for its `cooltime`.
 - **What the client does** (HeavenClient `Character/Diseases.h`, from v83
   CUserLocal): Stun stops all input, attacks and skills; Seduce moves the
   player by its `x` (1 left, 2 right, 3 jump, 4 down, 6 and 7 jump left and
-  right) and stops jumps, attacks and skills; Confuse reverses the arrows
-  (teleport too); Weakness stops jumping; Seal stops every skill but
-  Dispel; Slow sets the walking speed to its `x` before the 80-140 clamp.
-  Each disease shows `MobSkill.img/<skill>/level/<lvl>/affected` on the
+  right) and stops jumps, attacks and skills but Hero's Will; Confuse
+  reverses the arrows (teleport too); Weakness stops jumping; Seal stops
+  every skill but Dispel; Slow sets the walking speed to its `x` before the
+  80-140 clamp. Each disease shows `MobSkill.img/<skill>/level/<lvl>/affected` on the
   character, over the face when its `pos` is 1, otherwise at the feet; the
   player also gets a grey chat notice (none for Slow or Confuse) but no
   buff-bar icon.

@@ -160,6 +160,25 @@ pub const DISPELLED: [BuffStat; 6] = [
     BuffStat::Curse,
     BuffStat::Slow,
 ];
+/// The Hero's Wills, Pirate's Rage and 5221010 among them (v83
+/// FUN_00765e2d), which a seduced player may still use.
+pub const HEROS_WILL: [i32; 14] = [
+    1121011, 1221012, 1321010, 2121008, 2221008, 2321009, 3121009, 3221008, 4121009, 4221008,
+    5121008, 5221010, 21121008, 22171004,
+];
+/// The diseases Hero's Will cures: Dispel's, and Seduce, Confuse, and
+/// Undead (Cosmic's purgeDebuffs).
+pub const PURGED: [BuffStat; 9] = [
+    BuffStat::Poison,
+    BuffStat::Seal,
+    BuffStat::Darkness,
+    BuffStat::Weakness,
+    BuffStat::Curse,
+    BuffStat::Slow,
+    BuffStat::Seduce,
+    BuffStat::Confuse,
+    BuffStat::Undead,
+];
 pub const RESURRECTION: i32 = 2321006;
 pub const CHAKRA: i32 = 4211001;
 /// The Arch Mages' and Bishop's Mana Reflection share their levels' data;
@@ -179,6 +198,7 @@ pub const TELEPORTS: [i32; 5] = [2101002, 2201002, 2301001, 12101003, 22101001];
 pub fn acts_alone(skill_id: i32) -> bool {
     matches!(skill_id, MYSTIC_DOOR | CHAKRA | RESURRECTION | TIME_LEAP)
         || TELEPORTS.contains(&skill_id)
+        || HEROS_WILL.contains(&skill_id)
 }
 
 /// The HP Chakra heals: from 2.3 to 3.5 times the user's LUK, with

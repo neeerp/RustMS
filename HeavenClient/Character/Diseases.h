@@ -129,11 +129,24 @@ namespace ms
 			return !state.stunned && !state.seduced;
 		}
 
-		// So are skills, and while sealed every skill but Dispel
-		// (FUN_00966f7a).
+		// The Hero's Wills, Pirate's Rage and 5221010 among them (FUN_00765e2d).
+		constexpr bool heros_will(int32_t skillid)
+		{
+			switch (skillid)
+			{
+			case 1121011: case 1221012: case 1321010: case 2121008: case 2221008: case 2321009: case 3121009:
+			case 3221008: case 4121009: case 4221008: case 5121008: case 5221010: case 21121008: case 22171004:
+				return true;
+			default:
+				return false;
+			}
+		}
+
+		// So are skills, but Hero's Will gets through a seduction; while
+		// sealed every skill but Dispel is refused (FUN_00966f7a).
 		constexpr bool can_use_skill(int32_t skillid, const State &state)
 		{
-			return can_attack(state) && (!state.sealed || skillid == DISPEL);
+			return !state.stunned && (!state.seduced || heros_will(skillid)) && (!state.sealed || skillid == DISPEL);
 		}
 
 		// Items are refused, without a word, under Stop Potion or a
