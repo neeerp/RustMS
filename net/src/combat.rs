@@ -503,11 +503,18 @@ pub fn build_attack(
     p.write_byte(attack.speed)?;
     p.write_byte(0x0A)?;
     p.write_int(projectile)?;
+    // Bit 31 marks a critical (v83 0x980620). The client sends none, but
+    // Snipe always is one (0x78e4d6).
+    let critical = attack.kind == AttackKind::Ranged && attack.skill == SNIPE;
     for hit in &attack.hits {
         p.write_int(hit.object_id)?;
         p.write_byte(0)?;
-        for damage in &hit.damage {
-            p.write_int(*damage)?;
+        for &damage in &hit.damage {
+            p.write_int(if critical && damage > 0 {
+                damage | i32::MIN
+            } else {
+                damage
+            })?;
         }
     }
     if attack.kind == AttackKind::Ranged {
@@ -1299,6 +1306,22 @@ mod tests {
             validate(&snipe(200_000), &player).unwrap_err(),
             AttackRejection::Damage
         );
+    }
+
+    #[test]
+    fn others_see_a_snipe_as_critical() {
+        let attack = parse_attack(
+            &kind_attack_packet(AttackKind::Ranged, SNIPE, 1, &[150_000]),
+            AttackKind::Ranged,
+        )
+        .unwrap();
+        let packet = build_attack(5, &attack, 30, 2060000).unwrap();
+        let damage = i32::from_le_bytes(
+            packet.bytes[packet.bytes.len() - 8..][..4]
+                .try_into()
+                .unwrap(),
+        );
+        assert_eq!(damage, 150_000 | i32::MIN);
     }
 
     fn rogue_with_stars(stars: i16) -> Player {
