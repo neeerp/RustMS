@@ -37,6 +37,15 @@ const ERIN: i32 = 2012002;
 /// Orbis Station's guide, and the passage to the platform for Ellinia.
 const ISA: i32 = 2012006;
 const ORBIS_TUNNEL: i32 = 200000110;
+/// Henesys's hair salon (`hair_henesys1`): a cut or a dye of the player's
+/// choosing, for a coupon each.
+const NATALIE: i32 = 1012103;
+const HAIRCUT_COUPON: i32 = 5150001;
+const DYE_COUPON: i32 = 5151001;
+const NATALIE_HAIRS: [[i32; 7]; 2] = [
+    [30060, 30140, 30200, 30210, 30310, 33040, 33100],
+    [31150, 31300, 31350, 31700, 31740, 34050, 34110],
+];
 
 /// A first-job instructor: the job, its text key, and the weapons, ammunition
 /// and bag rows that come with it (upstream `fighter`, `magician`, `bowman`,
@@ -114,6 +123,12 @@ pub enum Page {
         text: String,
         choices: Vec<(String, Vec<Page>)>,
     },
+    /// A choice of styles (`Prompt::Style`), each with the effects picking
+    /// it applies before moving on.
+    Style {
+        text: String,
+        choices: Vec<(i32, Vec<Effect>)>,
+    },
 }
 
 /// What to do after an answer: apply `effects`, then show `prompt` (or end
@@ -163,6 +178,7 @@ impl NpcScript {
             PURIN => Some(leave_ship(PURIN, &conti::TO_ORBIS)),
             ERIN => Some(leave_ship(ERIN, &conti::TO_ELLINIA)),
             ISA => Some(isa()),
+            NATALIE => Some(natalie(player)),
             MAPLE_ADMINISTRATOR => Some(Self::new(
                 MAPLE_ADMINISTRATOR,
                 vec![Page::Ask {
@@ -216,6 +232,11 @@ impl NpcScript {
                 self.pages = pages.clone();
                 self.page = 0;
                 Some(self.begin())
+            }
+            (Page::Style { choices, .. }, ScriptInput::Select(choice)) => {
+                let (_, effects) = choices.get(usize::try_from(choice).ok()?)?;
+                let effects = effects.clone();
+                Some(self.advance(effects))
             }
             _ => None,
         }
@@ -272,6 +293,11 @@ impl NpcScript {
                 }
                 Prompt::Selection { npc_id, text: menu }
             }
+            Page::Style { text, choices } => Prompt::Style {
+                npc_id,
+                text: text.clone(),
+                styles: choices.iter().map(|&(style, _)| style).collect(),
+            },
         };
         Step {
             prompt: Some(prompt),
@@ -546,6 +572,77 @@ fn robin() -> NpcScript {
     )
 }
 
+/// `hair_henesys1`: Natalie cuts or dyes the player's hair for a coupon.
+fn natalie(player: &Player) -> NpcScript {
+    let hair = player.stats.hair;
+    let gender = usize::from(player.stats.gender.min(1));
+    let cuts = NATALIE_HAIRS[gender].map(|style| style + hair % 10);
+    let dyes = (0..8).map(|colour| hair / 10 * 10 + colour);
+    NpcScript::new(
+        NATALIE,
+        vec![Page::Menu {
+            text: text(keys::NATALIE_MENU),
+            // The client can't show an empty choice of styles.
+            choices: [
+                (
+                    keys::NATALIE_CUT,
+                    hair_salon(
+                        player,
+                        cuts.into_iter(),
+                        HAIRCUT_COUPON,
+                        keys::NATALIE_CUT_PAGES,
+                    ),
+                ),
+                (
+                    keys::NATALIE_DYE,
+                    hair_salon(player, dyes, DYE_COUPON, keys::NATALIE_DYE_PAGES),
+                ),
+            ]
+            .into_iter()
+            .filter_map(|(label, pages)| Some((text(label), pages?)))
+            .collect(),
+        }],
+    )
+}
+
+/// A choice of the hair `styles` that exist, other than the one worn, for a
+/// `coupon`; then what the stylist says after, or to a player without one.
+/// `None` if there are no such styles.
+fn hair_salon(
+    player: &Player,
+    styles: impl Iterator<Item = i32>,
+    coupon: i32,
+    [ask, done, no_coupon]: [&str; 3],
+) -> Option<Vec<Page>> {
+    let has_coupon = player.inventory.count(coupon) > 0;
+    let choices = styles
+        .filter(|&style| style != player.stats.hair && crate::items::has_style(style))
+        .map(|style| {
+            let effects = if has_coupon {
+                vec![
+                    Effect::TakeItem {
+                        item_id: coupon,
+                        quantity: 1,
+                    },
+                    Effect::SetStyle(style),
+                ]
+            } else {
+                Vec::new()
+            };
+            (style, effects)
+        })
+        .collect::<Vec<_>>();
+    (!choices.is_empty()).then(|| {
+        vec![
+            Page::Style {
+                text: text(ask),
+                choices,
+            },
+            Page::Say(text(if has_coupon { done } else { no_coupon })),
+        ]
+    })
+}
+
 fn text(key: &str) -> String {
     content::text().get(key, &[])
 }
@@ -564,6 +661,7 @@ pub fn input(
         (Prompt::YesNo { .. }, 1, 1) => Some(ScriptInput::Yes),
         (Prompt::YesNo { .. }, 1, 0) => Some(ScriptInput::No),
         (Prompt::Selection { .. }, 4, 1) => selection.map(ScriptInput::Select),
+        (Prompt::Style { .. }, 7, 1) => selection.map(ScriptInput::Select),
         _ => None,
     }
 }
@@ -584,6 +682,7 @@ mod tests {
             Prompt::Text(_) => 0,
             Prompt::YesNo { .. } => 1,
             Prompt::Selection { .. } => 4,
+            Prompt::Style { .. } => 7,
         })
     }
 
@@ -937,7 +1036,10 @@ mod tests {
 
         // Too little STR: the intro, then a word about training.
         let mut balrog = NpcScript::for_npc(1022000, &beginner).unwrap();
-        assert_eq!(buttons(&balrog.respond(ScriptInput::Next).unwrap()), (true, false));
+        assert_eq!(
+            buttons(&balrog.respond(ScriptInput::Next).unwrap()),
+            (true, false)
+        );
 
         // Past beginner, a single page.
         beginner.stats.job = 300;
@@ -962,5 +1064,72 @@ mod tests {
         };
         assert_eq!(input(&menu, 4, 1, Some(3)), Some(ScriptInput::Select(3)));
         assert_eq!(input(&menu, 4, -1, None), None);
+        let styles = Prompt::Style {
+            npc_id: 1,
+            text: String::new(),
+            styles: vec![30000],
+        };
+        assert_eq!(input(&styles, 7, 1, Some(0)), Some(ScriptInput::Select(0)));
+        assert_eq!(input(&styles, 7, 0, None), None, "cancelled");
+        assert_eq!(input(&styles, 4, 1, Some(0)), None);
+    }
+
+    fn styles(step: &Step) -> Vec<i32> {
+        match &step.prompt {
+            Some(Prompt::Style { styles, .. }) => styles.clone(),
+            other => panic!("styles expected, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn natalie_cuts_hair_for_a_coupon() {
+        // A man with black hair (30030) and a haircut coupon.
+        let mut man = player(50);
+        man.stats.gender = 0;
+        man.inventory.insert(
+            game::InventoryType::Cash,
+            1,
+            game::Item::stack(HAIRCUT_COUPON, 1),
+        );
+        let mut natalie = NpcScript::for_npc(NATALIE, &man).unwrap();
+        assert_eq!(kind(&natalie.begin()), Some(4));
+        let cuts = natalie.respond(ScriptInput::Select(0)).unwrap();
+        assert_eq!(
+            styles(&cuts),
+            [30060, 30140, 30200, 30210, 30310, 33040, 33100]
+        );
+        let done = natalie.respond(ScriptInput::Select(1)).unwrap();
+        assert_eq!(
+            done.effects,
+            [
+                Effect::TakeItem {
+                    item_id: HAIRCUT_COUPON,
+                    quantity: 1
+                },
+                Effect::SetStyle(30140),
+            ]
+        );
+        assert_eq!(buttons(&done), (false, false));
+        assert_eq!(natalie.respond(ScriptInput::Next), Some(Step::default()));
+    }
+
+    #[test]
+    fn natalie_dyes_to_other_colours_and_needs_the_coupon() {
+        // A woman with hair 31142, and no dye coupon.
+        let mut woman = player(50);
+        woman.stats.hair = 31142;
+        let mut natalie = NpcScript::for_npc(NATALIE, &woman).unwrap();
+        let cuts = natalie.respond(ScriptInput::Select(0)).unwrap();
+        assert_eq!(styles(&cuts)[0], 31152, "her colour, the women's styles");
+        let mut natalie = NpcScript::for_npc(NATALIE, &woman).unwrap();
+        let dyes = natalie.respond(ScriptInput::Select(1)).unwrap();
+        assert_eq!(
+            styles(&dyes),
+            [31140, 31141, 31143, 31144, 31145, 31146, 31147]
+        );
+        assert_eq!(natalie.respond(ScriptInput::Select(7)), None);
+        let refused = natalie.respond(ScriptInput::Select(0)).unwrap();
+        assert!(refused.effects.is_empty());
+        assert_eq!(kind(&refused), Some(0));
     }
 }

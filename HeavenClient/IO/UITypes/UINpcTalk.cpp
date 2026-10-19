@@ -699,6 +699,17 @@ namespace ms
 		}
 	}
 
+	NpcTextMarkup::Lookups UINpcTalk::markup_lookups()
+	{
+		return {
+			[]() { return Stage::get().get_player().get_name(); },
+			[](int32_t id) { return std::string(nl::nx::string["Npc.img"][std::to_string(id)]["name"]); },
+			[](int32_t id) { return ItemData::get(id).get_name(); },
+			[](int32_t id) { return std::string(nl::nx::string["Mob.img"][std::to_string(id)]["name"]); },
+			[](int32_t id) { return NxHelper::Map::get_map_info_by_id(id).name; }
+		};
+	}
+
 	// TODO: Move this to GraphicsGL?
 	std::string UINpcTalk::format_text(const std::string &tx, const int32_t &npcid, std::vector<InlineImage> &images)
 	{
@@ -716,16 +727,8 @@ namespace ms
 			else formatted_text += tx[i];
 		}
 
-		NpcTextMarkup::Lookups lookups {
-			[]() { return Stage::get().get_player().get_name(); },
-			[](int32_t id) { return std::string(nl::nx::string["Npc.img"][std::to_string(id)]["name"]); },
-			[](int32_t id) { return ItemData::get(id).get_name(); },
-			[](int32_t id) { return std::string(nl::nx::string["Mob.img"][std::to_string(id)]["name"]); },
-			[](int32_t id) { return NxHelper::Map::get_map_info_by_id(id).name; }
-		};
-
 		std::vector<NpcTextMarkup::InlineImage> tags;
-		formatted_text = NpcTextMarkup::expand(formatted_text, lookups, &tags);
+		formatted_text = NpcTextMarkup::expand(formatted_text, markup_lookups(), &tags);
 
 		for (const auto &tag : tags)
 		{

@@ -358,6 +358,7 @@ namespace ms
 					types.emplace_back(UIElement::Type::MEGAPHONE);
 					types.emplace_back(UIElement::Type::ITEMMEGAPHONE);
 					types.emplace_back(UIElement::Type::PETCHOOSER);
+					types.emplace_back(UIElement::Type::AVATARSELECT);
 				}
 				else if (enter)
 				{
@@ -370,6 +371,7 @@ namespace ms
 					types.emplace_back(UIElement::Type::TELEPORTROCK);
 					types.emplace_back(UIElement::Type::MEGAPHONE);
 					types.emplace_back(UIElement::Type::PETCHOOSER);
+					types.emplace_back(UIElement::Type::AVATARSELECT);
 				} else if (tab)
 				{
 					// Game

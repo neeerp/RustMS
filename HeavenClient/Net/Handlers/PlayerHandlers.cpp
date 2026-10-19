@@ -128,7 +128,8 @@ namespace ms
 		switch (stat)
 		{
 		case MapleStat::Id::SKIN:
-			player.change_look(stat, recv.read_short());
+			// A byte, as v83 reads it (FUN_004e2fba).
+			player.change_look(stat, recv.read_byte());
 			break;
 		case MapleStat::Id::FACE:
 		case MapleStat::Id::HAIR:

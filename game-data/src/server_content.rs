@@ -80,6 +80,23 @@ pub mod keys {
     pub const ISA_ASK: &str = "isa.ask";
     pub const ISA_DECLINE: &str = "isa.decline";
 
+    /// Natalie, Henesys's hair salon: a menu of a cut or a dye, then for
+    /// each the choice of styles, the line after, and the line to a player
+    /// without the coupon.
+    pub const NATALIE_MENU: &str = "natalie.menu";
+    pub const NATALIE_CUT: &str = "natalie.cut";
+    pub const NATALIE_DYE: &str = "natalie.dye";
+    pub const NATALIE_CUT_PAGES: [&str; 3] = [
+        "natalie.cut.ask",
+        "natalie.cut.done",
+        "natalie.cut.no_coupon",
+    ];
+    pub const NATALIE_DYE_PAGES: [&str; 3] = [
+        "natalie.dye.ask",
+        "natalie.dye.done",
+        "natalie.dye.no_coupon",
+    ];
+
     /// Robin's beginner Q&A (`begin5`): a menu, then each topic's pages.
     /// The placeholders decide how many topics and pages there are.
     pub const ROBIN_MENU: &str = "robin.menu";
@@ -407,6 +424,9 @@ mod tests {
             keys::ISA_PLATFORM,
             keys::ISA_ASK,
             keys::ISA_DECLINE,
+            keys::NATALIE_MENU,
+            keys::NATALIE_CUT,
+            keys::NATALIE_DYE,
             keys::ROBIN_MENU,
             keys::FIRST_JOB_INVENTORY_FULL,
         ];
@@ -415,6 +435,8 @@ mod tests {
             .chain(&keys::ROGER_START)
             .chain(&keys::ROGER_END)
             .chain(&keys::SHANKS_LETTER)
+            .chain(&keys::NATALIE_CUT_PAGES)
+            .chain(&keys::NATALIE_DYE_PAGES)
         {
             assert!(text.contains(key), "{key} has no placeholder");
         }

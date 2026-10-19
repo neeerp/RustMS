@@ -16,6 +16,7 @@ use tokio::time::{timeout, Duration, Instant};
 
 /// STAT_CHANGED mask bits the tests read.
 pub mod stat {
+    pub const HAIR: i32 = 0x4;
     pub const LEVEL: i32 = 0x10;
     pub const STR: i32 = 0x40;
     pub const HP: i32 = 0x400;

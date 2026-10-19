@@ -97,6 +97,9 @@ from `UI.nx`. Moved so far:
 - **NPC dialog** (`UINpcTalk`, `UIWindow.img/UtilDlgEx`): the frame,
   buttons, menu dots, quest list headers, and the `Basic.img/VScr4` scroll
   bar (`Slider::Type::CLASSIC`). See [npc-dialogue.md](npc-dialogue.md).
+- **Choice of styles** (`UIAvatarSelect`, `UIWindow.img/UtilDlgEx_Avatar`,
+  NPC dialogue types 7 and 8). Positions are v83's (FUN_009a92c9,
+  FUN_009aa708). See [npc-dialogue.md](npc-dialogue.md).
 - **Quest Helper** (`UIQuestHelper`, `UIWindow.img/QuestAlarm`). See
   [quests.md](quests.md).
 - **Quest Complete! notice** (`UIQuestComplete`, `UIWindow.img/FadeYesNo`).
@@ -771,3 +774,5 @@ These were corrected:
     pet's stance byte is `action << 1 | left`, but HeavenClient read the
     action as its own animation index and odd as facing right. 168 put pets
     at a fixed index; v83's list closes up. See `pets.md`.
+14. The client read the stat change's SKIN as a short; v83 reads a byte
+    (FUN_004e2fba), as the server writes it.

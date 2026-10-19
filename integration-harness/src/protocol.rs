@@ -42,6 +42,7 @@ pub struct WorldSession {
     pub job: i16,
     pub str: i16,
     pub max_hp: i16,
+    pub hair: i32,
     pub ap: i16,
     pub sp: i16,
     /// Skill levels by skill id.
@@ -188,6 +189,7 @@ pub async fn login_to_world_session(config: &HarnessConfig) -> Result<WorldSessi
         job: world_entry.job,
         str: world_entry.str,
         max_hp: world_entry.max_hp,
+        hair: world_entry.hair,
         ap: world_entry.ap,
         sp: world_entry.sp,
         skills: world_entry.skills,

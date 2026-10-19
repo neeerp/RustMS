@@ -21,6 +21,15 @@ unsourced = [
     "ships.sell.short",
     "ships.board.no_ticket",
     "first_job.inventory_full",
+    "natalie.menu",
+    "natalie.cut",
+    "natalie.dye",
+    "natalie.cut.ask",
+    "natalie.cut.done",
+    "natalie.cut.no_coupon",
+    "natalie.dye.ask",
+    "natalie.dye.done",
+    "natalie.dye.no_coupon",
 ]
 
 [text."glTutoMsg0.message"]

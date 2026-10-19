@@ -9,6 +9,7 @@ use net::packet::build::world::stat::StatUpdate;
 use net::packet::build::world::{drop, effect, guild, inventory, npc, stat};
 use net::quests::{self, QuestTemplate};
 use net::scripts::Effect;
+use net::WorldAction;
 use tracing::{debug, warn};
 
 /// The NPC that offers veterans a tutorial skip.
@@ -93,6 +94,7 @@ impl ClientActor {
         let mut offer_skip = false;
         let mut warp = None;
         let mut name_guild = false;
+        let mut restyled = false;
         for effect in effects {
             match effect {
                 Effect::FieldEffect(path) => afterwards.push(effect::build_field_effect(path)?),
@@ -187,6 +189,26 @@ impl ClientActor {
                     changed = true;
                     packets.push(inventory::build_inventory_grow(*kind, limit)?);
                 }
+                Effect::SetStyle(style) => {
+                    let stats = &mut next.stats;
+                    let update = match style / 10_000 {
+                        2 => {
+                            stats.face = *style;
+                            StatUpdate::Face(*style)
+                        }
+                        3 => {
+                            stats.hair = *style;
+                            StatUpdate::Hair(*style)
+                        }
+                        _ => {
+                            stats.skin = *style as u8;
+                            StatUpdate::Skin(stats.skin)
+                        }
+                    };
+                    changed = true;
+                    restyled = true;
+                    packets.push(stat::build_stat_update(false, &[update])?);
+                }
                 Effect::StartQuest(id) => change = Some(QuestChange::Start(template(*id)?)),
                 Effect::CompleteQuest(id) => change = Some(QuestChange::Complete(template(*id)?)),
                 Effect::Warp(map_id) => warp = Some(*map_id),
@@ -206,6 +228,10 @@ impl ClientActor {
         packets.append(&mut afterwards);
         self.naming_guild |= name_guild;
         self.send_all(&mut packets).await?;
+        if restyled {
+            let announce = inventory::build_char_look(&self.in_game()?.player)?;
+            Box::pin(self.apply(WorldAction::LookChanged(announce))).await?;
+        }
 
         if offer_skip {
             let account_id = self.in_game()?.player.account_id;

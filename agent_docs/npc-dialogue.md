@@ -42,8 +42,9 @@ each client chooses locally and players see different actions.
 ## Scripted NPCs
 
 `net::npc_scripts::NpcScript` holds native scripts (Lua is deferred) as a
-list of pages: `Say`, `Ask` (effects on yes), and `Menu` (each choice its
-own pages), plus effects applied after the last page. The effects are
+list of pages: `Say`, `Ask` (effects on yes), `Menu` (each choice its
+own pages), and `Style` (each style its own effects), plus effects applied
+after the last page. The effects are
 `net::scripts::Effect`, shared with map and portal scripts. The client actor
 (`ClientActor::apply_effects` in `client/npc_script.rs`) applies them to a
 copy of the player and commits any quest change together with it, or
@@ -60,6 +61,7 @@ applied, and apply nothing if the player no longer has them. Answers are matched
 | `tutorialSkip` | Clicking the Maple Administrator (2007), or the `tutoChatNPC` portal for accounts with a level-30 character | Yes warps to Lith Harbor (104000000). Neither is on the original island, so this is unused |
 | `begin7` | Clicking Shanks (22000) in Southperry | Yes sails to Lith Harbor (104000000) for Lucas's recommendation letter (4031801), at any level, or for 150 mesos from level 7; otherwise he says why not |
 | `fighter`, `magician`, `bowman`, `rogue` | Clicking Dances with Balrog (1022000), Grendel the Really Old (1032001), Athena Pierce (1012100), or the Dark Lord (1052001) | First job advancement: see below |
+| `hair_henesys1` | Clicking Natalie (1012103) in Henesys's hair salon (100000104) | A haircut (5150001) or a dye (5151001) coupon buys one of her styles, picked on a preview of the player; without a coupon she says so and nothing changes |
 
 The four Explorer instructors (`INSTRUCTORS` in `npc_scripts.rs`) make a
 beginner a Warrior, Magician, Bowman, or Thief. The beginner needs level 10
@@ -152,6 +154,19 @@ i32 max`, and a box text (13) `str default, i16 cols, i16 rows`. The
 client checks a text's trimmed length and a number's range, shows v83's
 notice and stays open when they are wrong, and answers `02 01 str`,
 `03 01 i32` or `0D 01 str`. The server sends none of them yet.
+
+Types 7 and 8 are a choice of styles: after the text come `u8 count` and
+that many `i32` style ids. The client shows the v83 `UtilDlgEx_Avatar`
+window (`UIAvatarSelect`) instead of the usual dialog: the NPC, the text,
+and the player wearing one style at a time, a face if the first id / 10000
+is 2, a hairstyle if 3, otherwise a skin. BACK and NEXT go round the
+styles, TAKE OFF ALL shows the player without equipment and DEFAULT
+SETTINGS brings it back. OK or Enter answers `07 01 u8` (the style's index);
+CANCEL, LEAVE STORE or Escape answers `07 00`. The server sends type 7 for
+Natalie's hairstyles and applies the chosen one with `Effect::SetStyle`
+(a stat change and UPDATE_CHAR_LOOK for others). The window has no scroll
+bar for text taller than its 100 px box, drops the text's images, and does
+not type the text out.
 
 ## Assets and validation
 

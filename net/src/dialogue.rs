@@ -32,6 +32,13 @@ pub enum Prompt {
         npc_id: i32,
         text: String,
     },
+    /// Pick one of `styles` (hair, face or skin) on a preview of the
+    /// player; the answer is the index of the chosen one.
+    Style {
+        npc_id: i32,
+        text: String,
+        styles: Vec<i32>,
+    },
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]

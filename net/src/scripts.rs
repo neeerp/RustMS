@@ -51,6 +51,9 @@ pub enum Effect {
     TakeFirstJob(i16),
     /// Add a row of four slots to a bag, up to 96.
     AddSlotRow(InventoryType),
+    /// Give the player a new hair (3xxxx), face (2xxxx) or skin (anything
+    /// else), judged as the client judges a style's kind.
+    SetStyle(i32),
 }
 
 #[derive(Debug, Default, PartialEq, Eq)]

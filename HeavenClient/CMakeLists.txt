@@ -592,6 +592,8 @@ add_executable(HeavenClient
     IO/UITypes/EnterNumber.h
     IO/UITypes/UINotice.cpp
     IO/UITypes/UINotice.h
+    IO/UITypes/UIAvatarSelect.cpp
+    IO/UITypes/UIAvatarSelect.h
     IO/UITypes/UINpcTalk.cpp
     IO/UITypes/UINpcTalk.h
     IO/UITypes/UIQuestLog.cpp

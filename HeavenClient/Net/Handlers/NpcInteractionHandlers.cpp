@@ -21,6 +21,7 @@
 #include "../Character/QuestResult.h"
 #include "../Gameplay/Stage.h"
 #include "../IO/UI.h"
+#include "../IO/UITypes/UIAvatarSelect.h"
 #include "../IO/UITypes/UIChatBar.h"
 #include "../IO/UITypes/UINotice.h"
 #include "../IO/UITypes/UINpcTalk.h"
@@ -39,7 +40,7 @@ namespace ms
 		recv.skip(1);
 
 		int32_t npcid = recv.read_int();
-		// 0 say, 1 yes/no, 2 text, 3 number, 4 menu, 12 accept/decline, 13 box text
+		// 0 say, 1 yes/no, 2 text, 3 number, 4 menu, 7/8 styles, 12 accept/decline, 13 box text
 		int8_t msgtype = recv.read_byte();
 		int8_t speaker = recv.read_byte();
 
@@ -48,6 +49,26 @@ namespace ms
 			npcid = recv.read_int();
 
 		std::string text = recv.read_string();
+
+		// A choice of styles: the styles, then the same reply whichever.
+		if (msgtype == 7 || msgtype == 8)
+		{
+			std::vector<int32_t> styles(static_cast<uint8_t>(recv.read_byte()));
+
+			for (int32_t &id : styles)
+				id = recv.read_int();
+
+			if (styles.empty())
+				return;
+
+			if (auto npctalk = UI::get().get_element<UINpcTalk>())
+				npctalk->deactivate();
+
+			UI::get().emplace<UIAvatarSelect>(npcid, msgtype, text, std::move(styles));
+			UI::get().enable();
+
+			return;
+		}
 
 		int16_t style = 0;
 		UINpcTalk::Input input;

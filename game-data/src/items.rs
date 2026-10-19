@@ -229,6 +229,16 @@ impl ItemData {
         Ok(found)
     }
 
+    /// Whether `Character.nx` has the hair (3xxxx) or face (2xxxx) `style`.
+    pub fn has_style(&self, style: i32) -> Result<bool, GameDataError> {
+        let directory = match style / 10_000 {
+            2 => "Face",
+            3 => "Hair",
+            _ => return Ok(false),
+        };
+        Ok(path_index(&self.equipment, &format!("{directory}/{style:08}.img"))?.is_some())
+    }
+
     /// The template for `item_id`, or `None` if the data has no such item.
     pub fn info(&self, item_id: i32) -> Result<Option<ItemInfo>, GameDataError> {
         if item_id / 1_000_000 == 1 {
@@ -551,6 +561,17 @@ mod tests {
         );
         let relaxer = data.info(3010000).unwrap().unwrap();
         assert_eq!((relaxer.recovery_hp, relaxer.recovery_mp), (50, 0));
+    }
+
+    #[test]
+    fn knows_which_hairs_and_faces_exist() {
+        let Some(data) = data() else {
+            return;
+        };
+        assert!(data.has_style(30060).unwrap());
+        assert!(data.has_style(20000).unwrap());
+        assert!(!data.has_style(30069).unwrap());
+        assert!(!data.has_style(1302000).unwrap());
     }
 
     #[test]

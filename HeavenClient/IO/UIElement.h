@@ -89,6 +89,7 @@ namespace ms
 			MEGAPHONE,
 			ITEMMEGAPHONE,
 			PETCHOOSER,
+			AVATARSELECT,
 			NUM_TYPES
 		};
 

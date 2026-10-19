@@ -45,6 +45,12 @@ pub fn info(item_id: i32) -> Option<ItemInfo> {
     data().ok()?.info(item_id).ok().flatten()
 }
 
+/// Whether the hair or face `style` exists. Without the data, every one
+/// does.
+pub fn has_style(style: i32) -> bool {
+    data().map_or(true, |data| data.has_style(style).unwrap_or(false))
+}
+
 /// How many of `item_id` fit in one slot.
 pub fn slot_max(item_id: i32) -> i16 {
     info(item_id).map_or(game_data::items::DEFAULT_SLOT_MAX, |info| info.slot_max)

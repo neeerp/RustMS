@@ -75,6 +75,17 @@ namespace ms
 		}
 	};
 
+	// Answers a choice of styles (7 or 8) with the index of the one picked.
+	// Opcode: NPC_TALK_MORE(60)
+	class NpcTalkStylePacket : public NpcTalkMorePacket
+	{
+	public:
+		NpcTalkStylePacket(int8_t lastmsg, uint8_t index) : NpcTalkMorePacket(lastmsg, 1)
+		{
+			write_byte(static_cast<int8_t>(index));
+		}
+	};
+
 	// Packet which tells the server of an interaction with an NPC shop
 	// Opcode: NPC_SHOP_ACTION(61)
 	class NpcShopActionPacket : public OutPacket
