@@ -2,7 +2,10 @@
 
 #include "../../Graphics/Animation.h"
 
+#include <algorithm>
 #include <cstdint>
+#include <string>
+#include <vector>
 
 // How v83 plays a map object's animation, and switches a named object between its states.
 namespace ms::obj_state
@@ -45,5 +48,26 @@ namespace ms::obj_state
 			return -1;
 
 		return state;
+	}
+
+	// An obj's `tags`, which split on "," with the spaces around each trimmed (FUN_0063ad16); ";" doesn't split.
+	inline std::vector<std::string> split_tags(const std::string &tags)
+	{
+		std::vector<std::string> split;
+		size_t start = 0;
+
+		while (start <= tags.size())
+		{
+			size_t end = std::min(tags.find(',', start), tags.size());
+			std::string piece = tags.substr(start, end - start);
+			size_t first = piece.find_first_not_of(" \t\r\n");
+
+			if (first != std::string::npos)
+				split.push_back(piece.substr(first, piece.find_last_not_of(" \t\r\n") - first + 1));
+
+			start = end + 1;
+		}
+
+		return split;
 	}
 }

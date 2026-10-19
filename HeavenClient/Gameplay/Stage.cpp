@@ -45,6 +45,7 @@
 #include <nlnx/nx.hpp>
 
 #include <cstdlib>
+#include <unordered_map>
 
 namespace ms
 {
@@ -53,6 +54,33 @@ namespace ms
 		// An in-map portal's move lands 120 ms after Up; the portal then
 		// waits 600 ms (v83 FUN_00957b74, FUN_0094e5e5).
 		constexpr int16_t TELEPORT_COOLDOWN = 600;
+
+		// How often v83 looks at the quest-bound tags again (FUN_00531b8d).
+		constexpr int32_t QUEST_TAG_INTERVAL = 5000;
+
+		// The quest whose QuestInfo.img showLayerTag is `tag`, or 0. Every quest counts, not only the supported
+		// ones (CQuestMan 0x722fd6).
+		int16_t layer_tag_quest(const std::string &tag)
+		{
+			static const std::unordered_map<std::string, int16_t> quests = []()
+			{
+				std::unordered_map<std::string, int16_t> found;
+
+				for (auto quest : nl::nx::quest["QuestInfo.img"])
+				{
+					std::string shown = quest["showLayerTag"].get_string();
+
+					if (!shown.empty())
+						found[shown] = string_conversion::or_default<int16_t>(quest.name(), 0);
+				}
+
+				return found;
+			}();
+
+			auto iter = quests.find(tag);
+
+			return iter == quests.end() ? 0 : iter->second;
+		}
 	}
 
 	Stage::Stage() : combat(player, chars, mobs, reactors, summons, drops, physics, mapinfo, portals)
@@ -75,6 +103,7 @@ namespace ms
 			case State::INACTIVE:
 				load_map(mapid);
 				respawn(portalid, chase);
+				show_quest_tags();
 
 				if (pending_clock && clock.is_present())
 					clock.set(pending_clock->hour, pending_clock->minute, pending_clock->second);
@@ -292,6 +321,12 @@ namespace ms
 		screen_effects.update();
 		overlay_effects.update();
 		tilesobjs.update();
+
+		// Every 5 s, and whenever a quest record changes (FUN_00a20f4c).
+		since_quest_tags += Constants::TIMESTEP;
+
+		if (since_quest_tags > QUEST_TAG_INTERVAL || player.get_quests().revision() != quest_tags_revision)
+			show_quest_tags();
 
 		reactors.update(physics);
 		mists.update();
@@ -1167,6 +1202,27 @@ namespace ms
 	void Stage::reset_obstacles()
 	{
 		tilesobjs.reset_obstacles(player.get_position());
+	}
+
+	void Stage::show_tag(const std::string &tag, bool shown)
+	{
+		tilesobjs.show_tags([&](const std::string &other) { return other == tag ? std::optional<bool>(shown) : std::nullopt; });
+	}
+
+	void Stage::show_quest_tags()
+	{
+		QuestLog &quests = player.get_quests();
+
+		tilesobjs.show_tags([&](const std::string &tag) -> std::optional<bool>
+		{
+			if (int16_t quest = layer_tag_quest(tag))
+				return quests.is_started(quest);
+
+			return std::nullopt;
+		});
+
+		since_quest_tags = 0;
+		quest_tags_revision = quests.revision();
 	}
 
 	void Stage::move_ship(uint8_t target, uint8_t event)

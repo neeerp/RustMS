@@ -84,6 +84,14 @@ namespace ms
 		void handle(InPacket& recv) const override;
 	};
 
+	// Map objs with a tag are shown or hidden, such as the arrows to a job
+	// instructor (v83 FUN_006449d2).
+	class MapObjectVisibleHandler : public PacketHandler
+	{
+	public:
+		void handle(InPacket& recv) const override;
+	};
+
 	// Every named trap goes back to its first state (v83 0x5330b6).
 	class ObstacleResetHandler : public PacketHandler
 	{

@@ -27,6 +27,8 @@
 
 #include <vector>
 #include <map>
+#include <functional>
+#include <optional>
 
 namespace ms
 {
@@ -50,6 +52,8 @@ namespace ms
 
 		// Puts every named trap back in its first state.
 		void reset_obstacles(Point<int16_t> listener);
+
+		void show_tags(const std::function<std::optional<bool>(const std::string &)> &shown);
 
 	private:
 		std::multimap<uint8_t, Tile> tiles;
@@ -77,6 +81,9 @@ namespace ms
 
 		// Puts every named trap back in its first state (FIELD_OBSTACLE_ALL_RESET 0x8D).
 		void reset_obstacles(Point<int16_t> listener);
+
+		// Show or hide each obj with a tag that `shown` gives a value for, leaving the rest as they are.
+		void show_tags(const std::function<std::optional<bool>(const std::string &)> &shown);
 
 	private:
 		EnumMap<Layer::Id, TilesObjs> layers;

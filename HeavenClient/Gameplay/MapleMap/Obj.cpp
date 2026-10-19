@@ -60,6 +60,8 @@ namespace ms
 		nl::node data = nl::nx::map["Obj"][src["oS"] + ".img"][src["l0"]][src["l1"]][src["l2"]];
 
 		name = src["name"].get_string();
+		tags = obj_state::split_tags(src["tags"].get_string());
+		shown = !src["hide"].get_bool();
 		pos = Point<int16_t>(src["x"], src["y"]);
 		flip = src["f"].get_bool();
 		z = src["z"];
@@ -99,7 +101,7 @@ namespace ms
 
 	void Obj::draw(Point<int16_t> viewpos, float inter) const
 	{
-		if (visible)
+		if (visible && shown)
 			states[current].animation.draw(DrawArgument(pos + viewpos, flip), inter);
 	}
 
@@ -130,6 +132,16 @@ namespace ms
 		play(shown);
 
 		return true;
+	}
+
+	const std::vector<std::string> &Obj::get_tags() const
+	{
+		return tags;
+	}
+
+	void Obj::set_shown(bool value)
+	{
+		shown = value;
 	}
 
 	bool Obj::has_obstacle() const

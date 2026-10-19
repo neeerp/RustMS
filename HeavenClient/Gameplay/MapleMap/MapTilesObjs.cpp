@@ -86,6 +86,14 @@ namespace ms
 		}
 	}
 
+	void TilesObjs::show_tags(const std::function<std::optional<bool>(const std::string &)> &shown)
+	{
+		for (auto &iter : objs)
+			for (auto &tag : iter.second.get_tags())
+				if (std::optional<bool> value = shown(tag))
+					iter.second.set_shown(*value);
+	}
+
 	void TilesObjs::draw(Point<int16_t> viewpos, float alpha) const
 	{
 		for (auto &iter : objs)
@@ -134,6 +142,12 @@ namespace ms
 	{
 		for (auto iter : layers)
 			iter.second.reset_obstacles(listener);
+	}
+
+	void MapTilesObjs::show_tags(const std::function<std::optional<bool>(const std::string &)> &shown)
+	{
+		for (auto iter : layers)
+			iter.second.show_tags(shown);
 	}
 
 	void MapTilesObjs::update()

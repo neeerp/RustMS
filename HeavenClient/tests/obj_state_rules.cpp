@@ -33,6 +33,13 @@ int main()
 		require(next_state(0, 4, 4) == -1 && next_state(0, 1, 1) == -1, "one it hasn't changes nothing");
 		require(next_state(0, 4, -2) == -1, "nor a negative one");
 
+		using Tags = std::vector<std::string>;
+		require(split_tags("bowQuest ") == Tags{ "bowQuest" }, "the spaces around a tag go");
+		require(split_tags("james1;james2;james3;") == Tags{ "james1;james2;james3;" }, "\";\" doesn't split");
+		require(split_tags(" a , b,c") == Tags{ "a", "b", "c" }, "\",\" does");
+		require(split_tags("a,, ,b,") == Tags{ "a", "b" }, "empty ones go");
+		require(split_tags("").empty(), "no tags");
+
 		std::cout << "Obj state rules passed\n";
 		return 0;
 	}

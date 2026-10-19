@@ -54,6 +54,12 @@ namespace ms
 		// (v83 FUN_00642aca). False if it has no such state.
 		bool set_state(int32_t state, Point<int16_t> listener);
 
+		// The tags a quest or the server shows or hides it by, such as the arrows to a job instructor.
+		const std::vector<std::string> &get_tags() const;
+
+		// Show or hide the obj as a whole, whatever its state (v83 layer put_visible).
+		void set_shown(bool shown);
+
 		// Whether any of its states is a trap.
 		bool has_obstacle() const;
 
@@ -87,7 +93,10 @@ namespace ms
 		std::vector<State> states;
 		size_t current;
 		bool visible;
+		// False for one hidden by its `hide` or a tag.
+		bool shown;
 		std::string name;
+		std::vector<std::string> tags;
 		Point<int16_t> pos;
 		uint8_t z;
 		bool flip;

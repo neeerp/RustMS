@@ -95,6 +95,7 @@ namespace ms
 
 		SKILL_MACROS = 124,
 		SET_FIELD = 125,
+		SET_MAP_OBJECT_VISIBLE = 129,
 		BLOCKED_MAP = 131,
 		BLOCKED_SERVER = 132,
 		WHISPER = 135,
@@ -236,6 +237,7 @@ namespace ms
 		emplace<FIELD_OBSTACLE_ONOFF, ObjectStateHandler>();
 		emplace<FIELD_OBSTACLE_ONOFF_LIST, ObjectStateListHandler>();
 		emplace<FIELD_OBSTACLE_ALL_RESET, ObstacleResetHandler>();
+		emplace<SET_MAP_OBJECT_VISIBLE, MapObjectVisibleHandler>();
 		emplace<SET_OBJECT_STATE, ObjectStateHandler>();
 
 		// MapObject handlers

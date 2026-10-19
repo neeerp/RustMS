@@ -369,6 +369,18 @@ namespace ms
 		}
 	}
 
+	void MapObjectVisibleHandler::handle(InPacket& recv) const
+	{
+		uint8_t count = recv.read_byte();
+
+		for (uint8_t i = 0; i < count; i++)
+		{
+			std::string tag = recv.read_string();
+			bool shown = recv.read_bool();
+			Stage::get().show_tag(tag, shown);
+		}
+	}
+
 	void ObstacleResetHandler::handle(InPacket&) const
 	{
 		Stage::get().reset_obstacles();

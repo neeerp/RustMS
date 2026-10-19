@@ -165,6 +165,9 @@ namespace ms
 		// Put every named trap back in its first state.
 		void reset_obstacles();
 
+		// SET_MAP_OBJECT_VISIBLE: show or hide the map objs with a tag.
+		void show_tag(const std::string &tag, bool shown);
+
 		// Draw the screen effects that go above the UI.
 		void draw_overlay(float alpha) const;
 
@@ -253,6 +256,10 @@ namespace ms
 		// Fear's darkness, all but the player's narrowed sight (FUN_0053868d).
 		void draw_fear(double viewx, double viewy, float alpha) const;
 
+		// Show the map objs whose tag is a quest's showLayerTag while that quest is in progress, and hide them
+		// otherwise (FUN_00537cdc).
+		void show_quest_tags();
+
 		enum State
 		{
 			INACTIVE,
@@ -285,6 +292,9 @@ namespace ms
 		// The ms until the player may move in the map again.
 		int16_t teleport_cooldown = 0;
 		MapTilesObjs tilesobjs;
+		// The ms since the quest-bound tags were last looked at, and the quest log they were looked at for.
+		int32_t since_quest_tags = 0;
+		uint64_t quest_tags_revision = 0;
 		MapBackgrounds backgrounds;
 		MapPortals portals;
 		MapReactors reactors;
