@@ -52,8 +52,8 @@ pub use self::change_map::{door_warp, warp, warp_to_spawn_point, ChangeMapHandle
 pub use self::char_info::CharInfoRequestHandler;
 pub use self::chat::AllChatHandler;
 pub use self::combat::{
-    catch_disease, countered, death_penalty, hurt_by_hazard, AttackHandler, MobBombHandler,
-    MobDistanceHandler, MoveLifeHandler, NpcActionHandler, TakeDamageHandler,
+    absorbed, catch_disease, countered, death_penalty, hurt_by_hazard, AttackHandler,
+    MobBombHandler, MobDistanceHandler, MoveLifeHandler, NpcActionHandler, TakeDamageHandler,
 };
 pub use self::conti::ContiStateRequestHandler;
 pub use self::door::UseDoorHandler;

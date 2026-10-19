@@ -1098,6 +1098,7 @@ impl ClientActor {
             ServerMessage::Beholder(support) => self.beholder_support(support).await?,
             ServerMessage::Diseased { disease, map_id } => self.diseased(disease, map_id).await?,
             ServerMessage::Countered { damage, map_id } => self.countered(damage, map_id).await?,
+            ServerMessage::Absorbed { hp, mp, map_id } => self.absorbed(hp, mp, map_id).await?,
             ServerMessage::Dispelled { map_id } => self.dispelled(map_id).await?,
             ServerMessage::Banished { to, map_id } => self.banished(to, map_id).await?,
             ServerMessage::DoorWarp {

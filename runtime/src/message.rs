@@ -168,6 +168,13 @@ pub enum ServerMessage {
         damage: i32,
         map_id: i32,
     },
+    /// This player's attack on `map_id` took `hp` and `mp` from the mobs
+    /// it hit (Drain, MP Eater).
+    Absorbed {
+        hp: i32,
+        mp: i32,
+        map_id: i32,
+    },
     /// The Mystic Door this player entered on `from_map` leads to `map_id`.
     DoorWarp {
         from_map: i32,

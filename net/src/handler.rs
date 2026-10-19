@@ -439,14 +439,16 @@ pub enum FieldRequest {
     NpcAction { object_id: i32, action: Vec<u8> },
     /// A validated attack: `broadcast` for the others, its skill (0 for a
     /// basic attack), total damage per mob, and what it may put on each mob
-    /// it hits and leaves alive. Each mob with the counter (PCounter, or
-    /// MCounter for a spell) hurts the player back.
+    /// it hits and leaves alive, and what it takes from them. Each mob with
+    /// the counter (PCounter, or MCounter for a spell) hurts the player
+    /// back.
     Attack {
         broadcast: Packet,
         skill: i32,
         counter: game::MobStat,
         hits: Vec<(i32, i64)>,
         inflicts: Vec<crate::skills::Inflict>,
+        takes: crate::skills::Takes,
     },
     /// Power Guard sent `damage` back at the mob `object_id` that touched
     /// the player, if it is still a `mob_id`.

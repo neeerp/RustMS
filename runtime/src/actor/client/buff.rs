@@ -6,7 +6,7 @@ use game::BuffStat;
 use net::packet::build::world::buff;
 use net::packet::build::world::stat::{self, StatUpdate};
 use net::packet::build::world::summon::Gone;
-use net::packet::handle::world::{catch_disease, countered, party_skill_reached};
+use net::packet::handle::world::{absorbed, catch_disease, countered, party_skill_reached};
 use net::summons::Support;
 use net::{summons, FieldRequest, PartySkill, SpawnPosition};
 use packet::Packet;
@@ -82,6 +82,31 @@ impl ClientActor {
         }
         let result = countered(&mut game.player, damage)
             .map_err(|e| RuntimeError::Handler(e.to_string()))?;
+        for action in result.actions {
+            self.apply(action).await?;
+        }
+        Ok(())
+    }
+
+    /// The player's attack took HP and MP from mobs, if they are still on
+    /// its map and out of the Cash Shop.
+    pub(super) async fn absorbed(
+        &mut self,
+        hp: i32,
+        mp: i32,
+        map_id: i32,
+    ) -> Result<(), RuntimeError> {
+        if self.in_cash_shop {
+            return Ok(());
+        }
+        let Some(game) = self.game.as_mut() else {
+            return Ok(());
+        };
+        if game.player.stats.map_id != map_id {
+            return Ok(());
+        }
+        let result =
+            absorbed(&mut game.player, hp, mp).map_err(|e| RuntimeError::Handler(e.to_string()))?;
         for action in result.actions {
             self.apply(action).await?;
         }

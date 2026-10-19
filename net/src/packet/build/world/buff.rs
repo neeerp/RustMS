@@ -184,6 +184,22 @@ pub fn build_skill_effect(
     Ok(p)
 }
 
+/// SHOW_ITEM_GAIN_INCHAT 1: the same on the player, as MP Eater shows
+/// when it eats (v83 FUN_009377d9 reads the same three fields).
+pub fn build_own_skill_effect(
+    skill_id: i32,
+    character_level: u8,
+    skill_level: u8,
+) -> Result<Packet, NetworkError> {
+    let mut p = Packet::new_empty();
+    p.write_short(SendOpcode::ShowItemGainInChat as i16)?;
+    p.write_byte(1)?;
+    p.write_int(skill_id)?;
+    p.write_byte(character_level)?;
+    p.write_byte(skill_level)?;
+    Ok(p)
+}
+
 /// SHOW_ITEM_GAIN_INCHAT 2: a party member's skill reached the player,
 /// who plays its `affected` animation (0x93632a).
 pub fn build_own_affected(skill_id: i32, skill_level: u8) -> Result<Packet, NetworkError> {

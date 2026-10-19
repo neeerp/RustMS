@@ -127,6 +127,8 @@ impl WorldHandler for AttackHandler {
         let mut skill_level = 0;
         let ranged = attack.kind == AttackKind::Ranged;
         let inflicts = skills::on_hit(ctx.player, uses.skill.as_ref(), ranged, rand::random());
+        let magic = attack.kind == AttackKind::Magic;
+        let takes = skills::takes(ctx.player, uses.skill.as_ref(), magic, rand::random());
         let mist = uses.skill.as_ref().and_then(|skill| {
             Some(FieldRequest::Mist {
                 skill_id: skill.skill_id,
@@ -189,7 +191,7 @@ impl WorldHandler for AttackHandler {
                 )
             })
             .collect();
-        let counter = if attack.kind == AttackKind::Magic {
+        let counter = if magic {
             MobStat::MCounter
         } else {
             MobStat::PCounter
@@ -200,6 +202,7 @@ impl WorldHandler for AttackHandler {
             counter,
             hits,
             inflicts,
+            takes,
         }));
         if let Some(mist) = mist {
             result = result.with(WorldAction::Field(mist));
@@ -528,6 +531,29 @@ pub fn countered(player: &mut Player, damage: i32) -> WorldResult {
     })
 }
 
+/// The player's attack took `hp` (Drain) and `mp` (MP Eater) from the mobs
+/// it hit, as one stat update; Drain gives back no more than half their max
+/// HP at once (its description).
+pub fn absorbed(player: &mut Player, hp: i32, mp: i32) -> WorldResult {
+    if player.stats.hp <= 0 {
+        return Ok(HandlerResult::empty());
+    }
+    let mut updates = Vec::new();
+    if hp > 0 {
+        let hp = hp.min(i32::from(player.stats.max_hp) / 2);
+        updates.push(StatUpdate::Hp(player.add_hp(hp)));
+    }
+    if mp > 0 {
+        updates.push(StatUpdate::Mp(player.add_mp(mp)));
+    }
+    if updates.is_empty() {
+        return Ok(HandlerResult::empty());
+    }
+    Ok(HandlerResult::reply(stat::build_stat_update(
+        false, &updates,
+    )?))
+}
+
 /// The map hurts the player every so often (its `decHP`, which the v83
 /// client leaves to the server): nothing while they're dead or wear its
 /// `protectItem`, or, in the cold, an equip scrolled against it. A thaw item
@@ -779,6 +805,19 @@ mod tests {
             int: 4,
             luk: 4,
         }
+    }
+
+    #[test]
+    fn drain_gives_back_no_more_than_half_of_max_hp() {
+        let mut player = crate::codec::stats::sample_player();
+        (player.stats.hp, player.stats.max_hp) = (10, 500);
+        (player.stats.mp, player.stats.max_mp) = (10, 100);
+        assert_eq!(absorbed(&mut player, 900, 30).unwrap().actions.len(), 1);
+        assert_eq!((player.stats.hp, player.stats.mp), (260, 40));
+        assert!(absorbed(&mut player, 0, 0).unwrap().actions.is_empty());
+        player.stats.hp = 0;
+        assert!(absorbed(&mut player, 100, 0).unwrap().actions.is_empty());
+        assert_eq!(player.stats.hp, 0);
     }
 
     #[test]

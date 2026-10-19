@@ -310,6 +310,25 @@ tag (`Basic.img/ShowLevel`) sits left of the name, except for bosses, mobs
 whose `info` hides their level, HP or name, and 9xxxxxx mobs outside 94xxxxx
 and 96xxxxx.
 
+Some attacks take something back from the mobs they hit (`skills::takes`,
+handled in the field's `handle_attack`):
+
+- **Drain**, **Energy Drain** and **Vampire** give back their `x` percent of
+  each hit's damage as HP, no more than the mob's max HP per mob, and no more
+  than half the player's max HP per attack (`absorbed`).
+- **MP Eater** (2100000, 2200000, 2300000, by the mage's branch) rolls its
+  `prop` for each non-boss mob a spell hits and survives, and takes `x`
+  percent of the mob's max MP, no more than it has, as MP. The player sees
+  the skill on themselves (SHOW_ITEM_GAIN_INCHAT 1) and the map sees it on
+  them (SHOW_FOREIGN_EFFECT 1), once per attack.
+- **Mortal Blow** (3110001, 3210001) rolls its `y` percent per attack. On a
+  hit, a non-boss mob with no more than `x` percent of its max HP left dies.
+  The v83 client sends it as a close-range swing when a mob comes near the
+  archer (FUN_00950921).
+
+The client actor applies what came back as one STAT_CHANGED
+(`ServerMessage::Absorbed`).
+
 A dead mob's EXP is shared by damage dealt (the top damager gets any
 rounding remainder) and each share goes to that player's client actor
 (`ServerMessage::MobKilled`), which adds it with `Player::gain_exp`. A level

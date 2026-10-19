@@ -9,6 +9,7 @@ use crate::message::{ClientHandle, FieldKey, FieldMessage, ServerMessage};
 use game::mob_skill::{self, MobSkillEffect};
 use game::{FieldAvatar, MobStat};
 use net::conti::{self, Happening};
+use net::packet::build::world::buff::{build_own_skill_effect, build_skill_effect};
 use net::packet::build::world::conti::build_conti_move;
 use net::packet::build::world::door::{build_remove_door, build_spawn_door};
 use net::packet::build::world::drop::{
@@ -36,7 +37,7 @@ use net::packet::build::world::summon::{
     build_damage_summon, build_move_summon, build_remove_summon, build_spawn_summon,
     build_summon_attack, build_summon_skill, Gone, SummonView,
 };
-use net::skills::{self, Inflict};
+use net::skills::{self, Inflict, Takes};
 use net::summons::{self, Limit, SummonAttack, SummonDamage, Support};
 use net::{ClientId, FieldRequest};
 use packet::Packet;
@@ -391,6 +392,7 @@ impl FieldActor {
                     counter,
                     hits,
                     inflicts,
+                    takes,
                 } => self.handle_attack(
                     from,
                     Some(broadcast),
@@ -398,6 +400,7 @@ impl FieldActor {
                     Some(counter),
                     hits,
                     &inflicts,
+                    takes,
                 ),
                 FieldRequest::Reflect {
                     object_id,
@@ -817,7 +820,9 @@ impl FieldActor {
     /// (v83 FUN_007937e3, rolled again here: its client only shows its own
     /// roll). A mob that only some skills hurt takes nothing from the others,
     /// as their v83 clients count it a miss (FUN_0068146c); a reflection
-    /// (no skill) isn't judged.
+    /// (no skill) isn't judged. What it `takes` from them goes back to
+    /// `from` as one message.
+    #[allow(clippy::too_many_arguments)]
     fn handle_attack(
         &mut self,
         from: ClientId,
@@ -826,10 +831,12 @@ impl FieldActor {
         counter: Option<MobStat>,
         hits: Vec<(i32, i64)>,
         inflicts: &[Inflict],
+        takes: Takes,
     ) {
         let Some(attacker) = self.occupants.get(&from) else {
             return;
         };
+        let (id, level) = (attacker.avatar.id, attacker.avatar.level);
         let attacker = attacker.handle.clone();
         if let Some(broadcast) = broadcast {
             self.broadcast(Some(from), broadcast);
@@ -847,17 +854,35 @@ impl FieldActor {
                 map_id: self.key.map_id,
             });
         }
+        let (mut hp_taken, mut mp_taken) = (0, 0);
         for (object_id, damage) in hits {
-            let hurts = skill.is_none_or(|skill| {
-                self.mobs
-                    .get(object_id)
-                    .is_none_or(|mob| mob.info.hurt_by(skill))
-            });
-            let damage = if hurts { damage } else { 0 };
+            let Some(mob) = self.mobs.get(object_id) else {
+                continue;
+            };
+            let hurts = skill.is_none_or(|skill| mob.info.hurt_by(skill));
+            let mut damage = if hurts { damage } else { 0 };
+            let max_hp = i64::from(mob.info.max_hp);
+            // Mortal Blow's kill takes what the mob has left.
+            if takes.life > 0
+                && damage > 0
+                && !mob.info.boss
+                && mob.hp * 100 <= max_hp * i64::from(takes.life)
+            {
+                damage = damage.max(mob.hp);
+            }
+            if damage > 0 {
+                hp_taken += (damage * i64::from(takes.hp) / 100).min(max_hp);
+            }
             match self.mobs.damage(from, object_id, damage, now) {
                 Some(Ok(percent)) => {
                     if let Ok(packet) = build_mob_hp(object_id, percent) {
                         attacker.send_packet(packet);
+                    }
+                    let eater = takes
+                        .mp
+                        .filter(|eater| damage > 0 && eater.eats(rand::random()));
+                    if let Some(eater) = eater {
+                        mp_taken += self.mobs.eat_mp(object_id, eater.x);
                     }
                     self.provoke(from, &attacker, object_id, now);
                     // A miss puts nothing on it.
@@ -899,6 +924,22 @@ impl FieldActor {
                 }
                 None => {}
             }
+        }
+        // MP Eater shows when it ate, once for the attack.
+        if let Some(eater) = takes.mp.filter(|_| mp_taken > 0) {
+            if let Ok(packet) = build_own_skill_effect(eater.skill_id, level, eater.level) {
+                attacker.send_packet(packet);
+            }
+            if let Ok(packet) = build_skill_effect(id, eater.skill_id, level, eater.level) {
+                self.broadcast(Some(from), packet);
+            }
+        }
+        if hp_taken > 0 || mp_taken > 0 {
+            attacker.send(ServerMessage::Absorbed {
+                hp: i32::try_from(hp_taken).unwrap_or(i32::MAX),
+                mp: mp_taken,
+                map_id: self.key.map_id,
+            });
         }
     }
 
@@ -1150,6 +1191,7 @@ impl FieldActor {
             None,
             hits,
             limit.inflict.as_slice(),
+            Takes::default(),
         );
     }
 
@@ -1161,7 +1203,8 @@ impl FieldActor {
             .get(object_id)
             .is_some_and(|mob| mob.info.mob_id == mob_id)
         {
-            self.handle_attack(from, None, None, None, vec![(object_id, damage)], &[]);
+            let hit = vec![(object_id, damage)];
+            self.handle_attack(from, None, None, None, hit, &[], Takes::default());
         }
     }
 
@@ -1971,6 +2014,76 @@ mod tests {
         assert_eq!(seen.iter().filter(|&&op| op == magnet).count(), 2);
         assert_eq!(seen.iter().filter(|&&op| op == control).count(), 1);
         assert_eq!(opcodes(&mut second_rx).await, [control]);
+    }
+
+    #[tokio::test]
+    async fn drain_takes_a_share_and_mortal_blow_finishes_the_weak() {
+        let mut mobs = MobSet::new([mob(100, false)]);
+        let snail = mobs.respawn(Instant::now())[0];
+        let (tx, rx) = mpsc::channel(16);
+        let actor = FieldActor::new(
+            FieldKey::new(0, 100000000),
+            rx,
+            Vec::new(),
+            mobs,
+            DropSet::default(),
+            ReactorSet::default(),
+            Duration::from_secs(60),
+        );
+        tokio::spawn(actor.run());
+        let (handle, mut client_rx) = client(1);
+        tx.send(FieldMessage::Join {
+            handle,
+            avatar: avatar(1, 0, 0),
+            party: None,
+        })
+        .await
+        .unwrap();
+        opcodes(&mut client_rx).await;
+        let attack = |damage, takes| FieldMessage::FromClient {
+            from: 1,
+            request: FieldRequest::Attack {
+                broadcast: Packet::new_empty(),
+                skill: 0,
+                counter: game::MobStat::PCounter,
+                hits: vec![(snail, damage)],
+                inflicts: Vec::new(),
+                takes,
+            },
+        };
+        // What it took back, and whether the snail died.
+        let outcome = |rx: &mut mpsc::Receiver<ServerMessage>| {
+            let (mut taken, mut killed) = (Vec::new(), false);
+            while let Ok(message) = rx.try_recv() {
+                match message {
+                    ServerMessage::Absorbed { hp, mp, .. } => taken.push((hp, mp)),
+                    ServerMessage::SendPacket(packet) => {
+                        killed |= packet.opcode() == SendOpcode::KillMonster as i16
+                    }
+                    _ => {}
+                }
+            }
+            (taken, killed)
+        };
+
+        // Half of 4 comes back, and the snail at half its HP is not yet
+        // weak enough for a blow that takes 40%.
+        let blow = Takes {
+            hp: 50,
+            mp: None,
+            life: 40,
+        };
+        tx.send(attack(4, blow)).await.unwrap();
+        tokio::time::sleep(Duration::from_millis(50)).await;
+        assert_eq!(outcome(&mut client_rx), (vec![(2, 0)], false));
+        // A hit of 1 leaves it at 3 and drains nothing; then a blow that
+        // takes 40% finishes it, and the drain counts the 3 it took.
+        tx.send(attack(1, Takes { life: 0, ..blow })).await.unwrap();
+        tokio::time::sleep(Duration::from_millis(50)).await;
+        assert_eq!(outcome(&mut client_rx), (vec![], false));
+        tx.send(attack(1, blow)).await.unwrap();
+        tokio::time::sleep(Duration::from_millis(50)).await;
+        assert_eq!(outcome(&mut client_rx), (vec![(1, 0)], true));
     }
 
     #[tokio::test]

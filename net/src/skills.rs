@@ -592,6 +592,74 @@ pub fn on_hit(player: &Player, skill: Option<&Learned>, ranged: bool, roll: f64)
     inflicts
 }
 
+/// Drain, the Marauder's and the Thunder Breaker's Energy Drain, and
+/// Vampire: each gives back its `x` percent of the damage as HP.
+pub const DRAINS: [i32; 4] = [4101005, 5111004, 15111001, 14101006];
+
+/// Mortal Blow, the Ranger's and the Sniper's close shot.
+pub const MORTAL_BLOWS: [i32; 2] = [3110001, 3210001];
+
+/// The wizards' and the cleric's MP Eater.
+pub const MP_EATERS: [i32; 3] = [2100000, 2200000, 2300000];
+
+/// What an attack takes from the mobs it hits besides their HP.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct Takes {
+    /// Drain and its kin: this percent of the damage comes back as HP, no
+    /// more than each mob's max HP, nor half the player's (Drain's
+    /// description).
+    pub hp: i32,
+    /// MP Eater, for a spell.
+    pub mp: Option<MpEater>,
+    /// Mortal Blow's kill came up: a mob, not a boss, at or under this
+    /// percent of its HP dies.
+    pub life: i32,
+}
+
+/// MP Eater: with its chance (`prop`), each mob a spell hits, not a boss,
+/// loses its `x` percent of its max MP to the player, as much as it has,
+/// and everyone sees the skill's effect (as Cosmic's applyPassive).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct MpEater {
+    pub skill_id: i32,
+    pub level: u8,
+    pub prop: i32,
+    pub x: i32,
+}
+
+impl MpEater {
+    /// Whether it eats this time.
+    pub fn eats(&self, roll: f64) -> bool {
+        roll * 100.0 < f64::from(self.prop)
+    }
+}
+
+/// What this attack takes. A spell has the MP Eater of the player's own
+/// branch; Mortal Blow rolls its `y` percent chance of a kill here.
+pub fn takes(player: &Player, skill: Option<&Learned>, magic: bool, roll: f64) -> Takes {
+    let mut takes = Takes::default();
+    if let Some(skill) = skill {
+        if DRAINS.contains(&skill.skill_id) {
+            takes.hp = skill.effect.x;
+        }
+        if MORTAL_BLOWS.contains(&skill.skill_id) && roll * 100.0 < f64::from(skill.effect.y) {
+            takes.life = skill.effect.x;
+        }
+    }
+    let eater = i32::from(player.stats.job) / 10 * 100_000;
+    if magic && MP_EATERS.contains(&eater) {
+        takes.mp = learned(player, eater)
+            .filter(|eater| eater.level > 0)
+            .map(|eater| MpEater {
+                skill_id: eater.skill_id,
+                level: eater.level as u8,
+                prop: eater.effect.prop,
+                x: eater.effect.x,
+            });
+    }
+    takes
+}
+
 /// Poison Mist: a cloud where it's cast that poisons the mobs in it.
 pub const POISON_MIST: i32 = 2111003;
 
@@ -917,6 +985,28 @@ mod tests {
         assert_eq!(stun_30.lasts, Duration::from_secs(2));
         assert_eq!(stun(1).unwrap().lasts, Duration::from_secs(4));
         assert_eq!(self_stun(&at_level(1001005, 20).unwrap()), None);
+    }
+
+    #[test]
+    fn drains_eaters_and_mortal_blows_take_their_shares() {
+        let mut player = knowing(&[(2100000, 20), (2200000, 20)]);
+        player.stats.job = 211;
+        let drain = at_level(4101005, 30).unwrap();
+        assert_eq!(takes(&player, Some(&drain), false, 0.0).hp, 45);
+        // A fire wizard eats with the fire wizard's skill, from a spell only.
+        let eater = takes(&player, None, true, 0.0).mp.unwrap();
+        assert_eq!((eater.skill_id, eater.level), (2100000, 20));
+        assert_eq!((eater.prop, eater.x), (30, 40));
+        assert!(eater.eats(0.29) && !eater.eats(0.3));
+        assert_eq!(takes(&player, None, false, 0.0).mp, None);
+        player.stats.job = 200;
+        assert_eq!(takes(&player, None, true, 0.0).mp, None);
+        player.stats.job = 230;
+        assert_eq!(takes(&player, None, true, 0.0).mp, None);
+        // Mortal Blow at 20 kills at half HP, one time in ten.
+        let blow = at_level(3110001, 20).unwrap();
+        assert_eq!(takes(&player, Some(&blow), false, 0.09).life, 50);
+        assert_eq!(takes(&player, Some(&blow), false, 0.1).life, 0);
     }
 
     #[test]
