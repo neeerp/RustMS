@@ -252,6 +252,8 @@ void conveyor_belts()
 		};
 
 		ms::PhysicsObject player = grounded_shoe(physics);
+		// Finding the floor took a tick on the belt already.
+		player.hspeed = 0.0;
 		run(player, 0, 1);
 		require(std::abs(speed(player) - 20.16) < 1e-9, "a belt did not push at 2520 px/s^2");
 		run(player, 0, 10);
