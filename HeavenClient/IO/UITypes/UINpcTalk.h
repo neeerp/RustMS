@@ -25,15 +25,29 @@
 
 #include "../UIElement.h"
 
+#include "../../Graphics/Geometry.h"
 #include "../Graphics/Text.h"
 #include "../Components/AnswerFocus.h"
 #include "../Components/Slider.h"
+#include "../Components/Textfield.h"
 
 #include <functional>
 #include <map>
 
 namespace ms
 {
+	// What a text, number or box text prompt starts with and allows.
+	struct NpcTalkInput
+	{
+		std::string text;
+		// Text: the fewest and most bytes (0: no limit). Number: the range.
+		int32_t min = 0;
+		int32_t max = 0;
+		// Box text: its size in characters and lines.
+		int16_t cols = 0;
+		int16_t rows = 0;
+	};
+
 	class UINpcTalk : public UIElement
 	{
 	public:
@@ -50,6 +64,7 @@ namespace ms
 			SENDGETTEXT,
 			SENDGETNUMBER,
 			SENDSIMPLE,
+			SENDBOXTEXT,
 			LENGTH
 		};
 
@@ -61,6 +76,8 @@ namespace ms
 			INLINE,
 			LIST
 		};
+
+		using Input = NpcTalkInput;
 
 		static constexpr Type TYPE = UIElement::Type::NPCTALK;
 		static constexpr bool FOCUSED = true;
@@ -81,9 +98,10 @@ namespace ms
 		UIElement::Type get_type() const override;
 
 		// `headers` puts an image (e.g. a quest list category) above listed
-		// menu choices.
+		// menu choices; `input` sets up a prompt.
 		void change_text(int32_t npcid, int8_t msgtype, int16_t style, int8_t speaker, const std::string &text,
-						 const std::map<int32_t, Texture> &headers = {}, Menu menu = Menu::INLINE);
+						 const std::map<int32_t, Texture> &headers = {}, Menu menu = Menu::INLINE,
+						 const Input &input = {});
 
 		// Answer this dialogue in the client instead of sending NPC_TALK_MORE.
 		// The responder gets 1/0/-1 (next or yes / previous or no / close) and,
@@ -119,6 +137,19 @@ namespace ms
 
 		// Send a response to the server, or to the local responder if set.
 		void respond(int8_t response, int32_t selection = -1);
+
+		// Closes without an answer, as End Chat does.
+		void close();
+
+		// Whether the page is a prompt with a field to type in.
+		bool has_field() const;
+
+		// Lets go of the keyboard if the field has it.
+		void release_field();
+
+		// Answers a prompt with what was typed, or says what is wrong with
+		// it and stays open.
+		void submit_field();
 
 		// An image in the text (#f, #i, #s, #v): its box in the layout, and
 		// where the texture's origin goes from the box's top-left corner.
@@ -208,6 +239,14 @@ namespace ms
 		answer_focus::Focus focus;
 		std::vector<InlineImage> images;
 		std::function<void(int8_t, int32_t)> local_responder;
+		// A prompt's field, its box relative to the window, and its limits.
+		Textfield field;
+		ColorBox field_border;
+		ColorBox field_fill;
+		Point<int16_t> field_box;
+		Input input;
+		// The speaker byte's 0x1: no END CHAT, and Esc does nothing.
+		bool no_end_chat = false;
 		std::string formatted_text;
 		size_t formatted_text_pos;
 		uint16_t timestep;

@@ -17,6 +17,10 @@
 //////////////////////////////////////////////////////////////////////////////////
 #include "UINpcTalk.h"
 
+#include "EnterNumber.h"
+#include "NpcInput.h"
+#include "UINotice.h"
+
 #include "../KeyAction.h"
 #include "../UI.h"
 
@@ -75,6 +79,20 @@ namespace ms
 		// How long each character takes to type out: footage types about 35
 		// a second.
 		constexpr uint16_t TYPE_MS = 28;
+		// A prompt's box, 2 px under its text, starts 1 px left of v83's
+		// text x (157; ours is 165). It is 218 x 18 for one line (9a83f6), or
+		// 6 px a column and 12 a row for a box text (9a8910).
+		constexpr int16_t FIELD_X = 156;
+		// A box text writes in the balloon font, A12M's face with the
+		// tightest lines we have, and is a line a row instead of 12 px.
+		constexpr Text::Font BOX_FONT = Text::Font::BALLOON;
+
+		// How far apart a font's lines are, and so how far below its anchor
+		// its first line's baseline sits.
+		int16_t line_height(Text::Font font)
+		{
+			return Text(font, Text::Alignment::LEFT, Color::Name::BLACK, "|").height();
+		}
 
 		// An image by path, such as UI/UIWindow.img/QuestIcon/4/0. UI paths
 		// name the v83 UI; our UI.nx has the quest icons under UIWindow2.img.
@@ -203,6 +221,14 @@ namespace ms
 
 		text.draw(origin, clip, revealed(), instant_text);
 
+		if (has_field())
+		{
+			Point<int16_t> box = position + field_box;
+			field_border.draw(box);
+			field_fill.draw(box + Point<int16_t>(1, 1));
+			field.draw(position);
+		}
+
 		for (size_t i = 0; i < choices.size(); i++)
 		{
 			const Choice &choice = choices[i];
@@ -255,7 +281,8 @@ namespace ms
 
 	int16_t UINpcTalk::text_x() const
 	{
-		return right_side ? TEXT_X - RIGHT_TEXT_SHIFT : TEXT_X;
+		// A prompt's text stays on the left (9acd54).
+		return right_side && !has_field() ? TEXT_X - RIGHT_TEXT_SHIFT : TEXT_X;
 	}
 
 	Range<int16_t> UINpcTalk::visible_rows() const
@@ -299,6 +326,9 @@ namespace ms
 	{
 		UIElement::update();
 
+		if (has_field())
+			field.update(position);
+
 		if (draw_text)
 		{
 			timestep += Constants::TIMESTEP;
@@ -320,6 +350,19 @@ namespace ms
 
 	Button::State UINpcTalk::button_pressed(uint16_t buttonid)
 	{
+		// A prompt's OK checks what was typed first, and may stay open.
+		if (has_field() && buttonid == Buttons::OK)
+		{
+			submit_field();
+			return Button::State::NORMAL;
+		}
+
+		if (buttonid == Buttons::CLOSE)
+		{
+			close();
+			return Button::State::NORMAL;
+		}
+
 		deactivate();
 
 		switch (type)
@@ -330,9 +373,6 @@ namespace ms
 				// Type = 0
 				switch (buttonid)
 				{
-					case Buttons::CLOSE:
-						respond(-1);
-						break;
 					case Buttons::NEXT:
 					case Buttons::OK:
 						respond(1);
@@ -346,9 +386,6 @@ namespace ms
 				// Type = 1
 				switch (buttonid)
 				{
-					case Buttons::CLOSE:
-						respond(-1);
-						break;
 					case Buttons::NO:
 						respond(0);
 						break;
@@ -361,9 +398,6 @@ namespace ms
 				// Type = 12
 				switch (buttonid)
 				{
-					case Buttons::CLOSE:
-						respond(-1);
-						break;
 					case Buttons::QNO:
 						respond(0);
 						break;
@@ -372,27 +406,10 @@ namespace ms
 						break;
 				}
 				break;
-			case TalkType::SENDGETTEXT:
-				// TODO: What is this?
-				break;
-			case TalkType::SENDGETNUMBER:
-				// Type = 3
-				switch (buttonid)
-				{
-					case Buttons::CLOSE:
-						respond(0);
-						break;
-					case Buttons::OK:
-						respond(1);
-						break;
-				}
-				break;
 			case TalkType::SENDSIMPLE:
 				// Type = 4: NEXT answers with the selected choice.
 				if (buttonid == Buttons::NEXT)
 					answer_choice();
-				else if (buttonid == Buttons::CLOSE)
-					local_responder ? respond(-1) : respond(0);
 				break;
 			default:
 				break;
@@ -403,6 +420,8 @@ namespace ms
 
 	void UINpcTalk::respond(int8_t response, int32_t selection)
 	{
+		release_field();
+
 		if (local_responder)
 		{
 			// The responder may replace this dialogue, so call a copy.
@@ -412,9 +431,65 @@ namespace ms
 		}
 
 		if (selection >= 0)
-			NpcTalkMorePacket(selection).dispatch();
+			NpcTalkMorePacket(message_type, response, selection).dispatch();
 		else
 			NpcTalkMorePacket(message_type, response).dispatch();
+	}
+
+	void UINpcTalk::close()
+	{
+		deactivate();
+		respond(local_responder ? -1 : npc_input::close_answer(message_type));
+	}
+
+	bool UINpcTalk::has_field() const
+	{
+		return type == TalkType::SENDGETTEXT || type == TalkType::SENDGETNUMBER || type == TalkType::SENDBOXTEXT;
+	}
+
+	void UINpcTalk::release_field()
+	{
+		if (has_field() && field.get_state() == Textfield::State::FOCUSED)
+			UI::get().remove_textfield();
+	}
+
+	void UINpcTalk::submit_field()
+	{
+		std::string answer = field.get_text();
+		std::string problem;
+		int32_t number = 0;
+
+		// A box text is sent as it is (9ab50a).
+		if (type == TalkType::SENDGETNUMBER)
+		{
+			enter_number::Checked checked = enter_number::check(answer, input.max, input.min);
+			problem = enter_number::problem_text(checked.problem, input.max, input.min);
+			number = checked.number;
+		} else if (type == TalkType::SENDGETTEXT)
+		{
+			answer = npc_input::trim(answer);
+			problem = npc_input::text_problem(answer, input.min);
+		}
+
+		// A problem is shown over the prompt, which takes the keyboard back
+		// when it is closed.
+		if (!problem.empty())
+		{
+			release_field();
+			UI::get().emplace<UIOk>(problem, [this](bool)
+			{
+				field.set_state(Textfield::State::FOCUSED);
+			});
+			return;
+		}
+
+		deactivate();
+		release_field();
+
+		if (type == TalkType::SENDGETNUMBER)
+			NpcTalkMorePacket(message_type, 1, number).dispatch();
+		else
+			NpcTalkMorePacket(message_type, 1, answer).dispatch();
 	}
 
 	void UINpcTalk::select(size_t choice)
@@ -457,6 +532,11 @@ namespace ms
 	{
 		Point<int16_t> cursor_relative = cursorpos - position;
 
+		// Clicking a prompt's field gives it the keyboard back.
+		if (has_field() && field.get_state() == Textfield::State::NORMAL)
+			if (Cursor::State fstate = field.send_cursor(cursorpos, clicked); fstate != Cursor::State::IDLE)
+				return fstate;
+
 		if (show_slider && slider.isenabled())
 			if (Cursor::State sstate = slider.send_cursor(cursor_relative, clicked))
 				return sstate;
@@ -494,17 +574,30 @@ namespace ms
 		if (!pressed)
 			return;
 
+		// Without END CHAT, Esc does nothing (9ac16c).
 		if (escape)
 		{
-			deactivate();
+			if (!no_end_chat)
+				close();
 
-			respond(-1);
 			return;
 		}
 
 		// The NPC chat key advances the conversation it started, as Enter
-		// does.
+		// does. Without END CHAT, both only answer a say page (9ac186).
 		bool confirm = keycode == KeyAction::Id::RETURN || keycode == KeyAction::Id::INTERACT_HARVEST;
+
+		if (confirm && no_end_chat && message_type != 0)
+			return;
+
+		// Enter answers a text or number prompt, not a box text.
+		if (has_field())
+		{
+			if (confirm && type != TalkType::SENDBOXTEXT)
+				submit_field();
+
+			return;
+		}
 
 		if (type == TalkType::SENDSIMPLE)
 		{
@@ -599,6 +692,8 @@ namespace ms
 				return TalkType::SENDSIMPLE;
 			case 12:
 				return TalkType::SENDACCEPTDECLINE;
+			case 13:
+				return TalkType::SENDBOXTEXT;
 			default:
 				return TalkType::NONE;
 		}
@@ -665,11 +760,13 @@ namespace ms
 	}
 
 	void UINpcTalk::change_text(int32_t npcid, int8_t msgtype, int16_t style, int8_t speakerbyte, const std::string &tx,
-								const std::map<int32_t, Texture> &headers, Menu menu)
+								const std::map<int32_t, Texture> &headers, Menu menu, const Input &prompt)
 	{
+		release_field();
 		local_responder = nullptr;
 		message_type = msgtype;
 		type = get_by_value(msgtype);
+		input = prompt;
 		const bool has_previous = (style & 0xff) != 0;
 		const bool has_next = (style & 0xff00) != 0;
 		if (msgtype == 0)
@@ -818,6 +915,7 @@ namespace ms
 		player_speaks = speakerbyte & 0x2;
 		right_side = speakerbyte & 0x6;
 		flip_speaker = speakerbyte & 0x8;
+		no_end_chat = speakerbyte & 0x1;
 
 		nl::node UtilDlgEx = NxFiles::ui_classic["UIWindow.img"]["UtilDlgEx"];
 		std::string art = right_side ? "i" : "";
@@ -838,7 +936,8 @@ namespace ms
 			name.change_text(namestr);
 		}
 
-		show_slider = block + PADDING > MAX_HEIGHT;
+		// A prompt never scrolls (9a3d71).
+		show_slider = !has_field() && block + PADDING > MAX_HEIGHT;
 
 		if (show_slider)
 		{
@@ -852,6 +951,11 @@ namespace ms
 			height = std::max<int16_t>(block + PADDING, MIN_HEIGHT);
 			text_y = 15 + (height - block) / 2;
 			rowmax = 0;
+
+			// A prompt's text sits 7 px higher to leave room for its box, and
+			// a box text's half its rows higher again (9acd54, 9acdf3).
+			if (has_field())
+				text_y -= 7 + (type == TalkType::SENDBOXTEXT && prompt.rows >= 2 ? line_height(BOX_FONT) * prompt.rows / 2 : 0);
 		}
 
 		for (auto &button : buttons)
@@ -908,8 +1012,47 @@ namespace ms
 				break;
 			case TalkType::SENDGETTEXT:
 			case TalkType::SENDGETNUMBER:
+			case TalkType::SENDBOXTEXT:
+				place(Buttons::OK, 475, bar_y);
+				break;
 			default:
 				break;
+		}
+
+		// A prompt opens with its default typed in. A number prompt holds 10
+		// bytes, a text prompt its most (0 for any), a box text a character
+		// a cell (9ac7cb, 9ac732, 9ac811).
+		if (has_field())
+		{
+			bool box_text = type == TalkType::SENDBOXTEXT;
+			Point<int16_t> size = box_text ? Point<int16_t>(6 * prompt.cols + 7, line_height(BOX_FONT) * prompt.rows + 6) : Point<int16_t>(218, 18);
+			size_t limit = box_text ? prompt.cols * prompt.rows
+				: type == TalkType::SENDGETNUMBER ? 10 : prompt.max > 0 ? prompt.max : 0xffff;
+
+			field_box = Point<int16_t>(FIELD_X, text_y + block + 2);
+			field_border = ColorBox(size.x(), size.y(), Color::Name::BLACK, 1.0f);
+			field_fill = ColorBox(size.x() - 2, size.y() - 2, Color::Name::WHITE, 1.0f);
+
+			// The first line's baseline sits 13 px into the box.
+			Text::Font font = box_text ? BOX_FONT : Text::Font::A12M;
+			int16_t top = field_box.y() + 13 - line_height(font);
+
+			field = Textfield(font, Text::Alignment::LEFT, Color::Name::BLACK,
+							  Rectangle<int16_t>(FIELD_X + 4, FIELD_X + size.x() - 4, top, top + size.y()), limit);
+
+			if (box_text)
+				field.set_wrap(6 * prompt.cols + 2);
+			else
+				field.set_enter_callback([this](std::string) { submit_field(); });
+
+			field.set_key_callback(KeyAction::Id::ESCAPE, [this]()
+			{
+				if (!no_end_chat)
+					close();
+			});
+
+			field.change_text(prompt.text);
+			field.set_state(Textfield::State::FOCUSED);
 		}
 
 		int16_t total = TOP + height + bottom.height();

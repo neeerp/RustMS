@@ -275,7 +275,12 @@ namespace ms
 			//auto report = UI::get().get_element<UIReport>();
 			//auto whisper = UI::get().get_element<UIWhisper>();
 
-			if (npctalk && npctalk->is_active())
+			// A notice over an NPC's talk, such as a prompt's complaint, hears
+			// the keys first.
+			UIElement *notice = state->get(UIElement::Type::NOTICE);
+			bool notice_open = notice && notice->is_active();
+
+			if (npctalk && npctalk->is_active() && !notice_open)
 			{
 				npctalk->send_key(mapping.action, pressed, escape);
 				sent = true;

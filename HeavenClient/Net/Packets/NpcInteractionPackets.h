@@ -62,14 +62,16 @@ namespace ms
 			write_byte(response);
 		}
 
-		NpcTalkMorePacket(const std::string& response) : NpcTalkMorePacket(2, 1)
+		// Answers a text (2) or box text (13) prompt with what was typed.
+		NpcTalkMorePacket(int8_t lastmsg, int8_t response, const std::string& answer) : NpcTalkMorePacket(lastmsg, response)
 		{
-			write_string(response);
+			write_string(answer);
 		}
 
-		NpcTalkMorePacket(int32_t selection) : NpcTalkMorePacket(4, 1)
+		// Answers a number prompt (3) with the number, or a menu (4) with the choice.
+		NpcTalkMorePacket(int8_t lastmsg, int8_t response, int32_t answer) : NpcTalkMorePacket(lastmsg, response)
 		{
-			write_int(selection);
+			write_int(answer);
 		}
 	};
 
