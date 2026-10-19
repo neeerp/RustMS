@@ -74,5 +74,6 @@ namespace ms
 		void move_swimming(PhysicsObject &) const;
 
 		FootholdTree fht;
+		double friction = 1.0;
 	};
 }

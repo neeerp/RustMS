@@ -558,6 +558,13 @@ force-and-friction model (`move_normal`).
 - **Air.** Gravity is 2000 px/s², capped at a fall speed of 670 px/s. A held
   direction accelerates at 200 px/s² toward about 8.9 px/s, so it barely
   steers.
+- **Ice.** A map's `info/fs` (0.2 on El Nath's 68 icy maps; missing or 0
+  means 1) multiplies, for every shoe, the walking push, the walk drag
+  factor before the clamp, the air's drag, steering and steering speed, and
+  the drag when flying or swimming (r25 0xa45cd6 into CVecCtrl's field
+  attribute). On ice the player takes 0.45 s to reach top speed and slides
+  about 1.6 s after letting go. The slide down steep slopes and the top
+  walking speed are unchanged.
 - **Stats.** `get_walkspeed` is clamp(SPEED, 80, 140)/100. `get_jumpforce`
   uses clamp(JUMP, 80, 123)/100 of the 555 px/s takeoff speed.
 - **Jumping.** `Physics::jump` sets the takeoff speed. A held direction adds

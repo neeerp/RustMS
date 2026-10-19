@@ -4,6 +4,7 @@
 #include <nlnx/file.hpp>
 #include <chrono>
 #include <cmath>
+#include <cstring>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
@@ -111,12 +112,29 @@ std::filesystem::path flat_map(const std::vector<int64_t>& floors)
 // One v83 tick is 8 ms, so 1 pixel per tick is 125 pixels per second.
 const double TICKS_PER_SECOND = 125.0;
 
-// A map's info node, separate from its footholds, with numeric properties.
-std::filesystem::path map_info(std::vector<std::pair<std::string, int64_t>> properties)
+// A map's info node, separate from its footholds, with integer and real
+// properties.
+std::filesystem::path map_info(std::vector<std::pair<std::string, int64_t>> integers,
+	const std::vector<std::pair<std::string, double>>& reals = {})
 {
-	std::sort(properties.begin(), properties.end());
+	struct Property
+	{
+		std::string name;
+		int type;
+		int64_t value;
+	};
+	std::vector<Property> properties;
+	for (const auto& integer : integers) properties.push_back({integer.first, 1, integer.second});
+	for (const auto& real : reals)
+	{
+		int64_t bits;
+		std::memcpy(&bits, &real.second, sizeof bits);
+		properties.push_back({real.first, 2, bits});
+	}
+	std::sort(properties.begin(), properties.end(),
+		[](const Property& a, const Property& b) { return a.name < b.name; });
 	std::vector<std::string> names {"", "info"};
-	for (const auto& property : properties) names.push_back(property.first);
+	for (const auto& property : properties) names.push_back(property.name);
 	size_t nodes = 2 + properties.size();
 	size_t strings = 64 + nodes * 20;
 	std::vector<uint8_t> bytes(strings + names.size() * 8);
@@ -133,7 +151,7 @@ std::filesystem::path map_info(std::vector<std::pair<std::string, int64_t>> prop
 	put(0, 0x34474b50, 4); put(4, nodes, 4); put(8, 64, 8);
 	put(16, names.size(), 4); put(20, strings, 8);
 	node(0, 0, 1, 1, 0, 0); node(1, 1, 2, properties.size(), 0, 0);
-	for (size_t i = 0; i < properties.size(); ++i) node(2 + i, 2 + i, 0, 0, 1, properties[i].second);
+	for (size_t i = 0; i < properties.size(); ++i) node(2 + i, 2 + i, 0, 0, properties[i].type, properties[i].value);
 	for (size_t i = 0; i < names.size(); ++i)
 	{
 		put(strings + i * 8, bytes.size(), 8);
@@ -324,6 +342,46 @@ void mob_walking(const ms::Physics& physics)
 	double speed = slippery.hspeed;
 	physics.move_object(slippery);
 	require(std::abs((speed - slippery.hspeed) * TICKS_PER_SECOND - 200.0 * 0.008) < 1e-9, "fs 0.5 did not quarter the drag");
+}
+
+// El Nath's ice (info/fs 0.2) scales the walking push to 280 px/s^2 and
+// the drag to 80, halved below 1, so walking takes 56 ticks to top speed
+// and stopping 196. In the air, steering tops out at a fifth of 8.9 px/s.
+void ice(nl::node footholds)
+{
+	auto path = map_info({}, {{"fs", 0.2}});
+	{
+		nl::file info(path.string());
+		ms::Physics physics(footholds, info.root()["info"]);
+		ms::PhysicsObject player = grounded_shoe(physics);
+		int ticks = 0;
+		while (player.hspeed < ms::Physics::walk_speed(1.0))
+		{
+			player.walkdir = 1;
+			physics.move_object(player);
+			require(++ticks <= 56, "walking on ice reached top speed slower than v83");
+		}
+		require(ticks == 56, "walking on ice reached top speed faster than v83");
+
+		ticks = 0;
+		while (player.hspeed != 0.0)
+		{
+			physics.move_object(player);
+			require(++ticks <= 196, "letting go on ice slid further than v83");
+		}
+		require(ticks == 196, "letting go on ice stopped sooner than v83");
+
+		ms::Physics::jump(player, ms::Physics::jump_speed(1.0), 0);
+		for (int tick = 0; tick < 30; ++tick)
+		{
+			player.walkdir = 1;
+			physics.move_object(player);
+		}
+		require(!player.onground, "the jump landed early");
+		require(std::abs(player.hspeed * TICKS_PER_SECOND - 125.0 / 140000.0 * 10000.0 * 0.2) < 1e-9,
+			"steering in the air on ice did not top out at a fifth of the speed");
+	}
+	std::filesystem::remove(path);
 }
 
 // A standing jump rises 555^2 / (2 * 2000) = 77 px and lands after 0.555 s.
@@ -801,6 +859,7 @@ int main()
 			nl::file map(path.string());
 			ms::Physics physics(map.root());
 			view_limits(map.root());
+			ice(map.root());
 			// v83 keeps objects 30 px inside the outermost footholds.
 			auto walls = physics.get_fht().get_walls();
 			require(walls.first() == -1970 && walls.second() == 1970, "map walls are not 30 px inside the footholds");

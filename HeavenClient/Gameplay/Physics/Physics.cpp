@@ -127,6 +127,14 @@ namespace ms
 	Physics::Physics(nl::node src, nl::node info)
 	{
 		fht = FootholdTree(src, info);
+
+		// A map's fs (0.2 on El Nath's ice) scales every object's walking
+		// push and drag, and its drag and steering in the air; v83 takes 0
+		// as 1 (r25 0xa45cd6).
+		double fs = info["fs"].get_real();
+
+		if (fs != 0.0)
+			friction = fs;
 	}
 
 	Physics::Physics()
@@ -227,8 +235,8 @@ namespace ms
 			double slant = std::abs(uy);
 			double speed = hspeed / ux;
 			double limit = WALKSPEED * phobj.walkspeed;
-			double acc = WALKACC * phobj.walkforce;
-			double drag = WALKDRAG * ground_drag(phobj.walkdrag);
+			double acc = WALKACC * phobj.walkforce * friction;
+			double drag = WALKDRAG * ground_drag(phobj.walkdrag * friction);
 
 			if (phobj.swim)
 			{
@@ -289,15 +297,16 @@ namespace ms
 			// faster than the top speed, then push the way the object steers.
 			double limit = phobj.swim ? SWIMSPEED : FLYSPEED * phobj.flyspeed;
 			double acc = phobj.swim ? SWIMACC : FLYACC;
+			double drag = FLYDRAG * friction;
 
-			decelerate(hspeed, limit, FLYDRAG);
+			decelerate(hspeed, limit, drag);
 
 			if (dir == 0)
-				decelerate(hspeed, 0.0, FLYDRAG);
+				decelerate(hspeed, 0.0, drag);
 			else
 				accelerate(hspeed, dir * acc, limit);
 
-			decelerate(vspeed, limit, FLYDRAG);
+			decelerate(vspeed, limit, drag);
 
 			if (phobj.flydir < 0)
 			{
@@ -320,16 +329,18 @@ namespace ms
 		} else
 		{
 			// CVecCtrl's falling (FUN_007f2a1c).
+			double drag = FLOATDRAG * friction;
+
 			if (vspeed > FALLSPEED)
-				vspeed = std::max(vspeed - FLOATDRAG * TICK, FALLSPEED);
+				vspeed = std::max(vspeed - drag * TICK, FALLSPEED);
 
 			if (phobj.is_flag_not_set(PhysicsObject::Flag::NOGRAVITY))
 				accelerate(vspeed, GRAVITYACC, FALLSPEED);
 
 			if (dir != 0)
-				accelerate(hspeed, dir * AIRACC, AIRSPEED);
+				accelerate(hspeed, dir * AIRACC * friction, AIRSPEED * friction);
 			else
-				decelerate(hspeed, 0.0, vspeed < FALLSPEED ? FLOATDRAG * FLOATCOEFFICIENT : FLOATDRAG);
+				decelerate(hspeed, 0.0, vspeed < FALLSPEED ? drag * FLOATCOEFFICIENT : drag);
 		}
 
 		// Positions advance by the average of the old and new speeds. A
