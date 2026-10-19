@@ -113,6 +113,13 @@ namespace ms
 		void handle(InPacket& recv) const override;
 	};
 
+	// Someone used a jukebox: its song replaces the map's BGM (v83 FUN_00535224).
+	class PlayJukeboxHandler : public PacketHandler
+	{
+	public:
+		void handle(InPacket& recv) const override;
+	};
+
 	// Every named trap goes back to its first state (v83 0x5330b6).
 	class ObstacleResetHandler : public PacketHandler
 	{

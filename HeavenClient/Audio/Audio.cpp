@@ -44,6 +44,10 @@ namespace ms
 	std::string Music::pending;
 	std::chrono::steady_clock::time_point Music::fade_start;
 	int32_t Music::fade_length = 0;
+	int32_t Music::start_delay = 0;
+	int32_t Music::fadein_length = 0;
+	bool Music::fading_in = false;
+	std::chrono::steady_clock::time_point Music::fadein_start;
 	std::unordered_map<std::string, membuf *> Music::audiodb;
 	std::vector<alure::Source> Sound::sources;
 	float Sound::gain = 1.0f;
@@ -278,7 +282,7 @@ namespace ms
 		path = p;
 	}
 
-	void Music::play(int32_t fadeout) const
+	void Music::play(int32_t fadeout, int32_t delay, int32_t fadein) const
 	{
 		static std::string bgmpath = "";
 
@@ -302,9 +306,10 @@ namespace ms
 		}
 
 		bgmpath = path;
+		fadein_length = fadein;
 
-		// v83 fades the old track out and then starts the new one at full volume (PlayBGM 0x43f301).
-		if (fadeout > 0 && music_src.isPlaying())
+		// v83 fades the old track out and then starts the new one (PlayBGM 0x43f301).
+		if ((fadeout > 0 && music_src.isPlaying()) || delay > 0)
 		{
 			if (pending.empty())
 			{
@@ -312,6 +317,7 @@ namespace ms
 				fade_length = fadeout;
 			}
 
+			start_delay = delay;
 			pending = path;
 
 			return;
@@ -324,7 +330,9 @@ namespace ms
 	void Music::start(const std::string &path)
 	{
 		music_buff = Music::ctx.getBuffer(path);
-		music_src.setGain(volume);
+		fading_in = fadein_length > 0;
+		fadein_start = std::chrono::steady_clock::now();
+		music_src.setGain(fading_in ? 0.0f : volume);
 		music_src.setLooping(true);
 		music_src.play(music_buff);
 	}
@@ -398,7 +406,7 @@ namespace ms
 		{
 			auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - fade_start).count();
 
-			if (elapsed >= fade_length)
+			if (elapsed >= std::max(fade_length, start_delay))
 			{
 				start(pending);
 				pending.clear();
@@ -407,6 +415,15 @@ namespace ms
 			{
 				music_src.setGain(volume * field_effect::fade_gain(static_cast<int32_t>(elapsed), fade_length));
 			}
+		}
+		else if (fading_in)
+		{
+			auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - fadein_start).count();
+
+			if (elapsed >= fadein_length)
+				fading_in = false;
+
+			music_src.setGain(volume * field_effect::fade_in_gain(static_cast<int32_t>(elapsed), fadein_length));
 		}
 
 		if (ctx)

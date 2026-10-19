@@ -32,6 +32,17 @@ int main()
 		require(std::abs(fade_gain(300, BGM_FADE) - 0.53f) < 0.01f, "half the volume is 5.5 dB down");
 		require(fade_gain(450, BGM_FADE) < 0.2f && fade_gain(450, BGM_FADE) > fade_gain(540, BGM_FADE), "falls away");
 
+		require(fade_in_gain(0, 1000) == 0.0f && fade_in_gain(1000, 1000) == 1.0f, "silent to full");
+		require(fade_in_gain(500, 1000) == fade_gain(500, 1000) && fade_in_gain(250, 1000) == fade_gain(750, 1000),
+				"the fade backwards");
+		require(fade_in_gain(5, 0) == 1.0f, "full at once without a duration");
+
+		require(is_jukebox(5100000) && !is_jukebox(5120000) && !is_jukebox(-1), "only 510xxxx items");
+		require(jukebox_path("Sound/Jukebox.img/Congratulation") == "Jukebox.img/Congratulation", "from Sound.nx's top");
+		require(jukebox_path("Jukebox.img/Congratulation") == "Jukebox.img/Congratulation", "already there");
+		require(jukebox_line("%s's song for you.", "Writs") == "Writs's song for you.", "the name for %s");
+		require(jukebox_line("A song for you.", "Writs") == "A song for you.", "no %s");
+
 		require(back_target(0) == 255.0f && back_target(1) == 0.0f, "in to full, out to nothing");
 		require(!back_target(2) && !back_target(255), "other modes do nothing");
 

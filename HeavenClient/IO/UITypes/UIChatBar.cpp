@@ -710,6 +710,9 @@ namespace ms
 			case LineType::GUILD:
 				color = Color::Name::MAUVE;
 				break;
+			case LineType::LIGHT_YELLOW:
+				color = Color::Name::LIGHTYELLOW;
+				break;
 			case LineType::MEGAPHONE:
 				color = Color::Name::MEGAPHONE;
 				strip = MEGAPHONE_STRIP;

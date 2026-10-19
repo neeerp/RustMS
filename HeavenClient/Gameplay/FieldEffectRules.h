@@ -64,6 +64,46 @@ namespace ms::field_effect
 		return static_cast<float>(std::pow(10.0, hundredths / 2000));
 	}
 
+	// The gain `elapsed` ms into a rise from silence that takes `duration` ms: a fade run backwards.
+	inline float fade_in_gain(int32_t elapsed, int32_t duration)
+	{
+		return fade_gain(duration - elapsed, duration);
+	}
+
+	// PLAY_JUKEBOX (0x8F) plays only 510xxxx items' songs (cash type 0x14 in FUN_004863d5).
+	inline bool is_jukebox(int32_t item_id)
+	{
+		return item_id / 10000 == 510;
+	}
+
+	// The map's BGM fades out over 1500 ms. 2500 ms after the packet the song starts, rising over 1000 ms, and it loops
+	// until the player leaves the map (FUN_00641ecc, FUN_00641db2).
+	constexpr int32_t JUKEBOX_FADE = 1500;
+	constexpr int32_t JUKEBOX_DELAY = 2500;
+	constexpr int32_t JUKEBOX_FADE_IN = 1000;
+
+	// A jukebox's info/path names its song from the top of Sound.nx: "Sound/Jukebox.img/Congratulation".
+	inline std::string jukebox_path(const std::string &path)
+	{
+		const std::string prefix = "Sound/";
+
+		if (path.compare(0, prefix.size(), prefix) == 0)
+			return path.substr(prefix.size());
+
+		return path;
+	}
+
+	// The item's String Cash.img msg with the player's name for %s: "%s's song for you." (v83 sprintf, chat type 9).
+	inline std::string jukebox_line(const std::string &msg, const std::string &name)
+	{
+		size_t at = msg.find("%s");
+
+		if (at == std::string::npos)
+			return msg;
+
+		return msg.substr(0, at) + name + msg.substr(at + 2);
+	}
+
 	// SET_BACK_EFFECT (0x80) fades a back in to full (mode 0) or out to nothing (mode 1). Other modes change nothing
 	// (FUN_006445c5).
 	inline std::optional<float> back_target(uint8_t mode)

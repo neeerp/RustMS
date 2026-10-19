@@ -24,8 +24,10 @@
 
 #include "../Packets/GameplayPackets.h"
 
+#include "../../Audio/Audio.h"
 #include "../../Configuration.h"
 
+#include "../../Gameplay/FieldEffectRules.h"
 #include "../../Gameplay/Stage.h"
 #include "../../IO/BuddyCommands.h"
 #include "../../IO/UI.h"
@@ -39,6 +41,8 @@
 #include "../../IO/UITypes/UIMobGage.h"
 #include "../../IO/UITypes/UIStatsInfo.h"
 #include "../../IO/UITypes/UITradingRoom.h"
+
+#include <nlnx/nx.hpp>
 
 #include <cstdlib>
 #include <optional>
@@ -401,6 +405,26 @@ namespace ms
 	{
 		// Any non-zero byte is on.
 		UIMiniMap::switch_on(recv.read_byte() != 0);
+	}
+
+	void PlayJukeboxHandler::handle(InPacket& recv) const
+	{
+		int32_t item_id = recv.read_int();
+
+		if (!field_effect::is_jukebox(item_id))
+			return;
+
+		std::string id = std::to_string(item_id);
+		std::string msg = nl::nx::string["Cash.img"][id]["msg"];
+		std::string line = field_effect::jukebox_line(msg, recv.read_string());
+
+		if (auto chatbar = UI::get().get_element<UIChatBar>())
+			chatbar->send_chatline(line, UIChatBar::LineType::LIGHT_YELLOW);
+
+		std::string path = nl::nx::item["Cash"]["0510.img"]["0" + id]["info"]["path"];
+
+		Music(field_effect::jukebox_path(path))
+			.play(field_effect::JUKEBOX_FADE, field_effect::JUKEBOX_DELAY, field_effect::JUKEBOX_FADE_IN);
 	}
 
 	void ObstacleResetHandler::handle(InPacket&) const

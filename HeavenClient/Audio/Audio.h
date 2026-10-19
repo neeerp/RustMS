@@ -156,8 +156,9 @@ namespace ms
 	public:
 		Music(std::string path);
 
-		// Loop this track. With a fade, the track playing fades out over that many ms first.
-		void play(int32_t fadeout = 0) const;
+		// Loop this track. With a fade, the track playing fades out over that many ms first. A delay holds the start
+		// back that many ms from now, and a fade-in raises the track from silence over that many ms.
+		void play(int32_t fadeout = 0, int32_t delay = 0, int32_t fadein = 0) const;
 
 		void play_once() const;
 
@@ -187,6 +188,12 @@ namespace ms
 		static std::string pending;
 		static std::chrono::steady_clock::time_point fade_start;
 		static int32_t fade_length;
+		// The pending track starts this many ms after fade_start at the soonest.
+		static int32_t start_delay;
+		// The next track to start rises from silence over this many ms.
+		static int32_t fadein_length;
+		static bool fading_in;
+		static std::chrono::steady_clock::time_point fadein_start;
 
 		friend Sound;
 	};

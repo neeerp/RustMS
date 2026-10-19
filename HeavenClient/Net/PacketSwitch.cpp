@@ -108,6 +108,7 @@ namespace ms
 		FIELD_OBSTACLE_ONOFF = 139,
 		FIELD_OBSTACLE_ONOFF_LIST = 140,
 		FIELD_OBSTACLE_ALL_RESET = 141,
+		PLAY_JUKEBOX = 143,
 		CLOCK = 147,
 		CONTI_MOVE = 148,
 		CONTI_STATE = 149,
@@ -240,6 +241,7 @@ namespace ms
 		emplace<FIELD_OBSTACLE_ONOFF, ObjectStateHandler>();
 		emplace<FIELD_OBSTACLE_ONOFF_LIST, ObjectStateListHandler>();
 		emplace<FIELD_OBSTACLE_ALL_RESET, ObstacleResetHandler>();
+		emplace<PLAY_JUKEBOX, PlayJukeboxHandler>();
 		emplace<SET_BACK_EFFECT, BackEffectHandler>();
 		emplace<SET_MAP_OBJECT_VISIBLE, MapObjectVisibleHandler>();
 		emplace<CLEAR_BACK_EFFECT, ClearBackEffectHandler>();
