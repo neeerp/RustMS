@@ -112,16 +112,20 @@ impl MobData {
         let Some(image) = nx.child_by_name(0, &format!("{mob_id:07}.img"))? else {
             return Ok(None);
         };
-        // Some mobs reuse another mob's data through info/link.
         let Some(mut info) = nx.child_by_name(image, "info")? else {
             return Ok(None);
         };
+        // Some mobs act as another (info/link) but keep their own stats, as
+        // Cosmic reads them; one whose info is only the link takes the
+        // other's.
         let mut image = image;
         if let Some(link) = nx.string_child(info, "link")? {
             if let Some(linked) = nx.child_by_name(0, &format!("{link}.img"))? {
-                if let Some(linked_info) = nx.child_by_name(linked, "info")? {
-                    image = linked;
-                    info = linked_info;
+                image = linked;
+                if nx.child_by_name(info, "maxHP")?.is_none() {
+                    if let Some(linked_info) = nx.child_by_name(linked, "info")? {
+                        info = linked_info;
+                    }
                 }
             }
         }
@@ -290,6 +294,25 @@ mod tests {
         // Stumpy's second attack hits harder than its body (125).
         let second = &mob(3220000).attacks[1];
         assert_eq!((second.kind, second.magic, second.attack), (2, false, 135));
+    }
+
+    #[test]
+    fn linked_mobs_keep_their_own_stats() {
+        let Some(path) = crate::test_assets::path("Mob.nx") else {
+            return;
+        };
+        let data = MobData::load(path).unwrap();
+        let mob = |id| data.info(id).unwrap().unwrap();
+        // Cherry Bubble Tea acts as Red Bubble Tea (level 38, 1900 HP) but
+        // is weaker, and without its weak spots.
+        let (cherry, red) = (mob(3400000), mob(9410005));
+        assert_eq!((cherry.level, cherry.max_hp, cherry.exp), (35, 1400, 80));
+        assert_eq!((red.level, red.max_hp), (38, 1900));
+        assert_eq!(cherry.element, "");
+        assert_eq!(cherry.attacks, red.attacks);
+        assert!(!cherry.attacks.is_empty());
+        // Nothing but a link: a Wild Boar.
+        assert_eq!(mob(9501016).max_hp, mob(2230102).max_hp);
     }
 
     #[test]
