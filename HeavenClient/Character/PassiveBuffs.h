@@ -59,6 +59,20 @@ namespace ms
 		void apply_to(CharStats &stats, nl::node level) const override;
 	};
 
+	// Accuracy and avoid: Blessing of Amazon, Nimble Body, Bullet Time
+	class NimbleBuff : public ConditionlessBuff
+	{
+	public:
+		void apply_to(CharStats &stats, nl::node level) const override;
+	};
+
+	// Thrust's speed
+	class ThrustBuff : public ConditionlessBuff
+	{
+	public:
+		void apply_to(CharStats &stats, nl::node level) const override;
+	};
+
 	// Collection of passive buffs
 	class PassiveBuffs
 	{

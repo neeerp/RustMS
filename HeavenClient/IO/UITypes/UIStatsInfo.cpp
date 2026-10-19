@@ -196,7 +196,7 @@ namespace ms
 				std::to_string(stats.get_mindamage()) + " ~ " + std::to_string(stats.get_maxdamage()));
 		statlabels[StatLabel::ATTACK].change_color(stats.is_damage_buffed() ? Color::Name::RED : Color::Name::BLACK);
 
-		// The window adds what INT, DEX and LUK give to the totals; the
+		// The window adds what INT, DEX and LUK give to magic and hands; the
 		// footage's beginners show these values with no equipment bonuses.
 		int32_t dex = stats.get_total(EquipStat::Id::DEX);
 		int32_t intl = stats.get_total(EquipStat::Id::INT);
@@ -206,7 +206,7 @@ namespace ms
 		update_buffed(StatLabel::MAGIC, EquipStat::Id::MAGIC, intl);
 		update_buffed(StatLabel::MDEF, EquipStat::Id::MDEF, intl);
 		update_buffed(StatLabel::ACCURACY, EquipStat::Id::ACC, 0);
-		update_buffed(StatLabel::AVOID, EquipStat::Id::AVOID, dex / 4 + luk / 2);
+		update_buffed(StatLabel::AVOID, EquipStat::Id::AVOID, 0);
 		update_buffed(StatLabel::HANDS, EquipStat::Id::HANDS, dex + intl + luk);
 
 		statlabels[StatLabel::SPEED].change_text(std::to_string(stats.get_total(EquipStat::Id::SPEED)) + "%");

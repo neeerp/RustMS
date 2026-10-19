@@ -17,6 +17,7 @@
 //////////////////////////////////////////////////////////////////////////////////
 #include "PassiveBuffs.h"
 
+#include "SecondaryStat.h"
 #include "SkillId.h"
 
 #include "../Util/Misc.h"
@@ -45,6 +46,17 @@ namespace ms
 		stats.set_reducedamage(reducedamage);
 	}
 
+	void NimbleBuff::apply_to(CharStats &stats, nl::node level) const
+	{
+		stats.add_value(EquipStat::Id::ACC, level["x"]);
+		stats.add_value(EquipStat::Id::AVOID, level["y"]);
+	}
+
+	void ThrustBuff::apply_to(CharStats &stats, nl::node level) const
+	{
+		stats.add_value(EquipStat::Id::SPEED, level["speed"]);
+	}
+
 	PassiveBuffs::PassiveBuffs()
 	{
 		// Beginner
@@ -58,6 +70,12 @@ namespace ms
 
 		// Dark Knight
 		buffs[SkillId::Id::ACHILLES_DK] = std::make_unique<AchillesBuff>();
+
+		for (int32_t id : secondary_stat::NIMBLE_SKILLS)
+			buffs[id] = std::make_unique<NimbleBuff>();
+
+		for (int32_t id : secondary_stat::THRUSTS)
+			buffs[id] = std::make_unique<ThrustBuff>();
 	}
 
 	void PassiveBuffs::apply_buff(CharStats &stats, int32_t skill_id, int32_t skill_level) const

@@ -232,6 +232,13 @@ Power Guard Up, Shadow Partner's share of the first set, Hard Skin, Berserk
 and Barrage, at most 199,999. A shot adds the attack of the ammo it throws,
 and the stat window shows the same range v83 does (FUN_008c2870).
 
+The totals count what v83's SetFrom adds (`Character/SecondaryStat.h`,
+FUN_0077f4c9): accuracy and avoid from DEX and LUK by the job, the `x`
+accuracy and `y` avoid of Blessing of Amazon, Nimble Body, Bullet Time and
+Quick Motion, a Thrust's speed, Shield Mastery's `x` percent of the shield's
+own defence, and a weaponless pirate's attack. A mob's blow and the stat
+window use the same avoid.
+
 HeavenClient picks targets as v83 does (`Combat::find_targets`). Melee and
 magic attacks take the mobs whose body overlaps the attack range in the order
 they entered the map (`MapObjects::entry_order`), not the closest ones, so a

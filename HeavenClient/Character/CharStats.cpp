@@ -18,6 +18,7 @@
 #include "CharStats.h"
 
 #include "MobDamage.h"
+#include "SecondaryStat.h"
 #include "StatCaps.h"
 
 #include "../Gameplay/Combat/Attack.h"
@@ -74,7 +75,12 @@ namespace ms
 
 	void CharStats::close_totalstats()
 	{
-		totalstats[EquipStat::Id::ACC] += base_accuracy();
+		// DEX and LUK add to accuracy and avoid by the job (SetFrom).
+		int32_t id = job.get_id();
+		int32_t dex = get_total(EquipStat::Id::DEX);
+		int32_t luk = get_total(EquipStat::Id::LUK);
+		totalstats[EquipStat::Id::ACC] += secondary_stat::base_accuracy(id, dex, luk);
+		totalstats[EquipStat::Id::AVOID] += secondary_stat::base_avoid(id, dex, luk);
 
 		for (auto iter : percentages)
 		{
@@ -89,29 +95,11 @@ namespace ms
 		namespace pd = physical_damage;
 
 		pd::Weapon weapon = pd::weapon(static_cast<int32_t>(weapontype) * 10000);
-		pd::Stats stats{ get_total(EquipStat::Id::STR), get_total(EquipStat::Id::DEX), get_total(EquipStat::Id::LUK) };
+		pd::Stats stats{ get_total(EquipStat::Id::STR), dex, luk };
 		int32_t pad = pd::attack(get_total(EquipStat::Id::WATK));
-		int32_t id = job.get_id();
 		auto shown = [](double damage) { return std::clamp(static_cast<int32_t>(damage), 1, 199999); };
 		mindamage = shown(pd::lowest(pd::wielded(weapon, id, 0, false, stats, pd::least(mastery)), pad));
 		maxdamage = shown(pd::highest(pd::wielded(weapon, id, 0, true, stats, 1.0), pad));
-	}
-
-	int32_t CharStats::base_accuracy() const
-	{
-		// A Brawler's, a pirate's, an archer's and a thief's DEX counts for
-		// less (SetFrom, 0x77f663).
-		int32_t id = job.get_id();
-		double dex = get_total(EquipStat::Id::DEX);
-		double luk = get_total(EquipStat::Id::LUK);
-
-		if (id / 10 == 51)
-			return static_cast<int32_t>(dex * 0.9 + luk * 0.3);
-
-		if (id / 100 == 5 || id % 1000 / 100 == 3 || id % 1000 / 100 == 4)
-			return static_cast<int32_t>(dex * 0.6 + luk * 0.3);
-
-		return static_cast<int32_t>(dex * 0.8 + luk * 0.5);
 	}
 
 	void CharStats::set_stat(MapleStat::Id stat, uint16_t value)

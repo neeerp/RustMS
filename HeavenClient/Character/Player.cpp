@@ -19,6 +19,7 @@
 
 #include "MobDamage.h"
 #include "PlayerStates.h"
+#include "SecondaryStat.h"
 #include "SkillId.h"
 
 #include "../Audio/Audio.h"
@@ -221,6 +222,23 @@ namespace ms
 		stats.add_value(EquipStat::Id::ACC, counted.accuracy);
 		stats.add_value(EquipStat::Id::WATK, counted.attack);
 		stats.set_mastery(physical_damage::mastery(weapon, physical_damage::shown_reach(weapon), job, 0, lookup).mastery);
+
+		// Shield Mastery raises the shield's own defence by its x percent,
+		// and a pirate's bare hands have attack of their own.
+		if (int32_t mastery = secondary_stat::shield_mastery(job))
+		{
+			int32_t percent = learned(skillbook, mastery).x;
+
+			if (auto shield = inventory.get_equip(InventoryType::Id::EQUIPPED, EquipSlot::Id::SHIELD); shield && percent)
+			{
+				int32_t defence = shield->get_stat(EquipStat::Id::WDEF);
+				stats.add_value(EquipStat::Id::WDEF, secondary_stat::shield_defence(defence, percent) - defence);
+			}
+		}
+
+		if (look.get_equips().get_weapon() == 0)
+			stats.add_value(EquipStat::Id::WATK,
+							secondary_stat::bare_hands_attack(job, stats.get_stat(MapleStat::Id::LEVEL)));
 
 		stats.close_totalstats();
 

@@ -129,9 +129,6 @@ namespace ms
 		bool get_female() const;
 
 	private:
-		// The accuracy from DEX and LUK.
-		int32_t base_accuracy() const;
-
 		std::string name;
 		std::vector<int64_t> petids;
 		Job job;
