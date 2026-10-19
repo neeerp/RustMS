@@ -777,17 +777,31 @@ namespace ms
 			damage = 1;
 
 		// A touch under Power Guard sends some back at the mob, which the
-		// player is spared (0x9587c6).
+		// player is spared (0x9587c6). A spell under Mana Reflection does
+		// too if its chance comes up, sparing them nothing (0x958d50).
 		uint8_t reflect = 0;
 		mob_damage::Reflected reflected{ 0, 0 };
+		mob_damage::Reflectee reflectee{ attack.level, attack.avoid, attack.maxhp, attack.fixeddamage, attack.boss,
+									   attack.invincible };
+		int32_t level = stats.get_stat(MapleStat::Id::LEVEL);
 
 		if (attack.index < 0 && damage > 0 && has_buff(Buffstat::Id::POWERGUARD))
 		{
 			reflect = static_cast<uint8_t>(get_buff_value(Buffstat::Id::POWERGUARD));
-			mob_damage::Toucher toucher{ attack.level, attack.avoid, attack.maxhp, attack.fixeddamage, attack.boss,
-										 attack.invincible };
-			reflected = mob_damage::power_guard(damage, reflect, toucher, stats.get_stat(MapleStat::Id::LEVEL),
-												stats.get_total(EquipStat::Id::ACC));
+			reflected = mob_damage::power_guard(damage, reflect, reflectee, level, stats.get_total(EquipStat::Id::ACC));
+		}
+		else if (attack.index >= 0 && attack.magic && damage > 0 && has_buff(Buffstat::Id::MANA_REFLECTION))
+		{
+			const SkillData::Stats &mana =
+					SkillData::get(SkillId::MANA_REFLECTION).get_stats(get_buff_value(Buffstat::Id::MANA_REFLECTION));
+
+			if (randomizer.below(mana.chance))
+			{
+				reflect = static_cast<uint8_t>(mana.x);
+				reflected.shown = mob_damage::mana_reflection(damage, mana.x, reflectee, level,
+															  stats.get_total(EquipStat::Id::INT),
+															  stats.get_total(EquipStat::Id::LUK));
+			}
 		}
 
 		int32_t achilles = 1000 - static_cast<int32_t>(std::lround(stats.get_reducedamage() * 1000.0f));

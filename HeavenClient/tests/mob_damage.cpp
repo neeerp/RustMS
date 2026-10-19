@@ -85,22 +85,33 @@ int main()
 
 		// Power Guard at 30% against a mob of level 10, 30 avoid and 1000 HP,
 		// for a level 10 player with 82 accuracy.
-		Toucher toucher{ 10, 30, 1000, 0, false, false };
-		Reflected reflected = power_guard(100, 30, toucher, 10, 82);
+		Reflectee reflectee{ 10, 30, 1000, 0, false, false };
+		Reflected reflected = power_guard(100, 30, reflectee, 10, 82);
 		require(reflected.damage == 30 && reflected.shown == 30, "Power Guard sends back its percent");
-		require(power_guard(-1, 30, toucher, 10, 82).damage == 0, "a dodge sends nothing back");
-		require(power_guard(100, 30, Toucher{ 10, 30, 200, 0, false, false }, 10, 82).damage == 20,
+		require(power_guard(-1, 30, reflectee, 10, 82).damage == 0, "a dodge sends nothing back");
+		require(power_guard(100, 30, Reflectee{ 10, 30, 200, 0, false, false }, 10, 82).damage == 20,
 				"at most a tenth of the mob's HP");
-		require(power_guard(100, 30, Toucher{ 10, 30, 1000, 0, true, false }, 10, 82).damage == 15,
+		require(power_guard(100, 30, Reflectee{ 10, 30, 1000, 0, true, false }, 10, 82).damage == 15,
 				"half that for a boss");
-		reflected = power_guard(100, 30, Toucher{ 10, 30, 1000, 1, false, false }, 10, 82);
+		reflected = power_guard(100, 30, Reflectee{ 10, 30, 1000, 1, false, false }, 10, 82);
 		require(reflected.damage == 1 && reflected.shown == 1, "a fixedDamage mob takes no more");
-		reflected = power_guard(100, 30, Toucher{ 10, 30, 1000, 50, false, false }, 10, 82);
+		reflected = power_guard(100, 30, Reflectee{ 10, 30, 1000, 50, false, false }, 10, 82);
 		require(reflected.damage == 30 && reflected.shown == 50, "but shows its fixed damage");
-		require(power_guard(100, 30, Toucher{ 10, 30, 1000, 0, false, true }, 10, 82).shown == 0,
+		require(power_guard(100, 30, Reflectee{ 10, 30, 1000, 0, false, true }, 10, 82).shown == 0,
 				"an invincible mob takes nothing");
-		require(power_guard(100, 30, Toucher{ 20, 30, 1000, 0, false, false }, 10, 82).shown == 0,
+		require(power_guard(100, 30, Reflectee{ 20, 30, 1000, 0, false, false }, 10, 82).shown == 0,
 				"82 accuracy reaches 32 avoid at the player's level, 23 ten levels up");
+
+		// Mana Reflection, with 100 INT and 4 LUK: 50.
+		Reflectee caster{ 10, 16, 10000, 0, true, false };
+		require(mana_reflection(100, 100, caster, 10, 100, 4) == 100, "Mana Reflection sends back its percent");
+		require(mana_reflection(100, 100, Reflectee{ 10, 16, 1000, 0, true, false }, 10, 100, 4) == 50,
+				"at most a twentieth of the mob's HP, bosses alike");
+		require(mana_reflection(100, 100, Reflectee{ 10, 17, 10000, 0, false, false }, 10, 100, 4) == 0,
+				"50 reaches 16 avoid at the player's level, not 17");
+		require(mana_reflection(100, 100, Reflectee{ 11, 16, 10000, 0, false, false }, 10, 100, 4) == 100 &&
+					mana_reflection(100, 100, Reflectee{ 12, 16, 10000, 0, false, false }, 10, 100, 4) == 0,
+				"nor 16 two levels up");
 
 		std::cout << "Mob damage passed\n";
 		return 0;

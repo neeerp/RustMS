@@ -227,18 +227,23 @@ impl WorldHandler for TakeDamageHandler {
             debug!(mob_id, from, damage, "Mob damage out of range");
             return Ok(HandlerResult::empty());
         }
-        // A touch under Power Guard sends some back at the mob, if the
-        // client says so (0x9587c6).
-        let reflected = match tail.shown {
-            Some([1, ..]) if attack.is_none() && tail.reflect != 0 => {
-                combat::power_guard(player, &mob, damage)
+        // A touch under Power Guard, or a spell under Mana Reflection whose
+        // chance came up, sends some back at the mob, if the client says so
+        // (0x9587c6, 0x958d50). Only Power Guard's spares the player.
+        let (reflected, spared) = match (tail.shown, attack) {
+            (Some([1, ..]), None) if tail.reflect != 0 => {
+                let reflected = combat::power_guard(player, &mob, damage);
+                (reflected, reflected)
             }
-            _ => 0,
+            (Some([0, ..]), Some(attack)) if attack.magic && tail.reflect != 0 => {
+                (combat::mana_reflection(player, &mob, damage), 0)
+            }
+            _ => (0, 0),
         };
         // As Cosmic does, Magic Guard leaves alone an attack that leaves 1
         // MP or burns MP.
         let mp_burn = attack.map_or(0, |a| a.mp_burn);
-        let taken = combat::taken(player, damage, !deadly && mp_burn == 0, true).less(reflected);
+        let taken = combat::taken(player, damage, !deadly && mp_burn == 0, true).less(spared);
         let hp = player.add_hp(-taken.hp);
         let mut updates = vec![StatUpdate::Hp(hp)];
         let mp_loss = match attack {
@@ -851,6 +856,52 @@ mod tests {
         // A client that doesn't say so sends nothing back.
         let actions = handle(&mut player, touch(40, 3220000));
         assert_eq!(player.stats.hp, 26);
+        assert!(!actions
+            .iter()
+            .any(|action| matches!(action, WorldAction::Field(FieldRequest::Reflect { .. }))));
+    }
+
+    #[test]
+    fn mana_reflection_sends_some_of_a_spell_back() {
+        if crate::mobs::data().is_err() || crate::skills::data().is_err() {
+            return;
+        }
+        let mut player = crate::codec::stats::sample_player();
+        player.stats.hp = 100;
+        // Enough INT to reach the mob's 8 avoid 10 levels up.
+        player.stats.int = 100;
+        // The buff is the skill's level.
+        let mana = crate::skills::at_level(2321002, 10).unwrap();
+        assert_eq!(
+            crate::skills::buffs(&mana),
+            Some(vec![(BuffStat::ManaReflection, 10)])
+        );
+        let now = std::time::Instant::now();
+        let lasts = std::time::Duration::from_secs(60);
+        player
+            .buffs
+            .give(Buff::new(2121002, BuffStat::ManaReflection, 10, now, lasts));
+        // Its percent, no Guardian, then the 14 bytes, not Power Guard's.
+        let mut tail = vec![100, 0, 0];
+        tail.extend(2_000_000_001i32.to_le_bytes());
+        tail.extend([6, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
+        // 9400568's spell: all 40 goes back, but at most 350 / 20, and the
+        // player still takes all of it.
+        let mut p = hit(0, 40, 9400568);
+        p.write_bytes(&tail).unwrap();
+        let actions = handle(&mut player, p);
+        assert_eq!(player.stats.hp, 60);
+        assert!(actions.iter().any(|action| matches!(
+            action,
+            WorldAction::Field(FieldRequest::Reflect {
+                object_id: 2_000_000_001,
+                mob_id: 9400568,
+                damage: 17
+            })
+        )));
+        // A touch says nothing of Mana Reflection.
+        let actions = handle(&mut player, touch_with(40, 9400568, &tail));
+        assert_eq!(player.stats.hp, 20);
         assert!(!actions
             .iter()
             .any(|action| matches!(action, WorldAction::Field(FieldRequest::Reflect { .. }))));

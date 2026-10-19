@@ -136,6 +136,9 @@ pub const DISPELLED: [BuffStat; 6] = [
 ];
 pub const RESURRECTION: i32 = 2321006;
 pub const CHAKRA: i32 = 4211001;
+/// The Arch Mages' and Bishop's Mana Reflection share their levels' data;
+/// v83 looks them all up as the Fire/Poison one's (0x958db2).
+pub const MANA_REFLECTION: i32 = 2121002;
 pub const TIME_LEAP: i32 = 5121010;
 
 pub const MYSTIC_DOOR: i32 = 2311002;
@@ -695,6 +698,7 @@ pub fn buffs(skill: &Learned) -> Option<Vec<(BuffStat, i32)>> {
         2301003 => vec![(BuffStat::Invincible, effect.x)],
         2311003 => vec![(BuffStat::HolySymbol, effect.x)],
         2121004 | 2221004 | 2321004 => vec![(BuffStat::Infinity, effect.x)],
+        2121002 | 2221002 | 2321002 => vec![(BuffStat::ManaReflection, skill.level)],
         3101004 | 3201004 => vec![(BuffStat::SoulArrow, effect.x)],
         3121008 => vec![(BuffStat::Concentrate, effect.x)],
         3121002 | 3221002 => vec![(BuffStat::SharpEyes, effect.x << 8 | effect.y)],

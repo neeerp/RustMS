@@ -841,6 +841,12 @@ FUN_009581a9), and the server applies them once (`net::combat::taken`):
   shown number; the server deals it to the mob as one of the player's
   hits (`FieldRequest::Reflect`). The client says it reflected with the
   block below; the server then uses its own buff and the mob's template.
+- **Mana Reflection** (a mob's spell only, `net::combat::mana_reflection`,
+  0x958d50) works the same way once the client's roll of its `prop`
+  comes up, but sends back `x` percent, at most a twentieth of the mob's
+  max HP, bosses alike, and spares the player nothing. Its accuracy is 5
+  for each 10 of INT and of LUK, times 0.85. The buff's value is the
+  skill level; v83 reads all three skills' data from 2121002's.
 
 The rest comes off HP; a `deadlyAttack` also takes all but 1 MP, and an
 `mpBurn` attack its `mpBurn` in MP. Poison ticks get Achilles too
@@ -896,10 +902,10 @@ Setting restores the same table.
 `field_mobs` unit tests cover spawning, control hand-off (including by
 distance report), movement, attacks' MP, damage, EXP sharing, and respawn;
 `net::combat` covers parsing, the damage cap, Shadow Meso's mesos, the
-broadcast, the guards' shares of a hit, Power Guard's reflect, and the
+broadcast, the guards' shares of a hit, both reflects, and the
 TAKE_DAMAGE handler's bounds by attack index, its tail, and dodges; `game::mob_damage` covers the
 StandardPDD table and the bound. HeavenClient's `mob_damage_tests` and
-`mob_attack_tests` cover the damage and miss formulas, Power Guard, and the attacks'
+`mob_attack_tests` cover the damage and miss formulas, both reflects, and the attacks'
 ranges, aim, balls, and rows. `mob_combat` (integration) runs two players in Dangerous
 Forest through control, relayed movement, hits, kills, EXP, refused damage,
 touch damage, damage by attack index, a level-up seen by the other player, and a respawn, then has

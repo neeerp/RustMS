@@ -563,6 +563,31 @@ pub fn power_guard(player: &Player, mob: &MobInfo, damage: i32) -> i32 {
     reflected
 }
 
+/// What Mana Reflection sends back at a mob whose magic attack hit the
+/// player for `damage`, once the client's roll of its chance came up
+/// (0x958d50): its `x` percent, at most a twentieth of the mob's HP.
+/// Nothing goes back at a mob whose avoid beats 5 for each 10 of the
+/// player's INT and of their LUK, weighed down for each level the mob has
+/// on them and by 0.85. Unlike Power Guard's, it spares the player nothing.
+pub fn mana_reflection(player: &Player, mob: &MobInfo, damage: i32) -> i32 {
+    let level = buff(player, BuffStat::ManaReflection);
+    if level <= 0 || damage <= 0 {
+        return 0;
+    }
+    let Some(skill) = skills::at_level(skills::MANA_REFLECTION, level) else {
+        return 0;
+    };
+    let reflected = (damage * skill.effect.x / 100).min(mob.max_hp / 20);
+    let (int, luk, _) = skills::spell_stats(player);
+    let above = (i32::from(mob.level) - i32::from(player.stats.level)).max(0);
+    let reach =
+        f64::from((int / 10 + luk / 10) * 5) * 100.0 / (f64::from(above) * 10.0 + 255.0) * 0.85;
+    if f64::from(mob.avoid.clamp(0, 999)) > reach {
+        return 0;
+    }
+    reflected
+}
+
 /// The player's accuracy: what they wear, 0.8 a point of DEX and 0.5 of
 /// LUK, and their buffs'. Power Guard's Fighters and Pages have no skill
 /// that adds to it.
@@ -1369,6 +1394,40 @@ mod taken_tests {
                 shown: 70
             }
         );
+    }
+
+    #[test]
+    fn mana_reflection_sends_back_its_share_of_a_spell() {
+        if crate::skills::data().is_err() {
+            return;
+        }
+        let mut player = crate::codec::stats::sample_player();
+        // 5 for each 10 of INT and of LUK: 50.
+        player.stats.int = 100;
+        let mob = MobInfo {
+            level: 10,
+            max_hp: 10000,
+            avoid: 16,
+            ..MobInfo::default()
+        };
+        assert_eq!(mana_reflection(&player, &mob, 100), 0);
+        // Level 10 sends back all of it.
+        with_buff(&mut player, 2121002, BuffStat::ManaReflection, 10);
+        assert_eq!(mana_reflection(&player, &mob, 100), 100);
+        assert_eq!(mana_reflection(&player, &mob, -1), 0);
+        let with = |change: fn(&mut MobInfo)| {
+            let mut mob = mob.clone();
+            change(&mut mob);
+            mana_reflection(&player, &mob, 100)
+        };
+        // At most a twentieth of the mob's HP, bosses alike.
+        assert_eq!(with(|mob| mob.max_hp = 1000), 50);
+        assert_eq!(with(|mob| mob.boss = true), 100);
+        // 50 reaches 16 avoid at the player's level, but not 17, nor 16
+        // two levels up.
+        assert_eq!(with(|mob| mob.avoid = 17), 0);
+        assert_eq!(with(|mob| mob.level = 11), 100);
+        assert_eq!(with(|mob| mob.level = 12), 0);
     }
 
     #[test]

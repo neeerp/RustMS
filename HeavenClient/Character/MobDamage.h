@@ -239,8 +239,9 @@ namespace ms
 			return damage - kept_off - saved;
 		}
 
-		// The mob a touch under Power Guard came from.
-		struct Toucher
+		// The mob that Power Guard or Mana Reflection sends some of its hit
+		// back at.
+		struct Reflectee
 		{
 			int32_t level;
 			int32_t avoid;
@@ -265,7 +266,7 @@ namespace ms
 		// goes back at an invincible mob, or at one whose avoid beats the
 		// accuracy, weighed down for each level the mob has on the player
 		// (0x9588cd).
-		inline Reflected power_guard(int32_t damage, int32_t percent, const Toucher &mob, int32_t level,
+		inline Reflected power_guard(int32_t damage, int32_t percent, const Reflectee &mob, int32_t level,
 									 int32_t accuracy)
 		{
 			if (damage <= 0 || percent <= 0 || mob.invincible)
@@ -291,6 +292,28 @@ namespace ms
 				return { 0, 0 };
 
 			return { reflected, shown };
+		}
+
+		// What Mana Reflection, its chance come up, shows sending `percent` of
+		// a spell's `damage` back at the mob (0x958d50): at most a twentieth
+		// of its HP, and nothing (a miss) if its avoid beats 5 for each 10 of
+		// the player's INT and of their LUK, weighed down for each level the
+		// mob has on them and by 0.85. Unlike Power Guard's, it spares the
+		// player nothing.
+		inline int32_t mana_reflection(int32_t damage, int32_t percent, const Reflectee &mob, int32_t level,
+									   int32_t intelligence, int32_t luck)
+		{
+			if (damage <= 0 || percent <= 0)
+				return 0;
+
+			int32_t reflected = std::min(percent * damage / 100, mob.maxhp / 20);
+			int32_t above = std::max(0, mob.level - level);
+			double reach = (intelligence / 10 + luck / 10) * 5 * 100.0 / (above * 10.0 + 255.0) * 0.85;
+
+			if (std::clamp(mob.avoid, 0, 999) > reach)
+				return 0;
+
+			return reflected;
 		}
 	}
 }

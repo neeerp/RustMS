@@ -156,8 +156,8 @@ namespace ms
 		uint8_t element;
 		// Whether Power Stance kept the player in place.
 		bool stance;
-		// Power Guard's percent on a touch, or 0, and the number it shows
-		// over the mob (0 a miss).
+		// Power Guard's percent on a touch or Mana Reflection's on a spell,
+		// or 0, and the number it shows over the mob (0 a miss).
 		uint8_t reflect = 0;
 		int32_t reflected = 0;
 		// Where the mob and the player were.

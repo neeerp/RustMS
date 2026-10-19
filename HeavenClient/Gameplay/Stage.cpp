@@ -312,6 +312,10 @@ namespace ms
 
 			if (result.damage > 0)
 				player.show_attack_effect(landed.hit, 1);
+
+			// What Mana Reflection sent back shows over the mob.
+			if (result.reflect)
+				mobs.show_damage(result.oid, result.reflected);
 		}
 
 		if (player.is_dead() || player.Char::is_invincible() || sheltered)
