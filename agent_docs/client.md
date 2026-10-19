@@ -132,7 +132,10 @@ from `UI.nx`. Moved so far:
   (`MaxMap`), laid out from period footage. M or the `Basic.img` minus and
   plus buttons step between them, and other maps keep the last choice
   (`MiniMapType`, the largest until one is made). Towns open in the largest,
-  and maps without a `miniMap` stay folded. The window fits the map's `miniMap/canvas` (scaled
+  and maps without a `miniMap` stay folded, as do, for all but GMs, the
+  `hideMinimap` maps (290 have a `miniMap`, mostly party quests and events)
+  and, once the server sends MINIMAP_ON_OFF (86) with 0, the `miniMapOnOff`
+  maps. Nothing sends 86 yet. The window fits the map's `miniMap/canvas` (scaled
   by `2^mag`) and the names. Markers (`Map.nx` `MapHelper.img/minimap`) stand
   bottom-centred on the visible portals (types 2 and 7), NPCs, other
   players, and you. Hovering an NPC shows its name. Hovering a portal's

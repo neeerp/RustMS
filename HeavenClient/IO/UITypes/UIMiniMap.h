@@ -51,6 +51,10 @@ namespace ms
 		// How far right the window reaches, which the boss HP bar starts from.
 		int16_t get_width() const;
 
+		// MINIMAP_ON_OFF (0x56) switches the miniMapOnOff maps' minimaps on
+		// or off until it comes again (v83 FUN_00a129ed).
+		static void switch_on(bool on);
+
 	protected:
 		Button::State button_pressed(uint16_t buttonid) override;
 
@@ -81,6 +85,9 @@ namespace ms
 		// Where a point of the map shows in the window.
 		Point<int16_t> to_window(Point<int16_t> map_position) const;
 		int16_t top() const;
+
+		// Whether the server has the miniMapOnOff maps' minimaps on.
+		static bool switched_on;
 
 		static constexpr int16_t MIN_WIDTH = 128;
 		static constexpr int16_t BORDER = 6;

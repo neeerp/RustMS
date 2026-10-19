@@ -106,6 +106,13 @@ namespace ms
 		void handle(InPacket& recv) const override;
 	};
 
+	// Whether the miniMapOnOff maps show their minimap (v83 FUN_00a129ed).
+	class MiniMapOnOffHandler : public PacketHandler
+	{
+	public:
+		void handle(InPacket& recv) const override;
+	};
+
 	// Every named trap goes back to its first state (v83 0x5330b6).
 	class ObstacleResetHandler : public PacketHandler
 	{

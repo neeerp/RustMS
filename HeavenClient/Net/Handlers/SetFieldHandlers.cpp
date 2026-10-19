@@ -35,6 +35,7 @@
 
 #include "../../IO/UITypes/UICharSelect.h"
 #include "../../IO/UITypes/UIFieldClock.h"
+#include "../../IO/UITypes/UIMiniMap.h"
 #include "../../IO/UITypes/UIMobGage.h"
 #include "../../IO/UITypes/UIStatsInfo.h"
 #include "../../IO/UITypes/UITradingRoom.h"
@@ -394,6 +395,12 @@ namespace ms
 	void ClearBackEffectHandler::handle(InPacket&) const
 	{
 		Stage::get().reset_backs();
+	}
+
+	void MiniMapOnOffHandler::handle(InPacket& recv) const
+	{
+		// Any non-zero byte is on.
+		UIMiniMap::switch_on(recv.read_byte() != 0);
 	}
 
 	void ObstacleResetHandler::handle(InPacket&) const

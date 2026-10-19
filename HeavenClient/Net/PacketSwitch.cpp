@@ -92,6 +92,7 @@ namespace ms
 		/// Monster Book
 		MONSTER_BOOK_SET_CARD = 83,
 		MONSTER_BOOK_SET_COVER = 84,
+		MINIMAP_ON_OFF = 86,
 
 		SKILL_MACROS = 124,
 		SET_FIELD = 125,
@@ -242,6 +243,7 @@ namespace ms
 		emplace<SET_BACK_EFFECT, BackEffectHandler>();
 		emplace<SET_MAP_OBJECT_VISIBLE, MapObjectVisibleHandler>();
 		emplace<CLEAR_BACK_EFFECT, ClearBackEffectHandler>();
+		emplace<MINIMAP_ON_OFF, MiniMapOnOffHandler>();
 		emplace<SET_OBJECT_STATE, ObjectStateHandler>();
 
 		// MapObject handlers

@@ -23,9 +23,11 @@
 
 #include "../Components/MapleButton.h"
 
+#include "../Gameplay/MapleMap/FieldLimit.h"
 #include "../Gameplay/MapleMap/MapTooltipRules.h"
 #include "../Gameplay/MapleMap/Npc.h"
 
+#include "../../Configuration.h"
 #include "../../Util/NxFiles.h"
 
 #include <nlnx/nx.hpp>
@@ -169,7 +171,10 @@ namespace ms
 		map = NxHelper::Map::get_map_node_name(mapid);
 
 		nl::node minimap = map["miniMap"];
-		has_map = minimap.size() > 0;
+		nl::node map_info = map["info"];
+		has_map = field_limit::shows_minimap(Configuration::get().get_admin(), minimap.size() > 0,
+											 map_info["hideMinimap"].get_bool(), map_info["miniMapOnOff"].get_bool(),
+											 switched_on);
 		canvas = minimap["canvas"];
 		scale = static_cast<int16_t>(1 << static_cast<int>(minimap["mag"]));
 		center_offset = Point<int16_t>(minimap["centerX"], minimap["centerY"]);
@@ -194,8 +199,18 @@ namespace ms
 		}
 
 		// Towns open with their mark and names.
-		nl::node town = map["info"]["town"];
+		nl::node town = map_info["town"];
 		set_type(!has_map ? Type::MIN : town && town.get_bool() ? Type::MAX : user_type);
+	}
+
+	bool UIMiniMap::switched_on = true;
+
+	void UIMiniMap::switch_on(bool on)
+	{
+		switched_on = on;
+
+		if (auto minimap = UI::get().get_element<UIMiniMap>())
+			minimap->change_map();
 	}
 
 	void UIMiniMap::set_type(int8_t new_type)

@@ -207,5 +207,17 @@ namespace ms
 		{
 			return !(fieldlimit & PARTY_LEADER);
 		}
+
+		// v83 FUN_00858603: the minimap folds to its title bar in a map
+		// without a miniMap, where hideMinimap is set, and in the
+		// miniMapOnOff maps once the server has switched them off
+		// (MINIMAP_ON_OFF 0x56). GMs see past both flags.
+		inline bool shows_minimap(bool gm, bool has_minimap, bool hide, bool on_off, bool switched_on)
+		{
+			if (!has_minimap)
+				return false;
+
+			return gm || (!hide && (switched_on || !on_off));
+		}
 	}
 }

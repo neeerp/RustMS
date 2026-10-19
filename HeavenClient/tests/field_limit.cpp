@@ -90,6 +90,16 @@ int main()
 
 		require(may_change_leader(0x2) && !may_change_leader(0x800), "bit 0x800 keeps the party's leader");
 
+		require(shows_minimap(false, true, false, false, true), "a map's miniMap shows");
+		require(!shows_minimap(false, false, false, false, true) && !shows_minimap(true, false, false, false, true),
+				"a map without one folds, even for a GM");
+		require(!shows_minimap(false, true, true, false, true) && shows_minimap(true, true, true, false, true),
+				"hideMinimap folds it for all but GMs");
+		require(shows_minimap(false, true, false, true, true) && !shows_minimap(false, true, false, true, false),
+				"miniMapOnOff folds it once the server switches minimaps off");
+		require(shows_minimap(true, true, false, true, false) && shows_minimap(false, true, false, false, false),
+				"but not for GMs, nor in other maps");
+
 		std::cout << "Field limit passed\n";
 		return 0;
 	}
