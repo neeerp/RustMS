@@ -345,6 +345,19 @@ pub struct MobSet {
     spawns: Vec<SpawnPoint>,
     live: BTreeMap<i32, LiveMob>,
     object_ids: ObjectIds,
+    revivals: Vec<Revival>,
+}
+
+/// Mobs to come out of one that died (`revive`) once it is done dying,
+/// where it died, facing its way, under its controller.
+struct Revival {
+    at: Instant,
+    mob_ids: Vec<i32>,
+    x: i16,
+    y: i16,
+    stance: u8,
+    foothold: i16,
+    controller: Option<ClientId>,
 }
 
 impl Default for MobSet {
@@ -368,6 +381,7 @@ impl MobSet {
                 .collect(),
             live: BTreeMap::new(),
             object_ids: ObjectIds::new(object_ids::MOBS),
+            revivals: Vec::new(),
         }
     }
 
@@ -424,6 +438,11 @@ impl MobSet {
     /// `leaving` stopped controlling its mobs; hand them to `next` if any.
     /// Returns the mobs that changed hands.
     pub fn release(&mut self, leaving: ClientId, next: Option<ClientId>) -> Vec<i32> {
+        for revival in &mut self.revivals {
+            if revival.controller == Some(leaving) {
+                revival.controller = next;
+            }
+        }
         self.live
             .values_mut()
             .filter(|mob| mob.controller == Some(leaving))
@@ -657,6 +676,27 @@ impl MobSet {
         spawned
     }
 
+    /// Bring out the mobs due to come out of ones that died, as `info`
+    /// has them; returns their object ids. They never respawn.
+    pub fn revive(&mut self, now: Instant, info: impl Fn(i32) -> Option<MobInfo>) -> Vec<i32> {
+        let (due, waiting): (Vec<_>, _) = std::mem::take(&mut self.revivals)
+            .into_iter()
+            .partition(|revival| revival.at <= now);
+        self.revivals = waiting;
+        let mut spawned = Vec::new();
+        for revival in due {
+            for info in revival.mob_ids.iter().filter_map(|&mob_id| info(mob_id)) {
+                let object_id = self.object_ids.next();
+                let at = (revival.x, revival.y);
+                let mut mob = LiveMob::new(object_id, info, at, revival.stance, revival.foothold);
+                mob.controller = revival.controller;
+                self.live.insert(object_id, mob);
+                spawned.push(object_id);
+            }
+        }
+        spawned
+    }
+
     /// Put statuses caused by `skill_id` on a mob from `now` until `until`,
     /// replacing any it has, save the ones a boss shrugs off and those its
     /// element wards off. Returns those it got.
@@ -830,6 +870,17 @@ impl MobSet {
                 RESPAWN_DELAY
             };
             spawn.next_spawn = Some(now + delay);
+        }
+        if !mob.info.revive.is_empty() {
+            self.revivals.push(Revival {
+                at: now + Duration::from_millis(mob.info.dying_ms.max(0) as u64),
+                mob_ids: mob.info.revive.clone(),
+                x: mob.x,
+                y: mob.y,
+                stance: mob.stance,
+                foothold: mob.foothold,
+                controller: mob.controller,
+            });
         }
         Some(Err(Kill {
             object_id,
@@ -1256,6 +1307,40 @@ mod tests {
             panic!("the snail should die");
         };
         assert_eq!((kill.exp, kill.showdown), (3, 0));
+    }
+
+    #[test]
+    fn a_dead_mob_lets_its_revive_out_once_done_dying() {
+        let now = Instant::now();
+        let (template, mut info) = snail_spawn(100);
+        info.revive = vec![100101, 100101];
+        info.dying_ms = 600;
+        let mut mobs = MobSet::new([(template, info)]);
+        let parent = mobs.respawn(now)[0];
+        mobs.live.get_mut(&parent).unwrap().controller = Some(1);
+        let blue = |mob_id| {
+            Some(MobInfo {
+                mob_id,
+                max_hp: 15,
+                ..MobInfo::default()
+            })
+        };
+        assert!(mobs.damage(1, parent, 8, now).unwrap().is_err());
+        // Its controller leaves while it dies: the next one gets them.
+        mobs.release(1, Some(2));
+        assert!(mobs
+            .revive(now + Duration::from_millis(599), blue)
+            .is_empty());
+        let revived = mobs.revive(now + Duration::from_millis(600), blue);
+        assert_eq!(revived.len(), 2);
+        for object_id in revived {
+            let mob = mobs.get(object_id).unwrap();
+            assert_eq!(
+                (mob.info.mob_id, (mob.x, mob.y), mob.spawn, mob.controller),
+                (100101, (100, -25), None, Some(2))
+            );
+        }
+        assert!(mobs.revive(now + Duration::from_secs(5), blue).is_empty());
     }
 
     #[test]

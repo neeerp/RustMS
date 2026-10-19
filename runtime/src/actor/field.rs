@@ -152,8 +152,8 @@ impl FieldActor {
         }
     }
 
-    /// Advance time-driven field state: drop expiry and mob and reactor
-    /// respawns.
+    /// Advance time-driven field state: drop expiry, mobs coming out of
+    /// dead ones, and mob and reactor respawns.
     fn on_tick(&mut self, now: Instant) {
         self.run_trips();
         for object_id in self.drops.expire(now) {
@@ -198,6 +198,17 @@ impl FieldActor {
         for (object_id, lost) in self.mobs.expire_statuses(now) {
             if let Ok(packet) = build_mob_stat_reset(object_id, &lost) {
                 self.broadcast(None, packet);
+            }
+        }
+        for object_id in self.mobs.revive(now, net::mobs::info) {
+            let Some(mob) = self.mobs.get(object_id) else {
+                continue;
+            };
+            if let Ok(packet) = build_spawn_mob(&mob.view(true)) {
+                self.broadcast(None, packet);
+            }
+            if let Some(controller) = mob.controller {
+                self.send_control(controller, &[object_id]);
             }
         }
         let spawned = self.mobs.respawn(now);

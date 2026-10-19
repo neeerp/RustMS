@@ -11,6 +11,12 @@ templates from `Mob.nx` (`maxHP`, `exp`, `PADamage`, `bodyAttack`,
   when the field starts. A killed mob comes back after `mobTime` seconds, at
   least 7 s, on the field's 100 ms tick, with a new object id (mobs and drops
   each have a range in `actor::object_ids`). Joining players get SPAWN_MONSTER for every live mob.
+- **Revive:** a mob with `info/revive` (the Blue Perfume bottle, Yeti and
+  Pepe, ...) lets those mobs out where it died once its `die1` animation is
+  over (`MobInfo::dying_ms`, 500 ms without one), as Cosmic does. They fade
+  in, facing its way, under its last controller, and never respawn. v83's
+  SPAWN_MONSTER also has a -3 appearance that ties the new mob to the dying
+  one, but by then the server has removed it, so they use -2.
 - **Control:** one player moves each mob (SPAWN_MONSTER_CONTROL 1). New
   mobs and joiners pick up uncontrolled mobs; leaving hands them to another
   occupant. MOVE_LIFE from the controller updates the position, answers

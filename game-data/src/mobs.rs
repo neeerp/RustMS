@@ -45,6 +45,11 @@ pub struct MobInfo {
     pub skills: Vec<MobSkillEntry>,
     /// Where its Banish sends players (`ban`).
     pub banish: Option<Banish>,
+    /// The mobs that come out of it where it dies (`revive`), in order.
+    pub revive: Vec<i32>,
+    /// How long it takes to die, in ms: its `die1` frames' delays (100 for
+    /// one without), or 500 without any, as Cosmic has it.
+    pub dying_ms: i32,
 }
 
 /// Where a mob's Banish sends players (`ban/banMap/0`), and what it tells
@@ -160,7 +165,33 @@ impl MobData {
             attacks: self.attacks(image)?,
             skills: self.skills(info)?,
             banish: self.banish(info)?,
+            revive: self.revive(info)?,
+            dying_ms: self.dying_ms(image)?,
         }))
+    }
+
+    fn revive(&self, info: u32) -> Result<Vec<i32>, GameDataError> {
+        let nx = &self.nx;
+        let mut revive = Vec::new();
+        if let Some(list) = nx.child_by_name(info, "revive")? {
+            while let Some(mob_id) = nx.int_child(list, &revive.len().to_string())? {
+                revive.push(mob_id);
+            }
+        }
+        Ok(revive)
+    }
+
+    fn dying_ms(&self, image: u32) -> Result<i32, GameDataError> {
+        let nx = &self.nx;
+        let Some(die) = nx.child_by_name(image, "die1")? else {
+            return Ok(500);
+        };
+        let (mut frames, mut total) = (0, 0);
+        while let Some(frame) = nx.child_by_name(die, &frames.to_string())? {
+            total += nx.int_child(frame, "delay")?.unwrap_or(100);
+            frames += 1;
+        }
+        Ok(if frames == 0 { 500 } else { total })
     }
 
     fn banish(&self, info: u32) -> Result<Option<Banish>, GameDataError> {
@@ -323,6 +354,25 @@ mod tests {
         assert!(!cherry.attacks.is_empty());
         // Nothing but a link: a Wild Boar.
         assert_eq!(mob(9501016).max_hp, mob(2230102).max_hp);
+    }
+
+    #[test]
+    fn reads_what_comes_out_of_a_dying_mob() {
+        let Some(path) = crate::test_assets::path("Mob.nx") else {
+            return;
+        };
+        let data = MobData::load(path).unwrap();
+        let mob = |id| data.info(id).unwrap().unwrap();
+        // Yeti and Pepe fall apart into a Yeti and a Pepe once its five
+        // 120 ms frames of dying are over.
+        let pair = mob(7130102);
+        assert_eq!(
+            (pair.revive.as_slice(), pair.dying_ms),
+            (&[6300002, 6130102][..], 600)
+        );
+        let snail = mob(100100);
+        assert!(snail.revive.is_empty());
+        assert!(snail.dying_ms > 0);
     }
 
     #[test]
