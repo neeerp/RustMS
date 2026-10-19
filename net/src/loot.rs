@@ -5,6 +5,8 @@
 use game::{Item, Player, QuestState};
 use game_data::server_content::RewardEntry;
 use rand::Rng;
+use std::collections::HashMap;
+use std::sync::OnceLock;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Loot {
@@ -66,7 +68,8 @@ fn roll_at(entries: &[RewardEntry], rate: f64, player: &Player, rng: &mut impl R
     for entry in entries {
         // Quest drops only while the quest is started and the player holds
         // fewer than it needs.
-        if let Some(quest) = entry.quest {
+        let quest = entry.quest.or_else(|| entry.item.and_then(quest_for));
+        if let Some(quest) = quest {
             if player.quests.state(quest) != QuestState::Started {
                 continue;
             }
@@ -96,11 +99,38 @@ fn roll_at(entries: &[RewardEntry], rate: f64, player: &Player, rng: &mut impl R
             loot.push(Loot::Item {
                 item_id,
                 quantity,
-                quest: entry.quest,
+                quest,
             });
         }
     }
     loot
+}
+
+/// The quest a quest item (`info/quest`) the drop table doesn't tag drops
+/// for: the one quest whose completion check asks for it.
+fn quest_for(item: i32) -> Option<i16> {
+    static ASKED_BY: OnceLock<HashMap<i32, Option<i16>>> = OnceLock::new();
+    let asked_by = ASKED_BY.get_or_init(|| {
+        let mut asked_by = HashMap::new();
+        let Ok(catalog) = crate::quests::catalog() else {
+            return asked_by;
+        };
+        for quest in catalog.supported() {
+            for &(item, count) in &quest.end_items {
+                if count > 0 {
+                    asked_by
+                        .entry(item)
+                        .and_modify(|only: &mut Option<i16>| *only = None)
+                        .or_insert(Some(quest.id));
+                }
+            }
+        }
+        asked_by
+    });
+    if !crate::items::info(item).is_some_and(|info| info.quest) {
+        return None;
+    }
+    asked_by.get(&item).copied().flatten()
 }
 
 /// How many of `item` completing `quest` takes: any number when the quest
@@ -178,6 +208,33 @@ mod tests {
             .add(game::Item::stack(4031792, 1), 100)
             .unwrap();
         assert!(roll_entries(&drop, &player, &mut rng).is_empty());
+    }
+
+    #[test]
+    fn untagged_quest_items_drop_for_their_quest() {
+        let mut rng = rand::rngs::StdRng::seed_from_u64(5);
+        // 4031792 is a quest item that only quest 1034 asks for.
+        let drop = [entry(Some(4031792), None, 1.0, None)];
+        let mut player = crate::codec::stats::sample_player();
+        assert!(roll_entries(&drop, &player, &mut rng).is_empty());
+        player.quests.upsert(QuestRecord {
+            quest_id: 1034,
+            status: QuestStatus::Started { kills: Vec::new() },
+        });
+        assert_eq!(
+            roll_entries(&drop, &player, &mut rng),
+            [Loot::Item {
+                item_id: 4031792,
+                quantity: 1,
+                quest: Some(1034)
+            }]
+        );
+        // An ordinary item a quest asks for (Blue Snail Shell, quest 1007)
+        // drops for everyone.
+        assert_eq!(
+            roll_entries(&[entry(Some(4000000), None, 1.0, None)], &player, &mut rng).len(),
+            1
+        );
     }
 
     #[test]
