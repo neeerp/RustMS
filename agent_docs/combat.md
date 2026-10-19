@@ -333,7 +333,9 @@ When a mob dies, each player who earned EXP from it rolls their own drops
 (`net::loot::roll`) from the content pack's table plus the committed v83
 overrides (`game-data/reward_overrides.toml`): each entry rolls its `prob`,
 mesos vary by ±25%, items take `min`..`max`. Quest-only entries roll only
-while that quest is started and the player doesn't hold the item yet. Without
+while that quest is started and the player holds fewer than its completion
+check (`Check.img/<quest>/1/item`) asks for, or any number if the check
+doesn't name the item. Without
 a content pack, mobs drop only the overrides. The client actor rolls (it has
 the player's quests) and asks the field to place the loot.
 

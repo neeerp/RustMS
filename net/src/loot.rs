@@ -64,15 +64,15 @@ pub fn roll_entries(entries: &[RewardEntry], player: &Player, rng: &mut impl Rng
 fn roll_at(entries: &[RewardEntry], rate: f64, player: &Player, rng: &mut impl Rng) -> Vec<Loot> {
     let mut loot = Vec::new();
     for entry in entries {
-        // Quest drops only while the quest is started and the item is still
-        // needed (one of each is enough for the beginner quests).
+        // Quest drops only while the quest is started and the player holds
+        // fewer than it needs.
         if let Some(quest) = entry.quest {
             if player.quests.state(quest) != QuestState::Started {
                 continue;
             }
             if entry
                 .item
-                .is_some_and(|item| player.inventory.count(item) > 0)
+                .is_some_and(|item| player.inventory.count(item) >= needed(quest, item))
             {
                 continue;
             }
@@ -101,6 +101,16 @@ fn roll_at(entries: &[RewardEntry], rate: f64, player: &Player, rng: &mut impl R
         }
     }
     loot
+}
+
+/// How many of `item` completing `quest` takes: any number when the quest
+/// doesn't ask for it.
+fn needed(quest: i16, item: i32) -> i32 {
+    crate::quests::catalog()
+        .ok()
+        .and_then(|catalog| catalog.quest(quest))
+        .and_then(|quest| quest.end_items.iter().find(|(id, _)| *id == item))
+        .map_or(i32::MAX, |&(_, count)| count)
 }
 
 #[cfg(test)]
@@ -144,6 +154,30 @@ mod tests {
             .add(game::Item::stack(4031802, 1), 100)
             .unwrap();
         assert!(roll_entries(&shellpiece, &player, &mut rng).is_empty());
+    }
+
+    #[test]
+    fn quest_drops_continue_until_the_quest_has_enough() {
+        let mut rng = rand::rngs::StdRng::seed_from_u64(4);
+        // Quest 1034 needs ten of item 4031792.
+        let quest = crate::quests::catalog().unwrap().quest(1034).unwrap();
+        assert!(quest.end_items.contains(&(4031792, 10)));
+        let drop = [entry(Some(4031792), None, 1.0, Some(1034))];
+        let mut player = crate::codec::stats::sample_player();
+        player.quests.upsert(QuestRecord {
+            quest_id: 1034,
+            status: QuestStatus::Started { kills: Vec::new() },
+        });
+        player
+            .inventory
+            .add(game::Item::stack(4031792, 9), 100)
+            .unwrap();
+        assert_eq!(roll_entries(&drop, &player, &mut rng).len(), 1);
+        player
+            .inventory
+            .add(game::Item::stack(4031792, 1), 100)
+            .unwrap();
+        assert!(roll_entries(&drop, &player, &mut rng).is_empty());
     }
 
     #[test]
