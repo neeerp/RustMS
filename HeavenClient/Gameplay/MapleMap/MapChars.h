@@ -69,6 +69,9 @@ namespace ms
 		// The bar's top is this far above a member's feet, as in period footage.
 		static constexpr int16_t PARTY_HP_RISE = 84;
 
+		// Add the characters spawned since, so packets that follow a spawn find them as v83's do.
+		void add_spawns();
+
 		MapObjects chars;
 		MobHpBar party_hpbar;
 
