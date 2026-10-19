@@ -53,6 +53,21 @@ int main()
 		require(PAYMENTS[default_payment(1000, 0, 1000, 0)] == MAPLE_POINTS, "Maple Points cover it exactly");
 		require(PAYMENTS[default_payment(1000, 0, 0, 0)] == PREPAID, "nothing covers it");
 
+		require(affordable(4000, 0, 4000, 0) && !affordable(4000, 3999, 3999, 3999), "any balance covering the price will do");
+
+		require(advancement_slots(0, 1, 88, 4) == 0 && advancement_slots(0, 1, 92, 4) == 4,
+			"a beginner keeps four Equip slots for an advancement");
+		require(advancement_slots(0, 2, 84, 4) == 0 && advancement_slots(0, 4, 88, 4) == 8 && advancement_slots(0, 3, 92, 4) == 0,
+			"and eight Use and Etc slots");
+		require(advancement_slots(0, 2, 84, 8) == 8, "an expansion commodity adds eight");
+		require(advancement_slots(100, 4, 92, 4) == 4 && advancement_slots(110, 2, 92, 4) == 4 && advancement_slots(100, 1, 92, 4) == 0,
+			"warriors keep four Use and Etc slots");
+		require(advancement_slots(111, 4, 92, 4) == 0, "third jobs aren't asked");
+		require(advancement_slots(200, 4, 92, 4) == 4 && advancement_slots(300, 2, 92, 4) == 0, "magicians and bowmen keep Etc slots");
+		require(advancement_slots(400, 2, 92, 4) == 4 && advancement_slots(400, 4, 92, 4) == 0, "thieves keep Use slots");
+		require(advancement_slots(500, 2, 92, 4) == 4 && advancement_slots(1100, 4, 92, 4) == 4, "pirates and Cygnus warriors as warriors");
+		require(advancement_slots(900, 2, 92, 4) == 0, "GMs aren't asked");
+
 		require(page_count(0) == 1 && page_count(10) == 1 && page_count(11) == 2, "ten items to a page");
 
 		std::cout << "Cash catalog passed\n";

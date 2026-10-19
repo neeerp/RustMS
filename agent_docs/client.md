@@ -638,6 +638,17 @@ the screen size.
   or 0x07 mode 0. On 0x60 the bag's slot count changes at once. For 0x60 and
   0x62 the notice says "You have added slots to your item inventory.", as in
   v83.
+- **Slot checks:** as in v83 (`FUN_0046c036`, `FUN_0046c55b`,
+  `FUN_00470653`), a slot purchase needs some balance that covers the price,
+  or it says "You don't have enough cash." first. A bag that would pass 96
+  slots says "The requested number of slots can't be added." after OK. The
+  storage, whose count comes from 0x4B and 0x62, stops at 48 and says "The
+  storage slots can't be extended.", before the dialog for Stor. Slot. A bag
+  that the player's next job advancement would widen past 96 asks first
+  whether to buy anyway (`FUN_0046c38f`): four Equip, or eight Use or Etc,
+  slots for a beginner, and four of the job's bags for a first or second job.
+  v83's slot buttons show a text-only dialog where HC shows the item, and
+  HC has no character-slot button.
 - **Item data:** packages and expansions take their name and icon from
   `Item.nx` `Special`, pets from `Item.nx` `Pet`, and pet equipment from
   `Character.nx` `PetEquip`.

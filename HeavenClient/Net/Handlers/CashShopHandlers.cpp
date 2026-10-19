@@ -240,7 +240,7 @@ namespace ms
 			for (int16_t i = 0; i < count; i++)
 				items.push_back(read_cash_item(recv));
 
-			recv.skip_short();	// storage slots; there is no storage window yet
+			cashshop->set_storage_slots(recv.read_short());
 			recv.skip_short();	// character slots
 
 			cashshop->set_cash_items(items);
@@ -317,7 +317,7 @@ namespace ms
 		case 0x62:
 			// The storage has more slots; the balance follows. v83 says
 			// the same as for a bag.
-			recv.skip_short();
+			cashshop->set_storage_slots(recv.read_short());
 			UI::get().emplace<UIOk>("You have added slots to your item inventory.", [](bool) {});
 			break;
 		case 0x5E:

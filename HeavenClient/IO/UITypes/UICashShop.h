@@ -76,6 +76,8 @@ namespace ms
 		void add_cash_items(const std::vector<CashItem>& items);
 		// A bag gained slots.
 		void refresh_slots();
+		void set_storage_slots(int16_t slots);
+		int16_t get_storage_slots() const;
 		void remove_cash_item(int64_t cash_id);
 		void set_wish_list(const std::vector<int32_t>& sns);
 
@@ -176,6 +178,7 @@ namespace ms
 		int32_t points;
 		int32_t prepaid;
 		bool pending;
+		int16_t storage_slots;
 
 		std::vector<CashItem> cash_items;
 		Slider cash_slider;

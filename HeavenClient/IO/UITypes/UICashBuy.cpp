@@ -17,6 +17,7 @@
 //////////////////////////////////////////////////////////////////////////////////
 #include "UICashBuy.h"
 #include "UICashShop.h"
+#include "UINotice.h"
 
 #include "../KeyAction.h"
 #include "../UI.h"
@@ -25,6 +26,7 @@
 
 #include "../../Constants.h"
 #include "../../Data/ItemData.h"
+#include "../../Gameplay/Stage.h"
 #include "../../Util/NxFiles.h"
 
 #include "../../Net/Packets/GameplayPackets.h"
@@ -65,6 +67,80 @@ namespace ms
 		{
 			return static_cast<InventoryType::Id>(item_id / 1000 % 10);
 		}
+
+		// StringPool 0x217, 0x1eb, 0x1ec and 0x11b0.
+		constexpr const char* NOT_ENOUGH_CASH = "You don't have enough cash.";
+		constexpr const char* BAG_FULL = "The requested number of slots\\ncan't be added.";
+		constexpr const char* STORAGE_FULL = "The storage slots can't be extended.";
+
+		std::string advancement_question(int32_t slots)
+		{
+			return "You can expand " + std::to_string(slots) + " slots when\\nyou change occupations.\\nWould you really like to\\nexpand now even at a cost?";
+		}
+
+		// A slot button adds four slots, a commodity its item's delta.
+		int32_t added_slots(const Commodity& commodity)
+		{
+			if (commodity.sn == 0)
+				return EXPANSION_SLOTS;
+
+			return static_cast<int32_t>(nl::nx::item["Special"]["0911.img"][std::to_string(commodity.item_id)]["delta"].get_integer());
+		}
+
+		int32_t storage_slots()
+		{
+			auto cashshop = UI::get().get_element<UICashShop>();
+
+			return cashshop ? cashshop->get_storage_slots() : 0;
+		}
+
+		// Whether the bag or the storage an expansion widens has room for it.
+		bool has_room(const Commodity& commodity)
+		{
+			InventoryType::Id bag = expanded(commodity.item_id);
+			int32_t added = added_slots(commodity);
+
+			if (bag == InventoryType::Id::NONE)
+				return storage_slots() + added <= MAX_STORAGE_SLOTS;
+
+			return Stage::get().get_player().get_inventory().get_slotmax(bag) + added <= MAX_BAG_SLOTS;
+		}
+
+		void notice(const char* text)
+		{
+			UI::get().emplace<UIOk>(text, [](bool) {});
+		}
+	}
+
+	void UICashBuy::open(const Commodity& commodity, int32_t credit, int32_t points, int32_t prepaid)
+	{
+		auto buy = [=]() { UI::get().emplace<UICashBuy>(commodity, credit, points, prepaid); };
+
+		if (!is_expansion(commodity.item_id))
+			return buy();
+
+		// v83 46c036, 46c55b and 470653; the dialog checks the bags' room.
+		if (commodity.price > 0 && !affordable(commodity.price, credit, points, prepaid))
+			return notice(NOT_ENOUGH_CASH);
+
+		InventoryType::Id bag = expanded(commodity.item_id);
+
+		if (bag == InventoryType::Id::NONE)
+		{
+			if (commodity.sn == 0 && !has_room(commodity))
+				return notice(STORAGE_FULL);
+
+			return buy();
+		}
+
+		const Player& player = Stage::get().get_player();
+		int32_t job = player.get_stats().get_job().get_id();
+		int32_t slots = player.get_inventory().get_slotmax(bag);
+
+		if (int32_t later = advancement_slots(job, bag, slots, added_slots(commodity)))
+			UI::get().emplace<UIYesNo>(advancement_question(later), [buy](bool yes) { if (yes) buy(); });
+		else
+			buy();
 	}
 
 	UICashBuy::UICashBuy(const Commodity& commodity, int32_t credit, int32_t points, int32_t prepaid) : UIElement(Point<int16_t>(0, 0), Point<int16_t>(0, 0)), sn(commodity.sn), item_id(commodity.item_id), payment(default_payment(commodity.price, credit, points, prepaid))
@@ -167,6 +243,14 @@ namespace ms
 	{
 		CashType cash_type = PAYMENTS[payment];
 		auto cashshop = UI::get().get_element<UICashShop>();
+
+		if (is_expansion(item_id) && !has_room({ sn, item_id }))
+		{
+			deactivate();
+			notice(expanded(item_id) == InventoryType::Id::NONE ? STORAGE_FULL : BAG_FULL);
+
+			return;
+		}
 
 		if (cashshop && cashshop->request())
 		{
