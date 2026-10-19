@@ -31,6 +31,10 @@ pub struct MobInfo {
     pub fixed_damage: i32,
     /// Power Guard sends nothing back at it (`invincible`).
     pub invincible: bool,
+    /// The only skills that hurt it (`damagedBySelectedSkill`), or empty
+    /// for any attack: the pirates' test Octopirates take only Flash Fist
+    /// or Double Shot.
+    pub damaged_by: Vec<i32>,
     /// Anyone may pick its drops up at once (`publicReward`).
     pub public_reward: bool,
     /// Its drops fly out wide, anyone's at once (`explosiveReward`).
@@ -130,6 +134,12 @@ impl MobInfo {
             .chunks(2)
             .any(|pair| pair.len() == 2 && pair[0] == letter as u8 && pair[1] == b'1')
     }
+
+    /// Whether an attack with `skill` (0 for a basic attack) can hurt it,
+    /// as v83's FUN_0068146c judges before zeroing a hit.
+    pub fn hurt_by(&self, skill: i32) -> bool {
+        self.damaged_by.is_empty() || self.damaged_by.contains(&skill)
+    }
 }
 
 pub struct MobData {
@@ -186,6 +196,7 @@ impl MobData {
             undead: int("undead")? != 0,
             fixed_damage: int("fixedDamage")?,
             invincible: int("invincible")? != 0,
+            damaged_by: self.damaged_by(info)?,
             public_reward: int("publicReward")? != 0,
             explosive_reward: int("explosiveReward")? != 0,
             element: nx.string_child(info, "elemAttr")?.unwrap_or_default(),
@@ -209,6 +220,17 @@ impl MobData {
             hp: nx.int_child(node, "hp")?.unwrap_or(-1),
             remove_after: nx.int_child(node, "removeAfter")?.unwrap_or(0),
         }))
+    }
+
+    fn damaged_by(&self, info: u32) -> Result<Vec<i32>, GameDataError> {
+        let nx = &self.nx;
+        let mut skills = Vec::new();
+        if let Some(list) = nx.child_by_name(info, "damagedBySelectedSkill")? {
+            while let Some(skill) = nx.int_child(list, &skills.len().to_string())? {
+                skills.push(skill);
+            }
+        }
+        Ok(skills)
     }
 
     fn revive(&self, info: u32) -> Result<Vec<i32>, GameDataError> {
@@ -338,7 +360,7 @@ mod tests {
     }
 
     #[test]
-    fn reads_elements_fixed_damage_and_invincible() {
+    fn reads_elements_fixed_damage_and_who_can_hurt_it() {
         let Some(path) = crate::test_assets::path("Mob.nx") else {
             return;
         };
@@ -353,6 +375,11 @@ mod tests {
         assert_eq!(mob(100100).fixed_damage, 0);
         assert!(mob(9300295).invincible);
         assert!(!mob(100100).invincible);
+        // Kyrin's test Octopirates.
+        assert_eq!(mob(9001006).damaged_by, [5001001]);
+        assert_eq!(mob(9001005).damaged_by, [5001003]);
+        assert!(mob(9001006).hurt_by(5001001) && !mob(9001006).hurt_by(0));
+        assert!(mob(100100).hurt_by(0));
         // Bergamot's drops are anyone's; Mano's in Mu Lung Dojo fly out.
         assert!(mob(7220003).public_reward && !mob(7220003).explosive_reward);
         assert!(mob(9300184).explosive_reward);

@@ -542,6 +542,9 @@ namespace ms
 		int32_t maxhp;
 		// Power Guard sends nothing back at it.
 		bool invincible;
+		// The only skills that hurt it (damagedBySelectedSkill), or none
+		// for any attack.
+		std::vector<int32_t> damagedby;
 		// How wide the mob first stands, for how near Monster Magnet pulls
 		// it (0x66486e).
 		int16_t standwidth;

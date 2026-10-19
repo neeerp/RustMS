@@ -848,7 +848,8 @@ impl MobSet {
     }
 
     /// Each second a mob has a status that hurts it, it loses the status's
-    /// value in HP (its `fixedDamage` instead, if it has one), as its
+    /// value in HP (its `fixedDamage` instead, if it has one, and nothing if
+    /// the status's skill can't hurt it), as its
     /// clients show, but never its last HP (inferred, as OdinMS-family
     /// servers do). The damage counts as the player's who put it on.
     pub fn hurt_by_statuses(&mut self, now: Instant) -> Vec<Hurt> {
@@ -859,6 +860,11 @@ impl MobSet {
                     continue;
                 }
                 status.next_hurt += HURT_INTERVAL;
+                // Only its skills hurt a mob that only some skills hurt
+                // (v83 FUN_006675a8).
+                if !mob.info.hurt_by(status.skill_id) {
+                    continue;
+                }
                 let damage = if mob.info.fixed_damage > 0 {
                     i64::from(mob.info.fixed_damage)
                 } else {
@@ -1586,6 +1592,11 @@ mod tests {
         mobs.live.get_mut(&snail).unwrap().hp = 8;
         mobs.live.get_mut(&snail).unwrap().info.fixed_damage = 1;
         mobs.hurt_by_statuses(second + HURT_INTERVAL * 4);
+        assert_eq!(mobs.get(snail).unwrap().hp, 7);
+
+        // One that only other skills hurt loses nothing.
+        mobs.live.get_mut(&snail).unwrap().info.damaged_by = vec![5001001];
+        assert!(mobs.hurt_by_statuses(second + HURT_INTERVAL * 5).is_empty());
         assert_eq!(mobs.get(snail).unwrap().hp, 7);
     }
 

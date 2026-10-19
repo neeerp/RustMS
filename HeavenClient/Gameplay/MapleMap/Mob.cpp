@@ -88,6 +88,9 @@ namespace ms
 		maxhp = info["maxHP"];
 		invincible = info["invincible"].get_bool();
 
+		for (nl::node skill : info["damagedBySelectedSkill"])
+			damagedby.push_back(skill.get_integer());
+
 		if (canfly)
 		{
 			animations[Stance::STAND] = src["fly"];
@@ -425,7 +428,7 @@ namespace ms
 
 		if (!dying)
 		{
-			for (int32_t number : hurts.update(statuses, fixeddamage, Constants::TIMESTEP))
+			for (int32_t number : hurts.update(statuses, fixeddamage, Constants::TIMESTEP, damagedby))
 				hurtnumbers.push_back(number);
 		}
 
@@ -2109,6 +2112,11 @@ namespace ms
 		Attack::DamageType damagetype = attack.damagetype;
 
 		std::vector<std::pair<int32_t, bool>> result(attack.hitcount);
+
+		// Any other attack misses a mob that only some skills hurt, as
+		// Kyrin's test Octopirates.
+		if (!MobHurts::hurt_by(damagedby, attack.skill))
+			return result;
 
 		// A spell rolls by v83's own formula, and never crits.
 		if (damagetype == Attack::DamageType::DMG_MAGIC)

@@ -156,6 +156,7 @@ impl WorldHandler for AttackHandler {
             projectile = ammo.item_id;
         }
         let broadcast = combat::build_attack(ctx.player.id(), &attack, skill_level, projectile)?;
+        let skill = attack.skill;
         let hits = attack
             .hits
             .into_iter()
@@ -173,6 +174,7 @@ impl WorldHandler for AttackHandler {
         };
         result = result.with(WorldAction::Field(FieldRequest::Attack {
             broadcast,
+            skill,
             counter,
             hits,
             inflicts,
