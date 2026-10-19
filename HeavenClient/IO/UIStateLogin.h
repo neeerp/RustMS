@@ -65,7 +65,7 @@ namespace ms
 		void show_equip(Tooltip::Parent, int16_t) override
 		{}
 
-		void show_item(Tooltip::Parent, int32_t) override
+		void show_item(Tooltip::Parent, int32_t, int64_t, int16_t) override
 		{}
 
 		void show_skill(Tooltip::Parent, int32_t, int32_t, int32_t, int64_t, bool) override

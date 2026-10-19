@@ -18,6 +18,7 @@
 #include "EquipTooltip.h"
 
 #include "../../Character/Inventory/Equip.h"
+#include "../../Character/Inventory/ItemExpiry.h"
 #include "../../Data/WeaponData.h"
 #include "../../Gameplay/Stage.h"
 #include "../../Util/NxFiles.h"
@@ -47,6 +48,11 @@ namespace ms
 		constexpr int16_t VALUE_GAP = 4;
 		constexpr int16_t DESC_X = 8;
 		constexpr int16_t DESC_WIDTH = 220;
+		// The expiry line under the name, after a dot like the stat lines'. Everything under it moves down
+		// (FUN_008e8252).
+		const Point<int16_t> EXPIRY_DOT = { 10, 33 };
+		const Point<int16_t> EXPIRY_POS = { 16, 22 };
+		constexpr int16_t EXPIRY_HEIGHT = 16;
 
 		constexpr const char *JOB_NAMES[] = { "beginner", "warrior", "magician", "bowman", "thief", "pirate" };
 
@@ -216,6 +222,11 @@ namespace ms
 		name = Text(Text::Font::A12B, Text::Alignment::LEFT, equip.get_level() > 0 ? Color::Name::CORNFLOWERBLUE : Color::Name::WHITE, namestr);
 		itemicon = itemdata.get_icon(false);
 
+		// Equips bought in the Cash Shop keep its serial.
+		bool cash = player.get_inventory().get_cash_id(invtype, invpos) != 0;
+		std::string expirystr = item_expiry::line(equip.get_expiration(), cash, equip.get_flags() & item_expiry::SEALED);
+		expiry = expirystr.empty() ? Text() : Text(Text::Font::A11M, Text::Alignment::LEFT, Color::Name::WHITE, expirystr);
+
 		for (MapleStat::Id ms : requirements)
 		{
 			int16_t req = equipdata.get_reqstat(ms);
@@ -273,6 +284,9 @@ namespace ms
 
 		int16_t height = STATS_TOP + STAT_STEP * static_cast<int16_t>(stats.size());
 
+		if (!expiry.empty())
+			height += EXPIRY_HEIGHT;
+
 		std::string descstr = itemdata.get_desc();
 
 		if (descstr.empty())
@@ -297,6 +311,14 @@ namespace ms
 
 		icon.draw_dot(pos + tooltip::DOT_POS);
 		name.draw(pos + tooltip::NAME_POS);
+
+		if (!expiry.empty())
+		{
+			stat_dot.draw(pos + EXPIRY_DOT);
+			expiry.draw(pos + EXPIRY_POS);
+			pos.shift_y(EXPIRY_HEIGHT);
+		}
+
 		icon.draw(itemicon, pos + tooltip::ICON_POS);
 
 		for (size_t i = 0; i < requirements.size(); i++)

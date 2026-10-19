@@ -1169,7 +1169,12 @@ namespace ms
 		} else
 		{
 			int32_t item_id = inventory.get_item_id(tab, slot);
-			UI::get().show_item(Tooltip::Parent::ITEMINVENTORY, item_id);
+			auto item = inventory.get_item(tab, slot);
+
+			if (item)
+				UI::get().show_item(Tooltip::Parent::ITEMINVENTORY, item_id, item->get_expiration(), item->get_flags());
+			else
+				UI::get().show_item(Tooltip::Parent::ITEMINVENTORY, item_id);
 		}
 	}
 

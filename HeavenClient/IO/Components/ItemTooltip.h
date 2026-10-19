@@ -35,10 +35,13 @@ namespace ms
 
 		void draw(Point<int16_t> position) const override;
 
-		bool set_item(int32_t itemid);
+		// An item in the inventory also has its expiry and flags.
+		bool set_item(int32_t itemid, int64_t expiration = 0, int16_t flags = 0);
 
 	private:
 		int32_t itemid;
+		int64_t expiration;
+		int16_t flags;
 		Point<int16_t> size;
 
 		TooltipBox box;
@@ -47,6 +50,8 @@ namespace ms
 		Texture itemicon;
 		Text name;
 		Text qual;
+		Texture expiry_dot;
+		Text expiry;
 		Text desc;
 	};
 }

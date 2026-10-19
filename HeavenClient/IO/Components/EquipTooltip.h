@@ -65,6 +65,7 @@ namespace ms
 		Texture stat_dot;
 
 		Text name;
+		Text expiry;
 		Texture itemicon;
 
 		std::vector<MapleStat::Id> requirements;

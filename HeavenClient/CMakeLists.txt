@@ -228,6 +228,8 @@ if(HEAVENCLIENT_BUILD_TESTS)
     add_test(NAME ap_reset_rules COMMAND ap_reset_rules_tests)
     add_executable(sp_reset_rules_tests tests/sp_reset_rules.cpp)
     add_test(NAME sp_reset_rules COMMAND sp_reset_rules_tests)
+    add_executable(item_expiry_tests tests/item_expiry.cpp)
+    add_test(NAME item_expiry COMMAND item_expiry_tests)
     add_executable(obj_state_rules_tests tests/obj_state_rules.cpp)
     target_include_directories(obj_state_rules_tests PRIVATE
         ${PROJECT_SOURCE_DIR}/libs/NoLifeNx ${PROJECT_SOURCE_DIR}/libs/glad/build/include)
@@ -322,6 +324,7 @@ add_executable(HeavenClient
     Character/Inventory/InventoryType.h
     Character/Inventory/Item.cpp
     Character/Inventory/Item.h
+    Character/Inventory/ItemExpiry.h
     Character/Inventory/Pet.cpp
     Character/Inventory/Pet.h
     Character/Inventory/Weapon.cpp

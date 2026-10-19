@@ -457,6 +457,21 @@ namespace ms
 		return equip_iter->second;
 	}
 
+	Optional<const Item> Inventory::get_item(InventoryType::Id type, int16_t slot) const
+	{
+		auto slot_iter = inventories[type].find(slot);
+
+		if (slot_iter == inventories[type].end())
+			return {};
+
+		auto item_iter = items.find(slot_iter->second.unique_id);
+
+		if (item_iter == items.end())
+			return {};
+
+		return item_iter->second;
+	}
+
 	Inventory::Movement Inventory::movementbyvalue(int8_t value)
 	{
 		if (value >= Inventory::Movement::MOVE_INTERNAL && value <= Inventory::Movement::MOVE_EQUIP)

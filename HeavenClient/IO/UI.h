@@ -97,7 +97,8 @@ namespace ms
 
 		void show_equip(Tooltip::Parent parent, int16_t slot);
 
-		void show_item(Tooltip::Parent parent, int32_t item_id);
+		// An item in the inventory also has its expiry and flags.
+		void show_item(Tooltip::Parent parent, int32_t item_id, int64_t expiration = 0, int16_t flags = 0);
 
 		void
 		show_skill(Tooltip::Parent parent, int32_t skill_id, int32_t level, int32_t masterlevel, int64_t expiration,

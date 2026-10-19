@@ -24,4 +24,14 @@ namespace ms
 																							   owner(owner),
 																							   flags(flags)
 	{}
+
+	int64_t Item::get_expiration() const
+	{
+		return expiration;
+	}
+
+	int16_t Item::get_flags() const
+	{
+		return flags;
+	}
 }

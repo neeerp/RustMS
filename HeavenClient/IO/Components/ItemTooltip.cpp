@@ -17,7 +17,9 @@
 //////////////////////////////////////////////////////////////////////////////////
 #include "ItemTooltip.h"
 
+#include "../Character/Inventory/ItemExpiry.h"
 #include "../Data/ItemData.h"
+#include "../Util/NxFiles.h"
 
 #include <algorithm>
 
@@ -30,19 +32,29 @@ namespace ms
 		constexpr int16_t QUAL_Y = 25;
 		const Point<int16_t> DESC_POS = { 91, 29 };
 		constexpr int16_t DESC_WIDTH = 186;
+		// The expiry line's bullet, with the text level with it (FUN_008edfc7). The icon and description move
+		// down to make room.
+		const Point<int16_t> EXPIRY_DOT = { 10, 33 };
+		const Point<int16_t> EXPIRY_POS = { 16, 22 };
+		constexpr int16_t EXPIRY_HEIGHT = 20;
 	}
 
-	ItemTooltip::ItemTooltip()
+	ItemTooltip::ItemTooltip() :
+		expiry_dot(NxFiles::ui_classic["UIWindow.img"]["ToolTip"]["Equip"]["Dot"]["1"])
 	{
 		itemid = 0;
+		expiration = 0;
+		flags = 0;
 	}
 
-	bool ItemTooltip::set_item(int32_t iid)
+	bool ItemTooltip::set_item(int32_t iid, int64_t expire, int16_t flag)
 	{
-		if (itemid == iid)
+		if (itemid == iid && expiration == expire && flags == flag)
 			return false;
 
 		itemid = iid;
+		expiration = expire;
+		flags = flag;
 
 		if (itemid == 0)
 			return false;
@@ -66,7 +78,10 @@ namespace ms
 		qual = quality.empty() ? Text() : Text(Text::Font::A12M, Text::Alignment::CENTER, Color::Name::ORANGE, quality);
 		desc = Text(Text::Font::A12M, Text::Alignment::LEFT, Color::Name::WHITE, idata.get_desc(), DESC_WIDTH, true, tooltip::LINE_ADJ);
 
-		int16_t top = qual.empty() ? 0 : qual.height();
+		std::string expirystr = item_expiry::line(expiration, idata.is_cashitem(), flags & item_expiry::SEALED);
+		expiry = expirystr.empty() ? Text() : Text(Text::Font::A11M, Text::Alignment::LEFT, Color::Name::WHITE, expirystr);
+
+		int16_t top = (qual.empty() ? 0 : qual.height()) + (expiry.empty() ? 0 : EXPIRY_HEIGHT);
 		int16_t bottom = std::max<int16_t>(tooltip::ICON_POS.y() + tooltip::ICON_BOX, DESC_POS.y() + desc.height());
 		size = Point<int16_t>(WIDTH, top + bottom + tooltip::BOTTOM);
 
@@ -88,6 +103,13 @@ namespace ms
 		{
 			qual.draw(pos + Point<int16_t>(WIDTH / 2, QUAL_Y));
 			pos.shift_y(qual.height());
+		}
+
+		if (!expiry.empty())
+		{
+			expiry_dot.draw(pos + EXPIRY_DOT);
+			expiry.draw(pos + EXPIRY_POS);
+			pos.shift_y(EXPIRY_HEIGHT);
 		}
 
 		icon.draw(itemicon, pos + tooltip::ICON_POS);

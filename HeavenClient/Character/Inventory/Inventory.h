@@ -167,6 +167,9 @@ namespace ms
 		// Return a pointer to an equip
 		Optional<const Equip> get_equip(InventoryType::Id type, int16_t slot) const;
 
+		// The item in a slot of the USE, SETUP, ETC or Cash tab, unless it's a pet.
+		Optional<const Item> get_item(InventoryType::Id type, int16_t slot) const;
+
 	private:
 		// Add an inventory slot and return the unique_id
 		int32_t add_slot(InventoryType::Id type, int16_t slot, int32_t item_id, int16_t count, int64_t cash_id);

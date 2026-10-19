@@ -27,6 +27,10 @@ namespace ms
 	public:
 		Item(int32_t itemid, int64_t expiration, const std::string &owner, int16_t flags);
 
+		int64_t get_expiration() const;
+
+		int16_t get_flags() const;
+
 	private:
 		int32_t item_id;
 		int64_t expiration;

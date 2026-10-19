@@ -568,9 +568,9 @@ namespace ms
 		}
 	}
 
-	void UIStateGame::show_item(Tooltip::Parent parent, int32_t itemid)
+	void UIStateGame::show_item(Tooltip::Parent parent, int32_t itemid, int64_t expiration, int16_t flags)
 	{
-		ittooltip.set_item(itemid);
+		ittooltip.set_item(itemid, expiration, flags);
 
 		if (itemid)
 		{

@@ -69,7 +69,7 @@ namespace ms
 
 		void show_equip(Tooltip::Parent parent, int16_t slot) override;
 
-		void show_item(Tooltip::Parent parent, int32_t itemid) override;
+		void show_item(Tooltip::Parent parent, int32_t itemid, int64_t expiration, int16_t flags) override;
 
 		void show_skill(Tooltip::Parent parent, int32_t skill_id, int32_t level, int32_t masterlevel,
 						int64_t expiration, bool levels) override;
