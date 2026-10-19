@@ -48,7 +48,7 @@ pub use self::cash_shop::{CashShopOperationHandler, CheckCashHandler, EnterCashS
 pub use self::chair::{CancelChairHandler, UseChairHandler};
 pub use self::chalkboard::CloseChalkboardHandler;
 pub use self::change_channel::ChangeChannelHandler;
-pub use self::change_map::{door_warp, warp, ChangeMapHandler, DoorExit};
+pub use self::change_map::{door_warp, warp, warp_to_spawn_point, ChangeMapHandler, DoorExit};
 pub use self::char_info::CharInfoRequestHandler;
 pub use self::chat::AllChatHandler;
 pub use self::combat::{

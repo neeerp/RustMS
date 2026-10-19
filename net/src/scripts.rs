@@ -40,6 +40,8 @@ pub enum Effect {
     StartQuest(i16),
     CompleteQuest(i16),
     Warp(i32),
+    /// To a map's portal by id, rather than its first spawn point.
+    WarpToPortal(i32, u8),
     /// Nothing is applied unless the ship from this platform is boarding
     /// (`conti::State::Wait`); the player may have answered too late.
     RequireBoarding(i32),
@@ -49,6 +51,9 @@ pub enum Effect {
     /// Make a beginner a first-job Explorer (`Player::take_first_job`).
     /// Nothing is applied unless the player still qualifies.
     TakeFirstJob(i16),
+    /// Make a first-job Explorer a second job (`Player::take_second_job`),
+    /// on the same terms.
+    TakeSecondJob(i16),
     /// Add a row of four slots to a bag, up to 96.
     AddSlotRow(InventoryType),
     /// Give the player a new hair (3xxxx), face (2xxxx) or skin (anything

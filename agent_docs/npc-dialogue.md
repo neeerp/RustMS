@@ -60,7 +60,8 @@ applied, and apply nothing if the player no longer has them. Answers are matched
 | `begin5` | Clicking Robin (2003) | 18-topic Q&A menu |
 | `tutorialSkip` | Clicking the Maple Administrator (2007), or the `tutoChatNPC` portal for accounts with a level-30 character | Yes warps to Lith Harbor (104000000). Neither is on the original island, so this is unused |
 | `begin7` | Clicking Shanks (22000) in Southperry | Yes sails to Lith Harbor (104000000) for Lucas's recommendation letter (4031801), at any level, or for 150 mesos from level 7; otherwise he says why not |
-| `fighter`, `magician`, `bowman`, `rogue` | Clicking Dances with Balrog (1022000), Grendel the Really Old (1032001), Athena Pierce (1012100), or the Dark Lord (1052001) | First job advancement: see below |
+| `fighter`, `magician`, `bowman`, `rogue` | Clicking Dances with Balrog (1022000), Grendel the Really Old (1032001), Athena Pierce (1012100), or the Dark Lord (1052001) | First and second job advancement: see below |
+| Job instructors | Clicking an examiner (1072000-1072003) or, inside the test, a proctor (1072004-1072007) | The second job's test: see below |
 | `hair_henesys1` | Clicking Natalie (1012103) in Henesys's hair salon (100000104) | A haircut (5150001) or a dye (5151001) coupon buys one of her styles, picked on a preview of the player; without a coupon she says so and nothing changes |
 
 The four Explorer instructors (`INSTRUCTORS` in `npc_scripts.rs`) make a
@@ -76,8 +77,24 @@ INVENTORY_GROW (`0x1E`: bag type, new slot count) per bag; others on the
 field see the job-change effect (SHOW_FOREIGN_EFFECT 8). The player's own
 client plays it, and the job-change sound, from the job bit of STAT_CHANGED.
 As in v83 (`FUN_00a1fb52`), HeavenClient also opens the Stat window after a
-beginner's first advancement if it isn't open. Pirates (Kyrin) and later
-advancements are not scripted yet.
+beginner's first advancement if it isn't open.
+
+From level 30 the same instructors offer their first jobs the second job,
+following Cosmic's flow. Without the test's proof, the instructor gives a
+letter (4031008-4031011) for the line's examiner, and with the letter only
+says to go. The examiner sends a letter holder to the test map (Warriors
+108000300, Magicians 108000200, Bowmen 108000100, Thieves 108000400). Upstream
+takes the letter there and records the entry in a quest the client data lacks
+(100003 does not fit a quest id), so here the player keeps the letter until
+passing and can come back in with it. The test's proctor trades all of the
+player's Dark Marbles (4031013), once there are 30, and the letter for the
+Proof of a Hero (4031012); passing or not, yes takes the player back to the
+examiner's map at the portal upstream uses (`Effect::WarpToPortal`). With the
+proof, the instructor shows a menu of the line's second jobs; each choice
+describes the job and asks, and yes takes the proof and applies
+`Effect::TakeSecondJob` (`Player::take_second_job`: 1 SP and the job's extra
+max HP or MP) and a row more in the Etc bag. Pirates (Kyrin) and the third
+and fourth jobs are not scripted yet.
 
 Text comes from the [server content pack](./server-content.md) with
 placeholders. HeavenClient expands NPC text markup (`Util/NpcTextMarkup.h`:

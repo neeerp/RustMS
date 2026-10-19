@@ -416,6 +416,26 @@ impl Player {
         self.dirty = true;
     }
 
+    /// Whether this first-job Explorer may take the second job `job` of its
+    /// line (e.g. a 100 may become a 110, 120 or 130): level 30.
+    pub fn can_take_second_job(&self, job: i16) -> bool {
+        let stats = &self.stats;
+        second_job_rules(job).is_some() && stats.job == job / 100 * 100 && stats.level >= 30
+    }
+
+    /// Become a second-job `job`: 1 SP and the job's max HP/MP bonus.
+    pub fn take_second_job(&mut self, job: i16) {
+        let Some((hp, mp)) = second_job_rules(job) else {
+            return;
+        };
+        let stats = &mut self.stats;
+        stats.job = job;
+        stats.sp = stats.sp.saturating_add(1);
+        stats.max_hp = stats.max_hp.saturating_add(hp).min(MAX_HP_MP);
+        stats.max_mp = stats.max_mp.saturating_add(mp).min(MAX_HP_MP);
+        self.dirty = true;
+    }
+
     /// Spend one AP on `stat`. Returns false, changing nothing, without AP
     /// or once the stat is at its cap.
     pub fn spend_ap(&mut self, stat: ApStat) -> bool {
@@ -547,6 +567,17 @@ fn first_job_rules(job: i16) -> Option<(u8, i16, i16)> {
         200 => Some((8, 0, 125)),
         300 | 400 => Some((10, 125, 38)),
         500 => Some((10, 175, 63)),
+        _ => None,
+    }
+}
+
+/// The max HP/MP an Explorer second job adds, again the middle of the
+/// community servers' ranges (e.g. warriors 300-350 HP).
+fn second_job_rules(job: i16) -> Option<(i16, i16)> {
+    match job {
+        110 | 120 | 130 => Some((325, 0)),
+        210 | 220 | 230 => Some((0, 475)),
+        310 | 320 | 410 | 420 => Some((325, 175)),
         _ => None,
     }
 }
@@ -717,6 +748,24 @@ mod tests {
         assert_eq!((player.stats.hp, player.stats.mp), (50, 5));
         assert!(player.is_dirty());
         assert!(!player.can_take_first_job(100), "only beginners advance");
+    }
+
+    #[test]
+    fn first_jobs_take_a_second_job_of_their_line_at_30() {
+        let mut player = player();
+        (player.stats.job, player.stats.level, player.stats.sp) = (300, 29, 2);
+        assert!(!player.can_take_second_job(310), "level 30");
+        player.stats.level = 30;
+        assert!(player.can_take_second_job(320));
+        assert!(!player.can_take_second_job(410), "another line");
+        assert!(!player.can_take_second_job(330), "no such job");
+        assert!(!player.can_take_second_job(300), "not a second job");
+
+        player.take_second_job(320);
+        assert_eq!(player.stats.job, 320);
+        assert_eq!(player.stats.sp, 3);
+        assert_eq!((player.stats.max_hp, player.stats.max_mp), (375, 180));
+        assert!(!player.can_take_second_job(310), "only once");
     }
 
     #[test]

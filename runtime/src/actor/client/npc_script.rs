@@ -161,12 +161,22 @@ impl ClientActor {
                     gain_exp(&mut next, *amount, &mut packets)?;
                     changed = true;
                 }
-                Effect::TakeFirstJob(job) => {
-                    if !next.can_take_first_job(*job) {
+                Effect::TakeFirstJob(job) | Effect::TakeSecondJob(job) => {
+                    let first = matches!(effect, Effect::TakeFirstJob(_));
+                    let qualifies = if first {
+                        next.can_take_first_job(*job)
+                    } else {
+                        next.can_take_second_job(*job)
+                    };
+                    if !qualifies {
                         warn!(job, "No longer qualifies for the job; nothing applied");
                         return Ok(Applied::Refused);
                     }
-                    next.take_first_job(*job);
+                    if first {
+                        next.take_first_job(*job);
+                    } else {
+                        next.take_second_job(*job);
+                    }
                     changed = true;
                     let stats = &next.stats;
                     packets.push(stat::build_stat_update(
@@ -211,7 +221,8 @@ impl ClientActor {
                 }
                 Effect::StartQuest(id) => change = Some(QuestChange::Start(template(*id)?)),
                 Effect::CompleteQuest(id) => change = Some(QuestChange::Complete(template(*id)?)),
-                Effect::Warp(map_id) => warp = Some(*map_id),
+                Effect::Warp(map_id) => warp = Some((*map_id, None)),
+                Effect::WarpToPortal(map_id, portal) => warp = Some((*map_id, Some(*portal))),
                 Effect::RequireBoarding(platform) => {
                     let boarding = conti::departing_from(*platform)
                         .is_some_and(|route| route.timetable.state(conti::now()) == State::Wait);
@@ -245,14 +256,15 @@ impl ClientActor {
                 Box::pin(self.start_script(script)).await?;
             }
         }
-        if let Some(map_id) = warp {
+        if let Some((map_id, portal)) = warp {
             let channel_id = self.channel_id;
-            let actions = net::packet::handle::world::warp(
-                &mut self.in_game_mut()?.player,
-                map_id,
-                "",
-                channel_id,
-            )?;
+            let player = &mut self.in_game_mut()?.player;
+            let actions = match portal {
+                Some(portal) => net::packet::handle::world::warp_to_spawn_point(
+                    player, map_id, portal, channel_id,
+                )?,
+                None => net::packet::handle::world::warp(player, map_id, "", channel_id)?,
+            };
             for action in actions {
                 Box::pin(self.apply(action)).await?;
             }

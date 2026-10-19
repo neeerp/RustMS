@@ -119,6 +119,18 @@ pub mod keys {
 
     pub const FIRST_JOB_INVENTORY_FULL: &str = "first_job.inventory_full";
 
+    /// The Explorer second job. By first job (`warrior`, ...): the
+    /// instructor's `letter`, `go` (to the examiner) and `choose` (a path,
+    /// with the proof), the examiner's `examiner`, `examiner.ask`,
+    /// `examiner.decline` and `examiner.other`, and the proctor's
+    /// `proctor.pass` and `proctor.ask`. By second job (`110`, ...): its
+    /// `name`, `about`, `ask` and `accept`.
+    pub fn second_job(job: &str, line: &str) -> String {
+        format!("second_job.{job}.{line}")
+    }
+
+    pub const SECOND_JOB_INVENTORY_FULL: &str = "second_job.inventory_full";
+
     /// Every key: one per placeholder.
     pub fn all() -> Vec<String> {
         super::parse_text(super::PLACEHOLDER_TEXT, "placeholder_text.toml")
@@ -429,6 +441,7 @@ mod tests {
             keys::NATALIE_DYE,
             keys::ROBIN_MENU,
             keys::FIRST_JOB_INVENTORY_FULL,
+            keys::SECOND_JOB_INVENTORY_FULL,
         ];
         for key in named
             .iter()
@@ -442,6 +455,8 @@ mod tests {
         }
         assert!(text.contains(&keys::robin_answer(0, 0)));
         assert!(text.contains(&keys::first_job("thief", "after.4")));
+        assert!(text.contains(&keys::second_job("thief", "proctor.ask")));
+        assert!(text.contains(&keys::second_job("420", "accept")));
         assert!(text
             .get(keys::LEAVE_AREA_WARNING, &[])
             .starts_with("[placeholder]"));

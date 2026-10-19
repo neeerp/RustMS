@@ -47,15 +47,30 @@ const NATALIE_HAIRS: [[i32; 7]; 2] = [
     [31150, 31300, 31350, 31700, 31740, 34050, 34110],
 ];
 
-/// A first-job instructor: the job, its text key, and the weapons, ammunition
-/// and bag rows that come with it (upstream `fighter`, `magician`, `bowman`,
-/// `rogue`).
+/// The second job's test: the examiner's proctor gives this for the marbles,
+/// and the instructor takes it for the job.
+const PROOF_OF_A_HERO: i32 = 4031012;
+const DARK_MARBLE: i32 = 4031013;
+const MARBLES_NEEDED: i32 = 30;
+
+/// A job instructor: the first job, its text key, and the weapons,
+/// ammunition and bag rows that come with it (upstream `fighter`,
+/// `magician`, `bowman`, `rogue`); then the second job's letter, examiner
+/// (and the examiner's map and the portal back to them), test map, proctor,
+/// and second jobs.
 struct Instructor {
     npc_id: i32,
     job: i16,
     text: &'static str,
     items: &'static [(i32, i16)],
     rows: &'static [InventoryType],
+    letter: i32,
+    examiner: i32,
+    examiner_map: i32,
+    examiner_portal: u8,
+    test_map: i32,
+    proctor: i32,
+    second_jobs: &'static [i16],
 }
 
 const INSTRUCTORS: [Instructor; 4] = [
@@ -71,6 +86,13 @@ const INSTRUCTORS: [Instructor; 4] = [
             InventoryType::Setup,
             InventoryType::Etc,
         ],
+        letter: 4031008,
+        examiner: 1072000,
+        examiner_map: 102020300,
+        examiner_portal: 2,
+        test_map: 108000300,
+        proctor: 1072004,
+        second_jobs: &[110, 120, 130],
     },
     // Grendel the Really Old: a wand.
     Instructor {
@@ -79,6 +101,13 @@ const INSTRUCTORS: [Instructor; 4] = [
         text: "magician",
         items: &[(1372043, 1)],
         rows: &[],
+        letter: 4031009,
+        examiner: 1072001,
+        examiner_map: 101020000,
+        examiner_portal: 1,
+        test_map: 108000200,
+        proctor: 1072005,
+        second_jobs: &[210, 220, 230],
     },
     // Athena Pierce: a bow and arrows.
     Instructor {
@@ -87,6 +116,13 @@ const INSTRUCTORS: [Instructor; 4] = [
         text: "bowman",
         items: &[(1452051, 1), (2060000, 6000)],
         rows: &[InventoryType::Equip, InventoryType::Use],
+        letter: 4031010,
+        examiner: 1072002,
+        examiner_map: 106010000,
+        examiner_portal: 9,
+        test_map: 108000100,
+        proctor: 1072006,
+        second_jobs: &[310, 320],
     },
     // The Dark Lord: a claw, a dagger and two sets of throwing stars.
     Instructor {
@@ -95,6 +131,13 @@ const INSTRUCTORS: [Instructor; 4] = [
         text: "thief",
         items: &[(1472061, 1), (1332063, 1), (2070015, 1000), (2070015, 1000)],
         rows: &[InventoryType::Equip, InventoryType::Etc],
+        letter: 4031011,
+        examiner: 1072003,
+        examiner_map: 102040000,
+        examiner_portal: 9,
+        test_map: 108000400,
+        proctor: 1072007,
+        second_jobs: &[410, 420],
     },
 ];
 
@@ -165,7 +208,18 @@ impl NpcScript {
     /// plays for `player`.
     pub fn for_npc(npc_id: i32, player: &Player) -> Option<Self> {
         if let Some(instructor) = INSTRUCTORS.iter().find(|i| i.npc_id == npc_id) {
-            return Some(first_job(instructor, player));
+            let stats = &player.stats;
+            return Some(if stats.job == instructor.job && stats.level >= 30 {
+                second_job(instructor, player)
+            } else {
+                first_job(instructor, player)
+            });
+        }
+        if let Some(instructor) = INSTRUCTORS.iter().find(|i| i.examiner == npc_id) {
+            return Some(examiner(instructor, player));
+        }
+        if let Some(instructor) = INSTRUCTORS.iter().find(|i| i.proctor == npc_id) {
+            return Some(proctor(instructor, player));
         }
         match npc_id {
             ROBIN => Some(robin()),
@@ -543,6 +597,110 @@ fn first_job(instructor: &Instructor, player: &Player) -> NpcScript {
     );
     let mut script = NpcScript::new(instructor.npc_id, pages);
     script.inventory_full = Some(text(keys::FIRST_JOB_INVENTORY_FULL));
+    script
+}
+
+/// A first-job Explorer of level 30 or more: a letter for the examiner,
+/// and for the proof from the examiner's test, the choice of second job.
+fn second_job(instructor: &Instructor, player: &Player) -> NpcScript {
+    let line = |line: &str| text(&keys::second_job(instructor.text, line));
+    if player.inventory.count(PROOF_OF_A_HERO) > 0 {
+        let choices = instructor
+            .second_jobs
+            .iter()
+            .map(|&job| {
+                let line = |line: &str| text(&keys::second_job(&job.to_string(), line));
+                let on_yes = vec![
+                    Effect::TakeItem {
+                        item_id: PROOF_OF_A_HERO,
+                        quantity: 1,
+                    },
+                    Effect::TakeSecondJob(job),
+                    Effect::AddSlotRow(InventoryType::Etc),
+                ];
+                let pages = vec![
+                    Page::Say(line("about")),
+                    Page::Ask {
+                        text: line("ask"),
+                        on_yes,
+                        on_no: None,
+                    },
+                    Page::Say(line("accept")),
+                ];
+                (line("name"), pages)
+            })
+            .collect();
+        let menu = Page::Menu {
+            text: line("choose"),
+            choices,
+        };
+        return NpcScript::new(instructor.npc_id, vec![menu]);
+    }
+    if player.inventory.count(instructor.letter) > 0 {
+        return NpcScript::new(instructor.npc_id, vec![Page::Say(line("go"))]);
+    }
+    let mut script = NpcScript::new(instructor.npc_id, vec![Page::Say(line("letter"))]);
+    script.on_end = vec![Effect::GiveItem {
+        item_id: instructor.letter,
+        quantity: 1,
+    }];
+    script.inventory_full = Some(text(keys::SECOND_JOB_INVENTORY_FULL));
+    script
+}
+
+/// The second job's examiner lets the instructor's letter into the test.
+/// The player keeps the letter until passing, so leaving and coming back
+/// needs no other record (upstream marks a quest the client doesn't have).
+fn examiner(instructor: &Instructor, player: &Player) -> NpcScript {
+    let line = |line: &str| text(&keys::second_job(instructor.text, line));
+    let pages = if player.inventory.count(instructor.letter) == 0 {
+        vec![Page::Say(line("examiner.other"))]
+    } else {
+        vec![
+            Page::Say(line("examiner")),
+            Page::Ask {
+                text: line("examiner.ask"),
+                on_yes: vec![Effect::Warp(instructor.test_map)],
+                on_no: Some(line("examiner.decline")),
+            },
+        ]
+    };
+    NpcScript::new(instructor.examiner, pages)
+}
+
+/// Inside the test, the proctor trades all of the player's Dark Marbles,
+/// once there are enough, and the letter for the proof, and sees anyone
+/// out to the examiner.
+fn proctor(instructor: &Instructor, player: &Player) -> NpcScript {
+    let line = |line: &str| text(&keys::second_job(instructor.text, line));
+    let out = Effect::WarpToPortal(instructor.examiner_map, instructor.examiner_portal);
+    let marbles = player.inventory.count(DARK_MARBLE);
+    if marbles < MARBLES_NEEDED {
+        let leave = Page::Ask {
+            text: line("proctor.ask"),
+            on_yes: vec![out],
+            on_no: None,
+        };
+        return NpcScript::new(instructor.proctor, vec![leave]);
+    }
+    let mut on_end = vec![Effect::TakeItem {
+        item_id: DARK_MARBLE,
+        quantity: i16::try_from(marbles).unwrap_or(i16::MAX),
+    }];
+    if player.inventory.count(instructor.letter) > 0 {
+        on_end.push(Effect::TakeItem {
+            item_id: instructor.letter,
+            quantity: 1,
+        });
+    }
+    on_end.push(Effect::GiveItem {
+        item_id: PROOF_OF_A_HERO,
+        quantity: 1,
+    });
+    on_end.push(out);
+    let mut script = NpcScript::new(instructor.proctor, vec![Page::Say(line("proctor.pass"))]);
+    script.on_end = on_end;
+    script.inventory_full = Some(text(keys::SECOND_JOB_INVENTORY_FULL));
     script
 }
 
@@ -1044,6 +1202,87 @@ mod tests {
         // Past beginner, a single page.
         beginner.stats.job = 300;
         let athena = NpcScript::for_npc(1012100, &beginner).unwrap();
+        assert_eq!(buttons(&athena.begin()), (false, false));
+    }
+
+    #[test]
+    fn first_jobs_pass_the_examiners_test_for_their_second_job() {
+        const LETTER: i32 = 4031010;
+        let bowman = |items: &[(i16, i32, i16)]| {
+            let mut player = player(50);
+            (player.stats.job, player.stats.level) = (300, 30);
+            for &(slot, item_id, quantity) in items {
+                let item = game::Item::stack(item_id, quantity);
+                player.inventory.insert(InventoryType::Etc, slot, item);
+            }
+            player
+        };
+        let give = |item_id| Effect::GiveItem {
+            item_id,
+            quantity: 1,
+        };
+        let take = |item_id, quantity| Effect::TakeItem { item_id, quantity };
+
+        // Athena gives a letter for the examiner, then sends the player on.
+        let mut athena = NpcScript::for_npc(1012100, &bowman(&[])).unwrap();
+        assert_eq!(buttons(&athena.begin()), (false, true));
+        assert_eq!(
+            athena.respond(ScriptInput::Next).unwrap().effects,
+            [give(LETTER)]
+        );
+        assert!(athena.inventory_full().is_some());
+        let with_letter = bowman(&[(1, LETTER, 1)]);
+        let athena = NpcScript::for_npc(1012100, &with_letter).unwrap();
+        assert_eq!(buttons(&athena.begin()), (false, false));
+
+        // The examiner lets letter holders into the test, letter and all.
+        let mut examiner = NpcScript::for_npc(1072002, &with_letter).unwrap();
+        examiner.respond(ScriptInput::Next).unwrap();
+        let entered = examiner.respond(ScriptInput::Yes).unwrap();
+        assert_eq!(entered.effects, [Effect::Warp(108000100)]);
+        let examiner = NpcScript::for_npc(1072002, &bowman(&[])).unwrap();
+        assert_eq!(buttons(&examiner.begin()), (false, false));
+
+        // The proctor sees anyone out, and trades every marble, once there
+        // are 30, and the letter for the proof.
+        let out = Effect::WarpToPortal(106010000, 9);
+        let mut proctor = NpcScript::for_npc(1072006, &with_letter).unwrap();
+        assert_eq!(kind(&proctor.begin()), Some(1));
+        assert_eq!(
+            proctor.respond(ScriptInput::Yes).unwrap().effects,
+            [out.clone()]
+        );
+        let passed = bowman(&[(1, LETTER, 1), (2, DARK_MARBLE, 25), (3, DARK_MARBLE, 6)]);
+        let mut proctor = NpcScript::for_npc(1072006, &passed).unwrap();
+        assert_eq!(
+            proctor.respond(ScriptInput::Next).unwrap().effects,
+            [
+                take(DARK_MARBLE, 31),
+                take(LETTER, 1),
+                give(PROOF_OF_A_HERO),
+                out
+            ]
+        );
+
+        // For the proof, Athena offers each path.
+        let mut athena = NpcScript::for_npc(1012100, &bowman(&[(1, PROOF_OF_A_HERO, 1)])).unwrap();
+        assert_eq!(kind(&athena.begin()), Some(4));
+        assert_eq!(athena.respond(ScriptInput::Select(2)), None, "two paths");
+        athena.respond(ScriptInput::Select(1)).unwrap();
+        assert_eq!(kind(&athena.respond(ScriptInput::Next).unwrap()), Some(1));
+        assert_eq!(
+            athena.respond(ScriptInput::Yes).unwrap().effects,
+            [
+                take(PROOF_OF_A_HERO, 1),
+                Effect::TakeSecondJob(320),
+                Effect::AddSlotRow(InventoryType::Etc),
+            ]
+        );
+
+        // Below level 30, the first job's single page.
+        let mut young = bowman(&[]);
+        young.stats.level = 29;
+        let athena = NpcScript::for_npc(1012100, &young).unwrap();
         assert_eq!(buttons(&athena.begin()), (false, false));
     }
 
