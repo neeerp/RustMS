@@ -22,6 +22,48 @@ pub fn build_avatar_effect(path: &str) -> Result<Packet, NetworkError> {
     Ok(p)
 }
 
+/// The charm that kept a dead player's EXP.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum CharmUsed {
+    /// A Safety Charm, with the charms left and the days the next one lasts.
+    SafetyCharm { left: u8, days: u8 },
+    /// Another charm item, which the line names.
+    Item(i32),
+}
+
+/// SHOW_ITEM_GAIN_INCHAT mode 6 (v83 FUN_009377d9): the grey chat line
+/// saying a charm kept the player's EXP. The client reads both counts
+/// before the item, which only the second form shows.
+pub fn build_charm_used(charm: CharmUsed) -> Result<Packet, NetworkError> {
+    let mut p = Packet::new_empty();
+    p.write_short(SendOpcode::ShowItemGainInChat as i16)?;
+    p.write_byte(6)?;
+    match charm {
+        CharmUsed::SafetyCharm { left, days } => {
+            p.write_byte(1)?;
+            p.write_byte(left)?;
+            p.write_byte(days)?;
+        }
+        CharmUsed::Item(item_id) => {
+            p.write_byte(0)?;
+            p.write_byte(0)?;
+            p.write_byte(0)?;
+            p.write_int(item_id)?;
+        }
+    }
+    Ok(p)
+}
+
+/// SHOW_ITEM_GAIN_INCHAT mode 0x15: the grey chat line saying a Wheel of
+/// Destiny revived the player where they died, with the wheels `left`.
+pub fn build_wheel_used(left: u8) -> Result<Packet, NetworkError> {
+    let mut p = Packet::new_empty();
+    p.write_short(SendOpcode::ShowItemGainInChat as i16)?;
+    p.write_byte(0x15)?;
+    p.write_byte(left)?;
+    Ok(p)
+}
+
 /// An effect played on a character.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum CharEffect {
@@ -103,6 +145,35 @@ mod tests {
             .short(SendOpcode::ShowItemGainInChat as i16)
             .byte(0x17);
         expect.string("UI/tutorial.img/25").int(1);
+        expect.end();
+    }
+
+    #[test]
+    fn a_safety_charm_line_has_the_charms_and_days_left() {
+        let packet = build_charm_used(CharmUsed::SafetyCharm { left: 4, days: 89 }).unwrap();
+        let mut expect = Expect::new(&packet.bytes);
+        expect.short(SendOpcode::ShowItemGainInChat as i16).byte(6);
+        expect.byte(1).byte(4).byte(89);
+        expect.end();
+    }
+
+    #[test]
+    fn another_charm_is_named_after_both_counts() {
+        let packet = build_charm_used(CharmUsed::Item(4140903)).unwrap();
+        let mut expect = Expect::new(&packet.bytes);
+        expect.short(SendOpcode::ShowItemGainInChat as i16).byte(6);
+        expect.byte(0).byte(0).byte(0).int(4140903);
+        expect.end();
+    }
+
+    #[test]
+    fn a_wheel_line_has_the_wheels_left() {
+        let packet = build_wheel_used(2).unwrap();
+        let mut expect = Expect::new(&packet.bytes);
+        expect
+            .short(SendOpcode::ShowItemGainInChat as i16)
+            .byte(0x15)
+            .byte(2);
         expect.end();
     }
 

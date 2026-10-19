@@ -65,6 +65,9 @@ namespace ms
 		UIElement::Type get_type() const override;
 
 		void exit_cashshop();
+		// Esc asks first (v83 FUN_004bcc86, StringPool 0x250); the Exit
+		// button leaves at once.
+		void confirm_exit();
 
 		// The account's name and the Best Item commodities, from SET_CASH_SHOP.
 		void set_account(const std::string& account, const std::vector<int32_t>& best);
@@ -73,6 +76,8 @@ namespace ms
 		void add_cash_items(const std::vector<CashItem>& items);
 		// A bag gained slots.
 		void refresh_slots();
+		void set_storage_slots(int16_t slots);
+		int16_t get_storage_slots() const;
 		void remove_cash_item(int64_t cash_id);
 		void set_wish_list(const std::vector<int32_t>& sns);
 
@@ -173,6 +178,7 @@ namespace ms
 		int32_t points;
 		int32_t prepaid;
 		bool pending;
+		int16_t storage_slots;
 
 		std::vector<CashItem> cash_items;
 		Slider cash_slider;

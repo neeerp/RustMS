@@ -376,6 +376,10 @@ namespace ms
 				return "Trade unsuccessful.";
 			case 9:
 				return "You cannot make the trade because\\nthere are some items which\\nyou cannot carry more than one.";
+			case 0xa:
+				return "Trade was canceled because there was an item\\nthat disappeared because it expired.";
+			case 0xb:
+				return "A cash item trade was canceled\\ndue to a server check.";
 			case 0xc:
 				return "You cannot make the trade because\\nthe other person's on a different map.";
 			case 0xd:

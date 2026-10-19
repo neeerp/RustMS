@@ -203,5 +203,60 @@ namespace ms
 
 			return 1;
 		}
+
+		inline bool affordable(int32_t price, int32_t credit, int32_t points, int32_t prepaid)
+		{
+			return credit >= price || points >= price || prepaid >= price;
+		}
+
+		// Slot expansions (v83 46c036, 46c55b, 470653). The Cash Inventory's
+		// buttons add four slots for 4,000 NX, the commodities their item's
+		// info/delta. Bags hold at most 96 slots, the storage 48.
+		constexpr int32_t EXPANSION_SLOTS = 4;
+		constexpr int32_t EXPANSION_PRICE = 4000;
+		constexpr int32_t MAX_BAG_SLOTS = 96;
+		constexpr int32_t MAX_STORAGE_SLOTS = 48;
+
+		// The slots a coming job advancement adds to a bag (1 Equip to 4
+		// Etc) that adding `added` now would leave no room for, or 0 (v83
+		// 46c38f). v83 asks before such a purchase.
+		inline int32_t advancement_slots(int32_t job, int32_t bag, int32_t slots, int32_t added)
+		{
+			constexpr int32_t EQUIP_BAG = 1, USE_BAG = 2, ETC_BAG = 4;
+
+			int32_t branch = job % 1000 / 100;
+			int32_t after = slots + added;
+
+			if (branch == 0)
+			{
+				if (bag == EQUIP_BAG)
+					return after > MAX_BAG_SLOTS - 4 ? 4 : 0;
+
+				return (bag == USE_BAG || bag == ETC_BAG) && after > MAX_BAG_SLOTS - 8 ? 8 : 0;
+			}
+
+			// Only first and second jobs are asked.
+			if (job % 10 != 0)
+				return 0;
+
+			bool widens = false;
+
+			switch (branch)
+			{
+			case 1:
+			case 5:
+				widens = bag == USE_BAG || bag == ETC_BAG;
+				break;
+			case 2:
+			case 3:
+				widens = bag == ETC_BAG;
+				break;
+			case 4:
+				widens = bag == USE_BAG;
+				break;
+			}
+
+			return widens && after > MAX_BAG_SLOTS - 4 ? 4 : 0;
+		}
 	}
 }

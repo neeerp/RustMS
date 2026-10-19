@@ -324,7 +324,7 @@ namespace ms
 							}
 								break;
 							case KeyAction::Id::WORLDMAP:
-								emplace<UIWorldMap>();
+								UIWorldMap::open();
 								break;
 							case KeyAction::Id::MAPLECHAT:
 								UIMessenger::toggle();

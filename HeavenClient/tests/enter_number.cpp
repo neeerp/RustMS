@@ -26,6 +26,8 @@ int main()
 		require(check("-5", 50).problem == Problem::NOT_A_NUMBER, "a sign is not a number");
 		require(check("9", 50000, 10).problem == Problem::TOO_LOW, "below a higher minimum is too low");
 		require(check("10", 50000, 10).number == 10, "the minimum itself is accepted");
+		require(check("", 50, 0).problem == Problem::NONE && check("", 50, 0).number == 0, "an empty box is 0 when 0 is allowed");
+		require(check("00", 50, 0).number == 0, "so is zero");
 
 		std::cout << "Enter number passed\n";
 		return 0;

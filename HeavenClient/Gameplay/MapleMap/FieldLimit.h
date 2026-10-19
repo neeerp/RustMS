@@ -49,6 +49,28 @@ namespace ms
 					|| std::find(allowed.begin(), allowed.end(), item_id) != allowed.end();
 		}
 
+		// v83 FUN_004a95bf: whether the death dialog offers a Wheel of
+		// Destiny here. It doesn't on fields of type 1, 3 to 5, 7, 10, 11
+		// or 15, in the event maps (9xxxxxxxx), on the ships (200090xxx)
+		// or in 390xxxxxx.
+		inline bool may_use_wheel(int32_t fieldtype, int32_t map_id)
+		{
+			switch (fieldtype)
+			{
+				case 1:
+				case 3:
+				case 4:
+				case 5:
+				case 7:
+				case 10:
+				case 11:
+				case 15:
+					return false;
+				default:
+					return map_id / 100000000 != 9 && map_id / 1000 != 200090 && map_id / 1000000 != 390;
+			}
+		}
+
 		// v83 FUN_00a26227: whether two maps are in the same area, by the
 		// first two digits of their ids in Map/AreaCode.img. Event maps
 		// (the millions digit 9) and the ships (20009xxxx) are in none.

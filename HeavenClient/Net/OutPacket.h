@@ -71,6 +71,7 @@ namespace ms
 			RANGED_ATTACK = 45,
 			MAGIC_ATTACK = 46,
 			TAKE_DAMAGE = 48,
+			USE_DEATHITEM = 53,
 
 			/// Messaging
 			GENERAL_CHAT = 49,

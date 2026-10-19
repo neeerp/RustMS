@@ -37,6 +37,14 @@ namespace ms
 		static constexpr bool TOGGLED = true;
 
 		UIWorldMap();
+
+		// Opens on the player's field, as the world map key and the
+		// minimap's button do, or says the world map isn't available there.
+		static void open();
+		// Opens with a field marked, as FIND NPC does, or says no world map
+		// shows it.
+		static void find(int32_t target_map);
+
 		void show_location(int32_t target_map);
 
 		void draw(float inter) const override;
@@ -51,10 +59,16 @@ namespace ms
 
 		void send_key(int32_t keycode, bool pressed, bool escape) override;
 
+		// Back to the parent world map, as Esc does (v83 FUN_009ee507).
+		void rightclick(Point<int16_t> cursorpos) override;
+
 		UIElement::Type get_type() const override;
 
 	protected:
 		Button::State button_pressed(uint16_t buttonid) override;
+
+		// A map link plays only SelectMap (v83 FUN_009ee30e).
+		bool has_own_click_sound(uint16_t buttonid) const override;
 
 	private:
 		static constexpr uint8_t MAPSPOT_TYPE_MAX = 4u;

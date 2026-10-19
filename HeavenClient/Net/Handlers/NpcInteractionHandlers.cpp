@@ -30,6 +30,8 @@
 
 #include <nlnx/nx.hpp>
 
+#include <algorithm>
+
 namespace ms
 {
 	void NpcDialogueHandler::handle(InPacket& recv) const
@@ -37,20 +39,51 @@ namespace ms
 		recv.skip(1);
 
 		int32_t npcid = recv.read_int();
-		int8_t msgtype = recv.read_byte(); // 0 - textonly, 1 - yes/no, 4 - selection, 12 - accept/decline
+		// 0 say, 1 yes/no, 2 text, 3 number, 4 menu, 12 accept/decline, 13 box text
+		int8_t msgtype = recv.read_byte();
 		int8_t speaker = recv.read_byte();
+
+		// A say page with 0x4 speaks for another NPC (v83 7467b8).
+		if (msgtype == 0 && (speaker & 0x4))
+			npcid = recv.read_int();
+
 		std::string text = recv.read_string();
 
 		int16_t style = 0;
+		UINpcTalk::Input input;
 
-		if (msgtype == 0 && recv.length() > 0)
-			style = recv.read_short();
+		switch (msgtype)
+		{
+			case 0:
+				if (recv.length() > 0)
+					style = recv.read_short();
+
+				break;
+			case 2:
+				// The default, then the fewest and most bytes.
+				input.text = recv.read_string();
+				input.min = recv.read_short();
+				input.max = recv.read_short();
+				break;
+			case 3:
+				// The default, then the range.
+				input.text = std::to_string(std::max(recv.read_int(), 0));
+				input.min = recv.read_int();
+				input.max = recv.read_int();
+				break;
+			case 13:
+				// The default, then the box's columns and rows.
+				input.text = recv.read_string();
+				input.cols = recv.read_short();
+				input.rows = recv.read_short();
+				break;
+		}
 
 		UI::get().emplace<UINpcTalk>();
 		UI::get().enable();
 
 		if (auto npctalk = UI::get().get_element<UINpcTalk>())
-			npctalk->change_text(npcid, msgtype, style, speaker, text);
+			npctalk->change_text(npcid, msgtype, style, speaker, text, {}, UINpcTalk::Menu::INLINE, input);
 	}
 
 	namespace

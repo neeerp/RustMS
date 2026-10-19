@@ -19,6 +19,7 @@
 
 #include "UICashBuy.h"
 #include "UICashGift.h"
+#include "UINotice.h"
 
 #include "../UI.h"
 #include "../Window.h"
@@ -96,7 +97,7 @@ namespace ms
 		}
 	}
 
-	UICashShop::UICashShop() : tab(EVENT_TAB), subtab(0), page(0), preview_index(0), female(false), credit(0), points(0), prepaid(0), pending(false), cash_row(0), item_tab(InventoryType::Id::EQUIP), item_row(0)
+	UICashShop::UICashShop() : tab(EVENT_TAB), subtab(0), page(0), preview_index(0), female(false), credit(0), points(0), prepaid(0), pending(false), storage_slots(0), cash_row(0), item_tab(InventoryType::Id::EQUIP), item_row(0)
 	{
 		nl::node CashShop = NxFiles::ui_classic["CashShop.img"];
 		nl::node Base = CashShop["Base"];
@@ -455,7 +456,7 @@ namespace ms
 				if (remove && request())
 					SetWishListPacket(unwish(wish_list, commodity.sn)).dispatch();
 				else if (list_button % 3 == 0)
-					UI::get().emplace<UICashBuy>(commodity, credit, points, prepaid);
+					UICashBuy::open(commodity, credit, points, prepaid);
 				else if (list_button % 3 == 1)
 					UI::get().emplace<UICashGift>(commodity);
 				else if (list_button % 3 == 2 && request())
@@ -470,11 +471,11 @@ namespace ms
 			int32_t bag = buttonid == Buttons::BT_EX_TRUNK ? 0 : buttonid - Buttons::BT_EX_EQUIP + 1;
 			Commodity slots = {};
 			slots.item_id = 9110000 + 1000 * bag;
-			slots.price = 4000;
+			slots.price = EXPANSION_PRICE;
 			slots.count = 1;
 			slots.label = Label::NONE;
 
-			UI::get().emplace<UICashBuy>(slots, credit, points, prepaid);
+			UICashBuy::open(slots, credit, points, prepaid);
 		}
 
 		return Button::State::NORMAL;
@@ -656,6 +657,15 @@ namespace ms
 		GraphicsGL::get().unlock();
 	}
 
+	void UICashShop::confirm_exit()
+	{
+		UI::get().emplace<UIYesNo>("Are you sure you want to leave the Cash Shop?", [this](bool yes)
+		{
+			if (yes)
+				button_pressed(Buttons::BT_EXIT);
+		});
+	}
+
 	void UICashShop::set_account(const std::string& account, const std::vector<int32_t>& best)
 	{
 		account_label.change_text(account);
@@ -703,6 +713,16 @@ namespace ms
 		cash_items = items;
 		cash_row = 0;
 		update_cash_slider();
+	}
+
+	void UICashShop::set_storage_slots(int16_t slots)
+	{
+		storage_slots = slots;
+	}
+
+	int16_t UICashShop::get_storage_slots() const
+	{
+		return storage_slots;
 	}
 
 	void UICashShop::refresh_slots()

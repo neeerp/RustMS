@@ -129,7 +129,12 @@ from `UI.nx`. Moved so far:
 - **World Map** (`UIWorldMap`, `UIWindow.img/WorldMap`): the frame, title,
   and `Basic.img/BtClose` around the map's 640x470 `BaseImg`, laid out from
   period footage. The Big Bang search panel is gone. Esc steps up to the
-  parent map and closes the window from the top.
+  parent map and closes the window from the top. It opens on the world map
+  v83 picks for the field (`WorldMapLookup.h`): the first of `WorldMap000`,
+  `010` to `100` listing it, unless one of the ten after it or `WorldMap140`
+  to `142` does too. On a field none of them lists, such as the Free Market,
+  the world map key and the minimap's button say the world map is not
+  available there instead, and FIND NPC says the NPC can't be shown.
 - **Map tooltips** (`MapTooltip`, `TooltipBox`): the World Map's spots and the
   minimap's NPCs and portals show the name, plus the map's description for
   World Map spots, in the v83 box. `UIClassic.nx` has no bitmaps for it (the
@@ -229,7 +234,8 @@ from `UI.nx`. Moved so far:
   rows a side with a `VScr4` scroll bar each, laid out from the background
   and period footage. The sell side has the five `Basic.img/Tab5` bag tabs;
   the buy side shows only the "All" tab. A star or bullet set below its full
-  size shows `BtRecharge` on its row, which recharges it at once. The
+  size shows `BtRecharge` on its row, which asks "Are you sure you want to
+  recharge it?" before it recharges (v83 `FUN_00756c28`). The
   right-click-to-sell checkbox is gone; right-click still sells.
 - **Character info** (`UICharInfo`, `UIWindow.img/UserInfo`): opened by
   double-clicking a character on the map, the player included
@@ -468,6 +474,7 @@ side yet.
 | Quest log and markers | Implemented (`UIQuestLog`); progress arrives via SHOW_STATUS_INFO, quest start/complete is driven by NPC dialogue; UPDATE_QUEST_INFO refusals 9–11, 13 and 14 show v83's notices (10 names the full inventories from `Act.img`), 15 the expiry chat line, and the timer modes are ignored |
 | Chat, whisper, `/find`, `/?`, `/party`, `/buddy`, `/all`, server messages, megaphones | Implemented; the megaphone dialogs are in `inventory.md`; buddy whisper/find modes ignored; `/w NAME` alone fills in a whisper to NAME, or says "Incorrect ID." for a name no character could have, as v83's `/whisper NAME` does; other commands are dropped, as v83 does for non-GMs |
 | Character info, minimap, world map | Implemented |
+| UI and game sounds | v83's: GameIn as the server lets a character in, not on map loads; RollDown/RollUp for the channel panel; SelectMap alone on world map links and right-click; BuyShopItem on Cash Shop purchase notices; other players' level-up, job, quest and card sounds. QuestAlert and a few rarer sounds are missing |
 | Party (`UIUserList` Party tab, `UIPartyHP`, party chat) | Implemented; see `parties.md` |
 | Buddy list (`UIUserList` Friend tab, buddy chat) | Implemented without groups; see `buddies.md` |
 | Guild (`UIUserList` Guild tab, name tags, guild chat) | Founding, invitations, leaving and expelling; see `guilds.md` |
@@ -632,6 +639,17 @@ the screen size.
   or 0x07 mode 0. On 0x60 the bag's slot count changes at once. For 0x60 and
   0x62 the notice says "You have added slots to your item inventory.", as in
   v83.
+- **Slot checks:** as in v83 (`FUN_0046c036`, `FUN_0046c55b`,
+  `FUN_00470653`), a slot purchase needs some balance that covers the price,
+  or it says "You don't have enough cash." first. A bag that would pass 96
+  slots says "The requested number of slots can't be added." after OK. The
+  storage, whose count comes from 0x4B and 0x62, stops at 48 and says "The
+  storage slots can't be extended.", before the dialog for Stor. Slot. A bag
+  that the player's next job advancement would widen past 96 asks first
+  whether to buy anyway (`FUN_0046c38f`): four Equip, or eight Use or Etc,
+  slots for a beginner, and four of the job's bags for a first or second job.
+  v83's slot buttons show a text-only dialog where HC shows the item, and
+  HC has no character-slot button.
 - **Item data:** packages and expansions take their name and icon from
   `Item.nx` `Special`, pets from `Item.nx` `Pet`, and pet equipment from
   `Character.nx` `PetEquip`.
@@ -652,6 +670,9 @@ the screen size.
   The receiver gets one notice listing each gift's sender, item and message
   when 0x4D arrives. The buddy and guild buttons that open the wider
   `backgrnd1` aren't drawn, and only one name is sent.
+- **Leaving:** EXIT sends CHANGE_MAP with no body at once. Esc first asks
+  "Are you sure you want to leave the Cash Shop?", as v83 does
+  (`FUN_004bcc86`).
 - **Not served yet:** CHARGE and COUPON do nothing.
 
 ## Estimated client work for a complete game

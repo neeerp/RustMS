@@ -881,10 +881,21 @@ damage over the mob, at most a tenth of its max HP for a physical hit
 (HeavenClient's `Mob::show_reflect`). Hits with no mob (-4) end with a byte: 1
 poison (ignored, the server ticks poison itself), 2 a mist (Achilles
 applies), or 3 Stop Motion (no guards, never fatal). At 0 HP the player is
-dead:
-non-beginners lose 10% of their level's EXP; the client's respawn
-(CHANGE_MAP with a target while dead) returns them to the map's return map
-with 50 HP.
+dead (`death_penalty`): non-beginners lose 10% of their level's EXP. Holding a
+charm keeps the EXP instead and uses up one charm. The charms are tried in
+Cosmic's order: the Safety Charm (5130000), the Easter Basket (4031283), then
+the Easter Charm (4140903). A grey chat line confirms it (SHOW_ITEM_GAIN_INCHAT
+mode 6). For a Safety Charm it gives the charms left and the days the next one
+lasts; any other charm is named. The server also keeps the spawn point nearest
+where the player fell.
+
+The client's respawn is a CHANGE_MAP with a target while dead. It returns the
+player to the map's return map with 50 HP. When the player chose a Wheel of
+Destiny (5510000) in the death dialog (the wheel byte after the portal name),
+one wheel is used instead. The player then revives on the same map, at the
+kept spawn point, and a grey line gives the wheels left (mode 0x15). After a
+charm kept their EXP, the player revives with 30% of their max HP and MP added
+rather than at 50 HP, as in Cosmic.
 
 After a hit, HeavenClient ignores touches for 1500 ms, as v83 does. If the hit
 did damage, the player blinks meanwhile: half brightness for 60 ms, then
@@ -893,13 +904,18 @@ normal for 60 ms. Other players don't blink.
 HeavenClient's `Player::update_death` notices HP reaching 0: the player
 becomes a ghost (`Char::State::DIED`), the tombstone from `Effect.nx/Tomb.img`
 drops behind them (drawn by `Char`) as `Sound.nx/Game.img/Tombstone` plays,
-keys are ignored, and a "You have died."
-notice opens. The ghost is the body's `dead` frame, which fades in. Head, hair
+keys are ignored, and the death window (`UIRevive`) opens. The ghost is the body's `dead` frame, which fades in. Head, hair
 and equips have no `dead` frames, so `CharLook` puts the standing ones on the
 ghost's neck, as the original client does. The ghost and its name tag circle
 the tombstone clockwise, 9 pixels out, once every two seconds; the data has no
 motion for this, so `Char::draw` offsets them. The radius and period were
-measured from 2008 GMS footage. The notice's OK sends that respawn CHANGE_MAP. The SET_FIELD that follows
+measured from 2008 GMS footage. The window is "PRESS OK TO BE REVIVED."
+(`UIWindow.img/Notice/0`); its OK sends that respawn CHANGE_MAP. A player
+holding a Wheel of Destiny gets Notice/2 instead, which asks whether to revive
+on this map, with YES and NO. Wheels are refused in some field types and maps
+(v83 FUN_004a95bf, `field_limit::may_use_wheel`). Before showing Notice/2 the
+client sends USE_DEATHITEM (0x35: the wheel's id and the tombstone's position),
+which the server ignores. YES sets the wheel byte. The SET_FIELD that follows
 carries the new HP, which brings the player back up.
 
 ## Keys

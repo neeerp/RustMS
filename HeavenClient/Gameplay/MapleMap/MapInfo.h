@@ -87,6 +87,9 @@ namespace ms
 		// The map's fieldLimit bits.
 		int32_t get_fieldlimit() const;
 
+		// The map's info/fieldType.
+		int32_t get_fieldtype() const;
+
 		std::string get_bgm() const;
 
 		// How much faster players recover HP and MP at rest (info/recovery).
@@ -118,6 +121,7 @@ namespace ms
 
 	private:
 		int32_t fieldlimit = 0;
+		int32_t fieldtype = 0;
 		// The items a map with fieldLimit bit 0x400 still allows.
 		std::vector<int32_t> allowed_items;
 		bool cloud;

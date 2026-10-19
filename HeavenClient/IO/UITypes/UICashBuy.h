@@ -36,6 +36,12 @@ namespace ms
 
 		UICashBuy(const cash_catalog::Commodity& commodity, int32_t credit, int32_t points, int32_t prepaid);
 
+		// Opens the dialog, after v83's checks for a slot expansion: some
+		// balance must cover the price, a slot button must find room in the
+		// storage, and a bag a job advancement would widen past its last
+		// slot asks first.
+		static void open(const cash_catalog::Commodity& commodity, int32_t credit, int32_t points, int32_t prepaid);
+
 		void draw(float inter) const override;
 
 		Cursor::State send_cursor(bool clicked, Point<int16_t> cursorpos) override;

@@ -240,7 +240,7 @@ namespace ms
 			for (int16_t i = 0; i < count; i++)
 				items.push_back(read_cash_item(recv));
 
-			recv.skip_short();	// storage slots; there is no storage window yet
+			cashshop->set_storage_slots(recv.read_short());
 			recv.skip_short();	// character slots
 
 			cashshop->set_cash_items(items);
@@ -283,7 +283,7 @@ namespace ms
 		case 0x57:
 			// A purchase is in the Cash Inventory; the balance follows.
 			cashshop->add_cash_items({ read_cash_item(recv) });
-			UI::get().emplace<UIOk>("You have successfully made the purchase.", [](bool) {});
+			UI::get().emplace<UIOk>("You have successfully made the purchase.", [](bool) {}, Sound::Name::BUYSHOPITEM);
 			break;
 		case 0x89:
 		{
@@ -300,7 +300,7 @@ namespace ms
 			cashshop->add_cash_items(items);
 			UI::get().emplace<UIOk>(points ? "Purchase successful.\\n" + std::to_string(points) + " You have received MaplePoints."
 										   : "You have successfully made the purchase.",
-									[](bool) {});
+									[](bool) {}, Sound::Name::BUYSHOPITEM);
 			break;
 		}
 		case 0x60:
@@ -317,7 +317,7 @@ namespace ms
 		case 0x62:
 			// The storage has more slots; the balance follows. v83 says
 			// the same as for a bag.
-			recv.skip_short();
+			cashshop->set_storage_slots(recv.read_short());
 			UI::get().emplace<UIOk>("You have added slots to your item inventory.", [](bool) {});
 			break;
 		case 0x5E:
@@ -329,7 +329,8 @@ namespace ms
 			int32_t price = recv.read_int();
 
 			UI::get().emplace<UIOk>(std::to_string(count) + " [ " + ItemData::get(item_id).get_name() + " ] \\nwas sent to " + to +
-				". \\n" + std::to_string(price) + " NX Prepaid \\nwere spent in the process.", [](bool) {});
+				". \\n" + std::to_string(price) + " NX Prepaid \\nwere spent in the process.", [](bool) {},
+				Sound::Name::BUYSHOPITEM);
 			break;
 		}
 		case 0x68:

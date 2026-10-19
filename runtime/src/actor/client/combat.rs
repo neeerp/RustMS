@@ -2,8 +2,7 @@ use super::quest::gain_exp_with_bonus;
 use super::ClientActor;
 use crate::error::RuntimeError;
 use net::packet::build::world::messaging::{build_broadcast, Broadcast};
-use net::packet::build::world::stat::{self, StatUpdate};
-use net::packet::handle::world::warp;
+use net::packet::handle::world::{death_penalty, warp};
 
 impl ClientActor {
     /// This player helped kill a mob, or shares in a party member's kill:
@@ -29,23 +28,14 @@ impl ClientActor {
         self.send_all(&mut packets).await
     }
 
-    /// HP reached 0: buffs end. Beginners lose nothing; others lose 10% of the EXP
-    /// their level needs (v83's field death penalty).
+    /// HP reached 0: buffs end and the death penalty applies. The spawn
+    /// point nearest is kept for a Wheel of Destiny revival.
     pub(super) async fn died(&mut self) -> Result<(), RuntimeError> {
         self.cancel_buffs().await?;
+        self.remember_spawn_point();
         let player = &mut self.in_game_mut()?.player;
-        if player.stats.job % 1000 == 0 {
-            return Ok(());
-        }
-        let Some(needed) = game::exp::to_next_level(player.stats.level) else {
-            return Ok(());
-        };
-        let loss = (needed / 10) as i32;
-        player.stats.exp = (player.stats.exp - loss).max(0);
-        player.mark_dirty();
-        let exp = player.stats.exp;
-        let mut packet = stat::build_stat_update(false, &[StatUpdate::Exp(exp)])?;
-        self.send(&mut packet).await
+        let mut packets = death_penalty(player)?;
+        self.send_all(&mut packets).await
     }
 }
 

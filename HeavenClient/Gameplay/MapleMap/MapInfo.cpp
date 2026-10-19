@@ -51,6 +51,7 @@ namespace ms
 
 		cloud = info["cloud"].get_bool();
 		fieldlimit = info["fieldLimit"];
+		fieldtype = info["fieldType"];
 
 		for (auto item : info["allowedItem"])
 			allowed_items.push_back(item);
@@ -105,6 +106,11 @@ namespace ms
 	int32_t MapInfo::get_fieldlimit() const
 	{
 		return fieldlimit;
+	}
+
+	int32_t MapInfo::get_fieldtype() const
+	{
+		return fieldtype;
 	}
 
 	bool MapInfo::can_migrate() const

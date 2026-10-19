@@ -621,11 +621,8 @@ namespace ms
 
 	void UIQuestLog::find_npc()
 	{
-		if (target_map < 0)
-			return;
-
-		if (auto map = UI::get().emplace<UIWorldMap>())
-			map->show_location(target_map);
+		if (target_map >= 0)
+			UIWorldMap::find(target_map);
 	}
 
 	void UIQuestLog::close()
