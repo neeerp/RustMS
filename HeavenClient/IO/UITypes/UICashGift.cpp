@@ -24,6 +24,7 @@
 #include "../Components/MapleButton.h"
 
 #include "../../Constants.h"
+#include "../../Data/CurseData.h"
 #include "../../Util/NxFiles.h"
 
 #include "../../Net/Packets/GameplayPackets.h"
@@ -181,9 +182,11 @@ namespace ms
 	{
 		if (asking_birthday)
 		{
-			// The server answers a wrong code with its own notice.
+			// The server answers a wrong code with its own notice. v83
+			// (FUN_007e47ef) stars out curse words in both lines first.
 			if (auto cashshop = UI::get().get_element<UICashShop>(); cashshop && cashshop->request())
-				GiftCashItemPacket(birthday_code(birthday.get_text()), sn, to.get_text(), message.get_text()).dispatch();
+				GiftCashItemPacket(birthday_code(birthday.get_text()), sn, CurseData::filter(to.get_text()),
+								   CurseData::filter(message.get_text())).dispatch();
 
 			close();
 

@@ -609,7 +609,13 @@ namespace ms
 			}
 			case Mode::CHAT:
 			{
+				// v83 (FUN_008515d7) stars out curse words in what follows
+				// the speaker's name; a line without " : " is shown as is.
 				std::string line = recv.read_string();
+				size_t at = line.find(" : ");
+
+				if (at != std::string::npos)
+					line = line.substr(0, at + 3) + CurseData::filter(line.substr(at + 3));
 
 				if (messenger && messenger->is_active())
 					messenger->add_chat(line);
