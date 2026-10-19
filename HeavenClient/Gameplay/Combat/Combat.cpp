@@ -29,6 +29,7 @@
 #include "ShotPath.h"
 
 #include "../MapleMap/DoorRules.h"
+#include "../MapleMap/FieldLimit.h"
 
 #include "../../Constants.h"
 #include "../../Character/SkillId.h"
@@ -293,6 +294,9 @@ namespace ms
 	{
 		// v83 takes no other move while a skill is held (0x96a86e).
 		if (preparing || !player.can_attack())
+			return false;
+
+		if (!field_limit::may_attack(mapinfo.get_fieldlimit(), move.get_id()))
 			return false;
 
 		SpecialMove::ForbidReason reason = player.can_use(move);

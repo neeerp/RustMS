@@ -104,11 +104,12 @@ namespace ms
 		// Check if the mob with the specified oid exists.
 		bool contains(int32_t oid) const;
 
-		// Return the id of the first mob who collides with the object.
-		int32_t find_colliding(const MovingObject &moveobj) const;
+		// Return the id of the first mob who collides with the object, which
+		// may be `hidden` by Dark Sight.
+		int32_t find_colliding(const MovingObject &moveobj, int32_t fieldlimit, bool hidden) const;
 
 		// The first mob whose touch hurts that overlaps `area`, or 0.
-		int32_t find_touching(const Rectangle<int16_t> &area) const;
+		int32_t find_touching(const Rectangle<int16_t> &area, int32_t fieldlimit = 0, bool hidden = false) const;
 
 		// The player's Puppet came, or went: the mobs this client moves turn
 		// on it, or give it up.

@@ -180,6 +180,12 @@ special move's `itemCon`, and Shadow Meso exactly the mesos the client checks
 for. The skill's description gives each level a range around its
 `moneyCon`, so v83's server may have charged a varying amount.
 
+On a map whose `fieldLimit` has bit 0x2, the attacks that carry the player
+along or push them back do nothing, without a word: the Rushes, Assaulter,
+Assassinate, Ninja Storm, Backspin Blow, both Corkscrew Blows, Snatch, Final
+Charge, Final Toss, Rolling Spin, Dragon's Breath, and Recoil Shot
+(`field_limit::may_attack`, 0x950921 and 0x9537d5).
+
 HeavenClient rolls Shadow Meso's hits as v83 does (`shot_path::meso_damage`,
 FUN_0078df87): ten times a whole number of mesos between half and one and a
 half its `moneyCon`, with its own `prop` and `x` for a critical in place of
@@ -931,7 +937,9 @@ Lord's or Shadower's Shadow Shifter dodges any hit, a miss too, at its
 `prop` percent (0x9584f6), and a Hero's or Paladin's Guardian blocks a hit
 that lands while they wear a shield, at its `prop` per mille, after Power
 Guard has sent its share back (0x958692). A dodge shows no number, only
-the skill's `special` animation, and Shadow Shifter smiles for 1.5 s. The
+the skill's `special` animation, and Shadow Shifter smiles for 1.5 s. On a
+map whose `fieldLimit` has bit 0x2, neither skill nor Power Stance takes
+effect (0x9585a5, 0x958778, 0x958af6). The
 server accepts -1 only from a Night Lord or Shadower who has Shadow
 Shifter, or (with a shield worn and a guard byte) a Hero or Paladin with
 Guardian. After the mob's id and object id, a mob's TAKE_DAMAGE carries
@@ -966,7 +974,9 @@ rather than at 50 HP, as in Cosmic.
 
 After a hit, HeavenClient ignores touches for 1500 ms, as v83 does. If the hit
 did damage, the player blinks meanwhile: half brightness for 60 ms, then
-normal for 60 ms. Other players don't blink.
+normal for 60 ms. Other players don't blink. Dark Sight keeps touches off
+too, but not on a map whose `fieldLimit` has bit 0x2, and never the Master
+Guardian's (9400594; `field_limit::may_touch`, FUN_00678c77).
 
 HeavenClient's `Player::update_death` notices HP reaching 0: the player
 becomes a ghost (`Char::State::DIED`), the tombstone from `Effect.nx/Tomb.img`

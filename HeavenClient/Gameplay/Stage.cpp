@@ -325,7 +325,8 @@ namespace ms
 		if (player.is_dead() || player.Char::is_invincible() || sheltered)
 			return;
 
-		int32_t touching = player.is_invincible() ? 0 : mobs.find_colliding(player.get_phobj());
+		int32_t touching = mobs.find_colliding(player.get_phobj(), mapinfo.get_fieldlimit(),
+				player.has_buff(Buffstat::Id::DARKSIGHT));
 
 		if (touching)
 		{

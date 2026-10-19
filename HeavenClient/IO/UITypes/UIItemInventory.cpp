@@ -356,14 +356,21 @@ namespace ms
 		}
 
 		// v83 FUN_00a0a4aa: a teleport rock goes to the map or the
-		// character chosen in its list. Maps that don't allow teleports
-		// refuse it before the list opens.
+		// character chosen in its list. The dead, and maps that don't allow
+		// teleports, are refused before the list opens.
 		void use_teleport_rock(int16_t slot, int32_t item_id)
 		{
 			if (!may_use_cash_item())
 				return;
 
-			if (Stage::get().get_mapinfo().get_fieldlimit() & (0x40 | 0x2))
+			if (Stage::get().get_player().is_dead())
+			{
+				UI::get().emplace<UIOk>("You can't do it while you're dead.", [](bool)
+				{});
+				return;
+			}
+
+			if (!field_limit::may_teleport_rock(Stage::get().get_mapinfo().get_fieldlimit(), Stage::get().get_mapid()))
 			{
 				UI::get().emplace<UIOk>("You cannot teleport to this map.", [](bool)
 				{});

@@ -324,17 +324,18 @@ HeavenClient reads both lists from the character data
 (`Character/TeleportRock`) and keeps them from MAP_TRANSFER_RESULT 2 and 3.
 Double-clicking a rock in the Cash tab opens `UITeleportRock`
 (`UIWindow.img/Teleport`), centred and modal, unless a request is still
-waiting ("Other requests are in process.", which the chalkboard checks too)
-or the map's `fieldLimit` has `0x40` or `0x2` ("You cannot teleport to this
-map."). It lists the kept maps by name (a map with `info/link` under the
-linked map's), five at a time with a scroll bar on the VIP rock, and counts
-them as `[used/size]`. ADD MAP asks before sending TROCK_ADD_MAP for the
-current map, unless the list is full, already has it, or the map can't be
-kept; DEL. MAP asks before dropping the selected map. MOVE asks before using
-the rock on the selected map, or uses it at once on the typed name once the
-name is valid and isn't the player's own. Enter is MOVE and Escape closes
-the window, which closes before the rock is used. A refused rock shows the
-result as a notice, naming the character for result 6.
+waiting ("Other requests are in process.", which the chalkboard checks too),
+the player is dead ("You can't do it while you're dead."), or the map is an
+event map (the millions digit 9) or its `fieldLimit` has `0x40` or `0x2` ("You
+cannot teleport to this map."). It lists the kept maps by name (a map with
+`info/link` under the linked map's), five at a time with a scroll bar on the
+VIP rock, and counts them as `[used/size]`. ADD MAP asks before sending
+TROCK_ADD_MAP for the current map, unless the list is full, already has it, or
+the map can't be kept; DEL. MAP asks before dropping the selected map. MOVE
+asks before using the rock on the selected map, or uses it at once on the
+typed name once the name is valid and isn't the player's own. Enter is MOVE
+and Escape closes the window, which closes before the rock is used. A refused
+rock shows the result as a notice, naming the character for result 6.
 
 ## NPC shops
 

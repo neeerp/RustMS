@@ -120,7 +120,7 @@ namespace ms
 
 	bool MapInfo::can_use_movement_skills() const
 	{
-		return (fieldlimit & 0x2) == 0;
+		return (fieldlimit & field_limit::MOVEMENT_SKILLS) == 0;
 	}
 
 	bool MapInfo::can_use_item(int32_t item_id) const
