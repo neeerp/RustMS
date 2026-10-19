@@ -117,6 +117,12 @@ namespace ms
 		// Return if a down-jump from this platform is refused (forbidFallDown).
 		bool forbid_fall_down() const;
 
+		// Return the conveyor push along this platform (force), 0 for none.
+		double force() const;
+
+		// Return this platform's own friction factor (drag), 1 for none.
+		double drag() const;
+
 	private:
 		uint16_t m_id;
 		uint16_t m_prev;
@@ -126,5 +132,7 @@ namespace ms
 		Range<int16_t> m_horizontal;
 		Range<int16_t> m_vertical;
 		bool m_forbid_fall_down = false;
+		double m_force = 0.0;
+		double m_drag = 1.0;
 	};
 }

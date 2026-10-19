@@ -21,6 +21,8 @@ struct TestFoothold
 {
 	int64_t group, id, x1, y1, x2, y2, prev, next;
 	int64_t forbid_fall_down = 0;
+	int64_t drag = 0;
+	int64_t force = 0;
 };
 
 // A tiny NX fixture holding the given footholds in layer 0. It exercises
@@ -35,7 +37,7 @@ std::filesystem::path foothold_map(std::vector<TestFoothold> footholds)
 			std::make_pair(std::to_string(b.group), std::to_string(b.id));
 	};
 	std::sort(footholds.begin(), footholds.end(), sorted);
-	std::vector<std::string> names {"", "0", "forbidFallDown", "next", "prev", "x1", "x2", "y1", "y2"};
+	std::vector<std::string> names {"", "0", "drag", "forbidFallDown", "force", "next", "prev", "x1", "x2", "y1", "y2"};
 	auto name = [&](const std::string& text)
 	{
 		auto found = std::find(names.begin(), names.end(), text);
@@ -49,7 +51,7 @@ std::filesystem::path foothold_map(std::vector<TestFoothold> footholds)
 		if (groups.empty() || groups.back() != fh.group) groups.push_back(fh.group);
 		name(std::to_string(fh.group)); name(std::to_string(fh.id));
 	}
-	size_t count = 2 + groups.size() + 8 * footholds.size();
+	size_t count = 2 + groups.size() + 10 * footholds.size();
 	size_t strings = 64 + count * 20;
 	std::vector<uint8_t> bytes(strings + names.size() * 8);
 	auto put = [&](size_t offset, uint64_t value, size_t count)
@@ -77,10 +79,10 @@ std::filesystem::path foothold_map(std::vector<TestFoothold> footholds)
 	for (size_t i = 0; i < footholds.size(); ++i)
 	{
 		const TestFoothold& fh = footholds[i];
-		size_t leaves = first + footholds.size() + 7 * i;
-		node(first + i, name(std::to_string(fh.id)), leaves, 7, 0, 0);
-		const int64_t values[] = {fh.forbid_fall_down, fh.next, fh.prev, fh.x1, fh.x2, fh.y1, fh.y2};
-		for (size_t j = 0; j < 7; ++j) node(leaves + j, 2 + j, 0, 0, 1, values[j]);
+		size_t leaves = first + footholds.size() + 9 * i;
+		node(first + i, name(std::to_string(fh.id)), leaves, 9, 0, 0);
+		const int64_t values[] = {fh.drag, fh.forbid_fall_down, fh.force, fh.next, fh.prev, fh.x1, fh.x2, fh.y1, fh.y2};
+		for (size_t j = 0; j < 9; ++j) node(leaves + j, 2 + j, 0, 0, 1, values[j]);
 	}
 	for (size_t i = 0; i < names.size(); ++i)
 	{
@@ -225,6 +227,58 @@ ms::PhysicsObject grounded_shoe(const ms::Physics& physics)
 	physics.move_object(player);
 	require(player.onground && player.fhid != 0, "fixture did not find its floor");
 	return player;
+}
+
+// A conveyor belt's force (0x9b23f2) of 180 (1.8) pushes a standing player
+// at 2520 px/s^2 up to 125 px/s, walking with it reaches 250 px/s and
+// walking against it 25. At -300 the drift is 375 px/s the other way and
+// walking against it 8.3.
+void conveyor_belts()
+{
+	auto path = foothold_map({
+		{0, 1, -1000, 100, 1000, 100, 0, 0, 0, 0, 180},
+		{0, 2, -1000, 300, 1000, 300, 0, 0, 0, 0, -300}});
+	{
+		nl::file map(path.string());
+		ms::Physics physics(map.root());
+		auto speed = [](const ms::PhysicsObject& object) { return object.hspeed * TICKS_PER_SECOND; };
+		auto run = [&](ms::PhysicsObject& object, int8_t direction, int ticks)
+		{
+			for (int tick = 0; tick < ticks; ++tick)
+			{
+				object.walkdir = direction;
+				physics.move_object(object);
+			}
+		};
+
+		ms::PhysicsObject player = grounded_shoe(physics);
+		run(player, 0, 1);
+		require(std::abs(speed(player) - 20.16) < 1e-9, "a belt did not push at 2520 px/s^2");
+		run(player, 0, 10);
+		require(std::abs(speed(player) - 125.0) < 1e-9, "a belt did not carry at 125 px/s");
+		run(player, 1, 60);
+		require(std::abs(speed(player) - 250.0) < 1e-9, "walking with a belt did not reach 250 px/s");
+		run(player, 0, 19);
+		require(speed(player) > 125.0, "a belt slowed a faster player quicker than 800 px/s^2");
+		run(player, 0, 1);
+		require(std::abs(speed(player) - 125.0) < 1e-9, "a belt did not settle back to 125 px/s");
+		run(player, -1, 100);
+		require(std::abs(speed(player) + 25.0) < 1e-9, "walking against a belt did not creep at 25 px/s");
+		player.walkspeed = 1.4;
+		run(player, 0, 30);
+		require(std::abs(speed(player) - 175.0) < 1e-9, "the SPEED stat did not scale a belt's drift");
+
+		ms::PhysicsObject other;
+		other.shoe = true;
+		other.set_x(0); other.set_y(300);
+		physics.move_object(other);
+		require(other.onground && other.fhid == 2, "belt fixture did not find its lower floor");
+		run(other, 0, 30);
+		require(std::abs(speed(other) + 375.0) < 1e-9, "a belt of -300 did not carry at 375 px/s");
+		run(other, 1, 200);
+		require(std::abs(speed(other) - 25.0 / 3.0) < 1e-9, "walking against a belt of -300 did not creep at 8.3 px/s");
+	}
+	std::filesystem::remove(path);
 }
 
 // HeavenClient's own model, which flying mobs, NPCs and pets still use.
@@ -873,6 +927,7 @@ int main()
 			swimming(physics);
 			jumping_down(physics);
 			knockback(physics);
+			conveyor_belts();
 			// A knocked back mob sets its own ground speed; friction must not
 			// eat into it, even below the usual stopping threshold.
 			ms::PhysicsObject mob = grounded_shoe(physics);
