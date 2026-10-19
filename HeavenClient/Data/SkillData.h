@@ -64,6 +64,8 @@ namespace ms
 			int32_t y;
 			// A second value of the skill's own, as Shadow Meso's critical.
 			int32_t x = 0;
+			// A third, as how much a charge's element counts.
+			int32_t z = 0;
 			// The mesos the skill takes, and the item and how many of it.
 			int32_t mesocost = 0;
 			int32_t itemcost = 0;

@@ -22,6 +22,7 @@
 #include "SkillId.h"
 
 #include "../Audio/Audio.h"
+#include "../Data/BulletData.h"
 #include "../Data/EquipData.h"
 #include "../Data/SkillData.h"
 #include "../Data/WeaponData.h"
@@ -59,6 +60,25 @@ namespace ms
 			using namespace std::chrono;
 
 			return duration_cast<milliseconds>(steady_clock::now().time_since_epoch()).count();
+		}
+
+		// A mastery skill as the player has learned it.
+		physical_damage::Learned learned(const SkillBook &skillbook, int32_t skill_id)
+		{
+			int32_t level = skillbook.get_level(skill_id);
+
+			if (level <= 0)
+				return {};
+
+			const SkillData::Stats &stats = SkillData::get(skill_id).get_stats(level);
+
+			return { stats.mastery, stats.x };
+		}
+
+		// A skill's damage or prop, in percent.
+		int32_t in_percent(float value)
+		{
+			return static_cast<int32_t>(std::lround(value * 100));
 		}
 	}
 
@@ -189,6 +209,18 @@ namespace ms
 
 		for (const Buff &buff : buffs.values())
 			active_buffs.apply_buff(stats, buff.stat, buff.value);
+
+		// The weapon's mastery adds its accuracy and an expert's attack for
+		// the reach the job counts (SetFrom, FUN_0077f4c9), and the window
+		// shows the range with the mastery of its own reach.
+		int32_t job = stats.get_job().get_id();
+		physical_damage::Weapon weapon = physical_damage::weapon(look.get_equips().get_weapon());
+		auto lookup = [&](int32_t skill_id) { return learned(skillbook, skill_id); };
+		physical_damage::Mastery counted = physical_damage::mastery(weapon, physical_damage::stat_reach(job), job, 0,
+																	 lookup);
+		stats.add_value(EquipStat::Id::ACC, counted.accuracy);
+		stats.add_value(EquipStat::Id::WATK, counted.attack);
+		stats.set_mastery(physical_damage::mastery(weapon, physical_damage::shown_reach(weapon), job, 0, lookup).mastery);
 
 		stats.close_totalstats();
 
@@ -727,21 +759,26 @@ namespace ms
 		return combo::percent(combo::finisher(skill), level, base, orbs);
 	}
 
+	int32_t Player::partner_percent(int32_t skill) const
+	{
+		// A skill's x, a regular shot's y (0x7902d1).
+		const SkillData::Stats &partner = skill_stats(skillbook, buffs[Buffstat::Id::SHADOWPARTNER].skillid);
+
+		return skill ? partner.y : partner.x;
+	}
+
 	Attack Player::prepare_attack(int32_t skill, bool whack) const
 	{
 		Attack::Type attacktype;
-		bool degenerate;
 		int32_t bullet = inventory.get_bulletid();
 
 		if (state == Char::State::PRONE || whack)
 		{
-			degenerate = true;
 			attacktype = Attack::Type::CLOSE;
 		} else if (skill)
 		{
 			// Like v83, a skill attacks as the skill does, whatever the weapon.
 			const SkillData &data = SkillData::get(skill);
-			degenerate = false;
 
 			if (data.is_shot())
 				attacktype = Attack::Type::RANGED;
@@ -763,32 +800,16 @@ namespace ms
 				case Weapon::Type::CROSSBOW:
 				case Weapon::Type::CLAW:
 				case Weapon::Type::GUN:
-					degenerate = !inventory.has_projectile();
-					attacktype = degenerate ? Attack::Type::CLOSE : Attack::Type::RANGED;
-					break;
-				case Weapon::Type::WAND:
-				case Weapon::Type::STAFF:
-					degenerate = true;
-					attacktype = Attack::Type::CLOSE;
+					attacktype = inventory.has_projectile() ? Attack::Type::RANGED : Attack::Type::CLOSE;
 					break;
 				default:
 					attacktype = Attack::Type::CLOSE;
-					degenerate = false;
 					break;
 			}
 		}
 
 		Attack attack;
 		attack.type = attacktype;
-		attack.mindamage = stats.get_mindamage();
-		attack.maxdamage = stats.get_maxdamage();
-
-		if (degenerate)
-		{
-			attack.mindamage /= 10;
-			attack.maxdamage /= 10;
-		}
-
 		attack.critical = stats.get_critical();
 		attack.ignoredef = stats.get_ignoredef();
 		attack.accuracy = stats.get_total(EquipStat::Id::ACC);
@@ -805,6 +826,64 @@ namespace ms
 		// A swing or stab throws or fires nothing, even with ammo.
 		if (attacktype == Attack::Type::RANGED)
 			attack.bullet = bullet;
+
+		// What a blow comes from (FUN_0078df87): the attack without the
+		// ammo the stats count, as a shot adds its own.
+		using namespace physical_damage;
+
+		Blow &blow = attack.blow;
+		int32_t job = stats.get_job().get_id();
+		Reach reach = attacktype == Attack::Type::RANGED ? SHOT : CLOSE;
+		blow.weapon = physical_damage::weapon(look.get_equips().get_weapon());
+		blow.job = job;
+		blow.stats = { stats.get_total(EquipStat::Id::STR), stats.get_total(EquipStat::Id::DEX),
+					   stats.get_total(EquipStat::Id::LUK) };
+		blow.attack = stats.get_total(EquipStat::Id::WATK);
+
+		if (int32_t counted = inventory.get_bulletid())
+			blow.attack -= BulletData::get(counted).get_watk();
+
+		blow.mastery = mastery(blow.weapon, reach, job, skill,
+							   [&](int32_t skill_id) { return learned(skillbook, skill_id); }).mastery;
+
+		int32_t critical = critical_skill(blow.weapon, reach, job);
+
+		if (skillbook.get_level(critical) > 0)
+		{
+			const SkillData::Stats &source = skill_stats(skillbook, critical);
+			blow.critical = { in_percent(source.chance), in_percent(source.damage), true };
+		}
+
+		blow.critical = sharpen(blow.critical, get_buff_value(Buffstat::Id::SHARP_EYES));
+
+		// Stun Mastery crits on a stunned monster.
+		if (skillbook.get_level(STUN_MASTERY) > 0)
+		{
+			const SkillData::Stats &source = skill_stats(skillbook, STUN_MASTERY);
+			blow.stunned = { in_percent(source.chance), in_percent(source.damage), true };
+		}
+
+		if (has_buff(Buffstat::Id::WK_CHARGE))
+		{
+			int32_t charge = buffs[Buffstat::Id::WK_CHARGE].skillid;
+
+			if (skillbook.get_level(charge) > 0)
+			{
+				const SkillData::Stats &source = skill_stats(skillbook, charge);
+				blow.charge = { charge_element(charge), in_percent(source.damage), source.z };
+			}
+		}
+
+		// Berserk, under x percent of the HP.
+		if (skillbook.get_level(SkillId::BERSERK) > 0)
+		{
+			const SkillData::Stats &source = skill_stats(skillbook, SkillId::BERSERK);
+
+			if (stats.get_stat(MapleStat::Id::HP) <= stats.get_total(EquipStat::Id::HP) * source.x / 100)
+				blow.berserk = in_percent(source.damage);
+		}
+
+		blow.blind = has_buff(Buffstat::Id::DARKNESS);
 
 		return attack;
 	}

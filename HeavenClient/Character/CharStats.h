@@ -57,9 +57,8 @@ namespace ms
 
 		void set_portal(uint8_t portal);
 
-		void set_mastery(float mastery);
-
-		void set_damagepercent(float damagepercent);
+		// The mastery the window's damage range counts.
+		void set_mastery(int32_t mastery);
 
 		void set_reducedamage(float reducedamage);
 
@@ -95,7 +94,7 @@ namespace ms
 
 		Weapon::Type get_weapontype() const;
 
-		float get_mastery() const;
+		int32_t get_mastery() const;
 
 		float get_critical() const;
 
@@ -130,13 +129,8 @@ namespace ms
 		bool get_female() const;
 
 	private:
-		int32_t calculateaccuracy() const;
-
-		int32_t get_primary_stat() const;
-
-		int32_t get_secondary_stat() const;
-
-		float get_multiplier() const;
+		// The accuracy from DEX and LUK.
+		int32_t base_accuracy() const;
 
 		std::string name;
 		std::vector<int64_t> petids;
@@ -156,11 +150,10 @@ namespace ms
 		int8_t attackspeed;
 		int16_t projectilerange;
 		Weapon::Type weapontype;
-		float mastery;
+		int32_t mastery;
 		float critical;
 		float mincrit;
 		float maxcrit;
-		float damagepercent;
 		float bossdmg;
 		float ignoredef;
 		float stance;

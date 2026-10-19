@@ -52,29 +52,10 @@ namespace ms
 		void apply_to(CharStats &stats, nl::node level) const override;
 	};
 
-	template<Weapon::Type...W>
-	// Buff for Mastery skills.
-	class WeaponMasteryBuff : public PassiveBuff
-	{
-	public:
-		bool is_applicable(CharStats &stats, nl::node level) const override;
-
-		void apply_to(CharStats &stats, nl::node level) const override;
-	};
-
 	// Buff for Achilles
 	class AchillesBuff : public ConditionlessBuff
 	{
 	public:
-		void apply_to(CharStats &stats, nl::node level) const override;
-	};
-
-	// Buff for Berserk
-	class BerserkBuff : public PassiveBuff
-	{
-	public:
-		bool is_applicable(CharStats &stats, nl::node level) const override;
-
 		void apply_to(CharStats &stats, nl::node level) const override;
 	};
 

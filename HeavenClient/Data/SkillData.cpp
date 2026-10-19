@@ -80,6 +80,7 @@ namespace ms
 			).first->second;
 
 			added.x = sub["x"];
+			added.z = sub["z"];
 			added.mesocost = sub["moneyCon"];
 			added.itemcost = sub["itemCon"];
 			added.itemcount = sub["itemConNo"];

@@ -36,6 +36,7 @@
 #include "../../Constants.h"
 #include "../../Character/SkillId.h"
 #include "../../Character/Look/AttackStances.h"
+#include "../../Data/BulletData.h"
 #include "../../Data/SkillData.h"
 #include "../../Data/WeaponData.h"
 #include "../../IO/Messages.h"
@@ -984,15 +985,7 @@ namespace ms
 
 			// The orbs multiply a swing's or a shot's damage after its skill's (FUN_007653fa).
 			if (attack.type != Attack::Type::MAGIC)
-			{
-				int32_t percent = player.combo_percent(attack.skill);
-
-				if (percent > 0)
-				{
-					attack.mindamage *= percent / 100.0;
-					attack.maxdamage *= percent / 100.0;
-				}
-			}
+				attack.blow.combo = player.combo_percent(attack.skill);
 
 			// Shadow Partner throws each bullet again, for twice the hits.
 			if (attack.type == Attack::Type::RANGED && player.has_buff(Buffstat::Id::SHADOWPARTNER) &&
@@ -1000,6 +993,7 @@ namespace ms
 			{
 				attack.sets = 2;
 				attack.hitcount = shot_path::partner_hits(attack.hitcount);
+				attack.blow.partner = player.partner_percent(attack.skill);
 			}
 
 			if (whack != Stance::Id::NONE)
@@ -1012,6 +1006,10 @@ namespace ms
 				attack.bulletslot = inventory.find_bulletslot(attack.bulletcost);
 				attack.bullet = inventory.get_item_id(InventoryType::Id::USE, attack.bulletslot);
 			}
+
+			// A shot adds the attack of the ammo it throws (FUN_0077df48).
+			if (physical_damage::ammo(attack.bullet))
+				attack.blow.ammo = BulletData::get(attack.bullet).get_watk();
 
 			Point<int16_t> origin = attack.origin;
 			Rectangle<int16_t> range = place_range(origin, attack.range, attack.hrange, attack.toleft);

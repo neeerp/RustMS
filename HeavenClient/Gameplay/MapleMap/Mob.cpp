@@ -2066,52 +2066,27 @@ namespace ms
 		effects.add(animation, DrawArgument(hit_point::centre(range, get_body()) - get_position(), f), 0);
 	}
 
-	float Mob::calculate_hitchance(int16_t leveldelta, int32_t player_accuracy) const
-	{
-		float faccuracy = static_cast<float>(player_accuracy);
-		// A monster's EVA status adds to its avoid (FUN_0078df87).
-		int32_t evasion = avoid + status_value(MobStatParser::EVA);
-		float hitchance = faccuracy / (((1.84f + 0.07f * leveldelta) * evasion) + 1.0f);
-
-		if (hitchance < 0.01f)
-			hitchance = 0.01f;
-
-		return hitchance;
-	}
-
 	// A monster's PDR status adds to its weapon defense.
 	int32_t Mob::defense() const
 	{
 		return wdef + status_value(MobStatParser::PDR);
 	}
 
-	double Mob::calculate_mindamage(int16_t leveldelta, double damage) const
+	bool Mob::blow_hits(const Attack &attack) const
 	{
-		double mindamage = damage * (1 - 0.01 * leveldelta) - defense() * 0.6;
+		using namespace physical_damage;
 
-		return mindamage < 1.0 ? 1.0 : mindamage;
-	}
+		// A monster's EVA status adds to its avoid (FUN_0078df87).
+		double accuracy = physical_damage::accuracy(attack.accuracy, attack.playerlevel, level);
 
-	double Mob::calculate_maxdamage(int16_t leveldelta, double damage) const
-	{
-		double maxdamage = damage * (1 - 0.01 * leveldelta) - defense() * 0.5;
+		if (!hits(accuracy, avoid + status_value(MobStatParser::EVA), randomizer.next_real(1.0)))
+			return false;
 
-		return maxdamage < 1.0 ? 1.0 : maxdamage;
+		return !attack.blow.blind || sees(randomizer.next_real(1.0));
 	}
 
 	std::vector<std::pair<int32_t, bool>> Mob::calculate_damage(const Attack &attack)
 	{
-		double mindamage;
-		double maxdamage;
-		float hitchance;
-		float critical;
-		int16_t leveldelta = level - attack.playerlevel;
-
-		if (leveldelta < 0)
-			leveldelta = 0;
-
-		Attack::DamageType damagetype = attack.damagetype;
-
 		std::vector<std::pair<int32_t, bool>> result(attack.hitcount);
 
 		// Any other attack misses a mob that only some skills hurt, as
@@ -2119,46 +2094,22 @@ namespace ms
 		if (!MobHurts::hurt_by(damagedby, attack.skill))
 			return result;
 
-		// A spell rolls by v83's own formula, and never crits.
-		if (damagetype == Attack::DamageType::DMG_MAGIC)
+		for (size_t i = 0; i < result.size(); i++)
 		{
-			for (auto &hit : result)
-				hit = {next_magic_damage(attack), false};
-
-			return result;
+			switch (attack.damagetype)
+			{
+				// A spell rolls by v83's own formula, and never crits.
+				case Attack::DamageType::DMG_MAGIC:
+					result[i] = { next_magic_damage(attack), false };
+					break;
+				case Attack::DamageType::DMG_WEAPON:
+					result[i] = next_blow(attack, result, i);
+					break;
+				default:
+					result[i] = next_damage(attack);
+					break;
+			}
 		}
-
-		switch (damagetype)
-		{
-			case Attack::DamageType::DMG_WEAPON:
-			case Attack::DamageType::DMG_MAGIC:
-				mindamage = calculate_mindamage(leveldelta, attack.mindamage);
-				maxdamage = calculate_maxdamage(leveldelta, attack.maxdamage);
-				hitchance = calculate_hitchance(leveldelta, attack.accuracy);
-				critical = attack.critical;
-				break;
-			case Attack::DamageType::DMG_FIXED:
-				mindamage = attack.fixdamage;
-				maxdamage = attack.fixdamage;
-				hitchance = 1.0f;
-				critical = 0.0f;
-				break;
-			// Shadow Meso misses as a blow does, but goes through defense.
-			case Attack::DamageType::DMG_MESO:
-				mindamage = attack.mindamage;
-				maxdamage = attack.maxdamage;
-				hitchance = calculate_hitchance(leveldelta, attack.accuracy);
-				critical = attack.critical;
-				break;
-		}
-
-		std::generate(
-				result.begin(), result.end(),
-				[&]()
-				{
-					return next_damage(mindamage, maxdamage, hitchance, critical, attack);
-				}
-		);
 
 		return result;
 	}
@@ -2185,51 +2136,40 @@ namespace ms
 		return meso_explosion::shown(number, fixeddamage, MobHurts::hurt_by(damagedby, meso_explosion::ID));
 	}
 
-	std::pair<int32_t, bool> Mob::next_damage(double mindamage, double maxdamage, float hitchance, float critical,
-											  const Attack &attack) const
+	std::pair<int32_t, bool> Mob::next_damage(const Attack &attack) const
 	{
 		using namespace magic_damage;
 
-		// A blow or Shadow Meso meets the same statuses a spell does
-		// (FUN_0078df87), but fixed damage skips them.
-		bool weapon = attack.damagetype == Attack::DamageType::DMG_WEAPON ||
-			attack.damagetype == Attack::DamageType::DMG_MESO;
-
-		if (weapon && status_value(MobStatParser::DISABLE))
-			return std::pair<int32_t, bool>(0, false);
-
-		if (weapon && status_value(MobStatParser::PIMMUNE) && !pierces(randomizer.next_int(100), 0))
-			return std::pair<int32_t, bool>(1, false);
-
-		// Snipe's shot neither misses nor meets defense or guards.
-		if (attack.skill == SkillId::SNIPE && attack.type == Attack::Type::RANGED)
-			return std::pair<int32_t, bool>(shot_path::snipe_damage(randomizer.next_real(10000.0)), true);
-
-		bool hit = randomizer.below(hitchance);
-
-		if (!hit)
-			return std::pair<int32_t, bool>(0, false);
-
 		constexpr double DAMAGECAP = 999999.0;
 
-		double damage = randomizer.next_real(mindamage, maxdamage);
-		bool iscritical = randomizer.below(critical);
+		bool meso = attack.damagetype == Attack::DamageType::DMG_MESO;
+		double damage = attack.fixdamage;
+		bool iscritical = false;
 
-		if (attack.damagetype == Attack::DamageType::DMG_MESO)
-			damage = shot_path::meso_damage(damage, iscritical, attack.mesocritical,
-				static_cast<int16_t>(std::max(level - attack.playerlevel, 0)));
-		else if (iscritical)
-			damage *= 1.5;
+		// Shadow Meso meets the statuses and misses as a blow does
+		// (FUN_0078df87), but fixed damage skips them.
+		if (meso)
+		{
+			if (status_value(MobStatParser::DISABLE))
+				return std::pair<int32_t, bool>(0, false);
 
-		// Sacrifice goes through a Power Guard Up.
-		if (weapon && attack.skill != static_cast<int32_t>(SkillId::SACRIFICE))
+			if (status_value(MobStatParser::PIMMUNE) && !pierces(randomizer.next_int(100), 0))
+				return std::pair<int32_t, bool>(1, false);
+
+			if (!blow_hits(attack))
+				return std::pair<int32_t, bool>(0, false);
+
+			iscritical = randomizer.below(attack.critical);
+			damage = shot_path::meso_damage(randomizer.next_real(attack.mindamage, attack.maxdamage), iscritical,
+				attack.mesocritical, static_cast<int16_t>(std::max(level - attack.playerlevel, 0)));
 			damage = guarded(damage, status_value(MobStatParser::PGUARD_UP));
+		}
 
 		// A held skill hits harder the longer it was charged (0x79048c).
 		damage = prepare::charge_percent(attack.skill, attack.charge) * damage * 0.01;
 
 		// Only a critical hit gets through Hard Skin (0x7904ba).
-		if (weapon && status_value(MobStatParser::HARD_SKIN) && !iscritical)
+		if (meso && status_value(MobStatParser::HARD_SKIN) && !iscritical)
 			return std::pair<int32_t, bool>(0, false);
 
 		if (damage < 1)
@@ -2237,9 +2177,86 @@ namespace ms
 		else if (damage > DAMAGECAP)
 			damage = DAMAGECAP;
 
-		auto intdamage = static_cast<int32_t>(damage);
+		return std::pair<int32_t, bool>(static_cast<int32_t>(damage), iscritical);
+	}
 
-		return std::pair<int32_t, bool>(intdamage, iscritical);
+	std::pair<int32_t, bool> Mob::next_blow(const Attack &attack, const std::vector<std::pair<int32_t, bool>> &hits,
+											size_t index) const
+	{
+		using namespace physical_damage;
+
+		const Blow &blow = attack.blow;
+
+		// Disable turns every blow away, and Physical Immunity all but 1 in
+		// 100 to 1 damage (FUN_0078df87).
+		if (status_value(MobStatParser::DISABLE))
+			return std::pair<int32_t, bool>(0, false);
+
+		if (status_value(MobStatParser::PIMMUNE) && !magic_damage::pierces(randomizer.next_int(100), 0))
+			return std::pair<int32_t, bool>(1, false);
+
+		// Snipe's shot neither misses nor meets defense or guards.
+		if (attack.skill == SkillId::SNIPE && attack.type == Attack::Type::RANGED)
+			return std::pair<int32_t, bool>(shot_path::snipe_damage(randomizer.next_real(10000.0)), true);
+
+		if (!blow_hits(attack))
+			return std::pair<int32_t, bool>(0, false);
+
+		bool swing = blow.motion == SWING || forced_swing(attack.skill, blow.job, index, randomizer.next_real(1.0));
+		Formula formula = physical_damage::formula(blow.weapon, blow.job, attack.skill, blow.motion, swing, blow.stats,
+												   least(blow.mastery));
+		double damage = raw(formula, physical_damage::attack(blow.attack + blow.ammo), randomizer.next_real(1.0));
+		damage *= capsule(attack.skill, attack.bullet);
+
+		// Each level the monster is above the player takes a percent off.
+		if (level > attack.playerlevel)
+			damage = (100 - (level - attack.playerlevel)) * damage * 0.01;
+
+		if (attack.skill && attack.element)
+			damage = physical_damage::attribute(damage, elements[attack.element % magic_damage::ELEMENTS],
+												blow.amplify * 0.01);
+
+		damage = charged(damage, blow.charge, elements);
+
+		if (defended(attack.skill))
+			damage = defend(damage, defense(), randomizer.next_real(1.0));
+
+		Critical critical = blow.critical;
+
+		if (blow.stunned.source && status_value(MobStatParser::STUN))
+			critical = stun(critical, blow.stunned.rate, blow.stunned.damage);
+
+		bool iscritical = physical_damage::critical(critical, attack.skill, randomizer.next_real(1.0));
+		damage = scaled(damage, static_cast<int32_t>(damage), blow.scale, blow.combo, iscritical, critical.damage);
+
+		// Sacrifice goes through a Power Guard Up.
+		if (attack.skill != static_cast<int32_t>(SkillId::SACRIFICE))
+			damage = magic_damage::guarded(damage, status_value(MobStatParser::PGUARD_UP));
+
+		// Shadow Partner's set does a share of the first's, and crits
+		// with it (0x7902d1).
+		size_t half = hits.size() / 2;
+
+		if (blow.partner && index >= half && half > 0)
+		{
+			const std::pair<int32_t, bool> &first = hits[index - half];
+			damage = first.first * blow.partner / 100;
+			iscritical = first.second;
+		}
+
+		// A held skill hits harder the longer it was charged (0x79048c).
+		damage = prepare::charge_percent(attack.skill, attack.charge) * damage * 0.01;
+
+		// Only a critical hit gets through Hard Skin (0x7904ba).
+		if (status_value(MobStatParser::HARD_SKIN) && !iscritical)
+			return std::pair<int32_t, bool>(0, false);
+
+		if (blow.berserk)
+			damage = (blow.berserk + 100) * damage * 0.01;
+
+		damage = barrage(damage, attack.skill, index);
+
+		return std::pair<int32_t, bool>(finish(damage), iscritical);
 	}
 
 	int32_t Mob::next_magic_damage(const Attack &attack) const

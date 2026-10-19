@@ -17,6 +17,8 @@
 //////////////////////////////////////////////////////////////////////////////////
 #pragma once
 
+#include "PhysicalDamage.h"
+
 #include "../Template/Rectangle.h"
 
 #include <cstdint>
@@ -71,6 +73,8 @@ namespace ms
 		// magic attack, and how many it reaches, mobs and party members.
 		int32_t heal = 0;
 		int32_t healed = 0;
+		// What a weapon's blow or shot does, rolled for each monster.
+		physical_damage::Blow blow;
 
 		uint8_t hitcount = 0;
 		// Shadow Partner's second set of bullets makes 2.

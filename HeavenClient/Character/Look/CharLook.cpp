@@ -673,6 +673,11 @@ namespace ms
 		return stance.get();
 	}
 
+	std::string CharLook::get_action_name() const
+	{
+		return action ? actionstr : Stance::names[stance.get()];
+	}
+
 	Point<int16_t> CharLook::get_facepos() const
 	{
 		return drawinfo.getfacepos(stance.get(), stframe.get());

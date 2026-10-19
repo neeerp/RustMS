@@ -369,21 +369,18 @@ namespace ms
 		// Stand (0) or walk left (-1) or right (1).
 		void walk(int8_t direction);
 
-		// Calculate the hit chance
-		float calculate_hitchance(int16_t leveldelta, int32_t accuracy) const;
-
 		// The weapon defense a blow meets.
 		int32_t defense() const;
 
-		// Calculate the minimum damage.
-		double calculate_mindamage(int16_t leveldelta, double mindamage) const;
+		// Whether a blow or Shadow Meso lands (physical_damage).
+		bool blow_hits(const Attack &attack) const;
 
-		// Calculate the maximum damage.
-		double calculate_maxdamage(int16_t leveldelta, double maxdamage) const;
+		// Roll one hit of fixed damage or Shadow Meso.
+		std::pair<int32_t, bool> next_damage(const Attack &attack) const;
 
-		// Calculate a random damage line based on the specified values.
-		std::pair<int32_t, bool> next_damage(double mindamage, double maxdamage, float hitchance, float critical,
-											 const Attack &attack) const;
+		// Roll a blow's hit `index`; Shadow Partner's copy the first set's.
+		std::pair<int32_t, bool> next_blow(const Attack &attack, const std::vector<std::pair<int32_t, bool>> &hits,
+										   size_t index) const;
 
 		// Roll one hit of a spell (magic_damage).
 		int32_t next_magic_damage(const Attack &attack) const;

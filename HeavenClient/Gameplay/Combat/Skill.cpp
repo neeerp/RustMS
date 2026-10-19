@@ -268,8 +268,13 @@ namespace ms
 			attack.damagetype = Attack::DMG_MAGIC;
 		} else
 		{
-			attack.mindamage *= stats.damage;
-			attack.maxdamage *= stats.damage;
+			attack.blow.scale = stats.damage;
+			attack.element = SkillData::get(skillid).get_element();
+
+			// Inferno's and Blizzard's element counts x percent.
+			if (skillid == 3111003 || skillid == 3211003)
+				attack.blow.amplify = stats.x;
+
 			attack.damagetype = Attack::DMG_WEAPON;
 		}
 
@@ -324,6 +329,8 @@ namespace ms
 			if (attack.type == Attack::CLOSE && !projectile)
 				attack.range = user.get_afterimage().get_range();
 		}
+
+		attack.blow.motion = physical_damage::motion(user.get_look().get_action_name(), attack.type == Attack::RANGED);
 	}
 
 	void Skill::apply_hiteffects(const AttackUser &user, Mob &target) const

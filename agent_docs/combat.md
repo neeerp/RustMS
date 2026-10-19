@@ -209,7 +209,22 @@ misses as a blow does but ignores the mob's defense. Snipe's shot never
 misses and meets neither defense nor guards: 199,999 less a roll from 0 to
 10,000 (`shot_path::snipe_damage`, 0x78e4d6), always shown as a critical
 (FUN_00668b83). Another player's attack shows a hit as a critical when its
-damage has the top bit set (0x980620); RustMS never sets it.
+damage has the top bit set (0x980620); RustMS sets it only for Snipe.
+
+HeavenClient rolls every other blow as v83's PDamage does (`Mob::next_blow`,
+`Gameplay/Combat/PhysicalDamage.h`, FUN_0078df87). The weapon, not the job,
+picks the stats and the multiplier, and a swing and a stab differ by the
+action's name; bow, crossbow, claw and gun whacks and a prone stab have
+formulas of their own. The roll starts at the mastery's share of the main
+stat (`(5m + 10)%`, 10% unlearned), and the mastery skill counts only for the
+reach it suits. A hit lands when 70% to 130% of the accuracy (ten percent
+lower for each level the mob is above) reaches the mob's avoid. Then come the
+level penalty, the skill's element, a White Knight charge, a defense roll of
+half to 0.6 of the mob's, the skill's percent, the Combo orbs, a critical
+(the weapon's crit skill, Sharp Eyes, or Stun Mastery on a stunned mob),
+Power Guard Up, Shadow Partner's share of the first set, Hard Skin, Berserk
+and Barrage, at most 199,999. A shot adds the attack of the ammo it throws,
+and the stat window shows the same range v83 does (FUN_008c2870).
 
 HeavenClient picks targets as v83 does (`Combat::find_targets`). Melee and
 magic attacks take the mobs whose body overlaps the attack range in the order

@@ -129,6 +129,9 @@ namespace ms
 		// The percent Combo Attack's orbs make a swing's or a shot's damage, 0 for none.
 		int32_t combo_percent(int32_t skill) const;
 
+		// The percent of the first set's damage Shadow Partner's set does.
+		int32_t partner_percent(int32_t skill) const;
+
 		// Execute a rush movement
 		void rush(double targetx);
 

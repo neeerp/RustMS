@@ -38,32 +38,6 @@ namespace ms
 		stats.add_value(EquipStat::Id::AVOID, level["z"]);
 	}
 
-	template<Weapon::Type W1, Weapon::Type W2>
-	bool f_is_applicable(CharStats &stats, nl::node level)
-	{
-		return f_is_applicable<W1>(stats, level) || f_is_applicable<W2>(stats, level);
-	}
-
-	template<Weapon::Type W1>
-	bool f_is_applicable(CharStats &stats, nl::node)
-	{
-		return stats.get_weapontype() == W1;
-	}
-
-	template<Weapon::Type...W>
-	bool WeaponMasteryBuff<W...>::is_applicable(CharStats &stats, nl::node level) const
-	{
-		return f_is_applicable<W...>(stats, level);
-	}
-
-	template<Weapon::Type...W>
-	void WeaponMasteryBuff<W...>::apply_to(CharStats &stats, nl::node level) const
-	{
-		float mastery = static_cast<float>(level["mastery"]) / 100;
-		stats.set_mastery(mastery);
-		stats.add_value(EquipStat::Id::ACC, level["x"]);
-	}
-
 	void AchillesBuff::apply_to(CharStats &stats, nl::node level) const
 	{
 		// Achilles leaves x per mille of a hit.
@@ -71,53 +45,19 @@ namespace ms
 		stats.set_reducedamage(reducedamage);
 	}
 
-	bool BerserkBuff::is_applicable(CharStats &stats, nl::node level) const
-	{
-		float hp_percent = static_cast<float>(level["x"]) / 100;
-		int32_t hp_threshold = static_cast<int32_t>(stats.get_total(EquipStat::Id::HP) * hp_percent);
-		int32_t hp_current = stats.get_stat(MapleStat::Id::HP);
-
-		return hp_current <= hp_threshold;
-	}
-
-	void BerserkBuff::apply_to(CharStats &stats, nl::node level) const
-	{
-		float damagepercent = static_cast<float>(level["damage"]) / 100;
-		stats.set_damagepercent(damagepercent);
-	}
-
 	PassiveBuffs::PassiveBuffs()
 	{
 		// Beginner
 		buffs[SkillId::Id::ANGEL_BLESSING] = std::make_unique<AngelBlessingBuff>();
 
-		// Fighter
-		buffs[SkillId::Id::SWORD_MASTERY_FIGHTER] = std::make_unique<WeaponMasteryBuff<Weapon::Type::SWORD_1H, Weapon::Type::SWORD_2H>>();
-		buffs[SkillId::Id::AXE_MASTERY] = std::make_unique<WeaponMasteryBuff<Weapon::Type::AXE_1H, Weapon::Type::AXE_2H>>();
-
-		// Crusader
-
 		// Hero
 		buffs[SkillId::Id::ACHILLES_HERO] = std::make_unique<AchillesBuff>();
-
-		// Page
-		buffs[SkillId::Id::SWORD_MASTERY_PAGE] = std::make_unique<WeaponMasteryBuff<Weapon::Type::SWORD_1H, Weapon::Type::SWORD_2H>>();
-		buffs[SkillId::Id::BW_MASTERY] = std::make_unique<WeaponMasteryBuff<Weapon::Type::MACE_1H, Weapon::Type::MACE_2H>>();
-
-		// White Knight
 
 		// Paladin
 		buffs[SkillId::Id::ACHILLES_PALADIN] = std::make_unique<AchillesBuff>();
 
-		// Spearman
-		buffs[SkillId::Id::SPEAR_MASTERY] = std::make_unique<WeaponMasteryBuff<Weapon::Type::SPEAR>>();
-		buffs[SkillId::Id::PA_MASTERY] = std::make_unique<WeaponMasteryBuff<Weapon::Type::POLEARM>>();
-
-		// Dragon Knight
-
 		// Dark Knight
 		buffs[SkillId::Id::ACHILLES_DK] = std::make_unique<AchillesBuff>();
-		buffs[SkillId::Id::BERSERK] = std::make_unique<BerserkBuff>();
 	}
 
 	void PassiveBuffs::apply_buff(CharStats &stats, int32_t skill_id, int32_t skill_level) const

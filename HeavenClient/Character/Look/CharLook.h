@@ -115,6 +115,9 @@ namespace ms
 
 		Stance::Id get_stance() const;
 
+		// The body action playing, or else the stance, by name.
+		std::string get_action_name() const;
+
 		// Return the face's offset from the feet in the current frame, facing left.
 		Point<int16_t> get_facepos() const;
 

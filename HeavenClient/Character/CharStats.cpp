@@ -21,7 +21,9 @@
 #include "StatCaps.h"
 
 #include "../Gameplay/Combat/Attack.h"
+#include "../Gameplay/Combat/PhysicalDamage.h"
 
+#include <algorithm>
 #include <cmath>
 
 namespace ms
@@ -58,12 +60,11 @@ namespace ms
 		honor = 0;
 		attackspeed = 0;
 		projectilerange = 400;
-		mastery = 0.0f;
+		mastery = 0;
 		// v83 has no base critical rate; only skills such as Critical Shot add one.
 		critical = 0.0f;
 		mincrit = 0.5f;
 		maxcrit = 0.75f;
-		damagepercent = 0.0f;
 		bossdmg = 0.0f;
 		ignoredef = 0.0f;
 		stance = 0.0f;
@@ -73,7 +74,7 @@ namespace ms
 
 	void CharStats::close_totalstats()
 	{
-		totalstats[EquipStat::Id::ACC] += calculateaccuracy();
+		totalstats[EquipStat::Id::ACC] += base_accuracy();
 
 		for (auto iter : percentages)
 		{
@@ -83,66 +84,34 @@ namespace ms
 			set_total(stat, total);
 		}
 
-		int32_t primary = get_primary_stat();
-		int32_t secondary = get_secondary_stat();
-		int32_t attack = get_total(EquipStat::Id::WATK);
-		float multiplier = damagepercent + static_cast<float>(attack) / 100;
-		maxdamage = static_cast<int32_t>((primary + secondary) * multiplier);
-		mindamage = static_cast<int32_t>(((primary * 0.9f * mastery) + secondary) * multiplier);
+		// The window's range (FUN_008c2870): the least roll of a stab, and
+		// the whole of a swing, between 1 and 199999.
+		namespace pd = physical_damage;
+
+		pd::Weapon weapon = pd::weapon(static_cast<int32_t>(weapontype) * 10000);
+		pd::Stats stats{ get_total(EquipStat::Id::STR), get_total(EquipStat::Id::DEX), get_total(EquipStat::Id::LUK) };
+		int32_t pad = pd::attack(get_total(EquipStat::Id::WATK));
+		int32_t id = job.get_id();
+		auto shown = [](double damage) { return std::clamp(static_cast<int32_t>(damage), 1, 199999); };
+		mindamage = shown(pd::lowest(pd::wielded(weapon, id, 0, false, stats, pd::least(mastery)), pad));
+		maxdamage = shown(pd::highest(pd::wielded(weapon, id, 0, true, stats, 1.0), pad));
 	}
 
-	int32_t CharStats::calculateaccuracy() const
+	int32_t CharStats::base_accuracy() const
 	{
-		int32_t totaldex = get_total(EquipStat::Id::DEX);
-		int32_t totalluk = get_total(EquipStat::Id::LUK);
+		// A Brawler's, a pirate's, an archer's and a thief's DEX counts for
+		// less (SetFrom, 0x77f663).
+		int32_t id = job.get_id();
+		double dex = get_total(EquipStat::Id::DEX);
+		double luk = get_total(EquipStat::Id::LUK);
 
-		return static_cast<int32_t>(totaldex * 0.8f + totalluk * 0.5f);
-	}
+		if (id / 10 == 51)
+			return static_cast<int32_t>(dex * 0.9 + luk * 0.3);
 
-	int32_t CharStats::get_primary_stat() const
-	{
-		EquipStat::Id primary = job.get_primary(weapontype);
+		if (id / 100 == 5 || id % 1000 / 100 == 3 || id % 1000 / 100 == 4)
+			return static_cast<int32_t>(dex * 0.6 + luk * 0.3);
 
-		return static_cast<int32_t>(get_multiplier() * get_total(primary));
-	}
-
-	int32_t CharStats::get_secondary_stat() const
-	{
-		EquipStat::Id secondary = job.get_secondary(weapontype);
-
-		return get_total(secondary);
-	}
-
-	float CharStats::get_multiplier() const
-	{
-		switch (weapontype)
-		{
-			case Weapon::Type::SWORD_1H:
-				return 4.0f;
-			case Weapon::Type::AXE_1H:
-			case Weapon::Type::MACE_1H:
-			case Weapon::Type::WAND:
-			case Weapon::Type::STAFF:
-				return 4.4f;
-			case Weapon::Type::DAGGER:
-			case Weapon::Type::CROSSBOW:
-			case Weapon::Type::CLAW:
-			case Weapon::Type::GUN:
-				return 3.6f;
-			case Weapon::Type::SWORD_2H:
-				return 4.6f;
-			case Weapon::Type::AXE_2H:
-			case Weapon::Type::MACE_2H:
-			case Weapon::Type::KNUCKLE:
-				return 4.8f;
-			case Weapon::Type::SPEAR:
-			case Weapon::Type::POLEARM:
-				return 5.0f;
-			case Weapon::Type::BOW:
-				return 3.4f;
-			default:
-				return 0.0f;
-		}
+		return static_cast<int32_t>(dex * 0.8 + luk * 0.5);
 	}
 
 	void CharStats::set_stat(MapleStat::Id stat, uint16_t value)
@@ -198,14 +167,9 @@ namespace ms
 		portal = p;
 	}
 
-	void CharStats::set_mastery(float m)
+	void CharStats::set_mastery(int32_t m)
 	{
-		mastery = 0.5f + m;
-	}
-
-	void CharStats::set_damagepercent(float d)
-	{
-		damagepercent = d;
+		mastery = m;
 	}
 
 	void CharStats::set_reducedamage(float r)
@@ -308,7 +272,7 @@ namespace ms
 		return weapontype;
 	}
 
-	float CharStats::get_mastery() const
+	int32_t CharStats::get_mastery() const
 	{
 		return mastery;
 	}
