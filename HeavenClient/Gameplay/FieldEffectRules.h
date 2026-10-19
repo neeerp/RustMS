@@ -2,9 +2,10 @@
 
 #include <cmath>
 #include <cstdint>
+#include <optional>
 #include <string>
 
-// The numbers behind v83's FIELD_EFFECT (0x8A) modes: summons, screen effects and BGM changes.
+// The numbers behind v83's FIELD_EFFECT (0x8A) modes (summons, screen effects and BGM changes) and its back fades.
 namespace ms::field_effect
 {
 	// A summon's sound by its distance from the player: full within 250 px, falling to 40 at 1000 px
@@ -61,5 +62,27 @@ namespace ms::field_effect
 		double hundredths = 625 - 1280000 / (15 * volume + 128);
 
 		return static_cast<float>(std::pow(10.0, hundredths / 2000));
+	}
+
+	// SET_BACK_EFFECT (0x80) fades a back in to full (mode 0) or out to nothing (mode 1). Other modes change nothing
+	// (FUN_006445c5).
+	inline std::optional<float> back_target(uint8_t mode)
+	{
+		if (mode == 0)
+			return 255.0f;
+
+		if (mode == 1)
+			return 0.0f;
+
+		return std::nullopt;
+	}
+
+	// A back's alpha `elapsed` ms into a fade from `from` to `to` that takes `duration` ms. Gr2D moves it linearly.
+	inline float back_alpha(float from, float to, int32_t elapsed, int32_t duration)
+	{
+		if (elapsed >= duration)
+			return to;
+
+		return from + (to - from) * elapsed / duration;
 	}
 }

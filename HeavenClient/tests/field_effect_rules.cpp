@@ -32,6 +32,13 @@ int main()
 		require(std::abs(fade_gain(300, BGM_FADE) - 0.53f) < 0.01f, "half the volume is 5.5 dB down");
 		require(fade_gain(450, BGM_FADE) < 0.2f && fade_gain(450, BGM_FADE) > fade_gain(540, BGM_FADE), "falls away");
 
+		require(back_target(0) == 255.0f && back_target(1) == 0.0f, "in to full, out to nothing");
+		require(!back_target(2) && !back_target(255), "other modes do nothing");
+
+		require(back_alpha(255, 0, 0, 1000) == 255 && back_alpha(255, 0, 250, 1000) == 191.25f, "linear");
+		require(back_alpha(100, 255, 1000, 1000) == 255 && back_alpha(100, 255, 1200, 1000) == 255, "then held");
+		require(back_alpha(0, 255, 0, 0) == 255, "at once without a duration");
+
 		std::cout << "Field effect rules passed\n";
 		return 0;
 	}

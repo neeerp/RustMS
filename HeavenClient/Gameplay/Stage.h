@@ -168,6 +168,12 @@ namespace ms
 		// SET_MAP_OBJECT_VISIBLE: show or hide the map objs with a tag.
 		void show_tag(const std::string &tag, bool shown);
 
+		// SET_BACK_EFFECT: fade one of the map's backs in (mode 0) or out (mode 1) over `duration` ms.
+		void fade_back(uint8_t mode, uint8_t index, int32_t duration);
+
+		// CLEAR_BACK_EFFECT: put the map's backs back as they were.
+		void reset_backs();
+
 		// Draw the screen effects that go above the UI.
 		void draw_overlay(float alpha) const;
 

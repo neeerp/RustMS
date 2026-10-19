@@ -1209,6 +1209,17 @@ namespace ms
 		tilesobjs.show_tags([&](const std::string &other) { return other == tag ? std::optional<bool>(shown) : std::nullopt; });
 	}
 
+	void Stage::fade_back(uint8_t mode, uint8_t index, int32_t duration)
+	{
+		if (std::optional<float> target = field_effect::back_target(mode))
+			backgrounds.fade(index, *target, duration);
+	}
+
+	void Stage::reset_backs()
+	{
+		backgrounds.reset();
+	}
+
 	void Stage::show_quest_tags()
 	{
 		QuestLog &quests = player.get_quests();

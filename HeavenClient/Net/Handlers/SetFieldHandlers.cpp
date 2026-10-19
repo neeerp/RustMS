@@ -381,6 +381,21 @@ namespace ms
 		}
 	}
 
+	void BackEffectHandler::handle(InPacket& recv) const
+	{
+		uint8_t mode = recv.read_byte();
+		// Read but unused (FUN_00587d24).
+		recv.skip_int();
+		uint8_t index = recv.read_byte();
+		int32_t duration = recv.read_int();
+		Stage::get().fade_back(mode, index, duration);
+	}
+
+	void ClearBackEffectHandler::handle(InPacket&) const
+	{
+		Stage::get().reset_backs();
+	}
+
 	void ObstacleResetHandler::handle(InPacket&) const
 	{
 		Stage::get().reset_obstacles();

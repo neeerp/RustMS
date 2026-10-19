@@ -95,7 +95,9 @@ namespace ms
 
 		SKILL_MACROS = 124,
 		SET_FIELD = 125,
+		SET_BACK_EFFECT = 128,
 		SET_MAP_OBJECT_VISIBLE = 129,
+		CLEAR_BACK_EFFECT = 130,
 		BLOCKED_MAP = 131,
 		BLOCKED_SERVER = 132,
 		WHISPER = 135,
@@ -237,7 +239,9 @@ namespace ms
 		emplace<FIELD_OBSTACLE_ONOFF, ObjectStateHandler>();
 		emplace<FIELD_OBSTACLE_ONOFF_LIST, ObjectStateListHandler>();
 		emplace<FIELD_OBSTACLE_ALL_RESET, ObstacleResetHandler>();
+		emplace<SET_BACK_EFFECT, BackEffectHandler>();
 		emplace<SET_MAP_OBJECT_VISIBLE, MapObjectVisibleHandler>();
+		emplace<CLEAR_BACK_EFFECT, ClearBackEffectHandler>();
 		emplace<SET_OBJECT_STATE, ObjectStateHandler>();
 
 		// MapObject handlers

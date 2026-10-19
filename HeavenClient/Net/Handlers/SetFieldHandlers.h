@@ -92,6 +92,20 @@ namespace ms
 		void handle(InPacket& recv) const override;
 	};
 
+	// One of the map's backs fades in or out (v83 FUN_006445c5).
+	class BackEffectHandler : public PacketHandler
+	{
+	public:
+		void handle(InPacket& recv) const override;
+	};
+
+	// The map's backs are loaded again, undoing any fades (v83 FUN_006449ca).
+	class ClearBackEffectHandler : public PacketHandler
+	{
+	public:
+		void handle(InPacket& recv) const override;
+	};
+
 	// Every named trap goes back to its first state (v83 0x5330b6).
 	class ObstacleResetHandler : public PacketHandler
 	{
