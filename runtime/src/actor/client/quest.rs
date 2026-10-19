@@ -306,10 +306,16 @@ impl ClientActor {
             let client_id = self.client_id;
             let mut announce = Vec::new();
             if levelled {
-                announce.push(effect::build_foreign_effect(client_id, CharEffect::LevelUp)?);
+                announce.push(effect::build_foreign_effect(
+                    client_id,
+                    CharEffect::LevelUp,
+                )?);
             }
             if advanced {
-                announce.push(effect::build_foreign_effect(client_id, CharEffect::JobChange)?);
+                announce.push(effect::build_foreign_effect(
+                    client_id,
+                    CharEffect::JobChange,
+                )?);
             }
             self.send_to_field(FieldMessage::UpdateAvatar {
                 client_id,

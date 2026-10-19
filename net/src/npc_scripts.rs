@@ -937,7 +937,10 @@ mod tests {
 
         // Too little STR: the intro, then a word about training.
         let mut balrog = NpcScript::for_npc(1022000, &beginner).unwrap();
-        assert_eq!(buttons(&balrog.respond(ScriptInput::Next).unwrap()), (true, false));
+        assert_eq!(
+            buttons(&balrog.respond(ScriptInput::Next).unwrap()),
+            (true, false)
+        );
 
         // Past beginner, a single page.
         beginner.stats.job = 300;
