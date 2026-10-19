@@ -218,6 +218,8 @@ if(HEAVENCLIENT_BUILD_TESTS)
     add_test(NAME obstacle_rules COMMAND obstacle_rules_tests)
     add_executable(tremble_rules_tests tests/tremble_rules.cpp)
     add_test(NAME tremble_rules COMMAND tremble_rules_tests)
+    add_executable(field_effect_rules_tests tests/field_effect_rules.cpp)
+    add_test(NAME field_effect_rules COMMAND field_effect_rules_tests)
     add_executable(map_clouds_tests tests/map_clouds.cpp)
     add_test(NAME map_clouds COMMAND map_clouds_tests)
     add_executable(map_tooltip_rules_tests tests/map_tooltip_rules.cpp)
@@ -448,8 +450,6 @@ add_executable(HeavenClient
     Gameplay/MapleMap/ClockRules.h
     Gameplay/MapleMap/MapDrops.cpp
     Gameplay/MapleMap/MapDrops.h
-    Gameplay/MapleMap/MapEffect.cpp
-    Gameplay/MapleMap/MapEffect.h
     Gameplay/MapleMap/MapInfo.cpp
     Gameplay/MapleMap/MapInfo.h
     Gameplay/MapleMap/CloudLayout.h
@@ -515,6 +515,7 @@ add_executable(HeavenClient
     Gameplay/Stage.cpp
     Gameplay/Stage.h
     Gameplay/TrembleRules.h
+    Gameplay/FieldEffectRules.h
     Graphics/Animation.cpp
     Graphics/Animation.h
     Graphics/Color.cpp

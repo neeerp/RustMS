@@ -130,6 +130,9 @@ namespace ms
 				element->draw(inter);
 		}
 
+		// A screen effect with its own z, such as the reward roulette, plays above the windows.
+		Stage::get().draw_overlay(inter);
+
 		if (tooltip)
 			tooltip->draw(cursor + Point<int16_t>(0, 22));
 

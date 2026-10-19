@@ -17,11 +17,14 @@
 //////////////////////////////////////////////////////////////////////////////////
 #include "TestingHandlers.h"
 
+#include "../../Gameplay/FieldEffectRules.h"
 #include "../../Gameplay/Stage.h"
 #include "../../IO/UI.h"
 
 #include "../../IO/UITypes/UILoginNotice.h"
 #include "../../IO/UITypes/UIMobGage.h"
+
+#include <nlnx/nx.hpp>
 
 namespace ms
 {
@@ -41,6 +44,18 @@ namespace ms
 	{
 		int rand = recv.read_byte();
 
+		// A summon's puff and sound, louder near the player (FUN_005330f7).
+		if (rand == 0)
+		{
+			uint8_t type = recv.read_byte();
+			int32_t x = recv.read_int();
+			int32_t y = recv.read_int();
+
+			Stage::get().add_summon_effect(type, Point<int16_t>(x, y));
+
+			return;
+		}
+
 		// The view shakes after a delay in ms, a heavy shake fading faster (0x5333eb).
 		if (rand == 1)
 		{
@@ -52,12 +67,23 @@ namespace ms
 			return;
 		}
 
-		// Effect
+		// A one-time effect on the screen; packets stack.
 		if (rand == 3)
 		{
 			std::string path = recv.read_string();
 
 			Stage::get().add_effect(path);
+
+			return;
+		}
+
+		// A sound from Sound.nx Field.img, played once.
+		if (rand == 4)
+		{
+			nl::node sound = nl::nx::sound["Field.img"].resolve(recv.read_string());
+
+			if (sound)
+				Sound(sound).play();
 
 			return;
 		}
@@ -72,6 +98,32 @@ namespace ms
 			uint8_t bgcolor = recv.read_byte();
 
 			UIMobGage::show(mobid, hp, maxhp, color, bgcolor);
+
+			return;
+		}
+
+		// The BGM until the next map, after the last one fades out.
+		if (rand == 6)
+		{
+			std::string path = field_effect::bgm_path(recv.read_string());
+
+			if (!path.empty())
+				Music(path).play(field_effect::BGM_FADE);
+
+			return;
+		}
+
+		// The reward roulette's three reels, above the windows. They stop at the first that is missing
+		// (FUN_0043d083).
+		if (rand == 7)
+		{
+			int32_t job = recv.read_int();
+			int32_t part = recv.read_int();
+			int32_t level = recv.read_int();
+			Stage &stage = Stage::get();
+
+			if (stage.add_effect("miro/RR1/" + std::to_string(job)) && stage.add_effect("miro/RR2/" + std::to_string(part)))
+				stage.add_effect("miro/RR3/" + std::to_string(level));
 
 			return;
 		}

@@ -23,6 +23,7 @@
 #include "Timer.h"
 #include "MapleMap/CharClick.h"
 #include "Combat/FlashJump.h"
+#include "FieldEffectRules.h"
 #include "MapleMap/DoorRules.h"
 #include "MapleMap/Npc.h"
 
@@ -155,6 +156,7 @@ namespace ms
 		ship = MapShip(src);
 		clock = MapClock(src);
 		ground_effects = EffectLayer();
+		field_effects = EffectLayer();
 
 		if (mapid != -1)
 			player.get_stats().set_mapid(mapid);
@@ -163,8 +165,12 @@ namespace ms
 	void Stage::respawn(int8_t portalid, std::optional<Point<int16_t>> chase)
 	{
 		// v83's Cash Shop stage has no music of its own; the Cash Shop plays
-		// its theme.
-		Music(mapid == -1 ? "BgmUI.img/ShopBgm" : mapinfo.get_bgm()).play();
+		// its theme. A map's BGM fades the last one out, as PlayFieldBGM does
+		// (FUN_0064211e).
+		if (mapid == -1)
+			Music("BgmUI.img/ShopBgm").play();
+		else
+			Music(mapinfo.get_bgm()).play(field_effect::BGM_FADE);
 
 		// A chased point is on the ground already, as a door is; look from
 		// just above it, since its rounded y may sit below a slope.
@@ -235,7 +241,16 @@ namespace ms
 		// The tips of the zones the player stands in are at z 0, above the
 		// field's own layers (FUN_008f3141).
 		tooltips.draw(viewpos);
-		effect.draw();
+		field_effects.drawabove(viewpos, alpha);
+		screen_effects.drawabove(Point<int16_t>(0, 0), alpha);
+	}
+
+	void Stage::draw_overlay(float alpha) const
+	{
+		if (state != State::ACTIVE)
+			return;
+
+		overlay_effects.drawabove(Point<int16_t>(0, 0), alpha);
 	}
 
 	void Stage::draw_fear(double viewx, double viewy, float alpha) const
@@ -272,8 +287,10 @@ namespace ms
 		clouds.update();
 		ship.update();
 		clock.update();
-		effect.update();
 		ground_effects.update();
+		field_effects.update();
+		screen_effects.update();
+		overlay_effects.update();
 		tilesobjs.update();
 
 		reactors.update(physics);
@@ -1107,9 +1124,39 @@ namespace ms
 		return field_key;
 	}
 
-	void Stage::add_effect(std::string path)
+	bool Stage::add_effect(std::string path)
 	{
-		effect = MapEffect(path);
+		nl::node src = nl::nx::map["Effect.img"].resolve(path);
+
+		if (!src)
+			return false;
+
+		// One-time and stacking, at z 0xc00614a4 below the UI unless the node has its own z, as
+		// only the miro nodes do (FUN_005330f7).
+		auto position = field_effect::screen_position(Constants::Constants::get().get_viewwidth(), Constants::Constants::get().get_viewheight());
+		EffectLayer &layer = src["z"] ? overlay_effects : screen_effects;
+		layer.add(src, DrawArgument(Point<int16_t>(position.x, position.y)));
+
+		return true;
+	}
+
+	void Stage::add_summon_effect(uint8_t type, Point<int16_t> position)
+	{
+		std::string id = std::to_string(type);
+		nl::node effect = nl::nx::effect["Summon.img"][id];
+
+		if (effect)
+			field_effects.add(effect, DrawArgument(position));
+
+		nl::node sound = nl::nx::sound["Summon.img"][id];
+
+		if (sound)
+		{
+			Point<int16_t> distance = position - player.get_position();
+			double length = std::sqrt(static_cast<double>(distance.x()) * distance.x() + static_cast<double>(distance.y()) * distance.y());
+
+			Sound(sound).play(field_effect::summon_volume(length));
+		}
 	}
 
 	void Stage::move_ship(uint8_t target, uint8_t event)

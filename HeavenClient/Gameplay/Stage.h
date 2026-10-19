@@ -40,7 +40,6 @@
 #include "MapleMap/MapReactors.h"
 #include "MapleMap/MapNpcs.h"
 #include "MapleMap/MapDrops.h"
-#include "MapleMap/MapEffect.h"
 #include "MapleMap/MapClock.h"
 #include "MapleMap/MapShip.h"
 #include "Physics/Physics.h"
@@ -153,8 +152,15 @@ namespace ms
 		// Return a pointer to a character, possibly the player.
 		Optional<Char> get_character(int32_t cid);
 
-		// Set a map effect
-		void add_effect(std::string path);
+		// FIELD_EFFECT 3: play Map.nx Effect.img/<path> once on the screen, above the UI when the
+		// node has a z. False when there is no such effect.
+		bool add_effect(std::string path);
+
+		// FIELD_EFFECT 0: a summon's puff and sound at a point on the map.
+		void add_summon_effect(uint8_t type, Point<int16_t> position);
+
+		// Draw the screen effects that go above the UI.
+		void draw_overlay(float alpha) const;
 
 		// CONTI_MOVE: the map's ship comes or goes.
 		void move_ship(uint8_t target, uint8_t event);
@@ -285,7 +291,6 @@ namespace ms
 		int32_t since_mist_hurt = mist::HURT_INTERVAL + 1;
 		MapDoors doors;
 		MapSummons summons;
-		MapEffect effect;
 		MapShip ship;
 		MapClouds clouds;
 		MapTooltips tooltips;
@@ -301,6 +306,10 @@ namespace ms
 		std::optional<ClockTime> pending_clock;
 		// Effects left where they started, such as a jump pad's burst.
 		EffectLayer ground_effects;
+		// One-time FIELD_EFFECT effects: on the map, on the screen, and on the screen above the UI.
+		EffectLayer field_effects;
+		EffectLayer screen_effects;
+		EffectLayer overlay_effects;
 		Animation jump_effect;
 		// What Fear leaves the player to see (Effect/MapEff.img/Viewrange/3).
 		Texture fear_sight;
