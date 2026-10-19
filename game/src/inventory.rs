@@ -199,6 +199,10 @@ pub struct EquipStats {
     pub item_exp: i32,
 }
 
+/// `Item.flags` bit of equipment that can no longer change hands, which
+/// equipment with `equipTradeBlock` gets once worn.
+pub const FLAG_UNTRADEABLE: i16 = 0x08;
+
 /// One stack (or one equipment instance) occupying an inventory slot.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Item {

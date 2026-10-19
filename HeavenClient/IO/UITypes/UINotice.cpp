@@ -122,11 +122,10 @@ namespace ms
 		return TEXT_TOP + TEXT_PADDING + question.height() + FIELD_GAP;
 	}
 
-	UIYesNo::UIYesNo(std::string message, std::function<void(bool yes)> yh, Text::Alignment alignment,
-					 uint8_t a) : UINotice(message, NoticeType::YESNO, alignment)
+	UIYesNo::UIYesNo(std::string message, std::function<void(bool yes)> yh, Text::Alignment alignment)
+			: UINotice(message, NoticeType::YESNO, alignment)
 	{
 		yesnohandler = yh;
-		asks = a;
 
 		nl::node src = NxFiles::ui_classic["Basic.img"];
 
@@ -165,8 +164,7 @@ namespace ms
 		switch (buttonid)
 		{
 			case Buttons::YES:
-				if (!answer(true))
-					return Button::State::NORMAL;
+				answer(true);
 				break;
 			case Buttons::NO:
 				answer(false);
@@ -176,19 +174,10 @@ namespace ms
 		return Button::State::PRESSED;
 	}
 
-	bool UIYesNo::answer(bool yes)
+	void UIYesNo::answer(bool yes)
 	{
-		if (yes && asks > 1)
-		{
-			asks--;
-
-			return false;
-		}
-
 		deactivate();
 		yesnohandler(yes);
-
-		return true;
 	}
 
 	UIEnterNumber::UIEnterNumber(std::string message, std::function<void(int32_t)> nh, int32_t m, int32_t quantity,

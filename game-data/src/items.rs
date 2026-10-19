@@ -22,6 +22,8 @@ pub struct ItemInfo {
     pub only: bool,
     /// Items that can't change hands (`info/tradeBlock`).
     pub trade_block: bool,
+    /// Equipment that can't change hands once worn (`info/equipTradeBlock`).
+    pub equip_trade_block: bool,
     /// Items nobody may pick up (`info/pickUpBlock`): the invisible ones
     /// party quests drop.
     pub pickup_block: bool,
@@ -439,6 +441,7 @@ impl ItemData {
             quest: nx.int_child(meta, "quest")? == Some(1),
             only: nx.int_child(meta, "only")? == Some(1),
             trade_block: nx.int_child(meta, "tradeBlock")? == Some(1),
+            equip_trade_block: nx.int_child(meta, "equipTradeBlock")? == Some(1),
             pickup_block: nx.int_child(meta, "pickUpBlock")? == Some(1),
             price: nx.int_child(meta, "price")?.unwrap_or(0),
             unit_price: 0.0,
@@ -765,6 +768,8 @@ mod tests {
         assert_eq!(sword.recovery, None);
         let robe = data.info(1050018).unwrap().unwrap().equip.unwrap();
         assert_eq!(robe.recovery, Some(1.5));
+        let earrings = data.info(1032031).unwrap().unwrap();
+        assert!(earrings.equip_trade_block && !earrings.trade_block);
     }
 
     #[test]

@@ -4,7 +4,7 @@ use crate::handler::{
 use crate::items;
 use crate::loot::Loot;
 use crate::packet::build::world::{inventory, stat};
-use game::inventory::equip_slot;
+use game::inventory::{equip_slot, FLAG_UNTRADEABLE};
 use game::{InventoryType, Item, Player};
 use game_data::items::EquipInfo;
 use packet::{io::read::PktRead, Packet};
@@ -69,7 +69,7 @@ impl WorldHandler for ItemMoveHandler {
 
 /// Take `quantity` of the item in bag slot `from` to throw on the ground.
 /// Returns the changes, what to throw, and whether it vanishes instead of
-/// landing (quest and untradeable items).
+/// landing (quest and untradeable items, and equipment made untradeable).
 fn drop_item(
     player: &mut Player,
     kind: i8,
@@ -112,7 +112,8 @@ fn drop_item(
         .inventory_mut()
         .take(kind, from, quantity)
         .map_err(|_| "bad quantity")?;
-    let vanish = items::info(item.item_id).is_some_and(|info| info.quest || info.trade_block);
+    let vanish = items::info(item.item_id).is_some_and(|info| info.quest || info.trade_block)
+        || item.equip.is_some() && item.flags & FLAG_UNTRADEABLE != 0;
     Ok((changes, Loot::Dropped(Item { quantity, ..item }), vanish))
 }
 
@@ -138,14 +139,14 @@ fn move_item(
         if kind != InventoryType::Equip {
             return Err("only equipment can be worn".into());
         }
-        let item_id = player
-            .inventory
-            .get(kind, from)
-            .ok_or("empty slot")?
-            .item_id;
-        let template = items::info(item_id)
-            .and_then(|info| info.equip)
-            .ok_or("unknown equipment")?;
+        let item = player.inventory.get(kind, from).ok_or("empty slot")?;
+        let item_id = item.item_id;
+        let info = items::info(item_id).ok_or("unknown equipment")?;
+        let template = info.equip.ok_or("unknown equipment")?;
+        // Equipment that can't trade once worn becomes untradeable, which the
+        // client is told by replacing it in the bag before the move (Cosmic
+        // InventoryManipulator.equip).
+        let binds = info.equip_trade_block && item.flags & FLAG_UNTRADEABLE == 0;
         let allowed = match equip_slot::pet_slots(item_id) {
             // Cash items are worn 100 below their slot.
             Some(_) => pet_can_wear(player, &template, to % 100),
@@ -154,10 +155,27 @@ fn move_item(
         if !allowed {
             return Err("requirements not met".into());
         }
-        let changes = player
-            .inventory_mut()
-            .equip(from, to)
-            .map_err(|e| e.to_string())?;
+        let inventory = player.inventory_mut();
+        let mut changes = inventory.equip(from, to).map_err(|e| e.to_string())?;
+        if binds {
+            let mut worn = inventory
+                .get(InventoryType::Equipped, to)
+                .expect("just worn")
+                .clone();
+            worn.flags |= FLAG_UNTRADEABLE;
+            inventory.insert(InventoryType::Equipped, to, worn.clone());
+            changes.splice(
+                0..0,
+                [
+                    game::InventoryChange::Remove { kind, slot: from },
+                    game::InventoryChange::Add {
+                        kind,
+                        slot: from,
+                        item: worn,
+                    },
+                ],
+            );
+        }
         return Ok((changes, true));
     }
     let item_id = player
@@ -326,6 +344,56 @@ mod tests {
             thrown(&actions),
             Some((&Loot::Dropped(Item::stack(2010007, 1)), true))
         );
+    }
+
+    #[test]
+    fn equipment_that_binds_becomes_untradeable_once_worn() {
+        // Timeless Earrings, "Trade disabled when equipped".
+        if items::info(1032031).is_none() {
+            return;
+        }
+        let mut player = crate::codec::stats::sample_player();
+        player.stats.level = 120;
+        let earrings = Item::equipment(1032031, EquipStats::default());
+        player
+            .inventory
+            .insert(InventoryType::Equip, 1, earrings.clone());
+        let (changes, _) = move_item(&mut player, 1, 1, -4).unwrap();
+        let bound = Item {
+            flags: FLAG_UNTRADEABLE,
+            ..earrings
+        };
+        assert_eq!(
+            changes,
+            [
+                game::InventoryChange::Remove {
+                    kind: InventoryType::Equip,
+                    slot: 1
+                },
+                game::InventoryChange::Add {
+                    kind: InventoryType::Equip,
+                    slot: 1,
+                    item: bound.clone()
+                },
+                game::InventoryChange::Move {
+                    kind: InventoryType::Equip,
+                    from: 1,
+                    to: -4
+                },
+            ]
+        );
+        assert_eq!(
+            player.inventory.get(InventoryType::Equipped, -4),
+            Some(&bound)
+        );
+
+        // Worn again, it is already bound; dropped, it vanishes.
+        move_item(&mut player, -1, -4, 1).unwrap();
+        let (changes, _) = move_item(&mut player, 1, 1, -4).unwrap();
+        assert_eq!(changes.len(), 1);
+        move_item(&mut player, -1, -4, 1).unwrap();
+        let actions = handle(&mut player, drop_request(1, 1, 0, 1));
+        assert_eq!(thrown(&actions), Some((&Loot::Dropped(bound), true)));
     }
 
     fn handle(player: &mut Player, packet: Packet) -> Vec<WorldAction> {

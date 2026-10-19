@@ -591,6 +591,62 @@ namespace ms
 			else
 				InChatMessage(Messages::DROP_FIELD).drop();
 		}
+
+		// Put up `steps` from `next` on, then do `then` if every question had Yes for an answer.
+		void confirm(std::vector<item_drop::Step> steps, size_t next, std::function<void()> then)
+		{
+			if (next == steps.size())
+			{
+				then();
+
+				return;
+			}
+
+			item_drop::Step step = steps[next];
+
+			if (step.question)
+			{
+				auto onanswer = [steps, next, then](bool yes)
+				{
+					if (yes)
+						confirm(steps, next + 1, then);
+				};
+
+				UI::get().emplace<UIYesNo>(step.text, onanswer);
+			} else
+			{
+				UI::get().emplace<UIOk>(step.text, [](bool) {});
+			}
+		}
+
+		// Ask to wear the equip in Equip tab `slot` at `worn`, after asking first where wearing it makes it
+		// untradeable (v83 FUN_004f1c2d, last of its checks).
+		void put_on(int16_t slot, int16_t worn)
+		{
+			auto send = [slot, worn]()
+			{
+				Stage::get().get_player().request(EquipItemPacket(slot, worn), ExclRequest::WAIT);
+			};
+
+			const Inventory &inventory = Stage::get().get_player().get_inventory();
+			Optional<const Equip> equip = inventory.get_equip(InventoryType::Id::EQUIP, slot);
+
+			if (equip && ItemData::get(equip->get_item_id()).get_properties().equip_trade_block
+				&& !(equip->get_flags() & item_properties::EQUIP_UNTRADEABLE))
+			{
+				auto onanswer = [send](bool yes)
+				{
+					if (yes)
+						send();
+				};
+
+				UI::get().emplace<UIYesNo>("You cannot trade this item after equipping.\\n Do you still wish to equip?",
+					onanswer);
+			} else
+			{
+				send();
+			}
+		}
 	}
 
 	UIItemInventory::UIItemInventory(const Inventory &invent)
@@ -740,15 +796,27 @@ namespace ms
 				count = inventory.get_item_count(tab, slot);
 
 			const ItemData &idata = ItemData::get(item_id);
-			const bool questitem = idata.is_questitem();
-			const bool untradable = idata.is_untradable();
 			const bool cashitem = idata.is_cashitem() || inventory.get_cash_id(tab, slot) != 0;
+			int16_t flags = 0;
+			int64_t expiration = item_expiry::BEFORE;
+
+			if (Optional<const Equip> equip = inventory.get_equip(tab, slot))
+			{
+				flags = equip->get_flags();
+				expiration = equip->get_expiration();
+			} else if (Optional<const Item> item = inventory.get_item(tab, slot))
+			{
+				flags = item->get_flags();
+				expiration = item->get_expiration();
+			}
+
+			item_drop::Traits traits = item_drop::traits(idata.get_properties(), tab == InventoryType::Id::EQUIP,
+				cashitem, flags, expiration);
 			const Texture &texture = idata.get_icon(false);
 			EquipSlot::Id eqslot = inventory.find_equipslot(item_id);
 
 			icons[slot] = std::make_unique<Icon>(
-					std::make_unique<ItemIcon>(*this, tab, eqslot, slot, item_id, count, questitem, untradable,
-											   cashitem),
+					std::make_unique<ItemIcon>(*this, tab, eqslot, slot, item_id, count, traits),
 					texture, count
 			);
 		} else if (icons.count(slot))
@@ -877,9 +945,7 @@ namespace ms
 							wear_pet_equip(slot, item_id);
 						} else if (can_wear_equip(slot))
 						{
-							int16_t worn = inventory.equip_position(slot, inventory.find_equipslot(item_id));
-
-							Stage::get().get_player().request(EquipItemPacket(slot, worn), ExclRequest::WAIT);
+							put_on(slot, inventory.equip_position(slot, inventory.find_equipslot(item_id)));
 							Sound(Sound::Name::DRAGEND).play();
 						}
 
@@ -1260,6 +1326,16 @@ namespace ms
 		const int32_t item_id = inventory.get_item_id(InventoryType::Id::EQUIP, slot);
 		const EquipData &equipdata = EquipData::get(item_id);
 
+		// Only one of a Unique Equipped Item may be worn, not counting cash slots (FUN_004f2c5e).
+		int16_t worn = inventory.find_item(InventoryType::Id::EQUIPPED, item_id);
+
+		if (ItemData::get(item_id).get_properties().only_equip && worn > 0 && worn < Inventory::CASH_EQUIP)
+		{
+			UI::get().emplace<UIOk>("You can only be equipped with 1 Unique Equipped Item.", [](bool)
+			{});
+			return false;
+		}
+
 		if (meets_equip_reqs(stats, equipdata))
 			return true;
 
@@ -1330,9 +1406,7 @@ namespace ms
 				|| !window->can_wear_pet_equip(slot, part))
 				return;
 
-			int16_t worn = window->inventory.equip_position(slot, static_cast<EquipSlot::Id>(part));
-
-			Stage::get().get_player().request(EquipItemPacket(slot, worn), ExclRequest::WAIT);
+			put_on(slot, window->inventory.equip_position(slot, static_cast<EquipSlot::Id>(part)));
 			Sound(Sound::Name::DRAGEND).play();
 		};
 
@@ -1444,11 +1518,18 @@ namespace ms
 		if (!player.can_request(ExclRequest::WAIT))
 			return;
 
+		if (!item_drop::tradeable(traits))
+		{
+			UI::get().emplace<UIOk>(item_drop::UNAVAILABLE, [](bool) {});
+
+			return;
+		}
+
 		auto tab = static_cast<int8_t>(sourcetab);
 
 		// v83 puts up one of anything that doesn't ask; the server takes
 		// equipment and whole stacks of stars and bullets.
-		if (mini_room::asks_count(item_id, count))
+		if (!traits.expires && mini_room::asks_count(item_id, count))
 		{
 			auto onenter = [tab, source = source, slot](int32_t qty)
 			{
@@ -1465,9 +1546,9 @@ namespace ms
 	void UIItemInventory::ItemIcon::drop_on_shop() const
 	{
 		// v83 refuses these before asking anything (FUN_004f41b9).
-		if (questitem || untradable || cashitem)
+		if (const char *refusal = item_drop::unsellable(traits))
 		{
-			UI::get().emplace<UIOk>("This item is unavailable to trade with others.", [](bool) {});
+			UI::get().emplace<UIOk>(refusal, [](bool) {});
 
 			return;
 		}
@@ -1494,22 +1575,19 @@ namespace ms
 	}
 
 	UIItemInventory::ItemIcon::ItemIcon(const UIItemInventory &parent, InventoryType::Id st, EquipSlot::Id eqs,
-										int16_t s, int32_t iid, int16_t c, bool q, bool u, bool cash) : parent(parent)
+										int16_t s, int32_t iid, int16_t c, item_drop::Traits t) : parent(parent)
 	{
 		sourcetab = st;
 		eqsource = eqs;
 		source = s;
 		item_id = iid;
 		count = c;
-		questitem = q;
-		untradable = u;
-		cashitem = cash;
+		traits = t;
 	}
 
 	void UIItemInventory::ItemIcon::drop_on_stage() const
 	{
 		constexpr const char *dropmessage = "How many will you drop?";
-		constexpr const char *untradablemessage = "This item can't be taken back once\\nthrown away. Will you still drop it?";
 		constexpr const char *cashmessage = "You can't drop this item.";
 
 		const Player &player = Stage::get().get_player();
@@ -1530,7 +1608,10 @@ namespace ms
 			return;
 		}
 
-		if (item_drop::refused(item_id, cashitem))
+		if (item_drop::kept(item_id))
+			return;
+
+		if (item_drop::refused(item_id, traits.cash))
 		{
 			UI::get().emplace<UIOk>(cashmessage, [](bool)
 			{});
@@ -1538,9 +1619,9 @@ namespace ms
 			return;
 		}
 
-		auto drop = [tab = sourcetab, slot = source, id = item_id, max = count, dropmessage]()
+		auto drop = [tab = sourcetab, slot = source, id = item_id, max = count, expires = traits.expires, dropmessage]()
 		{
-			if (item_drop::asks_count(id, max))
+			if (item_drop::asks_count(id, max, expires))
 			{
 				auto onenter = [tab, slot](int32_t qty)
 				{
@@ -1554,20 +1635,7 @@ namespace ms
 			}
 		};
 
-		// As in v83, a quest item that is also untradable asks twice.
-		if (uint8_t asks = item_drop::asks(questitem, untradable))
-		{
-			auto onok = [drop](bool ok)
-			{
-				if (ok)
-					drop();
-			};
-
-			UI::get().emplace<UIYesNo>(untradablemessage, onok, Text::Alignment::CENTER, asks);
-		} else
-		{
-			drop();
-		}
+		confirm(item_drop::steps(item_id, traits), 0, drop);
 	}
 
 	void UIItemInventory::ItemIcon::drop_on_equips(EquipSlot::Id eqslot) const
@@ -1582,16 +1650,12 @@ namespace ms
 					if (std::find(parts->begin(), parts->end(), eqslot) != parts->end()
 						&& parent.can_wear_pet_equip(source, eqslot))
 					{
-						int16_t worn = Stage::get().get_player().get_inventory().equip_position(source, eqslot);
-
-						Stage::get().get_player().request(EquipItemPacket(source, worn), ExclRequest::WAIT);
+						put_on(source, Stage::get().get_player().get_inventory().equip_position(source, eqslot));
 					}
 				} else if (eqsource == eqslot)
 				{
-					int16_t worn = Stage::get().get_player().get_inventory().equip_position(source, eqslot);
-
 					if (parent.can_wear_equip(source))
-						Stage::get().get_player().request(EquipItemPacket(source, worn), ExclRequest::WAIT);
+						put_on(source, Stage::get().get_player().get_inventory().equip_position(source, eqslot));
 				}
 
 				Sound(Sound::Name::DRAGEND).play();
