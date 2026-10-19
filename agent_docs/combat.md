@@ -135,6 +135,13 @@ A skill's HP cost (`skills::hp_cost`, as v83's `FUN_00764256`) is its
 have one. Dragon Roar instead takes its `x` percent of max HP and needs at
 least half of it. Sacrifice takes its `x` percent of its first blow, never
 the last HP, which v83 leaves wholly to the server (Cosmic's rule).
+Final Attack (`skills::FINAL_ATTACKS`) is a swing or shot the client sends
+on its own after a skill attack whose skill lists it under `finalAttack`
+(Power Strike, Slash Blast, Arrow Blow, Double Shot, …). It is an ordinary
+attack packet with the Final Attack's id and level, costs no MP (the
+Cygnus ones have an `mpCon` for their buff), and hits one mob, except that
+after Slash Blast (bit 0 of the attack's flags) it reaches as many as the
+player's Slash Blast does (`skills::slash_blast`).
 HeavenClient sends a skill as the attack v83's `CUserLocal::DoActiveSkill`
 makes it, whatever the weapon: a swing, a shot, or a spell
 (`SkillData::flags_of`). Any other skill goes out as SPECIAL_MOVE. Skills

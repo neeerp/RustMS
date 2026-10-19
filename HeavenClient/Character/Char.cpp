@@ -280,6 +280,11 @@ namespace ms
 		return static_cast<uint16_t>(delay * (get_action_speed() + 10) / 16);
 	}
 
+	uint16_t Char::get_attack_length() const
+	{
+		return static_cast<uint16_t>(look.get_attack_length() * (get_action_speed() + 10) / 16);
+	}
+
 	int32_t Char::get_action_duration(const std::string &action) const
 	{
 		int32_t duration = 0;

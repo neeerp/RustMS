@@ -17,7 +17,9 @@
 //////////////////////////////////////////////////////////////////////////////////
 #pragma once
 
+#include <map>
 #include <string>
+#include <vector>
 
 #include <cstdint>
 
@@ -149,6 +151,10 @@ namespace ms
 		// Return id and level of all required skills.
 		const std::unordered_map<int32_t, int32_t> &get_reqskills() const;
 
+		// The Final Attacks the skill may set off, and the weapon types each
+		// comes with (`finalAttack`).
+		const std::map<int32_t, std::vector<int32_t>> &get_final_attacks() const;
+
 	private:
 		// Allow the cache to use the constructor
 		friend Cache<SkillData>;
@@ -171,6 +177,7 @@ namespace ms
 		std::string desc;
 		std::unordered_map<int32_t, std::string> levels;
 		std::unordered_map<int32_t, int32_t> reqskills;
+		std::map<int32_t, std::vector<int32_t>> final_attacks;
 
 		std::array<Texture, Icon::NUM_ICONS> icons;
 	};

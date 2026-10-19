@@ -190,6 +190,22 @@ pub const SACRIFICE: i32 = 1311005;
 pub const DRAGON_ROAR: i32 = 1311006;
 pub const DRAGON_BLOOD: i32 = 1311008;
 
+/// Final Attack's swings, which the client sends on its own after some of
+/// its skill attacks (their `finalAttack`), and never pays for (0x96cd3e).
+pub const FINAL_ATTACKS: [i32; 10] = [
+    1100002, 1100003, 1200002, 1200003, 1300002, 1300003, 3100001, 3200001, 11101002, 13101002,
+];
+
+/// The Slash Blast whose mobs a Final Attack after it reaches: the Dawn
+/// Warrior's for a Cygnus Knight (0x95150e).
+pub fn slash_blast(player: &Player) -> i32 {
+    if player.stats.job / 1000 == 1 {
+        11001003
+    } else {
+        1001005
+    }
+}
+
 /// The HP a skill costs, or `None` when the player hasn't enough
 /// (FUN_00764256): its `hpCon`, which must stay under their HP. Dragon
 /// Roar instead takes its `x` percent of their max HP, and needs at least

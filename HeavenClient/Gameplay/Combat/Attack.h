@@ -78,6 +78,8 @@ namespace ms
 		uint8_t mobcount = 0;
 		uint8_t speed = 0;
 		uint8_t stance = 0;
+		// Flags: bit 0 marks a Final Attack after Slash Blast (0x952949).
+		uint8_t display = 0;
 		int32_t skill = 0;
 		// How long a held skill was charged, in ms.
 		int32_t charge = 0;
@@ -185,6 +187,7 @@ namespace ms
 			charge = attack.charge;
 			speed = attack.speed;
 			stance = attack.stance;
+			display = attack.display;
 			bullet = attack.bullet;
 			bulletslot = attack.bulletslot;
 			toleft = attack.toleft;

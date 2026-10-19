@@ -19,6 +19,7 @@
 
 #include <cstdint>
 
+#include "FinalAttack.h"
 #include "MonsterMagnet.h"
 #include "RegularAttack.h"
 #include "ShotPath.h"
@@ -199,9 +200,26 @@ namespace ms
 		// order they entered the map (FUN_00678760).
 		std::vector<int32_t> find_undead(Rectangle<int16_t> range, uint8_t count) const;
 
+		// A Final Attack in this stance, after the skill `trigger`.
+		struct Follow
+		{
+			Stance::Id stance;
+			int32_t trigger;
+		};
+
 		// Use the move. A held skill hits with its `charge`, and its shots
-		// while held keep the body's action (`held`).
-		void apply_move(const SpecialMove &move, int32_t charge = 0, bool held = false);
+		// while held keep the body's action (`held`). A Final Attack
+		// (`follow`) cuts short the action under way with its own.
+		void apply_move(const SpecialMove &move, int32_t charge = 0, bool held = false,
+						const Follow *follow = nullptr);
+
+		// After a skill attack, see whether one of the Final Attacks it may
+		// set off comes up, and when it follows (0x957830).
+		void roll_final_attack(int32_t trigger);
+
+		// Follow up with the Final Attack that came up, once it's time
+		// (0x96cd3e).
+		void update_final_attack();
 
 		// Let go of Monster Magnet, held for `charge` ms: it catches the mobs
 		// in front of the player (0x96c215). Whether it was used.
@@ -466,6 +484,18 @@ namespace ms
 		};
 
 		std::unordered_map<int32_t, RemotePrepare> remote_prepares;
+
+		// A Final Attack that came up: what set it off, with which weapon
+		// type, and when it follows.
+		struct FinalAttack
+		{
+			int32_t trigger;
+			int32_t skill;
+			int32_t weapon;
+			int64_t at;
+		};
+
+		std::optional<FinalAttack> pending_final;
 
 		// Game time in ms, for the shots of the skills that keep firing.
 		int64_t now = 0;

@@ -111,8 +111,9 @@ namespace ms
 		// Return if the player is attacking
 		bool is_attacking() const;
 
-		// Return whether the player is free to attack, weapon aside.
-		bool can_attack() const;
+		// Return whether the player is free to attack, weapon aside, or to
+		// cut short the attack under way (`interrupting`).
+		bool can_attack(bool interrupting = false) const;
 
 		// Return whether the player can use a skill or not.
 		SpecialMove::ForbidReason can_use(const SpecialMove &move) const;

@@ -77,6 +77,7 @@ pub struct Attack {
     pub skill: i32,
     pub mob_count: u8,
     pub hit_count: u8,
+    /// Flags: bit 0 marks a Final Attack after Slash Blast (0x952949).
     pub display: u8,
     /// The action, with the facing in the top bit (v83 0x952974: `action &
     /// 0x7fff | left << 15`).
@@ -310,9 +311,10 @@ pub enum AttackRejection {
     NoOrbs,
 }
 
-/// The MP a skill's attack spends: none for Heal, whose USE_SKILL paid.
+/// The MP a skill's attack spends: none for Heal, whose USE_SKILL paid,
+/// or for Final Attack.
 pub fn attack_mp_cost(skill: &Learned) -> i32 {
-    if skill.skill_id == skills::HEAL {
+    if skill.skill_id == skills::HEAL || skills::FINAL_ATTACKS.contains(&skill.skill_id) {
         0
     } else {
         skill.effect.mp_cost
@@ -406,7 +408,15 @@ pub fn validate(attack: &Attack, player: &Player) -> Result<Uses, AttackRejectio
             AttackKind::Ranged => effect.bullet_count,
             _ => effect.attack_count,
         };
-        let mob_count = effect.mob_count;
+        // Final Attack hits one mob, but after Slash Blast as many as it
+        // reaches.
+        let mob_count =
+            if skills::FINAL_ATTACKS.contains(&skill.skill_id) && attack.display & 1 != 0 {
+                skills::learned(player, skills::slash_blast(player))
+                    .map_or(1, |slash_blast| slash_blast.effect.mob_count)
+            } else {
+                effect.mob_count
+            };
         (Some(skill), mob_count, hit_count, cap)
     };
     // Shadow Partner throws every star again, up to 15 lines in all, but
@@ -811,6 +821,47 @@ mod tests {
         assert_eq!(hp(&player, 1001005, 1), Err(AttackRejection::NotEnoughHp));
         player.stats.hp = 2;
         assert_eq!(hp(&player, skills::SACRIFICE, 60), Ok(1));
+    }
+
+    #[test]
+    fn final_attack_is_free_and_follows_slash_blast_to_its_mobs() {
+        if skills::data().is_err() {
+            return;
+        }
+        let mut player = beginner_with_sword();
+        player.stats.mp = 0;
+        learn(&mut player, 11101002, 30);
+        learn(&mut player, 1100002, 30);
+        let mut attack = parse_close_attack(&skill_attack_packet(11101002, 1, 1)).unwrap();
+        attack.display = 0;
+        // The Cygnus one has an `mpCon`, for its buff.
+        assert!(validate(&attack, &player).is_ok());
+
+        attack.skill = 1100002;
+        attack.mob_count = 3;
+        attack.hits = (1..=3)
+            .map(|object_id| AttackHit {
+                object_id,
+                damage: vec![1],
+            })
+            .collect();
+        let rejection = |attack: &Attack, player: &Player| validate(attack, player).err();
+        assert_eq!(
+            rejection(&attack, &player),
+            Some(AttackRejection::TooManyTargets)
+        );
+        attack.display = 1;
+        assert_eq!(
+            rejection(&attack, &player),
+            Some(AttackRejection::TooManyTargets)
+        );
+        learn(&mut player, 1001005, 1);
+        assert_eq!(rejection(&attack, &player), None);
+        attack.display = 0;
+        assert_eq!(
+            rejection(&attack, &player),
+            Some(AttackRejection::TooManyTargets)
+        );
     }
 
     #[test]

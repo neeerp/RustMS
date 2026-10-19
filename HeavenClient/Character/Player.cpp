@@ -606,9 +606,9 @@ namespace ms
 		return attacking;
 	}
 
-	bool Player::can_attack() const
+	bool Player::can_attack(bool interrupting) const
 	{
-		return !attacking && !is_dead() && !is_climbing() && !is_sitting() && disease::can_attack(get_diseases());
+		return (interrupting || !attacking) && !is_dead() && !is_climbing() && !is_sitting() && disease::can_attack(get_diseases());
 	}
 
 	SpecialMove::ForbidReason Player::can_use(const SpecialMove &move) const

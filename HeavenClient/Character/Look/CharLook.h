@@ -101,6 +101,10 @@ namespace ms
 
 		uint16_t get_attackdelay(size_t no, uint8_t first_frame) const;
 
+		// How long the attack under way plays, in ms: its body action, or
+		// its stance's frames.
+		uint16_t get_attack_length() const;
+
 		// The delay of each frame of a body action, in order.
 		std::vector<uint16_t> get_action_delays(const std::string &action) const;
 

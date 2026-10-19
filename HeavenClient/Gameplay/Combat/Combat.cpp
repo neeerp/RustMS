@@ -33,7 +33,9 @@
 
 #include "../../Constants.h"
 #include "../../Character/SkillId.h"
+#include "../../Character/Look/AttackStances.h"
 #include "../../Data/SkillData.h"
+#include "../../Data/WeaponData.h"
 #include "../../IO/Messages.h"
 #include "../../Util/Misc.h"
 #include "../../Util/Randomizer.h"
@@ -163,6 +165,7 @@ namespace ms
 	{
 		now += Constants::TIMESTEP;
 		update_prepare();
+		update_final_attack();
 		update_remote_prepares();
 		update_grenades();
 		update_rains();
@@ -846,9 +849,9 @@ namespace ms
 		return targets;
 	}
 
-	void Combat::apply_move(const SpecialMove &move, int32_t charge, bool held)
+	void Combat::apply_move(const SpecialMove &move, int32_t charge, bool held, const Follow *follow)
 	{
-		if (move.is_attack())
+		if (move.is_attack() || follow)
 		{
 			// Heal asks the server first, as a skill that doesn't attack.
 			int32_t healed = 0;
@@ -864,7 +867,8 @@ namespace ms
 			if (!move.is_skill() && swing_at_reactor())
 				return;
 
-			Attack attack = player.prepare_attack(move.is_skill() ? move.get_id() : 0);
+			// A Final Attack swings or shoots as the weapon does.
+			Attack attack = player.prepare_attack(move.is_skill() && !follow ? move.get_id() : 0);
 			attack.charge = charge;
 			Stance::Id whack = Stance::Id::NONE;
 			int16_t reach = 0;
@@ -875,18 +879,39 @@ namespace ms
 			if (whack != Stance::Id::NONE)
 				attack = player.prepare_attack(0, true);
 
-			// A held skill's shots keep the body as it is (0x954165).
-			if (!held)
+			// A held skill's shots keep the body as it is (0x954165). A
+			// Final Attack shows no effect of its own (0x9519ac).
+			if (!held && !follow)
 				move.apply_useeffects(player);
 
-			if (whack != Stance::Id::NONE)
+			if (follow)
+			{
+				player.end_attack();
+				player.attack(false, follow->stance);
+			} else if (whack != Stance::Id::NONE)
+			{
 				player.attack(true, whack);
-			else if (!held)
+			} else if (!held)
+			{
 				move.apply_actions(player, attack.type);
+			}
 
 			player.set_afterimage(move.get_id());
 
 			move.apply_stats(player, attack);
+
+			// A Final Attack reaches as its stance's regular attack does, and
+			// after Slash Blast it says so (0x952949).
+			if (follow)
+			{
+				attack.stance = player.get_look().get_stance();
+
+				if (attack.type == Attack::Type::CLOSE)
+					attack.range = player.get_afterimage().get_range();
+
+				if (final_attack::slash_blast(follow->trigger))
+					attack.display |= 1;
+			}
 
 			// The orbs multiply a swing's or a shot's damage after its skill's (FUN_007653fa).
 			if (attack.type != Attack::Type::MAGIC)
@@ -937,6 +962,8 @@ namespace ms
 
 			if (spell)
 				reach = shot_path::SPELL_REACH;
+			else if (follow && shot)
+				reach = final_attack::SHOT_REACH;
 
 			Point<int16_t> shot_start = shot_path::origin(origin, reach, attack.toleft);
 			Point<int16_t> shot_end(attack.toleft ? range.left() : range.right(), shot_start.y());
@@ -1010,10 +1037,44 @@ namespace ms
 				attack.healed = healed + static_cast<int32_t>(mob_targets.size());
 			} else
 			{
+				// Slash Blast, Coma and Charged Blow reach as far as their
+				// `range` once a mob is in their swing's reach, and a Final
+				// Attack after Slash Blast as far as Slash Blast does and as
+				// many mobs (0x95150e).
+				bool after_slash_blast = attack.display & 1;
+
+				if (final_attack::stretches(attack.skill) || after_slash_blast)
+				{
+					int32_t skill = after_slash_blast ? final_attack::slash_blast_of(player.get_stats().get_job().get_id())
+													  : attack.skill;
+					const SkillData::Stats &stats = SkillData::get(skill).get_stats(player.get_skills().get_level(skill));
+					Rectangle<int16_t> swing = place_range(origin, attack.range, 1.0f, attack.toleft);
+
+					if (!find_targets(mob_objs, swing, origin, 1, false).empty())
+					{
+						attack.range = Rectangle<int16_t>(std::min<int16_t>(attack.range.left(), -stats.shotrange),
+														  attack.range.right(), attack.range.top(), attack.range.bottom());
+					}
+
+					range = place_range(origin, attack.range, 1.0f, attack.toleft);
+
+					if (after_slash_blast)
+						mobcount = stats.mobcount;
+				}
+
 				mob_targets = find_targets(mob_objs, range, origin, mobcount, closest_first);
 			}
 
 			mobs.send_attack(result, attack, mob_targets, mobcount);
+
+			// After Slash Blast, each mob takes less than the one before it
+			// (0x951e63).
+			if (attack.display & 1)
+			{
+				for (size_t target = 0; target < result.damagelines.size(); target++)
+					for (auto &line : result.damagelines[target].second)
+						line.first = final_attack::fall_off(line.first, target);
+			}
 
 			if (!result.damagelines.empty() && !result.damagelines[0].second.empty()
 				&& shot_path::drops_splash(attack.skill, result.damagelines[0].second[0].first))
@@ -1035,10 +1096,77 @@ namespace ms
 			apply_result_movement(move, result);
 
 			AttackPacket(result, player.get_position()).dispatch();
+
+			if (attack.skill && attack.type != Attack::Type::MAGIC && !held && !follow)
+				roll_final_attack(attack.skill);
 		} else
 		{
 			request_skill(move);
 		}
+	}
+
+	void Combat::roll_final_attack(int32_t trigger)
+	{
+		pending_final.reset();
+
+		int32_t weapon = final_attack::weapon_type(player.get_look().get_equips().get_weapon());
+		Randomizer random;
+
+		for (const auto &[skill, types] : SkillData::get(trigger).get_final_attacks())
+		{
+			int32_t level = player.get_skills().get_level(skill);
+
+			// The Cygnus Knights' come up only under their buff, which the
+			// server doesn't give yet.
+			if (level <= 0 || final_attack::needs_buff(skill))
+				continue;
+
+			if (std::find(types.begin(), types.end(), weapon) == types.end())
+				continue;
+
+			auto prop = static_cast<int32_t>(std::lround(SkillData::get(skill).get_stats(level).chance * 100));
+
+			if (random.next_int<int32_t>(101) <= prop)
+			{
+				int32_t delay = final_attack::delay(player.get_attackdelay(0), player.get_attack_length());
+				pending_final = FinalAttack{ trigger, skill, weapon, now + delay };
+
+				return;
+			}
+		}
+	}
+
+	void Combat::update_final_attack()
+	{
+		if (!pending_final || now < pending_final->at)
+			return;
+
+		FinalAttack due = *pending_final;
+		pending_final.reset();
+
+		// It's let go if the weapon changed, or the skill is gone.
+		int32_t weapon = player.get_look().get_equips().get_weapon();
+
+		if (final_attack::weapon_type(weapon) != due.weapon || player.get_skills().get_level(due.skill) <= 0)
+			return;
+
+		bool shoots = final_attack::shoots(due.weapon);
+
+		if (!final_attack::swings(due.weapon) && !shoots)
+			return;
+
+		if (!player.can_attack(true) || (shoots && !player.get_inventory().has_projectile()))
+			return;
+
+		const std::vector<Stance::Id> &stances = attack_stances::get_final(WeaponData::get(weapon).get_attack());
+
+		if (stances.empty())
+			return;
+
+		Randomizer random;
+		Follow follow = { stances[random.next_int(stances.size())], due.trigger };
+
+		apply_move(get_skill(due.skill), 0, false, &follow);
 	}
 
 	bool Combat::swing_at_reactor()

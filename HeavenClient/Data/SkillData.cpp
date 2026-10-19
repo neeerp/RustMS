@@ -109,6 +109,14 @@ namespace ms
 
 			reqskills.emplace(skillid, reqlv);
 		}
+
+		for (auto sub : src["finalAttack"])
+		{
+			std::vector<int32_t> &types = final_attacks[string_conversion::or_default<int32_t>(sub.name(), 0)];
+
+			for (auto type : sub)
+				types.push_back(static_cast<int32_t>(type.get_integer()));
+		}
 	}
 
 	int32_t SkillData::flags_of(int32_t id) const
@@ -325,5 +333,10 @@ namespace ms
 	const std::unordered_map<int32_t, int32_t> &SkillData::get_reqskills() const
 	{
 		return reqskills;
+	}
+
+	const std::map<int32_t, std::vector<int32_t>> &SkillData::get_final_attacks() const
+	{
+		return final_attacks;
 	}
 }
