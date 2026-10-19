@@ -275,6 +275,10 @@ pub struct MapDrop {
     pub meso: bool,
     /// The item id, or the amount of mesos.
     pub value: i32,
+    /// Whose it is: a character id, or a party id for ownership 1.
+    pub owner: i32,
+    /// 0 an owner's, 1 a party's, 2 anyone's, 3 anyone's, flung out.
+    pub ownership: u8,
     pub x: i16,
     pub y: i16,
 }
@@ -539,13 +543,15 @@ impl Field {
             let object_id = r.read_int().unwrap();
             let meso = r.read_byte().unwrap() != 0;
             let value = r.read_int().unwrap();
-            r.read_int().unwrap();
-            r.read_byte().unwrap();
+            let owner = r.read_int().unwrap();
+            let ownership = r.read_byte().unwrap();
             let (x, y) = (r.read_short().unwrap(), r.read_short().unwrap());
             self.drops.push(MapDrop {
                 object_id,
                 meso,
                 value,
+                owner,
+                ownership,
                 x,
                 y,
             });

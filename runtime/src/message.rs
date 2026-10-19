@@ -62,8 +62,9 @@ pub enum ServerMessage {
         object_id: i32,
         exp: i32,
         party_bonus: i32,
-        /// They hit it themselves, so they roll its loot.
-        attacked: bool,
+        /// They hit it hardest of those still on the field, so they roll
+        /// its loot.
+        looter: bool,
         x: i16,
         y: i16,
         /// Taunt's Showdown: the percent more drops it gives.
@@ -291,6 +292,7 @@ pub enum FieldMessage {
     /// Put a player's loot from a kill on the ground.
     SpawnLoot {
         owner: ClientId,
+        ownership: crate::actor::field_drops::Ownership,
         loot: Vec<net::loot::Loot>,
         x: i16,
         y: i16,

@@ -1,5 +1,5 @@
 use super::ClientActor;
-use crate::actor::field_drops::Drop;
+use crate::actor::field_drops::{Drop, Ownership};
 use crate::error::RuntimeError;
 use crate::message::FieldMessage;
 use game::monster_book::{self, MAX_CARD_LEVEL};
@@ -23,7 +23,12 @@ impl ClientActor {
     ) -> Result<(), RuntimeError> {
         let player = &self.in_game()?.player;
         let loot = loot::roll(mob_id, showdown, player, &mut rand::thread_rng());
-        self.spawn_loot(loot, object_id, x, y).await
+        let ownership = match net::mobs::info(mob_id) {
+            Some(mob) if mob.explosive_reward => Ownership::Explosive,
+            Some(mob) if mob.public_reward => Ownership::FreeForAll,
+            _ => self.ownership(),
+        };
+        self.spawn_loot(loot, ownership, object_id, x, y).await
     }
 
     /// A reactor this player broke drops its loot for them.
@@ -35,12 +40,19 @@ impl ClientActor {
         y: i16,
     ) -> Result<(), RuntimeError> {
         let loot = loot::roll_reactor(reactor_id, &self.in_game()?.player, &mut rand::thread_rng());
-        self.spawn_loot(loot, object_id, x, y).await
+        self.spawn_loot(loot, self.ownership(), object_id, x, y)
+            .await
+    }
+
+    /// This player's loot is kept for them, or their party, at first.
+    fn ownership(&self) -> Ownership {
+        self.party_id.map_or(Ownership::Owner, Ownership::Party)
     }
 
     async fn spawn_loot(
         &mut self,
         loot: Vec<Loot>,
+        ownership: Ownership,
         dropper: i32,
         x: i16,
         y: i16,
@@ -50,6 +62,7 @@ impl ClientActor {
         }
         self.send_to_field(FieldMessage::SpawnLoot {
             owner: self.client_id,
+            ownership,
             loot,
             x,
             y,

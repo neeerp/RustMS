@@ -869,8 +869,6 @@ pub struct ExpShare {
     pub exp: i32,
     /// Extra EXP for hunting with a party, shown separately.
     pub party_bonus: i32,
-    /// Whether they hit the mob, and so roll its loot.
-    pub attacked: bool,
 }
 
 /// Party members share a party's EXP when within this many levels of the
@@ -893,7 +891,7 @@ pub fn split_exp(
     sharers: &[Sharer],
 ) -> Vec<ExpShare> {
     let total: i64 = damage_by.iter().map(|(_, damage)| damage).sum();
-    if total <= 0 || exp <= 0 {
+    if total <= 0 {
         return Vec::new();
     }
     let per_damage = f64::from(exp) / total as f64;
@@ -911,7 +909,6 @@ pub fn split_exp(
                 client,
                 exp: round(damage as f64 * per_damage),
                 party_bonus: 0,
-                attacked: true,
             }),
         }
     }
@@ -948,7 +945,6 @@ pub fn split_exp(
                 client: member.client,
                 exp: round(exp),
                 party_bonus: round(exp * bonus_rate),
-                attacked: attackers.iter().any(|(a, _)| a.client == member.client),
             });
         }
     }
@@ -1378,6 +1374,10 @@ mod tests {
         let shares = split_exp(kill.exp, kill.level, &kill.damage_by, &[solo(1), solo(2)]);
         let exp: Vec<_> = shares.iter().map(|s| (s.client, s.exp)).collect();
         assert_eq!(exp, [(2, 2), (1, 1)]);
+        // A mob worth no EXP still counts for its attackers.
+        let shares = split_exp(0, kill.level, &kill.damage_by, &[solo(1), solo(2)]);
+        let exp: Vec<_> = shares.iter().map(|s| (s.client, s.exp)).collect();
+        assert_eq!(exp, [(2, 0), (1, 0)]);
         assert!(mobs.get(snail).is_none());
         assert!(
             mobs.damage(1, snail, 1, now).is_none(),
@@ -1488,19 +1488,16 @@ mod tests {
                     client: 1,
                     exp: 48,
                     party_bonus: 5,
-                    attacked: true,
                 },
                 ExpShare {
                     client: 2,
                     exp: 32,
                     party_bonus: 3,
-                    attacked: false,
                 },
                 ExpShare {
                     client: 5,
                     exp: 20,
                     party_bonus: 0,
-                    attacked: true,
                 },
             ]
         );

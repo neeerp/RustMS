@@ -31,6 +31,10 @@ pub struct MobInfo {
     pub fixed_damage: i32,
     /// Power Guard sends nothing back at it (`invincible`).
     pub invincible: bool,
+    /// Anyone may pick its drops up at once (`publicReward`).
+    pub public_reward: bool,
+    /// Its drops fly out wide, anyone's at once (`explosiveReward`).
+    pub explosive_reward: bool,
     /// How each element hurts it (`elemAttr`): pairs of an element letter
     /// and a degree, `1` for immune, as "I1S2".
     pub element: String,
@@ -150,6 +154,8 @@ impl MobData {
             undead: int("undead")? != 0,
             fixed_damage: int("fixedDamage")?,
             invincible: int("invincible")? != 0,
+            public_reward: int("publicReward")? != 0,
+            explosive_reward: int("explosiveReward")? != 0,
             element: nx.string_child(info, "elemAttr")?.unwrap_or_default(),
             attacks: self.attacks(image)?,
             skills: self.skills(info)?,
@@ -275,6 +281,10 @@ mod tests {
         assert_eq!(mob(100100).fixed_damage, 0);
         assert!(mob(9300295).invincible);
         assert!(!mob(100100).invincible);
+        // Bergamot's drops are anyone's; Mano's in Mu Lung Dojo fly out.
+        assert!(mob(7220003).public_reward && !mob(7220003).explosive_reward);
+        assert!(mob(9300184).explosive_reward);
+        assert!(!mob(100100).public_reward && !mob(100100).explosive_reward);
     }
 
     #[test]

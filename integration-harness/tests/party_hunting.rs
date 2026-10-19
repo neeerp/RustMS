@@ -1,7 +1,8 @@
 //! Parties: inviting, joining, party HP bars, sharing a kill's EXP on
-//! Snail Hunting Ground I (40000), party chat, and disbanding.
+//! Snail Hunting Ground I (40000), and its drops, party chat, and
+//! disbanding.
 
-use integration_harness::hunting::attack;
+use integration_harness::hunting::{attack, pickup};
 use integration_harness::login_to_world_session;
 use integration_harness::preconditions::load_harness_config_or_fail;
 use integration_harness::trace::{read_for, send, until, warp, Trace};
@@ -94,12 +95,36 @@ async fn a_party_shares_hp_bars_exp_and_chat() {
 
     // The leader kills a snail (3 EXP) alone; both level 1, so the leader
     // gets 40% plus 20% for the damage, the member 40%.
+    read_for(&mut member.connection, &mut m, 300).await;
+    let old_drops = m.field.drops.len();
     let snail = l.field.alive(SNAIL)[0];
     send(&mut leader.connection, attack(snail, 4)).await;
     send(&mut leader.connection, attack(snail, 4)).await;
     until(&mut leader.connection, &mut l, |t| !t.gains.is_empty()).await;
     until(&mut member.connection, &mut m, |t| !t.gains.is_empty()).await;
     assert_eq!((l.gains[0], m.gains[0]), (2, 1));
+
+    // Its drops (in the harness, at least a card) are the party's for now:
+    // the member may take one at once.
+    until(&mut member.connection, &mut m, |t| {
+        t.field.drops.len() > old_drops
+    })
+    .await;
+    let loot = m.field.drops[old_drops];
+    assert_eq!((loot.owner, loot.ownership), (party_id, 1));
+    send(
+        &mut member.connection,
+        pickup(loot.object_id, loot.x, loot.y),
+    )
+    .await;
+    until(&mut member.connection, &mut m, |t| {
+        !t.field.removals(loot.object_id).is_empty()
+    })
+    .await;
+    assert_eq!(
+        m.field.removals(loot.object_id),
+        [Some(member.character_id)]
+    );
 
     // Party chat reaches the others, not the speaker.
     send(

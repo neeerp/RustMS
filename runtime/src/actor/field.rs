@@ -1,4 +1,4 @@
-use crate::actor::field_drops::{Drop, DropSet};
+use crate::actor::field_drops::{Drop, DropSet, Ownership};
 use crate::actor::field_mists::MistSet;
 use crate::actor::field_mobs::{split_exp, Cast, MobSet, Sharer};
 use crate::actor::field_reactors::{Hit, ReactorSet};
@@ -442,9 +442,10 @@ impl FieldActor {
                     items,
                 } => {
                     let now = Instant::now();
-                    let taken = self
-                        .drops
-                        .take_for_pet(from, object_id, (x, y), now, mesos, items);
+                    let party = self.occupants.get(&from).and_then(|o| o.party);
+                    let taken =
+                        self.drops
+                            .take_for_pet(from, party, object_id, (x, y), now, mesos, items);
                     if let (Ok(drop), Some(occupant)) = (taken, self.occupants.get(&from)) {
                         occupant
                             .handle
@@ -463,11 +464,12 @@ impl FieldActor {
             },
             FieldMessage::SpawnLoot {
                 owner,
+                ownership,
                 loot,
                 x,
                 y,
                 dropper,
-            } => self.spawn_loot(owner, loot, x, y, dropper),
+            } => self.spawn_loot(owner, ownership, loot, x, y, dropper),
             FieldMessage::PetLooted {
                 looter,
                 pet,
@@ -617,6 +619,7 @@ impl FieldActor {
     fn spawn_loot(
         &mut self,
         owner: ClientId,
+        ownership: Ownership,
         loot: Vec<net::loot::Loot>,
         x: i16,
         y: i16,
@@ -625,7 +628,7 @@ impl FieldActor {
         let now = Instant::now();
         let packets: Vec<(Drop, Packet)> = self
             .drops
-            .spawn(loot, owner, x, y, dropper, now)
+            .spawn(loot, owner, ownership, x, y, dropper, now)
             .into_iter()
             .filter_map(|drop| {
                 build_drop(&drop.view(now), DropAppearance::Falling { from: (x, y) })
@@ -691,6 +694,7 @@ impl FieldActor {
                 object_id: self.drops.next_object_id(),
                 loot,
                 owner: from,
+                ownership: Ownership::Owner,
                 x,
                 y,
                 dropper: 0,
@@ -721,7 +725,10 @@ impl FieldActor {
             return;
         };
         let handle = occupant.handle.clone();
-        match self.drops.take(from, object_id, x, y, Instant::now()) {
+        match self
+            .drops
+            .take(from, occupant.party, object_id, x, y, Instant::now())
+        {
             Ok(drop) => {
                 if let Ok(packet) = build_remove_drop(object_id, Some(from)) {
                     self.send_drop_packet(&drop, packet);
@@ -839,6 +846,8 @@ impl FieldActor {
                             party: occupant.party,
                         })
                         .collect();
+                    // One roll per kill, for whoever hit it hardest.
+                    let looter = kill.damage_by.first().map(|&(client, _)| client);
                     for share in split_exp(kill.exp, kill.level, &kill.damage_by, &sharers) {
                         if let Some(occupant) = self.occupants.get(&share.client) {
                             occupant.handle.send(ServerMessage::MobKilled {
@@ -846,7 +855,7 @@ impl FieldActor {
                                 object_id: kill.object_id,
                                 exp: share.exp,
                                 party_bonus: share.party_bonus,
-                                attacked: share.attacked,
+                                looter: looter == Some(share.client),
                                 x: kill.x,
                                 y: kill.y,
                                 showdown: kill.showdown,

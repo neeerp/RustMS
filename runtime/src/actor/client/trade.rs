@@ -1,4 +1,5 @@
 use super::ClientActor;
+use crate::actor::field_drops::Ownership;
 use crate::actor::field_trades::{RoomRequest, TradeEvent};
 use crate::error::RuntimeError;
 use crate::message::FieldMessage;
@@ -277,6 +278,7 @@ impl ClientActor {
             let (x, y) = game.position;
             let spill = FieldMessage::SpawnLoot {
                 owner: self.client_id,
+                ownership: Ownership::Owner,
                 loot: given.overflow,
                 x,
                 y,

@@ -329,10 +329,12 @@ so every request is answered, refusals with an empty STAT_CHANGED.
 
 ## Drops and pickup
 
-When a mob dies, each player who earned EXP from it rolls their own drops
-(`net::loot::roll`) from the content pack's table plus the committed v83
-overrides (`game-data/reward_overrides.toml`): each entry rolls its `prob`,
-mesos vary by ±25%, items take `min`..`max`. Quest drops are the entries
+When a mob dies, its drops roll once (`net::loot::roll`), for whoever dealt
+it the most damage of the players still on the field, as Cosmic does. They
+come from the content pack's table plus the committed v83 overrides
+(`game-data/reward_overrides.toml`): each entry rolls its `prob`, mesos
+vary by ±25%, items take `min`..`max`. A mob worth no EXP still drops and
+counts for quests. Quest drops are the entries
 the overrides tag with a quest, and quest items (`info/quest`) that only one
 quest's completion check (`Check.img/<quest>/1/item`) asks for. They roll
 only while that quest is started and the player holds fewer than the check
@@ -348,9 +350,16 @@ ground below its column, searched from 50 px above the mob as v83 servers do.
 A wall between the mob and the drop's column, or no ground under it, keeps
 the drop on the ground below the mob, so drops don't end up inside a cliff or
 in the air. Quest drops are shown only to their owner.
-For 15 s only the killer may pick a drop up (quest drops: always only the
-owner); drops vanish after 180 s (REMOVE_ITEM_FROM_MAP 0). Drops players
-throw down are anyone's at once; see "Client moves" in `inventory.md`.
+
+For 15 s only the owner may pick a drop up, or with a party, the owner's
+party as it was at the drop (quest drops: always only the owner). Drops of
+mobs with `publicReward` are anyone's at once, as are those of mobs with
+`explosiveReward`, which fly out 40 px apart instead of 25. The packet's
+ownership type tells the client which (v83 FUN_0050483a, whose pets follow
+it): 0 with the owner's character id, 1 with the party id, 2 for anyone (and
+for any drop once the 15 s are over), 3 for an explosive drop. Drops vanish
+after 180 s (REMOVE_ITEM_FROM_MAP 0). Drops players throw down are anyone's
+at once; see "Client moves" in `inventory.md`.
 
 HeavenClient's `Drop` gives a falling drop its own, lighter gravity instead
 of the player's: it launches at -2.9 px per tick and gains 0.042 px per tick,
