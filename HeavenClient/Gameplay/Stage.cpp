@@ -1159,6 +1159,16 @@ namespace ms
 		}
 	}
 
+	void Stage::set_object_state(const std::string &name, int32_t state)
+	{
+		tilesobjs.set_state(name, state, player.get_position());
+	}
+
+	void Stage::reset_obstacles()
+	{
+		tilesobjs.reset_obstacles(player.get_position());
+	}
+
 	void Stage::move_ship(uint8_t target, uint8_t event)
 	{
 		// One for the map being left is no longer news.

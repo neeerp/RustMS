@@ -220,6 +220,10 @@ if(HEAVENCLIENT_BUILD_TESTS)
     add_test(NAME tremble_rules COMMAND tremble_rules_tests)
     add_executable(field_effect_rules_tests tests/field_effect_rules.cpp)
     add_test(NAME field_effect_rules COMMAND field_effect_rules_tests)
+    add_executable(obj_state_rules_tests tests/obj_state_rules.cpp)
+    target_include_directories(obj_state_rules_tests PRIVATE
+        ${PROJECT_SOURCE_DIR}/libs/NoLifeNx ${PROJECT_SOURCE_DIR}/libs/glad/build/include)
+    add_test(NAME obj_state_rules COMMAND obj_state_rules_tests)
     add_executable(map_clouds_tests tests/map_clouds.cpp)
     add_test(NAME map_clouds COMMAND map_clouds_tests)
     add_executable(map_tooltip_rules_tests tests/map_tooltip_rules.cpp)
@@ -491,6 +495,7 @@ add_executable(HeavenClient
     Gameplay/MapleMap/Npc.h
     Gameplay/MapleMap/Obj.cpp
     Gameplay/MapleMap/Obj.h
+    Gameplay/MapleMap/ObjStateRules.h
     Gameplay/MapleMap/Portal.cpp
     Gameplay/MapleMap/Portal.h
     Gameplay/MapleMap/Reactor.cpp

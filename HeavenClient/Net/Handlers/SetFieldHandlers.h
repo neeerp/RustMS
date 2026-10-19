@@ -69,6 +69,28 @@ namespace ms
 		void handle(InPacket& recv) const override;
 	};
 
+	// A named map obj, such as a party quest's gate or trap, switches state
+	// (v83 0x53300b for FIELD_OBSTACLE_ONOFF, 0x537a1e for SET_OBJECT_STATE).
+	class ObjectStateHandler : public PacketHandler
+	{
+	public:
+		void handle(InPacket& recv) const override;
+	};
+
+	// Several named map objs switch state (v83 0x533057).
+	class ObjectStateListHandler : public PacketHandler
+	{
+	public:
+		void handle(InPacket& recv) const override;
+	};
+
+	// Every named trap goes back to its first state (v83 0x5330b6).
+	class ObstacleResetHandler : public PacketHandler
+	{
+	public:
+		void handle(InPacket& recv) const override;
+	};
+
 	// A ship field's ship comes or goes (v83 FUN_0054dca3).
 	class ContiMoveHandler : public PacketHandler
 	{

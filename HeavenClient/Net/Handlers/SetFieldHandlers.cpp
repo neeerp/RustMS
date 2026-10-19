@@ -350,6 +350,30 @@ namespace ms
 		UI::get().remove(UIElement::Type::FIELDCLOCK);
 	}
 
+	void ObjectStateHandler::handle(InPacket& recv) const
+	{
+		std::string name = recv.read_string();
+		int32_t state = recv.read_int();
+		Stage::get().set_object_state(name, state);
+	}
+
+	void ObjectStateListHandler::handle(InPacket& recv) const
+	{
+		int32_t count = recv.read_int();
+
+		for (int32_t i = 0; i < count; i++)
+		{
+			std::string name = recv.read_string();
+			int32_t state = recv.read_int();
+			Stage::get().set_object_state(name, state);
+		}
+	}
+
+	void ObstacleResetHandler::handle(InPacket&) const
+	{
+		Stage::get().reset_obstacles();
+	}
+
 	void ContiMoveHandler::handle(InPacket& recv) const
 	{
 		uint8_t target = recv.read_byte();

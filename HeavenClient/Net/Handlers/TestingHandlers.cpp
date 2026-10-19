@@ -67,6 +67,14 @@ namespace ms
 			return;
 		}
 
+		// A named map obj, such as a party quest's gate, shows its current state (FUN_00642aca with -1).
+		if (rand == 2)
+		{
+			Stage::get().set_object_state(recv.read_string(), -1);
+
+			return;
+		}
+
 		// A one-time effect on the screen; packets stack.
 		if (rand == 3)
 		{

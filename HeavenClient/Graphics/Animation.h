@@ -79,6 +79,24 @@ namespace ms
 
 		Animation();
 
+		// What it does after its last frame (v83 Gr2D Animate's type): loop back to a frame, or stop on the last
+		// frame or the first.
+		enum class End : uint8_t
+		{
+			LOOP,
+			HOLD,
+			FIRST
+		};
+
+		// Play from the first frame again, ending as given.
+		void play(End end, int16_t loop_from = 0);
+
+		// Stay on the current frame until played again.
+		void stop();
+
+		// Whether it is still going; one that loops always is, until stopped.
+		bool is_playing() const;
+
 		bool update();
 
 		bool update(uint16_t timestep);
@@ -111,6 +129,9 @@ namespace ms
 		std::vector<Frame> frames;
 		bool animated;
 		bool zigzag;
+		End end = End::LOOP;
+		int16_t loop_from = 0;
+		bool playing = true;
 
 		Nominal<int16_t> frame;
 		Linear<float> opacity;

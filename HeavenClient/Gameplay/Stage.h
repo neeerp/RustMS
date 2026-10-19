@@ -159,6 +159,12 @@ namespace ms
 		// FIELD_EFFECT 0: a summon's puff and sound at a point on the map.
 		void add_summon_effect(uint8_t type, Point<int16_t> position);
 
+		// Show a named map obj, such as a party quest's gate, in `state`, or in its current one again for -1.
+		void set_object_state(const std::string &name, int32_t state);
+
+		// Put every named trap back in its first state.
+		void reset_obstacles();
+
 		// Draw the screen effects that go above the UI.
 		void draw_overlay(float alpha) const;
 

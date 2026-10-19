@@ -45,6 +45,12 @@ namespace ms
 		// The last-loaded trap in the layer that `body` touches.
 		const Obj *find_obstacle(const obstacle::Box &body) const;
 
+		// The obj with this name, or null.
+		Obj *find(const std::string &name);
+
+		// Puts every named trap back in its first state.
+		void reset_obstacles(Point<int16_t> listener);
+
 	private:
 		std::multimap<uint8_t, Tile> tiles;
 		std::multimap<uint8_t, Obj> objs;
@@ -64,6 +70,13 @@ namespace ms
 
 		// The trap that `body` touches. v83 tests them in reverse load order and takes the first (FUN_00642710).
 		const Obj *find_obstacle(const obstacle::Box &body) const;
+
+		// Show the named obj in `state`, or in its current one again for -1 (FUN_00642aca). False if there's no
+		// such obj or state. Names are unique in each map.
+		bool set_state(const std::string &name, int32_t state, Point<int16_t> listener);
+
+		// Puts every named trap back in its first state (FIELD_OBSTACLE_ALL_RESET 0x8D).
+		void reset_obstacles(Point<int16_t> listener);
 
 	private:
 		EnumMap<Layer::Id, TilesObjs> layers;

@@ -101,9 +101,13 @@ namespace ms
 		MESSENGER = 313,
 		PLAYER_INTERACTION = 314,
 		FIELD_EFFECT = 138,
+		FIELD_OBSTACLE_ONOFF = 139,
+		FIELD_OBSTACLE_ONOFF_LIST = 140,
+		FIELD_OBSTACLE_ALL_RESET = 141,
 		CLOCK = 147,
 		CONTI_MOVE = 148,
 		CONTI_STATE = 149,
+		SET_OBJECT_STATE = 153,
 		STOP_CLOCK = 154,
 
 		/// MapObject
@@ -229,6 +233,10 @@ namespace ms
 		emplace<CONTI_MOVE, ContiMoveHandler>();
 		emplace<CONTI_STATE, ContiStateHandler>();
 		emplace<STOP_CLOCK, StopClockHandler>();
+		emplace<FIELD_OBSTACLE_ONOFF, ObjectStateHandler>();
+		emplace<FIELD_OBSTACLE_ONOFF_LIST, ObjectStateListHandler>();
+		emplace<FIELD_OBSTACLE_ALL_RESET, ObstacleResetHandler>();
+		emplace<SET_OBJECT_STATE, ObjectStateHandler>();
 
 		// MapObject handlers
 		emplace<SPAWN_CHAR, SpawnCharHandler>();
