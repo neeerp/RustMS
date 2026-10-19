@@ -29,10 +29,11 @@ pub mod stat {
     /// The summoned pets' serials, which come right after HAIR (0x8).
     pub const PET_2: i32 = 0x80000;
     pub const PET_3: i32 = 0x100000;
+    pub const GACHA_EXP: i32 = 0x200000;
 }
 
 /// Wire widths of the STAT_CHANGED values, in mask order.
-const STAT_WIDTHS: [(i32, u8); 19] = [
+const STAT_WIDTHS: [(i32, u8); 20] = [
     (0x1, 1),
     (0x2, 4),
     (0x4, 4),
@@ -52,6 +53,7 @@ const STAT_WIDTHS: [(i32, u8); 19] = [
     (0x10000, 4),
     (0x20000, 2),
     (0x40000, 4),
+    (0x200000, 4),
 ];
 
 /// Everything a test reads back from the server for one client.

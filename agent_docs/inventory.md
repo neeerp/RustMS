@@ -337,6 +337,33 @@ typed name once the name is valid and isn't the player's own. Enter is MOVE
 and Escape closes the window, which closes before the rock is used. A refused
 rock shows the result as a notice, naming the character for result 6.
 
+### Writs of Solomon
+
+A Writ of Solomon (237xxxx) gives its `spec/exp` not as EXP but as gacha
+EXP, which the player takes in later. It is `CharacterStats.gacha_exp`,
+saved in the `gacha_exp` table (a row only while some is left, since
+`characters` is at diesel's 32-column limit), sent after fame in the
+character stats and as stat `0x200000`, an int. USE_SOLOMON_ITEM (`0x9D`:
+tick, USE slot, item id) takes one writ and answers with its
+INVENTORY_OPERATION and the new gacha EXP (`world/solomon.rs`); a writ above
+its `info/maxLevel` (50), while gacha EXP is left, or not in that slot gets
+only an empty stat change. USE_GACHA_EXP (`0x9E`: tick) takes in up to
+level 50 what finishes the level, and the whole next level too if the rest
+covers it, or all of it if it doesn't finish this one, as Cosmic's
+gainGachaExp does: `WorldAction::GainExp` adds it without an EXP message,
+and the stat update shows what is left.
+
+HeavenClient keeps the stat (`CharStats::get_gachaexp`). Double-clicking a
+writ sends USE_SOLOMON_ITEM, or logs "Your level is too high to use the
+selected item." above its `maxLevel` and "You'll need to use all your
+remaining EXP in order to use a new Writ of Solomon." while gacha EXP is
+left (v83 FUN_00a12685). Hovering over the EXP numbers on the status bar
+shows "EXP : exp / need", with "  GachaponEXP : n" while some is left (v83
+FUN_008d76d7); double-clicking them up to level 50 with some left asks "Do
+you wish to charge the EXP earned from The Writs of Solomon?", and Yes sends
+USE_GACHA_EXP (FUN_008d7611). The rules are `Character/GachaExp.h`. v83's
+tooltip over the level and name is not drawn.
+
 ## NPC shops
 
 Clicking an NPC that keeps a shop (`content::shops()`, from the pack's
@@ -600,6 +627,11 @@ and the rock used; `teleport_rocks` (integration) keeps Henesys, rocks back to
 it, is refused the same map and a missing name, rocks to a watcher, and rocks
 to Henesys again after a relog. The client's `teleport_rock` test covers the
 lists, the checks on the current map and a typed name, and the refusals.
+`net`'s Solomon handlers cover the writ and its refusals and how much
+gacha EXP is taken; `solomon` (integration) uses a writ, is refused a
+second, takes the EXP two levels at once, and takes the rest after a
+relogin. The client's `gacha_exp` test covers the refusals, when the EXP may
+be taken, and the tooltip.
 `net::storage` covers each request and its refusals. `storage` (integration)
 opens Mr. Lee's storage, stores part of a stack and a whole one for the fee,
 is refused too many and too many mesos, moves mesos in, sorts, takes items

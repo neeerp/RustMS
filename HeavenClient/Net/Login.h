@@ -63,6 +63,8 @@ namespace ms
 		std::vector<int64_t> petids;
 		EnumMap<MapleStat::Id, uint16_t> stats;
 		int64_t exp;
+		// EXP from a Writ of Solomon not yet taken.
+		int32_t gachaexp = 0;
 		int32_t mapid;
 		uint8_t portal;
 		std::pair<int32_t, int8_t> rank;

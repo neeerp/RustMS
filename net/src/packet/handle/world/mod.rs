@@ -34,6 +34,7 @@ mod reactor;
 mod rearrange;
 mod script_portal;
 mod scroll;
+mod solomon;
 mod spend_points;
 mod storage;
 mod summon;
@@ -83,14 +84,18 @@ pub use self::reactor::DamageReactorHandler;
 pub use self::rearrange::{GatherItemsHandler, SortItemsHandler};
 pub use self::script_portal::ChangeMapSpecialHandler;
 pub use self::scroll::UseUpgradeScrollHandler;
+pub use self::solomon::{UseGachaExpHandler, UseSolomonItemHandler};
 pub use self::spend_points::{SpendApHandler, SpendSpHandler};
 pub use self::storage::TrunkRequestHandler;
 pub use self::summon::{
     BeholderHandler, DamageSummonHandler, MoveSummonHandler, SummonAttackHandler,
 };
-pub use self::teleport_rock::{to_character, Rock, TeleportRockListHandler, Whereabouts};
+pub use self::teleport_rock::{
+    to_character, Rock, TeleportRockListHandler, UseTeleportRockHandler, Whereabouts,
+};
 pub use self::use_item::{
     HealOverTimeHandler, ReturnScrollHandler, UseItemHandler, UseSkillBookHandler,
+    UseSummonSackHandler,
 };
 pub use self::use_skill::{
     party_skill_reached, CancelBuffHandler, SkillEffectHandler, ThrowGrenadeHandler,

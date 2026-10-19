@@ -24,6 +24,13 @@ int main()
 		require(may_use(0x400, {}, 2040000), "a scroll doesn't go the potion way");
 		require(!may_use(0x400, {}, 2210000), "a transformation potion is refused");
 
+		require(may_summon(0, {}, 2100000), "a summoning sack opens on an open map");
+		require(!may_summon(0x4, {}, 2100000), "bit 0x4 keeps it shut");
+		require(may_summon(0x526fc, allowed, 2109004), "unless the map lists it");
+		require(!may_summon(0x526fc, allowed, 2100000), "an unlisted one stays shut");
+		require(sack_asks(2100000) && sack_asks(2101000), "a sack asks first");
+		require(!sack_asks(2109004) && !sack_asks(2100067), "an event's sack and 2100067 don't");
+
 		require(may_drop(0x400), "consumable limits leave drops alone");
 		require(!may_drop(0x400000), "bit 0x400000 keeps items on the player");
 

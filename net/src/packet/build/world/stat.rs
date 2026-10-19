@@ -26,6 +26,8 @@ pub enum StatUpdate {
     Exp(i32),
     Fame(i16),
     Meso(i32),
+    /// EXP from Writs of Solomon not yet taken.
+    GachaExp(i32),
 }
 
 impl StatUpdate {
@@ -50,6 +52,7 @@ impl StatUpdate {
             StatUpdate::Exp(_) => 0x10000,
             StatUpdate::Fame(_) => 0x20000,
             StatUpdate::Meso(_) => 0x40000,
+            StatUpdate::GachaExp(_) => 0x200000,
         }
     }
 
@@ -61,7 +64,8 @@ impl StatUpdate {
             StatUpdate::Face(v)
             | StatUpdate::Hair(v)
             | StatUpdate::Exp(v)
-            | StatUpdate::Meso(v) => packet.write_int(v)?,
+            | StatUpdate::Meso(v)
+            | StatUpdate::GachaExp(v) => packet.write_int(v)?,
             StatUpdate::Job(v)
             | StatUpdate::Str(v)
             | StatUpdate::Dex(v)
@@ -160,6 +164,16 @@ mod tests {
         expect.short(SendOpcode::StatChange as i16).byte(1);
         expect.int(0x4 | 0x8 | 0x10 | 0x80000 | 0x100000);
         expect.int(30000).long(7).long(0).long(0).byte(9);
+        expect.end();
+    }
+
+    #[test]
+    fn gacha_exp_is_an_int_after_the_meso() {
+        let updates = [StatUpdate::GachaExp(5000), StatUpdate::Meso(10)];
+        let packet = build_stat_update(true, &updates).unwrap();
+        let mut expect = Expect::new(&packet.bytes);
+        expect.short(SendOpcode::StatChange as i16).byte(1);
+        expect.int(0x40000 | 0x200000).int(10).int(5000);
         expect.end();
     }
 

@@ -33,6 +33,7 @@
 #include "../Components/MapleButton.h"
 #include "../UITypes/UIKeyConfig.h"
 
+#include "../../Character/GachaExp.h"
 #include "../../Character/Pets.h"
 #include "../../Character/Inventory/ItemDrop.h"
 #include "../../Character/Inventory/ScrollRules.h"
@@ -98,6 +99,7 @@ namespace ms
 		constexpr const char *MEGAPHONE_PROMPT = "Enter your comments through the megaphone.";
 		constexpr const char *MEGAPHONE_LEVEL = "This megaphone is only available for \\ncharacters that are over Level 10.";
 		constexpr const char *MEGAPHONE_LONG = "Use the megaphone to text up to 60 characters.";
+		constexpr const char *SUMMON_SACK = "Too much interest can hinder your process of leveling up.\\n\\nwill you really summon the monster?";
 		constexpr const char *BOSS_PET = "Would you like to change your Boss Pet?\\n (The \"Item Ignore\" skill, as well as \\nthe stats for speed and jump will \\nfollow that of the Lead Pet)";
 
 		// v83 FUN_00a240a2: double-clicking a pet asks the server to bring it
@@ -357,10 +359,19 @@ namespace ms
 
 		// v83 FUN_00a0a4aa: a teleport rock goes to the map or the
 		// character chosen in its list. The dead, and maps that don't allow
-		// teleports, are refused before the list opens.
+		// teleports, are refused before the list opens. The USE-tab rock
+		// (232xxxx, FUN_00a0a3bb) waits as an item use does, and says nothing
+		// while another request waits.
+		bool may_use_rock(int32_t item_id)
+		{
+			return item_id / 10000 == 504
+				? may_use_cash_item()
+				: Stage::get().get_player().can_request(ExclRequest::USE_WAIT);
+		}
+
 		void use_teleport_rock(int16_t slot, int32_t item_id)
 		{
-			if (!may_use_cash_item())
+			if (!may_use_rock(item_id))
 				return;
 
 			if (Stage::get().get_player().is_dead())
@@ -385,12 +396,13 @@ namespace ms
 				if (name.empty() && (map_id == TeleportRock::EMPTY || map_id == 0))
 					return;
 
-				if (!may_use_cash_item())
+				if (!may_use_rock(item_id))
 					return;
 
+				int32_t wait = item_id / 10000 == 504 ? ExclRequest::WAIT : ExclRequest::USE_WAIT;
 				bool sent = name.empty()
-						? player.request(UseTeleportRockPacket(slot, item_id, map_id), ExclRequest::WAIT)
-						: player.request(UseTeleportRockPacket(slot, item_id, name), ExclRequest::WAIT);
+						? player.request(UseTeleportRockPacket(slot, item_id, map_id), wait)
+						: player.request(UseTeleportRockPacket(slot, item_id, name), wait);
 
 				if (sent)
 					Sound(nl::nx::sound["Game.img"]["UseShopItem"]).play();
@@ -433,6 +445,59 @@ namespace ms
 					break;
 				case field_limit::ScrollRefusal::NONE:
 					if (player.request(ReturnScrollPacket(slot, item_id), ExclRequest::WAIT))
+						Sound(item_id).play();
+
+					break;
+			}
+		}
+
+		// v83 FUN_00a0977b: a summoning sack (210xxxx) stays shut where the
+		// map forbids it, and asks first unless it is an event's. (The
+		// client also refuses while riding, which this one can't.)
+		void use_summon_sack(int16_t slot, int32_t item_id)
+		{
+			if (!Stage::get().get_mapinfo().can_summon(item_id))
+			{
+				UI::get().emplace<UIOk>("You can't use it here in this map.", [](bool)
+				{});
+				return;
+			}
+
+			auto open = [slot, item_id]()
+			{
+				Stage::get().get_player().request(SummonSackPacket(slot, item_id), ExclRequest::USE_WAIT);
+			};
+
+			if (!field_limit::sack_asks(item_id))
+				open();
+			else
+				UI::get().emplace<UIYesNo>(SUMMON_SACK, [open](bool yes)
+				{
+					if (yes)
+						open();
+				});
+		}
+
+		// v83 FUN_00a12685: a Writ of Solomon (237xxxx) becomes gacha EXP, up
+		// to the writ's info/maxLevel and only once the last is taken. (The
+		// client also refuses while riding, which this one can't.)
+		void use_solomon_writ(int16_t slot, int32_t item_id)
+		{
+			Player &player = Stage::get().get_player();
+			const CharStats &stats = player.get_stats();
+			nl::node info = nl::nx::item["Consume"]["0237.img"]["0" + std::to_string(item_id)]["info"];
+			int32_t max_level = info["maxLevel"].get_integer();
+
+			switch (gacha_exp::writ_refusal(stats.get_stat(MapleStat::Id::LEVEL), max_level, stats.get_gachaexp()))
+			{
+				case gacha_exp::WritRefusal::LEVEL:
+					InChatMessage(Messages::ITEM_LEVEL_HIGH).drop();
+					break;
+				case gacha_exp::WritRefusal::EXP_LEFT:
+					InChatMessage(Messages::SOLOMON_EXP_LEFT).drop();
+					break;
+				case gacha_exp::WritRefusal::NONE:
+					if (player.request(SolomonItemPacket(slot, item_id), ExclRequest::WAIT))
 						Sound(item_id).play();
 
 					break;
@@ -744,6 +809,12 @@ namespace ms
 					case InventoryType::Id::USE:
 						if (item_id / 10000 == 203)
 							use_return_scroll(slot, item_id);
+						else if (item_id / 10000 == 210)
+							use_summon_sack(slot, item_id);
+						else if (item_id / 10000 == 232)
+							use_teleport_rock(slot, item_id);
+						else if (item_id / 10000 == 237)
+							use_solomon_writ(slot, item_id);
 						else if (!Stage::get().get_mapinfo().can_use_item(item_id))
 							InChatMessage(Messages::ITEM_FIELD).drop();
 						else if (!disease::can_use_item(Stage::get().get_player().get_diseases()))

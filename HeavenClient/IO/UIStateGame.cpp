@@ -88,6 +88,8 @@ namespace ms
 					return Tooltip::Parent::MONSTERBOOK;
 				case UIElement::Type::BUFFLIST:
 					return Tooltip::Parent::BUFFLIST;
+				case UIElement::Type::STATUSBAR:
+					return Tooltip::Parent::STATUSBAR;
 				default:
 					return Tooltip::Parent::NONE;
 			}

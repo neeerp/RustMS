@@ -508,6 +508,7 @@ side yet.
 | Chalkboards (`ChalkboardBalloon`) | Implemented: the board, the note prompt and the close button; see `inventory.md` |
 | Storage (`UIStorage`) | Implemented; see `inventory.md` |
 | Teleport rocks (`UITeleportRock`) | Implemented: the map list, keeping and dropping maps, and moving to a map or a character; see `inventory.md` |
+| Writs of Solomon, gacha EXP | Implemented: using a writ, the EXP gauge's tooltip and taking the EXP by double-click; see `inventory.md` |
 | Continent ships, station wall clocks | Docking ships and the Balrog's ship, CONTI_MOVE/CONTI_STATE, CLOCK kind 1; see `ships.md` |
 | Player shops, mini-games, memo/mail | No UI, no handlers |
 | Reactors | Spawning, swings, hits and breaking; no skill hits, touch or quest gates; see `combat.md` |
@@ -515,7 +516,7 @@ side yet.
 | Mounts, summons | Partial or absent |
 | Party/guild/boss quests, events, MTS | Absent |
 
-84 outbound opcodes are defined (`Net/OutPacket.h`) and 119 inbound handlers
+93 outbound opcodes are defined (`Net/OutPacket.h`) and 120 inbound handlers
 are registered (`Net/PacketSwitch.cpp`). Anything not listed there is silently ignored by the client.
 
 ## Movement physics

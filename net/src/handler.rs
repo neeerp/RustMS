@@ -394,6 +394,9 @@ pub enum WorldAction {
     ChangeChannel {
         channel_id: u8,
     },
+    /// Add `amount` EXP from outside a kill or quest (gacha EXP), levelling
+    /// up as far as it covers, with the stat update but no message.
+    GainExp(i32),
     /// Leave the field for the Cash Shop.
     EnterCashShop,
     /// Return from the Cash Shop to the map the player left.
@@ -524,6 +527,9 @@ pub enum FieldRequest {
         lasts: std::time::Duration,
         appear: bool,
     },
+    /// The player opened a summoning sack: bring out these mobs on the
+    /// ground below them.
+    SummonMobs(Vec<i32>),
     /// Send away the player's summon of this skill, or all of them.
     Unsummon {
         skill_id: Option<i32>,
@@ -661,6 +667,10 @@ fn world_routes() -> &'static HashMap<i16, WorldRoute> {
             (Op::UseItem, InGame(&world::UseItemHandler)),
             (Op::UseSkillBook, InGame(&world::UseSkillBookHandler)),
             (Op::UseReturnScroll, InGame(&world::ReturnScrollHandler)),
+            (Op::UseSummonBag, InGame(&world::UseSummonSackHandler)),
+            (Op::UseTeleportRock, InGame(&world::UseTeleportRockHandler)),
+            (Op::UseSolomonItem, InGame(&world::UseSolomonItemHandler)),
+            (Op::UseGachaExp, InGame(&world::UseGachaExpHandler)),
             (
                 Op::UseUpgradeScroll,
                 InGame(&world::UseUpgradeScrollHandler),
@@ -744,7 +754,7 @@ mod tests {
     fn every_registered_opcode_is_unique_per_server() {
         // The maps would silently drop duplicates; check the table sizes match.
         assert_eq!(login_routes().len(), 13);
-        assert_eq!(world_routes().len(), 73);
+        assert_eq!(world_routes().len(), 77);
     }
 
     #[test]

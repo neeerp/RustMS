@@ -208,14 +208,14 @@ namespace ms
 		}
 	};
 
-	// Uses the teleport rock (504xxxx) in Cash slot `slot` to go to a
-	// character, or to a kept map (FUN_00a0a4aa).
-	// Opcode: USE_CASH_ITEM(79)
+	// Uses the teleport rock (504xxxx) in Cash slot `slot`, or the USE-tab
+	// rock (232xxxx, FUN_00a0a3bb) in USE slot `slot`, to go to a character,
+	// or to a kept map (FUN_00a0a4aa).
+	// Opcode: USE_CASH_ITEM(79), USE_TELEPORT_ROCK(84)
 	class UseTeleportRockPacket : public OutPacket
 	{
 	public:
-		UseTeleportRockPacket(int16_t slot, int32_t itemid, const std::string &name)
-				: OutPacket(OutPacket::Opcode::USE_CASH_ITEM)
+		UseTeleportRockPacket(int16_t slot, int32_t itemid, const std::string &name) : OutPacket(opcode(itemid))
 		{
 			write_short(slot);
 			write_int(itemid);
@@ -224,13 +224,19 @@ namespace ms
 			write_time();
 		}
 
-		UseTeleportRockPacket(int16_t slot, int32_t itemid, int32_t mapid) : OutPacket(OutPacket::Opcode::USE_CASH_ITEM)
+		UseTeleportRockPacket(int16_t slot, int32_t itemid, int32_t mapid) : OutPacket(opcode(itemid))
 		{
 			write_short(slot);
 			write_int(itemid);
 			write_byte(0);
 			write_int(mapid);
 			write_time();
+		}
+
+	private:
+		static OutPacket::Opcode opcode(int32_t itemid)
+		{
+			return itemid / 10000 == 232 ? OutPacket::Opcode::USE_TELEPORT_ROCK : OutPacket::Opcode::USE_CASH_ITEM;
 		}
 	};
 
@@ -275,6 +281,34 @@ namespace ms
 	{
 	public:
 		ReturnScrollPacket(int16_t slot, int32_t itemid) : OutPacket(OutPacket::Opcode::USE_RETURN_SCROLL)
+		{
+			write_time();
+			write_short(slot);
+			write_int(itemid);
+		}
+	};
+
+	// Requests opening the summoning sack (210xxxx) in a USE slot, v83
+	// FUN_00a0977b
+	// Opcode: USE_SUMMON_BAG(75)
+	class SummonSackPacket : public OutPacket
+	{
+	public:
+		SummonSackPacket(int16_t slot, int32_t itemid) : OutPacket(OutPacket::Opcode::USE_SUMMON_BAG)
+		{
+			write_time();
+			write_short(slot);
+			write_int(itemid);
+		}
+	};
+
+	// Requests using the Writ of Solomon (237xxxx) in a USE slot, whose EXP
+	// becomes gacha EXP, v83 FUN_00a12685
+	// Opcode: USE_SOLOMON_ITEM(157)
+	class SolomonItemPacket : public OutPacket
+	{
+	public:
+		SolomonItemPacket(int16_t slot, int32_t itemid) : OutPacket(OutPacket::Opcode::USE_SOLOMON_ITEM)
 		{
 			write_time();
 			write_short(slot);

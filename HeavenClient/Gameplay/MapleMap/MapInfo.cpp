@@ -128,6 +128,11 @@ namespace ms
 		return field_limit::may_use(fieldlimit, allowed_items, item_id);
 	}
 
+	bool MapInfo::can_summon(int32_t item_id) const
+	{
+		return field_limit::may_summon(fieldlimit, allowed_items, item_id);
+	}
+
 	bool MapInfo::can_drop() const
 	{
 		return field_limit::may_drop(fieldlimit);

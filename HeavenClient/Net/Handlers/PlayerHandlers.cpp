@@ -148,6 +148,10 @@ namespace ms
 		case MapleStat::Id::MESO:
 			player.get_inventory().set_meso(recv.read_int());
 			break;
+		case MapleStat::Id::GACHAEXP:
+			// An int, as v83 reads it (FUN_004e2fba).
+			player.get_stats().set_gachaexp(recv.read_int());
+			break;
 		default:
 			player.get_stats().set_stat(stat, recv.read_short());
 			recalculate = true;

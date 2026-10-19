@@ -148,7 +148,7 @@ namespace ms
 		statsentry.exp = recv.read_int();
 		statsentry.stats[MapleStat::Id::FAME] = recv.read_short();
 
-		recv.skip(4); // gachaexp
+		statsentry.gachaexp = recv.read_int();
 
 		statsentry.mapid = recv.read_int();
 		statsentry.portal = recv.read_byte();

@@ -88,6 +88,7 @@ mod tests {
                 ap: 0,
                 sp: 0,
                 exp: 0,
+                gacha_exp: 0,
                 fame: 0,
                 map_id: 100000000,
                 spawn_point: 0,

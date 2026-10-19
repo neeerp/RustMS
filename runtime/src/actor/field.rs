@@ -456,6 +456,7 @@ impl FieldActor {
                     lasts,
                     appear,
                 } => self.handle_summon(from, skill_id, level, at, left, lasts, appear),
+                FieldRequest::SummonMobs(mobs) => self.handle_summon_mobs(from, mobs),
                 FieldRequest::Unsummon { skill_id, why } => {
                     self.handle_unsummon(from, skill_id, why)
                 }
@@ -1151,6 +1152,32 @@ impl FieldActor {
         if let Ok(packet) = build_spawn_summon(&view, appear) {
             self.broadcast(None, packet);
         }
+    }
+
+    /// Bring out the mobs from `from`'s summoning sack on the ground below
+    /// them, as Cosmic does (y - 1, the ground below that, less 1), facing
+    /// their way and under their control.
+    fn handle_summon_mobs(&mut self, from: ClientId, mobs: Vec<i32>) {
+        let Some(occupant) = self.occupants.get(&from) else {
+            return;
+        };
+        let (x, y) = (occupant.avatar.x, occupant.avatar.y);
+        let stance = 4 | (occupant.avatar.stance & 1);
+        let ground = self.drops.ground_below(x, y.saturating_sub(1)).unwrap_or(y);
+        let at = (x, ground.saturating_sub(1));
+        let now = Instant::now();
+        let mut placed = Vec::new();
+        for info in mobs.into_iter().filter_map(net::mobs::info) {
+            let object_id = self.mobs.place(info, at, stance, from, now);
+            let Some(mob) = self.mobs.get(object_id) else {
+                continue;
+            };
+            if let Ok(packet) = build_spawn_mob(&mob.view(true)) {
+                self.broadcast(None, packet);
+            }
+            placed.push(object_id);
+        }
+        self.send_control(from, &placed);
     }
 
     fn handle_unsummon(&mut self, from: ClientId, skill_id: Option<i32>, why: Gone) {
@@ -2596,6 +2623,31 @@ mod tests {
         opcodes(&mut first_rx).await;
         opcodes(&mut second_rx).await;
         (field, first_rx, second_rx)
+    }
+
+    #[tokio::test]
+    async fn a_summoning_sacks_mobs_show_to_all_under_its_opener() {
+        if net::mobs::info(100100).is_none() {
+            return;
+        }
+        let (field, mut first_rx, mut second_rx) = two_players().await;
+        field
+            .send(FieldMessage::FromClient {
+                from: 1,
+                request: FieldRequest::SummonMobs(vec![100100, 100101]),
+            })
+            .await
+            .unwrap();
+        for _ in 0..2 {
+            assert_eq!(
+                next_opcode(&mut second_rx).await,
+                SendOpcode::SpawnMonster as i16
+            );
+        }
+        let seen = opcodes(&mut first_rx).await;
+        let spawned = SendOpcode::SpawnMonster as i16;
+        let controlled = SendOpcode::SpawnMonsterControl as i16;
+        assert_eq!(seen, [spawned, spawned, controlled, controlled]);
     }
 
     fn summon(skill_id: i32, at: (i16, i16), lasts: Duration) -> FieldMessage {

@@ -140,6 +140,11 @@ impl DropSet {
         self.drops.values()
     }
 
+    /// The highest ground at `x` that is at or below `y`.
+    pub fn ground_below(&self, x: i16, y: i16) -> Option<i16> {
+        self.footholds.ground_below(x, y)
+    }
+
     /// Spread `loot` around (x, y), each on the ground below its place (see
     /// `Footholds::drop_position`), and return the new drops.
     #[allow(clippy::too_many_arguments)]

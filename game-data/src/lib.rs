@@ -26,6 +26,9 @@ pub const PORTAL_TYPE_TOWN_DOOR: i32 = 6;
 /// `info/fieldLimit` bit forbidding movement skills; teleport rocks can't
 /// be used there either (v83 FUN_00a0a4aa).
 pub const FIELD_LIMIT_MOVEMENT_SKILLS: i32 = 0x2;
+/// `info/fieldLimit` bit forbidding summoning sacks unless
+/// `info/allowedItem` lists them (v83 FUN_00a0977b).
+pub const FIELD_LIMIT_SUMMON_SACKS: i32 = 0x4;
 /// `info/fieldLimit` bit forbidding Mystic Door (v83 FUN_00969bf9).
 pub const FIELD_LIMIT_MYSTIC_DOOR: i32 = 0x8;
 /// `info/fieldLimit` bit forbidding every return scroll (v83 FUN_00a1e1ce).
@@ -282,6 +285,11 @@ impl FieldTemplate {
         !is_use_item(item_id)
             || self.field_limit & FIELD_LIMIT_CONSUMABLES == 0
             || self.allowed_items.contains(&item_id)
+    }
+
+    /// Whether a player may open the summoning sack `item_id` here.
+    pub fn may_summon(&self, item_id: i32) -> bool {
+        self.field_limit & FIELD_LIMIT_SUMMON_SACKS == 0 || self.allowed_items.contains(&item_id)
     }
 
     /// Whether players may drop items and mesos here.
