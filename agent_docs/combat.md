@@ -1180,6 +1180,32 @@ Two more things keep hazards off, both server-side too:
   either returns to El Nath (211000000) or the internet cafe (193000000),
   as Cosmic has it, or wants the cold cape (1102109).
 
+Traps hurt too: objs whose `Map/Obj` node has `obstacle`, such as the jump
+quests' thorns and lasers, Adobis's fire and the Leafre animals (3514
+placements on 276 maps). The client tests them itself, as v83 does
+(FUN_00642264 and FUN_00642710; `ObstacleRules.h`). Each tick a trap's box is
+its current frame's `lt`/`rb` on the obj, mirrored when the obj is flipped,
+and frames without one, or under 5 px both ways, don't hurt. The client takes
+the last-loaded trap the player's body meets, under the same gates as a mob's
+touch, and rolls its `damage` within a tenth either way when it's over 10. A
+`forceHP` trap (Test of Agility's menhirs) takes the player down to that
+much HP, or hits for all of it when they're at or below it. The hit knocks
+the player by the trap's `dir`, which v83 turns into a push with
+`90 - 30 * dir` taken as radians, so only 3 points where it says. Without a
+`dir` the push is 270 back against the player's step and up unless they're
+rising. The hit then makes the player invincible and blink as a mob's does,
+with no miss, guard or Power Stance, and goes out as TAKE_DAMAGE from -3:
+`tick, -3, 0, damage, short disease << 8 | level, 0`. The server
+(`obstacle_damage`) accepts up to the map's highest `damage` plus a tenth, or
+the player's HP on a map with a `forceHP` trap (`game_data::Traps`), takes
+Achilles' and Magic Guard's shares, and shows DAMAGE_PLAYER -3, which has no
+mob. Like Cosmic and Kinoko, it doesn't give the disease. A trap with a
+`targetField` (the Witch Tower's snacks, back to 980040000) sends a
+CHANGE_MAP there on touch, hurting or not, which the server allows a living
+player from that map. Not done: FIELD_OBSTACLE_ONOFF (139), which switches
+named traps such as the Orbis jail spears between states, and the
+`mobdamage` those spears do to mobs (0xBF).
+
 The client's respawn is a CHANGE_MAP with a target while dead. It returns the
 player to the map's return map with 50 HP. When the player chose a Wheel of
 Destiny (5510000) in the death dialog (the wheel byte after the portal name),
@@ -1272,6 +1298,8 @@ Panic.
 `boss_hp_bar` has a player hit Neo City's 7220003 and checks that another
 player on the field sees its bar in its colours, and the bar's removal when
 it dies.
+`map_traps` has a player in the Forest of Patience take a thorn's 1 damage,
+which another player sees as DAMAGE_PLAYER -3, and has a hit of 2 refused.
 `map_hazards` warps to El Nath's Ice Valley in its cape, which keeps the
 cold out, then takes it off and drinks an Air Bubble, which doesn't help: it
 loses 10 HP at the next tick. After a Red Bean Porridge it loses nothing.

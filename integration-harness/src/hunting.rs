@@ -331,6 +331,8 @@ pub struct Field {
     pub removed: Vec<(i32, Option<i32>)>,
     /// Effects on other characters: (character id, effect).
     pub effects: Vec<(i32, u8)>,
+    /// DAMAGE_PLAYER: (character id, source, damage).
+    pub players_hurt: Vec<(i32, i8, i32)>,
     pub reactors: Vec<MapReactor>,
     /// (object id, state it moved to)
     pub reactor_hits: Vec<(i32, u8)>,
@@ -536,6 +538,9 @@ impl Field {
                 self.boss_bars
                     .push((mob.unwrap(), hp.unwrap(), max_hp.unwrap(), colors));
             }
+        } else if op == SendOpcode::DamagePlayer as i16 {
+            let (id, from) = (r.read_int().unwrap(), r.read_byte().unwrap() as i8);
+            self.players_hurt.push((id, from, r.read_int().unwrap()));
         } else if op == SendOpcode::KillMonster as i16 {
             let oid = r.read_int().unwrap();
             self.killed.push(oid);

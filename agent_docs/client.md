@@ -518,6 +518,7 @@ side yet.
 | Screenshot key | Implemented: as v83 does, Scroll Lock saves the frame as the next free `MapleNNNN.jpg` (quality 75) in the working directory, where v83 uses the game folder; in game, a fourth press less than a second after the last shows "You cannot take screenshots at this moment..." and later quick presses do nothing |
 | Medal name tags (`MedalTag`) | Implemented: as v83 does, a worn medal's name hangs 1 px under the name or guild tag, in the art and text colour of its `info/medalTag` style from `UI NameTag.img/medal`, or in a plain name tag box when the style has no art. v83 writes it in Dotum 12, which HC doesn't have, so the text and the number of tiles follow HC's 12 px font |
 | Boss HP bar (`UIMobGage`) | Implemented: FIELD_EFFECT mode 5 and `HPgaugeHide` mobs' hits show v83's bar right of the minimap, with the mob's name over its icon; see `combat.md` |
+| Map traps (`obstacle` objs) | Implemented: the client tests the traps' frame boxes each tick, rolls and reports the hit as TAKE_DAMAGE -3 with v83's push, and follows a `targetField`; FIELD_OBSTACLE_ONOFF and trap damage to mobs are not done; see `combat.md` |
 | Player shops, mini-games, memo/mail | No UI, no handlers |
 | Reactors | Spawning, swings, hits and breaking; no skill hits, touch or quest gates; see `combat.md` |
 | Pets | Summoning, following, others' pets, map changes, chat commands, idle actions, level-up effect, food, cash food and hunger; see `pets.md` |

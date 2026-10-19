@@ -199,6 +199,9 @@ namespace ms
 
 		void check_portals();
 
+		// Hurts the player on a trap and takes them where it sends them.
+		void hit_obstacle();
+
 		// Go through the Mystic Door the player stands in, if any
 		// (FUN_005375ed in a town, FUN_007bd594 elsewhere).
 		void check_doors(Point<int16_t> playerpos);

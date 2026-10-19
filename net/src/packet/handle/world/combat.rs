@@ -4,7 +4,7 @@ use crate::error::NetworkError;
 use crate::handler::{
     FieldRequest, HandlerResult, WorldAction, WorldContext, WorldHandler, WorldResult,
 };
-use crate::packet::build::world::mob::{self, FROM_MIST, FROM_TOUCH};
+use crate::packet::build::world::mob::{self, FROM_MIST, FROM_OBSTACLE, FROM_TOUCH};
 use crate::packet::build::world::stat::{self, StatUpdate};
 use crate::packet::build::world::{buff, effect, inventory};
 use crate::skills;
@@ -253,7 +253,7 @@ pub(super) fn set_combo(
 }
 
 /// `TAKE_DAMAGE`: the player was hurt by touching a mob or by one of its
-/// attacks (FUN_009581a9), or by a mob's mist.
+/// attacks (FUN_009581a9), by a mob's mist, or by one of the map's traps.
 pub struct TakeDamageHandler;
 
 impl WorldHandler for TakeDamageHandler {
@@ -269,6 +269,9 @@ impl WorldHandler for TakeDamageHandler {
             let code = r.read_short()? as u16;
             let kind = r.read_byte()?;
             return mist_damage(player, code, kind, damage);
+        }
+        if from == FROM_OBSTACLE && player.stats.hp > 0 {
+            return obstacle_damage(player, damage);
         }
         if from < FROM_TOUCH || player.stats.hp <= 0 {
             return Ok(HandlerResult::empty());
@@ -504,6 +507,42 @@ fn mist_damage(player: &mut Player, code: u16, kind: u8, damage: i32) -> WorldRe
     };
     let shown = mob::build_damage_player(player.id(), &hurt)?;
     let actions = HandlerResult::reply(stat::build_stat_update(false, &[StatUpdate::Hp(hp)])?)
+        .with(WorldAction::Field(FieldRequest::Broadcast(shown)));
+    Ok(if hp == 0 {
+        actions.with(WorldAction::Died)
+    } else {
+        actions
+    })
+}
+
+/// A v83 client hurt itself on one of the map's traps (FUN_00642710): a
+/// tenth either way of the trap's `damage`, or down to its `forceHP`. Achilles
+/// and Magic Guard take their shares, Meso Guard doesn't (FUN_009581a9 with
+/// no mob). The disease the client names after the damage isn't given, as
+/// neither Cosmic nor Kinoko gives it.
+fn obstacle_damage(player: &mut Player, damage: i32) -> WorldResult {
+    let most = crate::get_game_data()
+        .ok()
+        .and_then(|data| data.field(player.stats.map_id))
+        .map_or(0, |field| field.traps.max_hit(i32::from(player.stats.hp)));
+    if !(1..=most).contains(&damage) {
+        debug!(damage, most, "Trap damage out of range");
+        return Ok(HandlerResult::empty());
+    }
+    let taken = combat::taken(player, damage, true, false);
+    let hp = player.add_hp(-taken.hp);
+    let mut updates = vec![StatUpdate::Hp(hp)];
+    if taken.mp > 0 {
+        updates.push(StatUpdate::Mp(player.add_mp(-taken.mp)));
+    }
+    let hurt = mob::Hurt {
+        from: FROM_OBSTACLE,
+        damage,
+        shown: taken.shown,
+        ..mob::Hurt::default()
+    };
+    let shown = mob::build_damage_player(player.id(), &hurt)?;
+    let actions = HandlerResult::reply(stat::build_stat_update(false, &updates)?)
         .with(WorldAction::Field(FieldRequest::Broadcast(shown)));
     Ok(if hp == 0 {
         actions.with(WorldAction::Died)

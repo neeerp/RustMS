@@ -21,12 +21,30 @@
 
 namespace ms
 {
-	Obj::Obj(nl::node src)
+	Obj::Obj(nl::node src, int32_t order) : order(order)
 	{
-		animation = Animation(nl::nx::map["Obj"][src["oS"] + ".img"][src["l0"]][src["l1"]][src["l2"]]);
+		nl::node data = nl::nx::map["Obj"][src["oS"] + ".img"][src["l0"]][src["l1"]][src["l2"]];
+
+		animation = Animation(data);
 		pos = Point<int16_t>(src["x"], src["y"]);
 		flip = src["f"].get_bool();
 		z = src["z"];
+
+		// v83 FUN_0063c741.
+		obstacle = data["obstacle"].get_integer() != 0;
+
+		if (obstacle)
+		{
+			trap.damage = data["damage"];
+			trap.mobdamage = data["mobdamage"];
+			trap.dir = data["dir"];
+			trap.disease = data["disease"];
+			trap.level = data["level"];
+			trap.target_field = data["targetField"];
+
+			if (data["forceHP"])
+				trap.force_hp = data["forceHP"];
+		}
 	}
 
 	void Obj::update()
@@ -42,5 +60,34 @@ namespace ms
 	uint8_t Obj::getz() const
 	{
 		return z;
+	}
+
+	int32_t Obj::get_order() const
+	{
+		return order;
+	}
+
+	bool Obj::is_obstacle() const
+	{
+		return obstacle;
+	}
+
+	const obstacle::Trap &Obj::get_trap() const
+	{
+		return trap;
+	}
+
+	bool Obj::obstacle_box(obstacle::Box &out) const
+	{
+		Rectangle<int16_t> bounds = animation.get_bounds();
+		Point<int16_t> lt = bounds.get_left_top();
+		Point<int16_t> rb = bounds.get_right_bottom();
+
+		return obstacle::box(pos.x(), pos.y(), { lt.x(), lt.y() }, { rb.x(), rb.y() }, flip, out);
+	}
+
+	obstacle::Vec Obj::get_push() const
+	{
+		return obstacle::push(trap.dir, flip);
 	}
 }

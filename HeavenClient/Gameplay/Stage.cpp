@@ -43,6 +43,8 @@
 
 #include <nlnx/nx.hpp>
 
+#include <cstdlib>
+
 namespace ms
 {
 	namespace
@@ -362,7 +364,11 @@ namespace ms
 					mobs.show_damage(result.oid, result.reflected);
 			}
 		}
-		else if (since_mist_hurt > mist::HURT_INTERVAL)
+
+		// v83 tests the traps whether or not a mob hit; a hit leaves the player invincible for the trap (0x94b5e8).
+		hit_obstacle();
+
+		if (!touching && since_mist_hurt > mist::HURT_INTERVAL)
 		{
 			// Not touching a mob, the player in a mob's mist hurts
 			// themselves its x, without a knockback or invincibility
@@ -387,6 +393,40 @@ namespace ms
 
 			TakeDamagePacket(4, damage, 0, 3).dispatch();
 		}
+	}
+
+	void Stage::hit_obstacle()
+	{
+		// The body the mob touch takes (I: FUN_0045183b for both).
+		const PhysicsObject &phobj = player.get_phobj();
+		Range<int16_t> horizontal(phobj.get_last_x(), phobj.get_x());
+		Range<int16_t> vertical(phobj.get_last_y(), phobj.get_y());
+		obstacle::Box body{ horizontal.smaller(), vertical.smaller() - 50, horizontal.greater(), vertical.greater() };
+
+		const Obj *trap = tilesobjs.find_obstacle(body);
+
+		if (!trap)
+			return;
+
+		const obstacle::Trap &data = trap->get_trap();
+		int32_t damage = obstacle::roll(data.damage, static_cast<uint32_t>(std::rand()));
+		uint16_t code = obstacle::code(damage, data);
+		damage = obstacle::forced(damage, player.get_stats().get_stat(MapleStat::Id::HP), data.force_hp);
+
+		if (damage > 0 && !player.Char::is_invincible())
+		{
+			obstacle::Vec push = trap->get_push();
+
+			if (push == obstacle::Vec{ 0, 0 })
+				push = obstacle::fallback(phobj.get_last_x(), phobj.get_last_y(), phobj.get_x(), phobj.get_y());
+
+			player.damage_by_obstacle(damage, push.x, push.y);
+			TakeDamagePacket(TakeDamagePacket::Obstacle{ damage, code }).dispatch();
+		}
+
+		// Witch Tower's snacks send the player back to its entrance, hurting or not (0x94b767).
+		if (data.target_field != 0)
+			player.request(ChangeMapPacket(field_key, data.target_field, "", false), ExclRequest::WAIT, true);
 	}
 
 	void Stage::show_character_effect(int32_t cid, CharEffect::Id effect)

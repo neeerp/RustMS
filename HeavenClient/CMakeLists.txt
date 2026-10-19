@@ -214,6 +214,8 @@ if(HEAVENCLIENT_BUILD_TESTS)
     add_test(NAME mob_hurts COMMAND mob_hurts_tests)
     add_executable(mist_layout_tests tests/mist_layout.cpp)
     add_test(NAME mist_layout COMMAND mist_layout_tests)
+    add_executable(obstacle_rules_tests tests/obstacle_rules.cpp)
+    add_test(NAME obstacle_rules COMMAND obstacle_rules_tests)
     add_executable(map_clouds_tests tests/map_clouds.cpp)
     add_test(NAME map_clouds COMMAND map_clouds_tests)
     add_executable(map_tooltip_rules_tests tests/map_tooltip_rules.cpp)
@@ -480,6 +482,7 @@ add_executable(HeavenClient
     Gameplay/MapleMap/MesoDrop.cpp
     Gameplay/MapleMap/MesoDrop.h
     Gameplay/MapleMap/MistLayout.h
+    Gameplay/MapleMap/ObstacleRules.h
     Gameplay/MapleMap/Mob.cpp
     Gameplay/MapleMap/Mob.h
     Gameplay/MapleMap/Npc.cpp
