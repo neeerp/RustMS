@@ -17,6 +17,11 @@ templates from `Mob.nx` (`maxHP`, `exp`, `PADamage`, `bodyAttack`,
   in, facing its way, under its last controller, and never respawn. v83's
   SPAWN_MONSTER also has a -3 appearance that ties the new mob to the dying
   one, but by then the server has removed it, so they use -2.
+- **Leaving on their own:** a mob with `info/removeAfter` (the Kitties in
+  Magatia's cheese storage, 926120400, ...) is taken away that many seconds
+  after it spawned (`LiveMob::leaves_at`), as Cosmic does: KILL_MONSTER with
+  animation 1, no EXP, drops or revive mobs, and its spawn point fills again
+  as after a kill. The v83 client never reads `removeAfter`.
 - **Control:** one player moves each mob (SPAWN_MONSTER_CONTROL 1). New
   mobs and joiners pick up uncontrolled mobs; leaving hands them to another
   occupant. MOVE_LIFE from the controller updates the position, answers

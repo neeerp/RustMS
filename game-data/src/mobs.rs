@@ -50,6 +50,9 @@ pub struct MobInfo {
     /// How long it takes to die, in ms: its `die1` frames' delays (100 for
     /// one without), or 500 without any, as Cosmic has it.
     pub dying_ms: i32,
+    /// How long it stays before it leaves on its own, in seconds
+    /// (`removeAfter`), or 0 for as long as it lives.
+    pub remove_after: i32,
 }
 
 /// Where a mob's Banish sends players (`ban/banMap/0`), and what it tells
@@ -167,6 +170,7 @@ impl MobData {
             banish: self.banish(info)?,
             revive: self.revive(info)?,
             dying_ms: self.dying_ms(image)?,
+            remove_after: int("removeAfter")?,
         }))
     }
 
@@ -373,6 +377,19 @@ mod tests {
         let snail = mob(100100);
         assert!(snail.revive.is_empty());
         assert!(snail.dying_ms > 0);
+    }
+
+    #[test]
+    fn reads_how_long_a_mob_stays() {
+        let Some(path) = crate::test_assets::path("Mob.nx") else {
+            return;
+        };
+        let data = MobData::load(path).unwrap();
+        let mob = |id| data.info(id).unwrap().unwrap();
+        // Lord Pirate's Devoted Kru; Spirit of Rock's Soul has it as text.
+        assert_eq!(mob(9300117).remove_after, 10);
+        assert_eq!(mob(4300017).remove_after, 15);
+        assert_eq!(mob(100100).remove_after, 0);
     }
 
     #[test]

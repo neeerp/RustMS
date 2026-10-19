@@ -58,6 +58,8 @@ pub struct LiveMob {
     pub granted: Option<Grant>,
     /// When each skill it cast may be cast again.
     pub cooldowns: HashMap<i32, Instant>,
+    /// When it leaves on its own (`removeAfter`), if it does.
+    pub leaves_at: Option<Instant>,
 }
 
 /// A mob skill and level the server let a mob cast, and when.
@@ -150,7 +152,16 @@ pub struct Hurt {
 }
 
 impl LiveMob {
-    fn new(object_id: i32, info: MobInfo, at: (i16, i16), stance: u8, foothold: i16) -> Self {
+    fn new(
+        object_id: i32,
+        info: MobInfo,
+        at: (i16, i16),
+        stance: u8,
+        foothold: i16,
+        now: Instant,
+    ) -> Self {
+        let leaves_at =
+            (info.remove_after > 0).then(|| now + Duration::from_secs(info.remove_after as u64));
         Self {
             object_id,
             spawn: None,
@@ -170,6 +181,7 @@ impl LiveMob {
             statuses: BTreeMap::new(),
             granted: None,
             cooldowns: HashMap::new(),
+            leaves_at,
         }
     }
 
@@ -413,6 +425,7 @@ impl MobSet {
                 // `flip` faces right.
                 if template.flip { 4 } else { 5 },
                 template.foothold,
+                now,
             );
             mob.spawn = Some(index);
             self.live.insert(object_id, mob);
@@ -644,7 +657,13 @@ impl MobSet {
     /// The mobs `summoner` calls up: as many of `summoned` as its `limit`
     /// (0 for none) leaves room for, where it stands, facing its way, and
     /// under its controller. They never respawn.
-    pub fn summon(&mut self, summoner: i32, summoned: &[MobInfo], limit: i32) -> Vec<i32> {
+    pub fn summon(
+        &mut self,
+        summoner: i32,
+        summoned: &[MobInfo],
+        limit: i32,
+        now: Instant,
+    ) -> Vec<i32> {
         let Some(caster) = self.live.get(&summoner) else {
             return Vec::new();
         };
@@ -667,7 +686,7 @@ impl MobSet {
         let mut spawned = Vec::new();
         for info in summoned.iter().take(room) {
             let object_id = self.object_ids.next();
-            let mut mob = LiveMob::new(object_id, info.clone(), at, stance, foothold);
+            let mut mob = LiveMob::new(object_id, info.clone(), at, stance, foothold, now);
             mob.summoner = Some(summoner);
             mob.controller = controller;
             self.live.insert(object_id, mob);
@@ -688,7 +707,8 @@ impl MobSet {
             for info in revival.mob_ids.iter().filter_map(|&mob_id| info(mob_id)) {
                 let object_id = self.object_ids.next();
                 let at = (revival.x, revival.y);
-                let mut mob = LiveMob::new(object_id, info, at, revival.stance, revival.foothold);
+                let mut mob =
+                    LiveMob::new(object_id, info, at, revival.stance, revival.foothold, now);
                 mob.controller = revival.controller;
                 self.live.insert(object_id, mob);
                 spawned.push(object_id);
@@ -857,20 +877,12 @@ impl MobSet {
             return Some(Ok(mob.hp_percent()));
         }
         let mob = self.live.remove(&object_id)?;
+        self.emptied(mob.spawn, now);
         let showdown = mob
             .statuses
             .get(&MobStat::Showdown)
             .filter(|status| status.until > now)
             .map_or(0, |status| i32::from(status.value).max(0));
-        if let Some(spawn) = mob.spawn.map(|index| &mut self.spawns[index]) {
-            spawn.alive = None;
-            let delay = if spawn.template.mob_time > 0 {
-                Duration::from_secs(spawn.template.mob_time as u64).max(RESPAWN_DELAY)
-            } else {
-                RESPAWN_DELAY
-            };
-            spawn.next_spawn = Some(now + delay);
-        }
         if !mob.info.revive.is_empty() {
             self.revivals.push(Revival {
                 at: now + Duration::from_millis(mob.info.dying_ms.max(0) as u64),
@@ -892,6 +904,39 @@ impl MobSet {
             damage_by: ranked_damage(&mob.damage_by),
             showdown,
         }))
+    }
+
+    /// Take away the mobs whose time is up (`removeAfter`); returns their
+    /// object ids. As in Cosmic, they give no EXP or drops and let nothing
+    /// out, and their spawn points fill again as after a kill.
+    pub fn leave(&mut self, now: Instant) -> Vec<i32> {
+        let gone: Vec<i32> = self
+            .live
+            .values()
+            .filter(|mob| mob.leaves_at.is_some_and(|at| at <= now))
+            .map(|mob| mob.object_id)
+            .collect();
+        for object_id in &gone {
+            if let Some(mob) = self.live.remove(object_id) {
+                self.emptied(mob.spawn, now);
+            }
+        }
+        gone
+    }
+
+    /// The mob from spawn point `spawn`, if it had one, is gone: it spawns
+    /// again after its `mobTime`, at least `RESPAWN_DELAY`.
+    fn emptied(&mut self, spawn: Option<usize>, now: Instant) {
+        let Some(spawn) = spawn.map(|index| &mut self.spawns[index]) else {
+            return;
+        };
+        spawn.alive = None;
+        let delay = if spawn.template.mob_time > 0 {
+            Duration::from_secs(spawn.template.mob_time as u64).max(RESPAWN_DELAY)
+        } else {
+            RESPAWN_DELAY
+        };
+        spawn.next_spawn = Some(now + delay);
     }
 }
 
@@ -1187,6 +1232,7 @@ mod tests {
             mob,
             &[snail_spawn(0).1, snail_spawn(0).1, snail_spawn(0).1],
             2,
+            now,
         );
         assert_eq!(summoned.len(), 2);
         let summon = mobs.get(summoned[0]).unwrap();
@@ -1195,7 +1241,7 @@ mod tests {
             (Some(mob), None, Some(2))
         );
         assert_eq!((summon.x, summon.y), (100, -25));
-        assert!(mobs.summon(mob, &[snail_spawn(0).1], 2).is_empty());
+        assert!(mobs.summon(mob, &[snail_spawn(0).1], 2, now).is_empty());
         // Hurt below half, only Heal remains while the summons live, and
         // only with MP for it.
         let later = now + GRANT_TIMEOUT;
@@ -1341,6 +1387,28 @@ mod tests {
             );
         }
         assert!(mobs.revive(now + Duration::from_secs(5), blue).is_empty());
+    }
+
+    #[test]
+    fn a_mob_with_remove_after_leaves_on_time_and_comes_back() {
+        let now = Instant::now();
+        let (template, mut info) = snail_spawn(100);
+        info.remove_after = 10;
+        info.revive = vec![100101];
+        let mut mobs = MobSet::new([(template, info)]);
+        let mob = mobs.respawn(now)[0];
+        let due = now + Duration::from_secs(10);
+        assert!(mobs.leave(due - Duration::from_millis(1)).is_empty());
+        assert_eq!(mobs.leave(due), [mob]);
+        assert!(mobs.get(mob).is_none());
+        // Nothing comes out of it, and its spawn point fills again.
+        assert!(mobs
+            .revive(due + Duration::from_secs(5), |_| Some(MobInfo::default()))
+            .is_empty());
+        assert!(mobs
+            .respawn(due + RESPAWN_DELAY - Duration::from_millis(1))
+            .is_empty());
+        assert_eq!(mobs.respawn(due + RESPAWN_DELAY).len(), 1);
     }
 
     #[test]
