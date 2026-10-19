@@ -91,6 +91,8 @@ namespace ms
 			PETCHOOSER,
 			AVATARSELECT,
 			SLIDEMENU,
+			QUIZ,
+			SPEEDQUIZ,
 			NUM_TYPES
 		};
 

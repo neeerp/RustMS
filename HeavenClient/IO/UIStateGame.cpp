@@ -629,6 +629,8 @@ namespace ms
 					UIElement::Type::AVATARSELECT,
 					UIElement::Type::PETCHOOSER,
 					UIElement::Type::SLIDEMENU,
+					UIElement::Type::QUIZ,
+					UIElement::Type::SPEEDQUIZ,
 					UIElement::Type::SHOP,
 					UIElement::Type::STORAGE,
 					UIElement::Type::INVITECARD,

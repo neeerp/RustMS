@@ -178,6 +178,29 @@ with the text as its question. OK or Enter answers `t 01` and the pet's
 serial; CANCEL, the corner button or Escape answers `t 00`. The server
 sends neither type yet.
 
+Types 5 and 6 are quizzes. Neither has text: after the speaker byte comes
+`u8 flag`, where 1 closes an open quiz without an answer. With 0, a quiz
+(5) has `str title, str question, str clue, i32 min, i32 max, i32
+seconds`, and a speed quiz (6) `i32 subject type, i32 subject id, i32
+points, i32 number, i32 seconds`. The subject is an NPC (0), a monster (1)
+or otherwise an item, shown by its picture. While one is open, another
+show is dropped, so the server hides the last before sending the next.
+Both windows (`UIQuiz` and `UISpeedQuiz`, rules in `IO/UITypes/Quiz.h`)
+count down and stay open beside the game: they are not modal, and Escape
+does not close them. The answer has no response byte: `05 str` or `06
+str`.
+- A quiz checks the answer's bytes against twice `min` and `max`, two
+  bytes a Korean letter, and otherwise shows v83's "You must enter
+  atleast/less than %d letters. (Korean)" notice and stays open. An empty
+  answer does nothing.
+- A speed quiz answers two letters or more. NEXT answers `""`, GIVE UP
+  `"__GIVEUP__"`, and its last two minutes tick, louder as they run out.
+- When the time is up, either answers `""` and closes.
+- While one is open, the Cash Shop and the game menu's channel change
+  refuse with "You can't do this while taking the quiz."
+
+The server sends neither type yet.
+
 Type 14 is a slide menu, such as the Dimensional Mirror's. It has no text:
 after the speaker byte come an `i32` art set
 (`UIWindow.img/SlideMenu/<set>`) and a string of `#<id>#<label>` pairs;

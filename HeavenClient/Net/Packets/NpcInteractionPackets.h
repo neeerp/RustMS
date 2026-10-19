@@ -75,6 +75,18 @@ namespace ms
 		}
 	};
 
+	// Answers a quiz (5) or speed quiz (6) with what was typed, and no response byte (v83 7eb276, 7ec934).
+	// Opcode: NPC_TALK_MORE(60)
+	class NpcQuizAnswerPacket : public OutPacket
+	{
+	public:
+		NpcQuizAnswerPacket(int8_t msgtype, const std::string& answer) : OutPacket(OutPacket::Opcode::NPC_TALK_MORE)
+		{
+			write_byte(msgtype);
+			write_string(answer);
+		}
+	};
+
 	// Answers a choice of styles (7 or 8) with the index of the one picked.
 	// Opcode: NPC_TALK_MORE(60)
 	class NpcTalkStylePacket : public NpcTalkMorePacket

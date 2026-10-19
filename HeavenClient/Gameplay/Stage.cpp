@@ -33,6 +33,7 @@
 #include "../IO/UITypes/UINotice.h"
 #include "../IO/UITypes/UINpcTalk.h"
 #include "../IO/UITypes/UIPersonalShop.h"
+#include "../IO/UITypes/UIQuiz.h"
 #include "../IO/UITypes/UIStatusBar.h"
 #include "../IO/UITypes/UITradingRoom.h"
 #include "../Net/Packets/AttackAndSkillPackets.h"
@@ -1055,6 +1056,8 @@ namespace ms
 		// v83's notices 0x10a and 0x115.
 		const char *const CATCH_BREATH = "You can't do it right now.\\nCatch your breath and then try again.";
 		const char *const NOT_HERE = "You can't do it here in this map.";
+		// StringPool 0xf52.
+		const char *const TAKING_QUIZ = "You can't do this while taking the quiz.";
 	}
 
 	// v83 FUN_005304af: the request gate, then the alert a hit or attack
@@ -1080,7 +1083,7 @@ namespace ms
 	}
 
 	// v83 FUN_00a04dca: the alert first, and the request gate without its
-	// check that the player is alive.
+	// check that the player is alive. A quiz keeps the player out.
 	void Stage::enter_cash_shop()
 	{
 		if (player.get_look().get_alerted())
@@ -1091,6 +1094,14 @@ namespace ms
 
 		if (!player.can_request(ExclRequest::WAIT, true))
 			return;
+
+		if (taking_quiz())
+		{
+			if (auto chatbar = UI::get().get_element<UIChatBar>())
+				chatbar->send_chatline(TAKING_QUIZ, UIChatBar::LineType::SKILL);
+
+			return;
+		}
 
 		if (!mapinfo.can_migrate())
 		{

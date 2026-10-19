@@ -98,6 +98,11 @@ namespace ms
 
 	void Sound::play()
 	{
+		play(100);
+	}
+
+	void Sound::play(uint8_t volume)
+	{
 		if (id > 0)
 		{
 			std::string id_s = std::to_string((uint32_t) id);
@@ -105,7 +110,7 @@ namespace ms
 
 			if (alure::Source source = free_source())
 			{
-				source.setGain(gain);
+				source.setGain(gain * std::min<uint8_t>(volume, 100) / 100.0f);
 				source.setLooping(false);
 				source.play(buff);
 			}

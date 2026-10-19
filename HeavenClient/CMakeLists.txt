@@ -40,6 +40,8 @@ if(HEAVENCLIENT_BUILD_TESTS)
     add_test(NAME npc_input COMMAND npc_input_tests)
     add_executable(slide_menu_tests tests/slide_menu.cpp)
     add_test(NAME slide_menu COMMAND slide_menu_tests)
+    add_executable(quiz_tests tests/quiz.cpp)
+    add_test(NAME quiz COMMAND quiz_tests)
     add_executable(world_map_lookup_tests tests/world_map_lookup.cpp)
     add_test(NAME world_map_lookup COMMAND world_map_lookup_tests)
     add_executable(swindle_words_tests tests/swindle_words.cpp)
@@ -599,8 +601,11 @@ add_executable(HeavenClient
     IO/UITypes/SlideMenu.h
     IO/UITypes/UINpcTalk.cpp
     IO/UITypes/UINpcTalk.h
+    IO/UITypes/Quiz.h
     IO/UITypes/UIQuestLog.cpp
     IO/UITypes/UIQuestLog.h
+    IO/UITypes/UIQuiz.cpp
+    IO/UITypes/UIQuiz.h
     IO/UITypes/UIQuit.cpp
     IO/UITypes/UIQuit.h
     IO/UITypes/UIRaceSelect.cpp

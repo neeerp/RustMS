@@ -26,6 +26,7 @@
 #include "../IO/UITypes/UINotice.h"
 #include "../IO/UITypes/UINpcTalk.h"
 #include "../IO/UITypes/UIPetChooser.h"
+#include "../IO/UITypes/UIQuiz.h"
 #include "../IO/UITypes/UIShop.h"
 #include "../IO/UITypes/UISlideMenu.h"
 #include "../IO/UITypes/UIStorage.h"
@@ -43,14 +44,62 @@ namespace ms
 		recv.skip(1);
 
 		int32_t npcid = recv.read_int();
-		// 0 say, 1 yes/no, 2 text, 3 number, 4 menu, 7/8 styles, 9/10 pets, 12 accept/decline, 13 box text,
-		// 14 slide menu
+		// 0 say, 1 yes/no, 2 text, 3 number, 4 menu, 5 quiz, 6 speed quiz, 7/8 styles, 9/10 pets,
+		// 12 accept/decline, 13 box text, 14 slide menu
 		int8_t msgtype = recv.read_byte();
 		int8_t speaker = recv.read_byte();
 
 		// A say page with 0x4 speaks for another NPC (v83 7467b8).
 		if (msgtype == 0 && (speaker & 0x4))
 			npcid = recv.read_int();
+
+		// A quiz (v83 a26b09) or speed quiz (a26c66) has no text and is no part of the conversation. A flag of 0
+		// shows one, unless one is open already; 1 closes it without an answer.
+		if (msgtype == 5 || msgtype == 6)
+		{
+			int8_t flag = recv.read_byte();
+
+			if (msgtype == 5 && flag == 0)
+			{
+				std::string title = recv.read_string();
+				std::string question = recv.read_string();
+				std::string clue = recv.read_string();
+				int32_t min_letters = recv.read_int();
+				int32_t max_letters = recv.read_int();
+				int32_t seconds = recv.read_int();
+
+				auto quiz = UI::get().get_element<UIQuiz>();
+
+				if (!quiz || !quiz->is_active())
+					UI::get().emplace<UIQuiz>(title, question, clue, min_letters, max_letters, seconds);
+			} else if (msgtype == 6 && flag == 0)
+			{
+				int32_t subject_type = recv.read_int();
+				int32_t subject_id = recv.read_int();
+				int32_t points = recv.read_int();
+				int32_t number = recv.read_int();
+				int32_t seconds = recv.read_int();
+
+				auto quiz = UI::get().get_element<UISpeedQuiz>();
+
+				if (!quiz || !quiz->is_active())
+					UI::get().emplace<UISpeedQuiz>(subject_type, subject_id, points, number, seconds);
+			} else if (flag == 1)
+			{
+				if (msgtype == 5)
+				{
+					if (auto quiz = UI::get().get_element<UIQuiz>())
+						quiz->hide();
+				} else if (auto quiz = UI::get().get_element<UISpeedQuiz>())
+				{
+					quiz->hide();
+				}
+			}
+
+			UI::get().enable();
+
+			return;
+		}
 
 		// A slide menu (v83 747a46) has no text: its art's set, then its choices.
 		if (msgtype == 14)
