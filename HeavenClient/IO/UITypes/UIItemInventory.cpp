@@ -17,6 +17,7 @@
 //////////////////////////////////////////////////////////////////////////////////
 #include "UIItemInventory.h"
 
+#include "UIApReset.h"
 #include "UIChatBar.h"
 #include "UIItemMegaphone.h"
 #include "UIMegaphone.h"
@@ -310,6 +311,23 @@ namespace ms
 				if (may_use_cash_item())
 					Stage::get().get_player().request(UseCashItemPacket(slot, item_id, text), ExclRequest::WAIT);
 			}, weather::MAX_MESSAGE);
+		}
+
+		// v83 FUN_00a0a63f, type 0x17: AP Reset's dialogs pick where an AP
+		// leaves and where it goes. A GM can't use it, and says nothing.
+		void use_ap_reset(int16_t slot, int32_t item_id)
+		{
+			if (!may_use_cash_item() || in_mini_room())
+				return;
+
+			if (!ap_reset::may_use(Stage::get().get_player().get_stats().get_stat(MapleStat::Id::JOB)))
+				return;
+
+			UI::get().emplace<UIApReset>([=](int32_t to, int32_t from)
+			{
+				if (may_use_cash_item())
+					Stage::get().get_player().request(UseApResetPacket(slot, item_id, to, from), ExclRequest::WAIT);
+			});
 		}
 
 		// Whether a megaphone's line is refused, saying why if v83 does.
@@ -891,6 +909,8 @@ namespace ms
 							use_megaphone(slot, item_id);
 						else if (weather::is_weather(item_id))
 							use_weather(slot, item_id);
+						else if (item_id == ap_reset::ITEM)
+							use_ap_reset(slot, item_id);
 						else if (item_id / 10000 == 501)
 							Stage::get().use_item_effect(item_id);
 

@@ -657,6 +657,7 @@ namespace ms
 					UIElement::Type::NPCTALK,
 					UIElement::Type::AVATARSELECT,
 					UIElement::Type::PETCHOOSER,
+					UIElement::Type::APRESET,
 					UIElement::Type::SLIDEMENU,
 					UIElement::Type::QUIZ,
 					UIElement::Type::SPEEDQUIZ,

@@ -37,6 +37,7 @@ mod script_portal;
 mod scroll;
 mod solomon;
 mod spend_points;
+mod stat_reset;
 mod storage;
 mod summon;
 mod teleport_rock;

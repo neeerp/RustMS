@@ -388,6 +388,7 @@ namespace ms
 					types.emplace_back(UIElement::Type::MEGAPHONE);
 					types.emplace_back(UIElement::Type::ITEMMEGAPHONE);
 					types.emplace_back(UIElement::Type::PETCHOOSER);
+					types.emplace_back(UIElement::Type::APRESET);
 					types.emplace_back(UIElement::Type::AVATARSELECT);
 					types.emplace_back(UIElement::Type::SLIDEMENU);
 				}
@@ -402,6 +403,7 @@ namespace ms
 					types.emplace_back(UIElement::Type::TELEPORTROCK);
 					types.emplace_back(UIElement::Type::MEGAPHONE);
 					types.emplace_back(UIElement::Type::PETCHOOSER);
+					types.emplace_back(UIElement::Type::APRESET);
 					types.emplace_back(UIElement::Type::AVATARSELECT);
 					types.emplace_back(UIElement::Type::SLIDEMENU);
 				} else if (tab)

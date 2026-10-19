@@ -2,7 +2,7 @@ use crate::handler::{HandlerResult, WorldContext, WorldHandler, WorldResult};
 use crate::packet::build::world::skill;
 use crate::packet::build::world::stat::{self, StatUpdate};
 use crate::skills;
-use game::{ApStat, Player, SkillRecord};
+use game::{ApStat, CharacterStats, Player, SkillRecord};
 use packet::{io::read::PktRead, Packet};
 use std::io::Cursor;
 use tracing::debug;
@@ -24,22 +24,27 @@ impl WorldHandler for SpendApHandler {
             return Ok(HandlerResult::reply(stat::build_stat_update(true, &[])?));
         };
         let stats = &ctx.player.stats;
-        let value = match stat {
-            ApStat::Str => StatUpdate::Str(stats.str),
-            ApStat::Dex => StatUpdate::Dex(stats.dex),
-            ApStat::Int => StatUpdate::Int(stats.int),
-            ApStat::Luk => StatUpdate::Luk(stats.luk),
-            ApStat::MaxHp => StatUpdate::MaxHp(stats.max_hp),
-            ApStat::MaxMp => StatUpdate::MaxMp(stats.max_mp),
-        };
         Ok(HandlerResult::reply(stat::build_stat_update(
             true,
-            &[value, StatUpdate::Ap(stats.ap)],
+            &[stat_value(stats, stat), StatUpdate::Ap(stats.ap)],
         )?))
     }
 }
 
-fn ap_stat(mask: i32) -> Option<ApStat> {
+/// `stat`'s value, as STAT_CHANGED sends it.
+pub(super) fn stat_value(stats: &CharacterStats, stat: ApStat) -> StatUpdate {
+    match stat {
+        ApStat::Str => StatUpdate::Str(stats.str),
+        ApStat::Dex => StatUpdate::Dex(stats.dex),
+        ApStat::Int => StatUpdate::Int(stats.int),
+        ApStat::Luk => StatUpdate::Luk(stats.luk),
+        ApStat::MaxHp => StatUpdate::MaxHp(stats.max_hp),
+        ApStat::MaxMp => StatUpdate::MaxMp(stats.max_mp),
+    }
+}
+
+/// The stat behind a STAT_CHANGED mask bit that AP goes into.
+pub(super) fn ap_stat(mask: i32) -> Option<ApStat> {
     Some(match mask {
         0x40 => ApStat::Str,
         0x80 => ApStat::Dex,

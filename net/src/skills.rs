@@ -494,6 +494,20 @@ pub(crate) fn total_stats(player: &Player) -> (i32, i32, i32) {
         )
 }
 
+/// A player's INT with what they wear and Maple Warrior's percent of their
+/// own, as `total_stats` counts the others.
+pub(crate) fn total_int(player: &Player) -> i32 {
+    let int = i32::from(player.stats.int);
+    let warrior = i32::from(player.buffs.value(BuffStat::MapleWarrior).unwrap_or(0));
+    player
+        .inventory
+        .items(InventoryType::Equipped)
+        .filter_map(|(_, item)| item.equip.as_ref())
+        .fold(int + int * warrior / 100, |total, equip| {
+            total + i32::from(equip.int)
+        })
+}
+
 /// What a skill that reaches mobs puts on each it takes hold of. None for
 /// one that doesn't (yet); no statuses for one that only takes buffs away.
 pub fn mob_debuffs(skill: &Learned, player: &Player) -> Option<Inflict> {
