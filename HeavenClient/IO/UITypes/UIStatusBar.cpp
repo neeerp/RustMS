@@ -24,6 +24,7 @@
 #include "UIItemInventory.h"
 #include "UIKeyConfig.h"
 #include "UIMessenger.h"
+#include "UINotice.h"
 #include "UIQuestLog.h"
 #include "UIQuiz.h"
 #include "UIQuit.h"
@@ -34,12 +35,14 @@
 #include "UIUserList.h"
 
 #include "../KeyConfig.h"
+#include "../Messages.h"
 #include "../UI.h"
 
 #include "../Components/MapleButton.h"
 #include "../Components/MenuCover.h"
 
 #include "../../Character/ExpTable.h"
+#include "../../Character/GachaExp.h"
 #include "../../Data/ItemData.h"
 #include "../../Data/SkillData.h"
 #include "../../Gameplay/Stage.h"
@@ -114,6 +117,14 @@ namespace ms
 		constexpr int16_t EXP_WIDTH = 115;
 
 		const Point<int16_t> GAUGE_POS = Point<int16_t>(218, 38);
+
+		// The EXP numbers over the gauge, (441, 559) to (556, 574) on v83's
+		// 800x600 screen: hovering shows the EXP and any gacha EXP, and
+		// double-clicking asks to take the gacha EXP in (FUN_008d76d7,
+		// FUN_008d7611).
+		constexpr Rectangle<int16_t> EXP_NUMBERS = Rectangle<int16_t>(441, 555, 30, 44);
+
+		constexpr const char *TAKE_GACHA_EXP = "Do you wish to charge the EXP \\nearned from The Writs of Solomon?";
 
 		// The warning flashes sit over the HP and MP fills, at (218, 580) and
 		// (326, 580) on v83's 800x600 screen.
@@ -695,6 +706,52 @@ namespace ms
 			return false;
 
 		return Rectangle<int16_t>(Point<int16_t>(), dimension).contains(pos);
+	}
+
+	Cursor::State UIStatusBar::send_cursor(bool clicked, Point<int16_t> cursorpos)
+	{
+		if (EXP_NUMBERS.contains(cursorpos - position))
+		{
+			int16_t level = stats.get_stat(MapleStat::Id::LEVEL);
+			int64_t need = level < ExpTable::LEVELCAP ? ExpTable::values[level] : 0;
+
+			UI::get().show_text(Tooltip::Parent::STATUSBAR,
+					gacha_exp::tooltip(stats.get_exp(), need, stats.get_gachaexp()));
+		} else
+		{
+			UI::get().clear_tooltip(Tooltip::Parent::STATUSBAR);
+		}
+
+		return UIElement::send_cursor(clicked, cursorpos);
+	}
+
+	void UIStatusBar::remove_cursor()
+	{
+		UI::get().clear_tooltip(Tooltip::Parent::STATUSBAR);
+
+		UIElement::remove_cursor();
+	}
+
+	void UIStatusBar::doubleclick(Point<int16_t> cursorpos)
+	{
+		if (!EXP_NUMBERS.contains(cursorpos - position)
+			|| !gacha_exp::may_take(stats.get_stat(MapleStat::Id::LEVEL), stats.get_gachaexp()))
+			return;
+
+		// FUN_00a1288f checks the level again once answered. (It also
+		// refuses while riding, which this client can't.)
+		UI::get().emplace<UIYesNo>(TAKE_GACHA_EXP, [](bool yes)
+		{
+			if (!yes)
+				return;
+
+			Player &player = Stage::get().get_player();
+
+			if (player.get_level() > gacha_exp::MAX_LEVEL)
+				InChatMessage(Messages::ITEM_LEVEL_HIGH).drop();
+			else
+				player.request(GachaExpPacket(), ExclRequest::WAIT);
+		});
 	}
 
 	bool UIStatusBar::button_covered(uint16_t buttonid, Point<int16_t> cursorpos) const

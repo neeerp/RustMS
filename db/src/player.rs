@@ -8,8 +8,8 @@ use crate::character::Character;
 use crate::keybinding::KeybindType;
 use crate::quest::QuestProgress;
 use crate::schema::{
-    accounts, character_quests, characters, equipment_stats, inventory_items, keybindings,
-    monster_book_cards, skills, teleport_rocks,
+    accounts, character_quests, characters, equipment_stats, gacha_exp, inventory_items,
+    keybindings, monster_book_cards, skills, teleport_rocks,
 };
 use diesel::pg::PgConnection;
 use diesel::prelude::*;
@@ -213,6 +213,12 @@ pub fn load_player(character_id: i32) -> crate::Result<Player> {
             .map(|(card, level)| (card, u8::try_from(level).unwrap_or(0))),
     );
     player.teleport_rocks = load_teleport_rocks(&mut conn, character_id)?;
+    player.stats.gacha_exp = gacha_exp::table
+        .find(character_id)
+        .select(gacha_exp::exp)
+        .first(&mut conn)
+        .optional()?
+        .unwrap_or(0);
     Ok(player)
 }
 
@@ -287,6 +293,19 @@ pub(crate) fn write_player(conn: &mut PgConnection, player: &Player) -> QueryRes
 
         save_keymap(conn, id, &player.keymap)?;
         save_teleport_rocks(conn, id, &player.teleport_rocks)?;
+        if stats.gacha_exp > 0 {
+            diesel::insert_into(gacha_exp::table)
+                .values((
+                    gacha_exp::character_id.eq(id),
+                    gacha_exp::exp.eq(stats.gacha_exp),
+                ))
+                .on_conflict(gacha_exp::character_id)
+                .do_update()
+                .set(gacha_exp::exp.eq(stats.gacha_exp))
+                .execute(conn)?;
+        } else {
+            diesel::delete(gacha_exp::table.find(id)).execute(conn)?;
+        }
         save_inventory(conn, id, &player.inventory)?;
         crate::pet::save(conn, &player.inventory, &player.pets)?;
         // Kill progress of started quests.
@@ -419,6 +438,8 @@ pub(crate) fn character_stats(character: &Character) -> CharacterStats {
         ap: character.ap,
         sp: character.sp,
         exp: character.exp,
+        // Kept in its own table, which load_player reads.
+        gacha_exp: 0,
         fame: character.fame,
         map_id: character.map_id,
         spawn_point: u8::try_from(character.spawn_point).unwrap_or(0),

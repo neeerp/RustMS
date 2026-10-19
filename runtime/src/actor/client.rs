@@ -373,6 +373,7 @@ impl ClientActor {
                 .await?
             }
             WorldAction::Died => self.died().await?,
+            WorldAction::GainExp(amount) => self.gained_exp(amount).await?,
             WorldAction::Quest(request) => self.request_quest_action(request).await?,
             WorldAction::Shop(request) => self.shop_action(request).await?,
             WorldAction::Storage(request) => self.storage_request(request).await?,

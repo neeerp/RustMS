@@ -302,6 +302,20 @@ namespace ms
 		}
 	};
 
+	// Requests using the Writ of Solomon (237xxxx) in a USE slot, whose EXP
+	// becomes gacha EXP, v83 FUN_00a12685
+	// Opcode: USE_SOLOMON_ITEM(157)
+	class SolomonItemPacket : public OutPacket
+	{
+	public:
+		SolomonItemPacket(int16_t slot, int32_t itemid) : OutPacket(OutPacket::Opcode::USE_SOLOMON_ITEM)
+		{
+			write_time();
+			write_short(slot);
+			write_int(itemid);
+		}
+	};
+
 	// Requests using the scroll in a USE slot on a worn equip
 	// Opcode: SCROLL_EQUIP(86), v83 FUN_00a09221
 	class ScrollEquipPacket : public OutPacket

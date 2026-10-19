@@ -44,7 +44,9 @@ namespace ms
 					"You cannot use the Mystic Door Skill near the portal.",
 					"Since you are not using a weapon, you are unable to attack.",
 					"This item cannot be used here.",
-					"You cannot drop the item here."
+					"You cannot drop the item here.",
+					"Your level is too high to use the selected item.",
+					"You'll need to use all your remaining EXP in order to use a new Writ of Solomon."
 			};
 
 	bool Messages::is_cost(Type type)

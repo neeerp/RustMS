@@ -34,6 +34,8 @@ pub struct ItemInfo {
     /// What a portable chair heals every 10 seconds (`recoveryHP`/`recoveryMP`).
     pub recovery_hp: i32,
     pub recovery_mp: i32,
+    /// The highest level that may use it (`info/maxLevel`), 0 for any.
+    pub max_level: i32,
     /// `spec` of consumable items.
     pub spec: Option<ConsumeSpec>,
     /// What a skill or mastery book teaches (`info/skill`).
@@ -97,6 +99,9 @@ pub struct ConsumeSpec {
     pub ignore_continent: bool,
     /// The quest record an event scroll keeps the way back in (`returnMapQR`).
     pub return_map_qr: i32,
+    /// What a Writ of Solomon (237xxxx) adds to the player's gacha EXP
+    /// (`exp`).
+    pub exp: i32,
 }
 
 impl ConsumeSpec {
@@ -283,6 +288,7 @@ impl ItemData {
             info.pad = nx.int_child(meta, "incPAD")?.unwrap_or(0);
             info.recovery_hp = nx.int_child(meta, "recoveryHP")?.unwrap_or(0);
             info.recovery_mp = nx.int_child(meta, "recoveryMP")?.unwrap_or(0);
+            info.max_level = nx.int_child(meta, "maxLevel")?.unwrap_or(0);
             if pet {
                 info.pet_hunger = nx.int_child(meta, "hungry")?.unwrap_or(1);
                 info.pet_name_tag = nx.int_child(meta, "nameTag")?.unwrap_or(0) != 0;
@@ -338,6 +344,7 @@ impl ItemData {
                 move_to: nx.int_child(spec, "moveTo")?,
                 ignore_continent: nx.int_child(spec, "ignoreContinent")?.unwrap_or(0) != 0,
                 return_map_qr: nx.int_child(spec, "returnMapQR")?.unwrap_or(0),
+                exp: nx.int_child(spec, "exp")?.unwrap_or(0),
             });
         }
         if item_id / 10_000 == 210 {
@@ -438,6 +445,7 @@ impl ItemData {
             pad: 0,
             recovery_hp: 0,
             recovery_mp: 0,
+            max_level: 0,
             spec: None,
             book: None,
             scroll: None,
@@ -585,6 +593,20 @@ mod tests {
         );
         let relaxer = data.info(3010000).unwrap().unwrap();
         assert_eq!((relaxer.recovery_hp, relaxer.recovery_mp), (50, 0));
+    }
+
+    #[test]
+    fn reads_what_a_writ_of_solomon_gives_and_to_whom() {
+        let Some(data) = data() else {
+            return;
+        };
+        let writ = |id| {
+            let info = data.info(id).unwrap().unwrap();
+            (info.max_level, info.spec.unwrap().exp)
+        };
+        assert_eq!(writ(2370000), (50, 100000));
+        assert_eq!(writ(2370012), (50, 100));
+        assert_eq!(data.info(2000000).unwrap().unwrap().max_level, 0);
     }
 
     #[test]

@@ -29,7 +29,7 @@
 
 namespace ms
 {
-	CharStats::CharStats(const StatsEntry &s) : name(s.name), petids(s.petids), exp(s.exp), mapid(s.mapid),
+	CharStats::CharStats(const StatsEntry &s) : name(s.name), petids(s.petids), exp(s.exp), gachaexp(s.gachaexp), mapid(s.mapid),
 												portal(s.portal), rank(s.rank), jobrank(s.jobrank), basestats(s.stats),
 												female(s.female)
 	{
@@ -150,6 +150,11 @@ namespace ms
 		exp = e;
 	}
 
+	void CharStats::set_gachaexp(int32_t e)
+	{
+		gachaexp = e;
+	}
+
 	void CharStats::set_portal(uint8_t p)
 	{
 		portal = p;
@@ -243,6 +248,11 @@ namespace ms
 	int64_t CharStats::get_exp() const
 	{
 		return exp;
+	}
+
+	int32_t CharStats::get_gachaexp() const
+	{
+		return gachaexp;
 	}
 
 	const std::string &CharStats::get_name() const

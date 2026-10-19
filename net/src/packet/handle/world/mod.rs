@@ -34,6 +34,7 @@ mod reactor;
 mod rearrange;
 mod script_portal;
 mod scroll;
+mod solomon;
 mod spend_points;
 mod storage;
 mod summon;
@@ -83,6 +84,7 @@ pub use self::reactor::DamageReactorHandler;
 pub use self::rearrange::{GatherItemsHandler, SortItemsHandler};
 pub use self::script_portal::ChangeMapSpecialHandler;
 pub use self::scroll::UseUpgradeScrollHandler;
+pub use self::solomon::{UseGachaExpHandler, UseSolomonItemHandler};
 pub use self::spend_points::{SpendApHandler, SpendSpHandler};
 pub use self::storage::TrunkRequestHandler;
 pub use self::summon::{

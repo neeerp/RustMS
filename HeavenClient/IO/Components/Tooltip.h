@@ -46,7 +46,8 @@ namespace ms
 			BUFFLIST,
 			TRADINGROOM,
 			PERSONALSHOP,
-			ITEMMEGAPHONE
+			ITEMMEGAPHONE,
+			STATUSBAR
 		};
 
 		virtual ~Tooltip()

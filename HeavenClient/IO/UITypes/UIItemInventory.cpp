@@ -33,6 +33,7 @@
 #include "../Components/MapleButton.h"
 #include "../UITypes/UIKeyConfig.h"
 
+#include "../../Character/GachaExp.h"
 #include "../../Character/Pets.h"
 #include "../../Character/Inventory/ItemDrop.h"
 #include "../../Character/Inventory/ScrollRules.h"
@@ -477,6 +478,32 @@ namespace ms
 				});
 		}
 
+		// v83 FUN_00a12685: a Writ of Solomon (237xxxx) becomes gacha EXP, up
+		// to the writ's info/maxLevel and only once the last is taken. (The
+		// client also refuses while riding, which this one can't.)
+		void use_solomon_writ(int16_t slot, int32_t item_id)
+		{
+			Player &player = Stage::get().get_player();
+			const CharStats &stats = player.get_stats();
+			nl::node info = nl::nx::item["Consume"]["0237.img"]["0" + std::to_string(item_id)]["info"];
+			int32_t max_level = info["maxLevel"].get_integer();
+
+			switch (gacha_exp::writ_refusal(stats.get_stat(MapleStat::Id::LEVEL), max_level, stats.get_gachaexp()))
+			{
+				case gacha_exp::WritRefusal::LEVEL:
+					InChatMessage(Messages::ITEM_LEVEL_HIGH).drop();
+					break;
+				case gacha_exp::WritRefusal::EXP_LEFT:
+					InChatMessage(Messages::SOLOMON_EXP_LEFT).drop();
+					break;
+				case gacha_exp::WritRefusal::NONE:
+					if (player.request(SolomonItemPacket(slot, item_id), ExclRequest::WAIT))
+						Sound(item_id).play();
+
+					break;
+			}
+		}
+
 		// v83 FUN_00a0900a: a map may keep items off the ground, which it
 		// says only once the player has answered every question.
 		void send_drop(InventoryType::Id tab, int16_t slot, int16_t qty)
@@ -786,6 +813,8 @@ namespace ms
 							use_summon_sack(slot, item_id);
 						else if (item_id / 10000 == 232)
 							use_teleport_rock(slot, item_id);
+						else if (item_id / 10000 == 237)
+							use_solomon_writ(slot, item_id);
 						else if (!Stage::get().get_mapinfo().can_use_item(item_id))
 							InChatMessage(Messages::ITEM_FIELD).drop();
 						else if (!disease::can_use_item(Stage::get().get_player().get_diseases()))

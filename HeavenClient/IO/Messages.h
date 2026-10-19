@@ -53,6 +53,10 @@ namespace ms
 			// The map forbids the item (fieldLimit)
 			ITEM_FIELD,
 			DROP_FIELD,
+			// The item's info/maxLevel is below the player's level
+			ITEM_LEVEL_HIGH,
+			// A Writ of Solomon while gacha EXP is left
+			SOLOMON_EXP_LEFT,
 			LENGTH
 		};
 

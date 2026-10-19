@@ -37,7 +37,7 @@ pub fn encode_character_stats(
     packet.write_short(stats.sp)?;
     packet.write_int(stats.exp)?;
     packet.write_short(stats.fame)?;
-    packet.write_int(0)?; // gachapon exp
+    packet.write_int(stats.gacha_exp)?;
     packet.write_int(stats.map_id)?;
     packet.write_byte(stats.spawn_point)?;
     packet.write_int(0)?;
@@ -80,6 +80,7 @@ pub(crate) fn sample_stats() -> CharacterStats {
         ap: 3,
         sp: 1,
         exp: 1234,
+        gacha_exp: 0,
         fame: 7,
         map_id: 100000000,
         spawn_point: 2,

@@ -91,6 +91,18 @@ namespace ms
 		}
 	};
 
+	// Requests taking in the gacha EXP from a Writ of Solomon, v83
+	// FUN_00a1288f
+	// Opcode: USE_GACHA_EXP(158)
+	class GachaExpPacket : public OutPacket
+	{
+	public:
+		GachaExpPacket() : OutPacket(OutPacket::Opcode::USE_GACHA_EXP)
+		{
+			write_time();
+		}
+	};
+
 	// Requests the server to show a collected card on the Monster Book's
 	// cover, or none for 0
 	// Opcode: MONSTER_BOOK_COVER(57)

@@ -51,6 +51,8 @@ pub struct CharacterStats {
     pub ap: i16,
     pub sp: i16,
     pub exp: i32,
+    /// EXP from Writs of Solomon, taken by double-clicking the EXP gauge.
+    pub gacha_exp: i32,
     pub fame: i16,
     pub map_id: i32,
     /// Portal id the character respawns at when entering `map_id`.
@@ -618,6 +620,7 @@ pub(crate) fn test_stats() -> CharacterStats {
         ap: 0,
         sp: 0,
         exp: 0,
+        gacha_exp: 0,
         fame: 0,
         map_id: 10000,
         spawn_point: 0,

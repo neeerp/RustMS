@@ -55,6 +55,9 @@ namespace ms
 
 		void set_exp(int64_t exp);
 
+		// EXP from a Writ of Solomon, taken by double-clicking the EXP gauge.
+		void set_gachaexp(int32_t exp);
+
 		void set_portal(uint8_t portal);
 
 		// The mastery the window's damage range counts.
@@ -87,6 +90,8 @@ namespace ms
 		uint8_t get_portal() const;
 
 		int64_t get_exp() const;
+
+		int32_t get_gachaexp() const;
 
 		const std::string &get_name() const;
 
@@ -133,6 +138,7 @@ namespace ms
 		std::vector<int64_t> petids;
 		Job job;
 		int64_t exp;
+		int32_t gachaexp = 0;
 		int32_t mapid;
 		uint8_t portal;
 		std::pair<int32_t, int8_t> rank;

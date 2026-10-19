@@ -83,6 +83,8 @@ pub enum RecvOpcode {
     ThrowGrenade = 0x6D,
 
     ChangeKeybinds = 0x87,
+    UseSolomonItem = 0x9D,
+    UseGachaExp = 0x9E,
     MovePet = 0xA7,
     PetChat = 0xA8,
     PetCommand = 0xA9,

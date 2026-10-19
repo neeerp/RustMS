@@ -2,6 +2,7 @@ use super::quest::gain_exp_with_bonus;
 use super::ClientActor;
 use crate::error::RuntimeError;
 use net::packet::build::world::messaging::{build_broadcast, Broadcast};
+use net::packet::build::world::stat;
 use net::packet::handle::world::{death_penalty, warp};
 
 impl ClientActor {
@@ -24,6 +25,16 @@ impl ClientActor {
         }
         let mut packets = Vec::new();
         gain_exp_with_bonus(&mut next, exp, party_bonus, &mut packets)?;
+        self.commit_player(next, None, &mut packets).await?;
+        self.send_all(&mut packets).await
+    }
+
+    /// EXP from outside a kill or quest, such as gacha EXP: the stat update
+    /// shows it, with no message.
+    pub(super) async fn gained_exp(&mut self, amount: i32) -> Result<(), RuntimeError> {
+        let mut next = self.in_game()?.player.clone();
+        let levelled = next.gain_exp(amount, net::skills::growth_bonus(&next, true)) > 0;
+        let mut packets = vec![stat::build_exp_stats(&next.stats, levelled)?];
         self.commit_player(next, None, &mut packets).await?;
         self.send_all(&mut packets).await
     }
