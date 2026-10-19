@@ -234,8 +234,14 @@ namespace ms
 			return;
 
 		// v83's spell handler swings a regular attack instead when the player
-		// is prone (0x969b10).
+		// is prone (0x969b10), and most shots whack a mob right in front of
+		// the player instead (0x9698ca).
+		int16_t reach = 0;
+
 		if (move.is_skill() && player.is_prone() && SkillData::get(move_id).is_spell())
+			apply_move(regularattack);
+		else if (move.is_skill() && SkillData::get(move_id).is_shot() && !point_blank::always_shoots(move_id)
+				 && find_whack(player.prepare_attack(0), reach) != Stance::Id::NONE)
 			apply_move(regularattack);
 		else
 			apply_move(move);
@@ -877,8 +883,28 @@ namespace ms
 			if (attack.type == Attack::Type::RANGED && !move.is_skill())
 				whack = find_whack(attack, reach);
 
+			// A Ranger's or a Sniper's whack shoots a Mortal Blow instead,
+			// with its prop, at the mob in front (0x9516c8).
+			uint8_t flags = 0;
+
 			if (whack != Stance::Id::NONE)
+			{
+				int32_t blow = point_blank::mortal_blow(player.get_stats().get_job().get_id());
+				int32_t level = blow ? player.get_skills().get_level(blow) : 0;
+
+				if (level > 0)
+				{
+					if (Randomizer().below(SkillData::get(blow).get_stats(level).chance))
+					{
+						apply_move(get_skill(blow));
+						return;
+					}
+
+					flags = point_blank::MISSED_BLOW_FLAG;
+				}
+
 				attack = player.prepare_attack(0, true);
+			}
 
 			// A held skill's shots keep the body as it is (0x954165). A
 			// Final Attack shows no effect of its own (0x9519ac).
@@ -904,6 +930,11 @@ namespace ms
 			player.set_afterimage(move.get_id());
 
 			move.apply_stats(player, attack);
+
+			if (attack.skill && attack.skill == point_blank::mortal_blow(player.get_stats().get_job().get_id()))
+				flags = point_blank::MORTAL_BLOW_FLAG;
+
+			attack.display |= flags;
 
 			// A Final Attack reaches as its stance's regular attack does, and
 			// after Slash Blast it says so (0x952949).
@@ -2530,6 +2561,20 @@ namespace ms
 		{
 			ForbidSkillMessage(reason, player.get_stats().get_weapontype()).drop();
 			finish_prepare();
+			return;
+		}
+
+		// A mob right in front of the player is whacked instead, and the
+		// skill let go (0x94bbd3).
+		int16_t reach = 0;
+
+		if (find_whack(player.prepare_attack(0), reach) != Stance::Id::NONE)
+		{
+			finish_prepare();
+
+			if (can_use_move(regularattack))
+				apply_move(regularattack);
+
 			return;
 		}
 

@@ -242,7 +242,12 @@ With ammo, a regular attack still whacks instead of shooting when a mob is
 right in front: v83 picks the melee stance first and looks for a mob in its
 afterimage range, cut to reach at most 65 px forward
 (`Gameplay/Combat/PointBlank.h`, `Combat::find_whack`). Only when there is
-none does it shoot.
+none does it shoot. Most skills that shoot do the same, and so does each tick
+of a held Hurricane or Rapid Fire, which also lets the skill go; a few shots,
+such as Arrow Rain or Arrow Eruption, never whack (`point_blank::always_shoots`).
+A Ranger's or Sniper's whack, with Mortal Blow learned, first rolls its
+`prop`: on success it shoots Mortal Blow at the mob instead, flagged 0x04;
+on failure the whack goes out flagged 0x10 (`point_blank::mortal_blow`).
 
 A shot leaves the user 28 px up and, for a regular attack, as far forward as
 the whack would reach (skills shoot from the user). Each bullet flies straight
@@ -323,8 +328,8 @@ handled in the field's `handle_attack`):
   them (SHOW_FOREIGN_EFFECT 1), once per attack.
 - **Mortal Blow** (3110001, 3210001) rolls its `y` percent per attack. On a
   hit, a non-boss mob with no more than `x` percent of its max HP left dies.
-  The v83 client sends it as a close-range swing when a mob comes near the
-  archer (FUN_00950921).
+  The v83 client shoots it as a ranged attack when a whack's roll succeeds
+  (FUN_00950921), as described above.
 
 The client actor applies what came back as one STAT_CHANGED
 (`ServerMessage::Absorbed`).
