@@ -94,21 +94,34 @@ impl ClientActor {
         Some(tokio::time::Instant::from_std(deadline))
     }
 
-    /// Heal from Recovery, hurt from Poison, and end the buffs and
-    /// cooldowns that ran out.
+    /// Heal from Recovery, hurt from Poison and Dragon Blood, and end the
+    /// buffs and cooldowns that ran out.
     pub(super) async fn update_buffs(&mut self) -> Result<(), RuntimeError> {
         let player = &mut self.in_game_mut()?.player;
-        let tick = player.buffs.advance(std::time::Instant::now());
+        let mut tick = player.buffs.advance(std::time::Instant::now());
         let mut packets = Vec::new();
         let stats = &player.stats;
         // Poison never takes the last HP, and Achilles takes its share off,
         // as a v83 client works it out (0x94b113).
         let poison = tick.poison.min(i32::from(stats.hp) - 1).max(0);
         let poison = net::combat::taken(player, poison, false, false).hp;
-        let change = tick.heal - poison;
+        let mut change = tick.heal - poison;
+        // Dragon Blood drinks its HP while the player has more, and ends
+        // rather than take their last (its description; the client leaves
+        // it to the server).
+        let bled = tick.blood > 0 && i32::from(stats.hp) + change > tick.blood;
+        if bled {
+            change -= tick.blood;
+        } else if tick.blood > 0 {
+            tick.expired
+                .extend(player.buffs.cancel(net::skills::DRAGON_BLOOD));
+        }
         if stats.hp > 0 && (change < 0 || (change > 0 && stats.hp < stats.max_hp)) {
             let hp = player.add_hp(change);
             packets.push(stat::build_stat_update(false, &[StatUpdate::Hp(hp)])?);
+        }
+        if bled {
+            packets.push(buff::build_own_special(net::skills::DRAGON_BLOOD)?);
         }
         if !tick.expired.is_empty() {
             packets.push(buff::build_cancel_buff(&tick.expired)?);
@@ -116,7 +129,16 @@ impl ClientActor {
         for skill_id in tick.cooled {
             packets.push(buff::build_cooldown(skill_id, 0)?);
         }
+        let id = player.id();
         self.send_all(&mut packets).await?;
+        if bled {
+            let shown = buff::build_foreign_special(id, net::skills::DRAGON_BLOOD)?;
+            self.send_to_field(FieldMessage::FromClient {
+                from: self.client_id,
+                request: FieldRequest::Broadcast(shown),
+            })
+            .await?;
+        }
         self.hide_buffs(&tick.expired).await
     }
 

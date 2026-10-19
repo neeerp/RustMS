@@ -8,6 +8,8 @@ use std::time::{Duration, Instant};
 pub const RECOVERY_INTERVAL: Duration = Duration::from_secs(5);
 /// How often Poison hurts.
 pub const POISON_INTERVAL: Duration = Duration::from_secs(1);
+/// How often Dragon Blood drinks HP.
+pub const DRAGON_BLOOD_INTERVAL: Duration = Duration::from_secs(4);
 
 /// A temporary stat, numbered by its bit in the v83 client's 128-bit
 /// temporary-stat flags (built as `1 << n` at startup, e.g. 0x78d9ad).
@@ -42,6 +44,7 @@ pub enum BuffStat {
     Darkness = 20,
     Combo = 21,
     WeaponCharge = 22,
+    /// Drinks `value` HP every `DRAGON_BLOOD_INTERVAL`.
     DragonBlood = 23,
     HolySymbol = 24,
     MesoUp = 25,
@@ -141,6 +144,7 @@ impl BuffStat {
         match self {
             BuffStat::Recovery => Some(RECOVERY_INTERVAL),
             BuffStat::Poison => Some(POISON_INTERVAL),
+            BuffStat::DragonBlood => Some(DRAGON_BLOOD_INTERVAL),
             _ => None,
         }
     }
@@ -156,7 +160,7 @@ pub struct Buff {
     pub stat: BuffStat,
     pub value: i16,
     pub expires: Instant,
-    /// When Recovery next heals, or Poison next hurts.
+    /// When Recovery next heals, or Poison or Dragon Blood next hurts.
     next_tick: Option<Instant>,
 }
 
@@ -214,6 +218,8 @@ pub struct BuffTick {
     pub heal: i32,
     /// HP that Poison takes now.
     pub poison: i32,
+    /// HP that Dragon Blood drinks now.
+    pub blood: i32,
 }
 
 #[derive(Clone, Debug, Default)]
@@ -293,8 +299,8 @@ impl Buffs {
         buffs.chain(cooldowns).min()
     }
 
-    /// Heal or hurt for each Recovery or Poison interval that has passed,
-    /// then end the buffs and cooldowns that ran out.
+    /// Heal or hurt for each Recovery, Poison or Dragon Blood interval that
+    /// has passed, then end the buffs and cooldowns that ran out.
     pub fn advance(&mut self, now: Instant) -> BuffTick {
         let mut tick = BuffTick::default();
         for buff in &mut self.active {
@@ -304,6 +310,7 @@ impl Buffs {
             while let Some(at) = buff.next_tick.filter(|&at| at <= now && at <= buff.expires) {
                 match buff.stat {
                     BuffStat::Poison => tick.poison += i32::from(buff.value),
+                    BuffStat::DragonBlood => tick.blood += i32::from(buff.value),
                     _ => tick.heal += i32::from(buff.value),
                 }
                 buff.next_tick = Some(at + interval);
@@ -449,6 +456,24 @@ mod tests {
         assert!(buffs.cure(&[BuffStat::Speed, BuffStat::Poison]).is_empty());
         assert_eq!(buffs.cure(&BuffStat::DISEASES), vec![BuffStat::Stun]);
         assert!(buffs.has(BuffStat::Speed) && !buffs.has(BuffStat::Stun));
+    }
+
+    #[test]
+    fn dragon_blood_drinks_every_four_seconds() {
+        let start = Instant::now();
+        let mut buffs = Buffs::default();
+        buffs.give(Buff::new(1311008, BuffStat::Pad, 12, start, 160 * SECOND));
+        buffs.give(Buff::new(
+            1311008,
+            BuffStat::DragonBlood,
+            20,
+            start,
+            160 * SECOND,
+        ));
+        assert_eq!(buffs.next_deadline(), Some(start + 4 * SECOND));
+        assert_eq!(buffs.advance(start + 3 * SECOND).blood, 0);
+        assert_eq!(buffs.advance(start + 8 * SECOND).blood, 40);
+        assert_eq!(buffs.next_deadline(), Some(start + 12 * SECOND));
     }
 
     #[test]

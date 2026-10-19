@@ -125,11 +125,16 @@ skill for that percentage of the basic cap, Shadow Meso for v83's highest
 roll (ten times one and a half its `moneyCon`, raised by its `x` percent on a
 critical), Snipe's shot for 199,999, and a skill with none is not an attack.
 A spell must name a skill.
-Too little MP refuses the attack, as do too few mesos for the skill's
+Too little HP or MP refuses the attack, as do too few mesos for the skill's
 `moneyCon` (Shadow Meso's, raised by Shadow Partner's `y` percent while that
 buff is on, as the v83 client checks). An attack skill with a `cooltime`
 (Heaven's Hammer, Snipe, Aerial Strike) is refused while it cools down;
 otherwise it starts the cooldown and the attacker gets COOLDOWN.
+A skill's HP cost (`skills::hp_cost`, as v83's `FUN_00764256`) is its
+`hpCon`, which must stay under the player's HP; Slash Blast and the Boosters
+have one. Dragon Roar instead takes its `x` percent of max HP and needs at
+least half of it. Sacrifice takes its `x` percent of its first blow, never
+the last HP, which v83 leaves wholly to the server (Cosmic's rule).
 HeavenClient sends a skill as the attack v83's `CUserLocal::DoActiveSkill`
 makes it, whatever the weapon: a swing, a shot, or a spell
 (`SkillData::flags_of`). Any other skill goes out as SPECIAL_MOVE. Skills
@@ -139,7 +144,7 @@ The field shows
 the attack under its own opcode (with the skill id and level, so others see
 the skill's effect, and for a shot the star, arrow, or bullet it fired) to the
 others, applies the damage, sends the attacker SHOW_MONSTER_HP, and on death
-KILL_MONSTER to everyone; the attacker gets the MP and mesos left as
+KILL_MONSTER to everyone; the attacker gets the HP, MP and mesos left as
 STAT_CHANGED.
 
 A mob with an `info/damagedBySelectedSkill` list (Kyrin's test
@@ -162,7 +167,8 @@ first fitting stack that covers the cost (`Inventory::find_bulletslot`).
 HeavenClient refuses a skill before sending it, with v83's lines in the skill
 chat colour (`Player::can_use`, `Skill::can_use`, `Combat::can_use_move`). The
 checks run in v83's order. A skill cooling down comes first. Then come the
-costs: HP, MP, mesos (`moneyCon`; Shadow Meso's grows by Shadow Partner's `y`
+costs: HP (Dragon Roar's is its `x` percent of max HP, and needs half of
+it), MP, mesos (`moneyCon`; Shadow Meso's grows by Shadow Partner's `y`
 percent while that buff is on), and the item (`itemCon`, named in the line).
 The four cost lines share one two-second throttle, so a second refusal within
 two seconds prints nothing. An attack with no weapon says so next. Then the
@@ -312,16 +318,19 @@ USE_SKILL (`0x5B`, `handle::world::use_skill`) casts a skill that doesn't
 attack. `net::skills::buffs` maps each buff skill to the stats it gives (the
 level's attack, defense, accuracy, avoidability, speed and jump, plus the
 skill's own stat); a skill missing from it is ignored. The level the client names must be the learned one, the skill must
-be off cooldown, and the player alive with enough MP. The caster gets the MP
-left, GIVE_BUFF (the temporary-stat masks match HeavenMS: Speed and Recovery
+be off cooldown, and the player alive with enough HP and MP. The caster gets
+the MP left (and the HP, for a Booster's `hpCon`), GIVE_BUFF (the temporary-stat masks match HeavenMS: Speed and Recovery
 are both second-mask bits), and COOLDOWN when the level has a `cooltime`;
 the map sees SHOW_FOREIGN_EFFECT 1 with the skill.
 
 `game::Buffs` on the `Player` holds the active buffs and cooldowns; neither is
 saved. A new buff replaces one on the same stat. The client actor sleeps until
 the next deadline (`actor::client::buff`): Recovery heals its `x` every 5 s
-while the player is hurt (HP stat update), and an expired buff sends
-CANCEL_BUFF, since the client never ends buffs itself. Right-clicking a buff
+while the player is hurt (HP stat update). Dragon Blood drinks its `x` every
+4 s, showing its `special` animation to everyone (user effect 5, an int
+skill id); when the player has no more than that left it ends instead, as its
+description says ("until 4 seconds before the remaining HP exhausts"). An
+expired buff sends CANCEL_BUFF, since the client never ends buffs itself. Right-clicking a buff
 icon sends CANCEL_BUFF (`0x5C`, the skill id), which ends that skill's buffs
 and answers with CANCEL_BUFF. Dying and changing channel end every buff;
 cooldowns keep running.
@@ -1064,7 +1073,9 @@ six snails, checks the effect another player sees and the cover, and that
 both survive logging out; `beginner_skills` has three players learn
 Three Snails, Nimble Feet, and Recovery and checks their damage caps, MP,
 buffs, cooldowns, Recovery's heal, what the others see, and that the buffs
-end on time and on death. `poison_mist` casts Poison Mist on a snail and
+end on time and on death. `hp_costs` has a Dragon Knight spend HP on Slash
+Blast and Dragon Roar, refuses Dragon Roar under half HP, and has Dragon
+Blood drink HP until it ends early. `poison_mist` casts Poison Mist on a snail and
 checks the cloud's packet, that it lifts on time, and that it poisons only
 the snails in its box. `snipe` has a Marksman Snipe snails: 200,000 is
 refused, 199,999 kills and starts the 4 s cooldown, which refuses another

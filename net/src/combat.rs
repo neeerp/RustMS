@@ -247,6 +247,8 @@ pub struct Uses {
     pub skill: Option<Learned>,
     pub ammo: Option<Ammo>,
     pub mesos: i32,
+    /// The HP the skill costs, Sacrifice's share of its blow among it.
+    pub hp: i32,
 }
 
 /// A shot fires the stack in the slot the client names, which the weapon
@@ -295,6 +297,7 @@ pub enum AttackRejection {
     Dead,
     /// A skill the player hasn't learned, or one that doesn't attack.
     Skill,
+    NotEnoughHp,
     NotEnoughMp,
     NotEnoughMesos,
     TooManyTargets,
@@ -357,6 +360,7 @@ pub fn validate(attack: &Attack, player: &Player) -> Result<Uses, AttackRejectio
         percent => (max_base_damage(player) * 2 * percent / 100).max(10),
     };
     let mut mesos = 0;
+    let mut hp = 0;
     let (skill, mob_count, hit_count, cap) = if attack.skill == 0 {
         if attack.kind == AttackKind::Magic {
             return Err(AttackRejection::Skill);
@@ -390,6 +394,7 @@ pub fn validate(attack: &Attack, player: &Player) -> Result<Uses, AttackRejectio
         } else {
             return Err(AttackRejection::Skill);
         };
+        hp = skills::hp_cost(player, &skill).ok_or(AttackRejection::NotEnoughHp)?;
         if i32::from(player.stats.mp) < attack_mp_cost(&skill) {
             return Err(AttackRejection::NotEnoughMp);
         }
@@ -428,8 +433,29 @@ pub fn validate(attack: &Attack, player: &Player) -> Result<Uses, AttackRejectio
     {
         return Err(AttackRejection::Damage);
     }
+    if let Some(sacrifice) = skill
+        .as_ref()
+        .filter(|skill| skill.skill_id == skills::SACRIFICE)
+    {
+        hp = sacrifice_cost(attack, sacrifice.effect.x, player.stats.hp);
+    }
     let ammo = shot_ammo(attack, player, skill.as_ref())?;
-    Ok(Uses { skill, ammo, mesos })
+    Ok(Uses {
+        skill,
+        ammo,
+        mesos,
+        hp,
+    })
+}
+
+/// The HP Sacrifice costs: its `x` percent of its first blow, though never
+/// the player's last HP. The v83 client leaves it to the server (its cost
+/// check, FUN_00764256, knows only `hpCon` and Dragon Roar), so this is
+/// Cosmic's.
+fn sacrifice_cost(attack: &Attack, x: i32, hp: i16) -> i32 {
+    let blow = attack.hits.first().and_then(|hit| hit.damage.first());
+    let cost = blow.map_or(0, |&blow| i64::from(blow) * i64::from(x) / 100);
+    cost.min(i64::from(hp) - 1).max(0) as i32
 }
 
 /// How much of the base damage a skill's hits deal, in percent, or `None`
@@ -712,7 +738,8 @@ mod tests {
             Ok(Uses {
                 skill: None,
                 ammo: None,
-                mesos: 0
+                mesos: 0,
+                hp: 0
             })
         );
         assert_eq!(
@@ -757,6 +784,33 @@ mod tests {
         assert_eq!(check(&player, 0, 29), Err(AttackRejection::Damage));
         assert_eq!(check(&player, 1111003, 245), Ok(()));
         assert_eq!(check(&player, 1111003, 246), Err(AttackRejection::Damage));
+    }
+
+    #[test]
+    fn skills_cost_hp_and_sacrifice_a_share_of_its_blow() {
+        let mut player = beginner_with_sword();
+        (player.stats.mp, player.stats.hp, player.stats.max_hp) = (100, 1000, 1000);
+        learn(&mut player, 1001005, 1);
+        learn(&mut player, skills::SACRIFICE, 30);
+        learn(&mut player, skills::DRAGON_ROAR, 30);
+        let hp = |player: &Player, skill, damage| {
+            let attack = parse_close_attack(&skill_attack_packet(skill, 1, damage)).unwrap();
+            validate(&attack, player).map(|uses| uses.hp)
+        };
+        // Slash Blast's hpCon, Dragon Roar's 30% of max HP, and Sacrifice's
+        // 5% of its blow.
+        assert_eq!(hp(&player, 1001005, 1), Ok(8));
+        assert_eq!(hp(&player, skills::DRAGON_ROAR, 1), Ok(300));
+        assert_eq!(hp(&player, skills::SACRIFICE, 60), Ok(3));
+        player.stats.hp = 499;
+        assert_eq!(
+            hp(&player, skills::DRAGON_ROAR, 1),
+            Err(AttackRejection::NotEnoughHp)
+        );
+        player.stats.hp = 8;
+        assert_eq!(hp(&player, 1001005, 1), Err(AttackRejection::NotEnoughHp));
+        player.stats.hp = 2;
+        assert_eq!(hp(&player, skills::SACRIFICE, 60), Ok(1));
     }
 
     #[test]
@@ -1231,7 +1285,8 @@ mod tests {
                     item_id: 2070000,
                     quantity: 1
                 }),
-                mesos: 0
+                mesos: 0,
+                hp: 0
             }
         );
         // Arrows don't fit a claw, and an empty slot holds nothing.

@@ -151,6 +151,9 @@ impl WorldHandler for AttackHandler {
             let mut updates = vec![StatUpdate::Mp(
                 ctx.player.add_mp(-combat::attack_mp_cost(&skill)),
             )];
+            if uses.hp > 0 {
+                updates.push(StatUpdate::Hp(ctx.player.add_hp(-uses.hp)));
+            }
             if uses.mesos > 0 {
                 ctx.player.meso -= uses.mesos;
                 ctx.player.mark_dirty();

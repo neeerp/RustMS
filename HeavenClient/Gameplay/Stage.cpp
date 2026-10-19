@@ -315,7 +315,7 @@ namespace ms
 				player.show_attack_effect(landed.hit, 1);
 
 			if (result.dodged)
-				combat.show_player_dodge(result.dodged);
+				combat.show_player_special(result.dodged);
 
 			// What Mana Reflection sent back shows over the mob.
 			if (result.reflect)
@@ -337,7 +337,7 @@ namespace ms
 				combat.interrupt_prepare(result.damage);
 
 				if (result.dodged)
-					combat.show_player_dodge(result.dodged);
+					combat.show_player_special(result.dodged);
 
 				// What Power Guard sent back shows over the mob.
 				if (result.reflect)

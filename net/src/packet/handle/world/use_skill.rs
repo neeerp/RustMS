@@ -250,6 +250,7 @@ enum Refusal {
     TooManyMobs,
     Unsupported,
     CoolingDown,
+    NotEnoughHp,
     NotEnoughMp,
     /// Without the item the skill costs.
     NoItem,
@@ -481,8 +482,8 @@ struct Used {
     debuffs: Option<Inflict>,
 }
 
-/// Check the skill can be used now, then spend its MP and items and start
-/// its buffs and cooldown.
+/// Check the skill can be used now, then spend its HP, MP and items and
+/// start its buffs and cooldown.
 fn use_skill(
     player: &mut Player,
     skill_id: i32,
@@ -509,6 +510,7 @@ fn use_skill(
         return Err(Refusal::CoolingDown);
     }
     let effect = &skill.effect;
+    let hp_cost = skills::hp_cost(player, &skill).ok_or(Refusal::NotEnoughHp)?;
     if i32::from(player.stats.mp) < effect.mp_cost {
         return Err(Refusal::NotEnoughMp);
     }
@@ -517,6 +519,7 @@ fn use_skill(
         return Err(Refusal::NoItem);
     }
 
+    player.add_hp(-hp_cost);
     player.add_mp(-effect.mp_cost);
     let items = if effect.item_cost != 0 {
         player
@@ -641,7 +644,7 @@ fn leap(player: &mut Player, mut result: HandlerResult<WorldAction>) -> WorldRes
     Ok(result)
 }
 
-/// The new MP, the items spent, the buff, and the cooldown for the player;
+/// The new MP (and HP), the items spent, the buff, and the cooldown for the player;
 /// the skill's effect and the buffs they show for everyone else on the map.
 fn announce(player: &Player, used: &Used) -> WorldResult {
     let Used {
@@ -653,8 +656,8 @@ fn announce(player: &Player, used: &Used) -> WorldResult {
     } = used;
     let effect = &skill.effect;
     let mut updates = vec![StatUpdate::Mp(player.stats.mp)];
-    // Chakra's heal comes with its MP.
-    if skill.skill_id == skills::CHAKRA {
+    // Chakra's heal comes with its MP, as does the HP a Booster costs.
+    if skill.skill_id == skills::CHAKRA || effect.hp_cost > 0 {
         updates.push(StatUpdate::Hp(player.stats.hp));
     }
     let mut result = HandlerResult::reply(stat::build_stat_update(true, &updates)?);
@@ -744,6 +747,33 @@ mod tests {
                 other => panic!("unexpected {other:?}"),
             })
             .collect()
+    }
+
+    #[test]
+    fn a_booster_spends_hp_too() {
+        if skills::data().is_err() {
+            return;
+        }
+        let now = Instant::now();
+        // Sword Booster at 1 costs 29 HP and 29 MP.
+        let mut player = beginner_with(1101004, 1);
+        (player.stats.mp, player.stats.max_mp) = (40, 40);
+        let used = use_skill(&mut player, 1101004, 1, now).unwrap();
+        assert_eq!((player.stats.hp, player.stats.mp), (21, 11));
+        let sent = announce(&player, &used).unwrap().actions.into_iter().next();
+        let Some(WorldAction::Reply(stats)) = sent else {
+            panic!("no stats");
+        };
+        let mut r = Cursor::new(&stats.bytes);
+        assert_eq!(r.read_short().unwrap(), SendOpcode::StatChange as i16);
+        r.read_byte().unwrap();
+        assert_eq!(r.read_int().unwrap(), 0x400 | 0x1000, "HP and MP");
+        player.buffs = Default::default();
+        (player.stats.hp, player.stats.mp) = (29, 40);
+        assert_eq!(
+            use_skill(&mut player, 1101004, 1, now).unwrap_err(),
+            Refusal::NotEnoughHp
+        );
     }
 
     #[test]

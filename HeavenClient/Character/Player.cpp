@@ -642,6 +642,17 @@ namespace ms
 
 		SpecialMove::ForbidReason reason = move.can_use(level, weapon, job, hp, mp, bullets);
 
+		// Dragon Roar costs its x percent of max HP instead, and needs at least half of it
+		// (FUN_00764256).
+		if (move.get_id() == SkillId::DRAGONS_ROAR && reason == SpecialMove::ForbidReason::FBR_NONE)
+		{
+			int32_t maxhp = stats.get_total(EquipStat::Id::HP);
+			int32_t cost = SkillData::get(move.get_id()).get_stats(level).x * maxhp / 100;
+
+			if (hp < maxhp / 2 || (cost != 0 && hp <= cost))
+				reason = SpecialMove::ForbidReason::FBR_HPCOST;
+		}
+
 		// v83 checks the skill's mesos and item right after its HP and MP,
 		// before the weapon (FUN_00764256).
 		if (!move.is_skill() || reason == SpecialMove::ForbidReason::FBR_OTHER ||

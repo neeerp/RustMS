@@ -2161,13 +2161,13 @@ namespace ms
 		player.show_attack_effect(affected.animation, affected.z);
 	}
 
-	void Combat::show_dodge(int32_t cid, int32_t skillid)
+	void Combat::show_special(int32_t cid, int32_t skillid)
 	{
 		if (Optional<OtherChar> ouser = chars.get_char(cid))
 			ouser->show_effect(get_skill(skillid).get_special());
 	}
 
-	void Combat::show_player_dodge(int32_t skillid)
+	void Combat::show_player_special(int32_t skillid)
 	{
 		player.show_effect(get_skill(skillid).get_special());
 	}

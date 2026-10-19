@@ -210,6 +210,26 @@ pub fn build_foreign_affected(
     Ok(p)
 }
 
+/// SHOW_ITEM_GAIN_INCHAT 5: the skill's `special` animation on the player,
+/// as each drink of Dragon Blood plays (0x937bb8).
+pub fn build_own_special(skill_id: i32) -> Result<Packet, NetworkError> {
+    let mut p = Packet::new_empty();
+    p.write_short(SendOpcode::ShowItemGainInChat as i16)?;
+    p.write_byte(5)?;
+    p.write_int(skill_id)?;
+    Ok(p)
+}
+
+/// SHOW_FOREIGN_EFFECT 5: the same, on another player.
+pub fn build_foreign_special(character_id: i32, skill_id: i32) -> Result<Packet, NetworkError> {
+    let mut p = Packet::new_empty();
+    p.write_short(SendOpcode::ShowForeignEffect as i16)?;
+    p.write_int(character_id)?;
+    p.write_byte(5)?;
+    p.write_int(skill_id)?;
+    Ok(p)
+}
+
 /// The skill effect of a Monster Magnet, which also says which way the
 /// player faced (0x937b42).
 pub fn build_magnet_effect(
@@ -363,6 +383,21 @@ mod tests {
         let mut expect = Expect::new(&packet.bytes);
         expect.short(SendOpcode::ShowForeignEffect as i16).int(7);
         expect.byte(2).int(2301004).byte(20);
+        expect.end();
+    }
+
+    #[test]
+    fn special_effects_carry_just_the_skill() {
+        let packet = build_own_special(1311008).unwrap();
+        let mut expect = Expect::new(&packet.bytes);
+        expect.short(SendOpcode::ShowItemGainInChat as i16);
+        expect.byte(5).int(1311008);
+        expect.end();
+
+        let packet = build_foreign_special(7, 1311008).unwrap();
+        let mut expect = Expect::new(&packet.bytes);
+        expect.short(SendOpcode::ShowForeignEffect as i16).int(7);
+        expect.byte(5).int(1311008);
         expect.end();
     }
 }

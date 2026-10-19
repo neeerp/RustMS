@@ -30,6 +30,8 @@ impl SkillInfo {
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct SkillLevel {
     pub mp_cost: i32,
+    /// HP each use costs (`hpCon`), as Slash Blast's and the Boosters'.
+    pub hp_cost: i32,
     /// Percent of weapon damage (`damage`).
     pub damage: i32,
     /// Damage that ignores stats (`fixdamage`), as Three Snails does.
@@ -147,6 +149,7 @@ impl SkillData {
                 };
                 levels.push(SkillLevel {
                     mp_cost: int("mpCon")?,
+                    hp_cost: int("hpCon")?,
                     damage: int("damage")?,
                     fixed_damage: int("fixdamage")?,
                     magic: int("mad")?,
@@ -281,6 +284,7 @@ mod tests {
         assert_eq!(power_strike.max_level, 20);
         let slash_blast = data.info(1001005).unwrap().unwrap();
         assert_eq!(slash_blast.requirements, vec![(1001004, 1)]);
+        assert_eq!(slash_blast.levels[0].hp_cost, 8);
 
         let energy_bolt = data.info(2001004).unwrap().unwrap().levels[19].clone();
         assert_eq!((energy_bolt.magic, energy_bolt.mp_cost), (55, 14));

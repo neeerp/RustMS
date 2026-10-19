@@ -186,6 +186,28 @@ pub const CHAKRA: i32 = 4211001;
 pub const MANA_REFLECTION: i32 = 2121002;
 pub const TIME_LEAP: i32 = 5121010;
 
+pub const SACRIFICE: i32 = 1311005;
+pub const DRAGON_ROAR: i32 = 1311006;
+pub const DRAGON_BLOOD: i32 = 1311008;
+
+/// The HP a skill costs, or `None` when the player hasn't enough
+/// (FUN_00764256): its `hpCon`, which must stay under their HP. Dragon
+/// Roar instead takes its `x` percent of their max HP, and needs at least
+/// half of it.
+pub fn hp_cost(player: &Player, skill: &Learned) -> Option<i32> {
+    let hp = i32::from(player.stats.hp);
+    let max_hp = i32::from(player.stats.max_hp);
+    let cost = if skill.skill_id == DRAGON_ROAR {
+        if hp < max_hp / 2 {
+            return None;
+        }
+        skill.effect.x * max_hp / 100
+    } else {
+        skill.effect.hp_cost
+    };
+    (cost == 0 || hp > cost).then_some(cost)
+}
+
 pub const MYSTIC_DOOR: i32 = 2311002;
 
 /// The Teleport skills (v83 FUN_00957b74): the client moves the player and
@@ -746,7 +768,7 @@ pub fn buffs(skill: &Learned) -> Option<Vec<(BuffStat, i32)>> {
             return Some(vec![(BuffStat::WeaponCharge, effect.x)]);
         }
         1301007 => vec![(BuffStat::MaxHp, effect.x), (BuffStat::MaxMp, effect.y)],
-        1311008 => vec![(BuffStat::DragonBlood, effect.x)],
+        DRAGON_BLOOD => vec![(BuffStat::DragonBlood, effect.x)],
         1121000 | 1221000 | 1321000 | 2121000 | 2221000 | 2321000 | 3121000 | 3221000 | 4121000
         | 4221000 | 5121000 | 5221000 => vec![(BuffStat::MapleWarrior, effect.x)],
         1121002 | 1221002 | 1321002 => vec![(BuffStat::Stance, effect.prop)],
@@ -836,6 +858,25 @@ mod tests {
         // A Gunslinger has no Improve MaxHP.
         player.stats.job = 520;
         assert_eq!(growth_bonus(&player, false), (0, 0));
+    }
+
+    #[test]
+    fn skills_cost_their_hp_and_dragon_roar_a_share_of_max_hp() {
+        let mut player = knowing(&[]);
+        player.stats.max_hp = 1000;
+        player.stats.hp = 9;
+        // Slash Blast at 1 costs 8, and needs more than that.
+        let slash_blast = at_level(1001005, 1).unwrap();
+        assert_eq!(hp_cost(&player, &slash_blast), Some(8));
+        player.stats.hp = 8;
+        assert_eq!(hp_cost(&player, &slash_blast), None);
+        assert_eq!(hp_cost(&player, &at_level(1001004, 1).unwrap()), Some(0));
+        // Dragon Roar at 30 takes 30 percent, from half of max HP up.
+        let roar = at_level(DRAGON_ROAR, 30).unwrap();
+        player.stats.hp = 500;
+        assert_eq!(hp_cost(&player, &roar), Some(300));
+        player.stats.hp = 499;
+        assert_eq!(hp_cost(&player, &roar), None);
     }
 
     #[test]

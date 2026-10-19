@@ -98,10 +98,10 @@ namespace ms
 		void show_affected(int32_t cid, int32_t skillid);
 		void show_player_affected(int32_t skillid);
 
-		// Show the `special` animation of the skill that dodged a hit,
-		// Guardian or Shadow Shifter, on a user or the player (0x936528).
-		void show_dodge(int32_t cid, int32_t skillid);
-		void show_player_dodge(int32_t skillid);
+		// Show a skill's `special` animation on a user or the player (0x936528): the skill that
+		// dodged a hit, Guardian or Shadow Shifter, or Dragon Blood drinking HP (user effect 5).
+		void show_special(int32_t cid, int32_t skillid);
+		void show_player_special(int32_t skillid);
 
 		// Show Monster Magnet catching a mob, or failing to, over it
 		// (0x66d6b9, 0x438eb6).
