@@ -73,7 +73,10 @@ pub struct QuestTemplate {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct QuestItem {
     pub item_id: i32,
-    /// Positive gives, negative takes.
+    /// Positive gives, negative takes, and 0 (no count in the data) takes
+    /// all the player holds. The data leaves the count out only on the
+    /// quest items a completion needs (Kyrin's test crystals), and v83's
+    /// reward list doesn't show those; taking them all is our reading.
     pub count: i32,
     /// Job families allowed (v83's bit encoding: 1 beginner, 2 warrior, 4
     /// magician, 8 bowman, 16 thief, 32 pirate, ...); 0 means any.
@@ -348,7 +351,7 @@ fn quest_items(nx: &NxDataFile, act: &str) -> Result<Vec<QuestItem>, GameDataErr
             item_id: nx
                 .int_child(item, "id")?
                 .ok_or_else(|| invalid("item action without id"))?,
-            count: nx.int_child(item, "count")?.unwrap_or(1),
+            count: nx.int_child(item, "count")?.unwrap_or(0),
             job: nx.int_child(item, "job")?.unwrap_or(0),
             gender: u8::try_from(nx.int_child(item, "gender")?.unwrap_or(2)).unwrap_or(2),
             prop: nx.int_child(item, "prop")?,
@@ -535,5 +538,10 @@ mod tests {
                 prop: None
             }
         );
+        // Kyrin's Brawler test takes every crystal: an item without a count.
+        let brawler = catalog.quest(2191).unwrap();
+        assert_eq!(brawler.end_items, [(4031856, 15)]);
+        let crystals = &brawler.end_rewards[0];
+        assert_eq!((crystals.item_id, crystals.count), (4031856, 0));
     }
 }

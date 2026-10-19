@@ -67,7 +67,11 @@ neither is unsupported, which keeps out the event records that only a
 server script completes.
 
 Item actions (`net::quests::pick_items`/`apply_items`) give positive counts
-and take negative ones (capped at what the player holds). An entry applies
+and take negative ones (capped at what the player holds). An entry without a
+count takes all the player holds: the data leaves it out only on the quest
+items a completion needs (32 entries, such as Kyrin's test crystals in 2191
+and 2192), and v83's reward list skips them. Cosmic gives one instead; taking
+them all is our reading of the original. An entry applies
 only to its `job` families (v83 bits: 0x1 beginner, 0x2 warrior, 0x4
 magician, 0x8 bowman, 0x10 thief, 0x20 pirate, 0x400+ Cygnus) and `gender`
 (2 or absent: either). Entries without `prop` always apply; among those with
