@@ -21,6 +21,8 @@
 
 #include "../Packets/LoginPackets.h"
 
+#include "../../Audio/Audio.h"
+
 #include "../../IO/UI.h"
 
 #include "../../IO/UITypes/UICharCreation.h"
@@ -192,6 +194,11 @@ namespace ms
 		LoginParser::parse_login(recv);
 
 		int32_t cid = recv.read_int();
+
+		// v83 plays GameIn as the server lets the character in (FUN_005fb541), not when the map
+		// has loaded, so a channel change or leaving the Cash Shop is silent.
+		Sound(Sound::Name::GAMESTART).play();
+
 		PlayerLoginPacket(cid).dispatch();
 	}
 

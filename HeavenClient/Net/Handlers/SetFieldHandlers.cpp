@@ -198,8 +198,6 @@ namespace ms
 
 		transition(mapid, portalid);
 
-		Sound(Sound::Name::GAMESTART).play();
-
 		UI::get().change_state(UI::State::GAME);
 	}
 

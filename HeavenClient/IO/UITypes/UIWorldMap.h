@@ -59,10 +59,16 @@ namespace ms
 
 		void send_key(int32_t keycode, bool pressed, bool escape) override;
 
+		// Back to the parent world map, as Esc does (v83 FUN_009ee507).
+		void rightclick(Point<int16_t> cursorpos) override;
+
 		UIElement::Type get_type() const override;
 
 	protected:
 		Button::State button_pressed(uint16_t buttonid) override;
+
+		// A map link plays only SelectMap (v83 FUN_009ee30e).
+		bool has_own_click_sound(uint16_t buttonid) const override;
 
 	private:
 		static constexpr uint8_t MAPSPOT_TYPE_MAX = 4u;

@@ -517,6 +517,9 @@ namespace ms
 
 		if (scroll != Scroll::OPEN)
 		{
+			// v83 unrolls the channel panel with RollDown (FUN_00629348) and rolls it up with RollUp.
+			Sound(Sound::Name::ROLLDOWN).play();
+
 			scroll = Scroll::OPENING;
 			scroll_open.reset();
 		}
@@ -551,7 +554,7 @@ namespace ms
 		if (scroll == Scroll::CLOSED || scroll == Scroll::CLOSING)
 			return;
 
-		Sound(Sound::Name::SCROLLUP).play();
+		Sound(Sound::Name::ROLLUP).play();
 
 		selected = -1;
 		scroll = Scroll::CLOSING;

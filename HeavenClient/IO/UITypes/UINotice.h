@@ -25,6 +25,7 @@
 
 #include "../Components/Textfield.h"
 
+#include "../../Audio/Audio.h"
 #include "../../Graphics/Geometry.h"
 
 namespace ms
@@ -44,7 +45,10 @@ namespace ms
 			OK
 		};
 
-		UINotice(std::string message, NoticeType type, Text::Alignment alignment);
+		// Every notice but number entry plays a sound as it opens: DlgNotice, or BuyShopItem for the
+		// Cash Shop's purchase and gift results (v83 FUN_00992eda).
+		UINotice(std::string message, NoticeType type, Text::Alignment alignment,
+			Sound::Name sound = Sound::Name::DLGNOTICE);
 
 		UINotice(std::string message, NoticeType type);
 
@@ -176,7 +180,7 @@ namespace ms
 	class UIOk : public UINotice
 	{
 	public:
-		UIOk(std::string message, std::function<void(bool ok)> okhandler);
+		UIOk(std::string message, std::function<void(bool ok)> okhandler, Sound::Name sound = Sound::Name::DLGNOTICE);
 
 		void draw(float alpha) const override;
 

@@ -113,6 +113,10 @@ namespace ms
 		virtual Button::State button_pressed(uint16_t buttonid)
 		{ return Button::State::DISABLED; }
 
+		// Clicking a button plays BtMouseClick unless the button makes a sound of its own.
+		virtual bool has_own_click_sound(uint16_t buttonid) const
+		{ return false; }
+
 		virtual bool send_icon(const Icon &icon, Point<int16_t> cursorpos)
 		{ return true; }
 

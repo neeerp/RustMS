@@ -184,7 +184,8 @@ namespace ms
 
 	Cursor::State UIElement::click_button(uint16_t buttonid)
 	{
-		Sound(Sound::Name::BUTTONCLICK).play();
+		if (!has_own_click_sound(buttonid))
+			Sound(Sound::Name::BUTTONCLICK).play();
 
 		Button::State state = button_pressed(buttonid);
 		auto btit = buttons.find(buttonid);

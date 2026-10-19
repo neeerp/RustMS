@@ -237,6 +237,16 @@ namespace ms
 		}
 	}
 
+	void UIWorldMap::rightclick(Point<int16_t>)
+	{
+		if (parent_map != "")
+		{
+			Sound(Sound::Name::SELECTMAP).play();
+
+			update_world(parent_map);
+		}
+	}
+
 	UIElement::Type UIWorldMap::get_type() const
 	{
 		return TYPE;
@@ -255,12 +265,19 @@ namespace ms
 
 		if (buttonid >= Buttons::BT_LINK0)
 		{
+			Sound(Sound::Name::SELECTMAP).play();
+
 			update_world(link_maps[buttonid]);
 
 			return Button::State::IDENTITY;
 		}
 
 		return Button::State::NORMAL;
+	}
+
+	bool UIWorldMap::has_own_click_sound(uint16_t buttonid) const
+	{
+		return buttonid >= Buttons::BT_LINK0;
 	}
 
 	void UIWorldMap::remove_cursor()

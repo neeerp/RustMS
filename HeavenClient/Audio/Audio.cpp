@@ -163,6 +163,9 @@ namespace ms
 		add_sound(Sound::Name::DRAGEND, uisrc["DragEnd"]);
 		add_sound(Sound::Name::WORLDMAPOPEN, uisrc["WorldmapOpen"]);
 		add_sound(Sound::Name::WORLDMAPCLOSE, uisrc["WorldmapClose"]);
+		add_sound(Sound::Name::ROLLDOWN, uisrc["RollDown"]);
+		add_sound(Sound::Name::ROLLUP, uisrc["RollUp"]);
+		add_sound(Sound::Name::BUYSHOPITEM, uisrc["BuyShopItem"]);
 
 		nl::node gamesrc = nl::nx::sound["Game.img"];
 
@@ -177,6 +180,7 @@ namespace ms
 		add_sound(Sound::Name::TOMBSTONE, gamesrc["Tombstone"]);
 		add_sound(Sound::Name::ENCHANTSUCCESS, gamesrc["EnchantSuccess"]);
 		add_sound(Sound::Name::ENCHANTFAILURE, gamesrc["EnchantFailure"]);
+		add_sound(Sound::Name::MCARDGET, gamesrc["mCardGet"]);
 
 		nl::node itemsrc = nl::nx::sound["Item.img"];
 

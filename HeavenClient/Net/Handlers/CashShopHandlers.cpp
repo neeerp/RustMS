@@ -283,7 +283,7 @@ namespace ms
 		case 0x57:
 			// A purchase is in the Cash Inventory; the balance follows.
 			cashshop->add_cash_items({ read_cash_item(recv) });
-			UI::get().emplace<UIOk>("You have successfully made the purchase.", [](bool) {});
+			UI::get().emplace<UIOk>("You have successfully made the purchase.", [](bool) {}, Sound::Name::BUYSHOPITEM);
 			break;
 		case 0x89:
 		{
@@ -300,7 +300,7 @@ namespace ms
 			cashshop->add_cash_items(items);
 			UI::get().emplace<UIOk>(points ? "Purchase successful.\\n" + std::to_string(points) + " You have received MaplePoints."
 										   : "You have successfully made the purchase.",
-									[](bool) {});
+									[](bool) {}, Sound::Name::BUYSHOPITEM);
 			break;
 		}
 		case 0x60:
@@ -329,7 +329,8 @@ namespace ms
 			int32_t price = recv.read_int();
 
 			UI::get().emplace<UIOk>(std::to_string(count) + " [ " + ItemData::get(item_id).get_name() + " ] \\nwas sent to " + to +
-				". \\n" + std::to_string(price) + " NX Prepaid \\nwere spent in the process.", [](bool) {});
+				". \\n" + std::to_string(price) + " NX Prepaid \\nwere spent in the process.", [](bool) {},
+				Sound::Name::BUYSHOPITEM);
 			break;
 		}
 		case 0x68:

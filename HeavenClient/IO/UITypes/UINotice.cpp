@@ -52,7 +52,7 @@ namespace ms
 		constexpr int16_t RIGHT_BUTTON_X = 141;
 	}
 
-	UINotice::UINotice(std::string message, NoticeType t, Text::Alignment a)
+	UINotice::UINotice(std::string message, NoticeType t, Text::Alignment a, Sound::Name sound)
 			: UIDragElement<PosNOTICE>(), type(t), alignment(a)
 	{
 		nl::node src = NxFiles::ui_classic["Basic.img"][type == NoticeType::OK ? "Notice2" : "YesNo2"];
@@ -77,7 +77,7 @@ namespace ms
 		dragarea = Point<int16_t>(dimension.x(), 19);
 
 		if (type != NoticeType::ENTERNUMBER)
-			Sound(Sound::Name::DLGNOTICE).play();
+			Sound(sound).play();
 	}
 
 	UINotice::UINotice(std::string message, NoticeType t) : UINotice(message, t, Text::Alignment::CENTER)
@@ -421,7 +421,8 @@ namespace ms
 		deactivate();
 	}
 
-	UIOk::UIOk(std::string message, std::function<void(bool ok)> oh) : UINotice(message, NoticeType::OK)
+	UIOk::UIOk(std::string message, std::function<void(bool ok)> oh, Sound::Name sound)
+			: UINotice(message, NoticeType::OK, Text::Alignment::CENTER, sound)
 	{
 		okhandler = oh;
 

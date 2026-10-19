@@ -332,6 +332,19 @@ namespace ms
 		Stage::get().get_chars().update_look(cid, look);
 	}
 
+	namespace
+	{
+		// v83 (FUN_009377d9) plays these effects' sounds for anyone on the map, at full volume.
+		void show_effect_with_sound(int32_t cid, CharEffect::Id effect, Sound::Name sound)
+		{
+			if (!Stage::get().get_character(cid))
+				return;
+
+			Stage::get().show_character_effect(cid, effect);
+			Sound(sound).play();
+		}
+	}
+
 	void ShowForeignEffectHandler::handle(InPacket& recv) const
 	{
 		int32_t cid = recv.read_int();
@@ -340,15 +353,15 @@ namespace ms
 		// v83 special effects: 0 level up, 8 job change, 9 quest complete.
 		if (effect == 0 && !recv.available())
 		{
-			Stage::get().show_character_effect(cid, CharEffect::LEVELUP);
+			show_effect_with_sound(cid, CharEffect::LEVELUP, Sound::Name::LEVELUP);
 		}
 		else if (effect == 8 && !recv.available())
 		{
-			Stage::get().show_character_effect(cid, CharEffect::JOBCHANGE);
+			show_effect_with_sound(cid, CharEffect::JOBCHANGE, Sound::Name::JOBCHANGED);
 		}
 		else if (effect == 9 && !recv.available())
 		{
-			Stage::get().show_character_effect(cid, CharEffect::QUEST_CLEAR);
+			show_effect_with_sound(cid, CharEffect::QUEST_CLEAR, Sound::Name::QUESTCLEAR);
 		}
 		else if (effect == 10) // recovery
 		{
@@ -356,7 +369,7 @@ namespace ms
 		}
 		else if (effect == 13) // card effect
 		{
-			Stage::get().show_character_effect(cid, CharEffect::MONSTER_CARD);
+			show_effect_with_sound(cid, CharEffect::MONSTER_CARD, Sound::Name::MCARDGET);
 		}
 		else if (effect == 4) // a pet effect
 		{

@@ -719,6 +719,7 @@ namespace ms
 		else if (mode1 == 13) // card effect
 		{
 			Stage::get().get_player().show_effect_id(CharEffect::Id::MONSTER_CARD);
+			Sound(Sound::Name::MCARDGET).play();
 		}
 		else if (mode1 == 2) // a party member's skill reached the player
 		{

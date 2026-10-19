@@ -76,6 +76,9 @@ namespace ms
 			DRAGEND,
 			WORLDMAPOPEN,
 			WORLDMAPCLOSE,
+			ROLLDOWN,
+			ROLLUP,
+			BUYSHOPITEM,
 
 			/// Login
 			GAMESTART,
@@ -91,6 +94,7 @@ namespace ms
 			TOMBSTONE,
 			ENCHANTSUCCESS,
 			ENCHANTFAILURE,
+			MCARDGET,
 			LENGTH
 		};
 
