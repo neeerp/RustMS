@@ -186,6 +186,8 @@ namespace ms
 		clock = MapClock(src);
 		ground_effects = EffectLayer();
 		field_effects = EffectLayer();
+		weather.stop_sounds();
+		weather = mapid == -1 ? MapWeather() : MapWeather(src["weather"], mapinfo.get_bgm());
 
 		if (mapid != -1)
 			player.get_stats().set_mapid(mapid);
@@ -258,6 +260,8 @@ namespace ms
 		// v83 puts a mist's clouds on the effect layer, above the map's
 		// objects (z 0xc00614a4).
 		mists.draw(viewx, viewy, alpha);
+		// A weather's bursts and fireworks share the mists' layer (z 0xc00614a4).
+		weather.draw_shows(alpha);
 		drops.draw_explosions(viewpos, alpha);
 		combat.draw(viewx, viewy, alpha);
 		ground_effects.drawabove(viewpos, alpha);
@@ -266,11 +270,15 @@ namespace ms
 		// v83's clouds are above the front backgrounds and below the fear
 		// overlay (z 0xc0061508).
 		clouds.draw(viewx, viewy, alpha);
+		// A weather's particles are on the clouds' layer.
+		weather.draw(viewx, viewy, alpha);
 		draw_fear(viewx, viewy, alpha);
 		// The tips of the zones the player stands in are at z 0, above the
 		// field's own layers (FUN_008f3141).
 		tooltips.draw(viewpos);
 		field_effects.drawabove(viewpos, alpha);
+		// The weather's message bar is above the field effects (z 0xc00616fc).
+		weather.draw_bar();
 		screen_effects.drawabove(Point<int16_t>(0, 0), alpha);
 	}
 
@@ -314,6 +322,7 @@ namespace ms
 		combat.update();
 		backgrounds.update();
 		clouds.update();
+		weather.update();
 		ship.update();
 		clock.update();
 		ground_effects.update();
@@ -1247,6 +1256,26 @@ namespace ms
 	{
 		if (Stage::state == State::ACTIVE)
 			ship.show_state(state, flag);
+	}
+
+	void Stage::blow_weather(int32_t item_id, const std::string &msg, bool from_map)
+	{
+		weather.blow(item_id, msg, from_map);
+	}
+
+	void Stage::set_weather_flag(uint8_t flag)
+	{
+		weather.set_packet_flag(flag);
+	}
+
+	void Stage::note_mob_left()
+	{
+		weather.mob_left();
+	}
+
+	void Stage::set_field_bgm(const std::string &path)
+	{
+		weather.set_bgm_override(path);
 	}
 
 	void Stage::set_clock(uint8_t hour, uint8_t minute, uint8_t second)

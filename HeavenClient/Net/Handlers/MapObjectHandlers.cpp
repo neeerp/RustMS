@@ -441,6 +441,8 @@ namespace ms
 		int8_t animation = recv.read_byte();
 
 		Stage::get().get_mobs().remove(oid, animation);
+		// The map's weathers that wait for no monster to leave won't blow now.
+		Stage::get().note_mob_left();
 	}
 
 	void SpawnMobControllerHandler::handle(InPacket& recv) const

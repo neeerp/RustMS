@@ -27,6 +27,7 @@
 #include "../../Data/SkillData.h"
 #include "../../Data/SwindleData.h"
 #include "../../Gameplay/Stage.h"
+#include "../../Gameplay/WeatherRules.h"
 #include "../../IO/UI.h"
 #include "../Packets/MessagingPackets.h"
 #include "StatusMessages.h"
@@ -55,6 +56,8 @@ namespace ms
 		constexpr int8_t FIND_RESULT_MODE = 0x09;
 		constexpr int8_t WHISPER_RESULT_MODE = 0x0A;
 		constexpr int8_t WHISPER_RECEIVE_MODE = 0x12;
+		// 0x92: an admin's message (string, byte, string message), shown as a weather's message bar
+		constexpr int8_t WHISPER_WEATHER_MODE = static_cast<int8_t>(0x92);
 
 		std::string unable_to_find(const std::string& target)
 		{
@@ -474,6 +477,16 @@ namespace ms
 	void WhisperHandler::handle(InPacket& recv) const
 	{
 		int8_t mode = recv.read_byte();
+
+		// v83 blows item 5120025's weather with it, which stops itself after 22 s (FUN_0053228e).
+		if (mode == WHISPER_WEATHER_MODE)
+		{
+			recv.read_string();
+			recv.read_byte();
+			Stage::get().blow_weather(weather::WHISPER_ITEM, recv.read_string(), true);
+
+			return;
+		}
 
 		auto chatbar = UI::get().get_element<UIChatBar>();
 

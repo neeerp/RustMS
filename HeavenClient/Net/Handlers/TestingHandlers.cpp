@@ -116,7 +116,11 @@ namespace ms
 			std::string path = field_effect::bgm_path(recv.read_string());
 
 			if (!path.empty())
+			{
 				Music(path).play(field_effect::BGM_FADE);
+				// A stopping weather plays this one again, not the map's.
+				Stage::get().set_field_bgm(path);
+			}
 
 			return;
 		}

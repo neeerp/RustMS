@@ -113,6 +113,13 @@ namespace ms
 		void handle(InPacket& recv) const override;
 	};
 
+	// Someone used a weather item, or the server stops theirs (v83 FUN_00535179).
+	class BlowWeatherHandler : public PacketHandler
+	{
+	public:
+		void handle(InPacket& recv) const override;
+	};
+
 	// Someone used a jukebox: its song replaces the map's BGM (v83 FUN_00535224).
 	class PlayJukeboxHandler : public PacketHandler
 	{

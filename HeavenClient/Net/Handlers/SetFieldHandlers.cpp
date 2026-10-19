@@ -407,6 +407,17 @@ namespace ms
 		UIMiniMap::switch_on(recv.read_byte() != 0);
 	}
 
+	void BlowWeatherHandler::handle(InPacket& recv) const
+	{
+		uint8_t flag = recv.read_byte();
+		int32_t item_id = recv.read_int();
+		// Only a start by a player's item carries their message.
+		std::string msg = item_id != 0 && flag == 0 ? recv.read_string() : "";
+
+		Stage::get().set_weather_flag(flag);
+		Stage::get().blow_weather(item_id, msg, false);
+	}
+
 	void PlayJukeboxHandler::handle(InPacket& recv) const
 	{
 		int32_t item_id = recv.read_int();

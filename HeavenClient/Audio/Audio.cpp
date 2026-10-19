@@ -46,6 +46,7 @@ namespace ms
 	int32_t Music::fade_length = 0;
 	int32_t Music::start_delay = 0;
 	int32_t Music::fadein_length = 0;
+	bool Music::looping = true;
 	bool Music::fading_in = false;
 	std::chrono::steady_clock::time_point Music::fadein_start;
 	std::unordered_map<std::string, membuf *> Music::audiodb;
@@ -282,7 +283,7 @@ namespace ms
 		path = p;
 	}
 
-	void Music::play(int32_t fadeout, int32_t delay, int32_t fadein) const
+	void Music::play(int32_t fadeout, int32_t delay, int32_t fadein, bool loop) const
 	{
 		static std::string bgmpath = "";
 
@@ -307,6 +308,7 @@ namespace ms
 
 		bgmpath = path;
 		fadein_length = fadein;
+		looping = loop;
 
 		// v83 fades the old track out and then starts the new one (PlayBGM 0x43f301).
 		if ((fadeout > 0 && music_src.isPlaying()) || delay > 0)
@@ -333,7 +335,7 @@ namespace ms
 		fading_in = fadein_length > 0;
 		fadein_start = std::chrono::steady_clock::now();
 		music_src.setGain(fading_in ? 0.0f : volume);
-		music_src.setLooping(true);
+		music_src.setLooping(looping);
 		music_src.play(music_buff);
 	}
 

@@ -34,6 +34,7 @@
 #include "MapleMap/MapMobs.h"
 #include "MapleMap/MapMists.h"
 #include "MapleMap/MapClouds.h"
+#include "MapleMap/MapWeather.h"
 #include "MapleMap/MapTooltips.h"
 #include "MapleMap/MapDoors.h"
 #include "MapleMap/MapSummons.h"
@@ -193,6 +194,19 @@ namespace ms
 		// they face `right` (0x96c107, 0x97ffa4).
 		void show_flash_jump(const char *effect, Point<int16_t> position, bool right);
 
+		// BLOW_WEATHER and a map's own weathers: start a 512xxxx item's weather with its message, or stop the one
+		// blowing with item 0. One from the map or a whisper stops itself after 22 s.
+		void blow_weather(int32_t item_id, const std::string &msg, bool from_map);
+
+		// BLOW_WEATHER's flag, which keeps the message bar up through a stop.
+		void set_weather_flag(uint8_t flag);
+
+		// KILL_MOB: a monster left the field.
+		void note_mob_left();
+
+		// FIELD_EFFECT 6 changed the field's BGM, which a stopping weather plays again.
+		void set_field_bgm(const std::string &path);
+
 		// CLOCK kind 1: the time of day on the map's wall clock. A time sent
 		// while the map loads waits for it.
 		void set_clock(uint8_t hour, uint8_t minute, uint8_t second);
@@ -315,6 +329,7 @@ namespace ms
 		MapSummons summons;
 		MapShip ship;
 		MapClouds clouds;
+		MapWeather weather;
 		MapTooltips tooltips;
 		MapClock clock;
 		// A wall clock time that came before its map loaded.
