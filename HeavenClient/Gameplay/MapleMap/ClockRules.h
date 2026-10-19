@@ -1,5 +1,6 @@
 #pragma once
 
+#include <array>
 #include <cstdint>
 
 namespace ms
@@ -128,5 +129,62 @@ namespace ms
 			int32_t since_set = 0;
 			int32_t since_refresh = 0;
 		};
+	}
+
+	// The countdown CLOCK (147) kinds 0, 2 and 3 put at the top of the
+	// screen, as v83 keeps it (0x49ae6a, 0x49aeee, 0x49ad14, 0x49a0f4).
+	namespace countdown
+	{
+		// What a running clock reads with `left_ms` to go: whole seconds,
+		// rounded toward zero, so a clock started at 10 reads 9 at once and
+		// -1 a second after the end (0x49ad14).
+		inline int32_t seconds_left(int64_t left_ms)
+		{
+			return static_cast<int32_t>(left_ms / 1000);
+		}
+
+		// What the clock shows for a reading: below an hour, minutes and
+		// seconds; from an hour on, hours and minutes on the hour
+		// background. A reading below 1 shows 0, and a first digit of 0 is
+		// left out (0x49a0f4).
+		struct Face
+		{
+			bool hours = false;
+			// -1 for a digit left out.
+			std::array<int32_t, 4> digits = {};
+		};
+
+		inline Face face(int32_t seconds)
+		{
+			if (seconds < 1)
+				seconds = 0;
+
+			Face face;
+			face.hours = seconds >= 3600;
+
+			int32_t high = face.hours ? seconds / 3600 : seconds / 60;
+			int32_t low = face.hours ? seconds % 3600 / 60 : seconds % 60;
+			int32_t first = high / 10 % 10;
+
+			face.digits = { first != 0 ? first : -1, high % 10, low / 10, low % 10 };
+			return face;
+		}
+
+		// Where each digit's top left goes in the clock's 258 by 58 box
+		// (0x52bf42, 0x49a0f4).
+		constexpr std::array<int16_t, 4> DIGIT_X = { 86, 112, 179, 205 };
+		constexpr int16_t DIGIT_Y = 12;
+		constexpr int16_t WIDTH = 258;
+		// v83 puts the box at (271, 30), centred on its 800 wide screen
+		// (0x536428).
+		constexpr int16_t TOP = 30;
+
+		// Whether an event's clock (kind 0) stays up on `mapid`: on event
+		// maps, those with a 9 in the millions, other than their 5 in the
+		// ten thousands (0x536575, from 0xa03350).
+		inline bool stays_on(int32_t mapid)
+		{
+			return mapid / 1000000 % 100 == 9 && mapid / 10000 % 100 != 5;
+		}
 	}
 }

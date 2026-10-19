@@ -47,6 +47,7 @@ pub enum SendOpcode {
     Clock = 0x93,
     ContiMove = 0x94,
     ContiState = 0x95,
+    StopClock = 0x9A,
     MultiChat = 0x86,
     Whisper = 0x87,
     SpawnPlayer = 0xA0,

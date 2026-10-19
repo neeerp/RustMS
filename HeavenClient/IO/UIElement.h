@@ -94,6 +94,8 @@ namespace ms
 			QUIZ,
 			SPEEDQUIZ,
 			GIFTNOTICE,
+			FIELDCLOCK,
+			EVENTCLOCK,
 			NUM_TYPES
 		};
 

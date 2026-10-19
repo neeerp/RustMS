@@ -14,6 +14,7 @@ mod script;
 mod ships;
 mod shop;
 mod storage;
+mod time_limit;
 mod trade;
 
 use crate::actor::registry::FieldRegistry;
@@ -120,6 +121,7 @@ pub struct ClientActor {
     presence: Option<Presence>,
     /// The player's open Mystic Door.
     door: Option<door::OpenDoor>,
+    map_timer: Option<time_limit::MapTimer>,
     /// The player's side of a trade they are in.
     trade: Option<trade::Trade>,
     /// The player's own shop, or the one they visit.
@@ -177,6 +179,7 @@ impl ClientActor {
             party_id: None,
             presence: None,
             door: None,
+            map_timer: None,
             trade: None,
             personal_shop: None,
             naming_guild: false,
@@ -195,6 +198,7 @@ impl ClientActor {
         let outcome = loop {
             let buffs_due = self.buffs_due();
             let door_due = self.door_due();
+            let map_timer_due = self.map_timer_due();
             let step = tokio::select! {
                 biased;
                 _ = kill.cancelled() => Err(RuntimeError::ClientDisconnected),
@@ -210,6 +214,9 @@ impl ClientActor {
                 }
                 _ = sleep_until(door_due.unwrap_or_else(Instant::now)), if door_due.is_some() => {
                     self.close_door().await
+                }
+                _ = sleep_until(map_timer_due.unwrap_or_else(Instant::now)), if map_timer_due.is_some() => {
+                    self.end_map_timer().await
                 }
             };
             if let Err(error) = step {
@@ -594,6 +601,7 @@ impl ClientActor {
         })
         .await?;
         self.set_wall_clock().await?;
+        self.start_map_timer().await?;
         self.bring_summons(spawn).await?;
         self.bring_pets(&avatar).await?;
         if let Some(note) = &avatar.chalkboard {

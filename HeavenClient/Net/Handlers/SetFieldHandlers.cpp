@@ -34,9 +34,11 @@
 #include "../../IO/Window.h"
 
 #include "../../IO/UITypes/UICharSelect.h"
+#include "../../IO/UITypes/UIFieldClock.h"
 #include "../../IO/UITypes/UIStatsInfo.h"
 #include "../../IO/UITypes/UITradingRoom.h"
 
+#include <cstdlib>
 #include <optional>
 
 namespace ms
@@ -122,6 +124,9 @@ namespace ms
 		// The server ends a trade when we leave the field.
 		if (auto room = UI::get().get_element<UITradingRoom>())
 			room->close();
+
+		// The field's countdown goes with it.
+		UI::get().remove(UIElement::Type::FIELDCLOCK);
 
 		// v83 (FUN_00a03eba, from CField::OnSetField) sends this on every
 		// field change, not only on entering the game.
@@ -270,15 +275,75 @@ namespace ms
 		}
 	}
 
+	namespace
+	{
+		template<class T>
+		Optional<T> shown_clock()
+		{
+			auto clock = UI::get().get_element<T>();
+
+			return clock && clock->is_active() ? clock : Optional<T>();
+		}
+	}
+
 	void ClockHandler::handle(InPacket& recv) const
 	{
-		if (recv.read_byte() != 1)
-			return;
+		int8_t kind = recv.read_byte();
+		auto field_clock = shown_clock<UIFieldClock>();
 
-		uint8_t hour = recv.read_byte();
-		uint8_t minute = recv.read_byte();
-		uint8_t second = recv.read_byte();
-		Stage::get().set_clock(hour, minute, second);
+		// Only kind 3 keeps the field's clock its own.
+		if (kind != 3 && field_clock)
+			field_clock->unswitch();
+
+		switch (kind)
+		{
+			case 0:
+			{
+				// An event's clock: a time stands until a 0 or less starts
+				// it, and does not reset one that is up (0xa24c82).
+				int32_t seconds = recv.read_int();
+				auto event_clock = shown_clock<UIEventClock>();
+
+				if (seconds != 0 && !event_clock)
+					event_clock = UI::get().emplace<UIEventClock>(std::abs(seconds));
+
+				if (seconds <= 0 && event_clock)
+					event_clock->start();
+
+				break;
+			}
+			case 1:
+			{
+				uint8_t hour = recv.read_byte();
+				uint8_t minute = recv.read_byte();
+				uint8_t second = recv.read_byte();
+				Stage::get().set_clock(hour, minute, second);
+				break;
+			}
+			case 2:
+				UI::get().emplace<UIFieldClock>(recv.read_int(), false);
+				break;
+			case 3:
+				// Takes down a clock it put up, and puts one up if asked and
+				// there is none.
+				if (field_clock && field_clock->is_switched())
+				{
+					UI::get().remove(UIElement::Type::FIELDCLOCK);
+					field_clock = {};
+				}
+
+				if (!field_clock && recv.read_bool())
+					UI::get().emplace<UIFieldClock>(recv.read_int(), true);
+
+				break;
+			default:
+				break;
+		}
+	}
+
+	void StopClockHandler::handle(InPacket&) const
+	{
+		UI::get().remove(UIElement::Type::FIELDCLOCK);
 	}
 
 	void ContiMoveHandler::handle(InPacket& recv) const

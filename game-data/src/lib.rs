@@ -235,6 +235,10 @@ pub struct FieldTemplate {
     /// Whether the map has a wall clock (a `clock` node with a position and
     /// size, as stations do), which the server sets to the time of day.
     pub clock: bool,
+    /// `info/timeLimit`: how many seconds a player may stay before being
+    /// sent to `forced_return`. The client never reads it; the server shows
+    /// the countdown.
+    pub time_limit: Option<u32>,
     pub footholds: footholds::Footholds,
     portals_by_id: BTreeMap<u32, PortalTemplate>,
     portal_ids_by_name: HashMap<String, Vec<u32>>,
@@ -416,6 +420,13 @@ fn build_field_template(
         .transpose()?
         .flatten()
         .unwrap_or(1.0);
+    let time_limit = nx
+        .child_by_name(map_node_idx, "info")?
+        .map(|info| nx.int_child(info, "timeLimit"))
+        .transpose()?
+        .flatten()
+        .and_then(|seconds| u32::try_from(seconds).ok())
+        .filter(|&seconds| seconds > 0);
     let (town, field_limit, allowed_items, personal_shop) =
         match nx.child_by_name(map_node_idx, "info")? {
             Some(info) => (
@@ -500,6 +511,7 @@ fn build_field_template(
         allowed_items,
         personal_shop,
         clock,
+        time_limit,
         footholds,
         portals_by_id,
         portal_ids_by_name,
@@ -986,6 +998,7 @@ mod tests {
             allowed_items: Vec::new(),
             personal_shop: false,
             clock: false,
+            time_limit: None,
             footholds: footholds::Footholds::default(),
             portals_by_id: BTreeMap::from([
                 (
@@ -1055,6 +1068,7 @@ mod tests {
             allowed_items: Vec::new(),
             personal_shop: false,
             clock: false,
+            time_limit: None,
             reactors: Vec::new(),
             footholds: footholds::Footholds::default(),
             portals_by_id: BTreeMap::from([
@@ -1175,5 +1189,20 @@ mod tests {
         assert!(clock(200_000_111));
         assert!(!clock(101_000_301));
         assert!(!clock(100_000_000));
+    }
+
+    #[test]
+    fn timed_maps_have_a_time_limit() {
+        let Some(path) = test_assets::path("Map.nx") else {
+            return;
+        };
+        let game_data = GameData::load_from_nx_map(&path).expect("load map nx");
+        let field = game_data.field(100_020_100).expect("a mini dungeon");
+        assert_eq!(field.time_limit, Some(7200));
+        assert_eq!(field.forced_return, Some(100_020_000));
+        assert_eq!(
+            game_data.field(100_000_000).expect("Henesys").time_limit,
+            None
+        );
     }
 }
