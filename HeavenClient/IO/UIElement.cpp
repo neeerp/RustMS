@@ -147,6 +147,11 @@ namespace ms
 		{
 			if (button_under(btit.first, pos))
 			{
+				// v83 presses the button the mouse goes down on whether or not
+				// it was hovered, such as one that opened under a still cursor.
+				if (down && !holding && btit.second->get_state() == Button::State::NORMAL)
+					btit.second->set_state(Button::State::MOUSEOVER);
+
 				if (btit.second->get_state() == Button::State::NORMAL)
 				{
 					// v83's tab strips (CCtrlTab, FUN_004dd822) make no sound on hover.
