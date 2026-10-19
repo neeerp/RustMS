@@ -5,7 +5,7 @@ use crate::handler::{
 };
 use crate::packet::build::world::mob::{self, FROM_MIST, FROM_TOUCH};
 use crate::packet::build::world::stat::{self, StatUpdate};
-use crate::packet::build::world::{buff, inventory};
+use crate::packet::build::world::{buff, effect, inventory};
 use crate::skills;
 use game::buff::BuffStat;
 use game::{Buff, Disease, InventoryType, MobStat, Player};
@@ -487,6 +487,62 @@ pub fn catch_disease(
     Ok(result)
 }
 
+const SAFETY_CHARM: i32 = 5130000;
+
+/// The items that keep a dying player's EXP, in the order they're used
+/// (Cosmic): the Safety Charm, the Easter Basket and the Easter Charm.
+const CHARMS: [i32; 3] = [SAFETY_CHARM, 4031283, 4140903];
+
+/// The player died. Beginners lose nothing; others lose 10% of the EXP
+/// their level needs (v83's field death penalty), unless they hold a charm,
+/// which is used up instead and lets them revive with 30% of their max HP
+/// and MP (Cosmic).
+pub fn death_penalty(player: &mut Player) -> Result<Vec<Packet>, NetworkError> {
+    if player.stats.job % 1000 == 0 {
+        return Ok(Vec::new());
+    }
+    let Some(needed) = game::exp::to_next_level(player.stats.level) else {
+        return Ok(Vec::new());
+    };
+    if let Some(charm) = CHARMS
+        .into_iter()
+        .find(|&item_id| player.inventory.count(item_id) > 0)
+    {
+        let changes = player
+            .inventory_mut()
+            .remove(charm, 1)
+            .map_err(|_| NetworkError::PacketHandlerError("Charm not found"))?;
+        player.charmed = true;
+        let used = if charm == SAFETY_CHARM {
+            let next = player
+                .inventory
+                .items(InventoryType::Cash)
+                .find(|(_, item)| item.item_id == charm);
+            let days = next
+                .and_then(|(_, item)| item.expiration)
+                .and_then(|at| at.duration_since(std::time::SystemTime::now()).ok())
+                .map_or(0, |left| left.as_secs().div_ceil(24 * 60 * 60));
+            effect::CharmUsed::SafetyCharm {
+                left: u8::try_from(player.inventory.count(charm)).unwrap_or(u8::MAX),
+                days: u8::try_from(days).unwrap_or(u8::MAX),
+            }
+        } else {
+            effect::CharmUsed::Item(charm)
+        };
+        return Ok(vec![
+            inventory::build_inventory_operation(true, &changes)?,
+            effect::build_charm_used(used)?,
+        ]);
+    }
+    let loss = (needed / 10) as i32;
+    player.stats.exp = (player.stats.exp - loss).max(0);
+    player.mark_dirty();
+    Ok(vec![stat::build_stat_update(
+        false,
+        &[StatUpdate::Exp(player.stats.exp)],
+    )?])
+}
+
 /// The most a mob's touch (`attack` None) or attack can hurt `stats`'
 /// owner. A v83 client rolls up to 85% of attack squared over 100, plus a
 /// share of any W.DEF shortfall (FUN_0079309f), or 80% for magic
@@ -613,6 +669,48 @@ mod tests {
             int: 4,
             luk: 4,
         }
+    }
+
+    #[test]
+    fn dying_costs_a_tenth_of_the_level_unless_a_charm_is_held() {
+        let mut player = crate::codec::stats::sample_player();
+        let needed = game::exp::to_next_level(player.stats.level).unwrap() as i32;
+        player.stats.exp = needed / 2;
+        assert_eq!(death_penalty(&mut player).unwrap().len(), 1);
+        assert_eq!(player.stats.exp, needed / 2 - needed / 10);
+        assert!(!player.charmed);
+
+        player
+            .inventory
+            .insert(InventoryType::Cash, 1, game::Item::stack(SAFETY_CHARM, 2));
+        player
+            .inventory
+            .insert(InventoryType::Etc, 1, game::Item::stack(4140903, 1));
+        let exp = player.stats.exp;
+        let packets = death_penalty(&mut player).unwrap();
+        assert_eq!(player.stats.exp, exp);
+        assert!(player.charmed);
+        assert_eq!(player.inventory.count(SAFETY_CHARM), 1);
+        // One charm left, which never expires.
+        assert_eq!(&packets[1].bytes[2..], &[6, 1, 1, 0]);
+
+        // The Safety Charm goes first; another charm is named.
+        death_penalty(&mut player).unwrap();
+        let packets = death_penalty(&mut player).unwrap();
+        assert_eq!(player.inventory.count(4140903), 0);
+        assert_eq!(&packets[1].bytes[2..6], &[6, 0, 0, 0]);
+        assert_eq!(player.stats.exp, exp);
+    }
+
+    #[test]
+    fn beginners_keep_their_charms() {
+        let mut player = crate::codec::stats::sample_player();
+        player.stats.job = 0;
+        player
+            .inventory
+            .insert(InventoryType::Cash, 1, game::Item::stack(SAFETY_CHARM, 1));
+        assert!(death_penalty(&mut player).unwrap().is_empty());
+        assert_eq!(player.inventory.count(SAFETY_CHARM), 1);
     }
 
     #[test]

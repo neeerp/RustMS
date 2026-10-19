@@ -731,6 +731,35 @@ namespace ms
 		{
 			recv.read_string(); // path
 		}
+		else if (mode1 == 6 || mode1 == 0x15 || mode1 == 0x1a)
+		{
+			// A charm kept the player's EXP when they died, or they revived where
+			// they fell: grey lines (chat type 7, v83 9377d9).
+			std::string line;
+
+			if (mode1 == 6)
+			{
+				bool safety_charm = recv.read_byte() != 0;
+				uint8_t times = recv.read_byte();
+				uint8_t days = recv.read_byte();
+
+				if (safety_charm)
+					line = "The EXP did not drop after using the Safety Charm once.(" + std::to_string(days) + " days/" + std::to_string(times) + " times left)";
+				else
+					line = "The EXP did not drop after using " + ItemData::get(recv.read_int()).get_name() + " item.";
+			}
+			else if (mode1 == 0x15)
+			{
+				line = "You have used 1 Wheel of Destiny in order to revive at the current map. (" + std::to_string(static_cast<uint8_t>(recv.read_byte())) + " left)";
+			}
+			else
+			{
+				line = "You have revived on the current map through the effect of the Spirit Stone.";
+			}
+
+			if (auto chatbar = UI::get().get_element<UIChatBar>())
+				chatbar->send_chatline(line, UIChatBar::LineType::GREY);
+		}
 		else if (mode1 == 23) // info: a UI image anchored to the player (tutorial hints)
 		{
 			std::string path = recv.read_string();

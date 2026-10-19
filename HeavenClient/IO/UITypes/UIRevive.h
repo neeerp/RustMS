@@ -6,9 +6,10 @@
 
 namespace ms
 {
-	// v83's "PRESS OK TO BE REVIVED." window (UIWindow.img/Notice/0, FUN_00897b5f). It does not
-	// move and ignores the keyboard. OK, or ten minutes without an answer, sends the player to the
-	// map's return map.
+	// v83's death window (FUN_00897c94). It does not move and ignores the keyboard. With a Wheel of
+	// Destiny where one works, it asks whether to revive here (UIWindow.img/Notice/2); YES revives on
+	// this map. Otherwise it says "PRESS OK TO BE REVIVED." (Notice/0). OK, NO, or ten minutes
+	// without an answer, sends the player to the map's return map.
 	class UIRevive : public UIElement
 	{
 	public:
@@ -27,9 +28,9 @@ namespace ms
 		Button::State button_pressed(uint16_t buttonid) override;
 
 	private:
-		void revive();
+		void revive(bool wheel);
 
-		enum Buttons : uint16_t { OK };
+		enum Buttons : uint16_t { OK, YES, NO };
 
 		uint32_t ticks = 0;
 	};

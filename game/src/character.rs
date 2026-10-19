@@ -185,6 +185,9 @@ pub struct Player {
     pub pets_named: Vec<i64>,
     /// The note on the chalkboard the player holds up, if any; not saved.
     pub chalkboard: Option<String>,
+    /// A charm kept the player's EXP when they last died, so they revive
+    /// with 30% of their max HP and MP; not saved.
+    pub charmed: bool,
     /// The maps kept for the teleport rocks.
     pub teleport_rocks: TeleportRocks,
     dirty: bool,
@@ -219,6 +222,7 @@ impl Player {
             pets: Vec::new(),
             pets_named: Vec::new(),
             chalkboard: None,
+            charmed: false,
             teleport_rocks: TeleportRocks::default(),
             dirty: false,
         }

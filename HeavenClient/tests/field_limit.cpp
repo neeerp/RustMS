@@ -62,6 +62,13 @@ int main()
 		require(return_scroll_refusal(0x4207c, lith, NEAREST_TOWN, false, codes) == ScrollRefusal::HERE,
 				"bit 0x20 stops every return scroll");
 
+		require(may_use_wheel(0, henesys) && may_use_wheel(2, 104000100) && may_use_wheel(6, 211041400),
+				"a Wheel of Destiny works in ordinary fields");
+		require(!may_use_wheel(1, henesys) && !may_use_wheel(4, henesys) && !may_use_wheel(15, henesys),
+				"but not in some field types");
+		require(!may_use_wheel(0, 910000000) && !may_use_wheel(0, 200090010) && !may_use_wheel(0, 390000000),
+				"nor in event maps, on the ships or in 390xxxxxx");
+
 		std::cout << "Field limit passed\n";
 		return 0;
 	}

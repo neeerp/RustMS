@@ -4,6 +4,7 @@ use crate::handler::{
 };
 use crate::packet::build;
 use crate::packet::build::world::map::BlockedMap;
+use crate::packet::build::world::stat::StatUpdate;
 use crate::policy;
 use game::Player;
 use packet::{io::read::PktRead, Packet};
@@ -12,6 +13,9 @@ use std::io::Cursor;
 
 /// HP a character respawns with after dying.
 const RESPAWN_HP: i16 = 50;
+
+/// Revives a dead player on the map they died on.
+const WHEEL_OF_DESTINY: i32 = 5510000;
 
 pub struct ChangeMapHandler;
 
@@ -26,18 +30,28 @@ impl WorldHandler for ChangeMapHandler {
         reader.read_byte()?; // the key SET_FIELD gave the field
         let target = reader.read_int()?;
         let portal_name = reader.read_str_with_length()?;
+        reader.read_byte()?;
+        // The death dialog's answer to "use a Wheel of Destiny?".
+        let wheel = reader.read_byte()? != 0;
 
         let game_data = crate::game_data::get()?;
         let player = &mut *ctx.player;
 
+        let mut revived = Vec::new();
         let (map_id, spawn_point, spawn) = if target != -1 {
-            let destination = direct_destination(player, target, |map_id| {
-                game_data.field(map_id).and_then(|field| field.return_map)
-            })?;
+            let (destination, spawn_point, replies) =
+                direct_destination(player, target, wheel, |map_id| {
+                    game_data.field(map_id).and_then(|field| field.return_map)
+                })?;
             if !game_data.field_exists(destination) {
                 return Err(NetworkError::PacketHandlerError("Target field not found"));
             }
-            (destination, 0, crate::spawn_position(destination, 0))
+            revived = replies;
+            (
+                destination,
+                spawn_point,
+                crate::spawn_position(destination, spawn_point),
+            )
         } else {
             let source_field = game_data
                 .field(player.stats.map_id)
@@ -77,9 +91,12 @@ impl WorldHandler for ChangeMapHandler {
         let warp_packet =
             build::world::map::build_warp_to_map(&player.stats, ctx.channel_id, None)?;
         let enable_actions = build::world::stat::build_stat_update(true, &[])?;
-        Ok(HandlerResult::reply(warp_packet)
-            .with(WorldAction::ChangeField { map_id, spawn })
-            .with_reply(enable_actions))
+        let mut result =
+            HandlerResult::reply(warp_packet).with(WorldAction::ChangeField { map_id, spawn });
+        for reply in revived {
+            result = result.with_reply(reply);
+        }
+        Ok(result.with_reply(enable_actions))
     }
 }
 
@@ -169,34 +186,71 @@ pub enum DoorExit {
     Field { x: i16, y: i16 },
 }
 
-/// Where a direct (map id) warp may take the player.
+/// Where a direct (map id) warp may take the player: the map, its spawn
+/// point, and what a revival tells them.
 ///
-/// In v83 the client only sends a map id when a dead player respawns, which
-/// always goes to the current map's return map. GMs (and debug builds, which
-/// the integration harness uses as a teleport command) may warp anywhere.
+/// In v83 the client only sends a map id when a dead player respawns. A
+/// Wheel of Destiny, if they chose to use one, keeps them on the map they
+/// died on, at the spawn point nearest where they fell (Cosmic); otherwise
+/// they go to its return map. GMs (and debug builds, which the integration
+/// harness uses as a teleport command) may warp anywhere.
 fn direct_destination(
     player: &mut Player,
     target: i32,
+    wheel: bool,
     return_map_of: impl Fn(i32) -> Option<i32>,
-) -> Result<i32, NetworkError> {
+) -> Result<(i32, u8, Vec<Packet>), NetworkError> {
     if player.stats.hp <= 0 {
-        let destination = return_map_of(player.stats.map_id).unwrap_or(player.stats.map_id);
-        player.stats.hp = RESPAWN_HP.min(player.stats.max_hp);
-        player.mark_dirty();
-        return Ok(destination);
+        let mut replies = Vec::new();
+        let destination = if wheel && player.inventory.count(WHEEL_OF_DESTINY) > 0 {
+            let changes = player
+                .inventory_mut()
+                .remove(WHEEL_OF_DESTINY, 1)
+                .map_err(|_| NetworkError::PacketHandlerError("Wheel of Destiny not found"))?;
+            let left = player.inventory.count(WHEEL_OF_DESTINY);
+            replies.push(build::world::inventory::build_inventory_operation(
+                true, &changes,
+            )?);
+            replies.push(build::world::effect::build_wheel_used(
+                u8::try_from(left).unwrap_or(u8::MAX),
+            )?);
+            (player.stats.map_id, player.stats.spawn_point)
+        } else {
+            let map_id = return_map_of(player.stats.map_id).unwrap_or(player.stats.map_id);
+            (map_id, 0)
+        };
+        replies.extend(revive(player)?);
+        return Ok((destination.0, destination.1, replies));
     }
     if policy::may_warp_anywhere(player) {
-        return Ok(target);
+        return Ok((target, 0, Vec::new()));
     }
     Err(NetworkError::PacketHandlerError(
         "Direct map warp is not permitted",
     ))
 }
 
+/// Bring a dead player back with 50 HP, or with 30% of their max HP and MP
+/// more after a charm kept their EXP (Cosmic).
+fn revive(player: &mut Player) -> Result<Option<Packet>, NetworkError> {
+    if !std::mem::take(&mut player.charmed) {
+        player.stats.hp = RESPAWN_HP.min(player.stats.max_hp);
+        player.mark_dirty();
+        return Ok(None);
+    }
+    let share = |most: i16| (3 * i32::from(most) + 9) / 10;
+    let hp = player.add_hp(share(player.stats.max_hp));
+    let mp = player.add_mp(share(player.stats.max_mp));
+    Ok(Some(build::world::stat::build_stat_update(
+        false,
+        &[StatUpdate::Hp(hp), StatUpdate::Mp(mp)],
+    )?))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
-    use game::{CharacterStats, Inventory, Keymap, QuestLog, SkillBook};
+    use game::{CharacterStats, Inventory, InventoryType, Item, Keymap, QuestLog, SkillBook};
     use packet::io::write::PktWrite;
 
     fn player(hp: i16, gm_level: i16) -> Player {
@@ -241,7 +295,7 @@ mod tests {
     fn living_players_cannot_warp_by_map_id() {
         let mut p = player(50, 0);
         if !policy::debug_warps_enabled() {
-            assert!(direct_destination(&mut p, 180000000, |_| None).is_err());
+            assert!(direct_destination(&mut p, 180000000, false, |_| None).is_err());
         }
     }
 
@@ -249,7 +303,9 @@ mod tests {
     fn gms_can_warp_by_map_id() {
         let mut p = player(50, 1);
         assert_eq!(
-            direct_destination(&mut p, 180000000, |_| None).unwrap(),
+            direct_destination(&mut p, 180000000, false, |_| None)
+                .unwrap()
+                .0,
             180000000
         );
     }
@@ -257,10 +313,58 @@ mod tests {
     #[test]
     fn dead_players_respawn_in_the_return_map_regardless_of_target() {
         let mut p = player(0, 0);
-        let destination = direct_destination(&mut p, 180000000, |_| Some(100000000)).unwrap();
-        assert_eq!(destination, 100000000);
+        let (destination, spawn_point, replies) =
+            direct_destination(&mut p, 180000000, false, |_| Some(100000000)).unwrap();
+        assert_eq!((destination, spawn_point), (100000000, 0));
+        assert!(replies.is_empty());
         assert_eq!(p.stats.hp, RESPAWN_HP);
         assert!(p.is_dirty());
+    }
+
+    #[test]
+    fn a_wheel_of_destiny_revives_where_the_player_fell() {
+        let mut p = player(0, 0);
+        p.stats.map_id = 104000100;
+        p.stats.spawn_point = 3;
+        p.inventory
+            .insert(InventoryType::Cash, 1, Item::stack(WHEEL_OF_DESTINY, 2));
+        let (map_id, spawn_point, replies) =
+            direct_destination(&mut p, 104000100, true, |_| Some(104000000)).unwrap();
+        assert_eq!((map_id, spawn_point), (104000100, 3));
+        assert_eq!(p.inventory.count(WHEEL_OF_DESTINY), 1);
+        assert_eq!(p.stats.hp, RESPAWN_HP);
+        // The inventory change, then the chat line with one wheel left.
+        assert_eq!(replies.len(), 2);
+        assert_eq!(&replies[1].bytes[2..], &[0x15, 1]);
+    }
+
+    #[test]
+    fn a_declined_wheel_is_kept() {
+        let mut p = player(0, 0);
+        p.inventory
+            .insert(InventoryType::Cash, 1, Item::stack(WHEEL_OF_DESTINY, 1));
+        let (map_id, _, replies) =
+            direct_destination(&mut p, 100000000, false, |_| Some(104000000)).unwrap();
+        assert_eq!(map_id, 104000000);
+        assert!(replies.is_empty());
+        assert_eq!(p.inventory.count(WHEEL_OF_DESTINY), 1);
+        // Asking for a wheel without one goes to the return map too.
+        let mut p = player(0, 0);
+        let (map_id, _, _) =
+            direct_destination(&mut p, 100000000, true, |_| Some(104000000)).unwrap();
+        assert_eq!(map_id, 104000000);
+    }
+
+    #[test]
+    fn a_charm_revives_with_thirty_percent_of_max_hp_and_mp() {
+        let mut p = player(0, 0);
+        p.stats.mp = 2;
+        p.charmed = true;
+        let (_, _, replies) =
+            direct_destination(&mut p, 100000000, false, |_| Some(104000000)).unwrap();
+        assert_eq!((p.stats.hp, p.stats.mp), (30, 5));
+        assert!(!p.charmed);
+        assert_eq!(replies.len(), 1);
     }
 
     #[test]

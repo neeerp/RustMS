@@ -101,6 +101,20 @@ namespace ms
 		ChangeMapPacket() : OutPacket(OutPacket::Opcode::CHANGEMAP) {}
 	};
 
+	// Tells the server which item the death dialog offers, and where the
+	// tombstone fell (v83 FUN_0095af8e)
+	// Opcode: USE_DEATHITEM(53)
+	class UseDeathItemPacket : public OutPacket
+	{
+	public:
+		UseDeathItemPacket(int32_t itemid, Point<int16_t> tomb) : OutPacket(OutPacket::Opcode::USE_DEATHITEM)
+		{
+			write_int(itemid);
+			write_int(tomb.x());
+			write_int(tomb.y());
+		}
+	};
+
 	// Opcode: ENTER_CASHSHOP(40)
 	class EnterCashShopPacket : public OutPacket
 	{
