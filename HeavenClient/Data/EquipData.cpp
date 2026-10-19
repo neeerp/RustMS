@@ -31,6 +31,7 @@ namespace ms
 		tradeblock = src["tradeBlock"].get_bool();
 		slots = src["tuc"];
 		recovery = src["recovery"].get_real(1.0);
+		medaltag = static_cast<int32_t>(src["medalTag"].get_integer(0));
 
 		// A field of 0 or less makes the spell do nothing.
 		int16_t elemdefault = static_cast<int16_t>(src["elemDefault"].get_integer(100));
@@ -196,5 +197,10 @@ namespace ms
 	int16_t EquipData::get_elemboost(uint8_t element) const
 	{
 		return element < elemboost.size() ? elemboost[element] : 100;
+	}
+
+	int32_t EquipData::get_medaltag() const
+	{
+		return medaltag;
 	}
 }

@@ -29,6 +29,7 @@
 #include "ChalkboardBalloon.h"
 #include "CharEffect.h"
 #include "GuildMark.h"
+#include "MedalTag.h"
 #include "MiniRoomBalloon.h"
 
 #include "Inventory/Weapon.h"
@@ -335,6 +336,7 @@ namespace ms
 		Text namelabel;
 		Text guildlabel;
 		GuildMark guildmark;
+		MedalTag medaltag;
 		ChalkboardBalloon chalkboard;
 		ChatBalloon chatballoon;
 		ChatBalloon hintballoon;

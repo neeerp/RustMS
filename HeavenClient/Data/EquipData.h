@@ -69,6 +69,10 @@ namespace ms
 		// 100.
 		int16_t get_elemboost(uint8_t element) const;
 
+		// The style of a medal's name tag, UI NameTag.img/medal/<n>
+		// (info/medalTag, 0 when absent).
+		int32_t get_medaltag() const;
+
 	private:
 		// Allow the cache to use the constructor
 		friend Cache<EquipData>;
@@ -86,6 +90,7 @@ namespace ms
 		bool cash;
 		bool tradeblock;
 		double recovery;
+		int32_t medaltag;
 		std::array<int16_t, 8> elemboost;
 	};
 }

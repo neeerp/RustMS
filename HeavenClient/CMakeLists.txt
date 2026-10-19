@@ -220,6 +220,8 @@ if(HEAVENCLIENT_BUILD_TESTS)
     add_test(NAME map_tooltip_rules COMMAND map_tooltip_rules_tests)
     add_executable(screenshot_rules_tests tests/screenshot_rules.cpp)
     add_test(NAME screenshot_rules COMMAND screenshot_rules_tests)
+    add_executable(medal_tag_layout_tests tests/medal_tag_layout.cpp)
+    add_test(NAME medal_tag_layout COMMAND medal_tag_layout_tests)
     add_executable(ships_tests tests/ships.cpp)
     add_test(NAME ships COMMAND ships_tests)
     add_executable(field_clock_tests tests/field_clock.cpp)
@@ -336,6 +338,9 @@ add_executable(HeavenClient
     Character/ChalkboardBalloon.h
     Character/Char.cpp
     Character/Char.h
+    Character/MedalTag.cpp
+    Character/MedalTag.h
+    Character/MedalTagLayout.h
     Character/CharEffect.cpp
     Character/CharEffect.h
     Character/CharStats.cpp
