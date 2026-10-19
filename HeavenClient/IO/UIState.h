@@ -78,6 +78,12 @@ namespace ms
 		virtual void
 		show_map(Tooltip::Parent parent, std::string name, std::string description) = 0;
 
+		// A map zone's title and description in v83's plain navy box.
+		virtual void show_zone(Tooltip::Parent parent, std::string title, std::string description) {}
+
+		// One line in v83's plain navy box, as for a portal on the minimap.
+		virtual void show_line(Tooltip::Parent parent, std::string text) {}
+
 		virtual Iterator pre_add(UIElement::Type type, bool toggled, bool focused) = 0;
 
 		virtual void remove(UIElement::Type type) = 0;

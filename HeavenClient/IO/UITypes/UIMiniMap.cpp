@@ -23,6 +23,7 @@
 
 #include "../Components/MapleButton.h"
 
+#include "../Gameplay/MapleMap/MapTooltipRules.h"
 #include "../Gameplay/MapleMap/Npc.h"
 
 #include "../../Util/NxFiles.h"
@@ -136,7 +137,7 @@ namespace ms
 			Texture portal_marker = markers["portal"];
 
 			for (const auto& portal : portals)
-				draw_marker(portal_marker, portal.second);
+				draw_marker(portal_marker, portal.position);
 
 			Texture npc_marker = markers["npc"];
 
@@ -181,8 +182,16 @@ namespace ms
 		portals.clear();
 
 		for (nl::node portal : map["portal"])
-			if (static_cast<int>(portal["pt"]) == 2)
-				portals.emplace_back(portal.name(), Point<int16_t>(portal["x"], portal["y"]));
+		{
+			int32_t type = portal["pt"];
+
+			if (!map_tooltips::minimap_shows(type))
+				continue;
+
+			int32_t target = portal["tm"];
+			bool tip = map_tooltips::minimap_tip(type, target, portal["hideTooltip"].get_integer() != 0);
+			portals.push_back({ Point<int16_t>(portal["x"], portal["y"]), tip, portal["pn"], target });
+		}
 
 		// Towns open with their mark and names.
 		nl::node town = map["info"]["town"];
@@ -276,23 +285,30 @@ namespace ms
 			}
 		}
 
-		Point<int16_t> portal_size = Texture(markers["portal"]).get_dimensions();
-
-		for (const auto& [portal, at] : portals)
+		// v83 tries the portals last to first, each in a small spot around
+		// its marker (FUN_0085ade2). A tip is the String
+		// ToolTipHelp.img/PortalTooltip text for the portal, or else where it
+		// leads; with neither, the last tip stays up.
+		for (auto portal = portals.rbegin(); portal != portals.rend(); ++portal)
 		{
-			if (!covers(at, portal_size))
+			if (!portal->tip)
 				continue;
 
-			nl::node target = map["portal"][portal]["tm"];
-			std::string category = NxHelper::Map::get_map_category(target);
-			nl::node target_name = nl::nx::string["Map.img"][category][target]["mapName"];
+			Point<int16_t> at = to_window(portal->position);
 
-			if (target_name)
-			{
-				UI::get().show_map(Tooltip::Parent::MINIMAP, target_name, "");
+			if (!map_tooltips::contains(map_tooltips::minimap_portal_spot(at.x(), at.y()), cursor.x(), cursor.y()))
+				continue;
 
-				return dstate;
-			}
+			nl::node tip = nl::nx::string["ToolTipHelp.img"]["PortalTooltip"][std::to_string(mapid)][portal->name];
+			std::string text = tip.data_type() == nl::node::type::string ? tip.get_string() : "";
+
+			if (text.empty())
+				text = NxHelper::Map::get_map_info_by_id(portal->target).name;
+
+			if (!text.empty())
+				UI::get().show_line(Tooltip::Parent::MINIMAP, text);
+
+			return dstate;
 		}
 
 		UI::get().clear_tooltip(Tooltip::Parent::MINIMAP);

@@ -134,8 +134,11 @@ from `UI.nx`. Moved so far:
   (`MiniMapType`, the largest until one is made). Towns open in the largest,
   and maps without a `miniMap` stay folded. The window fits the map's `miniMap/canvas` (scaled
   by `2^mag`) and the names. Markers (`Map.nx` `MapHelper.img/minimap`) stand
-  bottom-centred on portals to other maps, NPCs, other players, and you.
-  Hovering an NPC or portal shows its name. Period canvases had the map's
+  bottom-centred on the visible portals (types 2 and 7), NPCs, other
+  players, and you. Hovering an NPC shows its name. Hovering a portal's
+  marker shows, as v83 does, its `ToolTipHelp.img/PortalTooltip` line or
+  else where it leads, in a plain navy box 20 right of and below the
+  cursor. Period canvases had the map's
   background baked in; v83 `Map.nx` canvases are transparent there, so the
   frame shows through. Its middle is white at alpha 119 over black, as in
   v83, so it comes out grey and the field doesn't show through.
@@ -511,6 +514,7 @@ side yet.
 | Writs of Solomon, gacha EXP | Implemented: using a writ, the EXP gauge's tooltip and taking the EXP by double-click; see `inventory.md` |
 | Continent ships, station wall clocks | Docking ships and the Balrog's ship, CONTI_MOVE/CONTI_STATE, CLOCK kind 1; see `ships.md` |
 | Map clouds (`info/cloud`, 223 maps such as Perion) | Implemented (`MapClouds`): as v83 does, 10 to 59 of `MapHelper.img/weather/cloud`'s canvases scattered over the field's footholds plus 200 px, at 140 to 219 of 255 opacity, drifting right at 17 to 50 px/s for good and wrapping, above the front backgrounds |
+| Map tooltips (`ToolTip`, 270 maps such as Henesys) | Implemented (`MapTooltips`, `PlainTooltip`): as v83 does, a numbered zone's `ToolTipHelp.img/Mapobject` title and description show 20 below the cursor while it is over the zone, and stay up at the zone's bottom right while the player stands in its `<N>char` zone, in a translucent navy box without UI art. v83 pairs `<N>char` with the Nth zone in WZ order, which NX loses; HC pairs it with zone N, which differs only in Ellinia and Ariant. Font metrics are assumed (Arial 12). Seven titles in our `String.nx` carry a corrupt Korean prefix from the WZ conversion |
 | Player shops, mini-games, memo/mail | No UI, no handlers |
 | Reactors | Spawning, swings, hits and breaking; no skill hits, touch or quest gates; see `combat.md` |
 | Pets | Summoning, following, others' pets, map changes, chat commands, idle actions, level-up effect, food, cash food and hunger; see `pets.md` |

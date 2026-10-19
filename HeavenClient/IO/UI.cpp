@@ -499,6 +499,16 @@ namespace ms
 		state->show_map(parent, name, description);
 	}
 
+	void UI::show_zone(Tooltip::Parent parent, std::string title, std::string description)
+	{
+		state->show_zone(parent, title, description);
+	}
+
+	void UI::show_line(Tooltip::Parent parent, std::string text)
+	{
+		state->show_line(parent, text);
+	}
+
 	Keyboard &UI::get_keyboard()
 	{
 		return keyboard;

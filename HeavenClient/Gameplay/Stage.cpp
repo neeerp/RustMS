@@ -147,6 +147,8 @@ namespace ms
 		clouds = mapinfo.has_clouds() ? MapClouds(physics.get_fht().get_space_x(), physics.get_fht().get_space_y())
 									  : MapClouds();
 		portals = MapPortals(src["portal"], mapid);
+		tooltips = mapid == -1 ? MapTooltips() : MapTooltips(mapid, src);
+		UI::get().clear_tooltip(Tooltip::Parent::FIELD);
 		ship = MapShip(src);
 		clock = MapClock(src);
 		ground_effects = EffectLayer();
@@ -227,6 +229,9 @@ namespace ms
 		// overlay (z 0xc0061508).
 		clouds.draw(viewx, viewy, alpha);
 		draw_fear(viewx, viewy, alpha);
+		// The tips of the zones the player stands in are at z 0, above the
+		// field's own layers (FUN_008f3141).
+		tooltips.draw(viewpos);
 		effect.draw();
 	}
 
@@ -301,6 +306,7 @@ namespace ms
 		portals.update(player.get_position());
 		check_touch_portals(drawn);
 		camera.update(player.get_position());
+		tooltips.update(player.get_position());
 
 		// The player's or a party member's smoke screen keeps mobs' attacks,
 		// touch and mists off them (FUN_0043193a).
@@ -906,7 +912,11 @@ namespace ms
 				statusbar->remove_menus();
 
 			if (statusbar->is_in_range(position))
+			{
+				tooltips.leave();
+
 				return statusbar->send_cursor(pressed, position);
+			}
 		}
 
 		// The close button on the player's own chalkboard, which needs both
@@ -924,17 +934,29 @@ namespace ms
 			if (auto chatbar = UI::get().get_element<UIChatBar>())
 				chatbar->send_chatline("The chalkboard has closed.", UIChatBar::LineType::SKILL);
 
+			tooltips.leave();
+
 			return Cursor::State::CANCLICK;
 		}
 
 		if (!mini_room && player.on_chalkboard_close(feet, position))
+		{
+			tooltips.leave();
+
 			return Cursor::State::CANCLICK;
+		}
 
 		Cursor::State npcstate = npcs.send_cursor(pressed, position, camera.position());
 
 		// A shop's balloon shows the house cursor (FUN_00531cc7).
 		if (npcstate == Cursor::State::IDLE && mini_room_at(position))
-			return Cursor::State::HOUSE;
+			npcstate = Cursor::State::HOUSE;
+
+		// Otherwise a map zone under the cursor shows its tip.
+		if (npcstate == Cursor::State::IDLE)
+			tooltips.hover(position - camera.position());
+		else
+			tooltips.leave();
 
 		return npcstate;
 	}

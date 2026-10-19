@@ -216,6 +216,8 @@ if(HEAVENCLIENT_BUILD_TESTS)
     add_test(NAME mist_layout COMMAND mist_layout_tests)
     add_executable(map_clouds_tests tests/map_clouds.cpp)
     add_test(NAME map_clouds COMMAND map_clouds_tests)
+    add_executable(map_tooltip_rules_tests tests/map_tooltip_rules.cpp)
+    add_test(NAME map_tooltip_rules COMMAND map_tooltip_rules_tests)
     add_executable(ships_tests tests/ships.cpp)
     add_test(NAME ships COMMAND ships_tests)
     add_executable(field_clock_tests tests/field_clock.cpp)
@@ -463,6 +465,9 @@ add_executable(HeavenClient
     Gameplay/MapleMap/ShipRules.h
     Gameplay/MapleMap/MapTilesObjs.cpp
     Gameplay/MapleMap/MapTilesObjs.h
+    Gameplay/MapleMap/MapTooltipRules.h
+    Gameplay/MapleMap/MapTooltips.cpp
+    Gameplay/MapleMap/MapTooltips.h
     Gameplay/MapleMap/MesoDrop.cpp
     Gameplay/MapleMap/MesoDrop.h
     Gameplay/MapleMap/MistLayout.h
@@ -551,6 +556,8 @@ add_executable(HeavenClient
     IO/Components/NameTag.cpp
     IO/Components/NameTag.h
     IO/Components/NpcText.cpp
+    IO/Components/PlainTooltip.cpp
+    IO/Components/PlainTooltip.h
     IO/Components/ScrollingNotice.cpp
     IO/Components/ScrollingNotice.h
     IO/Components/SkillTooltip.cpp
