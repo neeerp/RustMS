@@ -63,7 +63,12 @@ async fn a_counter_hurts_whoever_attacks_the_mob() {
     // an earlier run on this stack did; nothing counters yet.
     send(c, attack(boss, 1)).await;
     until(c, &mut t, |t| !t.field.hp_bars.is_empty()).await;
-    while t.field.hp_bars.last().is_some_and(|&(_, percent)| percent > 50) {
+    while t
+        .field
+        .hp_bars
+        .last()
+        .is_some_and(|&(_, percent)| percent > 50)
+    {
         let bars = t.field.hp_bars.len();
         send(c, attack(boss, 199_999)).await;
         until(c, &mut t, |t| t.field.hp_bars.len() > bars).await;
