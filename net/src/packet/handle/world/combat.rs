@@ -1,4 +1,5 @@
 use crate::combat::{self, AttackKind};
+use crate::combo;
 use crate::error::NetworkError;
 use crate::handler::{
     FieldRequest, HandlerResult, WorldAction, WorldContext, WorldHandler, WorldResult,
@@ -8,7 +9,7 @@ use crate::packet::build::world::stat::{self, StatUpdate};
 use crate::packet::build::world::{buff, effect, inventory};
 use crate::skills;
 use game::buff::BuffStat;
-use game::{Buff, Disease, InventoryType, MobStat, Player};
+use game::{Buff, Disease, InventoryType, MobStat, Player, ShownBuff};
 use packet::{io::read::PktRead, Packet};
 use std::io::Cursor;
 use std::time::{Duration, Instant};
@@ -172,6 +173,7 @@ impl WorldHandler for AttackHandler {
             projectile = ammo.item_id;
         }
         let broadcast = combat::build_attack(ctx.player.id(), &attack, skill_level, projectile)?;
+        let combo = combo::after_attack(ctx.player, &attack, rand::random());
         let skill = attack.skill;
         let hits = attack
             .hits
@@ -198,8 +200,43 @@ impl WorldHandler for AttackHandler {
         if let Some(mist) = mist {
             result = result.with(WorldAction::Field(mist));
         }
+        if let Some(value) = combo {
+            result = set_combo(ctx.player, value, now, result)?;
+        }
         Ok(result)
     }
+}
+
+/// Combo Attack's new value, for what is left of it: the player hears it
+/// as the buff given again, and the others see the orbs.
+fn set_combo(
+    player: &mut Player,
+    value: i16,
+    now: Instant,
+    result: HandlerResult<WorldAction>,
+) -> WorldResult {
+    let Some(buff) = (player.buffs.active())
+        .iter()
+        .find(|buff| buff.stat == BuffStat::Combo)
+        .cloned()
+    else {
+        return Ok(result);
+    };
+    let left = buff.expires.saturating_duration_since(now);
+    (player.buffs).give(Buff::new(buff.skill_id, BuffStat::Combo, value, now, left));
+    let left = i32::try_from(left.as_millis()).unwrap_or(i32::MAX);
+    let given = [(BuffStat::Combo, value)];
+    let shown = [ShownBuff {
+        stat: BuffStat::Combo,
+        value,
+        skill_id: buff.skill_id,
+    }];
+    Ok(result
+        .with_reply(buff::build_give_buff(buff.skill_id, left, &given)?)
+        .with(WorldAction::BuffsChanged(buff::build_give_foreign_buff(
+            player.id(),
+            &shown,
+        )?)))
 }
 
 /// `TAKE_DAMAGE`: the player was hurt by touching a mob or by one of its

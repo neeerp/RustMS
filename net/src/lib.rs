@@ -7,6 +7,7 @@ extern crate serde;
 pub mod cash_shop;
 pub mod codec;
 pub mod combat;
+pub mod combo;
 pub mod content;
 pub mod conti;
 pub mod dialogue;

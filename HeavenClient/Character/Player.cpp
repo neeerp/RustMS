@@ -25,6 +25,7 @@
 #include "../Data/EquipData.h"
 #include "../Data/SkillData.h"
 #include "../Data/WeaponData.h"
+#include "../Gameplay/Combat/Combo.h"
 #include "../Gameplay/Combat/MagicDamage.h"
 #include "../Gameplay/MapleMap/FieldLimit.h"
 #include "../Gameplay/Stage.h"
@@ -44,6 +45,7 @@
 
 #include <algorithm>
 #include <chrono>
+#include <cmath>
 
 namespace ms
 {
@@ -624,6 +626,10 @@ namespace ms
 		if (move.is_skill() && !disease::can_use_skill(move.get_id(), get_diseases()))
 			return SpecialMove::ForbidReason::FBR_OTHER;
 
+		// A finisher needs an orb to spend (0x969623).
+		if (combo::finisher(move.get_id()) && get_buff_value(Buffstat::Id::COMBO) <= 1)
+			return SpecialMove::ForbidReason::FBR_OTHER;
+
 		if (has_cooldown(move.get_id()))
 			return SpecialMove::ForbidReason::FBR_COOLDOWN;
 
@@ -659,6 +665,22 @@ namespace ms
 			return SpecialMove::ForbidReason::FBR_ITEMCOST;
 
 		return reason;
+	}
+
+	int32_t Player::combo_percent(int32_t skill) const
+	{
+		combo::Line line = combo::line(stats.get_job().get_id());
+		int32_t level = skillbook.get_level(line.combo);
+
+		if (level == 0)
+			return 0;
+
+		int32_t base_skill = combo::base_skill(line, level, skillbook.get_level(line.advanced));
+		int32_t base_level = skillbook.get_level(base_skill);
+		auto base = static_cast<int32_t>(std::lround(SkillData::get(base_skill).get_stats(base_level).damage * 100));
+		int32_t orbs = get_buff_value(Buffstat::Id::COMBO) - 1;
+
+		return combo::percent(combo::finisher(skill), level, base, orbs);
 	}
 
 	Attack Player::prepare_attack(int32_t skill, bool whack) const

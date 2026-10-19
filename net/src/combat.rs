@@ -1,5 +1,6 @@
 //! Player attacks: parsing, damage limits, and the attack broadcast.
 
+use crate::combo;
 use crate::skills::{self, Learned};
 use crate::{error::NetworkError, packet::op::SendOpcode};
 use game::inventory::equip_slot;
@@ -302,6 +303,8 @@ pub enum AttackRejection {
     Ammo,
     /// Stun or Seduce stops every attack, Seal every skill.
     Diseased,
+    /// A finisher without an orb to spend.
+    NoOrbs,
 }
 
 /// The MP a skill's attack spends: none for Heal, whose USE_SKILL paid.
@@ -344,7 +347,15 @@ pub fn validate(attack: &Attack, player: &Player) -> Result<Uses, AttackRejectio
     {
         return Err(AttackRejection::Diseased);
     }
-    let base_cap = (max_base_damage(player) * 2).max(10);
+    // v83 won't use a finisher without an orb (0x969623).
+    if combo::finisher(attack.skill) && combo::orbs(player).unwrap_or(0) < 1 {
+        return Err(AttackRejection::NoOrbs);
+    }
+    // The orbs multiply the damage of a swing or a shot (FUN_007653fa).
+    let base_cap = match combo::damage_percent(player, attack.skill) {
+        0 => (max_base_damage(player) * 2).max(10),
+        percent => (max_base_damage(player) * 2 * percent / 100).max(10),
+    };
     let mut mesos = 0;
     let (skill, mob_count, hit_count, cap) = if attack.skill == 0 {
         if attack.kind == AttackKind::Magic {
@@ -714,6 +725,38 @@ mod tests {
             validate(&parse_close_attack(&attack_packet(1, 1)).unwrap(), &dead),
             Err(AttackRejection::Dead)
         );
+    }
+
+    #[test]
+    fn combo_orbs_raise_the_cap_and_a_finisher_needs_one() {
+        let mut player = beginner_with_sword();
+        player.stats.job = 111;
+        player.stats.mp = 100;
+        learn(&mut player, 1111002, 30);
+        learn(&mut player, 1111003, 30);
+        let combo = |player: &mut Player, value| {
+            let lasts = std::time::Duration::from_secs(60);
+            let now = std::time::Instant::now();
+            (player.buffs).give(game::Buff::new(1111002, BuffStat::Combo, value, now, lasts));
+        };
+        let check = |player: &Player, skill, damage| {
+            validate(
+                &parse_close_attack(&skill_attack_packet(skill, 1, damage)).unwrap(),
+                player,
+            )
+            .map(|_| ())
+        };
+        // No orbs: 20 as before, and no Panic.
+        combo(&mut player, 1);
+        assert_eq!(check(&player, 0, 20), Ok(()));
+        assert_eq!(check(&player, 0, 21), Err(AttackRejection::Damage));
+        assert_eq!(check(&player, 1111003, 1), Err(AttackRejection::NoOrbs));
+        // Five orbs: 140%, and Panic's 350% by 350%.
+        combo(&mut player, 6);
+        assert_eq!(check(&player, 0, 28), Ok(()));
+        assert_eq!(check(&player, 0, 29), Err(AttackRejection::Damage));
+        assert_eq!(check(&player, 1111003, 245), Ok(()));
+        assert_eq!(check(&player, 1111003, 246), Err(AttackRejection::Damage));
     }
 
     #[test]

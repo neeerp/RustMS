@@ -888,6 +888,18 @@ namespace ms
 
 			move.apply_stats(player, attack);
 
+			// The orbs multiply a swing's or a shot's damage after its skill's (FUN_007653fa).
+			if (attack.type != Attack::Type::MAGIC)
+			{
+				int32_t percent = player.combo_percent(attack.skill);
+
+				if (percent > 0)
+				{
+					attack.mindamage *= percent / 100.0;
+					attack.maxdamage *= percent / 100.0;
+				}
+			}
+
 			// Shadow Partner throws each bullet again, for twice the hits.
 			if (attack.type == Attack::Type::RANGED && player.has_buff(Buffstat::Id::SHADOWPARTNER) &&
 				shot_path::partner_shoots(attack.skill))

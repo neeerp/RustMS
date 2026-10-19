@@ -120,6 +120,9 @@ namespace ms
 		// Build a skill (0 for regular) or a point-blank whack from the player's stats.
 		Attack prepare_attack(int32_t skill, bool whack = false) const;
 
+		// The percent Combo Attack's orbs make a swing's or a shot's damage, 0 for none.
+		int32_t combo_percent(int32_t skill) const;
+
 		// Execute a rush movement
 		void rush(double targetx);
 

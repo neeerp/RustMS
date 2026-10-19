@@ -350,6 +350,18 @@ A few skills do more than buff:
   `luk * 2.3 * y / 100` and `luk * 3.5 * y / 100`, using LUK with equips
   (`skills::chakra_heal`). The client only lets it be cast below half HP;
   the server doesn't check, since its max HP leaves out equips.
+- **Combo Attack** (`net::combo`) starts at value 1, which is one more than
+  the orbs. After an accepted swing that reaches a mob (not Shout), the
+  attack handler adds an orb up to Combo Attack's `x`, or Advanced Combo's
+  once learned, and with Advanced Combo a second one on its `prop` chance,
+  as Cosmic does. Panic and Coma reset the value to 1, and `validate`
+  refuses them without an orb, as the client does. Each change goes to
+  the player as GIVE_BUFF for the time left and to the map as
+  GIVE_FOREIGN_BUFF. The orbs multiply a swing's or a shot's damage after
+  its skill's, by the client's table (FUN_007653fa, `combo::damage_percent`).
+  The damage cap and HeavenClient's `Player::combo_percent` both use it.
+  A Dawn Warrior's skills follow the same rules, with Combo Attack's last
+  level at 20.
 
 These and Mystic Door have neither buff stats nor a mob debuff, so
 `skills::acts_alone` lets them past the check that refuses such skills as
@@ -1067,10 +1079,13 @@ and back, keep a stranger out until they join the party, and close it on
 logout.
 `party_skills` has a Bishop resurrect a dead party member, and a Chief
 Bandit heal themselves with Chakra.
+`combo_attack` has a Crusader refused Panic without an orb, gather five
+orbs by swinging at a snail (a sixth swing adds none), and spend them with
+Panic.
 `player_diseases` has a Hogul in Korean Folk Town cast Slow from far away
 (it misses) and then on the player (it lands for 10 s, then ends).
 `map_hazards` warps to El Nath's Ice Valley in its cape, which keeps the
 cold out, then takes it off and drinks an Air Bubble, which doesn't help: it
 loses 10 HP at the next tick. After a Red Bean Porridge it loses nothing.
 HeavenClient's `diseases_tests` cover the input, jump, attack and skill
-gates and the notices.
+gates and the notices; `combo_tests` cover the orbs' damage table.
