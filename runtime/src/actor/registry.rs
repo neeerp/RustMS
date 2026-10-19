@@ -1,6 +1,6 @@
 use crate::actor::field::{FieldActor, FieldMapEntityNpc};
 use crate::actor::field_drops::DropSet;
-use crate::actor::field_mobs::MobSet;
+use crate::actor::field_mobs::{full_spawn, mob_capacity, MobSet};
 use crate::actor::field_reactors::ReactorSet;
 use crate::message::{FieldHandle, FieldKey};
 use crate::supervisor::spawn_supervised;
@@ -78,18 +78,21 @@ fn load_field_mobs(field_key: FieldKey) -> MobSet {
     else {
         return MobSet::default();
     };
-    MobSet::new(
-        field
-            .mob_spawns
-            .iter()
-            .filter_map(|spawn| match net::mobs::info(spawn.mob_id) {
-                Some(info) => Some((spawn.clone(), info)),
-                None => {
-                    warn!(field = ?field_key, mob_id = spawn.mob_id, "Unknown mob in spawn list");
-                    None
-                }
-            }),
-    )
+    let mobs = MobSet::new(field.mob_spawns.iter().filter_map(|spawn| {
+        match net::mobs::info(spawn.mob_id) {
+            Some(info) => Some((spawn.clone(), info)),
+            None => {
+                warn!(field = ?field_key, mob_id = spawn.mob_id, "Unknown mob in spawn list");
+                None
+            }
+        }
+    }))
+    .with_capacity(mob_capacity(field.footholds.bounds(), field.mob_rate));
+    if full_spawn() {
+        mobs.filling_every_point()
+    } else {
+        mobs
+    }
 }
 
 fn load_field_reactors(field_key: FieldKey) -> ReactorSet {

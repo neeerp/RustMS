@@ -10,13 +10,24 @@ use game_data::MapMobTemplate;
 use net::packet::build::world::field::parse_movement;
 use net::packet::build::world::mob::{MobStatusView, MobView};
 use net::ClientId;
+use rand::rngs::StdRng;
+use rand::{Rng, SeedableRng};
 use std::cmp::Reverse;
 use std::collections::{BTreeMap, HashMap};
+use std::sync::OnceLock;
 use tokio::time::{Duration, Instant};
 
-/// The soonest a killed mob comes back, when its spawn point has no
-/// `mobTime` of its own.
-pub const RESPAWN_DELAY: Duration = Duration::from_secs(7);
+/// A field makes mobs at most this often: the v83 server's
+/// CField::TryCreateMob waits 7000 ms after its last pass that had room
+/// (OrionAlpha, a replica of Nexon's server).
+pub const SPAWN_INTERVAL: Duration = Duration::from_secs(7);
+
+/// The most mobs a field holds before its users raise it.
+const MAX_CAPACITY: usize = 40;
+
+/// A spawn point without a `mobTime` stays empty while a mob, or another
+/// point filled in the same pass, is this close in both x and y.
+const SPAWN_ROOM: i32 = 100;
 
 /// A v83 client chases its target for 180 to 240 s after being given a mob
 /// with aggro (FUN_007f73d8). Within the shortest of those, another hit by
@@ -27,7 +38,8 @@ pub struct SpawnPoint {
     template: MapMobTemplate,
     info: MobInfo,
     alive: Option<i32>,
-    next_spawn: Option<Instant>,
+    /// The soonest a point with a `mobTime` spawns again.
+    regen_after: Option<Instant>,
 }
 
 pub struct LiveMob {
@@ -381,6 +393,13 @@ pub struct MobSet {
     live: BTreeMap<i32, LiveMob>,
     object_ids: ObjectIds,
     revivals: Vec<Revival>,
+    /// How many mobs the field holds with few users on it.
+    capacity: usize,
+    /// Fill every spawn point instead (see `full_spawn`).
+    full: bool,
+    /// The last spawn pass that had room.
+    last_pass: Option<Instant>,
+    rng: StdRng,
 }
 
 /// Mobs to come out of one that died (`revive`) once it is done dying,
@@ -406,18 +425,34 @@ impl MobSet {
         Self {
             spawns: spawns
                 .into_iter()
-                .filter(|(template, _)| template.mob_time >= 0 && !template.hide)
+                .filter(|(template, _)| !template.hide)
                 .map(|(template, info)| SpawnPoint {
                     template,
                     info,
                     alive: None,
-                    next_spawn: None,
+                    regen_after: None,
                 })
                 .collect(),
             live: BTreeMap::new(),
             object_ids: ObjectIds::new(object_ids::MOBS),
             revivals: Vec::new(),
+            capacity: MAX_CAPACITY,
+            full: false,
+            last_pass: None,
+            rng: StdRng::from_entropy(),
         }
+    }
+
+    /// The field holds `capacity` mobs with few users on it (`mob_capacity`).
+    pub fn with_capacity(mut self, capacity: usize) -> Self {
+        self.capacity = capacity.clamp(1, MAX_CAPACITY);
+        self
+    }
+
+    /// Every spawn point keeps a mob of its own (`full_spawn`).
+    pub fn filling_every_point(mut self) -> Self {
+        self.full = true;
+        self
     }
 
     pub fn live(&self) -> impl Iterator<Item = &LiveMob> {
@@ -428,33 +463,126 @@ impl MobSet {
         self.live.get(&object_id)
     }
 
-    /// Spawn every spawn point that is empty and due; returns the new mobs'
-    /// object ids.
-    pub fn respawn(&mut self, now: Instant) -> Vec<i32> {
-        let mut spawned = Vec::new();
-        for (index, spawn) in self.spawns.iter_mut().enumerate() {
-            if spawn.alive.is_some() || spawn.next_spawn.is_some_and(|at| at > now) {
-                continue;
+    /// The field's first spawn pass, as it loads: a point with a `mobTime`
+    /// waits a tenth to seven tenths of it first, and one with a negative
+    /// `mobTime` spawns now and never again. Returns the new mobs' object
+    /// ids.
+    pub fn start(&mut self, now: Instant) -> Vec<i32> {
+        if !self.full {
+            for spawn in &mut self.spawns {
+                if let Some(time) = mob_time_ms(&spawn.template) {
+                    let wait = time / 10 + self.rng.gen_range(0, time * 6 / 10);
+                    spawn.regen_after = Some(now + Duration::from_millis(wait));
+                }
             }
-            let object_id = self.object_ids.next();
-            spawn.alive = Some(object_id);
-            spawn.next_spawn = None;
-            let template = &spawn.template;
-            let mut mob = LiveMob::new(
-                object_id,
-                spawn.info.clone(),
-                (template.x, template.y),
-                // Mob stances are 2 (moving) or 4 (standing), +1 facing left;
-                // `flip` faces right.
-                if template.flip { 4 } else { 5 },
-                template.foothold,
-                now,
-            );
-            mob.spawn = Some(index);
-            self.live.insert(object_id, mob);
-            spawned.push(object_id);
         }
+        self.create(now, 0, true)
+    }
+
+    /// A spawn pass with `users` on the field; returns the new mobs' object
+    /// ids.
+    pub fn respawn(&mut self, now: Instant, users: usize) -> Vec<i32> {
+        self.create(now, users, false)
+    }
+
+    /// CField::TryCreateMob: at most every `SPAWN_INTERVAL`, while the field
+    /// holds fewer mobs than its capacity for `users`, fill spawn points
+    /// picked at random from those with room. A point without a `mobTime`
+    /// has room when no mob is near it; one with a `mobTime` when its mob is
+    /// gone and its wait is over. `reset` (the first pass) also takes the
+    /// points with a negative `mobTime`.
+    fn create(&mut self, now: Instant, users: usize, reset: bool) -> Vec<i32> {
+        if self.full {
+            return self.fill(now, reset);
+        }
+        if !reset && self.last_pass.is_some_and(|at| now < at + SPAWN_INTERVAL) {
+            return Vec::new();
+        }
+        let mut shortfall = self.capacity_for(users).saturating_sub(self.live.len());
+        if shortfall == 0 {
+            return Vec::new();
+        }
+        let mut taken: Vec<(i16, i16)> = self.live.values().map(|mob| (mob.x, mob.y)).collect();
+        let mut open = Vec::new();
+        for (index, spawn) in self.spawns.iter().enumerate() {
+            let at = (spawn.template.x, spawn.template.y);
+            let time = spawn.template.mob_time;
+            let room = if time == 0 {
+                !taken.iter().any(|&mob| near(mob, at))
+            } else {
+                (time > 0 || reset)
+                    && spawn.alive.is_none()
+                    && spawn.regen_after.is_none_or(|after| after <= now)
+            };
+            if room {
+                open.push(index);
+                taken.push(at);
+            }
+        }
+        let mut spawned = Vec::new();
+        while shortfall > 0 && !open.is_empty() {
+            let index = open.swap_remove(self.rng.gen_range(0, open.len()));
+            spawned.push(self.spawn_at(index, now));
+            shortfall -= 1;
+        }
+        self.last_pass = Some(now);
         spawned
+    }
+
+    /// Every empty point that is due (`filling_every_point`); a point with a
+    /// negative `mobTime` only on the first pass.
+    fn fill(&mut self, now: Instant, reset: bool) -> Vec<i32> {
+        let due: Vec<usize> = (0..self.spawns.len())
+            .filter(|&index| {
+                let spawn = &self.spawns[index];
+                (spawn.template.mob_time >= 0 || reset)
+                    && spawn.alive.is_none()
+                    && spawn.regen_after.is_none_or(|after| after <= now)
+            })
+            .collect();
+        due.into_iter()
+            .map(|index| self.spawn_at(index, now))
+            .collect()
+    }
+
+    /// Fill every spawn point, as a field filling every point does on load.
+    #[cfg(test)]
+    pub(crate) fn spawn_all(&mut self, now: Instant) -> Vec<i32> {
+        self.fill(now, true)
+    }
+
+    /// The field's capacity with `users` on it: from its capacity with up
+    /// to half that many users, up to twice it with as many users as that.
+    fn capacity_for(&self, users: usize) -> usize {
+        let (min, max) = (self.capacity, self.capacity * 2);
+        if users <= min / 2 {
+            min
+        } else if users < max {
+            min + (max - min) * (2 * users - min) / (3 * min)
+        } else {
+            max
+        }
+    }
+
+    fn spawn_at(&mut self, index: usize, now: Instant) -> i32 {
+        let object_id = self.object_ids.next();
+        let spawn = &mut self.spawns[index];
+        spawn.alive = Some(object_id);
+        spawn.regen_after = None;
+        let template = &spawn.template;
+        let mut mob = LiveMob::new(
+            object_id,
+            spawn.info.clone(),
+            (template.x, template.y),
+            // Mob stances are 2 (moving) or 4 (standing), +1 facing left;
+            // `flip` faces right.
+            if template.flip { 4 } else { 5 },
+            template.foothold,
+            now,
+        );
+        mob.spawn = Some(index);
+        self.live.insert(object_id, mob);
+        object_id
     }
 
     /// Give uncontrolled mobs to `candidate`; returns the ones it now controls.
@@ -1005,20 +1133,60 @@ impl MobSet {
         true
     }
 
-    /// The mob from spawn point `spawn`, if it had one, is gone: it spawns
-    /// again after its `mobTime`, at least `RESPAWN_DELAY`.
+    /// The mob from spawn point `spawn`, if it had one, is gone. A point
+    /// with a `mobTime` waits 1.3 to 2 times it before it spawns again, or
+    /// just its `mobTime`, at least `SPAWN_INTERVAL`, when filling every
+    /// point.
     fn emptied(&mut self, spawn: Option<usize>, now: Instant) {
         let Some(spawn) = spawn.map(|index| &mut self.spawns[index]) else {
             return;
         };
         spawn.alive = None;
-        let delay = if spawn.template.mob_time > 0 {
-            Duration::from_secs(spawn.template.mob_time as u64).max(RESPAWN_DELAY)
+        let wait = if self.full {
+            Duration::from_millis(mob_time_ms(&spawn.template).unwrap_or(0)).max(SPAWN_INTERVAL)
+        } else if let Some(time) = mob_time_ms(&spawn.template) {
+            Duration::from_millis(time * 13 / 10 + self.rng.gen_range(0, time * 7 / 10))
         } else {
-            RESPAWN_DELAY
+            return;
         };
-        spawn.next_spawn = Some(now + delay);
+        spawn.regen_after = Some(now + wait);
     }
+}
+
+/// A spawn point's positive `mobTime`, in milliseconds.
+fn mob_time_ms(template: &MapMobTemplate) -> Option<u64> {
+    u64::try_from(template.mob_time)
+        .ok()
+        .filter(|&seconds| seconds > 0)
+        .map(|seconds| seconds * 1000)
+}
+
+/// Whether a mob at `mob` crowds the spawn point at `at`.
+fn near(mob: (i16, i16), at: (i16, i16)) -> bool {
+    (i32::from(mob.0) - i32::from(at.0)).abs() <= SPAWN_ROOM
+        && (i32::from(mob.1) - i32::from(at.1)).abs() <= SPAWN_ROOM
+}
+
+/// How many mobs a field holds with few users on it (CField's mob
+/// capacity): one per 128,000 square pixels of the map, at least 800 wide
+/// and 600 high after taking off 450, times its `mobRate`, from 1 to 40.
+/// `bounds` are its footholds' bounds (`Footholds::bounds`), which the
+/// server grows by 10 px on every side.
+pub fn mob_capacity(bounds: Option<(i32, i32, i32, i32)>, mob_rate: f64) -> usize {
+    let (width, height) = bounds.map_or((0, 0), |(left, top, right, bottom)| {
+        (right - left + 20, bottom - top + 20)
+    });
+    let area = f64::from(width.max(800)) * f64::from((height - 450).max(600));
+    ((area * mob_rate * 0.000_007_812_5) as usize).clamp(1, MAX_CAPACITY)
+}
+
+/// Whether every spawn point keeps a mob of its own, as the integration
+/// harness wants (`RUSTMS_FULL_SPAWN=1`): no capacity, no room check, no
+/// first wait for a point with a `mobTime`, and an emptied point fills
+/// again after its `mobTime`, at least `SPAWN_INTERVAL`.
+pub fn full_spawn() -> bool {
+    static FULL: OnceLock<bool> = OnceLock::new();
+    *FULL.get_or_init(|| std::env::var("RUSTMS_FULL_SPAWN").is_ok_and(|full| full == "1"))
 }
 
 fn ranked_damage(damage_by: &HashMap<ClientId, i64>) -> Vec<(ClientId, i64)> {
@@ -1178,7 +1346,7 @@ mod tests {
             ..Default::default()
         }];
         let mut mobs = MobSet::new([(template, info)]);
-        let mob = mobs.respawn(now)[0];
+        let mob = mobs.spawn_all(now)[0];
         let attack1_left = FIRST_ATTACK_ACTION << 1 | 1;
         let walk = act(&mut mobs, mob, NO_ACTION, true);
         assert_eq!(
@@ -1205,7 +1373,7 @@ mod tests {
         assert_eq!(act(&mut mobs, mob, 6 << 1, true).action, 6 << 1);
         // A mob without attacks never may.
         let mut snails = MobSet::new([snail_spawn(100)]);
-        let snail = snails.respawn(now)[0];
+        let snail = snails.spawn_all(now)[0];
         assert!(!act(&mut snails, snail, NO_ACTION, true).next_attack);
     }
 
@@ -1258,7 +1426,7 @@ mod tests {
     fn skills_are_granted_then_cast() {
         let now = Instant::now();
         let mut mobs = MobSet::new([stumpy()]);
-        let mob = mobs.respawn(now)[0];
+        let mob = mobs.spawn_all(now)[0];
         mobs.assign_uncontrolled(1);
         let act = |mobs: &mut MobSet, action, skill_data, want_attack, at, roll| {
             mobs.act(
@@ -1361,14 +1529,14 @@ mod tests {
         let Some(Err(_)) = mobs.damage(1, summoned[0], 100, later) else {
             panic!("the summon should die");
         };
-        assert!(mobs.respawn(later + RESPAWN_DELAY * 10).is_empty());
+        assert!(mobs.respawn(later + SPAWN_INTERVAL * 10, 0).is_empty());
     }
 
     #[test]
     fn area_skills_reach_mobs_the_way_the_caster_faces() {
         let now = Instant::now();
         let mut mobs = MobSet::new([stumpy(), snail_spawn(140), snail_spawn(40)]);
-        let spawned = mobs.respawn(now);
+        let spawned = mobs.spawn_all(now);
         let (caster, ahead, behind) = (spawned[0], spawned[1], spawned[2]);
         let heal = Cast {
             object_id: caster,
@@ -1394,7 +1562,7 @@ mod tests {
         let (template, mut boss) = stumpy();
         boss.boss = true;
         let mut mobs = MobSet::new([stumpy(), (template, boss)]);
-        let spawned = mobs.respawn(now);
+        let spawned = mobs.spawn_all(now);
         let (stumpy, boss) = (spawned[0], spawned[1]);
         assert_eq!(mobs.eat_mp(stumpy, 40), 4);
         assert_eq!(mobs.eat_mp(stumpy, 100), 8);
@@ -1407,7 +1575,7 @@ mod tests {
     fn statuses_wear_off_and_spare_bosses() {
         let now = Instant::now();
         let mut mobs = MobSet::new([snail_spawn(100)]);
-        let snail = mobs.respawn(now)[0];
+        let snail = mobs.spawn_all(now)[0];
         let until = now + Duration::from_secs(10);
         let seal = [(MobStat::Seal, 1), (MobStat::Speed, -20)];
         assert_eq!(
@@ -1436,7 +1604,7 @@ mod tests {
     fn a_taunted_mob_gives_more_exp_until_taunt_wears_off() {
         let now = Instant::now();
         let mut mobs = MobSet::new([snail_spawn(100), snail_spawn(200)]);
-        let snails = mobs.respawn(now);
+        let snails = mobs.spawn_all(now);
         let until = now + Duration::from_secs(120);
         let taunt = [(MobStat::Showdown, 100), (MobStat::Pdr, 100)];
         for &snail in &snails {
@@ -1459,7 +1627,7 @@ mod tests {
         info.revive = vec![100101, 100101];
         info.dying_ms = 600;
         let mut mobs = MobSet::new([(template, info)]);
-        let parent = mobs.respawn(now)[0];
+        let parent = mobs.spawn_all(now)[0];
         mobs.live.get_mut(&parent).unwrap().controller = Some(1);
         let blue = |mob_id| {
             Some(MobInfo {
@@ -1493,7 +1661,7 @@ mod tests {
         info.remove_after = 10;
         info.revive = vec![100101];
         let mut mobs = MobSet::new([(template, info)]);
-        let mob = mobs.respawn(now)[0];
+        let mob = mobs.spawn_all(now)[0];
         let due = now + Duration::from_secs(10);
         assert!(mobs.leave(due - Duration::from_millis(1)).is_empty());
         assert_eq!(mobs.leave(due), [(mob, 1)]);
@@ -1502,10 +1670,7 @@ mod tests {
         assert!(mobs
             .revive(due + Duration::from_secs(5), |_| Some(MobInfo::default()))
             .is_empty());
-        assert!(mobs
-            .respawn(due + RESPAWN_DELAY - Duration::from_millis(1))
-            .is_empty());
-        assert_eq!(mobs.respawn(due + RESPAWN_DELAY).len(), 1);
+        assert_eq!(mobs.respawn(due + Duration::from_secs(5), 0).len(), 1);
     }
 
     #[test]
@@ -1521,7 +1686,7 @@ mod tests {
             remove_after: 90000,
         });
         let mut mobs = MobSet::new([(template, info)]);
-        let boomer = mobs.respawn(now)[0];
+        let boomer = mobs.spawn_all(now)[0];
         assert_eq!(mobs.get(boomer).unwrap().leaves_at, None);
         assert_eq!(mobs.damage(1, boomer, 349, now), Some(Ok(51)));
         let Some(Err(kill)) = mobs.damage(1, boomer, 1, now) else {
@@ -1545,7 +1710,7 @@ mod tests {
             remove_after: 0,
         });
         let mut mobs = MobSet::new([(template, info)]);
-        let bomb = mobs.respawn(now)[0];
+        let bomb = mobs.spawn_all(now)[0];
         assert_eq!(mobs.leave(now), [(bomb, 4)]);
     }
 
@@ -1554,7 +1719,7 @@ mod tests {
         let now = Instant::now();
         let (template, mut info) = snail_spawn(100);
         let mut snails = MobSet::new([(template.clone(), info.clone())]);
-        let snail = snails.respawn(now)[0];
+        let snail = snails.spawn_all(now)[0];
         assert!(!snails.bomb(snail, now));
         info.self_destruct = Some(SelfDestruct {
             action: 3,
@@ -1562,7 +1727,7 @@ mod tests {
             remove_after: 0,
         });
         let mut darkstars = MobSet::new([(template, info)]);
-        let darkstar = darkstars.respawn(now)[0];
+        let darkstar = darkstars.spawn_all(now)[0];
         assert!(darkstars.bomb(darkstar, now));
         assert!(darkstars.get(darkstar).is_none());
         assert!(!darkstars.bomb(darkstar, now));
@@ -1572,7 +1737,7 @@ mod tests {
     fn counters_hurt_their_value_give_or_take_half_the_spread() {
         let now = Instant::now();
         let mut mobs = MobSet::new([snail_spawn(100)]);
-        let snail = mobs.respawn(now)[0];
+        let snail = mobs.spawn_all(now)[0];
         let until = now + Duration::from_secs(10);
         assert_eq!(mobs.counter(snail, MobStat::PCounter, 7), 0);
         let counters = [(MobStat::PCounter, 220), (MobStat::MCounter, 220)];
@@ -1594,7 +1759,7 @@ mod tests {
     fn poison_hurts_each_second_but_never_kills() {
         let now = Instant::now();
         let mut mobs = MobSet::new([snail_spawn(100)]);
-        let snail = mobs.respawn(now)[0];
+        let snail = mobs.spawn_all(now)[0];
         let until = now + Duration::from_secs(10);
         let poison = [(MobStat::Poison, 3), (MobStat::Freeze, 1)];
 
@@ -1646,8 +1811,8 @@ mod tests {
     #[test]
     fn spawn_control_kill_and_respawn() {
         let now = Instant::now();
-        let mut mobs = MobSet::new([snail_spawn(100), snail_spawn(200)]);
-        let spawned = mobs.respawn(now);
+        let mut mobs = MobSet::new([snail_spawn(100), snail_spawn(300)]);
+        let spawned = mobs.start(now);
         assert_eq!(spawned.len(), 2);
         assert_eq!(mobs.assign_uncontrolled(1), spawned);
         assert!(mobs.assign_uncontrolled(2).is_empty());
@@ -1699,9 +1864,9 @@ mod tests {
             "dead mobs take no damage"
         );
 
-        // Comes back after the respawn delay with a new object id.
-        assert!(mobs.respawn(now + Duration::from_secs(1)).is_empty());
-        let back = mobs.respawn(now + RESPAWN_DELAY);
+        // Comes back on the next spawn pass with a new object id.
+        assert!(mobs.respawn(now + Duration::from_secs(1), 0).is_empty());
+        let back = mobs.respawn(now + SPAWN_INTERVAL, 0);
         assert_eq!(back.len(), 1);
         assert_ne!(back[0], snail);
     }
@@ -1709,7 +1874,7 @@ mod tests {
     #[test]
     fn leaving_hands_mobs_to_someone_else() {
         let mut mobs = MobSet::new([snail_spawn(100)]);
-        mobs.respawn(Instant::now());
+        mobs.spawn_all(Instant::now());
         mobs.assign_uncontrolled(1);
         assert_eq!(mobs.release(1, Some(2)).len(), 1);
         assert_eq!(mobs.live().next().unwrap().controller, Some(2));
@@ -1721,7 +1886,7 @@ mod tests {
     fn a_hit_takes_control_with_aggro() {
         let now = Instant::now();
         let mut mobs = MobSet::new([snail_spawn(100)]);
-        let snail = mobs.respawn(now)[0];
+        let snail = mobs.spawn_all(now)[0];
         mobs.assign_uncontrolled(1);
         assert_eq!(mobs.provoke(2, snail, now), Some(Some(1)));
         assert_eq!(mobs.get(snail).unwrap().controller, Some(2));
@@ -1741,7 +1906,7 @@ mod tests {
         let (template, mut info) = snail_spawn(100);
         info.first_attack = true;
         let mut mobs = MobSet::new([(template, info), snail_spawn(200)]);
-        let spawned = mobs.respawn(now);
+        let spawned = mobs.spawn_all(now);
         let (mob, snail) = (spawned[0], spawned[1]);
         mobs.assign_uncontrolled(1);
 
@@ -1769,13 +1934,156 @@ mod tests {
     }
 
     #[test]
-    fn hidden_and_never_respawning_points_stay_empty() {
+    fn hidden_points_stay_empty_and_negative_mob_times_spawn_once() {
+        let now = Instant::now();
         let (mut hidden, info) = snail_spawn(0);
         hidden.hide = true;
-        let (mut never, info2) = snail_spawn(0);
-        never.mob_time = -1;
-        let mut mobs = MobSet::new([(hidden, info), (never, info2)]);
-        assert!(mobs.respawn(Instant::now()).is_empty());
+        let (mut once, info2) = snail_spawn(0);
+        once.mob_time = -1;
+        let mut mobs = MobSet::new([(hidden, info), (once, info2)]);
+        let [mob] = mobs.start(now)[..] else {
+            panic!("the point with a negative mobTime should spawn");
+        };
+        let Some(Err(_)) = mobs.damage(1, mob, 100, now) else {
+            panic!("the snail should die");
+        };
+        assert!(mobs.respawn(now + Duration::from_secs(3600), 0).is_empty());
+    }
+
+    /// Snails without a `mobTime` at `xs`, at y -25 unless given.
+    fn snails(points: &[(i16, i16)]) -> MobSet {
+        let mut mobs = MobSet::new(points.iter().map(|&(x, y)| {
+            let (mut template, info) = snail_spawn(x);
+            template.y = y;
+            (template, info)
+        }));
+        mobs.rng = StdRng::seed_from_u64(7);
+        mobs
+    }
+
+    fn kill(mobs: &mut MobSet, mob: i32, now: Instant) {
+        let Some(Err(_)) = mobs.damage(1, mob, 100, now) else {
+            panic!("mob {mob} should die");
+        };
+    }
+
+    #[test]
+    fn capacity_grows_with_the_map_and_its_mob_rate() {
+        // An 800 by 600 map or smaller.
+        let small: Vec<_> = [0.8, 1.0, 1.2, 1.5, 1.7, 2.0, 3.0]
+            .map(|rate| mob_capacity(None, rate))
+            .into();
+        assert_eq!(small, [3, 3, 4, 5, 6, 7, 11]);
+        // Bounds grow by 10 px a side: 1600 by 1050, less 450.
+        assert_eq!(mob_capacity(Some((0, 0, 1580, 1030)), 1.0), 7);
+        assert_eq!(mob_capacity(Some((0, 0, 9000, 9000)), 1.0), 40);
+        assert_eq!(mob_capacity(None, 0.0), 1);
+    }
+
+    #[test]
+    fn users_raise_the_capacity_up_to_twice() {
+        let at = |capacity, users| {
+            MobSet::default()
+                .with_capacity(capacity)
+                .capacity_for(users)
+        };
+        let small: Vec<_> = (0..=7).map(|users| at(3, users)).collect();
+        assert_eq!(small, [3, 3, 3, 4, 4, 5, 6, 6]);
+        let big: Vec<_> = [5, 6, 7, 10, 19, 20, 50].map(|users| at(10, users)).into();
+        assert_eq!(big, [10, 10, 11, 13, 19, 20, 20]);
+    }
+
+    #[test]
+    fn spawn_passes_fill_up_to_capacity_every_seven_seconds() {
+        let now = Instant::now();
+        let points: Vec<_> = (0..5).map(|i| (i * 300, -25)).collect();
+        let mut mobs = snails(&points).with_capacity(3);
+        let first = mobs.start(now);
+        assert_eq!(first.len(), 3);
+        // A pass with no room doesn't count as one.
+        assert!(mobs.respawn(now + Duration::from_secs(10), 0).is_empty());
+        let later = now + Duration::from_secs(11);
+        kill(&mut mobs, first[0], later);
+        assert_eq!(mobs.respawn(later, 0).len(), 1);
+        kill(&mut mobs, first[1], later);
+        assert!(mobs
+            .respawn(later + SPAWN_INTERVAL - Duration::from_millis(1), 0)
+            .is_empty());
+        assert_eq!(mobs.respawn(later + SPAWN_INTERVAL, 0).len(), 1);
+        // Six users make room for six mobs: five points.
+        assert_eq!(mobs.respawn(later + SPAWN_INTERVAL * 2, 6).len(), 2);
+    }
+
+    #[test]
+    fn points_without_a_mob_time_need_room() {
+        let now = Instant::now();
+        let mut mobs = snails(&[(0, -25), (100, -25), (201, -25), (0, 80)]);
+        let spawned = mobs.start(now);
+        let mut at: Vec<_> = mobs.live().map(|mob| (mob.x, mob.y)).collect();
+        at.sort();
+        // (100, -25) is within 100 px of (0, -25), taken in the same pass.
+        assert_eq!(at, [(0, -25), (0, 80), (201, -25)]);
+        // A live mob crowds it too.
+        let right = spawned
+            .into_iter()
+            .find(|&mob| mobs.get(mob).unwrap().x == 201)
+            .unwrap();
+        kill(&mut mobs, right, now);
+        let back = mobs.respawn(now + SPAWN_INTERVAL, 0);
+        assert_eq!(back.len(), 1);
+        assert_eq!(mobs.get(back[0]).unwrap().x, 201);
+    }
+
+    #[test]
+    fn timed_points_wait_after_loading_and_after_their_mob_goes() {
+        let now = Instant::now();
+        let (mut template, info) = snail_spawn(0);
+        template.mob_time = 100;
+        for seed in 0..20 {
+            let mut mobs = MobSet::new([(template.clone(), info.clone())]);
+            mobs.rng = StdRng::seed_from_u64(seed);
+            // A tenth to seven tenths of its 100 s after loading.
+            assert!(mobs.start(now).is_empty());
+            let early = now + Duration::from_millis(9_999);
+            assert!(mobs.respawn(early, 0).is_empty());
+            let loaded = now + Duration::from_secs(70);
+            let [mob] = mobs.respawn(loaded, 0)[..] else {
+                panic!("the point should fill within 70 s");
+            };
+            // 1.3 to 2 times it after its mob goes.
+            kill(&mut mobs, mob, loaded);
+            let early = loaded + Duration::from_millis(129_999);
+            assert!(mobs.respawn(early, 0).is_empty());
+            assert_eq!(mobs.respawn(loaded + Duration::from_secs(200), 0).len(), 1);
+        }
+    }
+
+    #[test]
+    fn filling_every_point_skips_capacity_room_and_first_waits() {
+        let now = Instant::now();
+        let (mut timed, info) = snail_spawn(0);
+        timed.mob_time = 100;
+        let (mut once, _) = snail_spawn(0);
+        once.mob_time = -1;
+        let mut mobs = MobSet::new([
+            snail_spawn(0),
+            snail_spawn(50),
+            (timed, info.clone()),
+            (once, info),
+        ])
+        .with_capacity(1)
+        .filling_every_point();
+        let spawned = mobs.start(now);
+        assert_eq!(spawned.len(), 4);
+        for &mob in &spawned {
+            kill(&mut mobs, mob, now);
+        }
+        assert!(mobs
+            .respawn(now + SPAWN_INTERVAL - Duration::from_millis(1), 0)
+            .is_empty());
+        assert_eq!(mobs.respawn(now + SPAWN_INTERVAL, 0).len(), 2);
+        assert_eq!(mobs.respawn(now + Duration::from_secs(100), 0).len(), 1);
+        assert!(mobs.respawn(now + Duration::from_secs(3600), 0).is_empty());
     }
 
     #[test]

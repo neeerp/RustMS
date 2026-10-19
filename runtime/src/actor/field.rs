@@ -116,7 +116,7 @@ impl FieldActor {
         mut reactors: ReactorSet,
         tick: Duration,
     ) -> Self {
-        mobs.respawn(Instant::now());
+        mobs.start(Instant::now());
         reactors.respawn(Instant::now());
         Self {
             key,
@@ -218,7 +218,7 @@ impl FieldActor {
                 self.send_control(controller, &[object_id]);
             }
         }
-        let spawned = self.mobs.respawn(now);
+        let spawned = self.mobs.respawn(now, self.occupants.len());
         if spawned.is_empty() {
             return;
         }
@@ -2055,7 +2055,7 @@ mod tests {
     #[tokio::test]
     async fn monster_magnet_shows_its_catches_and_the_caught_chase_the_user() {
         let mut mobs = MobSet::new([mob(100, false), mob(200, true)]);
-        let spawned = mobs.respawn(Instant::now());
+        let spawned = mobs.spawn_all(Instant::now());
         let (tx, rx) = mpsc::channel(16);
         let actor = FieldActor::new(
             FieldKey::new(0, 100000000),
@@ -2105,7 +2105,7 @@ mod tests {
     #[tokio::test]
     async fn drain_takes_a_share_and_mortal_blow_finishes_the_weak() {
         let mut mobs = MobSet::new([mob(100, false)]);
-        let snail = mobs.respawn(Instant::now())[0];
+        let snail = mobs.spawn_all(Instant::now())[0];
         let (tx, rx) = mpsc::channel(16);
         let actor = FieldActor::new(
             FieldKey::new(0, 100000000),
@@ -2178,7 +2178,7 @@ mod tests {
         let (template, mut info) = mob(100, false);
         info.max_hp = 20_000;
         let mut mobs = MobSet::new([(template, info)]);
-        let snail = mobs.respawn(Instant::now())[0];
+        let snail = mobs.spawn_all(Instant::now())[0];
         let mut drops = DropSet::default();
         let now = Instant::now();
         let mut put = |owner, x| {

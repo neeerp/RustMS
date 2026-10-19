@@ -7,10 +7,36 @@ height, `fh`, `f`, `mobTime`, `hide`); `game_data::mobs::MobData` reads their
 templates from `Mob.nx` (`maxHP`, `exp`, `PADamage`, `bodyAttack`,
 `notAttack`, ...). Each `FieldActor` owns a `field_mobs::MobSet`:
 
-- **Spawning:** every visible spawn point (not `hide`, `mobTime` ≥ 0) spawns
-  when the field starts. A killed mob comes back after `mobTime` seconds, at
-  least 7 s, on the field's 100 ms tick, with a new object id (mobs and drops
-  each have a range in `actor::object_ids`). Joining players get SPAWN_MONSTER for every live mob.
+- **Spawning** follows the v83 server's CField::TryCreateMob, as
+  OrionAlpha (a replica of Nexon's server) has it:
+  - A field holds a number of mobs set by its size
+    (`field_mobs::mob_capacity`): one per 128,000 square pixels of its
+    footholds' bounds (`Footholds::bounds`, the client's: 30 px in from the
+    sides, 300 px above the top, 10 px below the bottom; the server adds 10
+    px a side), counted as at least 800 wide and 600 high after taking 450
+    off the height, times `info/mobRate`, from 1 to 40. With more than half
+    that many users on the field it grows, up to twice as many at twice as
+    many users.
+  - At most every 7 s, while the field holds fewer mobs than that, a pass
+    fills spawn points picked at random from those with room, as many as
+    are missing. A pass with nothing missing doesn't count. A point without
+    a `mobTime` has room when no mob, nor a point filled in the same pass,
+    is within 100 px in both x and y. A point with a positive `mobTime`
+    holds one mob: it first fills 0.1 to 0.7 times its `mobTime` after the
+    field loads, and again 1.3 to 2 times it after its mob goes (Mushmom's
+    1800 s: 39 to 60 minutes). A point with a negative `mobTime` (party
+    quest and job maps) fills on the first pass only. `hide` points never
+    do.
+  - The first pass runs as the field loads, with no users, so a field
+    starts at its plain capacity. Fields live on once loaded and keep
+    spawning with nobody on them.
+  - New mobs get new object ids (mobs and drops each have a range in
+    `actor::object_ids`). Joining players get SPAWN_MONSTER for every live
+    mob.
+  - `RUSTMS_FULL_SPAWN=1` (set by the integration harness) gives every
+    spawn point a mob of its own instead: no capacity, no room check and no
+    first wait, and an emptied point fills again after its `mobTime`, at
+    least 7 s.
 - **Revive:** a mob with `info/revive` (the Blue Perfume bottle, Yeti and
   Pepe, ...) lets those mobs out where it died once its `die1` animation is
   over (`MobInfo::dying_ms`, 500 ms without one), as Cosmic does. They fade
