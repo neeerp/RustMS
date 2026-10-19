@@ -58,6 +58,9 @@ pub struct LiveMob {
     pub granted: Option<Grant>,
     /// When each skill it cast may be cast again.
     pub cooldowns: HashMap<i32, Instant>,
+    /// When it leaves on its own (`removeAfter`, or a `selfDestruction`
+    /// without `hp`), if it does.
+    pub leaves_at: Option<Instant>,
 }
 
 /// A mob skill and level the server let a mob cast, and when.
@@ -150,7 +153,21 @@ pub struct Hurt {
 }
 
 impl LiveMob {
-    fn new(object_id: i32, info: MobInfo, at: (i16, i16), stance: u8, foothold: i16) -> Self {
+    fn new(
+        object_id: i32,
+        info: MobInfo,
+        at: (i16, i16),
+        stance: u8,
+        foothold: i16,
+        now: Instant,
+    ) -> Self {
+        // As in Cosmic, a mob that destroys itself without `hp` does so on
+        // its own clock instead.
+        let stays = match info.self_destruct {
+            Some(destruct) if destruct.hp < 0 => Some(destruct.remove_after.max(0)),
+            _ => (info.remove_after > 0).then_some(info.remove_after),
+        };
+        let leaves_at = stays.map(|secs| now + Duration::from_secs(secs as u64));
         Self {
             object_id,
             spawn: None,
@@ -170,7 +187,23 @@ impl LiveMob {
             statuses: BTreeMap::new(),
             granted: None,
             cooldowns: HashMap::new(),
+            leaves_at,
         }
+    }
+
+    /// How it goes when it destroys itself or leaves: KILL_MONSTER's leave
+    /// type, its `selfDestruction` action or else 1, dying.
+    pub fn leave_type(&self) -> u8 {
+        self.info
+            .self_destruct
+            .map_or(1, |destruct| destruct.action)
+    }
+
+    /// Whether it is down to the HP at which it destroys itself.
+    fn destructs(&self) -> bool {
+        self.info
+            .self_destruct
+            .is_some_and(|destruct| destruct.hp >= 0 && self.hp <= i64::from(destruct.hp))
     }
 
     /// Mob stances are even facing right, odd facing left.
@@ -339,12 +372,27 @@ pub struct Kill {
     /// Taunt's Showdown: the percent more EXP (already in `exp`) and drops
     /// it gives.
     pub showdown: i32,
+    /// KILL_MONSTER's leave type: 1 dies, or how it destroyed itself.
+    pub leave: u8,
 }
 
 pub struct MobSet {
     spawns: Vec<SpawnPoint>,
     live: BTreeMap<i32, LiveMob>,
     object_ids: ObjectIds,
+    revivals: Vec<Revival>,
+}
+
+/// Mobs to come out of one that died (`revive`) once it is done dying,
+/// where it died, facing its way, under its controller.
+struct Revival {
+    at: Instant,
+    mob_ids: Vec<i32>,
+    x: i16,
+    y: i16,
+    stance: u8,
+    foothold: i16,
+    controller: Option<ClientId>,
 }
 
 impl Default for MobSet {
@@ -368,6 +416,7 @@ impl MobSet {
                 .collect(),
             live: BTreeMap::new(),
             object_ids: ObjectIds::new(object_ids::MOBS),
+            revivals: Vec::new(),
         }
     }
 
@@ -399,6 +448,7 @@ impl MobSet {
                 // `flip` faces right.
                 if template.flip { 4 } else { 5 },
                 template.foothold,
+                now,
             );
             mob.spawn = Some(index);
             self.live.insert(object_id, mob);
@@ -424,6 +474,11 @@ impl MobSet {
     /// `leaving` stopped controlling its mobs; hand them to `next` if any.
     /// Returns the mobs that changed hands.
     pub fn release(&mut self, leaving: ClientId, next: Option<ClientId>) -> Vec<i32> {
+        for revival in &mut self.revivals {
+            if revival.controller == Some(leaving) {
+                revival.controller = next;
+            }
+        }
         self.live
             .values_mut()
             .filter(|mob| mob.controller == Some(leaving))
@@ -625,7 +680,13 @@ impl MobSet {
     /// The mobs `summoner` calls up: as many of `summoned` as its `limit`
     /// (0 for none) leaves room for, where it stands, facing its way, and
     /// under its controller. They never respawn.
-    pub fn summon(&mut self, summoner: i32, summoned: &[MobInfo], limit: i32) -> Vec<i32> {
+    pub fn summon(
+        &mut self,
+        summoner: i32,
+        summoned: &[MobInfo],
+        limit: i32,
+        now: Instant,
+    ) -> Vec<i32> {
         let Some(caster) = self.live.get(&summoner) else {
             return Vec::new();
         };
@@ -648,11 +709,33 @@ impl MobSet {
         let mut spawned = Vec::new();
         for info in summoned.iter().take(room) {
             let object_id = self.object_ids.next();
-            let mut mob = LiveMob::new(object_id, info.clone(), at, stance, foothold);
+            let mut mob = LiveMob::new(object_id, info.clone(), at, stance, foothold, now);
             mob.summoner = Some(summoner);
             mob.controller = controller;
             self.live.insert(object_id, mob);
             spawned.push(object_id);
+        }
+        spawned
+    }
+
+    /// Bring out the mobs due to come out of ones that died, as `info`
+    /// has them; returns their object ids. They never respawn.
+    pub fn revive(&mut self, now: Instant, info: impl Fn(i32) -> Option<MobInfo>) -> Vec<i32> {
+        let (due, waiting): (Vec<_>, _) = std::mem::take(&mut self.revivals)
+            .into_iter()
+            .partition(|revival| revival.at <= now);
+        self.revivals = waiting;
+        let mut spawned = Vec::new();
+        for revival in due {
+            for info in revival.mob_ids.iter().filter_map(|&mob_id| info(mob_id)) {
+                let object_id = self.object_ids.next();
+                let at = (revival.x, revival.y);
+                let mut mob =
+                    LiveMob::new(object_id, info, at, revival.stance, revival.foothold, now);
+                mob.controller = revival.controller;
+                self.live.insert(object_id, mob);
+                spawned.push(object_id);
+            }
         }
         spawned
     }
@@ -813,23 +896,30 @@ impl MobSet {
         let dealt = damage.clamp(0, mob.hp);
         mob.hp -= dealt;
         *mob.damage_by.entry(from).or_default() += dealt;
-        if mob.hp > 0 {
+        // One that destroys itself does so once a hit leaves it at its `hp`,
+        // and counts as killed, as in Cosmic.
+        let destructs = mob.destructs();
+        if mob.hp > 0 && !destructs {
             return Some(Ok(mob.hp_percent()));
         }
+        let leave = if destructs { mob.leave_type() } else { 1 };
         let mob = self.live.remove(&object_id)?;
+        self.emptied(mob.spawn, now);
         let showdown = mob
             .statuses
             .get(&MobStat::Showdown)
             .filter(|status| status.until > now)
             .map_or(0, |status| i32::from(status.value).max(0));
-        if let Some(spawn) = mob.spawn.map(|index| &mut self.spawns[index]) {
-            spawn.alive = None;
-            let delay = if spawn.template.mob_time > 0 {
-                Duration::from_secs(spawn.template.mob_time as u64).max(RESPAWN_DELAY)
-            } else {
-                RESPAWN_DELAY
-            };
-            spawn.next_spawn = Some(now + delay);
+        if !mob.info.revive.is_empty() {
+            self.revivals.push(Revival {
+                at: now + Duration::from_millis(mob.info.dying_ms.max(0) as u64),
+                mob_ids: mob.info.revive.clone(),
+                x: mob.x,
+                y: mob.y,
+                stance: mob.stance,
+                foothold: mob.foothold,
+                controller: mob.controller,
+            });
         }
         Some(Err(Kill {
             object_id,
@@ -840,7 +930,60 @@ impl MobSet {
             level: mob.info.level,
             damage_by: ranked_damage(&mob.damage_by),
             showdown,
+            leave,
         }))
+    }
+
+    /// Take away the mobs whose time is up (`removeAfter`); returns their
+    /// object ids and leave types. As in Cosmic, they give no EXP or drops
+    /// and let nothing out, and their spawn points fill again as after a
+    /// kill.
+    pub fn leave(&mut self, now: Instant) -> Vec<(i32, u8)> {
+        let gone: Vec<(i32, u8)> = self
+            .live
+            .values()
+            .filter(|mob| mob.leaves_at.is_some_and(|at| at <= now))
+            .map(|mob| (mob.object_id, mob.leave_type()))
+            .collect();
+        for &(object_id, _) in &gone {
+            if let Some(mob) = self.live.remove(&object_id) {
+                self.emptied(mob.spawn, now);
+            }
+        }
+        gone
+    }
+
+    /// A client says a mob that bombs (`selfDestruction` action 3, the
+    /// Darkstars Papulatus calls) has a player in reach: take it away as if
+    /// it left. Returns whether it was there to take.
+    pub fn bomb(&mut self, object_id: i32, now: Instant) -> bool {
+        let bombs = self
+            .live
+            .get(&object_id)
+            .and_then(|mob| mob.info.self_destruct)
+            .is_some_and(|destruct| destruct.bombs());
+        if !bombs {
+            return false;
+        }
+        if let Some(mob) = self.live.remove(&object_id) {
+            self.emptied(mob.spawn, now);
+        }
+        true
+    }
+
+    /// The mob from spawn point `spawn`, if it had one, is gone: it spawns
+    /// again after its `mobTime`, at least `RESPAWN_DELAY`.
+    fn emptied(&mut self, spawn: Option<usize>, now: Instant) {
+        let Some(spawn) = spawn.map(|index| &mut self.spawns[index]) else {
+            return;
+        };
+        spawn.alive = None;
+        let delay = if spawn.template.mob_time > 0 {
+            Duration::from_secs(spawn.template.mob_time as u64).max(RESPAWN_DELAY)
+        } else {
+            RESPAWN_DELAY
+        };
+        spawn.next_spawn = Some(now + delay);
     }
 }
 
@@ -869,8 +1012,6 @@ pub struct ExpShare {
     pub exp: i32,
     /// Extra EXP for hunting with a party, shown separately.
     pub party_bonus: i32,
-    /// Whether they hit the mob, and so roll its loot.
-    pub attacked: bool,
 }
 
 /// Party members share a party's EXP when within this many levels of the
@@ -893,7 +1034,7 @@ pub fn split_exp(
     sharers: &[Sharer],
 ) -> Vec<ExpShare> {
     let total: i64 = damage_by.iter().map(|(_, damage)| damage).sum();
-    if total <= 0 || exp <= 0 {
+    if total <= 0 {
         return Vec::new();
     }
     let per_damage = f64::from(exp) / total as f64;
@@ -911,7 +1052,6 @@ pub fn split_exp(
                 client,
                 exp: round(damage as f64 * per_damage),
                 party_bonus: 0,
-                attacked: true,
             }),
         }
     }
@@ -948,7 +1088,6 @@ pub fn split_exp(
                 client: member.client,
                 exp: round(exp),
                 party_bonus: round(exp * bonus_rate),
-                attacked: attackers.iter().any(|(a, _)| a.client == member.client),
             });
         }
     }
@@ -958,6 +1097,7 @@ pub fn split_exp(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use game_data::mobs::SelfDestruct;
 
     /// A move with `action`, in a world without mob skills.
     fn act(mobs: &mut MobSet, object_id: i32, action: u8, want_attack: bool) -> MobAct {
@@ -1140,6 +1280,7 @@ mod tests {
             mob,
             &[snail_spawn(0).1, snail_spawn(0).1, snail_spawn(0).1],
             2,
+            now,
         );
         assert_eq!(summoned.len(), 2);
         let summon = mobs.get(summoned[0]).unwrap();
@@ -1148,7 +1289,7 @@ mod tests {
             (Some(mob), None, Some(2))
         );
         assert_eq!((summon.x, summon.y), (100, -25));
-        assert!(mobs.summon(mob, &[snail_spawn(0).1], 2).is_empty());
+        assert!(mobs.summon(mob, &[snail_spawn(0).1], 2, now).is_empty());
         // Hurt below half, only Heal remains while the summons live, and
         // only with MP for it.
         let later = now + GRANT_TIMEOUT;
@@ -1260,6 +1401,122 @@ mod tests {
             panic!("the snail should die");
         };
         assert_eq!((kill.exp, kill.showdown), (3, 0));
+    }
+
+    #[test]
+    fn a_dead_mob_lets_its_revive_out_once_done_dying() {
+        let now = Instant::now();
+        let (template, mut info) = snail_spawn(100);
+        info.revive = vec![100101, 100101];
+        info.dying_ms = 600;
+        let mut mobs = MobSet::new([(template, info)]);
+        let parent = mobs.respawn(now)[0];
+        mobs.live.get_mut(&parent).unwrap().controller = Some(1);
+        let blue = |mob_id| {
+            Some(MobInfo {
+                mob_id,
+                max_hp: 15,
+                ..MobInfo::default()
+            })
+        };
+        assert!(mobs.damage(1, parent, 8, now).unwrap().is_err());
+        // Its controller leaves while it dies: the next one gets them.
+        mobs.release(1, Some(2));
+        assert!(mobs
+            .revive(now + Duration::from_millis(599), blue)
+            .is_empty());
+        let revived = mobs.revive(now + Duration::from_millis(600), blue);
+        assert_eq!(revived.len(), 2);
+        for object_id in revived {
+            let mob = mobs.get(object_id).unwrap();
+            assert_eq!(
+                (mob.info.mob_id, (mob.x, mob.y), mob.spawn, mob.controller),
+                (100101, (100, -25), None, Some(2))
+            );
+        }
+        assert!(mobs.revive(now + Duration::from_secs(5), blue).is_empty());
+    }
+
+    #[test]
+    fn a_mob_with_remove_after_leaves_on_time_and_comes_back() {
+        let now = Instant::now();
+        let (template, mut info) = snail_spawn(100);
+        info.remove_after = 10;
+        info.revive = vec![100101];
+        let mut mobs = MobSet::new([(template, info)]);
+        let mob = mobs.respawn(now)[0];
+        let due = now + Duration::from_secs(10);
+        assert!(mobs.leave(due - Duration::from_millis(1)).is_empty());
+        assert_eq!(mobs.leave(due), [(mob, 1)]);
+        assert!(mobs.get(mob).is_none());
+        // Nothing comes out of it, and its spawn point fills again.
+        assert!(mobs
+            .revive(due + Duration::from_secs(5), |_| Some(MobInfo::default()))
+            .is_empty());
+        assert!(mobs
+            .respawn(due + RESPAWN_DELAY - Duration::from_millis(1))
+            .is_empty());
+        assert_eq!(mobs.respawn(due + RESPAWN_DELAY).len(), 1);
+    }
+
+    #[test]
+    fn a_mob_destroys_itself_once_down_to_its_hp() {
+        let now = Instant::now();
+        let (template, mut info) = snail_spawn(100);
+        // A Boomer: 700 HP, gone at 350 with an explosion.
+        info.max_hp = 700;
+        info.exp = 55;
+        info.self_destruct = Some(SelfDestruct {
+            action: 5,
+            hp: 350,
+            remove_after: 90000,
+        });
+        let mut mobs = MobSet::new([(template, info)]);
+        let boomer = mobs.respawn(now)[0];
+        assert_eq!(mobs.get(boomer).unwrap().leaves_at, None);
+        assert_eq!(mobs.damage(1, boomer, 349, now), Some(Ok(51)));
+        let Some(Err(kill)) = mobs.damage(1, boomer, 1, now) else {
+            panic!("the boomer should go");
+        };
+        assert_eq!(
+            (kill.leave, kill.exp, kill.damage_by),
+            (5, 55, vec![(1, 350)])
+        );
+        assert!(!mobs.bomb(boomer, now));
+    }
+
+    #[test]
+    fn a_mob_without_its_hp_destroys_itself_on_its_clock() {
+        let now = Instant::now();
+        let (template, mut info) = snail_spawn(100);
+        // A Bomb goes off as soon as it comes.
+        info.self_destruct = Some(SelfDestruct {
+            action: 4,
+            hp: -1,
+            remove_after: 0,
+        });
+        let mut mobs = MobSet::new([(template, info)]);
+        let bomb = mobs.respawn(now)[0];
+        assert_eq!(mobs.leave(now), [(bomb, 4)]);
+    }
+
+    #[test]
+    fn only_a_mob_that_bombs_goes_on_mob_bomb() {
+        let now = Instant::now();
+        let (template, mut info) = snail_spawn(100);
+        let mut snails = MobSet::new([(template.clone(), info.clone())]);
+        let snail = snails.respawn(now)[0];
+        assert!(!snails.bomb(snail, now));
+        info.self_destruct = Some(SelfDestruct {
+            action: 3,
+            hp: 5000,
+            remove_after: 0,
+        });
+        let mut darkstars = MobSet::new([(template, info)]);
+        let darkstar = darkstars.respawn(now)[0];
+        assert!(darkstars.bomb(darkstar, now));
+        assert!(darkstars.get(darkstar).is_none());
+        assert!(!darkstars.bomb(darkstar, now));
     }
 
     #[test]
@@ -1378,6 +1635,10 @@ mod tests {
         let shares = split_exp(kill.exp, kill.level, &kill.damage_by, &[solo(1), solo(2)]);
         let exp: Vec<_> = shares.iter().map(|s| (s.client, s.exp)).collect();
         assert_eq!(exp, [(2, 2), (1, 1)]);
+        // A mob worth no EXP still counts for its attackers.
+        let shares = split_exp(0, kill.level, &kill.damage_by, &[solo(1), solo(2)]);
+        let exp: Vec<_> = shares.iter().map(|s| (s.client, s.exp)).collect();
+        assert_eq!(exp, [(2, 0), (1, 0)]);
         assert!(mobs.get(snail).is_none());
         assert!(
             mobs.damage(1, snail, 1, now).is_none(),
@@ -1488,19 +1749,16 @@ mod tests {
                     client: 1,
                     exp: 48,
                     party_bonus: 5,
-                    attacked: true,
                 },
                 ExpShare {
                     client: 2,
                     exp: 32,
                     party_bonus: 3,
-                    attacked: false,
                 },
                 ExpShare {
                     client: 5,
                     exp: 20,
                     party_bonus: 0,
-                    attacked: true,
                 },
             ]
         );

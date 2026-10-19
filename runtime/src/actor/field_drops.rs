@@ -9,7 +9,7 @@ use net::ClientId;
 use std::collections::BTreeMap;
 use tokio::time::{Duration, Instant};
 
-/// How long only the killer may pick a drop up.
+/// How long only the killer, or their party, may pick a drop up.
 pub const OWNERSHIP: Duration = Duration::from_secs(15);
 /// How long a drop lies on the ground.
 pub const LIFETIME: Duration = Duration::from_secs(180);
@@ -17,12 +17,28 @@ pub const LIFETIME: Duration = Duration::from_secs(180);
 const REACH: (i32, i32) = (800, 600);
 /// Spacing between drops from one kill.
 const SPREAD: i16 = 25;
+/// Spacing between drops a boss flings out (`explosiveReward`).
+const EXPLOSIVE_SPREAD: i16 = 40;
+
+/// Who may pick a drop up before `OWNERSHIP` runs out: the v83 ownership
+/// type, which its client reads as 0 (the owner, by character id), 1 (the
+/// owner's party, by party id), 2 (anyone) or 3 (anyone, flung out).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Ownership {
+    Owner,
+    Party(i32),
+    /// A mob with `publicReward`.
+    FreeForAll,
+    /// A mob with `explosiveReward`.
+    Explosive,
+}
 
 #[derive(Clone, Debug)]
 pub struct Drop {
     pub object_id: i32,
     pub loot: Loot,
     pub owner: ClientId,
+    pub ownership: Ownership,
     pub x: i16,
     pub y: i16,
     pub dropper: i32,
@@ -42,11 +58,16 @@ impl Drop {
             object_id: self.object_id,
             item_or_meso,
             meso,
-            owner: self.owner,
-            ownership: if !self.player_drop && now < self.dropped_at + OWNERSHIP {
-                0
-            } else {
-                2
+            owner: match self.ownership {
+                Ownership::Party(party) if self.owned(now) => party,
+                _ => self.owner,
+            },
+            ownership: match self.ownership {
+                Ownership::Explosive => 3,
+                _ if !self.owned(now) => 2,
+                Ownership::Owner => 0,
+                Ownership::Party(_) => 1,
+                Ownership::FreeForAll => 2,
             },
             x: self.x,
             y: self.y,
@@ -59,6 +80,27 @@ impl Drop {
     pub fn visible_to(&self, client: ClientId) -> bool {
         self.loot.quest().is_none() || self.owner == client
     }
+
+    /// Still kept for its owner or their party.
+    fn owned(&self, now: Instant) -> bool {
+        !self.player_drop && now < self.dropped_at + OWNERSHIP
+    }
+
+    /// Whether `client`, in `party`, may pick it up: quest items only their
+    /// owner, others whoever its ownership allows until it runs out.
+    fn takeable_by(&self, client: ClientId, party: Option<i32>, now: Instant) -> bool {
+        if self.owner == client {
+            return true;
+        }
+        if self.loot.quest().is_some() {
+            return false;
+        }
+        match self.ownership {
+            Ownership::Owner => !self.owned(now),
+            Ownership::Party(owners) => party == Some(owners) || !self.owned(now),
+            Ownership::FreeForAll | Ownership::Explosive => true,
+        }
+    }
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -68,6 +110,8 @@ pub enum PickupError {
     NotYours,
     /// A pet without the item for it, or a drop a player threw away.
     NotForPets,
+    /// Nobody may pick it up (`pickUpBlock`).
+    Blocked,
 }
 
 pub struct DropSet {
@@ -98,20 +142,27 @@ impl DropSet {
 
     /// Spread `loot` around (x, y), each on the ground below its place (see
     /// `Footholds::drop_position`), and return the new drops.
+    #[allow(clippy::too_many_arguments)]
     pub fn spawn(
         &mut self,
         loot: Vec<Loot>,
         owner: ClientId,
+        ownership: Ownership,
         x: i16,
         y: i16,
         dropper: i32,
         now: Instant,
     ) -> Vec<&Drop> {
         let count = loot.len() as i16;
+        let spread = if ownership == Ownership::Explosive {
+            EXPLOSIVE_SPREAD
+        } else {
+            SPREAD
+        };
         let mut ids = Vec::new();
         for (index, loot) in loot.into_iter().enumerate() {
             let object_id = self.object_ids.next();
-            let offset = (index as i16 * 2 - (count - 1)) * SPREAD / 2;
+            let offset = (index as i16 * 2 - (count - 1)) * spread / 2;
             let (drop_x, drop_y) = self
                 .footholds
                 .drop_position((x, y), x.saturating_add(offset));
@@ -121,6 +172,7 @@ impl DropSet {
                     object_id,
                     loot,
                     owner,
+                    ownership,
                     x: drop_x,
                     y: drop_y,
                     dropper,
@@ -140,6 +192,7 @@ impl DropSet {
             object_id,
             loot,
             owner,
+            ownership: Ownership::Owner,
             x,
             y,
             dropper: 0,
@@ -153,24 +206,26 @@ impl DropSet {
         self.object_ids.next()
     }
 
-    /// Take a drop for `client` standing at (x, y).
+    /// Take a drop for `client`, in `party`, standing at (x, y).
     pub fn take(
         &mut self,
         client: ClientId,
+        party: Option<i32>,
         object_id: i32,
         x: i16,
         y: i16,
         now: Instant,
     ) -> Result<Drop, PickupError> {
         let drop = self.drops.get(&object_id).ok_or(PickupError::Gone)?;
+        if drop.loot.blocked() {
+            return Err(PickupError::Blocked);
+        }
         if (i32::from(drop.x) - i32::from(x)).abs() > REACH.0
             || (i32::from(drop.y) - i32::from(y)).abs() > REACH.1
         {
             return Err(PickupError::TooFar);
         }
-        let owned =
-            drop.loot.quest().is_some() || (!drop.player_drop && now < drop.dropped_at + OWNERSHIP);
-        if owned && drop.owner != client {
+        if !drop.takeable_by(client, party, now) {
             return Err(PickupError::NotYours);
         }
         self.drops.remove(&object_id).ok_or(PickupError::Gone)
@@ -182,6 +237,7 @@ impl DropSet {
     pub fn take_for_pet(
         &mut self,
         client: ClientId,
+        party: Option<i32>,
         object_id: i32,
         (x, y): (i16, i16),
         now: Instant,
@@ -196,7 +252,7 @@ impl DropSet {
         if drop.player_drop || !wanted {
             return Err(PickupError::NotForPets);
         }
-        self.take(client, object_id, x, y, now)
+        self.take(client, party, object_id, x, y, now)
     }
 
     /// Put back a drop that couldn't be picked up (a full inventory).
@@ -238,6 +294,7 @@ mod tests {
                     },
                 ],
                 1,
+                Ownership::Owner,
                 100,
                 0,
                 9,
@@ -249,22 +306,22 @@ mod tests {
         assert_eq!(ids.len(), 2);
         assert_eq!(drops.all().map(|d| d.x).collect::<Vec<_>>(), [88, 112]);
         assert_eq!(
-            drops.take(2, ids[0], 100, 0, now).unwrap_err(),
+            drops.take(2, None, ids[0], 100, 0, now).unwrap_err(),
             PickupError::NotYours
         );
         assert_eq!(
-            drops.take(1, ids[0], 2000, 0, now).unwrap_err(),
+            drops.take(1, None, ids[0], 2000, 0, now).unwrap_err(),
             PickupError::TooFar
         );
         assert_eq!(
-            drops.take(1, ids[0], 100, 0, now).unwrap().loot,
+            drops.take(1, None, ids[0], 100, 0, now).unwrap().loot,
             Loot::Mesos(5)
         );
         assert_eq!(
-            drops.take(1, ids[0], 100, 0, now).unwrap_err(),
+            drops.take(1, None, ids[0], 100, 0, now).unwrap_err(),
             PickupError::Gone
         );
-        assert!(drops.take(2, ids[1], 100, 0, now + OWNERSHIP).is_ok());
+        assert!(drops.take(2, None, ids[1], 100, 0, now + OWNERSHIP).is_ok());
     }
 
     #[test]
@@ -282,6 +339,7 @@ mod tests {
                     },
                 ],
                 1,
+                Ownership::Owner,
                 100,
                 0,
                 9,
@@ -295,25 +353,70 @@ mod tests {
         // A meso magnet alone leaves items, and no pet takes what was thrown.
         assert_eq!(
             drops
-                .take_for_pet(1, ids[1], at, now, true, false)
+                .take_for_pet(1, None, ids[1], at, now, true, false)
                 .unwrap_err(),
             PickupError::NotForPets
         );
         assert_eq!(
             drops
-                .take_for_pet(1, thrown, at, now, true, true)
+                .take_for_pet(1, None, thrown, at, now, true, true)
                 .unwrap_err(),
             PickupError::NotForPets
         );
         // Someone else's pet waits for the owner's time to pass.
         assert_eq!(
             drops
-                .take_for_pet(2, ids[0], at, now, true, true)
+                .take_for_pet(2, None, ids[0], at, now, true, true)
                 .unwrap_err(),
             PickupError::NotYours
         );
-        let drop = drops.take_for_pet(1, ids[0], at, now, true, false).unwrap();
+        let drop = drops
+            .take_for_pet(1, None, ids[0], at, now, true, false)
+            .unwrap();
         assert_eq!(drop.loot, Loot::Mesos(5));
+    }
+
+    #[test]
+    fn party_drops_are_the_partys_and_boss_drops_anyones() {
+        let now = Instant::now();
+        let mut drops = DropSet::default();
+        let party =
+            drops.spawn(vec![Loot::Mesos(5)], 1, Ownership::Party(7), 0, 0, 9, now)[0].object_id;
+        let view = |drops: &DropSet, id, at| {
+            let view = drops.all().find(|d| d.object_id == id).unwrap().view(at);
+            (view.owner, view.ownership)
+        };
+        // The client goes by the party id until the time runs out.
+        assert_eq!(view(&drops, party, now), (7, 1));
+        assert_eq!(view(&drops, party, now + OWNERSHIP), (1, 2));
+        assert_eq!(
+            drops.take(2, Some(8), party, 0, 0, now).unwrap_err(),
+            PickupError::NotYours
+        );
+        assert!(drops.take(2, Some(7), party, 0, 0, now).is_ok());
+
+        let public =
+            drops.spawn(vec![Loot::Mesos(5)], 1, Ownership::FreeForAll, 0, 0, 9, now)[0].object_id;
+        assert_eq!(view(&drops, public, now), (1, 2));
+        assert!(drops.take(2, None, public, 0, 0, now).is_ok());
+
+        // Flung wider than the usual 25 apart.
+        let flung: Vec<(i32, i16)> = drops
+            .spawn(
+                vec![Loot::Mesos(5), Loot::Mesos(6)],
+                1,
+                Ownership::Explosive,
+                0,
+                0,
+                9,
+                now,
+            )
+            .iter()
+            .map(|d| (d.object_id, d.x))
+            .collect();
+        assert_eq!(flung.iter().map(|&(_, x)| x).collect::<Vec<_>>(), [-20, 20]);
+        assert_eq!(view(&drops, flung[0].0, now), (1, 3));
+        assert!(drops.take(2, None, flung[0].0, 0, 0, now).is_ok());
     }
 
     #[test]
@@ -329,7 +432,7 @@ mod tests {
             (2, 0, true)
         );
         assert_eq!(
-            drops.take(2, id, 40, 7, now).unwrap().loot,
+            drops.take(2, None, id, 40, 7, now).unwrap().loot,
             Loot::Dropped(item)
         );
     }
@@ -345,6 +448,7 @@ mod tests {
                 quest: Some(1035),
             }],
             1,
+            Ownership::Owner,
             0,
             0,
             9,
@@ -354,7 +458,9 @@ mod tests {
         let drop = drops.all().next().unwrap();
         assert!(drop.visible_to(1) && !drop.visible_to(2));
         assert_eq!(
-            drops.take(2, id, 0, 0, now + OWNERSHIP * 2).unwrap_err(),
+            drops
+                .take(2, None, id, 0, 0, now + OWNERSHIP * 2)
+                .unwrap_err(),
             PickupError::NotYours
         );
         assert_eq!(drops.expire(now + LIFETIME), [id]);
@@ -391,6 +497,7 @@ mod tests {
         drops.spawn(
             vec![Loot::Mesos(5), Loot::Mesos(6), Loot::Mesos(7)],
             1,
+            Ownership::Owner,
             0,
             195,
             9,

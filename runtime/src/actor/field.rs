@@ -1,4 +1,4 @@
-use crate::actor::field_drops::{Drop, DropSet};
+use crate::actor::field_drops::{Drop, DropSet, Ownership};
 use crate::actor::field_mists::MistSet;
 use crate::actor::field_mobs::{split_exp, Cast, MobSet, Sharer};
 use crate::actor::field_reactors::{Hit, ReactorSet};
@@ -152,8 +152,8 @@ impl FieldActor {
         }
     }
 
-    /// Advance time-driven field state: drop expiry and mob and reactor
-    /// respawns.
+    /// Advance time-driven field state: drop expiry, mobs leaving or coming
+    /// out of dead ones, and mob and reactor respawns.
     fn on_tick(&mut self, now: Instant) {
         self.run_trips();
         for object_id in self.drops.expire(now) {
@@ -198,6 +198,22 @@ impl FieldActor {
         for (object_id, lost) in self.mobs.expire_statuses(now) {
             if let Ok(packet) = build_mob_stat_reset(object_id, &lost) {
                 self.broadcast(None, packet);
+            }
+        }
+        for (object_id, leave) in self.mobs.leave(now) {
+            if let Ok(packet) = build_kill_mob(object_id, leave) {
+                self.broadcast(None, packet);
+            }
+        }
+        for object_id in self.mobs.revive(now, net::mobs::info) {
+            let Some(mob) = self.mobs.get(object_id) else {
+                continue;
+            };
+            if let Ok(packet) = build_spawn_mob(&mob.view(true)) {
+                self.broadcast(None, packet);
+            }
+            if let Some(controller) = mob.controller {
+                self.send_control(controller, &[object_id]);
             }
         }
         let spawned = self.mobs.respawn(now);
@@ -365,6 +381,7 @@ impl FieldActor {
                     object_id,
                     distance,
                 } => self.handle_mob_distance(from, object_id, distance),
+                FieldRequest::MobBomb { object_id } => self.handle_mob_bomb(object_id),
                 FieldRequest::NpcAction { object_id, action } => {
                     self.handle_npc_action(from, object_id, &action)
                 }
@@ -442,9 +459,10 @@ impl FieldActor {
                     items,
                 } => {
                     let now = Instant::now();
-                    let taken = self
-                        .drops
-                        .take_for_pet(from, object_id, (x, y), now, mesos, items);
+                    let party = self.occupants.get(&from).and_then(|o| o.party);
+                    let taken =
+                        self.drops
+                            .take_for_pet(from, party, object_id, (x, y), now, mesos, items);
                     if let (Ok(drop), Some(occupant)) = (taken, self.occupants.get(&from)) {
                         occupant
                             .handle
@@ -463,11 +481,12 @@ impl FieldActor {
             },
             FieldMessage::SpawnLoot {
                 owner,
+                ownership,
                 loot,
                 x,
                 y,
                 dropper,
-            } => self.spawn_loot(owner, loot, x, y, dropper),
+            } => self.spawn_loot(owner, ownership, loot, x, y, dropper),
             FieldMessage::PetLooted {
                 looter,
                 pet,
@@ -617,6 +636,7 @@ impl FieldActor {
     fn spawn_loot(
         &mut self,
         owner: ClientId,
+        ownership: Ownership,
         loot: Vec<net::loot::Loot>,
         x: i16,
         y: i16,
@@ -625,7 +645,7 @@ impl FieldActor {
         let now = Instant::now();
         let packets: Vec<(Drop, Packet)> = self
             .drops
-            .spawn(loot, owner, x, y, dropper, now)
+            .spawn(loot, owner, ownership, x, y, dropper, now)
             .into_iter()
             .filter_map(|drop| {
                 build_drop(&drop.view(now), DropAppearance::Falling { from: (x, y) })
@@ -691,6 +711,7 @@ impl FieldActor {
                 object_id: self.drops.next_object_id(),
                 loot,
                 owner: from,
+                ownership: Ownership::Owner,
                 x,
                 y,
                 dropper: 0,
@@ -721,7 +742,10 @@ impl FieldActor {
             return;
         };
         let handle = occupant.handle.clone();
-        match self.drops.take(from, object_id, x, y, Instant::now()) {
+        match self
+            .drops
+            .take(from, occupant.party, object_id, x, y, Instant::now())
+        {
             Ok(drop) => {
                 if let Ok(packet) = build_remove_drop(object_id, Some(from)) {
                     self.send_drop_packet(&drop, packet);
@@ -827,7 +851,7 @@ impl FieldActor {
                     }
                 }
                 Some(Err(kill)) => {
-                    if let Ok(packet) = build_kill_mob(kill.object_id, 1) {
+                    if let Ok(packet) = build_kill_mob(kill.object_id, kill.leave) {
                         self.broadcast(None, packet);
                     }
                     let sharers: Vec<Sharer> = self
@@ -839,6 +863,8 @@ impl FieldActor {
                             party: occupant.party,
                         })
                         .collect();
+                    // One roll per kill, for whoever hit it hardest.
+                    let looter = kill.damage_by.first().map(|&(client, _)| client);
                     for share in split_exp(kill.exp, kill.level, &kill.damage_by, &sharers) {
                         if let Some(occupant) = self.occupants.get(&share.client) {
                             occupant.handle.send(ServerMessage::MobKilled {
@@ -846,7 +872,7 @@ impl FieldActor {
                                 object_id: kill.object_id,
                                 exp: share.exp,
                                 party_bonus: share.party_bonus,
-                                attacked: share.attacked,
+                                looter: looter == Some(share.client),
                                 x: kill.x,
                                 y: kill.y,
                                 showdown: kill.showdown,
@@ -1251,7 +1277,9 @@ impl FieldActor {
                     .iter()
                     .filter_map(|&mob_id| net::mobs::info(mob_id))
                     .collect();
-                let spawned = self.mobs.summon(cast.object_id, &summoned, effect.limit);
+                let spawned = self
+                    .mobs
+                    .summon(cast.object_id, &summoned, effect.limit, now);
                 let summon_effect = u8::try_from(effect.summon_effect).ok();
                 for object_id in spawned {
                     let Some(mob) = self.mobs.get(object_id) else {
@@ -1469,6 +1497,18 @@ impl FieldActor {
             return;
         };
         self.hand_over(object_id, previous, from, &handle, false);
+    }
+
+    /// A client says a Darkstar has a player in reach: it blows up, giving
+    /// nothing, as in Cosmic, with leave type 4 so every client plays its
+    /// explosion and the players it reaches get hit.
+    fn handle_mob_bomb(&mut self, object_id: i32) {
+        if !self.mobs.bomb(object_id, Instant::now()) {
+            return;
+        }
+        if let Ok(packet) = build_kill_mob(object_id, 4) {
+            self.broadcast(None, packet);
+        }
     }
 
     /// Tell `previous` it no longer moves the mob, and `to` that it does.

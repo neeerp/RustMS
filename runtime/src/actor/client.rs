@@ -1018,14 +1018,14 @@ impl ClientActor {
                 object_id,
                 exp,
                 party_bonus,
-                attacked,
+                looter,
                 x,
                 y,
                 showdown,
             } => {
                 self.mob_killed(mob_id, exp, party_bonus).await?;
                 self.count_quest_kill(mob_id).await?;
-                if attacked {
+                if looter {
                     self.drop_loot(mob_id, showdown, object_id, x, y).await?
                 }
             }

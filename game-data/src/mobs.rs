@@ -31,6 +31,10 @@ pub struct MobInfo {
     pub fixed_damage: i32,
     /// Power Guard sends nothing back at it (`invincible`).
     pub invincible: bool,
+    /// Anyone may pick its drops up at once (`publicReward`).
+    pub public_reward: bool,
+    /// Its drops fly out wide, anyone's at once (`explosiveReward`).
+    pub explosive_reward: bool,
     /// How each element hurts it (`elemAttr`): pairs of an element letter
     /// and a degree, `1` for immune, as "I1S2".
     pub element: String,
@@ -41,6 +45,38 @@ pub struct MobInfo {
     pub skills: Vec<MobSkillEntry>,
     /// Where its Banish sends players (`ban`).
     pub banish: Option<Banish>,
+    /// The mobs that come out of it where it dies (`revive`), in order.
+    pub revive: Vec<i32>,
+    /// How long it takes to die, in ms: its `die1` frames' delays (100 for
+    /// one without), or 500 without any, as Cosmic has it.
+    pub dying_ms: i32,
+    /// How long it stays before it leaves on its own, in seconds
+    /// (`removeAfter`), or 0 for as long as it lives.
+    pub remove_after: i32,
+    /// How it destroys itself (`selfDestruction`), if it does.
+    pub self_destruct: Option<SelfDestruct>,
+}
+
+/// How a mob destroys itself (`selfDestruction`).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct SelfDestruct {
+    /// How it goes (`action`), the way a v83 client takes it as KILL_MONSTER's
+    /// leave type: 1 dies, 3 plays `skill1`, 2 and 4 on explode with
+    /// `attack1`, hitting whoever is in reach. The client also keeps its last
+    /// attack for this, and with bit 2 set sends MOB_BOMB when a player is in
+    /// reach of it (FUN_0067cf06).
+    pub action: u8,
+    /// It goes once it is down to this much HP (`hp`), or -1 if not.
+    pub hp: i32,
+    /// Without `hp`, how many seconds after it came it goes (`removeAfter`).
+    pub remove_after: i32,
+}
+
+impl SelfDestruct {
+    /// Whether the client sends MOB_BOMB for it.
+    pub fn bombs(&self) -> bool {
+        self.action & 2 != 0
+    }
 }
 
 /// Where a mob's Banish sends players (`ban/banMap/0`), and what it tells
@@ -112,16 +148,20 @@ impl MobData {
         let Some(image) = nx.child_by_name(0, &format!("{mob_id:07}.img"))? else {
             return Ok(None);
         };
-        // Some mobs reuse another mob's data through info/link.
         let Some(mut info) = nx.child_by_name(image, "info")? else {
             return Ok(None);
         };
+        // Some mobs act as another (info/link) but keep their own stats, as
+        // Cosmic reads them; one whose info is only the link takes the
+        // other's.
         let mut image = image;
         if let Some(link) = nx.string_child(info, "link")? {
             if let Some(linked) = nx.child_by_name(0, &format!("{link}.img"))? {
-                if let Some(linked_info) = nx.child_by_name(linked, "info")? {
-                    image = linked;
-                    info = linked_info;
+                image = linked;
+                if nx.child_by_name(info, "maxHP")?.is_none() {
+                    if let Some(linked_info) = nx.child_by_name(linked, "info")? {
+                        info = linked_info;
+                    }
                 }
             }
         }
@@ -146,11 +186,53 @@ impl MobData {
             undead: int("undead")? != 0,
             fixed_damage: int("fixedDamage")?,
             invincible: int("invincible")? != 0,
+            public_reward: int("publicReward")? != 0,
+            explosive_reward: int("explosiveReward")? != 0,
             element: nx.string_child(info, "elemAttr")?.unwrap_or_default(),
             attacks: self.attacks(image)?,
             skills: self.skills(info)?,
             banish: self.banish(info)?,
+            revive: self.revive(info)?,
+            dying_ms: self.dying_ms(image)?,
+            remove_after: int("removeAfter")?,
+            self_destruct: self.self_destruct(info)?,
         }))
+    }
+
+    fn self_destruct(&self, info: u32) -> Result<Option<SelfDestruct>, GameDataError> {
+        let nx = &self.nx;
+        let Some(node) = nx.child_by_name(info, "selfDestruction")? else {
+            return Ok(None);
+        };
+        Ok(Some(SelfDestruct {
+            action: u8::try_from(nx.int_child(node, "action")?.unwrap_or(0)).unwrap_or(0),
+            hp: nx.int_child(node, "hp")?.unwrap_or(-1),
+            remove_after: nx.int_child(node, "removeAfter")?.unwrap_or(0),
+        }))
+    }
+
+    fn revive(&self, info: u32) -> Result<Vec<i32>, GameDataError> {
+        let nx = &self.nx;
+        let mut revive = Vec::new();
+        if let Some(list) = nx.child_by_name(info, "revive")? {
+            while let Some(mob_id) = nx.int_child(list, &revive.len().to_string())? {
+                revive.push(mob_id);
+            }
+        }
+        Ok(revive)
+    }
+
+    fn dying_ms(&self, image: u32) -> Result<i32, GameDataError> {
+        let nx = &self.nx;
+        let Some(die) = nx.child_by_name(image, "die1")? else {
+            return Ok(500);
+        };
+        let (mut frames, mut total) = (0, 0);
+        while let Some(frame) = nx.child_by_name(die, &frames.to_string())? {
+            total += nx.int_child(frame, "delay")?.unwrap_or(100);
+            frames += 1;
+        }
+        Ok(if frames == 0 { 500 } else { total })
     }
 
     fn banish(&self, info: u32) -> Result<Option<Banish>, GameDataError> {
@@ -271,6 +353,10 @@ mod tests {
         assert_eq!(mob(100100).fixed_damage, 0);
         assert!(mob(9300295).invincible);
         assert!(!mob(100100).invincible);
+        // Bergamot's drops are anyone's; Mano's in Mu Lung Dojo fly out.
+        assert!(mob(7220003).public_reward && !mob(7220003).explosive_reward);
+        assert!(mob(9300184).explosive_reward);
+        assert!(!mob(100100).public_reward && !mob(100100).explosive_reward);
     }
 
     #[test]
@@ -290,6 +376,76 @@ mod tests {
         // Stumpy's second attack hits harder than its body (125).
         let second = &mob(3220000).attacks[1];
         assert_eq!((second.kind, second.magic, second.attack), (2, false, 135));
+    }
+
+    #[test]
+    fn linked_mobs_keep_their_own_stats() {
+        let Some(path) = crate::test_assets::path("Mob.nx") else {
+            return;
+        };
+        let data = MobData::load(path).unwrap();
+        let mob = |id| data.info(id).unwrap().unwrap();
+        // Cherry Bubble Tea acts as Red Bubble Tea (level 38, 1900 HP) but
+        // is weaker, and without its weak spots.
+        let (cherry, red) = (mob(3400000), mob(9410005));
+        assert_eq!((cherry.level, cherry.max_hp, cherry.exp), (35, 1400, 80));
+        assert_eq!((red.level, red.max_hp), (38, 1900));
+        assert_eq!(cherry.element, "");
+        assert_eq!(cherry.attacks, red.attacks);
+        assert!(!cherry.attacks.is_empty());
+        // Nothing but a link: a Wild Boar.
+        assert_eq!(mob(9501016).max_hp, mob(2230102).max_hp);
+    }
+
+    #[test]
+    fn reads_what_comes_out_of_a_dying_mob() {
+        let Some(path) = crate::test_assets::path("Mob.nx") else {
+            return;
+        };
+        let data = MobData::load(path).unwrap();
+        let mob = |id| data.info(id).unwrap().unwrap();
+        // Yeti and Pepe fall apart into a Yeti and a Pepe once its five
+        // 120 ms frames of dying are over.
+        let pair = mob(7130102);
+        assert_eq!(
+            (pair.revive.as_slice(), pair.dying_ms),
+            (&[6300002, 6130102][..], 600)
+        );
+        let snail = mob(100100);
+        assert!(snail.revive.is_empty());
+        assert!(snail.dying_ms > 0);
+    }
+
+    #[test]
+    fn reads_how_long_a_mob_stays() {
+        let Some(path) = crate::test_assets::path("Mob.nx") else {
+            return;
+        };
+        let data = MobData::load(path).unwrap();
+        let mob = |id| data.info(id).unwrap().unwrap();
+        // Lord Pirate's Devoted Kru; Spirit of Rock's Soul has it as text.
+        assert_eq!(mob(9300117).remove_after, 10);
+        assert_eq!(mob(4300017).remove_after, 15);
+        assert_eq!(mob(100100).remove_after, 0);
+    }
+
+    #[test]
+    fn reads_how_mobs_destroy_themselves() {
+        let Some(path) = crate::test_assets::path("Mob.nx") else {
+            return;
+        };
+        let data = MobData::load(path).unwrap();
+        let mob = |id| data.info(id).unwrap().unwrap();
+        let boomer = mob(9400547).self_destruct.unwrap();
+        assert_eq!(
+            (boomer.action, boomer.hp, boomer.remove_after),
+            (5, 350, 90000)
+        );
+        assert!(!boomer.bombs());
+        let bomb = mob(9300166).self_destruct.unwrap();
+        assert_eq!((bomb.action, bomb.hp, bomb.remove_after), (4, -1, 0));
+        assert!(mob(8500003).self_destruct.unwrap().bombs());
+        assert_eq!(mob(100100).self_destruct, None);
     }
 
     #[test]

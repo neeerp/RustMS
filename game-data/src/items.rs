@@ -22,6 +22,9 @@ pub struct ItemInfo {
     pub only: bool,
     /// Items that can't change hands (`info/tradeBlock`).
     pub trade_block: bool,
+    /// Items nobody may pick up (`info/pickUpBlock`): the invisible ones
+    /// party quests drop.
+    pub pickup_block: bool,
     pub price: i32,
     /// What one throwing star or bullet costs to recharge (`unitPrice`).
     pub unit_price: f64,
@@ -257,6 +260,7 @@ impl ItemData {
             info.quest = nx.int_child(meta, "quest")? == Some(1);
             info.only = nx.int_child(meta, "only")? == Some(1);
             info.trade_block = nx.int_child(meta, "tradeBlock")? == Some(1);
+            info.pickup_block = nx.int_child(meta, "pickUpBlock")? == Some(1);
             info.price = nx.int_child(meta, "price")?.unwrap_or(0);
             info.unit_price = nx.real_child(meta, "unitPrice")?.unwrap_or(0.0);
             info.recovery_hp = nx.int_child(meta, "recoveryHP")?.unwrap_or(0);
@@ -401,6 +405,7 @@ impl ItemData {
             quest: nx.int_child(meta, "quest")? == Some(1),
             only: nx.int_child(meta, "only")? == Some(1),
             trade_block: nx.int_child(meta, "tradeBlock")? == Some(1),
+            pickup_block: nx.int_child(meta, "pickUpBlock")? == Some(1),
             price: nx.int_child(meta, "price")?.unwrap_or(0),
             unit_price: 0.0,
             recovery_hp: 0,

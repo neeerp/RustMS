@@ -275,6 +275,10 @@ pub struct MapDrop {
     pub meso: bool,
     /// The item id, or the amount of mesos.
     pub value: i32,
+    /// Whose it is: a character id, or a party id for ownership 1.
+    pub owner: i32,
+    /// 0 an owner's, 1 a party's, 2 anyone's, 3 anyone's, flung out.
+    pub ownership: u8,
     pub x: i16,
     pub y: i16,
 }
@@ -312,6 +316,8 @@ pub struct Field {
     /// (object id, HP percentage)
     pub hp_bars: Vec<(i32, u8)>,
     pub killed: Vec<i32>,
+    /// How each killed mob went: KILL_MONSTER's leave type.
+    pub leave_types: BTreeMap<i32, u8>,
     /// Characters seen attacking.
     pub attacks_by: Vec<i32>,
     /// The skill of each attack seen: (character id, skill id, level).
@@ -522,7 +528,9 @@ impl Field {
             self.hp_bars
                 .push((r.read_int().unwrap(), r.read_byte().unwrap()));
         } else if op == SendOpcode::KillMonster as i16 {
-            self.killed.push(r.read_int().unwrap());
+            let oid = r.read_int().unwrap();
+            self.killed.push(oid);
+            self.leave_types.insert(oid, r.read_byte().unwrap());
         } else if op == SendOpcode::CloseRangeAttack as i16
             || op == SendOpcode::RangedAttack as i16
             || op == SendOpcode::MagicAttack as i16
@@ -539,13 +547,15 @@ impl Field {
             let object_id = r.read_int().unwrap();
             let meso = r.read_byte().unwrap() != 0;
             let value = r.read_int().unwrap();
-            r.read_int().unwrap();
-            r.read_byte().unwrap();
+            let owner = r.read_int().unwrap();
+            let ownership = r.read_byte().unwrap();
             let (x, y) = (r.read_short().unwrap(), r.read_short().unwrap());
             self.drops.push(MapDrop {
                 object_id,
                 meso,
                 value,
+                owner,
+                ownership,
                 x,
                 y,
             });

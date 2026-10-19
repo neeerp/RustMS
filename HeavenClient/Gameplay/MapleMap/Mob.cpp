@@ -72,6 +72,10 @@ namespace ms
 		blocksteleport = info["cantPassByTeleport"].get_bool();
 		notattack = info["notAttack"].get_bool();
 		firstattack = info["firstAttack"].get_bool();
+		int32_t destruct = info["selfDestruction"]["action"];
+		selfdestructs = destruct != 0;
+		bombs = selfdestructs && (destruct & 2) != 0;
+		bombed = false;
 		showleveltag = !info["hideLevel"].get_bool() && !info["hideHP"].get_bool() &&
 					   !info["hideName"].get_bool() && !info["boss"].get_bool() &&
 					   (mid / 1000000 != 9 || mid / 100000 == 94 || mid / 100000 == 96);
@@ -192,6 +196,10 @@ namespace ms
 			skills.push_back(skill);
 		}
 
+		// Leave type 3 plays skill1 whether it casts or not.
+		if (skillanimations.count(1) == 0 && src["skill1"].size() > 0)
+			skillanimations[1] = src["skill1"];
+
 		standwidth = animations[Stance::STAND].get_dimensions().x();
 
 		name = std::string(nl::nx::string["Mob.img"][std::to_string(mid)]["name"]);
@@ -253,7 +261,8 @@ namespace ms
 		reporttime = 0;
 		dying = false;
 		dead = false;
-		fading = false;
+		leaving = false;
+		exploding = false;
 		stance = Stance::STAND;
 		show_stance(st);
 		haswaypoint = false;
@@ -361,17 +370,7 @@ namespace ms
 		if (aniend && stance == Stance::DIE)
 			dead = true;
 
-		if (fading)
-		{
-			opacity -= 0.025f;
-
-			if (opacity.last() < 0.025f)
-			{
-				opacity.set(0.0f);
-				fading = false;
-				dead = true;
-			}
-		} else if (fadein)
+		if (fadein)
 		{
 			opacity += 0.025f;
 
@@ -395,6 +394,16 @@ namespace ms
 
 		clock += Constants::TIMESTEP;
 
+		// It blows up with attack1, which hits like any other (FUN_00663e5b).
+		if (exploding)
+		{
+			exploding = false;
+			casting.reset();
+
+			if (!attacks.empty())
+				do_attack(physics, 0, noflip || !flip, 0, get_position());
+		}
+
 		if (attacking && attacks[*attacking].animation.update())
 			attacking.reset();
 
@@ -402,6 +411,13 @@ namespace ms
 			casting.reset();
 
 		update_attacks();
+
+		if (leaving && !attacking && !casting && pendinghits.empty())
+		{
+			dead = true;
+
+			return phobj.fhlayer;
+		}
 
 		for (StatusEffect &effect : statuseffects)
 			effect.animation.update();
@@ -429,6 +445,24 @@ namespace ms
 				int32_t dy = std::abs(targetpos.y() - position.y());
 
 				MobDistancePacket(oid, dx / 10 + dy / 3 + (targetdead ? 100 : 0)).dispatch();
+			}
+		}
+
+		// Every client tells the server once the player is in reach of a
+		// bombing mob's plain attack, the box as it is in the data
+		// (FUN_0066e636).
+		if (bombs && !bombed && !dying && !notattack && !held() && !targetdead)
+		{
+			Point<int16_t> position = get_position();
+
+			for (const AttackInfo &info : attacks)
+			{
+				if (info.type == 0 && mob_attack::intersects(info.range.shift(position.x(), position.y()), targetbody))
+				{
+					bombed = true;
+					MobBombPacket(oid).dispatch();
+					break;
+				}
 			}
 		}
 
@@ -616,7 +650,11 @@ namespace ms
 		bool facingleft = noflip || !flip;
 		std::vector<Pick> candidates;
 
-		for (size_t i = 0; i < attacks.size(); i++)
+		// One that destroys itself keeps its last attack for that
+		// (FUN_0066a517).
+		size_t usable = attacks.size() - (selfdestructs ? 1 : 0);
+
+		for (size_t i = 0; i < usable; i++)
 		{
 			const AttackInfo &info = attacks[i];
 
@@ -1755,9 +1793,30 @@ namespace ms
 					death_timeout = 250; // 2 s
 
 				break;
-			case 2:
-				fading = true;
+			case 3:
+				// skill1 in place of its death; one without just goes
+				// (FUN_00663995).
 				dying = true;
+				leaving = true;
+				attacking.reset();
+				casting.reset();
+				diesound.play();
+
+				if (skillanimations.count(1) > 0)
+				{
+					skillanimations.at(1).reset();
+					casting = 1;
+					attackleft = noflip || !flip;
+				}
+
+				break;
+			default:
+				// It blows up (FUN_00663e5b).
+				dying = true;
+				leaving = true;
+				exploding = true;
+				attacking.reset();
+				diesound.play();
 				break;
 		}
 	}
@@ -2193,7 +2252,7 @@ namespace ms
 		if (pending_hits > 0)
 			pending_hits--;
 
-		if (dying && stance != Stance::DIE)
+		if (dying && !leaving && stance != Stance::DIE)
 		{
 			if (pending_hits == 0)
 				apply_death();

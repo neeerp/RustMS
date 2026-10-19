@@ -91,6 +91,7 @@ pub enum RecvOpcode {
     Beholder = 0xB2,
     MoveLife = 0xBC,
     MobDistance = 0xBD,
+    MobBomb = 0xC1,
     NpcAction = 0xC5,
     ItemPickup = 0xCA,
     DamageReactor = 0xCD,

@@ -11,6 +11,32 @@ templates from `Mob.nx` (`maxHP`, `exp`, `PADamage`, `bodyAttack`,
   when the field starts. A killed mob comes back after `mobTime` seconds, at
   least 7 s, on the field's 100 ms tick, with a new object id (mobs and drops
   each have a range in `actor::object_ids`). Joining players get SPAWN_MONSTER for every live mob.
+- **Revive:** a mob with `info/revive` (the Blue Perfume bottle, Yeti and
+  Pepe, ...) lets those mobs out where it died once its `die1` animation is
+  over (`MobInfo::dying_ms`, 500 ms without one), as Cosmic does. They fade
+  in, facing its way, under its last controller, and never respawn. v83's
+  SPAWN_MONSTER also has a -3 appearance that ties the new mob to the dying
+  one, but by then the server has removed it, so they use -2.
+- **Leaving on their own:** a mob with `info/removeAfter` (the Kitties in
+  Magatia's cheese storage, 926120400, ...) is taken away that many seconds
+  after it spawned (`LiveMob::leaves_at`), as Cosmic does: KILL_MONSTER with
+  animation 1, no EXP, drops or revive mobs, and its spawn point fills again
+  as after a kill. The v83 client never reads `removeAfter`.
+- **Destroying themselves:** a mob with `info/selfDestruction` goes once a
+  hit leaves it at its `hp` or less (a Boomer, 9400547, at 350 of 700),
+  counting as killed, or, without `hp`, `removeAfter` seconds after it came
+  (a Bomb, 9300166, at once), as in Cosmic. Either way KILL_MONSTER carries
+  its `action` as the leave type (`LiveMob::leave_type`), which the v83
+  client plays: 1 dies, 3 plays `skill1` (it just goes without one), and 2
+  or 4 and up blow it up with `attack1` (FUN_0067961d, FUN_00663e5b). The
+  explosion hits whoever is in reach like any attack, so its TAKE_DAMAGE
+  (attack 0) comes after the mob is gone; the server takes it, as it takes
+  any mob's damage by the mob id. The client never uses `attack1` otherwise
+  (FUN_0066a517). Darkstars (8500003, 8500004, action 3) also send MOB_BOMB
+  (0xC1, the object id) once a player is in reach of their attack's box,
+  unflipped (FUN_0066e636); the server blows them up with leave type 4 and
+  no EXP, as Cosmic does. HeavenClient does all this in `Mob::kill` and
+  `Mob::update`.
 - **Control:** one player moves each mob (SPAWN_MONSTER_CONTROL 1). New
   mobs and joiners pick up uncontrolled mobs; leaving hands them to another
   occupant. MOVE_LIFE from the controller updates the position, answers
@@ -329,12 +355,17 @@ so every request is answered, refusals with an empty STAT_CHANGED.
 
 ## Drops and pickup
 
-When a mob dies, each player who earned EXP from it rolls their own drops
-(`net::loot::roll`) from the content pack's table plus the committed v83
-overrides (`game-data/reward_overrides.toml`): each entry rolls its `prob`,
-mesos vary by ±25%, items take `min`..`max`. Quest-only entries roll only
-while that quest is started and the player doesn't hold the item yet. Without
-a content pack, mobs drop only the overrides. The client actor rolls (it has
+When a mob dies, its drops roll once (`net::loot::roll`), for whoever dealt
+it the most damage of the players still on the field, as Cosmic does. They
+come from the content pack's table plus the committed v83 overrides
+(`game-data/reward_overrides.toml`): each entry rolls its `prob`, mesos
+vary by ±25%, items take `min`..`max`. A mob worth no EXP still drops and
+counts for quests. Quest drops are the entries
+the overrides tag with a quest, and quest items (`info/quest`) that only one
+quest's completion check (`Check.img/<quest>/1/item`) asks for. They roll
+only while that quest is started and the player holds fewer than the check
+asks for (any number if it doesn't name the item). Without a content pack,
+mobs drop only the overrides. The client actor rolls (it has
 the player's quests) and asks the field to place the loot.
 
 The field's `field_drops::DropSet` spreads a kill's drops around where the
@@ -345,9 +376,16 @@ ground below its column, searched from 50 px above the mob as v83 servers do.
 A wall between the mob and the drop's column, or no ground under it, keeps
 the drop on the ground below the mob, so drops don't end up inside a cliff or
 in the air. Quest drops are shown only to their owner.
-For 15 s only the killer may pick a drop up (quest drops: always only the
-owner); drops vanish after 180 s (REMOVE_ITEM_FROM_MAP 0). Drops players
-throw down are anyone's at once; see "Client moves" in `inventory.md`.
+
+For 15 s only the owner may pick a drop up, or with a party, the owner's
+party as it was at the drop (quest drops: always only the owner). Drops of
+mobs with `publicReward` are anyone's at once, as are those of mobs with
+`explosiveReward`, which fly out 40 px apart instead of 25. The packet's
+ownership type tells the client which (v83 FUN_0050483a, whose pets follow
+it): 0 with the owner's character id, 1 with the party id, 2 for anyone (and
+for any drop once the 15 s are over), 3 for an explosive drop. Drops vanish
+after 180 s (REMOVE_ITEM_FROM_MAP 0). Drops players throw down are anyone's
+at once; see "Client moves" in `inventory.md`.
 
 HeavenClient's `Drop` gives a falling drop its own, lighter gravity instead
 of the player's: it launches at -2.9 px per tick and gains 0.042 px per tick,
@@ -363,7 +401,16 @@ removes it (REMOVE_ITEM_FROM_MAP 2 with the looter) and hands it to the
 client actor, which adds mesos (MESO stat update, "You have gained mesos")
 or the item (INVENTORY_OPERATION, "You have gained an item"). If the item
 doesn't fit, the player sees "You can't get anymore items." and the drop goes
-back on the ground.
+back on the ground. Equipment a mob or reactor dropped comes with its stats
+varied (`net::items::give_dropped`, Cosmic's `randomizeStats`): each stat it
+has moves up to a tenth of itself either way, at most 5, or 10 for defense,
+HP and MP. Equipment a player threw down keeps its stats.
+
+Nobody picks up an item with `info/pickUpBlock`, the invisible items party
+quests drop (Transparent Item 4001074, ...). The v83 client leaves them out
+of both the pickup key and pets' looting (FUN_005d5224 in FUN_0050463c and
+FUN_0050483a), and so does HeavenClient (`Drop::blocked`); the server refuses
+them too (`Loot::blocked`).
 
 ## Monster Book cards
 

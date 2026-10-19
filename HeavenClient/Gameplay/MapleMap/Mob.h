@@ -152,9 +152,10 @@ namespace ms
 		// The local player's hits from this mob's attacks since last asked.
 		std::vector<Landed> take_attacks();
 
-		// Kill the mob with the appropriate type:
-		// 0 - make inactive 1 - death animation 2 - fade out
-		// The death animation waits for any hits still on their way.
+		// Kill the mob with the appropriate type (FUN_0067961d): 0 makes it
+		// inactive, 1 plays its death, 3 its skill1, and 2 or 4 and up blow
+		// it up with attack1. The death waits for any hits still on their
+		// way.
 		void kill(int8_t killtype);
 
 		// Note hits that will land on this mob once their attack connects;
@@ -524,6 +525,12 @@ namespace ms
 		bool blocksteleport;
 		bool notattack;
 		bool firstattack;
+		// It destroys itself (`selfDestruction/action` not 0): its last
+		// attack is kept for that. One that bombs (action bit 2) tells the
+		// server once the player is in reach, and has.
+		bool selfdestructs;
+		bool bombs;
+		bool bombed;
 		bool canmove;
 		bool canjump;
 		bool canfly;
@@ -581,6 +588,10 @@ namespace ms
 		int8_t team;
 		bool dying;
 		bool dead;
+		// It leaves with an attack or skill, once that has played and hit;
+		// blowing up waits for the next update to start.
+		bool leaving;
+		bool exploding;
 		bool control = false;
 		// v83's control state (CMob +0x130): 3 when the controller may send
 		// a move, 4 when it may also attack or cast, 2 while a move awaits
@@ -647,7 +658,6 @@ namespace ms
 		int8_t flyy;
 		float walkforce;
 		int8_t hppercent;
-		bool fading;
 		bool fadein;
 		Linear<float> opacity;
 
