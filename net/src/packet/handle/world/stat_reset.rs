@@ -1,14 +1,16 @@
-//! AP Reset (5050000), used through USE_CASH_ITEM with the stat the AP goes
-//! to and the one it comes from, as STAT_CHANGED mask bits (v83
-//! FUN_00a0a63f, type 0x17; report 195). The stats change together and the
-//! item is used up; a refusal, or a dead player, keeps it and only unlocks
-//! the client.
+//! AP Reset (5050000) and SP Reset (5050001-5050004), used through
+//! USE_CASH_ITEM with where the point goes and where it comes from: STAT_CHANGED
+//! mask bits for AP, skill ids for SP (v83 FUN_00a0a63f, types 0x17 and 0x18;
+//! report 195). Both change together and the item is used up; a refusal, or a
+//! dead player, keeps it and only unlocks the client.
 
 use super::spend_points::{ap_stat, stat_value};
 use crate::handler::{HandlerResult, WorldContext, WorldResult};
 use crate::packet::build::world::inventory::build_inventory_operation;
+use crate::packet::build::world::skill::build_update_skills;
 use crate::packet::build::world::stat::{build_stat_update, StatUpdate};
 use crate::skills;
+use game::sp_reset::SkillRule;
 use game::{ap_reset, InventoryType};
 use packet::io::read::PktRead;
 use std::io::Cursor;
@@ -47,6 +49,44 @@ pub fn ap_reset(ctx: &mut WorldContext, r: &mut Cursor<&Vec<u8>>, slot: i16) -> 
         .with_reply(build_inventory_operation(true, &changes)?))
 }
 
+/// Use the SP Reset `item_id` in Cash `slot`; `r` is past the item id.
+pub fn sp_reset(
+    ctx: &mut WorldContext,
+    r: &mut Cursor<&Vec<u8>>,
+    slot: i16,
+    item_id: i32,
+) -> WorldResult {
+    let to = r.read_int()?;
+    let from = r.read_int()?;
+    if ctx.player.stats.hp <= 0 {
+        return refuse();
+    }
+    let mut book = ctx.player.skills.clone();
+    let rule = |skill_id| {
+        skills::info(skill_id).map(|info| SkillRule {
+            max_level: info.max_level,
+            invisible: info.invisible,
+            requirements: info.requirements,
+        })
+    };
+    let Some(changed) =
+        game::sp_reset::reset(&ctx.player.stats, &mut book, item_id, to, from, rule)
+    else {
+        return refuse();
+    };
+    let Ok(changes) = ctx
+        .player
+        .inventory_mut()
+        .take(InventoryType::Cash, slot, 1)
+    else {
+        return refuse();
+    };
+    ctx.player.skills = book;
+    ctx.player.mark_dirty();
+    Ok(HandlerResult::reply(build_update_skills(&changed)?)
+        .with_reply(build_inventory_operation(true, &changes)?))
+}
+
 fn refuse() -> WorldResult {
     Ok(HandlerResult::reply(build_stat_update(true, &[])?))
 }
@@ -56,16 +96,20 @@ mod tests {
     use crate::handler::{WorldAction, WorldContext, WorldHandler};
     use crate::packet::handle::world::UseCashItemHandler;
     use crate::packet::op::RecvOpcode;
-    use game::{InventoryType, Item, Player};
+    use game::{InventoryType, Item, Player, SkillRecord};
     use packet::{io::write::PktWrite, Packet};
 
     const AP_RESET: i32 = 5050000;
 
     fn reset(player: &mut Player, to: i32, from: i32) -> Vec<Vec<u8>> {
+        use_reset(player, AP_RESET, to, from)
+    }
+
+    fn use_reset(player: &mut Player, item_id: i32, to: i32, from: i32) -> Vec<Vec<u8>> {
         let mut p = Packet::new_empty();
         p.write_short(RecvOpcode::UseCashItem as i16).unwrap();
         p.write_short(3).unwrap();
-        p.write_int(AP_RESET).unwrap();
+        p.write_int(item_id).unwrap();
         p.write_int(to).unwrap();
         p.write_int(from).unwrap();
         p.write_int(1234).unwrap();
@@ -141,5 +185,78 @@ mod tests {
         assert_eq!(reset(&mut player, 0x40, 0x80).len(), 1, "not when dead");
         assert_eq!(left(&player), 2);
         assert_eq!((player.stats.str, player.stats.int), (120, 4));
+    }
+
+    const SP_RESET: i32 = 5050001;
+    const POWER_STRIKE: i32 = 1001004;
+    const SLASH_BLAST: i32 = 1001005;
+
+    fn skill_holder() -> Option<Player> {
+        crate::skills::data().ok()?;
+        let mut player = holder();
+        player.stats.sp = 1;
+        for (skill_id, level) in [(POWER_STRIKE, 20), (SLASH_BLAST, 3)] {
+            player.skills.set(SkillRecord {
+                skill_id,
+                level,
+                master_level: 0,
+                expiration: None,
+            });
+        }
+        player
+            .inventory
+            .insert(InventoryType::Cash, 3, Item::stack(SP_RESET, 1));
+        Some(player)
+    }
+
+    #[test]
+    fn a_skill_level_moves_and_the_item_is_used() {
+        let Some(mut player) = skill_holder() else {
+            return;
+        };
+        let replies = use_reset(&mut player, SP_RESET, SLASH_BLAST, POWER_STRIKE);
+        assert_eq!(replies.len(), 2);
+        // UPDATE_SKILLS, unlocking, with both skills.
+        assert_eq!(replies[0][..5], [0x24, 0, 1, 2, 0]);
+        assert_eq!(replies[0][5..9], SLASH_BLAST.to_le_bytes());
+        assert_eq!(replies[0][25..29], POWER_STRIKE.to_le_bytes());
+        assert_eq!(replies[1][..2], [0x1D, 0], "an inventory operation");
+        assert_eq!(
+            (
+                player.skills.level(SLASH_BLAST),
+                player.skills.level(POWER_STRIKE)
+            ),
+            (4, 19)
+        );
+        assert_eq!((left(&player), player.stats.sp), (0, 1));
+    }
+
+    #[test]
+    fn a_refused_skill_reset_keeps_the_item() {
+        let Some(mut player) = skill_holder() else {
+            return;
+        };
+        // Power Strike is full; Slash Blast to itself; the first job has no SP
+        // to spare for the second; a magician's skill.
+        for (item, to, from) in [
+            (SP_RESET, POWER_STRIKE, SLASH_BLAST),
+            (SP_RESET, SLASH_BLAST, SLASH_BLAST),
+            (SP_RESET + 1, 1101006, POWER_STRIKE),
+            (SP_RESET, 2001002, POWER_STRIKE),
+        ] {
+            player
+                .inventory
+                .insert(InventoryType::Cash, 3, Item::stack(item, 1));
+            let replies = use_reset(&mut player, item, to, from);
+            assert_eq!(replies, [vec![0x1F, 0, 1, 0, 0, 0, 0]], "{to} from {from}");
+            assert_eq!(left(&player), 1);
+        }
+        assert_eq!(
+            (
+                player.skills.level(SLASH_BLAST),
+                player.skills.level(POWER_STRIKE)
+            ),
+            (3, 20)
+        );
     }
 }

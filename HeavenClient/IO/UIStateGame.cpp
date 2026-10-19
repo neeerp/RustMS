@@ -658,6 +658,7 @@ namespace ms
 					UIElement::Type::AVATARSELECT,
 					UIElement::Type::PETCHOOSER,
 					UIElement::Type::APRESET,
+					UIElement::Type::SPRESET,
 					UIElement::Type::SLIDEMENU,
 					UIElement::Type::QUIZ,
 					UIElement::Type::SPEEDQUIZ,

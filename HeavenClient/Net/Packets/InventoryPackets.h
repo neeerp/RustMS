@@ -146,13 +146,14 @@ namespace ms
 		}
 	};
 
-	// Uses an AP Reset (FUN_00a0a63f type 0x17): the stat the AP goes to,
-	// then the one it leaves, as STAT_CHANGED mask bits.
+	// Uses an AP or SP Reset (FUN_00a0a63f types 0x17 and 0x18): where the
+	// AP or skill level goes, then where it leaves, as STAT_CHANGED mask
+	// bits or skill ids.
 	// Opcode: USE_CASH_ITEM(79)
-	class UseApResetPacket : public OutPacket
+	class UseResetPacket : public OutPacket
 	{
 	public:
-		UseApResetPacket(int16_t slot, int32_t itemid, int32_t to, int32_t from)
+		UseResetPacket(int16_t slot, int32_t itemid, int32_t to, int32_t from)
 				: OutPacket(OutPacket::Opcode::USE_CASH_ITEM)
 		{
 			write_short(slot);

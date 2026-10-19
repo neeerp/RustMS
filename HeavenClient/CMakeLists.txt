@@ -226,6 +226,8 @@ if(HEAVENCLIENT_BUILD_TESTS)
     add_test(NAME item_effect_rules COMMAND item_effect_rules_tests)
     add_executable(ap_reset_rules_tests tests/ap_reset_rules.cpp)
     add_test(NAME ap_reset_rules COMMAND ap_reset_rules_tests)
+    add_executable(sp_reset_rules_tests tests/sp_reset_rules.cpp)
+    add_test(NAME sp_reset_rules COMMAND sp_reset_rules_tests)
     add_executable(obj_state_rules_tests tests/obj_state_rules.cpp)
     target_include_directories(obj_state_rules_tests PRIVATE
         ${PROJECT_SOURCE_DIR}/libs/NoLifeNx ${PROJECT_SOURCE_DIR}/libs/glad/build/include)
@@ -365,6 +367,7 @@ add_executable(HeavenClient
     Character/ItemEffect.h
     Character/ItemEffectRules.h
     Character/ApResetRules.h
+    Character/SpResetRules.h
     Character/CharStats.cpp
     Character/CharStats.h
     Character/EquipStat.cpp
@@ -698,6 +701,8 @@ add_executable(HeavenClient
     IO/UITypes/UIPetChooser.h
     IO/UITypes/UIApReset.cpp
     IO/UITypes/UIApReset.h
+    IO/UITypes/UISpReset.cpp
+    IO/UITypes/UISpReset.h
     IO/UITypes/UIItemMegaphone.cpp
     IO/UITypes/UIItemMegaphone.h
     IO/UITypes/UIInviteCard.cpp

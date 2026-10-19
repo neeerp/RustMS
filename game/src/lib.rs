@@ -19,6 +19,7 @@ pub mod pet;
 pub mod quest;
 pub mod scroll;
 pub mod skill;
+pub mod sp_reset;
 pub mod storage;
 pub mod teleport_rock;
 

@@ -72,6 +72,16 @@ namespace ms
 		return passives;
 	}
 
+	std::map<int32_t, int32_t> SkillBook::collect_levels() const
+	{
+		std::map<int32_t, int32_t> levels;
+
+		for (auto &iter : skillentries)
+			levels.emplace(iter.first, iter.second.level);
+
+		return levels;
+	}
+
 	std::unordered_map<int32_t, int32_t> SkillBook::collect_required(int32_t id) const
 	{
 		auto iter = skillentries.find(id);

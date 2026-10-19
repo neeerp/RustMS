@@ -5,14 +5,22 @@ use packet::{io::write::PktWrite, Packet};
 
 /// UPDATE_SKILLS for one skill. It also unlocks the client UI.
 pub fn build_update_skill(skill: &SkillRecord) -> Result<Packet, NetworkError> {
+    build_update_skills(std::slice::from_ref(skill))
+}
+
+/// UPDATE_SKILLS for several skills at once (v83 FUN_00a1e48c reads a
+/// count). It also unlocks the client UI.
+pub fn build_update_skills(skills: &[SkillRecord]) -> Result<Packet, NetworkError> {
     let mut packet = Packet::new_empty();
     packet.write_short(SendOpcode::UpdateSkills as i16)?;
     packet.write_byte(1)?;
-    packet.write_short(1)?;
-    packet.write_int(skill.skill_id)?;
-    packet.write_int(skill.level)?;
-    packet.write_int(skill.master_level)?;
-    packet.write_long(expiration(skill.expiration))?;
+    packet.write_short(skills.len() as i16)?;
+    for skill in skills {
+        packet.write_int(skill.skill_id)?;
+        packet.write_int(skill.level)?;
+        packet.write_int(skill.master_level)?;
+        packet.write_long(expiration(skill.expiration))?;
+    }
     packet.write_byte(4)?;
     Ok(packet)
 }

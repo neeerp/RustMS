@@ -18,6 +18,7 @@
 #include "UIItemInventory.h"
 
 #include "UIApReset.h"
+#include "UISpReset.h"
 #include "UIChatBar.h"
 #include "UIItemMegaphone.h"
 #include "UIMegaphone.h"
@@ -326,7 +327,27 @@ namespace ms
 			UI::get().emplace<UIApReset>([=](int32_t to, int32_t from)
 			{
 				if (may_use_cash_item())
-					Stage::get().get_player().request(UseApResetPacket(slot, item_id, to, from), ExclRequest::WAIT);
+					Stage::get().get_player().request(UseResetPacket(slot, item_id, to, from), ExclRequest::WAIT);
+			});
+		}
+
+		// Type 0x18: SP Reset's dialogs pick the skill a level leaves and the
+		// one of the item's advancement it goes to. Beginners, GMs and those
+		// not advanced as far as the item can't use it, and are told nothing.
+		void use_sp_reset(int16_t slot, int32_t item_id)
+		{
+			if (!may_use_cash_item() || in_mini_room())
+				return;
+
+			int32_t job = Stage::get().get_player().get_stats().get_stat(MapleStat::Id::JOB);
+
+			if (!sp_reset::may_use(job, sp_reset::item_tab(item_id)))
+				return;
+
+			UI::get().emplace<UISpReset>(item_id, [=](int32_t to, int32_t from)
+			{
+				if (may_use_cash_item())
+					Stage::get().get_player().request(UseResetPacket(slot, item_id, to, from), ExclRequest::WAIT);
 			});
 		}
 
@@ -911,6 +932,8 @@ namespace ms
 							use_weather(slot, item_id);
 						else if (item_id == ap_reset::ITEM)
 							use_ap_reset(slot, item_id);
+						else if (sp_reset::is_item(item_id))
+							use_sp_reset(slot, item_id);
 						else if (item_id / 10000 == 501)
 							Stage::get().use_item_effect(item_id);
 

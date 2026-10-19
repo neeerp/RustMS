@@ -42,6 +42,9 @@ namespace ms
 		// An ordered map is used so that lower passive skills don't override higher ones
 		std::map<int32_t, int32_t> collect_passives() const;
 
+		// Return id and level of every skill.
+		std::map<int32_t, int32_t> collect_levels() const;
+
 		// Return id and level of all required skills.
 		std::unordered_map<int32_t, int32_t> collect_required(int32_t id) const;
 
