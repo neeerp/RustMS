@@ -218,8 +218,50 @@ pub async fn check_char_name_available(
     config: &HarnessConfig,
     name: &str,
 ) -> Result<bool, HarnessError> {
-    let (mut login_conn, _) = login_until_char_select(config).await?;
+    Ok(check_char_name(config, name).await? == 0)
+}
 
+/// The login server's answer about `name` for a new character: 0 available,
+/// 1 taken, 2 not allowed.
+pub async fn check_char_name(config: &HarnessConfig, name: &str) -> Result<u8, HarnessError> {
+    let (mut login_conn, _) = login_until_char_select(config).await?;
+    check_char_name_on(&mut login_conn, name).await
+}
+
+/// Ask to create another character called `name`, and return the server's
+/// result code (0 created). The login connection must still answer
+/// afterwards.
+pub async fn create_another_character(
+    config: &HarnessConfig,
+    name: &str,
+) -> Result<u8, HarnessError> {
+    let (mut login_conn, _) = login_until_char_select(config).await?;
+    login_conn
+        .send_packet(
+            build_create_char(name, CharacterTemplate::default_for_gender(config.gender)).map_err(
+                |message| HarnessError::protocol("create char", login_conn.endpoint(), message),
+            )?,
+            "create char",
+        )
+        .await?;
+    let response = read_packet(&mut login_conn, "create char").await?;
+    assert_opcode(
+        "create char",
+        &response,
+        login_conn.endpoint(),
+        SendOpcode::NewCharacter as i16,
+    )?;
+    let result = *response.packet.bytes.get(2).ok_or_else(|| {
+        HarnessError::protocol("create char", login_conn.endpoint(), "no result code")
+    })?;
+    check_char_name_on(&mut login_conn, name).await?;
+    Ok(result)
+}
+
+async fn check_char_name_on(
+    login_conn: &mut MapleTestConnection,
+    name: &str,
+) -> Result<u8, HarnessError> {
     login_conn
         .send_packet(
             build_check_char_name(name).map_err(|message| {
@@ -229,7 +271,7 @@ pub async fn check_char_name_available(
         )
         .await?;
 
-    let response = read_packet(&mut login_conn, "check char name").await?;
+    let response = read_packet(login_conn, "check char name").await?;
     let decoded = decode_char_name_response(&response.packet).map_err(|message| {
         HarnessError::protocol("check char name", login_conn.endpoint(), message)
     })?;
@@ -243,7 +285,7 @@ pub async fn check_char_name_available(
             ),
         ));
     }
-    Ok(decoded.available)
+    Ok(decoded.result)
 }
 
 async fn login_until_redirect(

@@ -1,12 +1,16 @@
-use super::check_name::name_is_available;
+use super::check_name::check_name;
 use crate::error::NetworkError;
 use crate::handler::{HandlerResult, LoginContext, LoginHandler, LoginResult};
+use crate::load::{self, asset_path};
 use crate::packet::build::login;
+use crate::packet::build::login::char::{CreateFailure, NameCheck};
 use db::character::NewCharacter;
 use game::inventory::equip_slot;
 use game::{InventoryType, Item};
+use game_data::make_char_info::MakeCharInfo;
 use packet::{io::read::PktRead, Packet};
 use std::io::Cursor;
+use std::sync::OnceLock;
 
 pub struct CreateCharacterHandler;
 
@@ -18,7 +22,8 @@ impl LoginHandler for CreateCharacterHandler {
         let session = ctx.session()?;
         let name = reader.read_str_with_length()?;
         // The creation packet carries a class-family flag, not a job ID.
-        let job = starting_job(reader.read_int()?)?;
+        let class_family = reader.read_int()?;
+        let job = starting_job(class_family)?;
         let face = reader.read_int()?;
         let hair = reader.read_int()?;
         let hair_color = reader.read_int()?;
@@ -29,13 +34,28 @@ impl LoginHandler for CreateCharacterHandler {
         let weapon = reader.read_int()?;
         let gender = reader.read_byte()?;
 
-        if !name_is_available(&name)? {
-            return Err(NetworkError::PacketHandlerError(
-                "Character name is invalid or taken",
-            ));
+        // The client checks all of this first, so only a forged packet or
+        // a name taken meanwhile gets here. It waits for an answer either way.
+        let fail = |reason| {
+            Ok(HandlerResult::reply(login::char::build_create_failure(
+                reason,
+            )?))
+        };
+        if check_name(&name, session.account_id)? != NameCheck::Available {
+            return fail(CreateFailure::NameRefused);
         }
-        validate_appearance(face, hair, hair_color, skin, gender)?;
-        let starting_items = starting_equipment(top, bottom, shoes, weapon)?;
+        let slots = db::account::get_account_by_id(session.account_id)?.character_slots;
+        let chosen = [face, hair, hair_color, skin, top, bottom, shoes, weapon];
+        if db::character::count_characters(session.account_id)? >= i64::from(slots)
+            || !creation_choices()
+                .map_err(NetworkError::PacketHandlerError)?
+                .allows(class_family, gender, chosen)
+        {
+            return fail(CreateFailure::Failed);
+        }
+        let Ok(starting_items) = starting_equipment(top, bottom, shoes, weapon) else {
+            return fail(CreateFailure::Failed);
+        };
 
         let character = NewCharacter {
             accountid: session.account_id,
@@ -72,33 +92,12 @@ fn starting_job(class_family: i32) -> Result<i16, NetworkError> {
     }
 }
 
-/// Character names: 4 to 12 ASCII letters or digits.
-pub(super) fn name_is_valid(name: &str) -> bool {
-    (4..=12).contains(&name.len()) && name.bytes().all(|b| b.is_ascii_alphanumeric())
-}
-
-/// Bounds checks on creation choices. The exact allowed sets live in
-/// Etc.wz/MakeCharInfo, which the server does not load yet.
-fn validate_appearance(
-    face: i32,
-    hair: i32,
-    hair_color: i32,
-    skin: i32,
-    gender: u8,
-) -> Result<(), NetworkError> {
-    let valid = (20000..22000).contains(&face)
-        && (30000..32000).contains(&hair)
-        && hair % 10 == 0
-        && (0..8).contains(&hair_color)
-        && (0..12).contains(&skin)
-        && gender <= 1;
-    if valid {
-        Ok(())
-    } else {
-        Err(NetworkError::PacketHandlerError(
-            "Invalid character appearance",
-        ))
-    }
+/// The looks and starting equipment the client offers (`MakeCharInfo.img`).
+fn creation_choices() -> Result<&'static MakeCharInfo, &'static str> {
+    static CHOICES: OnceLock<Result<MakeCharInfo, String>> = OnceLock::new();
+    load::once(&CHOICES, || {
+        MakeCharInfo::load(asset_path("RUSTMS_ETC_NX_PATH", "assets/game-data/Etc.nx"))
+    })
 }
 
 /// The chosen starting clothes and weapon, equipped. Each id must belong to
@@ -117,10 +116,6 @@ fn starting_equipment(
         (shoes, equip_slot::SHOES),
         (weapon, equip_slot::WEAPON),
     ] {
-        // Overalls leave the bottom slot empty.
-        if item_id == 0 && slot == equip_slot::BOTTOM {
-            continue;
-        }
         if equip_slot::for_item(item_id) != Some(slot) {
             return Err(NetworkError::PacketHandlerError(
                 "Invalid starting equipment",
@@ -153,33 +148,9 @@ mod tests {
     }
 
     #[test]
-    fn names_must_be_short_and_alphanumeric() {
-        assert!(name_is_valid("Maple123"));
-        assert!(!name_is_valid("abc"));
-        assert!(!name_is_valid("thirteenchars"));
-        assert!(!name_is_valid("bad name"));
-        assert!(!name_is_valid("ünï"));
-    }
-
-    #[test]
     fn starting_equipment_must_match_its_slot() {
         let items = starting_equipment(1040002, 1060002, 1072001, 1302000).unwrap();
         assert_eq!(items.len(), 4);
         assert!(starting_equipment(1060002, 1040002, 1072001, 1302000).is_err());
-        // Overall with no bottom.
-        assert_eq!(
-            starting_equipment(1052122, 0, 1072001, 1302000)
-                .unwrap()
-                .len(),
-            3
-        );
-    }
-
-    #[test]
-    fn appearance_is_bounds_checked() {
-        assert!(validate_appearance(20000, 30030, 0, 0, 0).is_ok());
-        assert!(validate_appearance(20000, 30031, 0, 0, 0).is_err());
-        assert!(validate_appearance(1, 30030, 0, 0, 0).is_err());
-        assert!(validate_appearance(20000, 30030, 9, 0, 0).is_err());
     }
 }

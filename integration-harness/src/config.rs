@@ -42,7 +42,7 @@ impl HarnessConfig {
         Self {
             username: random_name("iu"),
             password: "test".to_string(),
-            character_name: random_name("ic"),
+            character_name: random_character_name("ic"),
             gender: 0,
             world_id: 0,
             channel_id: 0,
@@ -84,7 +84,7 @@ impl MultiHarnessConfig {
                     role: "sender".to_string(),
                     username: random_name("is"),
                     password: "test".to_string(),
-                    character_name: random_name("cs"),
+                    character_name: random_character_name("cs"),
                     gender: 0,
                     world_id: 0,
                     channel_id: 0,
@@ -93,7 +93,7 @@ impl MultiHarnessConfig {
                     role: "recipient".to_string(),
                     username: random_name("ir"),
                     password: "test".to_string(),
-                    character_name: random_name("cr"),
+                    character_name: random_character_name("cr"),
                     gender: 0,
                     world_id: 0,
                     channel_id: 0,
@@ -148,6 +148,18 @@ fn parse_addr(name: &'static str, value: String) -> Result<SocketAddr, HarnessEr
             value,
             source,
         })
+}
+
+/// A name the server accepts for a character. Character names may not
+/// contain any of hundreds of short words (`Etc.nx` `ForbiddenName.img` and
+/// `Curse.img`); no word fits in these letters after these prefixes.
+fn random_character_name(prefix: &str) -> String {
+    const LETTERS: &[u8] = b"012345679bdjknpqvyz";
+    let mut rng = thread_rng();
+    let suffix = (0..10)
+        .map(|_| char::from(LETTERS[rng.gen_range(0..LETTERS.len())]))
+        .collect::<String>();
+    format!("{prefix}{suffix}")
 }
 
 fn random_name(prefix: &str) -> String {

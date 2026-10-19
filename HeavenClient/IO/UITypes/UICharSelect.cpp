@@ -604,6 +604,13 @@ namespace ms
 			enter_game();
 			break;
 		case Buttons::BT_NEW:
+			// v83 (FUN_005f6425) keeps the button and says when every slot is taken
+			if (characters_count >= slots)
+			{
+				UI::get().emplace<UILoginNotice>(UILoginNotice::Message::FULL_CHARACTER_SLOTS);
+				break;
+			}
+
 			Sound(Sound::Name::SCROLLUP).play();
 
 			deactivate();
@@ -639,7 +646,6 @@ namespace ms
 
 		buttons[Buttons::BT_SELECT]->set_state(any ? Button::State::NORMAL : Button::State::DISABLED);
 		buttons[Buttons::BT_DELETE]->set_state(any ? Button::State::NORMAL : Button::State::DISABLED);
-		buttons[Buttons::BT_NEW]->set_state(characters_count < slots ? Button::State::NORMAL : Button::State::DISABLED);
 
 		if (menu_focus >= 0 && buttons[menu_focus]->get_state() == Button::State::DISABLED)
 			move_focus(1);

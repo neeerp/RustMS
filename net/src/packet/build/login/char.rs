@@ -22,11 +22,21 @@ pub fn build_char_list(
     Ok(packet)
 }
 
-pub fn build_char_name_response(name: &str, valid: bool) -> Result<Packet, NetworkError> {
+/// The answer to a name check, as the client shows it.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum NameCheck {
+    Available = 0,
+    /// "This name is currently being used."
+    Taken = 1,
+    /// "You cannot use this name."
+    Refused = 2,
+}
+
+pub fn build_char_name_response(name: &str, check: NameCheck) -> Result<Packet, NetworkError> {
     let mut packet = Packet::new_empty();
     packet.write_short(SendOpcode::CharNameResponse as i16)?;
     packet.write_str_with_length(name)?;
-    packet.write_byte(!valid as u8)?;
+    packet.write_byte(check as u8)?;
     Ok(packet)
 }
 
@@ -47,6 +57,25 @@ pub fn build_char_packet(
     packet.write_short(SendOpcode::NewCharacter as i16)?;
     packet.write_byte(0)?;
     write_char_entry(&mut packet, stats, look)?;
+    Ok(packet)
+}
+
+/// Why a character was not created. The client stays on the creation
+/// window and shows a notice.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum CreateFailure {
+    /// "You cannot use this name. Please check again."
+    NameRefused = 0x1E,
+    /// "Failed due to unknown reason. Please try again later." Any code
+    /// the client does not know shows this.
+    Failed = 1,
+}
+
+/// ADD_NEW_CHAR_ENTRY when the character was not created.
+pub fn build_create_failure(reason: CreateFailure) -> Result<Packet, NetworkError> {
+    let mut packet = Packet::new_empty();
+    packet.write_short(SendOpcode::NewCharacter as i16)?;
+    packet.write_byte(reason as u8)?;
     Ok(packet)
 }
 
@@ -108,19 +137,27 @@ mod tests {
     }
 
     #[test]
-    fn name_response_flags_taken_names() {
-        let free = build_char_name_response("Fresh", true).unwrap();
-        Expect::new(&free.bytes)
-            .short(SendOpcode::CharNameResponse as i16)
-            .string("Fresh")
-            .byte(0)
-            .end();
+    fn name_response_says_why_a_name_cannot_be_used() {
+        for (check, code) in [
+            (NameCheck::Available, 0),
+            (NameCheck::Taken, 1),
+            (NameCheck::Refused, 2),
+        ] {
+            let packet = build_char_name_response("Fresh", check).unwrap();
+            Expect::new(&packet.bytes)
+                .short(SendOpcode::CharNameResponse as i16)
+                .string("Fresh")
+                .byte(code)
+                .end();
+        }
+    }
 
-        let taken = build_char_name_response("Taken", false).unwrap();
-        Expect::new(&taken.bytes)
-            .short(SendOpcode::CharNameResponse as i16)
-            .string("Taken")
-            .byte(1)
+    #[test]
+    fn a_failed_creation_is_only_its_code() {
+        let packet = build_create_failure(CreateFailure::NameRefused).unwrap();
+        Expect::new(&packet.bytes)
+            .short(SendOpcode::NewCharacter as i16)
+            .byte(0x1E)
             .end();
     }
 

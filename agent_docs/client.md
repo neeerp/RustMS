@@ -370,7 +370,11 @@ from `UI.nx`. Moved so far:
   `NewChar`, and `NewCharAran`): one class for all three races, with a
   `Layout` per race for its board and button positions. The new character
   stands in the race's scene. A `charName` board asks for the name first. OK
-  checks it against `Etc.img/ForbiddenName` and the server. The `charSet`
+  checks it as v83 does (4 to 12 letters or digits, fewer than four `I` and
+  `l`, and, except for GMs, no word from `Etc.img/ForbiddenName` or
+  `Curse` anywhere in it), then asks the server. Enter on an empty name does
+  nothing. The server's answer 1 shows "currently being used", 2 "cannot use
+  this name", and anything else "unknown reason". The `charSet`
   board then has nine rows of `avatarSel` with `BtLeft` and `BtRight`
   arrows. Their choices come from `Etc.img/MakeCharInfo`: `Info/CharMale`
   and `CharFemale` for Explorers, `PremiumCharMale` and `PremiumCharFemale`
@@ -379,8 +383,13 @@ from `UI.nx`. Moved so far:
   Musashi Shoes, drop to the 10 px font. Cancel on `charSet` returns to the
   name, and Cancel on `charName` or Back returns to the race select. Once
   the server adds the character, the scene scrolls back to the character
-  select with the new character picked. Positions are checked against v0.73
-  footage.
+  select with the new character picked. If it refuses (a non-zero result in
+  `NewCharacter`), a notice says why and the window stays: 0x1E "cannot use
+  this name", 0x0A "too many connection requests", anything else "unknown
+  reason" (v83 has its own text for 0x1A, a pending transfer, which the
+  server never sends). The character select's New button stays enabled and
+  answers "No more characters can be created" when every slot is taken.
+  Positions are checked against v0.73 footage.
 - **Login dialogs** (`UILoginNotice`, `UIQuitConfirm`, `UILoginWait`,
   `UITermsOfService`, `UIGender`): notices are a 362x219 `Notice/backgrnd`
   scroll at (219, 170). Errors use `backgrnd/1`, with the "no" stamp.

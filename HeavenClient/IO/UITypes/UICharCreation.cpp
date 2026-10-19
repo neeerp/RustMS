@@ -26,10 +26,12 @@
 
 #include "../Components/MapleButton.h"
 
+#include "../../Configuration.h"
 #include "../../Constants.h"
 
 #include "../../Audio/Audio.h"
 #include "../../Data/ItemData.h"
+#include "../../Util/CharacterName.h"
 #include "../../Util/NxFiles.h"
 
 #include "../../Net/Packets/CharCreationPackets.h"
@@ -145,10 +147,12 @@ namespace ms
 
 		name = Textfield(Text::Font::A12M, Text::Alignment::LEFT, layout.name_color, layout.name_slot, 12);
 
+		// Enter on an empty name does nothing; OK says it cannot be used
 		name.set_enter_callback(
-			[&](std::string)
+			[&](std::string text)
 			{
-				button_pressed(Buttons::BT_OK);
+				if (!text.empty())
+					button_pressed(Buttons::BT_OK);
 			}
 		);
 
@@ -246,7 +250,7 @@ namespace ms
 
 		if (escape)
 			button_pressed(Buttons::BT_CANCEL);
-		else if (keycode == KeyAction::Id::RETURN)
+		else if (keycode == KeyAction::Id::RETURN && (settings || !name.get_text().empty()))
 			button_pressed(Buttons::BT_OK);
 	}
 
@@ -255,12 +259,12 @@ namespace ms
 		return TYPE;
 	}
 
-	void UICharCreation::send_naming_result(bool nameused)
+	void UICharCreation::send_naming_result(uint8_t result)
 	{
 		if (settings)
 			return;
 
-		if (!nameused)
+		if (result == 0)
 		{
 			enable_buttons(true);
 			show_settings(true);
@@ -268,14 +272,36 @@ namespace ms
 			return;
 		}
 
+		// v83 (FUN_005f9c72): 1 is a taken name, 2 one the server refuses
+		UILoginNotice::Message message = UILoginNotice::Message::UNKNOWN_ERROR;
+
+		if (result == 1)
+			message = UILoginNotice::Message::NAME_IN_USE;
+		else if (result == 2)
+			message = UILoginNotice::Message::ILLEGAL_NAME;
+
 		UI::get().emplace<UILoginNotice>(
-			UILoginNotice::Message::NAME_IN_USE,
+			message,
 			[&]()
 			{
 				enable_buttons(true);
 				name.set_state(Textfield::State::FOCUSED);
 			}
 		);
+	}
+
+	void UICharCreation::send_creation_failed(uint8_t result)
+	{
+		// 0x1A, a pending world transfer, has its own text in v83; the
+		// server never sends it.
+		UILoginNotice::Message message = UILoginNotice::Message::UNKNOWN_ERROR;
+
+		if (result == 0x0A)
+			message = UILoginNotice::Message::TOO_MANY_REQUESTS;
+		else if (result == 0x1E)
+			message = UILoginNotice::Message::ILLEGAL_NAME;
+
+		UI::get().emplace<UILoginNotice>(message, [&]() { enable_buttons(true); });
 	}
 
 	void UICharCreation::send_created()
@@ -343,13 +369,10 @@ namespace ms
 	{
 		std::string text = name.get_text();
 
-		if (text.empty())
-			return;
-
 		enable_buttons(false);
 		name.set_state(Textfield::State::DISABLED);
 
-		if (text.size() >= 4 && name_allowed(text))
+		if (name_allowed(text))
 		{
 			NameCharPacket(text).dispatch();
 
@@ -500,13 +523,32 @@ namespace ms
 		}
 	}
 
+	// v83's name rules (FUN_0079fc74), and for everyone but GMs no word from
+	// ForbiddenName.img or, up to a comma, Curse.img anywhere in the name
 	bool UICharCreation::name_allowed(const std::string &text) const
 	{
+		if (!character_name_valid(text))
+			return false;
+
+		if (Configuration::get().get_admin())
+			return true;
+
 		std::string lower = to_lower(text);
 
 		for (auto forbidden : nl::nx::etc["ForbiddenName.img"])
 			if (lower.find(to_lower(forbidden)) != std::string::npos)
 				return false;
+
+		for (auto curse : nl::nx::etc["Curse.img"])
+		{
+			std::string word = curse;
+			word = word.substr(0, word.find(','));
+			word.erase(0, word.find_first_not_of(' '));
+			word.erase(word.find_last_not_of(' ') + 1);
+
+			if (!word.empty() && lower.find(to_lower(word)) != std::string::npos)
+				return false;
+		}
 
 		return true;
 	}

@@ -42,7 +42,8 @@ pub struct CharListPacket {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CharNameResponsePacket {
     pub name: String,
-    pub available: bool,
+    /// 0 available, 1 taken, 2 not allowed.
+    pub result: u8,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -718,13 +719,10 @@ pub fn decode_char_name_response(packet: &Packet) -> Result<CharNameResponsePack
     let name = cursor
         .read_str_with_length()
         .map_err(|e| format!("failed to read char-name response name: {e}"))?;
-    let unavailable_flag = cursor
+    let result = cursor
         .read_byte()
-        .map_err(|e| format!("failed to read char-name availability flag: {e}"))?;
-    Ok(CharNameResponsePacket {
-        name,
-        available: unavailable_flag == 0,
-    })
+        .map_err(|e| format!("failed to read char-name result: {e}"))?;
+    Ok(CharNameResponsePacket { name, result })
 }
 
 pub fn decode_new_character(packet: &Packet) -> Result<NewCharacterPacket, String> {

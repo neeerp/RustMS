@@ -204,18 +204,25 @@ namespace ms
 
 	void CharnameResponseHandler::handle(InPacket& recv) const
 	{
-		// Read the name and if it is already in use
+		// Read the name and whether it may be used
 		std::string name = recv.read_string();
-		bool used = recv.read_bool();
+		uint8_t result = recv.read_byte();
 
 		// Notify the character creation screen
 		if (auto charcreation = UI::get().get_element<UICharCreation>())
-			charcreation->send_naming_result(used);
+			charcreation->send_naming_result(result);
 	}
 
 	void AddNewCharEntryHandler::handle(InPacket& recv) const
 	{
-		recv.skip(1);
+		// v83 (FUN_005fa26c) stays on the creation screen and says why
+		if (uint8_t result = recv.read_byte())
+		{
+			if (auto charcreation = UI::get().get_element<UICharCreation>())
+				charcreation->send_creation_failed(result);
+
+			return;
+		}
 
 		// Parse info on the new character
 		CharEntry character = LoginParser::parse_charentry(recv);
