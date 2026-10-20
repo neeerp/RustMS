@@ -101,6 +101,8 @@ namespace ms
 			// A mob's Undead shares Puppet's bit (46); its reason tells them
 			// apart.
 			UNDEAD,
+			// Hunter's Luck (2450000): only its icon shows.
+			EXP_BUFF,
 			STOP_POTION,
 			STOP_MOTION,
 			FEAR,

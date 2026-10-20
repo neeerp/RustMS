@@ -349,6 +349,17 @@ mod tests {
     }
 
     #[test]
+    fn hunters_luck_sets_bit_74() {
+        let packet = build_give_buff(-2450000, 1_800_000, &[(BuffStat::ExpBuff, 200)]).unwrap();
+        let mut expect = Expect::new(&packet.bytes);
+        expect.short(SendOpcode::GiveBuff as i16);
+        expect.long(1 << 42).long(0);
+        expect.short(200).int(-2450000).int(1_800_000);
+        expect.byte(0).byte(0).short(0);
+        expect.end();
+    }
+
+    #[test]
     fn diseases_that_stop_movement_carry_the_movement_byte() {
         let seduce = 128 | 3 << 16;
         let packet = build_give_buff(seduce, 5_000, &[(BuffStat::Seduce, 3)]).unwrap();
