@@ -115,6 +115,10 @@ namespace ms
 		void show_affected(int32_t cid, int32_t skillid);
 		void show_player_affected(int32_t skillid);
 
+		// Show Recoil Shot's effect on another user whose path shows its push
+		// (0x980104).
+		void show_recoil_shot(Char &user);
+
 		// Show a skill's `special` animation on a user or the player (0x936528): the skill that
 		// dodged a hit, Guardian or Shadow Shifter, or Dragon Blood drinking HP (user effect 5).
 		void show_special(int32_t cid, int32_t skillid);

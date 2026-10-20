@@ -34,6 +34,7 @@
 #include "../Gameplay/Combat/Dash.h"
 #include "../Gameplay/Combat/EnergyCharge.h"
 #include "../Gameplay/Combat/FlashJump.h"
+#include "../Gameplay/Combat/RecoilShot.h"
 #include "../Gameplay/Combat/Wings.h"
 #include "../Gameplay/Combat/MagicDamage.h"
 #include "../Gameplay/MapleMap/FieldLimit.h"
@@ -514,6 +515,15 @@ namespace ms
 		flash_jump::Impulse push = flash_jump::impulse(level, !facing_right);
 
 		record_move(6);
+		Physics::knockback(phobj, push.vx, push.vy);
+		flash_jumped = true;
+	}
+
+	void Player::recoil_shot(int32_t level)
+	{
+		flash_jump::Impulse push = recoil_shot::backstep(level, !facing_right);
+
+		record_move(recoil_shot::MOVE);
 		Physics::knockback(phobj, push.vx, push.vy);
 		flash_jumped = true;
 	}

@@ -29,6 +29,7 @@
 #include "MesoExplosion.h"
 #include "PointBlank.h"
 #include "Prepare.h"
+#include "RecoilShot.h"
 #include "RemoteShot.h"
 #include "RemoteSpell.h"
 #include "ShotPath.h"
@@ -245,6 +246,10 @@ namespace ms
 		}
 
 		const SpecialMove &move = get_move(move_id);
+
+		// Recoil Shot waits a while to be shot again (0x953a79).
+		if (move_id == recoil_shot::ID && now < reuse_times[move_id])
+			return false;
 
 		if (!can_use_move(move))
 			return false;
@@ -1753,6 +1758,13 @@ namespace ms
 
 	void Combat::apply_use_movement(const SpecialMove &move)
 	{
+		// Recoil Shot pushes the player back as it goes (0x954336).
+		if (move.get_id() == recoil_shot::ID)
+		{
+			player.recoil_shot(player.get_skills().get_level(recoil_shot::ID));
+			reuse_times[recoil_shot::ID] = now + recoil_shot::REUSE_DELAY;
+		}
+
 		switch (move.get_id())
 		{
 			case SkillId::Id::TELEPORT_FP:
@@ -1880,7 +1892,10 @@ namespace ms
 				user.attack("assassinationS");
 			} else if (!prepare::throws(attack.skill))
 			{
-				move.apply_useeffects(user);
+				// Recoil Shot's shows when the user's path shows its push
+				// (0x980785).
+				if (attack.skill != recoil_shot::ID)
+					move.apply_useeffects(user);
 
 				if (combo::finisher(attack.skill))
 					user.show_combo_finish(attack.skill);
@@ -2691,6 +2706,11 @@ namespace ms
 			const SkillPrepare::Effect &affected = get_skill(skillid).get_affected();
 			ouser->show_attack_effect(affected.animation, affected.z);
 		}
+	}
+
+	void Combat::show_recoil_shot(Char &user)
+	{
+		get_move(recoil_shot::ID).apply_useeffects(user);
 	}
 
 	void Combat::show_player_affected(int32_t skillid)
