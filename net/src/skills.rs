@@ -651,8 +651,17 @@ pub fn elemental_boost(player: &Player, skill_id: i32) -> Option<Learned> {
 /// the Night Walker's Venom.
 const VENOMS: [(i32, bool); 3] = [(4120005, true), (4220005, false), (14110004, true)];
 
+/// The buffs that arm the player's hits, with what they put on the mobs:
+/// Hamstring slows them, and Blind makes their hits miss by its percent.
+const ARMED: [(i32, BuffStat, MobStat); 2] = [
+    (3121007, BuffStat::Hamstring, MobStat::Speed),
+    (3221006, BuffStat::Blind, MobStat::Blind),
+];
+
 /// What an attack puts on each mob it hits, besides its damage: its
-/// skill's status, and the poison of a thief's Venom, each second a roll
+/// skill's status, Hamstring's or Blind's `x` by their `prop` for `y`
+/// seconds while they last (Cosmic's AbstractDealDamageHandler), and the
+/// poison of a thief's Venom, each second a roll
 /// between (8 (STR + LUK) + 2 DEX) / 100 and (18.5 (STR + LUK) + 2 DEX) /
 /// 100 times the Venom's `mad` (the old community damage formulas).
 pub fn on_hit(player: &Player, skill: Option<&Learned>, ranged: bool, roll: f64) -> Vec<Inflict> {
@@ -666,6 +675,18 @@ pub fn on_hit(player: &Player, skill: Option<&Learned>, ranged: bool, roll: f64)
                 }
             }
             inflicts.push(inflict);
+        }
+    }
+    for (skill_id, buff, status) in ARMED {
+        let armed = learned(player, skill_id).filter(|_| player.buffs.has(buff));
+        if let Some(skill) = armed {
+            let effect = &skill.effect;
+            inflicts.push(Inflict {
+                skill_id,
+                prop: if effect.prop > 0 { effect.prop } else { 100 },
+                duration: Duration::from_secs(effect.y.max(0) as u64),
+                statuses: vec![(status, Amount::Value(effect.x as i16))],
+            });
         }
     }
     let venom = VENOMS
@@ -968,6 +989,8 @@ pub fn buffs(skill: &Learned) -> Option<Vec<(BuffStat, i32)>> {
         2311003 => vec![(BuffStat::HolySymbol, effect.x)],
         2121004 | 2221004 | 2321004 => vec![(BuffStat::Infinity, effect.x)],
         2321005 => vec![(BuffStat::HolyShield, effect.x)],
+        3121007 => vec![(BuffStat::Hamstring, effect.x)],
+        3221006 => vec![(BuffStat::Blind, effect.x)],
         1005 | 10001005 | 20001005 => vec![(BuffStat::EchoOfHero, effect.x)],
         2121002 | 2221002 | 2321002 => vec![(BuffStat::ManaReflection, skill.level)],
         3101004 | 3201004 => vec![(BuffStat::SoulArrow, effect.x)],
@@ -1167,6 +1190,39 @@ mod tests {
         assert_eq!(poison.against(0), 1);
         assert_eq!(poison.against(i32::MAX), i16::MAX);
         assert_eq!(Amount::Value(-20).against(1000), -20);
+    }
+
+    #[test]
+    fn hamstring_and_blind_arm_hits_while_they_last() {
+        if data().is_err() {
+            return;
+        }
+        let mut player = knowing(&[(3121007, 30), (3221006, 30)]);
+        assert!(on_hit(&player, None, true, 0.5).is_empty());
+        let now = std::time::Instant::now();
+        let lasts = Duration::from_secs(180);
+        for (skill_id, stat) in [(3121007, BuffStat::Hamstring), (3221006, BuffStat::Blind)] {
+            player
+                .buffs
+                .give(game::Buff::new(skill_id, stat, 1, now, lasts));
+        }
+        // At 30: a 40% chance of -60 speed or a 30% miss, for 15 seconds.
+        let armed = |skill_id, status| Inflict {
+            skill_id,
+            prop: 40,
+            duration: Duration::from_secs(15),
+            statuses: vec![(
+                status,
+                Amount::Value(if skill_id == 3121007 { -60 } else { 30 }),
+            )],
+        };
+        assert_eq!(
+            on_hit(&player, None, true, 0.5),
+            [
+                armed(3121007, MobStat::Speed),
+                armed(3221006, MobStat::Blind)
+            ]
+        );
     }
 
     #[test]

@@ -2398,6 +2398,7 @@ namespace ms
 		attack.invincible = invincible;
 		attack.powerup = status_value(MobStatParser::POWER_UP);
 		attack.magicup = status_value(MobStatParser::MAGIC_UP);
+		attack.blind = status_value(MobStatParser::BLIND);
 
 		return attack;
 	}

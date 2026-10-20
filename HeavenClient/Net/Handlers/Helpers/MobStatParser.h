@@ -53,6 +53,7 @@ namespace ms
 			HARD_SKIN = 21,
 			AMBUSH = 22,
 			VENOM = 24,
+			BLIND = 25,
 			BURNED = 27,
 			PCOUNTER = 29,
 			MCOUNTER = 30,

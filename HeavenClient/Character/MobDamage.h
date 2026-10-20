@@ -139,6 +139,14 @@ namespace ms
 			return std::clamp(chance, 2.0, 80.0);
 		}
 
+		// A blinded monster's hit, touch or attack, misses by the Blind's
+		// percent before any avoid roll (FUN_009581a9, 0x9585c3). `roll` is
+		// uniform in [0, 1).
+		inline bool blinded(int32_t blind, double roll)
+		{
+			return roll * 100.0 < blind;
+		}
+
 		// A magic hit misses when the monster's accuracy doesn't beat a roll
 		// between a tenth of the player's avoid and all of it. `roll` is
 		// uniform in [0, 1).

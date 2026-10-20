@@ -122,6 +122,8 @@ namespace ms
 		// hits at, or 0 without one.
 		int32_t powerup = 0;
 		int32_t magicup = 0;
+		// A Blind's percent chance that the hit misses outright.
+		int32_t blind = 0;
 		Point<int16_t> origin;
 		// Which of the mob's attacks (attack1 is 0) hit, or -1 for its body.
 		int8_t index = -1;
