@@ -58,6 +58,9 @@ namespace ms
 		const Point<int16_t> PAGES_POS = Point<int16_t>(480, 505);
 		const Point<int16_t> BEST_POS = Point<int16_t>(697, 158);
 		const int16_t BEST_STEP = 69;
+		// v83's Best Item window; each item is 90 x 68 of its 69 px step.
+		const Point<int16_t> BEST_WINDOW = Point<int16_t>(690, 157);
+		const int16_t BEST_WIDTH = 90;
 		const Point<int16_t> CASH_GRID_POS = Point<int16_t>(21, 349);
 		const Point<int16_t> ITEM_GRID_POS = Point<int16_t>(23, 481);
 		const int16_t GRID_STEP = 35;
@@ -342,7 +345,7 @@ namespace ms
 		{
 			Point<int16_t> pos = position + BEST_POS + Point<int16_t>(0, BEST_STEP * i);
 
-			ItemData::get(best_items[i].item_id).get_icon(false).draw(pos + Point<int16_t>(45, 1) + ICON_OFFSET);
+			ItemData::get(best_items[i].commodity.item_id).get_icon(false).draw(pos + Point<int16_t>(45, 1) + ICON_OFFSET);
 			best_items[i].name.draw(pos + Point<int16_t>(0, 31));
 			best_items[i].price.draw(pos + Point<int16_t>(0, 48));
 		}
@@ -621,6 +624,25 @@ namespace ms
 
 			if (int64_t cash_id = inventory.get_cash_id(item_tab, slot); cash_id && request())
 				PutBackCashItemPacket(cash_id, item_tab).dispatch();
+
+			return;
+		}
+
+		// A Best Item buys on a double-click, after the level gates its BUY button lacks
+		// (FUN_004bb884).
+		Point<int16_t> in_best = cursor - BEST_WINDOW;
+		bool on_best = in_best.x() >= 0 && in_best.x() < BEST_WIDTH && in_best.y() >= 0 && in_best.y() % BEST_STEP < BEST_STEP - 1;
+		size_t best = on_best ? in_best.y() / BEST_STEP : best_items.size();
+
+		if (best < best_items.size() && !pending)
+		{
+			const Commodity& commodity = best_items[best].commodity;
+			int16_t level = Stage::get().get_player().get_stats().get_stat(MapleStat::Id::LEVEL);
+
+			if (const char* refusal = best_item_refusal(commodity.item_id, level))
+				UI::get().emplace<UIOk>(refusal, [](bool) {});
+			else
+				UICashBuy::open(commodity, credit, points, prepaid);
 		}
 	}
 
@@ -698,7 +720,7 @@ namespace ms
 				continue;
 
 			Best entry = {
-				commodity.item_id,
+				commodity,
 				Text(Text::Font::A12M, Text::Alignment::LEFT, Color::Name::BLACK, ItemData::get(commodity.item_id).get_name()),
 				Text(Text::Font::A12M, Text::Alignment::LEFT, Color::Name::WHITE, price_text(commodity))
 			};

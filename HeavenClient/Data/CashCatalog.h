@@ -192,6 +192,26 @@ namespace ms
 			return sns;
 		}
 
+		// Why v83 (FUN_004bb884) won't buy a Best Item on a double-click, or nullptr when it will:
+		// megaphones (507) need level 11, store permits (514) and Hired Merchants (503) level 16,
+		// and Teleport Rocks (504) level 7. It also keeps the shops from accounts registered
+		// less than 14 days ago (0xea5), a date HC doesn't get.
+		inline const char* best_item_refusal(int32_t item_id, int32_t level)
+		{
+			int32_t kind = item_id / 10000;
+
+			if (kind == 507 && level <= 10)
+				return "This megaphone is only available for \\ncharacters that are over Level 10.";
+
+			if ((kind == 514 || kind == 503) && level <= 15)
+				return "Hired Merchant's Shop is only available for \\ncharacters that are over Level 15.";
+
+			if (kind == 504 && level <= 6)
+				return "This teleport rock is only available for \\ncharacters that are over level 6.";
+
+			return nullptr;
+		}
+
 		// What a purchase is paid with, as the server numbers it.
 		enum CashType : int32_t
 		{

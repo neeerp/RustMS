@@ -74,6 +74,12 @@ int main()
 		require(advancement_slots(500, 2, 92, 4) == 4 && advancement_slots(1100, 4, 92, 4) == 4, "pirates and Cygnus warriors as warriors");
 		require(advancement_slots(900, 2, 92, 4) == 0, "GMs aren't asked");
 
+		require(!best_item_refusal(5072000, 11) && best_item_refusal(5072000, 10), "megaphones from level 11");
+		require(best_item_refusal(5030000, 15) && best_item_refusal(5140000, 15) && !best_item_refusal(5030000, 16),
+			"shops from level 16");
+		require(best_item_refusal(5040000, 6) && !best_item_refusal(5040000, 7) && !best_item_refusal(5000000, 1),
+			"rocks from level 7, others always");
+
 		require(page_count(0) == 1 && page_count(10) == 1 && page_count(11) == 2, "ten items to a page");
 
 		std::cout << "Cash catalog passed\n";
