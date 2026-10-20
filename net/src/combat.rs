@@ -466,14 +466,14 @@ fn assassinate_most(skill: &Learned) -> i32 {
 /// The MP a skill's attack spends: none for Heal, whose USE_SKILL paid,
 /// for Final Attack, or for Assassinate's second strike, as the client
 /// paid for both strikes on the key press (0x966f7a).
-pub fn attack_mp_cost(skill: &Learned, attack: &Attack) -> i32 {
+pub fn attack_mp_cost(player: &Player, skill: &Learned, attack: &Attack) -> i32 {
     if skill.skill_id == skills::HEAL
         || skills::FINAL_ATTACKS.contains(&skill.skill_id)
         || second_strike(attack)
     {
         0
     } else {
-        skill.effect.mp_cost
+        skills::mp_cost(player, skill)
     }
 }
 
@@ -572,7 +572,7 @@ pub fn validate(attack: &Attack, player: &Player) -> Result<Uses, AttackRejectio
             return Err(AttackRejection::Skill);
         };
         hp = skills::hp_cost(player, &skill).ok_or(AttackRejection::NotEnoughHp)?;
-        if i32::from(player.stats.mp) < attack_mp_cost(&skill, attack) {
+        if i32::from(player.stats.mp) < attack_mp_cost(player, &skill, attack) {
             return Err(AttackRejection::NotEnoughMp);
         }
         mesos = meso_cost(&skill, player);
@@ -1472,7 +1472,8 @@ mod tests {
             let mut attack =
                 parse_close_attack(&skill_attack_packet(ASSASSINATE, 1, damage)).unwrap();
             attack.display = display;
-            validate(&attack, player).map(|uses| attack_mp_cost(&uses.skill.unwrap(), &attack))
+            validate(&attack, player)
+                .map(|uses| attack_mp_cost(player, &uses.skill.unwrap(), &attack))
         };
         // Twice 171 at 600%, five times over for 12 seconds in Dark Sight.
         assert_eq!(strike(&player, 0, 10_260), Ok(40));

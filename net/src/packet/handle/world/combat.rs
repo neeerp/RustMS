@@ -189,9 +189,8 @@ impl WorldHandler for AttackHandler {
             ctx.player.buffs.start_cooldown(attack.skill, now, length);
         }
         if let Some(skill) = uses.skill {
-            let mut updates = vec![StatUpdate::Mp(
-                ctx.player.add_mp(-combat::attack_mp_cost(&skill, &attack)),
-            )];
+            let cost = combat::attack_mp_cost(ctx.player, &skill, &attack);
+            let mut updates = vec![StatUpdate::Mp(ctx.player.add_mp(-cost))];
             if uses.hp > 0 {
                 updates.push(StatUpdate::Hp(ctx.player.add_hp(-uses.hp)));
             }

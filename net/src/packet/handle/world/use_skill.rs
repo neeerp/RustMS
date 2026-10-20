@@ -484,10 +484,11 @@ fn use_magnet(
     if caught.is_none() {
         return Err(Refusal::TooManyMobs);
     }
-    if i32::from(player.stats.mp) < skill.effect.mp_cost {
+    let mp_cost = skills::mp_cost(player, &skill);
+    if i32::from(player.stats.mp) < mp_cost {
         return Err(Refusal::NotEnoughMp);
     }
-    player.add_mp(-skill.effect.mp_cost);
+    player.add_mp(-mp_cost);
     Ok(skill)
 }
 
@@ -527,10 +528,11 @@ fn heal(player: &mut Player, level: i32, party: u8, roll: f64) -> Result<(i16, i
     let skill = skills::learned(player, skills::HEAL)
         .filter(|skill| skill.level == level)
         .ok_or(Refusal::NotLearned)?;
-    if i32::from(player.stats.mp) < skill.effect.mp_cost {
+    let mp_cost = skills::mp_cost(player, &skill);
+    if i32::from(player.stats.mp) < mp_cost {
         return Err(Refusal::NotEnoughMp);
     }
-    player.add_mp(-skill.effect.mp_cost);
+    player.add_mp(-mp_cost);
     let reached = party.count_ones() as i32;
     let amount = skills::heal_amount(player, skill.effect.hp, reached, roll) as i32;
     Ok((player.recover_hp(amount), amount))
@@ -567,10 +569,11 @@ fn ride(
     if !rideable {
         return Err(Refusal::NoMount);
     }
-    if i32::from(player.stats.mp) < skill.effect.mp_cost {
+    let mp_cost = skills::mp_cost(player, &skill);
+    if i32::from(player.stats.mp) < mp_cost {
         return Err(Refusal::NotEnoughMp);
     }
-    player.add_mp(-skill.effect.mp_cost);
+    player.add_mp(-mp_cost);
     let riding = Buff::new(skill_id, BuffStat::Riding, 0, now, mount::RIDE_DURATION);
     player.buffs.give(riding);
     Ok(Ride { item_id, skill_id })
@@ -648,7 +651,8 @@ fn use_skill(
     }
     let effect = &skill.effect;
     let hp_cost = skills::hp_cost(player, &skill).ok_or(Refusal::NotEnoughHp)?;
-    if i32::from(player.stats.mp) < effect.mp_cost {
+    let mp_cost = skills::mp_cost(player, &skill);
+    if i32::from(player.stats.mp) < mp_cost {
         return Err(Refusal::NotEnoughMp);
     }
     let cost = effect.item_cost_count.max(1);
@@ -657,7 +661,7 @@ fn use_skill(
     }
 
     player.add_hp(-hp_cost);
-    player.add_mp(-effect.mp_cost);
+    player.add_mp(-mp_cost);
     let items = if effect.item_cost != 0 {
         player
             .inventory_mut()

@@ -246,6 +246,16 @@ pub fn hp_cost(player: &Player, skill: &Learned) -> Option<i32> {
     (cost == 0 || hp > cost).then_some(cost)
 }
 
+/// The MP a skill costs: its `mpCon`, or none under Infinity, which the
+/// client zeroes for every skill (FUN_00764256, 0x76446d).
+pub fn mp_cost(player: &Player, skill: &Learned) -> i32 {
+    if player.buffs.has(BuffStat::Infinity) {
+        0
+    } else {
+        skill.effect.mp_cost
+    }
+}
+
 /// The stun Dragon Roar leaves its user in: `y` seconds of Stun, under the
 /// skill's own id, so the client shows Dragon Roar's icon and won't let it
 /// be cancelled (0xa203bf, 0x45ba47). The client never stuns the player
@@ -1091,6 +1101,23 @@ mod tests {
         assert_eq!(hp_cost(&player, &roar), Some(300));
         player.stats.hp = 499;
         assert_eq!(hp_cost(&player, &roar), None);
+    }
+
+    #[test]
+    fn infinity_makes_skills_free_of_mp() {
+        let mut player = knowing(&[]);
+        let slash_blast = at_level(1001005, 1).unwrap();
+        assert_eq!(mp_cost(&player, &slash_blast), slash_blast.effect.mp_cost);
+        assert!(slash_blast.effect.mp_cost > 0);
+        let now = std::time::Instant::now();
+        let long = Duration::from_secs(40);
+        player
+            .buffs
+            .give(game::Buff::new(2121004, BuffStat::Infinity, 1, now, long));
+        assert_eq!(mp_cost(&player, &slash_blast), 0);
+        // HP costs stay.
+        player.stats.hp = 100;
+        assert_eq!(hp_cost(&player, &slash_blast), Some(8));
     }
 
     #[test]

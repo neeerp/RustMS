@@ -827,7 +827,8 @@ namespace ms
 		Weapon::Type weapon = get_weapontype();
 		const Job &job = stats.get_job();
 		uint16_t hp = stats.get_stat(MapleStat::Id::HP);
-		uint16_t mp = stats.get_stat(MapleStat::Id::MP);
+		// Infinity zeroes every skill's MP cost (FUN_00764256, 0x76446d).
+		uint16_t mp = has_buff(Buffstat::Id::INFINITY_) ? UINT16_MAX : stats.get_stat(MapleStat::Id::MP);
 		uint16_t bullets = inventory.get_most_bullets();
 
 		SpecialMove::ForbidReason reason = move.can_use(level, weapon, job, hp, mp, bullets);
