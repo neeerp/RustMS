@@ -42,6 +42,7 @@
 #include "../../Data/CurseData.h"
 #include "../../Data/EquipData.h"
 #include "../../Data/PetData.h"
+#include "../../Gameplay/FieldEffectRules.h"
 #include "../../Gameplay/Stage.h"
 #include "../../Gameplay/WeatherRules.h"
 #include "../../Gameplay/MapleMap/FieldLimit.h"
@@ -54,6 +55,7 @@
 #include "../../Net/Packets/InventoryPackets.h"
 #include "../../Net/Packets/MiniRoomPackets.h"
 
+#include <nlnx/audio.hpp>
 #include <nlnx/nx.hpp>
 
 #include <algorithm>
@@ -99,7 +101,7 @@ namespace ms
 		constexpr const char *NAME_TAKEN = "That name is not available.";
 		constexpr const char *NO_CURSING = "Cursing is not allowed.";
 		// StringPool 0x112 and 0x318.
-		constexpr const char *WEATHER_BUSY = "The effect is taking place right now.\\nPlease try it later.";
+		constexpr const char *EFFECT_BUSY = "The effect is taking place right now.\\nPlease try it later.";
 		constexpr const char *WEATHER_PROMPT = "Please enter the attached message";
 		// StringPool 0x10f, 0xea1 and 0x111.
 		constexpr const char *MEGAPHONE_PROMPT = "Enter your comments through the megaphone.";
@@ -313,10 +315,10 @@ namespace ms
 
 			const MapInfo &mapinfo = Stage::get().get_mapinfo();
 
-			if (Stage::get().weather_busy()
+			if (Stage::get().effect_busy()
 				|| !field_limit::may_blow_weather(mapinfo.get_fieldlimit(), mapinfo.get_fieldtype()))
 			{
-				UI::get().emplace<UIOk>(WEATHER_BUSY, [](bool)
+				UI::get().emplace<UIOk>(EFFECT_BUSY, [](bool)
 				{});
 				return;
 			}
@@ -336,6 +338,34 @@ namespace ms
 				if (may_use_cash_item())
 					Stage::get().get_player().request(UseCashItemPacket(slot, item_id, text), ExclRequest::WAIT);
 			}, weather::MAX_MESSAGE);
+		}
+
+		// v83 FUN_00a0a63f, type 0x14: a jukebox asks whether to play its
+		// song, unless a song or the field's weather still plays, and sends
+		// the song's length in ms (inferred from FUN_00644dcf).
+		void use_jukebox(int16_t slot, int32_t item_id)
+		{
+			if (!may_use_cash_item())
+				return;
+
+			if (Stage::get().effect_busy())
+			{
+				UI::get().emplace<UIOk>(EFFECT_BUSY, [](bool)
+				{});
+				return;
+			}
+
+			std::string id = std::to_string(item_id);
+			std::string title = nl::nx::string["Cash.img"][id]["title"];
+			std::string path = nl::nx::item["Cash"]["0510.img"]["0" + id]["info"]["path"];
+			nl::audio song = nl::nx::sound.resolve(field_effect::jukebox_path(path));
+			int32_t length = field_effect::sound_length(static_cast<const uint8_t *>(song.data()), song.length());
+
+			UI::get().emplace<UIYesNo>("Will you play <" + title + "> on the jukebox?", [=](bool yes)
+			{
+				if (yes && may_use_cash_item())
+					Stage::get().get_player().request(UseJukeboxPacket(slot, item_id, length), ExclRequest::WAIT);
+			});
 		}
 
 		// v83 FUN_00a0a63f, type 0x17: AP Reset's dialogs pick where an AP
@@ -1040,6 +1070,8 @@ namespace ms
 							use_megaphone(slot, item_id);
 						else if (weather::is_weather(item_id))
 							use_weather(slot, item_id);
+						else if (field_effect::is_jukebox(item_id))
+							use_jukebox(slot, item_id);
 						else if (item_id == ap_reset::ITEM)
 							use_ap_reset(slot, item_id);
 						else if (sp_reset::is_item(item_id))

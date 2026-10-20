@@ -93,6 +93,21 @@ namespace ms::field_effect
 		return path;
 	}
 
+	// A sound's length in ms from its 82-byte WZ header: the bytes after it over the byte rate at byte 60 (WAVEFORMATEX
+	// nAvgBytesPerSec). Congratulation is 670302 bytes at 10000 a second, 67030 ms. 0 without a header or a rate.
+	inline int32_t sound_length(const uint8_t *data, uint32_t length)
+	{
+		if (!data || length <= 82)
+			return 0;
+
+		uint32_t rate = data[60] | data[61] << 8 | data[62] << 16 | static_cast<uint32_t>(data[63]) << 24;
+
+		if (rate == 0)
+			return 0;
+
+		return static_cast<int32_t>(static_cast<uint64_t>(length - 82) * 1000 / rate);
+	}
+
 	// The item's String Cash.img msg with the player's name for %s: "%s's song for you." (v83 sprintf, chat type 9).
 	inline std::string jukebox_line(const std::string &msg, const std::string &name)
 	{

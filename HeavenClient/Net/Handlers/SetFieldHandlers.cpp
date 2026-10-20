@@ -436,6 +436,7 @@ namespace ms
 
 		Music(field_effect::jukebox_path(path))
 			.play(field_effect::JUKEBOX_FADE, field_effect::JUKEBOX_DELAY, field_effect::JUKEBOX_FADE_IN);
+		Stage::get().start_jukebox();
 	}
 
 	void ObstacleResetHandler::handle(InPacket&) const
