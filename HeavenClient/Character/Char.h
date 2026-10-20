@@ -190,6 +190,10 @@ namespace ms
 		// its `Use` sound, unless the character just came into view, then the same over and over from 1.35 s on.
 		void show_energy(int32_t skill, bool full, bool init);
 
+		// Dash's dust, the skill's `special` looping at the feet while the character dashes on a foothold and
+		// hidden in the air (FUN_00930b27); a skill of 0 takes it away.
+		void show_dash(int32_t skill);
+
 		// Play an animation anchored to the character (e.g. a tutorial image).
 		void show_effect(const Animation &effect);
 
@@ -391,6 +395,8 @@ namespace ms
 		// The full gauge's effect, and how long until it loops; -1 once it does.
 		std::vector<Animation> energy_effect;
 		int16_t energy_wait = -1;
+		Animation dash_dust;
+		bool dashing = false;
 		Afterimage afterimage;
 		// A chair's effect and effect2 (v83 0x93c7c3), each on the face when
 		// its pos is 1 and on the feet otherwise; a negative z draws it

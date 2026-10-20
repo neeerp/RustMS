@@ -223,7 +223,8 @@ namespace ms
 		for (uint8_t bit : BuffParser::given(flags))
 			handle_buff(recv, Buffstat::by_bit(bit));
 
-		if (flags.has(BuffParser::ENERGY) || flags.has(BuffParser::RIDING))
+		if (flags.has(BuffParser::ENERGY) || flags.has(BuffParser::DASH_SPEED) || flags.has(BuffParser::DASH_JUMP) ||
+			flags.has(BuffParser::RIDING))
 			handle_two_state(recv, flags);
 
 		Stage::get().get_player().recalc_stats();
@@ -262,8 +263,8 @@ namespace ms
 			bufflist->add_buff(skillid, bs, duration);
 	}
 
-	// The player's energy changed, or they got on a mount (0xa202be). The two-state stats' data follows the
-	// defense attack and state.
+	// The player's energy changed, they dashed, or they got on a mount (0xa202be). The two-state stats' data
+	// follows the defense attack and state.
 	void ApplyBuffHandler::handle_two_state(InPacket& recv, const BuffParser::Flags& flags) const
 	{
 		recv.skip(2);
@@ -275,6 +276,20 @@ namespace ms
 		{
 			UIEnergyBar::show(state.energy);
 			Stage::get().get_player().show_energy(state.energy_skill, state.energy >= energy_bar::FULL, false);
+		}
+
+		// Dash lasts until the server ends it; its time is the icon's alone.
+		if (flags.has(BuffParser::DASH_SPEED))
+		{
+			BuffParser::Dash dash = state.dash;
+			int32_t duration = dash.seconds * 1000;
+			Player& player = Stage::get().get_player();
+			player.give_buff({ Buffstat::DASH_SPEED, static_cast<int16_t>(dash.speed), dash.skill, duration });
+			player.give_buff({ Buffstat::DASH_JUMP, static_cast<int16_t>(dash.jump), dash.skill, duration });
+			player.show_dash(dash.skill);
+
+			if (auto bufflist = UI::get().get_element<UIBuffList>())
+				bufflist->add_buff(dash.skill, Buffstat::DASH_SPEED, duration);
 		}
 
 		if (!flags.has(BuffParser::RIDING))
@@ -291,13 +306,24 @@ namespace ms
 			bufflist->add_buff(ride.skill, Buffstat::MONSTER_RIDING, INT32_MAX);
 	}
 
-	// The player's energy ran out, or they got off (0xa2071f).
+	// The player's energy ran out, their Dash ended, or they got off (0xa2071f).
 	void CancelBuffHandler::handle_two_state(InPacket&, const BuffParser::Flags& flags) const
 	{
 		if (flags.has(BuffParser::ENERGY))
 		{
 			UIEnergyBar::show(0);
 			Stage::get().get_player().show_energy(0, false, false);
+		}
+
+		if (flags.has(BuffParser::DASH_SPEED))
+		{
+			Player& player = Stage::get().get_player();
+			player.cancel_buff(Buffstat::DASH_SPEED);
+			player.cancel_buff(Buffstat::DASH_JUMP);
+			player.show_dash(0);
+
+			if (auto bufflist = UI::get().get_element<UIBuffList>())
+				bufflist->cancel_buff(Buffstat::DASH_SPEED);
 		}
 
 		if (!flags.has(BuffParser::RIDING))

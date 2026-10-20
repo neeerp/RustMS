@@ -82,8 +82,9 @@ namespace ms
 			// An item's protection from a map's hazard; the server applies it.
 			THAW,
 			WEAKEN,
-			DASH,
-			DASH2,
+			// Dash's speed and jump, two-state stats (report 194).
+			DASH_SPEED,
+			DASH_JUMP,
 			ELEMENTAL_RESET,
 			ARAN_COMBO,
 			COMBO_DRAIN,

@@ -20,6 +20,7 @@
 #include "Assassinate.h"
 #include "ChainLightning.h"
 #include "Combo.h"
+#include "Dash.h"
 #include "DamageLayout.h"
 #include "Heal.h"
 #include "HitTiming.h"
@@ -235,6 +236,7 @@ namespace ms
 			if (!can_use_move(skill))
 				return false;
 
+			end_dash();
 			start_prepare(skill);
 			return true;
 		}
@@ -243,6 +245,9 @@ namespace ms
 
 		if (!can_use_move(move))
 			return false;
+
+		if (!dash::is_dash(move_id))
+			end_dash();
 
 		if (move_id == meso_explosion::ID)
 		{
@@ -264,6 +269,12 @@ namespace ms
 			apply_move(move);
 
 		return true;
+	}
+
+	void Combat::end_dash() const
+	{
+		if (player.has_buff(Buffstat::Id::DASH_SPEED))
+			CancelBuffPacket(dash::skill(player.get_stats().get_job().get_id())).dispatch();
 	}
 
 	bool Combat::is_preparing() const

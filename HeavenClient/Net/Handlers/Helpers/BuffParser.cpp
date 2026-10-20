@@ -110,7 +110,7 @@ namespace ms
 
 	BuffParser::TwoState BuffParser::read_two_state(InPacket& recv, const Flags& flags)
 	{
-		TwoState state{ 0, 0, { 0, 0 } };
+		TwoState state{ 0, 0, { 0, 0, 0, 0 }, { 0, 0 } };
 
 		for (uint8_t slot = 0; slot < 7; slot++)
 		{
@@ -122,6 +122,14 @@ namespace ms
 				state.energy = recv.read_int();
 				state.energy_skill = recv.read_int();
 				recv.skip(TWO_STATE_SIZE[slot] - 8);
+			}
+			else if (TWO_STATE + slot == DASH_SPEED || TWO_STATE + slot == DASH_JUMP)
+			{
+				int32_t value = recv.read_int();
+				(TWO_STATE + slot == DASH_SPEED ? state.dash.speed : state.dash.jump) = value;
+				state.dash.skill = recv.read_int();
+				recv.skip(5); // the sign and the delta
+				state.dash.seconds = recv.read_short();
 			}
 			else if (TWO_STATE + slot == RIDING)
 			{
@@ -178,11 +186,14 @@ namespace ms
 
 		recv.skip(2); // defense attack and state
 
-		// A character shows its energy, and the mount it's on.
+		// A character shows its energy, its Dash, and the mount it's on.
 		TwoState state = read_two_state(recv, flags);
 
 		if (state.energy != 0)
 			shown.emplace_back(Buffstat::ENERGY_CHARGE, state.energy);
+
+		if (state.dash.speed != 0)
+			shown.emplace_back(Buffstat::DASH_SPEED, state.dash.speed);
 
 		if (state.ride.vehicle != 0)
 			shown.emplace_back(Buffstat::MONSTER_RIDING, state.ride.vehicle);

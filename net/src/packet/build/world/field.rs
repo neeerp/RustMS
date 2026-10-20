@@ -59,15 +59,16 @@ pub fn build_player_enter_field(avatar: &FieldAvatar) -> Result<Packet, NetworkE
 }
 
 /// The buffs others see, then the two-state stats' fixed blocks, which
-/// are empty here but for Energy Charge's gauge and the mount the player
-/// rides; the repeated spawn constant mirrors what the reference server
+/// are empty here but for Energy Charge's gauge, Dash and the mount the
+/// player rides; the repeated spawn constant mirrors what the reference server
 /// sends.
 fn write_foreign_buffs(packet: &mut Packet, avatar: &FieldAvatar) -> Result<(), NetworkError> {
     const CHAR_MAGIC_SPAWN: i32 = 0x2D0F_5E1A;
     buff::write_shown(packet, &avatar.buffs, true)?;
-    buff::write_energy(packet, avatar.energy)?;
-    packet.write_bytes(&[0; 15])?; // dash speed
-    packet.write_bytes(&[0; 15])?; // dash jump
+    buff::write_two_state(packet, avatar.energy, 0)?;
+    for dash in avatar.dash {
+        buff::write_two_state(packet, dash, 0)?; // speed, then jump
+    }
 
     let ride = avatar
         .ride
@@ -292,6 +293,7 @@ mod tests {
             chalkboard: None,
             item_effect: 0,
             energy: None,
+            dash: [None; 2],
             ride: None,
             mount: game::Mount::default(),
         }
@@ -507,6 +509,31 @@ mod tests {
         expect.int(0).short(0).byte(0xFC).byte(1).int(0).int(0);
         two_state(&mut expect, (10000, 15100004), (0, 0));
         expect.short(100);
+    }
+
+    #[test]
+    fn spawn_player_carries_a_dash() {
+        let mut avatar = avatar();
+        let dash = |stat, value| game::ShownBuff {
+            stat,
+            value,
+            skill_id: 5001005,
+        };
+        avatar.dash = [
+            Some(dash(game::BuffStat::DashSpeed, 30)),
+            Some(dash(game::BuffStat::DashJump, 10)),
+        ];
+        let packet = build_player_enter_field(&avatar).unwrap();
+
+        let mut expect = Expect::new(&packet.bytes);
+        expect.short(SendOpcode::SpawnPlayer as i16);
+        expect.int(0x0102_0304).byte(10).string("Tester");
+        expect.string("").bytes(&[0; 6]);
+        expect.int(0).short(0).byte(0xFC).byte(1).int(0).int(0);
+        expect.short(0).bytes(&[0; 15]); // energy charge
+        expect.int(30).int(5001005).byte(0).int(0).short(0);
+        expect.int(10).int(5001005).byte(0).int(0).short(0);
+        expect.int(0).int(0); // monster riding
     }
 
     #[test]

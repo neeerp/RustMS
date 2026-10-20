@@ -2109,6 +2109,7 @@ mod tests {
             chalkboard: None,
             item_effect: 0,
             energy: None,
+            dash: [None; 2],
             ride: None,
             mount: game::Mount::default(),
         }

@@ -11,7 +11,7 @@ use crate::packet::build::world::{buff, inventory, skill};
 use crate::skills::{self, Inflict, Learned};
 use crate::summons;
 use game::inventory::equip_slot;
-use game::{mount, Buff, BuffStat, InventoryChange, InventoryType, Player, Ride};
+use game::{mount, Buff, BuffStat, InventoryChange, InventoryType, Player, Ride, ShownBuff};
 use packet::{io::read::PktRead, Packet};
 use std::io::Cursor;
 use std::time::{Duration, Instant};
@@ -60,6 +60,24 @@ impl WorldHandler for UseSkillHandler {
                     debug!(skill_id, level, ?refusal, "Monster Rider refused");
                     let unlocked = HandlerResult::reply(stat::build_stat_update(true, &[])?);
                     dismount(ctx.player, unlocked)
+                }
+            };
+        }
+        if skills::DASHES.contains(&skill_id) {
+            let field_limit = crate::game_data::get()?
+                .field(ctx.player.stats.map_id)
+                .map_or(0, |field| field.field_limit);
+            let now = Instant::now();
+            let used = if field_limit & game_data::FIELD_LIMIT_MOVEMENT_SKILLS != 0 {
+                Err(Refusal::NoMovementSkillsHere)
+            } else {
+                use_skill(ctx.player, skill_id, level, now)
+            };
+            return match used {
+                Ok(used) => dash(ctx.player, &used, now),
+                Err(refusal) => {
+                    debug!(skill_id, level, ?refusal, "Dash refused");
+                    Ok(HandlerResult::reply(stat::build_stat_update(true, &[])?))
                 }
             };
         }
@@ -299,6 +317,9 @@ enum Refusal {
     NoMount,
     /// Riding where mounts aren't allowed.
     NoMountsHere,
+    /// Dashing where movement skills aren't allowed (the client's notice
+    /// 0x374).
+    NoMovementSkillsHere,
 }
 
 /// What USE_SKILL carries after the level (0x96d399), each part only for
@@ -550,6 +571,33 @@ fn ride(
     let riding = Buff::new(skill_id, BuffStat::Riding, 0, now, mount::RIDE_DURATION);
     player.buffs.give(riding);
     Ok(Ride { item_id, skill_id })
+}
+
+/// Start Dash, which `use_skill` paid for: its speed `x` and jump `y` for
+/// its `time`, which only the server ends (the client ends it sooner when
+/// the arrow is let go, or the player attacks or casts).
+fn dash(player: &mut Player, used: &Used, now: Instant) -> WorldResult {
+    let effect = &used.skill.effect;
+    let seconds = effect.duration.clamp(0, i32::from(u16::MAX));
+    let lasts = Duration::from_secs(seconds as u64);
+    let [speed, jump] = [
+        (BuffStat::DashSpeed, effect.x),
+        (BuffStat::DashJump, effect.y),
+    ]
+    .map(|(stat, value)| {
+        let buff = Buff::new(used.skill.skill_id, stat, value as i16, now, lasts);
+        player.buffs.give(buff);
+        ShownBuff {
+            stat,
+            value: value as i16,
+            skill_id: used.skill.skill_id,
+        }
+    });
+    let seconds = seconds as u16;
+    let shown = buff::build_give_foreign_dash(player.id(), speed, jump, seconds)?;
+    Ok(announce(player, used)?
+        .with_reply(buff::build_give_dash(speed, jump, seconds)?)
+        .with(WorldAction::BuffsChanged(shown)))
 }
 
 /// A skill that was used: the buffs it gave, and the items it cost. A
@@ -1372,6 +1420,46 @@ mod tests {
         assert!(player
             .buffs
             .cooling_down(skills::MP_RECOVERY, Instant::now()));
+    }
+
+    #[test]
+    fn dash_gives_its_speed_and_jump_until_its_time() {
+        if skills::data().is_err() || crate::game_data::get().is_err() {
+            return;
+        }
+        // Level 1: x 12, y 1, time 4, mpCon 14.
+        let mut player = beginner_with(5001005, 1);
+        let start = Instant::now();
+        let actions = handle(&mut player, 5001005, 1);
+        assert!(unlocks(&actions[0]));
+        assert_eq!(player.stats.mp, 6);
+        let opcodes = opcodes(Ok(HandlerResult { actions }));
+        assert_eq!(
+            opcodes,
+            [
+                SendOpcode::StatChange as i16,
+                SendOpcode::ShowForeignEffect as i16,
+                SendOpcode::GiveBuff as i16,
+                SendOpcode::GiveForeignBuff as i16,
+            ]
+        );
+        let values: Vec<_> = player
+            .buffs
+            .active()
+            .iter()
+            .map(|buff| (buff.stat, buff.value))
+            .collect();
+        assert_eq!(values, [(BuffStat::DashSpeed, 12), (BuffStat::DashJump, 1)]);
+        let tick = player.buffs.advance(start + Duration::from_secs(5));
+        assert_eq!(tick.expired, [BuffStat::DashSpeed, BuffStat::DashJump]);
+
+        // Letting go of the arrow cancels both.
+        player.stats.mp = 20;
+        handle(&mut player, 5001005, 1);
+        assert_eq!(
+            player.buffs.cancel(5001005),
+            [BuffStat::DashSpeed, BuffStat::DashJump]
+        );
     }
 
     #[test]

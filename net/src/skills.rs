@@ -269,16 +269,22 @@ pub const TELEPORTS: [i32; 5] = [2101002, 2201002, 2301001, 12101003, 22101001];
 /// through the air and asks only for the MP.
 pub const FLASH_JUMPS: [i32; 2] = [4111006, 14101004];
 
+/// The Dash skills (v83 FUN_009433a2): a double tap on an arrow casts them,
+/// and the handler gives their speed and jump as two-state stats.
+pub const DASHES: [i32; 2] = [5001005, 15001003];
+
 /// Skills that neither buff nor debuff: the handler does their work.
 /// Chakra heals the user, MP Recovery turns HP into MP, Resurrection raises
 /// dead party members, Time Leap ends cooldowns, and Mystic Door opens a
-/// door. Teleport and Flash Jump have no work.
+/// door. Teleport and Flash Jump have no work, and Dash gives its own
+/// buffs.
 pub fn acts_alone(skill_id: i32) -> bool {
     matches!(
         skill_id,
         MYSTIC_DOOR | CHAKRA | MP_RECOVERY | RESURRECTION | TIME_LEAP
     ) || TELEPORTS.contains(&skill_id)
         || FLASH_JUMPS.contains(&skill_id)
+        || DASHES.contains(&skill_id)
         || HEROS_WILL.contains(&skill_id)
 }
 
