@@ -415,6 +415,30 @@ Brawler's Improve MaxHP (5100000) and a magician's Improving MaxMP Increase
 (2000001) add their `x` to each level's growth and their `y` to an AP's
 (`net::skills::growth_bonus`).
 
+### Rates and rate cards
+
+`net::rates` scales kills for each player. Kill EXP is multiplied by the
+world's `RUSTMS_EXP_RATE`; quest and script EXP is not. Drop chances are
+multiplied by `RUSTMS_DROP_RATE` and meso amounts by `RUSTMS_MESO_RATE`;
+reactor drops are not. Each rate is 1 when unset.
+
+A 2x EXP card (521xxxx) or drop card (536xxxx) in the Cash inventory
+multiplies the same numbers again while it works. A card works while it is
+unexpired and the clock is inside one of its `info/time` windows: a
+`"DAY:HH-HH"` entry, with the end hour left out.
+- The clock is UTC, moved by `RUSTMS_RATE_CARD_UTC_OFFSET` hours. The cards
+  were sold for Pacific time.
+- `HOL` (holiday) entries never match.
+- A drop card also doubles mesos, as 5360000's description says.
+- Cards of one kind don't stack; the best one counts.
+- A few cards last hours instead of days from purchase, as their tooltips
+  and descriptions say: 5211060 2 h, 5211048 and 5360042 4 h, 5211049
+  90 min.
+
+v83's client never reads a card's rate or hours, and has no packet or line
+for one. The extra EXP is folded into the base number of the "You have
+gained experience" message; the "Bonus Event EXP" field would mislabel it.
+
 ### Meso Explosion
 
 Meso Explosion (4211006) sets off mesos lying in front of a Chief Bandit,
@@ -604,7 +628,8 @@ When a mob dies, its drops roll once (`net::loot::roll`), for whoever dealt
 it the most damage of the players still on the field, as Cosmic does. They
 come from the content pack's table plus the committed v83 overrides
 (`game-data/reward_overrides.toml`): each entry rolls its `prob`, mesos
-vary by ±25%, items take `min`..`max`. A mob worth no EXP still drops and
+vary by ±25%, items take `min`..`max` (see "Rates and rate cards" for
+what scales them). A mob worth no EXP still drops and
 counts for quests. Quest drops are the entries
 the overrides tag with a quest, and quest items (`info/quest`) that only one
 quest's completion check (`Check.img/<quest>/1/item`) asks for. They roll
@@ -1303,7 +1328,8 @@ persistence, and that the tutorial sentinel's quest drop needs its quest;
 `spend_points` levels a beginner and checks AP, the beginner pool, refusals,
 and that both survive logging out; `monster_book` fills a card's page from
 six snails, checks the effect another player sees and the cover, and that
-both survive logging out; `beginner_skills` has three players learn
+both survive logging out; `rate_cards` has a 3x EXP card triple a snail's
+EXP; `beginner_skills` has three players learn
 Three Snails, Nimble Feet, and Recovery and checks their damage caps, MP,
 buffs, cooldowns, Recovery's heal, what the others see, and that the buffs
 end on time and on death. `hp_costs` has a Dragon Knight spend HP on Slash

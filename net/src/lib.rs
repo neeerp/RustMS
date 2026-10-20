@@ -28,6 +28,7 @@ pub mod packet;
 pub mod personal_shop;
 pub mod policy;
 pub mod quests;
+pub mod rates;
 pub mod reactors;
 pub mod scripts;
 pub mod settings;

@@ -1353,7 +1353,18 @@ const BEST_SELLERS_CONSIDERED: i64 = 50;
 
 /// When the item `item_id` bought now for `period` days expires; `None` for
 /// 0, which never does. A pet sold for 0 days lives its `info/life` days.
+/// A few rate cards last hours instead, as their tooltips (v83's
+/// FUN_008edfc7) and descriptions say.
 fn expiry(item_id: i32, period: i32) -> Option<SystemTime> {
+    let minutes = match item_id {
+        5211060 => Some(120),
+        5211048 | 5360042 => Some(240),
+        5211049 => Some(90),
+        _ => None,
+    };
+    if let Some(minutes) = minutes.filter(|_| period > 0) {
+        return Some(SystemTime::now() + Duration::from_secs(minutes * 60));
+    }
     let days = match period {
         0 if game::pet::is_pet(item_id) => {
             net::items::info(item_id).map_or(0, |info| info.pet_life)
