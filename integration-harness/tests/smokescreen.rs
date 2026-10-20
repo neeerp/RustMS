@@ -43,7 +43,13 @@ async fn smokescreen_covers_the_shadower_then_cools_down() {
     until(c, &mut t, |t| !t.field.mists.is_empty()).await;
     let mist = t.field.mists[0];
     assert_eq!(
-        (mist.kind, mist.owner_id, mist.skill_id, mist.level, mist.delay),
+        (
+            mist.kind,
+            mist.owner_id,
+            mist.skill_id,
+            mist.level,
+            mist.delay
+        ),
         (SMOKE, id, SMOKESCREEN, 1, 8)
     );
     // Level 1's box, (-110, -82) to (110, 83) around the Shadower.
