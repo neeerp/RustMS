@@ -33,6 +33,9 @@ pub mod stat {
 }
 
 /// Wire widths of the STAT_CHANGED values, in mask order.
+/// GIVE_BUFF's flags with only Speed Infusion's bit 86.
+const INFUSION: [u8; 16] = [0, 0, 0, 0, 0, 0, 0x40, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+
 const STAT_WIDTHS: [(i32, u8); 20] = [
     (0x1, 1),
     (0x2, 4),
@@ -508,6 +511,14 @@ impl Trace {
             self.players.extend(decode_spawn_player(p));
         } else if op == SendOpcode::ConfirmShopTransaction as i16 {
             self.shop_results.push(r.read_byte().unwrap());
+        } else if op == SendOpcode::GiveBuff as i16 && p.bytes.get(2..18) == Some(&INFUSION) {
+            // Speed Infusion's two-state data follows the defense bytes.
+            r.read_bytes(16 + 2).unwrap();
+            let value = r.read_int().unwrap() as i16;
+            let skill = r.read_int().unwrap();
+            r.read_bytes(10).unwrap();
+            let seconds = i32::from(r.read_short().unwrap());
+            self.buffs.push((skill, value, seconds * 1000));
         } else if op == SendOpcode::GiveBuff as i16 {
             r.read_long().unwrap();
             r.read_long().unwrap();

@@ -224,7 +224,7 @@ namespace ms
 			handle_buff(recv, Buffstat::by_bit(bit));
 
 		if (flags.has(BuffParser::ENERGY) || flags.has(BuffParser::DASH_SPEED) || flags.has(BuffParser::DASH_JUMP) ||
-			flags.has(BuffParser::RIDING))
+			flags.has(BuffParser::RIDING) || flags.has(BuffParser::INFUSION))
 			handle_two_state(recv, flags);
 
 		Stage::get().get_player().recalc_stats();
@@ -292,6 +292,17 @@ namespace ms
 				bufflist->add_buff(dash.skill, Buffstat::DASH_SPEED, duration);
 		}
 
+		if (flags.has(BuffParser::INFUSION))
+		{
+			BuffParser::Infusion infusion = state.infusion;
+			int32_t duration = infusion.seconds * 1000;
+			Stage::get().get_player().give_buff(
+				{ Buffstat::SPEED_INFUSION, static_cast<int16_t>(infusion.speed), infusion.skill, duration });
+
+			if (auto bufflist = UI::get().get_element<UIBuffList>())
+				bufflist->add_buff(infusion.skill, Buffstat::SPEED_INFUSION, duration);
+		}
+
 		if (!flags.has(BuffParser::RIDING))
 			return;
 
@@ -324,6 +335,14 @@ namespace ms
 
 			if (auto bufflist = UI::get().get_element<UIBuffList>())
 				bufflist->cancel_buff(Buffstat::DASH_SPEED);
+		}
+
+		if (flags.has(BuffParser::INFUSION))
+		{
+			Stage::get().get_player().cancel_buff(Buffstat::SPEED_INFUSION);
+
+			if (auto bufflist = UI::get().get_element<UIBuffList>())
+				bufflist->cancel_buff(Buffstat::SPEED_INFUSION);
 		}
 
 		if (!flags.has(BuffParser::RIDING))

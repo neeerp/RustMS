@@ -104,6 +104,9 @@ pub enum BuffStat {
     /// RideVehicle, a two-state stat). Its value isn't used; the mount
     /// tires every `mount::TIRE_INTERVAL`.
     Riding = 85,
+    /// Speed Infusion (the client's PartyBooster, a two-state stat): `value`
+    /// adds to the player's attack speed, Booster's included.
+    SpeedInfusion = 86,
     /// Items heal half as much HP. It shares Puppet's bit 46 in the client
     /// (as Cosmic's ZOMBIFY and PUPPET do); 128 + 46 keeps it apart here.
     Undead = 174,

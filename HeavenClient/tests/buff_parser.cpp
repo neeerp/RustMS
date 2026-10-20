@@ -169,6 +169,18 @@ int main()
 				"a character shows its Dash");
 		require(foreign.read_short() == 0 && !foreign.available(), "each of Dash's blocks takes 15 bytes");
 
+		// GIVE_BUFF: Speed Infusion's 20 bytes, its speed, skill and seconds about two times.
+		BuffParser::Flags infused{ 0, 0 };
+		infused.set(BuffParser::INFUSION);
+		require(Buffstat::by_bit(BuffParser::INFUSION) == Buffstat::SPEED_INFUSION, "bit 86 is Speed Infusion");
+		Writer q;
+		q.put<int32_t>(-2).put<int32_t>(5121009).zeros(10).put<int16_t>(300).put<int16_t>(0);
+		InPacket infusion(q.bytes.data(), q.bytes.size());
+		BuffParser::Infusion got_infusion = BuffParser::read_two_state(infusion, infused).infusion;
+		require(got_infusion.speed == -2 && got_infusion.skill == 5121009 && got_infusion.seconds == 300,
+				"Speed Infusion's speed, skill and seconds");
+		require(infusion.read_short() == 0 && !infusion.available(), "and the delay follows");
+
 		std::cout << "Buff parser passed\n";
 		return 0;
 	}

@@ -46,9 +46,10 @@ namespace ms
 		stats.set_stance(static_cast<float>(value) / 100);
 	}
 
+	// Booster and Speed Infusion add up (FUN_00765066).
 	void BoosterBuff::apply_to(CharStats &stats, int16_t value) const
 	{
-		stats.set_attackspeed(static_cast<int8_t>(value));
+		stats.set_attackspeed(static_cast<int8_t>(stats.get_attackspeed() + value));
 	}
 
 	ActiveBuffs::ActiveBuffs()
@@ -56,6 +57,7 @@ namespace ms
 		buffs[Buffstat::Id::MAPLE_WARRIOR] = std::make_unique<MapleWarriorBuff>();
 		buffs[Buffstat::Id::STANCE] = std::make_unique<StanceBuff>();
 		buffs[Buffstat::Id::BOOSTER] = std::make_unique<BoosterBuff>();
+		buffs[Buffstat::Id::SPEED_INFUSION] = std::make_unique<BoosterBuff>();
 		buffs[Buffstat::Id::WATK] = std::make_unique<SimpleStatBuff<EquipStat::Id::WATK>>();
 		buffs[Buffstat::Id::WDEF] = std::make_unique<SimpleStatBuff<EquipStat::Id::WDEF>>();
 		buffs[Buffstat::Id::MATK] = std::make_unique<SimpleStatBuff<EquipStat::Id::MAGIC>>();
