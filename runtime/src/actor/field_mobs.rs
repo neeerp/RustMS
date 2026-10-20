@@ -116,6 +116,17 @@ impl CastArea {
     }
 }
 
+/// What became of a mob a catch item was thrown at.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Catch {
+    /// It is gone, giving nothing.
+    Caught,
+    /// It has too much of its HP left.
+    TooStrong,
+    /// It isn't here, is another mob, or is out of reach.
+    Missed,
+}
+
 /// A status on a mob: its value, the skill that caused it, who put it on,
 /// and when it wears off.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -1169,6 +1180,32 @@ impl MobSet {
         true
     }
 
+    /// Throw a catch item at the mob `object_id`, which catches a `mob_id`
+    /// in `reach` with less than `mob_hp` percent of its HP (any HP at
+    /// 100). Its spawn point waits as if it died.
+    pub fn catch(
+        &mut self,
+        object_id: i32,
+        mob_id: i32,
+        reach: CastArea,
+        mob_hp: i32,
+        now: Instant,
+    ) -> Catch {
+        let Some(mob) = self.live.get(&object_id) else {
+            return Catch::Missed;
+        };
+        if mob.info.mob_id != mob_id || !reach.contains((mob.x, mob.y)) {
+            return Catch::Missed;
+        }
+        if mob_hp < 100 && mob.hp * 100 >= i64::from(mob.info.max_hp) * i64::from(mob_hp) {
+            return Catch::TooStrong;
+        }
+        if let Some(mob) = self.live.remove(&object_id) {
+            self.emptied(mob.spawn, now);
+        }
+        Catch::Caught
+    }
+
     /// The mob from spawn point `spawn`, if it had one, is gone. A point
     /// with a `mobTime` waits 1.3 to 2 times it before it spawns again, or
     /// just its `mobTime`, at least `SPAWN_INTERVAL`, when filling every
@@ -1801,6 +1838,30 @@ mod tests {
         assert!(darkstars.bomb(darkstar, now));
         assert!(darkstars.get(darkstar).is_none());
         assert!(!darkstars.bomb(darkstar, now));
+    }
+
+    #[test]
+    fn a_catch_takes_the_mob_in_reach_once_it_is_weak_enough() {
+        let now = Instant::now();
+        let mut mobs = MobSet::new([snail_spawn(100)]);
+        let snail = mobs.spawn_all(now)[0];
+        let reach = CastArea {
+            left: 0,
+            top: -100,
+            right: 200,
+            bottom: 0,
+        };
+        let far = CastArea { left: 101, ..reach };
+        assert_eq!(mobs.catch(snail, 100101, reach, 100, now), Catch::Missed);
+        assert_eq!(mobs.catch(snail, 100100, far, 100, now), Catch::Missed);
+        // 40 percent of its 8 HP is 3.2.
+        assert_eq!(mobs.catch(snail, 100100, reach, 40, now), Catch::TooStrong);
+        mobs.damage(1, snail, 4, now);
+        assert_eq!(mobs.catch(snail, 100100, reach, 40, now), Catch::TooStrong);
+        mobs.damage(1, snail, 1, now);
+        assert_eq!(mobs.catch(snail, 100100, reach, 40, now), Catch::Caught);
+        assert!(mobs.get(snail).is_none());
+        assert_eq!(mobs.catch(snail, 100100, reach, 100, now), Catch::Missed);
     }
 
     #[test]

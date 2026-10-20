@@ -1072,6 +1072,11 @@ impl ClientActor {
                 y,
             } => self.drop_reactor_loot(reactor_id, object_id, x, y).await?,
             ServerMessage::PickedUp { drop } => self.picked_up(drop).await?,
+            ServerMessage::Caught {
+                slot,
+                item_id,
+                create,
+            } => self.caught(slot, item_id, create).await?,
             ServerMessage::PetPickedUp { drop, pet } => self.pet_picked_up(drop, pet).await?,
             ServerMessage::Locate { reply_to } => self.locate(&reply_to),
             ServerMessage::RockLocate { reply_to, rock } => {

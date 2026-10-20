@@ -318,6 +318,8 @@ pub struct Field {
     /// FIELD_EFFECT 5, a boss's HP bar: (mob id, HP, max HP, colours).
     pub boss_bars: Vec<(i32, i32, i32, (u8, u8))>,
     pub killed: Vec<i32>,
+    /// CATCH_MONSTER_WITH_ITEM: (object id, item id, caught).
+    pub catches: Vec<(i32, i32, bool)>,
     /// How each killed mob went: KILL_MONSTER's leave type.
     pub leave_types: BTreeMap<i32, u8>,
     /// Characters seen attacking.
@@ -545,6 +547,12 @@ impl Field {
             let oid = r.read_int().unwrap();
             self.killed.push(oid);
             self.leave_types.insert(oid, r.read_byte().unwrap());
+        } else if op == SendOpcode::CatchMonsterWithItem as i16 {
+            self.catches.push((
+                r.read_int().unwrap(),
+                r.read_int().unwrap(),
+                r.read_byte().unwrap() != 0,
+            ));
         } else if op == SendOpcode::CloseRangeAttack as i16
             || op == SendOpcode::RangedAttack as i16
             || op == SendOpcode::MagicAttack as i16

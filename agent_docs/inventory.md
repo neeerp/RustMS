@@ -372,6 +372,39 @@ you wish to charge the EXP earned from The Writs of Solomon?", and Yes sends
 USE_GACHA_EXP (FUN_008d7611). The rules are `Character/GachaExp.h`. v83's
 tooltip over the level and name is not drawn.
 
+### Catch items
+
+A catch item (227xxxx) is thrown at a mob to catch it, and turns into the
+item its `info/create` names: the Pheromone Perfume (2270000) catches a
+Tamable Hog (9300101, map 922200000) and becomes the Hog mount (1902000).
+USE_CATCH_ITEM (`0x51`: tick, USE slot, item id, mob object id) is handled
+in `world/catch_item.rs`. The handler checks that the player is alive, the
+item is in that slot and what it makes would fit, then asks the field
+(`FieldRequest::Catch`). The field catches a mob of the item's `mob`
+template that stands within the item's area of the player (`left`, `top`,
+`right`, `bottom`, plus 100 px slack, since the client finds the mob by its
+body and the server knows its feet) and is below `mobHP` percent of its HP.
+It broadcasts CATCH_MONSTER_WITH_ITEM (`0xFC`: oid, item, 1) and
+KILL_MONSTER (leave type 1), and the client actor trades the item for what
+it makes (`ServerMessage::Caught`). A mob above `mobHP` gets
+BRIDLE_MOB_CATCH_FAIL (`0x4F`: 0, item, 0), "the monster is too strong".
+Every answer but a catch ends with an empty stat change, which unlocks the
+client. The Element Rock (2270002, a `bridleProp` chance) and the Fish Net
+(2270008, a `useDelay`) are refused for now.
+
+HeavenClient throws one on double-click (500 ms between throws) or from a
+quick slot (`Player::use_catch_item`, v83 FUN_00a09bdf). Riding a tamed
+monster, it does nothing. Without room for what it makes, it says "You do
+not have enough slots in your item inventory." for an equip, else "<tab>
+item inventory is full.". It looks for the first mob of the item's template
+to have entered the map that overlaps the area around the player, whichever
+way they face (`MapMobs::find_catchable`); finding none, it says the item's
+`bridleMsgType` line ("Unable to find a tamable monster in this area." and
+others) and sends nothing. It shows CATCH_MONSTER_WITH_ITEM as the item's
+`Effect/ItemEff.img` animation over the mob, or its `fail` frames, and plays
+`Game.img/CatchSuccess` or `CatchFaild` for the Element Rock. The rules are
+`Character/CatchItemRules.h`; every line is in the skill chat colour.
+
 ## NPC shops
 
 Clicking an NPC that keeps a shop (`content::shops()`, from the pack's
@@ -640,6 +673,10 @@ gacha EXP is taken; `solomon` (integration) uses a writ, is refused a
 second, takes the EXP two levels at once, and takes the rest after a
 relogin. The client's `gacha_exp` test covers the refusals, when the EXP may
 be taken, and the tooltip.
+`net`'s catch item handler covers what may be thrown, and `field_mobs` which
+mobs a catch takes; `catch_items` (integration) throws the perfume at a Hog
+out of reach, then beside it, and finds the Hog mount in its place. The
+client's `catch_items` test covers the lines.
 `net::storage` covers each request and its refusals. `storage` (integration)
 opens Mr. Lee's storage, stores part of a stack and a whole one for the fee,
 is refused too many and too many mesos, moves mesos in, sorts, takes items

@@ -7,7 +7,9 @@ use net::loot::{self, Loot};
 use net::packet::build::world::effect::{self, CharEffect};
 use net::packet::build::world::stat::{self, StatUpdate};
 use net::packet::build::world::{drop, inventory, monster_book as book};
+use net::packet::handle::world::trade_catch;
 use net::FieldRequest;
+use tracing::debug;
 
 impl ClientActor {
     /// Roll this player's drops from a mob they helped kill (`showdown`
@@ -152,6 +154,28 @@ impl ClientActor {
         }
         self.send_all(&mut packets).await?;
         Ok(true)
+    }
+
+    /// The field let this player catch a mob with the catch item `item_id`
+    /// in USE `slot`: it turns into the item it makes, `create`.
+    pub(super) async fn caught(
+        &mut self,
+        slot: i16,
+        item_id: i32,
+        create: i32,
+    ) -> Result<(), RuntimeError> {
+        let player = &mut self.in_game_mut()?.player;
+        let mut inventory = player.inventory.clone();
+        let traded = trade_catch(&mut inventory, slot, item_id, create);
+        let Some(changes) = traded else {
+            // It moved while the mob was being caught, which is gone all
+            // the same.
+            debug!(slot, item_id, "Caught a mob without the catch item");
+            return self.send(&mut stat::build_stat_update(true, &[])?).await;
+        };
+        *player.inventory_mut() = inventory;
+        self.send(&mut inventory::build_inventory_operation(true, &changes)?)
+            .await
     }
 
     /// A picked-up card goes straight into the Monster Book; once its page

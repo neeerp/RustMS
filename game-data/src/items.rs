@@ -52,6 +52,8 @@ pub struct ItemInfo {
     /// What a summoning sack (210xxxx) brings out (`mob`): each mob and its
     /// percent chance, rolled for each.
     pub sack: Vec<(i32, i32)>,
+    /// What a catch item (227xxxx) catches.
+    pub catch: Option<CatchInfo>,
     pub equip: Option<EquipInfo>,
     /// A pet's commands (`interact`), by the index the client sends.
     pub pet_commands: Vec<PetCommand>,
@@ -76,6 +78,26 @@ pub struct BookInfo {
     pub req_skill_level: i32,
     /// Percent chance it works (`success`).
     pub success: i32,
+}
+
+/// What a catch item (227xxxx) catches, and what for (`info`). v83 reads
+/// only the mob, the area and `create`; the rest is the server's.
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct CatchInfo {
+    /// The mob it catches (`mob`).
+    pub mob: i32,
+    /// The item a catch gives (`create`).
+    pub create: i32,
+    /// Where it reaches from the player's feet, whichever way they face:
+    /// left, top, right, bottom.
+    pub area: (i16, i16, i16, i16),
+    /// The percent of its HP the mob must be below (`mobHP`); 100, the
+    /// default, for any.
+    pub mob_hp: i32,
+    /// The percent chance a catch works (`bridleProp`, default 100).
+    pub prop: f64,
+    /// The ms before it may be used again (`useDelay`).
+    pub use_delay: i32,
 }
 
 /// What using a consumable does (`spec`).
@@ -373,6 +395,23 @@ impl ItemData {
                 }
             }
         }
+        if item_id / 10_000 == 227 {
+            if let Some(meta) = nx.child_by_name(node, "info")? {
+                let side = |key: &str| -> Result<i16, GameDataError> {
+                    Ok(nx
+                        .int_child(meta, key)?
+                        .map_or(0, |v| i16::try_from(v).unwrap_or(0)))
+                };
+                info.catch = Some(CatchInfo {
+                    mob: nx.int_child(meta, "mob")?.unwrap_or(0),
+                    create: nx.int_child(meta, "create")?.unwrap_or(0),
+                    area: (side("left")?, side("top")?, side("right")?, side("bottom")?),
+                    mob_hp: nx.int_child(meta, "mobHP")?.unwrap_or(100),
+                    prop: nx.real_child(meta, "bridleProp")?.unwrap_or(100.0),
+                    use_delay: nx.int_child(meta, "useDelay")?.unwrap_or(0),
+                });
+            }
+        }
         if let Some(interact) = nx.child_by_name(node, "interact")? {
             while let Some(command) =
                 nx.child_by_name(interact, &info.pet_commands.len().to_string())?
@@ -472,6 +511,7 @@ impl ItemData {
             book: None,
             scroll: None,
             sack: Vec::new(),
+            catch: None,
             equip: Some(equip),
             pet_commands: Vec::new(),
             pet_hunger: 0,
@@ -655,6 +695,27 @@ mod tests {
             (16, (100100, 100), (1210102, 50))
         );
         assert!(data.info(2000000).unwrap().unwrap().sack.is_empty());
+    }
+
+    #[test]
+    fn reads_what_a_catch_item_catches() {
+        let Some(data) = data() else {
+            return;
+        };
+        assert_eq!(
+            data.info(2270000).unwrap().unwrap().catch,
+            Some(CatchInfo {
+                mob: 9300101,
+                create: 1902000,
+                area: (-100, -100, 100, 50),
+                mob_hp: 100,
+                prop: 100.0,
+                use_delay: 0,
+            })
+        );
+        let rock = data.info(2270002).unwrap().unwrap().catch.unwrap();
+        assert_eq!((rock.mob_hp, rock.prop, rock.use_delay), (40, 50.0, 800));
+        assert_eq!(data.info(2000000).unwrap().unwrap().catch, None);
     }
 
     #[test]

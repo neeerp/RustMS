@@ -1,6 +1,8 @@
 use crate::actor::field_drops::{Drop, DropSet, Ownership};
 use crate::actor::field_mists::MistSet;
-use crate::actor::field_mobs::{split_exp, BossBar, Cast, LiveMob, MobSet, Sharer};
+use crate::actor::field_mobs::{
+    split_exp, BossBar, Cast, CastArea, Catch, LiveMob, MobSet, Sharer,
+};
 use crate::actor::field_reactors::{Hit, ReactorSet};
 use crate::actor::field_shops::{ShopRoomRequest, Shops};
 use crate::actor::field_summons::SummonSet;
@@ -8,6 +10,7 @@ use crate::actor::field_trades::{Outbox, RoomRequest, Trades};
 use crate::message::{ClientHandle, FieldKey, FieldMessage, ServerMessage};
 use game::mob_skill::{self, MobSkillEffect};
 use game::{FieldAvatar, MobStat};
+use game_data::items::CatchInfo;
 use net::conti::{self, Happening};
 use net::meso_explosion::{self, Blast};
 use net::packet::build::world::buff::{build_own_skill_effect, build_skill_effect};
@@ -24,9 +27,10 @@ use net::packet::build::world::field::{
 use net::packet::build::world::mini_room::build_char_box;
 use net::packet::build::world::mist::{build_remove_mist, build_spawn_mist, MistKind, MistView};
 use net::packet::build::world::mob::{
-    build_control_mob, build_heal_mob, build_kill_mob, build_mob_hp, build_mob_stat_reset,
-    build_mob_stat_set, build_move_mob, build_move_mob_response, build_show_magnet,
-    build_spawn_mob, build_stop_controlling_mob, MobMoveView, MobView,
+    build_catch_fail, build_catch_with_item, build_control_mob, build_heal_mob, build_kill_mob,
+    build_mob_hp, build_mob_stat_reset, build_mob_stat_set, build_move_mob,
+    build_move_mob_response, build_show_magnet, build_spawn_mob, build_stop_controlling_mob,
+    MobMoveView, MobView,
 };
 use net::packet::build::world::npc::{
     build_control_npc, build_npc_action, build_spawn_npc, ForeignNpc,
@@ -75,6 +79,10 @@ const QUEST_NPC_REACH_Y: i32 = 800;
 /// How long after a cast its mist starts, in 100 ms (OdinMS-family
 /// servers; v83's client starts the mist's time then).
 const MIST_DELAY: i16 = 8;
+
+/// How far past a catch item's area a mob may stand and still be caught:
+/// the client finds it by its body, and the server knows only its feet.
+const CATCH_SLACK: i32 = 100;
 
 /// How far from its owner a client may put a summon: a Puppet goes 200 px
 /// ahead, onto a foothold within 80 px up or down (FUN_0096b140).
@@ -474,6 +482,12 @@ impl FieldActor {
                     appear,
                 } => self.handle_summon(from, skill_id, level, at, left, lasts, appear),
                 FieldRequest::SummonMobs(mobs) => self.handle_summon_mobs(from, mobs),
+                FieldRequest::Catch {
+                    object_id,
+                    slot,
+                    item_id,
+                    catch,
+                } => self.handle_catch(from, object_id, slot, item_id, &catch),
                 FieldRequest::Unsummon { skill_id, why } => {
                     self.handle_unsummon(from, skill_id, why)
                 }
@@ -1695,6 +1709,60 @@ impl FieldActor {
         }
         if let Ok(packet) = build_kill_mob(object_id, 4) {
             self.broadcast(None, packet);
+        }
+    }
+
+    /// A player threw the catch item `item_id` from USE `slot` at a mob:
+    /// everyone sees the mob caught, and the player's client actor trades
+    /// the item for what it makes, or the player hears the mob is too
+    /// strong.
+    fn handle_catch(
+        &mut self,
+        from: ClientId,
+        object_id: i32,
+        slot: i16,
+        item_id: i32,
+        catch: &CatchInfo,
+    ) {
+        let Some(occupant) = self.occupants.get(&from) else {
+            return;
+        };
+        let handle = occupant.handle.clone();
+        let (x, y) = (i32::from(occupant.avatar.x), i32::from(occupant.avatar.y));
+        let (left, top, right, bottom) = catch.area;
+        let reach = CastArea {
+            left: x + i32::from(left) - CATCH_SLACK,
+            top: y + i32::from(top) - CATCH_SLACK,
+            right: x + i32::from(right) + CATCH_SLACK,
+            bottom: y + i32::from(bottom) + CATCH_SLACK,
+        };
+        match self
+            .mobs
+            .catch(object_id, catch.mob, reach, catch.mob_hp, Instant::now())
+        {
+            Catch::Caught => {
+                if let Ok(packet) = build_catch_with_item(object_id, item_id, true) {
+                    self.broadcast(None, packet);
+                }
+                if let Ok(packet) = build_kill_mob(object_id, 1) {
+                    self.broadcast(None, packet);
+                }
+                handle.send(ServerMessage::Caught {
+                    slot,
+                    item_id,
+                    create: catch.create,
+                });
+                return;
+            }
+            Catch::TooStrong => {
+                if let Ok(packet) = build_catch_fail(item_id) {
+                    handle.send_packet(packet);
+                }
+            }
+            Catch::Missed => {}
+        }
+        if let Ok(packet) = net::packet::build::world::stat::build_stat_update(true, &[]) {
+            handle.send_packet(packet);
         }
     }
 

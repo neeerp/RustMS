@@ -1,6 +1,7 @@
 mod buddy;
 mod cash_item;
 mod cash_shop;
+mod catch_item;
 mod chair;
 mod chalkboard;
 mod change_channel;
@@ -50,6 +51,7 @@ mod whisper;
 pub use self::buddy::BuddyListModifyHandler;
 pub use self::cash_item::UseCashItemHandler;
 pub use self::cash_shop::{CashShopOperationHandler, CheckCashHandler, EnterCashShopHandler};
+pub use self::catch_item::{trade_catch, UseCatchItemHandler};
 pub use self::chair::{CancelChairHandler, UseChairHandler};
 pub use self::chalkboard::CloseChalkboardHandler;
 pub use self::change_channel::ChangeChannelHandler;

@@ -29,6 +29,7 @@ pub enum SendOpcode {
     GatherItemResult = 0x34,
     SortItemResult = 0x35,
     CashPetFoodResult = 0x4C,
+    BridleMobCatchFail = 0x4F,
 
     PartyOperation = 0x3E,
     SpawnPortal = 0x43,
@@ -83,6 +84,7 @@ pub enum SendOpcode {
     DamageMonster = 0xF6,
     ShowMonsterHp = 0xFA,
     ShowMagnet = 0xFB,
+    CatchMonsterWithItem = 0xFC,
     PlayerHint = 0xD6,
     MovePlayer = 0xB9,
     CloseRangeAttack = 0xBA,

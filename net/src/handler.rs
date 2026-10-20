@@ -537,6 +537,16 @@ pub enum FieldRequest {
     /// The player opened a summoning sack: bring out these mobs on the
     /// ground below them.
     SummonMobs(Vec<i32>),
+    /// The player threw the catch item in USE `slot` at the mob `object_id`:
+    /// catch it if it is a `catch.mob` within `catch.area` of them, below
+    /// `catch.mob_hp` percent of its HP. Answered with
+    /// `ServerMessage::Caught`.
+    Catch {
+        object_id: i32,
+        slot: i16,
+        item_id: i32,
+        catch: game_data::items::CatchInfo,
+    },
     /// Send away the player's summon of this skill, or all of them.
     Unsummon {
         skill_id: Option<i32>,
@@ -676,6 +686,7 @@ fn world_routes() -> &'static HashMap<i16, WorldRoute> {
             (Op::UseSkillBook, InGame(&world::UseSkillBookHandler)),
             (Op::UseReturnScroll, InGame(&world::ReturnScrollHandler)),
             (Op::UseSummonBag, InGame(&world::UseSummonSackHandler)),
+            (Op::UseCatchItem, InGame(&world::UseCatchItemHandler)),
             (Op::UseTeleportRock, InGame(&world::UseTeleportRockHandler)),
             (Op::UseSolomonItem, InGame(&world::UseSolomonItemHandler)),
             (Op::UseGachaExp, InGame(&world::UseGachaExpHandler)),
@@ -763,7 +774,7 @@ mod tests {
     fn every_registered_opcode_is_unique_per_server() {
         // The maps would silently drop duplicates; check the table sizes match.
         assert_eq!(login_routes().len(), 13);
-        assert_eq!(world_routes().len(), 79);
+        assert_eq!(world_routes().len(), 80);
     }
 
     #[test]

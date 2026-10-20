@@ -222,6 +222,34 @@ pub fn build_show_magnet(object_id: i32, success: bool) -> Result<Packet, Networ
     Ok(p)
 }
 
+/// CATCH_MONSTER_WITH_ITEM: a player threw the 227xxxx item `item_id` at
+/// the mob; the client plays the item's ItemEff over it, or its `fail`
+/// frames (0x66d997). It leaves the mob on the map: a catch also kills it.
+pub fn build_catch_with_item(
+    object_id: i32,
+    item_id: i32,
+    success: bool,
+) -> Result<Packet, NetworkError> {
+    let mut p = Packet::new_empty();
+    p.write_short(SendOpcode::CatchMonsterWithItem as i16)?;
+    p.write_int(object_id)?;
+    p.write_int(item_id)?;
+    p.write_byte(u8::from(success))?;
+    Ok(p)
+}
+
+/// BRIDLE_MOB_CATCH_FAIL: the 227xxxx item `item_id` couldn't catch the
+/// mob, which is too strong (0xa0800e; result 1 would show the item's
+/// `delayMsg` instead). The client stays locked until a stat update.
+pub fn build_catch_fail(item_id: i32) -> Result<Packet, NetworkError> {
+    let mut p = Packet::new_empty();
+    p.write_short(SendOpcode::BridleMobCatchFail as i16)?;
+    p.write_byte(0)?;
+    p.write_int(item_id)?;
+    p.write_int(0)?;
+    Ok(p)
+}
+
 /// MOB_STAT_SET: statuses put on a mob (0x66c301). The client has them
 /// take hold at once, and for one that stops the mob reads a byte more.
 pub fn build_mob_stat_set(
@@ -573,6 +601,26 @@ mod tests {
             .short(SendOpcode::ShowMonsterHp as i16)
             .int(7)
             .byte(40);
+        expect.end();
+    }
+
+    #[test]
+    fn a_catch_names_its_item() {
+        let caught = build_catch_with_item(7, 2270000, true).unwrap();
+        let mut expect = Expect::new(&caught.bytes);
+        expect
+            .short(SendOpcode::CatchMonsterWithItem as i16)
+            .int(7)
+            .int(2270000)
+            .byte(1);
+        expect.end();
+        let fail = build_catch_fail(2270001).unwrap();
+        let mut expect = Expect::new(&fail.bytes);
+        expect
+            .short(SendOpcode::BridleMobCatchFail as i16)
+            .byte(0)
+            .int(2270001)
+            .int(0);
         expect.end();
     }
 }

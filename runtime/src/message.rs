@@ -99,6 +99,13 @@ pub enum ServerMessage {
     PickedUp {
         drop: crate::actor::field_drops::Drop,
     },
+    /// This player caught a mob with the catch item `item_id` in USE
+    /// `slot`, which makes `create`.
+    Caught {
+        slot: i16,
+        item_id: i32,
+        create: i32,
+    },
     /// The field gave this player's pet at `pet` a drop it still shows;
     /// answer with `FieldMessage::PetLooted`.
     PetPickedUp {
