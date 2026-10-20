@@ -22,6 +22,7 @@
 #include "../../Configuration.h"
 #include "../../Audio/Audio.h"
 #include "../../Character/Inventory/ScrollRules.h"
+#include "../../Character/SkillId.h"
 #include "../../Data/CurseData.h"
 #include "../../Data/ItemData.h"
 #include "../../Data/SkillData.h"
@@ -841,6 +842,15 @@ namespace ms
 		else // Buff effect
 		{
 			int32_t skillid = recv.read_int();
+
+			// Berserk's aura loops until it is turned off (0x937982).
+			if (skillid == SkillId::BERSERK)
+			{
+				recv.skip(2); // character and skill level
+				Stage::get().get_player().show_berserk(recv.read_bool());
+
+				return;
+			}
 
 			// More bytes, but we don't need them.
 			Stage::get().get_combat().show_player_buff(skillid);

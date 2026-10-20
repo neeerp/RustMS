@@ -2157,6 +2157,7 @@ mod tests {
             pets: Vec::new(),
             chalkboard: None,
             item_effect: 0,
+            berserk: false,
             energy: None,
             dash: [None; 2],
             ride: None,

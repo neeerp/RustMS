@@ -875,6 +875,14 @@ namespace ms
 		}
 	};
 
+	// Tells the server Berserk turned on or off; it works out which itself
+	// Opcode: CALC_DAMAGE_STAT(108)
+	class CalcDamageStatPacket : public OutPacket
+	{
+	public:
+		CalcDamageStatPacket() : OutPacket(OutPacket::Opcode::CALC_DAMAGE_STAT) {}
+	};
+
 	// Opcode: PLAYER_UPDATE(223)
 	class PlayerUpdatePacket : public OutPacket
 	{

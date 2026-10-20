@@ -121,6 +121,8 @@ pub struct SpawnPlayerPacket {
     pub pets: Vec<(i32, String, i64)>,
     /// The note on the chalkboard they hold up, if any.
     pub chalkboard: Option<String>,
+    /// Whether their Berserk aura shows.
+    pub berserk: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -1107,6 +1109,12 @@ pub fn decode_spawn_player(packet: &Packet) -> Result<SpawnPlayerPacket, String>
         .map_err(|e| format!("failed to read spawn-player pets: {e}"))?;
     let chalkboard = decode_spawn_player_chalkboard(&mut cursor)
         .map_err(|e| format!("failed to read spawn-player chalkboard: {e}"))?;
+    // The three rings, and no new year cards.
+    skip(&mut cursor, 4)?;
+    let berserk = cursor
+        .read_byte()
+        .map_err(|e| format!("failed to read spawn-player berserk: {e}"))?
+        != 0;
 
     Ok(SpawnPlayerPacket {
         character_id,
@@ -1120,6 +1128,7 @@ pub fn decode_spawn_player(packet: &Packet) -> Result<SpawnPlayerPacket, String>
         stance,
         pets,
         chalkboard,
+        berserk,
     })
 }
 

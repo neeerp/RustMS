@@ -17,6 +17,7 @@
 //////////////////////////////////////////////////////////////////////////////////
 #include "Player.h"
 
+#include "Berserk.h"
 #include "CatchItemRules.h"
 #include "MobDamage.h"
 #include "PlayerStates.h"
@@ -1044,14 +1045,8 @@ namespace ms
 			}
 		}
 
-		// Berserk, under x percent of the HP.
-		if (skillbook.get_level(SkillId::BERSERK) > 0)
-		{
-			const SkillData::Stats &source = skill_stats(skillbook, SkillId::BERSERK);
-
-			if (stats.get_stat(MapleStat::Id::HP) <= stats.get_total(EquipStat::Id::HP) * source.x / 100)
-				blow.berserk = in_percent(source.damage);
-		}
+		// Berserk, as the player last turned it on.
+		blow.berserk = berserk;
 
 		blow.blind = has_buff(Buffstat::Id::DARKNESS);
 
@@ -1332,6 +1327,33 @@ namespace ms
 	bool Player::energy_full() const
 	{
 		return energy >= energy::FULL && skillbook.get_level(energy::skill(stats.get_job().get_id())) > 0;
+	}
+
+	void Player::update_berserk(bool reset)
+	{
+		if (reset)
+			berserk = 0;
+
+		int32_t level = skillbook.get_level(SkillId::BERSERK);
+		int32_t now = 0;
+
+		if (level > 0)
+		{
+			const SkillData::Stats &source = skill_stats(skillbook, SkillId::BERSERK);
+			now = berserk::damage(stats.get_job().get_id(), level, stats.get_stat(MapleStat::Id::HP),
+								  stats.get_total(EquipStat::Id::HP), source.x, in_percent(source.damage));
+		}
+
+		if (!berserk::changed(berserk, now))
+			return;
+
+		berserk = now;
+		CalcDamageStatPacket().dispatch();
+	}
+
+	int32_t Player::get_berserk() const
+	{
+		return berserk;
 	}
 
 	void Player::change_skill(int32_t skill_id, int32_t skill_level, int32_t masterlevel, int64_t expiration)

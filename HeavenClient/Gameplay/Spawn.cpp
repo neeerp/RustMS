@@ -121,10 +121,10 @@ namespace ms
 						 Point<int16_t> p, int32_t ch, std::vector<std::pair<Buffstat::Id, int32_t>> bf,
 						 const std::string &gd, const GuildEmblem &em, std::optional<MiniRoomBox> rm,
 						 std::vector<PetEntry> pt, std::optional<std::string> cb, int32_t ie, int32_t ml, int32_t me,
-						 int32_t mf) : cid(c), look(lk), level(l),
+						 int32_t mf, bool bs) : cid(c), look(lk), level(l),
 						 job(j), name(nm), stance(st), position(p), chair(ch), buffs(std::move(bf)), guild(gd), emblem(em),
 						 room(std::move(rm)), pets(std::move(pt)), chalkboard(std::move(cb)), item_effect(ie),
-						 mount_level(ml), mount_exp(me), mount_fatigue(mf)
+						 mount_level(ml), mount_exp(me), mount_fatigue(mf), berserk(bs)
 	{}
 
 	int32_t CharSpawn::get_cid() const
@@ -143,6 +143,7 @@ namespace ms
 		otherchar->set_mini_room(room);
 		otherchar->set_chalkboard(chalkboard, false);
 		otherchar->set_item_effect(item_effect);
+		otherchar->show_berserk(berserk);
 
 		for (size_t i = 0; i < pets.size(); i++)
 			otherchar->add_pet(static_cast<uint8_t>(i), false, pets[i], false);

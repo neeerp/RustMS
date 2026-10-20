@@ -760,7 +760,7 @@ namespace ms
 
 		nl::node aura = skill_level(summon_rules::AURA_OF_THE_BEHOLDER, level);
 		int32_t berserk_level = skills.get_level(SkillId::Id::BERSERK);
-		int32_t berserk = berserk_level > 0
+		int32_t berserk = player.get_berserk() != 0
 						  ? static_cast<int32_t>(skill_level(SkillId::Id::BERSERK, berserk_level)["x"].get_integer())
 						  : 0;
 		const CharStats &stats = player.get_stats();

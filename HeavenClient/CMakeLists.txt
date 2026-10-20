@@ -287,6 +287,8 @@ if(HEAVENCLIENT_BUILD_TESTS)
     add_test(NAME fame_cooldown COMMAND fame_cooldown_tests)
     add_executable(summon_rules_tests tests/summon_rules.cpp)
     add_test(NAME summon_rules COMMAND summon_rules_tests)
+    add_executable(berserk_tests tests/berserk.cpp)
+    add_test(NAME berserk COMMAND berserk_tests)
     add_executable(chat_flood_guard_tests tests/chat_flood_guard.cpp)
     add_test(NAME chat_flood_guard COMMAND chat_flood_guard_tests)
     add_executable(chat_target_tests tests/chat_target.cpp)
@@ -390,6 +392,7 @@ add_executable(HeavenClient
     Character/ActiveBuffs.h
     Character/BuddyList.cpp
     Character/BuddyList.h
+    Character/Berserk.h
     Character/Buff.cpp
     Character/Buff.h
     Character/ChalkboardBalloon.cpp

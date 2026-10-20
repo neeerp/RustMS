@@ -213,6 +213,8 @@ namespace ms
 		CharacterParser::parse_areainfo(recv);
 
 		player.recalc_stats();
+		// Logging in or changing channel starts Berserk over (0x7763a9).
+		player.update_berserk(true);
 
 		PlayerUpdatePacket().dispatch();
 

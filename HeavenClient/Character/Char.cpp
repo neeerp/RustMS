@@ -62,6 +62,7 @@ namespace ms
 		effects.drawbelow(absp, alpha);
 		held_effects.drawbelow(absp, alpha);
 		energy_glow.drawbelow(absp, alpha);
+		berserk_aura.drawbelow(absp, alpha);
 
 		if (dashing && phobj.onground)
 			dash_dust.draw(DrawArgument(absp, facing_right), alpha);
@@ -160,6 +161,7 @@ namespace ms
 		effects.drawabove(absp, alpha);
 		held_effects.drawabove(absp, alpha);
 		energy_glow.drawabove(absp, alpha);
+		berserk_aura.drawabove(absp, alpha);
 
 		for (auto &[reason, affliction] : afflictions)
 			affliction.animation.draw(affliction.at_face ? facepos : absp, alpha);
@@ -229,6 +231,7 @@ namespace ms
 		effects.update();
 		held_effects.update();
 		energy_glow.update();
+		berserk_aura.update();
 
 		if (dashing)
 			dash_dust.update();
@@ -515,6 +518,16 @@ namespace ms
 
 		Sound(nl::nx::sound["Skill.img"][id]["Use"]).play();
 		energy_wait = 1350;
+	}
+
+	void Char::show_berserk(bool on)
+	{
+		// Each "on" starts the loop over (FUN_009377d9, slot 0xd).
+		berserk_aura.clear();
+
+		if (on)
+			berserk_aura.add_looping(nl::nx::skill["132.img"]["skill"]["1320006"]["effect"], DrawArgument(facing_right),
+									 0, 1.0f);
 	}
 
 	void Char::show_held_effect(Animation toshow, int8_t z, bool looping)

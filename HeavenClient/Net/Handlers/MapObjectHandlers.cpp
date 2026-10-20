@@ -27,6 +27,7 @@
 
 #include "../../Character/CatchItemRules.h"
 #include "../../Character/Pets.h"
+#include "../../Character/SkillId.h"
 #include "../../Data/CurseData.h"
 #include "../../Data/ItemData.h"
 #include "../../Data/SkillData.h"
@@ -128,12 +129,19 @@ namespace ms
 		if (recv.read_bool())
 			chalkboard = Chalkboard::remote_text(recv.read_string(), CurseData::filter);
 
-		recv.skip(3);
+		recv.skip(3); // crush, friendship and marriage rings
+
+		// The new year cards the player sent.
+		if (recv.read_bool())
+			recv.skip(4 * recv.read_int());
+
+		bool berserk = recv.read_bool();
+		recv.read_byte(); // an Evan's Dragon Fury
 		recv.read_byte(); // team
 
 		Stage::get().get_chars().spawn(
 			{ cid, look, level, job, name, stance, position, chair, std::move(buffs), guild, emblem, room, std::move(pets),
-			  chalkboard, item_effect, mount_level, mount_exp, mount_fatigue }
+			  chalkboard, item_effect, mount_level, mount_exp, mount_fatigue, berserk }
 		);
 	}
 
@@ -485,6 +493,19 @@ namespace ms
 		else if (recv.available()) // skill
 		{
 			int32_t skillid = recv.read_int();
+
+			// Berserk's aura loops until it is turned off, with no action.
+			if (skillid == SkillId::BERSERK)
+			{
+				recv.skip(2); // character and skill level
+				bool on = recv.read_bool();
+
+				if (Optional<Char> character = Stage::get().get_character(cid))
+					character->show_berserk(on);
+
+				return;
+			}
+
 			recv.read_byte(); // 'direction'
 			// 9 more bytes after this
 

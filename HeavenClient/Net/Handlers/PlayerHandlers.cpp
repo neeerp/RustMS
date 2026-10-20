@@ -111,6 +111,10 @@ namespace ms
 		if (recalculate || player.get_level() != oldlevel)
 			player.recalc_stats();
 
+		// v83 checks Berserk on each HP change only (0xa20276).
+		if (updatemask & MapleStat::codes[MapleStat::Id::HP])
+			player.update_berserk(false);
+
 		// After a level-up, v83 tells anyone but a GM to spend AP once more than 199 pile up (FUN_00a1fb52).
 		const CharStats& stats = player.get_stats();
 
