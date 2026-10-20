@@ -1,5 +1,6 @@
 //! Player attacks: parsing, damage limits, and the attack broadcast.
 
+use crate::charge;
 use crate::combo;
 use crate::energy;
 use crate::meso_explosion::{self, Blast, Explosion, MESO_EXPLOSION};
@@ -533,7 +534,7 @@ pub fn validate(attack: &Attack, player: &Player) -> Result<Uses, AttackRejectio
     if (attack.kind == AttackKind::Body) != energy::charges(attack.skill) {
         return Err(AttackRejection::Skill);
     }
-    if energy::refused(player, attack.skill) {
+    if energy::refused(player, attack.skill) || charge::refused(player, attack.skill) {
         return Err(AttackRejection::NotCharged);
     }
     // A hit is the base times the skill's percent and the orbs'
@@ -545,8 +546,9 @@ pub fn validate(attack: &Attack, player: &Player) -> Result<Uses, AttackRejectio
         0 => 100,
         percent => i64::from(percent),
     };
+    let charged = i64::from(charge::damage_percent(player));
     let cap_for = |percent: i32| {
-        (2 * base * (i64::from(percent) * combo / 100 + critical) / 100)
+        (2 * base * (i64::from(percent) * combo / 100 + critical) / 100 * charged / 100)
             .clamp(10, i64::from(i32::MAX)) as i32
     };
     let base_cap = cap_for(100);
@@ -589,7 +591,9 @@ pub fn validate(attack: &Attack, player: &Player) -> Result<Uses, AttackRejectio
         } else if skill.skill_id == ASSASSINATE {
             let percent = damage_percent(&skill).ok_or(AttackRejection::Skill)?;
             cap_for(percent).saturating_mul(assassinate_most(&skill))
-        } else if let Some(percent) = damage_percent(&skill) {
+        } else if let Some(percent) =
+            charge::blow_percent(player, &skill).or_else(|| damage_percent(&skill))
+        {
             let boost = skills::elemental_boost(player, skill.skill_id);
             cap_for(percent + boost.map_or(0, |boost| boost.effect.damage))
         } else {

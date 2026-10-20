@@ -37,6 +37,11 @@ int main()
 		require(check(5001001, false, W::GUN, W::NONE) == FITS && check(5101002, false, W::GUN, W::NONE) == EQUIPPED,
 				"with v83's own exceptions");
 		require(check(2001005, false, W::NONE, W::NONE) == FITS, "a skill that names no weapon takes any");
+		require(check(1211003, false, W::SWORD_2H, W::NONE) == FITS && check(1211003, false, W::MACE_1H, W::NONE) == EQUIPPED
+				&& check(1221004, false, W::MACE_2H, W::NONE) == FITS && check(1221004, false, W::SWORD_1H, W::NONE) == EQUIPPED,
+				"a sword's charges take a sword, a mace's a mace");
+		require(check(1211002, false, W::MACE_1H, W::NONE) == FITS && check(1211002, false, W::AXE_1H, W::NONE) == EQUIPPED,
+				"Charged Blow takes either");
 
 		std::cout << "Skill weapon passed\n";
 		return 0;
