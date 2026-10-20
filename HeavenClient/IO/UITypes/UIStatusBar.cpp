@@ -203,6 +203,9 @@ namespace ms
 		for (auto &iter : ACTION_ICONS)
 			action_icons[iter.first] = window["KeyConfig"]["icon"][std::to_string(iter.second)];
 
+		for (size_t i = 0; i < SkillMacros::MAX_MACROS; i++)
+			macro_icons[i] = window["SkillMacro"]["Macroicon"][std::to_string(i)]["icon"];
+
 		const char *hint_keys[Key::NUM_KEYS] = { "EquipKey", "InvenKey", "StatKey", "SkillKey" };
 
 		for (size_t i = 0; i < Key::NUM_KEYS; i++)
@@ -455,6 +458,12 @@ namespace ms
 					itemnumber.draw(std::to_string(count), cellpos + Point<int16_t>(0, 20));
 					break;
 				}
+				case KeyType::Id::MACRO:
+					// v83 FUN_008d66be.
+					if (mapping.action >= 0 && mapping.action < static_cast<int32_t>(SkillMacros::MAX_MACROS))
+						macro_icons[mapping.action].draw(iconpos);
+
+					break;
 				case KeyType::Id::MENU:
 				case KeyType::Id::ACTION:
 				case KeyType::Id::FACE:
@@ -656,7 +665,8 @@ namespace ms
 		}
 	}
 
-	// Dropping a skill or item on a quick slot binds the slot's key to it.
+	// Dropping a skill, item or macro on a quick slot binds the slot's key to
+	// it.
 	bool UIStatusBar::send_icon(const Icon &icon, Point<int16_t> cursorpos)
 	{
 		int16_t slot = quickslot_at(cursorpos);

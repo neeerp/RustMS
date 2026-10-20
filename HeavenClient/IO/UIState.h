@@ -76,6 +76,9 @@ namespace ms
 
 		virtual void show_text(Tooltip::Parent parent, std::string text) = 0;
 
+		// The skill macro at `index`.
+		virtual void show_macro(Tooltip::Parent parent, size_t index) {}
+
 		virtual void
 		show_map(Tooltip::Parent parent, std::string name, std::string description) = 0;
 

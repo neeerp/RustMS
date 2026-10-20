@@ -27,6 +27,7 @@
 #include "Components/EquipTooltip.h"
 #include "Components/ItemTooltip.h"
 #include "Components/MapTooltip.h"
+#include "Components/MacroTooltip.h"
 #include "Components/SkillTooltip.h"
 #include "Components/PlainTooltip.h"
 #include "Components/TextTooltip.h"
@@ -76,6 +77,8 @@ namespace ms
 						int64_t expiration, bool levels) override;
 
 		void show_text(Tooltip::Parent parent, std::string text) override;
+
+		void show_macro(Tooltip::Parent parent, size_t index) override;
 
 		void show_map(Tooltip::Parent parent, std::string name, std::string description) override;
 
@@ -127,6 +130,7 @@ namespace ms
 		TextTooltip tetooltip;
 		MapTooltip matooltip;
 		PlainTooltip pltooltip;
+		MacroTooltip mctooltip;
 		Optional<Tooltip> tooltip;
 		Tooltip::Parent tooltipparent;
 

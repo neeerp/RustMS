@@ -604,6 +604,8 @@ add_executable(HeavenClient
     IO/Components/Icon.h
     IO/Components/ItemTooltip.cpp
     IO/Components/ItemTooltip.h
+    IO/Components/MacroTooltip.cpp
+    IO/Components/MacroTooltip.h
     IO/Components/MapleButton.cpp
     IO/Components/MapleButton.h
     IO/Components/MapleComboBox.cpp

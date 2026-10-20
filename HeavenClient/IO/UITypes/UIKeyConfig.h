@@ -23,6 +23,7 @@
 #include "../UIDragElement.h"
 
 #include "../../Character/SkillBook.h"
+#include "../../Character/SkillMacros.h"
 
 namespace ms
 {
@@ -40,6 +41,8 @@ namespace ms
 		Cursor::State send_cursor(bool clicked, Point<int16_t> cursorpos) override;
 		bool send_icon(const Icon& icon, Point<int16_t> cursorpos) override;
 		void send_key(int32_t keycode, bool pressed, bool escape) override;
+
+		void toggle_active() override;
 
 		UIElement::Type get_type() const override;
 
@@ -149,6 +152,8 @@ namespace ms
 
 		std::map<int32_t, std::unique_ptr<Icon>> item_icons;
 		std::map<int32_t, std::unique_ptr<Icon>> skill_icons;
+		// SkillMacro/Macroicon, for each place a macro can have.
+		std::unique_ptr<Icon> macro_icons[SkillMacros::MAX_MACROS];
 
 		// Used to determine if mapping belongs to predefined action, e.g. attack, pick up, faces, etc.
 		std::vector<Keyboard::Mapping> action_mappings;

@@ -110,6 +110,9 @@ namespace ms
 
 		void show_text(Tooltip::Parent parent, std::string text);
 
+		// The skill macro at `index`.
+		void show_macro(Tooltip::Parent parent, size_t index);
+
 		void show_map(Tooltip::Parent parent, std::string name, std::string description);
 
 		void show_zone(Tooltip::Parent parent, std::string title, std::string description);

@@ -25,6 +25,7 @@
 #include "../Components/Charset.h"
 
 #include "../../Character/CharStats.h"
+#include "../../Character/SkillMacros.h"
 #include "../../Graphics/Animation.h"
 #include "../../Graphics/Text.h"
 
@@ -176,6 +177,8 @@ namespace ms
 		Texture gamemenu;
 		Texture shortcutmenu;
 		std::map<int32_t, Texture> action_icons;
+		// SkillMacro/Macroicon, for a key bound to a macro.
+		Texture macro_icons[SkillMacros::MAX_MACROS];
 		Charset number;
 		Charset levelnumber;
 		Charset itemnumber;

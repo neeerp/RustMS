@@ -67,8 +67,9 @@ from `UI.nx`. Moved so far:
 - **Status bar** (`UIStatusBar`, `StatusBar.img`): gauges, menu buttons, the
   quick slot panel, and the Game Menu and ShortCut popups (`UIWindow.img`).
   Esc opens the Game Menu; the MENU key action opens ShortCut. Dropping a
-  skill, or a USE or SETUP item, on a quick slot binds that slot's key and
-  saves the keymap right away; an open Key Config shows the new binding.
+  skill, a USE or SETUP item, or a skill macro on a quick slot binds that
+  slot's key and saves the keymap right away; an open Key Config shows the
+  new binding. Quick slots show no tooltips yet.
   Status messages (`UIStatusMessenger`) stack upward from just above the
   quick slot panel, right-aligned with it; `UIStatusBar::QUICKSLOT_TOP` is
   the shared anchor. Each fades out over 6 s. SHOW_STATUS_INFO is worded and
@@ -194,8 +195,10 @@ from `UI.nx`. Moved so far:
   sends the whole list (`SkillMacroPacket`). Clicking a row selects it, and
   any other click in the window selects the first macro, as v83 does. The
   selected macro's name (12 bytes) and shout box are saved with OK, which
-  refuses curse words. The macro icons can be dragged, but no key takes them
-  yet. The buttons have no tooltips.
+  refuses curse words. A macro's icon is dragged onto a key in Key Config or
+  a quick slot, which then shows it (`Macroicon/<n>/icon`). Hovering the icon,
+  or such a key in Key Config, shows the macro's tooltip (`MacroTooltip`). The
+  buttons have no tooltips.
 - **Item window** (`UIItemInventory`, `UIWindow.img/Item`): five tabs
   (`Item/Tab`, drawn by `ClassicTabs`), six rows of four slots with a `VScr4`
   scroll bar, and the mesos, laid out from period footage. BtFull widens it to
@@ -221,6 +224,7 @@ from `UI.nx`. Moved so far:
   `key` label over each bindable key's icon, and a three-row palette of unbound
   functions (`icon/N`, by v83 function id), laid out from the background and
   period footage. Drag an icon between keys or onto the palette to unbind it.
+  It shows the keys as they are each time it opens, as v83 builds it anew.
   Esc, Tab, and the other keys printed on the background are fixed. DEFAULT
   restores the server's defaults; DEFAULT, CLEAR ALL, and Esc with unsaved
   changes ask through the in-window `notice` bitmaps. CHANGE QUICK SLOTS is

@@ -524,6 +524,11 @@ namespace ms
 		state->show_skill(parent, skill_id, level, masterlevel, expiration, levels);
 	}
 
+	void UI::show_macro(Tooltip::Parent parent, size_t index)
+	{
+		state->show_macro(parent, index);
+	}
+
 	void UI::show_text(Tooltip::Parent parent, std::string text)
 	{
 		state->show_text(parent, text);

@@ -595,6 +595,13 @@ namespace ms
 		}
 	}
 
+	void UIStateGame::show_macro(Tooltip::Parent parent, size_t index)
+	{
+		mctooltip.set_macro(index, UI::get().get_skill_macros());
+		tooltip = mctooltip;
+		tooltipparent = parent;
+	}
+
 	void UIStateGame::show_text(Tooltip::Parent parent, std::string text)
 	{
 		tetooltip.set_text(text);

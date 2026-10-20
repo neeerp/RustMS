@@ -1,6 +1,7 @@
 #include "UISkillMacro.h"
 
 #include "SkillMacroLayout.h"
+#include "UIKeyConfig.h"
 #include "UINotice.h"
 
 #include "../UI.h"
@@ -87,6 +88,22 @@ namespace ms
 	}
 
 	UISkillMacro::MacroIcon::MacroIcon(size_t i) : index(i) {}
+
+	void UISkillMacro::MacroIcon::drop_on_bindings(Point<int16_t> cursorposition, bool remove) const
+	{
+		auto keyconfig = UI::get().get_element<UIKeyConfig>();
+
+		if (remove)
+			keyconfig->unstage_mapping(get_mapping());
+		else
+			keyconfig->stage_mapping(cursorposition, get_mapping());
+	}
+
+	// A key bound to it has type 8 and the macro's place (v83 FUN_004fb32c).
+	Keyboard::Mapping UISkillMacro::MacroIcon::get_mapping() const
+	{
+		return Keyboard::Mapping(KeyType::Id::MACRO, static_cast<int32_t>(index));
+	}
 
 	Icon::IconType UISkillMacro::MacroIcon::get_type()
 	{
@@ -453,7 +470,7 @@ namespace ms
 	{
 		if (hit.column == ICON_COLUMN)
 		{
-			clear_tooltip();
+			UI::get().show_macro(Tooltip::Parent::SKILLMACRO, hit.row);
 
 			return;
 		}

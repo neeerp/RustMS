@@ -129,6 +129,7 @@ namespace ms
 			GIFTBLUE,
 			TIPORANGE,
 			LIGHTYELLOW,
+			TIPRED,
 			NUM_COLORS
 		};
 
@@ -207,7 +208,8 @@ namespace ms
 						{0.27f, 0.15f, 0.02f}, // Item megaphone (#462706, v83 chat font 0xf: item megaphones)
 						{0.13f, 0.00f, 1.00f}, // Gift blue (#2000FF, v83 font 4: who sent a gift)
 						{1.00f, 0.54f, 0.09f}, // Tip orange (#FF8A18, v83 tooltip font 11: a map zone's description)
-						{1.00f, 0.94f, 0.50f}  // Light yellow (#FFF080, v83 chat font 9: jukebox songs)
+						{1.00f, 0.94f, 0.50f}, // Light yellow (#FFF080, v83 chat font 9: jukebox songs)
+						{0.95f, 0.01f, 0.01f}  // Tip red (#F20303, v83 tooltip font 10: a macro's skills)
 				};
 
 		// Create a color by an array of real numbers [0.0f, 1.0f]
