@@ -39,8 +39,7 @@ namespace ms
 			// Pet equipment is the pets', not the character's.
 			if (pets::is_equip_part(equip.first))
 			{
-				if (int8_t index = pets::wear_owner(equip.first); index >= 0)
-					pet_wear[index] = equip.second;
+				set_pet_part(equip.first, equip.second);
 
 				continue;
 			}
@@ -815,10 +814,20 @@ namespace ms
 		return index < pet_wear.size() ? pet_wear[index] : 0;
 	}
 
-	void CharLook::set_pet_wear(size_t index, int32_t itemid)
+	void CharLook::set_pet_part(int16_t part, int32_t itemid)
 	{
-		if (index < pet_wear.size())
+		if (itemid)
+			pet_parts[part] = itemid;
+		else
+			pet_parts.erase(part);
+
+		if (int8_t index = pets::wear_owner(part); index >= 0)
 			pet_wear[index] = itemid;
+	}
+
+	const std::map<int16_t, int32_t> &CharLook::get_pet_parts() const
+	{
+		return pet_parts;
 	}
 
 	const CharEquips &CharLook::get_equips() const

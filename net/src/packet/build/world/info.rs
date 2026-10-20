@@ -18,7 +18,9 @@ pub fn build_character_info(player: &Player) -> Result<Packet, NetworkError> {
     packet.write_str_with_length(guild.map_or("", |guild| &guild.name))?;
     packet.write_str_with_length("")?; // alliance
     packet.write_byte(0)?; // medal info
-    for item in player.summoned_pets() {
+    for (index, item) in
+        (0..player.pets.len()).filter_map(|index| Some((index, player.summoned_pet(index)?)))
+    {
         let Some(pet) = &item.pet else { continue };
         packet.write_byte(1)?;
         packet.write_int(item.item_id)?;
@@ -27,7 +29,10 @@ pub fn build_character_info(player: &Player) -> Result<Packet, NetworkError> {
         packet.write_short(pet.closeness)?;
         packet.write_byte(pet.fullness)?;
         packet.write_short(0)?;
-        packet.write_int(0)?; // its equipment: pets wear none yet
+        let clothes = equip_slot::PET_CLOTHES
+            .get(index)
+            .and_then(|&slot| player.inventory.get(InventoryType::Equipped, slot));
+        packet.write_int(clothes.map_or(0, |item| item.item_id))?;
     }
     packet.write_byte(0)?; // end of pets
 
@@ -116,6 +121,11 @@ mod tests {
             .inventory
             .insert(InventoryType::Cash, 2, pet(78, "Stays home"));
         player.pets = vec![77];
+        player.inventory.insert(
+            InventoryType::Equipped,
+            equip_slot::PET_CLOTHES[0],
+            Item::equipment(1802000, EquipStats::default()),
+        );
         let packet = build_character_info(&player).unwrap();
         let mut expect = Expect::new(&packet.bytes);
         expect.short(SendOpcode::CharInfo as i16).int(0x0102_0304);
@@ -128,7 +138,7 @@ mod tests {
             .byte(3)
             .short(40)
             .byte(80);
-        expect.short(0).int(0);
+        expect.short(0).int(1802000);
         expect.byte(0); // end of pets
         expect.byte(0).byte(0);
     }

@@ -21,6 +21,7 @@
 
 #include "../../Character/Job.h"
 #include "../../Character/MountRules.h"
+#include "../../Data/EquipData.h"
 #include "../../Data/ItemData.h"
 #include "../../Gameplay/Stage.h"
 #include "../../IO/UI.h"
@@ -67,6 +68,34 @@ namespace ms
 		const Point<int16_t> MOUNT_EXP = { 189, 287 };
 		const Point<int16_t> MOUNT_TIREDNESS = { 189, 305 };
 
+		// The pet box (FUN_00901185, FUN_0090433a): the pet stands on the
+		// shadow over its name, the first wearing the boss crown, with its
+		// values in two columns.
+		const Point<int16_t> PET_STAND = { 53, 299 };
+		const Point<int16_t> CROWN = { 44, 209 };
+		const Point<int16_t> PET_NAME = { 53, 301 };
+		const Point<int16_t> PET_TYPE = { 58, 325 };
+		const Point<int16_t> PET_LEVEL = { 58, 342 };
+		const Point<int16_t> PET_CLOSENESS = { 189, 324 };
+		const Point<int16_t> PET_FULLNESS = { 189, 342 };
+		// A button per pet, placed by its top left (FUN_008ffe3b).
+		const Point<int16_t> PET_BUTTON = { 168, 177 };
+		constexpr int16_t PET_BUTTON_STEP = 34;
+		constexpr size_t MAX_PETS = 3;
+
+		// The pet's equipment, three rows at a time: the icon, the name
+		// cut to 100 pixels, and the level it needs.
+		constexpr int16_t ITEM_ROWS = 3, ITEM_STEP = 38;
+		constexpr size_t ITEM_NAME_WIDTH = 100;
+		const Point<int16_t> ITEM_ICON = { 106, 248 };
+		const Point<int16_t> ITEM_NAME = { 147, 211 };
+		const Point<int16_t> ITEM_REQ = { 147, 236 };
+		const Point<int16_t> ITEM_REQ_LEVEL = { 183, 229 };
+		// The scrollbar (id 0x7e1) is 112 tall from (252, 215); ours puts its
+		// lower arrow's top at the range's end.
+		constexpr int16_t ITEM_SLIDER_X = 252;
+		constexpr Range<int16_t> ITEM_SLIDER = Range<int16_t>(215, 215 + 112 - 13);
+
 		// Values sit right of the labels; a row's text has its cap top 4
 		// below the row's top.
 		constexpr int16_t VALUE_X = 160;
@@ -109,9 +138,27 @@ namespace ms
 		buttons[Buttons::BT_EXCEPTION] = std::make_unique<MapleButton>(UserInfo["BtExceptionShow"]);
 		buttons[Buttons::BT_PANEL_HIDE] = std::make_unique<MapleButton>(Basic["BtHide"], PANEL + PANEL_HIDE);
 
-		// There are no families, parties, or pets yet. The taming box opens
-		// once CHAR_INFO says there is a mount.
-		for (auto button : { Buttons::BT_FAMILY, Buttons::BT_PARTY, Buttons::BT_EXCEPTION, Buttons::BT_TAMING_SHOW })
+		for (size_t i = 0; i < MAX_PETS; i++)
+		{
+			nl::node src = UserInfo["BtPet" + std::to_string(i + 1)];
+			Point<int16_t> origin = Texture(src["normal"]["0"]).get_origin();
+			Point<int16_t> pos = PET_BUTTON + Point<int16_t>(PET_BUTTON_STEP * static_cast<int16_t>(i), 0) + origin;
+
+			buttons[Buttons::BT_PET1 + i] = std::make_unique<MapleButton>(src, pos);
+		}
+
+		crown = UserInfo["bossPetCrown"];
+		req_level = UserInfo["ReqLv"];
+
+		item_slider = Slider(Slider::Type::CLASSIC, ITEM_SLIDER, ITEM_SLIDER_X, ITEM_ROWS, 0, [&](bool upwards)
+		{
+			item_offset += upwards ? -1 : 1;
+		});
+
+		// There are no families or parties yet. The pet and taming boxes
+		// open once CHAR_INFO says there are pets or a mount.
+		for (auto button : { Buttons::BT_FAMILY, Buttons::BT_PARTY, Buttons::BT_EXCEPTION, Buttons::BT_PET_SHOW,
+							 Buttons::BT_TAMING_SHOW })
 			buttons[button]->set_state(Button::State::DISABLED);
 
 		// v83 offers fame only from level 15 (FUN_009007a0), and never for
@@ -180,7 +227,52 @@ namespace ms
 			mount_tiredness.draw(position + MOUNT_TIREDNESS);
 		}
 
+		if (mode == Mode::PET)
+		{
+			if (selected < pet_pages.size())
+			{
+				const PetPage &pet = pet_pages[selected];
+				pet.name.draw(position + PET_NAME);
+				pet.type.draw(position + PET_TYPE);
+				pet.level.draw(position + PET_LEVEL);
+				pet.closeness.draw(position + PET_CLOSENESS);
+				pet.fullness.draw(position + PET_FULLNESS);
+				pet.look.draw_standing(position + PET_STAND, alpha);
+
+				if (selected == 0)
+					crown.draw(position + CROWN);
+			}
+
+			for (int16_t r = 0; r < ITEM_ROWS; r++)
+			{
+				size_t i = static_cast<size_t>(item_offset + r);
+
+				if (item_offset + r < 0 || i >= item_rows.size())
+					break;
+
+				const ItemRow &row = item_rows[i];
+				Point<int16_t> step = Point<int16_t>(0, ITEM_STEP * r);
+
+				row.icon.draw(position + ITEM_ICON + step);
+				row.name.draw(position + ITEM_NAME + step);
+				req_level.draw(position + ITEM_REQ + step);
+
+				if (row.equip)
+					row.level.draw(position + ITEM_REQ_LEVEL + step);
+			}
+
+			item_slider.draw(position);
+		}
+
 		UIElement::draw_buttons(alpha);
+	}
+
+	void UICharInfo::update()
+	{
+		UIDragElement::update();
+
+		if (mode == Mode::PET && selected < pet_pages.size())
+			pet_pages[selected].look.update_standing();
 	}
 
 	Button::State UICharInfo::button_pressed(uint16_t buttonid)
@@ -222,6 +314,12 @@ namespace ms
 		case Buttons::BT_COLLECTION_HIDE:
 			set_mode(Mode::MAIN);
 			break;
+		case Buttons::BT_PET1:
+		case Buttons::BT_PET2:
+		case Buttons::BT_PET3:
+			select_pet(buttonid - Buttons::BT_PET1);
+			set_mode(Mode::PET);
+			break;
 		default:
 			break;
 		}
@@ -237,6 +335,32 @@ namespace ms
 		Point<int16_t> panelpos = position + PANEL;
 
 		return panel != Panel::NO_PANEL && Rectangle<int16_t>(panelpos, panelpos + PANEL_SIZE).contains(cursorpos);
+	}
+
+	Cursor::State UICharInfo::send_cursor(bool clicked, Point<int16_t> cursorpos)
+	{
+		if (mode == Mode::PET)
+		{
+			Cursor::State state = item_slider.send_cursor(cursorpos - position, clicked);
+
+			if (state != Cursor::State::IDLE)
+				return state;
+		}
+
+		return UIDragElement::send_cursor(clicked, cursorpos);
+	}
+
+	void UICharInfo::remove_cursor()
+	{
+		UIDragElement::remove_cursor();
+
+		item_slider.remove_cursor();
+	}
+
+	void UICharInfo::send_scroll(double yoffset)
+	{
+		if (mode == Mode::PET)
+			item_slider.send_scroll(yoffset);
 	}
 
 	void UICharInfo::send_key(int32_t, bool pressed, bool escape)
@@ -301,6 +425,60 @@ namespace ms
 
 		buttons[Buttons::BT_TAMING_SHOW]->set_state(Button::State::NORMAL);
 		set_mode(Mode::TAMING);
+	}
+
+	void UICharInfo::update_pets(int32_t character_id, const std::vector<Pet> &pets)
+	{
+		if (character_id != cid)
+			return;
+
+		pet_pages.clear();
+
+		for (size_t i = 0; i < pets.size() && i < MAX_PETS; i++)
+		{
+			const Pet &pet = pets[i];
+			PetPage page;
+			page.look = PetLook(PetEntry{ pet.itemid, pet.name, 0, Point<int16_t>(), 0, 0 }, false);
+			page.look.set_wear(pet.wear);
+			page.name = Text(Text::Font::A12M, Text::Alignment::CENTER, Color::Name::WHITE, pet.name);
+			page.type = Text(Text::Font::A12M, Text::Alignment::LEFT, Color::Name::BLACK, ItemData::get(pet.itemid).get_name());
+			page.level = Text(Text::Font::A12M, Text::Alignment::LEFT, Color::Name::BLACK, std::to_string(pet.level));
+			page.closeness = Text(Text::Font::A12M, Text::Alignment::LEFT, Color::Name::BLACK, std::to_string(pet.closeness));
+			page.fullness = Text(Text::Font::A12M, Text::Alignment::LEFT, Color::Name::BLACK, std::to_string(pet.fullness));
+			page.items = pets::info_items(i, pet.wear, look.get_pet_parts());
+			pet_pages.push_back(std::move(page));
+		}
+
+		if (pet_pages.empty())
+			return;
+
+		buttons[Buttons::BT_PET_SHOW]->set_state(Button::State::NORMAL);
+		select_pet(0);
+		set_mode(Mode::PET);
+	}
+
+	void UICharInfo::select_pet(size_t index)
+	{
+		selected = index;
+		item_rows.clear();
+
+		for (int32_t itemid : pet_pages[index].items)
+		{
+			const ItemData &item = ItemData::get(itemid);
+			const EquipData &equip = EquipData::get(itemid);
+
+			ItemRow row;
+			row.icon = item.get_icon(false);
+			row.name = Text(Text::Font::A12M, Text::Alignment::LEFT, Color::Name::BLACK, item.get_name());
+			string_format::format_with_ellipsis(row.name, ITEM_NAME_WIDTH);
+			row.equip = equip.is_valid();
+			row.level = Text(Text::Font::A12M, Text::Alignment::LEFT, Color::Name::BLACK,
+							 std::to_string(equip.get_reqstat(MapleStat::Id::LEVEL)));
+			item_rows.push_back(std::move(row));
+		}
+
+		item_offset = 0;
+		item_slider.setrows(0, ITEM_ROWS, static_cast<int16_t>(item_rows.size()));
 	}
 
 	bool UICharInfo::shows_mount() const
@@ -371,6 +549,14 @@ namespace ms
 		}
 
 		buttons[Buttons::BT_EXCEPTION]->set_position(Point<int16_t>(EXCEPTION_X, bottom));
+
+		// The pet buttons show in the pet box, for the pets there are.
+		for (size_t i = 0; i < MAX_PETS; i++)
+		{
+			auto &button = buttons[Buttons::BT_PET1 + i];
+			button->set_active(mode == Mode::PET);
+			button->set_state(i < pet_pages.size() ? Button::State::NORMAL : Button::State::DISABLED);
+		}
 	}
 
 	void UICharInfo::set_panel(Panel p)

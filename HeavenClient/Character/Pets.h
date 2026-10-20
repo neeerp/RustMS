@@ -5,6 +5,7 @@
 #include <cctype>
 #include <cstddef>
 #include <cstdint>
+#include <map>
 #include <optional>
 #include <string>
 #include <utility>
@@ -586,6 +587,38 @@ namespace ms
 			}
 
 			return choices;
+		}
+
+		// What the Character Info window's pet page lists for the pet at
+		// `index` (FUN_00904aea): the clothes CHAR_INFO says it wears, then
+		// the ability items (181xxxx), Pet Label Ring and Pet Quote Ring its
+		// owner's look wears for it, by part. The potion pouches serve every
+		// pet; of the rest, parts 31 to 37 and 47 are the second's, 39 to 45
+		// and 48 the third's, and any other the first's.
+		inline std::vector<int32_t> info_items(size_t index, int32_t wear, const std::map<int16_t, int32_t> &parts)
+		{
+			std::vector<int32_t> items;
+
+			if (wear != 0)
+				items.push_back(wear);
+
+			for (const auto &[part, itemid] : parts)
+			{
+				if (part < 0 || part >= 52 || itemid <= 0)
+					continue;
+
+				if (itemid / 10000 != 181 && itemid != 1822000 && itemid != 1832000)
+					continue;
+
+				size_t owner = (part >= 31 && part <= 37) || part == 47 ? 1
+							   : (part >= 39 && part <= 45) || part == 48 ? 2
+							   : 0;
+
+				if (itemid == 1812002 || itemid == 1812003 || owner == index)
+					items.push_back(itemid);
+			}
+
+			return items;
 		}
 	}
 }

@@ -19,11 +19,15 @@
 
 #include "../UIDragElement.h"
 
+#include "../Components/Slider.h"
+
 #include "../../Character/Look/CharLook.h"
+#include "../../Character/Look/PetLook.h"
 #include "../../Graphics/Text.h"
 
 #include <cstdint>
 #include <string>
+#include <vector>
 
 namespace ms
 {
@@ -39,10 +43,14 @@ namespace ms
 		UICharInfo(int32_t cid);
 
 		void draw(float inter) const override;
+		void update() override;
 
 		Button::State button_pressed(uint16_t buttonid) override;
 
 		bool is_in_range(Point<int16_t> cursorpos) const override;
+		Cursor::State send_cursor(bool clicked, Point<int16_t> cursorpos) override;
+		void remove_cursor() override;
+		void send_scroll(double yoffset) override;
 		void send_key(int32_t keycode, bool pressed, bool escape) override;
 
 		UIElement::Type get_type() const override;
@@ -59,6 +67,21 @@ namespace ms
 
 		// Show the mount the character wears, and open the taming box to it (FUN_00903db7).
 		void update_mount(int32_t character_id, const Mount &mount);
+
+		// A pet out, from CHAR_INFO.
+		struct Pet
+		{
+			int32_t itemid;
+			std::string name;
+			uint8_t level;
+			int16_t closeness;
+			uint8_t fullness;
+			// The clothes it wears, or 0.
+			int32_t wear;
+		};
+
+		// Show the pets out, and open the pet box to the first (FUN_00903ce7).
+		void update_pets(int32_t character_id, const std::vector<Pet> &pets);
 		// Show the fame the player just raised or dropped (FAME_RESPONSE).
 		void change_fame(int16_t fame);
 
@@ -101,10 +124,38 @@ namespace ms
 			BT_COLLECTION_SHOW,
 			BT_COLLECTION_HIDE,
 			BT_EXCEPTION,
-			BT_PANEL_HIDE
+			BT_PANEL_HIDE,
+			BT_PET1,
+			BT_PET2,
+			BT_PET3
+		};
+
+		// What the pet box shows of a pet.
+		struct PetPage
+		{
+			PetLook look;
+			Text name;
+			Text type;
+			Text level;
+			Text closeness;
+			Text fullness;
+			// Its clothes and the equipment its owner wears for it.
+			std::vector<int32_t> items;
+		};
+
+		// An equipment row in the pet box.
+		struct ItemRow
+		{
+			Texture icon;
+			Text name;
+			// The level it needs, for equipment.
+			bool equip;
+			Text level;
 		};
 
 		void set_mode(Mode mode);
+		// Show the pet at `index` in the pet box (0x8ff5b0).
+		void select_pet(size_t index);
 		void set_panel(Panel panel);
 
 		// Whether the window can show the mount: not when the saddle worn doesn't fit it (FUN_00903e24).
@@ -135,5 +186,14 @@ namespace ms
 		Text mount_level;
 		Text mount_exp;
 		Text mount_tiredness;
+
+		std::vector<PetPage> pet_pages;
+		size_t selected = 0;
+		// The selected pet's equipment, from the row at the top of the list.
+		std::vector<ItemRow> item_rows;
+		int16_t item_offset = 0;
+		Slider item_slider;
+		Texture crown;
+		Texture req_level;
 	};
 }
