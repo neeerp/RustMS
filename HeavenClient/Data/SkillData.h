@@ -105,6 +105,9 @@ namespace ms
 		// Return whether the skill is passive
 		bool is_passive() const;
 
+		// Return whether the skill has a cooldown at any level.
+		bool has_cooltime() const;
+
 		// Return whether the skill is an attack skill.
 		bool is_attack() const;
 
@@ -174,6 +177,7 @@ namespace ms
 		int32_t flags;
 		bool passive;
 		bool invisible;
+		bool cooltime = false;
 
 		std::string name;
 		std::string desc;

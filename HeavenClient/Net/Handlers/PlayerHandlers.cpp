@@ -411,6 +411,7 @@ namespace ms
 		}
 
 		UI::get().get_skill_macros().replace(std::move(macros));
+		Stage::get().stop_macro();
 	}
 
 	void AddCooldownHandler::handle(InPacket& recv) const

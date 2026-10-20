@@ -58,11 +58,14 @@ namespace ms
 		// Poll attacks, damage effects, etc.
 		void update();
 
-		// Make the player use a special move
-		void use_move(int32_t move_id);
+		// Make the player use a special move. Returns whether it went off.
+		bool use_move(int32_t move_id);
 
 		// Let go of the skill held down, as its key comes up.
 		void release_prepare(int32_t move_id);
+
+		// Whether a skill is held down.
+		bool is_preparing() const;
 
 		// Let go of the skill held down, if any, and use it, as when the
 		// window loses focus (FUN_0095bedf).
