@@ -173,6 +173,45 @@ namespace ms
 			return box;
 		}
 
+		// A Stat window zone from ToolTipHelp.img/Game/UIWnd, against its
+		// window's top left.
+		struct HelpZone
+		{
+			Zone zone;
+			std::string title;
+			std::string desc;
+		};
+
+		// The first of the first limit zones (all for 0) the point is in, or
+		// -1 (HitTest 0x8f6c44).
+		inline int32_t help_at(const std::vector<HelpZone> &zones, int32_t x, int32_t y, size_t limit = 0)
+		{
+			size_t count = limit > 0 ? std::min(limit, zones.size()) : zones.size();
+
+			for (size_t i = 0; i < count; i++)
+				if (contains(zones[i].zone, x, y))
+					return static_cast<int32_t>(i);
+
+			return -1;
+		}
+
+		// How many of the Stat window's zones have help (0x8c52d7): a
+		// beginner, Noblesse, Legend or Evan of level 10 or less only gets
+		// Name to Fame, the first 8.
+		inline size_t stat_help_limit(int32_t level, int32_t job)
+		{
+			bool beginner = job == 0 || job == 1000 || job == 2000 || job == 2001;
+
+			return level <= 10 && beginner ? 8 : 0;
+		}
+
+		// Whether a point in the Stat window is on its EXP line, which shows
+		// the EXP and what the level needs in the one-line box instead.
+		inline bool on_stat_exp(int32_t x, int32_t y)
+		{
+			return x > 61 && x < 172 && y > 140 && y < 155;
+		}
+
 		// The one-line box (0x8e6e7d) for a portal's tip on the minimap.
 		inline Box line_box(int16_t text_width)
 		{

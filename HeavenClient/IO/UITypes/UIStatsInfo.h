@@ -22,6 +22,7 @@
 #include "../UIDragElement.h"
 
 #include "../../Character/CharStats.h"
+#include "../../Gameplay/MapleMap/MapTooltipRules.h"
 #include "../../Template/BoolPair.h"
 
 namespace ms
@@ -38,6 +39,8 @@ namespace ms
 		void draw(float alpha) const override;
 
 		void send_key(int32_t keycode, bool pressed, bool escape) override;
+		Cursor::State send_cursor(bool clicked, Point<int16_t> cursorpos) override;
+		void remove_cursor() override;
 
 		bool is_in_range(Point<int16_t> cursorpos) const override;
 
@@ -108,6 +111,9 @@ namespace ms
 
 		bool is_beginner() const;
 
+		void show_zone_help(Point<int16_t> cursor);
+		void clear_zone_help();
+
 		const CharStats &stats;
 
 		Texture detail;
@@ -121,5 +127,10 @@ namespace ms
 		bool showdetail;
 
 		Text statlabels[StatLabel::NUM_LABELS];
+
+		// The help for the window's labels and the detail panel's.
+		std::vector<map_tooltips::HelpZone> stat_help;
+		std::vector<map_tooltips::HelpZone> detail_help;
+		bool zone_help = false;
 	};
 }
