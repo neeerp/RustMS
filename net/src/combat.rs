@@ -1,5 +1,6 @@
 //! Player attacks: parsing, damage limits, and the attack broadcast.
 
+use crate::beacon;
 use crate::berserk;
 use crate::charge;
 use crate::combo;
@@ -666,7 +667,10 @@ pub fn validate(attack: &Attack, player: &Player) -> Result<Uses, AttackRejectio
     {
         return Err(AttackRejection::TooManyTargets);
     }
+    // Bullseye raises every hit on its mark (FUN_0078dea6).
     if attack.hits.iter().any(|hit| {
+        let percent = i64::from(beacon::damage_percent(player, hit.object_id));
+        let cap = (i64::from(cap) * percent / 100).min(i64::from(i32::MAX)) as i32;
         (hit.damage.iter().enumerate())
             .any(|(line, &damage)| !(0..=barrage_cap(cap, attack.skill, line)).contains(&damage))
     }) {

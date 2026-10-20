@@ -332,8 +332,8 @@ namespace ms
 		int16_t get_shot_range(const Attack &attack) const;
 
 		// The mob a shot from `origin` toward `end_x` hits: the first one in
-		// its path, as it widens away from the player.
-		std::vector<int32_t> find_shot_target(Point<int16_t> origin, int16_t end_x) const;
+		// its path, as it widens away from the player, or only mob `only`.
+		std::vector<int32_t> find_shot_target(Point<int16_t> origin, int16_t end_x, int32_t only = 0) const;
 
 		// The mobs Chain Lightning hits, starting with `first`.
 		std::vector<int32_t> find_chain(int32_t first, uint8_t count, bool toleft) const;

@@ -110,7 +110,7 @@ namespace ms
 
 	BuffParser::TwoState BuffParser::read_two_state(InPacket& recv, const Flags& flags)
 	{
-		TwoState state{ 0, 0, { 0, 0, 0, 0 }, { 0, 0 }, { 0, 0, 0 } };
+		TwoState state{ 0, 0, { 0, 0, 0, 0 }, { 0, 0 }, { 0, 0, 0 }, { 0, 0 } };
 
 		for (uint8_t slot = 0; slot < 7; slot++)
 		{
@@ -143,6 +143,13 @@ namespace ms
 				state.infusion.skill = recv.read_int();
 				recv.skip(10); // two signs and deltas
 				state.infusion.seconds = recv.read_short();
+			}
+			else if (TWO_STATE + slot == GUIDED)
+			{
+				recv.skip_int(); // on
+				state.beacon.skill = recv.read_int();
+				recv.skip(5); // the sign and the delta
+				state.beacon.mob = recv.read_int();
 			}
 			else
 			{

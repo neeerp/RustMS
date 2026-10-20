@@ -1735,6 +1735,24 @@ namespace ms
 		targetbody = target.body;
 		targetonground = target.onground;
 		targetdarksight = target.darksight;
+
+		// The player's Homing Beacon marks the mob while it lasts, a mob
+		// that comes after it too (0xa20607, 0x663424, 0xa20786).
+		int32_t mark = target.guided.mob == oid ? target.guided.skill : 0;
+
+		if (mark == marked)
+			return;
+
+		statuseffects.erase(std::remove_if(statuseffects.begin(), statuseffects.end(),
+										   [this](const StatusEffect &effect)
+										   {
+											   return effect.reason == marked;
+										   }),
+							statuseffects.end());
+		marked = mark;
+
+		if (marked)
+			show_status(marked, false);
 	}
 
 	void Mob::aggro_puppet(int32_t oid, Point<int16_t> position)
@@ -1986,7 +2004,7 @@ namespace ms
 				std::remove_if(statuseffects.begin(), statuseffects.end(),
 							   [this](const StatusEffect &effect)
 							   {
-								   return std::none_of(statuses.begin(), statuses.end(),
+								   return effect.reason != marked && std::none_of(statuses.begin(), statuses.end(),
 													   [&effect](const auto &status)
 													   {
 														   return status.second.reason == effect.reason;
@@ -2304,6 +2322,8 @@ namespace ms
 		if (blow.berserk)
 			damage = (blow.berserk + 100) * damage * 0.01;
 
+		damage = beacon::bullseye(damage, attack.bullseye, attack.marked, oid);
+
 		damage = barrage(damage, attack.skill, index);
 
 		return std::pair<int32_t, bool>(finish(damage), iscritical);
@@ -2343,6 +2363,7 @@ namespace ms
 
 		damage = percent(damage, attack.elemboost);
 		damage = weakened(damage, status_value(MobStatParser::WEAKNESS));
+		damage = beacon::bullseye(damage, attack.bullseye, attack.marked, oid);
 
 		return finish(damage);
 	}

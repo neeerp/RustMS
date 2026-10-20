@@ -1,7 +1,7 @@
 //! Buffs, skill cooldowns, and skill effects.
 
 use crate::{error::NetworkError, packet::op::SendOpcode};
-use game::{BuffStat, Mount, Ride, ShownBuff};
+use game::{Beacon, BuffStat, Mount, Ride, ShownBuff};
 use packet::{io::write::PktWrite, Packet};
 
 /// A temporary stat's bit in the client's 128-bit flags, as the two longs
@@ -319,6 +319,25 @@ pub fn build_give_foreign_ride(character_id: i32, ride: Ride) -> Result<Packet, 
     Ok(p)
 }
 
+/// GIVE_BUFF for Homing Beacon: the player's shots seek `beacon.mob`, which
+/// the client marks with the skill's `mob` animation. GuidedBullet's
+/// two-state data (bit 87; v83 0x77c442) is the others' with no seconds and
+/// the mob after them; the client never times it out.
+pub fn build_give_beacon(beacon: Beacon) -> Result<Packet, NetworkError> {
+    let mut p = Packet::new_empty();
+    p.write_short(SendOpcode::GiveBuff as i16)?;
+    write_mask(&mut p, [BuffStat::GuidedBullet.bit()])?;
+    p.write_byte(0)?; // defense attack
+    p.write_byte(0)?; // defense state
+    p.write_int(1)?;
+    p.write_int(beacon.skill_id)?;
+    p.write_byte(0)?; // start before (1) or after now
+    p.write_int(0)?; // how long
+    p.write_int(beacon.mob)?;
+    p.write_short(0)?; // delay
+    Ok(p)
+}
+
 /// SET_TAMING_MOB_INFO: a player's mount's level, EXP and tiredness;
 /// `level_up` plays its level-up effect.
 pub fn build_taming_mob_info(
@@ -442,6 +461,23 @@ pub fn build_magnet_effect(
 mod tests {
     use super::*;
     use crate::codec::testing::Expect;
+
+    #[test]
+    fn a_beacon_marks_its_mob_in_seventeen_bytes() {
+        let beacon = Beacon {
+            skill_id: 5211006,
+            mob: 1234,
+        };
+        let packet = build_give_beacon(beacon).unwrap();
+        let mut expect = Expect::new(&packet.bytes);
+        expect.short(SendOpcode::GiveBuff as i16);
+        // Bit 87, as Cosmic's 0x80000000000000 in the first long.
+        expect.long(0x80_0000_0000_0000).long(0);
+        expect.byte(0).byte(0);
+        expect.int(1).int(5211006).byte(0).int(0).int(1234);
+        expect.short(0);
+        expect.end();
+    }
 
     #[test]
     fn give_buff_matches_the_client_masks() {

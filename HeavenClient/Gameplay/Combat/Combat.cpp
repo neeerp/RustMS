@@ -215,6 +215,8 @@ namespace ms
 
 	bool Combat::use_move(int32_t move_id)
 	{
+		move_id = beacon::cast(move_id, player.get_skills().get_level(beacon::BULLSEYE));
+
 		if (!ride_allows(move_id))
 			return false;
 
@@ -720,6 +722,12 @@ namespace ms
 														   static_cast<int32_t>(level["pad"].get_integer()), roll);
 				}
 
+				// Bullseye counts for a summon's hits too (0x792551).
+				if (int32_t bullseye = player.get_skills().get_level(beacon::BULLSEYE))
+					damage = static_cast<int32_t>(beacon::bullseye(
+							damage, SkillData::get(beacon::BULLSEYE).get_stats(bullseye).x,
+							player.get_beacon().mob, target));
+
 				Point<int16_t> at = mobs.get_mob_position(target);
 				int16_t delay = info.attackafter;
 
@@ -1178,7 +1186,15 @@ namespace ms
 					mob_targets = find_targets(mob_objs, shot_area, origin, mobcount, false);
 				} else
 				{
-					mob_targets = find_shot_target(shot_start, shot_end.x());
+					// A Homing Beacon's mark draws the shot or spell if it
+					// is in the path (0x953fdb, 0x955e77).
+					beacon::Mark mark = player.get_beacon();
+
+					if (beacon::guides(attack.skill, mark))
+						mob_targets = find_shot_target(shot_start, shot_end.x(), mark.mob);
+
+					if (mob_targets.empty())
+						mob_targets = find_shot_target(shot_start, shot_end.x());
 
 					Point<int16_t> sight = shot_path::origin(origin, 0, attack.toleft);
 					Point<int16_t> stop = shot_end;
@@ -1586,7 +1602,7 @@ namespace ms
 		return shot_path::range(attack.skill, attack.shotrange, weapon, bonus);
 	}
 
-	std::vector<int32_t> Combat::find_shot_target(Point<int16_t> origin, int16_t end_x) const
+	std::vector<int32_t> Combat::find_shot_target(Point<int16_t> origin, int16_t end_x, int32_t only) const
 	{
 		MapObjects *objs = mobs.get_mobs();
 
@@ -1600,7 +1616,8 @@ namespace ms
 			{
 				const Mob *mob = static_cast<const Mob *>(mmo.second.get());
 
-				if (mob && mob->is_alive() && shot_path::in_step(step, mob->get_body()))
+				if (mob && mob->is_alive() && (!only || mob->get_oid() == only)
+					&& shot_path::in_step(step, mob->get_body()))
 				{
 					uint32_t entry = objs->entry_order(mob->get_oid());
 

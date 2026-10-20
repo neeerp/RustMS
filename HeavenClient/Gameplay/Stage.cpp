@@ -377,7 +377,7 @@ namespace ms
 														   !player.getflip());
 
 		mobs.update(physics, { player.get_oid(), playerpos, playerbody, player.get_phobj().onground,
-							   player.is_dead(), player.has_buff(Buffstat::Id::DARKSIGHT) });
+							   player.is_dead(), player.has_buff(Buffstat::Id::DARKSIGHT), player.get_beacon() });
 		chars.update(physics);
 		drops.update(physics);
 

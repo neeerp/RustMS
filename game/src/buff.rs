@@ -120,6 +120,10 @@ pub enum BuffStat {
     /// Speed Infusion (the client's PartyBooster, a two-state stat): `value`
     /// adds to the player's attack speed, Booster's included.
     SpeedInfusion = 86,
+    /// Homing Beacon's mark (the client's GuidedBullet, a two-state stat):
+    /// the player's shots seek the mob in `Buffs::beacon`. Never shown to
+    /// the map.
+    GuidedBullet = 87,
     /// Items heal half as much HP. It shares Puppet's bit 46 in the client
     /// (as Cosmic's ZOMBIFY and PUPPET do); 128 + 46 keeps it apart here.
     Undead = 174,
@@ -280,6 +284,16 @@ pub struct Buffs {
     pub dark_sight_cancelled: Option<Instant>,
     /// The mob Assassinate's second strike must hit, and by when.
     pub assassinate: Option<(i32, Instant)>,
+    /// The mob Homing Beacon marked, until the player leaves the map.
+    pub beacon: Option<Beacon>,
+}
+
+/// A mob Homing Beacon or Bullseye marked: the skill and the mob's object
+/// id (the client's GuidedBullet data).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Beacon {
+    pub skill_id: i32,
+    pub mob: i32,
 }
 
 impl Buffs {

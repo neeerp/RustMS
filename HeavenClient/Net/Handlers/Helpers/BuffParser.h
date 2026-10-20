@@ -57,6 +57,8 @@ namespace ms
 		// Speed Infusion, a two-state stat: its data is the attack speed it adds, the skill and its seconds, with a
 		// second time between (0x793e28).
 		constexpr uint8_t INFUSION = 86;
+		// Homing Beacon's mark, a two-state stat: its data is the skill that marked a mob and the mob (0x77c442).
+		constexpr uint8_t GUIDED = 87;
 
 		struct Ride
 		{
@@ -80,6 +82,12 @@ namespace ms
 			int16_t seconds;
 		};
 
+		struct Beacon
+		{
+			int32_t skill;
+			int32_t mob;
+		};
+
 		struct TwoState
 		{
 			int32_t energy;
@@ -87,6 +95,7 @@ namespace ms
 			Dash dash;
 			Ride ride;
 			Infusion infusion;
+			Beacon beacon;
 		};
 
 		// The two-state stats' data, which follows the defense attack and state: the energy's, Dash's and

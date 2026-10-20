@@ -624,6 +624,18 @@ A few skills do more than buff:
   damage cap counts it when the server last saw it on or the HP is low
   enough (`berserk::damage_percent`). HeavenClient's Beholder heals by
   Berserk's `x` only while it is on.
+- **Homing Beacon** (`net::beacon`, 5211006) and a Corsair's **Bullseye**
+  (5220011) are plain shots: the client fires Bullseye in the beacon's
+  place once it is learned. After the shot, the server marks the first mob
+  hit with a self-only GIVE_BUFF of the two-state GuidedBullet (bit 87,
+  17 bytes: on, skill, sign, time, mob). A new mark comes after a
+  CANCEL_BUFF of the old one, since the client doesn't take an old mark
+  off on its own, and leaving the map takes it off (`drop_beacon`). It has
+  no time and no icon. HeavenClient loops the skill's `mob` animation on
+  the marked mob, a mob arriving later too. Other shots and single-target
+  spells hit the mark first if it is in their path. With Bullseye learned,
+  every hit on the mark, a summon's too, is raised by its `x` percent, and
+  the server's damage cap counts it (`beacon::damage_percent`).
 
 Teleport and Flash Jump move the player on the client alone; the server
 only spends the MP. HeavenClient's Flash Jump (4111006 and the Night
