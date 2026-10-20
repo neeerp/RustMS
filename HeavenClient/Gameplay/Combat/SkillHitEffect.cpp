@@ -104,4 +104,23 @@ namespace ms
 		if (iter != effects.end())
 			iter->second.apply(target, user);
 	}
+
+	ByChargeHitEffect::ByChargeHitEffect(nl::node src)
+	{
+		for (auto sub : src["hit"]["0"])
+		{
+			auto element = string_conversion::or_default<uint8_t>(sub.name(), 255);
+
+			if (element < 255)
+				effects.emplace(element, sub);
+		}
+	}
+
+	void ByChargeHitEffect::apply(const AttackUser &user, Mob &target) const
+	{
+		auto iter = effects.find(user.charge);
+
+		if (iter != effects.end())
+			iter->second.apply(target, user);
+	}
 }

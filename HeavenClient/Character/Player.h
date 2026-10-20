@@ -213,6 +213,9 @@ namespace ms
 		// Return the character's level of a skill.
 		int32_t get_skilllevel(int32_t skillid) const override;
 
+		// Return the charge skill on the character's weapon, or 0.
+		int32_t get_charge() const override;
+
 		// Return the character's attacking speed.
 		int8_t get_integer_attackspeed() const override;
 

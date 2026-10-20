@@ -23,6 +23,7 @@
 
 #include "../Audio/Audio.h"
 #include "../Data/WeaponData.h"
+#include "../Gameplay/Combat/PhysicalDamage.h"
 #include "../Net/Packets/GameplayPackets.h"
 #include "../Util/Misc.h"
 
@@ -808,7 +809,8 @@ namespace ms
 		int16_t weapon_level = weapon.get_equipdata().get_reqstat(MapleStat::Id::LEVEL);
 		const std::string& ai_name = weapon.get_afterimage();
 
-		afterimage = Afterimage(skill_id, ai_name, stance_name, weapon_level);
+		uint8_t charge = physical_damage::charge_element(get_charge());
+		afterimage = Afterimage(skill_id, ai_name, stance_name, weapon_level, charge);
 	}
 
 	const Afterimage &Char::get_afterimage() const
@@ -898,6 +900,11 @@ namespace ms
 	bool Char::is_invincible() const
 	{
 		return invincible == true;
+	}
+
+	int32_t Char::get_charge() const
+	{
+		return 0;
 	}
 
 	bool Char::is_sitting() const

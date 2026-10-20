@@ -29,7 +29,8 @@ namespace ms
 	class Afterimage
 	{
 	public:
-		Afterimage(int32_t skill_id, const std::string &name, const std::string &stance, int16_t level);
+		// A charged weapon (charge, its element) swings the charge's set.
+		Afterimage(int32_t skill_id, const std::string &name, const std::string &stance, int16_t level, uint8_t charge = 0);
 
 		Afterimage();
 
