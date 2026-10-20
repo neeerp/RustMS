@@ -131,6 +131,11 @@ fn move_item(
     to: i16,
 ) -> Result<(Vec<game::InventoryChange>, bool), String> {
     if from < 0 {
+        // Equipment dropped on an occupied bag slot swaps with what is there,
+        // which wears that item, so it goes the equip way (v83 FUN_004f11b4).
+        if player.inventory.get(InventoryType::Equip, to).is_some() {
+            return move_item(player, 1, to, from);
+        }
         // HeavenClient sends EQUIPPED (-1), the original client EQUIP (1).
         let changes = player
             .inventory_mut()
@@ -447,6 +452,53 @@ mod tests {
         let actions = handle(&mut player, request(1, 1, 5));
         assert!(matches!(actions.as_slice(), [WorldAction::Reply(_)]));
         assert!(player.inventory.get(InventoryType::Equip, 5).is_some());
+    }
+
+    #[test]
+    fn unequipping_onto_equipment_wears_it_instead() {
+        if items::info(1302000).is_none() {
+            return;
+        }
+        let sword = |watk| {
+            Item::equipment(
+                1302000,
+                EquipStats {
+                    watk,
+                    ..EquipStats::default()
+                },
+            )
+        };
+        let mut player = crate::codec::stats::sample_player();
+        player
+            .inventory
+            .insert(InventoryType::Equipped, equip_slot::WEAPON, sword(1));
+        player.inventory.insert(InventoryType::Equip, 1, sword(2));
+        player.inventory.insert(
+            InventoryType::Equip,
+            2,
+            Item::equipment(1002000, EquipStats::default()),
+        );
+
+        // A hat can't take the sword's place.
+        assert!(!worn(&handle(
+            &mut player,
+            request(-1, equip_slot::WEAPON, 2)
+        )));
+
+        assert!(worn(&handle(
+            &mut player,
+            request(1, equip_slot::WEAPON, 1)
+        )));
+        assert_eq!(
+            player
+                .inventory
+                .get(InventoryType::Equipped, equip_slot::WEAPON),
+            Some(&sword(2))
+        );
+        assert_eq!(
+            player.inventory.get(InventoryType::Equip, 1),
+            Some(&sword(1))
+        );
     }
 
     /// A player with a Brown Kitty out first and a Baby Tiger second, and

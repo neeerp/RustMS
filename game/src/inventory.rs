@@ -168,9 +168,10 @@ pub mod equip_slot {
         item_id / 10_000 == 105
     }
 
-    /// Two-handed weapons leave no room for a shield.
+    /// Two-handed weapons leave no room for a shield. For v83 that is every
+    /// 14xxxxx weapon, claws, knuckles and guns too (FUN_004f2f55).
     pub fn is_two_handed(item_id: i32) -> bool {
-        (140..=146).contains(&(item_id / 10_000))
+        item_id / 100_000 == 14
     }
 }
 
@@ -1155,6 +1156,18 @@ mod tests {
         assert!(inventory
             .get(InventoryType::Equipped, equip_slot::TOP)
             .is_none());
+    }
+
+    #[test]
+    fn a_shield_takes_off_a_claw() {
+        let mut inventory = Inventory::default();
+        inventory.insert(InventoryType::Equipped, equip_slot::WEAPON, equip(1472000));
+        inventory.insert(InventoryType::Equip, 1, equip(1092000));
+        inventory.equip(1, equip_slot::SHIELD).unwrap();
+        assert!(inventory
+            .get(InventoryType::Equipped, equip_slot::WEAPON)
+            .is_none());
+        assert_eq!(inventory.count(1472000), 1);
     }
 
     /// Item ids by slot in `kind`.

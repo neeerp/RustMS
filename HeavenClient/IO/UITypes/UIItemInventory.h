@@ -68,6 +68,10 @@ namespace ms
 		// Show a tab's new slot count.
 		void refresh_slots();
 
+		// Whether the player meets the requirements of the equipment
+		// `item_id` (FUN_004f2cee).
+		static bool meets_requirements(int32_t item_id);
+
 	protected:
 		Button::State button_pressed(uint16_t buttonid) override;
 

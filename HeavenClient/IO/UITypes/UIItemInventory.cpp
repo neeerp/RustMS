@@ -1315,6 +1315,11 @@ namespace ms
 			&& equipdata.get_reqstat(MapleStat::Id::FAME) <= stats.get_honor();
 	}
 
+	bool UIItemInventory::meets_requirements(int32_t item_id)
+	{
+		return meets_equip_reqs(Stage::get().get_player().get_stats(), EquipData::get(item_id));
+	}
+
 	bool UIItemInventory::can_wear_equip(int16_t slot) const
 	{
 		const Player &player = Stage::get().get_player();
