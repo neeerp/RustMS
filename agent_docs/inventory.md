@@ -151,8 +151,16 @@ event maps (millions digit 9) and the ships (20009xxxx) are in none
 The server checks the same rules, and that the target exists and isn't the
 current map, then spends the scroll and warps the player to the target's
 `sp` portal. A refusal keeps the scroll and answers with an enable-actions
-stat update. Event scrolls (`spec/returnMapQR`, 2031000-2031008) and
-2032000 (`randomMoveInFieldSet`) aren't supported and are refused.
+stat update.
+
+Event invitations (2031000-2031008) also have `spec/returnMapQR`, which v83
+never reads. The server saves the map the invitation was used in under that
+number (`saved_locations`), and the event map's exit script takes the player
+back there (`photoOut`, `StudioZone_Out`, `outBabyBird`; see
+`map-travel.md`). The event maps' field limits refuse every scroll, so the
+exit is the only way out. Two are refused: 2031002, whose moon map is left
+through an NPC that has no script yet, and 2031000, whose map isn't in the
+data. 2032000 (`randomMoveInFieldSet`) names no map and is refused too.
 
 ### Skill and mastery books
 

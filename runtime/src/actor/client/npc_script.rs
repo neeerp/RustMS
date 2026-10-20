@@ -102,8 +102,11 @@ impl ClientActor {
                 Effect::PortalSound => {
                     afterwards.push(effect::build_own_effect(CharEffect::PortalSound)?)
                 }
-                Effect::SetFreeMarketReturn(town) => {
-                    next.free_market_return = *town;
+                Effect::SaveLocation(kind, location) => {
+                    match location {
+                        Some(map_id) => next.saved_locations.insert(*kind, *map_id),
+                        None => next.saved_locations.remove(kind),
+                    };
                     changed = true;
                 }
                 Effect::AvatarEffect(path) => afterwards.push(effect::build_avatar_effect(path)?),

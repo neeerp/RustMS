@@ -214,11 +214,12 @@ pub fn load_player(character_id: i32) -> crate::Result<Player> {
             .map(|(card, level)| (card, u8::try_from(level).unwrap_or(0))),
     );
     player.teleport_rocks = load_teleport_rocks(&mut conn, character_id)?;
-    player.free_market_return = saved_locations::table
-        .find((character_id, FREE_MARKET))
-        .select(saved_locations::map_id)
-        .first(&mut conn)
-        .optional()?;
+    player.saved_locations = saved_locations::table
+        .filter(saved_locations::character_id.eq(character_id))
+        .select((saved_locations::kind, saved_locations::map_id))
+        .load::<(i16, i32)>(&mut conn)?
+        .into_iter()
+        .collect();
     player.stats.gacha_exp = gacha_exp::table
         .find(character_id)
         .select(gacha_exp::exp)
@@ -335,23 +336,22 @@ pub(crate) fn write_player(conn: &mut PgConnection, player: &Player) -> QueryRes
 
         save_keymap(conn, id, &player.keymap)?;
         save_teleport_rocks(conn, id, &player.teleport_rocks)?;
-        match player.free_market_return {
-            Some(map_id) => {
-                diesel::insert_into(saved_locations::table)
-                    .values((
-                        saved_locations::character_id.eq(id),
-                        saved_locations::kind.eq(FREE_MARKET),
-                        saved_locations::map_id.eq(map_id),
-                    ))
-                    .on_conflict((saved_locations::character_id, saved_locations::kind))
-                    .do_update()
-                    .set(saved_locations::map_id.eq(map_id))
-                    .execute(conn)?;
-            }
-            None => {
-                diesel::delete(saved_locations::table.find((id, FREE_MARKET))).execute(conn)?;
-            }
-        }
+        diesel::delete(saved_locations::table.filter(saved_locations::character_id.eq(id)))
+            .execute(conn)?;
+        let locations: Vec<_> = player
+            .saved_locations
+            .iter()
+            .map(|(&kind, &map_id)| {
+                (
+                    saved_locations::character_id.eq(id),
+                    saved_locations::kind.eq(kind),
+                    saved_locations::map_id.eq(map_id),
+                )
+            })
+            .collect();
+        diesel::insert_into(saved_locations::table)
+            .values(&locations)
+            .execute(conn)?;
         if stats.gacha_exp > 0 {
             diesel::insert_into(gacha_exp::table)
                 .values((
@@ -398,10 +398,6 @@ pub(crate) fn write_player(conn: &mut PgConnection, player: &Player) -> QueryRes
         Ok(())
     }
 }
-
-/// `saved_locations.kind` of the town a character entered the Free Market
-/// from.
-const FREE_MARKET: i16 = 0;
 
 fn load_teleport_rocks(conn: &mut PgConnection, character_id: i32) -> QueryResult<TeleportRocks> {
     let rows: Vec<(bool, i32)> = teleport_rocks::table

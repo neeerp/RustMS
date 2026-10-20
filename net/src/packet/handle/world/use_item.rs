@@ -123,7 +123,9 @@ fn use_item(player: &mut Player, slot: i16, item_id: i32, now: Instant) -> Optio
 /// or to the map's return map for 999999999, and is used up. The server
 /// checks what the client does before sending: the map's field limits and,
 /// unless the scroll ignores continents, that the map it names is in the
-/// player's area.
+/// player's area. An event invitation keeps the map it was used in under its
+/// `returnMapQR`, which the event map's exit takes the player back to (the
+/// v83 client never reads the key).
 pub struct ReturnScrollHandler;
 
 impl WorldHandler for ReturnScrollHandler {
@@ -133,18 +135,22 @@ impl WorldHandler for ReturnScrollHandler {
         reader.read_int()?; // client tick
         let slot = reader.read_short()?;
         let item_id = reader.read_int()?;
-        let taken = return_scroll_target(ctx.player, slot, item_id).and_then(|map_id| {
+        let taken = return_scroll_target(ctx.player, slot, item_id).and_then(|(map_id, qr)| {
             let changes = ctx
                 .player
                 .inventory_mut()
                 .take(InventoryType::Use, slot, 1)
                 .ok()?;
-            Some((map_id, changes))
+            Some((map_id, qr, changes))
         });
-        let Some((map_id, changes)) = taken else {
+        let Some((map_id, qr, changes)) = taken else {
             debug!(slot, item_id, "Return scroll refused");
             return Ok(HandlerResult::reply(stat::build_stat_update(true, &[])?));
         };
+        if qr != 0 {
+            let here = ctx.player.stats.map_id;
+            ctx.player.saved_locations.insert(qr, here);
+        }
         let mut result =
             HandlerResult::reply(inventory::build_inventory_operation(true, &changes)?);
         result
@@ -154,9 +160,10 @@ impl WorldHandler for ReturnScrollHandler {
     }
 }
 
-/// The map the return scroll in `slot` takes the player to, unless it may
-/// not be used.
-fn return_scroll_target(player: &Player, slot: i16, item_id: i32) -> Option<i32> {
+/// The map the return scroll in `slot` takes the player to, and the
+/// `returnMapQR` to keep the way back under (0 for none), unless it may not
+/// be used.
+fn return_scroll_target(player: &Player, slot: i16, item_id: i32) -> Option<(i32, i16)> {
     if player.stats.hp <= 0
         || item_id / 10_000 != 203
         || player.inventory.get(InventoryType::Use, slot)?.item_id != item_id
@@ -164,13 +171,13 @@ fn return_scroll_target(player: &Player, slot: i16, item_id: i32) -> Option<i32>
         return None;
     }
     let spec = items::info(item_id)?.spec?;
-    // Event scrolls keep the way back in a quest record (`returnMapQR`),
-    // and 2032000 moves the player within its PQ (`randomMoveInFieldSet`);
-    // neither is supported yet.
-    if spec.return_map_qr != 0 {
+    // 2032000 moves the player within its PQ (`randomMoveInFieldSet`) and
+    // names no map; it isn't supported yet.
+    let move_to = spec.move_to?;
+    let qr = i16::try_from(spec.return_map_qr).ok()?;
+    if move_to == MOON_BUNNIES {
         return None;
     }
-    let move_to = spec.move_to?;
     let data = crate::get_game_data().ok()?;
     let here = player.stats.map_id;
     let field = data.field(here)?;
@@ -187,8 +194,13 @@ fn return_scroll_target(player: &Player, slot: i16, item_id: i32) -> Option<i32>
     } else {
         move_to
     };
-    data.field_exists(target).then_some(target)
+    data.field_exists(target).then_some((target, qr))
 }
+
+/// The moon bunnies' map (2031002's invitation) is left by talking to an
+/// NPC, which isn't scripted yet; its invitation is refused rather than
+/// strand the player.
+const MOON_BUNNIES: i32 = 922231000;
 
 /// `USE_SUMMON_BAG` (0x4B, v83 FUN_00a0977b): tick, slot in the USE bag,
 /// item id. A summoning sack (210xxxx) is used up and brings out each of
@@ -684,7 +696,10 @@ mod tests {
         player
             .inventory
             .insert(InventoryType::Use, 2, Item::stack(2030004, 1));
-        assert_eq!(return_scroll_target(&player, 1, 2030000), Some(101_000_000));
+        assert_eq!(
+            return_scroll_target(&player, 1, 2030000),
+            Some((101_000_000, 0))
+        );
         let actions = read_scroll(&mut player, 2, 2030004);
         assert!(matches!(
             actions.as_slice(),
@@ -718,13 +733,38 @@ mod tests {
         assert!(matches!(actions.as_slice(), [WorldAction::Reply(p)]
             if p.opcode() == SendOpcode::StatChange as i16));
         assert_eq!(player.inventory.count(2030004), 1);
-        assert_eq!(return_scroll_target(&player, 2, 2030000), Some(200_000_000));
+        assert_eq!(
+            return_scroll_target(&player, 2, 2030000),
+            Some((200_000_000, 0))
+        );
 
         // The Kerning PQ's first stage forbids every return scroll.
         player.stats.map_id = 103_000_800;
         let field = crate::get_game_data().unwrap().field(103_000_800).unwrap();
         assert_ne!(field.field_limit & FIELD_LIMIT_RETURN_SCROLLS, 0);
         assert_eq!(return_scroll_target(&player, 2, 2030000), None);
+    }
+
+    #[test]
+    fn an_invitation_keeps_the_way_back() {
+        if items::data().is_err() || crate::get_game_data().is_err() {
+            return;
+        }
+        // The Invitation to Ereve ignores continents and keeps Orbis under
+        // its returnMapQR, 1056.
+        let mut player = crate::codec::stats::sample_player();
+        player.stats.map_id = 200_000_000;
+        player
+            .inventory
+            .insert(InventoryType::Use, 1, Item::stack(2031004, 1));
+        player
+            .inventory
+            .insert(InventoryType::Use, 2, Item::stack(2031002, 1));
+        read_scroll(&mut player, 1, 2031004);
+        assert_eq!(player.stats.map_id, 130_000_000);
+        assert_eq!(player.saved_locations.get(&1056), Some(&200_000_000));
+        // The moon bunnies' map has no way out yet.
+        assert_eq!(return_scroll_target(&player, 2, 2031002), None);
     }
 
     fn hero_with_book(slot: i16, item_id: i32) -> Player {
