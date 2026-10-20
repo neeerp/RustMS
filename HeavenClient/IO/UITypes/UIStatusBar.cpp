@@ -41,6 +41,7 @@
 #include "../Components/MapleButton.h"
 #include "../Components/MenuCover.h"
 
+#include "../../Configuration.h"
 #include "../../Character/ExpTable.h"
 #include "../../Character/GachaExp.h"
 #include "../../Data/ItemData.h"
@@ -118,11 +119,14 @@ namespace ms
 
 		const Point<int16_t> GAUGE_POS = Point<int16_t>(218, 38);
 
-		// The EXP numbers over the gauge, (441, 559) to (556, 574) on v83's
+		// The EXP numbers over the gauge, (442, 560) to (555, 573) on v83's
 		// 800x600 screen: hovering shows the EXP and any gacha EXP, and
 		// double-clicking asks to take the gacha EXP in (FUN_008d76d7,
 		// FUN_008d7611).
-		constexpr Rectangle<int16_t> EXP_NUMBERS = Rectangle<int16_t>(441, 555, 30, 44);
+		constexpr Rectangle<int16_t> EXP_NUMBERS = Rectangle<int16_t>(442, 555, 31, 44);
+		// The job and name, (88, 559) to (170, 573): hovering shows the
+		// login ID, channel and name (FUN_008d76d7, StringPool 0x7d3).
+		constexpr Rectangle<int16_t> NAME_AREA = Rectangle<int16_t>(88, 170, 30, 44);
 
 		constexpr const char *TAKE_GACHA_EXP = "Do you wish to charge the EXP \\nearned from The Writs of Solomon?";
 
@@ -721,13 +725,21 @@ namespace ms
 
 	Cursor::State UIStatusBar::send_cursor(bool clicked, Point<int16_t> cursorpos)
 	{
+		// Both go in the one-line box (0x8e6e7d) at the cursor + (20, 20).
 		if (EXP_NUMBERS.contains(cursorpos - position))
 		{
 			int16_t level = stats.get_stat(MapleStat::Id::LEVEL);
 			int64_t need = level < ExpTable::LEVELCAP ? ExpTable::values[level] : 0;
 
-			UI::get().show_text(Tooltip::Parent::STATUSBAR,
+			UI::get().show_line(Tooltip::Parent::STATUSBAR,
 					gacha_exp::tooltip(stats.get_exp(), need, stats.get_gachaexp()));
+		} else if (NAME_AREA.contains(cursorpos - position))
+		{
+			Configuration &config = Configuration::get();
+			std::string channel = config.get_channel_name(config.get_worldid(), config.get_channelid());
+
+			UI::get().show_line(Tooltip::Parent::STATUSBAR,
+					config.get_login_id() + " / " + channel + " / " + stats.get_name());
 		} else
 		{
 			UI::get().clear_tooltip(Tooltip::Parent::STATUSBAR);

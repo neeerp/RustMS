@@ -122,10 +122,13 @@ namespace ms
 			auto loginwait = UI::get().get_element<UILoginWait>();
 
 			if (loginwait && loginwait->is_active())
+			{
+				Configuration::get().set_login_id(Configuration::get().get_auto_acc());
 				LoginPacket(
 					Configuration::get().get_auto_acc(),
 					Configuration::get().get_auto_pass()
 					).dispatch();
+			}
 		}
 	}
 
@@ -183,7 +186,10 @@ namespace ms
 		auto loginwait = UI::get().get_element<UILoginWait>();
 
 		if (loginwait && loginwait->is_active())
+		{
+			Configuration::get().set_login_id(account_text);
 			LoginPacket(account_text, password_text).dispatch();
+		}
 	}
 
 	void UILogin::open_url(uint16_t id)

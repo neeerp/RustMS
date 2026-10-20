@@ -73,7 +73,9 @@ from `UI.nx`. Moved so far:
   as Item.nx has it, or its macro, with the box 128 px above the cursor;
   cash and other slots leave the last tooltip up, as v83 does. The mouse
   wheel goes only to the window under the cursor (or a modal window), never
-  to windows elsewhere on screen.
+  to windows elsewhere on screen. Hovering the job and name shows
+  "login ID / channel / name", and hovering the EXP numbers shows the EXP,
+  both in the one-line box 20 px right of and below the cursor.
   Status messages (`UIStatusMessenger`) stack upward from just above the
   quick slot panel, right-aligned with it; `UIStatusBar::QUICKSLOT_TOP` is
   the shared anchor. Each fades out over 6 s. SHOW_STATUS_INFO is worded and

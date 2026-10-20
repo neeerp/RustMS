@@ -383,6 +383,16 @@ namespace ms
 		channelid = id;
 	}
 
+	std::string Configuration::get_login_id()
+	{
+		return login_id;
+	}
+
+	void Configuration::set_login_id(const std::string& id)
+	{
+		login_id = id;
+	}
+
 	uint8_t Configuration::get_world_channel_count(uint8_t world_id)
 	{
 		auto iter = world_channel_counts.find(world_id);
