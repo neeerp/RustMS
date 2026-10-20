@@ -964,6 +964,7 @@ pub fn buffs(skill: &Learned) -> Option<Vec<(BuffStat, i32)>> {
         2301003 => vec![(BuffStat::Invincible, effect.x)],
         2311003 => vec![(BuffStat::HolySymbol, effect.x)],
         2121004 | 2221004 | 2321004 => vec![(BuffStat::Infinity, effect.x)],
+        2321005 => vec![(BuffStat::HolyShield, effect.x)],
         2121002 | 2221002 | 2321002 => vec![(BuffStat::ManaReflection, skill.level)],
         3101004 | 3201004 => vec![(BuffStat::SoulArrow, effect.x)],
         3121008 => vec![(BuffStat::Concentrate, effect.x)],

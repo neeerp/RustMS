@@ -75,6 +75,9 @@ pub enum BuffStat {
     /// attack (the client's Attract).
     Seduce = 39,
     Infinity = 41,
+    /// Holy Shield: mobs' skills give no diseases, and their attacks only
+    /// Stun and Seduce (Cosmic's rule). The client never reads it.
+    HolyShield = 42,
     Concentrate = 45,
     /// A summon that stays where it was put: a Puppet or an Octopus. The
     /// client only shows its icon (Cosmic's PUPPET).
