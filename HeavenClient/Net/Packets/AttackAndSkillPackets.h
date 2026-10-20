@@ -38,7 +38,9 @@ namespace ms
 	public:
 		// A close attack ends with where the user stands, and Poison Bomb's
 		// with where its grenade went off too (0x952b58).
-		AttackPacket(const AttackResult& attack, Point<int16_t> position, std::optional<Point<int16_t>> grenade = std::nullopt) : OutPacket(opcodefor(attack.type))
+		// Energy Charge's body attack goes as a close one with its own opcode.
+		AttackPacket(const AttackResult& attack, Point<int16_t> position, std::optional<Point<int16_t>> grenade = std::nullopt,
+					 std::optional<OutPacket::Opcode> opcode = std::nullopt) : OutPacket(opcode.value_or(opcodefor(attack.type)))
 		{
 			skip(1);
 

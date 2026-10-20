@@ -22,6 +22,7 @@
 #include "Combo.h"
 #include "Dash.h"
 #include "DamageLayout.h"
+#include "EnergyCharge.h"
 #include "Heal.h"
 #include "HitTiming.h"
 #include "MagicDamage.h"
@@ -1778,6 +1779,37 @@ namespace ms
 		mobs.apply_damage(effect.target_oid, effect.damage, effect.toleft, effect.user, move);
 	}
 
+	void Combat::body_attack(int32_t oid)
+	{
+		if (!player.energy_full() || now < next_body_attack || player.is_climbing()
+			|| mount::is_tamed_monster(player.get_look().get_vehicle()))
+			return;
+
+		// One line of the skill's damage, with no action or effect of the
+		// player's (0x95f1b6).
+		const Skill &move = get_skill(energy::skill(player.get_stats().get_job().get_id()));
+		Attack attack = player.prepare_attack(move.get_id());
+		move.apply_stats(player, attack);
+		attack.type = Attack::Type::CLOSE;
+		attack.mobcount = 1;
+		attack.hitcount = 1;
+		attack.stance = 0;
+		attack.speed = 0;
+
+		AttackResult result = attack;
+		mobs.send_attack(result, attack, { oid }, 1);
+
+		if (result.damagelines.empty())
+			return;
+
+		next_body_attack = now + 1000;
+		result.attacker = player.get_oid();
+		expect_hits(result, 1);
+		extract_effects(player, move, result, {}, 0, {}, {});
+
+		AttackPacket(result, player.get_position(), std::nullopt, OutPacket::Opcode::TOUCH_MONSTER_ATTACK).dispatch();
+	}
+
 	void Combat::push_attack(const AttackResult &attack)
 	{
 		expect_hits(attack, 1);
@@ -1797,6 +1829,14 @@ namespace ms
 			OtherChar &user = *ouser;
 			user.update_skill(attack.skill, attack.level);
 			user.update_speed(attack.speed);
+
+			// Energy Charge's body attack shows only its hit on the mob
+			// (FUN_009830bb).
+			if (energy::charges(attack.skill))
+			{
+				extract_effects(user, get_move(attack.skill), attack, {}, 0, {}, {});
+				return;
+			}
 
 			// An attack ends the skill the user was preparing, unless it
 			// is one of its shots (0x98044f).
@@ -2044,7 +2084,7 @@ namespace ms
 			// As in v83, every hit on a mob lands at once, at the frame the
 			// attack hits on, and each later target a little after. A
 			// grenade's land as it goes off.
-			uint16_t delay = prepare::throws(result.skill) ? 0 : user.get_attackdelay(0);
+			uint16_t delay = prepare::throws(result.skill) || energy::charges(result.skill) ? 0 : user.get_attackdelay(0);
 
 			for (size_t target = 0; target < result.damagelines.size(); target++)
 			{
