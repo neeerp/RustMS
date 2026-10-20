@@ -271,6 +271,11 @@ namespace ms
 			attack.blow.scale = stats.damage;
 			attack.element = SkillData::get(skillid).get_element();
 
+			// Elemental Boost adds its damage to Flamethrower's and Ice Splitter's (0x79004c).
+			if (skillid == 5211004 || skillid == 5211005)
+				if (int32_t boost = user.get_skilllevel(5220001))
+					attack.blow.scale += SkillData::get(5220001).get_stats(boost).damage;
+
 			// Inferno's and Blizzard's element counts x percent.
 			if (skillid == 3111003 || skillid == 3211003)
 				attack.blow.amplify = stats.x;

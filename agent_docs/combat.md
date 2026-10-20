@@ -154,7 +154,8 @@ shot's `bulletCount`, otherwise `attackCount`), the MP spent, and the cap: a
 spell for twice v83's magic maximum (`max_magic_damage`: ((M² / 1000 + M) / 30
 + INT / 200) × `mad`, where M is INT plus equipment magic attack), a `damage`
 skill for that percentage of the basic cap (Barrage's fifth line twice that
-and its sixth four times), Shadow Meso for v83's highest
+and its sixth four times; Elemental Boost adds its `damage` to Flamethrower's
+and Ice Splitter's, as v83 does at 0x79004c), Shadow Meso for v83's highest
 roll (ten times one and a half its `moneyCon`, raised by its `x` percent on a
 critical), Snipe's shot for 199,999, and a skill with none is not an attack.
 A spell must name a skill.
@@ -751,7 +752,9 @@ carry the statuses a mob has. Entries come in the client's decode order
 - An attack's hits carry `skills::on_hit`: the attack skill's own status
   (stuns, freezes, poisons, Disorder's lower attack and defence, Taunt's
   higher defence) and a learned Venom's poison. Each mob hit for more than
-  0 rolls each.
+  0 rolls each. Elemental Boost makes Ice Splitter's freeze last its `y`
+  seconds longer; the extra poison its description promises for
+  Flamethrower is not modelled.
 - Taunt also puts on Showdown (bit 11), which no v83 client reads: a mob
   that dies with it gives its value in percent more EXP and makes each of
   its drops that much likelier (`Kill::showdown`, `loot::roll`; the
