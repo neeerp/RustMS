@@ -51,9 +51,15 @@ pub fn after_attack(player: &Player, attack: &Attack) -> Option<i16> {
 /// (FUN_00969465, FUN_009696a2).
 const NEED_FULL: [i32; 5] = [5111002, 5111004, 5121002, 15101005, 15111001];
 
-/// Whether `skill_id` needs a full gauge the player hasn't got.
+/// Whether `skill_id` is Energy Charge, which hits as the body attack.
+pub fn charges(skill_id: i32) -> bool {
+    skill_id == ENERGY_CHARGE || skill_id == DAWN_ENERGY_CHARGE
+}
+
+/// Whether `skill_id` needs a full gauge the player hasn't got: the body
+/// attack too (0x94b3aa).
 pub fn refused(player: &Player, skill_id: i32) -> bool {
-    NEED_FULL.contains(&skill_id) && !full(player)
+    (NEED_FULL.contains(&skill_id) || charges(skill_id)) && !full(player)
 }
 
 /// Whether the player's gauge is full and they still have Energy Charge.
@@ -95,7 +101,7 @@ pub fn charge(player: &mut Player, energy: i16, now: Instant) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::combat::AttackHit;
+    use crate::combat::{self, AttackHit, AttackRejection};
     use game::SkillRecord;
 
     fn brawler(level: i32) -> Player {
@@ -184,6 +190,40 @@ mod tests {
         assert_eq!(raise(&player, BuffStat::Eva, 0), 20);
         assert_eq!(raise(&player, BuffStat::Mad, 3), 3);
         assert!(!refused(&player, 5111002) && !refused(&player, 5121002));
+    }
+
+    #[test]
+    fn a_full_gauge_hits_one_touching_mob_with_energy_charge() {
+        if skills::info(ENERGY_CHARGE).is_none() {
+            return;
+        }
+        let body = |kind, mobs, skill| Attack {
+            skill,
+            ..attack(kind, mobs)
+        };
+        let mut player = brawler(40);
+        let rejection = |player: &Player, attack: &Attack| combat::validate(attack, player).err();
+        let touch = body(AttackKind::Body, 1, ENERGY_CHARGE);
+        assert_eq!(
+            rejection(&player, &touch),
+            Some(AttackRejection::NotCharged)
+        );
+
+        charge(&mut player, 10000, Instant::now());
+        assert_eq!(rejection(&player, &touch), None);
+        assert_eq!(
+            rejection(&player, &body(AttackKind::Body, 2, ENERGY_CHARGE)),
+            Some(AttackRejection::TooManyTargets)
+        );
+        // Energy Charge is no swing, and the body attack is nothing else.
+        assert_eq!(
+            rejection(&player, &body(AttackKind::Close, 1, ENERGY_CHARGE)),
+            Some(AttackRejection::Skill)
+        );
+        assert_eq!(
+            rejection(&player, &body(AttackKind::Body, 1, 0)),
+            Some(AttackRejection::Skill)
+        );
     }
 
     #[test]

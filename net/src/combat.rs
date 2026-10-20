@@ -17,7 +17,7 @@ pub struct AttackHit {
     pub damage: Vec<i32>,
 }
 
-/// Which of v83's three attack packets an attack came in, and goes out as.
+/// Which of v83's attack packets an attack came in, and goes out as.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum AttackKind {
     /// A swing or stab, including a ranged weapon's with no ammo.
@@ -26,6 +26,9 @@ pub enum AttackKind {
     Ranged,
     /// A spell.
     Magic,
+    /// Energy Charge's hit on a mob that touches a player with a full
+    /// gauge, laid out as a swing (FUN_0095f135).
+    Body,
 }
 
 impl AttackKind {
@@ -34,6 +37,7 @@ impl AttackKind {
             AttackKind::Close => SendOpcode::CloseRangeAttack,
             AttackKind::Ranged => SendOpcode::RangedAttack,
             AttackKind::Magic => SendOpcode::MagicAttack,
+            AttackKind::Body => SendOpcode::EnergyAttack,
         }
     }
 }
@@ -524,6 +528,10 @@ pub fn validate(attack: &Attack, player: &Player) -> Result<Uses, AttackRejectio
     // v83 won't use a finisher without an orb (0x969623).
     if combo::finisher(attack.skill) && combo::orbs(player).unwrap_or(0) < 1 {
         return Err(AttackRejection::NoOrbs);
+    }
+    // Energy Charge hits only as the body attack, which nothing else is.
+    if (attack.kind == AttackKind::Body) != energy::charges(attack.skill) {
+        return Err(AttackRejection::Skill);
     }
     if energy::refused(player, attack.skill) {
         return Err(AttackRejection::NotCharged);

@@ -148,6 +148,8 @@ namespace ms
 		ATTACKED_CLOSE = 186,
 		ATTACKED_RANGED = 187,
 		ATTACKED_MAGIC = 188,
+		// Energy Charge's body attack, laid out as a swing (0x9803ab)
+		ATTACKED_ENERGY = 189,
 		SKILL_EFFECT = 190,
 		CANCEL_SKILL_EFFECT = 191,
 		DAMAGE_PLAYER = 192,
@@ -315,6 +317,7 @@ namespace ms
 		emplace<ATTACKED_CLOSE, CloseAttackHandler>();
 		emplace<ATTACKED_RANGED, RangedAttackHandler>();
 		emplace<ATTACKED_MAGIC, MagicAttackHandler>();
+		emplace<ATTACKED_ENERGY, CloseAttackHandler>();
 		emplace<SKILL_EFFECT, SkillEffectHandler>();
 		emplace<CANCEL_SKILL_EFFECT, CancelSkillEffectHandler>();
 		emplace<DAMAGE_PLAYER, DamagePlayerHandler>();

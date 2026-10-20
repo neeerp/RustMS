@@ -571,6 +571,18 @@ A few skills do more than buff:
   the newest five on a turning ring 40 pixels over the feet, the newest
   popping in, all fading out when spent, and a finisher's
   `finish/<orbs>` burst at the attacker's feet.
+- **Energy Charge** (`net::energy`, 5110001 and the Thunder Breaker's
+  15100004) fills a gauge with each hit, up to 10000. A full gauge frees
+  the Energy skills (`energy::refused`, chat 0xdd1 on the client) and
+  lends the player the skill's own attack, accuracy and avoid where they
+  beat the buffed stat. With a full gauge, a mob that touches the player
+  takes a body attack first: the client sends TOUCH_MONSTER_ATTACK (0x2F),
+  a close attack of Energy Charge on that one mob with one line of the
+  skill's damage, at most once a second, off ropes and ladders and not
+  on a tamed monster (FUN_0095f135). Neither side plays an action or an
+  effect of the attacker's, only the skill's `hit` on the mob. The server
+  takes it through the attack handler (`AttackKind::Body`) and sends the
+  map ENERGY_ATTACK (0xBD); Energy Charge comes no other way.
 
 Teleport and Flash Jump move the player on the client alone; the server
 only spends the MP. HeavenClient's Flash Jump (4111006 and the Night

@@ -70,6 +70,8 @@ namespace ms
 			CLOSE_ATTACK = 44,
 			RANGED_ATTACK = 45,
 			MAGIC_ATTACK = 46,
+			// Energy Charge's body attack on a touching mob (FUN_0095f135)
+			TOUCH_MONSTER_ATTACK = 47,
 			TAKE_DAMAGE = 48,
 			USE_DEATHITEM = 53,
 

@@ -36,6 +36,7 @@ pub enum RecvOpcode {
     CloseRangeAttack = 0x2C,
     RangedAttack = 0x2D,
     MagicAttack = 0x2E,
+    TouchMonsterAttack = 0x2F,
     TakeDamage = 0x30,
     AllChat = 0x31,
     CloseChalkboard = 0x32,

@@ -450,6 +450,8 @@ namespace ms
 
 		if (touching)
 		{
+			combat.body_attack(touching);
+
 			if (MobAttack attack = mobs.create_attack(touching))
 			{
 				MobAttackResult result = player.damage(attack);

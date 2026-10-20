@@ -94,6 +94,10 @@ namespace ms
 		// Add an attack to the attack queue.
 		void push_attack(const AttackResult &attack);
 
+		// With a full gauge, Energy Charge hits the mob `oid` touching the player, once a second at most
+		// (FUN_0095f135 from 0x94b3aa).
+		void body_attack(int32_t oid);
+
 		// Show a buff effect.
 		void show_buff(int32_t cid, int32_t skillid, int8_t level);
 
@@ -551,6 +555,8 @@ namespace ms
 		// letting go and pressing again doesn't shoot sooner (0x948ee5).
 		int64_t last_hurricane = INT32_MIN;
 		int64_t last_rapidfire = INT32_MIN;
+		// When Energy Charge may hit a touching mob again (0x95f2e6).
+		int64_t next_body_attack = 0;
 
 		static Texture gauge_bar[2];
 		static Texture gauge_fill[2];

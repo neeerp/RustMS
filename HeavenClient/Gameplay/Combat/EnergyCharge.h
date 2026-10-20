@@ -34,6 +34,12 @@ namespace ms
 			}
 		}
 
+		// Energy Charge hits only as the body attack (FUN_0095f135).
+		inline bool charges(int32_t skill)
+		{
+			return skill == 5110001 || skill == 15100004;
+		}
+
 		// What a full gauge adds to a stat whose buffs come to `buffed`: v83 takes the larger of the two,
 		// the skill's `own` pad, acc or eva (0x77dd8c, 0x77de1c, 0x77deb2).
 		inline int32_t bonus(int32_t buffed, int32_t own)

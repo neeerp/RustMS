@@ -739,6 +739,10 @@ fn world_routes() -> &'static HashMap<i16, WorldRoute> {
                 Op::MagicAttack,
                 InGame(&world::AttackHandler(AttackKind::Magic)),
             ),
+            (
+                Op::TouchMonsterAttack,
+                InGame(&world::AttackHandler(AttackKind::Body)),
+            ),
             (Op::TakeDamage, InGame(&world::TakeDamageHandler)),
             (Op::ItemPickup, InGame(&world::ItemPickupHandler)),
             (Op::DamageReactor, InGame(&world::DamageReactorHandler)),
@@ -806,7 +810,7 @@ mod tests {
     fn every_registered_opcode_is_unique_per_server() {
         // The maps would silently drop duplicates; check the table sizes match.
         assert_eq!(login_routes().len(), 13);
-        assert_eq!(world_routes().len(), 85);
+        assert_eq!(world_routes().len(), 86);
     }
 
     #[test]
