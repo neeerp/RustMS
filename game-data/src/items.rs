@@ -59,6 +59,9 @@ pub struct ItemInfo {
     pub pet_commands: Vec<PetCommand>,
     /// The fullness a pet loses each time it grows hungry (`info/hungry`).
     pub pet_hunger: i32,
+    /// The days a pet lives once bought (`info/life`); 0 for one that
+    /// never dies (`info/permanent`).
+    pub pet_life: i32,
     /// Whether a pet has a name tag style (`info/nameTag`), which lets it
     /// wear a label ring.
     pub pet_name_tag: bool,
@@ -329,6 +332,9 @@ impl ItemData {
             info.max_level = nx.int_child(meta, "maxLevel")?.unwrap_or(0);
             if pet {
                 info.pet_hunger = nx.int_child(meta, "hungry")?.unwrap_or(1);
+                if nx.int_child(meta, "permanent")? != Some(1) {
+                    info.pet_life = nx.int_child(meta, "life")?.unwrap_or(0);
+                }
                 info.pet_name_tag = nx.int_child(meta, "nameTag")?.unwrap_or(0) != 0;
                 info.pet_chat_balloon = nx.int_child(meta, "chatBalloon")?.unwrap_or(0) != 0;
             }
@@ -515,6 +521,7 @@ impl ItemData {
             equip: Some(equip),
             pet_commands: Vec::new(),
             pet_hunger: 0,
+            pet_life: 0,
             pet_name_tag: false,
             pet_chat_balloon: false,
         }))
@@ -741,6 +748,8 @@ mod tests {
         let kitty = data.info(5000000).unwrap().unwrap();
         assert!(!kitty.pet_name_tag && !kitty.pet_chat_balloon);
         assert_eq!(data.info(5000000).unwrap().unwrap().pet_hunger, 2);
+        assert_eq!(data.info(5000000).unwrap().unwrap().pet_life, 90);
+        assert_eq!(data.info(5000060).unwrap().unwrap().pet_life, 0);
         let food = data.info(2120000).unwrap().unwrap().spec.unwrap();
         assert_eq!(food.inc, 30);
         let drumstick = data.info(5240027).unwrap().unwrap().spec.unwrap();

@@ -11,9 +11,9 @@ use net::packet::build::world::pet::{
     build_pet_exception_list, build_pet_name, build_remove_pet, build_spawn_pet, PetGone,
 };
 use net::packet::build::world::stat::{build_stat_update, StatUpdate};
-use net::packet::handle::world::pets_grow_hungry;
+use net::packet::handle::world::{next_dry_up, pets_dry_up, pets_grow_hungry, PetsAged};
 use packet::Packet;
-use std::time::Duration;
+use std::time::{Duration, SystemTime};
 
 /// How often the pets out grow hungry (Cosmic: PET_EXHAUST_COUNT, 3, of
 /// its one-minute ticks).
@@ -79,15 +79,40 @@ impl ClientActor {
         };
         let hunger = |item_id| net::items::info(item_id).map_or(1, |info| info.pet_hunger);
         let hungry = pets_grow_hungry(&mut game.player, hunger);
-        if hungry.changes.is_empty() {
+        self.pets_aged(hungry, PetGone::Hungry).await
+    }
+
+    /// When the next of the player's pets dries up; not in the Cash Shop.
+    pub(super) fn pets_due(&self) -> Option<tokio::time::Instant> {
+        if self.in_cash_shop {
+            return None;
+        }
+        let wait = next_dry_up(&self.game.as_ref()?.player)?
+            .duration_since(SystemTime::now())
+            .unwrap_or_default();
+        Some(tokio::time::Instant::now() + wait)
+    }
+
+    /// The pets whose Water of Life dried up turn back into dolls: their
+    /// owner's client reads them dated 2079, and those out go home.
+    pub(super) async fn pets_dry_up(&mut self) -> Result<(), RuntimeError> {
+        let player = &mut self.in_game_mut()?.player;
+        let dried = pets_dry_up(player, SystemTime::now());
+        self.pets_aged(dried, PetGone::Expired).await
+    }
+
+    /// Show the player's client its pets' new items, and send home those
+    /// that went for `why`.
+    async fn pets_aged(&mut self, aged: PetsAged, why: PetGone) -> Result<(), RuntimeError> {
+        if aged.changes.is_empty() {
             return Ok(());
         }
-        self.send(&mut build_inventory_operation(false, &hungry.changes)?)
+        self.send(&mut build_inventory_operation(false, &aged.changes)?)
             .await?;
-        if hungry.gone.is_empty() {
+        if aged.gone.is_empty() {
             return Ok(());
         }
-        self.pets_changed(hungry.gone, PetGone::Hungry).await?;
+        self.pets_changed(aged.gone, why).await?;
         let serials = self.in_game()?.player.pet_serials();
         self.send(&mut build_stat_update(false, &[StatUpdate::Pets(serials)])?)
             .await

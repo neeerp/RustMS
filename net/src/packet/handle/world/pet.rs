@@ -11,16 +11,18 @@ use crate::packet::build::world::pet::{
 };
 use crate::packet::build::world::stat::{build_stat_update, StatUpdate};
 use game::inventory::equip_slot;
-use game::pet::{PetChange, PetCommand};
+use game::pet::{self, PetChange, PetCommand};
 use game::{InventoryChange, InventoryType, Item, Player};
 use game_data::items::ConsumeSpec;
 use packet::{io::read::PktRead, Packet};
 use rand::Rng;
 use std::io::Cursor;
+use std::time::SystemTime;
 
 /// SPAWN_PET (0x62, FUN_00a240a2): the tick, the pet's Cash Inventory
 /// slot, and whether it should lead the others. The same request sends a
-/// pet out back. The client waits for the stat change before asking again.
+/// pet out back. The client waits for the stat change before asking again,
+/// and doesn't ask for a doll.
 pub struct SpawnPetHandler;
 
 impl WorldHandler for SpawnPetHandler {
@@ -34,7 +36,7 @@ impl WorldHandler for SpawnPetHandler {
         let serial = player
             .inventory
             .get(InventoryType::Cash, slot)
-            .filter(|item| item.pet.is_some())
+            .filter(|item| item.pet.is_some() && !pet::is_doll(item))
             .and_then(|item| item.cash_serial);
         let Some(serial) = serial else {
             return Ok(
@@ -42,11 +44,23 @@ impl WorldHandler for SpawnPetHandler {
             );
         };
         let lead = player.follows_the_lead();
-        let changes = game::pet::toggle(player.pets_mut(), serial, lead, boss);
+        let changes = pet::toggle(player.pets_mut(), serial, lead, boss);
         let done = build_stat_update(true, &[StatUpdate::Pets(player.pet_serials())])?;
         Ok(HandlerResult::empty()
             .with(WorldAction::PetsChanged(changes))
             .with(WorldAction::Reply(done)))
+    }
+}
+
+/// DEAD_PET (0x50, FUN_00a240a2): the tick and the cash serial of a doll
+/// that can't be revived (`info/noRevive`), sent as the client offers the
+/// Cash Shop. What the server did with it is unknown; the client waits for
+/// the stat change.
+pub struct DeadPetHandler;
+
+impl WorldHandler for DeadPetHandler {
+    fn handle(&self, _packet: &mut Packet, _ctx: &mut WorldContext) -> WorldResult {
+        Ok(HandlerResult::reply(build_stat_update(true, &[])?))
     }
 }
 
@@ -394,20 +408,21 @@ fn rename_pet(player: &mut Player, slot: i16, name: &str) -> Option<Vec<Inventor
     Some(changes)
 }
 
-/// What growing hungry did to a player's pets.
+/// What time did to a player's pets: they grew hungry, or their Water of
+/// Life dried up.
 #[derive(Debug, Default)]
-pub struct Hungry {
-    /// The pets' items, with their new fullness.
+pub struct PetsAged {
+    /// The pets' items as they now are.
     pub changes: Vec<InventoryChange>,
-    /// The pets that went home, starving.
+    /// The pets that went home.
     pub gone: Vec<PetChange>,
 }
 
 /// Every pet out loses the fullness `hunger` gives for its kind (`info/
 /// hungry`); one left at 5 or less goes home (Cosmic's
 /// runFullnessSchedule).
-pub fn pets_grow_hungry(player: &mut Player, hunger: impl Fn(i32) -> i32) -> Hungry {
-    let mut hungry = Hungry::default();
+pub fn pets_grow_hungry(player: &mut Player, hunger: impl Fn(i32) -> i32) -> PetsAged {
+    let mut hungry = PetsAged::default();
     let mut index = 0;
     while let Some(&serial) = player.pets.get(index) {
         let Some((slot, mut item)) = pet_item(player, serial) else {
@@ -428,6 +443,42 @@ pub fn pets_grow_hungry(player: &mut Player, hunger: impl Fn(i32) -> i32) -> Hun
         }
     }
     hungry
+}
+
+/// Every pet whose Water of Life dried up by `now` is a doll again, dated
+/// 2079 for its owner's client to see (Cosmic's expirationTask); one out
+/// goes home.
+pub fn pets_dry_up(player: &mut Player, now: SystemTime) -> PetsAged {
+    let mut dried = PetsAged::default();
+    let due: Vec<_> = player
+        .inventory
+        .items(InventoryType::Cash)
+        .filter(|(_, item)| {
+            item.pet.is_some() && pet::dries_up(item).is_some_and(|date| date <= now)
+        })
+        .map(|(slot, item)| (slot, item.clone()))
+        .collect();
+    for (slot, mut item) in due {
+        let serial = item.cash_serial;
+        if let Some(index) = player.pets.iter().position(|&pet| Some(pet) == serial) {
+            player.pets_mut().remove(index);
+            player.pets_named.retain(|&pet| Some(pet) != serial);
+            dried.gone.push(PetChange::Dismissed { index: index as u8 });
+        }
+        item.expiration = Some(pet::doll_date());
+        dried.changes.extend(put_back(player, slot, item));
+    }
+    dried
+}
+
+/// When the next of the player's living pets dries up, if one ever does.
+pub fn next_dry_up(player: &Player) -> Option<SystemTime> {
+    player
+        .inventory
+        .items(InventoryType::Cash)
+        .filter(|(_, item)| item.pet.is_some())
+        .filter_map(|(_, item)| pet::dries_up(item))
+        .min()
 }
 
 /// PET_CHAT (0xA8, FUN_007055e2): what the owner's client showed its pet
@@ -708,5 +759,50 @@ mod tests {
         assert!(player.pets_named.is_empty());
         assert_eq!((fullness(&player, 3), fullness(&player, 4)), (15, 28));
         assert_eq!(hungry.changes.len(), 4);
+    }
+
+    #[test]
+    fn a_pet_dried_up_is_a_doll_that_stays_home() {
+        use std::time::{Duration, UNIX_EPOCH};
+        let (then, later) = (
+            UNIX_EPOCH + Duration::from_secs(100),
+            UNIX_EPOCH + Duration::from_secs(200),
+        );
+        let mut player = two_pets(50, 50);
+        let mut kitty = player
+            .inventory
+            .get(InventoryType::Cash, 4)
+            .unwrap()
+            .clone();
+        kitty.expiration = Some(then);
+        player
+            .inventory
+            .insert(InventoryType::Cash, 4, kitty.clone());
+        kitty.cash_serial = Some(79);
+        kitty.expiration = Some(later);
+        player.inventory.insert(InventoryType::Cash, 5, kitty);
+        assert_eq!(next_dry_up(&player), Some(then));
+
+        let dried = pets_dry_up(&mut player, then);
+        assert_eq!(dried.gone, [PetChange::Dismissed { index: 1 }]);
+        assert_eq!(dried.changes.len(), 2);
+        assert_eq!(player.pets, [77]);
+        let doll = player.inventory.get(InventoryType::Cash, 4).unwrap();
+        assert!(pet::is_doll(doll));
+        assert_eq!(next_dry_up(&player), Some(later));
+
+        let mut p = Packet::new_empty();
+        p.write_short(0x62).unwrap();
+        p.write_int(0).unwrap();
+        p.write_short(4).unwrap();
+        p.write_byte(0).unwrap();
+        let mut ctx = WorldContext {
+            client_id: 1,
+            channel_id: 0,
+            player: &mut player,
+        };
+        let refused = SpawnPetHandler.handle(&mut p, &mut ctx).unwrap();
+        assert!(matches!(refused.actions[..], [WorldAction::Reply(_)]));
+        assert_eq!(player.pets, [77]);
     }
 }

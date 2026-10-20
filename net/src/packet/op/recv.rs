@@ -64,6 +64,9 @@ pub enum RecvOpcode {
     PetFood = 0x4C,
     UseMountFood = 0x4D,
     UseCashItem = 0x4F,
+    /// A doll that can't be revived (FUN_00a240a2), before the client
+    /// offers the Cash Shop.
+    DeadPet = 0x50,
     UseCatchItem = 0x51,
     CancelItemEffect = 0x49,
     UseSkillBook = 0x52,

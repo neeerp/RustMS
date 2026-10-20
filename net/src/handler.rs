@@ -724,6 +724,7 @@ fn world_routes() -> &'static HashMap<i16, WorldRoute> {
             (Op::MesoDrop, InGame(&world::MesoDropHandler)),
             (Op::CharInfoRequest, InGame(&world::CharInfoRequestHandler)),
             (Op::SpawnPet, InGame(&world::SpawnPetHandler)),
+            (Op::DeadPet, InGame(&world::DeadPetHandler)),
             (Op::MovePet, InGame(&world::MovePetHandler)),
             (Op::PetChat, InGame(&world::PetChatHandler)),
             (Op::PetCommand, InGame(&world::PetCommandHandler)),
@@ -774,7 +775,7 @@ mod tests {
     fn every_registered_opcode_is_unique_per_server() {
         // The maps would silently drop duplicates; check the table sizes match.
         assert_eq!(login_routes().len(), 13);
-        assert_eq!(world_routes().len(), 80);
+        assert_eq!(world_routes().len(), 81);
     }
 
     #[test]
