@@ -754,9 +754,12 @@ normal attack needs a knuckle (or a bow for Albatross): a melee one is
 dropped silently, a shot says "This skill cannot be used with the equipped
 item." Without the transformation, Shockwave, Demolition and Snatch say
 "This skill is available only during transformation."
-(`morph::untransformed`). Not done
-anywhere: Ghost (bit 49), the random morph items (2211000, 2212000), the
-cash morphs (5300000-5300002), the fly-map template gate, and the refusals for trades, mini-games and shops.
+(`morph::untransformed`). Any morph, a superman's too, also refuses a
+trade invite and opening a personal shop with the same line
+(`Player::shape_refuses`). Not done anywhere: Ghost (bit 49), the random
+morph items (2211000, 2212000), the cash morphs (5300000-5300002), the
+fly-map template gate, and the mini-game and hired merchant refusals,
+which wait on those rooms.
 
 ## Spending AP and SP
 

@@ -396,6 +396,10 @@ namespace ms
 
 	void UITradingRoom::request(int32_t cid)
 	{
+		// Not while transformed, before any other check (FUN_0052fad4).
+		if (Stage::get().get_player().shape_refuses())
+			return;
+
 		auto room = UI::get().get_element<UITradingRoom>();
 		const char *refusal = nullptr;
 
