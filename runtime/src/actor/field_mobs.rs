@@ -917,19 +917,19 @@ impl MobSet {
         spawned
     }
 
-    /// Bring out `info` at `at`, standing as `stance`, under `controller`;
-    /// returns its object id. It never respawns.
+    /// Bring out `info` at `at`, standing as `stance`, under `controller`
+    /// if any; returns its object id. It never respawns.
     pub fn place(
         &mut self,
         info: MobInfo,
         at: (i16, i16),
         stance: u8,
-        controller: ClientId,
+        controller: Option<ClientId>,
         now: Instant,
     ) -> i32 {
         let object_id = self.object_ids.next();
         let mut mob = LiveMob::new(object_id, info, at, stance, 0, now);
-        mob.controller = Some(controller);
+        mob.controller = controller;
         self.live.insert(object_id, mob);
         object_id
     }
@@ -1162,10 +1162,23 @@ impl MobSet {
     /// give no EXP or drops and let nothing out, and their spawn points fill
     /// again as after a kill.
     pub fn leave(&mut self, now: Instant) -> Vec<(i32, u8, Option<BossBar>)> {
+        self.take_away(now, |mob| mob.leaves_at.is_some_and(|at| at <= now))
+    }
+
+    /// Take away every mob, as if its time were up.
+    pub fn leave_all(&mut self, now: Instant) -> Vec<(i32, u8, Option<BossBar>)> {
+        self.take_away(now, |_| true)
+    }
+
+    fn take_away(
+        &mut self,
+        now: Instant,
+        due: impl Fn(&LiveMob) -> bool,
+    ) -> Vec<(i32, u8, Option<BossBar>)> {
         let gone: Vec<_> = self
             .live
             .values()
-            .filter(|mob| mob.leaves_at.is_some_and(|at| at <= now))
+            .filter(|mob| due(mob))
             .map(|mob| (mob.object_id, mob.leave_type(), mob.boss_bar_gone()))
             .collect();
         for &(object_id, _, _) in &gone {

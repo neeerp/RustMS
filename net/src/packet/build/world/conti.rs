@@ -17,11 +17,11 @@ pub fn build_conti_move(target: Target, state: State) -> Result<Packet, NetworkE
 /// CONTI_STATE: where a trip is, for a client that has just entered one of
 /// its maps (v83 FUN_0054dd08). The second byte says whether the Crimson
 /// Balrog's ship is out, which only a deck reads.
-pub fn build_conti_state(state: State) -> Result<Packet, NetworkError> {
+pub fn build_conti_state(state: State, balrog: bool) -> Result<Packet, NetworkError> {
     let mut p = Packet::new_empty();
     p.write_short(SendOpcode::ContiState as i16)?;
     p.write_byte(state as u8)?;
-    p.write_byte(0)?;
+    p.write_byte(u8::from(balrog))?;
     Ok(p)
 }
 
@@ -75,10 +75,18 @@ mod tests {
     }
 
     #[test]
-    fn the_state_comes_without_the_balrog() {
+    fn the_state_comes_with_whether_the_balrog_is_out() {
         assert_eq!(
-            build_conti_state(State::Wait).unwrap().bytes,
+            build_conti_state(State::Wait, false).unwrap().bytes,
             [0x95, 0, 1, 0]
+        );
+        assert_eq!(
+            build_conti_state(State::Move, true).unwrap().bytes,
+            [0x95, 0, 3, 1]
+        );
+        assert_eq!(
+            build_conti_move(Target::Deck, State::MobGen).unwrap().bytes,
+            [0x94, 0, 10, 4]
         );
     }
 

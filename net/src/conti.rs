@@ -24,6 +24,10 @@ pub enum State {
     Start = 2,
     /// Under way.
     Move = 3,
+    /// The Crimson Balrog's ship comes alongside a deck (`MobGen`).
+    MobGen = 4,
+    /// It sails off (`MobDestroy`).
+    MobDestroy = 5,
     /// Arrived.
     End = 6,
 }
@@ -35,6 +39,8 @@ pub enum State {
 pub enum Target {
     /// The departure platform (`startShipMoveField`).
     Platform = 8,
+    /// A deck, which the Crimson Balrog's ship comes alongside.
+    Deck = 10,
     /// The arrival platform (`endShipMoveField`).
     ArrivalPlatform = 12,
 }
@@ -61,6 +67,9 @@ pub struct Route {
     pub deck: i32,
     /// Only Ellinia's ships have one.
     pub cabin: Option<i32>,
+    /// Where the Crimson Balrogs board the deck, on a route whose ship they
+    /// attack (Cosmic's Boats.js).
+    pub balrogs: Option<(i16, i16)>,
     /// Where riders step off, and by which portal.
     pub arrival: (i32, &'static str),
     /// Where the ship docks at the other end.
@@ -86,6 +95,7 @@ pub const TO_ORBIS: Route = Route {
     waiting_room: 101000301,
     deck: 200090010,
     cabin: Some(200090011),
+    balrogs: Some((339, 148)),
     arrival: (200000100, "come00"),
     arrival_platform: 200000111,
     ticket: 4031045,
@@ -98,6 +108,7 @@ pub const TO_ELLINIA: Route = Route {
     waiting_room: 200000112,
     deck: 200090000,
     cabin: Some(200090001),
+    balrogs: Some((-538, 143)),
     arrival: (101000300, "come00"),
     arrival_platform: 101000300,
     ticket: 4031047,
@@ -120,6 +131,7 @@ pub const TO_LUDIBRIUM: Route = Route {
     waiting_room: 200000122,
     deck: 200090100,
     cabin: None,
+    balrogs: None,
     arrival: (220000100, "sp"),
     arrival_platform: 220000110,
     ticket: 4031074,
@@ -135,6 +147,7 @@ pub const LUDIBRIUM_TO_ORBIS: Route = Route {
     waiting_room: 220000111,
     deck: 200090110,
     cabin: None,
+    balrogs: None,
     arrival: (200000100, "ludi00"),
     arrival_platform: 200000121,
     ticket: 4031045,
@@ -147,6 +160,7 @@ pub const TO_LEAFRE: Route = Route {
     waiting_room: 200000132,
     deck: 200090200,
     cabin: None,
+    balrogs: None,
     arrival: (240000100, "sp"),
     arrival_platform: 240000110,
     ticket: 4031331,
@@ -159,6 +173,7 @@ pub const LEAFRE_TO_ORBIS: Route = Route {
     waiting_room: 240000111,
     deck: 200090210,
     cabin: None,
+    balrogs: None,
     arrival: (200000100, "sp"),
     arrival_platform: 200000131,
     ticket: 4031045,
@@ -174,6 +189,7 @@ pub const TO_ARIANT: Route = Route {
     waiting_room: 200000152,
     deck: 200090400,
     cabin: None,
+    balrogs: None,
     arrival: (260000100, "sp"),
     arrival_platform: 260000100,
     ticket: 4031576,
@@ -186,6 +202,7 @@ pub const ARIANT_TO_ORBIS: Route = Route {
     waiting_room: 260000110,
     deck: 200090410,
     cabin: None,
+    balrogs: None,
     arrival: (200000100, "sp"),
     arrival_platform: 200000151,
     ticket: 4031045,
@@ -241,6 +258,58 @@ impl Timetable {
     }
 }
 
+/// The Crimson Balrog, and how many board a deck: Continent.img's `genMob`
+/// is a sack (2100009) of two.
+pub const BALROG: i32 = 8150000;
+pub const BALROGS: usize = 2;
+
+/// When the Crimson Balrog's ship attacks a trip, in route time.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Invasion {
+    /// The ship comes alongside.
+    pub appear: i64,
+    /// The Balrogs board, 5 seconds later.
+    pub board: i64,
+    /// The ship sails off, taking them with it, a minute before arrival
+    /// (`tEventEnd`, 9 minutes, in a later version's Continent.img).
+    pub end: i64,
+}
+
+/// The attack on the trip that departs at route time `departure`, if it is
+/// attacked: one roll for both decks and every channel, as in Cosmic, which
+/// has 42% of trips attacked 3 to 4 minutes after departure.
+/// `RUSTMS_CONTI_BALROG` sets the percentage.
+pub fn invasion(departure: i64) -> Option<Invasion> {
+    let roll = splitmix64(departure as u64);
+    if roll % 100 >= balrog_odds() {
+        return None;
+    }
+    let appear = departure + 3 * MINUTE + ((roll >> 8) % MINUTE as u64) as i64;
+    Some(Invasion {
+        appear,
+        board: appear + 5_000,
+        end: departure + 9 * MINUTE,
+    })
+}
+
+fn balrog_odds() -> u64 {
+    static ODDS: OnceLock<u64> = OnceLock::new();
+    *ODDS.get_or_init(|| {
+        std::env::var("RUSTMS_CONTI_BALROG")
+            .ok()
+            .and_then(|odds| odds.parse().ok())
+            .filter(|odds| *odds <= 100)
+            .unwrap_or(42)
+    })
+}
+
+fn splitmix64(seed: u64) -> u64 {
+    let mut z = seed.wrapping_add(0x9e37_79b9_7f4a_7c15);
+    z = (z ^ (z >> 30)).wrapping_mul(0xbf58_476d_1ce4_e5b9);
+    z = (z ^ (z >> 27)).wrapping_mul(0x94d0_49bb_1331_11eb);
+    z ^ (z >> 31)
+}
+
 /// Route time in milliseconds: the wall clock, sped up by
 /// `RUSTMS_CONTI_SCALE` (a whole number, default 1) for testing.
 pub fn now() -> i64 {
@@ -285,12 +354,19 @@ pub fn waiting_in(map_id: i32) -> Option<&'static Route> {
 }
 
 /// The state a client on `map_id` is told when it asks (send 0xDC): that of
-/// the route whose ship it shows, if any.
-pub fn ship_state(map_id: i32, t: i64) -> Option<State> {
-    ROUTES
+/// the route whose ship it shows, if any, and on a deck whether the Crimson
+/// Balrog's ship is alongside.
+pub fn ship_state(map_id: i32, t: i64) -> Option<(State, bool)> {
+    let route = ROUTES
         .into_iter()
-        .find(|route| [route.platform, route.arrival_platform, route.deck].contains(&map_id))
-        .map(|route| route.timetable.state(t))
+        .find(|route| [route.platform, route.arrival_platform, route.deck].contains(&map_id))?;
+    let state = route.timetable.state(t);
+    let departure = t - t.rem_euclid(route.timetable.term * MINUTE);
+    let alongside = map_id == route.deck
+        && route.balrogs.is_some()
+        && state == State::Move
+        && invasion(departure).is_some_and(|attack| attack.appear <= t && t < attack.end);
+    Some((state, alongside))
 }
 
 /// What a field does when a trip changes.
@@ -300,6 +376,14 @@ pub enum Happening {
     Show(Target, State),
     /// Move everyone on the map there.
     MoveAll { map_id: i32, portal: &'static str },
+    /// Bring `count` of `mob_id` aboard on the ground below `at`.
+    Board {
+        mob_id: i32,
+        count: usize,
+        at: (i16, i16),
+    },
+    /// The Balrog's ship sails off with every mob aboard.
+    Retreat,
 }
 
 /// Whether trips ever change anything on `map_id`.
@@ -321,6 +405,9 @@ pub fn has_trips(map_id: i32) -> bool {
 pub fn happenings(map_id: i32, from: i64, to: i64) -> Vec<Happening> {
     let mut happenings = Vec::new();
     for route in ROUTES {
+        if map_id == route.deck {
+            happenings.extend(attacks(route, from, to));
+        }
         for change in route.timetable.changes(from, to) {
             let happening = match change {
                 State::Start if map_id == route.platform => {
@@ -343,6 +430,37 @@ pub fn happenings(map_id: i32, from: i64, to: i64) -> Vec<Happening> {
         }
     }
     happenings
+}
+
+/// What the Crimson Balrog's attacks do on `route`'s deck after route time
+/// `from` up to `to`, oldest first; at most the last trip's.
+fn attacks(route: &Route, from: i64, to: i64) -> Vec<Happening> {
+    let Some(at) = route.balrogs else {
+        return Vec::new();
+    };
+    let term = route.timetable.term * MINUTE;
+    let from = from.max(to - term);
+    let mut timed = Vec::new();
+    for trip in (from.div_euclid(term) - 1)..=to.div_euclid(term) {
+        let Some(attack) = invasion(trip * term) else {
+            continue;
+        };
+        timed.extend([
+            (attack.appear, Happening::Show(Target::Deck, State::MobGen)),
+            (
+                attack.board,
+                Happening::Board {
+                    mob_id: BALROG,
+                    count: BALROGS,
+                    at,
+                },
+            ),
+            (attack.end, Happening::Retreat),
+        ]);
+    }
+    timed.retain(|(t, _)| from < *t && *t <= to);
+    timed.sort_by_key(|(t, _)| *t);
+    timed.into_iter().map(|(_, happening)| happening).collect()
 }
 
 #[cfg(test)]
@@ -450,7 +568,10 @@ mod tests {
             [Happening::Show(Target::ArrivalPlatform, State::End)]
         );
         assert_eq!(waiting_in(220000111), Some(&LUDIBRIUM_TO_ORBIS));
-        assert_eq!(ship_state(220000110, departure + MINUTE), Some(State::Move));
+        assert_eq!(
+            ship_state(220000110, departure + MINUTE),
+            Some((State::Move, false))
+        );
     }
 
     #[test]
@@ -462,9 +583,77 @@ mod tests {
     #[test]
     fn clients_are_told_the_state_of_the_ship_their_map_shows() {
         let boarding = 7 * HOUR + 12 * MINUTE;
-        assert_eq!(ship_state(101000300, boarding), Some(State::Wait));
-        assert_eq!(ship_state(200000111, boarding), Some(State::Wait));
-        assert_eq!(ship_state(200090000, 7 * HOUR), Some(State::Move));
+        assert_eq!(ship_state(101000300, boarding), Some((State::Wait, false)));
+        assert_eq!(ship_state(200000111, boarding), Some((State::Wait, false)));
+        assert_eq!(ship_state(200090000, 7 * HOUR), Some((State::Move, false)));
         assert_eq!(ship_state(200000100, boarding), None);
+    }
+
+    /// The first `count` Ellinia trips from 7:00 that are attacked.
+    fn attacked(count: usize) -> Vec<(i64, Invasion)> {
+        (0..)
+            .map(|trip| 7 * HOUR + trip * 15 * MINUTE)
+            .filter_map(|departure| Some((departure, invasion(departure)?)))
+            .take(count)
+            .collect()
+    }
+
+    #[test]
+    fn some_trips_meet_the_balrog_between_three_and_four_minutes_out() {
+        let trips = 1000;
+        let hit = (0..trips)
+            .filter(|trip| invasion(trip * 15 * MINUTE).is_some())
+            .count();
+        assert!((350..490).contains(&hit), "{hit} of {trips}");
+        for (departure, attack) in attacked(50) {
+            assert!((3 * MINUTE..4 * MINUTE).contains(&(attack.appear - departure)));
+            assert_eq!(attack.board, attack.appear + 5_000);
+            assert_eq!(attack.end, departure + 9 * MINUTE);
+            assert_eq!(invasion(departure), Some(attack));
+        }
+    }
+
+    #[test]
+    fn the_balrog_comes_aboard_both_ellinia_decks_and_leaves_before_arrival() {
+        let (departure, attack) = attacked(1)[0];
+        let happens = |map_id, at: i64| happenings(map_id, at - 1, at);
+        for (deck, at) in [(200090010, (339, 148)), (200090000, (-538, 143))] {
+            assert_eq!(
+                happens(deck, attack.appear),
+                [Happening::Show(Target::Deck, State::MobGen)]
+            );
+            assert_eq!(
+                happens(deck, attack.board),
+                [Happening::Board {
+                    mob_id: BALROG,
+                    count: 2,
+                    at
+                }]
+            );
+            assert_eq!(happens(deck, attack.end), [Happening::Retreat]);
+            assert_eq!(
+                ship_state(deck, attack.appear - 1),
+                Some((State::Move, false))
+            );
+            assert_eq!(ship_state(deck, attack.appear), Some((State::Move, true)));
+            assert_eq!(ship_state(deck, attack.end - 1), Some((State::Move, true)));
+            assert_eq!(ship_state(deck, attack.end), Some((State::Move, false)));
+        }
+        // Not the cabins, nor the other routes' decks.
+        assert_eq!(happens(200090011, attack.appear), []);
+        assert_eq!(happens(200090200, departure + 3 * MINUTE + 30_000), []);
+        // A field that missed the whole attack still sees it, in order.
+        assert_eq!(
+            happenings(200090010, departure, attack.end),
+            [
+                Happening::Show(Target::Deck, State::MobGen),
+                Happening::Board {
+                    mob_id: BALROG,
+                    count: 2,
+                    at: (339, 148)
+                },
+                Happening::Retreat
+            ]
+        );
     }
 }

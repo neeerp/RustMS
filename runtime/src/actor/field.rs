@@ -11,7 +11,7 @@ use crate::message::{ClientHandle, FieldKey, FieldMessage, ServerMessage};
 use game::mob_skill::{self, MobSkillEffect};
 use game::{FieldAvatar, MobStat};
 use game_data::items::CatchInfo;
-use net::conti::{self, Happening};
+use net::conti::{self, Happening, State, Target};
 use net::meso_explosion::{self, Blast};
 use net::packet::build::world::buff::{build_own_skill_effect, build_skill_effect};
 use net::packet::build::world::conti::build_conti_move;
@@ -229,12 +229,8 @@ impl FieldActor {
                 self.broadcast(None, packet);
             }
         }
-        for (object_id, leave, bar) in self.mobs.leave(now) {
-            if let Ok(packet) = build_kill_mob(object_id, leave) {
-                self.broadcast(None, packet);
-            }
-            self.show_boss_bar(bar);
-        }
+        let left = self.mobs.leave(now);
+        self.show_left(left);
         for object_id in self.mobs.revive(now, net::mobs::info) {
             let Some(mob) = self.mobs.get(object_id) else {
                 continue;
@@ -262,6 +258,16 @@ impl FieldActor {
         if let Some(controller) = controller {
             let controlled = self.mobs.assign_uncontrolled(controller);
             self.send_control(controller, &controlled);
+        }
+    }
+
+    /// Show everyone the mobs that left, as `MobSet::leave` gives them.
+    fn show_left(&self, left: Vec<(i32, u8, Option<BossBar>)>) {
+        for (object_id, leave, bar) in left {
+            if let Ok(packet) = build_kill_mob(object_id, leave) {
+                self.broadcast(None, packet);
+            }
+            self.show_boss_bar(bar);
         }
     }
 
@@ -1214,7 +1220,7 @@ impl FieldActor {
         let now = Instant::now();
         let mut placed = Vec::new();
         for info in mobs.into_iter().filter_map(net::mobs::info) {
-            let object_id = self.mobs.place(info, at, stance, from, now);
+            let object_id = self.mobs.place(info, at, stance, Some(from), now);
             let Some(mob) = self.mobs.get(object_id) else {
                 continue;
             };
@@ -1606,7 +1612,42 @@ impl FieldActor {
                         });
                     }
                 }
+                Happening::Board {
+                    mob_id,
+                    count,
+                    at: (x, y),
+                } => self.board(mob_id, count, (x, y)),
+                Happening::Retreat => {
+                    if let Ok(packet) = build_conti_move(Target::Deck, State::MobDestroy) {
+                        self.broadcast(None, packet);
+                    }
+                    let left = self.mobs.leave_all(Instant::now());
+                    self.show_left(left);
+                }
             }
+        }
+    }
+
+    /// Bring `count` of `mob_id` aboard on the ground below `(x, y)`, under
+    /// the first player here, or the next to come.
+    fn board(&mut self, mob_id: i32, count: usize, (x, y): (i16, i16)) {
+        let ground = self.drops.ground_below(x, y.saturating_sub(1)).unwrap_or(y);
+        let at = (x, ground.saturating_sub(1));
+        let now = Instant::now();
+        for info in std::iter::repeat_with(|| net::mobs::info(mob_id))
+            .take(count)
+            .flatten()
+        {
+            let object_id = self.mobs.place(info, at, 5, None, now);
+            if let Some(mob) = self.mobs.get(object_id) {
+                if let Ok(packet) = build_spawn_mob(&mob.view(true)) {
+                    self.broadcast(None, packet);
+                }
+            }
+        }
+        if let Some(controller) = self.occupants.keys().next().copied() {
+            let controlled = self.mobs.assign_uncontrolled(controller);
+            self.send_control(controller, &controlled);
         }
     }
 

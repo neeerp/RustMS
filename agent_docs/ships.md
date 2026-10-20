@@ -57,7 +57,8 @@ to 60, so a 15-minute cycle takes 15 seconds (`tests/ships.rs`).
   - on the arrival platform, the other ship docking at `End`
     (CONTI_MOVE 12, 6). Ellinia's platform is both, so it sees each;
   - in the waiting room at `Move`, and on the deck and in the cabin at
-    `End`, everyone is moved on (`ServerMessage::ShipWarp`).
+    `End`, everyone is moved on (`ServerMessage::ShipWarp`);
+  - on an Ellinia-Orbis deck, the Crimson Balrog's attack (below).
 - The client actor (`runtime/src/actor/client/ships.rs`) warps on
   `ShipWarp` only if the player is still on that map. A player in the Cash
   Shop stays where they are.
@@ -65,9 +66,31 @@ to 60, so a 15-minute cycle takes 15 seconds (`tests/ships.rs`).
   under way, starts on that map instead.
 - 0xDC (`ContiStateRequestHandler`) is the client asking about its own map's
   ship on entering it. The server answers CONTI_STATE with the state of the
-  route whose platform, arrival platform or deck it is, flag 0.
+  route whose platform, arrival platform or deck it is. The flag is 1 on a
+  deck while the Balrog's ship is out, else 0.
 - On joining a map with a `clock` node, the client actor sends CLOCK kind 1
   with the route time of day in UTC (`set_wall_clock`).
+
+### The Crimson Balrog
+
+`conti::invasion` decides from the departure time alone whether a trip
+between Ellinia and Orbis is attacked and when. Both decks and every
+channel therefore agree, as with Cosmic's single roll. The cabins are safe.
+
+- Cosmic attacks 42% of trips; `RUSTMS_CONTI_BALROG` sets the percentage,
+  and the harness world uses 100.
+- 3 to 4 minutes after departure (Cosmic) the ship comes alongside: CONTI_MOVE
+  (10, 4). The client starts the ArabPirate music itself.
+- 5 seconds later two Crimson Balrogs (8150000) board on the ground below
+  Cosmic's points, (339, 148) on 200090010 and (-538, 143) on 200090000.
+  The first player there controls them, or the next to come.
+- A minute before arrival (`tEventEnd` 9 in a later version's
+  Continent.img) the ship sails off: CONTI_MOVE (10, 5). Every mob on the
+  deck leaves with it (KILL_MONSTER 1, no EXP or drops). Cosmic keeps them
+  until arrival, after everyone has been moved off.
+
+None of the odds, times or points can be checked against the v83 client,
+which only shows the ship.
 
 The NPCs are in `net/src/npc_scripts.rs`, with placeholder lines under the
 `ships.*` content keys:
@@ -112,8 +135,7 @@ node is resolved in `Map.nx`, with `.img` added to the folder after `Obj/`
   fades in sliding from 100 px up and to the side, starts the
   `Bgm04.img/ArabPirate` music, and drifts at random every 1.2 seconds. It
   is drawn above the map. CONTI_MOVE (10, 4) is Appear and (10, 5)
-  Disappear; CONTI_STATE 3 or 4 with flag 1 is Appear. The server never
-  sends these yet.
+  Disappear; CONTI_STATE 3 or 4 with flag 1 is Appear.
 
 `Stage` sends 0xDC after loading a map with a ship. CONTI_MOVE and
 CONTI_STATE are ignored while a map loads.
@@ -132,7 +154,7 @@ again before it has finished docking.
 
 ## Not yet
 
-- The Balrog's attack on the Ellinia ship.
+- 8150000's drops, which belong in the content pack.
 - Mu Lung and Ereve in Isa's list; Corba's dragon flight to Leafre.
 - Ariant arrivals use the town's first `sp` portal; Cosmic uses the second.
 - CLOCK countdowns (kinds 0, 2 and 3).

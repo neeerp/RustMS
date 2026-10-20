@@ -174,8 +174,10 @@ pub struct Trace {
     pub countdowns: Vec<i32>,
     /// CONTI_MOVE: (target, state) of each ship shown leaving or docking.
     pub ship_moves: Vec<(u8, u8)>,
-    /// CONTI_STATE: the ship's state, as answered.
+    /// CONTI_STATE: the ship's state, as answered...
     pub ship_states: Vec<u8>,
+    /// ...and whether the Crimson Balrog's ship is out.
+    pub balrog_out: Vec<bool>,
     /// SPAWN_PET: (owner, index, the pet's item id, name and serial), or
     /// for a pet going back, (owner, index, why) in `pets_gone`.
     pub pets: Vec<(i32, u8, i32, String, i64)>,
@@ -539,6 +541,7 @@ impl Trace {
                 .push((r.read_byte().unwrap(), r.read_byte().unwrap()));
         } else if op == SendOpcode::ContiState as i16 {
             self.ship_states.push(r.read_byte().unwrap());
+            self.balrog_out.push(r.read_byte().unwrap() == 1);
         } else if op == SendOpcode::SpawnPortal as i16 {
             let (town, field) = (r.read_int().unwrap(), r.read_int().unwrap());
             self.own_doors.push((town != 999_999_999).then(|| {
