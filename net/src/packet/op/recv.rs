@@ -89,6 +89,7 @@ pub enum RecvOpcode {
     TeleportRockList = 0x66,
     QuestAction = 0x6B,
     ThrowGrenade = 0x6D,
+    SkillMacro = 0x6E,
 
     ChangeKeybinds = 0x87,
     UseSolomonItem = 0x9D,

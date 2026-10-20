@@ -397,16 +397,20 @@ namespace ms
 
 	void SkillMacrosHandler::handle(InPacket& recv) const
 	{
-		uint8_t size = recv.read_byte();
+		// v83 reads at most five and leaves the rest (FUN_004e77b0).
+		size_t count = std::min<size_t>(recv.read_byte(), SkillMacros::MAX_MACROS);
+		std::vector<SkillMacro> macros(count);
 
-		for (uint8_t i = 0; i < size; i++)
+		for (SkillMacro& macro : macros)
 		{
-			recv.read_string();	// name
-			recv.read_byte();	// 'shout' byte
-			recv.read_int();	// skill 1
-			recv.read_int();	// skill 2
-			recv.read_int();	// skill 3
+			macro.name = recv.read_string();
+			macro.silent = recv.read_byte() != 0;
+
+			for (int32_t& skill : macro.skills)
+				skill = recv.read_int();
 		}
+
+		UI::get().get_skill_macros().replace(std::move(macros));
 	}
 
 	void AddCooldownHandler::handle(InPacket& recv) const

@@ -24,6 +24,7 @@
 #include "../OutPacket.h"
 
 #include "../../Character/MapleStat.h"
+#include "../../Character/SkillMacros.h"
 
 #include "../IO/UITypes/UIKeyConfig.h"
 
@@ -112,6 +113,26 @@ namespace ms
 		MonsterBookCoverPacket(int32_t card) : OutPacket(OutPacket::Opcode::MONSTER_BOOK_COVER)
 		{
 			write_int(card);
+		}
+	};
+
+	// The whole macro list, sent after every edit
+	// Opcode: SKILL_MACRO(110)
+	class SkillMacroPacket : public OutPacket
+	{
+	public:
+		SkillMacroPacket(const SkillMacros& macros) : OutPacket(OutPacket::Opcode::SKILL_MACRO)
+		{
+			write_byte(static_cast<int8_t>(macros.size()));
+
+			for (const SkillMacro& macro : macros.get())
+			{
+				write_string(macro.name);
+				write_byte(macro.silent);
+
+				for (int32_t skill : macro.skills)
+					write_int(skill);
+			}
 		}
 	};
 

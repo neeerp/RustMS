@@ -7,6 +7,7 @@ use crate::mount::Mount;
 use crate::pet::{FieldPet, FOLLOW_THE_LEAD};
 use crate::quest::QuestLog;
 use crate::skill::{self, SkillBook, SkillRecord};
+use crate::skill_macro::SkillMacros;
 use crate::teleport_rock::TeleportRocks;
 use std::collections::BTreeMap;
 
@@ -214,6 +215,8 @@ pub struct Player {
     pub charmed: bool,
     /// The maps kept for the teleport rocks.
     pub teleport_rocks: TeleportRocks,
+    /// The skill macros, by place in the list.
+    pub skill_macros: SkillMacros,
     /// The tamed monster's level, EXP and tiredness.
     pub mount: Mount,
     /// Where the player came from before a trip, to go back to when it
@@ -256,6 +259,7 @@ impl Player {
             item_effect: 0,
             charmed: false,
             teleport_rocks: TeleportRocks::default(),
+            skill_macros: SkillMacros::default(),
             mount: Mount::default(),
             saved_locations: BTreeMap::new(),
             dirty: false,

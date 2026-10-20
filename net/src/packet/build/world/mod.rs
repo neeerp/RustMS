@@ -27,6 +27,7 @@ pub mod quest;
 pub mod reactor;
 pub mod shop;
 pub mod skill;
+pub mod skill_macro;
 pub mod stat;
 pub mod storage;
 pub mod summon;

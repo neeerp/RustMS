@@ -544,6 +544,11 @@ namespace ms
 		state->show_line(parent, text);
 	}
 
+	SkillMacros &UI::get_skill_macros()
+	{
+		return skill_macros;
+	}
+
 	Keyboard &UI::get_keyboard()
 	{
 		return keyboard;

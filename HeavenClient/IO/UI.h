@@ -27,6 +27,8 @@
 #include "Components/ScrollingNotice.h"
 #include "Components/Textfield.h"
 
+#include "../Character/SkillMacros.h"
+
 namespace ms
 {
 	class UI : public Singleton<UI>
@@ -116,6 +118,9 @@ namespace ms
 
 		Keyboard &get_keyboard();
 
+		// The skill macros, kept across characters as v83 does (report 206).
+		SkillMacros &get_skill_macros();
+
 		int64_t get_uptime();
 
 		uint16_t get_uplevel();
@@ -133,6 +138,7 @@ namespace ms
 	private:
 		std::unique_ptr<UIState> state;
 		Keyboard keyboard;
+		SkillMacros skill_macros;
 		Cursor cursor;
 		ScrollingNotice scrollingnotice;
 
