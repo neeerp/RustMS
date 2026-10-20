@@ -29,9 +29,11 @@ pub const SCRIPTS: &[&str] = &["q1021s", "q1021e"];
 /// Actions on starting a quest (`Act.img/<id>/0`) that the server applies.
 pub const START_ACTIONS: &[&str] = &["item"];
 /// Actions on completing a quest (`Act.img/<id>/1`) that the server applies.
-pub const END_ACTIONS: &[&str] = &["exp", "money", "nextQuest", "item"];
+pub const END_ACTIONS: &[&str] = &["exp", "money", "nextQuest", "item", "skill"];
 /// Keys of an `Act/<n>/item/<k>` entry the server applies.
 pub const ITEM_ACTION_KEYS: &[&str] = &["id", "count", "job", "gender", "prop"];
+/// Keys of an `Act/1/skill/<k>` entry the server applies.
+pub const SKILL_ACTION_KEYS: &[&str] = &["id", "skillLevel", "masterLevel", "job"];
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct QuestPrerequisite {
@@ -65,6 +67,8 @@ pub struct QuestTemplate {
     /// Items given or taken on start and on completion.
     pub start_items: Vec<QuestItem>,
     pub end_rewards: Vec<QuestItem>,
+    /// Skills taught on completion.
+    pub end_skills: Vec<QuestSkill>,
     /// Scripts that run the start or completion instead of the quest data.
     pub start_script: Option<String>,
     pub end_script: Option<String>,
@@ -127,6 +131,18 @@ impl QuestItem {
     }
 }
 
+/// One `Act/1/skill` entry.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct QuestSkill {
+    pub skill_id: i32,
+    /// The level taught; 0 (no `skillLevel`) teaches only the master level.
+    pub level: i32,
+    pub master_level: i32,
+    /// The jobs taught, matched exactly as v83's reward list does
+    /// (FUN_0071808a); a 0 in the data is beginner, not "any".
+    pub jobs: Vec<i16>,
+}
+
 /// The keys a quest declares in each `Check`/`Act` node, used to decide
 /// whether the server supports it.
 #[derive(Clone, Debug, Default)]
@@ -139,6 +155,8 @@ pub struct QuestKeys {
     pub item_keys: Vec<String>,
     /// Whether an item action has `prop` -1: a reward the player picks.
     pub item_choice: bool,
+    /// Keys used by any `Act/1/skill` entry.
+    pub skill_keys: Vec<String>,
 }
 
 /// `Ok` if every declared requirement and action is supported, otherwise the
@@ -167,6 +185,7 @@ pub fn classify(keys: &QuestKeys) -> Result<(), String> {
     unsupported(&keys.start_act, START_ACTIONS, "Act/0")?;
     unsupported(&keys.end_act, END_ACTIONS, "Act/1")?;
     unsupported(&keys.item_keys, ITEM_ACTION_KEYS, "Act/item")?;
+    unsupported(&keys.skill_keys, SKILL_ACTION_KEYS, "Act/skill")?;
     if keys.item_choice {
         return Err("Act/item/prop=-1".into());
     }
@@ -218,6 +237,11 @@ impl QuestCatalog {
                 for item in nx.child_indices(items)? {
                     keys.item_keys.extend(child_names(&nx, item)?);
                     keys.item_choice |= nx.int_child(item, "prop")? == Some(-1);
+                }
+            }
+            if let Some(skills) = path_index(&nx, &format!("Act.img/{id}/1/skill"))? {
+                for skill in nx.child_indices(skills)? {
+                    keys.skill_keys.extend(child_names(&nx, skill)?);
                 }
             }
             match classify(&keys).and_then(|()| template(&nx, id).map_err(|e| e.to_string())) {
@@ -327,6 +351,7 @@ fn template(nx: &NxDataFile, id: i16) -> Result<QuestTemplate, GameDataError> {
         end_quests: prerequisites(nx, end)?,
         start_items: quest_items(nx, &format!("Act.img/{id}/0"))?,
         end_rewards: quest_items(nx, &format!("Act.img/{id}/1"))?,
+        end_skills: quest_skills(nx, &format!("Act.img/{id}/1"))?,
         start_script: script(nx, start, "startscript")?,
         end_script: script(nx, end, "endscript")?,
         exp,
@@ -377,6 +402,34 @@ fn quest_items(nx: &NxDataFile, act: &str) -> Result<Vec<QuestItem>, GameDataErr
             job: nx.int_child(item, "job")?.unwrap_or(0),
             gender: u8::try_from(nx.int_child(item, "gender")?.unwrap_or(2)).unwrap_or(2),
             prop: nx.int_child(item, "prop")?,
+        });
+    }
+    Ok(result)
+}
+
+fn quest_skills(nx: &NxDataFile, act: &str) -> Result<Vec<QuestSkill>, GameDataError> {
+    let Some(skills) = path_index(nx, &format!("{act}/skill"))? else {
+        return Ok(Vec::new());
+    };
+    let mut result = Vec::new();
+    for skill in nx.child_indices(skills)? {
+        let mut jobs = Vec::new();
+        if let Some(list) = nx.child_by_name(skill, "job")? {
+            for job in nx.child_indices(list)? {
+                let name = nx.node_name(job)?;
+                let value = nx
+                    .int_child(list, &name)?
+                    .ok_or_else(|| invalid("non-integer skill job"))?;
+                jobs.push(small(value, "job")?);
+            }
+        }
+        result.push(QuestSkill {
+            skill_id: nx
+                .int_child(skill, "id")?
+                .ok_or_else(|| invalid("skill action without id"))?,
+            level: nx.int_child(skill, "skillLevel")?.unwrap_or(0),
+            master_level: nx.int_child(skill, "masterLevel")?.unwrap_or(0),
+            jobs,
         });
     }
     Ok(result)
@@ -478,6 +531,11 @@ mod tests {
         assert_eq!(classify(&money), Ok(()));
         let start_money = keys(&["npc"], &["npc"], &["money"], &[]);
         assert_eq!(classify(&start_money), Err("Act/0/money".into()));
+        let mut skill = keys(&["npc"], &["npc"], &[], &["skill"]);
+        skill.skill_keys = vec!["id".into(), "masterLevel".into(), "job".into()];
+        assert_eq!(classify(&skill), Ok(()));
+        skill.skill_keys.push("onlyMasterLevel".into());
+        assert_eq!(classify(&skill), Err("Act/skill/onlyMasterLevel".into()));
     }
 
     #[test]
@@ -565,5 +623,26 @@ mod tests {
         assert_eq!(brawler.end_items, [(4031856, 15)]);
         let crystals = &brawler.end_rewards[0];
         assert_eq!((crystals.item_id, crystals.count), (4031856, 0));
+        // Ninja Ambush for either Night Lord or Shadower; 0 is in the job list.
+        let ambush = catalog.quest(6141).unwrap();
+        assert_eq!(
+            ambush.end_skills,
+            [
+                QuestSkill {
+                    skill_id: 4221004,
+                    level: 0,
+                    master_level: 10,
+                    jobs: vec![422, 0]
+                },
+                QuestSkill {
+                    skill_id: 4121004,
+                    level: 0,
+                    master_level: 10,
+                    jobs: vec![412, 0]
+                }
+            ]
+        );
+        assert_eq!(catalog.quest(6800).unwrap().end_skills[0].level, 1);
+        assert!(catalog.quest(6121).is_none());
     }
 }

@@ -3,7 +3,7 @@ use crate::{db::spawn_db, error::RuntimeError, message::FieldMessage};
 use game::{Player, QuestRecord, QuestState, QuestStatus};
 use net::npc_scripts::NpcScript;
 use net::packet::build::world::effect::{self, CharEffect};
-use net::packet::build::world::{drop, inventory, quest, stat};
+use net::packet::build::world::{drop, inventory, quest, skill, stat};
 use net::quests::{self, QuestActionKind, QuestItem, QuestRejection, QuestRequest, QuestTemplate};
 use net::skills;
 use net::FieldRequest;
@@ -178,6 +178,7 @@ impl ClientActor {
         if template.exp > 0 {
             gain_exp(&mut next, template.exp, &mut packets)?;
         }
+        let taught = quests::apply_skills(&template.end_skills, &mut next);
         if !self
             .commit_player(next, Some(QuestChange::Complete(template)), &mut packets)
             .await?
@@ -195,6 +196,9 @@ impl ClientActor {
             follow_up,
         )?);
         packets.push(effect::build_own_effect(CharEffect::QuestClear)?);
+        if !taught.is_empty() {
+            packets.push(skill::build_update_skills(&taught)?);
+        }
         self.send_all(&mut packets).await?;
         let character_id = self.in_game()?.player.id();
         let shown = effect::build_foreign_effect(character_id, CharEffect::QuestClear)?;

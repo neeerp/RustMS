@@ -148,6 +148,16 @@ pub mod keys {
         format!("third_job.{job}.{line}")
     }
 
+    /// The Explorer fourth job. By first job (`warrior`, ...): the Leafre
+    /// instructor's `ask`, `decline`, `trials` (level 120 and the line's
+    /// last quest first), `done` (already a fourth job) and `other`. By
+    /// fourth job (`112`, ...): its `accept`.
+    pub fn fourth_job(job: &str, line: &str) -> String {
+        format!("fourth_job.{job}.{line}")
+    }
+
+    pub const FOURTH_JOB_INVENTORY_FULL: &str = "fourth_job.inventory_full";
+
     /// The Door of Dimension, the Sparkling Crystal back out of the clone's
     /// room, and items that don't fit.
     pub const THIRD_JOB_DOOR_ASK: &str = "third_job.door.ask";
@@ -544,6 +554,9 @@ mod tests {
         assert!(text.contains(&keys::second_job("520", "accept")));
         assert!(text.contains(&keys::third_job("pirate", "instructor.reward")));
         assert!(text.contains(&keys::third_job("521", "accept")));
+        assert!(text.contains(&keys::fourth_job("pirate", "trials")));
+        assert!(text.contains(&keys::fourth_job("522", "accept")));
+        assert!(text.contains(keys::FOURTH_JOB_INVENTORY_FULL));
         assert!(text.contains(&keys::holy_stone_wrong(4, 3)));
         assert!(text
             .get(keys::LEAVE_AREA_WARNING, &[])

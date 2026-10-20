@@ -25,6 +25,7 @@
 #include "../Components/SkillRecommendation.h"
 
 #include "../../Character/SkillId.h"
+#include "../../Character/SpResetRules.h"
 #include "../../Data/JobData.h"
 #include "../../Data/SkillData.h"
 #include "../../Gameplay/Stage.h"
@@ -564,7 +565,9 @@ namespace ms
 		int32_t level = skillbook.get_level(skill_id);
 		int32_t masterlevel = skillbook.get_masterlevel(skill_id);
 
-		if (masterlevel == 0)
+		// A skill with a master level can't be raised until one is taught
+		// (v83 FUN_00a08e05).
+		if (masterlevel == 0 && !sp_reset::has_master_level(skill_id))
 			masterlevel = SkillData::get(skill_id).get_masterlevel();
 
 		if (level >= masterlevel)

@@ -1,7 +1,7 @@
 //! Skill templates (`Skill.nx`), loaded once.
 
 use crate::load::{self, asset_path};
-use game::{BuffStat, Disease, InventoryType, MobStat, Player};
+use game::{BuffStat, Disease, InventoryType, MobStat, Player, SkillRecord};
 use game_data::skills::{SkillData, SkillInfo, SkillLevel};
 use game_data::{FieldTemplate, FIELD_LIMIT_MYSTIC_DOOR, PORTAL_TYPE_START_POINT};
 use std::sync::OnceLock;
@@ -37,6 +37,27 @@ pub fn learned(player: &Player, skill_id: i32) -> Option<Learned> {
         level,
         effect,
     })
+}
+
+/// What a new fourth job is taught at the advancement: each of `job`'s
+/// skills with a `masterLevel`, at level 0 and that master level. The rest
+/// are hidden until a quest or a book teaches them.
+pub fn fourth_job_skills(job: i16) -> Vec<SkillRecord> {
+    let Ok(data) = data() else {
+        return Vec::new();
+    };
+    data.job_skills(job.into())
+        .unwrap_or_default()
+        .into_iter()
+        .filter_map(|skill_id| data.info(skill_id).ok().flatten())
+        .filter(|info| info.master_level > 0)
+        .map(|info| SkillRecord {
+            skill_id: info.skill_id,
+            level: 0,
+            master_level: info.master_level,
+            expiration: None,
+        })
+        .collect()
 }
 
 /// What the v83 client heals on its own at rest (FUN_0083007f), before the
@@ -924,7 +945,25 @@ pub fn buffs(skill: &Learned) -> Option<Vec<(BuffStat, i32)>> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use game::SkillRecord;
+
+    #[test]
+    fn fourth_jobs_are_taught_the_skills_with_a_master_level() {
+        let taught = |job| {
+            let mut ids: Vec<_> = fourth_job_skills(job)
+                .into_iter()
+                .inspect(|record| assert_eq!((record.level, record.master_level), (0, 10)))
+                .map(|record| record.skill_id)
+                .collect();
+            ids.sort();
+            ids
+        };
+        assert_eq!(taught(112), [1120004, 1121001, 1121008]);
+        assert_eq!(taught(232), [2321001, 2321002, 2321005]);
+        assert_eq!(taught(412), [4120002, 4120005, 4121006]);
+        assert_eq!(taught(512), [5121001, 5121002, 5121007, 5121009]);
+        assert_eq!(taught(522), [5220001, 5220002, 5220011, 5221004]);
+        assert!(taught(111).is_empty());
+    }
 
     #[test]
     fn mystic_door_opens_away_from_towns_and_portals_and_leads_to_town() {

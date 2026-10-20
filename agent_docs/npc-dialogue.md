@@ -95,8 +95,7 @@ examiner's map at the portal upstream uses (`Effect::WarpToPortal`). With the
 proof, the instructor shows a menu of the line's second jobs; each choice
 describes the job and asks, and yes takes the proof and applies
 `Effect::TakeSecondJob` (`Player::take_second_job`: 1 SP and the job's extra
-max HP or MP) and a row more in the Etc bag. The fourth job is not
-scripted yet.
+max HP or MP) and a row more in the Etc bag.
 
 The third job (`THIRD_JOBS`), also after Cosmic, starts with a level-70
 second job's chief in El Nath (Tylus 2020008, Robeira 2020009, Rene
@@ -122,6 +121,18 @@ Upstream tracks the steps in quest records the client data lacks; here
 they are script markers (`Effect::Mark`/`Unmark`), Started records at
 `quest::SCRIPT_MARKERS` (32000) and up that are saved with the quests but
 never sent to the client.
+
+The fourth job (`FOURTH_JOBS`) is one talk with the line's instructor in
+Leafre's 240010501 (Harmonia 2081100, Gritto 2081200, Legor 2081300, Hellin
+2081400, Samuel 2081500), once a third job is level 120 and has completed
+the line's last quest (6904, 6914, 6924, 6934, 6944; see
+[quests](./quests.md)). Yes gives the Maple Hero skill book (2280003, as
+Cosmic does; refused with nothing changed if the Use bag is full) and
+applies `Effect::TakeFourthJob` (`Player::take_fourth_job`: 3 SP, 5 AP and
+the second job's max HP or MP again). It also teaches, at level 0 and
+their master level, the new job's skills whose `Skill.nx` node has a
+`masterLevel` (`net::skills::fourth_job_skills`), in one UPDATE_SKILLS.
+The other fourth-job skills are taught by quests and mastery books.
 
 Kyrin's second jobs are client-driven quests instead (see
 [quests](./quests.md)): How to become a Brawler (2191) and How to Become a

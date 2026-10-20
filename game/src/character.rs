@@ -536,6 +536,31 @@ impl Player {
         self.dirty = true;
     }
 
+    /// Whether this third-job Explorer may take the fourth job `job` that
+    /// follows it (e.g. a 111 may become a 112): level 120.
+    pub fn can_take_fourth_job(&self, job: i16) -> bool {
+        let stats = &self.stats;
+        job % 10 == 2
+            && second_job_rules(job - 2).is_some()
+            && stats.job == job - 1
+            && stats.level >= 120
+    }
+
+    /// Become a fourth-job `job`: 3 SP, 5 AP and the second job's max HP/MP
+    /// bonus again. The job's skills are taught apart from this.
+    pub fn take_fourth_job(&mut self, job: i16) {
+        let Some((hp, mp)) = second_job_rules(job - 2) else {
+            return;
+        };
+        let stats = &mut self.stats;
+        stats.job = job;
+        stats.sp = stats.sp.saturating_add(3);
+        stats.ap = stats.ap.saturating_add(5);
+        stats.max_hp = stats.max_hp.saturating_add(hp).min(MAX_HP_MP);
+        stats.max_mp = stats.max_mp.saturating_add(mp).min(MAX_HP_MP);
+        self.dirty = true;
+    }
+
     /// Spend one AP on `stat`, which for max HP or MP adds the job's growth
     /// plus `skill_bonus`, what the player's skills add to it. Returns false,
     /// changing nothing, without AP or once the stat is at its cap.
@@ -922,6 +947,37 @@ mod tests {
         for job in [111, 131, 211, 221, 231, 311, 321, 411, 421, 511, 521] {
             (player.stats.job, player.stats.sp) = (job - 1, 0);
             assert!(player.can_take_third_job(job), "{job}");
+        }
+    }
+
+    #[test]
+    fn third_jobs_take_the_next_job_at_120() {
+        let mut player = player();
+        (
+            player.stats.job,
+            player.stats.level,
+            player.stats.sp,
+            player.stats.ap,
+        ) = (211, 119, 7, 0);
+        assert!(!player.can_take_fourth_job(212), "level 120");
+        player.stats.level = 120;
+        assert!(player.can_take_fourth_job(212), "SP may be left");
+        assert!(!player.can_take_fourth_job(222), "another job");
+        assert!(!player.can_take_fourth_job(211), "not a fourth job");
+
+        let max = (player.stats.max_hp, player.stats.max_mp);
+        player.take_fourth_job(212);
+        assert_eq!(player.stats.job, 212);
+        assert_eq!((player.stats.sp, player.stats.ap), (10, 5));
+        assert_eq!(
+            (player.stats.max_hp, player.stats.max_mp),
+            (max.0, max.1 + 475)
+        );
+        assert!(!player.can_take_fourth_job(212), "only once");
+
+        for job in [112, 122, 132, 222, 232, 312, 322, 412, 422, 512, 522] {
+            player.stats.job = job - 1;
+            assert!(player.can_take_fourth_job(job), "{job}");
         }
     }
 
