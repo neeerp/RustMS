@@ -13,6 +13,12 @@ namespace ms::item_properties
 	// Any other item's flag for trading once more.
 	constexpr int16_t BUNDLE_KARMA = 0x02;
 
+	// Whether Scissors of Karma were used on the item `item_id` with `flags`, so it may trade once more.
+	inline bool karma(int32_t item_id, int16_t flags)
+	{
+		return flags & (item_id / 1000000 == 1 ? EQUIP_KARMA : BUNDLE_KARMA);
+	}
+
 	constexpr const char *KARMA_HINT = "#cYou can enable 1 time of trading when you use the Scissors of Karma.#";
 
 	// What an item's info node says about it.

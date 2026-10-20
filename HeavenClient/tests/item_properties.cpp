@@ -11,6 +11,7 @@ int main()
 {
 	try
 	{
+		using namespace ms;
 		using namespace ms::item_properties;
 
 		Info info;
@@ -59,6 +60,11 @@ int main()
 				spilled.second == "Unique Equipped Item, Time limit extension is not possible.",
 			"the rest join the second line");
 		require(equip(unique, 0, false).second == "Unique Equipped Item", "no expiry, no extension line");
+
+		require(item_properties::karma(1032031, EQUIP_KARMA) && !item_properties::karma(1032031, BUNDLE_KARMA),
+			"equip karma bit");
+		require(item_properties::karma(2210005, BUNDLE_KARMA) && !item_properties::karma(2210005, EQUIP_KARMA),
+			"bundle karma bit");
 
 		require(with_karma_hint("").find("#c") == 0, "hint alone");
 		require(with_karma_hint("A ring.") == std::string("A ring.\\n") + KARMA_HINT, "hint on its own line");

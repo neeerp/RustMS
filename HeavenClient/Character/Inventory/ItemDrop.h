@@ -145,5 +145,12 @@ namespace ms
 
 			return nullptr;
 		}
+
+		// Whether the storage keeper lists an item to store (FUN_007c6e3a).
+		// Account items are what storage is for, and Karma lets the rest in.
+		inline bool storable(const Traits &item)
+		{
+			return !item.cash && (!item.quest || item.karma) && (!item.untradeable || item.karma);
+		}
 	}
 }

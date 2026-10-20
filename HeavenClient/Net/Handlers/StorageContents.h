@@ -15,6 +15,9 @@ namespace ms
 		{
 			int32_t itemid;
 			int16_t count;
+			int16_t flags = 0;
+			// It has a Cash Shop serial.
+			bool cash = false;
 		};
 
 		// What a TRUNK_RESULT carries. A bag it leaves out keeps its items,
@@ -32,9 +35,9 @@ namespace ms
 		{
 			int8_t type = recv.read_byte();
 			Stored item = { recv.read_int(), 1 };
-			bool cash = recv.read_bool();
+			item.cash = recv.read_bool();
 
-			if (cash)
+			if (item.cash)
 				recv.skip_long();
 
 			recv.skip_long(); // expiration
@@ -44,8 +47,8 @@ namespace ms
 			case 1:
 				recv.skip(2 + 15 * 2); // upgrade slots, level, stats
 				recv.skip_string();
-				recv.skip_short(); // flag
-				recv.skip(cash ? 10 : 18);
+				item.flags = recv.read_short();
+				recv.skip(item.cash ? 10 : 18);
 				recv.skip(12);
 				break;
 			case 3:
@@ -55,7 +58,7 @@ namespace ms
 			default:
 				item.count = recv.read_short();
 				recv.skip_string();
-				recv.skip_short(); // flag
+				item.flags = recv.read_short();
 
 				if (item.itemid / 10000 == 207 || item.itemid / 10000 == 233)
 					recv.skip(8);

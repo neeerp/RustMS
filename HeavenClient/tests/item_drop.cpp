@@ -73,6 +73,13 @@ int main()
 		pquest.karma = true;
 		require(unsellable(pquest) == UNAVAILABLE, "party quest items stay even with Karma");
 
+		require(storable(plain) && storable(account) && storable(karma), "storage takes account and Karma items");
+		require(!storable(quest) && !storable(bound), "but not quest or untradeable ones without Karma");
+		Traits cash;
+		cash.cash = true;
+		cash.karma = true;
+		require(!storable(cash), "nor cash items");
+
 		require(asks_count(4000000, 10), "a stack of Snail Shells asks how many");
 		require(asks_count(2000000, 20), "a stack of potions asks how many");
 		require(asks_count(3010000, 2), "a stack of chairs asks how many");
