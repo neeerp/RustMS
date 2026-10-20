@@ -55,8 +55,8 @@ namespace ms
 	protected:
 		virtual void handle_buff(InPacket& recv, Buffstat::Id stat) const = 0;
 
-		// Riding's bit, after the other stats (report 201).
-		virtual void handle_ride(InPacket& recv, const BuffParser::Flags& flags) const = 0;
+		// Energy Charge's and riding's bits, after the other stats (reports 194, 201).
+		virtual void handle_two_state(InPacket& recv, const BuffParser::Flags& flags) const = 0;
 	};
 
 	// Notifies the client that a buff was applied to the player
@@ -65,7 +65,7 @@ namespace ms
 	{
 	protected:
 		void handle_buff(InPacket& recv, Buffstat::Id stat) const override;
-		void handle_ride(InPacket& recv, const BuffParser::Flags& flags) const override;
+		void handle_two_state(InPacket& recv, const BuffParser::Flags& flags) const override;
 	};
 
 	// Notifies the client that a buff was canceled
@@ -74,7 +74,7 @@ namespace ms
 	{
 	protected:
 		void handle_buff(InPacket& recv, Buffstat::Id stat) const override;
-		void handle_ride(InPacket& recv, const BuffParser::Flags& flags) const override;
+		void handle_two_state(InPacket& recv, const BuffParser::Flags& flags) const override;
 	};
 
 	// Force a stat recalculation

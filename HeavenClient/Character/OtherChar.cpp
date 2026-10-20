@@ -23,6 +23,7 @@
 #include "../Constants.h"
 #include "../Gameplay/Combat/FlashJump.h"
 #include "../Gameplay/Stage.h"
+#include "../IO/UITypes/EnergyBarLayout.h"
 
 namespace ms
 {
@@ -106,6 +107,10 @@ namespace ms
 			// One spawned on a mount is on it at once (0x983cdd).
 			if (stat == Buffstat::Id::MONSTER_RIDING)
 				ride(value, init);
+
+			// The glow is Energy Charge's for the character's line (0x94b44b).
+			if (stat == Buffstat::Id::ENERGY_CHARGE)
+				show_energy(job / 1000 == 1 ? 15100004 : 5110001, value >= energy_bar::FULL, init);
 		}
 
 		show_diseases();
@@ -122,6 +127,9 @@ namespace ms
 
 			if (stat == Buffstat::Id::MONSTER_RIDING)
 				ride(0, false);
+
+			if (stat == Buffstat::Id::ENERGY_CHARGE)
+				show_energy(0, false, false);
 		}
 
 		show_diseases();

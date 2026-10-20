@@ -121,9 +121,29 @@ int main()
 		Writer g;
 		g.zeros(15).put<int32_t>(1932000).put<int32_t>(5221006).zeros(5).put<int16_t>(0);
 		InPacket own(g.bytes.data(), g.bytes.size());
-		BuffParser::Ride got = BuffParser::read_two_state(own, riding);
+		BuffParser::Ride got = BuffParser::read_two_state(own, riding).ride;
 		require(got.vehicle == 1932000 && got.skill == 5221006, "the mount and the skill riding it");
 		require(own.read_short() == 0 && !own.available(), "and the delay follows");
+
+		// SPAWN_PLAYER: the energy, first of the two-state stats, as the server always writes them.
+		BuffParser::Flags charged{ 0, 0 };
+		charged.set(BuffParser::ENERGY);
+		Writer h;
+		h.flags(charged).zeros(2).put<int32_t>(4500).put<int32_t>(5110001).zeros(7).put<int16_t>(0);
+		InPacket energy(h.bytes.data(), h.bytes.size());
+		shown = BuffParser::parse_shown(energy, BuffParser::read_flags(energy));
+		require(shown.size() == 1 && shown[0].first == Buffstat::ENERGY_CHARGE && shown[0].second == 4500,
+				"a character shows its energy");
+		require(energy.read_short() == 0 && !energy.available(), "the energy's data takes 15 bytes");
+
+		// GIVE_BUFF: the energy and the skill charging it.
+		Writer k;
+		k.put<int32_t>(10000).put<int32_t>(15100004).zeros(7).put<int16_t>(0);
+		InPacket full(k.bytes.data(), k.bytes.size());
+		BuffParser::TwoState state = BuffParser::read_two_state(full, charged);
+		require(state.energy == 10000 && state.energy_skill == 15100004 && state.ride.vehicle == 0,
+				"a full gauge and Thunder Breaker's Energy Charge");
+		require(full.read_short() == 0 && !full.available(), "and the delay follows");
 
 		std::cout << "Buff parser passed\n";
 		return 0;

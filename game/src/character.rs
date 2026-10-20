@@ -147,6 +147,8 @@ pub struct FieldAvatar {
     pub chalkboard: Option<String>,
     /// The effect item (501xxxx or 429xxxx) the player shows, or 0.
     pub item_effect: i32,
+    /// Energy Charge's gauge, as `Buffs::energy`.
+    pub energy: Option<ShownBuff>,
     /// The tamed monster the player rides, if any.
     pub ride: Option<Ride>,
     /// The player's mount's level, EXP and tiredness, which every player
@@ -383,6 +385,7 @@ impl Player {
                 .collect(),
             chalkboard: self.chalkboard.clone(),
             item_effect: self.item_effect,
+            energy: self.buffs.energy(),
             ride: self.ride(),
             mount: self.mount,
         }

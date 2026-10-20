@@ -83,6 +83,7 @@ namespace ms
 		settings.emplace<PosSYSTEMOPTION>();
 		settings.emplace<PosCHARINFO>();
 		settings.emplace<PosQUESTHELPER>();
+		settings.emplace<PosENERGYBAR>();
 		settings.emplace<MiniMapType>();
 		settings.emplace<MiniMapSimpleMode>();
 		settings.emplace<MiniMapDefaultHelpers>();

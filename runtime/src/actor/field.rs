@@ -2108,6 +2108,7 @@ mod tests {
             pets: Vec::new(),
             chalkboard: None,
             item_effect: 0,
+            energy: None,
             ride: None,
             mount: game::Mount::default(),
         }

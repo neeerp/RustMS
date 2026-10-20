@@ -1,5 +1,6 @@
 use crate::combat::{self, AttackKind};
 use crate::combo;
+use crate::energy;
 use crate::error::NetworkError;
 use crate::handler::{
     FieldRequest, HandlerResult, WorldAction, WorldContext, WorldHandler, WorldResult,
@@ -217,6 +218,7 @@ impl WorldHandler for AttackHandler {
         }
         let broadcast = combat::build_attack(ctx.player.id(), &attack, skill_level, projectile)?;
         let combo = combo::after_attack(ctx.player, &attack, rand::random());
+        let energy = energy::after_attack(ctx.player, &attack);
         let skill = attack.skill;
         let hits = attack
             .hits
@@ -247,6 +249,9 @@ impl WorldHandler for AttackHandler {
         }
         if let Some(value) = combo {
             result = set_combo(ctx.player, value, now, result)?;
+        }
+        if let Some(value) = energy {
+            result = set_energy(ctx.player, value, now, result)?;
         }
         if let Some(stun) = stun {
             let stunned = catch_disease(ctx.player, stun, now)?;
@@ -285,6 +290,26 @@ pub(super) fn set_combo(
         .with(WorldAction::BuffsChanged(buff::build_give_foreign_buff(
             player.id(),
             &shown,
+        )?)))
+}
+
+/// Energy Charge's gauge filled to `value`: the player's gauge shows it,
+/// and the others see the glow once it is full.
+fn set_energy(
+    player: &mut Player,
+    value: i16,
+    now: Instant,
+    result: HandlerResult<WorldAction>,
+) -> WorldResult {
+    energy::charge(player, value, now);
+    let Some(gauge) = player.buffs.energy() else {
+        return Ok(result);
+    };
+    Ok(result
+        .with_reply(buff::build_give_energy(gauge)?)
+        .with(WorldAction::BuffsChanged(buff::build_give_foreign_energy(
+            player.id(),
+            gauge,
         )?)))
 }
 

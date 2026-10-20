@@ -266,6 +266,8 @@ if(HEAVENCLIENT_BUILD_TESTS)
     add_test(NAME medal_tag_layout COMMAND medal_tag_layout_tests)
     add_executable(mob_gage_layout_tests tests/mob_gage_layout.cpp)
     add_test(NAME mob_gage_layout COMMAND mob_gage_layout_tests)
+    add_executable(energy_bar_layout_tests tests/energy_bar_layout.cpp)
+    add_test(NAME energy_bar_layout COMMAND energy_bar_layout_tests)
     add_executable(ships_tests tests/ships.cpp)
     add_test(NAME ships COMMAND ships_tests)
     add_executable(field_clock_tests tests/field_clock.cpp)
@@ -716,6 +718,9 @@ add_executable(HeavenClient
     IO/UITypes/MobGageLayout.h
     IO/UITypes/UIMobGage.cpp
     IO/UITypes/UIMobGage.h
+    IO/UITypes/EnergyBarLayout.h
+    IO/UITypes/UIEnergyBar.cpp
+    IO/UITypes/UIEnergyBar.h
     IO/UITypes/EnterNumber.h
     IO/UITypes/UINotice.cpp
     IO/UITypes/UINotice.h

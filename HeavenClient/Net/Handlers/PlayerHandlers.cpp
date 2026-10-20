@@ -34,6 +34,8 @@
 #include "../../IO/UITypes/UIBuffList.h"
 #include "../../IO/UITypes/UICashShop.h"
 #include "../../IO/UITypes/UIChatBar.h"
+#include "../../IO/UITypes/EnergyBarLayout.h"
+#include "../../IO/UITypes/UIEnergyBar.h"
 #include "../../IO/UITypes/UIMonsterBook.h"
 #include "../../IO/UITypes/UINotice.h"
 #include "../../IO/UITypes/UISkillBook.h"
@@ -221,8 +223,8 @@ namespace ms
 		for (uint8_t bit : BuffParser::given(flags))
 			handle_buff(recv, Buffstat::by_bit(bit));
 
-		if (flags.has(BuffParser::RIDING))
-			handle_ride(recv, flags);
+		if (flags.has(BuffParser::ENERGY) || flags.has(BuffParser::RIDING))
+			handle_two_state(recv, flags);
 
 		Stage::get().get_player().recalc_stats();
 		// Giving and cancelling buffs check the alert's quests again too (FUN_00a202be, FUN_00a2071f).
@@ -260,12 +262,25 @@ namespace ms
 			bufflist->add_buff(skillid, bs, duration);
 	}
 
-	// The player got on a mount (0xa202be). The two-state stats' data follows the defense attack and state.
-	void ApplyBuffHandler::handle_ride(InPacket& recv, const BuffParser::Flags& flags) const
+	// The player's energy changed, or they got on a mount (0xa202be). The two-state stats' data follows the
+	// defense attack and state.
+	void ApplyBuffHandler::handle_two_state(InPacket& recv, const BuffParser::Flags& flags) const
 	{
 		recv.skip(2);
 
-		BuffParser::Ride ride = BuffParser::read_two_state(recv, flags);
+		BuffParser::TwoState state = BuffParser::read_two_state(recv, flags);
+
+		// An energy of 0 takes the gauge down (0x95f065).
+		if (flags.has(BuffParser::ENERGY))
+		{
+			UIEnergyBar::show(state.energy);
+			Stage::get().get_player().show_energy(state.energy_skill, state.energy >= energy_bar::FULL, false);
+		}
+
+		if (!flags.has(BuffParser::RIDING))
+			return;
+
+		BuffParser::Ride ride = state.ride;
 		Stage::get().get_player().change_ride(ride.vehicle);
 
 		// Space Dash shows no icon.
@@ -276,9 +291,18 @@ namespace ms
 			bufflist->add_buff(ride.skill, Buffstat::MONSTER_RIDING, INT32_MAX);
 	}
 
-	// The player got off (0xa2071f).
-	void CancelBuffHandler::handle_ride(InPacket&, const BuffParser::Flags&) const
+	// The player's energy ran out, or they got off (0xa2071f).
+	void CancelBuffHandler::handle_two_state(InPacket&, const BuffParser::Flags& flags) const
 	{
+		if (flags.has(BuffParser::ENERGY))
+		{
+			UIEnergyBar::show(0);
+			Stage::get().get_player().show_energy(0, false, false);
+		}
+
+		if (!flags.has(BuffParser::RIDING))
+			return;
+
 		Stage::get().get_player().change_ride(0);
 
 		if (auto bufflist = UI::get().get_element<UIBuffList>())

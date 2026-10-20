@@ -47,6 +47,8 @@ namespace ms
 		// The stats HeavenClient keeps among those set.
 		std::vector<Buffstat::Id> stats(const Flags& flags);
 
+		// Energy Charge, a two-state stat: its data is the energy and the skill charging it (report 194).
+		constexpr uint8_t ENERGY = 82;
 		// Riding, a two-state stat: its data is the mount and the skill riding it (0x793ef2).
 		constexpr uint8_t RIDING = 85;
 
@@ -56,8 +58,16 @@ namespace ms
 			int32_t skill;
 		};
 
-		// The two-state stats' data, which follows the defense attack and state: riding's, if set.
-		Ride read_two_state(InPacket& recv, const Flags& flags);
+		struct TwoState
+		{
+			int32_t energy;
+			int32_t energy_skill;
+			Ride ride;
+		};
+
+		// The two-state stats' data, which follows the defense attack and state: the energy's and riding's,
+		// if set.
+		TwoState read_two_state(InPacket& recv, const Flags& flags);
 
 		// The stats another character shows, and each one's value (FUN_00788156),
 		// as SPAWN_PLAYER and GIVE_FOREIGN_BUFF carry them: their data, the
