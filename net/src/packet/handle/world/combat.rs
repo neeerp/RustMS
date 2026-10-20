@@ -445,6 +445,9 @@ impl WorldHandler for TakeDamageHandler {
             updates.push(StatUpdate::Meso(player.meso));
         }
         let mut actions = HandlerResult::reply(stat::build_stat_update(false, &updates)?);
+        if taken.hp > 0 && player.ride_skill() == Some(game::mount::BATTLESHIP) {
+            actions = super::mount::hit_battleship(player, taken.hp, actions)?;
+        }
         let hurt = mob::Hurt {
             from,
             damage,

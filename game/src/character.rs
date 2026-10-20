@@ -355,9 +355,14 @@ impl Player {
         Some(riding.skill_id)
     }
 
-    /// What the player rides: the mount worn, while they ride it.
+    /// What the player rides: the Battleship, or else the mount worn,
+    /// while they ride it.
     pub fn ride(&self) -> Option<Ride> {
         let skill_id = self.ride_skill()?;
+        if skill_id == crate::mount::BATTLESHIP {
+            let item_id = crate::mount::BATTLESHIP_VEHICLE;
+            return Some(Ride { item_id, skill_id });
+        }
         let item_id = self
             .inventory
             .get(InventoryType::Equipped, equip_slot::MOUNT)?

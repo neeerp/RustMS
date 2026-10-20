@@ -294,13 +294,27 @@ pub(crate) fn write_ride(p: &mut Packet, ride: Option<Ride>) -> Result<(), Netwo
     Ok(())
 }
 
-/// GIVE_BUFF for riding: the player gets on their mount. A two-state stat
-/// has no value, skill and duration of its own: its data follows the
-/// defense bytes, and riding moves the player, so one more byte ends it.
-pub fn build_give_ride(ride: Ride) -> Result<Packet, NetworkError> {
+/// GIVE_BUFF for riding: the player gets on their mount, with the normal
+/// `stats` the ride gives for `duration_ms` (Battleship's defense). A
+/// two-state stat has no value, skill and duration of its own: its data
+/// follows the defense bytes, and riding moves the player, so one more
+/// byte ends it.
+pub fn build_give_ride(
+    ride: Ride,
+    duration_ms: i32,
+    stats: &[(BuffStat, i16)],
+) -> Result<Packet, NetworkError> {
+    let mut stats = stats.to_vec();
+    stats.sort_by_key(|&(stat, _)| stat.bit());
     let mut p = Packet::new_empty();
     p.write_short(SendOpcode::GiveBuff as i16)?;
-    write_mask(&mut p, [BuffStat::Riding.bit()])?;
+    let bits = stats.iter().map(|&(stat, _)| stat.bit());
+    write_mask(&mut p, bits.chain([BuffStat::Riding.bit()]))?;
+    for &(_, value) in &stats {
+        p.write_short(value)?;
+        p.write_int(ride.skill_id)?;
+        p.write_int(duration_ms)?;
+    }
     p.write_byte(0)?; // defense attack
     p.write_byte(0)?; // defense state
     write_ride(&mut p, Some(ride))?;
@@ -663,7 +677,7 @@ mod tests {
             item_id: 1902000,
             skill_id: 1004,
         };
-        let packet = build_give_ride(ride).unwrap();
+        let packet = build_give_ride(ride, 0, &[]).unwrap();
         let mut expect = Expect::new(&packet.bytes);
         expect.short(SendOpcode::GiveBuff as i16);
         expect.long(1 << 53).long(0);
@@ -685,6 +699,25 @@ mod tests {
         let mut expect = Expect::new(&packet.bytes);
         expect.short(SendOpcode::CancelBuff as i16);
         expect.long(1 << 53).long(0).byte(1);
+        expect.end();
+    }
+
+    #[test]
+    fn the_battleship_gives_its_defense_before_the_ride() {
+        let ride = Ride {
+            item_id: 1932000,
+            skill_id: 5221006,
+        };
+        let stats = [(BuffStat::Mdd, 100), (BuffStat::Pdd, 90)];
+        let packet = build_give_ride(ride, 5000, &stats).unwrap();
+        let mut expect = Expect::new(&packet.bytes);
+        expect.short(SendOpcode::GiveBuff as i16);
+        expect.long(1 << 53).long((1 << 33) | (1 << 35));
+        expect.short(90).int(5221006).int(5000);
+        expect.short(100).int(5221006).int(5000);
+        expect.byte(0).byte(0);
+        expect.int(1932000).int(5221006).byte(0).int(0);
+        expect.short(0).byte(0);
         expect.end();
     }
 

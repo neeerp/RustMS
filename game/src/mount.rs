@@ -29,6 +29,24 @@ pub const RIDER_SKILLS: [i32; 4] = [1004, 10001004, 20001004, 20011004];
 /// ends it (Cosmic gives it `Integer.MAX_VALUE` ms).
 pub const RIDE_DURATION: Duration = Duration::from_millis(i32::MAX as u64);
 
+/// Battleship, the Corsair's ship: ridden like a mount, whatever is worn,
+/// and worn down by the hits the player takes rather than tired.
+pub const BATTLESHIP: i32 = 5221006;
+
+/// The vehicle Battleship rides, which both client and server know without
+/// the skill's data saying so.
+pub const BATTLESHIP_VEHICLE: i32 = 1932000;
+
+/// The id SKILL_COOLDOWN carries the ship's HP under (v83 FUN_0095be66).
+pub const BATTLESHIP_HP: i32 = 5221999;
+
+/// The ship's HP for a character's level and skill level: the client's
+/// `(level - 120 + 2 * slv) * 200` (FUN_007665f1), floored at level 120
+/// as Cosmic does, and kept to the u16 SKILL_COOLDOWN carries.
+pub fn battleship_max_hp(level: i32, slv: i32) -> i32 {
+    (400 * slv + 200 * (level - 120).max(0)).min(i32::from(u16::MAX))
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Mount {
     pub level: i32,
@@ -80,6 +98,14 @@ impl Mount {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_battleship_holds_more_for_its_level_and_skill() {
+        assert_eq!(battleship_max_hp(120, 1), 400);
+        assert_eq!(battleship_max_hp(150, 10), 10_000);
+        assert_eq!(battleship_max_hp(200, 10), 20_000);
+        assert_eq!(battleship_max_hp(100, 1), 400);
+    }
 
     #[test]
     fn tires_by_one_until_it_has_had_enough() {

@@ -695,7 +695,20 @@ field limit 0x200 (`keep_mounts_off`). The mount and saddle, and their
 cash covers, can't be moved while riding. Not done: Cosmic's explorer and
 Cygnus restrictions on who may equip which mount, getting the skill and
 the Hog (quest 6002's `skill` act and the Tame Pig maps), event mounts,
-Battleship, and HeavenClient's side.
+and HeavenClient's side.
+
+Battleship (5221006, report 228) is a ride too, on the vehicle 1932000
+whatever is worn (`Player::ride`), with no mount or saddle needed
+(`use_skill::board`). Its GIVE_BUFF puts the skill's weapon and magic
+defense before the ride's block (`build_give_ride` with stats), and
+SKILL_COOLDOWN under the id 5221999 follows with the ship's HP, which the
+client shows on the buff icon: `400 * slv + 200 * (level - 120)`
+(`mount::battleship_max_hp`). Each hit the player takes in HP comes off
+the ship too (`mount::hit_battleship`), and the ship keeps its damage
+between rides (`Buffs::battleship_hp`, not saved). At 0 it sinks: the
+skill's 90 s cooldown starts, which boarding doesn't, and the player is put
+off it. The ship never tires. Not done: refusing the ship's own attacks
+off it, and other attacks on it, which the client already does.
 
 ### Morphs
 

@@ -291,6 +291,9 @@ pub struct Buffs {
     pub assassinate: Option<(i32, Instant)>,
     /// The mob Homing Beacon marked, until the player leaves the map.
     pub beacon: Option<Beacon>,
+    /// What is left of the Battleship's HP. It stays damaged between rides
+    /// and is whole again once the ship was destroyed (`None`).
+    pub battleship_hp: Option<i32>,
 }
 
 /// A mob Homing Beacon or Bullseye marked: the skill and the mob's object
@@ -399,7 +402,10 @@ impl Buffs {
                 match buff.stat {
                     BuffStat::Poison => tick.poison += i32::from(buff.value),
                     BuffStat::DragonBlood => tick.blood += i32::from(buff.value),
-                    BuffStat::Riding => tick.tire += 1,
+                    // The ship wears down by its hits instead.
+                    BuffStat::Riding => {
+                        tick.tire += i32::from(buff.skill_id != crate::mount::BATTLESHIP)
+                    }
                     _ => tick.heal += i32::from(buff.value),
                 }
                 buff.next_tick = Some(at + interval);
