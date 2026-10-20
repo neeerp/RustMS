@@ -5,7 +5,8 @@
 //! v83's client never reads a card's `rate` or `time`, and no packet starts
 //! or ends one: the server multiplies kill EXP and drops while a card in the
 //! Cash inventory is unexpired and the clock is inside one of its windows.
-//! Nor does it read Hunter's Luck's `expBuff`; it only shows the buff's icon.
+//! Nor does it read Hunter's Luck's `expBuff`, Holy Symbol's or Meso Up's
+//! `x`; it only shows the buffs' icons.
 
 use game::{BuffStat, InventoryType, Player};
 use std::sync::OnceLock;
@@ -49,15 +50,29 @@ pub fn exp(player: &Player, now: SystemTime) -> f64 {
     world().exp * card(player, EXP_CARDS, now) * buff
 }
 
+/// How much more EXP Holy Symbol (2311003) gives `player` from a kill: its
+/// `x` percent when the kill is `shared` with their party, a fifth of that
+/// alone (Cosmic, whose `USE_FULL_HOLY_SYMBOL` is off).
+pub fn holy_symbol(player: &Player, shared: bool) -> f64 {
+    let percent = player.buffs.value(BuffStat::HolySymbol).unwrap_or(0);
+    let share = if shared { 100.0 } else { 500.0 };
+    1.0 + f64::from(percent) / share
+}
+
 /// How much likelier each of `player`'s drops is at `now`.
 pub fn drop(player: &Player, now: SystemTime) -> f64 {
     world().drop * card(player, DROP_CARDS, now)
 }
 
 /// How many more mesos each of `player`'s meso drops holds at `now`. A drop
-/// card doubles these too (5360000's description).
+/// card doubles these too (5360000's description), and Meso Up (4111001)
+/// makes them its `x` percent (Cosmic's dropFromMonster).
 pub fn meso(player: &Player, now: SystemTime) -> f64 {
-    world().meso * card(player, DROP_CARDS, now)
+    let meso_up = player
+        .buffs
+        .value(BuffStat::MesoUp)
+        .map_or(1.0, |percent| f64::from(percent) / 100.0);
+    world().meso * card(player, DROP_CARDS, now) * meso_up
 }
 
 /// The best rate of the `kind` cards `player` holds that work at `now`; cards
@@ -164,5 +179,29 @@ mod tests {
             player.inventory.add_alone(Item::stack(5211060, 1)).unwrap();
             assert_eq!(exp(&player, now), 6.0 * world().exp);
         }
+    }
+
+    fn buffed(skill_id: i32, stat: BuffStat, value: i16) -> Player {
+        let mut player = crate::codec::stats::sample_player();
+        let lasts = Duration::from_secs(120);
+        let buff = game::Buff::new(skill_id, stat, value, std::time::Instant::now(), lasts);
+        player.buffs.give(buff);
+        player
+    }
+
+    #[test]
+    fn holy_symbol_gives_its_percent_in_a_party_and_a_fifth_alone() {
+        let player = buffed(2311003, BuffStat::HolySymbol, 50);
+        assert_eq!(holy_symbol(&player, true), 1.5);
+        assert_eq!(holy_symbol(&player, false), 1.1);
+        let plain = crate::codec::stats::sample_player();
+        assert_eq!(holy_symbol(&plain, true), 1.0);
+    }
+
+    #[test]
+    fn meso_up_makes_meso_drops_its_percent() {
+        let now = at(1_792_269_000);
+        let player = buffed(4111001, BuffStat::MesoUp, 150);
+        assert_eq!(meso(&player, now), 1.5 * world().meso);
     }
 }

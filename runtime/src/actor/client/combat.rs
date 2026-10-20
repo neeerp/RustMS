@@ -8,8 +8,9 @@ use net::packet::handle::world::{death_penalty, warp};
 impl ClientActor {
     /// This player helped kill a mob, or shares in a party member's kill:
     /// credit their share of its EXP times the world's and their cards'
-    /// rates, half of it while cursed (Cosmic). v83 has no line for a rate,
-    /// so the gain shows as plain EXP.
+    /// rates and Holy Symbol's, half of it while cursed (Cosmic). v83 has no
+    /// line for a rate, so the gain shows as plain EXP. A party bonus means
+    /// the kill was shared.
     pub(super) async fn mob_killed(
         &mut self,
         _mob_id: i32,
@@ -17,7 +18,8 @@ impl ClientActor {
         party_bonus: i32,
     ) -> Result<(), RuntimeError> {
         let mut next = self.in_game()?.player.clone();
-        let rate = net::rates::exp(&next, std::time::SystemTime::now());
+        let rate = net::rates::exp(&next, std::time::SystemTime::now())
+            * net::rates::holy_symbol(&next, party_bonus > 0);
         let scale = |exp: i32| (f64::from(exp) * rate).round().min(f64::from(i32::MAX)) as i32;
         let (exp, party_bonus) = (scale(exp), scale(party_bonus));
         let (exp, party_bonus) = if next.buffs.has(game::BuffStat::Curse) {
