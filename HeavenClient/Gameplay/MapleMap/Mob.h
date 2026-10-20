@@ -38,6 +38,7 @@
 #include "../Combat/MagicDamage.h"
 
 #include "../../Audio/Audio.h"
+#include "../../Character/Beacon.h"
 #include "../../Net/Handlers/Helpers/MobStatParser.h"
 #include "../../Graphics/EffectLayer.h"
 #include "../../Graphics/Geometry.h"
@@ -110,6 +111,8 @@ namespace ms
 			bool dead;
 			// Dark Sight keeps physical attacks off.
 			bool darksight;
+			// The mob the player's Homing Beacon marked.
+			beacon::Mark guided;
 		};
 
 		// Tell the mob where the local player is, whom it chases with aggro
@@ -585,6 +588,8 @@ namespace ms
 		};
 
 		std::vector<StatusEffect> statuseffects;
+		// The skill whose mark is on the mob, which no status takes off.
+		int32_t marked = 0;
 
 		EffectLayer effects;
 		// Hit effects on the current frame's head, and those left at a point

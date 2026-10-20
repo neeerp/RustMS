@@ -181,6 +181,16 @@ int main()
 				"Speed Infusion's speed, skill and seconds");
 		require(infusion.read_short() == 0 && !infusion.available(), "and the delay follows");
 
+		// GIVE_BUFF: Homing Beacon's 17 bytes, the skill and the mob it marked.
+		BuffParser::Flags guided{ 0, 0 };
+		guided.set(BuffParser::GUIDED);
+		Writer r;
+		r.put<int32_t>(1).put<int32_t>(5211006).zeros(5).put<int32_t>(1000123).put<int16_t>(0);
+		InPacket beacon(r.bytes.data(), r.bytes.size());
+		BuffParser::Beacon got_beacon = BuffParser::read_two_state(beacon, guided).beacon;
+		require(got_beacon.skill == 5211006 && got_beacon.mob == 1000123, "the beacon's skill and mob");
+		require(beacon.read_short() == 0 && !beacon.available(), "and the delay follows");
+
 		std::cout << "Buff parser passed\n";
 		return 0;
 	}

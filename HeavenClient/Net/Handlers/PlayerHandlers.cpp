@@ -228,7 +228,7 @@ namespace ms
 			handle_buff(recv, Buffstat::by_bit(bit));
 
 		if (flags.has(BuffParser::ENERGY) || flags.has(BuffParser::DASH_SPEED) || flags.has(BuffParser::DASH_JUMP) ||
-			flags.has(BuffParser::RIDING) || flags.has(BuffParser::INFUSION))
+			flags.has(BuffParser::RIDING) || flags.has(BuffParser::INFUSION) || flags.has(BuffParser::GUIDED))
 			handle_two_state(recv, flags);
 
 		Stage::get().get_player().recalc_stats();
@@ -308,6 +308,10 @@ namespace ms
 				bufflist->add_buff(infusion.skill, Buffstat::SPEED_INFUSION, duration);
 		}
 
+		// Homing Beacon marks its mob, with no icon (0x7b24ee).
+		if (flags.has(BuffParser::GUIDED))
+			Stage::get().get_player().set_beacon({ state.beacon.skill, state.beacon.mob });
+
 		if (!flags.has(BuffParser::RIDING))
 			return;
 
@@ -350,6 +354,9 @@ namespace ms
 			if (auto bufflist = UI::get().get_element<UIBuffList>())
 				bufflist->cancel_buff(Buffstat::SPEED_INFUSION);
 		}
+
+		if (flags.has(BuffParser::GUIDED))
+			Stage::get().get_player().set_beacon({});
 
 		if (!flags.has(BuffParser::RIDING))
 			return;

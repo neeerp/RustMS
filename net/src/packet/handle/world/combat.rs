@@ -1,3 +1,4 @@
+use crate::beacon;
 use crate::charge;
 use crate::combat::{self, AttackKind};
 use crate::combo;
@@ -223,6 +224,7 @@ impl WorldHandler for AttackHandler {
         let energy = energy::after_attack(ctx.player, &attack);
         let spent = charge::after_attack(ctx.player, &attack, rand::random());
         let pockets = skills::pickpocket(ctx.player, &attack, rand::random);
+        let beacon = beacon::after_attack(ctx.player, &attack);
         let skill = attack.skill;
         let hits = attack
             .hits
@@ -260,6 +262,13 @@ impl WorldHandler for AttackHandler {
         }
         if let Some(charge) = spent {
             result = end_charge(ctx.player, charge, result)?;
+        }
+        if let Some((replaced, beacon)) = beacon {
+            // A new mark doesn't take the old one off its mob (0xa20607).
+            if replaced.is_some() {
+                result = result.with_reply(buff::build_cancel_buff(&[BuffStat::GuidedBullet])?);
+            }
+            result = result.with_reply(buff::build_give_beacon(beacon)?);
         }
         if let Some(stun) = stun {
             let stunned = catch_disease(ctx.player, stun, now)?;

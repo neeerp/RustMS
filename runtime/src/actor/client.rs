@@ -603,6 +603,7 @@ impl ClientActor {
         self.leave_trade().await?;
         self.leave_personal_shop().await?;
         self.keep_mounts_off(map_id).await?;
+        self.drop_beacon().await?;
         self.send_to_field(FieldMessage::Leave {
             client_id: self.client_id,
         })

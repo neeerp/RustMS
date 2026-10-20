@@ -1048,6 +1048,12 @@ namespace ms
 		// Berserk, as the player last turned it on.
 		blow.berserk = berserk;
 
+		// Bullseye on the mob Homing Beacon marked, for any attack (FUN_0078dea6).
+		attack.marked = guided.mob;
+
+		if (skillbook.get_level(beacon::BULLSEYE) > 0)
+			attack.bullseye = skill_stats(skillbook, beacon::BULLSEYE).x;
+
 		blow.blind = has_buff(Buffstat::Id::DARKNESS);
 
 		return attack;
@@ -1354,6 +1360,16 @@ namespace ms
 	int32_t Player::get_berserk() const
 	{
 		return berserk;
+	}
+
+	void Player::set_beacon(beacon::Mark mark)
+	{
+		guided = mark;
+	}
+
+	beacon::Mark Player::get_beacon() const
+	{
+		return guided;
 	}
 
 	void Player::change_skill(int32_t skill_id, int32_t skill_level, int32_t masterlevel, int64_t expiration)

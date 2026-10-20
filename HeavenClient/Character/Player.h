@@ -20,6 +20,7 @@
 #include <cstdint>
 
 #include "ActiveBuffs.h"
+#include "Beacon.h"
 #include "Diseases.h"
 #include "BuddyList.h"
 #include "Guild.h"
@@ -176,6 +177,10 @@ namespace ms
 		void update_berserk(bool reset);
 		// The damage percent Berserk adds, 0 while it is off.
 		int32_t get_berserk() const;
+
+		// Homing Beacon marked a mob, or the mark came off.
+		void set_beacon(beacon::Mark mark);
+		beacon::Mark get_beacon() const;
 
 		// The diseases on the player.
 		disease::State get_diseases() const;
@@ -434,6 +439,8 @@ namespace ms
 		int32_t energy = 0;
 		// Berserk's damage percent while it is on, else 0 (+0x372c).
 		int32_t berserk = 0;
+		// Homing Beacon's mark (+0xcc8 of the temporary stats).
+		beacon::Mark guided;
 
 		move_path::Recorder path;
 

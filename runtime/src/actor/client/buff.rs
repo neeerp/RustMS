@@ -318,6 +318,16 @@ impl ClientActor {
         self.end_buff(skill_id).await
     }
 
+    /// A beacon's mark goes with the map: the next map's mobs reuse its
+    /// object ids (Cosmic's PlayerMapTransitionHandler).
+    pub(super) async fn drop_beacon(&mut self) -> Result<(), RuntimeError> {
+        if self.in_game_mut()?.player.buffs.beacon.take().is_none() {
+            return Ok(());
+        }
+        self.send(&mut buff::build_cancel_buff(&[BuffStat::GuidedBullet])?)
+            .await
+    }
+
     /// The player's own client learns their mount's state when they come
     /// in wearing one (Cosmic's PlayerLoggedinHandler).
     pub(super) async fn show_mount(&mut self) -> Result<(), RuntimeError> {
