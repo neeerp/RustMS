@@ -641,11 +641,12 @@ namespace ms
 			return critical;
 		}
 
-		// Whether a hit is critical. Blizzard, Shadow Meso and Assassinate
-		// have their own.
-		inline bool critical(const Critical &critical, int32_t skill, double roll)
+		// Whether a hit is critical. Blizzard, Shadow Meso and Assassinate's
+		// first strike have their own; Assassinate's second takes its rate and
+		// damage from the skill (0x790100).
+		inline bool critical(const Critical &critical, int32_t skill, double roll, bool second_strike = false)
 		{
-			if (skill == 3211003 || skill == 4111004 || skill == 4221001)
+			if (skill == 3211003 || skill == 4111004 || (skill == 4221001 && !second_strike))
 				return false;
 
 			if (critical.rate <= 0 || critical.damage <= 0 || !critical.source)
@@ -698,6 +699,9 @@ namespace ms
 			int32_t partner = 0;
 			// Whether the player is in Darkness.
 			bool blind = false;
+			// What Assassinate multiplies each line by, from how long the
+			// player was in Dark Sight; 1 for anything else.
+			int32_t stealth = 1;
 		};
 
 		// A hit from its raw value, before the monster's guards, with a

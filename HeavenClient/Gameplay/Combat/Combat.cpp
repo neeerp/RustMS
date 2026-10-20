@@ -17,6 +17,7 @@
 //////////////////////////////////////////////////////////////////////////////////
 #include "Combat.h"
 
+#include "Assassinate.h"
 #include "ChainLightning.h"
 #include "Combo.h"
 #include "DamageLayout.h"
@@ -173,6 +174,7 @@ namespace ms
 		now += Constants::TIMESTEP;
 		update_prepare();
 		update_final_attack();
+		update_second_strike();
 		update_remote_prepares();
 		update_grenades();
 		update_rains();
@@ -354,6 +356,9 @@ namespace ms
 			return false;
 
 		if (!field_limit::may_attack(mapinfo.get_fieldlimit(), move.get_id()))
+			return false;
+
+		if (assassinate::refused(move.get_id(), player.has_buff(Buffstat::Id::DARKSIGHT)))
 			return false;
 
 		SpecialMove::ForbidReason reason = player.can_use(move);
@@ -937,7 +942,8 @@ namespace ms
 		return targets;
 	}
 
-	void Combat::apply_move(const SpecialMove &move, int32_t charge, bool held, const Follow *follow)
+	void Combat::apply_move(const SpecialMove &move, int32_t charge, bool held, const Follow *follow,
+							std::optional<int32_t> again)
 	{
 		if (move.is_attack() || follow)
 		{
@@ -987,10 +993,27 @@ namespace ms
 				attack = player.prepare_attack(0, true);
 			}
 
+			// Assassinate's first strike shows Dark Sight going, and ends
+			// it before the attack goes out; its second shows `special`
+			// instead of its effect (0x951a20).
+			bool assassinates = move.get_id() == assassinate::ID;
+
+			if (assassinates && !again)
+			{
+				get_skill(assassinate::DARK_SIGHT).apply_useeffects(player);
+				CancelBuffPacket(assassinate::DARK_SIGHT).dispatch();
+			}
+
 			// A held skill's shots keep the body as it is (0x954165). A
 			// Final Attack shows no effect of its own (0x9519ac).
-			if (!held && !follow)
+			if (again)
+			{
+				show_player_special(assassinate::ID);
+				get_skill(assassinate::ID).play_use2();
+			} else if (!held && !follow)
+			{
 				move.apply_useeffects(player);
+			}
 
 			// A finisher bursts with the orbs it spends (0x934725).
 			if (combo::finisher(move.get_id()))
@@ -1000,6 +1023,10 @@ namespace ms
 			{
 				player.end_attack();
 				player.attack(false, follow->stance);
+			} else if (again)
+			{
+				player.end_attack();
+				player.attack("assassinationS");
 			} else if (whack != Stance::Id::NONE)
 			{
 				player.attack(true, whack);
@@ -1016,6 +1043,24 @@ namespace ms
 				flags = point_blank::MORTAL_BLOW_FLAG;
 
 			attack.display |= flags;
+
+			// Both strikes build up in Dark Sight; the second hits once, and
+			// crits with the skill's rate and damage (0x790100).
+			if (assassinates)
+			{
+				int32_t level = player.get_skills().get_level(assassinate::ID);
+				const SkillData::Stats &stats = SkillData::get(assassinate::ID).get_stats(level);
+				attack.blow.stealth = assassinate::multiplier(player.since_dark_sight(), stats.time);
+
+				if (again)
+				{
+					auto rate = static_cast<int32_t>(std::lround(stats.chance * 100));
+					attack.hitcount = 1;
+					attack.display |= assassinate::SECOND_STRIKE;
+					attack.blow.critical = physical_damage::sharpen({ rate, stats.criticaldamage, true },
+																	player.get_buff_value(Buffstat::Id::SHARP_EYES));
+				}
+			}
 
 			// A Final Attack reaches as its stance's regular attack does, and
 			// after Slash Blast it says so (0x952949).
@@ -1176,7 +1221,17 @@ namespace ms
 						mobcount = stats.mobcount;
 				}
 
-				mob_targets = find_targets(mob_objs, range, origin, mobcount, closest_first);
+				// The second strike hits the first's mob if it's still in reach,
+				// or swings at nothing.
+				if (again)
+				{
+					for (int32_t oid : find_targets(mob_objs, range, origin, UINT8_MAX, false))
+						if (oid == *again)
+							mob_targets.push_back(oid);
+				} else
+				{
+					mob_targets = find_targets(mob_objs, range, origin, mobcount, closest_first);
+				}
 			}
 
 			mobs.send_attack(result, attack, mob_targets, mobcount);
@@ -1216,7 +1271,20 @@ namespace ms
 
 			AttackPacket(result, player.get_position()).dispatch();
 
-			if (attack.skill && attack.type != Attack::Type::MAGIC && !held && !follow)
+			// The first strike strikes again an attack delay later if it found
+			// a mob (0x952bda).
+			if (assassinates && !again)
+			{
+				second_strike.reset();
+
+				if (!mob_targets.empty())
+				{
+					int32_t weapon = final_attack::weapon_type(player.get_look().get_equips().get_weapon());
+					second_strike = SecondStrike{ mob_targets[0], weapon, now + player.get_attackdelay(0) };
+				}
+			}
+
+			if (attack.skill && attack.type != Attack::Type::MAGIC && !held && !follow && !again)
 				roll_final_attack(attack.skill);
 		} else
 		{
@@ -1352,6 +1420,41 @@ namespace ms
 		Follow follow = { stances[random.next_int(stances.size())], due.trigger };
 
 		apply_move(get_skill(due.skill), 0, false, &follow);
+	}
+
+	void Combat::update_second_strike()
+	{
+		if (!second_strike || now < second_strike->at)
+			return;
+
+		SecondStrike due = *second_strike;
+		second_strike.reset();
+
+		int32_t weapon = player.get_look().get_equips().get_weapon();
+
+		if (final_attack::weapon_type(weapon) != due.weapon || player.get_skills().get_level(assassinate::ID) <= 0)
+			return;
+
+		if (!player.can_attack(true) || !Stage::get().may_dash())
+			return;
+
+		// It dashes its `lt.x` forward, onto the nearest floor.
+		const PhysicsObject &phobj = player.get_phobj();
+		uint16_t group = phobj.fhgroup;
+		auto clear = [&](Point<int16_t> from, Point<int16_t> to)
+		{
+			return !shot_path::blocked(from, to, find_platforms(from, to), group);
+		};
+
+		int32_t dx = player.getflip() ? 1 : -1;
+		std::optional<teleport::Spot> spot = teleport::destination(player.get_position(), phobj.fhid, dx, 0,
+																	 assassinate::DASH, find_floors(), clear);
+
+		if (!spot)
+			return;
+
+		apply_move(get_skill(assassinate::ID), 0, false, nullptr, due.oid);
+		Stage::get().dash(*spot);
 	}
 
 	bool Combat::swing_at_reactor()
@@ -1678,7 +1781,14 @@ namespace ms
 
 			// A grenade going off moves no one, and has its own effect
 			// (0x980712).
-			if (!prepare::throws(attack.skill))
+			// Assassinate's second strike shows no effect, and has its own
+			// action.
+			bool second_strike = attack.skill == assassinate::ID && (attack.display & assassinate::SECOND_STRIKE);
+
+			if (second_strike)
+			{
+				user.attack("assassinationS");
+			} else if (!prepare::throws(attack.skill))
 			{
 				move.apply_useeffects(user);
 

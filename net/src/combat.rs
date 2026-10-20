@@ -56,6 +56,11 @@ const SNIPE_MOST: i32 = 199_999;
 /// Stun Mastery, which crits on a stunned monster.
 const STUN_MASTERY: i32 = 5110000;
 
+/// Assassinate strikes twice from Dark Sight; the client marks the second
+/// strike with bit 0x20 of `display` (v83 0x952956).
+pub const ASSASSINATE: i32 = 4221001;
+pub const SECOND_STRIKE: u8 = 0x20;
+
 /// Skills sent as shots that fire no ammo (the v83 client's FUN_007667ee).
 const AMMO_FREE: [i32; 12] = [
     4111004,  // Shadow Meso
@@ -81,7 +86,8 @@ pub struct Attack {
     pub skill: i32,
     pub mob_count: u8,
     pub hit_count: u8,
-    /// Flags: bit 0 marks a Final Attack after Slash Blast (0x952949).
+    /// Flags: bit 0 marks a Final Attack after Slash Blast (0x952949), bit
+    /// 0x20 Assassinate's second strike.
     pub display: u8,
     /// The action, with the facing in the top bit (v83 0x952974: `action &
     /// 0x7fff | left << 15`).
@@ -297,8 +303,9 @@ pub fn max_base_damage(player: &Player, attack: &Attack) -> i32 {
 }
 
 /// The most a critical adds to a hit, in percent of it (FUN_0078df87): the
-/// weapon's critical skill for a shot or a punch, then Sharp Eyes as the
-/// server gives it, then Stun Mastery's whole damage, as the monster may be
+/// weapon's critical skill for a shot or a punch, or Assassinate's own
+/// `criticalDamage` for its second strike, then Sharp Eyes as the server
+/// gives it, then Stun Mastery's whole damage, as the monster may be
 /// stunned.
 fn critical_bonus(player: &Player, attack: &Attack) -> i32 {
     let shot = attack.kind == AttackKind::Ranged;
@@ -322,6 +329,10 @@ fn critical_bonus(player: &Player, attack: &Attack) -> i32 {
         _ => 0,
     };
     let mut damage = skills::learned(player, source).map_or(0, |skill| skill.effect.damage);
+    if second_strike(attack) {
+        damage =
+            skills::learned(player, ASSASSINATE).map_or(0, |skill| skill.effect.critical_damage);
+    }
     let sharp_eyes = buff(player, BuffStat::SharpEyes);
     if sharp_eyes > 0 {
         damage = if damage == 0 { 100 } else { damage } + (sharp_eyes & 0xFF);
@@ -441,10 +452,25 @@ pub enum AttackRejection {
     NoOrbs,
 }
 
+/// Whether this is Assassinate's second strike.
+pub fn second_strike(attack: &Attack) -> bool {
+    attack.skill == ASSASSINATE && attack.display & SECOND_STRIKE != 0
+}
+
+/// How many times Assassinate multiplies its strikes at most: once more
+/// for every 3 seconds in Dark Sight, up to its `time` (0x79028f).
+fn assassinate_most(skill: &Learned) -> i32 {
+    skill.effect.duration / 3 + 1
+}
+
 /// The MP a skill's attack spends: none for Heal, whose USE_SKILL paid,
-/// or for Final Attack.
-pub fn attack_mp_cost(skill: &Learned) -> i32 {
-    if skill.skill_id == skills::HEAL || skills::FINAL_ATTACKS.contains(&skill.skill_id) {
+/// for Final Attack, or for Assassinate's second strike, as the client
+/// paid for both strikes on the key press (0x966f7a).
+pub fn attack_mp_cost(skill: &Learned, attack: &Attack) -> i32 {
+    if skill.skill_id == skills::HEAL
+        || skills::FINAL_ATTACKS.contains(&skill.skill_id)
+        || second_strike(attack)
+    {
         0
     } else {
         skill.effect.mp_cost
@@ -536,13 +562,16 @@ pub fn validate(attack: &Attack, player: &Player) -> Result<Uses, AttackRejectio
                 return Err(AttackRejection::Skill);
             }
             50 * effect.x
+        } else if skill.skill_id == ASSASSINATE {
+            let percent = damage_percent(&skill).ok_or(AttackRejection::Skill)?;
+            cap_for(percent).saturating_mul(assassinate_most(&skill))
         } else if let Some(percent) = damage_percent(&skill) {
             cap_for(percent)
         } else {
             return Err(AttackRejection::Skill);
         };
         hp = skills::hp_cost(player, &skill).ok_or(AttackRejection::NotEnoughHp)?;
-        if i32::from(player.stats.mp) < attack_mp_cost(&skill) {
+        if i32::from(player.stats.mp) < attack_mp_cost(&skill, attack) {
             return Err(AttackRejection::NotEnoughMp);
         }
         mesos = meso_cost(&skill, player);
@@ -551,6 +580,8 @@ pub fn validate(attack: &Attack, player: &Player) -> Result<Uses, AttackRejectio
         }
         let hit_count = match attack.kind {
             AttackKind::Ranged => effect.bullet_count,
+            // Assassinate's second strike hits once (0x950dc4).
+            _ if second_strike(attack) => 1,
             _ => effect.attack_count,
         };
         // Final Attack hits one mob, but after Slash Blast as many as it
@@ -1413,6 +1444,52 @@ mod tests {
         // ceil((3.6 * 150 + 30 + 60) / 100 * 27) = 171; v83's window shows 170.
         player.stats.job = 420;
         assert_eq!(max_base_damage(&player, &basic), 171);
+    }
+
+    #[test]
+    fn assassinate_multiplies_its_strikes_and_crits_on_the_second() {
+        if skills::data().is_err() {
+            return;
+        }
+        let mut player = beginner_with_sword();
+        player.inventory.insert(
+            InventoryType::Equipped,
+            equip_slot::WEAPON,
+            Item::equipment(
+                1332000,
+                EquipStats {
+                    watk: 27,
+                    ..EquipStats::default()
+                },
+            ),
+        );
+        (player.stats.str, player.stats.dex, player.stats.luk) = (30, 60, 150);
+        player.stats.job = 422;
+        player.stats.mp = 40;
+        learn(&mut player, ASSASSINATE, 30);
+        let strike = |player: &Player, display, damage| {
+            let mut attack =
+                parse_close_attack(&skill_attack_packet(ASSASSINATE, 1, damage)).unwrap();
+            attack.display = display;
+            validate(&attack, player).map(|uses| attack_mp_cost(&uses.skill.unwrap(), &attack))
+        };
+        // Twice 171 at 600%, five times over for 12 seconds in Dark Sight.
+        assert_eq!(strike(&player, 0, 10_260), Ok(40));
+        assert_eq!(strike(&player, 0, 10_261), Err(AttackRejection::Damage));
+        // The second strike may crit for 250% and costs nothing.
+        player.stats.mp = 0;
+        assert_eq!(strike(&player, SECOND_STRIKE, 12_825), Ok(0));
+        assert_eq!(
+            strike(&player, SECOND_STRIKE, 12_826),
+            Err(AttackRejection::Damage)
+        );
+        assert_eq!(strike(&player, 0, 1), Err(AttackRejection::NotEnoughMp));
+        let mut twice = parse_close_attack(&skill_attack_packet(ASSASSINATE, 1, 1)).unwrap();
+        (twice.display, twice.hit_count) = (SECOND_STRIKE, 2);
+        assert_eq!(
+            validate(&twice, &player).err(),
+            Some(AttackRejection::TooManyTargets)
+        );
     }
 
     #[test]

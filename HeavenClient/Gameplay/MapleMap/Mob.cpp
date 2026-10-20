@@ -19,6 +19,7 @@
 #include "Layer.h"
 #include "SummonRules.h"
 
+#include "../Combat/Assassinate.h"
 #include "../Combat/Heal.h"
 #include "../Combat/HitPoint.h"
 #include "../Combat/MesoExplosion.h"
@@ -2265,7 +2266,8 @@ namespace ms
 		if (blow.stunned.source && status_value(MobStatParser::STUN))
 			critical = stun(critical, blow.stunned.rate, blow.stunned.damage);
 
-		bool iscritical = physical_damage::critical(critical, attack.skill, randomizer.next_real(1.0));
+		bool second_strike = attack.display & assassinate::SECOND_STRIKE;
+		bool iscritical = physical_damage::critical(critical, attack.skill, randomizer.next_real(1.0), second_strike);
 		damage = scaled(damage, static_cast<int32_t>(damage), blow.scale, blow.combo, iscritical, critical.damage);
 
 		// Sacrifice goes through a Power Guard Up.
@@ -2282,6 +2284,9 @@ namespace ms
 			damage = first.first * blow.partner / 100;
 			iscritical = first.second;
 		}
+
+		// Assassinate builds up in Dark Sight (0x79028f).
+		damage *= blow.stealth;
 
 		// A held skill hits harder the longer it was charged (0x79048c).
 		damage = prepare::charge_percent(attack.skill, attack.charge) * damage * 0.01;

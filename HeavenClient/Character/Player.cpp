@@ -1130,10 +1130,18 @@ namespace ms
 	{
 		buffs[buff.stat] = buff;
 
+		if (buff.stat == Buffstat::Id::DARKSIGHT)
+			dark_sight_at = now_ms();
+
 		if (buff.stat == Buffstat::Id::COMBO)
 			show_combo(buff.value - 1, false);
 
 		show_diseases();
+	}
+
+	int64_t Player::since_dark_sight() const
+	{
+		return dark_sight_at < 0 ? -1 : now_ms() - dark_sight_at;
 	}
 
 	void Player::cancel_buff(Buffstat::Id stat)

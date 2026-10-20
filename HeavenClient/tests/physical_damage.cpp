@@ -143,6 +143,7 @@ int main()
 
 		require(critical({ 50, 200, true }, 0, 0.49) && !critical({ 50, 200, true }, 0, 0.5), "a critical");
 		require(!critical({ 50, 200, false }, 0, 0.0) && !critical({ 50, 200, true }, 4221001, 0.0), "none");
+		require(critical({ 50, 200, true }, 4221001, 0.0, true), "Assassinate's second strike crits");
 
 		require(near(barrage(100, 5121007, 4), 200) && near(barrage(100, 15111004, 5), 400) && near(barrage(100, 5121007, 3), 100), "Barrage");
 

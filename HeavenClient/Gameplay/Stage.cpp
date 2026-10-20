@@ -741,6 +741,19 @@ namespace ms
 		return true;
 	}
 
+	bool Stage::may_dash() const
+	{
+		return !pending_teleport;
+	}
+
+	void Stage::dash(teleport::Spot spot)
+	{
+		// Element 8 marks the dash in the path, from where the player
+		// stands until it lands on the next update.
+		player.record_move(8);
+		pending_teleport = Teleport{ spot.position, spot.foothold };
+	}
+
 	// v83 checks a Teleport skill against the map and any pending move
 	// before it looks for where to go (FUN_00957b74).
 	void Stage::use_teleport(int32_t skill)

@@ -110,6 +110,38 @@ impl WorldHandler for NpcActionHandler {
     }
 }
 
+/// How long after Dark Sight is cancelled Assassinate may still strike: the
+/// client cancels it just before the first strike.
+const DARK_SIGHT_GRACE: Duration = Duration::from_secs(1);
+
+/// How long Assassinate's second strike may follow the first: the attack's
+/// delay, which is under 2 seconds, and some latency (0x957977).
+const SECOND_STRIKE_WITHIN: Duration = Duration::from_millis(2500);
+
+/// Whether an attack may go as far as Assassinate is concerned. Its first
+/// strike needs Dark Sight, running or just cancelled, and readies the
+/// second, which must follow soon on the first strike's mob, once.
+fn assassinate(attack: &combat::Attack, player: &mut Player, now: Instant) -> bool {
+    if attack.skill != combat::ASSASSINATE {
+        return true;
+    }
+    let buffs = &mut player.buffs;
+    if combat::second_strike(attack) {
+        let Some((mob, by)) = buffs.assassinate.take() else {
+            return false;
+        };
+        return now <= by && attack.hits.iter().all(|hit| hit.object_id == mob);
+    }
+    let hidden = buffs.has(BuffStat::DarkSight)
+        || (buffs.dark_sight_cancelled.take())
+            .is_some_and(|at| now.saturating_duration_since(at) <= DARK_SIGHT_GRACE);
+    if hidden {
+        buffs.assassinate =
+            (attack.hits.first()).map(|hit| (hit.object_id, now + SECOND_STRIKE_WITHIN));
+    }
+    hidden
+}
+
 /// `CLOSE_RANGE_ATTACK`, `RANGED_ATTACK`, and `MAGIC_ATTACK`: a swing, a
 /// shot, or a spell.
 pub struct AttackHandler(pub AttackKind);
@@ -117,6 +149,11 @@ pub struct AttackHandler(pub AttackKind);
 impl WorldHandler for AttackHandler {
     fn handle(&self, packet: &mut Packet, ctx: &mut WorldContext) -> WorldResult {
         let attack = combat::parse_attack(packet, self.0)?;
+        let now = Instant::now();
+        if !assassinate(&attack, ctx.player, now) {
+            debug!(display = attack.display, "Assassinate refused");
+            return Ok(HandlerResult::empty());
+        }
         let uses = match combat::validate(&attack, ctx.player) {
             Ok(uses) => uses,
             Err(rejection) => {
@@ -140,7 +177,6 @@ impl WorldHandler for AttackHandler {
         });
         // A skill with a cooltime, as Snipe, can't attack again until it is
         // over, and the client hears how long.
-        let now = Instant::now();
         let cooldown = uses.skill.as_ref().map_or(0, |skill| skill.effect.cooldown);
         let stun = uses.skill.as_ref().and_then(skills::self_stun);
         if cooldown > 0 {
@@ -153,7 +189,7 @@ impl WorldHandler for AttackHandler {
         }
         if let Some(skill) = uses.skill {
             let mut updates = vec![StatUpdate::Mp(
-                ctx.player.add_mp(-combat::attack_mp_cost(&skill)),
+                ctx.player.add_mp(-combat::attack_mp_cost(&skill, &attack)),
             )];
             if uses.hp > 0 {
                 updates.push(StatUpdate::Hp(ctx.player.add_hp(-uses.hp)));
@@ -795,6 +831,82 @@ mod tests {
     use super::*;
     use crate::packet::op::RecvOpcode;
     use packet::io::write::PktWrite;
+
+    #[test]
+    fn assassinate_strikes_from_dark_sight_then_once_more_on_its_mob() {
+        let mut player = crate::codec::stats::sample_player();
+        let now = Instant::now();
+        let strike = |display, object_id| combat::Attack {
+            kind: AttackKind::Close,
+            skill: combat::ASSASSINATE,
+            mob_count: 1,
+            hit_count: 1,
+            display,
+            action: 0,
+            speed: 4,
+            charge: 0,
+            ammo_slot: 0,
+            hits: vec![combat::AttackHit {
+                object_id,
+                damage: vec![1],
+            }],
+            explosion: None,
+        };
+        let (first, second) = (strike(0, 7), strike(combat::SECOND_STRIKE, 7));
+        assert!(!assassinate(&first, &mut player, now));
+        assert!(!assassinate(&second, &mut player, now));
+
+        // Dark Sight was cancelled just before the first strike.
+        player.buffs.dark_sight_cancelled = Some(now);
+        assert!(assassinate(
+            &first,
+            &mut player,
+            now + Duration::from_millis(900)
+        ));
+        assert!(!assassinate(
+            &strike(combat::SECOND_STRIKE, 8),
+            &mut player,
+            now
+        ));
+        // Refused once, the second strike is gone.
+        assert!(!assassinate(&second, &mut player, now));
+
+        player.buffs.dark_sight_cancelled = Some(now);
+        assert!(!assassinate(
+            &first,
+            &mut player,
+            now + Duration::from_secs(2)
+        ));
+        player.buffs.give(Buff::new(
+            4001003,
+            BuffStat::DarkSight,
+            1,
+            now,
+            Duration::from_secs(60),
+        ));
+        assert!(assassinate(&first, &mut player, now));
+        assert!(!assassinate(
+            &second,
+            &mut player,
+            now + Duration::from_secs(3)
+        ));
+        assert!(assassinate(&first, &mut player, now));
+        assert!(assassinate(
+            &second,
+            &mut player,
+            now + Duration::from_secs(1)
+        ));
+        assert!(!assassinate(
+            &second,
+            &mut player,
+            now + Duration::from_secs(1)
+        ));
+        // Other attacks pass.
+        let mut swing = strike(0, 7);
+        swing.skill = 0;
+        player.buffs = Default::default();
+        assert!(assassinate(&swing, &mut player, now));
+    }
 
     fn touch(damage: i32, mob_id: i32) -> Packet {
         hit(FROM_TOUCH, damage, mob_id)

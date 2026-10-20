@@ -66,6 +66,9 @@ namespace ms
 			int32_t x = 0;
 			// A third, as how much a charge's element counts.
 			int32_t z = 0;
+			// What a critical of the skill's own does, in percent of the
+			// hit, as Assassinate's second strike.
+			int32_t criticaldamage = 0;
 			// The mesos the skill takes, and the item and how many of it.
 			int32_t mesocost = 0;
 			int32_t itemcost = 0;

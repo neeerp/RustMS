@@ -177,6 +177,17 @@ attack packet with the Final Attack's id and level, costs no MP (the
 Cygnus ones have an `mpCon` for their buff), and hits one mob, except that
 after Slash Blast (bit 0 of the attack's flags) it reaches as many as the
 player's Slash Blast does (`skills::slash_blast`).
+Assassinate (4221001) goes only from Dark Sight, and in Dark Sight nothing
+else goes. The client sends CANCEL_BUFF for Dark Sight, then a 3-line
+strike; an attack delay later, if that found a mob, it strikes that mob
+again with one line, bit 0x20 of the attack's flags set, and dashes 100 px
+forward (a movement element 8 holds where it started). Every line of both
+strikes is multiplied by one more for each 3 seconds since Dark Sight was
+given, up to the skill's `time`, and only the second strike crits, with the
+skill's `prop` and `criticalDamage`. The server takes MP once, for the
+first strike, allows it within a second of cancelling Dark Sight, caps a
+line at the most the time can multiply it by, and takes a second strike
+only on the first's mob within 2.5 s (`net::combat::second_strike`).
 HeavenClient sends a skill as the attack v83's `CUserLocal::DoActiveSkill`
 makes it, whatever the weapon: a swing, a shot, or a spell
 (`SkillData::flags_of`). Any other skill goes out as SPECIAL_MOVE. Skills

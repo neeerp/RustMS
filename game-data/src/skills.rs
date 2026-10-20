@@ -73,6 +73,9 @@ pub struct SkillLevel {
     pub jump: i32,
     /// A chance in percent, e.g. Power Stance's (`prop`).
     pub prop: i32,
+    /// What a critical does, in percent of the hit (`criticalDamage`), as
+    /// Assassinate's second strike.
+    pub critical_damage: i32,
     /// An item each use costs, and how many (`itemCon`, `itemConNo`), as
     /// Shadow Partner's Summoning Rock.
     pub item_cost: i32,
@@ -174,6 +177,7 @@ impl SkillData {
                     eva: int("eva")?,
                     jump: int("jump")?,
                     prop: int("prop")?,
+                    critical_damage: int("criticalDamage")?,
                     item_cost: int("itemCon")?,
                     item_cost_count: int("itemConNo")?,
                     money_cost: int("moneyCon")?,
@@ -314,6 +318,15 @@ mod tests {
         let lucky_seven = data.info(4001344).unwrap().unwrap().levels[19].clone();
         assert_eq!((lucky_seven.bullet_count, lucky_seven.damage), (2, 150));
         let avenger = data.info(4111005).unwrap().unwrap().levels[29].clone();
+        let assassinate = data.info(4221001).unwrap().unwrap().levels[29].clone();
+        assert_eq!(
+            (
+                assassinate.duration,
+                assassinate.prop,
+                assassinate.critical_damage
+            ),
+            (12, 90, 250)
+        );
         assert_eq!((avenger.bullet_count, avenger.bullet_consume), (1, 3));
 
         let bless = data.info(2301004).unwrap().unwrap().levels[19].clone();
