@@ -498,7 +498,9 @@ namespace ms
 			// (FUN_00431783 at 0x94b7ba).
 			mist::Hurt hurt;
 
-			if (mists.hurt_at(player.get_position(), hurt))
+			// Less the job's resistance to its element (0x94b7f2).
+			if (mists.hurt_at(player.get_position(), hurt) &&
+				(hurt.damage = mist::resisted(hurt.damage, player.resists(mist::resisted_as(hurt.code >> 8)))) > 0)
 			{
 				player.show_damage(hurt.damage);
 				TakeDamagePacket(hurt.element, hurt.damage, hurt.code).dispatch();

@@ -1089,11 +1089,7 @@ namespace ms
 	{
 		// A magic attack with an element is resisted by the job's resistance
 		// skill (0x9583fa).
-		int32_t resist = 0;
-
-		if (attack.magic)
-			if (int32_t skill = mob_damage::resistance_skill(stats.get_stat(MapleStat::Id::JOB), attack.element))
-				resist = skill_stats(skillbook, skill).x;
+		int32_t resist = attack.magic ? resists(attack.element) : 0;
 
 		int32_t damage = stats.calculate_damage(attack, randomizer.next_real(1.0), randomizer.next_real(1.0),
 												 get_buff_value(Buffstat::Id::INVINCIBLE), resist);
@@ -1655,6 +1651,13 @@ namespace ms
 		InChatMessage(monster ? Messages::Type::RIDING_MONSTER : Messages::Type::RIDING_VEHICLE).drop();
 
 		return true;
+	}
+
+	int32_t Player::resists(int32_t element) const
+	{
+		int32_t skill = mob_damage::resistance_skill(stats.get_stat(MapleStat::Id::JOB), element);
+
+		return skill ? skill_stats(skillbook, skill).x : 0;
 	}
 
 	bool Player::morph_refuses() const
