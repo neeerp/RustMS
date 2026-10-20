@@ -31,6 +31,8 @@ namespace ms
 			std::string name;
 			int16_t level;
 			int16_t closeness;
+			// One whose Water of Life has dried up shows its iconD instead.
+			bool dead = false;
 		};
 
 		// The question for pet equipment (StringPool 0x182).
@@ -77,6 +79,7 @@ namespace ms
 		std::function<void()> oncancel;
 		size_t shown;
 		Animation standing;
+		Point<int16_t> standing_at;
 		Texture name_tag;
 		Text caption;
 		Text name;

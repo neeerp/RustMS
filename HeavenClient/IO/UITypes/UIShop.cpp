@@ -414,7 +414,7 @@ namespace ms
 		if (buy)
 			buystate.show_item(slot);
 		else
-			sellstate.show_item(slot);
+			sellstate.show_item(inventory, slot);
 	}
 
 	void UIShop::changeselltab(InventoryType::Id type)
@@ -786,7 +786,7 @@ namespace ms
 		}
 	}
 
-	void UIShop::SellState::show_item(int16_t slot)
+	void UIShop::SellState::show_item(const Inventory &inventory, int16_t slot)
 	{
 		int16_t absslot = slot + offset;
 
@@ -800,7 +800,11 @@ namespace ms
 		} else
 		{
 			int32_t itemid = items[absslot].get_id();
-			UI::get().show_item(Tooltip::Parent::SHOP, itemid);
+
+			if (auto item = inventory.get_item(tab, items[absslot].get_slot()))
+				UI::get().show_item(Tooltip::Parent::SHOP, itemid, item->get_expiration(), item->get_flags(), true);
+			else
+				UI::get().show_item(Tooltip::Parent::SHOP, itemid);
 		}
 	}
 

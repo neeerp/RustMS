@@ -4,6 +4,7 @@
 //! state. They deliberately know nothing about Diesel rows or packet layouts:
 //! `db` converts rows to and from them and `net` encodes them for the wire.
 
+pub mod ap_reset;
 pub mod buff;
 pub mod character;
 pub mod exp;
@@ -18,6 +19,7 @@ pub mod pet;
 pub mod quest;
 pub mod scroll;
 pub mod skill;
+pub mod sp_reset;
 pub mod storage;
 pub mod teleport_rock;
 

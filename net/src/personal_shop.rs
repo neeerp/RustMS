@@ -5,9 +5,9 @@
 //! stock itself, out of their inventory, until it sells or the shop closes.
 //! These are the rules for listing, buying and selling.
 
+use crate::items;
 use crate::packet::build::world::mini_room::{buy_result, SHOP_ITEMS};
 use crate::shop::is_rechargeable;
-use crate::storage::storable;
 use crate::trade::{self, Offer, TradeFailure, LOW_LEVEL_MAX, LOW_LEVEL_MESO_LIMIT};
 use game::{InventoryChange, InventoryType, Item, Player};
 
@@ -145,7 +145,8 @@ pub fn list_item(
         .get(kind, slot)
         .filter(|_| slot > 0)
         .ok_or("no item in that slot")?;
-    if !storable(item) {
+    // Party quest items stay out too (FUN_006fd96c).
+    if !trade::tradeable(item) || items::info(item.item_id).is_some_and(|info| info.pquest) {
         return Err("item can't be sold");
     }
     let (bundles, per_bundle) = if is_rechargeable(item.item_id) || item.equip.is_some() {
@@ -378,6 +379,32 @@ mod tests {
             );
         }
         assert_eq!(player.inventory, before);
+    }
+
+    #[test]
+    fn karma_items_list_but_party_quest_items_never_do() {
+        if items::data().is_err() {
+            return;
+        }
+        let karma = |item_id| Item {
+            flags: game::inventory::FLAG_BUNDLE_KARMA,
+            ..Item::stack(item_id, 3)
+        };
+        // Tigun Transformation Bundle, a quest item that can't be traded,
+        // and a first party quest coupon.
+        let mut player = player(0, 10);
+        player
+            .inventory
+            .insert(InventoryType::Use, 1, Item::stack(2210005, 3));
+        player
+            .inventory
+            .insert(InventoryType::Use, 2, karma(2210005));
+        player
+            .inventory
+            .insert(InventoryType::Etc, 1, karma(4001007));
+        assert!(list_item(&mut player, &[], 2, 1, 1, 1, 100).is_err());
+        assert!(list_item(&mut player, &[], 4, 1, 1, 1, 100).is_err());
+        assert!(list_item(&mut player, &[], 2, 2, 1, 1, 100).is_ok());
     }
 
     #[test]

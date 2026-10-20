@@ -168,9 +168,10 @@ pub mod equip_slot {
         item_id / 10_000 == 105
     }
 
-    /// Two-handed weapons leave no room for a shield.
+    /// Two-handed weapons leave no room for a shield. For v83 that is every
+    /// 14xxxxx weapon, claws, knuckles and guns too (FUN_004f2f55).
     pub fn is_two_handed(item_id: i32) -> bool {
-        (140..=146).contains(&(item_id / 10_000))
+        item_id / 100_000 == 14
     }
 }
 
@@ -198,6 +199,15 @@ pub struct EquipStats {
     pub item_level: u8,
     pub item_exp: i32,
 }
+
+/// `Item.flags` bit of equipment that can no longer change hands, which
+/// equipment with `equipTradeBlock` gets once worn.
+pub const FLAG_UNTRADEABLE: i16 = 0x08;
+
+/// `Item.flags` bits Scissors of Karma set, which let an item that can't
+/// change hands do so once: one for equipment, another for other items.
+pub const FLAG_EQUIP_KARMA: i16 = 0x10;
+pub const FLAG_BUNDLE_KARMA: i16 = 0x02;
 
 /// One stack (or one equipment instance) occupying an inventory slot.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -237,6 +247,30 @@ impl Item {
 
     pub fn is_cash(&self) -> bool {
         self.item_id / 1_000_000 == 5 || self.cash_serial.is_some()
+    }
+
+    fn karma_flag(&self) -> i16 {
+        if self.item_id / 1_000_000 == 1 {
+            FLAG_EQUIP_KARMA
+        } else {
+            FLAG_BUNDLE_KARMA
+        }
+    }
+
+    /// Whether Scissors of Karma let the item change hands once more.
+    pub fn has_karma(&self) -> bool {
+        self.flags & self.karma_flag() != 0
+    }
+
+    /// Use up the item's Karma as it changes hands. Equipment can't change
+    /// hands again; other items go back to what their data says.
+    pub fn use_karma(&mut self) {
+        if self.has_karma() {
+            self.flags &= !self.karma_flag();
+            if self.item_id / 1_000_000 == 1 {
+                self.flags |= FLAG_UNTRADEABLE;
+            }
+        }
     }
 }
 
@@ -781,6 +815,33 @@ mod tests {
     use super::*;
 
     #[test]
+    fn karma_is_used_up_once() {
+        let mut earrings = Item {
+            flags: FLAG_EQUIP_KARMA,
+            ..Item::stack(1032031, 1)
+        };
+        assert!(earrings.has_karma());
+        earrings.use_karma();
+        assert!(!earrings.has_karma());
+        assert_eq!(earrings.flags, FLAG_UNTRADEABLE);
+
+        let mut bundle = Item {
+            flags: FLAG_BUNDLE_KARMA | 0x01,
+            ..Item::stack(2210005, 3)
+        };
+        assert!(bundle.has_karma());
+        bundle.use_karma();
+        assert_eq!(bundle.flags, 0x01);
+
+        // Each kind has its own bit.
+        let other = Item {
+            flags: FLAG_EQUIP_KARMA,
+            ..Item::stack(2210005, 3)
+        };
+        assert!(!other.has_karma());
+    }
+
+    #[test]
     fn cash_items_are_placed_whole_and_pulled_by_serial() {
         let mut inventory = Inventory::default();
         let tickets = Item {
@@ -1095,6 +1156,18 @@ mod tests {
         assert!(inventory
             .get(InventoryType::Equipped, equip_slot::TOP)
             .is_none());
+    }
+
+    #[test]
+    fn a_shield_takes_off_a_claw() {
+        let mut inventory = Inventory::default();
+        inventory.insert(InventoryType::Equipped, equip_slot::WEAPON, equip(1472000));
+        inventory.insert(InventoryType::Equip, 1, equip(1092000));
+        inventory.equip(1, equip_slot::SHIELD).unwrap();
+        assert!(inventory
+            .get(InventoryType::Equipped, equip_slot::WEAPON)
+            .is_none());
+        assert_eq!(inventory.count(1472000), 1);
     }
 
     /// Item ids by slot in `kind`.

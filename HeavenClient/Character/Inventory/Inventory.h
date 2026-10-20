@@ -83,7 +83,8 @@ namespace ms
 
 		// Add a pet item.
 		void add_pet(InventoryType::Id type, int16_t slot, int32_t itemid, int64_t cash_id, int64_t expire,
-					 const std::string &name, int8_t level, int16_t closeness, int8_t fullness);
+					 const std::string &name, int8_t level, int16_t closeness, int8_t fullness, int64_t date_dead,
+					 int32_t remain_life);
 
 		// Add an equip item.
 		void add_equip(InventoryType::Id type, int16_t slot, int32_t itemid, int64_t cash_id, int64_t expire, uint8_t slots,
@@ -166,6 +167,9 @@ namespace ms
 
 		// Return a pointer to an equip
 		Optional<const Equip> get_equip(InventoryType::Id type, int16_t slot) const;
+
+		// The item in a slot of the USE, SETUP, ETC or Cash tab, unless it's a pet.
+		Optional<const Item> get_item(InventoryType::Id type, int16_t slot) const;
 
 	private:
 		// Add an inventory slot and return the unique_id

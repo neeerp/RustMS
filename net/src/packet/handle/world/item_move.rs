@@ -4,7 +4,7 @@ use crate::handler::{
 use crate::items;
 use crate::loot::Loot;
 use crate::packet::build::world::{inventory, stat};
-use game::inventory::equip_slot;
+use game::inventory::{equip_slot, FLAG_UNTRADEABLE};
 use game::{InventoryType, Item, Player};
 use game_data::items::EquipInfo;
 use packet::{io::read::PktRead, Packet};
@@ -69,7 +69,8 @@ impl WorldHandler for ItemMoveHandler {
 
 /// Take `quantity` of the item in bag slot `from` to throw on the ground.
 /// Returns the changes, what to throw, and whether it vanishes instead of
-/// landing (quest and untradeable items).
+/// landing (quest and untradeable items, and equipment made untradeable,
+/// unless Scissors of Karma were used on them).
 fn drop_item(
     player: &mut Player,
     kind: i8,
@@ -112,8 +113,14 @@ fn drop_item(
         .inventory_mut()
         .take(kind, from, quantity)
         .map_err(|_| "bad quantity")?;
-    let vanish = items::info(item.item_id).is_some_and(|info| info.quest || info.trade_block);
-    Ok((changes, Loot::Dropped(Item { quantity, ..item }), vanish))
+    let vanish = !item.has_karma()
+        && (items::info(item.item_id).is_some_and(|info| info.quest || info.trade_block)
+            || item.equip.is_some() && item.flags & FLAG_UNTRADEABLE != 0);
+    // A Karma item lands, its Karma used up: "Once dropped, the item cannot
+    // be traded." (0x1232)
+    let mut thrown = Item { quantity, ..item };
+    thrown.use_karma();
+    Ok((changes, Loot::Dropped(thrown), vanish))
 }
 
 /// Apply a move; returns the changes and whether the worn equipment changed.
@@ -124,6 +131,11 @@ fn move_item(
     to: i16,
 ) -> Result<(Vec<game::InventoryChange>, bool), String> {
     if from < 0 {
+        // Equipment dropped on an occupied bag slot swaps with what is there,
+        // which wears that item, so it goes the equip way (v83 FUN_004f11b4).
+        if player.inventory.get(InventoryType::Equip, to).is_some() {
+            return move_item(player, 1, to, from);
+        }
         // HeavenClient sends EQUIPPED (-1), the original client EQUIP (1).
         let changes = player
             .inventory_mut()
@@ -138,14 +150,14 @@ fn move_item(
         if kind != InventoryType::Equip {
             return Err("only equipment can be worn".into());
         }
-        let item_id = player
-            .inventory
-            .get(kind, from)
-            .ok_or("empty slot")?
-            .item_id;
-        let template = items::info(item_id)
-            .and_then(|info| info.equip)
-            .ok_or("unknown equipment")?;
+        let item = player.inventory.get(kind, from).ok_or("empty slot")?;
+        let item_id = item.item_id;
+        let info = items::info(item_id).ok_or("unknown equipment")?;
+        let template = info.equip.ok_or("unknown equipment")?;
+        // Equipment that can't trade once worn becomes untradeable, which the
+        // client is told by replacing it in the bag before the move (Cosmic
+        // InventoryManipulator.equip).
+        let binds = info.equip_trade_block && item.flags & FLAG_UNTRADEABLE == 0;
         let allowed = match equip_slot::pet_slots(item_id) {
             // Cash items are worn 100 below their slot.
             Some(_) => pet_can_wear(player, &template, to % 100),
@@ -154,10 +166,27 @@ fn move_item(
         if !allowed {
             return Err("requirements not met".into());
         }
-        let changes = player
-            .inventory_mut()
-            .equip(from, to)
-            .map_err(|e| e.to_string())?;
+        let inventory = player.inventory_mut();
+        let mut changes = inventory.equip(from, to).map_err(|e| e.to_string())?;
+        if binds {
+            let mut worn = inventory
+                .get(InventoryType::Equipped, to)
+                .expect("just worn")
+                .clone();
+            worn.flags |= FLAG_UNTRADEABLE;
+            inventory.insert(InventoryType::Equipped, to, worn.clone());
+            changes.splice(
+                0..0,
+                [
+                    game::InventoryChange::Remove { kind, slot: from },
+                    game::InventoryChange::Add {
+                        kind,
+                        slot: from,
+                        item: worn,
+                    },
+                ],
+            );
+        }
         return Ok((changes, true));
     }
     let item_id = player
@@ -199,6 +228,7 @@ fn pet_can_wear(player: &Player, equip: &EquipInfo, slot: i16) -> bool {
 mod tests {
     use super::*;
     use crate::packet::op::{RecvOpcode, SendOpcode};
+    use game::inventory::FLAG_BUNDLE_KARMA;
     use game::{inventory::equip_slot, EquipStats, Item};
     use packet::io::write::PktWrite;
 
@@ -326,6 +356,68 @@ mod tests {
             thrown(&actions),
             Some((&Loot::Dropped(Item::stack(2010007, 1)), true))
         );
+
+        // With Karma it lands, and the Karma is gone.
+        let karma = Item {
+            flags: FLAG_BUNDLE_KARMA,
+            ..Item::stack(2010007, 1)
+        };
+        player.inventory.insert(InventoryType::Use, 1, karma);
+        let actions = handle(&mut player, drop_request(2, 1, 0, 1));
+        assert_eq!(
+            thrown(&actions),
+            Some((&Loot::Dropped(Item::stack(2010007, 1)), false))
+        );
+    }
+
+    #[test]
+    fn equipment_that_binds_becomes_untradeable_once_worn() {
+        // Timeless Earrings, "Trade disabled when equipped".
+        if items::info(1032031).is_none() {
+            return;
+        }
+        let mut player = crate::codec::stats::sample_player();
+        player.stats.level = 120;
+        let earrings = Item::equipment(1032031, EquipStats::default());
+        player
+            .inventory
+            .insert(InventoryType::Equip, 1, earrings.clone());
+        let (changes, _) = move_item(&mut player, 1, 1, -4).unwrap();
+        let bound = Item {
+            flags: FLAG_UNTRADEABLE,
+            ..earrings
+        };
+        assert_eq!(
+            changes,
+            [
+                game::InventoryChange::Remove {
+                    kind: InventoryType::Equip,
+                    slot: 1
+                },
+                game::InventoryChange::Add {
+                    kind: InventoryType::Equip,
+                    slot: 1,
+                    item: bound.clone()
+                },
+                game::InventoryChange::Move {
+                    kind: InventoryType::Equip,
+                    from: 1,
+                    to: -4
+                },
+            ]
+        );
+        assert_eq!(
+            player.inventory.get(InventoryType::Equipped, -4),
+            Some(&bound)
+        );
+
+        // Worn again, it is already bound; dropped, it vanishes.
+        move_item(&mut player, -1, -4, 1).unwrap();
+        let (changes, _) = move_item(&mut player, 1, 1, -4).unwrap();
+        assert_eq!(changes.len(), 1);
+        move_item(&mut player, -1, -4, 1).unwrap();
+        let actions = handle(&mut player, drop_request(1, 1, 0, 1));
+        assert_eq!(thrown(&actions), Some((&Loot::Dropped(bound), true)));
     }
 
     fn handle(player: &mut Player, packet: Packet) -> Vec<WorldAction> {
@@ -360,6 +452,53 @@ mod tests {
         let actions = handle(&mut player, request(1, 1, 5));
         assert!(matches!(actions.as_slice(), [WorldAction::Reply(_)]));
         assert!(player.inventory.get(InventoryType::Equip, 5).is_some());
+    }
+
+    #[test]
+    fn unequipping_onto_equipment_wears_it_instead() {
+        if items::info(1302000).is_none() {
+            return;
+        }
+        let sword = |watk| {
+            Item::equipment(
+                1302000,
+                EquipStats {
+                    watk,
+                    ..EquipStats::default()
+                },
+            )
+        };
+        let mut player = crate::codec::stats::sample_player();
+        player
+            .inventory
+            .insert(InventoryType::Equipped, equip_slot::WEAPON, sword(1));
+        player.inventory.insert(InventoryType::Equip, 1, sword(2));
+        player.inventory.insert(
+            InventoryType::Equip,
+            2,
+            Item::equipment(1002000, EquipStats::default()),
+        );
+
+        // A hat can't take the sword's place.
+        assert!(!worn(&handle(
+            &mut player,
+            request(-1, equip_slot::WEAPON, 2)
+        )));
+
+        assert!(worn(&handle(
+            &mut player,
+            request(1, equip_slot::WEAPON, 1)
+        )));
+        assert_eq!(
+            player
+                .inventory
+                .get(InventoryType::Equipped, equip_slot::WEAPON),
+            Some(&sword(2))
+        );
+        assert_eq!(
+            player.inventory.get(InventoryType::Equip, 1),
+            Some(&sword(1))
+        );
     }
 
     /// A player with a Brown Kitty out first and a Baby Tiger second, and

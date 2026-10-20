@@ -121,7 +121,8 @@ namespace ms
 		nl::node common = NxFiles::ui_classic["Login.img"]["Common"];
 
 		backgrounds = MapBackgrounds(map["back"]);
-		tilesobjs = MapTilesObjs(map);
+		// The login map has no footholds, and none of its objs drift.
+		tilesobjs = MapTilesObjs(map, {});
 		frame = common["frame"];
 		shadow = common["shadow"]["0"];
 		version = Text(Text::Font::A12B, Text::Alignment::LEFT, Color::Name::BLACK,

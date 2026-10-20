@@ -65,6 +65,11 @@ namespace ms
 		Texture stat_dot;
 
 		Text name;
+		// The orange lines under the name; the first wraps where it is wider than the box.
+		std::array<Text, 2> properties;
+		bool wrapped;
+		int16_t properties_height;
+		Text expiry;
 		Texture itemicon;
 
 		std::vector<MapleStat::Id> requirements;

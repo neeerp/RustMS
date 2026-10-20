@@ -95,13 +95,21 @@ pub fn fee(meso: i32) -> i32 {
     (meso * per_thousand / 1000) as i32
 }
 
-/// What the partner's offer comes to on this side: the same items, and the
-/// mesos less the fee.
+/// What the partner's offer comes to on this side: the same items with
+/// their Karma used up, and the mesos less the fee.
 pub fn received(offer: &Offer) -> Offer {
+    let mut items = offer.items.clone();
+    items.values_mut().for_each(Item::use_karma);
     Offer {
-        items: offer.items.clone(),
+        items,
         meso: offer.meso - fee(offer.meso),
     }
+}
+
+/// Whether the item may be put up in a trade (FUN_007c359f): what storage
+/// takes, short of items that stay within the account.
+pub fn tradeable(item: &Item) -> bool {
+    storable(item) && !items::info(item.item_id).is_some_and(|info| info.account_sharable)
 }
 
 /// Take `count` of the item in a bag slot out of the inventory and into
@@ -126,7 +134,7 @@ pub fn put_item(
         .get(kind, slot)
         .filter(|_| slot > 0)
         .ok_or("no item in that slot")?;
-    if !storable(item) {
+    if !tradeable(item) {
         return Err("item can't be traded");
     }
     // A set of stars or bullets goes whole, like equipment.
@@ -233,6 +241,7 @@ pub fn give(player: &mut Player, offer: Offer) -> Given {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use game::inventory::{FLAG_BUNDLE_KARMA, FLAG_EQUIP_KARMA, FLAG_UNTRADEABLE};
 
     const RED_POTION: i32 = 2000000;
     const SUBI: i32 = 2070000;
@@ -337,6 +346,53 @@ mod tests {
             );
         }
         assert_eq!((player.inventory, offer), before);
+    }
+
+    #[test]
+    fn untradeable_items_go_up_once_with_karma() {
+        if items::data().is_err() {
+            return;
+        }
+        // Tigun Transformation Bundle, a quest item that can't be traded;
+        // earrings made untradeable once worn; a ring kept to the account.
+        const TIGUN: i32 = 2210005;
+        let bound = Item {
+            flags: FLAG_UNTRADEABLE,
+            ..items::create(1032031, 1).unwrap()
+        };
+        let karma = Item {
+            flags: FLAG_EQUIP_KARMA,
+            ..bound.clone()
+        };
+        let mut player = player(0);
+        let inventory = &mut player.inventory;
+        inventory.insert(InventoryType::Use, 1, Item::stack(TIGUN, 3));
+        inventory.insert(
+            InventoryType::Use,
+            2,
+            Item {
+                flags: FLAG_BUNDLE_KARMA,
+                ..Item::stack(TIGUN, 3)
+            },
+        );
+        inventory.insert(InventoryType::Equip, 1, bound);
+        inventory.insert(InventoryType::Equip, 2, karma);
+        inventory.insert(InventoryType::Equip, 3, items::create(1112405, 1).unwrap());
+        let mut offer = Offer::default();
+        for (kind, slot) in [(2, 1), (1, 1), (1, 3)] {
+            assert!(put_item(&mut player, &mut offer, kind, slot, 1, 1).is_err());
+        }
+        put_item(&mut player, &mut offer, 2, 2, 3, 1).unwrap();
+        put_item(&mut player, &mut offer, 1, 2, 1, 2).unwrap();
+
+        // The partner gets them with the Karma used up; given back, they
+        // keep it.
+        let got = received(&offer);
+        assert_eq!(
+            (got.items[&1].flags, got.items[&2].flags),
+            (0, FLAG_UNTRADEABLE)
+        );
+        assert!(offer.items.values().all(Item::has_karma));
     }
 
     #[test]

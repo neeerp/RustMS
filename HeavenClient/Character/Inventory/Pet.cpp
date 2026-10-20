@@ -20,8 +20,9 @@
 namespace ms
 {
 	Pet::Pet(int32_t item_id, int64_t expiration, const std::string &petname, uint8_t level, uint16_t closeness,
-			 uint8_t fullness) : item_id(item_id), expiration(expiration), petname(petname), petlevel(level),
-								 closeness(closeness), fullness(fullness)
+			 uint8_t fullness, int64_t date_dead, int32_t remain_life) : item_id(item_id), expiration(expiration),
+								 petname(petname), petlevel(level), closeness(closeness), fullness(fullness),
+								 date_dead(date_dead), remain_life(remain_life)
 	{}
 
 	int32_t Pet::get_item_id() const
@@ -47,5 +48,15 @@ namespace ms
 	uint8_t Pet::get_fullness() const
 	{
 		return fullness;
+	}
+
+	int64_t Pet::get_date_dead() const
+	{
+		return date_dead;
+	}
+
+	int32_t Pet::get_remain_life() const
+	{
+		return remain_life;
 	}
 }

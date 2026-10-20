@@ -7,7 +7,8 @@ const FILETIME_UNIX_OFFSET: i64 = 116_444_736_000_000_000;
 /// 1900-01-01: the "unset" timestamp (`getTime(-2)` in HeavenMS), used for
 /// the inventory header and the trailer of every equipment entry.
 pub const ZERO_TIME: i64 = 94_354_848_000_000_000;
-/// 2078-12-31 (`getTime(-3)` in HeavenMS).
+/// 2078-12-31 (`getTime(-3)` in HeavenMS): the date of a pet that never
+/// dies, as v83 takes one dated 2079 for dead.
 pub const PERMANENT_TIME: i64 = 150_841_440_000_000_000;
 /// 2079-01-01 (`getTime(-1)` in HeavenMS): what an item or skill with no
 /// expiration (stored as -1 in the reference) is sent as.

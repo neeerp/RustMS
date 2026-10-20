@@ -23,6 +23,7 @@
 #include "../UITypes/UIItemInventory.h"
 
 #include "../../Audio/Audio.h"
+#include "../../Data/EquipData.h"
 #include "../../Data/ItemData.h"
 #include "../../Gameplay/Stage.h"
 #include "../../Util/NxFiles.h"
@@ -506,7 +507,7 @@ namespace ms
 			Sound(Sound::Name::DRAGEND).play();
 	}
 
-	bool UIEquipInventory::EquipIcon::drop_on_items(InventoryType::Id tab, EquipSlot::Id eqslot, int16_t slot, bool equip) const
+	bool UIEquipInventory::EquipIcon::drop_on_items(InventoryType::Id tab, EquipSlot::Id, int16_t slot, bool equip) const
 	{
 		if (tab != InventoryType::Id::EQUIP)
 		{
@@ -520,19 +521,44 @@ namespace ms
 			}
 		}
 
-		if (equip)
-		{
-			// Only an item worn at the same position swaps with this one.
-			int16_t worn = Stage::get().get_player().get_inventory().equip_position(slot, eqslot);
+		if (equip && !can_swap(slot))
+			return true;
 
-			if (worn == source)
-				Stage::get().get_player().request(EquipItemPacket(slot, worn), ExclRequest::WAIT);
-		} else
-		{
-			Stage::get().get_player().request(UnequipItemPacket(source, slot), ExclRequest::WAIT);
-		}
+		// Onto equipment, the server swaps the two (FUN_004f11b4).
+		Stage::get().get_player().request(UnequipItemPacket(source, slot), ExclRequest::WAIT);
 
 		return true;
+	}
+
+	bool UIEquipInventory::EquipIcon::can_swap(int16_t slot) const
+	{
+		// v83 refuses a swap without a word.
+		const Inventory &inventory = Stage::get().get_player().get_inventory();
+		int32_t item_id = inventory.get_item_id(InventoryType::Id::EQUIP, slot);
+
+		// It has to go where this is worn; any ring goes on any finger.
+		auto finger = [](int16_t part)
+		{
+			return part == EquipSlot::Id::RING2 || part == EquipSlot::Id::RING3 || part == EquipSlot::Id::RING4
+				? EquipSlot::Id::RING1 : part;
+		};
+
+		EquipSlot::Id part = EquipData::get(item_id).get_eqslot();
+
+		if (finger(part) != finger(source % Inventory::CASH_EQUIP)
+			|| inventory.equip_position(slot, part) / Inventory::CASH_EQUIP != source / Inventory::CASH_EQUIP)
+			return false;
+
+		// An overall takes off pants, and a two-handed weapon a shield, which
+		// need a free slot (FUN_004f2f55, FUN_004f2fdc).
+		bool displaces = source < Inventory::CASH_EQUIP
+			&& ((item_id / 10000 == 105 && inventory.has_equipped(EquipSlot::Id::BOTTOM))
+				|| (item_id / 100000 == 14 && inventory.has_equipped(EquipSlot::Id::SHIELD)));
+
+		if (displaces && !inventory.find_free_slot(InventoryType::Id::EQUIP))
+			return false;
+
+		return UIItemInventory::meets_requirements(item_id);
 	}
 
 	Icon::IconType UIEquipInventory::EquipIcon::get_type()

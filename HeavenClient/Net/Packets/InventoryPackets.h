@@ -146,6 +146,24 @@ namespace ms
 		}
 	};
 
+	// Uses an AP or SP Reset (FUN_00a0a63f types 0x17 and 0x18): where the
+	// AP or skill level goes, then where it leaves, as STAT_CHANGED mask
+	// bits or skill ids.
+	// Opcode: USE_CASH_ITEM(79)
+	class UseResetPacket : public OutPacket
+	{
+	public:
+		UseResetPacket(int16_t slot, int32_t itemid, int32_t to, int32_t from)
+				: OutPacket(OutPacket::Opcode::USE_CASH_ITEM)
+		{
+			write_short(slot);
+			write_int(itemid);
+			write_int(to);
+			write_int(from);
+			write_time();
+		}
+	};
+
 	// Uses a super megaphone (FUN_00a0a63f type 0xd): the line, and
 	// whether it shows an ear to whisper back by.
 	// Opcode: USE_CASH_ITEM(79)

@@ -568,9 +568,10 @@ namespace ms
 		}
 	}
 
-	void UIStateGame::show_item(Tooltip::Parent parent, int32_t itemid)
+	void UIStateGame::show_item(Tooltip::Parent parent, int32_t itemid, int64_t expiration, int16_t flags,
+								bool owned, int32_t remain_life)
 	{
-		ittooltip.set_item(itemid);
+		ittooltip.set_item(itemid, expiration, flags, owned, remain_life);
 
 		if (itemid)
 		{
@@ -657,6 +658,8 @@ namespace ms
 					UIElement::Type::NPCTALK,
 					UIElement::Type::AVATARSELECT,
 					UIElement::Type::PETCHOOSER,
+					UIElement::Type::APRESET,
+					UIElement::Type::SPRESET,
 					UIElement::Type::SLIDEMENU,
 					UIElement::Type::QUIZ,
 					UIElement::Type::SPEEDQUIZ,

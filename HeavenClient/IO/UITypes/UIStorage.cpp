@@ -7,6 +7,7 @@
 #include "../Components/Charset.h"
 #include "../Components/MapleButton.h"
 #include "../Audio/Audio.h"
+#include "../Character/Inventory/ItemDrop.h"
 #include "../Data/ItemData.h"
 
 #include "../Net/Handlers/ShopList.h"
@@ -58,12 +59,26 @@ namespace ms
 		constexpr int16_t CARRIED_SLIDER_X = 441;
 		constexpr Range<int16_t> CARRIED_SLIDER = Range<int16_t>(127, 272);
 
-		// Cash items can't be stored, nor quest or untradable ones.
-		bool storable(int32_t itemid)
+		// Cash items can't be stored, nor quest or untradeable ones without
+		// Karma.
+		bool storable(const Inventory &inventory, InventoryType::Id tab, int16_t slot, int32_t itemid)
 		{
 			const ItemData &item = ItemData::get(itemid);
 
-			return item.is_valid() && !item.is_cashitem() && !item.is_questitem() && !item.is_untradable();
+			if (!item.is_valid())
+				return false;
+
+			int16_t flags = 0;
+
+			if (Optional<const Equip> equip = inventory.get_equip(tab, slot))
+				flags = equip->get_flags();
+			else if (Optional<const Item> bundle = inventory.get_item(tab, slot))
+				flags = bundle->get_flags();
+
+			bool cash = item.is_cashitem() || inventory.get_cash_id(tab, slot) != 0;
+
+			return item_drop::storable(item_drop::traits(item.get_properties(), tab == InventoryType::Id::EQUIP, cash,
+				flags, item_expiry::BEFORE));
 		}
 
 		// Use, setup, and etc items show how many there are.
@@ -463,7 +478,7 @@ namespace ms
 		{
 			int32_t itemid = inventory.get_item_id(tab, slot);
 
-			if (itemid && storable(itemid))
+			if (itemid && storable(inventory, tab, slot, itemid))
 				carried.rows.push_back(make_row(itemid, inventory.get_item_count(tab, slot), slot));
 		}
 
@@ -564,22 +579,38 @@ namespace ms
 
 		auto type = static_cast<int8_t>(tab);
 		auto index = static_cast<int8_t>(stored.selection);
+		const storage_contents::Stored &item = bags[tab][stored.selection];
 
-		auto ondecide = [this, type, index](bool yes)
+		auto ask = [this, type, index]()
 		{
-			if (yes && can_request())
+			auto ondecide = [this, type, index](bool yes)
 			{
-				pending = true;
-				TrunkRequestPacket(type, index).dispatch();
-			}
+				if (yes && can_request())
+				{
+					pending = true;
+					TrunkRequestPacket(type, index).dispatch();
+				}
+			};
+
+			if (get_fee > 0)
+				UI::get().emplace<UIYesNo>(
+						with_fee("Recovering the items will cost %d mesos.\\nAre you sure you want to recover this?",
+							get_fee),
+						ondecide);
+			else
+				UI::get().emplace<UIYesNo>("Are you sure you want to \\nrecover the item(s) from storage?", ondecide);
 		};
 
-		if (get_fee > 0)
-			UI::get().emplace<UIYesNo>(
-					with_fee("Recovering the items will cost %d mesos.\\nAre you sure you want to recover this?", get_fee),
-					ondecide);
+		// An item with Scissors of Karma used on it loses them in storage (FUN_007c83af).
+		if (item_properties::karma(item.itemid, item.flags))
+			UI::get().emplace<UIYesNo>("Once found, the item cannot be traded.\\nWould you still like to find it?",
+				[ask](bool yes)
+				{
+					if (yes)
+						ask();
+				});
 		else
-			UI::get().emplace<UIYesNo>("Are you sure you want to \\nrecover the item(s) from storage?", ondecide);
+			ask();
 	}
 
 	void UIStorage::store()
@@ -592,6 +623,12 @@ namespace ms
 		int32_t itemid = row.itemid;
 		int16_t count = row.count;
 		int32_t fee = put_fee;
+		int16_t flags = 0;
+
+		if (Optional<const Equip> equip = inventory.get_equip(tab, slot))
+			flags = equip->get_flags();
+		else if (Optional<const Item> item = inventory.get_item(tab, slot))
+			flags = item->get_flags();
 
 		auto confirm = [this, slot, itemid, fee](int32_t quantity)
 		{
@@ -616,10 +653,27 @@ namespace ms
 
 		// Equips, stars, and bullets go whole; a stack asks how many, all of
 		// it to begin with.
-		if (tab == InventoryType::Id::EQUIP || shop_list::is_rechargeable(itemid) || count <= 1)
-			confirm(count);
+		bool whole = tab == InventoryType::Id::EQUIP || shop_list::is_rechargeable(itemid) || count <= 1;
+
+		auto ask = [whole, count, confirm]()
+		{
+			if (whole)
+				confirm(count);
+			else
+				UI::get().emplace<UIEnterNumber>("How many will you store?", confirm, count, count);
+		};
+
+		// Scissors of Karma are used up in storage (FUN_007c858c).
+		if (item_properties::karma(itemid, flags))
+			UI::get().emplace<UIYesNo>("Once stored in the Inventory,\\nthe item cannot be traded\\nby the character "
+				"when taken out.\\nWould you still like to store it?",
+				[ask](bool yes)
+				{
+					if (yes)
+						ask();
+				});
 		else
-			UI::get().emplace<UIEnterNumber>("How many will you store?", confirm, count, count);
+			ask();
 	}
 
 	void UIStorage::take_meso()

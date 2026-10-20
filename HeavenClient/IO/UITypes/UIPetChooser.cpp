@@ -27,6 +27,7 @@ namespace ms
 		const Point<int16_t> EXIT_AT(9, 272);
 		const Point<int16_t> NAME_TAG_AT(123, 220);
 		const Point<int16_t> PET_AT(209, 218);
+		const Point<int16_t> DEAD_PET_AT(226, 218);
 		constexpr int16_t NAME_X = 210, NAME_Y = 224;
 		constexpr int16_t LEVEL_X = 194, CLOSENESS_X = 280, NUMBERS_Y = 243;
 		// The caption's box (FUN_009acc20): its text starts 120 across, and is centred on 100 rows from 28 down
@@ -75,7 +76,7 @@ namespace ms
 		name.draw(position + Point<int16_t>(NAME_X, NAME_Y - TEXT_RAISE));
 		level.draw(position + Point<int16_t>(LEVEL_X, NUMBERS_Y - TEXT_RAISE));
 		closeness.draw(position + Point<int16_t>(CLOSENESS_X, NUMBERS_Y - TEXT_RAISE));
-		standing.draw(position + PET_AT, alpha);
+		standing.draw(position + standing_at, alpha);
 
 		UIElement::draw_buttons(alpha);
 	}
@@ -144,7 +145,9 @@ namespace ms
 
 		const Pet &pet = pets[index];
 
-		standing = nl::nx::item["Pet"][std::to_string(pet.itemid) + ".img"]["stand0"];
+		nl::node src = nl::nx::item["Pet"][std::to_string(pet.itemid) + ".img"];
+		standing = pet.dead ? src["info"]["iconD"] : src["stand0"];
+		standing_at = pet.dead ? DEAD_PET_AT : PET_AT;
 		name.change_text(pet.name);
 		level.change_text(std::to_string(pet.level));
 		closeness.change_text(std::to_string(pet.closeness));

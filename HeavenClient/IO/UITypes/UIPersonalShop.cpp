@@ -11,6 +11,7 @@
 #include "../Components/MapleButton.h"
 
 #include "../../Character/ExclRequest.h"
+#include "../../Character/Inventory/ItemProperties.h"
 #include "../../Constants.h"
 #include "../../Data/CurseData.h"
 #include "../../Data/ItemData.h"
@@ -690,48 +691,62 @@ namespace ms
 			player.request(ShopBuyPacket(row, bundles), ExclRequest::WAIT);
 		};
 
-		if (personal_shop::sells_whole(listing.item.itemid))
-		{
-			int64_t total = listing.price;
-
-			UI::get().emplace<UIYesNo>(
-					"Are you sure you want to buy it?",
-					[send, total](bool yes)
-					{
-						if (yes)
-							send(1, total);
-					}
-			);
-
-			return;
-		}
-
 		mini_room::Listing chosen = listing;
 
-		UI::get().emplace<UIEnterNumber>(
-				"How many are you willing to buy?",
-				[send, chosen](int32_t units)
-				{
-					personal_shop::Purchase purchase = personal_shop::purchase(chosen, units);
+		auto order = [send, chosen]()
+		{
+			if (personal_shop::sells_whole(chosen.item.itemid))
+			{
+				int64_t total = chosen.price;
 
-					if (!purchase.problem.empty())
+				UI::get().emplace<UIYesNo>(
+						"Are you sure you want to buy it?",
+						[send, total](bool yes)
+						{
+							if (yes)
+								send(1, total);
+						}
+				);
+
+				return;
+			}
+
+			UI::get().emplace<UIEnterNumber>(
+					"How many are you willing to buy?",
+					[send, chosen](int32_t units)
 					{
-						notice(purchase.problem);
+						personal_shop::Purchase purchase = personal_shop::purchase(chosen, units);
 
-						return;
-					}
+						if (!purchase.problem.empty())
+						{
+							notice(purchase.problem);
 
-					UI::get().emplace<UIYesNo>(
-							personal_shop::total_question(purchase.total),
-							[send, purchase](bool yes)
-							{
-								if (yes)
-									send(purchase.bundles, purchase.total);
-							}
-					);
-				},
-				listing.bundles * listing.per_bundle, 1
-		);
+							return;
+						}
+
+						UI::get().emplace<UIYesNo>(
+								personal_shop::total_question(purchase.total),
+								[send, purchase](bool yes)
+								{
+									if (yes)
+										send(purchase.bundles, purchase.total);
+								}
+						);
+					},
+					chosen.bundles * chosen.per_bundle, 1
+			);
+		};
+
+		// Buying uses up Scissors of Karma (FUN_006fd261).
+		if (!listing.item.cash && item_properties::karma(listing.item.itemid, listing.item.flags))
+			UI::get().emplace<UIYesNo>("Once purchased, the item cannot be traded.\\nWould you still like to purchase it?",
+				[order](bool yes)
+				{
+					if (yes)
+						order();
+				});
+		else
+			order();
 	}
 
 	void UIPersonalShop::ban(uint8_t slot)

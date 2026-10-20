@@ -19,6 +19,7 @@
 #include "ShopList.h"
 
 #include "../Character/QuestResult.h"
+#include "../Data/ItemData.h"
 #include "../Gameplay/Stage.h"
 #include "../IO/UI.h"
 #include "../IO/UITypes/UIAvatarSelect.h"
@@ -157,8 +158,10 @@ namespace ms
 
 				if (Optional<const Pet> pet = inventory.get_pet(serial))
 				{
+					bool dead = item_expiry::pet_dead(pet->get_date_dead(), pet->get_remain_life(),
+						ItemData::get(pet->get_item_id()).get_pet_life());
 					pets.push_back({ pet->get_item_id(), pet->get_name(), pet->get_level(),
-									 static_cast<int16_t>(pet->get_closeness()) });
+									 static_cast<int16_t>(pet->get_closeness()), dead });
 					serials.push_back(serial);
 				}
 			}

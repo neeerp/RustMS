@@ -22,9 +22,16 @@ pub struct ItemInfo {
     pub only: bool,
     /// Items that can't change hands (`info/tradeBlock`).
     pub trade_block: bool,
+    /// Equipment that can't change hands once worn (`info/equipTradeBlock`).
+    pub equip_trade_block: bool,
     /// Items nobody may pick up (`info/pickUpBlock`): the invisible ones
     /// party quests drop.
     pub pickup_block: bool,
+    /// Items that move only between an account's characters, through
+    /// storage (`info/accountSharable`).
+    pub account_sharable: bool,
+    /// Party quest items (`info/pquest`).
+    pub pquest: bool,
     pub price: i32,
     /// What one throwing star or bullet costs to recharge (`unitPrice`).
     pub unit_price: f64,
@@ -160,12 +167,13 @@ pub struct EquipInfo {
     pub jump: i16,
     pub req_level: i16,
     /// Bit flags of job branches (1 warrior, 2 magician, 4 bowman, 8 thief,
-    /// 16 pirate); 0 means anyone.
+    /// 16 pirate); 0 means anyone and -1 beginners only.
     pub req_job: i16,
     pub req_str: i16,
     pub req_dex: i16,
     pub req_int: i16,
     pub req_luk: i16,
+    pub req_fame: i16,
     pub cash: bool,
     /// `info/recovery`: how much faster the wearer recovers on a map whose
     /// own recovery is above 1 (the sauna robes, 1.5).
@@ -283,6 +291,8 @@ impl ItemData {
             info.only = nx.int_child(meta, "only")? == Some(1);
             info.trade_block = nx.int_child(meta, "tradeBlock")? == Some(1);
             info.pickup_block = nx.int_child(meta, "pickUpBlock")? == Some(1);
+            info.account_sharable = nx.int_child(meta, "accountSharable")? == Some(1);
+            info.pquest = nx.int_child(meta, "pquest")? == Some(1);
             info.price = nx.int_child(meta, "price")?.unwrap_or(0);
             info.unit_price = nx.real_child(meta, "unitPrice")?.unwrap_or(0.0);
             info.pad = nx.int_child(meta, "incPAD")?.unwrap_or(0);
@@ -429,6 +439,7 @@ impl ItemData {
             req_dex: stat("reqDEX")?,
             req_int: stat("reqINT")?,
             req_luk: stat("reqLUK")?,
+            req_fame: stat("reqPOP")?,
             cash: nx.int_child(meta, "cash")? == Some(1),
             recovery: nx.real_child(meta, "recovery")?,
             pets,
@@ -439,7 +450,10 @@ impl ItemData {
             quest: nx.int_child(meta, "quest")? == Some(1),
             only: nx.int_child(meta, "only")? == Some(1),
             trade_block: nx.int_child(meta, "tradeBlock")? == Some(1),
+            equip_trade_block: nx.int_child(meta, "equipTradeBlock")? == Some(1),
             pickup_block: nx.int_child(meta, "pickUpBlock")? == Some(1),
+            account_sharable: nx.int_child(meta, "accountSharable")? == Some(1),
+            pquest: nx.int_child(meta, "pquest")? == Some(1),
             price: nx.int_child(meta, "price")?.unwrap_or(0),
             unit_price: 0.0,
             pad: 0,
@@ -583,6 +597,8 @@ mod tests {
         // Stored as an integer in one and as a string in the other.
         assert!(data.info(2000012).unwrap().unwrap().trade_block);
         assert!(data.info(4031044).unwrap().unwrap().trade_block);
+        assert!(data.info(4001007).unwrap().unwrap().pquest);
+        assert!(!shell.pquest);
         assert!(data.info(4999999).unwrap().is_none());
         let subi = data.info(2070000).unwrap().unwrap();
         assert_eq!(
@@ -765,6 +781,10 @@ mod tests {
         assert_eq!(sword.recovery, None);
         let robe = data.info(1050018).unwrap().unwrap().equip.unwrap();
         assert_eq!(robe.recovery, Some(1.5));
+        let earrings = data.info(1032031).unwrap().unwrap();
+        assert!(earrings.equip_trade_block && !earrings.trade_block);
+        assert!(data.info(1112405).unwrap().unwrap().account_sharable);
+        assert!(!earrings.account_sharable);
     }
 
     #[test]

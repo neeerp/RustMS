@@ -208,7 +208,7 @@ namespace ms
 
 			void draw(Point<int16_t> position, const Texture &selected) const;
 
-			void show_item(int16_t slot);
+			void show_item(const Inventory &inventory, int16_t slot);
 
 			void sell(bool skip_confirmation) const;
 

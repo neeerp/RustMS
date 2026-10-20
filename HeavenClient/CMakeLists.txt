@@ -224,6 +224,16 @@ if(HEAVENCLIENT_BUILD_TESTS)
     add_test(NAME weather_rules COMMAND weather_rules_tests)
     add_executable(item_effect_rules_tests tests/item_effect_rules.cpp)
     add_test(NAME item_effect_rules COMMAND item_effect_rules_tests)
+    add_executable(ap_reset_rules_tests tests/ap_reset_rules.cpp)
+    add_test(NAME ap_reset_rules COMMAND ap_reset_rules_tests)
+    add_executable(sp_reset_rules_tests tests/sp_reset_rules.cpp)
+    add_test(NAME sp_reset_rules COMMAND sp_reset_rules_tests)
+    add_executable(item_expiry_tests tests/item_expiry.cpp)
+    add_test(NAME item_expiry COMMAND item_expiry_tests)
+    add_executable(obj_flow_tests tests/obj_flow.cpp)
+    add_test(NAME obj_flow COMMAND obj_flow_tests)
+    add_executable(item_properties_tests tests/item_properties.cpp)
+    add_test(NAME item_properties COMMAND item_properties_tests)
     add_executable(obj_state_rules_tests tests/obj_state_rules.cpp)
     target_include_directories(obj_state_rules_tests PRIVATE
         ${PROJECT_SOURCE_DIR}/libs/NoLifeNx ${PROJECT_SOURCE_DIR}/libs/glad/build/include)
@@ -318,6 +328,8 @@ add_executable(HeavenClient
     Character/Inventory/InventoryType.h
     Character/Inventory/Item.cpp
     Character/Inventory/Item.h
+    Character/Inventory/ItemExpiry.h
+    Character/Inventory/ItemProperties.h
     Character/Inventory/Pet.cpp
     Character/Inventory/Pet.h
     Character/Inventory/Weapon.cpp
@@ -362,6 +374,8 @@ add_executable(HeavenClient
     Character/ItemEffect.cpp
     Character/ItemEffect.h
     Character/ItemEffectRules.h
+    Character/ApResetRules.h
+    Character/SpResetRules.h
     Character/CharStats.cpp
     Character/CharStats.h
     Character/EquipStat.cpp
@@ -464,6 +478,7 @@ add_executable(HeavenClient
     Gameplay/MapleMap/MapInfo.cpp
     Gameplay/MapleMap/MapInfo.h
     Gameplay/MapleMap/CloudLayout.h
+    Gameplay/MapleMap/ObjFlow.h
     Gameplay/MapleMap/MapClouds.cpp
     Gameplay/MapleMap/MapClouds.h
     Gameplay/MapleMap/MapWeather.cpp
@@ -693,6 +708,10 @@ add_executable(HeavenClient
     IO/UITypes/UIMegaphone.h
     IO/UITypes/UIPetChooser.cpp
     IO/UITypes/UIPetChooser.h
+    IO/UITypes/UIApReset.cpp
+    IO/UITypes/UIApReset.h
+    IO/UITypes/UISpReset.cpp
+    IO/UITypes/UISpReset.h
     IO/UITypes/UIItemMegaphone.cpp
     IO/UITypes/UIItemMegaphone.h
     IO/UITypes/UIInviteCard.cpp

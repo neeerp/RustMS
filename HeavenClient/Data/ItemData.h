@@ -21,6 +21,8 @@
 
 #include <cstdint>
 
+#include "../Character/Inventory/ItemExpiry.h"
+#include "../Character/Inventory/ItemProperties.h"
 #include "../Graphics/Texture.h"
 #include "../Template/BoolPair.h"
 #include "../Template/Cache.h"
@@ -53,6 +55,12 @@ namespace ms
 		// Returns whether nobody may pick the item up (`pickUpBlock`), as
 		// with the invisible items party quests drop (FUN_005d5224).
 		bool is_pickup_blocked() const;
+
+		// What its info node says for the orange lines under its name in a tooltip.
+		const item_properties::Info &get_properties() const;
+
+		// What a pet's info node says of its life.
+		const item_expiry::PetLife &get_pet_life() const;
 
 		// Returns whether the item was loaded correctly.
 		explicit operator bool() const;
@@ -108,5 +116,7 @@ namespace ms
 		bool cashitem;
 		bool questitem;
 		bool pickupblock;
+		item_properties::Info properties;
+		item_expiry::PetLife pet_life;
 	};
 }

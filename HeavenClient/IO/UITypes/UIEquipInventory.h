@@ -83,6 +83,9 @@ namespace ms
 			Icon::IconType get_type() override;
 
 		private:
+			// Whether this may swap with the equipment in item window `slot`.
+			bool can_swap(int16_t slot) const;
+
 			int16_t source;
 		};
 

@@ -277,17 +277,21 @@ namespace ms
 		if (recv.read_bool())
 			Stage::get().get_player().request_answered();
 
-		recv.skip(2);
+		// v83 FUN_00a1e48c takes several, as SP Reset sends.
+		int16_t count = recv.read_short();
 
-		int32_t skillid = recv.read_int();
-		int32_t level = recv.read_int();
-		int32_t masterlevel = recv.read_int();
-		int64_t expire = recv.read_long();
+		for (int16_t i = 0; i < count; i++)
+		{
+			int32_t skillid = recv.read_int();
+			int32_t level = recv.read_int();
+			int32_t masterlevel = recv.read_int();
+			int64_t expire = recv.read_long();
 
-		Stage::get().get_player().change_skill(skillid, level, masterlevel, expire);
+			Stage::get().get_player().change_skill(skillid, level, masterlevel, expire);
 
-		if (auto skillbook = UI::get().get_element<UISkillBook>())
-			skillbook->update_skills(skillid);
+			if (auto skillbook = UI::get().get_element<UISkillBook>())
+				skillbook->update_skills(skillid);
+		}
 
 		UI::get().enable();
 	}

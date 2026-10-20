@@ -35,7 +35,9 @@ namespace ms
 		nl::node backsrc = nl::nx::map["Back"];
 
 		animated = src["ani"].get_bool();
-		animation = backsrc[src["bS"] + ".img"][animated ? "ani" : "back"][src["no"]];
+		nl::node backnode = backsrc[src["bS"] + ".img"][animated ? "ani" : "back"][src["no"]];
+		animation = backnode;
+		additive = backnode["blend"].get_integer() == 1;
 		opacity = src["a"];
 		flipped = src["f"].get_bool();
 		cx = src["cx"];
@@ -145,9 +147,15 @@ namespace ms
 		int16_t tw = cx * htile;
 		int16_t th = cy * vtile;
 
+		if (additive)
+			GraphicsGL::get().set_additive(true);
+
 		for (int16_t tx = 0; tx < tw; tx += cx)
 			for (int16_t ty = 0; ty < th; ty += cy)
 				animation.draw(DrawArgument(Point<int16_t>(ix + tx, iy + ty), flipped, opacity / 255), alpha);
+
+		if (additive)
+			GraphicsGL::get().set_additive(false);
 	}
 
 	void Background::update()

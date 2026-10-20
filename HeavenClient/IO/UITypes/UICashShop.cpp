@@ -146,8 +146,12 @@ namespace ms
 
 		const int16_t preview_x[3] = { 149, 184, 216 };
 
+		// A tab strip (CCtrlTab, FUN_004ab0b0): selects as the mouse goes down.
 		for (size_t i = 0; i < 3; i++)
+		{
 			buttons[Buttons::BT_PREVIEW1 + i] = std::make_unique<TwoSpriteButton>(Base["Tab"]["Disable"][i], Base["Tab"]["Enable"][i], Point<int16_t>(preview_x[i], 18), Point<int16_t>(preview_x[i], 11));
+			buttons[Buttons::BT_PREVIEW1 + i]->set_tab();
+		}
 
 		buttons[Buttons::BT_PREVIEW1]->set_state(Button::State::PRESSED);
 
@@ -506,8 +510,12 @@ namespace ms
 		{
 			Tab clicked_tab = in_bar.x() >= WISH_LIST_LEFT ? WISH_LIST : static_cast<Tab>(std::min<int16_t>(in_bar.x() / TAB_WIDTH, PACKAGE));
 
+			// v83's bar (FUN_004d9adb) clicks only when the tab changes.
 			if (clicked && clicked_tab != tab)
+			{
+				Sound(Sound::Name::BUTTONCLICK).play();
 				change_tab(clicked_tab);
+			}
 
 			return clicked ? Cursor::State::CLICKING : Cursor::State::CANCLICK;
 		}
@@ -524,7 +532,10 @@ namespace ms
 				if (cursor.x() >= x && cursor.x() < x + width)
 				{
 					if (clicked && i != subtab)
+					{
+						Sound(Sound::Name::BUTTONCLICK).play();
 						change_subtab(i);
+					}
 
 					return clicked ? Cursor::State::CLICKING : Cursor::State::CANCLICK;
 				}
@@ -565,6 +576,10 @@ namespace ms
 		if (in_tabs.y() >= 0 && in_tabs.y() < ITEM_TAB_SIZE.y() && in_tabs.x() >= 0 && in_tabs.x() < ITEM_TAB_STEP * ITEM_TABS)
 		{
 			InventoryType::Id clicked_tab = static_cast<InventoryType::Id>(InventoryType::Id::EQUIP + in_tabs.x() / ITEM_TAB_STEP);
+
+			// A tab strip (CCtrlTab, FUN_004b0986): the selected tab sounds too.
+			if (clicked)
+				Sound(Sound::Name::TAB).play();
 
 			if (clicked && clicked_tab != item_tab)
 			{

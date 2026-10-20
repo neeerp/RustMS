@@ -388,6 +388,8 @@ namespace ms
 					types.emplace_back(UIElement::Type::MEGAPHONE);
 					types.emplace_back(UIElement::Type::ITEMMEGAPHONE);
 					types.emplace_back(UIElement::Type::PETCHOOSER);
+					types.emplace_back(UIElement::Type::APRESET);
+					types.emplace_back(UIElement::Type::SPRESET);
 					types.emplace_back(UIElement::Type::AVATARSELECT);
 					types.emplace_back(UIElement::Type::SLIDEMENU);
 				}
@@ -402,6 +404,8 @@ namespace ms
 					types.emplace_back(UIElement::Type::TELEPORTROCK);
 					types.emplace_back(UIElement::Type::MEGAPHONE);
 					types.emplace_back(UIElement::Type::PETCHOOSER);
+					types.emplace_back(UIElement::Type::APRESET);
+					types.emplace_back(UIElement::Type::SPRESET);
 					types.emplace_back(UIElement::Type::AVATARSELECT);
 					types.emplace_back(UIElement::Type::SLIDEMENU);
 				} else if (tab)
@@ -507,9 +511,10 @@ namespace ms
 		state->show_equip(parent, slot);
 	}
 
-	void UI::show_item(Tooltip::Parent parent, int32_t item_id)
+	void UI::show_item(Tooltip::Parent parent, int32_t item_id, int64_t expiration, int16_t flags, bool owned,
+					   int32_t remain_life)
 	{
-		state->show_item(parent, item_id);
+		state->show_item(parent, item_id, expiration, flags, owned, remain_life);
 	}
 
 	void

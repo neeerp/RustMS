@@ -36,7 +36,7 @@ namespace ms
 	class TilesObjs
 	{
 	public:
-		TilesObjs(nl::node src);
+		TilesObjs(nl::node src, Point<int16_t> space);
 
 		TilesObjs();
 
@@ -64,7 +64,8 @@ namespace ms
 	class MapTilesObjs
 	{
 	public:
-		MapTilesObjs(nl::node src);
+		// `space` is the width and height of the map's physical space.
+		MapTilesObjs(nl::node src, Point<int16_t> space);
 
 		MapTilesObjs();
 

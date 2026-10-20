@@ -147,9 +147,16 @@ namespace ms
 		{
 			if (button_under(btit.first, pos))
 			{
+				// v83 presses the button the mouse goes down on whether or not
+				// it was hovered, such as one that opened under a still cursor.
+				if (down && !holding && btit.second->get_state() == Button::State::NORMAL)
+					btit.second->set_state(Button::State::MOUSEOVER);
+
 				if (btit.second->get_state() == Button::State::NORMAL)
 				{
-					Sound(Sound::Name::BUTTONOVER).play();
+					// v83's tab strips (CCtrlTab, FUN_004dd822) make no sound on hover.
+					if (!btit.second->is_tab())
+						Sound(Sound::Name::BUTTONOVER).play();
 
 					btit.second->set_state(Button::State::MOUSEOVER);
 					ret = Cursor::State::CANCLICK;
@@ -184,11 +191,14 @@ namespace ms
 
 	Cursor::State UIElement::click_button(uint16_t buttonid)
 	{
+		auto btit = buttons.find(buttonid);
+
+		// A tab strip plays UI.img/Tab as it selects (FUN_004dd8c0).
 		if (!has_own_click_sound(buttonid))
-			Sound(Sound::Name::BUTTONCLICK).play();
+			Sound(btit != buttons.end() && btit->second->is_tab() ? Sound::Name::TAB : Sound::Name::BUTTONCLICK).play();
 
 		Button::State state = button_pressed(buttonid);
-		auto btit = buttons.find(buttonid);
+		btit = buttons.find(buttonid);
 
 		if (btit == buttons.end())
 			return Cursor::State::IDLE;

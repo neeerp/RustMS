@@ -94,6 +94,17 @@ namespace ms
 			cashitem = src["cash"].get_bool();
 			questitem = src["quest"].get_bool();
 			pickupblock = src["pickUpBlock"].get_bool();
+			properties.only = unique;
+			properties.quest = questitem;
+			properties.pquest = src["pquest"].get_bool();
+			properties.trade_block = untradable;
+			properties.equip_trade_block = src["equipTradeBlock"].get_bool();
+			properties.only_equip = src["onlyEquip"].get_bool();
+			properties.account_sharable = src["accountSharable"].get_bool();
+			properties.not_extend = src["notExtend"].get_bool();
+			properties.trade_available = src["tradeAvailable"].get_bool();
+			pet_life.permanent = src["permanent"].get_bool();
+			pet_life.limited = src["limitedLife"];
 			gender = get_item_gender(itemid);
 
 			name = std::string(strsrc["name"]);
@@ -194,6 +205,16 @@ namespace ms
 	bool ItemData::is_pickup_blocked() const
 	{
 		return pickupblock;
+	}
+
+	const item_properties::Info &ItemData::get_properties() const
+	{
+		return properties;
+	}
+
+	const item_expiry::PetLife &ItemData::get_pet_life() const
+	{
+		return pet_life;
 	}
 
 	ItemData::operator bool() const
