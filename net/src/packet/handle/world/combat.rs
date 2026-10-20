@@ -222,6 +222,7 @@ impl WorldHandler for AttackHandler {
         let combo = combo::after_attack(ctx.player, &attack, rand::random());
         let energy = energy::after_attack(ctx.player, &attack);
         let spent = charge::after_attack(ctx.player, &attack, rand::random());
+        let pockets = skills::pickpocket(ctx.player, &attack, rand::random);
         let skill = attack.skill;
         let hits = attack
             .hits
@@ -246,6 +247,7 @@ impl WorldHandler for AttackHandler {
             inflicts,
             takes,
             blast: uses.blast,
+            pockets,
         }));
         if let Some(mist) = mist {
             result = result.with(WorldAction::Field(mist));

@@ -482,6 +482,8 @@ pub enum FieldRequest {
         inflicts: Vec<crate::skills::Inflict>,
         takes: crate::skills::Takes,
         blast: Option<crate::meso_explosion::Blast>,
+        /// Pickpocket's mesos, per mob hit (`skills::pickpocket`).
+        pockets: Vec<(i32, Vec<i32>)>,
     },
     /// Power Guard sent `damage` back at the mob `object_id` that touched
     /// the player, if it is still a `mob_id`.

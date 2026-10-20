@@ -34,6 +34,27 @@ impl ClientActor {
         self.spawn_loot(loot, ownership, object_id, x, y).await
     }
 
+    /// A mob this player stole from drops one of its items for them.
+    pub(super) async fn drop_stolen(
+        &mut self,
+        mob_id: i32,
+        object_id: i32,
+        x: i16,
+        y: i16,
+    ) -> Result<(), RuntimeError> {
+        let player = &self.in_game()?.player;
+        let now = std::time::SystemTime::now();
+        let loot = loot::steal(mob_id, player, now, &mut rand::thread_rng());
+        self.spawn_loot(
+            loot.into_iter().collect(),
+            self.ownership(),
+            object_id,
+            x,
+            y,
+        )
+        .await
+    }
+
     /// A reactor this player broke drops its loot for them.
     pub(super) async fn drop_reactor_loot(
         &mut self,

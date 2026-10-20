@@ -1069,6 +1069,12 @@ impl ClientActor {
                     self.drop_loot(mob_id, showdown, object_id, x, y).await?
                 }
             }
+            ServerMessage::Stole {
+                mob_id,
+                object_id,
+                x,
+                y,
+            } => self.drop_stolen(mob_id, object_id, x, y).await?,
             ServerMessage::PartyChanged { party_id } => {
                 self.party_id = party_id;
                 self.send_to_field(FieldMessage::SetParty {

@@ -737,6 +737,10 @@ pub struct Takes {
     /// Mortal Blow's kill came up: a mob, not a boss, at or under this
     /// percent of its HP dies.
     pub life: i32,
+    /// Steal: each mob hit, not yet stolen from, drops one of its items with
+    /// this percent chance, then never again (Cosmic's rule; the v83 client
+    /// sends a plain swing and sees a plain drop).
+    pub steal: i32,
 }
 
 /// MP Eater: with its chance (`prop`), each mob a spell hits, not a boss,
@@ -768,6 +772,9 @@ pub fn takes(player: &Player, skill: Option<&Learned>, magic: bool, roll: f64) -
         if MORTAL_BLOWS.contains(&skill.skill_id) && roll * 100.0 < f64::from(skill.effect.y) {
             takes.life = skill.effect.x;
         }
+        if skill.skill_id == STEAL {
+            takes.steal = skill.effect.prop;
+        }
     }
     let eater = i32::from(player.stats.job) / 10 * 100_000;
     if magic && MP_EATERS.contains(&eater) {
@@ -781,6 +788,50 @@ pub fn takes(player: &Player, skill: Option<&Learned>, magic: bool, roll: f64) -
             });
     }
     takes
+}
+
+pub const STEAL: i32 = 4201004;
+pub const PICKPOCKET: i32 = 4211003;
+
+/// The attacks Pickpocket picks with: a plain swing and the Bandit's own
+/// (Cosmic's list).
+const PICKS: [i32; 8] = [
+    0, 4001334, 4201005, 4211002, 4211004, 4221001, 4221003, 4221007,
+];
+
+/// Pickpocket's mesos for an attack, per mob hit: each line that hurts
+/// shakes out, with the skill's chance (`prop`), a line/20000 share of its
+/// `x`, at least 1 (Cosmic's rule; v83's client only shows the drops).
+pub fn pickpocket(
+    player: &Player,
+    attack: &crate::combat::Attack,
+    mut roll: impl FnMut() -> f64,
+) -> Vec<(i32, Vec<i32>)> {
+    let Some(most) = player.buffs.value(BuffStat::PickPocket) else {
+        return Vec::new();
+    };
+    let Some(skill) = learned(player, PICKPOCKET).filter(|skill| skill.level > 0) else {
+        return Vec::new();
+    };
+    if !PICKS.contains(&attack.skill) {
+        return Vec::new();
+    }
+    let most = i64::from(most);
+    attack
+        .hits
+        .iter()
+        .map(|hit| {
+            let mesos = hit
+                .damage
+                .iter()
+                .filter(|&&line| line > 0)
+                .filter(|_| roll() * 100.0 < f64::from(skill.effect.prop))
+                .map(|&line| (i64::from(line) * most / 20_000).clamp(1, most) as i32)
+                .collect();
+            (hit.object_id, mesos)
+        })
+        .filter(|(_, mesos): &(i32, Vec<i32>)| !mesos.is_empty())
+        .collect()
 }
 
 /// Poison Mist: a cloud where it's cast that poisons the mobs in it.
@@ -1206,6 +1257,54 @@ mod tests {
         let blow = at_level(3110001, 20).unwrap();
         assert_eq!(takes(&player, Some(&blow), false, 0.09).life, 50);
         assert_eq!(takes(&player, Some(&blow), false, 0.1).life, 0);
+        // Steal at 30 steals four times in ten.
+        let steal = at_level(STEAL, 30).unwrap();
+        assert_eq!(takes(&player, Some(&steal), false, 0.99).steal, 40);
+        assert_eq!(takes(&player, Some(&drain), false, 0.0).steal, 0);
+    }
+
+    #[test]
+    fn pickpocket_shakes_mesos_out_of_the_lines_that_hurt() {
+        use crate::combat::{AttackHit, AttackKind};
+        let attack = |skill, damage: Vec<i32>| crate::combat::Attack {
+            kind: AttackKind::Close,
+            skill,
+            hits: vec![AttackHit {
+                object_id: 7,
+                damage,
+            }],
+            mob_count: 1,
+            hit_count: 1,
+            display: 0,
+            action: 0,
+            speed: 4,
+            charge: 0,
+            ammo_slot: 0,
+            explosion: None,
+        };
+        let mut player = knowing(&[(PICKPOCKET, 20)]);
+        let lines = vec![10_000, 0, 1, 50_000, -5];
+        // Without the buff, nothing.
+        assert!(pickpocket(&player, &attack(0, lines.clone()), || 0.0).is_empty());
+        (player.buffs).give(game::Buff::new(
+            PICKPOCKET,
+            BuffStat::PickPocket,
+            200,
+            std::time::Instant::now(),
+            Duration::from_secs(120),
+        ));
+        // Level 20 picks 60% of the time, up to 200 a line.
+        assert_eq!(
+            pickpocket(&player, &attack(0, lines.clone()), || 0.59),
+            vec![(7, vec![100, 1, 200])]
+        );
+        assert!(pickpocket(&player, &attack(0, lines.clone()), || 0.6).is_empty());
+        // Savage Blow picks; Lucky Seven doesn't.
+        assert_eq!(
+            pickpocket(&player, &attack(4201005, vec![4_000]), || 0.0)[0].1,
+            [40]
+        );
+        assert!(pickpocket(&player, &attack(4001344, vec![4_000]), || 0.0).is_empty());
     }
 
     #[test]

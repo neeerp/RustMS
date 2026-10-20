@@ -70,6 +70,14 @@ pub enum ServerMessage {
         /// Taunt's Showdown: the percent more drops it gives.
         showdown: i32,
     },
+    /// This player's Steal took an item from a mob, which drops one of its
+    /// items for them where it stands.
+    Stole {
+        mob_id: i32,
+        object_id: i32,
+        x: i16,
+        y: i16,
+    },
     /// The player joined or left a party.
     PartyChanged {
         party_id: Option<i32>,
