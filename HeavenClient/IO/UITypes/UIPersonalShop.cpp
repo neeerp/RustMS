@@ -554,8 +554,10 @@ namespace ms
 
 	void UIPersonalShop::create(int16_t slot, int32_t itemid)
 	{
-		// Not on a mount (FUN_00a1dd99).
-		if (Stage::get().get_player().ride_refuses())
+		// Not on a mount, then not while transformed (FUN_00a1dd99).
+		Player &player = Stage::get().get_player();
+
+		if (player.ride_refuses() || player.shape_refuses())
 			return;
 
 		if (auto shop = UI::get().get_element<UIPersonalShop>(); shop && shop->is_active())
