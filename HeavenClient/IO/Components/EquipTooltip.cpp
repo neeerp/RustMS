@@ -190,9 +190,8 @@ namespace ms
 				invtype = InventoryType::Id::NONE;
 		}
 
-		const Player &player = Stage::get().get_player();
-		const CharStats &charstats = player.get_stats();
-		auto oequip = player.get_inventory().get_equip(invtype, invpos);
+		const Inventory &inventory = Stage::get().get_player().get_inventory();
+		auto oequip = inventory.get_equip(invtype, invpos);
 
 		if (!oequip)
 		{
@@ -201,6 +200,44 @@ namespace ms
 		}
 
 		const Equip &equip = *oequip;
+		// Equips bought in the Cash Shop keep its serial.
+		bool cash = inventory.get_cash_id(invtype, invpos) != 0;
+		build(equip, item_expiry::line(equip.get_expiration(), cash, equip.get_flags() & item_expiry::SEALED), "");
+	}
+
+	namespace
+	{
+		// An equip as Character.nx makes it, before any upgrade (CItemInfo FUN_005d5d95).
+		Equip template_equip(int32_t item_id)
+		{
+			const EquipData &equipdata = EquipData::get(item_id);
+			EnumMap<EquipStat::Id, uint16_t> stats;
+
+			for (EquipStat::Id es : EquipStat::values)
+				stats[es] = static_cast<uint16_t>(equipdata.get_defstat(es));
+
+			return Equip(item_id, 0, "", 0, equipdata.get_slots(), 0, stats, 0, 0, 0);
+		}
+	}
+
+	void EquipTooltip::set_commodity(int32_t item_id, int32_t period)
+	{
+		parent = Tooltip::Parent::CASHSHOP;
+		invpos = -1;
+		build(template_equip(item_id), item_expiry::commodity_line(item_id, period), "");
+	}
+
+	void EquipTooltip::set_cash_item(int32_t item_id, int64_t expiration, const std::string &gift_from)
+	{
+		parent = Tooltip::Parent::CASHSHOP;
+		invpos = -1;
+		build(template_equip(item_id), item_expiry::line(expiration, true, false),
+			gift_from.empty() ? "" : "IT'S A GIFT FROM '" + gift_from + "'");
+	}
+
+	void EquipTooltip::build(const Equip &equip, const std::string &expirystr, const std::string &giftstr)
+	{
+		const CharStats &charstats = Stage::get().get_player().get_stats();
 		int32_t item_id = equip.get_item_id();
 		const EquipData &equipdata = EquipData::get(item_id);
 		const ItemData &itemdata = equipdata.get_itemdata();
@@ -231,10 +268,8 @@ namespace ms
 		name = Text(Text::Font::A12B, Text::Alignment::LEFT, equip.get_level() > 0 ? Color::Name::CORNFLOWERBLUE : Color::Name::WHITE, namestr);
 		itemicon = itemdata.get_icon(false);
 
-		// Equips bought in the Cash Shop keep its serial.
-		bool cash = player.get_inventory().get_cash_id(invtype, invpos) != 0;
-		std::string expirystr = item_expiry::line(equip.get_expiration(), cash, equip.get_flags() & item_expiry::SEALED);
 		expiry = expirystr.empty() ? Text() : Text(Text::Font::A11M, Text::Alignment::LEFT, Color::Name::WHITE, expirystr);
+		gift = giftstr.empty() ? Text() : Text(Text::Font::A11M, Text::Alignment::LEFT, Color::Name::WHITE, giftstr);
 
 		const item_properties::Info &info = itemdata.get_properties();
 		item_properties::Lines lines = item_properties::equip(info, equip.get_flags(), !expirystr.empty());
@@ -334,6 +369,9 @@ namespace ms
 		if (!expiry.empty())
 			height += EXPIRY_HEIGHT;
 
+		if (!gift.empty())
+			height += EXPIRY_HEIGHT;
+
 		// One that could trade with Scissors of Karma says so.
 		std::string descstr = itemdata.get_desc();
 
@@ -373,10 +411,14 @@ namespace ms
 
 		pos.shift_y(properties_height);
 
-		if (!expiry.empty())
+		// Each dot line, the date and then the sender, moves the rest down (FUN_008e8252).
+		for (const Text *line : { &expiry, &gift })
 		{
+			if (line->empty())
+				continue;
+
 			stat_dot.draw(pos + EXPIRY_DOT);
-			expiry.draw(pos + EXPIRY_POS);
+			line->draw(pos + EXPIRY_POS);
 			pos.shift_y(EXPIRY_HEIGHT);
 		}
 

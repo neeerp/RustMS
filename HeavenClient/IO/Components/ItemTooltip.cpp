@@ -42,6 +42,9 @@ namespace ms
 		constexpr int16_t EXPIRY_HEIGHT = 20;
 		// A pet's tooltip has its Water of Life there instead, and makes 16 px of room (FUN_008ed8f5).
 		constexpr int16_t PET_LINE_HEIGHT = 16;
+		// The sender of a present: a dot line 16 under the date, or a pet's centred line, either making 16 px of
+		// room.
+		constexpr int16_t GIFT_STEP = 16;
 
 		Text property_line(const std::string &line)
 		{
@@ -57,13 +60,14 @@ namespace ms
 		flags = 0;
 		owned = false;
 		remain_life = 0;
+		cash_shop = false;
 		properties_height = 0;
 		expiry_height = 0;
 	}
 
 	bool ItemTooltip::set_item(int32_t iid, int64_t expire, int16_t flag, bool own, int32_t remain)
 	{
-		if (itemid == iid && expiration == expire && flags == flag && owned == own && remain_life == remain)
+		if (!cash_shop && itemid == iid && expiration == expire && flags == flag && owned == own && remain_life == remain)
 			return false;
 
 		itemid = iid;
@@ -71,10 +75,48 @@ namespace ms
 		flags = flag;
 		owned = own;
 		remain_life = remain;
+		cash_shop = false;
 
 		if (itemid == 0)
 			return false;
 
+		const ItemData &idata = ItemData::get(itemid);
+		bool pet = itemid / 10000 == 500;
+		build(pet ? item_expiry::pet_line(expiration, remain_life, idata.get_pet_life())
+				  : item_expiry::line(expiration, idata.is_cashitem(), flags & item_expiry::SEALED), "");
+
+		return true;
+	}
+
+	void ItemTooltip::set_commodity(int32_t iid, int32_t period)
+	{
+		itemid = iid;
+		expiration = 0;
+		flags = 0;
+		owned = false;
+		remain_life = 0;
+		cash_shop = true;
+
+		bool pet = itemid / 10000 == 500;
+		build(pet ? item_expiry::commodity_pet_line(ItemData::get(itemid).get_pet_life())
+				  : item_expiry::commodity_line(itemid, period), "");
+	}
+
+	void ItemTooltip::set_cash_item(int32_t iid, int64_t expire, const std::string &gift_from)
+	{
+		itemid = iid;
+		expiration = expire;
+		flags = 0;
+		owned = false;
+		remain_life = 0;
+		cash_shop = true;
+
+		bool pet = itemid / 10000 == 500;
+		build(pet ? "" : item_expiry::line(expiration, true, false), gift_from.empty() ? "" : "A GIFT FROM '" + gift_from + "'");
+	}
+
+	void ItemTooltip::build(const std::string &expirystr, const std::string &giftstr)
+	{
 		const ItemData &idata = ItemData::get(itemid);
 
 		const item_properties::Info &info = idata.get_properties();
@@ -93,16 +135,19 @@ namespace ms
 		desc = Text(Text::Font::A12M, Text::Alignment::LEFT, Color::Name::WHITE, descstr, DESC_WIDTH, true, tooltip::LINE_ADJ);
 
 		bool pet = itemid / 10000 == 500;
-		std::string expirystr = pet ? item_expiry::pet_line(expiration, remain_life, idata.get_pet_life())
-									: item_expiry::line(expiration, idata.is_cashitem(), flags & item_expiry::SEALED);
 		expiry = expirystr.empty() ? Text() : Text(Text::Font::A11M, Text::Alignment::LEFT, Color::Name::WHITE, expirystr);
 		expiry_height = expiry.empty() ? 0 : pet ? PET_LINE_HEIGHT : EXPIRY_HEIGHT;
 
-		int16_t top = properties_height + expiry_height;
+		if (giftstr.empty())
+			gift = Text();
+		else if (pet)
+			gift = Text(Text::Font::A12M, Text::Alignment::CENTER, Color::Name::WHITE, giftstr);
+		else
+			gift = Text(Text::Font::A11M, Text::Alignment::LEFT, Color::Name::WHITE, giftstr);
+
+		int16_t top = properties_height + expiry_height + (gift.empty() ? 0 : GIFT_STEP);
 		int16_t bottom = std::max<int16_t>(tooltip::ICON_POS.y() + tooltip::ICON_BOX, DESC_POS.y() + desc.height());
 		size = Point<int16_t>(WIDTH, top + bottom + tooltip::BOTTOM);
-
-		return true;
 	}
 
 	void ItemTooltip::draw(Point<int16_t> pos) const
@@ -126,8 +171,27 @@ namespace ms
 		{
 			expiry_dot.draw(pos + EXPIRY_DOT);
 			expiry.draw(pos + EXPIRY_POS);
-			pos.shift_y(expiry_height);
 		}
+
+		if (!gift.empty())
+		{
+			// FUN_008edfc7 puts it 16 under the date, FUN_008ed8f5 centres a pet's.
+			Point<int16_t> line = pos + Point<int16_t>(0, expiry.empty() ? 0 : GIFT_STEP);
+
+			if (itemid / 10000 == 500)
+			{
+				gift.draw(line + Point<int16_t>(WIDTH / 2, PROPERTY_Y));
+			}
+			else
+			{
+				expiry_dot.draw(line + EXPIRY_DOT);
+				gift.draw(line + EXPIRY_POS);
+			}
+
+			pos.shift_y(GIFT_STEP);
+		}
+
+		pos.shift_y(expiry_height);
 
 		icon.draw(itemicon, pos + tooltip::ICON_POS);
 		desc.draw(pos + DESC_POS);

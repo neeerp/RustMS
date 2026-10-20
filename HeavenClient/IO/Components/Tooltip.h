@@ -49,7 +49,9 @@ namespace ms
 			ITEMMEGAPHONE,
 			STATUSBAR,
 			// The map under the cursor, outside every window.
-			FIELD
+			FIELD,
+			// The Cash Shop's list and Cash Inventory, which show items that aren't in an inventory.
+			CASHSHOP
 		};
 
 		virtual ~Tooltip()

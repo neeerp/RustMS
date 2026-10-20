@@ -46,6 +46,20 @@ int main()
 		require(pet_dead(OCT_19_2026_13_05, 0, limited), "limited life spent");
 		require(pet_line(0, 18000, limited).empty() && pet_line(0, 0, days).empty(), "no date, no line");
 
+		require(commodity_line(1012180, 90) == "AVAILABLE FOR 90 DAYS.", "a period");
+		require(commodity_line(1012180, 0).empty(), "forever");
+		require(commodity_line(5211060, 1) == "AVAILABLE FOR 2 HOURS.", "two hours");
+		require(commodity_line(5360042, 7) == "AVAILABLE FOR 4 HOURS.", "four hours");
+		require(commodity_line(5211060, 0).empty(), "hours need a period");
+
+		PetLife ninety{ false, 0, false, 90 };
+		PetLife no_days{};
+
+		require(commodity_pet_line(ninety) == "DAYS OF MAGIC : 90", "life in days");
+		require(commodity_pet_line(no_days) == "DAYS OF MAGIC : 0", "life 0 still shown");
+		require(commodity_pet_line(permanent) == "PERMANENT", "permanent for sale");
+		require(commodity_pet_line(limited) == "DAYS OF MAGIC : 5hrs. 0min.", "limited life for sale");
+
 		std::cout << "item expiry passed\n";
 		return 0;
 	}
