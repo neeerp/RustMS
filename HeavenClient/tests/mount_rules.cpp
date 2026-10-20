@@ -37,6 +37,16 @@ int main()
 		require(action("rope", false, 1902000) == "rope" && action("ladder", false, 1932003) == "ladder",
 			"climbers climb");
 		require(action("ladder", false, 1932000) == "stand1", "the Battleship doesn't");
+		require(action("cannon", false, 1932000) == "cannon" && action("alert3", true, 1932000) == "alert3",
+			"the ship shoots");
+		require(action("cannon", false, 1902000) == "stand1", "a tamed monster doesn't");
+
+		require(is_ship(1932000) && is_ship(1932006) && !is_ship(1932001) && !is_ship(1932011) &&
+			!is_ship(1902000), "the ship and not the event vehicles");
+		require(ship_allows(5221007) && ship_allows(5201003) && ship_allows(21121008), "guns from the ship");
+		require(!ship_allows(BATTLESHIP) && !ship_allows(5001001) && !ship_allows(0), "nothing else");
+		require(ship_only(5221008) && !ship_only(5211004), "the Cannon and Torpedo need it");
+		require(battleship_max_hp(120, 1) == 400 && battleship_max_hp(200, 30) == 28000, "its HP");
 
 		require(z_index("tamingMobMid") < BEHIND && z_index("saddleFront") < BEHIND, "in front");
 		require(z_index("saddleRear") == BEHIND && z_index("backTamingMobMid") > BEHIND, "behind");

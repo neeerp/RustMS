@@ -52,6 +52,7 @@ namespace ms
 					"Not available during the ride.",
 					"This skill requires a tamed monster and a saddle.",
 					"You cannot ride on this tamed monster.",
+					"This skill is available only when you are riding the Battleship.",
 					"It is not appropriate to use it here.",
 					"Unavailable while transforming.",
 					"Unavailable while transforming. Please right-click the icon at the top right corner to cancel the transformation.",

@@ -67,6 +67,62 @@ namespace ms::mount
 		return item / 10000 == 193;
 	}
 
+	// The Corsair's Battleship, and the vehicle it rides (decomp.c:1178699).
+	constexpr int32_t BATTLESHIP = 5221006;
+	constexpr int32_t BATTLESHIP_VEHICLE = 1932000;
+	// The id SKILL_COOLDOWN gives the ship's HP under.
+	constexpr int32_t BATTLESHIP_HP = 5221999;
+
+	// The vehicles event skills ride (FUN_008c466d), which the Battleship's rules leave alone.
+	inline bool is_event_vehicle(int32_t item)
+	{
+		return (item >= 1932001 && item <= 1932005) || (item >= 1932007 && item <= 1932011);
+	}
+
+	// A vehicle the Battleship's rules hold for.
+	inline bool is_ship(int32_t item)
+	{
+		return is_vehicle(item) && !is_event_vehicle(item);
+	}
+
+	// The skills used from the ship (FUN_00966f7a): the Battleship's, the Corsair's guns and buffs, and a
+	// few other jobs'. The Battleship itself gets off.
+	inline bool ship_allows(int32_t skill)
+	{
+		switch (skill)
+		{
+			case 5201002:
+			case 5201003:
+			case 5211001:
+			case 5211002:
+			case 5211004:
+			case 5211005:
+			case 5220002:
+			case 5221000:
+			case 5221007:
+			case 5221008:
+			case 5221010:
+			case 14111006:
+			case 21121008:
+			case 22171004:
+				return true;
+			default:
+				return false;
+		}
+	}
+
+	// Battleship Cannon and Torpedo, used only from the ship (FUN_00969a57).
+	inline bool ship_only(int32_t skill)
+	{
+		return skill == 5221007 || skill == 5221008;
+	}
+
+	// How much the ship holds when it is new (FUN_007665f1). The server keeps count.
+	inline int32_t battleship_max_hp(int32_t level, int32_t slv)
+	{
+		return (level - 120 + 2 * slv) * 200;
+	}
+
 	// The Monster Rider skill whose effect plays as a job gets on or off (FUN_00936859): Evan's base
 	// is 2001, everyone else's their job's thousands.
 	inline int32_t rider_skill(int32_t job)
@@ -85,6 +141,9 @@ namespace ms::mount
 	// How long after getting on or off the avatar changes, in ms: 30 off each 30 ms update from 240
 	// (FUN_00936859, 0x932a2c).
 	constexpr int16_t SWITCH_DELAY = 240;
+
+	// The Battleship's, which plays its own effect (FUN_00936859).
+	constexpr int16_t SHIP_SWITCH_DELAY = 540;
 
 	// How long the client waits for the server to answer getting on or off before it gives up, in ms
 	// (0x94aa5e). Until then it uses no skill.
@@ -109,6 +168,14 @@ namespace ms::mount
 			(mount >= 1932007 && mount <= 1932011);
 	}
 
+	// The actions a vehicle has for the ship's skills (FUN_004138be): Gun Booster's, Maple Warrior's,
+	// Flamethrower's, Ice Splitter's, and the Cannon's and Torpedo's.
+	inline bool is_ship_action(const std::string &name)
+	{
+		return name == "alert2" || name == "alert3" || name == "fireburner" || name == "coolingeffect" ||
+			name == "cannon" || name == "torpedo";
+	}
+
 	// The mount's action for the rider's (FUN_004138be): alert stands, and anything else it has no
 	// frames for, such as an attack, stands too. A tired mount stands tired.
 	inline std::string action(const std::string &rider, bool tired, int32_t mount)
@@ -118,8 +185,9 @@ namespace ms::mount
 		bool basic = name == "walk1" || name == "walk2" || name == "stand1" || name == "stand2" ||
 			name == "jump" || name == "prone" || name == "fly";
 		bool climbing = (name == "ladder" || name == "rope") && climbs(mount);
+		bool shooting = is_vehicle(mount) && is_ship_action(name);
 
-		if (!basic && !climbing)
+		if (!basic && !climbing && !shooting)
 			name = "stand1";
 
 		if (tired && (name == "stand1" || name == "stand2"))

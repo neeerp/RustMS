@@ -20,15 +20,37 @@ namespace ms
 
 		explicit BuffTimer(int32_t duration) : unit(duration / SHADOWS), left(duration) {}
 
+		// The Battleship's HP, which shows the same way out of `max` but drains only by hits, and blinks once
+		// a sixteenth or less is left (FUN_007b3176, decomp.c:815195).
+		static BuffTimer gauge(int32_t max)
+		{
+			BuffTimer timer(max);
+			timer.draining = false;
+			timer.blink_at = timer.unit;
+
+			return timer;
+		}
+
 		void update(int32_t elapsed)
 		{
 			int32_t before = left;
-			left -= elapsed;
+
+			if (draining)
+				left -= elapsed;
 
 			if (blinking)
 				blink += elapsed;
-			else if (before > BLINK_TIME && left <= BLINK_TIME)
+			else if (before > blink_at && left <= blink_at)
 				blinking = true;
+		}
+
+		// What a gauge has left.
+		void set(int32_t value)
+		{
+			if (!blinking && left > blink_at && value <= blink_at)
+				blinking = true;
+
+			left = value;
 		}
 
 		// The CoolTime frame: 15 is clear, 0 is shaded.
@@ -53,7 +75,9 @@ namespace ms
 	private:
 		int32_t unit, left;
 		int32_t blink = 0;
+		int32_t blink_at = BLINK_TIME;
 		bool blinking = false;
+		bool draining = true;
 	};
 
 	// v83's buff row (FUN_007b24d5, FUN_007b2717): one icon per buff, the
@@ -97,6 +121,22 @@ namespace ms
 		void cancel(int32_t stat)
 		{
 			drop(stat, nullptr);
+		}
+
+		// The icon `id`'s timer, if it has one.
+		BuffTimer* timer(int32_t id)
+		{
+			auto entry = find(id);
+
+			return entry != entries.end() ? &entry->timer : nullptr;
+		}
+
+		void remove(int32_t id)
+		{
+			auto entry = find(id);
+
+			if (entry != entries.end())
+				entries.erase(entry);
 		}
 
 		void update(int32_t elapsed)

@@ -297,8 +297,8 @@ namespace ms
 
 	std::string CharLook::morph_action(Stance::Id st) const
 	{
-		if (!morphact.empty())
-			return morphact;
+		if (!tmplact.empty())
+			return tmplact;
 
 		return MorphTemplate::get(morph).action(Stance::names[st]);
 	}
@@ -326,7 +326,7 @@ namespace ms
 	std::string CharLook::mount_action(Stance::Id st) const
 	{
 		int32_t mountid = get_mount();
-		std::string mobaction = mount::action(Stance::names[st], tired, mountid);
+		std::string mobaction = mount::action(tmplact.empty() ? Stance::names[st] : tmplact, tired, mountid);
 
 		return TamingMob::get(mountid).count(mobaction) > 0 ? mobaction : "stand1";
 	}
@@ -407,10 +407,10 @@ namespace ms
 				{
 					aniend = true;
 
-					// A superman's attack ends with the template's frames.
-					if (!morphact.empty())
+					// A superman's or the ship's attack ends with its frames.
+					if (!tmplact.empty())
 					{
-						morphact = "";
+						tmplact = "";
 						actionstr = "";
 					}
 				}
@@ -611,7 +611,7 @@ namespace ms
 
 	void CharLook::set_stance(Stance::Id newstance)
 	{
-		if (action || !morphact.empty() || newstance == Stance::Id::NONE)
+		if (action || !tmplact.empty() || newstance == Stance::Id::NONE)
 			return;
 
 		Stance::Id adjstance = equips.adjust_stance(newstance);
@@ -635,7 +635,7 @@ namespace ms
 		heldframe = -1;
 		action = nullptr;
 		actionstr = "";
-		morphact = "";
+		tmplact = "";
 	}
 
 	Stance::Id CharLook::getattackstance(uint8_t attack, bool degenerate) const
@@ -714,7 +714,16 @@ namespace ms
 			// The superman plays it through once, at the stance it stands in.
 			action = nullptr;
 			actionstr = acstr;
-			morphact = attack;
+			tmplact = attack;
+			heldframe = -1;
+			stframe.set(0);
+			stelapsed = 0;
+		} else if (riding(stance.get()) && mount::is_ship_action(acstr) && TamingMob::get(get_mount()).count(acstr) > 0)
+		{
+			// So does the ship, under its sitting rider (FUN_004138be).
+			action = nullptr;
+			actionstr = acstr;
+			tmplact = acstr;
 			heldframe = -1;
 			stframe.set(0);
 			stelapsed = 0;
@@ -767,7 +776,7 @@ namespace ms
 	uint16_t CharLook::get_attackdelay(size_t no, uint8_t first_frame) const
 	{
 		// A superman hits when the action would have.
-		if (action || !morphact.empty())
+		if (action || !tmplact.empty())
 		{
 			return drawinfo.get_attackdelay(actionstr, no);
 		} else
@@ -825,7 +834,7 @@ namespace ms
 
 	std::string CharLook::get_action_name() const
 	{
-		return action || !morphact.empty() ? actionstr : Stance::names[stance.get()];
+		return action || !tmplact.empty() ? actionstr : Stance::names[stance.get()];
 	}
 
 	Point<int16_t> CharLook::get_facepos() const
@@ -892,6 +901,12 @@ namespace ms
 		equips.set_riding(v > 0);
 		stframe.set(0);
 		stelapsed = 0;
+
+		if (!tmplact.empty() && !morphed(stance.get()))
+		{
+			tmplact = "";
+			actionstr = "";
+		}
 	}
 
 	int32_t CharLook::get_vehicle() const
@@ -913,9 +928,9 @@ namespace ms
 		stframe.set(0);
 		stelapsed = 0;
 
-		if (!morphact.empty())
+		if (!tmplact.empty())
 		{
-			morphact = "";
+			tmplact = "";
 			actionstr = "";
 		}
 	}

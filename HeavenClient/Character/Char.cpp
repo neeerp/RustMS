@@ -588,8 +588,11 @@ namespace ms
 
 	void Char::ride(int32_t v, bool at_once)
 	{
+		// The Battleship's effect plays longer.
+		bool ship = (v > 0 ? v : vehicle) == mount::BATTLESHIP_VEHICLE;
+
 		vehicle = v;
-		vehicle_switch = at_once ? 0 : mount::SWITCH_DELAY;
+		vehicle_switch = at_once ? 0 : ship ? mount::SHIP_SWITCH_DELAY : mount::SWITCH_DELAY;
 
 		int32_t saddle = mount::is_tamed_monster(v) ? look.get_equips().get_equip(EquipSlot::Id::SADDLE) : 0;
 		ride_ability = v > 0 ? TamingMob::ability(v, saddle) : std::nullopt;

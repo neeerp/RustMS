@@ -72,6 +72,9 @@ namespace ms
 
 	private:
 		Effect effect;
+		// Flamethrower's and Ice Splitter's from the ship.
+		Effect ship;
+		bool has_ship;
 	};
 
 	// An effect which displays an animation over the character's position

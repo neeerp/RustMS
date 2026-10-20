@@ -65,6 +65,8 @@ namespace ms
 			// Getting on a tamed monster without one or a saddle, or one that can't be ridden (0x968b9d)
 			RIDE_NO_SADDLE,
 			RIDE_REFUSED,
+			// Battleship Cannon or Torpedo off the ship (0xdd3)
+			SHIP_ONLY,
 			// A chair in a field of type 61 (0x10ad)
 			CHAIR_FIELD,
 			// Not while an item's morph lasts, one that can't be cancelled or else one that can
