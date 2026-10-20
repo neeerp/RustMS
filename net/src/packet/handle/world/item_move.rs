@@ -130,6 +130,12 @@ fn move_item(
     from: i16,
     to: i16,
 ) -> Result<(Vec<game::InventoryChange>, bool), String> {
+    // A rider's client gets them off before the mount or saddle (or a
+    // cover, 100 below) comes off or is swapped.
+    let saddled = |slot: i16| [equip_slot::MOUNT, equip_slot::SADDLE].contains(&(slot % 100));
+    if player.ride_skill().is_some() && (saddled(from) || saddled(to)) {
+        return Err("riding".into());
+    }
     if from < 0 {
         // Equipment dropped on an occupied bag slot swaps with what is there,
         // which wears that item, so it goes the equip way (v83 FUN_004f11b4).
@@ -562,5 +568,34 @@ mod tests {
                 if p.opcode() == SendOpcode::StatChange as i16));
         }
         assert!(!player.is_dirty());
+    }
+
+    #[test]
+    fn riders_keep_their_mount_and_saddle_on() {
+        let mut player = crate::codec::stats::sample_player();
+        let saddle = Item::equipment(1912000, EquipStats::default());
+        player
+            .inventory
+            .insert(InventoryType::Equipped, equip_slot::SADDLE, saddle);
+        let riding = game::Buff::new(
+            1004,
+            game::BuffStat::Riding,
+            0,
+            std::time::Instant::now(),
+            game::mount::RIDE_DURATION,
+        );
+        player.buffs.give(riding);
+        assert_eq!(
+            move_item(&mut player, -1, equip_slot::SADDLE, 1),
+            Err("riding".into())
+        );
+        assert_eq!(
+            move_item(&mut player, 1, 1, equip_slot::MOUNT - 100),
+            Err("riding".into()),
+            "nor its cover"
+        );
+
+        player.buffs.cancel(1004);
+        assert!(move_item(&mut player, -1, equip_slot::SADDLE, 1).is_ok());
     }
 }

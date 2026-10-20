@@ -249,6 +249,15 @@ diesel::table! {
 }
 diesel::joinable!(gacha_exp -> characters (character_id));
 diesel::table! {
+    character_mounts (character_id) {
+        character_id -> Int4,
+        level -> Int4,
+        exp -> Int4,
+        tiredness -> Int4,
+    }
+}
+diesel::joinable!(character_mounts -> characters (character_id));
+diesel::table! {
     fame_log (id) {
         id -> Int4,
         giver_id -> Int4,
@@ -362,6 +371,7 @@ diesel::allow_tables_to_appear_in_same_query!(
     monster_book_cards,
     teleport_rocks,
     gacha_exp,
+    character_mounts,
     fame_log,
     storage_items,
     storage_equipment_stats,

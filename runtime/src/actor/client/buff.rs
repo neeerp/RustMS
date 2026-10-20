@@ -2,14 +2,20 @@ use super::ClientActor;
 use crate::error::RuntimeError;
 use crate::message::FieldMessage;
 use game::buff::{Buff, Buffs};
-use game::BuffStat;
+use game::inventory::equip_slot;
+use game::{BuffStat, InventoryType};
 use net::packet::build::world::buff;
+use net::packet::build::world::messaging::build_item_line;
 use net::packet::build::world::stat::{self, StatUpdate};
 use net::packet::build::world::summon::Gone;
 use net::packet::handle::world::{absorbed, catch_disease, countered, party_skill_reached};
 use net::summons::Support;
 use net::{summons, FieldRequest, PartySkill, SpawnPosition};
 use packet::Packet;
+
+/// What a player is told when their mount tires them off it.
+const MOUNT_TIRED: &str =
+    "Your mount grew tired! Treat it some revitalizer before riding it again!";
 
 impl ClientActor {
     /// A party member's skill reached the player: if they are still on its
@@ -119,8 +125,9 @@ impl ClientActor {
         Some(tokio::time::Instant::from_std(deadline))
     }
 
-    /// Heal from Recovery, hurt from Poison and Dragon Blood, and end the
-    /// buffs and cooldowns that ran out.
+    /// Heal from Recovery, hurt from Poison and Dragon Blood, tire a ridden
+    /// mount, and end the buffs and cooldowns that ran out; a mount tired
+    /// out ends the ride.
     pub(super) async fn update_buffs(&mut self) -> Result<(), RuntimeError> {
         let player = &mut self.in_game_mut()?.player;
         let mut tick = player.buffs.advance(std::time::Instant::now());
@@ -141,6 +148,16 @@ impl ClientActor {
             tick.expired
                 .extend(player.buffs.cancel(net::skills::DRAGON_BLOOD));
         }
+        let mut tired = false;
+        for _ in 0..tick.tire {
+            tired |= player.mount.tire();
+        }
+        if tired {
+            if let Some(ride) = player.ride_skill() {
+                tick.expired.extend(player.buffs.cancel(ride));
+            }
+        }
+        let stats = &player.stats;
         if stats.hp > 0 && (change < 0 || (change > 0 && stats.hp < stats.max_hp)) {
             let hp = player.add_hp(change);
             packets.push(stat::build_stat_update(false, &[StatUpdate::Hp(hp)])?);
@@ -155,7 +172,25 @@ impl ClientActor {
             packets.push(buff::build_cooldown(skill_id, 0)?);
         }
         let id = player.id();
+        // The map sees the mount tire (Cosmic's runTirednessSchedule).
+        let tiring = if tick.tire > 0 {
+            let info = buff::build_taming_mob_info(id, &player.mount, false)?;
+            packets.push(info.clone());
+            Some(info)
+        } else {
+            None
+        };
+        if tired {
+            packets.push(build_item_line(MOUNT_TIRED, 0)?);
+        }
         self.send_all(&mut packets).await?;
+        if let Some(info) = tiring {
+            self.send_to_field(FieldMessage::FromClient {
+                from: self.client_id,
+                request: FieldRequest::Broadcast(info),
+            })
+            .await?;
+        }
         if bled {
             let shown = buff::build_foreign_special(id, net::skills::DRAGON_BLOOD)?;
             self.send_to_field(FieldMessage::FromClient {
@@ -249,6 +284,37 @@ impl ClientActor {
         let mut packet = buff::build_cancel_buff(&ended)?;
         self.send(&mut packet).await?;
         self.hide_buffs(&ended).await
+    }
+
+    /// Get the player off their mount before they enter a map that keeps
+    /// mounts off (Cosmic's `MapleMap.addPlayer`).
+    pub(super) async fn keep_mounts_off(&mut self, map_id: i32) -> Result<(), RuntimeError> {
+        let Some(skill_id) = self.in_game()?.player.ride_skill() else {
+            return Ok(());
+        };
+        let field_limit = net::get_game_data()
+            .ok()
+            .and_then(|data| data.field(map_id))
+            .map_or(0, |field| field.field_limit);
+        if field_limit & game_data::FIELD_LIMIT_MOUNTS == 0 {
+            return Ok(());
+        }
+        self.end_buff(skill_id).await
+    }
+
+    /// The player's own client learns their mount's state when they come
+    /// in wearing one (Cosmic's PlayerLoggedinHandler).
+    pub(super) async fn show_mount(&mut self) -> Result<(), RuntimeError> {
+        let player = &self.in_game()?.player;
+        if player
+            .inventory
+            .get(InventoryType::Equipped, equip_slot::MOUNT)
+            .is_none()
+        {
+            return Ok(());
+        }
+        let mut packet = buff::build_taming_mob_info(player.id(), &player.mount, false)?;
+        self.send(&mut packet).await
     }
 
     pub(super) async fn summon_broken(&mut self, skill_id: i32) -> Result<(), RuntimeError> {

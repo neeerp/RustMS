@@ -86,6 +86,10 @@ pub enum BuffStat {
     StopMotion = 76,
     /// Darkness all around but a ring about the player.
     Fear = 77,
+    /// Riding the tamed monster worn at `equip_slot::MOUNT` (the client's
+    /// RideVehicle, a two-state stat). Its value isn't used; the mount
+    /// tires every `mount::TIRE_INTERVAL`.
+    Riding = 85,
     /// Items heal half as much HP. It shares Puppet's bit 46 in the client
     /// (as Cosmic's ZOMBIFY and PUPPET do); 128 + 46 keeps it apart here.
     Undead = 174,
@@ -146,12 +150,15 @@ impl BuffStat {
             BuffStat::Recovery => Some(RECOVERY_INTERVAL),
             BuffStat::Poison => Some(POISON_INTERVAL),
             BuffStat::DragonBlood => Some(DRAGON_BLOOD_INTERVAL),
+            BuffStat::Riding => Some(crate::mount::TIRE_INTERVAL),
             _ => None,
         }
     }
 
+    /// Whether the rest of the map sees it: one of `SHOWN`, or riding,
+    /// which they get in a two-state block of its own.
     pub fn shown(self) -> bool {
-        Self::SHOWN.contains(&self)
+        Self::SHOWN.contains(&self) || self == BuffStat::Riding
     }
 }
 
@@ -221,6 +228,8 @@ pub struct BuffTick {
     pub poison: i32,
     /// HP that Dragon Blood drinks now.
     pub blood: i32,
+    /// How many times the ridden mount tires now.
+    pub tire: i32,
 }
 
 #[derive(Clone, Debug, Default)]
@@ -301,7 +310,8 @@ impl Buffs {
     }
 
     /// Heal or hurt for each Recovery, Poison or Dragon Blood interval that
-    /// has passed, then end the buffs and cooldowns that ran out.
+    /// has passed, and tire a ridden mount, then end the buffs and
+    /// cooldowns that ran out.
     pub fn advance(&mut self, now: Instant) -> BuffTick {
         let mut tick = BuffTick::default();
         for buff in &mut self.active {
@@ -312,6 +322,7 @@ impl Buffs {
                 match buff.stat {
                     BuffStat::Poison => tick.poison += i32::from(buff.value),
                     BuffStat::DragonBlood => tick.blood += i32::from(buff.value),
+                    BuffStat::Riding => tick.tire += 1,
                     _ => tick.heal += i32::from(buff.value),
                 }
                 buff.next_tick = Some(at + interval);

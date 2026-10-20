@@ -543,6 +543,42 @@ These, Mystic Door, Teleport and Flash Jump have neither buff stats nor a
 mob debuff, so `skills::acts_alone` lets them past the check that refuses
 such skills as unsupported.
 
+### Mounts
+
+Monster Rider (1004, and 10001004, 20001004, 20011004 for the other
+beginners) rides the 190xxxx mount worn at -18 with the 191xxxx saddle at
+-19 (`game::mount`, report 201). USE_SKILL for it (`use_skill::ride`)
+checks the player is alive and not Seduced, knows the skill at that level,
+the map's `fieldLimit` lacks 0x200 (`game_data::FIELD_LIMIT_MOUNTS`), both
+are worn and the mount has a `tamingMob`, and the MP. The ride is a
+`BuffStat::Riding` buff (bit 85) with the rider skill's id and no end. It
+is a two-state stat, so the generic buff packets never carry it.
+GIVE_BUFF and GIVE_FOREIGN_BUFF for it carry its own block: the mount, the
+skill, a byte and an int (`buff::build_give_ride`). SPAWN_PLAYER carries
+the same block in its riding slot. The client locks every skill
+until it hears bit 85 back, so a refusal and CANCEL_BUFF for the skill
+both answer with CANCEL_BUFF for riding (`mount::dismount`). The map sees
+CANCEL_FOREIGN_BUFF when the player gets off.
+
+`Player.mount` holds the mount's level, EXP and tiredness, saved in
+`character_mounts` (a row once it differs from a new mount's 1 / 0 / 0).
+SET_TAMING_MOB_INFO (`0x30`) carries them: to the player on entering the
+world wearing a mount, and to the map on each change. While riding, the
+mount tires by one each minute (the buff's interval, `BuffTick.tire`);
+past 99 it stays at 99, the ride ends, and the player is told so (a
+BROADCAST_MSG type 6 line). USE_MOUNT_FOOD (`0x4D`, `MountFoodHandler`)
+takes a 226xxxx food from USE while riding. The food takes up to its
+`spec/incFatigue` (Revitalizer: 30) off for `ceil(taken / 30 * (2 * level
++ 6))` EXP, levelling up by Cosmic's table to 29. The food is used even
+on a rested mount, as in Cosmic. CHAR_INFO shows the worn mount's state.
+
+The ride ends on death, a mob's Dispel, logout, and entering a map with
+field limit 0x200 (`keep_mounts_off`). The mount and saddle, and their
+cash covers, can't be moved while riding. Not done: Cosmic's explorer and
+Cygnus restrictions on who may equip which mount, getting the skill and
+the Hog (quest 6002's `skill` act and the Tame Pig maps), event mounts,
+Battleship, and HeavenClient's side.
+
 ## Spending AP and SP
 
 The client locks its UI after SPEND_AP or SPEND_SP until the server answers,
@@ -1285,6 +1321,10 @@ Hawk attack, the Puppet breaking, and the Hawk following its owner to the
 next map with no entrance. It also has a Dark Knight's Beholder heal them
 and buff their weapon defense, refusing both too soon and a stat Hex's
 level doesn't give, and an Arch Mage's Elquines freeze a mob for 3 s.
+`mounts` has a rider on a tired Hog get on in Henesys. A player coming
+onto the map sees them riding. A Revitalizer levels the Hog up, for both
+of them, and getting off shows on both. Food is refused once off, and the
+Hog's state survives logging out.
 `mystic_door` has a Priest open a door, refused in town, use it to town
 and back, keep a stranger out until they join the party, and close it on
 logout.

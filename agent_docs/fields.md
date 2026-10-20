@@ -63,7 +63,8 @@ included, the field sends their client actor
 answers with CHAR_INFO (0x3D, `build::world::info::build_character_info`)
 built from its own `Player`, so the level and fame are current rather than
 the field's projection. It lists the pets out, without their equipment.
-Alliance, mount, wish list, and monster book are empty; the medal is the item
+It shows the worn mount's level, EXP and tiredness. Alliance, wish list,
+and monster book are empty; the medal is the item
 worn in the medal slot. A request for someone not on the map gets no answer.
 
 ## Fame

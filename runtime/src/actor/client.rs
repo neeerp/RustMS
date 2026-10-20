@@ -553,6 +553,7 @@ impl ClientActor {
             position: (spawn.x, spawn.y),
         });
         self.join_current_field(spawn).await?;
+        self.show_mount().await?;
         self.load_buddies().await?;
         self.load_guild().await?;
         info!(
@@ -580,6 +581,7 @@ impl ClientActor {
 
         self.leave_trade().await?;
         self.leave_personal_shop().await?;
+        self.keep_mounts_off(map_id).await?;
         self.send_to_field(FieldMessage::Leave {
             client_id: self.client_id,
         })

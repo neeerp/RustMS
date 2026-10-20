@@ -39,6 +39,8 @@ pub const FIELD_LIMIT_TELEPORT_ROCK: i32 = 0x40;
 /// `info/fieldLimit` bit forbidding return scrolls that name a map (v83
 /// FUN_00a1e1ce).
 pub const FIELD_LIMIT_MAP_SCROLLS: i32 = 0x100;
+/// `info/fieldLimit` bit keeping mounts off the map (v83 FUN_00966f7a).
+pub const FIELD_LIMIT_MOUNTS: i32 = 0x200;
 /// `info/fieldLimit` bit leaving only the map's `info/allowedItem` usable
 /// (v83 FUN_00a092fb).
 pub const FIELD_LIMIT_CONSUMABLES: i32 = 0x400;

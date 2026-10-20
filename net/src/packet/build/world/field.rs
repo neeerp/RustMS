@@ -25,7 +25,7 @@ pub fn build_player_enter_field(avatar: &FieldAvatar) -> Result<Packet, NetworkE
         &guild.map(|guild| guild.emblem).unwrap_or_default(),
     )?;
 
-    write_foreign_buffs(&mut packet, &avatar.buffs)?;
+    write_foreign_buffs(&mut packet, &avatar.buffs, avatar.ride)?;
 
     packet.write_short(avatar.job)?;
     encode_avatar_look(&mut packet, &avatar.look, false)?;
@@ -43,8 +43,9 @@ pub fn build_player_enter_field(avatar: &FieldAvatar) -> Result<Packet, NetworkE
         super::pet::write_pet(&mut packet, pet)?;
     }
     packet.write_byte(0)?; // end of pets
-    packet.write_int(1)?; // mount level
-    packet.write_long(0)?; // mount exp and tiredness
+    packet.write_int(avatar.mount.level)?;
+    packet.write_int(avatar.mount.exp)?;
+    packet.write_int(avatar.mount.tiredness)?;
     write_mini_room_box(&mut packet, avatar.mini_room.as_ref())?;
     write_chalkboard(&mut packet, avatar.chalkboard.as_deref())?;
     packet.write_byte(0)?; // crush ring
@@ -58,9 +59,13 @@ pub fn build_player_enter_field(avatar: &FieldAvatar) -> Result<Packet, NetworkE
 }
 
 /// The buffs others see, then the two-state stats' fixed blocks, which
-/// are always empty here; the repeated spawn constant mirrors what the
-/// reference server sends.
-fn write_foreign_buffs(packet: &mut Packet, shown: &[game::ShownBuff]) -> Result<(), NetworkError> {
+/// are empty here but for the mount the player rides; the repeated spawn
+/// constant mirrors what the reference server sends.
+fn write_foreign_buffs(
+    packet: &mut Packet,
+    shown: &[game::ShownBuff],
+    ride: Option<game::Ride>,
+) -> Result<(), NetworkError> {
     const CHAR_MAGIC_SPAWN: i32 = 0x2D0F_5E1A;
     buff::write_shown(packet, shown, true)?;
 
@@ -76,7 +81,9 @@ fn write_foreign_buffs(packet: &mut Packet, shown: &[game::ShownBuff]) -> Result
     packet.write_short(0)?;
     packet.write_byte(0)?;
 
-    packet.write_long(0)?; // monster riding
+    let ride = ride.map_or((0, 0), |ride| (ride.item_id, ride.skill_id));
+    packet.write_int(ride.0)?; // monster riding
+    packet.write_int(ride.1)?;
     packet.write_int(CHAR_MAGIC_SPAWN)?;
     packet.write_bytes(&[0; 8])?; // speed infusion
     packet.write_int(CHAR_MAGIC_SPAWN)?;
@@ -294,6 +301,8 @@ mod tests {
             pets: Vec::new(),
             chalkboard: None,
             item_effect: 0,
+            ride: None,
+            mount: game::Mount::default(),
         }
     }
 
@@ -307,11 +316,16 @@ mod tests {
     }
 
     fn empty_two_state(expect: &mut Expect<'_>) {
+        two_state(expect, (0, 0));
+    }
+
+    /// The two-state data with the mount and skill a player rides.
+    fn two_state(expect: &mut Expect<'_>, ride: (i32, i32)) {
         expect.int(0); // defense attack and state, then two-state data
         expect.int(0).short(0).bytes(&[0; 4]); // energy charge
         expect.int(0).bytes(&[0; 11]).short(0); // dash speed
         expect.bytes(&[0; 9]).int(0).short(0).byte(0); // dash jump
-        expect.long(0); // monster riding
+        expect.int(ride.0).int(ride.1); // monster riding
         let magic = expect.read_int();
         expect.bytes(&[0; 8]); // speed infusion
         assert_eq!(expect.read_int(), magic);
@@ -342,7 +356,7 @@ mod tests {
         expect.int(0).int(5010000).int(3010000); // 5110000 count, item effect, chair
         expect.short(-120).short(275).byte(4).short(0).byte(0);
         expect.byte(0); // end of pets
-        expect.int(1).long(0); // mount level, exp and tiredness
+        expect.int(1).int(0).int(0); // mount level, exp and tiredness
         expect.byte(0); // no shop or minigame box
         expect.byte(0); // no chalkboard
         expect.byte(0).byte(0).byte(0); // crush, friendship, marriage rings
@@ -454,6 +468,34 @@ mod tests {
         expect.byte(40); // speed; Dark Sight has no data
         empty_two_state(&mut expect);
         expect.short(100);
+    }
+
+    #[test]
+    fn spawn_player_carries_the_ridden_mount() {
+        let mut avatar = avatar();
+        avatar.ride = Some(game::Ride {
+            item_id: 1902000,
+            skill_id: 1004,
+        });
+        avatar.mount = game::Mount {
+            level: 4,
+            exp: 120,
+            tiredness: 33,
+        };
+        let packet = build_player_enter_field(&avatar).unwrap();
+
+        let mut expect = Expect::new(&packet.bytes);
+        expect.short(SendOpcode::SpawnPlayer as i16);
+        expect.int(0x0102_0304).byte(10).string("Tester");
+        expect.string("").bytes(&[0; 6]);
+        expect.int(0).short(0).byte(0xFC).byte(1).int(0).int(0);
+        two_state(&mut expect, (1902000, 1004));
+        expect.short(100);
+        expect.look(&avatar.look, false);
+        expect.int(0).int(0).int(3010000);
+        expect.short(-120).short(275).byte(4).short(0).byte(0);
+        expect.byte(0); // end of pets
+        expect.int(4).int(120).int(33);
     }
 
     #[test]
