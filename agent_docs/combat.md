@@ -821,6 +821,11 @@ rolling `prop`, and lasts the skill's `time`. AFFECTED_AREA_CREATED (0x111)
 shows it to the map and to players who join; AFFECTED_AREA_REMOVED (0x112)
 lifts it. The reach interval and the 800 ms come from OdinMS-family servers.
 
+A Shadower's Smokescreen (4221006) is a USE_SKILL that asks the field for
+a type 2 (smoke) mist around the caster that puts nothing on mobs. The
+v83 client shelters itself from mob attacks while it stands in its own or
+a party member's smoke, so the server has nothing more to do.
+
 HeavenClient's `MapMists` lays the skill's `tile` clouds over the area as
 v83 does (`MistLayout.h`, a diamond of random tiles), draws them above the
 map's objects, and fades them out over a second when the mist lifts.
@@ -1391,7 +1396,8 @@ Blast and Dragon Roar, checks Dragon Roar's stun and its end, refuses
 Dragon Roar under half HP, and has Dragon Blood drink HP until it ends
 early. `poison_mist` casts Poison Mist on a snail and
 checks the cloud's packet, that it lifts on time, and that it poisons only
-the snails in its box. `snipe` has a Marksman Snipe snails: 200,000 is
+the snails in its box. `smokescreen` checks the smoke's packet and that
+the 600 s cooldown refuses another. `snipe` has a Marksman Snipe snails: 200,000 is
 refused, 199,999 kills and starts the 4 s cooldown, which refuses another
 until it ends. `critical_shots` has an Assassin with Subis shot for 16,
 its cap, but not 17, then for 32 but not 33 once it learns Critical Throw.

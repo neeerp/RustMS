@@ -1,6 +1,7 @@
 //! Skill templates (`Skill.nx`), loaded once.
 
 use crate::load::{self, asset_path};
+use crate::packet::build::world::mist::MistKind;
 use game::{BuffStat, Disease, InventoryType, MobStat, Player, SkillRecord};
 use game_data::skills::{SkillData, SkillInfo, SkillLevel};
 use game_data::{FieldTemplate, FIELD_LIMIT_MYSTIC_DOOR, PORTAL_TYPE_START_POINT};
@@ -300,13 +301,13 @@ pub const WINGS: i32 = 5201005;
 
 /// Skills that neither buff nor debuff: the handler does their work.
 /// Chakra heals the user, MP Recovery turns HP into MP, Resurrection raises
-/// dead party members, Time Leap ends cooldowns, and Mystic Door opens a
-/// door. Teleport, Flash Jump and Wings have no work, and Dash gives its
-/// own buffs.
+/// dead party members, Time Leap ends cooldowns, Mystic Door opens a door,
+/// and Smokescreen leaves its smoke. Teleport, Flash Jump and Wings have no
+/// work, and Dash gives its own buffs.
 pub fn acts_alone(skill_id: i32) -> bool {
     matches!(
         skill_id,
-        MYSTIC_DOOR | CHAKRA | MP_RECOVERY | RESURRECTION | TIME_LEAP | WINGS
+        MYSTIC_DOOR | CHAKRA | MP_RECOVERY | RESURRECTION | TIME_LEAP | WINGS | SMOKESCREEN
     ) || TELEPORTS.contains(&skill_id)
         || FLASH_JUMPS.contains(&skill_id)
         || DASHES.contains(&skill_id)
@@ -785,17 +786,32 @@ pub fn takes(player: &Player, skill: Option<&Learned>, magic: bool, roll: f64) -
 /// Poison Mist: a cloud where it's cast that poisons the mobs in it.
 pub const POISON_MIST: i32 = 2111003;
 
-/// What the mist a spell leaves puts on the mobs in it, each with the
-/// skill's chance, for as long as the mist's `time`; None for a spell that
+/// Smokescreen: smoke around the caster where mobs can't hurt them or
+/// their party, which the v83 client works out itself (FUN_0043193a).
+pub const SMOKESCREEN: i32 = 4221006;
+
+/// What the mist a skill leaves puts on the mobs in it, each with the
+/// skill's chance, for as long as the mist's `time`; None for a skill that
 /// leaves none. v83's client draws the mist (0x431a63); what it does is the
-/// server's (OdinMS-family: Poison Mist poisons).
+/// server's (OdinMS-family: Poison Mist poisons, Smokescreen nothing).
 pub fn mist(skill: &Learned) -> Option<Inflict> {
-    (skill.skill_id == POISON_MIST).then(|| {
-        Inflict::new(
+    match skill.skill_id {
+        POISON_MIST => Some(Inflict::new(
             skill,
             vec![(MobStat::Poison, Amount::Poison { level: skill.level })],
-        )
-    })
+        )),
+        SMOKESCREEN => Some(Inflict::new(skill, Vec::new())),
+        _ => None,
+    }
+}
+
+/// The kind of mist a skill leaves: smoke for Smokescreen, else poison.
+pub fn mist_kind(skill_id: i32) -> MistKind {
+    if skill_id == SMOKESCREEN {
+        MistKind::Smoke
+    } else {
+        MistKind::Poison
+    }
 }
 
 /// The mob buffs a skill that reaches mobs takes away: the Crashes, and
@@ -1317,6 +1333,12 @@ mod tests {
                 ],
             }]
         );
+    }
+
+    #[test]
+    fn smokescreen_leaves_smoke_and_poison_mist_poison() {
+        assert_eq!(mist_kind(SMOKESCREEN), MistKind::Smoke);
+        assert_eq!(mist_kind(POISON_MIST), MistKind::Poison);
     }
 
     #[test]
