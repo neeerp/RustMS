@@ -149,7 +149,7 @@ namespace ms
 
 	void UI::send_scroll(double yoffset)
 	{
-		state->send_scroll(yoffset);
+		state->send_scroll(yoffset, cursor.get_position());
 	}
 
 	void UI::send_close()

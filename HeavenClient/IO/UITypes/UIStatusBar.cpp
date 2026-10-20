@@ -134,8 +134,9 @@ namespace ms
 		// The soHPFlash and soMPFlash options, in 5% steps. v83 reads them
 		// from the registry, 10 (50%) unless set in the options.
 		constexpr int32_t FLASH_LEVEL = 10;
-		const Point<int16_t> CELL_SPACING = Point<int16_t>(35, 34);
-		const Point<int16_t> LABEL_SPACING = Point<int16_t>(35, 33);
+		// Quick slot cells are 32 x 32 at (7, 8) + (35, 33) per column and row (0xbe2db0).
+		const Point<int16_t> CELL_PITCH = Point<int16_t>(35, 33);
+		constexpr int16_t CELL_SIZE = 32;
 
 		// Bind a key to a mapping and tell the server. As in Key Config, the
 		// mapping leaves any other key it was on.
@@ -436,7 +437,7 @@ namespace ms
 		{
 			int16_t col = i % 4;
 			int16_t row = i / 4;
-			Point<int16_t> cellpos = panel + Point<int16_t>(7 + col * CELL_SPACING.x(), 8 + row * CELL_SPACING.y());
+			Point<int16_t> cellpos = panel + Point<int16_t>(7 + col * CELL_PITCH.x(), 8 + row * CELL_PITCH.y());
 
 			Keyboard::Mapping mapping = keyboard.get_maple_mapping(QUICKSLOT_KEYS[i]);
 
@@ -479,7 +480,7 @@ namespace ms
 					break;
 			}
 
-			keylabels[i].draw(panel + Point<int16_t>(9 + col * LABEL_SPACING.x(), 10 + row * LABEL_SPACING.y()));
+			keylabels[i].draw(panel + Point<int16_t>(9 + col * CELL_PITCH.x(), 10 + row * CELL_PITCH.y()));
 		}
 	}
 
@@ -692,9 +693,9 @@ namespace ms
 		{
 			int16_t col = i % 4;
 			int16_t row = i / 4;
-			Point<int16_t> cellpos = panel + Point<int16_t>(7 + col * CELL_SPACING.x(), 8 + row * CELL_SPACING.y());
+			Point<int16_t> cellpos = panel + Point<int16_t>(7 + col * CELL_PITCH.x(), 8 + row * CELL_PITCH.y());
 
-			if (Rectangle<int16_t>(cellpos, cellpos + CELL_SPACING).contains(cursorpos))
+			if (Rectangle<int16_t>(cellpos, cellpos + Point<int16_t>(CELL_SIZE, CELL_SIZE)).contains(cursorpos))
 				return i;
 		}
 
@@ -732,12 +733,56 @@ namespace ms
 			UI::get().clear_tooltip(Tooltip::Parent::STATUSBAR);
 		}
 
+		// v83 FUN_008d795a: a press or the cursor off the cells takes a slot's tooltip down.
+		if (quickslot_active)
+		{
+			int16_t slot = quickslot_at(cursorpos);
+
+			if (clicked || slot < 0)
+				UI::get().clear_tooltip(Tooltip::Parent::QUICKSLOT);
+			else
+				show_quickslot(slot);
+		}
+
 		return UIElement::send_cursor(clicked, cursorpos);
+	}
+
+	// The slot's skill with its levels, its item as Item.nx has it (no count or flags), or its macro. Other slots
+	// leave the last tooltip up, as v83 does.
+	void UIStatusBar::show_quickslot(int16_t slot) const
+	{
+		Keyboard::Mapping mapping = UI::get().get_keyboard().get_maple_mapping(QUICKSLOT_KEYS[slot]);
+
+		switch (mapping.type)
+		{
+			case KeyType::Id::SKILL:
+			{
+				const SkillBook &skills = Stage::get().get_player().get_skills();
+				int32_t level = skills.get_level(mapping.action);
+
+				if (level > 0)
+					UI::get().show_skill(Tooltip::Parent::QUICKSLOT, mapping.action, level,
+										 skills.get_masterlevel(mapping.action), skills.get_expiration(mapping.action));
+
+				break;
+			}
+			case KeyType::Id::ITEM:
+				UI::get().show_item(Tooltip::Parent::QUICKSLOT, mapping.action);
+				break;
+			case KeyType::Id::MACRO:
+				if (mapping.action >= 0 && mapping.action < static_cast<int32_t>(SkillMacros::MAX_MACROS))
+					UI::get().show_macro(Tooltip::Parent::QUICKSLOT, mapping.action);
+
+				break;
+			default:
+				break;
+		}
 	}
 
 	void UIStatusBar::remove_cursor()
 	{
 		UI::get().clear_tooltip(Tooltip::Parent::STATUSBAR);
+		UI::get().clear_tooltip(Tooltip::Parent::QUICKSLOT);
 
 		UIElement::remove_cursor();
 	}

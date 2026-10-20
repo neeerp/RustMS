@@ -69,7 +69,11 @@ from `UI.nx`. Moved so far:
   Esc opens the Game Menu; the MENU key action opens ShortCut. Dropping a
   skill, a USE or SETUP item, or a skill macro on a quick slot binds that
   slot's key and saves the keymap right away; an open Key Config shows the
-  new binding. Quick slots show no tooltips yet.
+  new binding. Hovering a quick slot shows its skill with levels, its item
+  as Item.nx has it, or its macro, with the box 128 px above the cursor;
+  cash and other slots leave the last tooltip up, as v83 does. The mouse
+  wheel goes only to the window under the cursor (or a modal window), never
+  to windows elsewhere on screen.
   Status messages (`UIStatusMessenger`) stack upward from just above the
   quick slot panel, right-aligned with it; `UIStatusBar::QUICKSLOT_TOP` is
   the shared anchor. Each fades out over 6 s. SHOW_STATUS_INFO is worded and

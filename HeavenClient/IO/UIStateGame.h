@@ -58,7 +58,7 @@ namespace ms
 
 		Cursor::State send_cursor(Cursor::State cursorstate, Point<int16_t> cursorpos) override;
 
-		void send_scroll(double yoffset) override;
+		void send_scroll(double yoffset, Point<int16_t> pos) override;
 
 		void send_close() override;
 

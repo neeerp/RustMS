@@ -49,6 +49,8 @@ namespace ms
 			PERSONALSHOP,
 			ITEMMEGAPHONE,
 			STATUSBAR,
+			// The status bar's quick slots, whose tooltips go above the cursor.
+			QUICKSLOT,
 			// The map under the cursor, outside every window.
 			FIELD,
 			// The Cash Shop's list and Cash Inventory, which show items that aren't in an inventory.

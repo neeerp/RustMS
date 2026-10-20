@@ -132,6 +132,7 @@ namespace ms
 
 		void draw_quickslots() const;
 		int16_t quickslot_at(Point<int16_t> cursorpos) const;
+		void show_quickslot(int16_t slot) const;
 
 		Rectangle<int16_t> get_menu_bounds() const;
 

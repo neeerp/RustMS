@@ -19,6 +19,7 @@
 
 #include "UI.h"
 #include "InputFocus.h"
+#include "Components/TooltipBox.h"
 
 #include "UITypes/UIBuffList.h"
 #include "UITypes/UIPartyHP.h"
@@ -96,6 +97,18 @@ namespace ms
 					return Tooltip::Parent::NONE;
 			}
 		}
+
+		// The quick slots' tooltips belong to the status bar too.
+		bool tooltip_belongs(Tooltip::Parent parent, UIElement::Type type)
+		{
+			return tooltip_parent_for(type) == parent ||
+				   (parent == Tooltip::Parent::QUICKSLOT && type == UIElement::Type::STATUSBAR);
+		}
+
+		// Where tooltips are drawn against the cursor. The quick slots put the box's top-left 128 above it instead
+		// (FUN_008d795a).
+		const Point<int16_t> TOOLTIP_POS = Point<int16_t>(0, 22);
+		const Point<int16_t> QUICKSLOT_TOOLTIP_POS = Point<int16_t>(0, -128) - tooltip::OFFSET;
 	}
 
 	UIStateGame::UIStateGame() : stats(Stage::get().get_player().get_stats()), dragged(nullptr)
@@ -136,7 +149,7 @@ namespace ms
 		Stage::get().draw_overlay(inter);
 
 		if (tooltip)
-			tooltip->draw(cursor + Point<int16_t>(0, 22));
+			tooltip->draw(cursor + (tooltipparent == Tooltip::Parent::QUICKSLOT ? QUICKSLOT_TOOLTIP_POS : TOOLTIP_POS));
 
 		if (draggedicon)
 			draggedicon->dragdraw(cursor);
@@ -179,7 +192,7 @@ namespace ms
 		{
 			auto &element = elements[type];
 
-			if (tooltipparent != Tooltip::Parent::NONE && tooltip_parent_for(type) == tooltipparent &&
+			if (tooltipparent != Tooltip::Parent::NONE && tooltip_belongs(tooltipparent, type) &&
 				!(element && element->is_active()))
 			{
 				clear_tooltip(tooltipparent);
@@ -471,7 +484,7 @@ namespace ms
 						UIElement::Type front_type = front->get_type();
 
 						if (tooltipparent != Tooltip::Parent::NONE)
-							if (tooltip_parent_for(front_type) != tooltipparent)
+							if (!tooltip_belongs(tooltipparent, front_type))
 								clear_tooltip(tooltipparent);
 
 						remove_cursor(front_type);
@@ -518,15 +531,17 @@ namespace ms
 		}
 	}
 
-	void UIStateGame::send_scroll(double yoffset)
+	// Only the window under the cursor gets the wheel, even with nothing to scroll, and none over the field. A modal
+	// window gets it wherever the cursor is (FUN_009e42b2).
+	void UIStateGame::send_scroll(double yoffset, Point<int16_t> pos)
 	{
-		for (auto &type : elementorder)
-		{
-			auto &element = elements[type];
+		UIElement *target = get_focused();
 
-			if (element && element->is_active())
-				element->send_scroll(yoffset);
-		}
+		if (!target)
+			target = get_front(pos);
+
+		if (target)
+			target->send_scroll(yoffset);
 	}
 
 	void UIStateGame::send_close()
@@ -758,7 +773,7 @@ namespace ms
 		if (type == focused)
 			focused = UIElement::Type::NONE;
 
-		if (tooltip_parent_for(type) == tooltipparent)
+		if (tooltip_belongs(tooltipparent, type))
 			clear_tooltip(tooltipparent);
 
 		elementorder.remove(type);

@@ -53,7 +53,8 @@ namespace ms
 
 		virtual Cursor::State send_cursor(Cursor::State mst, Point<int16_t> pos) = 0;
 
-		virtual void send_scroll(double yoffset) = 0;
+		// The wheel, with the cursor where it turned.
+		virtual void send_scroll(double yoffset, Point<int16_t> pos) = 0;
 
 		virtual void send_close() = 0;
 
@@ -111,7 +112,7 @@ namespace ms
 		void rightclick(Point<int16_t>) override {}
 		void send_key(KeyType::Id, int32_t, bool, bool) override {}
 		Cursor::State send_cursor(Cursor::State, Point<int16_t>) override { return Cursor::State::IDLE; }
-		void send_scroll(double yoffset) override {}
+		void send_scroll(double, Point<int16_t>) override {}
 		void send_close() override {}
 		void drag_icon(Icon*) override {}
 		void clear_tooltip(Tooltip::Parent) override {}
