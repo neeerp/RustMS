@@ -19,6 +19,9 @@ unsourced = [
     "ships.sell.ask",
     "ships.sell.decline",
     "ships.sell.short",
+    "ships.sell.menu",
+    "ships.sell.choice",
+    "ships.sell.full",
     "ships.board.no_ticket",
     "first_job.inventory_full",
     "second_job.warrior.letter",
@@ -416,13 +419,13 @@ sha256 = "b0f758155c684403ac4d46c6500c5a6b6bb588029bbb479ffbe8d8823dd81820"
 
 [text."isa.platform"]
 source = "Server.Scripts/src/station_in.lua"
-template = "{s24}{s4}{s25}{s3}"
-sha256 = "7152a65c5cf7311272cdbd2ea665edc34681583030257591528fc7b1e63bab5e"
+template = "{s24}{vehicle}{s25}{place}"
+sha256 = "bd70370afcc27e63cad92529214a11fc1220a0b863498384d05859c31ae4116e"
 
 [text."isa.ask"]
 source = "Server.Scripts/src/station_in.lua"
-template = "{s27}{s4}{s28}{s3}{s29}"
-sha256 = "e6801d03f79577972e727d4eb30552a16f41354f3c4f1013dd5dfc199fc61189"
+template = "{s27}{vehicle}{s28}{place}{s29}"
+sha256 = "58c668fc5220d17be317ef871077dd054596ddd8a08bd762b8a3322dfceb6a11"
 
 [text."isa.decline"]
 source = "Server.Scripts/src/station_in.lua"

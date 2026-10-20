@@ -28,17 +28,53 @@ const LITH_HARBOR: i32 = 104_000_000;
 const RECOMMENDATION_LETTER: i32 = 4031801;
 const SHIP_FARE: i32 = 150;
 const SHIP_LEVEL: u8 = 7;
-/// The Ellinia and Orbis stations' crews: ticket sellers, ushers, and the
-/// crew who let passengers off before departure.
+/// The stations' crews (report 183-routes): ticket sellers, ushers, and
+/// the crew who let passengers off before departure.
 const JOEL: i32 = 1032007;
 const CHERRY: i32 = 1032008;
 const PURIN: i32 = 1032009;
 const AGATHA: i32 = 2012000;
 const RINI: i32 = 2012001;
 const ERIN: i32 = 2012002;
-/// Orbis Station's guide, and the passage to the platform for Ellinia.
+/// Each town's booth sells the ticket back to Orbis; Agatha, in Orbis,
+/// sells one for each ship.
+const SELLERS: [(i32, &Route); 4] = [
+    (JOEL, &conti::TO_ORBIS),
+    (2040000, &conti::LUDIBRIUM_TO_ORBIS),
+    (2082000, &conti::LEAFRE_TO_ORBIS),
+    (2102002, &conti::ARIANT_TO_ORBIS),
+];
+/// Agatha's tickets, with the destination her menu names.
+const AGATHA_ROUTES: [(&Route, &str); 4] = [
+    (&conti::TO_ELLINIA, "Ellinia"),
+    (&conti::TO_LUDIBRIUM, "Ludibrium"),
+    (&conti::TO_LEAFRE, "Leafre"),
+    (&conti::TO_ARIANT, "Ariant"),
+];
+const USHERS: [(i32, &Route); 8] = [
+    (CHERRY, &conti::TO_ORBIS),
+    (RINI, &conti::TO_ELLINIA),
+    (2012013, &conti::TO_LUDIBRIUM),
+    (2041000, &conti::LUDIBRIUM_TO_ORBIS),
+    (2012021, &conti::TO_LEAFRE),
+    (2082001, &conti::LEAFRE_TO_ORBIS),
+    (2012025, &conti::TO_ARIANT),
+    (2102000, &conti::ARIANT_TO_ORBIS),
+];
+/// The waiting rooms' guides. Rosey (2041001) has both of Ludibrium's
+/// train's, so the player's map picks the route.
+const WAITING_ROOM_GUIDES: [i32; 7] = [PURIN, ERIN, 2041001, 2012022, 2012024, 2082002, 2102001];
+/// Orbis Station's guide, and the passages to the platforms: (vehicle,
+/// destination, passage), as `station_in` names them. The passages to Mu
+/// Lung's crane and Ereve's ferry are left out until those run.
 const ISA: i32 = 2012006;
 const ORBIS_TUNNEL: i32 = 200000110;
+const ISA_PLATFORMS: [(&str, &str, i32); 4] = [
+    ("Ship", "Victoria Island", ORBIS_TUNNEL),
+    ("Ship", "Ludibrium", 200000120),
+    ("Ship", "Leafre", 200000130),
+    ("Genie", "Ariant", 200000150),
+];
 /// Henesys's hair salon (`hair_henesys1`): a cut or a dye of the player's
 /// choosing, for a coupon each.
 const NATALIE: i32 = 1012103;
@@ -394,6 +430,15 @@ impl NpcScript {
         if let Some(line) = THIRD_JOBS.iter().find(|line| line.chief == npc_id) {
             return Some(chief(line, player));
         }
+        if let Some((_, route)) = SELLERS.iter().find(|(seller, _)| *seller == npc_id) {
+            return Some(ticket_seller(npc_id, route, player));
+        }
+        if let Some((_, route)) = USHERS.iter().find(|(usher, _)| *usher == npc_id) {
+            return Some(usher(npc_id, route, player, conti::now()));
+        }
+        if WAITING_ROOM_GUIDES.contains(&npc_id) {
+            return conti::waiting_in(player.stats.map_id).map(|route| leave_ship(npc_id, route));
+        }
         match npc_id {
             DOOR_OF_DIMENSION => Some(door_of_dimension(player)),
             SPARKLING_CRYSTAL => sparkling_crystal(player),
@@ -403,12 +448,7 @@ impl NpcScript {
             ROBIN => Some(robin()),
             SHANKS => Some(shanks(player)),
             HERACLE => Some(heracle(player)),
-            JOEL => Some(ticket_seller(JOEL, &conti::TO_ORBIS, player)),
-            AGATHA => Some(ticket_seller(AGATHA, &conti::TO_ELLINIA, player)),
-            CHERRY => Some(usher(CHERRY, &conti::TO_ORBIS, player, conti::now())),
-            RINI => Some(usher(RINI, &conti::TO_ELLINIA, player, conti::now())),
-            PURIN => Some(leave_ship(PURIN, &conti::TO_ORBIS)),
-            ERIN => Some(leave_ship(ERIN, &conti::TO_ELLINIA)),
+            AGATHA => Some(agatha(player)),
             ISA => Some(isa()),
             NATALIE => Some(natalie(player)),
             MAPLE_ADMINISTRATOR => Some(Self::new(
@@ -720,7 +760,36 @@ fn heracle(player: &Player) -> NpcScript {
 /// A station's ticket booth: one ticket for the route's price. Like the
 /// original, it asks first and only then says the player can't pay.
 fn ticket_seller(npc_id: i32, route: &Route, player: &Player) -> NpcScript {
-    let short = text(keys::SHIPS_SELL_SHORT);
+    let mut script = NpcScript::new(npc_id, sell_ticket(route, player));
+    script.inventory_full = Some(ticket_text(keys::SHIPS_SELL_SHORT, route));
+    script
+}
+
+/// Agatha's booth: a ticket for any of Orbis's ships.
+fn agatha(player: &Player) -> NpcScript {
+    let choices = AGATHA_ROUTES
+        .iter()
+        .map(|(route, place)| {
+            let choice = content::text().get(keys::SHIPS_SELL_CHOICE, &[("place", place)]);
+            (choice, sell_ticket(route, player))
+        })
+        .collect();
+    let mut script = NpcScript::new(
+        AGATHA,
+        vec![Page::Menu {
+            text: text(keys::SHIPS_SELL_MENU),
+            choices,
+        }],
+    );
+    script.inventory_full = Some(text(keys::SHIPS_SELL_FULL));
+    script
+}
+
+fn ticket_text(key: &str, route: &Route) -> String {
+    content::text().get(key, &[("price", &route.price.to_string())])
+}
+
+fn sell_ticket(route: &Route, player: &Player) -> Vec<Page> {
     let can_pay = player.meso >= route.price;
     let on_yes = if can_pay {
         vec![
@@ -734,16 +803,14 @@ fn ticket_seller(npc_id: i32, route: &Route, player: &Player) -> NpcScript {
         Vec::new()
     };
     let mut pages = vec![Page::Ask {
-        text: text(keys::SHIPS_SELL_ASK),
+        text: ticket_text(keys::SHIPS_SELL_ASK, route),
         on_yes,
         on_no: Some(text(keys::SHIPS_SELL_DECLINE)),
     }];
     if !can_pay {
-        pages.push(Page::Say(short.clone()));
+        pages.push(Page::Say(ticket_text(keys::SHIPS_SELL_SHORT, route)));
     }
-    let mut script = NpcScript::new(npc_id, pages);
-    script.inventory_full = Some(short);
-    script
+    pages
 }
 
 /// `get_ticket`: the platform's usher takes a ticket and shows the player
@@ -783,21 +850,25 @@ fn leave_ship(npc_id: i32, route: &Route) -> NpcScript {
     )
 }
 
-/// `station_in`: Isa shows the way to Orbis Station's platforms; only the
-/// one for Ellinia's ship so far.
+/// `station_in`: Isa shows the way to Orbis Station's platforms.
 fn isa() -> NpcScript {
+    let choices = ISA_PLATFORMS
+        .iter()
+        .map(|&(vehicle, place, passage)| {
+            let vars = [("vehicle", vehicle), ("place", place)];
+            let ask = Page::Ask {
+                text: content::text().get(keys::ISA_ASK, &vars),
+                on_yes: vec![Effect::Warp(passage)],
+                on_no: Some(text(keys::ISA_DECLINE)),
+            };
+            (content::text().get(keys::ISA_PLATFORM, &vars), vec![ask])
+        })
+        .collect();
     NpcScript::new(
         ISA,
         vec![Page::Menu {
             text: text(keys::ISA_MENU),
-            choices: vec![(
-                text(keys::ISA_PLATFORM),
-                vec![Page::Ask {
-                    text: text(keys::ISA_ASK),
-                    on_yes: vec![Effect::Warp(ORBIS_TUNNEL)],
-                    on_no: Some(text(keys::ISA_DECLINE)),
-                }],
-            )],
+            choices,
         }],
     )
 }
@@ -1657,9 +1728,35 @@ mod tests {
                 ]
             }
         );
-        let mut agatha = NpcScript::for_npc(AGATHA, &buyer).unwrap();
-        agatha.respond(ScriptInput::Yes).unwrap();
+        let mut agatha = NpcScript::for_npc(AGATHA, &traveller(10, 30000, false)).unwrap();
+        assert_eq!(kind(&agatha.begin()), Some(4));
+        assert_eq!(
+            kind(&agatha.respond(ScriptInput::Select(2)).unwrap()),
+            Some(1)
+        );
+        assert_eq!(
+            agatha.respond(ScriptInput::Yes).unwrap().effects,
+            [
+                Effect::SpendMeso(30000),
+                Effect::GiveItem {
+                    item_id: conti::TO_LEAFRE.ticket,
+                    quantity: 1
+                }
+            ]
+        );
         assert!(agatha.inventory_full().is_some(), "a full Etc tab is told");
+        // The other towns' booths sell the ticket back to Orbis.
+        let mut mel = NpcScript::for_npc(2040000, &buyer).unwrap();
+        mel.begin();
+        assert!(mel.respond(ScriptInput::Yes).unwrap().effects.is_empty());
+        let mut mel = NpcScript::for_npc(2040000, &traveller(10, 6000, false)).unwrap();
+        assert_eq!(
+            mel.respond(ScriptInput::Yes).unwrap().effects[1],
+            Effect::GiveItem {
+                item_id: 4031045,
+                quantity: 1
+            }
+        );
 
         // Short of mesos: yes is answered with why not.
         let mut joel = NpcScript::for_npc(JOEL, &traveller(10, 4999, false)).unwrap();
@@ -1708,23 +1805,40 @@ mod tests {
 
     #[test]
     fn the_crew_let_passengers_off_and_isa_shows_the_way() {
-        let mut purin = NpcScript::for_npc(PURIN, &player(50)).unwrap();
-        assert_eq!(
-            purin.respond(ScriptInput::Yes).unwrap().effects,
-            [Effect::Warp(101000300)]
-        );
-        let mut erin = NpcScript::for_npc(ERIN, &player(50)).unwrap();
-        assert_eq!(
-            erin.respond(ScriptInput::Yes).unwrap().effects,
-            [Effect::Warp(200000111)]
-        );
-        let mut isa = NpcScript::for_npc(ISA, &player(50)).unwrap();
-        assert_eq!(kind(&isa.begin()), Some(4));
-        assert_eq!(kind(&isa.respond(ScriptInput::Select(0)).unwrap()), Some(1));
-        assert_eq!(
-            isa.respond(ScriptInput::Yes).unwrap().effects,
-            [Effect::Warp(ORBIS_TUNNEL)]
-        );
+        let waiting = |map_id| {
+            let mut passenger = player(50);
+            passenger.stats.map_id = map_id;
+            passenger
+        };
+        // Back to the platform the waiting room boards from; Rosey has two.
+        for (guide, room, platform) in [
+            (PURIN, 101000301, 101000300),
+            (ERIN, 200000112, 200000111),
+            (2041001, 200000122, 200000121),
+            (2041001, 220000111, 220000110),
+            (2082002, 240000111, 240000110),
+            (2102001, 260000110, 260000100),
+        ] {
+            let mut script = NpcScript::for_npc(guide, &waiting(room)).unwrap();
+            assert_eq!(
+                script.respond(ScriptInput::Yes).unwrap().effects,
+                [Effect::Warp(platform)]
+            );
+        }
+        assert!(NpcScript::for_npc(2041001, &waiting(220000100)).is_none());
+
+        for (choice, passage) in [(0, ORBIS_TUNNEL), (2, 200000130), (3, 200000150)] {
+            let mut isa = NpcScript::for_npc(ISA, &player(50)).unwrap();
+            assert_eq!(kind(&isa.begin()), Some(4));
+            assert_eq!(
+                kind(&isa.respond(ScriptInput::Select(choice)).unwrap()),
+                Some(1)
+            );
+            assert_eq!(
+                isa.respond(ScriptInput::Yes).unwrap().effects,
+                [Effect::Warp(passage)]
+            );
+        }
     }
 
     #[test]

@@ -59,7 +59,8 @@ pub struct Route {
     pub waiting_room: i32,
     /// The deck, where the waiting room is moved at departure.
     pub deck: i32,
-    pub cabin: i32,
+    /// Only Ellinia's ships have one.
+    pub cabin: Option<i32>,
     /// Where riders step off, and by which portal.
     pub arrival: (i32, &'static str),
     /// Where the ship docks at the other end.
@@ -84,7 +85,7 @@ pub const TO_ORBIS: Route = Route {
     platform: 101000300,
     waiting_room: 101000301,
     deck: 200090010,
-    cabin: 200090011,
+    cabin: Some(200090011),
     arrival: (200000100, "come00"),
     arrival_platform: 200000111,
     ticket: 4031045,
@@ -96,7 +97,7 @@ pub const TO_ELLINIA: Route = Route {
     platform: 200000111,
     waiting_room: 200000112,
     deck: 200090000,
-    cabin: 200090001,
+    cabin: Some(200090001),
     arrival: (101000300, "come00"),
     arrival_platform: 101000300,
     ticket: 4031047,
@@ -104,7 +105,104 @@ pub const TO_ELLINIA: Route = Route {
     timetable: ELLINIA_ORBIS,
 };
 
-const ROUTES: [&Route; 2] = [&TO_ORBIS, &TO_ELLINIA];
+/// Orbis and Ludibrium, Leafre and Ariant: one leaves each way every 10
+/// minutes and sails for 5, boarding the 5 before (Continent.img and
+/// Cosmic; Ariant from Cosmic alone, report 183-routes).
+const ORBIS_BOATS: Timetable = Timetable {
+    term: 10,
+    wait: 5,
+    closed: 1,
+    ride: 5,
+};
+
+pub const TO_LUDIBRIUM: Route = Route {
+    platform: 200000121,
+    waiting_room: 200000122,
+    deck: 200090100,
+    cabin: None,
+    arrival: (220000100, "sp"),
+    arrival_platform: 220000110,
+    ticket: 4031074,
+    price: 6000,
+    timetable: ORBIS_BOATS,
+};
+
+/// Riders land on Orbis's `ludi00`, the spawn point named for this train (an
+/// inference; Cosmic uses the first). Leafre's and Ariant's land on the
+/// first, as Cosmic's do.
+pub const LUDIBRIUM_TO_ORBIS: Route = Route {
+    platform: 220000110,
+    waiting_room: 220000111,
+    deck: 200090110,
+    cabin: None,
+    arrival: (200000100, "ludi00"),
+    arrival_platform: 200000121,
+    ticket: 4031045,
+    price: 6000,
+    timetable: ORBIS_BOATS,
+};
+
+pub const TO_LEAFRE: Route = Route {
+    platform: 200000131,
+    waiting_room: 200000132,
+    deck: 200090200,
+    cabin: None,
+    arrival: (240000100, "sp"),
+    arrival_platform: 240000110,
+    ticket: 4031331,
+    price: 30000,
+    timetable: ORBIS_BOATS,
+};
+
+pub const LEAFRE_TO_ORBIS: Route = Route {
+    platform: 240000110,
+    waiting_room: 240000111,
+    deck: 200090210,
+    cabin: None,
+    arrival: (200000100, "sp"),
+    arrival_platform: 200000131,
+    ticket: 4031045,
+    price: 30000,
+    timetable: ORBIS_BOATS,
+};
+
+/// Ariant's platform is also the town's entrance. Both its spawn points are
+/// named `sp`; riders get the first, at the west end (Cosmic uses the
+/// second).
+pub const TO_ARIANT: Route = Route {
+    platform: 200000151,
+    waiting_room: 200000152,
+    deck: 200090400,
+    cabin: None,
+    arrival: (260000100, "sp"),
+    arrival_platform: 260000100,
+    ticket: 4031576,
+    price: 6000,
+    timetable: ORBIS_BOATS,
+};
+
+pub const ARIANT_TO_ORBIS: Route = Route {
+    platform: 260000100,
+    waiting_room: 260000110,
+    deck: 200090410,
+    cabin: None,
+    arrival: (200000100, "sp"),
+    arrival_platform: 200000151,
+    ticket: 4031045,
+    price: 6000,
+    timetable: ORBIS_BOATS,
+};
+
+const ROUTES: [&Route; 8] = [
+    &TO_ORBIS,
+    &TO_ELLINIA,
+    &TO_LUDIBRIUM,
+    &LUDIBRIUM_TO_ORBIS,
+    &TO_LEAFRE,
+    &LEAFRE_TO_ORBIS,
+    &TO_ARIANT,
+    &ARIANT_TO_ORBIS,
+];
 
 const MINUTE: i64 = 60_000;
 
@@ -179,6 +277,13 @@ pub fn departing_from(platform: i32) -> Option<&'static Route> {
     ROUTES.into_iter().find(|route| route.platform == platform)
 }
 
+/// The route whose waiting room is `map_id`.
+pub fn waiting_in(map_id: i32) -> Option<&'static Route> {
+    ROUTES
+        .into_iter()
+        .find(|route| route.waiting_room == map_id)
+}
+
 /// The state a client on `map_id` is told when it asks (send 0xDC): that of
 /// the route whose ship it shows, if any.
 pub fn ship_state(map_id: i32, t: i64) -> Option<State> {
@@ -204,10 +309,10 @@ pub fn has_trips(map_id: i32) -> bool {
             route.platform,
             route.waiting_room,
             route.deck,
-            route.cabin,
             route.arrival_platform,
         ]
         .contains(&map_id)
+            || route.cabin == Some(map_id)
     })
 }
 
@@ -225,7 +330,7 @@ pub fn happenings(map_id: i32, from: i64, to: i64) -> Vec<Happening> {
                     map_id: route.deck,
                     portal: "",
                 },
-                State::End if map_id == route.deck || map_id == route.cabin => {
+                State::End if map_id == route.deck || route.cabin == Some(map_id) => {
                     let (map_id, portal) = route.arrival;
                     Happening::MoveAll { map_id, portal }
                 }
@@ -312,6 +417,40 @@ mod tests {
         );
         assert_eq!(happens(101000000, arrival), []);
         assert!(!has_trips(101000000));
+    }
+
+    #[test]
+    fn orbis_boats_leave_every_ten_minutes_for_ludibrium_leafre_and_ariant() {
+        let departure = 7 * HOUR + 20 * MINUTE;
+        let happens = |map_id, at: i64| happenings(map_id, at - 50, at + 50);
+        assert_eq!(ORBIS_BOATS.state(departure - 5 * MINUTE), State::Wait);
+        assert_eq!(ORBIS_BOATS.state(departure - MINUTE), State::Start);
+        assert_eq!(
+            happens(200000132, departure),
+            [Happening::MoveAll {
+                map_id: 200090200,
+                portal: ""
+            }]
+        );
+        let arrival = departure + 5 * MINUTE;
+        assert_eq!(
+            happens(200090200, arrival),
+            [Happening::MoveAll {
+                map_id: 240000100,
+                portal: "sp"
+            }]
+        );
+        // Ariant's platform sees its own ship leave and the other dock.
+        assert_eq!(
+            happens(260000100, departure - MINUTE),
+            [Happening::Show(Target::Platform, State::Start)]
+        );
+        assert_eq!(
+            happens(260000100, arrival),
+            [Happening::Show(Target::ArrivalPlatform, State::End)]
+        );
+        assert_eq!(waiting_in(220000111), Some(&LUDIBRIUM_TO_ORBIS));
+        assert_eq!(ship_state(220000110, departure + MINUTE), Some(State::Move));
     }
 
     #[test]
