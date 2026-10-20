@@ -45,6 +45,9 @@ namespace ms
 			if (element && element != shop && element->is_active())
 				element->draw(inter);
 		}
+
+		if (help_owner != UIElement::Type::NONE)
+			help.draw(cursor + Point<int16_t>(0, 22));
 	}
 
 	void UIStateCashShop::update()
@@ -109,6 +112,22 @@ namespace ms
 		}
 
 		return Cursor::State::IDLE;
+	}
+
+	void UIStateCashShop::show_help(UIElement::Type owner, std::string title, std::string description,
+									std::optional<Point<int16_t>> anchor, bool above)
+	{
+		help.set_help(title, description, anchor, above);
+		help_owner = help.empty() ? UIElement::Type::NONE : owner;
+	}
+
+	void UIStateCashShop::clear_help(UIElement::Type owner)
+	{
+		if (help_owner != owner)
+			return;
+
+		help.reset();
+		help_owner = UIElement::Type::NONE;
 	}
 
 	UIState::Iterator UIStateCashShop::pre_add(UIElement::Type type, bool toggled, bool is_focused)

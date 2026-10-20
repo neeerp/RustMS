@@ -184,6 +184,16 @@ namespace ms
 		buttons[Buttons::BT_COUPON] = std::make_unique<MapleButton>(CSStatus["BtCoupon"], Point<int16_t>(586, 544));
 		buttons[Buttons::BT_EXIT] = std::make_unique<MapleButton>(CSStatus["BtExit"], Point<int16_t>(632, 546));
 
+		// The avatar's buttons' help hangs from their top right, the status
+		// bar's sits on it (0x4ab0b0, 0x4bc3e4). The inventory expansions'
+		// help is never read.
+		set_button_help(Buttons::BT_BUY_AVATAR, "Shop/Button/BuyAvatar");
+		set_button_help(Buttons::BT_DEFAULT_AVATAR, "Shop/Button/DefaultAvatar");
+		set_button_help(Buttons::BT_TAKEOFF_AVATAR, "Shop/Button/TakeoffAvatar");
+		set_button_help(Buttons::BT_CHARGE, "Shop/Button/Charge", true);
+		set_button_help(Buttons::BT_CHECK, "Shop/Button/Check", true);
+		set_button_help(Buttons::BT_COUPON, "Shop/Button/Coupon", true);
+
 		for (size_t i = 0; i < PAGE_SIZE; i++)
 		{
 			div_t div = std::div(static_cast<int>(i), static_cast<int>(LIST_COLUMNS));
