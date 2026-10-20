@@ -338,8 +338,9 @@ namespace ms
 		void show_mount_levelup();
 
 		// Look like a Morph.nx template, or as before with 0, in a puff of smoke unless coming into view
-		// `at_once` (FUN_00941d4b).
-		void transform(int32_t morph, bool at_once);
+		// `at_once` (FUN_00941d4b). A template that can't move the way the map does, `flying` in water or
+		// not, isn't put on.
+		void transform(int32_t morph, bool at_once, bool flying = false);
 
 		// The item's morph or barrel the character looks like, if any: one that moves by its template
 		// (FUN_004520a4, FUN_004520d5).

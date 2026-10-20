@@ -756,9 +756,11 @@ item." Without the transformation, Shockwave, Demolition and Snatch say
 "This skill is available only during transformation."
 (`morph::untransformed`). Any morph, a superman's too, also refuses a
 trade invite and opening a personal shop with the same line
-(`Player::shape_refuses`). Not done anywhere: Ghost (bit 49), the random
-morph items (2211000, 2212000), the cash morphs (5300000-5300002), the
-fly-map template gate, and the mini-game and hired merchant refusals,
+(`Player::shape_refuses`). A template that can't move the way the map
+does isn't put on: in water only 0004 (2210003), which has no `fly`,
+stays off, and the buff just runs (`MorphTemplate::moves`). Not done anywhere: Ghost (bit 49), the random
+morph items (2211000, 2212000), the cash morphs (5300000-5300002), and
+the mini-game and hired merchant refusals,
 which wait on those rooms.
 
 ## Spending AP and SP
