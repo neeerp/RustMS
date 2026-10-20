@@ -31,6 +31,7 @@
 #include "../UIElement.h"
 
 #include "../Components/ChatFloodGuard.h"
+#include "../Components/ChatTarget.h"
 #include "../Components/Textfield.h"
 
 #include "../../Template/EnumMap.h"
@@ -80,14 +81,7 @@ namespace ms
 			MEGAPHONE_PREVIEW
 		};
 
-		// Who a typed line goes to
-		enum class Target
-		{
-			ALL,
-			PARTY,
-			BUDDY,
-			GUILD
-		};
+		using Target = chat_target::Target;
 
 		UIChatBar();
 
@@ -132,11 +126,18 @@ namespace ms
 
 		bool is_chatfieldopen();
 
-		// Send typed lines to everyone nearby, the party, online buddies, or the
-		// guild, and open the input field.
+		// v83's SetChatTarget (FUN_008d4d43). A buddy group and a whisper
+		// ask who first; the rest open the input field, empty, and stop
+		// whispering.
 		void set_target(Target new_target);
-		// Open the chat field with "/w name " typed, ready for the message.
-		void start_whisper(const std::string& name);
+		// Whisper whatever is typed to name, and open the input field
+		// (FUN_008db01c, FUN_008d5a4d).
+		void whisper_to(const std::string& name);
+		// Ask who to whisper to (FUN_008d4dbf).
+		void ask_whisper_name();
+		// Someone whispered to or from goes to the front of the names the
+		// whisper prompt offers.
+		void add_whisper_history(const std::string& name);
 		// Whisper message to name, or ask where name is if message is empty
 		// (FUN_0052f185). Only one request waits for an answer at a time.
 		void send_whisper(const std::string& name, const std::string& message);
@@ -197,8 +198,30 @@ namespace ms
 		// Whether a chat line may be sent; if not, warns as v83 does.
 		bool flood_guard_allows(const std::string& line);
 		void send_party_chat(const std::string& message);
-		void send_buddy_chat(const std::string& message);
+		// The online buddies, or those in group if one is given.
+		void send_buddy_chat(const std::string& message, const std::string* group = nullptr);
 		void send_guild_chat(const std::string& message);
+		// What a line goes to by the target, once a whisper has been ruled
+		// out (FUN_008d536c).
+		void send_to_target(const std::string& message);
+		// "/whisper" with or without a name (FUN_0052c40c, FUN_0052f0f4).
+		void whisper_command(const std::string& name);
+		// Tab in the input field (FUN_008d536c).
+		void tab_target();
+		// Ask which buddy group to talk to (FUN_008d500b).
+		void ask_group();
+		// Open the input field, empty (FUN_008d5a4d).
+		void focus_field();
+		void update_face();
+
+		// The list the target box at the strip's left end opens upwards, row
+		// i being target i.
+		Rectangle<int16_t> combo_list_bounds() const;
+		// The list's row under the cursor, if any.
+		std::optional<size_t> combo_row_at(Point<int16_t> cursorpos) const;
+		bool on_combo(Point<int16_t> cursorpos) const;
+		bool combo_shown() const;
+		void close_combo();
 
 		static constexpr int16_t CHATROWHEIGHT = 13;
 		static constexpr int16_t LOG_WIDTH = 580;
@@ -224,9 +247,20 @@ namespace ms
 		bool chatfieldopen;
 		Texture backgrnd;
 		Texture backgrnd2;
-		Texture chattarget;
+		// The target box's normal, hovered and pressed looks
+		Texture combo_box[3];
 		Text chattarget_label;
 		Target chat_target;
+		// The name every typed line is whispered to while there is one, and
+		// the buddy group group chat goes to.
+		std::string whisper_name;
+		std::string group_name;
+		chat_target::WhisperHistory whisper_history;
+		bool combo_hovered;
+		bool combo_open;
+		// The list row under the cursor
+		std::optional<size_t> combo_row;
+		Text combo_items[chat_target::COUNT];
 		Texture arrows[2][2];
 		Texture arrows_disabled[2];
 		Texture scrollbase;

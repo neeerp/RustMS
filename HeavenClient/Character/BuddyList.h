@@ -51,6 +51,8 @@ namespace ms
 
 		// Buddies who would hear buddy chat.
 		std::vector<int32_t> online_ids() const;
+		// Those of them in group (FUN_00a3fbc6).
+		std::vector<int32_t> online_ids(const std::string& group) const;
 
 		void update(std::vector<Buddy> buddies);
 		// A request's entry, which v83 adds as it comes (FUN_00a40028).

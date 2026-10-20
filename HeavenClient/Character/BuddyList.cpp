@@ -91,6 +91,17 @@ namespace ms
 		return result;
 	}
 
+	std::vector<int32_t> BuddyList::online_ids(const std::string& group) const
+	{
+		std::vector<int32_t> result;
+
+		for (auto& buddy : buddies)
+			if (buddy.group == group && buddy.hears_chat())
+				result.push_back(buddy.id);
+
+		return result;
+	}
+
 	void BuddyList::update(std::vector<Buddy> new_buddies)
 	{
 		buddies = std::move(new_buddies);

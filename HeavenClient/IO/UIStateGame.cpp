@@ -399,6 +399,21 @@ namespace ms
 									chatbar->set_target(UIChatBar::Target::GUILD);
 
 								break;
+							case KeyAction::Id::ALLIANCECHAT:
+								if (auto chatbar = UI::get().get_element<UIChatBar>())
+									chatbar->set_target(UIChatBar::Target::ALLIANCE);
+
+								break;
+							case KeyAction::Id::TOSPOUSE:
+								if (auto chatbar = UI::get().get_element<UIChatBar>())
+									chatbar->set_target(UIChatBar::Target::SPOUSE);
+
+								break;
+							case KeyAction::Id::WHISPER:
+								if (auto chatbar = UI::get().get_element<UIChatBar>())
+									chatbar->ask_whisper_name();
+
+								break;
 							case KeyAction::Id::TOGGLECHAT:
 								if (auto chatbar = UI::get().get_element<UIChatBar>())
 									if (!chatbar->is_chatfieldopen())

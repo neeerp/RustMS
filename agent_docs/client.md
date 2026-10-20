@@ -101,6 +101,15 @@ from `UI.nx`. Moved so far:
   row at a time, from 2 to 39 rows, once the cursor is more than a row from
   where the edge last stopped. The height is saved as `ChatHeight`, and logs
   under four rows tall hide the thumb.
+- **Chat target** (`UIChatBar`, `IO/Components/ChatTarget.h`,
+  `Basic.img/ComboBox2`): the box at the strip's left end opens v83's list
+  of eight targets upward, and Tab in the input field steps through them in
+  v83's order (FUN_008d536c). Picking Whisper asks for a name, and every
+  typed line then goes to that name until another target is picked; the
+  name prompt, `/w NAME`, and incoming whispers feed the history `/w` alone
+  uses. To Alliance and To Spouse give v83's notices, since HC has no
+  alliances or marriage. To Group (a buddy group) is not done yet, and the
+  name prompt has no history list.
 - **NPC dialog** (`UINpcTalk`, `UIWindow.img/UtilDlgEx`): the frame,
   buttons, menu dots, quest list headers, and the `Basic.img/VScr4` scroll
   bar (`Slider::Type::CLASSIC`). See [npc-dialogue.md](npc-dialogue.md).
@@ -309,14 +318,14 @@ from `UI.nx`. Moved so far:
   out move up (`IO/Components/ContextMenuLayout.h`). It holds the mouse and
   keys: a press or right release outside, ESC, or Enter closes it, and it
   closes before a row acts. Info opens the character info window, SAVE NAME
-  copies the name and opens the chat field, WHISPER fills in "/w name ",
-  TRADE and PARTY INVITE do what the info window's trade and `/party invite`
-  do, GUILD INVITE sends GUILD_OPERATION 5 after v83's guild checks, and
-  ALERT GM shows v83's notice that reports are down. Approximations: v83
-  also hits the character's second position and a morph's own box; it puts
-  the chat into whisper mode rather than filling in a command; and it offers
-  Add Junior to family members, which HC doesn't have. The right button
-  acts when it comes up, everywhere, as in v83.
+  copies the name and opens the chat field, WHISPER puts the chat into
+  whisper mode for them, TRADE and PARTY INVITE do what the info window's
+  trade and `/party invite` do, GUILD INVITE sends GUILD_OPERATION 5 after
+  v83's guild checks, and ALERT GM shows v83's notice that reports are down.
+  Approximations: v83 also hits the character's second position and a
+  morph's own box, and it offers Add Junior to family members, which HC
+  doesn't have. The right button acts when it comes up, everywhere, as in
+  v83.
 - **Quest log** (`UIQuestLog`, `UIWindow.img/Quest`): Available, In Progress,
   and Complete tabs (`Basic.img/Tab2`), quests folded by area, and a detail
   panel with the quest's text and FIND NPC or QUEST HELPER, laid out from
@@ -524,7 +533,7 @@ side yet.
 | Skills, stat/AP/SP allocation, buffs, keymap | Implemented |
 | NPC dialogue and NPC shop | Implemented (`UINpcTalk`, `UIShop`) |
 | Quest log and markers | Implemented (`UIQuestLog`); progress arrives via SHOW_STATUS_INFO, quest start/complete is driven by NPC dialogue; UPDATE_QUEST_INFO refusals 9–11, 13 and 14 show v83's notices (10 names the full inventories from `Act.img`), 15 the expiry chat line, and the timer modes are ignored |
-| Chat, whisper, `/find`, `/?`, `/party`, `/buddy`, `/all`, server messages, megaphones | Implemented; the megaphone dialogs are in `inventory.md`; buddy whisper/find modes ignored; `/w NAME` alone fills in a whisper to NAME, or says "Incorrect ID." for a name no character could have, as v83's `/whisper NAME` does; other commands are dropped, as v83 does for non-GMs |
+| Chat, whisper, `/find`, `/?`, `/party`, `/buddy`, `/all`, server messages, megaphones | Implemented; the megaphone dialogs are in `inventory.md`; buddy whisper/find modes ignored; `/w NAME` alone whispers every line to NAME, or says "Incorrect ID." for a name no character could have, as v83's `/whisper NAME` does; other commands are dropped, as v83 does for non-GMs |
 | Character info, minimap, world map | Implemented |
 | UI and game sounds | v83's: GameIn as the server lets a character in, not on map loads; RollDown/RollUp for the channel panel; SelectMap alone on world map links and right-click; BuyShopItem on Cash Shop purchase notices; other players' level-up, job, quest and card sounds. QuestAlert and a few rarer sounds are missing |
 | Party (`UIUserList` Party tab, `UIPartyHP`, party chat) | Implemented; see `parties.md` |

@@ -729,7 +729,7 @@ namespace ms
 			case Buttons::BT_WHISPER:
 				if (member)
 					if (auto chatbar = UI::get().get_element<UIChatBar>())
-						chatbar->start_whisper(member->name);
+						chatbar->whisper_to(member->name);
 
 				break;
 			case Buttons::BT_CHAT:
@@ -787,7 +787,7 @@ namespace ms
 			case Buttons::BT_WHISPER_BUDDY:
 				if (buddy)
 					if (auto chatbar = UI::get().get_element<UIChatBar>())
-						chatbar->start_whisper(buddy->name);
+						chatbar->whisper_to(buddy->name);
 
 				break;
 			case Buttons::BT_BUDDY_CHAT:
@@ -833,7 +833,7 @@ namespace ms
 			case Buttons::BT_GUILD_WHISPER:
 				if (const GuildMember* picked = picked_online_member())
 					if (auto chatbar = UI::get().get_element<UIChatBar>())
-						chatbar->start_whisper(picked->name);
+						chatbar->whisper_to(picked->name);
 
 				break;
 			case Buttons::BT_GUILD_CHAT:
