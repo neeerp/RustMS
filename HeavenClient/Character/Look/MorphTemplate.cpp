@@ -75,6 +75,11 @@ namespace ms
 		return !actions.empty() && !superman && !hide;
 	}
 
+	bool MorphTemplate::is_hide() const
+	{
+		return !actions.empty() && hide;
+	}
+
 	int32_t MorphTemplate::get_speed() const
 	{
 		return speed;

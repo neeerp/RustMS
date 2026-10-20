@@ -730,9 +730,20 @@ item's morph moves at the template's speed and jump, clamped to 80-140 and
 emotes and item effects with "Unavailable while transforming." for an item
 with `noCancelMouse`, and the longer line about right-clicking the icon
 otherwise. Right-clicking a `noCancelMouse` item's icon shows "You may not
-cancel the transformation." and sends nothing. Not done in
-HeavenClient: Oak Barrel's drop and break and its detection by mobs, and
-the superman's stances and gates. Not done anywhere: Ghost (bit 49), the random morph items (2211000, 2212000), the
+cancel the transformation." and sends nothing.
+
+Oak Barrel (a `hide` template) drops onto the player with the skill's
+`effect` and replaces the body 840 ms later, and breaks with `affected`
+and `Use2` as the body fades back in over 240 ms (`morph::Barrel`); on a
+ladder or rope, or coming into view, it swaps at once. The barrel moves by
+its template like an item's morph and is refused the same things, but the
+attack key sends CANCEL_BUFF instead, and its icon can't cancel it while
+it drops or breaks. Mobs never pick an attack against it, and touching one
+does no damage: every 2 seconds of contact rolls `prop` and breaks the
+barrel on a hit (`morph::spotted`). HeavenClient also refuses the attack
+key while the barrel drops, where v83 attacks and the server would refuse.
+Not done in HeavenClient: the superman's stances and gates. Not done
+anywhere: Ghost (bit 49), the random morph items (2211000, 2212000), the
 cash morphs (5300000-5300002), the fly-map template gate, and the refusals for trades, mini-games and shops.
 
 ## Spending AP and SP

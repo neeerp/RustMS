@@ -219,9 +219,27 @@ namespace ms
 	{
 		move_id = beacon::cast(move_id, player.get_skills().get_level(beacon::BULLSEYE));
 
-		// An item's morph uses no skill and doesn't attack (FUN_00966f7a, FUN_0094e256).
-		if (!ride_allows(move_id) || player.morph_refuses())
+		if (!ride_allows(move_id))
 			return false;
+
+		// In Oak Barrel the attack key breaks it (FUN_0094e256).
+		if (move_id == 0 && player.is_barrelled())
+		{
+			CancelBuffPacket(morph::OAK_BARREL).dispatch();
+			return false;
+		}
+
+		// An item's morph or the barrel uses no skill and doesn't attack, nor does the player while the
+		// barrel drops or breaks (FUN_00966f7a, FUN_0094e256). v83 still attacks while it drops, which the
+		// server refuses.
+		if (player.morph_refuses())
+			return false;
+
+		if (player.is_barrel_busy())
+		{
+			InChatMessage(Messages::Type::MORPHED).drop();
+			return false;
+		}
 
 		if (prepare::held(move_id) || prepare::timed(move_id))
 		{

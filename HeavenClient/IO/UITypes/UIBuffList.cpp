@@ -128,7 +128,8 @@ namespace ms
 	void UIBuffList::rightclick(Point<int16_t> cursorpos)
 	{
 		// FUN_0045b9fc. The icon goes when the server cancels the buff.
-		// Dragon Roar's can't be cancelled. An item buff (negative id) sends
+		// Dragon Roar's can't be cancelled, nor Oak Barrel's while it drops
+		// or breaks (FUN_0095009a). An item buff (negative id) sends
 		// CANCEL_ITEM_EFFECT, but a morph item's with noCancelMouse is
 		// refused while morphed (FUN_00a096af).
 		constexpr int32_t DRAGON_ROAR = 1311006;
@@ -142,7 +143,7 @@ namespace ms
 				InChatMessage(Messages::Type::MORPH_FIXED).drop();
 			else if (entry->id < 0)
 				CancelItemEffectPacket(entry->id).dispatch();
-			else if (entry->id != DRAGON_ROAR)
+			else if (entry->id != DRAGON_ROAR && !(entry->id == morph::OAK_BARREL && player.is_barrel_busy()))
 				CancelBuffPacket(entry->id).dispatch();
 		}
 	}

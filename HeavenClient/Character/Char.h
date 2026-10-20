@@ -31,6 +31,7 @@
 #include "GuildMark.h"
 #include "ItemEffect.h"
 #include "MedalTag.h"
+#include "MorphRules.h"
 #include "MiniRoomBalloon.h"
 
 #include "Inventory/Weapon.h"
@@ -340,8 +341,15 @@ namespace ms
 		// `at_once` (FUN_00941d4b).
 		void transform(int32_t morph, bool at_once);
 
-		// The item's morph the character looks like, if any: one that moves by its template.
-		const MorphTemplate *get_item_morph() const;
+		// The item's morph or barrel the character looks like, if any: one that moves by its template
+		// (FUN_004520a4, FUN_004520d5).
+		const MorphTemplate *get_template_morph() const;
+
+		// Whether the character is hidden in Oak Barrel.
+		bool is_barrelled() const;
+
+		// Whether Oak Barrel is dropping onto the character or breaking.
+		bool is_barrel_busy() const;
 
 		// Play a mount skill's effect of getting on or off.
 		void show_ride_effect(int32_t skill);
@@ -414,6 +422,7 @@ namespace ms
 		// The full gauge's effect, and how long until it loops; -1 once it does.
 		std::vector<Animation> energy_effect;
 		int16_t energy_wait = -1;
+		morph::Barrel barrel;
 		Animation dash_dust;
 		bool dashing = false;
 		Animation wings_glow;

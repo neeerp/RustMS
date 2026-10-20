@@ -83,6 +83,8 @@ namespace ms
 			color = Color::Code::CWHITE;
 		}
 
+		color = color * Color(1.0f, 1.0f, 1.0f, barrel.alpha());
+
 		if (state == State::DIED)
 		{
 			// The ghost floats in front of its tombstone, circling it from the top.
@@ -252,6 +254,9 @@ namespace ms
 					energy_glow.add_looping(layer, DrawArgument(facing_right), 0, 1.0f);
 			}
 		}
+
+		if (int32_t landed = barrel.update(Constants::TIMESTEP))
+			look.set_morph(landed);
 
 		if (vehicle_switch > 0)
 		{
@@ -629,16 +634,47 @@ namespace ms
 
 	void Char::transform(int32_t morph, bool at_once)
 	{
+		// A barrel cancelled before it lands never does.
+		if (!morph && barrel.dropping())
+		{
+			barrel.stop();
+			return;
+		}
+
 		if (look.get_morph() == morph)
 			return;
 
+		bool hide = morph > 0 ? MorphTemplate::get(morph).is_hide() : is_barrelled();
+
+		// Off a ladder or rope, Oak Barrel drops onto the character and lands later, and breaks as the
+		// body fades back in (FUN_00936ca1).
+		if (hide && !at_once && !is_climbing())
+		{
+			nl::node skill = nl::nx::skill["510.img"]["skill"][std::to_string(morph::OAK_BARREL)];
+
+			if (morph > 0)
+			{
+				barrel.drop(morph);
+				effects.add(skill["effect"], DrawArgument(facing_right));
+			} else
+			{
+				barrel.crack();
+				look.set_morph(0);
+				effects.add(skill["affected"], DrawArgument(facing_right));
+				Sound(nl::nx::sound["Skill.img"][std::to_string(morph::OAK_BARREL)]["Use2"]).play();
+			}
+
+			return;
+		}
+
+		barrel.stop();
 		look.set_morph(morph);
 
 		if (!at_once)
 			show_effect_id(is_climbing() ? CharEffect::Id::TRANSFORM_ON_LADDER : CharEffect::Id::TRANSFORM);
 	}
 
-	const MorphTemplate *Char::get_item_morph() const
+	const MorphTemplate *Char::get_template_morph() const
 	{
 		int32_t morph = look.get_morph();
 
@@ -647,7 +683,19 @@ namespace ms
 
 		const MorphTemplate &shape = MorphTemplate::get(morph);
 
-		return shape.is_item() ? &shape : nullptr;
+		return shape.is_item() || shape.is_hide() ? &shape : nullptr;
+	}
+
+	bool Char::is_barrelled() const
+	{
+		int32_t morph = look.get_morph();
+
+		return morph > 0 && MorphTemplate::get(morph).is_hide();
+	}
+
+	bool Char::is_barrel_busy() const
+	{
+		return barrel.busy();
 	}
 
 	void Char::show_skill_book(bool success)

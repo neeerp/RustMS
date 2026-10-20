@@ -658,9 +658,11 @@ namespace ms
 
 	std::optional<Mob::Pick> Mob::pick_attack(const Physics &physics)
 	{
-		// It attacks the player it chases, not a Puppet, from the ground or
-		// in the air, while not hit, attacking or held (FUN_006675a8).
-		if (attacks.empty() || acting || attacking || casting || !hastarget || puppet || targetdead || held())
+		// It attacks the player it chases, not a Puppet nor one in Oak
+		// Barrel, from the ground or in the air, while not hit, attacking or
+		// held (FUN_006675a8, FUN_0066a517).
+		if (attacks.empty() || acting || attacking || casting || !hastarget || puppet || targetdead || targethidden ||
+			held())
 			return std::nullopt;
 
 		if (!phobj.onground && !canfly)
@@ -1735,6 +1737,7 @@ namespace ms
 		targetbody = target.body;
 		targetonground = target.onground;
 		targetdarksight = target.darksight;
+		targethidden = target.hidden;
 
 		// The player's Homing Beacon marks the mob while it lasts, a mob
 		// that comes after it too (0xa20607, 0x663424, 0xa20786).
