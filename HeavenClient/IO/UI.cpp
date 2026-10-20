@@ -549,6 +549,17 @@ namespace ms
 		state->show_line(parent, text);
 	}
 
+	void UI::show_help(UIElement::Type owner, std::string title, std::string description,
+					   std::optional<Point<int16_t>> anchor, bool above)
+	{
+		state->show_help(owner, title, description, anchor, above);
+	}
+
+	void UI::clear_help(UIElement::Type owner)
+	{
+		state->clear_help(owner);
+	}
+
 	SkillMacros &UI::get_skill_macros()
 	{
 		return skill_macros;

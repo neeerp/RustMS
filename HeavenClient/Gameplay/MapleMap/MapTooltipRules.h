@@ -16,6 +16,7 @@
 //	along with this program.  If not, see <https://www.gnu.org/licenses/>.		//
 #pragma once
 
+#include <algorithm>
 #include <cstdint>
 #include <cstdlib>
 #include <map>
@@ -138,6 +139,35 @@ namespace ms
 			}
 
 			box.wrap = box.width - 15;
+			box.height += desc_height > 0 ? desc_height : -4;
+
+			return box;
+		}
+
+		// The normal box SetToolTip_TitleDesc (0x8e7150) makes for a button's
+		// help and the Stat window's zones: 270 wide unless the title needs
+		// more, the description wrapped at 255 below the title, or in its
+		// place without one.
+		inline Box help_box(int16_t title_width, int16_t desc_height)
+		{
+			constexpr int16_t MARGIN = 10;
+			constexpr int16_t WIDTH = 270;
+			Box box = {};
+			box.width = WIDTH;
+			box.height = 2 * MARGIN - 6;
+			box.desc_x = 10;
+			box.desc_y = MARGIN;
+			box.wrap = WIDTH - 15;
+
+			if (title_width > 0)
+			{
+				box.width = std::max<int16_t>(WIDTH, title_width + 16);
+				box.height += FONT_HEIGHT + 8;
+				box.title_x = (box.width - title_width) / 2;
+				box.title_y = MARGIN - 2;
+				box.desc_y += FONT_HEIGHT + 8;
+			}
+
 			box.height += desc_height > 0 ? desc_height : -4;
 
 			return box;

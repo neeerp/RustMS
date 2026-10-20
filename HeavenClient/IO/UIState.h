@@ -30,6 +30,7 @@
 
 #include <memory>
 #include <list>
+#include <optional>
 
 namespace ms
 {
@@ -88,6 +89,15 @@ namespace ms
 
 		// One line in v83's plain navy box, as for a portal on the minimap.
 		virtual void show_line(Tooltip::Parent parent, std::string text) {}
+
+		// Help from String's ToolTipHelp.img for the owner window: a button's
+		// hangs from anchor, the button's top right, or sits on it if above;
+		// without an anchor it follows the cursor, as a zone's does.
+		virtual void show_help(UIElement::Type owner, std::string title, std::string description,
+							   std::optional<Point<int16_t>> anchor, bool above) {}
+
+		// Take the owner's help down, if it is up.
+		virtual void clear_help(UIElement::Type owner) {}
 
 		virtual Iterator pre_add(UIElement::Type type, bool toggled, bool focused) = 0;
 

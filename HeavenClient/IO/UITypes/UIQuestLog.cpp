@@ -272,6 +272,7 @@ namespace ms
 		buttons[FIND_NPC] = std::make_unique<MapleButton>(Quest["BtMarkNpc"], detail + FIND_NPC_POS);
 		buttons[HELPER] = std::make_unique<MapleButton>(Quest["BtAlert"], detail + HELPER_POS);
 		buttons[FORFEIT] = std::make_unique<MapleButton>(Quest["BtGiveup"], detail + FORFEIT_POS);
+		set_button_help(HELPER, "Game/Button/QuestAlarm");
 
 		list_slider = Slider(Slider::Type::CLASSIC, LIST_SLIDER, LIST_SLIDER_X, ROWS, 0,
 			[&](bool up) { scroll_list(list_offset + (up ? -1 : 1)); });

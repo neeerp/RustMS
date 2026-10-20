@@ -119,6 +119,11 @@ namespace ms
 
 		void show_line(Tooltip::Parent parent, std::string text);
 
+		void show_help(UIElement::Type owner, std::string title, std::string description,
+					   std::optional<Point<int16_t>> anchor = std::nullopt, bool above = false);
+
+		void clear_help(UIElement::Type owner);
+
 		Keyboard &get_keyboard();
 
 		// The skill macros, kept across characters as v83 does (report 206).

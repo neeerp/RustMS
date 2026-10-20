@@ -86,6 +86,11 @@ namespace ms
 
 		void show_line(Tooltip::Parent parent, std::string text) override;
 
+		void show_help(UIElement::Type owner, std::string title, std::string description,
+					   std::optional<Point<int16_t>> anchor, bool above) override;
+
+		void clear_help(UIElement::Type owner) override;
+
 		Iterator pre_add(UIElement::Type type, bool toggled, bool focused);
 
 		void remove(UIElement::Type type) override;
@@ -108,6 +113,9 @@ namespace ms
 		void remove_cursors();
 
 		void remove_cursor(UIElement::Type type);
+
+		// Whether the tooltip up belongs to the window.
+		bool owns_tooltip(UIElement::Type type) const;
 
 		// The window holding the focus. Once it closes, the focus goes back
 		// to the one it opened over, such as a dialog under its notice.
@@ -133,6 +141,8 @@ namespace ms
 		MacroTooltip mctooltip;
 		Optional<Tooltip> tooltip;
 		Tooltip::Parent tooltipparent;
+		// The window whose help is up, while the tooltip is help
+		UIElement::Type help_owner = UIElement::Type::NONE;
 
 		Optional<Icon> draggedicon;
 

@@ -47,6 +47,16 @@ int main()
 		require(both.desc_x == 10 && both.desc_y == 26 && both.wrap == 89, "wrapped inside the title's width");
 		require(compact_box(0, 30).width == 0, "nothing without a title");
 
+		Box help = help_box(70, 32);
+		require(help.width == 270 && help.height == 66, "a button's help is 270 wide");
+		require(help.title_x == 100 && help.title_y == 8, "its title centred");
+		require(help.desc_x == 10 && help.desc_y == 30 && help.wrap == 255, "its description below");
+		Box wide = help_box(300, 0);
+		require(wide.width == 316 && wide.height == 30, "a long title widens it");
+		Box untitled = help_box(0, 48);
+		require(untitled.width == 270 && untitled.height == 62 && untitled.desc_y == 10,
+				"a description alone takes the title's place");
+
 		Box line = line_box(50);
 		require(line.width == 58 && line.height == 18 && line.title_x == 4 && line.title_y == 1, "a portal's tip");
 

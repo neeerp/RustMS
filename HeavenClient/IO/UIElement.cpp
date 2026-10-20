@@ -17,7 +17,11 @@
 //////////////////////////////////////////////////////////////////////////////////
 #include "UIElement.h"
 
+#include "UI.h"
+
 #include "../Audio/Audio.h"
+
+#include <nlnx/nx.hpp>
 
 namespace ms
 {
@@ -100,9 +104,19 @@ namespace ms
 			if (button->get_state() == Button::State::MOUSEOVER)
 				button->set_state(Button::State::NORMAL);
 		}
+
+		update_help();
 	}
 
 	Cursor::State UIElement::send_cursor(bool down, Point<int16_t> pos)
+	{
+		Cursor::State state = send_cursor_to_buttons(down, pos);
+		update_help();
+
+		return state;
+	}
+
+	Cursor::State UIElement::send_cursor_to_buttons(bool down, Point<int16_t> pos)
 	{
 		if (holding)
 		{
@@ -219,6 +233,43 @@ namespace ms
 
 		return btit != buttons.end() && btit->second->is_active() && btit->second->bounds(position).contains(pos)
 			&& !button_covered(buttonid, pos);
+	}
+
+	void UIElement::set_button_help(uint16_t buttonid, const std::string &path, bool above)
+	{
+		nl::node src = nl::nx::string["ToolTipHelp.img"].resolve(path);
+
+		if (!src)
+			return;
+
+		button_help[buttonid] = { src["Title"].get_string(), src["Desc"].get_string(), above };
+	}
+
+	// A disabled or checked button never looks hovered, and so shows none
+	// (FUN_004c0ad9).
+	void UIElement::update_help()
+	{
+		for (auto &[id, help] : button_help)
+		{
+			auto btit = buttons.find(id);
+
+			if (active && btit != buttons.end() && btit->second->is_active()
+				&& btit->second->get_state() == Button::State::MOUSEOVER)
+			{
+				Rectangle<int16_t> bounds = btit->second->bounds(position);
+				UI::get().show_help(get_type(), help.title, help.desc, Point<int16_t>(bounds.right(), bounds.top()),
+									help.above);
+				help_up = true;
+
+				return;
+			}
+		}
+
+		if (help_up)
+		{
+			help_up = false;
+			UI::get().clear_help(get_type());
+		}
 	}
 
 	void UIElement::release_button()

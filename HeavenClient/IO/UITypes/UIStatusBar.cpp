@@ -244,6 +244,14 @@ namespace ms
 		buttons[Buttons::BT_QUICKSLOT_SHOW]->set_active(!quickslot_active);
 		buttons[Buttons::BT_QUICKSLOT_HIDE]->set_active(quickslot_active);
 
+		// v83 turns Menu's help off and attaches the trade button's to the
+		// Cash Shop's by mistake, so only these have any (FUN_008d01b2).
+		set_button_help(Buttons::BT_CASHSHOP, "Game/Button/Shop");
+		set_button_help(Buttons::BT_KEYSET, "Game/Button/KeySet");
+		set_button_help(Buttons::BT_QUICKSLOT_SHOW, "Game/Button/QuickSlot");
+		set_button_help(Buttons::BT_QUICKSLOT_HIDE, "Game/Button/QuickSlotD");
+		set_button_help(Buttons::BT_CLAIM, "Game/Button/Claim");
+
 		quickslot_pos = Point<int16_t>(647 + right, QUICKSLOT_TOP);
 
 		// Each menu's pointer sits over the button that opens it, as far as

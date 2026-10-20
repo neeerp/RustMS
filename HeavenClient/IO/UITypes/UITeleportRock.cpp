@@ -72,6 +72,12 @@ namespace ms
 		buttons[Buttons::CLOSE] = std::make_unique<MapleButton>(NxFiles::ui_classic["Basic.img"]["BtClose"],
 																Point<int16_t>(156, 6));
 
+		// FUN_008392c1: the VIP rock's register help says 10 maps.
+		set_button_help(Buttons::REGISTER, vip ? "Game/Button/MapTransfer/RegisterEx"
+											   : "Game/Button/MapTransfer/Register");
+		set_button_help(Buttons::DELETE, "Game/Button/MapTransfer/Delete");
+		set_button_help(Buttons::MOVE, "Game/Button/MapTransfer/Move");
+
 		// Until something is chosen.
 		buttons[Buttons::DELETE]->set_state(Button::State::DISABLED);
 		buttons[Buttons::MOVE]->set_state(Button::State::DISABLED);

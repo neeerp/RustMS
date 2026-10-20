@@ -47,34 +47,65 @@ namespace ms
 
 	void PlainTooltip::set_zone(const std::string &t, const std::string &d)
 	{
-		set(t, d, false);
+		set(t, d, Kind::ZONE);
+		anchor.reset();
 	}
 
 	void PlainTooltip::set_line(const std::string &text)
 	{
-		set(text, "", true);
+		set(text, "", Kind::LINE);
+		anchor.reset();
+	}
+
+	// Show (0x4c131c) takes an empty description for the one-line box,
+	// which has no use for above.
+	void PlainTooltip::set_help(const std::string &t, const std::string &d, std::optional<Point<int16_t>> a, bool ab)
+	{
+		set(t, d, Kind::HELP);
+		anchor = a;
+		above = ab;
 	}
 
 	void PlainTooltip::reset()
 	{
-		set("", "", false);
+		set("", "", Kind::ZONE);
+		anchor.reset();
 	}
 
-	void PlainTooltip::set(const std::string &t, const std::string &d, bool l)
+	void PlainTooltip::set(const std::string &t, const std::string &d, Kind k)
 	{
-		if (t == title && d == desc && l == line)
+		if (t == title && d == desc && k == kind)
 			return;
 
 		title = t;
 		desc = d;
-		line = l;
-		title_label = Text(Text::Font::A12M, Text::Alignment::LEFT, Color::Name::WHITE, title, 0, false);
+		kind = k;
+		line = kind == Kind::LINE || (kind == Kind::HELP && desc.empty());
+		bool help = kind == Kind::HELP && !line;
+		title_label = Text(help ? Text::Font::A12B : Text::Font::A12M, Text::Alignment::LEFT, Color::Name::WHITE,
+						   title, 0, false);
 		int16_t title_width = title.empty() ? 0 : title_label.width();
 
 		if (line)
 		{
 			desc_label = Text();
 			box = map_tooltips::line_box(title_width);
+
+			return;
+		}
+
+		// v83 writes the help's description in white (font 7, FUN_008e49b5).
+		if (help)
+		{
+			box = map_tooltips::help_box(title_width, 0);
+			desc_label = Text();
+
+			if (!desc.empty())
+			{
+				desc_label = Text(Text::Font::A12M, Text::Alignment::LEFT, Color::Name::WHITE, desc, box.wrap, true,
+								  tooltip::LINE_ADJ);
+				box = map_tooltips::help_box(title_width, desc_label.height() - tooltip::LINE_ADJ);
+			}
 
 			return;
 		}
@@ -104,9 +135,29 @@ namespace ms
 
 		int16_t x = position.x(), y = position.y(), w = box.width, h = box.height;
 		GraphicsGL &gl = GraphicsGL::get();
-		gl.drawrectangle(x + 1, y, w - 2, 1, 0.0f, 0.0f, FILL_BLUE, FILL_ALPHA);
-		gl.drawrectangle(x, y + 1, w, h - 2, 0.0f, 0.0f, FILL_BLUE, FILL_ALPHA);
-		gl.drawrectangle(x + 1, y + h - 1, w - 2, 1, 0.0f, 0.0f, FILL_BLUE, FILL_ALPHA);
+		auto fill = [&](int16_t left, int16_t top, int16_t width, int16_t height)
+		{
+			gl.drawrectangle(x + left, y + top, width, height, 0.0f, 0.0f, FILL_BLUE, FILL_ALPHA);
+		};
+
+		fill(1, 0, w - 2, 1);
+		fill(1, h - 1, w - 2, 1);
+
+		// The help also leaves out a ring one pixel inside the edge (the
+		// layer's fourth flag, 0x8f35b6), all but its corners.
+		if (kind == Kind::HELP && !line)
+		{
+			fill(0, 1, 2, 1);
+			fill(w - 2, 1, 2, 1);
+			fill(0, 2, 1, h - 4);
+			fill(2, 2, w - 4, h - 4);
+			fill(w - 1, 2, 1, h - 4);
+			fill(0, h - 2, 2, 1);
+			fill(w - 2, h - 2, 2, 1);
+		} else
+		{
+			fill(0, 1, w, h - 2);
+		}
 
 		title_label.draw(position + Point<int16_t>(box.title_x, text_y(box.title_y)));
 		desc_label.draw(position + Point<int16_t>(box.desc_x, text_y(box.desc_y)));
@@ -118,6 +169,10 @@ namespace ms
 			return;
 
 		Point<int16_t> at = position - Point<int16_t>(0, DRAWN_BELOW) + (line ? LINE_OFFSET : ZONE_OFFSET);
+
+		if (anchor)
+			at = *anchor - Point<int16_t>(0, above && !line ? box.height : 0);
+
 		auto [x, y] = map_tooltips::clamp_screen(at.x(), at.y(), box.width, box.height,
 												 Constants::Constants::get().get_viewwidth(),
 												 Constants::Constants::get().get_viewheight());

@@ -192,7 +192,7 @@ namespace ms
 		{
 			auto &element = elements[type];
 
-			if (tooltipparent != Tooltip::Parent::NONE && tooltip_belongs(tooltipparent, type) &&
+			if (tooltipparent != Tooltip::Parent::NONE && owns_tooltip(type) &&
 				!(element && element->is_active()))
 			{
 				clear_tooltip(tooltipparent);
@@ -499,7 +499,7 @@ namespace ms
 						UIElement::Type front_type = front->get_type();
 
 						if (tooltipparent != Tooltip::Parent::NONE)
-							if (!tooltip_belongs(tooltipparent, front_type))
+							if (!owns_tooltip(front_type))
 								clear_tooltip(tooltipparent);
 
 						remove_cursor(front_type);
@@ -677,6 +677,30 @@ namespace ms
 		}
 	}
 
+	void UIStateGame::show_help(UIElement::Type owner, std::string title, std::string description,
+								std::optional<Point<int16_t>> anchor, bool above)
+	{
+		pltooltip.set_help(title, description, anchor, above);
+
+		if (!pltooltip.empty())
+		{
+			tooltip = pltooltip;
+			tooltipparent = Tooltip::Parent::HELP;
+			help_owner = owner;
+		}
+	}
+
+	void UIStateGame::clear_help(UIElement::Type owner)
+	{
+		if (tooltipparent == Tooltip::Parent::HELP && help_owner == owner)
+			clear_tooltip(Tooltip::Parent::HELP);
+	}
+
+	bool UIStateGame::owns_tooltip(UIElement::Type type) const
+	{
+		return tooltipparent == Tooltip::Parent::HELP ? help_owner == type : tooltip_belongs(tooltipparent, type);
+	}
+
 	template<class T, typename...Args>
 	void UIStateGame::emplace(Args &&...args)
 	{
@@ -788,7 +812,7 @@ namespace ms
 		if (type == focused)
 			focused = UIElement::Type::NONE;
 
-		if (tooltip_belongs(tooltipparent, type))
+		if (owns_tooltip(type))
 			clear_tooltip(tooltipparent);
 
 		elementorder.remove(type);
