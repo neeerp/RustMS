@@ -79,5 +79,22 @@ int main()
 	brief.update(1500);
 	assert(near(brief.opacity(), 0xd2 / 255.0f));
 
+	// The Battleship's gauge: only hits drain it, and it blinks at a sixteenth.
+	ms::BuffTimer ship = ms::BuffTimer::gauge(1600);
+	ship.update(60000);
+	assert(ship.shadow() == 15);
+	ship.set(1000);
+	assert(ship.shadow() == 10 && near(ship.opacity(), 0xd2 / 255.0f));
+	ship.set(100);
+	assert(ship.shadow() == 1 && near(ship.opacity(), 0xd2 / 255.0f));
+	ship.update(250);
+	assert(near(ship.opacity(), (0xd2 + 0x40) / 2.0f / 255.0f));
+
+	row.add(5221006, JUMP, 60000, [] { return "B"; });
+	*row.timer(5221006) = ms::BuffTimer::gauge(400);
+	assert(row.timer(5221006)->shadow() == 15 && !row.timer(1));
+	row.remove(5221006);
+	assert(order(row) == "S");
+
 	return 0;
 }

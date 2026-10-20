@@ -20,6 +20,7 @@
 #include "../Data/ItemData.h"
 #include "../Data/SkillData.h"
 #include "../../Character/MorphRules.h"
+#include "../../Character/MountRules.h"
 #include "../../Gameplay/Stage.h"
 #include "../../Net/Packets/AttackAndSkillPackets.h"
 #include "../Messages.h"
@@ -157,6 +158,29 @@ namespace ms
 	{
 		row.add(buffid, stat, duration, [buffid] { return buff_icon(buffid); });
 		remove_cursor();
+
+		// The Battleship's icon shows the ship's HP, full as it comes (decomp.c:1324230).
+		if (buffid == mount::BATTLESHIP)
+		{
+			Player &player = Stage::get().get_player();
+			int32_t level = player.get_stats().get_stat(MapleStat::Id::LEVEL);
+			int32_t max = mount::battleship_max_hp(level, player.get_skills().get_level(buffid));
+
+			if (BuffTimer *timer = row.timer(buffid))
+				*timer = BuffTimer::gauge(max);
+		}
+	}
+
+	void UIBuffList::set_gauge(int32_t buffid, int32_t value)
+	{
+		if (value == 0)
+		{
+			row.remove(buffid);
+			remove_cursor();
+		} else if (BuffTimer *timer = row.timer(buffid))
+		{
+			timer->set(value);
+		}
 	}
 
 	void UIBuffList::cancel_buff(int32_t stat)

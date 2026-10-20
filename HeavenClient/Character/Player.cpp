@@ -1603,6 +1603,13 @@ namespace ms
 	{
 		ride_pending.answered();
 
+		// The ship come while climbing is sent back at once (decomp.c:1324318).
+		if (mount::is_ship(v) && is_climbing())
+		{
+			ask_ride(mount::BATTLESHIP);
+			return;
+		}
+
 		// The effect is the mount's got on, or the one got off.
 		int32_t shown = v > 0 ? v : vehicle;
 
@@ -1611,6 +1618,8 @@ namespace ms
 
 		if (mount::is_tamed_monster(shown))
 			show_ride_effect(mount::rider_skill(stats.get_stat(MapleStat::Id::JOB)));
+		else if (shown == mount::BATTLESHIP_VEHICLE)
+			show_ride_effect(mount::BATTLESHIP);
 
 		ride(v, false);
 

@@ -17,16 +17,22 @@
 //////////////////////////////////////////////////////////////////////////////////
 #include "SkillUseEffect.h"
 
+#include "../../Character/MountRules.h"
 #include "../../Util/Misc.h"
 
 namespace ms
 {
-	SingleUseEffect::SingleUseEffect(nl::node src) : effect(src["effect"])
+	SingleUseEffect::SingleUseEffect(nl::node src) :
+		effect(src["effect"]), ship(src["effect_ship"]), has_ship(src["effect_ship"].size() > 0)
 	{}
 
 	void SingleUseEffect::apply(Char &target) const
 	{
-		effect.apply(target);
+		// On a vehicle a skill plays its effect_ship, if it has one (0x933990).
+		if (has_ship && mount::is_vehicle(target.get_vehicle()))
+			ship.apply(target);
+		else
+			effect.apply(target);
 	}
 
 	TwoHandedUseEffect::TwoHandedUseEffect(nl::node src) : effects(src["effect"]["0"], src["effect"]["1"]) {}

@@ -56,6 +56,8 @@ namespace ms
 		// Item buffs have negative ids.
 		void add_buff(int32_t buffid, int32_t stat, int32_t duration);
 		void cancel_buff(int32_t stat);
+		// The Battleship's HP: 0 takes its icon away.
+		void set_gauge(int32_t buffid, int32_t value);
 
 	private:
 		static constexpr int16_t CELL = 32;

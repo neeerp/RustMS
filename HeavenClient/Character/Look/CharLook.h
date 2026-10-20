@@ -217,8 +217,9 @@ namespace ms
 		const BodyAction *action;
 		std::string actionstr;
 		uint8_t actframe;
-		// A superman's attack or skill, drawn and timed by the template's frames in place of the action's.
-		std::string morphact;
+		// A superman's attack or skill, or the ship's, drawn and timed by the morph's or mount's frames in
+		// place of the action's.
+		std::string tmplact;
 		int16_t heldframe = -1;
 
 		const Body *body;

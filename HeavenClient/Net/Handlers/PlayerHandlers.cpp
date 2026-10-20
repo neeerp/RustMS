@@ -21,6 +21,7 @@
 #include "Helpers/LoginParser.h"
 #include "../../Audio/Audio.h"
 #include "../../Character/Diseases.h"
+#include "../../Character/MountRules.h"
 
 #include "../Packets/LoginPackets.h"
 
@@ -508,6 +509,19 @@ namespace ms
 	{
 		int32_t skill_id = recv.read_int();
 		int16_t cooltime = recv.read_short();
+
+		// The Battleship's HP comes as a cooldown of its own, not one to wait out (decomp.c:1169755).
+		if (skill_id == mount::BATTLESHIP_HP)
+		{
+			auto hp = static_cast<uint16_t>(cooltime);
+			bool shipped = mount::is_ship(Stage::get().get_player().get_vehicle());
+
+			if (hp == 0 || shipped)
+				if (auto bufflist = UI::get().get_element<UIBuffList>())
+					bufflist->set_gauge(mount::BATTLESHIP, hp);
+
+			return;
+		}
 
 		Stage::get().get_player().add_cooldown(skill_id, cooltime);
 	}
