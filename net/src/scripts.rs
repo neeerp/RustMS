@@ -69,6 +69,10 @@ pub enum Effect {
     /// Make a second-job Explorer a third job (`Player::take_third_job`),
     /// on the same terms.
     TakeThirdJob(i16),
+    /// Make a third-job Explorer a fourth job (`Player::take_fourth_job`),
+    /// on the same terms, and teach the job's first skills
+    /// (`skills::fourth_job_skills`).
+    TakeFourthJob(i16),
     /// Set or clear a script marker (`game::quest::SCRIPT_MARKERS`), which
     /// the client is not told about.
     Mark(i16),

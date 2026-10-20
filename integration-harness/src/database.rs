@@ -292,6 +292,29 @@ pub async fn start_quest(character_id: i32, quest_id: i16) -> Result<(), Harness
     .await
 }
 
+/// Give the logged-out character `character_id` quest `quest_id` in
+/// `status` (1 started, 2 completed) with kill `progress`.
+pub async fn set_quest(
+    character_id: i32,
+    quest_id: i16,
+    status: i16,
+    progress: &str,
+) -> Result<(), HarnessError> {
+    let progress = progress.to_string();
+    change_one_row("set quest", move |conn| {
+        diesel::sql_query(
+            "INSERT INTO character_quests (character_id, quest_id, status, completed_at, progress) \
+             VALUES ($1, $2, $3, CASE WHEN $3 = 2 THEN now() END, $4)",
+        )
+        .bind::<Integer, _>(character_id)
+        .bind::<SmallInt, _>(quest_id)
+        .bind::<SmallInt, _>(status)
+        .bind::<Text, _>(progress)
+        .execute(conn)
+    })
+    .await
+}
+
 /// Teach the logged-out character `character_id` skill `skill_id` at
 /// `level`.
 pub async fn grant_skill(character_id: i32, skill_id: i32, level: i32) -> Result<(), HarnessError> {

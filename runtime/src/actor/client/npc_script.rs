@@ -8,7 +8,7 @@ use net::dialogue::Prompt;
 use net::npc_scripts::{self, NpcScript, Step};
 use net::packet::build::world::effect::CharEffect;
 use net::packet::build::world::stat::StatUpdate;
-use net::packet::build::world::{drop, effect, guild, inventory, npc, stat};
+use net::packet::build::world::{drop, effect, guild, inventory, npc, skill, stat};
 use net::quests::{self, QuestTemplate};
 use net::scripts::Effect;
 use net::WorldAction;
@@ -191,11 +191,13 @@ impl ClientActor {
                 }
                 Effect::TakeFirstJob(job)
                 | Effect::TakeSecondJob(job)
-                | Effect::TakeThirdJob(job) => {
+                | Effect::TakeThirdJob(job)
+                | Effect::TakeFourthJob(job) => {
                     let qualifies = match effect {
                         Effect::TakeFirstJob(_) => next.can_take_first_job(*job),
                         Effect::TakeSecondJob(_) => next.can_take_second_job(*job),
-                        _ => next.can_take_third_job(*job),
+                        Effect::TakeThirdJob(_) => next.can_take_third_job(*job),
+                        _ => next.can_take_fourth_job(*job),
                     };
                     if !qualifies {
                         warn!(job, "No longer qualifies for the job; nothing applied");
@@ -204,7 +206,8 @@ impl ClientActor {
                     match effect {
                         Effect::TakeFirstJob(_) => next.take_first_job(*job),
                         Effect::TakeSecondJob(_) => next.take_second_job(*job),
-                        _ => next.take_third_job(*job),
+                        Effect::TakeThirdJob(_) => next.take_third_job(*job),
+                        _ => next.take_fourth_job(*job),
                     }
                     changed = true;
                     let stats = &next.stats;
@@ -214,10 +217,25 @@ impl ClientActor {
                         StatUpdate::MaxMp(stats.max_mp),
                         StatUpdate::Sp(stats.sp),
                     ];
-                    if matches!(effect, Effect::TakeThirdJob(_)) {
+                    if matches!(effect, Effect::TakeThirdJob(_) | Effect::TakeFourthJob(_)) {
                         updates.push(StatUpdate::Ap(stats.ap));
                     }
                     packets.push(stat::build_stat_update(false, &updates)?);
+                    if matches!(effect, Effect::TakeFourthJob(_)) {
+                        let taught: Vec<_> = net::skills::fourth_job_skills(*job)
+                            .into_iter()
+                            .map(|mut record| {
+                                if let Some(known) = next.skills.get(record.skill_id) {
+                                    record.level = known.level;
+                                    record.master_level =
+                                        record.master_level.max(known.master_level);
+                                }
+                                next.skills.set(record.clone());
+                                record
+                            })
+                            .collect();
+                        packets.push(skill::build_update_skills(&taught)?);
+                    }
                 }
                 Effect::Mark(marker) => {
                     next.quests.mark(*marker);

@@ -305,6 +305,59 @@ const THIRD_JOBS: [ThirdJob; 5] = [
     },
 ];
 
+/// The Explorer fourth job: a level-120 third job who has finished their
+/// line's last quest in Leafre (bringing the Pentagon and the Star) asks
+/// the line's instructor there to advance them.
+struct FourthJob {
+    /// The line's first job.
+    job: i16,
+    text: &'static str,
+    instructor: i32,
+    quest: i16,
+}
+
+const FOURTH_JOBS: [FourthJob; 5] = [
+    // Harmonia; "Hero's Quality".
+    FourthJob {
+        job: 100,
+        text: "warrior",
+        instructor: 2081100,
+        quest: 6904,
+    },
+    // Gritto.
+    FourthJob {
+        job: 200,
+        text: "magician",
+        instructor: 2081200,
+        quest: 6914,
+    },
+    // Legor.
+    FourthJob {
+        job: 300,
+        text: "bowman",
+        instructor: 2081300,
+        quest: 6924,
+    },
+    // Hellin.
+    FourthJob {
+        job: 400,
+        text: "thief",
+        instructor: 2081400,
+        quest: 6934,
+    },
+    // Samuel.
+    FourthJob {
+        job: 500,
+        text: "pirate",
+        instructor: 2081500,
+        quest: 6944,
+    },
+];
+
+/// [Skill Book] Maple Hero, which teaches every fourth job Maple Warrior;
+/// the instructor gives one with the advancement (upstream).
+const MAPLE_HERO: i32 = 2280003;
+
 /// The chief has assigned the test (upstream `JB3`).
 const CHIEF_ASSIGNED: i16 = 32100;
 /// The instructor has sent the player to the door (`JBP`).
@@ -429,6 +482,9 @@ impl NpcScript {
         }
         if let Some(line) = THIRD_JOBS.iter().find(|line| line.chief == npc_id) {
             return Some(chief(line, player));
+        }
+        if let Some(line) = FOURTH_JOBS.iter().find(|line| line.instructor == npc_id) {
+            return Some(fourth_job_instructor(line, player));
         }
         if let Some((_, route)) = SELLERS.iter().find(|(seller, _)| *seller == npc_id) {
             return Some(ticket_seller(npc_id, route, player));
@@ -1152,6 +1208,40 @@ fn chief(line: &ThirdJob, player: &Player) -> NpcScript {
             Page::Say(say("chief.go")),
         ]
     };
+    script
+}
+
+/// A fourth-job instructor in Leafre and a third job of their line: the
+/// advancement once the player is level 120 and has finished the line's
+/// last quest.
+fn fourth_job_instructor(line: &FourthJob, player: &Player) -> NpcScript {
+    let say = |part: &str| text(&keys::fourth_job(line.text, part));
+    let stats = &player.stats;
+    let mut script = NpcScript::new(line.instructor, Vec::new());
+    script.pages = if stats.job / 100 * 100 != line.job || stats.job % 10 == 0 {
+        vec![Page::Say(say("other"))]
+    } else if stats.job % 10 == 2 {
+        vec![Page::Say(say("done"))]
+    } else if stats.level < 120 || player.quests.state(line.quest) != QuestState::Completed {
+        vec![Page::Say(say("trials"))]
+    } else {
+        let job = stats.job + 1;
+        vec![
+            Page::Ask {
+                text: say("ask"),
+                on_yes: vec![
+                    Effect::GiveItem {
+                        item_id: MAPLE_HERO,
+                        quantity: 1,
+                    },
+                    Effect::TakeFourthJob(job),
+                ],
+                on_no: Some(say("decline")),
+            },
+            Page::Say(text(&keys::fourth_job(&job.to_string(), "accept"))),
+        ]
+    };
+    script.inventory_full = Some(text(keys::FOURTH_JOB_INVENTORY_FULL));
     script
 }
 
@@ -2307,6 +2397,45 @@ mod tests {
         // Unsent, Athena talks as she does to any second job.
         let athena = NpcScript::for_npc(ATHENA, &hunter(&[], &[])).unwrap();
         assert_eq!(athena, first_job(&INSTRUCTORS[2], &hunter(&[], &[])));
+    }
+
+    #[test]
+    fn third_jobs_who_passed_the_trials_take_the_fourth_job_in_leafre() {
+        const LEGOR: i32 = 2081300;
+        let says = |player: &Player| kind(&NpcScript::for_npc(LEGOR, player).unwrap().begin());
+        let mut ranger = hunter(&[], &[]);
+        (ranger.stats.job, ranger.stats.level) = (311, 120);
+        assert_eq!(says(&ranger), Some(0), "the trials first");
+        ranger.quests.upsert(game::QuestRecord {
+            quest_id: 6924,
+            status: QuestStatus::Completed {
+                at: std::time::SystemTime::UNIX_EPOCH,
+            },
+        });
+        let mut legor = NpcScript::for_npc(LEGOR, &ranger).unwrap();
+        assert_eq!(kind(&legor.begin()), Some(1));
+        assert_eq!(
+            legor.respond(ScriptInput::Yes).unwrap().effects,
+            [
+                Effect::GiveItem {
+                    item_id: MAPLE_HERO,
+                    quantity: 1
+                },
+                Effect::TakeFourthJob(312),
+            ]
+        );
+        assert_eq!(kind(&legor.inventory_full().unwrap()), Some(0));
+
+        let mut young = ranger.clone();
+        young.stats.level = 119;
+        assert_eq!(says(&young), Some(0), "level 120");
+        let mut other = ranger.clone();
+        other.stats.job = 411;
+        let hellin = NpcScript::for_npc(2081400, &ranger).unwrap();
+        assert_eq!(kind(&hellin.begin()), Some(0), "another line");
+        assert_eq!(says(&other), Some(0));
+        ranger.stats.job = 312;
+        assert_eq!(says(&ranger), Some(0), "already a fourth job");
     }
 
     /// The answer the quiz on the current page takes as right.

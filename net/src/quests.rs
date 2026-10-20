@@ -3,9 +3,9 @@
 //! catalog and the player's state before anything is persisted.
 
 use crate::load;
-use game::{InventoryChange, InventoryError, Player, QuestState};
+use game::{InventoryChange, InventoryError, Player, QuestState, SkillRecord};
 pub use game_data::quests::{
-    QuestCatalog, QuestItem, QuestPrerequisite, QuestTemplate, StartRequirements,
+    QuestCatalog, QuestItem, QuestPrerequisite, QuestSkill, QuestTemplate, StartRequirements,
 };
 use rand::Rng;
 use std::sync::OnceLock;
@@ -231,6 +231,32 @@ pub fn apply_items(
     Ok(changes)
 }
 
+/// Teach `player` the skills for their exact job, raising the level and the
+/// master level to the entry's where they are lower (as Cosmic's
+/// SkillAction does). The records that changed, for UPDATE_SKILLS.
+pub fn apply_skills(skills: &[QuestSkill], player: &mut Player) -> Vec<SkillRecord> {
+    let mut taught = Vec::new();
+    for skill in skills
+        .iter()
+        .filter(|skill| skill.jobs.contains(&player.stats.job))
+    {
+        let known = player.skills.get(skill.skill_id).cloned();
+        let record = SkillRecord {
+            skill_id: skill.skill_id,
+            level: skill.level.max(known.as_ref().map_or(0, |k| k.level)),
+            master_level: skill
+                .master_level
+                .max(known.as_ref().map_or(0, |k| k.master_level)),
+            expiration: known.as_ref().and_then(|k| k.expiration),
+        };
+        if known.as_ref() != Some(&record) {
+            player.skills.set(record.clone());
+            taught.push(record);
+        }
+    }
+    taught
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -257,6 +283,7 @@ mod tests {
             end_quests: vec![],
             start_items: vec![],
             end_rewards: vec![],
+            end_skills: vec![],
             start_script: None,
             end_script: None,
             exp: 7,
@@ -472,5 +499,37 @@ mod tests {
             hats.insert(picked.iter().find(|(_, c)| *c > 0).unwrap().0);
         }
         assert_eq!(hats.len(), 2);
+    }
+
+    #[test]
+    fn skill_rewards_match_the_exact_job_and_never_lower_a_skill() {
+        let ambush = |skill_id, job| QuestSkill {
+            skill_id,
+            level: 0,
+            master_level: 10,
+            jobs: vec![job, 0],
+        };
+        let skills = [ambush(4221004, 422), ambush(4121004, 412)];
+        let mut p = player(130, 412);
+        let taught = apply_skills(&skills, &mut p);
+        let expected = SkillRecord {
+            skill_id: 4121004,
+            level: 0,
+            master_level: 10,
+            expiration: None,
+        };
+        assert_eq!(taught, [expected.clone()]);
+        assert_eq!(p.skills.get(4121004), Some(&expected));
+        assert!(p.skills.get(4221004).is_none());
+        // A known skill keeps its higher level and master level.
+        p.skills.set(SkillRecord {
+            level: 12,
+            master_level: 20,
+            ..expected
+        });
+        assert!(apply_skills(&skills, &mut p).is_empty());
+        assert_eq!(p.skills.level(4121004), 12);
+        // Job 410 is not 412, though both are thieves.
+        assert!(apply_skills(&skills, &mut player(70, 410)).is_empty());
     }
 }

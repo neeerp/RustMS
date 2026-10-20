@@ -11,6 +11,9 @@ pub struct SkillInfo {
     pub max_level: i32,
     /// Hidden from the skill window until learned some other way.
     pub invisible: bool,
+    /// The master level a fourth-job skill starts with at the advancement
+    /// (`masterLevel`), or 0 for one learned some other way.
+    pub master_level: i32,
     /// Skills that must reach a level first (`req`): `(skill id, level)`.
     pub requirements: Vec<(i32, i32)>,
     /// What each level does, from level 1.
@@ -193,9 +196,29 @@ impl SkillData {
             skill_id,
             max_level: levels.len() as i32,
             invisible: nx.int_child(skill, "invisible")?.unwrap_or(0) != 0,
+            master_level: nx.int_child(skill, "masterLevel")?.unwrap_or(0),
             requirements,
             levels,
         }))
+    }
+
+    /// The ids of a job's skills (`<job>.img/skill`).
+    pub fn job_skills(&self, job: i32) -> Result<Vec<i32>, GameDataError> {
+        let nx = &self.nx;
+        let Some(image) = nx.child_by_name(0, &format!("{job:03}.img"))? else {
+            return Ok(Vec::new());
+        };
+        let Some(skills) = nx.child_by_name(image, "skill")? else {
+            return Ok(Vec::new());
+        };
+        nx.child_indices(skills)?
+            .into_iter()
+            .map(|child| {
+                nx.node_name(child)?.parse().map_err(|_| {
+                    GameDataError::InvalidData(format!("job {job} has a bad skill id"))
+                })
+            })
+            .collect()
     }
 
     pub fn mob_skill(
@@ -300,6 +323,13 @@ mod tests {
         let maple_warrior = data.info(2121000).unwrap().unwrap();
         assert!(maple_warrior.invisible);
         assert_eq!(maple_warrior.max_level, 30);
+        assert_eq!(maple_warrior.master_level, 0);
+        assert_eq!(data.info(2121001).unwrap().unwrap().master_level, 10);
+
+        let bishop = data.job_skills(232).unwrap();
+        assert!(bishop.contains(&2321001) && bishop.contains(&2321008));
+        assert!(bishop.iter().all(|id| id / 10_000 == 232));
+        assert!(data.job_skills(999).unwrap().is_empty());
 
         assert!(data.info(1009999).unwrap().is_none());
         assert!(data.info(9_990_000).unwrap().is_none());
