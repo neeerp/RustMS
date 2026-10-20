@@ -17,13 +17,15 @@
 //////////////////////////////////////////////////////////////////////////////////
 #include "MapBackgrounds.h"
 
+#include "../FieldEffectRules.h"
+
 #include "../../Graphics/GraphicsGL.h"
 
 #include <nlnx/nx.hpp>
 
 namespace ms
 {
-	Background::Background(nl::node src)
+	Background::Background(nl::node src, int16_t index) : index(index)
 	{
 		VWIDTH = Constants::Constants::get().get_viewwidth();
 		VHEIGHT = Constants::Constants::get().get_viewheight();
@@ -152,9 +154,29 @@ namespace ms
 	{
 		moveobj.move();
 		animation.update();
+
+		if (fade_elapsed < fade_duration)
+		{
+			fade_elapsed += Constants::TIMESTEP;
+			opacity = field_effect::back_alpha(fade_from, fade_to, fade_elapsed, fade_duration);
+		}
 	}
 
-	MapBackgrounds::MapBackgrounds(nl::node src)
+	int16_t Background::get_index() const
+	{
+		return index;
+	}
+
+	void Background::fade(float target, int32_t duration)
+	{
+		fade_from = opacity;
+		fade_to = target;
+		fade_elapsed = 0;
+		fade_duration = duration;
+		opacity = field_effect::back_alpha(fade_from, fade_to, fade_elapsed, fade_duration);
+	}
+
+	MapBackgrounds::MapBackgrounds(nl::node src) : src(src)
 	{
 		int16_t no = 0;
 		nl::node back = src[std::to_string(no)];
@@ -164,9 +186,9 @@ namespace ms
 			bool front = back["front"].get_bool();
 
 			if (front)
-				foregrounds.push_back(back);
+				foregrounds.emplace_back(back, no);
 			else
-				backgrounds.push_back(back);
+				backgrounds.emplace_back(back, no);
 
 			no++;
 			back = src[std::to_string(no)];
@@ -200,5 +222,21 @@ namespace ms
 
 		for (auto &foreground : foregrounds)
 			foreground.update();
+	}
+
+	void MapBackgrounds::fade(int16_t index, float target, int32_t duration)
+	{
+		for (auto &background : backgrounds)
+			if (background.get_index() == index)
+				background.fade(target, duration);
+
+		for (auto &foreground : foregrounds)
+			if (foreground.get_index() == index)
+				foreground.fade(target, duration);
+	}
+
+	void MapBackgrounds::reset()
+	{
+		*this = MapBackgrounds(src);
 	}
 }

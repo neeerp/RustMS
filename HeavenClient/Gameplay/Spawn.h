@@ -58,8 +58,8 @@ namespace ms
 	class MobSpawn
 	{
 	public:
-		// `summon` is the Effect/Summon.img effect a summoned mob plays
-		// `summondelay` ms after it appears, or -1.
+		// `summon` is how the mob appears: the Effect/Summon.img effect a
+		// summoned mob plays `summondelay` ms in, or a negative type.
 		MobSpawn(int32_t oid, int32_t id, int8_t mode, int8_t stance, uint16_t fh, uint16_t homefh, bool newspawn,
 				 int8_t team, Point<int16_t> position, std::vector<MobStatParser::Status> statuses,
 				 int8_t summon = -1, int32_t summondelay = 0);
@@ -137,7 +137,8 @@ namespace ms
 				  int8_t stance, Point<int16_t> position, int32_t chair,
 				  std::vector<std::pair<Buffstat::Id, int32_t>> buffs, const std::string &guild,
 				  const GuildEmblem &emblem, std::optional<MiniRoomBox> room = std::nullopt,
-				  std::vector<PetEntry> pets = {}, std::optional<std::string> chalkboard = std::nullopt);
+				  std::vector<PetEntry> pets = {}, std::optional<std::string> chalkboard = std::nullopt,
+				  int32_t item_effect = 0);
 
 		int32_t get_cid() const;
 
@@ -158,5 +159,6 @@ namespace ms
 		std::optional<MiniRoomBox> room;
 		std::vector<PetEntry> pets;
 		std::optional<std::string> chalkboard;
+		int32_t item_effect;
 	};
 }

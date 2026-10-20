@@ -405,7 +405,8 @@ impl ClientActor {
                 .await?
             }
             WorldAction::BuffsChanged(announce) => self.show_buffs(announce).await?,
-            WorldAction::ChalkboardChanged(announce) => {
+            WorldAction::ChalkboardChanged(announce)
+            | WorldAction::ItemEffectChanged(announce) => {
                 let avatar = self.in_game()?.player.field_avatar(0, 0, 0);
                 self.send_to_field(FieldMessage::UpdateAvatar {
                     client_id: self.client_id,

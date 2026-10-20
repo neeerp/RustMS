@@ -16,6 +16,7 @@
 //	along with this program.  If not, see <https://www.gnu.org/licenses/>.		//
 //////////////////////////////////////////////////////////////////////////////////
 #include "Spawn.h"
+#include "Stage.h"
 
 #include "MapleMap/Npc.h"
 #include "MapleMap/Mob.h"
@@ -64,6 +65,10 @@ namespace ms
 
 		if (summon >= 0)
 			mob->show_summon(summon, summondelay);
+
+		// Zakum's body shakes the view as it comes (0x663391).
+		if (summon == -4 && id == 8800000)
+			Stage::get().tremble(30, false, 0, 0, false);
 
 		return mob;
 	}
@@ -115,9 +120,9 @@ namespace ms
 	CharSpawn::CharSpawn(int32_t c, const LookEntry &lk, uint8_t l, int16_t j, const std::string &nm, int8_t st,
 						 Point<int16_t> p, int32_t ch, std::vector<std::pair<Buffstat::Id, int32_t>> bf,
 						 const std::string &gd, const GuildEmblem &em, std::optional<MiniRoomBox> rm,
-						 std::vector<PetEntry> pt, std::optional<std::string> cb) : cid(c), look(lk), level(l), job(j),
-						 name(nm), stance(st), position(p), chair(ch), buffs(std::move(bf)), guild(gd), emblem(em),
-						 room(std::move(rm)), pets(std::move(pt)), chalkboard(std::move(cb))
+						 std::vector<PetEntry> pt, std::optional<std::string> cb, int32_t ie) : cid(c), look(lk), level(l),
+						 job(j), name(nm), stance(st), position(p), chair(ch), buffs(std::move(bf)), guild(gd), emblem(em),
+						 room(std::move(rm)), pets(std::move(pt)), chalkboard(std::move(cb)), item_effect(ie)
 	{}
 
 	int32_t CharSpawn::get_cid() const
@@ -134,6 +139,7 @@ namespace ms
 		otherchar->set_guild_emblem(emblem);
 		otherchar->set_mini_room(room);
 		otherchar->set_chalkboard(chalkboard, false);
+		otherchar->set_item_effect(item_effect);
 
 		for (size_t i = 0; i < pets.size(); i++)
 			otherchar->add_pet(static_cast<uint8_t>(i), false, pets[i], false);

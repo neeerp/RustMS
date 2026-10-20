@@ -362,6 +362,17 @@ namespace ms
 		}
 	};
 
+	// Shows the player's effect item to the rest of the map, or stops it with 0
+	// Opcode: USE_ITEMEFFECT(52)
+	class UseItemEffectPacket : public OutPacket
+	{
+	public:
+		UseItemEffectPacket(int32_t item_id) : OutPacket(OutPacket::Opcode::USE_ITEMEFFECT)
+		{
+			write_int(item_id);
+		}
+	};
+
 	// Asks to take the player's chalkboard down
 	// Opcode: CLOSE_CHALKBOARD(50)
 	class CloseChalkboardPacket : public OutPacket

@@ -325,6 +325,9 @@ namespace ms
 		// Start the death animation.
 		void apply_death();
 
+		// Some bosses shake the view as they die (FUN_00663995).
+		void tremble_on_death() const;
+
 		// Take one 90 ms step of a ground mob's AI.
 		void think(const Physics &physics);
 
@@ -475,6 +478,8 @@ namespace ms
 		};
 
 		std::vector<PendingHit> pendinghits;
+		// When an attack with `tremble` set lands, shaking the view.
+		std::optional<int32_t> trembleat;
 
 		// A ball flying from one point to another between two times.
 		struct Ball

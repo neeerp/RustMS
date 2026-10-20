@@ -140,6 +140,8 @@ pub struct FieldAvatar {
     pub pets: Vec<FieldPet>,
     /// The note on the chalkboard the player holds up, if any.
     pub chalkboard: Option<String>,
+    /// The effect item (501xxxx or 429xxxx) the player shows, or 0.
+    pub item_effect: i32,
 }
 
 /// The balloon over a player who keeps a mini room open, which others
@@ -187,6 +189,9 @@ pub struct Player {
     pub pets_named: Vec<i64>,
     /// The note on the chalkboard the player holds up, if any; not saved.
     pub chalkboard: Option<String>,
+    /// The effect item (501xxxx or 429xxxx) the player shows, or 0; not
+    /// saved.
+    pub item_effect: i32,
     /// A charm kept the player's EXP when they last died, so they revive
     /// with 30% of their max HP and MP; not saved.
     pub charmed: bool,
@@ -224,6 +229,7 @@ impl Player {
             pets: Vec::new(),
             pets_named: Vec::new(),
             chalkboard: None,
+            item_effect: 0,
             charmed: false,
             teleport_rocks: TeleportRocks::default(),
             dirty: false,
@@ -314,6 +320,7 @@ impl Player {
                 })
                 .collect(),
             chalkboard: self.chalkboard.clone(),
+            item_effect: self.item_effect,
         }
     }
 

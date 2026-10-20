@@ -42,6 +42,10 @@ namespace ms
 		// Updates the view's boundaries. Determined by mapinfo or footholds.
 		void set_view(Range<int16_t> hborders, Range<int16_t> vborders);
 
+		// Move the view's centre this far off the followed point from the
+		// next update on, replacing the last offset.
+		void shake(Point<int16_t> offset);
+
 		// Return the current position.
 		Point<int16_t> position() const;
 
@@ -59,6 +63,7 @@ namespace ms
 		// The point the view follows, before it is kept inside the map.
 		double lookx;
 		double looky;
+		Point<int16_t> shaken;
 
 		// View limits.
 		Range<int16_t> hbounds;

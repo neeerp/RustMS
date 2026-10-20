@@ -18,11 +18,13 @@
 #include "Stage.h"
 
 #include "../Configuration.h"
+#include "../Character/ItemEffectRules.h"
 #include "../Character/Pets.h"
 #include "QuestConversation.h"
 #include "Timer.h"
 #include "MapleMap/CharClick.h"
 #include "Combat/FlashJump.h"
+#include "FieldEffectRules.h"
 #include "MapleMap/DoorRules.h"
 #include "MapleMap/Npc.h"
 
@@ -44,6 +46,7 @@
 #include <nlnx/nx.hpp>
 
 #include <cstdlib>
+#include <unordered_map>
 
 namespace ms
 {
@@ -52,6 +55,33 @@ namespace ms
 		// An in-map portal's move lands 120 ms after Up; the portal then
 		// waits 600 ms (v83 FUN_00957b74, FUN_0094e5e5).
 		constexpr int16_t TELEPORT_COOLDOWN = 600;
+
+		// How often v83 looks at the quest-bound tags again (FUN_00531b8d).
+		constexpr int32_t QUEST_TAG_INTERVAL = 5000;
+
+		// The quest whose QuestInfo.img showLayerTag is `tag`, or 0. Every quest counts, not only the supported
+		// ones (CQuestMan 0x722fd6).
+		int16_t layer_tag_quest(const std::string &tag)
+		{
+			static const std::unordered_map<std::string, int16_t> quests = []()
+			{
+				std::unordered_map<std::string, int16_t> found;
+
+				for (auto quest : nl::nx::quest["QuestInfo.img"])
+				{
+					std::string shown = quest["showLayerTag"].get_string();
+
+					if (!shown.empty())
+						found[shown] = string_conversion::or_default<int16_t>(quest.name(), 0);
+				}
+
+				return found;
+			}();
+
+			auto iter = quests.find(tag);
+
+			return iter == quests.end() ? 0 : iter->second;
+		}
 	}
 
 	Stage::Stage() : combat(player, chars, mobs, reactors, summons, drops, physics, mapinfo, portals)
@@ -74,11 +104,15 @@ namespace ms
 			case State::INACTIVE:
 				load_map(mapid);
 				respawn(portalid, chase);
+				show_quest_tags();
 
 				if (pending_clock && clock.is_present())
 					clock.set(pending_clock->hour, pending_clock->minute, pending_clock->second);
 
 				pending_clock.reset();
+
+				// The player's effect item goes along, starting over where they arrive.
+				player.restart_item_effect();
 
 				// The player's chalkboard follows them, but not to a map where
 				// shops open (FUN_00949513).
@@ -111,6 +145,7 @@ namespace ms
 		start = ContinuousTimer::get().start();
 		emote_cooldown = {};
 		fame_cooldown = {};
+		item_effect_shown = -1;
 
 		CharStats stats = player.get_stats();
 		levelBefore = stats.get_stat(MapleStat::Id::LEVEL);
@@ -155,6 +190,9 @@ namespace ms
 		ship = MapShip(src);
 		clock = MapClock(src);
 		ground_effects = EffectLayer();
+		field_effects = EffectLayer();
+		weather.stop_sounds();
+		weather = mapid == -1 ? MapWeather() : MapWeather(src["weather"], mapinfo.get_bgm());
 
 		if (mapid != -1)
 			player.get_stats().set_mapid(mapid);
@@ -163,8 +201,12 @@ namespace ms
 	void Stage::respawn(int8_t portalid, std::optional<Point<int16_t>> chase)
 	{
 		// v83's Cash Shop stage has no music of its own; the Cash Shop plays
-		// its theme.
-		Music(mapid == -1 ? "BgmUI.img/ShopBgm" : mapinfo.get_bgm()).play();
+		// its theme. A map's BGM fades the last one out, as PlayFieldBGM does
+		// (FUN_0064211e).
+		if (mapid == -1)
+			Music("BgmUI.img/ShopBgm").play();
+		else
+			Music(mapinfo.get_bgm()).play(field_effect::BGM_FADE);
 
 		// A chased point is on the ground already, as a door is; look from
 		// just above it, since its rounded y may sit below a slope.
@@ -223,6 +265,8 @@ namespace ms
 		// v83 puts a mist's clouds on the effect layer, above the map's
 		// objects (z 0xc00614a4).
 		mists.draw(viewx, viewy, alpha);
+		// A weather's bursts and fireworks share the mists' layer (z 0xc00614a4).
+		weather.draw_shows(alpha);
 		drops.draw_explosions(viewpos, alpha);
 		combat.draw(viewx, viewy, alpha);
 		ground_effects.drawabove(viewpos, alpha);
@@ -231,11 +275,24 @@ namespace ms
 		// v83's clouds are above the front backgrounds and below the fear
 		// overlay (z 0xc0061508).
 		clouds.draw(viewx, viewy, alpha);
+		// A weather's particles are on the clouds' layer.
+		weather.draw(viewx, viewy, alpha);
 		draw_fear(viewx, viewy, alpha);
 		// The tips of the zones the player stands in are at z 0, above the
 		// field's own layers (FUN_008f3141).
 		tooltips.draw(viewpos);
-		effect.draw();
+		field_effects.drawabove(viewpos, alpha);
+		// The weather's message bar is above the field effects (z 0xc00616fc).
+		weather.draw_bar();
+		screen_effects.drawabove(Point<int16_t>(0, 0), alpha);
+	}
+
+	void Stage::draw_overlay(float alpha) const
+	{
+		if (state != State::ACTIVE)
+			return;
+
+		overlay_effects.drawabove(Point<int16_t>(0, 0), alpha);
 	}
 
 	void Stage::draw_fear(double viewx, double viewy, float alpha) const
@@ -270,11 +327,20 @@ namespace ms
 		combat.update();
 		backgrounds.update();
 		clouds.update();
+		weather.update();
 		ship.update();
 		clock.update();
-		effect.update();
 		ground_effects.update();
+		field_effects.update();
+		screen_effects.update();
+		overlay_effects.update();
 		tilesobjs.update();
+
+		// Every 5 s, and whenever a quest record changes (FUN_00a20f4c).
+		since_quest_tags += Constants::TIMESTEP;
+
+		if (since_quest_tags > QUEST_TAG_INTERVAL || player.get_quests().revision() != quest_tags_revision)
+			show_quest_tags();
 
 		reactors.update(physics);
 		mists.update();
@@ -308,6 +374,16 @@ namespace ms
 
 		portals.update(player.get_position());
 		check_touch_portals(drawn);
+
+		auto now = static_cast<int32_t>(get_uptime() / 1000);
+
+		if (now >= next_shake)
+		{
+			next_shake = now + tremble::TICK;
+			auto offset = tremble::step(shake, now, std::rand(), std::rand());
+			camera.shake({ static_cast<int16_t>(offset.x), static_cast<int16_t>(offset.y) });
+		}
+
 		camera.update(player.get_position());
 		tooltips.update(player.get_position());
 
@@ -675,6 +751,14 @@ namespace ms
 	void Stage::show_flash_jump(const char *effect, Point<int16_t> position, bool right)
 	{
 		ground_effects.add(nl::nx::effect["BasicEff.img"][effect], DrawArgument(position, right));
+	}
+
+	void Stage::tremble(double force, bool heavy, int32_t delay, int32_t additional, bool forced)
+	{
+		if (!forced && !Setting<ShakeScreen>::get().load())
+			return;
+
+		shake = tremble::set(force, heavy, delay, additional, static_cast<int32_t>(get_uptime() / 1000));
 	}
 
 	void Stage::check_seats()
@@ -1089,9 +1173,81 @@ namespace ms
 		return field_key;
 	}
 
-	void Stage::add_effect(std::string path)
+	bool Stage::add_effect(std::string path)
 	{
-		effect = MapEffect(path);
+		nl::node src = nl::nx::map["Effect.img"].resolve(path);
+
+		if (!src)
+			return false;
+
+		// One-time and stacking, at z 0xc00614a4 below the UI unless the node has its own z, as
+		// only the miro nodes do (FUN_005330f7).
+		auto position = field_effect::screen_position(Constants::Constants::get().get_viewwidth(), Constants::Constants::get().get_viewheight());
+		EffectLayer &layer = src["z"] ? overlay_effects : screen_effects;
+		layer.add(src, DrawArgument(Point<int16_t>(position.x, position.y)));
+
+		return true;
+	}
+
+	void Stage::add_summon_effect(uint8_t type, Point<int16_t> position)
+	{
+		std::string id = std::to_string(type);
+		nl::node effect = nl::nx::effect["Summon.img"][id];
+
+		if (effect)
+			field_effects.add(effect, DrawArgument(position));
+
+		nl::node sound = nl::nx::sound["Summon.img"][id];
+
+		if (sound)
+		{
+			Point<int16_t> distance = position - player.get_position();
+			double length = std::sqrt(static_cast<double>(distance.x()) * distance.x() + static_cast<double>(distance.y()) * distance.y());
+
+			Sound(sound).play(field_effect::summon_volume(length));
+		}
+	}
+
+	void Stage::set_object_state(const std::string &name, int32_t state)
+	{
+		tilesobjs.set_state(name, state, player.get_position());
+	}
+
+	void Stage::reset_obstacles()
+	{
+		tilesobjs.reset_obstacles(player.get_position());
+	}
+
+	void Stage::show_tag(const std::string &tag, bool shown)
+	{
+		tilesobjs.show_tags([&](const std::string &other) { return other == tag ? std::optional<bool>(shown) : std::nullopt; });
+	}
+
+	void Stage::fade_back(uint8_t mode, uint8_t index, int32_t duration)
+	{
+		if (std::optional<float> target = field_effect::back_target(mode))
+			backgrounds.fade(index, *target, duration);
+	}
+
+	void Stage::reset_backs()
+	{
+		backgrounds.reset();
+	}
+
+	void Stage::show_quest_tags()
+	{
+		QuestLog &quests = player.get_quests();
+
+		tilesobjs.show_tags([&](const std::string &tag) -> std::optional<bool>
+		{
+			if (int16_t quest = layer_tag_quest(tag))
+				return quests.is_started(quest);
+
+			return std::nullopt;
+		});
+
+		since_quest_tags = 0;
+		quest_tags_revision = quests.revision();
 	}
 
 	void Stage::move_ship(uint8_t target, uint8_t event)
@@ -1107,6 +1263,31 @@ namespace ms
 			ship.show_state(state, flag);
 	}
 
+	void Stage::blow_weather(int32_t item_id, const std::string &msg, bool from_map)
+	{
+		weather.blow(item_id, msg, from_map);
+	}
+
+	void Stage::set_weather_flag(uint8_t flag)
+	{
+		weather.set_packet_flag(flag);
+	}
+
+	bool Stage::weather_busy() const
+	{
+		return weather.busy();
+	}
+
+	void Stage::note_mob_left()
+	{
+		weather.mob_left();
+	}
+
+	void Stage::set_field_bgm(const std::string &path)
+	{
+		weather.set_bgm_override(path);
+	}
+
 	void Stage::set_clock(uint8_t hour, uint8_t minute, uint8_t second)
 	{
 		if (state != State::ACTIVE)
@@ -1118,6 +1299,22 @@ namespace ms
 	bool Stage::try_give_fame()
 	{
 		return fame_cooldown.try_give(get_uptime() / 1000);
+	}
+
+	void Stage::use_item_effect(int32_t item_id)
+	{
+		int32_t next = item_effect::toggled(player.get_item_effect(), item_id);
+		int64_t now = get_uptime() / 1000;
+
+		if (!item_effect::may_send(next, now, item_effect_shown))
+			return;
+
+		if (next != 0)
+			item_effect_shown = now;
+
+		// The player sees it at once; the server shows it to the others.
+		player.set_item_effect(next);
+		UseItemEffectPacket(next).dispatch();
 	}
 
 	int64_t Stage::get_uptime()

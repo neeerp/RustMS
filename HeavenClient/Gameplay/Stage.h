@@ -25,6 +25,7 @@
 #include "Combat/Combat.h"
 #include "EmoteCooldown.h"
 #include "FameCooldown.h"
+#include "TrembleRules.h"
 #include "MapleMap/MapInfo.h"
 #include "MapleMap/MapTilesObjs.h"
 #include "MapleMap/MapBackgrounds.h"
@@ -33,13 +34,13 @@
 #include "MapleMap/MapMobs.h"
 #include "MapleMap/MapMists.h"
 #include "MapleMap/MapClouds.h"
+#include "MapleMap/MapWeather.h"
 #include "MapleMap/MapTooltips.h"
 #include "MapleMap/MapDoors.h"
 #include "MapleMap/MapSummons.h"
 #include "MapleMap/MapReactors.h"
 #include "MapleMap/MapNpcs.h"
 #include "MapleMap/MapDrops.h"
-#include "MapleMap/MapEffect.h"
 #include "MapleMap/MapClock.h"
 #include "MapleMap/MapShip.h"
 #include "Physics/Physics.h"
@@ -152,8 +153,30 @@ namespace ms
 		// Return a pointer to a character, possibly the player.
 		Optional<Char> get_character(int32_t cid);
 
-		// Set a map effect
-		void add_effect(std::string path);
+		// FIELD_EFFECT 3: play Map.nx Effect.img/<path> once on the screen, above the UI when the
+		// node has a z. False when there is no such effect.
+		bool add_effect(std::string path);
+
+		// FIELD_EFFECT 0: a summon's puff and sound at a point on the map.
+		void add_summon_effect(uint8_t type, Point<int16_t> position);
+
+		// Show a named map obj, such as a party quest's gate, in `state`, or in its current one again for -1.
+		void set_object_state(const std::string &name, int32_t state);
+
+		// Put every named trap back in its first state.
+		void reset_obstacles();
+
+		// SET_MAP_OBJECT_VISIBLE: show or hide the map objs with a tag.
+		void show_tag(const std::string &tag, bool shown);
+
+		// SET_BACK_EFFECT: fade one of the map's backs in (mode 0) or out (mode 1) over `duration` ms.
+		void fade_back(uint8_t mode, uint8_t index, int32_t duration);
+
+		// CLEAR_BACK_EFFECT: put the map's backs back as they were.
+		void reset_backs();
+
+		// Draw the screen effects that go above the UI.
+		void draw_overlay(float alpha) const;
 
 		// CONTI_MOVE: the map's ship comes or goes.
 		void move_ship(uint8_t target, uint8_t event);
@@ -162,9 +185,30 @@ namespace ms
 		// entering the map.
 		void show_ship_state(uint8_t state, uint8_t flag);
 
+		// Shake the field's view, not the UI, replacing any shake under way
+		// (SetTremble 0x43da05). Unless forced, only with the ShakeScreen
+		// option on.
+		void tremble(double force, bool heavy, int32_t delay, int32_t additional, bool forced);
+
 		// Leave a Flash Jump's `effect` where a player jumped, flipped when
 		// they face `right` (0x96c107, 0x97ffa4).
 		void show_flash_jump(const char *effect, Point<int16_t> position, bool right);
+
+		// BLOW_WEATHER and a map's own weathers: start a 512xxxx item's weather with its message, or stop the one
+		// blowing with item 0. One from the map or a whisper stops itself after 22 s.
+		void blow_weather(int32_t item_id, const std::string &msg, bool from_map);
+
+		// BLOW_WEATHER's flag, which keeps the message bar up through a stop.
+		void set_weather_flag(uint8_t flag);
+
+		// Whether a weather item has to wait for the field's weather to end.
+		bool weather_busy() const;
+
+		// KILL_MOB: a monster left the field.
+		void note_mob_left();
+
+		// FIELD_EFFECT 6 changed the field's BGM, which a stopping weather plays again.
+		void set_field_bgm(const std::string &path);
 
 		// CLOCK kind 1: the time of day on the map's wall clock. A time sent
 		// while the map loads waits for it.
@@ -173,6 +217,9 @@ namespace ms
 		// Whether the player may give fame now (once every 5 minutes); if
 		// so, the wait starts.
 		bool try_give_fame();
+
+		// Show the player's 501xxxx or 429xxxx effect item, or stop it if it is the one shown (FUN_00a24530).
+		void use_item_effect(int32_t item_id);
 		// Get the total up time of the client
 		int64_t get_uptime();
 		// Get the level at the start of the client
@@ -235,6 +282,10 @@ namespace ms
 		// Fear's darkness, all but the player's narrowed sight (FUN_0053868d).
 		void draw_fear(double viewx, double viewy, float alpha) const;
 
+		// Show the map objs whose tag is a quest's showLayerTag while that quest is in progress, and hide them
+		// otherwise (FUN_00537cdc).
+		void show_quest_tags();
+
 		enum State
 		{
 			INACTIVE,
@@ -243,6 +294,9 @@ namespace ms
 		};
 
 		Camera camera;
+		// The view's shake, and when it next moves.
+		tremble::State shake;
+		int32_t next_shake = 0;
 		Physics physics;
 		Player player;
 
@@ -264,6 +318,9 @@ namespace ms
 		// The ms until the player may move in the map again.
 		int16_t teleport_cooldown = 0;
 		MapTilesObjs tilesobjs;
+		// The ms since the quest-bound tags were last looked at, and the quest log they were looked at for.
+		int32_t since_quest_tags = 0;
+		uint64_t quest_tags_revision = 0;
 		MapBackgrounds backgrounds;
 		MapPortals portals;
 		MapReactors reactors;
@@ -276,9 +333,9 @@ namespace ms
 		int32_t since_mist_hurt = mist::HURT_INTERVAL + 1;
 		MapDoors doors;
 		MapSummons summons;
-		MapEffect effect;
 		MapShip ship;
 		MapClouds clouds;
+		MapWeather weather;
 		MapTooltips tooltips;
 		MapClock clock;
 		// A wall clock time that came before its map loaded.
@@ -292,6 +349,10 @@ namespace ms
 		std::optional<ClockTime> pending_clock;
 		// Effects left where they started, such as a jump pad's burst.
 		EffectLayer ground_effects;
+		// One-time FIELD_EFFECT effects: on the map, on the screen, and on the screen above the UI.
+		EffectLayer field_effects;
+		EffectLayer screen_effects;
+		EffectLayer overlay_effects;
 		Animation jump_effect;
 		// What Fear leaves the player to see (Effect/MapEff.img/Viewrange/3).
 		Texture fear_sight;
@@ -299,6 +360,8 @@ namespace ms
 		Combat combat;
 		EmoteCooldown emote_cooldown;
 		FameCooldown fame_cooldown;
+		// When the last effect item was shown, in ms of uptime, or -1.
+		int64_t item_effect_shown = -1;
 
 		std::chrono::time_point<std::chrono::steady_clock> start;
 		uint16_t levelBefore;

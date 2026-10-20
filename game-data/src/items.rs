@@ -459,7 +459,7 @@ impl ItemData {
     }
 }
 
-/// Item names (`String.nx`); only pets' so far.
+/// Item names (`String.nx`); pets' and the cash items' messages so far.
 pub struct ItemNames {
     strings: NxDataFile,
 }
@@ -478,6 +478,16 @@ impl ItemNames {
             return Ok(None);
         };
         nx.string_child(node, "name")
+    }
+
+    /// A cash item's message (`Cash.img/<id>/msg`), such as a weather
+    /// item's `%s's snow : %s`.
+    pub fn cash_message(&self, item_id: i32) -> Result<Option<String>, GameDataError> {
+        let nx = &self.strings;
+        let Some(node) = path_index(nx, &format!("Cash.img/{item_id}"))? else {
+            return Ok(None);
+        };
+        nx.string_child(node, "msg")
     }
 }
 
@@ -666,6 +676,11 @@ mod tests {
         assert_eq!(names.pet(5000066).unwrap().as_deref(), Some("Baby Tiger"));
         assert_eq!(names.pet(5000000).unwrap().as_deref(), Some("Brown Kitty"));
         assert_eq!(names.pet(5009999).unwrap(), None);
+        assert_eq!(
+            names.cash_message(5120000).unwrap().as_deref(),
+            Some("%s's snow : %s")
+        );
+        assert_eq!(names.cash_message(5121011).unwrap(), None);
     }
 
     #[test]

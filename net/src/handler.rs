@@ -341,6 +341,10 @@ pub enum WorldAction {
     /// already changed); refresh their field avatar and show the others
     /// this CHALKBOARD.
     ChalkboardChanged(Packet),
+    /// The player showed or stopped an effect item (`player.item_effect`
+    /// already changed); refresh their field avatar and show the others
+    /// this SHOW_ITEM_EFFECT.
+    ItemEffectChanged(Packet),
     /// Look on the channel for the character named `name`, to take the
     /// player to them with `rock`.
     RockToCharacter {
@@ -490,6 +494,9 @@ pub enum FieldRequest {
     },
     /// Sit on the portable chair `item_id`, or stand up with 0.
     Chair(i32),
+    /// Blow the weather of the 512xxxx item `item_id` over the map with
+    /// its `message`, in place of any that blows, for 30 s.
+    Weather { item_id: i32, message: String },
     /// Pick up the drop `object_id`, answered with `ServerMessage::PickedUp`;
     /// the player stands at (x, y).
     Pickup { object_id: i32, x: i16, y: i16 },
@@ -632,6 +639,7 @@ fn world_routes() -> &'static HashMap<i16, WorldRoute> {
             ),
             (Op::AllChat, InGame(&world::AllChatHandler)),
             (Op::FaceExpression, InGame(&world::FaceExpressionHandler)),
+            (Op::UseItemEffect, InGame(&world::UseItemEffectHandler)),
             (Op::UseChair, InGame(&world::UseChairHandler)),
             (Op::CancelChair, InGame(&world::CancelChairHandler)),
             (Op::Whisper, InGame(&world::WhisperHandler)),
@@ -754,7 +762,7 @@ mod tests {
     fn every_registered_opcode_is_unique_per_server() {
         // The maps would silently drop duplicates; check the table sizes match.
         assert_eq!(login_routes().len(), 13);
-        assert_eq!(world_routes().len(), 77);
+        assert_eq!(world_routes().len(), 78);
     }
 
     #[test]

@@ -57,7 +57,7 @@ namespace ms
 		LookEntry look = LoginParser::parse_look(recv);
 
 		recv.read_int(); // count of 5110000 
-		recv.read_int(); // 'itemeffect'
+		int32_t item_effect = recv.read_int();
 		int32_t chair = recv.read_int();
 
 		Point<int16_t> position = recv.read_point();
@@ -83,7 +83,7 @@ namespace ms
 
 		Stage::get().get_chars().spawn(
 			{ cid, look, level, job, name, stance, position, chair, std::move(buffs), guild, emblem, room, std::move(pets),
-			  chalkboard }
+			  chalkboard, item_effect }
 		);
 	}
 
@@ -308,6 +308,16 @@ namespace ms
 			otherchar->set_expression(emote + 99);
 	}
 
+	void ShowItemEffectHandler::handle(InPacket& recv) const
+	{
+		int32_t cid = recv.read_int();
+		int32_t item_id = recv.read_int();
+
+		// The player's own effect is shown as it is used; the server tells only the others.
+		if (Optional<OtherChar> otherchar = Stage::get().get_chars().get_char(cid))
+			otherchar->set_item_effect(item_id);
+	}
+
 	void ShowChairHandler::handle(InPacket& recv) const
 	{
 		int32_t cid = recv.read_int();
@@ -441,6 +451,8 @@ namespace ms
 		int8_t animation = recv.read_byte();
 
 		Stage::get().get_mobs().remove(oid, animation);
+		// The map's weathers that wait for no monster to leave won't blow now.
+		Stage::get().note_mob_left();
 	}
 
 	void SpawnMobControllerHandler::handle(InPacket& recv) const

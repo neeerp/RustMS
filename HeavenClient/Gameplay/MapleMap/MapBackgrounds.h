@@ -30,11 +30,17 @@ namespace ms
 	class Background
 	{
 	public:
-		Background(nl::node src);
+		// The map's back `index`, which is its node's name.
+		Background(nl::node src, int16_t index);
 
 		void draw(double viewx, double viewy, float alpha) const;
 
 		void update();
+
+		int16_t get_index() const;
+
+		// SET_BACK_EFFECT: take the alpha from where it is to `target` over `duration` ms.
+		void fade(float target, int32_t duration);
 
 	private:
 		enum Type
@@ -76,6 +82,12 @@ namespace ms
 		int16_t vtile;
 		float opacity;
 		bool flipped;
+		int16_t index;
+
+		float fade_from = 0.0f;
+		float fade_to = 0.0f;
+		int32_t fade_elapsed = 0;
+		int32_t fade_duration = 0;
 
 		MovingObject moveobj;
 	};
@@ -93,7 +105,14 @@ namespace ms
 
 		void update();
 
+		// SET_BACK_EFFECT: fade the back with this index.
+		void fade(int16_t index, float target, int32_t duration);
+
+		// CLEAR_BACK_EFFECT: load the backs again as the map has them (FUN_00644491).
+		void reset();
+
 	private:
+		nl::node src;
 		std::vector<Background> backgrounds;
 		std::vector<Background> foregrounds;
 		bool black;

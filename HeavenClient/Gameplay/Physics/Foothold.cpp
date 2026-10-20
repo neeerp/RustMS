@@ -26,7 +26,14 @@ namespace ms
 																m_vertical(src["y1"], src["y2"]), m_id(id), m_layer(ly),
 																m_group(gr),
 																m_forbid_fall_down(src["forbidFallDown"].get_integer() != 0)
-	{}
+	{
+		// v83 stores both keys as a hundredth of the integer, and only when set (0xa44712).
+		if (int64_t force = src["force"].get_integer())
+			m_force = force * 0.01;
+
+		if (int64_t drag = src["drag"].get_integer())
+			m_drag = drag * 0.01;
+	}
 
 	Foothold::Foothold() : m_id(0), m_layer(0), m_group(0), m_next(0), m_prev(0)
 	{}
@@ -34,6 +41,16 @@ namespace ms
 	bool Foothold::forbid_fall_down() const
 	{
 		return m_forbid_fall_down;
+	}
+
+	double Foothold::force() const
+	{
+		return m_force;
+	}
+
+	double Foothold::drag() const
+	{
+		return m_drag;
 	}
 
 	uint16_t Foothold::id() const

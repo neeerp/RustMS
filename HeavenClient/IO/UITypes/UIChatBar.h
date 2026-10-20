@@ -70,6 +70,8 @@ namespace ms
 			GM,
 			// Guild chat
 			GUILD,
+			// A jukebox's song (v83 chat type 9)
+			LIGHT_YELLOW,
 			// Megaphones (v83 chat types 0xd to 0xf)
 			MEGAPHONE,
 			SUPER_MEGAPHONE,

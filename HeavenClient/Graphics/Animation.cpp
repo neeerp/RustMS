@@ -21,6 +21,7 @@
 
 #include "../Util/Misc.h"
 
+#include <algorithm>
 #include <set>
 
 namespace ms
@@ -193,6 +194,25 @@ namespace ms
 		xyscale.set(frames[0].start_scale());
 		delay = frames[0].get_delay();
 		framestep = 1;
+		playing = true;
+	}
+
+	void Animation::play(End e, int16_t from)
+	{
+		end = e;
+		loop_from = std::min<int16_t>(std::max<int16_t>(from, 0), static_cast<int16_t>(frames.size() - 1));
+
+		reset();
+	}
+
+	void Animation::stop()
+	{
+		playing = false;
+	}
+
+	bool Animation::is_playing() const
+	{
+		return playing;
 	}
 
 	void Animation::draw(const DrawArgument &args, float alpha) const
@@ -217,6 +237,13 @@ namespace ms
 
 	bool Animation::update(uint16_t timestep)
 	{
+		if (!playing)
+		{
+			frame.normalize();
+
+			return false;
+		}
+
 		const Frame &framedata = get_frame();
 
 		opacity += framedata.opcstep(timestep);
@@ -257,8 +284,25 @@ namespace ms
 			{
 				if (frame == lastframe)
 				{
-					nextframe = 0;
 					ended = true;
+
+					// It stays as the last frame left it.
+					if (end == End::HOLD)
+					{
+						playing = false;
+						frame.normalize();
+
+						return ended;
+					}
+
+					if (end == End::FIRST)
+					{
+						playing = false;
+						nextframe = 0;
+					} else
+					{
+						nextframe = loop_from;
+					}
 				} else
 				{
 					nextframe = frame + 1;

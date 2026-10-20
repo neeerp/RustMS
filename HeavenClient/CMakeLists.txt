@@ -216,6 +216,18 @@ if(HEAVENCLIENT_BUILD_TESTS)
     add_test(NAME mist_layout COMMAND mist_layout_tests)
     add_executable(obstacle_rules_tests tests/obstacle_rules.cpp)
     add_test(NAME obstacle_rules COMMAND obstacle_rules_tests)
+    add_executable(tremble_rules_tests tests/tremble_rules.cpp)
+    add_test(NAME tremble_rules COMMAND tremble_rules_tests)
+    add_executable(field_effect_rules_tests tests/field_effect_rules.cpp)
+    add_test(NAME field_effect_rules COMMAND field_effect_rules_tests)
+    add_executable(weather_rules_tests tests/weather_rules.cpp)
+    add_test(NAME weather_rules COMMAND weather_rules_tests)
+    add_executable(item_effect_rules_tests tests/item_effect_rules.cpp)
+    add_test(NAME item_effect_rules COMMAND item_effect_rules_tests)
+    add_executable(obj_state_rules_tests tests/obj_state_rules.cpp)
+    target_include_directories(obj_state_rules_tests PRIVATE
+        ${PROJECT_SOURCE_DIR}/libs/NoLifeNx ${PROJECT_SOURCE_DIR}/libs/glad/build/include)
+    add_test(NAME obj_state_rules COMMAND obj_state_rules_tests)
     add_executable(map_clouds_tests tests/map_clouds.cpp)
     add_test(NAME map_clouds COMMAND map_clouds_tests)
     add_executable(map_tooltip_rules_tests tests/map_tooltip_rules.cpp)
@@ -347,6 +359,9 @@ add_executable(HeavenClient
     Character/MedalTagLayout.h
     Character/CharEffect.cpp
     Character/CharEffect.h
+    Character/ItemEffect.cpp
+    Character/ItemEffect.h
+    Character/ItemEffectRules.h
     Character/CharStats.cpp
     Character/CharStats.h
     Character/EquipStat.cpp
@@ -446,13 +461,14 @@ add_executable(HeavenClient
     Gameplay/MapleMap/ClockRules.h
     Gameplay/MapleMap/MapDrops.cpp
     Gameplay/MapleMap/MapDrops.h
-    Gameplay/MapleMap/MapEffect.cpp
-    Gameplay/MapleMap/MapEffect.h
     Gameplay/MapleMap/MapInfo.cpp
     Gameplay/MapleMap/MapInfo.h
     Gameplay/MapleMap/CloudLayout.h
     Gameplay/MapleMap/MapClouds.cpp
     Gameplay/MapleMap/MapClouds.h
+    Gameplay/MapleMap/MapWeather.cpp
+    Gameplay/MapleMap/MapWeather.h
+    Gameplay/WeatherRules.h
     Gameplay/MapleMap/MapMists.cpp
     Gameplay/MapleMap/MapDoors.cpp
     Gameplay/MapleMap/MapMists.h
@@ -489,6 +505,7 @@ add_executable(HeavenClient
     Gameplay/MapleMap/Npc.h
     Gameplay/MapleMap/Obj.cpp
     Gameplay/MapleMap/Obj.h
+    Gameplay/MapleMap/ObjStateRules.h
     Gameplay/MapleMap/Portal.cpp
     Gameplay/MapleMap/Portal.h
     Gameplay/MapleMap/Reactor.cpp
@@ -512,6 +529,8 @@ add_executable(HeavenClient
     Gameplay/QuestConversation.h
     Gameplay/Stage.cpp
     Gameplay/Stage.h
+    Gameplay/TrembleRules.h
+    Gameplay/FieldEffectRules.h
     Graphics/Animation.cpp
     Graphics/Animation.h
     Graphics/Color.cpp

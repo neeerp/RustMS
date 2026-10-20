@@ -41,6 +41,7 @@
 #include "../../Data/EquipData.h"
 #include "../../Data/PetData.h"
 #include "../../Gameplay/Stage.h"
+#include "../../Gameplay/WeatherRules.h"
 #include "../../Gameplay/MapleMap/FieldLimit.h"
 #include "../../Util/Chalkboard.h"
 #include "../../Util/Megaphones.h"
@@ -95,6 +96,9 @@ namespace ms
 		constexpr const char *NAME_PET = "Please name your pet.";
 		constexpr const char *NAME_TAKEN = "That name is not available.";
 		constexpr const char *NO_CURSING = "Cursing is not allowed.";
+		// StringPool 0x112 and 0x318.
+		constexpr const char *WEATHER_BUSY = "The effect is taking place right now.\\nPlease try it later.";
+		constexpr const char *WEATHER_PROMPT = "Please enter the attached message";
 		// StringPool 0x10f, 0xea1 and 0x111.
 		constexpr const char *MEGAPHONE_PROMPT = "Enter your comments through the megaphone.";
 		constexpr const char *MEGAPHONE_LEVEL = "This megaphone is only available for \\ncharacters that are over Level 10.";
@@ -271,6 +275,41 @@ namespace ms
 				if (!Chalkboard::trim(text).empty() && may_use_cash_item())
 					Stage::get().get_player().request(UseCashItemPacket(slot, item_id, text), ExclRequest::WAIT);
 			}, Chalkboard::MAX_TEXT);
+		}
+
+		// v83 FUN_00a0a63f, type 0x10: a weather item asks for a message of
+		// up to 35 characters, unless the field's weather isn't over or the
+		// map forbids them. A blank message isn't sent.
+		void use_weather(int16_t slot, int32_t item_id)
+		{
+			if (!may_use_cash_item())
+				return;
+
+			const MapInfo &mapinfo = Stage::get().get_mapinfo();
+
+			if (Stage::get().weather_busy()
+				|| !field_limit::may_blow_weather(mapinfo.get_fieldlimit(), mapinfo.get_fieldtype()))
+			{
+				UI::get().emplace<UIOk>(WEATHER_BUSY, [](bool)
+				{});
+				return;
+			}
+
+			UI::get().emplace<UIEnterText>(WEATHER_PROMPT, [=](const std::string &text)
+			{
+				if (text.empty())
+					return;
+
+				if (CurseData::filter(text) != text)
+				{
+					UI::get().emplace<UIOk>(NO_CURSING, [](bool)
+					{});
+					return;
+				}
+
+				if (may_use_cash_item())
+					Stage::get().get_player().request(UseCashItemPacket(slot, item_id, text), ExclRequest::WAIT);
+			}, weather::MAX_MESSAGE);
 		}
 
 		// Whether a megaphone's line is refused, saying why if v83 does.
@@ -850,7 +889,18 @@ namespace ms
 							use_teleport_rock(slot, item_id);
 						else if (item_id / 10000 == 507)
 							use_megaphone(slot, item_id);
+						else if (weather::is_weather(item_id))
+							use_weather(slot, item_id);
+						else if (item_id / 10000 == 501)
+							Stage::get().use_item_effect(item_id);
 
+						break;
+					case InventoryType::Id::ETC:
+						if (item_id / 10000 == 429)
+							Stage::get().use_item_effect(item_id);
+
+						break;
+					default:
 						break;
 				}
 			}

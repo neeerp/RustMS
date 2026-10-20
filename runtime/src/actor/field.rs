@@ -16,7 +16,7 @@ use net::packet::build::world::door::{build_remove_door, build_spawn_door};
 use net::packet::build::world::drop::{
     build_drop, build_explode_drop, build_pet_loot_drop, build_remove_drop, DropAppearance,
 };
-use net::packet::build::world::effect::build_boss_hp_bar;
+use net::packet::build::world::effect::{build_blow_weather, build_boss_hp_bar};
 use net::packet::build::world::field::{
     build_player_enter_field, build_player_leave_field, build_show_chair, parse_movement,
     parse_movement_state,
@@ -81,6 +81,10 @@ const MIST_DELAY: i16 = 8;
 const SUMMON_REACH_X: i32 = 250;
 const SUMMON_REACH_Y: i32 = 150;
 
+/// How long a weather item's weather blows (Cosmic's 30 s; the v83 client
+/// waits for the server to stop it).
+const WEATHER_TIME: Duration = Duration::from_secs(30);
+
 /// One live copy of a map. It owns everything local to that map: who is on
 /// it and where, its NPCs, mobs, drops, and reactors, which advance on
 /// `tick`, and its players' mists and summons.
@@ -104,6 +108,8 @@ pub struct FieldActor {
     shops: Shops,
     /// On a ship route's maps, the route time trips were last checked at.
     trips: Option<i64>,
+    /// The weather item blowing here, its message, and when it stops.
+    weather: Option<(i32, String, Instant)>,
     tick: Duration,
 }
 
@@ -135,6 +141,7 @@ impl FieldActor {
             trades: Trades::default(),
             shops: Shops::default(),
             trips: conti::has_trips(key.map_id).then(conti::now),
+            weather: None,
             tick,
         }
     }
@@ -159,6 +166,12 @@ impl FieldActor {
     /// out of dead ones, and mob and reactor respawns.
     fn on_tick(&mut self, now: Instant) {
         self.run_trips();
+        if self.weather.as_ref().is_some_and(|(_, _, until)| *until <= now) {
+            self.weather = None;
+            if let Ok(packet) = build_blow_weather(None) {
+                self.broadcast(None, packet);
+            }
+        }
         for object_id in self.drops.expire(now) {
             if let Ok(packet) = build_remove_drop(object_id, None) {
                 self.broadcast(None, packet);
@@ -434,6 +447,7 @@ impl FieldActor {
                     inflict,
                 } => self.handle_mob_debuff(from, skill_id, level, origin, &mobs, &inflict),
                 FieldRequest::Chair(item_id) => self.handle_chair(from, item_id),
+                FieldRequest::Weather { item_id, message } => self.blow_weather(item_id, message),
                 FieldRequest::Pickup { object_id, x, y } => {
                     self.handle_pickup(from, object_id, x, y)
                 }
@@ -1820,6 +1834,12 @@ impl FieldActor {
             }
         }
 
+        if let Some((item_id, message, _)) = &self.weather {
+            if let Ok(packet) = build_blow_weather(Some((*item_id, message))) {
+                handle.send_packet(packet);
+            }
+        }
+
         self.occupants.insert(
             client_id,
             Occupant {
@@ -1834,6 +1854,16 @@ impl FieldActor {
         if self.npc_controller.is_none() || self.npc_controller == Some(client_id) {
             self.send_npc_control(client_id);
         }
+    }
+
+    /// A player used a weather item: everyone here sees it, in place of any
+    /// that was blowing, until it stops.
+    fn blow_weather(&mut self, item_id: i32, message: String) {
+        match build_blow_weather(Some((item_id, &message))) {
+            Ok(packet) => self.broadcast(None, packet),
+            Err(error) => warn!(item_id, %error, "Failed to build weather"),
+        }
+        self.weather = Some((item_id, message, Instant::now() + WEATHER_TIME));
     }
 
     fn handle_leave(&mut self, client_id: ClientId) {
@@ -1953,6 +1983,7 @@ mod tests {
             mini_room: None,
             pets: Vec::new(),
             chalkboard: None,
+            item_effect: 0,
         }
     }
 
@@ -2039,6 +2070,72 @@ mod tests {
         let stood = next_packet(&mut second_rx).await;
         assert_eq!(stood.opcode(), SendOpcode::ShowChair as i16);
         assert_eq!(&stood.bytes[2..], &[1, 0, 0, 0, 0, 0, 0, 0]);
+    }
+
+    /// The packets `rx` holds now.
+    fn sent(rx: &mut mpsc::Receiver<ServerMessage>) -> Vec<Packet> {
+        let mut packets = Vec::new();
+        while let Ok(message) = rx.try_recv() {
+            if let ServerMessage::SendPacket(packet) = message {
+                packets.push(packet);
+            }
+        }
+        packets
+    }
+
+    #[tokio::test]
+    async fn a_weather_blows_for_whoever_comes_until_it_stops() {
+        let (_tx, rx) = mpsc::channel(16);
+        let mut actor = FieldActor::new(
+            FieldKey::new(0, 100000000),
+            rx,
+            Vec::new(),
+            MobSet::default(),
+            DropSet::default(),
+            ReactorSet::default(),
+            Duration::from_millis(50),
+        );
+        let (first, mut first_rx) = client(1);
+        let (second, mut second_rx) = client(2);
+        let snow = [0x8E, 0, 0, 0, 0x20, 0x4E, 0, 2, 0, b'h', b'i'];
+        let weather = |packets: Vec<Packet>| -> Vec<Vec<u8>> {
+            packets
+                .into_iter()
+                .filter(|packet| packet.opcode() == SendOpcode::BlowWeather as i16)
+                .map(|packet| packet.bytes)
+                .collect()
+        };
+
+        actor.handle_message(FieldMessage::Join {
+            handle: first,
+            avatar: avatar(1, 10, 20),
+            party: None,
+        });
+        sent(&mut first_rx);
+        actor.handle_message(FieldMessage::FromClient {
+            from: 1,
+            request: FieldRequest::Weather {
+                item_id: 5120000,
+                message: "hi".into(),
+            },
+        });
+        assert_eq!(weather(sent(&mut first_rx)), [snow.to_vec()]);
+
+        actor.handle_message(FieldMessage::Join {
+            handle: second,
+            avatar: avatar(2, 30, 40),
+            party: None,
+        });
+        assert_eq!(weather(sent(&mut second_rx)), [snow.to_vec()]);
+
+        actor.on_tick(Instant::now() + Duration::from_secs(29));
+        assert!(weather(sent(&mut first_rx)).is_empty(), "still blowing");
+        actor.on_tick(Instant::now() + WEATHER_TIME);
+        let stop = vec![0x8E, 0, 0, 0, 0, 0, 0];
+        assert_eq!(weather(sent(&mut first_rx)), [stop.clone()]);
+        assert_eq!(weather(sent(&mut second_rx)), [stop]);
+        actor.on_tick(Instant::now() + WEATHER_TIME * 2);
+        assert!(weather(sent(&mut first_rx)).is_empty(), "stopped once");
     }
 
     fn mob(x: i16, boss: bool) -> (game_data::MapMobTemplate, game_data::mobs::MobInfo) {

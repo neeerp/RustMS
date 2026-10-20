@@ -18,6 +18,7 @@
 #include "Audio.h"
 
 #include "../Configuration.h"
+#include "../Gameplay/FieldEffectRules.h"
 
 #ifdef WIN32
 #define WIN32_LEAN_AND_MEAN
@@ -39,6 +40,15 @@ namespace ms
 	alure::Context Music::ctx;
 	alure::Source Music::music_src;
 	alure::Buffer Music::music_buff;
+	float Music::volume = 1.0f;
+	std::string Music::pending;
+	std::chrono::steady_clock::time_point Music::fade_start;
+	int32_t Music::fade_length = 0;
+	int32_t Music::start_delay = 0;
+	int32_t Music::fadein_length = 0;
+	bool Music::looping = true;
+	bool Music::fading_in = false;
+	std::chrono::steady_clock::time_point Music::fadein_start;
 	std::unordered_map<std::string, membuf *> Music::audiodb;
 	std::vector<alure::Source> Sound::sources;
 	float Sound::gain = 1.0f;
@@ -229,7 +239,10 @@ namespace ms
 			size_t id = ad.id();
 
 			std::string id_s = std::to_string((uint32_t) id);
-			Music::audiodb[id_s] = new membuf(data + 82, ad.length() - 82);
+
+			// A field effect loads its sound each time it plays.
+			if (!Music::audiodb.count(id_s))
+				Music::audiodb[id_s] = new membuf(data + 82, ad.length() - 82);
 
 			return id;
 		} else
@@ -270,7 +283,7 @@ namespace ms
 		path = p;
 	}
 
-	void Music::play() const
+	void Music::play(int32_t fadeout, int32_t delay, int32_t fadein, bool loop) const
 	{
 		static std::string bgmpath = "";
 
@@ -293,11 +306,37 @@ namespace ms
 			audiodb[path] = new membuf(data + 82, ad.length() - 82);
 		}
 
-		music_buff = Music::ctx.getBuffer(path);
-		music_src.setLooping(true);
-		music_src.play(music_buff);
-
 		bgmpath = path;
+		fadein_length = fadein;
+		looping = loop;
+
+		// v83 fades the old track out and then starts the new one (PlayBGM 0x43f301).
+		if ((fadeout > 0 && music_src.isPlaying()) || delay > 0)
+		{
+			if (pending.empty())
+			{
+				fade_start = std::chrono::steady_clock::now();
+				fade_length = fadeout;
+			}
+
+			start_delay = delay;
+			pending = path;
+
+			return;
+		}
+
+		pending.clear();
+		start(path);
+	}
+
+	void Music::start(const std::string &path)
+	{
+		music_buff = Music::ctx.getBuffer(path);
+		fading_in = fadein_length > 0;
+		fadein_start = std::chrono::steady_clock::now();
+		music_src.setGain(fading_in ? 0.0f : volume);
+		music_src.setLooping(looping);
+		music_src.play(music_buff);
 	}
 
 	void Music::play_once() const
@@ -352,7 +391,8 @@ namespace ms
 		if (!music_src)
 			return false;
 
-		music_src.setGain(std::min<uint8_t>(vol, 100) / 100.0f);
+		volume = std::min<uint8_t>(vol, 100) / 100.0f;
+		music_src.setGain(volume);
 
 		return true;
 	}
@@ -364,6 +404,30 @@ namespace ms
 
 	void Music::update_context()
 	{
+		if (!pending.empty())
+		{
+			auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - fade_start).count();
+
+			if (elapsed >= std::max(fade_length, start_delay))
+			{
+				start(pending);
+				pending.clear();
+			}
+			else
+			{
+				music_src.setGain(volume * field_effect::fade_gain(static_cast<int32_t>(elapsed), fade_length));
+			}
+		}
+		else if (fading_in)
+		{
+			auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - fadein_start).count();
+
+			if (elapsed >= fadein_length)
+				fading_in = false;
+
+			music_src.setGain(volume * field_effect::fade_in_gain(static_cast<int32_t>(elapsed), fadein_length));
+		}
+
 		if (ctx)
 			ctx.update();
 	}

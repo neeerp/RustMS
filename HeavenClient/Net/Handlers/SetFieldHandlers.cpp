@@ -24,8 +24,10 @@
 
 #include "../Packets/GameplayPackets.h"
 
+#include "../../Audio/Audio.h"
 #include "../../Configuration.h"
 
+#include "../../Gameplay/FieldEffectRules.h"
 #include "../../Gameplay/Stage.h"
 #include "../../IO/BuddyCommands.h"
 #include "../../IO/UI.h"
@@ -35,9 +37,12 @@
 
 #include "../../IO/UITypes/UICharSelect.h"
 #include "../../IO/UITypes/UIFieldClock.h"
+#include "../../IO/UITypes/UIMiniMap.h"
 #include "../../IO/UITypes/UIMobGage.h"
 #include "../../IO/UITypes/UIStatsInfo.h"
 #include "../../IO/UITypes/UITradingRoom.h"
+
+#include <nlnx/nx.hpp>
 
 #include <cstdlib>
 #include <optional>
@@ -348,6 +353,94 @@ namespace ms
 	void StopClockHandler::handle(InPacket&) const
 	{
 		UI::get().remove(UIElement::Type::FIELDCLOCK);
+	}
+
+	void ObjectStateHandler::handle(InPacket& recv) const
+	{
+		std::string name = recv.read_string();
+		int32_t state = recv.read_int();
+		Stage::get().set_object_state(name, state);
+	}
+
+	void ObjectStateListHandler::handle(InPacket& recv) const
+	{
+		int32_t count = recv.read_int();
+
+		for (int32_t i = 0; i < count; i++)
+		{
+			std::string name = recv.read_string();
+			int32_t state = recv.read_int();
+			Stage::get().set_object_state(name, state);
+		}
+	}
+
+	void MapObjectVisibleHandler::handle(InPacket& recv) const
+	{
+		uint8_t count = recv.read_byte();
+
+		for (uint8_t i = 0; i < count; i++)
+		{
+			std::string tag = recv.read_string();
+			bool shown = recv.read_bool();
+			Stage::get().show_tag(tag, shown);
+		}
+	}
+
+	void BackEffectHandler::handle(InPacket& recv) const
+	{
+		uint8_t mode = recv.read_byte();
+		// Read but unused (FUN_00587d24).
+		recv.skip_int();
+		uint8_t index = recv.read_byte();
+		int32_t duration = recv.read_int();
+		Stage::get().fade_back(mode, index, duration);
+	}
+
+	void ClearBackEffectHandler::handle(InPacket&) const
+	{
+		Stage::get().reset_backs();
+	}
+
+	void MiniMapOnOffHandler::handle(InPacket& recv) const
+	{
+		// Any non-zero byte is on.
+		UIMiniMap::switch_on(recv.read_byte() != 0);
+	}
+
+	void BlowWeatherHandler::handle(InPacket& recv) const
+	{
+		uint8_t flag = recv.read_byte();
+		int32_t item_id = recv.read_int();
+		// Only a start by a player's item carries their message.
+		std::string msg = item_id != 0 && flag == 0 ? recv.read_string() : "";
+
+		Stage::get().set_weather_flag(flag);
+		Stage::get().blow_weather(item_id, msg, false);
+	}
+
+	void PlayJukeboxHandler::handle(InPacket& recv) const
+	{
+		int32_t item_id = recv.read_int();
+
+		if (!field_effect::is_jukebox(item_id))
+			return;
+
+		std::string id = std::to_string(item_id);
+		std::string msg = nl::nx::string["Cash.img"][id]["msg"];
+		std::string line = field_effect::jukebox_line(msg, recv.read_string());
+
+		if (auto chatbar = UI::get().get_element<UIChatBar>())
+			chatbar->send_chatline(line, UIChatBar::LineType::LIGHT_YELLOW);
+
+		std::string path = nl::nx::item["Cash"]["0510.img"]["0" + id]["info"]["path"];
+
+		Music(field_effect::jukebox_path(path))
+			.play(field_effect::JUKEBOX_FADE, field_effect::JUKEBOX_DELAY, field_effect::JUKEBOX_FADE_IN);
+	}
+
+	void ObstacleResetHandler::handle(InPacket&) const
+	{
+		Stage::get().reset_obstacles();
 	}
 
 	void ContiMoveHandler::handle(InPacket& recv) const

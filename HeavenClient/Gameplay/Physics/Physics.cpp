@@ -234,36 +234,58 @@ namespace ms
 			double uy = phobj.fhslope * ux;
 			double slant = std::abs(uy);
 			double speed = hspeed / ux;
+
+			// A foothold with a force or a drag of its own (0x9b23f2) takes the
+			// shoe's walkAcc and walkDrag as 1.
+			const Foothold &fh = fht.get_fh(phobj.fhid);
+			double belt = fh.force();
+			bool own = belt != 0.0 || fh.drag() != 1.0;
+			double base = WALKACC * (own ? 1.0 : phobj.walkforce) * friction;
+			double drag = WALKDRAG * ground_drag(fh.drag() * (own ? 1.0 : phobj.walkdrag) * friction);
 			double limit = WALKSPEED * phobj.walkspeed;
-			double acc = WALKACC * phobj.walkforce * friction;
-			double drag = WALKDRAG * ground_drag(phobj.walkdrag * friction);
+			double push = dir * base;
 
 			if (phobj.swim)
 			{
 				limit *= SWIMWALK;
-				acc *= SWIMWALK;
+				push *= SWIMWALK;
 			}
+
+			// A conveyor belt doubles its whole part for walking with it and
+			// divides 0.2 by it for walking against it. Standing still, it pushes
+			// at its full force up to its whole part of the speed. No map has a
+			// force below 100 (1.0).
+			if (belt != 0.0)
+			{
+				double whole = std::max(1.0, std::abs(std::trunc(belt)));
+				double factor = dir == 0 ? whole : dir * belt > 0.0 ? 2.0 * whole : 0.2 / whole;
+
+				push = dir == 0 ? belt * base : push * factor;
+				limit *= factor;
+			}
+
+			bool idle = dir == 0 && belt == 0.0;
 
 			if (slant == 0.0)
 			{
 				decelerate(speed, limit, drag);
 
-				if (dir == 0)
+				if (idle)
 					decelerate(speed, 0.0, drag);
 				else
-					accelerate(speed, dir * acc, limit);
+					accelerate(speed, push, limit);
 			} else
 			{
 				int8_t uphill = uy >= 0.0 ? -1 : 1;
 				double steep = slant * slant;
-				double force = dir * acc * (uphill < 0 ? 1.0 + steep : 1.0 - steep);
+				double force = push * (uphill < 0 ? 1.0 + steep : 1.0 - steep);
 				double downhill = (1.0 + steep) * limit;
 
 				decelerate(speed, uphill * speed > 0.0 ? limit : downhill, drag);
 
 				if (slant <= WALKSLANT)
 				{
-					if (dir == 0)
+					if (idle)
 						decelerate(speed, 0.0, drag);
 					else
 						accelerate(speed, force, uphill * force > 0.0 ? limit : downhill);
@@ -276,7 +298,7 @@ namespace ms
 					{
 						slip *= 0.5;
 						sliplimit *= 0.5;
-					} else if (dir != 0)
+					} else if (!idle)
 					{
 						slip += force;
 						sliplimit += downhill;

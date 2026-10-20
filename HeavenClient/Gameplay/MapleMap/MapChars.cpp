@@ -26,23 +26,19 @@ namespace ms
 
 	void MapChars::update(const Physics &physics)
 	{
+		add_spawns();
+		chars.update(physics);
+	}
+
+	void MapChars::add_spawns()
+	{
 		for (; !spawns.empty(); spawns.pop())
 		{
 			const CharSpawn &spawn = spawns.front();
 
-			int32_t cid = spawn.get_cid();
-			Optional<OtherChar> ochar = get_char(cid);
-
-			if (ochar)
-			{
-				// TODO: Blank
-			} else
-			{
+			if (!chars.get(spawn.get_cid()))
 				chars.add(spawn.instantiate());
-			}
 		}
-
-		chars.update(physics);
 	}
 
 	void MapChars::spawn(CharSpawn &&spawn)
@@ -52,6 +48,7 @@ namespace ms
 
 	void MapChars::remove(int32_t cid)
 	{
+		add_spawns();
 		chars.remove(cid);
 	}
 
@@ -79,6 +76,8 @@ namespace ms
 
 	Optional<OtherChar> MapChars::get_char(int32_t cid)
 	{
+		add_spawns();
+
 		return chars.get(cid);
 	}
 

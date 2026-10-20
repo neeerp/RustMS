@@ -41,6 +41,21 @@ int main()
 		camera.update({-500, 200});
 		require(camera.position().x() == centred && centred == 400 + 810, "a map narrower than the view is centred");
 
+		// A shake moves the centre, inside the map's range.
+		camera.set_view({-5000, 5000}, {-5000, 5000});
+		camera.set_position({0, 0});
+		camera.shake({10, -20});
+		camera.update({0, 0});
+		require(camera.position() == Point<int16_t>(390, 370), "a shake moves the view's centre");
+		camera.shake({});
+		camera.update({0, 0});
+		require(camera.position() == Point<int16_t>(400, 350), "the next offset replaces the last");
+		camera.set_view({-1199, -421}, {-805, 590});
+		camera.set_position({-1100, 200});
+		camera.shake({30, 30});
+		camera.update({-1100, 200});
+		require(camera.position().x() == centred, "the map's range keeps a shake in");
+
 		std::cout << "Camera follow passed\n";
 		return 0;
 	}

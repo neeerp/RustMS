@@ -18,9 +18,12 @@
 #pragma once
 
 #include <cstdint>
+#include <string>
+#include <vector>
 
 #include "ObstacleRules.h"
 
+#include "../../Audio/Audio.h"
 #include "../Graphics/Animation.h"
 #include "../Template/Point.h"
 
@@ -44,6 +47,22 @@ namespace ms
 
 		int32_t get_order() const;
 
+		// The name the server switches its state by. Most objs have none.
+		const std::string &get_name() const;
+
+		// Show a named obj in `state`, or in its current one again for -1, with its sound as heard from `listener`
+		// (v83 FUN_00642aca). False if it has no such state.
+		bool set_state(int32_t state, Point<int16_t> listener);
+
+		// The tags a quest or the server shows or hides it by, such as the arrows to a job instructor.
+		const std::vector<std::string> &get_tags() const;
+
+		// Show or hide the obj as a whole, whatever its state (v83 layer put_visible).
+		void set_shown(bool shown);
+
+		// Whether any of its states is a trap.
+		bool has_obstacle() const;
+
 		// Whether the obj is a trap, which hurts what touches it.
 		bool is_obstacle() const;
 
@@ -56,12 +75,31 @@ namespace ms
 		obstacle::Vec get_push() const;
 
 	private:
-		Animation animation;
+		// Its own node, or one of a named obj's s1, s2...
+		struct State
+		{
+			State(nl::node data);
+
+			Animation animation;
+			int32_t repeat;
+			Sound sound;
+			bool obstacle;
+			obstacle::Trap trap;
+		};
+
+		// Start its animation as its `repeat` says (FUN_006431e3).
+		static void play(State &state);
+
+		std::vector<State> states;
+		size_t current;
+		bool visible;
+		// False for one hidden by its `hide` or a tag.
+		bool shown;
+		std::string name;
+		std::vector<std::string> tags;
 		Point<int16_t> pos;
 		uint8_t z;
 		bool flip;
 		int32_t order;
-		bool obstacle;
-		obstacle::Trap trap;
 	};
 }

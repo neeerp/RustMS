@@ -69,6 +69,71 @@ namespace ms
 		void handle(InPacket& recv) const override;
 	};
 
+	// A named map obj, such as a party quest's gate or trap, switches state
+	// (v83 0x53300b for FIELD_OBSTACLE_ONOFF, 0x537a1e for SET_OBJECT_STATE).
+	class ObjectStateHandler : public PacketHandler
+	{
+	public:
+		void handle(InPacket& recv) const override;
+	};
+
+	// Several named map objs switch state (v83 0x533057).
+	class ObjectStateListHandler : public PacketHandler
+	{
+	public:
+		void handle(InPacket& recv) const override;
+	};
+
+	// Map objs with a tag are shown or hidden, such as the arrows to a job
+	// instructor (v83 FUN_006449d2).
+	class MapObjectVisibleHandler : public PacketHandler
+	{
+	public:
+		void handle(InPacket& recv) const override;
+	};
+
+	// One of the map's backs fades in or out (v83 FUN_006445c5).
+	class BackEffectHandler : public PacketHandler
+	{
+	public:
+		void handle(InPacket& recv) const override;
+	};
+
+	// The map's backs are loaded again, undoing any fades (v83 FUN_006449ca).
+	class ClearBackEffectHandler : public PacketHandler
+	{
+	public:
+		void handle(InPacket& recv) const override;
+	};
+
+	// Whether the miniMapOnOff maps show their minimap (v83 FUN_00a129ed).
+	class MiniMapOnOffHandler : public PacketHandler
+	{
+	public:
+		void handle(InPacket& recv) const override;
+	};
+
+	// Someone used a weather item, or the server stops theirs (v83 FUN_00535179).
+	class BlowWeatherHandler : public PacketHandler
+	{
+	public:
+		void handle(InPacket& recv) const override;
+	};
+
+	// Someone used a jukebox: its song replaces the map's BGM (v83 FUN_00535224).
+	class PlayJukeboxHandler : public PacketHandler
+	{
+	public:
+		void handle(InPacket& recv) const override;
+	};
+
+	// Every named trap goes back to its first state (v83 0x5330b6).
+	class ObstacleResetHandler : public PacketHandler
+	{
+	public:
+		void handle(InPacket& recv) const override;
+	};
+
 	// A ship field's ship comes or goes (v83 FUN_0054dca3).
 	class ContiMoveHandler : public PacketHandler
 	{

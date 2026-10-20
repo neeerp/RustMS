@@ -92,18 +92,28 @@ namespace ms
 		/// Monster Book
 		MONSTER_BOOK_SET_CARD = 83,
 		MONSTER_BOOK_SET_COVER = 84,
+		MINIMAP_ON_OFF = 86,
 
 		SKILL_MACROS = 124,
 		SET_FIELD = 125,
+		SET_BACK_EFFECT = 128,
+		SET_MAP_OBJECT_VISIBLE = 129,
+		CLEAR_BACK_EFFECT = 130,
 		BLOCKED_MAP = 131,
 		BLOCKED_SERVER = 132,
 		WHISPER = 135,
 		MESSENGER = 313,
 		PLAYER_INTERACTION = 314,
 		FIELD_EFFECT = 138,
+		FIELD_OBSTACLE_ONOFF = 139,
+		FIELD_OBSTACLE_ONOFF_LIST = 140,
+		FIELD_OBSTACLE_ALL_RESET = 141,
+		BLOW_WEATHER = 142,
+		PLAY_JUKEBOX = 143,
 		CLOCK = 147,
 		CONTI_MOVE = 148,
 		CONTI_STATE = 149,
+		SET_OBJECT_STATE = 153,
 		STOP_CLOCK = 154,
 
 		/// MapObject
@@ -141,6 +151,7 @@ namespace ms
 		THROW_GRENADE = 204,
 
 		FACIAL_EXPRESSION = 193,
+		SHOW_ITEM_EFFECT = 194,
 		SHOW_CHAIR = 196,
 		CANCEL_CHAIR = 205,
 		UPDATE_CHARLOOK = 197,
@@ -229,6 +240,16 @@ namespace ms
 		emplace<CONTI_MOVE, ContiMoveHandler>();
 		emplace<CONTI_STATE, ContiStateHandler>();
 		emplace<STOP_CLOCK, StopClockHandler>();
+		emplace<FIELD_OBSTACLE_ONOFF, ObjectStateHandler>();
+		emplace<FIELD_OBSTACLE_ONOFF_LIST, ObjectStateListHandler>();
+		emplace<FIELD_OBSTACLE_ALL_RESET, ObstacleResetHandler>();
+		emplace<BLOW_WEATHER, BlowWeatherHandler>();
+		emplace<PLAY_JUKEBOX, PlayJukeboxHandler>();
+		emplace<SET_BACK_EFFECT, BackEffectHandler>();
+		emplace<SET_MAP_OBJECT_VISIBLE, MapObjectVisibleHandler>();
+		emplace<CLEAR_BACK_EFFECT, ClearBackEffectHandler>();
+		emplace<MINIMAP_ON_OFF, MiniMapOnOffHandler>();
+		emplace<SET_OBJECT_STATE, ObjectStateHandler>();
 
 		// MapObject handlers
 		emplace<SPAWN_CHAR, SpawnCharHandler>();
@@ -236,6 +257,7 @@ namespace ms
 		emplace<UPDATE_CHAR_BOX, UpdateCharBoxHandler>();
 		emplace<CHAR_MOVED, CharMovedHandler>();
 		emplace<FACIAL_EXPRESSION, FacialExpressionHandler>();
+		emplace<SHOW_ITEM_EFFECT, ShowItemEffectHandler>();
 		emplace<SHOW_CHAIR, ShowChairHandler>();
 		emplace<CANCEL_CHAIR, CancelChairHandler>();
 		emplace<UPDATE_CHARLOOK, UpdateCharLookHandler>();

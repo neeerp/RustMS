@@ -66,6 +66,34 @@ namespace ms
 		return found;
 	}
 
+	Obj *TilesObjs::find(const std::string &name)
+	{
+		for (auto &iter : objs)
+			if (iter.second.get_name() == name)
+				return &iter.second;
+
+		return nullptr;
+	}
+
+	void TilesObjs::reset_obstacles(Point<int16_t> listener)
+	{
+		for (auto &iter : objs)
+		{
+			Obj &obj = iter.second;
+
+			if (!obj.get_name().empty() && obj.has_obstacle())
+				obj.set_state(0, listener);
+		}
+	}
+
+	void TilesObjs::show_tags(const std::function<std::optional<bool>(const std::string &)> &shown)
+	{
+		for (auto &iter : objs)
+			for (auto &tag : iter.second.get_tags())
+				if (std::optional<bool> value = shown(tag))
+					iter.second.set_shown(*value);
+	}
+
 	void TilesObjs::draw(Point<int16_t> viewpos, float alpha) const
 	{
 		for (auto &iter : objs)
@@ -96,6 +124,30 @@ namespace ms
 				return obj;
 
 		return nullptr;
+	}
+
+	bool MapTilesObjs::set_state(const std::string &name, int32_t state, Point<int16_t> listener)
+	{
+		if (name.empty())
+			return false;
+
+		for (auto iter : layers)
+			if (Obj *obj = iter.second.find(name))
+				return obj->set_state(state, listener);
+
+		return false;
+	}
+
+	void MapTilesObjs::reset_obstacles(Point<int16_t> listener)
+	{
+		for (auto iter : layers)
+			iter.second.reset_obstacles(listener);
+	}
+
+	void MapTilesObjs::show_tags(const std::function<std::optional<bool>(const std::string &)> &shown)
+	{
+		for (auto iter : layers)
+			iter.second.show_tags(shown);
 	}
 
 	void MapTilesObjs::update()

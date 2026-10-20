@@ -27,6 +27,7 @@
 #include <cstdint>
 #include <string>
 #include <array>
+#include <chrono>
 #include <vector>
 
 #include <nlnx/node.hpp>
@@ -155,7 +156,10 @@ namespace ms
 	public:
 		Music(std::string path);
 
-		void play() const;
+		// Play this track, looping unless told not to. With a fade, the track playing fades out over that many ms
+		// first. A delay holds the start back that many ms from now, and a fade-in raises the track from silence over
+		// that many ms.
+		void play(int32_t fadeout = 0, int32_t delay = 0, int32_t fadein = 0, bool loop = true) const;
 
 		void play_once() const;
 
@@ -171,12 +175,28 @@ namespace ms
 
 	private:
 		std::string path;
+
+		static void start(const std::string &path);
+
 		static std::unordered_map<std::string, membuf *> audiodb;
 		static alure::DeviceManager devMgr;
 		static alure::Device dev;
 		static alure::Context ctx;
 		static alure::Source music_src;
 		static alure::Buffer music_buff;
+		static float volume;
+		// The track to start once the one playing has faded out.
+		static std::string pending;
+		static std::chrono::steady_clock::time_point fade_start;
+		static int32_t fade_length;
+		// The pending track starts this many ms after fade_start at the soonest.
+		static int32_t start_delay;
+		// The next track to start rises from silence over this many ms.
+		static int32_t fadein_length;
+		// Whether the next track to start loops.
+		static bool looping;
+		static bool fading_in;
+		static std::chrono::steady_clock::time_point fadein_start;
 
 		friend Sound;
 	};

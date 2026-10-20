@@ -128,6 +128,7 @@ namespace ms
 			ITEMMEGAPHONE,
 			GIFTBLUE,
 			TIPORANGE,
+			LIGHTYELLOW,
 			NUM_COLORS
 		};
 
@@ -205,7 +206,8 @@ namespace ms
 						{0.47f, 0.00f, 0.26f}, // Super megaphone (#770042, v83 chat font 0xe: super and triple megaphones)
 						{0.27f, 0.15f, 0.02f}, // Item megaphone (#462706, v83 chat font 0xf: item megaphones)
 						{0.13f, 0.00f, 1.00f}, // Gift blue (#2000FF, v83 font 4: who sent a gift)
-						{1.00f, 0.54f, 0.09f}  // Tip orange (#FF8A18, v83 tooltip font 11: a map zone's description)
+						{1.00f, 0.54f, 0.09f}, // Tip orange (#FF8A18, v83 tooltip font 11: a map zone's description)
+						{1.00f, 0.94f, 0.50f}  // Light yellow (#FFF080, v83 chat font 9: jukebox songs)
 				};
 
 		// Create a color by an array of real numbers [0.0f, 1.0f]

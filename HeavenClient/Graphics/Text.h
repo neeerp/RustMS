@@ -47,6 +47,8 @@ namespace ms
 			A10M,
 			// Chat balloon text: 12 px Arimo with 14 px lines, like the original's Arial.
 			BALLOON,
+			// A weather's message bar: v83's 14 px bold Arial.
+			A14B,
 			NUM_FONTS
 		};
 

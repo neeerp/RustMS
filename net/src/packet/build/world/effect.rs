@@ -31,6 +31,23 @@ pub fn build_boss_hp_bar(
     Ok(p)
 }
 
+/// BLOW_WEATHER (v83 FUN_00535179): the weather of the 512xxxx item
+/// `item_id` with its message bar, or `None` to stop it. The client never
+/// stops one by itself.
+pub fn build_blow_weather(weather: Option<(i32, &str)>) -> Result<Packet, NetworkError> {
+    let mut p = Packet::new_empty();
+    p.write_short(SendOpcode::BlowWeather as i16)?;
+    p.write_byte(0)?;
+    match weather {
+        Some((item_id, message)) => {
+            p.write_int(item_id)?;
+            p.write_str_with_length(message)?;
+        }
+        None => p.write_int(0)?,
+    }
+    Ok(p)
+}
+
 /// SHOW_ITEM_GAIN_INCHAT mode 0x17: show a UI image (`UI/tutorial.img/25`)
 /// anchored to the player, as the tutorial hints do.
 pub fn build_avatar_effect(path: &str) -> Result<Packet, NetworkError> {
@@ -165,6 +182,17 @@ mod tests {
         expect.int(8800000).int(33_000_000).int(66_000_000);
         expect.byte(1).byte(3);
         expect.end();
+    }
+
+    #[test]
+    fn a_weather_carries_its_message_and_stops_with_item_zero() {
+        let packet = build_blow_weather(Some((5120000, "Tester's snow : hi"))).unwrap();
+        let mut expect = Expect::new(&packet.bytes);
+        expect.short(0x8E).byte(0).int(5120000);
+        expect.string("Tester's snow : hi");
+        expect.end();
+        let packet = build_blow_weather(None).unwrap();
+        Expect::new(&packet.bytes).short(0x8E).byte(0).int(0).end();
     }
 
     #[test]

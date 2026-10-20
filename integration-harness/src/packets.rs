@@ -112,6 +112,8 @@ pub struct SpawnPlayerPacket {
     /// The guild name under theirs, or "" for none.
     pub guild: String,
     pub visible_equips: BTreeMap<u8, i32>,
+    /// The effect item they show, or 0.
+    pub item_effect: i32,
     pub x: i16,
     pub y: i16,
     pub stance: u8,
@@ -1046,7 +1048,11 @@ pub fn decode_spawn_player(packet: &Packet) -> Result<SpawnPlayerPacket, String>
     skip(&mut cursor, 6 + 8 + 4 + 4 + 4 + 43 + 65 + 2)?;
     let visible_equips = decode_look(&mut cursor)?;
     // Item 5110000 count, item effect, chair.
-    skip(&mut cursor, 4 + 4 + 4)?;
+    skip(&mut cursor, 4)?;
+    let item_effect = cursor
+        .read_int()
+        .map_err(|e| format!("failed to read spawn-player item effect: {e}"))?;
+    skip(&mut cursor, 4)?;
     let x = cursor
         .read_short()
         .map_err(|e| format!("failed to read spawn-player x: {e}"))?;
@@ -1067,6 +1073,7 @@ pub fn decode_spawn_player(packet: &Packet) -> Result<SpawnPlayerPacket, String>
         character_name,
         guild,
         visible_equips,
+        item_effect,
         x,
         y,
         stance,

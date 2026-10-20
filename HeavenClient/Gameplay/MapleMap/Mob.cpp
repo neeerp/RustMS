@@ -34,6 +34,7 @@
 #include "../../IO/UITypes/UIMobGage.h"
 
 #include "../../Net/Packets/GameplayPackets.h"
+#include "../Stage.h"
 
 #include <nlnx/nx.hpp>
 
@@ -804,6 +805,10 @@ namespace ms
 
 		int32_t due = clock + info.after;
 
+		// v83 shakes the view as it lands, whoever it hits (0x6671fa).
+		if (info.tremble)
+			trembleat = due;
+
 		switch (info.type)
 		{
 			case 0:
@@ -980,6 +985,12 @@ namespace ms
 				effects.add(iter->animation, DrawArgument(Point<int16_t>(0, 0), !iter->left), 0);
 
 			iter = pendingeffects.erase(iter);
+		}
+
+		if (trembleat && clock >= *trembleat)
+		{
+			trembleat.reset();
+			Stage::get().tremble(30, true, 0, 0, false);
 		}
 
 		// A box hits the player where they are once due; a jump attack only
@@ -1817,6 +1828,7 @@ namespace ms
 				attacking.reset();
 				casting.reset();
 				diesound.play();
+				tremble_on_death();
 
 				if (skillanimations.count(1) > 0)
 				{
@@ -2407,7 +2419,29 @@ namespace ms
 	{
 		show_stance(Stance::DIE, flip);
 		diesound.play();
+		tremble_on_death();
 		dying = true;
+	}
+
+	void Mob::tremble_on_death() const
+	{
+		switch (id)
+		{
+			case 8800002:
+				Stage::get().tremble(30, false, 0, 0, false);
+				break;
+			case 8810026:
+				Stage::get().tremble(10, false, 0, 4000, true);
+				break;
+			case 8810018:
+				Stage::get().tremble(5, false, 0, 3000, true);
+				break;
+			case 8830003:
+				Stage::get().tremble(10, false, 0, 3000, false);
+				break;
+			default:
+				break;
+		}
 	}
 
 	bool Mob::is_alive() const

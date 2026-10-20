@@ -76,6 +76,9 @@ int main()
 		require(!may_use_wheel(0, 910000000) && !may_use_wheel(0, 200090010) && !may_use_wheel(0, 390000000),
 				"nor in event maps, on the ships or in 390xxxxxx");
 
+		require(may_blow_weather(0, 0) && may_blow_weather(0x400, 59), "weather items work in ordinary fields");
+		require(!may_blow_weather(0x4000, 0) && !may_blow_weather(0, 60), "but not with bit 0x4000 or in type 60");
+
 		require(may_touch(0, false, 100100) && !may_touch(0, true, 100100), "Dark Sight keeps a snail's touch off");
 		require(may_touch(0x2, true, 100100), "but not where bit 0x2 is set");
 		require(may_touch(0, true, MASTER_GUARDIAN), "and never the Master Guardian's");
@@ -89,6 +92,16 @@ int main()
 		require(!may_teleport_rock(0, 109010000) && !may_teleport_rock(0, 209000000), "nor in the event maps");
 
 		require(may_change_leader(0x2) && !may_change_leader(0x800), "bit 0x800 keeps the party's leader");
+
+		require(shows_minimap(false, true, false, false, true), "a map's miniMap shows");
+		require(!shows_minimap(false, false, false, false, true) && !shows_minimap(true, false, false, false, true),
+				"a map without one folds, even for a GM");
+		require(!shows_minimap(false, true, true, false, true) && shows_minimap(true, true, true, false, true),
+				"hideMinimap folds it for all but GMs");
+		require(shows_minimap(false, true, false, true, true) && !shows_minimap(false, true, false, true, false),
+				"miniMapOnOff folds it once the server switches minimaps off");
+		require(shows_minimap(true, true, false, true, false) && shows_minimap(false, true, false, false, false),
+				"but not for GMs, nor in other maps");
 
 		std::cout << "Field limit passed\n";
 		return 0;
