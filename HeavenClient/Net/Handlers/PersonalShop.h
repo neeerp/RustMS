@@ -185,12 +185,19 @@ namespace ms
 			}
 		};
 
-		// Equipment, throwing stars and bullets sell whole, as one bundle of
-		// one (FUN_004f3144); a set of stars counts as one.
-		inline bool sells_whole(int32_t itemid)
+		// Equipment, cash items, throwing stars and bullets, and anything with
+		// a time limit sell whole, as one bundle of one (FUN_004f3144); a set
+		// of stars counts as one.
+		inline bool sells_whole(int32_t itemid, int64_t expiration = item_expiry::BEFORE)
 		{
-			return itemid / 1000000 == 1 || shop_list::is_rechargeable(itemid);
+			int32_t prefix = itemid / 1000000;
+
+			return prefix < 2 || prefix > 4 || shop_list::is_rechargeable(itemid) || expiration < item_expiry::BEFORE;
 		}
+
+		// What buying a cash item that sells whole asks.
+		constexpr const char* CASH_BUY_QUESTION = "Cash Items become untradable\\nonce they have been traded and "
+			"\\nMaple Points cannot be accumulated\\nusing Item Deletions in the Cash Shop.\\n\\nDo you really want to buy?";
 
 		// What the owner puts up: bundles of per_bundle items, at price a bundle.
 		struct Sale

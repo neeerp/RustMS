@@ -139,6 +139,12 @@ int main()
 
 		require(sword.box == Box::NONE && sword.sale.bundles == 1 && sword.sale.per_bundle == 1, "an equip sells whole");
 		require(sells_whole(1302000) && sells_whole(2070000) && !sells_whole(2000000), "equips and stars sell whole");
+		require(sells_whole(5072000) && sells_whole(2330000) && !sells_whole(4000000) && !sells_whole(3010000),
+				"so do cash items and bullets, but not etc or setup stacks");
+		require(sells_whole(2000000, ms::item_expiry::BEFORE - 1), "a stack with a time limit sells whole");
+		require(ms::mini_room::time_limit_line("Hat", ms::item_expiry::BEFORE, ms::item_expiry::BEFORE) +
+				ms::mini_room::CHECK_TIME_LIMIT == "Hat(Time Limit Expired)\\n\\nHave you checked the\\ntime limit on the item?",
+				"a timed cash item is named before the question");
 		require(too_pricey(2, 2000000000) && !too_pricey(1, 2147483647), "a sale can't total past what fits");
 
 		// Buying takes whole bundles.

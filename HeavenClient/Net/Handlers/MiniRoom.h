@@ -372,6 +372,15 @@ namespace ms
 			return text;
 		}
 
+		// A timed item's line in a time limit question.
+		inline std::string time_limit_line(const std::string& name, int64_t expiration, int64_t now)
+		{
+			return name + "(" + time_left(expiration, now) + ")\\n";
+		}
+
+		// What follows the timed items' lines.
+		constexpr const char* CHECK_TIME_LIMIT = "\\nHave you checked the\\ntime limit on the item?";
+
 		// What Trade asks before it confirms (FUN_00485dcd). The partner's
 		// items with Karma can't be traded again, so it warns of that, after
 		// first listing those of them with a time limit.
@@ -396,13 +405,13 @@ namespace ms
 				karma = true;
 
 				if (item->expiration < item_expiry::BEFORE)
-					list += name(item->itemid) + "(" + time_left(item->expiration, now) + ")\\n";
+					list += time_limit_line(name(item->itemid), item->expiration, now);
 			}
 
 			TradeQuestions questions;
 
 			if (!list.empty())
-				questions.time_limit = list + "\\nHave you checked the\\ntime limit on the item?";
+				questions.time_limit = list + CHECK_TIME_LIMIT;
 
 			questions.confirm = karma
 				? "Cash Items become untradable\\nonce they have been traded and \\nMaple Points cannot be accumulated"
