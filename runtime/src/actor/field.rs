@@ -725,8 +725,8 @@ impl FieldActor {
                         delay: 0,
                     },
                 )
-                    .ok()
-                    .map(|packet| (drop.clone(), packet))
+                .ok()
+                .map(|packet| (drop.clone(), packet))
             })
             .collect();
         for (drop, packet) in packets {
@@ -745,7 +745,9 @@ impl FieldActor {
             let (x, y) = (mob.x, mob.y);
             for (index, amount) in mesos.into_iter().enumerate() {
                 let place = x.saturating_add((rand::random::<u32>() % 100) as i16 - 50);
-                let drop = self.drops.pocket(amount, from, (x, y), place, object_id, now);
+                let drop = self
+                    .drops
+                    .pocket(amount, from, (x, y), place, object_id, now);
                 let falling = DropAppearance::Falling {
                     from: (x, y),
                     delay: (index as i16).saturating_mul(100),
