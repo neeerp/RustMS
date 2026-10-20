@@ -287,7 +287,8 @@ namespace ms
 		auto add_line = [&](const std::string &label, const std::string &value, bool word)
 		{
 			StatLine statline;
-			statline.label = Text(Text::Font::A11M, Text::Alignment::LEFT, Color::Name::WHITE, label + " :");
+			statline.label = Text(Text::Font::A11M, Text::Alignment::LEFT, Color::Name::WHITE,
+								  label.empty() ? "" : label + " :");
 			statline.value = Text(word ? Text::Font::A11M : Text::Font::A11B, Text::Alignment::LEFT,
 								  Color::Name::WHITE, value);
 			statline.gap = word ? 0 : VALUE_GAP;
@@ -313,7 +314,19 @@ namespace ms
 			add_line(stat_label(es), (base ? "" : "+") + std::to_string(value), false);
 		}
 
-		if (!itemdata.is_cashitem())
+		// Then a bow's knock-back rate, the lines of spikes and cold
+		// protection, and the slots left of an equip that came with some
+		// (FUN_008eca0c).
+		if (int32_t knockback = equipdata.get_knockback(); knockback > 0)
+			add_line("THE RATE OF KNOCK-BACK", std::to_string(knockback) + "%", false);
+
+		if (equip.get_flags() & item_properties::EQUIP_SPIKES)
+			add_line("", "ADD PREVENT SLIPPING", true);
+
+		if (equip.get_flags() & item_properties::EQUIP_COLD)
+			add_line("", "ADD PREVENT COLDNESS", true);
+
+		if (equipdata.get_slots() > 0)
 			add_line("NUMBER OF UPGRADES AVAILABLE", std::to_string(equip.get_slots()), false);
 
 		int16_t height = properties_height + STATS_TOP + STAT_STEP * static_cast<int16_t>(stats.size());

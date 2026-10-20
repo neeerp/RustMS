@@ -80,6 +80,13 @@ namespace ms
 		// How fast a shoe swims, as a percent (info/swim, 100 when absent).
 		int32_t get_swim() const;
 
+		// How many upgrade slots the equip comes with (info/tuc).
+		uint8_t get_slots() const;
+
+		// The percent chance a bow or crossbow knocks a mob back
+		// (info/knockback, 0 when absent).
+		int32_t get_knockback() const;
+
 	private:
 		// Allow the cache to use the constructor
 		friend Cache<EquipData>;
@@ -100,6 +107,7 @@ namespace ms
 		int32_t medaltag;
 		double grip;
 		int32_t swim;
+		int32_t knockback;
 		std::array<int16_t, 8> elemboost;
 	};
 }
