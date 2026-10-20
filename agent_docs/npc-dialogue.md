@@ -95,8 +95,33 @@ examiner's map at the portal upstream uses (`Effect::WarpToPortal`). With the
 proof, the instructor shows a menu of the line's second jobs; each choice
 describes the job and asks, and yes takes the proof and applies
 `Effect::TakeSecondJob` (`Player::take_second_job`: 1 SP and the job's extra
-max HP or MP) and a row more in the Etc bag. The third and fourth jobs are
-not scripted yet.
+max HP or MP) and a row more in the Etc bag. The fourth job is not
+scripted yet.
+
+The third job (`THIRD_JOBS`), also after Cosmic, starts with a level-70
+second job's chief in El Nath (Tylus 2020008, Robeira 2020009, Rene
+2020010, Arec 2020011, Pedro 2020013), who sends the player to their
+instructor. The instructor sends them to the Door of Dimension (1061009) in
+the line's hunting map, which lets one challenger at a time into the
+line's two clone maps (`Effect::RequireEmptyMap` asks the directory
+whether anyone is in either on the channel). The clone's room has a
+20-minute limit (`npc_scripts::time_limit`), puts its clone back when the
+last player leaves (`npc_scripts::resets_when_empty`), and has a Sparkling
+Crystal (1061010) back to the door. The clones (9001000-9001004) drop the
+Black Charm (4031059) to a player the instructor sent (`[mobs]` in
+`reward_overrides.toml`); the instructor trades it for the Necklace of
+Strength (4031057), and the chief that for the Holy Stone's assignment.
+The Holy Stone (2030006) takes a Dark Crystal (4005004; Spiruna, 2032001,
+refines one from 10 ore and 500,000 mesos after her quest 3034) and asks
+five questions picked from the text's `holy_stone.q.<n>` keys, with the
+answers shuffled. A wrong answer ends the try; all right earns the Necklace
+of Wisdom (4031058). The chief takes it for `Effect::TakeThirdJob`
+(`Player::take_third_job`: 1 SP, 5 AP and the second job's max HP or MP
+again) once the player has no more SP left than 3 for each level past 70.
+Upstream tracks the steps in quest records the client data lacks; here
+they are script markers (`Effect::Mark`/`Unmark`), Started records at
+`quest::SCRIPT_MARKERS` (32000) and up that are saved with the quests but
+never sent to the client.
 
 Kyrin's second jobs are client-driven quests instead (see
 [quests](./quests.md)): How to become a Brawler (2191) and How to Become a

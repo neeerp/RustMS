@@ -459,6 +459,12 @@ pub enum DirectoryMessage {
         owner: ClientId,
         guild: Guild,
     },
+    /// Whether anyone is on `map_id` in `channel_id`.
+    MapOccupied {
+        channel_id: u8,
+        map_id: i32,
+        reply: tokio::sync::oneshot::Sender<bool>,
+    },
     /// Send a packet to whichever of these characters are online.
     Deliver {
         to: Vec<ClientId>,

@@ -30,7 +30,8 @@ Fields are created on demand by `FieldRegistry` and kept alive afterwards.
   their turns and answers. The offers stay with the client actors; see
   "Trading" in [Inventory](./inventory.md).
 - **Time**: a 100 ms tick (`on_tick`) respawns mobs and reactors and expires
-  drops.
+  drops. A third job's clone room puts all its mobs back when its last
+  player leaves (`MobSet::renew`).
 
 A field does not own character state (stats, inventory, quests). Those live
 in the client's `Player`.

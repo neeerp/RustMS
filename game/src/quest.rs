@@ -1,6 +1,12 @@
 use std::collections::BTreeMap;
 use std::time::SystemTime;
 
+/// Quest ids from here up are not in Quest.nx (its last is 29933). Scripts
+/// keep markers under them as started quests (`QuestLog::mark`), saved with
+/// the player rather than through quest start and completion, as upstream
+/// servers keep job advancement steps.
+pub const SCRIPT_MARKERS: i16 = 32000;
+
 /// A quest's state as the client and the quest data number it.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum QuestState {
@@ -57,6 +63,19 @@ impl QuestLog {
     /// Forget a quest, e.g. after it was forfeited.
     pub fn remove(&mut self, quest_id: i16) {
         self.records.remove(&quest_id);
+    }
+
+    /// Set a script marker (an id from `SCRIPT_MARKERS` up).
+    pub fn mark(&mut self, marker: i16) {
+        debug_assert!(marker >= SCRIPT_MARKERS);
+        self.upsert(QuestRecord {
+            quest_id: marker,
+            status: QuestStatus::Started { kills: Vec::new() },
+        });
+    }
+
+    pub fn markers(&self) -> impl Iterator<Item = i16> + '_ {
+        self.records.range(SCRIPT_MARKERS..).map(|(&id, _)| id)
     }
 
     /// Kill counts for a started quest's required mobs.

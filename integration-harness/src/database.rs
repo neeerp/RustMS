@@ -259,6 +259,16 @@ pub async fn set_dex(character_id: i32, dex: i16) -> Result<(), HarnessError> {
 }
 
 /// Give the logged-out character `character_id` `meso` mesos.
+pub async fn set_sp(character_id: i32, sp: i16) -> Result<(), HarnessError> {
+    change_one_row("set sp", move |conn| {
+        diesel::sql_query("UPDATE characters SET sp = $2 WHERE id = $1")
+            .bind::<Integer, _>(character_id)
+            .bind::<SmallInt, _>(sp)
+            .execute(conn)
+    })
+    .await
+}
+
 pub async fn set_meso(character_id: i32, meso: i32) -> Result<(), HarnessError> {
     change_one_row("set meso", move |conn| {
         diesel::sql_query("UPDATE characters SET meso = $2 WHERE id = $1")

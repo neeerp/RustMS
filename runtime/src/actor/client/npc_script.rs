@@ -2,6 +2,7 @@ use super::quest::{gain_exp, QuestChange};
 use super::ClientActor;
 use crate::db::spawn_db;
 use crate::error::RuntimeError;
+use crate::message::DirectoryMessage;
 use net::conti::{self, State};
 use net::dialogue::Prompt;
 use net::npc_scripts::{self, NpcScript, Step};
@@ -12,6 +13,7 @@ use net::quests::{self, QuestTemplate};
 use net::scripts::Effect;
 use net::WorldAction;
 use std::time::{Duration, SystemTime};
+use tokio::sync::oneshot;
 use tracing::{debug, warn};
 
 /// The NPC that offers veterans a tutorial skip.
@@ -72,7 +74,10 @@ impl ClientActor {
                 Some(step) => step,
                 None => return Ok(()),
             },
-            Applied::Refused => return Ok(()),
+            Applied::Refused => match script.refused() {
+                Some(step) => step,
+                None => return Ok(()),
+            },
         };
         if let Some(prompt) = step.prompt {
             let mut packet = npc::build_prompt(&prompt)?;
@@ -184,33 +189,56 @@ impl ClientActor {
                     gain_exp(&mut next, *amount, &mut packets)?;
                     changed = true;
                 }
-                Effect::TakeFirstJob(job) | Effect::TakeSecondJob(job) => {
-                    let first = matches!(effect, Effect::TakeFirstJob(_));
-                    let qualifies = if first {
-                        next.can_take_first_job(*job)
-                    } else {
-                        next.can_take_second_job(*job)
+                Effect::TakeFirstJob(job)
+                | Effect::TakeSecondJob(job)
+                | Effect::TakeThirdJob(job) => {
+                    let qualifies = match effect {
+                        Effect::TakeFirstJob(_) => next.can_take_first_job(*job),
+                        Effect::TakeSecondJob(_) => next.can_take_second_job(*job),
+                        _ => next.can_take_third_job(*job),
                     };
                     if !qualifies {
                         warn!(job, "No longer qualifies for the job; nothing applied");
                         return Ok(Applied::Refused);
                     }
-                    if first {
-                        next.take_first_job(*job);
-                    } else {
-                        next.take_second_job(*job);
+                    match effect {
+                        Effect::TakeFirstJob(_) => next.take_first_job(*job),
+                        Effect::TakeSecondJob(_) => next.take_second_job(*job),
+                        _ => next.take_third_job(*job),
                     }
                     changed = true;
                     let stats = &next.stats;
-                    packets.push(stat::build_stat_update(
-                        false,
-                        &[
-                            StatUpdate::Job(stats.job),
-                            StatUpdate::MaxHp(stats.max_hp),
-                            StatUpdate::MaxMp(stats.max_mp),
-                            StatUpdate::Sp(stats.sp),
-                        ],
-                    )?);
+                    let mut updates = vec![
+                        StatUpdate::Job(stats.job),
+                        StatUpdate::MaxHp(stats.max_hp),
+                        StatUpdate::MaxMp(stats.max_mp),
+                        StatUpdate::Sp(stats.sp),
+                    ];
+                    if matches!(effect, Effect::TakeThirdJob(_)) {
+                        updates.push(StatUpdate::Ap(stats.ap));
+                    }
+                    packets.push(stat::build_stat_update(false, &updates)?);
+                }
+                Effect::Mark(marker) => {
+                    next.quests.mark(*marker);
+                    changed = true;
+                }
+                Effect::Unmark(marker) => {
+                    next.quests.remove(*marker);
+                    changed = true;
+                }
+                Effect::RequireEmptyMap(map_id) => {
+                    let (reply, occupied) = oneshot::channel();
+                    self.send_to_directory(DirectoryMessage::MapOccupied {
+                        channel_id: self.channel_id,
+                        map_id: *map_id,
+                        reply,
+                    })
+                    .await?;
+                    if occupied.await.unwrap_or(true) {
+                        debug!(map_id, "Map occupied; nothing applied");
+                        return Ok(Applied::Refused);
+                    }
                 }
                 Effect::AddSlotRow(kind) => {
                     let limit = next

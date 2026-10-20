@@ -65,6 +65,16 @@ pub enum Effect {
     /// Make a first-job Explorer a second job (`Player::take_second_job`),
     /// on the same terms.
     TakeSecondJob(i16),
+    /// Make a second-job Explorer a third job (`Player::take_third_job`),
+    /// on the same terms.
+    TakeThirdJob(i16),
+    /// Set or clear a script marker (`game::quest::SCRIPT_MARKERS`), which
+    /// the client is not told about.
+    Mark(i16),
+    Unmark(i16),
+    /// Nothing is applied while anyone is on this map in the player's
+    /// channel; the script says its `refused` text instead.
+    RequireEmptyMap(i32),
     /// Add a row of four slots to a bag, up to 96.
     AddSlotRow(InventoryType),
     /// Give the player a new hair (3xxxx), face (2xxxx) or skin (anything

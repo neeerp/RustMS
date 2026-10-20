@@ -102,6 +102,8 @@ pub struct Trace {
     pub inventory_full: usize,
     /// NPC dialogue prompts: (npc, message type).
     pub prompts: Vec<(i32, u8)>,
+    /// Their text, in the same order.
+    pub prompt_texts: Vec<String>,
     /// Maps warped to.
     pub warps: Vec<i32>,
     /// Each map change: (map, spawn point, where the player appears
@@ -382,6 +384,8 @@ impl Trace {
             r.read_byte().unwrap();
             let npc = r.read_int().unwrap();
             self.prompts.push((npc, r.read_byte().unwrap()));
+            r.read_byte().unwrap();
+            self.prompt_texts.push(r.read_str_with_length().unwrap());
         } else if op == SendOpcode::PartyOperation as i16 {
             let party_op = r.read_byte().unwrap();
             self.party_ops.push(party_op);

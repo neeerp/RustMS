@@ -134,6 +134,55 @@ pub mod keys {
 
     pub const SECOND_JOB_INVENTORY_FULL: &str = "second_job.inventory_full";
 
+    /// The Explorer third job. By first job (`warrior`, ...): the chief's
+    /// `chief.ask`, `chief.decline`, `chief.go`, `chief.remind`,
+    /// `chief.strength` (the Necklace of Strength handed in, the Holy Stone
+    /// next), `chief.wisdom`, `chief.sp` (too much SP left), `chief.advance`
+    /// and `chief.other`, and the instructor's `instructor.assign`,
+    /// `instructor.remind` and `instructor.reward`. By third job (`111`,
+    /// ...): its `accept`.
+    pub fn third_job(job: &str, line: &str) -> String {
+        format!("third_job.{job}.{line}")
+    }
+
+    /// The Door of Dimension, the Sparkling Crystal back out of the clone's
+    /// room, and items that don't fit.
+    pub const THIRD_JOB_DOOR_ASK: &str = "third_job.door.ask";
+    pub const THIRD_JOB_DOOR_BUSY: &str = "third_job.door.busy";
+    pub const THIRD_JOB_DOOR_OTHER: &str = "third_job.door.other";
+    pub const THIRD_JOB_CRYSTAL_ASK: &str = "third_job.crystal.ask";
+    pub const THIRD_JOB_INVENTORY_FULL: &str = "third_job.inventory_full";
+
+    /// The Holy Stone's quiz: its lines, then questions `0`, `1`, ... (the
+    /// placeholders decide how many), each with one right answer and its
+    /// wrong ones.
+    pub const HOLY_STONE_OTHER: &str = "holy_stone.other";
+    pub const HOLY_STONE_DONE: &str = "holy_stone.done";
+    pub const HOLY_STONE_NO_CRYSTAL: &str = "holy_stone.no_crystal";
+    pub const HOLY_STONE_ETC_FULL: &str = "holy_stone.etc_full";
+    pub const HOLY_STONE_ASK: &str = "holy_stone.ask";
+    pub const HOLY_STONE_PASS: &str = "holy_stone.pass";
+    pub const HOLY_STONE_FAIL: &str = "holy_stone.fail";
+
+    pub fn holy_stone_question(question: usize) -> String {
+        format!("holy_stone.q.{question}")
+    }
+
+    pub fn holy_stone_right(question: usize) -> String {
+        format!("holy_stone.q.{question}.right")
+    }
+
+    pub fn holy_stone_wrong(question: usize, answer: usize) -> String {
+        format!("holy_stone.q.{question}.wrong.{answer}")
+    }
+
+    /// Spiruna refining Dark Crystals: for those who haven't done her
+    /// quest, the offer, and the result or what is short.
+    pub const SPIRUNA_OTHER: &str = "spiruna.other";
+    pub const SPIRUNA_ASK: &str = "spiruna.ask";
+    pub const SPIRUNA_DONE: &str = "spiruna.done";
+    pub const SPIRUNA_SHORT: &str = "spiruna.short";
+
     /// Mar the Fairy and the Water of Life: the dolls to pick from, then for
     /// the one picked (`{name}`, revived for `{days}`) the offer and the
     /// pet awake; or no doll at all.
@@ -453,6 +502,22 @@ mod tests {
             keys::ROBIN_MENU,
             keys::FIRST_JOB_INVENTORY_FULL,
             keys::SECOND_JOB_INVENTORY_FULL,
+            keys::THIRD_JOB_DOOR_ASK,
+            keys::THIRD_JOB_DOOR_BUSY,
+            keys::THIRD_JOB_DOOR_OTHER,
+            keys::THIRD_JOB_CRYSTAL_ASK,
+            keys::THIRD_JOB_INVENTORY_FULL,
+            keys::HOLY_STONE_OTHER,
+            keys::HOLY_STONE_DONE,
+            keys::HOLY_STONE_NO_CRYSTAL,
+            keys::HOLY_STONE_ETC_FULL,
+            keys::HOLY_STONE_ASK,
+            keys::HOLY_STONE_PASS,
+            keys::HOLY_STONE_FAIL,
+            keys::SPIRUNA_OTHER,
+            keys::SPIRUNA_ASK,
+            keys::SPIRUNA_DONE,
+            keys::SPIRUNA_SHORT,
         ];
         for key in named
             .iter()
@@ -471,6 +536,9 @@ mod tests {
         assert!(text.contains(&keys::first_job("pirate", "after.4")));
         assert!(text.contains(&keys::second_job("pirate", "test")));
         assert!(text.contains(&keys::second_job("520", "accept")));
+        assert!(text.contains(&keys::third_job("pirate", "instructor.reward")));
+        assert!(text.contains(&keys::third_job("521", "accept")));
+        assert!(text.contains(&keys::holy_stone_wrong(4, 3)));
         assert!(text
             .get(keys::LEAVE_AREA_WARNING, &[])
             .starts_with("[placeholder]"));

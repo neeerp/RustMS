@@ -133,6 +133,17 @@ impl WorldDirectory {
             }
             DirectoryMessage::BuddyList { owner, buddies } => self.send_buddy_list(owner, buddies),
             DirectoryMessage::GuildInfo { owner, guild } => self.send_guild_info(owner, guild),
+            DirectoryMessage::MapOccupied {
+                channel_id,
+                map_id,
+                reply,
+            } => {
+                let occupied = self
+                    .clients
+                    .values()
+                    .any(|entry| entry.channel_id == channel_id && entry.presence.map_id == map_id);
+                let _ = reply.send(occupied);
+            }
             DirectoryMessage::Deliver { to, packet } => {
                 for client in to {
                     if let Some(entry) = self.clients.get(&client) {
