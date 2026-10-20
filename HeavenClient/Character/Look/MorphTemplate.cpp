@@ -85,6 +85,11 @@ namespace ms
 		return !actions.empty() && superman;
 	}
 
+	bool MorphTemplate::moves(bool flying) const
+	{
+		return count(flying ? "fly" : "jump") > 0;
+	}
+
 	int32_t MorphTemplate::get_speed() const
 	{
 		return speed;

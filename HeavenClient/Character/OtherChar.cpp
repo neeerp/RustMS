@@ -128,7 +128,7 @@ namespace ms
 				ride(value, init);
 
 			if (stat == Buffstat::Id::MORPH)
-				transform(value, init);
+				transform(value, init, Stage::get().get_mapinfo().is_underwater());
 
 			// The glow is Energy Charge's for the character's line (0x94b44b).
 			if (stat == Buffstat::Id::ENERGY_CHARGE)

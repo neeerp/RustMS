@@ -635,7 +635,7 @@ namespace ms
 		effects.add(src, DrawArgument(facing_right), src["z"]);
 	}
 
-	void Char::transform(int32_t morph, bool at_once)
+	void Char::transform(int32_t morph, bool at_once, bool flying)
 	{
 		// A barrel cancelled before it lands never does.
 		if (!morph && barrel.dropping())
@@ -643,6 +643,9 @@ namespace ms
 			barrel.stop();
 			return;
 		}
+
+		if (morph > 0 && !MorphTemplate::get(morph).moves(flying))
+			return;
 
 		if (look.get_morph() == morph)
 			return;

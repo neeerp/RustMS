@@ -38,6 +38,9 @@ namespace ms
 		// Transformation's, which keeps the player's own stats and attacks.
 		bool is_superman() const;
 
+		// Whether it can move on the ground, by `jump`, or in water, by `fly`. Only 0004 has no fly.
+		bool moves(bool flying) const;
+
 		int32_t get_speed() const;
 
 		int32_t get_jump() const;

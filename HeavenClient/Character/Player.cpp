@@ -1248,7 +1248,7 @@ namespace ms
 			show_combo(buff.value - 1, false);
 
 		if (buff.stat == Buffstat::Id::MORPH)
-			transform(buff.value, false);
+			transform(buff.value, false, underwater);
 
 		show_diseases();
 	}
