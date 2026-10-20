@@ -697,6 +697,32 @@ Cygnus restrictions on who may equip which mount, getting the skill and
 the Hog (quest 6002's `skill` act and the Tame Pig maps), event mounts,
 Battleship, and HeavenClient's side.
 
+### Morphs
+
+A morph item (2210xxx) turns its user into the Morph.nx template in its
+`spec/morph` (2210000 is template 1, the Orange Mushroom) for its
+`spec/time`, as a `BuffStat::Morph` buff (bit 33) from the item (report
+225). Its value is the template, written as a short. Morph is a movement
+stat, so GIVE_BUFF ends with the extra byte. The map sees it with
+GIVE_FOREIGN_BUFF and in SPAWN_PLAYER, after Soul Arrow. Expiry,
+CANCEL_ITEM_EFFECT (right-clicking the icon), death and logout end it like
+any item buff. An item's morph (a value below 100) can't
+attack: the attack handlers drop the attack (`AttackRejection::Morphed`,
+Cosmic's `isMorphWithoutAttack`).
+
+HeavenClient draws the template's action for the stance (stand, walk,
+jump, prone, ladder, rope, sit, fly; stand when the template lacks it) in
+place of the body and equipment (`MorphTemplate`, `morph::action`). The
+item's morph moves at the template's speed and jump, clamped to 80-140 and
+80-123, with its `fs` and `swim`. It refuses attacks, skills, chairs,
+emotes and item effects with "Unavailable while transforming." for an item
+with `noCancelMouse`, and the longer line about right-clicking the icon
+otherwise. Right-clicking a `noCancelMouse` item's icon shows "You may not
+cancel the transformation." and sends nothing. Not done: Oak Barrel
+(1002) and the Transformation skills (1000, 1001, 1003 and their 11xx
+templates), Ghost (bit 49), the random morph items (2211000, 2212000), the
+cash morphs (5300000-5300002), the fly-map template gate, and the refusals for trades, mini-games and shops.
+
 ## Spending AP and SP
 
 The client locks its UI after SPEND_AP or SPEND_SP until the server answers,

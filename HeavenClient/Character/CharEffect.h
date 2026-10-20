@@ -33,6 +33,9 @@ namespace ms
 			MONSTER_CARD,
 			QUEST_CLEAR,
 			TELEPORT,
+			// Turning into a morph or back, on the ground or climbing (FUN_0093679a)
+			TRANSFORM,
+			TRANSFORM_ON_LADDER,
 			LENGTH
 		};
 

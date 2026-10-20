@@ -238,6 +238,13 @@ namespace ms
 		// callers, such as chairs, and only a tamed monster for items (`monster_only`, FUN_00a092fb).
 		bool ride_refuses(bool monster_only = false) const;
 
+		// Whether an item's morph keeps the player from something, saying so in chat (FUN_00a2a193): attacks,
+		// skills, chairs, emotes and item effects.
+		bool morph_refuses() const;
+
+		// Whether the morph item the player is morphed by may not be cancelled by its icon (noCancelMouse).
+		bool no_cancel_morph() const;
+
 		// Moving a mount or saddle (190xxxx or 191xxxx) while riding a tamed monster gets the player off
 		// instead (FUN_004f0e97). True if it did.
 		bool ride_keeps(int32_t itemid);

@@ -52,7 +52,10 @@ namespace ms
 					"Not available during the ride.",
 					"This skill requires a tamed monster and a saddle.",
 					"You cannot ride on this tamed monster.",
-					"It is not appropriate to use it here."
+					"It is not appropriate to use it here.",
+					"Unavailable while transforming.",
+					"Unavailable while transforming. Please right-click the icon at the top right corner to cancel the transformation.",
+					"You may not cancel the transformation."
 			};
 
 	bool Messages::is_cost(Type type)

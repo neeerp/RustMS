@@ -332,6 +332,13 @@ namespace ms
 		// The tamed monster reached a new level.
 		void show_mount_levelup();
 
+		// Look like a Morph.nx template, or as before with 0, in a puff of smoke unless coming into view
+		// `at_once` (FUN_00941d4b).
+		void transform(int32_t morph, bool at_once);
+
+		// The item's morph the character looks like, if any: one that moves by its template.
+		const MorphTemplate *get_item_morph() const;
+
 		// Play a mount skill's effect of getting on or off.
 		void show_ride_effect(int32_t skill);
 

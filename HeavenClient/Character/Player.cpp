@@ -19,6 +19,7 @@
 
 #include "Berserk.h"
 #include "CatchItemRules.h"
+#include "MorphRules.h"
 #include "MobDamage.h"
 #include "PlayerStates.h"
 #include "SecondaryStat.h"
@@ -426,6 +427,11 @@ namespace ms
 			{
 				grip = ride_ability->fs;
 				swim = ride_ability->swim;
+			}
+			else if (const MorphTemplate *morph = get_item_morph())
+			{
+				grip = morph->get_fs();
+				swim = morph->get_swim();
 			}
 			else if (auto shoes = inventory.get_equip(InventoryType::Id::EQUIPPED, EquipSlot::Id::SHOES))
 			{
@@ -1245,6 +1251,9 @@ namespace ms
 		if (buff.stat == Buffstat::Id::COMBO)
 			show_combo(buff.value - 1, false);
 
+		if (buff.stat == Buffstat::Id::MORPH)
+			transform(buff.value, false);
+
 		show_diseases();
 	}
 
@@ -1259,6 +1268,9 @@ namespace ms
 
 		if (stat == Buffstat::Id::COMBO)
 			show_combo(-1, false);
+
+		if (stat == Buffstat::Id::MORPH)
+			transform(0, false);
 
 		show_diseases();
 	}
@@ -1487,7 +1499,8 @@ namespace ms
 		if (look.get_alerted())
 			return;
 
-		if (!phobj.onground || is_sitting() || is_climbing() || attacking || is_dead() || ride_refuses())
+		if (!phobj.onground || is_sitting() || is_climbing() || attacking || is_dead() || ride_refuses() ||
+			morph_refuses())
 			return;
 
 		if (!field_limit::may_sit(Stage::get().get_mapinfo().get_fieldtype()))
@@ -1639,6 +1652,24 @@ namespace ms
 		return true;
 	}
 
+	bool Player::morph_refuses() const
+	{
+		if (!get_item_morph())
+			return false;
+
+		InChatMessage(no_cancel_morph() ? Messages::Type::MORPHED_FIXED : Messages::Type::MORPHED).drop();
+
+		return true;
+	}
+
+	bool Player::no_cancel_morph() const
+	{
+		int32_t item = -buffs[Buffstat::Id::MORPH].skillid;
+
+		return item > 0 && nl::nx::item["Consume"][string_format::extend_id(item / 10000, 4) + ".img"]
+			[string_format::extend_id(item, 8)]["info"]["noCancelMouse"].get_bool();
+	}
+
 	bool Player::ride_keeps(int32_t itemid)
 	{
 		int32_t type = itemid / 10000;
@@ -1691,11 +1722,14 @@ namespace ms
 
 	// CUserLocal clamps SPEED to 80-140 and JUMP to 80-123 before turning
 	// them into shoe multipliers (FUN_007a4dec). A rider moves as the mount
-	// does instead (FUN_0094d3d9).
+	// does instead, and an item's morph as its template (FUN_0094d3d9).
 	double Player::get_walkspeed() const
 	{
 		if (ride_ability)
 			return ride_ability->speed / 100.0;
+
+		if (const MorphTemplate *morph = get_item_morph())
+			return morph::speed(morph->get_speed()) / 100.0;
 
 		std::optional<int32_t> slow;
 
@@ -1711,6 +1745,9 @@ namespace ms
 	{
 		if (ride_ability)
 			return Physics::jump_speed(ride_ability->jump / 100.0);
+
+		if (const MorphTemplate *morph = get_item_morph())
+			return Physics::jump_speed(morph::jump(morph->get_jump()) / 100.0);
 
 		return Physics::jump_speed(std::clamp<int32_t>(stats.get_total(EquipStat::Id::JUMP), 80, 123) / 100.0);
 	}

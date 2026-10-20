@@ -252,7 +252,9 @@ namespace ms
 				break;
 		}
 
-		if (riding(interstance))
+		if (morphed(interstance))
+			MorphTemplate::get(morph).draw(morph_action(interstance), interframe, relargs + args);
+		else if (riding(interstance))
 			draw_mounted(relargs + args, interstance, interexpression, interframe, interexpframe);
 		else
 			draw(relargs + args, interstance, interexpression, interframe, interexpframe);
@@ -285,6 +287,16 @@ namespace ms
 		draw_parts(static_cast<int8_t>(std::size(mount::ZMAP) - 1), mount::BEHIND);
 		draw(riderargs, pose, interexp, rider_frame(pose, interframe), interexpframe);
 		draw_parts(mount::BEHIND - 1, 0);
+	}
+
+	bool CharLook::morphed(Stance::Id st) const
+	{
+		return morph > 0 && st != Stance::Id::DEAD;
+	}
+
+	std::string CharLook::morph_action(Stance::Id st) const
+	{
+		return MorphTemplate::get(morph).action(Stance::names[st]);
 	}
 
 	bool CharLook::riding(Stance::Id st) const
@@ -631,6 +643,9 @@ namespace ms
 
 	uint16_t CharLook::get_delay(Stance::Id st, uint8_t fr) const
 	{
+		if (morphed(st))
+			return MorphTemplate::get(morph).delay(morph_action(st), fr);
+
 		// A rider keeps the mount's time (0x453ad1).
 		if (riding(st))
 			return TamingMob::get(get_mount()).delay(mount_action(st), fr);
@@ -640,6 +655,13 @@ namespace ms
 
 	uint8_t CharLook::getnextframe(Stance::Id st, uint8_t fr) const
 	{
+		if (morphed(st))
+		{
+			uint8_t count = MorphTemplate::get(morph).count(morph_action(st));
+
+			return fr + 1 < count ? fr + 1 : 0;
+		}
+
 		if (riding(st))
 		{
 			uint8_t count = TamingMob::get(get_mount()).count(mount_action(st));
@@ -854,6 +876,21 @@ namespace ms
 	void CharLook::set_tired(bool t)
 	{
 		tired = t;
+	}
+
+	void CharLook::set_morph(int32_t m)
+	{
+		if (morph == m)
+			return;
+
+		morph = m;
+		stframe.set(0);
+		stelapsed = 0;
+	}
+
+	int32_t CharLook::get_morph() const
+	{
+		return morph;
 	}
 
 	void CharLook::init()

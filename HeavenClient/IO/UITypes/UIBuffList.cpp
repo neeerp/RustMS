@@ -19,7 +19,10 @@
 
 #include "../Data/ItemData.h"
 #include "../Data/SkillData.h"
+#include "../../Character/MorphRules.h"
+#include "../../Gameplay/Stage.h"
 #include "../../Net/Packets/AttackAndSkillPackets.h"
+#include "../Messages.h"
 #include "../UI.h"
 #include "../Util/NxFiles.h"
 
@@ -126,13 +129,18 @@ namespace ms
 	{
 		// FUN_0045b9fc. The icon goes when the server cancels the buff.
 		// Dragon Roar's can't be cancelled. An item buff (negative id) sends
-		// CANCEL_ITEM_EFFECT; v83 instead refuses a morph item's while
-		// morphed (notice 0x10fc), which this client doesn't track.
+		// CANCEL_ITEM_EFFECT, but a morph item's with noCancelMouse is
+		// refused while morphed (FUN_00a096af).
 		constexpr int32_t DRAGON_ROAR = 1311006;
 
 		if (auto entry = entry_at(cursorpos))
 		{
-			if (entry->id < 0)
+			const Player &player = Stage::get().get_player();
+
+			if (entry->id < 0 && !morph::may_cancel(entry->id, player.get_look().get_morph() > 0,
+				player.no_cancel_morph()))
+				InChatMessage(Messages::Type::MORPH_FIXED).drop();
+			else if (entry->id < 0)
 				CancelItemEffectPacket(entry->id).dispatch();
 			else if (entry->id != DRAGON_ROAR)
 				CancelBuffPacket(entry->id).dispatch();

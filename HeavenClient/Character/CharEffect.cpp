@@ -27,6 +27,8 @@ namespace ms
 					"Enchant/Failure",
 					"MonsterBook/cardGet",
 					"QuestClear",
-					"Teleport"
+					"Teleport",
+					"Transform",
+					"TransformOnLadder"
 			};
 }

@@ -492,6 +492,8 @@ pub enum AttackRejection {
     NoOrbs,
     /// An Energy skill without a full gauge.
     NotCharged,
+    /// Morphed by an item.
+    Morphed,
 }
 
 /// Whether this is Assassinate's second strike.
@@ -549,6 +551,14 @@ pub fn validate(attack: &Attack, player: &Player) -> Result<Uses, AttackRejectio
         || (attack.skill != 0 && buffs.has(BuffStat::Seal))
     {
         return Err(AttackRejection::Diseased);
+    }
+    // An item's morph can't attack (FUN_0094e256; Cosmic's
+    // `isMorphWithoutAttack`).
+    if buffs
+        .value(BuffStat::Morph)
+        .is_some_and(|morph| morph < 100)
+    {
+        return Err(AttackRejection::Morphed);
     }
     // v83 won't use a finisher without an orb (0x969623).
     if combo::finisher(attack.skill) && combo::orbs(player).unwrap_or(0) < 1 {
@@ -1450,6 +1460,22 @@ mod tests {
             validate(&seven(&[1, 1, 1]), &player).unwrap_err(),
             AttackRejection::TooManyTargets
         );
+    }
+
+    #[test]
+    fn an_item_morph_cannot_attack() {
+        let now = std::time::Instant::now();
+        let long = std::time::Duration::from_secs(60);
+        let swing = parse_close_attack(&attack_packet(1, 1)).unwrap();
+        let mut player = beginner_with_sword();
+        player
+            .buffs
+            .give(game::Buff::new(-2210000, BuffStat::Morph, 1, now, long));
+        assert_eq!(validate(&swing, &player), Err(AttackRejection::Morphed));
+        player
+            .buffs
+            .give(game::Buff::new(5111005, BuffStat::Morph, 1000, now, long));
+        assert!(validate(&swing, &player).is_ok());
     }
 
     #[test]

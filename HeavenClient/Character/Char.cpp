@@ -626,6 +626,29 @@ namespace ms
 		effects.add(src, DrawArgument(facing_right), src["z"]);
 	}
 
+	void Char::transform(int32_t morph, bool at_once)
+	{
+		if (look.get_morph() == morph)
+			return;
+
+		look.set_morph(morph);
+
+		if (!at_once)
+			show_effect_id(is_climbing() ? CharEffect::Id::TRANSFORM_ON_LADDER : CharEffect::Id::TRANSFORM);
+	}
+
+	const MorphTemplate *Char::get_item_morph() const
+	{
+		int32_t morph = look.get_morph();
+
+		if (morph <= 0)
+			return nullptr;
+
+		const MorphTemplate &shape = MorphTemplate::get(morph);
+
+		return shape.is_item() ? &shape : nullptr;
+	}
+
 	void Char::show_skill_book(bool success)
 	{
 		effects.add(skill_book[success][0], DrawArgument(), 3);
