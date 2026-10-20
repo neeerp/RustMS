@@ -62,6 +62,7 @@ int main()
 		require(BuffParser::stats(hyperbody) == std::vector<Buffstat::Id>({ Buffstat::HYPERBODYHP, Buffstat::HYPERBODYMP }),
 				"each set bit names its stat");
 		require(Buffstat::by_bit(48) == Buffstat::NONE, "stats HeavenClient doesn't keep are NONE");
+		require(Buffstat::by_bit(74) == Buffstat::EXP_BUFF, "Hunter's Luck keeps its icon");
 
 		// SPAWN_PLAYER: Speed and Dark Sight, then all seven two-state stats.
 		BuffParser::Flags spawn{ 0, 0 };

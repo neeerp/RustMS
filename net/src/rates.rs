@@ -1,11 +1,13 @@
-//! The world's EXP, drop and meso rates, and the 2x EXP (521xxxx) and drop
-//! (536xxxx) cards that raise them for whoever holds one.
+//! The world's EXP, drop and meso rates, the 2x EXP (521xxxx) and drop
+//! (536xxxx) cards that raise them for whoever holds one, and Hunter's Luck
+//! (2450000), which raises kill EXP while its buff lasts.
 //!
 //! v83's client never reads a card's `rate` or `time`, and no packet starts
 //! or ends one: the server multiplies kill EXP and drops while a card in the
 //! Cash inventory is unexpired and the clock is inside one of its windows.
+//! Nor does it read Hunter's Luck's `expBuff`; it only shows the buff's icon.
 
-use game::{InventoryType, Player};
+use game::{BuffStat, InventoryType, Player};
 use std::sync::OnceLock;
 use std::time::{Duration, SystemTime};
 
@@ -40,7 +42,11 @@ fn world() -> &'static World {
 
 /// How much more EXP `player` earns from a kill at `now`.
 pub fn exp(player: &Player, now: SystemTime) -> f64 {
-    world().exp * card(player, EXP_CARDS, now)
+    let buff = player
+        .buffs
+        .value(BuffStat::ExpBuff)
+        .map_or(1.0, |percent| f64::from(percent) / 100.0);
+    world().exp * card(player, EXP_CARDS, now) * buff
 }
 
 /// How much likelier each of `player`'s drops is at `now`.
@@ -138,5 +144,25 @@ mod tests {
         assert_eq!(card(&player, EXP_CARDS, saturday_evening), 3.0);
         player.inventory.add_alone(Item::stack(5360000, 1)).unwrap();
         assert_eq!(card(&player, DROP_CARDS, saturday_morning), 2.0);
+    }
+
+    #[test]
+    fn hunters_luck_multiplies_with_the_cards() {
+        let now = at(1_792_269_000);
+        let mut player = crate::codec::stats::sample_player();
+        let lasts = Duration::from_secs(1800);
+        let buff = game::Buff::new(
+            -2450000,
+            BuffStat::ExpBuff,
+            200,
+            std::time::Instant::now(),
+            lasts,
+        );
+        player.buffs.give(buff);
+        assert_eq!(exp(&player, now), 2.0 * world().exp);
+        if crate::items::info(5211060).is_some() {
+            player.inventory.add_alone(Item::stack(5211060, 1)).unwrap();
+            assert_eq!(exp(&player, now), 6.0 * world().exp);
+        }
     }
 }

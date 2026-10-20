@@ -79,6 +79,9 @@ pub enum BuffStat {
     Puppet = 46,
     /// The arrow keys are swapped (the client's ReverseInput).
     Confuse = 51,
+    /// Kills give `value` percent of their EXP: Hunter's Luck (2450000).
+    /// The client only shows its icon.
+    ExpBuff = 74,
     /// No potions or other use items.
     StopPotion = 75,
     /// Standing still for two seconds costs `value` HP, never the last

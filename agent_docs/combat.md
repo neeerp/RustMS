@@ -435,6 +435,11 @@ unexpired and the clock is inside one of its `info/time` windows: a
   and descriptions say: 5211060 2 h, 5211048 and 5360042 4 h, 5211049
   90 min.
 
+Hunter's Luck (2450000) multiplies kill EXP by its `spec/expBuff` percent
+(200) for its `spec/time` (30 minutes), on top of the rates and cards. It is
+an item buff on TemporaryStat bit 74 (`BuffStat::ExpBuff`), which only the
+player sees: the client shows the item's icon and reads nothing else.
+
 v83's client never reads a card's rate or hours, and has no packet or line
 for one. The extra EXP is folded into the base number of the "You have
 gained experience" message; the "Bonus Event EXP" field would mislabel it.
@@ -1329,7 +1334,7 @@ persistence, and that the tutorial sentinel's quest drop needs its quest;
 and that both survive logging out; `monster_book` fills a card's page from
 six snails, checks the effect another player sees and the cover, and that
 both survive logging out; `rate_cards` has a 3x EXP card triple a snail's
-EXP; `beginner_skills` has three players learn
+EXP and Hunter's Luck double it; `beginner_skills` has three players learn
 Three Snails, Nimble Feet, and Recovery and checks their damage caps, MP,
 buffs, cooldowns, Recovery's heal, what the others see, and that the buffs
 end on time and on death. `hp_costs` has a Dragon Knight spend HP on Slash

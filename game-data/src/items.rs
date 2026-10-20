@@ -184,7 +184,7 @@ impl ConsumeSpec {
 }
 
 /// The `spec` keys of the stats a consumable raises.
-const SPEC_STATS: [(&str, BuffStat); 9] = [
+const SPEC_STATS: [(&str, BuffStat); 10] = [
     ("pad", BuffStat::Pad),
     ("pdd", BuffStat::Pdd),
     ("mad", BuffStat::Mad),
@@ -194,6 +194,7 @@ const SPEC_STATS: [(&str, BuffStat); 9] = [
     ("speed", BuffStat::Speed),
     ("jump", BuffStat::Jump),
     ("thaw", BuffStat::Thaw),
+    ("expBuff", BuffStat::ExpBuff),
 ];
 
 /// The `spec` keys of the diseases a consumable cures.
