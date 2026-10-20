@@ -8,7 +8,7 @@ use crate::items;
 use crate::packet::build::world::buff;
 use crate::packet::build::world::inventory::build_inventory_operation;
 use crate::packet::build::world::stat::build_stat_update;
-use game::{BuffStat, InventoryChange, InventoryType, Player};
+use game::{mount, BuffStat, InventoryChange, InventoryType, Player};
 use packet::{io::read::PktRead, Packet};
 use std::io::Cursor;
 
@@ -16,13 +16,40 @@ use std::io::Cursor;
 /// CANCEL_BUFF with riding's bit after asking to get on or off (v83
 /// FUN_0095f065), so it gets one either way.
 pub fn dismount(player: &mut Player, result: HandlerResult<WorldAction>) -> WorldResult {
-    let result = result.with_reply(buff::build_cancel_buff(&[BuffStat::Riding])?);
     let Some(skill_id) = player.ride_skill() else {
-        return Ok(result);
+        return Ok(result.with_reply(buff::build_cancel_buff(&[BuffStat::Riding])?));
     };
-    player.buffs.cancel(skill_id);
+    // The Battleship's defense goes with it.
+    let ended = player.buffs.cancel(skill_id);
+    let result = result.with_reply(buff::build_cancel_buff(&ended)?);
     let foreign = buff::build_cancel_foreign_buff(player.id(), &[BuffStat::Riding])?;
     Ok(result.with(WorldAction::BuffsChanged(foreign)))
+}
+
+/// The player riding the Battleship took `damage` HP, which the ship takes
+/// too (Cosmic's TakeDamageHandler). The client shows what is left on the
+/// ship's buff icon. At 0 the ship is destroyed: the player is put off it
+/// and can't board again for the skill's cooldown.
+pub fn hit_battleship(
+    player: &mut Player,
+    damage: i32,
+    result: HandlerResult<WorldAction>,
+) -> WorldResult {
+    let hp = player.buffs.battleship_hp.unwrap_or(0) - damage;
+    if hp > 0 {
+        player.buffs.battleship_hp = Some(hp);
+        let left = buff::build_cooldown(mount::BATTLESHIP_HP, hp as u16 as i16)?;
+        return Ok(result.with_reply(left));
+    }
+    player.buffs.battleship_hp = None;
+    let seconds = crate::skills::learned(player, mount::BATTLESHIP)
+        .map_or(0, |skill| skill.effect.cooldown)
+        .clamp(0, i32::from(i16::MAX));
+    let now = std::time::Instant::now();
+    let length = std::time::Duration::from_secs(seconds as u64);
+    player.buffs.start_cooldown(mount::BATTLESHIP, now, length);
+    let cooling = buff::build_cooldown(mount::BATTLESHIP, seconds as i16)?;
+    dismount(player, result.with_reply(cooling))
 }
 
 /// USE_MOUNT_FOOD (0x4D, FUN_00a09a64): the tick, the USE slot and the
