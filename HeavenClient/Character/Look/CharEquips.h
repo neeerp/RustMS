@@ -77,8 +77,12 @@ namespace ms
 		// Return the item id of the equipped weapon.
 		int32_t get_weapon() const;
 
+		// A rider shows neither weapon nor shield (FUN_00407757).
+		void set_riding(bool riding);
+
 	private:
 		EnumMap<EquipSlot::Id, const Clothing *> clothes;
+		bool riding = false;
 
 		static std::unordered_map<int32_t, Clothing> cloth_cache;
 	};

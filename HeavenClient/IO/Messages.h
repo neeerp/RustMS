@@ -57,6 +57,9 @@ namespace ms
 			ITEM_LEVEL_HIGH,
 			// A Writ of Solomon while gacha EXP is left
 			SOLOMON_EXP_LEFT,
+			// Not while riding a tamed monster, or another mount (FUN_0095f9d9)
+			RIDING_MONSTER,
+			RIDING_VEHICLE,
 			LENGTH
 		};
 

@@ -296,6 +296,28 @@ namespace ms
 		// Return if the char is in the Char::LADDER or Char::ROPE state.
 		bool is_climbing() const;
 
+		// Get on a mount (190xxxx or 193xxxx), or off with 0. The look follows a moment later, while the Monster
+		// Rider effect plays (FUN_00936859); a rider coming into view rides `at_once`.
+		void ride(int32_t vehicle, bool at_once);
+
+		// The mount ridden, 0 for none.
+		int32_t get_vehicle() const;
+
+		// Whether the look is still to get on or off (+0x1f4c).
+		bool is_switching_vehicle() const;
+
+		// How riding moves, or nothing when not riding a mount with a template.
+		const std::optional<TamingMob::Ability> &get_ride_ability() const;
+
+		// The tamed monster's level, EXP and fatigue (SET_TAMING_MOB_INFO). A tired one stands tired.
+		void set_mount_info(int32_t level, int32_t exp, int32_t fatigue);
+
+		// The tamed monster reached a new level.
+		void show_mount_levelup();
+
+		// Play a mount skill's effect of getting on or off.
+		void show_ride_effect(int32_t skill);
+
 		// Return whether the character sprite uses stances for two-handed weapons.
 		bool is_twohanded() const;
 
@@ -341,6 +363,12 @@ namespace ms
 		float stance_carry = 0.0f;
 		bool facing_right;
 		int32_t chair = 0;
+		int32_t vehicle = 0;
+		int16_t vehicle_switch = 0;
+		std::optional<TamingMob::Ability> ride_ability;
+		int32_t mount_level = 0;
+		int32_t mount_exp = 0;
+		int32_t mount_fatigue = 0;
 
 	private:
 		Text namelabel;

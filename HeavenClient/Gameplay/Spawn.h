@@ -138,7 +138,8 @@ namespace ms
 				  std::vector<std::pair<Buffstat::Id, int32_t>> buffs, const std::string &guild,
 				  const GuildEmblem &emblem, std::optional<MiniRoomBox> room = std::nullopt,
 				  std::vector<PetEntry> pets = {}, std::optional<std::string> chalkboard = std::nullopt,
-				  int32_t item_effect = 0);
+				  int32_t item_effect = 0, int32_t mount_level = 0, int32_t mount_exp = 0,
+				  int32_t mount_fatigue = 0);
 
 		int32_t get_cid() const;
 
@@ -160,5 +161,8 @@ namespace ms
 		std::vector<PetEntry> pets;
 		std::optional<std::string> chalkboard;
 		int32_t item_effect;
+		int32_t mount_level;
+		int32_t mount_exp;
+		int32_t mount_fatigue;
 	};
 }

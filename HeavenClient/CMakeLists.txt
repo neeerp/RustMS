@@ -230,6 +230,8 @@ if(HEAVENCLIENT_BUILD_TESTS)
     add_test(NAME sp_reset_rules COMMAND sp_reset_rules_tests)
     add_executable(item_expiry_tests tests/item_expiry.cpp)
     add_test(NAME item_expiry COMMAND item_expiry_tests)
+    add_executable(mount_rules_tests tests/mount_rules.cpp)
+    add_test(NAME mount_rules COMMAND mount_rules_tests)
     add_executable(obj_flow_tests tests/obj_flow.cpp)
     add_test(NAME obj_flow COMMAND obj_flow_tests)
     add_executable(item_properties_tests tests/item_properties.cpp)
@@ -356,6 +358,8 @@ add_executable(HeavenClient
     Character/Look/PetLook.h
     Character/Look/Stance.cpp
     Character/Look/Stance.h
+    Character/Look/TamingMob.cpp
+    Character/Look/TamingMob.h
     Character/ActiveBuffs.cpp
     Character/ActiveBuffs.h
     Character/BuddyList.cpp
@@ -392,6 +396,7 @@ add_executable(HeavenClient
     Character/MapleStat.h
     Character/MonsterBook.cpp
     Character/MonsterBook.h
+    Character/MountRules.h
     Character/Party.cpp
     Character/Party.h
     Character/Pets.h

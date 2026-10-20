@@ -39,6 +39,7 @@
 #include "../IO/UITypes/UISkillBook.h"
 #include "../IO/UITypes/UIStatsInfo.h"
 #include "../IO/UITypes/UIStatusBar.h"
+#include "../Net/Packets/AttackAndSkillPackets.h"
 #include "../Net/Packets/GameplayPackets.h"
 #include "../Net/Packets/PlayerPackets.h"
 #include "../Net/Packets/InventoryPackets.h"
@@ -339,6 +340,10 @@ namespace ms
 				pst->send_action(*this, KeyAction::Id::JUMP, true);
 
 			phobj.walkspeed = get_walkspeed();
+
+			// A mount grips the ground by its fs (FUN_0094d3d9).
+			phobj.walkforce = ride_ability ? ride_ability->fs : 1.0;
+			phobj.walkdrag = phobj.walkforce;
 			pst->update(*this);
 
 			// v83 marks every knockback in the path as element 2 when it
@@ -1319,13 +1324,49 @@ namespace ms
 
 	int32_t Player::get_walk_animation_speed() const
 	{
+		if (ride_ability)
+			return ride_ability->speed;
+
 		return stats.get_total(EquipStat::Id::SPEED);
 	}
 
+	void Player::ask_ride(int32_t off)
+	{
+		if (off > 0)
+			CancelBuffPacket(off).dispatch();
+
+		ride_pending.asked(now_ms());
+	}
+
+	bool Player::is_ride_locked() const
+	{
+		return ride_pending.waiting(now_ms()) || is_switching_vehicle();
+	}
+
+	void Player::change_ride(int32_t v)
+	{
+		ride_pending.answered();
+
+		// The effect is the mount's got on, or the one got off.
+		int32_t shown = v > 0 ? v : vehicle;
+
+		if (shown <= 0)
+			return;
+
+		if (mount::is_tamed_monster(shown))
+			show_ride_effect(mount::rider_skill(stats.get_stat(MapleStat::Id::JOB)));
+
+		ride(v, false);
+	}
+
 	// CUserLocal clamps SPEED to 80-140 and JUMP to 80-123 before turning
-	// them into shoe multipliers (FUN_007a4dec).
+	// them into shoe multipliers (FUN_007a4dec). A rider moves as the mount
+	// does instead (FUN_0094d3d9).
 	double Player::get_walkspeed() const
 	{
+		if (ride_ability)
+			return ride_ability->speed / 100.0;
+
 		std::optional<int32_t> slow;
 
 		if (has_buff(Buffstat::Id::SLOW))
@@ -1338,6 +1379,9 @@ namespace ms
 
 	double Player::get_jumpforce() const
 	{
+		if (ride_ability)
+			return Physics::jump_speed(ride_ability->jump / 100.0);
+
 		return Physics::jump_speed(std::clamp<int32_t>(stats.get_total(EquipStat::Id::JUMP), 80, 123) / 100.0);
 	}
 

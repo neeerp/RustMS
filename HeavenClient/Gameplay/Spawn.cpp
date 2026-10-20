@@ -120,9 +120,11 @@ namespace ms
 	CharSpawn::CharSpawn(int32_t c, const LookEntry &lk, uint8_t l, int16_t j, const std::string &nm, int8_t st,
 						 Point<int16_t> p, int32_t ch, std::vector<std::pair<Buffstat::Id, int32_t>> bf,
 						 const std::string &gd, const GuildEmblem &em, std::optional<MiniRoomBox> rm,
-						 std::vector<PetEntry> pt, std::optional<std::string> cb, int32_t ie) : cid(c), look(lk), level(l),
+						 std::vector<PetEntry> pt, std::optional<std::string> cb, int32_t ie, int32_t ml, int32_t me,
+						 int32_t mf) : cid(c), look(lk), level(l),
 						 job(j), name(nm), stance(st), position(p), chair(ch), buffs(std::move(bf)), guild(gd), emblem(em),
-						 room(std::move(rm)), pets(std::move(pt)), chalkboard(std::move(cb)), item_effect(ie)
+						 room(std::move(rm)), pets(std::move(pt)), chalkboard(std::move(cb)), item_effect(ie),
+						 mount_level(ml), mount_exp(me), mount_fatigue(mf)
 	{}
 
 	int32_t CharSpawn::get_cid() const
@@ -134,6 +136,7 @@ namespace ms
 	{
 		auto otherchar = std::make_unique<OtherChar>(cid, look, level, job, name, stance, position);
 		otherchar->set_chair(chair);
+		otherchar->set_mount_info(mount_level, mount_exp, mount_fatigue);
 		otherchar->show_buffs(buffs, true);
 		otherchar->set_guild_name(guild);
 		otherchar->set_guild_emblem(emblem);

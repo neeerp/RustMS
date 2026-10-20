@@ -67,9 +67,9 @@ namespace ms
 
 		std::vector<PetEntry> pets = PetParser::parse_pets(recv);
 
-		recv.read_int(); // mountlevel
-		recv.read_int(); // mountexp
-		recv.read_int(); // mounttiredness
+		int32_t mount_level = recv.read_int();
+		int32_t mount_exp = recv.read_int();
+		int32_t mount_fatigue = recv.read_int();
 
 		std::optional<MiniRoomBox> room = mini_room::read_box(recv);
 
@@ -83,7 +83,7 @@ namespace ms
 
 		Stage::get().get_chars().spawn(
 			{ cid, look, level, job, name, stance, position, chair, std::move(buffs), guild, emblem, room, std::move(pets),
-			  chalkboard, item_effect }
+			  chalkboard, item_effect, mount_level, mount_exp, mount_fatigue }
 		);
 	}
 

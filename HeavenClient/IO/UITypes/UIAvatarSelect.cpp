@@ -188,8 +188,9 @@ namespace ms
 			for (auto slot : EquipSlot::values)
 				look.remove_equip(slot);
 
-		// Standing still, facing left.
+		// Standing still, facing left, off any mount.
 		look.reset();
+		look.set_vehicle(0);
 		look.set_direction(false);
 		look.set_alerted(0);
 

@@ -104,6 +104,26 @@ int main()
 				"Undead, Stop Potion, Stop Motion and Fear");
 		require(curse.read_short() == 0 && !curse.available(), "and the delay follows");
 
+		// GIVE_FOREIGN_BUFF: another character gets on a mount.
+		BuffParser::Flags riding{ 0, 0 };
+		riding.set(BuffParser::RIDING);
+		Writer e;
+		e.flags(riding).zeros(2).put<int32_t>(1902000).put<int32_t>(1004).zeros(5).put<int16_t>(0);
+		InPacket ride(e.bytes.data(), e.bytes.size());
+		shown = BuffParser::parse_shown(ride, BuffParser::read_flags(ride));
+		require(shown.size() == 1 && shown[0].first == Buffstat::MONSTER_RIDING && shown[0].second == 1902000,
+				"a character shows the mount it rides");
+		require(ride.read_short() == 0 && !ride.available(), "riding's data takes 13 bytes");
+
+		// GIVE_BUFF: riding's data comes after the two-state stats before it.
+		riding.set(83);
+		Writer g;
+		g.zeros(15).put<int32_t>(1932000).put<int32_t>(5221006).zeros(5).put<int16_t>(0);
+		InPacket own(g.bytes.data(), g.bytes.size());
+		BuffParser::Ride got = BuffParser::read_two_state(own, riding);
+		require(got.vehicle == 1932000 && got.skill == 5221006, "the mount and the skill riding it");
+		require(own.read_short() == 0 && !own.available(), "and the delay follows");
+
 		std::cout << "Buff parser passed\n";
 		return 0;
 	}

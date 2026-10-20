@@ -142,6 +142,14 @@ namespace ms
 			size_t weaponindex = index - WEAPON_OFFSET;
 			type = types[weaponindex];
 			eqslot = EquipSlot::Id::WEAPON;
+		} else if (index == 90)
+		{
+			type = "TAMED MONSTER";
+			eqslot = EquipSlot::Id::TAMEDMOB;
+		} else if (index == 91)
+		{
+			type = "SADDLE";
+			eqslot = EquipSlot::Id::SADDLE;
 		} else
 		{
 			type = "CASH";

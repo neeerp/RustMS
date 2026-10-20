@@ -102,8 +102,14 @@ namespace ms
 				break;
 		}
 
+		// A mount and its saddle are drawn by TamingMob, under the rider.
+		bool mount = eqslot == EquipSlot::Id::TAMEDMOB || eqslot == EquipSlot::Id::SADDLE;
+
 		for (auto iter : Stance::names)
 		{
+			if (mount)
+				break;
+
 			Stance::Id stance = iter.first;
 			const std::string &stancename = iter.second;
 

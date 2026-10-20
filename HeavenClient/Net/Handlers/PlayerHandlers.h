@@ -19,6 +19,8 @@
 
 #include "../PacketHandler.h"
 
+#include "Helpers/BuffParser.h"
+
 #include "../../Character/Buff.h"
 #include "../../Character/MapleStat.h"
 
@@ -52,6 +54,9 @@ namespace ms
 
 	protected:
 		virtual void handle_buff(InPacket& recv, Buffstat::Id stat) const = 0;
+
+		// Riding's bit, after the other stats (report 201).
+		virtual void handle_ride(InPacket& recv, const BuffParser::Flags& flags) const = 0;
 	};
 
 	// Notifies the client that a buff was applied to the player
@@ -60,6 +65,7 @@ namespace ms
 	{
 	protected:
 		void handle_buff(InPacket& recv, Buffstat::Id stat) const override;
+		void handle_ride(InPacket& recv, const BuffParser::Flags& flags) const override;
 	};
 
 	// Notifies the client that a buff was canceled
@@ -68,6 +74,7 @@ namespace ms
 	{
 	protected:
 		void handle_buff(InPacket& recv, Buffstat::Id stat) const override;
+		void handle_ride(InPacket& recv, const BuffParser::Flags& flags) const override;
 	};
 
 	// Force a stat recalculation
@@ -75,6 +82,13 @@ namespace ms
 	class RecalculateStatsHandler : public PacketHandler
 	{
 		void handle(InPacket&) const override;
+	};
+
+	// A character's mount's level, EXP and tiredness, and whether it just reached the level
+	// Opcode: SET_TAMING_MOB_INFO(48)
+	class SetTamingMobInfoHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
 	};
 
 	// Updates the player's skills with the client

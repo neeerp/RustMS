@@ -36,6 +36,7 @@
 #include "../TrembleRules.h"
 
 #include "../../Constants.h"
+#include "../../Character/MountRules.h"
 #include "../../Character/SkillId.h"
 #include "../../Character/Look/AttackStances.h"
 #include "../../Data/BulletData.h"
@@ -210,6 +211,9 @@ namespace ms
 
 	void Combat::use_move(int32_t move_id)
 	{
+		if (!ride_allows(move_id))
+			return;
+
 		if (prepare::held(move_id) || prepare::timed(move_id))
 		{
 			// A skill that keeps firing whacks a mob right in front of the
@@ -385,6 +389,30 @@ namespace ms
 		return true;
 	}
 
+	bool Combat::ride_allows(int32_t move_id)
+	{
+		if (move_id != 0 && player.is_ride_locked())
+			return false;
+
+		int32_t vehicle = player.get_vehicle();
+		bool monster = mount::is_tamed_monster(vehicle);
+
+		if (!monster && !mount::is_vehicle(vehicle))
+			return true;
+
+		if (mount::is_rider_skill(move_id))
+		{
+			if (monster)
+				player.ask_ride(move_id);
+
+			return false;
+		}
+
+		InChatMessage(monster ? Messages::Type::RIDING_MONSTER : Messages::Type::RIDING_VEHICLE).drop();
+
+		return false;
+	}
+
 	bool Combat::request_skill(const SpecialMove &move)
 	{
 		// v83 uses a skill that doesn't attack only when it may ask the
@@ -401,6 +429,10 @@ namespace ms
 		if (moveid == door_rules::MYSTIC_DOOR)
 			return request_door(move, level);
 
+		// Nothing is ridden from a ladder or rope (FUN_00969e21).
+		if (mount::is_rider_skill(moveid) && player.is_climbing())
+			return false;
+
 		std::optional<UseSkillPacket::Reach> reach = find_reach(moveid, level);
 
 		if (!reach)
@@ -416,7 +448,10 @@ namespace ms
 			return true;
 
 		uint16_t lock = action.empty() ? 0 : player.get_action_lock(action);
-		player.request(UseSkillPacket(moveid, level, lock, *reach), ExclRequest::SKILL_WAIT);
+
+		if (player.request(UseSkillPacket(moveid, level, lock, *reach), ExclRequest::SKILL_WAIT) &&
+			mount::is_rider_skill(moveid))
+			player.ask_ride();
 
 		return true;
 	}

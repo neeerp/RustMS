@@ -67,6 +67,7 @@ namespace ms
 		GIVE_BUFF = 32,
 		CANCEL_BUFF = 33,
 		RECALCULATE_STATS = 35,
+		SET_TAMING_MOB_INFO = 48,
 		UPDATE_SKILL = 36,
 		SKILL_USE_RESULT = 37,
 		FAME_RESPONSE = 38,
@@ -319,6 +320,7 @@ namespace ms
 		emplace<GIVE_BUFF, ApplyBuffHandler>();
 		emplace<CANCEL_BUFF, CancelBuffHandler>();
 		emplace<RECALCULATE_STATS, RecalculateStatsHandler>();
+		emplace<SET_TAMING_MOB_INFO, SetTamingMobInfoHandler>();
 		emplace<UPDATE_SKILL, UpdateSkillHandler>();
 		emplace<SKILL_USE_RESULT, SkillUseResultHandler>();
 		emplace<SKILL_LEARN_ITEM_RESULT, SkillLearnItemResultHandler>();

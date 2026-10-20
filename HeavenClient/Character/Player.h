@@ -25,6 +25,7 @@
 #include "Guild.h"
 #include "ExclRequest.h"
 #include "MonsterBook.h"
+#include "MountRules.h"
 #include "Party.h"
 #include "PassiveBuffs.h"
 #include "QuestLog.h"
@@ -183,8 +184,19 @@ namespace ms
 		// Return the character's attacking speed.
 		int8_t get_integer_attackspeed() const override;
 
-		// Return the total ES_SPEED stat.
+		// Return the total ES_SPEED stat, or the mount's while riding.
 		int32_t get_walk_animation_speed() const override;
+
+		// The player asked to get on a mount, or off with a skill (`off`); no skill goes until the server
+		// answers (FUN_00969e21, FUN_0096d873).
+		void ask_ride(int32_t off = 0);
+
+		// Whether skills wait on getting on or off: the server is yet to answer, or the look to change
+		// (FUN_00966f7a).
+		bool is_ride_locked() const;
+
+		// The server answered getting on `vehicle`, or off with 0 (FUN_0095f065, FUN_00936859).
+		void change_ride(int32_t vehicle);
 
 		// Returns the shoe's walking speed multiplier, from the total ES_SPEED stat.
 		double get_walkspeed() const;
@@ -359,6 +371,7 @@ namespace ms
 		std::unordered_map<int32_t, int32_t> cooldowns;
 
 		ExclRequest excl;
+		mutable mount::Pending ride_pending;
 
 		std::map<KeyAction::Id, bool> keysdown;
 		// When the player last moved under Stop Motion, or entered the map
