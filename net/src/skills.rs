@@ -273,15 +273,19 @@ pub const FLASH_JUMPS: [i32; 2] = [4111006, 14101004];
 /// and the handler gives their speed and jump as two-state stats.
 pub const DASHES: [i32; 2] = [5001005, 15001003];
 
+/// Wings (v83 FUN_00930b27): the client jumps and glides down, and asks
+/// only for the MP.
+pub const WINGS: i32 = 5201005;
+
 /// Skills that neither buff nor debuff: the handler does their work.
 /// Chakra heals the user, MP Recovery turns HP into MP, Resurrection raises
 /// dead party members, Time Leap ends cooldowns, and Mystic Door opens a
-/// door. Teleport and Flash Jump have no work, and Dash gives its own
-/// buffs.
+/// door. Teleport, Flash Jump and Wings have no work, and Dash gives its
+/// own buffs.
 pub fn acts_alone(skill_id: i32) -> bool {
     matches!(
         skill_id,
-        MYSTIC_DOOR | CHAKRA | MP_RECOVERY | RESURRECTION | TIME_LEAP
+        MYSTIC_DOOR | CHAKRA | MP_RECOVERY | RESURRECTION | TIME_LEAP | WINGS
     ) || TELEPORTS.contains(&skill_id)
         || FLASH_JUMPS.contains(&skill_id)
         || DASHES.contains(&skill_id)

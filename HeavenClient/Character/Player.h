@@ -77,6 +77,11 @@ namespace ms
 		bool may_flash_jump() const;
 		void flash_jump(int32_t level);
 
+		// Whether Wings may go now, and its jump, gliding down at the level's `x` for up to `seconds`
+		// (FUN_00957a1f).
+		bool may_wings() const;
+		void wings(int32_t x, int32_t seconds);
+
 		// Sends a Keyaction to the player's state, to apply forces, change the state and other behaviour.
 		void send_action(KeyAction::Id action, bool pressed);
 
@@ -408,6 +413,8 @@ namespace ms
 		// Whether the player has Flash Jumped since last on the ground or a
 		// rope (+0x2b58).
 		bool flash_jumped = false;
+		// How long Wings may still glide, in milliseconds (+0x3130).
+		int32_t wings_left = 0;
 
 		move_path::Recorder path;
 

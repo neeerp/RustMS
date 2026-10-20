@@ -240,6 +240,9 @@ namespace ms
 		bool impact = false;
 		double impactx = 0.0;
 		double impacty = 0.0;
+		// While Wings is on, how fast a shoe falls in the air, in pixels per
+		// second, in place of gravity; 0 when off.
+		double wingsfall = 0.0;
 
 		// A shoe with a flyspeed flies through platforms, steered by walkdir
 		// and by flydir: -1 to glide down slowly, 0 to dive, 1 to drop.

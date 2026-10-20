@@ -38,6 +38,7 @@
 #include "Look/CharLook.h"
 #include "Look/PetLook.h"
 
+#include "../Audio/Audio.h"
 #include "../Template/Optional.h"
 
 #include "../Graphics/EffectLayer.h"
@@ -193,6 +194,10 @@ namespace ms
 		// Dash's dust, the skill's `special` looping at the feet while the character dashes on a foothold and
 		// hidden in the air (FUN_00930b27); a skill of 0 takes it away.
 		void show_dash(int32_t skill);
+
+		// Wings' glide: its `special` looping at the feet with its `Loop` sound while the character glides, and its
+		// `finish` once on landing from one (FUN_00930b27).
+		void glide(bool gliding, bool landed);
 
 		// Play an animation anchored to the character (e.g. a tutorial image).
 		void show_effect(const Animation &effect);
@@ -397,6 +402,9 @@ namespace ms
 		int16_t energy_wait = -1;
 		Animation dash_dust;
 		bool dashing = false;
+		Animation wings_glow;
+		Sound wings_sound;
+		bool gliding = false;
 		Afterimage afterimage;
 		// A chair's effect and effect2 (v83 0x93c7c3), each on the face when
 		// its pos is 1 and on the feet otherwise; a negative z draws it

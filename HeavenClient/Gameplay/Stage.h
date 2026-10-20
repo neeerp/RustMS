@@ -292,6 +292,8 @@ namespace ms
 
 		void use_flash_jump(int32_t skill);
 
+		void use_wings(int32_t skill);
+
 		void check_seats();
 
 		void catch_ladders(Point<int16_t> before);

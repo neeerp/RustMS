@@ -173,6 +173,20 @@ void player()
 	path.receive({ walk });
 	path.step(8);
 	require(!path.playing() && path.get_state().x == -50, "one too far behind jumps to its end");
+
+	// The type playing is the head's, then the last played.
+	ms::Movement glide = at(-50, 100, 0, 55, 0);
+	glide.command = 17;
+	glide.duration = 500;
+	ms::Movement land = at(-50, 120, 0, 0, 7);
+	land.duration = 100;
+	path.receive({ glide, land });
+	path.step(100);
+	require(path.command() == 17, "a gliding element plays as one");
+	path.step(500);
+	require(path.command() == 0 && path.get_state().fh == 7, "the landing plays after it");
+	path.step(100);
+	require(!path.playing() && path.command() == 0, "the last element played stays the type");
 }
 
 struct Writer

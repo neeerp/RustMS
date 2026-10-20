@@ -460,6 +460,31 @@ void standing_jump(const ms::Physics& physics)
 	require(player.crnt_y() == 100 && player.vspeed == 0.0, "landing must become grounded on the collision tick");
 }
 
+// Wings keeps a jump's rise, then falls at its speed outright: 55.5 px/s
+// at level 10 (0x9b2ce8).
+void wings_glide(const ms::Physics& physics)
+{
+	ms::PhysicsObject player = grounded_shoe(physics);
+	ms::Physics::jump(player, ms::Physics::jump_speed(1.0), 0);
+	player.wingsfall = 55.5;
+	double peak = player.crnt_y();
+	int ticks = 0;
+	int falling = 0;
+	do
+	{
+		physics.move_object(player);
+		peak = std::min(peak, player.crnt_y());
+		// A step goes by the average of its speeds, so the glide's speed
+		// shows from the third step down.
+		if (player.vspeed > 0.0 && !player.onground && ++falling > 2)
+			require(std::abs(player.vspeed * TICKS_PER_SECOND - 55.5) < 1e-9, "Wings did not fall at its speed");
+		require(++ticks < 1000, "a glide never landed");
+	} while (!player.onground);
+	require(std::abs(100 - peak - 77.0) < 0.6, "Wings changed the jump's height");
+	// The 77 px back down take about 1.4 s at 55.5 px/s.
+	require(ticks > 200 && ticks < 230, "the glide took the wrong time");
+}
+
 void running_jump(const ms::Physics& physics)
 {
 	for (int8_t direction : {-1, 1})
@@ -939,6 +964,7 @@ int main()
 			walking(physics);
 			mob_walking(physics);
 			standing_jump(physics);
+			wings_glide(physics);
 			running_jump(physics);
 			falling(physics);
 			flying(physics);

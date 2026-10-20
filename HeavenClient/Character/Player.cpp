@@ -32,6 +32,7 @@
 #include "../Gameplay/Combat/Combo.h"
 #include "../Gameplay/Combat/Dash.h"
 #include "../Gameplay/Combat/FlashJump.h"
+#include "../Gameplay/Combat/Wings.h"
 #include "../Gameplay/Combat/MagicDamage.h"
 #include "../Gameplay/MapleMap/FieldLimit.h"
 #include "../Gameplay/Stage.h"
@@ -177,6 +178,8 @@ namespace ms
 		attacking = false;
 		ladder = nullptr;
 		set_chair(0);
+		phobj.wingsfall = 0.0;
+		glide(false, false);
 		nullstate.update_state(*this);
 		path.reset(current_move(0));
 		stirred = now_ms();
@@ -443,6 +446,14 @@ namespace ms
 		if (phobj.onground || is_climbing())
 			flash_jumped = false;
 
+		// They end Wings too, and so does its deadline once the player glides (0x9b4995, 0x94a834).
+		wings_left -= Constants::TIMESTEP;
+
+		if (phobj.onground || is_climbing() || wings::expired(wings_left, wings::gliding(phobj.wingsfall > 0.0, phobj.vspeed)))
+			phobj.wingsfall = 0.0;
+
+		glide(wings::gliding(phobj.wingsfall > 0.0, phobj.vspeed), phobj.onground);
+
 		path.step(current_move(0), Constants::TIMESTEP);
 
 		if (path.ready())
@@ -484,8 +495,32 @@ namespace ms
 		flash_jumped = true;
 	}
 
+	bool Player::may_wings() const
+	{
+		return wings::may_cast(phobj.onground, phobj.swim, attacking);
+	}
+
+	// A plain jump, marked in the path by element 16, after which the path glides (FUN_009b21da).
+	void Player::wings(int32_t x, int32_t seconds)
+	{
+		bool walking = is_key_down(KeyAction::Id::LEFT) || is_key_down(KeyAction::Id::RIGHT);
+		Physics::jump(phobj, get_jumpforce(), walking ? (facing_right ? 1 : -1) : 0);
+
+		Movement takeoff = current_move(wings::TAKEOFF);
+		takeoff.vx = Movement::velocity(phobj.hspeed);
+		takeoff.vy = Movement::velocity(phobj.vforce);
+		path.add(takeoff);
+
+		phobj.wingsfall = wings::fall_speed(x);
+		wings_left = seconds * 1000;
+	}
+
 	Movement Player::current_move(uint8_t command) const
 	{
+		// While Wings is on, the path glides instead of walking and falling (0x9b10ee).
+		if (command == 0 && phobj.wingsfall > 0.0)
+			command = wings::GLIDE;
+
 		Movement move(phobj, get_stancebyte(), command, 0);
 
 		if (is_dead())
