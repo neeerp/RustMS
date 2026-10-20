@@ -176,7 +176,14 @@ impl WorldHandler for UseSkillHandler {
                 if skill_id == combo::ENRAGE {
                     result = set_combo(ctx.player, 1, now, result)?;
                 }
-                let result = with_party(result, skill_id, level, extras.party, 0);
+                // Echo of Hero sends the players it reached rather than the
+                // party's bits; the server finds them itself.
+                let party = if skills::ECHOES.contains(&skill_id) {
+                    Some(EVERYONE)
+                } else {
+                    extras.party
+                };
+                let result = with_party(result, skill_id, level, party, 0);
                 let Some(inflict) = used.debuffs.clone() else {
                     return Ok(result);
                 };
@@ -377,6 +384,9 @@ fn read_extras_into(
     }
     Ok(())
 }
+
+/// The slots of a skill that reaches everyone on the map, party or not.
+const EVERYONE: u8 = 0x3F;
 
 /// Pass a used skill on to the party members it reached besides the
 /// player, if any.

@@ -206,6 +206,9 @@ pub const CHAKRA: i32 = 4211001;
 /// v83 looks them all up as the Fire/Poison one's (0x958db2).
 pub const MANA_REFLECTION: i32 = 2121002;
 pub const TIME_LEAP: i32 = 5121010;
+/// Echo of Hero, the Beginner's, the Noblesse's, and the Legend's: it
+/// reaches everyone around, in the player's party or not (0x96a33a).
+pub const ECHOES: [i32; 3] = [1005, 10001005, 20001005];
 pub const MP_RECOVERY: i32 = 5101005;
 
 pub const SACRIFICE: i32 = 1311005;
@@ -965,6 +968,7 @@ pub fn buffs(skill: &Learned) -> Option<Vec<(BuffStat, i32)>> {
         2311003 => vec![(BuffStat::HolySymbol, effect.x)],
         2121004 | 2221004 | 2321004 => vec![(BuffStat::Infinity, effect.x)],
         2321005 => vec![(BuffStat::HolyShield, effect.x)],
+        1005 | 10001005 | 20001005 => vec![(BuffStat::EchoOfHero, effect.x)],
         2121002 | 2221002 | 2321002 => vec![(BuffStat::ManaReflection, skill.level)],
         3101004 | 3201004 => vec![(BuffStat::SoulArrow, effect.x)],
         3121008 => vec![(BuffStat::Concentrate, effect.x)],

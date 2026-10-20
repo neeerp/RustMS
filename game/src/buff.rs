@@ -82,6 +82,9 @@ pub enum BuffStat {
     /// A summon that stays where it was put: a Puppet or an Octopus. The
     /// client only shows its icon (Cosmic's PUPPET).
     Puppet = 46,
+    /// Echo of Hero (the client's MaxLevelBuff): attack and magic rise by
+    /// `value` percent of their whole.
+    EchoOfHero = 47,
     /// The arrow keys are swapped (the client's ReverseInput).
     Confuse = 51,
     /// Kills give `value` percent of their EXP: Hunter's Luck (2450000).

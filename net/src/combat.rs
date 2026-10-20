@@ -233,6 +233,12 @@ fn buff(player: &Player, stat: BuffStat) -> i32 {
     player.buffs.value(stat).map_or(0, i32::from)
 }
 
+/// What Echo of Hero adds to a whole attack or magic: its percent, rounded
+/// down (0x77e01c, 0x79167b).
+fn echo_bonus(player: &Player, total: i32) -> i32 {
+    total * buff(player, BuffStat::EchoOfHero).max(0) / 100
+}
+
 /// What an expert's mastery adds to attack with its weapon (SetFrom,
 /// FUN_00764795): Bow Expert's, Marksman Boost's, or High Mastery's `x`.
 fn expert_attack(player: &Player, weapon: i32) -> i32 {
@@ -298,6 +304,7 @@ pub fn max_base_damage(player: &Player, attack: &Attack) -> i32 {
         + expert_attack(player, weapon)
         + ammo_attack(attack, player, weapon)
         + bare_hands;
+    let watk = watk + echo_bonus(player, watk);
     let stats = weapon_stats(weapon, job, attack.skill, skills::total_stats(player));
     (stats / 100.0 * f64::from(watk.clamp(1, 1999))).ceil() as i32
 }
@@ -352,7 +359,9 @@ pub fn max_magic_damage(player: &Player, spell: i32) -> i32 {
         .fold((i32::from(player.stats.int), 0), |(int, matk), equip| {
             (int + i32::from(equip.int), matk + i32::from(equip.matk))
         });
-    let magic = f64::from(int + matk + buff(player, BuffStat::Mad));
+    // The client caps magic at 1999 before and after Echo (0x79167b).
+    let magic = (int + matk + buff(player, BuffStat::Mad)).clamp(0, 1999);
+    let magic = f64::from((magic + echo_bonus(player, magic)).min(1999));
     let max = ((magic * magic / 1000.0 + magic) / 30.0 + f64::from(int) / 200.0) * f64::from(spell);
     max.ceil() as i32
 }
@@ -1422,6 +1431,25 @@ mod tests {
         // ceil((4.2 * 12 + 5) / 100 * 1) = 1
         player.stats.job = 100;
         assert_eq!(max_base_damage(&player, &basic), 1);
+    }
+
+    #[test]
+    fn echo_of_hero_raises_whole_attack_and_magic() {
+        let mut player = crate::codec::stats::sample_player();
+        (player.stats.str, player.stats.dex, player.stats.int) = (12, 5, 200);
+        (player.stats.job, player.stats.level) = (500, 70);
+        player.buffs.give(game::Buff::new(
+            1005,
+            BuffStat::EchoOfHero,
+            4,
+            std::time::Instant::now(),
+            std::time::Duration::from_secs(60),
+        ));
+        let basic = parse_close_attack(&attack_packet(1, 0)).unwrap();
+        // Bare hands' 31 attack and 4% more is 32: ceil(41 / 100 * 32) = 14.
+        assert_eq!(max_base_damage(&player, &basic), 14);
+        // M = 208: ((43.264 + 208) / 30 + 1) * 55 = 515.65.
+        assert_eq!(max_magic_damage(&player, 55), 516);
     }
 
     #[test]

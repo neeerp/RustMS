@@ -32,6 +32,9 @@ int main()
 		require(shield_mastery(110) == 0 && shield_mastery(131) == 0 && shield_mastery(412) == 0, "none for the rest");
 		require(shield_defence(25, 200) == 50 && shield_defence(17, 150) == 25, "x percent, rounded down");
 
+		require(echo_bonus(103, 4) == 4 && echo_bonus(1000, 4) == 40, "Echo's percent, rounded down");
+		require(echo_bonus(103, 0) == 0, "none without it");
+
 		require(bare_hands_attack(500, 1) == 10 && bare_hands_attack(510, 20) == 24, "ten and 0.7 a level");
 		require(bare_hands_attack(500, 30) == 31 && bare_hands_attack(520, 120) == 31, "at most 31");
 		require(bare_hands_attack(1500, 10) == 17, "Thunder Breakers too");
