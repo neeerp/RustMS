@@ -1290,9 +1290,9 @@ namespace ms
 	static bool meets_equip_reqs(const CharStats &stats, const EquipData &equipdata)
 	{
 		// GMs wear anything (job digit 8 or 9).
-		const std::string jobname = stats.get_jobname();
+		int32_t branch = stats.get_job().get_id() % 1000 / 100;
 
-		if (jobname == "GM" || jobname == "SuperGM")
+		if (branch == 8 || branch == 9)
 			return true;
 
 		const ItemData &itemdata = equipdata.get_itemdata();
@@ -1302,9 +1302,12 @@ namespace ms
 		if ((reqGender == 0 && female) || (reqGender == 1 && !female))
 			return false;
 
+		// reqJob has a bit per branch from warriors on; 0 is anyone and -1
+		// beginners only.
 		int16_t reqJOB = equipdata.get_reqstat(MapleStat::Id::JOB);
+		int32_t mask = branch ? 1 << (branch - 1) : 0;
 
-		if (!stats.get_job().is_sub_job(reqJOB))
+		if (reqJOB != 0 && !(reqJOB == -1 && mask == 0) && !(reqJOB > 0 && (reqJOB & mask)))
 			return false;
 
 		return equipdata.get_reqstat(MapleStat::Id::LEVEL) <= stats.get_stat(MapleStat::Id::LEVEL)
@@ -1312,7 +1315,8 @@ namespace ms
 			&& equipdata.get_reqstat(MapleStat::Id::STR) <= stats.get_total(EquipStat::Id::STR)
 			&& equipdata.get_reqstat(MapleStat::Id::LUK) <= stats.get_total(EquipStat::Id::LUK)
 			&& equipdata.get_reqstat(MapleStat::Id::INT) <= stats.get_total(EquipStat::Id::INT)
-			&& equipdata.get_reqstat(MapleStat::Id::FAME) <= stats.get_honor();
+			&& (equipdata.get_reqstat(MapleStat::Id::FAME) == 0
+				|| equipdata.get_reqstat(MapleStat::Id::FAME) <= stats.get_honor());
 	}
 
 	bool UIItemInventory::meets_requirements(int32_t item_id)

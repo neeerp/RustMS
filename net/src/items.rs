@@ -164,30 +164,75 @@ pub fn base_stats(equip: &EquipInfo) -> EquipStats {
     }
 }
 
-/// Whether `player` meets an equipment's level, stat, and job requirements.
+/// Whether `player` meets an equipment's requirements, counting what they
+/// wear (v83 FUN_004f2cee).
 pub fn can_wear(equip: &EquipInfo, player: &game::Player) -> bool {
     let stats = &player.stats;
-    let branch = match stats.job / 100 {
-        1 => 1,
-        2 => 2,
-        3 => 4,
-        4 => 8,
-        5 => 16,
-        _ => 0,
+    // GMs wear anything.
+    let branch = stats.job % 1000 / 100;
+    if branch == 8 || branch == 9 {
+        return true;
+    }
+    let mask = if branch == 0 { 0 } else { 1 << (branch - 1) };
+    let job_ok = match equip.req_job {
+        0 => true,
+        -1 => mask == 0,
+        req => req > 0 && req & mask != 0,
     };
-    let job_ok = equip.req_job == 0 || (branch != 0 && equip.req_job & branch != 0);
+    let (str, dex, luk) = crate::skills::total_stats(player);
     job_ok
         && i16::from(stats.level) >= equip.req_level
-        && stats.str >= equip.req_str
-        && stats.dex >= equip.req_dex
-        && stats.int >= equip.req_int
-        && stats.luk >= equip.req_luk
+        && str >= i32::from(equip.req_str)
+        && dex >= i32::from(equip.req_dex)
+        && crate::skills::total_int(player) >= i32::from(equip.req_int)
+        && luk >= i32::from(equip.req_luk)
+        && (equip.req_fame == 0 || stats.fame >= equip.req_fame)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use rand::SeedableRng;
+
+    #[test]
+    fn requirements_follow_the_job_bits_and_what_is_worn() {
+        let mut player = crate::codec::stats::sample_player();
+        player.stats.job = 0;
+        let beginners = EquipInfo {
+            req_job: -1,
+            ..EquipInfo::default()
+        };
+        let warriors = EquipInfo {
+            req_job: 1 | 8,
+            req_str: player.stats.str + 5,
+            ..EquipInfo::default()
+        };
+        assert!(can_wear(&beginners, &player));
+        assert!(!can_wear(&warriors, &player));
+
+        player.stats.job = 2110;
+        assert!(!can_wear(&beginners, &player));
+        assert!(!can_wear(&warriors, &player), "short of STR");
+        let gloves = Item::equipment(
+            1082002,
+            EquipStats {
+                str: 5,
+                ..EquipStats::default()
+            },
+        );
+        player
+            .inventory
+            .insert(game::InventoryType::Equipped, -8, gloves);
+        assert!(can_wear(&warriors, &player));
+
+        let famous = EquipInfo {
+            req_fame: 1,
+            ..EquipInfo::default()
+        };
+        player.stats.fame = -3;
+        assert!(can_wear(&EquipInfo::default(), &player));
+        assert!(!can_wear(&famous, &player));
+    }
 
     #[test]
     fn dropped_equipment_varies_by_a_tenth_at_most_five_or_ten() {

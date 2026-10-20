@@ -167,12 +167,13 @@ pub struct EquipInfo {
     pub jump: i16,
     pub req_level: i16,
     /// Bit flags of job branches (1 warrior, 2 magician, 4 bowman, 8 thief,
-    /// 16 pirate); 0 means anyone.
+    /// 16 pirate); 0 means anyone and -1 beginners only.
     pub req_job: i16,
     pub req_str: i16,
     pub req_dex: i16,
     pub req_int: i16,
     pub req_luk: i16,
+    pub req_fame: i16,
     pub cash: bool,
     /// `info/recovery`: how much faster the wearer recovers on a map whose
     /// own recovery is above 1 (the sauna robes, 1.5).
@@ -438,6 +439,7 @@ impl ItemData {
             req_dex: stat("reqDEX")?,
             req_int: stat("reqINT")?,
             req_luk: stat("reqLUK")?,
+            req_fame: stat("reqPOP")?,
             cash: nx.int_child(meta, "cash")? == Some(1),
             recovery: nx.real_child(meta, "recovery")?,
             pets,
