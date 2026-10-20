@@ -320,6 +320,21 @@ namespace ms
 		}
 	};
 
+	// Requests throwing the catch item (227xxxx) in a USE slot at the mob
+	// `oid`, found within the item's area, v83 FUN_00a09bdf
+	// Opcode: USE_CATCH_ITEM(81)
+	class UseCatchItemPacket : public OutPacket
+	{
+	public:
+		UseCatchItemPacket(int16_t slot, int32_t itemid, int32_t oid) : OutPacket(OutPacket::Opcode::USE_CATCH_ITEM)
+		{
+			write_time();
+			write_short(slot);
+			write_int(itemid);
+			write_int(oid);
+		}
+	};
+
 	// Requests opening the summoning sack (210xxxx) in a USE slot, v83
 	// FUN_00a0977b
 	// Opcode: USE_SUMMON_BAG(75)

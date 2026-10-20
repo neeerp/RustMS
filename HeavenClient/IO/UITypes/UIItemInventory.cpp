@@ -971,6 +971,12 @@ namespace ms
 							use_solomon_writ(slot, item_id);
 						else if (item_id / 10000 == 226)
 							Stage::get().get_player().feed_mount(slot, item_id);
+						else if (item_id / 10000 == 227)
+						{
+							// A double-click waits longer between throws (0x4f0666).
+							if (Stage::get().get_player().can_request(ExclRequest::WAIT))
+								Stage::get().get_player().use_catch_item(slot, item_id);
+						}
 						else if (!Stage::get().get_mapinfo().can_use_item(item_id))
 							InChatMessage(Messages::ITEM_FIELD).drop();
 						else if (field_limit::is_use_item(item_id) && Stage::get().get_player().ride_refuses(true))

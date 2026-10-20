@@ -232,6 +232,22 @@ namespace ms
 		void handle(InPacket& recv) const override;
 	};
 
+	// Show a catch item thrown at a mob catching it, or failing to
+	// (0x66d997). The mob leaves by KILL_MOB.
+	// Opcode: CATCH_MONSTER_WITH_ITEM(252)
+	class CatchMonsterWithItemHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
+	// A catch item couldn't catch a mob: it is too strong, or the item was
+	// used too recently (0xa0800e). The server unlocks the player apart.
+	// Opcode: BRIDLE_MOB_CATCH_FAIL(79)
+	class BridleMobCatchFailHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
 	// Spawn an NPC on the current stage
 	// Opcode: SPAWN_NPC(257)
 	class SpawnNpcHandler : public PacketHandler

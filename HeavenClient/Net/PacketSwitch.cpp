@@ -175,6 +175,8 @@ namespace ms
 		DAMAGE_MOB = 246,
 		SHOW_MOB_HP = 250,
 		SHOW_MAGNET = 251,
+		CATCH_MONSTER_WITH_ITEM = 252,
+		BRIDLE_MOB_CATCH_FAIL = 79,
 		SPAWN_NPC = 257,
 		REMOVE_NPC = 258,
 		SPAWN_NPC_C = 259,
@@ -285,6 +287,8 @@ namespace ms
 		emplace<DAMAGE_MOB, DamageMobHandler>();
 		emplace<SHOW_MOB_HP, ShowMobHpHandler>();
 		emplace<SHOW_MAGNET, ShowMagnetHandler>();
+		emplace<CATCH_MONSTER_WITH_ITEM, CatchMonsterWithItemHandler>();
+		emplace<BRIDLE_MOB_CATCH_FAIL, BridleMobCatchFailHandler>();
 		emplace<KILL_MOB, KillMobHandler>();
 		emplace<DROP_LOOT, DropLootHandler>();
 		emplace<REMOVE_LOOT, RemoveLootHandler>();

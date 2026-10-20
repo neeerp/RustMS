@@ -25,6 +25,7 @@
 #include "Helpers/PetParser.h"
 #include "MiniRoom.h"
 
+#include "../../Character/CatchItemRules.h"
 #include "../../Data/CurseData.h"
 #include "../../Data/SkillData.h"
 #include "../../Gameplay/Stage.h"
@@ -33,6 +34,8 @@
 #include "../../IO/UITypes/UINotice.h"
 #include "../../Util/Chalkboard.h"
 #include "../Packets/GameplayPackets.h"
+
+#include <nlnx/nx.hpp>
 
 namespace ms
 {
@@ -593,6 +596,31 @@ namespace ms
 		bool success = recv.read_bool();
 
 		Stage::get().get_combat().show_catch(oid, success);
+	}
+
+	void CatchMonsterWithItemHandler::handle(InPacket& recv) const
+	{
+		int32_t oid = recv.read_int();
+		int32_t itemid = recv.read_int();
+		bool success = recv.read_bool();
+
+		Stage::get().get_combat().show_item_catch(oid, itemid, success);
+	}
+
+	void BridleMobCatchFailHandler::handle(InPacket& recv) const
+	{
+		int8_t result = recv.read_byte();
+		int32_t itemid = recv.read_int();
+		recv.read_int();
+
+		nl::node info = nl::nx::item["Consume"]["0227.img"]["0" + std::to_string(itemid)]["info"];
+		std::string line = catch_item::fail_notice(result, info["delayMsg"].get_string());
+
+		if (line.empty())
+			return;
+
+		if (auto chatbar = UI::get().get_element<UIChatBar>())
+			chatbar->send_chatline(line, UIChatBar::LineType::SKILL);
 	}
 
 	void SpawnNpcHandler::handle(InPacket& recv) const

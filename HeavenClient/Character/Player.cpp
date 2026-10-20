@@ -17,6 +17,7 @@
 //////////////////////////////////////////////////////////////////////////////////
 #include "Player.h"
 
+#include "CatchItemRules.h"
 #include "MobDamage.h"
 #include "PlayerStates.h"
 #include "SecondaryStat.h"
@@ -36,6 +37,7 @@
 #include "../IO/Messages.h"
 #include "../IO/UI.h"
 
+#include "../IO/UITypes/UIChatBar.h"
 #include "../IO/UITypes/UIRevive.h"
 #include "../IO/UITypes/UISkillBook.h"
 #include "../IO/UITypes/UIStatsInfo.h"
@@ -63,6 +65,40 @@ namespace ms
 			using namespace std::chrono;
 
 			return duration_cast<milliseconds>(steady_clock::now().time_since_epoch()).count();
+		}
+
+		// A catch item's notice, in the chat line v83 uses for them (type 0xc).
+		void catch_notice(const std::string &line)
+		{
+			if (line.empty())
+				return;
+
+			if (auto chatbar = UI::get().get_element<UIChatBar>())
+				chatbar->send_chatline(line, UIChatBar::LineType::SKILL);
+		}
+
+		// Whether the item `create` a catch makes would fit: an equip needs an empty slot, anything else an
+		// empty slot or a stack below its slotMax (FUN_00a09bdf, 0xa09cf2-0xa09e19).
+		bool catch_fits(const Inventory &inventory, int32_t create)
+		{
+			InventoryType::Id type = InventoryType::by_item_id(create);
+
+			if (inventory.find_free_slot(type))
+				return true;
+
+			if (create / 1000000 < 2 || create / 1000000 > 4)
+				return false;
+
+			static const char *const dirs[] = { "", "", "Consume", "Install", "Etc" };
+			std::string strid = "0" + std::to_string(create);
+			nl::node max = nl::nx::item[dirs[create / 1000000]][strid.substr(0, 4) + ".img"][strid]["info"]["slotMax"];
+			int64_t most = max ? max.get_integer() : 100;
+
+			for (int16_t slot = 1; slot <= inventory.get_slotmax(type); slot++)
+				if (inventory.get_item_id(type, slot) == create && inventory.get_item_count(type, slot) < most)
+					return true;
+
+			return false;
 		}
 
 		// A mastery skill as the player has learned it.
@@ -283,6 +319,8 @@ namespace ms
 		{
 			if (type == InventoryType::Id::USE && itemid / 10000 == 226)
 				feed_mount(slot, itemid);
+			else if (type == InventoryType::Id::USE && itemid / 10000 == 227)
+				use_catch_item(slot, itemid);
 			else if (type == InventoryType::Id::USE && !Stage::get().get_mapinfo().can_use_item(itemid))
 				InChatMessage(Messages::ITEM_FIELD).drop();
 			else if (type == InventoryType::Id::USE && field_limit::is_use_item(itemid) && ride_refuses(true))
@@ -1451,6 +1489,38 @@ namespace ms
 	{
 		if (mount::is_tamed_monster(look.get_vehicle()))
 			request(MountFoodPacket(slot, itemid), ExclRequest::USE_WAIT);
+	}
+
+	void Player::use_catch_item(int16_t slot, int32_t itemid)
+	{
+		if (mount::is_tamed_monster(look.get_vehicle()) || itemid / 10000 != 227 || !can_request(ExclRequest::USE_WAIT))
+			return;
+
+		nl::node info = nl::nx::item["Consume"]["0227.img"]["0" + std::to_string(itemid)]["info"];
+
+		if (!info)
+			return;
+
+		int32_t create = info["create"].get_integer();
+
+		if (!catch_fits(inventory, create))
+			return catch_notice(catch_item::no_room_notice(create));
+
+		// The area is the player's, whichever way they face.
+		Rectangle<int16_t> area(
+			static_cast<int16_t>(info["left"].get_integer()),
+			static_cast<int16_t>(info["right"].get_integer()),
+			static_cast<int16_t>(info["top"].get_integer()),
+			static_cast<int16_t>(info["bottom"].get_integer())
+		);
+		area.shift(get_position());
+
+		int32_t oid = Stage::get().get_mobs().find_catchable(area, info["mob"].get_integer());
+
+		if (!oid)
+			return catch_notice(catch_item::no_mob_notice(info["bridleMsgType"].get_integer(), info["nomobMsg"].get_string()));
+
+		request(UseCatchItemPacket(slot, itemid, oid), ExclRequest::USE_WAIT);
 	}
 
 	// CUserLocal clamps SPEED to 80-140 and JUMP to 80-123 before turning

@@ -113,6 +113,10 @@ namespace ms
 		// (0x66d6b9, 0x438eb6).
 		void show_catch(int32_t oid, bool success);
 
+		// Show the catch item `itemid` thrown at a mob catching it, or failing to: its ItemEff, or that
+		// effect's `fail`, over the mob; the Element Rock's sound too (0x6692c8, 0x66934f).
+		void show_item_catch(int32_t oid, int32_t itemid, bool success);
+
 		// Show another user throwing a grenade from `position`, held for
 		// `charge` ms (0x983bc1).
 		void show_throw(int32_t cid, Point<int16_t> position, int32_t charge, int32_t skillid);

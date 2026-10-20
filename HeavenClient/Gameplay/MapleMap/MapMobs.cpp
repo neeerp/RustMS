@@ -244,6 +244,30 @@ namespace ms
 		return iter->second->get_oid();
 	}
 
+	int32_t MapMobs::find_catchable(const Rectangle<int16_t> &area, int32_t mobid) const
+	{
+		int32_t found = 0;
+		uint32_t first = UINT32_MAX;
+
+		for (auto &mmo : mobs)
+		{
+			Optional<Mob> mob = mmo.second.get();
+
+			if (!mob || !mob->is_alive() || mob->get_id() != mobid || !mob->is_in_range(area))
+				continue;
+
+			uint32_t order = mobs.entry_order(mmo.first);
+
+			if (order < first || !found)
+			{
+				found = mmo.first;
+				first = order;
+			}
+		}
+
+		return found;
+	}
+
 	void MapMobs::aggro_puppet(int32_t oid, Point<int16_t> position)
 	{
 		for (auto &mmo : mobs)
