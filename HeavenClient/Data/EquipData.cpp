@@ -32,6 +32,9 @@ namespace ms
 		slots = src["tuc"];
 		recovery = src["recovery"].get_real(1.0);
 		medaltag = static_cast<int32_t>(src["medalTag"].get_integer(0));
+		grip = src["fs"].get_real(1.0);
+		swim = static_cast<int32_t>(src["swim"].get_integer(100));
+		knockback = static_cast<int32_t>(src["knockback"].get_integer(0));
 
 		// A field of 0 or less makes the spell do nothing.
 		int16_t elemdefault = static_cast<int16_t>(src["elemDefault"].get_integer(100));
@@ -142,6 +145,14 @@ namespace ms
 			size_t weaponindex = index - WEAPON_OFFSET;
 			type = types[weaponindex];
 			eqslot = EquipSlot::Id::WEAPON;
+		} else if (index == 90)
+		{
+			type = "TAMED MONSTER";
+			eqslot = EquipSlot::Id::TAMEDMOB;
+		} else if (index == 91)
+		{
+			type = "SADDLE";
+			eqslot = EquipSlot::Id::SADDLE;
 		} else
 		{
 			type = "CASH";
@@ -202,5 +213,25 @@ namespace ms
 	int32_t EquipData::get_medaltag() const
 	{
 		return medaltag;
+	}
+
+	double EquipData::get_grip() const
+	{
+		return grip;
+	}
+
+	int32_t EquipData::get_swim() const
+	{
+		return swim;
+	}
+
+	uint8_t EquipData::get_slots() const
+	{
+		return slots;
+	}
+
+	int32_t EquipData::get_knockback() const
+	{
+		return knockback;
 	}
 }

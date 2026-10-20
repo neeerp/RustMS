@@ -753,6 +753,22 @@ void swimming(const ms::Physics& physics)
 	double rise = start - player.crnt_y();
 	require(rise > 105.0 && rise < 113.0, "a kick did not rise about 109 px more");
 
+	// Faster shoes swim faster both ways and kick harder (0x9b313d).
+	player = swimmer();
+	player.swimspeed = 1.5;
+	player.swimkick = 1.2;
+	for (int tick = 0; tick < 40; ++tick)
+	{
+		player.walkdir = 1;
+		physics.move_object(player);
+	}
+	require(std::abs(speed(player.hspeed) - 210.0) < 1e-9, "a fast swimmer did not top out at 1.5 swimSpeed");
+	player.flydir = 1;
+	physics.move_object(player);
+	require(std::abs(speed(player.vspeed) - 315.0) < 1e-9, "a fast swimmer did not drop at 1.5 times its top speed");
+	ms::Physics::swim_jump(player);
+	require(std::abs(speed(player.vspeed) + 840.0) < 1e-9, "a strong kick did not rise at 840 px/s");
+
 	// On the floor of a swim map it walks at 0.9 of the push and speed,
 	// and jumps at 0.7 of jumpSpeed.
 	player = grounded_shoe(physics);

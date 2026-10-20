@@ -47,6 +47,18 @@ namespace ms
 		// The stats HeavenClient keeps among those set.
 		std::vector<Buffstat::Id> stats(const Flags& flags);
 
+		// Riding, a two-state stat: its data is the mount and the skill riding it (0x793ef2).
+		constexpr uint8_t RIDING = 85;
+
+		struct Ride
+		{
+			int32_t vehicle;
+			int32_t skill;
+		};
+
+		// The two-state stats' data, which follows the defense attack and state: riding's, if set.
+		Ride read_two_state(InPacket& recv, const Flags& flags);
+
 		// The stats another character shows, and each one's value (FUN_00788156),
 		// as SPAWN_PLAYER and GIVE_FOREIGN_BUFF carry them: their data, the
 		// defense attack and state, then the two-state stats' data.

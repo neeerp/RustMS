@@ -46,7 +46,11 @@ namespace ms
 					"This item cannot be used here.",
 					"You cannot drop the item here.",
 					"Your level is too high to use the selected item.",
-					"You'll need to use all your remaining EXP in order to use a new Writ of Solomon."
+					"You'll need to use all your remaining EXP in order to use a new Writ of Solomon.",
+					"Not available while riding on the tamed monster.",
+					"Not available during the ride.",
+					"This skill requires a tamed monster and a saddle.",
+					"You cannot ride on this tamed monster."
 			};
 
 	bool Messages::is_cost(Type type)

@@ -25,6 +25,7 @@
 #include "Guild.h"
 #include "ExclRequest.h"
 #include "MonsterBook.h"
+#include "MountRules.h"
 #include "Party.h"
 #include "PassiveBuffs.h"
 #include "QuestLog.h"
@@ -183,8 +184,35 @@ namespace ms
 		// Return the character's attacking speed.
 		int8_t get_integer_attackspeed() const override;
 
-		// Return the total ES_SPEED stat.
+		// Return the total ES_SPEED stat, or the mount's while riding.
 		int32_t get_walk_animation_speed() const override;
+
+		// The player asked to get on a mount, or off with a skill (`off`); no skill goes until the server
+		// answers (FUN_00969e21, FUN_0096d873).
+		void ask_ride(int32_t off = 0);
+
+		// Whether skills wait on getting on or off: the server is yet to answer, or the look to change
+		// (FUN_00966f7a).
+		bool is_ride_locked() const;
+
+		// The server answered getting on `vehicle`, or off with 0 (FUN_0095f065, FUN_00936859).
+		void change_ride(int32_t vehicle);
+
+		// Whether the player may get on their tamed monster, saying why not in chat (0x968b9d): it takes a
+		// mount with a template and a saddle for its level, on a map that allows riding.
+		bool can_get_on() const;
+
+		// Whether riding keeps the player from something, saying so in chat: any mount for FUN_0095f9d9's
+		// callers, such as chairs, and only a tamed monster for items (`monster_only`, FUN_00a092fb).
+		bool ride_refuses(bool monster_only = false) const;
+
+		// Moving a mount or saddle (190xxxx or 191xxxx) while riding a tamed monster gets the player off
+		// instead (FUN_004f0e97). True if it did.
+		bool ride_keeps(int32_t itemid);
+
+		// Feed the tamed monster ridden the food (226xxxx) in USE `slot`; not riding one, nothing happens
+		// (FUN_00a09a64).
+		void feed_mount(int16_t slot, int32_t itemid);
 
 		// Returns the shoe's walking speed multiplier, from the total ES_SPEED stat.
 		double get_walkspeed() const;
@@ -359,6 +387,7 @@ namespace ms
 		std::unordered_map<int32_t, int32_t> cooldowns;
 
 		ExclRequest excl;
+		mutable mount::Pending ride_pending;
 
 		std::map<KeyAction::Id, bool> keysdown;
 		// When the player last moved under Stop Motion, or entered the map

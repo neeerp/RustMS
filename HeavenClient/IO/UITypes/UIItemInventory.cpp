@@ -529,11 +529,14 @@ namespace ms
 			}
 		}
 
-		// v83 FUN_00a0977b: a summoning sack (210xxxx) stays shut where the
-		// map forbids it, and asks first unless it is an event's. (The
-		// client also refuses while riding, which this one can't.)
+		// v83 FUN_00a0977b: a summoning sack (210xxxx) stays shut while
+		// riding or where the map forbids it, and asks first unless it is an
+		// event's.
 		void use_summon_sack(int16_t slot, int32_t item_id)
 		{
+			if (Stage::get().get_player().ride_refuses())
+				return;
+
 			if (!Stage::get().get_mapinfo().can_summon(item_id))
 			{
 				UI::get().emplace<UIOk>("You can't use it here in this map.", [](bool)
@@ -557,11 +560,15 @@ namespace ms
 		}
 
 		// v83 FUN_00a12685: a Writ of Solomon (237xxxx) becomes gacha EXP, up
-		// to the writ's info/maxLevel and only once the last is taken. (The
-		// client also refuses while riding, which this one can't.)
+		// to the writ's info/maxLevel and only once the last is taken, and
+		// not on a tamed monster.
 		void use_solomon_writ(int16_t slot, int32_t item_id)
 		{
 			Player &player = Stage::get().get_player();
+
+			if (player.ride_refuses(true))
+				return;
+
 			const CharStats &stats = player.get_stats();
 			nl::node info = nl::nx::item["Consume"]["0237.img"]["0" + std::to_string(item_id)]["info"];
 			int32_t max_level = info["maxLevel"].get_integer();
@@ -630,6 +637,9 @@ namespace ms
 
 			const Inventory &inventory = Stage::get().get_player().get_inventory();
 			Optional<const Equip> equip = inventory.get_equip(InventoryType::Id::EQUIP, slot);
+
+			if (Stage::get().get_player().ride_keeps(inventory.get_item_id(InventoryType::Id::EQUIP, slot)))
+				return;
 
 			if (equip && ItemData::get(equip->get_item_id()).get_properties().equip_trade_block
 				&& !(equip->get_flags() & item_properties::EQUIP_UNTRADEABLE))
@@ -959,8 +969,12 @@ namespace ms
 							use_teleport_rock(slot, item_id);
 						else if (item_id / 10000 == 237)
 							use_solomon_writ(slot, item_id);
+						else if (item_id / 10000 == 226)
+							Stage::get().get_player().feed_mount(slot, item_id);
 						else if (!Stage::get().get_mapinfo().can_use_item(item_id))
 							InChatMessage(Messages::ITEM_FIELD).drop();
+						else if (field_limit::is_use_item(item_id) && Stage::get().get_player().ride_refuses(true))
+							break;
 						else if (!disease::can_use_item(Stage::get().get_player().get_diseases()))
 							break;
 						else if (pets::is_food(item_id))

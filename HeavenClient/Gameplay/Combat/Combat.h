@@ -144,6 +144,10 @@ namespace ms
 		// Use a skill that doesn't attack. Whether it could ask the server.
 		bool request_skill(const SpecialMove &move);
 
+		// Whether a move may go with the player on a mount, or getting on or off one (FUN_00966f7a). Monster
+		// Rider gets off a tamed monster instead.
+		bool ride_allows(int32_t move_id);
+
 		// Summon in front of the player, if there is room (FUN_0096b140).
 		// Whether it could ask the server.
 		bool request_summon(const SpecialMove &move, int32_t level);

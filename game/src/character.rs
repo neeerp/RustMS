@@ -1,8 +1,9 @@
-use crate::buff::{Buffs, ShownBuff};
+use crate::buff::{BuffStat, Buffs, ShownBuff};
 use crate::guild::GuildTag;
 use crate::inventory::{equip_slot, Inventory, InventoryType, Item};
 use crate::keymap::Keymap;
 use crate::monster_book::MonsterBook;
+use crate::mount::Mount;
 use crate::pet::{FieldPet, FOLLOW_THE_LEAD};
 use crate::quest::QuestLog;
 use crate::skill::{self, SkillBook, SkillRecord};
@@ -142,6 +143,19 @@ pub struct FieldAvatar {
     pub chalkboard: Option<String>,
     /// The effect item (501xxxx or 429xxxx) the player shows, or 0.
     pub item_effect: i32,
+    /// The tamed monster the player rides, if any.
+    pub ride: Option<Ride>,
+    /// The player's mount's level, EXP and tiredness, which every player
+    /// shows whether they ride or not.
+    pub mount: Mount,
+}
+
+/// What a player rides (the client's RideVehicle data): the mount item and
+/// the skill that rode it.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Ride {
+    pub item_id: i32,
+    pub skill_id: i32,
 }
 
 /// The balloon over a player who keeps a mini room open, which others
@@ -197,6 +211,8 @@ pub struct Player {
     pub charmed: bool,
     /// The maps kept for the teleport rocks.
     pub teleport_rocks: TeleportRocks,
+    /// The tamed monster's level, EXP and tiredness.
+    pub mount: Mount,
     dirty: bool,
 }
 
@@ -232,6 +248,7 @@ impl Player {
             item_effect: 0,
             charmed: false,
             teleport_rocks: TeleportRocks::default(),
+            mount: Mount::default(),
             dirty: false,
         }
     }
@@ -289,6 +306,26 @@ impl Player {
         &mut self.pets
     }
 
+    /// The skill the player rides with, while they ride.
+    pub fn ride_skill(&self) -> Option<i32> {
+        let riding = self
+            .buffs
+            .active()
+            .iter()
+            .find(|buff| buff.stat == BuffStat::Riding)?;
+        Some(riding.skill_id)
+    }
+
+    /// What the player rides: the mount worn, while they ride it.
+    pub fn ride(&self) -> Option<Ride> {
+        let skill_id = self.ride_skill()?;
+        let item_id = self
+            .inventory
+            .get(InventoryType::Equipped, equip_slot::MOUNT)?
+            .item_id;
+        Some(Ride { item_id, skill_id })
+    }
+
     /// The projection a field broadcasts for this player at a position.
     pub fn field_avatar(&self, x: i16, y: i16, stance: u8) -> FieldAvatar {
         FieldAvatar {
@@ -321,6 +358,8 @@ impl Player {
                 .collect(),
             chalkboard: self.chalkboard.clone(),
             item_effect: self.item_effect,
+            ride: self.ride(),
+            mount: self.mount,
         }
     }
 

@@ -43,7 +43,9 @@ namespace ms
 			case 1:
 				category = get_eqcategory(itemid);
 				src = nl::nx::character[category][strid + ".img"]["info"];
-				strsrc = nl::nx::string["Eqp.img"]["Eqp"][category][std::to_string(itemid)];
+				// Mounts and saddles are named under Taming.
+				strsrc = nl::nx::string["Eqp.img"]["Eqp"][category == "TamingMob" ? "Taming" : category]
+						[std::to_string(itemid)];
 				break;
 			case 2:
 				category = "Consume";
@@ -146,6 +148,8 @@ namespace ms
 			return "Weapon";
 		else if (index >= 80 && index <= 83)
 			return "PetEquip";
+		else if (index >= 90 && index <= 93)
+			return "TamingMob";
 		else
 			return "";
 	}

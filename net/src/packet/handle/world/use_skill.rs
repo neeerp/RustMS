@@ -1,4 +1,5 @@
 use super::combat::set_combo;
+use super::mount::dismount;
 use crate::combo;
 use crate::error::NetworkError;
 use crate::handler::{
@@ -9,7 +10,8 @@ use crate::packet::build::world::summon::Gone;
 use crate::packet::build::world::{buff, inventory, skill};
 use crate::skills::{self, Inflict, Learned};
 use crate::summons;
-use game::{Buff, BuffStat, InventoryChange, Player};
+use game::inventory::equip_slot;
+use game::{mount, Buff, BuffStat, InventoryChange, InventoryType, Player, Ride};
 use packet::{io::read::PktRead, Packet};
 use std::io::Cursor;
 use std::time::{Duration, Instant};
@@ -39,6 +41,25 @@ impl WorldHandler for UseSkillHandler {
                 Err(refusal) => {
                     debug!(skill_id, level, ?refusal, "Monster Magnet refused");
                     Ok(HandlerResult::reply(stat::build_stat_update(true, &[])?))
+                }
+            };
+        }
+        if mount::RIDER_SKILLS.contains(&skill_id) {
+            let field_limit = crate::game_data::get()?
+                .field(ctx.player.stats.map_id)
+                .map_or(0, |field| field.field_limit);
+            return match ride(ctx.player, skill_id, level, field_limit, Instant::now()) {
+                Ok(ride) => {
+                    let mp = StatUpdate::Mp(ctx.player.stats.mp);
+                    let shown = buff::build_give_foreign_ride(ctx.player.id(), ride)?;
+                    Ok(HandlerResult::reply(stat::build_stat_update(true, &[mp])?)
+                        .with_reply(buff::build_give_ride(ride)?)
+                        .with(WorldAction::BuffsChanged(shown)))
+                }
+                Err(refusal) => {
+                    debug!(skill_id, level, ?refusal, "Monster Rider refused");
+                    let unlocked = HandlerResult::reply(stat::build_stat_update(true, &[])?);
+                    dismount(ctx.player, unlocked)
                 }
             };
         }
@@ -224,6 +245,9 @@ impl WorldHandler for CancelBuffHandler {
                 HandlerResult::empty().with(WorldAction::Field(FieldRequest::Broadcast(shown)))
             );
         }
+        if mount::RIDER_SKILLS.contains(&skill_id) {
+            return dismount(ctx.player, HandlerResult::empty());
+        }
         let ended = ctx.player.buffs.cancel(skill_id);
         if ended.is_empty() {
             return Ok(HandlerResult::empty());
@@ -264,6 +288,10 @@ enum Refusal {
     NoDoorHere,
     /// Enrage without the orbs to spend.
     TooFewOrbs,
+    /// Riding without a mount that can be ridden and a saddle on.
+    NoMount,
+    /// Riding where mounts aren't allowed.
+    NoMountsHere,
 }
 
 /// What USE_SKILL carries after the level (0x96d399), each part only for
@@ -475,6 +503,46 @@ fn heal(player: &mut Player, level: i32, party: u8, roll: f64) -> Result<(i16, i
     let reached = party.count_ones() as i32;
     let amount = skills::heal_amount(player, skill.effect.hp, reached, roll) as i32;
     Ok((player.recover_hp(amount), amount))
+}
+
+/// Check the player can get on the mount they wear with a rider skill,
+/// then spend its MP and start the ride. The client checks the same first
+/// (v83 FUN_00966f7a), and that they're off ladders and ropes.
+fn ride(
+    player: &mut Player,
+    skill_id: i32,
+    level: i32,
+    field_limit: i32,
+    now: Instant,
+) -> Result<Ride, Refusal> {
+    if player.stats.hp <= 0 {
+        return Err(Refusal::Dead);
+    }
+    if kept_from(player, skill_id) {
+        return Err(Refusal::Diseased);
+    }
+    let skill = skills::learned(player, skill_id)
+        .filter(|skill| skill.level == level && level > 0)
+        .ok_or(Refusal::NotLearned)?;
+    if field_limit & game_data::FIELD_LIMIT_MOUNTS != 0 {
+        return Err(Refusal::NoMountsHere);
+    }
+    let worn = |slot| player.inventory.get(InventoryType::Equipped, slot);
+    let item_id = worn(equip_slot::MOUNT).ok_or(Refusal::NoMount)?.item_id;
+    worn(equip_slot::SADDLE).ok_or(Refusal::NoMount)?;
+    let rideable = crate::items::info(item_id)
+        .and_then(|info| info.equip)
+        .is_some_and(|equip| equip.taming_mob != 0);
+    if !rideable {
+        return Err(Refusal::NoMount);
+    }
+    if i32::from(player.stats.mp) < skill.effect.mp_cost {
+        return Err(Refusal::NotEnoughMp);
+    }
+    player.add_mp(-skill.effect.mp_cost);
+    let riding = Buff::new(skill_id, BuffStat::Riding, 0, now, mount::RIDE_DURATION);
+    player.buffs.give(riding);
+    Ok(Ride { item_id, skill_id })
 }
 
 /// A skill that was used: the buffs it gave, and the items it cost. A

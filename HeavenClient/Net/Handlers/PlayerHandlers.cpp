@@ -217,6 +217,9 @@ namespace ms
 		for (uint8_t bit : BuffParser::given(flags))
 			handle_buff(recv, Buffstat::by_bit(bit));
 
+		if (flags.has(BuffParser::RIDING))
+			handle_ride(recv, flags);
+
 		Stage::get().get_player().recalc_stats(false);
 	}
 
@@ -251,6 +254,31 @@ namespace ms
 			bufflist->add_buff(skillid, bs, duration);
 	}
 
+	// The player got on a mount (0xa202be). The two-state stats' data follows the defense attack and state.
+	void ApplyBuffHandler::handle_ride(InPacket& recv, const BuffParser::Flags& flags) const
+	{
+		recv.skip(2);
+
+		BuffParser::Ride ride = BuffParser::read_two_state(recv, flags);
+		Stage::get().get_player().change_ride(ride.vehicle);
+
+		// Space Dash shows no icon.
+		if (ride.skill <= 0 || ride.skill == 1014 || ride.skill == 10001015)
+			return;
+
+		if (auto bufflist = UI::get().get_element<UIBuffList>())
+			bufflist->add_buff(ride.skill, Buffstat::MONSTER_RIDING, INT32_MAX);
+	}
+
+	// The player got off (0xa2071f).
+	void CancelBuffHandler::handle_ride(InPacket&, const BuffParser::Flags&) const
+	{
+		Stage::get().get_player().change_ride(0);
+
+		if (auto bufflist = UI::get().get_element<UIBuffList>())
+			bufflist->cancel_buff(Buffstat::MONSTER_RIDING);
+	}
+
 	void CancelBuffHandler::handle_buff(InPacket&, Buffstat::Id bs) const
 	{
 		if (bs == Buffstat::NONE)
@@ -269,6 +297,30 @@ namespace ms
 	void RecalculateStatsHandler::handle(InPacket&) const
 	{
 		Stage::get().get_player().recalc_stats(false);
+	}
+
+	void SetTamingMobInfoHandler::handle(InPacket& recv) const
+	{
+		int32_t cid = recv.read_int();
+		int32_t level = recv.read_int();
+		int32_t exp = recv.read_int();
+		int32_t fatigue = recv.read_int();
+		bool levelup = recv.read_bool();
+
+		Char *character = nullptr;
+
+		if (Stage::get().is_player(cid))
+			character = &Stage::get().get_player();
+		else if (Optional<OtherChar> other = Stage::get().get_chars().get_char(cid))
+			character = other.get();
+
+		if (!character)
+			return;
+
+		character->set_mount_info(level, exp, fatigue);
+
+		if (levelup)
+			character->show_mount_levelup();
 	}
 
 	void UpdateSkillHandler::handle(InPacket& recv) const

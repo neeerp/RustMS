@@ -17,8 +17,11 @@
 //////////////////////////////////////////////////////////////////////////////////
 #include "Char.h"
 
+#include "MountRules.h"
+
 #include "Pets.h"
 
+#include "../Audio/Audio.h"
 #include "../Data/WeaponData.h"
 #include "../Net/Packets/GameplayPackets.h"
 #include "../Util/Misc.h"
@@ -211,6 +214,18 @@ namespace ms
 
 		effects.update();
 		held_effects.update();
+
+		if (vehicle_switch > 0)
+		{
+			vehicle_switch -= Constants::TIMESTEP;
+
+			if (vehicle_switch <= 0)
+			{
+				vehicle_switch = 0;
+				look.set_vehicle(vehicle);
+			}
+		}
+
 		for (auto &layer : chair_layers)
 			layer.animation.update();
 
@@ -320,7 +335,8 @@ namespace ms
 
 	int32_t Char::get_walk_animation_speed() const
 	{
-		return 100;
+		// A rider walks at the mount's pace.
+		return ride_ability ? ride_ability->speed : 100;
 	}
 
 	float Char::get_real_attackspeed() const
@@ -447,6 +463,55 @@ namespace ms
 	void Char::show_effect(const Animation &effect)
 	{
 		effects.add(effect);
+	}
+
+	void Char::ride(int32_t v, bool at_once)
+	{
+		vehicle = v;
+		vehicle_switch = at_once ? 0 : mount::SWITCH_DELAY;
+
+		int32_t saddle = mount::is_tamed_monster(v) ? look.get_equips().get_equip(EquipSlot::Id::SADDLE) : 0;
+		ride_ability = v > 0 ? TamingMob::ability(v, saddle) : std::nullopt;
+
+		if (at_once)
+			look.set_vehicle(v);
+	}
+
+	int32_t Char::get_vehicle() const
+	{
+		return vehicle;
+	}
+
+	bool Char::is_switching_vehicle() const
+	{
+		return vehicle_switch > 0;
+	}
+
+	const std::optional<TamingMob::Ability> &Char::get_ride_ability() const
+	{
+		return ride_ability;
+	}
+
+	void Char::set_mount_info(int32_t level, int32_t exp, int32_t fatigue)
+	{
+		mount_level = level;
+		mount_exp = exp;
+		mount_fatigue = fatigue;
+		look.set_tired(mount::tired(level, fatigue));
+	}
+
+	void Char::show_mount_levelup()
+	{
+		effects.add(nl::nx::effect["PetEff.img"]["Basic"]["LevelUp"]);
+		Sound(Sound::Name::LEVELUP).play();
+	}
+
+	void Char::show_ride_effect(int32_t skill)
+	{
+		nl::node src = nl::nx::skill[string_format::skill_img(skill)]["skill"][string_format::extend_id(skill, 7)]
+			["effect"];
+
+		effects.add(src, DrawArgument(facing_right), src["z"]);
 	}
 
 	void Char::show_skill_book(bool success)

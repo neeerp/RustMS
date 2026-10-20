@@ -317,7 +317,7 @@ namespace ms
 		{
 			// CVecCtrl's flying (FUN_007f2a1c) and swimming slow anything
 			// faster than the top speed, then push the way the object steers.
-			double limit = phobj.swim ? SWIMSPEED : FLYSPEED * phobj.flyspeed;
+			double limit = phobj.swim ? SWIMSPEED * phobj.swimspeed : FLYSPEED * phobj.flyspeed;
 			double acc = phobj.swim ? SWIMACC : FLYACC;
 			double drag = FLYDRAG * friction;
 
@@ -438,7 +438,7 @@ namespace ms
 	// up at 5 times swimSpeed, keeping its sideways speed.
 	void Physics::swim_jump(PhysicsObject &phobj)
 	{
-		phobj.vspeed = -SWIMKICK * TICK;
+		phobj.vspeed = -SWIMKICK * phobj.swimkick * TICK;
 	}
 
 	// CVecCtrl's down-jump (FUN_007f1ac6) rises at jumpSpeed / sqrt(8)

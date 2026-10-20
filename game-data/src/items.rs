@@ -109,6 +109,9 @@ pub struct ConsumeSpec {
     /// What a Writ of Solomon (237xxxx) adds to the player's gacha EXP
     /// (`exp`).
     pub exp: i32,
+    /// How much a mount food (226xxxx) changes a mount's tiredness
+    /// (`incFatigue`): negative takes it off.
+    pub inc_fatigue: i32,
 }
 
 impl ConsumeSpec {
@@ -178,6 +181,9 @@ pub struct EquipInfo {
     /// `info/recovery`: how much faster the wearer recovers on a map whose
     /// own recovery is above 1 (the sauna robes, 1.5).
     pub recovery: Option<f64>,
+    /// The `TamingMob.nx` template a mount (190xxxx) rides with
+    /// (`tamingMob`); 0 for one that can't be ridden.
+    pub taming_mob: i32,
     /// The pets that pet wear (180xxxx) suits: the image's children named
     /// for pet item ids.
     pub pets: Vec<i32>,
@@ -355,6 +361,7 @@ impl ItemData {
                 ignore_continent: nx.int_child(spec, "ignoreContinent")?.unwrap_or(0) != 0,
                 return_map_qr: nx.int_child(spec, "returnMapQR")?.unwrap_or(0),
                 exp: nx.int_child(spec, "exp")?.unwrap_or(0),
+                inc_fatigue: nx.int_child(spec, "incFatigue")?.unwrap_or(0),
             });
         }
         if item_id / 10_000 == 210 {
@@ -442,6 +449,7 @@ impl ItemData {
             req_fame: stat("reqPOP")?,
             cash: nx.int_child(meta, "cash")? == Some(1),
             recovery: nx.real_child(meta, "recovery")?,
+            taming_mob: nx.int_child(meta, "tamingMob")?.unwrap_or(0),
             pets,
         };
         Ok(Some(ItemInfo {

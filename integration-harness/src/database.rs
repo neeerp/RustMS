@@ -299,6 +299,28 @@ pub async fn backdate_fame(giver_id: i32, days: i32) -> Result<(), HarnessError>
     .await
 }
 
+/// Give the logged-out character `character_id`'s mount `level`, `exp`
+/// and `tiredness`.
+pub async fn set_mount(
+    character_id: i32,
+    level: i32,
+    exp: i32,
+    tiredness: i32,
+) -> Result<(), HarnessError> {
+    change_one_row("set mount", move |conn| {
+        diesel::sql_query(
+            "INSERT INTO character_mounts (character_id, level, exp, tiredness) VALUES ($1, $2, $3, $4) \
+             ON CONFLICT (character_id) DO UPDATE SET level = $2, exp = $3, tiredness = $4",
+        )
+        .bind::<Integer, _>(character_id)
+        .bind::<Integer, _>(level)
+        .bind::<Integer, _>(exp)
+        .bind::<Integer, _>(tiredness)
+        .execute(conn)
+    })
+    .await
+}
+
 async fn change_one_row(
     phase: &'static str,
     query: impl FnOnce(&mut PgConnection) -> QueryResult<usize> + Send + 'static,

@@ -25,6 +25,7 @@
 #include "../Components/MapleButton.h"
 
 #include "../../Constants.h"
+#include "../../Character/MountRules.h"
 #include "../../Data/ItemData.h"
 #include "../../Gameplay/Stage.h"
 #include "../../Util/NxFiles.h"
@@ -73,6 +74,9 @@ namespace ms
 		constexpr const char* BAG_FULL = "The requested number of slots\\ncan't be added.";
 		constexpr const char* STORAGE_FULL = "The storage slots can't be extended.";
 
+		// StringPool 0x1f9.
+		constexpr const char* NO_RIDING = "This is an item that cannot be used\\nif you do not have the Monster\\nRiding skill. Would you\\nstill like to purchase it?";
+
 		std::string advancement_question(int32_t slots)
 		{
 			return "You can expand " + std::to_string(slots) + " slots when\\nyou change occupations.\\nWould you really like to\\nexpand now even at a cost?";
@@ -117,7 +121,19 @@ namespace ms
 		auto buy = [=]() { UI::get().emplace<UICashBuy>(commodity, credit, points, prepaid); };
 
 		if (!is_expansion(commodity.item_id))
-			return buy();
+		{
+			// v83 46d211: a mount or saddle, for a job without Monster Rider.
+			Player& player = Stage::get().get_player();
+			int32_t rider = mount::rider_skill(player.get_stats().get_job().get_id());
+			int32_t prefix = commodity.item_id / 10000;
+
+			if ((prefix == 190 || prefix == 191) && player.get_skills().get_level(rider) <= 0)
+				UI::get().emplace<UIYesNo>(NO_RIDING, [buy](bool yes) { if (yes) buy(); });
+			else
+				buy();
+
+			return;
+		}
 
 		// v83 46c036, 46c55b and 470653; the dialog checks the bags' room.
 		if (commodity.price > 0 && !affordable(commodity.price, credit, points, prepaid))

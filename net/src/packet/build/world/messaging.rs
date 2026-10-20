@@ -43,6 +43,8 @@ pub enum Broadcast {
 
 /// BROADCAST_MSG kinds that carry the sender's channel and ear.
 const SUPER_MEGAPHONE: u8 = 3;
+/// BROADCAST_MSG kind for a chat line that links an item.
+const ITEM_LINE: u8 = 6;
 const ITEM_MEGAPHONE: u8 = 8;
 const TRIPLE_MEGAPHONE: u8 = 10;
 
@@ -52,6 +54,17 @@ pub fn build_broadcast(kind: Broadcast, message: &str) -> Result<Packet, Network
     packet.write_short(SendOpcode::BroadcastMsg as i16)?;
     packet.write_byte(kind as u8)?;
     packet.write_str_with_length(message)?;
+    Ok(packet)
+}
+
+/// A line in chat that links an item, or none for 0 (v83 FUN_00a22785
+/// reads the item after the message).
+pub fn build_item_line(message: &str, item_id: i32) -> Result<Packet, NetworkError> {
+    let mut packet = Packet::new_empty();
+    packet.write_short(SendOpcode::BroadcastMsg as i16)?;
+    packet.write_byte(ITEM_LINE)?;
+    packet.write_str_with_length(message)?;
+    packet.write_int(item_id)?;
     Ok(packet)
 }
 
@@ -174,6 +187,17 @@ mod tests {
             .short(0x44)
             .byte(5)
             .string("Begone")
+            .end();
+    }
+
+    #[test]
+    fn an_item_line_ends_with_its_item() {
+        let packet = build_item_line("Tired", 0).unwrap();
+        Expect::new(&packet.bytes)
+            .short(0x44)
+            .byte(6)
+            .string("Tired")
+            .int(0)
             .end();
     }
 

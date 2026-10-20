@@ -19,6 +19,7 @@
 
 #include "AttackStances.h"
 
+#include "../MountRules.h"
 #include "../Pets.h"
 
 #include "../../Data/WeaponData.h"
@@ -252,7 +253,90 @@ namespace ms
 				break;
 		}
 
-		draw(relargs + args, interstance, interexpression, interframe, interexpframe);
+		if (riding(interstance))
+			draw_mounted(relargs + args, interstance, interexpression, interframe, interexpframe);
+		else
+			draw(relargs + args, interstance, interexpression, interframe, interexpframe);
+	}
+
+	void CharLook::draw_mounted(const DrawArgument &args, Stance::Id interstance, Expression::Id interexp,
+								uint8_t interframe, uint8_t interexpframe) const
+	{
+		std::string mobaction = mount_action(interstance);
+		int32_t mountid = get_mount();
+		int32_t saddleid = get_saddle();
+		const TamingMob &mob = TamingMob::get(mountid);
+		const TamingMob *saddle = saddleid > 0 ? &TamingMob::get(saddleid, mountid) : nullptr;
+
+		Stance::Id pose = rider_pose(interstance);
+		DrawArgument riderargs = args + DrawArgument{rider_shift(interstance, interframe), false, Point<int16_t>{}};
+
+		// The parts behind the rider, back to front, then those in front.
+		auto draw_parts = [&](int8_t from, int8_t to)
+		{
+			for (int8_t z = from; z >= to; z--)
+			{
+				mob.draw(mobaction, interframe, z, args);
+
+				if (saddle)
+					saddle->draw(mobaction, interframe, z, args);
+			}
+		};
+
+		draw_parts(static_cast<int8_t>(std::size(mount::ZMAP) - 1), mount::BEHIND);
+		draw(riderargs, pose, interexp, rider_frame(pose, interframe), interexpframe);
+		draw_parts(mount::BEHIND - 1, 0);
+	}
+
+	bool CharLook::riding(Stance::Id st) const
+	{
+		return vehicle > 0 && st != Stance::Id::DEAD;
+	}
+
+	int32_t CharLook::get_mount() const
+	{
+		if (!mount::is_tamed_monster(vehicle))
+			return vehicle;
+
+		int32_t worn = equips.get_equip(EquipSlot::Id::TAMEDMOB);
+
+		return worn > 0 ? worn : vehicle;
+	}
+
+	int32_t CharLook::get_saddle() const
+	{
+		return mount::is_tamed_monster(vehicle) ? equips.get_equip(EquipSlot::Id::SADDLE) : 0;
+	}
+
+	std::string CharLook::mount_action(Stance::Id st) const
+	{
+		int32_t mountid = get_mount();
+		std::string mobaction = mount::action(Stance::names[st], tired, mountid);
+
+		return TamingMob::get(mountid).count(mobaction) > 0 ? mobaction : "stand1";
+	}
+
+	Stance::Id CharLook::rider_pose(Stance::Id st) const
+	{
+		return Stance::is_climbing(st) ? Stance::Id::ROPE : Stance::Id::SIT;
+	}
+
+	uint8_t CharLook::rider_frame(Stance::Id pose, uint8_t frame) const
+	{
+		uint8_t poseframe = 0;
+
+		for (uint8_t i = 0; i < frame; i++)
+			poseframe = drawinfo.nextframe(pose, poseframe);
+
+		return poseframe;
+	}
+
+	Point<int16_t> CharLook::rider_shift(Stance::Id st, uint8_t frame) const
+	{
+		Stance::Id pose = rider_pose(st);
+		Point<int16_t> navel = TamingMob::get(get_mount()).navel(mount_action(st), frame);
+
+		return navel - drawinfo.get_body_position(pose, rider_frame(pose, frame));
 	}
 
 	void CharLook::draw(Point<int16_t> position, bool flipped, Stance::Id interstance,
@@ -260,6 +344,14 @@ namespace ms
 	{
 		interstance = equips.adjust_stance(interstance);
 		draw({position, flipped}, interstance, interexpression, 0, 0);
+	}
+
+	void CharLook::draw(const DrawArgument &args, Stance::Id interstance, Expression::Id interexpression) const
+	{
+		if (riding(interstance))
+			draw_mounted(args, interstance, interexpression, 0, 0);
+		else
+			draw(args, equips.adjust_stance(interstance), interexpression, 0, 0);
 	}
 
 	bool CharLook::update(uint16_t timestep)
@@ -540,11 +632,22 @@ namespace ms
 
 	uint16_t CharLook::get_delay(Stance::Id st, uint8_t fr) const
 	{
+		// A rider keeps the mount's time (0x453ad1).
+		if (riding(st))
+			return TamingMob::get(get_mount()).delay(mount_action(st), fr);
+
 		return drawinfo.get_delay(st, fr);
 	}
 
 	uint8_t CharLook::getnextframe(Stance::Id st, uint8_t fr) const
 	{
+		if (riding(st))
+		{
+			uint8_t count = TamingMob::get(get_mount()).count(mount_action(st));
+
+			return fr + 1 < count ? fr + 1 : 0;
+		}
+
 		return drawinfo.nextframe(st, fr);
 	}
 
@@ -680,7 +783,16 @@ namespace ms
 
 	Point<int16_t> CharLook::get_facepos() const
 	{
-		return drawinfo.getfacepos(stance.get(), stframe.get());
+		Stance::Id st = stance.get();
+
+		if (riding(st))
+		{
+			Stance::Id pose = rider_pose(st);
+
+			return drawinfo.getfacepos(pose, rider_frame(pose, stframe.get())) + rider_shift(st, stframe.get());
+		}
+
+		return drawinfo.getfacepos(st, stframe.get());
 	}
 
 	const Body *CharLook::get_body() const
@@ -712,6 +824,27 @@ namespace ms
 	const CharEquips &CharLook::get_equips() const
 	{
 		return equips;
+	}
+
+	void CharLook::set_vehicle(int32_t v)
+	{
+		if (vehicle == v)
+			return;
+
+		vehicle = v;
+		equips.set_riding(v > 0);
+		stframe.set(0);
+		stelapsed = 0;
+	}
+
+	int32_t CharLook::get_vehicle() const
+	{
+		return vehicle;
+	}
+
+	void CharLook::set_tired(bool t)
+	{
+		tired = t;
 	}
 
 	void CharLook::init()

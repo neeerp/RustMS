@@ -738,14 +738,16 @@ namespace ms
 			|| !gacha_exp::may_take(stats.get_stat(MapleStat::Id::LEVEL), stats.get_gachaexp()))
 			return;
 
-		// FUN_00a1288f checks the level again once answered. (It also
-		// refuses while riding, which this client can't.)
+		// FUN_00a1288f checks riding and the level again once answered.
 		UI::get().emplace<UIYesNo>(TAKE_GACHA_EXP, [](bool yes)
 		{
 			if (!yes)
 				return;
 
 			Player &player = Stage::get().get_player();
+
+			if (player.ride_refuses(true))
+				return;
 
 			if (player.get_level() > gacha_exp::MAX_LEVEL)
 				InChatMessage(Messages::ITEM_LEVEL_HIGH).drop();

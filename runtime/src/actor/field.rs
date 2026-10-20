@@ -1984,6 +1984,8 @@ mod tests {
             pets: Vec::new(),
             chalkboard: None,
             item_effect: 0,
+            ride: None,
+            mount: game::Mount::default(),
         }
     }
 

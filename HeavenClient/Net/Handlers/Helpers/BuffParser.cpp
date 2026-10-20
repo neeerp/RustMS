@@ -108,6 +108,30 @@ namespace ms
 		return ids;
 	}
 
+	BuffParser::Ride BuffParser::read_two_state(InPacket& recv, const Flags& flags)
+	{
+		Ride ride{ 0, 0 };
+
+		for (uint8_t slot = 0; slot < 7; slot++)
+		{
+			if (!flags.has(TWO_STATE + slot))
+				continue;
+
+			if (TWO_STATE + slot == RIDING)
+			{
+				ride.vehicle = recv.read_int();
+				ride.skill = recv.read_int();
+				recv.skip(TWO_STATE_SIZE[slot] - 8);
+			}
+			else
+			{
+				recv.skip(TWO_STATE_SIZE[slot]);
+			}
+		}
+
+		return ride;
+	}
+
 	std::vector<std::pair<Buffstat::Id, int32_t>> BuffParser::parse_shown(InPacket& recv, const Flags& flags)
 	{
 		std::vector<std::pair<Buffstat::Id, int32_t>> shown;
@@ -148,9 +172,11 @@ namespace ms
 
 		recv.skip(2); // defense attack and state
 
-		for (uint8_t slot = 0; slot < 7; slot++)
-			if (flags.has(TWO_STATE + slot))
-				recv.skip(TWO_STATE_SIZE[slot]);
+		// A character on a mount shows it.
+		Ride ride = read_two_state(recv, flags);
+
+		if (ride.vehicle != 0)
+			shown.emplace_back(Buffstat::MONSTER_RIDING, ride.vehicle);
 
 		return shown;
 	}

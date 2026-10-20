@@ -8,8 +8,8 @@ use crate::character::Character;
 use crate::keybinding::KeybindType;
 use crate::quest::QuestProgress;
 use crate::schema::{
-    accounts, character_quests, characters, equipment_stats, gacha_exp, inventory_items,
-    keybindings, monster_book_cards, skills, teleport_rocks,
+    accounts, character_mounts, character_quests, characters, equipment_stats, gacha_exp,
+    inventory_items, keybindings, monster_book_cards, skills, teleport_rocks,
 };
 use diesel::pg::PgConnection;
 use diesel::prelude::*;
@@ -18,7 +18,8 @@ use game::inventory::DEFAULT_SLOT_LIMIT;
 use game::quest::{decode_kills, encode_kills};
 use game::{
     AvatarLook, CharacterStats, EquipStats, Inventory, InventoryType, Item, KeyBinding, Keymap,
-    MonsterBook, Player, QuestLog, QuestRecord, QuestStatus, SkillBook, SkillRecord, TeleportRocks,
+    MonsterBook, Mount, Player, QuestLog, QuestRecord, QuestStatus, SkillBook, SkillRecord,
+    TeleportRocks,
 };
 use std::collections::HashMap;
 use std::convert::TryFrom;
@@ -219,6 +220,22 @@ pub fn load_player(character_id: i32) -> crate::Result<Player> {
         .first(&mut conn)
         .optional()?
         .unwrap_or(0);
+    if let Some((level, exp, tiredness)) = character_mounts::table
+        .find(character_id)
+        .select((
+            character_mounts::level,
+            character_mounts::exp,
+            character_mounts::tiredness,
+        ))
+        .first(&mut conn)
+        .optional()?
+    {
+        player.mount = Mount {
+            level,
+            exp,
+            tiredness,
+        };
+    }
     Ok(player)
 }
 
@@ -229,6 +246,26 @@ pub fn save_player(player: &Player) -> crate::Result<()> {
     let mut conn = crate::connection()?;
     conn.transaction(|conn| write_player(conn, player))
         .map_err(Into::into)
+}
+
+/// Keep a row for a mount only once it differs from a new one.
+fn save_mount(conn: &mut PgConnection, id: i32, mount: &Mount) -> QueryResult<()> {
+    if *mount == Mount::default() {
+        diesel::delete(character_mounts::table.find(id)).execute(conn)?;
+        return Ok(());
+    }
+    let values = (
+        character_mounts::level.eq(mount.level),
+        character_mounts::exp.eq(mount.exp),
+        character_mounts::tiredness.eq(mount.tiredness),
+    );
+    diesel::insert_into(character_mounts::table)
+        .values((character_mounts::character_id.eq(id), values))
+        .on_conflict(character_mounts::character_id)
+        .do_update()
+        .set(values)
+        .execute(conn)?;
+    Ok(())
 }
 
 /// Write the whole player within the caller's transaction.
@@ -306,6 +343,7 @@ pub(crate) fn write_player(conn: &mut PgConnection, player: &Player) -> QueryRes
         } else {
             diesel::delete(gacha_exp::table.find(id)).execute(conn)?;
         }
+        save_mount(conn, id, &player.mount)?;
         save_inventory(conn, id, &player.inventory)?;
         crate::pet::save(conn, &player.inventory, &player.pets)?;
         // Kill progress of started quests.

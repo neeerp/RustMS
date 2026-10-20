@@ -83,6 +83,9 @@ pub mod equip_slot {
     pub const SHIELD: i16 = -10;
     pub const RINGS: [i16; 4] = [-12, -13, -15, -16];
     pub const PENDANT: i16 = -17;
+    /// The tamed monster (190xxxx) and its saddle (191xxxx).
+    pub const MOUNT: i16 = -18;
+    pub const SADDLE: i16 = -19;
     pub const MEDAL: i16 = -49;
     pub const BELT: i16 = -50;
 
@@ -104,6 +107,8 @@ pub mod equip_slot {
             112 => Some(PENDANT),
             113 => Some(BELT),
             114 => Some(MEDAL),
+            190 => Some(MOUNT),
+            191 => Some(SADDLE),
             130..=170 => Some(WEAPON),
             _ => None,
         }

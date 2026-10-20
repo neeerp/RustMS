@@ -28,6 +28,7 @@
 #include "CharEquips.h"
 #include "Face.h"
 #include "Hair.h"
+#include "TamingMob.h"
 
 #include "../../Net/Login.h"
 #include "../../Template/Interpolated.h"
@@ -48,6 +49,9 @@ namespace ms
 		void draw(const DrawArgument &args, float alpha) const;
 
 		void draw(Point<int16_t> pos, bool flip, Stance::Id stance, Expression::Id expression) const;
+
+		// Draw a still pose, on the mount if riding one.
+		void draw(const DrawArgument &args, Stance::Id stance, Expression::Id expression) const;
 
 		bool update(uint16_t timestep);
 
@@ -129,6 +133,14 @@ namespace ms
 
 		const CharEquips &get_equips() const;
 
+		// Ride a mount (190xxxx or 193xxxx), or get off with 0 (report 201).
+		void set_vehicle(int32_t vehicle);
+
+		int32_t get_vehicle() const;
+
+		// Whether the mount stands tired (SET_TAMING_MOB_INFO).
+		void set_tired(bool tired);
+
 		// Initialize drawinfo
 		static void init();
 
@@ -138,6 +150,28 @@ namespace ms
 
 		void draw(const DrawArgument &args, Stance::Id interstance, Expression::Id interexp, uint8_t interframe,
 				  uint8_t interfcframe) const;
+
+		// Draw the mount, and the rider sitting on it (FUN_00401de9).
+		void draw_mounted(const DrawArgument &args, Stance::Id interstance, Expression::Id interexp,
+						  uint8_t interframe, uint8_t interexpframe) const;
+
+		// Whether the mount shows in this stance: a dead rider is a ghost without one.
+		bool riding(Stance::Id stance) const;
+
+		// The mount drawn: the one worn, or its cash cover, for a tamed monster, and the ride's for a vehicle.
+		int32_t get_mount() const;
+
+		// The saddle drawn, 0 for none.
+		int32_t get_saddle() const;
+
+		// The mount's action for the rider's stance (FUN_004138be).
+		std::string mount_action(Stance::Id stance) const;
+
+		// The rider's pose and its frame for the mount's frame (FUN_00407757), and how far the rider is moved
+		// to sit on the mount's navel.
+		Stance::Id rider_pose(Stance::Id stance) const;
+		uint8_t rider_frame(Stance::Id pose, uint8_t frame) const;
+		Point<int16_t> rider_shift(Stance::Id stance, uint8_t frame) const;
 
 		// Draw the hair over the head and the cap, which covers some of it.
 		void draw_cap(const DrawArgument &args, Stance::Id stance, uint8_t frame) const;
@@ -169,6 +203,8 @@ namespace ms
 		const Face *face;
 		CharEquips equips;
 		std::array<int32_t, 3> pet_wear = {};
+		int32_t vehicle = 0;
+		bool tired = false;
 
 		Randomizer randomizer;
 		TimedBool alerted;

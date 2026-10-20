@@ -18,6 +18,7 @@
 #include "OtherChar.h"
 
 #include "Diseases.h"
+#include "MountRules.h"
 
 #include "../Constants.h"
 #include "../Gameplay/Combat/FlashJump.h"
@@ -84,7 +85,11 @@ namespace ms
 
 	void OtherChar::update_look(const LookEntry &newlook)
 	{
+		// The new look rides as the old did.
+		int32_t riding = look.get_vehicle();
 		look = newlook;
+		look.set_vehicle(riding);
+		look.set_tired(mount::tired(mount_level, mount_fatigue));
 
 		set_state(path.get_state().stance);
 	}
@@ -97,6 +102,10 @@ namespace ms
 
 			if (stat == Buffstat::Id::COMBO)
 				show_combo(value - 1, init);
+
+			// One spawned on a mount is on it at once (0x983cdd).
+			if (stat == Buffstat::Id::MONSTER_RIDING)
+				ride(value, init);
 		}
 
 		show_diseases();
@@ -110,6 +119,9 @@ namespace ms
 
 			if (stat == Buffstat::Id::COMBO)
 				show_combo(-1, false);
+
+			if (stat == Buffstat::Id::MONSTER_RIDING)
+				ride(0, false);
 		}
 
 		show_diseases();

@@ -48,6 +48,17 @@ namespace ms
 		UIElement::Type get_type() const override;
 
 		void update_stats(int32_t character_id, int16_t job_id, int8_t level, int16_t fame, std::string guild, std::string alliance);
+
+		// The mount's state, from CHAR_INFO.
+		struct Mount
+		{
+			int32_t level;
+			int32_t exp;
+			int32_t tiredness;
+		};
+
+		// Show the mount the character wears, and open the taming box to it (FUN_00903db7).
+		void update_mount(int32_t character_id, const Mount &mount);
 		// Show the fame the player just raised or dropped (FAME_RESPONSE).
 		void change_fame(int16_t fame);
 
@@ -96,9 +107,16 @@ namespace ms
 		void set_mode(Mode mode);
 		void set_panel(Panel panel);
 
+		// Whether the window can show the mount: not when the saddle worn doesn't fit it (FUN_00903e24).
+		bool shows_mount() const;
+
 		int32_t cid;
 		bool known;
 		CharLook look;
+		// The character on the mount they wear, drawn in the taming box when the saddle fits it.
+		bool riding;
+		CharLook rider;
+		DrawArgument rider_args;
 
 		Mode mode;
 		Panel panel;
@@ -112,5 +130,10 @@ namespace ms
 		Text fame;
 		Text guild;
 		Text alliance;
+		Text mount_name;
+		Text mount_type;
+		Text mount_level;
+		Text mount_exp;
+		Text mount_tiredness;
 	};
 }

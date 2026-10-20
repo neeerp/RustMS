@@ -765,7 +765,8 @@ namespace ms
 
 	void Stage::check_seats()
 	{
-		if (player.is_sitting() || player.is_attacking())
+		// Not on a mount, wherever the player is (FUN_0094e45f).
+		if (player.is_sitting() || player.is_attacking() || player.ride_refuses())
 			return;
 
 		Optional<const Seat> seat = mapinfo.findseat(player.get_position());

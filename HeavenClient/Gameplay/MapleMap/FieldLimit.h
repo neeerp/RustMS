@@ -16,6 +16,7 @@ namespace ms
 		constexpr int32_t RETURN_SCROLLS = 0x20;
 		constexpr int32_t TELEPORT_ROCKS = 0x40;
 		constexpr int32_t MAP_SCROLLS = 0x100;
+		constexpr int32_t RIDING = 0x200;
 		constexpr int32_t CONSUMABLES = 0x400;
 		constexpr int32_t PARTY_LEADER = 0x800;
 		constexpr int32_t WEATHER_ITEMS = 0x4000;
@@ -196,6 +197,30 @@ namespace ms
 				case 3121003:  // Dragon's Breath
 				case 3221003:
 				case 5201006:  // Recoil Shot
+					return false;
+				default:
+					return true;
+			}
+		}
+
+		// v83 FUN_00969e21: bit 0x2 stops the dashes and the transformations
+		// that move the player faster, with "You cannot use that skill on
+		// this map."
+		inline bool may_buff(int32_t fieldlimit, int32_t skill_id)
+		{
+			if (!(fieldlimit & MOVEMENT_SKILLS))
+				return true;
+
+			switch (skill_id)
+			{
+				case 1014:     // Space Dash
+				case 10001015:
+				case 5001005:  // Dash
+				case 15001003:
+				case 5111005:  // Transformation
+				case 5121003:  // Super Transformation
+				case 15111002:
+				case 13111005: // Albatross
 					return false;
 				default:
 					return true;

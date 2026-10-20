@@ -21,6 +21,7 @@
 #include "PlayerStates.h"
 #include "SecondaryStat.h"
 #include "SkillId.h"
+#include "Inventory/ItemProperties.h"
 
 #include "../Audio/Audio.h"
 #include "../Data/BulletData.h"
@@ -39,6 +40,7 @@
 #include "../IO/UITypes/UISkillBook.h"
 #include "../IO/UITypes/UIStatsInfo.h"
 #include "../IO/UITypes/UIStatusBar.h"
+#include "../Net/Packets/AttackAndSkillPackets.h"
 #include "../Net/Packets/GameplayPackets.h"
 #include "../Net/Packets/PlayerPackets.h"
 #include "../Net/Packets/InventoryPackets.h"
@@ -279,8 +281,12 @@ namespace ms
 
 		if (int16_t slot = inventory.find_item(type, itemid))
 		{
-			if (type == InventoryType::Id::USE && !Stage::get().get_mapinfo().can_use_item(itemid))
+			if (type == InventoryType::Id::USE && itemid / 10000 == 226)
+				feed_mount(slot, itemid);
+			else if (type == InventoryType::Id::USE && !Stage::get().get_mapinfo().can_use_item(itemid))
 				InChatMessage(Messages::ITEM_FIELD).drop();
+			else if (type == InventoryType::Id::USE && field_limit::is_use_item(itemid) && ride_refuses(true))
+				return;
 			else if (type == InventoryType::Id::USE && !disease::can_use_item(get_diseases()))
 				return;
 			else if (type == InventoryType::Id::USE && pets::is_food(itemid))
@@ -339,6 +345,29 @@ namespace ms
 				pst->send_action(*this, KeyAction::Id::JUMP, true);
 
 			phobj.walkspeed = get_walkspeed();
+
+			// A mount or the shoes grip the ground by their fs, spiked shoes
+			// at 10, and swim at their swim percent of the speed, kicking at
+			// the speed (FUN_0094d3d9).
+			double grip = 1.0;
+			int32_t swim = 100;
+
+			if (ride_ability)
+			{
+				grip = ride_ability->fs;
+				swim = ride_ability->swim;
+			}
+			else if (auto shoes = inventory.get_equip(InventoryType::Id::EQUIPPED, EquipSlot::Id::SHOES))
+			{
+				const EquipData &data = EquipData::get(shoes->get_item_id());
+				grip = shoes->get_flags() & item_properties::EQUIP_SPIKES ? 10.0 : data.get_grip();
+				swim = data.get_swim();
+			}
+
+			phobj.walkforce = grip;
+			phobj.walkdrag = grip;
+			phobj.swimspeed = phobj.walkspeed * swim / 100.0;
+			phobj.swimkick = phobj.walkspeed;
 			pst->update(*this);
 
 			// v83 marks every knockback in the path as element 2 when it
@@ -1254,7 +1283,7 @@ namespace ms
 		if (look.get_alerted())
 			return;
 
-		if (!phobj.onground || is_sitting() || is_climbing() || attacking || is_dead())
+		if (!phobj.onground || is_sitting() || is_climbing() || attacking || is_dead() || ride_refuses())
 			return;
 
 		nl::node info = nl::nx::item["Install"]["0301.img"][string_format::extend_id(itemid, 8)]["info"];
@@ -1319,13 +1348,113 @@ namespace ms
 
 	int32_t Player::get_walk_animation_speed() const
 	{
+		if (ride_ability)
+			return ride_ability->speed;
+
 		return stats.get_total(EquipStat::Id::SPEED);
 	}
 
+	void Player::ask_ride(int32_t off)
+	{
+		if (off > 0)
+			CancelBuffPacket(off).dispatch();
+
+		ride_pending.asked(now_ms());
+	}
+
+	bool Player::is_ride_locked() const
+	{
+		return ride_pending.waiting(now_ms()) || is_switching_vehicle();
+	}
+
+	void Player::change_ride(int32_t v)
+	{
+		ride_pending.answered();
+
+		// The effect is the mount's got on, or the one got off.
+		int32_t shown = v > 0 ? v : vehicle;
+
+		if (shown <= 0)
+			return;
+
+		if (mount::is_tamed_monster(shown))
+			show_ride_effect(mount::rider_skill(stats.get_stat(MapleStat::Id::JOB)));
+
+		ride(v, false);
+
+		if (auto statsinfo = UI::get().get_element<UIStatsInfo>())
+			statsinfo->update_all_stats();
+	}
+
+	bool Player::can_get_on() const
+	{
+		int32_t mob = inventory.get_item_id(InventoryType::Id::EQUIPPED, EquipSlot::Id::TAMEDMOB);
+		int32_t saddle = inventory.get_item_id(InventoryType::Id::EQUIPPED, EquipSlot::Id::SADDLE);
+
+		if (mob == 0 || saddle == 0)
+		{
+			InChatMessage(Messages::Type::RIDE_NO_SADDLE).drop();
+			return false;
+		}
+
+		nl::node items = nl::nx::character["TamingMob"];
+		auto info = [&items](int32_t id)
+		{
+			return items[string_format::extend_id(id, 8) + ".img"]["info"];
+		};
+
+		// The saddle, and anything else the mount wears (slot -20), have a least level for it.
+		int32_t worn = inventory.get_item_id(InventoryType::Id::EQUIPPED, 20);
+		bool ready = info(mob)["tamingMob"].get_integer() != 0 &&
+			info(saddle)["reqMobLevel"].get_integer() <= mount_level &&
+			(worn == 0 || info(worn)["reqMobLevel"].get_integer() <= mount_level) &&
+			!(Stage::get().get_mapinfo().get_fieldlimit() & field_limit::RIDING);
+
+		if (!ready)
+			InChatMessage(Messages::Type::RIDE_REFUSED).drop();
+
+		return ready;
+	}
+
+	bool Player::ride_refuses(bool monster_only) const
+	{
+		int32_t ridden = look.get_vehicle();
+		bool monster = mount::is_tamed_monster(ridden);
+
+		if (!monster && (monster_only || !mount::is_vehicle(ridden)))
+			return false;
+
+		InChatMessage(monster ? Messages::Type::RIDING_MONSTER : Messages::Type::RIDING_VEHICLE).drop();
+
+		return true;
+	}
+
+	bool Player::ride_keeps(int32_t itemid)
+	{
+		int32_t type = itemid / 10000;
+
+		if (!mount::is_tamed_monster(look.get_vehicle()) || (type != 190 && type != 191))
+			return false;
+
+		ask_ride(mount::rider_skill(stats.get_stat(MapleStat::Id::JOB)));
+
+		return true;
+	}
+
+	void Player::feed_mount(int16_t slot, int32_t itemid)
+	{
+		if (mount::is_tamed_monster(look.get_vehicle()))
+			request(MountFoodPacket(slot, itemid), ExclRequest::USE_WAIT);
+	}
+
 	// CUserLocal clamps SPEED to 80-140 and JUMP to 80-123 before turning
-	// them into shoe multipliers (FUN_007a4dec).
+	// them into shoe multipliers (FUN_007a4dec). A rider moves as the mount
+	// does instead (FUN_0094d3d9).
 	double Player::get_walkspeed() const
 	{
+		if (ride_ability)
+			return ride_ability->speed / 100.0;
+
 		std::optional<int32_t> slow;
 
 		if (has_buff(Buffstat::Id::SLOW))
@@ -1338,6 +1467,9 @@ namespace ms
 
 	double Player::get_jumpforce() const
 	{
+		if (ride_ability)
+			return Physics::jump_speed(ride_ability->jump / 100.0);
+
 		return Physics::jump_speed(std::clamp<int32_t>(stats.get_total(EquipStat::Id::JUMP), 80, 123) / 100.0);
 	}
 

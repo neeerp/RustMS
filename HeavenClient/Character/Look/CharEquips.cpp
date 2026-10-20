@@ -27,6 +27,9 @@ namespace ms
 
 	void CharEquips::draw(EquipSlot::Id slot, Stance::Id stance, Clothing::Layer layer, uint8_t frame, const DrawArgument& args) const
 	{
+		if (riding && (slot == EquipSlot::Id::WEAPON || slot == EquipSlot::Id::SHIELD))
+			return;
+
 		if (const Clothing* cloth = clothes[slot])
 			cloth->draw(stance, layer, frame, args);
 	}
@@ -143,6 +146,11 @@ namespace ms
 	int32_t CharEquips::get_weapon() const
 	{
 		return get_equip(EquipSlot::Id::WEAPON);
+	}
+
+	void CharEquips::set_riding(bool r)
+	{
+		riding = r;
 	}
 
 	std::unordered_map<int32_t, Clothing> CharEquips::cloth_cache;

@@ -306,6 +306,20 @@ namespace ms
 		}
 	};
 
+	// Requests feeding the tamed monster ridden the food (226xxxx) in a USE
+	// slot, v83 FUN_00a09a64
+	// Opcode: USE_MOUNT_FOOD(77)
+	class MountFoodPacket : public OutPacket
+	{
+	public:
+		MountFoodPacket(int16_t slot, int32_t itemid) : OutPacket(OutPacket::Opcode::USE_MOUNT_FOOD)
+		{
+			write_time();
+			write_short(slot);
+			write_int(itemid);
+		}
+	};
+
 	// Requests opening the summoning sack (210xxxx) in a USE slot, v83
 	// FUN_00a0977b
 	// Opcode: USE_SUMMON_BAG(75)

@@ -62,6 +62,7 @@ pub enum RecvOpcode {
     UseItem = 0x48,
     UseSummonBag = 0x4B,
     PetFood = 0x4C,
+    UseMountFood = 0x4D,
     UseCashItem = 0x4F,
     CancelItemEffect = 0x49,
     UseSkillBook = 0x52,

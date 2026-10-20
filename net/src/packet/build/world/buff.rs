@@ -1,7 +1,7 @@
 //! Buffs, skill cooldowns, and skill effects.
 
 use crate::{error::NetworkError, packet::op::SendOpcode};
-use game::{BuffStat, ShownBuff};
+use game::{BuffStat, Mount, Ride, ShownBuff};
 use packet::{io::write::PktWrite, Packet};
 
 /// A temporary stat's bit in the client's 128-bit flags, as the two longs
@@ -155,6 +155,63 @@ pub fn build_cancel_foreign_buff(
     p.write_short(SendOpcode::CancelForeignBuff as i16)?;
     p.write_int(character_id)?;
     write_mask(&mut p, stats.iter().map(|stat| stat.bit()))?;
+    Ok(p)
+}
+
+/// Riding's two-state data (RideVehicle, bit 85; v83 0x793ef2): the mount
+/// and the skill riding it, then when it started, which the client never
+/// times out.
+pub(crate) fn write_ride(p: &mut Packet, ride: Option<Ride>) -> Result<(), NetworkError> {
+    let (item_id, skill_id) = ride.map_or((0, 0), |ride| (ride.item_id, ride.skill_id));
+    p.write_int(item_id)?;
+    p.write_int(skill_id)?;
+    p.write_byte(0)?; // start before (1) or after now
+    p.write_int(0)?; // how long
+    Ok(())
+}
+
+/// GIVE_BUFF for riding: the player gets on their mount. A two-state stat
+/// has no value, skill and duration of its own: its data follows the
+/// defense bytes, and riding moves the player, so one more byte ends it.
+pub fn build_give_ride(ride: Ride) -> Result<Packet, NetworkError> {
+    let mut p = Packet::new_empty();
+    p.write_short(SendOpcode::GiveBuff as i16)?;
+    write_mask(&mut p, [BuffStat::Riding.bit()])?;
+    p.write_byte(0)?; // defense attack
+    p.write_byte(0)?; // defense state
+    write_ride(&mut p, Some(ride))?;
+    p.write_short(0)?; // delay
+    p.write_byte(0)?;
+    Ok(p)
+}
+
+/// GIVE_FOREIGN_BUFF for riding: another player got on their mount.
+pub fn build_give_foreign_ride(character_id: i32, ride: Ride) -> Result<Packet, NetworkError> {
+    let mut p = Packet::new_empty();
+    p.write_short(SendOpcode::GiveForeignBuff as i16)?;
+    p.write_int(character_id)?;
+    write_mask(&mut p, [BuffStat::Riding.bit()])?;
+    p.write_byte(0)?; // defense attack
+    p.write_byte(0)?; // defense state
+    write_ride(&mut p, Some(ride))?;
+    p.write_short(0)?; // delay
+    Ok(p)
+}
+
+/// SET_TAMING_MOB_INFO: a player's mount's level, EXP and tiredness;
+/// `level_up` plays its level-up effect.
+pub fn build_taming_mob_info(
+    character_id: i32,
+    mount: &Mount,
+    level_up: bool,
+) -> Result<Packet, NetworkError> {
+    let mut p = Packet::new_empty();
+    p.write_short(SendOpcode::SetTamingMobInfo as i16)?;
+    p.write_int(character_id)?;
+    p.write_int(mount.level)?;
+    p.write_int(mount.exp)?;
+    p.write_int(mount.tiredness)?;
+    p.write_byte(u8::from(level_up))?;
     Ok(p)
 }
 
@@ -375,6 +432,51 @@ mod tests {
         let mut expect = Expect::new(&packet.bytes);
         expect.short(SendOpcode::CancelBuff as i16);
         expect.long(0).long(0x80_0000_0004).byte(1);
+        expect.end();
+    }
+
+    #[test]
+    fn riding_carries_the_mount_and_skill_in_its_two_state_block() {
+        let ride = Ride {
+            item_id: 1902000,
+            skill_id: 1004,
+        };
+        let packet = build_give_ride(ride).unwrap();
+        let mut expect = Expect::new(&packet.bytes);
+        expect.short(SendOpcode::GiveBuff as i16);
+        expect.long(1 << 53).long(0);
+        expect.byte(0).byte(0);
+        expect.int(1902000).int(1004).byte(0).int(0);
+        expect.short(0).byte(0);
+        expect.end();
+
+        let packet = build_give_foreign_ride(7, ride).unwrap();
+        let mut expect = Expect::new(&packet.bytes);
+        expect.short(SendOpcode::GiveForeignBuff as i16).int(7);
+        expect.long(1 << 53).long(0);
+        expect.byte(0).byte(0);
+        expect.int(1902000).int(1004).byte(0).int(0);
+        expect.short(0);
+        expect.end();
+
+        let packet = build_cancel_buff(&[BuffStat::Riding]).unwrap();
+        let mut expect = Expect::new(&packet.bytes);
+        expect.short(SendOpcode::CancelBuff as i16);
+        expect.long(1 << 53).long(0).byte(1);
+        expect.end();
+    }
+
+    #[test]
+    fn taming_mob_info_carries_the_mount() {
+        let mount = Mount {
+            level: 3,
+            exp: 60,
+            tiredness: 12,
+        };
+        let packet = build_taming_mob_info(7, &mount, true).unwrap();
+        let mut expect = Expect::new(&packet.bytes);
+        expect.short(SendOpcode::SetTamingMobInfo as i16).int(7);
+        expect.int(3).int(60).int(12).byte(1);
         expect.end();
     }
 
