@@ -82,8 +82,9 @@ pub use self::npc_shop::NpcShopActionHandler;
 pub use self::party::{DenyPartyRequestHandler, MultiChatHandler, PartyOperationHandler};
 pub use self::party_search_update::PartySearchUpdateHandler;
 pub use self::pet::{
-    next_dry_up, pets_dry_up, pets_grow_hungry, DeadPetHandler, MovePetHandler, PetChatHandler,
-    PetCommandHandler, PetFoodHandler, PetLootHandler, PetsAged, SpawnPetHandler,
+    next_dry_up, pets_dry_up, pets_grow_hungry, revive_pet, DeadPetHandler, MovePetHandler,
+    PetChatHandler, PetCommandHandler, PetFoodHandler, PetLootHandler, PetsAged, SpawnPetHandler,
+    WaterOfLifeHandler,
 };
 pub use self::pickup::ItemPickupHandler;
 pub use self::player_interaction::PlayerInteractionHandler;

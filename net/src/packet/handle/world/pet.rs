@@ -1,6 +1,7 @@
 //! Pets (report 159): summoning one from the Cash Inventory, sending it
 //! back, its moves, commands, chat, food and hunger.
 
+use crate::dialogue::NpcInteraction;
 use crate::handler::{
     FieldRequest, HandlerResult, WorldAction, WorldContext, WorldHandler, WorldResult,
 };
@@ -61,6 +62,17 @@ pub struct DeadPetHandler;
 impl WorldHandler for DeadPetHandler {
     fn handle(&self, _packet: &mut Packet, _ctx: &mut WorldContext) -> WorldResult {
         Ok(HandlerResult::reply(build_stat_update(true, &[])?))
+    }
+}
+
+/// WATER_OF_LIFE (0x75, FUN_00a1dce6): a Water of Life was double-clicked;
+/// no body. Mar the Fairy offers to revive a doll (as Cosmic has it; what
+/// the original server did is unknown).
+pub struct WaterOfLifeHandler;
+
+impl WorldHandler for WaterOfLifeHandler {
+    fn handle(&self, _packet: &mut Packet, _ctx: &mut WorldContext) -> WorldResult {
+        Ok(HandlerResult::empty().with(WorldAction::NpcInteraction(NpcInteraction::WaterOfLife)))
     }
 }
 
@@ -471,6 +483,22 @@ pub fn pets_dry_up(player: &mut Player, now: SystemTime) -> PetsAged {
     dried
 }
 
+/// Bring the doll `serial` back to life until `until`; the item re-sent,
+/// or `None` if the player has no such doll.
+pub fn revive_pet(
+    player: &mut Player,
+    serial: i64,
+    until: SystemTime,
+) -> Option<Vec<InventoryChange>> {
+    let (slot, mut item) = player
+        .inventory
+        .items(InventoryType::Cash)
+        .find(|(_, item)| item.cash_serial == Some(serial) && pet::is_doll(item))
+        .map(|(slot, item)| (slot, item.clone()))?;
+    item.expiration = Some(until);
+    Some(put_back(player, slot, item).into())
+}
+
 /// When the next of the player's living pets dries up, if one ever does.
 pub fn next_dry_up(player: &Player) -> Option<SystemTime> {
     player
@@ -804,5 +832,24 @@ mod tests {
         let refused = SpawnPetHandler.handle(&mut p, &mut ctx).unwrap();
         assert!(matches!(refused.actions[..], [WorldAction::Reply(_)]));
         assert_eq!(player.pets, [77]);
+    }
+
+    #[test]
+    fn a_revived_doll_lives_until_its_new_date() {
+        use std::time::{Duration, UNIX_EPOCH};
+        let until = UNIX_EPOCH + Duration::from_secs(300);
+        let mut player = two_pets(50, 50);
+        assert_eq!(revive_pet(&mut player, 78, until), None, "alive already");
+        let mut kitty = player
+            .inventory
+            .get(InventoryType::Cash, 4)
+            .unwrap()
+            .clone();
+        kitty.expiration = Some(pet::doll_date());
+        player.inventory.insert(InventoryType::Cash, 4, kitty);
+        assert_eq!(revive_pet(&mut player, 78, until).map(|c| c.len()), Some(2));
+        let kitty = player.inventory.get(InventoryType::Cash, 4).unwrap();
+        assert_eq!(kitty.expiration, Some(until));
+        assert_eq!(next_dry_up(&player), Some(until));
     }
 }

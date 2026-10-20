@@ -356,6 +356,12 @@ impl ClientActor {
                 })
                 .await?
             }
+            WorldAction::NpcInteraction(NpcInteraction::WaterOfLife) => {
+                let player = &self.in_game()?.player;
+                if let Some(script) = net::npc_scripts::NpcScript::water_of_life(player) {
+                    self.start_script(script).await?
+                }
+            }
             WorldAction::NpcInteraction(NpcInteraction::Respond {
                 message_type,
                 response,

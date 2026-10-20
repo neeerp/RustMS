@@ -134,6 +134,14 @@ pub mod keys {
 
     pub const SECOND_JOB_INVENTORY_FULL: &str = "second_job.inventory_full";
 
+    /// Mar the Fairy and the Water of Life: the dolls to pick from, then for
+    /// the one picked (`{name}`, revived for `{days}`) the offer and the
+    /// pet awake; or no doll at all.
+    pub const WATER_OF_LIFE_PICK: &str = "water_of_life.pick";
+    pub const WATER_OF_LIFE_ASK: &str = "water_of_life.ask";
+    pub const WATER_OF_LIFE_DONE: &str = "water_of_life.done";
+    pub const WATER_OF_LIFE_NO_DOLL: &str = "water_of_life.no_doll";
+
     /// Every key: one per placeholder.
     pub fn all() -> Vec<String> {
         super::parse_text(super::PLACEHOLDER_TEXT, "placeholder_text.toml")

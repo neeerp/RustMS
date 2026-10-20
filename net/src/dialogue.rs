@@ -17,6 +17,8 @@ pub enum NpcInteraction {
         response: i8,
         selection: Option<i32>,
     },
+    /// A Water of Life was used: Mar the Fairy offers to revive a doll.
+    WaterOfLife,
 }
 
 /// One server-driven NPC prompt.

@@ -39,6 +39,12 @@ pub enum Effect {
         item_id: i32,
         quantity: i16,
     },
+    /// Bring the doll with cash serial `serial` back to life for `days`;
+    /// nothing is applied if the player no longer has it.
+    RevivePet {
+        serial: i64,
+        days: i32,
+    },
     /// Nothing is applied if the player no longer has that much.
     SpendMeso(i32),
     GainExp(i32),

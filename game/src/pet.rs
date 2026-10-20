@@ -146,6 +146,12 @@ pub fn is_pet(item_id: i32) -> bool {
     item_id / 10_000 == 500
 }
 
+/// Whether `item_id` is a Water of Life (518xxxx), which brings a doll back
+/// to life (v83 FUN_0048645b type 5).
+pub fn is_water_of_life(item_id: i32) -> bool {
+    item_id / 10_000 == 518
+}
+
 /// 2079-01-01: the date of a pet whose Water of Life has dried up. v83
 /// takes a pet dated then or later for a doll again (FUN_004e4003), so the
 /// date is how its death is kept.
