@@ -68,6 +68,37 @@ pub struct ItemInfo {
     /// Whether a pet has a chat balloon style (`info/chatBalloon`), which
     /// lets it wear a quote ring.
     pub pet_chat_balloon: bool,
+    /// What a 2x EXP (521xxxx) or drop (536xxxx) card multiplies, and when.
+    pub rate_card: Option<RateCard>,
+}
+
+/// A rate card's multiplier (`info/rate`) and the hours it works in
+/// (`info/time`).
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct RateCard {
+    pub rate: f64,
+    /// Each `"DAY:HH-HH"` entry as (day, first hour, end hour), with Monday
+    /// as day 0 and the end hour left out. `HOL` (holiday) entries are
+    /// dropped: which days count is unknown.
+    pub windows: Vec<(u8, u8, u8)>,
+}
+
+impl RateCard {
+    /// Whether it works at `hour` of `day` (Monday is 0).
+    pub fn active(&self, day: u8, hour: u8) -> bool {
+        self.windows
+            .iter()
+            .any(|&(on, from, to)| on == day && from <= hour && hour < to)
+    }
+}
+
+/// One `info/time` entry, such as `"SAT:19-23"`.
+fn rate_window(entry: &str) -> Option<(u8, u8, u8)> {
+    const DAYS: [&str; 7] = ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"];
+    let (day, hours) = entry.split_once(':')?;
+    let (from, to) = hours.split_once('-')?;
+    let day = DAYS.iter().position(|d| *d == day)?;
+    Some((day as u8, from.parse().ok()?, to.parse().ok()?))
 }
 
 /// A skill book (228xxxx) or mastery book (229xxxx).
@@ -356,6 +387,25 @@ impl ItemData {
             if item_id / 10_000 == 204 {
                 info.scroll = scroll_info(nx, node, meta)?;
             }
+            if matches!(item_id / 10_000, 521 | 536) {
+                let mut windows = Vec::new();
+                if let Some(time) = nx.child_by_name(meta, "time")? {
+                    for entry in nx.child_indices(time)? {
+                        let name = nx.node_name(entry)?;
+                        if let Some(window) = nx
+                            .string_child(time, &name)?
+                            .as_deref()
+                            .and_then(rate_window)
+                        {
+                            windows.push(window);
+                        }
+                    }
+                }
+                info.rate_card = Some(RateCard {
+                    rate: nx.real_child(meta, "rate")?.unwrap_or(1.0),
+                    windows,
+                });
+            }
         }
         if let Some(spec) = nx.child_by_name(node, "spec")? {
             let mut pets = Vec::new();
@@ -527,6 +577,7 @@ impl ItemData {
             pet_life: 0,
             pet_name_tag: false,
             pet_chat_balloon: false,
+            rate_card: None,
         }))
     }
 }
@@ -638,6 +689,28 @@ mod tests {
         let items = crate::test_assets::path("Item.nx")?;
         let equipment = crate::test_assets::path("Character.nx")?;
         Some(ItemData::load(items, equipment).unwrap())
+    }
+
+    #[test]
+    fn reads_rate_cards_and_their_hours() {
+        assert_eq!(rate_window("SAT:19-23"), Some((5, 19, 23)));
+        assert_eq!(rate_window("HOL:00-24"), None);
+        let Some(data) = data() else {
+            return;
+        };
+        // Weekend Type 5: Saturdays and Sundays, 7 to 11 pm.
+        let weekend = data.info(5211013).unwrap().unwrap().rate_card.unwrap();
+        assert_eq!(
+            (weekend.rate, weekend.windows),
+            (2.0, vec![(5, 19, 23), (6, 19, 23)])
+        );
+        // A drop card's rate is a real, and the 3x card also has a HOL entry.
+        let drop = data.info(5360000).unwrap().unwrap().rate_card.unwrap();
+        assert_eq!((drop.rate, drop.windows.len()), (2.0, 7));
+        let triple = data.info(5211060).unwrap().unwrap().rate_card.unwrap();
+        assert_eq!((triple.rate, triple.windows.len()), (3.0, 7));
+        assert!(triple.active(3, 0) && triple.active(3, 23));
+        assert!(data.info(5040000).unwrap().unwrap().rate_card.is_none());
     }
 
     #[test]

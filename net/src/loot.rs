@@ -7,6 +7,7 @@ use game_data::server_content::RewardEntry;
 use rand::Rng;
 use std::collections::HashMap;
 use std::sync::OnceLock;
+use std::time::SystemTime;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Loot {
@@ -42,12 +43,20 @@ impl Loot {
     }
 }
 
-/// Roll one mob's drops for `player`, each `showdown` percent more likely
-/// (Taunt's), then its Monster Book card.
-pub fn roll(mob_id: i32, showdown: i32, player: &Player, rng: &mut impl Rng) -> Vec<Loot> {
-    let rate = f64::from(100 + showdown) / 100.0;
+/// Roll one mob's drops for `player` at `now`, each `showdown` percent more
+/// likely (Taunt's) and scaled by the world's and their cards' rates
+/// (`crate::rates`), then its Monster Book card.
+pub fn roll(
+    mob_id: i32,
+    showdown: i32,
+    player: &Player,
+    now: SystemTime,
+    rng: &mut impl Rng,
+) -> Vec<Loot> {
+    let rate = f64::from(100 + showdown) / 100.0 * crate::rates::drop(player, now);
+    let mesos = crate::rates::meso(player, now);
     let entries = crate::content::rewards().drops(mob_id);
-    let mut loot = roll_at(entries, rate, player, rng);
+    let mut loot = roll_at(entries, (rate, mesos), player, rng);
     if let Some(card) = crate::monster_book::card_for(mob_id) {
         if rng.gen_bool(crate::monster_book::drop_rate()) {
             loot.push(Loot::Item {
@@ -70,11 +79,17 @@ pub fn roll_reactor(reactor_id: i32, player: &Player, rng: &mut impl Rng) -> Vec
 }
 
 pub fn roll_entries(entries: &[RewardEntry], player: &Player, rng: &mut impl Rng) -> Vec<Loot> {
-    roll_at(entries, 1.0, player, rng)
+    roll_at(entries, (1.0, 1.0), player, rng)
 }
 
-/// `roll_entries`, with every chance times `rate`.
-fn roll_at(entries: &[RewardEntry], rate: f64, player: &Player, rng: &mut impl Rng) -> Vec<Loot> {
+/// `roll_entries`, with every chance times `rate` and every meso amount
+/// times `mesos`.
+fn roll_at(
+    entries: &[RewardEntry],
+    (rate, mesos): (f64, f64),
+    player: &Player,
+    rng: &mut impl Rng,
+) -> Vec<Loot> {
     let mut loot = Vec::new();
     for entry in entries {
         // Quest drops only while the quest is started and the player holds
@@ -98,7 +113,8 @@ fn roll_at(entries: &[RewardEntry], rate: f64, player: &Player, rng: &mut impl R
             // v83 varies meso drops by about ±25%.
             let spread = (amount / 4).max(0);
             let amount = rng.gen_range(amount - spread, amount + spread + 1).max(1);
-            loot.push(Loot::Mesos(amount));
+            let amount = (f64::from(amount) * mesos).round().min(f64::from(i32::MAX)) as i32;
+            loot.push(Loot::Mesos(amount.max(1)));
         } else if let Some(item_id) = entry.item {
             let (min, max) = (
                 entry.min.unwrap_or(1),
@@ -272,7 +288,20 @@ mod tests {
         let half = [entry(Some(4000019), None, 0.5, None)];
         // Twice as likely: always.
         for _ in 0..50 {
-            assert_eq!(roll_at(&half, 2.0, &player, &mut rng).len(), 1);
+            assert_eq!(roll_at(&half, (2.0, 1.0), &player, &mut rng).len(), 1);
+        }
+    }
+
+    #[test]
+    fn the_meso_rate_multiplies_each_amount() {
+        let mut rng = rand::rngs::StdRng::seed_from_u64(4);
+        let player = crate::codec::stats::sample_player();
+        let mesos = [entry(None, Some(100), 1.0, None)];
+        for _ in 0..50 {
+            let [Loot::Mesos(amount)] = roll_at(&mesos, (1.0, 2.0), &player, &mut rng)[..] else {
+                panic!("one meso drop");
+            };
+            assert!((150..=250).contains(&amount) && amount % 2 == 0);
         }
     }
 

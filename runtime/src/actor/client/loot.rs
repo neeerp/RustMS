@@ -24,7 +24,8 @@ impl ClientActor {
         y: i16,
     ) -> Result<(), RuntimeError> {
         let player = &self.in_game()?.player;
-        let loot = loot::roll(mob_id, showdown, player, &mut rand::thread_rng());
+        let now = std::time::SystemTime::now();
+        let loot = loot::roll(mob_id, showdown, player, now, &mut rand::thread_rng());
         let ownership = match net::mobs::info(mob_id) {
             Some(mob) if mob.explosive_reward => Ownership::Explosive,
             Some(mob) if mob.public_reward => Ownership::FreeForAll,
