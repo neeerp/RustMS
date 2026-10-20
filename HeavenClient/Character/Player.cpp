@@ -1070,8 +1070,16 @@ namespace ms
 
 	MobAttackResult Player::damage(const MobAttack &attack)
 	{
+		// A magic attack with an element is resisted by the job's resistance
+		// skill (0x9583fa).
+		int32_t resist = 0;
+
+		if (attack.magic)
+			if (int32_t skill = mob_damage::resistance_skill(stats.get_stat(MapleStat::Id::JOB), attack.element))
+				resist = skill_stats(skillbook, skill).x;
+
 		int32_t damage = stats.calculate_damage(attack, randomizer.next_real(1.0), randomizer.next_real(1.0),
-												 get_buff_value(Buffstat::Id::INVINCIBLE));
+												 get_buff_value(Buffstat::Id::INVINCIBLE), resist);
 
 		if (mob_damage::blinded(attack.blind, randomizer.next_real(1.0)))
 			damage = 0;

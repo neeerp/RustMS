@@ -819,6 +819,22 @@ pub struct Taken {
     pub shown: i32,
 }
 
+/// A Poison tick of `poison` less the player's resistance to poison, as a
+/// v83 client works it out (FUN_00765a34, 0x94b075): Dragon Knights, F/P
+/// Wizards, Priests and Blaze Wizards take their skill's `x` percent off;
+/// I/L Wizards don't resist poison.
+pub fn poison_resisted(player: &Player, poison: i32) -> i32 {
+    let skill = match player.stats.job {
+        131 | 132 => 1310000,
+        211 | 212 => 2110000,
+        231 | 232 => 2310000,
+        1211 | 1212 => 12110000,
+        _ => return poison,
+    };
+    let percent = skills::learned(player, skill).map_or(0, |skill| skill.effect.x);
+    (100 - percent) * poison / 100
+}
+
 /// What a hit of `damage` takes from the player. A v83 client sends the
 /// damage before these skills and leaves them to the server, working them
 /// out only to show the number and to drink a pet's potion in time
@@ -2380,5 +2396,27 @@ mod taken_tests {
         // Another job's Achilles does nothing.
         player.stats.job = 122;
         assert_eq!(taken(&player, 1000, true, true).hp, 1000);
+    }
+
+    #[test]
+    fn resistance_takes_its_share_off_poison() {
+        if skills::data().is_err() {
+            return;
+        }
+        let mut player = crate::codec::stats::sample_player();
+        player.stats.job = 212;
+        player.skills.set(SkillRecord {
+            skill_id: 2110000,
+            level: 20,
+            master_level: 0,
+            expiration: None,
+        });
+        // An F/P Archmage's Partial Resistance 20 keeps 70% off.
+        assert_eq!(poison_resisted(&player, 1000), 300);
+        // An I/L Wizard has none for poison, nor anyone without the skill.
+        player.stats.job = 222;
+        assert_eq!(poison_resisted(&player, 1000), 1000);
+        player.stats.job = 131;
+        assert_eq!(poison_resisted(&player, 1000), 1000);
     }
 }

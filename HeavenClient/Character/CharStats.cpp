@@ -176,7 +176,8 @@ namespace ms
 		job.change_job(id);
 	}
 
-	int32_t CharStats::calculate_damage(const MobAttack &attack, double missroll, double roll, int32_t invincible) const
+	int32_t CharStats::calculate_damage(const MobAttack &attack, double missroll, double roll, int32_t invincible,
+										int32_t resist) const
 	{
 		mob_damage::Defender player{
 				get_stat(MapleStat::Id::LEVEL),
@@ -196,7 +197,7 @@ namespace ms
 			if (mob_damage::magic_misses(player, mob, missroll))
 				return 0;
 
-			return mob_damage::magic(player, attack.matk, roll, 0, attack.magicup);
+			return mob_damage::magic(player, attack.matk, roll, resist, attack.magicup);
 		}
 
 		if (missroll * 100.0 < mob_damage::physical_miss_chance(player, mob))

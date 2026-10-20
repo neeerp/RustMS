@@ -40,6 +40,38 @@ namespace ms
 			return job % 1000 / 100;
 		}
 
+		// The skill whose x percent a job resists a magic attack of
+		// `element` (1 ice, 2 fire, 3 lightning, 4 poison) by, or 0
+		// (FUN_00765a34). Dragon Knights, Priests and Blaze Wizards resist
+		// every element, F/P Wizards fire and poison, I/L Wizards ice and
+		// lightning.
+		inline int32_t resistance_skill(int32_t job, int32_t element)
+		{
+			if (element < 1 || element > 7)
+				return 0;
+
+			auto line = [job](int32_t base) {
+				return job / 10 == base / 10 && base % 10 <= job % 10;
+			};
+
+			if (line(131))
+				return 1310000;
+
+			if (line(211))
+				return element == 2 || element == 4 ? 2110000 : 0;
+
+			if (line(221))
+				return element == 1 || element == 3 ? 2210000 : 0;
+
+			if (line(231))
+				return 2310000;
+
+			if (line(1211))
+				return 12110000;
+
+			return 0;
+		}
+
 		// The W.DEF a player of a job and level is expected to have
 		// (Base.wz StandardPDD.img, read by FUN_00792d21). Each level takes
 		// the last listed value at or below it, or 0 before the first.

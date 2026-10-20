@@ -134,9 +134,11 @@ impl ClientActor {
         let mut tick = player.buffs.advance(std::time::Instant::now());
         let mut packets = Vec::new();
         let stats = &player.stats;
-        // Poison never takes the last HP, and Achilles takes its share off,
-        // as a v83 client works it out (0x94b113).
-        let poison = tick.poison.min(i32::from(stats.hp) - 1).max(0);
+        // Resistance takes its share off Poison, which never takes the last
+        // HP, and Achilles takes its share off, as a v83 client works it out
+        // (0x94b075, 0x94b113).
+        let poison = net::combat::poison_resisted(player, tick.poison);
+        let poison = poison.min(i32::from(stats.hp) - 1).max(0);
         let poison = net::combat::taken(player, poison, false, false).hp;
         let mut change = tick.heal - poison;
         // Dragon Blood drinks its HP while the player has more, and ends

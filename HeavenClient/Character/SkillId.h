@@ -101,7 +101,8 @@ namespace ms
 			HYPER_BODY = 1301007,
 
 			// Dragon Knight
-					DRAGON_BUSTER = 1311001,
+					ELEMENTAL_RESISTANCE_DK = 1310000,
+			DRAGON_BUSTER = 1311001,
 			DRAGON_FURY = 1311002,
 			PA_BUSTER = 1311003,
 			PA_FURY = 1311004,
@@ -151,8 +152,12 @@ namespace ms
 			// I/L Mage
 					IL_TELEPORT = 2201002,
 
+			// I/L Wizard
+					PARTIAL_RESISTANCE_IL = 2210000,
+
 			// Priest
 					PRIEST_TELEPORT = 2301001,
+			ELEMENTAL_RESISTANCE_PRIEST = 2310000,
 
 			// Marksman
 					SNIPE = 3221007,

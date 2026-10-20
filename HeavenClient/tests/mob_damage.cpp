@@ -123,6 +123,19 @@ int main()
 		require(guard(true, true) == 2 && guard(true, false) == 1 && guard(false, true) == 0,
 				"the Guardian byte tells a touch from an attack");
 
+		// Resistances by job line and element.
+		require(resistance_skill(131, 2) == 1310000 && resistance_skill(132, 4) == 1310000,
+				"Dragon and Dark Knights resist every element");
+		require(resistance_skill(231, 1) == 2310000 && resistance_skill(232, 3) == 2310000,
+				"so do Priests and Bishops");
+		require(resistance_skill(211, 2) == 2110000 && resistance_skill(212, 4) == 2110000 &&
+				resistance_skill(211, 1) == 0, "F/P Wizards resist fire and poison only");
+		require(resistance_skill(221, 1) == 2210000 && resistance_skill(222, 3) == 2210000 &&
+				resistance_skill(221, 4) == 0, "I/L Wizards resist ice and lightning only");
+		require(resistance_skill(130, 2) == 0 && resistance_skill(210, 2) == 0 && resistance_skill(412, 2) == 0,
+				"second job and other jobs resist nothing");
+		require(resistance_skill(131, 0) == 0 && resistance_skill(131, 8) == 0, "nor a hit without an element");
+
 		std::cout << "Mob damage passed\n";
 		return 0;
 	}
