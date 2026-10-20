@@ -74,6 +74,9 @@ pub enum BuffStat {
     /// Seduce: walks the way the mob wants, pattern `value`, and can't
     /// attack (the client's Attract).
     Seduce = 39,
+    /// Shadow Stars: claw throws use the star `value` + 2069999 and spend
+    /// none (the client's SpiritJavelin).
+    ShadowStars = 40,
     Infinity = 41,
     /// Holy Shield: mobs' skills give no diseases, and their attacks only
     /// Stun and Seduce (Cosmic's rule). The client never reads it.
@@ -130,7 +133,7 @@ impl BuffStat {
 
     /// Stats the rest of the map is told about, in the order the client
     /// reads them (FUN_00788156); the others only matter to the player.
-    pub const SHOWN: [BuffStat; 18] = [
+    pub const SHOWN: [BuffStat; 19] = [
         BuffStat::Speed,
         BuffStat::Combo,
         BuffStat::WeaponCharge,
@@ -144,6 +147,7 @@ impl BuffStat {
         BuffStat::DarkSight,
         BuffStat::SoulArrow,
         BuffStat::Seduce,
+        BuffStat::ShadowStars,
         BuffStat::Undead,
         BuffStat::Confuse,
         BuffStat::StopPotion,

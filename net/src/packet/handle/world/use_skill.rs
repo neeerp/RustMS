@@ -151,6 +151,16 @@ impl WorldHandler for UseSkillHandler {
                 }
             };
         }
+        if skill_id == skills::SHADOW_STARS {
+            let star = r.read_int()?;
+            return match shadow_stars(ctx.player, level, star, Instant::now()) {
+                Ok(used) => announce(ctx.player, &used),
+                Err(refusal) => {
+                    debug!(skill_id, level, star, ?refusal, "Shadow Stars refused");
+                    Ok(HandlerResult::reply(stat::build_stat_update(true, &[])?))
+                }
+            };
+        }
         let extras = read_extras(&mut r, skill_id);
         let now = Instant::now();
         match use_skill(ctx.player, skill_id, level, now) {
@@ -346,8 +356,7 @@ struct Extras {
     mobs: Vec<i32>,
 }
 
-/// Read what follows the level: where the player stands, Shadow Stars'
-/// star, the party bits (with Dispel's delay), and the mobs reached, each
+/// Read what follows the level: where the player stands, the party bits (with Dispel's delay), and the mobs reached, each
 /// for the skills that send it. As much as was there, for a packet cut
 /// short.
 fn read_extras(r: &mut Cursor<&Vec<u8>>, skill_id: i32) -> Extras {
@@ -363,9 +372,6 @@ fn read_extras_into(
 ) -> Result<(), NetworkError> {
     if skills::sends_position(skill_id) {
         extras.position = Some((r.read_short()?, r.read_short()?));
-    }
-    if skill_id == skills::SHADOW_STARS {
-        r.read_int()?;
     }
     if skills::reaches_party(skill_id) {
         extras.party = Some(r.read_byte()?);
@@ -692,6 +698,34 @@ fn use_skill(
         items,
         debuffs,
     })
+}
+
+/// Shadow Stars costs `bulletConsume` of the stars the client names, from
+/// a claw (0x949f5c), and its buff carries them.
+fn shadow_stars(player: &mut Player, level: i32, star: i32, now: Instant) -> Result<Used, Refusal> {
+    let claw = player
+        .inventory
+        .get(InventoryType::Equipped, equip_slot::WEAPON)
+        .is_some_and(|weapon| weapon.item_id / 10_000 == 147);
+    let cost = skills::at_level(skills::SHADOW_STARS, level)
+        .map_or(0, |skill| skill.effect.bullet_consume)
+        .max(1);
+    if !claw || star / 10_000 != 207 || player.inventory.count(star) < cost {
+        return Err(Refusal::NoItem);
+    }
+    let mut used = use_skill(player, skills::SHADOW_STARS, level, now)?;
+    used.items = player
+        .inventory_mut()
+        .remove(star, cost as i16)
+        .map_err(|_| Refusal::NoItem)?;
+    let value = star - skills::SHADOW_STARS_BASE;
+    used.stats = give(
+        player,
+        &used.skill,
+        vec![(BuffStat::ShadowStars, value)],
+        now,
+    );
+    Ok(used)
 }
 
 /// Start a skill's buffs on the player: the stats it gives, as GIVE_BUFF
@@ -1299,6 +1333,61 @@ mod tests {
         assert!(!actions.iter().any(|action| matches!(action,
             WorldAction::Reply(p) if p.opcode() == SendOpcode::GiveBuff as i16)));
         assert_eq!(player.stats.mp, 80);
+    }
+
+    #[test]
+    fn shadow_stars_costs_200_of_the_named_star_from_a_claw() {
+        if skills::data().is_err() {
+            return;
+        }
+        let now = Instant::now();
+        let mut player = beginner_with(skills::SHADOW_STARS, 30);
+        (player.stats.mp, player.stats.max_mp) = (200, 200);
+        let inventory = player.inventory_mut();
+        inventory
+            .add(game::Item::stack(2070006, 150), 1000)
+            .unwrap();
+        inventory
+            .add(game::Item::stack(2070000, 100), 1000)
+            .unwrap();
+        inventory
+            .add(game::Item::stack(2070006, 100), 1000)
+            .unwrap();
+        // Stars without a claw.
+        assert_eq!(
+            shadow_stars(&mut player, 30, 2070006, now).unwrap_err(),
+            Refusal::NoItem
+        );
+        player.inventory.insert(
+            InventoryType::Equipped,
+            equip_slot::WEAPON,
+            game::Item::equipment(1472000, Default::default()),
+        );
+        // Too few Subis, then something that isn't a star.
+        for item in [2070000, 2060000] {
+            assert_eq!(
+                shadow_stars(&mut player, 30, item, now).unwrap_err(),
+                Refusal::NoItem
+            );
+        }
+        assert_eq!(player.stats.mp, 200);
+        // Both stacks of Ilbis count.
+        let used = shadow_stars(&mut player, 30, 2070006, now).unwrap();
+        assert_eq!(used.stats, [(BuffStat::ShadowStars, 7)]);
+        assert_eq!(skills::shadow_star(&player), Some(2070006));
+        assert_eq!(player.inventory.count(2070006), 50);
+        assert_eq!(player.inventory.count(2070000), 100);
+        let sent = opcodes(announce(&player, &used));
+        assert_eq!(
+            sent,
+            [
+                SendOpcode::StatChange as i16,
+                SendOpcode::InventoryOperation as i16,
+                SendOpcode::GiveBuff as i16,
+                SendOpcode::ShowForeignEffect as i16,
+                SendOpcode::GiveForeignBuff as i16,
+            ]
+        );
     }
 
     #[test]

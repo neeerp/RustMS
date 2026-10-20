@@ -859,7 +859,8 @@ namespace ms
 		uint16_t hp = stats.get_stat(MapleStat::Id::HP);
 		// Infinity zeroes every skill's MP cost (FUN_00764256, 0x76446d).
 		uint16_t mp = has_buff(Buffstat::Id::INFINITY_) ? UINT16_MAX : stats.get_stat(MapleStat::Id::MP);
-		uint16_t bullets = inventory.get_most_bullets();
+		// Shadow Stars throws its star whatever a skill's cost (FUN_00949b5d).
+		uint16_t bullets = shadow_star() ? UINT16_MAX : inventory.get_most_bullets();
 
 		SpecialMove::ForbidReason reason = move.can_use(level, weapon, job, hp, mp, bullets);
 
@@ -923,10 +924,23 @@ namespace ms
 		return skill ? partner.y : partner.x;
 	}
 
+	int32_t Player::shadow_star() const
+	{
+		int16_t value = get_buff_value(Buffstat::Id::SHADOW_CLAW);
+
+		if (value < 1 || get_weapontype() != Weapon::Type::CLAW)
+			return 0;
+
+		int32_t star = value + skill_use::SHADOW_STARS_BASE;
+
+		return inventory.find_item(InventoryType::Id::USE, star) ? star : 0;
+	}
+
 	Attack Player::prepare_attack(int32_t skill, bool whack) const
 	{
 		Attack::Type attacktype;
-		int32_t bullet = inventory.get_bulletid();
+		int32_t star = shadow_star();
+		int32_t bullet = star ? star : inventory.get_bulletid();
 
 		if (state == Char::State::PRONE || whack)
 		{
@@ -956,7 +970,7 @@ namespace ms
 				case Weapon::Type::CROSSBOW:
 				case Weapon::Type::CLAW:
 				case Weapon::Type::GUN:
-					attacktype = inventory.has_projectile() ? Attack::Type::RANGED : Attack::Type::CLOSE;
+					attacktype = inventory.has_projectile() || star ? Attack::Type::RANGED : Attack::Type::CLOSE;
 					break;
 				default:
 					attacktype = Attack::Type::CLOSE;

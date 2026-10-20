@@ -10,6 +10,11 @@ namespace ms
 	namespace skill_use
 	{
 		constexpr int32_t SHADOW_STARS = 4121006;
+		// Shadow Stars' buff names its star as the id less this, and a shot
+		// thrown under it carries this display bit and the star (0x949b5d,
+		// 0x95514b).
+		constexpr int32_t SHADOW_STARS_BASE = 2069999;
+		constexpr uint8_t SHADOW_STARS_DISPLAY = 0x40;
 		constexpr int32_t DISPEL = 2311001;
 		constexpr int32_t RESURRECTION = 2321006;
 

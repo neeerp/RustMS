@@ -170,6 +170,14 @@ pub fn at_level(skill_id: i32, level: i32) -> Option<Learned> {
 }
 
 pub const SHADOW_STARS: i32 = 4121006;
+/// Shadow Stars' buff names its star as the id less this (0x949b5d).
+pub const SHADOW_STARS_BASE: i32 = 2069999;
+
+/// The star Shadow Stars throws, while it lasts.
+pub fn shadow_star(player: &Player) -> Option<i32> {
+    let value = player.buffs.value(BuffStat::ShadowStars)?;
+    Some(i32::from(value) + SHADOW_STARS_BASE)
+}
 pub const DISPEL: i32 = 2311001;
 /// The diseases Dispel cures, as Cosmic has them: not Stun, Seduce, or
 /// Confuse.
@@ -994,6 +1002,8 @@ pub fn buffs(skill: &Learned) -> Option<Vec<(BuffStat, i32)>> {
         1005 | 10001005 | 20001005 => vec![(BuffStat::EchoOfHero, effect.x)],
         2121002 | 2221002 | 2321002 => vec![(BuffStat::ManaReflection, skill.level)],
         3101004 | 3201004 => vec![(BuffStat::SoulArrow, effect.x)],
+        // The caster names the star, which the buff's value carries.
+        SHADOW_STARS => vec![(BuffStat::ShadowStars, 0)],
         3121008 => vec![(BuffStat::Concentrate, effect.x)],
         3121002 | 3221002 => vec![(BuffStat::SharpEyes, effect.x << 8 | effect.y)],
         4001003 => vec![(BuffStat::DarkSight, effect.x)],

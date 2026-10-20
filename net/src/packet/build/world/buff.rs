@@ -135,6 +135,9 @@ pub(crate) fn write_shown(
             | BuffStat::Fear => {
                 p.write_int(buff.skill_id)?;
             }
+            BuffStat::ShadowStars => {
+                p.write_int(i32::from(buff.value))?;
+            }
             _ => {}
         }
     }

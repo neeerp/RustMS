@@ -207,7 +207,9 @@ impl WorldHandler for AttackHandler {
             skill_level = skill.level as u8;
         }
         let mut projectile = 0;
-        if let Some(ammo) = uses.ammo {
+        if let Some(ammo) = uses.ammo.filter(|ammo| ammo.quantity == 0) {
+            projectile = ammo.item_id;
+        } else if let Some(ammo) = uses.ammo {
             let changes = ctx
                 .player
                 .inventory_mut()

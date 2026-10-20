@@ -83,6 +83,9 @@ const AMMO_FREE: [i32; 12] = [
     21120006, // Combo Tempest
 ];
 
+/// The display bit of a shot thrown under Shadow Stars.
+const SHADOW_STARS_DISPLAY: u8 = 0x40;
+
 /// A claw that throws arrows instead of stars.
 const ARROW_CLAW: i32 = 1472063;
 
@@ -116,7 +119,8 @@ pub fn parse_close_attack(packet: &Packet) -> Result<Attack, NetworkError> {
 /// An attack packet's body (after the opcode). RANGED_ATTACK and
 /// MAGIC_ATTACK share CLOSE_RANGE_ATTACK's layout; a shot adds 5 bytes
 /// before its targets (an int, then its ammo slot and its cash ammo slot
-/// as shorts, then a byte where the others have an int). A held skill's
+/// as shorts, then a byte where the others have an int), and under Shadow
+/// Stars the star it throws as an int (0x95514b). A held skill's
 /// charge (an int) follows the 8 bytes after the skill (v83 0x95292e,
 /// 0x955210, 0x956e66).
 pub fn parse_attack(packet: &Packet, kind: AttackKind) -> Result<Attack, NetworkError> {
@@ -142,6 +146,9 @@ pub fn parse_attack(packet: &Packet, kind: AttackKind) -> Result<Attack, Network
         ammo_slot = r.read_short()?;
         r.read_short()?;
         r.read_byte()?;
+        if display & SHADOW_STARS_DISPLAY != 0 && !AMMO_FREE.contains(&skill) {
+            r.read_int()?; // the star, which the slot holds too
+        }
     } else {
         r.read_bytes(4)?;
     }
@@ -388,7 +395,8 @@ fn shoots(weapon: i32, item_id: i32) -> bool {
     }
 }
 
-/// The ammo a shot uses up.
+/// The ammo a shot throws, and how much of it it uses up: none under
+/// Shadow Stars.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Ammo {
     pub slot: i16,
@@ -428,6 +436,20 @@ fn shot_ammo(
     // Soul Arrow shoots a bow or crossbow without arrows.
     if matches!(weapon / 10_000, 145 | 146) && player.buffs.value(BuffStat::SoulArrow).is_some() {
         return Ok(None);
+    }
+    // Shadow Stars throws its star from a claw, one of which the slot must
+    // hold, and spends none (0x949b5d).
+    if let Some(star) = skills::shadow_star(player).filter(|_| weapon / 10_000 == 147) {
+        player
+            .inventory
+            .get(InventoryType::Use, attack.ammo_slot)
+            .filter(|item| item.item_id == star && item.quantity >= 1)
+            .ok_or(AttackRejection::Ammo)?;
+        return Ok(Some(Ammo {
+            slot: attack.ammo_slot,
+            item_id: star,
+            quantity: 0,
+        }));
     }
     let quantity = skill.map_or(1, |skill| {
         let effect = &skill.effect;
@@ -1845,6 +1867,41 @@ mod tests {
             .inventory
             .insert(InventoryType::Use, 1, Item::stack(2070000, stars));
         player
+    }
+
+    #[test]
+    fn shadow_stars_throws_its_star_for_nothing() {
+        let now = std::time::Instant::now();
+        let long = std::time::Duration::from_secs(60);
+        let mut player = rogue_with_stars(1);
+        player
+            .inventory
+            .insert(InventoryType::Use, 2, Item::stack(2070006, 1));
+        let ilbis = game::Buff::new(skills::SHADOW_STARS, BuffStat::ShadowStars, 7, now, long);
+        player.buffs.give(ilbis);
+        // Display 0x40, and the star after the shot's 5 bytes.
+        let shot = |slot| {
+            let mut p = kind_attack_packet(AttackKind::Ranged, 0, slot, &[1]);
+            p.bytes[16] |= SHADOW_STARS_DISPLAY;
+            p.bytes.splice(30..30, 2070006i32.to_le_bytes());
+            parse_attack(&p, AttackKind::Ranged).unwrap()
+        };
+        let attack = shot(2);
+        assert_eq!(
+            (attack.hits[0].object_id, &attack.hits[0].damage[..]),
+            (77, &[1][..])
+        );
+        let ammo = Ammo {
+            slot: 2,
+            item_id: 2070006,
+            quantity: 0,
+        };
+        assert_eq!(validate(&attack, &player).unwrap().ammo, Some(ammo));
+        // The slot must hold the buff's star.
+        assert_eq!(
+            validate(&shot(1), &player).unwrap_err(),
+            AttackRejection::Ammo
+        );
     }
 
     #[test]

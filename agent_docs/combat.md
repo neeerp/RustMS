@@ -213,10 +213,20 @@ the skill's `bulletConsume` if it has one (Avenger's 3), otherwise its
 `bulletCount` (Lucky Seven's 2), or 1 for a basic shot. Anything else refuses
 the attack. The cost is taken from that slot and the attacker gets
 INVENTORY_OPERATION. Skills v83 fires without ammo (Shadow Meso, Taunt,
-Energy Orb, and some Cygnus and Aran skills; `AMMO_FREE`) use none. The
-server tracks neither Shadow Partner, which doubles the cost, nor Soul
-Arrow's buff, nor the cash ammo slot. HeavenClient, like v83, fires from the
-first fitting stack that covers the cost (`Inventory::find_bulletslot`).
+Energy Orb, and some Cygnus and Aran skills; `AMMO_FREE`) use none, and
+neither does a bow or crossbow under Soul Arrow. The server tracks neither
+Shadow Partner, which doubles the cost, nor the cash ammo slot. HeavenClient,
+like v83, fires from the first fitting stack that covers the cost
+(`Inventory::find_bulletslot`).
+
+Shadow Stars (4121006) names a star in USE_SKILL and costs its
+`bulletConsume` (200) of it, summed over that star's stacks, from a claw;
+otherwise it is refused. Its buff (bit 40, the client's SpiritJavelin) carries
+the star as `id - 2069999`, an i16 in GIVE_BUFF and an i32 for the others.
+While it lasts, a claw throws that star from a slot holding one and spends
+none; the shot sets display bit 0x40 and, unless the skill is ammo-free,
+carries the star as an int after the cash slot byte (v83 0x95514b). The
+others are shown the star in the attack's projectile.
 
 HeavenClient refuses a skill before sending it, with v83's lines in the skill
 chat colour (`Player::can_use`, `Skill::can_use`, `Combat::can_use_move`). The
