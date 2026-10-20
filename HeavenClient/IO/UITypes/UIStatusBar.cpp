@@ -313,8 +313,10 @@ namespace ms
 				DrawArgument(position, Point<int16_t>(VWIDTH, HEIGHT - strip_bottom)),
 				Rectangle<int16_t>(0, 800, strip_bottom, HEIGHT)
 		);
-		backgrnd2.draw(position, Rectangle<int16_t>(0, backgrnd2.width(), 0, strip_top));
-		backgrnd2.draw(position, Rectangle<int16_t>(0, backgrnd2.width(), strip_bottom, HEIGHT));
+		// v83 copies backgrnd2 two pixels in from the left (0x8d3ff2).
+		Point<int16_t> backgrnd2_at = position + Point<int16_t>(2, 0);
+		backgrnd2.draw(backgrnd2_at, Rectangle<int16_t>(0, backgrnd2.width(), 0, strip_top));
+		backgrnd2.draw(backgrnd2_at, Rectangle<int16_t>(0, backgrnd2.width(), strip_bottom, HEIGHT));
 
 		UIElement::draw_sprites(alpha);
 
