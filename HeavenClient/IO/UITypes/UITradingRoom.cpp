@@ -15,6 +15,7 @@
 #include "../../Gameplay/Stage.h"
 #include "../../Graphics/Geometry.h"
 #include "../../Net/Packets/MiniRoomPackets.h"
+#include "../../Util/Misc.h"
 #include "../../Util/NxFiles.h"
 
 #include <algorithm>
@@ -447,16 +448,39 @@ namespace ms
 
 	void UITradingRoom::ask_trade()
 	{
-		UI::get().emplace<UIYesNo>(
-				"Are you sure you want to trade?",
-				[](bool yes)
-				{
-					auto room = UI::get().get_element<UITradingRoom>();
+		mini_room::TradeQuestions questions = mini_room::trade_questions(offers[Side::PARTNER], item_expiry::now(),
+			[](int32_t itemid)
+			{
+				// v83 cuts names to 100 px (FUN_00988cf3).
+				Text name(Text::Font::A12M, Text::Alignment::LEFT, Color::Name::BLACK, ItemData::get(itemid).get_name());
+				string_format::format_with_ellipsis(name, 100);
 
-					if (yes && room && room->is_active())
-						room->confirm();
-				}
-		);
+				return name.get_text();
+			});
+
+		std::string confirm = questions.confirm;
+		auto ask = [confirm]()
+		{
+			UI::get().emplace<UIYesNo>(
+					confirm,
+					[](bool yes)
+					{
+						auto room = UI::get().get_element<UITradingRoom>();
+
+						if (yes && room && room->is_active())
+							room->confirm();
+					}
+			);
+		};
+
+		if (questions.time_limit.empty())
+			ask();
+		else
+			UI::get().emplace<UIYesNo>(questions.time_limit, [ask](bool yes)
+				{
+					if (yes)
+						ask();
+				});
 	}
 
 	void UITradingRoom::confirm()
