@@ -87,7 +87,7 @@ namespace ms
 		void release_keys();
 
 		// Recalculates the total stats from base stats, inventories and skills.
-		void recalc_stats(bool equipchanged);
+		void recalc_stats();
 
 		// Change the equipment at the specified slot and recalculate stats.
 		void change_equip(int16_t slot);

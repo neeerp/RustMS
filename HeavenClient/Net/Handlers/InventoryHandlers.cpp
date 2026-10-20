@@ -263,7 +263,7 @@ namespace ms
 			}
 		}
 
-		Stage::get().get_player().recalc_stats(true);
+		Stage::get().get_player().recalc_stats();
 
 		std::array<int32_t, 3> now = Stage::get().get_player().get_pet_closeness();
 

@@ -55,7 +55,7 @@ namespace ms
 			CharacterParser::parse_nyinfo(recv);
 			CharacterParser::parse_areainfo(recv);
 
-			player.recalc_stats(true);
+			player.recalc_stats();
 
 			recv.read_short();
 

@@ -184,15 +184,15 @@ namespace ms
 			send_action(action, false);
 	}
 
-	void Player::recalc_stats(bool equipchanged)
+	void Player::recalc_stats()
 	{
 		Weapon::Type weapontype = get_weapontype();
 
 		stats.set_weapontype(weapontype);
 		stats.init_totalstats();
 
-		if (equipchanged)
-			inventory.recalc_stats(weapontype);
+		// The ammo is picked again too, as a level up may allow more.
+		inventory.recalc_stats(weapontype, stats.get_stat(MapleStat::Id::LEVEL));
 
 		for (auto stat : EquipStat::values)
 		{
@@ -1184,7 +1184,7 @@ namespace ms
 		skillbook.set_skill(skill_id, skill_level, masterlevel, expiration);
 
 		if (old_level != skill_level)
-			recalc_stats(false);
+			recalc_stats();
 	}
 
 	void Player::add_cooldown(int32_t skill_id, int32_t cooltime)

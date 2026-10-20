@@ -38,6 +38,9 @@ namespace ms
 		// Returns the weapon attack increase when using this bullet.
 		int16_t get_watk() const;
 
+		// The level a character needs to shoot it (info/reqLevel).
+		int16_t get_reqlevel() const;
+
 		// Returns the bullet animation.
 		const Animation &get_animation() const;
 
@@ -55,5 +58,6 @@ namespace ms
 
 		Animation bullet;
 		int16_t watk;
+		int16_t reqlevel;
 	};
 }
