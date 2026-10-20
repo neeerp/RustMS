@@ -876,8 +876,9 @@ namespace ms
 		uint16_t hp = stats.get_stat(MapleStat::Id::HP);
 		// Infinity zeroes every skill's MP cost (FUN_00764256, 0x76446d).
 		uint16_t mp = has_buff(Buffstat::Id::INFINITY_) ? UINT16_MAX : stats.get_stat(MapleStat::Id::MP);
-		// Shadow Stars throws its star whatever a skill's cost (FUN_00949b5d).
-		uint16_t bullets = shadow_star() ? UINT16_MAX : inventory.get_most_bullets();
+		// Shadow Stars throws its star whatever a skill's cost, and Soul Arrow
+		// needs no arrows at all (FUN_00949b5d, 0x969...).
+		uint16_t bullets = shadow_star() || soul_arrow() ? UINT16_MAX : inventory.get_most_bullets();
 
 		SpecialMove::ForbidReason reason = move.can_use(level, weapon, job, hp, mp, bullets);
 
@@ -941,6 +942,11 @@ namespace ms
 		return skill ? partner.y : partner.x;
 	}
 
+	bool Player::soul_arrow() const
+	{
+		return has_buff(Buffstat::Id::SOULARROW);
+	}
+
 	int32_t Player::shadow_star() const
 	{
 		int16_t value = get_buff_value(Buffstat::Id::SHADOW_CLAW);
@@ -987,7 +993,9 @@ namespace ms
 				case Weapon::Type::CROSSBOW:
 				case Weapon::Type::CLAW:
 				case Weapon::Type::GUN:
-					attacktype = inventory.has_projectile() || star ? Attack::Type::RANGED : Attack::Type::CLOSE;
+					// Soul Arrow shoots even with an empty quiver (FUN_0094e256).
+					attacktype = inventory.has_projectile() || star || soul_arrow() ? Attack::Type::RANGED
+																					: Attack::Type::CLOSE;
 					break;
 				default:
 					attacktype = Attack::Type::CLOSE;

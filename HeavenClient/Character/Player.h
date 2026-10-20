@@ -147,6 +147,9 @@ namespace ms
 		// is left; 0 otherwise.
 		int32_t shadow_star() const;
 
+		// Whether Soul Arrow is on, so shots need no arrows.
+		bool soul_arrow() const;
+
 		// Execute a rush movement
 		void rush(double targetx);
 

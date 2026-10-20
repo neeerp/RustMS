@@ -34,6 +34,7 @@
 #include "RemoteShot.h"
 #include "RemoteSpell.h"
 #include "ShotPath.h"
+#include "SoulArrow.h"
 
 #include "../MapleMap/DoorRules.h"
 #include "../MapleMap/FieldLimit.h"
@@ -1185,7 +1186,16 @@ namespace ms
 			// Shadow Stars throws its star for nothing, and names it (0x95514b).
 			int32_t star = player.shadow_star();
 
-			if (attack.type == Attack::Type::RANGED && star && attack.bullet == star)
+			if (attack.type == Attack::Type::RANGED && player.soul_arrow())
+			{
+				// Soul Arrow takes nothing from the quiver: the shot names
+				// no slot or arrow, so adds no arrow's attack, and flies the
+				// skill's own ball or else Soul Arrow's (0x953b9e, 0x9546c9).
+				int32_t job = player.get_stats().get_job().get_id();
+				attack.bulletslot = 0;
+				attack.bullet = move.has_ball() ? move.get_id() : soul_arrow::ball_skill(job);
+				attack.display |= soul_arrow::DISPLAY;
+			} else if (attack.type == Attack::Type::RANGED && star && attack.bullet == star)
 			{
 				attack.bulletslot = inventory.find_item(InventoryType::Id::USE, star);
 				attack.display |= skill_use::SHADOW_STARS_DISPLAY;
@@ -2341,7 +2351,11 @@ namespace ms
 
 		// Shadow Partner throws every bullet twice (0x981447).
 		uint8_t sets = user.get_buff(Buffstat::Id::SHADOWPARTNER) ? 2 : 1;
-		Animation animation = move.get_bullet(user, result.bullet);
+		// Under Soul Arrow it flies the ball, whatever ammo the server names
+		// (0x981a61).
+		bool soul_arrow = user.get_buff(Buffstat::Id::SOULARROW) && !move.has_ball();
+		int32_t bullet = soul_arrow ? soul_arrow::ball_skill(user.get_job()) : result.bullet;
+		Animation animation = move.get_bullet(user, bullet);
 		Point<int16_t> position = user.get_position();
 		uint16_t delay = remote_shot::attack_delay(skill, user.get_attackdelay(0));
 		uint16_t first = 0;

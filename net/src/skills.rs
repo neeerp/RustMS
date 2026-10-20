@@ -1069,14 +1069,14 @@ pub fn buffs(skill: &Learned) -> Option<Vec<(BuffStat, i32)>> {
         3221006 => vec![(BuffStat::Blind, effect.x)],
         1005 | 10001005 | 20001005 => vec![(BuffStat::EchoOfHero, effect.x)],
         2121002 | 2221002 | 2321002 => vec![(BuffStat::ManaReflection, skill.level)],
-        3101004 | 3201004 => vec![(BuffStat::SoulArrow, effect.x)],
+        3101004 | 3201004 | 13101003 => vec![(BuffStat::SoulArrow, effect.x)],
         // The caster names the star, which the buff's value carries.
         SHADOW_STARS => vec![(BuffStat::ShadowStars, 0)],
         3121008 => vec![(BuffStat::Concentrate, effect.x)],
         3121002 | 3221002 => vec![(BuffStat::SharpEyes, effect.x << 8 | effect.y)],
         4001003 => vec![(BuffStat::DarkSight, effect.x)],
         4111001 => vec![(BuffStat::MesoUp, effect.x)],
-        4111002 => vec![(BuffStat::ShadowPartner, effect.x)],
+        4111002 | 14111000 => vec![(BuffStat::ShadowPartner, effect.x)],
         4211003 => vec![(BuffStat::PickPocket, effect.x)],
         4211005 => vec![(BuffStat::MesoGuard, effect.x)],
         crate::morph::OAK_BARREL
@@ -1153,6 +1153,13 @@ mod tests {
             });
         }
         player
+    }
+
+    #[test]
+    fn the_knights_soul_arrow_and_shadow_partner_are_buffs() {
+        let stat = |skill_id| buffs(&at_level(skill_id, 1).unwrap()).unwrap()[0].0;
+        assert_eq!(stat(13101003), BuffStat::SoulArrow);
+        assert_eq!(stat(14111000), BuffStat::ShadowPartner);
     }
 
     #[test]
