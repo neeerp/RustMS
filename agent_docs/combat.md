@@ -583,6 +583,15 @@ A few skills do more than buff:
   effect of the attacker's, only the skill's `hit` on the mob. The server
   takes it through the attack handler (`AttackKind::Body`) and sends the
   map ENERGY_ATTACK (0xBD); Energy Charge comes no other way.
+- **Weapon charges** (`net::charge`, 1211003 to 1211008 and the Paladin's
+  1221003 and 1221004) raise every weapon hit by the charge's `damage`
+  and its element; the client works the damage out and puts no status on
+  the mob, so the server only widens its damage cap. A sword's charges
+  need a sword and a mace's a mace (FUN_00966f7a, 0x1116 on the client).
+  Charged Blow (1211002) is refused without a charge (`charge::refused`)
+  and spends it when it reaches a mob. A Paladin's Advanced Charge
+  (1220010) keeps the charge by its `x` percent, and its `damage` replaces
+  Charged Blow's own on both sides.
 
 Teleport and Flash Jump move the player on the client alone; the server
 only spends the MP. HeavenClient's Flash Jump (4111006 and the Night

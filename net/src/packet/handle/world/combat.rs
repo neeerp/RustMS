@@ -1,3 +1,4 @@
+use crate::charge;
 use crate::combat::{self, AttackKind};
 use crate::combo;
 use crate::energy;
@@ -218,6 +219,7 @@ impl WorldHandler for AttackHandler {
         let broadcast = combat::build_attack(ctx.player.id(), &attack, skill_level, projectile)?;
         let combo = combo::after_attack(ctx.player, &attack, rand::random());
         let energy = energy::after_attack(ctx.player, &attack);
+        let spent = charge::after_attack(ctx.player, &attack, rand::random());
         let skill = attack.skill;
         let hits = attack
             .hits
@@ -251,6 +253,9 @@ impl WorldHandler for AttackHandler {
         }
         if let Some(value) = energy {
             result = set_energy(ctx.player, value, now, result)?;
+        }
+        if let Some(charge) = spent {
+            result = end_charge(ctx.player, charge, result)?;
         }
         if let Some(stun) = stun {
             let stunned = catch_disease(ctx.player, stun, now)?;
@@ -289,6 +294,25 @@ pub(super) fn set_combo(
         .with(WorldAction::BuffsChanged(buff::build_give_foreign_buff(
             player.id(),
             &shown,
+        )?)))
+}
+
+/// Charged Blow spent the charge: the player's icon goes, and the others
+/// see the weapon plain again.
+fn end_charge(
+    player: &mut Player,
+    skill_id: i32,
+    result: HandlerResult<WorldAction>,
+) -> WorldResult {
+    let ended = player.buffs.cancel(skill_id);
+    if ended.is_empty() {
+        return Ok(result);
+    }
+    Ok(result
+        .with_reply(buff::build_cancel_buff(&ended)?)
+        .with(WorldAction::BuffsChanged(buff::build_cancel_foreign_buff(
+            player.id(),
+            &ended,
         )?)))
 }
 

@@ -271,6 +271,12 @@ namespace ms
 			attack.blow.scale = stats.damage;
 			attack.element = SkillData::get(skillid).get_element();
 
+			// A Paladin's Charged Blow hits by Advanced Charge's damage instead
+			// (0x951cf9); only a Paladin learns it.
+			if (skillid == SkillId::CHARGE)
+				if (int32_t advanced = user.get_skilllevel(SkillId::ADVANCED_CHARGE))
+					attack.blow.scale = SkillData::get(SkillId::ADVANCED_CHARGE).get_stats(advanced).damage;
+
 			// Elemental Boost adds its damage to Flamethrower's and Ice Splitter's (0x79004c).
 			if (skillid == 5211004 || skillid == 5211005)
 				if (int32_t boost = user.get_skilllevel(5220001))

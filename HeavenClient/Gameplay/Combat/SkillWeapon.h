@@ -68,6 +68,21 @@ namespace ms
 			case 11101004: // Soul Blade
 			case 11111006: // Soul Driver
 				return weapon == Weapon::SWORD_1H || weapon == Weapon::SWORD_2H;
+			// A sword's charges and a mace's, and Charged Blow with either
+			// (0x967ac1).
+			case 1211003:
+			case 1211005:
+			case 1211007:
+			case 1221003:
+				return weapon == Weapon::SWORD_1H || weapon == Weapon::SWORD_2H;
+			case 1211004:
+			case 1211006:
+			case 1211008:
+			case 1221004:
+				return weapon == Weapon::MACE_1H || weapon == Weapon::MACE_2H;
+			case 1211002:
+				return weapon == Weapon::SWORD_1H || weapon == Weapon::SWORD_2H || weapon == Weapon::MACE_1H ||
+					weapon == Weapon::MACE_2H;
 			case 12101006: // Fire Pillar
 			case 12111005: // Flame Gear
 			case 12111006: // Fire Strike

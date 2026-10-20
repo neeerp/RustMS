@@ -840,6 +840,10 @@ namespace ms
 		if (combo::finisher(move.get_id()) && get_buff_value(Buffstat::Id::COMBO) <= 1)
 			return SpecialMove::ForbidReason::FBR_OTHER;
 
+		// Charged Blow needs a charge to spend (0x969545).
+		if (move.get_id() == SkillId::CHARGE && !has_buff(Buffstat::Id::WK_CHARGE))
+			return SpecialMove::ForbidReason::FBR_OTHER;
+
 		if (combo::enrage_refused(move.get_id(), get_buff_value(Buffstat::Id::COMBO)))
 			return SpecialMove::ForbidReason::FBR_OTHER;
 
