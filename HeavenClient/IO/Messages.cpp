@@ -50,7 +50,8 @@ namespace ms
 					"Not available while riding on the tamed monster.",
 					"Not available during the ride.",
 					"This skill requires a tamed monster and a saddle.",
-					"You cannot ride on this tamed monster."
+					"You cannot ride on this tamed monster.",
+					"It is not appropriate to use it here."
 			};
 
 	bool Messages::is_cost(Type type)

@@ -1286,6 +1286,12 @@ namespace ms
 		if (!phobj.onground || is_sitting() || is_climbing() || attacking || is_dead() || ride_refuses())
 			return;
 
+		if (!field_limit::may_sit(Stage::get().get_mapinfo().get_fieldtype()))
+		{
+			InChatMessage(Messages::Type::CHAIR_FIELD).drop();
+			return;
+		}
+
 		nl::node info = nl::nx::item["Install"]["0301.img"][string_format::extend_id(itemid, 8)]["info"];
 
 		if (stats.get_stat(MapleStat::Id::LEVEL) < info["reqLevel"].get_integer())
