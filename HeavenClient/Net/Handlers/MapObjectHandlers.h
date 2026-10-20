@@ -80,6 +80,14 @@ namespace ms
 		void handle(InPacket& recv) const override;
 	};
 
+	// A pet's exception list, for the pet at the index only if the serial
+	// is its own (FUN_007061a5).
+	// Opcode: PET_EXCEPTION_LIST(173)
+	class PetExceptionListHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
 	// Whether a pet ate the cash food the player used: it plays its eat
 	// sound, or the food suits none of the pets out (FUN_00a29049). It
 	// doesn't unlock the client; the inventory operation after it does.

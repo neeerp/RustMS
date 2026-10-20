@@ -107,8 +107,10 @@ impl WorldHandler for MovePetHandler {
 /// PET_LOOT (0xAA, FUN_00705c7c): the pet's cash serial, the field key,
 /// the tick, where the pet stands, the drop, its CRC and the pet's sweep,
 /// range and pick-up-others flags. A pet takes mesos with a meso magnet
-/// and items with an item pouch worn for it (FUN_00705e2c). The client
-/// doesn't wait for an answer.
+/// and items with an item pouch worn for it (FUN_00705e2c). If the first
+/// pet wears an Item Ignore Pendant, every pet leaves what the exception
+/// lists of the pets wearing one name (FUN_00508679). The client doesn't
+/// wait for an answer.
 pub struct PetLootHandler;
 
 impl WorldHandler for PetLootHandler {
@@ -126,7 +128,7 @@ impl WorldHandler for PetLootHandler {
         let Some(index) = index.filter(|_| player.stats.hp > 0) else {
             return Ok(HandlerResult::empty());
         };
-        let worn = |item_id| {
+        let worn = |index: usize, item_id| {
             equip_slot::pet_slots(item_id).is_some_and(|slots| {
                 let position = slots[index] - 100;
                 player
@@ -135,10 +137,22 @@ impl WorldHandler for PetLootHandler {
                     .is_some()
             })
         };
-        let (mesos, items) = (worn(1_812_000), worn(1_812_001));
+        let (mesos, items) = (worn(index, 1_812_000), worn(index, 1_812_001));
         if !mesos && !items {
             return Ok(HandlerResult::empty());
         }
+        let ignore_pendant = 1_812_007;
+        let ignored = if worn(0, ignore_pendant) {
+            player
+                .pets
+                .iter()
+                .enumerate()
+                .filter(|&(i, _)| worn(i, ignore_pendant))
+                .flat_map(|(_, &serial)| player.pet_ignored(serial).iter().copied())
+                .collect()
+        } else {
+            Vec::new()
+        };
         Ok(
             HandlerResult::empty().with(WorldAction::Field(FieldRequest::PetPickup {
                 index: index as u8,
@@ -147,6 +161,7 @@ impl WorldHandler for PetLootHandler {
                 y,
                 mesos,
                 items,
+                ignored,
             })),
         )
     }

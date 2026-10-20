@@ -2,6 +2,7 @@
 //! packets.
 
 use crate::actor::object_ids::{self, ObjectIds};
+use game::pet::IGNORED_MESOS;
 use game_data::footholds::Footholds;
 use net::loot::Loot;
 use net::packet::build::world::drop::DropView;
@@ -237,8 +238,9 @@ impl DropSet {
     }
 
     /// Take a drop for the pet of `client` standing at (x, y), which takes
-    /// mesos with `mesos` and items with `items`. As in v83 (FUN_0050483a),
-    /// pets leave what players threw away.
+    /// mesos and items as `takes` says, but not the ids `ignored` (mesos
+    /// as `IGNORED_MESOS`). As in v83 (FUN_0050483a), pets leave what
+    /// players threw away.
     pub fn take_for_pet(
         &mut self,
         client: ClientId,
@@ -246,15 +248,16 @@ impl DropSet {
         object_id: i32,
         (x, y): (i16, i16),
         now: Instant,
-        mesos: bool,
-        items: bool,
+        (mesos, items): (bool, bool),
+        ignored: &[i32],
     ) -> Result<Drop, PickupError> {
         let drop = self.drops.get(&object_id).ok_or(PickupError::Gone)?;
-        let wanted = match drop.loot {
-            Loot::Mesos(_) => mesos,
-            _ => items,
+        let (wanted, id) = match &drop.loot {
+            Loot::Mesos(_) => (mesos, IGNORED_MESOS),
+            Loot::Item { item_id, .. } => (items, *item_id),
+            Loot::Dropped(item) => (items, item.item_id),
         };
-        if drop.player_drop || !wanted {
+        if drop.player_drop || !wanted || ignored.contains(&id) {
             return Err(PickupError::NotForPets);
         }
         self.take(client, party, object_id, x, y, now)
@@ -376,25 +379,34 @@ mod tests {
         // A meso magnet alone leaves items, and no pet takes what was thrown.
         assert_eq!(
             drops
-                .take_for_pet(1, None, ids[1], at, now, true, false)
+                .take_for_pet(1, None, ids[1], at, now, (true, false), &[])
                 .unwrap_err(),
             PickupError::NotForPets
         );
         assert_eq!(
             drops
-                .take_for_pet(1, None, thrown, at, now, true, true)
+                .take_for_pet(1, None, thrown, at, now, (true, true), &[])
                 .unwrap_err(),
             PickupError::NotForPets
         );
         // Someone else's pet waits for the owner's time to pass.
         assert_eq!(
             drops
-                .take_for_pet(2, None, ids[0], at, now, true, true)
+                .take_for_pet(2, None, ids[0], at, now, (true, true), &[])
                 .unwrap_err(),
             PickupError::NotYours
         );
+        // The exception list leaves what it names, mesos by IGNORED_MESOS.
+        for (id, ignored) in [(ids[0], IGNORED_MESOS), (ids[1], 4000019)] {
+            assert_eq!(
+                drops
+                    .take_for_pet(1, None, id, at, now, (true, true), &[ignored])
+                    .unwrap_err(),
+                PickupError::NotForPets
+            );
+        }
         let drop = drops
-            .take_for_pet(1, None, ids[0], at, now, true, false)
+            .take_for_pet(1, None, ids[0], at, now, (true, false), &[4000019])
             .unwrap();
         assert_eq!(drop.loot, Loot::Mesos(5));
     }

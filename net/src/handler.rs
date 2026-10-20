@@ -558,7 +558,9 @@ pub enum FieldRequest {
     },
     /// The player's pet at `index` in their pet list, standing at (x, y),
     /// would pick up the drop `object_id`. It may take mesos with `mesos`
-    /// and items with `items`. Answered with `ServerMessage::PetPickedUp`.
+    /// and items with `items`, but not the ids in `ignored` (mesos as
+    /// `game::pet::IGNORED_MESOS`). Answered with
+    /// `ServerMessage::PetPickedUp`.
     PetPickup {
         index: u8,
         object_id: i32,
@@ -566,6 +568,7 @@ pub enum FieldRequest {
         y: i16,
         mesos: bool,
         items: bool,
+        ignored: Vec<i32>,
     },
     /// The player's client moved their pet at `index` in their pet list.
     PetMove {
@@ -737,10 +740,7 @@ fn world_routes() -> &'static HashMap<i16, WorldRoute> {
             (Op::PetFood, InGame(&world::PetFoodHandler)),
             (Op::UseMountFood, InGame(&world::MountFoodHandler)),
             (Op::PetLoot, InGame(&world::PetLootHandler)),
-            (
-                Op::PetExcludeItems,
-                InGame(&world::PetExcludeItemsHandler),
-            ),
+            (Op::PetExcludeItems, InGame(&world::PetExcludeItemsHandler)),
             (Op::UseCashItem, InGame(&world::UseCashItemHandler)),
             (Op::CloseChalkboard, InGame(&world::CloseChalkboardHandler)),
             (

@@ -18,6 +18,7 @@
 #pragma once
 
 #include <cstdint>
+#include <vector>
 
 #include "MapObject.h"
 
@@ -41,9 +42,10 @@ namespace ms
 		void try_loot();
 
 		// Whether a pet at `feet` could take the drop now, if it takes mesos,
-		// items and others' drops as given (FUN_0050483a).
-		bool pet_lootable(Point<int16_t> feet, int32_t self, int32_t party, bool mesos, bool items,
-						  bool others) const;
+		// items and others' drops as given and leaves the ids `ignored`
+		// (FUN_0050483a).
+		bool pet_lootable(Point<int16_t> feet, int32_t self, int32_t party, bool mesos, bool items, bool others,
+						  const std::vector<int32_t> &ignored) const;
 
 		// Note a pet's request, so no pet tries the drop again for a while.
 		void try_pet_loot();

@@ -328,6 +328,28 @@ void info_page()
 	require(info_items(0, 0, { { 31, 1822001 }, { 23, 1802000 } }).empty(), "other rings and clothes aren't listed");
 }
 
+void exception_list()
+{
+	using namespace ms::pets;
+	using Items = std::vector<int32_t>;
+
+	std::map<int32_t, std::string> names = { { 4000000, "Blue Snail Shell" },
+											 { 4000019, "Snail Shell" },
+											 { 2000000, "Red Potion" },
+											 { 4000016, "Red Snail Shell" } };
+	auto name = [&](int32_t id) { return names[id]; };
+
+	Items ids = { 4000019, 2000000, IGNORED_MESOS, 4000000, 4000016 };
+	sort_ignored(ids, name);
+	require(ids == Items{ 4000000, 2000000, 4000016, 4000019, IGNORED_MESOS }, "by name, mesos as \"mesos\"");
+	require(ignored_name(IGNORED_MESOS, name) == "mesos", "mesos show trimmed");
+
+	Items cased = { 4000019, 4000000 };
+	names[4000000] = "blue snail shell";
+	sort_ignored(cased, name);
+	require(cased == Items{ 4000019, 4000000 }, "names compare byte by byte");
+}
+
 int main()
 {
 	try
@@ -343,6 +365,7 @@ int main()
 		naming();
 		equipment();
 		info_page();
+		exception_list();
 
 		std::cout << "Pets passed\n";
 		return 0;

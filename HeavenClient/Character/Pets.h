@@ -404,6 +404,13 @@ namespace ms
 		constexpr int32_t SWEEPER = 1812004;
 		constexpr int32_t LONG_RANGE = 1812005;
 		constexpr int32_t MAGIC_SCALES = 1812006;
+		// The Item Ignore Pendant makes a pet leave what its exception list
+		// names, up to 10 things (FUN_008fcede). The list names mesos by this
+		// id, and calls them " mesos" (StringPool 0x1586).
+		constexpr int32_t ITEM_IGNORE = 1812007;
+		constexpr int32_t IGNORED_MESOS = 0x7FFFFFFF;
+		constexpr size_t MAX_IGNORED = 10;
+		constexpr const char *MESOS_NAME = " mesos";
 
 		inline std::optional<std::array<int16_t, 3>> equip_parts(int32_t itemid)
 		{
@@ -619,6 +626,24 @@ namespace ms
 			}
 
 			return items;
+		}
+
+		// What a pet's exception list shows for `id`, with `name` giving an
+		// item's name: the name, trimmed (FUN_008fca75).
+		template <typename Name>
+		std::string ignored_name(int32_t id, Name name)
+		{
+			return trim(id == IGNORED_MESOS ? std::string(MESOS_NAME) : std::string(name(id)));
+		}
+
+		// A pet's exception list in the order PET_EXCEPTION_LIST (173) leaves
+		// it (FUN_007061a5): by the names it shows, byte by byte.
+		template <typename Name>
+		void sort_ignored(std::vector<int32_t> &ids, Name name)
+		{
+			auto key = [&](int32_t id) { return ignored_name(id, name); };
+
+			std::stable_sort(ids.begin(), ids.end(), [&](int32_t a, int32_t b) { return key(a) < key(b); });
 		}
 	}
 }

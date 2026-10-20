@@ -508,12 +508,19 @@ impl FieldActor {
                     y,
                     mesos,
                     items,
+                    ignored,
                 } => {
                     let now = Instant::now();
                     let party = self.occupants.get(&from).and_then(|o| o.party);
-                    let taken =
-                        self.drops
-                            .take_for_pet(from, party, object_id, (x, y), now, mesos, items);
+                    let taken = self.drops.take_for_pet(
+                        from,
+                        party,
+                        object_id,
+                        (x, y),
+                        now,
+                        (mesos, items),
+                        &ignored,
+                    );
                     if let (Ok(drop), Some(occupant)) = (taken, self.occupants.get(&from)) {
                         occupant
                             .handle

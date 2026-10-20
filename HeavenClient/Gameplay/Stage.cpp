@@ -863,6 +863,23 @@ namespace ms
 			return inventory.get_item_id(InventoryType::Id::EQUIPPED, inventory.shown_equip(part)) == itemid;
 		};
 
+		// What every pet leaves (FUN_00508679): nothing unless the first pet
+		// wears an Item Ignore Pendant, and then what the lists of those of
+		// the pets out that wear one name.
+		std::vector<int32_t> ignored;
+
+		if (player.get_pet(0) && wears(0, pets::ITEM_IGNORE))
+			for (uint8_t index = 0; index < 3; index++)
+			{
+				Optional<PetLook> pet = player.get_pet(index);
+
+				if (!pet)
+					break;
+
+				if (wears(index, pets::ITEM_IGNORE))
+					ignored.insert(ignored.end(), pet->get_ignored().begin(), pet->get_ignored().end());
+			}
+
 		for (uint8_t index = 0; index < 3; index++)
 		{
 			Optional<PetLook> pet = player.get_pet(index);
@@ -880,7 +897,7 @@ namespace ms
 			Point<int16_t> position = pet->get_position();
 
 			if (int32_t oid = drops.find_pet_loot_at(position, player.get_oid(), player.get_party().get_id(), mesos,
-													 items, others))
+													 items, others, ignored))
 				PetLootPacket(pet->get_serial(), position, oid, others, wears(index, pets::SWEEPER),
 							  wears(index, pets::LONG_RANGE))
 					.dispatch();
