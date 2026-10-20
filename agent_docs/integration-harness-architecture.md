@@ -54,7 +54,8 @@ Containerized servers use env overrides so they are decoupled from local static 
   channel on its advertised port, so the compose file maps those ports 1:1.
 - debug map-id warps: `RUSTMS_ALLOW_DEBUG_WARPS=1` (`net/src/policy.rs`)
 - ship route clock speed: `RUSTMS_CONTI_SCALE=60`, so a ship's 15-minute
-  cycle takes 15 seconds (`net/src/conti.rs`)
+  cycle takes 15 seconds, and `RUSTMS_CONTI_BALROG=100`, so the Crimson
+  Balrog attacks every Ellinia-Orbis trip (`net/src/conti.rs`)
 - Monster Book card drop chance: `RUSTMS_CARD_DROP_RATE=1` so every kill
   drops its card (`net/src/monster_book.rs`)
 - mob spawning: `RUSTMS_FULL_SPAWN=1` keeps a mob on every spawn point,

@@ -17,7 +17,7 @@ impl WorldHandler for ContiStateRequestHandler {
             return Ok(HandlerResult::empty());
         }
         match conti::ship_state(field, conti::now()) {
-            Some(state) => Ok(HandlerResult::reply(build_conti_state(state)?)),
+            Some((state, balrog)) => Ok(HandlerResult::reply(build_conti_state(state, balrog)?)),
             None => Ok(HandlerResult::empty()),
         }
     }

@@ -51,6 +51,8 @@ services:
       # Ships sail 60 times as fast: a trip takes 15 seconds (see
       # tests/ships.rs).
       RUSTMS_CONTI_SCALE: "60"
+      # The Crimson Balrog attacks every Ellinia-Orbis trip.
+      RUSTMS_CONTI_BALROG: "100"
       # Every spawn point keeps a mob, bosses too, rather than the v83 rule
       # of a few mobs per map and bosses after a wait (see
       # agent_docs/combat.md). Override with 0 to try the v83 rule.

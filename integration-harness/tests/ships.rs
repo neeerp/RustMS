@@ -1,8 +1,10 @@
 //! The ships from Ellinia to Orbis and from Orbis to Leafre (CONTI_MOVE):
 //! the station's wall clock, boarding with a ticket while the ship boards,
-//! the waiting room moved onto the deck at departure, and the riders set
-//! down on arrival. The harness world runs the route clock 60 times as fast
-//! (`RUSTMS_CONTI_SCALE`), so a trip takes 10 to 15 seconds.
+//! the waiting room moved onto the deck at departure, the Crimson Balrog's
+//! attack on the way, and the riders set down on arrival. The harness world
+//! runs the route clock 60 times as fast (`RUSTMS_CONTI_SCALE`), so a trip
+//! takes 10 to 15 seconds, and has the Balrog attack every Ellinia trip
+//! (`RUSTMS_CONTI_BALROG`).
 
 use game_data::GameData;
 use integration_harness::database::grant_item;
@@ -11,6 +13,7 @@ use integration_harness::quests::answer;
 use integration_harness::trace::{step, until, warp, Trace};
 use integration_harness::{login_to_world_session, relogin};
 use net::conti::{self, State};
+use net::conti::{Target, BALROG};
 use net::packet::op::RecvOpcode;
 use packet::io::write::PktWrite;
 use packet::Packet;
@@ -165,4 +168,39 @@ async fn a_ticket_takes_the_ship_from_orbis_to_leafre() {
     until(c, &mut trace, |t| t.warps.contains(&route.deck)).await;
     let mut trace = Trace::default();
     until(c, &mut trace, |t| t.warps.contains(&LEAFRE_STATION)).await;
+}
+
+#[tokio::test]
+async fn the_crimson_balrog_boards_the_ship_to_orbis_and_leaves() {
+    let route = &conti::TO_ORBIS;
+    let config = load_harness_config_or_fail().await;
+    let m = config.character_name.clone();
+    drop(login_to_world_session(&config).await.unwrap());
+    let mut session = relogin(&config).await;
+    let c = &mut session.connection;
+
+    // Step onto the deck before the Balrog's ship comes, 3 to 4 minutes
+    // into the trip.
+    let term = route.timetable.term * MINUTE;
+    let into = route_time().rem_euclid(term);
+    if into > 2 * MINUTE {
+        tokio::time::sleep(Duration::from_millis(((term - into) / SCALE) as u64)).await;
+    }
+    let mut trace = Trace::default();
+    assert_eq!(warp(c, route.deck, "", &mut trace).await, route.deck);
+
+    // The ship comes alongside, and two Balrogs board.
+    let comes = (Target::Deck as u8, State::MobGen as u8);
+    until(c, &mut trace, |t| t.ship_moves.contains(&comes)).await;
+    until(c, &mut trace, |t| t.field.alive(BALROG).len() == 2).await;
+    let t = step(c, &m, ship_state(route.deck)).await;
+    assert_eq!(t.ship_states, [State::Move as u8]);
+    assert_eq!(t.balrog_out, [true]);
+
+    // A minute before arrival it sails off with them.
+    let goes = (Target::Deck as u8, State::MobDestroy as u8);
+    until(c, &mut trace, |t| {
+        t.ship_moves.contains(&goes) && t.field.alive(BALROG).is_empty()
+    })
+    .await;
 }
