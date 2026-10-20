@@ -15,6 +15,7 @@ mod emote;
 mod fame;
 mod guild;
 mod item_effect;
+mod jukebox;
 mod item_move;
 mod keybinds;
 mod logged_in;

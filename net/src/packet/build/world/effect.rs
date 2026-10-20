@@ -48,6 +48,16 @@ pub fn build_blow_weather(weather: Option<(i32, &str)>) -> Result<Packet, Networ
     Ok(p)
 }
 
+/// PLAY_JUKEBOX (v83 FUN_00535224): `name` plays the song of the 510xxxx
+/// item `item_id`, which loops until each player leaves the map.
+pub fn build_play_jukebox(item_id: i32, name: &str) -> Result<Packet, NetworkError> {
+    let mut p = Packet::new_empty();
+    p.write_short(SendOpcode::PlayJukebox as i16)?;
+    p.write_int(item_id)?;
+    p.write_str_with_length(name)?;
+    Ok(p)
+}
+
 /// SHOW_ITEM_GAIN_INCHAT mode 0x17: show a UI image (`UI/tutorial.img/25`)
 /// anchored to the player, as the tutorial hints do.
 pub fn build_avatar_effect(path: &str) -> Result<Packet, NetworkError> {
@@ -184,6 +194,16 @@ mod tests {
         expect.int(8800000).int(33_000_000).int(66_000_000);
         expect.byte(1).byte(3);
         expect.end();
+    }
+
+    #[test]
+    fn a_jukebox_names_its_player() {
+        let packet = build_play_jukebox(5100000, "Tester").unwrap();
+        Expect::new(&packet.bytes)
+            .short(0x8F)
+            .int(5100000)
+            .string("Tester")
+            .end();
     }
 
     #[test]
