@@ -4,6 +4,9 @@
 //!
 //! The Hogs come back an hour after they're caught, so on one stack this
 //! test passes twice, once per Hog.
+//!
+//! The Element Rock won't work on a Scorpion that is too strong, and not
+//! again within its 800 ms `useDelay`.
 
 use integration_harness::database::grant_stack;
 use integration_harness::hunting::walk_to;
@@ -21,6 +24,10 @@ const TAMABLE_HOG: i32 = 9_300_101;
 /// The Hog mount the perfume turns into.
 const HOG: i32 = 1_902_000;
 const HOG_FIELD: i32 = 922_200_000;
+const ELEMENT_ROCK: i32 = 2_270_002;
+const SCORPION: i32 = 9_300_157;
+/// An Ariant arena with Scorpions.
+const ARENA: i32 = 980_010_101;
 
 /// USE_CATCH_ITEM of the item in USE slot `slot` at the mob `object_id`.
 fn throw(slot: i16, item_id: i32, object_id: i32) -> Packet {
@@ -82,4 +89,52 @@ async fn the_perfume_catches_a_hog_in_reach() {
         .added
         .iter()
         .any(|&(kind, _, item)| kind == EQUIP && item == HOG));
+}
+
+/// The result of the next BRIDLE_MOB_CATCH_FAIL, which must be for `item_id`
+/// and be followed by an unlock.
+async fn catch_fail(
+    c: &mut integration_harness::connection::MapleTestConnection,
+    t: &mut Trace,
+    item_id: i32,
+) -> u8 {
+    let fail = loop {
+        let p = read(c, t).await;
+        if p.opcode() == SendOpcode::BridleMobCatchFail as i16 {
+            break p;
+        }
+    };
+    assert_eq!(fail.bytes[3..7], item_id.to_le_bytes());
+    let unlock = read(c, t).await;
+    assert_eq!(unlock.opcode(), SendOpcode::StatChange as i16);
+    fail.bytes[2]
+}
+
+#[tokio::test]
+async fn the_element_rock_needs_a_weak_scorpion_and_a_wait() {
+    let config = load_harness_config_or_fail().await;
+    let id = login_to_world_session(&config)
+        .await
+        .expect("first login failed")
+        .character_id;
+    tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+    grant_stack(id, USE, 1, ELEMENT_ROCK, 2)
+        .await
+        .expect("grant the rocks");
+    let mut player = relogin(&config).await;
+    let (c, mut t) = (&mut player.connection, Trace::default());
+    assert_eq!(warp(c, ARENA, "", &mut t).await, ARENA);
+    until(c, &mut t, |t| !t.field.alive(SCORPION).is_empty()).await;
+    let scorpion = t.field.alive(SCORPION)[0];
+    let (x, y) = t.field.mob_positions[&scorpion];
+    send(c, walk_to(x, y)).await;
+
+    // At full HP it is too strong (result 0); thrown again at once, the
+    // rock is too soon (result 1, its delay line).
+    send(c, throw(1, ELEMENT_ROCK, scorpion)).await;
+    assert_eq!(catch_fail(c, &mut t, ELEMENT_ROCK).await, 0);
+    send(c, throw(1, ELEMENT_ROCK, scorpion)).await;
+    assert_eq!(catch_fail(c, &mut t, ELEMENT_ROCK).await, 1);
+    assert!(t.field.catches.is_empty());
+    assert!(t.removed.is_empty(), "the rocks are kept");
 }

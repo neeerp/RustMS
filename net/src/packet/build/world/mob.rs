@@ -238,13 +238,23 @@ pub fn build_catch_with_item(
     Ok(p)
 }
 
+/// Why a catch item didn't work, as BRIDLE_MOB_CATCH_FAIL says it.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum CatchFail {
+    /// "Unable to capture the monster; the monster is too strong."
+    TooStrong = 0,
+    /// The item's `delayMsg`, or "Element Rock cannot be used right after
+    /// usage." without one.
+    TooSoon = 1,
+}
+
 /// BRIDLE_MOB_CATCH_FAIL: the 227xxxx item `item_id` couldn't catch the
-/// mob, which is too strong (0xa0800e; result 1 would show the item's
-/// `delayMsg` instead). The client stays locked until a stat update.
-pub fn build_catch_fail(item_id: i32) -> Result<Packet, NetworkError> {
+/// mob, for `why` (0xa0800e). The client stays locked until a stat
+/// update.
+pub fn build_catch_fail(why: CatchFail, item_id: i32) -> Result<Packet, NetworkError> {
     let mut p = Packet::new_empty();
     p.write_short(SendOpcode::BridleMobCatchFail as i16)?;
-    p.write_byte(0)?;
+    p.write_byte(why as u8)?;
     p.write_int(item_id)?;
     p.write_int(0)?;
     Ok(p)
@@ -614,7 +624,7 @@ mod tests {
             .int(2270000)
             .byte(1);
         expect.end();
-        let fail = build_catch_fail(2270001).unwrap();
+        let fail = build_catch_fail(CatchFail::TooStrong, 2270001).unwrap();
         let mut expect = Expect::new(&fail.bytes);
         expect
             .short(SendOpcode::BridleMobCatchFail as i16)

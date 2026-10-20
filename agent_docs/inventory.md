@@ -388,9 +388,15 @@ It broadcasts CATCH_MONSTER_WITH_ITEM (`0xFC`: oid, item, 1) and
 KILL_MONSTER (leave type 1), and the client actor trades the item for what
 it makes (`ServerMessage::Caught`). A mob above `mobHP` gets
 BRIDLE_MOB_CATCH_FAIL (`0x4F`: 0, item, 0), "the monster is too strong".
+A mob weak enough is caught `bridleProp` percent of the time (the Element
+Rock, 2270002, has 50); otherwise the map sees CATCH_MONSTER_WITH_ITEM with
+result 0, the mob stays and the item is kept. What `bridlePropChg` (1.2 on
+the rock) does is unknown, so it is ignored. An item with a `useDelay` (the
+rock's 800 ms, the Fish Net's 3000 ms) thrown again within it gets
+BRIDLE_MOB_CATCH_FAIL result 1, which shows its `delayMsg`; the wait runs
+from the last throw that got past it (`Player::last_catch`, not saved).
 Every answer but a catch ends with an empty stat change, which unlocks the
-client. The Element Rock (2270002, a `bridleProp` chance) and the Fish Net
-(2270008, a `useDelay`) are refused for now.
+client.
 
 HeavenClient throws one on double-click (500 ms between throws) or from a
 quick slot (`Player::use_catch_item`, v83 FUN_00a09bdf). Riding a tamed

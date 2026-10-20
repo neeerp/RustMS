@@ -5,11 +5,13 @@ use crate::handler::{
     FieldRequest, HandlerResult, WorldAction, WorldContext, WorldHandler, WorldResult,
 };
 use crate::items;
+use crate::packet::build::world::mob::{build_catch_fail, CatchFail};
 use crate::packet::build::world::stat::build_stat_update;
 use game::{Inventory, InventoryChange, InventoryType, Player};
 use game_data::items::CatchInfo;
 use packet::{io::read::PktRead, Packet};
 use std::io::Cursor;
+use std::time::{Duration, Instant};
 use tracing::debug;
 
 /// USE_CATCH_ITEM (0x51, FUN_00a09bdf): the tick, the USE slot, the item
@@ -29,6 +31,12 @@ impl WorldHandler for UseCatchItemHandler {
             debug!(slot, item_id, "Catch item refused");
             return Ok(HandlerResult::reply(build_stat_update(true, &[])?));
         };
+        if too_soon(ctx.player, item_id, &catch, Instant::now()) {
+            return Ok(
+                HandlerResult::reply(build_catch_fail(CatchFail::TooSoon, item_id)?)
+                    .with_reply(build_stat_update(true, &[])?),
+            );
+        }
         Ok(
             HandlerResult::empty().with(WorldAction::Field(FieldRequest::Catch {
                 object_id,
@@ -47,13 +55,25 @@ fn may_throw(player: &Player, slot: i16, item_id: i32) -> Option<CatchInfo> {
         return None;
     }
     let catch = items::info(item_id)?.catch?;
-    // The Element Rock's chance and the waits of it and the Fish Net
-    // aren't supported yet.
-    if catch.use_delay > 0 || catch.prop < 100.0 {
-        return None;
-    }
     trade_catch(&mut player.inventory.clone(), slot, item_id, catch.create)?;
     Some(catch)
+}
+
+/// Whether `item_id` was thrown less than its `useDelay` ago; if not, the
+/// wait starts again `now`. Only throws that get past it count, as in
+/// Cosmic (the client doesn't time it).
+fn too_soon(player: &mut Player, item_id: i32, catch: &CatchInfo, now: Instant) -> bool {
+    let wait = Duration::from_millis(u64::try_from(catch.use_delay).unwrap_or(0));
+    if wait.is_zero() {
+        return false;
+    }
+    if let Some((last, at)) = player.last_catch {
+        if last == item_id && now.duration_since(at) < wait {
+            return true;
+        }
+    }
+    player.last_catch = Some((item_id, now));
+    false
 }
 
 /// Trade the catch item `item_id` in USE `slot` for the `create` it makes;
@@ -103,7 +123,7 @@ mod tests {
     }
 
     #[test]
-    fn the_element_rock_and_fish_net_wait_for_later() {
+    fn the_element_rock_and_fish_net_wait_between_throws() {
         if items::data().is_err() {
             return;
         }
@@ -117,8 +137,31 @@ mod tests {
         player
             .inventory
             .insert(InventoryType::Use, 3, Item::stack(2270001, 1));
-        assert!(may_throw(&player, 1, 2270002).is_none());
-        assert!(may_throw(&player, 2, 2270008).is_none());
-        assert_eq!(may_throw(&player, 3, 2270001).unwrap().mob_hp, 40);
+        let rock = may_throw(&player, 1, 2270002).unwrap();
+        assert_eq!((rock.prop, rock.use_delay, rock.mob_hp), (50.0, 800, 40));
+        let net = may_throw(&player, 2, 2270008).unwrap();
+        assert_eq!((net.use_delay, net.mob_hp), (3000, 100));
+        let pouch = may_throw(&player, 3, 2270001).unwrap();
+
+        let now = Instant::now();
+        assert!(!too_soon(&mut player, 2270002, &rock, now));
+        let soon = now + Duration::from_millis(799);
+        assert!(too_soon(&mut player, 2270002, &rock, soon));
+        // The pouch has no wait, and leaves the rock's alone.
+        assert!(!too_soon(&mut player, 2270001, &pouch, soon));
+        assert!(too_soon(&mut player, 2270002, &rock, soon));
+        assert!(!too_soon(
+            &mut player,
+            2270002,
+            &rock,
+            now + Duration::from_millis(800)
+        ));
+        assert!(!too_soon(&mut player, 2270008, &net, soon));
+        assert!(too_soon(
+            &mut player,
+            2270008,
+            &net,
+            soon + Duration::from_millis(2999)
+        ));
     }
 }
