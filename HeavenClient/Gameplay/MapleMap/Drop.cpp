@@ -20,6 +20,7 @@
 
 #include "../Combat/MesoExplosion.h"
 
+#include "../../Character/Pets.h"
 #include "../../Data/ItemData.h"
 
 #include "../../Audio/Audio.h"
@@ -328,8 +329,8 @@ namespace ms
 		sincetry = 0;
 	}
 
-	bool Drop::pet_lootable(Point<int16_t> feet, int32_t self, int32_t party, bool mesos, bool items,
-							bool others) const
+	bool Drop::pet_lootable(Point<int16_t> feet, int32_t self, int32_t party, bool mesos, bool items, bool others,
+							const std::vector<int32_t> &ignored) const
 	{
 		// Pets leave what players dropped, and whatever their equipment
 		// doesn't pick up.
@@ -342,7 +343,12 @@ namespace ms
 		if (state != Drop::State::FLOATING || sincepet < pickup::RETRY)
 			return false;
 
-		return pickup::in_reach(feet, spot);
+		if (!pickup::in_reach(feet, spot))
+			return false;
+
+		int32_t id = get_itemid() ? get_itemid() : pets::IGNORED_MESOS;
+
+		return std::find(ignored.begin(), ignored.end(), id) == ignored.end();
 	}
 
 	void Drop::try_pet_loot()

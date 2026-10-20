@@ -56,7 +56,9 @@ namespace ms
 			// The Cash Shop's list and Cash Inventory, which show items that aren't in an inventory.
 			CASHSHOP,
 			// Help from String's ToolTipHelp.img, which belongs to the window it was shown for.
-			HELP
+			HELP,
+			// The item search's results, whose tooltips go right of the cursor.
+			PETITEMSEARCH
 		};
 
 		virtual ~Tooltip()

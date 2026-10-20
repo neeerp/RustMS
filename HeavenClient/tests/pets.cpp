@@ -328,6 +328,50 @@ void info_page()
 	require(info_items(0, 0, { { 31, 1822001 }, { 23, 1802000 } }).empty(), "other rings and clothes aren't listed");
 }
 
+void exception_list()
+{
+	using namespace ms::pets;
+	using Items = std::vector<int32_t>;
+
+	std::map<int32_t, std::string> names = { { 4000000, "Blue Snail Shell" },
+											 { 4000019, "Snail Shell" },
+											 { 2000000, "Red Potion" },
+											 { 4000016, "Red Snail Shell" } };
+	auto name = [&](int32_t id) { return names[id]; };
+
+	Items ids = { 4000019, 2000000, IGNORED_MESOS, 4000000, 4000016 };
+	sort_ignored(ids, name);
+	require(ids == Items{ 4000000, 2000000, 4000016, 4000019, IGNORED_MESOS }, "by name, mesos as \"mesos\"");
+	require(ignored_name(IGNORED_MESOS, name) == "mesos", "mesos show trimmed");
+
+	Items cased = { 4000019, 4000000 };
+	names[4000000] = "blue snail shell";
+	sort_ignored(cased, name);
+	require(cased == Items{ 4000019, 4000000 }, "names compare byte by byte");
+
+	names[4000000] = "Blue Snail Shell";
+	names[4000001] = " Red Potion ";
+	Items listed = { 4000000, 4000019, IGNORED_MESOS };
+	require(ignored_slot(listed, 2000000, name) == std::optional<size_t>(1), "added before the next name");
+	require(ignored_slot(listed, 4000016, name) == std::optional<size_t>(1), "Red Snail Shell before Snail Shell");
+	require(!ignored_slot(Items{ 2000000 }, 4000001, name), "a name already listed stays once");
+	require(ignored_slot(Items{ 4000000 }, IGNORED_MESOS, name) == std::optional<size_t>(1), "mesos after capitals");
+	require(ignored_slot(Items{}, 4000000, name) == std::optional<size_t>(0), "the first goes first");
+	require(!ignored_slot(Items(MAX_IGNORED, 4000000), 2000000, name), "a full list takes no more");
+}
+
+void item_search()
+{
+	using namespace ms::pets;
+
+	require(search_key(" Red  Snail Shell ") == "redsnailshell", "lower case without spaces");
+	require(search_key("   ").empty(), "spaces alone search nothing");
+	require(searchable(4000000) && searchable(1302000) && searchable(2000000), "ordinary items are offered");
+
+	for (int32_t id : { 9110000, 5550000, 5010000, 5020000, 5160000, 5430000, 1112000, 1112899, 5109488 })
+		require(!searchable(id), "families the search leaves out");
+}
+
 int main()
 {
 	try
@@ -343,6 +387,8 @@ int main()
 		naming();
 		equipment();
 		info_page();
+		exception_list();
+		item_search();
 
 		std::cout << "Pets passed\n";
 		return 0;

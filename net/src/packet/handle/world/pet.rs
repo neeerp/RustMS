@@ -107,8 +107,10 @@ impl WorldHandler for MovePetHandler {
 /// PET_LOOT (0xAA, FUN_00705c7c): the pet's cash serial, the field key,
 /// the tick, where the pet stands, the drop, its CRC and the pet's sweep,
 /// range and pick-up-others flags. A pet takes mesos with a meso magnet
-/// and items with an item pouch worn for it (FUN_00705e2c). The client
-/// doesn't wait for an answer.
+/// and items with an item pouch worn for it (FUN_00705e2c). If the first
+/// pet wears an Item Ignore Pendant, every pet leaves what the exception
+/// lists of the pets wearing one name (FUN_00508679). The client doesn't
+/// wait for an answer.
 pub struct PetLootHandler;
 
 impl WorldHandler for PetLootHandler {
@@ -126,7 +128,7 @@ impl WorldHandler for PetLootHandler {
         let Some(index) = index.filter(|_| player.stats.hp > 0) else {
             return Ok(HandlerResult::empty());
         };
-        let worn = |item_id| {
+        let worn = |index: usize, item_id| {
             equip_slot::pet_slots(item_id).is_some_and(|slots| {
                 let position = slots[index] - 100;
                 player
@@ -135,10 +137,22 @@ impl WorldHandler for PetLootHandler {
                     .is_some()
             })
         };
-        let (mesos, items) = (worn(1_812_000), worn(1_812_001));
+        let (mesos, items) = (worn(index, 1_812_000), worn(index, 1_812_001));
         if !mesos && !items {
             return Ok(HandlerResult::empty());
         }
+        let ignore_pendant = 1_812_007;
+        let ignored = if worn(0, ignore_pendant) {
+            player
+                .pets
+                .iter()
+                .enumerate()
+                .filter(|&(i, _)| worn(i, ignore_pendant))
+                .flat_map(|(_, &serial)| player.pet_ignored(serial).iter().copied())
+                .collect()
+        } else {
+            Vec::new()
+        };
         Ok(
             HandlerResult::empty().with(WorldAction::Field(FieldRequest::PetPickup {
                 index: index as u8,
@@ -147,9 +161,64 @@ impl WorldHandler for PetLootHandler {
                 y,
                 mesos,
                 items,
+                ignored,
             })),
         )
     }
+}
+
+/// PET_EXCLUDE_ITEMS (0xAC, FUN_00706393): a summoned pet's cash serial and
+/// the whole of its exception list, mesos as 0x7fffffff, sent on every
+/// change in the list's window. The client keeps the list, so nothing comes
+/// back.
+pub struct PetExcludeItemsHandler;
+
+impl WorldHandler for PetExcludeItemsHandler {
+    fn handle(&self, packet: &mut Packet, ctx: &mut WorldContext) -> WorldResult {
+        let mut r = Cursor::new(&packet.bytes);
+        r.read_short()?;
+        let serial = r.read_long()?;
+        let count = r.read_byte()?;
+        let mut ignored = Vec::with_capacity(usize::from(count));
+        for _ in 0..count {
+            ignored.push(r.read_int()?);
+        }
+        let known = |item_id| item_id == pet::IGNORED_MESOS || items::info(item_id).is_some();
+        ignore_items(ctx.player, serial, ignored, known);
+        Ok(HandlerResult::empty())
+    }
+}
+
+/// Give the summoned pet `serial` the exception list `ignored`: at most ten
+/// different drops, each mesos or an item `known`. False, with nothing
+/// changed, otherwise.
+fn ignore_items(
+    player: &mut Player,
+    serial: i64,
+    ignored: Vec<i32>,
+    known: impl Fn(i32) -> bool,
+) -> bool {
+    let unique = ignored
+        .iter()
+        .enumerate()
+        .all(|(i, item_id)| !ignored[..i].contains(item_id));
+    if !player.pets.contains(&serial)
+        || ignored.len() > pet::MAX_IGNORED
+        || !unique
+        || !ignored.iter().all(|&item_id| known(item_id))
+    {
+        return false;
+    }
+    let Some((slot, mut item)) = pet_item(player, serial) else {
+        return false;
+    };
+    let Some(data) = item.pet.as_mut() else {
+        return false;
+    };
+    data.ignored = ignored;
+    player.inventory.insert(InventoryType::Cash, slot, item);
+    player.mark_dirty();
+    true
 }
 
 /// PET_COMMAND (0xA9, FUN_00704d5d): the pet's cash serial, whether the
@@ -568,6 +637,34 @@ mod tests {
     fn tiger(player: &Player) -> PetData {
         let item = player.inventory.get(InventoryType::Cash, 3).unwrap();
         item.pet.clone().unwrap()
+    }
+
+    #[test]
+    fn a_pet_out_takes_its_exception_list() {
+        let mut player = owner();
+        let known = |item_id| item_id != 4_000_999;
+        assert!(ignore_items(
+            &mut player,
+            77,
+            vec![4_000_000, pet::IGNORED_MESOS],
+            known
+        ));
+        assert_eq!(tiger(&player).ignored, [4_000_000, pet::IGNORED_MESOS]);
+        assert!(ignore_items(&mut player, 77, vec![], known));
+        assert!(tiger(&player).ignored.is_empty());
+    }
+
+    #[test]
+    fn a_bad_exception_list_changes_nothing() {
+        let mut player = owner();
+        let known = |item_id| item_id != 4_000_999;
+        assert!(!ignore_items(&mut player, 78, vec![4_000_000], known));
+        assert!(!ignore_items(&mut player, 77, vec![4_000_999], known));
+        assert!(!ignore_items(&mut player, 77, vec![4_000_000; 2], known));
+        assert!(!ignore_items(&mut player, 77, (0..11).collect(), |_| true));
+        player.pets.clear();
+        assert!(!ignore_items(&mut player, 77, vec![4_000_000], known));
+        assert!(tiger(&player).ignored.is_empty());
     }
 
     #[test]

@@ -41,7 +41,12 @@ impl ClientActor {
                     };
                     let packet = build_spawn_pet(avatar.id, index, pet)?;
                     own.push(packet.clone());
-                    own.push(build_pet_exception_list(avatar.id, index, serial, &[])?);
+                    own.push(build_pet_exception_list(
+                        avatar.id,
+                        index,
+                        serial,
+                        game.player.pet_ignored(serial),
+                    )?);
                     announce.push(packet);
                 }
                 PetChange::Dismissed { index } => {
@@ -121,6 +126,7 @@ impl ClientActor {
     /// On a new map the pets come along: the player's client shows only
     /// those it is told about.
     pub(super) async fn bring_pets(&mut self, avatar: &FieldAvatar) -> Result<(), RuntimeError> {
+        let player = &self.in_game()?.player;
         let mut packets: Vec<Packet> = Vec::new();
         for (index, pet) in avatar.pets.iter().enumerate() {
             packets.push(build_spawn_pet(avatar.id, index as u8, pet)?);
@@ -128,7 +134,7 @@ impl ClientActor {
                 avatar.id,
                 index as u8,
                 pet.serial,
-                &[],
+                player.pet_ignored(pet.serial),
             )?);
         }
         self.send_all(&mut packets).await

@@ -158,7 +158,11 @@ pub fn classify(keys: &QuestKeys) -> Result<(), String> {
     if !end.iter().any(|k| k == "npc" || k == "item" || k == "mob") {
         return Err("no completion NPC".into());
     }
-    unsupported(start, &[START_REQUIREMENTS, START_TRIGGERS].concat(), "Check/0")?;
+    unsupported(
+        start,
+        &[START_REQUIREMENTS, START_TRIGGERS].concat(),
+        "Check/0",
+    )?;
     unsupported(end, END_REQUIREMENTS, "Check/1")?;
     unsupported(&keys.start_act, START_ACTIONS, "Act/0")?;
     unsupported(&keys.end_act, END_ACTIONS, "Act/1")?;

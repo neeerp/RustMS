@@ -667,6 +667,10 @@ add_executable(HeavenClient
     IO/UITypes/UIGameOption.h
     IO/UITypes/UICharInfo.cpp
     IO/UITypes/UICharInfo.h
+    IO/UITypes/UIPetExceptions.cpp
+    IO/UITypes/UIPetExceptions.h
+    IO/UITypes/UIPetItemSearch.cpp
+    IO/UITypes/UIPetItemSearch.h
     IO/UITypes/UIContextMenu.cpp
     IO/UITypes/UIContextMenu.h
     IO/UITypes/UICharCreation.cpp

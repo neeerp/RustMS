@@ -101,6 +101,7 @@ namespace ms
 			FIELDCLOCK,
 			EVENTCLOCK,
 			MOBGAGE,
+			PETITEMSEARCH,
 			NUM_TYPES
 		};
 

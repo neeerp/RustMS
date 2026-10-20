@@ -296,6 +296,18 @@ impl Player {
             .find(|item| item.cash_serial == Some(serial) && item.pet.is_some())
     }
 
+    /// The exception list of the pet `serial`, empty if it isn't carried.
+    pub fn pet_ignored(&self, serial: i64) -> &[i32] {
+        self.inventory
+            .items(InventoryType::Cash)
+            .find_map(|(_, item)| {
+                item.pet
+                    .as_ref()
+                    .filter(|_| item.cash_serial == Some(serial))
+            })
+            .map_or(&[], |pet| &pet.ignored)
+    }
+
     /// The summoned pets' cash serials, 0 past the last.
     pub fn pet_serials(&self) -> [i64; 3] {
         let mut serials = [0; 3];

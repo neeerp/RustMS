@@ -522,6 +522,16 @@ namespace ms
 		namelabel.change_text(name);
 	}
 
+	void PetLook::set_ignored(std::vector<int32_t> ids)
+	{
+		ignored = std::move(ids);
+	}
+
+	const std::vector<int32_t> &PetLook::get_ignored() const
+	{
+		return ignored;
+	}
+
 	void PetLook::set_wear(int32_t w)
 	{
 		if (wear == w)

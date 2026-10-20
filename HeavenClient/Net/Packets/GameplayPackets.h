@@ -768,6 +768,23 @@ namespace ms
 		}
 	};
 
+	// The player closed a pet's exception list (FUN_00706393): the ids it
+	// is to leave, pets::IGNORED_MESOS for mesos.
+	// Opcode: PET_EXCLUDE_ITEMS(172)
+	class PetExcludeItemsPacket : public OutPacket
+	{
+	public:
+		PetExcludeItemsPacket(int64_t serial, const std::vector<int32_t>& ids)
+			: OutPacket(OutPacket::Opcode::PET_EXCLUDE_ITEMS)
+		{
+			write_long(serial);
+			write_byte(static_cast<int8_t>(ids.size()));
+
+			for (int32_t id : ids)
+				write_int(id);
+		}
+	};
+
 	// Hits a reactor (v83 FUN_007356c7). The kind is 0 for a swing and 1 for
 	// a skill, the flags bit 0 for facing left and bit 1 for standing, and
 	// the delay the ms until the hit lands, for others to see it then.

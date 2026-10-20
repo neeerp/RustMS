@@ -133,6 +133,12 @@ namespace ms
 		// its place in the list, or none for 0 (FUN_00703d15).
 		void set_wear(int32_t wear);
 
+		// PET_EXCEPTION_LIST (173): what it leaves while it wears an Item
+		// Ignore Pendant, by name (pets::sort_ignored).
+		void set_ignored(std::vector<int32_t> ids);
+
+		const std::vector<int32_t> &get_ignored() const;
+
 		bool is_local() const;
 
 		Stance get_stance() const;
@@ -153,6 +159,7 @@ namespace ms
 		int32_t itemid;
 		std::string name;
 		int64_t serial;
+		std::vector<int32_t> ignored;
 		bool local;
 		Stance stance;
 		// Facing right.

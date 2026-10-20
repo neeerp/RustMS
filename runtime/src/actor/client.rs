@@ -415,8 +415,7 @@ impl ClientActor {
                 .await?
             }
             WorldAction::BuffsChanged(announce) => self.show_buffs(announce).await?,
-            WorldAction::ChalkboardChanged(announce)
-            | WorldAction::ItemEffectChanged(announce) => {
+            WorldAction::ChalkboardChanged(announce) | WorldAction::ItemEffectChanged(announce) => {
                 let avatar = self.in_game()?.player.field_avatar(0, 0, 0);
                 self.send_to_field(FieldMessage::UpdateAvatar {
                     client_id: self.client_id,
@@ -1352,7 +1351,9 @@ const BEST_SELLERS_CONSIDERED: i64 = 50;
 /// 0, which never does. A pet sold for 0 days lives its `info/life` days.
 fn expiry(item_id: i32, period: i32) -> Option<SystemTime> {
     let days = match period {
-        0 if game::pet::is_pet(item_id) => net::items::info(item_id).map_or(0, |info| info.pet_life),
+        0 if game::pet::is_pet(item_id) => {
+            net::items::info(item_id).map_or(0, |info| info.pet_life)
+        }
         _ => period,
     };
     (days > 0).then(|| SystemTime::now() + Duration::from_secs(days as u64 * 86_400))

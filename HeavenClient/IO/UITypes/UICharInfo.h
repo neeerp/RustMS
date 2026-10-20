@@ -19,6 +19,8 @@
 
 #include "../UIDragElement.h"
 
+#include "UIPetExceptions.h"
+
 #include "../Components/Slider.h"
 
 #include "../../Character/Look/CharLook.h"
@@ -26,6 +28,7 @@
 #include "../../Graphics/Text.h"
 
 #include <cstdint>
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -84,6 +87,12 @@ namespace ms
 		void update_pets(int32_t character_id, const std::vector<Pet> &pets);
 		// Show the fame the player just raised or dropped (FAME_RESPONSE).
 		void change_fame(int16_t fame);
+
+		// Whether the exception window is open, and add to or remove from
+		// its pet's list, for the item search.
+		bool has_exceptions() const;
+		void add_exception(int32_t itemid);
+		void remove_exception(int32_t itemid);
 
 	private:
 		void give_fame(bool up) const;
@@ -161,6 +170,18 @@ namespace ms
 		// Whether the window can show the mount: not when the saddle worn doesn't fit it (FUN_00903e24).
 		bool shows_mount() const;
 
+		// Open or close the exception window (FUN_009009bf).
+		void toggle_exceptions();
+		void close_exceptions();
+		// Where it sits: beside the window, by the pet box when one shows (FUN_008ff7fa).
+		Point<int16_t> exceptions_position() const;
+		// Whether the cursor is on it, and not on the window above it.
+		bool on_exceptions(Point<int16_t> cursorpos) const;
+		// Whether it can open: for the player's own first pet wearing an
+		// Item Ignore Pendant (FUN_00904fad).
+		bool can_show_exceptions() const;
+		void close();
+
 		int32_t cid;
 		bool known;
 		CharLook look;
@@ -195,5 +216,7 @@ namespace ms
 		Slider item_slider;
 		Texture crown;
 		Texture req_level;
+		std::unique_ptr<UIPetExceptions> exceptions;
+		Point<int16_t> cursor;
 	};
 }

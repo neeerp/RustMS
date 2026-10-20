@@ -404,6 +404,13 @@ namespace ms
 		constexpr int32_t SWEEPER = 1812004;
 		constexpr int32_t LONG_RANGE = 1812005;
 		constexpr int32_t MAGIC_SCALES = 1812006;
+		// The Item Ignore Pendant makes a pet leave what its exception list
+		// names, up to 10 things (FUN_008fcede). The list names mesos by this
+		// id, and calls them " mesos" (StringPool 0x1586).
+		constexpr int32_t ITEM_IGNORE = 1812007;
+		constexpr int32_t IGNORED_MESOS = 0x7FFFFFFF;
+		constexpr size_t MAX_IGNORED = 10;
+		constexpr const char *MESOS_NAME = " mesos";
 
 		inline std::optional<std::array<int16_t, 3>> equip_parts(int32_t itemid)
 		{
@@ -619,6 +626,72 @@ namespace ms
 			}
 
 			return items;
+		}
+
+		// What a pet's exception list shows for `id`, with `name` giving an
+		// item's name: the name, trimmed (FUN_008fca75).
+		template <typename Name>
+		std::string ignored_name(int32_t id, Name name)
+		{
+			return trim(id == IGNORED_MESOS ? std::string(MESOS_NAME) : std::string(name(id)));
+		}
+
+		// A pet's exception list in the order PET_EXCEPTION_LIST (173) leaves
+		// it (FUN_007061a5): by the names it shows, byte by byte.
+		template <typename Name>
+		void sort_ignored(std::vector<int32_t> &ids, Name name)
+		{
+			auto key = [&](int32_t id) { return ignored_name(id, name); };
+
+			std::stable_sort(ids.begin(), ids.end(), [&](int32_t a, int32_t b) { return key(a) < key(b); });
+		}
+
+		// Where the exception window adds `id` to a pet's list (FUN_008fcede):
+		// before the first name after its own. Nowhere when the list is full
+		// or already shows that name.
+		template <typename Name>
+		std::optional<size_t> ignored_slot(const std::vector<int32_t> &ids, int32_t id, Name name)
+		{
+			if (ids.size() >= MAX_IGNORED)
+				return std::nullopt;
+
+			std::string key = ignored_name(id, name);
+
+			for (size_t i = 0; i < ids.size(); i++)
+			{
+				std::string other = ignored_name(ids[i], name);
+
+				if (key == other)
+					return std::nullopt;
+
+				if (key < other)
+					return i;
+			}
+
+			return ids.size();
+		}
+
+		// What the item search matches (FUN_008fbe4b): the text in lower
+		// case, without its spaces.
+		inline std::string search_key(const std::string &text)
+		{
+			std::string key;
+
+			for (char c : text)
+				if (c != ' ')
+					key += static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+
+			return key;
+		}
+
+		// Whether the item search may offer an item of this id at all
+		// (FUN_005d49a4).
+		inline bool searchable(int32_t id)
+		{
+			int32_t family = id / 10000;
+
+			return family != 911 && family != 555 && family != 501 && family != 502 && family != 516
+				   && id / 1000 != 5430 && id / 100 != 11120 && id / 100 != 11128 && id != 5109488;
 		}
 	}
 }

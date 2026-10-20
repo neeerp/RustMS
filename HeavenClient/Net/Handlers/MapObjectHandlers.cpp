@@ -26,7 +26,9 @@
 #include "MiniRoom.h"
 
 #include "../../Character/CatchItemRules.h"
+#include "../../Character/Pets.h"
 #include "../../Data/CurseData.h"
+#include "../../Data/ItemData.h"
 #include "../../Data/SkillData.h"
 #include "../../Gameplay/Stage.h"
 #include "../../IO/UI.h"
@@ -282,6 +284,26 @@ namespace ms
 		if (Optional<Char> character = Stage::get().get_character(cid))
 			if (Optional<PetLook> pet = character->get_pet(index))
 				pet->set_name(name);
+	}
+
+	void PetExceptionListHandler::handle(InPacket& recv) const
+	{
+		int32_t cid = recv.read_int();
+		uint8_t index = recv.read_byte();
+		int64_t serial = recv.read_long();
+		std::vector<int32_t> ids(recv.read_byte());
+
+		for (int32_t &id : ids)
+			id = recv.read_int();
+
+		Optional<Char> character = Stage::get().get_character(cid);
+		Optional<PetLook> pet = character ? character->get_pet(index) : Optional<PetLook>();
+
+		if (!pet || pet->get_serial() != serial)
+			return;
+
+		pets::sort_ignored(ids, [](int32_t id) { return ItemData::get(id).get_name(); });
+		pet->set_ignored(std::move(ids));
 	}
 
 	void CashPetFoodResultHandler::handle(InPacket& recv) const

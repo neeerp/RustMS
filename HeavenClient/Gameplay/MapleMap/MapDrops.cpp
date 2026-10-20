@@ -192,13 +192,13 @@ namespace ms
 	}
 
 	int32_t MapDrops::find_pet_loot_at(Point<int16_t> petpos, int32_t self, int32_t party, bool mesos, bool items,
-									   bool others)
+									   bool others, const std::vector<int32_t> &ignored)
 	{
 		for (auto &mmo : drops)
 		{
 			Optional<Drop> drop = mmo.second.get();
 
-			if (drop && drop->pet_lootable(petpos, self, party, mesos, items, others))
+			if (drop && drop->pet_lootable(petpos, self, party, mesos, items, others, ignored))
 			{
 				drop->try_pet_loot();
 

@@ -174,7 +174,11 @@ impl FieldActor {
     /// out of dead ones, and mob and reactor respawns.
     fn on_tick(&mut self, now: Instant) {
         self.run_trips();
-        if self.weather.as_ref().is_some_and(|(_, _, until)| *until <= now) {
+        if self
+            .weather
+            .as_ref()
+            .is_some_and(|(_, _, until)| *until <= now)
+        {
             self.weather = None;
             if let Ok(packet) = build_blow_weather(None) {
                 self.broadcast(None, packet);
@@ -508,12 +512,19 @@ impl FieldActor {
                     y,
                     mesos,
                     items,
+                    ignored,
                 } => {
                     let now = Instant::now();
                     let party = self.occupants.get(&from).and_then(|o| o.party);
-                    let taken =
-                        self.drops
-                            .take_for_pet(from, party, object_id, (x, y), now, mesos, items);
+                    let taken = self.drops.take_for_pet(
+                        from,
+                        party,
+                        object_id,
+                        (x, y),
+                        now,
+                        (mesos, items),
+                        &ignored,
+                    );
                     if let (Ok(drop), Some(occupant)) = (taken, self.occupants.get(&from)) {
                         occupant
                             .handle

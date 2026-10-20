@@ -107,6 +107,10 @@ namespace ms
 		const Point<int16_t> PANEL = { 270, 0 };
 		const Point<int16_t> PANEL_HIDE = { 220, 6 };
 		const Point<int16_t> PANEL_SIZE = { 240, 162 };
+		// The exception window opens under the window's right edge, lower
+		// beside a box (FUN_009009bf).
+		const Point<int16_t> EXCEPTIONS = { 270, 34 };
+		constexpr int16_t EXCEPTIONS_PET_Y = 196;
 	}
 
 	UICharInfo::UICharInfo(int32_t id) : UIDragElement<PosCHARINFO>(Point<int16_t>(WIDTH, 20)), cid(id), known(false), mode(Mode::MAIN), panel(Panel::NO_PANEL)
@@ -198,6 +202,9 @@ namespace ms
 
 	void UICharInfo::draw(float alpha) const
 	{
+		if (exceptions)
+			exceptions->draw(alpha);
+
 		backgrounds[mode].draw(position);
 
 		if (panel == Panel::ITEMS)
@@ -273,6 +280,20 @@ namespace ms
 
 		if (mode == Mode::PET && selected < pet_pages.size())
 			pet_pages[selected].look.update_standing();
+
+		if (exceptions)
+		{
+			exceptions->set_position(exceptions_position());
+			exceptions->update();
+		}
+
+		Button &exception = *buttons[Buttons::BT_EXCEPTION];
+		bool shows = can_show_exceptions();
+
+		if (shows && exception.get_state() == Button::State::DISABLED)
+			exception.set_state(Button::State::NORMAL);
+		else if (!shows)
+			exception.set_state(Button::State::DISABLED);
 	}
 
 	Button::State UICharInfo::button_pressed(uint16_t buttonid)
@@ -280,7 +301,10 @@ namespace ms
 		switch (buttonid)
 		{
 		case Buttons::BT_CLOSE:
-			deactivate();
+			close();
+			break;
+		case Buttons::BT_EXCEPTION:
+			toggle_exceptions();
 			break;
 		case Buttons::BT_ITEM:
 			set_panel(panel == Panel::ITEMS ? Panel::NO_PANEL : Panel::ITEMS);
@@ -310,6 +334,9 @@ namespace ms
 			set_mode(Mode::COLLECTION);
 			break;
 		case Buttons::BT_PET_HIDE:
+			close_exceptions();
+			set_mode(Mode::MAIN);
+			break;
 		case Buttons::BT_TAMING_HIDE:
 		case Buttons::BT_COLLECTION_HIDE:
 			set_mode(Mode::MAIN);
@@ -317,6 +344,10 @@ namespace ms
 		case Buttons::BT_PET1:
 		case Buttons::BT_PET2:
 		case Buttons::BT_PET3:
+			// The exception window stays only for the pet it shows.
+			if (exceptions && exceptions->get_pet() != buttonid - Buttons::BT_PET1)
+				close_exceptions();
+
 			select_pet(buttonid - Buttons::BT_PET1);
 			set_mode(Mode::PET);
 			break;
@@ -329,7 +360,7 @@ namespace ms
 
 	bool UICharInfo::is_in_range(Point<int16_t> cursorpos) const
 	{
-		if (Rectangle<int16_t>(position, position + dimension).contains(cursorpos))
+		if (Rectangle<int16_t>(position, position + dimension).contains(cursorpos) || on_exceptions(cursorpos))
 			return true;
 
 		Point<int16_t> panelpos = position + PANEL;
@@ -339,6 +370,23 @@ namespace ms
 
 	Cursor::State UICharInfo::send_cursor(bool clicked, Point<int16_t> cursorpos)
 	{
+		cursor = cursorpos;
+
+		if (exceptions && !dragged)
+		{
+			if (exceptions->is_holding_button() || on_exceptions(cursorpos))
+			{
+				Cursor::State state = exceptions->send_cursor(clicked, cursorpos);
+
+				if (!exceptions->is_active())
+					toggle_exceptions();
+
+				return state;
+			}
+
+			exceptions->remove_cursor();
+		}
+
 		if (mode == Mode::PET)
 		{
 			Cursor::State state = item_slider.send_cursor(cursorpos - position, clicked);
@@ -355,18 +403,23 @@ namespace ms
 		UIDragElement::remove_cursor();
 
 		item_slider.remove_cursor();
+
+		if (exceptions)
+			exceptions->remove_cursor();
 	}
 
 	void UICharInfo::send_scroll(double yoffset)
 	{
-		if (mode == Mode::PET)
+		if (on_exceptions(cursor))
+			exceptions->send_scroll(yoffset);
+		else if (mode == Mode::PET)
 			item_slider.send_scroll(yoffset);
 	}
 
 	void UICharInfo::send_key(int32_t, bool pressed, bool escape)
 	{
 		if (pressed && escape)
-			deactivate();
+			close();
 	}
 
 	UIElement::Type UICharInfo::get_type() const
@@ -498,6 +551,67 @@ namespace ms
 	void UICharInfo::change_fame(int16_t f)
 	{
 		fame.change_text(std::to_string(f));
+	}
+
+	bool UICharInfo::has_exceptions() const
+	{
+		return exceptions != nullptr;
+	}
+
+	void UICharInfo::add_exception(int32_t itemid)
+	{
+		if (exceptions)
+			exceptions->add(itemid);
+	}
+
+	void UICharInfo::remove_exception(int32_t itemid)
+	{
+		if (exceptions)
+			exceptions->remove(itemid);
+	}
+
+	void UICharInfo::toggle_exceptions()
+	{
+		if (exceptions)
+			close_exceptions();
+		else
+			exceptions = std::make_unique<UIPetExceptions>(static_cast<uint8_t>(selected), exceptions_position());
+	}
+
+	void UICharInfo::close_exceptions()
+	{
+		if (!exceptions)
+			return;
+
+		exceptions->close();
+		exceptions.reset();
+	}
+
+	Point<int16_t> UICharInfo::exceptions_position() const
+	{
+		return position + Point<int16_t>(EXCEPTIONS.x(), mode == Mode::MAIN ? EXCEPTIONS.y() : EXCEPTIONS_PET_Y);
+	}
+
+	bool UICharInfo::on_exceptions(Point<int16_t> cursorpos) const
+	{
+		if (!exceptions || Rectangle<int16_t>(position, position + dimension).contains(cursorpos))
+			return false;
+
+		return exceptions->is_in_range(cursorpos);
+	}
+
+	bool UICharInfo::can_show_exceptions() const
+	{
+		Player &player = Stage::get().get_player();
+
+		return mode == Mode::PET && cid == player.get_oid() && player.get_pet(0)
+			   && player.pet_wears(0, pets::ITEM_IGNORE);
+	}
+
+	void UICharInfo::close()
+	{
+		close_exceptions();
+		deactivate();
 	}
 
 	void UICharInfo::give_fame(bool up) const

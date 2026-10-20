@@ -379,6 +379,7 @@ namespace ms
 					types.emplace_back(UIElement::Type::QUESTLOG);
 					types.emplace_back(UIElement::Type::USERLIST);
 					types.emplace_back(UIElement::Type::NPCTALK);
+					types.emplace_back(UIElement::Type::PETITEMSEARCH);
 					types.emplace_back(UIElement::Type::CHARINFO);
 					types.emplace_back(UIElement::Type::TRADINGROOM);
 					types.emplace_back(UIElement::Type::PERSONALSHOP);

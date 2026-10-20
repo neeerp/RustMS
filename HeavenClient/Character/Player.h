@@ -270,6 +270,9 @@ namespace ms
 		// Obtain a reference to the player's inventory.
 		const Inventory &get_inventory() const;
 
+		// Whether the pet `index` wears `itemid` (FUN_00705e2c).
+		bool pet_wears(uint8_t index, int32_t itemid) const;
+
 		// The player's pets hear a chat line, and each one it commands asks
 		// the server whether it obeys (FUN_00704d5d).
 		void command_pets(const std::string &line);
