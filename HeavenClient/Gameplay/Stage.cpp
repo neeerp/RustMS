@@ -928,6 +928,18 @@ namespace ms
 		if (walking || (down && type != KeyType::Id::MACRO && !crouching))
 			macro_runner.clear();
 
+		// A double tap on Left or Right dashes, and letting either go ends the Dash (FUN_0074d993, 0x9678e1).
+		int32_t arrow = !walking ? 0 : action == KeyAction::Id::LEFT ? 1 : 2;
+		bool dashing = player.has_buff(Buffstat::Id::DASH_SPEED);
+		int32_t dash_skill = dash::skill(player.get_stats().get_job().get_id());
+
+		bool tapped = dash_command.feed(arrow, down, get_uptime() / 1000, dashing);
+
+		if (tapped && player.get_skills().get_level(dash_skill) > 0)
+			combat.use_move(dash_skill);
+		else if (walking && !down && dashing)
+			CancelBuffPacket(dash_skill).dispatch();
+
 		switch (type)
 		{
 			case KeyType::Id::ACTION:

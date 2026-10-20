@@ -21,6 +21,7 @@
 #include "MountRules.h"
 
 #include "../Constants.h"
+#include "../Gameplay/Combat/Dash.h"
 #include "../Gameplay/Combat/FlashJump.h"
 #include "../Gameplay/Stage.h"
 #include "../IO/UITypes/EnergyBarLayout.h"
@@ -111,6 +112,9 @@ namespace ms
 			// The glow is Energy Charge's for the character's line (0x94b44b).
 			if (stat == Buffstat::Id::ENERGY_CHARGE)
 				show_energy(job / 1000 == 1 ? 15100004 : 5110001, value >= energy_bar::FULL, init);
+
+			if (stat == Buffstat::Id::DASH_SPEED)
+				show_dash(dash::skill(job));
 		}
 
 		show_diseases();
@@ -130,6 +134,9 @@ namespace ms
 
 			if (stat == Buffstat::Id::ENERGY_CHARGE)
 				show_energy(0, false, false);
+
+			if (stat == Buffstat::Id::DASH_SPEED)
+				show_dash(0);
 		}
 
 		show_diseases();

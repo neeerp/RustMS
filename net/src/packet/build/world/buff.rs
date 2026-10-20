@@ -158,16 +158,21 @@ pub fn build_cancel_foreign_buff(
     Ok(p)
 }
 
-/// Energy Charge's two-state data (bit 82; v83 0x793ef2): the energy and
-/// the skill, then when it started and how many seconds it lasts, which
-/// the client never reads.
-pub(crate) fn write_energy(p: &mut Packet, energy: Option<ShownBuff>) -> Result<(), NetworkError> {
-    let (value, skill_id) = energy.map_or((0, 0), |energy| (energy.value, energy.skill_id));
+/// A two-state stat's data, as Energy Charge (bit 82) and Dash (83, 84)
+/// carry it (v83 0x793ef2, 0x794332): the value and the skill, then when
+/// it started and how many seconds it lasts. The client never times it out
+/// itself; the seconds only time its buff icon.
+pub(crate) fn write_two_state(
+    p: &mut Packet,
+    buff: Option<ShownBuff>,
+    seconds: u16,
+) -> Result<(), NetworkError> {
+    let (value, skill_id) = buff.map_or((0, 0), |buff| (buff.value, buff.skill_id));
     p.write_int(i32::from(value))?;
     p.write_int(skill_id)?;
     p.write_byte(0)?; // start before (1) or after now
     p.write_int(0)?; // how long
-    p.write_short(0)?; // seconds it lasts
+    p.write_short(seconds as i16)?;
     Ok(())
 }
 
@@ -180,7 +185,7 @@ pub fn build_give_energy(energy: ShownBuff) -> Result<Packet, NetworkError> {
     write_mask(&mut p, [BuffStat::EnergyCharge.bit()])?;
     p.write_byte(0)?; // defense attack
     p.write_byte(0)?; // defense state
-    write_energy(&mut p, Some(energy))?;
+    write_two_state(&mut p, Some(energy), 0)?;
     p.write_short(0)?; // delay
     Ok(p)
 }
@@ -197,7 +202,47 @@ pub fn build_give_foreign_energy(
     write_mask(&mut p, [BuffStat::EnergyCharge.bit()])?;
     p.write_byte(0)?; // defense attack
     p.write_byte(0)?; // defense state
-    write_energy(&mut p, Some(energy))?;
+    write_two_state(&mut p, Some(energy), 0)?;
+    p.write_short(0)?; // delay
+    Ok(p)
+}
+
+/// GIVE_BUFF for Dash: its speed and jump (bits 83 and 84) for `seconds`.
+/// Like riding, it moves the player, so a byte follows the delay
+/// (FUN_0077dc78).
+pub fn build_give_dash(
+    speed: ShownBuff,
+    jump: ShownBuff,
+    seconds: u16,
+) -> Result<Packet, NetworkError> {
+    let mut p = Packet::new_empty();
+    p.write_short(SendOpcode::GiveBuff as i16)?;
+    write_mask(&mut p, [speed.stat.bit(), jump.stat.bit()])?;
+    p.write_byte(0)?; // defense attack
+    p.write_byte(0)?; // defense state
+    write_two_state(&mut p, Some(speed), seconds)?;
+    write_two_state(&mut p, Some(jump), seconds)?;
+    p.write_short(0)?; // delay
+    p.write_byte(0)?;
+    Ok(p)
+}
+
+/// GIVE_FOREIGN_BUFF for Dash: another player dashes, raising dust while
+/// they're on the ground (0x9310a2).
+pub fn build_give_foreign_dash(
+    character_id: i32,
+    speed: ShownBuff,
+    jump: ShownBuff,
+    seconds: u16,
+) -> Result<Packet, NetworkError> {
+    let mut p = Packet::new_empty();
+    p.write_short(SendOpcode::GiveForeignBuff as i16)?;
+    p.write_int(character_id)?;
+    write_mask(&mut p, [speed.stat.bit(), jump.stat.bit()])?;
+    p.write_byte(0)?; // defense attack
+    p.write_byte(0)?; // defense state
+    write_two_state(&mut p, Some(speed), seconds)?;
+    write_two_state(&mut p, Some(jump), seconds)?;
     p.write_short(0)?; // delay
     Ok(p)
 }
@@ -543,6 +588,39 @@ mod tests {
         expect.long(1 << 50).long(0);
         expect.byte(0).byte(0);
         expect.int(10000).int(5110001).byte(0).int(0).short(0);
+        expect.short(0);
+        expect.end();
+    }
+
+    #[test]
+    fn dash_carries_its_speed_and_jump_in_two_15_byte_blocks() {
+        let speed = ShownBuff {
+            stat: BuffStat::DashSpeed,
+            value: 12,
+            skill_id: 5001005,
+        };
+        let jump = ShownBuff {
+            stat: BuffStat::DashJump,
+            value: 1,
+            skill_id: 5001005,
+        };
+        let packet = build_give_dash(speed, jump, 4).unwrap();
+        let mut expect = Expect::new(&packet.bytes);
+        expect.short(SendOpcode::GiveBuff as i16);
+        expect.long(1 << 51 | 1 << 52).long(0);
+        expect.byte(0).byte(0);
+        expect.int(12).int(5001005).byte(0).int(0).short(4);
+        expect.int(1).int(5001005).byte(0).int(0).short(4);
+        expect.short(0).byte(0);
+        expect.end();
+
+        let packet = build_give_foreign_dash(7, speed, jump, 4).unwrap();
+        let mut expect = Expect::new(&packet.bytes);
+        expect.short(SendOpcode::GiveForeignBuff as i16).int(7);
+        expect.long(1 << 51 | 1 << 52).long(0);
+        expect.byte(0).byte(0);
+        expect.int(12).int(5001005).byte(0).int(0).short(4);
+        expect.int(1).int(5001005).byte(0).int(0).short(4);
         expect.short(0);
         expect.end();
     }

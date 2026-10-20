@@ -23,6 +23,7 @@
 #include <optional>
 
 #include "Combat/Combat.h"
+#include "Combat/Dash.h"
 #include "EmoteCooldown.h"
 #include "QuestAlert.h"
 #include "FameCooldown.h"
@@ -383,6 +384,7 @@ namespace ms
 
 		Combat combat;
 		skill_macro::Runner macro_runner;
+		dash::Command dash_command;
 		EmoteCooldown emote_cooldown;
 		FameCooldown fame_cooldown;
 		// When the last effect item was shown, in ms of uptime, or -1.

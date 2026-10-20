@@ -63,6 +63,9 @@ namespace ms
 		held_effects.drawbelow(absp, alpha);
 		energy_glow.drawbelow(absp, alpha);
 
+		if (dashing && phobj.onground)
+			dash_dust.draw(DrawArgument(absp, facing_right), alpha);
+
 		Color color;
 
 		// While blinking, the avatar is drawn at half brightness for two of
@@ -223,6 +226,9 @@ namespace ms
 		effects.update();
 		held_effects.update();
 		energy_glow.update();
+
+		if (dashing)
+			dash_dust.update();
 
 		if (energy_wait >= 0)
 		{
@@ -438,6 +444,14 @@ namespace ms
 		nl::node finish = nl::nx::skill[string_format::skill_img(skill)]["skill"][std::to_string(skill)]["finish"];
 		effects.add(finish[std::to_string(orbs)], DrawArgument(false), static_cast<int8_t>(finish["z"].get_integer()),
 			get_real_attackspeed());
+	}
+
+	void Char::show_dash(int32_t skill)
+	{
+		dashing = skill != 0;
+
+		if (dashing)
+			dash_dust = nl::nx::skill[string_format::skill_img(skill)]["skill"][std::to_string(skill)]["special"];
 	}
 
 	void Char::show_energy(int32_t skill, bool full, bool init)

@@ -95,6 +95,11 @@ pub enum BuffStat {
     /// at `ENERGY_FULL`. It fills slowly and, once full, empties after the
     /// skill's `time`.
     EnergyCharge = 82,
+    /// Dash's speed (a two-state stat): the player walks at their base
+    /// speed plus the larger of `value` and their Speed buff.
+    DashSpeed = 83,
+    /// Dash's jump, as `DashSpeed` with the Jump buff.
+    DashJump = 84,
     /// Riding the tamed monster worn at `equip_slot::MOUNT` (the client's
     /// RideVehicle, a two-state stat). Its value isn't used; the mount
     /// tires every `mount::TIRE_INTERVAL`.
@@ -164,10 +169,17 @@ impl BuffStat {
         }
     }
 
-    /// Whether the rest of the map sees it: one of `SHOWN`, or energy or
-    /// riding, which they get in two-state blocks of their own.
+    /// Whether the rest of the map sees it: one of `SHOWN`, or energy, a
+    /// dash or riding, which they get in two-state blocks of their own.
     pub fn shown(self) -> bool {
-        Self::SHOWN.contains(&self) || matches!(self, BuffStat::EnergyCharge | BuffStat::Riding)
+        Self::SHOWN.contains(&self)
+            || matches!(
+                self,
+                BuffStat::EnergyCharge
+                    | BuffStat::DashSpeed
+                    | BuffStat::DashJump
+                    | BuffStat::Riding
+            )
     }
 }
 
@@ -281,10 +293,12 @@ impl Buffs {
 
     /// Energy Charge's gauge, while it has energy.
     pub fn energy(&self) -> Option<ShownBuff> {
-        let buff = self
-            .active
-            .iter()
-            .find(|buff| buff.stat == BuffStat::EnergyCharge)?;
+        self.two_state(BuffStat::EnergyCharge)
+    }
+
+    /// A two-state stat, as others see it, while it lasts.
+    pub fn two_state(&self, stat: BuffStat) -> Option<ShownBuff> {
+        let buff = self.active.iter().find(|buff| buff.stat == stat)?;
         Some(ShownBuff {
             stat: buff.stat,
             value: buff.value,

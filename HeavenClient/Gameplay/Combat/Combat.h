@@ -148,6 +148,9 @@ namespace ms
 		// Whether the player may use the move now, saying why not if not.
 		bool can_use_move(const SpecialMove &move) const;
 
+		// Attacking or casting ends Dash first (0x9678e1).
+		void end_dash() const;
+
 		// Use a skill that doesn't attack. Whether it could ask the server.
 		bool request_skill(const SpecialMove &move);
 

@@ -314,6 +314,8 @@ if(HEAVENCLIENT_BUILD_TESTS)
     add_test(NAME quest_catalog COMMAND quest_catalog_tests)
     add_executable(skill_weapon_tests tests/skill_weapon.cpp)
     add_test(NAME skill_weapon COMMAND skill_weapon_tests)
+    add_executable(dash_tests tests/dash.cpp)
+    add_test(NAME dash COMMAND dash_tests)
 endif()
 
 include_directories(.)

@@ -82,8 +82,8 @@ namespace ms
 			case 76: return STOP_MOTION;
 			case 77: return FEAR;
 			case 82: return ENERGY_CHARGE;
-			case 83: return DASH2;
-			case 84: return DASH;
+			case 83: return DASH_SPEED;
+			case 84: return DASH_JUMP;
 			case 85: return MONSTER_RIDING;
 			case 87: return HOMING_BEACON;
 			case 88: return SPEED_INFUSION;

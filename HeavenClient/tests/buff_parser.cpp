@@ -145,6 +145,30 @@ int main()
 				"a full gauge and Thunder Breaker's Energy Charge");
 		require(full.read_short() == 0 && !full.available(), "and the delay follows");
 
+		// GIVE_BUFF: Dash's speed and jump, each with the skill and the icon's seconds, then the delay and the
+		// movement byte.
+		BuffParser::Flags dashing{ 0, 0 };
+		dashing.set(BuffParser::DASH_SPEED);
+		dashing.set(BuffParser::DASH_JUMP);
+		Writer m;
+		m.put<int32_t>(30).put<int32_t>(5001005).zeros(5).put<int16_t>(40);
+		m.put<int32_t>(20).put<int32_t>(5001005).zeros(5).put<int16_t>(40).put<int16_t>(0);
+		InPacket dash(m.bytes.data(), m.bytes.size());
+		BuffParser::Dash got_dash = BuffParser::read_two_state(dash, dashing).dash;
+		require(got_dash.speed == 30 && got_dash.jump == 20 && got_dash.skill == 5001005 && got_dash.seconds == 40,
+				"Dash's speed, jump, skill and seconds");
+		require(dash.read_short() == 0 && !dash.available(), "and the delay follows");
+
+		// GIVE_FOREIGN_BUFF: another character dashes.
+		Writer n;
+		n.flags(dashing).zeros(2).put<int32_t>(12).put<int32_t>(5001005).zeros(5).put<int16_t>(4);
+		n.put<int32_t>(1).put<int32_t>(5001005).zeros(5).put<int16_t>(4).put<int16_t>(0);
+		InPacket foreign(n.bytes.data(), n.bytes.size());
+		shown = BuffParser::parse_shown(foreign, BuffParser::read_flags(foreign));
+		require(shown.size() == 1 && shown[0].first == Buffstat::DASH_SPEED && shown[0].second == 12,
+				"a character shows its Dash");
+		require(foreign.read_short() == 0 && !foreign.available(), "each of Dash's blocks takes 15 bytes");
+
 		std::cout << "Buff parser passed\n";
 		return 0;
 	}

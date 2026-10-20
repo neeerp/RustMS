@@ -30,6 +30,7 @@
 #include "../Data/SkillData.h"
 #include "../Data/WeaponData.h"
 #include "../Gameplay/Combat/Combo.h"
+#include "../Gameplay/Combat/Dash.h"
 #include "../Gameplay/Combat/FlashJump.h"
 #include "../Gameplay/Combat/MagicDamage.h"
 #include "../Gameplay/MapleMap/FieldLimit.h"
@@ -248,6 +249,12 @@ namespace ms
 
 		for (const Buff &buff : buffs.values())
 			active_buffs.apply_buff(stats, buff.stat, buff.value);
+
+		// Dash's speed and jump count only past a Speed or Jump buff's (0x8c457c, 0x8c45e8).
+		stats.add_value(EquipStat::Id::SPEED, dash::speed_bonus(get_buff_value(Buffstat::Id::SPEED),
+																 get_buff_value(Buffstat::Id::DASH_SPEED)));
+		stats.add_value(EquipStat::Id::JUMP, dash::jump_bonus(get_buff_value(Buffstat::Id::JUMP),
+															   get_buff_value(Buffstat::Id::DASH_JUMP)));
 
 		// The weapon's mastery adds its accuracy and an expert's attack for
 		// the reach the job counts (SetFrom, FUN_0077f4c9), and the window

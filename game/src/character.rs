@@ -149,6 +149,8 @@ pub struct FieldAvatar {
     pub item_effect: i32,
     /// Energy Charge's gauge, as `Buffs::energy`.
     pub energy: Option<ShownBuff>,
+    /// Dash's speed and jump, while the player dashes.
+    pub dash: [Option<ShownBuff>; 2],
     /// The tamed monster the player rides, if any.
     pub ride: Option<Ride>,
     /// The player's mount's level, EXP and tiredness, which every player
@@ -386,6 +388,7 @@ impl Player {
             chalkboard: self.chalkboard.clone(),
             item_effect: self.item_effect,
             energy: self.buffs.energy(),
+            dash: [BuffStat::DashSpeed, BuffStat::DashJump].map(|stat| self.buffs.two_state(stat)),
             ride: self.ride(),
             mount: self.mount,
         }
