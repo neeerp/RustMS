@@ -182,6 +182,8 @@ if(HEAVENCLIENT_BUILD_TESTS)
     add_test(NAME flash_jump COMMAND flash_jump_tests)
     add_executable(recoil_shot_tests tests/recoil_shot.cpp)
     add_test(NAME recoil_shot COMMAND recoil_shot_tests)
+    add_executable(morph_rules_tests tests/morph_rules.cpp)
+    add_test(NAME morph_rules COMMAND morph_rules_tests)
     add_executable(prepare_tests tests/prepare.cpp)
     target_include_directories(prepare_tests PRIVATE ${PROJECT_SOURCE_DIR}/libs/NoLifeNx)
     add_test(NAME prepare COMMAND prepare_tests)
@@ -390,6 +392,8 @@ add_executable(HeavenClient
     Character/Look/PetLook.h
     Character/Look/Stance.cpp
     Character/Look/Stance.h
+    Character/Look/MorphTemplate.cpp
+    Character/Look/MorphTemplate.h
     Character/Look/TamingMob.cpp
     Character/Look/TamingMob.h
     Character/ActiveBuffs.cpp
@@ -429,6 +433,7 @@ add_executable(HeavenClient
     Character/MapleStat.h
     Character/MonsterBook.cpp
     Character/MonsterBook.h
+    Character/MorphRules.h
     Character/MountRules.h
     Character/Party.cpp
     Character/Party.h

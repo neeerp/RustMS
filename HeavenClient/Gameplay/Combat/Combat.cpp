@@ -218,7 +218,8 @@ namespace ms
 	{
 		move_id = beacon::cast(move_id, player.get_skills().get_level(beacon::BULLSEYE));
 
-		if (!ride_allows(move_id))
+		// An item's morph uses no skill and doesn't attack (FUN_00966f7a, FUN_0094e256).
+		if (!ride_allows(move_id) || player.morph_refuses())
 			return false;
 
 		if (prepare::held(move_id) || prepare::timed(move_id))

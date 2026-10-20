@@ -63,6 +63,10 @@ pub enum BuffStat {
     Curse = 31,
     /// Walks at `value` speed.
     Slow = 32,
+    /// Looks like the template `Morph.nx/<value>.img`. Below 100, an item's
+    /// morph, the player can't attack (Cosmic's rule; the client refuses
+    /// too).
+    Morph = 33,
     /// Heals `value` HP every `RECOVERY_INTERVAL`.
     Recovery = 34,
     MapleWarrior = 35,
@@ -137,7 +141,7 @@ impl BuffStat {
 
     /// Stats the rest of the map is told about, in the order the client
     /// reads them (FUN_00788156); the others only matter to the player.
-    pub const SHOWN: [BuffStat; 19] = [
+    pub const SHOWN: [BuffStat; 20] = [
         BuffStat::Speed,
         BuffStat::Combo,
         BuffStat::WeaponCharge,
@@ -150,6 +154,7 @@ impl BuffStat {
         BuffStat::ShadowPartner,
         BuffStat::DarkSight,
         BuffStat::SoulArrow,
+        BuffStat::Morph,
         BuffStat::Seduce,
         BuffStat::ShadowStars,
         BuffStat::Undead,

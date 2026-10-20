@@ -34,9 +34,8 @@ pub(crate) fn write_mask(
 }
 
 /// Stats the client reads one more byte for at the end of GIVE_BUFF
-/// (FUN_0077dc78): the ones that change how the player moves. Morph (33),
-/// 49, and the two-state dash and riding stats (83..85) are among them
-/// too.
+/// (FUN_0077dc78): the ones that change how the player moves. 49 and the
+/// two-state dash and riding stats (83..85) are among them too.
 fn moves(stat: BuffStat) -> bool {
     matches!(
         stat,
@@ -45,6 +44,7 @@ fn moves(stat: BuffStat) -> bool {
             | BuffStat::Stun
             | BuffStat::Weakness
             | BuffStat::Slow
+            | BuffStat::Morph
             | BuffStat::MapleWarrior
             | BuffStat::Seduce
     )
@@ -120,6 +120,9 @@ pub(crate) fn write_shown(
             BuffStat::Poison => {
                 p.write_short(buff.value)?;
                 p.write_int(buff.skill_id)?;
+            }
+            BuffStat::Morph => {
+                p.write_short(buff.value)?;
             }
             BuffStat::WeaponCharge
             | BuffStat::Stun
@@ -553,6 +556,37 @@ mod tests {
         expect.short(SendOpcode::GiveBuff as i16);
         expect.long(0).long(1 << 51);
         expect.short(1).int(seal).int(5_000);
+        expect.byte(0).byte(0).short(0);
+        expect.end();
+    }
+
+    #[test]
+    fn a_morph_shows_its_template_after_soul_arrow() {
+        let packet = build_give_buff(-2210000, 3_600_000, &[(BuffStat::Morph, 1)]).unwrap();
+        let mut expect = Expect::new(&packet.bytes);
+        expect.short(SendOpcode::GiveBuff as i16);
+        expect.long(0).long(1 << 1);
+        expect.short(1).int(-2210000).int(3_600_000);
+        expect.byte(0).byte(0).short(0).byte(0);
+        expect.end();
+
+        let shown = [
+            ShownBuff {
+                stat: BuffStat::Seduce,
+                value: 3,
+                skill_id: 128 | 3 << 16,
+            },
+            ShownBuff {
+                stat: BuffStat::Morph,
+                value: 1,
+                skill_id: -2210000,
+            },
+        ];
+        let packet = build_give_foreign_buff(7, &shown).unwrap();
+        let mut expect = Expect::new(&packet.bytes);
+        expect.short(SendOpcode::GiveForeignBuff as i16).int(7);
+        expect.long(0).long((1 << 1) | (1 << 7));
+        expect.short(1).int(128 | 3 << 16);
         expect.byte(0).byte(0).short(0);
         expect.end();
     }

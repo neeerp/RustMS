@@ -67,6 +67,12 @@ namespace ms
 			RIDE_REFUSED,
 			// A chair in a field of type 61 (0x10ad)
 			CHAIR_FIELD,
+			// Not while an item's morph lasts, one that can't be cancelled or else one that can
+			// (0xdcf, 0xdd0)
+			MORPHED_FIXED,
+			MORPHED,
+			// Right-clicking such a morph item's icon (0x10fc)
+			MORPH_FIXED,
 			LENGTH
 		};
 

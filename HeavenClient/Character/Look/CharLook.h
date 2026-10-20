@@ -29,6 +29,7 @@
 #include "CharEquips.h"
 #include "Face.h"
 #include "Hair.h"
+#include "MorphTemplate.h"
 #include "TamingMob.h"
 
 #include "../../Net/Login.h"
@@ -147,6 +148,11 @@ namespace ms
 		// Whether the mount stands tired (SET_TAMING_MOB_INFO).
 		void set_tired(bool tired);
 
+		// Look like a Morph.nx template, or as before with 0 (FUN_0045676f).
+		void set_morph(int32_t morph);
+
+		int32_t get_morph() const;
+
 		// Initialize drawinfo
 		static void init();
 
@@ -160,6 +166,12 @@ namespace ms
 		// Draw the mount, and the rider sitting on it (FUN_00401de9).
 		void draw_mounted(const DrawArgument &args, Stance::Id interstance, Expression::Id interexp,
 						  uint8_t interframe, uint8_t interexpframe) const;
+
+		// Whether the morph shows in this stance: a dead character is a ghost.
+		bool morphed(Stance::Id stance) const;
+
+		// The morph's action for a stance.
+		std::string morph_action(Stance::Id stance) const;
 
 		// Whether the mount shows in this stance: a dead rider is a ghost without one.
 		bool riding(Stance::Id stance) const;
@@ -212,6 +224,7 @@ namespace ms
 		std::map<int16_t, int32_t> pet_parts;
 		int32_t vehicle = 0;
 		bool tired = false;
+		int32_t morph = 0;
 
 		Randomizer randomizer;
 		TimedBool alerted;

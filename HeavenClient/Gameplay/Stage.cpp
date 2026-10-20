@@ -819,8 +819,8 @@ namespace ms
 
 	void Stage::check_seats()
 	{
-		// Not on a mount, wherever the player is (FUN_0094e45f).
-		if (player.is_sitting() || player.is_attacking() || player.ride_refuses())
+		// Not on a mount or as an item's morph, wherever the player is (FUN_0094e45f).
+		if (player.is_sitting() || player.is_attacking() || player.ride_refuses() || player.morph_refuses())
 			return;
 
 		Optional<const Seat> seat = mapinfo.findseat(player.get_position());
@@ -1018,7 +1018,8 @@ namespace ms
 
 				break;
 			case KeyType::Id::FACE:
-				if (down && emote_cooldown.try_start(get_uptime() / 1000))
+				// Not as an item's morph (FUN_00a24470).
+				if (down && !player.morph_refuses() && emote_cooldown.try_start(get_uptime() / 1000))
 				{
 					player.set_expression(action);
 					// v83 numbers emotes from F1's action (100) as 1.
@@ -1456,6 +1457,10 @@ namespace ms
 
 	void Stage::use_item_effect(int32_t item_id)
 	{
+		// Not as an item's morph (FUN_00a24530).
+		if (player.morph_refuses())
+			return;
+
 		int32_t next = item_effect::toggled(player.get_item_effect(), item_id);
 		int64_t now = get_uptime() / 1000;
 

@@ -145,7 +145,8 @@ pub struct ConsumeSpec {
     /// How long `stats` last, in ms (`time`).
     pub time: i32,
     /// The stats it raises for `time` (`pad`, `pdd`, `mad`, `mdd`, `acc`,
-    /// `eva`, `speed`, `jump`, `thaw`).
+    /// `eva`, `speed`, `jump`, `thaw`, `expBuff`), and the template it
+    /// morphs the player into (`morph`).
     pub stats: Vec<(BuffStat, i16)>,
     /// The diseases it cures (`poison`, `darkness`, `weakness`, `seal`,
     /// `curse`).
@@ -184,7 +185,7 @@ impl ConsumeSpec {
 }
 
 /// The `spec` keys of the stats a consumable raises.
-const SPEC_STATS: [(&str, BuffStat); 10] = [
+const SPEC_STATS: [(&str, BuffStat); 11] = [
     ("pad", BuffStat::Pad),
     ("pdd", BuffStat::Pdd),
     ("mad", BuffStat::Mad),
@@ -195,6 +196,7 @@ const SPEC_STATS: [(&str, BuffStat); 10] = [
     ("jump", BuffStat::Jump),
     ("thaw", BuffStat::Thaw),
     ("expBuff", BuffStat::ExpBuff),
+    ("morph", BuffStat::Morph),
 ];
 
 /// The `spec` keys of the diseases a consumable cures.
@@ -744,6 +746,8 @@ mod tests {
             (warrior_pill.stats, warrior_pill.time),
             (vec![(BuffStat::Pad, 5)], 180_000)
         );
+        let morph = data.info(2210000).unwrap().unwrap().spec.unwrap();
+        assert!(morph.stats.contains(&(BuffStat::Morph, 1)));
         let air_bubble = data.info(2022040).unwrap().unwrap().spec.unwrap();
         assert_eq!(
             (air_bubble.stats, air_bubble.time),
