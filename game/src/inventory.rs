@@ -425,8 +425,9 @@ impl Inventory {
     }
 
     /// Add an item, filling partial stacks of the same id before taking
-    /// empty slots. `slot_max` is the item's stack size (1 for equipment).
-    /// Nothing changes unless all of it fits.
+    /// empty slots. A timed or cash item merges with none, but a stack of
+    /// it stays whole. `slot_max` is the item's stack size (1 for
+    /// equipment). Nothing changes unless all of it fits.
     pub fn add(
         &mut self,
         item: Item,
@@ -469,10 +470,10 @@ impl Inventory {
             if remaining == 0 {
                 break;
             }
-            let quantity = if stackable {
-                remaining.min(slot_max)
-            } else {
+            let quantity = if item.equip.is_some() {
                 1
+            } else {
+                remaining.min(slot_max)
             };
             let placed = Item {
                 quantity,
@@ -944,6 +945,25 @@ mod tests {
             ]
         );
         assert_eq!(inventory.count(2010000), 103);
+    }
+
+    #[test]
+    fn a_timed_stack_keeps_to_itself_whole() {
+        let mut inventory = Inventory::default();
+        inventory.insert(InventoryType::Use, 1, Item::stack(2000000, 5));
+        let timed = Item {
+            expiration: Some(SystemTime::UNIX_EPOCH),
+            ..Item::stack(2000000, 10)
+        };
+        let changes = inventory.add(timed.clone(), 100).unwrap();
+        assert_eq!(
+            changes,
+            [InventoryChange::Add {
+                kind: InventoryType::Use,
+                slot: 2,
+                item: timed
+            }]
+        );
     }
 
     #[test]
