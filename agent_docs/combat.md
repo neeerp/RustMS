@@ -710,6 +710,18 @@ any item buff. An item's morph (a value below 100) can't
 attack: the attack handlers drop the attack (`AttackRejection::Morphed`,
 Cosmic's `isMorphWithoutAttack`).
 
+Oak Barrel (5101007) and Transformation (5111005) and Super
+Transformation (5121003) give the skill level's `morph` (1002, 1000,
+1001) as the Morph buff, beside their leveled defence, speed and jump; a
+woman's superman is the template plus 100 (`net::morph::template`, as
+Cosmic sends). `net::morph::refused` keeps the client's skill rules on
+the server (reports 225b, 225c): nothing, not even a normal attack, from
+inside the barrel (the client's attack key cancels it instead); no
+Double Shot, Oak Barrel or Burst Fire as a superman; Shockwave only
+transformed and Demolition and Snatch only after Super Transformation.
+Use Skill refuses the transformations on maps that forbid movement
+skills, like Dash.
+
 HeavenClient draws the template's action for the stance (stand, walk,
 jump, prone, ladder, rope, sit, fly; stand when the template lacks it) in
 place of the body and equipment (`MorphTemplate`, `morph::action`). The
@@ -718,9 +730,9 @@ item's morph moves at the template's speed and jump, clamped to 80-140 and
 emotes and item effects with "Unavailable while transforming." for an item
 with `noCancelMouse`, and the longer line about right-clicking the icon
 otherwise. Right-clicking a `noCancelMouse` item's icon shows "You may not
-cancel the transformation." and sends nothing. Not done: Oak Barrel
-(1002) and the Transformation skills (1000, 1001, 1003 and their 11xx
-templates), Ghost (bit 49), the random morph items (2211000, 2212000), the
+cancel the transformation." and sends nothing. Not done in
+HeavenClient: Oak Barrel's drop and break and its detection by mobs, and
+the superman's stances and gates. Not done anywhere: Ghost (bit 49), the random morph items (2211000, 2212000), the
 cash morphs (5300000-5300002), the fly-map template gate, and the refusals for trades, mini-games and shops.
 
 ## Spending AP and SP

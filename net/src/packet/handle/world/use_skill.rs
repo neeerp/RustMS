@@ -5,6 +5,7 @@ use crate::error::NetworkError;
 use crate::handler::{
     FieldRequest, HandlerResult, PartySkill, WorldAction, WorldContext, WorldHandler, WorldResult,
 };
+use crate::morph;
 use crate::packet::build::world::stat::{self, StatUpdate};
 use crate::packet::build::world::summon::Gone;
 use crate::packet::build::world::{buff, inventory, skill};
@@ -163,7 +164,18 @@ impl WorldHandler for UseSkillHandler {
         }
         let extras = read_extras(&mut r, skill_id);
         let now = Instant::now();
-        match use_skill(ctx.player, skill_id, level, now) {
+        let field_limit = crate::game_data::get()?
+            .field(ctx.player.stats.map_id)
+            .map_or(0, |field| field.field_limit);
+        let transforms = [morph::TRANSFORMATION, morph::SUPER_TRANSFORMATION];
+        let used = if transforms.contains(&skill_id)
+            && field_limit & game_data::FIELD_LIMIT_MOVEMENT_SKILLS != 0
+        {
+            Err(Refusal::NoMovementSkillsHere)
+        } else {
+            use_skill(ctx.player, skill_id, level, now)
+        };
+        match used {
             Ok(used) => {
                 if skill_id == skills::CHAKRA {
                     let heal = skills::chakra_heal(ctx.player, used.skill.effect.y, rand::random());
@@ -345,9 +357,11 @@ enum Refusal {
     NoMount,
     /// Riding where mounts aren't allowed.
     NoMountsHere,
-    /// Dashing where movement skills aren't allowed (the client's notice
-    /// 0x374).
+    /// Dashing or transforming where movement skills aren't allowed (the
+    /// client's notice 0x374).
     NoMovementSkillsHere,
+    /// A skill the player's morph can't use.
+    Morphed,
 }
 
 /// What USE_SKILL carries after the level (0x96d399), each part only for
@@ -660,6 +674,9 @@ fn use_skill(
     let skill = skills::learned(player, skill_id)
         .filter(|skill| skill.level == level)
         .ok_or(Refusal::NotLearned)?;
+    if morph::refused(player, skill_id) {
+        return Err(Refusal::Morphed);
+    }
     if combo::enrage_refused(player, skill_id) {
         return Err(Refusal::TooFewOrbs);
     }

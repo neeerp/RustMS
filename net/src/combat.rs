@@ -492,7 +492,7 @@ pub enum AttackRejection {
     NoOrbs,
     /// An Energy skill without a full gauge.
     NotCharged,
-    /// Morphed by an item.
+    /// Morphed by an item, or by a skill that rules this attack out.
     Morphed,
 }
 
@@ -553,10 +553,11 @@ pub fn validate(attack: &Attack, player: &Player) -> Result<Uses, AttackRejectio
         return Err(AttackRejection::Diseased);
     }
     // An item's morph can't attack (FUN_0094e256; Cosmic's
-    // `isMorphWithoutAttack`).
+    // `isMorphWithoutAttack`), nor a skill's morph some skills.
     if buffs
         .value(BuffStat::Morph)
         .is_some_and(|morph| morph < 100)
+        || crate::morph::refused(player, attack.skill)
     {
         return Err(AttackRejection::Morphed);
     }

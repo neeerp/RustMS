@@ -26,6 +26,7 @@ pub mod loot;
 pub mod meso_explosion;
 pub mod mobs;
 pub mod monster_book;
+pub mod morph;
 mod npc_data;
 pub mod npc_scripts;
 pub mod packet;

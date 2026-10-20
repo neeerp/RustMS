@@ -269,6 +269,17 @@ pub async fn set_sp(character_id: i32, sp: i16) -> Result<(), HarnessError> {
     .await
 }
 
+/// Make the logged-out character `character_id` a man (0) or a woman (1).
+pub async fn set_gender(character_id: i32, gender: i16) -> Result<(), HarnessError> {
+    change_one_row("set gender", move |conn| {
+        diesel::sql_query("UPDATE characters SET gender = $2 WHERE id = $1")
+            .bind::<Integer, _>(character_id)
+            .bind::<SmallInt, _>(gender)
+            .execute(conn)
+    })
+    .await
+}
+
 pub async fn set_meso(character_id: i32, meso: i32) -> Result<(), HarnessError> {
     change_one_row("set meso", move |conn| {
         diesel::sql_query("UPDATE characters SET meso = $2 WHERE id = $1")
