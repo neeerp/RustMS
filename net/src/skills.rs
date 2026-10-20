@@ -600,6 +600,21 @@ fn hit_statuses(skill: &Learned) -> Option<Vec<(MobStat, Amount)>> {
     Some(statuses)
 }
 
+/// Elemental Boost, which adds its `damage` percent to Flamethrower's and
+/// Ice Splitter's (0x79004c) and, as its description says, its `y` seconds
+/// to Ice Splitter's freeze.
+pub const ELEMENTAL_BOOST: i32 = 5220001;
+const FLAMETHROWER: i32 = 5211004;
+const ICE_SPLITTER: i32 = 5211005;
+
+/// The player's Elemental Boost, if they know it and it boosts `skill_id`.
+pub fn elemental_boost(player: &Player, skill_id: i32) -> Option<Learned> {
+    if skill_id != FLAMETHROWER && skill_id != ICE_SPLITTER {
+        return None;
+    }
+    learned(player, ELEMENTAL_BOOST).filter(|boost| boost.level > 0)
+}
+
 /// Venomous Star (a claw's shots), Venomous Stab (a dagger's swings), and
 /// the Night Walker's Venom.
 const VENOMS: [(i32, bool); 3] = [(4120005, true), (4220005, false), (14110004, true)];
@@ -612,7 +627,13 @@ pub fn on_hit(player: &Player, skill: Option<&Learned>, ranged: bool, roll: f64)
     let mut inflicts = Vec::new();
     if let Some(skill) = skill {
         if let Some(statuses) = hit_statuses(skill) {
-            inflicts.push(Inflict::new(skill, statuses));
+            let mut inflict = Inflict::new(skill, statuses);
+            if skill.skill_id == ICE_SPLITTER {
+                if let Some(boost) = elemental_boost(player, ICE_SPLITTER) {
+                    inflict.duration += Duration::from_secs(boost.effect.y.max(0) as u64);
+                }
+            }
+            inflicts.push(inflict);
         }
     }
     let venom = VENOMS
@@ -1118,6 +1139,22 @@ mod tests {
             [(MobStat::Poison, Amount::Poison { level: 30 })]
         );
         assert!(on_hit(&player, None, true, 0.5).is_empty());
+
+        // Ice Splitter at 30 freezes for 3 seconds, and 2 more with
+        // Elemental Boost at 30.
+        let splitter = at_level(ICE_SPLITTER, 30).unwrap();
+        let freeze = |player: &Player| on_hit(player, Some(&splitter), true, 0.5)[0].duration;
+        assert_eq!(freeze(&player), Duration::from_secs(3));
+        let corsair = knowing(&[(ELEMENTAL_BOOST, 30)]);
+        assert_eq!(freeze(&corsair), Duration::from_secs(5));
+        assert_eq!(
+            elemental_boost(&corsair, FLAMETHROWER)
+                .unwrap()
+                .effect
+                .damage,
+            200
+        );
+        assert!(elemental_boost(&corsair, 5221004).is_none());
 
         // Venomous Star at 30 (mad 60, 30% for 4 seconds) poisons a
         // claw's shots only. STR 35, DEX 4, LUK 4: between 3.2 and 7.295

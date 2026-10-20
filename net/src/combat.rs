@@ -566,7 +566,8 @@ pub fn validate(attack: &Attack, player: &Player) -> Result<Uses, AttackRejectio
             let percent = damage_percent(&skill).ok_or(AttackRejection::Skill)?;
             cap_for(percent).saturating_mul(assassinate_most(&skill))
         } else if let Some(percent) = damage_percent(&skill) {
-            cap_for(percent)
+            let boost = skills::elemental_boost(player, skill.skill_id);
+            cap_for(percent + boost.map_or(0, |boost| boost.effect.damage))
         } else {
             return Err(AttackRejection::Skill);
         };
@@ -1695,6 +1696,48 @@ mod tests {
         );
         player.meso = 855;
         assert_eq!(validate(&toss(&[1, 1]), &player).unwrap().mesos, 855);
+    }
+
+    #[test]
+    fn elemental_boost_raises_flamethrowers_cap() {
+        if skills::data().is_err() || crate::items::data().is_err() {
+            return;
+        }
+        let mut player = beginner_with_sword();
+        player.stats.job = 521;
+        player.stats.mp = 100;
+        player.stats.dex = 200;
+        player.inventory.insert(
+            InventoryType::Equipped,
+            equip_slot::WEAPON,
+            Item::equipment(
+                1492000,
+                EquipStats {
+                    watk: 50,
+                    ..EquipStats::default()
+                },
+            ),
+        );
+        player
+            .inventory
+            .insert(InventoryType::Use, 1, Item::stack(2331000, 10));
+        learn(&mut player, 5211004, 30);
+        let flame = |damage| {
+            parse_attack(
+                &kind_attack_packet(AttackKind::Ranged, 5211004, 1, &[damage]),
+                AttackKind::Ranged,
+            )
+            .unwrap()
+        };
+        let base = max_base_damage(&player, &flame(1));
+        let check = |player: &Player, damage| validate(&flame(damage), player).map(|_| ());
+        // Level 30 does 160%, and 360% with Elemental Boost's 200.
+        let (alone, boosted) = (2 * base * 160 / 100, 2 * base * 360 / 100);
+        assert_eq!(check(&player, alone), Ok(()));
+        assert_eq!(check(&player, alone + 1), Err(AttackRejection::Damage));
+        learn(&mut player, skills::ELEMENTAL_BOOST, 30);
+        assert_eq!(check(&player, boosted), Ok(()));
+        assert_eq!(check(&player, boosted + 1), Err(AttackRejection::Damage));
     }
 
     #[test]
