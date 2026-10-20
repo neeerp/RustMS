@@ -206,6 +206,7 @@ pub const CHAKRA: i32 = 4211001;
 /// v83 looks them all up as the Fire/Poison one's (0x958db2).
 pub const MANA_REFLECTION: i32 = 2121002;
 pub const TIME_LEAP: i32 = 5121010;
+pub const MP_RECOVERY: i32 = 5101005;
 
 pub const SACRIFICE: i32 = 1311005;
 pub const DRAGON_ROAR: i32 = 1311006;
@@ -230,14 +231,14 @@ pub fn slash_blast(player: &Player) -> i32 {
 /// The HP a skill costs, or `None` when the player hasn't enough
 /// (FUN_00764256): its `hpCon`, which must stay under their HP. Dragon
 /// Roar instead takes its `x` percent of their max HP, and needs at least
-/// half of it.
+/// half of it; MP Recovery takes the same, and needs more.
 pub fn hp_cost(player: &Player, skill: &Learned) -> Option<i32> {
     let hp = i32::from(player.stats.hp);
     let max_hp = i32::from(player.stats.max_hp);
-    let cost = if skill.skill_id == DRAGON_ROAR {
-        if hp < max_hp / 2 {
-            return None;
-        }
+    if skill.skill_id == DRAGON_ROAR && hp < max_hp / 2 {
+        return None;
+    }
+    let cost = if matches!(skill.skill_id, DRAGON_ROAR | MP_RECOVERY) {
         skill.effect.x * max_hp / 100
     } else {
         skill.effect.hp_cost
@@ -269,12 +270,14 @@ pub const TELEPORTS: [i32; 5] = [2101002, 2201002, 2301001, 12101003, 22101001];
 pub const FLASH_JUMPS: [i32; 2] = [4111006, 14101004];
 
 /// Skills that neither buff nor debuff: the handler does their work.
-/// Chakra heals the user, Resurrection raises dead party members, Time Leap
-/// ends cooldowns, and Mystic Door opens a door. Teleport and Flash Jump
-/// have no work.
+/// Chakra heals the user, MP Recovery turns HP into MP, Resurrection raises
+/// dead party members, Time Leap ends cooldowns, and Mystic Door opens a
+/// door. Teleport and Flash Jump have no work.
 pub fn acts_alone(skill_id: i32) -> bool {
-    matches!(skill_id, MYSTIC_DOOR | CHAKRA | RESURRECTION | TIME_LEAP)
-        || TELEPORTS.contains(&skill_id)
+    matches!(
+        skill_id,
+        MYSTIC_DOOR | CHAKRA | MP_RECOVERY | RESURRECTION | TIME_LEAP
+    ) || TELEPORTS.contains(&skill_id)
         || FLASH_JUMPS.contains(&skill_id)
         || HEROS_WILL.contains(&skill_id)
 }
@@ -289,6 +292,12 @@ pub fn chakra_heal(player: &Player, y: i32, roll: f64) -> i32 {
     let low = (f64::from(luk) * 2.3 * rate) as i32;
     let high = (f64::from(luk) * 3.5 * rate) as i32;
     (low + (roll * f64::from(high - low + 1)) as i32).min(high)
+}
+
+/// The MP MP Recovery gives: its `y` percent of the HP it took. The v83
+/// client leaves it to the server, so this is OdinMS-family servers' rule.
+pub fn recovered_mp(player: &Player, skill: &Learned) -> i32 {
+    skill.effect.x * i32::from(player.stats.max_hp) / 100 * skill.effect.y / 100
 }
 
 /// How close to a portal Mystic Door may not open (v83 FUN_00712ab1).

@@ -141,6 +141,10 @@ impl WorldHandler for UseSkillHandler {
                     let heal = skills::chakra_heal(ctx.player, used.skill.effect.y, rand::random());
                     ctx.player.recover_hp(heal);
                 }
+                if skill_id == skills::MP_RECOVERY {
+                    let mp = skills::recovered_mp(ctx.player, &used.skill);
+                    ctx.player.add_mp(mp);
+                }
                 let mut result = announce(ctx.player, &used)?;
                 if skill_id == skills::TIME_LEAP {
                     result = leap(ctx.player, result)?;
@@ -738,8 +742,10 @@ fn announce(player: &Player, used: &Used) -> WorldResult {
     } = used;
     let effect = &skill.effect;
     let mut updates = vec![StatUpdate::Mp(player.stats.mp)];
-    // Chakra's heal comes with its MP, as does the HP a Booster costs.
-    if skill.skill_id == skills::CHAKRA || effect.hp_cost > 0 {
+    // Chakra's heal comes with its MP, as do the HP a Booster or MP
+    // Recovery costs.
+    let hp_changed = [skills::CHAKRA, skills::MP_RECOVERY].contains(&skill.skill_id);
+    if hp_changed || effect.hp_cost > 0 {
         updates.push(StatUpdate::Hp(player.stats.hp));
     }
     let mut result = HandlerResult::reply(stat::build_stat_update(true, &updates)?);
@@ -1342,6 +1348,30 @@ mod tests {
         assert!(unlocks(&actions[0]));
         assert!((50 + 689..=50 + 1050).contains(&player.stats.hp));
         assert_eq!(player.stats.mp, 100 - 27);
+    }
+
+    #[test]
+    fn mp_recovery_turns_a_tenth_of_max_hp_into_mp() {
+        if skills::data().is_err() {
+            return;
+        }
+        // Level 10: x 10, y 100, cooltime 25.
+        let mut player = beginner_with(skills::MP_RECOVERY, 10);
+        player.stats.max_hp = 5_000;
+        player.stats.hp = 500;
+        player.stats.max_mp = 1_000;
+        player.stats.mp = 100;
+        let actions = handle(&mut player, skills::MP_RECOVERY, 10);
+        assert!(unlocks(&actions[0]));
+        assert_eq!((player.stats.hp, player.stats.mp), (500, 100));
+
+        player.stats.hp = 1_000;
+        let actions = handle(&mut player, skills::MP_RECOVERY, 10);
+        assert!(unlocks(&actions[0]));
+        assert_eq!((player.stats.hp, player.stats.mp), (500, 600));
+        assert!(player
+            .buffs
+            .cooling_down(skills::MP_RECOVERY, Instant::now()));
     }
 
     #[test]
