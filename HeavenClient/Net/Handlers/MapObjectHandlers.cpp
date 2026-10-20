@@ -25,17 +25,64 @@
 #include "Helpers/PetParser.h"
 #include "MiniRoom.h"
 
+#include "../../Character/CatchItemRules.h"
 #include "../../Data/CurseData.h"
 #include "../../Data/SkillData.h"
 #include "../../Gameplay/Stage.h"
 #include "../../IO/UI.h"
 #include "../../IO/UITypes/UIChatBar.h"
 #include "../../IO/UITypes/UINotice.h"
+#include "../../IO/UITypes/UINpcTalk.h"
 #include "../../Util/Chalkboard.h"
 #include "../Packets/GameplayPackets.h"
 
+#include <nlnx/nx.hpp>
+
 namespace ms
 {
+	namespace
+	{
+		// Cloy, the Pet Master, whose face tells the Water of Life story.
+		constexpr int32_t CLOY = 1012005;
+
+		// The Water of Life story, as Mar the Fairy tells it (StringPool 0x178, 0x179).
+		const char *const WATER_OF_LIFE_STORY[] = {
+			"Oh...you're the one that'll take care of my baby! Can you hear me? I am a wizard who is at the very "
+			"bottom of the World Tree, extracting the Water of Life from there. I'm speaking to your mind right "
+			"now.\r\n\r\nThat kid...is a magical animal that I've poured life into by pouring the Water of Life at "
+			"the doll that I've made myself. For the longest time, I've been studying and researching on life "
+			"itself, and learned to actually create a spell that creates life. But it's only possible with the "
+			"Water of Life...and since it comes out so little, I can only give that kid a life for so long...",
+			"When the time passes and the Water of Life that's been sprinkled onto it dries up, it'll turn back "
+			"into a doll. Yes, it's very unfortunate, but not to worry. If you pour the Water of Life again on it, "
+			"it'll come back to life.\r\n\r\n.And for that, I collect the Water of Life everyday here deep in the "
+			"underground. I sent my apprentice up overground, so there comes a time where you'll need the Water of "
+			"Life, please go visit him. Don't forget that the Water of Life will last once poured onto the "
+			"doll...Please take care of it..."
+		};
+
+		// Page `page` of the story, read back and forth until it is closed; nothing is sent (FUN_0095a94c,
+		// SPAWN_PET index 3).
+		void tell_water_of_life_story(size_t page)
+		{
+			UI::get().emplace<UINpcTalk>();
+			UI::get().enable();
+
+			if (auto talk = UI::get().get_element<UINpcTalk>())
+			{
+				int16_t style = (page > 0 ? 0x00FF : 0) | (page < 1 ? 0xFF00 : 0);
+				talk->change_text(CLOY, 0, style, 0, WATER_OF_LIFE_STORY[page]);
+				talk->set_local_responder([page](int8_t response, int32_t)
+				{
+					if (response == 1 && page < 1)
+						tell_water_of_life_story(page + 1);
+					else if (response == 0 && page > 0)
+						tell_water_of_life_story(page - 1);
+				});
+			}
+		}
+	}
+
 	void SpawnCharHandler::handle(InPacket& recv) const
 	{
 		int32_t cid = recv.read_int();
@@ -150,13 +197,15 @@ namespace ms
 		if (!character)
 			return;
 
-		// Index 3 asks the owner which pet the Water of Life revives.
 		uint8_t index = recv.read_byte();
+		bool local = Stage::get().is_player(cid);
+
+		// Index 3 tells the owner the Water of Life story, and nothing more.
+		if (index == 3 && local)
+			tell_water_of_life_story(0);
 
 		if (index > 2)
 			return;
-
-		bool local = Stage::get().is_player(cid);
 
 		if (recv.read_bool())
 		{
@@ -364,6 +413,10 @@ namespace ms
 		if (effect == 0 && !recv.available())
 		{
 			show_effect_with_sound(cid, CharEffect::LEVELUP, Sound::Name::LEVELUP);
+		}
+		else if (effect == 7) // a scripted portal's sound
+		{
+			Sound(Sound::Name::PORTAL).play();
 		}
 		else if (effect == 8 && !recv.available())
 		{
@@ -589,6 +642,31 @@ namespace ms
 		bool success = recv.read_bool();
 
 		Stage::get().get_combat().show_catch(oid, success);
+	}
+
+	void CatchMonsterWithItemHandler::handle(InPacket& recv) const
+	{
+		int32_t oid = recv.read_int();
+		int32_t itemid = recv.read_int();
+		bool success = recv.read_bool();
+
+		Stage::get().get_combat().show_item_catch(oid, itemid, success);
+	}
+
+	void BridleMobCatchFailHandler::handle(InPacket& recv) const
+	{
+		int8_t result = recv.read_byte();
+		int32_t itemid = recv.read_int();
+		recv.read_int();
+
+		nl::node info = nl::nx::item["Consume"]["0227.img"]["0" + std::to_string(itemid)]["info"];
+		std::string line = catch_item::fail_notice(result, info["delayMsg"].get_string());
+
+		if (line.empty())
+			return;
+
+		if (auto chatbar = UI::get().get_element<UIChatBar>())
+			chatbar->send_chatline(line, UIChatBar::LineType::SKILL);
 	}
 
 	void SpawnNpcHandler::handle(InPacket& recv) const

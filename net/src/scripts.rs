@@ -4,8 +4,13 @@
 //! runtime would have. Unknown names do nothing.
 
 use crate::content;
+use game::character::FREE_MARKET_RETURN;
 use game::{InventoryType, Player, QuestState};
 use game_data::server_content::keys;
+use game_data::PortalTemplate;
+
+const FREE_MARKET: i32 = 910000000;
+const HENESYS: i32 = 100000000;
 
 /// What a map, portal, or NPC script does. Scripts only return effects; the
 /// runtime applies them, committing player changes together.
@@ -34,6 +39,12 @@ pub enum Effect {
         item_id: i32,
         quantity: i16,
     },
+    /// Bring the doll with cash serial `serial` back to life for `days`;
+    /// nothing is applied if the player no longer has it.
+    RevivePet {
+        serial: i64,
+        days: i32,
+    },
     /// Nothing is applied if the player no longer has that much.
     SpendMeso(i32),
     GainExp(i32),
@@ -59,6 +70,12 @@ pub enum Effect {
     /// Give the player a new hair (3xxxx), face (2xxxx) or skin (anything
     /// else), judged as the client judges a style's kind.
     SetStyle(i32),
+    /// Set or clear where the player goes back to after a trip
+    /// (`Player::saved_locations`).
+    SaveLocation(i16, Option<i32>),
+    /// Play the portal sound, which the client leaves to the server for a
+    /// scripted portal.
+    PortalSound,
 }
 
 #[derive(Debug, Default, PartialEq, Eq)]
@@ -95,6 +112,14 @@ pub fn portal(script: &str, player: &Player) -> Option<ScriptOutcome> {
             ScriptOutcome::default()
         }
     };
+    // Where the player was saved to go back to, else Henesys.
+    let saved = |kind: i16| {
+        player
+            .saved_locations
+            .get(&kind)
+            .copied()
+            .unwrap_or(HENESYS)
+    };
     let outcome = match script {
         "infoMinimap" => hint(quest(1031) == QuestState::Started, 25),
         "infoAttack" => hint(quest(1035) == QuestState::Started, 20),
@@ -107,6 +132,31 @@ pub fn portal(script: &str, player: &Player) -> Option<ScriptOutcome> {
             effects: vec![Effect::OfferTutorialSkip],
             block: true,
         },
+        // The Free Market's exit, back to the town the player came from.
+        "market00" => {
+            let town = saved(FREE_MARKET_RETURN);
+            go_back(
+                FREE_MARKET_RETURN,
+                Effect::WarpToPortal(town, portal_id(town, is_market_portal)),
+            )
+        }
+        // A town's Free Market entrance (market01 to market22).
+        script if script.starts_with("market") => ScriptOutcome {
+            effects: vec![
+                Effect::SaveLocation(FREE_MARKET_RETURN, Some(player.stats.map_id)),
+                Effect::PortalSound,
+                Effect::WarpToPortal(
+                    FREE_MARKET,
+                    portal_id(FREE_MARKET, |portal| portal.name == "out00"),
+                ),
+            ],
+            block: false,
+        },
+        // Event maps' exits, back to where the invitation (2031001, 2031006,
+        // 2031003) was used, kept under its `returnMapQR`.
+        "photoOut" => go_back(7686, Effect::Warp(saved(7686))),
+        "StudioZone_Out" => go_back(7752, Effect::Warp(saved(7752))),
+        "outBabyBird" => go_back(10061, Effect::Warp(saved(10061))),
         "glTutoMsg0" => ScriptOutcome {
             effects: vec![Effect::Hint {
                 text: content::text().get(keys::LEAVE_AREA_WARNING, &[]),
@@ -118,6 +168,31 @@ pub fn portal(script: &str, player: &Player) -> Option<ScriptOutcome> {
         _ => return None,
     };
     Some(outcome)
+}
+
+/// End a trip: forget the saved location `kind` and take the player back
+/// with `warp`.
+fn go_back(kind: i16, warp: Effect) -> ScriptOutcome {
+    ScriptOutcome {
+        effects: vec![Effect::SaveLocation(kind, None), Effect::PortalSound, warp],
+        block: false,
+    }
+}
+
+fn is_market_portal(portal: &PortalTemplate) -> bool {
+    portal
+        .script
+        .as_deref()
+        .is_some_and(|script| script.contains("market"))
+}
+
+/// The id of `map_id`'s first portal that `pick` accepts, else 0.
+fn portal_id(map_id: i32, pick: impl Fn(&PortalTemplate) -> bool) -> u8 {
+    crate::game_data::get()
+        .ok()
+        .and_then(|data| data.field(map_id))
+        .and_then(|field| field.portals().find(|portal| pick(portal)))
+        .map_or(0, |portal| u8::try_from(portal.id).unwrap_or(0))
 }
 
 #[cfg(test)]
@@ -145,6 +220,52 @@ mod tests {
             effects: vec![Effect::AvatarEffect(path.into())],
             block: true,
         }
+    }
+
+    #[test]
+    fn the_free_market_sends_players_back_where_they_came_from() {
+        let mut player = player_with(&[]);
+        player.stats.map_id = 100000100;
+        assert_eq!(
+            portal("market01", &player).unwrap().effects,
+            vec![
+                Effect::SaveLocation(FREE_MARKET_RETURN, Some(100000100)),
+                Effect::PortalSound,
+                Effect::WarpToPortal(FREE_MARKET, 34),
+            ]
+        );
+        player.saved_locations.insert(FREE_MARKET_RETURN, 220000000);
+        assert_eq!(
+            portal("market00", &player).unwrap().effects,
+            vec![
+                Effect::SaveLocation(FREE_MARKET_RETURN, None),
+                Effect::PortalSound,
+                Effect::WarpToPortal(220000000, 31),
+            ]
+        );
+        player.saved_locations.clear();
+        assert_eq!(
+            portal("market00", &player).unwrap().effects[2],
+            Effect::WarpToPortal(HENESYS, 0)
+        );
+    }
+
+    #[test]
+    fn event_exits_go_back_where_the_invitation_was_used() {
+        let mut player = player_with(&[]);
+        player.saved_locations.insert(7686, 101000000);
+        assert_eq!(
+            portal("photoOut", &player).unwrap().effects,
+            vec![
+                Effect::SaveLocation(7686, None),
+                Effect::PortalSound,
+                Effect::Warp(101000000),
+            ]
+        );
+        assert_eq!(
+            portal("outBabyBird", &player).unwrap().effects[2],
+            Effect::Warp(HENESYS)
+        );
     }
 
     #[test]

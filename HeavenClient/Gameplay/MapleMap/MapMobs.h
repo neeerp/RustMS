@@ -112,6 +112,10 @@ namespace ms
 		// The first mob whose touch hurts that overlaps `area`, or 0.
 		int32_t find_touching(const Rectangle<int16_t> &area, int32_t fieldlimit = 0, bool hidden = false) const;
 
+		// The first mob of template `mobid` to have entered the map that is
+		// alive and overlaps `area`, which a catch item may be thrown at, or 0.
+		int32_t find_catchable(const Rectangle<int16_t> &area, int32_t mobid) const;
+
 		// The player's Puppet came, or went: the mobs this client moves turn
 		// on it, or give it up.
 		void aggro_puppet(int32_t oid, Point<int16_t> position);

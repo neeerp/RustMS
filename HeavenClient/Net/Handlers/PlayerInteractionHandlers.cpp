@@ -20,6 +20,7 @@
 
 #include "Helpers/LoginParser.h"
 
+#include "../../Configuration.h"
 #include "../../IO/UI.h"
 
 #include "../../Gameplay/Stage.h"
@@ -227,6 +228,13 @@ namespace ms
 					if (type != mini_room::TRADING_ROOM)
 					{
 						std::cout << "[PlayerInteractionHandler]: Unsupported invite to room type " << static_cast<int32_t>(type) << std::endl;
+						break;
+					}
+
+					// The Game Option turns trade requests away unseen (FUN_0065e53b).
+					if (!Setting<AllowTradeRequest>::get().load())
+					{
+						MiniRoomDeclinePacket(serial, MiniRoomPacket::Decline::NOT_ACCEPTING).dispatch();
 						break;
 					}
 

@@ -52,11 +52,16 @@ pub struct ItemInfo {
     /// What a summoning sack (210xxxx) brings out (`mob`): each mob and its
     /// percent chance, rolled for each.
     pub sack: Vec<(i32, i32)>,
+    /// What a catch item (227xxxx) catches.
+    pub catch: Option<CatchInfo>,
     pub equip: Option<EquipInfo>,
     /// A pet's commands (`interact`), by the index the client sends.
     pub pet_commands: Vec<PetCommand>,
     /// The fullness a pet loses each time it grows hungry (`info/hungry`).
     pub pet_hunger: i32,
+    /// The days a pet lives once bought, or once a Water of Life revives
+    /// it (`info/life`); 0 for a pet that never dies (`info/permanent`).
+    pub pet_life: i32,
     /// Whether a pet has a name tag style (`info/nameTag`), which lets it
     /// wear a label ring.
     pub pet_name_tag: bool,
@@ -76,6 +81,26 @@ pub struct BookInfo {
     pub req_skill_level: i32,
     /// Percent chance it works (`success`).
     pub success: i32,
+}
+
+/// What a catch item (227xxxx) catches, and what for (`info`). v83 reads
+/// only the mob, the area and `create`; the rest is the server's.
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct CatchInfo {
+    /// The mob it catches (`mob`).
+    pub mob: i32,
+    /// The item a catch gives (`create`).
+    pub create: i32,
+    /// Where it reaches from the player's feet, whichever way they face:
+    /// left, top, right, bottom.
+    pub area: (i16, i16, i16, i16),
+    /// The percent of its HP the mob must be below (`mobHP`); 100, the
+    /// default, for any.
+    pub mob_hp: i32,
+    /// The percent chance a catch works (`bridleProp`, default 100).
+    pub prop: f64,
+    /// The ms before it may be used again (`useDelay`).
+    pub use_delay: i32,
 }
 
 /// What using a consumable does (`spec`).
@@ -307,8 +332,14 @@ impl ItemData {
             info.max_level = nx.int_child(meta, "maxLevel")?.unwrap_or(0);
             if pet {
                 info.pet_hunger = nx.int_child(meta, "hungry")?.unwrap_or(1);
+                if nx.int_child(meta, "permanent")? != Some(1) {
+                    info.pet_life = nx.int_child(meta, "life")?.unwrap_or(0);
+                }
                 info.pet_name_tag = nx.int_child(meta, "nameTag")?.unwrap_or(0) != 0;
                 info.pet_chat_balloon = nx.int_child(meta, "chatBalloon")?.unwrap_or(0) != 0;
+            }
+            if game::pet::is_water_of_life(item_id) {
+                info.pet_life = nx.int_child(meta, "life")?.unwrap_or(0);
             }
             if let Some(skills) = nx.child_by_name(meta, "skill")? {
                 let mut book = BookInfo {
@@ -371,6 +402,23 @@ impl ItemData {
                     let prob = nx.int_child(mob, "prob")?.unwrap_or(0);
                     info.sack.push((id, prob));
                 }
+            }
+        }
+        if item_id / 10_000 == 227 {
+            if let Some(meta) = nx.child_by_name(node, "info")? {
+                let side = |key: &str| -> Result<i16, GameDataError> {
+                    Ok(nx
+                        .int_child(meta, key)?
+                        .map_or(0, |v| i16::try_from(v).unwrap_or(0)))
+                };
+                info.catch = Some(CatchInfo {
+                    mob: nx.int_child(meta, "mob")?.unwrap_or(0),
+                    create: nx.int_child(meta, "create")?.unwrap_or(0),
+                    area: (side("left")?, side("top")?, side("right")?, side("bottom")?),
+                    mob_hp: nx.int_child(meta, "mobHP")?.unwrap_or(100),
+                    prop: nx.real_child(meta, "bridleProp")?.unwrap_or(100.0),
+                    use_delay: nx.int_child(meta, "useDelay")?.unwrap_or(0),
+                });
             }
         }
         if let Some(interact) = nx.child_by_name(node, "interact")? {
@@ -472,9 +520,11 @@ impl ItemData {
             book: None,
             scroll: None,
             sack: Vec::new(),
+            catch: None,
             equip: Some(equip),
             pet_commands: Vec::new(),
             pet_hunger: 0,
+            pet_life: 0,
             pet_name_tag: false,
             pet_chat_balloon: false,
         }))
@@ -658,6 +708,27 @@ mod tests {
     }
 
     #[test]
+    fn reads_what_a_catch_item_catches() {
+        let Some(data) = data() else {
+            return;
+        };
+        assert_eq!(
+            data.info(2270000).unwrap().unwrap().catch,
+            Some(CatchInfo {
+                mob: 9300101,
+                create: 1902000,
+                area: (-100, -100, 100, 50),
+                mob_hp: 100,
+                prop: 100.0,
+                use_delay: 0,
+            })
+        );
+        let rock = data.info(2270002).unwrap().unwrap().catch.unwrap();
+        assert_eq!((rock.mob_hp, rock.prop, rock.use_delay), (40, 50.0, 800));
+        assert_eq!(data.info(2000000).unwrap().unwrap().catch, None);
+    }
+
+    #[test]
     fn knows_which_hairs_and_faces_exist() {
         let Some(data) = data() else {
             return;
@@ -680,6 +751,9 @@ mod tests {
         let kitty = data.info(5000000).unwrap().unwrap();
         assert!(!kitty.pet_name_tag && !kitty.pet_chat_balloon);
         assert_eq!(data.info(5000000).unwrap().unwrap().pet_hunger, 2);
+        assert_eq!(data.info(5000000).unwrap().unwrap().pet_life, 90);
+        assert_eq!(data.info(5000060).unwrap().unwrap().pet_life, 0);
+        assert_eq!(data.info(5180000).unwrap().unwrap().pet_life, 90);
         let food = data.info(2120000).unwrap().unwrap().spec.unwrap();
         assert_eq!(food.inc, 30);
         let drumstick = data.info(5240027).unwrap().unwrap().spec.unwrap();

@@ -199,6 +199,37 @@ int main()
 		require(received_after_fees(500, 500 + 1000000, trade) == 0, "no fee, no fee message");
 		require(received_after_fees(500, 500, trade) == 0, "no mesos, no fee message");
 
+		// Trade warns of the partner's Karma items, first listing those with a
+		// time limit.
+		constexpr int64_t MINUTE = 600000000;
+		constexpr int64_t NOW = 1000 * 1440 * MINUTE;
+		auto named = [](int32_t itemid) { return std::to_string(itemid); };
+		Offer partner;
+		partner.items[0] = storage_contents::Stored{ 4000000, 3 };
+		partner.items[0]->expiration = NOW + MINUTE;
+		TradeQuestions plain = trade_questions(partner, NOW, named);
+
+		require(plain.time_limit.empty() && plain.confirm == "Are you sure you want to trade?",
+			"items without Karma are only asked about");
+
+		partner.items[3] = storage_contents::Stored{ 1302000, 1, 0x10 };
+		TradeQuestions karma = trade_questions(partner, NOW, named);
+
+		require(karma.time_limit.empty() && karma.confirm.rfind("Cash Items become untradable\\n", 0) == 0 &&
+			karma.confirm.find("Do you really want to trade?") != std::string::npos,
+			"a Karma item warns it can't be traded again");
+
+		partner.items[3]->expiration = NOW + (2 * 1440 + 3 * 60 + 4) * MINUTE + MINUTE - 1;
+		partner.items[5] = storage_contents::Stored{ 2000000, 1, 0x02 };
+		partner.items[5]->expiration = NOW;
+		partner.items[6] = storage_contents::Stored{ 1302000, 1, 0x02 };
+		partner.items[6]->expiration = NOW;
+
+		require(trade_questions(partner, NOW, named).time_limit ==
+			"1302000(2days, 3hours, and 4minutes left)\\n2000000(Time Limit Expired)\\n"
+			"\\nHave you checked the\\ntime limit on the item?",
+			"timed Karma items are listed slot by slot with the whole days, hours and minutes left");
+
 		trade[MINE].meso = 200000;
 
 		require(received_after_fees(0, 790000, trade) == 790000, "my own offer counts against the partner's");

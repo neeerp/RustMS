@@ -195,6 +195,7 @@ namespace ms
 		field_effects = EffectLayer();
 		weather.stop_sounds();
 		weather = mapid == -1 ? MapWeather() : MapWeather(src["weather"], mapinfo.get_bgm());
+		jukebox = false;
 
 		if (mapid != -1)
 			player.get_stats().set_mapid(mapid);
@@ -1276,9 +1277,14 @@ namespace ms
 		weather.set_packet_flag(flag);
 	}
 
-	bool Stage::weather_busy() const
+	void Stage::start_jukebox()
 	{
-		return weather.busy();
+		jukebox = true;
+	}
+
+	bool Stage::effect_busy() const
+	{
+		return jukebox || weather.busy();
 	}
 
 	void Stage::note_mob_left()

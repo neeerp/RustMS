@@ -5,6 +5,7 @@
 
 #include "../InPacket.h"
 #include "../../Character/MiniRoomBox.h"
+#include "../../Character/Inventory/ItemProperties.h"
 #include "../Login.h"
 
 #include <array>
@@ -352,6 +353,72 @@ namespace ms
 			int64_t offered = static_cast<int64_t>(offers[Side::PARTNER].meso) - offers[Side::MINE].meso;
 
 			return received > 0 && received < offered ? static_cast<int32_t>(received) : 0;
+		}
+
+		// What is left of an item's time limit, as Trade lists it
+		// (FUN_007b8f7e): whole days, hours and minutes.
+		inline std::string time_left(int64_t expiration, int64_t now)
+		{
+			if (expiration <= now)
+				return "Time Limit Expired";
+
+			constexpr int64_t MINUTE = 60 * item_expiry::TICKS_PER_SECOND;
+			int64_t left = expiration - now;
+			char text[64];
+			std::snprintf(text, sizeof(text), "%ddays, %dhours, and %dminutes left",
+				static_cast<int32_t>(left / (MINUTE * 60 * 24)), static_cast<int32_t>(left / (MINUTE * 60) % 24),
+				static_cast<int32_t>(left / MINUTE % 60));
+
+			return text;
+		}
+
+		// A timed item's line in a time limit question.
+		inline std::string time_limit_line(const std::string& name, int64_t expiration, int64_t now)
+		{
+			return name + "(" + time_left(expiration, now) + ")\\n";
+		}
+
+		// What follows the timed items' lines.
+		constexpr const char* CHECK_TIME_LIMIT = "\\nHave you checked the\\ntime limit on the item?";
+
+		// What Trade asks before it confirms (FUN_00485dcd). The partner's
+		// items with Karma can't be traded again, so it warns of that, after
+		// first listing those of them with a time limit.
+		struct TradeQuestions
+		{
+			// The timed items to check, or nothing.
+			std::string time_limit;
+			std::string confirm;
+		};
+
+		template <typename Name>
+		TradeQuestions trade_questions(const Offer& partner, int64_t now, Name name)
+		{
+			std::string list;
+			bool karma = false;
+
+			for (const auto& item : partner.items)
+			{
+				if (!item || !item_properties::karma(item->itemid, item->flags))
+					continue;
+
+				karma = true;
+
+				if (item->expiration < item_expiry::BEFORE)
+					list += time_limit_line(name(item->itemid), item->expiration, now);
+			}
+
+			TradeQuestions questions;
+
+			if (!list.empty())
+				questions.time_limit = list + CHECK_TIME_LIMIT;
+
+			questions.confirm = karma
+				? "Cash Items become untradable\\nonce they have been traded and \\nMaple Points cannot be accumulated"
+				  "\\nusing Item Deletions in the Cash Shop.\\n\\nDo you really want to trade?"
+				: "Are you sure you want to trade?";
+
+			return questions;
 		}
 
 		// What the trading room says as it closes, or nothing.

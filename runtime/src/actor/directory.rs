@@ -272,11 +272,14 @@ impl WorldDirectory {
             .get(&delivery.target_name)
             .and_then(|id| self.clients.get(id))
             .is_some_and(|target| target.handle.send_packet(delivery.recipient_packet));
-        sender.handle.send_packet(if delivered {
+        let answer = if delivered {
             delivery.sender_success_packet
         } else {
             delivery.sender_failure_packet
-        });
+        };
+        if let Some(answer) = answer {
+            sender.handle.send_packet(answer);
+        }
     }
 
     /// Tell the asker where a character is: their channel if it isn't the
@@ -349,10 +352,11 @@ impl WorldDirectory {
                 let target_id = self.names.get(&target).copied();
                 self.messengers.invite(from, target_id, &target)
             }
-            MessengerRequest::Decline { inviter } => match self.names.get(&inviter) {
-                Some(&inviter) => self
-                    .messengers
-                    .decline(from, &sender.presence.name, inviter),
+            MessengerRequest::Decline { inviter, blocking } => match self.names.get(&inviter) {
+                Some(&inviter) => {
+                    self.messengers
+                        .decline(from, &sender.presence.name, inviter, blocking)
+                }
                 None => Outbox::new(),
             },
             MessengerRequest::Chat { line } => self.messengers.chat(from, &line),
@@ -463,16 +467,16 @@ impl WorldDirectory {
                     self.exchange_hp(from);
                 }
             }
-            PartyRequest::Decline { inviter, busy } => {
+            PartyRequest::Decline { inviter, status } => {
                 let Some(&inviter) = self.names.get(&inviter) else {
                     return;
                 };
-                if busy {
+                if status == PartyStatus::BusyWithInvite {
                     if self.parties.is_invited(from, inviter) {
-                        self.send_status(inviter, PartyStatus::BusyWithInvite, &member.name);
+                        self.send_status(inviter, status, &member.name);
                     }
                 } else if self.parties.decline(from, inviter) {
-                    self.send_status(inviter, PartyStatus::Declined, &member.name);
+                    self.send_status(inviter, status, &member.name);
                 }
             }
             PartyRequest::Leave => match self.parties.leave(from) {
@@ -958,7 +962,7 @@ mod tests {
             3,
             PartyRequest::Decline {
                 inviter: "Bobby".into(),
-                busy: true,
+                status: PartyStatus::BusyWithInvite,
             },
         );
         assert_eq!(received(&mut bobby), ["op 0x16"]);
@@ -967,7 +971,7 @@ mod tests {
             3,
             PartyRequest::Decline {
                 inviter: "Bobby".into(),
-                busy: false,
+                status: PartyStatus::Declined,
             },
         );
         assert_eq!(received(&mut bobby), ["op 0x17"]);

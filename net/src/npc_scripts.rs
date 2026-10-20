@@ -42,6 +42,8 @@ const ORBIS_TUNNEL: i32 = 200000110;
 const NATALIE: i32 = 1012103;
 const HAIRCUT_COUPON: i32 = 5150001;
 const DYE_COUPON: i32 = 5151001;
+/// Mar the Fairy, who pours the Water of Life on dolls.
+const MAR_THE_FAIRY: i32 = 1032102;
 const NATALIE_HAIRS: [[i32; 7]; 2] = [
     [30060, 30140, 30200, 30210, 30310, 33040, 33100],
     [31150, 31300, 31350, 31700, 31740, 34050, 34110],
@@ -309,6 +311,53 @@ impl NpcScript {
             )),
             _ => None,
         }
+    }
+
+    /// Mar the Fairy's offer when a Water of Life is used: pick a doll,
+    /// and the water wakes it for the days the item gives (`info/life`).
+    /// `None` if the player holds no Water of Life.
+    pub fn water_of_life(player: &Player) -> Option<Self> {
+        let water = player
+            .inventory
+            .items(InventoryType::Cash)
+            .map(|(_, item)| item.item_id)
+            .find(|&item_id| game::pet::is_water_of_life(item_id))?;
+        let days = crate::items::info(water).map_or(0, |info| info.pet_life);
+        let choices: Vec<_> = player
+            .inventory
+            .items(InventoryType::Cash)
+            .filter(|(_, item)| game::pet::is_doll(item))
+            .filter_map(|(_, item)| Some((item.cash_serial?, item.pet.as_ref()?)))
+            .map(|(serial, pet)| {
+                let name = pet.name.as_str();
+                let says =
+                    |key| content::text().get(key, &[("name", name), ("days", &days.to_string())]);
+                let pages = vec![
+                    Page::Ask {
+                        text: says(keys::WATER_OF_LIFE_ASK),
+                        on_yes: vec![
+                            Effect::TakeItem {
+                                item_id: water,
+                                quantity: 1,
+                            },
+                            Effect::RevivePet { serial, days },
+                        ],
+                        on_no: None,
+                    },
+                    Page::Say(says(keys::WATER_OF_LIFE_DONE)),
+                ];
+                (format!("{name} (Lv. {})", pet.level), pages)
+            })
+            .collect();
+        let page = if choices.is_empty() {
+            Page::Say(text(keys::WATER_OF_LIFE_NO_DOLL))
+        } else {
+            Page::Menu {
+                text: text(keys::WATER_OF_LIFE_PICK),
+                choices,
+            }
+        };
+        Some(Self::new(MAR_THE_FAIRY, vec![page]))
     }
 
     /// A quest's start or end script (`Check.img startscript`/`endscript`),
@@ -1581,5 +1630,54 @@ mod tests {
         let refused = natalie.respond(ScriptInput::Select(0)).unwrap();
         assert!(refused.effects.is_empty());
         assert_eq!(kind(&refused), Some(0));
+    }
+
+    #[test]
+    fn the_water_of_life_wakes_the_doll_picked() {
+        if crate::items::data().is_err() {
+            return;
+        }
+        const WATER: i32 = 5180000;
+        let mut owner = player(50);
+        assert_eq!(NpcScript::water_of_life(&owner), None, "no water");
+        owner
+            .inventory
+            .insert(InventoryType::Cash, 1, game::Item::stack(WATER, 1));
+        let mut none = NpcScript::water_of_life(&owner).unwrap();
+        assert_eq!(kind(&none.begin()), Some(0), "no doll to wake");
+        assert_eq!(none.respond(ScriptInput::Next), Some(Step::default()));
+
+        let mut kitty = game::Item::stack(5000000, 1);
+        kitty.cash_serial = Some(78);
+        kitty.pet = Some(game::pet::PetData::new("Brown Kitty"));
+        owner
+            .inventory
+            .insert(InventoryType::Cash, 2, kitty.clone());
+        kitty.cash_serial = Some(79);
+        kitty.expiration = Some(game::pet::doll_date());
+        owner.inventory.insert(InventoryType::Cash, 3, kitty);
+        let mut mar = NpcScript::water_of_life(&owner).unwrap();
+        assert_eq!(mar.npc_id(), MAR_THE_FAIRY);
+        let Some(Prompt::Selection { text, .. }) = mar.begin().prompt else {
+            panic!("a choice of dolls");
+        };
+        assert_eq!(text.matches("#L").count(), 1, "only the doll");
+        assert!(text.contains("#L0##bBrown Kitty (Lv. 1)#k#l"));
+        assert_eq!(kind(&mar.respond(ScriptInput::Select(0)).unwrap()), Some(1));
+        let woken = mar.respond(ScriptInput::Yes).unwrap();
+        assert_eq!(
+            woken.effects,
+            [
+                Effect::TakeItem {
+                    item_id: WATER,
+                    quantity: 1
+                },
+                Effect::RevivePet {
+                    serial: 79,
+                    days: 90
+                },
+            ]
+        );
+        assert_eq!(kind(&woken), Some(0));
     }
 }

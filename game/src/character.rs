@@ -16,6 +16,9 @@ pub const MAX_BASE_STAT: i16 = 999;
 pub const MAX_HP_MP: i16 = 30_000;
 /// The most SP the three beginner skills can share (one per level from 2).
 pub const MAX_BEGINNER_SP: i32 = 6;
+/// The `saved_locations` key of the town the player entered the Free Market
+/// from. Event invitations use their `returnMapQR`, which is never 0.
+pub const FREE_MARKET_RETURN: i16 = 0;
 
 /// A stat `SPEND_AP` can raise.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -213,6 +216,11 @@ pub struct Player {
     pub teleport_rocks: TeleportRocks,
     /// The tamed monster's level, EXP and tiredness.
     pub mount: Mount,
+    /// Where the player came from before a trip, to go back to when it
+    /// ends: the town they entered the Free Market from
+    /// (`FREE_MARKET_RETURN`), or the map they used an event invitation in,
+    /// under its `returnMapQR`.
+    pub saved_locations: BTreeMap<i16, i32>,
     dirty: bool,
 }
 
@@ -249,6 +257,7 @@ impl Player {
             charmed: false,
             teleport_rocks: TeleportRocks::default(),
             mount: Mount::default(),
+            saved_locations: BTreeMap::new(),
             dirty: false,
         }
     }

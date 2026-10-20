@@ -699,12 +699,19 @@ namespace ms
 
 		auto order = [send, chosen]()
 		{
-			if (personal_shop::sells_whole(chosen.item.itemid))
+			if (chosen.item.expiration < item_expiry::now())
+			{
+				notice("The time limit has expired.");
+
+				return;
+			}
+
+			if (personal_shop::sells_whole(chosen.item.itemid, chosen.item.expiration))
 			{
 				int64_t total = chosen.price;
 
 				UI::get().emplace<UIYesNo>(
-						"Are you sure you want to buy it?",
+						chosen.item.cash ? personal_shop::CASH_BUY_QUESTION : "Are you sure you want to buy it?",
 						[send, total](bool yes)
 						{
 							if (yes)
@@ -742,15 +749,39 @@ namespace ms
 		};
 
 		// Buying uses up Scissors of Karma (FUN_006fd261).
-		if (!listing.item.cash && item_properties::karma(listing.item.itemid, listing.item.flags))
-			UI::get().emplace<UIYesNo>("Once purchased, the item cannot be traded.\\nWould you still like to purchase it?",
-				[order](bool yes)
+		auto karma = [order, chosen]()
+		{
+			if (!chosen.item.cash && item_properties::karma(chosen.item.itemid, chosen.item.flags))
+				UI::get().emplace<UIYesNo>("Once purchased, the item cannot be traded.\\nWould you still like to purchase it?",
+					[order](bool yes)
+					{
+						if (yes)
+							order();
+					});
+			else
+				order();
+		};
+
+		// A cash item with a time limit asks first that it was checked.
+		if (listing.item.cash && listing.item.expiration < item_expiry::BEFORE)
+		{
+			Text name = Text(Text::Font::A12M, Text::Alignment::LEFT, Color::Name::BLACK,
+				ItemData::get(listing.item.itemid).get_name());
+			string_format::format_with_ellipsis(name, 100);
+
+			UI::get().emplace<UIYesNo>(
+				mini_room::time_limit_line(name.get_text(), listing.item.expiration, item_expiry::now()) +
+					mini_room::CHECK_TIME_LIMIT,
+				[karma](bool yes)
 				{
 					if (yes)
-						order();
+						karma();
 				});
+		}
 		else
-			order();
+		{
+			karma();
+		}
 	}
 
 	void UIPersonalShop::ban(uint8_t slot)

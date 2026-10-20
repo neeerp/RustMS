@@ -1,5 +1,6 @@
 #pragma once
 
+#include <chrono>
 #include <cstdint>
 #include <cstdio>
 #include <string>
@@ -13,6 +14,15 @@ namespace ms::item_expiry
 	constexpr int64_t BEFORE = 150842304000000000;
 	constexpr int64_t UNIX_EPOCH = 116444736000000000;
 	constexpr int64_t TICKS_PER_SECOND = 10000000;
+
+	// The time now as a FILETIME.
+	inline int64_t now()
+	{
+		auto ticks = std::chrono::duration_cast<std::chrono::microseconds>(
+			std::chrono::system_clock::now().time_since_epoch()).count() * 10;
+
+		return UNIX_EPOCH + ticks;
+	}
 
 	struct Time
 	{
@@ -83,6 +93,8 @@ namespace ms::item_expiry
 		// `limitedLife`: the seconds it lives in all. Such a pet counts down
 		// the seconds it has left instead of having a date.
 		int32_t limited = 0;
+		// `noRevive`: the Water of Life can't bring it back once it dies.
+		bool no_revive = false;
 	};
 
 	// Whether a pet has died (FUN_004e4003). One with limitedLife dies when its

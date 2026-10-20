@@ -29,12 +29,13 @@ namespace ms
 	{
 		bulletslot = 0;
 		bulletprefix = 0;
+		bulletlevel = 0;
 		meso = 0;
 		running_uid = 0;
 		slotmaxima[InventoryType::Id::EQUIPPED] = EquipSlot::Id::LENGTH;
 	}
 
-	void Inventory::recalc_stats(Weapon::Type type)
+	void Inventory::recalc_stats(Weapon::Type type, int32_t level)
 	{
 		totalstats.clear();
 
@@ -73,6 +74,7 @@ namespace ms
 		}
 
 		bulletprefix = prefix;
+		bulletlevel = level;
 		bulletslot = 0;
 
 		if (prefix)
@@ -81,7 +83,7 @@ namespace ms
 			{
 				const Slot &slot = iter.second;
 
-				if (slot.count && slot.item_id / 1000 == prefix)
+				if (slot.count && is_bullet(slot))
 				{
 					bulletslot = iter.first;
 					break;
@@ -276,7 +278,7 @@ namespace ms
 		{
 			const Slot &slot = iter.second;
 
-			if (slot.count >= std::max<int16_t>(cost, 1) && slot.item_id / 1000 == bulletprefix)
+			if (slot.count >= std::max<int16_t>(cost, 1) && is_bullet(slot))
 				return iter.first;
 		}
 
@@ -289,10 +291,15 @@ namespace ms
 
 		if (bulletprefix)
 			for (auto &iter : inventories[InventoryType::Id::USE])
-				if (iter.second.item_id / 1000 == bulletprefix)
+				if (is_bullet(iter.second))
 					most = std::max<uint16_t>(most, iter.second.count);
 
 		return most;
+	}
+
+	bool Inventory::is_bullet(const Slot &slot) const
+	{
+		return slot.item_id / 1000 == bulletprefix && BulletData::get(slot.item_id).get_reqlevel() <= bulletlevel;
 	}
 
 	EquipSlot::Id Inventory::find_equipslot(int32_t itemid) const

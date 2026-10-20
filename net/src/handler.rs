@@ -9,6 +9,7 @@
 use crate::combat::AttackKind;
 use crate::dialogue::NpcInteraction;
 use crate::error::NetworkError;
+use crate::packet::build::world::party::PartyStatus;
 use crate::packet::handle::{login, world};
 use crate::packet::op::RecvOpcode;
 use db::session::{Session, SessionState};
@@ -177,13 +178,13 @@ pub struct WorldContext<'a> {
 }
 
 /// A whisper ready for delivery; the world directory picks which packet the
-/// sender gets back.
+/// sender gets back, if any.
 #[derive(Debug)]
 pub struct WhisperDelivery {
     pub target_name: String,
     pub recipient_packet: Packet,
-    pub sender_success_packet: Packet,
-    pub sender_failure_packet: Packet,
+    pub sender_success_packet: Option<Packet>,
+    pub sender_failure_packet: Option<Packet>,
 }
 
 /// A party operation; the world directory owns parties and carries it out.
@@ -200,11 +201,11 @@ pub enum PartyRequest {
     Invite {
         name: String,
     },
-    /// Turn down `inviter`'s invitation. `busy` says another was still
-    /// showing, which leaves the invitation waiting for that one's answer.
+    /// Turn down `inviter`'s invitation, telling them `status`. Busy with
+    /// another invitation leaves this one waiting for that one's answer.
     Decline {
         inviter: String,
-        busy: bool,
+        status: PartyStatus,
     },
     Expel {
         member_id: i32,
@@ -276,8 +277,11 @@ pub enum MessengerRequest {
     Invite {
         target: String,
     },
+    /// Turn down `inviter`'s invitation, `blocking` when the Game Option
+    /// turned it away unseen.
     Decline {
         inviter: String,
+        blocking: bool,
     },
     /// A line already formatted as `name : text`.
     Chat {
@@ -537,6 +541,16 @@ pub enum FieldRequest {
     /// The player opened a summoning sack: bring out these mobs on the
     /// ground below them.
     SummonMobs(Vec<i32>),
+    /// The player threw the catch item in USE `slot` at the mob `object_id`:
+    /// catch it if it is a `catch.mob` within `catch.area` of them, below
+    /// `catch.mob_hp` percent of its HP. Answered with
+    /// `ServerMessage::Caught`.
+    Catch {
+        object_id: i32,
+        slot: i16,
+        item_id: i32,
+        catch: game_data::items::CatchInfo,
+    },
     /// Send away the player's summon of this skill, or all of them.
     Unsummon {
         skill_id: Option<i32>,
@@ -676,6 +690,7 @@ fn world_routes() -> &'static HashMap<i16, WorldRoute> {
             (Op::UseSkillBook, InGame(&world::UseSkillBookHandler)),
             (Op::UseReturnScroll, InGame(&world::ReturnScrollHandler)),
             (Op::UseSummonBag, InGame(&world::UseSummonSackHandler)),
+            (Op::UseCatchItem, InGame(&world::UseCatchItemHandler)),
             (Op::UseTeleportRock, InGame(&world::UseTeleportRockHandler)),
             (Op::UseSolomonItem, InGame(&world::UseSolomonItemHandler)),
             (Op::UseGachaExp, InGame(&world::UseGachaExpHandler)),
@@ -713,6 +728,8 @@ fn world_routes() -> &'static HashMap<i16, WorldRoute> {
             (Op::MesoDrop, InGame(&world::MesoDropHandler)),
             (Op::CharInfoRequest, InGame(&world::CharInfoRequestHandler)),
             (Op::SpawnPet, InGame(&world::SpawnPetHandler)),
+            (Op::DeadPet, InGame(&world::DeadPetHandler)),
+            (Op::WaterOfLife, InGame(&world::WaterOfLifeHandler)),
             (Op::MovePet, InGame(&world::MovePetHandler)),
             (Op::PetChat, InGame(&world::PetChatHandler)),
             (Op::PetCommand, InGame(&world::PetCommandHandler)),
@@ -763,7 +780,7 @@ mod tests {
     fn every_registered_opcode_is_unique_per_server() {
         // The maps would silently drop duplicates; check the table sizes match.
         assert_eq!(login_routes().len(), 13);
-        assert_eq!(world_routes().len(), 79);
+        assert_eq!(world_routes().len(), 82);
     }
 
     #[test]

@@ -107,6 +107,7 @@ namespace ms
 			properties.trade_available = src["tradeAvailable"].get_bool();
 			pet_life.permanent = src["permanent"].get_bool();
 			pet_life.limited = src["limitedLife"];
+			pet_life.no_revive = src["noRevive"].get_bool();
 			gender = get_item_gender(itemid);
 
 			name = std::string(strsrc["name"]);

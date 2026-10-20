@@ -145,7 +145,7 @@ namespace ms
 
 		struct Best
 		{
-			int32_t item_id;
+			cash_catalog::Commodity commodity;
 			Text name;
 			Text price;
 		};

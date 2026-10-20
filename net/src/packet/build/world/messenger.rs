@@ -101,11 +101,12 @@ pub fn build_messenger_invite_result(target: &str, sent: bool) -> Result<Packet,
     Ok(packet)
 }
 
-/// `target` declined the receiving client's invitation.
-pub fn build_messenger_declined(target: &str) -> Result<Packet, NetworkError> {
+/// `target` declined the receiving client's invitation, or `blocking`, their
+/// Game Option turned it away ("not accepting chat").
+pub fn build_messenger_declined(target: &str, blocking: bool) -> Result<Packet, NetworkError> {
     let mut packet = messenger_packet(DECLINED_MODE)?;
     packet.write_str_with_length(target)?;
-    packet.write_byte(0)?;
+    packet.write_byte(blocking as u8)?;
     Ok(packet)
 }
 
@@ -184,12 +185,12 @@ mod tests {
             .string("Bob")
             .byte(1)
             .end();
-        let declined = build_messenger_declined("Bob").unwrap();
+        let declined = build_messenger_declined("Bob", true).unwrap();
         Expect::new(&declined.bytes)
             .short(OP)
             .byte(0x05)
             .string("Bob")
-            .byte(0)
+            .byte(1)
             .end();
     }
 

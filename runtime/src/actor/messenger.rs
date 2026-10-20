@@ -195,13 +195,19 @@ impl Messengers {
     }
 
     /// `client_id` (named `name`) turned down `inviter`'s invitation.
-    pub fn decline(&mut self, client_id: ClientId, name: &str, inviter: ClientId) -> Outbox {
+    pub fn decline(
+        &mut self,
+        client_id: ClientId,
+        name: &str,
+        inviter: ClientId,
+        blocking: bool,
+    ) -> Outbox {
         let mut out = Outbox::new();
         let Some(&id) = self.member_of.get(&inviter) else {
             return out;
         };
         if self.invites.remove(&(client_id, id)) {
-            push(&mut out, inviter, build_messenger_declined(name));
+            push(&mut out, inviter, build_messenger_declined(name, blocking));
         }
         out
     }
@@ -425,9 +431,9 @@ mod tests {
         messengers.open(ALICE, "Alice", 0, look(30000), 0);
         messengers.invite(ALICE, Some(BOB), "Bob");
 
-        let out = messengers.decline(BOB, "Bob", ALICE);
+        let out = messengers.decline(BOB, "Bob", ALICE, false);
         assert_eq!(summary(&out), vec![(ALICE, 0x05, 3)]);
-        assert!(messengers.decline(BOB, "Bob", ALICE).is_empty());
+        assert!(messengers.decline(BOB, "Bob", ALICE, false).is_empty());
         assert!(messengers.open(BOB, "Bob", 0, look(30010), 1).is_empty());
     }
 

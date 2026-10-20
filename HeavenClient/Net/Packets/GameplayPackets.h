@@ -321,6 +321,28 @@ namespace ms
 		}
 	};
 
+	// Opcode: DEAD_PET(80)
+	class DeadPetPacket : public OutPacket
+	{
+	public:
+		// Sent for the doll `serial`, which can't be revived, as the Cash
+		// Shop is offered instead (FUN_00a240a2).
+		DeadPetPacket(int64_t serial) : OutPacket(OutPacket::Opcode::DEAD_PET)
+		{
+			write_time();
+			write_long(serial);
+		}
+	};
+
+	// Asks the server to revive a doll with the Water of Life just used
+	// (FUN_00a1dce6); it carries nothing.
+	// Opcode: WATER_OF_LIFE(117)
+	class WaterOfLifePacket : public OutPacket
+	{
+	public:
+		WaterOfLifePacket() : OutPacket(OutPacket::Opcode::WATER_OF_LIFE) {}
+	};
+
 	// Opcode: PET_CHAT(168)
 	class PetChatPacket : public OutPacket
 	{
@@ -462,13 +484,14 @@ namespace ms
 		}
 	};
 
-	// Turns down a party invitation: X on the invite (DENIED), or one that
-	// came while another was still showing (BUSY) (FUN_00a3e31c, FUN_0051fff5).
+	// Turns down a party invitation: X on the invite (DENIED), one that came
+	// while another was still showing (BUSY), or one the Game Option blocks
+	// (BLOCKING) (FUN_00a3e31c, FUN_0051fff5).
 	// Opcode: DENY_PARTY_REQUEST(125)
 	class DenyPartyRequestPacket : public OutPacket
 	{
 	public:
-		static constexpr int8_t BUSY = 0x16, DENIED = 0x17;
+		static constexpr int8_t BLOCKING = 0x15, BUSY = 0x16, DENIED = 0x17;
 
 		DenyPartyRequestPacket(int8_t reason, const std::string& inviter, const std::string& self) :
 			OutPacket(OutPacket::Opcode::DENY_PARTY_REQUEST)

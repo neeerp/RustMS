@@ -65,8 +65,9 @@ namespace ms
 
 		Inventory();
 
-		// Recalculate sums of equip stats
-		void recalc_stats(Weapon::Type weapontype);
+		// Recalculate sums of equip stats, and pick the projectile a
+		// character of `level` shoots.
+		void recalc_stats(Weapon::Type weapontype, int32_t level);
 
 		// Set the meso amount.
 		void set_meso(int64_t meso);
@@ -192,6 +193,10 @@ namespace ms
 			int64_t cash_id;
 		};
 
+		// Whether a stack is ammo for the weapon that the character may
+		// shoot. v83 passes over ammo above their level (FUN_00949b5d).
+		bool is_bullet(const Slot &slot) const;
+
 		EnumMap<InventoryType::Id, std::map<int16_t, Slot>> inventories;
 		std::unordered_map<int32_t, Item> items;
 		std::unordered_map<int32_t, Equip> equips;
@@ -203,5 +208,6 @@ namespace ms
 		int64_t meso;
 		int16_t bulletslot;
 		int32_t bulletprefix;
+		int32_t bulletlevel;
 	};
 }

@@ -201,8 +201,12 @@ namespace ms
 		// BLOW_WEATHER's flag, which keeps the message bar up through a stop.
 		void set_weather_flag(uint8_t flag);
 
-		// Whether a weather item has to wait for the field's weather to end.
-		bool weather_busy() const;
+		// PLAY_JUKEBOX: a song plays until the player leaves the field (v83 CField+0x20).
+		void start_jukebox();
+
+		// Whether a weather item or a jukebox has to wait: a jukebox song plays, or the field's weather isn't over
+		// (FUN_00a0ec80, FUN_00a0ec3b).
+		bool effect_busy() const;
 
 		// KILL_MOB: a monster left the field.
 		void note_mob_left();
@@ -336,6 +340,7 @@ namespace ms
 		MapShip ship;
 		MapClouds clouds;
 		MapWeather weather;
+		bool jukebox = false;
 		MapTooltips tooltips;
 		MapClock clock;
 		// A wall clock time that came before its map loaded.

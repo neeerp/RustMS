@@ -52,10 +52,12 @@ namespace ms
 		//       1 int map id, int x, int y; 2 int -1 (Cash Shop); 3 int channel (0-based))
 		// 0x0A: reply to our whisper or find request (string target, byte success)
 		// 0x12: incoming whisper (string sender, byte channel (0-based), byte from_admin, string message)
+		// 0x22: the target blocks whispers (string target, byte 0), or isn't found (nonzero)
 		// Other modes (e.g. 0x48 buddy whisper) are not handled and are ignored.
 		constexpr int8_t FIND_RESULT_MODE = 0x09;
 		constexpr int8_t WHISPER_RESULT_MODE = 0x0A;
 		constexpr int8_t WHISPER_RECEIVE_MODE = 0x12;
+		constexpr int8_t WHISPER_BLOCKED_MODE = 0x22;
 		// 0x92: an admin's message (string, byte, string message), shown as a weather's message bar
 		constexpr int8_t WHISPER_WEATHER_MODE = static_cast<int8_t>(0x92);
 
@@ -254,6 +256,11 @@ namespace ms
 			{
 				for (const auto& line : status_messages::exp_lines(exp))
 					show_status(line.yellow ? Color::Name::YELLOW : Color::Name::WHITE, line.text);
+
+				static int32_t mob_bonus = 0;
+
+				if (std::string line = status_messages::mob_bonus_line(exp, mob_bonus); !line.empty())
+					chat_line(line, UIChatBar::LineType::SKILL);
 			}
 		}
 		else if (mode == 4)
@@ -497,10 +504,16 @@ namespace ms
 		{
 			std::string sender = recv.read_string();
 			int8_t channel = recv.read_byte();
-			// From an admin: v83 shows it even with whispers blocked, which
-			// HeavenClient can't do.
-			recv.read_bool();
+			bool from_admin = recv.read_bool();
 			std::string message = CurseData::filter(recv.read_string());
+
+			// Blocked, a whisper is turned away unseen, unless from an admin.
+			if (!from_admin && !Setting<AllowWhisper>::get().load())
+			{
+				WhisperBlockedPacket(sender).dispatch();
+
+				return;
+			}
 
 			// Print the warning before the whisper.
 			if (auto warning = SwindleData::warning(message))
@@ -520,6 +533,15 @@ namespace ms
 
 			if (!success)
 				chatbar->send_chatline(unable_to_find(target), UIChatBar::LineType::SKILL);
+		}
+		else if (mode == WHISPER_BLOCKED_MODE)
+		{
+			std::string target = recv.read_string();
+
+			if (recv.read_bool())
+				chatbar->send_chatline(unable_to_find(target), UIChatBar::LineType::SKILL);
+			else
+				chatbar->send_chatline("'" + target + "' have currently disabled whispers.", UIChatBar::LineType::WHISPER);
 		}
 		else if (mode == FIND_RESULT_MODE)
 		{
@@ -581,6 +603,14 @@ namespace ms
 				recv.skip_byte();
 				int32_t messenger_id = recv.read_int();
 				std::string self = Stage::get().get_player().get_stats().get_name();
+
+				// Blocked, the invitation is turned away unseen (FUN_00851478).
+				if (!Setting<AllowChatInvite>::get().load())
+				{
+					MessengerDeclinePacket(from, self, true).dispatch();
+
+					break;
+				}
 
 				// O does nothing while a messenger is already open (FUN_0084dd25).
 				if (auto cards = UI::get().get_element<UIInviteCard>())
@@ -724,6 +754,10 @@ namespace ms
 					if (auto messenger = UI::get().get_element<UIStatusMessenger>())
 						messenger->show_status(Color::Name::PICTONBLUE, message);
 			}
+		}
+		else if (mode1 == 7) // a scripted portal's sound (FUN_009377d9)
+		{
+			Sound(Sound::Name::PORTAL).play();
 		}
 		else if (mode1 == 8) // job change
 		{

@@ -87,7 +87,7 @@ namespace ms
 		void release_keys();
 
 		// Recalculates the total stats from base stats, inventories and skills.
-		void recalc_stats(bool equipchanged);
+		void recalc_stats();
 
 		// Change the equipment at the specified slot and recalculate stats.
 		void change_equip(int16_t slot);
@@ -213,6 +213,10 @@ namespace ms
 		// Feed the tamed monster ridden the food (226xxxx) in USE `slot`; not riding one, nothing happens
 		// (FUN_00a09a64).
 		void feed_mount(int16_t slot, int32_t itemid);
+
+		// Throw the catch item (227xxxx) in USE `slot` at the first mob it catches within its area, if what it
+		// makes would fit; else say why in chat. Riding a tamed monster, nothing happens (FUN_00a09bdf).
+		void use_catch_item(int16_t slot, int32_t itemid);
 
 		// Returns the shoe's walking speed multiplier, from the total ES_SPEED stat.
 		double get_walkspeed() const;

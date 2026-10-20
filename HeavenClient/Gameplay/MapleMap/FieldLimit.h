@@ -65,6 +65,13 @@ namespace ms
 			return !(fieldlimit & WEATHER_ITEMS) && fieldtype != 60;
 		}
 
+		// v83 FUN_00a0f9e2: chairs can't be sat on in fields of type 61,
+		// the wedding hall 680000300.
+		inline bool may_sit(int32_t fieldtype)
+		{
+			return fieldtype != 61;
+		}
+
 		// v83 FUN_004a95bf: whether the death dialog offers a Wheel of
 		// Destiny here. It doesn't on fields of type 1, 3 to 5, 7, 10, 11
 		// or 15, in the event maps (9xxxxxxxx), on the ships (200090xxx)

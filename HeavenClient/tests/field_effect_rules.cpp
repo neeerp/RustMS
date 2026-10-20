@@ -43,6 +43,14 @@ int main()
 		require(jukebox_line("%s's song for you.", "Writs") == "Writs's song for you.", "the name for %s");
 		require(jukebox_line("A song for you.", "Writs") == "A song for you.", "no %s");
 
+		uint8_t header[92] = {};
+		header[60] = 0x10;
+		header[61] = 0x27;
+		require(sound_length(header, 92) == 1, "10 bytes at 10000 a second");
+		require(sound_length(header, 82) == 0 && sound_length(nullptr, 92) == 0, "no sound");
+		header[60] = header[61] = 0;
+		require(sound_length(header, 92) == 0, "no rate");
+
 		require(back_target(0) == 255.0f && back_target(1) == 0.0f, "in to full, out to nothing");
 		require(!back_target(2) && !back_target(255), "other modes do nothing");
 

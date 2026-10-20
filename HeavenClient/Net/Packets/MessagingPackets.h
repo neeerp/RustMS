@@ -78,6 +78,21 @@ namespace ms
 		}
 	};
 
+	// Turns away a whisper from `sender` while the Game Option blocks them,
+	// for the server to tell them (FUN_0053228e).
+	// Opcode: WHISPER(120)
+	class WhisperBlockedPacket : public OutPacket
+	{
+	public:
+		static constexpr int8_t BLOCKED_MODE = 0x22;
+
+		WhisperBlockedPacket(const std::string& sender) : OutPacket(OutPacket::Opcode::WHISPER)
+		{
+			write_byte(BLOCKED_MODE);
+			write_string(sender);
+		}
+	};
+
 	// Asks where a character is (/find)
 	// Opcode: WHISPER(120)
 	class FindPacket : public OutPacket
@@ -136,16 +151,16 @@ namespace ms
 		}
 	};
 
-	// X on an invitation (FUN_0051fff5); v83 ends with 1 instead when its
-	// options turn invitations away unseen (FUN_00851478).
+	// X on an invitation (FUN_0051fff5), or `blocking` when the Game Option
+	// turns invitations away unseen (FUN_00851478).
 	class MessengerDeclinePacket : public MessengerPacket
 	{
 	public:
-		MessengerDeclinePacket(const std::string& inviter, const std::string& self) : MessengerPacket(Mode::DECLINE)
+		MessengerDeclinePacket(const std::string& inviter, const std::string& self, bool blocking = false) : MessengerPacket(Mode::DECLINE)
 		{
 			write_string(inviter);
 			write_string(self);
-			write_byte(0);
+			write_byte(blocking);
 		}
 	};
 

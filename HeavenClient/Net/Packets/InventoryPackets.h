@@ -146,6 +146,21 @@ namespace ms
 		}
 	};
 
+	// Uses a jukebox (FUN_00a0a63f type 0x14): the song's length in ms
+	// (inferred).
+	// Opcode: USE_CASH_ITEM(79)
+	class UseJukeboxPacket : public OutPacket
+	{
+	public:
+		UseJukeboxPacket(int16_t slot, int32_t itemid, int32_t length) : OutPacket(OutPacket::Opcode::USE_CASH_ITEM)
+		{
+			write_short(slot);
+			write_int(itemid);
+			write_int(length);
+			write_time();
+		}
+	};
+
 	// Uses an AP or SP Reset (FUN_00a0a63f types 0x17 and 0x18): where the
 	// AP or skill level goes, then where it leaves, as STAT_CHANGED mask
 	// bits or skill ids.
@@ -317,6 +332,21 @@ namespace ms
 			write_time();
 			write_short(slot);
 			write_int(itemid);
+		}
+	};
+
+	// Requests throwing the catch item (227xxxx) in a USE slot at the mob
+	// `oid`, found within the item's area, v83 FUN_00a09bdf
+	// Opcode: USE_CATCH_ITEM(81)
+	class UseCatchItemPacket : public OutPacket
+	{
+	public:
+		UseCatchItemPacket(int16_t slot, int32_t itemid, int32_t oid) : OutPacket(OutPacket::Opcode::USE_CATCH_ITEM)
+		{
+			write_time();
+			write_short(slot);
+			write_int(itemid);
+			write_int(oid);
 		}
 	};
 

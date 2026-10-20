@@ -90,6 +90,8 @@ pub struct Trace {
     pub cleared: usize,
     /// "Card get" effects (SHOW_ITEM_GAIN_INCHAT 0x0D).
     pub card_effects: usize,
+    /// Portal sounds of scripted portals (SHOW_ITEM_GAIN_INCHAT 7).
+    pub portal_sounds: usize,
     /// MONSTER_BOOK_SET_CARD: (went into the book, card, copies).
     pub cards: Vec<(bool, i32, i32)>,
     /// MONSTER_BOOK_SET_COVER answers.
@@ -260,6 +262,7 @@ impl Trace {
                             .push((r.read_int().unwrap(), r.read_int().unwrap()));
                     }
                 }
+                7 => self.portal_sounds += 1,
                 9 => self.cleared += 1,
                 0x0D => self.card_effects += 1,
                 0x17 => self.images.push(r.read_str_with_length().unwrap()),

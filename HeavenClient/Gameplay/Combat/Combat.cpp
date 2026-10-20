@@ -2950,6 +2950,23 @@ namespace ms
 		fieldeffects.add(success ? catch_success : catch_fail, DrawArgument(position), 0);
 	}
 
+	void Combat::show_item_catch(int32_t oid, int32_t itemid, bool success)
+	{
+		if (!mobs.contains(oid))
+			return;
+
+		nl::node effect = nl::nx::effect["ItemEff.img"][std::to_string(itemid)];
+
+		if (!success)
+			effect = effect["fail"];
+
+		if (effect)
+			fieldeffects.add(Animation(effect), DrawArgument(mobs.get_mob_position(oid) + Point<int16_t>(0, -2)), 0);
+
+		if (itemid == 2270002)
+			Sound(nl::nx::sound["Game.img"][success ? "CatchSuccess" : "CatchFaild"]).play();
+	}
+
 	void Combat::show_throw(int32_t cid, Point<int16_t> position, int32_t charge, int32_t skillid)
 	{
 		if (Optional<OtherChar> user = chars.get_char(cid))

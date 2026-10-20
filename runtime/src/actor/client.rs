@@ -204,6 +204,7 @@ impl ClientActor {
             let door_due = self.door_due();
             let map_timer_due = self.map_timer_due();
             let hazard_due = self.hazard_due();
+            let pets_due = self.pets_due();
             let step = tokio::select! {
                 biased;
                 _ = kill.cancelled() => Err(RuntimeError::ClientDisconnected),
@@ -214,6 +215,9 @@ impl ClientActor {
                 Some(message) = self.rx.recv() => self.handle_server_message(message).await,
                 _ = autosave.tick() => self.save_if_dirty().await,
                 _ = hunger.tick() => self.pets_grow_hungry().await,
+                _ = sleep_until(pets_due.unwrap_or_else(Instant::now)), if pets_due.is_some() => {
+                    self.pets_dry_up().await
+                }
                 _ = sleep_until(buffs_due.unwrap_or_else(Instant::now)), if buffs_due.is_some() => {
                     self.update_buffs().await
                 }
@@ -351,6 +355,12 @@ impl ClientActor {
                     request_id: self.npc_request_id,
                 })
                 .await?
+            }
+            WorldAction::NpcInteraction(NpcInteraction::WaterOfLife) => {
+                let player = &self.in_game()?.player;
+                if let Some(script) = net::npc_scripts::NpcScript::water_of_life(player) {
+                    self.start_script(script).await?
+                }
             }
             WorldAction::NpcInteraction(NpcInteraction::Respond {
                 message_type,
@@ -525,6 +535,8 @@ impl ClientActor {
             return Err(RuntimeError::NotLoggedIn);
         }
         ships::leave_forced_return_map(&mut player);
+        // The client learns of pets that dried up meanwhile with the rest.
+        net::packet::handle::world::pets_dry_up(&mut player, SystemTime::now());
         self.client_id = character_id;
 
         let mut keymap = build::world::keymap::build_keymap(&player.keymap)
@@ -723,7 +735,7 @@ impl ClientActor {
                         item_id: item.item_id,
                         sn: item.sn,
                         quantity: item.count,
-                        expires_at: expiry(item.period),
+                        expires_at: expiry(item.item_id, item.period),
                     })
                     .collect();
                 let (sn, price) = (commodity.sn, commodity.price);
@@ -832,7 +844,7 @@ impl ClientActor {
             item_id: commodity.item_id,
             sn: commodity.sn,
             quantity: commodity.count,
-            expires_at: expiry(commodity.period),
+            expires_at: expiry(commodity.item_id, commodity.period),
             gift_from: sender,
             gift_message: Some(message),
         };
@@ -1072,6 +1084,11 @@ impl ClientActor {
                 y,
             } => self.drop_reactor_loot(reactor_id, object_id, x, y).await?,
             ServerMessage::PickedUp { drop } => self.picked_up(drop).await?,
+            ServerMessage::Caught {
+                slot,
+                item_id,
+                create,
+            } => self.caught(slot, item_id, create).await?,
             ServerMessage::PetPickedUp { drop, pet } => self.pet_picked_up(drop, pet).await?,
             ServerMessage::Locate { reply_to } => self.locate(&reply_to),
             ServerMessage::RockLocate { reply_to, rock } => {
@@ -1327,10 +1344,14 @@ impl ClientActor {
 /// gender.
 const BEST_SELLERS_CONSIDERED: i64 = 50;
 
-/// When an item bought now for `period` days expires; `None` for 0, which
-/// never does.
-fn expiry(period: i32) -> Option<SystemTime> {
-    (period > 0).then(|| SystemTime::now() + Duration::from_secs(period as u64 * 86_400))
+/// When the item `item_id` bought now for `period` days expires; `None` for
+/// 0, which never does. A pet sold for 0 days lives its `info/life` days.
+fn expiry(item_id: i32, period: i32) -> Option<SystemTime> {
+    let days = match period {
+        0 if game::pet::is_pet(item_id) => net::items::info(item_id).map_or(0, |info| info.pet_life),
+        _ => period,
+    };
+    (days > 0).then(|| SystemTime::now() + Duration::from_secs(days as u64 * 86_400))
 }
 
 #[cfg(test)]

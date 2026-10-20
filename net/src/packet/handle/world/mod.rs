@@ -1,6 +1,7 @@
 mod buddy;
 mod cash_item;
 mod cash_shop;
+mod catch_item;
 mod chair;
 mod chalkboard;
 mod change_channel;
@@ -14,6 +15,7 @@ mod emote;
 mod fame;
 mod guild;
 mod item_effect;
+mod jukebox;
 mod item_move;
 mod keybinds;
 mod logged_in;
@@ -50,6 +52,7 @@ mod whisper;
 pub use self::buddy::BuddyListModifyHandler;
 pub use self::cash_item::UseCashItemHandler;
 pub use self::cash_shop::{CashShopOperationHandler, CheckCashHandler, EnterCashShopHandler};
+pub use self::catch_item::{trade_catch, UseCatchItemHandler};
 pub use self::chair::{CancelChairHandler, UseChairHandler};
 pub use self::chalkboard::CloseChalkboardHandler;
 pub use self::change_channel::ChangeChannelHandler;
@@ -80,8 +83,9 @@ pub use self::npc_shop::NpcShopActionHandler;
 pub use self::party::{DenyPartyRequestHandler, MultiChatHandler, PartyOperationHandler};
 pub use self::party_search_update::PartySearchUpdateHandler;
 pub use self::pet::{
-    pets_grow_hungry, Hungry, MovePetHandler, PetChatHandler, PetCommandHandler, PetFoodHandler,
-    PetLootHandler, SpawnPetHandler,
+    next_dry_up, pets_dry_up, pets_grow_hungry, revive_pet, DeadPetHandler, MovePetHandler,
+    PetChatHandler, PetCommandHandler, PetFoodHandler, PetLootHandler, PetsAged, SpawnPetHandler,
+    WaterOfLifeHandler,
 };
 pub use self::pickup::ItemPickupHandler;
 pub use self::player_interaction::PlayerInteractionHandler;

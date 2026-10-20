@@ -192,6 +192,21 @@ pub async fn set_pet_fullness(serial: i64, fullness: i16) -> Result<(), HarnessE
     .await
 }
 
+/// Date the pet `serial`, whose owner is logged out, to dry up `seconds`
+/// from now; in the past if negative.
+pub async fn date_pet(serial: i64, seconds: i32) -> Result<(), HarnessError> {
+    change_one_row("date pet", move |conn| {
+        diesel::sql_query(
+            "UPDATE inventory_items SET expires_at = now() + make_interval(secs => $2) \
+             WHERE cash_serial = $1",
+        )
+        .bind::<BigInt, _>(serial)
+        .bind::<Integer, _>(seconds)
+        .execute(conn)
+    })
+    .await
+}
+
 /// Set the logged-out character `character_id`'s HP and max HP; 0 HP
 /// leaves them dead.
 pub async fn set_hp(character_id: i32, hp: i16, max_hp: i16) -> Result<(), HarnessError> {

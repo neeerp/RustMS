@@ -94,6 +94,7 @@ namespace ms
 			bool inchat;
 			int32_t event;
 			// The bonus percent for hunting a while, and for how many hours.
+			// The same percent is the bonus for every 3rd monster.
 			uint8_t hunting_rate;
 			uint8_t hunting_hours;
 			int32_t wedding;
@@ -188,6 +189,19 @@ namespace ms
 				lines.push_back({ "Rainbow Week Bonus EXP (+" + std::to_string(exp.rainbow) + ")", true });
 
 			return lines;
+		}
+
+		// When EXP not gained in chat brings a new bonus percent, v83 says once
+		// in chat (type 0xc) that every 3rd monster gives it, keeping the last
+		// percent said in `last` (CWvsContext+0x36d0, never reset).
+		inline std::string mob_bonus_line(const ExpGain& exp, int32_t& last)
+		{
+			if (exp.inchat || exp.hunting_rate == 0 || exp.hunting_rate == last)
+				return "";
+
+			last = exp.hunting_rate;
+
+			return "A bonus EXP " + std::to_string(last) + "% is awarded for every 3rd monster defeated.";
 		}
 
 		// The chat-log lines for EXP gained in chat: the gain, then any Spirit

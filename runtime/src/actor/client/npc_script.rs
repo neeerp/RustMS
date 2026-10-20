@@ -5,11 +5,13 @@ use crate::error::RuntimeError;
 use net::conti::{self, State};
 use net::dialogue::Prompt;
 use net::npc_scripts::{self, NpcScript, Step};
+use net::packet::build::world::effect::CharEffect;
 use net::packet::build::world::stat::StatUpdate;
 use net::packet::build::world::{drop, effect, guild, inventory, npc, stat};
 use net::quests::{self, QuestTemplate};
 use net::scripts::Effect;
 use net::WorldAction;
+use std::time::{Duration, SystemTime};
 use tracing::{debug, warn};
 
 /// The NPC that offers veterans a tutorial skip.
@@ -98,6 +100,16 @@ impl ClientActor {
         for effect in effects {
             match effect {
                 Effect::FieldEffect(path) => afterwards.push(effect::build_field_effect(path)?),
+                Effect::PortalSound => {
+                    afterwards.push(effect::build_own_effect(CharEffect::PortalSound)?)
+                }
+                Effect::SaveLocation(kind, location) => {
+                    match location {
+                        Some(map_id) => next.saved_locations.insert(*kind, *map_id),
+                        None => next.saved_locations.remove(kind),
+                    };
+                    changed = true;
+                }
                 Effect::AvatarEffect(path) => afterwards.push(effect::build_avatar_effect(path)?),
                 Effect::Hint {
                     text,
@@ -143,6 +155,17 @@ impl ClientActor {
                         *item_id,
                         -i32::from(*quantity),
                     )?);
+                }
+                Effect::RevivePet { serial, days } => {
+                    let until = SystemTime::now() + Duration::from_secs(*days as u64 * 86_400);
+                    let Some(changes) =
+                        net::packet::handle::world::revive_pet(&mut next, *serial, until)
+                    else {
+                        warn!(serial, "Script pet no longer a doll; nothing applied");
+                        return Ok(Applied::Refused);
+                    };
+                    changed = true;
+                    packets.push(inventory::build_inventory_operation(false, &changes)?);
                 }
                 Effect::SpendMeso(amount) => {
                     if next.meso < *amount {

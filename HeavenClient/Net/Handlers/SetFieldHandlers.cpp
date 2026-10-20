@@ -203,7 +203,7 @@ namespace ms
 		CharacterParser::parse_nyinfo(recv);
 		CharacterParser::parse_areainfo(recv);
 
-		player.recalc_stats(true);
+		player.recalc_stats();
 
 		PlayerUpdatePacket().dispatch();
 
@@ -436,6 +436,7 @@ namespace ms
 
 		Music(field_effect::jukebox_path(path))
 			.play(field_effect::JUKEBOX_FADE, field_effect::JUKEBOX_DELAY, field_effect::JUKEBOX_FADE_IN);
+		Stage::get().start_jukebox();
 	}
 
 	void ObstacleResetHandler::handle(InPacket&) const

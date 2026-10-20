@@ -238,3 +238,8 @@
 "robin.answer.15.0" = "[placeholder] Robin explains: skills (page 1 of 1)."
 "robin.answer.16.0" = "[placeholder] Robin explains: getting to victoria island (page 1 of 1)."
 "robin.answer.17.0" = "[placeholder] Robin explains: mesos (page 1 of 1)."
+
+"water_of_life.pick" = "[placeholder] Mar the Fairy can wake a doll with your Water of Life. Which one?"
+"water_of_life.ask" = "[placeholder] Pour the Water of Life on {name}? It will live for {days} days."
+"water_of_life.done" = "[placeholder] {name} is alive again. Take care of it until the water dries up."
+"water_of_life.no_doll" = "[placeholder] Mar the Fairy finds no pet of yours that has turned back into a doll."

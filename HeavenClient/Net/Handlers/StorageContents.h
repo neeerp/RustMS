@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../InPacket.h"
+#include "../../Character/Inventory/ItemExpiry.h"
 
 #include <array>
 #include <cstdint>
@@ -18,6 +19,7 @@ namespace ms
 			int16_t flags = 0;
 			// It has a Cash Shop serial.
 			bool cash = false;
+			int64_t expiration = item_expiry::BEFORE;
 		};
 
 		// What a TRUNK_RESULT carries. A bag it leaves out keeps its items,
@@ -40,7 +42,7 @@ namespace ms
 			if (item.cash)
 				recv.skip_long();
 
-			recv.skip_long(); // expiration
+			item.expiration = recv.read_long();
 
 			switch (type)
 			{

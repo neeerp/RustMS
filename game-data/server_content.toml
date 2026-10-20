@@ -117,6 +117,10 @@ unsourced = [
     "natalie.dye.ask",
     "natalie.dye.done",
     "natalie.dye.no_coupon",
+    "water_of_life.pick",
+    "water_of_life.ask",
+    "water_of_life.done",
+    "water_of_life.no_doll",
 ]
 
 [text."glTutoMsg0.message"]

@@ -3,6 +3,9 @@
 //! (v83 FUN_0092eb37); the server keeps the same list so the indexes it
 //! sends match.
 
+use crate::Item;
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
+
 /// At most three pets follow a player.
 pub const MAX_PETS: usize = 3;
 
@@ -141,6 +144,29 @@ impl PetCommand {
 
 pub fn is_pet(item_id: i32) -> bool {
     item_id / 10_000 == 500
+}
+
+/// Whether `item_id` is a Water of Life (518xxxx), which brings a doll back
+/// to life (v83 FUN_0048645b type 5).
+pub fn is_water_of_life(item_id: i32) -> bool {
+    item_id / 10_000 == 518
+}
+
+/// 2079-01-01: the date of a pet whose Water of Life has dried up. v83
+/// takes a pet dated then or later for a doll again (FUN_004e4003), so the
+/// date is how its death is kept.
+pub fn doll_date() -> SystemTime {
+    UNIX_EPOCH + Duration::from_secs(3_439_756_800)
+}
+
+/// Whether the pet `item` is a doll again.
+pub fn is_doll(item: &Item) -> bool {
+    item.expiration.is_some_and(|date| date >= doll_date())
+}
+
+/// When the living pet `item` dries up, if it ever does.
+pub fn dries_up(item: &Item) -> Option<SystemTime> {
+    item.expiration.filter(|&date| date < doll_date())
 }
 
 /// A summoned pet as the field shows it.
@@ -331,5 +357,15 @@ mod tests {
         assert!(!command.obeyed(&pet, 30));
         pet.level = 10;
         assert!(!command.obeyed(&pet, 0));
+    }
+
+    #[test]
+    fn a_pet_dated_2079_is_a_doll() {
+        let mut pet = Item::stack(5000000, 1);
+        assert!(!is_doll(&pet) && dries_up(&pet).is_none());
+        pet.expiration = Some(UNIX_EPOCH);
+        assert!(!is_doll(&pet) && dries_up(&pet) == Some(UNIX_EPOCH));
+        pet.expiration = Some(doll_date());
+        assert!(is_doll(&pet) && dries_up(&pet).is_none());
     }
 }

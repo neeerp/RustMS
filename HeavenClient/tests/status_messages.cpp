@@ -90,6 +90,13 @@ int main()
 		require(bonus_lines[3].text == "Bonus Event EXP (+4)", "the event bonus");
 		require(bonus_lines[4].text == "Rainbow Week Bonus EXP (+6)", "the rainbow week bonus comes last");
 
+		int32_t last = 0;
+		require(mob_bonus_line(exp, last).empty(), "no bonus percent, no line");
+		require(mob_bonus_line(bonus_exp, last) == "A bonus EXP 10% is awarded for every 3rd monster defeated." &&
+				last == 10, "a new bonus percent is told");
+		require(mob_bonus_line(bonus_exp, last).empty() && mob_bonus_line(exp, last).empty() && last == 10,
+				"once, until the percent changes");
+
 		std::cout << "Status messages passed\n";
 		return 0;
 	}

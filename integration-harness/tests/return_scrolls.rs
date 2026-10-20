@@ -1,6 +1,7 @@
 //! Return scrolls: a Nearest Town scroll goes to the map's return map, and a
 //! town scroll to its town while the player is in the same area. A scroll
-//! that can't be used is kept.
+//! that can't be used is kept. An event invitation's map leads back to where
+//! it was used.
 
 use integration_harness::connection::MapleTestConnection;
 use integration_harness::database::grant_stack;
@@ -20,6 +21,9 @@ const ELLINIA: i32 = 101_000_000;
 const ELLINIA_FIELD: i32 = 101_010_000;
 const LITH_HARBOR: i32 = 104_000_000;
 const ORBIS: i32 = 200_000_000;
+const STUDIO_INVITATION: i32 = 2_031_001;
+/// The Studio Entrance, whose exit "out00" runs `photoOut`.
+const STUDIO: i32 = 970_000_000;
 
 /// USE_RETURN_SCROLL of the scroll in USE slot `slot`.
 fn read_scroll(slot: i16, item_id: i32) -> Packet {
@@ -28,6 +32,16 @@ fn read_scroll(slot: i16, item_id: i32) -> Packet {
     p.write_int(0).unwrap();
     p.write_short(slot).unwrap();
     p.write_int(item_id).unwrap();
+    p
+}
+
+/// CHANGE_MAP_SPECIAL: walk into the scripted portal `portal`.
+fn enter(portal: &str) -> Packet {
+    let mut p = Packet::new_empty();
+    p.write_short(RecvOpcode::ChangeMapSpecial as i16).unwrap();
+    p.write_byte(0).unwrap();
+    p.write_str_with_length(portal).unwrap();
+    p.write_short(0).unwrap();
     p
 }
 
@@ -86,4 +100,32 @@ async fn return_scrolls_go_to_town_within_their_area() {
     send(c, read_scroll(2, TO_HENESYS)).await;
     assert_eq!(arrival(c, &mut t).await, HENESYS);
     assert_eq!(t.quantities.last(), Some(&(USE as u8, 2, 1)));
+}
+
+#[tokio::test]
+async fn an_invitation_leads_back_where_it_was_used() {
+    let config = load_harness_config_or_fail().await;
+    let id = login_to_world_session(&config)
+        .await
+        .expect("first login failed")
+        .character_id;
+    tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+    grant_stack(id, USE, 1, STUDIO_INVITATION, 1)
+        .await
+        .expect("grant the Studio Invitation");
+    let mut player = relogin(&config).await;
+    let (c, mut t) = (&mut player.connection, Trace::default());
+    assert_eq!(warp(c, LITH_HARBOR, "", &mut t).await, LITH_HARBOR);
+    send(c, read_scroll(1, STUDIO_INVITATION)).await;
+    assert_eq!(arrival(c, &mut t).await, STUDIO);
+    assert_eq!(t.removed.last(), Some(&(USE as u8, 1)));
+    drop(player);
+
+    // The way back outlasts a relogin.
+    let mut player = relogin(&config).await;
+    assert_eq!(player.map_id, STUDIO);
+    let (c, mut t) = (&mut player.connection, Trace::default());
+    send(c, enter("out00")).await;
+    assert_eq!(arrival(c, &mut t).await, LITH_HARBOR);
+    assert_eq!(t.portal_sounds, 1);
 }

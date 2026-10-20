@@ -80,6 +80,7 @@ int main()
 
 		require(may_blow_weather(0, 0) && may_blow_weather(0x400, 59), "weather items work in ordinary fields");
 		require(!may_blow_weather(0x4000, 0) && !may_blow_weather(0, 60), "but not with bit 0x4000 or in type 60");
+		require(may_sit(0) && may_sit(60) && !may_sit(61), "chairs work except in type 61");
 
 		require(may_touch(0, false, 100100) && !may_touch(0, true, 100100), "Dark Sight keeps a snail's touch off");
 		require(may_touch(0x2, true, 100100), "but not where bit 0x2 is set");

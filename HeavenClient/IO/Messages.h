@@ -63,6 +63,8 @@ namespace ms
 			// Getting on a tamed monster without one or a saddle, or one that can't be ridden (0x968b9d)
 			RIDE_NO_SADDLE,
 			RIDE_REFUSED,
+			// A chair in a field of type 61 (0x10ad)
+			CHAIR_FIELD,
 			LENGTH
 		};
 

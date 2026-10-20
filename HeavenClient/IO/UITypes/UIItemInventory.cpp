@@ -42,6 +42,7 @@
 #include "../../Data/CurseData.h"
 #include "../../Data/EquipData.h"
 #include "../../Data/PetData.h"
+#include "../../Gameplay/FieldEffectRules.h"
 #include "../../Gameplay/Stage.h"
 #include "../../Gameplay/WeatherRules.h"
 #include "../../Gameplay/MapleMap/FieldLimit.h"
@@ -54,6 +55,7 @@
 #include "../../Net/Packets/InventoryPackets.h"
 #include "../../Net/Packets/MiniRoomPackets.h"
 
+#include <nlnx/audio.hpp>
 #include <nlnx/nx.hpp>
 
 #include <algorithm>
@@ -99,7 +101,7 @@ namespace ms
 		constexpr const char *NAME_TAKEN = "That name is not available.";
 		constexpr const char *NO_CURSING = "Cursing is not allowed.";
 		// StringPool 0x112 and 0x318.
-		constexpr const char *WEATHER_BUSY = "The effect is taking place right now.\\nPlease try it later.";
+		constexpr const char *EFFECT_BUSY = "The effect is taking place right now.\\nPlease try it later.";
 		constexpr const char *WEATHER_PROMPT = "Please enter the attached message";
 		// StringPool 0x10f, 0xea1 and 0x111.
 		constexpr const char *MEGAPHONE_PROMPT = "Enter your comments through the megaphone.";
@@ -107,9 +109,13 @@ namespace ms
 		constexpr const char *MEGAPHONE_LONG = "Use the megaphone to text up to 60 characters.";
 		constexpr const char *SUMMON_SACK = "Too much interest can hinder your process of leveling up.\\n\\nwill you really summon the monster?";
 		constexpr const char *BOSS_PET = "Would you like to change your Boss Pet?\\n (The \"Item Ignore\" skill, as well as \\nthe stats for speed and jump will \\nfollow that of the Lead Pet)";
+		// StringPool 0x17a and 0x17b.
+		constexpr const char *PET_TIME_UP = "The time has run out, so it can't move.";
+		constexpr const char *NO_REVIVE = "You cannot revive this pet.\\nYou can purchase a new pet\\nin the Cash Shop. Would you like\\nto move to the Cash Shop?";
 
 		// v83 FUN_00a240a2: double-clicking a pet asks the server to bring it
-		// out, or back if it is out.
+		// out, or back if it is out. A doll stays home; one that can't be
+		// revived offers the Cash Shop.
 		void summon_pet(int16_t slot, int64_t serial)
 		{
 			Player &player = Stage::get().get_player();
@@ -122,6 +128,26 @@ namespace ms
 				UI::get().emplace<UIOk>(CATCH_BREATH, [](bool)
 				{});
 				return;
+			}
+
+			if (Optional<const Pet> pet = player.get_inventory().get_pet(serial))
+			{
+				const item_expiry::PetLife &life = ItemData::get(pet->get_item_id()).get_pet_life();
+
+				if (item_expiry::pet_dead(pet->get_date_dead(), pet->get_remain_life(), life))
+				{
+					if (!life.no_revive)
+						UI::get().emplace<UIOk>(PET_TIME_UP, [](bool)
+						{});
+					else if (player.request(DeadPetPacket(serial), ExclRequest::USE_WAIT))
+						UI::get().emplace<UIYesNo>(NO_REVIVE, [](bool yes)
+						{
+							if (yes)
+								Stage::get().enter_cash_shop();
+						});
+
+					return;
+				}
 			}
 
 			int32_t lead = pets::follow_the_lead(player.get_stats().get_job().get_id());
@@ -289,10 +315,10 @@ namespace ms
 
 			const MapInfo &mapinfo = Stage::get().get_mapinfo();
 
-			if (Stage::get().weather_busy()
+			if (Stage::get().effect_busy()
 				|| !field_limit::may_blow_weather(mapinfo.get_fieldlimit(), mapinfo.get_fieldtype()))
 			{
-				UI::get().emplace<UIOk>(WEATHER_BUSY, [](bool)
+				UI::get().emplace<UIOk>(EFFECT_BUSY, [](bool)
 				{});
 				return;
 			}
@@ -312,6 +338,34 @@ namespace ms
 				if (may_use_cash_item())
 					Stage::get().get_player().request(UseCashItemPacket(slot, item_id, text), ExclRequest::WAIT);
 			}, weather::MAX_MESSAGE);
+		}
+
+		// v83 FUN_00a0a63f, type 0x14: a jukebox asks whether to play its
+		// song, unless a song or the field's weather still plays, and sends
+		// the song's length in ms (inferred from FUN_00644dcf).
+		void use_jukebox(int16_t slot, int32_t item_id)
+		{
+			if (!may_use_cash_item())
+				return;
+
+			if (Stage::get().effect_busy())
+			{
+				UI::get().emplace<UIOk>(EFFECT_BUSY, [](bool)
+				{});
+				return;
+			}
+
+			std::string id = std::to_string(item_id);
+			std::string title = nl::nx::string["Cash.img"][id]["title"];
+			std::string path = nl::nx::item["Cash"]["0510.img"]["0" + id]["info"]["path"];
+			nl::audio song = nl::nx::sound.resolve(field_effect::jukebox_path(path));
+			int32_t length = field_effect::sound_length(static_cast<const uint8_t *>(song.data()), song.length());
+
+			UI::get().emplace<UIYesNo>("Will you play <" + title + "> on the jukebox?", [=](bool yes)
+			{
+				if (yes && may_use_cash_item())
+					Stage::get().get_player().request(UseJukeboxPacket(slot, item_id, length), ExclRequest::WAIT);
+			});
 		}
 
 		// v83 FUN_00a0a63f, type 0x17: AP Reset's dialogs pick where an AP
@@ -971,6 +1025,12 @@ namespace ms
 							use_solomon_writ(slot, item_id);
 						else if (item_id / 10000 == 226)
 							Stage::get().get_player().feed_mount(slot, item_id);
+						else if (item_id / 10000 == 227)
+						{
+							// A double-click waits longer between throws (0x4f0666).
+							if (Stage::get().get_player().can_request(ExclRequest::WAIT))
+								Stage::get().get_player().use_catch_item(slot, item_id);
+						}
 						else if (!Stage::get().get_mapinfo().can_use_item(item_id))
 							InChatMessage(Messages::ITEM_FIELD).drop();
 						else if (field_limit::is_use_item(item_id) && Stage::get().get_player().ride_refuses(true))
@@ -1010,12 +1070,18 @@ namespace ms
 							use_megaphone(slot, item_id);
 						else if (weather::is_weather(item_id))
 							use_weather(slot, item_id);
+						else if (field_effect::is_jukebox(item_id))
+							use_jukebox(slot, item_id);
 						else if (item_id == ap_reset::ITEM)
 							use_ap_reset(slot, item_id);
 						else if (sp_reset::is_item(item_id))
 							use_sp_reset(slot, item_id);
 						else if (item_id / 10000 == 501)
 							Stage::get().use_item_effect(item_id);
+						// A Water of Life (518xxxx) asks the server, which
+						// offers to revive a doll.
+						else if (item_id / 10000 == 518)
+							WaterOfLifePacket().dispatch();
 
 						break;
 					case InventoryType::Id::ETC:

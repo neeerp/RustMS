@@ -29,6 +29,7 @@ namespace ms
 
 		bullet = src["bullet"];
 		watk = src["info"]["incPAD"];
+		reqlevel = src["info"]["reqLevel"];
 	}
 
 	bool BulletData::is_valid() const
@@ -44,6 +45,11 @@ namespace ms
 	int16_t BulletData::get_watk() const
 	{
 		return watk;
+	}
+
+	int16_t BulletData::get_reqlevel() const
+	{
+		return reqlevel;
 	}
 
 	const Animation &BulletData::get_animation() const

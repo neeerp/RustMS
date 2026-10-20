@@ -48,6 +48,9 @@ nothing. A script returns effects that the client actor sends:
 | `infoWorldmap` | `/26` |
 | `infoReactor` | `/22` after 1008, else `/27` after 1020 |
 | `glTutoMsg0` | PLAYER_HINT balloon, text key `glTutoMsg0.message` |
+| `market01`-`market22` | A town's Free Market entrance: save the town, portal sound, warp to `910000000` portal `out00` |
+| `market00` | The Free Market's exit: portal sound, back to the saved town's entrance (else Henesys), forget the town |
+| `photoOut`, `StudioZone_Out`, `outBabyBird` | An event map's exit: portal sound, back to where its invitation was used (else Henesys), forget it |
 
 Only the `go<map id>` banners are used by the current maps, on the Adventurer
 Training Centers and the revamp's Southperry (`2000000`). The other scripts,
@@ -63,7 +66,14 @@ triggers that sit 30-40 px above the floor fire as the player walks past. The
 client sends again once that answer arrives and the portal's `delay` (ms) has
 passed, unless the portal is `onlyOnce` and was the last to run in the map.
 Pressing Up on a type 7, 8 or 11 script portal with no destination sends the
-same packet, at most once per 500 ms.
+same packet, at most once per 500 ms. The client plays no portal sound for
+these; a script that warps sends it, SHOW_ITEM_GAIN_INCHAT mode 7.
+
+The town a player entered the Free Market from is saved with the character
+(`saved_locations`, kind 0), so the exit still leads back after a relogin.
+`free_market.rs` checks the round trip through the network harness. An event
+invitation saves the map it was used in the same way, under its
+`returnMapQR` (see "Return scrolls" in `inventory.md`).
 
 Touch portals and jump pads test where the player was at the start of the
 physics step, not where it ended. v83 tests the drawn position, which lies

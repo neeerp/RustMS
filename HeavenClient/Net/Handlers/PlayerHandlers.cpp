@@ -105,8 +105,9 @@ namespace ms
 						recv.skip(8);
 		}
 
-		if (recalculate)
-			player.recalc_stats(false);
+		// A new level may allow other ammo.
+		if (recalculate || player.get_level() != oldlevel)
+			player.recalc_stats();
 
 		// After a level-up, v83 tells anyone but a GM to spend AP once more than 199 pile up (FUN_00a1fb52).
 		const CharStats& stats = player.get_stats();
@@ -220,7 +221,7 @@ namespace ms
 		if (flags.has(BuffParser::RIDING))
 			handle_ride(recv, flags);
 
-		Stage::get().get_player().recalc_stats(false);
+		Stage::get().get_player().recalc_stats();
 	}
 
 	void ApplyBuffHandler::handle_buff(InPacket& recv, Buffstat::Id bs) const
@@ -296,7 +297,7 @@ namespace ms
 
 	void RecalculateStatsHandler::handle(InPacket&) const
 	{
-		Stage::get().get_player().recalc_stats(false);
+		Stage::get().get_player().recalc_stats();
 	}
 
 	void SetTamingMobInfoHandler::handle(InPacket& recv) const
