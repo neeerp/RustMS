@@ -429,6 +429,12 @@ namespace ms
 		if (mount::is_ground_only(moveid) && player.is_climbing())
 			return false;
 
+		if (!field_limit::may_buff(mapinfo.get_fieldlimit(), moveid))
+		{
+			InChatMessage(Messages::SKILL_FIELD).drop();
+			return false;
+		}
+
 		std::optional<UseSkillPacket::Reach> reach = find_reach(moveid, level);
 
 		if (!reach)

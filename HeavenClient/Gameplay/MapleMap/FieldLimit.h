@@ -203,6 +203,30 @@ namespace ms
 			}
 		}
 
+		// v83 FUN_00969e21: bit 0x2 stops the dashes and the transformations
+		// that move the player faster, with "You cannot use that skill on
+		// this map."
+		inline bool may_buff(int32_t fieldlimit, int32_t skill_id)
+		{
+			if (!(fieldlimit & MOVEMENT_SKILLS))
+				return true;
+
+			switch (skill_id)
+			{
+				case 1014:     // Space Dash
+				case 10001015:
+				case 5001005:  // Dash
+				case 15001003:
+				case 5111005:  // Transformation
+				case 5121003:  // Super Transformation
+				case 15111002:
+				case 13111005: // Albatross
+					return false;
+				default:
+					return true;
+			}
+		}
+
 		// v83 FUN_00a0a4aa: no teleport rock in the event maps (the
 		// millions digit 9), or where bit 0x40 or 0x2 is set.
 		inline bool may_teleport_rock(int32_t fieldlimit, int32_t map_id)
