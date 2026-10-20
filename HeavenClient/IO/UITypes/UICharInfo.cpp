@@ -95,6 +95,13 @@ namespace ms
 		// lower arrow's top at the range's end.
 		constexpr int16_t ITEM_SLIDER_X = 252;
 		constexpr Range<int16_t> ITEM_SLIDER = Range<int16_t>(215, 215 + 112 - 13);
+		// The taming box draws the same rows higher up (0x902641): icons
+		// and the ReqLv art 36 higher, the text 38.
+		const Point<int16_t> TAMING_ICON = { 106, 212 };
+		const Point<int16_t> TAMING_NAME = { 147, 173 };
+		const Point<int16_t> TAMING_REQ = { 147, 200 };
+		const Point<int16_t> TAMING_REQ_LEVEL = { 183, 191 };
+		constexpr Range<int16_t> TAMING_SLIDER = Range<int16_t>(177, 177 + 112 - 13);
 
 		// Values sit right of the labels; a row's text has its cap top 4
 		// below the row's top.
@@ -158,6 +165,7 @@ namespace ms
 		{
 			item_offset += upwards ? -1 : 1;
 		});
+		taming_slider = Slider(Slider::Type::CLASSIC, TAMING_SLIDER, ITEM_SLIDER_X, ITEM_ROWS, 0, [](bool) {});
 
 		// There are no families or parties yet. The pet and taming boxes
 		// open once CHAR_INFO says there are pets or a mount.
@@ -232,6 +240,9 @@ namespace ms
 			mount_level.draw(position + MOUNT_LEVEL);
 			mount_exp.draw(position + MOUNT_EXP);
 			mount_tiredness.draw(position + MOUNT_TIREDNESS);
+
+			draw_items(taming_rows, 0, true);
+			taming_slider.draw(position);
 		}
 
 		if (mode == Mode::PET)
@@ -250,28 +261,32 @@ namespace ms
 					crown.draw(position + CROWN);
 			}
 
-			for (int16_t r = 0; r < ITEM_ROWS; r++)
-			{
-				size_t i = static_cast<size_t>(item_offset + r);
-
-				if (item_offset + r < 0 || i >= item_rows.size())
-					break;
-
-				const ItemRow &row = item_rows[i];
-				Point<int16_t> step = Point<int16_t>(0, ITEM_STEP * r);
-
-				row.icon.draw(position + ITEM_ICON + step);
-				row.name.draw(position + ITEM_NAME + step);
-				req_level.draw(position + ITEM_REQ + step);
-
-				if (row.equip)
-					row.level.draw(position + ITEM_REQ_LEVEL + step);
-			}
-
+			draw_items(item_rows, item_offset, false);
 			item_slider.draw(position);
 		}
 
 		UIElement::draw_buttons(alpha);
+	}
+
+	void UICharInfo::draw_items(const std::vector<ItemRow> &rows, int16_t offset, bool taming) const
+	{
+		for (int16_t r = 0; r < ITEM_ROWS; r++)
+		{
+			size_t i = static_cast<size_t>(offset + r);
+
+			if (offset + r < 0 || i >= rows.size())
+				break;
+
+			const ItemRow &row = rows[i];
+			Point<int16_t> step = Point<int16_t>(0, ITEM_STEP * r);
+
+			row.icon.draw(position + (taming ? TAMING_ICON : ITEM_ICON) + step);
+			row.name.draw(position + (taming ? TAMING_NAME : ITEM_NAME) + step);
+			req_level.draw(position + (taming ? TAMING_REQ : ITEM_REQ) + step);
+
+			if (row.equip)
+				row.level.draw(position + (taming ? TAMING_REQ_LEVEL : ITEM_REQ_LEVEL) + step);
+		}
 	}
 
 	void UICharInfo::update()
@@ -458,6 +473,15 @@ namespace ms
 		mount_exp.change_text(std::to_string(mount.exp));
 		mount_tiredness.change_text(std::to_string(mount.tiredness));
 
+		// The saddle and whatever is worn at -20, not the mount itself; HC
+		// keeps no -20 part, and no v83 item seems to use it.
+		taming_rows.clear();
+
+		if (saddleid > 0)
+			taming_rows.push_back(item_row(saddleid));
+
+		taming_slider.setrows(0, ITEM_ROWS, static_cast<int16_t>(taming_rows.size()));
+
 		riding = known && mountid > 0 && saddleid > 0;
 
 		if (riding)
@@ -516,22 +540,26 @@ namespace ms
 		item_rows.clear();
 
 		for (int32_t itemid : pet_pages[index].items)
-		{
-			const ItemData &item = ItemData::get(itemid);
-			const EquipData &equip = EquipData::get(itemid);
-
-			ItemRow row;
-			row.icon = item.get_icon(false);
-			row.name = Text(Text::Font::A12M, Text::Alignment::LEFT, Color::Name::BLACK, item.get_name());
-			string_format::format_with_ellipsis(row.name, ITEM_NAME_WIDTH);
-			row.equip = equip.is_valid();
-			row.level = Text(Text::Font::A12M, Text::Alignment::LEFT, Color::Name::BLACK,
-							 std::to_string(equip.get_reqstat(MapleStat::Id::LEVEL)));
-			item_rows.push_back(std::move(row));
-		}
+			item_rows.push_back(item_row(itemid));
 
 		item_offset = 0;
 		item_slider.setrows(0, ITEM_ROWS, static_cast<int16_t>(item_rows.size()));
+	}
+
+	UICharInfo::ItemRow UICharInfo::item_row(int32_t itemid)
+	{
+		const ItemData &item = ItemData::get(itemid);
+		const EquipData &equip = EquipData::get(itemid);
+
+		ItemRow row;
+		row.icon = item.get_icon(false);
+		row.name = Text(Text::Font::A12M, Text::Alignment::LEFT, Color::Name::BLACK, item.get_name());
+		string_format::format_with_ellipsis(row.name, ITEM_NAME_WIDTH);
+		row.equip = equip.is_valid();
+		row.level = Text(Text::Font::A12M, Text::Alignment::LEFT, Color::Name::BLACK,
+						 std::to_string(equip.get_reqstat(MapleStat::Id::LEVEL)));
+
+		return row;
 	}
 
 	bool UICharInfo::shows_mount() const

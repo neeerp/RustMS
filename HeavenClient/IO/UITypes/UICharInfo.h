@@ -165,6 +165,9 @@ namespace ms
 		void set_mode(Mode mode);
 		// Show the pet at `index` in the pet box (0x8ff5b0).
 		void select_pet(size_t index);
+		static ItemRow item_row(int32_t itemid);
+		// The rows from `offset`, in the pet box or a little higher in the taming box.
+		void draw_items(const std::vector<ItemRow> &rows, int16_t offset, bool taming) const;
 		void set_panel(Panel panel);
 
 		// Whether the window can show the mount: not when the saddle worn doesn't fit it (FUN_00903e24).
@@ -214,6 +217,9 @@ namespace ms
 		std::vector<ItemRow> item_rows;
 		int16_t item_offset = 0;
 		Slider item_slider;
+		// The saddle, in the taming box (FUN_00904c0d). It never scrolls.
+		std::vector<ItemRow> taming_rows;
+		Slider taming_slider;
 		Texture crown;
 		Texture req_level;
 		std::unique_ptr<UIPetExceptions> exceptions;
