@@ -32,7 +32,8 @@ pub struct Learned {
 
 pub fn learned(player: &Player, skill_id: i32) -> Option<Learned> {
     let level = player.skills.level(skill_id);
-    let effect = info(skill_id)?.level(level)?.clone();
+    let mut effect = info(skill_id)?.level(level)?.clone();
+    effect.morph = crate::morph::template(effect.morph, player.stats.gender);
     Some(Learned {
         skill_id,
         level,
@@ -1078,6 +1079,9 @@ pub fn buffs(skill: &Learned) -> Option<Vec<(BuffStat, i32)>> {
         4111002 => vec![(BuffStat::ShadowPartner, effect.x)],
         4211003 => vec![(BuffStat::PickPocket, effect.x)],
         4211005 => vec![(BuffStat::MesoGuard, effect.x)],
+        crate::morph::OAK_BARREL
+        | crate::morph::TRANSFORMATION
+        | crate::morph::SUPER_TRANSFORMATION => vec![(BuffStat::Morph, effect.morph)],
         _ => return None,
     };
     let leveled = [
