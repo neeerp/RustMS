@@ -254,6 +254,11 @@ namespace ms
 			{
 				for (const auto& line : status_messages::exp_lines(exp))
 					show_status(line.yellow ? Color::Name::YELLOW : Color::Name::WHITE, line.text);
+
+				static int32_t mob_bonus = 0;
+
+				if (std::string line = status_messages::mob_bonus_line(exp, mob_bonus); !line.empty())
+					chat_line(line, UIChatBar::LineType::SKILL);
 			}
 		}
 		else if (mode == 4)
