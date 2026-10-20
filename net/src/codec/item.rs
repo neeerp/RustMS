@@ -1,5 +1,5 @@
 use super::stats::write_padded_name;
-use super::time::{expiration, ZERO_TIME};
+use super::time::{expiration, filetime, PERMANENT_TIME, ZERO_TIME};
 use crate::error::NetworkError;
 use game::{Inventory, InventoryType, Item};
 use packet::{io::write::PktWrite, Packet};
@@ -59,12 +59,13 @@ pub fn encode_item(
 
     if let Some(pet) = &item.pet {
         // v83 GW_ItemSlotPet (FUN_004e4219). The pet lives until the item
-        // expires.
+        // expires. v83 takes a pet dated 2079 or later for dead (FUN_004e4003),
+        // so one that never expires is dated the day before.
         write_padded_name(packet, &pet.name)?;
         packet.write_byte(pet.level)?;
         packet.write_short(pet.closeness)?;
         packet.write_byte(pet.fullness)?;
-        packet.write_long(expiration(item.expiration))?;
+        packet.write_long(item.expiration.map_or(PERMANENT_TIME, filetime))?;
         packet.write_short(pet.attribute)?;
         packet.write_short(pet.skill as i16)?;
         packet.write_int(PET_REMAIN_LIFE)?;
@@ -202,7 +203,7 @@ mod tests {
         expect.long(DEFAULT_TIME);
         expect.bytes(b"Baby Tiger\0\0\0").byte(1).short(12).byte(90);
         expect
-            .long(DEFAULT_TIME)
+            .long(PERMANENT_TIME)
             .short(0)
             .short(0)
             .int(18_000)

@@ -36,14 +36,17 @@ namespace ms
 
 		void draw(Point<int16_t> position) const override;
 
-		// An item in the inventory also has its expiry and flags, and is `owned`.
-		bool set_item(int32_t itemid, int64_t expiration = 0, int16_t flags = 0, bool owned = false);
+		// An item in the inventory also has its expiry and flags, and is `owned`. A pet's expiry is when its Water
+		// of Life dries up, and one with limitedLife has `remain_life` seconds left.
+		bool set_item(int32_t itemid, int64_t expiration = 0, int16_t flags = 0, bool owned = false,
+					  int32_t remain_life = 0);
 
 	private:
 		int32_t itemid;
 		int64_t expiration;
 		int16_t flags;
 		bool owned;
+		int32_t remain_life;
 		Point<int16_t> size;
 
 		TooltipBox box;
@@ -56,6 +59,7 @@ namespace ms
 		int16_t properties_height;
 		Texture expiry_dot;
 		Text expiry;
+		int16_t expiry_height;
 		Text desc;
 	};
 }

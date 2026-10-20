@@ -1236,10 +1236,15 @@ namespace ms
 		{
 			int32_t item_id = inventory.get_item_id(tab, slot);
 			auto item = inventory.get_item(tab, slot);
+			auto pet = tab == InventoryType::Id::CASH ? inventory.get_pet(inventory.get_cash_id(tab, slot))
+													  : Optional<const Pet>();
 
 			if (item)
 				UI::get().show_item(Tooltip::Parent::ITEMINVENTORY, item_id, item->get_expiration(), item->get_flags(),
 									true);
+			else if (pet)
+				UI::get().show_item(Tooltip::Parent::ITEMINVENTORY, item_id, pet->get_date_dead(), 0, true,
+									pet->get_remain_life());
 			else
 				UI::get().show_item(Tooltip::Parent::ITEMINVENTORY, item_id);
 		}

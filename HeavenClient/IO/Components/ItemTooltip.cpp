@@ -40,6 +40,8 @@ namespace ms
 		const Point<int16_t> EXPIRY_DOT = { 10, 33 };
 		const Point<int16_t> EXPIRY_POS = { 16, 22 };
 		constexpr int16_t EXPIRY_HEIGHT = 20;
+		// A pet's tooltip has its Water of Life there instead, and makes 16 px of room (FUN_008ed8f5).
+		constexpr int16_t PET_LINE_HEIGHT = 16;
 
 		Text property_line(const std::string &line)
 		{
@@ -54,18 +56,21 @@ namespace ms
 		expiration = 0;
 		flags = 0;
 		owned = false;
+		remain_life = 0;
 		properties_height = 0;
+		expiry_height = 0;
 	}
 
-	bool ItemTooltip::set_item(int32_t iid, int64_t expire, int16_t flag, bool own)
+	bool ItemTooltip::set_item(int32_t iid, int64_t expire, int16_t flag, bool own, int32_t remain)
 	{
-		if (itemid == iid && expiration == expire && flags == flag && owned == own)
+		if (itemid == iid && expiration == expire && flags == flag && owned == own && remain_life == remain)
 			return false;
 
 		itemid = iid;
 		expiration = expire;
 		flags = flag;
 		owned = own;
+		remain_life = remain;
 
 		if (itemid == 0)
 			return false;
@@ -87,10 +92,13 @@ namespace ms
 		name = Text(Text::Font::A12B, Text::Alignment::LEFT, Color::Name::WHITE, idata.get_name(), WIDTH - 2 * tooltip::NAME_POS.x());
 		desc = Text(Text::Font::A12M, Text::Alignment::LEFT, Color::Name::WHITE, descstr, DESC_WIDTH, true, tooltip::LINE_ADJ);
 
-		std::string expirystr = item_expiry::line(expiration, idata.is_cashitem(), flags & item_expiry::SEALED);
+		bool pet = itemid / 10000 == 500;
+		std::string expirystr = pet ? item_expiry::pet_line(expiration, remain_life, idata.get_pet_life())
+									: item_expiry::line(expiration, idata.is_cashitem(), flags & item_expiry::SEALED);
 		expiry = expirystr.empty() ? Text() : Text(Text::Font::A11M, Text::Alignment::LEFT, Color::Name::WHITE, expirystr);
+		expiry_height = expiry.empty() ? 0 : pet ? PET_LINE_HEIGHT : EXPIRY_HEIGHT;
 
-		int16_t top = properties_height + (expiry.empty() ? 0 : EXPIRY_HEIGHT);
+		int16_t top = properties_height + expiry_height;
 		int16_t bottom = std::max<int16_t>(tooltip::ICON_POS.y() + tooltip::ICON_BOX, DESC_POS.y() + desc.height());
 		size = Point<int16_t>(WIDTH, top + bottom + tooltip::BOTTOM);
 
@@ -118,7 +126,7 @@ namespace ms
 		{
 			expiry_dot.draw(pos + EXPIRY_DOT);
 			expiry.draw(pos + EXPIRY_POS);
-			pos.shift_y(EXPIRY_HEIGHT);
+			pos.shift_y(expiry_height);
 		}
 
 		icon.draw(itemicon, pos + tooltip::ICON_POS);

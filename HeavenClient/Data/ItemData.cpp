@@ -103,6 +103,8 @@ namespace ms
 			properties.account_sharable = src["accountSharable"].get_bool();
 			properties.not_extend = src["notExtend"].get_bool();
 			properties.trade_available = src["tradeAvailable"].get_bool();
+			pet_life.permanent = src["permanent"].get_bool();
+			pet_life.limited = src["limitedLife"];
 			gender = get_item_gender(itemid);
 
 			name = std::string(strsrc["name"]);
@@ -208,6 +210,11 @@ namespace ms
 	const item_properties::Info &ItemData::get_properties() const
 	{
 		return properties;
+	}
+
+	const item_expiry::PetLife &ItemData::get_pet_life() const
+	{
+		return pet_life;
 	}
 
 	ItemData::operator bool() const

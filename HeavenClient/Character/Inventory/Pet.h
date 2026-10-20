@@ -26,13 +26,17 @@ namespace ms
 	{
 	public:
 		Pet(int32_t item_id, int64_t expiration, const std::string &name, uint8_t level, uint16_t closeness,
-			uint8_t fullness);
+			uint8_t fullness, int64_t date_dead, int32_t remain_life);
 
 		int32_t get_item_id() const;
 		const std::string &get_name() const;
 		uint8_t get_level() const;
 		uint16_t get_closeness() const;
 		uint8_t get_fullness() const;
+		// When its Water of Life dries up, as a FILETIME.
+		int64_t get_date_dead() const;
+		// The seconds a pet with limitedLife has left.
+		int32_t get_remain_life() const;
 
 	private:
 		int32_t item_id;
@@ -41,5 +45,7 @@ namespace ms
 		uint8_t petlevel;
 		uint16_t closeness;
 		uint8_t fullness;
+		int64_t date_dead;
+		int32_t remain_life;
 	};
 }

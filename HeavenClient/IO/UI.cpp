@@ -511,9 +511,10 @@ namespace ms
 		state->show_equip(parent, slot);
 	}
 
-	void UI::show_item(Tooltip::Parent parent, int32_t item_id, int64_t expiration, int16_t flags, bool owned)
+	void UI::show_item(Tooltip::Parent parent, int32_t item_id, int64_t expiration, int16_t flags, bool owned,
+					   int32_t remain_life)
 	{
-		state->show_item(parent, item_id, expiration, flags, owned);
+		state->show_item(parent, item_id, expiration, flags, owned, remain_life);
 	}
 
 	void

@@ -52,11 +52,18 @@ namespace ms
 			int8_t petlevel = recv.read_byte();
 			int16_t closeness = recv.read_short();
 			int8_t fullness = recv.read_byte();
+			int64_t date_dead = recv.read_long();
 
-			// Some unused bytes
-			recv.skip(18);
+			// Its attribute and skills
+			recv.skip(4);
 
-			inventory.add_pet(invtype, slot, id, cash_id, expire, petname, petlevel, closeness, fullness);
+			int32_t remain_life = recv.read_int();
+
+			// Its attribute again
+			recv.skip(2);
+
+			inventory.add_pet(invtype, slot, id, cash_id, expire, petname, petlevel, closeness, fullness, date_dead,
+				remain_life);
 		}
 
 		// Parse an equip from a packet

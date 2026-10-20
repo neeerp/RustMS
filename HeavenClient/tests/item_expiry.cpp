@@ -29,6 +29,23 @@ int main()
 		require(line(116444735400000000, true, false) == "Available until 12/31/1969 at 23:59", "before 1970");
 		require(line(125962830000000000, true, false) == "Available until 2/29/2000 at 07:30", "a leap day");
 
+		PetLife days{};
+		PetLife permanent{ true, 0 };
+		PetLife limited{ false, 18000 };
+
+		require(pet_line(OCT_19_2026_13_05, 0, days) == "WATER OF LIFE DRIES UP ON 10-19-2026 AT 13 : 00",
+			"pet date, minutes dropped");
+		require(pet_line(OCT_19_2026_13_05, 0, permanent) == "PERMANENT", "permanent pet");
+		require(pet_line(BEFORE, 0, days) == "THE WATER OF LIFE HAS DRIED UP." && pet_dead(BEFORE, 0, days),
+			"dated 2079 is dead");
+		require(pet_line(BEFORE, 0, permanent) == "THE WATER OF LIFE HAS DRIED UP.", "dead before permanent");
+		require(!pet_dead(AFTER, 0, days), "a past date isn't dead");
+		require(pet_line(BEFORE, 18000, limited) == "DAYS OF MAGIC : 5hrs. 0min." && !pet_dead(BEFORE, 18000, limited),
+			"limited life counts seconds");
+		require(pet_line(BEFORE, 3725, limited) == "DAYS OF MAGIC : 1hrs. 2min.", "hours and minutes");
+		require(pet_dead(OCT_19_2026_13_05, 0, limited), "limited life spent");
+		require(pet_line(0, 18000, limited).empty() && pet_line(0, 0, days).empty(), "no date, no line");
+
 		std::cout << "item expiry passed\n";
 		return 0;
 	}

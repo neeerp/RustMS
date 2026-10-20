@@ -75,4 +75,52 @@ namespace ms::item_expiry
 
 	// An item's flag for being sealed (GW_ItemSlotBase::IsProtectedItem).
 	constexpr int16_t SEALED = 0x01;
+
+	// What a pet's Item.nx info says of its life.
+	struct PetLife
+	{
+		bool permanent = false;
+		// `limitedLife`: the seconds it lives in all. Such a pet counts down
+		// the seconds it has left instead of having a date.
+		int32_t limited = 0;
+	};
+
+	// Whether a pet has died (FUN_004e4003). One with limitedLife dies when its
+	// seconds run out; the server marks any other dead by dating it 2079 or
+	// later, so a date already past isn't enough.
+	inline bool pet_dead(int64_t date_dead, int32_t remain_life, const PetLife &life)
+	{
+		return life.limited > 0 ? remain_life < 1 : date_dead >= BEFORE;
+	}
+
+	// The line a pet's tooltip gives its Water of Life (FUN_008ebfde), or
+	// nothing for one without a date. The hour is UTC and the minutes are
+	// always 00.
+	inline std::string pet_line(int64_t date_dead, int32_t remain_life, const PetLife &life)
+	{
+		if (date_dead == 0)
+			return "";
+
+		char text[64];
+
+		if (life.limited > 0)
+		{
+			std::snprintf(text, sizeof(text), "DAYS OF MAGIC : %dhrs. %dmin.", remain_life / 3600,
+				remain_life / 60 % 60);
+
+			return text;
+		}
+
+		if (pet_dead(date_dead, remain_life, life))
+			return "THE WATER OF LIFE HAS DRIED UP.";
+
+		if (life.permanent)
+			return "PERMANENT";
+
+		Time t = utc(date_dead);
+		std::snprintf(text, sizeof(text), "WATER OF LIFE DRIES UP ON %d-%d-%04d AT %02d : 00", t.month, t.day,
+			t.year, t.hour);
+
+		return text;
+	}
 }
