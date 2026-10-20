@@ -348,6 +348,9 @@ namespace ms
 		// Whether the character is hidden in Oak Barrel.
 		bool is_barrelled() const;
 
+		// Whether it is Transformation's superman.
+		bool is_superman() const;
+
 		// Whether Oak Barrel is dropping onto the character or breaking.
 		bool is_barrel_busy() const;
 

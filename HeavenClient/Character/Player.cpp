@@ -1667,9 +1667,27 @@ namespace ms
 		return true;
 	}
 
+	bool Player::shape_refuses() const
+	{
+		if (morph_refuses())
+			return true;
+
+		if (!is_superman())
+			return false;
+
+		InChatMessage(Messages::Type::MORPHED).drop();
+
+		return true;
+	}
+
+	int32_t Player::get_morph_reason() const
+	{
+		return buffs[Buffstat::Id::MORPH].skillid;
+	}
+
 	bool Player::no_cancel_morph() const
 	{
-		int32_t item = -buffs[Buffstat::Id::MORPH].skillid;
+		int32_t item = -get_morph_reason();
 
 		return item > 0 && nl::nx::item["Consume"][string_format::extend_id(item / 10000, 4) + ".img"]
 			[string_format::extend_id(item, 8)]["info"]["noCancelMouse"].get_bool();

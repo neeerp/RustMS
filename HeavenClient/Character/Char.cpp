@@ -361,6 +361,9 @@ namespace ms
 		if (attacking)
 			return get_real_attackspeed();
 
+		// A superman plays all but its walk at attack speed, standing too (FUN_00453ad1).
+		float pace = look.is_superman() ? get_real_attackspeed() : 1.0f;
+
 		switch (state)
 		{
 			case State::WALK:
@@ -370,9 +373,9 @@ namespace ms
 			case State::LADDER:
 			case State::ROPE:
 				// Climbing plays at its own pace, and holds still between moves.
-				return phobj.vspeed != 0.0 ? 1.0f : 0.0f;
+				return phobj.vspeed != 0.0 ? pace : 0.0f;
 			default:
-				return 1.0f;
+				return pace;
 		}
 	}
 
@@ -691,6 +694,11 @@ namespace ms
 		int32_t morph = look.get_morph();
 
 		return morph > 0 && MorphTemplate::get(morph).is_hide();
+	}
+
+	bool Char::is_superman() const
+	{
+		return look.is_superman();
 	}
 
 	bool Char::is_barrel_busy() const

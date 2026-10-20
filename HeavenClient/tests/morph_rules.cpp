@@ -14,10 +14,29 @@ int main()
 
 	try
 	{
-		require(action("stand1") == "stand" && action("alert") == "stand", "standing and alert stand");
-		require(action("walk2") == "walk" && action("proneStab") == "prone", "walks walk and a prone stab lies prone");
-		require(action("rope") == "rope" && action("fly") == "fly" && action("sit") == "sit", "climbing, flying and sitting keep their names");
-		require(action("swingO1") == "stand", "an attack stands");
+		require(action("stand1", false) == "stand" && action("alert", false) == "stand", "standing and alert stand");
+		require(action("walk2", false) == "walk" && action("proneStab", false) == "prone", "walks walk and a prone stab lies prone");
+		require(action("rope", false) == "rope" && action("fly", false) == "fly", "climbing and flying keep their names");
+		require(action("sit", false) == "stand", "an item's morph stands on a chair");
+		require(action("swingO1", false) == "stand" && action("stabO1", false) == "stand", "an attack stands");
+
+		require(action("alert", true) == "alert" && action("sit", true) == "sit", "a superman shows its alert and sits");
+		require(action("stand2", true) == "stand" && action("walk1", true) == "walk", "and stands and walks");
+		require(action("stabO1", true) == "stabO1" && action("proneStab", true) == "proneStab", "and stabs");
+		require(action("swingO1", true) == "stand", "but stands for an attack it lacks");
+
+		require(superman_action("somersault") == "somersault" && superman_action("snatch") == "snatch", "a skill keeps its name");
+		require(superman_action("alert5") == "alert", "alert5 is the alert");
+		require(superman_action("swingO1").empty() && superman_action("alert").empty(), "others take the stance's");
+
+		require(superman_refuses(5001003) && superman_refuses(OAK_BARREL) && superman_refuses(5210000), "a superman can't shoot twice or hide");
+		require(superman_refuses(1004) && superman_refuses(10001014) && superman_refuses(20001023) && superman_refuses(20011031), "nor ride");
+		require(!superman_refuses(1014) && !superman_refuses(20011019) && !superman_refuses(5121003), "but uses the rest");
+		require(superman_refuses(1017) && !superman_refuses(10001017), "a beginner's 1017 but not a Noblesse's");
+
+		require(untransformed(5111006, false, 0) && !untransformed(5111006, true, 5111005), "Shockwave wants a transformation");
+		require(untransformed(5121004, true, 5111005) && !untransformed(5121005, true, SUPER_TRANSFORMATION), "Demolition and Snatch Super Transformation");
+		require(!untransformed(5001001, false, 0), "another skill wants none");
 
 		require(speed(80) == 80 && speed(150) == 140 && speed(50) == 80, "speed is 80 to 140");
 		require(jump(100) == 100 && jump(130) == 123 && jump(70) == 80, "jump is 80 to 123");

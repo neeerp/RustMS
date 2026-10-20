@@ -153,6 +153,9 @@ namespace ms
 
 		int32_t get_morph() const;
 
+		// Whether it looks like Transformation's superman.
+		bool is_superman() const;
+
 		// Initialize drawinfo
 		static void init();
 
@@ -214,6 +217,8 @@ namespace ms
 		const BodyAction *action;
 		std::string actionstr;
 		uint8_t actframe;
+		// A superman's attack or skill, drawn and timed by the template's frames in place of the action's.
+		std::string morphact;
 		int16_t heldframe = -1;
 
 		const Body *body;

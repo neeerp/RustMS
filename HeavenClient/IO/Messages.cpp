@@ -55,7 +55,8 @@ namespace ms
 					"It is not appropriate to use it here.",
 					"Unavailable while transforming.",
 					"Unavailable while transforming. Please right-click the icon at the top right corner to cancel the transformation.",
-					"You may not cancel the transformation."
+					"You may not cancel the transformation.",
+					"This skill is available only during transformation."
 			};
 
 	bool Messages::is_cost(Type type)

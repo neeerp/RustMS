@@ -242,8 +242,15 @@ namespace ms
 		bool ride_refuses(bool monster_only = false) const;
 
 		// Whether an item's morph or Oak Barrel keeps the player from something, saying so in chat
-		// (FUN_00a2a193): attacks, skills, seats, chairs, emotes and item effects.
+		// (FUN_00a2a193): attacks, skills, seats and chairs.
 		bool morph_refuses() const;
+
+		// Whether any morph, a superman's too, keeps the player from something, saying so in chat: emotes
+		// and item effects (FUN_00a24470, FUN_00a24530).
+		bool shape_refuses() const;
+
+		// The skill the player is morphed by, or a morph item's id negated.
+		int32_t get_morph_reason() const;
 
 		// Whether the morph item the player is morphed by may not be cancelled by its icon (noCancelMouse).
 		bool no_cancel_morph() const;
