@@ -30,7 +30,7 @@ use net::packet::build::world::mob::{
     build_catch_fail, build_catch_with_item, build_control_mob, build_heal_mob, build_kill_mob,
     build_mob_hp, build_mob_stat_reset, build_mob_stat_set, build_move_mob,
     build_move_mob_response, build_show_magnet, build_spawn_mob, build_stop_controlling_mob,
-    MobMoveView, MobView,
+    CatchFail, MobMoveView, MobView,
 };
 use net::packet::build::world::npc::{
     build_control_npc, build_npc_action, build_spawn_npc, ForeignNpc,
@@ -1837,10 +1837,14 @@ impl FieldActor {
             right: x + i32::from(right) + CATCH_SLACK,
             bottom: y + i32::from(bottom) + CATCH_SLACK,
         };
-        match self
-            .mobs
-            .catch(object_id, catch.mob, reach, catch.mob_hp, Instant::now())
-        {
+        match self.mobs.catch(
+            object_id,
+            catch.mob,
+            reach,
+            catch.mob_hp,
+            catch.prop,
+            Instant::now(),
+        ) {
             Catch::Caught => {
                 if let Ok(packet) = build_catch_with_item(object_id, item_id, true) {
                     self.broadcast(None, packet);
@@ -1856,8 +1860,14 @@ impl FieldActor {
                 return;
             }
             Catch::TooStrong => {
-                if let Ok(packet) = build_catch_fail(item_id) {
+                if let Ok(packet) = build_catch_fail(CatchFail::TooStrong, item_id) {
                     handle.send_packet(packet);
+                }
+            }
+            // The map sees it fail, and the item is kept.
+            Catch::Escaped => {
+                if let Ok(packet) = build_catch_with_item(object_id, item_id, false) {
+                    self.broadcast(None, packet);
                 }
             }
             Catch::Missed => {}

@@ -222,6 +222,9 @@ pub struct Player {
     /// Whether Berserk is on, as the client last told the server
     /// (`net::berserk`); not saved.
     pub berserk: bool,
+    /// The catch item (227xxxx) last thrown and when, for its `useDelay`;
+    /// not saved.
+    pub last_catch: Option<(i32, std::time::Instant)>,
     /// The maps kept for the teleport rocks.
     pub teleport_rocks: TeleportRocks,
     /// The skill macros, by place in the list.
@@ -268,6 +271,7 @@ impl Player {
             item_effect: 0,
             charmed: false,
             berserk: false,
+            last_catch: None,
             teleport_rocks: TeleportRocks::default(),
             skill_macros: SkillMacros::default(),
             mount: Mount::default(),

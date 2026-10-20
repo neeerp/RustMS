@@ -125,6 +125,8 @@ pub enum Catch {
     Caught,
     /// It has too much of its HP left.
     TooStrong,
+    /// It was weak enough but got away (`bridleProp`); it stays.
+    Escaped,
     /// It isn't here, is another mob, or is out of reach.
     Missed,
 }
@@ -1220,13 +1222,15 @@ impl MobSet {
 
     /// Throw a catch item at the mob `object_id`, which catches a `mob_id`
     /// in `reach` with less than `mob_hp` percent of its HP (any HP at
-    /// 100). Its spawn point waits as if it died.
+    /// 100), `prop` percent of the time. Its spawn point waits as if it
+    /// died.
     pub fn catch(
         &mut self,
         object_id: i32,
         mob_id: i32,
         reach: CastArea,
         mob_hp: i32,
+        prop: f64,
         now: Instant,
     ) -> Catch {
         let Some(mob) = self.live.get(&object_id) else {
@@ -1237,6 +1241,9 @@ impl MobSet {
         }
         if mob_hp < 100 && mob.hp * 100 >= i64::from(mob.info.max_hp) * i64::from(mob_hp) {
             return Catch::TooStrong;
+        }
+        if prop < 100.0 && self.rng.gen_range(0.0, 100.0) >= prop {
+            return Catch::Escaped;
         }
         if let Some(mob) = self.live.remove(&object_id) {
             self.emptied(mob.spawn, now);
@@ -1890,16 +1897,38 @@ mod tests {
             bottom: 0,
         };
         let far = CastArea { left: 101, ..reach };
-        assert_eq!(mobs.catch(snail, 100101, reach, 100, now), Catch::Missed);
-        assert_eq!(mobs.catch(snail, 100100, far, 100, now), Catch::Missed);
+        assert_eq!(
+            mobs.catch(snail, 100101, reach, 100, 100.0, now),
+            Catch::Missed
+        );
+        assert_eq!(
+            mobs.catch(snail, 100100, far, 100, 100.0, now),
+            Catch::Missed
+        );
         // 40 percent of its 8 HP is 3.2.
-        assert_eq!(mobs.catch(snail, 100100, reach, 40, now), Catch::TooStrong);
+        assert_eq!(
+            mobs.catch(snail, 100100, reach, 40, 100.0, now),
+            Catch::TooStrong
+        );
         mobs.damage(1, snail, 4, now);
-        assert_eq!(mobs.catch(snail, 100100, reach, 40, now), Catch::TooStrong);
+        assert_eq!(
+            mobs.catch(snail, 100100, reach, 40, 100.0, now),
+            Catch::TooStrong
+        );
         mobs.damage(1, snail, 1, now);
-        assert_eq!(mobs.catch(snail, 100100, reach, 40, now), Catch::Caught);
+        assert_eq!(
+            mobs.catch(snail, 100100, reach, 40, 0.0, now),
+            Catch::Escaped
+        );
+        assert_eq!(
+            mobs.catch(snail, 100100, reach, 40, 100.0, now),
+            Catch::Caught
+        );
         assert!(mobs.get(snail).is_none());
-        assert_eq!(mobs.catch(snail, 100100, reach, 100, now), Catch::Missed);
+        assert_eq!(
+            mobs.catch(snail, 100100, reach, 100, 100.0, now),
+            Catch::Missed
+        );
     }
 
     #[test]
