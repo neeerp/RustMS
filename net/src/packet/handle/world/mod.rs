@@ -1,3 +1,4 @@
+mod berserk;
 mod buddy;
 mod cash_item;
 mod cash_shop;
@@ -51,6 +52,7 @@ mod use_skill;
 mod weather;
 mod whisper;
 
+pub use self::berserk::CalcDamageStatHandler;
 pub use self::buddy::BuddyListModifyHandler;
 pub use self::cash_item::UseCashItemHandler;
 pub use self::cash_shop::{CashShopOperationHandler, CheckCashHandler, EnterCashShopHandler};

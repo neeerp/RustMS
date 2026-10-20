@@ -364,6 +364,10 @@ pub enum WorldAction {
     /// already changed); refresh their field avatar and show the others
     /// this CHALKBOARD.
     ChalkboardChanged(Packet),
+    /// Berserk turned on or off (`player.berserk` already changed); refresh
+    /// the player's field avatar and show the others this
+    /// SHOW_FOREIGN_EFFECT.
+    BerserkChanged(Packet),
     /// The player showed or stopped an effect item (`player.item_effect`
     /// already changed); refresh their field avatar and show the others
     /// this SHOW_ITEM_EFFECT.
@@ -768,6 +772,7 @@ fn world_routes() -> &'static HashMap<i16, WorldRoute> {
             (Op::PetExcludeItems, InGame(&world::PetExcludeItemsHandler)),
             (Op::UseCashItem, InGame(&world::UseCashItemHandler)),
             (Op::CloseChalkboard, InGame(&world::CloseChalkboardHandler)),
+            (Op::CalcDamageStat, InGame(&world::CalcDamageStatHandler)),
             (
                 Op::TeleportRockList,
                 InGame(&world::TeleportRockListHandler),
@@ -810,7 +815,7 @@ mod tests {
     fn every_registered_opcode_is_unique_per_server() {
         // The maps would silently drop duplicates; check the table sizes match.
         assert_eq!(login_routes().len(), 13);
-        assert_eq!(world_routes().len(), 86);
+        assert_eq!(world_routes().len(), 87);
     }
 
     #[test]

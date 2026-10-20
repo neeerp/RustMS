@@ -231,6 +231,8 @@ namespace ms
 		// v83 makes the user anew in each field, showing their orbs as they
 		// are (FUN_0092e499).
 		player.show_combo(player.get_buff_value(Buffstat::Id::COMBO) - 1, true);
+		// And the aura of a Berserk it is in (0x9497c1).
+		player.show_berserk(player.get_berserk() != 0);
 		player.set_recovery_rate(mapinfo.get_recovery());
 		pending_teleport.reset();
 		teleport_cooldown = 0;

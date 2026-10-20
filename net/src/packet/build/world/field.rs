@@ -52,8 +52,8 @@ pub fn build_player_enter_field(avatar: &FieldAvatar) -> Result<Packet, NetworkE
     packet.write_byte(0)?; // friendship ring
     packet.write_byte(0)?; // marriage ring
     packet.write_byte(0)?; // new year cards
-    packet.write_byte(0)?;
-    packet.write_byte(0)?;
+    packet.write_byte(u8::from(avatar.berserk))?; // the aura (0x97fc24)
+    packet.write_byte(0)?; // an Evan's Dragon Fury
     packet.write_byte(0)?; // team (only used in event fields)
     Ok(packet)
 }
@@ -292,6 +292,7 @@ mod tests {
             pets: Vec::new(),
             chalkboard: None,
             item_effect: 0,
+            berserk: false,
             energy: None,
             dash: [None; 2],
             ride: None,
@@ -354,7 +355,7 @@ mod tests {
         expect.byte(0); // no shop or minigame box
         expect.byte(0); // no chalkboard
         expect.byte(0).byte(0).byte(0); // crush, friendship, marriage rings
-        expect.byte(0).byte(0).byte(0); // new year cards, two zero bytes
+        expect.byte(0).byte(0).byte(0); // new year cards, berserk, dragon fury
         expect.byte(0); // team
         expect.end();
     }

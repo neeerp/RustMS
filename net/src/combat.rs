@@ -1,5 +1,6 @@
 //! Player attacks: parsing, damage limits, and the attack broadcast.
 
+use crate::berserk;
 use crate::charge;
 use crate::combo;
 use crate::energy;
@@ -568,9 +569,12 @@ pub fn validate(attack: &Attack, player: &Player) -> Result<Uses, AttackRejectio
         0 => 100,
         percent => i64::from(percent),
     };
+    // A charge and Berserk raise every weapon hit.
     let charged = i64::from(charge::damage_percent(player));
+    let berserk = i64::from(berserk::damage_percent(player));
     let cap_for = |percent: i32| {
-        (2 * base * (i64::from(percent) * combo / 100 + critical) / 100 * charged / 100)
+        (2 * base * (i64::from(percent) * combo / 100 + critical) / 100 * charged / 100 * berserk
+            / 100)
             .clamp(10, i64::from(i32::MAX)) as i32
     };
     let base_cap = cap_for(100);
@@ -1068,6 +1072,26 @@ mod tests {
             validate(&parse_close_attack(&attack_packet(1, 1)).unwrap(), &dead),
             Err(AttackRejection::Dead)
         );
+    }
+
+    #[test]
+    fn berserk_doubles_the_cap_at_half_hp() {
+        let mut player = beginner_with_sword();
+        player.stats.job = 132;
+        player.stats.max_hp = 1000;
+        player.stats.hp = 501;
+        player.skills.set(game::SkillRecord {
+            skill_id: berserk::BERSERK,
+            level: 30,
+            master_level: 0,
+            expiration: None,
+        });
+        let swing = |damage| parse_close_attack(&attack_packet(1, damage)).unwrap();
+        assert!(validate(&swing(20), &player).is_ok());
+        assert_eq!(validate(&swing(21), &player), Err(AttackRejection::Damage));
+        player.stats.hp = 500;
+        assert!(validate(&swing(40), &player).is_ok());
+        assert_eq!(validate(&swing(41), &player), Err(AttackRejection::Damage));
     }
 
     #[test]

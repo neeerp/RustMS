@@ -171,6 +171,12 @@ namespace ms
 		// Whether the gauge is full and the player has Energy Charge.
 		bool energy_full() const;
 
+		// Check Berserk against the player's HP, and tell the server when
+		// it turns on or off (FUN_00a292bb); `reset` forgets it first.
+		void update_berserk(bool reset);
+		// The damage percent Berserk adds, 0 while it is off.
+		int32_t get_berserk() const;
+
 		// The diseases on the player.
 		disease::State get_diseases() const;
 		// What Stop Motion takes now from a player who stood still too
@@ -426,6 +432,8 @@ namespace ms
 		int32_t wings_left = 0;
 		// The Energy Charge gauge, 0 to 10000.
 		int32_t energy = 0;
+		// Berserk's damage percent while it is on, else 0 (+0x372c).
+		int32_t berserk = 0;
 
 		move_path::Recorder path;
 

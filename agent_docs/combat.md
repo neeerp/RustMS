@@ -602,6 +602,18 @@ A few skills do more than buff:
   and spends it when it reaches a mob. A Paladin's Advanced Charge
   (1220010) keeps the charge by its `x` percent, and its `damage` replaces
   Charged Blow's own on both sides.
+- **Berserk** (`net::berserk`, 1320006) is a Dark Knight's passive. The
+  client keeps the state: Berserk is on while HP is at most `x` percent
+  of max HP, rechecked when HP changes and anew on entering the game. Each
+  change sends an empty CALC_DAMAGE_STAT (0x6C). The server works the state
+  out again, keeps it on the player, and shows the looping aura (the
+  skill's `effect`) to the player as SHOW_ITEM_GAIN_INCHAT 1 and to the map
+  as SHOW_FOREIGN_EFFECT, with a last byte for on or off. Players who see
+  the knight arrive get it from SPAWN_PLAYER's berserk byte. While it is on,
+  every weapon hit is raised by its `damage` percent, and the server's
+  damage cap counts it when the server last saw it on or the HP is low
+  enough (`berserk::damage_percent`). HeavenClient's Beholder heals by
+  Berserk's `x` only while it is on.
 
 Teleport and Flash Jump move the player on the client alone; the server
 only spends the MP. HeavenClient's Flash Jump (4111006 and the Night

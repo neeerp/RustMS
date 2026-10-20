@@ -90,6 +90,7 @@ pub enum RecvOpcode {
     ChangeMapSpecial = 0x64,
     TeleportRockList = 0x66,
     QuestAction = 0x6B,
+    CalcDamageStat = 0x6C,
     ThrowGrenade = 0x6D,
     SkillMacro = 0x6E,
 

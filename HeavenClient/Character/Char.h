@@ -190,6 +190,8 @@ namespace ms
 		// Energy Charge's glow while the gauge is full (0x93e2e5, FUN_00930b27): the skill's `effect` once with
 		// its `Use` sound, unless the character just came into view, then the same over and over from 1.35 s on.
 		void show_energy(int32_t skill, bool full, bool init);
+		// Loop Berserk's aura, or take it away (SHOW_ITEM_GAIN_INCHAT 1).
+		void show_berserk(bool on);
 
 		// Dash's dust, the skill's `special` looping at the feet while the character dashes on a foothold and
 		// hidden in the air (FUN_00930b27); a skill of 0 takes it away.
@@ -397,6 +399,7 @@ namespace ms
 		EffectLayer effects;
 		EffectLayer held_effects;
 		EffectLayer energy_glow;
+		EffectLayer berserk_aura;
 		// The full gauge's effect, and how long until it loops; -1 once it does.
 		std::vector<Animation> energy_effect;
 		int16_t energy_wait = -1;

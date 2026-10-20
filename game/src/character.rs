@@ -147,6 +147,8 @@ pub struct FieldAvatar {
     pub chalkboard: Option<String>,
     /// The effect item (501xxxx or 429xxxx) the player shows, or 0.
     pub item_effect: i32,
+    /// Whether the player's Berserk aura shows.
+    pub berserk: bool,
     /// Energy Charge's gauge, as `Buffs::energy`.
     pub energy: Option<ShownBuff>,
     /// Dash's speed and jump, while the player dashes.
@@ -217,6 +219,9 @@ pub struct Player {
     /// A charm kept the player's EXP when they last died, so they revive
     /// with 30% of their max HP and MP; not saved.
     pub charmed: bool,
+    /// Whether Berserk is on, as the client last told the server
+    /// (`net::berserk`); not saved.
+    pub berserk: bool,
     /// The maps kept for the teleport rocks.
     pub teleport_rocks: TeleportRocks,
     /// The skill macros, by place in the list.
@@ -262,6 +267,7 @@ impl Player {
             chalkboard: None,
             item_effect: 0,
             charmed: false,
+            berserk: false,
             teleport_rocks: TeleportRocks::default(),
             skill_macros: SkillMacros::default(),
             mount: Mount::default(),
@@ -387,6 +393,7 @@ impl Player {
                 .collect(),
             chalkboard: self.chalkboard.clone(),
             item_effect: self.item_effect,
+            berserk: self.berserk,
             energy: self.buffs.energy(),
             dash: [BuffStat::DashSpeed, BuffStat::DashJump].map(|stat| self.buffs.two_state(stat)),
             ride: self.ride(),
