@@ -359,6 +359,41 @@ pub async fn set_mount(
     .await
 }
 
+/// Put `item_id` in the Cash Inventory of the account of the character
+/// `character_id`, as a gift from `from`. The item's cash serial.
+pub async fn gift_cash_item(
+    character_id: i32,
+    item_id: i32,
+    from: &str,
+) -> Result<i64, HarnessError> {
+    #[derive(QueryableByName)]
+    struct Serial {
+        #[diesel(sql_type = BigInt)]
+        id: i64,
+    }
+    let from = from.to_string();
+    let fixture = |message: String| HarnessError::Fixture {
+        phase: "gift a cash item",
+        message,
+    };
+    let serial = tokio::task::spawn_blocking(move || {
+        let mut conn = PgConnection::establish(&database_url()).map_err(|e| e.to_string())?;
+        diesel::sql_query(
+            "INSERT INTO cash_items (account_id, item_id, sn, quantity, gift_from) \
+             SELECT accountid, $2, 0, 1, $3 FROM characters WHERE id = $1 RETURNING id",
+        )
+        .bind::<Integer, _>(character_id)
+        .bind::<Integer, _>(item_id)
+        .bind::<Text, _>(from)
+        .get_result::<Serial>(&mut conn)
+        .map_err(|e| e.to_string())
+    })
+    .await
+    .map_err(|e| fixture(e.to_string()))?
+    .map_err(fixture)?;
+    Ok(serial.id)
+}
+
 async fn change_one_row(
     phase: &'static str,
     query: impl FnOnce(&mut PgConnection) -> QueryResult<usize> + Send + 'static,

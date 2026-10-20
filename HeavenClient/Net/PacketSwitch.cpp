@@ -26,6 +26,7 @@
 #include "Handlers/InventoryHandlers.h"
 #include "Handlers/LoginHandlers.h"
 #include "Handlers/MapObjectHandlers.h"
+#include "Handlers/MemoHandlers.h"
 #include "Handlers/MessagingHandlers.h"
 #include "Handlers/NpcInteractionHandlers.h"
 #include "Handlers/PlayerHandlers.h"
@@ -205,6 +206,7 @@ namespace ms
 		/// Party
 		PARTY_OPERATION = 62,
 		BUDDYLIST = 63,
+		MEMO_RESULT = 41,
 		MULTICHAT = 134,
 		UPDATE_PARTYMEMBER_HP = 201,
 
@@ -371,6 +373,7 @@ namespace ms
 
 		// Buddy list
 		emplace<BUDDYLIST, BuddyListHandler>();
+		emplace<MEMO_RESULT, MemoResultHandler>();
 
 		// Guilds
 		emplace<GUILD_OPERATION, GuildOperationHandler>();

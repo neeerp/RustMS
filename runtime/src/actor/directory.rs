@@ -133,6 +133,9 @@ impl WorldDirectory {
             }
             DirectoryMessage::BuddyList { owner, buddies } => self.send_buddy_list(owner, buddies),
             DirectoryMessage::GuildInfo { owner, guild } => self.send_guild_info(owner, guild),
+            DirectoryMessage::Online { client_id, reply } => {
+                let _ = reply.send(self.clients.contains_key(&client_id));
+            }
             DirectoryMessage::MapOccupied {
                 channel_id,
                 map_id,

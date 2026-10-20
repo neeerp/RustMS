@@ -23,6 +23,7 @@
 #include "UIGameOption.h"
 #include "UIItemInventory.h"
 #include "UIKeyConfig.h"
+#include "UIMemo.h"
 #include "UIMessenger.h"
 #include "UINotice.h"
 #include "UIQuestLog.h"
@@ -809,6 +810,15 @@ namespace ms
 
 	void UIStatusBar::doubleclick(Point<int16_t> cursorpos)
 	{
+		// The note icon opens the notes waiting, as v83's 0x8d74ff does
+		// over the box's right part, EquipKey's left edge included.
+		if (Rectangle<int16_t>(610 + right, 642 + right, 10, 24).contains(cursorpos - position))
+		{
+			UIMemo::open();
+
+			return;
+		}
+
 		if (!EXP_NUMBERS.contains(cursorpos - position)
 			|| !gacha_exp::may_take(stats.get_stat(MapleStat::Id::LEVEL), stats.get_gachaexp()))
 			return;

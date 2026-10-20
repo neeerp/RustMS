@@ -13,6 +13,7 @@ This repository is a Rust workspace for a MapleStory server plus a nested C++ cl
 - `agent_docs/combat.md`: mob spawning and control, melee attacks, EXP and level-ups, spending AP and SP, drops and pickup, touch damage and death
 - `agent_docs/parties.md`: party state and flows, EXP sharing, party chat, and the client's party window and HP displays
 - `agent_docs/buddies.md`: buddy list storage, requests, channel visibility, buddy chat, and the client's Friend tab
+- `agent_docs/notes.md`: notes (memos) left for offline characters, gift thank-yous, and the client's inbox and send dialog
 - `agent_docs/guilds.md`: guild storage, founding at Heracle, invitations, leaving and expelling, guild chat, name tags, and the client's Guild tab
 - `agent_docs/pets.md`: pet items and storage, summoning, the list of pets out, their packets, and the client's side
 - `agent_docs/inventory.md`: inventory operations, item data, item moves, NPC shops, storage, and their packets

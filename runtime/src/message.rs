@@ -459,6 +459,11 @@ pub enum DirectoryMessage {
         owner: ClientId,
         guild: Guild,
     },
+    /// Whether `client_id` is online.
+    Online {
+        client_id: ClientId,
+        reply: tokio::sync::oneshot::Sender<bool>,
+    },
     /// Whether anyone is on `map_id` in `channel_id`.
     MapOccupied {
         channel_id: u8,

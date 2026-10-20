@@ -21,6 +21,7 @@
 #include "UISpReset.h"
 #include "UIChatBar.h"
 #include "UIItemMegaphone.h"
+#include "UIMemoSend.h"
 #include "UIMegaphone.h"
 #include "UINotice.h"
 #include "UIPersonalShop.h"
@@ -1068,6 +1069,11 @@ namespace ms
 							use_teleport_rock(slot, item_id);
 						else if (item_id / 10000 == 507)
 							use_megaphone(slot, item_id);
+						else if (item_id / 10000 == 509)
+						{
+							if (may_use_cash_item())
+								UI::get().emplace<UIMemoSend>(slot, item_id, "");
+						}
 						else if (weather::is_weather(item_id))
 							use_weather(slot, item_id);
 						else if (field_effect::is_jukebox(item_id))

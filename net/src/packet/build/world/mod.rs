@@ -20,6 +20,7 @@ pub mod mini_room;
 pub mod mist;
 pub mod mob;
 pub mod monster_book;
+pub mod note;
 pub mod npc;
 pub mod party;
 pub mod pet;

@@ -20,13 +20,16 @@
 #include <string>
 #include <vector>
 
+#include <algorithm>
 #include <cstdint>
+#include <cstdlib>
 
 #include "MovementPacket.h"
 
 #include "../../Gameplay/MovePath.h"
 
 #include "../../Character/Inventory/InventoryType.h"
+#include "../../Util/Memos.h"
 
 namespace ms
 {
@@ -224,6 +227,54 @@ namespace ms
 			write_byte(1);
 			write_int(index);
 			write_long(cash_id);
+		}
+	};
+
+	// Opcode: NOTE_ACTION(131)
+	class ReadNotesPacket : public OutPacket
+	{
+	public:
+		// The inbox closed and these notes are read (v83 64aa57). Each
+		// invitation brings its item, one per free Etc slot; those left
+		// over aren't sent, though counted.
+		ReadNotesPacket(const std::vector<Memos::Memo>& memos, int8_t free_etc) : OutPacket(OutPacket::Opcode::NOTE_ACTION)
+		{
+			int8_t invitations = static_cast<int8_t>(std::count_if(memos.begin(), memos.end(),
+					[](const Memos::Memo& memo) { return memo.flag == Memos::INVITATION; }));
+
+			write_byte(1);
+			write_byte(static_cast<int8_t>(memos.size()));
+			write_byte(invitations);
+			write_byte(free_etc);
+
+			for (const Memos::Memo& memo : memos)
+			{
+				if (memo.flag != Memos::INVITATION)
+				{
+					write_int(memo.id);
+					write_byte(static_cast<int8_t>(memo.flag));
+				}
+				else if (free_etc > 0)
+				{
+					size_t mark = memo.text.find('_');
+
+					write_int(memo.id);
+					write_byte(static_cast<int8_t>(memo.flag));
+					write_int(mark == std::string::npos ? 0 : std::atoi(memo.text.c_str() + mark + 1));
+					free_etc--;
+				}
+			}
+		}
+	};
+
+	// Opcode: NOTE_ACTION(131)
+	class AskNotesPacket : public OutPacket
+	{
+	public:
+		// A note arrived; the server answers with the list (v83 a251ef).
+		AskNotesPacket() : OutPacket(OutPacket::Opcode::NOTE_ACTION)
+		{
+			write_byte(2);
 		}
 	};
 

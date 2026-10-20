@@ -132,6 +132,8 @@ namespace ms
 			TIPRED,
 			PACKAGEYELLOW,
 			DISCOUNTRED,
+			MEMOBLUE,
+			MEMOCYAN,
 			NUM_COLORS
 		};
 
@@ -213,7 +215,9 @@ namespace ms
 						{1.00f, 0.94f, 0.50f}, // Light yellow (#FFF080, v83 chat font 9: jukebox songs)
 						{0.95f, 0.01f, 0.01f}, // Tip red (#F20303, v83 tooltip font 10: a macro's skills)
 						{0.99f, 0.96f, 0.08f}, // Package yellow (#FDF514, v83 tooltip font 1: a Cash Shop package's name)
-						{0.97f, 0.06f, 0.20f}  // Discount red (#F71034, v83's Cash Shop package tooltip: the regular total)
+						{0.97f, 0.06f, 0.20f}, // Discount red (#F71034, v83's Cash Shop package tooltip: the regular total)
+						{0.14f, 0.28f, 0.42f}, // Memo blue (#24476B, who sent a note in v83's inbox)
+						{0.80f, 1.00f, 1.00f}  // Memo cyan (#CCFFFF, the v83 inbox's heading)
 				};
 
 		// Create a color by an array of real numbers [0.0f, 1.0f]

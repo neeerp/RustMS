@@ -65,6 +65,8 @@ namespace ms
 
 		void send_scroll(double yoffset) override;
 
+		void doubleclick(Point<int16_t> cursorpos) override;
+
 		UIElement::Type get_type() const override;
 
 		void change_tab(uint16_t tabid);
@@ -93,6 +95,7 @@ namespace ms
 			BT_BUDDY_CHAT,
 			BT_BUDDY_MAP,
 			BT_INVITE_BUDDY,
+			BT_MESSAGE_BUDDY,
 			BT_SHOW_ONLINE,
 			BT_SHOW_ALL,
 			BT_GUILD_INVITE,

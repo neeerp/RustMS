@@ -146,6 +146,22 @@ namespace ms
 		}
 	};
 
+	// Sends a note with the note item (509xxxx, v83 a0b6e4).
+	// Opcode: USE_CASH_ITEM(79)
+	class SendNotePacket : public OutPacket
+	{
+	public:
+		SendNotePacket(int16_t slot, int32_t itemid, const std::string &to, const std::string &text)
+				: OutPacket(OutPacket::Opcode::USE_CASH_ITEM)
+		{
+			write_short(slot);
+			write_int(itemid);
+			write_string(to);
+			write_string(text);
+			write_time();
+		}
+	};
+
 	// Uses a jukebox (FUN_00a0a63f type 0x14): the song's length in ms
 	// (inferred).
 	// Opcode: USE_CASH_ITEM(79)

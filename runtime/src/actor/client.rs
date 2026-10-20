@@ -7,6 +7,7 @@ mod fame;
 mod guilds;
 mod hazard;
 mod loot;
+mod notes;
 mod npc_script;
 mod personal_shop;
 mod pets;
@@ -273,12 +274,13 @@ impl ClientActor {
             debug!(opcode, "Ignoring unhandled world opcode");
             return Ok(());
         };
-        // In the Cash Shop the player is off the map; only leaving and the
-        // shop itself count.
+        // In the Cash Shop the player is off the map; only leaving, the shop
+        // itself and thanking for gifts count.
         if self.in_cash_shop
             && opcode != RecvOpcode::ChangeMap as i16
             && opcode != RecvOpcode::CashShopOperation as i16
             && opcode != RecvOpcode::CheckCash as i16
+            && opcode != RecvOpcode::NoteAction as i16
         {
             debug!(opcode, "Ignoring opcode in the Cash Shop");
             return Ok(());
@@ -451,6 +453,7 @@ impl ClientActor {
                 .await?
             }
             WorldAction::Buddy(request) => self.buddy_request(request).await?,
+            WorldAction::Note(request) => self.note_request(request).await?,
             WorldAction::Guild(request) => self.guild_request(request).await?,
             WorldAction::GiveFame { target, up } => self.give_fame(target, up).await?,
             WorldAction::OpenDoor { town, at, lasts } => self.open_door(town, at, lasts).await?,
@@ -571,6 +574,7 @@ impl ClientActor {
         self.show_mount().await?;
         self.load_buddies().await?;
         self.load_guild().await?;
+        self.load_notes().await?;
         info!(
             character_id,
             channel_id = self.channel_id,

@@ -19,6 +19,7 @@
 
 #include "UIChatBar.h"
 #include "UIEnterText.h"
+#include "UIMemoSend.h"
 
 #include "../BuddyCommands.h"
 #include "../GuildCommands.h"
@@ -245,6 +246,12 @@ namespace ms
 
 		Point<int16_t> second_row = BUTTONS + Point<int16_t>(0, BUTTON_PITCH.y());
 		buttons[Buttons::BT_INVITE_BUDDY] = std::make_unique<MapleButton>(Friend["BtParty"], second_row);
+		// v83 has it at (254, 362); our Friend tab is laid out differently.
+		// Unlike the others, its art is drawn about its centre.
+		int16_t after_party = buttons[Buttons::BT_INVITE_BUDDY]->bounds(Point<int16_t>()).right() + BUDDY_BUTTON_GAP;
+		Point<int16_t> message_origin = Texture(Friend["BtMessage"]["normal"]["0"]).get_origin();
+		buttons[Buttons::BT_MESSAGE_BUDDY] = std::make_unique<MapleButton>(Friend["BtMessage"],
+				Point<int16_t>(after_party, second_row.y()) + message_origin);
 
 		for (auto [id, name] : { std::pair(Buttons::BT_SHOW_ONLINE, "BtShowOnline"), std::pair(Buttons::BT_SHOW_ALL, "BtShowAll") })
 		{
@@ -642,6 +649,36 @@ namespace ms
 		return UIElement::send_cursor(clicked, cursorpos);
 	}
 
+	void UIUserList::doubleclick(Point<int16_t> cursorpos)
+	{
+		// The first click picked the buddy. v83 (0x91de7b) writes a note to
+		// one away and whispers one online.
+		const Buddy* buddy = selected_buddy();
+
+		if (tab != Tab::FRIEND || !buddy)
+			return;
+
+		Point<int16_t> cursor_relative = cursorpos - position;
+		bool on_cell = false;
+
+		for (const BuddySection* section : {&buddies_online, &buddies_offline})
+			for (const Cell& cell : section->cells)
+			{
+				Point<int16_t> corner = cell.pos + Point<int16_t>(1, 0);
+
+				if (cell.id == buddy->id && Rectangle<int16_t>(corner, corner + CELL_HIGHLIGHT).contains(cursor_relative))
+					on_cell = true;
+			}
+
+		if (!on_cell)
+			return;
+
+		if (!buddy->online())
+			UIMemoSend::write_to(buddy->name);
+		else if (auto chatbar = UI::get().get_element<UIChatBar>())
+			chatbar->whisper_to(buddy->name);
+	}
+
 	void UIUserList::send_key(int32_t keycode, bool pressed, bool escape)
 	{
 		if (pressed)
@@ -677,7 +714,7 @@ namespace ms
 		for (uint16_t i = Buttons::BT_HP; i <= Buttons::BT_INVITE; i++)
 			buttons[i]->set_active(tab == Tab::PARTY);
 
-		for (uint16_t i = Buttons::BT_ADD_BUDDY; i <= Buttons::BT_INVITE_BUDDY; i++)
+		for (uint16_t i = Buttons::BT_ADD_BUDDY; i <= Buttons::BT_MESSAGE_BUDDY; i++)
 			buttons[i]->set_active(tab == Tab::FRIEND);
 
 		// The filter button offers whichever view isn't showing.
@@ -799,6 +836,10 @@ namespace ms
 				if (buddy)
 					PartyCommands::invite(buddy->name);
 
+				break;
+			// Whoever is picked, or no one (0x90aa2c).
+			case Buttons::BT_MESSAGE_BUDDY:
+				UIMemoSend::write_to(buddy ? buddy->name : "");
 				break;
 			case Buttons::BT_SHOW_ONLINE:
 			case Buttons::BT_SHOW_ALL:
