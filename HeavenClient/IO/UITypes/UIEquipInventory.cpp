@@ -401,10 +401,16 @@ namespace ms
 	{
 		EquipSlot::Id slot = slot_by_position(cursorpos);
 
-		if (icons[slot])
-			if (int16_t freeslot = inventory.find_free_slot(InventoryType::Id::EQUIP))
-				Stage::get().get_player().request(UnequipItemPacket(inventory.shown_equip(slot), freeslot),
-												  ExclRequest::WAIT);
+		if (!icons[slot])
+			return;
+
+		int16_t shown = inventory.shown_equip(slot);
+
+		if (Stage::get().get_player().ride_keeps(inventory.get_item_id(InventoryType::Id::EQUIPPED, shown)))
+			return;
+
+		if (int16_t freeslot = inventory.find_free_slot(InventoryType::Id::EQUIP))
+			Stage::get().get_player().request(UnequipItemPacket(shown, freeslot), ExclRequest::WAIT);
 	}
 
 	bool UIEquipInventory::is_in_range(Point<int16_t> cursorpos) const
@@ -522,6 +528,11 @@ namespace ms
 		}
 
 		if (equip && !can_swap(slot))
+			return true;
+
+		Player &player = Stage::get().get_player();
+
+		if (player.ride_keeps(player.get_inventory().get_item_id(InventoryType::Id::EQUIPPED, source)))
 			return true;
 
 		// Onto equipment, the server swaps the two (FUN_004f11b4).

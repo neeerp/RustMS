@@ -18,6 +18,11 @@ int main()
 			"each family its own");
 		require(rider_skill(2001) == 20011004 && rider_skill(2218) == 20011004, "Evan's");
 
+		require(is_ground_only(5001005) && is_ground_only(10001027) && is_ground_only(20011031),
+			"dashes and event mounts keep off ladders");
+		require(!is_ground_only(1004) && !is_ground_only(1015) && !is_ground_only(1026) &&
+			!is_ground_only(1032) && !is_ground_only(30001027), "Monster Rider doesn't");
+
 		require(!tired(1, 94) && tired(1, 95), "level 1 tires at 95");
 		require(!tired(3, 104) && tired(3, 105), "every 3 levels 10 more");
 

@@ -16,6 +16,7 @@ namespace ms
 		constexpr int32_t RETURN_SCROLLS = 0x20;
 		constexpr int32_t TELEPORT_ROCKS = 0x40;
 		constexpr int32_t MAP_SCROLLS = 0x100;
+		constexpr int32_t RIDING = 0x200;
 		constexpr int32_t CONSUMABLES = 0x400;
 		constexpr int32_t PARTY_LEADER = 0x800;
 		constexpr int32_t WEATHER_ITEMS = 0x4000;

@@ -198,6 +198,22 @@ namespace ms
 		// The server answered getting on `vehicle`, or off with 0 (FUN_0095f065, FUN_00936859).
 		void change_ride(int32_t vehicle);
 
+		// Whether the player may get on their tamed monster, saying why not in chat (0x968b9d): it takes a
+		// mount with a template and a saddle for its level, on a map that allows riding.
+		bool can_get_on() const;
+
+		// Whether riding keeps the player from something, saying so in chat: any mount for FUN_0095f9d9's
+		// callers, such as chairs, and only a tamed monster for items (`monster_only`, FUN_00a092fb).
+		bool ride_refuses(bool monster_only = false) const;
+
+		// Moving a mount or saddle (190xxxx or 191xxxx) while riding a tamed monster gets the player off
+		// instead (FUN_004f0e97). True if it did.
+		bool ride_keeps(int32_t itemid);
+
+		// Feed the tamed monster ridden the food (226xxxx) in USE `slot`; not riding one, nothing happens
+		// (FUN_00a09a64).
+		void feed_mount(int16_t slot, int32_t itemid);
+
 		// Returns the shoe's walking speed multiplier, from the total ES_SPEED stat.
 		double get_walkspeed() const;
 

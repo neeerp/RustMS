@@ -16,6 +16,44 @@ namespace ms::mount
 		return std::find(std::begin(RIDER_SKILLS), std::end(RIDER_SKILLS), skill) != std::end(RIDER_SKILLS);
 	}
 
+	// The skills not used from a ladder or rope (FUN_00969e21): dashes, Ninja Ambush, the Battleship and the
+	// event mounts. Monster Rider is.
+	inline bool is_ground_only(int32_t skill)
+	{
+		switch (skill)
+		{
+			case 1013:
+			case 1014:
+			case 1017:
+			case 1018:
+			case 1019:
+			case 4121004:
+			case 4221004:
+			case 5001005:
+			case 5221006:
+			case 10001014:
+			case 10001015:
+			case 10001019:
+			case 10001022:
+			case 10001023:
+			case 15001003:
+			case 20001019:
+			case 20001022:
+			case 20001023:
+			case 22131001:
+			case 22181003:
+				return true;
+			default:
+				break;
+		}
+
+		// 1027 to 1031, for each of the four beginners.
+		int32_t base = skill % 10000;
+		int32_t job = skill / 10000;
+
+		return base >= 1027 && base <= 1031 && (job == 0 || job == 1000 || job == 2000 || job == 2001);
+	}
+
 	// A tamed monster (190xxxx) rides with a saddle; a vehicle (193xxxx), such as the Battleship, rides
 	// alone.
 	inline bool is_tamed_monster(int32_t item)

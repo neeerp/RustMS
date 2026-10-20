@@ -554,6 +554,10 @@ namespace ms
 
 	void UIPersonalShop::create(int16_t slot, int32_t itemid)
 	{
+		// Not on a mount (FUN_00a1dd99).
+		if (Stage::get().get_player().ride_refuses())
+			return;
+
 		if (auto shop = UI::get().get_element<UIPersonalShop>(); shop && shop->is_active())
 		{
 			if (auto chatbar = UI::get().get_element<UIChatBar>())

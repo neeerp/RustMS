@@ -60,6 +60,9 @@ namespace ms
 			// Not while riding a tamed monster, or another mount (FUN_0095f9d9)
 			RIDING_MONSTER,
 			RIDING_VEHICLE,
+			// Getting on a tamed monster without one or a saddle, or one that can't be ridden (0x968b9d)
+			RIDE_NO_SADDLE,
+			RIDE_REFUSED,
 			LENGTH
 		};
 

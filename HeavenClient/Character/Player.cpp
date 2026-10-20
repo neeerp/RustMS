@@ -280,8 +280,12 @@ namespace ms
 
 		if (int16_t slot = inventory.find_item(type, itemid))
 		{
-			if (type == InventoryType::Id::USE && !Stage::get().get_mapinfo().can_use_item(itemid))
+			if (type == InventoryType::Id::USE && itemid / 10000 == 226)
+				feed_mount(slot, itemid);
+			else if (type == InventoryType::Id::USE && !Stage::get().get_mapinfo().can_use_item(itemid))
 				InChatMessage(Messages::ITEM_FIELD).drop();
+			else if (type == InventoryType::Id::USE && field_limit::is_use_item(itemid) && ride_refuses(true))
+				return;
 			else if (type == InventoryType::Id::USE && !disease::can_use_item(get_diseases()))
 				return;
 			else if (type == InventoryType::Id::USE && pets::is_food(itemid))
@@ -1259,7 +1263,7 @@ namespace ms
 		if (look.get_alerted())
 			return;
 
-		if (!phobj.onground || is_sitting() || is_climbing() || attacking || is_dead())
+		if (!phobj.onground || is_sitting() || is_climbing() || attacking || is_dead() || ride_refuses())
 			return;
 
 		nl::node info = nl::nx::item["Install"]["0301.img"][string_format::extend_id(itemid, 8)]["info"];
@@ -1357,6 +1361,70 @@ namespace ms
 			show_ride_effect(mount::rider_skill(stats.get_stat(MapleStat::Id::JOB)));
 
 		ride(v, false);
+
+		if (auto statsinfo = UI::get().get_element<UIStatsInfo>())
+			statsinfo->update_all_stats();
+	}
+
+	bool Player::can_get_on() const
+	{
+		int32_t mob = inventory.get_item_id(InventoryType::Id::EQUIPPED, EquipSlot::Id::TAMEDMOB);
+		int32_t saddle = inventory.get_item_id(InventoryType::Id::EQUIPPED, EquipSlot::Id::SADDLE);
+
+		if (mob == 0 || saddle == 0)
+		{
+			InChatMessage(Messages::Type::RIDE_NO_SADDLE).drop();
+			return false;
+		}
+
+		nl::node items = nl::nx::character["TamingMob"];
+		auto info = [&items](int32_t id)
+		{
+			return items[string_format::extend_id(id, 8) + ".img"]["info"];
+		};
+
+		// The saddle, and anything else the mount wears (slot -20), have a least level for it.
+		int32_t worn = inventory.get_item_id(InventoryType::Id::EQUIPPED, 20);
+		bool ready = info(mob)["tamingMob"].get_integer() != 0 &&
+			info(saddle)["reqMobLevel"].get_integer() <= mount_level &&
+			(worn == 0 || info(worn)["reqMobLevel"].get_integer() <= mount_level) &&
+			!(Stage::get().get_mapinfo().get_fieldlimit() & field_limit::RIDING);
+
+		if (!ready)
+			InChatMessage(Messages::Type::RIDE_REFUSED).drop();
+
+		return ready;
+	}
+
+	bool Player::ride_refuses(bool monster_only) const
+	{
+		int32_t ridden = look.get_vehicle();
+		bool monster = mount::is_tamed_monster(ridden);
+
+		if (!monster && (monster_only || !mount::is_vehicle(ridden)))
+			return false;
+
+		InChatMessage(monster ? Messages::Type::RIDING_MONSTER : Messages::Type::RIDING_VEHICLE).drop();
+
+		return true;
+	}
+
+	bool Player::ride_keeps(int32_t itemid)
+	{
+		int32_t type = itemid / 10000;
+
+		if (!mount::is_tamed_monster(look.get_vehicle()) || (type != 190 && type != 191))
+			return false;
+
+		ask_ride(mount::rider_skill(stats.get_stat(MapleStat::Id::JOB)));
+
+		return true;
+	}
+
+	void Player::feed_mount(int16_t slot, int32_t itemid)
+	{
+		if (mount::is_tamed_monster(look.get_vehicle()))
+			request(MountFoodPacket(slot, itemid), ExclRequest::USE_WAIT);
 	}
 
 	// CUserLocal clamps SPEED to 80-140 and JUMP to 80-123 before turning

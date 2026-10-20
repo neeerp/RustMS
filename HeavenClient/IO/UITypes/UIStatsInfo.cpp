@@ -209,8 +209,13 @@ namespace ms
 		update_buffed(StatLabel::AVOID, EquipStat::Id::AVOID, 0);
 		update_buffed(StatLabel::HANDS, EquipStat::Id::HANDS, dex + intl + luk);
 
-		statlabels[StatLabel::SPEED].change_text(std::to_string(stats.get_total(EquipStat::Id::SPEED)) + "%");
-		statlabels[StatLabel::JUMP].change_text(std::to_string(stats.get_total(EquipStat::Id::JUMP)) + "%");
+		// A rider moves as the mount does (FUN_008c2870).
+		const auto &ride = Stage::get().get_player().get_ride_ability();
+		int32_t speed = ride ? ride->speed : stats.get_total(EquipStat::Id::SPEED);
+		int32_t jump = ride ? ride->jump : stats.get_total(EquipStat::Id::JUMP);
+
+		statlabels[StatLabel::SPEED].change_text(std::to_string(speed) + "%");
+		statlabels[StatLabel::JUMP].change_text(std::to_string(jump) + "%");
 	}
 
 	void UIStatsInfo::update_stat(MapleStat::Id)

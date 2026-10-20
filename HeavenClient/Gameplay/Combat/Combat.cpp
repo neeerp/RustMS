@@ -395,20 +395,13 @@ namespace ms
 			return false;
 
 		int32_t vehicle = player.get_vehicle();
-		bool monster = mount::is_tamed_monster(vehicle);
 
-		if (!monster && !mount::is_vehicle(vehicle))
-			return true;
+		if (!mount::is_rider_skill(move_id) || (!mount::is_tamed_monster(vehicle) && !mount::is_vehicle(vehicle)))
+			return !player.ride_refuses();
 
-		if (mount::is_rider_skill(move_id))
-		{
-			if (monster)
-				player.ask_ride(move_id);
-
-			return false;
-		}
-
-		InChatMessage(monster ? Messages::Type::RIDING_MONSTER : Messages::Type::RIDING_VEHICLE).drop();
+		// The rider skill gets off a tamed monster, and does nothing on a vehicle.
+		if (mount::is_tamed_monster(vehicle))
+			player.ask_ride(move_id);
 
 		return false;
 	}
@@ -429,8 +422,11 @@ namespace ms
 		if (moveid == door_rules::MYSTIC_DOOR)
 			return request_door(move, level);
 
-		// Nothing is ridden from a ladder or rope (FUN_00969e21).
-		if (mount::is_rider_skill(moveid) && player.is_climbing())
+		if (mount::is_rider_skill(moveid) && !player.can_get_on())
+			return false;
+
+		// Dashes and event mounts aren't used from a ladder or rope (FUN_00969e21).
+		if (mount::is_ground_only(moveid) && player.is_climbing())
 			return false;
 
 		std::optional<UseSkillPacket::Reach> reach = find_reach(moveid, level);
