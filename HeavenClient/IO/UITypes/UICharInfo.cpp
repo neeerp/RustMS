@@ -20,11 +20,14 @@
 #include "../Components/MapleButton.h"
 
 #include "../../Character/Job.h"
+#include "../../Character/MountRules.h"
+#include "../../Data/ItemData.h"
 #include "../../Gameplay/Stage.h"
 #include "../../IO/UI.h"
 #include "../../IO/UITypes/UIChatBar.h"
 #include "../../IO/UITypes/UITradingRoom.h"
 #include "../../Net/Packets/PlayerInteractionPackets.h"
+#include "../../Util/Misc.h"
 #include "../../Util/NxFiles.h"
 
 #include <nlnx/nx.hpp>
@@ -54,6 +57,15 @@ namespace ms
 		// their name in the box below.
 		const Point<int16_t> PORTRAIT = { 52, 133 };
 		const Point<int16_t> NAME = { 53, 139 };
+
+		// The taming box below has the rider on their mount over a shadow,
+		// the mount's name under them, and its values in two columns.
+		const Point<int16_t> RIDER = { 50, 264 };
+		const Point<int16_t> MOUNT_NAME = { 53, 264 };
+		const Point<int16_t> MOUNT_TYPE = { 58, 287 };
+		const Point<int16_t> MOUNT_LEVEL = { 58, 305 };
+		const Point<int16_t> MOUNT_EXP = { 189, 287 };
+		const Point<int16_t> MOUNT_TIREDNESS = { 189, 305 };
 
 		// Values sit right of the labels; a row's text has its cap top 4
 		// below the row's top.
@@ -97,8 +109,9 @@ namespace ms
 		buttons[Buttons::BT_EXCEPTION] = std::make_unique<MapleButton>(UserInfo["BtExceptionShow"]);
 		buttons[Buttons::BT_PANEL_HIDE] = std::make_unique<MapleButton>(Basic["BtHide"], PANEL + PANEL_HIDE);
 
-		// There are no families, parties, or pets yet.
-		for (auto button : { Buttons::BT_FAMILY, Buttons::BT_PARTY, Buttons::BT_EXCEPTION })
+		// There are no families, parties, or pets yet. The taming box opens
+		// once CHAR_INFO says there is a mount.
+		for (auto button : { Buttons::BT_FAMILY, Buttons::BT_PARTY, Buttons::BT_EXCEPTION, Buttons::BT_TAMING_SHOW })
 			buttons[button]->set_state(Button::State::DISABLED);
 
 		// v83 offers fame only from level 15 (FUN_009007a0), and never for
@@ -115,15 +128,22 @@ namespace ms
 		fame = Text(Text::Font::A12M, Text::Alignment::LEFT, Color::Name::BLACK);
 		guild = Text(Text::Font::A12M, Text::Alignment::LEFT, Color::Name::BLACK);
 		alliance = Text(Text::Font::A12M, Text::Alignment::LEFT, Color::Name::BLACK);
+		mount_name = Text(Text::Font::A12M, Text::Alignment::CENTER, Color::Name::WHITE);
+
+		for (Text *text : { &mount_type, &mount_level, &mount_exp, &mount_tiredness })
+			*text = Text(Text::Font::A12M, Text::Alignment::LEFT, Color::Name::BLACK);
 
 		// Copy what is shown: the character may leave the map while the
-		// window is open.
+		// window is open. The portrait stands even if they ride.
 		if (auto character = Stage::get().get_character(cid))
 		{
 			look = character->get_look();
+			look.set_vehicle(0);
 			name.change_text(character->get_name());
 			known = true;
 		}
+
+		riding = false;
 
 		set_mode(Mode::MAIN);
 		set_panel(Panel::NO_PANEL);
@@ -147,6 +167,18 @@ namespace ms
 
 		for (size_t i = 0; i < 5; i++)
 			rows[i]->draw(position + Point<int16_t>(VALUE_X, ROW_LEVEL + ROW_STEP * i + 4 + TEXT_Y));
+
+		if (mode == Mode::TAMING)
+		{
+			if (riding)
+				rider.draw(rider_args + position, Stance::Id::STAND1, Expression::Id::DEFAULT);
+
+			mount_name.draw(position + MOUNT_NAME);
+			mount_type.draw(position + MOUNT_TYPE);
+			mount_level.draw(position + MOUNT_LEVEL);
+			mount_exp.draw(position + MOUNT_EXP);
+			mount_tiredness.draw(position + MOUNT_TIREDNESS);
+		}
 
 		UIElement::draw_buttons(alpha);
 	}
@@ -228,6 +260,61 @@ namespace ms
 		fame.change_text(std::to_string(f));
 		guild.change_text(g.empty() ? "-" : g);
 		alliance.change_text(a.empty() ? "-" : a);
+	}
+
+	void UICharInfo::update_mount(int32_t character_id, const Mount &mount)
+	{
+		if (character_id != cid || !shows_mount())
+			return;
+
+		int32_t mountid = look.get_equips().get_equip(EquipSlot::Id::TAMEDMOB);
+		int32_t saddleid = look.get_equips().get_equip(EquipSlot::Id::SADDLE);
+
+		if (mountid > 0)
+		{
+			std::string itemname = ItemData::get(mountid).get_name();
+			mount_name.change_text(itemname);
+			mount_type.change_text(itemname);
+		}
+
+		mount_level.change_text(std::to_string(mount.level));
+		mount_exp.change_text(std::to_string(mount.exp));
+		mount_tiredness.change_text(std::to_string(mount.tiredness));
+
+		riding = known && mountid > 0 && saddleid > 0;
+
+		if (riding)
+		{
+			rider = look;
+			rider.set_vehicle(mountid);
+
+			nl::node info = nl::nx::character["TamingMob"][string_format::extend_id(mountid, 8) + ".img"]["info"];
+			mount::InfoPortrait shown = mount::fixed_info_portrait(mountid).value_or(mount::InfoPortrait{
+				static_cast<int32_t>(info["userInfoScale"].get_integer(100)),
+				static_cast<int16_t>(info["userInfoDiffX"].get_integer(0)),
+				static_cast<int16_t>(info["userInfoDiffY"].get_integer(0))
+			});
+			float scale = shown.scale / 100.0f;
+
+			rider_args = DrawArgument(RIDER + Point<int16_t>(shown.x, shown.y), scale, scale);
+		}
+
+		buttons[Buttons::BT_TAMING_SHOW]->set_state(Button::State::NORMAL);
+		set_mode(Mode::TAMING);
+	}
+
+	bool UICharInfo::shows_mount() const
+	{
+		int32_t mountid = look.get_equips().get_equip(EquipSlot::Id::TAMEDMOB);
+		int32_t saddleid = look.get_equips().get_equip(EquipSlot::Id::SADDLE);
+
+		if (mountid <= 0 || saddleid <= 0)
+			return true;
+
+		// A saddle lists the mounts it fits.
+		nl::node saddle = nl::nx::character["TamingMob"][string_format::extend_id(saddleid, 8) + ".img"];
+
+		return static_cast<bool>(saddle[std::to_string(mountid)]);
 	}
 
 	void UICharInfo::change_fame(int16_t f)

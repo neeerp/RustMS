@@ -50,6 +50,9 @@ namespace ms
 
 		void draw(Point<int16_t> pos, bool flip, Stance::Id stance, Expression::Id expression) const;
 
+		// Draw a still pose, on the mount if riding one.
+		void draw(const DrawArgument &args, Stance::Id stance, Expression::Id expression) const;
+
 		bool update(uint16_t timestep);
 
 		void set_hair(int32_t hairid);

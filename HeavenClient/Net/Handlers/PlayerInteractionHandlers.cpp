@@ -32,6 +32,7 @@
 #include "../Packets/MiniRoomPackets.h"
 
 #include <iostream>
+#include <optional>
 
 namespace ms
 {
@@ -48,9 +49,10 @@ namespace ms
 		std::string guild_name = recv.read_string();
 		std::string alliance_name = recv.read_string();
 
-		recv.skip_byte();
-
+		// v83 shows the mount only when this or the first pet's byte is 0 (0xa23869).
+		int8_t unknown = recv.read_byte();
 		int8_t pet_unique_id = recv.read_byte();
+		bool shows_mount = unknown == 0 || pet_unique_id == 0;
 
 		while (pet_unique_id != 0)
 		{
@@ -67,13 +69,16 @@ namespace ms
 			pet_unique_id = recv.read_byte();
 		}
 
-		int8_t mount = recv.read_byte();
+		std::optional<UICharInfo::Mount> mount;
 
-		if (mount != 0)
+		if (recv.read_byte() != 0)
 		{
-			recv.skip_int(); // mount_level
-			recv.skip_int(); // mount_exp
-			recv.skip_int(); // mount_tiredness
+			int32_t mount_level = recv.read_int();
+			int32_t mount_exp = recv.read_int();
+			int32_t mount_tiredness = recv.read_int();
+
+			if (shows_mount)
+				mount = UICharInfo::Mount{ mount_level, mount_exp, mount_tiredness };
 		}
 
 		int8_t wishlist_size = recv.read_byte();
@@ -96,7 +101,12 @@ namespace ms
 
 		// Update the character information window
 		if (auto charinfo = UI::get().get_element<UICharInfo>())
+		{
 			charinfo->update_stats(character_id, character_job_id, character_level, character_fame, guild_name, alliance_name);
+
+			if (mount)
+				charinfo->update_mount(character_id, *mount);
+		}
 	}
 
 	namespace

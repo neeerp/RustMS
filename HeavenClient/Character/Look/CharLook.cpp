@@ -346,6 +346,14 @@ namespace ms
 		draw({position, flipped}, interstance, interexpression, 0, 0);
 	}
 
+	void CharLook::draw(const DrawArgument &args, Stance::Id interstance, Expression::Id interexpression) const
+	{
+		if (riding(interstance))
+			draw_mounted(args, interstance, interexpression, 0, 0);
+		else
+			draw(args, equips.adjust_stance(interstance), interexpression, 0, 0);
+	}
+
 	bool CharLook::update(uint16_t timestep)
 	{
 		// The face and the alert keep the clock's time, even while the body

@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cstdint>
+#include <optional>
 #include <string>
 
 // Riding a tamed monster (Monster Rider) as v83 does it (report 201).
@@ -147,6 +148,35 @@ namespace ms::mount
 				return i;
 
 		return -1;
+	}
+
+	// How the character info window shrinks a rider and moves them in its taming box: by `scale` percent,
+	// `x` and `y` from where the rider stands.
+	struct InfoPortrait
+	{
+		int32_t scale;
+		int16_t x;
+		int16_t y;
+	};
+
+	// The mounts too big for the box, fixed in the client (FUN_00903e24). The rest use their item's
+	// info/userInfoScale, userInfoDiffX and userInfoDiffY.
+	inline std::optional<InfoPortrait> fixed_info_portrait(int32_t mount)
+	{
+		switch (mount)
+		{
+			case 1902002:
+				return InfoPortrait{ 70, -25, -25 };
+			case 1902015:
+				return InfoPortrait{ 80, 0, -12 };
+			case 1902016:
+			case 1902017:
+				return InfoPortrait{ 80, -5, -15 };
+			case 1902018:
+				return InfoPortrait{ 75, -5, -20 };
+			default:
+				return std::nullopt;
+		}
 	}
 
 	// The client keeps count of the answers it waits for after asking to get on or off: while any is

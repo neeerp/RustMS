@@ -42,6 +42,10 @@ int main()
 		require(z_index("saddleRear") == BEHIND && z_index("backTamingMobMid") > BEHIND, "behind");
 		require(z_index("characterEnd") == -1 && z_index("") == -1, "neither");
 
+		auto hog = fixed_info_portrait(1902002);
+		require(hog && hog->scale == 70 && hog->x == -25 && hog->y == -25, "the big ones shrink");
+		require(fixed_info_portrait(1902017)->y == -15 && !fixed_info_portrait(1902000), "the rest use data");
+
 		Pending pending;
 		require(!pending.waiting(0), "nothing asked");
 		pending.asked(100);
