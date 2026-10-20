@@ -48,6 +48,10 @@ int main()
 		require(MobHurts::hurt_by(flashfist, 5001001) && !MobHurts::hurt_by(flashfist, 0),
 				"only Flash Fist hurts it, not a basic attack");
 		require(MobHurts::hurt_by({}, 0), "any attack hurts other mobs");
+		require(MobHurts::hurt_by({}, 0, true) && !MobHurts::hurt_by({}, 1001004, true),
+				"only a basic attack hurts an onlyNormalAttack mob");
+		require(hurts.update(statuses, 0, 1000, {}, true) == std::vector<int32_t>{ 0 },
+				"nor does its poison");
 		require(!MobHurts::hurts(MobStatParser::SPEED), "Slow doesn't hurt");
 	}
 	catch (const std::exception& e)

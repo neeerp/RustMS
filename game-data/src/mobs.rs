@@ -35,6 +35,9 @@ pub struct MobInfo {
     /// for any attack: the pirates' test Octopirates take only Flash Fist
     /// or Double Shot.
     pub damaged_by: Vec<i32>,
+    /// Only basic attacks hurt it (`onlyNormalAttack`): every skill and
+    /// damage over time does nothing.
+    pub only_normal_attack: bool,
     /// Anyone may pick its drops up at once (`publicReward`).
     pub public_reward: bool,
     /// Its drops fly out wide, anyone's at once (`explosiveReward`).
@@ -159,6 +162,9 @@ impl MobInfo {
     /// Whether an attack with `skill` (0 for a basic attack) can hurt it,
     /// as v83's FUN_0068146c judges before zeroing a hit.
     pub fn hurt_by(&self, skill: i32) -> bool {
+        if self.only_normal_attack && skill > 0 {
+            return false;
+        }
         self.damaged_by.is_empty() || self.damaged_by.contains(&skill)
     }
 }
@@ -218,6 +224,7 @@ impl MobData {
             fixed_damage: int("fixedDamage")?,
             invincible: int("invincible")? != 0,
             damaged_by: self.damaged_by(info)?,
+            only_normal_attack: int("onlyNormalAttack")? != 0,
             public_reward: int("publicReward")? != 0,
             explosive_reward: int("explosiveReward")? != 0,
             element: nx.string_child(info, "elemAttr")?.unwrap_or_default(),
@@ -404,6 +411,9 @@ mod tests {
         assert_eq!(mob(9001005).damaged_by, [5001003]);
         assert!(mob(9001006).hurt_by(5001001) && !mob(9001006).hurt_by(0));
         assert!(mob(100100).hurt_by(0));
+        // 9300311 takes only basic attacks.
+        assert!(mob(9300311).only_normal_attack && !mob(100100).only_normal_attack);
+        assert!(mob(9300311).hurt_by(0) && !mob(9300311).hurt_by(1001004));
         // Bergamot's drops are anyone's; Mano's in Mu Lung Dojo fly out.
         assert!(mob(7220003).public_reward && !mob(7220003).explosive_reward);
         assert!(mob(9300184).explosive_reward);

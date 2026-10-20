@@ -21,8 +21,12 @@ namespace ms
 
 		// Whether `skill` (0 for a basic attack) may hurt a mob with this
 		// info/damagedBySelectedSkill list (0x68146c): any, if it's empty.
-		static bool hurt_by(const std::vector<int32_t> &damagedby, int32_t skill)
+		// No skill hurts one with info/onlyNormalAttack.
+		static bool hurt_by(const std::vector<int32_t> &damagedby, int32_t skill, bool onlynormal = false)
 		{
+			if (onlynormal && skill > 0)
+				return false;
+
 			return damagedby.empty() || std::find(damagedby.begin(), damagedby.end(), skill) != damagedby.end();
 		}
 
@@ -41,7 +45,8 @@ namespace ms
 		// Move `elapsed` ms on, returning the numbers due, in the client's
 		// order: Poison, Venom, Ambush.
 		std::vector<int32_t> update(const std::map<uint8_t, MobStatParser::Status> &statuses, int32_t fixeddamage,
-									int32_t elapsed, const std::vector<int32_t> &damagedby = {})
+									int32_t elapsed, const std::vector<int32_t> &damagedby = {},
+									bool onlynormal = false)
 		{
 			std::vector<int32_t> due;
 
@@ -61,7 +66,7 @@ namespace ms
 				if (clock >= INTERVAL)
 				{
 					clock = 0;
-					if (!hurt_by(damagedby, status->second.reason))
+					if (!hurt_by(damagedby, status->second.reason, onlynormal))
 						due.push_back(0);
 					else
 						due.push_back(fixeddamage > 0 ? fixeddamage : status->second.value);
