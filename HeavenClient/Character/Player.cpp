@@ -1612,6 +1612,13 @@ namespace ms
 		return inventory;
 	}
 
+	bool Player::pet_wears(uint8_t index, int32_t itemid) const
+	{
+		auto part = static_cast<EquipSlot::Id>((*pets::equip_parts(itemid))[index]);
+
+		return inventory.get_item_id(InventoryType::Id::EQUIPPED, inventory.shown_equip(part)) == itemid;
+	}
+
 	void Player::command_pets(const std::string &line)
 	{
 		for (PetLook &pet : pets)

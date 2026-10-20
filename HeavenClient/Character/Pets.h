@@ -645,5 +645,53 @@ namespace ms
 
 			std::stable_sort(ids.begin(), ids.end(), [&](int32_t a, int32_t b) { return key(a) < key(b); });
 		}
+
+		// Where the exception window adds `id` to a pet's list (FUN_008fcede):
+		// before the first name after its own. Nowhere when the list is full
+		// or already shows that name.
+		template <typename Name>
+		std::optional<size_t> ignored_slot(const std::vector<int32_t> &ids, int32_t id, Name name)
+		{
+			if (ids.size() >= MAX_IGNORED)
+				return std::nullopt;
+
+			std::string key = ignored_name(id, name);
+
+			for (size_t i = 0; i < ids.size(); i++)
+			{
+				std::string other = ignored_name(ids[i], name);
+
+				if (key == other)
+					return std::nullopt;
+
+				if (key < other)
+					return i;
+			}
+
+			return ids.size();
+		}
+
+		// What the item search matches (FUN_008fbe4b): the text in lower
+		// case, without its spaces.
+		inline std::string search_key(const std::string &text)
+		{
+			std::string key;
+
+			for (char c : text)
+				if (c != ' ')
+					key += static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+
+			return key;
+		}
+
+		// Whether the item search may offer an item of this id at all
+		// (FUN_005d49a4).
+		inline bool searchable(int32_t id)
+		{
+			int32_t family = id / 10000;
+
+			return family != 911 && family != 555 && family != 501 && family != 502 && family != 516
+				   && id / 1000 != 5430 && id / 100 != 11120 && id / 100 != 11128 && id != 5109488;
+		}
 	}
 }

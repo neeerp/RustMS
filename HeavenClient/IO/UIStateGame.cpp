@@ -93,6 +93,8 @@ namespace ms
 					return Tooltip::Parent::BUFFLIST;
 				case UIElement::Type::STATUSBAR:
 					return Tooltip::Parent::STATUSBAR;
+				case UIElement::Type::PETITEMSEARCH:
+					return Tooltip::Parent::PETITEMSEARCH;
 				default:
 					return Tooltip::Parent::NONE;
 			}
@@ -109,6 +111,21 @@ namespace ms
 		// (FUN_008d795a).
 		const Point<int16_t> TOOLTIP_POS = Point<int16_t>(0, 22);
 		const Point<int16_t> QUICKSLOT_TOOLTIP_POS = Point<int16_t>(0, -128) - tooltip::OFFSET;
+		// The item search's results put it 20 right of the cursor (FUN_008fbd2e).
+		const Point<int16_t> SEARCH_TOOLTIP_POS = Point<int16_t>(20, 0) - tooltip::OFFSET;
+
+		Point<int16_t> tooltip_pos(Tooltip::Parent parent)
+		{
+			switch (parent)
+			{
+				case Tooltip::Parent::QUICKSLOT:
+					return QUICKSLOT_TOOLTIP_POS;
+				case Tooltip::Parent::PETITEMSEARCH:
+					return SEARCH_TOOLTIP_POS;
+				default:
+					return TOOLTIP_POS;
+			}
+		}
 	}
 
 	UIStateGame::UIStateGame() : stats(Stage::get().get_player().get_stats()), dragged(nullptr)
@@ -149,7 +166,7 @@ namespace ms
 		Stage::get().draw_overlay(inter);
 
 		if (tooltip)
-			tooltip->draw(cursor + (tooltipparent == Tooltip::Parent::QUICKSLOT ? QUICKSLOT_TOOLTIP_POS : TOOLTIP_POS));
+			tooltip->draw(cursor + tooltip_pos(tooltipparent));
 
 		if (draggedicon)
 			draggedicon->dragdraw(cursor);

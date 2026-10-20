@@ -855,12 +855,8 @@ namespace ms
 		if (player.is_dead() || mapid == 209080000)
 			return;
 
-		const Inventory &inventory = player.get_inventory();
-		// Whether the pet `index` wears `itemid` (FUN_00705e2c).
 		auto wears = [&](uint8_t index, int32_t itemid) {
-			auto part = static_cast<EquipSlot::Id>((*pets::equip_parts(itemid))[index]);
-
-			return inventory.get_item_id(InventoryType::Id::EQUIPPED, inventory.shown_equip(part)) == itemid;
+			return player.pet_wears(index, itemid);
 		};
 
 		// What every pet leaves (FUN_00508679): nothing unless the first pet
