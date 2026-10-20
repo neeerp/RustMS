@@ -1046,6 +1046,10 @@ namespace ms
 							use_sp_reset(slot, item_id);
 						else if (item_id / 10000 == 501)
 							Stage::get().use_item_effect(item_id);
+						// A Water of Life (518xxxx) asks the server, which
+						// offers to revive a doll.
+						else if (item_id / 10000 == 518)
+							WaterOfLifePacket().dispatch();
 
 						break;
 					case InventoryType::Id::ETC:

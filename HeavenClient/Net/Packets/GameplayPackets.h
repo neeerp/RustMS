@@ -334,6 +334,15 @@ namespace ms
 		}
 	};
 
+	// Asks the server to revive a doll with the Water of Life just used
+	// (FUN_00a1dce6); it carries nothing.
+	// Opcode: WATER_OF_LIFE(117)
+	class WaterOfLifePacket : public OutPacket
+	{
+	public:
+		WaterOfLifePacket() : OutPacket(OutPacket::Opcode::WATER_OF_LIFE) {}
+	};
+
 	// Opcode: PET_CHAT(168)
 	class PetChatPacket : public OutPacket
 	{
