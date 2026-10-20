@@ -363,6 +363,13 @@ diesel::table! {
 diesel::joinable!(guild_members -> characters (character_id));
 diesel::joinable!(guild_members -> guilds (guild_id));
 diesel::table! {
+    pet_ignores (serial, item_id) {
+        serial -> Int8,
+        item_id -> Int4,
+    }
+}
+diesel::joinable!(pet_ignores -> pets (serial));
+diesel::table! {
     pets (serial) {
         serial -> Int8,
         #[max_length = 13]
@@ -399,5 +406,6 @@ diesel::allow_tables_to_appear_in_same_query!(
     storage_equipment_stats,
     guilds,
     guild_members,
+    pet_ignores,
     pets,
 );

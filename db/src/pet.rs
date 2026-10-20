@@ -1,7 +1,7 @@
 //! Pets, kept by the cash serial of their item so they keep their name and
 //! closeness in and out of the Cash Inventory.
 
-use crate::schema::pets;
+use crate::schema::{pet_ignores, pets};
 use diesel::pg::PgConnection;
 use diesel::prelude::*;
 use diesel::upsert::excluded;
@@ -31,6 +31,7 @@ impl PetRow {
             fullness: u8::try_from(self.fullness).unwrap_or(0),
             skill: u16::try_from(self.skill).unwrap_or(0),
             attribute: self.attribute,
+            ignored: Vec::new(),
         }
     }
 }
@@ -39,21 +40,27 @@ impl PetRow {
 /// Inventory before.
 pub fn find(serial: i64) -> crate::Result<Option<PetData>> {
     let mut conn = crate::connection()?;
-    Ok(pets::table
-        .find(serial)
-        .first::<PetRow>(&mut conn)
-        .optional()?
-        .map(PetRow::data))
+    Ok(load(&mut conn, &[serial])?.remove(&serial))
 }
 
 /// The pets with these serials.
 pub(crate) fn load(conn: &mut PgConnection, serials: &[i64]) -> QueryResult<HashMap<i64, PetData>> {
-    Ok(pets::table
+    let mut pets: HashMap<i64, PetData> = pets::table
         .filter(pets::serial.eq_any(serials))
         .load::<PetRow>(conn)?
         .into_iter()
         .map(|row| (row.serial, row.data()))
-        .collect())
+        .collect();
+    let ignored: Vec<(i64, i32)> = pet_ignores::table
+        .filter(pet_ignores::serial.eq_any(serials))
+        .order((pet_ignores::serial, pet_ignores::item_id))
+        .load(conn)?;
+    for (serial, item_id) in ignored {
+        if let Some(pet) = pets.get_mut(&serial) {
+            pet.ignored.push(item_id);
+        }
+    }
+    Ok(pets)
 }
 
 /// The serials of the pets in `inventory` that were out, in list order.
@@ -116,5 +123,26 @@ pub(crate) fn save(
             pets::summoned.eq(excluded(pets::summoned)),
         ))
         .execute(conn)?;
+    let serials: Vec<i64> = rows.iter().map(|row| row.serial).collect();
+    diesel::delete(pet_ignores::table.filter(pet_ignores::serial.eq_any(&serials)))
+        .execute(conn)?;
+    let ignored: Vec<_> = inventory
+        .items(InventoryType::Cash)
+        .filter_map(|(_, item)| Some((item.cash_serial?, item.pet.as_ref()?)))
+        .flat_map(|(serial, pet)| {
+            pet.ignored.iter().map(move |&item_id| {
+                (
+                    pet_ignores::serial.eq(serial),
+                    pet_ignores::item_id.eq(item_id),
+                )
+            })
+        })
+        .collect();
+    if !ignored.is_empty() {
+        diesel::insert_into(pet_ignores::table)
+            .values(&ignored)
+            .on_conflict_do_nothing()
+            .execute(conn)?;
+    }
     Ok(())
 }

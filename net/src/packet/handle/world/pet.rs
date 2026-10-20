@@ -152,6 +152,60 @@ impl WorldHandler for PetLootHandler {
     }
 }
 
+/// PET_EXCLUDE_ITEMS (0xAC, FUN_00706393): a summoned pet's cash serial and
+/// the whole of its exception list, mesos as 0x7fffffff, sent on every
+/// change in the list's window. The client keeps the list, so nothing comes
+/// back.
+pub struct PetExcludeItemsHandler;
+
+impl WorldHandler for PetExcludeItemsHandler {
+    fn handle(&self, packet: &mut Packet, ctx: &mut WorldContext) -> WorldResult {
+        let mut r = Cursor::new(&packet.bytes);
+        r.read_short()?;
+        let serial = r.read_long()?;
+        let count = r.read_byte()?;
+        let mut ignored = Vec::with_capacity(usize::from(count));
+        for _ in 0..count {
+            ignored.push(r.read_int()?);
+        }
+        let known = |item_id| item_id == pet::IGNORED_MESOS || items::info(item_id).is_some();
+        ignore_items(ctx.player, serial, ignored, known);
+        Ok(HandlerResult::empty())
+    }
+}
+
+/// Give the summoned pet `serial` the exception list `ignored`: at most ten
+/// different drops, each mesos or an item `known`. False, with nothing
+/// changed, otherwise.
+fn ignore_items(
+    player: &mut Player,
+    serial: i64,
+    ignored: Vec<i32>,
+    known: impl Fn(i32) -> bool,
+) -> bool {
+    let unique = ignored
+        .iter()
+        .enumerate()
+        .all(|(i, item_id)| !ignored[..i].contains(item_id));
+    if !player.pets.contains(&serial)
+        || ignored.len() > pet::MAX_IGNORED
+        || !unique
+        || !ignored.iter().all(|&item_id| known(item_id))
+    {
+        return false;
+    }
+    let Some((slot, mut item)) = pet_item(player, serial) else {
+        return false;
+    };
+    let Some(data) = item.pet.as_mut() else {
+        return false;
+    };
+    data.ignored = ignored;
+    player.inventory.insert(InventoryType::Cash, slot, item);
+    player.mark_dirty();
+    true
+}
+
 /// PET_COMMAND (0xA9, FUN_00704d5d): the pet's cash serial, whether the
 /// words began with its name, and the command (`interact/<n>`) they
 /// matched. The server rolls whether the pet obeys; obeying earns
@@ -568,6 +622,34 @@ mod tests {
     fn tiger(player: &Player) -> PetData {
         let item = player.inventory.get(InventoryType::Cash, 3).unwrap();
         item.pet.clone().unwrap()
+    }
+
+    #[test]
+    fn a_pet_out_takes_its_exception_list() {
+        let mut player = owner();
+        let known = |item_id| item_id != 4_000_999;
+        assert!(ignore_items(
+            &mut player,
+            77,
+            vec![4_000_000, pet::IGNORED_MESOS],
+            known
+        ));
+        assert_eq!(tiger(&player).ignored, [4_000_000, pet::IGNORED_MESOS]);
+        assert!(ignore_items(&mut player, 77, vec![], known));
+        assert!(tiger(&player).ignored.is_empty());
+    }
+
+    #[test]
+    fn a_bad_exception_list_changes_nothing() {
+        let mut player = owner();
+        let known = |item_id| item_id != 4_000_999;
+        assert!(!ignore_items(&mut player, 78, vec![4_000_000], known));
+        assert!(!ignore_items(&mut player, 77, vec![4_000_999], known));
+        assert!(!ignore_items(&mut player, 77, vec![4_000_000; 2], known));
+        assert!(!ignore_items(&mut player, 77, (0..11).collect(), |_| true));
+        player.pets.clear();
+        assert!(!ignore_items(&mut player, 77, vec![4_000_000], known));
+        assert!(tiger(&player).ignored.is_empty());
     }
 
     #[test]

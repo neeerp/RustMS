@@ -737,6 +737,10 @@ fn world_routes() -> &'static HashMap<i16, WorldRoute> {
             (Op::PetFood, InGame(&world::PetFoodHandler)),
             (Op::UseMountFood, InGame(&world::MountFoodHandler)),
             (Op::PetLoot, InGame(&world::PetLootHandler)),
+            (
+                Op::PetExcludeItems,
+                InGame(&world::PetExcludeItemsHandler),
+            ),
             (Op::UseCashItem, InGame(&world::UseCashItemHandler)),
             (Op::CloseChalkboard, InGame(&world::CloseChalkboardHandler)),
             (

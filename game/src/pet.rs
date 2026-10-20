@@ -25,6 +25,12 @@ pub const MAX_CLOSENESS: i16 = 30000;
 /// A pet this full won't eat, and loses closeness for being fed.
 pub const MAX_FULLNESS: u8 = 100;
 
+/// A pet leaves at most ten kinds of drop (v83 FUN_008fcede).
+pub const MAX_IGNORED: usize = 10;
+
+/// The item id that stands for mesos among the drops a pet leaves.
+pub const IGNORED_MESOS: i32 = i32::MAX;
+
 /// What a pet item carries besides the item itself (v83 GW_ItemSlotPet).
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct PetData {
@@ -35,6 +41,9 @@ pub struct PetData {
     /// `petSkill` bits; 0x100 lets the pet speak at events.
     pub skill: u16,
     pub attribute: i16,
+    /// The items, and mesos as `IGNORED_MESOS`, the pet leaves where they
+    /// lie: its exception list.
+    pub ignored: Vec<i32>,
 }
 
 impl PetData {
@@ -47,6 +56,7 @@ impl PetData {
             fullness: 100,
             skill: 0,
             attribute: 0,
+            ignored: Vec::new(),
         }
     }
 }
