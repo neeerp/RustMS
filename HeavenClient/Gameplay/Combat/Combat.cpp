@@ -583,6 +583,7 @@ namespace ms
 			int32_t skill = summon->get_skill();
 
 			if (summon->get_assist() != summon_rules::ATTACK || !summon->is_idle() ||
+				!summon_rules::attacks_riding(player.get_vehicle(), skill) ||
 				now - summon->last_attack < summon_rules::attack_interval(skill))
 				continue;
 

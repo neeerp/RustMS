@@ -149,6 +149,15 @@ namespace ms::summon_rules
 		return skill == WRATH_OF_THE_OCTOPI || skill == GAVIOTA ? 1500 : 3000;
 	}
 
+	// Whether it attacks while its owner rides `vehicle`, 0 for none (FUN_007a4d42): on a 190xxxx or
+	// 193xxxx mount only the Octopi and Gaviota do.
+	inline bool attacks_riding(int32_t vehicle, int32_t skill)
+	{
+		int32_t kind = vehicle / 10000;
+
+		return (kind != 190 && kind != 193) || is_octopus(skill) || skill == GAVIOTA;
+	}
+
 	// The animation for a move action (`stance << 1 | left`), unless a
 	// one-shot plays (FUN_007a3d98).
 	inline Action pick(int8_t oneshot, uint8_t action)

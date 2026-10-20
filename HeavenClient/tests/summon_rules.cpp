@@ -20,6 +20,10 @@ int main()
 		require(can_act(STATIONARY, OCTOPUS), "the Octopus stays put but shoots");
 		require(attack_interval(3111005) == 3000 && attack_interval(GAVIOTA) == 1500,
 				"Gaviota and Wrath of the Octopi attack twice as often");
+		require(attacks_riding(0, 3111005) && !attacks_riding(1902000, 3111005) && !attacks_riding(1932000, 2121005),
+				"a rider's summons stand idle");
+		require(attacks_riding(1902000, OCTOPUS) && attacks_riding(1932000, GAVIOTA),
+				"but the Octopi and Gaviota still attack");
 		require(pick(-1, 1 << 1 | 1) == MOVE && pick(-1, 6 << 1) == FLY && pick(-1, 0) == STAND,
 				"the move action picks move, fly, or stand");
 		require(pick(ATTACK1, 1 << 1) == ATTACK1, "a one-shot plays over the move action");
