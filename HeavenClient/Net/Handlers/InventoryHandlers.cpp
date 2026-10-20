@@ -277,6 +277,9 @@ namespace ms
 					messenger->show_status(Color::Name::YELLOW, line);
 		}
 
+		// As after a stat change, v83 checks the alert's quests again (FUN_00a1ead9 -> FUN_00a0843c).
+		Stage::get().get_quest_alert().stats_changed();
+
 		UI::get().enable();
 	}
 }

@@ -225,6 +225,8 @@ namespace ms
 			handle_ride(recv, flags);
 
 		Stage::get().get_player().recalc_stats();
+		// Giving and cancelling buffs check the alert's quests again too (FUN_00a202be, FUN_00a2071f).
+		Stage::get().get_quest_alert().stats_changed();
 	}
 
 	void ApplyBuffHandler::handle_buff(InPacket& recv, Buffstat::Id bs) const
@@ -348,6 +350,9 @@ namespace ms
 			if (auto skillbook = UI::get().get_element<UISkillBook>())
 				skillbook->update_skills(skillid);
 		}
+
+		// So does a skill update (FUN_00a1e48c).
+		Stage::get().get_quest_alert().stats_changed();
 
 		UI::get().enable();
 	}
