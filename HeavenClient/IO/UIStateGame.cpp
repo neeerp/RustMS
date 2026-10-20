@@ -19,6 +19,7 @@
 
 #include "UI.h"
 #include "InputFocus.h"
+#include "Components/TooltipBox.h"
 
 #include "UITypes/UIBuffList.h"
 #include "UITypes/UIPartyHP.h"
@@ -66,6 +67,8 @@ namespace ms
 					return Tooltip::Parent::ITEMINVENTORY;
 				case UIElement::Type::SKILLBOOK:
 					return Tooltip::Parent::SKILLBOOK;
+				case UIElement::Type::SKILLMACRO:
+					return Tooltip::Parent::SKILLMACRO;
 				case UIElement::Type::SHOP:
 					return Tooltip::Parent::SHOP;
 				case UIElement::Type::STORAGE:
@@ -94,6 +97,18 @@ namespace ms
 					return Tooltip::Parent::NONE;
 			}
 		}
+
+		// The quick slots' tooltips belong to the status bar too.
+		bool tooltip_belongs(Tooltip::Parent parent, UIElement::Type type)
+		{
+			return tooltip_parent_for(type) == parent ||
+				   (parent == Tooltip::Parent::QUICKSLOT && type == UIElement::Type::STATUSBAR);
+		}
+
+		// Where tooltips are drawn against the cursor. The quick slots put the box's top-left 128 above it instead
+		// (FUN_008d795a).
+		const Point<int16_t> TOOLTIP_POS = Point<int16_t>(0, 22);
+		const Point<int16_t> QUICKSLOT_TOOLTIP_POS = Point<int16_t>(0, -128) - tooltip::OFFSET;
 	}
 
 	UIStateGame::UIStateGame() : stats(Stage::get().get_player().get_stats()), dragged(nullptr)
@@ -134,7 +149,7 @@ namespace ms
 		Stage::get().draw_overlay(inter);
 
 		if (tooltip)
-			tooltip->draw(cursor + Point<int16_t>(0, 22));
+			tooltip->draw(cursor + (tooltipparent == Tooltip::Parent::QUICKSLOT ? QUICKSLOT_TOOLTIP_POS : TOOLTIP_POS));
 
 		if (draggedicon)
 			draggedicon->dragdraw(cursor);
@@ -177,7 +192,7 @@ namespace ms
 		{
 			auto &element = elements[type];
 
-			if (tooltipparent != Tooltip::Parent::NONE && tooltip_parent_for(type) == tooltipparent &&
+			if (tooltipparent != Tooltip::Parent::NONE && owns_tooltip(type) &&
 				!(element && element->is_active()))
 			{
 				clear_tooltip(tooltipparent);
@@ -384,6 +399,21 @@ namespace ms
 									chatbar->set_target(UIChatBar::Target::GUILD);
 
 								break;
+							case KeyAction::Id::ALLIANCECHAT:
+								if (auto chatbar = UI::get().get_element<UIChatBar>())
+									chatbar->set_target(UIChatBar::Target::ALLIANCE);
+
+								break;
+							case KeyAction::Id::TOSPOUSE:
+								if (auto chatbar = UI::get().get_element<UIChatBar>())
+									chatbar->set_target(UIChatBar::Target::SPOUSE);
+
+								break;
+							case KeyAction::Id::WHISPER:
+								if (auto chatbar = UI::get().get_element<UIChatBar>())
+									chatbar->ask_whisper_name();
+
+								break;
 							case KeyAction::Id::TOGGLECHAT:
 								if (auto chatbar = UI::get().get_element<UIChatBar>())
 									if (!chatbar->is_chatfieldopen())
@@ -425,6 +455,7 @@ namespace ms
 				case KeyType::Id::FACE:
 				case KeyType::Id::ITEM:
 				case KeyType::Id::SKILL:
+				case KeyType::Id::MACRO:
 					Stage::get().send_key(type, action, pressed);
 					break;
 			}
@@ -468,7 +499,7 @@ namespace ms
 						UIElement::Type front_type = front->get_type();
 
 						if (tooltipparent != Tooltip::Parent::NONE)
-							if (tooltip_parent_for(front_type) != tooltipparent)
+							if (!owns_tooltip(front_type))
 								clear_tooltip(tooltipparent);
 
 						remove_cursor(front_type);
@@ -515,15 +546,17 @@ namespace ms
 		}
 	}
 
-	void UIStateGame::send_scroll(double yoffset)
+	// Only the window under the cursor gets the wheel, even with nothing to scroll, and none over the field. A modal
+	// window gets it wherever the cursor is (FUN_009e42b2).
+	void UIStateGame::send_scroll(double yoffset, Point<int16_t> pos)
 	{
-		for (auto &type : elementorder)
-		{
-			auto &element = elements[type];
+		UIElement *target = get_focused();
 
-			if (element && element->is_active())
-				element->send_scroll(yoffset);
-		}
+		if (!target)
+			target = get_front(pos);
+
+		if (target)
+			target->send_scroll(yoffset);
 	}
 
 	void UIStateGame::send_close()
@@ -592,6 +625,13 @@ namespace ms
 		}
 	}
 
+	void UIStateGame::show_macro(Tooltip::Parent parent, size_t index)
+	{
+		mctooltip.set_macro(index, UI::get().get_skill_macros());
+		tooltip = mctooltip;
+		tooltipparent = parent;
+	}
+
 	void UIStateGame::show_text(Tooltip::Parent parent, std::string text)
 	{
 		tetooltip.set_text(text);
@@ -635,6 +675,30 @@ namespace ms
 			tooltip = pltooltip;
 			tooltipparent = parent;
 		}
+	}
+
+	void UIStateGame::show_help(UIElement::Type owner, std::string title, std::string description,
+								std::optional<Point<int16_t>> anchor, bool above)
+	{
+		pltooltip.set_help(title, description, anchor, above);
+
+		if (!pltooltip.empty())
+		{
+			tooltip = pltooltip;
+			tooltipparent = Tooltip::Parent::HELP;
+			help_owner = owner;
+		}
+	}
+
+	void UIStateGame::clear_help(UIElement::Type owner)
+	{
+		if (tooltipparent == Tooltip::Parent::HELP && help_owner == owner)
+			clear_tooltip(Tooltip::Parent::HELP);
+	}
+
+	bool UIStateGame::owns_tooltip(UIElement::Type type) const
+	{
+		return tooltipparent == Tooltip::Parent::HELP ? help_owner == type : tooltip_belongs(tooltipparent, type);
 	}
 
 	template<class T, typename...Args>
@@ -748,7 +812,7 @@ namespace ms
 		if (type == focused)
 			focused = UIElement::Type::NONE;
 
-		if (tooltip_parent_for(type) == tooltipparent)
+		if (owns_tooltip(type))
 			clear_tooltip(tooltipparent);
 
 		elementorder.remove(type);

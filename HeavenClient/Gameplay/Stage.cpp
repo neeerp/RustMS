@@ -42,6 +42,8 @@
 #include "../IO/UITypes/UITradingRoom.h"
 #include "../Net/Packets/AttackAndSkillPackets.h"
 #include "../Net/Packets/GameplayPackets.h"
+#include "../Net/Packets/MessagingPackets.h"
+#include "../Data/SkillData.h"
 
 #include <nlnx/nx.hpp>
 
@@ -95,6 +97,7 @@ namespace ms
 
 		jump_effect = nl::nx::effect["BasicEff.img"]["VerticalJump"];
 		fear_sight = nl::nx::effect["MapEff.img"]["Viewrange"]["3"];
+		quest_alert.init();
 	}
 
 	void Stage::load(int32_t mapid, int8_t portalid, std::optional<Point<int16_t>> chase)
@@ -105,6 +108,9 @@ namespace ms
 				load_map(mapid);
 				respawn(portalid, chase);
 				show_quest_tags();
+
+				if (mapid != -1)
+					quest_alert.enter_field(mapid);
 
 				if (pending_clock && clock.is_present())
 					clock.set(pending_clock->hour, pending_clock->minute, pending_clock->second);
@@ -146,6 +152,7 @@ namespace ms
 		emote_cooldown = {};
 		fame_cooldown = {};
 		item_effect_shown = -1;
+		quest_alert.reset();
 
 		CharStats stats = player.get_stats();
 		levelBefore = stats.get_stat(MapleStat::Id::LEVEL);
@@ -252,6 +259,11 @@ namespace ms
 			mobs.draw(id, viewx, viewy, alpha);
 			chars.draw(id, viewx, viewy, alpha);
 			player.draw(id, viewx, viewy, alpha);
+
+			// The quest alert is in front of the player (z 3 at the face, FUN_00941417).
+			if (id == player.get_layer())
+				quest_alert.draw(player.get_phobj().get_absolute(viewx, viewy, alpha) + player.get_face_offset(), alpha);
+
 			drops.draw(id, viewx, viewy, alpha);
 			summons.draw(id, viewx, viewy, alpha);
 		}
@@ -328,6 +340,10 @@ namespace ms
 			return;
 
 		combat.update();
+
+		if (auto step = macro_runner.due(Constants::TIMESTEP))
+			macro_runner.tried(try_macro_step(*step));
+
 		backgrounds.update();
 		clouds.update();
 		weather.update();
@@ -344,6 +360,8 @@ namespace ms
 
 		if (since_quest_tags > QUEST_TAG_INTERVAL || player.get_quests().revision() != quest_tags_revision)
 			show_quest_tags();
+
+		quest_alert.update();
 
 		reactors.update(physics);
 		mists.update();
@@ -874,6 +892,16 @@ namespace ms
 		if (state != State::ACTIVE || !playable || player.is_dead())
 			return;
 
+		// Any other bound key going down drops the macro running (v83
+		// FUN_0094f2ed), and so do Left and Right going down or up
+		// (FUN_0094c856). Down isn't bound in v83.
+		bool walking = type == KeyType::Id::ACTION
+					   && (action == KeyAction::Id::LEFT || action == KeyAction::Id::RIGHT);
+		bool crouching = type == KeyType::Id::ACTION && action == KeyAction::Id::DOWN;
+
+		if (walking || (down && type != KeyType::Id::MACRO && !crouching))
+			macro_runner.clear();
+
 		switch (type)
 		{
 			case KeyType::Id::ACTION:
@@ -917,6 +945,16 @@ namespace ms
 					player.use_item(action);
 
 				break;
+			// The macro at the key's place in the list, unless a skill is held
+			// down (FUN_0094f2ed).
+			case KeyType::Id::MACRO:
+				if (down && !combat.is_preparing())
+					macro_runner.start(UI::get().get_skill_macros(), action, [](int32_t skill)
+					{
+						return SkillData::get(skill).has_cooltime();
+					});
+
+				break;
 			case KeyType::Id::FACE:
 				if (down && emote_cooldown.try_start(get_uptime() / 1000))
 				{
@@ -927,6 +965,39 @@ namespace ms
 
 				break;
 		}
+	}
+
+	void Stage::stop_macro()
+	{
+		macro_runner.clear();
+	}
+
+	bool Stage::try_macro_step(const skill_macro::Step& step)
+	{
+		// In Dark Sight only Assassinate goes. (v83 lets Vanish's owner use
+		// any skill; there is no Vanish here.)
+		constexpr int32_t ASSASSINATE = 4221001;
+
+		if (player.has_buff(Buffstat::Id::DARKSIGHT) && step.skill != ASSASSINATE)
+			return false;
+
+		// Nor does anything while a mini room is open.
+		auto shop = UI::get().get_element<UIPersonalShop>();
+		auto trade = UI::get().get_element<UITradingRoom>();
+
+		if ((shop && shop->is_active()) || (trade && trade->is_active()))
+			return false;
+
+		if (!combat.use_move(step.skill))
+			return false;
+
+		const SkillMacros &macros = UI::get().get_skill_macros();
+
+		// The first skill to go off says the macro's name, in a balloon only.
+		if (step.first && macros.shouts(step.macro) && UI::get().get_element<UIChatBar>())
+			GeneralChatPacket(macros.name(step.macro), true).dispatch();
+
+		return true;
 	}
 
 	void Stage::talk_to_nearest_npc()
@@ -1029,6 +1100,7 @@ namespace ms
 	void Stage::release_cursor()
 	{
 		player.release_chalkboard_cursor();
+		quest_alert.release_cursor();
 	}
 
 	Cursor::State Stage::send_cursor(bool pressed, Point<int16_t> position)
@@ -1080,6 +1152,11 @@ namespace ms
 		}
 
 		Cursor::State npcstate = npcs.send_cursor(pressed, position, camera.position());
+
+		// Then the quest alert (FUN_0094fa8e).
+		if (npcstate == Cursor::State::IDLE)
+			quest_alert.send_cursor(player.get_position() + player.get_face_offset() + camera.position(), position,
+									pressed, UI::get().is_cursor_pressed());
 
 		// A shop's balloon shows the house cursor (FUN_00531cc7).
 		if (npcstate == Cursor::State::IDLE && mini_room_at(position))
@@ -1142,6 +1219,11 @@ namespace ms
 	Player &Stage::get_player()
 	{
 		return player;
+	}
+
+	QuestAlert &Stage::get_quest_alert()
+	{
+		return quest_alert;
 	}
 
 	Combat &Stage::get_combat()

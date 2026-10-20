@@ -37,6 +37,7 @@ async fn read_until(
             SendOpcode::MoveMonster as i16,
             SendOpcode::StatChange as i16,
             SendOpcode::KeyMap as i16,
+            SendOpcode::MacroSysDataInit as i16,
         ];
         if !skippable.contains(&envelope.opcode()) {
             return Err(HarnessError::protocol(

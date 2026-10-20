@@ -18,6 +18,7 @@
 #pragma once
 
 #include <cstdint>
+#include <string>
 
 #include "Components/Button.h"
 #include "Components/Icon.h"
@@ -60,6 +61,7 @@ namespace ms
 			ITEMINVENTORY,
 			EQUIPINVENTORY,
 			SKILLBOOK,
+			SKILLMACRO,
 			QUESTLOG,
 			WORLDMAP,
 			USERLIST,
@@ -169,6 +171,12 @@ namespace ms
 		bool is_holding_button() const
 		{ return holding; }
 
+		// Help for a button while the cursor is over it, from the Title and
+		// Desc at path in String's ToolTipHelp.img (CCtrlButton::
+		// SetToolTipHelp, FUN_004c10f7). A path that isn't there leaves the
+		// button as it was.
+		void set_button_help(uint16_t buttonid, const std::string &path, bool above = false);
+
 		std::map<uint16_t, std::unique_ptr<Button>> buttons;
 		std::vector<Sprite> sprites;
 		Point<int16_t> position;
@@ -184,7 +192,23 @@ namespace ms
 		// Let go of the pressed button without clicking it.
 		void release_button();
 
+		Cursor::State send_cursor_to_buttons(bool down, Point<int16_t> pos);
+
+		// Show the help of the button under the cursor, or take it down: v83
+		// shows it only while the button looks hovered (FUN_004c0bed).
+		void update_help();
+
 		bool holding = false;
 		uint16_t held_button = 0;
+
+		struct ButtonHelp
+		{
+			std::string title;
+			std::string desc;
+			bool above;
+		};
+
+		std::map<uint16_t, ButtonHelp> button_help;
+		bool help_up = false;
 	};
 }

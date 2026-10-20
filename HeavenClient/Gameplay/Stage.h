@@ -24,7 +24,9 @@
 
 #include "Combat/Combat.h"
 #include "EmoteCooldown.h"
+#include "QuestAlert.h"
 #include "FameCooldown.h"
+#include "SkillMacroRules.h"
 #include "TrembleRules.h"
 #include "MapleMap/MapInfo.h"
 #include "MapleMap/MapTilesObjs.h"
@@ -83,6 +85,9 @@ namespace ms
 		// Talk to the nearest NPC in reach, as if it had been clicked.
 		void talk_to_nearest_npc();
 
+		// Drop the rest of the skill macro running (v83 FUN_00631a80).
+		void stop_macro();
+
 		// The character under a cursor position, or 0 if there is none.
 		int32_t character_at(Point<int16_t> cursorpos);
 		// Someone else under a cursor position, by v83's box for opening the
@@ -135,6 +140,9 @@ namespace ms
 
 		// Returns a reference to the Player.
 		Player &get_player();
+
+		// The bulb over the player that offers auto quests.
+		QuestAlert &get_quest_alert();
 
 		// Return a reference to the attack and buff component.
 		Combat &get_combat();
@@ -246,6 +254,10 @@ namespace ms
 	private:
 		void load_map(int32_t mapid);
 
+		// Try the running macro's next skill; returns whether it went off
+		// (v83 FUN_0063196b).
+		bool try_macro_step(const skill_macro::Step& step);
+
 		void respawn(int8_t portalid, std::optional<Point<int16_t>> chase);
 
 		void check_portals();
@@ -325,6 +337,7 @@ namespace ms
 		// The ms since the quest-bound tags were last looked at, and the quest log they were looked at for.
 		int32_t since_quest_tags = 0;
 		uint64_t quest_tags_revision = 0;
+		QuestAlert quest_alert;
 		MapBackgrounds backgrounds;
 		MapPortals portals;
 		MapReactors reactors;
@@ -363,6 +376,7 @@ namespace ms
 		Texture fear_sight;
 
 		Combat combat;
+		skill_macro::Runner macro_runner;
 		EmoteCooldown emote_cooldown;
 		FameCooldown fame_cooldown;
 		// When the last effect item was shown, in ms of uptime, or -1.

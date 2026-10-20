@@ -692,6 +692,7 @@ fn world_routes() -> &'static HashMap<i16, WorldRoute> {
             (Op::UseSummonBag, InGame(&world::UseSummonSackHandler)),
             (Op::UseCatchItem, InGame(&world::UseCatchItemHandler)),
             (Op::UseTeleportRock, InGame(&world::UseTeleportRockHandler)),
+            (Op::SkillMacro, InGame(&world::SkillMacroHandler)),
             (Op::UseSolomonItem, InGame(&world::UseSolomonItemHandler)),
             (Op::UseGachaExp, InGame(&world::UseGachaExpHandler)),
             (

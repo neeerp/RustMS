@@ -243,6 +243,8 @@ namespace ms
 
 		// Return if the character is facing left
 		bool getflip() const;
+		// Where the face is drawn from the feet: the look's face position, mirrored when facing right.
+		Point<int16_t> get_face_offset() const;
 		// Return the name of this character
 		std::string get_name() const;
 		// The guild tag under the character's name: the guild's name, or ""

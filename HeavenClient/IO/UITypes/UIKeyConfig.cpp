@@ -276,6 +276,14 @@ namespace ms
 			unbound_actions_pos[function.action] = palette_slot(function.icon);
 		}
 
+		// v83 FUN_0083488e.
+		nl::node macroicons = NxFiles::ui_classic["UIWindow.img"]["SkillMacro"]["Macroicon"];
+
+		for (int32_t i = 0; i < static_cast<int32_t>(SkillMacros::MAX_MACROS); i++)
+			macro_icons[i] = std::make_unique<Icon>(
+				std::make_unique<MappingIcon>(Keyboard::Mapping(KeyType::Id::MACRO, i)),
+				macroicons[std::to_string(i)]["icon"], -1);
+
 		dimension = bg.get_dimensions();
 		dragarea = Point<int16_t>(dimension.x(), 20);
 
@@ -431,6 +439,8 @@ namespace ms
 					show_item(mapping.action);
 				else if (mapping.type == KeyType::Id::SKILL)
 					show_skill(mapping.action);
+				else if (mapping.type == KeyType::Id::MACRO)
+					UI::get().show_macro(Tooltip::Parent::KEYCONFIG, mapping.action);
 
 				return Cursor::State::CANGRAB;
 			}
@@ -466,6 +476,16 @@ namespace ms
 			answer_notice(false);
 		else
 			safe_close();
+	}
+
+	// v83 builds the window anew each time it opens, so it shows the keys as
+	// they are, including any bound from a quick slot while it was shut.
+	void UIKeyConfig::toggle_active()
+	{
+		UIElement::toggle_active();
+
+		if (active)
+			reset();
 	}
 
 	UIElement::Type UIKeyConfig::get_type() const
@@ -748,6 +768,10 @@ namespace ms
 
 			return iter == skill_icons.end() ? nullptr : iter->second.get();
 		}
+
+		if (mapping.type == KeyType::Id::MACRO)
+			return mapping.action >= 0 && mapping.action < static_cast<int32_t>(SkillMacros::MAX_MACROS)
+				? macro_icons[mapping.action].get() : nullptr;
 
 		if (is_action_mapping(mapping))
 			return action_icons.at(KeyAction::actionbyid(mapping.action)).get();

@@ -41,6 +41,7 @@
 #include "../Components/MapleButton.h"
 #include "../Components/MenuCover.h"
 
+#include "../../Configuration.h"
 #include "../../Character/ExpTable.h"
 #include "../../Character/GachaExp.h"
 #include "../../Data/ItemData.h"
@@ -118,11 +119,14 @@ namespace ms
 
 		const Point<int16_t> GAUGE_POS = Point<int16_t>(218, 38);
 
-		// The EXP numbers over the gauge, (441, 559) to (556, 574) on v83's
+		// The EXP numbers over the gauge, (442, 560) to (555, 573) on v83's
 		// 800x600 screen: hovering shows the EXP and any gacha EXP, and
 		// double-clicking asks to take the gacha EXP in (FUN_008d76d7,
 		// FUN_008d7611).
-		constexpr Rectangle<int16_t> EXP_NUMBERS = Rectangle<int16_t>(441, 555, 30, 44);
+		constexpr Rectangle<int16_t> EXP_NUMBERS = Rectangle<int16_t>(442, 555, 31, 44);
+		// The job and name, (88, 559) to (170, 573): hovering shows the
+		// login ID, channel and name (FUN_008d76d7, StringPool 0x7d3).
+		constexpr Rectangle<int16_t> NAME_AREA = Rectangle<int16_t>(88, 170, 30, 44);
 
 		constexpr const char *TAKE_GACHA_EXP = "Do you wish to charge the EXP \\nearned from The Writs of Solomon?";
 
@@ -134,8 +138,9 @@ namespace ms
 		// The soHPFlash and soMPFlash options, in 5% steps. v83 reads them
 		// from the registry, 10 (50%) unless set in the options.
 		constexpr int32_t FLASH_LEVEL = 10;
-		const Point<int16_t> CELL_SPACING = Point<int16_t>(35, 34);
-		const Point<int16_t> LABEL_SPACING = Point<int16_t>(35, 33);
+		// Quick slot cells are 32 x 32 at (7, 8) + (35, 33) per column and row (0xbe2db0).
+		const Point<int16_t> CELL_PITCH = Point<int16_t>(35, 33);
+		constexpr int16_t CELL_SIZE = 32;
 
 		// Bind a key to a mapping and tell the server. As in Key Config, the
 		// mapping leaves any other key it was on.
@@ -203,6 +208,9 @@ namespace ms
 		for (auto &iter : ACTION_ICONS)
 			action_icons[iter.first] = window["KeyConfig"]["icon"][std::to_string(iter.second)];
 
+		for (size_t i = 0; i < SkillMacros::MAX_MACROS; i++)
+			macro_icons[i] = window["SkillMacro"]["Macroicon"][std::to_string(i)]["icon"];
+
 		const char *hint_keys[Key::NUM_KEYS] = { "EquipKey", "InvenKey", "StatKey", "SkillKey" };
 
 		for (size_t i = 0; i < Key::NUM_KEYS; i++)
@@ -235,6 +243,14 @@ namespace ms
 
 		buttons[Buttons::BT_QUICKSLOT_SHOW]->set_active(!quickslot_active);
 		buttons[Buttons::BT_QUICKSLOT_HIDE]->set_active(quickslot_active);
+
+		// v83 turns Menu's help off and attaches the trade button's to the
+		// Cash Shop's by mistake, so only these have any (FUN_008d01b2).
+		set_button_help(Buttons::BT_CASHSHOP, "Game/Button/Shop");
+		set_button_help(Buttons::BT_KEYSET, "Game/Button/KeySet");
+		set_button_help(Buttons::BT_QUICKSLOT_SHOW, "Game/Button/QuickSlot");
+		set_button_help(Buttons::BT_QUICKSLOT_HIDE, "Game/Button/QuickSlotD");
+		set_button_help(Buttons::BT_CLAIM, "Game/Button/Claim");
 
 		quickslot_pos = Point<int16_t>(647 + right, QUICKSLOT_TOP);
 
@@ -433,7 +449,7 @@ namespace ms
 		{
 			int16_t col = i % 4;
 			int16_t row = i / 4;
-			Point<int16_t> cellpos = panel + Point<int16_t>(7 + col * CELL_SPACING.x(), 8 + row * CELL_SPACING.y());
+			Point<int16_t> cellpos = panel + Point<int16_t>(7 + col * CELL_PITCH.x(), 8 + row * CELL_PITCH.y());
 
 			Keyboard::Mapping mapping = keyboard.get_maple_mapping(QUICKSLOT_KEYS[i]);
 
@@ -455,6 +471,12 @@ namespace ms
 					itemnumber.draw(std::to_string(count), cellpos + Point<int16_t>(0, 20));
 					break;
 				}
+				case KeyType::Id::MACRO:
+					// v83 FUN_008d66be.
+					if (mapping.action >= 0 && mapping.action < static_cast<int32_t>(SkillMacros::MAX_MACROS))
+						macro_icons[mapping.action].draw(iconpos);
+
+					break;
 				case KeyType::Id::MENU:
 				case KeyType::Id::ACTION:
 				case KeyType::Id::FACE:
@@ -470,7 +492,7 @@ namespace ms
 					break;
 			}
 
-			keylabels[i].draw(panel + Point<int16_t>(9 + col * LABEL_SPACING.x(), 10 + row * LABEL_SPACING.y()));
+			keylabels[i].draw(panel + Point<int16_t>(9 + col * CELL_PITCH.x(), 10 + row * CELL_PITCH.y()));
 		}
 	}
 
@@ -656,7 +678,8 @@ namespace ms
 		}
 	}
 
-	// Dropping a skill or item on a quick slot binds the slot's key to it.
+	// Dropping a skill, item or macro on a quick slot binds the slot's key to
+	// it.
 	bool UIStatusBar::send_icon(const Icon &icon, Point<int16_t> cursorpos)
 	{
 		int16_t slot = quickslot_at(cursorpos);
@@ -682,9 +705,9 @@ namespace ms
 		{
 			int16_t col = i % 4;
 			int16_t row = i / 4;
-			Point<int16_t> cellpos = panel + Point<int16_t>(7 + col * CELL_SPACING.x(), 8 + row * CELL_SPACING.y());
+			Point<int16_t> cellpos = panel + Point<int16_t>(7 + col * CELL_PITCH.x(), 8 + row * CELL_PITCH.y());
 
-			if (Rectangle<int16_t>(cellpos, cellpos + CELL_SPACING).contains(cursorpos))
+			if (Rectangle<int16_t>(cellpos, cellpos + Point<int16_t>(CELL_SIZE, CELL_SIZE)).contains(cursorpos))
 				return i;
 		}
 
@@ -710,24 +733,76 @@ namespace ms
 
 	Cursor::State UIStatusBar::send_cursor(bool clicked, Point<int16_t> cursorpos)
 	{
+		// Both go in the one-line box (0x8e6e7d) at the cursor + (20, 20).
 		if (EXP_NUMBERS.contains(cursorpos - position))
 		{
 			int16_t level = stats.get_stat(MapleStat::Id::LEVEL);
 			int64_t need = level < ExpTable::LEVELCAP ? ExpTable::values[level] : 0;
 
-			UI::get().show_text(Tooltip::Parent::STATUSBAR,
+			UI::get().show_line(Tooltip::Parent::STATUSBAR,
 					gacha_exp::tooltip(stats.get_exp(), need, stats.get_gachaexp()));
+		} else if (NAME_AREA.contains(cursorpos - position))
+		{
+			Configuration &config = Configuration::get();
+			std::string channel = config.get_channel_name(config.get_worldid(), config.get_channelid());
+
+			UI::get().show_line(Tooltip::Parent::STATUSBAR,
+					config.get_login_id() + " / " + channel + " / " + stats.get_name());
 		} else
 		{
 			UI::get().clear_tooltip(Tooltip::Parent::STATUSBAR);
 		}
 
+		// v83 FUN_008d795a: a press or the cursor off the cells takes a slot's tooltip down.
+		if (quickslot_active)
+		{
+			int16_t slot = quickslot_at(cursorpos);
+
+			if (clicked || slot < 0)
+				UI::get().clear_tooltip(Tooltip::Parent::QUICKSLOT);
+			else
+				show_quickslot(slot);
+		}
+
 		return UIElement::send_cursor(clicked, cursorpos);
+	}
+
+	// The slot's skill with its levels, its item as Item.nx has it (no count or flags), or its macro. Other slots
+	// leave the last tooltip up, as v83 does.
+	void UIStatusBar::show_quickslot(int16_t slot) const
+	{
+		Keyboard::Mapping mapping = UI::get().get_keyboard().get_maple_mapping(QUICKSLOT_KEYS[slot]);
+
+		switch (mapping.type)
+		{
+			case KeyType::Id::SKILL:
+			{
+				const SkillBook &skills = Stage::get().get_player().get_skills();
+				int32_t level = skills.get_level(mapping.action);
+
+				if (level > 0)
+					UI::get().show_skill(Tooltip::Parent::QUICKSLOT, mapping.action, level,
+										 skills.get_masterlevel(mapping.action), skills.get_expiration(mapping.action));
+
+				break;
+			}
+			case KeyType::Id::ITEM:
+				UI::get().show_item(Tooltip::Parent::QUICKSLOT, mapping.action);
+				break;
+			case KeyType::Id::MACRO:
+				if (mapping.action >= 0 && mapping.action < static_cast<int32_t>(SkillMacros::MAX_MACROS))
+					UI::get().show_macro(Tooltip::Parent::QUICKSLOT, mapping.action);
+
+				break;
+			default:
+				break;
+		}
 	}
 
 	void UIStatusBar::remove_cursor()
 	{
 		UI::get().clear_tooltip(Tooltip::Parent::STATUSBAR);
+		UI::get().clear_tooltip(Tooltip::Parent::QUICKSLOT);
 
 		UIElement::remove_cursor();
 	}

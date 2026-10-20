@@ -64,6 +64,17 @@ namespace ms
 		const Point<int16_t> CASH_GRID_POS = Point<int16_t>(21, 349);
 		const Point<int16_t> ITEM_GRID_POS = Point<int16_t>(23, 481);
 		const int16_t GRID_STEP = 35;
+		// v83 hit-tests the icons for tooltips: 32x32 in the grids, the 2x 64x64 in the list.
+		const int16_t ICON_SIZE = 32;
+		const Point<int16_t> LIST_ICON = Point<int16_t>(5, 5);
+		const int16_t LIST_ICON_SIZE = 64;
+		// The list window, which keeps a commodity's tooltip until the cursor leaves it.
+		const Point<int16_t> LIST_WINDOW = Point<int16_t>(275, 95);
+		const Point<int16_t> LIST_SIZE = Point<int16_t>(412, 430);
+		// Tooltips open 20 px right of the cursor in the list and the Cash Inventory, and under it in the Item
+		// Inventory, as in game (UIStateGame's cursor + (0, 22)).
+		const Point<int16_t> TOOLTIP_RIGHT = Point<int16_t>(20, 22);
+		const Point<int16_t> TOOLTIP_BELOW = Point<int16_t>(0, 22);
 		const Point<int16_t> ITEM_TABS_POS = Point<int16_t>(21, 457);
 		const Point<int16_t> ITEM_TAB_SIZE = Point<int16_t>(30, 16);
 		const int16_t ITEM_TAB_STEP = 31;
@@ -172,6 +183,16 @@ namespace ms
 		buttons[Buttons::BT_CHECK] = std::make_unique<MapleButton>(CSStatus["BtCheck"], Point<int16_t>(545, 544));
 		buttons[Buttons::BT_COUPON] = std::make_unique<MapleButton>(CSStatus["BtCoupon"], Point<int16_t>(586, 544));
 		buttons[Buttons::BT_EXIT] = std::make_unique<MapleButton>(CSStatus["BtExit"], Point<int16_t>(632, 546));
+
+		// The avatar's buttons' help hangs from their top right, the status
+		// bar's sits on it (0x4ab0b0, 0x4bc3e4). The inventory expansions'
+		// help is never read.
+		set_button_help(Buttons::BT_BUY_AVATAR, "Shop/Button/BuyAvatar");
+		set_button_help(Buttons::BT_DEFAULT_AVATAR, "Shop/Button/DefaultAvatar");
+		set_button_help(Buttons::BT_TAKEOFF_AVATAR, "Shop/Button/TakeoffAvatar");
+		set_button_help(Buttons::BT_CHARGE, "Shop/Button/Charge", true);
+		set_button_help(Buttons::BT_CHECK, "Shop/Button/Check", true);
+		set_button_help(Buttons::BT_COUPON, "Shop/Button/Coupon", true);
 
 		for (size_t i = 0; i < PAGE_SIZE; i++)
 		{
@@ -372,6 +393,9 @@ namespace ms
 		item_slider.draw(position);
 
 		UIElement::draw_buttons(inter);
+
+		if (tooltip)
+			tooltip->draw(tooltip_pos);
 	}
 
 	void UICashShop::draw_item_inventory() const
@@ -495,6 +519,8 @@ namespace ms
 	{
 		Point<int16_t> cursor = cursorpos - position;
 
+		update_tooltip(cursor, cursorpos);
+
 		for (Slider* slider : { &cash_slider, &item_slider })
 		{
 			if (slider->isenabled())
@@ -595,6 +621,152 @@ namespace ms
 		}
 
 		return UIElement::send_cursor(clicked, cursorpos);
+	}
+
+	void UICashShop::update_tooltip(Point<int16_t> cursor, Point<int16_t> cursorpos)
+	{
+		// A commodity on the page (FUN_004b7297) has its tooltip built once where the cursor met its icon. Off
+		// the icons it stays up until the cursor leaves the list.
+		Point<int16_t> in_list = cursor - LIST_WINDOW;
+
+		if (tab != MAIN && in_list.x() >= 0 && in_list.y() >= 0 && in_list.x() < LIST_SIZE.x()
+			&& in_list.y() < LIST_SIZE.y())
+		{
+			for (size_t i = 0; i < PAGE_SIZE && page * PAGE_SIZE + i < listed.size(); i++)
+			{
+				Point<int16_t> in_icon = cursor - LIST_POS - LIST_ICON
+					- Point<int16_t>(CELL_STEP.x() * (i % LIST_COLUMNS), CELL_STEP.y() * (i / LIST_COLUMNS));
+
+				if (in_icon.x() < 0 || in_icon.y() < 0 || in_icon.x() >= LIST_ICON_SIZE || in_icon.y() >= LIST_ICON_SIZE)
+					continue;
+
+				if (hovered == static_cast<int16_t>(i))
+					return;
+
+				// FUN_004baf1a: only cash items, packages and the 911, 5430 and 8xxxxxxx specials.
+				const Commodity& commodity = listed[page * PAGE_SIZE + i];
+				int32_t item_id = commodity.item_id;
+				bool special = item_id / 10000 == 910 || item_id / 10000 == 911 || item_id / 1000 == 5430
+					|| commodity.sn / 10000000 == 8;
+
+				if (!special && !ItemData::get(item_id).is_cashitem())
+				{
+					clear_tooltip();
+					return;
+				}
+
+				if (item_id / 1000000 == 1)
+				{
+					eqtooltip.set_commodity(item_id, commodity.period);
+					tooltip = &eqtooltip;
+				}
+				else
+				{
+					ittooltip.set_commodity(item_id, commodity.period);
+					tooltip = &ittooltip;
+				}
+
+				tooltip_pos = cursorpos + TOOLTIP_RIGHT;
+				hovered = static_cast<int16_t>(i);
+				hovered_cash = 0;
+
+				return;
+			}
+
+			hovered = -1;
+
+			return;
+		}
+
+		// The grids are rebuilt on every move (FUN_004b0764, FUN_004b180c), so they follow the cursor.
+		auto icon_cell = [&](Point<int16_t> grid, size_t columns, size_t rows) -> int16_t
+		{
+			Point<int16_t> in_grid = cursor - grid;
+			bool on_icon = in_grid.x() % GRID_STEP < ICON_SIZE && in_grid.y() % GRID_STEP < ICON_SIZE;
+
+			return on_icon ? grid_cell(cursor, grid, columns, rows) : -1;
+		};
+
+		int16_t cash_cell = icon_cell(CASH_GRID_POS, CASH_COLUMNS, CASH_ROWS);
+		size_t cash_index = cash_row * CASH_COLUMNS + cash_cell;
+
+		if (cash_cell >= 0 && cash_index < cash_items.size())
+		{
+			const CashItem& item = cash_items[cash_index];
+
+			if (!tooltip || hovered_cash != item.cash_id)
+			{
+				if (item.item_id / 1000000 == 1)
+				{
+					eqtooltip.set_cash_item(item.item_id, item.expiration, item.gift_from);
+					tooltip = &eqtooltip;
+				}
+				else
+				{
+					ittooltip.set_cash_item(item.item_id, item.expiration, item.gift_from);
+					tooltip = &ittooltip;
+				}
+
+				hovered = -1;
+				hovered_cash = item.cash_id;
+			}
+
+			tooltip_pos = cursorpos + TOOLTIP_RIGHT;
+
+			return;
+		}
+
+		// Only cash items in the Item Inventory, with the tooltip they have in game.
+		int16_t item_cell = icon_cell(ITEM_GRID_POS, ITEM_COLUMNS, ITEM_ROWS);
+		const Inventory& inventory = Stage::get().get_player().get_inventory();
+		int16_t slot = static_cast<int16_t>(item_row * ITEM_COLUMNS + item_cell + 1);
+		int32_t item_id = item_cell >= 0 ? inventory.get_item_id(item_tab, slot) : 0;
+
+		if (item_id && ItemData::get(item_id).is_cashitem())
+		{
+			if (item_tab == InventoryType::Id::EQUIP)
+			{
+				eqtooltip.set_equip(Tooltip::Parent::ITEMINVENTORY, slot);
+				tooltip = &eqtooltip;
+			}
+			else
+			{
+				auto item = inventory.get_item(item_tab, slot);
+				auto pet = item_tab == InventoryType::Id::CASH ? inventory.get_pet(inventory.get_cash_id(item_tab, slot))
+															   : Optional<const Pet>();
+
+				if (item)
+					ittooltip.set_item(item_id, item->get_expiration(), item->get_flags(), true);
+				else if (pet)
+					ittooltip.set_item(item_id, pet->get_date_dead(), 0, true, pet->get_remain_life());
+				else
+					ittooltip.set_item(item_id);
+
+				tooltip = &ittooltip;
+			}
+
+			tooltip_pos = cursorpos + TOOLTIP_BELOW;
+			hovered = -1;
+			hovered_cash = 0;
+
+			return;
+		}
+
+		clear_tooltip();
+	}
+
+	void UICashShop::clear_tooltip()
+	{
+		tooltip = nullptr;
+		hovered = -1;
+		hovered_cash = 0;
+	}
+
+	void UICashShop::remove_cursor()
+	{
+		UIElement::remove_cursor();
+
+		clear_tooltip();
 	}
 
 	void UICashShop::doubleclick(Point<int16_t> cursorpos)
@@ -783,6 +955,9 @@ namespace ms
 			cash_items.end()
 		);
 
+		if (hovered_cash == cash_id)
+			clear_tooltip();
+
 		size_t rows = (cash_items.size() + CASH_COLUMNS - 1) / CASH_COLUMNS;
 
 		if (cash_row + CASH_ROWS > rows)
@@ -871,6 +1046,9 @@ namespace ms
 
 	void UICashShop::update_page()
 	{
+		// Another page, sub-tab, tab or wish list.
+		clear_tooltip();
+
 		page_texts.clear();
 
 		size_t pages = page_count(listed.size());

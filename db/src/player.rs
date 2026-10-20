@@ -9,7 +9,8 @@ use crate::keybinding::KeybindType;
 use crate::quest::QuestProgress;
 use crate::schema::{
     accounts, character_mounts, character_quests, characters, equipment_stats, gacha_exp,
-    inventory_items, keybindings, monster_book_cards, saved_locations, skills, teleport_rocks,
+    inventory_items, keybindings, monster_book_cards, saved_locations, skill_macros, skills,
+    teleport_rocks,
 };
 use diesel::pg::PgConnection;
 use diesel::prelude::*;
@@ -18,8 +19,8 @@ use game::inventory::DEFAULT_SLOT_LIMIT;
 use game::quest::{decode_kills, encode_kills};
 use game::{
     AvatarLook, CharacterStats, EquipStats, Inventory, InventoryType, Item, KeyBinding, Keymap,
-    MonsterBook, Mount, Player, QuestLog, QuestRecord, QuestStatus, SkillBook, SkillRecord,
-    TeleportRocks,
+    MonsterBook, Mount, Player, QuestLog, QuestRecord, QuestStatus, SkillBook, SkillMacro,
+    SkillMacros, SkillRecord, TeleportRocks,
 };
 use std::collections::HashMap;
 use std::convert::TryFrom;
@@ -214,6 +215,7 @@ pub fn load_player(character_id: i32) -> crate::Result<Player> {
             .map(|(card, level)| (card, u8::try_from(level).unwrap_or(0))),
     );
     player.teleport_rocks = load_teleport_rocks(&mut conn, character_id)?;
+    player.skill_macros = load_skill_macros(&mut conn, character_id)?;
     player.saved_locations = saved_locations::table
         .filter(saved_locations::character_id.eq(character_id))
         .select((saved_locations::kind, saved_locations::map_id))
@@ -336,6 +338,7 @@ pub(crate) fn write_player(conn: &mut PgConnection, player: &Player) -> QueryRes
 
         save_keymap(conn, id, &player.keymap)?;
         save_teleport_rocks(conn, id, &player.teleport_rocks)?;
+        save_skill_macros(conn, id, &player.skill_macros)?;
         diesel::delete(saved_locations::table.filter(saved_locations::character_id.eq(id)))
             .execute(conn)?;
         let locations: Vec<_> = player
@@ -439,6 +442,58 @@ fn save_teleport_rocks(
         })
         .collect();
     diesel::insert_into(teleport_rocks::table)
+        .values(&rows)
+        .execute(conn)?;
+    Ok(())
+}
+
+fn load_skill_macros(conn: &mut PgConnection, character_id: i32) -> QueryResult<SkillMacros> {
+    let rows: Vec<(String, bool, i32, i32, i32)> = skill_macros::table
+        .filter(skill_macros::character_id.eq(character_id))
+        .order(skill_macros::place)
+        .select((
+            skill_macros::name,
+            skill_macros::silent,
+            skill_macros::skill1,
+            skill_macros::skill2,
+            skill_macros::skill3,
+        ))
+        .load(conn)?;
+    Ok(SkillMacros::new(
+        rows.into_iter()
+            .map(|(name, silent, a, b, c)| SkillMacro {
+                name,
+                silent,
+                skills: [a, b, c],
+            })
+            .collect(),
+    ))
+}
+
+fn save_skill_macros(
+    conn: &mut PgConnection,
+    character_id: i32,
+    macros: &SkillMacros,
+) -> QueryResult<()> {
+    diesel::delete(skill_macros::table.filter(skill_macros::character_id.eq(character_id)))
+        .execute(conn)?;
+    let rows: Vec<_> = macros
+        .macros()
+        .iter()
+        .enumerate()
+        .map(|(place, m)| {
+            (
+                skill_macros::character_id.eq(character_id),
+                skill_macros::place.eq(place as i16),
+                skill_macros::name.eq(&m.name),
+                skill_macros::silent.eq(m.silent),
+                skill_macros::skill1.eq(m.skills[0]),
+                skill_macros::skill2.eq(m.skills[1]),
+                skill_macros::skill3.eq(m.skills[2]),
+            )
+        })
+        .collect();
+    diesel::insert_into(skill_macros::table)
         .values(&rows)
         .execute(conn)?;
     Ok(())

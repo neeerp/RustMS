@@ -19,6 +19,8 @@
 
 #include "../UIElement.h"
 
+#include "../Components/EquipTooltip.h"
+#include "../Components/ItemTooltip.h"
 #include "../Components/Slider.h"
 
 #include "../../Character/Inventory/InventoryType.h"
@@ -49,6 +51,9 @@ namespace ms
 			int64_t cash_id;
 			int32_t item_id;
 			int16_t count;
+			// Who sent it, if it was a present.
+			std::string gift_from;
+			int64_t expiration = 0;
 		};
 
 		UICashShop();
@@ -61,6 +66,7 @@ namespace ms
 		Cursor::State send_cursor(bool clicked, Point<int16_t> cursorpos) override;
 		// Double-clicking moves an item between the Cash and Item Inventories.
 		void doubleclick(Point<int16_t> cursorpos) override;
+		void remove_cursor() override;
 
 		UIElement::Type get_type() const override;
 
@@ -103,6 +109,10 @@ namespace ms
 		void update_item_slider();
 
 		void draw_item_inventory() const;
+
+		// The tooltip of the commodity, Cash Inventory item or cash item under the cursor (report 202).
+		void update_tooltip(Point<int16_t> cursor, Point<int16_t> cursorpos);
+		void clear_tooltip();
 
 		// The cell of a grid under the cursor, or -1.
 		int16_t grid_cell(Point<int16_t> cursor, Point<int16_t> grid, size_t columns, size_t rows) const;
@@ -196,5 +206,14 @@ namespace ms
 		ColorBox item_tab_outline;
 		ColorBox item_tab_selected;
 		ColorBox item_tab_unselected;
+
+		EquipTooltip eqtooltip;
+		ItemTooltip ittooltip;
+		const Tooltip* tooltip = nullptr;
+		Point<int16_t> tooltip_pos;
+		// The commodity on the page whose tooltip is shown, kept while the cursor stays on it.
+		int16_t hovered = -1;
+		// The Cash Inventory item whose tooltip is shown.
+		int64_t hovered_cash = 0;
 	};
 }

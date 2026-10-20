@@ -27,6 +27,7 @@
 #include "Components/EquipTooltip.h"
 #include "Components/ItemTooltip.h"
 #include "Components/MapTooltip.h"
+#include "Components/MacroTooltip.h"
 #include "Components/SkillTooltip.h"
 #include "Components/PlainTooltip.h"
 #include "Components/TextTooltip.h"
@@ -57,7 +58,7 @@ namespace ms
 
 		Cursor::State send_cursor(Cursor::State cursorstate, Point<int16_t> cursorpos) override;
 
-		void send_scroll(double yoffset) override;
+		void send_scroll(double yoffset, Point<int16_t> pos) override;
 
 		void send_close() override;
 
@@ -77,11 +78,18 @@ namespace ms
 
 		void show_text(Tooltip::Parent parent, std::string text) override;
 
+		void show_macro(Tooltip::Parent parent, size_t index) override;
+
 		void show_map(Tooltip::Parent parent, std::string name, std::string description) override;
 
 		void show_zone(Tooltip::Parent parent, std::string title, std::string description) override;
 
 		void show_line(Tooltip::Parent parent, std::string text) override;
+
+		void show_help(UIElement::Type owner, std::string title, std::string description,
+					   std::optional<Point<int16_t>> anchor, bool above) override;
+
+		void clear_help(UIElement::Type owner) override;
 
 		Iterator pre_add(UIElement::Type type, bool toggled, bool focused);
 
@@ -106,6 +114,9 @@ namespace ms
 
 		void remove_cursor(UIElement::Type type);
 
+		// Whether the tooltip up belongs to the window.
+		bool owns_tooltip(UIElement::Type type) const;
+
 		// The window holding the focus. Once it closes, the focus goes back
 		// to the one it opened over, such as a dialog under its notice.
 		UIElement *get_focused();
@@ -127,8 +138,11 @@ namespace ms
 		TextTooltip tetooltip;
 		MapTooltip matooltip;
 		PlainTooltip pltooltip;
+		MacroTooltip mctooltip;
 		Optional<Tooltip> tooltip;
 		Tooltip::Parent tooltipparent;
+		// The window whose help is up, while the tooltip is help
+		UIElement::Type help_owner = UIElement::Type::NONE;
 
 		Optional<Icon> draggedicon;
 
@@ -138,6 +152,8 @@ namespace ms
 				{Icon::IconType::EQUIP,     UIElement::Type::EQUIPINVENTORY},
 				{Icon::IconType::ITEM,      UIElement::Type::ITEMINVENTORY},
 				{Icon::IconType::KEY,       UIElement::Type::KEYCONFIG},
+				{Icon::IconType::MACRO_SKILL, UIElement::Type::SKILLMACRO},
+				{Icon::IconType::MACRO,     UIElement::Type::SKILLMACRO},
 				{Icon::IconType::NUM_TYPES, UIElement::Type::NUM_TYPES}
 		};
 

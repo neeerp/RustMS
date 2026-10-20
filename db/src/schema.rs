@@ -242,6 +242,18 @@ diesel::table! {
 }
 diesel::joinable!(teleport_rocks -> characters (character_id));
 diesel::table! {
+    skill_macros (character_id, place) {
+        character_id -> Int4,
+        place -> Int2,
+        name -> Text,
+        silent -> Bool,
+        skill1 -> Int4,
+        skill2 -> Int4,
+        skill3 -> Int4,
+    }
+}
+diesel::joinable!(skill_macros -> characters (character_id));
+diesel::table! {
     saved_locations (character_id, kind) {
         character_id -> Int4,
         kind -> Int2,
@@ -378,6 +390,7 @@ diesel::allow_tables_to_appear_in_same_query!(
     wish_lists,
     monster_book_cards,
     teleport_rocks,
+    skill_macros,
     saved_locations,
     gacha_exp,
     character_mounts,

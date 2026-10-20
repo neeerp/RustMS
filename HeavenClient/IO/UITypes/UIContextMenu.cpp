@@ -152,7 +152,7 @@ namespace ms
 				break;
 			case context_menu::WHISPER:
 				if (chatbar)
-					chatbar->start_whisper(name);
+					chatbar->whisper_to(name);
 				break;
 			case context_menu::PARTY:
 				PartyCommands::invite(name);

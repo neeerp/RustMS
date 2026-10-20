@@ -245,6 +245,7 @@ pub fn opcode_name(opcode: i16) -> &'static str {
         x if x == SendOpcode::ChatText as i16 => "ChatText",
         x if x == SendOpcode::MovePlayer as i16 => "MovePlayer",
         x if x == SendOpcode::KeyMap as i16 => "KeyMap",
+        x if x == SendOpcode::MacroSysDataInit as i16 => "MacroSysDataInit",
         x if x == SendOpcode::FieldEffect as i16 => "FieldEffect",
         x if x == SendOpcode::StatChange as i16 => "StatChange",
         x if x == SendOpcode::ShowStatusInfo as i16 => "ShowStatusInfo",
@@ -934,6 +935,46 @@ pub fn decode_keymap(packet: &Packet) -> Result<Vec<(u8, i32)>, String> {
             Ok((kind, action))
         })
         .collect()
+}
+
+/// A skill macro as sent: its name, whether it is used silently, and its
+/// three skills.
+pub type SkillMacroEntry = (String, bool, [i32; 3]);
+
+pub fn decode_skill_macros(packet: &Packet) -> Result<Vec<SkillMacroEntry>, String> {
+    expect_opcode(packet, SendOpcode::MacroSysDataInit as i16)?;
+    let mut cursor = Cursor::new(&packet.bytes[..]);
+    skip(&mut cursor, 2)?;
+    let count = cursor.read_byte().map_err(|e| e.to_string())?;
+    (0..count)
+        .map(|_| {
+            let name = cursor.read_str_with_length().map_err(|e| e.to_string())?;
+            let silent = cursor.read_byte().map_err(|e| e.to_string())? != 0;
+            let mut skills = [0; 3];
+            for skill in &mut skills {
+                *skill = cursor.read_int().map_err(|e| e.to_string())?;
+            }
+            Ok((name, silent, skills))
+        })
+        .collect()
+}
+
+/// SKILL_MACRO: the whole list, with `count` in place of its length.
+pub fn build_skill_macro_change(macros: &[SkillMacroEntry], count: u8) -> Result<Packet, String> {
+    let mut packet = packet_with_opcode(RecvOpcode::SkillMacro as i16);
+    packet.write_byte(count).map_err(|e| e.to_string())?;
+    for (name, silent, skills) in macros {
+        packet
+            .write_str_with_length(name)
+            .map_err(|e| e.to_string())?;
+        packet
+            .write_byte(u8::from(*silent))
+            .map_err(|e| e.to_string())?;
+        for skill in skills {
+            packet.write_int(*skill).map_err(|e| e.to_string())?;
+        }
+    }
+    Ok(packet)
 }
 
 /// CHANGE_KEYMAP mode 0 with `(key, kind, action)` bindings.

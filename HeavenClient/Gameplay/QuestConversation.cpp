@@ -42,6 +42,10 @@ namespace ms
 			// Menu choice for the NPC's script; quest ids are positive.
 			constexpr int32_t TALK_CHOICE = 0;
 
+			// Maple Administrator, who speaks for the quest alert, and what he says first (StringPool 0x104b).
+			constexpr int32_t ALERT_NPC = 9010000;
+			constexpr const char* ALERT_GREETING = "Someone in MapleStory would like to send you a message.";
+
 			Player& player()
 			{
 				return Stage::get().get_player();
@@ -144,9 +148,14 @@ namespace ms
 			void send(QuestDialogue::Effect effect, int16_t quest_id, int32_t npc_id)
 			{
 				auto action = effect == QuestDialogue::Effect::START ? QuestActionPacket::START : QuestActionPacket::COMPLETE;
+				const QuestInfo* quest = QuestCatalog::get().find(quest_id);
+				std::optional<Point<int16_t>> position;
+
+				if (!quest || !(quest->auto_start || quest->auto_complete))
+					position = player().get_position();
 
 				if (effect != QuestDialogue::Effect::NONE)
-					QuestActionPacket(action, quest_id, npc_id, player().get_position()).dispatch();
+					QuestActionPacket(action, quest_id, npc_id, position).dispatch();
 			}
 
 			void show();
@@ -243,7 +252,9 @@ namespace ms
 					return;
 				}
 
-				begin({ QuestDialogue(QuestDialogue::Mode::OFFER, QuestCatalog::get().script(quest_id, false)), quest_id, npc_id });
+				// An autoAccept quest starts without its offer (FUN_00717182).
+				QuestScript script = quest->auto_accept ? QuestScript() : QuestCatalog::get().script(quest_id, false);
+				begin({ QuestDialogue(QuestDialogue::Mode::OFFER, std::move(script)), quest_id, npc_id });
 				return;
 			}
 
@@ -371,6 +382,56 @@ namespace ms
 						TalkToNPCPacket(object_id).dispatch();
 					else
 						open(static_cast<int16_t>(selection), npc_id);
+				});
+			}
+		}
+
+		bool startable(const QuestInfo& quest)
+		{
+			return can_start(quest);
+		}
+
+		bool completable(const QuestInfo& quest, int32_t npc_id)
+		{
+			return state(quest.id) == 1 && completion_stop(quest, npc_id) == QuestStop::NONE;
+		}
+
+		void alert_menu(const std::vector<quest_alert::Entry>& entries, std::function<void(int16_t)> chosen)
+		{
+			// The quests under the same headers as an NPC's menu: list3 completable, list1 startable, list0 in
+			// progress.
+			std::string text = ALERT_GREETING;
+			std::map<int32_t, Texture> headers;
+			int header = -1;
+
+			for (const quest_alert::Entry& entry : entries)
+			{
+				const QuestInfo* quest = QuestCatalog::get().find(entry.quest);
+
+				if (!quest)
+					continue;
+
+				if (entry.header != header)
+				{
+					header = entry.header;
+					headers[entry.quest] = list_header(header);
+				}
+
+				text += quest_menu_line(entry.quest, *quest, header != 1, header == 3);
+			}
+
+			active.reset();
+
+			UI::get().emplace<UINpcTalk>();
+			UI::get().enable();
+
+			if (auto talk = UI::get().get_element<UINpcTalk>())
+			{
+				talk->change_text(ALERT_NPC, 4, 0, 0, text, headers, UINpcTalk::Menu::LIST);
+				talk->set_local_responder([chosen](int8_t response, int32_t selection)
+				{
+					if (response == 1)
+						chosen(static_cast<int16_t>(selection));
 				});
 			}
 		}

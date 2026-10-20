@@ -55,17 +55,20 @@ namespace ms
 		int8_t pet_unique_id = recv.read_byte();
 		bool shows_mount = unknown == 0 || pet_unique_id == 0;
 
+		// The pets out, each after a non-zero byte (FUN_00903ce7).
+		std::vector<UICharInfo::Pet> pets;
+
 		while (pet_unique_id != 0)
 		{
-			recv.skip_int();	// pet_id
-			recv.skip_string();	// pet_name
-			recv.skip_byte();	// pet_level
-			recv.skip_short();	// pet_closeness
-			recv.skip_byte();	// pet_fullness
-
+			UICharInfo::Pet pet;
+			pet.itemid = recv.read_int();
+			pet.name = recv.read_string();
+			pet.level = static_cast<uint8_t>(recv.read_byte());
+			pet.closeness = recv.read_short();
+			pet.fullness = static_cast<uint8_t>(recv.read_byte());
 			recv.skip_short();
-
-			recv.skip_int(); // pet_inventory_id
+			pet.wear = recv.read_int();
+			pets.push_back(pet);
 
 			pet_unique_id = recv.read_byte();
 		}
@@ -104,6 +107,8 @@ namespace ms
 		if (auto charinfo = UI::get().get_element<UICharInfo>())
 		{
 			charinfo->update_stats(character_id, character_job_id, character_level, character_fame, guild_name, alliance_name);
+			// v83 opens the pet box, then the taming box over it.
+			charinfo->update_pets(character_id, pets);
 
 			if (mount)
 				charinfo->update_mount(character_id, *mount);

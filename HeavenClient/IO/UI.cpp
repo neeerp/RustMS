@@ -149,7 +149,7 @@ namespace ms
 
 	void UI::send_scroll(double yoffset)
 	{
-		state->send_scroll(yoffset);
+		state->send_scroll(yoffset, cursor.get_position());
 	}
 
 	void UI::send_close()
@@ -524,6 +524,11 @@ namespace ms
 		state->show_skill(parent, skill_id, level, masterlevel, expiration, levels);
 	}
 
+	void UI::show_macro(Tooltip::Parent parent, size_t index)
+	{
+		state->show_macro(parent, index);
+	}
+
 	void UI::show_text(Tooltip::Parent parent, std::string text)
 	{
 		state->show_text(parent, text);
@@ -542,6 +547,22 @@ namespace ms
 	void UI::show_line(Tooltip::Parent parent, std::string text)
 	{
 		state->show_line(parent, text);
+	}
+
+	void UI::show_help(UIElement::Type owner, std::string title, std::string description,
+					   std::optional<Point<int16_t>> anchor, bool above)
+	{
+		state->show_help(owner, title, description, anchor, above);
+	}
+
+	void UI::clear_help(UIElement::Type owner)
+	{
+		state->clear_help(owner);
+	}
+
+	SkillMacros &UI::get_skill_macros()
+	{
+		return skill_macros;
 	}
 
 	Keyboard &UI::get_keyboard()

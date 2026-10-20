@@ -16,6 +16,7 @@
 //	along with this program.  If not, see <https://www.gnu.org/licenses/>.		//
 //////////////////////////////////////////////////////////////////////////////////
 #include "UIQuestLog.h"
+#include "UINotice.h"
 #include "UIQuestHelper.h"
 #include "UIWorldMap.h"
 
@@ -29,6 +30,7 @@
 #include "../../Character/QuestCatalog.h"
 #include "../../Data/ItemData.h"
 #include "../../Gameplay/Stage.h"
+#include "../../Net/Packets/QuestPackets.h"
 #include "../../Graphics/GraphicsGL.h"
 #include "../../Util/Misc.h"
 #include "../../Util/NpcTextMarkup.h"
@@ -270,6 +272,7 @@ namespace ms
 		buttons[FIND_NPC] = std::make_unique<MapleButton>(Quest["BtMarkNpc"], detail + FIND_NPC_POS);
 		buttons[HELPER] = std::make_unique<MapleButton>(Quest["BtAlert"], detail + HELPER_POS);
 		buttons[FORFEIT] = std::make_unique<MapleButton>(Quest["BtGiveup"], detail + FORFEIT_POS);
+		set_button_help(HELPER, "Game/Button/QuestAlarm");
 
 		list_slider = Slider(Slider::Type::CLASSIC, LIST_SLIDER, LIST_SLIDER_X, ROWS, 0,
 			[&](bool up) { scroll_list(list_offset + (up ? -1 : 1)); });
@@ -510,9 +513,6 @@ namespace ms
 		buttons[FIND_NPC]->set_active(details_open && tab == TAB0);
 		buttons[HELPER]->set_active(details_open && tab == TAB1);
 		buttons[FORFEIT]->set_active(details_open && tab == TAB1);
-
-		// Forfeiting is not supported yet.
-		buttons[FORFEIT]->set_state(Button::DISABLED);
 		buttons[FIND_NPC]->set_state(target_map >= 0 ? Button::NORMAL : Button::DISABLED);
 
 		if (tab == TAB1 && selected >= 0)
@@ -739,11 +739,31 @@ namespace ms
 
 				break;
 			}
+			case FORFEIT:
+				give_up(selected);
+				break;
 			default:
 				break;
 		}
 
 		return Button::State::NORMAL;
+	}
+
+	// v83 asks first, takes the quest off the quest helper, and sends the forfeit (FUN_00a26ea7). The server's
+	// record 0 then lets the quest alert offer the quest again.
+	void UIQuestLog::give_up(int16_t id)
+	{
+		if (!questlog.started_quests().count(id))
+			return;
+
+		UI::get().emplace<UIYesNo>("Are you sure you want to quit?", [id](bool yes)
+		{
+			if (!yes)
+				return;
+
+			Stage::get().get_player().get_quests().untrack(id);
+			QuestActionPacket(QuestActionPacket::FORFEIT, id, 0, std::nullopt).dispatch();
+		});
 	}
 
 	void UIQuestLog::show_quest(int16_t id)

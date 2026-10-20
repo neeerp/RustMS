@@ -291,12 +291,10 @@ namespace ms
 		if (part == EquipSlot::Id::NONE)
 			return;
 
-		// The pets wear their own equipment, and the look carries only
-		// their clothes.
+		// The pets wear their own equipment.
 		if (pets::is_equip_part(part))
 		{
-			if (int8_t index = pets::wear_owner(part); index >= 0)
-				look.set_pet_wear(index, inventory.get_item_id(InventoryType::Id::EQUIPPED, inventory.shown_equip(part)));
+			look.set_pet_part(part, inventory.get_item_id(InventoryType::Id::EQUIPPED, inventory.shown_equip(part)));
 
 			return;
 		}

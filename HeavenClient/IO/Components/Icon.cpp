@@ -138,7 +138,7 @@ namespace ms
 		type->set_count(c);
 	}
 
-	Icon::IconType Icon::get_type()
+	Icon::IconType Icon::get_type() const
 	{
 		return type->get_type();
 	}

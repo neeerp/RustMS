@@ -19,7 +19,8 @@ pub(super) enum QuestChange {
 
 impl ClientActor {
     /// Check a `QUEST_ACTION` against the catalog and the player, then ask the
-    /// field whether the NPC is near before anything is persisted.
+    /// field whether the NPC is near before anything is persisted, unless the
+    /// quest alert offers the step.
     pub(super) async fn request_quest_action(
         &mut self,
         request: QuestRequest,
@@ -67,7 +68,18 @@ impl ClientActor {
             return Ok(());
         }
         self.npc_request_id = self.npc_request_id.wrapping_add(1);
+        // The quest alert starts autoStart quests and completes autoComplete
+        // ones wherever the player is.
+        let anywhere = match request.kind {
+            QuestActionKind::Start { .. } | QuestActionKind::ScriptStart { .. } => {
+                template.auto_start
+            }
+            _ => template.auto_complete,
+        };
         self.pending_quest = Some((self.npc_request_id, request));
+        if anywhere {
+            return self.quest_npc_checked(self.npc_request_id, true).await;
+        }
         self.send_to_field(FieldMessage::QuestNpc {
             from: self.client_id,
             npc_id,

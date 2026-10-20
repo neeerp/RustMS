@@ -8,6 +8,8 @@ if(HEAVENCLIENT_BUILD_TESTS)
     enable_testing()
     add_executable(quest_marker_tests tests/quest_marker.cpp)
     add_test(NAME quest_markers COMMAND quest_marker_tests)
+    add_executable(quest_alert_rules_tests tests/quest_alert_rules.cpp)
+    add_test(NAME quest_alert_rules COMMAND quest_alert_rules_tests)
     add_executable(quest_completion_tests tests/quest_completion.cpp)
     add_test(NAME quest_completion COMMAND quest_completion_tests)
     add_executable(fade_notice_tests tests/fade_notice.cpp)
@@ -230,6 +232,12 @@ if(HEAVENCLIENT_BUILD_TESTS)
     add_test(NAME sp_reset_rules COMMAND sp_reset_rules_tests)
     add_executable(item_expiry_tests tests/item_expiry.cpp)
     add_test(NAME item_expiry COMMAND item_expiry_tests)
+    add_executable(skill_macros_tests tests/skill_macros.cpp)
+    add_test(NAME skill_macros COMMAND skill_macros_tests)
+    add_executable(skill_macro_rules_tests tests/skill_macro_rules.cpp)
+    add_test(NAME skill_macro_rules COMMAND skill_macro_rules_tests)
+    add_executable(skill_macro_layout_tests tests/skill_macro_layout.cpp)
+    add_test(NAME skill_macro_layout COMMAND skill_macro_layout_tests)
     add_executable(mount_rules_tests tests/mount_rules.cpp)
     add_test(NAME mount_rules COMMAND mount_rules_tests)
     add_executable(catch_items_tests tests/catch_items.cpp)
@@ -271,6 +279,8 @@ if(HEAVENCLIENT_BUILD_TESTS)
     add_test(NAME summon_rules COMMAND summon_rules_tests)
     add_executable(chat_flood_guard_tests tests/chat_flood_guard.cpp)
     add_test(NAME chat_flood_guard COMMAND chat_flood_guard_tests)
+    add_executable(chat_target_tests tests/chat_target.cpp)
+    add_test(NAME chat_target COMMAND chat_target_tests)
     add_executable(char_click_tests tests/char_click.cpp)
     target_include_directories(char_click_tests PRIVATE ${PROJECT_SOURCE_DIR}/libs/NoLifeNx)
     add_test(NAME char_click COMMAND char_click_tests)
@@ -547,6 +557,9 @@ add_executable(HeavenClient
     Gameplay/Playable.h
     Gameplay/Spawn.cpp
     Gameplay/Spawn.h
+    Gameplay/QuestAlert.cpp
+    Gameplay/QuestAlert.h
+    Gameplay/QuestAlertRules.h
     Gameplay/QuestConversation.cpp
     Gameplay/QuestConversation.h
     Gameplay/Stage.cpp
@@ -587,6 +600,8 @@ add_executable(HeavenClient
     IO/Components/ClassicSlider.h
     IO/Components/ClassicTabs.cpp
     IO/Components/ClassicTabs.h
+    IO/Components/ComboEdit.cpp
+    IO/Components/ComboEdit.h
     IO/Components/SliderSteps.h
     IO/Components/EquipTooltip.cpp
     IO/Components/EquipTooltip.h
@@ -598,6 +613,8 @@ add_executable(HeavenClient
     IO/Components/Icon.h
     IO/Components/ItemTooltip.cpp
     IO/Components/ItemTooltip.h
+    IO/Components/MacroTooltip.cpp
+    IO/Components/MacroTooltip.h
     IO/Components/MapleButton.cpp
     IO/Components/MapleButton.h
     IO/Components/MapleComboBox.cpp
@@ -663,6 +680,10 @@ add_executable(HeavenClient
     IO/UITypes/UIEquipInventory.h
     IO/UITypes/UIGender.cpp
     IO/UITypes/UIGender.h
+    IO/UITypes/UIGroupPicker.cpp
+    IO/UITypes/UIGroupPicker.h
+    IO/UITypes/UIWhisperPrompt.cpp
+    IO/UITypes/UIWhisperPrompt.h
     IO/UITypes/UIItemInventory.cpp
     IO/UITypes/UIItemInventory.h
     IO/UITypes/UIKeyConfig.cpp
@@ -731,6 +752,9 @@ add_executable(HeavenClient
     IO/UITypes/UIMonsterBook.h
     IO/UITypes/UISkillBook.cpp
     IO/UITypes/UISkillBook.h
+    IO/UITypes/SkillMacroLayout.h
+    IO/UITypes/UISkillMacro.cpp
+    IO/UITypes/UISkillMacro.h
     IO/UITypes/UISystemOption.cpp
     IO/UITypes/UISystemOption.h
     IO/UITypes/UISoftKey.cpp

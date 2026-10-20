@@ -41,6 +41,7 @@ pub enum SendOpcode {
     MonsterBookSetCover = 0x54,
     FamilyInfo = 0x5F,
     FamilyList = 0x64,
+    MacroSysDataInit = 0x7C,
     SetField = 0x7D,
     SetCashShop = 0x7F,
     BlockedMap = 0x83,

@@ -541,9 +541,13 @@ impl ClientActor {
 
         let mut keymap = build::world::keymap::build_keymap(&player.keymap)
             .map_err(|e| RuntimeError::Handler(e.to_string()))?;
+        // Sent even with no macros: the client keeps the last list it had.
+        let mut macros = build::world::skill_macro::build_skill_macros(&player.skill_macros)
+            .map_err(|e| RuntimeError::Handler(e.to_string()))?;
         let mut char_info = build::world::char::build_char_info(&player, self.channel_id)
             .map_err(|e| RuntimeError::Handler(e.to_string()))?;
         self.send(&mut keymap).await?;
+        self.send(&mut macros).await?;
         self.send(&mut char_info).await?;
 
         let presence = Presence::of(&player);

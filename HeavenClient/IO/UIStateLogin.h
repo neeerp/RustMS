@@ -52,7 +52,7 @@ namespace ms
 
 		Cursor::State send_cursor(Cursor::State mst, Point<int16_t> pos) override;
 
-		void send_scroll(double) override
+		void send_scroll(double, Point<int16_t>) override
 		{}
 
 		void send_close() override;

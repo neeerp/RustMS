@@ -21,7 +21,9 @@
 #include <cctype>
 #include <cstdlib>
 
+#include "UIGroupPicker.h"
 #include "UINotice.h"
+#include "UIWhisperPrompt.h"
 #include "UIStatusBar.h"
 
 #include "../UI.h"
@@ -161,6 +163,21 @@ namespace ms
 		// The input field, from the status bar's top left
 		constexpr Rectangle<int16_t> CHATFIELD = Rectangle<int16_t>(87, 530, 5, 25);
 
+		// The chat target box (FUN_008dfb36), which opens its list upwards
+		// with a 16 pixel row per target, framed in a pixel more
+		// (FUN_004c5fb9).
+		constexpr Rectangle<int16_t> COMBO = Rectangle<int16_t>(1, 81, 8, 28);
+		constexpr int16_t COMBO_ROW = 16;
+		constexpr int16_t COMBO_LIST_WIDTH = 90;
+		// Where the box's text and each row's starts, by the top of the text,
+		// and how far above that Arial 11 is drawn here.
+		constexpr Point<int16_t> COMBO_TEXT = Point<int16_t>(6, 3);
+		constexpr int16_t COMBO_ROW_TEXT_X = 7;
+		constexpr int16_t COMBO_TEXT_RAISE = 6;
+		constexpr Color COMBO_BORDER = Color(0x999999FF);
+		constexpr Color COMBO_FILL = Color(0x315573FF);
+		constexpr Color COMBO_LIT = Color(0x559AB9FF);
+
 		// The original places a line by the top of its text; text here is
 		// placed this far above that.
 		constexpr int16_t TEXT_RAISE = 7;
@@ -212,9 +229,21 @@ namespace ms
 
 		backgrnd = base["backgrnd"];
 		backgrnd2 = base["backgrnd2"];
-		chattarget = base["chatTarget"];
-		chattarget_label = Text(Text::Font::A11M, Text::Alignment::LEFT, Color::Name::WHITE, "To All");
+
+		nl::node combo = basic["ComboBox2"];
+		combo_box[0] = combo["normal"]["0"];
+		combo_box[1] = combo["mouseOver"]["0"];
+		combo_box[2] = combo["pressed"]["0"];
+		combo_hovered = false;
+		combo_open = false;
+
+		for (size_t i = 0; i < chat_target::COUNT; i++)
+			combo_items[i] = Text(Text::Font::A11M, Text::Alignment::LEFT, Color::Name::WHITE,
+								  chat_target::item_text(static_cast<Target>(i)));
+
+		chattarget_label = Text(Text::Font::A11M, Text::Alignment::LEFT, Color::Name::WHITE, "");
 		chat_target = Target::ALL;
+		update_face();
 
 		// The original's scroll bar has only a normal and a pressed look.
 		for (size_t i = 0; i < 2; i++)
@@ -241,9 +270,18 @@ namespace ms
 		chatfield.set_enter_callback(
 				[&](std::string msg)
 				{
+					// The open target list takes Enter for the row lit.
+					if (combo_open)
+					{
+						if (combo_row)
+							set_target(static_cast<Target>(*combo_row));
+
+						close_combo();
+						return;
+					}
+
 					if (msg.size() > 0)
 					{
-						std::string whisper_to;
 						size_t last = msg.find_last_not_of(' ');
 
 						if (last != std::string::npos)
@@ -253,32 +291,24 @@ namespace ms
 							std::string message;
 							WhisperParseResult whisper_result = parse_whisper_command(msg, target, message);
 
-							if ((whisper_result == WhisperParseResult::ValidWhisper
-								|| whisper_result == WhisperParseResult::TargetOnly)
+							// Whisper picked by Tab, with no name to go to; the line
+							// still reaches the pets (FUN_008d536c).
+							if (msg[0] != '/' && chat_target == Target::WHISPER && whisper_name.empty())
+								send_chatline("There is no one to whisper to.", LineType::SKILL);
+
+							// HC's own: v83 has no command to whisper one line.
+							if (whisper_result == WhisperParseResult::ValidWhisper
 								&& same_name(target, Stage::get().get_player().get_stats().get_name()))
 							{
-								// v83 refuses before sending anything (FUN_0052c40c).
 								send_chatline("You can't whisper to yourself.", LineType::SKILL);
 							}
 							else if (whisper_result == WhisperParseResult::ValidWhisper)
 							{
 								send_whisper(target, message);
 							}
-							// A name alone switches to whispering to it, if it could
-							// be a character's (0x52e4b5).
-							else if (whisper_result == WhisperParseResult::TargetOnly
-								&& !character_name_valid(target))
+							else if (whisper_result != WhisperParseResult::NotWhisper)
 							{
-								send_chatline("Incorrect ID.", LineType::SKILL);
-							}
-							else if (whisper_result == WhisperParseResult::TargetOnly)
-							{
-								whisper_to = target;
-							}
-							// v83 goes back to the last name whispered to. HC keeps
-							// no list of them, so nothing happens.
-							else if (whisper_result == WhisperParseResult::NoTarget)
-							{
+								whisper_command(target);
 							}
 							else if (is_command(msg, "/?") || is_command(msg, "/Help"))
 							{
@@ -297,6 +327,14 @@ namespace ms
 							else if (is_command(msg, "/guild"))
 							{
 								set_target(Target::GUILD);
+							}
+							else if (is_command(msg, "/alliance"))
+							{
+								set_target(Target::ALLIANCE);
+							}
+							else if (is_command(msg, "/couple"))
+							{
+								set_target(Target::SPOUSE);
 							}
 							else if (is_command(msg, "/all"))
 							{
@@ -321,20 +359,18 @@ namespace ms
 							{
 								// Refused: nothing is sent or shown.
 							}
+							else if (!whisper_name.empty())
+							{
+								// Whatever the target, a name means a whisper, which
+								// the pets don't hear.
+								send_whisper(whisper_name, msg);
+							}
 							else
 							{
 								// The player's pets hear the line, whoever it is
 								// for, and it is still said (FUN_008d54b3).
 								Stage::get().get_player().command_pets(msg);
-
-								if (chat_target == Target::PARTY)
-									send_party_chat(msg);
-								else if (chat_target == Target::BUDDY)
-									send_buddy_chat(msg);
-								else if (chat_target == Target::GUILD)
-									send_guild_chat(msg);
-								else
-									GeneralChatPacket(msg, false).dispatch();
+								send_to_target(msg);
 							}
 
 							lastentered.push_back(msg);
@@ -345,9 +381,6 @@ namespace ms
 						}
 
 						chatfield.change_text("");
-
-						if (!whisper_to.empty())
-							start_whisper(whisper_to);
 					} else
 					{
 						toggle_chatfield();
@@ -359,7 +392,11 @@ namespace ms
 				KeyAction::Id::UP,
 				[&]()
 				{
-					if (lastpos > 0)
+					if (combo_open)
+					{
+						combo_row = combo_row && *combo_row > 0 ? *combo_row - 1 : 0;
+					}
+					else if (lastpos > 0)
 					{
 						lastpos--;
 						chatfield.change_text(lastentered[lastpos]);
@@ -371,7 +408,11 @@ namespace ms
 				KeyAction::Id::DOWN,
 				[&]()
 				{
-					if (lastentered.size() > 0 && lastpos < lastentered.size() - 1)
+					if (combo_open)
+					{
+						combo_row = combo_row ? std::min(*combo_row + 1, chat_target::COUNT - 1) : 0;
+					}
+					else if (lastentered.size() > 0 && lastpos < lastentered.size() - 1)
 					{
 						lastpos++;
 						chatfield.change_text(lastentered[lastpos]);
@@ -383,7 +424,18 @@ namespace ms
 				KeyAction::Id::ESCAPE,
 				[&]()
 				{
-					toggle_chatfield(false);
+					if (combo_open)
+						close_combo();
+					else
+						toggle_chatfield(false);
+				}
+		);
+
+		chatfield.set_key_callback(
+				KeyAction::Id::TAB,
+				[&]()
+				{
+					tab_target();
 				}
 		);
 
@@ -404,10 +456,10 @@ namespace ms
 
 		auto &graphics = GraphicsGL::get();
 
-		if (chatfieldopen || chatopen)
+		if (combo_shown())
 		{
-			chattarget.draw(position + Point<int16_t>(2, 8));
-			chattarget_label.draw(position + Point<int16_t>(6, 5));
+			combo_box[combo_open ? 2 : combo_hovered ? 1 : 0].draw(position + COMBO.get_left_top());
+			chattarget_label.draw(position + COMBO.get_left_top() + COMBO_TEXT - Point<int16_t>(0, COMBO_TEXT_RAISE));
 			chatfield.draw(position);
 		}
 
@@ -476,6 +528,28 @@ namespace ms
 			thumb[thumb_dragging ? 1 : 0].draw(bar + Point<int16_t>(0, *offset));
 
 		UIElement::draw_buttons(inter);
+
+		if (combo_open)
+		{
+			Rectangle<int16_t> list = combo_list_bounds();
+			Point<int16_t> origin = position + list.get_left_top();
+
+			graphics.drawrectangle(origin.x(), origin.y(), list.width(), list.height(), COMBO_BORDER.r(),
+								   COMBO_BORDER.g(), COMBO_BORDER.b(), COMBO_BORDER.a());
+			graphics.drawrectangle(origin.x() + 1, origin.y() + 1, list.width() - 2, list.height() - 2,
+								   COMBO_FILL.r(), COMBO_FILL.g(), COMBO_FILL.b(), COMBO_FILL.a());
+
+			for (size_t i = 0; i < chat_target::COUNT; i++)
+			{
+				int16_t top = static_cast<int16_t>(COMBO_ROW * i + 1);
+
+				if (combo_row == i)
+					graphics.drawrectangle(origin.x() + 1, origin.y() + top, list.width() - 2, COMBO_ROW - 1,
+										   COMBO_LIT.r(), COMBO_LIT.g(), COMBO_LIT.b(), COMBO_LIT.a());
+
+				combo_items[i].draw(origin + Point<int16_t>(COMBO_ROW_TEXT_X, top - COMBO_TEXT_RAISE));
+			}
+		}
 	}
 
 	void UIChatBar::update()
@@ -522,6 +596,11 @@ namespace ms
 
 	bool UIChatBar::is_in_range(Point<int16_t> cursorpos) const
 	{
+		// The open target list has the mouse to itself, so that a click
+		// anywhere closes it.
+		if (combo_open)
+			return true;
+
 		Point<int16_t> pos = cursorpos - position;
 
 		if (UIStatusBar::CHAT_STRIP.contains(pos))
@@ -538,6 +617,7 @@ namespace ms
 	Cursor::State UIChatBar::send_cursor(bool clicking, Point<int16_t> cursorpos)
 	{
 		bool pressed = clicking && !scrollbar_pressed;
+		bool released = !clicking && scrollbar_pressed;
 		scrollbar_pressed = clicking;
 
 		if (thumb_dragging)
@@ -573,6 +653,42 @@ namespace ms
 			}
 
 			edge_dragging = false;
+		}
+
+		combo_hovered = combo_shown() && on_combo(cursorpos);
+
+		if (combo_open)
+		{
+			// The row under the cursor lights up and is picked when the
+			// button comes up on it (CCtrlComboBox).
+			if (std::optional<size_t> row = combo_row_at(cursorpos))
+			{
+				combo_row = row;
+
+				if (released)
+					set_target(static_cast<Target>(*row));
+
+				return clicking ? Cursor::State::CLICKING : Cursor::State::CANCLICK;
+			}
+
+			if (!pressed)
+				return Cursor::State::IDLE;
+
+			close_combo();
+
+			if (on_combo(cursorpos))
+				return Cursor::State::CLICKING;
+		}
+
+		if (combo_hovered)
+		{
+			if (pressed)
+			{
+				combo_open = true;
+				combo_row = static_cast<size_t>(chat_target);
+			}
+
+			return clicking ? Cursor::State::CLICKING : Cursor::State::CANCLICK;
 		}
 
 		if (on_log_edge(cursorpos) && scroll_part_at(cursorpos) == ScrollPart::NONE)
@@ -652,6 +768,7 @@ namespace ms
 		thumb_dragging = false;
 		held_part = ScrollPart::NONE;
 		edge_dragging = false;
+		combo_hovered = false;
 	}
 
 	UIElement::Type UIChatBar::get_type() const
@@ -809,6 +926,9 @@ namespace ms
 		buttons[Buttons::BT_OPENCHAT]->set_active(!chatopen);
 		buttons[Buttons::BT_CLOSECHAT]->set_active(chatopen);
 
+		if (!combo_shown())
+			close_combo();
+
 		Setting<Chatopen>::get().save(chatopen);
 	}
 
@@ -833,6 +953,9 @@ namespace ms
 			chatfield.set_state(Textfield::State::DISABLED);
 			chatfield.change_text("");
 		}
+
+		if (!combo_shown())
+			close_combo();
 	}
 
 	bool UIChatBar::is_chatopen()
@@ -845,33 +968,174 @@ namespace ms
 		return chatfieldopen;
 	}
 
-	// The labels are v83's chat target list (StringPool 0x312-0x314).
 	void UIChatBar::set_target(Target new_target)
 	{
-		chat_target = new_target;
+		close_combo();
 
-		switch (chat_target)
-		{
-			case Target::PARTY:
-				chattarget_label.change_text("To the party");
-				break;
-			case Target::BUDDY:
-				chattarget_label.change_text("To a buddy");
-				break;
-			case Target::GUILD:
-				chattarget_label.change_text("To the Guild");
-				break;
-			default:
-				chattarget_label.change_text("To All");
-				break;
-		}
-		toggle_chatfield(true);
+		if (new_target == Target::GROUP)
+			return ask_group();
+
+		if (new_target == Target::WHISPER)
+			return ask_whisper_name();
+
+		focus_field();
+		whisper_name.clear();
+		chat_target = new_target;
+		update_face();
 	}
 
-	void UIChatBar::start_whisper(const std::string& name)
+	void UIChatBar::whisper_to(const std::string& name)
+	{
+		whisper_name = name;
+
+		if (!name.empty())
+			chat_target = Target::WHISPER;
+
+		update_face();
+		focus_field();
+	}
+
+	void UIChatBar::ask_whisper_name()
+	{
+		const std::deque<std::string>& names = whisper_history.all();
+
+		UI::get().emplace<UIWhisperPrompt>(
+			std::vector<std::string>(names.begin(), names.end()),
+			[this](const std::string& typed, const std::vector<std::string>& kept)
+			{
+				// OK keeps the names left in the list, before the name typed
+				// is checked (FUN_008d4dbf).
+				whisper_history.replace(kept);
+
+				size_t first = typed.find_first_not_of(' ');
+
+				if (first == std::string::npos)
+					return;
+
+				std::string name = typed.substr(first, typed.find_last_not_of(' ') + 1 - first);
+
+				if (!character_name_valid(name))
+					return send_chatline("Incorrect ID.", LineType::SKILL);
+
+				if (same_name(name, Stage::get().get_player().get_stats().get_name()))
+					return send_chatline("You can't whisper to yourself.", LineType::SKILL);
+
+				add_whisper_history(name);
+				whisper_to(name);
+			}
+		);
+	}
+
+	void UIChatBar::add_whisper_history(const std::string& name)
+	{
+		whisper_history.add(name);
+	}
+
+	void UIChatBar::whisper_command(const std::string& name)
+	{
+		// Alone, it goes back to the last name, or to none.
+		if (name.empty())
+			return whisper_to(whisper_history.latest());
+
+		if (same_name(name, Stage::get().get_player().get_stats().get_name()))
+			return send_chatline("You can't whisper to yourself.", LineType::SKILL);
+
+		if (!character_name_valid(name))
+			return send_chatline("Incorrect ID.", LineType::SKILL);
+
+		add_whisper_history(name);
+		whisper_to(name);
+	}
+
+	void UIChatBar::tab_target()
+	{
+		close_combo();
+
+		Target next = chat_target::next_tab(chat_target);
+
+		// From alliance, Tab keeps a name if there is one, and otherwise
+		// whispers no one rather than asking who.
+		if (next == Target::WHISPER)
+		{
+			if (!whisper_name.empty())
+				return whisper_to(whisper_name);
+
+			chat_target = Target::WHISPER;
+			update_face();
+			return;
+		}
+
+		set_target(next);
+	}
+
+	void UIChatBar::ask_group()
+	{
+		std::vector<std::string> groups;
+
+		for (const Buddy& buddy : Stage::get().get_player().get_buddies().get_buddies())
+			groups.push_back(buddy.group);
+
+		UI::get().emplace<UIGroupPicker>(
+			chat_target::group_choices(groups),
+			[this](const std::string& group)
+			{
+				// OK whispers to the group typed, even a blank one
+				// (FUN_008d4d43).
+				focus_field();
+				whisper_name.clear();
+				group_name = group;
+				chat_target = Target::GROUP;
+				update_face();
+			}
+		);
+	}
+
+	void UIChatBar::focus_field()
 	{
 		toggle_chatfield(true);
-		chatfield.change_text("/w " + name + " ");
+		chatfield.change_text("");
+	}
+
+	void UIChatBar::update_face()
+	{
+		chattarget_label.change_text(chat_target::face_text(chat_target, group_name, whisper_name));
+	}
+
+	Rectangle<int16_t> UIChatBar::combo_list_bounds() const
+	{
+		int16_t height = static_cast<int16_t>(COMBO_ROW * chat_target::COUNT + 1);
+		int16_t left = COMBO.left() + 1;
+
+		return Rectangle<int16_t>(left, left + COMBO_LIST_WIDTH, COMBO.top() - height, COMBO.top());
+	}
+
+	std::optional<size_t> UIChatBar::combo_row_at(Point<int16_t> cursorpos) const
+	{
+		Rectangle<int16_t> list = combo_list_bounds();
+		Point<int16_t> pos = cursorpos - position - list.get_left_top();
+
+		if (pos.x() < 0 || pos.x() >= list.width() || pos.y() < 0 || pos.y() >= list.height())
+			return std::nullopt;
+
+		return std::min<size_t>(pos.y() / COMBO_ROW, chat_target::COUNT - 1);
+	}
+
+	bool UIChatBar::on_combo(Point<int16_t> cursorpos) const
+	{
+		Point<int16_t> pos = cursorpos - position;
+
+		return pos.x() >= COMBO.left() && pos.x() < COMBO.right() && pos.y() >= COMBO.top() && pos.y() < COMBO.bottom();
+	}
+
+	bool UIChatBar::combo_shown() const
+	{
+		return chatfieldopen || chatopen;
+	}
+
+	void UIChatBar::close_combo()
+	{
+		combo_open = false;
+		combo_row.reset();
 	}
 
 	bool UIChatBar::flood_guard_allows(const std::string& line)
@@ -949,10 +1213,11 @@ namespace ms
 		send_chatline(player.get_stats().get_name() + " : " + message, LineType::PARTY);
 	}
 
-	void UIChatBar::send_buddy_chat(const std::string& message)
+	void UIChatBar::send_buddy_chat(const std::string& message, const std::string* group)
 	{
 		Player& player = Stage::get().get_player();
-		std::vector<int32_t> recipients = player.get_buddies().online_ids();
+		const BuddyList& buddies = player.get_buddies();
+		std::vector<int32_t> recipients = group ? buddies.online_ids(*group) : buddies.online_ids();
 
 		if (recipients.empty())
 		{
@@ -980,6 +1245,42 @@ namespace ms
 
 		MultiChatPacket(MultiChatPacket::Mode::GUILD, recipients, message).dispatch();
 		send_chatline(player.get_stats().get_name() + " : " + message, LineType::GUILD);
+	}
+
+	void UIChatBar::send_to_target(const std::string& message)
+	{
+		switch (chat_target)
+		{
+			case Target::BUDDY:
+				send_buddy_chat(message);
+				break;
+			case Target::GROUP:
+				send_buddy_chat(message, &group_name);
+				break;
+			case Target::PARTY:
+				send_party_chat(message);
+				break;
+			case Target::GUILD:
+				send_guild_chat(message);
+				break;
+			case Target::ALLIANCE:
+				// HC knows of no guild alliance, so v83 would find no one in
+				// one (FUN_008df155).
+				send_chatline("There are no guild alliance you joined OR no one online in your guild alliance.",
+							  LineType::SKILL);
+				break;
+			case Target::SPOUSE:
+				// Nor of marriages: v83 says this without a wedding ring
+				// (FUN_008defff).
+				send_chatline("You are not married or your spouse is currently offline.", LineType::SKILL);
+				break;
+			case Target::WHISPER:
+				// No one to whisper to, as the player has been told.
+				break;
+			case Target::ALL:
+				GeneralChatPacket(message, false).dispatch();
+				break;
+		}
 	}
 
 	Button::State UIChatBar::button_pressed(uint16_t buttonid)

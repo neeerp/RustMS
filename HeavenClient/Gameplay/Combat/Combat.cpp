@@ -209,10 +209,10 @@ namespace ms
 		}
 	}
 
-	void Combat::use_move(int32_t move_id)
+	bool Combat::use_move(int32_t move_id)
 	{
 		if (!ride_allows(move_id))
-			return;
+			return false;
 
 		if (prepare::held(move_id) || prepare::timed(move_id))
 		{
@@ -224,28 +224,28 @@ namespace ms
 
 				if (player.is_prone() || find_whack(player.prepare_attack(0), reach) != Stance::Id::NONE)
 				{
-					use_move(0);
-					return;
+					return use_move(0);
 				}
 			}
 
 			const Skill &skill = get_skill(move_id);
 
-			if (can_use_move(skill))
-				start_prepare(skill);
+			if (!can_use_move(skill))
+				return false;
 
-			return;
+			start_prepare(skill);
+			return true;
 		}
 
 		const SpecialMove &move = get_move(move_id);
 
 		if (!can_use_move(move))
-			return;
+			return false;
 
 		if (move_id == meso_explosion::ID)
 		{
 			set_off_mesos(move);
-			return;
+			return true;
 		}
 
 		// v83's spell handler swings a regular attack instead when the player
@@ -260,6 +260,13 @@ namespace ms
 			apply_move(regularattack);
 		else
 			apply_move(move);
+
+		return true;
+	}
+
+	bool Combat::is_preparing() const
+	{
+		return preparing.has_value();
 	}
 
 	std::optional<teleport::Spot> Combat::use_teleport(int32_t move_id, bool allowed)

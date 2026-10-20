@@ -148,6 +148,19 @@ namespace ms
 		balloon.draw(absp - Point<int16_t>(0, animations[Stance::STAND].get_origin().y()));
 	}
 
+	void PetLook::draw_standing(Point<int16_t> pos, float alpha) const
+	{
+		DrawArgument args = DrawArgument(pos, false);
+
+		animations[Stance::STAND].draw(args, alpha);
+		draw_dressing(dressing[Stance::STAND], animations[Stance::STAND], args, alpha);
+	}
+
+	void PetLook::update_standing()
+	{
+		animations[Stance::STAND].update();
+	}
+
 	std::optional<move_path::Path> PetLook::update(const Physics &physics, Point<int16_t> charpos)
 	{
 		static const double PETWALKFORCE = 0.35;

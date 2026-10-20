@@ -10,8 +10,9 @@ use crate::packets::{
     build_create_char, build_login_credentials, build_login_started, build_player_logged_in,
     build_server_list_request, build_set_gender, decode_char_list, decode_char_name_response,
     decode_keymap, decode_last_connected_world, decode_login_status, decode_new_character,
-    decode_recommended_worlds, decode_server_redirect, decode_set_field, opcode_name,
-    CharacterSummary, CharacterTemplate, LoginStatusPacket, ServerListPacket,
+    decode_recommended_worlds, decode_server_redirect, decode_set_field, decode_skill_macros,
+    opcode_name, CharacterSummary, CharacterTemplate, LoginStatusPacket, ServerListPacket,
+    SkillMacroEntry,
 };
 use net::packet::op::SendOpcode;
 use std::net::Ipv4Addr;
@@ -62,6 +63,8 @@ pub struct WorldSession {
     pub monster_book: std::collections::BTreeMap<i32, u8>,
     /// `(kind, action)` for each of the 90 keys, from the world-entry KEYMAP.
     pub keymap: Vec<(u8, i32)>,
+    /// The world-entry MACRO_SYS_DATA_INIT.
+    pub skill_macros: Vec<SkillMacroEntry>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -109,6 +112,7 @@ pub async fn login_to_world_session(config: &HarnessConfig) -> Result<WorldSessi
         .await?;
 
     let mut keymap = None;
+    let mut skill_macros = None;
     let mut world_entry = None;
 
     for _ in 0..8 {
@@ -116,6 +120,11 @@ pub async fn login_to_world_session(config: &HarnessConfig) -> Result<WorldSessi
         match envelope.opcode() {
             x if x == SendOpcode::KeyMap as i16 => {
                 keymap = Some(decode_keymap(&envelope.packet).map_err(|message| {
+                    HarnessError::protocol("world entry", world_conn.endpoint(), message)
+                })?);
+            }
+            x if x == SendOpcode::MacroSysDataInit as i16 => {
+                skill_macros = Some(decode_skill_macros(&envelope.packet).map_err(|message| {
                     HarnessError::protocol("world entry", world_conn.endpoint(), message)
                 })?);
             }
@@ -158,7 +167,7 @@ pub async fn login_to_world_session(config: &HarnessConfig) -> Result<WorldSessi
             }
         }
 
-        if keymap.is_some() && world_entry.is_some() {
+        if keymap.is_some() && skill_macros.is_some() && world_entry.is_some() {
             break;
         }
     }
@@ -176,6 +185,14 @@ pub async fn login_to_world_session(config: &HarnessConfig) -> Result<WorldSessi
             "world entry",
             world_conn.endpoint(),
             "did not receive KeyMap during world entry".to_string(),
+        ));
+    };
+
+    let Some(skill_macros) = skill_macros else {
+        return Err(HarnessError::protocol(
+            "world entry",
+            world_conn.endpoint(),
+            "did not receive MacroSysDataInit during world entry".to_string(),
         ));
     };
 
@@ -202,6 +219,7 @@ pub async fn login_to_world_session(config: &HarnessConfig) -> Result<WorldSessi
         monster_book_cover: world_entry.monster_book_cover,
         monster_book: world_entry.monster_book,
         keymap,
+        skill_macros,
         character_name: world_entry.character_name,
         map_id: world_entry.map_id,
         spawn_point: world_entry.spawn_point,

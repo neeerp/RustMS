@@ -95,6 +95,8 @@ namespace ms::item_expiry
 		int32_t limited = 0;
 		// `noRevive`: the Water of Life can't bring it back once it dies.
 		bool no_revive = false;
+		// `life`: the days a Water of Life lasts.
+		int32_t days = 0;
 	};
 
 	// Whether a pet has died (FUN_004e4003). One with limitedLife dies when its
@@ -132,6 +134,42 @@ namespace ms::item_expiry
 		Time t = utc(date_dead);
 		std::snprintf(text, sizeof(text), "WATER OF LIFE DRIES UP ON %d-%d-%04d AT %02d : 00", t.month, t.day,
 			t.year, t.hour);
+
+		return text;
+	}
+
+	// The line a Cash Shop commodity lasting `period` days shows (FUN_008ebe04 with the commodity's Period), or
+	// nothing for one that lasts forever. Three bundles count hours instead.
+	inline std::string commodity_line(int32_t item_id, int32_t period)
+	{
+		if (period == 0)
+			return "";
+
+		char text[64];
+
+		if (item_id == 5211060)
+			std::snprintf(text, sizeof(text), "AVAILABLE FOR %d HOURS.", 2);
+		else if (item_id == 5211048 || item_id == 5360042)
+			std::snprintf(text, sizeof(text), "AVAILABLE FOR %d HOURS.", 4);
+		else
+			std::snprintf(text, sizeof(text), "AVAILABLE FOR %d DAYS.", period);
+
+		return text;
+	}
+
+	// The line a pet for sale shows (FUN_008ebfde with the commodity flag): its whole limitedLife, or permanent,
+	// or the days its Water of Life lasts.
+	inline std::string commodity_pet_line(const PetLife &life)
+	{
+		char text[64];
+
+		if (life.limited > 0)
+			std::snprintf(text, sizeof(text), "DAYS OF MAGIC : %dhrs. %dmin.", life.limited / 3600,
+				life.limited / 60 % 60);
+		else if (life.permanent)
+			return "PERMANENT";
+		else
+			std::snprintf(text, sizeof(text), "DAYS OF MAGIC : %d", life.days);
 
 		return text;
 	}

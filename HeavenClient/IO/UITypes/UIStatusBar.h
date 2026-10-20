@@ -25,6 +25,7 @@
 #include "../Components/Charset.h"
 
 #include "../../Character/CharStats.h"
+#include "../../Character/SkillMacros.h"
 #include "../../Graphics/Animation.h"
 #include "../../Graphics/Text.h"
 
@@ -131,6 +132,7 @@ namespace ms
 
 		void draw_quickslots() const;
 		int16_t quickslot_at(Point<int16_t> cursorpos) const;
+		void show_quickslot(int16_t slot) const;
 
 		Rectangle<int16_t> get_menu_bounds() const;
 
@@ -176,6 +178,8 @@ namespace ms
 		Texture gamemenu;
 		Texture shortcutmenu;
 		std::map<int32_t, Texture> action_icons;
+		// SkillMacro/Macroicon, for a key bound to a macro.
+		Texture macro_icons[SkillMacros::MAX_MACROS];
 		Charset number;
 		Charset levelnumber;
 		Charset itemnumber;

@@ -152,6 +152,12 @@ namespace ms
 		// Set the character's selected channel
 		void set_channelid(uint8_t id);
 
+		// The ID the player last tried to log in with
+		std::string get_login_id();
+
+		// Keep the ID the player tries to log in with (v83 FUN_005f6952)
+		void set_login_id(const std::string& id);
+
 		// Get the known channel count for a world.
 		uint8_t get_world_channel_count(uint8_t world_id);
 
@@ -303,6 +309,7 @@ namespace ms
 		std::string VolumeSerialNumber;
 		uint8_t worldid;
 		uint8_t channelid;
+		std::string login_id;
 		std::map<uint8_t, uint8_t> world_channel_counts;
 		std::map<uint8_t, std::vector<std::string>> world_channel_names;
 		bool admin;

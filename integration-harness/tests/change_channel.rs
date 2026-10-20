@@ -27,6 +27,7 @@ async fn read_world_entry(
         let envelope = connection.read_packet("world entry").await?;
         match envelope.opcode() {
             x if x == SendOpcode::KeyMap as i16 => saw_keymap = true,
+            x if x == SendOpcode::MacroSysDataInit as i16 => {}
             x if x == SendOpcode::SetField as i16 => saw_set_field = true,
             x if x == SendOpcode::SpawnNpc as i16 => {}
             x if x == SendOpcode::SpawnNpcRequestController as i16 => {}

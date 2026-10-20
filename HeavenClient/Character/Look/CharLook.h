@@ -18,6 +18,7 @@
 #pragma once
 
 #include <array>
+#include <map>
 #include <string>
 
 #include <cstddef>
@@ -68,7 +69,12 @@ namespace ms
 		// 30 and 38), 0 for none.
 		int32_t get_pet_wear(size_t index) const;
 
-		void set_pet_wear(size_t index, int32_t itemid);
+		// Put pet equipment `itemid` on body part `part` (14 or 21 to 48),
+		// or take it off for 0.
+		void set_pet_part(int16_t part, int32_t itemid);
+
+		// The pet equipment worn, by body part.
+		const std::map<int16_t, int32_t> &get_pet_parts() const;
 
 		void attack(bool degenerate);
 
@@ -203,6 +209,7 @@ namespace ms
 		const Face *face;
 		CharEquips equips;
 		std::array<int32_t, 3> pet_wear = {};
+		std::map<int16_t, int32_t> pet_parts;
 		int32_t vehicle = 0;
 		bool tired = false;
 

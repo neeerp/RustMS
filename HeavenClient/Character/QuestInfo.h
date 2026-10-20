@@ -38,5 +38,15 @@ namespace ms
 		// QuestInfo.img/<id>/type, such as "[Job Adv.]": shown before the
 		// name in an NPC's quest menu.
 		std::string type;
+		// QuestInfo.img flags for the quest alert, the bulb over the player: it offers autoStart quests and completes
+		// autoComplete ones wherever the player is, and lists started autoPreComplete ones. An autoAccept quest opens
+		// by itself instead.
+		bool auto_start = false;
+		bool auto_accept = false;
+		bool auto_pre_complete = false;
+		bool auto_complete = false;
+		// When the alert checks an autoStart quest (Check/0): on every stat change, or on entering one of these maps.
+		bool normal_auto_start = false;
+		std::vector<int32_t> field_enter;
 	};
 }

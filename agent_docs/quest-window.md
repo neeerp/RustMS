@@ -49,8 +49,9 @@ along the bottom depend on the tab:
   legacy map variants. When no world map lists the NPC's map, it says so
   instead, as v83 does.
 - In Progress has QUEST HELPER (`BtAlert`), which tracks or untracks the
-  quest in the Quest Helper, and FORFEIT (`BtGiveup`). FORFEIT stays disabled
-  because forfeiting isn't implemented.
+  quest in the Quest Helper, and FORFEIT (`BtGiveup`). FORFEIT asks "Are you
+  sure you want to quit?", then untracks the quest and sends the forfeit, as
+  v83 does. A quest the quest alert offers is offered again once it is gone.
 
 The window has no Accept/Finish: v83 started and finished quests through NPC
 dialogue only. It also has no search, filters, Recommended tab, reward panel,

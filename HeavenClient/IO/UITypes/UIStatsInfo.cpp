@@ -59,6 +59,25 @@ namespace ms
 		constexpr int16_t DETAIL_ROW = 7, DETAIL_STEP = 18;
 		// The right edge of the AP box's number, and its cap top.
 		const Point<int16_t> AP_VALUE = { 84, 218 };
+
+		// A window's zones from ToolTipHelp.img/Game/UIWnd, in WZ order, which
+		// for these is by number (0x8f5da9).
+		std::vector<map_tooltips::HelpZone> load_help(const char *window)
+		{
+			nl::node src = nl::nx::string["ToolTipHelp.img"]["Game"]["UIWnd"][window];
+			std::vector<map_tooltips::HelpZone> zones;
+
+			for (size_t i = 0; nl::node zone = src[std::to_string(i)]; i++)
+			{
+				Point<int16_t> lt = zone["lt"];
+				Point<int16_t> rb = zone["rb"];
+
+				zones.push_back({ { lt.x(), lt.y(), rb.x(), rb.y() }, zone["Title"].get_string(),
+								  zone["Desc"].get_string() });
+			}
+
+			return zones;
+		}
 	}
 
 	UIStatsInfo::UIStatsInfo(const CharStats &st) : UIDragElement<PosSTATS>(Point<int16_t>(WIDTH, 20)), stats(st)
@@ -91,6 +110,9 @@ namespace ms
 
 		statlabels[StatLabel::AP] = Text(Text::Font::A12M, Text::Alignment::RIGHT, Color::Name::BLACK);
 		job_name = Text(Text::Font::A12M, Text::Alignment::LEFT, Color::Name::BLACK);
+
+		stat_help = load_help("Stat");
+		detail_help = load_help("StatDetail");
 
 		dimension = Point<int16_t>(WIDTH, HEIGHT);
 		set_detail(false);
@@ -147,6 +169,26 @@ namespace ms
 	{
 		if (pressed && escape)
 			deactivate();
+	}
+
+	Cursor::State UIStatsInfo::send_cursor(bool clicked, Point<int16_t> cursorpos)
+	{
+		Cursor::State state = UIDragElement<PosSTATS>::send_cursor(clicked, cursorpos);
+
+		// A press hides the help until the cursor moves again (0x8c474a).
+		if (clicked)
+			clear_zone_help();
+		else
+			show_zone_help(cursorpos - position);
+
+		return state;
+	}
+
+	void UIStatsInfo::remove_cursor()
+	{
+		UIDragElement<PosSTATS>::remove_cursor();
+
+		clear_zone_help();
 	}
 
 	bool UIStatsInfo::is_in_range(Point<int16_t> cursorpos) const
@@ -289,6 +331,59 @@ namespace ms
 
 		buttons[Buttons::BT_DETAIL]->set_active(!enabled);
 		buttons[Buttons::BT_HIDE]->set_active(enabled);
+	}
+
+	// The EXP line's numbers, or else the help of the first zone the cursor
+	// is in, by it (0x8c52d7, and 0x8c475f for the detail panel).
+	void UIStatsInfo::show_zone_help(Point<int16_t> cursor)
+	{
+		int16_t level = stats.get_stat(MapleStat::Id::LEVEL);
+
+		if (map_tooltips::on_stat_exp(cursor.x(), cursor.y()))
+		{
+			int64_t need = level < ExpTable::LEVELCAP ? ExpTable::values[level] : 0;
+
+			UI::get().show_help(TYPE, "EXP : " + std::to_string(stats.get_exp()) + " / " + std::to_string(need), "");
+			zone_help = true;
+
+			return;
+		}
+
+		const map_tooltips::HelpZone *zone = nullptr;
+		size_t limit = map_tooltips::stat_help_limit(level, stats.get_job().get_id());
+
+		if (int32_t i = map_tooltips::help_at(stat_help, cursor.x(), cursor.y(), limit); i >= 0)
+			zone = &stat_help[i];
+		else if (showdetail)
+		{
+			Point<int16_t> at = cursor - DETAIL;
+
+			if (int32_t j = map_tooltips::help_at(detail_help, at.x(), at.y()); j >= 0)
+				zone = &detail_help[j];
+		}
+
+		if (!zone)
+		{
+			clear_zone_help();
+
+			return;
+		}
+
+		// The detail panel's Hands zone has no text, so whatever was up stays.
+		if (zone->title.empty() && zone->desc.empty())
+			return;
+
+		UI::get().show_help(TYPE, zone->title, zone->desc);
+		zone_help = true;
+	}
+
+	void UIStatsInfo::clear_zone_help()
+	{
+		if (!zone_help)
+			return;
+
+		zone_help = false;
+		UI::get().clear_help(TYPE);
 	}
 
 	bool UIStatsInfo::is_beginner() const

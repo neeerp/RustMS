@@ -63,6 +63,12 @@ namespace ms
 
 		void draw(double viewx, double viewy, float alpha) const;
 
+		// Stand in its clothes at `pos` in a window, without its name tag,
+		// as the Character Info window shows it (FUN_0090433a).
+		void draw_standing(Point<int16_t> pos, float alpha) const;
+
+		void update_standing();
+
 		// Follow the owner at `charpos`, returning a path to send once
 		// there is one, or play the paths received.
 		std::optional<move_path::Path> update(const Physics &physics, Point<int16_t> charpos);

@@ -47,6 +47,31 @@ int main()
 		require(both.desc_x == 10 && both.desc_y == 26 && both.wrap == 89, "wrapped inside the title's width");
 		require(compact_box(0, 30).width == 0, "nothing without a title");
 
+		Box help = help_box(70, 32);
+		require(help.width == 270 && help.height == 66, "a button's help is 270 wide");
+		require(help.title_x == 100 && help.title_y == 8, "its title centred");
+		require(help.desc_x == 10 && help.desc_y == 30 && help.wrap == 255, "its description below");
+		Box wide = help_box(300, 0);
+		require(wide.width == 316 && wide.height == 30, "a long title widens it");
+		Box untitled = help_box(0, 48);
+		require(untitled.width == 270 && untitled.height == 62 && untitled.desc_y == 10,
+				"a description alone takes the title's place");
+
+		// The Stat window's Name, Fame and STR zones.
+		std::vector<HelpZone> stat = { { { 8, 32, 55, 47 }, "Name of the Character", "" },
+									   { { 8, 168, 55, 183 }, "Fame", "" },
+									   { { 8, 243, 55, 258 }, "Strength (STR)", "" } };
+		require(help_at(stat, 8, 32) == 0 && help_at(stat, 30, 250, 0) == 2, "the zone under the cursor");
+		require(help_at(stat, 55, 40) == -1 && help_at(stat, 100, 100) == -1, "none past a zone's right edge");
+		require(help_at(stat, 30, 250, 2) == -1 && help_at(stat, 30, 170, 2) == 1, "only the first ones");
+		require(stat_help_limit(10, 0) == 8 && stat_help_limit(10, 1000) == 8 && stat_help_limit(1, 2001) == 8,
+				"a young beginner's");
+		require(stat_help_limit(11, 0) == 0 && stat_help_limit(8, 100) == 0 && stat_help_limit(10, 2100) == 0,
+				"everyone else's");
+		require(on_stat_exp(62, 141) && on_stat_exp(171, 154), "the EXP line");
+		require(!on_stat_exp(61, 150) && !on_stat_exp(172, 150) && !on_stat_exp(100, 140) && !on_stat_exp(100, 155),
+				"not past it");
+
 		Box line = line_box(50);
 		require(line.width == 58 && line.height == 18 && line.title_x == 4 && line.title_y == 1, "a portal's tip");
 

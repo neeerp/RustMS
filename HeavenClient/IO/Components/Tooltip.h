@@ -35,6 +35,7 @@ namespace ms
 			EQUIPINVENTORY,
 			ITEMINVENTORY,
 			SKILLBOOK,
+			SKILLMACRO,
 			SHOP,
 			STORAGE,
 			EVENT,
@@ -48,8 +49,14 @@ namespace ms
 			PERSONALSHOP,
 			ITEMMEGAPHONE,
 			STATUSBAR,
+			// The status bar's quick slots, whose tooltips go above the cursor.
+			QUICKSLOT,
 			// The map under the cursor, outside every window.
-			FIELD
+			FIELD,
+			// The Cash Shop's list and Cash Inventory, which show items that aren't in an inventory.
+			CASHSHOP,
+			// Help from String's ToolTipHelp.img, which belongs to the window it was shown for.
+			HELP
 		};
 
 		virtual ~Tooltip()

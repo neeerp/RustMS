@@ -242,6 +242,8 @@ namespace ms
 				quests.add_started(id, recv.read_string());
 			else if (status == 2)
 				quests.add_completed(id, recv.read_long());
+
+			Stage::get().get_quest_alert().record_changed(id, status);
 		}
 		else if (mode == 3)
 		{
@@ -520,6 +522,9 @@ namespace ms
 				chatbar->send_chatline(*warning, UIChatBar::LineType::YELLOW);
 
 			chatbar->send_chatline(build_whisper_chatline(sender, channel, message), UIChatBar::LineType::WHISPER);
+			// The whisper prompt and a bare /whisper offer them next
+			// (0x532667).
+			chatbar->add_whisper_history(sender);
 		}
 		else if (mode == WHISPER_RESULT_MODE)
 		{

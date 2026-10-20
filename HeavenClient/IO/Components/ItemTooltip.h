@@ -19,6 +19,7 @@
 
 #include <array>
 #include <cstdint>
+#include <string>
 
 #include "Tooltip.h"
 #include "TooltipBox.h"
@@ -40,13 +41,24 @@ namespace ms
 		// of Life dries up, and one with limitedLife has `remain_life` seconds left.
 		bool set_item(int32_t itemid, int64_t expiration = 0, int16_t flags = 0, bool owned = false,
 					  int32_t remain_life = 0);
+		// A Cash Shop commodity lasting `period` days, 0 for ever, as Item.nx makes it: the period for a date, and
+		// a pet's whole life (FUN_004baf1a).
+		void set_commodity(int32_t itemid, int32_t period);
+		// An item in the Cash Inventory, as Item.nx makes it, with its date and who sent it (FUN_004b0764). A pet
+		// has no line for its life.
+		void set_cash_item(int32_t itemid, int64_t expiration, const std::string &gift_from);
 
 	private:
+		// Lays the tooltip out for `itemid` with these lines under the name.
+		void build(const std::string &expiry, const std::string &gift);
+
 		int32_t itemid;
 		int64_t expiration;
 		int16_t flags;
 		bool owned;
 		int32_t remain_life;
+		// Laid out by set_commodity or set_cash_item, so set_item lays it out again.
+		bool cash_shop;
 		Point<int16_t> size;
 
 		TooltipBox box;
@@ -60,6 +72,7 @@ namespace ms
 		Texture expiry_dot;
 		Text expiry;
 		int16_t expiry_height;
+		Text gift;
 		Text desc;
 	};
 }

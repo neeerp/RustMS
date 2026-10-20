@@ -21,6 +21,7 @@
 #include "../Gameplay/MapleMap/MapTooltipRules.h"
 #include "../Graphics/Text.h"
 
+#include <optional>
 #include <string>
 
 namespace ms
@@ -38,6 +39,12 @@ namespace ms
 		void set_zone(const std::string &title, const std::string &desc);
 		// One line, as for a portal on the minimap.
 		void set_line(const std::string &text);
+		// Help from String's ToolTipHelp.img in the normal box, with a ring
+		// cut inside its edge: a title alone goes in the one-line box. A
+		// button's help hangs from anchor, its top right, or sits on it if
+		// above; a zone's follows the cursor.
+		void set_help(const std::string &title, const std::string &desc, std::optional<Point<int16_t>> anchor,
+					  bool above);
 		void reset();
 
 		bool empty() const;
@@ -49,11 +56,21 @@ namespace ms
 		void draw(Point<int16_t> position) const override;
 
 	private:
-		void set(const std::string &title, const std::string &desc, bool line);
+		enum class Kind
+		{
+			ZONE,
+			LINE,
+			HELP
+		};
+
+		void set(const std::string &title, const std::string &desc, Kind kind);
 
 		std::string title;
 		std::string desc;
+		Kind kind = Kind::ZONE;
 		bool line = false;
+		std::optional<Point<int16_t>> anchor;
+		bool above = false;
 		Text title_label;
 		Text desc_label;
 		map_tooltips::Box box = {};

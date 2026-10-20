@@ -27,6 +27,7 @@
 #include "Tooltip.h"
 #include "TooltipBox.h"
 
+#include "../Character/Inventory/Equip.h"
 #include "../Character/MapleStat.h"
 #include "../Graphics/Text.h"
 #include "../Template/BoolPair.h"
@@ -41,12 +42,20 @@ namespace ms
 		EquipTooltip();
 
 		void set_equip(Tooltip::Parent parent, int16_t invpos);
+		// A Cash Shop commodity lasting `period` days, 0 for ever: the equip as Character.nx makes it, with the
+		// period for a date (FUN_004baf1a).
+		void set_commodity(int32_t item_id, int32_t period);
+		// An equip in the Cash Inventory: the equip as Character.nx makes it, with its date and who sent it
+		// (FUN_004b0764).
+		void set_cash_item(int32_t item_id, int64_t expiration, const std::string &gift_from);
 
 		void draw(Point<int16_t> position) const override;
 
 	private:
 		// In the order of the job row.
 		static constexpr size_t NUM_JOBS = 6;
+
+		void build(const Equip &equip, const std::string &expiry, const std::string &gift);
 
 		struct StatLine
 		{
@@ -70,6 +79,7 @@ namespace ms
 		bool wrapped;
 		int16_t properties_height;
 		Text expiry;
+		Text gift;
 		Texture itemicon;
 
 		std::vector<MapleStat::Id> requirements;

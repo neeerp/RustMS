@@ -24,11 +24,13 @@ Quests run the way the original client ran them:
    and DECLINE.
 2. When the player accepts or finishes, the client sends `QUEST_ACTION`
    (`0x6B`): action byte (1 start, 2 complete, 3 forfeit, 4/5 scripted),
-   quest id, and the NPC, then its position.
+   quest id, and the NPC, then its position (left out for the quest
+   alert's autoStart and autoComplete quests, below).
 3. **The server** checks the request against the quest's `Check.img`
    requirements and the player (`net::quests::check_start`/`check_complete`),
    asks the field whether that NPC is on the map within reach (1200×800
-   around the player), and commits the change and its `Act.img` rewards
+   around the player; not when starting a QuestInfo `autoStart` quest or
+   completing an `autoComplete` one), and commits the change and its `Act.img` rewards
    atomically (`db::quest::start`/`complete`/`forfeit`).
 4. It answers with the quest record (`SHOW_STATUS_INFO` mode 1), EXP and
    mesos with their stats if any (both shown in the chat log, as mode 3 with
@@ -42,6 +44,26 @@ Rejected actions (unsupported quest, wrong NPC or state, unmet job, level, or
 prerequisite, NPC not nearby, replays) are logged at debug level and ignored;
 only missing mesos and a full inventory get an answer (below).
 
+## The quest alert
+
+QuestInfo `autoStart` quests are offered by a bulb over the player's face
+instead of an NPC (`Gameplay/QuestAlert.cpp`, rules in
+`Gameplay/QuestAlertRules.h`; v83ref report 201-quest-alert). The client
+checks the start requirements of those with `Check/0/normalAutoStart` on
+entering a field (silently) and on every stat change or quest record (with
+the alert), and of those whose `Check/0/fieldEnter` lists the map on entering
+it (with the alert). Started `autoPreComplete` quests and `autoComplete`
+quests that `Check/1` passes with their end NPC (checked every 10 s) light
+the bulb too. A new one shows the bulb's Appear animation, plays
+`Sound/Game.img/QuestAlert`, and adds a grey chat line.
+
+Clicking the bulb opens Maple Administrator (9010000) listing them under the
+NPC menu's headers. Picking one opens its conversation as its start NPC
+would, wherever the player is, so the server starts `autoStart` quests and
+completes `autoComplete` ones without the reach check. An `autoAccept` quest opens by itself and
+starts without its offer pages. `normalAutoStart` and `fieldEnter` only say
+when to check; they are not requirements.
+
 ## Supported quests
 
 Only requirements and actions the server implements are allowed
@@ -49,7 +71,7 @@ Only requirements and actions the server implements are allowed
 
 | Node | Allowed keys |
 | --- | --- |
-| `Check/<id>/0` (start) | `npc`, `job`, `lvmin`, `lvmax`, `quest`, `startscript` |
+| `Check/<id>/0` (start) | `npc`, `job`, `lvmin`, `lvmax`, `quest`, `startscript`, and the alert triggers `normalAutoStart` and `fieldEnter` |
 | `Check/<id>/1` (complete) | `npc`, `item`, `mob`, `quest`, `endscript` |
 | `Act/<id>/0` | `item` |
 | `Act/<id>/1` | `exp`, `nextQuest`, `item`, `money` |

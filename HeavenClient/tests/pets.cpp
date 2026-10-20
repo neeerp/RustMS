@@ -312,6 +312,22 @@ void equipment()
 	require(equip_choices(1002008, three).empty(), "not pet equipment");
 }
 
+void info_page()
+{
+	using namespace ms::pets;
+	using Items = std::vector<int32_t>;
+
+	// A magnet and label ring on the first, a pouch on the second, the HP
+	// pouch for all, and the third's quote ring.
+	std::map<int16_t, int32_t> parts = { { 1, 1002008 }, { 14, 1802000 }, { 21, 1822000 }, { 22, 1812001 },
+										 { 24, 1812002 }, { 34, 1812000 }, { 40, 1832000 }, { 47, 1812007 } };
+	require(info_items(0, 1802000, parts) == Items{ 1802000, 1822000, 1812001, 1812002 },
+			"the first's clothes, then its items by part");
+	require(info_items(1, 0, parts) == Items{ 1812002, 1812000, 1812007 }, "the second's");
+	require(info_items(2, 0, parts) == Items{ 1812002, 1832000 }, "the third's");
+	require(info_items(0, 0, { { 31, 1822001 }, { 23, 1802000 } }).empty(), "other rings and clothes aren't listed");
+}
+
 int main()
 {
 	try
@@ -326,6 +342,7 @@ int main()
 		food();
 		naming();
 		equipment();
+		info_page();
 
 		std::cout << "Pets passed\n";
 		return 0;

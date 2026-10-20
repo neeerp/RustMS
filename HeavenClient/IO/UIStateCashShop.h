@@ -23,6 +23,8 @@
 
 #include "UIState.h"
 
+#include "Components/PlainTooltip.h"
+
 namespace ms
 {
 	class UIStateCashShop : public UIState
@@ -37,7 +39,7 @@ namespace ms
 		void rightclick(Point<int16_t> pos) override {}
 		void send_key(KeyType::Id type, int32_t action, bool pressed, bool escape) override;
 		Cursor::State send_cursor(Cursor::State mst, Point<int16_t> pos) override;
-		void send_scroll(double yoffset) override {}
+		void send_scroll(double, Point<int16_t>) override {}
 		void send_close() override {}
 
 		void drag_icon(Icon* icon) override {}
@@ -48,6 +50,9 @@ namespace ms
 		void show_skill(Tooltip::Parent parent, int32_t skill_id, int32_t level, int32_t masterlevel, int64_t expiration, bool levels) override {}
 		void show_text(Tooltip::Parent parent, std::string text) override {}
 		void show_map(Tooltip::Parent parent, std::string name, std::string description) override {}
+		void show_help(UIElement::Type owner, std::string title, std::string description,
+					   std::optional<Point<int16_t>> anchor, bool above) override;
+		void clear_help(UIElement::Type owner) override;
 
 		Iterator pre_add(UIElement::Type type, bool toggled, bool focused) override;
 		void remove(UIElement::Type type) override;
@@ -64,5 +69,9 @@ namespace ms
 
 		EnumMap<UIElement::Type, UIElement::UPtr, UIElement::Type::NUM_TYPES> elements;
 		UIElement::Type focused;
+
+		// The shop's buttons' help, the only tooltip it leaves to the state.
+		PlainTooltip help;
+		UIElement::Type help_owner = UIElement::Type::NONE;
 	};
 }

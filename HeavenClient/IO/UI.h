@@ -27,6 +27,8 @@
 #include "Components/ScrollingNotice.h"
 #include "Components/Textfield.h"
 
+#include "../Character/SkillMacros.h"
+
 namespace ms
 {
 	class UI : public Singleton<UI>
@@ -108,13 +110,24 @@ namespace ms
 
 		void show_text(Tooltip::Parent parent, std::string text);
 
+		// The skill macro at `index`.
+		void show_macro(Tooltip::Parent parent, size_t index);
+
 		void show_map(Tooltip::Parent parent, std::string name, std::string description);
 
 		void show_zone(Tooltip::Parent parent, std::string title, std::string description);
 
 		void show_line(Tooltip::Parent parent, std::string text);
 
+		void show_help(UIElement::Type owner, std::string title, std::string description,
+					   std::optional<Point<int16_t>> anchor = std::nullopt, bool above = false);
+
+		void clear_help(UIElement::Type owner);
+
 		Keyboard &get_keyboard();
+
+		// The skill macros, kept across characters as v83 does (report 206).
+		SkillMacros &get_skill_macros();
 
 		int64_t get_uptime();
 
@@ -133,6 +146,7 @@ namespace ms
 	private:
 		std::unique_ptr<UIState> state;
 		Keyboard keyboard;
+		SkillMacros skill_macros;
 		Cursor cursor;
 		ScrollingNotice scrollingnotice;
 

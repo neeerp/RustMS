@@ -59,6 +59,9 @@ namespace ms
 
 		void change_text(const std::string &text);
 
+		// Select the whole text, which the next key typed replaces.
+		void select_all();
+
 		void set_cryptchar(int8_t character);
 
 		// Wrap the text at width pixels instead of keeping it on one line.
@@ -83,6 +86,9 @@ namespace ms
 
 		bool belowlimit() const;
 
+		// Drop the selected text.
+		void erase_selection();
+
 		Point<int16_t> marker_offset() const;
 
 		Text textlabel;
@@ -100,6 +106,8 @@ namespace ms
 		size_t limit;
 		int8_t crypt;
 		State state;
+		bool selected = false;
+		Text selectedlabel;
 
 		std::map<int32_t, std::function<void(void)>> callbacks;
 		std::function<void(std::string)> onreturn;

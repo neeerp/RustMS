@@ -30,6 +30,7 @@
 
 #include <memory>
 #include <list>
+#include <optional>
 
 namespace ms
 {
@@ -53,7 +54,8 @@ namespace ms
 
 		virtual Cursor::State send_cursor(Cursor::State mst, Point<int16_t> pos) = 0;
 
-		virtual void send_scroll(double yoffset) = 0;
+		// The wheel, with the cursor where it turned.
+		virtual void send_scroll(double yoffset, Point<int16_t> pos) = 0;
 
 		virtual void send_close() = 0;
 
@@ -76,6 +78,9 @@ namespace ms
 
 		virtual void show_text(Tooltip::Parent parent, std::string text) = 0;
 
+		// The skill macro at `index`.
+		virtual void show_macro(Tooltip::Parent parent, size_t index) {}
+
 		virtual void
 		show_map(Tooltip::Parent parent, std::string name, std::string description) = 0;
 
@@ -84,6 +89,15 @@ namespace ms
 
 		// One line in v83's plain navy box, as for a portal on the minimap.
 		virtual void show_line(Tooltip::Parent parent, std::string text) {}
+
+		// Help from String's ToolTipHelp.img for the owner window: a button's
+		// hangs from anchor, the button's top right, or sits on it if above;
+		// without an anchor it follows the cursor, as a zone's does.
+		virtual void show_help(UIElement::Type owner, std::string title, std::string description,
+							   std::optional<Point<int16_t>> anchor, bool above) {}
+
+		// Take the owner's help down, if it is up.
+		virtual void clear_help(UIElement::Type owner) {}
 
 		virtual Iterator pre_add(UIElement::Type type, bool toggled, bool focused) = 0;
 
@@ -108,7 +122,7 @@ namespace ms
 		void rightclick(Point<int16_t>) override {}
 		void send_key(KeyType::Id, int32_t, bool, bool) override {}
 		Cursor::State send_cursor(Cursor::State, Point<int16_t>) override { return Cursor::State::IDLE; }
-		void send_scroll(double yoffset) override {}
+		void send_scroll(double, Point<int16_t>) override {}
 		void send_close() override {}
 		void drag_icon(Icon*) override {}
 		void clear_tooltip(Tooltip::Parent) override {}

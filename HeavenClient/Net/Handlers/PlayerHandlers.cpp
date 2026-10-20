@@ -118,6 +118,9 @@ namespace ms
 				"If you do not use your AP when you level up, \\nthen you won't be able to receive any additional AP.\\nPlease use your AP.",
 				[](bool) {});
 
+		// v83 checks the alert's quests again on any stat change (FUN_00a0843c).
+		Stage::get().get_quest_alert().stats_changed();
+
 		UI::get().enable();
 	}
 
@@ -222,6 +225,8 @@ namespace ms
 			handle_ride(recv, flags);
 
 		Stage::get().get_player().recalc_stats();
+		// Giving and cancelling buffs check the alert's quests again too (FUN_00a202be, FUN_00a2071f).
+		Stage::get().get_quest_alert().stats_changed();
 	}
 
 	void ApplyBuffHandler::handle_buff(InPacket& recv, Buffstat::Id bs) const
@@ -346,6 +351,9 @@ namespace ms
 				skillbook->update_skills(skillid);
 		}
 
+		// So does a skill update (FUN_00a1e48c).
+		Stage::get().get_quest_alert().stats_changed();
+
 		UI::get().enable();
 	}
 
@@ -397,16 +405,21 @@ namespace ms
 
 	void SkillMacrosHandler::handle(InPacket& recv) const
 	{
-		uint8_t size = recv.read_byte();
+		// v83 reads at most five and leaves the rest (FUN_004e77b0).
+		size_t count = std::min<size_t>(recv.read_byte(), SkillMacros::MAX_MACROS);
+		std::vector<SkillMacro> macros(count);
 
-		for (uint8_t i = 0; i < size; i++)
+		for (SkillMacro& macro : macros)
 		{
-			recv.read_string();	// name
-			recv.read_byte();	// 'shout' byte
-			recv.read_int();	// skill 1
-			recv.read_int();	// skill 2
-			recv.read_int();	// skill 3
+			macro.name = recv.read_string();
+			macro.silent = recv.read_byte() != 0;
+
+			for (int32_t& skill : macro.skills)
+				skill = recv.read_int();
 		}
+
+		UI::get().get_skill_macros().replace(std::move(macros));
+		Stage::get().stop_macro();
 	}
 
 	void AddCooldownHandler::handle(InPacket& recv) const

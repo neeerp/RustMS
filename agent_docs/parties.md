@@ -99,5 +99,5 @@ reconstruction of v83:
 - The party chat colour (#FF99CC).
 - Whether the leading tab in v83's "has become the leader" line shows.
 - The bottom button grid's exact pitch.
-- Whisper fills in `/w name` in the chat bar. In footage, v83 asked for the
-  name in a dialog first.
+- Whisper puts the chat bar into whisper mode for the member. In footage,
+  v83 asked for the name in a dialog first.

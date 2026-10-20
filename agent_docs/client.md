@@ -67,8 +67,15 @@ from `UI.nx`. Moved so far:
 - **Status bar** (`UIStatusBar`, `StatusBar.img`): gauges, menu buttons, the
   quick slot panel, and the Game Menu and ShortCut popups (`UIWindow.img`).
   Esc opens the Game Menu; the MENU key action opens ShortCut. Dropping a
-  skill, or a USE or SETUP item, on a quick slot binds that slot's key and
-  saves the keymap right away; an open Key Config shows the new binding.
+  skill, a USE or SETUP item, or a skill macro on a quick slot binds that
+  slot's key and saves the keymap right away; an open Key Config shows the
+  new binding. Hovering a quick slot shows its skill with levels, its item
+  as Item.nx has it, or its macro, with the box 128 px above the cursor;
+  cash and other slots leave the last tooltip up, as v83 does. The mouse
+  wheel goes only to the window under the cursor (or a modal window), never
+  to windows elsewhere on screen. Hovering the job and name shows
+  "login ID / channel / name", and hovering the EXP numbers shows the EXP,
+  both in the one-line box 20 px right of and below the cursor.
   Status messages (`UIStatusMessenger`) stack upward from just above the
   quick slot panel, right-aligned with it; `UIStatusBar::QUICKSLOT_TOP` is
   the shared anchor. Each fades out over 6 s. SHOW_STATUS_INFO is worded and
@@ -94,6 +101,18 @@ from `UI.nx`. Moved so far:
   row at a time, from 2 to 39 rows, once the cursor is more than a row from
   where the edge last stopped. The height is saved as `ChatHeight`, and logs
   under four rows tall hide the thumb.
+- **Chat target** (`UIChatBar`, `IO/Components/ChatTarget.h`,
+  `Basic.img/ComboBox2`): the box at the strip's left end opens v83's list
+  of eight targets upward, and Tab in the input field steps through them in
+  v83's order (FUN_008d536c). Picking Whisper asks for a name, and every
+  typed line then goes to that name until another target is picked; the
+  name prompt, `/w NAME`, and incoming whispers feed the history `/w` alone
+  uses. To Alliance and To Spouse give v83's notices, since HC has no
+  alliances or marriage. Picking To Group opens v83's group dialog
+  (`UIGroupPicker`, FUN_008d500b): a combo box of a blank entry and the
+  buddies' groups, which can also be typed in. OK sends lines to that
+  group's online buddies. It does so even with the box blank, and then
+  finds no one. The name prompt has no history list.
 - **NPC dialog** (`UINpcTalk`, `UIWindow.img/UtilDlgEx`): the frame,
   buttons, menu dots, quest list headers, and the `Basic.img/VScr4` scroll
   bar (`Slider::Type::CLASSIC`). See [npc-dialogue.md](npc-dialogue.md).
@@ -114,6 +133,9 @@ from `UI.nx`. Moved so far:
   [quests.md](quests.md).
 - **Quest Complete! notice** (`UIQuestComplete`, `UIWindow.img/FadeYesNo`).
   See [quests.md](quests.md).
+- **Quest alert** (`QuestAlert`, `Effect/BasicEff.img/QuestAlert`): the bulb
+  over the player's face for autoStart and autoComplete quests. See
+  [quests.md](quests.md).
 - **Invitation notices** (`UIInviteCard`, `UIWindow.img/FadeYesNo`): v83's
   fading cards above the status bar for Maple Messenger invitations, buddy
   requests, trade requests, and party invites, each "from '<name>'" beside
@@ -183,8 +205,21 @@ from `UI.nx`. Moved so far:
   (`Text::Font::A10M`). Rows are grey when a required skill is missing. SP-up
   spends a point at once; v83 had no allocation popup. A `recommend/0` frame
   marks the skill `Etc/RecommendSkill.img` names for the SP spent in the tab
-  (`recommended_skill`). The MACRO button and the `SkillMacro` window are not
-  drawn yet.
+  (`recommended_skill`). Its MACRO button (`Basic.img/BtMacro`) shows or hides
+  the skill macro window.
+- **Skill macro window** (`UISkillMacro`, `UIWindow.img/SkillMacro`): docked
+  at the skill window's right, which closes it and forgets its selection. It
+  lists the five macros three at a time with a scroll bar. Skills are dragged
+  into a macro's slots from the skill window or from another slot, and taken
+  out by dropping them on the field. v83 refuses passive, charged and movement
+  skills and ones with a cooldown (`skill_macro::may_hold`). Every change
+  sends the whole list (`SkillMacroPacket`). Clicking a row selects it, and
+  any other click in the window selects the first macro, as v83 does. The
+  selected macro's name (12 bytes) and shout box are saved with OK, which
+  refuses curse words. A macro's icon is dragged onto a key in Key Config or
+  a quick slot, which then shows it (`Macroicon/<n>/icon`). Hovering the icon,
+  or such a key in Key Config, shows the macro's tooltip (`MacroTooltip`). The
+  buttons have no tooltips.
 - **Item window** (`UIItemInventory`, `UIWindow.img/Item`): five tabs
   (`Item/Tab`, drawn by `ClassicTabs`), six rows of four slots with a `VScr4`
   scroll bar, and the mesos, laid out from period footage. BtFull widens it to
@@ -210,6 +245,7 @@ from `UI.nx`. Moved so far:
   `key` label over each bindable key's icon, and a three-row palette of unbound
   functions (`icon/N`, by v83 function id), laid out from the background and
   period footage. Drag an icon between keys or onto the palette to unbind it.
+  It shows the keys as they are each time it opens, as v83 builds it anew.
   Esc, Tab, and the other keys printed on the background are fixed. DEFAULT
   restores the server's defaults; DEFAULT, CLEAR ALL, and Esc with unsaved
   changes ask through the in-window `notice` bitmaps. CHANGE QUICK SLOTS is
@@ -285,14 +321,14 @@ from `UI.nx`. Moved so far:
   out move up (`IO/Components/ContextMenuLayout.h`). It holds the mouse and
   keys: a press or right release outside, ESC, or Enter closes it, and it
   closes before a row acts. Info opens the character info window, SAVE NAME
-  copies the name and opens the chat field, WHISPER fills in "/w name ",
-  TRADE and PARTY INVITE do what the info window's trade and `/party invite`
-  do, GUILD INVITE sends GUILD_OPERATION 5 after v83's guild checks, and
-  ALERT GM shows v83's notice that reports are down. Approximations: v83
-  also hits the character's second position and a morph's own box; it puts
-  the chat into whisper mode rather than filling in a command; and it offers
-  Add Junior to family members, which HC doesn't have. The right button
-  acts when it comes up, everywhere, as in v83.
+  copies the name and opens the chat field, WHISPER puts the chat into
+  whisper mode for them, TRADE and PARTY INVITE do what the info window's
+  trade and `/party invite` do, GUILD INVITE sends GUILD_OPERATION 5 after
+  v83's guild checks, and ALERT GM shows v83's notice that reports are down.
+  Approximations: v83 also hits the character's second position and a
+  morph's own box, and it offers Add Junior to family members, which HC
+  doesn't have. The right button acts when it comes up, everywhere, as in
+  v83.
 - **Quest log** (`UIQuestLog`, `UIWindow.img/Quest`): Available, In Progress,
   and Complete tabs (`Basic.img/Tab2`), quests folded by area, and a detail
   panel with the quest's text and FIND NPC or QUEST HELPER, laid out from
@@ -500,7 +536,7 @@ side yet.
 | Skills, stat/AP/SP allocation, buffs, keymap | Implemented |
 | NPC dialogue and NPC shop | Implemented (`UINpcTalk`, `UIShop`) |
 | Quest log and markers | Implemented (`UIQuestLog`); progress arrives via SHOW_STATUS_INFO, quest start/complete is driven by NPC dialogue; UPDATE_QUEST_INFO refusals 9–11, 13 and 14 show v83's notices (10 names the full inventories from `Act.img`), 15 the expiry chat line, and the timer modes are ignored |
-| Chat, whisper, `/find`, `/?`, `/party`, `/buddy`, `/all`, server messages, megaphones | Implemented; the megaphone dialogs are in `inventory.md`; buddy whisper/find modes ignored; `/w NAME` alone fills in a whisper to NAME, or says "Incorrect ID." for a name no character could have, as v83's `/whisper NAME` does; other commands are dropped, as v83 does for non-GMs |
+| Chat, whisper, `/find`, `/?`, `/party`, `/buddy`, `/all`, server messages, megaphones | Implemented; the megaphone dialogs are in `inventory.md`; buddy whisper/find modes ignored; `/w NAME` alone whispers every line to NAME, or says "Incorrect ID." for a name no character could have, as v83's `/whisper NAME` does; other commands are dropped, as v83 does for non-GMs |
 | Character info, minimap, world map | Implemented |
 | UI and game sounds | v83's: GameIn as the server lets a character in, not on map loads; RollDown/RollUp for the channel panel; SelectMap alone on world map links and right-click; BuyShopItem on Cash Shop purchase notices; other players' level-up, job, quest and card sounds. QuestAlert and a few rarer sounds are missing |
 | Party (`UIUserList` Party tab, `UIPartyHP`, party chat) | Implemented; see `parties.md` |
@@ -518,6 +554,7 @@ side yet.
 | Continent ships, station wall clocks | Docking ships and the Balrog's ship, CONTI_MOVE/CONTI_STATE, CLOCK kind 1; see `ships.md` |
 | Map clouds (`info/cloud`, 223 maps such as Perion) | Implemented (`MapClouds`): as v83 does, 10 to 59 of `MapHelper.img/weather/cloud`'s canvases scattered over the field's footholds plus 200 px, at 140 to 219 of 255 opacity, drifting right at 17 to 50 px/s for good and wrapping, above the front backgrounds |
 | Map tooltips (`ToolTip`, 270 maps such as Henesys) | Implemented (`MapTooltips`, `PlainTooltip`): as v83 does, a numbered zone's `ToolTipHelp.img/Mapobject` title and description show 20 below the cursor while it is over the zone, and stay up at the zone's bottom right while the player stands in its `<N>char` zone, in a translucent navy box without UI art. v83 pairs `<N>char` with the Nth zone in WZ order, which NX loses; HC pairs it with zone N, which differs only in Ellinia and Ariant. Font metrics are assumed (Arial 12). Seven titles in our `String.nx` carry a corrupt Korean prefix from the WZ conversion |
+| Button help (`ToolTipHelp.img/Game/Button`) | Implemented (`UIElement::set_button_help`, `PlainTooltip`): as v83 does, hovering a button with help shows its title and description in the plain navy box with a ring cut inside its edge, 270 wide unless the title needs more, hanging from the button's top right; a title alone takes the one-line box. Pressing hides it, and disabled buttons have none. The status bar's Cash Shop, Key Config, quick slot toggle and Claim buttons, the Teleport Rock's buttons (the VIP rock's register help says 10 maps) and the quest log's Quest Helper have it. v83 attaches the Trade button's help to the Cash Shop's by mistake and turns Menu's off, so neither has any. The Stat window's labels and the detail panel's (`Game/UIWnd/Stat` and `StatDetail`) show their help in the same box 20 below the cursor, but a beginner, Noblesse, Legend or Evan of level 10 or less only gets Name to Fame's; the EXP line shows "EXP : current / needed" in the one-line box 20 right of and below it. In the Cash Shop, the avatar's three buttons have help too, and Charge, Check and Coupon's sits on top of them (`UIStateCashShop` draws it). The inventory expansion buttons' help is never read, as in v83 |
 | Screenshot key | Implemented: as v83 does, Scroll Lock saves the frame as the next free `MapleNNNN.jpg` (quality 75) in the working directory, where v83 uses the game folder; in game, a fourth press less than a second after the last shows "You cannot take screenshots at this moment..." and later quick presses do nothing |
 | Medal name tags (`MedalTag`) | Implemented: as v83 does, a worn medal's name hangs 1 px under the name or guild tag, in the art and text colour of its `info/medalTag` style from `UI NameTag.img/medal`, or in a plain name tag box when the style has no art. v83 writes it in Dotum 12, which HC doesn't have, so the text and the number of tiles follow HC's 12 px font |
 | Boss HP bar (`UIMobGage`) | Implemented: FIELD_EFFECT mode 5 and `HPgaugeHide` mobs' hits show v83's bar right of the minimap, with the mob's name over its icon; see `combat.md` |

@@ -84,6 +84,9 @@ namespace ms
 			added.mesocost = sub["moneyCon"];
 			added.itemcost = sub["itemCon"];
 			added.itemcount = sub["itemConNo"];
+
+			if ((int32_t) sub["cooltime"] > 0)
+				cooltime = true;
 		}
 
 		element = std::string(src["elemAttr"]);
@@ -243,6 +246,11 @@ namespace ms
 	bool SkillData::is_passive() const
 	{
 		return passive;
+	}
+
+	bool SkillData::has_cooltime() const
+	{
+		return cooltime;
 	}
 
 	bool SkillData::is_attack() const
