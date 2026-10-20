@@ -549,6 +549,10 @@ A few skills do more than buff:
   `luk * 2.3 * y / 100` and `luk * 3.5 * y / 100`, using LUK with equips
   (`skills::chakra_heal`). The client only lets it be cast below half HP;
   the server doesn't check, since its max HP leaves out equips.
+- **MP Recovery** takes its `x` percent of the caster's max HP (without
+  equips) and gives `y` percent of that as MP (`skills::recovered_mp`). It
+  is refused unless the caster has more HP than it takes. v83 checks
+  nothing for it, so the rule is OdinMS-family servers'.
 - **Combo Attack** (`net::combo`) starts at value 1, which is one more than
   the orbs. After an accepted swing that reaches a mob (not Shout), the
   attack handler adds an orb up to Combo Attack's `x`, or Advanced Combo's
