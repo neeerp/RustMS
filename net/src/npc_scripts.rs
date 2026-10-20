@@ -10,6 +10,8 @@ use crate::dialogue::{DialoguePage, Prompt};
 use crate::scripts::Effect;
 use game::{guild, InventoryType, Player, QuestState};
 use game_data::server_content::keys;
+use rand::seq::SliceRandom;
+use rand::Rng;
 
 /// Roger's Apple, the tutorial's lesson on items.
 pub const ROGERS_APPLE_QUEST: i16 = 1021;
@@ -201,6 +203,97 @@ const PIRATE_TESTS: [PirateTest; 2] = [
     },
 ];
 
+/// The Explorer third job: a chief in El Nath sends a level-70 second job
+/// to their instructor, who sends them through the Door of Dimension to
+/// beat their clone; the clone's charm earns the Necklace of Strength, and
+/// the Holy Stone's quiz the Necklace of Wisdom, which the chief takes for
+/// the job. The steps between are script markers, as upstream servers keep
+/// them: the chief's assignment, the instructor's, the Holy Stone's.
+struct ThirdJob {
+    /// The line's first job.
+    job: i16,
+    text: &'static str,
+    chief: i32,
+    /// The hunting map with the line's Door of Dimension.
+    door_map: i32,
+    /// Behind the door, and the clone's room after it.
+    entry_map: i32,
+    boss_map: i32,
+}
+
+const THIRD_JOBS: [ThirdJob; 5] = [
+    // Tylus.
+    ThirdJob {
+        job: 100,
+        text: "warrior",
+        chief: 2020008,
+        door_map: 105070001,
+        entry_map: 108010300,
+        boss_map: 108010301,
+    },
+    // Robeira.
+    ThirdJob {
+        job: 200,
+        text: "magician",
+        chief: 2020009,
+        door_map: 100040106,
+        entry_map: 108010200,
+        boss_map: 108010201,
+    },
+    // Rene.
+    ThirdJob {
+        job: 300,
+        text: "bowman",
+        chief: 2020010,
+        door_map: 105040305,
+        entry_map: 108010100,
+        boss_map: 108010101,
+    },
+    // Arec.
+    ThirdJob {
+        job: 400,
+        text: "thief",
+        chief: 2020011,
+        door_map: 107000402,
+        entry_map: 108010400,
+        boss_map: 108010401,
+    },
+    // Pedro.
+    ThirdJob {
+        job: 500,
+        text: "pirate",
+        chief: 2020013,
+        door_map: 105070200,
+        entry_map: 108010500,
+        boss_map: 108010501,
+    },
+];
+
+/// The chief has assigned the test (upstream `JB3`).
+const CHIEF_ASSIGNED: i16 = 32100;
+/// The instructor has sent the player to the door (`JBP`).
+const INSTRUCTOR_ASSIGNED: i16 = 32101;
+/// The chief has sent the player to the Holy Stone (`JBQ`).
+const HOLY_STONE_ASSIGNED: i16 = 32102;
+const DOOR_OF_DIMENSION: i32 = 1061009;
+const SPARKLING_CRYSTAL: i32 = 1061010;
+const HOLY_STONE: i32 = 2030006;
+const SPIRUNA: i32 = 2032001;
+/// Dropped by the clone, for the player sent to fight it.
+const BLACK_CHARM: i32 = 4031059;
+const NECKLACE_OF_STRENGTH: i32 = 4031057;
+const NECKLACE_OF_WISDOM: i32 = 4031058;
+const DARK_CRYSTAL: i32 = 4005004;
+const DARK_CRYSTAL_ORE: i32 = 4004004;
+/// Spiruna refines for those who finished her quest (upstream).
+const SPIRUNA_QUEST: i16 = 3034;
+const ORE_PER_CRYSTAL: i16 = 10;
+const REFINING_FEE: i32 = 500_000;
+/// Questions asked of each challenger, any wrong answer failing.
+const QUIZ_LENGTH: usize = 5;
+/// How long a challenger has with the clone (upstream).
+const CLONE_TIME_LIMIT: u32 = 20 * 60;
+
 /// The player's answer to the current prompt.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ScriptInput {
@@ -232,6 +325,9 @@ pub enum Page {
         text: String,
         choices: Vec<(i32, Vec<Effect>)>,
     },
+    /// The last page of a menu choice that fails: said, and the script's
+    /// end effects are dropped.
+    End(String),
 }
 
 /// What to do after an answer: apply `effects`, then show `prompt` (or end
@@ -251,6 +347,8 @@ pub struct NpcScript {
     on_end: Vec<Effect>,
     /// Said instead of moving on when the items an answer gives don't fit.
     inventory_full: Option<String>,
+    /// Said when the player no longer may have what an answer applies.
+    refused: Option<String>,
 }
 
 impl NpcScript {
@@ -261,6 +359,7 @@ impl NpcScript {
             page: 0,
             on_end: Vec::new(),
             inventory_full: None,
+            refused: None,
         }
     }
 
@@ -269,6 +368,10 @@ impl NpcScript {
     pub fn for_npc(npc_id: i32, player: &Player) -> Option<Self> {
         if let Some(instructor) = INSTRUCTORS.iter().find(|i| i.npc_id == npc_id) {
             let stats = &player.stats;
+            let sent = marked(player, CHIEF_ASSIGNED) || marked(player, INSTRUCTOR_ASSIGNED);
+            if sent && third_job_line(player).is_some_and(|line| line.job == instructor.job) {
+                return Some(third_job_instructor(instructor, player));
+            }
             return Some(match &instructor.test {
                 _ if stats.job != instructor.job || stats.level < 30 => {
                     first_job(instructor, player)
@@ -288,7 +391,14 @@ impl NpcScript {
                 return Some(proctor(instructor, test, player));
             }
         }
+        if let Some(line) = THIRD_JOBS.iter().find(|line| line.chief == npc_id) {
+            return Some(chief(line, player));
+        }
         match npc_id {
+            DOOR_OF_DIMENSION => Some(door_of_dimension(player)),
+            SPARKLING_CRYSTAL => sparkling_crystal(player),
+            HOLY_STONE => Some(holy_stone(player, &mut rand::thread_rng())),
+            SPIRUNA => Some(spiruna(player)),
             PIRATE_PROCTOR => Some(pirate_proctor(player)),
             ROBIN => Some(robin()),
             SHANKS => Some(shanks(player)),
@@ -383,7 +493,7 @@ impl NpcScript {
     /// the prompt (the runtime ends the conversation).
     pub fn respond(&mut self, input: ScriptInput) -> Option<Step> {
         match (&self.pages[self.page], input) {
-            (Page::Say(_), ScriptInput::Next) => Some(self.advance(Vec::new())),
+            (Page::Say(_) | Page::End(_), ScriptInput::Next) => Some(self.advance(Vec::new())),
             (Page::Say(_), ScriptInput::Previous) if self.has_previous() => {
                 self.page -= 1;
                 Some(self.begin())
@@ -400,6 +510,9 @@ impl NpcScript {
                 let (_, pages) = choices.get(usize::try_from(choice).ok()?)?;
                 self.pages = pages.clone();
                 self.page = 0;
+                if matches!(self.pages.last(), Some(Page::End(_))) {
+                    self.on_end.clear();
+                }
                 Some(self.begin())
             }
             (Page::Style { choices, .. }, ScriptInput::Select(choice)) => {
@@ -415,6 +528,13 @@ impl NpcScript {
     /// script has words for it.
     pub fn inventory_full(&mut self) -> Option<Step> {
         let text = self.inventory_full.take()?;
+        Some(self.replace(text))
+    }
+
+    /// An answer's effects were refused: say so instead, if the script has
+    /// words for it.
+    pub fn refused(&mut self) -> Option<Step> {
+        let text = self.refused.take()?;
         Some(self.replace(text))
     }
 
@@ -450,6 +570,12 @@ impl NpcScript {
                 text: text.clone(),
                 has_previous: self.has_previous(),
                 has_next: self.page + 1 < self.pages.len() || !self.on_end.is_empty(),
+            }),
+            Page::End(text) => Prompt::Text(DialoguePage {
+                npc_id,
+                text: text.clone(),
+                has_previous: false,
+                has_next: false,
             }),
             Page::Ask { text, .. } => Prompt::YesNo {
                 npc_id,
@@ -877,6 +1003,270 @@ fn pirate_proctor(player: &Player) -> NpcScript {
     }
     let mut script = NpcScript::new(PIRATE_PROCTOR, vec![Page::Say(line("proctor.pass"))]);
     script.on_end = vec![out];
+    script
+}
+
+/// The third-job line of a level-70 second-job Explorer, if they are one.
+fn third_job_line(player: &Player) -> Option<&'static ThirdJob> {
+    let stats = &player.stats;
+    if stats.level < 70 || stats.job % 10 != 0 || stats.job % 100 == 0 {
+        return None;
+    }
+    THIRD_JOBS
+        .iter()
+        .find(|line| line.job == stats.job / 100 * 100)
+}
+
+fn marked(player: &Player, marker: i16) -> bool {
+    player.quests.state(marker) == QuestState::Started
+}
+
+/// Whether the player holds any `item_id`.
+fn holds(player: &Player, item_id: i32) -> bool {
+    player.inventory.count(item_id) > 0
+}
+
+/// A chief in El Nath and a second job of their line: the test, the
+/// Necklace of Strength traded for the Holy Stone's assignment, and the
+/// Necklace of Wisdom for the third job, once the player has spent all but
+/// three SP for each level past 70.
+fn chief(line: &ThirdJob, player: &Player) -> NpcScript {
+    let say = |part: &str| text(&keys::third_job(line.text, part));
+    let mut script = NpcScript::new(line.chief, Vec::new());
+    if third_job_line(player).is_none_or(|own| own.job != line.job) {
+        script.pages = vec![Page::Say(say("chief.other"))];
+        return script;
+    }
+    let job = player.stats.job + 1;
+    script.pages = if marked(player, HOLY_STONE_ASSIGNED) && holds(player, NECKLACE_OF_WISDOM) {
+        if !player.can_take_third_job(job) {
+            vec![Page::Say(say("chief.sp"))]
+        } else {
+            vec![
+                Page::Ask {
+                    text: say("chief.advance"),
+                    on_yes: vec![
+                        Effect::TakeItem {
+                            item_id: NECKLACE_OF_WISDOM,
+                            quantity: 1,
+                        },
+                        Effect::Unmark(HOLY_STONE_ASSIGNED),
+                        Effect::TakeThirdJob(job),
+                    ],
+                    on_no: None,
+                },
+                Page::Say(text(&keys::third_job(&job.to_string(), "accept"))),
+            ]
+        }
+    } else if marked(player, HOLY_STONE_ASSIGNED) {
+        vec![Page::Say(say("chief.wisdom"))]
+    } else if holds(player, NECKLACE_OF_STRENGTH) {
+        script.on_end = vec![
+            Effect::TakeItem {
+                item_id: NECKLACE_OF_STRENGTH,
+                quantity: 1,
+            },
+            Effect::Mark(HOLY_STONE_ASSIGNED),
+        ];
+        vec![Page::Say(say("chief.strength"))]
+    } else if marked(player, CHIEF_ASSIGNED) || marked(player, INSTRUCTOR_ASSIGNED) {
+        vec![Page::Say(say("chief.remind"))]
+    } else {
+        vec![
+            Page::Ask {
+                text: say("chief.ask"),
+                on_yes: vec![Effect::Mark(CHIEF_ASSIGNED)],
+                on_no: Some(say("chief.decline")),
+            },
+            Page::Say(say("chief.go")),
+        ]
+    };
+    script
+}
+
+/// The instructor of a player the chief sent: on to the Door of Dimension,
+/// and for the clone's Black Charm, the Necklace of Strength.
+fn third_job_instructor(instructor: &Instructor, player: &Player) -> NpcScript {
+    let say = |part: &str| text(&keys::third_job(instructor.text, part));
+    let mut script = NpcScript::new(instructor.npc_id, Vec::new());
+    if marked(player, CHIEF_ASSIGNED) {
+        script.pages = vec![Page::Say(say("instructor.assign"))];
+        script.on_end = vec![
+            Effect::Unmark(CHIEF_ASSIGNED),
+            Effect::Mark(INSTRUCTOR_ASSIGNED),
+        ];
+    } else if holds(player, BLACK_CHARM) {
+        script.pages = vec![Page::Say(say("instructor.reward"))];
+        script.on_end = vec![
+            Effect::TakeItem {
+                item_id: BLACK_CHARM,
+                quantity: 1,
+            },
+            Effect::GiveItem {
+                item_id: NECKLACE_OF_STRENGTH,
+                quantity: 1,
+            },
+            Effect::Unmark(INSTRUCTOR_ASSIGNED),
+        ];
+        script.inventory_full = Some(text(keys::THIRD_JOB_INVENTORY_FULL));
+    } else {
+        script.pages = vec![Page::Say(say("instructor.remind"))];
+    }
+    script
+}
+
+/// The Door of Dimension in a line's hunting map lets in the player their
+/// instructor sent, one challenger at a time: there is a single clone
+/// room per line.
+fn door_of_dimension(player: &Player) -> NpcScript {
+    let line = THIRD_JOBS
+        .iter()
+        .find(|line| line.door_map == player.stats.map_id)
+        .filter(|line| third_job_line(player).is_some_and(|own| own.job == line.job))
+        .filter(|_| marked(player, INSTRUCTOR_ASSIGNED) && !holds(player, BLACK_CHARM));
+    let Some(line) = line else {
+        return NpcScript::new(
+            DOOR_OF_DIMENSION,
+            vec![Page::Say(text(keys::THIRD_JOB_DOOR_OTHER))],
+        );
+    };
+    let mut script = NpcScript::new(
+        DOOR_OF_DIMENSION,
+        vec![Page::Ask {
+            text: text(keys::THIRD_JOB_DOOR_ASK),
+            on_yes: vec![
+                Effect::RequireEmptyMap(line.boss_map),
+                Effect::RequireEmptyMap(line.entry_map),
+                Effect::WarpToPortal(line.entry_map, 0),
+            ],
+            on_no: None,
+        }],
+    );
+    script.refused = Some(text(keys::THIRD_JOB_DOOR_BUSY));
+    script
+}
+
+/// The Sparkling Crystal in a clone's room leads back to the door. `None`
+/// anywhere else.
+fn sparkling_crystal(player: &Player) -> Option<NpcScript> {
+    let line = THIRD_JOBS
+        .iter()
+        .find(|line| line.boss_map == player.stats.map_id)?;
+    Some(NpcScript::new(
+        SPARKLING_CRYSTAL,
+        vec![Page::Ask {
+            text: text(keys::THIRD_JOB_CRYSTAL_ASK),
+            on_yes: vec![Effect::Warp(line.door_map)],
+            on_no: None,
+        }],
+    ))
+}
+
+/// The clone's room: the time a challenger has in it, which the map itself
+/// doesn't set.
+pub fn time_limit(map_id: i32) -> Option<u32> {
+    resets_when_empty(map_id).then_some(CLONE_TIME_LIMIT)
+}
+
+/// Whether the field puts its mobs back when the last player leaves, as a
+/// clone's room does for the next challenger.
+pub fn resets_when_empty(map_id: i32) -> bool {
+    THIRD_JOBS.iter().any(|line| line.boss_map == map_id)
+}
+
+/// The Holy Stone takes a Dark Crystal from the player the chief sent and
+/// asks them `QUIZ_LENGTH` questions picked from the text's; all right
+/// earns the Necklace of Wisdom, any wrong ends the try (the crystal is
+/// spent either way).
+fn holy_stone(player: &Player, rng: &mut impl Rng) -> NpcScript {
+    let say = |key| NpcScript::new(HOLY_STONE, vec![Page::Say(text(key))]);
+    if !marked(player, HOLY_STONE_ASSIGNED) {
+        return say(keys::HOLY_STONE_OTHER);
+    }
+    if holds(player, NECKLACE_OF_WISDOM) {
+        return say(keys::HOLY_STONE_DONE);
+    }
+    if !holds(player, DARK_CRYSTAL) {
+        return say(keys::HOLY_STONE_NO_CRYSTAL);
+    }
+    if crate::items::give(&mut player.inventory.clone(), NECKLACE_OF_WISDOM, 1).is_err() {
+        return say(keys::HOLY_STONE_ETC_FULL);
+    }
+    let content = content::text();
+    let questions: Vec<usize> = (0..)
+        .take_while(|&n| content.contains(&keys::holy_stone_question(n)))
+        .collect();
+    let fail = vec![Page::End(text(keys::HOLY_STONE_FAIL))];
+    let mut next = vec![Page::Say(text(keys::HOLY_STONE_PASS))];
+    for &n in questions.choose_multiple(rng, QUIZ_LENGTH) {
+        let mut choices = vec![(text(&keys::holy_stone_right(n)), next)];
+        choices.extend(
+            (0..)
+                .map(|k| keys::holy_stone_wrong(n, k))
+                .take_while(|key| content.contains(key))
+                .map(|key| (text(&key), fail.clone())),
+        );
+        choices.shuffle(rng);
+        next = vec![Page::Menu {
+            text: text(&keys::holy_stone_question(n)),
+            choices,
+        }];
+    }
+    let mut pages = vec![Page::Ask {
+        text: text(keys::HOLY_STONE_ASK),
+        on_yes: vec![Effect::TakeItem {
+            item_id: DARK_CRYSTAL,
+            quantity: 1,
+        }],
+        on_no: None,
+    }];
+    pages.extend(next);
+    let mut script = NpcScript::new(HOLY_STONE, pages);
+    script.on_end = vec![Effect::GiveItem {
+        item_id: NECKLACE_OF_WISDOM,
+        quantity: 1,
+    }];
+    script.inventory_full = Some(text(keys::THIRD_JOB_INVENTORY_FULL));
+    script
+}
+
+/// Spiruna refines Dark Crystal Ore into a Dark Crystal, one at a time,
+/// for those who finished her quest.
+fn spiruna(player: &Player) -> NpcScript {
+    if player.quests.state(SPIRUNA_QUEST) != QuestState::Completed {
+        return NpcScript::new(SPIRUNA, vec![Page::Say(text(keys::SPIRUNA_OTHER))]);
+    }
+    let can_pay = player.meso >= REFINING_FEE
+        && player.inventory.count(DARK_CRYSTAL_ORE) >= i32::from(ORE_PER_CRYSTAL);
+    let on_yes = if can_pay {
+        vec![
+            Effect::TakeItem {
+                item_id: DARK_CRYSTAL_ORE,
+                quantity: ORE_PER_CRYSTAL,
+            },
+            Effect::SpendMeso(REFINING_FEE),
+            Effect::GiveItem {
+                item_id: DARK_CRYSTAL,
+                quantity: 1,
+            },
+        ]
+    } else {
+        Vec::new()
+    };
+    let pages = vec![
+        Page::Ask {
+            text: text(keys::SPIRUNA_ASK),
+            on_yes,
+            on_no: None,
+        },
+        Page::Say(text(if can_pay {
+            keys::SPIRUNA_DONE
+        } else {
+            keys::SPIRUNA_SHORT
+        })),
+    ];
+    let mut script = NpcScript::new(SPIRUNA, pages);
+    script.inventory_full = Some(text(keys::THIRD_JOB_INVENTORY_FULL));
     script
 }
 
@@ -1679,5 +2069,235 @@ mod tests {
             ]
         );
         assert_eq!(kind(&woken), Some(0));
+    }
+
+    /// A level-70 Hunter holding `items` in the Etc bag, with `markers`.
+    fn hunter(items: &[(i32, i16)], markers: &[i16]) -> Player {
+        let mut player = player(50);
+        (player.stats.job, player.stats.level, player.stats.sp) = (310, 70, 0);
+        for (slot, &(item_id, quantity)) in (1..).zip(items) {
+            let item = game::Item::stack(item_id, quantity);
+            player.inventory.insert(InventoryType::Etc, slot, item);
+        }
+        for &marker in markers {
+            player.quests.mark(marker);
+        }
+        player
+    }
+
+    #[test]
+    fn second_jobs_earn_the_third_job_from_their_chief() {
+        const RENE: i32 = 2020010;
+        const ATHENA: i32 = 1012100;
+        let take = |item_id| Effect::TakeItem {
+            item_id,
+            quantity: 1,
+        };
+
+        // Rene only trains her own line, from level 70.
+        let mut young = hunter(&[], &[]);
+        young.stats.level = 69;
+        assert_eq!(
+            kind(&NpcScript::for_npc(RENE, &young).unwrap().begin()),
+            Some(0)
+        );
+        let mut tylus = NpcScript::for_npc(2020008, &hunter(&[], &[])).unwrap();
+        assert_eq!(kind(&tylus.begin()), Some(0));
+        assert_eq!(tylus.respond(ScriptInput::Next).unwrap().effects, []);
+
+        // She assigns the test, and Athena sends the player to the door.
+        let mut rene = NpcScript::for_npc(RENE, &hunter(&[], &[])).unwrap();
+        assert_eq!(
+            rene.respond(ScriptInput::Yes).unwrap().effects,
+            [Effect::Mark(CHIEF_ASSIGNED)]
+        );
+        let mut athena = NpcScript::for_npc(ATHENA, &hunter(&[], &[CHIEF_ASSIGNED])).unwrap();
+        assert_eq!(
+            athena.respond(ScriptInput::Next).unwrap().effects,
+            [
+                Effect::Unmark(CHIEF_ASSIGNED),
+                Effect::Mark(INSTRUCTOR_ASSIGNED)
+            ]
+        );
+        let sent = hunter(&[], &[INSTRUCTOR_ASSIGNED]);
+        let rene = NpcScript::for_npc(RENE, &sent).unwrap();
+        assert_eq!(buttons(&rene.begin()), (false, false));
+
+        // The door lets the player in from the line's map only, the clone's
+        // room and the way in empty.
+        let mut at_door = sent.clone();
+        at_door.stats.map_id = 105040305;
+        let mut door = NpcScript::for_npc(DOOR_OF_DIMENSION, &at_door).unwrap();
+        assert_eq!(
+            door.respond(ScriptInput::Yes).unwrap().effects,
+            [
+                Effect::RequireEmptyMap(108010101),
+                Effect::RequireEmptyMap(108010100),
+                Effect::WarpToPortal(108010100, 0),
+            ]
+        );
+        assert_eq!(kind(&door.refused().unwrap()), Some(0));
+        let door = NpcScript::for_npc(DOOR_OF_DIMENSION, &sent).unwrap();
+        assert_eq!(kind(&door.begin()), Some(0));
+        let mut in_room = sent.clone();
+        in_room.stats.map_id = 108010101;
+        let mut crystal = NpcScript::for_npc(SPARKLING_CRYSTAL, &in_room).unwrap();
+        assert_eq!(
+            crystal.respond(ScriptInput::Yes).unwrap().effects,
+            [Effect::Warp(105040305)]
+        );
+        assert_eq!(time_limit(108010101), Some(20 * 60));
+        assert_eq!(time_limit(108010100), None);
+
+        // The clone's charm earns the Necklace of Strength, which Rene
+        // trades for the Holy Stone's assignment.
+        let charmed = hunter(&[(BLACK_CHARM, 1)], &[INSTRUCTOR_ASSIGNED]);
+        let mut athena = NpcScript::for_npc(ATHENA, &charmed).unwrap();
+        assert_eq!(
+            athena.respond(ScriptInput::Next).unwrap().effects,
+            [
+                take(BLACK_CHARM),
+                Effect::GiveItem {
+                    item_id: NECKLACE_OF_STRENGTH,
+                    quantity: 1
+                },
+                Effect::Unmark(INSTRUCTOR_ASSIGNED),
+            ]
+        );
+        let mut rene =
+            NpcScript::for_npc(RENE, &hunter(&[(NECKLACE_OF_STRENGTH, 1)], &[])).unwrap();
+        assert_eq!(
+            rene.respond(ScriptInput::Next).unwrap().effects,
+            [
+                take(NECKLACE_OF_STRENGTH),
+                Effect::Mark(HOLY_STONE_ASSIGNED)
+            ]
+        );
+
+        // For the Necklace of Wisdom, the job, once enough SP is spent.
+        let mut wise = hunter(&[(NECKLACE_OF_WISDOM, 1)], &[HOLY_STONE_ASSIGNED]);
+        wise.stats.level = 72;
+        wise.stats.sp = 7;
+        let rene = NpcScript::for_npc(RENE, &wise).unwrap();
+        assert_eq!(kind(&rene.begin()), Some(0), "too much SP left");
+        wise.stats.sp = 6;
+        let mut rene = NpcScript::for_npc(RENE, &wise).unwrap();
+        assert_eq!(
+            rene.respond(ScriptInput::Yes).unwrap().effects,
+            [
+                take(NECKLACE_OF_WISDOM),
+                Effect::Unmark(HOLY_STONE_ASSIGNED),
+                Effect::TakeThirdJob(311),
+            ]
+        );
+        // Unsent, Athena talks as she does to any second job.
+        let athena = NpcScript::for_npc(ATHENA, &hunter(&[], &[])).unwrap();
+        assert_eq!(athena, first_job(&INSTRUCTORS[2], &hunter(&[], &[])));
+    }
+
+    /// The answer the quiz on the current page takes as right.
+    fn right_answer(script: &NpcScript) -> i32 {
+        let Page::Menu { choices, .. } = &script.pages[script.page] else {
+            panic!("a question");
+        };
+        let right = choices
+            .iter()
+            .position(|(_, pages)| !matches!(pages.last(), Some(Page::End(_))));
+        right.unwrap() as i32
+    }
+
+    #[test]
+    fn the_holy_stone_asks_five_questions_for_the_necklace() {
+        use rand::SeedableRng;
+        let mut rng = rand::rngs::StdRng::seed_from_u64(3);
+        let ready = hunter(&[(DARK_CRYSTAL, 2)], &[HOLY_STONE_ASSIGNED]);
+        let crystal = Effect::TakeItem {
+            item_id: DARK_CRYSTAL,
+            quantity: 1,
+        };
+
+        let mut stone = holy_stone(&ready, &mut rng);
+        assert_eq!(kind(&stone.begin()), Some(1));
+        assert_eq!(
+            stone.respond(ScriptInput::Yes).unwrap().effects,
+            [crystal.clone()]
+        );
+        let mut asked = Vec::new();
+        for _ in 0..QUIZ_LENGTH {
+            let Page::Menu { text, choices } = &stone.pages[stone.page] else {
+                panic!("a question");
+            };
+            assert_eq!(choices.len(), 5);
+            asked.push(text.clone());
+            let right = right_answer(&stone);
+            assert_eq!(
+                stone.respond(ScriptInput::Select(right)).unwrap().effects,
+                []
+            );
+        }
+        asked.sort();
+        asked.dedup();
+        assert_eq!(asked.len(), QUIZ_LENGTH, "no question twice");
+        assert_eq!(
+            stone.respond(ScriptInput::Next).unwrap().effects,
+            [Effect::GiveItem {
+                item_id: NECKLACE_OF_WISDOM,
+                quantity: 1
+            }]
+        );
+
+        // A wrong answer ends it, the crystal spent.
+        let mut stone = holy_stone(&ready, &mut rng);
+        stone.respond(ScriptInput::Yes).unwrap();
+        let wrong = (right_answer(&stone) + 1) % 5;
+        let failed = stone.respond(ScriptInput::Select(wrong)).unwrap();
+        assert_eq!(buttons(&failed), (false, false));
+        assert_eq!(stone.respond(ScriptInput::Next).unwrap().effects, []);
+
+        // Not without the chief's assignment, a crystal, or with the necklace.
+        for player in [
+            hunter(&[(DARK_CRYSTAL, 1)], &[]),
+            hunter(&[], &[HOLY_STONE_ASSIGNED]),
+            hunter(
+                &[(DARK_CRYSTAL, 1), (NECKLACE_OF_WISDOM, 1)],
+                &[HOLY_STONE_ASSIGNED],
+            ),
+        ] {
+            let mut stone = holy_stone(&player, &mut rng);
+            assert_eq!(kind(&stone.begin()), Some(0));
+            assert_eq!(stone.respond(ScriptInput::Next).unwrap().effects, []);
+        }
+    }
+
+    #[test]
+    fn spiruna_refines_dark_crystals_after_her_quest() {
+        let mut player = hunter(&[(DARK_CRYSTAL_ORE, 12)], &[]);
+        player.meso = REFINING_FEE;
+        let spiruna = NpcScript::for_npc(SPIRUNA, &player).unwrap();
+        assert_eq!(kind(&spiruna.begin()), Some(0));
+        player.quests.upsert(game::QuestRecord {
+            quest_id: SPIRUNA_QUEST,
+            status: QuestStatus::Completed {
+                at: std::time::SystemTime::UNIX_EPOCH,
+            },
+        });
+        let mut spiruna = NpcScript::for_npc(SPIRUNA, &player).unwrap();
+        assert_eq!(
+            spiruna.respond(ScriptInput::Yes).unwrap().effects,
+            [
+                Effect::TakeItem {
+                    item_id: DARK_CRYSTAL_ORE,
+                    quantity: 10
+                },
+                Effect::SpendMeso(REFINING_FEE),
+                Effect::GiveItem {
+                    item_id: DARK_CRYSTAL,
+                    quantity: 1
+                },
+            ]
+        );
+        player.meso -= 1;
+        let mut spiruna = NpcScript::for_npc(SPIRUNA, &player).unwrap();
+        assert_eq!(spiruna.respond(ScriptInput::Yes).unwrap().effects, []);
     }
 }

@@ -2,6 +2,7 @@ use super::quest::{gain_exp, QuestChange};
 use super::ClientActor;
 use crate::db::spawn_db;
 use crate::error::RuntimeError;
+use crate::message::DirectoryMessage;
 use net::conti::{self, State};
 use net::dialogue::Prompt;
 use net::npc_scripts::{self, NpcScript, Step};
@@ -12,6 +13,7 @@ use net::quests::{self, QuestTemplate};
 use net::scripts::Effect;
 use net::WorldAction;
 use std::time::{Duration, SystemTime};
+use tokio::sync::oneshot;
 use tracing::{debug, warn};
 
 /// The NPC that offers veterans a tutorial skip.
@@ -72,7 +74,10 @@ impl ClientActor {
                 Some(step) => step,
                 None => return Ok(()),
             },
-            Applied::Refused => return Ok(()),
+            Applied::Refused => match script.refused() {
+                Some(step) => step,
+                None => return Ok(()),
+            },
         };
         if let Some(prompt) = step.prompt {
             let mut packet = npc::build_prompt(&prompt)?;
@@ -213,6 +218,27 @@ impl ClientActor {
                         updates.push(StatUpdate::Ap(stats.ap));
                     }
                     packets.push(stat::build_stat_update(false, &updates)?);
+                }
+                Effect::Mark(marker) => {
+                    next.quests.mark(*marker);
+                    changed = true;
+                }
+                Effect::Unmark(marker) => {
+                    next.quests.remove(*marker);
+                    changed = true;
+                }
+                Effect::RequireEmptyMap(map_id) => {
+                    let (reply, occupied) = oneshot::channel();
+                    self.send_to_directory(DirectoryMessage::MapOccupied {
+                        channel_id: self.channel_id,
+                        map_id: *map_id,
+                        reply,
+                    })
+                    .await?;
+                    if occupied.await.unwrap_or(true) {
+                        debug!(map_id, "Map occupied; nothing applied");
+                        return Ok(Applied::Refused);
+                    }
                 }
                 Effect::AddSlotRow(kind) => {
                     let limit = next

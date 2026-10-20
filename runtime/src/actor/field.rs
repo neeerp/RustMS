@@ -1972,6 +1972,10 @@ impl FieldActor {
                 self.send_npc_control(next);
             }
         }
+        // A boss room is fresh for its next challenger.
+        if next.is_none() && net::npc_scripts::resets_when_empty(self.key.map_id) {
+            self.mobs.renew(Instant::now());
+        }
     }
 
     fn handle_npc_interaction(&self, from: ClientId, object_id: i32, request_id: u64) {

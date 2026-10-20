@@ -525,6 +525,20 @@ impl MobSet {
         self.create(now, 0, true)
     }
 
+    /// Start afresh, as when the field loaded: every mob goes without a
+    /// trace and every point spawns again, those with a negative `mobTime`
+    /// too. For a field nobody is on. Returns the new mobs' object ids.
+    pub fn renew(&mut self, now: Instant) -> Vec<i32> {
+        self.live.clear();
+        self.revivals.clear();
+        for spawn in &mut self.spawns {
+            spawn.alive = None;
+            spawn.regen_after = None;
+        }
+        self.last_pass = None;
+        self.create(now, 0, true)
+    }
+
     /// A spawn pass with `users` on the field; returns the new mobs' object
     /// ids.
     pub fn respawn(&mut self, now: Instant, users: usize) -> Vec<i32> {

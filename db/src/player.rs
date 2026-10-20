@@ -16,7 +16,7 @@ use diesel::pg::PgConnection;
 use diesel::prelude::*;
 use diesel::upsert::excluded;
 use game::inventory::DEFAULT_SLOT_LIMIT;
-use game::quest::{decode_kills, encode_kills};
+use game::quest::{decode_kills, encode_kills, SCRIPT_MARKERS};
 use game::{
     AvatarLook, CharacterStats, EquipStats, Inventory, InventoryType, Item, KeyBinding, Keymap,
     MonsterBook, Mount, Player, QuestLog, QuestRecord, QuestStatus, SkillBook, SkillMacro,
@@ -371,6 +371,29 @@ pub(crate) fn write_player(conn: &mut PgConnection, player: &Player) -> QueryRes
         save_mount(conn, id, &player.mount)?;
         save_inventory(conn, id, &player.inventory)?;
         crate::pet::save(conn, &player.inventory, &player.pets)?;
+        // Script markers are whatever the player holds now.
+        diesel::delete(
+            character_quests::table
+                .filter(character_quests::character_id.eq(id))
+                .filter(character_quests::quest_id.ge(SCRIPT_MARKERS)),
+        )
+        .execute(conn)?;
+        let markers: Vec<_> = player
+            .quests
+            .markers()
+            .map(|marker| {
+                (
+                    character_quests::character_id.eq(id),
+                    character_quests::quest_id.eq(marker),
+                    character_quests::status.eq(1),
+                )
+            })
+            .collect();
+        if !markers.is_empty() {
+            diesel::insert_into(character_quests::table)
+                .values(&markers)
+                .execute(conn)?;
+        }
         // Kill progress of started quests.
         for record in player.quests.started() {
             let kills = player.quests.kills(record.quest_id);

@@ -20,6 +20,25 @@ replace = [{ item = 4031856, prob = 0.7, quest = 2191 }]
 # (2192) checks for 15 Potent Wind Crystals 4031857.
 replace = [{ item = 4031857, prob = 0.7, quest = 2192 }]
 
+[mobs.9001000]
+# The third job's clones (Map.nx 108010301, ...201, ...101, ...401, ...501)
+# drop the Black Charm 4031059 their challenger brings the instructor. It
+# drops only for one the instructor sent (script marker 32101,
+# net::npc_scripts), every time, as on the community servers.
+replace = [{ item = 4031059, prob = 1.0, quest = 32101 }]
+
+[mobs.9001001]
+replace = [{ item = 4031059, prob = 1.0, quest = 32101 }]
+
+[mobs.9001002]
+replace = [{ item = 4031059, prob = 1.0, quest = 32101 }]
+
+[mobs.9001003]
+replace = [{ item = 4031059, prob = 1.0, quest = 32101 }]
+
+[mobs.9001004]
+replace = [{ item = 4031059, prob = 1.0, quest = 32101 }]
+
 [reactors.2000]
 # Maple Island's scrap box. Pio's Collecting Recycled Goods (1008) checks for
 # 4031161 and 4031162 (Quest.nx Check.img/1008/1/item).

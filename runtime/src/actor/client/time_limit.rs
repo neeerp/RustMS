@@ -14,8 +14,9 @@ pub(super) struct MapTimer {
 }
 
 impl ClientActor {
-    /// On a map with `info/timeLimit` and another map to return to, the
-    /// client shows the countdown and the player has that long. Any other
+    /// On a map with `info/timeLimit` (or one a script sets,
+    /// `npc_scripts::time_limit`) and another map to return to, the client
+    /// shows the countdown and the player has that long. Any other
     /// map clears the timer, so coming back starts it again.
     pub(super) async fn start_map_timer(&mut self) -> Result<(), RuntimeError> {
         self.map_timer = None;
@@ -26,7 +27,10 @@ impl ClientActor {
         let Some(field) = data.field(map_id) else {
             return Ok(());
         };
-        let (Some(seconds), Some(to)) = (field.time_limit, field.forced_return) else {
+        let seconds = field
+            .time_limit
+            .or_else(|| net::npc_scripts::time_limit(map_id));
+        let (Some(seconds), Some(to)) = (seconds, field.forced_return) else {
             return Ok(());
         };
         if to == map_id || !data.field_exists(to) {
