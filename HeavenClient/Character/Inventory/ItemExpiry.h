@@ -93,6 +93,8 @@ namespace ms::item_expiry
 		// `limitedLife`: the seconds it lives in all. Such a pet counts down
 		// the seconds it has left instead of having a date.
 		int32_t limited = 0;
+		// `noRevive`: the Water of Life can't bring it back once it dies.
+		bool no_revive = false;
 	};
 
 	// Whether a pet has died (FUN_004e4003). One with limitedLife dies when its

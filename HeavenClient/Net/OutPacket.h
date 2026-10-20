@@ -107,6 +107,7 @@ namespace ms
 			PET_FOOD = 76,
 			USE_MOUNT_FOOD = 77,
 			USE_CASH_ITEM = 79,
+			DEAD_PET = 80,
 			USE_CATCH_ITEM = 81,
 			USE_SKILL_BOOK = 82,
 			USE_TELEPORT_ROCK = 84,

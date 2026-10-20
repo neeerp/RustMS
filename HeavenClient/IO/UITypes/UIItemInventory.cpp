@@ -107,9 +107,13 @@ namespace ms
 		constexpr const char *MEGAPHONE_LONG = "Use the megaphone to text up to 60 characters.";
 		constexpr const char *SUMMON_SACK = "Too much interest can hinder your process of leveling up.\\n\\nwill you really summon the monster?";
 		constexpr const char *BOSS_PET = "Would you like to change your Boss Pet?\\n (The \"Item Ignore\" skill, as well as \\nthe stats for speed and jump will \\nfollow that of the Lead Pet)";
+		// StringPool 0x17a and 0x17b.
+		constexpr const char *PET_TIME_UP = "The time has run out, so it can't move.";
+		constexpr const char *NO_REVIVE = "You cannot revive this pet.\\nYou can purchase a new pet\\nin the Cash Shop. Would you like\\nto move to the Cash Shop?";
 
 		// v83 FUN_00a240a2: double-clicking a pet asks the server to bring it
-		// out, or back if it is out.
+		// out, or back if it is out. A doll stays home; one that can't be
+		// revived offers the Cash Shop.
 		void summon_pet(int16_t slot, int64_t serial)
 		{
 			Player &player = Stage::get().get_player();
@@ -122,6 +126,26 @@ namespace ms
 				UI::get().emplace<UIOk>(CATCH_BREATH, [](bool)
 				{});
 				return;
+			}
+
+			if (Optional<const Pet> pet = player.get_inventory().get_pet(serial))
+			{
+				const item_expiry::PetLife &life = ItemData::get(pet->get_item_id()).get_pet_life();
+
+				if (item_expiry::pet_dead(pet->get_date_dead(), pet->get_remain_life(), life))
+				{
+					if (!life.no_revive)
+						UI::get().emplace<UIOk>(PET_TIME_UP, [](bool)
+						{});
+					else if (player.request(DeadPetPacket(serial), ExclRequest::USE_WAIT))
+						UI::get().emplace<UIYesNo>(NO_REVIVE, [](bool yes)
+						{
+							if (yes)
+								Stage::get().enter_cash_shop();
+						});
+
+					return;
+				}
 			}
 
 			int32_t lead = pets::follow_the_lead(player.get_stats().get_job().get_id());

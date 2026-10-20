@@ -321,6 +321,19 @@ namespace ms
 		}
 	};
 
+	// Opcode: DEAD_PET(80)
+	class DeadPetPacket : public OutPacket
+	{
+	public:
+		// Sent for the doll `serial`, which can't be revived, as the Cash
+		// Shop is offered instead (FUN_00a240a2).
+		DeadPetPacket(int64_t serial) : OutPacket(OutPacket::Opcode::DEAD_PET)
+		{
+			write_time();
+			write_long(serial);
+		}
+	};
+
 	// Opcode: PET_CHAT(168)
 	class PetChatPacket : public OutPacket
 	{
