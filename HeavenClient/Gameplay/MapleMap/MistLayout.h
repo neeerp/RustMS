@@ -162,6 +162,21 @@ namespace ms
 			return false;
 		}
 
+		// The element a mob mist's hurt is resisted as: 125 poison, 130
+		// fire; Poison Mist (131) none, so it takes its full x
+		// (FUN_00765c0f).
+		constexpr int32_t resisted_as(int32_t skillid)
+		{
+			return skillid == 125 ? 4 : skillid == 130 ? 2 : 0;
+		}
+
+		// What's left of `damage` after `percent` of it is resisted
+		// (0x94b7f2).
+		constexpr int32_t resisted(int32_t damage, int32_t percent)
+		{
+			return (100 - percent) * damage / 100;
+		}
+
 		// How long apart a mist hurts the player, in ms: more than this
 		// since the last time (0x94b7a2).
 		constexpr int32_t HURT_INTERVAL = 1000;

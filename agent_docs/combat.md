@@ -1205,8 +1205,13 @@ and FUN_0066d9c0 (DoAttack); details are in the v83 notes for L173.
   `hit` animation plays on a player who takes damage, and a row attack
   shows its `areaWarning` on each cell.
 
-HeavenClient leaves out `tremble` (the screen shake), `doFirst`, element
-resistance, hits on summons and other mobs, and attacks on a Puppet.
+A magic attack with an element, and a fire (130) or poison (125) mob
+mist, lose the job's resistance skill's `x` percent (`Player::resists`:
+Dragon Knights, Priests and Blaze Wizards resist every element, F/P
+Wizards fire and poison, I/L Wizards ice and lightning). Poison Mist (131)
+always hurts its full `x`. HeavenClient leaves out `tremble` (the screen
+shake), `doFirst`, hits on summons and other mobs, and attacks on a
+Puppet.
 
 ### Mob skills
 

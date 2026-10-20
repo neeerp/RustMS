@@ -60,6 +60,10 @@ int main()
 		areas[0].damage = 0;
 		require(!mist::hurt_at(areas, 0, 0, hurt), "one that does nothing doesn't");
 		require(mist::hurts(130) && mist::hurts(131) && !mist::hurts(2111003), "the hurting mob skills");
+		require(mist::resisted_as(130) == 2 && mist::resisted_as(125) == 4 && mist::resisted_as(131) == 0,
+				"a fire mist is resisted as fire, Poison Mist not at all");
+		require(mist::resisted(200, 40) == 120 && mist::resisted(7, 50) == 3 && mist::resisted(200, 0) == 200,
+				"the rest of the damage, rounded down");
 
 		// A smoke screen shelters its owner and their party, not others.
 		mist::Area smoke{ mist::SMOKE, 7, 4221006, 20, -100, -100, 100, 100, 0, 0, true };
