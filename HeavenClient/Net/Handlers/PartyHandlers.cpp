@@ -139,13 +139,16 @@ namespace ms
 			int32_t party_id = recv.read_int();
 			std::string inviter = recv.read_string();
 			// Nonzero for a party search's invitation, which v83 accepts
-			// unseen (FUN_00a3e31c).
+			// unseen, or drops if the Game Option blocks either (FUN_00a3e31c).
 			int8_t search = recv.read_byte();
 			const std::string& self = player.get_stats().get_name();
+			bool allowed = Setting<AllowPartyInvite>::get().load();
 
 			if (search)
 			{
-				JoinPartyPacket(party_id, search).dispatch();
+				if (allowed && Setting<AllowPartySearch>::get().load())
+					JoinPartyPacket(party_id, search).dispatch();
+
 				break;
 			}
 
@@ -157,6 +160,12 @@ namespace ms
 			if (cards->showing(UIInviteCard::PARTY))
 			{
 				DenyPartyRequestPacket(DenyPartyRequestPacket::BUSY, inviter, self).dispatch();
+				break;
+			}
+
+			if (!allowed)
+			{
+				DenyPartyRequestPacket(DenyPartyRequestPacket::BLOCKING, inviter, self).dispatch();
 				break;
 			}
 
@@ -334,6 +343,14 @@ namespace ms
 	void MultiChatHandler::handle(InPacket& recv) const
 	{
 		int8_t mode = recv.read_byte();
+
+		// The Game Option drops buddy and guild chat unread (FUN_00531e00).
+		if (mode == MultiChatPacket::Mode::BUDDY && !Setting<AllowFriends>::get().load())
+			return;
+
+		if (mode == MultiChatPacket::Mode::GUILD && !Setting<AllowGuildChat>::get().load())
+			return;
+
 		std::string name = recv.read_string();
 		// As with nearby chat, v83 stars out curse words and shows what it
 		// can't print as spaces (FUN_00531e00).

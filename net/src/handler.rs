@@ -9,6 +9,7 @@
 use crate::combat::AttackKind;
 use crate::dialogue::NpcInteraction;
 use crate::error::NetworkError;
+use crate::packet::build::world::party::PartyStatus;
 use crate::packet::handle::{login, world};
 use crate::packet::op::RecvOpcode;
 use db::session::{Session, SessionState};
@@ -177,13 +178,13 @@ pub struct WorldContext<'a> {
 }
 
 /// A whisper ready for delivery; the world directory picks which packet the
-/// sender gets back.
+/// sender gets back, if any.
 #[derive(Debug)]
 pub struct WhisperDelivery {
     pub target_name: String,
     pub recipient_packet: Packet,
-    pub sender_success_packet: Packet,
-    pub sender_failure_packet: Packet,
+    pub sender_success_packet: Option<Packet>,
+    pub sender_failure_packet: Option<Packet>,
 }
 
 /// A party operation; the world directory owns parties and carries it out.
@@ -200,11 +201,11 @@ pub enum PartyRequest {
     Invite {
         name: String,
     },
-    /// Turn down `inviter`'s invitation. `busy` says another was still
-    /// showing, which leaves the invitation waiting for that one's answer.
+    /// Turn down `inviter`'s invitation, telling them `status`. Busy with
+    /// another invitation leaves this one waiting for that one's answer.
     Decline {
         inviter: String,
-        busy: bool,
+        status: PartyStatus,
     },
     Expel {
         member_id: i32,
@@ -276,8 +277,11 @@ pub enum MessengerRequest {
     Invite {
         target: String,
     },
+    /// Turn down `inviter`'s invitation, `blocking` when the Game Option
+    /// turned it away unseen.
     Decline {
         inviter: String,
+        blocking: bool,
     },
     /// A line already formatted as `name : text`.
     Chat {

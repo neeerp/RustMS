@@ -47,10 +47,10 @@ namespace ms
 		settings.emplace<AllowTradeRequest>();
 		settings.emplace<AllowPartyInvite>();
 		settings.emplace<AllowPartySearch>();
-		settings.emplace<AllowGameInvite>();
+		settings.emplace<AllowExpeditionInvite>();
 		settings.emplace<AllowGuildChat>();
 		settings.emplace<AllowGuildInvite>();
-		settings.emplace<AllowAllianceTournament>();
+		settings.emplace<AllowAllianceChat>();
 		settings.emplace<AllowAllianceInvite>();
 		settings.emplace<AllowFamilyInvite>();
 		settings.emplace<SaveLogin>();

@@ -913,6 +913,10 @@ namespace ms
 		whisper_waiting = true;
 		whisper_sent = std::chrono::steady_clock::now();
 		whisper_message = message;
+
+		// With whispers blocked, an answer would be turned away (FUN_0052f185).
+		if (!message.empty() && !Setting<AllowWhisper>::get().load())
+			send_chatline("Since the character has the whispers blocked at this point, you may not receive an answer.", LineType::LIGHT_YELLOW);
 	}
 
 	std::string UIChatBar::whisper_answered()

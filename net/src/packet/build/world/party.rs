@@ -29,6 +29,8 @@ pub enum PartyStatus {
     Full = 17,
     /// "Unable to find the requested character in this channel."
     NotFound = 19,
+    /// "'name' is currently blocking any party invitations."
+    Blocking = 21,
     /// "'name' is taking care of another invitation."
     BusyWithInvite = 22,
     /// "name have denied request to the party."
@@ -37,7 +39,10 @@ pub enum PartyStatus {
 
 impl PartyStatus {
     fn names_someone(self) -> bool {
-        matches!(self, PartyStatus::BusyWithInvite | PartyStatus::Declined)
+        matches!(
+            self,
+            PartyStatus::Blocking | PartyStatus::BusyWithInvite | PartyStatus::Declined
+        )
     }
 }
 

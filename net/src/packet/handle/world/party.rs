@@ -4,12 +4,13 @@ use crate::handler::{
 };
 use crate::packet::build::world::buddy::MULTICHAT_BUDDY;
 use crate::packet::build::world::guild::MULTICHAT_GUILD;
-use crate::packet::build::world::party::MULTICHAT_PARTY;
+use crate::packet::build::world::party::{PartyStatus, MULTICHAT_PARTY};
 use packet::{io::read::PktRead, Packet};
 use std::io::Cursor;
 
-/// The `DENY_PARTY_REQUEST` reason for an invitation that came while
+/// `DENY_PARTY_REQUEST` reasons: the Game Option blocks invitations, or
 /// another was showing.
+const DENY_BLOCKING: u8 = 0x15;
 const DENY_BUSY: u8 = 0x16;
 
 /// `PARTY_OPERATION`: create, leave, accept, invite, expel, or pass the lead.
@@ -43,20 +44,27 @@ impl WorldHandler for PartyOperationHandler {
 
 /// `DENY_PARTY_REQUEST`: reason, inviter, receiver. The receiver turned
 /// down an invitation (`0x17`), or v83 did for them because another was
-/// still showing (`0x16`, FUN_00a3e31c).
+/// still showing (`0x16`) or its Game Option blocks them (`0x15`,
+/// FUN_00a3e31c).
 pub struct DenyPartyRequestHandler;
 
 impl WorldHandler for DenyPartyRequestHandler {
     fn handle(&self, packet: &mut Packet, _ctx: &mut WorldContext) -> WorldResult {
         let mut reader = Cursor::new(&packet.bytes);
         reader.read_short()?;
-        let busy = reader.read_byte()? == DENY_BUSY;
+        let status = match reader.read_byte()? {
+            DENY_BLOCKING => PartyStatus::Blocking,
+            DENY_BUSY => PartyStatus::BusyWithInvite,
+            _ => PartyStatus::Declined,
+        };
         let inviter = reader.read_str_with_length()?;
         // Party search invitations name the inviter as "PS: name".
         let inviter = inviter.strip_prefix("PS: ").unwrap_or(&inviter).to_string();
         Ok(
-            HandlerResult::empty()
-                .with(WorldAction::Party(PartyRequest::Decline { inviter, busy })),
+            HandlerResult::empty().with(WorldAction::Party(PartyRequest::Decline {
+                inviter,
+                status,
+            })),
         )
     }
 }
@@ -152,7 +160,7 @@ mod tests {
             request(&DenyPartyRequestHandler, &packet.bytes),
             Some(PartyRequest::Decline {
                 inviter: "Alice".into(),
-                busy: false,
+                status: PartyStatus::Declined,
             })
         );
         packet.bytes[2] = 0x16;
@@ -160,7 +168,15 @@ mod tests {
             request(&DenyPartyRequestHandler, &packet.bytes),
             Some(PartyRequest::Decline {
                 inviter: "Alice".into(),
-                busy: true,
+                status: PartyStatus::BusyWithInvite,
+            })
+        );
+        packet.bytes[2] = 0x15;
+        assert_eq!(
+            request(&DenyPartyRequestHandler, &packet.bytes),
+            Some(PartyRequest::Decline {
+                inviter: "Alice".into(),
+                status: PartyStatus::Blocking,
             })
         );
     }

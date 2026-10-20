@@ -4,6 +4,7 @@
 
 #include "../Packets/GameplayPackets.h"
 
+#include "../../Configuration.h"
 #include "../../Gameplay/Stage.h"
 #include "../../IO/UI.h"
 #include "../../IO/UITypes/UIChatBar.h"
@@ -125,9 +126,10 @@ namespace ms
 				stats->update_all_stats();
 		}
 
-		// An invitation (FUN_00a37490): a card, unless one is up already or
-		// the player is busy with a window, when the client turns it down
-		// itself. The card's X declines; letting it fade says nothing.
+		// An invitation (FUN_00a37490): a card, unless one is up already, the
+		// Game Option blocks it or the player is busy with a window, when the
+		// client turns it down itself. The card's X declines; letting it fade
+		// says nothing.
 		void invited(int32_t guild_id, const std::string& inviter)
 		{
 			std::string self = Stage::get().get_player().get_stats().get_name();
@@ -136,7 +138,7 @@ namespace ms
 			if (cards && cards->showing(UIInviteCard::GUILD))
 				return DenyGuildRequestPacket(DenyGuildRequestPacket::ANOTHER, inviter, self).dispatch();
 
-			if (!cards || UI::get().modal_open())
+			if (!cards || !Setting<AllowGuildInvite>::get().load() || UI::get().modal_open())
 				return DenyGuildRequestPacket(DenyGuildRequestPacket::BUSY, inviter, self).dispatch();
 
 			cards->add(UIInviteCard::GUILD, inviter, [guild_id, inviter, self](bool yes)

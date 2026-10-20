@@ -439,8 +439,8 @@ namespace ms
 		{}
 	};
 
-	// The Game Option settings: whether to allow each kind of request. The
-	// client stores them; declining needs the features they belong to.
+	// The Game Option settings: whether to allow each kind of request. As in
+	// v83 the client enforces them, turning requests down for the player.
 	struct AllowWhisper : public Configuration::BoolEntry
 	{
 		AllowWhisper() : BoolEntry("AllowWhisper", "true")
@@ -477,9 +477,10 @@ namespace ms
 		{}
 	};
 
-	struct AllowGameInvite : public Configuration::BoolEntry
+	// v83 has the box but never loads, saves or reads it.
+	struct AllowExpeditionInvite : public Configuration::BoolEntry
 	{
-		AllowGameInvite() : BoolEntry("AllowGameInvite", "true")
+		AllowExpeditionInvite() : BoolEntry("AllowExpeditionInvite", "true")
 		{}
 	};
 
@@ -495,9 +496,9 @@ namespace ms
 		{}
 	};
 
-	struct AllowAllianceTournament : public Configuration::BoolEntry
+	struct AllowAllianceChat : public Configuration::BoolEntry
 	{
-		AllowAllianceTournament() : BoolEntry("AllowAllianceTournament", "true")
+		AllowAllianceChat() : BoolEntry("AllowAllianceChat", "true")
 		{}
 	};
 

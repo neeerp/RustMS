@@ -31,11 +31,15 @@ impl WorldHandler for MessengerHandler {
                 MessengerRequest::Invite { target }
             }
             MESSENGER_DECLINE_MODE => {
+                // The inviter, the decliner's own name, and whether the
+                // Game Option turned the invitation away (FUN_00851478).
                 let inviter = reader.read_str_with_length()?;
+                reader.read_str_with_length()?;
+                let blocking = reader.read_byte()? != 0;
                 if !valid_name(&inviter) {
                     return Ok(HandlerResult::empty());
                 }
-                MessengerRequest::Decline { inviter }
+                MessengerRequest::Decline { inviter, blocking }
             }
             MESSENGER_CHAT_MODE => {
                 // The v83 client sends the whole line, "name : text"; only
@@ -163,6 +167,25 @@ mod tests {
         assert!(matches!(
             handle(MESSENGER_INVITE_MODE, name("Bob")),
             Some(MessengerRequest::Invite { target }) if target == "Bob"
+        ));
+    }
+
+    #[test]
+    fn a_decline_says_whether_the_options_blocked_it() {
+        let decline = |flag: u8| {
+            move |p: &mut Packet| {
+                p.write_str_with_length("Bob").unwrap();
+                p.write_str_with_length("Alice").unwrap();
+                p.write_byte(flag).unwrap();
+            }
+        };
+        assert!(matches!(
+            handle(MESSENGER_DECLINE_MODE, decline(0)),
+            Some(MessengerRequest::Decline { inviter, blocking: false }) if inviter == "Bob"
+        ));
+        assert!(matches!(
+            handle(MESSENGER_DECLINE_MODE, decline(1)),
+            Some(MessengerRequest::Decline { blocking: true, .. })
         ));
     }
 }

@@ -48,10 +48,10 @@ namespace ms
 			&Setting<AllowTradeRequest>::get(),
 			&Setting<AllowPartyInvite>::get(),
 			&Setting<AllowPartySearch>::get(),
-			&Setting<AllowGameInvite>::get(),
+			&Setting<AllowExpeditionInvite>::get(),
 			&Setting<AllowGuildChat>::get(),
 			&Setting<AllowGuildInvite>::get(),
-			&Setting<AllowAllianceTournament>::get(),
+			&Setting<AllowAllianceChat>::get(),
 			&Setting<AllowAllianceInvite>::get(),
 			&Setting<AllowFamilyInvite>::get()
 		};

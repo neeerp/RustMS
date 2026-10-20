@@ -12,6 +12,8 @@ pub const WHISPER_REQUEST_MODE: u8 = 0x06;
 pub const WHISPER_RESULT_MODE: u8 = 0x0A;
 /// Server → client: an incoming whisper.
 pub const WHISPER_RECEIVE_MODE: u8 = 0x12;
+/// Both ways: the receiver's Game Option turned a whisper away.
+pub const WHISPER_BLOCKED_MODE: u8 = 0x22;
 /// Client → server: find where a character is (`/find`).
 pub const FIND_REQUEST_MODE: u8 = 0x05;
 /// Server → client: where the character the client looked for is.
@@ -149,6 +151,17 @@ pub fn build_whisper_result(target_name: &str, success: bool) -> Result<Packet, 
     Ok(packet)
 }
 
+/// `target` blocks whispers, so the receiver's last one went unseen.
+pub fn build_whisper_blocked(target: &str) -> Result<Packet, NetworkError> {
+    let mut packet = Packet::new_empty();
+    packet.write_short(SendOpcode::Whisper as i16)?;
+    packet.write_byte(WHISPER_BLOCKED_MODE)?;
+    packet.write_str_with_length(target)?;
+    // Nonzero would say "Unable to find" instead.
+    packet.write_byte(0)?;
+    Ok(packet)
+}
+
 /// The answer to a find. A character who isn't online gets the failed
 /// whisper result instead.
 pub fn build_find_result(
@@ -198,6 +211,17 @@ mod tests {
             .byte(6)
             .string("Tired")
             .int(0)
+            .end();
+    }
+
+    #[test]
+    fn a_blocked_whisper_names_who_blocked_it() {
+        let packet = build_whisper_blocked("Bobby").unwrap();
+        Expect::new(&packet.bytes)
+            .short(SendOpcode::Whisper as i16)
+            .byte(0x22)
+            .string("Bobby")
+            .byte(0)
             .end();
     }
 
