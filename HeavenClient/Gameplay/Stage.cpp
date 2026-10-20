@@ -24,8 +24,10 @@
 #include "Timer.h"
 #include "MapleMap/CharClick.h"
 #include "Combat/FlashJump.h"
+#include "Combat/Wings.h"
 #include "FieldEffectRules.h"
 #include "MapleMap/DoorRules.h"
+#include "MapleMap/FieldLimit.h"
 #include "MapleMap/Npc.h"
 
 #include "../IO/UI.h"
@@ -173,6 +175,7 @@ namespace ms
 		summons.clear();
 		// The server brings the player's pets out again on the new field.
 		player.clear_pets();
+		player.glide(false, false);
 		pending_clock.reset();
 	}
 
@@ -782,6 +785,21 @@ namespace ms
 		show_flash_jump(flash_jump::effect(skill), player.get_position(), player.getflip());
 	}
 
+	// v83 casts Wings from a foothold or the water, jumps, and glides the
+	// player down once falling (FUN_00957a1f). The jump can still fail
+	// after the cast, as where the map forbids jumping (FUN_009b21da).
+	void Stage::use_wings(int32_t skill)
+	{
+		if (!combat.use_wings(skill, mapinfo.can_use_movement_skills(), player.may_wings()))
+			return;
+
+		if (!field_limit::may_jump(mapinfo.get_fieldlimit(), false))
+			return;
+
+		const SkillData::Stats &stats = SkillData::get(skill).get_stats(player.get_skills().get_level(skill));
+		player.wings(stats.x, stats.time);
+	}
+
 	void Stage::show_flash_jump(const char *effect, Point<int16_t> position, bool right)
 	{
 		ground_effects.add(nl::nx::effect["BasicEff.img"][effect], DrawArgument(position, right));
@@ -974,6 +992,8 @@ namespace ms
 					use_teleport(action);
 				else if (down && flash_jump::jumps(action))
 					use_flash_jump(action);
+				else if (down && wings::is_wings(action))
+					use_wings(action);
 				else if (down)
 					combat.use_move(action);
 

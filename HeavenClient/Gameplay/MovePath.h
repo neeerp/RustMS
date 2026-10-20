@@ -298,6 +298,12 @@ namespace ms
 				return !queue.empty();
 			}
 
+			// The type of the element playing now, or of the last played with none.
+			uint8_t command() const
+			{
+				return queue.empty() ? last : queue.front().command;
+			}
+
 			// The types of the elements played since last asked, a bit each
 			// (FUN_0068adcc).
 			uint32_t take_arrived()
@@ -319,6 +325,8 @@ namespace ms
 			{
 				if (element.command < 32)
 					arrived |= 1u << element.command;
+
+				last = element.command;
 
 				state.x = element.xpos;
 				state.y = element.ypos;
@@ -349,6 +357,7 @@ namespace ms
 			int32_t queued = 0;
 			int32_t rate = TICK;
 			uint32_t arrived = 0;
+			uint8_t last = 0;
 		};
 	}
 }

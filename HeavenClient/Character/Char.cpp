@@ -66,6 +66,9 @@ namespace ms
 		if (dashing && phobj.onground)
 			dash_dust.draw(DrawArgument(absp, facing_right), alpha);
 
+		if (gliding)
+			wings_glow.draw(DrawArgument(absp, facing_right), alpha);
+
 		Color color;
 
 		// While blinking, the avatar is drawn at half brightness for two of
@@ -229,6 +232,9 @@ namespace ms
 
 		if (dashing)
 			dash_dust.update();
+
+		if (gliding)
+			wings_glow.update();
 
 		if (energy_wait >= 0)
 		{
@@ -452,6 +458,28 @@ namespace ms
 
 		if (dashing)
 			dash_dust = nl::nx::skill[string_format::skill_img(skill)]["skill"][std::to_string(skill)]["special"];
+	}
+
+	void Char::glide(bool now, bool landed)
+	{
+		if (now == gliding)
+			return;
+
+		gliding = now;
+		nl::node skill = nl::nx::skill["520.img"]["skill"]["5201005"];
+
+		if (gliding)
+		{
+			wings_glow = skill["special"];
+			wings_sound = Sound(nl::nx::sound["Skill.img"]["5201005"]["Loop"]);
+			wings_sound.play_loop();
+		} else
+		{
+			wings_sound.stop();
+
+			if (landed)
+				effects.add(skill["finish"], DrawArgument(facing_right));
+		}
 	}
 
 	void Char::show_energy(int32_t skill, bool full, bool init)

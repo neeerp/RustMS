@@ -1079,6 +1079,23 @@ mod tests {
     }
 
     #[test]
+    fn wings_spends_its_mp() {
+        if skills::data().is_err() {
+            return;
+        }
+        // Wings costs 50 MP at level 1 and 14 at level 10, and buffs nothing.
+        for (level, mp) in [(1, 50), (10, 86)] {
+            let mut player = beginner_with(5201005, level);
+            player.stats.max_mp = 100;
+            player.stats.mp = 100;
+            let used = use_skill(&mut player, 5201005, level, Instant::now()).unwrap();
+            assert!(!used.buffs);
+            assert!(player.buffs.active().is_empty());
+            assert_eq!(player.stats.mp, mp);
+        }
+    }
+
+    #[test]
     fn recovery_heals_by_its_x_and_attacks_are_not_buffs() {
         if skills::data().is_err() {
             return;

@@ -42,6 +42,8 @@ namespace ms
 		OtherChar(int32_t charid, const CharLook &look, uint8_t level, int16_t job, const std::string &name,
 				  int8_t stance, Point<int16_t> position);
 
+		~OtherChar() override;
+
 		// Update the character.
 		int8_t update(const Physics &physics) override;
 

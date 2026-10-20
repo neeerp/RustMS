@@ -23,6 +23,7 @@
 #include "../Constants.h"
 #include "../Gameplay/Combat/Dash.h"
 #include "../Gameplay/Combat/FlashJump.h"
+#include "../Gameplay/Combat/Wings.h"
 #include "../Gameplay/Stage.h"
 #include "../IO/UITypes/EnergyBarLayout.h"
 
@@ -39,6 +40,11 @@ namespace ms
 
 		attackspeed = 6;
 		attacking = false;
+	}
+
+	OtherChar::~OtherChar()
+	{
+		glide(false, false);
 	}
 
 	int8_t OtherChar::update(const Physics &physics)
@@ -59,6 +65,9 @@ namespace ms
 		if (path.take_arrived() & (1u << 6))
 			if (const char *effect = flash_jump::remote_effect(job))
 				Stage::get().show_flash_jump(effect, get_position(), facing_right);
+
+		// Wings' glide shows while the path glides down (0x9b17ec).
+		glide(wings::gliding(path.command() == wings::GLIDE, now.vy), now.fh > 0);
 
 		physics.get_fht().update_fh(phobj);
 

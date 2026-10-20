@@ -360,6 +360,21 @@ namespace ms
 		return true;
 	}
 
+	bool Combat::use_wings(int32_t move_id, bool allowed, bool may)
+	{
+		const SpecialMove &move = get_move(move_id);
+
+		// Unlike Flash Jump, v83 refuses it silently (FUN_00957a1f).
+		if (!can_use_move(move) || !allowed || !may || !player.can_request(ExclRequest::SKILL_WAIT))
+			return false;
+
+		// With no action and no position, as Flash Jump (0x957b10).
+		int32_t level = player.get_skills().get_level(move_id);
+		player.request(UseSkillPacket(move_id, level, 0, UseSkillPacket::Reach{}), ExclRequest::SKILL_WAIT);
+
+		return true;
+	}
+
 	bool Combat::can_use_move(const SpecialMove &move) const
 	{
 		// v83 takes no other move while a skill is held (0x96a86e).

@@ -316,6 +316,8 @@ if(HEAVENCLIENT_BUILD_TESTS)
     add_test(NAME skill_weapon COMMAND skill_weapon_tests)
     add_executable(dash_tests tests/dash.cpp)
     add_test(NAME dash COMMAND dash_tests)
+    add_executable(wings_tests tests/wings.cpp)
+    add_test(NAME wings COMMAND wings_tests)
 endif()
 
 include_directories(.)

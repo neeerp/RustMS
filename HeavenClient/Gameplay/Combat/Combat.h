@@ -87,6 +87,10 @@ namespace ms
 		// player be `airborne` for. Whether it was asked.
 		bool use_flash_jump(int32_t move_id, bool allowed, bool airborne);
 
+		// Ask to use Wings, which the map must have `allowed` and the player
+		// `may` cast now; it says nothing when not. Whether it was asked.
+		bool use_wings(int32_t move_id, bool allowed, bool may);
+
 		// Add an attack to the attack queue.
 		void push_attack(const AttackResult &attack);
 

@@ -350,14 +350,21 @@ namespace ms
 			}
 		} else
 		{
-			// CVecCtrl's falling (FUN_007f2a1c).
+			// CVecCtrl's falling (FUN_007f2a1c). Falling with Wings on goes at
+			// its speed outright, with no gravity (0x9b2ce8).
 			double drag = FLOATDRAG * friction;
 
-			if (vspeed > FALLSPEED)
-				vspeed = std::max(vspeed - drag * TICK, FALLSPEED);
+			if (phobj.wingsfall > 0.0 && vspeed > 0.0)
+			{
+				vspeed = phobj.wingsfall;
+			} else
+			{
+				if (vspeed > FALLSPEED)
+					vspeed = std::max(vspeed - drag * TICK, FALLSPEED);
 
-			if (phobj.is_flag_not_set(PhysicsObject::Flag::NOGRAVITY))
-				accelerate(vspeed, GRAVITYACC, FALLSPEED);
+				if (phobj.is_flag_not_set(PhysicsObject::Flag::NOGRAVITY))
+					accelerate(vspeed, GRAVITYACC, FALLSPEED);
+			}
 
 			if (dir != 0)
 				accelerate(hspeed, dir * AIRACC * friction, AIRSPEED * friction);
