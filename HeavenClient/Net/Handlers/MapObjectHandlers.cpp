@@ -31,6 +31,7 @@
 #include "../../Data/ItemData.h"
 #include "../../Data/SkillData.h"
 #include "../../Gameplay/Stage.h"
+#include "../../Gameplay/Combat/Assassinate.h"
 #include "../../IO/UI.h"
 #include "../../IO/UITypes/UIChatBar.h"
 #include "../../IO/UITypes/UINotice.h"
@@ -365,6 +366,11 @@ namespace ms
 		int32_t cid = recv.read_int();
 		Point<int16_t> start = recv.read_point();
 		std::vector<Movement> movements = MovementParser::parse_movements(recv, start);
+
+		// Assassinate's dash shows its `special` where it starts.
+		for (const Movement &movement : movements)
+			if (movement.command == 8)
+				Stage::get().get_combat().show_special(cid, assassinate::ID);
 
 		Stage::get().get_chars().send_movement(cid, movements);
 	}

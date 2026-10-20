@@ -151,6 +151,9 @@ namespace ms
 
 		// Return whether the buff is active.
 		bool has_buff(Buffstat::Id stat) const;
+		// How many milliseconds ago Dark Sight was last given, -1 if never
+		// this session; cancelling it keeps the time (0x78698f).
+		int64_t since_dark_sight() const;
 		// What a buff adds, 0 without it.
 		int16_t get_buff_value(Buffstat::Id stat) const;
 
@@ -400,6 +403,8 @@ namespace ms
 		// When the player last moved under Stop Motion, or entered the map
 		// (+0x311c).
 		int64_t stirred = 0;
+		// When Dark Sight was last given, -1 if never.
+		int64_t dark_sight_at = -1;
 		// Whether the player has Flash Jumped since last on the ground or a
 		// rope (+0x2b58).
 		bool flash_jumped = false;

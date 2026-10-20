@@ -237,6 +237,11 @@ pub struct Buffs {
     active: Vec<Buff>,
     /// (skill id, usable again at)
     cooldowns: Vec<(i32, Instant)>,
+    /// When Dark Sight was last cancelled: Assassinate cancels it just
+    /// before it strikes.
+    pub dark_sight_cancelled: Option<Instant>,
+    /// The mob Assassinate's second strike must hit, and by when.
+    pub assassinate: Option<(i32, Instant)>,
 }
 
 impl Buffs {

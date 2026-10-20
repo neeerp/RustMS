@@ -249,6 +249,9 @@ impl WorldHandler for CancelBuffHandler {
             return dismount(ctx.player, HandlerResult::empty());
         }
         let ended = ctx.player.buffs.cancel(skill_id);
+        if ended.contains(&BuffStat::DarkSight) {
+            ctx.player.buffs.dark_sight_cancelled = Some(Instant::now());
+        }
         if ended.is_empty() {
             return Ok(HandlerResult::empty());
         }

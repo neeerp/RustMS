@@ -226,8 +226,9 @@ namespace ms
 		// Use the move. A held skill hits with its `charge`, and its shots
 		// while held keep the body's action (`held`). A Final Attack
 		// (`follow`) cuts short the action under way with its own.
+		// Assassinate's second strike (`again`) hits only that mob.
 		void apply_move(const SpecialMove &move, int32_t charge = 0, bool held = false,
-						const Follow *follow = nullptr);
+						const Follow *follow = nullptr, std::optional<int32_t> again = std::nullopt);
 
 		// Meso Explosion: set off the mesos in front of the player, each
 		// hurting the mobs around it (FUN_0096b3fb).
@@ -240,6 +241,9 @@ namespace ms
 		// Follow up with the Final Attack that came up, once it's time
 		// (0x96cd3e).
 		void update_final_attack();
+		// Strike again with Assassinate when due, and dash forward, if the
+		// dash finds somewhere to land (FUN_0096ce79, FUN_0096cb93).
+		void update_second_strike();
 
 		// Let go of Monster Magnet, held for `charge` ms: it catches the mobs
 		// in front of the player (0x96c215). Whether it was used.
@@ -522,6 +526,17 @@ namespace ms
 		};
 
 		std::optional<FinalAttack> pending_final;
+
+		// Assassinate's second strike: on which mob, with which weapon
+		// type, and when (0x957977).
+		struct SecondStrike
+		{
+			int32_t oid;
+			int32_t weapon;
+			int64_t at;
+		};
+
+		std::optional<SecondStrike> second_strike;
 
 		// Game time in ms, for the shots of the skills that keep firing.
 		int64_t now = 0;

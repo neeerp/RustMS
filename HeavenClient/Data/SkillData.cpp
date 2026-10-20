@@ -81,6 +81,7 @@ namespace ms
 
 			added.x = sub["x"];
 			added.z = sub["z"];
+			added.criticaldamage = sub["criticalDamage"];
 			added.mesocost = sub["moneyCon"];
 			added.itemcost = sub["itemCon"];
 			added.itemcount = sub["itemConNo"];

@@ -147,6 +147,12 @@ namespace ms
 		// Return a reference to the attack and buff component.
 		Combat &get_combat();
 
+		// Whether no in-map move is waiting, so a dash may go.
+		bool may_dash() const;
+		// Move the player onto `spot` on the next update, as Assassinate's
+		// second strike does (0x952d7b).
+		void dash(teleport::Spot spot);
+
 		// Returns the current map ID.
 		int32_t get_mapid();
 
