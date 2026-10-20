@@ -74,6 +74,8 @@ namespace ms
 		// Tooltips open 20 px right of the cursor in the list and the Cash Inventory, and under it in the Item
 		// Inventory, as in game (UIStateGame's cursor + (0, 22)).
 		const Point<int16_t> TOOLTIP_RIGHT = Point<int16_t>(20, 22);
+		// A package's tooltip has its top left here from the cursor (FUN_008efcb7).
+		const Point<int16_t> PACKAGE_TOOLTIP = Point<int16_t>(20, 20);
 		const Point<int16_t> TOOLTIP_BELOW = Point<int16_t>(0, 22);
 		const Point<int16_t> ITEM_TABS_POS = Point<int16_t>(21, 457);
 		const Point<int16_t> ITEM_TAB_SIZE = Point<int16_t>(30, 16);
@@ -228,12 +230,9 @@ namespace ms
 
 		for (nl::node item : nl::nx::etc["Commodity.img"])
 		{
-			if (item["OnSale"].get_integer() != 1)
-				continue;
-
 			int32_t sn = static_cast<int32_t>(item["SN"].get_integer());
 
-			commodities.push_back({
+			catalog.push_back({
 				sn,
 				static_cast<int32_t>(item["ItemId"].get_integer()),
 				static_cast<int32_t>(item["Price"].get_integer()),
@@ -243,6 +242,9 @@ namespace ms
 				static_cast<int32_t>(item["Priority"].get_integer()),
 				static_cast<int32_t>(item["Period"].get_integer())
 			});
+
+			if (item["OnSale"].get_integer() == 1)
+				commodities.push_back(catalog.back());
 		}
 
 		name_label = Text(Text::Font::A12M, Text::Alignment::RIGHT, Color::Name::BLACK, stats.get_name());
@@ -655,18 +657,24 @@ namespace ms
 					return;
 				}
 
+				tooltip_pos = cursorpos + TOOLTIP_RIGHT;
+
 				if (item_id / 1000000 == 1)
 				{
 					eqtooltip.set_commodity(item_id, commodity.period);
 					tooltip = &eqtooltip;
+				}
+				else if (item_id / 10000 == 910)
+				{
+					packagetooltip.set_package(item_id, catalog);
+					tooltip = &packagetooltip;
+					tooltip_pos = cursorpos + PACKAGE_TOOLTIP;
 				}
 				else
 				{
 					ittooltip.set_commodity(item_id, commodity.period);
 					tooltip = &ittooltip;
 				}
-
-				tooltip_pos = cursorpos + TOOLTIP_RIGHT;
 				hovered = static_cast<int16_t>(i);
 				hovered_cash = 0;
 

@@ -153,6 +153,20 @@ namespace ms
 			return found;
 		}
 
+		// What a package's content costs on its own (FUN_00a25ae9): the
+		// dearest commodity with its item, count and period.
+		inline int32_t regular_price(const std::vector<Commodity>& all, const Commodity& content)
+		{
+			int32_t price = content.price;
+
+			for (const Commodity& commodity : all)
+				if (commodity.item_id == content.item_id && commodity.count == content.count
+					&& commodity.period == content.period)
+					price = std::max(price, commodity.price);
+
+			return price;
+		}
+
 		inline size_t page_count(size_t items)
 		{
 			return std::max<size_t>(1, (items + PAGE_SIZE - 1) / PAGE_SIZE);

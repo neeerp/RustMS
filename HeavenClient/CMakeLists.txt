@@ -72,6 +72,8 @@ if(HEAVENCLIENT_BUILD_TESTS)
     add_test(NAME map_tooltip COMMAND map_tooltip_tests)
     add_executable(cash_catalog_tests tests/cash_catalog.cpp)
     add_test(NAME cash_catalog COMMAND cash_catalog_tests)
+    add_executable(package_tooltip_tests tests/package_tooltip.cpp)
+    add_test(NAME package_tooltip COMMAND package_tooltip_tests)
     add_executable(answer_focus_tests tests/answer_focus.cpp)
     add_test(NAME answer_focus COMMAND answer_focus_tests)
     add_executable(slider_steps_tests tests/slider_steps.cpp)
@@ -626,6 +628,9 @@ add_executable(HeavenClient
     IO/Components/NameTag.cpp
     IO/Components/NameTag.h
     IO/Components/NpcText.cpp
+    IO/Components/PackageTooltip.cpp
+    IO/Components/PackageTooltip.h
+    IO/Components/PackageTooltipLayout.h
     IO/Components/PlainTooltip.cpp
     IO/Components/PlainTooltip.h
     IO/Components/ScrollingNotice.cpp

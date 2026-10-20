@@ -21,6 +21,7 @@
 
 #include "../Components/EquipTooltip.h"
 #include "../Components/ItemTooltip.h"
+#include "../Components/PackageTooltip.h"
 #include "../Components/Slider.h"
 
 #include "../../Character/Inventory/InventoryType.h"
@@ -161,6 +162,8 @@ namespace ms
 		};
 
 		std::vector<cash_catalog::Commodity> commodities;
+		// Every commodity, on sale or not, for what a package's contents cost on their own.
+		std::vector<cash_catalog::Commodity> catalog;
 		std::array<std::vector<std::string>, cash_catalog::NUM_TABS> subtab_names;
 
 		Texture background;
@@ -209,6 +212,7 @@ namespace ms
 
 		EquipTooltip eqtooltip;
 		ItemTooltip ittooltip;
+		PackageTooltip packagetooltip;
 		const Tooltip* tooltip = nullptr;
 		Point<int16_t> tooltip_pos;
 		// The commodity on the page whose tooltip is shown, kept while the cursor stays on it.
