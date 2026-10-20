@@ -11,6 +11,7 @@ use game_data::PortalTemplate;
 
 const FREE_MARKET: i32 = 910000000;
 const HENESYS: i32 = 100000000;
+const LEAFRE_STATION_ENTRANCE: i32 = 240000100;
 
 /// What a map, portal, or NPC script does. Scripts only return effects; the
 /// runtime applies them, committing player changes together.
@@ -162,6 +163,17 @@ pub fn portal(script: &str, player: &Player) -> Option<ScriptOutcome> {
             ],
             block: false,
         },
+        // Leafre Station's way back into town (Cosmic's `dracoout`).
+        "dracoout" => ScriptOutcome {
+            effects: vec![
+                Effect::PortalSound,
+                Effect::WarpToPortal(
+                    LEAFRE_STATION_ENTRANCE,
+                    portal_id(LEAFRE_STATION_ENTRANCE, |portal| portal.name == "east00"),
+                ),
+            ],
+            block: false,
+        },
         // Event maps' exits, back to where the invitation (2031001, 2031006,
         // 2031003) was used, kept under its `returnMapQR`.
         "photoOut" => go_back(7686, Effect::Warp(saved(7686))),
@@ -230,6 +242,18 @@ mod tests {
             effects: vec![Effect::AvatarEffect(path.into())],
             block: true,
         }
+    }
+
+    #[test]
+    fn leafre_station_lets_players_back_into_town() {
+        let outcome = portal("dracoout", &player_with(&[])).unwrap();
+        assert_eq!(
+            outcome.effects,
+            [
+                Effect::PortalSound,
+                Effect::WarpToPortal(LEAFRE_STATION_ENTRANCE, 2)
+            ]
+        );
     }
 
     #[test]

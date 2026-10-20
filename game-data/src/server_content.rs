@@ -66,6 +66,9 @@ pub mod keys {
     pub const SHIPS_SELL_ASK: &str = "ships.sell.ask";
     pub const SHIPS_SELL_DECLINE: &str = "ships.sell.decline";
     pub const SHIPS_SELL_SHORT: &str = "ships.sell.short";
+    pub const SHIPS_SELL_MENU: &str = "ships.sell.menu";
+    pub const SHIPS_SELL_CHOICE: &str = "ships.sell.choice";
+    pub const SHIPS_SELL_FULL: &str = "ships.sell.full";
     pub const SHIPS_BOARD_ASK: &str = "ships.board.ask";
     pub const SHIPS_BOARD_DECLINE: &str = "ships.board.decline";
     pub const SHIPS_BOARD_NO_TICKET: &str = "ships.board.no_ticket";
@@ -485,6 +488,9 @@ mod tests {
             keys::SHIPS_SELL_ASK,
             keys::SHIPS_SELL_DECLINE,
             keys::SHIPS_SELL_SHORT,
+            keys::SHIPS_SELL_MENU,
+            keys::SHIPS_SELL_CHOICE,
+            keys::SHIPS_SELL_FULL,
             keys::SHIPS_BOARD_ASK,
             keys::SHIPS_BOARD_DECLINE,
             keys::SHIPS_BOARD_NO_TICKET,

@@ -1,8 +1,8 @@
-//! The ship from Ellinia to Orbis (CONTI_MOVE): the station's wall clock,
-//! boarding with a ticket while the ship boards, the waiting room moved onto
-//! the deck at departure, and the riders set down in Orbis on arrival. The
-//! harness world runs the route clock 60 times as fast
-//! (`RUSTMS_CONTI_SCALE`), so a trip takes 15 seconds.
+//! The ships from Ellinia to Orbis and from Orbis to Leafre (CONTI_MOVE):
+//! the station's wall clock, boarding with a ticket while the ship boards,
+//! the waiting room moved onto the deck at departure, and the riders set
+//! down on arrival. The harness world runs the route clock 60 times as fast
+//! (`RUSTMS_CONTI_SCALE`), so a trip takes 10 to 15 seconds.
 
 use game_data::GameData;
 use integration_harness::database::grant_item;
@@ -25,6 +25,8 @@ const MINUTE: i64 = 60_000;
 const ELLINIA_STATION: i32 = 101_000_300;
 const ORBIS_STATION: i32 = 200_000_100;
 const CHERRY: i32 = 1032008;
+const RAMINI: i32 = 2012021;
+const LEAFRE_STATION: i32 = 240_000_100;
 
 fn maps() -> &'static GameData {
     static MAPS: OnceLock<GameData> = OnceLock::new();
@@ -125,4 +127,42 @@ async fn a_ticket_takes_the_ship_from_ellinia_to_orbis() {
         .unwrap()
         .id;
     assert_eq!(trace.arrivals[0].1, u8::try_from(come00).unwrap());
+}
+
+#[tokio::test]
+async fn a_ticket_takes_the_ship_from_orbis_to_leafre() {
+    let route = &conti::TO_LEAFRE;
+    let config = load_harness_config_or_fail().await;
+    let m = config.character_name.clone();
+    let board = talk(route.platform, RAMINI);
+    let character_id = login_to_world_session(&config).await.unwrap().character_id;
+    drop(relogin(&config).await);
+    tokio::time::sleep(Duration::from_millis(500)).await;
+    grant_item(character_id, 4, 1, route.ticket).await.unwrap();
+    let mut session = relogin(&config).await;
+    let c = &mut session.connection;
+    let mut trace = Trace::default();
+    assert_eq!(
+        warp(c, route.platform, "", &mut trace).await,
+        route.platform
+    );
+
+    // Boarding opens 5 minutes before each departure on the ten minutes.
+    let term = route.timetable.term * MINUTE;
+    let opens = (route.timetable.term - route.timetable.wait) * MINUTE;
+    let wait = (opens - route_time().rem_euclid(term)).rem_euclid(term) / SCALE;
+    tokio::time::sleep(Duration::from_millis((wait + 200) as u64)).await;
+    let t = step(c, &m, ship_state(route.platform)).await;
+    assert_eq!(t.ship_states, [State::Wait as u8]);
+
+    let t = step(c, &m, board).await;
+    assert_eq!(t.prompts, [(RAMINI, 1)]);
+    let t = step(c, &m, answer(1, 1, None)).await;
+    assert_eq!(t.warps, [route.waiting_room]);
+    assert_eq!(t.items, [(route.ticket, -1)]);
+
+    let mut trace = Trace::default();
+    until(c, &mut trace, |t| t.warps.contains(&route.deck)).await;
+    let mut trace = Trace::default();
+    until(c, &mut trace, |t| t.warps.contains(&LEAFRE_STATION)).await;
 }

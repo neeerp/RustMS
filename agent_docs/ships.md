@@ -1,8 +1,8 @@
 # Ships
 
 The continent ships (v83 `ContiMove`) carry players between continents on a
-fixed timetable. So far only the route between Ellinia and Orbis runs. A
-station's wall clock shows the time of day.
+fixed timetable. Orbis is the hub: ships run from it to Ellinia, Ludibrium,
+Leafre and Ariant, and back. A station's wall clock shows the time of day.
 
 ## Timetable
 
@@ -23,9 +23,26 @@ minutes, the first on the hour. Each trip:
 `End` is only ever a change, never a state a client is told. `Dormant` (0),
 between an arrival and boarding, takes no time on this route.
 
-A `Route` names its platform, waiting room, deck, cabin, arrival map and
-portal, the platform where it docks at the other end, and its ticket.
-`TO_ORBIS` boards at 101000300 and `TO_ELLINIA` at 200000111.
+The other routes (`ORBIS_BOATS`) leave every 10 minutes: five minutes
+boarding, closed for the last minute, and five minutes at sea.
+
+A `Route` names its platform, waiting room, deck, cabin (only the Ellinia
+boats have one), arrival map and portal, the platform where it docks at the
+other end, its ticket and its fare:
+
+| Route | Boards at | Deck | Arrives at | Fare |
+| --- | --- | --- | --- | --- |
+| `TO_ORBIS` | 101000300 | 200090010 | 200000100 | 5,000 |
+| `TO_ELLINIA` | 200000111 | 200090000 | 101000300 | 5,000 |
+| `TO_LUDIBRIUM` | 200000121 | 200090100 | 220000100 | 6,000 |
+| `LUDIBRIUM_TO_ORBIS` | 220000110 | 200090110 | 200000100 | 6,000 |
+| `TO_LEAFRE` | 200000131 | 200090200 | 240000100 | 30,000 |
+| `LEAFRE_TO_ORBIS` | 240000110 | 200090210 | 200000100 | 30,000 |
+| `TO_ARIANT` | 200000151 | 200090400 | 260000100 | 6,000 |
+| `ARIANT_TO_ORBIS` | 260000100 | 200090410 | 200000100 | 6,000 |
+
+The fares and the 10-minute timetable come from Cosmic and have not been
+checked against v83.
 
 `conti::now()` is route time in milliseconds: the wall clock times
 `RUSTMS_CONTI_SCALE` (a whole number, default 1). The harness world sets it
@@ -55,13 +72,15 @@ to 60, so a 15-minute cycle takes 15 seconds (`tests/ships.rs`).
 The NPCs are in `net/src/npc_scripts.rs`, with placeholder lines under the
 `ships.*` content keys:
 
-- Joel (Ellinia) and Agatha (Orbis) sell tickets for 5,000 mesos.
-- Cherry and Rini take a ticket and show the holder to the waiting room
-  while the ship boards. A yes that comes after boarding closed is refused
-  by the `RequireBoarding` effect.
-- Purin and Erin take people in the waiting room back to the platform. The
-  ticket is not returned.
-- Isa points the way to Orbis Station's platforms; only Ellinia's is listed.
+- Joel (Ellinia), Mel (Ludibrium), Mue (Leafre) and Syras (Ariant) sell
+  tickets to Orbis. Agatha sells Orbis's four from one menu.
+- Each platform's usher (`USHERS`) takes a ticket and shows the holder to
+  the waiting room while the ship boards. A yes that comes after boarding
+  closed is refused by the `RequireBoarding` effect.
+- The waiting-room guides take people back to the platform of the room they
+  are in (`conti::waiting_in`). The ticket is not returned.
+- Isa points the way to Orbis Station's four platforms.
+- Leafre Station's `dracoout` portal leads back into Leafre.
 
 ## Packets
 
@@ -113,7 +132,7 @@ again before it has finished docking.
 
 ## Not yet
 
-- Other routes (Orbis to Ludibrium, Leafre, Ariant, Mu Lung) and the
-  Balrog's attack on the Ellinia ship.
+- The Balrog's attack on the Ellinia ship.
+- Mu Lung and Ereve in Isa's list; Corba's dragon flight to Leafre.
+- Ariant arrivals use the town's first `sp` portal; Cosmic uses the second.
 - CLOCK countdowns (kinds 0, 2 and 3).
-- Agatha's full menu of destinations.
