@@ -78,6 +78,10 @@ pub enum BuffStat {
     /// Holy Shield: mobs' skills give no diseases, and their attacks only
     /// Stun and Seduce (Cosmic's rule). The client never reads it.
     HolyShield = 42,
+    /// Hamstring and Blind arm the player's hits with their mob status
+    /// while they last. The client only shows their icons.
+    Hamstring = 43,
+    Blind = 44,
     Concentrate = 45,
     /// A summon that stays where it was put: a Puppet or an Octopus. The
     /// client only shows its icon (Cosmic's PUPPET).

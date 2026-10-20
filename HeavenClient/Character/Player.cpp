@@ -1037,6 +1037,9 @@ namespace ms
 		int32_t damage = stats.calculate_damage(attack, randomizer.next_real(1.0), randomizer.next_real(1.0),
 												 get_buff_value(Buffstat::Id::INVINCIBLE));
 
+		if (mob_damage::blinded(attack.blind, randomizer.next_real(1.0)))
+			damage = 0;
+
 		// A deadly attack that hits leaves 1 HP, and an MP burn takes 1
 		// (FUN_009581a9).
 		if (damage > 0 && attack.deadly)

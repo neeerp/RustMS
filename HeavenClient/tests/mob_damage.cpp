@@ -69,6 +69,8 @@ int main()
 		require(physical_miss_chance(Defender{ 30, 400, 4, 4, 4, 4, 0, 0, 0 }, stumpy) == 5.0,
 				"thieves dodge at least 5%");
 
+		require(blinded(30, 0.29) && !blinded(30, 0.3) && !blinded(0, 0.0), "Blind misses by its percent");
+
 		// Magic: STR, DEX, LUK and M.DEF soak it, more for magicians.
 		require(magic(magician, 200, 0.0, 0) == 268, "magicians soak 30% of their magic defense");
 		require(magic(warrior, 200, 0.0, 0) == 294, "everyone else soaks 25%");
