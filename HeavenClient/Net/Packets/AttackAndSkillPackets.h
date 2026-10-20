@@ -68,6 +68,9 @@ namespace ms
 				write_short(attack.bulletslot);
 				write_short(0);
 				write_byte(0);
+
+				if (attack.display & skill_use::SHADOW_STARS_DISPLAY)
+					write_int(attack.bullet);
 			}
 			else
 			{

@@ -138,6 +138,10 @@ namespace ms
 		// The percent of the first set's damage Shadow Partner's set does.
 		int32_t partner_percent(int32_t skill) const;
 
+		// The star Shadow Stars throws from a claw, while it lasts and one
+		// is left; 0 otherwise.
+		int32_t shadow_star() const;
+
 		// Execute a rush movement
 		void rush(double targetx);
 

@@ -1120,7 +1120,14 @@ namespace ms
 			// Like v83, shoot from the first stack that covers the cost.
 			const Inventory &inventory = player.get_inventory();
 
-			if (attack.type == Attack::Type::RANGED && attack.bullet == inventory.get_bulletid())
+			// Shadow Stars throws its star for nothing, and names it (0x95514b).
+			int32_t star = player.shadow_star();
+
+			if (attack.type == Attack::Type::RANGED && star && attack.bullet == star)
+			{
+				attack.bulletslot = inventory.find_item(InventoryType::Id::USE, star);
+				attack.display |= skill_use::SHADOW_STARS_DISPLAY;
+			} else if (attack.type == Attack::Type::RANGED && attack.bullet == inventory.get_bulletid())
 			{
 				attack.bulletslot = inventory.find_bulletslot(attack.bulletcost);
 				attack.bullet = inventory.get_item_id(InventoryType::Id::USE, attack.bulletslot);
