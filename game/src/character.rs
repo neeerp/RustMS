@@ -1,6 +1,6 @@
 use crate::buff::{BuffStat, Buffs, ShownBuff};
 use crate::guild::GuildTag;
-use crate::inventory::{equip_slot, Inventory, InventoryType, Item};
+use crate::inventory::{equip_slot, EquipStats, Inventory, InventoryType, Item};
 use crate::keymap::Keymap;
 use crate::monster_book::MonsterBook;
 use crate::mount::Mount;
@@ -637,9 +637,48 @@ impl Player {
         Some(record)
     }
 
-    /// Change HP by `delta`, clamped to `0..=max_hp`. Returns the new HP.
+    /// The max HP the v83 client shows and the player heals up to
+    /// (BasicStat::SetFrom, 0x77ec9f): the base plus what the worn equipment
+    /// adds, raised by Hyper Body's percent, at most 30000. `stats.max_hp`
+    /// stays the base, which is what the MAXHP stat sends.
+    pub fn effective_max_hp(&self) -> i32 {
+        self.effective_max(self.stats.max_hp, |equip| equip.hp, BuffStat::MaxHp)
+    }
+
+    /// The max MP, as `effective_max_hp` works out max HP.
+    pub fn effective_max_mp(&self) -> i32 {
+        self.effective_max(self.stats.max_mp, |equip| equip.mp, BuffStat::MaxMp)
+    }
+
+    fn effective_max(&self, base: i16, gear: fn(&EquipStats) -> i16, buff: BuffStat) -> i32 {
+        let gear: i32 = self
+            .inventory
+            .items(InventoryType::Equipped)
+            .filter_map(|(_, item)| item.equip.as_ref())
+            .map(|equip| i32::from(gear(equip)))
+            .sum();
+        let percent = self.buffs.value(buff).map_or(0, i32::from);
+        ((i32::from(base) + gear) * (100 + percent) / 100).min(i32::from(MAX_HP_MP))
+    }
+
+    /// Bring HP and MP down to their max after it fell, e.g. when Hyper
+    /// Body ends or equipment comes off (Cosmic's enforceMaxHpMp). Returns
+    /// whether either changed.
+    pub fn fit_hp_mp(&mut self) -> bool {
+        let hp = i32::from(self.stats.hp).min(self.effective_max_hp());
+        let mp = i32::from(self.stats.mp).min(self.effective_max_mp());
+        if (hp, mp) == (i32::from(self.stats.hp), i32::from(self.stats.mp)) {
+            return false;
+        }
+        (self.stats.hp, self.stats.mp) = (hp as i16, mp as i16);
+        self.dirty = true;
+        true
+    }
+
+    /// Change HP by `delta`, clamped to `0..=effective_max_hp()`. Returns
+    /// the new HP.
     pub fn add_hp(&mut self, delta: i32) -> i16 {
-        let hp = (i32::from(self.stats.hp) + delta).clamp(0, i32::from(self.stats.max_hp));
+        let hp = (i32::from(self.stats.hp) + delta).clamp(0, self.effective_max_hp());
         self.stats.hp = hp as i16;
         self.dirty = true;
         self.stats.hp
@@ -655,9 +694,10 @@ impl Player {
         }
     }
 
-    /// Change MP by `delta`, clamped to `0..=max_mp`. Returns the new MP.
+    /// Change MP by `delta`, clamped to `0..=effective_max_mp()`. Returns
+    /// the new MP.
     pub fn add_mp(&mut self, delta: i32) -> i16 {
-        let mp = (i32::from(self.stats.mp) + delta).clamp(0, i32::from(self.stats.max_mp));
+        let mp = (i32::from(self.stats.mp) + delta).clamp(0, self.effective_max_mp());
         self.stats.mp = mp as i16;
         self.dirty = true;
         self.stats.mp
@@ -813,6 +853,46 @@ mod tests {
             Keymap::default(),
             QuestLog::default(),
         )
+    }
+
+    #[test]
+    fn equipment_and_hyper_body_raise_max_hp_and_mp() {
+        let mut player = player();
+        (player.stats.max_hp, player.stats.max_mp) = (1000, 500);
+        let stats = EquipStats {
+            hp: 200,
+            mp: 100,
+            ..EquipStats::default()
+        };
+        let top = Item::equipment(1040002, stats);
+        player.inventory.insert(InventoryType::Equipped, -5, top);
+        assert_eq!(
+            (player.effective_max_hp(), player.effective_max_mp()),
+            (1200, 600)
+        );
+
+        let now = std::time::Instant::now();
+        let lasts = std::time::Duration::from_secs(60);
+        let hp = crate::buff::Buff::new(1301007, BuffStat::MaxHp, 60, now, lasts);
+        let mp = crate::buff::Buff::new(1301007, BuffStat::MaxMp, 40, now, lasts);
+        player.buffs.give(hp);
+        player.buffs.give(mp);
+        assert_eq!(
+            (player.effective_max_hp(), player.effective_max_mp()),
+            (1920, 840)
+        );
+        assert_eq!(player.add_hp(5000), 1920);
+        assert_eq!(player.add_mp(5000), 840);
+
+        // Ending it takes HP and MP back down to the max.
+        player.buffs.cancel(1301007);
+        assert!(player.fit_hp_mp());
+        assert_eq!((player.stats.hp, player.stats.mp), (1200, 600));
+        assert!(!player.fit_hp_mp());
+
+        // Never more than 30000.
+        player.stats.max_hp = 29_900;
+        assert_eq!(player.effective_max_hp(), 30_000);
     }
 
     #[test]

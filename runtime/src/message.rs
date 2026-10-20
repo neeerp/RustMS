@@ -382,7 +382,7 @@ impl Presence {
             level: stats.level,
             map_id: stats.map_id,
             hp: stats.hp,
-            max_hp: stats.max_hp,
+            max_hp: player.effective_max_hp() as i16,
             guild_id: player.guild.as_ref().map(|guild| guild.id),
         }
     }

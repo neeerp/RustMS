@@ -55,6 +55,10 @@ impl WorldHandler for ItemMoveHandler {
                     actions = actions.with(WorldAction::LookChanged(inventory::build_char_look(
                         ctx.player,
                     )?));
+                    // Taking off equipment that raised max HP or MP.
+                    if ctx.player.fit_hp_mp() {
+                        actions = actions.with_reply(stat::build_hp_mp(&ctx.player.stats)?);
+                    }
                 }
             }
             outcome => {

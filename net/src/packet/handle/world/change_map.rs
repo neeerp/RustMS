@@ -244,9 +244,9 @@ fn revive(player: &mut Player) -> Result<Option<Packet>, NetworkError> {
         player.mark_dirty();
         return Ok(None);
     }
-    let share = |most: i16| (3 * i32::from(most) + 9) / 10;
-    let hp = player.add_hp(share(player.stats.max_hp));
-    let mp = player.add_mp(share(player.stats.max_mp));
+    let share = |most: i32| (3 * most + 9) / 10;
+    let hp = player.add_hp(share(player.effective_max_hp()));
+    let mp = player.add_mp(share(player.effective_max_mp()));
     Ok(Some(build::world::stat::build_stat_update(
         false,
         &[StatUpdate::Hp(hp), StatUpdate::Mp(mp)],

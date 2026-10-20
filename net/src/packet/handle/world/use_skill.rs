@@ -278,6 +278,9 @@ impl WorldHandler for CancelBuffHandler {
             return Ok(HandlerResult::empty());
         }
         let mut result = HandlerResult::reply(buff::build_cancel_buff(&ended)?);
+        if ctx.player.fit_hp_mp() {
+            result = result.with_reply(stat::build_hp_mp(&ctx.player.stats)?);
+        }
         if summons::kind(skill_id).is_some() {
             result = result.with(WorldAction::Field(FieldRequest::Unsummon {
                 skill_id: Some(skill_id),
@@ -740,7 +743,7 @@ pub fn party_skill_reached(
     let mut result = if used.skill_id == skills::HEAL || used.skill_id == skills::RESURRECTION {
         // Resurrection raises them with full HP (OdinMS-family servers).
         let hp = if dead {
-            player.add_hp(i32::from(player.stats.max_hp))
+            player.add_hp(player.effective_max_hp())
         } else {
             player.recover_hp(used.heal.max(0))
         };

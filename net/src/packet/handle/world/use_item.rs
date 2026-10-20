@@ -94,8 +94,8 @@ fn use_item(player: &mut Player, slot: i16, item_id: i32, now: Instant) -> Optio
         .inventory_mut()
         .take(InventoryType::Use, slot, 1)
         .ok()?;
-    let max_hp = i32::from(player.stats.max_hp);
-    let max_mp = i32::from(player.stats.max_mp);
+    let max_hp = player.effective_max_hp();
+    let max_mp = player.effective_max_mp();
     player.recover_hp(spec.hp + max_hp * spec.hp_r / 100);
     player.add_mp(spec.mp + max_mp * spec.mp_r / 100);
     let cured = player.buffs.cure(&spec.cures);
