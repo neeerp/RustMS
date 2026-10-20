@@ -382,6 +382,24 @@ diesel::table! {
         summoned -> Nullable<Int2>,
     }
 }
+diesel::table! {
+    notes (id) {
+        id -> Int4,
+        receiver_id -> Int4,
+        #[max_length = 13]
+        sender -> Varchar,
+        message -> Text,
+        sent_at -> Timestamp,
+        flag -> Int2,
+    }
+}
+diesel::joinable!(notes -> characters (receiver_id));
+diesel::table! {
+    gift_replies (cash_item_id) {
+        cash_item_id -> Int8,
+    }
+}
+diesel::joinable!(gift_replies -> cash_items (cash_item_id));
 diesel::allow_tables_to_appear_in_same_query!(
     accounts,
     buddies,
@@ -408,4 +426,6 @@ diesel::allow_tables_to_appear_in_same_query!(
     guild_members,
     pet_ignores,
     pets,
+    notes,
+    gift_replies,
 );

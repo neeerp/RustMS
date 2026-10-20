@@ -2,12 +2,13 @@
 //! Cash Inventory. Every request is the item's Cash slot and id, then the
 //! item's own fields and the tick. The client then waits for an answer that
 //! unlocks it. Cash pet food, the pet name tag, megaphones, the chalkboard,
-//! teleport rocks, weather items, the jukebox, AP Reset and SP Reset are
-//! used so far.
+//! teleport rocks, notes, weather items, the jukebox, AP Reset and SP Reset
+//! are used so far.
 
 use super::chalkboard::chalkboard;
 use super::jukebox::jukebox;
 use super::megaphone::megaphone;
+use super::note::note;
 use super::pet::{cash_pet_food, pet_name_tag};
 use super::stat_reset::{ap_reset, sp_reset};
 use super::teleport_rock::teleport_rock;
@@ -38,6 +39,7 @@ impl WorldHandler for UseCashItemHandler {
                 sp_reset(ctx, &mut r, slot, item_id)
             }
             507 if held => megaphone(ctx, &mut r, slot, item_id),
+            509 if held => note(ctx, &mut r, slot, item_id),
             510 if held => jukebox(ctx, slot, item_id),
             512 if held => weather(ctx, &mut r, slot, item_id),
             517 if held && item_id % 10_000 == 0 => pet_name_tag(ctx, &mut r, slot),

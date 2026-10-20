@@ -11,7 +11,7 @@ use net::FieldRequest;
 
 /// The most fame (or the least, negated) a character can have
 /// (OdinMS-family limit).
-const FAME_LIMIT: i16 = 30000;
+pub(super) const FAME_LIMIT: i16 = 30000;
 
 impl ClientActor {
     /// This player raises (or drops) `target`'s fame: once a day, and once a

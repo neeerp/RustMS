@@ -34,9 +34,11 @@
 #include "../../IO/UITypes/UIChatBar.h"
 #include "../../IO/UITypes/UINotice.h"
 #include "../../IO/Window.h"
+#include "../../Util/Memos.h"
 
 #include "../../IO/UITypes/UICharSelect.h"
 #include "../../IO/UITypes/UIFieldClock.h"
+#include "../../IO/UITypes/UIMemoNotice.h"
 #include "../../IO/UITypes/UIMiniMap.h"
 #include "../../IO/UITypes/UIMobGage.h"
 #include "../../IO/UITypes/UIStatsInfo.h"
@@ -71,6 +73,10 @@ namespace ms
 
 				// Requests left unanswered come back (FUN_00a3fecf).
 				BuddyCommands::show_requests();
+
+				// So do notes left unread (0x5293eb).
+				if (!Memos::Inbox::get().empty() && !UIMemoNotice::showing())
+					UI::get().emplace<UIMemoNotice>();
 			});
 
 		GraphicsGL::get().lock();
@@ -182,6 +188,9 @@ namespace ms
 		cached_player_entry = entry;
 
 		Stage::get().loadplayer(entry);
+
+		// The server lists this character's notes, if it has any.
+		Memos::Inbox::get().listed({});
 
 		Player& player = Stage::get().get_player();
 

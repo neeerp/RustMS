@@ -231,6 +231,25 @@ pub enum BuddyRequest {
     Chat { recipients: Vec<i32>, text: String },
 }
 
+/// A note (memo) operation, carried out by the client's actor.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum NoteRequest {
+    /// Leave the character named `to` a note, using up the note item
+    /// `item_id` in Cash `slot`.
+    Send {
+        slot: i16,
+        item_id: i32,
+        to: String,
+        text: String,
+    },
+    /// Send the notes waiting for the player.
+    List,
+    /// The player has read these notes: delete them.
+    Delete { ids: Vec<i32> },
+    /// Thank `to` with a note for the gift with cash serial `gift`.
+    ThankForGift { to: String, text: String, gift: i64 },
+}
+
 /// A guild operation, carried out by the client's actor.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum GuildRequest {
@@ -369,6 +388,7 @@ pub enum WorldAction {
     /// A skill the player used reached party members; see `PartySkill`.
     PartySkill(PartySkill),
     Buddy(BuddyRequest),
+    Note(NoteRequest),
     Guild(GuildRequest),
     /// The player cast Mystic Door at `at` on their map, leading to `town`,
     /// for `lasts`. It replaces any door they had open.
@@ -667,6 +687,7 @@ fn world_routes() -> &'static HashMap<i16, WorldRoute> {
             ),
             (Op::MultiChat, InGame(&world::MultiChatHandler)),
             (Op::BuddyListModify, InGame(&world::BuddyListModifyHandler)),
+            (Op::NoteAction, InGame(&world::NoteActionHandler)),
             (Op::GuildOperation, InGame(&world::GuildOperationHandler)),
             (
                 Op::DenyGuildRequest,

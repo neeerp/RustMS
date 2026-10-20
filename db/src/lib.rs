@@ -25,6 +25,7 @@ pub mod character;
 pub mod fame;
 pub mod guild;
 pub mod keybinding;
+pub mod note;
 pub mod pet;
 pub mod player;
 pub mod quest;

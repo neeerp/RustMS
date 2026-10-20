@@ -102,6 +102,9 @@ namespace ms
 			EVENTCLOCK,
 			MOBGAGE,
 			PETITEMSEARCH,
+			MEMONOTICE,
+			MEMO,
+			MEMOSEND,
 			NUM_TYPES
 		};
 

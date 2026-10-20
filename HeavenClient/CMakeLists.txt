@@ -58,6 +58,8 @@ if(HEAVENCLIENT_BUILD_TESTS)
     add_test(NAME megaphones COMMAND megaphones_tests)
     add_executable(chalkboard_tests tests/chalkboard.cpp)
     add_test(NAME chalkboard COMMAND chalkboard_tests)
+    add_executable(memos_tests tests/memos.cpp)
+    add_test(NAME memos COMMAND memos_tests)
     add_executable(teleport_rock_tests tests/teleport_rock.cpp Character/TeleportRock.cpp)
     add_test(NAME teleport_rock COMMAND teleport_rock_tests)
     add_executable(gacha_exp_tests tests/gacha_exp.cpp)
@@ -753,6 +755,12 @@ add_executable(HeavenClient
     IO/UITypes/UIItemMegaphone.h
     IO/UITypes/UIInviteCard.cpp
     IO/UITypes/UIInviteCard.h
+    IO/UITypes/UIMemo.cpp
+    IO/UITypes/UIMemo.h
+    IO/UITypes/UIMemoNotice.cpp
+    IO/UITypes/UIMemoNotice.h
+    IO/UITypes/UIMemoSend.cpp
+    IO/UITypes/UIMemoSend.h
     IO/UITypes/UITradingRoom.cpp
     IO/UITypes/UITradingRoom.h
     IO/UITypes/UIPersonalShop.cpp
@@ -836,6 +844,8 @@ add_executable(HeavenClient
     Net/Handlers/AttackHandlers.h
     Net/Handlers/BuddyHandlers.cpp
     Net/Handlers/BuddyHandlers.h
+    Net/Handlers/MemoHandlers.cpp
+    Net/Handlers/MemoHandlers.h
     Net/Handlers/CashShopHandlers.cpp
     Net/Handlers/CashShopHandlers.h
     Net/Handlers/CommonHandlers.cpp

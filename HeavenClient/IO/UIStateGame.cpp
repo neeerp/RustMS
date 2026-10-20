@@ -747,6 +747,7 @@ namespace ms
 					UIElement::Type::SHOP,
 					UIElement::Type::STORAGE,
 					UIElement::Type::INVITECARD,
+					UIElement::Type::MEMONOTICE,
 					UIElement::Type::CONTEXTMENU,
 					UIElement::Type::REVIVE,
 					UIElement::Type::FIELDCLOCK,
