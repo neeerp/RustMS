@@ -126,4 +126,17 @@ namespace ms
 	private:
 		std::map<int32_t, Effect> effects;
 	};
+
+	// The animation is the one for the element of the user's charge, under
+	// hit/0 (Charged Blow, Blast).
+	class ByChargeHitEffect : public SkillHitEffect
+	{
+	public:
+		ByChargeHitEffect(nl::node src);
+
+		void apply(const AttackUser &user, Mob &target) const override;
+
+	private:
+		std::map<uint8_t, Effect> effects;
+	};
 }

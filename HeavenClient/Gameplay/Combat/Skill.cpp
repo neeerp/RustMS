@@ -132,6 +132,10 @@ namespace ms
 		if (skillid == SkillId::MESO_EXPLOSION)
 		{
 			hiteffect = std::make_unique<NoHitEffect>();
+		} else if (skillid == SkillId::CHARGE || skillid == SkillId::BLAST)
+		{
+			// Their hit/0 has an animation for each charge element.
+			hiteffect = std::make_unique<ByChargeHitEffect>(src);
 		} else if (bylevelhit)
 		{
 			if (hashit0 && hashit1)

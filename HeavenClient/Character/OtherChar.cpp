@@ -207,4 +207,9 @@ namespace ms
 
 		return iter->second;
 	}
+
+	int32_t OtherChar::get_charge() const
+	{
+		return get_buff(Buffstat::Id::WK_CHARGE).value_or(0);
+	}
 }

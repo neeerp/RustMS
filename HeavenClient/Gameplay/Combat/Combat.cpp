@@ -27,6 +27,7 @@
 #include "HitTiming.h"
 #include "MagicDamage.h"
 #include "MesoExplosion.h"
+#include "PhysicalDamage.h"
 #include "PointBlank.h"
 #include "Prepare.h"
 #include "RecoilShot.h"
@@ -2004,7 +2005,8 @@ namespace ms
 				!result.toleft,
 				user.get_look().get_equips().get_weapon(),
 				result.stance,
-				range
+				range,
+				physical_damage::charge_element(user.get_charge())
 		};
 
 		bool chain = chain_lightning::chains(result.skill);

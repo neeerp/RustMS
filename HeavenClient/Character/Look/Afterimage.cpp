@@ -23,7 +23,7 @@
 
 namespace ms
 {
-	Afterimage::Afterimage(int32_t skill_id, const std::string &name, const std::string &stance_name, int16_t level)
+	Afterimage::Afterimage(int32_t skill_id, const std::string &name, const std::string &stance_name, int16_t level, uint8_t charge)
 	{
 		nl::node src;
 
@@ -33,8 +33,13 @@ namespace ms
 			src = nl::nx::skill[string_format::skill_img(skill_id)]["skill"][strid]["afterimage"][name][stance_name];
 		}
 
+		nl::node set = nl::nx::character["Afterimage"][name + ".img"];
+
+		if (!src && charge > 0)
+			src = set["charge"][std::to_string(charge)][stance_name];
+
 		if (!src)
-			src = nl::nx::character["Afterimage"][name + ".img"][level / 10][stance_name];
+			src = set[level / 10][stance_name];
 
 		range = src;
 		firstframe = 0;

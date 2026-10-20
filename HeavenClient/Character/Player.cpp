@@ -1458,6 +1458,11 @@ namespace ms
 		return skillbook.get_level(skillid);
 	}
 
+	int32_t Player::get_charge() const
+	{
+		return has_buff(Buffstat::Id::WK_CHARGE) ? buffs[Buffstat::Id::WK_CHARGE].skillid : 0;
+	}
+
 	void Player::change_job(uint16_t jobid)
 	{
 		uint16_t oldjob = stats.get_stat(MapleStat::Id::JOB);

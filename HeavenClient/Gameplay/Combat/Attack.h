@@ -235,5 +235,7 @@ namespace ms
 		uint8_t stance;
 		// Where the attack reached, in map coordinates.
 		Rectangle<int16_t> range;
+		// The element of the charge on the weapon, or 0.
+		uint8_t charge = 0;
 	};
 }

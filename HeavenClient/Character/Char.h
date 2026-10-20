@@ -95,6 +95,10 @@ namespace ms
 		// Return the character's level.
 		virtual int32_t get_skilllevel(int32_t skillid) const = 0;
 
+		// Return the charge skill (Weapon Charge) on the character's
+		// weapon, or 0.
+		virtual int32_t get_charge() const;
+
 		// Return the character's base attacking speed.
 		virtual int8_t get_integer_attackspeed() const = 0;
 
