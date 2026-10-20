@@ -101,6 +101,10 @@ namespace ms
 		for (nl::node skill : info["damagedBySelectedSkill"])
 			damagedby.push_back(skill.get_integer());
 
+		onlynormal = info["onlyNormalAttack"].get_bool();
+		hidename = info["hideName"].get_bool();
+		hidehp = info["hideHP"].get_bool();
+
 		if (canfly)
 		{
 			animations[Stance::STAND] = src["fly"];
@@ -443,7 +447,7 @@ namespace ms
 
 		if (!dying)
 		{
-			for (int32_t number : hurts.update(statuses, fixeddamage, Constants::TIMESTEP, damagedby))
+			for (int32_t number : hurts.update(statuses, fixeddamage, Constants::TIMESTEP, damagedby, onlynormal))
 				hurtnumbers.push_back(number);
 		}
 
@@ -1562,7 +1566,8 @@ namespace ms
 
 			if (showhp)
 			{
-				namelabel.draw(absp);
+				if (!hidename)
+					namelabel.draw(absp);
 
 				if (showleveltag)
 				{
@@ -1582,7 +1587,7 @@ namespace ms
 					}
 				}
 
-				if (!dying && hppercent > 0)
+				if (!dying && hppercent > 0 && !hidehp)
 					draw_hp_bar(absp);
 			}
 		}
@@ -2130,8 +2135,9 @@ namespace ms
 		std::vector<std::pair<int32_t, bool>> result(attack.hitcount);
 
 		// Any other attack misses a mob that only some skills hurt, as
-		// Kyrin's test Octopirates.
-		if (!MobHurts::hurt_by(damagedby, attack.skill))
+		// Kyrin's test Octopirates, and any skill one that only basic
+		// attacks hurt.
+		if (!MobHurts::hurt_by(damagedby, attack.skill, onlynormal))
 			return result;
 
 		for (size_t i = 0; i < result.size(); i++)
@@ -2173,7 +2179,7 @@ namespace ms
 
 	int32_t Mob::shown_explosion(int32_t number) const
 	{
-		return meso_explosion::shown(number, fixeddamage, MobHurts::hurt_by(damagedby, meso_explosion::ID));
+		return meso_explosion::shown(number, fixeddamage, MobHurts::hurt_by(damagedby, meso_explosion::ID, onlynormal));
 	}
 
 	std::pair<int32_t, bool> Mob::next_damage(const Attack &attack) const

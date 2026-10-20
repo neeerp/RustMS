@@ -560,6 +560,12 @@ namespace ms
 		// The only skills that hurt it (damagedBySelectedSkill), or none
 		// for any attack.
 		std::vector<int32_t> damagedby;
+		// Only basic attacks hurt it (onlyNormalAttack).
+		bool onlynormal;
+		// It shows no name over its head (hideName), or no HP bar
+		// (hideHP), when hit (0x668a64, 0x668a93).
+		bool hidename;
+		bool hidehp;
 		// How wide the mob first stands, for how near Monster Magnet pulls
 		// it (0x66486e).
 		int16_t standwidth;
