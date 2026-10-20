@@ -184,33 +184,35 @@ impl ClientActor {
                     gain_exp(&mut next, *amount, &mut packets)?;
                     changed = true;
                 }
-                Effect::TakeFirstJob(job) | Effect::TakeSecondJob(job) => {
-                    let first = matches!(effect, Effect::TakeFirstJob(_));
-                    let qualifies = if first {
-                        next.can_take_first_job(*job)
-                    } else {
-                        next.can_take_second_job(*job)
+                Effect::TakeFirstJob(job)
+                | Effect::TakeSecondJob(job)
+                | Effect::TakeThirdJob(job) => {
+                    let qualifies = match effect {
+                        Effect::TakeFirstJob(_) => next.can_take_first_job(*job),
+                        Effect::TakeSecondJob(_) => next.can_take_second_job(*job),
+                        _ => next.can_take_third_job(*job),
                     };
                     if !qualifies {
                         warn!(job, "No longer qualifies for the job; nothing applied");
                         return Ok(Applied::Refused);
                     }
-                    if first {
-                        next.take_first_job(*job);
-                    } else {
-                        next.take_second_job(*job);
+                    match effect {
+                        Effect::TakeFirstJob(_) => next.take_first_job(*job),
+                        Effect::TakeSecondJob(_) => next.take_second_job(*job),
+                        _ => next.take_third_job(*job),
                     }
                     changed = true;
                     let stats = &next.stats;
-                    packets.push(stat::build_stat_update(
-                        false,
-                        &[
-                            StatUpdate::Job(stats.job),
-                            StatUpdate::MaxHp(stats.max_hp),
-                            StatUpdate::MaxMp(stats.max_mp),
-                            StatUpdate::Sp(stats.sp),
-                        ],
-                    )?);
+                    let mut updates = vec![
+                        StatUpdate::Job(stats.job),
+                        StatUpdate::MaxHp(stats.max_hp),
+                        StatUpdate::MaxMp(stats.max_mp),
+                        StatUpdate::Sp(stats.sp),
+                    ];
+                    if matches!(effect, Effect::TakeThirdJob(_)) {
+                        updates.push(StatUpdate::Ap(stats.ap));
+                    }
+                    packets.push(stat::build_stat_update(false, &updates)?);
                 }
                 Effect::AddSlotRow(kind) => {
                     let limit = next
