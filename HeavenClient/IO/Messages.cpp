@@ -40,6 +40,7 @@ namespace ms
 					"You do not have enough throwing stars to use this skill.",
 					"You may not use the skill yet.",
 					"You may only use this skill with a one-handed weapon equipped.",
+					"This skill is available only when your energy is fully charged.",
 					"You cannot use that skill on this map.",
 					"You cannot use the Mystic Door Skill near the portal.",
 					"Since you are not using a weapon, you are unable to attack.",
@@ -96,6 +97,8 @@ namespace ms
 				return Messages::SKILL_COOLDOWN;
 			case SpecialMove::FBR_ONEHANDED:
 				return Messages::SKILL_ONEHANDED;
+			case SpecialMove::FBR_ENERGY:
+				return Messages::SKILL_ENERGY;
 			case SpecialMove::FBR_BULLETCOST:
 				return message_by_weapon(weapon);
 			default:

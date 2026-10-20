@@ -276,6 +276,7 @@ namespace ms
 		{
 			UIEnergyBar::show(state.energy);
 			Stage::get().get_player().show_energy(state.energy_skill, state.energy >= energy_bar::FULL, false);
+			Stage::get().get_player().set_energy(state.energy);
 		}
 
 		// Dash lasts until the server ends it; its time is the icon's alone.
@@ -324,6 +325,7 @@ namespace ms
 		{
 			UIEnergyBar::show(0);
 			Stage::get().get_player().show_energy(0, false, false);
+			Stage::get().get_player().set_energy(0);
 		}
 
 		if (flags.has(BuffParser::DASH_SPEED))

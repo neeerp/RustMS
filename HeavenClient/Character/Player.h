@@ -162,6 +162,11 @@ namespace ms
 		// What a buff adds, 0 without it.
 		int16_t get_buff_value(Buffstat::Id stat) const;
 
+		// The Energy Charge gauge changed.
+		void set_energy(int32_t value);
+		// Whether the gauge is full and the player has Energy Charge.
+		bool energy_full() const;
+
 		// The diseases on the player.
 		disease::State get_diseases() const;
 		// What Stop Motion takes now from a player who stood still too
@@ -415,6 +420,8 @@ namespace ms
 		bool flash_jumped = false;
 		// How long Wings may still glide, in milliseconds (+0x3130).
 		int32_t wings_left = 0;
+		// The Energy Charge gauge, 0 to 10000.
+		int32_t energy = 0;
 
 		move_path::Recorder path;
 

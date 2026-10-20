@@ -42,6 +42,8 @@ namespace ms
 			FBR_BULLETCOST,
 			FBR_COOLDOWN,
 			FBR_ONEHANDED,
+			// An Energy skill before the gauge is full.
+			FBR_ENERGY,
 			FBR_OTHER
 		};
 

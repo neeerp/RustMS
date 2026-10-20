@@ -73,6 +73,10 @@ namespace ms
 			int32_t mesocost = 0;
 			int32_t itemcost = 0;
 			int32_t itemcount = 0;
+			// The attack, accuracy and avoid the skill lends, as a full Energy Charge's.
+			int32_t pad = 0;
+			int32_t acc = 0;
+			int32_t eva = 0;
 
 			constexpr Stats(float damage, int32_t matk, int32_t fixdamage, int32_t mastery, uint8_t attackcount,
 							uint8_t mobcount, uint8_t bulletcount, int16_t bulletcost, int32_t hpcost, int32_t mpcost,

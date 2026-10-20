@@ -44,6 +44,8 @@ namespace ms
 			SKILL_SHADOWSTARS,
 			SKILL_COOLDOWN,
 			SKILL_ONEHANDED,
+			// StringPool 0xdd1
+			SKILL_ENERGY,
 			// The map forbids the skill (fieldLimit)
 			SKILL_FIELD,
 			// A Mystic Door may not open by a portal
