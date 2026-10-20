@@ -97,6 +97,7 @@ namespace ms
 
 		jump_effect = nl::nx::effect["BasicEff.img"]["VerticalJump"];
 		fear_sight = nl::nx::effect["MapEff.img"]["Viewrange"]["3"];
+		quest_alert.init();
 	}
 
 	void Stage::load(int32_t mapid, int8_t portalid, std::optional<Point<int16_t>> chase)
@@ -107,6 +108,9 @@ namespace ms
 				load_map(mapid);
 				respawn(portalid, chase);
 				show_quest_tags();
+
+				if (mapid != -1)
+					quest_alert.enter_field(mapid);
 
 				if (pending_clock && clock.is_present())
 					clock.set(pending_clock->hour, pending_clock->minute, pending_clock->second);
@@ -148,6 +152,7 @@ namespace ms
 		emote_cooldown = {};
 		fame_cooldown = {};
 		item_effect_shown = -1;
+		quest_alert.reset();
 
 		CharStats stats = player.get_stats();
 		levelBefore = stats.get_stat(MapleStat::Id::LEVEL);
@@ -254,6 +259,11 @@ namespace ms
 			mobs.draw(id, viewx, viewy, alpha);
 			chars.draw(id, viewx, viewy, alpha);
 			player.draw(id, viewx, viewy, alpha);
+
+			// The quest alert is in front of the player (z 3 at the face, FUN_00941417).
+			if (id == player.get_layer())
+				quest_alert.draw(player.get_phobj().get_absolute(viewx, viewy, alpha) + player.get_face_offset(), alpha);
+
 			drops.draw(id, viewx, viewy, alpha);
 			summons.draw(id, viewx, viewy, alpha);
 		}
@@ -350,6 +360,8 @@ namespace ms
 
 		if (since_quest_tags > QUEST_TAG_INTERVAL || player.get_quests().revision() != quest_tags_revision)
 			show_quest_tags();
+
+		quest_alert.update();
 
 		reactors.update(physics);
 		mists.update();
@@ -1088,6 +1100,7 @@ namespace ms
 	void Stage::release_cursor()
 	{
 		player.release_chalkboard_cursor();
+		quest_alert.release_cursor();
 	}
 
 	Cursor::State Stage::send_cursor(bool pressed, Point<int16_t> position)
@@ -1139,6 +1152,11 @@ namespace ms
 		}
 
 		Cursor::State npcstate = npcs.send_cursor(pressed, position, camera.position());
+
+		// Then the quest alert (FUN_0094fa8e).
+		if (npcstate == Cursor::State::IDLE)
+			quest_alert.send_cursor(player.get_position() + player.get_face_offset() + camera.position(), position,
+									pressed, UI::get().is_cursor_pressed());
 
 		// A shop's balloon shows the house cursor (FUN_00531cc7).
 		if (npcstate == Cursor::State::IDLE && mini_room_at(position))
@@ -1201,6 +1219,11 @@ namespace ms
 	Player &Stage::get_player()
 	{
 		return player;
+	}
+
+	QuestAlert &Stage::get_quest_alert()
+	{
+		return quest_alert;
 	}
 
 	Combat &Stage::get_combat()

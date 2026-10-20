@@ -89,8 +89,7 @@ namespace ms
 		}
 
 		bool on_chair = chair && state == State::SIT;
-		Point<int16_t> face = look.get_facepos();
-		Point<int16_t> facepos = absp + Point<int16_t>(facing_right ? -face.x() : face.x(), face.y());
+		Point<int16_t> facepos = absp + get_face_offset();
 
 		auto draw_chair = [&](bool in_front)
 		{
@@ -159,6 +158,13 @@ namespace ms
 
 		for (auto &number : damagenumbers)
 			number.draw(viewx, viewy, alpha);
+	}
+
+	Point<int16_t> Char::get_face_offset() const
+	{
+		Point<int16_t> face = look.get_facepos();
+
+		return Point<int16_t>(facing_right ? -face.x() : face.x(), face.y());
 	}
 
 	void Char::draw_combo(Point<int16_t> position) const

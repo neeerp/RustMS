@@ -115,6 +115,9 @@ from `UI.nx`. Moved so far:
   [quests.md](quests.md).
 - **Quest Complete! notice** (`UIQuestComplete`, `UIWindow.img/FadeYesNo`).
   See [quests.md](quests.md).
+- **Quest alert** (`QuestAlert`, `Effect/BasicEff.img/QuestAlert`): the bulb
+  over the player's face for autoStart and autoComplete quests. See
+  [quests.md](quests.md).
 - **Invitation notices** (`UIInviteCard`, `UIWindow.img/FadeYesNo`): v83's
   fading cards above the status bar for Maple Messenger invitations, buddy
   requests, trade requests, and party invites, each "from '<name>'" beside

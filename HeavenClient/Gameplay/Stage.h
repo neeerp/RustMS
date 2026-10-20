@@ -24,6 +24,7 @@
 
 #include "Combat/Combat.h"
 #include "EmoteCooldown.h"
+#include "QuestAlert.h"
 #include "FameCooldown.h"
 #include "SkillMacroRules.h"
 #include "TrembleRules.h"
@@ -139,6 +140,9 @@ namespace ms
 
 		// Returns a reference to the Player.
 		Player &get_player();
+
+		// The bulb over the player that offers auto quests.
+		QuestAlert &get_quest_alert();
 
 		// Return a reference to the attack and buff component.
 		Combat &get_combat();
@@ -333,6 +337,7 @@ namespace ms
 		// The ms since the quest-bound tags were last looked at, and the quest log they were looked at for.
 		int32_t since_quest_tags = 0;
 		uint64_t quest_tags_revision = 0;
+		QuestAlert quest_alert;
 		MapBackgrounds backgrounds;
 		MapPortals portals;
 		MapReactors reactors;

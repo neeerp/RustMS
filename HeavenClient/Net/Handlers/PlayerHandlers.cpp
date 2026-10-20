@@ -118,6 +118,9 @@ namespace ms
 				"If you do not use your AP when you level up, \\nthen you won't be able to receive any additional AP.\\nPlease use your AP.",
 				[](bool) {});
 
+		// v83 checks the alert's quests again on any stat change (FUN_00a0843c).
+		Stage::get().get_quest_alert().stats_changed();
+
 		UI::get().enable();
 	}
 

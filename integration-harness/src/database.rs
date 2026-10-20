@@ -269,6 +269,19 @@ pub async fn set_meso(character_id: i32, meso: i32) -> Result<(), HarnessError> 
     .await
 }
 
+/// Start quest `quest_id` for the logged-out character `character_id`.
+pub async fn start_quest(character_id: i32, quest_id: i16) -> Result<(), HarnessError> {
+    change_one_row("start quest", move |conn| {
+        diesel::sql_query(
+            "INSERT INTO character_quests (character_id, quest_id, status) VALUES ($1, $2, 1)",
+        )
+        .bind::<Integer, _>(character_id)
+        .bind::<SmallInt, _>(quest_id)
+        .execute(conn)
+    })
+    .await
+}
+
 /// Teach the logged-out character `character_id` skill `skill_id` at
 /// `level`.
 pub async fn grant_skill(character_id: i32, skill_id: i32, level: i32) -> Result<(), HarnessError> {

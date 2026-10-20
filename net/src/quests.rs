@@ -262,6 +262,8 @@ mod tests {
             exp: 7,
             money: 0,
             next_quest: None,
+            auto_start: false,
+            auto_complete: false,
         }
     }
 

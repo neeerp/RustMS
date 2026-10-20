@@ -1,9 +1,15 @@
 #pragma once
 
+#include "QuestAlertRules.h"
+
 #include <cstdint>
+#include <functional>
+#include <vector>
 
 namespace ms
 {
+	struct QuestInfo;
+
 	// The client side of the v83 quest flow. The client lists an NPC's quests,
 	// renders their Say.img conversations, and sends QUEST_ACTION; the server
 	// only validates and applies the result.
@@ -21,5 +27,13 @@ namespace ms
 		// says its yes pages, then `next_quest`, if any, opens once they
 		// have all been read (FUN_00959a73).
 		void confirmed(int16_t quest_id, int32_t npc_id, int16_t next_quest);
+
+		// Whether the player can start a quest now, and complete a started one with an NPC.
+		bool startable(const QuestInfo& quest);
+		bool completable(const QuestInfo& quest, int32_t npc_id);
+
+		// The quest alert was clicked: Maple Administrator lists its quests (FUN_0095d260), and `chosen` gets the one
+		// picked.
+		void alert_menu(const std::vector<quest_alert::Entry>& entries, std::function<void(int16_t)> chosen);
 	}
 }

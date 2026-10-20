@@ -192,6 +192,7 @@ namespace ms
 		add_sound(Sound::Name::LEVELUP, gamesrc["LevelUp"]);
 		add_sound(Sound::Name::JOBCHANGED, gamesrc["JobChanged"]);
 		add_sound(Sound::Name::QUESTCLEAR, gamesrc["QuestClear"]);
+		add_sound(Sound::Name::QUESTALERT, gamesrc["QuestAlert"]);
 		add_sound(Sound::Name::TOMBSTONE, gamesrc["Tombstone"]);
 		add_sound(Sound::Name::ENCHANTSUCCESS, gamesrc["EnchantSuccess"]);
 		add_sound(Sound::Name::ENCHANTFAILURE, gamesrc["EnchantFailure"]);

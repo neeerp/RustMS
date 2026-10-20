@@ -42,8 +42,16 @@ namespace ms
 
 			QuestInfo info;
 			info.id = id;
-			info.name = root["QuestInfo.img"][name]["name"].get_string();
-			info.type = root["QuestInfo.img"][name]["type"].get_string();
+			nl::node quest_info = root["QuestInfo.img"][name];
+
+			info.name = quest_info["name"].get_string();
+			info.type = quest_info["type"].get_string();
+			info.auto_start = quest_info["autoStart"].get_integer() != 0;
+			info.auto_accept = quest_info["autoAccept"].get_integer() != 0;
+			info.auto_pre_complete = quest_info["autoPreComplete"].get_integer() != 0;
+			info.auto_complete = quest_info["autoComplete"].get_integer() != 0;
+			// v83 only looks for the key (FUN_0071e1d6).
+			info.normal_auto_start = start["normalAutoStart"].data_type() != nl::node::type::none;
 			info.start_npc = static_cast<int32_t>(start["npc"].get_integer());
 			// A hand-in quest without a completion NPC goes back to the NPC
 			// that gave it (Pio's 1008), as on the server.
@@ -55,6 +63,9 @@ namespace ms
 			info.next_quest = static_cast<int16_t>(act["nextQuest"].get_integer());
 			info.start_script = start["startscript"].data_type() == nl::node::type::string;
 			info.end_script = end["endscript"].data_type() == nl::node::type::string;
+
+			for (auto map : start["fieldEnter"])
+				info.field_enter.push_back(static_cast<int32_t>(map.get_integer()));
 
 			for (auto job : start["job"])
 				info.jobs.push_back(static_cast<int16_t>(job.get_integer()));

@@ -242,6 +242,8 @@ namespace ms
 				quests.add_started(id, recv.read_string());
 			else if (status == 2)
 				quests.add_completed(id, recv.read_long());
+
+			Stage::get().get_quest_alert().record_changed(id, status);
 		}
 		else if (mode == 3)
 		{

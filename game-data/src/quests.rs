@@ -16,6 +16,11 @@ use std::path::Path;
 
 /// Requirements to start a quest (`Check.img/<id>/0`) that the server checks.
 pub const START_REQUIREMENTS: &[&str] = &["npc", "job", "lvmin", "lvmax", "quest", "startscript"];
+/// Keys in `Check.img/<id>/0` that only tell the client when to offer an
+/// autoStart quest through its quest alert: on stat changes, or on entering
+/// one of the listed maps. They aren't requirements, as v83's own start check
+/// (FUN_00721163) ignores them.
+pub const START_TRIGGERS: &[&str] = &["normalAutoStart", "fieldEnter"];
 /// Requirements to complete a quest (`Check.img/<id>/1`) that the server checks.
 pub const END_REQUIREMENTS: &[&str] = &["npc", "item", "mob", "quest", "endscript"];
 /// Quest scripts (`startscript`/`endscript`) the server implements. A quest
@@ -67,6 +72,10 @@ pub struct QuestTemplate {
     /// Mesos given on completion; negative takes them (and needs them held).
     pub money: i32,
     pub next_quest: Option<i16>,
+    /// `QuestInfo` `autoStart` and `autoComplete`: the client's quest alert
+    /// offers the quest wherever the player is.
+    pub auto_start: bool,
+    pub auto_complete: bool,
 }
 
 /// One `Act/<n>/item` entry.
@@ -149,7 +158,7 @@ pub fn classify(keys: &QuestKeys) -> Result<(), String> {
     if !end.iter().any(|k| k == "npc" || k == "item" || k == "mob") {
         return Err("no completion NPC".into());
     }
-    unsupported(start, START_REQUIREMENTS, "Check/0")?;
+    unsupported(start, &[START_REQUIREMENTS, START_TRIGGERS].concat(), "Check/0")?;
     unsupported(end, END_REQUIREMENTS, "Check/1")?;
     unsupported(&keys.start_act, START_ACTIONS, "Act/0")?;
     unsupported(&keys.end_act, END_ACTIONS, "Act/1")?;
@@ -291,9 +300,16 @@ fn template(nx: &NxDataFile, id: i16) -> Result<QuestTemplate, GameDataError> {
     if exp < 0 {
         return Err(invalid("negative EXP reward"));
     }
-    let name = match path_index(nx, &format!("QuestInfo.img/{id}"))? {
+    let info = path_index(nx, &format!("QuestInfo.img/{id}"))?;
+    let name = match info {
         Some(info) => nx.string_child(info, "name")?.unwrap_or_default(),
         None => String::new(),
+    };
+    let flag = |key: &str| -> Result<bool, GameDataError> {
+        Ok(match info {
+            Some(info) => nx.int_child(info, key)?.unwrap_or(0) != 0,
+            None => false,
+        })
     };
     // See `classify`: quests without a completion NPC go back to the start NPC.
     let start_npc = requirements.npc;
@@ -314,6 +330,8 @@ fn template(nx: &NxDataFile, id: i16) -> Result<QuestTemplate, GameDataError> {
         next_quest: action_int("nextQuest")?
             .map(|id| small(id, "quest id"))
             .transpose()?,
+        auto_start: flag("autoStart")?,
+        auto_complete: flag("autoComplete")?,
     })
 }
 

@@ -85,6 +85,19 @@ int main()
 		return 1;
 	}
 
+	// The quest alert's flags and triggers.
+	const ms::QuestInfo* blake = catalog.find(2292);
+	const ms::QuestInfo* parwen = catalog.find(3318);
+	const ms::QuestInfo* story = catalog.find(2313);
+
+	if (!blake || !blake->auto_start || blake->auto_complete || !blake->normal_auto_start || !parwen ||
+		parwen->normal_auto_start || parwen->field_enter != std::vector<int32_t>{ 261020401 } || !story ||
+		!story->auto_complete || story->auto_start)
+	{
+		std::cerr << "The quest alert's flags did not parse as expected\n";
+		return 1;
+	}
+
 	ms::QuestScript rain = catalog.script(1009, true);
 
 	if (!rain.ask || rain.questions.at(0).wrong.count(1) != 1 || rain.questions.at(0).wrong.count(0) != 0)

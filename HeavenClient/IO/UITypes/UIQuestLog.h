@@ -106,6 +106,7 @@ namespace ms
 		void show_details(bool open);
 		void close();
 		void find_npc();
+		void give_up(int16_t id);
 		std::vector<QuestObjective> objectives(int16_t id) const;
 		Icon progress_icon(int16_t id) const;
 		void scroll_list(int16_t offset);

@@ -8,6 +8,8 @@ if(HEAVENCLIENT_BUILD_TESTS)
     enable_testing()
     add_executable(quest_marker_tests tests/quest_marker.cpp)
     add_test(NAME quest_markers COMMAND quest_marker_tests)
+    add_executable(quest_alert_rules_tests tests/quest_alert_rules.cpp)
+    add_test(NAME quest_alert_rules COMMAND quest_alert_rules_tests)
     add_executable(quest_completion_tests tests/quest_completion.cpp)
     add_test(NAME quest_completion COMMAND quest_completion_tests)
     add_executable(fade_notice_tests tests/fade_notice.cpp)
@@ -553,6 +555,9 @@ add_executable(HeavenClient
     Gameplay/Playable.h
     Gameplay/Spawn.cpp
     Gameplay/Spawn.h
+    Gameplay/QuestAlert.cpp
+    Gameplay/QuestAlert.h
+    Gameplay/QuestAlertRules.h
     Gameplay/QuestConversation.cpp
     Gameplay/QuestConversation.h
     Gameplay/Stage.cpp
