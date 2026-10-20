@@ -16,14 +16,21 @@
 //	along with this program.  If not, see <https://www.gnu.org/licenses/>.		//
 //////////////////////////////////////////////////////////////////////////////////
 #include "SkillBullet.h"
+#include "SoulArrow.h"
 
 #include "../Data/BulletData.h"
 #include "../Util/Misc.h"
+
+#include <nlnx/nx.hpp>
 
 namespace ms
 {
 	Animation RegularBullet::get(const Char &, int32_t bulletid) const
 	{
+		// A Soul Arrow shot flies that skill's ball rather than an arrow.
+		if (soul_arrow::is_ball(bulletid))
+			return nl::nx::skill[string_format::skill_img(bulletid)]["skill"][std::to_string(bulletid)]["ball"];
+
 		return BulletData::get(bulletid).get_animation();
 	}
 
