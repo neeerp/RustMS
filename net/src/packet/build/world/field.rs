@@ -25,7 +25,7 @@ pub fn build_player_enter_field(avatar: &FieldAvatar) -> Result<Packet, NetworkE
         &guild.map(|guild| guild.emblem).unwrap_or_default(),
     )?;
 
-    write_foreign_buffs(&mut packet, &avatar.buffs, avatar.ride)?;
+    write_foreign_buffs(&mut packet, avatar)?;
 
     packet.write_short(avatar.job)?;
     encode_avatar_look(&mut packet, &avatar.look, false)?;
@@ -59,29 +59,19 @@ pub fn build_player_enter_field(avatar: &FieldAvatar) -> Result<Packet, NetworkE
 }
 
 /// The buffs others see, then the two-state stats' fixed blocks, which
-/// are empty here but for the mount the player rides; the repeated spawn
-/// constant mirrors what the reference server sends.
-fn write_foreign_buffs(
-    packet: &mut Packet,
-    shown: &[game::ShownBuff],
-    ride: Option<game::Ride>,
-) -> Result<(), NetworkError> {
+/// are empty here but for Energy Charge's gauge and the mount the player
+/// rides; the repeated spawn constant mirrors what the reference server
+/// sends.
+fn write_foreign_buffs(packet: &mut Packet, avatar: &FieldAvatar) -> Result<(), NetworkError> {
     const CHAR_MAGIC_SPAWN: i32 = 0x2D0F_5E1A;
-    buff::write_shown(packet, shown, true)?;
+    buff::write_shown(packet, &avatar.buffs, true)?;
+    buff::write_energy(packet, avatar.energy)?;
+    packet.write_bytes(&[0; 15])?; // dash speed
+    packet.write_bytes(&[0; 15])?; // dash jump
 
-    packet.write_short(0)?; // energy charge
-    packet.write_int(0)?;
-    packet.write_short(0)?;
-    packet.write_bytes(&[0; 4])?;
-    packet.write_int(0)?; // dash speed
-    packet.write_bytes(&[0; 11])?;
-    packet.write_short(0)?;
-    packet.write_bytes(&[0; 9])?; // dash jump
-    packet.write_int(0)?;
-    packet.write_short(0)?;
-    packet.write_byte(0)?;
-
-    let ride = ride.map_or((0, 0), |ride| (ride.item_id, ride.skill_id));
+    let ride = avatar
+        .ride
+        .map_or((0, 0), |ride| (ride.item_id, ride.skill_id));
     packet.write_int(ride.0)?; // monster riding
     packet.write_int(ride.1)?;
     packet.write_int(CHAR_MAGIC_SPAWN)?;
@@ -301,6 +291,7 @@ mod tests {
             pets: Vec::new(),
             chalkboard: None,
             item_effect: 0,
+            energy: None,
             ride: None,
             mount: game::Mount::default(),
         }
@@ -316,15 +307,16 @@ mod tests {
     }
 
     fn empty_two_state(expect: &mut Expect<'_>) {
-        two_state(expect, (0, 0));
+        two_state(expect, (0, 0), (0, 0));
     }
 
-    /// The two-state data with the mount and skill a player rides.
-    fn two_state(expect: &mut Expect<'_>, ride: (i32, i32)) {
-        expect.int(0); // defense attack and state, then two-state data
-        expect.int(0).short(0).bytes(&[0; 4]); // energy charge
-        expect.int(0).bytes(&[0; 11]).short(0); // dash speed
-        expect.bytes(&[0; 9]).int(0).short(0).byte(0); // dash jump
+    /// The two-state data with a player's energy and its skill, and the
+    /// mount and skill they ride.
+    fn two_state(expect: &mut Expect<'_>, energy: (i32, i32), ride: (i32, i32)) {
+        expect.short(0); // defense attack and state, then two-state data
+        expect.int(energy.0).int(energy.1).byte(0).int(0).short(0);
+        expect.bytes(&[0; 15]); // dash speed
+        expect.bytes(&[0; 15]); // dash jump
         expect.int(ride.0).int(ride.1); // monster riding
         let magic = expect.read_int();
         expect.bytes(&[0; 8]); // speed infusion
@@ -489,13 +481,32 @@ mod tests {
         expect.int(0x0102_0304).byte(10).string("Tester");
         expect.string("").bytes(&[0; 6]);
         expect.int(0).short(0).byte(0xFC).byte(1).int(0).int(0);
-        two_state(&mut expect, (1902000, 1004));
+        two_state(&mut expect, (0, 0), (1902000, 1004));
         expect.short(100);
         expect.look(&avatar.look, false);
         expect.int(0).int(0).int(3010000);
         expect.short(-120).short(275).byte(4).short(0).byte(0);
         expect.byte(0); // end of pets
         expect.int(4).int(120).int(33);
+    }
+
+    #[test]
+    fn spawn_player_carries_the_energy() {
+        let mut avatar = avatar();
+        avatar.energy = Some(game::ShownBuff {
+            stat: game::BuffStat::EnergyCharge,
+            value: 10000,
+            skill_id: 15100004,
+        });
+        let packet = build_player_enter_field(&avatar).unwrap();
+
+        let mut expect = Expect::new(&packet.bytes);
+        expect.short(SendOpcode::SpawnPlayer as i16);
+        expect.int(0x0102_0304).byte(10).string("Tester");
+        expect.string("").bytes(&[0; 6]);
+        expect.int(0).short(0).byte(0xFC).byte(1).int(0).int(0);
+        two_state(&mut expect, (10000, 15100004), (0, 0));
+        expect.short(100);
     }
 
     #[test]

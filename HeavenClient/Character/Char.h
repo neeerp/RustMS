@@ -186,6 +186,10 @@ namespace ms
 		// spends, never mirrored (0x934725).
 		void show_combo_finish(int32_t skill);
 
+		// Energy Charge's glow while the gauge is full (0x93e2e5, FUN_00930b27): the skill's `effect` once with
+		// its `Use` sound, unless the character just came into view, then the same over and over from 1.35 s on.
+		void show_energy(int32_t skill, bool full, bool init);
+
 		// Play an animation anchored to the character (e.g. a tutorial image).
 		void show_effect(const Animation &effect);
 
@@ -383,6 +387,10 @@ namespace ms
 		MiniRoomBalloon miniroom;
 		EffectLayer effects;
 		EffectLayer held_effects;
+		EffectLayer energy_glow;
+		// The full gauge's effect, and how long until it loops; -1 once it does.
+		std::vector<Animation> energy_effect;
+		int16_t energy_wait = -1;
 		Afterimage afterimage;
 		// A chair's effect and effect2 (v83 0x93c7c3), each on the face when
 		// its pos is 1 and on the feet otherwise; a negative z draws it

@@ -158,6 +158,50 @@ pub fn build_cancel_foreign_buff(
     Ok(p)
 }
 
+/// Energy Charge's two-state data (bit 82; v83 0x793ef2): the energy and
+/// the skill, then when it started and how many seconds it lasts, which
+/// the client never reads.
+pub(crate) fn write_energy(p: &mut Packet, energy: Option<ShownBuff>) -> Result<(), NetworkError> {
+    let (value, skill_id) = energy.map_or((0, 0), |energy| (energy.value, energy.skill_id));
+    p.write_int(i32::from(value))?;
+    p.write_int(skill_id)?;
+    p.write_byte(0)?; // start before (1) or after now
+    p.write_int(0)?; // how long
+    p.write_short(0)?; // seconds it lasts
+    Ok(())
+}
+
+/// GIVE_BUFF for Energy Charge: the player's gauge holds `energy` now
+/// (0x95f065 opens or closes it). Unlike riding, energy doesn't move the
+/// player, so nothing follows the delay.
+pub fn build_give_energy(energy: ShownBuff) -> Result<Packet, NetworkError> {
+    let mut p = Packet::new_empty();
+    p.write_short(SendOpcode::GiveBuff as i16)?;
+    write_mask(&mut p, [BuffStat::EnergyCharge.bit()])?;
+    p.write_byte(0)?; // defense attack
+    p.write_byte(0)?; // defense state
+    write_energy(&mut p, Some(energy))?;
+    p.write_short(0)?; // delay
+    Ok(p)
+}
+
+/// GIVE_FOREIGN_BUFF for Energy Charge: another player's energy, which
+/// glows about them once full (0x9838b7).
+pub fn build_give_foreign_energy(
+    character_id: i32,
+    energy: ShownBuff,
+) -> Result<Packet, NetworkError> {
+    let mut p = Packet::new_empty();
+    p.write_short(SendOpcode::GiveForeignBuff as i16)?;
+    p.write_int(character_id)?;
+    write_mask(&mut p, [BuffStat::EnergyCharge.bit()])?;
+    p.write_byte(0)?; // defense attack
+    p.write_byte(0)?; // defense state
+    write_energy(&mut p, Some(energy))?;
+    p.write_short(0)?; // delay
+    Ok(p)
+}
+
 /// Riding's two-state data (RideVehicle, bit 85; v83 0x793ef2): the mount
 /// and the skill riding it, then when it started, which the client never
 /// times out.
@@ -474,6 +518,32 @@ mod tests {
         let mut expect = Expect::new(&packet.bytes);
         expect.short(SendOpcode::CancelBuff as i16);
         expect.long(1 << 53).long(0).byte(1);
+        expect.end();
+    }
+
+    #[test]
+    fn energy_carries_its_value_and_skill_in_a_15_byte_block() {
+        let energy = ShownBuff {
+            stat: BuffStat::EnergyCharge,
+            value: 10000,
+            skill_id: 5110001,
+        };
+        let packet = build_give_energy(energy).unwrap();
+        let mut expect = Expect::new(&packet.bytes);
+        expect.short(SendOpcode::GiveBuff as i16);
+        expect.long(1 << 50).long(0);
+        expect.byte(0).byte(0);
+        expect.int(10000).int(5110001).byte(0).int(0).short(0);
+        expect.short(0);
+        expect.end();
+
+        let packet = build_give_foreign_energy(7, energy).unwrap();
+        let mut expect = Expect::new(&packet.bytes);
+        expect.short(SendOpcode::GiveForeignBuff as i16).int(7);
+        expect.long(1 << 50).long(0);
+        expect.byte(0).byte(0);
+        expect.int(10000).int(5110001).byte(0).int(0).short(0);
+        expect.short(0);
         expect.end();
     }
 

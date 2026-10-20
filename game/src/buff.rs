@@ -10,6 +10,8 @@ pub const RECOVERY_INTERVAL: Duration = Duration::from_secs(5);
 pub const POISON_INTERVAL: Duration = Duration::from_secs(1);
 /// How often Dragon Blood drinks HP.
 pub const DRAGON_BLOOD_INTERVAL: Duration = Duration::from_secs(4);
+/// The energy that fills Energy Charge's gauge (the v83 client's 10000).
+pub const ENERGY_FULL: i16 = 10000;
 
 /// A temporary stat, numbered by its bit in the v83 client's 128-bit
 /// temporary-stat flags (built as `1 << n` at startup, e.g. 0x78d9ad).
@@ -89,6 +91,10 @@ pub enum BuffStat {
     StopMotion = 76,
     /// Darkness all around but a ring about the player.
     Fear = 77,
+    /// Energy Charge's gauge (a two-state stat): `value` is the energy, full
+    /// at `ENERGY_FULL`. It fills slowly and, once full, empties after the
+    /// skill's `time`.
+    EnergyCharge = 82,
     /// Riding the tamed monster worn at `equip_slot::MOUNT` (the client's
     /// RideVehicle, a two-state stat). Its value isn't used; the mount
     /// tires every `mount::TIRE_INTERVAL`.
@@ -158,10 +164,10 @@ impl BuffStat {
         }
     }
 
-    /// Whether the rest of the map sees it: one of `SHOWN`, or riding,
-    /// which they get in a two-state block of its own.
+    /// Whether the rest of the map sees it: one of `SHOWN`, or energy or
+    /// riding, which they get in two-state blocks of their own.
     pub fn shown(self) -> bool {
-        Self::SHOWN.contains(&self) || self == BuffStat::Riding
+        Self::SHOWN.contains(&self) || matches!(self, BuffStat::EnergyCharge | BuffStat::Riding)
     }
 }
 
@@ -273,6 +279,19 @@ impl Buffs {
             .collect()
     }
 
+    /// Energy Charge's gauge, while it has energy.
+    pub fn energy(&self) -> Option<ShownBuff> {
+        let buff = self
+            .active
+            .iter()
+            .find(|buff| buff.stat == BuffStat::EnergyCharge)?;
+        Some(ShownBuff {
+            stat: buff.stat,
+            value: buff.value,
+            skill_id: buff.skill_id,
+        })
+    }
+
     pub fn has(&self, stat: BuffStat) -> bool {
         self.active.iter().any(|buff| buff.stat == stat)
     }
@@ -381,12 +400,12 @@ impl Buffs {
         ended
     }
 
-    /// End every buff but the diseases, as a mob's Dispel does. Cooldowns
-    /// keep running.
+    /// End every buff but the diseases and Energy Charge's gauge, as a mob's
+    /// Dispel does. Cooldowns keep running.
     pub fn dispel(&mut self) -> Vec<BuffStat> {
         let mut ended = Vec::new();
         self.active.retain(|buff| {
-            if buff.stat.disease() {
+            if buff.stat.disease() || buff.stat == BuffStat::EnergyCharge {
                 return true;
             }
             ended.push(buff.stat);

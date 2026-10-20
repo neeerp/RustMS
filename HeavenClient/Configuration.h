@@ -730,6 +730,12 @@ namespace ms
 		PosQUESTHELPER() : PointEntry("PosQUESTHELPER", "(-1,-1)") {}
 	};
 
+	// Where v83 first puts the Energy Charge gauge isn't known; this is above the status bar's middle.
+	struct PosENERGYBAR : public Configuration::PointEntry
+	{
+		PosENERGYBAR() : PointEntry("PosENERGYBAR", "(359,500)") {}
+	};
+
 	// The type of UIMiniMap on maps that aren't towns: 0 folded, 1 the map
 	// alone, 2 the map under its names
 	struct MiniMapType : public Configuration::ByteEntry

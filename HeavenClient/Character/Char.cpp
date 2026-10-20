@@ -61,6 +61,7 @@ namespace ms
 		item_effect.draw_ghosts(view);
 		effects.drawbelow(absp, alpha);
 		held_effects.drawbelow(absp, alpha);
+		energy_glow.drawbelow(absp, alpha);
 
 		Color color;
 
@@ -152,6 +153,7 @@ namespace ms
 
 		effects.drawabove(absp, alpha);
 		held_effects.drawabove(absp, alpha);
+		energy_glow.drawabove(absp, alpha);
 
 		for (auto &[reason, affliction] : afflictions)
 			affliction.animation.draw(affliction.at_face ? facepos : absp, alpha);
@@ -220,6 +222,20 @@ namespace ms
 
 		effects.update();
 		held_effects.update();
+		energy_glow.update();
+
+		if (energy_wait >= 0)
+		{
+			energy_wait -= Constants::TIMESTEP;
+
+			if (energy_wait <= 0)
+			{
+				energy_wait = -1;
+
+				for (const Animation &layer : energy_effect)
+					energy_glow.add_looping(layer, DrawArgument(facing_right), 0, 1.0f);
+			}
+		}
 
 		if (vehicle_switch > 0)
 		{
@@ -422,6 +438,41 @@ namespace ms
 		nl::node finish = nl::nx::skill[string_format::skill_img(skill)]["skill"][std::to_string(skill)]["finish"];
 		effects.add(finish[std::to_string(orbs)], DrawArgument(false), static_cast<int8_t>(finish["z"].get_integer()),
 			get_real_attackspeed());
+	}
+
+	void Char::show_energy(int32_t skill, bool full, bool init)
+	{
+		if (!full)
+		{
+			energy_glow.clear();
+			energy_effect.clear();
+			energy_wait = -1;
+
+			return;
+		}
+
+		if (!energy_effect.empty())
+			return;
+
+		// The effect's layers play together.
+		std::string id = std::to_string(skill);
+		nl::node effect = nl::nx::skill[string_format::skill_img(skill)]["skill"][id]["effect"];
+
+		for (nl::node layer : effect)
+			energy_effect.emplace_back(layer);
+
+		if (init)
+		{
+			energy_wait = 0;
+
+			return;
+		}
+
+		for (const Animation &layer : energy_effect)
+			effects.add(layer, DrawArgument(facing_right), 0, 1.0f);
+
+		Sound(nl::nx::sound["Skill.img"][id]["Use"]).play();
+		energy_wait = 1350;
 	}
 
 	void Char::show_held_effect(Animation toshow, int8_t z, bool looping)
