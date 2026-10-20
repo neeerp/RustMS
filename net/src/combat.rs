@@ -1453,6 +1453,38 @@ mod tests {
     }
 
     #[test]
+    fn recoil_shot_is_a_plain_gun_shot() {
+        if skills::data().is_err() || crate::items::data().is_err() {
+            return;
+        }
+        // The client pushes the user back itself, in its movement path.
+        let mut player = beginner_with_sword();
+        player.stats.job = 520;
+        player.stats.mp = 100;
+        player.inventory.insert(
+            InventoryType::Equipped,
+            equip_slot::WEAPON,
+            Item::equipment(1492000, EquipStats::default()),
+        );
+        player
+            .inventory
+            .insert(InventoryType::Use, 1, Item::stack(2330000, 10));
+        learn(&mut player, 5201006, 20);
+        let recoil = |damage: &[i32]| {
+            parse_attack(
+                &kind_attack_packet(AttackKind::Ranged, 5201006, 1, damage),
+                AttackKind::Ranged,
+            )
+            .unwrap()
+        };
+        assert!(validate(&recoil(&[1]), &player).is_ok());
+        assert_eq!(
+            validate(&recoil(&[1, 1]), &player).unwrap_err(),
+            AttackRejection::TooManyTargets
+        );
+    }
+
+    #[test]
     fn shadow_partner_doubles_a_shot_and_soul_arrow_needs_no_arrows() {
         let now = std::time::Instant::now();
         let long = std::time::Duration::from_secs(60);

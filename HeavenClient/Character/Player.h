@@ -78,6 +78,10 @@ namespace ms
 		bool may_flash_jump() const;
 		void flash_jump(int32_t level);
 
+		// Recoil Shot's push back and up, away from where the player faces,
+		// at its `level`; no Flash Jump follows it in the air.
+		void recoil_shot(int32_t level);
+
 		// Whether Wings may go now, and its jump, gliding down at the level's `x` for up to `seconds`
 		// (FUN_00957a1f).
 		bool may_wings() const;

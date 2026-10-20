@@ -649,6 +649,14 @@ for every four levels, records path element 6 before the push, and leaves
 Another player's client shows that effect, picked by the jumper's job, when
 their path arrives with element 6 (FUN_0097fdf8).
 
+A Gunslinger's Recoil Shot (5201006) is a plain gun shot to the server.
+HeavenClient follows v83 (FUN_009537d5): as the shot goes, it records path
+element 13 and throws the player 250 px/s back, away from where they
+face, and 250 up, plus 40 and 20 for every four levels (`recoil_shot`). No
+Flash Jump follows it before the player lands, and it may be shot again
+only after 2 s. Another player's client shows its `effect` when their path
+arrives with element 13, rather than with the attack.
+
 These, Mystic Door, Teleport and Flash Jump have neither buff stats nor a
 mob debuff, so `skills::acts_alone` lets them past the check that refuses
 such skills as unsupported.

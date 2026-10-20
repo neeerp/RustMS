@@ -23,6 +23,7 @@
 #include "../Constants.h"
 #include "../Gameplay/Combat/Dash.h"
 #include "../Gameplay/Combat/FlashJump.h"
+#include "../Gameplay/Combat/RecoilShot.h"
 #include "../Gameplay/Combat/Wings.h"
 #include "../Gameplay/Stage.h"
 #include "../IO/UITypes/EnergyBarLayout.h"
@@ -62,9 +63,15 @@ namespace ms
 
 		// A Flash Jump in the path leaves its effect, by the player's job
 		// (0x97feb8).
-		if (path.take_arrived() & (1u << 6))
+		uint32_t arrived = path.take_arrived();
+
+		if (arrived & (1u << 6))
 			if (const char *effect = flash_jump::remote_effect(job))
 				Stage::get().show_flash_jump(effect, get_position(), facing_right);
+
+		// So does a Recoil Shot (0x980104).
+		if (arrived & (1u << recoil_shot::MOVE))
+			Stage::get().get_combat().show_recoil_shot(*this);
 
 		// Wings' glide shows while the path glides down (0x9b17ec).
 		glide(wings::gliding(path.command() == wings::GLIDE, now.vy), now.fh > 0);
