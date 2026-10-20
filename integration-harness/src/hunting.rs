@@ -16,7 +16,19 @@ pub fn attack(object_id: i32, damage: i32) -> Packet {
 
 /// CLOSE_RANGE_ATTACK with a skill (0 for none), hitting one mob once.
 pub fn skill_attack(skill_id: i32, object_id: i32, damage: i32) -> Packet {
-    kind_attack(RecvOpcode::CloseRangeAttack, skill_id, 0, object_id, damage)
+    kind_attack(
+        RecvOpcode::CloseRangeAttack,
+        skill_id,
+        0,
+        object_id,
+        &[damage],
+    )
+}
+
+/// CLOSE_RANGE_ATTACK with a skill (0 for none), hitting one mob with
+/// each of `lines`.
+pub fn skill_attack_lines(skill_id: i32, object_id: i32, lines: &[i32]) -> Packet {
+    kind_attack(RecvOpcode::CloseRangeAttack, skill_id, 0, object_id, lines)
 }
 
 /// RANGED_ATTACK with a skill (0 for none) firing the ammo in USE slot
@@ -27,29 +39,29 @@ pub fn ranged_attack(skill_id: i32, ammo_slot: i16, object_id: i32, damage: i32)
         skill_id,
         ammo_slot,
         object_id,
-        damage,
+        &[damage],
     )
 }
 
 /// MAGIC_ATTACK with a skill, hitting one mob once.
 pub fn magic_attack(skill_id: i32, object_id: i32, damage: i32) -> Packet {
-    kind_attack(RecvOpcode::MagicAttack, skill_id, 0, object_id, damage)
+    kind_attack(RecvOpcode::MagicAttack, skill_id, 0, object_id, &[damage])
 }
 
-/// An attack hitting one mob once: a shot has 5 more bytes before its
-/// target, its ammo slot among them.
+/// An attack hitting one mob with each of `lines`: a shot has 5 more bytes
+/// before its target, its ammo slot among them.
 fn kind_attack(
     op: RecvOpcode,
     skill_id: i32,
     ammo_slot: i16,
     object_id: i32,
-    damage: i32,
+    lines: &[i32],
 ) -> Packet {
     let ranged = matches!(op, RecvOpcode::RangedAttack);
     let mut p = Packet::new_empty();
     p.write_short(op as i16).unwrap();
     p.write_byte(0).unwrap();
-    p.write_byte(0x11).unwrap();
+    p.write_byte(0x10 | lines.len() as u8).unwrap();
     p.write_int(skill_id).unwrap();
     p.write_bytes(&[0; 8]).unwrap();
     // Flags, then action 5 facing left (v83 `action | left << 15`), then
@@ -68,7 +80,9 @@ fn kind_attack(
     }
     p.write_int(object_id).unwrap();
     p.write_bytes(&[0; 14]).unwrap();
-    p.write_int(damage).unwrap();
+    for &damage in lines {
+        p.write_int(damage).unwrap();
+    }
     p.write_bytes(&[0; 4]).unwrap();
     p
 }

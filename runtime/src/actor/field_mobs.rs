@@ -73,6 +73,8 @@ pub struct LiveMob {
     /// When it leaves on its own (`removeAfter`, or a `selfDestruction`
     /// without `hp`), if it does.
     pub leaves_at: Option<Instant>,
+    /// Steal took its item; it gives no other.
+    pub stolen: bool,
 }
 
 /// A mob skill and level the server let a mob cast, and when.
@@ -211,6 +213,7 @@ impl LiveMob {
             granted: None,
             cooldowns: HashMap::new(),
             leaves_at,
+            stolen: false,
         }
     }
 
@@ -507,6 +510,14 @@ impl MobSet {
 
     pub fn get(&self, object_id: i32) -> Option<&LiveMob> {
         self.live.get(&object_id)
+    }
+
+    /// Steal from a mob, once: its id and where it stands, or None if it is
+    /// gone or was stolen from already.
+    pub fn steal(&mut self, object_id: i32) -> Option<(i32, i16, i16)> {
+        let mob = self.live.get_mut(&object_id).filter(|mob| !mob.stolen)?;
+        mob.stolen = true;
+        Some((mob.info.mob_id, mob.x, mob.y))
     }
 
     /// The field's first spawn pass, as it loads: a point with a `mobTime`

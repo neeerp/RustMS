@@ -109,28 +109,72 @@ fn roll_at(
         if !rng.gen_bool((entry.prob * rate).clamp(0.0, 1.0)) {
             continue;
         }
-        if let Some(amount) = entry.money {
-            // v83 varies meso drops by about ±25%.
-            let spread = (amount / 4).max(0);
-            let amount = rng.gen_range(amount - spread, amount + spread + 1).max(1);
-            let amount = (f64::from(amount) * mesos).round().min(f64::from(i32::MAX)) as i32;
-            loot.push(Loot::Mesos(amount.max(1)));
-        } else if let Some(item_id) = entry.item {
-            let (min, max) = (
-                entry.min.unwrap_or(1),
-                entry.max.unwrap_or(entry.min.unwrap_or(1)),
-            );
-            let quantity = rng
-                .gen_range(min.min(max), max.max(min) + 1)
-                .clamp(1, i32::from(i16::MAX)) as i16;
-            loot.push(Loot::Item {
-                item_id,
-                quantity,
-                quest,
-            });
-        }
+        loot.extend(loot_of(entry, quest, mesos, rng));
     }
     loot
+}
+
+/// What one entry drops: its mesos times `mesos`, or its item.
+fn loot_of(
+    entry: &RewardEntry,
+    quest: Option<i16>,
+    mesos: f64,
+    rng: &mut impl Rng,
+) -> Option<Loot> {
+    if let Some(amount) = entry.money {
+        // v83 varies meso drops by about ±25%.
+        let spread = (amount / 4).max(0);
+        let amount = rng.gen_range(amount - spread, amount + spread + 1).max(1);
+        let amount = (f64::from(amount) * mesos).round().min(f64::from(i32::MAX)) as i32;
+        return Some(Loot::Mesos(amount.max(1)));
+    }
+    let item_id = entry.item?;
+    let (min, max) = (
+        entry.min.unwrap_or(1),
+        entry.max.unwrap_or(entry.min.unwrap_or(1)),
+    );
+    let quantity = rng
+        .gen_range(min.min(max), max.max(min) + 1)
+        .clamp(1, i32::from(i16::MAX)) as i16;
+    Some(Loot::Item {
+        item_id,
+        quantity,
+        quest,
+    })
+}
+
+/// What Steal takes from a mob for `player`: one of its drops, quest items
+/// aside, picked by their chances (Cosmic's rule), its mesos at the
+/// player's rates.
+pub fn steal(mob_id: i32, player: &Player, now: SystemTime, rng: &mut impl Rng) -> Option<Loot> {
+    let mesos = crate::rates::meso(player, now);
+    steal_from(crate::content::rewards().drops(mob_id), mesos, rng)
+}
+
+fn steal_from(entries: &[RewardEntry], mesos: f64, rng: &mut impl Rng) -> Option<Loot> {
+    let pool: Vec<&RewardEntry> = entries
+        .iter()
+        .filter(|entry| {
+            entry
+                .quest
+                .or_else(|| entry.item.and_then(quest_for))
+                .is_none()
+        })
+        .filter(|entry| entry.prob > 0.0)
+        .collect();
+    let total: f64 = pool.iter().map(|entry| entry.prob).sum();
+    if pool.is_empty() {
+        return None;
+    }
+    let mut pick = rng.gen::<f64>() * total;
+    let entry = pool
+        .iter()
+        .find(|entry| {
+            pick -= entry.prob;
+            pick < 0.0
+        })
+        .unwrap_or(&pool[pool.len() - 1]);
+    loot_of(entry, None, mesos, rng)
 }
 
 /// The quest a quest item (`info/quest`) the drop table doesn't tag drops
@@ -186,6 +230,34 @@ mod tests {
             quest,
             premium: None,
         }
+    }
+
+    #[test]
+    fn steal_picks_one_drop_by_its_chance_and_never_a_quest_item() {
+        let mut rng = rand::rngs::StdRng::seed_from_u64(1);
+        assert_eq!(steal_from(&[], 1.0, &mut rng), None);
+        let table = [
+            entry(Some(4000019), None, 0.3, None),
+            entry(Some(4031802), None, 1.0, Some(1035)),
+            entry(None, Some(10), 0.1, None),
+        ];
+        let mut counts = (0, 0);
+        for _ in 0..400 {
+            match steal_from(&table, 2.0, &mut rng) {
+                Some(Loot::Item {
+                    item_id: 4000019,
+                    quantity: 1,
+                    quest: None,
+                }) => counts.0 += 1,
+                Some(Loot::Mesos(amount)) => {
+                    assert!((16..=26).contains(&amount), "{amount}");
+                    counts.1 += 1;
+                }
+                other => panic!("stole {other:?}"),
+            }
+        }
+        // Three items for each meso bag.
+        assert!((250..350).contains(&counts.0), "{counts:?}");
     }
 
     #[test]

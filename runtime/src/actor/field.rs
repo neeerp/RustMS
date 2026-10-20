@@ -429,11 +429,13 @@ impl FieldActor {
                     inflicts,
                     takes,
                     blast,
+                    pockets,
                 } => {
                     let hits = match blast {
                         Some(blast) => self.set_off(from, &blast, hits),
                         None => hits,
                     };
+                    self.pick_pockets(from, pockets);
                     self.handle_attack(
                         from,
                         Some(broadcast),
@@ -716,13 +718,43 @@ impl FieldActor {
             .spawn(loot, owner, ownership, x, y, dropper, now)
             .into_iter()
             .filter_map(|drop| {
-                build_drop(&drop.view(now), DropAppearance::Falling { from: (x, y) })
+                build_drop(
+                    &drop.view(now),
+                    DropAppearance::Falling {
+                        from: (x, y),
+                        delay: 0,
+                    },
+                )
                     .ok()
                     .map(|packet| (drop.clone(), packet))
             })
             .collect();
         for (drop, packet) in packets {
             self.send_drop_packet(&drop, packet);
+        }
+    }
+
+    /// Pickpocket's mesos fall from each mob still here, anyone's at once,
+    /// within 50 of it and 100 ms apart (Cosmic's rule).
+    fn pick_pockets(&mut self, from: ClientId, pockets: Vec<(i32, Vec<i32>)>) {
+        let now = Instant::now();
+        for (object_id, mesos) in pockets {
+            let Some(mob) = self.mobs.get(object_id) else {
+                continue;
+            };
+            let (x, y) = (mob.x, mob.y);
+            for (index, amount) in mesos.into_iter().enumerate() {
+                let place = x.saturating_add((rand::random::<u32>() % 100) as i16 - 50);
+                let drop = self.drops.pocket(amount, from, (x, y), place, object_id, now);
+                let falling = DropAppearance::Falling {
+                    from: (x, y),
+                    delay: (index as i16).saturating_mul(100),
+                };
+                if let Ok(packet) = build_drop(&drop.view(now), falling) {
+                    let drop = drop.clone();
+                    self.send_drop_packet(&drop, packet);
+                }
+            }
         }
     }
 
@@ -789,7 +821,11 @@ impl FieldActor {
             (drop, DropAppearance::Vanishing { from: (x, y) })
         } else {
             let drop = self.drops.throw(loot, from, x, y, now).clone();
-            (drop, DropAppearance::Falling { from: (x, y) })
+            let falling = DropAppearance::Falling {
+                from: (x, y),
+                delay: 0,
+            };
+            (drop, falling)
         };
         if let Ok(packet) = build_drop(&drop.view(now), appearance) {
             self.send_drop_packet(&drop, packet);
@@ -913,6 +949,17 @@ impl FieldActor {
         }
         let (mut hp_taken, mut mp_taken) = (0, 0);
         for (object_id, damage) in hits {
+            // Steal rolls on every mob hit, until one gives (Cosmic's rule).
+            if takes.steal > 0 && rand::random::<f64>() * 100.0 < f64::from(takes.steal) {
+                if let Some((mob_id, x, y)) = self.mobs.steal(object_id) {
+                    attacker.send(ServerMessage::Stole {
+                        mob_id,
+                        object_id,
+                        x,
+                        y,
+                    });
+                }
+            }
             let Some(mob) = self.mobs.get(object_id) else {
                 continue;
             };
@@ -2381,6 +2428,7 @@ mod tests {
                 inflicts: Vec::new(),
                 takes,
                 blast: None,
+                pockets: Vec::new(),
             },
         };
         // What it took back, and whether the snail died.
@@ -2404,6 +2452,7 @@ mod tests {
             hp: 50,
             mp: None,
             life: 40,
+            steal: 0,
         };
         tx.send(attack(4, blow)).await.unwrap();
         tokio::time::sleep(Duration::from_millis(50)).await;
@@ -2480,6 +2529,7 @@ mod tests {
                     rb: (0, 50),
                     left: true,
                 }),
+                pockets: Vec::new(),
             },
         };
         // What went off, when, and the snail's HP after.

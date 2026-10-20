@@ -422,6 +422,16 @@ handled in the field's `handle_attack`):
   hit, a non-boss mob with no more than `x` percent of its max HP left dies.
   The v83 client shoots it as a ranged attack when a whack's roll succeeds
   (FUN_00950921), as described above.
+- **Steal** (4201004) rolls its `prop` for each mob it hits, misses too, and
+  takes one item from a mob once (`LiveMob.stolen`). The client actor picks
+  it from the mob's drops, quest items aside, weighted by their chances
+  (`loot::steal`), and drops it as the attacker's own.
+- **Pickpocket** (4211003), while its buff is on, rolls its `prop` for each
+  line that hurts in a melee attack, Savage Blow, Assaulter, Boomerang Step,
+  Band of Thieves and the like (`skills::pickpocket`), and drops
+  `line * x / 20000` mesos, at least 1 and no more than `x`, near the mob,
+  anyone's at once. They fall 100 ms apart, the DROP packet's delay. A
+  killing blow still pays.
 
 The client actor applies what came back as one STAT_CHANGED
 (`ServerMessage::Absorbed`).

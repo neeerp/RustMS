@@ -5,8 +5,9 @@ use packet::{io::write::PktWrite, Packet};
 /// How a drop appears.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum DropAppearance {
-    /// Falls from the mob that died (`dropfrom` → `dropto`).
-    Falling { from: (i16, i16) },
+    /// Falls from the mob that died (`dropfrom` → `dropto`), `delay` ms
+    /// from now (the client hides it until then).
+    Falling { from: (i16, i16), delay: i16 },
     /// Already on the ground (shown to someone entering the map).
     Lying,
     /// Thrown from `from`, then fades away instead of landing (an item that
@@ -48,10 +49,15 @@ pub fn build_drop(drop: &DropView, appearance: DropAppearance) -> Result<Packet,
     p.write_short(drop.x)?;
     p.write_short(drop.y)?;
     p.write_int(drop.dropper)?;
-    if let DropAppearance::Falling { from } | DropAppearance::Vanishing { from } = appearance {
+    let falls = match appearance {
+        DropAppearance::Falling { from, delay } => Some((from, delay)),
+        DropAppearance::Vanishing { from } => Some((from, 0)),
+        DropAppearance::Lying => None,
+    };
+    if let Some((from, delay)) = falls {
         p.write_short(from.0)?;
         p.write_short(from.1)?;
-        p.write_short(0)?;
+        p.write_short(delay)?;
     }
     if !drop.meso {
         p.write_long(expiration(None))?;
@@ -143,7 +149,11 @@ mod tests {
 
     #[test]
     fn falling_item_layout() {
-        let packet = build_drop(&shell(), DropAppearance::Falling { from: (140, -25) }).unwrap();
+        let falling = DropAppearance::Falling {
+            from: (140, -25),
+            delay: 300,
+        };
+        let packet = build_drop(&shell(), falling).unwrap();
         let mut expect = Expect::new(&packet.bytes);
         expect
             .short(SendOpcode::DropItemFromMapObject as i16)
@@ -155,7 +165,7 @@ mod tests {
             .int(7)
             .byte(0);
         expect.short(150).short(-25).int(2_000_000_001);
-        expect.short(140).short(-25).short(0);
+        expect.short(140).short(-25).short(300);
         expect.long(expiration(None)).byte(1);
         expect.end();
     }

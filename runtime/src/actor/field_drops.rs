@@ -191,6 +191,32 @@ impl DropSet {
         ids.iter().filter_map(|id| self.drops.get(id)).collect()
     }
 
+    /// Shake `amount` mesos out of the mob `dropper` at `from` for anyone,
+    /// pets aside, on the ground below `place` (Pickpocket).
+    pub fn pocket(
+        &mut self,
+        amount: i32,
+        owner: ClientId,
+        from: (i16, i16),
+        place: i16,
+        dropper: i32,
+        now: Instant,
+    ) -> &Drop {
+        let object_id = self.object_ids.next();
+        let (x, y) = self.footholds.drop_position(from, place);
+        self.drops.entry(object_id).or_insert(Drop {
+            object_id,
+            loot: Loot::Mesos(amount),
+            owner,
+            ownership: Ownership::FreeForAll,
+            x,
+            y,
+            dropper,
+            dropped_at: now,
+            player_drop: true,
+        })
+    }
+
     /// Put down what `owner` threw away at (x, y).
     pub fn throw(&mut self, loot: Loot, owner: ClientId, x: i16, y: i16, now: Instant) -> &Drop {
         let object_id = self.object_ids.next();
