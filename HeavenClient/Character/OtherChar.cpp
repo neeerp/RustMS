@@ -217,4 +217,9 @@ namespace ms
 	{
 		return get_buff(Buffstat::Id::WK_CHARGE).value_or(0);
 	}
+
+	int32_t OtherChar::get_shadow_partner() const
+	{
+		return get_buff(Buffstat::Id::SHADOWPARTNER) ? shadow_partner::skill_for(job) : 0;
+	}
 }

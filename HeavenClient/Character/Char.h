@@ -33,6 +33,7 @@
 #include "MedalTag.h"
 #include "MorphRules.h"
 #include "MiniRoomBalloon.h"
+#include "ShadowPartnerRules.h"
 
 #include "Inventory/Weapon.h"
 #include "Look/Afterimage.h"
@@ -99,6 +100,9 @@ namespace ms
 		// Return the charge skill (Weapon Charge) on the character's
 		// weapon, or 0.
 		virtual int32_t get_charge() const;
+
+		// Return the skill whose clone Shadow Partner draws behind the character, or 0 without the buff.
+		virtual int32_t get_shadow_partner() const;
 
 		// Return the character's base attacking speed.
 		virtual int8_t get_integer_attackspeed() const = 0;
@@ -432,6 +436,18 @@ namespace ms
 		Animation wings_glow;
 		Sound wings_sound;
 		bool gliding = false;
+		// Shadow Partner's clone (FUN_0092efe9): the skill's `special` node, the frames of the avatar's action, and
+		// where it slides from and to; it plays `dead` behind the character as it goes.
+		nl::node partner_art;
+		std::string partner_action;
+		std::vector<Texture> partner_frames;
+		shadow_partner::Offset partner_from = { 0, 0 };
+		shadow_partner::Offset partner_to = { 0, 0 };
+		int16_t partner_ms = 0;
+		bool partner_shown = false;
+
+		void update_partner();
+		Point<int16_t> partner_offset() const;
 		Afterimage afterimage;
 		// A chair's effect and effect2 (v83 0x93c7c3), each on the face when
 		// its pos is 1 and on the feet otherwise; a negative z draws it

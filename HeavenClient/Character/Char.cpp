@@ -112,6 +112,12 @@ namespace ms
 					layer.animation.draw(DrawArgument(layer.at_face ? facepos : absp, facing_right), alpha);
 		};
 
+		if (partner_shown && !partner_frames.empty())
+		{
+			size_t frame = shadow_partner::frame(look.get_frame(), partner_frames.size());
+			partner_frames[frame].draw(DrawArgument(absp + partner_offset(), facing_right));
+		}
+
 		item_effect.draw(false, absp, facepos, facing_right, view, alpha);
 		draw_chair(false);
 		look.draw(DrawArgument(absp, color), alpha);
@@ -241,6 +247,8 @@ namespace ms
 
 		if (gliding)
 			wings_glow.update();
+
+		update_partner();
 
 		if (energy_wait >= 0)
 		{
@@ -470,6 +478,64 @@ namespace ms
 
 		if (dashing)
 			dash_dust = nl::nx::skill[string_format::skill_img(skill)]["skill"][std::to_string(skill)]["special"];
+	}
+
+	void Char::update_partner()
+	{
+		int32_t skill = get_shadow_partner();
+		bool dead = state == State::DIED;
+		Stance::Id stance = look.get_stance();
+
+		if (!shadow_partner::shown(skill != 0, dead, look.get_vehicle() != 0))
+		{
+			if (partner_shown && shadow_partner::dies(skill != 0, dead))
+				effects.add(partner_art["dead"], DrawArgument(partner_offset(), facing_right), -2);
+
+			partner_shown = false;
+
+			return;
+		}
+
+		if (!partner_shown)
+		{
+			partner_shown = true;
+			partner_art = nl::nx::skill[string_format::skill_img(skill)]["skill"][std::to_string(skill)]["special"];
+			partner_action.clear();
+			partner_from = { 0, 0 };
+			partner_to = { 0, 0 };
+		}
+
+		const std::string &action = Stance::names[stance];
+
+		if (action != partner_action)
+		{
+			partner_action = action;
+			partner_frames.clear();
+
+			for (nl::node frame = partner_art[action]["0"]; frame;
+				frame = partner_art[action][std::to_string(partner_frames.size())])
+				partner_frames.emplace_back(frame);
+		}
+
+		shadow_partner::Offset to = shadow_partner::offset(facing_right,
+			stance == Stance::Id::LADDER || stance == Stance::Id::ROPE);
+
+		if (!(to == partner_to))
+		{
+			Point<int16_t> at = partner_offset();
+			partner_from = { at.x(), at.y() };
+			partner_to = to;
+			partner_ms = 0;
+		}
+
+		partner_ms = std::min<int16_t>(partner_ms + Constants::TIMESTEP, shadow_partner::SLIDE_MS);
+	}
+
+	Point<int16_t> Char::partner_offset() const
+	{
+		return Point<int16_t>(
+			shadow_partner::slid(partner_from.x, partner_to.x, partner_ms),
+			shadow_partner::slid(partner_from.y, partner_to.y, partner_ms));
 	}
 
 	void Char::glide(bool now, bool landed)
@@ -965,6 +1031,11 @@ namespace ms
 	}
 
 	int32_t Char::get_charge() const
+	{
+		return 0;
+	}
+
+	int32_t Char::get_shadow_partner() const
 	{
 		return 0;
 	}

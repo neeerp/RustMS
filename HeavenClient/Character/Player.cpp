@@ -1467,6 +1467,11 @@ namespace ms
 		return has_buff(Buffstat::Id::WK_CHARGE) ? buffs[Buffstat::Id::WK_CHARGE].skillid : 0;
 	}
 
+	int32_t Player::get_shadow_partner() const
+	{
+		return has_buff(Buffstat::Id::SHADOWPARTNER) ? shadow_partner::skill_for(stats.get_job().get_id()) : 0;
+	}
+
 	void Player::change_job(uint16_t jobid)
 	{
 		uint16_t oldjob = stats.get_stat(MapleStat::Id::JOB);
