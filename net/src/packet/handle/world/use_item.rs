@@ -96,15 +96,13 @@ fn use_item(player: &mut Player, slot: i16, item_id: i32, now: Instant) -> Optio
         .ok()?;
     let max_hp = player.effective_max_hp();
     let max_mp = player.effective_max_mp();
-    player.recover_hp(spec.hp + max_hp * spec.hp_r / 100);
-    player.add_mp(spec.mp + max_mp * spec.mp_r / 100);
+    let (more, longer) = alchemist(player);
+    player.recover_hp(spec.hp * more / 100 + max_hp * spec.hp_r / 100);
+    player.add_mp(spec.mp * more / 100 + max_mp * spec.mp_r / 100);
     let cured = player.buffs.cure(&spec.cures);
-    let given = if spec.time > 0 {
-        spec.stats
-    } else {
-        Vec::new()
-    };
-    let lasts = Duration::from_millis(spec.time.max(0) as u64);
+    let time = spec.time * longer / 100;
+    let given = if time > 0 { spec.stats } else { Vec::new() };
+    let lasts = Duration::from_millis(time.max(0) as u64);
     for &(stat, value) in &given {
         player
             .buffs
@@ -114,8 +112,15 @@ fn use_item(player: &mut Player, slot: i16, item_id: i32, now: Instant) -> Optio
         changes,
         cured,
         given,
-        time: spec.time,
+        time,
     })
+}
+
+/// Alchemist (4110000): the percent of an item's flat HP and MP, `x`, and of
+/// its buff's time, `y`, the player gets, truncated (Cosmic's
+/// `alchemistModifyVal`). The client never reads it.
+fn alchemist(player: &Player) -> (i32, i32) {
+    skills::learned(player, 4110000).map_or((100, 100), |skill| (skill.effect.x, skill.effect.y))
 }
 
 /// `USE_RETURN_SCROLL` (0x55, v83 FUN_00a1e1ce): tick, slot in the USE bag,
@@ -502,6 +507,35 @@ mod tests {
         ));
         assert!(use_item(&mut player, 3, 2000000, now).is_some());
         assert_eq!(player.stats.hp, 125);
+    }
+
+    #[test]
+    fn alchemist_strengthens_flat_potions_and_lengthens_item_buffs() {
+        if items::data().is_err() || skills::data().is_err() {
+            return;
+        }
+        let mut player = crate::codec::stats::sample_player();
+        player.stats.max_hp = 500;
+        player.stats.hp = 100;
+        player.skills.set(SkillRecord {
+            skill_id: 4110000,
+            level: 10,
+            master_level: 0,
+            expiration: None,
+        });
+        player
+            .inventory
+            .insert(InventoryType::Use, 3, Item::stack(2000000, 1));
+        player
+            .inventory
+            .insert(InventoryType::Use, 4, Item::stack(2002004, 1));
+        let now = std::time::Instant::now();
+        // Level 10 is 130%: a Red Potion heals 65 rather than 50.
+        assert!(use_item(&mut player, 3, 2000000, now).is_some());
+        assert_eq!(player.stats.hp, 165);
+        let time = items::info(2002004).unwrap().spec.unwrap().time;
+        let used = use_item(&mut player, 4, 2002004, now).unwrap();
+        assert_eq!(used.time, time * 130 / 100);
     }
 
     #[test]

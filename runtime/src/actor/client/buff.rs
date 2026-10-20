@@ -51,7 +51,8 @@ impl ClientActor {
     }
 
     /// A mob's skill gave the player a disease, if they are still on its
-    /// map and out of the Cash Shop.
+    /// map, out of the Cash Shop, and not under Holy Shield, which keeps off
+    /// every disease a mob's skill brings.
     pub(super) async fn diseased(
         &mut self,
         disease: game::Disease,
@@ -63,7 +64,7 @@ impl ClientActor {
         let Some(game) = self.game.as_mut() else {
             return Ok(());
         };
-        if game.player.stats.map_id != map_id {
+        if game.player.stats.map_id != map_id || game.player.buffs.has(BuffStat::HolyShield) {
             return Ok(());
         }
         let result = catch_disease(&mut game.player, disease, std::time::Instant::now())

@@ -685,15 +685,18 @@ pub fn hurt_by_hazard(player: &mut Player, hazard: &game_data::Hazard) -> WorldR
     })
 }
 
-/// A mob gave the player a disease: unless they're dead or already have it,
-/// it starts, and the others see it if it shows.
+/// A mob gave the player a disease: unless they're dead, already have it,
+/// or Holy Shield keeps it off (all but Stun and Seduce), it starts, and
+/// the others see it if it shows.
 pub fn catch_disease(
     player: &mut Player,
     disease: Disease,
     now: std::time::Instant,
 ) -> WorldResult {
     let stat = disease.stat;
-    if player.stats.hp <= 0 || player.buffs.has(stat) {
+    let shielded = player.buffs.has(BuffStat::HolyShield)
+        && !matches!(stat, BuffStat::Stun | BuffStat::Seduce);
+    if player.stats.hp <= 0 || player.buffs.has(stat) || shielded {
         return Ok(HandlerResult::empty());
     }
     player.buffs.give(Buff::new(
@@ -1060,6 +1063,32 @@ mod tests {
         assert_eq!(died_on(104_040_000, 50), needed / 20);
         // Mu Lung Dojo's first floor.
         assert_eq!(died_on(925_020_100, 4), 0);
+    }
+
+    #[test]
+    fn holy_shield_keeps_off_all_but_stun_and_seduce() {
+        let now = std::time::Instant::now();
+        let mut player = crate::codec::stats::sample_player();
+        let lasts = std::time::Duration::from_secs(30);
+        player
+            .buffs
+            .give(Buff::new(2321005, BuffStat::HolyShield, 1, now, lasts));
+        for stat in [
+            BuffStat::Poison,
+            BuffStat::Seal,
+            BuffStat::Stun,
+            BuffStat::Seduce,
+        ] {
+            let disease = Disease {
+                stat,
+                value: 1,
+                skill_id: 120 | 1 << 16,
+                lasts,
+            };
+            catch_disease(&mut player, disease, now).unwrap();
+        }
+        assert!(!player.buffs.has(BuffStat::Poison) && !player.buffs.has(BuffStat::Seal));
+        assert!(player.buffs.has(BuffStat::Stun) && player.buffs.has(BuffStat::Seduce));
     }
 
     #[test]
