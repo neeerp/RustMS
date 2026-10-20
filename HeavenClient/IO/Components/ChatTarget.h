@@ -1,9 +1,11 @@
 #pragma once
 
+#include <algorithm>
 #include <cstddef>
 #include <cstdint>
 #include <deque>
 #include <string>
+#include <vector>
 
 namespace ms
 {
@@ -86,6 +88,22 @@ namespace ms
 				default:
 					return Target::ALL;
 			}
+		}
+
+		// What the "To Group" dialog offers (FUN_00a3fc85): a blank entry,
+		// then each buddy's group once, in bytewise order. Pending buddies'
+		// groups count too.
+		inline std::vector<std::string> group_choices(std::vector<std::string> groups)
+		{
+			std::sort(groups.begin(), groups.end());
+
+			std::vector<std::string> choices = { "" };
+
+			for (const std::string& group : groups)
+				if (!group.empty() && group != choices.back())
+					choices.push_back(group);
+
+			return choices;
 		}
 
 		// The names last whispered to, the latest first, each once and at

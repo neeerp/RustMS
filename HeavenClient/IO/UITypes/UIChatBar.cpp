@@ -21,6 +21,7 @@
 #include <cctype>
 #include <cstdlib>
 
+#include "UIGroupPicker.h"
 #include "UINotice.h"
 #include "UIStatusBar.h"
 
@@ -1065,7 +1066,24 @@ namespace ms
 
 	void UIChatBar::ask_group()
 	{
-		// STUB: replaced once the group dialog is reversed.
+		std::vector<std::string> groups;
+
+		for (const Buddy& buddy : Stage::get().get_player().get_buddies().get_buddies())
+			groups.push_back(buddy.group);
+
+		UI::get().emplace<UIGroupPicker>(
+			chat_target::group_choices(groups),
+			[this](const std::string& group)
+			{
+				// OK whispers to the group typed, even a blank one
+				// (FUN_008d4d43).
+				focus_field();
+				whisper_name.clear();
+				group_name = group;
+				chat_target = Target::GROUP;
+				update_face();
+			}
+		);
 	}
 
 	void UIChatBar::focus_field()

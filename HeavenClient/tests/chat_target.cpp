@@ -3,6 +3,7 @@
 #include <iostream>
 #include <stdexcept>
 #include <string>
+#include <vector>
 
 void require(bool condition, const char* message)
 {
@@ -40,6 +41,13 @@ int main()
 			target = next_tab(target);
 			require(target == expected, "Tab follows v83's order");
 		}
+
+		using ms::chat_target::group_choices;
+		using Groups = std::vector<std::string>;
+		require(group_choices({}) == Groups({ "" }), "a blank entry with no buddies");
+		require(group_choices({ "Default Group", "", "Default Group" }) == Groups({ "", "Default Group" }),
+				"each group once, and no second blank");
+		require(group_choices({ "b", "A", "a", "B" }) == Groups({ "", "A", "B", "a", "b" }), "bytewise order");
 
 		ms::chat_target::WhisperHistory history;
 		require(history.latest().empty(), "an empty history has no latest name");

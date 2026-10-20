@@ -678,6 +678,8 @@ add_executable(HeavenClient
     IO/UITypes/UIEquipInventory.h
     IO/UITypes/UIGender.cpp
     IO/UITypes/UIGender.h
+    IO/UITypes/UIGroupPicker.cpp
+    IO/UITypes/UIGroupPicker.h
     IO/UITypes/UIItemInventory.cpp
     IO/UITypes/UIItemInventory.h
     IO/UITypes/UIKeyConfig.cpp
