@@ -234,7 +234,7 @@ pub fn slash_blast(player: &Player) -> i32 {
 /// half of it; MP Recovery takes the same, and needs more.
 pub fn hp_cost(player: &Player, skill: &Learned) -> Option<i32> {
     let hp = i32::from(player.stats.hp);
-    let max_hp = i32::from(player.stats.max_hp);
+    let max_hp = player.effective_max_hp();
     if skill.skill_id == DRAGON_ROAR && hp < max_hp / 2 {
         return None;
     }
@@ -307,7 +307,7 @@ pub fn chakra_heal(player: &Player, y: i32, roll: f64) -> i32 {
 /// The MP MP Recovery gives: its `y` percent of the HP it took. The v83
 /// client leaves it to the server, so this is OdinMS-family servers' rule.
 pub fn recovered_mp(player: &Player, skill: &Learned) -> i32 {
-    skill.effect.x * i32::from(player.stats.max_hp) / 100 * skill.effect.y / 100
+    skill.effect.x * player.effective_max_hp() / 100 * skill.effect.y / 100
 }
 
 /// How close to a portal Mystic Door may not open (v83 FUN_00712ab1).

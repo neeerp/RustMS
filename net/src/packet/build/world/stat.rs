@@ -109,6 +109,11 @@ pub fn build_stat_update(
     Ok(packet)
 }
 
+/// HP and MP, e.g. after `Player::fit_hp_mp` brought them down.
+pub fn build_hp_mp(stats: &CharacterStats) -> Result<Packet, NetworkError> {
+    build_stat_update(false, &[StatUpdate::Hp(stats.hp), StatUpdate::Mp(stats.mp)])
+}
+
 /// The stats an EXP gain changes: EXP, and after a level-up the level, AP,
 /// SP, and the (restored) HP and MP.
 pub fn build_exp_stats(stats: &CharacterStats, levelled: bool) -> Result<Packet, NetworkError> {

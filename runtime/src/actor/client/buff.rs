@@ -158,7 +158,8 @@ impl ClientActor {
             }
         }
         let stats = &player.stats;
-        if stats.hp > 0 && (change < 0 || (change > 0 && stats.hp < stats.max_hp)) {
+        let below_max = i32::from(stats.hp) < player.effective_max_hp();
+        if stats.hp > 0 && (change < 0 || (change > 0 && below_max)) {
             let hp = player.add_hp(change);
             packets.push(stat::build_stat_update(false, &[StatUpdate::Hp(hp)])?);
         }
@@ -167,6 +168,9 @@ impl ClientActor {
         }
         if !tick.expired.is_empty() {
             packets.push(buff::build_cancel_buff(&tick.expired)?);
+            if player.fit_hp_mp() {
+                packets.push(stat::build_hp_mp(&player.stats)?);
+            }
         }
         for skill_id in tick.cooled {
             packets.push(buff::build_cooldown(skill_id, 0)?);
@@ -270,9 +274,19 @@ impl ClientActor {
             })
             .await?;
         }
-        let mut packet = buff::build_cancel_buff(&ended)?;
-        self.send(&mut packet).await?;
+        self.send_cancelled(&ended).await?;
         self.hide_buffs(&ended).await
+    }
+
+    /// Tell the player their buffs among `ended` ended, and bring HP and MP
+    /// down to the max they left.
+    async fn send_cancelled(&mut self, ended: &[BuffStat]) -> Result<(), RuntimeError> {
+        let mut packets = vec![buff::build_cancel_buff(ended)?];
+        let player = &mut self.in_game_mut()?.player;
+        if player.fit_hp_mp() {
+            packets.push(stat::build_hp_mp(&player.stats)?);
+        }
+        self.send_all(&mut packets).await
     }
 
     /// End one buff, e.g. a Puppet's when a mob broke it.
@@ -281,8 +295,7 @@ impl ClientActor {
         if ended.is_empty() {
             return Ok(());
         }
-        let mut packet = buff::build_cancel_buff(&ended)?;
-        self.send(&mut packet).await?;
+        self.send_cancelled(&ended).await?;
         self.hide_buffs(&ended).await
     }
 

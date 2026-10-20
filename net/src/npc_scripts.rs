@@ -737,7 +737,7 @@ fn roger_start(player: &Player) -> NpcScript {
 
 /// `q1021e`: Roger checks the HP and pays the reward.
 fn roger_end(player: &Player) -> NpcScript {
-    if player.stats.hp < player.stats.max_hp {
+    if i32::from(player.stats.hp) < player.effective_max_hp() {
         // Not recovered: say so and stop without completing.
         return NpcScript::new(ROGER, vec![Page::Say(text(keys::ROGER_NOT_RECOVERED))]);
     }

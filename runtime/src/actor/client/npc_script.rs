@@ -127,7 +127,7 @@ impl ClientActor {
                     afterwards.push(guild::build_name_prompt()?);
                 }
                 Effect::SetHp(hp) => {
-                    next.stats.hp = (*hp).clamp(0, next.stats.max_hp);
+                    next.stats.hp = (*hp).clamp(0, next.effective_max_hp() as i16);
                     changed = true;
                     packets.push(stat::build_stat_update(
                         false,
