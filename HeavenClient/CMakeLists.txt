@@ -600,6 +600,8 @@ add_executable(HeavenClient
     IO/Components/ClassicSlider.h
     IO/Components/ClassicTabs.cpp
     IO/Components/ClassicTabs.h
+    IO/Components/ComboEdit.cpp
+    IO/Components/ComboEdit.h
     IO/Components/SliderSteps.h
     IO/Components/EquipTooltip.cpp
     IO/Components/EquipTooltip.h
@@ -680,6 +682,8 @@ add_executable(HeavenClient
     IO/UITypes/UIGender.h
     IO/UITypes/UIGroupPicker.cpp
     IO/UITypes/UIGroupPicker.h
+    IO/UITypes/UIWhisperPrompt.cpp
+    IO/UITypes/UIWhisperPrompt.h
     IO/UITypes/UIItemInventory.cpp
     IO/UITypes/UIItemInventory.h
     IO/UITypes/UIKeyConfig.cpp

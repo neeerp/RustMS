@@ -19,6 +19,8 @@
 
 #include "../UI.h"
 
+#include "../../Graphics/GraphicsGL.h"
+
 #include <sstream>
 
 namespace ms
@@ -46,8 +48,19 @@ namespace ms
 
 		Point<int16_t> absp = bounds.get_left_top() + posiiton;
 
-		if (text.size() > 0)
+		if (selected && state == State::FOCUSED)
+		{
+			// A focused edit's selection is white on navy, as tall as the
+			// font, from the top of the text (FUN_004cb1ea).
+			int16_t top = absp.y() + marker.height() - 11;
+
+			GraphicsGL::get().drawrectangle(absp.x(), top, textlabel.width(), 12, 0.0f, 0.0f, 0x7F / 255.0f, 1.0f);
+			selectedlabel.draw(absp);
+		}
+		else if (text.size() > 0)
+		{
 			textlabel.draw(absp);
+		}
 
 		if (state == State::FOCUSED && showmarker)
 		{
@@ -112,17 +125,23 @@ namespace ms
 				switch (key)
 				{
 				case KeyAction::Id::LEFT:
+					selected = false;
+
 					if (markerpos > 0)
 						markerpos--;
 
 					break;
 				case KeyAction::Id::RIGHT:
+					selected = false;
+
 					if (markerpos < text.size())
 						markerpos++;
 
 					break;
 				case KeyAction::Id::BACK:
-					if (text.size() > 0 && markerpos > 0)
+					if (selected)
+						erase_selection();
+					else if (text.size() > 0 && markerpos > 0)
 					{
 						text.erase(markerpos - 1, 1);
 
@@ -141,13 +160,17 @@ namespace ms
 					add_string(" ");
 					break;
 				case KeyAction::Id::HOME:
+					selected = false;
 					markerpos = 0;
 					break;
 				case KeyAction::Id::END:
+					selected = false;
 					markerpos = text.size();
 					break;
 				case KeyAction::Id::DELETE:
-					if (text.size() > 0 && markerpos < text.size())
+					if (selected)
+						erase_selection();
+					else if (text.size() > 0 && markerpos < text.size())
 					{
 						text.erase(markerpos, 1);
 
@@ -176,6 +199,9 @@ namespace ms
 
 	void Textfield::add_string(const std::string& str)
 	{
+		if (selected && !str.empty())
+			erase_selection();
+
 		for (char c : str)
 		{
 			if (belowlimit())
@@ -218,6 +244,9 @@ namespace ms
 				if (state == State::NORMAL)
 					set_state(State::FOCUSED);
 
+				// A click puts the caret down, ending a selection (FUN_004cbe89).
+				selected = false;
+
 				return Cursor::State::CLICKING;
 			}
 			else
@@ -239,6 +268,21 @@ namespace ms
 		modifytext(t);
 
 		markerpos = text.size();
+		selected = false;
+	}
+
+	void Textfield::select_all()
+	{
+		markerpos = text.size();
+		selected = !text.empty();
+		selectedlabel = Text(font, alignment, Color::Name::WHITE, textlabel.get_text(), 0, false);
+	}
+
+	void Textfield::erase_selection()
+	{
+		selected = false;
+		markerpos = 0;
+		modifytext("");
 	}
 
 	void Textfield::set_cryptchar(int8_t character)

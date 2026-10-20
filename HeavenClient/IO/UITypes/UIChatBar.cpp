@@ -23,6 +23,7 @@
 
 #include "UIGroupPicker.h"
 #include "UINotice.h"
+#include "UIWhisperPrompt.h"
 #include "UIStatusBar.h"
 
 #include "../UI.h"
@@ -176,7 +177,6 @@ namespace ms
 		constexpr Color COMBO_BORDER = Color(0x999999FF);
 		constexpr Color COMBO_FILL = Color(0x315573FF);
 		constexpr Color COMBO_LIT = Color(0x559AB9FF);
-		constexpr size_t WHISPER_NAME_LIMIT = 12;
 
 		// The original places a line by the top of its text; text here is
 		// placed this far above that.
@@ -997,11 +997,16 @@ namespace ms
 
 	void UIChatBar::ask_whisper_name()
 	{
-		// v83's prompt offers the names in the history to pick from too.
-		UI::get().emplace<UIEnterText>(
-			"Please enter the person you want to whisper to.",
-			[this](const std::string& typed)
+		const std::deque<std::string>& names = whisper_history.all();
+
+		UI::get().emplace<UIWhisperPrompt>(
+			std::vector<std::string>(names.begin(), names.end()),
+			[this](const std::string& typed, const std::vector<std::string>& kept)
 			{
+				// OK keeps the names left in the list, before the name typed
+				// is checked (FUN_008d4dbf).
+				whisper_history.replace(kept);
+
 				size_t first = typed.find_first_not_of(' ');
 
 				if (first == std::string::npos)
@@ -1017,8 +1022,7 @@ namespace ms
 
 				add_whisper_history(name);
 				whisper_to(name);
-			},
-			WHISPER_NAME_LIMIT
+			}
 		);
 	}
 

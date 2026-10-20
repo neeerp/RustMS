@@ -141,6 +141,13 @@ namespace ms
 				return names;
 			}
 
+			// The names left in the whisper prompt's list when OK is pressed
+			// (FUN_009acea9).
+			void replace(const std::vector<std::string>& kept)
+			{
+				names.assign(kept.begin(), kept.begin() + std::min(kept.size(), MAX));
+			}
+
 		private:
 			std::deque<std::string> names;
 		};

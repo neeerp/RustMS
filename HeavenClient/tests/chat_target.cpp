@@ -1,5 +1,6 @@
 #include "../IO/Components/ChatTarget.h"
 
+#include <deque>
 #include <iostream>
 #include <stdexcept>
 #include <string>
@@ -66,6 +67,12 @@ int main()
 
 		history.add("N5");
 		require(history.all().size() == 10 && history.latest() == "N5", "names are compared exactly");
+
+		history.replace({ "b", "a" });
+		require(history.all() == std::deque<std::string>({ "b", "a" }), "the prompt's list replaces the history");
+
+		history.replace({});
+		require(history.latest().empty(), "every name can be dropped");
 	}
 	catch (const std::exception& e)
 	{
