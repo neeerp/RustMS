@@ -35,6 +35,9 @@ namespace ms
 		// Oak Barrel's, which hides the player from mobs (FUN_004520d5).
 		bool is_hide() const;
 
+		// Transformation's, which keeps the player's own stats and attacks.
+		bool is_superman() const;
+
 		int32_t get_speed() const;
 
 		int32_t get_jump() const;

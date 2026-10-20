@@ -73,6 +73,8 @@ namespace ms
 			MORPHED,
 			// Right-clicking such a morph item's icon (0x10fc)
 			MORPH_FIXED,
+			// Shockwave and the like without a transformation (0xdd2)
+			UNTRANSFORMED,
 			LENGTH
 		};
 

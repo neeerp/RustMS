@@ -241,6 +241,35 @@ namespace ms
 			return false;
 		}
 
+		// A superman can't use some skills, and attacks only with a knuckle, or Albatross with a bow; a
+		// shot says so (FUN_00966f7a, FUN_009537d5, FUN_0095571f).
+		int32_t reason = player.get_morph_reason();
+
+		if (player.is_superman())
+		{
+			if (morph::superman_refuses(move_id))
+			{
+				InChatMessage(Messages::Type::MORPHED).drop();
+				return false;
+			}
+
+			Weapon::Type weapon = player.get_stats().get_weapontype();
+
+			if (move_id == 0 && weapon != Weapon::KNUCKLE && !(reason == morph::ALBATROSS && weapon == Weapon::BOW))
+			{
+				if (weapon == Weapon::BOW || weapon == Weapon::CROSSBOW || weapon == Weapon::CLAW || weapon == Weapon::GUN)
+					InChatMessage(Messages::Type::SKILL_EQUIPPED).drop();
+
+				return false;
+			}
+		}
+
+		if (morph::untransformed(move_id, player.is_superman(), reason))
+		{
+			InChatMessage(Messages::Type::UNTRANSFORMED).drop();
+			return false;
+		}
+
 		if (prepare::held(move_id) || prepare::timed(move_id))
 		{
 			// A skill that keeps firing whacks a mob right in front of the

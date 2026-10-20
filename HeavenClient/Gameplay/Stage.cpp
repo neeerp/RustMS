@@ -1038,7 +1038,7 @@ namespace ms
 				break;
 			case KeyType::Id::FACE:
 				// Not morphed (FUN_00a24470).
-				if (down && !player.morph_refuses() && emote_cooldown.try_start(get_uptime() / 1000))
+				if (down && !player.shape_refuses() && emote_cooldown.try_start(get_uptime() / 1000))
 				{
 					player.set_expression(action);
 					// v83 numbers emotes from F1's action (100) as 1.
@@ -1477,7 +1477,7 @@ namespace ms
 	void Stage::use_item_effect(int32_t item_id)
 	{
 		// Not morphed (FUN_00a24530).
-		if (player.morph_refuses())
+		if (player.shape_refuses())
 			return;
 
 		int32_t next = item_effect::toggled(player.get_item_effect(), item_id);

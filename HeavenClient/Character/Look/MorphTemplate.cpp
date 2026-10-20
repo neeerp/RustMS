@@ -51,7 +51,7 @@ namespace ms
 
 	std::string MorphTemplate::action(const std::string &stance) const
 	{
-		std::string name = morph::action(stance);
+		std::string name = morph::action(stance, superman);
 
 		return count(name) > 0 ? name : "stand";
 	}
@@ -78,6 +78,11 @@ namespace ms
 	bool MorphTemplate::is_hide() const
 	{
 		return !actions.empty() && hide;
+	}
+
+	bool MorphTemplate::is_superman() const
+	{
+		return !actions.empty() && superman;
 	}
 
 	int32_t MorphTemplate::get_speed() const

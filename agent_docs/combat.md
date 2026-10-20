@@ -723,7 +723,7 @@ Use Skill refuses the transformations on maps that forbid movement
 skills, like Dash.
 
 HeavenClient draws the template's action for the stance (stand, walk,
-jump, prone, ladder, rope, sit, fly; stand when the template lacks it) in
+jump, prone, ladder, rope, fly; stand when the template lacks it) in
 place of the body and equipment (`MorphTemplate`, `morph::action`). The
 item's morph moves at the template's speed and jump, clamped to 80-140 and
 80-123, with its `fs` and `swim`. It refuses attacks, skills, chairs,
@@ -742,7 +742,19 @@ it drops or breaks. Mobs never pick an attack against it, and touching one
 does no damage: every 2 seconds of contact rolls `prop` and breaks the
 barrel on a hit (`morph::spotted`). HeavenClient also refuses the attack
 key while the barrel drops, where v83 attacks and the server would refuse.
-Not done in HeavenClient: the superman's stances and gates. Not done
+
+A superman (a `superman` template) also shows its alert and sits, and
+draws an attack or skill by the template's action of the same name
+(`morph::superman_action`; alert5 is the alert), played through once by
+its own frames. Every action but the walk plays at attack speed, standing
+too. It keeps the player's own speed and jump. It refuses Double Shot, Oak
+Barrel, Burst Fire and the beginners' rides with the right-click line
+(`morph::superman_refuses`), and emotes and item effects, but may sit. A
+normal attack needs a knuckle (or a bow for Albatross): a melee one is
+dropped silently, a shot says "This skill cannot be used with the equipped
+item." Without the transformation, Shockwave, Demolition and Snatch say
+"This skill is available only during transformation."
+(`morph::untransformed`). Not done
 anywhere: Ghost (bit 49), the random morph items (2211000, 2212000), the
 cash morphs (5300000-5300002), the fly-map template gate, and the refusals for trades, mini-games and shops.
 

@@ -19,6 +19,7 @@
 
 #include "AttackStances.h"
 
+#include "../MorphRules.h"
 #include "../MountRules.h"
 #include "../Pets.h"
 
@@ -296,6 +297,9 @@ namespace ms
 
 	std::string CharLook::morph_action(Stance::Id st) const
 	{
+		if (!morphact.empty())
+			return morphact;
+
 		return MorphTemplate::get(morph).action(Stance::names[st]);
 	}
 
@@ -400,7 +404,16 @@ namespace ms
 				stframe.next(nextframe, threshold);
 
 				if (stframe == 0)
+				{
 					aniend = true;
+
+					// A superman's attack ends with the template's frames.
+					if (!morphact.empty())
+					{
+						morphact = "";
+						actionstr = "";
+					}
+				}
 			} else
 			{
 				stance.normalize();
@@ -598,7 +611,7 @@ namespace ms
 
 	void CharLook::set_stance(Stance::Id newstance)
 	{
-		if (action || newstance == Stance::Id::NONE)
+		if (action || !morphact.empty() || newstance == Stance::Id::NONE)
 			return;
 
 		Stance::Id adjstance = equips.adjust_stance(newstance);
@@ -622,6 +635,7 @@ namespace ms
 		heldframe = -1;
 		action = nullptr;
 		actionstr = "";
+		morphact = "";
 	}
 
 	Stance::Id CharLook::getattackstance(uint8_t attack, bool degenerate) const
@@ -690,9 +704,20 @@ namespace ms
 		if (acstr == actionstr || acstr == "")
 			return;
 
+		std::string attack = is_superman() ? morph::superman_action(acstr) : "";
+
 		if (Stance::Id ac_stance = Stance::by_string(acstr))
 		{
 			set_stance(ac_stance);
+		} else if (!attack.empty() && MorphTemplate::get(morph).count(attack) > 0)
+		{
+			// The superman plays it through once, at the stance it stands in.
+			action = nullptr;
+			actionstr = acstr;
+			morphact = attack;
+			heldframe = -1;
+			stframe.set(0);
+			stelapsed = 0;
 		} else
 		{
 			action = drawinfo.get_action(acstr, 0);
@@ -741,7 +766,8 @@ namespace ms
 
 	uint16_t CharLook::get_attackdelay(size_t no, uint8_t first_frame) const
 	{
-		if (action)
+		// A superman hits when the action would have.
+		if (action || !morphact.empty())
 		{
 			return drawinfo.get_attackdelay(actionstr, no);
 		} else
@@ -799,7 +825,7 @@ namespace ms
 
 	std::string CharLook::get_action_name() const
 	{
-		return action ? actionstr : Stance::names[stance.get()];
+		return action || !morphact.empty() ? actionstr : Stance::names[stance.get()];
 	}
 
 	Point<int16_t> CharLook::get_facepos() const
@@ -886,11 +912,22 @@ namespace ms
 		morph = m;
 		stframe.set(0);
 		stelapsed = 0;
+
+		if (!morphact.empty())
+		{
+			morphact = "";
+			actionstr = "";
+		}
 	}
 
 	int32_t CharLook::get_morph() const
 	{
 		return morph;
+	}
+
+	bool CharLook::is_superman() const
+	{
+		return morph > 0 && MorphTemplate::get(morph).is_superman();
 	}
 
 	void CharLook::init()
