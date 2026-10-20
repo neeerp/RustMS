@@ -193,7 +193,15 @@ impl WorldHandler for UseSkillHandler {
                 } else {
                     extras.party
                 };
-                let result = with_party(result, skill_id, level, party, 0);
+                let mut result = with_party(result, skill_id, level, party, 0);
+                if let Some(inflict) = skills::mist(&used.skill) {
+                    result = result.with(WorldAction::Field(FieldRequest::Mist {
+                        skill_id,
+                        level,
+                        left: false,
+                        inflict,
+                    }));
+                }
                 let Some(inflict) = used.debuffs.clone() else {
                     return Ok(result);
                 };
@@ -1333,6 +1341,55 @@ mod tests {
         assert!(!actions.iter().any(|action| matches!(action,
             WorldAction::Reply(p) if p.opcode() == SendOpcode::GiveBuff as i16)));
         assert_eq!(player.stats.mp, 80);
+    }
+
+    #[test]
+    fn smokescreen_leaves_smoke_that_does_nothing_to_mobs() {
+        if skills::data().is_err() {
+            return;
+        }
+        let mut player = beginner_with(skills::SMOKESCREEN, 30);
+        (player.stats.mp, player.stats.max_mp) = (100, 100);
+        let cast = || {
+            let mut packet = Packet::new_empty();
+            packet.write_short(RecvOpcode::UseSkill as i16).unwrap();
+            packet.write_int(0).unwrap();
+            packet.write_int(skills::SMOKESCREEN).unwrap();
+            packet.write_byte(30).unwrap();
+            packet.write_short(0).unwrap();
+            packet
+        };
+        let mut ctx = WorldContext {
+            client_id: 1,
+            channel_id: 0,
+            player: &mut player,
+        };
+        let actions = UseSkillHandler
+            .handle(&mut cast(), &mut ctx)
+            .unwrap()
+            .actions;
+        let mist = actions.iter().find_map(|action| match action {
+            WorldAction::Field(FieldRequest::Mist {
+                skill_id,
+                level,
+                inflict,
+                ..
+            }) => Some((*skill_id, *level, inflict.duration, inflict.statuses.len())),
+            _ => None,
+        });
+        // Level 30: 60 s of smoke, 45 MP, and 600 s before the next.
+        assert_eq!(
+            mist,
+            Some((skills::SMOKESCREEN, 30, Duration::from_secs(60), 0))
+        );
+        assert_eq!(ctx.player.stats.mp, 55);
+        let again = UseSkillHandler
+            .handle(&mut cast(), &mut ctx)
+            .unwrap()
+            .actions;
+        assert!(!again
+            .iter()
+            .any(|action| matches!(action, WorldAction::Field(FieldRequest::Mist { .. }))));
     }
 
     #[test]

@@ -1144,7 +1144,7 @@ impl FieldActor {
         };
         let view = MistView {
             object_id: 0,
-            kind: MistKind::Poison,
+            kind: skills::mist_kind(skill_id),
             owner_id: user.avatar.id,
             skill_id,
             level: level as u8,
