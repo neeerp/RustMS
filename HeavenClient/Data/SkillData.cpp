@@ -85,6 +85,9 @@ namespace ms
 			added.mesocost = sub["moneyCon"];
 			added.itemcost = sub["itemCon"];
 			added.itemcount = sub["itemConNo"];
+			added.pad = sub["pad"];
+			added.acc = sub["acc"];
+			added.eva = sub["eva"];
 
 			if ((int32_t) sub["cooltime"] > 0)
 				cooltime = true;

@@ -31,6 +31,7 @@
 #include "../Data/WeaponData.h"
 #include "../Gameplay/Combat/Combo.h"
 #include "../Gameplay/Combat/Dash.h"
+#include "../Gameplay/Combat/EnergyCharge.h"
 #include "../Gameplay/Combat/FlashJump.h"
 #include "../Gameplay/Combat/Wings.h"
 #include "../Gameplay/Combat/MagicDamage.h"
@@ -258,6 +259,20 @@ namespace ms
 																 get_buff_value(Buffstat::Id::DASH_SPEED)));
 		stats.add_value(EquipStat::Id::JUMP, dash::jump_bonus(get_buff_value(Buffstat::Id::JUMP),
 															   get_buff_value(Buffstat::Id::DASH_JUMP)));
+
+		// A full gauge lends Energy Charge's attack, accuracy and avoid past the buffs', and its prop as the
+		// Stance chance when Power Stance is off (0x958bcc).
+		if (energy_full())
+		{
+			int32_t skill = energy::skill(stats.get_job().get_id());
+			const SkillData::Stats &own = SkillData::get(skill).get_stats(skillbook.get_level(skill));
+			stats.add_value(EquipStat::Id::WATK, energy::bonus(get_buff_value(Buffstat::Id::WATK), own.pad));
+			stats.add_value(EquipStat::Id::ACC, energy::bonus(get_buff_value(Buffstat::Id::ACC), own.acc));
+			stats.add_value(EquipStat::Id::AVOID, energy::bonus(get_buff_value(Buffstat::Id::AVOID), own.eva));
+
+			if (!has_buff(Buffstat::Id::STANCE))
+				stats.set_stance(own.chance);
+		}
 
 		// The weapon's mastery adds its accuracy and an expert's attack for
 		// the reach the job counts (SetFrom, FUN_0077f4c9), and the window
@@ -828,6 +843,9 @@ namespace ms
 		if (combo::enrage_refused(move.get_id(), get_buff_value(Buffstat::Id::COMBO)))
 			return SpecialMove::ForbidReason::FBR_OTHER;
 
+		if (energy::needs_full(move.get_id()) && !energy_full())
+			return SpecialMove::ForbidReason::FBR_ENERGY;
+
 		if (has_cooldown(move.get_id()))
 			return SpecialMove::ForbidReason::FBR_COOLDOWN;
 
@@ -1274,6 +1292,20 @@ namespace ms
 	int16_t Player::get_buff_value(Buffstat::Id stat) const
 	{
 		return buffs[stat].value;
+	}
+
+	void Player::set_energy(int32_t value)
+	{
+		bool was_full = energy_full();
+		energy = value;
+
+		if (energy_full() != was_full)
+			recalc_stats();
+	}
+
+	bool Player::energy_full() const
+	{
+		return energy >= energy::FULL && skillbook.get_level(energy::skill(stats.get_job().get_id())) > 0;
 	}
 
 	void Player::change_skill(int32_t skill_id, int32_t skill_level, int32_t masterlevel, int64_t expiration)

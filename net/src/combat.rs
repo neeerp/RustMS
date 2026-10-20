@@ -1,6 +1,7 @@
 //! Player attacks: parsing, damage limits, and the attack broadcast.
 
 use crate::combo;
+use crate::energy;
 use crate::meso_explosion::{self, Blast, Explosion, MESO_EXPLOSION};
 use crate::skills::{self, Learned};
 use crate::{error::NetworkError, packet::op::SendOpcode};
@@ -228,9 +229,10 @@ fn weapon_stats(weapon: i32, job: i32, skill: i32, (str, dex, luk): (i32, i32, i
     }
 }
 
-/// What a running buff adds to a stat, or 0.
+/// What a running buff adds to a stat, or 0, and to attack and accuracy
+/// what a full Energy Charge does.
 fn buff(player: &Player, stat: BuffStat) -> i32 {
-    player.buffs.value(stat).map_or(0, i32::from)
+    energy::raise(player, stat, player.buffs.value(stat).map_or(0, i32::from))
 }
 
 /// What Echo of Hero adds to a whole attack or magic: its percent, rounded
@@ -459,6 +461,8 @@ pub enum AttackRejection {
     Diseased,
     /// A finisher without an orb to spend.
     NoOrbs,
+    /// An Energy skill without a full gauge.
+    NotCharged,
 }
 
 /// Whether this is Assassinate's second strike.
@@ -520,6 +524,9 @@ pub fn validate(attack: &Attack, player: &Player) -> Result<Uses, AttackRejectio
     // v83 won't use a finisher without an orb (0x969623).
     if combo::finisher(attack.skill) && combo::orbs(player).unwrap_or(0) < 1 {
         return Err(AttackRejection::NoOrbs);
+    }
+    if energy::refused(player, attack.skill) {
+        return Err(AttackRejection::NotCharged);
     }
     // A hit is the base times the skill's percent and the orbs'
     // (FUN_007653fa), plus a critical's share of the base; twice that allows

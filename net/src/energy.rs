@@ -45,6 +45,39 @@ pub fn after_attack(player: &Player, attack: &Attack) -> Option<i16> {
     Some((energy + gained).min(i32::from(ENERGY_FULL)) as i16)
 }
 
+/// Energy Blast, Energy Drain and Energy Orb, and the Thunder Breaker's
+/// two: v83 casts them only on a full gauge, telling the player "This
+/// skill is available only when your energy is fully charged." otherwise
+/// (FUN_00969465, FUN_009696a2).
+const NEED_FULL: [i32; 5] = [5111002, 5111004, 5121002, 15101005, 15111001];
+
+/// Whether `skill_id` needs a full gauge the player hasn't got.
+pub fn refused(player: &Player, skill_id: i32) -> bool {
+    NEED_FULL.contains(&skill_id) && !full(player)
+}
+
+/// Whether the player's gauge is full and they still have Energy Charge.
+pub fn full(player: &Player) -> bool {
+    player.buffs.value(BuffStat::EnergyCharge).unwrap_or(0) >= ENERGY_FULL
+        && skill(player).is_some()
+}
+
+/// What buffs add to attack, accuracy or avoidability (`buffed`), raised
+/// to Energy Charge's own `pad`, `acc` or `eva` while the gauge is full:
+/// the larger of the two, not their sum (0x77dd8c, 0x77de1c, 0x77deb2).
+pub fn raise(player: &Player, stat: BuffStat, buffed: i32) -> i32 {
+    let Some(skill) = skill(player).filter(|_| full(player)) else {
+        return buffed;
+    };
+    let own = match stat {
+        BuffStat::Pad => skill.effect.pad,
+        BuffStat::Acc => skill.effect.acc,
+        BuffStat::Eva => skill.effect.eva,
+        _ => return buffed,
+    };
+    buffed.max(own)
+}
+
 /// Fill the gauge to `energy`. A full one empties after the skill's `time`.
 pub fn charge(player: &mut Player, energy: i16, now: Instant) {
     let Some(skill) = skill(player) else {
@@ -128,6 +161,29 @@ mod tests {
         );
         charge(&mut player, 10000, now);
         assert_eq!(after_attack(&player, &attack(AttackKind::Close, 1)), None);
+    }
+
+    #[test]
+    fn a_full_gauge_raises_attack_accuracy_and_avoid_and_frees_the_energy_skills() {
+        if skills::info(ENERGY_CHARGE).is_none() {
+            return;
+        }
+        // Energy Charge 40 has 20 attack, accuracy and avoidability.
+        let mut player = brawler(40);
+        let now = Instant::now();
+        charge(&mut player, 9999, now);
+        assert!(!full(&player));
+        assert_eq!(raise(&player, BuffStat::Pad, 12), 12);
+        assert!(refused(&player, 5111002) && !refused(&player, 5001001));
+
+        charge(&mut player, 10000, now);
+        assert!(full(&player));
+        assert_eq!(raise(&player, BuffStat::Pad, 12), 20);
+        assert_eq!(raise(&player, BuffStat::Pad, 25), 25);
+        assert_eq!(raise(&player, BuffStat::Acc, 0), 20);
+        assert_eq!(raise(&player, BuffStat::Eva, 0), 20);
+        assert_eq!(raise(&player, BuffStat::Mad, 3), 3);
+        assert!(!refused(&player, 5111002) && !refused(&player, 5121002));
     }
 
     #[test]
