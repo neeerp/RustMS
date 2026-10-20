@@ -69,7 +69,8 @@ impl WorldHandler for ItemMoveHandler {
 
 /// Take `quantity` of the item in bag slot `from` to throw on the ground.
 /// Returns the changes, what to throw, and whether it vanishes instead of
-/// landing (quest and untradeable items, and equipment made untradeable).
+/// landing (quest and untradeable items, and equipment made untradeable,
+/// unless Scissors of Karma were used on them).
 fn drop_item(
     player: &mut Player,
     kind: i8,
@@ -112,9 +113,14 @@ fn drop_item(
         .inventory_mut()
         .take(kind, from, quantity)
         .map_err(|_| "bad quantity")?;
-    let vanish = items::info(item.item_id).is_some_and(|info| info.quest || info.trade_block)
-        || item.equip.is_some() && item.flags & FLAG_UNTRADEABLE != 0;
-    Ok((changes, Loot::Dropped(Item { quantity, ..item }), vanish))
+    let vanish = !item.has_karma()
+        && (items::info(item.item_id).is_some_and(|info| info.quest || info.trade_block)
+            || item.equip.is_some() && item.flags & FLAG_UNTRADEABLE != 0);
+    // A Karma item lands, its Karma used up: "Once dropped, the item cannot
+    // be traded." (0x1232)
+    let mut thrown = Item { quantity, ..item };
+    thrown.use_karma();
+    Ok((changes, Loot::Dropped(thrown), vanish))
 }
 
 /// Apply a move; returns the changes and whether the worn equipment changed.
@@ -217,6 +223,7 @@ fn pet_can_wear(player: &Player, equip: &EquipInfo, slot: i16) -> bool {
 mod tests {
     use super::*;
     use crate::packet::op::{RecvOpcode, SendOpcode};
+    use game::inventory::FLAG_BUNDLE_KARMA;
     use game::{inventory::equip_slot, EquipStats, Item};
     use packet::io::write::PktWrite;
 
@@ -343,6 +350,18 @@ mod tests {
         assert_eq!(
             thrown(&actions),
             Some((&Loot::Dropped(Item::stack(2010007, 1)), true))
+        );
+
+        // With Karma it lands, and the Karma is gone.
+        let karma = Item {
+            flags: FLAG_BUNDLE_KARMA,
+            ..Item::stack(2010007, 1)
+        };
+        player.inventory.insert(InventoryType::Use, 1, karma);
+        let actions = handle(&mut player, drop_request(2, 1, 0, 1));
+        assert_eq!(
+            thrown(&actions),
+            Some((&Loot::Dropped(Item::stack(2010007, 1)), false))
         );
     }
 

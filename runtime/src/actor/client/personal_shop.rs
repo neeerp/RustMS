@@ -261,7 +261,9 @@ impl ClientActor {
         let sent = self.to_shop(ShopRoomRequest::Purchase(sale)).await;
         let answer = tokio::time::timeout(SALE_TIMEOUT, sold).await;
         let result = match answer {
-            Ok(Ok(Ok(item))) => {
+            Ok(Ok(Ok(mut item))) => {
+                // Buying uses up the item's Karma (FUN_006fd261).
+                item.use_karma();
                 let changes = self.receive(rules::goods(vec![item])).await?;
                 let meso = self.in_game()?.player.meso;
                 self.send(&mut inventory::build_inventory_operation(false, &changes)?)

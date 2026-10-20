@@ -27,6 +27,11 @@ pub struct ItemInfo {
     /// Items nobody may pick up (`info/pickUpBlock`): the invisible ones
     /// party quests drop.
     pub pickup_block: bool,
+    /// Items that move only between an account's characters, through
+    /// storage (`info/accountSharable`).
+    pub account_sharable: bool,
+    /// Party quest items (`info/pquest`).
+    pub pquest: bool,
     pub price: i32,
     /// What one throwing star or bullet costs to recharge (`unitPrice`).
     pub unit_price: f64,
@@ -285,6 +290,8 @@ impl ItemData {
             info.only = nx.int_child(meta, "only")? == Some(1);
             info.trade_block = nx.int_child(meta, "tradeBlock")? == Some(1);
             info.pickup_block = nx.int_child(meta, "pickUpBlock")? == Some(1);
+            info.account_sharable = nx.int_child(meta, "accountSharable")? == Some(1);
+            info.pquest = nx.int_child(meta, "pquest")? == Some(1);
             info.price = nx.int_child(meta, "price")?.unwrap_or(0);
             info.unit_price = nx.real_child(meta, "unitPrice")?.unwrap_or(0.0);
             info.pad = nx.int_child(meta, "incPAD")?.unwrap_or(0);
@@ -443,6 +450,8 @@ impl ItemData {
             trade_block: nx.int_child(meta, "tradeBlock")? == Some(1),
             equip_trade_block: nx.int_child(meta, "equipTradeBlock")? == Some(1),
             pickup_block: nx.int_child(meta, "pickUpBlock")? == Some(1),
+            account_sharable: nx.int_child(meta, "accountSharable")? == Some(1),
+            pquest: nx.int_child(meta, "pquest")? == Some(1),
             price: nx.int_child(meta, "price")?.unwrap_or(0),
             unit_price: 0.0,
             pad: 0,
@@ -586,6 +595,8 @@ mod tests {
         // Stored as an integer in one and as a string in the other.
         assert!(data.info(2000012).unwrap().unwrap().trade_block);
         assert!(data.info(4031044).unwrap().unwrap().trade_block);
+        assert!(data.info(4001007).unwrap().unwrap().pquest);
+        assert!(!shell.pquest);
         assert!(data.info(4999999).unwrap().is_none());
         let subi = data.info(2070000).unwrap().unwrap();
         assert_eq!(
@@ -770,6 +781,8 @@ mod tests {
         assert_eq!(robe.recovery, Some(1.5));
         let earrings = data.info(1032031).unwrap().unwrap();
         assert!(earrings.equip_trade_block && !earrings.trade_block);
+        assert!(data.info(1112405).unwrap().unwrap().account_sharable);
+        assert!(!earrings.account_sharable);
     }
 
     #[test]

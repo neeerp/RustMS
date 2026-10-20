@@ -11,6 +11,7 @@ use crate::packet::build::world::{
 };
 use crate::shop::is_rechargeable;
 use crate::{items, npc_data};
+use game::inventory::FLAG_UNTRADEABLE;
 use game::{InventoryType, Player, Storage};
 use game_data::StorageFees;
 use packet::Packet;
@@ -67,13 +68,16 @@ pub fn fees(npc_id: i32) -> Option<StorageFees> {
 }
 
 /// Whether the item may go into storage. The client lists neither cash
-/// items nor quest or trade-blocked ones.
+/// items nor quest or untradeable ones, unless Scissors of Karma were used
+/// on them (FUN_007c6e3a).
 pub fn storable(item: &game::Item) -> bool {
     if item.is_cash() {
         return false;
     }
+    let bound = item.equip.is_some() && item.flags & FLAG_UNTRADEABLE != 0;
     items::info(item.item_id).is_some_and(|info| {
-        !info.quest && !info.trade_block && !info.equip.is_some_and(|equip| equip.cash)
+        !info.equip.is_some_and(|equip| equip.cash)
+            && (item.has_karma() || !info.quest && !info.trade_block && !bound)
     })
 }
 
@@ -106,9 +110,12 @@ impl OpenStorage {
         else {
             return Outcome::refused(result::ERROR);
         };
-        let Some(item) = self.storage.get(kind, usize::from(index)).cloned() else {
+        let Some(mut item) = self.storage.get(kind, usize::from(index)).cloned() else {
             return Outcome::refused(result::ERROR);
         };
+        // The client warns that taking an item out uses up its Karma
+        // (FUN_007c83af).
+        item.use_karma();
         if player.meso < self.fees.get {
             return Outcome::refused(result::TAKE_OUT_NO_MESOS);
         }
@@ -404,6 +411,48 @@ mod tests {
             .unwrap();
         assert_eq!(mode(&full), result::INVENTORY_FULL);
         assert_eq!(open.storage.all().len(), 1);
+    }
+
+    #[test]
+    fn karma_lets_untradeable_items_in_and_is_used_up_coming_out() {
+        if items::data().is_err() {
+            return;
+        }
+        // Tigun Transformation Bundle, a quest item that can't be traded.
+        const TIGUN: i32 = 2210005;
+        let karma = Item {
+            flags: game::inventory::FLAG_BUNDLE_KARMA,
+            ..Item::stack(TIGUN, 3)
+        };
+        assert!(!storable(&Item::stack(TIGUN, 3)) && storable(&karma));
+        let bound = Item {
+            flags: FLAG_UNTRADEABLE,
+            ..items::create(SWORD, 1).unwrap()
+        };
+        assert!(!storable(&bound));
+
+        let mut player = player(100);
+        player.inventory.insert(InventoryType::Use, 1, karma);
+        let mut open = open(Vec::new());
+        let stored = open
+            .respond(
+                &mut player,
+                StorageRequest::Store {
+                    slot: 1,
+                    item_id: TIGUN,
+                    quantity: 3,
+                },
+            )
+            .unwrap();
+        assert_eq!(mode(&stored), result::STORED);
+        assert!(open.storage.get(InventoryType::Use, 0).unwrap().has_karma());
+        let taken = open
+            .respond(&mut player, StorageRequest::TakeOut { tab: 2, index: 0 })
+            .unwrap();
+        assert_eq!(mode(&taken), result::TAKEN_OUT);
+        let (_, carried) = player.inventory.items(InventoryType::Use).next().unwrap();
+        assert_eq!(carried.flags, 0);
+        assert!(!storable(carried));
     }
 
     #[test]
