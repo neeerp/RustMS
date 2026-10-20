@@ -249,6 +249,10 @@ namespace ms
 		// steered by walkdir and flydir as a flier is, but still lands on
 		// platforms. It walks and jumps more slowly too.
 		bool swim = false;
+		// The shoe's swimSpeedH and swimSpeedV: its top speed in the water and
+		// its kick, as shares of the map's.
+		double swimspeed = 1.0;
+		double swimkick = 1.0;
 
 		// A JUMPER's home group, whether it jumps or carries on at the end of
 		// its foothold, and whether it walks down a step there rather than

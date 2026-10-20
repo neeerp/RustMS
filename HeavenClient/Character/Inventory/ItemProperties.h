@@ -10,6 +10,9 @@ namespace ms::item_properties
 	// An equip's flags for being untradeable, and for trading once more after Scissors of Karma.
 	constexpr int16_t EQUIP_UNTRADEABLE = 0x08;
 	constexpr int16_t EQUIP_KARMA = 0x10;
+	// An equip's flags for spikes and cold protection (GW_ItemSlotEquip vtable+8 and +0xc).
+	constexpr int16_t EQUIP_SPIKES = 0x02;
+	constexpr int16_t EQUIP_COLD = 0x04;
 	// Any other item's flag for trading once more.
 	constexpr int16_t BUNDLE_KARMA = 0x02;
 

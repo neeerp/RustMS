@@ -21,6 +21,7 @@
 #include "PlayerStates.h"
 #include "SecondaryStat.h"
 #include "SkillId.h"
+#include "Inventory/ItemProperties.h"
 
 #include "../Audio/Audio.h"
 #include "../Data/BulletData.h"
@@ -345,9 +346,28 @@ namespace ms
 
 			phobj.walkspeed = get_walkspeed();
 
-			// A mount grips the ground by its fs (FUN_0094d3d9).
-			phobj.walkforce = ride_ability ? ride_ability->fs : 1.0;
-			phobj.walkdrag = phobj.walkforce;
+			// A mount or the shoes grip the ground by their fs, spiked shoes
+			// at 10, and swim at their swim percent of the speed, kicking at
+			// the speed (FUN_0094d3d9).
+			double grip = 1.0;
+			int32_t swim = 100;
+
+			if (ride_ability)
+			{
+				grip = ride_ability->fs;
+				swim = ride_ability->swim;
+			}
+			else if (auto shoes = inventory.get_equip(InventoryType::Id::EQUIPPED, EquipSlot::Id::SHOES))
+			{
+				const EquipData &data = EquipData::get(shoes->get_item_id());
+				grip = shoes->get_flags() & item_properties::EQUIP_SPIKES ? 10.0 : data.get_grip();
+				swim = data.get_swim();
+			}
+
+			phobj.walkforce = grip;
+			phobj.walkdrag = grip;
+			phobj.swimspeed = phobj.walkspeed * swim / 100.0;
+			phobj.swimkick = phobj.walkspeed;
 			pst->update(*this);
 
 			// v83 marks every knockback in the path as element 2 when it

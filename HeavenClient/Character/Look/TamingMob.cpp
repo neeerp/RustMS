@@ -69,7 +69,8 @@ namespace ms
 		return Ability{
 			mount::speed(info["speed"], bonus["incSpeed"]),
 			mount::jump(info["jump"], bonus["incJump"]),
-			info["fs"].get_real(1.0)
+			info["fs"].get_real(1.0),
+			static_cast<int32_t>(info["swim"].get_integer(100))
 		};
 	}
 

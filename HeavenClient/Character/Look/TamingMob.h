@@ -24,6 +24,8 @@ namespace ms
 			int32_t jump;
 			// The mount's grip on the ground, for the walk's force and drag.
 			double fs;
+			// How fast it swims, as a percent of its speed.
+			int32_t swim;
 		};
 
 		// The mount `id`, or with a `mount`, the saddle `id` on that mount. Each is loaded once.

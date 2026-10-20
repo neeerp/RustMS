@@ -73,6 +73,13 @@ namespace ms
 		// (info/medalTag, 0 when absent).
 		int32_t get_medaltag() const;
 
+		// A shoe's grip on the ground, for the walk's force and drag
+		// (info/fs, 1 when absent, FUN_005cc277).
+		double get_grip() const;
+
+		// How fast a shoe swims, as a percent (info/swim, 100 when absent).
+		int32_t get_swim() const;
+
 	private:
 		// Allow the cache to use the constructor
 		friend Cache<EquipData>;
@@ -91,6 +98,8 @@ namespace ms
 		bool tradeblock;
 		double recovery;
 		int32_t medaltag;
+		double grip;
+		int32_t swim;
 		std::array<int16_t, 8> elemboost;
 	};
 }
